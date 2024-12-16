@@ -1,0 +1,78 @@
+prefix: subject
+
+Changes:
+
+
+Reason:
+
+
+BREAKING CHANGE: N/A
+Related: N/A
+Refs: N/A
+
+# ==== Prefix: Conventional Commitsに基づくコミットメッセージの先頭に付与する識別子 ====
+# 各Prefixは変更内容の種類を明確にするために使用します。
+# feat: 新しい機能の追加や大きな改善
+# add: 新しいファイルや画像の追加・作成
+# fix: バグや問題の修正
+# tweak: 軽微な修正やリファクタリング（挙動には影響しない）
+# docs: ドキュメントの追加・更新
+# remove: 不要なファイルやコードの削除
+# move: ファイルやディレクトリの移動
+# test: テストの追加・更新・合格
+# front: フロントエンドの追加・更新
+# ci: CI関連の設定ファイルの追加・更新
+# initial: 初回コミット
+# chore: プロジェクトの設定ファイルや依存関係の更新（コード自体には影響しない変更）
+# revert: 以前のコミットへの戻し
+
+# ==== フォーマットの説明 ====
+# コミットメッセージは以下の形式で記述します。
+# <prefix>: <簡潔な概要>
+#
+# Changes:
+# このコミットで加えた変更内容を詳細に記述します。
+#
+# Reason:
+# この変更を行った理由を記述します。背景や意図を説明することで、履歴の理解を容易にします。
+#
+# BREAKING CHANGE:
+# 破壊的変更（後方互換性がない変更）がある場合はその内容を記載します。
+# N/A（該当なし）の場合はその旨を明記します。
+#
+# Related:
+# 変更内容に関連するリソース（例: ドキュメントや議論など）があればURLを記載します。N/Aの場合も記載。
+#
+# Refs:
+# 関連するIssueやPull Requestの番号を記載します（例: #123）。該当がない場合はN/Aを記載します。
+
+# ==== Example1 ====
+# tweak: 重複していた関数を統一
+#
+# Changes:
+# 重複していた`calculateTotal`関数を`utils.py`に統一
+#
+# Reason:
+# コードの可読性を向上させるため
+#
+# BREAKING CHANGE: N/A
+# Related: N/A
+# Refs: #13
+
+# ==== Example2 ====
+# feat: CustomUserModelに移行
+#
+# Changes:
+# Django標準のUserモデルからCustomUserモデルに移行
+#
+# Reason:
+# メールアドレスでのログインを実装するため。
+#
+# BREAKING CHANGE: settings.pyのAUTH_USER_MODELを変更。
+# Related: https://qiita.com/kkk777/items/ae8eb88d504420e9f5cd
+# Refs: #14
+
+# === その他 ===
+# このフォーマットはConventional Commitsに準拠しています。
+# 詳細については以下を参照してください:
+# https://www.conventionalcommits.org/ja/v1.0.0/
