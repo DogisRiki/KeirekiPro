@@ -1,0 +1,205 @@
+@startuml 要求モデル
+
+title 要求モデル
+
+left to right direction
+hide stereotype
+
+skinparam rectangleBackgroundColor<<youbou>> YellowGreen
+skinparam rectangleBackgroundColor<<youbou>> YellowGreen
+skinparam rectangleBackgroundColor<<youkyuu>> LightBlue
+skinparam rectangleBackgroundColor<<youken>> Orange
+
+actor "転職活動中のエンジニア" as user
+
+'---------------------------------------------
+' 要望
+'---------------------------------------------
+rectangle "要望" {
+    rectangle  "普段使ってるGoogleアカウントとかGitHubアカウントでログインできると、パスワード管理しなくて済むから楽。" as want_oauth <<youbou>>
+    rectangle "メールとパスワードでログインできるようにしたい。" as want_emailpw <<youbou>>
+    rectangle "パスワード忘れたらすぐにリセットできるようにしたい。" as want_pwreset <<youbou>>
+    rectangle "セキュリティしっかりしてほしい、二段階認証とかあると安心。" as want_2fa <<youbou>>
+
+    rectangle "職務経歴書を何パターンか作って管理したい。複数持てるようにしたい。" as want_multi_cv <<youbou>>
+    rectangle "職務経歴書は新規で作ったり、保存したり、編集したり、削除したり全部できると助かる。" as want_crud_cv <<youbou>>
+    rectangle "職務経歴書ごとに名前つけられたらわかりやすい。" as want_name_cv <<youbou>>
+    rectangle "色々なテンプレートがあると助かる。技術スタック重視とか成果重視とか、簡易型とか。" as want_template_cv <<youbou>>
+    rectangle "職務経歴書の項目は任意入力できるようにしたい。" as want_form_cv <<youbou>>
+    rectangle "自動保存してくれたらうっかり消してしまうことが減るからありがたい。100件くらい履歴保存とかできたら便利。" as want_autosave_cv <<youbou>>
+    rectangle "自動保存は使わない人もいるだろうから、有効/無効切り替えられるといい。" as want_autosave_toggle <<youbou>>
+    rectangle "基本情報を自動で挿入してくれるといちいち書かなくて済む。" as want_basicinfo_cv <<youbou>>
+    rectangle "職務経歴書はPDFで出力したい。" as want_pdf <<youbou>>
+    rectangle "Markdownでも出力できると他で加工できるから助かる。" as want_md <<youbou>>
+
+    rectangle "パスワードを後で変更できるようにしたい。" as want_pwchange <<youbou>>
+    rectangle "EmailはアカウントのIDにしたいから変更不可にしたい。" as want_noemailchange <<youbou>>
+    rectangle "二段階認証は使わない人もいるからオンオフできるように。" as want_2fa_toggle <<youbou>>
+    rectangle "基本情報は後から編集できるようにしたい。" as want_edit_basicinfo <<youbou>>
+    rectangle "プロフィール画像を設定できると嬉しい。" as want_profileimg <<youbou>>
+    rectangle "もう使わなくなったらアカウント削除できるようしたい。" as want_account_delete <<youbou>>
+}
+
+'---------------------------------------------
+' 要求
+'---------------------------------------------
+rectangle "要求" {
+
+    ' 認証要求
+    rectangle "Email+パスワードログイン機能" as dem_emailpw <<youkyuu>>
+    rectangle "OIDC（Google/GitHub）ログイン機能" as dem_oauth <<youkyuu>>
+    rectangle "パスワードリセット機能" as dem_pwreset <<youkyuu>>
+    rectangle "二段階認証機能（オン/オフ切替含む）" as dem_2fa <<youkyuu>>
+
+    ' 職務経歴書要求
+    rectangle "複数経歴書の保持・CRUD・名称付与" as dem_cv_manage <<youkyuu>>
+    rectangle "テンプレート選択機能" as dem_cv_template <<youkyuu>>
+    rectangle "任意項目編集機能" as dem_cv_form <<youkyuu>>
+    rectangle "自動保存（有効/無効切替、100件履歴）機能" as dem_cv_autosave <<youkyuu>>
+    rectangle "基本情報自動挿入・編集機能" as dem_cv_basicinfo <<youkyuu>>
+    rectangle "PDF/Markdown出力機能" as dem_cv_export <<youkyuu>>
+
+    ' アカウント要求
+    rectangle "パスワード変更機能" as dem_pwchange <<youkyuu>>
+    rectangle "Email不変更方針" as dem_noemailchange <<youkyuu>>
+    rectangle "基本情報編集機能" as dem_edit_basicinfo <<youkyuu>>
+    rectangle "プロフィール画像設定機能" as dem_profileimg <<youkyuu>>
+    rectangle "アカウント削除機能" as dem_account_delete <<youkyuu>>
+}
+
+'---------------------------------------------
+' 要件
+'---------------------------------------------
+rectangle "要件" {
+
+    rectangle "認証" {
+
+        rectangle "ログイン" {
+            rectangle "Email+パスワードによるログインができること。" as req3 <<youken>>
+            rectangle "OIDCによるログイン（Google、GitHub）ができること。" as req4 <<youken>>
+        }
+
+        rectangle "パスワードリセット" {
+            rectangle "Emailに再設定用リンク（時間制限付き）を送信することでパスワードリセットができること。" as req6 <<youken>>
+        }
+
+        rectangle "二段階認証" {
+            rectangle "Emailに確認コードを送信することで二段階認証ができること。" as req8 <<youken>>
+            rectangle "ユーザーごとに二段階認証の有効/無効の設定ができること。" as req9 <<youken>>
+        }
+    }
+
+    rectangle "職務経歴書" {
+
+        rectangle "管理" {
+            rectangle "複数の職務経歴書を保持可能であること。" as req13 <<youken>>
+            rectangle "職務経歴書の新規作成・保存・編集・削除ができること。" as req14 <<youken>>
+            rectangle "職務経歴書ごとに名称設定ができること。" as req15 <<youken>>
+        }
+
+        rectangle "作成・編集" {
+            rectangle "以下のテンプレートから選択が可能であること。\n・技術スタック重視\n・成果重視\n・簡易型" as req17 <<youken>>
+            rectangle "フォーム入力による項目編集（全項目任意入力）ができること。" as req21 <<youken>>
+            rectangle "入力内容の自動保存機能（最大100件の履歴保存・復元）が可能であること。" as req22 <<youken>>
+            rectangle "職務経歴書単位での自動保存有効/無効の設定ができること。" as req23 <<youken>>
+            rectangle "基本情報の自動挿入と編集（ユーザー設定から取得）ができること。" as req24 <<youken>>
+        }
+
+        rectangle "出力" {
+            rectangle "PDF形式での出力ができること。" as req26 <<youken>>
+            rectangle "Markdown形式での出力ができること。" as req27 <<youken>>
+        }
+    }
+
+    rectangle "アカウント" {
+
+        rectangle "アカウント情報設定" {
+            rectangle "パスワード変更ができること。" as req31 <<youken>>
+            rectangle "Emailは変更不可であること。" as req32 <<youken>>
+            rectangle "二段階認証有効/無効の設定ができること。" as req33 <<youken>>
+            rectangle "基本情報編集ができること。" as req34 <<youken>>
+            rectangle "プロフィール画像（1枚）設定ができること。" as req35 <<youken>>
+        }
+
+        rectangle "アカウント削除" {
+            rectangle "アカウント自体の削除ができること。" as req37 <<youken>>
+        }
+    }
+}
+
+'---------------------------------------------
+' 関連線
+'---------------------------------------------
+user -- want_oauth
+user -- want_emailpw
+user -- want_pwreset
+user -- want_2fa
+user -- want_multi_cv
+user -- want_crud_cv
+user -- want_name_cv
+user -- want_template_cv
+user -- want_form_cv
+user -- want_autosave_cv
+user -- want_autosave_toggle
+user -- want_basicinfo_cv
+user -- want_pdf
+user -- want_md
+user -- want_pwchange
+user -- want_noemailchange
+user -- want_2fa_toggle
+user -- want_edit_basicinfo
+user -- want_profileimg
+user -- want_account_delete
+
+' 要望 → 要求
+want_oauth -- dem_oauth
+want_emailpw -- dem_emailpw
+want_pwreset -- dem_pwreset
+want_2fa -- dem_2fa
+want_2fa_toggle -- dem_2fa
+
+want_multi_cv -- dem_cv_manage
+want_crud_cv -- dem_cv_manage
+want_name_cv -- dem_cv_manage
+want_template_cv -- dem_cv_template
+want_form_cv -- dem_cv_form
+want_autosave_cv -- dem_cv_autosave
+want_autosave_toggle -- dem_cv_autosave
+want_basicinfo_cv -- dem_cv_basicinfo
+want_pdf -- dem_cv_export
+want_md -- dem_cv_export
+
+want_pwchange -- dem_pwchange
+want_noemailchange -- dem_noemailchange
+want_edit_basicinfo -- dem_edit_basicinfo
+want_profileimg -- dem_profileimg
+want_account_delete -- dem_account_delete
+
+' 要求 → 要件
+dem_emailpw -- req3
+dem_oauth -- req4
+dem_pwreset -- req6
+dem_2fa -- req8
+dem_2fa -- req9
+dem_2fa -- req33
+
+dem_cv_manage -- req13
+dem_cv_manage -- req14
+dem_cv_manage -- req15
+
+dem_cv_template -- req17
+
+dem_cv_form -- req21
+dem_cv_autosave -- req22
+dem_cv_autosave -- req23
+dem_cv_basicinfo -- req24
+dem_cv_export -- req26
+dem_cv_export -- req27
+
+dem_pwchange -- req31
+dem_noemailchange -- req32
+dem_edit_basicinfo -- req34
+dem_profileimg -- req35
+dem_account_delete -- req37
+
+@enduml
