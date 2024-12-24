@@ -23,7 +23,7 @@ rectangle "要望" {
     rectangle "職務経歴書を何パターンか作って管理したい。複数持てるようにしたい。" as want_multi_cv <<youbou>>
     rectangle "職務経歴書は新規で作ったり、保存したり、編集したり、削除したり全部できると助かる。" as want_crud_cv <<youbou>>
     rectangle "職務経歴書ごとに名前つけられたらわかりやすい。" as want_name_cv <<youbou>>
-    rectangle "色々なテンプレートがあると助かる。技術スタック重視とか成果重視とか、簡易型とか。" as want_template_cv <<youbou>>
+    ' rectangle "色々なテンプレートがあると助かる。技術スタック重視とか成果重視とか、簡易型とか。" as want_template_cv <<youbou>>
     rectangle "職務経歴書の項目は任意入力できるようにしたい。" as want_form_cv <<youbou>>
     rectangle "自動保存してくれたらうっかり消してしまうことが減るからありがたい。100件くらい履歴保存とかできたら便利。" as want_autosave_cv <<youbou>>
     rectangle "自動保存は使わない人もいるだろうから、有効/無効切り替えられるといい。" as want_autosave_toggle <<youbou>>
@@ -51,7 +51,7 @@ rectangle "要求" {
     rectangle "二段階認証機能（オン/オフ切替含む）" as dem_2fa <<youkyuu>>
 
     rectangle "複数経歴書の保持・CRUD・名称付与" as dem_cv_manage <<youkyuu>>
-    rectangle "テンプレート選択機能" as dem_cv_template <<youkyuu>>
+    ' rectangle "テンプレート選択機能" as dem_cv_template <<youkyuu>>
     rectangle "任意項目編集機能" as dem_cv_form <<youkyuu>>
     rectangle "自動保存（有効/無効切替、100件履歴）機能" as dem_cv_autosave <<youkyuu>>
     rectangle "基本情報自動挿入・編集機能" as dem_cv_basicinfo <<youkyuu>>
@@ -74,7 +74,7 @@ rectangle "要件" {
         rectangle "複数の職務経歴書を保持可能であること。" as req1 <<youken>>
         rectangle "職務経歴書の新規作成・保存・編集・削除ができること。" as req2 <<youken>>
         rectangle "職務経歴書ごとに名称設定ができること。" as req3 <<youken>>
-        rectangle "以下のテンプレートから選択が可能であること。\n・技術スタック重視\n・成果重視\n・簡易型" as req4 <<youken>>
+        ' rectangle "以下のテンプレートから選択が可能であること。\n・技術スタック重視\n・成果重視\n・簡易型" as req4 <<youken>>
         rectangle "フォーム入力による項目編集（全項目任意入力）ができること。" as req5 <<youken>>
         rectangle "入力内容の自動保存機能（最大100件の履歴保存・復元）が可能であること。" as req6 <<youken>>
         rectangle "職務経歴書単位での自動保存有効/無効の設定ができること。" as req7 <<youken>>
@@ -108,7 +108,7 @@ user -- want_2fa
 user -- want_multi_cv
 user -- want_crud_cv
 user -- want_name_cv
-user -- want_template_cv
+' user -- want_template_cv
 user -- want_form_cv
 user -- want_autosave_cv
 user -- want_autosave_toggle
@@ -133,7 +133,7 @@ want_2fa_toggle -- dem_2fa
 want_multi_cv -- dem_cv_manage
 want_crud_cv -- dem_cv_manage
 want_name_cv -- dem_cv_manage
-want_template_cv -- dem_cv_template
+' want_template_cv -- dem_cv_template
 want_form_cv -- dem_cv_form
 want_autosave_cv -- dem_cv_autosave
 want_autosave_toggle -- dem_cv_autosave
@@ -159,7 +159,7 @@ dem_cv_manage -- req1
 dem_cv_manage -- req2
 dem_cv_manage -- req3
 
-dem_cv_template -- req4
+' dem_cv_template -- req4
 
 dem_cv_form -- req5
 dem_cv_autosave -- req6
