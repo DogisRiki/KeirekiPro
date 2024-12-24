@@ -50,13 +50,7 @@ package "ユーザー情報" {
 
 package "職務経歴書" {
     rectangle create_resume as "職務経歴書を作成する" <<resume>>
-    rectangle auto_insert as "基本情報を自動挿入する" <<resume_child>>
-    ' rectangle choose_template as "テンプレートを選択する" <<resume_child>>
-    ' note right
-    '     ・技術スタック重視型
-    '     ・成果重視型
-    '     ・簡易型
-    ' end note
+    rectangle copy_create_resume as "職務経歴書をコピーして作成する" <<resume_child>>
     rectangle auto_save as "自動保存機能を有効化/無効化する" <<resume_child>>
     rectangle restore_history as "入力履歴を復元する" <<resume_child>>
     rectangle save_resume as "職務経歴書を保存する" <<resume_child>>
@@ -69,8 +63,7 @@ package "職務経歴書" {
         ・Markdown
     end note
 
-    create_resume ..> auto_insert : <<include>>
-    ' create_resume ..> choose_template : <<include>>
+    create_resume ..> copy_create_resume : <<extend>>
     create_resume ..> auto_save : <<include>>
     create_resume ..> save_resume : <<include>>
 
