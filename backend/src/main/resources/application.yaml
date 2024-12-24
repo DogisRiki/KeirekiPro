@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: keirekipro
+  web:
+    locale: ja_JP
+    locale-resolver: fixed
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+server:
+  servlet:
+    context-path: /api
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true

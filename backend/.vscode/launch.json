@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "SpringBoot Debug",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.example.keirekipro.KeirekiProApplication",
+            "env": {
+                "SPRING_PROFILES_ACTIVE": "dev"
+            }
+        }
+    ]
+}
