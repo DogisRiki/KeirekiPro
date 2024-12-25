@@ -1,0 +1,59 @@
+{
+    "name": "react",
+    "service": "frontend",
+    "workspaceFolder": "/home/node/app",
+    "dockerComposeFile": "../../../compose.yaml",
+    "remoteUser": "node",
+    "shutdownAction": "stopCompose",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "dsznajder.es7-react-js-snippets",
+                "vitest.explorer",
+                "oderwat.indent-rainbow",
+                "formulahendry.auto-close-tag",
+                "formulahendry.auto-rename-tag",
+                "mikestead.dotenv"
+            ],
+            "settings": {
+                "files.encoding": "utf8",
+                "files.eol": "\n",
+                "editor.detectIndentation": false,
+                "editor.renderWhitespace": "boundary",
+                "editor.insertSpaces": true,
+                "editor.formatOnSave": true,
+                "files.insertFinalNewline": true,
+                "files.trimFinalNewlines": true,
+                "files.trimTrailingWhitespace": true,
+                "editor.codeActionsOnSave": {
+                    "source.fixAll.eslint": "explicit"
+                },
+                "eslint.format.enable": false,
+                // "eslint.useFlatConfig": true,
+                "eslint.useESLintClass": true,
+                "editor.formatOnType": true,
+                "editor.formatOnPaste": true,
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+                "typescript.preferences.importModuleSpecifier": "non-relative",
+                "typescript.tsdk": "/home/node/app/node_modules/typescript/lib",
+                "typescript.tsserver.watchOptions": {
+                    "watchFile": "useFsEvents"
+                },
+                "files.watcherExclude": {
+                    "**/.git/objects/**": true,
+                    "**/.git/subtree-cache/**": true,
+                    "**/node_modules/*/**": true,
+                    "**/.hg/store/**": true
+                },
+                "emmet.triggerExpansionOnTab": true,
+                "emmet.includeLanguages": {
+                    "javascript": "javascriptreact",
+                    "typescript": "typescriptreact"
+                },
+                "window.title": "${activeEditorShort} / ${rootName}"
+            }
+        }
+    }
+}

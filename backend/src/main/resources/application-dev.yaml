@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://db:5432/keireki_pro
+    username: postgres
+    password: postgres
+    show-sql: true
+
+# ログ設定
+logging:
+  level:
+    com.example.demo.mapper: debug        # MyBatisのSQLログを出力
+    org.springframework.web: debug        # Spring Webのログを出力
+    org.flywaydb.core: debug              # Flywayのログを出力
+    org.springframework.security: debug   # Spring Securityのログを出力
+
+# Sprig Boot Actuator設定
+# /actuator/health: アプリケーションの健康状態を表示
+# /actuator/info: 任意のアプリケーション情報を表示
+# /actuator/metrics: 現在のアプリケーションのメトリクス情報を表示
+# /actuator/env: Environmentからのプロパティを表示
+# /actuator/beans: アプリケーション内のすべてのSpring Beanの完全なリストを表示
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+    env:
+      show-values: always
+
+# Swagger UI設定
+# /swagger-ui.html: Swagger UIを表示
+# /v3/api-docs: Swagger JSONを表示
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html

@@ -1,0 +1,74 @@
+services:
+  backend:
+    container_name: spring
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    ports:
+      - 8080:8080
+    tty: true
+    volumes:
+      - ./backend:/home/spring/app
+    networks:
+      - my-network
+
+  frontend:
+    container_name: react
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    ports:
+      - 5173:5173
+      - 6006:6006
+    environment:
+      CHOKIDAR_USEPOLLING: true
+    tty: true
+    volumes:
+      - type: bind
+        source: ./frontend
+        target: /home/node/app
+      - type: volume
+        source: node_modules
+        target: /home/node/app/node_modules
+    networks:
+      - my-network
+
+  db:
+    container_name: postgresql
+    build:
+      context: .
+      dockerfile: docker/db/Dockerfile
+    ports:
+      - 5432:5432
+    environment:
+      TZ: Asia/Tokyo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: keireki_pro
+    restart: always
+    command: -c 'config_file=/etc/postgresql/postgresql.conf'
+    volumes:
+      - type: volume
+        source: db-data
+        target: /var/lib/postgresql/data
+    configs:
+      - source: postgres_config
+        target: /etc/postgresql/postgresql.conf
+    networks:
+      - my-network
+
+volumes:
+  db-data:
+    name: named-db-data
+  node_modules:
+    name: named-node_modules
+  vendor:
+    name: named-vendor
+
+configs:
+  postgres_config:
+    file: ./docker/db/postgresql.conf
+
+networks:
+  my-network:
+    driver: bridge
