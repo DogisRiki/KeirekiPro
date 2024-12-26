@@ -1,0 +1,91 @@
+@startuml ユースケースモデル
+
+title ユースケースモデル
+
+left to right direction
+hide stereotype
+
+skinparam rectangleBackgroundColor<<auth>> YellowGreen
+skinparam rectangleBackgroundColor<<auth_child>> LightGreen
+skinparam rectangleBackgroundColor<<resume>> SkyBlue
+skinparam rectangleBackgroundColor<<resume_child>> LightBlue
+
+actor "転職活動中のエンジニア" as user
+
+package "ユーザー情報" {
+    rectangle login as "ログインする" <<auth>>
+    rectangle local_login as "Email+パスワードによるログイン" <<auth_child>>
+    rectangle oidc_login as "OIDC（Google/Github）によるログイン" <<auth_child>>
+    rectangle two_factor_login as "二段階認証" <<auth_child>>
+    note right
+        ・設定が有効化されているユーザーのみ
+        ・メールアドレス宛に確認コードを送信
+    end note
+
+    rectangle reset_password as "パスワードをリセットする" <<auth>>
+    note right
+        ・Email+パスワードによって登録されているユーザーのみ
+        ・メールアドレス宛にリセットリンクを送信
+    end note
+
+    rectangle register_account as "アカウントを登録する" <<auth>>
+
+    rectangle delete_account as "アカウントを削除する" <<auth>>
+
+    rectangle edit_user as "ユーザー情報を管理する" <<auth>>
+    rectangle edit_password as "パスワードを変更する" <<auth_child>>
+    rectangle edit_two_facotr as "二段階認証の有効化/無効化を設定する" <<auth_child>>
+    rectangle edit_basic_info as "基本情報を編集する" <<auth_child>>
+    rectangle edit_profile_image as "プロフィール画像を設定する" <<auth_child>>
+
+    login ..> local_login : <<include>>
+    login ..> oidc_login : <<include>>
+    login ..> two_factor_login : <<extend>>
+
+    edit_user ..> edit_password : <<include>>
+    edit_user ..> edit_two_facotr : <<include>>
+    edit_user ..> edit_basic_info : <<include>>
+    edit_user ..> edit_profile_image : <<include>>
+}
+
+package "職務経歴書" {
+    rectangle create_resume as "職務経歴書を作成する" <<resume>>
+    rectangle copy_create_resume as "職務経歴書をコピーして作成する" <<resume_child>>
+    rectangle auto_save as "自動保存機能を有効化/無効化する" <<resume_child>>
+    rectangle restore_history as "入力履歴を復元する" <<resume_child>>
+    rectangle save_resume as "職務経歴書を保存する" <<resume_child>>
+    rectangle auto_save_resume as "職務経歴書を自動保存する" <<resume_child>>
+    rectangle edit_resume as "職務経歴書を編集する" <<resume>>
+    rectangle delete_resume as "職務経歴書を削除する" <<resume>>
+    rectangle export_resume as "職務経歴書をファイル出力する" <<resume>>
+    note right
+        ・PDF
+        ・Markdown
+    end note
+
+    create_resume ..> copy_create_resume : <<extend>>
+    create_resume ..> auto_save : <<include>>
+    create_resume ..> save_resume : <<include>>
+
+    auto_save ..> restore_history : <<include>>
+
+    save_resume ..> auto_save_resume : <<extend>>
+
+    edit_resume ..> auto_save : <<include>>
+    edit_resume ..> save_resume : <<include>>
+
+    auto_save ..> restore_history : <<include>>
+}
+
+user --> login
+user --> reset_password
+user --> register_account
+user --> delete_account
+user --> edit_user
+
+user --> create_resume
+user --> edit_resume
+user --> export_resume
+user --> delete_resume
+
+@enduml
