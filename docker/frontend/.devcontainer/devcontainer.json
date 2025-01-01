@@ -37,7 +37,6 @@
                 "editor.formatOnPaste": true,
                 "editor.defaultFormatter": "esbenp.prettier-vscode",
                 "typescript.preferences.importModuleSpecifier": "non-relative",
-                "typescript.tsdk": "/home/node/app/node_modules/typescript/lib",
                 "typescript.tsserver.watchOptions": {
                     "watchFile": "useFsEvents"
                 },
