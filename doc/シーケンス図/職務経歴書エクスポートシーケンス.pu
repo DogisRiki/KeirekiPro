@@ -1,0 +1,51 @@
+@startuml 職務経歴書エクスポートシーケンス
+
+title 職務経歴書エクスポートシーケンス
+
+actor ユーザー
+participant React
+participant SpringBoot
+participant PostgreSQL
+participant Thymeleaf
+participant PDFBox
+participant S3
+participant Redis
+
+ユーザー -> React: エクスポートボタンを押下
+React -> SpringBoot: 職務経歴書エクスポートリクエスト (職務経歴書ID)
+SpringBoot -> SpringBoot: JWTトークンからユーザーIDを取得
+SpringBoot -> PostgreSQL: 職務経歴書データを取得 (職務経歴書ID, ユーザーID)
+PostgreSQL --> SpringBoot: 職務経歴書データ
+SpringBoot -> Thymeleaf: データをテンプレートに埋め込む
+
+alt PDFファイルエクスポートの場合
+    Thymeleaf --> SpringBoot: HTMLデータ
+    SpringBoot -> PDFBox: HTMLをPDFに変換
+    PDFBox --> SpringBoot: PDFファイル
+    SpringBoot -> S3: PDFファイルをアップロード
+else Markdownファイルエクスポートの場合
+    Thymeleaf --> SpringBoot: Markdownデータ
+    SpringBoot -> S3: Markdownファイルをアップロード
+end
+
+S3 --> SpringBoot: 署名付きURL
+SpringBoot -> Redis: 署名付きURLとユーザーIDを紐づけて保存
+alt エクスポート成功
+    SpringBoot -> React: ダウンロードトリガーレスポンス
+    React -> SpringBoot: 職務経歴書ダウンロードリクエスト
+    SpringBoot -> SpringBoot: JWTトークンからユーザーIDを取得
+    SpringBoot -> Redis: 署名付きURLとユーザーIDの照合
+    Redis --> SpringBoot: 照合結果
+    alt 照合成功
+        SpringBoot -> React: 署名付きURLをレスポンス
+        React -> S3: 署名付きURLを使用して職務経歴書ファイルをダウンロード
+        S3 --> React: 職務経歴書ファイル
+        React --> ユーザー: 職務経歴書ファイルを表示
+    else 照合失敗
+        SpringBoot --> React: エラーレスポンス (アクセス権限エラー)
+    end
+else エクスポート失敗
+    SpringBoot --> React: エラーレスポンス (エクスポート失敗)
+end
+
+@enduml
