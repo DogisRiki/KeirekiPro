@@ -12,6 +12,12 @@ const featureDirectories = readdirSync(featuresPath).filter((dir) => statSync(jo
 // FlatCompat のインスタンスを作成
 const compat = new FlatCompat();
 
+// 相対パスパターンを生成する関数
+const createRelativePaths = (dir) => {
+    // '../'を最大5階層分（必要に応じて調整）生成
+    return Array.from({ length: 5 }, (_, i) => "../".repeat(i + 1) + dir);
+};
+
 export default [
     // ESLintの推奨設定を適用
     js.configs.recommended,
@@ -105,12 +111,14 @@ export default [
                 "error",
                 {
                     patterns: [
-                        // 他のfeatureからのimport制限
                         {
                             group: [
                                 ...featureDirectories
                                     .filter((dir) => dir !== feature)
-                                    .map((dir) => `@/features/${dir}`),
+                                    .flatMap((dir) => [
+                                        `@/features/${dir}`, // エイリアスパス
+                                        ...createRelativePaths(dir), // 相対パス
+                                    ]),
                             ],
                             message: "features/から他のfeatures/は参照できません。",
                         },
