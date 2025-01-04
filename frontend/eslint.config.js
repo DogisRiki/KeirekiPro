@@ -105,14 +105,12 @@ export default [
                 "error",
                 {
                     patterns: [
+                        // 他のfeatureからのimport制限
                         {
                             group: [
                                 ...featureDirectories
                                     .filter((dir) => dir !== feature)
-                                    .flatMap((dir) => [
-                                        `@/features/${dir}/*`, // エイリアスパス
-                                        `../../${dir}/*`, // 相対パス
-                                    ]),
+                                    .map((dir) => `@/features/${dir}`),
                             ],
                             message: "features/から他のfeatures/は参照できません。",
                         },
@@ -122,11 +120,29 @@ export default [
         },
     })),
 
+    // その他のディレクトリからfeatures内部モジュールへのアクセス制限
+    {
+        files: ["src/**/*.{js,jsx,ts,tsx}"],
+        ignores: [`${featuresPath}/**/*.{js,jsx,ts,tsx}`],
+        rules: {
+            "no-restricted-imports": [
+                "error",
+                {
+                    patterns: [
+                        {
+                            group: [`@/features/*/!(index)`, `@/features/*/*`],
+                            message: "featuresモジュールはindex.tsからexportされたものだけをimportできます。",
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+
     // components/ ディレクトリのルール
     {
         files: ["src/components/**/*.{js,jsx,ts,tsx}"],
         rules: {
-            // エイリアスパスの制限
             "no-restricted-imports": [
                 "error",
                 {
@@ -138,7 +154,6 @@ export default [
                     ],
                 },
             ],
-            // 相対パスの制限
             "import/no-restricted-paths": [
                 "error",
                 {
@@ -158,7 +173,6 @@ export default [
     {
         files: ["src/config/**/*.{js,jsx,ts,tsx}"],
         rules: {
-            // エイリアスパスの制限
             "no-restricted-imports": [
                 "error",
                 {
@@ -170,7 +184,6 @@ export default [
                     ],
                 },
             ],
-            // 相対パスの制限
             "import/no-restricted-paths": [
                 "error",
                 {
