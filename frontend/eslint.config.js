@@ -38,6 +38,7 @@ export default [
         "plugin:jsx-a11y/recommended",
         "plugin:testing-library/react",
         "plugin:jest-dom/recommended",
+        "plugin:@tanstack/eslint-plugin-query/recommended",
         "prettier", // eslint-config-prettier を拡張して競合ルールを無効化
     ),
 
