@@ -1,50 +1,120 @@
-# React + TypeScript + Vite
+# プロジェクト構造ガイド
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+このプロジェクトは [Bulletproof React](https://github.com/alan2207/bulletproof-react) のアーキテクチャをベースに、カスタマイズを加えた構成となっています。
+※https://zenn.dev/ukkyon/articles/03893da1dbf825 を参考。
 
-Currently, two official plugins are available:
+## ディレクトリ構造
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+#### アプリケーションのベース構造 (`src/`)
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```
+src
+|
++-- assets          # 画像やフォントなどの静的ファイルを格納
+|
++-- components      # アプリケーション全体で使用される共有コンポーネント
+|
++-- config          # 設定、環境変数などのエクスポート
+|
++-- features        # 機能ベースのモジュール
+|
++-- pages           # ページ別のコンポーネント
+|
++-- hooks           # アプリケーション全体で使用される共有フック
+|
++-- lib             # 事前設定済みライブラリの再エクスポート
+|
++-- providers       # アプリケーション・プロバイダ
+|
++-- routes          # ルート設定
+|
++-- stores          # グローバル状態管理
+|
++-- test            # テストユーティリティとモックサーバー
+|
++-- types           # アプリケーション全体で使用される基本型
+|
++-- utils           # 共通のユーティリティ関数
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+#### 機能モジュールの構造 (`src/features/{feature-name}/`)
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+各機能モジュールは以下の構造を持ちます：
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
 ```
+src/features/{feature-name}
+|
++-- api         # 機能固有のAPIリクエストとAPI Hooks
+|
++-- assets      # 機能固有の静的ファイル
+|
++-- components  # 機能固有のコンポーネント
+|
++-- hooks       # 機能固有のHooks
+|
++-- stores      # 機能固有の状態管理
+|
++-- types       # 機能固有のTypeScript型定義
+|
++-- utils       # 機能固有のユーティリティ関数
+|
++-- index.ts    # 機能のエントリーポイント
+                # 機能のパブリックAPIとして機能し、外部で使用される
+                # すべてのものをエクスポート
+```
+
+## プロジェクトのセットアップ
+
+#### 初期ディレクトリ構造の作成
+
+基本となるディレクトリ構造を作成するには：
+
+```bash
+npm run init
+```
+
+このコマンドを実行すると、`src/` 配下に必要なすべてのディレクトリが自動的に作成されます。
+
+#### 新規機能モジュールの作成
+
+新しい機能モジュールを作成するには：
+
+```bash
+npm run new
+```
+
+実行すると、以下のプロンプトが表示されます。
+
+```
+features配下に作成するディレクトリ名を入力してください:
+```
+
+ディレクトリ名を入力すると、`src/features/` 配下に指定した名前で必要なディレクトリ構造が自動的に作成されます。
+
+## アプリケーションの起動方法
+
+#### 通常起動
+
+1. 以下のコマンドを実行：
+
+```bash
+npm run dev
+```
+
+2. ブラウザで以下のURLにアクセス：
+
+```
+http://localhost:5173/
+```
+
+#### デバッグモードでの起動
+
+1. 以下のコマンドを実行：
+
+```bash
+npm run dev
+```
+
+2. VSCodeで`F5`キーを押下
+    - デバッグ用のブラウザが自動的に起動します。
+    - ブレークポイントを設定して、アプリケーションのデバッグが可能です。
