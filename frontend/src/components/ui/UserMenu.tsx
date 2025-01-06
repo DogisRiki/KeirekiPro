@@ -57,6 +57,7 @@ export const UserMenu = () => {
                         key={index}
                         onClick={() => handleMenuItemClick(item)}
                         sx={{
+                            color: "primary.main",
                             display: "flex",
                             alignItems: "center",
                             gap: 1,

@@ -10,9 +10,9 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router";
 
 const menuItems = [
-    { label: "ホーム", icon: <HomeIcon sx={{ mr: 1, color: "#2C3E50" }} />, path: paths.resume.list },
-    { label: "職務経歴書作成", icon: <BusinessCenter sx={{ mr: 1, color: "#2C3E50" }} />, path: paths.resume.new },
-    { label: "お問い合わせ", icon: <ContactMailIcon sx={{ mr: 1, color: "#2C3E50" }} />, path: paths.contact },
+    { label: "ホーム", icon: <HomeIcon />, path: paths.resume.list },
+    { label: "職務経歴書作成", icon: <BusinessCenter />, path: paths.resume.new },
+    { label: "お問い合わせ", icon: <ContactMailIcon />, path: paths.contact },
 ];
 
 /**
@@ -37,7 +37,16 @@ export const MainMenu = () => {
             </IconButton>
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                 {menuItems.map((item, index) => (
-                    <MenuItem key={index} onClick={() => navigateTo(item.path)}>
+                    <MenuItem
+                        key={index}
+                        onClick={() => navigateTo(item.path)}
+                        sx={{
+                            color: "primary.main",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                        }}
+                    >
                         {item.icon}
                         {item.label}
                     </MenuItem>
