@@ -1,1 +1,2 @@
-export * from "@/lib/reactQueryConfig";
+export * from "@/lib/apiClient";
+export * from "@/lib/queryConfig";
