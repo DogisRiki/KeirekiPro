@@ -13,7 +13,7 @@ import {
     Top,
     TwoFactor,
 } from "@/pages";
-import { PublicLoader } from "@/routes/AppLoader";
+import { ProtectedLoader, PublicLoader } from "@/routes/AppLoader";
 import { createBrowserRouter, RouterProvider } from "react-router";
 
 /**
@@ -49,7 +49,7 @@ const router = createBrowserRouter([
     },
     {
         element: <ProtectedLayout />,
-        loader: ProtectedLayout,
+        loader: ProtectedLoader,
         children: [
             {
                 path: paths.twoFactor,
