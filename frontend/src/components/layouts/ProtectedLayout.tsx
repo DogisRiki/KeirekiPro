@@ -1,3 +1,5 @@
+import { MainMenu, UserMenu } from "@/components/ui";
+import { AppBar, Box, Container, Toolbar, Typography } from "@mui/material";
 import { Outlet } from "react-router";
 
 /**
@@ -5,8 +7,19 @@ import { Outlet } from "react-router";
  */
 export const ProtectedLayout = () => {
     return (
-        <div>
-            <Outlet />
-        </div>
+        <Box>
+            <AppBar position="fixed">
+                <Toolbar>
+                    <MainMenu />
+                    <Typography variant="h6" sx={{ flexGrow: 1 }}>
+                        KeirekiPro
+                    </Typography>
+                    <UserMenu />
+                </Toolbar>
+            </AppBar>
+            <Container sx={{ mt: 10 }}>
+                <Outlet />
+            </Container>
+        </Box>
     );
 };
