@@ -1,0 +1,21 @@
+import { ErrorResponse } from "@/types";
+import { create } from "zustand";
+
+interface ErrorMessageState {
+    message: string | null;
+    errors: {
+        [field: string]: string[];
+    };
+    setErrors: (errorResponse: ErrorResponse) => void;
+    clearErrors: () => void;
+}
+
+/**
+ * エラーメッセージを管理するストア
+ */
+export const useErrorMessageStore = create<ErrorMessageState>((set) => ({
+    message: null,
+    errors: {},
+    setErrors: (errorResponse: ErrorResponse) => set({ message: errorResponse.message, errors: errorResponse.errors }),
+    clearErrors: () => set({ message: null, errors: {} }),
+}));
