@@ -34,5 +34,15 @@ export const theme = createTheme({
                 },
             },
         },
+        MuiFormLabel: {
+            styleOverrides: {
+                asterisk: {
+                    color: "#D32F2F",
+                    "&$error": {
+                        color: "#D32F2F",
+                    },
+                },
+            },
+        },
     },
 });

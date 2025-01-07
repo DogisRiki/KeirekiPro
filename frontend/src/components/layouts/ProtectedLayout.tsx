@@ -1,4 +1,4 @@
-import { MainMenu, UserMenu } from "@/components/ui";
+import { Footer, MainMenu, UserMenu } from "@/components/ui";
 import { AppBar, Box, Container, Toolbar, Typography } from "@mui/material";
 import { Outlet } from "react-router";
 
@@ -20,6 +20,7 @@ export const ProtectedLayout = () => {
             <Container sx={{ mt: 10 }}>
                 <Outlet />
             </Container>
+            <Footer />
         </Box>
     );
 };

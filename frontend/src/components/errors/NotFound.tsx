@@ -1,5 +1,6 @@
+import { Button } from "@/components/ui";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
-import { Box, Button, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 
 /**
  * 404
