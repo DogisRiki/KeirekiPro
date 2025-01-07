@@ -31,6 +31,7 @@
         "react-error-boundary": "^5.0.0",
         "react-icons": "^5.4.0",
         "react-router": "^7.1.1-pre.0",
+        "react-verification-input": "^4.2.0",
         "zustand": "^5.0.2"
     },
     "devDependencies": {

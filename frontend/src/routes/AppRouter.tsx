@@ -37,6 +37,10 @@ const router = createBrowserRouter([
                 element: <Login />,
             },
             {
+                path: paths.twoFactor,
+                element: <TwoFactor />,
+            },
+            {
                 path: paths.register,
                 element: <Register />,
             },
@@ -54,10 +58,6 @@ const router = createBrowserRouter([
         element: <ProtectedLayout />,
         loader: ProtectedLoader,
         children: [
-            {
-                path: paths.twoFactor,
-                element: <TwoFactor />,
-            },
             {
                 path: paths.resume.list,
                 element: <ResumeList />,
