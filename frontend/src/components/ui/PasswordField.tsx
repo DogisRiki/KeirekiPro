@@ -14,12 +14,7 @@ export const PasswordTextField = (props: TextFieldProps) => {
     };
 
     const defaultSlotProps = {
-        inputLabel: {
-            shrink: true,
-            ...slotProps?.inputLabel,
-        },
         input: {
-            ...slotProps?.input,
             endAdornment: (
                 <InputAdornment
                     position="end"
@@ -33,6 +28,16 @@ export const PasswordTextField = (props: TextFieldProps) => {
                     </IconButton>
                 </InputAdornment>
             ),
+            ...slotProps?.input,
+        },
+        inputLabel: {
+            shrink: true,
+            ...slotProps?.inputLabel,
+        },
+        htmlInput: {
+            maxLength: 20,
+            minLength: 8,
+            ...slotProps?.htmlInput,
         },
     };
 
