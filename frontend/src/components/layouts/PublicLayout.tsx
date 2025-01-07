@@ -31,7 +31,7 @@ export const PublicLayout = () => {
                     <Outlet />
                 </Box>
             </Container>
-            <Footer isFixed={true} />
+            <Footer />
         </>
     );
 };

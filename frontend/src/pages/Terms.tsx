@@ -93,7 +93,7 @@ export const Terms = () => {
                     </Box>
                 </Paper>
             </Container>
-            <Footer isFixed={false} />
+            <Footer />
         </>
     );
 };

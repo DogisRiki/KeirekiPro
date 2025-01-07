@@ -89,7 +89,7 @@ export const Privacy = () => {
                     </Box>
                 </Paper>
             </Container>
-            <Footer isFixed={false} />
+            <Footer />
         </>
     );
 };

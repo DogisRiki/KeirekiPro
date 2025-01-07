@@ -20,7 +20,7 @@ export const ProtectedLayout = () => {
             <Container sx={{ mt: 10 }}>
                 <Outlet />
             </Container>
-            <Footer isFixed={false} />
+            <Footer />
         </Box>
     );
 };
