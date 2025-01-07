@@ -8,7 +8,7 @@ export const paths = {
     password: {
         resetRquest: "/password/reset",
         reset: "/password/reset/:token",
-        verify: "/password/verify",
+        change: "/password/change",
     },
     twoFactor: "/two-factor",
     resume: {

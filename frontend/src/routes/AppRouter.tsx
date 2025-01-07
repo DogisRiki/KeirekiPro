@@ -2,6 +2,7 @@ import { NotFound } from "@/components/errors";
 import { ProtectedLayout, PublicLayout } from "@/components/layouts";
 import { paths } from "@/config/paths";
 import {
+    ChangePassword,
     Contact,
     Login,
     Privacy,
@@ -72,6 +73,10 @@ const router = createBrowserRouter([
             {
                 path: paths.user,
                 element: <SettingUser />,
+            },
+            {
+                path: paths.password.change,
+                element: <ChangePassword />,
             },
             {
                 path: paths.contact,
