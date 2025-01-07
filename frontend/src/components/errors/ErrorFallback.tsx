@@ -1,5 +1,6 @@
+import { Button } from "@/components/ui";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { Box, Button, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 
 /**
  * 非同期処理以外のエラー発生時のフォールバックページ
@@ -19,11 +20,7 @@ export const ErrorFallback = () => {
             <Typography variant="h6" fontWeight={"bold"} sx={{ mb: 2 }}>
                 Ooops, something went wrong :(
             </Typography>
-            <Button
-                variant="contained"
-                startIcon={<RefreshIcon />}
-                onClick={() => window.location.assign(window.location.origin)}
-            >
+            <Button startIcon={<RefreshIcon />} onClick={() => window.location.assign(window.location.origin)}>
                 Refresh
             </Button>
         </Box>
