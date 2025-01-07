@@ -18,4 +18,6 @@ export const paths = {
     },
     user: "/user",
     contact: "/contact",
+    terms: "/terms",
+    privacy: "/privacy",
 };

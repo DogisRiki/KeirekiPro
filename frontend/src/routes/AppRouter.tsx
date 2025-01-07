@@ -4,12 +4,14 @@ import { paths } from "@/config/paths";
 import {
     Contact,
     Login,
+    Privacy,
     Register,
     ResetPassword,
     ResetRequestPassword,
     Resume,
     ResumeList,
     SettingUser,
+    Terms,
     Top,
     TwoFactor,
 } from "@/pages";
@@ -76,6 +78,14 @@ const router = createBrowserRouter([
                 element: <Contact />,
             },
         ],
+    },
+    {
+        path: paths.terms,
+        element: <Terms />,
+    },
+    {
+        path: paths.privacy,
+        element: <Privacy />,
     },
     {
         path: "*",
