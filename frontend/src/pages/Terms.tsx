@@ -11,7 +11,7 @@ export const Terms = () => {
             <Container maxWidth="md" sx={{ py: 6 }}>
                 <Paper elevation={3} sx={{ p: 4 }}>
                     <Box>
-                        <Typography variant="h4" gutterBottom>
+                        <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
                             利用規約
                         </Typography>
                         <Typography variant="body2" color="textSecondary" gutterBottom>

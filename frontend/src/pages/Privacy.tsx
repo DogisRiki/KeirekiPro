@@ -11,7 +11,7 @@ export const Privacy = () => {
             <Container maxWidth="md" sx={{ py: 6 }}>
                 <Paper elevation={3} sx={{ p: 4 }}>
                     <Box>
-                        <Typography variant="h4" gutterBottom>
+                        <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
                             プライバシーポリシー
                         </Typography>
                         <Typography variant="body2" color="textSecondary" gutterBottom>
