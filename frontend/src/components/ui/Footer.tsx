@@ -1,14 +1,29 @@
 import { env } from "@/config/env";
 import { Box, Typography } from "@mui/material";
-
-interface FooterProps {
-    isFixed: boolean;
-}
+import { useLayoutEffect, useState } from "react";
 
 /**
  * フッター
  */
-export const Footer = ({ isFixed }: FooterProps) => {
+export const Footer = () => {
+    // スクロールするかしないか
+    const [isFixed, setIsFixed] = useState(true);
+
+    /**
+     * 画面がスクロールするかどうかを検出する
+     */
+    useLayoutEffect(() => {
+        const checkScroll = () => {
+            const hasScroll = document.documentElement.scrollHeight > window.innerHeight;
+            setIsFixed(!hasScroll);
+        };
+
+        checkScroll();
+        window.addEventListener("resize", checkScroll);
+
+        return () => window.removeEventListener("resize", checkScroll);
+    }, []);
+
     return (
         <Box
             component="footer"
