@@ -17,7 +17,7 @@ export const ProtectedLayout = () => {
                     <UserMenu />
                 </Toolbar>
             </AppBar>
-            <Container sx={{ mt: 10 }}>
+            <Container sx={{ mt: 12 }}>
                 <Outlet />
             </Container>
             <Footer />
