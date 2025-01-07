@@ -10,4 +10,4 @@ export * from "@/pages/SettingUser";
 export * from "@/pages/Terms";
 export * from "@/pages/Top";
 export * from "@/pages/TwoFactor";
-export * from "@/pages/VerifyPassword";
+export * from "@/pages/ChangePassword";
