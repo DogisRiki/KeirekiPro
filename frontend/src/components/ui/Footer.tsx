@@ -18,10 +18,18 @@ export const Footer = () => {
             setIsFixed(!hasScroll);
         };
 
-        checkScroll();
-        window.addEventListener("resize", checkScroll);
+        // ResizeObserverの設定
+        const resizeObserver = new ResizeObserver(() => {
+            checkScroll();
+        });
 
-        return () => window.removeEventListener("resize", checkScroll);
+        // document.bodyを監視
+        resizeObserver.observe(document.body);
+
+        // クリーンアップ
+        return () => {
+            resizeObserver.disconnect();
+        };
     }, []);
 
     return (
