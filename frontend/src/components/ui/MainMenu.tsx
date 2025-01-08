@@ -33,7 +33,13 @@ export const MainMenu = () => {
     return (
         <>
             <IconButton size="large" edge="start" color="inherit" aria-label="menu" onClick={handleMenuOpen}>
-                <MenuIcon />
+                <MenuIcon
+                    sx={{
+                        "&:hover": {
+                            bgcolor: "primary.light",
+                        },
+                    }}
+                />
             </IconButton>
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                 {menuItems.map((item, index) => (
@@ -41,7 +47,6 @@ export const MainMenu = () => {
                         key={index}
                         onClick={() => navigateTo(item.path)}
                         sx={{
-                            color: "primary.main",
                             display: "flex",
                             alignItems: "center",
                             gap: 1,

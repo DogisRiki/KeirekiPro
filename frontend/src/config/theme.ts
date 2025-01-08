@@ -16,6 +16,7 @@ export const theme = createTheme({
     palette: {
         primary: {
             main: mainColor,
+            light: "#2A3A48",
         },
         background: {
             default: BgColor,
