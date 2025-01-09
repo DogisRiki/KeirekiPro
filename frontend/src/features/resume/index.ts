@@ -1,2 +1,2 @@
-export * from "@/features/resume/components/ResumeCard";
-export * from "@/features/resume/components/SearchForm";
+export * from "@/features/resume/components/resume-list/ResumeCard";
+export * from "@/features/resume/components/resume-list/SearchForm";
