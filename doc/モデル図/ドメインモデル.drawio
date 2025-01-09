@@ -25,7 +25,7 @@
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-135" value="&lt;b&gt;&lt;u&gt;ユーザー設定集約(UserSettingAggregation)&lt;/u&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="-X1_m2EYrhHD0JWwDC6E-133" vertex="1">
           <mxGeometry x="27.019999999999996" y="7.037037037037037" width="285.95" height="29.99888888888889" as="geometry" />
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-136" value="&lt;b&gt;&lt;u&gt;ユーザー設定(UserSetting)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;ユーザーID(userId)&lt;br&gt;二段階認証設定(twoFactorAuthEnabled)&lt;br&gt;プロフィール画像(profileImage)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#f8cecc;strokeColor=#b85450;" parent="-X1_m2EYrhHD0JWwDC6E-133" vertex="1">
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-136" value="&lt;b&gt;&lt;u&gt;ユーザー設定(UserSetting)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;ユーザーID(userId)&lt;br&gt;ユーザー名(userName)&lt;br&gt;二段階認証設定(twoFactorAuthEnabled)&lt;br&gt;プロフィール画像(profileImage)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#f8cecc;strokeColor=#b85450;" parent="-X1_m2EYrhHD0JWwDC6E-133" vertex="1">
           <mxGeometry x="41.889999999999986" y="45.00148148148148" width="256.21" height="100" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-205" value="" style="group" parent="1" vertex="1" connectable="0">
@@ -53,7 +53,7 @@
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-152" value="&lt;b&gt;&lt;u&gt;職務経歴書集約(Resume&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;Aggregation)&lt;/u&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
           <mxGeometry x="90.59647058823532" y="20.69851851851851" width="958.7735294117647" height="88.23778444444443" as="geometry" />
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-153" value="&lt;b&gt;&lt;u&gt;職務経歴書(Resume)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;職務経歴書ID(resumeId)&lt;br&gt;職務経歴書名(resumeName)&lt;br&gt;日付(date)&lt;br&gt;氏名(FullName)&lt;br&gt;自動保存設定(autoSaveEnabled)&lt;/div&gt;&lt;div&gt;作成日時(createdAt)&lt;br&gt;更新日時(updatedAt)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-153" value="&lt;b&gt;&lt;u&gt;職務経歴書(Resume)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;職務経歴書ID(id)&lt;br&gt;職務経歴書名(name)&lt;br&gt;日付(date)&lt;br&gt;姓(lastName)&lt;br&gt;名(firstName)&lt;br&gt;自動保存設定(autoSaveEnabled)&lt;/div&gt;&lt;div&gt;作成日時(createdAt)&lt;br&gt;更新日時(updatedAt)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
           <mxGeometry x="441.8800000000001" y="255.0014814814815" width="256.21" height="190" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-166" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-154" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
@@ -69,7 +69,7 @@
             <mxPoint x="9" y="-2" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-154" value="&lt;b&gt;&lt;u&gt;プロジェクト(Project)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;プロジェクトID(projectId)&lt;br&gt;会社名(companyName)&lt;br&gt;開始年月(startDate)&lt;br&gt;終了年月(endDate)&lt;br&gt;担当中フラグ(isAssigned)&lt;br&gt;プロジェクト名(projectName)&lt;br&gt;プロジェクト概要(overview)&lt;br&gt;チーム構成(teamComp)&lt;br&gt;役割(role)&lt;br&gt;成果(achievement)&lt;br&gt;作業工程(process)&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-154" value="&lt;b&gt;&lt;u&gt;プロジェクト(Project)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;プロジェクトID(id)&lt;br&gt;会社名(companyName)&lt;br&gt;開始年月(startDate)&lt;br&gt;終了年月(endDate)&lt;br&gt;担当中フラグ(isAssigned)&lt;br&gt;プロジェクト名(projectName)&lt;br&gt;プロジェクト概要(overview)&lt;br&gt;チーム構成(teamComp)&lt;br&gt;役割(role)&lt;br&gt;成果(achievement)&lt;br&gt;作業工程(process)&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
           <mxGeometry x="50" y="255" width="256.21" height="190" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-164" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-128" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
