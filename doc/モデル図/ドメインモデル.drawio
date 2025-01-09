@@ -1,6 +1,6 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/25.0.2 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="25.0.2">
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.0.4 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="26.0.4">
   <diagram name="ページ1" id="oXaW7aQPTFVuqWrh0Pf7">
-    <mxGraphModel dx="2049" dy="1220" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+    <mxGraphModel dx="1912" dy="1139" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -85,7 +85,7 @@
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-128" value="&lt;b&gt;&lt;u&gt;職歴(&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;WorkExperinence&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;会社名(companyName)&lt;br&gt;入社年月(startDate)&lt;br&gt;退職年月(endDate)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-128" value="&lt;b&gt;&lt;u&gt;職歴(&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;Career&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;会社名(companyName)&lt;br&gt;入社年月(startDate)&lt;br&gt;退職年月(endDate)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
           <mxGeometry x="840" y="39.47148148148152" width="256.21" height="100" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-157" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.25;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-132" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
@@ -101,7 +101,7 @@
             <mxPoint y="-1" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-132" value="&lt;b&gt;&lt;u&gt;資格(&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;Qualification&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;資格名(name)&lt;br&gt;取得年月(date)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-132" value="&lt;b&gt;&lt;u&gt;資格(&lt;/u&gt;&lt;/b&gt;&lt;u style=&quot;&quot;&gt;&lt;b&gt;Certification)&lt;/b&gt;&lt;/u&gt;&lt;br&gt;資格名(name)&lt;br&gt;取得年月(date)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
           <mxGeometry x="840" y="170.54148148148153" width="256.21" height="100" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-161" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-140" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
@@ -117,7 +117,7 @@
             <mxPoint x="-1" y="-2" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-140" value="&lt;b&gt;&lt;u&gt;成果物(Output)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;成果物名(name)&lt;br&gt;成果物概要(overviwe)&lt;br&gt;リンク(link)&lt;br&gt;技術スタック(techStack)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-140" value="&lt;u style=&quot;&quot;&gt;&lt;b&gt;成果物(Portfolio)&lt;/b&gt;&lt;/u&gt;&lt;br&gt;成果物名(name)&lt;br&gt;成果物概要(overviwe)&lt;br&gt;リンク(link)&lt;br&gt;技術スタック(techStack)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
           <mxGeometry x="840" y="300.5414814814815" width="256.21" height="100" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-162" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-145" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
