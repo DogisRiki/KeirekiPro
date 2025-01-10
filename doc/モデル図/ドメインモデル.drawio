@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.0.4 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="26.0.4">
   <diagram name="ページ1" id="oXaW7aQPTFVuqWrh0Pf7">
-    <mxGraphModel dx="1912" dy="1139" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+    <mxGraphModel dx="1434" dy="854" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -165,7 +165,7 @@
             <mxPoint x="4" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-155" value="&lt;b&gt;&lt;u&gt;技術スタック(TeckStack)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;開発言語(DevlopmentLang)&lt;br&gt;フレームワーク(Framework)&lt;br&gt;インフラ(Infrastructire)&lt;br&gt;開発支援ツール(Tool)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-155" value="&lt;b&gt;&lt;u&gt;技術スタック(TechStack)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;開発言語(DevlopmentLang)&lt;br&gt;フレームワーク(Framework)&lt;br&gt;インフラ(Infrastructire)&lt;br&gt;開発支援ツール(Tool)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
           <mxGeometry x="50" y="560.54" width="256.21" height="100" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-17" value="" style="group" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1" connectable="0">
