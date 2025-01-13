@@ -13,6 +13,7 @@ import { useDebounce } from "use-debounce";
 export const ResumeList = () => {
     // 検索ワード
     const [searchWord, setSearchWord] = useState<string>("");
+
     // 検索結果の反映を500ms遅延させる
     const [debouncedSearchWord] = useDebounce(searchWord, 500);
 
@@ -87,9 +88,7 @@ export const ResumeList = () => {
                 setSortType={setSortType}
             />
             {/* 職務経歴書カード */}
-            {filteredResumeData.length === 0 ? (
-                <NoData message={"表示するデータがありません。"} />
-            ) : (
+            {filteredResumeData.length > 0 ? (
                 <Grid container spacing={3} sx={{ my: 4 }}>
                     {filteredResumeData.slice(0, currentDisplayCount).map((resume) => (
                         <Grid size={{ xs: 12, sm: 6, md: 4 }} key={resume.resumeId}>
@@ -103,6 +102,18 @@ export const ResumeList = () => {
                         </Grid>
                     ))}
                 </Grid>
+            ) : (
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        height: "calc(100vh - 300px)",
+                        overflow: "hidden",
+                    }}
+                >
+                    <NoData variant="h6" message={"表示するデータがありません。"} />
+                </Box>
             )}
             {/* もっと見る or 表示を減らすボタン */}
             <Box sx={{ display: "flex", justifyContent: "center", gap: 2, my: 4 }}>
