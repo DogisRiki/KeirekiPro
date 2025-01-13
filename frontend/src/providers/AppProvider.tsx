@@ -1,6 +1,7 @@
 import { ErrorFallback } from "@/components/errors";
 import { theme } from "@/config/theme";
 import { queryConfig } from "@/lib";
+import { NotificationProvider } from "@/providers/NotificationProvider";
 import { ThemeProvider } from "@emotion/react";
 import { CircularProgress, CssBaseline } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers";
@@ -29,6 +30,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 <QueryClientProvider client={queryClient}>
                     <ThemeProvider theme={theme}>
                         <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ja">
+                            <NotificationProvider />
                             <CssBaseline />
                             {children}
                         </LocalizationProvider>
