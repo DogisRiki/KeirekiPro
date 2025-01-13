@@ -41,7 +41,7 @@ export const Footer = () => {
                 width: "100%",
                 textAlign: "center",
                 py: 1,
-                backgroundColor: "background.paper",
+                backgroundColor: "primary.paper",
             }}
         >
             <Typography variant="body2" color="text.secondary">

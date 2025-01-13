@@ -1,25 +1,26 @@
-import { Box, Typography } from "@mui/material";
+import { Typography, TypographyProps } from "@mui/material";
+import { SxProps, Theme } from "@mui/system";
 
-interface NoDataProps {
+interface NoDataProps extends Omit<TypographyProps, "children"> {
     message: string;
 }
 
 /**
  * データがないときに表示する
  */
-export const NoData = ({ message }: NoDataProps) => {
+export const NoData = ({ message, sx, ...props }: NoDataProps) => {
+    const defaultSx: SxProps<Theme> = {
+        textAlign: "center",
+    };
+
+    const combinedSx: SxProps<Theme> = {
+        ...(sx as object),
+        ...defaultSx,
+    };
+
     return (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}>
-            <Typography
-                variant="h6"
-                color="text.secondary"
-                sx={{
-                    textAlign: "center",
-                    my: 4,
-                }}
-            >
-                {message}
-            </Typography>
-        </Box>
+        <Typography color="text.secondary" sx={combinedSx} {...props}>
+            {message}
+        </Typography>
     );
 };
