@@ -47,6 +47,7 @@ export const MainMenu = () => {
                         key={index}
                         onClick={() => navigateTo(item.path)}
                         sx={{
+                            color: "primary.main",
                             display: "flex",
                             alignItems: "center",
                             gap: 1,
