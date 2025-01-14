@@ -1,12 +1,6 @@
-import {
-    DateRange as DateRangeIcon,
-    Delete as DeleteIcon,
-    Download as DownloadIcon,
-    Edit as EditIcon,
-    MoreHoriz as MoreHorizIcon,
-} from "@mui/icons-material";
-import { Box, Card, CardContent, IconButton, Menu, MenuItem, Typography } from "@mui/material";
-import React, { useState } from "react";
+import { ResumeCardMenu } from "@/features/resume";
+import { DateRange as DateRangeIcon } from "@mui/icons-material";
+import { Box, Card, CardContent, Typography } from "@mui/material";
 
 interface resumeCardProps {
     resumeId: string;
@@ -16,32 +10,9 @@ interface resumeCardProps {
 }
 
 /**
- * カードメニュー
- */
-const menuList = [
-    { name: "編集", icon: <EditIcon sx={{ mr: 1 }} /> },
-    { name: "削除", icon: <DeleteIcon sx={{ mr: 1 }} /> },
-    { name: "エクスポート", icon: <DownloadIcon sx={{ mr: 1 }} /> },
-];
-
-/**
  * 職務経歴書カード
  */
 export const ResumeCard = ({ resumeId, resumeName, createdAt, updatedAt }: resumeCardProps) => {
-    const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
-    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
-    const handleCardMenuClick = (event: React.MouseEvent<HTMLElement>, resumeId: string) => {
-        event.stopPropagation();
-        setMenuAnchorEl(event.currentTarget);
-        setOpenMenuId(resumeId);
-    };
-
-    const handleCardMenuClose = () => {
-        setMenuAnchorEl(null);
-        setOpenMenuId(null);
-    };
-
     return (
         <Card
             key={resumeId}
@@ -54,42 +25,8 @@ export const ResumeCard = ({ resumeId, resumeName, createdAt, updatedAt }: resum
             }}
         >
             <CardContent sx={{ position: "relative" }}>
-                {/* 3点リーダー */}
-                <IconButton
-                    onClick={(event) => handleCardMenuClick(event, resumeId)}
-                    sx={{
-                        position: "absolute",
-                        top: 8,
-                        right: 8,
-                    }}
-                >
-                    <MoreHorizIcon />
-                </IconButton>
                 {/* メニュー */}
-                <Menu
-                    anchorEl={menuAnchorEl}
-                    open={openMenuId === resumeId}
-                    onClose={handleCardMenuClose}
-                    anchorOrigin={{
-                        vertical: "bottom",
-                        horizontal: "right",
-                    }}
-                    transformOrigin={{
-                        vertical: "top",
-                        horizontal: "right",
-                    }}
-                >
-                    {menuList.map((menu, index) => (
-                        <MenuItem
-                            key={resumeId + index}
-                            onClick={handleCardMenuClose}
-                            sx={{ color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                            {menu.icon}
-                            {menu.name}
-                        </MenuItem>
-                    ))}
-                </Menu>
+                <ResumeCardMenu resumeId={resumeId} />
                 {/* 職務経歴書名 */}
                 <Typography variant="h6" gutterBottom>
                     {resumeName}
