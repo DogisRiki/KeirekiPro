@@ -1,5 +1,6 @@
 import { ErrorResponse } from "@/types";
 import { create } from "zustand";
+import { devtools } from "zustand/middleware";
 
 interface ErrorMessageState {
     message: string | null;
@@ -13,9 +14,12 @@ interface ErrorMessageState {
 /**
  * エラーメッセージを管理するストア
  */
-export const useErrorMessageStore = create<ErrorMessageState>((set) => ({
-    message: null,
-    errors: {},
-    setErrors: (errorResponse: ErrorResponse) => set({ message: errorResponse.message, errors: errorResponse.errors }),
-    clearErrors: () => set({ message: null, errors: {} }),
-}));
+export const useErrorMessageStore = create<ErrorMessageState>()(
+    devtools((set) => ({
+        message: null,
+        errors: {},
+        setErrors: (errorResponse: ErrorResponse) =>
+            set({ message: errorResponse.message, errors: errorResponse.errors }),
+        clearErrors: () => set({ message: null, errors: {} }),
+    })),
+);
