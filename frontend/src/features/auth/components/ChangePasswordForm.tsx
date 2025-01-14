@@ -1,10 +1,13 @@
 import { Button, PasswordTextField } from "@/components/ui";
+import { useUserAuthStore } from "@/stores";
 import { Box } from "@mui/material";
 
 /**
- * パスワード変更フォーム
+ * パスワード変更/設定フォーム
  */
 export const ChangePasswordForm = () => {
+    const { user } = useUserAuthStore();
+
     // 送信処理
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -18,27 +21,29 @@ export const ChangePasswordForm = () => {
             onSubmit={handleSubmit}
         >
             <PasswordTextField
-                label="現在のパスワード"
+                label={user?.hasPassword ? "現在のパスワード" : "パスワード"}
                 fullWidth
                 required
-                placeholder="現在のパスワード"
+                placeholder={user?.hasPassword ? "現在のパスワード" : "パスワード"}
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}
                 sx={{ mb: 4 }}
             />
-            <PasswordTextField
-                label="新しいパスワード"
-                fullWidth
-                required
-                placeholder="新しいパスワード"
-                slotProps={{
-                    inputLabel: { shrink: true },
-                }}
-                sx={{ mb: 4 }}
-            />
+            {user?.hasPassword && (
+                <PasswordTextField
+                    label="新しいパスワード"
+                    fullWidth
+                    required
+                    placeholder="新しいパスワード"
+                    slotProps={{
+                        inputLabel: { shrink: true },
+                    }}
+                    sx={{ mb: 4 }}
+                />
+            )}
             <Button type="submit" sx={{ width: 240, mx: "auto" }}>
-                変更
+                {user?.hasPassword ? "変更" : "設定"}
             </Button>
         </Box>
     );
