@@ -13,11 +13,16 @@ interface NotificationState {
  * 処理結果の通知を管理するストア
  */
 export const useNotificationStore = create<NotificationState>()(
-    devtools((set) => ({
-        message: null,
-        type: undefined,
-        isShow: false,
-        setNotification: (message, type) => set({ message, type, isShow: true }),
-        clearNotification: () => set({ message: null, type: undefined, isShow: false }),
-    })),
+    devtools(
+        (set) => ({
+            message: null,
+            type: undefined,
+            isShow: false,
+            setNotification: (message, type) => set({ message, type, isShow: true }, false, "setNotification"),
+            clearNotification: () => set({ message: null, type: undefined, isShow: false }, false, "clearNotification"),
+        }),
+        {
+            name: "NotificationStore",
+        },
+    ),
 );
