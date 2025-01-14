@@ -1,4 +1,5 @@
 export * from "@/features/resume/components/resume-list/ResumeCard";
+export * from "@/features/resume/components/resume-list/ResumeCardMenu";
 export * from "@/features/resume/components/resume-list/SearchForm";
 
 export * from "@/features/resume/components/resume/BottomMenu";
