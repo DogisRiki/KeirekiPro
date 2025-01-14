@@ -15,11 +15,16 @@ interface ErrorMessageState {
  * エラーメッセージを管理するストア
  */
 export const useErrorMessageStore = create<ErrorMessageState>()(
-    devtools((set) => ({
-        message: null,
-        errors: {},
-        setErrors: (errorResponse: ErrorResponse) =>
-            set({ message: errorResponse.message, errors: errorResponse.errors }),
-        clearErrors: () => set({ message: null, errors: {} }),
-    })),
+    devtools(
+        (set) => ({
+            message: null,
+            errors: {},
+            setErrors: (errorResponse: ErrorResponse) =>
+                set({ message: errorResponse.message, errors: errorResponse.errors }, false, "setErrors"),
+            clearErrors: () => set({ message: null, errors: {} }, false, "clearErrors"),
+        }),
+        {
+            name: "ErrorMessageStore",
+        },
+    ),
 );
