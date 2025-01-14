@@ -3,7 +3,7 @@ import { useUserAuthStore } from "@/stores";
 import { Box } from "@mui/material";
 
 /**
- * パスワード変更/設定フォーム
+ * パスワード設定/変更フォーム
  */
 export const ChangePasswordForm = () => {
     const { user } = useUserAuthStore();

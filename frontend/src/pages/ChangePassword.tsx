@@ -4,7 +4,7 @@ import { useUserAuthStore } from "@/stores";
 import { Box, Typography } from "@mui/material";
 
 /**
- * パスワード変更画面
+ * パスワード設定&変更画面
  */
 export const ChangePassword = () => {
     const { user } = useUserAuthStore();
@@ -18,7 +18,7 @@ export const ChangePassword = () => {
                     ? "以下の項目を入力し、変更してください。"
                     : "以下の項目を入力し、設定してください。"}
             </Typography>
-            {/* パスワード変更フォーム */}
+            {/* パスワード変更&設定フォーム */}
             <ChangePasswordForm />
         </Box>
     );
