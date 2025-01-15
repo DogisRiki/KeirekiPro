@@ -54,7 +54,7 @@
           <mxGeometry x="90.59647058823532" y="20.69851851851851" width="958.7735294117647" height="88.23778444444443" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-153" value="&lt;b&gt;&lt;u&gt;職務経歴書(Resume)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;職務経歴書ID(id)&lt;br&gt;職務経歴書名(name)&lt;br&gt;日付(date)&lt;br&gt;姓(lastName)&lt;br&gt;名(firstName)&lt;br&gt;自動保存設定(autoSaveEnabled)&lt;/div&gt;&lt;div&gt;作成日時(createdAt)&lt;br&gt;更新日時(updatedAt)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
-          <mxGeometry x="441.8800000000001" y="255.0014814814815" width="256.21" height="190" as="geometry" />
+          <mxGeometry x="441.88" y="250" width="256.21" height="195" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-166" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-154" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
           <mxGeometry relative="1" as="geometry" />
@@ -69,8 +69,8 @@
             <mxPoint x="9" y="-2" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-154" value="&lt;b&gt;&lt;u&gt;プロジェクト(Project)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;プロジェクトID(id)&lt;br&gt;会社名(companyName)&lt;br&gt;開始年月(startDate)&lt;br&gt;終了年月(endDate)&lt;br&gt;担当中フラグ(isAssigned)&lt;br&gt;プロジェクト名(projectName)&lt;br&gt;プロジェクト概要(overview)&lt;br&gt;チーム構成(teamComp)&lt;br&gt;役割(role)&lt;br&gt;成果(achievement)&lt;br&gt;作業工程(process)&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
-          <mxGeometry x="50" y="255" width="256.21" height="190" as="geometry" />
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-154" value="&lt;b&gt;&lt;u&gt;プロジェクト(Project)&lt;/u&gt;&lt;/b&gt;&lt;div&gt;プロジェクトID(id)&lt;br&gt;会社名(companyName)&lt;br&gt;開始年月(startDate)&lt;br&gt;終了年月(endDate)&lt;br&gt;担当中フラグ(isAssigned)&lt;br&gt;プロジェクト名(projectName)&lt;br&gt;プロジェクト概要(overview)&lt;br&gt;チーム構成(teamComp)&lt;br&gt;役割(role)&lt;br&gt;成果(achievement)&lt;br&gt;作業工程(process)&lt;br&gt;&lt;/div&gt;&lt;div&gt;並び順(orderNo)&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+          <mxGeometry x="50" y="250" width="256.21" height="200" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-164" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-128" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
           <mxGeometry relative="1" as="geometry" />
@@ -85,8 +85,8 @@
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-128" value="&lt;b&gt;&lt;u&gt;職歴(&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;Career&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;会社名(companyName)&lt;br&gt;入社年月(startDate)&lt;br&gt;退職年月(endDate)&lt;br&gt;在職中フラグ(isEmployed)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
-          <mxGeometry x="840" y="39.47148148148152" width="256.21" height="100" as="geometry" />
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-128" value="&lt;b&gt;&lt;u&gt;職歴(&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;Career&lt;/u&gt;&lt;/b&gt;&lt;b&gt;&lt;u&gt;)&lt;br&gt;&lt;/u&gt;&lt;/b&gt;職歴ID(id)&lt;br&gt;会社名(companyName)&lt;br&gt;入社年月(startDate)&lt;br&gt;退職年月(endDate)&lt;br&gt;在職中フラグ(isEmployed)&lt;br&gt;並び順(orderNo)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+          <mxGeometry x="840" y="34.47" width="257.56" height="111" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-157" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.25;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-132" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
           <mxGeometry relative="1" as="geometry" />
@@ -101,7 +101,7 @@
             <mxPoint y="-1" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-132" value="&lt;b&gt;&lt;u&gt;資格(&lt;/u&gt;&lt;/b&gt;&lt;u style=&quot;&quot;&gt;&lt;b&gt;Certification)&lt;/b&gt;&lt;/u&gt;&lt;br&gt;資格名(name)&lt;br&gt;取得年月(date)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-132" value="&lt;b&gt;&lt;u&gt;資格(&lt;/u&gt;&lt;/b&gt;&lt;u style=&quot;&quot;&gt;&lt;b&gt;Certification)&lt;/b&gt;&lt;/u&gt;&lt;div&gt;資格&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;ID(id)&lt;/span&gt;&lt;/div&gt;&lt;div&gt;資格名(name)&lt;br&gt;取得年月(date)&lt;br&gt;並び順(orderNo)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
           <mxGeometry x="840" y="170.54148148148153" width="256.21" height="100" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-161" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-140" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
@@ -117,8 +117,8 @@
             <mxPoint x="-1" y="-2" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-140" value="&lt;u style=&quot;&quot;&gt;&lt;b&gt;ポートフォリオ(Portfolio)&lt;/b&gt;&lt;/u&gt;&lt;br&gt;ポートフォリオ名(name)&lt;br&gt;ポートフォリオ概要(overviwe)&lt;br&gt;リンク(link)&lt;br&gt;技術スタック(techStack)" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
-          <mxGeometry x="840" y="300.5414814814815" width="256.21" height="100" as="geometry" />
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-140" value="&lt;u style=&quot;&quot;&gt;&lt;b&gt;ポートフォリオ(Portfolio)&lt;/b&gt;&lt;/u&gt;&lt;br&gt;ポートフォリオID(id)&lt;br&gt;&lt;div&gt;ポートフォリオ名(name)&lt;br&gt;ポートフォリオ概要(overviwe)&lt;br&gt;リンク(link)&lt;br&gt;技術スタック(techStack)&lt;div&gt;並び順(orderNo)&lt;br&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+          <mxGeometry x="840" y="300.5414814814815" width="256.21" height="110" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-162" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-145" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
           <mxGeometry relative="1" as="geometry" />
@@ -133,8 +133,8 @@
             <mxPoint x="1" y="-2" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-145" value="&lt;div&gt;&lt;b&gt;&lt;u&gt;ソーシャルリンク(SociealLink)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;ソーシャル名(name)&lt;br&gt;リンク(link)&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
-          <mxGeometry x="840" y="430.5414814814815" width="256.21" height="100" as="geometry" />
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-145" value="&lt;div&gt;&lt;b&gt;&lt;u&gt;ソーシャルリンク(SociealLink)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;ソーシャルリンクID&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;(id)&lt;/span&gt;&lt;/div&gt;&lt;div&gt;ソーシャル名(name)&lt;br&gt;リンク(link)&lt;br&gt;&lt;/div&gt;&lt;div&gt;並び順(orderNo)&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+          <mxGeometry x="840" y="438.5414814814815" width="256.21" height="100" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-163" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-149" target="-X1_m2EYrhHD0JWwDC6E-153" edge="1">
           <mxGeometry relative="1" as="geometry" />
@@ -149,8 +149,8 @@
             <mxPoint x="1" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="-X1_m2EYrhHD0JWwDC6E-149" value="&lt;div&gt;&lt;b&gt;&lt;u&gt;自己PR(SelfPromotion)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;タイトル(title)&lt;br&gt;コンテンツ(content)&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
-          <mxGeometry x="840" y="560.5414814814815" width="256.21" height="100" as="geometry" />
+        <mxCell id="-X1_m2EYrhHD0JWwDC6E-149" value="&lt;div&gt;&lt;b&gt;&lt;u&gt;自己PR(SelfPromotion)&lt;/u&gt;&lt;/b&gt;&lt;br&gt;自己PR&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;ID(id)&lt;/span&gt;&lt;/div&gt;&lt;div&gt;タイトル(title)&lt;br&gt;コンテンツ(content)&lt;br&gt;&lt;/div&gt;&lt;div&gt;並び順(orderNo)&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#d5e8d4;strokeColor=#82b366;" parent="-X1_m2EYrhHD0JWwDC6E-150" vertex="1">
+          <mxGeometry x="840" y="568.5414814814815" width="256.21" height="100" as="geometry" />
         </mxCell>
         <mxCell id="-X1_m2EYrhHD0JWwDC6E-167" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;endArrow=diamondThin;endFill=1;targetPerimeterSpacing=0;endSize=12;" parent="-X1_m2EYrhHD0JWwDC6E-150" source="-X1_m2EYrhHD0JWwDC6E-155" target="-X1_m2EYrhHD0JWwDC6E-154" edge="1">
           <mxGeometry relative="1" as="geometry" />
