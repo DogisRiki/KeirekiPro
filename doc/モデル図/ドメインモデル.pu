@@ -1,0 +1,226 @@
+@startuml ドメインモデル
+
+title ドメインモデル
+
+' left to right direction
+
+' skinparam classAttributeIconSize 0
+
+package "ユーザー設定集約(UserSettingAggregation)" as UserSettingAggregation {
+    ' -------------------------------- エンティティの定義 --------------------------------
+    class "ユーザー設定(UserSetting)" as UserSetting << (R,red) RootEntity >> {
+        - ユーザーID: id
+        - ユーザー名: userName
+        - 二段階認証設定: twoFactorAuthEnabled
+    }
+
+    ' -------------------------------- 値オブジェクトの定義 --------------------------------
+    class "プロフィール画像(ProfileImage)" as ProfileImage << (V, SkyBlue) ValueObject >> {
+    }
+
+    ' ------------------------------------ 関連線の定義 ------------------------------------
+    UserSetting "1" *-down- "0..1" ProfileImage #Green
+
+    ' ----------------------------- ビジネスルールや注釈の定義 -----------------------------
+    note bottom of UserSetting
+        ・二段階認証が有効である場合のみログイン時に確認コードをメールアドレス宛に送信する。
+    end note
+
+    note top of ProfileImage
+        ・PNG形式またはJPEG形式の許可する。
+        ・画像サイズは5MBまで許可する。
+        ・ドメイン層では画像パスのみを保持し、実データはインフラ層へ委譲する
+    end note
+}
+
+package "ユーザー集約(UserAggregation)" as UserAggregation {
+    ' -------------------------------- エンティティの定義 --------------------------------
+    class "ユーザー設定(User)" as User << (R,red) RootEntity >> {
+        - ユーザーID: id
+        - ユーザー名: userName
+    }
+}
+
+package "ユーザー認証情報集約(UserAuthInfoAggregation)" as UserAuthInfoAggregation {
+    ' -------------------------------- エンティティの定義 --------------------------------
+    class "ユーザー認証情報(UserAuthInfo)" as UserAuthInfo << (R,red) RootEntity >> {
+        - ユーザーID: id
+        - ユーザー名: userName
+        - 二段階認証設定: twoFactorAuthEnabled
+    }
+
+    ' -------------------------------- 値オブジェクトの定義 --------------------------------
+    class "パスワード(Password)" as Password << (V, SkyBlue) ValueObject >> {
+    }
+
+    ' ------------------------------------ 関連線の定義 ------------------------------------
+    UserAuthInfo "1" *-down- "0..1" Password #Green
+
+    ' ----------------------------- ビジネスルールや注釈の定義 -----------------------------
+    note bottom of Password
+        ・MIN_LENGTH=8、MAX_LENGTH=20
+        ・最低1文字ずつ英字・数字・記号を含むこと。
+        ・パスワード変更時に旧パスワードの検証を必須とする。
+        ・世代管理は行わない。
+        ・GoogleやGithubでログインしているユーザーはパスワード設定は任意。
+    end note
+}
+
+package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
+
+    note as CommonRules
+        【バリデーションの方針】
+        ・職務経歴書ファイル出力では、HTMLファイルからPDFファイルやMarkdownファイルへ変換するため、
+        文字数によるレイアウト崩れが発生しない。
+        ・そのため、文字数制限などはビジネスルール外とする。同様に日付のフォーマットなどもビジネスルール外とする。
+        ・上記理由から、UIやDB都合の形式チェックや文字数制限バリデーションはプレゼンテーション層で行うものとする。
+        【共通ルール】
+        ・idはUUIDによって生成された文字列とする。
+        ・orderNoは各項目をソートするために使用するため、各リスト内でユニークでなければならない。
+    end note
+
+    ' -------------------------------- エンティティの定義 --------------------------------
+    class "職務経歴書(Resume)" as Resume << (R,red) RootEntity >> {
+        - 職務経歴書ID: id
+        - 日付: date
+        - 自動保存設定: autoSaveEnabled
+        - 作成日時: createdAt
+        - 更新日時: updatedAt
+    }
+
+    class "職歴(Career)" as Career << (E,green) Entity >> {
+        - 職歴ID: id
+        - 会社名: companyName
+        - 並び順: orderNo
+    }
+
+    class "プロジェクト(Project)" as Project << (E,green) Entity >> {
+        - プロジェクトID: id
+        - 会社名: companyName
+        - プロジェクト名: projectName
+        - プロジェクト概要: overview
+        - チーム構成: teamComp
+        - 役割: role
+        - 成果: achievement
+        - 作業工程: process
+        - 並び順: orderNo
+    }
+
+    class "資格(Certification)" as Certification << (E,green) Entity >> {
+        - 資格ID: id
+        - 資格名: name
+        - 取得年月: date
+        - 並び順: orderNo
+    }
+
+    class "ポートフォリオ(Portfolio)" as Portfolio << (E,green) Entity >> {
+        - ポートフォリオID: id
+        - ポートフォリオ名: name
+        - ポートフォリオ概要: overview
+        - 技術スタック: techStack
+        - 並び順: orderNo
+    }
+
+    class "ソーシャルリンク(SociealLink)" as SociealLink << (E,green) Entity >> {
+        - ソーシャルリンクID: id
+        - ソーシャル名: name
+        - 並び順: orderNo
+    }
+
+    class "自己PR(SelfPromotion)" as SelfPromotion << (E,green) Entity >> {
+        - 自己PRID: id
+        - タイトル: title
+        - コンテンツ: content
+        - 並び順: orderNo
+    }
+
+    ' -------------------------------- 値オブジェクトの定義 --------------------------------
+    class "職務経歴書名(ResumeName)" as ResumeName << (V, SkyBlue) ValueObject >> {
+    }
+
+    class "氏名(FullName)" as FullName << (V, SkyBlue) ValueObject >> {
+        - 姓: lastName
+        - 名: firstName
+    }
+
+    class "期間(Period)" as Period << (V, SkyBlue) ValueObject >> {
+        - 開始年月: startDate
+        - 終了年月: endDate
+        - 継続中フラグ: isActive
+    }
+
+    class "リンク(Link)" as Link << (V, SkyBlue) ValueObject >> {
+    }
+
+    class "技術スタック(TechStack)" as TechStack << (V, SkyBlue) ValueObject >> {
+        - 開発言語: languages
+        - 依存関係: dependencies
+        - インフラ: Infrastructire
+        - 開発支援ツール: tools
+        - その他: others
+    }
+
+    ' ------------------------------------ 関連線の定義 ------------------------------------
+    Resume "1" *-down- "0..n" Career #Green
+    Resume "1" *-down- "0..n" Project #Green
+    Resume "1" *-down- "0..n" Certification #Green
+    Resume "1" *-down- "0..n" Portfolio #Green
+    Resume "1" *-down- "0..n" SociealLink #Green
+    Resume "1" *-down- "0..n" SelfPromotion #Green
+    Resume "1" *-down- "0..1" FullName #Green
+    Resume "1" *-down- "1" ResumeName #Green
+    Career "1" *-down- "0..1" Period #Green
+    Project "1" *-down- "0..1" Period #Green
+    Project "1" *-down- "0..1" TechStack #Green
+    Portfolio "1" *-down- "0..1" Link #Green
+    SociealLink "1" *-down- "0..1" Link #Green
+
+    ' ----------------------------- ビジネスルールや注釈の定義 -----------------------------
+    note bottom of Resume
+        ・職務経歴書をファイルエクスポートする際、以下項目については最低でも１つ以上の入力を必須とする。
+            (不適切な職務経歴書が作成されるのを防止するため。)
+            ・日付
+            ・氏名
+            ・職歴（会社名、期間）
+            ・プロジェクト（プロジェクト名、会社名、プロジェクト概要、チーム構成、役割、成果、作業工程）
+            ・技術スタック（開発言語）
+            ・自己PR
+    end note
+
+    note bottom of Project
+        ・職歴に入力された会社名以外は許可しない。
+            (職務経歴書内の整合性担保のため)
+    end note
+
+    note bottom of Certification
+        ・取得年月の未来日付は許可する。
+            (柔軟性確保のため)
+        ・存在しない資格名の入力も許可する。
+            (全ての資格をシステム内で網羅するのが現実的でないため。)
+    end note
+
+    note bottom of ResumeName
+        ・職務経歴書名をファイル名として使用するので以下を禁止する。
+            ・\ / : * ? " < > | を含むこと。
+            ・先頭・末尾が「.(ドット)」であること。
+    end note
+
+    note bottom of FullName
+        ・姓と名が両方nullは許可するが、片方のみがnullは許可しない。
+    end note
+
+    note bottom of Period
+        ・継続中がtrueの場合、終了年月は指定できない(2025年1月 〜 現在)
+        ・終了年月 >= 開始年月
+    end note
+
+    note bottom of Link
+        ・RFC3986に準拠しなければならない。
+        ・スキームはhttpsしか許可しない。
+    end note
+}
+
+' ------------------------------------ 集約間の関連線の定義 ------------------------------------
+UserSetting "1" --> "1" User #Blue
+UserAuthInfo "1" --> "1" User #Blue
+Resume "0..n" --> "1" User #Blue
