@@ -30,13 +30,13 @@ class FullNameTest {
     @Test
     @DisplayName("有効な値でインスタンス化する")
     void test1() {
-        FullName fullName = FullName.create(notification, "山田", "太郎");
+        FullName fullName = FullName.create(notification, "Yaま田", "タRoゥ");
         // インスタンスがnullでない。
         assertNotNull(fullName);
         // 姓が正しい値である。
-        assertEquals(fullName.getLastName(), "山田");
+        assertEquals(fullName.getLastName(), "Yaま田");
         // 名が正しい値である。
-        assertEquals(fullName.getFirstName(), "太郎");
+        assertEquals(fullName.getFirstName(), "タRoゥ");
         // notification.addError()が一度も呼ばれていない。
         verify(notification, never()).addError(anyString(), anyString());
     }

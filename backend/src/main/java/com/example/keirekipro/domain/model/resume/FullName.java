@@ -15,7 +15,7 @@ public class FullName {
     /**
      * 許可する文字列
      */
-    private static final String PATTERN = "^[a-zA-Zぁ-んァ-ン一-龯]+$";
+    public static final String ARROW_PATTERN = "^[a-zA-Zぁ-んァ-ン一-龯]+$";
 
     /**
      * 姓
@@ -36,8 +36,9 @@ public class FullName {
     /**
      * 生成メソッド
      *
-     * @param lastName  姓
-     * @param firstName 名
+     * @param notification 通知オブジェクト
+     * @param lastName     姓
+     * @param firstName    名
      * @return 値オブジェクト
      */
     public static FullName create(Notification notification, String lastName, String firstName) {
@@ -61,7 +62,7 @@ public class FullName {
      * @return 検証結果
      */
     private boolean isInvalidValue(String field) {
-        return !field.matches(PATTERN);
+        return !field.matches(ARROW_PATTERN);
     }
 
     @Override
