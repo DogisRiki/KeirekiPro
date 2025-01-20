@@ -16,7 +16,7 @@ class NotificationTest {
     @DisplayName("インスタンス化した直後はエラーが1つも存在しないこと")
     void test1() {
         Notification notification = new Notification();
-        assertFalse(notification.hasErrors());
+        assertFalse(notification.hasErrors(), "notificationにエラーが存在しない。");
     }
 
     @Test
@@ -24,8 +24,8 @@ class NotificationTest {
     void test2() {
         Notification notification = new Notification();
         notification.addError("field", "エラーメッセージ");
-        assertTrue(notification.hasErrors());
-        assertEquals(notification.getErrors(), Map.of("field", List.of("エラーメッセージ")));
+        assertTrue(notification.hasErrors(), "notificationにエラーが存在する。");
+        assertEquals(notification.getErrors(), Map.of("field", List.of("エラーメッセージ")), "notificationに単一のエラーが存在する");
     }
 
     @Test
@@ -34,8 +34,9 @@ class NotificationTest {
         Notification notification = new Notification();
         notification.addError("field", "エラーメッセージ1");
         notification.addError("field", "エラーメッセージ2");
-        assertTrue(notification.hasErrors());
-        assertEquals(notification.getErrors(), Map.of("field", List.of("エラーメッセージ1", "エラーメッセージ2")));
+        assertTrue(notification.hasErrors(), "notificationにエラーが存在する。");
+        assertEquals(notification.getErrors(), Map.of("field", List.of("エラーメッセージ1", "エラーメッセージ2")),
+                "notificationに同一フィールド名の複数エラーが存在する。");
     }
 
     @Test
@@ -49,7 +50,7 @@ class NotificationTest {
         assertTrue(notification.hasErrors());
         assertEquals(notification.getErrors(),
                 Map.of("field1", List.of("エラーメッセージ1-1", "エラーメッセージ1-2"), "field2",
-                        List.of("エラーメッセージ2-1", "エラーメッセージ2-2")));
+                        List.of("エラーメッセージ2-1", "エラーメッセージ2-2")),
+                "notificationに複数フィールド名の複数エラーが存在する。");
     }
-
 }
