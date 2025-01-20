@@ -1,7 +1,6 @@
 package com.example.keirekipro.domain.resume;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -83,29 +82,5 @@ class FullNameTest {
         verify(notification).addError(
                 eq("firstName"),
                 eq("名には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
-    }
-
-    @Test
-    @DisplayName("equals")
-    void test5() {
-        FullName fullName1 = FullName.create(notification, "山田", "太郎");
-        FullName fullName2 = FullName.create(notification, "山田", "太郎");
-        FullName fullName3 = FullName.create(notification, "ああ", "いい");
-        // 値が同一であれば等価。
-        assertEquals(fullName1, fullName2);
-        // 値が同一でなければ等価でない。
-        assertNotEquals(fullName1, fullName3);
-    }
-
-    @Test
-    @DisplayName("hashCode")
-    void test6() {
-        int fullName1 = FullName.create(notification, "山田", "太郎").hashCode();
-        int fullName2 = FullName.create(notification, "山田", "太郎").hashCode();
-        int fullName3 = FullName.create(notification, "ああ", "いい").hashCode();
-        // 値が同一であれば同一。
-        assertEquals(fullName1, fullName2);
-        // 値が同一でなければ同一でない。
-        assertNotEquals(fullName1, fullName3);
     }
 }

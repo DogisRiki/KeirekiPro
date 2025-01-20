@@ -1,15 +1,15 @@
 package com.example.keirekipro.domain.model.resume;
 
-import java.util.Objects;
-
 import com.example.keirekipro.domain.shared.Notification;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 /**
  * 職務経歴書名
  */
 @Getter
+@EqualsAndHashCode
 public class ResumeName {
 
     /**
@@ -67,22 +67,5 @@ public class ResumeName {
      */
     private boolean isInvalidCharStartOrEnd(String value) {
         return value.startsWith(INVALID_START_END_CHAR) || value.endsWith(INVALID_START_END_CHAR);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null || getClass() != obj.getClass()) {
-            return false;
-        }
-        ResumeName resumeName = (ResumeName) obj;
-        return Objects.equals(value, resumeName.value);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(value);
     }
 }
