@@ -206,7 +206,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     end note
 
     note bottom of FullName
-        ・姓と名が両方nullは許可するが、片方のみがnullは許可しない。
+        ・英数、ひらがな、カタカナ、漢字のみ許可する。
     end note
 
     note bottom of Period
