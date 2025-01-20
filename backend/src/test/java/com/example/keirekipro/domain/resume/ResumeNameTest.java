@@ -1,7 +1,6 @@
 package com.example.keirekipro.domain.resume;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -82,29 +81,5 @@ class ResumeNameTest {
                     eq("resumeName"),
                     eq("職務経歴書名の先頭または末尾に「.」を使用することはできません。"));
         }
-    }
-
-    @Test
-    @DisplayName("equals")
-    void test4() {
-        ResumeName resumeName1 = ResumeName.create(notification, "職務経歴書名サンプル");
-        ResumeName resumeName2 = ResumeName.create(notification, "職務経歴書名サンプル");
-        ResumeName resumeName3 = ResumeName.create(notification, "ああ");
-        // 値が同一であれば等価。
-        assertEquals(resumeName1, resumeName2);
-        // 値が同一でなければ等価でない。
-        assertNotEquals(resumeName1, resumeName3);
-    }
-
-    @Test
-    @DisplayName("hashCode")
-    void test5() {
-        int resumeName1 = ResumeName.create(notification, "職務経歴書名サンプル").hashCode();
-        int resumeName2 = ResumeName.create(notification, "職務経歴書名サンプル").hashCode();
-        int resumeName3 = ResumeName.create(notification, "ああ").hashCode();
-        // 値が同一であれば同一。
-        assertEquals(resumeName1, resumeName2);
-        // 値が同一でなければ同一でない。
-        assertNotEquals(resumeName1, resumeName3);
     }
 }

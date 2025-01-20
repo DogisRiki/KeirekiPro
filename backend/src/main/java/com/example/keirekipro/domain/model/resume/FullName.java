@@ -1,15 +1,15 @@
 package com.example.keirekipro.domain.model.resume;
 
-import java.util.Objects;
-
 import com.example.keirekipro.domain.shared.Notification;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 /**
  * 氏名
  */
 @Getter
+@EqualsAndHashCode
 public class FullName {
 
     /**
@@ -63,22 +63,5 @@ public class FullName {
      */
     private boolean isInvalidValue(String field) {
         return !field.matches(ARROW_PATTERN);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null || getClass() != obj.getClass()) {
-            return false;
-        }
-        FullName fullName = (FullName) obj;
-        return Objects.equals(lastName, fullName.lastName) && Objects.equals(firstName, fullName.firstName);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(lastName, firstName);
     }
 }
