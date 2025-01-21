@@ -23,7 +23,7 @@ public class Link {
     }
 
     /**
-     * 生成メソッド
+     * ファクトリーメソッド
      *
      * @param notification 通知オブジェクト
      * @param value        リンク

@@ -30,7 +30,7 @@ public class ResumeName {
     }
 
     /**
-     * 生成メソッド
+     * ファクトリーメソッド
      *
      * @param notification 通知オブジェクト
      * @param value        職務経歴書名

@@ -40,7 +40,7 @@ public class TechStack {
     }
 
     /**
-     * 生成メソッド
+     * ファクトリーメソッド
      *
      * @param languages      開発言語
      * @param dependencies   依存関係
@@ -95,7 +95,7 @@ public class TechStack {
         }
 
         /**
-         * 生成メソッド
+         * ファクトリーメソッド
          *
          * @param frameworks      フレームワーク
          * @param libraries       ライブラリ
@@ -172,7 +172,7 @@ public class TechStack {
         }
 
         /**
-         * 生成メソッド
+         * ファクトリーメソッド
          *
          * @param clouds          クラウド
          * @param containers      コンテナ
@@ -241,7 +241,7 @@ public class TechStack {
         }
 
         /**
-         * 生成メソッド
+         * ファクトリーメソッド
          *
          * @param sourceControls      ソース管理
          * @param projectManagements  プロジェクト管理

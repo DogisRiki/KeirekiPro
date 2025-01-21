@@ -6,23 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.time.YearMonth;
 
 import com.example.keirekipro.domain.model.resume.Certification;
-import com.example.keirekipro.domain.shared.Notification;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 class CertificationTest {
-
-    @Mock
-    private Notification notification;
-
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
 
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
