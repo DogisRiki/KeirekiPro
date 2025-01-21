@@ -82,4 +82,55 @@ class ResumeNameTest {
                     eq("職務経歴書名の先頭または末尾に「.」を使用することはできません。"));
         }
     }
+
+    @Test
+    @DisplayName("職務経歴書名に禁止文字も含み、かつ先頭/末尾に不正な文字列が混入した状態でインスタンス化する")
+    void test4() {
+        String invalidChars = ResumeName.INVALID_PATTERN.replace("[", "").replace("]", "");
+
+        // 1) 先頭にドット + 禁則文字
+        // 2) 末尾にドット + 禁則文字
+        for (char c : invalidChars.toCharArray()) {
+            // 先頭にドット
+            {
+                // 毎回モックをリセットして、呼び出し履歴をクリアする
+                reset(notification);
+                String value = "." + "invalid" + c;
+                ResumeName resumeName = ResumeName.create(notification, value);
+                // インスタンスがnullでない。
+                assertNotNull(resumeName);
+
+                // 禁止文字エラー + 先頭ドットエラーの2回
+                verify(notification).addError(
+                        eq("resumeName"),
+                        eq("職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | "));
+                verify(notification).addError(
+                        eq("resumeName"),
+                        eq("職務経歴書名の先頭または末尾に「.」を使用することはできません。"));
+
+                // 2回呼ばれたことを総数でも確認（呼び出し順が変わる可能性もあるため）
+                verify(notification, times(2)).addError(eq("resumeName"), anyString());
+            }
+
+            // 末尾にドット
+            {
+                // 毎回モックをリセットして、呼び出し履歴をクリアする
+                reset(notification);
+                String value = "invalid" + c + "."; // 例: "invalid/."
+                ResumeName resumeName = ResumeName.create(notification, value);
+                // インスタンスがnullでない。
+                assertNotNull(resumeName);
+
+                // 禁止文字エラー + 先頭ドットエラーの2回
+                verify(notification).addError(
+                        eq("resumeName"),
+                        eq("職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | "));
+                verify(notification).addError(
+                        eq("resumeName"),
+                        eq("職務経歴書名の先頭または末尾に「.」を使用することはできません。"));
+                // 2回呼ばれたことを総数でも確認（呼び出し順が変わる可能性もあるため）
+                verify(notification, times(2)).addError(eq("resumeName"), anyString());
+            }
+        }
+    }
 }
