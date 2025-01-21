@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.example.keirekipro.domain.model.resume.FullName;
@@ -47,7 +48,7 @@ class FullNameTest {
         // インスタンスがnullでない。
         assertNotNull(fullName);
         // 姓に対するエラーメッセージが登録される。
-        verify(notification).addError(
+        verify(notification, times(1)).addError(
                 eq("lastName"),
                 eq("姓には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
         // 名に対するエラーメッセージが登録されない。
@@ -61,9 +62,10 @@ class FullNameTest {
         // インスタンスがnullでない。
         assertNotNull(fullName);
         // 名に対するエラーメッセージが登録される。
-        verify(notification).addError(
-                eq("firstName"),
-                eq("名には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
+        verify(notification, times(
+                1)).addError(
+                        eq("firstName"),
+                        eq("名には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
         // 姓に対するエラーメッセージが登録されない。
         verify(notification, never()).addError(eq("lastName"), anyString());
     }
@@ -75,12 +77,14 @@ class FullNameTest {
         // インスタンスがnullでない。
         assertNotNull(fullName);
         // 姓に対するエラーメッセージが登録される。
-        verify(notification).addError(
-                eq("lastName"),
-                eq("姓には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
+        verify(notification, times(
+                1)).addError(
+                        eq("lastName"),
+                        eq("姓には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
         // 名に対するエラーメッセージが登録される。
-        verify(notification).addError(
-                eq("firstName"),
-                eq("名には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
+        verify(notification, times(
+                1)).addError(
+                        eq("firstName"),
+                        eq("名には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
     }
 }
