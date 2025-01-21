@@ -37,7 +37,7 @@ public class Period {
     }
 
     /**
-     * 生成メソッド
+     * ファクトリーメソッド
      *
      * @param notification 通知オブジェクト
      * @param startDate    開始年月

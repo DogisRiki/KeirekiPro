@@ -41,7 +41,7 @@ public class Certification extends Entity {
     }
 
     /**
-     * 新規構築用のメソッド
+     * 新規構築用のファクトリーメソッド
      *
      * @param orderNo 並び順
      * @param name    会社名
@@ -53,7 +53,7 @@ public class Certification extends Entity {
     }
 
     /**
-     * 再構築用のメソッド
+     * 再構築用のファクトリーメソッド
      *
      * @param id      識別子
      * @param orderNo 並び順

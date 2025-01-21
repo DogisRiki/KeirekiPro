@@ -32,7 +32,7 @@ class CareerTest {
         Career career = Career.create(0, "株式会社ABC", period);
         // インスタンスがnullでない。
         assertNotNull(career);
-        // idが生成されている
+        // idが生成されている。
         assertNotNull(career.getId());
         // 並び順が正しい値である。
         assertEquals(0, career.getOrderNo());

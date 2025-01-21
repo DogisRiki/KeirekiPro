@@ -8,8 +8,6 @@ import lombok.Getter;
 
 /**
  * エンティティの抽象クラス
- *
- * @param <T> 識別子の型
  */
 @Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

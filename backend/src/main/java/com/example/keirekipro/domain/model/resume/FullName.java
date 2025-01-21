@@ -34,7 +34,7 @@ public class FullName {
     }
 
     /**
-     * 生成メソッド
+     * ファクトリーメソッド
      *
      * @param notification 通知オブジェクト
      * @param lastName     姓
