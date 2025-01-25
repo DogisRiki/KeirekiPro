@@ -126,7 +126,7 @@ class ResumeTest {
         assertEquals(1, resume.getProjects().size());
         assertEquals(1, resume.getCertifications().size());
         assertEquals(1, resume.getPortfolios().size());
-        assertEquals(1, resume.getSociealLinks().size());
+        assertEquals(1, resume.getSocialLinks().size());
         assertEquals(1, resume.getSelfPromotions().size());
     }
 
@@ -622,9 +622,9 @@ class ResumeTest {
         Resume afterResume = beforeResume.addSociealLink(newSocialLink);
 
         // 新しいソーシャルリンクがリストに含まれている。
-        assertTrue(afterResume.getSociealLinks().contains(newSocialLink));
+        assertTrue(afterResume.getSocialLinks().contains(newSocialLink));
         // ソーシャルリンクリストのサイズが増加している。
-        assertEquals(afterResume.getSociealLinks().size(), beforeResume.getSociealLinks().size() + 1);
+        assertEquals(afterResume.getSocialLinks().size(), beforeResume.getSocialLinks().size() + 1);
     }
 
     @Test
@@ -632,7 +632,7 @@ class ResumeTest {
     void test26() {
         Resume beforeResume = createSampleResume();
         SocialLink updatedSocialLink = SocialLink.reconstruct(
-                beforeResume.getSociealLinks().get(0).getId(),
+                beforeResume.getSocialLinks().get(0).getId(),
                 0,
                 "LinkedIn",
                 Link.create(notification, "https://linkedin.com/in/user"));
@@ -640,15 +640,15 @@ class ResumeTest {
         Resume afterResume = beforeResume.updateSociealLink(updatedSocialLink);
 
         // 更新したソーシャルリンクがリストに含まれている。
-        assertTrue(afterResume.getSociealLinks().contains(updatedSocialLink));
+        assertTrue(afterResume.getSocialLinks().contains(updatedSocialLink));
         // ソーシャルリンクリストのサイズが変わらない。
-        assertEquals(afterResume.getSociealLinks().size(), beforeResume.getSociealLinks().size());
+        assertEquals(afterResume.getSocialLinks().size(), beforeResume.getSocialLinks().size());
         // 更新したソーシャルリンクの値が正しい。
         assertAll(
-                () -> assertEquals(afterResume.getSociealLinks().get(0).getName(), updatedSocialLink.getName()),
-                () -> assertEquals(afterResume.getSociealLinks().get(0).getLink(), updatedSocialLink.getLink()),
-                () -> assertEquals(afterResume.getSociealLinks().get(0).getId(),
-                        beforeResume.getSociealLinks().get(0).getId()));
+                () -> assertEquals(afterResume.getSocialLinks().get(0).getName(), updatedSocialLink.getName()),
+                () -> assertEquals(afterResume.getSocialLinks().get(0).getLink(), updatedSocialLink.getLink()),
+                () -> assertEquals(afterResume.getSocialLinks().get(0).getId(),
+                        beforeResume.getSocialLinks().get(0).getId()));
     }
 
     @Test
@@ -665,14 +665,14 @@ class ResumeTest {
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeSociealLink(newSocialLink.getId());
         // 削除したソーシャルリンクがリストに含まれていない。
-        assertFalse(deletedResume.getSociealLinks().contains(newSocialLink));
+        assertFalse(deletedResume.getSocialLinks().contains(newSocialLink));
         // ソーシャルリンクリストのサイズが減少している。
-        assertEquals(afterResume.getSociealLinks().size() - 1, deletedResume.getSociealLinks().size());
+        assertEquals(afterResume.getSocialLinks().size() - 1, deletedResume.getSocialLinks().size());
 
         // 削除2回目(1件 → 0件)
-        Resume deletedResume2 = deletedResume.removeSociealLink(deletedResume.getSociealLinks().get(0).getId());
+        Resume deletedResume2 = deletedResume.removeSociealLink(deletedResume.getSocialLinks().get(0).getId());
         // ソーシャルリンクリストが空になっている。
-        assertTrue(deletedResume2.getSociealLinks().isEmpty());
+        assertTrue(deletedResume2.getSocialLinks().isEmpty());
     }
 
     @Test
