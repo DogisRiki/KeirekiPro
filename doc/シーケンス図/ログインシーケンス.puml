@@ -8,45 +8,123 @@ actor ユーザー
 participant クライアント
 participant アプリケーションサーバー as サーバー
 participant DB
-participant OAuthプロバイダー as OAuth
+participant OIDCプロバイダー兼認可サーバー as OIDC
 
-== Email + パスワード認証 ==
+== Email + パスワードログイン ==
+ユーザー -> クライアント: [1] Emailとパスワードを入力し「ログイン」ボタン押下
+note right of ユーザー
+    ここではフロント(クライアント)としてReactを想定
+end note
 
-ユーザー -> クライアント: Emailとパスワードを入力し、ログインボタン押下
-クライアント -> サーバー: ログインリクエスト (Email, パスワード)
-サーバー -> DB: ユーザー情報をEmailから検索
-DB --> サーバー: ユーザー情報
-サーバー -> サーバー: パスワード検証
-alt パスワードが一致する場合
-    サーバー -> サーバー: JWTトークン生成
-    サーバー -> クライアント: JWTトークン返却
-    クライアント -> ユーザー: 職務経歴書一覧画面へ遷移
-else パスワードが不一致の場合
-    サーバー -> クライアント: エラーメッセージ返却
-    クライアント -> ユーザー: ログイン失敗メッセージ表示
+クライアント -> サーバー: [2] ログインリクエスト (Email, パスワード)
+note right of クライアント
+    - HTTP POST /api/auth/login
+    - ボディに { email, password }
+end note
+
+サーバー -> DB: [3] usersテーブルを Email で検索
+DB --> サーバー: [4] ユーザー情報とパスワードハッシュを返却
+
+サーバー -> サーバー: [5] BCrypt によるハッシュ照合
+alt 一致
+    サーバー -> サーバー: [6] JWTアクセストークンとリフレッシュトークン生成
+    note right of サーバー
+        - アクセストークンにはユーザーIDや有効期限を含む
+        - リフレッシュトークンは1回のログインセッションを通して有効
+    end note
+
+    サーバー -> クライアント: [7] {accessToken, refreshToken} を返却
+    note left of クライアント
+        - HTTPレスポンスで両方を返却
+        - クライアントはCookieに保存 (必ず HttpOnly)
+    end note
+
+    クライアント -> ユーザー: [8] ログイン成功。職務経歴書一覧画面へ
+else 不一致
+    サーバー -> クライアント: [X1] 401 Unauthorized (ログイン失敗)
+    クライアント -> ユーザー: [X2] ログイン失敗メッセージ表示
 end
 
-== OAuth2.0/OpenID Connect認証 ==
+== Google / GitHub ログイン (OIDC) ==
+ユーザー -> クライアント: [1] 「Googleでログイン」または「GitHubでログイン」ボタン押下
 
-ユーザー -> クライアント: Gooleでログイン/Githubでログインボタン押下
-クライアント -> OAuth: 認証リクエスト (クライアントID, リダイレクトURI)
-OAuth --> ユーザー: 認証ページ表示
-ユーザー -> OAuth: 認証情報を入力して許可
-OAuth --> クライアント: 認可コード返却 (リダイレクトURI経由)
-クライアント -> サーバー: 認可コードを含むコールバックリクエスト
-サーバー -> OAuth: 認可コードでアクセストークンを取得
-OAuth --> サーバー: アクセストークン返却
-サーバー -> OAuth: アクセストークンでユーザー情報を取得
-OAuth --> サーバー: ユーザー情報返却 (Email, ユーザー名, OAuthプロバイダーID 他)
-サーバー -> DB: Emailでユーザー情報を検索
-alt ユーザーが存在する場合
-    サーバー -> DB: OAuth認証情報を追加/更新
-else ユーザーが存在しない場合
-    サーバー -> DB: 新規ユーザー登録
-    サーバー -> DB: OAuth認証情報を追加
+クライアント -> サーバー: [2] GET /api/auth/oidc/authorize?provider=google または github
+note right of クライアント
+    サーバー側が OIDCプロバイダーの認可URLを組み立て、302リダイレクトを返す
+end note
+
+サーバー -> クライアント: [3] 302リダイレクト (Location = OIDC認可エンドポイント)
+クライアント -> OIDC: [4] 認可エンドポイントへ遷移 (ブラウザが自動リダイレクト)
+OIDC --> ユーザー: [5] ログイン画面と同意画面 (GoogleまたはGitHubの画面)
+
+ユーザー -> OIDC: [6] ログイン情報の入力と同意
+OIDC -> クライアント: [7] 認可コード付きリダイレクト (callback URL)
+note left of クライアント
+    /api/auth/oidc/callback?code=XXX
+end note
+
+クライアント -> サーバー: [8] /api/auth/oidc/callback?code=XXX へアクセス
+note right of クライアント
+    ブラウザが自動的に code=XXX を付与してサーバーにアクセス
+end note
+
+サーバー -> OIDC: [9] 認可コードとPKCE情報をトークンエンドポイントにPOST
+note left of サーバー
+    code, code_verifier, client_id などを送信
+end note
+
+OIDC --> サーバー: [10] アクセストークンと (Googleの場合は IDトークンも) を返却
+
+サーバー -> OIDC: [11] ユーザー情報取得 (アクセストークンを使って /userinfo か /user)
+note left of サーバー
+    Googleの場合 /userinfo
+    GitHubの場合 /user
+end note
+
+OIDC --> サーバー: [12] ユーザー情報 (Email, プロバイダー固有ID)
+
+サーバー -> DB: [13] user_auth_providers から (provider_type=GOOGLE または GITHUB, provider_user_id=取得したID) を検索
+note right of サーバー
+    1. 見つかれば既存ユーザー
+    2. 見つからなければ新規ユーザー作成:
+        - usersテーブルに email を保存
+        - user_auth_providersテーブルに (provider_type, provider_user_id) を登録
+end note
+
+alt 既存ユーザー
+    DB --> サーバー: [13-1] user_id 取得
+    サーバー -> DB: [13-2] 必要があれば情報更新
+else 新規ユーザー
+    サーバー -> DB: [13-A] usersテーブルにINSERT
+    サーバー -> DB: [13-B] user_auth_providersにINSERT
 end
-サーバー -> サーバー: JWTトークン生成
-サーバー -> クライアント: JWTトークン返却
-クライアント -> ユーザー: 職務経歴書一覧画面へ遷移
+
+サーバー -> サーバー: [14] JWTアクセストークンとリフレッシュトークン生成
+note right of サーバー
+    OIDCのアクセストークンとは別物
+end note
+
+サーバー -> クライアント: [15] {accessToken, refreshToken} を返却
+クライアント -> ユーザー: [16] ログイン成功。職務経歴書一覧画面へ
+
+== リフレッシュトークンでアクセストークン再取得 ==
+note over クライアント,サーバー
+    アクセストークンの期限切れ時に行われるフロー
+end note
+
+クライアント -> サーバー: [R1] POST /api/auth/token/refresh (refreshToken)
+note right of クライアント
+    Cookie (HttpOnly) 内の refreshToken を送信
+end note
+
+サーバー -> サーバー: [R2] リフレッシュトークン検証
+alt 有効
+    サーバー -> サーバー: [R3] 新規アクセストークン生成 (リフレッシュトークンは同じものを使う)
+    サーバー -> クライアント: [R4] {accessToken} を返却
+    クライアント -> ユーザー: [R5] Cookieのアクセストークンを更新
+else 無効または期限切れ
+    サーバー -> クライアント: [RX] 401 エラー (リフレッシュ不可)
+    クライアント -> ユーザー: [RX2] 再ログインが必要
+end
 
 @enduml
