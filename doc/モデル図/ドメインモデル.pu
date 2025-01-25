@@ -2,70 +2,6 @@
 
 title ドメインモデル
 
-' left to right direction
-
-' skinparam classAttributeIconSize 0
-
-package "ユーザー設定集約(UserSettingAggregation)" as UserSettingAggregation {
-    ' -------------------------------- エンティティの定義 --------------------------------
-    class "ユーザー設定(UserSetting)" as UserSetting << (R,red) RootEntity >> {
-        - ユーザーID: id
-        - ユーザー名: userName
-        - 二段階認証設定: twoFactorAuthEnabled
-    }
-
-    ' -------------------------------- 値オブジェクトの定義 --------------------------------
-    class "プロフィール画像(ProfileImage)" as ProfileImage << (V, SkyBlue) ValueObject >> {
-    }
-
-    ' ------------------------------------ 関連線の定義 ------------------------------------
-    UserSetting "1" *-down- "0..1" ProfileImage #Green
-
-    ' ----------------------------- ビジネスルールや注釈の定義 -----------------------------
-    note bottom of UserSetting
-        ・二段階認証が有効である場合のみログイン時に確認コードをメールアドレス宛に送信する。
-    end note
-
-    note top of ProfileImage
-        ・PNG形式またはJPEG形式の許可する。
-        ・画像サイズは5MBまで許可する。
-        ・ドメイン層では画像パスのみを保持し、実データはインフラ層へ委譲する
-    end note
-}
-
-package "ユーザー集約(UserAggregation)" as UserAggregation {
-    ' -------------------------------- エンティティの定義 --------------------------------
-    class "ユーザー設定(User)" as User << (R,red) RootEntity >> {
-        - ユーザーID: id
-        - ユーザー名: userName
-    }
-}
-
-package "ユーザー認証情報集約(UserAuthInfoAggregation)" as UserAuthInfoAggregation {
-    ' -------------------------------- エンティティの定義 --------------------------------
-    class "ユーザー認証情報(UserAuthInfo)" as UserAuthInfo << (R,red) RootEntity >> {
-        - ユーザーID: id
-        - ユーザー名: userName
-        - 二段階認証設定: twoFactorAuthEnabled
-    }
-
-    ' -------------------------------- 値オブジェクトの定義 --------------------------------
-    class "パスワード(Password)" as Password << (V, SkyBlue) ValueObject >> {
-    }
-
-    ' ------------------------------------ 関連線の定義 ------------------------------------
-    UserAuthInfo "1" *-down- "0..1" Password #Green
-
-    ' ----------------------------- ビジネスルールや注釈の定義 -----------------------------
-    note bottom of Password
-        ・MIN_LENGTH=8、MAX_LENGTH=20
-        ・最低1文字ずつ英字・数字・記号を含むこと。
-        ・パスワード変更時に旧パスワードの検証を必須とする。
-        ・世代管理は行わない。
-        ・GoogleやGithubでログインしているユーザーはパスワード設定は任意。
-    end note
-}
-
 package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
 
     note as CommonRules
@@ -241,8 +177,3 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         ・スキームはhttpsしか許可しない。
     end note
 }
-
-' ------------------------------------ 集約間の関連線の定義 ------------------------------------
-UserSetting "1" --> "1" User #Blue
-UserAuthInfo "1" --> "1" User #Blue
-Resume "0..n" --> "1" User #Blue
