@@ -57,7 +57,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         - 並び順: orderNo
     }
 
-    class "ソーシャルリンク(SociealLink)" as SociealLink << (E,green) Entity >> {
+    class "ソーシャルリンク(SocialLink)" as SocialLink << (E,green) Entity >> {
         - ソーシャルリンクID: id
         - ソーシャル名: name
         - 並び順: orderNo
@@ -101,7 +101,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     Resume "1" *-down- "0..n" Project #Green
     Resume "1" *-down- "0..n" Certification #Green
     Resume "1" *-down- "0..n" Portfolio #Green
-    Resume "1" *-down- "0..n" SociealLink #Green
+    Resume "1" *-down- "0..n" SocialLink #Green
     Resume "1" *-down- "0..n" SelfPromotion #Green
     Resume "1" *-down- "0..1" FullName #Green
     Resume "1" *-down- "1" ResumeName #Green
@@ -109,7 +109,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     Project "1" *-down- "0..1" Period #Green
     Project "1" *-down- "0..1" TechStack #Green
     Portfolio "1" *-down- "0..1" Link #Green
-    SociealLink "1" *-down- "0..1" Link #Green
+    SocialLink "1" *-down- "0..1" Link #Green
 
     ' ----------------------------- ビジネスルールや注釈の定義 -----------------------------
     note bottom of Resume
