@@ -8,7 +8,7 @@ import lombok.Getter;
  * ソーシャルリンク
  */
 @Getter
-public class SociealLink extends Entity {
+public class SocialLink extends Entity {
 
     /**
      * ソーシャル名
@@ -23,7 +23,7 @@ public class SociealLink extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private SociealLink(int orderNo, String name, Link link) {
+    private SocialLink(int orderNo, String name, Link link) {
         super(orderNo);
         this.name = name;
         this.link = link;
@@ -32,7 +32,7 @@ public class SociealLink extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private SociealLink(String id, int orderNo, String name, Link link) {
+    private SocialLink(String id, int orderNo, String name, Link link) {
         super(id, orderNo);
         this.name = name;
         this.link = link;
@@ -46,8 +46,8 @@ public class SociealLink extends Entity {
      * @param link    リンク
      * @return ソーシャルリンクエンティティ
      */
-    public static SociealLink create(int orderNo, String name, Link link) {
-        return new SociealLink(orderNo, name, link);
+    public static SocialLink create(int orderNo, String name, Link link) {
+        return new SocialLink(orderNo, name, link);
     }
 
     /**
@@ -59,8 +59,8 @@ public class SociealLink extends Entity {
      * @param link    リンク
      * @return ソーシャルリンクエンティティ
      */
-    public static SociealLink reconstruct(String id, int orderNo, String name, Link link) {
-        return new SociealLink(id, orderNo, name, link);
+    public static SocialLink reconstruct(String id, int orderNo, String name, Link link) {
+        return new SocialLink(id, orderNo, name, link);
     }
 
     /**
@@ -69,8 +69,8 @@ public class SociealLink extends Entity {
      * @param name ソーシャル名
      * @return 変更後のソーシャルリンクエンティティ
      */
-    public SociealLink changeName(String name) {
-        return new SociealLink(this.id, this.orderNo, name, this.link);
+    public SocialLink changeName(String name) {
+        return new SocialLink(this.id, this.orderNo, name, this.link);
     }
 
     /**
@@ -79,7 +79,7 @@ public class SociealLink extends Entity {
      * @param link リンク
      * @return 変更後のソーシャルリンクエンティティ
      */
-    public SociealLink changeLink(Link link) {
-        return new SociealLink(this.id, this.orderNo, this.name, link);
+    public SocialLink changeLink(Link link) {
+        return new SocialLink(this.id, this.orderNo, this.name, link);
     }
 }

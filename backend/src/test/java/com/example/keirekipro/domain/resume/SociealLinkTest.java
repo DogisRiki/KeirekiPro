@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.example.keirekipro.domain.model.resume.Link;
-import com.example.keirekipro.domain.model.resume.SociealLink;
+import com.example.keirekipro.domain.model.resume.SocialLink;
 import com.example.keirekipro.domain.shared.Notification;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +27,7 @@ class SociealLinkTest {
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
         Link link = Link.create(notification, "https://example.com");
-        SociealLink sociealLink = SociealLink.create(0, "GitHub", link);
+        SocialLink sociealLink = SocialLink.create(0, "GitHub", link);
         // インスタンスがnullでない。
         assertNotNull(sociealLink);
         // idが生成されている。
@@ -44,7 +44,7 @@ class SociealLinkTest {
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
         Link link = Link.create(notification, "https://example.com");
-        SociealLink sociealLink = SociealLink.reconstruct("1234", 0, "GitHub", link);
+        SocialLink sociealLink = SocialLink.reconstruct("1234", 0, "GitHub", link);
         // インスタンスがnullでない。
         assertNotNull(sociealLink);
         // idが正しい値である。
@@ -61,8 +61,8 @@ class SociealLinkTest {
     @DisplayName("ソーシャル名を変更する")
     void test3() {
         Link link = Link.create(notification, "https://example.com");
-        SociealLink beforeSociealLink = SociealLink.create(0, "GitHub", link);
-        SociealLink afterSociealLink = beforeSociealLink.changeName("LinkedIn");
+        SocialLink beforeSociealLink = SocialLink.create(0, "GitHub", link);
+        SocialLink afterSociealLink = beforeSociealLink.changeName("LinkedIn");
         // 変更したソーシャル名が正しい値である。
         assertEquals(afterSociealLink.getName(), "LinkedIn");
     }
@@ -71,9 +71,9 @@ class SociealLinkTest {
     @DisplayName("リンクを変更する")
     void test4() {
         Link beforeLink = Link.create(notification, "https://example.com");
-        SociealLink beforeSociealLink = SociealLink.create(0, "GitHub", beforeLink);
+        SocialLink beforeSociealLink = SocialLink.create(0, "GitHub", beforeLink);
         Link afterLink = Link.create(notification, "https://linkedin.com");
-        SociealLink afterSociealLink = beforeSociealLink.changeLink(afterLink);
+        SocialLink afterSociealLink = beforeSociealLink.changeLink(afterLink);
         // 変更したリンクが正しい値である。
         assertEquals(afterSociealLink.getLink(), afterLink);
     }
@@ -82,9 +82,9 @@ class SociealLinkTest {
     @DisplayName("ソーシャル名、リンクを変更する")
     void test5() {
         Link beforeLink = Link.create(notification, "https://example.com");
-        SociealLink beforeSociealLink = SociealLink.create(0, "GitHub", beforeLink);
+        SocialLink beforeSociealLink = SocialLink.create(0, "GitHub", beforeLink);
         Link afterLink = Link.create(notification, "https://linkedin.com");
-        SociealLink afterSociealLink = beforeSociealLink.changeLink(afterLink).changeName("LinkedIn");
+        SocialLink afterSociealLink = beforeSociealLink.changeLink(afterLink).changeName("LinkedIn");
         // 変更した項目が正しい値である。
         assertEquals(afterSociealLink.getLink(), afterLink);
         assertEquals(afterSociealLink.getName(), "LinkedIn");

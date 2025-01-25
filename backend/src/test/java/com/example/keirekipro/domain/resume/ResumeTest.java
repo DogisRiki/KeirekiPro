@@ -25,7 +25,7 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SociealLink;
+import com.example.keirekipro.domain.model.resume.SocialLink;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.shared.Notification;
 import com.example.keirekipro.domain.shared.exception.DomainException;
@@ -614,7 +614,7 @@ class ResumeTest {
     @DisplayName("ソーシャルリンクを追加する")
     void test25() {
         Resume beforeResume = createSampleResume();
-        SociealLink newSocialLink = SociealLink.create(
+        SocialLink newSocialLink = SocialLink.create(
                 1,
                 "Twitter",
                 Link.create(notification, "https://twitter.com/user"));
@@ -631,7 +631,7 @@ class ResumeTest {
     @DisplayName("ソーシャルリンクを更新する")
     void test26() {
         Resume beforeResume = createSampleResume();
-        SociealLink updatedSocialLink = SociealLink.reconstruct(
+        SocialLink updatedSocialLink = SocialLink.reconstruct(
                 beforeResume.getSociealLinks().get(0).getId(),
                 0,
                 "LinkedIn",
@@ -655,7 +655,7 @@ class ResumeTest {
     @DisplayName("ソーシャルリンクを削除する")
     void test27() {
         Resume beforeResume = createSampleResume();
-        SociealLink newSocialLink = SociealLink.create(
+        SocialLink newSocialLink = SocialLink.create(
                 1,
                 "Facebook",
                 Link.create(notification, "https://facebook.com/user"));
@@ -820,8 +820,8 @@ class ResumeTest {
     /**
      * ソーシャルリンクのサンプルエンティティを作成する補助メソッド
      */
-    private SociealLink createSampleSociealLink() {
-        return SociealLink.create(0, "GitHub", Link.create(notification, "https://github.com/user"));
+    private SocialLink createSampleSociealLink() {
+        return SocialLink.create(0, "GitHub", Link.create(notification, "https://github.com/user"));
     }
 
     /**
