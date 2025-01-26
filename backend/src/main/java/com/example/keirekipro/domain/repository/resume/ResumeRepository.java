@@ -6,12 +6,9 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Resume;
 
-import org.springframework.stereotype.Repository;
-
 /**
  * 職務経歴書リポジトリ
  */
-@Repository
 public interface ResumeRepository {
     /**
      * 全ての職務経歴書を取得する
@@ -31,5 +28,5 @@ public interface ResumeRepository {
     /**
      * 職務経歴書を削除する
      */
-    void delete(UUID userId, UUID resumeId);
+    void delete(UUID resumeId);
 }
