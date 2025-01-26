@@ -133,4 +133,48 @@ class ResumeNameTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("職務経歴書名がnullまたは空白の状態でインスタンス化する")
+    void test5() {
+        // nullのケース
+        {
+            reset(notification);
+            ResumeName resumeName = ResumeName.create(notification, null);
+            assertNotNull(resumeName);
+            verify(notification, times(1)).addError(
+                    eq("resumeName"),
+                    eq("職務経歴書名は入力必須です。"));
+        }
+
+        // 空文字のケース
+        {
+            reset(notification);
+            ResumeName resumeName = ResumeName.create(notification, "");
+            assertNotNull(resumeName);
+            verify(notification, times(1)).addError(
+                    eq("resumeName"),
+                    eq("職務経歴書名は入力必須です。"));
+        }
+
+        // スペースのみのケース
+        {
+            reset(notification);
+            ResumeName resumeName = ResumeName.create(notification, "   ");
+            assertNotNull(resumeName);
+            verify(notification, times(1)).addError(
+                    eq("resumeName"),
+                    eq("職務経歴書名は入力必須です。"));
+        }
+
+        // タブのみのケース
+        {
+            reset(notification);
+            ResumeName resumeName = ResumeName.create(notification, "\t");
+            assertNotNull(resumeName);
+            verify(notification, times(1)).addError(
+                    eq("resumeName"),
+                    eq("職務経歴書名は入力必須です。"));
+        }
+    }
 }

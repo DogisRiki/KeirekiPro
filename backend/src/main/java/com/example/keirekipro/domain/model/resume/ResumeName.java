@@ -41,6 +41,10 @@ public class ResumeName {
     }
 
     private void validate(Notification notification, String value) {
+        if (value == null || value.isBlank()) {
+            notification.addError("resumeName", "職務経歴書名は入力必須です。");
+            return;
+        }
         if (isInvalidValue(value)) {
             notification.addError("resumeName", "職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | ");
         }
