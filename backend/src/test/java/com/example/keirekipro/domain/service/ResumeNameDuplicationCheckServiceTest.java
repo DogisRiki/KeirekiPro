@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
@@ -99,6 +100,7 @@ class ResumeNameDuplicationCheckServiceTest {
                 userId,
                 ResumeName.create(notification, resumeName),
                 LocalDate.now(),
+                FullName.create(notification, "山田", "太郎"),
                 false,
                 LocalDateTime.now(),
                 LocalDateTime.now(),

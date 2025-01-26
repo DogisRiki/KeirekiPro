@@ -35,6 +35,11 @@ public class Resume extends Entity {
     private final LocalDate date;
 
     /**
+     * 氏名
+     */
+    private final FullName fullName;
+
+    /**
      * 自動保存設定
      */
     private final boolean autoSaveEnabled;
@@ -111,6 +116,7 @@ public class Resume extends Entity {
      * 新規構築用のコンストラクタ
      */
     private Resume(Notification notification, int orderNo, UUID userId, ResumeName name, LocalDate date,
+            FullName fullName,
             boolean autoSaveEnabled,
             LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers, List<Project> projects,
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
@@ -123,6 +129,7 @@ public class Resume extends Entity {
         this.userId = userId;
         this.name = name;
         this.date = date;
+        this.fullName = fullName;
         this.autoSaveEnabled = autoSaveEnabled;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -137,7 +144,8 @@ public class Resume extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Resume(UUID id, int orderNo, UUID userId, ResumeName name, LocalDate date, boolean autoSaveEnabled,
+    private Resume(UUID id, int orderNo, UUID userId, ResumeName name, LocalDate date, FullName fullName,
+            boolean autoSaveEnabled,
             LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers, List<Project> projects,
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
@@ -145,6 +153,7 @@ public class Resume extends Entity {
         this.userId = userId;
         this.name = name;
         this.date = date;
+        this.fullName = fullName;
         this.autoSaveEnabled = autoSaveEnabled;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -163,6 +172,7 @@ public class Resume extends Entity {
      * @param orderNo         並び順
      * @param userId          ユーザーID
      * @param name            職務経歴書名
+     * @param fullName        氏名
      * @param date            日付
      * @param autoSaveEnabled 自動保存設定
      * @param createdAt       作成日時
@@ -176,11 +186,13 @@ public class Resume extends Entity {
      * @return 職務経歴書エンティティ
      */
     public static Resume create(Notification notification, int orderNo, UUID userId, ResumeName name, LocalDate date,
+            FullName fullName,
             boolean autoSaveEnabled,
             LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers,
             List<Project> projects, List<Certification> certifications, List<Portfolio> portfolios,
             List<SocialLink> socialLinks, List<SelfPromotion> selfPromotions) {
-        return new Resume(notification, orderNo, userId, name, date, autoSaveEnabled, createdAt, updatedAt, careers,
+        return new Resume(notification, orderNo, userId, name, date, fullName, autoSaveEnabled, createdAt, updatedAt,
+                careers,
                 projects,
                 certifications, portfolios, socialLinks, selfPromotions);
     }
@@ -192,6 +204,7 @@ public class Resume extends Entity {
      * @param orderNo         並び順
      * @param userId          ユーザーID
      * @param name            職務経歴書名
+     * @param fullName        氏名
      * @param date            日付
      * @param autoSaveEnabled 自動保存設定
      * @param createdAt       作成日時
@@ -205,11 +218,13 @@ public class Resume extends Entity {
      * @return 職務経歴書エンティティ
      */
     public static Resume reconstruct(UUID id, int orderNo, UUID userId, ResumeName name, LocalDate date,
+            FullName fullName,
             boolean autoSaveEnabled, LocalDateTime createdAt, LocalDateTime updatedAt,
             List<Career> careers, List<Project> projects, List<Certification> certifications,
             List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
-        return new Resume(id, orderNo, userId, name, date, autoSaveEnabled, createdAt, updatedAt, careers, projects,
+        return new Resume(id, orderNo, userId, name, date, fullName, autoSaveEnabled, createdAt, updatedAt, careers,
+                projects,
                 certifications, portfolios, socialLinks, selfPromotions);
     }
 
@@ -220,7 +235,21 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume changeName(ResumeName name) {
-        return new Resume(this.id, this.orderNo, this.userId, name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, name, this.date, this.fullName, this.autoSaveEnabled,
+                this.createdAt, LocalDateTime
+                        .now(),
+                this.careers, this.projects,
+                this.certifications, this.portfolios, this.socialLinks, this.selfPromotions);
+    }
+
+    /**
+     * 氏名を変更する
+     *
+     * @param fullName 新しい氏名
+     * @return 変更後の職務経歴書エンティティ
+     */
+    public Resume ChangeFullName(FullName fullName) {
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects,
@@ -234,7 +263,7 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume changeDate(LocalDate date) {
-        return new Resume(this.id, this.orderNo, this.userId, this.name, date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects,
@@ -248,7 +277,7 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume changeAutoSaveEnabled(boolean autoSaveEnabled) {
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects,
@@ -268,7 +297,7 @@ public class Resume extends Entity {
         }
         List<Career> updatedCareers = new ArrayList<>(this.careers);
         updatedCareers.add(career);
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 updatedCareers, this.projects, this.certifications,
@@ -289,7 +318,7 @@ public class Resume extends Entity {
         List<Career> updatedCareers = this.careers.stream()
                 .map(career -> career.getId().equals(updatedCareer.getId()) ? updatedCareer : career)
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 updatedCareers, this.projects, this.certifications,
@@ -306,7 +335,7 @@ public class Resume extends Entity {
         List<Career> updatedCareers = this.careers.stream()
                 .filter(career -> !career.getId().equals(careerId))
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 updatedCareers, this.projects, this.certifications,
@@ -381,7 +410,7 @@ public class Resume extends Entity {
         }
         List<Project> updatedProjects = new ArrayList<>(this.projects);
         updatedProjects.add(project);
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, updatedProjects, this.certifications,
@@ -402,7 +431,7 @@ public class Resume extends Entity {
         List<Project> updatedProjects = this.projects.stream()
                 .map(project -> project.getId().equals(updatedProject.getId()) ? updatedProject : project)
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, updatedProjects, this.certifications,
@@ -419,7 +448,7 @@ public class Resume extends Entity {
         List<Project> updatedProjects = this.projects.stream()
                 .filter(project -> !project.getId().equals(projectId))
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, updatedProjects, this.certifications,
@@ -450,7 +479,7 @@ public class Resume extends Entity {
     public Resume addCertification(Certification certification) {
         List<Certification> updatedCertifications = new ArrayList<>(this.certifications);
         updatedCertifications.add(certification);
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, updatedCertifications,
@@ -468,7 +497,7 @@ public class Resume extends Entity {
                 .map(certification -> certification.getId().equals(updatedCertification.getId()) ? updatedCertification
                         : certification)
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, updatedCertifications,
@@ -485,7 +514,7 @@ public class Resume extends Entity {
         List<Certification> updatedCertifications = this.certifications.stream()
                 .filter(certification -> !certification.getId().equals(certificationId))
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, updatedCertifications,
@@ -501,7 +530,7 @@ public class Resume extends Entity {
     public Resume addPortfolio(Portfolio portfolio) {
         List<Portfolio> updatedPortfolios = new ArrayList<>(this.portfolios);
         updatedPortfolios.add(portfolio);
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,
@@ -518,7 +547,7 @@ public class Resume extends Entity {
         List<Portfolio> updatedPortfolios = this.portfolios.stream()
                 .map(portfolio -> portfolio.getId().equals(updatedPortfolio.getId()) ? updatedPortfolio : portfolio)
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,
@@ -535,7 +564,7 @@ public class Resume extends Entity {
         List<Portfolio> updatedPortfolios = this.portfolios.stream()
                 .filter(portfolio -> !portfolio.getId().equals(portfolioId))
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,
@@ -551,7 +580,7 @@ public class Resume extends Entity {
     public Resume addSociealLink(SocialLink sociealLink) {
         List<SocialLink> updatedSocialLinks = new ArrayList<>(this.socialLinks);
         updatedSocialLinks.add(sociealLink);
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,
@@ -569,7 +598,7 @@ public class Resume extends Entity {
                 .map(sociealLink -> sociealLink.getId().equals(updatedSociealLink.getId()) ? updatedSociealLink
                         : sociealLink)
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,
@@ -586,7 +615,7 @@ public class Resume extends Entity {
         List<SocialLink> updatedSocialLinks = this.socialLinks.stream()
                 .filter(sociealLink -> !sociealLink.getId().equals(sociealLinkId))
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,
@@ -602,7 +631,7 @@ public class Resume extends Entity {
     public Resume addSelfPromotion(SelfPromotion selfPromotion) {
         List<SelfPromotion> updatedSelfPromotions = new ArrayList<>(this.selfPromotions);
         updatedSelfPromotions.add(selfPromotion);
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,
@@ -619,7 +648,7 @@ public class Resume extends Entity {
         List<SelfPromotion> updatedSelfPromotions = this.selfPromotions.stream()
                 .filter(selfPromotion -> !selfPromotion.getId().equals(selfPromotionId))
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,
@@ -637,7 +666,7 @@ public class Resume extends Entity {
                 .map(selfPromotion -> selfPromotion.getId().equals(updatedSelfPromotion.getId()) ? updatedSelfPromotion
                         : selfPromotion)
                 .toList();
-        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.autoSaveEnabled,
+        return new Resume(this.id, this.orderNo, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
                 this.createdAt, LocalDateTime
                         .now(),
                 this.careers, this.projects, this.certifications,

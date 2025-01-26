@@ -19,6 +19,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.Certification;
+import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Portfolio;
@@ -61,6 +62,7 @@ class ResumeTest {
         assertEquals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), resume.getUserId());
         assertEquals(ResumeName.create(notification, "職務経歴書A"), resume.getName());
         assertEquals(LocalDate.now(), resume.getDate());
+        assertEquals(FullName.create(notification, "山田", "太郎"), resume.getFullName());
         assertEquals(true, resume.isAutoSaveEnabled());
         assertEquals(LocalDateTime.of(2023, 1, 1, 0, 0), resume.getCreatedAt());
         assertEquals(LocalDateTime.of(2023, 1, 2, 0, 0), resume.getUpdatedAt());
@@ -80,6 +82,7 @@ class ResumeTest {
                     userId,
                     null, // 名前がnull
                     LocalDate.now(),
+                    FullName.create(notification, "山田", "太郎"),
                     true,
                     LocalDateTime.now(),
                     LocalDateTime.now(),
@@ -103,6 +106,7 @@ class ResumeTest {
                 userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.of(2023, 1, 1),
+                FullName.create(notification, "山田", "太郎"),
                 true,
                 LocalDateTime.of(2023, 1, 1, 0, 0),
                 LocalDateTime.of(2023, 1, 2, 0, 0),
@@ -123,6 +127,7 @@ class ResumeTest {
         assertEquals(userId, resume.getUserId());
         assertEquals(ResumeName.create(notification, "職務経歴書A"), resume.getName());
         assertEquals(LocalDate.of(2023, 1, 1), resume.getDate());
+        assertEquals(FullName.create(notification, "山田", "太郎"), resume.getFullName());
         assertEquals(true, resume.isAutoSaveEnabled());
         assertEquals(LocalDateTime.of(2023, 1, 1, 0, 0), resume.getCreatedAt());
         assertEquals(LocalDateTime.of(2023, 1, 2, 0, 0), resume.getUpdatedAt());
@@ -190,6 +195,7 @@ class ResumeTest {
                 userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
+                FullName.create(notification, "山田", "太郎"),
                 true,
                 LocalDateTime.of(2023, 1, 1, 0, 0),
                 LocalDateTime.of(2023, 1, 2, 0, 0),
@@ -242,6 +248,7 @@ class ResumeTest {
                 userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
+                FullName.create(notification, "山田", "太郎"),
                 true,
                 LocalDateTime.of(2023, 1, 1, 0, 0),
                 LocalDateTime.of(2023, 1, 2, 0, 0),
@@ -747,6 +754,16 @@ class ResumeTest {
         assertTrue(deletedResume2.getSelfPromotions().isEmpty());
     }
 
+    @Test
+    @DisplayName("氏名を変更する")
+    void test31() {
+        Resume originalResume = createSampleResume();
+        FullName newFullName = FullName.create(notification, "変更", "しました");
+        Resume updatedResume = originalResume.ChangeFullName(newFullName);
+        // 職務経歴書名が正しい値である。
+        assertEquals(newFullName, updatedResume.getFullName());
+    }
+
     /**
      * 職務経歴書のサンプルエンティティを作成する補助メソッド
      */
@@ -758,6 +775,7 @@ class ResumeTest {
                 userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
+                FullName.create(notification, "山田", "太郎"),
                 true,
                 LocalDateTime.of(2023, 1, 1, 0, 0),
                 LocalDateTime.of(2023, 1, 2, 0, 0),
