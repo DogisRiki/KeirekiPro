@@ -1,5 +1,7 @@
 package com.example.keirekipro.domain.model.resume;
 
+import java.util.UUID;
+
 import com.example.keirekipro.domain.shared.Entity;
 
 import lombok.Getter;
@@ -44,7 +46,7 @@ public class Portfolio extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Portfolio(String id, int orderNo, String name, String overview, String techStack, Link link) {
+    private Portfolio(UUID id, int orderNo, String name, String overview, String techStack, Link link) {
         super(id, orderNo);
         this.name = name;
         this.overview = overview;
@@ -77,7 +79,7 @@ public class Portfolio extends Entity {
      * @param link      リンク
      * @return ポートフォリオエンティティ
      */
-    public static Portfolio reconstruct(String id, int orderNo, String name, String overview, String techStack,
+    public static Portfolio reconstruct(UUID id, int orderNo, String name, String overview, String techStack,
             Link link) {
         return new Portfolio(id, orderNo, name, overview, techStack, link);
     }

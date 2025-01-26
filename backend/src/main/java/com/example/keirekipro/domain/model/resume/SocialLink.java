@@ -1,5 +1,7 @@
 package com.example.keirekipro.domain.model.resume;
 
+import java.util.UUID;
+
 import com.example.keirekipro.domain.shared.Entity;
 
 import lombok.Getter;
@@ -32,7 +34,7 @@ public class SocialLink extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private SocialLink(String id, int orderNo, String name, Link link) {
+    private SocialLink(UUID id, int orderNo, String name, Link link) {
         super(id, orderNo);
         this.name = name;
         this.link = link;
@@ -59,7 +61,7 @@ public class SocialLink extends Entity {
      * @param link    リンク
      * @return ソーシャルリンクエンティティ
      */
-    public static SocialLink reconstruct(String id, int orderNo, String name, Link link) {
+    public static SocialLink reconstruct(UUID id, int orderNo, String name, Link link) {
         return new SocialLink(id, orderNo, name, link);
     }
 

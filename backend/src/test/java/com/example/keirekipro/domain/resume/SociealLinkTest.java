@@ -3,6 +3,8 @@ package com.example.keirekipro.domain.resume;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.util.UUID;
+
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.SocialLink;
 import com.example.keirekipro.domain.shared.Notification;
@@ -44,7 +46,8 @@ class SociealLinkTest {
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
         Link link = Link.create(notification, "https://example.com");
-        SocialLink sociealLink = SocialLink.reconstruct("1234", 0, "GitHub", link);
+        UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        SocialLink sociealLink = SocialLink.reconstruct(id, 0, "GitHub", link);
         // インスタンスがnullでない。
         assertNotNull(sociealLink);
         // idが正しい値である。

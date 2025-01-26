@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.time.YearMonth;
 import java.util.List;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Project;
@@ -57,7 +58,8 @@ class ProjectTest {
         Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
-        Project project = Project.reconstruct("1234", 0, "株式会社ABC", period, "プロジェクト概要", "5人", "リーダー", "成果内容", process,
+        UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        Project project = Project.reconstruct(id, 0, "株式会社ABC", period, "プロジェクト概要", "5人", "リーダー", "成果内容", process,
                 techStack);
         // インスタンスがnullでない。
         assertNotNull(project);

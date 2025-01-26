@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
 import com.example.keirekipro.domain.shared.Notification;
@@ -21,7 +22,7 @@ public class Resume extends Entity {
     /**
      * ユーザーID
      */
-    private final String userId;
+    private final UUID userId;
 
     /**
      * 職務経歴書名
@@ -109,7 +110,7 @@ public class Resume extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private Resume(Notification notification, int orderNo, String userId, ResumeName name, LocalDate date,
+    private Resume(Notification notification, int orderNo, UUID userId, ResumeName name, LocalDate date,
             boolean autoSaveEnabled,
             LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers, List<Project> projects,
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
@@ -136,7 +137,7 @@ public class Resume extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Resume(String id, int orderNo, String userId, ResumeName name, LocalDate date, boolean autoSaveEnabled,
+    private Resume(UUID id, int orderNo, UUID userId, ResumeName name, LocalDate date, boolean autoSaveEnabled,
             LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers, List<Project> projects,
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
@@ -174,7 +175,7 @@ public class Resume extends Entity {
      * @param selfPromotions  自己PRリスト
      * @return 職務経歴書エンティティ
      */
-    public static Resume create(Notification notification, int orderNo, String userId, ResumeName name, LocalDate date,
+    public static Resume create(Notification notification, int orderNo, UUID userId, ResumeName name, LocalDate date,
             boolean autoSaveEnabled,
             LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers,
             List<Project> projects, List<Certification> certifications, List<Portfolio> portfolios,
@@ -203,7 +204,7 @@ public class Resume extends Entity {
      * @param selfPromotions  自己PRリスト
      * @return 職務経歴書エンティティ
      */
-    public static Resume reconstruct(String id, int orderNo, String userId, ResumeName name, LocalDate date,
+    public static Resume reconstruct(UUID id, int orderNo, UUID userId, ResumeName name, LocalDate date,
             boolean autoSaveEnabled, LocalDateTime createdAt, LocalDateTime updatedAt,
             List<Career> careers, List<Project> projects, List<Certification> certifications,
             List<Portfolio> portfolios, List<SocialLink> socialLinks,
@@ -301,7 +302,7 @@ public class Resume extends Entity {
      * @param careerId 削除する職歴の識別子
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume removeCareer(String careerId) {
+    public Resume removeCareer(UUID careerId) {
         List<Career> updatedCareers = this.careers.stream()
                 .filter(career -> !career.getId().equals(careerId))
                 .toList();
@@ -414,7 +415,7 @@ public class Resume extends Entity {
      * @param projectId 削除するプロジェクトの識別子
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume removeProject(String projectId) {
+    public Resume removeProject(UUID projectId) {
         List<Project> updatedProjects = this.projects.stream()
                 .filter(project -> !project.getId().equals(projectId))
                 .toList();
@@ -480,7 +481,7 @@ public class Resume extends Entity {
      * @param certificationId 削除する資格の識別子
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume removeCertification(String certificationId) {
+    public Resume removeCertification(UUID certificationId) {
         List<Certification> updatedCertifications = this.certifications.stream()
                 .filter(certification -> !certification.getId().equals(certificationId))
                 .toList();
@@ -530,7 +531,7 @@ public class Resume extends Entity {
      * @param portfolioId 削除するポートフォリオの識別子
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume removePortfolio(String portfolioId) {
+    public Resume removePortfolio(UUID portfolioId) {
         List<Portfolio> updatedPortfolios = this.portfolios.stream()
                 .filter(portfolio -> !portfolio.getId().equals(portfolioId))
                 .toList();
@@ -581,7 +582,7 @@ public class Resume extends Entity {
      * @param sociealLinkId 削除するソーシャルリンクの識別子
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume removeSociealLink(String sociealLinkId) {
+    public Resume removeSociealLink(UUID sociealLinkId) {
         List<SocialLink> updatedSocialLinks = this.socialLinks.stream()
                 .filter(sociealLink -> !sociealLink.getId().equals(sociealLinkId))
                 .toList();
@@ -614,7 +615,7 @@ public class Resume extends Entity {
      * @param selfPromotionId 削除する自己PRの識別子
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume removeSelfPromotion(String selfPromotionId) {
+    public Resume removeSelfPromotion(UUID selfPromotionId) {
         List<SelfPromotion> updatedSelfPromotions = this.selfPromotions.stream()
                 .filter(selfPromotion -> !selfPromotion.getId().equals(selfPromotionId))
                 .toList();

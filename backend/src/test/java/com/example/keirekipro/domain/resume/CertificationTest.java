@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.time.YearMonth;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Certification;
 
@@ -31,7 +32,8 @@ class CertificationTest {
     @Test
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
-        Certification certification = Certification.reconstruct("1234", 0, "基本情報技術者", YearMonth.of(2025, 01));
+        UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        Certification certification = Certification.reconstruct(id, 0, "基本情報技術者", YearMonth.of(2025, 01));
         // インスタンスがnullでない。
         assertNotNull(certification);
         // idが正しい値である。

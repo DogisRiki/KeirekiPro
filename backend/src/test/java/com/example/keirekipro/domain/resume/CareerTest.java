@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.time.YearMonth;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.Period;
@@ -46,11 +47,12 @@ class CareerTest {
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
         Period period = Period.create(notification, YearMonth.of(2025, 01), YearMonth.of(2025, 02), false);
-        Career career = Career.reconstruct("1234", 0, "株式会社ABC", period);
+        UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        Career career = Career.reconstruct(id, 0, "株式会社ABC", period);
         // インスタンスがnullでない。
         assertNotNull(career);
         // idが正しい値である。
-        assertEquals(career.getId(), "1234");
+        assertEquals(career.getId(), id);
         // 並び順が正しい値である。
         assertEquals(career.getOrderNo(), 0);
         // 会社名が正しい値である。

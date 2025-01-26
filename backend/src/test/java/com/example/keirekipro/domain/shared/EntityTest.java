@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +17,7 @@ class EntityTest {
             super(orderNo);
         }
 
-        public TestEntity(String id, int orderNo) {
+        public TestEntity(UUID id, int orderNo) {
             super(id, orderNo);
         }
     }
@@ -33,9 +35,10 @@ class EntityTest {
     @Test
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
-        TestEntity entity = new TestEntity("5af48f3b-468b-4ae0-a065-7d7ac70b37a8", 2);
+        UUID id = UUID.fromString("5af48f3b-468b-4ae0-a065-7d7ac70b37a8");
+        TestEntity entity = new TestEntity(id, 2);
         // idが正しい値である。
-        assertEquals(entity.getId(), "5af48f3b-468b-4ae0-a065-7d7ac70b37a8");
+        assertEquals(entity.getId(), id);
         // 並び順が正しい値である。
         assertEquals(entity.getOrderNo(), 2);
     }
@@ -52,9 +55,11 @@ class EntityTest {
     @Test
     @DisplayName("等価チェック")
     void test4() {
-        TestEntity entity1 = new TestEntity("1234", 1);
-        TestEntity entity2 = new TestEntity("1234", 1);
-        TestEntity entity3 = new TestEntity("9999", 1);
+        UUID id1 = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        UUID id2 = UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
+        TestEntity entity1 = new TestEntity(id1, 1);
+        TestEntity entity2 = new TestEntity(id1, 1);
+        TestEntity entity3 = new TestEntity(id2, 1);
         // idが同値であれば等価である。
         assertEquals(entity1, entity2);
         // idが同値でなければ等価でない。
@@ -64,9 +69,11 @@ class EntityTest {
     @Test
     @DisplayName("ハッシュ値")
     void test5() {
-        int entity1 = new TestEntity("1234", 1).hashCode();
-        int entity2 = new TestEntity("1234", 1).hashCode();
-        int entity3 = new TestEntity("9999", 1).hashCode();
+        UUID id1 = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        UUID id2 = UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
+        int entity1 = new TestEntity(id1, 1).hashCode();
+        int entity2 = new TestEntity(id1, 1).hashCode();
+        int entity3 = new TestEntity(id2, 1).hashCode();
         // idが同値であれば同一のハッシュ値である。
         assertEquals(entity1, entity2);
         // idが異なればハッシュ値も異なる。

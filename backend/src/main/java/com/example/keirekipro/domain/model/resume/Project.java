@@ -1,5 +1,7 @@
 package com.example.keirekipro.domain.model.resume;
 
+import java.util.UUID;
+
 import com.example.keirekipro.domain.shared.Entity;
 
 import lombok.EqualsAndHashCode;
@@ -70,7 +72,7 @@ public class Project extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Project(String id, int orderNo, String companyName, Period period, String overview, String teamComp,
+    private Project(UUID id, int orderNo, String companyName, Period period, String overview, String teamComp,
             String role,
             String achievement, Process process, TechStack techStack) {
         super(id, orderNo);
@@ -117,7 +119,7 @@ public class Project extends Entity {
      * @param process     作業工程
      * @return プロジェクトエンティティ
      */
-    public static Project reconstruct(String id, int orderNo, String companyName, Period period, String overview,
+    public static Project reconstruct(UUID id, int orderNo, String companyName, Period period, String overview,
             String teamComp,
             String role,
             String achievement, Process process, TechStack techStack) {

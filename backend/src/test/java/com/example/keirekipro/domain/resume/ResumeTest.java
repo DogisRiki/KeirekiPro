@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.Certification;
@@ -57,7 +58,7 @@ class ResumeTest {
         // 並び順が正しい値である。
         assertEquals(0, resume.getOrderNo());
         // 各フィールドが正しい値である。
-        assertEquals("user123", resume.getUserId());
+        assertEquals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), resume.getUserId());
         assertEquals(ResumeName.create(notification, "職務経歴書A"), resume.getName());
         assertEquals(LocalDate.now(), resume.getDate());
         assertEquals(true, resume.isAutoSaveEnabled());
@@ -70,12 +71,13 @@ class ResumeTest {
     void test2() {
         Notification invalidNotification = new Notification();
         invalidNotification.addError("name", "職務経歴書名は必須です。");
+        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         // ドメイン例外がスローされる。
         assertThrows(DomainException.class, () -> {
             Resume.create(
                     invalidNotification,
                     0,
-                    "user123",
+                    userId,
                     null, // 名前がnull
                     LocalDate.now(),
                     true,
@@ -93,10 +95,12 @@ class ResumeTest {
     @Test
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test3() {
+        UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        UUID userId = UUID.fromString("223e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.reconstruct(
-                "12345",
+                id,
                 0,
-                "user123",
+                userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.of(2023, 1, 1),
                 true,
@@ -112,11 +116,11 @@ class ResumeTest {
         // インスタンスがnullでない。
         assertNotNull(resume);
         // IDが正しい値である。
-        assertEquals("12345", resume.getId());
+        assertEquals(id, resume.getId());
         // 並び順が正しい値である。
         assertEquals(0, resume.getOrderNo());
         // 各フィールドが正しい値である。
-        assertEquals("user123", resume.getUserId());
+        assertEquals(userId, resume.getUserId());
         assertEquals(ResumeName.create(notification, "職務経歴書A"), resume.getName());
         assertEquals(LocalDate.of(2023, 1, 1), resume.getDate());
         assertEquals(true, resume.isAutoSaveEnabled());
@@ -179,10 +183,11 @@ class ResumeTest {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
+        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
                 notification,
                 0,
-                "user123",
+                userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 true,
@@ -230,10 +235,11 @@ class ResumeTest {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
+        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
                 notification,
                 0,
-                "user123",
+                userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 true,
@@ -745,10 +751,11 @@ class ResumeTest {
      * 職務経歴書のサンプルエンティティを作成する補助メソッド
      */
     private Resume createSampleResume() {
+        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         return Resume.create(
                 notification,
                 0,
-                "user123",
+                userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 true,

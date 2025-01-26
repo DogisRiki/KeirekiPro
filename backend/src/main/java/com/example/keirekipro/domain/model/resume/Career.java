@@ -1,5 +1,7 @@
 package com.example.keirekipro.domain.model.resume;
 
+import java.util.UUID;
+
 import com.example.keirekipro.domain.shared.Entity;
 
 import lombok.Getter;
@@ -32,7 +34,7 @@ public class Career extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Career(String id, int orderNo, String companyName, Period period) {
+    private Career(UUID id, int orderNo, String companyName, Period period) {
         super(id, orderNo);
         this.companyName = companyName;
         this.period = period;
@@ -59,7 +61,7 @@ public class Career extends Entity {
      * @param period      期間
      * @return 職歴エンティティ
      */
-    public static Career reconstruct(String id, int orderNo, String companyName, Period period) {
+    public static Career reconstruct(UUID id, int orderNo, String companyName, Period period) {
         return new Career(id, orderNo, companyName, period);
     }
 

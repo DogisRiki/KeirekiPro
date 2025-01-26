@@ -1,6 +1,7 @@
 package com.example.keirekipro.domain.model.resume;
 
 import java.time.YearMonth;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
 
@@ -34,7 +35,7 @@ public class Certification extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Certification(String id, int orderNo, String name, YearMonth date) {
+    private Certification(UUID id, int orderNo, String name, YearMonth date) {
         super(id, orderNo);
         this.name = name;
         this.date = date;
@@ -61,7 +62,7 @@ public class Certification extends Entity {
      * @param date    取得年月
      * @return 資格エンティティ
      */
-    public static Certification reconstruct(String id, int orderNo, String name, YearMonth date) {
+    public static Certification reconstruct(UUID id, int orderNo, String name, YearMonth date) {
         return new Certification(id, orderNo, name, date);
     }
 

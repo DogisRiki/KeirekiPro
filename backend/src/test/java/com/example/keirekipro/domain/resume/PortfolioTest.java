@@ -3,6 +3,8 @@ package com.example.keirekipro.domain.resume;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.util.UUID;
+
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.shared.Notification;
@@ -48,7 +50,8 @@ class PortfolioTest {
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
         Link link = Link.create(notification, "https://example.com");
-        Portfolio portfolio = Portfolio.reconstruct("1234", 0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        Portfolio portfolio = Portfolio.reconstruct(id, 0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         // インスタンスがnullでない。
         assertNotNull(portfolio);
         // idが正しい値である。
