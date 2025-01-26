@@ -64,8 +64,8 @@ class ResumeTest {
         assertEquals(LocalDate.now(), resume.getDate());
         assertEquals(FullName.create(notification, "山田", "太郎"), resume.getFullName());
         assertEquals(true, resume.isAutoSaveEnabled());
-        assertEquals(LocalDateTime.of(2023, 1, 1, 0, 0), resume.getCreatedAt());
-        assertEquals(LocalDateTime.of(2023, 1, 2, 0, 0), resume.getUpdatedAt());
+        assertNotNull(resume.getCreatedAt());
+        assertNotNull(resume.getUpdatedAt());
     }
 
     @Test
@@ -84,8 +84,6 @@ class ResumeTest {
                     LocalDate.now(),
                     FullName.create(notification, "山田", "太郎"),
                     true,
-                    LocalDateTime.now(),
-                    LocalDateTime.now(),
                     List.of(),
                     List.of(),
                     List.of(),
@@ -197,8 +195,6 @@ class ResumeTest {
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
                 true,
-                LocalDateTime.of(2023, 1, 1, 0, 0),
-                LocalDateTime.of(2023, 1, 2, 0, 0),
                 List.of(Career.create(0, "株式会社ABC",
                         Period.create(notification, YearMonth.of(2024, 1), null, true))),
                 List.of(),
@@ -250,8 +246,6 @@ class ResumeTest {
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
                 true,
-                LocalDateTime.of(2023, 1, 1, 0, 0),
-                LocalDateTime.of(2023, 1, 2, 0, 0),
                 List.of(Career.create(0, "株式会社ABC",
                         Period.create(notification, YearMonth.of(2024, 1), null, true))),
                 List.of(),
@@ -777,8 +771,6 @@ class ResumeTest {
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
                 true,
-                LocalDateTime.of(2023, 1, 1, 0, 0),
-                LocalDateTime.of(2023, 1, 2, 0, 0),
                 List.of(createSampleCareer()),
                 List.of(createSampleProject()),
                 List.of(createSampleCertification()),

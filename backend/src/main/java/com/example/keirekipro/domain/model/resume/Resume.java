@@ -118,7 +118,7 @@ public class Resume extends Entity {
     private Resume(Notification notification, int orderNo, UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
             boolean autoSaveEnabled,
-            LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers, List<Project> projects,
+            List<Career> careers, List<Project> projects,
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
         super(orderNo);
@@ -131,8 +131,8 @@ public class Resume extends Entity {
         this.date = date;
         this.fullName = fullName;
         this.autoSaveEnabled = autoSaveEnabled;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
         this.careers = careers;
         this.projects = projects;
         this.certifications = certifications;
@@ -175,8 +175,6 @@ public class Resume extends Entity {
      * @param fullName        氏名
      * @param date            日付
      * @param autoSaveEnabled 自動保存設定
-     * @param createdAt       作成日時
-     * @param updatedAt       更新日時
      * @param careers         職歴リスト
      * @param projects        プロジェクトリスト
      * @param certifications  資格リスト
@@ -187,11 +185,10 @@ public class Resume extends Entity {
      */
     public static Resume create(Notification notification, int orderNo, UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
-            boolean autoSaveEnabled,
-            LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers,
+            boolean autoSaveEnabled, List<Career> careers,
             List<Project> projects, List<Certification> certifications, List<Portfolio> portfolios,
             List<SocialLink> socialLinks, List<SelfPromotion> selfPromotions) {
-        return new Resume(notification, orderNo, userId, name, date, fullName, autoSaveEnabled, createdAt, updatedAt,
+        return new Resume(notification, orderNo, userId, name, date, fullName, autoSaveEnabled,
                 careers,
                 projects,
                 certifications, portfolios, socialLinks, selfPromotions);
