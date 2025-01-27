@@ -59,6 +59,7 @@ package com.example.keirekipro.domain.model.resume {
     class Project {
         - String companyName
         - Period period
+        - String name
         - String overview
         - String teamComp
         - String role
