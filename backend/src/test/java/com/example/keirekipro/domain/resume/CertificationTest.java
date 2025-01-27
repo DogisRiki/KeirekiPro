@@ -37,7 +37,7 @@ class CertificationTest {
         // インスタンスがnullでない。
         assertNotNull(certification);
         // idが正しい値である。
-        assertEquals(certification.getId(), "1234");
+        assertEquals(certification.getId(), id);
         // 並び順が正しい値である。
         assertEquals(0, certification.getOrderNo());
         // 資格名が正しい値である。

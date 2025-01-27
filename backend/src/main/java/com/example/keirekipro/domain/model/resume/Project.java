@@ -24,6 +24,11 @@ public class Project extends Entity {
     private final Period period;
 
     /**
+     * プロジェクト名
+     */
+    private final String name;
+
+    /**
      * プロジェクト概要
      */
     private final String overview;
@@ -56,11 +61,13 @@ public class Project extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private Project(int orderNo, String companyName, Period period, String overview, String teamComp, String role,
+    private Project(int orderNo, String companyName, Period period, String name, String overview, String teamComp,
+            String role,
             String achievement, Process process, TechStack techStack) {
         super(orderNo);
         this.companyName = companyName;
         this.period = period;
+        this.name = name;
         this.overview = overview;
         this.teamComp = teamComp;
         this.role = role;
@@ -72,12 +79,14 @@ public class Project extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Project(UUID id, int orderNo, String companyName, Period period, String overview, String teamComp,
+    private Project(UUID id, int orderNo, String companyName, Period period, String name, String overview,
+            String teamComp,
             String role,
             String achievement, Process process, TechStack techStack) {
         super(id, orderNo);
         this.companyName = companyName;
         this.period = period;
+        this.name = name;
         this.overview = overview;
         this.teamComp = teamComp;
         this.role = role;
@@ -92,6 +101,7 @@ public class Project extends Entity {
      * @param orderNo     並び順
      * @param companyName 会社名
      * @param period      期間
+     * @param name        プロジェクト名
      * @param overview    プロジェクト概要
      * @param teamComp    チーム構成
      * @param role        役割
@@ -99,10 +109,12 @@ public class Project extends Entity {
      * @param process     作業工程
      * @return プロジェクトエンティティ
      */
-    public static Project create(int orderNo, String companyName, Period period, String overview, String teamComp,
+    public static Project create(int orderNo, String companyName, Period period, String name, String overview,
+            String teamComp,
             String role,
             String achievement, Process process, TechStack techStack) {
-        return new Project(orderNo, companyName, period, overview, teamComp, role, achievement, process, techStack);
+        return new Project(orderNo, companyName, period, name, overview, teamComp, role, achievement, process,
+                techStack);
     }
 
     /**
@@ -112,6 +124,7 @@ public class Project extends Entity {
      * @param orderNo     並び順
      * @param companyName 会社名
      * @param period      期間
+     * @param name        プロジェクト名
      * @param overview    プロジェクト概要
      * @param teamComp    チーム構成
      * @param role        役割
@@ -119,11 +132,13 @@ public class Project extends Entity {
      * @param process     作業工程
      * @return プロジェクトエンティティ
      */
-    public static Project reconstruct(UUID id, int orderNo, String companyName, Period period, String overview,
+    public static Project reconstruct(UUID id, int orderNo, String companyName, Period period, String name,
+            String overview,
             String teamComp,
             String role,
             String achievement, Process process, TechStack techStack) {
-        return new Project(id, orderNo, companyName, period, overview, teamComp, role, achievement, process, techStack);
+        return new Project(id, orderNo, companyName, period, name, overview, teamComp, role, achievement, process,
+                techStack);
     }
 
     /**
@@ -133,7 +148,8 @@ public class Project extends Entity {
      * @return 変更後のプロジェクトエンティティ
      */
     public Project changeCompanyName(String companyName) {
-        return new Project(this.id, this.orderNo, companyName, this.period, this.overview, this.teamComp, this.role,
+        return new Project(this.id, this.orderNo, companyName, this.period, this.name, this.overview, this.teamComp,
+                this.role,
                 this.achievement, this.process, this.techStack);
     }
 
@@ -144,7 +160,20 @@ public class Project extends Entity {
      * @return 変更後のプロジェクトエンティティ
      */
     public Project changePeriod(Period period) {
-        return new Project(this.id, this.orderNo, this.companyName, period, this.overview, this.teamComp, this.role,
+        return new Project(this.id, this.orderNo, this.companyName, period, this.name, this.overview, this.teamComp,
+                this.role,
+                this.achievement, this.process, this.techStack);
+    }
+
+    /**
+     * プロジェクト名を変更する
+     *
+     * @param name 新しいプロジェクト名
+     * @return 変更後のプロジェクトエンティティ
+     */
+    public Project changeName(String name) {
+        return new Project(this.id, this.orderNo, this.companyName, this.period, name, this.overview, this.teamComp,
+                this.role,
                 this.achievement, this.process, this.techStack);
     }
 
@@ -155,7 +184,8 @@ public class Project extends Entity {
      * @return 変更後のプロジェクトエンティティ
      */
     public Project changeOverview(String overview) {
-        return new Project(this.id, this.orderNo, this.companyName, this.period, overview, this.teamComp, this.role,
+        return new Project(this.id, this.orderNo, this.companyName, this.period, this.name, overview, this.teamComp,
+                this.role,
                 this.achievement, this.process, this.techStack);
     }
 
@@ -166,7 +196,8 @@ public class Project extends Entity {
      * @return 変更後のプロジェクトエンティティ
      */
     public Project changeTeamComp(String teamComp) {
-        return new Project(this.id, this.orderNo, this.companyName, this.period, this.overview, teamComp, this.role,
+        return new Project(this.id, this.orderNo, this.companyName, this.period, this.name, this.overview, teamComp,
+                this.role,
                 this.achievement, this.process, this.techStack);
     }
 
@@ -177,7 +208,8 @@ public class Project extends Entity {
      * @return 変更後のプロジェクトエンティティ
      */
     public Project changeRole(String role) {
-        return new Project(this.id, this.orderNo, this.companyName, this.period, this.overview, this.teamComp, role,
+        return new Project(this.id, this.orderNo, this.companyName, this.period, this.name, this.overview,
+                this.teamComp, role,
                 this.achievement, this.process, this.techStack);
     }
 
@@ -188,7 +220,8 @@ public class Project extends Entity {
      * @return 変更後のプロジェクトエンティティ
      */
     public Project changeAchievement(String achievement) {
-        return new Project(this.id, this.orderNo, this.companyName, this.period, this.overview, this.teamComp,
+        return new Project(this.id, this.orderNo, this.companyName, this.period, this.name, this.overview,
+                this.teamComp,
                 this.role,
                 achievement, this.process, this.techStack);
     }
@@ -200,7 +233,8 @@ public class Project extends Entity {
      * @return 変更後のプロジェクトエンティティ
      */
     public Project changeProcess(Process process) {
-        return new Project(this.id, this.orderNo, this.companyName, this.period, this.overview, this.teamComp,
+        return new Project(this.id, this.orderNo, this.companyName, this.period, this.name, this.overview,
+                this.teamComp,
                 this.role,
                 this.achievement, process, this.techStack);
     }
@@ -212,7 +246,8 @@ public class Project extends Entity {
      * @return 変更後のプロジェクトエンティティ
      */
     public Project changeTechStack(TechStack techStack) {
-        return new Project(this.id, this.orderNo, this.companyName, this.period, this.overview, this.teamComp,
+        return new Project(this.id, this.orderNo, this.companyName, this.period, this.name, this.overview,
+                this.teamComp,
                 this.role,
                 this.achievement, this.process, techStack);
     }

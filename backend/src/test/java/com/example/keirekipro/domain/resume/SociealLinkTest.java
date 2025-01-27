@@ -51,7 +51,7 @@ class SociealLinkTest {
         // インスタンスがnullでない。
         assertNotNull(sociealLink);
         // idが正しい値である。
-        assertEquals(sociealLink.getId(), "1234");
+        assertEquals(sociealLink.getId(), id);
         // 並び順が正しい値である。
         assertEquals(sociealLink.getOrderNo(), 0);
         // ソーシャル名が正しい値である。

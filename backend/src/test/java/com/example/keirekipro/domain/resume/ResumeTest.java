@@ -381,6 +381,7 @@ class ResumeTest {
                 originalProject.getOrderNo(),
                 originalProject.getCompanyName(), // 会社名は変更しない
                 originalProject.getPeriod(),
+                "新しいプロジェクト名",
                 "新しいプロジェクト概要",
                 "10人",
                 "マネージャー",
@@ -422,6 +423,7 @@ class ResumeTest {
                 () -> assertEquals(afterResume.getProjects().get(0).getId(), originalProject.getId()),
                 () -> assertEquals(afterResume.getProjects().get(0).getCompanyName(), originalProject.getCompanyName()),
                 () -> assertEquals(afterResume.getProjects().get(0).getPeriod(), originalProject.getPeriod()),
+                () -> assertEquals(afterResume.getProjects().get(0).getName(), "新しいプロジェクト名"),
                 () -> assertEquals(afterResume.getProjects().get(0).getOverview(), "新しいプロジェクト概要"),
                 () -> assertEquals(afterResume.getProjects().get(0).getTeamComp(), "10人"),
                 () -> assertEquals(afterResume.getProjects().get(0).getRole(), "マネージャー"),
@@ -449,6 +451,7 @@ class ResumeTest {
                 "株式会社DEF",
                 Period.create(notification, YearMonth.of(2022, 1), YearMonth.of(2023, 1), false),
                 "プロジェクト概要",
+                "プロジェクト名",
                 "5人",
                 "リーダー",
                 "成果内容",
@@ -817,7 +820,7 @@ class ResumeTest {
                         List.of("Postman"),
                         List.of("Figma")));
         Project.Process process = Project.Process.create(true, true, true, true, true, true, true);
-        return Project.create(0, "株式会社ABC", period, "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
+        return Project.create(0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
     }
 
     /**

@@ -34,7 +34,8 @@ class ProjectTest {
         Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
-        Project project = Project.create(0, "株式会社ABC", period, "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
+        Project project = Project.create(0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process,
+                techStack);
         // インスタンスがnullでない。
         assertNotNull(project);
         // idが生成されている。
@@ -44,6 +45,7 @@ class ProjectTest {
         // 各フィールドの値が正しい。
         assertEquals("株式会社ABC", project.getCompanyName());
         assertEquals(period, project.getPeriod());
+        assertEquals("プロジェクト名", project.getName());
         assertEquals("プロジェクト概要", project.getOverview());
         assertEquals("5人", project.getTeamComp());
         assertEquals("リーダー", project.getRole());
@@ -59,17 +61,19 @@ class ProjectTest {
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        Project project = Project.reconstruct(id, 0, "株式会社ABC", period, "プロジェクト概要", "5人", "リーダー", "成果内容", process,
+        Project project = Project.reconstruct(id, 0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容",
+                process,
                 techStack);
         // インスタンスがnullでない。
         assertNotNull(project);
         // idが正しい値である。
-        assertEquals("1234", project.getId());
+        assertEquals(id, project.getId());
         // 並び順が正しい値である。
         assertEquals(0, project.getOrderNo());
         // 各フィールドの値が正しい。
         assertEquals("株式会社ABC", project.getCompanyName());
         assertEquals(period, project.getPeriod());
+        assertEquals("プロジェクト名", project.getName());
         assertEquals("プロジェクト概要", project.getOverview());
         assertEquals("5人", project.getTeamComp());
         assertEquals("リーダー", project.getRole());
@@ -154,8 +158,17 @@ class ProjectTest {
     }
 
     @Test
+    @DisplayName("プロジェクト名を変更する")
+    void test11() {
+        Project project = createSampleProject();
+        Project updatedProject = project.changeName("新しいプロジェクト名");
+        // 変更したプロジェクト名が正しい値である。
+        assertEquals("新しいプロジェクト名", updatedProject.getName());
+    }
+
+    @Test
     @DisplayName("すべてのフィールドを変更する")
-    void testSequentialFieldChanges() {
+    void test12() {
         // 初期データ作成
         Project initialProject = createSampleProject();
 
@@ -191,6 +204,7 @@ class ProjectTest {
         Project updatedProject = initialProject
                 .changeCompanyName("新しい会社名")
                 .changePeriod(newPeriod)
+                .changeName("新しいプロジェクト名")
                 .changeOverview("新しいプロジェクト概要")
                 .changeTeamComp("15人")
                 .changeRole("プロジェクトマネージャー")
@@ -201,6 +215,7 @@ class ProjectTest {
         // アサーション
         assertEquals("新しい会社名", updatedProject.getCompanyName());
         assertEquals(newPeriod, updatedProject.getPeriod());
+        assertEquals("新しいプロジェクト名", updatedProject.getName());
         assertEquals("新しいプロジェクト概要", updatedProject.getOverview());
         assertEquals("15人", updatedProject.getTeamComp());
         assertEquals("プロジェクトマネージャー", updatedProject.getRole());
@@ -213,7 +228,7 @@ class ProjectTest {
         Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
-        return Project.create(0, "株式会社ABC", period, "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
+        return Project.create(0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
     }
 
     private TechStack createSampleTechStack() {

@@ -36,7 +36,7 @@ class SelfPromotionTest {
         // インスタンスがnullでない。
         assertNotNull(selfPromotion);
         // idが正しい値である。
-        assertEquals(selfPromotion.getId(), "1234");
+        assertEquals(selfPromotion.getId(), id);
         // 並び順が正しい値である。
         assertEquals(selfPromotion.getOrderNo(), 0);
         // タイトルが正しい値である。

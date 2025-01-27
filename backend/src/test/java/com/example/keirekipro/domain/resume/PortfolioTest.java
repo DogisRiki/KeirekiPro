@@ -55,7 +55,7 @@ class PortfolioTest {
         // インスタンスがnullでない。
         assertNotNull(portfolio);
         // idが正しい値である。
-        assertEquals(portfolio.getId(), "1234");
+        assertEquals(portfolio.getId(), id);
         // 並び順が正しい値である。
         assertEquals(portfolio.getOrderNo(), 0);
         // ポートフォリオ名が正しい値である。
