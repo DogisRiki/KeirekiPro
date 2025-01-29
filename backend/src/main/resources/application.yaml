@@ -10,7 +10,7 @@ spring:
     baseline-version: 0
 server:
   servlet:
-    context-path: /api
+    context-path: /api/v1
 mybatis:
   configuration:
     map-underscore-to-camel-case: true

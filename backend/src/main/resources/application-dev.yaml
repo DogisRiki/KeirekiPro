@@ -6,6 +6,15 @@ spring:
     password: postgres
     show-sql: true
 
+cors:
+  allowed-origins:
+    - "http://localhost"
+
+jwt:
+  secret: vh8JBWqYFC2mJwZ4XD9pE7TKq3mN5RxS2HnUcL7VfAy
+  access-token-validity-in-minutes: 30
+  refresh-token-validity-in-days: 7
+
 # ログ設定
 logging:
   level:
