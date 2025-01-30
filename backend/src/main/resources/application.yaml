@@ -8,9 +8,10 @@ spring:
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
+    placeholders:
+      text_array_type: "VARCHAR ARRAY"
 server:
   servlet:
     context-path: /api/v1
 mybatis:
-  configuration:
-    map-underscore-to-camel-case: true
+  config-location: "classpath:/mybatis/mybatis-config.xml"
