@@ -72,7 +72,7 @@ class ResumeTest {
     @DisplayName("通知オブジェクト内にエラーがある状態で、新規構築用コンストラクタでインスタンス化する")
     void test2() {
         Notification invalidNotification = new Notification();
-        invalidNotification.addError("name", "職務経歴書名は必須です。");
+        invalidNotification.addError("name", "職務経歴書名は入力必須です。");
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         // ドメイン例外がスローされる。
         assertThrows(DomainException.class, () -> {

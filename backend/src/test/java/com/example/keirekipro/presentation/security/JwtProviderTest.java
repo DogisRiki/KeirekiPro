@@ -135,7 +135,7 @@ class JwtProviderTest {
                 .withIssuedAt(new Date(System.currentTimeMillis() - 1000 * 60 * 30)) // 30分前
                 .withExpiresAt(new Date(System.currentTimeMillis() - 1000 * 60)) // 1分前に期限切れ
                 .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
-        // 別の秘密鍵で署名されたトークンの場合、JWTVerificationExceptionがスローされる
+        // 有効期限切れのトークンの場合、JWTVerificationExceptionがスローされる
         assertThrows(JWTVerificationException.class, () -> jwtProvider.getAuthentication(invalidToken));
     }
 }

@@ -9,7 +9,7 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     placeholders:
-      text_array_type: "VARCHAR ARRAY"
+      text_array_type: "TEXT[]"
 server:
   servlet:
     context-path: /api/v1
