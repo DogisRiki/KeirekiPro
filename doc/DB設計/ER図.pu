@@ -2,9 +2,6 @@
 
 title ER図
 
-' -----------------------
-' 既存テーブル
-' -----------------------
 entity "ユーザー(users)" as users {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
@@ -132,16 +129,16 @@ entity "自己PR(self_promotions)" as SelfPromotions {
 }
 
 entity "技術スタックマスタ(tech_stack_mst)" as TechStackMst {
-    + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
+    + id : <color:#1E90FF>INTEGER</color> -- 識別子 (PK)
     --
-    name : <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL]</color> -- 技術名
+    name : <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- 技術名
     category: <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL]</color> -- カテゴリ
 }
 
 entity "技術スタックカテゴリマスタ(tech_stack_category_mst)" as TechStackCategoryMst {
-    + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
+    + id : <color:#1E90FF>INTEGER</color> -- 識別子 (PK)
     --
-    name : <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL]</color> -- カテゴリ名
+    name : <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- カテゴリ名
 }
 
 ' ----------------------
