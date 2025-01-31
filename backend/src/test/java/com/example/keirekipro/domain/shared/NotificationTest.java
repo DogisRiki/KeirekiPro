@@ -28,7 +28,7 @@ class NotificationTest {
         // notificationにエラーが存在する。
         assertTrue(notification.hasErrors());
         // notificationに単一のエラーが存在する
-        assertEquals(notification.getErrors(), Map.of("field", List.of("エラーメッセージ")));
+        assertEquals(Map.of("field", List.of("エラーメッセージ")), notification.getErrors());
     }
 
     @Test
@@ -40,7 +40,7 @@ class NotificationTest {
         // notificationにエラーが存在する。
         assertTrue(notification.hasErrors());
         // notificationに同一フィールド名の複数エラーが存在する。
-        assertEquals(notification.getErrors(), Map.of("field", List.of("エラーメッセージ1", "エラーメッセージ2")));
+        assertEquals(Map.of("field", List.of("エラーメッセージ1", "エラーメッセージ2")), notification.getErrors());
     }
 
     @Test
@@ -54,8 +54,9 @@ class NotificationTest {
         // notificationにエラーが存在する。
         assertTrue(notification.hasErrors());
         // notificationに複数フィールド名の複数エラーが存在する。
-        assertEquals(notification.getErrors(),
+        assertEquals(
                 Map.of("field1", List.of("エラーメッセージ1-1", "エラーメッセージ1-2"), "field2",
-                        List.of("エラーメッセージ2-1", "エラーメッセージ2-2")));
+                        List.of("エラーメッセージ2-1", "エラーメッセージ2-2")),
+                notification.getErrors());
     }
 }

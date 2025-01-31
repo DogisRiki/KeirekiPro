@@ -29,7 +29,7 @@ class EntityTest {
         // idがnullでない。
         assertNotNull(entity.getId());
         // 並び順が正しい値である。
-        assertEquals(entity.getOrderNo(), 1);
+        assertEquals(1, entity.getOrderNo());
     }
 
     @Test
@@ -40,7 +40,7 @@ class EntityTest {
         // idが正しい値である。
         assertEquals(entity.getId(), id);
         // 並び順が正しい値である。
-        assertEquals(entity.getOrderNo(), 2);
+        assertEquals(2, entity.getOrderNo());
     }
 
     @Test
@@ -49,7 +49,7 @@ class EntityTest {
         TestEntity entity = new TestEntity(1);
         entity.changeOrderNo(100);
         // 変更した並び順が正しい値である。
-        assertEquals(entity.getOrderNo(), 100);
+        assertEquals(100, entity.getOrderNo());
     }
 
     @Test

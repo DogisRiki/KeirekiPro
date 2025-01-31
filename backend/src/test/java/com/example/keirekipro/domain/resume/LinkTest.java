@@ -37,7 +37,7 @@ class LinkTest {
         // インスタンスがnullでない。
         assertNotNull(link);
         // 職務経歴書名が正しい値である。
-        assertEquals(link.getValue(), "https://example.com");
+        assertEquals("https://example.com", link.getValue());
         // notification.addError()が一度も呼ばれていない。
         verify(notification, never()).addError(anyString(), anyString());
     }

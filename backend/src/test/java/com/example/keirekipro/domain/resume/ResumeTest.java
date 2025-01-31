@@ -63,7 +63,7 @@ class ResumeTest {
         assertEquals(ResumeName.create(notification, "職務経歴書A"), resume.getName());
         assertEquals(LocalDate.now(), resume.getDate());
         assertEquals(FullName.create(notification, "山田", "太郎"), resume.getFullName());
-        assertEquals(true, resume.isAutoSaveEnabled());
+        assertTrue(resume.isAutoSaveEnabled());
         assertNotNull(resume.getCreatedAt());
         assertNotNull(resume.getUpdatedAt());
     }
@@ -177,7 +177,7 @@ class ResumeTest {
         // 新しい職歴がリストに含まれている。
         assertTrue(afterResume.getCareers().contains(newCareer));
         // 職歴リストのサイズが増加している。
-        assertEquals(afterResume.getCareers().size(), beforeResume.getCareers().size() + 1);
+        assertEquals(beforeResume.getCareers().size() + 1, afterResume.getCareers().size());
     }
 
     @Test
@@ -310,13 +310,13 @@ class ResumeTest {
         // 更新した職歴がリストに含まれている。
         assertTrue(afterResume.getCareers().contains(newCareer));
         // 職歴リストのサイズが変わらない。
-        assertEquals(afterResume.getCareers().size(), beforeResume.getCareers().size());
+        assertEquals(beforeResume.getCareers().size(), afterResume.getCareers().size());
         // 更新した職歴の値が正しい。
         assertAll(
-                () -> assertEquals(afterResume.getCareers().get(0).getCompanyName(), newCareer.getCompanyName()),
-                () -> assertEquals(afterResume.getCareers().get(0).getPeriod(), newCareer.getPeriod()),
-                () -> assertEquals(afterResume.getCareers().get(0).getOrderNo(), newCareer.getOrderNo()),
-                () -> assertEquals(afterResume.getCareers().get(0).getId(), beforeResume.getCareers().get(0).getId()));
+                () -> assertEquals(newCareer.getCompanyName(), afterResume.getCareers().get(0).getCompanyName()),
+                () -> assertEquals(newCareer.getPeriod(), afterResume.getCareers().get(0).getPeriod()),
+                () -> assertEquals(newCareer.getOrderNo(), afterResume.getCareers().get(0).getOrderNo()),
+                () -> assertEquals(beforeResume.getCareers().get(0).getId(), afterResume.getCareers().get(0).getId()));
     }
 
     @Test
@@ -348,7 +348,7 @@ class ResumeTest {
         // 新しいプロジェクトがリストに含まれている。
         assertTrue(afterResume.getProjects().contains(newProject));
         // プロジェクトリストのサイズが増加している。
-        assertEquals(afterResume.getProjects().size(), beforeResume.getProjects().size() + 1);
+        assertEquals(beforeResume.getProjects().size() + 1, afterResume.getProjects().size());
     }
 
     @Test
@@ -417,27 +417,27 @@ class ResumeTest {
         // 更新したプロジェクトがリストに含まれている。
         assertTrue(afterResume.getProjects().contains(updatedProject));
         // プロジェクトリストのサイズが変わらない。
-        assertEquals(afterResume.getProjects().size(), beforeResume.getProjects().size());
+        assertEquals(beforeResume.getProjects().size(), afterResume.getProjects().size());
         // 更新したプロジェクトの値が正しい。
         assertAll(
-                () -> assertEquals(afterResume.getProjects().get(0).getId(), originalProject.getId()),
-                () -> assertEquals(afterResume.getProjects().get(0).getCompanyName(), originalProject.getCompanyName()),
-                () -> assertEquals(afterResume.getProjects().get(0).getPeriod(), originalProject.getPeriod()),
-                () -> assertEquals(afterResume.getProjects().get(0).getName(), "新しいプロジェクト名"),
-                () -> assertEquals(afterResume.getProjects().get(0).getOverview(), "新しいプロジェクト概要"),
-                () -> assertEquals(afterResume.getProjects().get(0).getTeamComp(), "10人"),
-                () -> assertEquals(afterResume.getProjects().get(0).getRole(), "マネージャー"),
-                () -> assertEquals(afterResume.getProjects().get(0).getAchievement(), "新しい成果内容"),
-                () -> assertEquals(afterResume.getProjects().get(0).getProcess(),
-                        Project.Process.create(false, true, true, false, true, true, false)),
-                () -> assertEquals(afterResume.getProjects().get(0).getTechStack().getLanguages(),
-                        List.of("JavaScript", "TypeScript")),
-                () -> assertEquals(afterResume.getProjects().get(0).getTechStack().getDependencies().getFrameworks(),
-                        List.of("React", "Redux")),
-                () -> assertEquals(afterResume.getProjects().get(0).getTechStack().getInfrastructure().getClouds(),
-                        List.of("Azure")),
-                () -> assertEquals(afterResume.getProjects().get(0).getTechStack().getTools().getSourceControls(),
-                        List.of("GitLab")));
+                () -> assertEquals(originalProject.getId(), afterResume.getProjects().get(0).getId()),
+                () -> assertEquals(originalProject.getCompanyName(), afterResume.getProjects().get(0).getCompanyName()),
+                () -> assertEquals(originalProject.getPeriod(), afterResume.getProjects().get(0).getPeriod()),
+                () -> assertEquals("新しいプロジェクト名", afterResume.getProjects().get(0).getName()),
+                () -> assertEquals("新しいプロジェクト概要", afterResume.getProjects().get(0).getOverview()),
+                () -> assertEquals("10人", afterResume.getProjects().get(0).getTeamComp()),
+                () -> assertEquals("マネージャー", afterResume.getProjects().get(0).getRole()),
+                () -> assertEquals("新しい成果内容", afterResume.getProjects().get(0).getAchievement()),
+                () -> assertEquals(Project.Process.create(false, true, true, false, true, true, false),
+                        afterResume.getProjects().get(0).getProcess()),
+                () -> assertEquals(List.of("JavaScript", "TypeScript"),
+                        afterResume.getProjects().get(0).getTechStack().getLanguages()),
+                () -> assertEquals(List.of("React", "Redux"),
+                        afterResume.getProjects().get(0).getTechStack().getDependencies().getFrameworks()),
+                () -> assertEquals(List.of("Azure"),
+                        afterResume.getProjects().get(0).getTechStack().getInfrastructure().getClouds()),
+                () -> assertEquals(List.of("GitLab"),
+                        afterResume.getProjects().get(0).getTechStack().getTools().getSourceControls()));
     }
 
     @Test
@@ -505,7 +505,7 @@ class ResumeTest {
         // 新しい資格がリストに含まれている
         assertTrue(afterResume.getCertifications().contains(newCertification));
         // 資格リストのサイズが増加している。
-        assertEquals(afterResume.getCertifications().size(), beforeResume.getCertifications().size() + 1);
+        assertEquals(beforeResume.getCertifications().size() + 1, afterResume.getCertifications().size());
     }
 
     @Test
@@ -518,14 +518,14 @@ class ResumeTest {
         // 更新した資格がリストに含まれている。
         assertTrue(afterResume.getCertifications().contains(newCertification));
         // 資格リストのサイズが変わらない。
-        assertEquals(afterResume.getCertifications().size(), beforeResume.getCertifications().size());
+        assertEquals(beforeResume.getCertifications().size(), afterResume.getCertifications().size());
         // 更新した資格の値が正しい。
         assertAll(
-                () -> assertEquals(afterResume.getCertifications().get(0).getName(), newCertification.getName()),
-                () -> assertEquals(afterResume.getCertifications().get(0).getDate(), newCertification.getDate()),
-                () -> assertEquals(afterResume.getCertifications().get(0).getOrderNo(), newCertification.getOrderNo()),
-                () -> assertEquals(afterResume.getCertifications().get(0).getId(),
-                        beforeResume.getCertifications().get(0).getId()));
+                () -> assertEquals(newCertification.getName(), afterResume.getCertifications().get(0).getName()),
+                () -> assertEquals(newCertification.getDate(), afterResume.getCertifications().get(0).getDate()),
+                () -> assertEquals(newCertification.getOrderNo(), afterResume.getCertifications().get(0).getOrderNo()),
+                () -> assertEquals(beforeResume.getCertifications().get(0).getId(),
+                        afterResume.getCertifications().get(0).getId()));
     }
 
     @Test
@@ -563,7 +563,7 @@ class ResumeTest {
         // 新しいポートフォリオがリストに含まれている。
         assertTrue(afterResume.getPortfolios().contains(newPortfolio));
         // ポートフォリオリストのサイズが増加している。
-        assertEquals(afterResume.getPortfolios().size(), beforeResume.getPortfolios().size() + 1);
+        assertEquals(beforeResume.getPortfolios().size() + 1, afterResume.getPortfolios().size());
     }
 
     @Test
@@ -583,15 +583,15 @@ class ResumeTest {
         // 更新したポートフォリオがリストに含まれている。
         assertTrue(afterResume.getPortfolios().contains(updatedPortfolio));
         // ポートフォリオリストのサイズが変わらない。
-        assertEquals(afterResume.getPortfolios().size(), beforeResume.getPortfolios().size());
+        assertEquals(beforeResume.getPortfolios().size(), afterResume.getPortfolios().size());
         // 更新したポートフォリオの値が正しい。
         assertAll(
-                () -> assertEquals(afterResume.getPortfolios().get(0).getName(), updatedPortfolio.getName()),
-                () -> assertEquals(afterResume.getPortfolios().get(0).getOverview(), updatedPortfolio.getOverview()),
-                () -> assertEquals(afterResume.getPortfolios().get(0).getTechStack(), updatedPortfolio.getTechStack()),
-                () -> assertEquals(afterResume.getPortfolios().get(0).getLink(), updatedPortfolio.getLink()),
-                () -> assertEquals(afterResume.getPortfolios().get(0).getId(),
-                        beforeResume.getPortfolios().get(0).getId()));
+                () -> assertEquals(updatedPortfolio.getName(), afterResume.getPortfolios().get(0).getName()),
+                () -> assertEquals(updatedPortfolio.getOverview(), afterResume.getPortfolios().get(0).getOverview()),
+                () -> assertEquals(updatedPortfolio.getTechStack(), afterResume.getPortfolios().get(0).getTechStack()),
+                () -> assertEquals(updatedPortfolio.getLink(), afterResume.getPortfolios().get(0).getLink()),
+                () -> assertEquals(beforeResume.getPortfolios().get(0).getId(),
+                        afterResume.getPortfolios().get(0).getId()));
     }
 
     @Test
@@ -634,7 +634,7 @@ class ResumeTest {
         // 新しいソーシャルリンクがリストに含まれている。
         assertTrue(afterResume.getSocialLinks().contains(newSocialLink));
         // ソーシャルリンクリストのサイズが増加している。
-        assertEquals(afterResume.getSocialLinks().size(), beforeResume.getSocialLinks().size() + 1);
+        assertEquals(beforeResume.getSocialLinks().size() + 1, afterResume.getSocialLinks().size());
     }
 
     @Test
@@ -652,13 +652,13 @@ class ResumeTest {
         // 更新したソーシャルリンクがリストに含まれている。
         assertTrue(afterResume.getSocialLinks().contains(updatedSocialLink));
         // ソーシャルリンクリストのサイズが変わらない。
-        assertEquals(afterResume.getSocialLinks().size(), beforeResume.getSocialLinks().size());
+        assertEquals(beforeResume.getSocialLinks().size(), afterResume.getSocialLinks().size());
         // 更新したソーシャルリンクの値が正しい。
         assertAll(
-                () -> assertEquals(afterResume.getSocialLinks().get(0).getName(), updatedSocialLink.getName()),
-                () -> assertEquals(afterResume.getSocialLinks().get(0).getLink(), updatedSocialLink.getLink()),
-                () -> assertEquals(afterResume.getSocialLinks().get(0).getId(),
-                        beforeResume.getSocialLinks().get(0).getId()));
+                () -> assertEquals(updatedSocialLink.getName(), afterResume.getSocialLinks().get(0).getName()),
+                () -> assertEquals(updatedSocialLink.getLink(), afterResume.getSocialLinks().get(0).getLink()),
+                () -> assertEquals(beforeResume.getSocialLinks().get(0).getId(),
+                        afterResume.getSocialLinks().get(0).getId()));
     }
 
     @Test
@@ -699,7 +699,7 @@ class ResumeTest {
         // 新しい自己PRがリストに含まれている。
         assertTrue(afterResume.getSelfPromotions().contains(newSelfPromotion));
         // 自己PRリストのサイズが増加している。
-        assertEquals(afterResume.getSelfPromotions().size(), beforeResume.getSelfPromotions().size() + 1);
+        assertEquals(beforeResume.getSelfPromotions().size() + 1, afterResume.getSelfPromotions().size());
     }
 
     @Test
@@ -717,14 +717,14 @@ class ResumeTest {
         // 更新した自己PRがリストに含まれている。
         assertTrue(afterResume.getSelfPromotions().contains(updatedSelfPromotion));
         // 自己PRリストのサイズが変わらない。
-        assertEquals(afterResume.getSelfPromotions().size(), beforeResume.getSelfPromotions().size());
+        assertEquals(beforeResume.getSelfPromotions().size(), afterResume.getSelfPromotions().size());
         // 更新した自己PRの値が正しい。
         assertAll(
-                () -> assertEquals(afterResume.getSelfPromotions().get(0).getTitle(), updatedSelfPromotion.getTitle()),
-                () -> assertEquals(afterResume.getSelfPromotions().get(0).getContent(),
-                        updatedSelfPromotion.getContent()),
-                () -> assertEquals(afterResume.getSelfPromotions().get(0).getId(),
-                        beforeResume.getSelfPromotions().get(0).getId()));
+                () -> assertEquals(updatedSelfPromotion.getTitle(), afterResume.getSelfPromotions().get(0).getTitle()),
+                () -> assertEquals(updatedSelfPromotion.getContent(),
+                        afterResume.getSelfPromotions().get(0).getContent()),
+                () -> assertEquals(beforeResume.getSelfPromotions().get(0).getId(),
+                        afterResume.getSelfPromotions().get(0).getId()));
     }
 
     @Test

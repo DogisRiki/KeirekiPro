@@ -32,7 +32,7 @@ class DomainExceptionTest {
         // errorsは空のMapでない。
         assertFalse(ex.getErrors().isEmpty());
         // errorsの値が初期化時の値と同値である。
-        assertEquals(ex.getErrors(), Map.of("key1", List.of("value1")));
+        assertEquals(Map.of("key1", List.of("value1")), ex.getErrors());
     }
 
     @Test
@@ -44,7 +44,7 @@ class DomainExceptionTest {
             // DomainExceptionはRuntimeExceptionのサブクラスである。
             assertTrue(ex instanceof RuntimeException);
             // errorsの値が初期化時の値と同値である。
-            assertEquals(ex.getErrors(), Map.of("key1", List.of("value1")));
+            assertEquals(Map.of("key1", List.of("value1")), ex.getErrors());
         }
     }
 }

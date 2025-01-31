@@ -37,7 +37,7 @@ class ResumeNameTest {
         // インスタンスがnullでない。
         assertNotNull(resumeName);
         // 職務経歴書名が正しい値である。
-        assertEquals(resumeName.getValue(), "職務経歴書名サンプル");
+        assertEquals("職務経歴書名サンプル", resumeName.getValue());
         // notification.addError()が一度も呼ばれていない。
         verify(notification, never()).addError(anyString(), anyString());
     }

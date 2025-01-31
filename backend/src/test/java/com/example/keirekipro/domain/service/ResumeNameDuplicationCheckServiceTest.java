@@ -39,16 +39,20 @@ class ResumeNameDuplicationCheckServiceTest {
         MockitoAnnotations.openMocks(this);
     }
 
+    private static final UUID USERID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+
     @Test
     @DisplayName("同名の職務経歴書名が存在しない")
     void test1() {
-        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        when(repository.findAll(userId)).thenReturn(List.of(
-                createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名1"),
-                createSampleResume(UUID.fromString("323e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名2")));
+        when(repository.findAll(
+                USERID)).thenReturn(List.of(
+                        createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"),
+                                USERID, "職務経歴書名1"),
+                        createSampleResume(UUID.fromString("323e4567-e89b-12d3-a456-426614174000"),
+                                USERID, "職務経歴書名2")));
 
         // 重複しない職務経歴書名
-        Resume target = createSampleResume(UUID.fromString("423e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名3");
+        Resume target = createSampleResume(UUID.fromString("423e4567-e89b-12d3-a456-426614174000"), USERID, "職務経歴書名3");
 
         boolean result = service.execute(target);
 
@@ -59,13 +63,15 @@ class ResumeNameDuplicationCheckServiceTest {
     @Test
     @DisplayName("同名の職務経歴書が存在する")
     void test2() {
-        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        when(repository.findAll(userId)).thenReturn(List.of(
-                createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名1"),
-                createSampleResume(UUID.fromString("323e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名2")));
+        when(repository.findAll(
+                USERID)).thenReturn(List.of(
+                        createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"),
+                                USERID, "職務経歴書名1"),
+                        createSampleResume(UUID.fromString("323e4567-e89b-12d3-a456-426614174000"), USERID,
+                                "職務経歴書名2")));
 
         // 重複する職務経歴書名
-        Resume target = createSampleResume(UUID.fromString("423e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名1");
+        Resume target = createSampleResume(UUID.fromString("423e4567-e89b-12d3-a456-426614174000"), USERID, "職務経歴書名1");
 
         boolean result = service.execute(target);
 
@@ -76,13 +82,15 @@ class ResumeNameDuplicationCheckServiceTest {
     @Test
     @DisplayName("自分自身は除外される(同じIDで同じ名前があっても重複とみなさない)")
     void test3() {
-        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        when(repository.findAll(userId)).thenReturn(List.of(
-                createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名1"),
-                createSampleResume(UUID.fromString("323e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名2")));
+        when(repository.findAll(
+                USERID)).thenReturn(List.of(
+                        createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"),
+                                USERID, "職務経歴書名1"),
+                        createSampleResume(UUID.fromString("323e4567-e89b-12d3-a456-426614174000"), USERID,
+                                "職務経歴書名2")));
 
         // 同一の職務経歴書IDに対して行う
-        Resume target = createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"), userId, "職務経歴書名1");
+        Resume target = createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"), USERID, "職務経歴書名1");
 
         boolean result = service.execute(target);
 

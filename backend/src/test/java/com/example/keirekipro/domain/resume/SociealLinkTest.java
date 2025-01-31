@@ -51,11 +51,11 @@ class SociealLinkTest {
         // インスタンスがnullでない。
         assertNotNull(sociealLink);
         // idが正しい値である。
-        assertEquals(sociealLink.getId(), id);
+        assertEquals(id, sociealLink.getId());
         // 並び順が正しい値である。
-        assertEquals(sociealLink.getOrderNo(), 0);
+        assertEquals(0, sociealLink.getOrderNo());
         // ソーシャル名が正しい値である。
-        assertEquals(sociealLink.getName(), "GitHub");
+        assertEquals("GitHub", sociealLink.getName());
         // リンクが正しい値である。
         assertEquals(link, sociealLink.getLink());
     }
@@ -67,7 +67,7 @@ class SociealLinkTest {
         SocialLink beforeSociealLink = SocialLink.create(0, "GitHub", link);
         SocialLink afterSociealLink = beforeSociealLink.changeName("LinkedIn");
         // 変更したソーシャル名が正しい値である。
-        assertEquals(afterSociealLink.getName(), "LinkedIn");
+        assertEquals("LinkedIn", afterSociealLink.getName());
     }
 
     @Test
@@ -78,7 +78,7 @@ class SociealLinkTest {
         Link afterLink = Link.create(notification, "https://linkedin.com");
         SocialLink afterSociealLink = beforeSociealLink.changeLink(afterLink);
         // 変更したリンクが正しい値である。
-        assertEquals(afterSociealLink.getLink(), afterLink);
+        assertEquals(afterLink, afterSociealLink.getLink());
     }
 
     @Test
@@ -89,7 +89,7 @@ class SociealLinkTest {
         Link afterLink = Link.create(notification, "https://linkedin.com");
         SocialLink afterSociealLink = beforeSociealLink.changeLink(afterLink).changeName("LinkedIn");
         // 変更した項目が正しい値である。
-        assertEquals(afterSociealLink.getLink(), afterLink);
-        assertEquals(afterSociealLink.getName(), "LinkedIn");
+        assertEquals(afterLink, afterSociealLink.getLink());
+        assertEquals("LinkedIn", afterSociealLink.getName());
     }
 }

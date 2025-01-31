@@ -34,9 +34,9 @@ class FullNameTest {
         // インスタンスがnullでない。
         assertNotNull(fullName);
         // 姓が正しい値である。
-        assertEquals(fullName.getLastName(), "Yaま田");
+        assertEquals("Yaま田", fullName.getLastName());
         // 名が正しい値である。
-        assertEquals(fullName.getFirstName(), "タRoゥ");
+        assertEquals("タRoゥ", fullName.getFirstName());
         // notification.addError()が一度も呼ばれていない。
         verify(notification, never()).addError(anyString(), anyString());
     }

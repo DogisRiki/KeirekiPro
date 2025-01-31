@@ -36,13 +36,13 @@ class SelfPromotionTest {
         // インスタンスがnullでない。
         assertNotNull(selfPromotion);
         // idが正しい値である。
-        assertEquals(selfPromotion.getId(), id);
+        assertEquals(id, selfPromotion.getId());
         // 並び順が正しい値である。
-        assertEquals(selfPromotion.getOrderNo(), 0);
+        assertEquals(0, selfPromotion.getOrderNo());
         // タイトルが正しい値である。
-        assertEquals(selfPromotion.getTitle(), "タイトル");
+        assertEquals("タイトル", selfPromotion.getTitle());
         // コンテンツが正しい値である。
-        assertEquals(selfPromotion.getContent(), "自己PRコンテンツ");
+        assertEquals("自己PRコンテンツ", selfPromotion.getContent());
     }
 
     @Test
@@ -51,7 +51,7 @@ class SelfPromotionTest {
         SelfPromotion beforeSelfPromotion = SelfPromotion.create(0, "タイトル", "自己PRコンテンツ");
         SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeTitle("新しいタイトル");
         // 変更したタイトルが正しい値である。
-        assertEquals(afterSelfPromotion.getTitle(), "新しいタイトル");
+        assertEquals("新しいタイトル", afterSelfPromotion.getTitle());
     }
 
     @Test
@@ -60,7 +60,7 @@ class SelfPromotionTest {
         SelfPromotion beforeSelfPromotion = SelfPromotion.create(0, "タイトル", "自己PRコンテンツ");
         SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeContent("新しい自己PRコンテンツ");
         // 変更したコンテンツが正しい値である。
-        assertEquals(afterSelfPromotion.getContent(), "新しい自己PRコンテンツ");
+        assertEquals("新しい自己PRコンテンツ", afterSelfPromotion.getContent());
     }
 
     @Test
@@ -70,7 +70,7 @@ class SelfPromotionTest {
         SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeContent("新しい自己PRコンテンツ")
                 .changeTitle("新しいタイトル");
         // 変更した項目が正しい値である。
-        assertEquals(afterSelfPromotion.getContent(), "新しい自己PRコンテンツ");
-        assertEquals(afterSelfPromotion.getTitle(), "新しいタイトル");
+        assertEquals("新しい自己PRコンテンツ", afterSelfPromotion.getContent());
+        assertEquals("新しいタイトル", afterSelfPromotion.getTitle());
     }
 }

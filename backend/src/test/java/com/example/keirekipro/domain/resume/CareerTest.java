@@ -56,7 +56,7 @@ class CareerTest {
         // 並び順が正しい値である。
         assertEquals(career.getOrderNo(), 0);
         // 会社名が正しい値である。
-        assertEquals(career.getCompanyName(), "株式会社ABC");
+        assertEquals("株式会社ABC", career.getCompanyName());
         // 期間が正しい値である。
         assertEquals(period, career.getPeriod());
     }
@@ -68,7 +68,7 @@ class CareerTest {
         Career beforeCareer = Career.create(0, "株式会社ABC", period);
         Career afterCareer = beforeCareer.changeCompanyName("株式会社ZZZ");
         // 変更した会社名が正しい値である。
-        assertEquals(afterCareer.getCompanyName(), "株式会社ZZZ");
+        assertEquals("株式会社ZZZ", afterCareer.getCompanyName());
     }
 
     @Test
@@ -79,7 +79,7 @@ class CareerTest {
         Period afterPeriod = Period.create(notification, YearMonth.of(2030, 01), null, true);
         Career afterCareer = beforeCareer.changePeriod(afterPeriod);
         // 変更した期間が正しい値である。
-        assertEquals(afterCareer.getPeriod(), afterPeriod);
+        assertEquals(afterPeriod, afterCareer.getPeriod());
     }
 
     @Test
@@ -90,7 +90,7 @@ class CareerTest {
         Period afterPeriod = Period.create(notification, YearMonth.of(2030, 01), null, true);
         Career afterCareer = beforeCareer.changePeriod(afterPeriod).changeCompanyName("株式会社ZZZ");
         // 変更した項目が正しい値である。
-        assertEquals(afterCareer.getPeriod(), afterPeriod);
-        assertEquals(afterCareer.getCompanyName(), "株式会社ZZZ");
+        assertEquals(afterPeriod, afterCareer.getPeriod());
+        assertEquals("株式会社ZZZ", afterCareer.getCompanyName());
     }
 }

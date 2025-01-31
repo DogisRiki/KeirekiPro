@@ -55,17 +55,17 @@ class PortfolioTest {
         // インスタンスがnullでない。
         assertNotNull(portfolio);
         // idが正しい値である。
-        assertEquals(portfolio.getId(), id);
+        assertEquals(id, portfolio.getId());
         // 並び順が正しい値である。
-        assertEquals(portfolio.getOrderNo(), 0);
+        assertEquals(0, portfolio.getOrderNo());
         // ポートフォリオ名が正しい値である。
-        assertEquals(portfolio.getName(), "ポートフォリオ名");
+        assertEquals("ポートフォリオ名", portfolio.getName());
         // ポートフォリオ概要が正しい値である。
-        assertEquals(portfolio.getOverview(), "概要説明");
+        assertEquals("概要説明", portfolio.getOverview());
         // 技術スタックが正しい値である。
-        assertEquals(portfolio.getTechStack(), "Java, Spring, React");
+        assertEquals("Java, Spring, React", portfolio.getTechStack());
         // リンクが正しい値である。
-        assertEquals(portfolio.getLink(), link);
+        assertEquals(link, portfolio.getLink());
     }
 
     @Test
@@ -75,7 +75,7 @@ class PortfolioTest {
         Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeName("新しいポートフォリオ名");
         // 変更したポートフォリオ名が正しい値である。
-        assertEquals(afterPortfolio.getName(), "新しいポートフォリオ名");
+        assertEquals("新しいポートフォリオ名", afterPortfolio.getName());
     }
 
     @Test
@@ -85,7 +85,7 @@ class PortfolioTest {
         Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeOverview("新しい概要説明");
         // 変更したポートフォリオ概要が正しい値である。
-        assertEquals(afterPortfolio.getOverview(), "新しい概要説明");
+        assertEquals("新しい概要説明", afterPortfolio.getOverview());
     }
 
     @Test
@@ -95,7 +95,7 @@ class PortfolioTest {
         Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeTechStack("TypeScript, Node.js");
         // 変更した技術スタックが正しい値である。
-        assertEquals(afterPortfolio.getTechStack(), "TypeScript, Node.js");
+        assertEquals("TypeScript, Node.js", afterPortfolio.getTechStack());
     }
 
     @Test
@@ -106,7 +106,7 @@ class PortfolioTest {
         Link afterLink = Link.create(notification, "https://github.com");
         Portfolio afterPortfolio = beforePortfolio.changeLink(afterLink);
         // 変更したリンクが正しい値である。
-        assertEquals(afterPortfolio.getLink(), afterLink);
+        assertEquals(afterLink, afterPortfolio.getLink());
     }
 
     @Test
@@ -120,9 +120,9 @@ class PortfolioTest {
                 .changeTechStack("TypeScript, Node.js")
                 .changeLink(afterLink);
         // 変更した項目が正しい値である。
-        assertEquals(afterPortfolio.getName(), "新しいポートフォリオ名");
-        assertEquals(afterPortfolio.getOverview(), "新しい概要説明");
-        assertEquals(afterPortfolio.getTechStack(), "TypeScript, Node.js");
-        assertEquals(afterPortfolio.getLink(), afterLink);
+        assertEquals("新しいポートフォリオ名", afterPortfolio.getName());
+        assertEquals("新しい概要説明", afterPortfolio.getOverview());
+        assertEquals("TypeScript, Node.js", afterPortfolio.getTechStack());
+        assertEquals(afterLink, afterPortfolio.getLink());
     }
 }

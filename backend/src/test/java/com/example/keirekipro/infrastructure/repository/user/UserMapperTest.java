@@ -22,26 +22,30 @@ class UserMapperTest {
     @Autowired
     private UserMapper userMapper;
 
-    private static final UUID TEST_USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final UUID USERID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+
+    private static final String EMAIL = "test@example.com";
+
+    private static final String PASSWORD = "hashedPassword";
 
     @Test
     @DisplayName("ユーザーが存在する場合、正しく取得できる")
     @Sql("/sql/user/UserMapperTest/test1.sql")
     void test1() {
-        Optional<UserAuthInfoDto> user = userMapper.findByEmail("test@example.com");
+        Optional<UserAuthInfoDto> user = userMapper.findByEmail(EMAIL);
 
-        // ユーザーが存在する。
+        // ユーザー認証情報が存在する
         assertTrue(user.isPresent());
         // 各フィールドが正しい値である。
-        assertEquals(TEST_USER_ID, user.get().getId());
-        assertEquals(user.get().getEmail(), "test@example.com");
-        assertEquals(user.get().getPassword(), "hashedPassword");
+        assertEquals(USERID, user.get().getId());
+        assertEquals(EMAIL, user.get().getEmail());
+        assertEquals(PASSWORD, user.get().getPassword());
     }
 
     @Test
     @DisplayName("ユーザーが存在しない場合、空のOptionalが返る")
     void test2() {
-        Optional<UserAuthInfoDto> user = userMapper.findByEmail("test@example.com");
+        Optional<UserAuthInfoDto> user = userMapper.findByEmail(EMAIL);
         // ユーザーが存在しない。
         assertTrue(user.isEmpty());
     }

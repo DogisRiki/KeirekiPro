@@ -37,7 +37,7 @@ class CertificationTest {
         // インスタンスがnullでない。
         assertNotNull(certification);
         // idが正しい値である。
-        assertEquals(certification.getId(), id);
+        assertEquals(id, certification.getId());
         // 並び順が正しい値である。
         assertEquals(0, certification.getOrderNo());
         // 資格名が正しい値である。
@@ -52,7 +52,7 @@ class CertificationTest {
         Certification beforeCertification = Certification.create(0, "基本情報技術者", YearMonth.of(2025, 01));
         Certification afteCertification = beforeCertification.changeName("応用情報技術者");
         // 変更した資格名が正しい値である。
-        assertEquals(afteCertification.getName(), "応用情報技術者");
+        assertEquals("応用情報技術者", afteCertification.getName());
     }
 
     @Test
@@ -61,7 +61,7 @@ class CertificationTest {
         Certification beforeCertification = Certification.create(0, "基本情報技術者", YearMonth.of(2025, 01));
         Certification afteCertification = beforeCertification.changeDate(YearMonth.of(2030, 01));
         // 変更した取得年月が正しい値である。
-        assertEquals(afteCertification.getDate(), YearMonth.of(2030, 01));
+        assertEquals(YearMonth.of(2030, 01), afteCertification.getDate());
     }
 
     @Test
@@ -70,7 +70,7 @@ class CertificationTest {
         Certification beforeCertification = Certification.create(0, "基本情報技術者", YearMonth.of(2025, 01));
         Certification afteCertification = beforeCertification.changeDate(YearMonth.of(2030, 01)).changeName("応用情報技術者");
         // 変更した項目が正しい値である。
-        assertEquals(afteCertification.getDate(), YearMonth.of(2030, 01));
-        assertEquals(afteCertification.getName(), "応用情報技術者");
+        assertEquals(YearMonth.of(2030, 01), afteCertification.getDate());
+        assertEquals("応用情報技術者", afteCertification.getName());
     }
 }

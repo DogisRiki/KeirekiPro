@@ -39,9 +39,9 @@ class PeriodTest {
         // インスタンスがnullでない。
         assertNotNull(period);
         // 開始年月が正しい値である。
-        assertEquals(period.getStartDate(), YearMonth.of(2025, 01));
+        assertEquals(YearMonth.of(2025, 01), period.getStartDate());
         // 終了年月が正しい値である。
-        assertEquals(period.getEndDate(), YearMonth.of(2025, 02));
+        assertEquals(YearMonth.of(2025, 02), period.getEndDate());
         // 継続中フラグが正しい値である。
         assertFalse(period.isActive());
         // notification.addError()が一度も呼ばれていない。
@@ -55,7 +55,7 @@ class PeriodTest {
         // インスタンスがnullでない。
         assertNotNull(period);
         // 開始年月が正しい値である。
-        assertEquals(period.getStartDate(), YearMonth.of(2025, 01));
+        assertEquals(YearMonth.of(2025, 01), period.getStartDate());
         // 終了年月が正しい値である。
         assertNull(period.getEndDate());
         // 継続中フラグが正しい値である。
