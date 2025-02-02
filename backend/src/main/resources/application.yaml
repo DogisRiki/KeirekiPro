@@ -10,8 +10,5 @@ spring:
     baseline-version: 0
     placeholders:
       text_array_type: "TEXT[]"
-server:
-  servlet:
-    context-path: /api/v1
 mybatis:
   config-location: "classpath:/mybatis/mybatis-config.xml"

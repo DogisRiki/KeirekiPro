@@ -31,7 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
     @Value("${cors.allowed-origins}")
-    private String[] allowedOrigins;
+    private String allowedOrigins;
 
     private final JwtProvider jwtProvider;
 
@@ -41,13 +41,18 @@ public class SecurityConfig {
                 // CSRFの設定
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        // CSRF保護が不要なパスを設定
-                        .ignoringRequestMatchers("/auth/**"))
+                        // CSRF保護が不要なパスを設定 - OpenAPI仕様へのアクセスを許可
+                        .ignoringRequestMatchers(
+                                "/api/auth/**",
+                                "/actuator/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**"))
 
                 // CORSの設定を有効化
                 .cors(cors -> cors
-                        .configurationSource(
-                                corsConfigurationSource()))
+                        .configurationSource(corsConfigurationSource()))
 
                 // セッションを使用しない設定（JWTベースの認証のため）
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -55,7 +60,16 @@ public class SecurityConfig {
                 // エンドポイントの認可設定
                 .authorizeHttpRequests(auth -> auth
                         // 認証関連のエンドポイントは認証不要
-                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        // Actuator関連のエンドポイントを許可
+                        .requestMatchers("/actuator/**").permitAll()
+                        // Swagger UI関連のエンドポイントを許可（個別に指定）
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**")
+                        .permitAll()
                         // その他のエンドポイントは認証必要
                         .anyRequest().authenticated())
 
@@ -68,7 +82,7 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
+        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

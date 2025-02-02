@@ -245,7 +245,7 @@ COMMENT ON COLUMN tech_stack_category_mst.name IS 'カテゴリ名';
 -- 技術スタックマスタテーブル
 CREATE TABLE tech_stack_mst (
     id INTEGER PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
     category INTEGER NOT NULL REFERENCES tech_stack_category_mst(id)
 );
 

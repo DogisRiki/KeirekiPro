@@ -7,8 +7,7 @@ spring:
     show-sql: true
 
 cors:
-  allowed-origins:
-    - "http://localhost"
+  allowed-origins: "http://localhost"
 
 cookie:
   secure: false
@@ -51,3 +50,5 @@ springdoc:
     enabled: true
   swagger-ui:
     path: /swagger-ui.html
+  packages-to-exclude:
+    - com.example.demo.test.controller
