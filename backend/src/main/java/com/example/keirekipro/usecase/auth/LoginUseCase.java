@@ -2,7 +2,8 @@ package com.example.keirekipro.usecase.auth;
 
 import com.example.keirekipro.infrastructure.repository.user.UserAuthInfoDto;
 import com.example.keirekipro.infrastructure.repository.user.UserMapper;
-import com.example.keirekipro.presentation.auth.LoginRequest;
+import com.example.keirekipro.presentation.auth.dto.LoginRequest;
+import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;

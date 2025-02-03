@@ -1,9 +1,10 @@
-package com.example.keirekipro.presentation.auth;
+package com.example.keirekipro.presentation.auth.controller;
 
+import com.example.keirekipro.presentation.auth.dto.LoginRequest;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
-import com.example.keirekipro.usecase.auth.LoginUseCaseDto;
+import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;

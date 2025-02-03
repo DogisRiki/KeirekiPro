@@ -1,4 +1,4 @@
-package com.example.keirekipro.presentation.auth;
+package com.example.keirekipro.presentation.auth.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

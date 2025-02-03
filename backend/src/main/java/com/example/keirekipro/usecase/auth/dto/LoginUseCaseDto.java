@@ -1,4 +1,4 @@
-package com.example.keirekipro.usecase.auth;
+package com.example.keirekipro.usecase.auth.dto;
 
 import java.util.UUID;
 

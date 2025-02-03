@@ -1,4 +1,4 @@
-package com.example.keirekipro.presentation.auth;
+package com.example.keirekipro.presentation.auth.controller;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -9,9 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.UUID;
 
+import com.example.keirekipro.presentation.auth.dto.LoginRequest;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
-import com.example.keirekipro.usecase.auth.LoginUseCaseDto;
+import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.BeforeEach;
