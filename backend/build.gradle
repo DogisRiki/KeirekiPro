@@ -48,6 +48,10 @@ dependencies {
     implementation 'com.auth0:java-jwt:4.4.0'
 }
 
+configurations.configureEach {
+    exclude group: 'commons-logging', module: 'commons-logging'
+}
+
 tasks.named('test') {
     useJUnitPlatform()
 }
