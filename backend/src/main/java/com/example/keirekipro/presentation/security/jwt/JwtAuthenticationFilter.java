@@ -74,4 +74,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return Arrays.stream(request.getCookies()).filter(cookie -> COOKIE_NAME.equals(cookie.getName()))
                 .map(Cookie::getValue).findFirst();
     }
+
+    @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) throws ServletException {
+        // リフレッシュトークン再発行のエンドポイントはフィルタ処理をスキップする
+        return request.getServletPath().equals("/api/auth/token/refresh");
+    }
 }
