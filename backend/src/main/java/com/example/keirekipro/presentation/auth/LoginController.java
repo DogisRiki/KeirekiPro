@@ -1,12 +1,12 @@
 package com.example.keirekipro.presentation.auth;
 
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
 import com.example.keirekipro.usecase.auth.LoginUseCaseDto;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,24 +48,8 @@ public class LoginController {
         String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
 
         // レスポンスヘッダーにセット
-        response.addHeader("Set-Cookie", createHttpOnlyCookie("accessToken", accessToken));
-        response.addHeader("Set-Cookie", createHttpOnlyCookie("refreshToken", refreshToken));
+        response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
+        response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
     }
 
-    /**
-     * HttpOnlyクッキーを作成する
-     *
-     * @param name  キー
-     * @param value 値
-     * @return HttpCookie文字列
-     */
-    private String createHttpOnlyCookie(String name, String value) {
-        return ResponseCookie.from(name, value)
-                .httpOnly(true)
-                .secure(isSecureCookie)
-                .sameSite("Lax")
-                .path("/")
-                .build()
-                .toString();
-    }
 }
