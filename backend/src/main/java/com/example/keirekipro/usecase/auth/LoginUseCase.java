@@ -1,7 +1,7 @@
 package com.example.keirekipro.usecase.auth;
 
-import com.example.keirekipro.infrastructure.repository.user.UserAuthInfoDto;
-import com.example.keirekipro.infrastructure.repository.user.UserMapper;
+import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
+import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
 import com.example.keirekipro.presentation.auth.dto.LoginRequest;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 

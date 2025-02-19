@@ -1,6 +1,8 @@
-package com.example.keirekipro.infrastructure.repository.user;
+package com.example.keirekipro.infrastructure.repository.user.mapper;
 
 import java.util.Optional;
+
+import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.springframework.stereotype.Repository;

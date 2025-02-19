@@ -1,10 +1,12 @@
-package com.example.keirekipro.infrastructure.repository.user;
+package com.example.keirekipro.infrastructure.repository.user.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Optional;
 import java.util.UUID;
+
+import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

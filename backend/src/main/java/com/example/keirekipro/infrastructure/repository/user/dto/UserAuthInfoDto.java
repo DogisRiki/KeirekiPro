@@ -1,4 +1,4 @@
-package com.example.keirekipro.infrastructure.repository.user;
+package com.example.keirekipro.infrastructure.repository.user.dto;
 
 import java.util.UUID;
 
