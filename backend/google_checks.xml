@@ -368,9 +368,10 @@
             <property name="forbiddenSummaryFragments"
                 value="^@return the *|^This method returns |^A [{]@code [a-zA-Z0-9]+[}]( is a )" />
         </module> -->
-        <module name="JavadocParagraph">
+        <!-- フォーマッターと競合するのでコメントアウト -->
+        <!-- <module name="JavadocParagraph">
             <property name="allowNewlineParagraph" value="false" />
-        </module>
+        </module> -->
         <module name="RequireEmptyLineBeforeBlockTagGroup" />
         <module name="AtclauseOrder">
             <property name="tagOrder" value="@param, @return, @throws, @deprecated" />
