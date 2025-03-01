@@ -46,6 +46,11 @@ dependencies {
     implementation 'com.openhtmltopdf:openhtmltopdf-core:1.0.10'
     implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
     implementation 'com.auth0:java-jwt:4.4.0'
+    implementation platform('software.amazon.awssdk:bom:2.30.21')
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:ses'
+    implementation 'software.amazon.awssdk:secretsmanager'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 }
 
 configurations.configureEach {
