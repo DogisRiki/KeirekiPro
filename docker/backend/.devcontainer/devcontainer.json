@@ -50,8 +50,7 @@
                     "editor.tabSize": 4,
                     "editor.codeActionsOnSave": {
                         "source.organizeImports": "explicit"
-                    },
-                    "editor.defaultFormatter": "redhat.java"
+                    }
                 },
                 "[spring-boot-properties-yaml]": {
                     "editor.insertSpaces": true,
