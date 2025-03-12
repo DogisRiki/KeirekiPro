@@ -5,9 +5,9 @@ title ER図
 entity "ユーザー(users)" as users {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
-    email : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- メールアドレス
-    password : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- パスワード
-    username : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- ユーザー名
+    email : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[UNIQUE]</color> -- メールアドレス
+    password : <color:#1E90FF>VARCHAR(255)</color> -- パスワード
+    username : <color:#1E90FF>VARCHAR(255)</color> -- ユーザー名
     profile_image : <color:#1E90FF>VARCHAR(255)</color> -- プロフィール画像
     two_factor_auth_enabled : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL, DEFAULT FALSE]</color> -- 二段階認証設定
     created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
