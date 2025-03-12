@@ -15,4 +15,23 @@
             email = #{email}
     </select>
 
+    <insert id="registerUser">
+        INSERT INTO users(
+            id,
+            email,
+            password,
+            username,
+            created_at,
+            updated_at
+        )
+        VALUES(
+            #{id},
+            #{email},
+            #{password},
+            #{username},
+            NOW(),
+            NOW()
+        )
+    </insert>
+
 </mapper>

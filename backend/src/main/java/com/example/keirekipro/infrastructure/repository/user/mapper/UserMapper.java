@@ -1,10 +1,12 @@
 package com.example.keirekipro.infrastructure.repository.user.mapper;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -20,5 +22,16 @@ public interface UserMapper {
      * @param email メールアドレス
      * @return ユーザー認証情報
      */
-    Optional<UserAuthInfoDto> findByEmail(String email);
+    Optional<UserAuthInfoDto> findByEmail(@Param("email") String email);
+
+    /**
+     * 新規ユーザーを登録する
+     *
+     * @param id       ユーザーID
+     * @param email    メールアドレス
+     * @param password パスワード
+     * @param username ユーザー名
+     */
+    void registerUser(@Param("id") UUID id, @Param("email") String email, @Param("password") String password,
+            @Param("username") String username);
 }
