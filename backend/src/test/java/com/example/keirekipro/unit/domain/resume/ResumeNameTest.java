@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.resume;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -14,31 +13,25 @@ import java.util.List;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.shared.Notification;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class ResumeNameTest {
 
     @Mock
     private Notification notification;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
     @Test
     @DisplayName("有効な値でインスタンス化する")
     void test1() {
         ResumeName resumeName = ResumeName.create(notification, "職務経歴書名サンプル");
-        // インスタンスがnullでない。
-        assertNotNull(resumeName);
-        // 職務経歴書名が正しい値である。
-        assertEquals("職務経歴書名サンプル", resumeName.getValue());
-        // notification.addError()が一度も呼ばれていない。
+
+        assertThat(resumeName).isNotNull();
+        assertThat(resumeName.getValue()).isEqualTo("職務経歴書名サンプル");
         verify(notification, never()).addError(anyString(), anyString());
     }
 
@@ -49,12 +42,11 @@ class ResumeNameTest {
         for (char c : invalidChars.toCharArray()) {
             // 毎回モックをリセットして、呼び出し履歴をクリアする
             reset(notification);
-            // 通常の文字列に禁則文字を混ぜる
             String invalidName = "Valid" + c;
 
             ResumeName resumeName = ResumeName.create(notification, invalidName);
-            // インスタンスがnullでない。
-            assertNotNull(resumeName);
+
+            assertThat(resumeName).isNotNull();
             // 職務経歴書名に対するエラーメッセージが登録される
             verify(notification, times(1)).addError(
                     eq("resumeName"),
@@ -74,8 +66,8 @@ class ResumeNameTest {
             reset(notification);
 
             ResumeName resumeName = ResumeName.create(notification, value);
-            // インスタンスがnullでない。
-            assertNotNull(resumeName);
+
+            assertThat(resumeName).isNotNull();
             // 職務経歴書名に対するエラーメッセージが登録される
             verify(notification, times(1)).addError(
                     eq("resumeName"),
@@ -97,8 +89,8 @@ class ResumeNameTest {
                 reset(notification);
                 String value = "." + "invalid" + c;
                 ResumeName resumeName = ResumeName.create(notification, value);
-                // インスタンスがnullでない。
-                assertNotNull(resumeName);
+
+                assertThat(resumeName).isNotNull();
 
                 // 禁止文字エラー + 先頭ドットエラーの2回
                 verify(notification).addError(
@@ -116,10 +108,10 @@ class ResumeNameTest {
             {
                 // 毎回モックをリセットして、呼び出し履歴をクリアする
                 reset(notification);
-                String value = "invalid" + c + "."; // 例: "invalid/."
+                String value = "invalid" + c + ".";
                 ResumeName resumeName = ResumeName.create(notification, value);
-                // インスタンスがnullでない。
-                assertNotNull(resumeName);
+
+                assertThat(resumeName).isNotNull();
 
                 // 禁止文字エラー + 先頭ドットエラーの2回
                 verify(notification).addError(
@@ -128,6 +120,7 @@ class ResumeNameTest {
                 verify(notification).addError(
                         eq("resumeName"),
                         eq("職務経歴書名の先頭または末尾に「.」を使用することはできません。"));
+
                 // 2回呼ばれたことを総数でも確認（呼び出し順が変わる可能性もあるため）
                 verify(notification, times(2)).addError(eq("resumeName"), anyString());
             }
@@ -141,7 +134,7 @@ class ResumeNameTest {
         {
             reset(notification);
             ResumeName resumeName = ResumeName.create(notification, null);
-            assertNotNull(resumeName);
+            assertThat(resumeName).isNotNull();
             verify(notification, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名は入力必須です。"));
@@ -151,7 +144,7 @@ class ResumeNameTest {
         {
             reset(notification);
             ResumeName resumeName = ResumeName.create(notification, "");
-            assertNotNull(resumeName);
+            assertThat(resumeName).isNotNull();
             verify(notification, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名は入力必須です。"));
@@ -161,7 +154,7 @@ class ResumeNameTest {
         {
             reset(notification);
             ResumeName resumeName = ResumeName.create(notification, "   ");
-            assertNotNull(resumeName);
+            assertThat(resumeName).isNotNull();
             verify(notification, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名は入力必須です。"));
@@ -171,7 +164,7 @@ class ResumeNameTest {
         {
             reset(notification);
             ResumeName resumeName = ResumeName.create(notification, "\t");
-            assertNotNull(resumeName);
+            assertThat(resumeName).isNotNull();
             verify(notification, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名は入力必須です。"));

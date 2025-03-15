@@ -1,8 +1,6 @@
 package com.example.keirekipro.unit.domain.shared;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Map;
@@ -18,8 +16,9 @@ class NotificationTest {
     @DisplayName("インスタンス化した直後はエラーが1つも存在しないこと")
     void test1() {
         Notification notification = new Notification();
-        // notificationにエラーが存在しない。
-        assertFalse(notification.hasErrors());
+
+        assertThat(notification.hasErrors())
+                .isFalse();
     }
 
     @Test
@@ -27,10 +26,11 @@ class NotificationTest {
     void test2() {
         Notification notification = new Notification();
         notification.addError("field", "エラーメッセージ");
-        // notificationにエラーが存在する。
-        assertTrue(notification.hasErrors());
-        // notificationに単一のエラーが存在する
-        assertEquals(Map.of("field", List.of("エラーメッセージ")), notification.getErrors());
+
+        assertThat(notification.hasErrors())
+                .isTrue();
+        assertThat(notification.getErrors())
+                .isEqualTo(Map.of("field", List.of("エラーメッセージ")));
     }
 
     @Test
@@ -39,10 +39,11 @@ class NotificationTest {
         Notification notification = new Notification();
         notification.addError("field", "エラーメッセージ1");
         notification.addError("field", "エラーメッセージ2");
-        // notificationにエラーが存在する。
-        assertTrue(notification.hasErrors());
-        // notificationに同一フィールド名の複数エラーが存在する。
-        assertEquals(Map.of("field", List.of("エラーメッセージ1", "エラーメッセージ2")), notification.getErrors());
+
+        assertThat(notification.hasErrors())
+                .isTrue();
+        assertThat(notification.getErrors())
+                .isEqualTo(Map.of("field", List.of("エラーメッセージ1", "エラーメッセージ2")));
     }
 
     @Test
@@ -53,12 +54,12 @@ class NotificationTest {
         notification.addError("field1", "エラーメッセージ1-2");
         notification.addError("field2", "エラーメッセージ2-1");
         notification.addError("field2", "エラーメッセージ2-2");
-        // notificationにエラーが存在する。
-        assertTrue(notification.hasErrors());
-        // notificationに複数フィールド名の複数エラーが存在する。
-        assertEquals(
-                Map.of("field1", List.of("エラーメッセージ1-1", "エラーメッセージ1-2"), "field2",
-                        List.of("エラーメッセージ2-1", "エラーメッセージ2-2")),
-                notification.getErrors());
+
+        assertThat(notification.hasErrors())
+                .isTrue();
+        assertThat(notification.getErrors())
+                .isEqualTo(Map.of(
+                        "field1", List.of("エラーメッセージ1-1", "エラーメッセージ1-2"),
+                        "field2", List.of("エラーメッセージ2-1", "エラーメッセージ2-2")));
     }
 }

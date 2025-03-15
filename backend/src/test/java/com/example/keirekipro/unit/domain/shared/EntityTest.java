@@ -1,8 +1,6 @@
 package com.example.keirekipro.unit.domain.shared;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.UUID;
 
@@ -28,10 +26,11 @@ class EntityTest {
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
         TestEntity entity = new TestEntity(1);
-        // idがnullでない。
-        assertNotNull(entity.getId());
-        // 並び順が正しい値である。
-        assertEquals(1, entity.getOrderNo());
+
+        assertThat(entity.getId())
+                .isNotNull();
+        assertThat(entity.getOrderNo())
+                .isEqualTo(1);
     }
 
     @Test
@@ -39,10 +38,11 @@ class EntityTest {
     void test2() {
         UUID id = UUID.fromString("5af48f3b-468b-4ae0-a065-7d7ac70b37a8");
         TestEntity entity = new TestEntity(id, 2);
-        // idが正しい値である。
-        assertEquals(entity.getId(), id);
-        // 並び順が正しい値である。
-        assertEquals(2, entity.getOrderNo());
+
+        assertThat(entity.getId())
+                .isEqualTo(id);
+        assertThat(entity.getOrderNo())
+                .isEqualTo(2);
     }
 
     @Test
@@ -50,8 +50,9 @@ class EntityTest {
     void test3() {
         TestEntity entity = new TestEntity(1);
         entity.changeOrderNo(100);
-        // 変更した並び順が正しい値である。
-        assertEquals(100, entity.getOrderNo());
+
+        assertThat(entity.getOrderNo())
+                .isEqualTo(100);
     }
 
     @Test
@@ -62,10 +63,10 @@ class EntityTest {
         TestEntity entity1 = new TestEntity(id1, 1);
         TestEntity entity2 = new TestEntity(id1, 1);
         TestEntity entity3 = new TestEntity(id2, 1);
-        // idが同値であれば等価である。
-        assertEquals(entity1, entity2);
-        // idが同値でなければ等価でない。
-        assertNotEquals(entity1, entity3);
+
+        assertThat(entity1)
+                .isEqualTo(entity2)
+                .isNotEqualTo(entity3);
     }
 
     @Test
@@ -73,12 +74,12 @@ class EntityTest {
     void test5() {
         UUID id1 = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         UUID id2 = UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
-        int entity1 = new TestEntity(id1, 1).hashCode();
-        int entity2 = new TestEntity(id1, 1).hashCode();
-        int entity3 = new TestEntity(id2, 1).hashCode();
-        // idが同値であれば同一のハッシュ値である。
-        assertEquals(entity1, entity2);
-        // idが異なればハッシュ値も異なる。
-        assertNotEquals(entity1, entity3);
+        int entity1HashCode = new TestEntity(id1, 1).hashCode();
+        int entity2HashCode = new TestEntity(id1, 1).hashCode();
+        int entity3HashCode = new TestEntity(id2, 1).hashCode();
+
+        assertThat(entity1HashCode)
+                .isEqualTo(entity2HashCode)
+                .isNotEqualTo(entity3HashCode);
     }
 }

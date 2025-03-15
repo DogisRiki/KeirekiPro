@@ -1,8 +1,7 @@
 package com.example.keirekipro.unit.presentation.security;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -20,9 +19,10 @@ import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
@@ -31,6 +31,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.Cookie;
 
+@ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
     @Mock
@@ -44,7 +45,6 @@ class JwtAuthenticationFilterTest {
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
         // SecurityContextHolderを毎回クリアする
         SecurityContextHolder.clearContext();
     }
@@ -65,7 +65,8 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
         // SecurityContextに認証情報が設定されている。
-        assertEquals(authentication, SecurityContextHolder.getContext().getAuthentication());
+        assertThat(SecurityContextHolder.getContext().getAuthentication())
+                .isEqualTo(authentication);
         // フィルタチェーンが呼び出されている。
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
@@ -85,11 +86,13 @@ class JwtAuthenticationFilterTest {
                 .when(jwtProvider).getAuthentication(invalidToken);
 
         // JWTVerificationExceptionがスローされる。
-        assertThrows(JWTVerificationException.class, () -> {
+        assertThatThrownBy(() -> {
             filter.doFilter(mockRequest, mockResponse, filterChain);
-        });
+        }).isInstanceOf(JWTVerificationException.class);
+
         // SecurityContextに認証情報が設定されていないことを確認
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertThat(SecurityContextHolder.getContext().getAuthentication())
+                .isNull();
         // フィルタチェーンが呼び出されていることを確認
     }
 
@@ -105,7 +108,8 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
         // SecurityContext に認証情報が設定されていない。
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertThat(SecurityContextHolder.getContext().getAuthentication())
+                .isNull();
         // フィルタチェーンが呼び出されている。
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
@@ -131,11 +135,13 @@ class JwtAuthenticationFilterTest {
                 .when(jwtProvider).getAuthentication(expiredToken);
 
         // JWTVerificationExceptionがスローされる。
-        assertThrows(JWTVerificationException.class, () -> {
+        assertThatThrownBy(() -> {
             filter.doFilter(mockRequest, mockResponse, filterChain);
-        });
+        }).isInstanceOf(JWTVerificationException.class);
+
         // SecurityContext に認証情報が設定されていない。
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertThat(SecurityContextHolder.getContext().getAuthentication())
+                .isNull();
     }
 
     @Test
@@ -159,7 +165,8 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
         // SecurityContext に認証情報が設定されている。
-        assertEquals(authentication, SecurityContextHolder.getContext().getAuthentication());
+        assertThat(SecurityContextHolder.getContext().getAuthentication())
+                .isEqualTo(authentication);
         // フィルタチェーンが呼び出されている。
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }

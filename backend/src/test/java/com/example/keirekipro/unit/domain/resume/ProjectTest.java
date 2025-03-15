@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.resume;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.YearMonth;
 import java.util.List;
@@ -12,21 +11,17 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.shared.Notification;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class ProjectTest {
 
     @Mock
     private Notification notification;
-
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
 
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
@@ -36,22 +31,19 @@ class ProjectTest {
         Project.Process process = createSampleProcess();
         Project project = Project.create(0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process,
                 techStack);
-        // インスタンスがnullでない。
-        assertNotNull(project);
-        // idが生成されている。
-        assertNotNull(project.getId());
-        // 並び順が正しい値である。
-        assertEquals(0, project.getOrderNo());
-        // 各フィールドの値が正しい。
-        assertEquals("株式会社ABC", project.getCompanyName());
-        assertEquals(period, project.getPeriod());
-        assertEquals("プロジェクト名", project.getName());
-        assertEquals("プロジェクト概要", project.getOverview());
-        assertEquals("5人", project.getTeamComp());
-        assertEquals("リーダー", project.getRole());
-        assertEquals("成果内容", project.getAchievement());
-        assertEquals(process, project.getProcess());
-        assertEquals(techStack, project.getTechStack());
+
+        assertThat(project).isNotNull();
+        assertThat(project.getId()).isNotNull();
+        assertThat(project.getOrderNo()).isEqualTo(0);
+        assertThat(project.getCompanyName()).isEqualTo("株式会社ABC");
+        assertThat(project.getPeriod()).isEqualTo(period);
+        assertThat(project.getName()).isEqualTo("プロジェクト名");
+        assertThat(project.getOverview()).isEqualTo("プロジェクト概要");
+        assertThat(project.getTeamComp()).isEqualTo("5人");
+        assertThat(project.getRole()).isEqualTo("リーダー");
+        assertThat(project.getAchievement()).isEqualTo("成果内容");
+        assertThat(project.getProcess()).isEqualTo(process);
+        assertThat(project.getTechStack()).isEqualTo(techStack);
     }
 
     @Test
@@ -64,22 +56,19 @@ class ProjectTest {
         Project project = Project.reconstruct(id, 0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容",
                 process,
                 techStack);
-        // インスタンスがnullでない。
-        assertNotNull(project);
-        // idが正しい値である。
-        assertEquals(id, project.getId());
-        // 並び順が正しい値である。
-        assertEquals(0, project.getOrderNo());
-        // 各フィールドの値が正しい。
-        assertEquals("株式会社ABC", project.getCompanyName());
-        assertEquals(period, project.getPeriod());
-        assertEquals("プロジェクト名", project.getName());
-        assertEquals("プロジェクト概要", project.getOverview());
-        assertEquals("5人", project.getTeamComp());
-        assertEquals("リーダー", project.getRole());
-        assertEquals("成果内容", project.getAchievement());
-        assertEquals(process, project.getProcess());
-        assertEquals(techStack, project.getTechStack());
+
+        assertThat(project).isNotNull();
+        assertThat(project.getId()).isEqualTo(id);
+        assertThat(project.getOrderNo()).isEqualTo(0);
+        assertThat(project.getCompanyName()).isEqualTo("株式会社ABC");
+        assertThat(project.getPeriod()).isEqualTo(period);
+        assertThat(project.getName()).isEqualTo("プロジェクト名");
+        assertThat(project.getOverview()).isEqualTo("プロジェクト概要");
+        assertThat(project.getTeamComp()).isEqualTo("5人");
+        assertThat(project.getRole()).isEqualTo("リーダー");
+        assertThat(project.getAchievement()).isEqualTo("成果内容");
+        assertThat(project.getProcess()).isEqualTo(process);
+        assertThat(project.getTechStack()).isEqualTo(techStack);
     }
 
     @Test
@@ -87,8 +76,8 @@ class ProjectTest {
     void test3() {
         Project project = createSampleProject();
         Project updatedProject = project.changeCompanyName("新しい会社名");
-        // 変更した会社名が正しい値である。
-        assertEquals("新しい会社名", updatedProject.getCompanyName());
+
+        assertThat(updatedProject.getCompanyName()).isEqualTo("新しい会社名");
     }
 
     @Test
@@ -97,8 +86,8 @@ class ProjectTest {
         Project project = createSampleProject();
         Period newPeriod = Period.create(notification, YearMonth.of(2025, 1), YearMonth.of(2025, 12), false);
         Project updatedProject = project.changePeriod(newPeriod);
-        // 変更した期間が正しい値である。
-        assertEquals(newPeriod, updatedProject.getPeriod());
+
+        assertThat(updatedProject.getPeriod()).isEqualTo(newPeriod);
     }
 
     @Test
@@ -106,8 +95,8 @@ class ProjectTest {
     void test5() {
         Project project = createSampleProject();
         Project updatedProject = project.changeOverview("新しいプロジェクト概要");
-        // 変更したプロジェクト概要が正しい値である。
-        assertEquals("新しいプロジェクト概要", updatedProject.getOverview());
+
+        assertThat(updatedProject.getOverview()).isEqualTo("新しいプロジェクト概要");
     }
 
     @Test
@@ -115,8 +104,8 @@ class ProjectTest {
     void test6() {
         Project project = createSampleProject();
         Project updatedProject = project.changeTeamComp("10人");
-        // 変更したチーム構成が正しい値である。
-        assertEquals("10人", updatedProject.getTeamComp());
+
+        assertThat(updatedProject.getTeamComp()).isEqualTo("10人");
     }
 
     @Test
@@ -124,8 +113,8 @@ class ProjectTest {
     void test7() {
         Project project = createSampleProject();
         Project updatedProject = project.changeRole("メンバー");
-        // 変更した役割が正しい値である。
-        assertEquals("メンバー", updatedProject.getRole());
+
+        assertThat(updatedProject.getRole()).isEqualTo("メンバー");
     }
 
     @Test
@@ -133,8 +122,8 @@ class ProjectTest {
     void test8() {
         Project project = createSampleProject();
         Project updatedProject = project.changeAchievement("新しい成果");
-        // 変更した成果が正しい値である。
-        assertEquals("新しい成果", updatedProject.getAchievement());
+
+        assertThat(updatedProject.getAchievement()).isEqualTo("新しい成果");
     }
 
     @Test
@@ -143,8 +132,8 @@ class ProjectTest {
         Project project = createSampleProject();
         Project.Process newProcess = createSampleProcess();
         Project updatedProject = project.changeProcess(newProcess);
-        // 変更した作業工程が正しい値である。
-        assertEquals(newProcess, updatedProject.getProcess());
+
+        assertThat(updatedProject.getProcess()).isEqualTo(newProcess);
     }
 
     @Test
@@ -153,8 +142,8 @@ class ProjectTest {
         Project project = createSampleProject();
         TechStack newTechStack = createSampleTechStack();
         Project updatedProject = project.changeTechStack(newTechStack);
-        // 変更した技術スタックが正しい値である。
-        assertEquals(newTechStack, updatedProject.getTechStack());
+
+        assertThat(updatedProject.getTechStack()).isEqualTo(newTechStack);
     }
 
     @Test
@@ -162,17 +151,15 @@ class ProjectTest {
     void test11() {
         Project project = createSampleProject();
         Project updatedProject = project.changeName("新しいプロジェクト名");
-        // 変更したプロジェクト名が正しい値である。
-        assertEquals("新しいプロジェクト名", updatedProject.getName());
+
+        assertThat(updatedProject.getName()).isEqualTo("新しいプロジェクト名");
     }
 
     @Test
     @DisplayName("すべてのフィールドを変更する")
     void test12() {
-        // 初期データ作成
         Project initialProject = createSampleProject();
 
-        // 新しい値の準備
         Period newPeriod = Period.create(notification, YearMonth.of(2026, 1), YearMonth.of(2027, 12), false);
         TechStack newTechStack = TechStack.create(
                 List.of("Kotlin", "Go"),
@@ -212,16 +199,15 @@ class ProjectTest {
                 .changeProcess(newProcess)
                 .changeTechStack(newTechStack);
 
-        // アサーション
-        assertEquals("新しい会社名", updatedProject.getCompanyName());
-        assertEquals(newPeriod, updatedProject.getPeriod());
-        assertEquals("新しいプロジェクト名", updatedProject.getName());
-        assertEquals("新しいプロジェクト概要", updatedProject.getOverview());
-        assertEquals("15人", updatedProject.getTeamComp());
-        assertEquals("プロジェクトマネージャー", updatedProject.getRole());
-        assertEquals("大きな成功を達成", updatedProject.getAchievement());
-        assertEquals(newProcess, updatedProject.getProcess());
-        assertEquals(newTechStack, updatedProject.getTechStack());
+        assertThat(updatedProject.getCompanyName()).isEqualTo("新しい会社名");
+        assertThat(updatedProject.getPeriod()).isEqualTo(newPeriod);
+        assertThat(updatedProject.getName()).isEqualTo("新しいプロジェクト名");
+        assertThat(updatedProject.getOverview()).isEqualTo("新しいプロジェクト概要");
+        assertThat(updatedProject.getTeamComp()).isEqualTo("15人");
+        assertThat(updatedProject.getRole()).isEqualTo("プロジェクトマネージャー");
+        assertThat(updatedProject.getAchievement()).isEqualTo("大きな成功を達成");
+        assertThat(updatedProject.getProcess()).isEqualTo(newProcess);
+        assertThat(updatedProject.getTechStack()).isEqualTo(newTechStack);
     }
 
     private Project createSampleProject() {

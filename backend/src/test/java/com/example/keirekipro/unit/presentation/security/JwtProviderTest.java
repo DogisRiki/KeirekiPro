@@ -1,8 +1,7 @@
 package com.example.keirekipro.unit.presentation.security;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -46,8 +45,8 @@ class JwtProviderTest {
         String token = jwtProvider.createAccessToken(USER_ID);
         Authentication auth = jwtProvider.getAuthentication(token);
 
-        // ユーザーIDが正しい値である。
-        assertEquals(USER_ID, auth.getPrincipal());
+        // ユーザーIDが正しい値である
+        assertThat(auth.getPrincipal()).isEqualTo(USER_ID);
 
         Date expiration = jwtProvider.getExpirationDate(token);
         Date now = new Date();
@@ -56,15 +55,15 @@ class JwtProviderTest {
         System.out.println("現在時刻 : " + sdf.format(now));
         System.out.println("有効期限 : " + sdf.format(expiration));
 
-        // トークンの有効期限が現在時刻より後で、かつ31分以内である。
+        // トークンの有効期限が現在時刻より後で、かつ31分以内である
         // example
         // テスト実行時刻： 15:00:00
         // 期待される有効期限： 15:30:00 （30分後）
         // テストの許容範囲： 15:00:00 ～ 15:31:00
         // (トークン生成と有効期限チェックの時間差を考慮し、1分の余裕を持たせる)
-        assertTrue(expiration.after(now));
-        assertTrue(expiration.before(new Date(
-                now.getTime() + (jwtProperties.getAccessTokenValidityInMinutes() + 1) * 60 * 1000)));
+        assertThat(expiration)
+                .isAfter(now)
+                .isBefore(new Date(now.getTime() + (jwtProperties.getAccessTokenValidityInMinutes() + 1) * 60 * 1000));
     }
 
     @Test
@@ -73,8 +72,8 @@ class JwtProviderTest {
         String token = jwtProvider.createRefreshToken(USER_ID);
         Authentication auth = jwtProvider.getAuthentication(token);
 
-        // ユーザーIDが正しい値である。
-        assertEquals(USER_ID, auth.getPrincipal());
+        // ユーザーIDが正しい値である
+        assertThat(auth.getPrincipal()).isEqualTo(USER_ID);
 
         Date expiration = jwtProvider.getExpirationDate(token);
         Date now = new Date();
@@ -86,14 +85,15 @@ class JwtProviderTest {
         // 7日間の有効期限をミリ秒に変換(1日=24時間, 1時間=60分, 1分=60秒, 1秒=1000ミリ秒)
         long daysInMillis = jwtProperties.getRefreshTokenValidityInDays() * 24 * 60 * 60 * 1000L;
 
-        // トークンの有効期限が現在時刻より後で、かつ7日と1分以内である。
+        // トークンの有効期限が現在時刻より後で、かつ7日と1分以内である
         // example
         // テスト実行時刻： 2025/01/01 15:00:00
         // 期待される有効期限： 2025/01/07 15:00:00 （7日後）
         // テストの許容範囲： 2025/01/01 15:00:00 ～ 2025/01/07 15:01:00
         // (トークン生成と有効期限チェックの時間差を考慮し、1分の余裕を持たせる)
-        assertTrue(expiration.after(now));
-        assertTrue(expiration.before(new Date(now.getTime() + daysInMillis + (60 * 1000))));
+        assertThat(expiration)
+                .isAfter(now)
+                .isBefore(new Date(now.getTime() + daysInMillis + (60 * 1000)));
     }
 
     @Test
@@ -101,7 +101,8 @@ class JwtProviderTest {
     void test3() {
         String invalidToken = "";
         // トークンが空の場合、JWTVerificationExceptionがスローされる
-        assertThrows(JWTVerificationException.class, () -> jwtProvider.getAuthentication(invalidToken));
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(invalidToken))
+                .isInstanceOf(JWTVerificationException.class);
     }
 
     @Test
@@ -111,7 +112,8 @@ class JwtProviderTest {
                 + "eyJzdWIiOiIxMjNlNDU2Ny1lODliLTEyZDMtYTQ1Ni00MjY2MTQxNzQwMDAiLCJpYXQiOjE2NzQ5MjYwMDB9"
                 + ".invalid-signature";
         // 改ざんされたトークンの場合、JWTVerificationExceptionがスローされる
-        assertThrows(JWTVerificationException.class, () -> jwtProvider.getAuthentication(invalidToken));
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(invalidToken))
+                .isInstanceOf(JWTVerificationException.class);
     }
 
     @Test
@@ -124,7 +126,8 @@ class JwtProviderTest {
                 .withExpiresAt(new Date(System.currentTimeMillis() + 1000 * 60 * 30))
                 .sign(wrongAlgorithm);
         // 別の秘密鍵で署名されたトークンの場合、JWTVerificationExceptionがスローされる
-        assertThrows(JWTVerificationException.class, () -> jwtProvider.getAuthentication(invalidToken));
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(invalidToken))
+                .isInstanceOf(JWTVerificationException.class);
     }
 
     @Test
@@ -136,6 +139,7 @@ class JwtProviderTest {
                 .withExpiresAt(new Date(System.currentTimeMillis() - 1000 * 60)) // 1分前に期限切れ
                 .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
         // 有効期限切れのトークンの場合、JWTVerificationExceptionがスローされる
-        assertThrows(JWTVerificationException.class, () -> jwtProvider.getAuthentication(invalidToken));
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(invalidToken))
+                .isInstanceOf(JWTVerificationException.class);
     }
 }

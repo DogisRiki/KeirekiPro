@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.resume;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.UUID;
 
@@ -9,41 +8,31 @@ import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.shared.Notification;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class PortfolioTest {
 
     @Mock
     private Notification notification;
-
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
 
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
         Link link = Link.create(notification, "https://example.com");
         Portfolio portfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
-        // インスタンスがnullでない。
-        assertNotNull(portfolio);
-        // idが生成されている。
-        assertNotNull(portfolio.getId());
-        // 並び順が正しい値である。
-        assertEquals(0, portfolio.getOrderNo());
-        // ポートフォリオ名が正しい値である。
-        assertEquals("ポートフォリオ名", portfolio.getName());
-        // ポートフォリオ概要が正しい値である。
-        assertEquals("概要説明", portfolio.getOverview());
-        // 技術スタックが正しい値である。
-        assertEquals("Java, Spring, React", portfolio.getTechStack());
-        // リンクが正しい値である。
-        assertEquals(link, portfolio.getLink());
+
+        assertThat(portfolio).isNotNull();
+        assertThat(portfolio.getId()).isNotNull();
+        assertThat(portfolio.getOrderNo()).isEqualTo(0);
+        assertThat(portfolio.getName()).isEqualTo("ポートフォリオ名");
+        assertThat(portfolio.getOverview()).isEqualTo("概要説明");
+        assertThat(portfolio.getTechStack()).isEqualTo("Java, Spring, React");
+        assertThat(portfolio.getLink()).isEqualTo(link);
     }
 
     @Test
@@ -52,20 +41,14 @@ class PortfolioTest {
         Link link = Link.create(notification, "https://example.com");
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Portfolio portfolio = Portfolio.reconstruct(id, 0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
-        // インスタンスがnullでない。
-        assertNotNull(portfolio);
-        // idが正しい値である。
-        assertEquals(id, portfolio.getId());
-        // 並び順が正しい値である。
-        assertEquals(0, portfolio.getOrderNo());
-        // ポートフォリオ名が正しい値である。
-        assertEquals("ポートフォリオ名", portfolio.getName());
-        // ポートフォリオ概要が正しい値である。
-        assertEquals("概要説明", portfolio.getOverview());
-        // 技術スタックが正しい値である。
-        assertEquals("Java, Spring, React", portfolio.getTechStack());
-        // リンクが正しい値である。
-        assertEquals(link, portfolio.getLink());
+
+        assertThat(portfolio).isNotNull();
+        assertThat(portfolio.getId()).isEqualTo(id);
+        assertThat(portfolio.getOrderNo()).isEqualTo(0);
+        assertThat(portfolio.getName()).isEqualTo("ポートフォリオ名");
+        assertThat(portfolio.getOverview()).isEqualTo("概要説明");
+        assertThat(portfolio.getTechStack()).isEqualTo("Java, Spring, React");
+        assertThat(portfolio.getLink()).isEqualTo(link);
     }
 
     @Test
@@ -74,8 +57,8 @@ class PortfolioTest {
         Link link = Link.create(notification, "https://example.com");
         Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeName("新しいポートフォリオ名");
-        // 変更したポートフォリオ名が正しい値である。
-        assertEquals("新しいポートフォリオ名", afterPortfolio.getName());
+
+        assertThat(afterPortfolio.getName()).isEqualTo("新しいポートフォリオ名");
     }
 
     @Test
@@ -84,8 +67,8 @@ class PortfolioTest {
         Link link = Link.create(notification, "https://example.com");
         Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeOverview("新しい概要説明");
-        // 変更したポートフォリオ概要が正しい値である。
-        assertEquals("新しい概要説明", afterPortfolio.getOverview());
+
+        assertThat(afterPortfolio.getOverview()).isEqualTo("新しい概要説明");
     }
 
     @Test
@@ -94,8 +77,8 @@ class PortfolioTest {
         Link link = Link.create(notification, "https://example.com");
         Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeTechStack("TypeScript, Node.js");
-        // 変更した技術スタックが正しい値である。
-        assertEquals("TypeScript, Node.js", afterPortfolio.getTechStack());
+
+        assertThat(afterPortfolio.getTechStack()).isEqualTo("TypeScript, Node.js");
     }
 
     @Test
@@ -105,8 +88,8 @@ class PortfolioTest {
         Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", beforeLink);
         Link afterLink = Link.create(notification, "https://github.com");
         Portfolio afterPortfolio = beforePortfolio.changeLink(afterLink);
-        // 変更したリンクが正しい値である。
-        assertEquals(afterLink, afterPortfolio.getLink());
+
+        assertThat(afterPortfolio.getLink()).isEqualTo(afterLink);
     }
 
     @Test
@@ -119,10 +102,10 @@ class PortfolioTest {
                 .changeOverview("新しい概要説明")
                 .changeTechStack("TypeScript, Node.js")
                 .changeLink(afterLink);
-        // 変更した項目が正しい値である。
-        assertEquals("新しいポートフォリオ名", afterPortfolio.getName());
-        assertEquals("新しい概要説明", afterPortfolio.getOverview());
-        assertEquals("TypeScript, Node.js", afterPortfolio.getTechStack());
-        assertEquals(afterLink, afterPortfolio.getLink());
+
+        assertThat(afterPortfolio.getName()).isEqualTo("新しいポートフォリオ名");
+        assertThat(afterPortfolio.getOverview()).isEqualTo("新しい概要説明");
+        assertThat(afterPortfolio.getTechStack()).isEqualTo("TypeScript, Node.js");
+        assertThat(afterPortfolio.getLink()).isEqualTo(afterLink);
     }
 }

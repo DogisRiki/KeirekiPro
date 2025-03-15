@@ -17,25 +17,28 @@ import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import lombok.RequiredArgsConstructor;
 
 import jakarta.servlet.http.Cookie;
 
 @WebMvcTest(RefreshAccessTokenController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@RequiredArgsConstructor
 class RefreshAccessTokenControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
 
     @MockitoBean
     private JwtProvider jwtProvider;
+
+    private final MockMvc mockMvc;
 
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String ACCESS_TOKEN = "mockAccessToken";
@@ -45,6 +48,7 @@ class RefreshAccessTokenControllerTest {
     @Test
     @DisplayName("有効なリフレッシュトークンの場合、新しいアクセストークンが返される")
     void test1() throws Exception {
+        // モックをセットアップ
         when(jwtProvider.createAccessToken(USER_ID.toString())).thenReturn(NEW_ACCESS_TOKEN);
         when(jwtProvider.getAuthentication(REFRESH_TOKEN))
                 .thenReturn(new UsernamePasswordAuthenticationToken(USER_ID.toString(), null, List.of()));
@@ -52,6 +56,7 @@ class RefreshAccessTokenControllerTest {
         Cookie accessTokenCookie = new Cookie("accessToken", ACCESS_TOKEN);
         Cookie refreshTokenCookie = new Cookie("refreshToken", REFRESH_TOKEN);
 
+        // リクエストを実行
         mockMvc.perform(post("/api/auth/token/refresh")
                 .cookie(accessTokenCookie, refreshTokenCookie))
                 .andExpect(status().isOk())
@@ -62,6 +67,8 @@ class RefreshAccessTokenControllerTest {
     @DisplayName("リフレッシュトークンが存在しない場合、401が返る")
     void test2() throws Exception {
         Cookie accessTokenCookie = new Cookie("accessToken", ACCESS_TOKEN);
+
+        // リクエストを実行
         mockMvc.perform(post("/api/auth/token/refresh")
                 .cookie(accessTokenCookie))
                 .andExpect(status().isUnauthorized())
@@ -73,12 +80,14 @@ class RefreshAccessTokenControllerTest {
     @Test
     @DisplayName("リフレッシュトークンの有効期限が切れている場合、401が返る")
     void test3() throws Exception {
+        // モックをセットアップ
         when(jwtProvider.getAuthentication(REFRESH_TOKEN))
                 .thenThrow(new JWTVerificationException("トークンの有効期限が切れています。"));
 
         Cookie accessTokenCookie = new Cookie("accessToken", ACCESS_TOKEN);
         Cookie refreshTokenCookie = new Cookie("refreshToken", REFRESH_TOKEN);
 
+        // リクエストを実行
         mockMvc.perform(post("/api/auth/token/refresh")
                 .cookie(accessTokenCookie, refreshTokenCookie))
                 .andExpect(status().isUnauthorized())

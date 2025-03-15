@@ -1,8 +1,7 @@
 package com.example.keirekipro.unit.usecase.auth;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -14,15 +13,16 @@ import com.example.keirekipro.presentation.auth.dto.LoginRequest;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+@ExtendWith(MockitoExtension.class)
 class LoginUseCaseTest {
 
     @Mock
@@ -34,11 +34,6 @@ class LoginUseCaseTest {
     @InjectMocks
     private LoginUseCase loginUseCase;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
     private static final UUID USERID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
     private static final String EMAIL = "test@example.com";
@@ -46,45 +41,48 @@ class LoginUseCaseTest {
     private static final String PASSWORD = "hashedPassword";
 
     @Test
-    @DisplayName("正しいメールアドレスとパスワード")
+    @DisplayName("正しいメールアドレスとパスワードでログインする")
     void test1() {
+        // モックをセットアップ
         when(userMapper.findByEmail(EMAIL))
                 .thenReturn(Optional.of(new UserAuthInfoDto(USERID, EMAIL, PASSWORD)));
         when(passwordEncoder.matches(PASSWORD, PASSWORD)).thenReturn(true);
 
         LoginUseCaseDto dto = loginUseCase.execute(new LoginRequest(EMAIL, PASSWORD));
 
-        // ユーザー認証情報が存在する。
-        assertNotNull(dto);
-        // idが正しい値である。
-        assertEquals(USERID, dto.getId());
+        // ユーザー認証情報が存在する
+        assertThat(dto).isNotNull();
+        // idが正しい
+        assertThat(dto.getId()).isEqualTo(USERID);
     }
 
     @Test
     @DisplayName("ユーザーが存在しない場合、BadCredentialsExceptionが発生する")
     void test2() {
+        // モックをセットアップ
         when(userMapper.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
-        // BadCredentialsExceptionがスローされる。
-        Exception exception = assertThrows(BadCredentialsException.class, () -> {
+        // BadCredentialsExceptionがスローされる
+        assertThatThrownBy(() -> {
             loginUseCase.execute(new LoginRequest(EMAIL, PASSWORD));
-        });
-        // 例外メッセージが正しい値である。
-        assertEquals("メールアドレスまたはパスワードが正しくありません。", exception.getMessage());
+        })
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("メールアドレスまたはパスワードが正しくありません。");
     }
 
     @Test
     @DisplayName("パスワードが正しくない場合、BadCredentialsExceptionが発生する")
     void test3() {
+        // モックをセットアップ
         when(userMapper.findByEmail(EMAIL))
                 .thenReturn(Optional.of(new UserAuthInfoDto(USERID, EMAIL, PASSWORD)));
         when(passwordEncoder.matches(PASSWORD, PASSWORD)).thenReturn(false);
 
-        // BadCredentialsExceptionがスローされる。
-        Exception exception = assertThrows(BadCredentialsException.class, () -> {
+        // BadCredentialsExceptionがスローされる
+        assertThatThrownBy(() -> {
             loginUseCase.execute(new LoginRequest(EMAIL, PASSWORD));
-        });
-        // 例外メッセージが正しい値である。
-        assertEquals("メールアドレスまたはパスワードが正しくありません。", exception.getMessage());
+        })
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("メールアドレスまたはパスワードが正しくありません。");
     }
 }

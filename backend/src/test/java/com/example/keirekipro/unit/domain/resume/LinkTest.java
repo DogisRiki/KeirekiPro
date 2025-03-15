@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.resume;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -14,31 +13,25 @@ import java.util.List;
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.shared.Notification;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class LinkTest {
 
     @Mock
     private Notification notification;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
     @Test
     @DisplayName("有効な値でインスタンス化する")
     void test1() {
         Link link = Link.create(notification, "https://example.com");
-        // インスタンスがnullでない。
-        assertNotNull(link);
-        // 職務経歴書名が正しい値である。
-        assertEquals("https://example.com", link.getValue());
-        // notification.addError()が一度も呼ばれていない。
+
+        assertThat(link).isNotNull();
+        assertThat(link.getValue()).isEqualTo("https://example.com");
         verify(notification, never()).addError(anyString(), anyString());
     }
 
@@ -50,8 +43,8 @@ class LinkTest {
             // 毎回モックをリセットして、呼び出し履歴をクリアする
             reset(notification);
             Link link = Link.create(notification, value);
-            // インスタンスがnullでない。
-            assertNotNull(link);
+
+            assertThat(link).isNotNull();
             // リンクに対するエラーメッセージが登録される
             verify(notification, times(1)).addError(
                     eq("link"),

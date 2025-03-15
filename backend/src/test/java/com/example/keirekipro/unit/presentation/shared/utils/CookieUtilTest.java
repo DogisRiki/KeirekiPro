@@ -34,10 +34,8 @@ class CookieUtilTest {
         Optional<String> resultTestCookie = CookieUtil.getCookieValue(request, "test-cookie");
         Optional<String> resultOtherCookie = CookieUtil.getCookieValue(request, "other-cookie");
 
-        assertThat(resultTestCookie).isPresent();
-        assertThat(resultTestCookie).contains("test-value");
-        assertThat(resultOtherCookie).isPresent();
-        assertThat(resultOtherCookie).contains("other-value");
+        assertThat(resultTestCookie).isPresent().contains("test-value");
+        assertThat(resultOtherCookie).isPresent().contains("other-value");
     }
 
     @Test
@@ -67,11 +65,12 @@ class CookieUtilTest {
     public void test4() {
         String result = CookieUtil.createHttpOnlyCookie("test-cookie", "test-value", true);
 
-        assertThat(result).contains("test-cookie=test-value");
-        assertThat(result).contains("HttpOnly");
-        assertThat(result).contains("Secure");
-        assertThat(result).contains("SameSite=Lax");
-        assertThat(result).contains("Path=/");
+        assertThat(result)
+                .contains("test-cookie=test-value")
+                .contains("HttpOnly")
+                .contains("Secure")
+                .contains("SameSite=Lax")
+                .contains("Path=/");
     }
 
     @Test
@@ -79,10 +78,11 @@ class CookieUtilTest {
     public void test5() {
         String result = CookieUtil.createHttpOnlyCookie("test-cookie", "test-value", false);
 
-        assertThat(result).contains("test-cookie=test-value");
-        assertThat(result).contains("HttpOnly");
-        assertThat(result).doesNotContain("Secure");
-        assertThat(result).contains("SameSite=Lax");
-        assertThat(result).contains("Path=/");
+        assertThat(result)
+                .contains("test-cookie=test-value")
+                .contains("HttpOnly")
+                .doesNotContain("Secure")
+                .contains("SameSite=Lax")
+                .contains("Path=/");
     }
 }

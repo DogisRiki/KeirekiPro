@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.resume;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 
@@ -46,11 +45,11 @@ class TechStackTest {
                 infrastructure,
                 tools);
 
-        assertNotNull(techStack);
-        assertEquals(4, techStack.getLanguages().size());
-        assertEquals(3, techStack.getDependencies().getFrameworks().size());
-        assertEquals("Docker", techStack.getInfrastructure().getContainers().get(0));
-        assertEquals("Figma", techStack.getTools().getDesignTools().get(0));
+        assertThat(techStack).isNotNull();
+        assertThat(techStack.getLanguages().size()).isEqualTo(4);
+        assertThat(techStack.getDependencies().getFrameworks().size()).isEqualTo(3);
+        assertThat(techStack.getInfrastructure().getContainers().get(0)).isEqualTo("Docker");
+        assertThat(techStack.getTools().getDesignTools().get(0)).isEqualTo("Figma");
     }
 
     @Test
@@ -89,10 +88,10 @@ class TechStackTest {
                 infrastructure,
                 tools);
 
-        assertNotNull(techStack);
-        assertEquals(1, techStack.getLanguages().size());
-        assertEquals(0, techStack.getDependencies().getLibraries().size());
-        assertEquals(0, techStack.getInfrastructure().getContainers().size());
-        assertEquals(1, techStack.getTools().getDesignTools().size());
+        assertThat(techStack).isNotNull();
+        assertThat(techStack.getLanguages().size()).isEqualTo(1);
+        assertThat(techStack.getDependencies().getLibraries().size()).isEqualTo(0);
+        assertThat(techStack.getInfrastructure().getContainers().size()).isEqualTo(0);
+        assertThat(techStack.getTools().getDesignTools().size()).isEqualTo(1);
     }
 }

@@ -199,7 +199,7 @@ class OidcCallbackControllerTest {
     }
 
     @Test
-    @DisplayName("アクセストークン取得結果にエラーが入っている場合、エラーメッセージへリダイレクトされる")
+    @DisplayName("アクセストークン取得結果にエラーが入っている場合、エラーページへリダイレクトされる")
     void test6() throws Exception {
         // モックをセットアップ
         when(redisClient.hasKey("oidc:state:" + STATE_VALUE)).thenReturn(true);

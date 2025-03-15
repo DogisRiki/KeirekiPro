@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.resume;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.YearMonth;
 import java.util.UUID;
@@ -17,16 +16,12 @@ class CertificationTest {
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
         Certification certification = Certification.create(0, "基本情報技術者", YearMonth.of(2025, 01));
-        // インスタンスがnullでない。
-        assertNotNull(certification);
-        // idが生成されている。
-        assertNotNull(certification.getId());
-        // 並び順が正しい値である。
-        assertEquals(0, certification.getOrderNo());
-        // 資格名が正しい値である。
-        assertEquals("基本情報技術者", certification.getName());
-        // 取得年月が正しい値である。
-        assertEquals(YearMonth.of(2025, 01), certification.getDate());
+
+        assertThat(certification).isNotNull();
+        assertThat(certification.getId()).isNotNull();
+        assertThat(certification.getOrderNo()).isEqualTo(0);
+        assertThat(certification.getName()).isEqualTo("基本情報技術者");
+        assertThat(certification.getDate()).isEqualTo(YearMonth.of(2025, 01));
     }
 
     @Test
@@ -34,16 +29,12 @@ class CertificationTest {
     void test2() {
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Certification certification = Certification.reconstruct(id, 0, "基本情報技術者", YearMonth.of(2025, 01));
-        // インスタンスがnullでない。
-        assertNotNull(certification);
-        // idが正しい値である。
-        assertEquals(id, certification.getId());
-        // 並び順が正しい値である。
-        assertEquals(0, certification.getOrderNo());
-        // 資格名が正しい値である。
-        assertEquals("基本情報技術者", certification.getName());
-        // 取得年月が正しい値である。
-        assertEquals(YearMonth.of(2025, 01), certification.getDate());
+
+        assertThat(certification).isNotNull();
+        assertThat(certification.getId()).isEqualTo(id);
+        assertThat(certification.getOrderNo()).isEqualTo(0);
+        assertThat(certification.getName()).isEqualTo("基本情報技術者");
+        assertThat(certification.getDate()).isEqualTo(YearMonth.of(2025, 01));
     }
 
     @Test
@@ -51,8 +42,8 @@ class CertificationTest {
     void test3() {
         Certification beforeCertification = Certification.create(0, "基本情報技術者", YearMonth.of(2025, 01));
         Certification afteCertification = beforeCertification.changeName("応用情報技術者");
-        // 変更した資格名が正しい値である。
-        assertEquals("応用情報技術者", afteCertification.getName());
+
+        assertThat(afteCertification.getName()).isEqualTo("応用情報技術者");
     }
 
     @Test
@@ -60,8 +51,8 @@ class CertificationTest {
     void test4() {
         Certification beforeCertification = Certification.create(0, "基本情報技術者", YearMonth.of(2025, 01));
         Certification afteCertification = beforeCertification.changeDate(YearMonth.of(2030, 01));
-        // 変更した取得年月が正しい値である。
-        assertEquals(YearMonth.of(2030, 01), afteCertification.getDate());
+
+        assertThat(afteCertification.getDate()).isEqualTo(YearMonth.of(2030, 01));
     }
 
     @Test
@@ -69,8 +60,8 @@ class CertificationTest {
     void test5() {
         Certification beforeCertification = Certification.create(0, "基本情報技術者", YearMonth.of(2025, 01));
         Certification afteCertification = beforeCertification.changeDate(YearMonth.of(2030, 01)).changeName("応用情報技術者");
-        // 変更した項目が正しい値である。
-        assertEquals(YearMonth.of(2030, 01), afteCertification.getDate());
-        assertEquals("応用情報技術者", afteCertification.getName());
+
+        assertThat(afteCertification.getDate()).isEqualTo(YearMonth.of(2030, 01));
+        assertThat(afteCertification.getName()).isEqualTo("応用情報技術者");
     }
 }

@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.service;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
@@ -16,13 +15,14 @@ import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.domain.shared.Notification;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class ResumeNameDuplicationCheckServiceTest {
 
     @Mock
@@ -34,16 +34,12 @@ class ResumeNameDuplicationCheckServiceTest {
     @InjectMocks
     private ResumeNameDuplicationCheckService service;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
     private static final UUID USERID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
     @Test
     @DisplayName("同名の職務経歴書名が存在しない")
     void test1() {
+        // モックをセットアップ
         when(repository.findAll(
                 USERID)).thenReturn(List.of(
                         createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"),
@@ -56,13 +52,14 @@ class ResumeNameDuplicationCheckServiceTest {
 
         boolean result = service.execute(target);
 
-        // 重複がないため、falseとなる。
-        assertFalse(result);
+        // 重複がないため、falseとなる
+        assertThat(result).isFalse();
     }
 
     @Test
     @DisplayName("同名の職務経歴書が存在する")
     void test2() {
+        // モックをセットアップ
         when(repository.findAll(
                 USERID)).thenReturn(List.of(
                         createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"),
@@ -75,13 +72,14 @@ class ResumeNameDuplicationCheckServiceTest {
 
         boolean result = service.execute(target);
 
-        // 重複するため、trueとなる。
-        assertTrue(result);
+        // 重複するため、trueとなる
+        assertThat(result).isTrue();
     }
 
     @Test
     @DisplayName("自分自身は除外される(同じIDで同じ名前があっても重複とみなさない)")
     void test3() {
+        // モックをセットアップ
         when(repository.findAll(
                 USERID)).thenReturn(List.of(
                         createSampleResume(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"),
@@ -94,8 +92,8 @@ class ResumeNameDuplicationCheckServiceTest {
 
         boolean result = service.execute(target);
 
-        // 重複とみなされないため、falseとなる。
-        assertFalse(result);
+        // 重複とみなされないため、falseとなる
+        assertThat(result).isFalse();
     }
 
     /**

@@ -56,20 +56,20 @@ class OidcClientTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final String providerName = "google";
-    private final String redirectUri = "https://keirekipro.click/api/auth/oidc/callback";
-    private final String state = "random-state";
-    private final String codeChallenge = "code-challenge";
-    private final String codeVerifier = "code-verifier";
-    private final String code = "authorization-code";
-    private final String accessToken = "access-token";
-    private final String userInfoEndopoint = "https://openidconnect.googleapis.com/v1/userinfo";
+    private static final String PROVIDER_NAME = "google";
+    private static final String REDIRECT_URI = "https://keirekipro.click/api/auth/oidc/callback";
+    private static final String STATE = "random-state";
+    private static final String CODE_CHALLENGE = "code-challenge";
+    private static final String CODE_VERIFIER = "code-verifier";
+    private static final String CODE = "authorization-code";
+    private static final String ACCESS_TOKEN = "access-token";
+    private static final String USER_INFO_ENDOPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
 
     @Test
     @DisplayName("認可URLが正しく構築される")
     void test1() {
-        // モックの振る舞いをセットアップ
-        when(providerFactory.getProvider(providerName)).thenReturn(oidcProvider);
+        // モックをセットアップ
+        when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
         when(oidcProvider.getSecretName()).thenReturn("google-oidc-secret");
         when(oidcProvider.getAuthorizationEndpoint()).thenReturn("https://accounts.google.com/o/oauth2/auth");
         when(oidcProvider.getScopes()).thenReturn("openid email profile");
@@ -80,7 +80,7 @@ class OidcClientTest {
         when(secretsClient.getSecretJson("google-oidc-secret")).thenReturn(jsonNode);
 
         // 認可URLの構築を実行
-        String result = oidcClient.buildAuthorizationUrl(providerName, redirectUri, state, codeChallenge);
+        String result = oidcClient.buildAuthorizationUrl(PROVIDER_NAME, REDIRECT_URI, STATE, CODE_CHALLENGE);
 
         // 検証
         assertThat(result)
@@ -100,8 +100,8 @@ class OidcClientTest {
     @Test
     @DisplayName("プロバイダー固有のパラメータを付与した状態で認可URLが正しく構築される")
     void test2() {
-        // モックの振る舞いをセットアップ
-        when(providerFactory.getProvider(providerName)).thenReturn(oidcProvider);
+        // モックをセットアップ
+        when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
         when(oidcProvider.getSecretName()).thenReturn("google-oidc-secret");
         when(oidcProvider.getAuthorizationEndpoint()).thenReturn("https://accounts.google.com/o/oauth2/auth");
         when(oidcProvider.getScopes()).thenReturn("openid email profile");
@@ -128,7 +128,7 @@ class OidcClientTest {
         }).when(oidcProvider).addAuthorizationUrlParameters(any());
 
         // 認可URLの構築を実行
-        String result = oidcClient.buildAuthorizationUrl(providerName, redirectUri, state, codeChallenge);
+        String result = oidcClient.buildAuthorizationUrl(PROVIDER_NAME, REDIRECT_URI, STATE, CODE_CHALLENGE);
 
         // 検証
         assertThat(result)
@@ -151,8 +151,8 @@ class OidcClientTest {
     @DisplayName("アクセストークンを取得できる")
     @SuppressWarnings({ "unchecked", "rawtypes" })
     void test3() {
-        // モックセットアップ
-        when(providerFactory.getProvider(providerName)).thenReturn(oidcProvider);
+        // モックをセットアップ
+        when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
         when(oidcProvider.getSecretName()).thenReturn("google-oidc-secret");
         when(oidcProvider.getTokenEndpoint()).thenReturn("https://oauth2.googleapis.com/token");
 
@@ -194,7 +194,7 @@ class OidcClientTest {
         ArgumentCaptor<Map<String, String>> formDataCaptor = ArgumentCaptor.forClass((Class) Map.class);
 
         // アクセストークンの取得を実行
-        OidcTokenResponse result = oidcClient.getToken(providerName, code, redirectUri, codeVerifier);
+        OidcTokenResponse result = oidcClient.getToken(PROVIDER_NAME, CODE, REDIRECT_URI, CODE_VERIFIER);
 
         // requestBodySpec.bodyメソッドが呼ばれた際に渡されたパラメータをキャプチャするよう指定
         verify(requestBodySpec).body(formDataCaptor.capture());
@@ -210,17 +210,17 @@ class OidcClientTest {
         // リクエストパラメータに必要なパラメータがすべて含まれているかをキャプチャから検証
         assertThat(formData)
                 .containsEntry("grant_type", "authorization_code")
-                .containsEntry("code", code)
-                .containsEntry("redirect_uri", redirectUri)
-                .containsEntry("code_verifier", codeVerifier);
+                .containsEntry("code", CODE)
+                .containsEntry("redirect_uri", REDIRECT_URI)
+                .containsEntry("code_verifier", CODE_VERIFIER);
     }
 
     @Test
     @DisplayName("プロバイダー固有のパラメータを付与した状態でアクセストークンを取得できる")
     @SuppressWarnings({ "unchecked", "rawtypes" })
     void test4() {
-        // モックセットアップ
-        when(providerFactory.getProvider(providerName)).thenReturn(oidcProvider);
+        // モックをセットアップ
+        when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
         when(oidcProvider.getSecretName()).thenReturn("google-oidc-secret");
         when(oidcProvider.getTokenEndpoint()).thenReturn("https://oauth2.googleapis.com/token");
 
@@ -263,7 +263,7 @@ class OidcClientTest {
         ArgumentCaptor<Map<String, String>> formDataCaptor = ArgumentCaptor.forClass((Class) Map.class);
 
         // アクセストークンの取得を実行
-        OidcTokenResponse result = oidcClient.getToken(providerName, code, redirectUri, codeVerifier);
+        OidcTokenResponse result = oidcClient.getToken(PROVIDER_NAME, CODE, REDIRECT_URI, CODE_VERIFIER);
 
         // requestBodySpec.bodyメソッドが呼ばれた際に渡されたパラメータをキャプチャするよう指定
         verify(requestBodySpec).body(formDataCaptor.capture());
@@ -279,17 +279,17 @@ class OidcClientTest {
         // リクエストパラメータに必要なパラメータがすべて含まれているかをキャプチャから検証
         assertThat(formData)
                 .containsEntry("grant_type", "authorization_code")
-                .containsEntry("code", code)
-                .containsEntry("redirect_uri", redirectUri)
-                .containsEntry("code_verifier", codeVerifier)
+                .containsEntry("code", CODE)
+                .containsEntry("redirect_uri", REDIRECT_URI)
+                .containsEntry("code_verifier", CODE_VERIFIER)
                 .containsEntry("unique_param", "mock-unique_param");
     }
 
     @Test
     @DisplayName("アクセストークンの取得に失敗した場合、エラーレスポンスが返却される")
     void test5() {
-        // モックセットアップ
-        when(providerFactory.getProvider(providerName)).thenReturn(oidcProvider);
+        // モックをセットアップ
+        when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
         when(oidcProvider.getSecretName()).thenReturn("google-oidc-secret");
         when(oidcProvider.getTokenEndpoint()).thenReturn("https://oauth2.googleapis.com/token");
 
@@ -311,7 +311,7 @@ class OidcClientTest {
         when(requestBodySpec.retrieve()).thenThrow(new RestClientException("API call failed"));
 
         // アクセストークンの取得を実行
-        OidcTokenResponse result = oidcClient.getToken(providerName, code, redirectUri, codeVerifier);
+        OidcTokenResponse result = oidcClient.getToken(PROVIDER_NAME, CODE, REDIRECT_URI, CODE_VERIFIER);
 
         // 検証
         assertThat(result.getError()).isEqualTo("server_error");
@@ -323,9 +323,9 @@ class OidcClientTest {
     @DisplayName("userinfoエンドポイントからユーザー情報を取得できる")
     @SuppressWarnings({ "unchecked", "rawtypes" })
     void test6() {
-        // モックセットアップ
-        when(providerFactory.getProvider(providerName)).thenReturn(oidcProvider);
-        when(oidcProvider.getUserInfoEndpoint()).thenReturn(userInfoEndopoint);
+        // モックをセットアップ
+        when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
+        when(oidcProvider.getUserInfoEndpoint()).thenReturn(USER_INFO_ENDOPOINT);
 
         // RestClientをモック
         RestClient.RequestHeadersSpec requestHeadersSpec = mock(RestClient.RequestHeadersSpec.class);
@@ -351,14 +351,14 @@ class OidcClientTest {
                 .providerUserId("123456789")
                 .email("test@example.com")
                 .username("Test User")
-                .providerType(providerName)
+                .providerType(PROVIDER_NAME)
                 .build();
 
         // ユーザー情報変換時、expectedUserInfoを返すように設定
         when(oidcProvider.convertToStandardUserInfo(userInfoMap)).thenReturn(expectedUserInfo);
 
         // ユーザー情報の取得を実行
-        OidcUserInfoDto result = oidcClient.getUserInfo(providerName, accessToken);
+        OidcUserInfoDto result = oidcClient.getUserInfo(PROVIDER_NAME, ACCESS_TOKEN);
 
         // レスポンスの検証
         assertThat(result).isEqualTo(expectedUserInfo);
@@ -372,14 +372,14 @@ class OidcClientTest {
         // ヘッダーのBearerトークン検証
         HttpHeaders capturedHeaders = new HttpHeaders();
         ((Consumer<HttpHeaders>) headersCaptor.getValue()).accept(capturedHeaders);
-        assertThat(capturedHeaders.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer " + accessToken);
+        assertThat(capturedHeaders.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer " + ACCESS_TOKEN);
     }
 
     @Test
     @DisplayName("プロバイダー固有のヘッダーを付与した状態でuserinfoエンドポイントからユーザー情報の取得ができる")
     @SuppressWarnings({ "unchecked", "rawtypes" })
     void test7() {
-        // モックセットアップ
+        // モックをセットアップ
         when(providerFactory.getProvider("github")).thenReturn(oidcProvider);
         when(oidcProvider.getUserInfoEndpoint()).thenReturn("https://api.github.com/user");
 
@@ -422,7 +422,7 @@ class OidcClientTest {
         when(oidcProvider.convertToStandardUserInfo(userInfoMap)).thenReturn(expectedUserInfo);
 
         // ユーザー情報の取得を実行
-        OidcUserInfoDto result = oidcClient.getUserInfo("github", accessToken);
+        OidcUserInfoDto result = oidcClient.getUserInfo("github", ACCESS_TOKEN);
 
         // レスポンスの検証
         assertThat(result).isEqualTo(expectedUserInfo);
@@ -438,7 +438,7 @@ class OidcClientTest {
         ((Consumer<HttpHeaders>) headersCaptor.getValue()).accept(capturedHeaders);
 
         // Bearerトークンが設定されていることを検証
-        assertThat(capturedHeaders.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer " + accessToken);
+        assertThat(capturedHeaders.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer " + ACCESS_TOKEN);
 
         // プロバイダー固有のヘッダーが設定されていることを検証
         assertThat(capturedHeaders.getFirst(HttpHeaders.ACCEPT)).isEqualTo("application/vnd.github+json");
@@ -452,9 +452,9 @@ class OidcClientTest {
     @DisplayName("userinfoエンドポイントからユーザー情報の取得に失敗した場合、nullが返却される")
     @SuppressWarnings({ "unchecked", "rawtypes" })
     void test8() {
-        // モックセットアップ
-        when(providerFactory.getProvider(providerName)).thenReturn(oidcProvider);
-        when(oidcProvider.getUserInfoEndpoint()).thenReturn(userInfoEndopoint);
+        // モックをセットアップ
+        when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
+        when(oidcProvider.getUserInfoEndpoint()).thenReturn(USER_INFO_ENDOPOINT);
 
         // RestClientをモック
         RestClient.RequestHeadersSpec requestHeadersSpec = mock(RestClient.RequestHeadersSpec.class);
@@ -466,7 +466,7 @@ class OidcClientTest {
         when(requestHeadersSpec.retrieve()).thenThrow(new RestClientException("API call failed"));
 
         // ユーザー情報の取得を実行
-        OidcUserInfoDto result = oidcClient.getUserInfo(providerName, accessToken);
+        OidcUserInfoDto result = oidcClient.getUserInfo(PROVIDER_NAME, ACCESS_TOKEN);
 
         // 検証
         assertThat(result).isNull();

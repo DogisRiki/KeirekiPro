@@ -1,11 +1,8 @@
 package com.example.keirekipro.unit.domain.resume;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,50 +29,44 @@ import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.shared.Notification;
 import com.example.keirekipro.domain.shared.exception.DomainException;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class ResumeTest {
 
     @Mock
     private Notification notification;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
         Resume resume = createSampleResume();
-        // インスタンスがnullでない。
-        assertNotNull(resume);
-        // IDが生成されている。
-        assertNotNull(resume.getId());
-        // 並び順が正しい値である。
-        assertEquals(0, resume.getOrderNo());
-        // 各フィールドが正しい値である。
-        assertEquals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), resume.getUserId());
-        assertEquals(ResumeName.create(notification, "職務経歴書A"), resume.getName());
-        assertEquals(LocalDate.now(), resume.getDate());
-        assertEquals(FullName.create(notification, "山田", "太郎"), resume.getFullName());
-        assertTrue(resume.isAutoSaveEnabled());
-        assertNotNull(resume.getCreatedAt());
-        assertNotNull(resume.getUpdatedAt());
+
+        assertThat(resume).isNotNull();
+        assertThat(resume.getId()).isNotNull();
+        assertThat(resume.getOrderNo()).isEqualTo(0);
+        assertThat(resume.getUserId()).isEqualTo(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
+        assertThat(resume.getName()).isEqualTo(ResumeName.create(notification, "職務経歴書A"));
+        assertThat(resume.getDate()).isEqualTo(LocalDate.now());
+        assertThat(resume.getFullName()).isEqualTo(FullName.create(notification, "山田", "太郎"));
+        assertThat(resume.isAutoSaveEnabled()).isTrue();
+        assertThat(resume.getCreatedAt()).isNotNull();
+        assertThat(resume.getUpdatedAt()).isNotNull();
     }
 
     @Test
-    @DisplayName("通知オブジェクト内にエラーがある状態で、新規構築用コンストラクタでインスタンス化する")
+    @DisplayName("通知オブジェクト内にエラーがある状態で、新規構築用コンストラクタでインスタンス化するとDomainExceptionをスローする")
     void test2() {
         Notification invalidNotification = new Notification();
         invalidNotification.addError("name", "職務経歴書名は入力必須です。");
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        // ドメイン例外がスローされる。
-        assertThrows(DomainException.class, () -> {
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> {
             Resume.create(
                     invalidNotification,
                     0,
@@ -90,7 +81,7 @@ class ResumeTest {
                     List.of(),
                     List.of(),
                     List.of());
-        });
+        }).isInstanceOf(DomainException.class);
     }
 
     @Test
@@ -115,26 +106,22 @@ class ResumeTest {
                 List.of(createSampleSociealLink()),
                 List.of(createSampleSelfPromotion()));
 
-        // インスタンスがnullでない。
-        assertNotNull(resume);
-        // IDが正しい値である。
-        assertEquals(id, resume.getId());
-        // 並び順が正しい値である。
-        assertEquals(0, resume.getOrderNo());
-        // 各フィールドが正しい値である。
-        assertEquals(userId, resume.getUserId());
-        assertEquals(ResumeName.create(notification, "職務経歴書A"), resume.getName());
-        assertEquals(LocalDate.of(2023, 1, 1), resume.getDate());
-        assertEquals(FullName.create(notification, "山田", "太郎"), resume.getFullName());
-        assertEquals(true, resume.isAutoSaveEnabled());
-        assertEquals(LocalDateTime.of(2023, 1, 1, 0, 0), resume.getCreatedAt());
-        assertEquals(LocalDateTime.of(2023, 1, 2, 0, 0), resume.getUpdatedAt());
-        assertEquals(1, resume.getCareers().size());
-        assertEquals(1, resume.getProjects().size());
-        assertEquals(1, resume.getCertifications().size());
-        assertEquals(1, resume.getPortfolios().size());
-        assertEquals(1, resume.getSocialLinks().size());
-        assertEquals(1, resume.getSelfPromotions().size());
+        assertThat(resume).isNotNull();
+        assertThat(resume.getId()).isEqualTo(id);
+        assertThat(resume.getOrderNo()).isEqualTo(0);
+        assertThat(resume.getUserId()).isEqualTo(userId);
+        assertThat(resume.getName()).isEqualTo(ResumeName.create(notification, "職務経歴書A"));
+        assertThat(resume.getDate()).isEqualTo(LocalDate.of(2023, 1, 1));
+        assertThat(resume.getFullName()).isEqualTo(FullName.create(notification, "山田", "太郎"));
+        assertThat(resume.isAutoSaveEnabled()).isEqualTo(true);
+        assertThat(resume.getCreatedAt()).isEqualTo(LocalDateTime.of(2023, 1, 1, 0, 0));
+        assertThat(resume.getUpdatedAt()).isEqualTo(LocalDateTime.of(2023, 1, 2, 0, 0));
+        assertThat(resume.getCareers().size()).isEqualTo(1);
+        assertThat(resume.getProjects().size()).isEqualTo(1);
+        assertThat(resume.getCertifications().size()).isEqualTo(1);
+        assertThat(resume.getPortfolios().size()).isEqualTo(1);
+        assertThat(resume.getSocialLinks().size()).isEqualTo(1);
+        assertThat(resume.getSelfPromotions().size()).isEqualTo(1);
     }
 
     @Test
@@ -143,8 +130,8 @@ class ResumeTest {
         Resume originalResume = createSampleResume();
         ResumeName newName = ResumeName.create(notification, "新しい履歴書名");
         Resume updatedResume = originalResume.changeName(newName);
-        // 職務経歴書名が正しい値である。
-        assertEquals(newName, updatedResume.getName());
+
+        assertThat(updatedResume.getName()).isEqualTo(newName);
     }
 
     @Test
@@ -153,8 +140,8 @@ class ResumeTest {
         Resume originalResume = createSampleResume();
         LocalDate newDate = LocalDate.of(2025, 1, 1);
         Resume updatedResume = originalResume.changeDate(newDate);
-        // 日付が正しい値である。
-        assertEquals(newDate, updatedResume.getDate());
+
+        assertThat(updatedResume.getDate()).isEqualTo(newDate);
     }
 
     @Test
@@ -163,8 +150,8 @@ class ResumeTest {
         Resume originalResume = createSampleResume();
         boolean newAutoSaveEnabled = false;
         Resume updatedResume = originalResume.changeAutoSaveEnabled(newAutoSaveEnabled);
-        // 自動保存設定が正しい値である。
-        assertEquals(newAutoSaveEnabled, updatedResume.isAutoSaveEnabled());
+
+        assertThat(updatedResume.isAutoSaveEnabled()).isEqualTo(newAutoSaveEnabled);
     }
 
     @Test
@@ -174,16 +161,15 @@ class ResumeTest {
         Career newCareer = Career.create(1, "株式会社DEF",
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
         Resume afterResume = beforeResume.addCareer(notification, newCareer);
-        // 新しい職歴がリストに含まれている。
-        assertTrue(afterResume.getCareers().contains(newCareer));
-        // 職歴リストのサイズが増加している。
-        assertEquals(beforeResume.getCareers().size() + 1, afterResume.getCareers().size());
+
+        assertThat(afterResume.getCareers().contains(newCareer)).isTrue();
+        assertThat(afterResume.getCareers().size()).isEqualTo(beforeResume.getCareers().size() + 1);
     }
 
     @Test
-    @DisplayName("継続中の職歴と期間が重なる職歴を追加するとドメイン例外をスローする")
+    @DisplayName("継続中の職歴と期間が重なる職歴を追加するとDomainExceptionをスローする")
     void test8() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
+        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
@@ -202,39 +188,43 @@ class ResumeTest {
                 List.of(),
                 List.of(),
                 List.of());
-        // DomainExceptionがスローされる。
-        assertThrows(DomainException.class, () -> {
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> {
             resume.addCareer(notification, Career.create(1, "株式会社DEF",
                     Period.create(notification, YearMonth.of(2024, 2), YearMonth.of(2024, 3), false)));
-        });
-        // エラーメッセージが登録される。
+        }).isInstanceOf(DomainException.class);
+
+        // エラーメッセージが登録される
         verify(notification, times(1)).addError(
                 eq("career"),
                 eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
     }
 
     @Test
-    @DisplayName("同じ期間の職歴を追加するとドメイン例外をスローする")
+    @DisplayName("同じ期間の職歴を追加するとDomainExceptionをスローする")
     void test9() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
+        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
         Resume resume = createSampleResume();
-        // DomainExceptionがスローされる。
-        assertThrows(DomainException.class, () -> {
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> {
             resume.addCareer(notification, Career.create(1, "株式会社DEF",
                     Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false)));
-        });
-        // エラーメッセージが登録される。
+        }).isInstanceOf(DomainException.class);
+
+        // エラーメッセージが登録される
         verify(notification, times(1)).addError(
                 eq("career"),
                 eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
     }
 
     @Test
-    @DisplayName("継続中の職歴が存在する状態で、継続中の職歴を追加するとドメイン例外をスローする")
+    @DisplayName("継続中の職歴が存在する状態で、継続中の職歴を追加するとDomainExceptionをスローする")
     void test10() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
+        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
@@ -253,48 +243,54 @@ class ResumeTest {
                 List.of(),
                 List.of(),
                 List.of());
-        // DomainExceptionがスローされる。
-        assertThrows(DomainException.class, () -> {
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> {
             resume.addCareer(notification, Career.create(1, "株式会社DEF",
                     Period.create(notification, YearMonth.of(2024, 2), null, true)));
-        });
-        // エラーメッセージが登録される。
+        }).isInstanceOf(DomainException.class);
+
+        // エラーメッセージが登録される
         verify(notification, times(1)).addError(
                 eq("career"),
                 eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
     }
 
     @Test
-    @DisplayName("期間が重なる職歴を追加するとドメイン例外をスローする")
+    @DisplayName("期間が重なる職歴を追加するとDomainExceptionをスローする")
     void test11() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
+        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
         Resume resume = createSampleResume();
-        // DomainExceptionがスローされる。
-        assertThrows(DomainException.class, () -> {
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> {
             resume.addCareer(notification, Career.create(1, "株式会社DEF",
                     Period.create(notification, YearMonth.of(2023, 10), YearMonth.of(2024, 11), false)));
-        });
-        // エラーメッセージが登録される。
+        }).isInstanceOf(DomainException.class);
+
+        // エラーメッセージが登録される
         verify(notification, times(1)).addError(
                 eq("career"),
                 eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
     }
 
     @Test
-    @DisplayName("期間が一部重なる職歴を追加するとドメイン例外をスローする")
+    @DisplayName("期間が一部重なる職歴を追加するとDomainExceptionをスローする")
     void test12() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
+        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
         Resume resume = createSampleResume();
-        // DomainExceptionがスローされる。
-        assertThrows(DomainException.class, () -> {
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> {
             resume.addCareer(notification, Career.create(1, "株式会社DEF",
                     Period.create(notification, YearMonth.of(2023, 11), YearMonth.of(2024, 6), false)));
-        });
-        // エラーメッセージが登録される。
+        }).isInstanceOf(DomainException.class);
+
+        // エラーメッセージが登録される
         verify(notification, times(1)).addError(
                 eq("career"),
                 eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
@@ -307,16 +303,16 @@ class ResumeTest {
         Career newCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(), 0, "株式会社DEF",
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
         Resume afterResume = beforeResume.updateCareer(notification, newCareer);
-        // 更新した職歴がリストに含まれている。
-        assertTrue(afterResume.getCareers().contains(newCareer));
-        // 職歴リストのサイズが変わらない。
-        assertEquals(beforeResume.getCareers().size(), afterResume.getCareers().size());
-        // 更新した職歴の値が正しい。
-        assertAll(
-                () -> assertEquals(newCareer.getCompanyName(), afterResume.getCareers().get(0).getCompanyName()),
-                () -> assertEquals(newCareer.getPeriod(), afterResume.getCareers().get(0).getPeriod()),
-                () -> assertEquals(newCareer.getOrderNo(), afterResume.getCareers().get(0).getOrderNo()),
-                () -> assertEquals(beforeResume.getCareers().get(0).getId(), afterResume.getCareers().get(0).getId()));
+
+        // 更新した職歴がリストに含まれている
+        assertThat(afterResume.getCareers().contains(newCareer)).isTrue();
+        // 職歴リストのサイズが変わらない
+        assertThat(afterResume.getCareers().size()).isEqualTo(beforeResume.getCareers().size());
+        // 更新した職歴の値が正しい
+        assertThat(afterResume.getCareers().get(0).getCompanyName()).isEqualTo(newCareer.getCompanyName());
+        assertThat(afterResume.getCareers().get(0).getPeriod()).isEqualTo(newCareer.getPeriod());
+        assertThat(afterResume.getCareers().get(0).getOrderNo()).isEqualTo(newCareer.getOrderNo());
+        assertThat(afterResume.getCareers().get(0).getId()).isEqualTo(beforeResume.getCareers().get(0).getId());
     }
 
     @Test
@@ -328,15 +324,16 @@ class ResumeTest {
         Resume afterResume = beforeResume.addCareer(notification, newCareer);
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeCareer(newCareer.getId());
-        // 削除した職歴がリストに含まれていない。
-        assertFalse(deletedResume.getCareers().contains(newCareer));
-        // 職歴リストのサイズが減少している。
-        assertEquals(afterResume.getCareers().size() - 1, deletedResume.getCareers().size());
+
+        // 削除した職歴がリストに含まれていない
+        assertThat(deletedResume.getCareers().contains(newCareer)).isFalse();
+        // 職歴リストのサイズが減少している
+        assertThat(deletedResume.getCareers().size()).isEqualTo(afterResume.getCareers().size() - 1);
 
         // 削除2回目(1件 → 0件)
         Resume deletedResume2 = deletedResume.removeCareer(deletedResume.getCareers().get(0).getId());
-        // 職歴リストが空になっている。
-        assertTrue(deletedResume2.getCareers().isEmpty());
+        // 職歴リストが空になっている
+        assertThat(deletedResume2.getCareers().isEmpty()).isTrue();
     }
 
     @Test
@@ -345,25 +342,28 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         Project newProject = createSampleProject();
         Resume afterResume = beforeResume.addProject(notification, newProject);
-        // 新しいプロジェクトがリストに含まれている。
-        assertTrue(afterResume.getProjects().contains(newProject));
-        // プロジェクトリストのサイズが増加している。
-        assertEquals(beforeResume.getProjects().size() + 1, afterResume.getProjects().size());
+
+        // 新しいプロジェクトがリストに含まれている
+        assertThat(afterResume.getProjects().contains(newProject)).isTrue();
+        // プロジェクトリストのサイズが増加している
+        assertThat(afterResume.getProjects().size()).isEqualTo(beforeResume.getProjects().size() + 1);
     }
 
     @Test
-    @DisplayName("職歴に存在しない会社名のプロジェクトを追加するとドメイン例外をスローする")
+    @DisplayName("職歴に存在しない会社名のプロジェクトを追加するとDomainExceptionをスローする")
     void test16() {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
         Resume resume = createSampleResume();
         Project notExistProject = createSampleProject().changeCompanyName("株式会社ZZZ");
-        // DomainExceptionがスローされる。
-        assertThrows(DomainException.class, () -> {
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> {
             resume.addProject(notification, notExistProject);
-        });
-        // エラーメッセージが登録される。
+        }).isInstanceOf(DomainException.class);
+
+        // エラーメッセージが登録される
         verify(notification, times(1)).addError(
                 eq("companyName"),
                 eq("株式会社ZZZは職歴に存在しません。職歴に存在する会社名を選択してください。"));
@@ -414,30 +414,31 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updateProject(notification, updatedProject);
 
-        // 更新したプロジェクトがリストに含まれている。
-        assertTrue(afterResume.getProjects().contains(updatedProject));
-        // プロジェクトリストのサイズが変わらない。
-        assertEquals(beforeResume.getProjects().size(), afterResume.getProjects().size());
-        // 更新したプロジェクトの値が正しい。
+        // 更新したプロジェクトがリストに含まれている
+        assertThat(afterResume.getProjects().contains(updatedProject)).isTrue();
+        // プロジェクトリストのサイズが変わらない
+        assertThat(afterResume.getProjects().size()).isEqualTo(beforeResume.getProjects().size());
+        // 更新したプロジェクトの値が正しい
         assertAll(
-                () -> assertEquals(originalProject.getId(), afterResume.getProjects().get(0).getId()),
-                () -> assertEquals(originalProject.getCompanyName(), afterResume.getProjects().get(0).getCompanyName()),
-                () -> assertEquals(originalProject.getPeriod(), afterResume.getProjects().get(0).getPeriod()),
-                () -> assertEquals("新しいプロジェクト名", afterResume.getProjects().get(0).getName()),
-                () -> assertEquals("新しいプロジェクト概要", afterResume.getProjects().get(0).getOverview()),
-                () -> assertEquals("10人", afterResume.getProjects().get(0).getTeamComp()),
-                () -> assertEquals("マネージャー", afterResume.getProjects().get(0).getRole()),
-                () -> assertEquals("新しい成果内容", afterResume.getProjects().get(0).getAchievement()),
-                () -> assertEquals(Project.Process.create(false, true, true, false, true, true, false),
-                        afterResume.getProjects().get(0).getProcess()),
-                () -> assertEquals(List.of("JavaScript", "TypeScript"),
-                        afterResume.getProjects().get(0).getTechStack().getLanguages()),
-                () -> assertEquals(List.of("React", "Redux"),
-                        afterResume.getProjects().get(0).getTechStack().getDependencies().getFrameworks()),
-                () -> assertEquals(List.of("Azure"),
-                        afterResume.getProjects().get(0).getTechStack().getInfrastructure().getClouds()),
-                () -> assertEquals(List.of("GitLab"),
-                        afterResume.getProjects().get(0).getTechStack().getTools().getSourceControls()));
+                () -> assertThat(afterResume.getProjects().get(0).getId()).isEqualTo(originalProject.getId()),
+                () -> assertThat(afterResume.getProjects().get(0).getCompanyName())
+                        .isEqualTo(originalProject.getCompanyName()),
+                () -> assertThat(afterResume.getProjects().get(0).getPeriod()).isEqualTo(originalProject.getPeriod()),
+                () -> assertThat(afterResume.getProjects().get(0).getName()).isEqualTo("新しいプロジェクト名"),
+                () -> assertThat(afterResume.getProjects().get(0).getOverview()).isEqualTo("新しいプロジェクト概要"),
+                () -> assertThat(afterResume.getProjects().get(0).getTeamComp()).isEqualTo("10人"),
+                () -> assertThat(afterResume.getProjects().get(0).getRole()).isEqualTo("マネージャー"),
+                () -> assertThat(afterResume.getProjects().get(0).getAchievement()).isEqualTo("新しい成果内容"),
+                () -> assertThat(afterResume.getProjects().get(0).getProcess())
+                        .isEqualTo(Project.Process.create(false, true, true, false, true, true, false)),
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getLanguages())
+                        .isEqualTo(List.of("JavaScript", "TypeScript")),
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getDependencies().getFrameworks())
+                        .isEqualTo(List.of("React", "Redux")),
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getInfrastructure().getClouds())
+                        .isEqualTo(List.of("Azure")),
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getTools().getSourceControls())
+                        .isEqualTo(List.of("GitLab")));
     }
 
     @Test
@@ -485,15 +486,15 @@ class ResumeTest {
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeProject(newProject.getId());
-        // 削除したプロジェクトがリストに含まれていない。
-        assertFalse(deletedResume.getProjects().contains(newProject));
-        // プロジェクトリストのサイズが減少している。
-        assertEquals(afterResume.getProjects().size() - 1, deletedResume.getProjects().size());
+        // 削除したプロジェクトがリストに含まれていない
+        assertThat(deletedResume.getProjects().contains(newProject)).isFalse();
+        // プロジェクトリストのサイズが減少している
+        assertThat(deletedResume.getProjects().size()).isEqualTo(afterResume.getProjects().size() - 1);
 
         // 削除2回目(1件 → 0件)
         Resume deletedResume2 = deletedResume.removeProject(deletedResume.getProjects().get(0).getId());
-        // プロジェクトリストが空になっている。
-        assertTrue(deletedResume2.getProjects().isEmpty());
+        // プロジェクトリストが空になっている
+        assertThat(deletedResume2.getProjects().isEmpty()).isTrue();
     }
 
     @Test
@@ -502,10 +503,11 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.create(1, "応用情報技術者", YearMonth.of(2025, 02));
         Resume afterResume = beforeResume.addCertification(newCertification);
+
         // 新しい資格がリストに含まれている
-        assertTrue(afterResume.getCertifications().contains(newCertification));
-        // 資格リストのサイズが増加している。
-        assertEquals(beforeResume.getCertifications().size() + 1, afterResume.getCertifications().size());
+        assertThat(afterResume.getCertifications().contains(newCertification)).isTrue();
+        // 資格リストのサイズが増加している
+        assertThat(afterResume.getCertifications().size()).isEqualTo(beforeResume.getCertifications().size() + 1);
     }
 
     @Test
@@ -515,17 +517,21 @@ class ResumeTest {
         Certification newCertification = Certification.reconstruct(beforeResume.getCertifications().get(0).getId(), 0,
                 "応用情報技術者", YearMonth.of(2025, 02));
         Resume afterResume = beforeResume.updateCertification(newCertification);
-        // 更新した資格がリストに含まれている。
-        assertTrue(afterResume.getCertifications().contains(newCertification));
-        // 資格リストのサイズが変わらない。
-        assertEquals(beforeResume.getCertifications().size(), afterResume.getCertifications().size());
-        // 更新した資格の値が正しい。
+
+        // 更新した資格がリストに含まれている
+        assertThat(afterResume.getCertifications().contains(newCertification)).isTrue();
+        // 資格リストのサイズが変わらない
+        assertThat(afterResume.getCertifications().size()).isEqualTo(beforeResume.getCertifications().size());
+        // 更新した資格の値が正しい
         assertAll(
-                () -> assertEquals(newCertification.getName(), afterResume.getCertifications().get(0).getName()),
-                () -> assertEquals(newCertification.getDate(), afterResume.getCertifications().get(0).getDate()),
-                () -> assertEquals(newCertification.getOrderNo(), afterResume.getCertifications().get(0).getOrderNo()),
-                () -> assertEquals(beforeResume.getCertifications().get(0).getId(),
-                        afterResume.getCertifications().get(0).getId()));
+                () -> assertThat(afterResume.getCertifications().get(0).getName())
+                        .isEqualTo(newCertification.getName()),
+                () -> assertThat(afterResume.getCertifications().get(0).getDate())
+                        .isEqualTo(newCertification.getDate()),
+                () -> assertThat(afterResume.getCertifications().get(0).getOrderNo())
+                        .isEqualTo(newCertification.getOrderNo()),
+                () -> assertThat(afterResume.getCertifications().get(0).getId())
+                        .isEqualTo(beforeResume.getCertifications().get(0).getId()));
     }
 
     @Test
@@ -534,17 +540,18 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.create(1, "応用情報技術者", YearMonth.of(2025, 02));
         Resume afterResume = beforeResume.addCertification(newCertification);
+
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeCertification(newCertification.getId());
-        // 削除した職歴がリストに含まれていない。
-        assertFalse(deletedResume.getCertifications().contains(newCertification));
-        // 職歴リストのサイズが減少している。
-        assertEquals(afterResume.getCertifications().size() - 1, deletedResume.getCertifications().size());
+        // 削除した職歴がリストに含まれていない
+        assertThat(deletedResume.getCertifications().contains(newCertification)).isFalse();
+        // 職歴リストのサイズが減少している
+        assertThat(deletedResume.getCertifications().size()).isEqualTo(afterResume.getCertifications().size() - 1);
 
         // 削除2回目(1件 → 0件)
         Resume deletedResume2 = deletedResume.removeCertification(deletedResume.getCertifications().get(0).getId());
-        // 職歴リストが空になっている。
-        assertTrue(deletedResume2.getCertifications().isEmpty());
+        // 職歴リストが空になっている
+        assertThat(deletedResume2.getCertifications().isEmpty()).isTrue();
     }
 
     @Test
@@ -560,10 +567,10 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.addPortfolio(newPortfolio);
 
-        // 新しいポートフォリオがリストに含まれている。
-        assertTrue(afterResume.getPortfolios().contains(newPortfolio));
-        // ポートフォリオリストのサイズが増加している。
-        assertEquals(beforeResume.getPortfolios().size() + 1, afterResume.getPortfolios().size());
+        // 新しいポートフォリオがリストに含まれている
+        assertThat(afterResume.getPortfolios().contains(newPortfolio)).isTrue();
+        // ポートフォリオリストのサイズが増加している
+        assertThat(afterResume.getPortfolios().size()).isEqualTo(beforeResume.getPortfolios().size() + 1);
     }
 
     @Test
@@ -580,18 +587,20 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updatePortfolio(updatedPortfolio);
 
-        // 更新したポートフォリオがリストに含まれている。
-        assertTrue(afterResume.getPortfolios().contains(updatedPortfolio));
-        // ポートフォリオリストのサイズが変わらない。
-        assertEquals(beforeResume.getPortfolios().size(), afterResume.getPortfolios().size());
-        // 更新したポートフォリオの値が正しい。
+        // 更新したポートフォリオがリストに含まれている
+        assertThat(afterResume.getPortfolios().contains(updatedPortfolio)).isTrue();
+        // ポートフォリオリストのサイズが変わらない
+        assertThat(afterResume.getPortfolios().size()).isEqualTo(beforeResume.getPortfolios().size());
+        // 更新したポートフォリオの値が正しい
         assertAll(
-                () -> assertEquals(updatedPortfolio.getName(), afterResume.getPortfolios().get(0).getName()),
-                () -> assertEquals(updatedPortfolio.getOverview(), afterResume.getPortfolios().get(0).getOverview()),
-                () -> assertEquals(updatedPortfolio.getTechStack(), afterResume.getPortfolios().get(0).getTechStack()),
-                () -> assertEquals(updatedPortfolio.getLink(), afterResume.getPortfolios().get(0).getLink()),
-                () -> assertEquals(beforeResume.getPortfolios().get(0).getId(),
-                        afterResume.getPortfolios().get(0).getId()));
+                () -> assertThat(afterResume.getPortfolios().get(0).getName()).isEqualTo(updatedPortfolio.getName()),
+                () -> assertThat(afterResume.getPortfolios().get(0).getOverview())
+                        .isEqualTo(updatedPortfolio.getOverview()),
+                () -> assertThat(afterResume.getPortfolios().get(0).getTechStack())
+                        .isEqualTo(updatedPortfolio.getTechStack()),
+                () -> assertThat(afterResume.getPortfolios().get(0).getLink()).isEqualTo(updatedPortfolio.getLink()),
+                () -> assertThat(afterResume.getPortfolios().get(0).getId())
+                        .isEqualTo(beforeResume.getPortfolios().get(0).getId()));
     }
 
     @Test
@@ -609,15 +618,15 @@ class ResumeTest {
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removePortfolio(newPortfolio.getId());
-        // 削除したポートフォリオがリストに含まれていない。
-        assertFalse(deletedResume.getPortfolios().contains(newPortfolio));
-        // ポートフォリオリストのサイズが減少している。
-        assertEquals(afterResume.getPortfolios().size() - 1, deletedResume.getPortfolios().size());
+        // 削除したポートフォリオがリストに含まれていない
+        assertThat(deletedResume.getPortfolios().contains(newPortfolio)).isFalse();
+        // ポートフォリオリストのサイズが減少している
+        assertThat(deletedResume.getPortfolios().size()).isEqualTo(afterResume.getPortfolios().size() - 1);
 
         // 削除2回目(1件 → 0件)
         Resume deletedResume2 = deletedResume.removePortfolio(deletedResume.getPortfolios().get(0).getId());
-        // ポートフォリオリストが空になっている。
-        assertTrue(deletedResume2.getPortfolios().isEmpty());
+        // ポートフォリオリストが空になっている
+        assertThat(deletedResume2.getPortfolios().isEmpty()).isTrue();
     }
 
     @Test
@@ -631,10 +640,10 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.addSociealLink(newSocialLink);
 
-        // 新しいソーシャルリンクがリストに含まれている。
-        assertTrue(afterResume.getSocialLinks().contains(newSocialLink));
-        // ソーシャルリンクリストのサイズが増加している。
-        assertEquals(beforeResume.getSocialLinks().size() + 1, afterResume.getSocialLinks().size());
+        // 新しいソーシャルリンクがリストに含まれている
+        assertThat(afterResume.getSocialLinks().contains(newSocialLink)).isTrue();
+        // ソーシャルリンクリストのサイズが増加している
+        assertThat(afterResume.getSocialLinks().size()).isEqualTo(beforeResume.getSocialLinks().size() + 1);
     }
 
     @Test
@@ -649,16 +658,14 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updateSociealLink(updatedSocialLink);
 
-        // 更新したソーシャルリンクがリストに含まれている。
-        assertTrue(afterResume.getSocialLinks().contains(updatedSocialLink));
-        // ソーシャルリンクリストのサイズが変わらない。
-        assertEquals(beforeResume.getSocialLinks().size(), afterResume.getSocialLinks().size());
-        // 更新したソーシャルリンクの値が正しい。
-        assertAll(
-                () -> assertEquals(updatedSocialLink.getName(), afterResume.getSocialLinks().get(0).getName()),
-                () -> assertEquals(updatedSocialLink.getLink(), afterResume.getSocialLinks().get(0).getLink()),
-                () -> assertEquals(beforeResume.getSocialLinks().get(0).getId(),
-                        afterResume.getSocialLinks().get(0).getId()));
+        // 更新したソーシャルリンクがリストに含まれている
+        assertThat(afterResume.getSocialLinks().contains(updatedSocialLink)).isTrue();
+        // ソーシャルリンクリストのサイズが変わらない
+        assertThat(afterResume.getSocialLinks().size()).isEqualTo(beforeResume.getSocialLinks().size());
+        // 更新したソーシャルリンクの値が正しい
+        assertThat(afterResume.getSocialLinks().get(0).getName()).isEqualTo(updatedSocialLink.getName());
+        assertThat(afterResume.getSocialLinks().get(0).getLink()).isEqualTo(updatedSocialLink.getLink());
+        assertThat(afterResume.getSocialLinks().get(0).getId()).isEqualTo(beforeResume.getSocialLinks().get(0).getId());
     }
 
     @Test
@@ -674,15 +681,15 @@ class ResumeTest {
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeSociealLink(newSocialLink.getId());
-        // 削除したソーシャルリンクがリストに含まれていない。
-        assertFalse(deletedResume.getSocialLinks().contains(newSocialLink));
-        // ソーシャルリンクリストのサイズが減少している。
-        assertEquals(afterResume.getSocialLinks().size() - 1, deletedResume.getSocialLinks().size());
+        // 削除したソーシャルリンクがリストに含まれていない
+        assertThat(deletedResume.getSocialLinks().contains(newSocialLink)).isFalse();
+        // ソーシャルリンクリストのサイズが減少している
+        assertThat(deletedResume.getSocialLinks().size()).isEqualTo(afterResume.getSocialLinks().size() - 1);
 
         // 削除2回目(1件 → 0件)
         Resume deletedResume2 = deletedResume.removeSociealLink(deletedResume.getSocialLinks().get(0).getId());
-        // ソーシャルリンクリストが空になっている。
-        assertTrue(deletedResume2.getSocialLinks().isEmpty());
+        // ソーシャルリンクリストが空になっている
+        assertThat(deletedResume2.getSocialLinks().isEmpty()).isTrue();
     }
 
     @Test
@@ -696,10 +703,10 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.addSelfPromotion(newSelfPromotion);
 
-        // 新しい自己PRがリストに含まれている。
-        assertTrue(afterResume.getSelfPromotions().contains(newSelfPromotion));
-        // 自己PRリストのサイズが増加している。
-        assertEquals(beforeResume.getSelfPromotions().size() + 1, afterResume.getSelfPromotions().size());
+        // 新しい自己PRがリストに含まれている
+        assertThat(afterResume.getSelfPromotions().contains(newSelfPromotion)).isTrue();
+        // 自己PRリストのサイズが増加してい。
+        assertThat(afterResume.getSelfPromotions().size()).isEqualTo(beforeResume.getSelfPromotions().size() + 1);
     }
 
     @Test
@@ -714,17 +721,18 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updateSelfPromotion(updatedSelfPromotion);
 
-        // 更新した自己PRがリストに含まれている。
-        assertTrue(afterResume.getSelfPromotions().contains(updatedSelfPromotion));
-        // 自己PRリストのサイズが変わらない。
-        assertEquals(beforeResume.getSelfPromotions().size(), afterResume.getSelfPromotions().size());
-        // 更新した自己PRの値が正しい。
+        // 更新した自己PRがリストに含まれている
+        assertThat(afterResume.getSelfPromotions().contains(updatedSelfPromotion)).isTrue();
+        // 自己PRリストのサイズが変わらない
+        assertThat(afterResume.getSelfPromotions().size()).isEqualTo(beforeResume.getSelfPromotions().size());
+        // 更新した自己PRの値が正しい
         assertAll(
-                () -> assertEquals(updatedSelfPromotion.getTitle(), afterResume.getSelfPromotions().get(0).getTitle()),
-                () -> assertEquals(updatedSelfPromotion.getContent(),
-                        afterResume.getSelfPromotions().get(0).getContent()),
-                () -> assertEquals(beforeResume.getSelfPromotions().get(0).getId(),
-                        afterResume.getSelfPromotions().get(0).getId()));
+                () -> assertThat(afterResume.getSelfPromotions().get(0).getTitle())
+                        .isEqualTo(updatedSelfPromotion.getTitle()),
+                () -> assertThat(afterResume.getSelfPromotions().get(0).getContent())
+                        .isEqualTo(updatedSelfPromotion.getContent()),
+                () -> assertThat(afterResume.getSelfPromotions().get(0).getId())
+                        .isEqualTo(beforeResume.getSelfPromotions().get(0).getId()));
     }
 
     @Test
@@ -740,15 +748,15 @@ class ResumeTest {
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeSelfPromotion(newSelfPromotion.getId());
-        // 削除した自己PRがリストに含まれていない。
-        assertFalse(deletedResume.getSelfPromotions().contains(newSelfPromotion));
-        // 自己PRリストのサイズが減少している。
-        assertEquals(afterResume.getSelfPromotions().size() - 1, deletedResume.getSelfPromotions().size());
+        // 削除した自己PRがリストに含まれていない
+        assertThat(deletedResume.getSelfPromotions().contains(newSelfPromotion)).isFalse();
+        // 自己PRリストのサイズが減少している
+        assertThat(deletedResume.getSelfPromotions().size()).isEqualTo(afterResume.getSelfPromotions().size() - 1);
 
         // 削除2回目(1件 → 0件)
         Resume deletedResume2 = deletedResume.removeSelfPromotion(deletedResume.getSelfPromotions().get(0).getId());
-        // 自己PRリストが空になっている。
-        assertTrue(deletedResume2.getSelfPromotions().isEmpty());
+        // 自己PRリストが空になっている
+        assertThat(deletedResume2.getSelfPromotions().isEmpty()).isTrue();
     }
 
     @Test
@@ -757,8 +765,8 @@ class ResumeTest {
         Resume originalResume = createSampleResume();
         FullName newFullName = FullName.create(notification, "変更", "しました");
         Resume updatedResume = originalResume.ChangeFullName(newFullName);
-        // 職務経歴書名が正しい値である。
-        assertEquals(newFullName, updatedResume.getFullName());
+
+        assertThat(updatedResume.getFullName()).isEqualTo(newFullName);
     }
 
     /**

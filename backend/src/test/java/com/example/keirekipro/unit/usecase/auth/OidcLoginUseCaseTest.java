@@ -39,29 +39,29 @@ class OidcLoginUseCaseTest {
     @InjectMocks
     private OidcLoginUseCase oidcLoginUseCase;
 
-    private final UUID id = UUID.randomUUID();
-    private final String providerUserId = "12345";
-    private final String email = "test@keirekipro.click";
-    private final String username = "test-user";
-    private final String password = "password";
-    private final String providerType = "google";
+    private static final UUID ID = UUID.randomUUID();
+    private static final String PROVIDER_USER_ID = "12345";
+    private static final String EMAIL = "test@keirekipro.click";
+    private static final String USERNAME = "test-user";
+    private static final String PASSWORD = "password";
+    private static final String PROVIDER_TYPE = "google";
 
     @Test
     @DisplayName("既存ユーザーの場合(同一または別プロバイダー)、新規ユーザーを作成せず既存ユーザーIDを返す")
     void test1() {
         // モックをセットアップ
-        when(userAuthProviderMapper.findUserIdByProvider(anyString(), anyString())).thenReturn(Optional.of(id));
+        when(userAuthProviderMapper.findUserIdByProvider(anyString(), anyString())).thenReturn(Optional.of(ID));
 
         // ユースケース実行
         OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(providerUserId, email, username, providerType));
+                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
 
         // 検証
         assertThat(result).isNotNull();
-        assertThat(result.getId()).isEqualTo(id);
-        assertThat(result.getEmail()).isEqualTo(email);
-        assertThat(result.getUsername()).isEqualTo(username);
-        assertThat(result.getProviderType()).isEqualTo(providerType);
+        assertThat(result.getId()).isEqualTo(ID);
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
     }
 
     @Test
@@ -73,18 +73,18 @@ class OidcLoginUseCaseTest {
 
         // ユースケース実行
         OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(providerUserId, email, username, providerType));
+                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
 
         // 検証
         assertThat(result).isNotNull();
         assertThat(result.getId()).isNotNull(); // idはユースケース内で採番されるためnullチェックのみとする
-        assertThat(result.getEmail()).isEqualTo(email);
-        assertThat(result.getUsername()).isEqualTo(username);
-        assertThat(result.getProviderType()).isEqualTo(providerType);
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
 
-        verify(userMapper).registerUser(any(UUID.class), eq(email), eq(null), eq(username));
-        verify(userAuthProviderMapper).registerAuthProvider(any(UUID.class), any(UUID.class), eq(providerType),
-                eq(providerUserId));
+        verify(userMapper).registerUser(any(UUID.class), eq(EMAIL), eq(null), eq(USERNAME));
+        verify(userAuthProviderMapper).registerAuthProvider(any(UUID.class), any(UUID.class), eq(PROVIDER_TYPE),
+                eq(PROVIDER_USER_ID));
     }
 
     @Test
@@ -92,21 +92,21 @@ class OidcLoginUseCaseTest {
     void test3() {
         // モックをセットアップ
         when(userAuthProviderMapper.findUserIdByProvider(anyString(), anyString())).thenReturn(Optional.empty());
-        when(userMapper.findByEmail(anyString())).thenReturn(Optional.of(new UserAuthInfoDto(id, email, password)));
+        when(userMapper.findByEmail(anyString())).thenReturn(Optional.of(new UserAuthInfoDto(ID, EMAIL, PASSWORD)));
 
         // ユースケース実行
         OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(providerUserId, email, username, providerType));
+                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
 
         // 検証
         assertThat(result).isNotNull();
-        assertThat(result.getId()).isEqualTo(id);
-        assertThat(result.getEmail()).isEqualTo(email);
-        assertThat(result.getUsername()).isEqualTo(username);
-        assertThat(result.getProviderType()).isEqualTo(providerType);
+        assertThat(result.getId()).isEqualTo(ID);
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
 
-        verify(userAuthProviderMapper).registerAuthProvider(any(UUID.class), eq(id), eq(providerType),
-                eq(providerUserId));
+        verify(userAuthProviderMapper).registerAuthProvider(any(UUID.class), eq(ID), eq(PROVIDER_TYPE),
+                eq(PROVIDER_USER_ID));
     }
 
     @Test
@@ -124,7 +124,7 @@ class OidcLoginUseCaseTest {
         // RuntimeException が発生し、トランザクションが中断される
         assertThrows(RuntimeException.class, () -> {
             oidcLoginUseCase.execute(
-                    new OidcUserInfoDto(providerUserId, email, username, providerType));
+                    new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
         });
 
         // ロールバックされているため、registerAuthProvider()が呼び出されていないことを検証

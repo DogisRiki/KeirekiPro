@@ -1,6 +1,6 @@
 package com.example.keirekipro.unit.presentation.shared.utils;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.example.keirekipro.presentation.shared.utils.UrlUtil;
@@ -29,7 +29,7 @@ class UrlUtilTest {
 
         String result = UrlUtil.getBaseUrl(request);
 
-        assertEquals("http://example.com", result);
+        assertThat(result).isEqualTo("http://example.com");
     }
 
     @Test
@@ -42,7 +42,7 @@ class UrlUtilTest {
 
         String result = UrlUtil.getBaseUrl(request);
 
-        assertEquals("https://example.com", result);
+        assertThat(result).isEqualTo("https://example.com");
     }
 
     @Test
@@ -55,7 +55,7 @@ class UrlUtilTest {
 
         String result = UrlUtil.getBaseUrl(request);
 
-        assertEquals("http://example.com:8080", result);
+        assertThat(result).isEqualTo("http://example.com:8080");
     }
 
     @Test
@@ -68,7 +68,7 @@ class UrlUtilTest {
 
         String result = UrlUtil.getBaseUrl(request);
 
-        assertEquals("https://example.com:8443", result);
+        assertThat(result).isEqualTo("https://example.com:8443");
     }
 
     @Test
@@ -81,6 +81,6 @@ class UrlUtilTest {
 
         String result = UrlUtil.getBaseUrl(request);
 
-        assertEquals("http://localhost:8080", result);
+        assertThat(result).isEqualTo("http://localhost:8080");
     }
 }

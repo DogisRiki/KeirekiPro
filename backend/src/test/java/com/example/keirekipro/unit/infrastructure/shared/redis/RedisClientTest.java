@@ -25,83 +25,83 @@ class RedisClientTest extends TestContainersConfig {
 
     private final RedisClient redisClient;
 
-    private final String key = "testKey";
+    private static final String KEY = "testKey";
 
-    private final String value = "testValue";
+    private static final String VALUE = "testValue";
 
-    private final Duration timeout = Duration.ofSeconds(1);
+    private static final Duration TIMEOUT = Duration.ofSeconds(1);
 
     @Test
     @DisplayName("値を保存し、正しく取得できる")
     void test1() throws InterruptedException {
-        redisClient.setValue(key, value);
-        Optional<String> retrievedValue = redisClient.getValue(key, String.class);
+        redisClient.setValue(KEY, VALUE);
+        Optional<String> retrievedValue = redisClient.getValue(KEY, String.class);
 
         assertThat(retrievedValue).isPresent();
-        assertThat(retrievedValue.get()).isEqualTo(value);
+        assertThat(retrievedValue.get()).isEqualTo(VALUE);
     }
 
     @Test
     @DisplayName("値を有効期限付きで保存し、正しく取得でき、期限切れ後に値が削除される")
     void test2() throws InterruptedException {
-        redisClient.setValue(key, value, timeout);
+        redisClient.setValue(KEY, VALUE, TIMEOUT);
 
         // 保存直後は値が存在する
-        assertThat(redisClient.getValue(key, String.class))
+        assertThat(redisClient.getValue(KEY, String.class))
                 .isPresent()
-                .contains(value);
+                .contains(VALUE);
 
         // 有効期限が切れるまで待機
         Thread.sleep(1200);
 
         // 有効期限切れにより値は削除される
-        assertThat(redisClient.getValue(key, String.class)).isEmpty();
+        assertThat(redisClient.getValue(KEY, String.class)).isEmpty();
     }
 
     @Test
     @DisplayName("値を削除する")
     void test3() {
         // 通常の値設定後の削除
-        redisClient.setValue(key, value);
-        assertThat(redisClient.deleteValue(key)).isTrue();
-        assertThat(redisClient.getValue(key, String.class)).isEmpty();
+        redisClient.setValue(KEY, VALUE);
+        assertThat(redisClient.deleteValue(KEY)).isTrue();
+        assertThat(redisClient.getValue(KEY, String.class)).isEmpty();
 
         // 有効期限付き値設定後の削除
-        redisClient.setValue(key, value, timeout);
-        assertThat(redisClient.deleteValue(key)).isTrue();
-        assertThat(redisClient.getValue(key, String.class)).isEmpty();
+        redisClient.setValue(KEY, VALUE, TIMEOUT);
+        assertThat(redisClient.deleteValue(KEY)).isTrue();
+        assertThat(redisClient.getValue(KEY, String.class)).isEmpty();
     }
 
     @Test
     @DisplayName("キーの有効期限設定テスト")
     void test4() throws InterruptedException {
-        redisClient.setValue(key, value);
+        redisClient.setValue(KEY, VALUE);
 
         // キーに有効期限を設定する
-        assertThat(redisClient.expire(key, timeout)).isTrue();
+        assertThat(redisClient.expire(KEY, TIMEOUT)).isTrue();
         // 設定直後はキーが存在する
-        assertThat(redisClient.hasKey(key)).isTrue();
+        assertThat(redisClient.hasKey(KEY)).isTrue();
 
         // 有効期限が切れるまで待機
         Thread.sleep(1200);
 
         // 有効期限切れによりキーが存在しなくなる
-        assertThat(redisClient.hasKey(key)).isFalse();
+        assertThat(redisClient.hasKey(KEY)).isFalse();
     }
 
     @Test
     @DisplayName("キーの存在確認")
     void test5() {
         // 初期状態ではキーが存在しない
-        assertThat(redisClient.hasKey(key)).isFalse();
+        assertThat(redisClient.hasKey(KEY)).isFalse();
 
         // 値をセットした後はキーが存在する
-        redisClient.setValue(key, value);
-        assertThat(redisClient.hasKey(key)).isTrue();
+        redisClient.setValue(KEY, VALUE);
+        assertThat(redisClient.hasKey(KEY)).isTrue();
 
         // キーを削除した後は再び存在しない
-        redisClient.deleteValue(key);
-        assertThat(redisClient.hasKey(key)).isFalse();
+        redisClient.deleteValue(KEY);
+        assertThat(redisClient.hasKey(KEY)).isFalse();
     }
 
     @Test
