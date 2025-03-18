@@ -26,6 +26,10 @@ aws:
   secrets-manager:
     region: "ap-northeast-1"
     endpoint: "http://localhost:4566"
+  ses:
+    region: "ap-northeast-1"
+    endpoint: "http://localhost:4566"
+    from-address: "no-reply@keirekipro.click"
 
 # ログ設定
 logging:
