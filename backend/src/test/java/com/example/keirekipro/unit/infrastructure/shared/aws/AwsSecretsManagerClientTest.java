@@ -1,7 +1,7 @@
 package com.example.keirekipro.unit.infrastructure.shared.aws;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -47,8 +47,9 @@ class AwsSecretsManagerClientTest {
         assertThat(awsSecretsManagerClient.getRegion()).isEqualTo("ap-northeast-1");
         assertThat(awsSecretsManagerClient.getEndpoint()).isEqualTo("http://localhost:4566");
         // SecretsManagerClientのインスタンスが存在し、正しい
-        assertThat(awsSecretsManagerClient.getSecretsManagerClient()).isNotNull();
-        assertThat(awsSecretsManagerClient.getSecretsManagerClient()).isInstanceOf(SecretsManagerClient.class);
+        assertThat(awsSecretsManagerClient.getSecretsManagerClient())
+                .isNotNull()
+                .isInstanceOf(SecretsManagerClient.class);
     }
 
     @Test
@@ -77,9 +78,8 @@ class AwsSecretsManagerClientTest {
         // テスト対象のAwsSecretsManagerClientの内部依存をモックに上書き
         awsSecretsManagerClient.setSecretsManagerClient(secretsManagerClient);
 
-        assertThrows(RuntimeException.class, () -> {
-            awsSecretsManagerClient.getSecretJson("dummySecret");
-        });
+        assertThatThrownBy(() -> awsSecretsManagerClient.getSecretJson("dummySecret"))
+                .isInstanceOf(RuntimeException.class);
     }
 
     @TestConfiguration
