@@ -1,8 +1,8 @@
-package com.example.keirekipro.unit.presentation.auth.oidc.utils;
+package com.example.keirekipro.unit.presentation.security.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.keirekipro.presentation.auth.oidc.utils.OidcSecurityUtil;
+import com.example.keirekipro.presentation.security.utils.SecurityUtil;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,13 +11,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class OidcSecurityUtilTest {
+class SecurityUtilTest {
 
-    private OidcSecurityUtil oidcSecurityUtil;
+    private SecurityUtil oidcSecurityUtil;
 
     @BeforeEach
     void setUp() {
-        oidcSecurityUtil = new OidcSecurityUtil();
+        oidcSecurityUtil = new SecurityUtil();
     }
 
     @Test

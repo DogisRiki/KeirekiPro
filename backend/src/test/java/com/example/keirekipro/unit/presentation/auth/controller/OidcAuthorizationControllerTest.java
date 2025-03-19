@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.keirekipro.infrastructure.auth.oidc.OidcClient;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.presentation.auth.controller.OidcAuthorizationController;
-import com.example.keirekipro.presentation.auth.oidc.utils.OidcSecurityUtil;
+import com.example.keirekipro.presentation.security.utils.SecurityUtil;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ class OidcAuthorizationControllerTest {
     private OidcClient oidcClient;
 
     @MockitoBean
-    private OidcSecurityUtil securityUtil;
+    private SecurityUtil securityUtil;
 
     @MockitoBean
     private RedisClient redisClient;

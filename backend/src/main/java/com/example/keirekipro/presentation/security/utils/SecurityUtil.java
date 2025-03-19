@@ -1,4 +1,4 @@
-package com.example.keirekipro.presentation.auth.oidc.utils;
+package com.example.keirekipro.presentation.security.utils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * PKCEとstate値の生成を行う
  */
 @Component
-public class OidcSecurityUtil {
+public class SecurityUtil {
 
     /**
      * 乱数ジェネレータ

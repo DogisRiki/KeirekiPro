@@ -4,7 +4,7 @@ import java.time.Duration;
 
 import com.example.keirekipro.infrastructure.auth.oidc.OidcClient;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
-import com.example.keirekipro.presentation.auth.oidc.utils.OidcSecurityUtil;
+import com.example.keirekipro.presentation.security.utils.SecurityUtil;
 import com.example.keirekipro.presentation.shared.utils.UrlUtil;
 
 import org.springframework.http.HttpStatus;
@@ -28,7 +28,7 @@ public class OidcAuthorizationController {
 
     private final OidcClient oidcClient;
 
-    private final OidcSecurityUtil securityUtil;
+    private final SecurityUtil securityUtil;
 
     private final RedisClient redisClient;
 
@@ -68,5 +68,4 @@ public class OidcAuthorizationController {
 
         return authorizationUrl;
     }
-
 }

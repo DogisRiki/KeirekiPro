@@ -1,4 +1,4 @@
-package com.example.keirekipro.unit.presentation.security;
+package com.example.keirekipro.unit.presentation.security.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
