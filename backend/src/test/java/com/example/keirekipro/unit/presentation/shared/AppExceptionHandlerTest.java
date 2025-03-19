@@ -7,7 +7,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Map;
+
 import com.example.keirekipro.presentation.shared.AppExceptionHandler;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,8 +33,11 @@ class AppExceptionHandlerTest {
 
     private final MockMvc mockMvc;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Test
     @DisplayName("JWT認証エラー発生時、401が返る")
+
     void test1() throws Exception {
         mockMvc.perform(get("/test/test1")
                 .accept(MediaType.APPLICATION_JSON))
@@ -69,7 +75,8 @@ class AppExceptionHandlerTest {
     @Test
     @DisplayName("バリデーションエラー: 1フィールドに2アノテーションの場合")
     void test4() throws Exception {
-        String requestBody = "{\"value1\": \"abcde\", \"value2\": \"abcde\"}";
+        Map<String, String> map = Map.of("value1", "abcde", "value2", "abcde");
+        String requestBody = objectMapper.writeValueAsString(map);
         mockMvc.perform(post("/test/test4")
                 .content(requestBody)
                 .contentType(MediaType.APPLICATION_JSON)
