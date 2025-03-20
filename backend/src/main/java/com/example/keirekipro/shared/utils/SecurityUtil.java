@@ -1,4 +1,4 @@
-package com.example.keirekipro.presentation.security.utils;
+package com.example.keirekipro.shared.utils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

@@ -1,9 +1,9 @@
-package com.example.keirekipro.unit.presentation.security.utils;
+package com.example.keirekipro.unit.shared.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.keirekipro.presentation.security.utils.SecurityUtil;
+import com.example.keirekipro.shared.utils.SecurityUtil;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

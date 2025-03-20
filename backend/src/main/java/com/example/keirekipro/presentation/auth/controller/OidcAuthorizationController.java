@@ -4,8 +4,8 @@ import java.time.Duration;
 
 import com.example.keirekipro.infrastructure.auth.oidc.OidcClient;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
-import com.example.keirekipro.presentation.security.utils.SecurityUtil;
 import com.example.keirekipro.presentation.shared.utils.UrlUtil;
+import com.example.keirekipro.shared.utils.SecurityUtil;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
