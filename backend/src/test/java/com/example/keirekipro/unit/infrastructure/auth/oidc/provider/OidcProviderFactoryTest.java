@@ -1,7 +1,7 @@
 package com.example.keirekipro.unit.infrastructure.auth.oidc.provider;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Map;
@@ -62,9 +62,9 @@ class OidcProviderFactoryTest {
                 DUMMY_SECRET_NAME);
         OidcProviderFactory factory = new OidcProviderFactory(List.of(googleProvider));
 
-        assertThrows(RuntimeException.class, () -> {
+        assertThatThrownBy(() -> {
             factory.getProvider("nonexistent");
-        });
+        }).isInstanceOf(RuntimeException.class);
     }
 
     @Test
