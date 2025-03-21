@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.example.keirekipro.usecase.shared.UseCaseException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -57,5 +58,17 @@ public class AppExceptionHandler {
                         FieldError::getField,
                         Collectors.mapping(FieldError::getDefaultMessage, Collectors.toList())));
         return new ErrorResponse("入力エラーがあります。", errors);
+    }
+
+    /**
+     * UseCaseExceptionをハンドリングする
+     *
+     * @param ex 例外オブジェクト
+     * @return エラーレスポンス
+     */
+    @ExceptionHandler(UseCaseException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleUseCaseException(UseCaseException ex) {
+        return new ErrorResponse(ex.getMessage(), null);
     }
 }
