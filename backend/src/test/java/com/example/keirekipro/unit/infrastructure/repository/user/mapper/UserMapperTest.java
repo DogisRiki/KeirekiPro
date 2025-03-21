@@ -45,6 +45,7 @@ class UserMapperTest {
         assertThat(user.get().getId()).isEqualTo(USERID);
         assertThat(user.get().getEmail()).isEqualTo(EMAIL);
         assertThat(user.get().getPassword()).isEqualTo(PASSWORD);
+        assertThat(user.get().isTwoFactorAuthEnabled()).isEqualTo(false);
     }
 
     @Test
@@ -67,5 +68,6 @@ class UserMapperTest {
         assertThat(user.get().getId()).isEqualTo(USERID);
         assertThat(user.get().getEmail()).isEqualTo(EMAIL);
         assertThat(user.get().getPassword()).isEqualTo(PASSWORD);
+        assertThat(user.get().isTwoFactorAuthEnabled()).isEqualTo(false);
     }
 }

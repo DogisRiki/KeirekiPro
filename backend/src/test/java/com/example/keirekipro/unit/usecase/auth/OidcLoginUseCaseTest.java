@@ -92,7 +92,8 @@ class OidcLoginUseCaseTest {
     void test3() {
         // モックをセットアップ
         when(userAuthProviderMapper.findUserIdByProvider(anyString(), anyString())).thenReturn(Optional.empty());
-        when(userMapper.findByEmail(anyString())).thenReturn(Optional.of(new UserAuthInfoDto(ID, EMAIL, PASSWORD)));
+        when(userMapper.findByEmail(anyString()))
+                .thenReturn(Optional.of(new UserAuthInfoDto(ID, EMAIL, PASSWORD, false)));
 
         // ユースケース実行
         OidcLoginUseCaseDto result = oidcLoginUseCase

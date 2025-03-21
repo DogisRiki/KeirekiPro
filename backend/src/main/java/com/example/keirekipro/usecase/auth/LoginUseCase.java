@@ -39,6 +39,10 @@ public class LoginUseCase {
             throw new BadCredentialsException("メールアドレスまたはパスワードが正しくありません。");
         }
 
-        return new LoginUseCaseDto(user.getId());
+        return LoginUseCaseDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
+                .build();
     }
 }

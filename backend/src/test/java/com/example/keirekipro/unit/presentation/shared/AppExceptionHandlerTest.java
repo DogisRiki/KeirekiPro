@@ -48,11 +48,11 @@ class AppExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("認証エラー発生時、403が返る")
+    @DisplayName("認証エラー発生時、401が返る")
     void test2() throws Exception {
         mockMvc.perform(get("/test/test2")
                 .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("メールアドレスまたはパスワードが違います。"))
                 .andExpect(jsonPath("$.errors").doesNotExist());

@@ -45,7 +45,7 @@ class LoginUseCaseTest {
     void test1() {
         // モックをセットアップ
         when(userMapper.findByEmail(EMAIL))
-                .thenReturn(Optional.of(new UserAuthInfoDto(USERID, EMAIL, PASSWORD)));
+                .thenReturn(Optional.of(new UserAuthInfoDto(USERID, EMAIL, PASSWORD, false)));
         when(passwordEncoder.matches(PASSWORD, PASSWORD)).thenReturn(true);
 
         LoginUseCaseDto dto = loginUseCase.execute(new LoginRequest(EMAIL, PASSWORD));
@@ -75,7 +75,7 @@ class LoginUseCaseTest {
     void test3() {
         // モックをセットアップ
         when(userMapper.findByEmail(EMAIL))
-                .thenReturn(Optional.of(new UserAuthInfoDto(USERID, EMAIL, PASSWORD)));
+                .thenReturn(Optional.of(new UserAuthInfoDto(USERID, EMAIL, PASSWORD, false)));
         when(passwordEncoder.matches(PASSWORD, PASSWORD)).thenReturn(false);
 
         // BadCredentialsExceptionがスローされる

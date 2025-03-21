@@ -13,4 +13,5 @@ public class UserAuthInfoDto {
     private UUID id;
     private String email;
     private String password;
+    private boolean twoFactorAuthEnabled;
 }

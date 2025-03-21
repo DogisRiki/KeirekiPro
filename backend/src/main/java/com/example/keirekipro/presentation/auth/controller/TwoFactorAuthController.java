@@ -1,11 +1,11 @@
 package com.example.keirekipro.presentation.auth.controller;
 
-import com.example.keirekipro.presentation.auth.dto.LoginRequest;
+import java.util.UUID;
+
+import com.example.keirekipro.presentation.auth.dto.TwoFactorAuthRequest;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
-import com.example.keirekipro.usecase.auth.LoginUseCase;
-import com.example.keirekipro.usecase.auth.TwoFactorAuthIssueUseCase;
-import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
+import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -21,16 +21,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 /**
- * ログインコントローラー
+ * 二段階認証検証コントローラ
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/auth/2fa")
 @RequiredArgsConstructor
-public class LoginController {
+public class TwoFactorAuthController {
 
-    private final LoginUseCase loginUseCase;
-
-    private final TwoFactorAuthIssueUseCase twoFactorAuthIssueUseCase;
+    private final TwoFactorAuthVerifyUseCase twoFactorAuthVerifyUseCase;
 
     private final JwtProvider jwtProvider;
 
@@ -38,24 +36,18 @@ public class LoginController {
     private boolean isSecureCookie;
 
     /**
-     * ログインエンドポイント
+     * 二段階認証検証エンドポイント
      */
-    @PostMapping("/login")
+    @PostMapping("/verify")
     @ResponseStatus(HttpStatus.OK)
-    public void login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+    public void verify(@Valid @RequestBody TwoFactorAuthRequest request, HttpServletResponse response) {
 
         // ユースケース実行
-        LoginUseCaseDto user = loginUseCase.execute(request);
-
-        // ユーザーの二段階認証設定をチェックし、有効なら二段階認証発行ユースケースを実行
-        if (user.isTwoFactorAuthEnabled()) {
-            twoFactorAuthIssueUseCase.execute(user.getId(), user.getEmail());
-            return;
-        }
+        twoFactorAuthVerifyUseCase.execute(UUID.fromString(request.getUserId()), request.getCode());
 
         // JWT発行
-        String accessToken = jwtProvider.createAccessToken(user.getId().toString());
-        String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
+        String accessToken = jwtProvider.createAccessToken(request.getUserId());
+        String refreshToken = jwtProvider.createRefreshToken(request.getUserId());
 
         // レスポンスヘッダーにセット
         response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));

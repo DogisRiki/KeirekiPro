@@ -38,7 +38,7 @@ public class AppExceptionHandler {
      * @return エラーレスポンス
      */
     @ExceptionHandler(BadCredentialsException.class)
-    @ResponseStatus(HttpStatus.FORBIDDEN)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleBadCredentialsException(BadCredentialsException ex) {
         return new ErrorResponse(ex.getMessage(), null);
     }
