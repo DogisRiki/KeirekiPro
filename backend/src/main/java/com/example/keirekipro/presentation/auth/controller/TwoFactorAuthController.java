@@ -40,7 +40,7 @@ public class TwoFactorAuthController {
      */
     @PostMapping("/verify")
     @ResponseStatus(HttpStatus.OK)
-    public void verify(@Valid @RequestBody TwoFactorAuthRequest request, HttpServletResponse response) {
+    public void handle(@Valid @RequestBody TwoFactorAuthRequest request, HttpServletResponse response) {
 
         // ユースケース実行
         twoFactorAuthVerifyUseCase.execute(UUID.fromString(request.getUserId()), request.getCode());

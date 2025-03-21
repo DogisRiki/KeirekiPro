@@ -42,7 +42,7 @@ public class LoginController {
      */
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.OK)
-    public void login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+    public void handle(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
 
         // ユースケース実行
         LoginUseCaseDto user = loginUseCase.execute(request);

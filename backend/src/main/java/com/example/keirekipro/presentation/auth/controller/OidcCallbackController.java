@@ -64,7 +64,7 @@ public class OidcCallbackController {
      * @param response HTTPレスポンス
      */
     @GetMapping("/callback")
-    public void handleCallback(
+    public void handle(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,

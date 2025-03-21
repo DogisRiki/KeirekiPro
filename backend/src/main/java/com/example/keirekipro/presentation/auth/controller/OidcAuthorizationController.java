@@ -41,7 +41,7 @@ public class OidcAuthorizationController {
      */
     @GetMapping("/authorize")
     @ResponseStatus(HttpStatus.OK)
-    public String authorize(@RequestParam String provider, HttpServletRequest servletRequest) {
+    public String handle(@RequestParam String provider, HttpServletRequest servletRequest) {
 
         // PKCEパラメータを生成
         String codeVerifier = securityUtil.generateRandomToken();

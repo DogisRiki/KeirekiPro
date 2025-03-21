@@ -36,7 +36,7 @@ public class RefreshAccessTokenController {
      */
     @PostMapping("/token/refresh")
     @ResponseStatus(HttpStatus.OK)
-    public void refreshAccessToken(HttpServletRequest request, HttpServletResponse response) {
+    public void handle(HttpServletRequest request, HttpServletResponse response) {
 
         // Cookieからリフレッシュトークンを取得
         Optional<String> refreshToken = CookieUtil.getCookieValue(request, "refreshToken");
