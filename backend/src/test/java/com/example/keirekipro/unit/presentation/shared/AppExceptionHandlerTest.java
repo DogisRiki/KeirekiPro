@@ -37,14 +37,13 @@ class AppExceptionHandlerTest {
 
     @Test
     @DisplayName("JWT認証エラー発生時、401が返る")
-
     void test1() throws Exception {
         mockMvc.perform(get("/test/test1")
                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("認証に失敗しました。"))
-                .andExpect(jsonPath("$.errors").doesNotExist());
+                .andExpect(jsonPath("$.errors").isEmpty());
     }
 
     @Test
@@ -55,7 +54,7 @@ class AppExceptionHandlerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("メールアドレスまたはパスワードが違います。"))
-                .andExpect(jsonPath("$.errors").doesNotExist());
+                .andExpect(jsonPath("$.errors").isEmpty());
     }
 
     @Test
@@ -86,5 +85,51 @@ class AppExceptionHandlerTest {
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.value1", containsInAnyOrder("値1は数字でなければなりません", "値1は1～4桁を入力してください")))
                 .andExpect(jsonPath("$.errors.value2", containsInAnyOrder("値2は数字でなければなりません", "値2は1～4桁を入力してください")));
+    }
+
+    @Test
+    @DisplayName("UseCaseException: メッセージのみの場合")
+    void test5() throws Exception {
+        mockMvc.perform(get("/test/test5")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("ユースケースエラーが発生しました。"))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
+    @DisplayName("DomainException: メッセージのみの場合")
+    void test6() throws Exception {
+        mockMvc.perform(get("/test/test6")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("ドメインエラーが発生しました。"))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
+    @DisplayName("UseCaseException: メッセージとフィールドエラーの場合")
+    void test7() throws Exception {
+        mockMvc.perform(get("/test/test7")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("ユースケースフィールドエラー"))
+                .andExpect(jsonPath("$.errors.field1[0]").value("フィールド1エラー"))
+                .andExpect(jsonPath("$.errors.field2[0]").value("フィールド2エラー"));
+    }
+
+    @Test
+    @DisplayName("DomainException: メッセージとフィールドエラーの場合")
+    void test8() throws Exception {
+        mockMvc.perform(get("/test/test8")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("ドメインフィールドエラー"))
+                .andExpect(jsonPath("$.errors.field1[0]").value("フィールド1ドメインエラー"))
+                .andExpect(jsonPath("$.errors.field2[0]").value("フィールド2ドメインエラー"));
     }
 }

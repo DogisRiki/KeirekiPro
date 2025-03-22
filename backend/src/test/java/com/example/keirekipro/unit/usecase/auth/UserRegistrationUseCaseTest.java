@@ -15,7 +15,7 @@ import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto
 import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
 import com.example.keirekipro.usecase.auth.UserRegistrationUseCase;
-import com.example.keirekipro.usecase.shared.UseCaseException;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,7 +65,7 @@ class UserRegistrationUseCaseTest {
     }
 
     @Test
-    @DisplayName("既にメールアドレスが登録されている場合、UseCaseExceptionがスローされる")
+    @DisplayName("既にメールアドレスが登録されている場合、フィールドエラーを含むUseCaseExceptionがスローされる")
     void test2() {
         // データ準備
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
@@ -77,7 +77,11 @@ class UserRegistrationUseCaseTest {
         // ユースケース実行
         assertThatThrownBy(() -> userRegistrationUseCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessageContaining("このメールアドレスは既に登録されています。");
+                .matches(e -> {
+                    UseCaseException exception = (UseCaseException) e;
+                    return exception.getErrors().containsKey("email")
+                            && exception.getErrors().get("email").contains("このメールアドレスは既に登録されています。");
+                });
 
         // 検証
         verify(passwordEncoder, never()).encode(any());

@@ -4,7 +4,8 @@ import java.util.UUID;
 
 import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
-import com.example.keirekipro.usecase.shared.UseCaseException;
+import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,9 @@ public class UserRegistrationUseCase {
     public void execute(UserRegistrationRequest request) {
         // 重複チェック
         userMapper.findByEmail(request.getEmail()).ifPresent(user -> {
-            throw new UseCaseException("このメールアドレスは既に登録されています。");
+            Notification notification = new Notification();
+            notification.addError("email", "このメールアドレスは既に登録されています。");
+            throw new UseCaseException(notification.getErrors());
         });
 
         // ユーザー新規登録

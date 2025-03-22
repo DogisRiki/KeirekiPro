@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import java.time.YearMonth;
 
 import com.example.keirekipro.domain.model.resume.Period;
-import com.example.keirekipro.domain.shared.Notification;
+import com.example.keirekipro.shared.Notification;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

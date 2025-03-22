@@ -1,4 +1,4 @@
-package com.example.keirekipro.domain.shared;
+package com.example.keirekipro.shared;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,7 +8,7 @@ import java.util.Map;
 import lombok.Getter;
 
 /**
- * 複数のドメインエラーを一時的に蓄積する通知クラス
+ * 複数のフィールドエラーを一時的に蓄積する通知クラス
  */
 @Getter
 public class Notification {

@@ -1,4 +1,4 @@
-package com.example.keirekipro.domain.shared.exception;
+package com.example.keirekipro.usecase.shared.exception;
 
 import java.util.List;
 import java.util.Map;
@@ -6,19 +6,19 @@ import java.util.Map;
 import com.example.keirekipro.shared.exception.BaseException;
 
 /**
- * ドメイン層で発生した例外
+ * ユースケース層で発生した例外
  */
-public class DomainException extends BaseException {
+public class UseCaseException extends BaseException {
 
-    private static final String DEFAULT_DOMAIN_ERROR_MESSAGE = "入力エラーがあります。";
+    private static final String DEFAULT_USECASE_ERROR_MESSAGE = "入力エラーがあります。";
 
     /**
      * フィールドエラーを指定するコンストラクタ
      *
      * @param errors フィールドエラーのマップ
      */
-    public DomainException(Map<String, List<String>> errors) {
-        super(DEFAULT_DOMAIN_ERROR_MESSAGE, errors);
+    public UseCaseException(Map<String, List<String>> errors) {
+        super(DEFAULT_USECASE_ERROR_MESSAGE, errors);
     }
 
     /**
@@ -26,7 +26,7 @@ public class DomainException extends BaseException {
      *
      * @param message エラーメッセージ
      */
-    public DomainException(String message) {
+    public UseCaseException(String message) {
         super(message);
     }
 
@@ -36,7 +36,7 @@ public class DomainException extends BaseException {
      * @param message エラーメッセージ
      * @param errors  フィールドエラーのマップ
      */
-    public DomainException(String message, Map<String, List<String>> errors) {
+    public UseCaseException(String message, Map<String, List<String>> errors) {
         super(message, errors);
     }
 }

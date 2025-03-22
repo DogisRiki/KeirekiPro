@@ -74,7 +74,7 @@ class RefreshAccessTokenControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("認証に失敗しました。"))
-                .andExpect(jsonPath("$.errors").doesNotExist());
+                .andExpect(jsonPath("$.errors").isEmpty());
     }
 
     @Test
@@ -93,6 +93,6 @@ class RefreshAccessTokenControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("認証に失敗しました。"))
-                .andExpect(jsonPath("$.errors").doesNotExist());
+                .andExpect(jsonPath("$.errors").isEmpty());
     }
 }

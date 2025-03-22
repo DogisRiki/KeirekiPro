@@ -26,8 +26,8 @@ import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.model.resume.SocialLink;
 import com.example.keirekipro.domain.model.resume.TechStack;
-import com.example.keirekipro.domain.shared.Notification;
 import com.example.keirekipro.domain.shared.exception.DomainException;
+import com.example.keirekipro.shared.Notification;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

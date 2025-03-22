@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
-import com.example.keirekipro.domain.shared.Notification;
 import com.example.keirekipro.domain.shared.exception.DomainException;
+import com.example.keirekipro.shared.Notification;
 
 import lombok.Getter;
 

@@ -1,11 +1,12 @@
 package com.example.keirekipro.presentation.shared;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
-import com.example.keirekipro.usecase.shared.UseCaseException;
+import com.example.keirekipro.shared.exception.BaseException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -29,7 +30,7 @@ public class AppExceptionHandler {
     @ExceptionHandler(JWTVerificationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleJwtVerificationException() {
-        return new ErrorResponse("認証に失敗しました。", null);
+        return new ErrorResponse("認証に失敗しました。", Collections.emptyMap());
     }
 
     /**
@@ -41,7 +42,7 @@ public class AppExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleBadCredentialsException(BadCredentialsException ex) {
-        return new ErrorResponse(ex.getMessage(), null);
+        return new ErrorResponse(ex.getMessage(), Collections.emptyMap());
     }
 
     /**
@@ -61,14 +62,14 @@ public class AppExceptionHandler {
     }
 
     /**
-     * UseCaseExceptionをハンドリングする
+     * BaseExceptionをハンドリングする
      *
      * @param ex 例外オブジェクト
      * @return エラーレスポンス
      */
-    @ExceptionHandler(UseCaseException.class)
+    @ExceptionHandler(BaseException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleUseCaseException(UseCaseException ex) {
-        return new ErrorResponse(ex.getMessage(), null);
+    public ErrorResponse handleBaseException(BaseException ex) {
+        return new ErrorResponse(ex.getMessage(), ex.getErrors());
     }
 }

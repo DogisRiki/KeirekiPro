@@ -1,6 +1,6 @@
 package com.example.keirekipro.domain.model.resume;
 
-import com.example.keirekipro.domain.shared.Notification;
+import com.example.keirekipro.shared.Notification;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
