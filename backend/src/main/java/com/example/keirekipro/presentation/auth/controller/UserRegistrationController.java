@@ -18,7 +18,7 @@ import jakarta.validation.Valid;
  * ユーザー新規登録コントローラー
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/auth/register")
 @RequiredArgsConstructor
 public class UserRegistrationController {
 
@@ -27,7 +27,7 @@ public class UserRegistrationController {
     /**
      * ユーザー新規登録エンドポイント
      */
-    @PostMapping("/register")
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public void handle(@Valid @RequestBody UserRegistrationRequest request) {
         userRegistrationUseCase.execute(request);
