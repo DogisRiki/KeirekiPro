@@ -44,6 +44,7 @@ class AwsSesClientTest {
         // プロパティがバインドされている
         assertThat(awsSesClient.getRegion()).isEqualTo("ap-northeast-1");
         assertThat(awsSesClient.getEndpoint()).isEqualTo("http://localhost:4566");
+        assertThat(awsSesClient.getFromAddress()).isEqualTo("no-reply@keirekipro.click");
 
         // SesClientのインスタンスが存在し、正しい
         assertThat(awsSesClient.getSesClient())
