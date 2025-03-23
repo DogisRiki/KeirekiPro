@@ -30,6 +30,10 @@ aws:
     region: "ap-northeast-1"
     endpoint: "http://localhost:4566"
     from-address: "no-reply@keirekipro.click"
+  s3:
+    region: "ap-northeast-1"
+    endpoint: "http://localhost:4566"
+    bucket-name: "keirekipro-storage"
 
 # ログ設定
 logging:
