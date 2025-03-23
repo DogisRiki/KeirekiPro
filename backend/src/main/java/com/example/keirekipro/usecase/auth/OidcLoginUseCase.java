@@ -34,7 +34,7 @@ public class OidcLoginUseCase {
     @Transactional
     public OidcLoginUseCaseDto execute(OidcUserInfoDto userInfo) {
         // OIDCプロバイダー情報からユーザーを検索
-        Optional<UUID> existingUserId = userAuthProviderMapper.findUserIdByProvider(userInfo.getProviderType(),
+        Optional<UUID> existingUserId = userAuthProviderMapper.selectUserIdByProvider(userInfo.getProviderType(),
                 userInfo.getProviderUserId());
 
         // 既存ユーザーが見つかった場合はそのまま取得できたユーザー情報を返す
@@ -65,7 +65,7 @@ public class OidcLoginUseCase {
         UUID userId;
 
         // メールアドレスからユーザーを取得する(ユーザー情報が空でない場合、メールアドレス+パスワード認証で既に登録されているケース)
-        Optional<UserAuthInfoDto> existingUserByEmail = userMapper.findByEmail(userInfo.getEmail());
+        Optional<UserAuthInfoDto> existingUserByEmail = userMapper.selectByEmail(userInfo.getEmail());
 
         // ユーザー情報が存在する場合、既存のユーザー情報にOIDC認証連係情報を追加する
         if (existingUserByEmail.isPresent()) {
@@ -73,7 +73,7 @@ public class OidcLoginUseCase {
             userId = existingUserByEmail.get().getId();
 
             // 既存ユーザーにOIDC認証連係情報を登録する
-            userAuthProviderMapper.registerAuthProvider(
+            userAuthProviderMapper.insert(
                     authProviderId,
                     userId,
                     userInfo.getProviderType(),
@@ -83,14 +83,14 @@ public class OidcLoginUseCase {
             userId = UUID.randomUUID();
 
             // ユーザー情報を登録する
-            userMapper.registerUser(
+            userMapper.insert(
                     userId,
                     userInfo.getEmail(),
                     null,
                     userInfo.getUsername());
 
             // OIDC認証連係情報を登録する
-            userAuthProviderMapper.registerAuthProvider(
+            userAuthProviderMapper.insert(
                     authProviderId,
                     userId,
                     userInfo.getProviderType(),

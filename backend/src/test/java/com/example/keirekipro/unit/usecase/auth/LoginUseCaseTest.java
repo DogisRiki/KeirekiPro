@@ -44,7 +44,7 @@ class LoginUseCaseTest {
     @DisplayName("正しいメールアドレスとパスワードでログインする")
     void test1() {
         // モックをセットアップ
-        when(userMapper.findByEmail(EMAIL))
+        when(userMapper.selectByEmail(EMAIL))
                 .thenReturn(Optional.of(new UserAuthInfoDto(USERID, EMAIL, PASSWORD, false)));
         when(passwordEncoder.matches(PASSWORD, PASSWORD)).thenReturn(true);
 
@@ -60,7 +60,7 @@ class LoginUseCaseTest {
     @DisplayName("ユーザーが存在しない場合、BadCredentialsExceptionが発生する")
     void test2() {
         // モックをセットアップ
-        when(userMapper.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        when(userMapper.selectByEmail(EMAIL)).thenReturn(Optional.empty());
 
         // BadCredentialsExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -74,7 +74,7 @@ class LoginUseCaseTest {
     @DisplayName("パスワードが正しくない場合、BadCredentialsExceptionが発生する")
     void test3() {
         // モックをセットアップ
-        when(userMapper.findByEmail(EMAIL))
+        when(userMapper.selectByEmail(EMAIL))
                 .thenReturn(Optional.of(new UserAuthInfoDto(USERID, EMAIL, PASSWORD, false)));
         when(passwordEncoder.matches(PASSWORD, PASSWORD)).thenReturn(false);
 

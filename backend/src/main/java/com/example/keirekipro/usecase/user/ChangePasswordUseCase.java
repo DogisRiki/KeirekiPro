@@ -31,7 +31,7 @@ public class ChangePasswordUseCase {
      */
     public void execute(ChangePasswordRequest request, UUID userId) {
 
-        String nowPassword = userMapper.findPasswordById(userId)
+        String nowPassword = userMapper.selectPasswordById(userId)
                 .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
 
         Notification notification = new Notification();
@@ -53,6 +53,6 @@ public class ChangePasswordUseCase {
 
         // 新しいパスワードを保存
         String newHashedPassword = passwordEncoder.encode(request.getNewPassword());
-        userMapper.changePassword(userId, newHashedPassword);
+        userMapper.updatePassword(userId, newHashedPassword);
     }
 }

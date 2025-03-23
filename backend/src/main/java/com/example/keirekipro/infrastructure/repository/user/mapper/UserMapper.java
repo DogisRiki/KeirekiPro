@@ -22,7 +22,7 @@ public interface UserMapper {
      * @param email メールアドレス
      * @return ユーザー認証情報
      */
-    Optional<UserAuthInfoDto> findByEmail(@Param("email") String email);
+    Optional<UserAuthInfoDto> selectByEmail(@Param("email") String email);
 
     /**
      * 新規ユーザーを登録する
@@ -32,7 +32,7 @@ public interface UserMapper {
      * @param password パスワード
      * @param username ユーザー名
      */
-    void registerUser(@Param("id") UUID id, @Param("email") String email, @Param("password") String password,
+    void insert(@Param("id") UUID id, @Param("email") String email, @Param("password") String password,
             @Param("username") String username);
 
     /**
@@ -41,7 +41,7 @@ public interface UserMapper {
      * @param id ユーザーID
      * @return パスワード
      */
-    Optional<String> findPasswordById(@Param("id") UUID id);
+    Optional<String> selectPasswordById(@Param("id") UUID id);
 
     /**
      * パスワードを変更する
@@ -49,5 +49,5 @@ public interface UserMapper {
      * @param id       ユーザーID
      * @param password パスワード
      */
-    void changePassword(@Param("id") UUID id, @Param("password") String password);
+    void updatePassword(@Param("id") UUID id, @Param("password") String password);
 }

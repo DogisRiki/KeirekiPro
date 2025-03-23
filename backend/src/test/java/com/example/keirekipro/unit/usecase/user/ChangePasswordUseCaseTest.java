@@ -50,7 +50,7 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // モックをセットアップ
-        when(userMapper.findPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
+        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
         when(passwordEncoder.matches(NEW_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(false);
         when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(HASHED_NEW_PASSWORD);
@@ -61,7 +61,7 @@ class ChangePasswordUseCaseTest {
         }).doesNotThrowAnyException();
 
         // 検証
-        verify(userMapper).changePassword(USER_ID, HASHED_NEW_PASSWORD);
+        verify(userMapper).updatePassword(USER_ID, HASHED_NEW_PASSWORD);
     }
 
     @Test
@@ -71,7 +71,7 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // モックをセットアップ
-        when(userMapper.findPasswordById(USER_ID)).thenReturn(Optional.empty());
+        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.empty());
 
         // ユースケース実行
         assertThatThrownBy(() -> {
@@ -81,7 +81,7 @@ class ChangePasswordUseCaseTest {
                 .hasMessage("不正なアクセスです。");
 
         // 検証
-        verify(userMapper, never()).changePassword(any(UUID.class), anyString());
+        verify(userMapper, never()).updatePassword(any(UUID.class), anyString());
     }
 
     @Test
@@ -91,7 +91,7 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // モックをセットアップ
-        when(userMapper.findPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
+        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(false);
 
         // ユースケース実行
@@ -105,7 +105,7 @@ class ChangePasswordUseCaseTest {
                 });
 
         // 検証
-        verify(userMapper, never()).changePassword(any(UUID.class), anyString());
+        verify(userMapper, never()).updatePassword(any(UUID.class), anyString());
     }
 
     @Test
@@ -115,7 +115,7 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // モックをセットアップ
-        when(userMapper.findPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
+        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
         when(passwordEncoder.matches(NEW_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
 
@@ -130,7 +130,7 @@ class ChangePasswordUseCaseTest {
                 });
 
         // 検証
-        verify(userMapper, never()).changePassword(any(UUID.class), anyString());
+        verify(userMapper, never()).updatePassword(any(UUID.class), anyString());
     }
 
     @Test
@@ -140,7 +140,7 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // モックをセットアップ
-        when(userMapper.findPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
+        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(false);
         when(passwordEncoder.matches(NEW_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
 
@@ -157,6 +157,6 @@ class ChangePasswordUseCaseTest {
                 });
 
         // 検証
-        verify(userMapper, never()).changePassword(any(UUID.class), anyString());
+        verify(userMapper, never()).updatePassword(any(UUID.class), anyString());
     }
 }

@@ -30,7 +30,7 @@ public class UserRegistrationUseCase {
      */
     public void execute(UserRegistrationRequest request) {
         // 重複チェック
-        userMapper.findByEmail(request.getEmail()).ifPresent(user -> {
+        userMapper.selectByEmail(request.getEmail()).ifPresent(user -> {
             Notification notification = new Notification();
             notification.addError("email", "このメールアドレスは既に登録されています。");
             throw new UseCaseException(notification.getErrors());
@@ -38,6 +38,6 @@ public class UserRegistrationUseCase {
 
         // ユーザー新規登録
         String hashedPassword = passwordEncoder.encode(request.getPassword());
-        userMapper.registerUser(UUID.randomUUID(), request.getEmail(), hashedPassword, request.getUsername());
+        userMapper.insert(UUID.randomUUID(), request.getEmail(), hashedPassword, request.getUsername());
     }
 }

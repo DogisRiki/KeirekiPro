@@ -31,7 +31,7 @@ public class LoginUseCase {
     public LoginUseCaseDto execute(LoginRequest request) {
 
         // ユーザーが存在するか
-        UserAuthInfoDto user = userMapper.findByEmail(request.getEmail())
+        UserAuthInfoDto user = userMapper.selectByEmail(request.getEmail())
                 .orElseThrow(() -> new BadCredentialsException("メールアドレスまたはパスワードが正しくありません。"));
 
         // パスワードが一致するか

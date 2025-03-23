@@ -50,7 +50,7 @@ class UserRegistrationUseCaseTest {
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
 
         // モックをセットアップ
-        when(userMapper.findByEmail(request.getEmail())).thenReturn(Optional.empty());
+        when(userMapper.selectByEmail(request.getEmail())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(eq(request.getPassword()))).thenReturn(HASHED_PASSWORD);
 
         // ユースケース実行
@@ -60,7 +60,7 @@ class UserRegistrationUseCaseTest {
 
         // 検証
         verify(passwordEncoder).encode(eq(request.getPassword()));
-        verify(userMapper).registerUser(any(UUID.class), eq(request.getEmail()), eq(HASHED_PASSWORD),
+        verify(userMapper).insert(any(UUID.class), eq(request.getEmail()), eq(HASHED_PASSWORD),
                 eq(request.getUsername()));
     }
 
@@ -72,7 +72,7 @@ class UserRegistrationUseCaseTest {
         UserAuthInfoDto dto = new UserAuthInfoDto(UUID.randomUUID(), EMAIL, PASSWORD, false);
 
         // モックをセットアップ
-        when(userMapper.findByEmail(request.getEmail())).thenReturn(Optional.of(dto));
+        when(userMapper.selectByEmail(request.getEmail())).thenReturn(Optional.of(dto));
 
         // ユースケース実行
         assertThatThrownBy(() -> userRegistrationUseCase.execute(request))
@@ -85,6 +85,6 @@ class UserRegistrationUseCaseTest {
 
         // 検証
         verify(passwordEncoder, never()).encode(any());
-        verify(userMapper, never()).registerUser(any(), any(), any(), any());
+        verify(userMapper, never()).insert(any(), any(), any(), any());
     }
 }

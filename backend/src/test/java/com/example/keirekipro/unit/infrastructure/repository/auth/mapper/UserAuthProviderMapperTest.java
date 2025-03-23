@@ -36,7 +36,7 @@ class UserAuthProviderMapperTest {
     @DisplayName("既存の認証プロバイダー情報からユーザーIDを取得できる")
     @Sql("/sql/auth/UserAuthProviderMapperTest/test1.sql")
     void test1() {
-        Optional<UUID> userIdOpt = userAuthProviderMapper.findUserIdByProvider(PROVIDER_TYPE, PROVIDER_USERID);
+        Optional<UUID> userIdOpt = userAuthProviderMapper.selectUserIdByProvider(PROVIDER_TYPE, PROVIDER_USERID);
         assertThat(userIdOpt).isPresent();
         assertThat(userIdOpt.get()).isEqualTo(USERID);
     }
@@ -44,7 +44,7 @@ class UserAuthProviderMapperTest {
     @Test
     @DisplayName("存在しない認証プロバイダー情報の場合、空のOptionalを返す")
     void test2() {
-        Optional<UUID> userIdOpt = userAuthProviderMapper.findUserIdByProvider(PROVIDER_TYPE, "non-existent");
+        Optional<UUID> userIdOpt = userAuthProviderMapper.selectUserIdByProvider(PROVIDER_TYPE, "non-existent");
         assertThat(userIdOpt).isNotPresent();
     }
 
@@ -54,9 +54,9 @@ class UserAuthProviderMapperTest {
     void test3() {
         UUID newId = UUID.randomUUID();
         String newProviderUserId = "new-google-uid";
-        userAuthProviderMapper.registerAuthProvider(newId, USERID, PROVIDER_TYPE, newProviderUserId);
+        userAuthProviderMapper.insert(newId, USERID, PROVIDER_TYPE, newProviderUserId);
 
-        Optional<UUID> userIdOpt = userAuthProviderMapper.findUserIdByProvider(PROVIDER_TYPE, newProviderUserId);
+        Optional<UUID> userIdOpt = userAuthProviderMapper.selectUserIdByProvider(PROVIDER_TYPE, newProviderUserId);
         assertThat(userIdOpt).isPresent();
         assertThat(userIdOpt.get()).isEqualTo(USERID);
     }
@@ -68,8 +68,8 @@ class UserAuthProviderMapperTest {
         // 同一ユーザー・異なるプロバイダー種別で2件登録
         UUID id1 = UUID.randomUUID();
         UUID id2 = UUID.randomUUID();
-        userAuthProviderMapper.registerAuthProvider(id1, USERID, PROVIDER_TYPE, "uid1");
-        userAuthProviderMapper.registerAuthProvider(id2, USERID, "GITHUB", "uid2");
+        userAuthProviderMapper.insert(id1, USERID, PROVIDER_TYPE, "uid1");
+        userAuthProviderMapper.insert(id2, USERID, "GITHUB", "uid2");
 
         int googleCount = userAuthProviderMapper.countByUserIdAndProviderType(USERID, PROVIDER_TYPE);
         int githubCount = userAuthProviderMapper.countByUserIdAndProviderType(USERID, "GITHUB");
@@ -84,7 +84,7 @@ class UserAuthProviderMapperTest {
         // 新規登録
         UUID newId = UUID.randomUUID();
         String originalProviderUserId = "old-uid";
-        userAuthProviderMapper.registerAuthProvider(newId, USERID, PROVIDER_TYPE, originalProviderUserId);
+        userAuthProviderMapper.insert(newId, USERID, PROVIDER_TYPE, originalProviderUserId);
 
         // プロバイダーユーザーIDの更新
         String updatedProviderUserId = "updated-uid";
@@ -92,8 +92,8 @@ class UserAuthProviderMapperTest {
         assertThat(updatedRows).isEqualTo(1);
 
         // 旧IDでは取得できず、新IDで取得できることを確認
-        Optional<UUID> oldLookup = userAuthProviderMapper.findUserIdByProvider(PROVIDER_TYPE, originalProviderUserId);
-        Optional<UUID> newLookup = userAuthProviderMapper.findUserIdByProvider(PROVIDER_TYPE, updatedProviderUserId);
+        Optional<UUID> oldLookup = userAuthProviderMapper.selectUserIdByProvider(PROVIDER_TYPE, originalProviderUserId);
+        Optional<UUID> newLookup = userAuthProviderMapper.selectUserIdByProvider(PROVIDER_TYPE, updatedProviderUserId);
         assertThat(oldLookup).isNotPresent();
         assertThat(newLookup).isPresent();
         assertThat(newLookup.get()).isEqualTo(USERID);

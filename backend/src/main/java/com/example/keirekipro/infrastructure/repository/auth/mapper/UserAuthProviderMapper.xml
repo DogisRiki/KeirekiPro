@@ -3,7 +3,7 @@
 
 <mapper namespace="com.example.keirekipro.infrastructure.repository.auth.mapper.UserAuthProviderMapper">
 
-    <select id="findUserIdByProvider" resultType="java.util.UUID">
+    <select id="selectUserIdByProvider" resultType="java.util.UUID">
         SELECT
             user_id
         FROM
@@ -13,7 +13,7 @@
         AND provider_user_id = #{providerUserId}
     </select>
 
-    <insert id="registerAuthProvider">
+    <insert id="insert">
         INSERT INTO user_auth_providers(
             id,
             user_id,

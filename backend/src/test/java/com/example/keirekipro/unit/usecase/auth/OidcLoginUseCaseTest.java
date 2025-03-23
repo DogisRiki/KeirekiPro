@@ -50,7 +50,7 @@ class OidcLoginUseCaseTest {
     @DisplayName("既存ユーザーの場合(同一または別プロバイダー)、新規ユーザーを作成せず既存ユーザーIDを返す")
     void test1() {
         // モックをセットアップ
-        when(userAuthProviderMapper.findUserIdByProvider(anyString(), anyString())).thenReturn(Optional.of(ID));
+        when(userAuthProviderMapper.selectUserIdByProvider(anyString(), anyString())).thenReturn(Optional.of(ID));
 
         // ユースケース実行
         OidcLoginUseCaseDto result = oidcLoginUseCase
@@ -68,8 +68,8 @@ class OidcLoginUseCaseTest {
     @DisplayName("未連携かつメールアドレスも既存ユーザーに無い場合、新規ユーザーを作成する")
     void test2() {
         // モックをセットアップ
-        when(userAuthProviderMapper.findUserIdByProvider(anyString(), anyString())).thenReturn(Optional.empty());
-        when(userMapper.findByEmail(anyString())).thenReturn(Optional.empty());
+        when(userAuthProviderMapper.selectUserIdByProvider(anyString(), anyString())).thenReturn(Optional.empty());
+        when(userMapper.selectByEmail(anyString())).thenReturn(Optional.empty());
 
         // ユースケース実行
         OidcLoginUseCaseDto result = oidcLoginUseCase
@@ -82,8 +82,8 @@ class OidcLoginUseCaseTest {
         assertThat(result.getUsername()).isEqualTo(USERNAME);
         assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
 
-        verify(userMapper).registerUser(any(UUID.class), eq(EMAIL), eq(null), eq(USERNAME));
-        verify(userAuthProviderMapper).registerAuthProvider(any(UUID.class), any(UUID.class), eq(PROVIDER_TYPE),
+        verify(userMapper).insert(any(UUID.class), eq(EMAIL), eq(null), eq(USERNAME));
+        verify(userAuthProviderMapper).insert(any(UUID.class), any(UUID.class), eq(PROVIDER_TYPE),
                 eq(PROVIDER_USER_ID));
     }
 
@@ -91,8 +91,8 @@ class OidcLoginUseCaseTest {
     @DisplayName("メールアドレスで既存ユーザーが見つかるが、外部連携無しの場合、既存ユーザーに連携情報を追加する")
     void test3() {
         // モックをセットアップ
-        when(userAuthProviderMapper.findUserIdByProvider(anyString(), anyString())).thenReturn(Optional.empty());
-        when(userMapper.findByEmail(anyString()))
+        when(userAuthProviderMapper.selectUserIdByProvider(anyString(), anyString())).thenReturn(Optional.empty());
+        when(userMapper.selectByEmail(anyString()))
                 .thenReturn(Optional.of(new UserAuthInfoDto(ID, EMAIL, PASSWORD, false)));
 
         // ユースケース実行
@@ -106,7 +106,7 @@ class OidcLoginUseCaseTest {
         assertThat(result.getUsername()).isEqualTo(USERNAME);
         assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
 
-        verify(userAuthProviderMapper).registerAuthProvider(any(UUID.class), eq(ID), eq(PROVIDER_TYPE),
+        verify(userAuthProviderMapper).insert(any(UUID.class), eq(ID), eq(PROVIDER_TYPE),
                 eq(PROVIDER_USER_ID));
     }
 
@@ -114,13 +114,13 @@ class OidcLoginUseCaseTest {
     @DisplayName("DB登録時に例外が発生した場合、トランザクションがロールバックされる")
     void test4() {
         // モックをセットアップ
-        when(userAuthProviderMapper.findUserIdByProvider(anyString(), anyString())).thenReturn(Optional.empty());
-        when(userMapper.findByEmail(anyString())).thenReturn(Optional.empty());
+        when(userAuthProviderMapper.selectUserIdByProvider(anyString(), anyString())).thenReturn(Optional.empty());
+        when(userMapper.selectByEmail(anyString())).thenReturn(Optional.empty());
 
         // ユーザー登録時に例外を発生させる
         doThrow(new RuntimeException("登録失敗"))
                 .when(userMapper)
-                .registerUser(any(UUID.class), anyString(), any(), anyString());
+                .insert(any(UUID.class), anyString(), any(), anyString());
 
         // RuntimeException が発生し、トランザクションが中断される
         assertThrows(RuntimeException.class, () -> {
@@ -130,6 +130,6 @@ class OidcLoginUseCaseTest {
 
         // ロールバックされているため、registerAuthProvider()が呼び出されていないことを検証
         verify(userAuthProviderMapper, never())
-                .registerAuthProvider(any(UUID.class), any(UUID.class), anyString(), anyString());
+                .insert(any(UUID.class), any(UUID.class), anyString(), anyString());
     }
 }

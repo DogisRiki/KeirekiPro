@@ -20,7 +20,7 @@ public interface UserAuthProviderMapper {
      * @param providerUserId プロバイダー側のユーザーID
      * @return ユーザーID
      */
-    Optional<UUID> findUserIdByProvider(@Param("providerType") String providerType,
+    Optional<UUID> selectUserIdByProvider(@Param("providerType") String providerType,
             @Param("providerUserId") String providerUserId);
 
     /**
@@ -32,7 +32,7 @@ public interface UserAuthProviderMapper {
      * @param providerType   プロバイダー種別
      * @param providerUserId プロバイダー側のユーザーID
      */
-    void registerAuthProvider(@Param("id") UUID id,
+    void insert(@Param("id") UUID id,
             @Param("userId") UUID userId,
             @Param("providerType") String providerType,
             @Param("providerUserId") String providerUserId);

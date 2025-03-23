@@ -37,7 +37,7 @@ class UserMapperTest {
     @DisplayName("ユーザーが存在する場合、正しく取得できる")
     @Sql("/sql/user/UserMapperTest/test1.sql")
     void test1() {
-        Optional<UserAuthInfoDto> user = userMapper.findByEmail(EMAIL);
+        Optional<UserAuthInfoDto> user = userMapper.selectByEmail(EMAIL);
 
         // 検証
         assertThat(user).isPresent();
@@ -50,7 +50,7 @@ class UserMapperTest {
     @Test
     @DisplayName("ユーザーが存在しない場合、空のOptionalが返る")
     void test2() {
-        Optional<UserAuthInfoDto> user = userMapper.findByEmail(EMAIL);
+        Optional<UserAuthInfoDto> user = userMapper.selectByEmail(EMAIL);
 
         // 検証
         assertThat(user).isNotPresent();
@@ -59,8 +59,8 @@ class UserMapperTest {
     @Test
     @DisplayName("ユーザーを新規登録する")
     void test3() {
-        userMapper.registerUser(USERID, EMAIL, PASSWORD, EMAIL);
-        Optional<UserAuthInfoDto> user = userMapper.findByEmail(EMAIL);
+        userMapper.insert(USERID, EMAIL, PASSWORD, EMAIL);
+        Optional<UserAuthInfoDto> user = userMapper.selectByEmail(EMAIL);
 
         // 検証
         assertThat(user).isPresent();
@@ -73,8 +73,8 @@ class UserMapperTest {
     @Test
     @DisplayName("ユーザーIDからパスワードを取得する")
     void test4() {
-        userMapper.registerUser(USERID, EMAIL, PASSWORD, EMAIL);
-        Optional<String> password = userMapper.findPasswordById(USERID);
+        userMapper.insert(USERID, EMAIL, PASSWORD, EMAIL);
+        Optional<String> password = userMapper.selectPasswordById(USERID);
 
         // 検証
         assertThat(password).isPresent();
@@ -84,8 +84,8 @@ class UserMapperTest {
     @Test
     @DisplayName("パスワードがnullの場合、空のOptionalが返る")
     void test5() {
-        userMapper.registerUser(USERID, EMAIL, null, EMAIL);
-        Optional<String> password = userMapper.findPasswordById(USERID);
+        userMapper.insert(USERID, EMAIL, null, EMAIL);
+        Optional<String> password = userMapper.selectPasswordById(USERID);
 
         // 検証
         assertThat(password).isNotPresent();
@@ -94,9 +94,9 @@ class UserMapperTest {
     @Test
     @DisplayName("パスワードを変更する")
     void test6() {
-        userMapper.registerUser(USERID, EMAIL, PASSWORD, EMAIL);
-        userMapper.changePassword(USERID, "newPassword");
-        Optional<String> password = userMapper.findPasswordById(USERID);
+        userMapper.insert(USERID, EMAIL, PASSWORD, EMAIL);
+        userMapper.updatePassword(USERID, "newPassword");
+        Optional<String> password = userMapper.selectPasswordById(USERID);
 
         // 検証
         assertThat(password).isPresent();

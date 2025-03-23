@@ -4,7 +4,7 @@
 
 <mapper namespace="com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper">
 
-    <select id="findByEmail" parameterType="string" resultType="com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto">
+    <select id="selectByEmail" parameterType="string" resultType="com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto">
         SELECT
             id,
             email,
@@ -16,7 +16,7 @@
             email = #{email}
     </select>
 
-    <insert id="registerUser">
+    <insert id="insert">
         INSERT INTO users(
             id,
             email,
@@ -35,7 +35,7 @@
         )
     </insert>
 
-    <select id="findPasswordById" resultType="java.lang.String">
+    <select id="selectPasswordById" resultType="java.lang.String">
         SELECT
             password
         FROM
@@ -44,7 +44,7 @@
             id = #{id}
     </select>
 
-    <update id="changePassword">
+    <update id="updatePassword">
         UPDATE
             users
         SET
