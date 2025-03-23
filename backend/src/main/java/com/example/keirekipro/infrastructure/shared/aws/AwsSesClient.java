@@ -45,6 +45,9 @@ public class AwsSesClient {
      */
     private String fromAddress;
 
+    /**
+     * SESクライアント
+     */
     private SesClient sesClient;
 
     /**

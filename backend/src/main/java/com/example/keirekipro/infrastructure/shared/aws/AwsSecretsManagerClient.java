@@ -40,6 +40,9 @@ public class AwsSecretsManagerClient {
      */
     private String endpoint;
 
+    /**
+     * SecretsManagerクライアント
+     */
     private SecretsManagerClient secretsManagerClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
