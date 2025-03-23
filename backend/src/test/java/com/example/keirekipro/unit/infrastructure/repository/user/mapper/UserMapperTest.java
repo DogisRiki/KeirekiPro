@@ -39,9 +39,8 @@ class UserMapperTest {
     void test1() {
         Optional<UserAuthInfoDto> user = userMapper.findByEmail(EMAIL);
 
-        // ユーザー認証情報が存在する
+        // 検証
         assertThat(user).isPresent();
-        // 各フィールドが正しい
         assertThat(user.get().getId()).isEqualTo(USERID);
         assertThat(user.get().getEmail()).isEqualTo(EMAIL);
         assertThat(user.get().getPassword()).isEqualTo(PASSWORD);
@@ -52,7 +51,8 @@ class UserMapperTest {
     @DisplayName("ユーザーが存在しない場合、空のOptionalが返る")
     void test2() {
         Optional<UserAuthInfoDto> user = userMapper.findByEmail(EMAIL);
-        // ユーザーが存在しない
+
+        // 検証
         assertThat(user).isNotPresent();
     }
 
@@ -62,12 +62,44 @@ class UserMapperTest {
         userMapper.registerUser(USERID, EMAIL, PASSWORD, EMAIL);
         Optional<UserAuthInfoDto> user = userMapper.findByEmail(EMAIL);
 
-        // 登録したユーザーが存在する
+        // 検証
         assertThat(user).isPresent();
-        // 各フィールドが正しい
         assertThat(user.get().getId()).isEqualTo(USERID);
         assertThat(user.get().getEmail()).isEqualTo(EMAIL);
         assertThat(user.get().getPassword()).isEqualTo(PASSWORD);
         assertThat(user.get().isTwoFactorAuthEnabled()).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("ユーザーIDからパスワードを取得する")
+    void test4() {
+        userMapper.registerUser(USERID, EMAIL, PASSWORD, EMAIL);
+        Optional<String> password = userMapper.findPasswordById(USERID);
+
+        // 検証
+        assertThat(password).isPresent();
+        assertThat(password.get()).isEqualTo(PASSWORD);
+    }
+
+    @Test
+    @DisplayName("パスワードがnullの場合、空のOptionalが返る")
+    void test5() {
+        userMapper.registerUser(USERID, EMAIL, null, EMAIL);
+        Optional<String> password = userMapper.findPasswordById(USERID);
+
+        // 検証
+        assertThat(password).isNotPresent();
+    }
+
+    @Test
+    @DisplayName("パスワードを変更する")
+    void test6() {
+        userMapper.registerUser(USERID, EMAIL, PASSWORD, EMAIL);
+        userMapper.changePassword(USERID, "newPassword");
+        Optional<String> password = userMapper.findPasswordById(USERID);
+
+        // 検証
+        assertThat(password).isPresent();
+        assertThat(password.get()).isEqualTo("newPassword");
     }
 }

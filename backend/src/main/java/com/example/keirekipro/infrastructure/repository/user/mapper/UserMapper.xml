@@ -35,4 +35,22 @@
         )
     </insert>
 
+    <select id="findPasswordById" resultType="java.lang.String">
+        SELECT
+            password
+        FROM
+            users
+        WHERE
+            id = #{id}
+    </select>
+
+    <update id="changePassword">
+        UPDATE
+            users
+        SET
+            password = #{password}
+        WHERE
+            id = #{id}
+    </update>
+
 </mapper>

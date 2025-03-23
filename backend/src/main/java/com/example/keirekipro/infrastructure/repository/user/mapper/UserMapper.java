@@ -34,4 +34,20 @@ public interface UserMapper {
      */
     void registerUser(@Param("id") UUID id, @Param("email") String email, @Param("password") String password,
             @Param("username") String username);
+
+    /**
+     * ユーザーIDからパスワードを取得する
+     *
+     * @param id ユーザーID
+     * @return パスワード
+     */
+    Optional<String> findPasswordById(@Param("id") UUID id);
+
+    /**
+     * パスワードを変更する
+     *
+     * @param id       ユーザーID
+     * @param password パスワード
+     */
+    void changePassword(@Param("id") UUID id, @Param("password") String password);
 }
