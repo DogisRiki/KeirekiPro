@@ -31,6 +31,7 @@ public class ChangePasswordUseCase {
      */
     public void execute(ChangePasswordRequest request, UUID userId) {
 
+        // パスワード未設定のユーザーは、パスワード変更画面にアクセスできない
         String nowPassword = userMapper.selectPasswordById(userId)
                 .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
 

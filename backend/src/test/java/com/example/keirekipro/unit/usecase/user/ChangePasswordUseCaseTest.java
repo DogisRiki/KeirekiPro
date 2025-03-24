@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,7 +62,7 @@ class ChangePasswordUseCaseTest {
         }).doesNotThrowAnyException();
 
         // 検証
-        verify(userMapper).updatePassword(USER_ID, HASHED_NEW_PASSWORD);
+        verify(userMapper).updatePassword(eq(USER_ID), eq(HASHED_NEW_PASSWORD));
     }
 
     @Test
