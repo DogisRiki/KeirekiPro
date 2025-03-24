@@ -31,7 +31,7 @@ class UserMapperTest {
 
     private static final UUID USERID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
-    private static final String EMAIL = "test@example.com";
+    private static final String EMAIL = "test@keirekipro.click";
 
     private static final String USERNAME = "test-user";
 
