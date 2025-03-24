@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
+import com.example.keirekipro.infrastructure.repository.user.dto.UserInfo;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -50,4 +51,12 @@ public interface UserMapper {
      * @param password パスワード
      */
     void updatePassword(@Param("id") UUID id, @Param("password") String password);
+
+    /**
+     * ユーザーIDからユーザー情報を取得する
+     *
+     * @param id ユーザーID
+     * @return ユーザー情報
+     */
+    Optional<UserInfo> selectById(@Param("id") UUID id);
 }

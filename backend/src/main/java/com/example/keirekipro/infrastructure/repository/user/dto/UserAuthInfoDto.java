@@ -2,12 +2,16 @@ package com.example.keirekipro.infrastructure.repository.user.dto;
 
 import java.util.UUID;
 
-import lombok.Value;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * ユーザー認証情報DTO
  */
-@Value
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserAuthInfoDto {
 
     private UUID id;

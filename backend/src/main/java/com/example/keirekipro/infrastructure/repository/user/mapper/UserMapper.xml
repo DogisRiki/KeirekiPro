@@ -4,6 +4,19 @@
 
 <mapper namespace="com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper">
 
+    <resultMap id="userInfoMap" type="com.example.keirekipro.infrastructure.repository.user.dto.UserInfo">
+        <id property="id" column="id"/>
+        <result property="email" column="email"/>
+        <result property="username" column="username"/>
+        <result property="profileImage" column="profile_image"/>
+        <result property="twoFactorAuthEnabled" column="two_factor_auth_enabled"/>
+        <collection property="authProviders" ofType="com.example.keirekipro.infrastructure.repository.user.dto.UserInfo$AuthProviderInfo">
+            <id property="id" column="auth_provider_id"/>
+            <result property="providerType" column="provider_type"/>
+            <result property="providerUserId" column="provider_user_id"/>
+        </collection>
+    </resultMap>
+
     <select id="selectByEmail" parameterType="string" resultType="com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto">
         SELECT
             id,
@@ -52,5 +65,24 @@
         WHERE
             id = #{id}
     </update>
+
+    <select id="selectById" resultMap="userInfoMap">
+        SELECT
+            u.id,
+            u.email,
+            u.username,
+            u.profile_image,
+            u.two_factor_auth_enabled,
+            uap.id AS auth_provider_id,
+            uap.provider_type,
+            uap.provider_user_id
+        FROM
+            users u
+            LEFT JOIN
+                user_auth_providers uap
+            ON u.id = uap.user_id
+        WHERE
+            u.id = #{id}
+    </select>
 
 </mapper>
