@@ -5,23 +5,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.util.Optional;
 
-import com.example.keirekipro.config.RedisTestConfiguration;
-import com.example.keirekipro.config.TestContainersConfig;
+import com.example.keirekipro.config.RedisTestContainerConfig;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestConstructor;
 
 import lombok.RequiredArgsConstructor;
 
 @DataRedisTest
-@Import({ RedisTestConfiguration.class, TestContainersConfig.class })
+@Import(RedisTestContainerConfig.class)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
-class RedisClientTest extends TestContainersConfig {
+@ComponentScan(basePackages = "com.example.keirekipro.infrastructure.shared.redis")
+class RedisClientTest {
 
     private final RedisClient redisClient;
 

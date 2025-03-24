@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.example.keirekipro.config.PostgresTestContainerConfig;
 import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
 import com.example.keirekipro.infrastructure.repository.user.dto.UserInfo;
 import com.example.keirekipro.infrastructure.repository.user.dto.UserInfo.AuthProviderInfo;
@@ -13,6 +14,8 @@ import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.TestPropertySource;
@@ -25,6 +28,8 @@ import lombok.RequiredArgsConstructor;
 @TestPropertySource(properties = "spring.flyway.target=1")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import(PostgresTestContainerConfig.class)
 class UserMapperTest {
 
     private final UserMapper userMapper;

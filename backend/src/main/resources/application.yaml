@@ -8,8 +8,6 @@ spring:
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
-    placeholders:
-      text_array_type: "TEXT[]"
 
 mybatis:
   config-location: "classpath:/mybatis/mybatis-config.xml"
