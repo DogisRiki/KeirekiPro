@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import com.example.keirekipro.config.PostgresTestContainerConfig;
 import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
@@ -13,6 +14,9 @@ import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
@@ -148,5 +152,69 @@ class UserMapperTest {
 
         // 検証
         assertThat(user).isNotPresent();
+    }
+
+    @ParameterizedTest
+    @MethodSource("updateParameters")
+    @Sql("/sql/user/UserMapperTest/test9.sql")
+    @DisplayName("ユーザー情報を更新する")
+    void test9(String usernameInput,
+            String profileImageInput,
+            boolean twoFactorAuthEnabled,
+            String expectedUsername,
+            String expectedProfileImage,
+            boolean expectedTwoFactorAuthEnabled) {
+
+        Optional<UserInfo> updatedUserOpt = userMapper.update(
+                USERID,
+                usernameInput,
+                profileImageInput,
+                twoFactorAuthEnabled);
+
+        // 検証
+        assertThat(updatedUserOpt).isPresent();
+        UserInfo updatedUser = updatedUserOpt.get();
+        assertThat(updatedUser.getId()).isEqualTo(USERID);
+        assertThat(updatedUser.getUsername()).isEqualTo(expectedUsername);
+        assertThat(updatedUser.getProfileImage()).isEqualTo(expectedProfileImage);
+        assertThat(updatedUser.isTwoFactorAuthEnabled()).isEqualTo(expectedTwoFactorAuthEnabled);
+    }
+
+    static Stream<Arguments> updateParameters() {
+        return Stream.of(
+                // 1) 全項目更新
+                Arguments.of(
+                        // 第1~3引数は更新する実際の値
+                        "updatedUser",
+                        "profile/updatedUser.jpg",
+                        true,
+                        // 第4~6引数は期待値
+                        "updatedUser",
+                        "profile/updatedUser.jpg",
+                        true),
+                // 2) usernameのみ更新
+                Arguments.of(
+                        "onlyUsername",
+                        null,
+                        true,
+                        "onlyUsername",
+                        "profile/test-user.jpg",
+                        true),
+                // 3) profileImageのみ更新
+                Arguments.of(
+                        null,
+                        "profile/onlyProfile.jpg",
+                        true,
+                        "test-user",
+                        "profile/onlyProfile.jpg",
+                        true),
+                // 4) twoFactorAuthEnabledのみ更新
+                Arguments.of(
+                        null,
+                        null,
+                        true,
+                        "test-user",
+                        "profile/test-user.jpg",
+                        true));
     }
 }

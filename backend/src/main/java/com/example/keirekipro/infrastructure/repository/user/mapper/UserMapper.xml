@@ -85,4 +85,21 @@
             u.id = #{id}
     </select>
 
+    <select id="update" resultMap="userInfoMap" flushCache="true">
+        UPDATE users
+        <set>
+            <if test="username != null">
+                username = #{username},
+            </if>
+            <if test="profileImage != null">
+                profile_image = #{profileImage},
+            </if>
+            two_factor_auth_enabled = #{twoFactorAuthEnabled},
+            updated_at = NOW()
+        </set>
+        WHERE
+            id = #{id}
+        RETURNING id, email, username, profile_image, two_factor_auth_enabled
+    </select>
+
 </mapper>

@@ -59,4 +59,16 @@ public interface UserMapper {
      * @return ユーザー情報
      */
     Optional<UserInfo> selectById(@Param("id") UUID id);
+
+    /**
+     * ユーザー情報を更新する
+     *
+     * @param id                   ユーザーID
+     * @param username             ユーザー名
+     * @param profileImage         プロフィール画像
+     * @param twoFactorAuthEnabled 二段階認証設定
+     * @return 更新後のユーザー情報
+     */
+    Optional<UserInfo> update(@Param("id") UUID id, @Param("username") String username,
+            @Param("profileImage") String profileImage, @Param("twoFactorAuthEnabled") boolean twoFactorAuthEnabled);
 }

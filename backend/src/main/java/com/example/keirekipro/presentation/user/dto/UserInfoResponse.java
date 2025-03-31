@@ -2,6 +2,8 @@ package com.example.keirekipro.presentation.user.dto;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,13 +17,20 @@ import lombok.Value;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserInfoResponse {
 
     private String id;
+
     private String email;
+
     private String username;
+
     private byte[] profileImage;
+
     private boolean twoFactorAuthEnabled;
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private List<AuthProviderInfo> authProviders;
 
     /**
