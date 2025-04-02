@@ -65,7 +65,7 @@ class GetUserInfoControllerTest {
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
         when(getUserInfoUseCase.execute(USER_ID)).thenReturn(dto);
 
-        // GETリクエストを実行し、レスポンスの内容を検証
+        // リクエストを実行
         mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(USER_ID.toString()))
