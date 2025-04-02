@@ -9,34 +9,42 @@ import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
 import com.example.keirekipro.usecase.user.dto.UpdateUserInfoUseCaseDto;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * パスワード変更コントローラー
+ * ユーザー情報更新コントローラー
  */
 @RestController
 @RequestMapping("/api/users/me")
 @RequiredArgsConstructor
 public class UpdateUserInfoController {
 
-    private UpdateUserInfoUseCase updateUserInfoUseCase;
+    private final UpdateUserInfoUseCase updateUserInfoUseCase;
 
     private final CurrentUserFacade currentUserFacade;
 
     /**
      * ユーザー情報更新エンドポイント
      */
-    @PutMapping
+    @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.OK)
-    public UserInfoResponse handle(@RequestBody UpdateUserInfoRequest request) {
+    public UserInfoResponse handle(
+            @RequestParam(name = "username", required = false) String username,
+            @RequestParam(name = "profileImage", required = false) MultipartFile profileImage,
+            @RequestParam(name = "twoFactorAuthEnabled", required = false) boolean twoFactorAuthEnabled) {
+
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
+        UpdateUserInfoRequest request = new UpdateUserInfoRequest(username, profileImage, twoFactorAuthEnabled);
         UpdateUserInfoUseCaseDto dto = updateUserInfoUseCase.execute(request, userId);
+
         return UserInfoResponse.builder()
                 .id(dto.getId().toString())
                 .username(dto.getUsername())

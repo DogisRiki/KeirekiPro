@@ -13,6 +13,7 @@ import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import com.example.keirekipro.usecase.user.dto.UpdateUserInfoUseCaseDto;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -58,7 +59,7 @@ public class UpdateUserInfoUseCase {
         if (request.getUsername() != null) {
             String trimmed = request.getUsername().strip();
             if (trimmed.isEmpty()) {
-                notification.addError("username", "ユーザー名は入力必須です。");
+                notification.addError("username", "ユーザー名は必ず指定してください。");
             } else if (trimmed.length() > 50) {
                 notification.addError("username", "ユーザー名は50文字以内で入力してください。");
             }
@@ -100,7 +101,7 @@ public class UpdateUserInfoUseCase {
 
         // ユーザー情報更新
         UserInfo userInfo = userMapper.update(userId, request.getUsername(), key,
-                request.isTwoFactorAuthEnabled()).orElseThrow(() -> new UseCaseException("a"));
+                request.isTwoFactorAuthEnabled()).orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
 
         return UpdateUserInfoUseCaseDto.builder()
                 .id(userInfo.getId())
