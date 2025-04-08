@@ -2,6 +2,7 @@ package com.example.keirekipro.usecase.user;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.infrastructure.repository.user.dto.UserInfo;
@@ -21,6 +22,9 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * ユーザー情報更新ユースケース
+ * TODO: 実装がよくなさすぎるのでここはドメインとして扱うことにする
+ * 良くない点1：外部認証情報がない判定をメールアドレスとパスワードがnullであることでチェックしている点
+ * 良くない点2：SQLを3回も実行してしまっている点
  */
 @Service
 @RequiredArgsConstructor
@@ -97,6 +101,18 @@ public class UpdateUserInfoUseCase {
             } catch (IOException e) {
                 throw new UseCaseException("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
             }
+        }
+
+        // 更新対象のユーザーを取得
+        UserInfo targetUserInfo = userMapper.selectById(userId)
+                .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
+
+        // パスワードを取得
+        Optional<String> password = userMapper.selectPasswordById(userId);
+
+        // 外部認証情報しか持たないユーザーは二段階認証設定を有効にできない
+        if (targetUserInfo.getEmail() == null && password.isEmpty()) {
+            request.setTwoFactorAuthEnabled(false);
         }
 
         // ユーザー情報更新
