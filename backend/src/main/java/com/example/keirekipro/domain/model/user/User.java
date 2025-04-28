@@ -313,11 +313,10 @@ public class User extends Entity {
     /**
      * パスワードをリセットする
      *
-     * @param notification    通知オブジェクト
      * @param newPasswordHash 新しいパスワードハッシュ
      * @return 変更後のUserエンティティ
      */
-    public User resetPassword(Notification notification, String newPasswordHash) {
+    public User resetPassword(String newPasswordHash) {
 
         return new User(
                 this.id,

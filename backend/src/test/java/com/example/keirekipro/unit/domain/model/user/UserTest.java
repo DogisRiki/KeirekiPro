@@ -597,7 +597,7 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updatedUser = user.resetPassword(notification, "newResetPasswordHash");
+        User updatedUser = user.resetPassword("newResetPasswordHash");
 
         assertThat(updatedUser.getPasswordHash()).isEqualTo("newResetPasswordHash");
         assertThat(updatedUser.getId()).isEqualTo(ID);
