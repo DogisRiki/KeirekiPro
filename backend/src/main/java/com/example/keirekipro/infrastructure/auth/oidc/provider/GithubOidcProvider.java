@@ -38,7 +38,7 @@ public class GithubOidcProvider implements OidcProvider {
 
     @Override
     public String getProviderType() {
-        return "GITHUB";
+        return "github";
     }
 
     @Override

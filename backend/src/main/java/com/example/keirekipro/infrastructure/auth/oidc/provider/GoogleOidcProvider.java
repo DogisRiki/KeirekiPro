@@ -38,7 +38,7 @@ public class GoogleOidcProvider implements OidcProvider {
 
     @Override
     public String getProviderType() {
-        return "GOOGLE";
+        return "google";
     }
 
     @Override

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class TwoFactorAuthIssueUseCaseTest {
@@ -49,6 +50,8 @@ class TwoFactorAuthIssueUseCaseTest {
         // モックをセットアップ
         when(securityUtil.generateRandomNumber(6)).thenReturn("012345");
         when(freeMarkerMailTemplate.create(eq("two-factor-auth.ftl"), anyMap())).thenReturn("テストメール本文");
+        // テスト用にapplicationNameをセット
+        ReflectionTestUtils.setField(twoFactorAuthIssueUseCase, "applicationName", "keirekipro");
 
         // ユースケース実行
         assertThatCode(() -> {
@@ -59,6 +62,6 @@ class TwoFactorAuthIssueUseCaseTest {
         verify(securityUtil).generateRandomNumber(eq(6));
         verify(redisClient).setValue(eq("2fa:" + USER_ID), eq("012345"), eq(Duration.ofMinutes(10)));
         verify(freeMarkerMailTemplate).create(eq("two-factor-auth.ftl"), anyMap());
-        verify(awsSesClient).sendMail(eq(EMAIL), eq("2段階認証コード"), eq("テストメール本文"));
+        verify(awsSesClient).sendMail(eq(EMAIL), eq("【keirekipro】2段階認証コードのお知らせ"), eq("テストメール本文"));
     }
 }

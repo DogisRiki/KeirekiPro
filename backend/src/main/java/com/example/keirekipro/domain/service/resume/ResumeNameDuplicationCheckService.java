@@ -22,7 +22,7 @@ public class ResumeNameDuplicationCheckService {
      * ドメインサービスを実行する
      *
      * @param resume 職務経歴書エンティティ
-     * @return 検証結果
+     * @return 重複チェック結果
      */
     public boolean execute(Resume resume) {
         List<Resume> resumeList = resumeRepository.findAll(resume.getUserId());

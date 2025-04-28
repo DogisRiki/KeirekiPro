@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.keirekipro.infrastructure.repository.user.UserMapper">
+
+    <resultMap id="userMap" type="com.example.keirekipro.infrastructure.repository.user.UserDto">
+        <id property="id" column="u_id"/>
+        <result property="email" column="u_email"/>
+        <result property="password" column="u_password"/>
+        <result property="username" column="u_username"/>
+        <result property="profileImage" column="u_profile_image"/>
+        <result property="twoFactorAuthEnabled" column="u_two_factor_auth_enabled"/>
+        <result property="createdAt" column="u_created_at"/>
+        <result property="updatedAt" column="u_updated_at"/>
+        <collection property="authProviders"
+                    ofType="com.example.keirekipro.infrastructure.repository.user.UserDto$AuthProviderDto">
+            <id property="id" column="p_id"/>
+            <result property="providerName" column="p_provider_name"/>
+            <result property="providerUserId" column="p_provider_user_id"/>
+            <result property="createdAt" column="p_created_at"/>
+            <result property="updatedAt" column="p_updated_at"/>
+        </collection>
+    </resultMap>
+
+    <select id="selectById" resultMap="userMap" parameterType="java.util.UUID">
+        SELECT
+            u.id AS u_id,
+            u.email AS u_email,
+            u.password AS u_password,
+            u.username AS u_username,
+            u.profile_image AS u_profile_image,
+            u.two_factor_auth_enabled AS u_two_factor_auth_enabled,
+            u.created_at AS u_created_at,
+            u.updated_at AS u_updated_at,
+            p.id AS p_id,
+            p.provider_name AS p_provider_name,
+            p.provider_user_id AS p_provider_user_id,
+            p.created_at AS p_created_at,
+            p.updated_at AS p_updated_at
+        FROM
+            users u
+            LEFT JOIN
+                user_auth_providers p
+            ON  p.user_id = u.id
+        WHERE
+            u.id = #{id}
+    </select>
+
+    <select id="selectByEmail" resultMap="userMap" parameterType="string">
+        SELECT
+            u.id AS u_id,
+            u.email AS u_email,
+            u.password AS u_password,
+            u.username AS u_username,
+            u.profile_image AS u_profile_image,
+            u.two_factor_auth_enabled AS u_two_factor_auth_enabled,
+            u.created_at AS u_created_at,
+            u.updated_at AS u_updated_at,
+            p.id AS p_id,
+            p.provider_name AS p_provider_name,
+            p.provider_user_id AS p_provider_user_id,
+            p.created_at AS p_created_at,
+            p.updated_at AS p_updated_at
+        FROM
+            users u
+            LEFT JOIN
+                user_auth_providers p
+            ON  p.user_id = u.id
+        WHERE
+            u.email = #{email}
+    </select>
+
+    <insert id="upsert" parameterType="com.example.keirekipro.infrastructure.repository.user.UserDto">
+        INSERT INTO users(
+            id,
+            email,
+            password,
+            username,
+            profile_image,
+            two_factor_auth_enabled,
+            created_at,
+            updated_at
+        )
+        VALUES(
+            #{id},
+            #{email},
+            #{password},
+            #{username},
+            #{profileImage},
+            #{twoFactorAuthEnabled},
+            #{createdAt},
+            #{updatedAt}
+        )
+        ON  CONFLICT(
+                id
+            ) DO
+            UPDATE
+            SET
+                email = EXCLUDED.email,
+                password = EXCLUDED.password,
+                username = EXCLUDED.username,
+                profile_image = EXCLUDED.profile_image,
+                two_factor_auth_enabled = EXCLUDED.two_factor_auth_enabled,
+                updated_at = EXCLUDED.updated_at
+        ;
+        DELETE
+        FROM
+            user_auth_providers
+        WHERE
+            user_id = #{id};
+        <foreach collection="authProviders" item="ap" separator=";">
+            INSERT INTO user_auth_providers(
+                id,
+                user_id,
+                provider_name,
+                provider_user_id,
+                created_at,
+                updated_at
+            )
+            VALUES(
+                #{ap.id},
+                #{id},
+                #{ap.providerName},
+                #{ap.providerUserId},
+                #{ap.createdAt},
+                #{ap.updatedAt}
+            )
+        </foreach>
+    </insert>
+
+    <delete id="delete" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            user_auth_providers
+        WHERE
+            user_id = #{id}
+        ;
+        DELETE
+        FROM
+            users
+        WHERE
+            id = #{id}
+        ;
+    </delete>
+</mapper>

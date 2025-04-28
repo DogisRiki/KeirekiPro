@@ -44,7 +44,7 @@ class GetUserInfoControllerTest {
     private static final byte[] PROFILE_IMAGE_DATA = new byte[] { 0x12, 0x34, 0x56 };
     private static final boolean TWO_FACTOR_AUTH_ENABLED = false;
     private static final UUID AUTH_PROVIDER_ID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479");
-    private static final String PROVIDER_TYPE = "GOOGLE";
+    private static final String PROVIDER_TYPE = "goolge";
     private static final String PROVIDER_USER_ID = "109876543210987654321";
 
     @Test

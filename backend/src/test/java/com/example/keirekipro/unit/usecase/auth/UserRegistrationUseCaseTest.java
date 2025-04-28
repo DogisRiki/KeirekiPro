@@ -9,17 +9,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
-import java.util.UUID;
 
-import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
-import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
+import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.User;
+import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
+import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.auth.UserRegistrationUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,7 +31,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class UserRegistrationUseCaseTest {
 
     @Mock
-    private UserMapper userMapper;
+    private UserRepository userRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -50,41 +52,45 @@ class UserRegistrationUseCaseTest {
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
 
         // モックをセットアップ
-        when(userMapper.selectByEmail(request.getEmail())).thenReturn(Optional.empty());
-        when(passwordEncoder.encode(eq(request.getPassword()))).thenReturn(HASHED_PASSWORD);
+        when(userRepository.findByEmail(eq(EMAIL))).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(eq(PASSWORD))).thenReturn(HASHED_PASSWORD);
 
         // ユースケース実行
-        assertThatCode(() -> {
-            userRegistrationUseCase.execute(request);
-        }).doesNotThrowAnyException();
+        assertThatCode(() -> userRegistrationUseCase.execute(request)).doesNotThrowAnyException();
 
         // 検証
-        verify(passwordEncoder).encode(eq(request.getPassword()));
-        verify(userMapper).insert(any(UUID.class), eq(request.getEmail()), eq(HASHED_PASSWORD),
-                eq(request.getUsername()));
+        verify(passwordEncoder).encode(eq(PASSWORD));
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        User saved = captor.getValue();
+        assert saved.getEmail().getValue().equals(EMAIL);
+        assert saved.getPasswordHash().equals(HASHED_PASSWORD);
+        assert saved.getUsername().equals(USERNAME);
     }
 
     @Test
-    @DisplayName("既にメールアドレスが登録されている場合、フィールドエラーを含むUseCaseExceptionがスローされる")
+    @DisplayName("既にメールアドレスが登録されている場合、UseCaseExceptionがスローされる")
     void test2() {
         // データ準備
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
-        UserAuthInfoDto dto = new UserAuthInfoDto(UUID.randomUUID(), EMAIL, PASSWORD, false);
+        Notification notification = new Notification();
+        User existing = User.create(notification, 1, Email.create(notification, EMAIL), HASHED_PASSWORD,
+                false, null, null, USERNAME);
 
         // モックをセットアップ
-        when(userMapper.selectByEmail(request.getEmail())).thenReturn(Optional.of(dto));
+        when(userRepository.findByEmail(eq(EMAIL))).thenReturn(Optional.of(existing));
 
         // ユースケース実行
         assertThatThrownBy(() -> userRegistrationUseCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .matches(e -> {
-                    UseCaseException exception = (UseCaseException) e;
-                    return exception.getErrors().containsKey("email")
-                            && exception.getErrors().get("email").contains("このメールアドレスは既に登録されています。");
+                    UseCaseException ex = (UseCaseException) e;
+                    return ex.getErrors().containsKey("email")
+                            && ex.getErrors().get("email").contains("このメールアドレスは既に登録されています。");
                 });
 
         // 検証
         verify(passwordEncoder, never()).encode(any());
-        verify(userMapper, never()).insert(any(), any(), any(), any());
+        verify(userRepository, never()).save(any());
     }
 }

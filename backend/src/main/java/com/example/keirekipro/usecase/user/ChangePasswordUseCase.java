@@ -2,7 +2,8 @@ package com.example.keirekipro.usecase.user;
 
 import java.util.UUID;
 
-import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
+import com.example.keirekipro.domain.model.user.User;
+import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -20,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ChangePasswordUseCase {
 
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
 
     private final PasswordEncoder passwordEncoder;
 
@@ -31,29 +32,23 @@ public class ChangePasswordUseCase {
      */
     public void execute(ChangePasswordRequest request, UUID userId) {
 
-        // パスワード未設定のユーザーは、パスワード変更画面にアクセスできない
-        String nowPassword = userMapper.selectPasswordById(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
 
         Notification notification = new Notification();
 
-        // 旧パスワードが一致しているかを検証する
-        if (!passwordEncoder.matches(request.getNowPassword(), nowPassword)) {
+        if (!passwordEncoder.matches(request.getNowPassword(), user.getPasswordHash())) {
             notification.addError("nowPassword", "現在のパスワードが正しくありません。");
         }
-
-        // 旧パスワードと新パスワードが異なることを検証する
-        if (passwordEncoder.matches(request.getNewPassword(), nowPassword)) {
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
             notification.addError("newPassword", "新しいパスワードは現在のパスワードと異なる必要があります。");
         }
-
-        // エラーチェック
         if (notification.hasErrors()) {
             throw new UseCaseException(notification.getErrors());
         }
 
-        // 新しいパスワードを保存
-        String newHashedPassword = passwordEncoder.encode(request.getNewPassword());
-        userMapper.updatePassword(userId, newHashedPassword);
+        String hashed = passwordEncoder.encode(request.getNewPassword());
+        User updated = user.changePassword(new Notification(), hashed);
+        userRepository.save(updated);
     }
 }
