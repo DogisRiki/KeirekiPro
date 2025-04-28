@@ -26,6 +26,7 @@ public class TwoFactorAuthVerifyUseCase {
      * @param code   2段階認証用コード
      */
     public void execute(UUID userId, String code) {
+
         // 保存されたコードを取得
         String key = "2fa:" + userId;
         Optional<String> storedOpt = redisClient.getValue(key, String.class);

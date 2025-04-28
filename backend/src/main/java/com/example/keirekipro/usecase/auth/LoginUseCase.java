@@ -1,7 +1,7 @@
 package com.example.keirekipro.usecase.auth;
 
-import com.example.keirekipro.infrastructure.repository.user.dto.UserAuthInfoDto;
-import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
+import com.example.keirekipro.domain.model.user.User;
+import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.auth.dto.LoginRequest;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 
@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class LoginUseCase {
 
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
 
     private final PasswordEncoder passwordEncoder;
 
@@ -31,17 +31,17 @@ public class LoginUseCase {
     public LoginUseCaseDto execute(LoginRequest request) {
 
         // ユーザーが存在するか
-        UserAuthInfoDto user = userMapper.selectByEmail(request.getEmail())
+        User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BadCredentialsException("メールアドレスまたはパスワードが正しくありません。"));
 
         // パスワードが一致するか
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new BadCredentialsException("メールアドレスまたはパスワードが正しくありません。");
         }
 
         return LoginUseCaseDto.builder()
                 .id(user.getId())
-                .email(user.getEmail())
+                .email(user.getEmail().getValue())
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
                 .build();
     }

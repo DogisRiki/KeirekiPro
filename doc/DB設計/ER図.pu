@@ -18,8 +18,8 @@ entity "外部認証連携(user_auth_providers)" as UserAuthProviders {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     user_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- ユーザーID
-    provider_type : <color:#1E90FF>VARCHAR(50)</color> <color:#32CD32>[NOT NULL]</color> -- プロバイダー種別
-    provider_user_id : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プロバイダ側ーID
+    provider_name : <color:#1E90FF>VARCHAR(50)</color> <color:#32CD32>[NOT NULL]</color> -- プロバイダー名
+    provider_user_id : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プロバイダ側ユーザーID
     created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
     updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
 }

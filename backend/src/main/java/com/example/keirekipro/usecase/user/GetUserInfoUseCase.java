@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import com.example.keirekipro.infrastructure.repository.user.dto.UserInfo;
-import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
+import com.example.keirekipro.domain.model.user.User;
+import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
 import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto;
 import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto.AuthProviderInfo;
@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class GetUserInfoUseCase {
 
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
 
     private final AwsS3Client awsS3Client;
 
@@ -34,39 +34,36 @@ public class GetUserInfoUseCase {
      * @return ユーザー情報DTO
      */
     public GetUserInfoUseCaseDto execute(UUID userId) {
+
         // ユーザー情報取得
-        UserInfo user = userMapper.selectById(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
 
         // S3からプロフィール画像をバイト配列として取得する
-        byte[] profileImageData = null;
-        if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
+        byte[] img = null;
+        if (user.getProfileImage() != null) {
             try {
-                profileImageData = awsS3Client.getFileAsBytes(user.getProfileImage());
+                img = awsS3Client.getFileAsBytes(user.getProfileImage());
             } catch (IOException e) {
                 // 画像取得失敗はエラーとせず、フロントエンド側でデフォルト画像を設定するため何もしない
-                // TODO: ログ出力する？
             }
         }
 
         // 外部認証連携情報の変換
-        List<AuthProviderInfo> authProviders = null;
-        if (user.getAuthProviders() != null) {
-            authProviders = user.getAuthProviders().stream()
-                    .map(provider -> new AuthProviderInfo(
-                            provider.getId(),
-                            provider.getProviderType(),
-                            provider.getProviderUserId()))
-                    .collect(Collectors.toList());
-        }
+        List<AuthProviderInfo> providers = user.getAuthProviders().values().stream()
+                .map(ap -> new AuthProviderInfo(
+                        UUID.randomUUID(),
+                        ap.getProviderName(),
+                        ap.getProviderUserId()))
+                .collect(Collectors.toList());
 
         return GetUserInfoUseCaseDto.builder()
                 .id(user.getId())
-                .email(user.getEmail())
+                .email(user.getEmail() != null ? user.getEmail().getValue() : null)
                 .username(user.getUsername())
-                .profileImage(profileImageData)
+                .profileImage(img)
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
-                .authProviders(authProviders)
+                .authProviders(providers)
                 .build();
     }
 }

@@ -44,7 +44,7 @@ class OidcProviderFactoryTest {
         OidcProviderFactory factory = new OidcProviderFactory(List.of(googleProvider, githubProvider));
 
         // 小文字・大文字混在でも正しいプロバイダーが返る
-        OidcProvider p1 = factory.getProvider("google");
+        OidcProvider p1 = factory.getProvider("Google");
         assertThat(p1).isInstanceOf(GoogleOidcProvider.class);
 
         OidcProvider p2 = factory.getProvider("GITHUB");
@@ -88,7 +88,7 @@ class OidcProviderFactoryTest {
         assertThat(standardUserInfo.getProviderUserId()).isEqualTo("googleSub123");
         assertThat(standardUserInfo.getEmail()).isEqualTo("google@example.com");
         assertThat(standardUserInfo.getUsername()).isEqualTo("Google User");
-        assertThat(standardUserInfo.getProviderType()).isEqualTo("GOOGLE");
+        assertThat(standardUserInfo.getProviderType()).isEqualTo("google");
     }
 
     @Test
@@ -112,6 +112,6 @@ class OidcProviderFactoryTest {
         assertThat(standardUserInfo.getProviderUserId()).isEqualTo("githubId456");
         assertThat(standardUserInfo.getEmail()).isEqualTo("github@example.com");
         assertThat(standardUserInfo.getUsername()).isEqualTo("GithubUser");
-        assertThat(standardUserInfo.getProviderType()).isEqualTo("GITHUB");
+        assertThat(standardUserInfo.getProviderType()).isEqualTo("github");
     }
 }

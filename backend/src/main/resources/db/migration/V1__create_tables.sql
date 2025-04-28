@@ -24,7 +24,7 @@ COMMENT ON COLUMN users.updated_at IS '更新日時';
 CREATE TABLE user_auth_providers (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id),
-    provider_type VARCHAR(50) NOT NULL,
+    provider_name VARCHAR(50) NOT NULL,
     provider_user_id VARCHAR(255) NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL
@@ -33,8 +33,8 @@ CREATE TABLE user_auth_providers (
 COMMENT ON TABLE user_auth_providers IS '外部認証連携';
 COMMENT ON COLUMN user_auth_providers.id IS '識別子';
 COMMENT ON COLUMN user_auth_providers.user_id IS 'ユーザーID';
-COMMENT ON COLUMN user_auth_providers.provider_type IS 'プロバイダー種別';
-COMMENT ON COLUMN user_auth_providers.provider_user_id IS 'プロバイダ側ーID';
+COMMENT ON COLUMN user_auth_providers.provider_name IS 'プロバイダー名';
+COMMENT ON COLUMN user_auth_providers.provider_user_id IS 'プロバイダ側ユーザーID';
 COMMENT ON COLUMN user_auth_providers.created_at IS '作成日時';
 COMMENT ON COLUMN user_auth_providers.updated_at IS '更新日時';
 

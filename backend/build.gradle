@@ -59,6 +59,7 @@ dependencies {
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
     implementation 'org.freemarker:freemarker:2.3.34'
+    implementation 'commons-validator:commons-validator:1.9.0'
 }
 
 configurations.configureEach {

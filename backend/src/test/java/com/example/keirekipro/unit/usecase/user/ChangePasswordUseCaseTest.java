@@ -3,23 +3,26 @@ package com.example.keirekipro.unit.usecase.user;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.example.keirekipro.infrastructure.repository.user.mapper.UserMapper;
+import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.User;
+import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
+import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import com.example.keirekipro.usecase.user.ChangePasswordUseCase;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,7 +33,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class ChangePasswordUseCaseTest {
 
     @Mock
-    private UserMapper userMapper;
+    private UserRepository userRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -50,19 +53,25 @@ class ChangePasswordUseCaseTest {
         // リクエスト作成
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
+        // テスト用ユーザー生成
+        Notification notification = new Notification();
+        User user = User.create(notification, 1, Email.create(notification, "test@keirekipro.click"),
+                HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
+
         // モックをセットアップ
-        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
         when(passwordEncoder.matches(NEW_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(false);
         when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(HASHED_NEW_PASSWORD);
 
         // ユースケース実行
-        assertThatCode(() -> {
-            changePasswordUseCase.execute(request, USER_ID);
-        }).doesNotThrowAnyException();
+        assertThatCode(() -> changePasswordUseCase.execute(request, USER_ID)).doesNotThrowAnyException();
 
         // 検証
-        verify(userMapper).updatePassword(eq(USER_ID), eq(HASHED_NEW_PASSWORD));
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        User saved = captor.getValue();
+        assert saved.getPasswordHash().equals(HASHED_NEW_PASSWORD);
     }
 
     @Test
@@ -72,17 +81,15 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // モックをセットアップ
-        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         // ユースケース実行
-        assertThatThrownBy(() -> {
-            changePasswordUseCase.execute(request, USER_ID);
-        })
+        assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessage("不正なアクセスです。");
 
         // 検証
-        verify(userMapper, never()).updatePassword(any(UUID.class), anyString());
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -91,22 +98,26 @@ class ChangePasswordUseCaseTest {
         // リクエスト作成
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
+        // テスト用ユーザー生成
+        Notification notification = new Notification();
+        User user = User.create(notification, 1, Email.create(notification, "test@keirekipro.click"),
+                HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
+
         // モックをセットアップ
-        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(false);
 
         // ユースケース実行
-        assertThatThrownBy(() -> changePasswordUseCase.execute(request,
-                USER_ID))
+        assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
                 .isInstanceOf(UseCaseException.class)
                 .matches(e -> {
-                    UseCaseException exception = (UseCaseException) e;
-                    return exception.getErrors().containsKey("nowPassword")
-                            && exception.getErrors().get("nowPassword").contains("現在のパスワードが正しくありません。");
+                    UseCaseException ex = (UseCaseException) e;
+                    return ex.getErrors().containsKey("nowPassword")
+                            && ex.getErrors().get("nowPassword").contains("現在のパスワードが正しくありません。");
                 });
 
         // 検証
-        verify(userMapper, never()).updatePassword(any(UUID.class), anyString());
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -115,23 +126,28 @@ class ChangePasswordUseCaseTest {
         // リクエスト作成
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
+        // テスト用ユーザー生成
+        Notification notification = new Notification();
+        User user = User.create(notification, 1, Email.create(notification, "test@keirekipro.click"),
+                HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
+
         // モックをセットアップ
-        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
         when(passwordEncoder.matches(NEW_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
 
         // ユースケース実行
-        assertThatThrownBy(() -> changePasswordUseCase.execute(request,
-                USER_ID))
+        assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
                 .isInstanceOf(UseCaseException.class)
                 .matches(e -> {
-                    UseCaseException exception = (UseCaseException) e;
-                    return exception.getErrors().containsKey("newPassword")
-                            && exception.getErrors().get("newPassword").contains("新しいパスワードは現在のパスワードと異なる必要があります。");
+                    UseCaseException ex = (UseCaseException) e;
+                    return ex.getErrors().containsKey("newPassword")
+                            && ex.getErrors().get("newPassword")
+                                    .contains("新しいパスワードは現在のパスワードと異なる必要があります。");
                 });
 
         // 検証
-        verify(userMapper, never()).updatePassword(any(UUID.class), anyString());
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -140,24 +156,29 @@ class ChangePasswordUseCaseTest {
         // リクエスト作成
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
+        // テスト用ユーザー生成
+        Notification notification = new Notification();
+        User user = User.create(notification, 1, Email.create(notification, "test@keirekipro.click"),
+                HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
+
         // モックをセットアップ
-        when(userMapper.selectPasswordById(USER_ID)).thenReturn(Optional.of(HASHED_CURRENT_PASSWORD));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(false);
         when(passwordEncoder.matches(NEW_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
 
         // ユースケース実行
-        assertThatThrownBy(() -> changePasswordUseCase.execute(request,
-                USER_ID))
+        assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
                 .isInstanceOf(UseCaseException.class)
                 .matches(e -> {
-                    UseCaseException exception = (UseCaseException) e;
-                    return exception.getErrors().containsKey("nowPassword")
-                            && exception.getErrors().get("nowPassword").contains("現在のパスワードが正しくありません。")
-                            && exception.getErrors().containsKey("newPassword")
-                            && exception.getErrors().get("newPassword").contains("新しいパスワードは現在のパスワードと異なる必要があります。");
+                    UseCaseException ex = (UseCaseException) e;
+                    return ex.getErrors().containsKey("nowPassword")
+                            && ex.getErrors().get("nowPassword").contains("現在のパスワードが正しくありません。")
+                            && ex.getErrors().containsKey("newPassword")
+                            && ex.getErrors().get("newPassword")
+                                    .contains("新しいパスワードは現在のパスワードと異なる必要があります。");
                 });
 
         // 検証
-        verify(userMapper, never()).updatePassword(any(UUID.class), anyString());
+        verify(userRepository, never()).save(any());
     }
 }
