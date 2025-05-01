@@ -1,11 +1,16 @@
 package com.example.keirekipro.domain.model.user;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.example.keirekipro.domain.event.user.UserDeletedEvent;
 import com.example.keirekipro.domain.shared.Entity;
+import com.example.keirekipro.domain.shared.event.DomainEvent;
 import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.shared.Notification;
 
@@ -33,7 +38,7 @@ public class User extends Entity {
     private final boolean twoFactorAuthEnabled;
 
     /**
-     * 外部認証連携情報 (providerName → AuthProvider)
+     * 外部認証連携情報
      */
     private final Map<String, AuthProvider> authProviders;
 
@@ -56,6 +61,11 @@ public class User extends Entity {
      * 更新日時
      */
     private final LocalDateTime updatedAt;
+
+    /**
+     * ドメインイベント蓄積用
+     */
+    private final List<DomainEvent> domainEvents = new ArrayList<>();
 
     /**
      * 新規構築用のコンストラクタ
@@ -211,6 +221,20 @@ public class User extends Entity {
         if (email == null && providers.isEmpty()) {
             throw new DomainException("ユーザー情報の作成に失敗しました。");
         }
+    }
+
+    /**
+     * 登録されたドメインイベントを取得する
+     */
+    public List<DomainEvent> getDomainEvents() {
+        return Collections.unmodifiableList(domainEvents);
+    }
+
+    /**
+     * ドメインイベントをクリアする
+     */
+    public void clearDomainEvents() {
+        domainEvents.clear();
     }
 
     /**
@@ -427,7 +451,7 @@ public class User extends Entity {
      *
      * @param notification 通知オブジェクト
      * @param newUsername  新しいユーザー名
-     * @return 変更後の User エンティティ
+     * @return 変更後のUserエンティティ
      */
     public User changeUsername(Notification notification, String newUsername) {
 
@@ -461,4 +485,13 @@ public class User extends Entity {
                 LocalDateTime.now());
     }
 
+    /**
+     * ユーザーを削除する
+     */
+    public void delete() {
+
+        // 削除イベントを発行
+        UserDeletedEvent event = new UserDeletedEvent(this.id, this.email.getValue(), this.username);
+        this.domainEvents.add(event);
+    }
 }

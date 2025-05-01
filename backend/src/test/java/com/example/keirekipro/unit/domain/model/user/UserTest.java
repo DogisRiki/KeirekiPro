@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.example.keirekipro.domain.event.user.UserDeletedEvent;
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
@@ -605,5 +606,31 @@ class UserTest {
         assertThat(updatedUser.getUsername()).isEqualTo(USERNAME);
         assertThat(updatedUser.getAuthProviders()).isEqualTo(AUTH_PROVIDERS);
         verify(notification, never()).addError(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("ユーザー削除でUserDeletedEventが追加される")
+    void test23() {
+        Email email = Email.create(notification, EMAIL);
+        User user = User.reconstruct(
+                ID,
+                1,
+                email,
+                PASSWORD_HASH,
+                false,
+                AUTH_PROVIDERS,
+                PROFILE_IMAGE,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT);
+
+        user.delete();
+
+        assertThat(user.getDomainEvents()).hasSize(1);
+        assertThat(user.getDomainEvents().get(0)).isInstanceOf(UserDeletedEvent.class);
+        UserDeletedEvent event = (UserDeletedEvent) user.getDomainEvents().get(0);
+        assertThat(event.getUserId()).isEqualTo(ID);
+        assertThat(event.getEmail()).isEqualTo(email.getValue());
+        assertThat(event.getUsername()).isEqualTo(USERNAME);
     }
 }
