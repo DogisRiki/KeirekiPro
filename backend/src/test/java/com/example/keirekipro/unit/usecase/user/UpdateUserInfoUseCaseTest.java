@@ -121,7 +121,7 @@ class UpdateUserInfoUseCaseTest {
             assertThat(result.isTwoFactorAuthEnabled()).isEqualTo(savedUser.isTwoFactorAuthEnabled());
             assertThat(result.getProfileImage()).isEqualTo(PROFILE_IMAGE_BYTES);
 
-            verify(awsS3Client).uploadFile(eq(PROFILE_IMAGE), eq("/profile/image/"));
+            verify(awsS3Client).uploadFile(PROFILE_IMAGE, "/profile/image/");
         }
     }
 

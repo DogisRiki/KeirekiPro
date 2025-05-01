@@ -3,7 +3,6 @@ package com.example.keirekipro.unit.usecase.auth;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,7 +45,7 @@ class TwoFactorAuthVerifyUseCaseTest {
         }).doesNotThrowAnyException();
 
         // 検証
-        verify(redisClient).deleteValue(eq("2fa:" + USER_ID));
+        verify(redisClient).deleteValue("2fa:" + USER_ID);
     }
 
     @Test

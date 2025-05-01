@@ -88,9 +88,9 @@ class RequestPasswordResetUseCaseTest {
 
         // 検証
         verify(userRepository).findByEmail(eq(EMAIL));
-        verify(redisClient).setValue(eq("password-reset:" + TOKEN), eq(USER_ID.toString()), eq(Duration.ofMinutes(10)));
+        verify(redisClient).setValue("password-reset:" + TOKEN, USER_ID.toString(), Duration.ofMinutes(10));
         verify(freeMarkerMailTemplate).create(eq("password-reset.ftl"), anyMap());
-        verify(awsSesClient).sendMail(eq(EMAIL), eq("【keirekipro】パスワードリセットのご案内"), eq("テストメール本文"));
+        verify(awsSesClient).sendMail(EMAIL, "【keirekipro】パスワードリセットのご案内", "テストメール本文");
     }
 
     @Test

@@ -3,7 +3,6 @@ package com.example.keirekipro.unit.usecase.auth;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,8 +48,8 @@ class ResetPasswordUseCaseTest {
         User user = User.reconstruct(USER_ID, 1, null, "oldHash", false, null, null, USERNAME, null, null);
 
         // モックをセットアップ
-        when(userRepository.findById(eq(USER_ID))).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode(eq(RAW_PASSWORD))).thenReturn(HASHED_PASSWORD);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(HASHED_PASSWORD);
 
         // ユースケース実行
         assertThatCode(() -> resetPasswordUseCase.execute(USER_ID, RAW_PASSWORD)).doesNotThrowAnyException();
@@ -63,14 +62,14 @@ class ResetPasswordUseCaseTest {
         // パスワードが新しいハッシュに更新されていること
         assert saved.getPasswordHash().equals(HASHED_PASSWORD);
 
-        verify(passwordEncoder).encode(eq(RAW_PASSWORD));
+        verify(passwordEncoder).encode(RAW_PASSWORD);
     }
 
     @Test
     @DisplayName("存在しないユーザーIDの場合、AccessDeniedExceptionがスローされる")
     void test2() {
         // モックをセットアップ
-        when(userRepository.findById(eq(USER_ID))).thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         // ユースケース実行
         assertThatThrownBy(() -> resetPasswordUseCase.execute(USER_ID, RAW_PASSWORD))
@@ -78,7 +77,7 @@ class ResetPasswordUseCaseTest {
                 .hasMessage("不正なアクセスです。");
 
         // 検証
-        verify(passwordEncoder, never()).encode(eq(RAW_PASSWORD));
+        verify(passwordEncoder, never()).encode(RAW_PASSWORD);
         verify(userRepository, never()).save(any());
     }
 }

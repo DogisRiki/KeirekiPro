@@ -60,8 +60,8 @@ class TwoFactorAuthIssueUseCaseTest {
 
         // 検証
         verify(securityUtil).generateRandomNumber(eq(6));
-        verify(redisClient).setValue(eq("2fa:" + USER_ID), eq("012345"), eq(Duration.ofMinutes(10)));
+        verify(redisClient).setValue("2fa:" + USER_ID, "012345", Duration.ofMinutes(10));
         verify(freeMarkerMailTemplate).create(eq("two-factor-auth.ftl"), anyMap());
-        verify(awsSesClient).sendMail(eq(EMAIL), eq("【keirekipro】2段階認証コードのお知らせ"), eq("テストメール本文"));
+        verify(awsSesClient).sendMail(EMAIL, "【keirekipro】2段階認証コードのお知らせ", "テストメール本文");
     }
 }

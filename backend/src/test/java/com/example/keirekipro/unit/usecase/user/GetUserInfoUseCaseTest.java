@@ -3,7 +3,6 @@ package com.example.keirekipro.unit.usecase.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -89,7 +88,7 @@ class GetUserInfoUseCaseTest {
         assertThat(result.getAuthProviders().get(0).getProviderType()).isEqualTo(PROVIDER_TYPE_VALUE);
         assertThat(result.getAuthProviders().get(0).getProviderUserId()).isEqualTo(PROVIDER_USER_ID_VALUE);
 
-        verify(awsS3Client).getFileAsBytes(eq(PROFILE_IMAGE_PATH));
+        verify(awsS3Client).getFileAsBytes(PROFILE_IMAGE_PATH);
     }
 
     @Test
@@ -163,6 +162,6 @@ class GetUserInfoUseCaseTest {
 
         // 検証
         assertThat(result.getProfileImage()).isNull();
-        verify(awsS3Client).getFileAsBytes(eq(PROFILE_IMAGE_PATH));
+        verify(awsS3Client).getFileAsBytes(PROFILE_IMAGE_PATH);
     }
 }
