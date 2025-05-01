@@ -34,6 +34,8 @@ class VerifyPasswordResetTokenControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final String ENDPOINT = "/api/auth/password/reset/verify";
+
     private static final String TOKEN = "mock-token";
 
     @Test
@@ -47,7 +49,8 @@ class VerifyPasswordResetTokenControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/password/reset/verify")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType("application/json")
                 .content(requestBody))
                 .andExpect(status().isNoContent());

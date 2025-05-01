@@ -52,6 +52,8 @@ class LoginControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final String ENDPOINT = "/api/auth/login";
+
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String EMAIL = "test@keirekipro.click";
     private static final String PASSWORD = "hashedPassword";
@@ -74,7 +76,8 @@ class LoginControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isOk())
@@ -104,7 +107,8 @@ class LoginControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isOk())
@@ -126,7 +130,8 @@ class LoginControllerTest {
         String emailEmptyRequestBody = objectMapper.writeValueAsString(emailEmptyRequest);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(emailEmptyRequestBody))
                 .andExpect(status().isBadRequest())
@@ -139,7 +144,8 @@ class LoginControllerTest {
         String passwordEmptyRequestBody = objectMapper.writeValueAsString(passwordEmptyRequest);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(passwordEmptyRequestBody))
                 .andExpect(status().isBadRequest())
@@ -152,7 +158,8 @@ class LoginControllerTest {
         String bothEmptyRequestBody = objectMapper.writeValueAsString(bothEmptyRequest);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(bothEmptyRequestBody))
                 .andExpect(status().isBadRequest())

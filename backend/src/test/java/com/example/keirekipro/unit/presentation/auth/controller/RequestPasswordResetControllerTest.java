@@ -36,20 +36,23 @@ class RequestPasswordResetControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private static final String VALID_EMAIL = "test@keirekipro.click";
+    private static final String ENDPOINT = "/api/auth/password/reset/request";
+
+    private static final String EMAIL = "test@keirekipro.click";
 
     @Test
     @DisplayName("パスワードリセット要求が正常に完了する")
     void test1() throws Exception {
-        RequestPasswordResetRequest request = new RequestPasswordResetRequest(VALID_EMAIL);
+        RequestPasswordResetRequest request = new RequestPasswordResetRequest(EMAIL);
         String requestBody = objectMapper.writeValueAsString(request);
 
-        mockMvc.perform(post("/api/auth/password/reset/request")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType("application/json")
                 .content(requestBody))
                 .andExpect(status().isNoContent());
 
-        verify(requestPasswordResetUseCase).execute(VALID_EMAIL);
+        verify(requestPasswordResetUseCase).execute(EMAIL);
     }
 
     @Test
@@ -58,7 +61,8 @@ class RequestPasswordResetControllerTest {
         RequestPasswordResetRequest request = new RequestPasswordResetRequest("");
         String requestBody = objectMapper.writeValueAsString(request);
 
-        mockMvc.perform(post("/auth/password/reset/request")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType("application/json")
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -75,7 +79,8 @@ class RequestPasswordResetControllerTest {
         RequestPasswordResetRequest request = new RequestPasswordResetRequest("invalid-email");
         String requestBody = objectMapper.writeValueAsString(request);
 
-        mockMvc.perform(post("/auth/password/reset/request")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType("application/json")
                 .content(requestBody))
                 .andExpect(status().isBadRequest())

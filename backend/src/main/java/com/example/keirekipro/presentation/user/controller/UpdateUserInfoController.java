@@ -8,6 +8,9 @@ import com.example.keirekipro.presentation.user.dto.UserInfoResponse;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
 import com.example.keirekipro.usecase.user.dto.UpdateUserInfoUseCaseDto;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -25,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/users/me")
 @RequiredArgsConstructor
+@Tag(name = "users", description = "ユーザーに関するエンドポイント")
 public class UpdateUserInfoController {
 
     private final UpdateUserInfoUseCase updateUserInfoUseCase;
@@ -36,6 +40,7 @@ public class UpdateUserInfoController {
      */
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "ユーザー情報の更新", description = "ユーザー情報の更新処理を実行する")
     public UserInfoResponse handle(
             @RequestParam(name = "username", required = false) String username,
             @RequestParam(name = "profileImage", required = false) MultipartFile profileImage,

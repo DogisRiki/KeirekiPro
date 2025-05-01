@@ -6,6 +6,9 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +27,7 @@ import jakarta.servlet.http.HttpServletResponse;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Tag(name = "auth", description = "認証・認可に関するエンドポイント")
 public class RefreshAccessTokenController {
 
     private final JwtProvider jwtProvider;
@@ -36,6 +40,7 @@ public class RefreshAccessTokenController {
      */
     @PostMapping("/token/refresh")
     @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "アクセストークンの再発行", description = "リフレッシュトークンによってアクセストークンを再発行する")
     public void handle(HttpServletRequest request, HttpServletResponse response) {
 
         // Cookieからリフレッシュトークンを取得

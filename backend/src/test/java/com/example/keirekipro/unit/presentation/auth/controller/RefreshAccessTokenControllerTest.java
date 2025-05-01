@@ -41,6 +41,8 @@ class RefreshAccessTokenControllerTest {
 
     private final MockMvc mockMvc;
 
+    private static final String ENDPOINT = "/api/auth/token/refresh";
+
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String ACCESS_TOKEN = "mockAccessToken";
     private static final String NEW_ACCESS_TOKEN = "newMockAccessToken";
@@ -58,7 +60,8 @@ class RefreshAccessTokenControllerTest {
         Cookie refreshTokenCookie = new Cookie("refreshToken", REFRESH_TOKEN);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/token/refresh")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .cookie(accessTokenCookie, refreshTokenCookie))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Set-Cookie", containsString("accessToken=newMockAccessToken")));
@@ -74,7 +77,8 @@ class RefreshAccessTokenControllerTest {
         Cookie accessTokenCookie = new Cookie("accessToken", ACCESS_TOKEN);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/token/refresh")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .cookie(accessTokenCookie))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -93,7 +97,8 @@ class RefreshAccessTokenControllerTest {
         Cookie refreshTokenCookie = new Cookie("refreshToken", REFRESH_TOKEN);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/token/refresh")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .cookie(accessTokenCookie, refreshTokenCookie))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))

@@ -44,6 +44,8 @@ class TwoFactorAuthControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final String ENDPOINT = "/api/auth/2fa/verify";
+
     private static final String USER_ID = UUID.randomUUID().toString();
     private static final String EMAIL = "test@keirekipro.click";
     private static final String ACCESS_TOKEN = "mockAccessToken";
@@ -63,7 +65,8 @@ class TwoFactorAuthControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/2fa/verify")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isOk())
@@ -88,7 +91,8 @@ class TwoFactorAuthControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/2fa/verify")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())

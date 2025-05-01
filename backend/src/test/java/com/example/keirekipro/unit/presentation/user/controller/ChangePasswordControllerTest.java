@@ -43,6 +43,8 @@ class ChangePasswordControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final String ENDPOINT = "/api/users/me/password";
+
     private static final String CURRENT_PASSWORD = "CurrentPassword123";
     private static final String NEW_PASSWORD = "NewPassword123";
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
@@ -58,7 +60,8 @@ class ChangePasswordControllerTest {
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isNoContent());
@@ -76,7 +79,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -93,7 +97,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -113,7 +118,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -133,7 +139,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -153,7 +160,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -173,7 +181,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -193,7 +202,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -213,7 +223,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -231,7 +242,8 @@ class ChangePasswordControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(patch("/api/users/me/password")
+        mockMvc.perform(patch(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())

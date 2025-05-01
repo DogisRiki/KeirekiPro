@@ -42,6 +42,8 @@ class ResetPasswordControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final String ENDPOINT = "/api/auth/password/reset";
+
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String PASSWORD = "Password123";
     private static final String INVALID_PASSWORD = "short";
@@ -55,7 +57,8 @@ class ResetPasswordControllerTest {
         // モックセットアップ
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
 
-        mockMvc.perform(post("/api/auth/password/reset")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isNoContent());
@@ -69,7 +72,8 @@ class ResetPasswordControllerTest {
         ResetPasswordRequest request = new ResetPasswordRequest("", "");
         String requestBody = objectMapper.writeValueAsString(request);
 
-        mockMvc.perform(post("/auth/password/reset")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -86,7 +90,8 @@ class ResetPasswordControllerTest {
         ResetPasswordRequest request = new ResetPasswordRequest(INVALID_PASSWORD, INVALID_PASSWORD);
         String requestBody = objectMapper.writeValueAsString(request);
 
-        mockMvc.perform(post("/auth/password/reset")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -102,7 +107,8 @@ class ResetPasswordControllerTest {
         ResetPasswordRequest request = new ResetPasswordRequest(PASSWORD, "DifferentPassword123");
         String requestBody = objectMapper.writeValueAsString(request);
 
-        mockMvc.perform(post("/auth/password/reset")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())

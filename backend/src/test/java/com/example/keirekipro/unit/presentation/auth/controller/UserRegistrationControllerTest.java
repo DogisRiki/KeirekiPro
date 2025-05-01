@@ -36,6 +36,8 @@ class UserRegistrationControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final String ENDPOINT = "/api/auth/register";
+
     private static final String EMAIL = "test@keirekipro.click";
     private static final String USERNAME = "test-user";
     private static final String PASSWORD = "Password123";
@@ -49,7 +51,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isCreated());
@@ -66,7 +69,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -86,7 +90,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -104,7 +109,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -121,7 +127,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -141,7 +148,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -158,7 +166,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -178,7 +187,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -198,7 +208,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -219,7 +230,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -240,7 +252,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -261,7 +274,7 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -278,7 +291,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -295,7 +309,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -312,7 +327,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -333,7 +349,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -355,7 +372,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -381,7 +399,8 @@ class UserRegistrationControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())

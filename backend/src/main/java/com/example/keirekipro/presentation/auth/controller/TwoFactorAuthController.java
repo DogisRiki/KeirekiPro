@@ -7,6 +7,9 @@ import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +29,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/auth/2fa")
 @RequiredArgsConstructor
+@Tag(name = "auth", description = "認証・認可に関するエンドポイント")
 public class TwoFactorAuthController {
 
     private final TwoFactorAuthVerifyUseCase twoFactorAuthVerifyUseCase;
@@ -40,6 +44,7 @@ public class TwoFactorAuthController {
      */
     @PostMapping("/verify")
     @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "二段階認証の実行", description = "二段階認証コードの検証を行う")
     public void handle(@Valid @RequestBody TwoFactorAuthRequest request, HttpServletResponse response) {
 
         // ユースケース実行

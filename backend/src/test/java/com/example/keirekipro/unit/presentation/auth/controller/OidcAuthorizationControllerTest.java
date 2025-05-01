@@ -42,6 +42,8 @@ class OidcAuthorizationControllerTest {
 
     private final MockMvc mockMvc;
 
+    private static final String ENDPOINT = "/api/auth/oidc/authorize";
+
     private static final String PROVIDER_PARAM = "google";
     private static final String REDIRECT_URI = "https://keirekipro.click/api/auth/oidc/callback";
     private static final String CODE_VERIFIER = "randomVerifier";
@@ -72,7 +74,8 @@ class OidcAuthorizationControllerTest {
                 eq(CODE_CHALLENGE))).thenReturn(EXPECTED_URL);
 
         // リクエストを実行
-        mockMvc.perform(get("/api/auth/oidc/authorize")
+        mockMvc.perform(get(
+                ENDPOINT)
                 .param("provider", PROVIDER_PARAM))
                 .andExpect(status().isOk())
                 .andExpect(content().string(EXPECTED_URL));

@@ -36,6 +36,8 @@ class DeleteUserControllerTest {
 
     private final MockMvc mockMvc;
 
+    private static final String ENDPOINT = "/api/users/me";
+
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
     @Test
@@ -45,7 +47,8 @@ class DeleteUserControllerTest {
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
 
         // リクエストを実行
-        mockMvc.perform(delete("/api/users/me")
+        mockMvc.perform(delete(
+                ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNoContent());
 

@@ -39,6 +39,8 @@ class GetUserInfoControllerTest {
 
     private final MockMvc mockMvc;
 
+    private static final String ENDPOINT = "/api/users/me";
+
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String EMAIL = "test@keirekipro.click";
     private static final String USERNAME = "test-user";
@@ -67,7 +69,8 @@ class GetUserInfoControllerTest {
         when(getUserInfoUseCase.execute(USER_ID)).thenReturn(dto);
 
         // リクエストを実行
-        mockMvc.perform(get("/api/users/me"))
+        mockMvc.perform(get(
+                ENDPOINT))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.email").value(EMAIL))

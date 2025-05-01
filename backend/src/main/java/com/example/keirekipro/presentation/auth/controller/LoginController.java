@@ -7,6 +7,9 @@ import com.example.keirekipro.usecase.auth.LoginUseCase;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthIssueUseCase;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +29,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Tag(name = "auth", description = "認証・認可に関するエンドポイント")
 public class LoginController {
 
     private final LoginUseCase loginUseCase;
@@ -42,6 +46,7 @@ public class LoginController {
      */
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "ログイン", description = "メールアドレスとパスワードによるログイン")
     public void handle(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
 
         // ユースケース実行

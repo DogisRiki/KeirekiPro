@@ -13,6 +13,9 @@ import com.example.keirekipro.presentation.shared.utils.UrlUtil;
 import com.example.keirekipro.usecase.auth.OidcLoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +33,7 @@ import jakarta.servlet.http.HttpServletResponse;
 @RestController
 @RequestMapping("/api/auth/oidc")
 @RequiredArgsConstructor
+@Tag(name = "auth", description = "認証・認可に関するエンドポイント")
 public class OidcCallbackController {
 
     private final OidcClient oidcClient;
@@ -64,6 +68,7 @@ public class OidcCallbackController {
      * @param response HTTPレスポンス
      */
     @GetMapping("/callback")
+    @Operation(summary = "OIDCコールバック", description = "OIDCプロバイダーからのコールバック処理を実行する")
     public void handle(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,

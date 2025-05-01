@@ -35,6 +35,8 @@ class RemoveAuthProviderControllerTest {
 
     private final MockMvc mockMvc;
 
+    private static final String ENDPOINT = "/api/users/me/auth-provider/{provider}";
+
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String PROVIDER = "github";
 
@@ -46,7 +48,8 @@ class RemoveAuthProviderControllerTest {
         when(currentUserFacade.getUserId()).thenReturn(userId);
 
         // リクエストを実行
-        mockMvc.perform(delete("/api/users/me/auth-provider/{provider}", PROVIDER)
+        mockMvc.perform(delete(
+                ENDPOINT, PROVIDER)
                 .contentType("application/json"))
                 .andExpect(status().isNoContent());
 

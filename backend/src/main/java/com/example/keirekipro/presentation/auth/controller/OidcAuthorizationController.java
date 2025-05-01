@@ -7,6 +7,9 @@ import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.presentation.shared.utils.UrlUtil;
 import com.example.keirekipro.shared.utils.SecurityUtil;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 @RestController
 @RequestMapping("/api/auth/oidc")
 @RequiredArgsConstructor
+@Tag(name = "auth", description = "認証・認可に関するエンドポイント")
 public class OidcAuthorizationController {
 
     private final OidcClient oidcClient;
@@ -41,6 +45,7 @@ public class OidcAuthorizationController {
      */
     @GetMapping("/authorize")
     @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "OIDC認可フローの開始", description = "OIDCの認可フローを開始し、認可URLを生成する")
     public String handle(@RequestParam String provider, HttpServletRequest servletRequest) {
 
         // PKCEパラメータを生成

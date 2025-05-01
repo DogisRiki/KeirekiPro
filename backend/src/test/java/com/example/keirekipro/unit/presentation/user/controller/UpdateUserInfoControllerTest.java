@@ -41,6 +41,8 @@ class UpdateUserInfoControllerTest {
 
     private final MockMvc mockMvc;
 
+    private static final String ENDPOINT = "/api/users/me";
+
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
     private static final String USERNAME = "test-user";
@@ -73,7 +75,8 @@ class UpdateUserInfoControllerTest {
 
         // リクエストを実行
         mockMvc.perform(
-                multipart("/api/users/me")
+                multipart(
+                        ENDPOINT)
                         .file(PROFILE_IMAGE)
                         .param("username", USERNAME)
                         .param("twoFactorAuthEnabled", "true")

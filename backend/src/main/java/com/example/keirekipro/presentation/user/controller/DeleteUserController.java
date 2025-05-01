@@ -5,6 +5,9 @@ import java.util.UUID;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.usecase.user.DeleteUserUseCase;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("api/users/me")
 @RequiredArgsConstructor
+@Tag(name = "users", description = "ユーザーに関するエンドポイント")
 public class DeleteUserController {
 
     private final DeleteUserUseCase deleteUserUseCase;
@@ -30,6 +34,7 @@ public class DeleteUserController {
      */
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "ユーザー退会", description = "ユーザーの退会処理を実行し、ユーザー情報を削除する")
     public void deleteUser() {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
         deleteUserUseCase.execute(userId);
