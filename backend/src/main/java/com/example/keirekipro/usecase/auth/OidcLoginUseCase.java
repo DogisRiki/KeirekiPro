@@ -5,6 +5,7 @@ import java.util.Collections;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
+import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
@@ -22,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 public class OidcLoginUseCase {
 
     private final UserRepository userRepository;
+
+    private final DomainEventPublisher eventPublisher;
 
     /**
      * OIDCログインを実行する
@@ -43,6 +46,10 @@ public class OidcLoginUseCase {
 
         userRepository.save(user);
 
+        // ドメインイベントをパブリッシュ
+        user.getDomainEvents().forEach(eventPublisher::publish);
+        user.clearDomainEvents();
+
         return OidcLoginUseCaseDto.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -62,6 +69,12 @@ public class OidcLoginUseCase {
                 Collections.emptyMap(),
                 null,
                 userInfo.getUsername());
+
+        // 新規登録イベント発行
+        if (user.getEmail() != null) {
+            user.register();
+        }
+
         return user;
     }
 }

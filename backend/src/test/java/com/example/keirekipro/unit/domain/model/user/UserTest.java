@@ -77,6 +77,7 @@ class UserTest {
         assertThat(user.getUsername()).isEqualTo(USERNAME);
         assertThat(user.getCreatedAt()).isNotNull();
         assertThat(user.getUpdatedAt()).isNotNull();
+        assertThat(user.isNew()).isTrue();
     }
 
     @Test
@@ -111,6 +112,7 @@ class UserTest {
         assertThat(user.getUsername()).isEqualTo(USERNAME);
         assertThat(user.getCreatedAt()).isNotNull();
         assertThat(user.getUpdatedAt()).isNotNull();
+        assertThat(user.isNew()).isTrue();
     }
 
     @Test
@@ -143,6 +145,7 @@ class UserTest {
         assertThat(user.getUsername()).isEqualTo(USERNAME);
         assertThat(user.getCreatedAt()).isNotNull();
         assertThat(user.getUpdatedAt()).isNotNull();
+        assertThat(user.isNew()).isTrue();
     }
 
     @Test
@@ -190,6 +193,7 @@ class UserTest {
         assertThat(user.getUsername()).isEqualTo(USERNAME);
         assertThat(user.getCreatedAt()).isEqualTo(CREATED_AT);
         assertThat(user.getUpdatedAt()).isEqualTo(UPDATED_AT);
+        assertThat(user.isNew()).isFalse();
     }
 
     @Test
@@ -634,8 +638,28 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("ユーザー削除でUserDeletedEventが追加される")
+    @DisplayName("再構築時にregister()を呼び出すとIllegalStateExceptionがスローされる")
     void test24() {
+        Email email = Email.create(notification, EMAIL);
+        User user = User.reconstruct(
+                ID,
+                1,
+                email,
+                PASSWORD_HASH,
+                true,
+                AUTH_PROVIDERS,
+                PROFILE_IMAGE,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT);
+
+        // IllegalStateExceptionがスローされる
+        assertThatThrownBy(() -> user.register()).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("ユーザー削除でUserDeletedEventが追加される")
+    void test25() {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,

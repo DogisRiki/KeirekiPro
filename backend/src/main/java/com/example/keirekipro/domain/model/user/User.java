@@ -69,6 +69,11 @@ public class User extends Entity {
     private final List<DomainEvent> domainEvents = new ArrayList<>();
 
     /**
+     * 新規登録か否かを判定するフラグ
+     */
+    private final boolean isNew;
+
+    /**
      * 新規構築用のコンストラクタ
      */
     private User(Notification notification,
@@ -97,6 +102,7 @@ public class User extends Entity {
         this.username = username;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        this.isNew = true;
     }
 
     /**
@@ -121,6 +127,7 @@ public class User extends Entity {
         this.username = username;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.isNew = false;
     }
 
     /**
@@ -266,7 +273,7 @@ public class User extends Entity {
                 this.email,
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
-                Map.copyOf(updated), // ← immutable化して渡す
+                Map.copyOf(updated),
                 this.profileImage,
                 this.username,
                 this.createdAt,
@@ -490,6 +497,11 @@ public class User extends Entity {
      * ユーザーを新規登録する
      */
     public void register() {
+
+        // 新規登録時しか呼び出せないようにする
+        if (!isNew) {
+            throw new IllegalStateException("このユーザーは新規作成ではありません。");
+        }
 
         // 新規登録イベントを発行
         UserRegisteredEvent event = new UserRegisteredEvent(id, this.email.getValue(), username);

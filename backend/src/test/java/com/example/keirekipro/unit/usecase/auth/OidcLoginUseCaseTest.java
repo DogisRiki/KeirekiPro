@@ -4,15 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 
+import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
+import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.auth.OidcLoginUseCase;
@@ -30,6 +34,9 @@ class OidcLoginUseCaseTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private DomainEventPublisher eventPublisher;
 
     @InjectMocks
     private OidcLoginUseCase oidcLoginUseCase;
@@ -65,6 +72,10 @@ class OidcLoginUseCaseTest {
         assertThat(result.getEmail()).isEqualTo(EMAIL);
         assertThat(result.getUsername()).isEqualTo(USERNAME);
         assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+
+        verify(userRepository).findByEmail(EMAIL);
+        verify(userRepository).save(existingUser);
+        verify(eventPublisher, never()).publish(any());
     }
 
     @Test
@@ -84,7 +95,9 @@ class OidcLoginUseCaseTest {
         assertThat(result.getUsername()).isEqualTo(USERNAME);
         assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
 
+        verify(userRepository).findByEmail(EMAIL);
         verify(userRepository).save(any(User.class));
+        verify(eventPublisher).publish(any());
     }
 
     @Test
@@ -103,5 +116,42 @@ class OidcLoginUseCaseTest {
             oidcLoginUseCase.execute(
                     new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
         });
+
+        verify(userRepository).findByEmail(EMAIL);
+        verify(userRepository).save(any(User.class));
+        verify(eventPublisher, never()).publish(any());
+    }
+
+    @Test
+    @DisplayName("OIDCログインでメールアドレスが無い場合、ユーザー新規登録イベントが発火されない")
+    void test4() {
+        // モックをセットアップ
+        Notification notification = new Notification();
+        Map<String, AuthProvider> providers = Map.of(
+                PROVIDER_TYPE,
+                AuthProvider.create(new Notification(), PROVIDER_TYPE, PROVIDER_USER_ID));
+        User existingUser = User.create(
+                notification,
+                1,
+                null,
+                null,
+                false,
+                providers,
+                null,
+                USERNAME);
+        when(userRepository.findByEmail(any())).thenReturn(Optional.of(existingUser));
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase
+                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, null, USERNAME, PROVIDER_TYPE));
+
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isNotNull();
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+        assertThat(result.getEmail()).isNull();
+
+        verify(userRepository).findByEmail(any());
+        verify(userRepository).save(any(User.class));
+        verify(eventPublisher, never()).publish(any());
     }
 }
