@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.event.user.UserDeletedEvent;
+import com.example.keirekipro.domain.event.user.UserRegisteredEvent;
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
@@ -609,8 +610,32 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("ユーザー削除でUserDeletedEventが追加される")
+    @DisplayName("ユーザー登録でUserRegisteredEventが追加される")
     void test23() {
+        Email email = Email.create(notification, EMAIL);
+        User user = User.create(
+                notification,
+                1,
+                email,
+                PASSWORD_HASH,
+                true,
+                Collections.emptyMap(),
+                null,
+                USERNAME);
+
+        user.register();
+
+        assertThat(user.getDomainEvents()).hasSize(1);
+        assertThat(user.getDomainEvents().get(0)).isInstanceOf(UserRegisteredEvent.class);
+        UserRegisteredEvent event = (UserRegisteredEvent) user.getDomainEvents().get(0);
+        assertThat(event.getUserId()).isEqualTo(user.getId());
+        assertThat(event.getEmail()).isEqualTo(email.getValue());
+        assertThat(event.getUsername()).isEqualTo(USERNAME);
+    }
+
+    @Test
+    @DisplayName("ユーザー削除でUserDeletedEventが追加される")
+    void test24() {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,

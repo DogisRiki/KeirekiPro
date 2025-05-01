@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 
-import com.example.keirekipro.domain.event.user.UserDeletedEvent;
-import com.example.keirekipro.infrastructure.event.user.UserDeletedEventListener;
+import com.example.keirekipro.domain.event.user.UserRegisteredEvent;
+import com.example.keirekipro.infrastructure.event.user.UserRegisteredEventListener;
 import com.example.keirekipro.infrastructure.shared.aws.AwsSesClient;
 import com.example.keirekipro.infrastructure.shared.mail.FreeMarkerMailTemplate;
 
@@ -22,7 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-class UserDeletedEventListenerTest {
+class UserRegisteredEventListenerTest {
 
     @Mock
     private AwsSesClient awsSesClient;
@@ -31,26 +31,26 @@ class UserDeletedEventListenerTest {
     private FreeMarkerMailTemplate freeMarkerMailTemplate;
 
     @InjectMocks
-    private UserDeletedEventListener listener;
+    private UserRegisteredEventListener listener;
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String EMAIL = "test@keirekipro.click";
-    private static final String USERNAME = "deleted-user";
+    private static final String USERNAME = "registered-user";
 
     @Test
-    @DisplayName("ユーザー削除イベントを受け取り、退会メールを送信する")
+    @DisplayName("ユーザー新規登録イベントを受け取り、新規登録メールを送信する")
     void test1() {
         // モックをセットアップ
-        when(freeMarkerMailTemplate.create(eq("user-deleted.ftl"), anyMap())).thenReturn("退会メール本文");
+        when(freeMarkerMailTemplate.create(eq("user-registered.ftl"), anyMap())).thenReturn("新規登録メール本文");
         // テスト用にapplicationNameをセット
         ReflectionTestUtils.setField(listener, "applicationName", "keirekipro");
 
         // イベント生成
-        UserDeletedEvent event = new UserDeletedEvent(USER_ID, EMAIL, USERNAME);
+        UserRegisteredEvent event = new UserRegisteredEvent(USER_ID, EMAIL, USERNAME);
 
         // 実行 & 検証
         assertThatCode(() -> listener.handle(event)).doesNotThrowAnyException();
-        verify(freeMarkerMailTemplate).create(eq("user-deleted.ftl"), anyMap());
-        verify(awsSesClient).sendMail(eq(EMAIL), eq("【keirekipro】退会手続き完了のお知らせ"), eq("退会メール本文"));
+        verify(freeMarkerMailTemplate).create(eq("user-registered.ftl"), anyMap());
+        verify(awsSesClient).sendMail(eq(EMAIL), eq("【keirekipro】新規登録完了のお知らせ"), eq("新規登録メール本文"));
     }
 }

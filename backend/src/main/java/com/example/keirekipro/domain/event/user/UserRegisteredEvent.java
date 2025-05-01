@@ -8,10 +8,10 @@ import com.example.keirekipro.domain.shared.event.DomainEvent;
 import lombok.Getter;
 
 /**
- * ユーザー削除イベント
+ * ユーザー登録イベント
  */
 @Getter
-public class UserDeletedEvent extends AbstractDomainEvent implements DomainEvent {
+public class UserRegisteredEvent extends AbstractDomainEvent implements DomainEvent {
 
     private final UUID userId;
     private final String email;
@@ -24,7 +24,7 @@ public class UserDeletedEvent extends AbstractDomainEvent implements DomainEvent
      * @param email    メールアドレス
      * @param username ユーザー名
      */
-    public UserDeletedEvent(UUID userId, String email, String username) {
+    public UserRegisteredEvent(UUID userId, String email, String username) {
         super();
         this.userId = userId;
         this.email = email;

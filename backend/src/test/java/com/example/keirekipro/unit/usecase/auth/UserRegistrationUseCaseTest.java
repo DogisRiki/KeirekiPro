@@ -3,7 +3,7 @@ package com.example.keirekipro.unit.usecase.auth;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +13,7 @@ import java.util.Optional;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
+import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.auth.UserRegistrationUseCase;
@@ -39,6 +40,9 @@ class UserRegistrationUseCaseTest {
     @InjectMocks
     private UserRegistrationUseCase userRegistrationUseCase;
 
+    @Mock
+    private DomainEventPublisher eventPublisher;
+
     private static final String EMAIL = "test@keirekipro.click";
     private static final String USERNAME = "test-user";
     private static final String PASSWORD = "password";
@@ -52,14 +56,15 @@ class UserRegistrationUseCaseTest {
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
 
         // モックをセットアップ
-        when(userRepository.findByEmail(eq(EMAIL))).thenReturn(Optional.empty());
-        when(passwordEncoder.encode(eq(PASSWORD))).thenReturn(HASHED_PASSWORD);
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(PASSWORD)).thenReturn(HASHED_PASSWORD);
 
         // ユースケース実行
         assertThatCode(() -> userRegistrationUseCase.execute(request)).doesNotThrowAnyException();
 
         // 検証
-        verify(passwordEncoder).encode(eq(PASSWORD));
+        verify(passwordEncoder).encode(PASSWORD);
+        verify(eventPublisher, atLeastOnce()).publish(any());
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
         User saved = captor.getValue();
@@ -78,7 +83,7 @@ class UserRegistrationUseCaseTest {
                 false, null, null, USERNAME);
 
         // モックをセットアップ
-        when(userRepository.findByEmail(eq(EMAIL))).thenReturn(Optional.of(existing));
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(existing));
 
         // ユースケース実行
         assertThatThrownBy(() -> userRegistrationUseCase.execute(request))
@@ -92,5 +97,6 @@ class UserRegistrationUseCaseTest {
         // 検証
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any());
+        verify(eventPublisher, never()).publish(any());
     }
 }

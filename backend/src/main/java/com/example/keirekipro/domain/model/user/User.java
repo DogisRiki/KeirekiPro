@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.event.user.UserDeletedEvent;
+import com.example.keirekipro.domain.event.user.UserRegisteredEvent;
 import com.example.keirekipro.domain.shared.Entity;
 import com.example.keirekipro.domain.shared.event.DomainEvent;
 import com.example.keirekipro.domain.shared.exception.DomainException;
@@ -483,6 +484,16 @@ public class User extends Entity {
                 trimmed,
                 this.createdAt,
                 LocalDateTime.now());
+    }
+
+    /**
+     * ユーザーを新規登録する
+     */
+    public void register() {
+
+        // 新規登録イベントを発行
+        UserRegisteredEvent event = new UserRegisteredEvent(id, this.email.getValue(), username);
+        this.domainEvents.add(event);
     }
 
     /**

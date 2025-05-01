@@ -3,7 +3,7 @@ package com.example.keirekipro.infrastructure.event.user;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.example.keirekipro.domain.event.user.UserDeletedEvent;
+import com.example.keirekipro.domain.event.user.UserRegisteredEvent;
 import com.example.keirekipro.infrastructure.shared.aws.AwsSesClient;
 import com.example.keirekipro.infrastructure.shared.mail.FreeMarkerMailTemplate;
 
@@ -14,11 +14,11 @@ import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
 
 /**
- * ユーザー削除イベントリスナー
+ * ユーザー登録イベントリスナー
  */
 @Component
 @RequiredArgsConstructor
-public class UserDeletedEventListener {
+public class UserRegisteredEventListener {
 
     private final AwsSesClient awsSesClient;
 
@@ -30,17 +30,17 @@ public class UserDeletedEventListener {
     /**
      * イベントリスナー実行ハンドル
      *
-     * @param event ユーザー削除イベント
+     * @param event ユーザー登録イベント
      */
     @EventListener
-    public void handle(UserDeletedEvent event) {
+    public void handle(UserRegisteredEvent event) {
 
         // メール本文を作成
         Map<String, Object> dataModel = new HashMap<>();
         dataModel.put("username", event.getUsername());
-        String body = freeMarkerMailTemplate.create("user-deleted.ftl", dataModel);
+        String body = freeMarkerMailTemplate.create("user-registered.ftl", dataModel);
 
         // メール送信
-        awsSesClient.sendMail(event.getEmail(), "【" + applicationName + "】退会手続き完了のお知らせ", body);
+        awsSesClient.sendMail(event.getEmail(), "【" + applicationName + "】新規登録完了のお知らせ", body);
     }
 }
