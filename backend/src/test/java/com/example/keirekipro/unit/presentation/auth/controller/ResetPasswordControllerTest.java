@@ -1,9 +1,13 @@
 package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
 
 import com.example.keirekipro.presentation.auth.controller.ResetPasswordController;
 import com.example.keirekipro.presentation.auth.dto.ResetPasswordRequest;
@@ -38,14 +42,31 @@ class ResetPasswordControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String PASSWORD = "Password123";
     private static final String INVALID_PASSWORD = "short";
 
     @Test
-    @DisplayName("新しいパスワードが空の場合、バリデーションエラーとなる")
+    @DisplayName("正常にパスワードがリセットされる")
     void test1() throws Exception {
-        ResetPasswordRequest request = new ResetPasswordRequest("", "");
+        ResetPasswordRequest request = new ResetPasswordRequest(PASSWORD, PASSWORD);
+        String requestBody = objectMapper.writeValueAsString(request);
 
+        // モックセットアップ
+        when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
+
+        mockMvc.perform(post("/api/auth/password/reset")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+                .andExpect(status().isNoContent());
+
+        verify(resetPasswordUseCase).execute(USER_ID, PASSWORD);
+    }
+
+    @Test
+    @DisplayName("新しいパスワードが空の場合、バリデーションエラーとなる")
+    void test2() throws Exception {
+        ResetPasswordRequest request = new ResetPasswordRequest("", "");
         String requestBody = objectMapper.writeValueAsString(request);
 
         mockMvc.perform(post("/auth/password/reset")
@@ -61,9 +82,8 @@ class ResetPasswordControllerTest {
 
     @Test
     @DisplayName("新しいパスワードが8文字未満の場合、バリデーションエラーとなる")
-    void test2() throws Exception {
+    void test3() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest(INVALID_PASSWORD, INVALID_PASSWORD);
-
         String requestBody = objectMapper.writeValueAsString(request);
 
         mockMvc.perform(post("/auth/password/reset")
@@ -78,9 +98,8 @@ class ResetPasswordControllerTest {
 
     @Test
     @DisplayName("新しいパスワードと確認パスワードが一致しない場合、バリデーションエラーとなる")
-    void test3() throws Exception {
+    void test4() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest(PASSWORD, "DifferentPassword123");
-
         String requestBody = objectMapper.writeValueAsString(request);
 
         mockMvc.perform(post("/auth/password/reset")

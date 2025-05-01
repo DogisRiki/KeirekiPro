@@ -2,6 +2,7 @@ package com.example.keirekipro.unit.presentation.user.controller;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -61,6 +62,10 @@ class ChangePasswordControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isNoContent());
+
+        // 呼び出しを検証
+        verify(currentUserFacade).getUserId();
+        verify(changePasswordUseCase).execute(request, USER_ID);
     }
 
     @Test
@@ -236,5 +241,4 @@ class ChangePasswordControllerTest {
                 .andExpect(jsonPath("$.errors.nowPassword", hasItem("現在のパスワードは入力必須です。")))
                 .andExpect(jsonPath("$.errors.newPassword", hasItem("新しいパスワードは入力必須です。")));
     }
-
 }

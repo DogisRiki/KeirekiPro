@@ -1,5 +1,6 @@
 package com.example.keirekipro.unit.presentation.user.controller;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -76,5 +77,9 @@ class GetUserInfoControllerTest {
                 .andExpect(jsonPath("$.authProviders[0].id").value(AUTH_PROVIDER_ID.toString()))
                 .andExpect(jsonPath("$.authProviders[0].providerType").value(PROVIDER_TYPE))
                 .andExpect(jsonPath("$.authProviders[0].providerUserId").value(PROVIDER_USER_ID));
+
+        // 呼び出しを検証
+        verify(currentUserFacade).getUserId();
+        verify(getUserInfoUseCase).execute(USER_ID);
     }
 }

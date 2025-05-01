@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
  * パスワードリセットリンク検証コントローラー
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class VerifyPasswordResetTokenController {
 

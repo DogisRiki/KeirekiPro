@@ -44,7 +44,7 @@ class RequestPasswordResetControllerTest {
         RequestPasswordResetRequest request = new RequestPasswordResetRequest(VALID_EMAIL);
         String requestBody = objectMapper.writeValueAsString(request);
 
-        mockMvc.perform(post("/auth/password/reset/request")
+        mockMvc.perform(post("/api/auth/password/reset/request")
                 .contentType("application/json")
                 .content(requestBody))
                 .andExpect(status().isNoContent());

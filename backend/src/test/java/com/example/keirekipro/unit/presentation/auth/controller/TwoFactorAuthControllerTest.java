@@ -2,6 +2,7 @@ package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -72,6 +73,11 @@ class TwoFactorAuthControllerTest {
                         containsInAnyOrder(
                                 containsString("accessToken=mockAccessToken"),
                                 containsString("refreshToken=mockRefreshToken"))));
+
+        // 呼び出し検証を追加
+        verify(twoFactorAuthIssueUseCase).execute(UUID.fromString(USER_ID), EMAIL);
+        verify(jwtProvider).createAccessToken(USER_ID);
+        verify(jwtProvider).createRefreshToken(USER_ID);
     }
 
     @Test

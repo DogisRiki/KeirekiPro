@@ -2,6 +2,7 @@ package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,9 +47,12 @@ class VerifyPasswordResetTokenControllerTest {
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
-        mockMvc.perform(post("/auth/password/reset/verify")
+        mockMvc.perform(post("/api/auth/password/reset/verify")
                 .contentType("application/json")
                 .content(requestBody))
                 .andExpect(status().isNoContent());
+
+        // 呼び出し検証
+        verify(verifyPasswordResetTokenUseCase).execute(eq(TOKEN));
     }
 }

@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -85,13 +84,19 @@ class LoginControllerTest {
                         containsInAnyOrder(
                                 containsString("accessToken=mockAccessToken"),
                                 containsString("refreshToken=mockRefreshToken"))));
+
+        // 呼び出しを検証
+        verify(loginUseCase).execute(request);
+        verify(twoFactorAuthIssueUseCase, never()).execute(any(), any());
+        verify(jwtProvider).createAccessToken(USER_ID.toString());
+        verify(jwtProvider).createRefreshToken((USER_ID.toString()));
     }
 
     @Test
     @DisplayName("二段階認証設定が有効の場合、二段階認証発行ユースケースが実行される")
     void test2() throws Exception {
         // モックをセットアップ
-        when(loginUseCase.execute(Mockito.any()))
+        when(loginUseCase.execute(any()))
                 .thenReturn(new LoginUseCaseDto(USER_ID, EMAIL, true));
 
         // リクエストを準備
@@ -106,7 +111,8 @@ class LoginControllerTest {
                 // JWTは発行されないためSet-Cookieヘッダーが存在しない
                 .andExpect(header().doesNotExist("Set-Cookie"));
 
-        // 検証
+        // 呼び出しを検証
+        verify(loginUseCase).execute(request);
         verify(twoFactorAuthIssueUseCase).execute(USER_ID, EMAIL);
         verify(jwtProvider, never()).createAccessToken(anyString());
         verify(jwtProvider, never()).createRefreshToken(anyString());

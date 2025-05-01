@@ -1,6 +1,7 @@
 package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -61,6 +62,10 @@ class RefreshAccessTokenControllerTest {
                 .cookie(accessTokenCookie, refreshTokenCookie))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Set-Cookie", containsString("accessToken=newMockAccessToken")));
+
+        // 呼び出し検証を追加
+        verify(jwtProvider).getAuthentication(REFRESH_TOKEN);
+        verify(jwtProvider).createAccessToken(USER_ID.toString());
     }
 
     @Test

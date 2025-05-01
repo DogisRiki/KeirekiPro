@@ -2,10 +2,13 @@ package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.Duration;
 
 import com.example.keirekipro.infrastructure.auth.oidc.OidcClient;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
@@ -73,5 +76,13 @@ class OidcAuthorizationControllerTest {
                 .param("provider", PROVIDER_PARAM))
                 .andExpect(status().isOk())
                 .andExpect(content().string(EXPECTED_URL));
+
+        // 呼び出し検証
+        verify(oidcClient).buildAuthorizationUrl(eq(PROVIDER_PARAM), anyString(), eq(STATE_VALUE), eq(CODE_CHALLENGE));
+        verify(redisClient).setValue(eq("oidc:provider:" + STATE_VALUE), eq(PROVIDER_PARAM),
+                eq(Duration.ofMinutes(10)));
+        verify(redisClient).setValue(eq("oidc:state:" + STATE_VALUE), eq(STATE_VALUE), eq(Duration.ofMinutes(10)));
+        verify(redisClient).setValue(eq("oidc:code_verifier:" + STATE_VALUE), eq(CODE_VERIFIER),
+                eq(Duration.ofMinutes(10)));
     }
 }

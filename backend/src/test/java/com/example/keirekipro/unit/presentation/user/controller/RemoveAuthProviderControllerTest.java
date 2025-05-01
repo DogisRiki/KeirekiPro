@@ -1,6 +1,5 @@
 package com.example.keirekipro.unit.presentation.user.controller;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -47,12 +46,12 @@ class RemoveAuthProviderControllerTest {
         when(currentUserFacade.getUserId()).thenReturn(userId);
 
         // リクエストを実行
-        mockMvc.perform(delete("/user/auth-provider/{provider}", PROVIDER)
+        mockMvc.perform(delete("/api/users/me/auth-provider/{provider}", PROVIDER)
                 .contentType("application/json"))
                 .andExpect(status().isNoContent());
 
         // 呼び出しを検証
         verify(currentUserFacade).getUserId();
-        verify(removeAuthProviderUseCase).execute(eq(USER_ID), eq(PROVIDER));
+        verify(removeAuthProviderUseCase).execute(USER_ID, PROVIDER);
     }
 }

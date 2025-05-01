@@ -21,7 +21,7 @@ import jakarta.validation.Valid;
  * パスワードリセット実行コントローラー
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class ResetPasswordController {
 

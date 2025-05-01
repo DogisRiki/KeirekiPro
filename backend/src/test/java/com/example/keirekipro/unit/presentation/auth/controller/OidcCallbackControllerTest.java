@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -125,6 +126,16 @@ class OidcCallbackControllerTest {
                         containsInAnyOrder(
                                 containsString("accessToken=mockAccessToken"),
                                 containsString("refreshToken=mockRefreshToken"))));
+
+        // 呼び出し検証を追加
+        verify(oidcClient).getToken(eq(PROVIDER_VALUE), eq(CODE_VALUE), anyString(), eq(CODE_VERIFIER));
+        verify(oidcClient).getUserInfo(PROVIDER_VALUE, ACCESS_TOKEN);
+        verify(oidcLoginUseCase).execute(userInfoDto);
+        verify(redisClient).deleteValue("oidc:state:" + STATE_VALUE);
+        verify(redisClient).deleteValue("oidc:provider:" + STATE_VALUE);
+        verify(redisClient).deleteValue("oidc:code_verifier:" + STATE_VALUE);
+        verify(jwtProvider).createAccessToken(ID.toString());
+        verify(jwtProvider).createRefreshToken(ID.toString());
     }
 
     @Test

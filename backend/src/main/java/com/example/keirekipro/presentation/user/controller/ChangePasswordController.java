@@ -21,7 +21,7 @@ import jakarta.validation.Valid;
  * パスワード変更コントローラー
  */
 @RestController
-@RequestMapping("/api/users/me/password")
+@RequestMapping("/api/users/me")
 @RequiredArgsConstructor
 public class ChangePasswordController {
 
@@ -32,7 +32,7 @@ public class ChangePasswordController {
     /**
      * パスワード変更エンドポイント
      */
-    @PatchMapping
+    @PatchMapping("/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void handle(@Valid @RequestBody ChangePasswordRequest request) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

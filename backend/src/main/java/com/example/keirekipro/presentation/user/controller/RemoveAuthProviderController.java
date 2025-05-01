@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
  * 外部認証連携解除コントローラー
  */
 @RestController
-@RequestMapping("/user/auth-provider")
+@RequestMapping("/api/users/me")
 @RequiredArgsConstructor
 public class RemoveAuthProviderController {
 
@@ -29,10 +29,10 @@ public class RemoveAuthProviderController {
     /**
      * 外部認証連携解除エンドポイント
      */
-    @DeleteMapping("/{provider}")
+    @DeleteMapping("/auth-provider/{provider}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void handle(@PathVariable String provider) {
-        String userId = currentUserFacade.getUserId();
-        removeAuthProviderUseCase.execute(UUID.fromString(userId), provider);
+        UUID userId = UUID.fromString(currentUserFacade.getUserId());
+        removeAuthProviderUseCase.execute(userId, provider);
     }
 }
