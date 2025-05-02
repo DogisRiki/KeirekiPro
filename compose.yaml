@@ -69,6 +69,27 @@ services:
     ports:
       - 6379:6379
 
+  localstack:
+    container_name: localstack
+    image: localstack/localstack
+    ports:
+      - 4566:4566
+    environment:
+      - SERVICES=s3,secretsmanager,ses
+      - DEBUG=1
+    volumes:
+      - type: bind
+        source: ./docker/localstack/init-localstack.sh
+        target: /etc/localstack/init/ready.d/init-localstack.sh
+        read_only: true
+      - type: volume
+        source: localstack-data
+        target: /var/lib/localstack
+    env_file:
+      - ./docker/localstack/.env.local
+    networks:
+      - my-network
+
 volumes:
   db-data:
     name: named-db-data
@@ -76,6 +97,8 @@ volumes:
     name: named-node_modules
   vendor:
     name: named-vendor
+  localstack-data:
+    name: named-localstack
 
 configs:
   postgres_config:
