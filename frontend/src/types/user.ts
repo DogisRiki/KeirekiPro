@@ -1,17 +1,26 @@
 /**
- * ユーザー
+ * 外部認証連携情報
  */
-export interface User {
-    userId: string; // ユーザーID
-    userName: string; // ユーザー名
-    email: string; // メールアドレス
-    hasPassword: boolean; // パスワードが設定されているかどうか
-    profileImage: string; // プロフィール画像
-    twoFactorAuthEnabled: boolean; // 二段階認証が有効かどうか
-    authProviders: ("email" | "github" | "google")[]; // どの認証プロバイダーで認証済みか
+export interface AuthProviderInfo {
+    id: string;
+    providerType: "github" | "google";
+    providerUserId: string;
 }
 
 /**
- * プロフィール更新
+ * ユーザー情報
  */
-export type updateUserProfile = Pick<User, "userName" | "profileImage" | "twoFactorAuthEnabled">;
+export interface User {
+    id: string;
+    email: string | null;
+    username: string;
+    profileImage: string | null;
+    twoFactorAuthEnabled: boolean;
+    hasPassword: boolean;
+    authProviders: AuthProviderInfo[];
+}
+
+/**
+ * ユーザー情報更新用
+ */
+export type UserPatch = Partial<User>;

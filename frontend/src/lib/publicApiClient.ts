@@ -1,4 +1,6 @@
-import { baseApiClient } from "@/lib/baseApiClient";
+import { baseApiClient } from "@/lib";
 
-// 認証不要なAPIに使用するクライアント
+/**
+ * 認証が不要なAPI通信に使用するクライアント
+ */
 export const publicApiClient = baseApiClient;

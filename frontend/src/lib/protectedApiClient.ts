@@ -1,17 +1,20 @@
+import { toastMessage } from "@/config/messages";
 import { paths } from "@/config/paths";
-import { baseApiClient } from "@/lib/baseApiClient";
-import { useNotificationStore } from "@/stores";
+import { baseApiClient } from "@/lib";
+import { useNotificationStore, useUserAuthStore } from "@/stores";
 import axios from "axios";
 
 /**
- * 認証が必要なAPIに使用するクライアント
+ * 認証が必要なAPI通信に使用するクライアント
  */
 export const protectedApiClient = axios.create({
     ...baseApiClient.defaults,
     withCredentials: true,
 });
 
-// リクエストインターセプター
+/**
+ * リクエストインターセプタ
+ */
 protectedApiClient.interceptors.request.use((config) => {
     const xsrfToken = document.cookie
         .split("; ")
@@ -23,24 +26,34 @@ protectedApiClient.interceptors.request.use((config) => {
     return config;
 });
 
-// レスポンスインターセプター
+/**
+ * レスポンスインターセプタ
+ */
 protectedApiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
         if (axios.isAxiosError(error)) {
             const originalRequest = error.config;
-            if (!originalRequest) return Promise.reject(error);
-            // 認証エラーの場合はリフレッシュトークンでアクセストークンを更新
+
+            if (!originalRequest) {
+                // リクエスト情報が無い場合はそのまま例外を伝播
+                return Promise.reject(error);
+            }
+
+            // 401の場合、トークンリフレッシュ試行
             if (error.response?.status === 401) {
                 try {
-                    await protectedApiClient.post("/auth/refresh-token");
-                    // 元のリクエストを再試行
+                    // アクセストークンのリフレッシュを試行
+                    await protectedApiClient.post("/api/auth/token/refresh");
+                    // リフレッシュに成功した時点で認証フラグを維持
+                    useUserAuthStore.getState().setRefresh();
+                    // 元のリクエストを再試行して結果を返す
                     return protectedApiClient(originalRequest);
-                } catch (refreshError) {
-                    // リフレッシュ失敗時はログイン画面へリダイレクト
-                    useNotificationStore.getState().setNotification(error.response.data?.message, "error");
+                } catch {
+                    // リフレッシュに失敗した場合、エラー通知+ログイン画面遷移
+                    useNotificationStore.getState().setNotification(toastMessage.unauthorized, "error");
                     window.location.href = paths.login;
-                    return Promise.reject(refreshError);
+                    return Promise.reject(error);
                 }
             }
         }

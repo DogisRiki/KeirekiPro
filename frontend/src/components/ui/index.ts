@@ -5,6 +5,7 @@ export * from "@/components/ui/DatePicker";
 export * from "@/components/ui/Footer";
 export * from "@/components/ui/Headline";
 export * from "@/components/ui/Link";
+export * from "@/components/ui/Loading";
 export * from "@/components/ui/MainMenu";
 export * from "@/components/ui/PasswordTextField";
 export * from "@/components/ui/Select";

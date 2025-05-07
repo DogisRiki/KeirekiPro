@@ -13,11 +13,14 @@ export const SettingUser = () => {
     // 初期化
     useEffect(() => {
         setLogin({
-            userId: "test",
-            userName: "テストユーザー",
+            id: "test",
+            username: "テストユーザー",
             hasPassword: false,
             twoFactorAuthEnabled: true,
-            authProviders: ["email", "github", "google"],
+            authProviders: [
+                { id: "1", providerType: "github", providerUserId: "1" },
+                { id: "2", providerType: "google", providerUserId: "2" },
+            ],
             email: "test@keirekipro.click",
             profileImage: "https://cdn.pixabay.com/photo/2016/02/19/15/46/labrador-retriever-1210559_1280.jpg",
         });
