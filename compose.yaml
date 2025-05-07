@@ -25,8 +25,8 @@ services:
     ports:
       - 5173:5173
       - 6006:6006
-    environment:
-      CHOKIDAR_USEPOLLING: true
+    # environment:
+    #   CHOKIDAR_USEPOLLING: true
     tty: true
     volumes:
       - type: bind
