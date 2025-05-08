@@ -113,7 +113,8 @@ class LoginControllerTest {
                 .content(requestBody))
                 .andExpect(status().isAccepted())
                 // JWTは発行されないためSet-Cookieヘッダーが存在しない
-                .andExpect(header().doesNotExist("Set-Cookie"));
+                .andExpect(header().doesNotExist("Set-Cookie"))
+                .andExpect(jsonPath("$").value(USER_ID.toString()));
 
         // 呼び出しを検証
         verify(loginUseCase).execute(request);

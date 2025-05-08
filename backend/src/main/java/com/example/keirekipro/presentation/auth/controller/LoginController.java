@@ -45,7 +45,7 @@ public class LoginController {
      */
     @PostMapping("/login")
     @Operation(summary = "ログイン", description = "メールアドレスとパスワードによるログイン")
-    public ResponseEntity<Void> handle(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+    public ResponseEntity<String> handle(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
 
         // ユースケース実行
         LoginUseCaseDto user = loginUseCase.execute(request);
@@ -53,7 +53,7 @@ public class LoginController {
         // ユーザーの二段階認証設定をチェックし、有効なら二段階認証発行ユースケースを実行
         if (user.isTwoFactorAuthEnabled()) {
             twoFactorAuthIssueUseCase.execute(user.getId(), user.getEmail());
-            return ResponseEntity.accepted().build();
+            return ResponseEntity.accepted().body(user.getId().toString());
         }
 
         // JWT発行
