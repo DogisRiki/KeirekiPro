@@ -100,4 +100,21 @@ class TwoFactorAuthControllerTest {
                 .andExpect(jsonPath("$.errors.code").isArray())
                 .andExpect(jsonPath("$.errors.code[0]").value("認証コードは入力必須です。"));
     }
+
+    @Test
+    @DisplayName("userIdがnullの場合、403が返される")
+    void test3() throws Exception {
+        // リクエストを準備（userIdがnull）
+        TwoFactorAuthRequest request = new TwoFactorAuthRequest(null, "123456");
+        String requestBody = objectMapper.writeValueAsString(request);
+
+        // リクエストを実行
+        mockMvc.perform(post(
+                ENDPOINT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("不正なアクセスです。"))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
 }

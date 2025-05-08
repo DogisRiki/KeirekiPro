@@ -9,7 +9,7 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.shared.exception.BaseException;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -23,6 +23,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class AppExceptionHandler {
 
     /**
+     * AccessDeniedExceptionをハンドリングする
+     *
+     * @return エラーレスポンス
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleAccessDeniedException(AccessDeniedException ex) {
+        return new ErrorResponse(ex.getMessage(), Collections.emptyMap());
+    }
+
+    /**
      * JWTVerificationExceptionをハンドリングする
      *
      * @return エラーレスポンス
@@ -31,18 +42,6 @@ public class AppExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleJwtVerificationException() {
         return new ErrorResponse("認証に失敗しました。", Collections.emptyMap());
-    }
-
-    /**
-     * BadCredentialsExceptionをハンドリングする
-     *
-     * @param ex 例外オブジェクト
-     * @return エラーレスポンス
-     */
-    @ExceptionHandler(BadCredentialsException.class)
-    @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public ErrorResponse handleBadCredentialsException(BadCredentialsException ex) {
-        return new ErrorResponse(ex.getMessage(), Collections.emptyMap());
     }
 
     /**

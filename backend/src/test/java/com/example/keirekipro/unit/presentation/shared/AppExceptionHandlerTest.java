@@ -51,9 +51,9 @@ class AppExceptionHandlerTest {
     void test2() throws Exception {
         mockMvc.perform(get("/test/test2")
                 .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isForbidden())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.message").value("メールアドレスまたはパスワードが違います。"))
+                .andExpect(jsonPath("$.message").value("不正なアクセスです。"))
                 .andExpect(jsonPath("$.errors").isEmpty());
     }
 

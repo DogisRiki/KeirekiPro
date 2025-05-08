@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -45,7 +46,12 @@ public class TwoFactorAuthController {
     @PostMapping("/verify")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "二段階認証の実行", description = "二段階認証コードの検証を行う")
-    public void handle(@Valid @RequestBody TwoFactorAuthRequest request, HttpServletResponse response) {
+    public void handle(@Valid @RequestBody TwoFactorAuthRequest request, HttpServletResponse response)
+            throws Exception {
+
+        if (request.getUserId() == null) {
+            throw new AccessDeniedException("不正なアクセスです。");
+        }
 
         // ユースケース実行
         twoFactorAuthVerifyUseCase.execute(UUID.fromString(request.getUserId()), request.getCode());

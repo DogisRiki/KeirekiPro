@@ -10,7 +10,7 @@ import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import io.swagger.v3.oas.annotations.Hidden;
 
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,8 +37,8 @@ class TestController {
     }
 
     @GetMapping("/test2")
-    public void throwBadCredentialsException() {
-        throw new BadCredentialsException("メールアドレスまたはパスワードが違います。");
+    public void throwAccessDeniedException() {
+        throw new AccessDeniedException("不正なアクセスです。");
     }
 
     @PostMapping("/test3")
