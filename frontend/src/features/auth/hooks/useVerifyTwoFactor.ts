@@ -1,0 +1,26 @@
+import { paths } from "@/config/paths";
+import { useTwoFactorStore, verifyTwoFactor } from "@/features/auth";
+import { protectedApiClient } from "@/lib";
+import { useUserAuthStore } from "@/stores";
+import { User } from "@/types";
+import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
+
+/**
+ * 二段階認証コード検証フック
+ */
+export const useVerifyTwoFactor = () => {
+    const navigate = useNavigate();
+    const { setLogin } = useUserAuthStore();
+    const { userId, clear } = useTwoFactorStore();
+
+    return useMutation({
+        mutationFn: (code: string) => verifyTwoFactor({ userId: userId as string, code }),
+        onSuccess: async () => {
+            clear();
+            const { data } = await protectedApiClient.get<User>("/users/me");
+            setLogin(data);
+            navigate(paths.resume.list, { replace: true });
+        },
+    });
+};

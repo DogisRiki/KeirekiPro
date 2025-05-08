@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui";
 import { paths } from "@/config/paths";
-import { TwoFactorForm } from "@/features/auth";
+import { TwoFactorContainer } from "@/features/auth";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import { Box, Typography } from "@mui/material";
 
@@ -28,7 +28,7 @@ export const TwoFactor = () => {
                 <br />
                 メールをご確認のうえ認証コードを入力してください。
             </Typography>
-            <TwoFactorForm />
+            <TwoFactorContainer />
         </>
     );
 };

@@ -16,6 +16,7 @@ import {
     Top,
     TwoFactor,
 } from "@/pages";
+import { ProtectedLoader, PublicLoader } from "@/routes/AppLoader";
 import { createBrowserRouter, RouterProvider } from "react-router";
 
 /**
@@ -25,12 +26,12 @@ const router = createBrowserRouter([
     {
         path: paths.top,
         element: <Top />,
-        // loader: PublicLoader,
+        loader: PublicLoader,
         errorElement: <ErrorFallback />,
     },
     {
         element: <PublicLayout />,
-        // loader: PublicLoader,
+        loader: PublicLoader,
         errorElement: <ErrorFallback />,
         children: [
             { path: paths.login, element: <Login /> },
@@ -42,7 +43,7 @@ const router = createBrowserRouter([
     },
     {
         element: <ProtectedLayout />,
-        // loader: ProtectedLoader,
+        loader: ProtectedLoader,
         errorElement: <ErrorFallback />,
         children: [
             { path: paths.resume.list, element: <ResumeList /> },

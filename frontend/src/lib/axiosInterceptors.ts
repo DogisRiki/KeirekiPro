@@ -1,5 +1,6 @@
 import { toastMessage } from "@/config/messages";
-import { useErrorMessageStore, useNotificationStore } from "@/stores";
+import { paths } from "@/config/paths";
+import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
 import { ErrorResponse } from "@/types";
 import axios from "axios";
 
@@ -15,6 +16,12 @@ export const createErrorInterceptor =
             // 400(バリデーションエラー)
             if (response?.status === 400 && response.data) {
                 useErrorMessageStore.getState().setErrors(response.data as ErrorResponse);
+            }
+
+            // 403(アクセス不正)
+            if (response?.status === 403) {
+                useUserAuthStore.getState().setLogout();
+                window.location.replace(paths.top);
             }
 
             // 500(サーバーエラー)

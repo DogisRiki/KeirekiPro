@@ -1,40 +1,65 @@
 import { Button, Link, PasswordTextField, TextField } from "@/components/ui";
 import { paths } from "@/config/paths";
+import { useErrorMessageStore } from "@/stores";
 import { Box } from "@mui/material";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
+
+export interface LoginFormProps {
+    email: string;
+    password: string;
+    onEmailChange: (v: string) => void;
+    onPasswordChange: (v: string) => void;
+    onSubmit: () => void;
+    loading?: boolean;
+}
+
 /**
  * ログインフォーム
  */
-export const LoginForm = () => {
+export const LoginForm = ({
+    email,
+    password,
+    onEmailChange,
+    onPasswordChange,
+    onSubmit,
+    loading = false,
+}: LoginFormProps) => {
     // ボタンの共通スタイル
-    const buttonStyle = {
-        width: "240px",
-    };
-
-    // ログイン処理
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        // TODO: API呼び出し
-        alert("ログイン");
-    };
+    const buttonStyle = { width: "240px" };
+    const { errors } = useErrorMessageStore();
 
     return (
-        <Box component="form" onSubmit={handleLogin}>
-            {/* メールアドレス */}
+        <Box
+            component="form"
+            onSubmit={(e) => {
+                e.preventDefault();
+                onSubmit();
+            }}
+        >
             <TextField
                 type="email"
                 label="メールアドレス"
                 variant="standard"
                 fullWidth
                 margin="normal"
-                slotProps={{
-                    inputLabel: { shrink: true },
-                }}
+                value={email}
+                onChange={(e) => onEmailChange(e.target.value)}
+                error={!!errors.email?.length}
+                helperText={errors.email?.[0] ?? ""}
+                slotProps={{ inputLabel: { shrink: true } }}
                 sx={{ mb: 2 }}
             />
-            {/* パスワード */}
-            <PasswordTextField label="パスワード" variant="standard" fullWidth margin="normal" />
+            <PasswordTextField
+                label="パスワード"
+                variant="standard"
+                fullWidth
+                margin="normal"
+                value={password}
+                onChange={(e) => onPasswordChange(e.target.value)}
+                error={!!errors.password?.length}
+                helperText={errors.password?.[0] ?? ""}
+            />
             <Box
                 sx={{
                     display: "flex",
@@ -43,30 +68,18 @@ export const LoginForm = () => {
                     mt: 1,
                 }}
             >
-                {/* パスワードをお忘れですか？ */}
-                <Link
-                    to={paths.password.resetRquest}
-                    variant="caption"
-                    sx={{
-                        alignSelf: "flex-start",
-                        mb: 2,
-                    }}
-                >
+                <Link to={paths.password.resetRquest} variant="caption" sx={{ alignSelf: "flex-start", mb: 2 }}>
                     パスワードをお忘れですか？
                 </Link>
-                {/* ログインボタン */}
-                <Button type="submit" sx={{ ...buttonStyle, mb: 2 }}>
+                <Button type="submit" sx={{ ...buttonStyle, mb: 2 }} disabled={loading}>
                     ログイン
                 </Button>
-                {/* Googleでログインボタン */}
                 <Button variant="outlined" startIcon={<FcGoogle />} sx={{ ...buttonStyle, mb: 2 }}>
                     Googleでログイン
                 </Button>
-                {/* Githubでログインボタン */}
                 <Button variant="outlined" startIcon={<FaGithub />} sx={{ ...buttonStyle, mb: 2 }}>
                     Githubでログイン
                 </Button>
-                {/* 新規登録はこちら */}
                 <Link to={paths.register} variant="body2">
                     新規登録はこちら
                 </Link>

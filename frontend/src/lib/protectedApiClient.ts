@@ -1,8 +1,9 @@
 import { toastMessage } from "@/config/messages";
 import { paths } from "@/config/paths";
 import { baseApiClient } from "@/lib";
-import { useNotificationStore, useUserAuthStore } from "@/stores";
+import { useUserAuthStore } from "@/stores";
 import axios from "axios";
+import createAuthRefreshInterceptor from "axios-auth-refresh";
 
 /**
  * 認証が必要なAPI通信に使用するクライアント
@@ -27,36 +28,24 @@ protectedApiClient.interceptors.request.use((config) => {
 });
 
 /**
- * レスポンスインターセプタ
+ * 401受信時のトークンリフレッシュ処理
  */
-protectedApiClient.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        if (axios.isAxiosError(error)) {
-            const originalRequest = error.config;
+const refreshAuthLogic = async () => {
+    try {
+        // リフレッシュトークンを使ってアクセストークンを再取得（interceptorから除外）
+        await baseApiClient.post("/auth/token/refresh", null, { withCredentials: true, skipAuthRefresh: true });
+    } catch {
+        // 失敗時、トースト内容をセッションに保存（後で表示される）
+        sessionStorage.setItem("global-toast", JSON.stringify({ m: toastMessage.unauthorized, t: "error" }));
+        // ログアウト状態にしてログイン画面へ遷移
+        useUserAuthStore.getState().setLogout();
+        window.location.replace(paths.login);
+        // axios-auth-refresh用に例外を再スロー
+        throw new Error("refresh failed");
+    }
+};
 
-            if (!originalRequest) {
-                // リクエスト情報が無い場合はそのまま例外を伝播
-                return Promise.reject(error);
-            }
-
-            // 401の場合、トークンリフレッシュ試行
-            if (error.response?.status === 401) {
-                try {
-                    // アクセストークンのリフレッシュを試行
-                    await protectedApiClient.post("/api/auth/token/refresh");
-                    // リフレッシュに成功した時点で認証フラグを維持
-                    useUserAuthStore.getState().setRefresh();
-                    // 元のリクエストを再試行して結果を返す
-                    return protectedApiClient(originalRequest);
-                } catch {
-                    // リフレッシュに失敗した場合、エラー通知+ログイン画面遷移
-                    useNotificationStore.getState().setNotification(toastMessage.unauthorized, "error");
-                    window.location.href = paths.login;
-                    return Promise.reject(error);
-                }
-            }
-        }
-        return Promise.reject(error);
-    },
-);
+createAuthRefreshInterceptor(protectedApiClient, refreshAuthLogic, {
+    statusCodes: [401],
+    pauseInstanceWhileRefreshing: true,
+});
