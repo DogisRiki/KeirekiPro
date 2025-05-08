@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.presentation.security.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -30,6 +29,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
@@ -64,15 +64,15 @@ class JwtAuthenticationFilterTest {
         // フィルタを実行
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // SecurityContextに認証情報が設定されている。
+        // SecurityContextに認証情報が設定されている
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isEqualTo(authentication);
-        // フィルタチェーンが呼び出されている。
+        // フィルタチェーンが呼び出されている
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
 
     @Test
-    @DisplayName("無効なJWTの場合、認証情報がSecurityContextに設定されない")
+    @DisplayName("無効なJWTの場合、401エラーが返されフィルタチェーンが呼ばれない")
     void test2() throws Exception {
         String invalidToken = "invalid.jwt.token";
 
@@ -85,15 +85,17 @@ class JwtAuthenticationFilterTest {
         doThrow(new JWTVerificationException("Invalid token"))
                 .when(jwtProvider).getAuthentication(invalidToken);
 
-        // JWTVerificationExceptionがスローされる。
-        assertThatThrownBy(() -> {
-            filter.doFilter(mockRequest, mockResponse, filterChain);
-        }).isInstanceOf(JWTVerificationException.class);
+        // フィルタを実行
+        filter.doFilter(mockRequest, mockResponse, filterChain);
+
+        // 401エラーが返されたことを確認
+        assertThat(mockResponse.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
 
         // SecurityContextに認証情報が設定されていないことを確認
-        assertThat(SecurityContextHolder.getContext().getAuthentication())
-                .isNull();
-        // フィルタチェーンが呼び出されていることを確認
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+
+        // フィルタチェーンが呼ばれていないことを確認
+        verify(filterChain, org.mockito.Mockito.never()).doFilter(mockRequest, mockResponse);
     }
 
     @Test
@@ -107,23 +109,24 @@ class JwtAuthenticationFilterTest {
         // フィルタを実行
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // SecurityContext に認証情報が設定されていない。
+        // SecurityContext に認証情報が設定されていない
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isNull();
-        // フィルタチェーンが呼び出されている。
+        // フィルタチェーンが呼び出されている
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
 
     @Test
-    @DisplayName("有効期限切れのJWTの場合、認証情報がSecurityContextに設定されない")
-    void test4() {
+    @DisplayName("有効期限切れのJWTの場合、401エラーが返されフィルタチェーンが呼ばれない")
+    void test4() throws Exception {
         JwtProperties jwtProperties = new JwtProperties();
         jwtProperties.setSecret("test-secret");
-        // 期限切れトークン
+
+        // 有効期限切れトークン
         String expiredToken = JWT.create()
                 .withSubject("user_id")
-                .withIssuedAt(new Date(System.currentTimeMillis() - 1000 * 60 * 30)) // 30分前に発行
-                .withExpiresAt(new Date(System.currentTimeMillis() - 1000 * 60)) // 1分前に有効期限切れ
+                .withIssuedAt(new Date(System.currentTimeMillis() - 1000 * 60 * 30)) // 30分前
+                .withExpiresAt(new Date(System.currentTimeMillis() - 1000 * 60)) // 1分前に期限切れ
                 .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
 
         MockHttpServletRequest mockRequest = new MockHttpServletRequest();
@@ -131,17 +134,21 @@ class JwtAuthenticationFilterTest {
 
         MockHttpServletResponse mockResponse = new MockHttpServletResponse();
 
+        // jwtProvider がトークンの期限切れで例外をスロー
         doThrow(new JWTVerificationException("Token expired"))
                 .when(jwtProvider).getAuthentication(expiredToken);
 
-        // JWTVerificationExceptionがスローされる。
-        assertThatThrownBy(() -> {
-            filter.doFilter(mockRequest, mockResponse, filterChain);
-        }).isInstanceOf(JWTVerificationException.class);
+        // フィルタを実行
+        filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // SecurityContext に認証情報が設定されていない。
-        assertThat(SecurityContextHolder.getContext().getAuthentication())
-                .isNull();
+        // 401エラーが返されたことを確認
+        assertThat(mockResponse.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+
+        // SecurityContextに認証情報が設定されていないことを確認
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+
+        // フィルタチェーンが呼ばれていないことを確認
+        verify(filterChain, org.mockito.Mockito.never()).doFilter(mockRequest, mockResponse);
     }
 
     @Test
@@ -164,10 +171,29 @@ class JwtAuthenticationFilterTest {
         // フィルタを実行
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // SecurityContext に認証情報が設定されている。
+        // SecurityContext に認証情報が設定されている
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isEqualTo(authentication);
-        // フィルタチェーンが呼び出されている。
+        // フィルタチェーンが呼び出されている
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
+
+    @Test
+    @DisplayName("shouldNotFilterに該当するパスではフィルター処理がスキップされる")
+    void test6() throws Exception {
+        MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+        mockRequest.setServletPath("/api/auth/token/refresh");
+
+        MockHttpServletResponse mockResponse = new MockHttpServletResponse();
+
+        // フィルタを実行
+        filter.doFilter(mockRequest, mockResponse, filterChain);
+
+        // SecurityContextに認証情報が設定されていない（スキップされた）
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+
+        // フィルタチェーンがそのまま呼ばれている（doFilterInternalが通っていない）
+        verify(filterChain).doFilter(mockRequest, mockResponse);
+    }
+
 }

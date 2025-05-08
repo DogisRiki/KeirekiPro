@@ -73,9 +73,10 @@ public class JwtProvider {
      * @param validityInMinutes 有効期間（分）
      * @return 生成されたトークン
      */
-    private String createToken(String userId, long validityInMinutes) {
+    private String createToken(String userId, double validityInMinutes) {
         Date now = new Date();
-        Date validity = new Date(now.getTime() + validityInMinutes * 60 * 1000);
+        long millis = (long) (validityInMinutes * 60_000); // 分→ミリ秒
+        Date validity = new Date(now.getTime() + millis);
 
         return JWT.create()
                 .withSubject(userId) // ユーザーIDを設定

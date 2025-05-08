@@ -23,10 +23,10 @@ public class JwtProperties {
     /**
      * アクセストークンの有効期限
      */
-    private long accessTokenValidityInMinutes;
+    private double accessTokenValidityInMinutes;
 
     /**
      * リフレッシュトークンの有効期限
      */
-    private long refreshTokenValidityInDays;
+    private double refreshTokenValidityInDays;
 }

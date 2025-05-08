@@ -47,15 +47,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         Optional<String> jwt = getJwtFromCookies(request);
 
         try {
-            if (jwt.isPresent()) {
+            jwt.ifPresent(tok -> {
                 // トークンの検証と認証情報の取得
-                Authentication authentication = jwtProvider.getAuthentication(jwt.get());
+                Authentication auth = jwtProvider.getAuthentication(tok);
                 // SecurityContextに認証情報を設定
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            }
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            });
         } catch (JWTVerificationException e) {
-            // ハンドラーへ委譲
-            throw e;
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "トークンが不正です。");
+            return;
         }
         // 次のフィルタへ処理を移譲
         filterChain.doFilter(request, response);
@@ -77,7 +77,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) throws ServletException {
-        // リフレッシュトークン再発行のエンドポイントはフィルタ処理をスキップする
-        return request.getServletPath().equals("/api/auth/token/refresh");
+        String path = request.getServletPath();
+        // /api/auth/ 以下のエンドポイントではフィルタをスキップする
+        return path.startsWith("/api/auth");
     }
 }

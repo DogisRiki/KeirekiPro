@@ -63,7 +63,7 @@ class JwtProviderTest {
         // (トークン生成と有効期限チェックの時間差を考慮し、1分の余裕を持たせる)
         assertThat(expiration)
                 .isAfter(now)
-                .isBefore(new Date(now.getTime() + (jwtProperties.getAccessTokenValidityInMinutes() + 1) * 60 * 1000));
+                .isBefore(new Date(now.getTime() + (ACCESS_TOKEN_VALIDITY + 1) * 60 * 1000));
     }
 
     @Test
@@ -83,7 +83,7 @@ class JwtProviderTest {
         System.out.println("有効期限 : " + sdf.format(expiration));
 
         // 7日間の有効期限をミリ秒に変換(1日=24時間, 1時間=60分, 1分=60秒, 1秒=1000ミリ秒)
-        long daysInMillis = jwtProperties.getRefreshTokenValidityInDays() * 24 * 60 * 60 * 1000L;
+        long daysInMillis = REFRESH_TOKEN_VALIDITY * 24 * 60 * 60 * 1000L;
 
         // トークンの有効期限が現在時刻より後で、かつ7日と1分以内である
         // example
@@ -123,7 +123,7 @@ class JwtProviderTest {
         String invalidToken = JWT.create()
                 .withSubject(USER_ID)
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 1000 * 60 * 30))
+                .withExpiresAt(new Date(System.currentTimeMillis() + 30 * 60 * 1000))
                 .sign(wrongAlgorithm);
         // 別の秘密鍵で署名されたトークンの場合、JWTVerificationExceptionがスローされる
         assertThatThrownBy(() -> jwtProvider.getAuthentication(invalidToken))
@@ -133,13 +133,13 @@ class JwtProviderTest {
     @Test
     @DisplayName("無効なトークンを検証する: 有効期限切れ")
     void test6() {
-        String invalidToken = JWT.create()
+        String expiredToken = JWT.create()
                 .withSubject(USER_ID)
-                .withIssuedAt(new Date(System.currentTimeMillis() - 1000 * 60 * 30)) // 30分前
-                .withExpiresAt(new Date(System.currentTimeMillis() - 1000 * 60)) // 1分前に期限切れ
+                .withIssuedAt(new Date(System.currentTimeMillis() - 30 * 60 * 1000))
+                .withExpiresAt(new Date(System.currentTimeMillis() - 60 * 1000))
                 .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
         // 有効期限切れのトークンの場合、JWTVerificationExceptionがスローされる
-        assertThatThrownBy(() -> jwtProvider.getAuthentication(invalidToken))
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(expiredToken))
                 .isInstanceOf(JWTVerificationException.class);
     }
 }
