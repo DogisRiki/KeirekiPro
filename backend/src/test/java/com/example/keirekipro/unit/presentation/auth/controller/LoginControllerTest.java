@@ -111,7 +111,7 @@ class LoginControllerTest {
                 ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andExpect(status().isOk())
+                .andExpect(status().isAccepted())
                 // JWTは発行されないためSet-Cookieヘッダーが存在しない
                 .andExpect(header().doesNotExist("Set-Cookie"));
 
