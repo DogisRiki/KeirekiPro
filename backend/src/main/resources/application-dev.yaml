@@ -14,7 +14,7 @@ spring:
 frontend-base-url: "http://localhost:5173"
 
 cors:
-  allowed-origins: "http://localhost"
+  allowed-origins: "http://localhost:5173"
 
 cookie:
   secure: false
