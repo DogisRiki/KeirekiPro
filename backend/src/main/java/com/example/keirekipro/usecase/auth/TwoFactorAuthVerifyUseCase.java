@@ -4,8 +4,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -33,12 +33,12 @@ public class TwoFactorAuthVerifyUseCase {
 
         // 期限切れ or そもそも未発行の場合
         if (storedOpt.isEmpty()) {
-            throw new BadCredentialsException("二段階認証コードが期限切れです。再度認証を行ってください。");
+            throw new UseCaseException("二段階認証コードが期限切れです。再度認証を行ってください。");
         }
 
         // 検証NGの場合
         if (!storedOpt.get().equals(code)) {
-            throw new BadCredentialsException("二段階認証コードが正しくありません。");
+            throw new UseCaseException("二段階認証コードが正しくありません。");
         }
 
         // 検証OKの場合は再利用防止のため、コードを削除

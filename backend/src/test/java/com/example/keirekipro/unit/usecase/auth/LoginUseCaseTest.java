@@ -16,6 +16,7 @@ import com.example.keirekipro.presentation.auth.dto.LoginRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,24 +60,25 @@ class LoginUseCaseTest {
     }
 
     @Test
-    @DisplayName("ユーザーが存在しない場合、BadCredentialsExceptionが発生する")
+    @DisplayName("ユーザーが存在しない場合、UseCaseExceptionが発生する")
     void test2() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> loginUseCase.execute(new LoginRequest(EMAIL, RAW_PASSWORD)))
-                .isInstanceOf(BadCredentialsException.class)
+                .isInstanceOf(UseCaseException.class)
                 .hasMessage("メールアドレスまたはパスワードが正しくありません。");
     }
 
     @Test
-    @DisplayName("パスワードが正しくない場合、BadCredentialsExceptionが発生する")
+    @DisplayName("パスワードが正しくない場合、UseCaseExceptionが発生する")
     void test3() {
         when(userRepository.findByEmail(EMAIL))
                 .thenReturn(Optional.of(buildStoredUser(HASHED_PWD)));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PWD)).thenReturn(false);
 
         assertThatThrownBy(() -> loginUseCase.execute(new LoginRequest(EMAIL, RAW_PASSWORD)))
-                .isInstanceOf(BadCredentialsException.class)
+                .isInstanceOf(
+                        UseCaseException.class)
                 .hasMessage("メールアドレスまたはパスワードが正しくありません。");
     }
 

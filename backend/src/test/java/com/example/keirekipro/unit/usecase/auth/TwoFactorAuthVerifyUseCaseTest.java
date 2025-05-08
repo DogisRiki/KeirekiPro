@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.BadCredentialsException;
 
 @ExtendWith(MockitoExtension.class)
 class TwoFactorAuthVerifyUseCaseTest {
@@ -49,7 +49,7 @@ class TwoFactorAuthVerifyUseCaseTest {
     }
 
     @Test
-    @DisplayName("2段階認証コードが期限切れの場合、BadCredentialsExceptionがスローされる")
+    @DisplayName("2段階認証コードが期限切れの場合、UseCaseExceptionがスローされる")
     void test2() {
         // モックをセットアップ
         when(redisClient.getValue("2fa:" + USER_ID, String.class)).thenReturn(Optional.empty());
@@ -58,7 +58,7 @@ class TwoFactorAuthVerifyUseCaseTest {
         assertThatThrownBy(() -> {
             twoFactorAuthVerifyUseCase.execute(USER_ID, CODE);
         })
-                .isInstanceOf(BadCredentialsException.class)
+                .isInstanceOf(UseCaseException.class)
                 .hasMessage("二段階認証コードが期限切れです。再度認証を行ってください。");
 
         // 検証
@@ -66,7 +66,7 @@ class TwoFactorAuthVerifyUseCaseTest {
     }
 
     @Test
-    @DisplayName("2段階認証コードの検証がNGの場合、BadCredentialsExceptionがスローされる")
+    @DisplayName("2段階認証コードの検証がNGの場合、UseCaseExceptionがスローされる")
     void test3() {
         // モックをセットアップ
         when(redisClient.getValue("2fa:" + USER_ID, String.class)).thenReturn(Optional.of(CODE));
@@ -75,7 +75,8 @@ class TwoFactorAuthVerifyUseCaseTest {
         assertThatThrownBy(() -> {
             twoFactorAuthVerifyUseCase.execute(USER_ID, "999999");
         })
-                .isInstanceOf(BadCredentialsException.class)
+                .isInstanceOf(
+                        UseCaseException.class)
                 .hasMessage("二段階認証コードが正しくありません。");
 
         // 検証

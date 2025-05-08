@@ -4,8 +4,8 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.auth.dto.LoginRequest;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -32,11 +32,11 @@ public class LoginUseCase {
 
         // ユーザーが存在するか
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BadCredentialsException("メールアドレスまたはパスワードが正しくありません。"));
+                .orElseThrow(() -> new UseCaseException("メールアドレスまたはパスワードが正しくありません。"));
 
         // パスワードが一致するか
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new BadCredentialsException("メールアドレスまたはパスワードが正しくありません。");
+            throw new UseCaseException("メールアドレスまたはパスワードが正しくありません。");
         }
 
         return LoginUseCaseDto.builder()
