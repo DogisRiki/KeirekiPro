@@ -1,6 +1,7 @@
 package com.example.keirekipro.usecase.user;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -70,11 +71,11 @@ public class UpdateUserInfoUseCase {
 
         // S3へのアップロード（画像がある場合のみ）
         String imageKey = null;
-        byte[] profileImageFile = null;
+        String imageUrl = null;
         if (profileImage != null && !profileImage.isEmpty()) {
             try {
                 imageKey = awsS3Client.uploadFile(profileImage, "/profile/image/");
-                profileImageFile = profileImage.getBytes();
+                imageUrl = awsS3Client.generatePresignedUrl(imageKey, Duration.ofMinutes(10));
             } catch (IOException e) {
                 throw new UseCaseException("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
             }
@@ -103,7 +104,7 @@ public class UpdateUserInfoUseCase {
         return UpdateUserInfoUseCaseDto.builder()
                 .id(user.getId())
                 .username(user.getUsername())
-                .profileImage(profileImageFile)
+                .profileImage(imageUrl)
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
                 .build();
     }

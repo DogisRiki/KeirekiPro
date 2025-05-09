@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -55,104 +56,95 @@ class UpdateUserInfoUseCaseTest {
 
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
-    // ダミーのPNG(実際には中身不十分だが、FileUtilはモックするので問題なし)
+    // ダミーのPNGヘッダバイト列
     private static final byte[] PROFILE_IMAGE_BYTES = new byte[] {
-            (byte) 0x89, 0x50, 0x4E, 0x47,
-            0x0D, 0x0A, 0x1A, 0x0A
+            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
     };
+    private static final MockMultipartFile PROFILE_IMAGE = new MockMultipartFile("profileImage", "test.png",
+            "image/png", PROFILE_IMAGE_BYTES);
 
-    private static final MockMultipartFile PROFILE_IMAGE = new MockMultipartFile(
-            "profileImage",
-            "test.png",
-            "image/png",
-            PROFILE_IMAGE_BYTES);
+    // uploadFile の戻り値（S3キー）と generatePresignedUrl の戻り値（署名付きURL）
+    private static final String S3_KEY = "s3-key";
+    private static final String SIGNED_URL = "https://signed.example.com/profile/test.png";
 
     @Test
     @DisplayName("正常にユーザー情報更新ができる")
     void test1() throws IOException {
-        // 準備
+        // リクエスト準備
         UpdateUserInfoRequest request = new UpdateUserInfoRequest();
         request.setUsername("Valid User");
         request.setProfileImage(PROFILE_IMAGE);
         request.setTwoFactorAuthEnabled(true);
 
+        // 既存ユーザー
         Notification notification = new Notification();
         AuthProvider authProvider = AuthProvider.create(notification, "google", "gid-1");
         User existingUser = User.reconstruct(
-                USER_ID,
-                1,
+                USER_ID, 1,
                 Email.create(notification, "test@example.com"),
-                "passowrd",
-                false,
+                "dummy-password", false,
                 Map.of("google", authProvider),
-                null,
-                "old",
-                LocalDateTime.now(),
-                LocalDateTime.now());
+                null, "old-name",
+                LocalDateTime.now(), LocalDateTime.now());
 
-        // モックをセットアップ
+        // S3 とリポジトリのモック
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existingUser));
         when(awsS3Client.uploadFile(any(MultipartFile.class), eq("/profile/image/")))
-                .thenReturn("s3-key");
+                .thenReturn(S3_KEY);
+        when(awsS3Client.generatePresignedUrl(eq(S3_KEY), eq(Duration.ofMinutes(10))))
+                .thenReturn(SIGNED_URL);
 
-        // FileUtilのメソッドはすべてtrueを返すようモック
-        try (MockedStatic<FileUtil> fileUtilMock = mockStatic(FileUtil.class)) {
-            fileUtilMock.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
+        // FileUtil のバリデーションをすべて通過させる
+        try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
+            util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
+            util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-            // ユースケース実行
+            // 実行
             UpdateUserInfoUseCaseDto result = updateUserInfoUseCase.execute(request, USER_ID);
 
-            // 検証
-            assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(USER_ID);
-
+            // 保存された User の検証
             ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
             verify(userRepository).save(captor.capture());
-            User savedUser = captor.getValue();
+            User saved = captor.getValue();
+            assertThat(saved.getUsername()).isEqualTo("Valid User");
+            assertThat(saved.isTwoFactorAuthEnabled()).isTrue();
+            assertThat(saved.getProfileImage()).isEqualTo(S3_KEY);
 
-            assertThat(savedUser.getUsername()).isEqualTo("Valid User");
-            assertThat(savedUser.isTwoFactorAuthEnabled()).isTrue();
-            assertThat(savedUser.getProfileImage()).isEqualTo("s3-key");
-
-            assertThat(result.getUsername()).isEqualTo(savedUser.getUsername());
-            assertThat(result.isTwoFactorAuthEnabled()).isEqualTo(savedUser.isTwoFactorAuthEnabled());
-            assertThat(result.getProfileImage()).isEqualTo(PROFILE_IMAGE_BYTES);
+            // 戻り値 DTO の検証
+            assertThat(result.getId()).isEqualTo(USER_ID);
+            assertThat(result.getUsername()).isEqualTo("Valid User");
+            assertThat(result.isTwoFactorAuthEnabled()).isTrue();
+            assertThat(result.getProfileImage()).isEqualTo(SIGNED_URL);
 
             verify(awsS3Client).uploadFile(PROFILE_IMAGE, "/profile/image/");
+            verify(awsS3Client).generatePresignedUrl(S3_KEY, Duration.ofMinutes(10));
         }
     }
 
     @Test
     @DisplayName("許可されていないMIMEタイプの場合はUseCaseExceptionがスローされる")
     void test2() throws Exception {
-        // 準備
-        MockMultipartFile invalidFile = new MockMultipartFile(
-                "profileImage",
-                "test.png",
-                "text/plain", // MIMEタイプが不正
-                PROFILE_IMAGE_BYTES);
+        MockMultipartFile badFile = new MockMultipartFile(
+                "profileImage", "test.png", "text/plain", PROFILE_IMAGE_BYTES);
 
-        UpdateUserInfoRequest request = new UpdateUserInfoRequest();
-        request.setUsername("Test User");
-        request.setProfileImage(invalidFile);
-        request.setTwoFactorAuthEnabled(false);
+        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
+        req.setUsername("User");
+        req.setProfileImage(badFile);
+        req.setTwoFactorAuthEnabled(false);
 
-        // isMimeTypeValidだけfalseにする
-        try (MockedStatic<FileUtil> fileUtilMock = mockStatic(FileUtil.class)) {
-            fileUtilMock.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(false);
-            fileUtilMock.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
+        try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
+            util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(false);
+            util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
+            util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-            // ユースケース実行
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(request, USER_ID))
+            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
                     .isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(awsS3Client, never()).uploadFile(any(MultipartFile.class), any(String.class));
+            verify(awsS3Client, never()).uploadFile(any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -160,31 +152,25 @@ class UpdateUserInfoUseCaseTest {
     @Test
     @DisplayName("許可されていない拡張子の場合はUseCaseExceptionがスローされる")
     void test3() throws Exception {
-        // 準備
-        MockMultipartFile invalidFile = new MockMultipartFile(
-                "profileImage",
-                "test.txt", // 拡張子不正
-                "image/png", // MIMEタイプはOKでも拡張子NG
-                PROFILE_IMAGE_BYTES);
+        MockMultipartFile badExt = new MockMultipartFile(
+                "profileImage", "test.txt", "image/png", PROFILE_IMAGE_BYTES);
 
-        UpdateUserInfoRequest request = new UpdateUserInfoRequest();
-        request.setUsername("Test User");
-        request.setProfileImage(invalidFile);
-        request.setTwoFactorAuthEnabled(false);
+        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
+        req.setUsername("User");
+        req.setProfileImage(badExt);
+        req.setTwoFactorAuthEnabled(false);
 
-        // isExtensionValidだけfalseにする
-        try (MockedStatic<FileUtil> fileUtilMock = mockStatic(FileUtil.class)) {
-            fileUtilMock.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(false);
-            fileUtilMock.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
+        try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
+            util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(false);
+            util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
+            util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-            // ユースケース実行
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(request, USER_ID))
+            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
                     .isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(awsS3Client, never()).uploadFile(any(MultipartFile.class), any(String.class));
+            verify(awsS3Client, never()).uploadFile(any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -192,32 +178,26 @@ class UpdateUserInfoUseCaseTest {
     @Test
     @DisplayName("ファイルサイズ超過の場合はUseCaseExceptionがスローされる")
     void test4() throws Exception {
-        // 準備
-        MockMultipartFile tooLargeFile = new MockMultipartFile(
-                "profileImage",
-                "test.png",
-                "image/png",
-                new byte[1024 * 1024 + 1] // 1MB超え
-        );
+        byte[] tooBig = new byte[1024 * 1024 + 1];
+        MockMultipartFile bigFile = new MockMultipartFile(
+                "profileImage", "test.png", "image/png", tooBig);
 
-        UpdateUserInfoRequest request = new UpdateUserInfoRequest();
-        request.setUsername("Test User");
-        request.setProfileImage(tooLargeFile);
-        request.setTwoFactorAuthEnabled(false);
+        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
+        req.setUsername("User");
+        req.setProfileImage(bigFile);
+        req.setTwoFactorAuthEnabled(false);
 
-        // isFileSizeValidだけfalseにする
-        try (MockedStatic<FileUtil> fileUtilMock = mockStatic(FileUtil.class)) {
-            fileUtilMock.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(false);
-            fileUtilMock.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
+        try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
+            util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(false);
+            util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-            // ユースケース実行
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(request, USER_ID))
+            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
                     .isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(awsS3Client, never()).uploadFile(any(MultipartFile.class), any(String.class));
+            verify(awsS3Client, never()).uploadFile(any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -225,31 +205,25 @@ class UpdateUserInfoUseCaseTest {
     @Test
     @DisplayName("無効な画像ファイルの場合はUseCaseExceptionがスローされる")
     void test5() throws Exception {
-        // 準備
-        MockMultipartFile invalidFile = new MockMultipartFile(
-                "profileImage",
-                "test.png",
-                "image/png",
-                "dummy".getBytes());
+        MockMultipartFile badImg = new MockMultipartFile(
+                "profileImage", "test.png", "image/png", "dummy".getBytes());
 
-        UpdateUserInfoRequest request = new UpdateUserInfoRequest();
-        request.setUsername("Test User");
-        request.setProfileImage(invalidFile);
-        request.setTwoFactorAuthEnabled(false);
+        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
+        req.setUsername("User");
+        req.setProfileImage(badImg);
+        req.setTwoFactorAuthEnabled(false);
 
-        // isImageReadValidだけfalseにする
-        try (MockedStatic<FileUtil> fileUtilMock = mockStatic(FileUtil.class)) {
-            fileUtilMock.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isImageReadValid(any())).thenReturn(false);
+        try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
+            util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
+            util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(false);
 
-            // ユースケース実行
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(request, USER_ID))
+            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
                     .isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(awsS3Client, never()).uploadFile(any(MultipartFile.class), any(String.class));
+            verify(awsS3Client, never()).uploadFile(any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -257,31 +231,25 @@ class UpdateUserInfoUseCaseTest {
     @Test
     @DisplayName("S3へのアップロードに失敗した場合、UseCaseExceptionがスローされる")
     void test6() throws IOException {
-        // 準備
-        UpdateUserInfoRequest request = new UpdateUserInfoRequest();
-        request.setUsername("Valid User");
-        request.setProfileImage(PROFILE_IMAGE);
-        request.setTwoFactorAuthEnabled(true);
+        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
+        req.setUsername("Valid");
+        req.setProfileImage(PROFILE_IMAGE);
+        req.setTwoFactorAuthEnabled(true);
 
         Notification notification = new Notification();
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
-                User.reconstruct(USER_ID, 1, Email.create(notification, "test@example.com"), "dummy-password-hash",
-                        false, Map.of(), null, "", LocalDateTime.now(),
-                        LocalDateTime.now())));
+                User.reconstruct(USER_ID, 1, Email.create(notification, "a@b.com"),
+                        "pw", false, Map.of(), null, "", LocalDateTime.now(), LocalDateTime.now())));
+        try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
+            util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
+            util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-        // FileUtil側は全部OKにする(ここはアップロードで失敗を再現したいのでバリデーションは通す)
-        try (MockedStatic<FileUtil> fileUtilMock = mockStatic(FileUtil.class)) {
-            fileUtilMock.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
-
-            // モックをセットアップ
             when(awsS3Client.uploadFile(eq(PROFILE_IMAGE), eq("/profile/image/")))
                     .thenThrow(new IOException("S3 error"));
 
-            // ユースケース実行
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(request, USER_ID))
+            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
                     .isInstanceOf(UseCaseException.class)
                     .hasMessage("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
 
@@ -291,24 +259,20 @@ class UpdateUserInfoUseCaseTest {
 
     @Test
     @DisplayName("ユーザーが存在しない場合、AccessDeniedExceptionがスローされる")
-    void test7() throws IOException {
-        // 準備
-        UpdateUserInfoRequest request = new UpdateUserInfoRequest();
-        request.setUsername("Valid User");
-        request.setProfileImage(PROFILE_IMAGE);
-        request.setTwoFactorAuthEnabled(true);
+    void test7() {
+        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
+        req.setUsername("Valid");
+        req.setProfileImage(PROFILE_IMAGE);
+        req.setTwoFactorAuthEnabled(true);
 
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+        try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
+            util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
+            util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
+            util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-        // FileUtilは全部trueを返す
-        try (MockedStatic<FileUtil> fileUtilMock = mockStatic(FileUtil.class)) {
-            fileUtilMock.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
-            fileUtilMock.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
-
-            // ユースケース実行
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(request, USER_ID))
+            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
                     .isInstanceOf(AccessDeniedException.class)
                     .hasMessage("不正なアクセスです。");
 

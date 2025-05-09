@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.URI;
+import java.time.Duration;
 
 import com.example.keirekipro.config.YamlPropertySourceFactory;
 import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
@@ -39,6 +42,9 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 @SpringJUnitConfig(AwsS3ClientTest.TestConfig.class)
 @TestPropertySource(locations = "classpath:application-test.yaml", factory = YamlPropertySourceFactory.class)
@@ -228,6 +234,29 @@ class AwsS3ClientTest {
         assertThatThrownBy(() -> awsS3Client.getFileAsBytes(key))
                 .isInstanceOf(S3Exception.class)
                 .hasMessageContaining("File not found");
+    }
+
+    @Test
+    @DisplayName("generatePresignedUrlメソッドで署名付きURLが生成される")
+    void test7() throws Exception {
+        // モック化した PresignedGetObjectRequest を作成
+        PresignedGetObjectRequest presignedRequest = mock(PresignedGetObjectRequest.class);
+        when(presignedRequest.url())
+                .thenReturn(URI.create("https://signed-url.test/file.png").toURL());
+
+        // S3Presigner モックを作成し、presignGetObject をスタブ
+        S3Presigner presignerMock = mock(S3Presigner.class);
+        when(presignerMock.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedRequest);
+
+        // テスト対象 AwsS3Client にモックを注入
+        awsS3Client.setS3Presigner(presignerMock);
+
+        // 実行
+        String resultUrl = awsS3Client.generatePresignedUrl("path/to/file.png", Duration.ofMinutes(10));
+
+        // 検証
+        assertThat(resultUrl).isEqualTo("https://signed-url.test/file.png");
     }
 
     @TestConfiguration

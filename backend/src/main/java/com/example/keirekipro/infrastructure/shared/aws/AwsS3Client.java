@@ -2,10 +2,12 @@ package com.example.keirekipro.infrastructure.shared.aws;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +28,9 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 /**
  * AWS S3ストレージを操作する汎用クラス
@@ -59,11 +64,16 @@ public class AwsS3Client {
     private S3Client s3Client;
 
     /**
-     * Bean初期化時にS3Clientを初期化する
+     * S3プリサイナー (署名付きURL生成用)
+     */
+    private S3Presigner s3Presigner;
+
+    /**
+     * Bean初期化時にS3ClientおよびS3Presignerを初期化する
      */
     @PostConstruct
     public void init() {
-        // ビルダー初期化(Region, CredentialsProviderをセット)
+        // S3Clientのビルダー初期化(Region, CredentialsProviderをセット)
         S3ClientBuilder builder = S3Client.builder()
                 .region(Region.of(this.region))
                 .credentialsProvider(DefaultCredentialsProvider.create());
@@ -75,8 +85,36 @@ public class AwsS3Client {
                     .serviceConfiguration(
                             S3Configuration.builder().pathStyleAccessEnabled(true).build());
         }
-        // クライアント生成
+        // S3Client生成
         this.s3Client = builder.build();
+
+        // S3Presignerのビルダー初期化(Region, CredentialsProviderをセット)
+        S3Presigner.Builder presignerBuilder = S3Presigner.builder()
+                .region(Region.of(this.region))
+                .credentialsProvider(DefaultCredentialsProvider.create());
+
+        // エンドポイントが設定されていれば上書き(localStackに対応)
+        if (this.endpoint != null && !this.endpoint.isEmpty()) {
+            presignerBuilder
+                    .endpointOverride(URI.create(this.endpoint))
+                    .serviceConfiguration(
+                            S3Configuration.builder()
+                                    .pathStyleAccessEnabled(true)
+                                    .build());
+        }
+        // S3Presigner生成
+        this.s3Presigner = presignerBuilder.build();
+    }
+
+    /**
+     * 外部からS3Presignerを差し替えるためのセッター
+     * Bean定義やテスト時に別インスタンスを注入可能
+     *
+     * @param s3Presigner 置き換えるS3Presignerインスタンス
+     */
+    @Autowired(required = false)
+    public void setS3Presigner(S3Presigner s3Presigner) {
+        this.s3Presigner = s3Presigner;
     }
 
     /**
@@ -179,5 +217,35 @@ public class AwsS3Client {
                 .build();
 
         s3Client.deleteObject(deleteObjectRequest);
+    }
+
+    /**
+     * 署名付きURLを生成する
+     *
+     * @param key    オブジェクトキー
+     * @param expiry 有効期限
+     * @return 署名付きURL
+     */
+    public String generatePresignedUrl(String key, Duration expiry) {
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(expiry)
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
+        String url = presignedRequest.url().toString();
+
+        // エンドポイントが設定されている場合、開発環境とみなしホスト名をlocalhostに置換
+        if (this.endpoint != null && !this.endpoint.isEmpty()) {
+            String originalHost = URI.create(this.endpoint).getHost();
+            url = url.replace(originalHost, "localhost");
+        }
+
+        return url;
     }
 }

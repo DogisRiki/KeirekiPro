@@ -26,7 +26,7 @@ public class UserInfoResponse {
 
     private String username;
 
-    private byte[] profileImage;
+    private String profileImage;
 
     private boolean twoFactorAuthEnabled;
 

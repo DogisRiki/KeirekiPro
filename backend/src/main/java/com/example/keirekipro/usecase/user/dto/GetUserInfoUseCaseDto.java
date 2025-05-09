@@ -18,7 +18,7 @@ public class GetUserInfoUseCaseDto {
     private final UUID id;
     private final String email;
     private final String username;
-    private final byte[] profileImage;
+    private final String profileImage;
     private final boolean twoFactorAuthEnabled;
     private final List<AuthProviderInfo> authProviders;
 

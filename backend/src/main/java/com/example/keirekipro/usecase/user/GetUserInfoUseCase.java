@@ -1,6 +1,6 @@
 package com.example.keirekipro.usecase.user;
 
-import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -40,13 +40,9 @@ public class GetUserInfoUseCase {
                 .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
 
         // S3からプロフィール画像をバイト配列として取得する
-        byte[] img = null;
+        String imageUrl = null;
         if (user.getProfileImage() != null) {
-            try {
-                img = awsS3Client.getFileAsBytes(user.getProfileImage());
-            } catch (IOException e) {
-                // 画像取得失敗はエラーとせず、フロントエンド側でデフォルト画像を設定するため何もしない
-            }
+            imageUrl = awsS3Client.generatePresignedUrl(user.getProfileImage(), Duration.ofMinutes(10));
         }
 
         // 外部認証連携情報の変換
@@ -61,7 +57,7 @@ public class GetUserInfoUseCase {
                 .id(user.getId())
                 .email(user.getEmail() != null ? user.getEmail().getValue() : null)
                 .username(user.getUsername())
-                .profileImage(img)
+                .profileImage(imageUrl)
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
                 .authProviders(providers)
                 .build();

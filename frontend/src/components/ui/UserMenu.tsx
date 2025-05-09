@@ -74,7 +74,7 @@ export const UserMenu = () => {
                         {user?.profileImage || <PersonIcon />}
                     </Avatar>
                     <Typography variant="body2" sx={{ color: "#ffffff", fontSize: "14px" }}>
-                        {user?.userName}
+                        {user?.username}
                     </Typography>
                 </Box>
             </ButtonBase>

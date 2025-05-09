@@ -2,12 +2,13 @@ package com.example.keirekipro.unit.usecase.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -18,7 +19,6 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
-import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto;
 
@@ -46,6 +46,7 @@ class GetUserInfoUseCaseTest {
     private static final String EMAIL = "test@keirekipro.click";
     private static final String USERNAME_VALUE = "test-user";
     private static final String PROFILE_IMAGE_PATH = "profile/test-user.jpg";
+    private static final String SIGNED_URL = "https://signed.example.com/profile/test-user.jpg";
     private static final String PROVIDER_TYPE_VALUE = "google";
     private static final String PROVIDER_USER_ID_VALUE = "109876543210987654321";
     private static final LocalDateTime CREATED_AT = LocalDateTime.now();
@@ -53,14 +54,16 @@ class GetUserInfoUseCaseTest {
 
     @Test
     @DisplayName("正常にユーザー情報取得ができる")
-    void test1() throws IOException {
+    void test1() {
         // ユーザー情報を準備
-        Notification notification = new Notification();
-        AuthProvider authProvider = AuthProvider.create(notification, PROVIDER_TYPE_VALUE, PROVIDER_USER_ID_VALUE);
+        AuthProvider authProvider = AuthProvider.create(
+                new com.example.keirekipro.shared.Notification(),
+                PROVIDER_TYPE_VALUE,
+                PROVIDER_USER_ID_VALUE);
         User user = User.reconstruct(
                 USER_ID,
                 1,
-                Email.create(notification, EMAIL),
+                Email.create(new com.example.keirekipro.shared.Notification(), EMAIL),
                 null,
                 false,
                 Map.of(PROVIDER_TYPE_VALUE.toLowerCase(), authProvider),
@@ -68,11 +71,11 @@ class GetUserInfoUseCaseTest {
                 USERNAME_VALUE,
                 CREATED_AT,
                 UPDATED_AT);
-        byte[] profileImageData = new byte[] { 0x12, 0x34, 0x56 };
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        when(awsS3Client.getFileAsBytes(PROFILE_IMAGE_PATH)).thenReturn(profileImageData);
+        when(awsS3Client.generatePresignedUrl(PROFILE_IMAGE_PATH, Duration.ofMinutes(10)))
+                .thenReturn(SIGNED_URL);
 
         // ユースケース実行
         GetUserInfoUseCaseDto result = getUserInfoUseCase.execute(USER_ID);
@@ -82,25 +85,29 @@ class GetUserInfoUseCaseTest {
         assertThat(result.getId()).isEqualTo(USER_ID);
         assertThat(result.getEmail()).isEqualTo(EMAIL);
         assertThat(result.getUsername()).isEqualTo(USERNAME_VALUE);
-        assertThat(result.getProfileImage()).isEqualTo(profileImageData);
+        assertThat(result.getProfileImage()).isEqualTo(SIGNED_URL);
         assertThat(result.isTwoFactorAuthEnabled()).isFalse();
         assertThat(result.getAuthProviders()).hasSize(1);
-        assertThat(result.getAuthProviders().get(0).getProviderType()).isEqualTo(PROVIDER_TYPE_VALUE);
-        assertThat(result.getAuthProviders().get(0).getProviderUserId()).isEqualTo(PROVIDER_USER_ID_VALUE);
+        assertThat(result.getAuthProviders().get(0).getProviderType())
+                .isEqualTo(PROVIDER_TYPE_VALUE);
+        assertThat(result.getAuthProviders().get(0).getProviderUserId())
+                .isEqualTo(PROVIDER_USER_ID_VALUE);
 
-        verify(awsS3Client).getFileAsBytes(PROFILE_IMAGE_PATH);
+        verify(awsS3Client).generatePresignedUrl(PROFILE_IMAGE_PATH, Duration.ofMinutes(10));
     }
 
     @Test
-    @DisplayName("プロフィール画像がnullの場合、S3へのプロフィール画像取得が行われない")
-    void test2() throws IOException {
+    @DisplayName("プロフィール画像がnullの場合、署名付きURL生成は呼び出されない")
+    void test2() {
         // プロフィール画像がnullのユーザー情報を準備
-        Notification notification = new Notification();
-        AuthProvider authProvider = AuthProvider.create(notification, PROVIDER_TYPE_VALUE, PROVIDER_USER_ID_VALUE);
+        AuthProvider authProvider = AuthProvider.create(
+                new com.example.keirekipro.shared.Notification(),
+                PROVIDER_TYPE_VALUE,
+                PROVIDER_USER_ID_VALUE);
         User user = User.reconstruct(
                 USER_ID,
                 1,
-                Email.create(notification, EMAIL),
+                Email.create(new com.example.keirekipro.shared.Notification(), EMAIL),
                 null,
                 false,
                 Map.of(PROVIDER_TYPE_VALUE.toLowerCase(), authProvider),
@@ -117,12 +124,12 @@ class GetUserInfoUseCaseTest {
 
         // 検証
         assertThat(result.getProfileImage()).isNull();
-        verify(awsS3Client, never()).getFileAsBytes(anyString());
+        verify(awsS3Client, never()).generatePresignedUrl(anyString(), any());
     }
 
     @Test
     @DisplayName("ユーザー情報が存在しない場合、AccessDeniedExceptionがスローされる")
-    void test3() throws Exception {
+    void test3() {
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
@@ -131,37 +138,7 @@ class GetUserInfoUseCaseTest {
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessage("不正なアクセスです。");
 
-        // 検証
-        verify(awsS3Client, never()).getFileAsBytes(anyString());
-    }
-
-    @Test
-    @DisplayName("S3からプロフィール画像を取得できない場合、IOExceptionがスローされるが処理が継続される")
-    void test4() throws IOException {
-        // プロフィール画像が設定されているユーザー情報を準備
-        Notification notification = new Notification();
-        AuthProvider authProvider = AuthProvider.create(notification, PROVIDER_TYPE_VALUE, PROVIDER_USER_ID_VALUE);
-        User user = User.reconstruct(
-                USER_ID,
-                1,
-                Email.create(notification, EMAIL),
-                null,
-                false,
-                Map.of(PROVIDER_TYPE_VALUE.toLowerCase(), authProvider),
-                PROFILE_IMAGE_PATH,
-                USERNAME_VALUE,
-                CREATED_AT,
-                UPDATED_AT);
-
-        // モックをセットアップ
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        when(awsS3Client.getFileAsBytes(PROFILE_IMAGE_PATH)).thenThrow(new IOException("S3 error"));
-
-        // ユースケース実行（内部でIOExceptionはキャッチされ、profileImageはnullになる）
-        GetUserInfoUseCaseDto result = getUserInfoUseCase.execute(USER_ID);
-
-        // 検証
-        assertThat(result.getProfileImage()).isNull();
-        verify(awsS3Client).getFileAsBytes(PROFILE_IMAGE_PATH);
+        // generatePresignedUrl は呼ばれない
+        verify(awsS3Client, never()).generatePresignedUrl(anyString(), any());
     }
 }

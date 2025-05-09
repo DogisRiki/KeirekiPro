@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.Base64;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
@@ -42,21 +41,18 @@ class UpdateUserInfoControllerTest {
     private final MockMvc mockMvc;
 
     private static final String ENDPOINT = "/api/users/me";
-
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-
     private static final String USERNAME = "test-user";
-
-    private static final byte[] PROFILE_IMAGE_BYTES = new byte[] {
-            (byte) 0x89, 0x50, 0x4E, 0x47,
-            0x0D, 0x0A, 0x1A, 0x0A
-    };
+    private static final String PROFILE_IMAGE_URL = "https://signed-url.example.com/dog.jpg";
 
     private static final MockMultipartFile PROFILE_IMAGE = new MockMultipartFile(
             "profileImage",
             "test.png",
             "image/png",
-            PROFILE_IMAGE_BYTES);
+            new byte[] {
+                    (byte) 0x89, 0x50, 0x4E, 0x47,
+                    0x0D, 0x0A, 0x1A, 0x0A
+            });
 
     @Test
     @DisplayName("正常なリクエストの場合、200が返される")
@@ -65,7 +61,7 @@ class UpdateUserInfoControllerTest {
         UpdateUserInfoUseCaseDto dto = UpdateUserInfoUseCaseDto.builder()
                 .id(USER_ID)
                 .username(USERNAME)
-                .profileImage(PROFILE_IMAGE_BYTES)
+                .profileImage(PROFILE_IMAGE_URL)
                 .twoFactorAuthEnabled(true)
                 .build();
 
@@ -75,20 +71,18 @@ class UpdateUserInfoControllerTest {
 
         // リクエストを実行
         mockMvc.perform(
-                multipart(
-                        ENDPOINT)
+                multipart(ENDPOINT)
                         .file(PROFILE_IMAGE)
                         .param("username", USERNAME)
                         .param("twoFactorAuthEnabled", "true")
-                        .with(request -> {
-                            request.setMethod("PUT");
-                            return request;
+                        .with(req -> {
+                            req.setMethod("PUT");
+                            return req;
                         }))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.username").value(USERNAME))
-                .andExpect(jsonPath("$.profileImage")
-                        .value(Base64.getEncoder().encodeToString(PROFILE_IMAGE_BYTES)))
+                .andExpect(jsonPath("$.profileImage").value(PROFILE_IMAGE_URL))
                 .andExpect(jsonPath("$.twoFactorAuthEnabled").value(true));
 
         // 呼び出しを検証

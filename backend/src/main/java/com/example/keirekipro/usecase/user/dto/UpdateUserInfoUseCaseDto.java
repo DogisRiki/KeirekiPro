@@ -16,6 +16,6 @@ public class UpdateUserInfoUseCaseDto {
 
     private final UUID id;
     private final String username;
-    private final byte[] profileImage;
+    private final String profileImage;
     private final boolean twoFactorAuthEnabled;
 }
