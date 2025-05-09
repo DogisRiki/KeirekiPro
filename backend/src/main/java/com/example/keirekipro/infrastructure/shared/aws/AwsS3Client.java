@@ -20,6 +20,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
@@ -66,9 +67,13 @@ public class AwsS3Client {
         S3ClientBuilder builder = S3Client.builder()
                 .region(Region.of(this.region))
                 .credentialsProvider(DefaultCredentialsProvider.create());
-        // エンドポイントが設定されていれば上書き(localStackの場合)
+
+        // エンドポイントが設定されていれば上書きし、パススタイル形式にする(localStackに対応)
         if (this.endpoint != null && !this.endpoint.isEmpty()) {
-            builder.endpointOverride(URI.create(this.endpoint));
+            builder
+                    .endpointOverride(URI.create(this.endpoint))
+                    .serviceConfiguration(
+                            S3Configuration.builder().pathStyleAccessEnabled(true).build());
         }
         // クライアント生成
         this.s3Client = builder.build();
