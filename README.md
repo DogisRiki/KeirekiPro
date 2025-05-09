@@ -74,8 +74,8 @@ awslocal --region ap-northeast-1 ses list-identities
 - テストメールの送信
 ```bash
 awslocal --region ap-northeast-1 ses send-email \
-  --from keirekipro@example.com \
-  --destination "ToAddresses=keirekipro@example.com" \
+  --from no-reply@keirekipro.click \
+  --destination "ToAddresses=no-reply@keirekipro.click" \
   --message "Subject={Data=Test Email},Body={Text={Data=This is a test email.}}"
 ```
 

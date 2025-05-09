@@ -30,5 +30,5 @@ AWS_ACCESS_KEY_ID=dummy AWS_SECRET_ACCESS_KEY=dummy \
 aws --endpoint-url=http://localhost:4566 \
     --region ap-northeast-1 \
     ses verify-email-identity \
-    --email-address keirekipro@example.com \
+    --email-address no-reply@keirekipro.click \
     || echo "SES identity already exists or failed."

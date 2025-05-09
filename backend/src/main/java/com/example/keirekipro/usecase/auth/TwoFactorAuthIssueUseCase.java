@@ -8,9 +8,9 @@ import java.util.UUID;
 import com.example.keirekipro.infrastructure.shared.aws.AwsSesClient;
 import com.example.keirekipro.infrastructure.shared.mail.FreeMarkerMailTemplate;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
+import com.example.keirekipro.shared.config.AppProperties;
 import com.example.keirekipro.shared.utils.SecurityUtil;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -30,8 +30,7 @@ public class TwoFactorAuthIssueUseCase {
 
     private final SecurityUtil securityUtil;
 
-    @Value("${spring.application.name}")
-    private String applicationName;
+    private final AppProperties properties;
 
     /**
      * 2段階認証コード発行ユースケースを実行する
@@ -51,9 +50,11 @@ public class TwoFactorAuthIssueUseCase {
         // メール本文を作成
         Map<String, Object> dataModel = new HashMap<>();
         dataModel.put("code", code);
+        dataModel.put("siteName", properties.getSiteName());
+        dataModel.put("siteUrl", properties.getSiteUrl());
         String body = freeMarkerMailTemplate.create("two-factor-auth.ftl", dataModel);
 
         // メール送信
-        awsSesClient.sendMail(email, "【" + applicationName + "】2段階認証コードのお知らせ", body);
+        awsSesClient.sendMail(email, "【" + properties.getSiteName() + "】2段階認証コードのお知らせ", body);
     }
 }

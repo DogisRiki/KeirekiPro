@@ -72,6 +72,8 @@ tasks.named('test') {
 
 sourceSets {
     main {
-        resources.srcDir 'src/main/java'
+        resources {
+            srcDirs = ['src/main/resources', 'src/main/java']
+        }
     }
 }

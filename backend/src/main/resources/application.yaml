@@ -8,13 +8,16 @@ spring:
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
+  freemarker:
+    template-loader-path: classpath:/mail/
+    prefer-file-system-access: false
 
 mybatis:
   config-location: "classpath:/mybatis/mybatis-config.xml"
 
 app:
-  site-name: "KeirekiPro"
-  site-url: "https://keirekipro.click"
+  siteName: "KeirekiPro"
+  siteUrl: "https://keirekipro.click"
 
 oidc:
   providers:
