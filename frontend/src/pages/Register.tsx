@@ -1,4 +1,4 @@
-import { RegisterForm } from "@/features/auth";
+import { UserRegisterContainer } from "@/features/auth";
 import { Typography } from "@mui/material";
 
 /**
@@ -10,7 +10,7 @@ export const Register = () => {
             <Typography variant="h5" gutterBottom>
                 新規登録
             </Typography>
-            <RegisterForm />
+            <UserRegisterContainer />
         </>
     );
 };

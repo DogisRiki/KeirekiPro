@@ -1,17 +1,41 @@
 import { Button, Checkbox, Link, PasswordTextField, TextField } from "@/components/ui";
-import { env } from "@/config/env";
 import { paths } from "@/config/paths";
+import { useErrorMessageStore } from "@/stores";
 import { Box, FormControlLabel, FormGroup } from "@mui/material";
 import { useState } from "react";
-import { FaGithub } from "react-icons/fa";
-import { FcGoogle } from "react-icons/fc";
+
+export interface UserRegisterFormProps {
+    email: string;
+    username: string;
+    password: string;
+    confirmPassword: string;
+    onEmailChange: (v: string) => void;
+    onUsernameChange: (v: string) => void;
+    onPasswordChange: (v: string) => void;
+    onConfirmPasswordChange: (v: string) => void;
+    onSubmit: () => void;
+    loading?: boolean;
+}
 
 /**
- * 新規登録フォーム
+ * ユーザー新規登録フォーム
  */
-export const RegisterForm = () => {
+export const UserRegisterForm = ({
+    email,
+    username,
+    password,
+    confirmPassword,
+    onEmailChange,
+    onUsernameChange,
+    onPasswordChange,
+    onConfirmPasswordChange,
+    onSubmit,
+    loading = false,
+}: UserRegisterFormProps) => {
     // チェックボックスのチェック状態
     const [isChecked, setIsChecked] = useState({ terms: false, privacy: false });
+
+    const { errors } = useErrorMessageStore();
 
     // チェックボックスのハンドラー
     const handleCheck = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,48 +46,68 @@ export const RegisterForm = () => {
         }));
     };
 
-    // 登録処理
-    const handleRegister = (e: React.FormEvent) => {
-        e.preventDefault();
-        // TODO: API呼び出し
-        alert("登録");
-    };
-
     // ボタンの共通スタイル
     const buttonStyle = {
         width: "240px",
     };
 
     return (
-        <Box component="form" onSubmit={handleRegister}>
-            {/* メールアドレス */}
+        <Box
+            component="form"
+            onSubmit={(e) => {
+                e.preventDefault();
+                onSubmit();
+            }}
+        >
             <TextField
                 type="email"
                 label="メールアドレス"
                 fullWidth
                 required
-                placeholder={env.APP_EMAIL}
+                value={email}
+                onChange={(e) => onEmailChange(e.target.value)}
+                error={!!errors.email?.length}
+                helperText={errors.email?.[0] ?? ""}
                 margin="normal"
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}
                 sx={{ mb: 2 }}
             />
-            {/* ユーザー名 */}
             <TextField
                 label="ユーザー名"
                 fullWidth
                 required
-                placeholder="山田 太郎"
+                value={username}
+                onChange={(e) => onUsernameChange(e.target.value)}
+                error={!!errors.username?.length}
+                helperText={errors.username?.[0] ?? ""}
                 margin="normal"
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}
             />
-            {/* パスワード */}
-            <PasswordTextField label="パスワード" fullWidth required margin="normal" />
+            <PasswordTextField
+                label="パスワード"
+                fullWidth
+                required
+                value={password}
+                onChange={(e) => onPasswordChange(e.target.value)}
+                error={!!errors.password?.length}
+                helperText={errors.password?.[0] ?? ""}
+                margin="normal"
+            />
+            <PasswordTextField
+                label="パスワード（確認）"
+                fullWidth
+                required
+                value={confirmPassword}
+                onChange={(e) => onConfirmPasswordChange(e.target.value)}
+                error={!!errors.confirmPassword?.length}
+                helperText={errors.confirmPassword?.[0] ?? ""}
+                margin="normal"
+            />
             <FormGroup sx={{ mt: 1 }}>
-                {/* 利用規約 */}
                 <FormControlLabel
                     control={<Checkbox name="terms" required checked={isChecked.terms} onChange={handleCheck} />}
                     label={
@@ -80,7 +124,6 @@ export const RegisterForm = () => {
                         </Box>
                     }
                 />
-                {/* プライバシーポリシー */}
                 <FormControlLabel
                     control={<Checkbox name="privacy" required checked={isChecked.privacy} onChange={handleCheck} />}
                     label={
@@ -106,19 +149,13 @@ export const RegisterForm = () => {
                     mt: 2,
                 }}
             >
-                {/* 登録ボタン */}
-                <Button type="submit" sx={{ ...buttonStyle, mb: 2 }} disabled={!(isChecked.terms && isChecked.privacy)}>
+                <Button
+                    type="submit"
+                    sx={{ ...buttonStyle, mb: 2 }}
+                    disabled={!(isChecked.terms && isChecked.privacy) || loading}
+                >
                     登録
                 </Button>
-                {/* Googleで登録ボタン */}
-                <Button variant="outlined" startIcon={<FcGoogle />} sx={{ ...buttonStyle, mb: 2 }}>
-                    Googleで登録
-                </Button>
-                {/* Githubで登録ボタン */}
-                <Button variant="outlined" startIcon={<FaGithub />} sx={{ ...buttonStyle, mb: 2 }}>
-                    Githubで登録
-                </Button>
-                {/* アカウントをお持ちの方はこちら */}
                 <Link to={paths.login} variant="body2">
                     アカウントをお持ちの方はこちら
                 </Link>

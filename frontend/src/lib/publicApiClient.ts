@@ -1,4 +1,4 @@
-import { baseApiClient } from "@/lib";
+import { baseApiClient, createErrorInterceptor } from "@/lib";
 import axios from "axios";
 
 /**
@@ -8,3 +8,5 @@ export const publicApiClient = axios.create({
     ...baseApiClient.defaults,
     withCredentials: true,
 });
+
+publicApiClient.interceptors.response.use((response) => response, createErrorInterceptor());
