@@ -298,7 +298,7 @@ class UserRegistrationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.confirmPassword").isArray())
-                .andExpect(jsonPath("$.errors.confirmPassword", hasItem("パスワード(確認用)は入力必須です。")));
+                .andExpect(jsonPath("$.errors.confirmPassword", hasItem("パスワード(確認)は入力必須です。")));
     }
 
     @Test
@@ -315,8 +315,8 @@ class UserRegistrationControllerTest {
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
-                .andExpect(jsonPath("$.errors.passwordMatching").isArray())
-                .andExpect(jsonPath("$.errors.passwordMatching", hasItem("パスワードとパスワード(確認用)が一致していません。")));
+                .andExpect(jsonPath("$.errors.confirmPassword").isArray())
+                .andExpect(jsonPath("$.errors.confirmPassword", hasItem("パスワードとパスワード(確認)が一致していません。")));
     }
 
     @Test
@@ -379,7 +379,7 @@ class UserRegistrationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.email", hasItem("メールアドレスの形式が無効です。")))
-                .andExpect(jsonPath("$.errors.passwordMatching", hasItem("パスワードとパスワード(確認用)が一致していません。")));
+                .andExpect(jsonPath("$.errors.confirmPassword", hasItem("パスワードとパスワード(確認)が一致していません。")));
     }
 
     @Test
@@ -408,6 +408,6 @@ class UserRegistrationControllerTest {
                 .andExpect(jsonPath("$.errors.email", hasItem("メールアドレスは255文字以内で入力してください。")))
                 .andExpect(jsonPath("$.errors.username", hasItem("ユーザー名は50文字以内で入力してください。")))
                 .andExpect(jsonPath("$.errors.password", hasItem("パスワードには英小文字、英大文字、数字をそれぞれ1文字以上含める必要があります。")))
-                .andExpect(jsonPath("$.errors.passwordMatching", hasItem("パスワードとパスワード(確認用)が一致していません。")));
+                .andExpect(jsonPath("$.errors.confirmPassword", hasItem("パスワードとパスワード(確認)が一致していません。")));
     }
 }

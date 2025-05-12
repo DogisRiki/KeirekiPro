@@ -1,10 +1,11 @@
 package com.example.keirekipro.presentation.auth.dto;
 
+import com.example.keirekipro.presentation.shared.validator.PasswordMatches;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -16,6 +17,7 @@ import jakarta.validation.constraints.Size;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@PasswordMatches
 public class UserRegistrationRequest {
 
     @NotBlank(message = "メールアドレスは入力必須です。")
@@ -32,11 +34,6 @@ public class UserRegistrationRequest {
     @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$", message = "パスワードには英小文字、英大文字、数字をそれぞれ1文字以上含める必要があります。")
     private String password;
 
-    @NotBlank(message = "パスワード(確認用)は入力必須です。")
+    @NotBlank(message = "パスワード(確認)は入力必須です。")
     private String confirmPassword;
-
-    @AssertTrue(message = "パスワードとパスワード(確認用)が一致していません。")
-    public boolean isPasswordMatching() {
-        return password != null && password.equals(confirmPassword);
-    }
 }

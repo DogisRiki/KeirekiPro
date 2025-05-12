@@ -81,7 +81,7 @@ class ResetPasswordControllerTest {
                 .andExpect(jsonPath("$.errors.password").isArray())
                 .andExpect(jsonPath("$.errors.password", hasItem("新しいパスワードは入力必須です。")))
                 .andExpect(jsonPath("$.errors.confirmPassword").isArray())
-                .andExpect(jsonPath("$.errors.confirmPassword", hasItem("新しいパスワード(確認用)は入力必須です。")));
+                .andExpect(jsonPath("$.errors.confirmPassword", hasItem("新しいパスワード(確認)は入力必須です。")));
     }
 
     @Test
@@ -113,7 +113,7 @@ class ResetPasswordControllerTest {
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
-                .andExpect(jsonPath("$.errors.passwordMatching").isArray())
-                .andExpect(jsonPath("$.errors.passwordMatching", hasItem("新しいパスワードと新しいパスワード(確認用)が一致していません。")));
+                .andExpect(jsonPath("$.errors.confirmPassword").isArray())
+                .andExpect(jsonPath("$.errors.confirmPassword", hasItem("新しいパスワードと新しいパスワード(確認)が一致していません。")));
     }
 }

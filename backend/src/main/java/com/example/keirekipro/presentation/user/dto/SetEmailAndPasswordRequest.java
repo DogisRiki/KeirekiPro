@@ -1,10 +1,11 @@
 package com.example.keirekipro.presentation.user.dto;
 
+import com.example.keirekipro.presentation.shared.validator.PasswordMatches;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -16,6 +17,7 @@ import jakarta.validation.constraints.Size;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@PasswordMatches
 public class SetEmailAndPasswordRequest {
 
     @Email(message = "メールアドレスの形式が無効です。")
@@ -28,9 +30,4 @@ public class SetEmailAndPasswordRequest {
     private String password;
 
     private String confirmPassword;
-
-    @AssertTrue(message = "パスワードとパスワード(確認用)が一致していません。")
-    public boolean isPasswordMatching() {
-        return password != null && password.equals(confirmPassword);
-    }
 }
