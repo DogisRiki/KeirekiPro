@@ -38,11 +38,11 @@ public class UserRegistrationUseCase {
     public void execute(UserRegistrationRequest request) {
 
         // 重複チェック
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
             Notification notification = new Notification();
             notification.addError("email", "このメールアドレスは既に登録されています。");
             throw new UseCaseException(notification.getErrors());
-        }
+        });
 
         Notification notification = new Notification();
         User user = User.create(
