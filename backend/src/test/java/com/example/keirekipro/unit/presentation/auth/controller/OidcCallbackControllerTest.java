@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.TestConstructor;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -37,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 @AutoConfigureMockMvc(addFilters = false)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
+@TestPropertySource(properties = { "frontend-base-url=http://localhost:3000" })
 class OidcCallbackControllerTest {
 
     @MockitoBean
@@ -65,8 +69,15 @@ class OidcCallbackControllerTest {
     private static final String PROVIDER_USER_ID = "999";
     private static final String CALLBACK_PATH = "/api/auth/oidc/callback";
     private static final String FRONTEND_REDIRECT_PATH = "/resume/list";
-    private static final String AUTH_ERROR_REDIRECT_URL = "/login?error=認証に失敗しました。しばらく時間を置いてから再度お試しください。";
-    private static final String USER_ERROR_REDIRECT_URL = "/login?error=ユーザー情報の取得に失敗しました。しばらく時間を置いてから再度お試しください。";
+
+    private static final String AUTH_ERROR_REDIRECT_URL = "/login?error="
+            + URLEncoder.encode("認証に失敗しました。しばらく時間を置いてから再度お試しください。", StandardCharsets.UTF_8);
+
+    private static final String USER_ERROR_REDIRECT_URL = "/login?error="
+            + URLEncoder.encode("ユーザー情報の取得に失敗しました。しばらく時間を置いてから再度お試しください。",
+                    StandardCharsets.UTF_8);
+
+    private static final String FRONTEND_BASE_URL = "http://localhost:3000";
 
     @Test
     @DisplayName("OIDCコールバックで認証に成功し、成功ページへリダイレクトされる")
@@ -119,7 +130,7 @@ class OidcCallbackControllerTest {
                 .param("code", CODE_VALUE)
                 .param("state", STATE_VALUE))
                 .andExpect(status().is3xxRedirection()) // 302が返る
-                .andExpect(redirectedUrl("http://localhost" + FRONTEND_REDIRECT_PATH)) // リダイレクト先が正しい
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + FRONTEND_REDIRECT_PATH)) // リダイレクト先が正しい
                 .andExpect(header().exists("Set-Cookie"))
                 .andExpect(header().stringValues(
                         "Set-Cookie",
@@ -144,7 +155,7 @@ class OidcCallbackControllerTest {
         mockMvc.perform(get(CALLBACK_PATH)
                 .param("error", "access_denied")) // エラーパラメータを付与
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(AUTH_ERROR_REDIRECT_URL));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + AUTH_ERROR_REDIRECT_URL));
     }
 
     @Test
@@ -154,13 +165,13 @@ class OidcCallbackControllerTest {
         mockMvc.perform(get(CALLBACK_PATH)
                 .param("state", STATE_VALUE))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(AUTH_ERROR_REDIRECT_URL));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + AUTH_ERROR_REDIRECT_URL));
 
         // stateがない
         mockMvc.perform(get(CALLBACK_PATH)
                 .param("code", CODE_VALUE))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(AUTH_ERROR_REDIRECT_URL));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + AUTH_ERROR_REDIRECT_URL));
     }
 
     @Test
@@ -174,7 +185,7 @@ class OidcCallbackControllerTest {
                 .param("code", CODE_VALUE)
                 .param("state", STATE_VALUE))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(AUTH_ERROR_REDIRECT_URL));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + AUTH_ERROR_REDIRECT_URL));
     }
 
     @Test
@@ -192,7 +203,7 @@ class OidcCallbackControllerTest {
                 .param("code", CODE_VALUE)
                 .param("state", STATE_VALUE))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(AUTH_ERROR_REDIRECT_URL));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + AUTH_ERROR_REDIRECT_URL));
 
         // 2回目
         when(redisClient.hasKey("oidc:state:" + STATE_VALUE)).thenReturn(true);
@@ -206,7 +217,7 @@ class OidcCallbackControllerTest {
                 .param("code", CODE_VALUE)
                 .param("state", STATE_VALUE))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(AUTH_ERROR_REDIRECT_URL));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + AUTH_ERROR_REDIRECT_URL));
     }
 
     @Test
@@ -232,7 +243,7 @@ class OidcCallbackControllerTest {
                 .param("code", CODE_VALUE)
                 .param("state", STATE_VALUE))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(AUTH_ERROR_REDIRECT_URL));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + AUTH_ERROR_REDIRECT_URL));
     }
 
     @Test
@@ -261,6 +272,6 @@ class OidcCallbackControllerTest {
                 .param("code", CODE_VALUE)
                 .param("state", STATE_VALUE))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(USER_ERROR_REDIRECT_URL));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + USER_ERROR_REDIRECT_URL));
     }
 }

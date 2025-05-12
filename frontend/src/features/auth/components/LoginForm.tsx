@@ -11,6 +11,7 @@ export interface LoginFormProps {
     onEmailChange: (v: string) => void;
     onPasswordChange: (v: string) => void;
     onSubmit: () => void;
+    onOidcLogin: (provider: "google" | "github") => void;
     loading?: boolean;
 }
 
@@ -23,6 +24,7 @@ export const LoginForm = ({
     onEmailChange,
     onPasswordChange,
     onSubmit,
+    onOidcLogin,
     loading = false,
 }: LoginFormProps) => {
     // ボタンの共通スタイル
@@ -74,10 +76,20 @@ export const LoginForm = ({
                 <Button type="submit" sx={{ ...buttonStyle, mb: 2 }} disabled={loading}>
                     ログイン
                 </Button>
-                <Button variant="outlined" startIcon={<FcGoogle />} sx={{ ...buttonStyle, mb: 2 }}>
+                <Button
+                    variant="outlined"
+                    startIcon={<FcGoogle />}
+                    sx={{ ...buttonStyle, mb: 2 }}
+                    onClick={() => onOidcLogin("google")}
+                >
                     Googleでログイン
                 </Button>
-                <Button variant="outlined" startIcon={<FaGithub />} sx={{ ...buttonStyle, mb: 2 }}>
+                <Button
+                    variant="outlined"
+                    startIcon={<FaGithub />}
+                    sx={{ ...buttonStyle, mb: 2 }}
+                    onClick={() => onOidcLogin("github")}
+                >
                     Githubでログイン
                 </Button>
                 <Link to={paths.register} variant="body2">

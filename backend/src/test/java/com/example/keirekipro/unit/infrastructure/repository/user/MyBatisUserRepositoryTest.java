@@ -36,6 +36,9 @@ class MyBatisUserRepositoryTest {
     private static final String EMAIL = "test@keirekipro.click";
     private static final String PASSWORD = "hashedPassword";
     private static final String USERNAME = "test-user";
+    private static final String PROVIDER_NAME = "google";
+    private static final String PROVIDER_USER_ID = "gid-1";
+    private static final UUID PROVIDER_ID = UUID.fromString("987e6543-e21b-12d3-a456-426614174999");
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2023, 5, 1, 0, 0);
     private static final LocalDateTime UPDATED_AT = LocalDateTime.of(2023, 5, 2, 0, 0);
 
@@ -58,11 +61,16 @@ class MyBatisUserRepositoryTest {
         assertThat(user.getPasswordHash()).isEqualTo(PASSWORD);
         assertThat(user.getUsername()).isEqualTo(USERNAME);
 
-        // 外部認証連携
+        // 外部認証連携（フィールドベース比較）
         Map<String, AuthProvider> providers = user.getAuthProviders();
-        assertThat(providers).containsOnlyKeys("google");
-        assertThat(providers.get("google"))
-                .isEqualTo(AuthProvider.create(new Notification(), "google", "gid-1"));
+        assertThat(providers).containsOnlyKeys(PROVIDER_NAME);
+
+        AuthProvider actual = providers.get(PROVIDER_NAME);
+        assertThat(actual.getProviderName()).isEqualTo(PROVIDER_NAME);
+        assertThat(actual.getProviderUserId()).isEqualTo(PROVIDER_USER_ID);
+        assertThat(actual.getId()).isEqualTo(PROVIDER_ID);
+        assertThat(actual.getCreatedAt()).isEqualTo(CREATED_AT);
+        assertThat(actual.getUpdatedAt()).isEqualTo(UPDATED_AT);
     }
 
     @Test
@@ -70,20 +78,26 @@ class MyBatisUserRepositoryTest {
     void test2() {
         MyBatisUserRepository repo = new MyBatisUserRepository(mapper);
 
+        AuthProvider authProvider = AuthProvider.reconstruct(
+                PROVIDER_ID,
+                PROVIDER_NAME,
+                PROVIDER_USER_ID,
+                CREATED_AT,
+                UPDATED_AT);
+
         User entity = User.reconstruct(
                 ID,
                 1,
                 Email.create(new Notification(), EMAIL),
                 PASSWORD,
                 false,
-                Collections.singletonMap("google", AuthProvider.create(new Notification(), "google", "gid-1")),
+                Collections.singletonMap(PROVIDER_NAME, authProvider),
                 null,
                 USERNAME,
                 CREATED_AT,
                 UPDATED_AT);
 
         ArgumentCaptor<UserDto> captor = ArgumentCaptor.forClass(UserDto.class);
-
         repo.save(entity);
 
         verify(mapper).upsert(captor.capture());
@@ -94,10 +108,16 @@ class MyBatisUserRepositoryTest {
         assertThat(dto.getEmail()).isEqualTo(EMAIL);
         assertThat(dto.getPassword()).isEqualTo(PASSWORD);
         assertThat(dto.getUsername()).isEqualTo(USERNAME);
+
         assertThat(dto.getAuthProviders())
                 .hasSize(1)
-                .extracting(UserDto.AuthProviderDto::getProviderName)
-                .containsExactly("google");
+                .satisfiesExactly(ap -> {
+                    assertThat(ap.getProviderName()).isEqualTo(PROVIDER_NAME);
+                    assertThat(ap.getProviderUserId()).isEqualTo(PROVIDER_USER_ID);
+                    assertThat(ap.getId()).isEqualTo(PROVIDER_ID);
+                    assertThat(ap.getCreatedAt()).isEqualTo(UPDATED_AT);
+                    assertThat(ap.getUpdatedAt()).isEqualTo(UPDATED_AT);
+                });
     }
 
     @Test
@@ -114,14 +134,35 @@ class MyBatisUserRepositoryTest {
         assertThat(opt.get().getId()).isEqualTo(ID);
     }
 
+    @Test
+    @DisplayName("findByProvider()を実行するとDTOがエンティティに変換されて返却される")
+    void test4() {
+        // セットアップ：UserDto を返すようにMock設定
+        UserDto dto = buildDto();
+        when(mapper.selectByProvider(PROVIDER_NAME, PROVIDER_USER_ID)).thenReturn(Optional.of(dto));
+
+        MyBatisUserRepository repo = new MyBatisUserRepository(mapper);
+
+        // テスト実行
+        Optional<User> opt = repo.findByProvider(PROVIDER_NAME, PROVIDER_USER_ID);
+
+        // 検証
+        assertThat(opt).isPresent();
+        User user = opt.get();
+        assertThat(user.getId()).isEqualTo(ID);
+        assertThat(user.getUsername()).isEqualTo(USERNAME);
+        assertThat(user.getAuthProviders()).containsKey(PROVIDER_NAME);
+        assertThat(user.getAuthProviders().get(PROVIDER_NAME).getProviderUserId()).isEqualTo(PROVIDER_USER_ID);
+    }
+
     /**
      * テスト用DTOビルダー
      */
     private static UserDto buildDto() {
         UserDto.AuthProviderDto ap = new UserDto.AuthProviderDto();
-        ap.setId(UUID.randomUUID());
-        ap.setProviderName("google");
-        ap.setProviderUserId("gid-1");
+        ap.setId(PROVIDER_ID);
+        ap.setProviderName(PROVIDER_NAME);
+        ap.setProviderUserId(PROVIDER_USER_ID);
         ap.setCreatedAt(CREATED_AT);
         ap.setUpdatedAt(UPDATED_AT);
 

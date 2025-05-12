@@ -36,6 +36,11 @@ public class MyBatisUserRepository implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByProvider(String providerName, String providerUserId) {
+        return mapper.selectByProvider(providerName, providerUserId).map(this::toEntity);
+    }
+
+    @Override
     public void save(User user) {
         mapper.upsert(toDto(user));
     }
@@ -50,9 +55,12 @@ public class MyBatisUserRepository implements UserRepository {
      */
     private User toEntity(UserDto dto) {
         Map<String, AuthProvider> providers = dto.getAuthProviders().stream()
-                .map(ap -> AuthProvider.create(new Notification(),
+                .map(ap -> AuthProvider.reconstruct(
+                        ap.getId(),
                         ap.getProviderName(),
-                        ap.getProviderUserId()))
+                        ap.getProviderUserId(),
+                        ap.getCreatedAt(),
+                        ap.getUpdatedAt()))
                 .collect(Collectors.toMap(
                         p -> p.getProviderName().toLowerCase(),
                         p -> p,
@@ -90,11 +98,11 @@ public class MyBatisUserRepository implements UserRepository {
                 user.getAuthProviders().values().stream()
                         .map(p -> {
                             UserDto.AuthProviderDto ap = new UserDto.AuthProviderDto();
-                            ap.setId(UUID.randomUUID());
+                            ap.setId(p.getId());
                             ap.setProviderName(p.getProviderName());
                             ap.setProviderUserId(p.getProviderUserId());
-                            ap.setCreatedAt(user.getUpdatedAt());
-                            ap.setUpdatedAt(user.getUpdatedAt());
+                            ap.setCreatedAt(p.getUpdatedAt());
+                            ap.setUpdatedAt(p.getUpdatedAt());
                             return ap;
                         })
                         .toList());

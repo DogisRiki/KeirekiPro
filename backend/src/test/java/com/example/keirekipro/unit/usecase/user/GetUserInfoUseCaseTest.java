@@ -19,6 +19,7 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
+import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto;
 
@@ -57,13 +58,13 @@ class GetUserInfoUseCaseTest {
     void test1() {
         // ユーザー情報を準備
         AuthProvider authProvider = AuthProvider.create(
-                new com.example.keirekipro.shared.Notification(),
+                new Notification(),
                 PROVIDER_TYPE_VALUE,
                 PROVIDER_USER_ID_VALUE);
         User user = User.reconstruct(
                 USER_ID,
                 1,
-                Email.create(new com.example.keirekipro.shared.Notification(), EMAIL),
+                Email.create(new Notification(), EMAIL),
                 null,
                 false,
                 Map.of(PROVIDER_TYPE_VALUE.toLowerCase(), authProvider),
@@ -101,13 +102,13 @@ class GetUserInfoUseCaseTest {
     void test2() {
         // プロフィール画像がnullのユーザー情報を準備
         AuthProvider authProvider = AuthProvider.create(
-                new com.example.keirekipro.shared.Notification(),
+                new Notification(),
                 PROVIDER_TYPE_VALUE,
                 PROVIDER_USER_ID_VALUE);
         User user = User.reconstruct(
                 USER_ID,
                 1,
-                Email.create(new com.example.keirekipro.shared.Notification(), EMAIL),
+                Email.create(new Notification(), EMAIL),
                 null,
                 false,
                 Map.of(PROVIDER_TYPE_VALUE.toLowerCase(), authProvider),

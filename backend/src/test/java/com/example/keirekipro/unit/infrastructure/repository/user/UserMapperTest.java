@@ -303,4 +303,43 @@ class UserMapperTest {
         assertThat(userMapper.selectById(USERID)).isEmpty();
         assertThat(userMapper.selectByEmail(EMAIL)).isEmpty();
     }
+
+    @Test
+    @DisplayName("selectByProvider_指定されたプロバイダー情報でユーザーが取得できる")
+    void test11() {
+        // セットアップ：プロバイダー付きユーザーを登録
+        UserDto dto = new UserDto();
+        dto.setId(USERID);
+        dto.setEmail(EMAIL);
+        dto.setPassword(PASSWORD);
+        dto.setUsername(USERNAME);
+        dto.setProfileImage(PROFILE_IMAGE);
+        dto.setTwoFactorAuthEnabled(true);
+        dto.setCreatedAt(CREATED_AT);
+        dto.setUpdatedAt(UPDATED_AT);
+
+        AuthProviderDto ap = new AuthProviderDto();
+        ap.setId(AUTH_PROVIDER_ID);
+        ap.setProviderName(PROVIDER_NAME);
+        ap.setProviderUserId(PROVIDER_USER_ID);
+        ap.setCreatedAt(CREATED_AT);
+        ap.setUpdatedAt(UPDATED_AT);
+
+        dto.setAuthProviders(List.of(ap));
+        userMapper.upsert(dto);
+
+        // テスト実行：プロバイダーで検索
+        Optional<UserDto> opt = userMapper.selectByProvider(PROVIDER_NAME, PROVIDER_USER_ID);
+
+        // 検証
+        assertThat(opt).isPresent();
+        UserDto loaded = opt.get();
+        assertThat(loaded.getId()).isEqualTo(USERID);
+        assertThat(loaded.getEmail()).isEqualTo(EMAIL);
+        assertThat(loaded.getUsername()).isEqualTo(USERNAME);
+        assertThat(loaded.getAuthProviders()).hasSize(1);
+        assertThat(loaded.getAuthProviders().get(0).getProviderName()).isEqualTo(PROVIDER_NAME);
+        assertThat(loaded.getAuthProviders().get(0).getProviderUserId()).isEqualTo(PROVIDER_USER_ID);
+    }
+
 }

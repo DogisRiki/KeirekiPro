@@ -6,8 +6,8 @@ import java.util.Map;
 import com.example.keirekipro.domain.event.user.UserRegisteredEvent;
 import com.example.keirekipro.infrastructure.shared.aws.AwsSesClient;
 import com.example.keirekipro.infrastructure.shared.mail.FreeMarkerMailTemplate;
+import com.example.keirekipro.shared.config.AppProperties;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -24,8 +24,7 @@ public class UserRegisteredEventListener {
 
     private final FreeMarkerMailTemplate freeMarkerMailTemplate;
 
-    @Value("${spring.application.name}")
-    private String applicationName;
+    private final AppProperties properties;
 
     /**
      * イベントリスナー実行ハンドル
@@ -38,9 +37,11 @@ public class UserRegisteredEventListener {
         // メール本文を作成
         Map<String, Object> dataModel = new HashMap<>();
         dataModel.put("username", event.getUsername());
+        dataModel.put("siteName", properties.getSiteName());
+        dataModel.put("siteUrl", properties.getSiteUrl());
         String body = freeMarkerMailTemplate.create("user-registered.ftl", dataModel);
 
         // メール送信
-        awsSesClient.sendMail(event.getEmail(), "【" + applicationName + "】新規登録完了のお知らせ", body);
+        awsSesClient.sendMail(event.getEmail(), "【" + properties.getSiteName() + "】新規登録完了のお知らせ", body);
     }
 }

@@ -1,7 +1,9 @@
 package com.example.keirekipro.usecase.auth;
 
-import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
 
+import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
@@ -37,12 +39,43 @@ public class OidcLoginUseCase {
 
         Notification notification = new Notification();
 
-        // ユーザーを取得し、存在しなければ新規登録
-        User user = userRepository.findByEmail(userInfo.getEmail())
-                .orElseGet(() -> registerNewUser(userInfo, notification));
+        // プロバイダー名を小文字で統一
+        String provider = userInfo.getProviderType().toLowerCase();
+        String providerUserId = userInfo.getProviderUserId();
 
-        // 外部認証連携情報を登録
-        user.addAuthProvider(notification, userInfo.getProviderType(), userInfo.getProviderUserId());
+        // 外部認証情報でユーザーを検索
+        Optional<User> existingUserOpt = userRepository.findByProvider(provider, providerUserId);
+
+        // 外部認証で見つからず、email がある場合はメールアドレスで既存ユーザーを検索
+        if (existingUserOpt.isEmpty() && userInfo.getEmail() != null) {
+            existingUserOpt = userRepository.findByEmail(userInfo.getEmail());
+        }
+
+        User user = existingUserOpt.map(existing -> {
+            // 同一プロバイダーの場合は何もせず返す、他プロバイダーなら追加
+            return existing.addAuthProvider(notification, provider, providerUserId);
+        }).orElseGet(() -> {
+            // 新規登録
+            Map<String, AuthProvider> providers = Map.of(
+                    provider, AuthProvider.create(notification, provider, providerUserId));
+
+            User newUser = User.create(
+                    notification,
+                    1,
+                    userInfo.getEmail() != null ? Email.create(notification, userInfo.getEmail()) : null,
+                    null,
+                    false,
+                    providers,
+                    null,
+                    userInfo.getUsername());
+
+            // メールアドレスがある場合のみイベントを発行
+            if (newUser.getEmail() != null) {
+                newUser.register();
+            }
+
+            return newUser;
+        });
 
         userRepository.save(user);
 
@@ -56,25 +89,5 @@ public class OidcLoginUseCase {
                 .email(user.getEmail() != null ? user.getEmail().getValue() : null)
                 .providerType(userInfo.getProviderType())
                 .build();
-    }
-
-    private User registerNewUser(OidcUserInfoDto userInfo, Notification notification) {
-        User user = User.create(
-                notification,
-                1,
-                userInfo.getEmail() != null ? Email.create(
-                        notification, userInfo.getEmail()) : null,
-                null,
-                false,
-                Collections.emptyMap(),
-                null,
-                userInfo.getUsername());
-
-        // 新規登録イベント発行
-        if (user.getEmail() != null) {
-            user.register();
-        }
-
-        return user;
     }
 }

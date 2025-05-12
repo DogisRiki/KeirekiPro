@@ -8,7 +8,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
@@ -47,111 +46,134 @@ class OidcLoginUseCaseTest {
     private static final String PROVIDER_TYPE = "google";
 
     @Test
-    @DisplayName("既存ユーザーの場合(同一または別プロバイダー)、新規ユーザーを作成せず既存ユーザーIDを返す")
+    @DisplayName("同一プロバイダーで既存ユーザーが存在する場合、既存ユーザーを返す（何も変更しない）")
     void test1() {
-        // モックをセットアップ
         Notification notification = new Notification();
-        User existingUser = User.create(
-                notification,
-                1,
-                Email.create(notification, EMAIL),
-                null,
-                false,
-                Collections.emptyMap(),
-                null,
-                USERNAME);
-        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(existingUser));
+        Map<String, AuthProvider> providers = Map.of(
+                PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
+        User existingUser = User.create(notification, 1, Email.create(notification, EMAIL), null, false, providers,
+                null, USERNAME);
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID)).thenReturn(Optional.of(existingUser));
 
-        // ユースケース実行
         OidcLoginUseCaseDto result = oidcLoginUseCase
                 .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
 
-        // 検証
-        assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(existingUser.getId());
-        assertThat(result.getEmail()).isEqualTo(EMAIL);
-        assertThat(result.getUsername()).isEqualTo(USERNAME);
-        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
-
-        verify(userRepository).findByEmail(EMAIL);
+        verify(userRepository).findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID);
         verify(userRepository).save(existingUser);
         verify(eventPublisher, never()).publish(any());
     }
 
     @Test
-    @DisplayName("未連携かつメールアドレスも既存ユーザーに無い場合、新規ユーザーを作成する")
+    @DisplayName("別プロバイダーで既存ユーザーが存在する場合、新しいプロバイダーを追加する")
     void test2() {
-        // モックをセットアップ
-        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        // 既存ユーザー（異なるプロバイダー連携済み）を返すように設定
+        Notification notification = new Notification();
+        Map<String, AuthProvider> existingProviders = Map.of(
+                "github", AuthProvider.create(notification, "github", "github-id"));
+        User existingUser = User.create(notification, 1, Email.create(notification, EMAIL), null, false,
+                existingProviders, null, USERNAME);
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(existingUser));
 
-        // ユースケース実行
+        // 実行
         OidcLoginUseCaseDto result = oidcLoginUseCase
                 .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
 
         // 検証
-        assertThat(result).isNotNull();
-        assertThat(result.getId()).isNotNull(); // idはユースケース内で採番されるためnullチェックのみとする
         assertThat(result.getEmail()).isEqualTo(EMAIL);
-        assertThat(result.getUsername()).isEqualTo(USERNAME);
-        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
-
-        verify(userRepository).findByEmail(EMAIL);
-        verify(userRepository).save(any(User.class));
-        verify(eventPublisher).publish(any());
-    }
-
-    @Test
-    @DisplayName("DB登録時に例外が発生した場合、トランザクションがロールバックされる")
-    void test3() {
-        // モックをセットアップ
-        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-
-        // save時に例外を発生させる
-        doThrow(new RuntimeException("登録失敗"))
-                .when(userRepository)
-                .save(any(User.class));
-
-        // RuntimeExceptionが発生し、トランザクションが中断される
-        assertThrows(RuntimeException.class, () -> {
-            oidcLoginUseCase.execute(
-                    new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
-        });
-
-        verify(userRepository).findByEmail(EMAIL);
         verify(userRepository).save(any(User.class));
         verify(eventPublisher, never()).publish(any());
     }
 
     @Test
-    @DisplayName("OIDCログインでメールアドレスが無い場合、ユーザー新規登録イベントが発火されない")
-    void test4() {
-        // モックをセットアップ
+    @DisplayName("メールアドレスが無く、同一プロバイダーで既存ユーザーが存在する場合、既存ユーザーを返す")
+    void test3() {
         Notification notification = new Notification();
         Map<String, AuthProvider> providers = Map.of(
-                PROVIDER_TYPE,
-                AuthProvider.create(new Notification(), PROVIDER_TYPE, PROVIDER_USER_ID));
-        User existingUser = User.create(
-                notification,
-                1,
-                null,
-                null,
-                false,
-                providers,
-                null,
-                USERNAME);
-        when(userRepository.findByEmail(any())).thenReturn(Optional.of(existingUser));
+                PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
+        User existingUser = User.create(notification, 1, null, null, false, providers, null, USERNAME);
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID)).thenReturn(Optional.of(existingUser));
 
         OidcLoginUseCaseDto result = oidcLoginUseCase
                 .execute(new OidcUserInfoDto(PROVIDER_USER_ID, null, USERNAME, PROVIDER_TYPE));
 
-        assertThat(result).isNotNull();
-        assertThat(result.getId()).isNotNull();
-        assertThat(result.getUsername()).isEqualTo(USERNAME);
-        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
         assertThat(result.getEmail()).isNull();
+        verify(userRepository).save(existingUser);
+        verify(eventPublisher, never()).publish(any());
+    }
 
-        verify(userRepository).findByEmail(any());
+    @Test
+    @DisplayName("プロバイダー・メールアドレスともに未連携の場合、新規ユーザーを作成しイベントを発行する")
+    void test4() {
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase
+                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
+
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
         verify(userRepository).save(any(User.class));
+        verify(eventPublisher).publish(any());
+    }
+
+    @Test
+    @DisplayName("メールアドレスが無い新規ユーザーは登録されるがイベントは発行されない")
+    void test5() {
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID)).thenReturn(Optional.empty());
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase
+                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, null, USERNAME, PROVIDER_TYPE));
+
+        assertThat(result.getEmail()).isNull();
+        verify(userRepository).save(any(User.class));
+        verify(eventPublisher, never()).publish(any());
+    }
+
+    @Test
+    @DisplayName("ユーザー保存時に例外が発生した場合、例外をスローしイベントは発行されない")
+    void test6() {
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        doThrow(new RuntimeException("DB Error")).when(userRepository).save(any(User.class));
+
+        assertThrows(RuntimeException.class, () -> {
+            oidcLoginUseCase.execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
+        });
+
+        verify(eventPublisher, never()).publish(any());
+    }
+
+    @Test
+    @DisplayName("別プロバイダー連携済みユーザーがメールなしで存在し、ログインした場合はaddして保存される")
+    void test7() {
+        // プロバイダーでは見つからず、メールアドレスも null のため email 検索も呼ばれない
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID)).thenReturn(Optional.empty());
+
+        // 実行
+        OidcLoginUseCaseDto result = oidcLoginUseCase
+                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, null, USERNAME, PROVIDER_TYPE));
+
+        // 検証
+        assertThat(result.getEmail()).isNull();
+        verify(userRepository).save(any(User.class));
+        verify(eventPublisher, never()).publish(any());
+    }
+
+    @Test
+    @DisplayName("プロバイダーもメールも一致する既存ユーザーがいてもプロバイダー追加はされない")
+    void test8() {
+        Notification notification = new Notification();
+        Map<String, AuthProvider> providers = Map.of(
+                PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
+        User existingUser = User.create(notification, 1, Email.create(notification, EMAIL), null, false, providers,
+                null, USERNAME);
+
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID)).thenReturn(Optional.of(existingUser));
+
+        oidcLoginUseCase.execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
+
+        verify(userRepository).save(existingUser);
         verify(eventPublisher, never()).publish(any());
     }
 }

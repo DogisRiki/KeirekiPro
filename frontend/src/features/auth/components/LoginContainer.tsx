@@ -1,4 +1,4 @@
-import { LoginForm, useLogin } from "@/features/auth";
+import { LoginForm, useAuthorizeOidc, useLogin } from "@/features/auth";
 import { useErrorMessageStore } from "@/stores";
 import { useState } from "react";
 
@@ -9,6 +9,7 @@ export const LoginContainer = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const loginMutation = useLogin();
+    const oidcMutation = useAuthorizeOidc();
     const { clearErrors } = useErrorMessageStore();
 
     return (
@@ -24,7 +25,8 @@ export const LoginContainer = () => {
                 setPassword(v);
             }}
             onSubmit={() => loginMutation.mutate({ email, password })}
-            loading={loginMutation.isPending}
+            onOidcLogin={(provider) => oidcMutation.mutate(provider)}
+            loading={loginMutation.isPending || oidcMutation.isPending}
         />
     );
 };

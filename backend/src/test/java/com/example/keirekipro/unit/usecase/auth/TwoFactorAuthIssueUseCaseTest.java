@@ -1,7 +1,7 @@
 package com.example.keirekipro.unit.usecase.auth;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
@@ -72,7 +72,7 @@ class TwoFactorAuthIssueUseCaseTest {
         // 検証
         verify(securityUtil).generateRandomNumber(eq(6));
         verify(redisClient).setValue("2fa:" + USER_ID, "012345", Duration.ofMinutes(10));
-        verify(freeMarkerMailTemplate).create(eq("two-factor-auth.ftl"), any());
+        verify(freeMarkerMailTemplate).create(eq("two-factor-auth.ftl"), anyMap());
         verify(awsSesClient).sendMail(EMAIL, "【KeirekiPro】2段階認証コードのお知らせ", "テストメール本文");
 
         // テンプレートデータの内容確認

@@ -27,6 +27,15 @@ public interface UserRepository {
     Optional<User> findByEmail(String email);
 
     /**
+     * プロバイダー情報でユーザーを取得する
+     *
+     * @param providerName   プロバイダー名
+     * @param providerUserId プロバイダー側ユーザーID
+     * @return ユーザーエンティティ
+     */
+    Optional<User> findByProvider(String providerName, String providerUserId);
+
+    /**
      * ユーザーを保存する（新規作成または更新）
      *
      * @param user ユーザーエンティティ

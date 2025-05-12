@@ -29,6 +29,16 @@ public interface UserMapper {
     Optional<UserDto> selectByEmail(@Param("email") String email);
 
     /**
+     * プロバイダー情報でユーザーを取得する
+     *
+     * @param providerName   プロバイダー名
+     * @param providerUserId プロバイダー側ユーザーID
+     * @return ユーザーDTO
+     */
+    Optional<UserDto> selectByProvider(@Param("providerName") String providerName,
+            @Param("providerUserId") String providerUserId);
+
+    /**
      * ユーザーを作成/更新する
      *
      * @param user ユーザーDTO

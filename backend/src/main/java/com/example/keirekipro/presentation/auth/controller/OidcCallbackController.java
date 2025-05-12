@@ -1,6 +1,8 @@
 package com.example.keirekipro.presentation.auth.controller;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import com.example.keirekipro.infrastructure.auth.oidc.OidcClient;
@@ -46,6 +48,9 @@ public class OidcCallbackController {
 
     @Value("${cookie.secure:false}")
     private boolean isSecureCookie;
+
+    @Value("${frontend-base-url}")
+    private String frontendBaseUrl;
 
     /**
      * フロントエンドのリダイレクトURL（認証成功後にリダイレクトする）
@@ -155,7 +160,7 @@ public class OidcCallbackController {
                     CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
 
             // 成功ページへリダイレクト
-            response.sendRedirect(baseUrl + FRONTEND_REDIRECT_URL);
+            response.sendRedirect(frontendBaseUrl + FRONTEND_REDIRECT_URL);
 
         } catch (Exception e) {
             redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
@@ -170,7 +175,9 @@ public class OidcCallbackController {
      */
     private void redirectToErrorPage(HttpServletResponse response, String errorMessage)
             throws IOException {
-        String redirectUrl = ERROR_REDIRECT_URL + "?error=" + errorMessage;
+        // 日本語を含むクエリパラメータをURLエンコード
+        String encoded = URLEncoder.encode(errorMessage, StandardCharsets.UTF_8);
+        String redirectUrl = frontendBaseUrl + ERROR_REDIRECT_URL + "?error=" + encoded;
         response.sendRedirect(redirectUrl);
     }
 }

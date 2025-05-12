@@ -3,7 +3,6 @@ package com.example.keirekipro.usecase.user;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
@@ -48,10 +47,10 @@ public class GetUserInfoUseCase {
         // 外部認証連携情報の変換
         List<AuthProviderInfo> providers = user.getAuthProviders().values().stream()
                 .map(ap -> new AuthProviderInfo(
-                        UUID.randomUUID(),
+                        ap.getId(),
                         ap.getProviderName(),
                         ap.getProviderUserId()))
-                .collect(Collectors.toList());
+                .toList();
 
         return GetUserInfoUseCaseDto.builder()
                 .id(user.getId())

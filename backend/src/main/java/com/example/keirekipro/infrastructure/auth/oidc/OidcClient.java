@@ -14,6 +14,8 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -108,12 +110,15 @@ public class OidcClient {
         provider.processSecrets(secrets, formData::putAll);
 
         try {
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            formData.forEach(form::add);
             // トークンエンドポイントにPOSTリクエスト
             return restClient
                     .post()
                     .uri(provider.getTokenEndpoint())
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(formData)
+                    .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                    .body(form)
                     .retrieve()
                     .body(OidcTokenResponse.class);
         } catch (Exception e) {
@@ -153,6 +158,14 @@ public class OidcClient {
                     .retrieve()
                     .body(new ParameterizedTypeReference<Map<String, Object>>() {
                     });
+
+            if (userInfo == null) {
+                return null;
+            }
+
+            // access_tokenをuserInfoに追加（GitHub 用）
+            userInfo.put("access_token", accessToken);
+
             // プロバイダー固有の変換処理で標準形式に変換
             return provider.convertToStandardUserInfo(userInfo);
         } catch (Exception e) {

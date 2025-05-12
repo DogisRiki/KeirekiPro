@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -33,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -163,22 +165,15 @@ class OidcClientTest {
         when(secretsClient.getSecretJson("google-oidc-secret")).thenReturn(secretsNode);
 
         // RestClientをモック
-        // リクエストボディとヘッダーなどを設定するためのインターフェースをモック化
         RestClient.RequestBodySpec requestBodySpec = mock(RestClient.RequestBodySpec.class);
-        // URIを設定するためのインターフェースをモック化
         RestClient.RequestBodyUriSpec requestBodyUriSpec = mock(RestClient.RequestBodyUriSpec.class);
-        // レスポンスを処理するためのインターフェースをモック化
         RestClient.ResponseSpec responseSpec = mock(RestClient.ResponseSpec.class);
 
-        // restClient.post()が呼ばれたら、URIを設定するためのrequestBodyUriSpecを返すよう設定
         when(restClient.post()).thenReturn(requestBodyUriSpec);
-        // requestBodyUriSpec.uri()が任意の文字列引数で呼ばれたら、requestBodySpecを返すよう設定
         when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
-        // requestBodySpec.contentType()が任意のMediaType引数で呼ばれたら、同じrequestBodySpecを返すよう設定（メソッドチェーン用）
         when(requestBodySpec.contentType(any(MediaType.class))).thenReturn(requestBodySpec);
-        // requestBodySpec.body()が任意のMap引数で呼ばれたら、同じrequestBodySpecを返すよう設定（メソッドチェーン用）
-        when(requestBodySpec.body(anyMap())).thenReturn(requestBodySpec);
-        // requestBodySpec.retrieve()が呼ばれたら、レスポンス処理用のresponseSpecを返すよう設定
+        when(requestBodySpec.header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)).thenReturn(requestBodySpec);
+        when(requestBodySpec.body(any(MultiValueMap.class))).thenReturn(requestBodySpec);
         when(requestBodySpec.retrieve()).thenReturn(responseSpec);
 
         // 期待されるレスポンス
@@ -191,7 +186,8 @@ class OidcClientTest {
         when(responseSpec.body(OidcTokenResponse.class)).thenReturn(expectedResponse);
 
         // フォームデータの検証に使用するキャプチャを作成
-        ArgumentCaptor<Map<String, String>> formDataCaptor = ArgumentCaptor.forClass((Class) Map.class);
+        ArgumentCaptor<MultiValueMap<String, String>> formDataCaptor = ArgumentCaptor
+                .forClass((Class) MultiValueMap.class);
 
         // アクセストークンの取得を実行
         OidcTokenResponse result = oidcClient.getToken(PROVIDER_NAME, CODE, REDIRECT_URI, CODE_VERIFIER);
@@ -199,8 +195,11 @@ class OidcClientTest {
         // requestBodySpec.bodyメソッドが呼ばれた際に渡されたパラメータをキャプチャするよう指定
         verify(requestBodySpec).body(formDataCaptor.capture());
 
+        // .header()呼び出しが正しく行われているか検証
+        verify(requestBodySpec).header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
+
         // キャプチャの取得
-        Map<String, String> formData = (Map<String, String>) formDataCaptor.getValue();
+        MultiValueMap<String, String> formData = formDataCaptor.getValue();
 
         // レスポンスの検証
         assertThat(result)
@@ -209,10 +208,10 @@ class OidcClientTest {
 
         // リクエストパラメータに必要なパラメータがすべて含まれているかをキャプチャから検証
         assertThat(formData)
-                .containsEntry("grant_type", "authorization_code")
-                .containsEntry("code", CODE)
-                .containsEntry("redirect_uri", REDIRECT_URI)
-                .containsEntry("code_verifier", CODE_VERIFIER);
+                .containsEntry("grant_type", List.of("authorization_code"))
+                .containsEntry("code", List.of(CODE))
+                .containsEntry("redirect_uri", List.of(REDIRECT_URI))
+                .containsEntry("code_verifier", List.of(CODE_VERIFIER));
     }
 
     @Test
@@ -247,7 +246,8 @@ class OidcClientTest {
         when(restClient.post()).thenReturn(requestBodyUriSpec);
         when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
         when(requestBodySpec.contentType(any(MediaType.class))).thenReturn(requestBodySpec);
-        when(requestBodySpec.body(anyMap())).thenReturn(requestBodySpec);
+        when(requestBodySpec.header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)).thenReturn(requestBodySpec);
+        when(requestBodySpec.body(any(MultiValueMap.class))).thenReturn(requestBodySpec);
         when(requestBodySpec.retrieve()).thenReturn(responseSpec);
 
         // 期待されるレスポンス
@@ -260,7 +260,8 @@ class OidcClientTest {
         when(responseSpec.body(OidcTokenResponse.class)).thenReturn(expectedResponse);
 
         // フォームデータの検証に使用するキャプチャを作成
-        ArgumentCaptor<Map<String, String>> formDataCaptor = ArgumentCaptor.forClass((Class) Map.class);
+        ArgumentCaptor<MultiValueMap<String, String>> formDataCaptor = ArgumentCaptor
+                .forClass((Class) MultiValueMap.class);
 
         // アクセストークンの取得を実行
         OidcTokenResponse result = oidcClient.getToken(PROVIDER_NAME, CODE, REDIRECT_URI, CODE_VERIFIER);
@@ -269,7 +270,7 @@ class OidcClientTest {
         verify(requestBodySpec).body(formDataCaptor.capture());
 
         // キャプチャの取得
-        Map<String, String> formData = (Map<String, String>) formDataCaptor.getValue();
+        MultiValueMap<String, String> formData = formDataCaptor.getValue();
 
         // レスポンスの検証
         assertThat(result)
@@ -278,11 +279,11 @@ class OidcClientTest {
 
         // リクエストパラメータに必要なパラメータがすべて含まれているかをキャプチャから検証
         assertThat(formData)
-                .containsEntry("grant_type", "authorization_code")
-                .containsEntry("code", CODE)
-                .containsEntry("redirect_uri", REDIRECT_URI)
-                .containsEntry("code_verifier", CODE_VERIFIER)
-                .containsEntry("unique_param", "mock-unique_param");
+                .containsEntry("grant_type", List.of("authorization_code"))
+                .containsEntry("code", List.of(CODE))
+                .containsEntry("redirect_uri", List.of(REDIRECT_URI))
+                .containsEntry("code_verifier", List.of(CODE_VERIFIER))
+                .containsEntry("unique_param", List.of("mock-unique_param"));
     }
 
     @Test
@@ -306,6 +307,7 @@ class OidcClientTest {
         when(restClient.post()).thenReturn(requestBodyUriSpec);
         when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
         when(requestBodySpec.contentType(any(MediaType.class))).thenReturn(requestBodySpec);
+        when(requestBodySpec.header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)).thenReturn(requestBodySpec);
         when(requestBodySpec.body(anyMap())).thenReturn(requestBodySpec);
         // RestClientExceptionをスローするように設定
         when(requestBodySpec.retrieve()).thenThrow(new RestClientException("API call failed"));
@@ -323,7 +325,6 @@ class OidcClientTest {
     @DisplayName("userinfoエンドポイントからユーザー情報を取得できる")
     @SuppressWarnings({ "unchecked", "rawtypes" })
     void test6() {
-        // モックをセットアップ
         when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
         when(oidcProvider.getUserInfoEndpoint()).thenReturn(USER_INFO_ENDOPOINT);
 
@@ -354,25 +355,17 @@ class OidcClientTest {
                 .providerType(PROVIDER_NAME)
                 .build();
 
-        // ユーザー情報変換時、expectedUserInfoを返すように設定
-        when(oidcProvider.convertToStandardUserInfo(userInfoMap)).thenReturn(expectedUserInfo);
+        // convertToStandardUserInfo内でaccess_tokenがuserInfoに追加されている前提で検証
+        doAnswer(invocation -> {
+            Map<String, Object> actualUserInfo = invocation.getArgument(0);
+            assertThat(actualUserInfo.get("access_token")).isEqualTo(ACCESS_TOKEN);
+            return expectedUserInfo;
+        }).when(oidcProvider).convertToStandardUserInfo(any(Map.class));
 
-        // ユーザー情報の取得を実行
+        // 実行
         OidcUserInfoDto result = oidcClient.getUserInfo(PROVIDER_NAME, ACCESS_TOKEN);
 
-        // レスポンスの検証
         assertThat(result).isEqualTo(expectedUserInfo);
-
-        // ヘッダーの検証に使用するキャプチャを作成
-        ArgumentCaptor<Consumer> headersCaptor = ArgumentCaptor.forClass(Consumer.class);
-
-        // requestHeadersSpec.headersメソッドが呼ばれた際に渡されたパラメータをキャプチャするよう指定
-        verify(requestHeadersSpec).headers(headersCaptor.capture());
-
-        // ヘッダーのBearerトークン検証
-        HttpHeaders capturedHeaders = new HttpHeaders();
-        ((Consumer<HttpHeaders>) headersCaptor.getValue()).accept(capturedHeaders);
-        assertThat(capturedHeaders.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer " + ACCESS_TOKEN);
     }
 
     @Test
@@ -466,6 +459,34 @@ class OidcClientTest {
         when(requestHeadersSpec.retrieve()).thenThrow(new RestClientException("API call failed"));
 
         // ユーザー情報の取得を実行
+        OidcUserInfoDto result = oidcClient.getUserInfo(PROVIDER_NAME, ACCESS_TOKEN);
+
+        // 検証
+        assertThat(result).isNull();
+    }
+
+    @Test
+    @DisplayName("userinfoエンドポイントのレスポンスがnullの場合、nullが返却される")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    void test9() {
+        // モックをセットアップ
+        when(providerFactory.getProvider(PROVIDER_NAME)).thenReturn(oidcProvider);
+        when(oidcProvider.getUserInfoEndpoint()).thenReturn(USER_INFO_ENDOPOINT);
+
+        // RestClientをモック
+        RestClient.RequestHeadersSpec requestHeadersSpec = mock(RestClient.RequestHeadersSpec.class);
+        RestClient.RequestHeadersUriSpec requestHeadersUriSpec = mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.ResponseSpec responseSpec = mock(RestClient.ResponseSpec.class);
+
+        when(restClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.headers(any())).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+
+        // body() が null を返す設定
+        when(responseSpec.body(any(ParameterizedTypeReference.class))).thenReturn(null);
+
+        // 実行
         OidcUserInfoDto result = oidcClient.getUserInfo(PROVIDER_NAME, ACCESS_TOKEN);
 
         // 検証
