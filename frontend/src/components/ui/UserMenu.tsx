@@ -1,4 +1,5 @@
 import { paths } from "@/config/paths";
+import { useLogout } from "@/hooks";
 import { useUserAuthStore } from "@/stores";
 import {
     Lock as LockIcon,
@@ -17,6 +18,7 @@ export const UserMenu = () => {
     const { user } = useUserAuthStore();
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
     const navigate = useNavigate();
+    const logout = useLogout();
 
     const userMenuItems = [
         { label: "ユーザー設定", icon: <ManageAccountsIcon />, path: paths.user },
@@ -33,8 +35,8 @@ export const UserMenu = () => {
     const handleMenuClose = () => setAnchorEl(null);
 
     const handleLogout = () => {
-        navigate(paths.login);
         handleMenuClose();
+        logout();
     };
 
     const handleMenuItemClick = (item: (typeof userMenuItems)[0]) => {

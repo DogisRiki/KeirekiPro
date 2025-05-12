@@ -47,4 +47,22 @@ public class CookieUtil {
                 .build()
                 .toString();
     }
+
+    /**
+     * Cookie削除用のHttpOnly属性付きCookie文字列を生成する
+     *
+     * @param name           削除対象のCookie名
+     * @param isSecureCookie セキュア属性を有効にするかどうか
+     * @return 有効期限切れのCookie文字列
+     */
+    public static String deleteCookie(String name, boolean isSecureCookie) {
+        return ResponseCookie.from(name, "")
+                .httpOnly(true)
+                .secure(isSecureCookie)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(0)
+                .build()
+                .toString();
+    }
 }

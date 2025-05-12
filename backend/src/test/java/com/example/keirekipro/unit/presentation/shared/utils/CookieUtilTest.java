@@ -85,4 +85,32 @@ class CookieUtilTest {
                 .contains("SameSite=Lax")
                 .contains("Path=/");
     }
+
+    @Test
+    @DisplayName("deleteCookie: isSecureCookie=true の場合、有効期限0・Secure・HttpOnly属性付きで生成されること")
+    public void test6() {
+        String result = CookieUtil.deleteCookie("test-cookie", true);
+
+        assertThat(result)
+                .contains("test-cookie=")
+                .contains("Max-Age=0")
+                .contains("HttpOnly")
+                .contains("Secure")
+                .contains("SameSite=Lax")
+                .contains("Path=/");
+    }
+
+    @Test
+    @DisplayName("deleteCookie: isSecureCookie=false の場合、有効期限0・HttpOnly属性のみで生成されること")
+    public void test7() {
+        String result = CookieUtil.deleteCookie("test-cookie", false);
+
+        assertThat(result)
+                .contains("test-cookie=")
+                .contains("Max-Age=0")
+                .contains("HttpOnly")
+                .doesNotContain("Secure")
+                .contains("SameSite=Lax")
+                .contains("Path=/");
+    }
 }
