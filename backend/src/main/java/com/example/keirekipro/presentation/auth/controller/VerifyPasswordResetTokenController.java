@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import lombok.RequiredArgsConstructor;
 
 /**
- * パスワードリセットリンク検証コントローラー
+ * パスワードリセットトークン検証コントローラー
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -27,11 +27,11 @@ public class VerifyPasswordResetTokenController {
     private final VerifyPasswordResetTokenUseCase verifyPasswordResetTokenUseCase;
 
     /**
-     * パスワードリセットリンク検証エンドポイント
+     * パスワードリセットトークン検証エンドポイント
      */
     @PostMapping("/password/reset/verify")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "パスワードリセットリンクの検証", description = "パスワードのリセットリンクの検証を行う")
+    @Operation(summary = "パスワードリセットトークンの検証", description = "パスワードリセットトークンの検証を行う")
     public void handle(@RequestBody RequestPasswordResetVerifyRequest request) {
         verifyPasswordResetTokenUseCase.execute(request.getToken());
     }
