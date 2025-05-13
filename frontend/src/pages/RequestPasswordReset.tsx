@@ -1,13 +1,13 @@
 import { Button } from "@/components/ui";
 import { paths } from "@/config/paths";
-import { ResetRequestPasswordForm } from "@/features/auth";
+import { RequestPasswordResetContainer } from "@/features/auth";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import { Box, Typography } from "@mui/material";
 
 /**
- * パスワードリセットリンク送信画面
+ * パスワードリセット要求
  */
-export const ResetRequestPassword = () => {
+export const RequestPasswordReset = () => {
     return (
         <>
             <Box sx={{ width: "100%", textAlign: "left", mb: 4 }}>
@@ -28,7 +28,7 @@ export const ResetRequestPassword = () => {
                 <br />
                 パスワードリセットのためのメールを送信します。
             </Typography>
-            <ResetRequestPasswordForm />
+            <RequestPasswordResetContainer />
         </>
     );
 };

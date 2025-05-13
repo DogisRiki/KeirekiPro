@@ -6,7 +6,7 @@ export const paths = {
     login: "/login",
     register: "/register",
     password: {
-        resetRquest: "/password/reset",
+        resetRequest: "/password/reset",
         reset: "/password/reset/:token",
         change: "/password/change",
     },
