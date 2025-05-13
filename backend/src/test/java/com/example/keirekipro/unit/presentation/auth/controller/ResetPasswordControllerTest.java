@@ -47,11 +47,12 @@ class ResetPasswordControllerTest {
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String PASSWORD = "Password123";
     private static final String INVALID_PASSWORD = "short";
+    private static final String TOKEN = "reset-token";
 
     @Test
     @DisplayName("正常にパスワードがリセットされる")
     void test1() throws Exception {
-        ResetPasswordRequest request = new ResetPasswordRequest(PASSWORD, PASSWORD);
+        ResetPasswordRequest request = new ResetPasswordRequest(PASSWORD, PASSWORD, TOKEN);
         String requestBody = objectMapper.writeValueAsString(request);
 
         // モックセットアップ
@@ -63,13 +64,13 @@ class ResetPasswordControllerTest {
                 .content(requestBody))
                 .andExpect(status().isNoContent());
 
-        verify(resetPasswordUseCase).execute(USER_ID, PASSWORD);
+        verify(resetPasswordUseCase).execute(TOKEN, PASSWORD);
     }
 
     @Test
     @DisplayName("新しいパスワードが空の場合、バリデーションエラーとなる")
     void test2() throws Exception {
-        ResetPasswordRequest request = new ResetPasswordRequest("", "");
+        ResetPasswordRequest request = new ResetPasswordRequest("", "", TOKEN);
         String requestBody = objectMapper.writeValueAsString(request);
 
         mockMvc.perform(post(
@@ -87,7 +88,7 @@ class ResetPasswordControllerTest {
     @Test
     @DisplayName("新しいパスワードが8文字未満の場合、バリデーションエラーとなる")
     void test3() throws Exception {
-        ResetPasswordRequest request = new ResetPasswordRequest(INVALID_PASSWORD, INVALID_PASSWORD);
+        ResetPasswordRequest request = new ResetPasswordRequest(INVALID_PASSWORD, INVALID_PASSWORD, TOKEN);
         String requestBody = objectMapper.writeValueAsString(request);
 
         mockMvc.perform(post(
@@ -104,7 +105,7 @@ class ResetPasswordControllerTest {
     @Test
     @DisplayName("新しいパスワードと確認パスワードが一致しない場合、バリデーションエラーとなる")
     void test4() throws Exception {
-        ResetPasswordRequest request = new ResetPasswordRequest(PASSWORD, "DifferentPassword123");
+        ResetPasswordRequest request = new ResetPasswordRequest(PASSWORD, "DifferentPassword123", TOKEN);
         String requestBody = objectMapper.writeValueAsString(request);
 
         mockMvc.perform(post(

@@ -32,8 +32,5 @@ public class VerifyPasswordResetTokenUseCase {
         if (userIdOpt.isEmpty()) {
             throw new UseCaseException("リセットリンクが無効または期限切れです。もう一度最初からお試しください。");
         }
-
-        // 取得できたら削除（再利用防止）
-        redisClient.deleteValue(key);
     }
 }

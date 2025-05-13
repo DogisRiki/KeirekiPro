@@ -12,7 +12,9 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
+import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.usecase.auth.ResetPasswordUseCase;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +23,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +34,9 @@ class ResetPasswordUseCaseTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private RedisClient redisClient;
+
     @InjectMocks
     private ResetPasswordUseCase resetPasswordUseCase;
 
@@ -40,6 +44,8 @@ class ResetPasswordUseCaseTest {
     private static final String USERNAME = "test-user";
     private static final String RAW_PASSWORD = "newPassword";
     private static final String HASHED_PASSWORD = "hashedNewPassword";
+    private static final String TOKEN = "reset-token";
+    private static final String REDIS_KEY = "password-reset:" + TOKEN;
 
     @Test
     @DisplayName("パスワードリセットが正常に完了する")
@@ -48,11 +54,12 @@ class ResetPasswordUseCaseTest {
         User user = User.reconstruct(USER_ID, 1, null, "oldHash", false, null, null, USERNAME, null, null);
 
         // モックをセットアップ
+        when(redisClient.getValue(REDIS_KEY, String.class)).thenReturn(Optional.of(USER_ID.toString()));
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(HASHED_PASSWORD);
 
         // ユースケース実行
-        assertThatCode(() -> resetPasswordUseCase.execute(USER_ID, RAW_PASSWORD)).doesNotThrowAnyException();
+        assertThatCode(() -> resetPasswordUseCase.execute(TOKEN, RAW_PASSWORD)).doesNotThrowAnyException();
 
         // 検証
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
@@ -63,18 +70,19 @@ class ResetPasswordUseCaseTest {
         assert saved.getPasswordHash().equals(HASHED_PASSWORD);
 
         verify(passwordEncoder).encode(RAW_PASSWORD);
+        verify(redisClient).deleteValue(REDIS_KEY);
     }
 
     @Test
-    @DisplayName("存在しないユーザーIDの場合、AccessDeniedExceptionがスローされる")
+    @DisplayName("無効なトークンの場合、UseCaseExceptionがスローされる")
     void test2() {
         // モックをセットアップ
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+        when(redisClient.getValue(REDIS_KEY, String.class)).thenReturn(Optional.empty());
 
         // ユースケース実行
-        assertThatThrownBy(() -> resetPasswordUseCase.execute(USER_ID, RAW_PASSWORD))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessage("不正なアクセスです。");
+        assertThatThrownBy(() -> resetPasswordUseCase.execute(TOKEN, RAW_PASSWORD))
+                .isInstanceOf(UseCaseException.class)
+                .hasMessage("リセットリンクが無効または期限切れです。もう一度最初からお試しください。");
 
         // 検証
         verify(passwordEncoder, never()).encode(RAW_PASSWORD);

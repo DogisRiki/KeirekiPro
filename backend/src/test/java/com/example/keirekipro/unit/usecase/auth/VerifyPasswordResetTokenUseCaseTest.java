@@ -2,7 +2,6 @@ package com.example.keirekipro.unit.usecase.auth;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -40,9 +39,6 @@ class VerifyPasswordResetTokenUseCaseTest {
         // ユースケース実行
         assertThatCode(() -> verifyPasswordResetTokenUseCase.execute(TOKEN))
                 .doesNotThrowAnyException();
-
-        // 検証
-        verify(redisClient).deleteValue("password-reset:" + TOKEN);
     }
 
     @Test

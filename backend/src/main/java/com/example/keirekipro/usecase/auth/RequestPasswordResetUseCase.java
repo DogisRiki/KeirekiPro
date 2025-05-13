@@ -55,9 +55,9 @@ public class RequestPasswordResetUseCase {
                     // トークンを生成
                     String token = securityUtil.generateRandomToken();
 
-                    // トークンをRedisに保存
-                    String redisKey = "password-reset:" + token;
-                    redisClient.setValue(redisKey, user.getId().toString(), Duration.ofMinutes(10));
+                    // トークンを保存
+                    String key = "password-reset:" + token;
+                    redisClient.setValue(key, user.getId().toString(), Duration.ofMinutes(10));
 
                     // リセットリンクを生成
                     String resetLink = frontendBaseUrl + "/password/reset/" + token;

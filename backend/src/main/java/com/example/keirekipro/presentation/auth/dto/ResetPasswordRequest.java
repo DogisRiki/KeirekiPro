@@ -26,4 +26,6 @@ public class ResetPasswordRequest {
 
     @NotBlank(message = "新しいパスワード(確認)は入力必須です。")
     private String confirmPassword;
+
+    private String token;
 }
