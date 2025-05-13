@@ -15,26 +15,31 @@ const SlideDown = React.forwardRef(function SlideDown(
  * ジェネラルエラー表示バナー
  */
 export const ErrorBanner = () => {
-    const { message, clearErrors } = useErrorMessageStore();
+    const { message } = useErrorMessageStore();
     const [open, setOpen] = useState(false);
+    const [dismissed, setDismissed] = useState(false);
 
-    /**
-     * メッセージがストアに格納されたら発火
-     */
     useEffect(() => {
-        if (message) setOpen(true);
+        if (message) {
+            setDismissed(false); // 新しいエラーが来たら再表示できるように
+            setOpen(true);
+        }
     }, [message]);
 
-    const handleClose = () => setOpen(false);
+    const handleClose = (_: React.SyntheticEvent | Event, reason?: string) => {
+        if (reason === "clickaway") return;
+        setOpen(false); // バナーを閉じる
+        setDismissed(true); // 閉じたことを記憶
+    };
 
-    const handleExited = () => clearErrors();
+    // 表示条件：メッセージがあり、まだ手動で閉じられていない
+    if (!message || dismissed) return null;
 
     return (
         <Snackbar
             open={open}
             onClose={handleClose}
             TransitionComponent={SlideDown}
-            TransitionProps={{ onExited: handleExited }}
             anchorOrigin={{ vertical: "top", horizontal: "center" }}
             sx={{ mt: 2 }}
         >

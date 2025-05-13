@@ -1,7 +1,7 @@
 import { paths } from "@/config/paths";
 import { useTwoFactorStore, verifyTwoFactor } from "@/features/auth";
 import { protectedApiClient } from "@/lib";
-import { useUserAuthStore } from "@/stores";
+import { useErrorMessageStore, useUserAuthStore } from "@/stores";
 import { User } from "@/types";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
@@ -13,10 +13,12 @@ export const useVerifyTwoFactor = () => {
     const navigate = useNavigate();
     const { setLogin } = useUserAuthStore();
     const { userId, clear } = useTwoFactorStore();
+    const { clearErrors } = useErrorMessageStore();
 
     return useMutation({
         mutationFn: (code: string) => verifyTwoFactor({ userId: userId as string, code }),
         onSuccess: async () => {
+            clearErrors();
             clear();
             const { data } = await protectedApiClient.get<User>("/users/me");
             setLogin(data);

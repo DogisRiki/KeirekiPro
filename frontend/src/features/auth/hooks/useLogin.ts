@@ -1,7 +1,7 @@
 import { paths } from "@/config/paths";
 import { login, LoginPayload, useTwoFactorStore } from "@/features/auth";
 import { protectedApiClient } from "@/lib";
-import { useUserAuthStore } from "@/stores";
+import { useErrorMessageStore, useUserAuthStore } from "@/stores";
 import { User } from "@/types";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
@@ -13,10 +13,12 @@ export const useLogin = () => {
     const navigate = useNavigate();
     const { setLogin } = useUserAuthStore();
     const { setUserId } = useTwoFactorStore();
+    const { clearErrors } = useErrorMessageStore();
 
     return useMutation({
         mutationFn: (payload: LoginPayload) => login(payload),
         onSuccess: async (response) => {
+            clearErrors();
             // 2FAが無効
             if (response.status === 200) {
                 const { data } = await protectedApiClient.get<User>("/users/me");

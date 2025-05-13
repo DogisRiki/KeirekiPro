@@ -70,7 +70,7 @@ export const LoginForm = ({
                     mt: 1,
                 }}
             >
-                <Link to={paths.password.resetRquest} variant="caption" sx={{ alignSelf: "flex-start", mb: 2 }}>
+                <Link to={paths.password.resetRequest} variant="caption" sx={{ alignSelf: "flex-start", mb: 2 }}>
                     パスワードをお忘れですか？
                 </Link>
                 <Button type="submit" sx={{ ...buttonStyle, mb: 2 }} disabled={loading}>

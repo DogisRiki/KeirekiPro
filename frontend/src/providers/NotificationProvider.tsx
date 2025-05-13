@@ -8,6 +8,14 @@ import { useEffect } from "react";
 export const NotificationProvider = () => {
     const { message, type, isShow, clearNotification, setNotification } = useNotificationStore();
 
+    // 5秒でトーストを自動で閉じる
+    const duration = 5000;
+
+    const handleClose = (_: React.SyntheticEvent | Event, reason?: string) => {
+        if (reason === "clickaway") return;
+        clearNotification();
+    };
+
     useEffect(() => {
         // セッションに保存された通知があれば取り出して再表示
         const cached = sessionStorage.getItem("global-toast");
@@ -18,13 +26,10 @@ export const NotificationProvider = () => {
         }
     }, [setNotification]);
 
-    // 成功: 3秒 / 失敗: 5秒でトーストを自動で閉じる
-    const duration = type === "success" ? 3000 : 5000;
-
     return (
         <Snackbar
             open={isShow}
-            onClose={clearNotification}
+            onClose={handleClose}
             autoHideDuration={duration}
             anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >

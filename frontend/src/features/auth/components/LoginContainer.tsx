@@ -1,5 +1,4 @@
 import { LoginForm, useAuthorizeOidc, useLogin } from "@/features/auth";
-import { useErrorMessageStore } from "@/stores";
 import { useState } from "react";
 
 /**
@@ -10,18 +9,15 @@ export const LoginContainer = () => {
     const [password, setPassword] = useState("");
     const loginMutation = useLogin();
     const oidcMutation = useAuthorizeOidc();
-    const { clearErrors } = useErrorMessageStore();
 
     return (
         <LoginForm
             email={email}
             password={password}
             onEmailChange={(v) => {
-                clearErrors();
                 setEmail(v);
             }}
             onPasswordChange={(v) => {
-                clearErrors();
                 setPassword(v);
             }}
             onSubmit={() => loginMutation.mutate({ email, password })}

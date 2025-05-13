@@ -1,5 +1,4 @@
 import { UserRegisterForm, useUserRegister } from "@/features/auth";
-import { useErrorMessageStore } from "@/stores";
 import { useState } from "react";
 
 /**
@@ -12,7 +11,6 @@ export const UserRegisterContainer = () => {
     const [confirmPassword, setConfirmPassword] = useState("");
 
     const registerMutation = useUserRegister();
-    const { clearErrors } = useErrorMessageStore();
 
     return (
         <UserRegisterForm
@@ -21,19 +19,15 @@ export const UserRegisterContainer = () => {
             password={password}
             confirmPassword={confirmPassword}
             onEmailChange={(v) => {
-                clearErrors();
                 setEmail(v);
             }}
             onUsernameChange={(v) => {
-                clearErrors();
                 setUsername(v);
             }}
             onPasswordChange={(v) => {
-                clearErrors();
                 setPassword(v);
             }}
             onConfirmPasswordChange={(v) => {
-                clearErrors();
                 setConfirmPassword(v);
             }}
             onSubmit={() => registerMutation.mutate({ email, username, password, confirmPassword })}
