@@ -6,9 +6,9 @@ import { redirect } from "react-router";
 
 const fetchCurrentUser = async (): Promise<User | null> => {
     try {
-        // ✅ baseURL に /api が含まれるので先頭 `/api` を削除
+        // ✅ baseURLに/apiが含まれるので先頭の/apiを削除
         const { data } = await protectedApiClient.get<User>("/users/me", {
-            skipAuthRefresh: true, // ✅ 未ログイン時に 401 となっても refresh させない
+            skipAuthRefresh: true, // 未ログイン時に401となってもrefreshさせない
         });
         return data;
     } catch {

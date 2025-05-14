@@ -1,8 +1,7 @@
 import { paths } from "@/config/paths";
 import { useTwoFactorStore, verifyTwoFactor } from "@/features/auth";
-import { protectedApiClient } from "@/lib";
+import { getUserInfo } from "@/hooks";
 import { useErrorMessageStore, useUserAuthStore } from "@/stores";
-import { User } from "@/types";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 
@@ -20,7 +19,7 @@ export const useVerifyTwoFactor = () => {
         onSuccess: async () => {
             clearErrors();
             clear();
-            const { data } = await protectedApiClient.get<User>("/users/me");
+            const data = await getUserInfo();
             setLogin(data);
             navigate(paths.resume.list, { replace: true });
         },
