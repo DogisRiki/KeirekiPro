@@ -28,6 +28,7 @@ public class UserDto {
     @Data
     public static class AuthProviderDto {
         private UUID id;
+        private UUID userId;
         private String providerName;
         private String providerUserId;
         private LocalDateTime createdAt;

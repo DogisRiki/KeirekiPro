@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,84 +34,61 @@ class UserMapperTest {
 
     private final UserMapper userMapper;
 
-    private static final UUID USERID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String EMAIL = "test@keirekipro.click";
     private static final String USERNAME = "test-user";
     private static final String PROFILE_IMAGE = "profile/test-user.jpg";
     private static final String PASSWORD = "hashedPassword";
-    private static final UUID AUTH_PROVIDER_ID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479");
-    private static final String PROVIDER_NAME = "google";
-    private static final String PROVIDER_USER_ID = "109876543210987654321";
+
+    private static final UUID GOOGLE_AUTH_PROVIDER_ID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479");
+    private static final String GOOGLE_PROVIDER_NAME = "google";
+    private static final String GOOGLE_PROVIDER_USER_ID = "109876543210987654321";
+
+    private static final UUID GITHUB_AUTH_PROVIDER_ID = UUID.fromString("3f8e7f2e-34a1-4c5b-9d7a-8f6e2c1b0a9f");
+    private static final String GITHUB_PROVIDER_NAME = "github";
+    private static final String GITHUB_PROVIDER_USER_ID = "482915736";
+
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2023, 1, 1, 0, 0);
     private static final LocalDateTime UPDATED_AT = LocalDateTime.of(2023, 1, 2, 0, 0);
 
     @Test
     @DisplayName("selectById_ユーザーが存在する場合、正しく取得できる")
     void test1() {
-        // セットアップ：ユーザーと外部認証プロバイダーを登録
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(false);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
-        AuthProviderDto ap = new AuthProviderDto();
-        ap.setId(AUTH_PROVIDER_ID);
-        ap.setProviderName(PROVIDER_NAME);
-        ap.setProviderUserId(PROVIDER_USER_ID);
-        ap.setCreatedAt(CREATED_AT);
-        ap.setUpdatedAt(UPDATED_AT);
-        dto.setAuthProviders(List.of(ap));
-        userMapper.upsert(dto);
+        // セットアップ：ユーザーのみ登録
+        UserDto dto = createUserDto();
+        userMapper.upsertUser(dto);
 
         // テスト実行
-        Optional<UserDto> opt = userMapper.selectById(USERID);
+        Optional<UserDto> opt = userMapper.selectById(USER_ID);
 
         // 検証
         assertThat(opt).isPresent();
         UserDto loaded = opt.get();
-        assertThat(loaded.getId()).isEqualTo(USERID);
+        assertThat(loaded.getId()).isEqualTo(USER_ID);
         assertThat(loaded.getEmail()).isEqualTo(EMAIL);
         assertThat(loaded.getUsername()).isEqualTo(USERNAME);
         assertThat(loaded.getProfileImage()).isEqualTo(PROFILE_IMAGE);
-        assertThat(loaded.isTwoFactorAuthEnabled()).isFalse();
+        assertThat(loaded.isTwoFactorAuthEnabled()).isTrue();
         assertThat(loaded.getCreatedAt()).isEqualTo(CREATED_AT);
         assertThat(loaded.getUpdatedAt()).isEqualTo(UPDATED_AT);
-        assertThat(loaded.getAuthProviders())
-                .hasSize(1)
-                .first()
-                .satisfies(p -> {
-                    assertThat(p.getId()).isEqualTo(AUTH_PROVIDER_ID);
-                    assertThat(p.getProviderName()).isEqualTo(PROVIDER_NAME);
-                    assertThat(p.getProviderUserId()).isEqualTo(PROVIDER_USER_ID);
-                });
+        assertThat(loaded.getAuthProviders()).isEmpty();
     }
 
     @Test
     @DisplayName("selectById_ユーザーが存在しない場合、空のOptionalが返る")
     void test2() {
-        Optional<UserDto> opt = userMapper.selectById(USERID);
+        Optional<UserDto> opt = userMapper.selectById(USER_ID);
         assertThat(opt).isEmpty();
     }
 
     @Test
     @DisplayName("selectByEmail_ユーザーが存在する場合、正しく取得できる")
     void test3() {
-        // セットアップ：ユーザーを登録（プロバイダーなし）
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(true);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
-        dto.setAuthProviders(Collections.emptyList());
-        userMapper.upsert(dto);
+        // セットアップ：ユーザーとgoogleプロバイダーを登録
+        UserDto userDto = createUserDto();
+        AuthProviderDto apDto = createGoogleAuthProviderDto();
+        userMapper.upsertUser(userDto);
+        userMapper.insertAuthProvider(apDto);
 
         // テスト実行
         Optional<UserDto> opt = userMapper.selectByEmail(EMAIL);
@@ -120,10 +96,21 @@ class UserMapperTest {
         // 検証
         assertThat(opt).isPresent();
         UserDto loaded = opt.get();
+        assertThat(loaded.getId()).isEqualTo(USER_ID);
         assertThat(loaded.getEmail()).isEqualTo(EMAIL);
         assertThat(loaded.getUsername()).isEqualTo(USERNAME);
+        assertThat(loaded.getProfileImage()).isEqualTo(PROFILE_IMAGE);
         assertThat(loaded.isTwoFactorAuthEnabled()).isTrue();
-        assertThat(loaded.getAuthProviders()).isEmpty();
+        assertThat(loaded.getCreatedAt()).isEqualTo(CREATED_AT);
+        assertThat(loaded.getUpdatedAt()).isEqualTo(UPDATED_AT);
+        assertThat(loaded.getAuthProviders())
+                .hasSize(1)
+                .first()
+                .satisfies(p -> {
+                    assertThat(p.getId()).isEqualTo(GOOGLE_AUTH_PROVIDER_ID);
+                    assertThat(p.getProviderName()).isEqualTo(GOOGLE_PROVIDER_NAME);
+                    assertThat(p.getProviderUserId()).isEqualTo(GOOGLE_PROVIDER_USER_ID);
+                });
     }
 
     @Test
@@ -134,212 +121,246 @@ class UserMapperTest {
     }
 
     @Test
-    @DisplayName("selectById_プロバイダーなしの場合、authProvidersは空のリストになる")
+    @DisplayName("selectByProvider_ユーザーが存在する場合、正しく取得できる")
     void test5() {
-        // セットアップ：プロバイダーなしユーザー登録
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(false);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
-        dto.setAuthProviders(Collections.emptyList());
-        userMapper.upsert(dto);
+        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録
+        UserDto userDto = createUserDto();
+        AuthProviderDto googleDto = createGoogleAuthProviderDto();
+        AuthProviderDto githubDto = createGitHubAuthProviderDto();
+        userMapper.upsertUser(userDto);
+        userMapper.insertAuthProvider(googleDto);
+        userMapper.insertAuthProvider(githubDto);
 
         // テスト実行
-        UserDto loaded = userMapper.selectById(USERID).orElseThrow();
-        assertThat(loaded.getAuthProviders()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("selectByEmail_プロバイダーなしの場合、authProvidersは空のリストになる")
-    void test6() {
-        // セットアップ：プロバイダーなしユーザー登録
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(false);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
-        dto.setAuthProviders(Collections.emptyList());
-        userMapper.upsert(dto);
-
-        // テスト実行
-        UserDto loaded = userMapper.selectByEmail(EMAIL).orElseThrow();
-        assertThat(loaded.getAuthProviders()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("upsert_新規作成時にusersとuser_auth_providersにレコードが登録される")
-    void test7() {
-        // セットアップなし（空DB）
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(true);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
-        AuthProviderDto ap = new AuthProviderDto();
-        ap.setId(AUTH_PROVIDER_ID);
-        ap.setProviderName(PROVIDER_NAME);
-        ap.setProviderUserId(PROVIDER_USER_ID);
-        ap.setCreatedAt(CREATED_AT);
-        ap.setUpdatedAt(UPDATED_AT);
-        dto.setAuthProviders(List.of(ap));
-
-        // 実行
-        userMapper.upsert(dto);
+        Optional<UserDto> opt1 = userMapper.selectByProvider(GOOGLE_PROVIDER_NAME,
+                GOOGLE_PROVIDER_USER_ID);
+        Optional<UserDto> opt2 = userMapper.selectByProvider(GITHUB_PROVIDER_NAME,
+                GITHUB_PROVIDER_USER_ID);
 
         // 検証
-        UserDto loaded = userMapper.selectById(USERID).orElseThrow();
+        assertThat(opt1).isPresent();
+        UserDto loaded1 = opt1.get();
+        assertThat(loaded1.getId()).isEqualTo(USER_ID);
+        assertThat(loaded1.getEmail()).isEqualTo(EMAIL);
+        assertThat(loaded1.getUsername()).isEqualTo(USERNAME);
+        assertThat(loaded1.getProfileImage()).isEqualTo(PROFILE_IMAGE);
+        assertThat(loaded1.isTwoFactorAuthEnabled()).isTrue();
+        assertThat(loaded1.getCreatedAt()).isEqualTo(CREATED_AT);
+        assertThat(loaded1.getUpdatedAt()).isEqualTo(UPDATED_AT);
+        assertThat(loaded1.getAuthProviders())
+                .hasSize(1)
+                .anySatisfy(p -> {
+                    assertThat(p.getId()).isEqualTo(GOOGLE_AUTH_PROVIDER_ID);
+                    assertThat(p.getProviderName()).isEqualTo(GOOGLE_PROVIDER_NAME);
+                    assertThat(p.getProviderUserId()).isEqualTo(GOOGLE_PROVIDER_USER_ID);
+                });
+
+        assertThat(opt2).isPresent();
+        UserDto loaded2 = opt2.get();
+        assertThat(loaded2.getId()).isEqualTo(USER_ID);
+        assertThat(loaded2.getEmail()).isEqualTo(EMAIL);
+        assertThat(loaded2.getUsername()).isEqualTo(USERNAME);
+        assertThat(loaded2.getProfileImage()).isEqualTo(PROFILE_IMAGE);
+        assertThat(loaded2.isTwoFactorAuthEnabled()).isTrue();
+        assertThat(loaded2.getCreatedAt()).isEqualTo(CREATED_AT);
+        assertThat(loaded2.getUpdatedAt()).isEqualTo(UPDATED_AT);
+        assertThat(loaded2.getAuthProviders())
+                .hasSize(1)
+                .anySatisfy(p -> {
+                    assertThat(p.getId()).isEqualTo(GITHUB_AUTH_PROVIDER_ID);
+                    assertThat(p.getProviderName()).isEqualTo(GITHUB_PROVIDER_NAME);
+                    assertThat(p.getProviderUserId()).isEqualTo(GITHUB_PROVIDER_USER_ID);
+                });
+    }
+
+    @Test
+    @DisplayName("selectByProvider_ユーザーが存在しない場合、空のOptionalが返る")
+    void test6() {
+        Optional<UserDto> opt = userMapper.selectByProvider(GOOGLE_PROVIDER_NAME, GOOGLE_PROVIDER_USER_ID);
+        assertThat(opt).isEmpty();
+    }
+
+    @Test
+    @DisplayName("upsert_ユーザー情報を新規登録できる")
+    void test7() {
+        // 挿入用データ
+        UserDto dto = createUserDto();
+
+        // 実行
+        userMapper.upsertUser(dto);
+
+        // 検証
+        Optional<UserDto> opt = userMapper.selectById(USER_ID);
+        assertThat(opt).isPresent();
+        UserDto loaded = opt.get();
+        assertThat(loaded.getId()).isEqualTo(USER_ID);
+        assertThat(loaded.getEmail()).isEqualTo(EMAIL);
         assertThat(loaded.getUsername()).isEqualTo(USERNAME);
-        assertThat(loaded.getAuthProviders()).hasSize(1);
+        assertThat(loaded.getProfileImage()).isEqualTo(PROFILE_IMAGE);
+        assertThat(loaded.isTwoFactorAuthEnabled()).isTrue();
+        assertThat(loaded.getCreatedAt()).isEqualTo(CREATED_AT);
+        assertThat(loaded.getUpdatedAt()).isEqualTo(UPDATED_AT);
+        assertThat(loaded.getAuthProviders()).isEmpty();
     }
 
     @Test
     @DisplayName("upsert_既存ユーザーを更新するとユーザー情報が更新される")
     void test8() {
-        // セットアップ：初回登録
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(false);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
-        dto.setAuthProviders(Collections.emptyList());
-        userMapper.upsert(dto);
-
-        // 更新用DTO
-        UserDto updated = new UserDto();
-        updated.setId(USERID);
-        updated.setEmail(EMAIL);
-        updated.setPassword(PASSWORD);
-        updated.setUsername(USERNAME + "-upd");
-        updated.setProfileImage(PROFILE_IMAGE + ".upd");
-        updated.setTwoFactorAuthEnabled(true);
-        updated.setCreatedAt(CREATED_AT);
-        updated.setUpdatedAt(UPDATED_AT.plusDays(1));
-        updated.setAuthProviders(Collections.emptyList());
+        // 挿入用データ
+        UserDto dto = createUserDto();
 
         // 実行
-        userMapper.upsert(updated);
+        userMapper.upsertUser(dto);
+
+        // 更新用DTO
+        UserDto updated = createUserDto();
+        updated.setEmail(EMAIL + "-upd");
+        updated.setPassword(PASSWORD + "-upd");
+        updated.setUsername(USERNAME + "-upd");
+        updated.setProfileImage(PROFILE_IMAGE + ".upd");
+        updated.setTwoFactorAuthEnabled(false);
+        updated.setUpdatedAt(LocalDateTime.now());
+
+        // 実行
+        userMapper.upsertUser(updated);
 
         // 検証
-        UserDto loaded = userMapper.selectById(USERID).orElseThrow();
+        Optional<UserDto> opt = userMapper.selectById(USER_ID);
+        assertThat(opt).isPresent();
+        UserDto loaded = opt.get();
+        assertThat(loaded.getEmail()).isEqualTo(EMAIL + "-upd");
+        assertThat(loaded.getPassword()).isEqualTo(PASSWORD + "-upd");
         assertThat(loaded.getUsername()).isEqualTo(USERNAME + "-upd");
-        assertThat(loaded.getProfileImage()).endsWith(".upd");
-        assertThat(loaded.isTwoFactorAuthEnabled()).isTrue();
-    }
-
-    @Test
-    @DisplayName("upsert_プロバイダーリストを空にすると関連情報が削除される")
-    void test9() {
-        // セットアップ：プロバイダーありで初回登録
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(false);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
-        AuthProviderDto ap = new AuthProviderDto();
-        ap.setId(AUTH_PROVIDER_ID);
-        ap.setProviderName(PROVIDER_NAME);
-        ap.setProviderUserId(PROVIDER_USER_ID);
-        ap.setCreatedAt(CREATED_AT);
-        ap.setUpdatedAt(UPDATED_AT);
-        dto.setAuthProviders(List.of(ap));
-        userMapper.upsert(dto);
-
-        // プロバイダーを空にして再登録
-        dto.setAuthProviders(Collections.emptyList());
-        userMapper.upsert(dto);
-
-        // 検証
-        UserDto loaded = userMapper.selectById(USERID).orElseThrow();
-        assertThat(loaded.getAuthProviders()).isEmpty();
+        assertThat(loaded.getProfileImage()).isEqualTo(PROFILE_IMAGE + ".upd");
+        assertThat(loaded.isTwoFactorAuthEnabled()).isFalse();
+        assertThat(loaded.getCreatedAt()).isEqualTo(dto.getCreatedAt());
+        assertThat(loaded.getUpdatedAt()).isNotEqualTo(dto.getUpdatedAt());
     }
 
     @Test
     @DisplayName("delete_ユーザーとプロバイダー情報を削除できる")
-    void test10() {
-        // セットアップ：プロバイダーありで登録
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(true);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
-        AuthProviderDto ap = new AuthProviderDto();
-        ap.setId(AUTH_PROVIDER_ID);
-        ap.setProviderName(PROVIDER_NAME);
-        ap.setProviderUserId(PROVIDER_USER_ID);
-        ap.setCreatedAt(CREATED_AT);
-        ap.setUpdatedAt(UPDATED_AT);
-        dto.setAuthProviders(List.of(ap));
-        userMapper.upsert(dto);
+    void test9() {
+        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録
+        UserDto userDto = createUserDto();
+        AuthProviderDto googleDto = createGoogleAuthProviderDto();
+        AuthProviderDto githubDto = createGitHubAuthProviderDto();
+        userMapper.upsertUser(userDto);
+        userMapper.insertAuthProvider(googleDto);
+        userMapper.insertAuthProvider(githubDto);
 
         // 実行：削除
-        userMapper.delete(USERID);
+        userMapper.delete(USER_ID);
 
         // 検証
-        assertThat(userMapper.selectById(USERID)).isEmpty();
-        assertThat(userMapper.selectByEmail(EMAIL)).isEmpty();
+        assertThat(userMapper.selectById(USER_ID)).isEmpty();
     }
 
     @Test
-    @DisplayName("selectByProvider_指定されたプロバイダー情報でユーザーが取得できる")
+    @DisplayName("insertAuthProvider_外部連携認証情報を登録できる")
     void test11() {
         // セットアップ：プロバイダー付きユーザーを登録
-        UserDto dto = new UserDto();
-        dto.setId(USERID);
-        dto.setEmail(EMAIL);
-        dto.setPassword(PASSWORD);
-        dto.setUsername(USERNAME);
-        dto.setProfileImage(PROFILE_IMAGE);
-        dto.setTwoFactorAuthEnabled(true);
-        dto.setCreatedAt(CREATED_AT);
-        dto.setUpdatedAt(UPDATED_AT);
+        UserDto userDto = createUserDto();
+        AuthProviderDto apDto = createGoogleAuthProviderDto();
+        userMapper.upsertUser(userDto);
+        userMapper.insertAuthProvider(apDto);
 
-        AuthProviderDto ap = new AuthProviderDto();
-        ap.setId(AUTH_PROVIDER_ID);
-        ap.setProviderName(PROVIDER_NAME);
-        ap.setProviderUserId(PROVIDER_USER_ID);
-        ap.setCreatedAt(CREATED_AT);
-        ap.setUpdatedAt(UPDATED_AT);
-
-        dto.setAuthProviders(List.of(ap));
-        userMapper.upsert(dto);
-
-        // テスト実行：プロバイダーで検索
-        Optional<UserDto> opt = userMapper.selectByProvider(PROVIDER_NAME, PROVIDER_USER_ID);
+        // テスト実行
+        Optional<UserDto> opt = userMapper.selectByEmail(EMAIL);
 
         // 検証
         assertThat(opt).isPresent();
         UserDto loaded = opt.get();
-        assertThat(loaded.getId()).isEqualTo(USERID);
+        assertThat(loaded.getId()).isEqualTo(USER_ID);
         assertThat(loaded.getEmail()).isEqualTo(EMAIL);
         assertThat(loaded.getUsername()).isEqualTo(USERNAME);
-        assertThat(loaded.getAuthProviders()).hasSize(1);
-        assertThat(loaded.getAuthProviders().get(0).getProviderName()).isEqualTo(PROVIDER_NAME);
-        assertThat(loaded.getAuthProviders().get(0).getProviderUserId()).isEqualTo(PROVIDER_USER_ID);
+        assertThat(loaded.getProfileImage()).isEqualTo(PROFILE_IMAGE);
+        assertThat(loaded.isTwoFactorAuthEnabled()).isTrue();
+        assertThat(loaded.getCreatedAt()).isEqualTo(CREATED_AT);
+        assertThat(loaded.getUpdatedAt()).isEqualTo(UPDATED_AT);
+        assertThat(loaded.getAuthProviders())
+                .hasSize(1)
+                .first()
+                .satisfies(p -> {
+                    assertThat(p.getId()).isEqualTo(GOOGLE_AUTH_PROVIDER_ID);
+                    assertThat(p.getProviderName()).isEqualTo(GOOGLE_PROVIDER_NAME);
+                    assertThat(p.getProviderUserId()).isEqualTo(GOOGLE_PROVIDER_USER_ID);
+                });
     }
 
+    @Test
+    @DisplayName("deleteAuthProviderByName_プロバイダー名で外部連携認証情報を削除できる")
+    void test12() {
+        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録
+        UserDto userDto = createUserDto();
+        AuthProviderDto googleDto = createGoogleAuthProviderDto();
+        AuthProviderDto githubDto = createGitHubAuthProviderDto();
+        userMapper.upsertUser(userDto);
+        userMapper.insertAuthProvider(googleDto);
+        userMapper.insertAuthProvider(githubDto);
+
+        // テスト実行(1回目)
+        userMapper.deleteAuthProviderByName(USER_ID, GOOGLE_PROVIDER_NAME);
+
+        // 検証
+        Optional<UserDto> opt1 = userMapper.selectById(USER_ID);
+        assertThat(opt1).isPresent();
+        UserDto loaded1 = opt1.get();
+        assertThat(loaded1.getUpdatedAt()).isEqualTo(UPDATED_AT);
+        assertThat(loaded1.getAuthProviders())
+                .hasSize(1);
+
+        // テスト実行(2回目)
+        userMapper.deleteAuthProviderByName(USER_ID, GITHUB_PROVIDER_NAME);
+
+        // 検証
+        Optional<UserDto> opt2 = userMapper.selectById(USER_ID);
+        assertThat(opt2).isPresent();
+        UserDto loaded2 = opt2.get();
+        assertThat(loaded2.getAuthProviders()).hasSize(0);
+    }
+
+    /**
+     * Google用のAuthProviderDtoを作成するヘルパーメソッド
+     */
+    private AuthProviderDto createGoogleAuthProviderDto() {
+        AuthProviderDto dto = new AuthProviderDto();
+        dto.setId(GOOGLE_AUTH_PROVIDER_ID);
+        dto.setUserId(USER_ID);
+        dto.setProviderName(GOOGLE_PROVIDER_NAME);
+        dto.setProviderUserId(GOOGLE_PROVIDER_USER_ID);
+        dto.setCreatedAt(CREATED_AT);
+        dto.setUpdatedAt(UPDATED_AT);
+        return dto;
+    }
+
+    /**
+     * GitHub用のAuthProviderDtoを作成するヘルパーメソッド
+     */
+    private AuthProviderDto createGitHubAuthProviderDto() {
+        AuthProviderDto dto = new AuthProviderDto();
+        dto.setId(GITHUB_AUTH_PROVIDER_ID);
+        dto.setUserId(USER_ID);
+        dto.setProviderName(GITHUB_PROVIDER_NAME);
+        dto.setProviderUserId(GITHUB_PROVIDER_USER_ID);
+        dto.setCreatedAt(CREATED_AT);
+        dto.setUpdatedAt(UPDATED_AT);
+        return dto;
+    }
+
+    /**
+     * UserDtoを作成するヘルパーメソッド
+     */
+    private UserDto createUserDto() {
+        UserDto dto = new UserDto();
+        dto.setId(USER_ID);
+        dto.setEmail(EMAIL);
+        dto.setPassword(PASSWORD);
+        dto.setUsername(USERNAME);
+        dto.setProfileImage(PROFILE_IMAGE);
+        dto.setTwoFactorAuthEnabled(true);
+        dto.setCreatedAt(CREATED_AT);
+        dto.setUpdatedAt(UPDATED_AT);
+        dto.setAuthProviders(Collections.emptyList());
+        return dto;
+    }
 }

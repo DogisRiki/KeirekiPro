@@ -42,7 +42,15 @@ public class MyBatisUserRepository implements UserRepository {
 
     @Override
     public void save(User user) {
-        mapper.upsert(toDto(user));
+        // ユーザー情報のupsert
+        UserDto dto = toDto(user);
+        mapper.upsertUser(dto);
+
+        // プロバイダー単位でdelete→insert
+        for (UserDto.AuthProviderDto apDto : dto.getAuthProviders()) {
+            mapper.deleteAuthProviderByName(dto.getId(), apDto.getProviderName());
+            mapper.insertAuthProvider(apDto);
+        }
     }
 
     @Override
@@ -99,9 +107,10 @@ public class MyBatisUserRepository implements UserRepository {
                         .map(p -> {
                             UserDto.AuthProviderDto ap = new UserDto.AuthProviderDto();
                             ap.setId(p.getId());
+                            ap.setUserId(user.getId());
                             ap.setProviderName(p.getProviderName());
                             ap.setProviderUserId(p.getProviderUserId());
-                            ap.setCreatedAt(p.getUpdatedAt());
+                            ap.setCreatedAt(p.getCreatedAt());
                             ap.setUpdatedAt(p.getUpdatedAt());
                             return ap;
                         })

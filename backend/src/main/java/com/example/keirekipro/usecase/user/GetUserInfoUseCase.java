@@ -56,6 +56,7 @@ public class GetUserInfoUseCase {
                 .id(user.getId())
                 .email(user.getEmail() != null ? user.getEmail().getValue() : null)
                 .username(user.getUsername())
+                .hasPassword(user.getPasswordHash() != null)
                 .profileImage(imageUrl)
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
                 .authProviders(providers)

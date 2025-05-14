@@ -2,7 +2,6 @@ package com.example.keirekipro.presentation.user.controller;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.dto.UserInfoResponse;
@@ -53,21 +52,19 @@ public class GetUserInfoController {
      */
     private UserInfoResponse convertToResponse(GetUserInfoUseCaseDto dto) {
 
-        List<UserInfoResponse.AuthProviderInfo> authProviders = null;
+        List<String> authProviders = null;
 
         if (dto.getAuthProviders() != null) {
             authProviders = dto.getAuthProviders().stream()
-                    .map(provider -> new UserInfoResponse.AuthProviderInfo(
-                            provider.getId().toString(),
-                            provider.getProviderType(),
-                            provider.getProviderUserId()))
-                    .collect(Collectors.toList());
+                    .map(provider -> provider.getProviderName())
+                    .toList();
         }
 
         return UserInfoResponse.builder()
                 .id(dto.getId().toString())
                 .email(dto.getEmail())
                 .username(dto.getUsername())
+                .hasPassword(dto.isHasPassword())
                 .profileImage(dto.getProfileImage())
                 .twoFactorAuthEnabled(dto.isTwoFactorAuthEnabled())
                 .authProviders(authProviders)

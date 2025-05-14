@@ -18,6 +18,7 @@ public class GetUserInfoUseCaseDto {
     private final UUID id;
     private final String email;
     private final String username;
+    private final boolean hasPassword;
     private final String profileImage;
     private final boolean twoFactorAuthEnabled;
     private final List<AuthProviderInfo> authProviders;
@@ -29,7 +30,7 @@ public class GetUserInfoUseCaseDto {
     @Getter
     public static class AuthProviderInfo {
         private final UUID id;
-        private final String providerType;
+        private final String providerName;
         private final String providerUserId;
     }
 }

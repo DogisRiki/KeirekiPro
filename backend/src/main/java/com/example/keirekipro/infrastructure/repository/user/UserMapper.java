@@ -39,11 +39,11 @@ public interface UserMapper {
             @Param("providerUserId") String providerUserId);
 
     /**
-     * ユーザーを作成/更新する
+     * ユーザー情報を作成/更新する
      *
-     * @param user ユーザーDTO
+     * @param dto ユーザーDTO
      */
-    void upsert(UserDto user);
+    void upsertUser(UserDto dto);
 
     /**
      * ユーザーを削除する
@@ -51,4 +51,19 @@ public interface UserMapper {
      * @param userId ユーザーID
      */
     void delete(@Param("id") UUID userId);
+
+    /**
+     * 外部連携認証情報を登録する
+     *
+     * @param dto 外部連携認証情報DTO
+     */
+    void insertAuthProvider(UserDto.AuthProviderDto dto);
+
+    /**
+     * ユーザーIDとプロバイダー名で外部連携認証情報を削除する
+     *
+     * @param userId       ユーザーID
+     * @param providerName プロバイダー名
+     */
+    void deleteAuthProviderByName(@Param("userId") UUID userId, @Param("providerName") String providerName);
 }

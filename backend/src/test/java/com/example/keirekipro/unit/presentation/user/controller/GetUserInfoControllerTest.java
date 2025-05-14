@@ -47,17 +47,18 @@ class GetUserInfoControllerTest {
     private static final String PROFILE_IMAGE_URL = "https://signed-url.example.com/dog.jpg";
     private static final boolean TWO_FACTOR_AUTH_ENABLED = false;
     private static final UUID AUTH_PROVIDER_ID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479");
-    private static final String PROVIDER_TYPE = "google";
+    private static final String PROVIDER_NAME = "google";
     private static final String PROVIDER_USER_ID = "109876543210987654321";
 
     @Test
     @DisplayName("正常なリクエストの場合、200が返される")
     void test1() throws Exception {
-        AuthProviderInfo authProvider = new AuthProviderInfo(AUTH_PROVIDER_ID, PROVIDER_TYPE, PROVIDER_USER_ID);
+        AuthProviderInfo authProvider = new AuthProviderInfo(AUTH_PROVIDER_ID, PROVIDER_NAME, PROVIDER_USER_ID);
         GetUserInfoUseCaseDto dto = GetUserInfoUseCaseDto.builder()
                 .id(USER_ID)
                 .email(EMAIL)
                 .username(USERNAME)
+                .hasPassword(false)
                 .profileImage(PROFILE_IMAGE_URL)
                 .twoFactorAuthEnabled(TWO_FACTOR_AUTH_ENABLED)
                 .authProviders(List.of(authProvider))
@@ -71,11 +72,10 @@ class GetUserInfoControllerTest {
                 .andExpect(jsonPath("$.id").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.email").value(EMAIL))
                 .andExpect(jsonPath("$.username").value(USERNAME))
+                .andExpect(jsonPath("$.hasPassword").value(false))
                 .andExpect(jsonPath("$.profileImage").value(PROFILE_IMAGE_URL))
                 .andExpect(jsonPath("$.twoFactorAuthEnabled").value(TWO_FACTOR_AUTH_ENABLED))
-                .andExpect(jsonPath("$.authProviders[0].id").value(AUTH_PROVIDER_ID.toString()))
-                .andExpect(jsonPath("$.authProviders[0].providerType").value(PROVIDER_TYPE))
-                .andExpect(jsonPath("$.authProviders[0].providerUserId").value(PROVIDER_USER_ID));
+                .andExpect(jsonPath("$.authProviders[0]").value(PROVIDER_NAME));
 
         verify(currentUserFacade).getUserId();
         verify(getUserInfoUseCase).execute(USER_ID);

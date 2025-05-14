@@ -96,7 +96,7 @@
         AND p.provider_user_id = #{providerUserId}
     </select>
 
-    <insert id="upsert" parameterType="com.example.keirekipro.infrastructure.repository.user.UserDto">
+    <insert id="upsertUser" parameterType="com.example.keirekipro.infrastructure.repository.user.UserDto">
         INSERT INTO users(
             id,
             email,
@@ -128,30 +128,6 @@
                 profile_image = EXCLUDED.profile_image,
                 two_factor_auth_enabled = EXCLUDED.two_factor_auth_enabled,
                 updated_at = EXCLUDED.updated_at
-        ;
-        DELETE
-        FROM
-            user_auth_providers
-        WHERE
-            user_id = #{id};
-        <foreach collection="authProviders" item="ap" separator=";">
-            INSERT INTO user_auth_providers(
-                id,
-                user_id,
-                provider_name,
-                provider_user_id,
-                created_at,
-                updated_at
-            )
-            VALUES(
-                #{ap.id},
-                #{id},
-                #{ap.providerName},
-                #{ap.providerUserId},
-                #{ap.createdAt},
-                #{ap.updatedAt}
-            )
-        </foreach>
     </insert>
 
     <delete id="delete" parameterType="java.util.UUID">
@@ -167,5 +143,33 @@
         WHERE
             id = #{id}
         ;
+    </delete>
+
+    <insert id="insertAuthProvider" parameterType="com.example.keirekipro.infrastructure.repository.user.UserDto$AuthProviderDto">
+        INSERT INTO user_auth_providers(
+            id,
+            user_id,
+            provider_name,
+            provider_user_id,
+            created_at,
+            updated_at
+        )
+        VALUES(
+            #{id},
+            #{userId},
+            #{providerName},
+            #{providerUserId},
+            #{createdAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <delete id="deleteAuthProviderByName">
+        DELETE
+        FROM
+            user_auth_providers
+        WHERE
+            user_id = #{userId}
+        AND provider_name = #{providerName}
     </delete>
 </mapper>

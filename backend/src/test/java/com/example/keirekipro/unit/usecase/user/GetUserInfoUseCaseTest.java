@@ -86,10 +86,11 @@ class GetUserInfoUseCaseTest {
         assertThat(result.getId()).isEqualTo(USER_ID);
         assertThat(result.getEmail()).isEqualTo(EMAIL);
         assertThat(result.getUsername()).isEqualTo(USERNAME_VALUE);
+        assertThat(result.isHasPassword()).isEqualTo(false);
         assertThat(result.getProfileImage()).isEqualTo(SIGNED_URL);
         assertThat(result.isTwoFactorAuthEnabled()).isFalse();
         assertThat(result.getAuthProviders()).hasSize(1);
-        assertThat(result.getAuthProviders().get(0).getProviderType())
+        assertThat(result.getAuthProviders().get(0).getProviderName())
                 .isEqualTo(PROVIDER_TYPE_VALUE);
         assertThat(result.getAuthProviders().get(0).getProviderUserId())
                 .isEqualTo(PROVIDER_USER_ID_VALUE);

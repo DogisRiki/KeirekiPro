@@ -1,13 +1,4 @@
 /**
- * 外部認証連携情報
- */
-export interface AuthProviderInfo {
-    id: string;
-    providerType: "github" | "google";
-    providerUserId: string;
-}
-
-/**
  * ユーザー情報
  */
 export interface User {
@@ -17,7 +8,7 @@ export interface User {
     profileImage: string | null;
     twoFactorAuthEnabled: boolean;
     hasPassword: boolean;
-    authProviders: AuthProviderInfo[];
+    authProviders: ("github" | "google")[];
 }
 
 /**
