@@ -16,6 +16,9 @@ export const useVerifyTwoFactor = () => {
 
     return useMutation({
         mutationFn: (code: string) => verifyTwoFactor({ userId: userId as string, code }),
+        onMutate: () => {
+            clearErrors();
+        },
         onSuccess: async () => {
             clearErrors();
             clear();

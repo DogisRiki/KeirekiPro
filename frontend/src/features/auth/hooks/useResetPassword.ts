@@ -14,6 +14,9 @@ export const useResetPassword = () => {
 
     return useMutation({
         mutationFn: (payload: ResetPasswordPayload) => resetPassword(payload),
+        onMutate: () => {
+            clearErrors();
+        },
         onSuccess: () => {
             clearErrors();
             setNotification("パスワードを変更しました。ログインしてください。", "success");

@@ -13,6 +13,9 @@ export const useAuthorizeOidc = () => {
             const response = await authorizeOidc(provider);
             return response.data;
         },
+        onMutate: () => {
+            clearErrors();
+        },
         onSuccess: (authorizationUrl) => {
             clearErrors();
             window.location.href = authorizationUrl;

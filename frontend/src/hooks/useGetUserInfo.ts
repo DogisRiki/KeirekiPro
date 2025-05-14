@@ -1,4 +1,5 @@
 import { protectedApiClient } from "@/lib";
+import { useErrorMessageStore } from "@/stores";
 import { User } from "@/types";
 import { useQuery, UseQueryResult } from "@tanstack/react-query";
 
@@ -14,9 +15,14 @@ export const getUserInfo = async (): Promise<User> => {
  * ユーザー情報取得フック
  */
 export const useGetUserInfo = (): UseQueryResult<User, unknown> => {
+    const { clearErrors } = useErrorMessageStore();
+
     return useQuery({
         queryKey: ["getUserInfo"],
-        queryFn: getUserInfo,
+        queryFn: async () => {
+            clearErrors();
+            return await getUserInfo();
+        },
         retry: false,
     });
 };

@@ -14,6 +14,9 @@ export const useUserRegister = () => {
 
     return useMutation({
         mutationFn: (payload: UserRegistrationPayload) => userRegister(payload),
+        onMutate: () => {
+            clearErrors();
+        },
         onSuccess: () => {
             clearErrors();
             setNotification(

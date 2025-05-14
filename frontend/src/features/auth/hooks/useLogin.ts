@@ -16,6 +16,9 @@ export const useLogin = () => {
 
     return useMutation({
         mutationFn: (payload: LoginPayload) => login(payload),
+        onMutate: () => {
+            clearErrors();
+        },
         onSuccess: async (response) => {
             clearErrors();
             // 2FAが無効
