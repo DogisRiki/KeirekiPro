@@ -1,6 +1,7 @@
 import { Button, Link, PasswordTextField, TextField } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useErrorMessageStore } from "@/stores";
+import { AuthProvider } from "@/types";
 import { Box } from "@mui/material";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
@@ -11,7 +12,7 @@ export interface LoginFormProps {
     onEmailChange: (v: string) => void;
     onPasswordChange: (v: string) => void;
     onSubmit: () => void;
-    onOidcLogin: (provider: "google" | "github") => void;
+    onOidcLogin: (provider: AuthProvider) => void;
     loading?: boolean;
 }
 

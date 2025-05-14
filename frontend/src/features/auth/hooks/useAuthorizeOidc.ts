@@ -1,5 +1,6 @@
 import { authorizeOidc } from "@/features/auth";
 import { useErrorMessageStore } from "@/stores";
+import { AuthProvider } from "@/types";
 import { useMutation } from "@tanstack/react-query";
 
 /**
@@ -9,7 +10,7 @@ export const useAuthorizeOidc = () => {
     const { clearErrors } = useErrorMessageStore();
 
     return useMutation({
-        mutationFn: async (provider: "google" | "github") => {
+        mutationFn: async (provider: AuthProvider) => {
             const response = await authorizeOidc(provider);
             return response.data;
         },
