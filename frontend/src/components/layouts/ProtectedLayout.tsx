@@ -1,11 +1,20 @@
 import { Footer, MainMenu, UserMenu } from "@/components/ui";
+import { useErrorMessageStore } from "@/stores";
 import { AppBar, Box, Container, Toolbar, Typography } from "@mui/material";
-import { Outlet } from "react-router";
+import { useEffect } from "react";
+import { Outlet, useLocation } from "react-router";
 
 /**
  * ログイン時のみアクセス可能な画面の共通レイアウト
  */
 export const ProtectedLayout = () => {
+    const { clearErrors } = useErrorMessageStore();
+    const { pathname } = useLocation();
+
+    useEffect(() => {
+        clearErrors();
+    }, [pathname, clearErrors]);
+
     return (
         <Box>
             <AppBar position="fixed">
