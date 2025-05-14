@@ -4,7 +4,6 @@ import { AxiosResponse } from "axios";
 
 /**
  * OIDC認可URL取得API
- *
  * @param provider 使用するOIDCプロバイダー
  * @returns 認可URLを含むAxiosレスポンス
  */

@@ -11,6 +11,8 @@ export interface VerifyTwoFactorPayload {
 
 /**
  * 二段階認証コード検証API
+ * @param payload 二段階認証コード検証リクエスト
+ * @returns Axiosレスポンス
  */
 export const verifyTwoFactor = (payload: VerifyTwoFactorPayload): Promise<AxiosResponse<void>> =>
     publicApiClient.post("/auth/2fa/verify", payload);

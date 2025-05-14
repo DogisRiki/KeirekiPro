@@ -3,10 +3,12 @@ import { login, LoginPayload, useTwoFactorStore } from "@/features/auth";
 import { getUserInfo } from "@/hooks";
 import { useErrorMessageStore, useUserAuthStore } from "@/stores";
 import { useMutation } from "@tanstack/react-query";
+import { AxiosError, AxiosResponse } from "axios";
 import { useNavigate } from "react-router";
 
 /**
  * ログインフック
+ * @returns ログインミューテーション
  */
 export const useLogin = () => {
     const navigate = useNavigate();
@@ -14,7 +16,7 @@ export const useLogin = () => {
     const { setUserId } = useTwoFactorStore();
     const { clearErrors } = useErrorMessageStore();
 
-    return useMutation({
+    return useMutation<AxiosResponse<string>, AxiosError, LoginPayload>({
         mutationFn: (payload: LoginPayload) => login(payload),
         onMutate: () => {
             clearErrors();

@@ -11,6 +11,8 @@ export interface LoginPayload {
 
 /**
  * ログインAPI
+ * @param payload ログインリクエスト
+ * @returns 認証トークンを含むAxiosレスポンス
  */
 export const login = (payload: LoginPayload): Promise<AxiosResponse<string>> =>
     publicApiClient.post("/auth/login", payload);

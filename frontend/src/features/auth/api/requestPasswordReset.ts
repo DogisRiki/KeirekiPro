@@ -10,6 +10,8 @@ export interface RequestPasswordResetPayload {
 
 /**
  * パスワードリセット要求API
+ * @param payload パスワードリセット要求リクエスト
+ * @returns Axiosレスポンス
  */
 export const requestPasswordReset = (payload: RequestPasswordResetPayload): Promise<AxiosResponse<void>> =>
     publicApiClient.post("/auth/password/reset/request", payload);

@@ -13,6 +13,8 @@ export interface UserRegistrationPayload {
 
 /**
  * ユーザー新規登録API
+ * @param payload ユーザー新規登録リクエスト
+ * @returns Axiosレスポンス
  */
 export const userRegister = (payload: UserRegistrationPayload): Promise<AxiosResponse<void>> =>
     publicApiClient.post("/auth/register", payload);

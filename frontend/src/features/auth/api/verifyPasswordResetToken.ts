@@ -1,4 +1,5 @@
 import { publicApiClient } from "@/lib";
+import { AxiosResponse } from "axios";
 
 /**
  * パスワードリセットトークン検証リクエスト
@@ -9,8 +10,8 @@ export interface VerifyPasswordResetTokenPayload {
 
 /**
  * パスワードリセットトークン検証API
- *
- * @param payload トークン
+ * @param payload パスワードリセットトークン検証リクエスト
+ * @returns Axiosレスポンス
  */
-export const verifyPasswordResetToken = (payload: VerifyPasswordResetTokenPayload): Promise<void> =>
+export const verifyPasswordResetToken = (payload: VerifyPasswordResetTokenPayload): Promise<AxiosResponse<void>> =>
     publicApiClient.post("/auth/password/reset/verify", payload);
