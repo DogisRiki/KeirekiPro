@@ -7,6 +7,7 @@ const createEnv = () => {
         API_URL: import.meta.env.VITE_API_URL,
         APP_EMAIL: import.meta.env.VITE_APP_CONTACT_EMAIL,
         APP_URL: import.meta.env.VITE_APP_URL,
+        GA_MEASUREMENT_ID: import.meta.env.VITE_GA_MEASUREMENT_ID,
     };
 
     // 必須変数のチェック

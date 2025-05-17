@@ -1,4 +1,5 @@
 import { Footer, MainMenu, UserMenu } from "@/components/ui";
+import { useGoogleAnalytics } from "@/hooks";
 import { useErrorMessageStore } from "@/stores";
 import { AppBar, Box, Container, Toolbar, Typography } from "@mui/material";
 import { useEffect } from "react";
@@ -14,6 +15,8 @@ export const ProtectedLayout = () => {
     useEffect(() => {
         clearErrors();
     }, [pathname, clearErrors]);
+
+    useGoogleAnalytics();
 
     return (
         <Box>

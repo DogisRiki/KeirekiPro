@@ -1,4 +1,5 @@
 import { Footer } from "@/components/ui";
+import { useGoogleAnalytics } from "@/hooks";
 import { useErrorMessageStore } from "@/stores";
 import { Box, Container } from "@mui/material";
 import { useEffect } from "react";
@@ -14,6 +15,8 @@ export const PublicLayout = () => {
     useEffect(() => {
         clearErrors();
     }, [pathname, clearErrors]);
+
+    useGoogleAnalytics();
 
     return (
         <>
