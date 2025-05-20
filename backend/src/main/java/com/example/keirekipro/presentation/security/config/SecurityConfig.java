@@ -18,6 +18,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -43,6 +44,8 @@ public class SecurityConfig {
                 // CSRFの設定
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        // マスクしないハンドラを使用
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         // CSRF保護が不要なパスを設定 - OpenAPI仕様へのアクセスを許可
                         .ignoringRequestMatchers(
                                 "/api/auth/**",
