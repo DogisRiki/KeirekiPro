@@ -24,5 +24,7 @@ export const useGetUserInfo = (): UseQueryResult<User, unknown> => {
             return await getUserInfo();
         },
         retry: false,
+        staleTime: 0,
+        refetchOnMount: "always",
     });
 };
