@@ -5,6 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
 import com.example.keirekipro.presentation.user.dto.UserInfoResponse;
+import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
@@ -33,6 +34,8 @@ public class UpdateUserInfoController {
 
     private final UpdateUserInfoUseCase updateUserInfoUseCase;
 
+    private final GetUserInfoUseCase getUserInfoUseCase;
+
     private final CurrentUserFacade currentUserFacade;
 
     /**
@@ -48,7 +51,8 @@ public class UpdateUserInfoController {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
         UpdateUserInfoRequest request = new UpdateUserInfoRequest(username, profileImage, twoFactorAuthEnabled);
-        UserInfoUseCaseDto dto = updateUserInfoUseCase.execute(request, userId);
+        updateUserInfoUseCase.execute(request, userId);
+        UserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
         return dto.convertToResponse(dto);
     }
 }

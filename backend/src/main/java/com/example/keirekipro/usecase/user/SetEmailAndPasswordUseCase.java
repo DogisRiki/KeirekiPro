@@ -1,6 +1,5 @@
 package com.example.keirekipro.usecase.user;
 
-import java.util.List;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.Email;
@@ -8,8 +7,6 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
 import com.example.keirekipro.shared.Notification;
-import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
-import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,9 +28,12 @@ public class SetEmailAndPasswordUseCase {
 
     /**
      * メールアドレス+パスワードの設定ユースケースを実行する
+     *
+     * @param userId  ユーザーID
+     * @param request リクエスト
      */
     @Transactional
-    public UserInfoUseCaseDto execute(UUID userId, SetEmailAndPasswordRequest request) {
+    public void execute(UUID userId, SetEmailAndPasswordRequest request) {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
@@ -51,23 +51,5 @@ public class SetEmailAndPasswordUseCase {
         }
 
         userRepository.save(user);
-
-        // 外部認証連携情報の変換
-        List<AuthProviderInfo> providers = user.getAuthProviders().values().stream()
-                .map(ap -> new AuthProviderInfo(
-                        ap.getId(),
-                        ap.getProviderName(),
-                        ap.getProviderUserId()))
-                .toList();
-
-        return UserInfoUseCaseDto.builder()
-                .id(user.getId())
-                .email(user.getEmail() != null ? user.getEmail().getValue() : null)
-                .username(user.getUsername())
-                .hasPassword(user.getPasswordHash() != null)
-                .profileImage(user.getProfileImage())
-                .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
-                .authProviders(providers)
-                .build();
     }
 }

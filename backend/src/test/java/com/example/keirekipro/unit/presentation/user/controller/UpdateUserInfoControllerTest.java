@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.controller.UpdateUserInfoController;
+import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
@@ -36,6 +37,9 @@ class UpdateUserInfoControllerTest {
 
     @MockitoBean
     private UpdateUserInfoUseCase updateUserInfoUseCase;
+
+    @MockitoBean
+    private GetUserInfoUseCase getUserInfoUseCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -78,7 +82,7 @@ class UpdateUserInfoControllerTest {
 
         // モックをセットアップ
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(updateUserInfoUseCase.execute(any(), eq(USER_ID))).thenReturn(dto);
+        when(getUserInfoUseCase.execute(USER_ID)).thenReturn(dto);
 
         // リクエストを実行
         mockMvc.perform(

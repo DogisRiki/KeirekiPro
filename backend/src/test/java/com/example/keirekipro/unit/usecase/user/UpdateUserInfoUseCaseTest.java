@@ -12,7 +12,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -28,7 +27,6 @@ import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
-import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,9 +64,8 @@ class UpdateUserInfoUseCaseTest {
     private static final MockMultipartFile PROFILE_IMAGE = new MockMultipartFile("profileImage", "test.png",
             "image/png", PROFILE_IMAGE_BYTES);
 
-    // uploadFile の戻り値（S3キー）と generatePresignedUrl の戻り値（署名付きURL）
+    // uploadFile の戻り値（S3キー）
     private static final String S3_KEY = "s3-key";
-    private static final String SIGNED_URL = "https://signed.example.com/profile/test.png";
 
     @Test
     @DisplayName("正常にユーザー情報更新ができる")
@@ -94,8 +91,6 @@ class UpdateUserInfoUseCaseTest {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existingUser));
         when(awsS3Client.uploadFile(any(MultipartFile.class), eq("/profile/image/")))
                 .thenReturn(S3_KEY);
-        when(awsS3Client.generatePresignedUrl(eq(S3_KEY), eq(Duration.ofMinutes(10))))
-                .thenReturn(SIGNED_URL);
 
         // FileUtil のバリデーションをすべて通過させる
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
@@ -105,7 +100,7 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
             // 実行
-            UserInfoUseCaseDto result = updateUserInfoUseCase.execute(request, USER_ID);
+            updateUserInfoUseCase.execute(request, USER_ID);
 
             // 保存されたUserの検証
             ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
@@ -117,17 +112,8 @@ class UpdateUserInfoUseCaseTest {
             assertThat(saved.isTwoFactorAuthEnabled()).isTrue();
             assertThat(saved.getProfileImage()).isEqualTo(S3_KEY);
 
-            // 戻り値DTOの検証
-            assertThat(result.getId()).isEqualTo(USER_ID);
-            assertThat(result.getUsername()).isEqualTo(USERNAME);
-            assertThat(result.isTwoFactorAuthEnabled()).isTrue();
-            assertThat(result.getProfileImage()).isEqualTo(SIGNED_URL);
-            assertThat(result.isHasPassword()).isEqualTo(true);
-            assertThat(result.getEmail()).isEqualTo(EMAIL);
-            assertThat(result.getAuthProviders()).hasSize(1);
-
+            // S3呼び出しの検証
             verify(awsS3Client).uploadFile(PROFILE_IMAGE, "/profile/image/");
-            verify(awsS3Client).generatePresignedUrl(S3_KEY, Duration.ofMinutes(10));
         }
     }
 
@@ -148,8 +134,9 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
-                    .isInstanceOf(UseCaseException.class)
+            assertThatThrownBy(() -> {
+                updateUserInfoUseCase.execute(req, USER_ID);
+            }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
             verify(awsS3Client, never()).uploadFile(any(), any());
@@ -174,8 +161,9 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
-                    .isInstanceOf(UseCaseException.class)
+            assertThatThrownBy(() -> {
+                updateUserInfoUseCase.execute(req, USER_ID);
+            }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
             verify(awsS3Client, never()).uploadFile(any(), any());
@@ -201,8 +189,9 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(false);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
-                    .isInstanceOf(UseCaseException.class)
+            assertThatThrownBy(() -> {
+                updateUserInfoUseCase.execute(req, USER_ID);
+            }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
             verify(awsS3Client, never()).uploadFile(any(), any());
@@ -227,8 +216,9 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(false);
 
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
-                    .isInstanceOf(UseCaseException.class)
+            assertThatThrownBy(() -> {
+                updateUserInfoUseCase.execute(req, USER_ID);
+            }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
             verify(awsS3Client, never()).uploadFile(any(), any());
@@ -257,8 +247,9 @@ class UpdateUserInfoUseCaseTest {
             when(awsS3Client.uploadFile(eq(PROFILE_IMAGE), eq("/profile/image/")))
                     .thenThrow(new IOException("S3 error"));
 
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
-                    .isInstanceOf(UseCaseException.class)
+            assertThatThrownBy(() -> {
+                updateUserInfoUseCase.execute(req, USER_ID);
+            }).isInstanceOf(UseCaseException.class)
                     .hasMessage("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
 
             verify(userRepository, never()).save(any());
@@ -280,8 +271,9 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
-            assertThatThrownBy(() -> updateUserInfoUseCase.execute(req, USER_ID))
-                    .isInstanceOf(AccessDeniedException.class)
+            assertThatThrownBy(() -> {
+                updateUserInfoUseCase.execute(req, USER_ID);
+            }).isInstanceOf(AccessDeniedException.class)
                     .hasMessage("不正なアクセスです。");
 
             verify(userRepository, never()).save(any());

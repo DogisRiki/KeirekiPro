@@ -5,6 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
 import com.example.keirekipro.presentation.user.dto.UserInfoResponse;
+import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.SetEmailAndPasswordUseCase;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
@@ -33,6 +34,8 @@ public class SetEmailAndPasswordController {
 
     private final SetEmailAndPasswordUseCase setEmailAndPasswordUseCase;
 
+    private final GetUserInfoUseCase getUserInfoUseCase;
+
     private final CurrentUserFacade currentUserFacade;
 
     /**
@@ -43,7 +46,8 @@ public class SetEmailAndPasswordController {
     @Operation(summary = "メールアドレスとパスワードの設定", description = "メールアドレスとパスワードの設定を実行する")
     public UserInfoResponse handle(@Valid @RequestBody SetEmailAndPasswordRequest request) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
-        UserInfoUseCaseDto dto = setEmailAndPasswordUseCase.execute(userId, request);
+        setEmailAndPasswordUseCase.execute(userId, request);
+        UserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
         return dto.convertToResponse(dto);
     }
 }

@@ -13,6 +13,7 @@ import java.util.UUID;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.controller.SetEmailAndPasswordController;
 import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
+import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.SetEmailAndPasswordUseCase;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
@@ -37,6 +38,9 @@ class SetEmailAndPasswordControllerTest {
 
     @MockitoBean
     private final SetEmailAndPasswordUseCase setEmailAndPasswordUseCase;
+
+    @MockitoBean
+    private final GetUserInfoUseCase getUserInfoUseCase;
 
     @MockitoBean
     private final CurrentUserFacade currentUserFacade;
@@ -79,7 +83,7 @@ class SetEmailAndPasswordControllerTest {
                 .build();
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID);
-        when(setEmailAndPasswordUseCase.execute(UUID.fromString(USER_ID), request)).thenReturn(dto);
+        when(getUserInfoUseCase.execute(UUID.fromString(USER_ID))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -159,7 +163,7 @@ class SetEmailAndPasswordControllerTest {
                 .build();
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID);
-        when(setEmailAndPasswordUseCase.execute(UUID.fromString(USER_ID), request)).thenReturn(dto);
+        when(getUserInfoUseCase.execute(UUID.fromString(USER_ID))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)

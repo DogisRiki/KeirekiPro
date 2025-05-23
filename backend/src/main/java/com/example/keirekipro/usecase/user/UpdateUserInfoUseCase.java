@@ -1,7 +1,6 @@
 package com.example.keirekipro.usecase.user;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,8 +11,6 @@ import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
-import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
-import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -52,9 +49,8 @@ public class UpdateUserInfoUseCase {
      *
      * @param request リクエスト
      * @param userId  ユーザーID
-     * @return 更新後のユーザー情報 DTO
      */
-    public UserInfoUseCaseDto execute(UpdateUserInfoRequest request, UUID userId) {
+    public void execute(UpdateUserInfoRequest request, UUID userId) {
 
         Notification notification = new Notification();
 
@@ -72,11 +68,9 @@ public class UpdateUserInfoUseCase {
 
         // S3へのアップロード（画像がある場合のみ）
         String imageKey = null;
-        String imageUrl = null;
         if (profileImage != null && !profileImage.isEmpty()) {
             try {
                 imageKey = awsS3Client.uploadFile(profileImage, "/profile/image/");
-                imageUrl = awsS3Client.generatePresignedUrl(imageKey, Duration.ofMinutes(10));
             } catch (IOException e) {
                 throw new UseCaseException("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
             }
@@ -101,24 +95,6 @@ public class UpdateUserInfoUseCase {
 
         // 更新処理実行
         userRepository.save(user);
-
-        // 外部認証連携情報の変換
-        List<AuthProviderInfo> providers = user.getAuthProviders().values().stream()
-                .map(ap -> new AuthProviderInfo(
-                        ap.getId(),
-                        ap.getProviderName(),
-                        ap.getProviderUserId()))
-                .toList();
-
-        return UserInfoUseCaseDto.builder()
-                .id(user.getId())
-                .email(user.getEmail() != null ? user.getEmail().getValue() : null)
-                .username(user.getUsername())
-                .hasPassword(user.getPasswordHash() != null)
-                .profileImage(imageUrl)
-                .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
-                .authProviders(providers)
-                .build();
     }
 
     private void validateProfileImage(MultipartFile file, Notification notification) {
