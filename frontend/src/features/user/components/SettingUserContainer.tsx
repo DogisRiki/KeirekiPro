@@ -104,7 +104,7 @@ export const SettingUserContainer = () => {
             onRemoveProvider={(p) => removeProviderMutation.mutate(p)}
             messages={messages}
             onSave={handleSave}
-            saving={updateMutation.isPending || removeProviderMutation.isPending || !isStateChange}
+            loading={updateMutation.isPending || removeProviderMutation.isPending || !isStateChange}
         />
     );
 };

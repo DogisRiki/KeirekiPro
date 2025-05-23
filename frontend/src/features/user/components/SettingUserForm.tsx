@@ -24,7 +24,7 @@ export interface SettingUserFormProps {
     onRemoveProvider: (p: "google" | "github") => void;
     messages: SettingMessages;
     onSave: () => void;
-    saving?: boolean;
+    loading?: boolean;
 }
 
 /**
@@ -44,7 +44,7 @@ export const SettingUserForm = ({
     onRemoveProvider,
     messages,
     onSave,
-    saving = false,
+    loading = false,
 }: SettingUserFormProps) => {
     const { errors } = useErrorMessageStore();
 
@@ -106,7 +106,7 @@ export const SettingUserForm = ({
             />
 
             <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
-                <Button type="submit" sx={{ width: 240 }} disabled={saving}>
+                <Button type="submit" sx={{ width: 240 }} disabled={loading}>
                     保存
                 </Button>
             </Box>

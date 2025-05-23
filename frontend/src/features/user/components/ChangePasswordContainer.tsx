@@ -1,7 +1,6 @@
 import { paths } from "@/config/paths";
-import { ChangePasswordForm } from "@/features/user";
+import { ChangePasswordForm, UserState, useUserState } from "@/features/user";
 import { useChangePassword } from "@/features/user/hooks/useChangePassword";
-import { useUserAuthStore } from "@/stores";
 import { useState } from "react";
 import { Navigate } from "react-router";
 
@@ -12,10 +11,10 @@ export const ChangePasswordContainer = () => {
     const [nowPassword, setNowPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
 
-    const { user } = useUserAuthStore();
+    const userState = useUserState();
     const changePasswordMutation = useChangePassword();
 
-    if (user && !user.hasPassword) {
+    if (userState !== UserState.EMAIL_PASSWORD && userState !== UserState.EMAIL_PASSWORD_WITH_PROVIDER) {
         return <Navigate to={paths.login} replace />;
     }
 
@@ -46,6 +45,7 @@ export const ChangePasswordContainer = () => {
                 setNewPassword(v);
             }}
             onSubmit={handleSubmit}
+            loading={changePasswordMutation.isPending}
         />
     );
 };

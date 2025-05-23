@@ -8,6 +8,7 @@ export interface ChangePasswordFormProps {
     onNowPasswordChange: (v: string) => void;
     onNewPasswordChange: (v: string) => void;
     onSubmit: () => void;
+    loading?: boolean;
 }
 
 /**
@@ -19,6 +20,7 @@ export const ChangePasswordForm = ({
     onNowPasswordChange,
     onNewPasswordChange,
     onSubmit,
+    loading = false,
 }: ChangePasswordFormProps) => {
     const { errors } = useErrorMessageStore();
 
@@ -61,7 +63,7 @@ export const ChangePasswordForm = ({
                 }}
                 sx={{ mb: 4 }}
             />
-            <Button type="submit" sx={{ width: 240, mx: "auto" }}>
+            <Button type="submit" sx={{ width: 240, mx: "auto" }} disabled={loading}>
                 変更
             </Button>
         </Box>
