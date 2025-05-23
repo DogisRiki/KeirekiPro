@@ -81,6 +81,11 @@ export const SettingUserForm = ({
                 helperText={errors.username?.[0] ?? ""}
                 margin="normal"
                 sx={{ mb: 4 }}
+                slotProps={{
+                    htmlInput: {
+                        maxLength: 50,
+                    },
+                }}
             />
 
             <TwoFactorSwitch enabled={twoFactorEnabled} disabled={twoFactorDisabled} onToggle={onToggleTwoFactor} />

@@ -3,7 +3,7 @@ import { ChangePasswordForm } from "@/features/user";
 import { useChangePassword } from "@/features/user/hooks/useChangePassword";
 import { useUserAuthStore } from "@/stores";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Navigate } from "react-router";
 
 /**
  * パスワード変更コンテナ
@@ -14,10 +14,9 @@ export const ChangePasswordContainer = () => {
 
     const { user } = useUserAuthStore();
     const changePasswordMutation = useChangePassword();
-    const navigate = useNavigate();
 
-    if (!user?.hasPassword) {
-        navigate(paths.login, { replace: true });
+    if (user && !user.hasPassword) {
+        return <Navigate to={paths.login} replace />;
     }
 
     /**

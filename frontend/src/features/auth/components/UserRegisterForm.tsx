@@ -71,6 +71,9 @@ export const UserRegisterForm = ({
                 margin="normal"
                 slotProps={{
                     inputLabel: { shrink: true },
+                    htmlInput: {
+                        maxLength: 255,
+                    },
                 }}
                 sx={{ mb: 2 }}
             />
@@ -85,6 +88,9 @@ export const UserRegisterForm = ({
                 margin="normal"
                 slotProps={{
                     inputLabel: { shrink: true },
+                    htmlInput: {
+                        maxLength: 50,
+                    },
                 }}
             />
             <PasswordTextField
