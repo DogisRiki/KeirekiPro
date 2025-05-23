@@ -61,7 +61,7 @@ export const SettingUserForm = ({
 
             <TextField
                 type="email"
-                label="メールアドレス（変更できません）"
+                label={email ? "メールアドレス（変更できません）" : "メールアドレスが設定されていません"}
                 value={email ?? ""}
                 fullWidth
                 disabled

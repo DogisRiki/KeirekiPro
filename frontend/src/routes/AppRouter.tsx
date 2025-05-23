@@ -16,6 +16,7 @@ import {
     Top,
     TwoFactor,
 } from "@/pages";
+import { SetEmailAndPassword } from "@/pages/SetEmailAndPassword";
 import { ProtectedLoader, PublicLoader } from "@/routes/AppLoader";
 import { createBrowserRouter, RouterProvider } from "react-router";
 
@@ -51,6 +52,7 @@ const router = createBrowserRouter([
             { path: paths.resume.edit, element: <ResumeList /> },
             { path: paths.user, element: <SettingUser /> },
             { path: paths.password.change, element: <ChangePassword /> },
+            { path: paths.emailPassword.set, element: <SetEmailAndPassword /> },
             { path: paths.contact, element: <Contact /> },
         ],
     },

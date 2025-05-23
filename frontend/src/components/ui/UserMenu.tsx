@@ -26,7 +26,7 @@ export const UserMenu = () => {
         {
             label: user?.hasPassword ? "パスワード変更" : "パスワード設定",
             icon: <LockIcon />,
-            path: paths.password.change,
+            path: user?.hasPassword ? paths.password.change : paths.emailPassword.set,
         },
         { label: "ログアウト", icon: <LogoutIcon />, action: "logout" },
     ];
