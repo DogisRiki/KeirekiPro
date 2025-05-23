@@ -7,8 +7,8 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
-import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto;
-import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto.AuthProviderInfo;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -32,7 +32,7 @@ public class GetUserInfoUseCase {
      * @param userId ユーザーID
      * @return ユーザー情報DTO
      */
-    public GetUserInfoUseCaseDto execute(UUID userId) {
+    public UserInfoUseCaseDto execute(UUID userId) {
 
         // ユーザー情報取得
         User user = userRepository.findById(userId)
@@ -52,7 +52,7 @@ public class GetUserInfoUseCase {
                         ap.getProviderUserId()))
                 .toList();
 
-        return GetUserInfoUseCaseDto.builder()
+        return UserInfoUseCaseDto.builder()
                 .id(user.getId())
                 .email(user.getEmail() != null ? user.getEmail().getValue() : null)
                 .username(user.getUsername())

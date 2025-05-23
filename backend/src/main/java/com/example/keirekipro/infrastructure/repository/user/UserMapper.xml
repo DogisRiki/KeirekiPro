@@ -164,12 +164,11 @@
         )
     </insert>
 
-    <delete id="deleteAuthProviderByName">
+    <delete id="deleteAuthProvidersByUserId" parameterType="java.util.UUID">
         DELETE
         FROM
             user_auth_providers
         WHERE
             user_id = #{userId}
-        AND provider_name = #{providerName}
     </delete>
 </mapper>

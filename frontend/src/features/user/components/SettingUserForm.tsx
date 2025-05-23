@@ -1,206 +1,126 @@
 import { Button, TextField } from "@/components/ui";
-import { paths } from "@/config/paths";
-import { useUserAuthStore } from "@/stores";
 import {
-    Cancel as CancelIcon,
-    CheckCircle as CheckCircleIcon,
-    Person as PersonIcon,
-    PhotoCamera as PhotoCameraIcon,
-} from "@mui/icons-material";
-import { Avatar, Box, FormControlLabel, FormGroup, IconButton, Switch, Typography } from "@mui/material";
-import { useRef, useState } from "react";
-import { useNavigate } from "react-router";
+    AuthProviderField,
+    AuthProviderWarningMessage,
+    PasswordStatusBox,
+    ProfileImageField,
+    SettingMessages,
+    TwoFactorSwitch,
+} from "@/features/user";
+import { useErrorMessageStore } from "@/stores";
+import { Box } from "@mui/material";
+
+export interface SettingUserFormProps {
+    email: string | null;
+    username: string;
+    onUsernameChange: (v: string) => void;
+    profileImageUrl: string | null;
+    onProfileImageChange: (file: File | null) => void;
+    twoFactorEnabled: boolean;
+    twoFactorDisabled: boolean;
+    onToggleTwoFactor: (v: boolean) => void;
+    authProviders: ("google" | "github")[];
+    canRemoveProvider: boolean;
+    onRemoveProvider: (p: "google" | "github") => void;
+    messages: SettingMessages;
+    onSave: () => void;
+    saving?: boolean;
+}
 
 /**
  * ユーザー設定フォーム
  */
-export const SettingUserForm = () => {
-    const { user, updateProfile } = useUserAuthStore();
-    const navigate = useNavigate();
-
-    // ファイル選択ボタン押下時の挙動
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-    // プロフィール画像のプレビュー用
-    const [tempProfileImage, setTempProfileImage] = useState<string | null>(null);
-
-    // Button内のinput属性への参照
-    const handleInputButtonClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    // プロフィール画像変更ハンドラー
-    const handleProfileImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files && event.target.files.length > 0) {
-            const file = event.target.files[0];
-            // 選択した画像をプレビュー表示
-            const previewUrl = URL.createObjectURL(file);
-            setTempProfileImage(previewUrl);
-        }
-    };
-
-    // 保存処理
-    const handleSave = () => {
-        if (tempProfileImage) {
-            updateProfile({
-                profileImage: tempProfileImage,
-            });
-        }
-    };
+export const SettingUserForm = ({
+    email,
+    username,
+    onUsernameChange,
+    profileImageUrl,
+    onProfileImageChange,
+    twoFactorEnabled,
+    twoFactorDisabled,
+    onToggleTwoFactor,
+    authProviders,
+    canRemoveProvider,
+    onRemoveProvider,
+    messages,
+    onSave,
+    saving = false,
+}: SettingUserFormProps) => {
+    const { errors } = useErrorMessageStore();
 
     return (
-        <Box>
-            <Box sx={{ position: "relative", width: "fit-content", mx: "auto", my: 4 }}>
-                <Avatar
-                    alt="プロフィール画像"
-                    src={tempProfileImage || user?.profileImage || undefined}
-                    sx={{ width: 120, height: 120 }}
-                >
-                    {/* srcがない場合に表示するデフォルトのアイコン */}
-                    {!(tempProfileImage || user?.profileImage) && <PersonIcon sx={{ width: 80, height: 80 }} />}
-                </Avatar>
-                <IconButton
-                    color="primary"
-                    sx={{
-                        position: "absolute",
-                        right: -10,
-                        bottom: -10,
-                        bgcolor: "background.paper",
-                        boxShadow: 1,
-                        "&:hover": { bgcolor: "background.paper" },
-                    }}
-                    onClick={handleInputButtonClick}
-                >
-                    <PhotoCameraIcon />
-                </IconButton>
-                <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleProfileImageChange} />
+        <Box
+            component="form"
+            onSubmit={(e) => {
+                e.preventDefault();
+                onSave();
+            }}
+            sx={{ position: "relative", width: "fit-content", mx: "auto", my: 4 }}
+        >
+            <ProfileImageField currentImage={profileImageUrl} onChange={onProfileImageChange} />
+
+            <TextField
+                type="email"
+                label="メールアドレス（変更できません）"
+                value={email ?? ""}
+                fullWidth
+                disabled
+                margin="normal"
+                error={!!errors.email?.length}
+                helperText={errors.email?.[0] ?? ""}
+                sx={{ mt: 4, mb: 4 }}
+            />
+
+            <TextField
+                label="ユーザー名"
+                fullWidth
+                required
+                value={username}
+                onChange={(e) => onUsernameChange(e.target.value)}
+                error={!!errors.username?.length}
+                helperText={errors.username?.[0] ?? ""}
+                margin="normal"
+                sx={{ mb: 4 }}
+            />
+
+            <TwoFactorSwitch enabled={twoFactorEnabled} disabled={twoFactorDisabled} onToggle={onToggleTwoFactor} />
+
+            <PasswordStatusBox
+                statusLabel={messages.emailPasswordStatusLabel}
+                navigationMessage={messages.emailPasswordNavigationMessage}
+                isWarning={messages.emailPasswordIsWarning}
+                linkPath={messages.emailPasswordLinkPath}
+            />
+
+            <AuthProviderWarningMessage messages={messages} />
+
+            <AuthProviderField
+                connected={authProviders}
+                canRemoveProvider={canRemoveProvider}
+                onRemove={onRemoveProvider}
+            />
+
+            <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
+                <Button type="submit" sx={{ width: 240 }} disabled={saving}>
+                    保存
+                </Button>
             </Box>
-            <Box>
-                {/* メールアドレス */}
-                <TextField
-                    label="メールアドレス（変更できません）"
-                    value={user?.email}
-                    fullWidth
-                    disabled
-                    sx={{ mb: 4 }}
-                />
-                {/* ユーザー名 */}
-                <TextField label="ユーザー名" value={user?.userName} fullWidth required sx={{ mb: 4 }} />
-                {/* 二段階認証 */}
-                <FormGroup sx={{ mb: 4 }}>
-                    <FormControlLabel
-                        control={<Switch color="primary" checked={user?.twoFactorAuthEnabled} />}
-                        label={
-                            <Box>
-                                <Typography variant="subtitle1">二段階認証</Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    アカウントのセキュリティを強化します
-                                </Typography>
-                            </Box>
-                        }
-                    />
-                </FormGroup>
-                {/* パスワード */}
-                <Box
+
+            <Box sx={{ display: "flex", justifyContent: "center" }}>
+                <Button
+                    color="error"
+                    variant="outlined"
                     sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                        mb: 4,
-                        p: 2,
-                        borderRadius: 1,
-                        bgcolor: "grey.50",
-                        border: 1,
-                        borderColor: user?.hasPassword ? "success.light" : "error.light",
+                        width: 240,
+                        "&:hover": {
+                            bgcolor: "error.main",
+                            color: "error.contrastText",
+                            borderColor: "error.main",
+                        },
                     }}
                 >
-                    <Box sx={{ display: "flex", alignItems: "center", flex: 1 }}>
-                        {user?.hasPassword ? (
-                            <>
-                                <CheckCircleIcon
-                                    sx={{
-                                        mr: 1.5,
-                                        color: "success.light",
-                                        fontSize: 20,
-                                    }}
-                                />
-                                <Box>
-                                    <Typography
-                                        variant="body1"
-                                        sx={{
-                                            fontWeight: 500,
-                                            color: "text.primary",
-                                            mb: 0.5,
-                                        }}
-                                    >
-                                        パスワード設定済み
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                        パスワードを変更する場合は右のボタンをクリックしてください。
-                                    </Typography>
-                                </Box>
-                            </>
-                        ) : (
-                            <>
-                                <CancelIcon
-                                    sx={{
-                                        mr: 1.5,
-                                        color: "error.light",
-                                        fontSize: 20,
-                                    }}
-                                />
-                                <Box>
-                                    <Typography
-                                        variant="body1"
-                                        sx={{
-                                            fontWeight: 500,
-                                            color: "text.primary",
-                                            mb: 0.5,
-                                        }}
-                                    >
-                                        パスワード未設定
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                        セキュリティ強化のためパスワードを設定してください。
-                                    </Typography>
-                                </Box>
-                            </>
-                        )}
-                    </Box>
-                    <Button
-                        variant="text"
-                        onClick={() => navigate(paths.password.change)}
-                        sx={{
-                            whiteSpace: "nowrap",
-                            color: user?.hasPassword ? "success.main" : "error.main",
-                        }}
-                    >
-                        {user?.hasPassword ? "パスワードを変更" : "パスワードを設定"}
-                    </Button>
-                </Box>
-                {/* 保存ボタン */}
-                <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
-                    <Button onClick={handleSave} sx={{ width: 240 }}>
-                        保存
-                    </Button>
-                </Box>
-                {/* 退会ボタン */}
-                <Box sx={{ display: "flex", justifyContent: "center" }}>
-                    <Button
-                        color="error"
-                        variant="outlined"
-                        sx={{
-                            width: 240,
-                            "&:hover": {
-                                backgroundColor: "error.main",
-                                color: "error.contrastText",
-                                borderColor: "error.main",
-                            },
-                        }}
-                    >
-                        退会
-                    </Button>
-                </Box>
+                    退会
+                </Button>
             </Box>
         </Box>
     );

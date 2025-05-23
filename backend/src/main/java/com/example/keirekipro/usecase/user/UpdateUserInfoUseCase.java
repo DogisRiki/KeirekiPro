@@ -12,7 +12,8 @@ import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
-import com.example.keirekipro.usecase.user.dto.UpdateUserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -53,7 +54,7 @@ public class UpdateUserInfoUseCase {
      * @param userId  ユーザーID
      * @return 更新後のユーザー情報 DTO
      */
-    public UpdateUserInfoUseCaseDto execute(UpdateUserInfoRequest request, UUID userId) {
+    public UserInfoUseCaseDto execute(UpdateUserInfoRequest request, UUID userId) {
 
         Notification notification = new Notification();
 
@@ -101,11 +102,22 @@ public class UpdateUserInfoUseCase {
         // 更新処理実行
         userRepository.save(user);
 
-        return UpdateUserInfoUseCaseDto.builder()
+        // 外部認証連携情報の変換
+        List<AuthProviderInfo> providers = user.getAuthProviders().values().stream()
+                .map(ap -> new AuthProviderInfo(
+                        ap.getId(),
+                        ap.getProviderName(),
+                        ap.getProviderUserId()))
+                .toList();
+
+        return UserInfoUseCaseDto.builder()
                 .id(user.getId())
+                .email(user.getEmail() != null ? user.getEmail().getValue() : null)
                 .username(user.getUsername())
+                .hasPassword(user.getPasswordHash() != null)
                 .profileImage(imageUrl)
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
+                .authProviders(providers)
                 .build();
     }
 

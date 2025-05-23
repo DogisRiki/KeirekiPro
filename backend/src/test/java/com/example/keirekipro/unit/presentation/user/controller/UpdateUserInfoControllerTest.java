@@ -8,12 +8,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.controller.UpdateUserInfoController;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
-import com.example.keirekipro.usecase.user.dto.UpdateUserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,8 +44,13 @@ class UpdateUserInfoControllerTest {
 
     private static final String ENDPOINT = "/api/users/me";
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final String EMAIL = "test@keirekipro.click";
     private static final String USERNAME = "test-user";
     private static final String PROFILE_IMAGE_URL = "https://signed-url.example.com/dog.jpg";
+    private static final boolean TWO_FACTOR_AUTH_ENABLED = false;
+    private static final UUID AUTH_PROVIDER_ID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479");
+    private static final String PROVIDER_NAME = "google";
+    private static final String PROVIDER_USER_ID = "109876543210987654321";
 
     private static final MockMultipartFile PROFILE_IMAGE = new MockMultipartFile(
             "profileImage",
@@ -58,11 +65,15 @@ class UpdateUserInfoControllerTest {
     @DisplayName("正常なリクエストの場合、200が返される")
     void test1() throws Exception {
         // ダミーのユースケースDTOを生成
-        UpdateUserInfoUseCaseDto dto = UpdateUserInfoUseCaseDto.builder()
+        AuthProviderInfo authProvider = new AuthProviderInfo(AUTH_PROVIDER_ID, PROVIDER_NAME, PROVIDER_USER_ID);
+        UserInfoUseCaseDto dto = UserInfoUseCaseDto.builder()
                 .id(USER_ID)
+                .email(EMAIL)
                 .username(USERNAME)
+                .hasPassword(false)
                 .profileImage(PROFILE_IMAGE_URL)
-                .twoFactorAuthEnabled(true)
+                .twoFactorAuthEnabled(TWO_FACTOR_AUTH_ENABLED)
+                .authProviders(List.of(authProvider))
                 .build();
 
         // モックをセットアップ
@@ -81,9 +92,12 @@ class UpdateUserInfoControllerTest {
                         }))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.email").value(EMAIL))
                 .andExpect(jsonPath("$.username").value(USERNAME))
+                .andExpect(jsonPath("$.hasPassword").value(false))
                 .andExpect(jsonPath("$.profileImage").value(PROFILE_IMAGE_URL))
-                .andExpect(jsonPath("$.twoFactorAuthEnabled").value(true));
+                .andExpect(jsonPath("$.twoFactorAuthEnabled").value(TWO_FACTOR_AUTH_ENABLED))
+                .andExpect(jsonPath("$.authProviders[0]").value(PROVIDER_NAME));
 
         // 呼び出しを検証
         verify(currentUserFacade).getUserId();

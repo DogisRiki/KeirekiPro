@@ -42,13 +42,15 @@ public class MyBatisUserRepository implements UserRepository {
 
     @Override
     public void save(User user) {
-        // ユーザー情報のupsert
+        // UserDTO に変換
         UserDto dto = toDto(user);
+
+        // ユーザー情報の upsert
         mapper.upsertUser(dto);
 
-        // プロバイダー単位でdelete→insert
+        // 外部認証連携情報を全件削除してから再挿入
+        mapper.deleteAuthProvidersByUserId(dto.getId());
         for (UserDto.AuthProviderDto apDto : dto.getAuthProviders()) {
-            mapper.deleteAuthProviderByName(dto.getId(), apDto.getProviderName());
             mapper.insertAuthProvider(apDto);
         }
     }

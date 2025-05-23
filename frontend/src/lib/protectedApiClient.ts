@@ -1,6 +1,6 @@
 import { toastMessage } from "@/config/messages";
 import { paths } from "@/config/paths";
-import { baseApiClient } from "@/lib";
+import { baseApiClient, createErrorInterceptor } from "@/lib";
 import { useUserAuthStore } from "@/stores";
 import axios from "axios";
 import createAuthRefreshInterceptor from "axios-auth-refresh";
@@ -12,6 +12,11 @@ export const protectedApiClient = axios.create({
     ...baseApiClient.defaults,
     withCredentials: true,
 });
+
+/**
+ * レスポンスインターセプタ
+ */
+protectedApiClient.interceptors.response.use((response) => response, createErrorInterceptor());
 
 /**
  * リクエストインターセプタ

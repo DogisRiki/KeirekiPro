@@ -288,7 +288,7 @@ class UserMapperTest {
     }
 
     @Test
-    @DisplayName("deleteAuthProviderByName_プロバイダー名で外部連携認証情報を削除できる")
+    @DisplayName("deleteAuthProvidersByUserId_外部連携認証情報を削除できる")
     void test12() {
         // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録
         UserDto userDto = createUserDto();
@@ -298,25 +298,15 @@ class UserMapperTest {
         userMapper.insertAuthProvider(googleDto);
         userMapper.insertAuthProvider(githubDto);
 
-        // テスト実行(1回目)
-        userMapper.deleteAuthProviderByName(USER_ID, GOOGLE_PROVIDER_NAME);
+        // テスト実行
+        userMapper.deleteAuthProvidersByUserId(USER_ID);
 
-        // 検証
-        Optional<UserDto> opt1 = userMapper.selectById(USER_ID);
-        assertThat(opt1).isPresent();
-        UserDto loaded1 = opt1.get();
-        assertThat(loaded1.getUpdatedAt()).isEqualTo(UPDATED_AT);
-        assertThat(loaded1.getAuthProviders())
-                .hasSize(1);
-
-        // テスト実行(2回目)
-        userMapper.deleteAuthProviderByName(USER_ID, GITHUB_PROVIDER_NAME);
-
-        // 検証
-        Optional<UserDto> opt2 = userMapper.selectById(USER_ID);
-        assertThat(opt2).isPresent();
-        UserDto loaded2 = opt2.get();
-        assertThat(loaded2.getAuthProviders()).hasSize(0);
+        // 検証：外部連携認証情報が存在しない
+        Optional<UserDto> optUser = userMapper.selectById(USER_ID);
+        assertThat(optUser).isPresent();
+        UserDto loadedUser = optUser.get();
+        assertThat(loadedUser.getUpdatedAt()).isEqualTo(UPDATED_AT);
+        assertThat(loadedUser.getAuthProviders()).isEmpty();
     }
 
     /**

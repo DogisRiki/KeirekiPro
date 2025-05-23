@@ -28,7 +28,7 @@ import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
-import com.example.keirekipro.usecase.user.dto.UpdateUserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,6 +55,9 @@ class UpdateUserInfoUseCaseTest {
     private UpdateUserInfoUseCase updateUserInfoUseCase;
 
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final String EMAIL = "test@keirekipro.click";
+    private static final String USERNAME = "test-user";
+    private static final String PASSWORD_HASH = "Password123";
 
     // ダミーのPNGヘッダバイト列
     private static final byte[] PROFILE_IMAGE_BYTES = new byte[] {
@@ -72,7 +75,7 @@ class UpdateUserInfoUseCaseTest {
     void test1() throws IOException {
         // リクエスト準備
         UpdateUserInfoRequest request = new UpdateUserInfoRequest();
-        request.setUsername("Valid User");
+        request.setUsername(USERNAME);
         request.setProfileImage(PROFILE_IMAGE);
         request.setTwoFactorAuthEnabled(true);
 
@@ -81,8 +84,8 @@ class UpdateUserInfoUseCaseTest {
         AuthProvider authProvider = AuthProvider.create(notification, "google", "gid-1");
         User existingUser = User.reconstruct(
                 USER_ID, 1,
-                Email.create(notification, "test@example.com"),
-                "dummy-password", false,
+                Email.create(notification, EMAIL),
+                PASSWORD_HASH, false,
                 Map.of("google", authProvider),
                 null, "old-name",
                 LocalDateTime.now(), LocalDateTime.now());
@@ -102,21 +105,26 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
             // 実行
-            UpdateUserInfoUseCaseDto result = updateUserInfoUseCase.execute(request, USER_ID);
+            UserInfoUseCaseDto result = updateUserInfoUseCase.execute(request, USER_ID);
 
-            // 保存された User の検証
+            // 保存されたUserの検証
             ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
             verify(userRepository).save(captor.capture());
             User saved = captor.getValue();
-            assertThat(saved.getUsername()).isEqualTo("Valid User");
+
+            // 更新対象のデータの検証
+            assertThat(saved.getUsername()).isEqualTo(USERNAME);
             assertThat(saved.isTwoFactorAuthEnabled()).isTrue();
             assertThat(saved.getProfileImage()).isEqualTo(S3_KEY);
 
-            // 戻り値 DTO の検証
+            // 戻り値DTOの検証
             assertThat(result.getId()).isEqualTo(USER_ID);
-            assertThat(result.getUsername()).isEqualTo("Valid User");
+            assertThat(result.getUsername()).isEqualTo(USERNAME);
             assertThat(result.isTwoFactorAuthEnabled()).isTrue();
             assertThat(result.getProfileImage()).isEqualTo(SIGNED_URL);
+            assertThat(result.isHasPassword()).isEqualTo(true);
+            assertThat(result.getEmail()).isEqualTo(EMAIL);
+            assertThat(result.getAuthProviders()).hasSize(1);
 
             verify(awsS3Client).uploadFile(PROFILE_IMAGE, "/profile/image/");
             verify(awsS3Client).generatePresignedUrl(S3_KEY, Duration.ofMinutes(10));

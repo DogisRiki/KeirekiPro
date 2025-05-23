@@ -60,10 +60,9 @@ public interface UserMapper {
     void insertAuthProvider(UserDto.AuthProviderDto dto);
 
     /**
-     * ユーザーIDとプロバイダー名で外部連携認証情報を削除する
+     * 外部連携認証情報を全件削除する
      *
-     * @param userId       ユーザーID
-     * @param providerName プロバイダー名
+     * @param userId ユーザーID
      */
-    void deleteAuthProviderByName(@Param("userId") UUID userId, @Param("providerName") String providerName);
+    void deleteAuthProvidersByUserId(@Param("userId") UUID userId);
 }

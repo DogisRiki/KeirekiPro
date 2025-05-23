@@ -1,12 +1,11 @@
 package com.example.keirekipro.presentation.user.controller;
 
-import java.util.List;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.dto.UserInfoResponse;
 import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
-import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,34 +39,7 @@ public class GetUserInfoController {
     @Operation(summary = "ユーザー情報の取得", description = "ユーザー情報の取得を実行する")
     public UserInfoResponse handle() {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
-        GetUserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
-        return convertToResponse(dto);
-    }
-
-    /**
-     * ユースケースDTOからレスポンスへの変換を行う
-     *
-     * @param dto ユースケースDTO
-     * @return レスポンス
-     */
-    private UserInfoResponse convertToResponse(GetUserInfoUseCaseDto dto) {
-
-        List<String> authProviders = null;
-
-        if (dto.getAuthProviders() != null) {
-            authProviders = dto.getAuthProviders().stream()
-                    .map(provider -> provider.getProviderName())
-                    .toList();
-        }
-
-        return UserInfoResponse.builder()
-                .id(dto.getId().toString())
-                .email(dto.getEmail())
-                .username(dto.getUsername())
-                .hasPassword(dto.isHasPassword())
-                .profileImage(dto.getProfileImage())
-                .twoFactorAuthEnabled(dto.isTwoFactorAuthEnabled())
-                .authProviders(authProviders)
-                .build();
+        UserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
+        return dto.convertToResponse(dto);
     }
 }

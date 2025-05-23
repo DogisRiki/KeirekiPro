@@ -12,8 +12,8 @@ import java.util.UUID;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.controller.GetUserInfoController;
 import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
-import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto;
-import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto.AuthProviderInfo;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,7 +54,7 @@ class GetUserInfoControllerTest {
     @DisplayName("正常なリクエストの場合、200が返される")
     void test1() throws Exception {
         AuthProviderInfo authProvider = new AuthProviderInfo(AUTH_PROVIDER_ID, PROVIDER_NAME, PROVIDER_USER_ID);
-        GetUserInfoUseCaseDto dto = GetUserInfoUseCaseDto.builder()
+        UserInfoUseCaseDto dto = UserInfoUseCaseDto.builder()
                 .id(USER_ID)
                 .email(EMAIL)
                 .username(USERNAME)

@@ -97,7 +97,7 @@ class MyBatisUserRepositoryTest {
     }
 
     @Test
-    @DisplayName("save_UserエンティティがDTOに変換されてupsertUserとプロバイダー削除・挿入が実行される")
+    @DisplayName("save_UserエンティティがDTOに変換されてupsertUserとプロバイダー全削除・挿入が実行される")
     void test2() {
         // 外部認証プロバイダーを再構成
         AuthProvider authProvider = AuthProvider.reconstruct(
@@ -130,8 +130,9 @@ class MyBatisUserRepositoryTest {
         verify(mapper).upsertUser(captor.capture());
         UserDto dto = captor.getValue();
 
-        // プロバイダー削除 → 挿入 が呼ばれること
-        verify(mapper).deleteAuthProviderByName(USER_ID, GOOGLE_PROVIDER_NAME);
+        // プロバイダー全削除 → 再挿入 が呼ばれること
+        verify(mapper).deleteAuthProvidersByUserId(USER_ID);
+        verify(mapper).deleteAuthProvidersByUserId(any());
         verify(mapper).insertAuthProvider(any(UserDto.AuthProviderDto.class));
 
         // DTOの内容を検証

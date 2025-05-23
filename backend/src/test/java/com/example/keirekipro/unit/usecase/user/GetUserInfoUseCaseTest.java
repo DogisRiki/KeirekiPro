@@ -21,7 +21,7 @@ import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
-import com.example.keirekipro.usecase.user.dto.GetUserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -79,7 +79,7 @@ class GetUserInfoUseCaseTest {
                 .thenReturn(SIGNED_URL);
 
         // ユースケース実行
-        GetUserInfoUseCaseDto result = getUserInfoUseCase.execute(USER_ID);
+        UserInfoUseCaseDto result = getUserInfoUseCase.execute(USER_ID);
 
         // 検証
         assertThat(result).isNotNull();
@@ -122,7 +122,7 @@ class GetUserInfoUseCaseTest {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         // ユースケース実行
-        GetUserInfoUseCaseDto result = getUserInfoUseCase.execute(USER_ID);
+        UserInfoUseCaseDto result = getUserInfoUseCase.execute(USER_ID);
 
         // 検証
         assertThat(result.getProfileImage()).isNull();

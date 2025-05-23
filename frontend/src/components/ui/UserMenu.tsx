@@ -16,6 +16,7 @@ import { useNavigate } from "react-router";
  */
 export const UserMenu = () => {
     const { user } = useUserAuthStore();
+    const [imgError, setImgError] = useState(false);
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
     const navigate = useNavigate();
     const logout = useLogout();
@@ -71,9 +72,12 @@ export const UserMenu = () => {
                     }}
                 >
                     {/* プロフィール画像 */}
-                    <Avatar src={user?.profileImage || undefined} sx={{ width: 32, height: 32, bgcolor: "#34495E" }}>
-                        {/* srcがない場合に表示するデフォルトのアイコン */}
-                        {user?.profileImage || <PersonIcon />}
+                    <Avatar
+                        src={!imgError ? (user?.profileImage ?? undefined) : undefined}
+                        onError={() => setImgError(true)}
+                        sx={{ width: 32, height: 32, bgcolor: "#34495E" }}
+                    >
+                        <PersonIcon />
                     </Avatar>
                     <Typography variant="body2" sx={{ color: "#ffffff", fontSize: "14px" }}>
                         {user?.username}
