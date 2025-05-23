@@ -6,7 +6,6 @@ export * from "@/features/auth/api/userRegister";
 export * from "@/features/auth/api/verifyPasswordResetToken";
 export * from "@/features/auth/api/verifyTwoFactor";
 
-export * from "@/features/auth/components/ChangePasswordForm";
 export * from "@/features/auth/components/LoginContainer";
 export * from "@/features/auth/components/LoginForm";
 export * from "@/features/auth/components/RequestPasswordResetContainer";
