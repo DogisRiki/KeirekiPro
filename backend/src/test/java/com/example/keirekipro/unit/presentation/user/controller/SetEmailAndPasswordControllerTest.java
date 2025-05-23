@@ -7,12 +7,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.controller.SetEmailAndPasswordController;
 import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
 import com.example.keirekipro.usecase.user.SetEmailAndPasswordUseCase;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.DisplayName;
@@ -45,28 +48,52 @@ class SetEmailAndPasswordControllerTest {
     private static final String ENDPOINT = "/api/users/me/email-password";
 
     private static final String USER_ID = "123e4567-e89b-12d3-a456-426614174000";
+    private static final String EMAIL = "test@keirekipro.click";
+    private static final String USERNAME = "test-user";
+    private static final String PROFILE_IMAGE_URL = "https://signed-url.example.com/dog.jpg";
     private static final String PASSWORD = "Password123";
+    private static final UUID AUTH_PROVIDER_ID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479");
+    private static final String PROVIDER_NAME = "google";
+    private static final String PROVIDER_USER_ID = "109876543210987654321";
 
     @Test
     @DisplayName("正常にメールアドレスとパスワードを設定できる")
     void test1() throws Exception {
         SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(
-                "test@example.com",
-                "Password123",
-                "Password123");
-
+                EMAIL,
+                PASSWORD,
+                PASSWORD);
         String json = objectMapper.writeValueAsString(request);
 
-        // モックユーザーIDを返すようにセット
+        UserInfoUseCaseDto.AuthProviderInfo authProvider = new AuthProviderInfo(
+                AUTH_PROVIDER_ID, PROVIDER_NAME, PROVIDER_USER_ID);
+
+        UserInfoUseCaseDto dto = UserInfoUseCaseDto.builder()
+                .id(UUID.fromString(USER_ID))
+                .email(EMAIL)
+                .username(USERNAME)
+                .hasPassword(true)
+                .profileImage(PROFILE_IMAGE_URL)
+                .twoFactorAuthEnabled(true)
+                .authProviders(List.of(authProvider))
+                .build();
+
         when(currentUserFacade.getUserId()).thenReturn(USER_ID);
+        when(setEmailAndPasswordUseCase.execute(UUID.fromString(USER_ID), request)).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(USER_ID))
+                .andExpect(jsonPath("$.email").value(EMAIL))
+                .andExpect(jsonPath("$.username").value(USERNAME))
+                .andExpect(jsonPath("$.hasPassword").value(true))
+                .andExpect(jsonPath("$.profileImage").value(PROFILE_IMAGE_URL))
+                .andExpect(jsonPath("$.twoFactorAuthEnabled").value(true))
+                .andExpect(jsonPath("$.authProviders[0]").value(PROVIDER_NAME));
 
-        verify(setEmailAndPasswordUseCase)
-                .execute(UUID.fromString(USER_ID), request);
+        verify(setEmailAndPasswordUseCase).execute(UUID.fromString(USER_ID), request);
     }
 
     @Test
@@ -117,28 +144,43 @@ class SetEmailAndPasswordControllerTest {
     void test5() throws Exception {
         SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(
                 null,
-                "Password123",
-                "Password123");
-
+                PASSWORD,
+                PASSWORD);
         String json = objectMapper.writeValueAsString(request);
 
-        when(currentUserFacade.getUserId()).thenReturn(USER_ID);
+        UserInfoUseCaseDto dto = UserInfoUseCaseDto.builder()
+                .id(UUID.fromString(USER_ID))
+                .email(null)
+                .username(USERNAME)
+                .hasPassword(true)
+                .profileImage(null)
+                .twoFactorAuthEnabled(false)
+                .authProviders(List.of())
+                .build();
 
-        mockMvc.perform(post(
-                ENDPOINT)
+        when(currentUserFacade.getUserId()).thenReturn(USER_ID);
+        when(setEmailAndPasswordUseCase.execute(UUID.fromString(USER_ID), request)).thenReturn(dto);
+
+        mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(USER_ID))
+                .andExpect(jsonPath("$.email").doesNotExist())
+                .andExpect(jsonPath("$.username").value(USERNAME))
+                .andExpect(jsonPath("$.hasPassword").value(true))
+                .andExpect(jsonPath("$.profileImage").doesNotExist())
+                .andExpect(jsonPath("$.twoFactorAuthEnabled").value(false))
+                .andExpect(jsonPath("$.authProviders").isArray());
 
-        verify(setEmailAndPasswordUseCase)
-                .execute(UUID.fromString(USER_ID), request);
+        verify(setEmailAndPasswordUseCase).execute(UUID.fromString(USER_ID), request);
     }
 
     @Test
     @DisplayName("パスワードがnullの場合、バリデーションエラーとなる")
     void test6() throws Exception {
         SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(
-                "test@example.com",
+                EMAIL,
                 null,
                 null);
 

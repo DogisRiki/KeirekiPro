@@ -4,7 +4,9 @@ import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
+import com.example.keirekipro.presentation.user.dto.UserInfoResponse;
 import com.example.keirekipro.usecase.user.SetEmailAndPasswordUseCase;
+import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,10 +39,11 @@ public class SetEmailAndPasswordController {
      * メールアドレス+パスワード設定エンドポイント
      */
     @PostMapping("/email-password")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "メールアドレスとパスワードの設定", description = "メールアドレスとパスワードの設定を実行する")
-    public void handle(@Valid @RequestBody SetEmailAndPasswordRequest request) {
+    public UserInfoResponse handle(@Valid @RequestBody SetEmailAndPasswordRequest request) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
-        setEmailAndPasswordUseCase.execute(userId, request);
+        UserInfoUseCaseDto dto = setEmailAndPasswordUseCase.execute(userId, request);
+        return dto.convertToResponse(dto);
     }
 }
