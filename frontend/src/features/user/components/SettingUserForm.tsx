@@ -8,6 +8,7 @@ import {
     TwoFactorSwitch,
 } from "@/features/user";
 import { useErrorMessageStore } from "@/stores";
+import { AuthProvider } from "@/types";
 import { Box } from "@mui/material";
 
 export interface SettingUserFormProps {
@@ -19,9 +20,9 @@ export interface SettingUserFormProps {
     twoFactorEnabled: boolean;
     twoFactorDisabled: boolean;
     onToggleTwoFactor: (v: boolean) => void;
-    authProviders: ("google" | "github")[];
+    authProviders: AuthProvider[];
     canRemoveProvider: boolean;
-    onRemoveProvider: (p: "google" | "github") => void;
+    onRemoveProvider: (p: AuthProvider) => void;
     messages: SettingMessages;
     onSave: () => void;
     loading?: boolean;
