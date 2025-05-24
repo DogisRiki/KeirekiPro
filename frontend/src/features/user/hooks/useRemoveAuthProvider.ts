@@ -1,4 +1,3 @@
-// src/features/user/hooks/useRemoveAuthProvider.ts
 import { removeAuthProvider } from "@/features/user";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
 import { AuthProvider } from "@/types";

@@ -2,6 +2,7 @@ import {
     createUserSettingMessages,
     SettingMessages,
     SettingUserForm,
+    useDeleteUser,
     useRemoveAuthProvider,
     UserState,
     useUpdateUserInfo,
@@ -44,6 +45,7 @@ export const SettingUserContainer = () => {
     const { data, isSuccess } = useGetUserInfo();
     const updateMutation = useUpdateUserInfo();
     const removeProviderMutation = useRemoveAuthProvider();
+    const deleteUserMutation = useDeleteUser();
 
     /**
      * ユーザー情報を取得
@@ -76,6 +78,13 @@ export const SettingUserContainer = () => {
         });
     }, [username, profileImageFile, twoFactor, user, updateMutation]);
 
+    /**
+     * 退会ハンドラ
+     */
+    const handleDelete = () => {
+        deleteUserMutation.mutate();
+    };
+
     // ユーザー未取得時レンダリングしない
     if (!user || userState === UserState.UNKNOWN) return <></>;
 
@@ -94,7 +103,8 @@ export const SettingUserContainer = () => {
             onRemoveProvider={(p) => removeProviderMutation.mutate(p)}
             messages={messages}
             onSave={handleSave}
-            loading={updateMutation.isPending || removeProviderMutation.isPending || !canRemoveProvider}
+            onDelete={handleDelete}
+            loading={updateMutation.isPending || removeProviderMutation.isPending || deleteUserMutation.isPending}
         />
     );
 };

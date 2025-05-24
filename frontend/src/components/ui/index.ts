@@ -1,6 +1,7 @@
 export * from "@/components/ui/Autocomplete";
 export * from "@/components/ui/Button";
 export * from "@/components/ui/Checkbox";
+export * from "@/components/ui/ConfirmDialog";
 export * from "@/components/ui/DatePicker";
 export * from "@/components/ui/Footer";
 export * from "@/components/ui/Headline";

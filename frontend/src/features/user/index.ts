@@ -13,10 +13,12 @@ export * from "@/features/user/components/SettingUserForm";
 export * from "@/features/user/components/TwoFactorSwitch";
 
 export * from "@/features/user/api/changePassword";
+export * from "@/features/user/api/deleteUser";
 export * from "@/features/user/api/removeAuthProvider";
 export * from "@/features/user/api/setEmailAndPassword";
 export * from "@/features/user/api/updateUserInfo";
 
+export * from "@/features/user/hooks/useDeleteUser";
 export * from "@/features/user/hooks/useRemoveAuthProvider";
 export * from "@/features/user/hooks/useSetEmailAndPassword";
 export * from "@/features/user/hooks/useUpdateUserInfo";
