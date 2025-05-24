@@ -1,4 +1,5 @@
-import { Box, FormControlLabel, Switch, Typography } from "@mui/material";
+import { Switch } from "@/components/ui";
+import { Box, FormControlLabel, Typography } from "@mui/material";
 
 export interface TwoFactorSwitchProps {
     enabled: boolean;
