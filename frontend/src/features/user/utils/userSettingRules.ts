@@ -18,8 +18,16 @@ export const isTwoFactorDisabled = (state: UserState): boolean => !TWO_FACTOR_EN
 
 /**
  * 外部連携を解除可能か判定
+ * @param state ユーザー状態
  * @param providers プロバイダー情報
- * @returns 判定結果(連携済みプロバイダーが 2 つ以上あれば解除可能)
+ * @returns 判定結果
  */
-export const isProviderRemovable = (providers: AuthProvider[] | null | undefined): boolean =>
-    (Array.isArray(providers) ? providers.length : 0) >= 2;
+export const isProviderRemovable = (state: UserState, providers: AuthProvider[] | null | undefined): boolean => {
+    // メールアドレス+パスワードが設定済みであれば、プロバイダー数にかかわらず解除可能
+    if (state === UserState.EMAIL_PASSWORD_WITH_PROVIDER) {
+        return true;
+    }
+    // それ以外の状態はプロバイダーが2件以上ある場合のみ解除可能
+    const count = Array.isArray(providers) ? providers.length : 0;
+    return count >= 2;
+};

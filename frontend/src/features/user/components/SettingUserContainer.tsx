@@ -1,7 +1,5 @@
 import {
     createUserSettingMessages,
-    isProviderRemovable,
-    isTwoFactorDisabled,
     SettingMessages,
     SettingUserForm,
     useRemoveAuthProvider,
@@ -9,6 +7,7 @@ import {
     useUpdateUserInfo,
     useUserState,
 } from "@/features/user";
+import { isProviderRemovable, isTwoFactorDisabled } from "@/features/user/utils/userSettingRules";
 import { useGetUserInfo } from "@/hooks";
 import { useUserAuthStore } from "@/stores";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -25,10 +24,14 @@ export const SettingUserContainer = () => {
     const [profileImageUrl, setProfileImageUrl] = useState<string | null>(user?.profileImage ?? null);
     const [twoFactor, setTwoFactor] = useState<boolean>(user?.twoFactorAuthEnabled ?? false);
 
+    // 二段階認証設定の設定可否
     const twoFactorDisabled = isTwoFactorDisabled(userState);
-    const canRemoveProvider = isProviderRemovable(user?.authProviders ?? []);
 
-    const providerCount = Array.isArray(user?.authProviders) ? user!.authProviders.length : 0;
+    // 外部連携認証情報の解除可否
+    const canRemoveProvider = isProviderRemovable(userState, user?.authProviders);
+
+    // プロバイダー数
+    const providerCount = Array.isArray(user?.authProviders) ? user.authProviders.length : 0;
 
     /**
      * 表示用メッセージ生成
@@ -73,19 +76,6 @@ export const SettingUserContainer = () => {
         });
     }, [username, profileImageFile, twoFactor, user, updateMutation]);
 
-    /**
-     * 更新対象のデータに対する更新フラグ
-     */
-    const isStateChange = useMemo(() => {
-        if (!user) return false;
-
-        return [
-            [username, user.username],
-            [twoFactor, user.twoFactorAuthEnabled],
-            [profileImageFile, null],
-        ].some(([current, initial]) => current !== initial);
-    }, [username, twoFactor, profileImageFile, user]);
-
     // ユーザー未取得時レンダリングしない
     if (!user || userState === UserState.UNKNOWN) return <></>;
 
@@ -104,7 +94,7 @@ export const SettingUserContainer = () => {
             onRemoveProvider={(p) => removeProviderMutation.mutate(p)}
             messages={messages}
             onSave={handleSave}
-            loading={updateMutation.isPending || removeProviderMutation.isPending || !isStateChange}
+            loading={updateMutation.isPending || removeProviderMutation.isPending || !canRemoveProvider}
         />
     );
 };
