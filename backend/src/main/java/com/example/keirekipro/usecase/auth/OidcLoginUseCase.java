@@ -25,7 +25,6 @@ import lombok.RequiredArgsConstructor;
 public class OidcLoginUseCase {
 
     private final UserRepository userRepository;
-
     private final DomainEventPublisher eventPublisher;
 
     /**
@@ -38,27 +37,29 @@ public class OidcLoginUseCase {
     public OidcLoginUseCaseDto execute(OidcUserInfoDto userInfo) {
 
         Notification notification = new Notification();
-
-        // プロバイダー名を小文字で統一
         String provider = userInfo.getProviderType().toLowerCase();
         String providerUserId = userInfo.getProviderUserId();
 
-        // 外部認証情報でユーザーを検索
-        Optional<User> existingUserOpt = userRepository.findByProvider(provider, providerUserId);
+        // まずはプロバイダーで検索
+        Optional<User> byProvider = userRepository.findByProvider(provider, providerUserId);
 
-        // 外部認証で見つからず、email がある場合はメールアドレスで既存ユーザーを検索
-        if (existingUserOpt.isEmpty() && userInfo.getEmail() != null) {
-            existingUserOpt = userRepository.findByEmail(userInfo.getEmail());
+        // プロバイダーなし or ユーザーは存在するが providers が部分的→ID で改めて全件取得
+        Optional<User> existingUser = byProvider.map(u -> userRepository.findById(u.getId())
+                .orElseThrow(() -> new IllegalStateException("ユーザー情報取得に失敗しました")));
+
+        // プロバイダーでも見つからずメールがあればメールで検索
+        if (existingUser.isEmpty() && userInfo.getEmail() != null) {
+            existingUser = userRepository.findByEmail(userInfo.getEmail())
+                    .flatMap(u -> userRepository.findById(u.getId()));
         }
 
-        User user = existingUserOpt.map(existing -> {
-            // 同一プロバイダーの場合は何もせず返す、他プロバイダーなら追加
+        User user = existingUser.map(existing -> {
+            // すでに当該プロバイダーがある場合は何もせず、なければ追加
             return existing.addAuthProvider(notification, provider, providerUserId);
         }).orElseGet(() -> {
-            // 新規登録
+            // 新規ユーザー登録
             Map<String, AuthProvider> providers = Map.of(
                     provider, AuthProvider.create(notification, provider, providerUserId));
-
             User newUser = User.create(
                     notification,
                     1,
@@ -68,12 +69,9 @@ public class OidcLoginUseCase {
                     providers,
                     null,
                     userInfo.getUsername());
-
-            // メールアドレスがある場合のみイベントを発行
             if (newUser.getEmail() != null) {
                 newUser.register();
             }
-
             return newUser;
         });
 
