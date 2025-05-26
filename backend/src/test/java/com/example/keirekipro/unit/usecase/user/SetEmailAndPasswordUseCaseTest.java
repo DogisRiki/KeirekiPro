@@ -25,7 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -81,13 +81,13 @@ class SetEmailAndPasswordUseCaseTest {
     }
 
     @Test
-    @DisplayName("ユーザーが存在しない場合、AccessDeniedExceptionがスローされる")
+    @DisplayName("ユーザーが存在しない場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
     void test3() {
         // モックをセットアップ
         when(userRepository.findById(eq(USER_ID))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> setEmailAndPasswordUseCase.execute(USER_ID, any()))
-                .isInstanceOf(AccessDeniedException.class)
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                 .hasMessage("不正なアクセスです。");
 
         // 検証

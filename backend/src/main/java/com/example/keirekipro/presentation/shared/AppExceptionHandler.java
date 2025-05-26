@@ -6,15 +6,19 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.shared.exception.BaseException;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * アプリケーション全体の例外を処理するハンドラー
@@ -22,14 +26,21 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class AppExceptionHandler {
 
+    @Value("${cookie.secure:false}")
+    private boolean isSecureCookie;
+
     /**
-     * AccessDeniedExceptionをハンドリングする
+     * AuthenticationCredentialsNotFoundExceptionをハンドリングする
      *
      * @return エラーレスポンス
      */
-    @ExceptionHandler(AccessDeniedException.class)
-    @ResponseStatus(HttpStatus.FORBIDDEN)
-    public ErrorResponse handleAccessDeniedException(AccessDeniedException ex) {
+    @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleAuthenticationException(AuthenticationCredentialsNotFoundException ex,
+            HttpServletResponse response) {
+        // トークン Cookie をクリア
+        response.addHeader("Set-Cookie", CookieUtil.deleteCookie("accessToken", isSecureCookie));
+        response.addHeader("Set-Cookie", CookieUtil.deleteCookie("refreshToken", isSecureCookie));
         return new ErrorResponse(ex.getMessage(), Collections.emptyMap());
     }
 

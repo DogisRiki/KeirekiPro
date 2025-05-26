@@ -1,6 +1,6 @@
 package com.example.keirekipro.presentation.security;
 
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +21,7 @@ public class CurrentUserFacade {
         var auth = SecurityContextHolder.getContext().getAuthentication();
 
         if (auth == null) {
-            throw new AccessDeniedException("認証されていないユーザーからのリクエストです。");
+            throw new AuthenticationCredentialsNotFoundException("認証されていないユーザーからのリクエストです。");
         }
 
         return (String) auth.getPrincipal();

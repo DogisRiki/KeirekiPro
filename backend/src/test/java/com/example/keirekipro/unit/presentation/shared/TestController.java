@@ -10,7 +10,7 @@ import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import io.swagger.v3.oas.annotations.Hidden;
 
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,8 +37,8 @@ class TestController {
     }
 
     @GetMapping("/test2")
-    public void throwAccessDeniedException() {
-        throw new AccessDeniedException("不正なアクセスです。");
+    public void throwAuthenticationCredentialsNotFoundException() {
+        throw new AuthenticationCredentialsNotFoundException("不正なアクセスです。");
     }
 
     @PostMapping("/test3")

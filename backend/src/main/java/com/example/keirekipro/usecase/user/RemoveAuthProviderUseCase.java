@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.shared.Notification;
 
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +32,7 @@ public class RemoveAuthProviderUseCase {
 
         // 対象ユーザーを取得
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
         // プロバイダ解除
         Notification notification = new Notification();

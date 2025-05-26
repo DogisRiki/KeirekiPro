@@ -26,7 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,7 +75,7 @@ class ChangePasswordUseCaseTest {
     }
 
     @Test
-    @DisplayName("ユーザーが存在しない場合、AccessDeniedExceptionがスローされる")
+    @DisplayName("ユーザーが存在しない場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
     void test2() {
         // リクエスト作成
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
@@ -85,7 +85,7 @@ class ChangePasswordUseCaseTest {
 
         // ユースケース実行
         assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
-                .isInstanceOf(AccessDeniedException.class)
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                 .hasMessage("不正なアクセスです。");
 
         // 検証

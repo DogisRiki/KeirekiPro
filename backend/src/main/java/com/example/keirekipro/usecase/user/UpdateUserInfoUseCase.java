@@ -12,7 +12,7 @@ import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -64,7 +64,7 @@ public class UpdateUserInfoUseCase {
 
         // ユーザー取得(ユーザーが存在しないのに更新リクエストはできない)
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
         // S3へのアップロード（画像がある場合のみ）
         String imageKey = null;

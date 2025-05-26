@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -87,5 +88,24 @@ class ResetPasswordUseCaseTest {
         // 検証
         verify(passwordEncoder, never()).encode(RAW_PASSWORD);
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("ユーザーが存在しない場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
+    void test3() {
+        // モックをセットアップ：トークンは有効
+        when(redisClient.getValue(REDIS_KEY, String.class)).thenReturn(Optional.of(USER_ID.toString()));
+        // ユーザーが見つからない
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        // ユースケース実行
+        assertThatThrownBy(() -> resetPasswordUseCase.execute(TOKEN, RAW_PASSWORD))
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
+                .hasMessage("不正なアクセスです。");
+
+        // 検証
+        verify(passwordEncoder, never()).encode(RAW_PASSWORD);
+        verify(userRepository, never()).save(any());
+        verify(redisClient, never()).deleteValue(any());
     }
 }

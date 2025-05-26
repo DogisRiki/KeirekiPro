@@ -102,7 +102,7 @@ class TwoFactorAuthControllerTest {
     }
 
     @Test
-    @DisplayName("userIdがnullの場合、403が返される")
+    @DisplayName("userIdがnullの場合、401が返される")
     void test3() throws Exception {
         // リクエストを準備（userIdがnull）
         TwoFactorAuthRequest request = new TwoFactorAuthRequest(null, "123456");
@@ -113,7 +113,7 @@ class TwoFactorAuthControllerTest {
                 ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("不正なアクセスです。"))
                 .andExpect(jsonPath("$.errors").isEmpty());
     }

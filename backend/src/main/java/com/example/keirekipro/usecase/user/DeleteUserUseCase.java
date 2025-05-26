@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +32,7 @@ public class DeleteUserUseCase {
     public void execute(UUID userId) {
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
         // 退会イベントを発行する
         user.delete();

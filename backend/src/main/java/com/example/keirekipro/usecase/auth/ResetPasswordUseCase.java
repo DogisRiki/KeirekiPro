@@ -8,7 +8,7 @@ import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +49,7 @@ public class ResetPasswordUseCase {
 
         // 対象ユーザーを取得
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
         // パスワードハッシュ化
         String hashedPassword = passwordEncoder.encode(newPassword);

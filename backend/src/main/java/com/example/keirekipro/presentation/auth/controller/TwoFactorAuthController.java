@@ -12,7 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,7 +50,7 @@ public class TwoFactorAuthController {
             throws Exception {
 
         if (request.getUserId() == null) {
-            throw new AccessDeniedException("不正なアクセスです。");
+            throw new AuthenticationCredentialsNotFoundException("不正なアクセスです。");
         }
 
         // ユースケース実行

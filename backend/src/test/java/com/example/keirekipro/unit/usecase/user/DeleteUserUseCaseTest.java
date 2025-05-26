@@ -24,7 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class DeleteUserUseCaseTest {
@@ -56,12 +56,12 @@ class DeleteUserUseCaseTest {
     }
 
     @Test
-    @DisplayName("ユーザーが存在しない場合はAccessDeniedExceptionがスローされる")
+    @DisplayName("ユーザーが存在しない場合はAuthenticationCredentialsNotFoundExceptionがスローされる")
     void test2() {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> deleteUserUseCase.execute(USER_ID))
-                .isInstanceOf(AccessDeniedException.class)
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                 .hasMessage("不正なアクセスです。");
 
         verify(userRepository, never()).delete(any());

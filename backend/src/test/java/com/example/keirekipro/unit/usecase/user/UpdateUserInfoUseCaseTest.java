@@ -37,7 +37,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
@@ -257,7 +257,7 @@ class UpdateUserInfoUseCaseTest {
     }
 
     @Test
-    @DisplayName("ユーザーが存在しない場合、AccessDeniedExceptionがスローされる")
+    @DisplayName("ユーザーが存在しない場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
     void test7() {
         UpdateUserInfoRequest req = new UpdateUserInfoRequest();
         req.setUsername("Valid");
@@ -273,7 +273,7 @@ class UpdateUserInfoUseCaseTest {
 
             assertThatThrownBy(() -> {
                 updateUserInfoUseCase.execute(req, USER_ID);
-            }).isInstanceOf(AccessDeniedException.class)
+            }).isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                     .hasMessage("不正なアクセスです。");
 
             verify(userRepository, never()).save(any());

@@ -8,7 +8,7 @@ import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +33,7 @@ public class ChangePasswordUseCase {
     public void execute(ChangePasswordRequest request, UUID userId) {
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AccessDeniedException("不正なアクセスです。"));
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
         Notification notification = new Notification();
 

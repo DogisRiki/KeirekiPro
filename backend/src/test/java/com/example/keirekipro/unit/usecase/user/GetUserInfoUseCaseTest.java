@@ -29,7 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class GetUserInfoUseCaseTest {
@@ -130,14 +130,14 @@ class GetUserInfoUseCaseTest {
     }
 
     @Test
-    @DisplayName("ユーザー情報が存在しない場合、AccessDeniedExceptionがスローされる")
+    @DisplayName("ユーザー情報が存在しない場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
     void test3() {
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         // ユースケース実行
         assertThatThrownBy(() -> getUserInfoUseCase.execute(USER_ID))
-                .isInstanceOf(AccessDeniedException.class)
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                 .hasMessage("不正なアクセスです。");
 
         // generatePresignedUrl は呼ばれない

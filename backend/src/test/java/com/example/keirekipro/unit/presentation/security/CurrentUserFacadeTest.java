@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,7 +48,7 @@ class CurrentUserFacadeTest {
     }
 
     @Test
-    @DisplayName("認証情報がnullの場合、AccessDeniedExceptionがスローされる")
+    @DisplayName("認証情報がnullの場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
     void test2() {
         // SecurityContextに認証情報をセットしない（nullのまま）
         SecurityContextHolder.clearContext();
@@ -56,7 +56,7 @@ class CurrentUserFacadeTest {
         // 実行と検証
         assertThatThrownBy(() -> {
             currentUserFacade.getUserId();
-        }).isInstanceOf(AccessDeniedException.class)
+        }).isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                 .hasMessageContaining("認証されていないユーザーからのリクエストです。");
     }
 }
