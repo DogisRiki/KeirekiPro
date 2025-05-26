@@ -13,6 +13,12 @@ export const createErrorInterceptor =
         if (axios.isAxiosError(error)) {
             const { response } = error;
 
+            // サーバー無応答／ネットワークエラー
+            if (!response) {
+                window.location.assign(paths.serverError);
+                return Promise.reject(error);
+            }
+
             // 400(バリデーションエラー)
             if (response?.status === 400 && response.data) {
                 useErrorMessageStore.getState().setErrors(response.data as ErrorResponse);

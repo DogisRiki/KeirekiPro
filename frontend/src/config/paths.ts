@@ -23,4 +23,5 @@ export const paths = {
     contact: "/contact",
     terms: "/terms",
     privacy: "/privacy",
+    serverError: "/500",
 };

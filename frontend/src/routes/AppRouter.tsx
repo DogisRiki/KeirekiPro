@@ -1,4 +1,4 @@
-import { ErrorFallback, NotFound } from "@/components/errors";
+import { ErrorFallback, NotFound, ServerError } from "@/components/errors";
 import { ProtectedLayout, PublicLayout } from "@/components/layouts";
 import { paths } from "@/config/paths";
 import {
@@ -58,6 +58,7 @@ const router = createBrowserRouter([
     },
     { path: paths.terms, element: <Terms />, errorElement: <ErrorFallback /> },
     { path: paths.privacy, element: <Privacy />, errorElement: <ErrorFallback /> },
+    { path: paths.serverError, element: <ServerError />, errorElement: <ErrorFallback /> },
     { path: "*", element: <NotFound />, errorElement: <ErrorFallback /> },
 ]);
 
