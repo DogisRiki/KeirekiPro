@@ -55,7 +55,7 @@ describe("useUpdateUserInfo", () => {
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-        // clearErrors が onMutate と onSuccess で呼ばれていること
+        // clearErrorsがonMutateとonSuccessで計2回呼び出されること
         expect(useErrorMessageStore.getState().message).toBeNull();
         expect(useErrorMessageStore.getState().errors).toEqual({});
 
