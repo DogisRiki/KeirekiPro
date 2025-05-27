@@ -19,7 +19,7 @@ export const UserMenu = () => {
     const [imgError, setImgError] = useState(false);
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
     const navigate = useNavigate();
-    const logout = useLogout();
+    const logoutMutation = useLogout();
 
     const userMenuItems = [
         { label: "ユーザー設定", icon: <ManageAccountsIcon />, path: paths.user },
@@ -37,7 +37,7 @@ export const UserMenu = () => {
 
     const handleLogout = () => {
         handleMenuClose();
-        logout();
+        logoutMutation.mutate();
     };
 
     const handleMenuItemClick = (item: (typeof userMenuItems)[0]) => {
@@ -88,6 +88,7 @@ export const UserMenu = () => {
                 {userMenuItems.map((item, index) => (
                     <MenuItem
                         key={index}
+                        disabled={logoutMutation.isPending}
                         onClick={() => handleMenuItemClick(item)}
                         sx={{
                             color: "primary.main",
