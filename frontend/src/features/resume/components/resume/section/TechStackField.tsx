@@ -1,7 +1,7 @@
 import { Autocomplete, TextField } from "@/components/ui";
 import { techStackInfo, teckStackList } from "@/features/resume";
 import { TechStack } from "@/types";
-import { getNestedValue, setNestedValue } from "@/utils/objectUtils";
+import { getNestedValue, setNestedValue } from "@/utils";
 import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
 import { Accordion, AccordionDetails, AccordionSummary, SxProps, Theme, Typography } from "@mui/material";
 import { useState } from "react";
