@@ -18,6 +18,7 @@ export * from "@/features/user/api/removeAuthProvider";
 export * from "@/features/user/api/setEmailAndPassword";
 export * from "@/features/user/api/updateUserInfo";
 
+export * from "@/features/user/hooks/useChangePassword";
 export * from "@/features/user/hooks/useDeleteUser";
 export * from "@/features/user/hooks/useRemoveAuthProvider";
 export * from "@/features/user/hooks/useSetEmailAndPassword";

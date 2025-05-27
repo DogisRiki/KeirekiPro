@@ -1,6 +1,5 @@
 import { paths } from "@/config/paths";
-import { ChangePasswordForm, UserState, useUserState } from "@/features/user";
-import { useChangePassword } from "@/features/user/hooks/useChangePassword";
+import { ChangePasswordForm, useChangePassword, UserState, useUserState } from "@/features/user";
 import { useState } from "react";
 import { Navigate } from "react-router";
 
