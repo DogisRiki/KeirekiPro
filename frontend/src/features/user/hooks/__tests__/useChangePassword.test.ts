@@ -11,7 +11,7 @@ import { AxiosResponse } from "axios";
 import { ChangePasswordPayload, useChangePassword } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test/testUtils";
+import { createQueryWrapper, resetStoresAndMocks } from "@/test";
 
 describe("useChangePassword", () => {
     const wrapper = createQueryWrapper();

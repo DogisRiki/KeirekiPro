@@ -13,11 +13,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
-import { SetEmailAndPasswordPayload } from "@/features/user";
-import { useSetEmailAndPassword } from "@/features/user/hooks/useSetEmailAndPassword";
+import { SetEmailAndPasswordPayload, useSetEmailAndPassword } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test/testUtils";
+import { createQueryWrapper, resetStoresAndMocks } from "@/test";
 import { User } from "@/types";
 
 describe("useSetEmailAndPassword", () => {

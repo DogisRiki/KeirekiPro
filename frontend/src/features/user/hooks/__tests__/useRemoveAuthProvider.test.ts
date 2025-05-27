@@ -8,10 +8,10 @@ vi.mock("@/lib", () => ({
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { AxiosResponse } from "axios";
 
-import { useRemoveAuthProvider } from "@/features/user/hooks/useRemoveAuthProvider";
+import { useRemoveAuthProvider } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test/testUtils";
+import { createQueryWrapper, resetStoresAndMocks } from "@/test";
 import { AuthProvider, User } from "@/types";
 
 describe("useRemoveAuthProvider", () => {

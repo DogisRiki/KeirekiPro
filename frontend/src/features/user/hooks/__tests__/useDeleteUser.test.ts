@@ -16,7 +16,7 @@ import { paths } from "@/config/paths";
 import { useDeleteUser } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test/testUtils";
+import { createQueryWrapper, resetStoresAndMocks } from "@/test";
 
 describe("useDeleteUser", () => {
     const wrapper = createQueryWrapper();
