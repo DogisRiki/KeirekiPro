@@ -51,7 +51,8 @@
                     "javascript": "javascriptreact",
                     "typescript": "typescriptreact"
                 },
-                "window.title": "${activeEditorShort} / ${rootName}"
+                "window.title": "${activeEditorShort} / ${rootName}",
+                "vitest.rootConfig": "vite.config.ts"
             }
         }
     }
