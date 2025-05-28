@@ -55,9 +55,11 @@ dependencies {
     implementation 'software.amazon.awssdk:ses'
     implementation 'software.amazon.awssdk:secretsmanager'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    testImplementation platform('org.testcontainers:testcontainers-bom:1.19.3')
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:localstack'
     implementation 'org.freemarker:freemarker:2.3.34'
     implementation 'commons-validator:commons-validator:1.9.0'
 }
