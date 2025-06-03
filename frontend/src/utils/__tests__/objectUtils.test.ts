@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getNestedValue, setNestedValue } from "@/utils";
+import { getNestedValue, setNestedValue, stringListToBulletList } from "@/utils";
 
 describe("getNestedValue", () => {
     const obj = {
@@ -45,5 +45,28 @@ describe("setNestedValue", () => {
 
         expect(result).toBe(target);
         expect(target.x.y).toEqual([0, 99, 2]);
+    });
+});
+
+describe("stringListToBulletList", () => {
+    it("空配列またはundefinedの場合は空文字を返す", () => {
+        expect(stringListToBulletList(undefined)).toBe("");
+        expect(stringListToBulletList([])).toBe("");
+    });
+
+    it("要素が1件の場合はそのまま返す", () => {
+        expect(stringListToBulletList(["single message"])).toBe("single message");
+    });
+
+    it("複数要素の場合は先頭に「・ 」を付け改行でつなげて返す", () => {
+        const input = ["first", "second", "third"];
+        const expected = "・ first\n・ second\n・ third";
+        expect(stringListToBulletList(input)).toBe(expected);
+    });
+
+    it("特殊文字や空文字を含む要素も正しく処理する", () => {
+        const input = ["", "こんにちは", "error: ⚠️"];
+        const expected = "・ \n・ こんにちは\n・ error: ⚠️";
+        expect(stringListToBulletList(input)).toBe(expected);
     });
 });
