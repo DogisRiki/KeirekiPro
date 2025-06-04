@@ -18,20 +18,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Show event info for debug
-        run: |
-          echo "event_name=${{ github.event_name }}"
-          echo "base_ref=${{ github.base_ref }}"
-          echo "head_ref=${{ github.head_ref }}"
-
-      # デバッグ: 変更されたファイル一覧を表示
-      - name: Show changed files
-        run: |
-          echo "=== Changed files in this PR ==="
-          git diff --name-only origin/${{ github.base_ref }}..HEAD
-          echo "=== Backend files specifically ==="
-          git diff --name-only origin/${{ github.base_ref }}..HEAD | grep -E '^backend/' || echo "No backend files found"
-
       - name: Run paths-filter
         id: filter
         uses: dorny/paths-filter@v3
@@ -41,13 +27,6 @@ jobs:
               - 'frontend/**'
             backend:
               - 'backend/**'
-
-      - name: Debug outputs
-        run: |
-          echo "frontend_changed=${{ steps.filter.outputs.frontend }}"
-          echo "backend_changed=${{ steps.filter.outputs.backend }}"
-          echo "=== All filter outputs ==="
-          echo "Changes: ${{ steps.filter.outputs.changes }}"
 
   frontend-test:
     needs: detect-changes
@@ -106,4 +85,25 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run tests
-        run: ./gradlew test
+        run: ./gradlew test --info
+
+      # テスト結果レポートをアーティファクトとしてアップロード
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: backend/build/reports/tests/test/
+
+      # 失敗した場合の詳細ログ出力
+      - name: Show test failure details
+        if: failure()
+        run: |
+          echo "=== Test Report Contents ==="
+          if [ -f backend/build/reports/tests/test/index.html ]; then
+            echo "HTML report exists"
+            # テキスト形式のレポートがあれば表示
+            find backend/build/reports/tests/test -name "*.xml" -exec cat {} \;
+          else
+            echo "No HTML report found"
+          fi
