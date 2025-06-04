@@ -71,7 +71,7 @@ class EntityTest {
 
     @Test
     @DisplayName("ハッシュ値")
-    void test6() {
+    void test5() {
         UUID id1 = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         UUID id2 = UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
         int entity1HashCode = new TestEntity(id1, 1).hashCode();

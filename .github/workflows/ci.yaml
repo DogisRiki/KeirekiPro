@@ -35,6 +35,7 @@ jobs:
     defaults:
       run:
         working-directory: frontend
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,8 +54,15 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
-      - name: Run test
+      - name: Run tests
         run: npm test
+
+      - name: Upload frontend test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-test-results
+          path: frontend/test-results/
 
   backend-test:
     needs: detect-changes
@@ -63,6 +71,7 @@ jobs:
     defaults:
       run:
         working-directory: backend
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -85,25 +94,11 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run tests
-        run: ./gradlew test --info
+        run: ./gradlew test
 
-      # テスト結果レポートをアーティファクトとしてアップロード
-      - name: Upload test results
+      - name: Upload backend test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: backend-test-results
           path: backend/build/reports/tests/test/
-
-      # 失敗した場合の詳細ログ出力
-      - name: Show test failure details
-        if: failure()
-        run: |
-          echo "=== Test Report Contents ==="
-          if [ -f backend/build/reports/tests/test/index.html ]; then
-            echo "HTML report exists"
-            # テキスト形式のレポートがあれば表示
-            find backend/build/reports/tests/test -name "*.xml" -exec cat {} \;
-          else
-            echo "No HTML report found"
-          fi

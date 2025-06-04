@@ -31,5 +31,6 @@ export default defineConfig({
         globals: true,
         environment: "happy-dom",
         setupFiles: ["./vitest-setup.ts"],
+        reporters: ["default", ["junit", { outputFile: "test-results/junit.xml" }]],
     },
 } as ExtendedUserConfig);
