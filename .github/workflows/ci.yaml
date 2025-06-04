@@ -51,8 +51,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Format code (fix)
-        run: npm run format:fix
+      - name: Run Format
+        run: npm run format
 
       - name: Run ESLint
         run: npm run lint
