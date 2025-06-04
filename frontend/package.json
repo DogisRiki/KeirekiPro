@@ -6,11 +6,12 @@
     "scripts": {
         "dev": "vite --host",
         "build": "tsc -b && vite build",
-        "lint": "eslint .",
-        "lint:fix": "eslint src --fix",
-        "format": "prettier --write",
+        "lint": "eslint ./src",
+        "lint:fix": "eslint ./src --fix",
+        "format": "prettier --check ./src",
+        "format:fix": "prettier --write ./src",
         "preview": "vite preview",
-        "test": "vitest watch",
+        "test": "vitest",
         "coverage": "vitest run --coverage",
         "init": "hygen structure new",
         "new": "hygen feature new"
