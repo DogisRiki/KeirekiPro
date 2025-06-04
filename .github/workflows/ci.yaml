@@ -24,6 +24,14 @@ jobs:
           echo "base_ref=${{ github.base_ref }}"
           echo "head_ref=${{ github.head_ref }}"
 
+      # デバッグ: 変更されたファイル一覧を表示
+      - name: Show changed files
+        run: |
+          echo "=== Changed files in this PR ==="
+          git diff --name-only origin/${{ github.base_ref }}..HEAD
+          echo "=== Backend files specifically ==="
+          git diff --name-only origin/${{ github.base_ref }}..HEAD | grep -E '^backend/' || echo "No backend files found"
+
       - name: Run paths-filter
         id: filter
         uses: dorny/paths-filter@v3
@@ -31,15 +39,15 @@ jobs:
           filters: |
             frontend:
               - 'frontend/**'
-              - 'frontend/*'
             backend:
               - 'backend/**'
-              - 'backend/*'
 
       - name: Debug outputs
         run: |
           echo "frontend_changed=${{ steps.filter.outputs.frontend }}"
           echo "backend_changed=${{ steps.filter.outputs.backend }}"
+          echo "=== All filter outputs ==="
+          echo "Changes: ${{ steps.filter.outputs.changes }}"
 
   frontend-test:
     needs: detect-changes
