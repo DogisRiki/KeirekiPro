@@ -1,4 +1,5 @@
 import { paths } from "@/config/paths";
+import { useLogout } from "@/hooks";
 import { useUserAuthStore } from "@/stores";
 import {
     Lock as LockIcon,
@@ -15,15 +16,17 @@ import { useNavigate } from "react-router";
  */
 export const UserMenu = () => {
     const { user } = useUserAuthStore();
+    const [imgError, setImgError] = useState(false);
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
     const navigate = useNavigate();
+    const logoutMutation = useLogout();
 
     const userMenuItems = [
         { label: "ユーザー設定", icon: <ManageAccountsIcon />, path: paths.user },
         {
             label: user?.hasPassword ? "パスワード変更" : "パスワード設定",
             icon: <LockIcon />,
-            path: paths.password.change,
+            path: user?.hasPassword ? paths.password.change : paths.emailPassword.set,
         },
         { label: "ログアウト", icon: <LogoutIcon />, action: "logout" },
     ];
@@ -33,8 +36,8 @@ export const UserMenu = () => {
     const handleMenuClose = () => setAnchorEl(null);
 
     const handleLogout = () => {
-        navigate(paths.login);
         handleMenuClose();
+        logoutMutation.mutate();
     };
 
     const handleMenuItemClick = (item: (typeof userMenuItems)[0]) => {
@@ -69,12 +72,15 @@ export const UserMenu = () => {
                     }}
                 >
                     {/* プロフィール画像 */}
-                    <Avatar src={user?.profileImage || undefined} sx={{ width: 32, height: 32, bgcolor: "#34495E" }}>
-                        {/* srcがない場合に表示するデフォルトのアイコン */}
-                        {user?.profileImage || <PersonIcon />}
+                    <Avatar
+                        src={!imgError ? (user?.profileImage ?? undefined) : undefined}
+                        onError={() => setImgError(true)}
+                        sx={{ width: 32, height: 32, bgcolor: "#34495E" }}
+                    >
+                        <PersonIcon />
                     </Avatar>
                     <Typography variant="body2" sx={{ color: "#ffffff", fontSize: "14px" }}>
-                        {user?.userName}
+                        {user?.username}
                     </Typography>
                 </Box>
             </ButtonBase>
@@ -82,6 +88,7 @@ export const UserMenu = () => {
                 {userMenuItems.map((item, index) => (
                     <MenuItem
                         key={index}
+                        disabled={logoutMutation.isPending}
                         onClick={() => handleMenuItemClick(item)}
                         sx={{
                             color: "primary.main",

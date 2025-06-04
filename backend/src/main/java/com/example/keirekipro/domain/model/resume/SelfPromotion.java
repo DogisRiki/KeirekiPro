@@ -1,5 +1,7 @@
 package com.example.keirekipro.domain.model.resume;
 
+import java.util.UUID;
+
 import com.example.keirekipro.domain.shared.Entity;
 
 import lombok.Getter;
@@ -32,7 +34,7 @@ public class SelfPromotion extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private SelfPromotion(String id, int orderNo, String title, String content) {
+    private SelfPromotion(UUID id, int orderNo, String title, String content) {
         super(id, orderNo);
         this.title = title;
         this.content = content;
@@ -59,7 +61,7 @@ public class SelfPromotion extends Entity {
      * @param content コンテンツ
      * @return 自己PRエンティティ
      */
-    public static SelfPromotion reconstruct(String id, int orderNo, String title, String content) {
+    public static SelfPromotion reconstruct(UUID id, int orderNo, String title, String content) {
         return new SelfPromotion(id, orderNo, title, content);
     }
 

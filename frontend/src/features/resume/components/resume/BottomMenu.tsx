@@ -1,20 +1,10 @@
-import { Button } from "@/components/ui";
+import { Button, Switch } from "@/components/ui";
 import {
     Delete as DeleteIcon,
     ExpandMore as ExpandMoreIcon,
     FileDownload as FileDownloadIcon,
 } from "@mui/icons-material";
-import {
-    Box,
-    FormControlLabel,
-    FormGroup,
-    Menu,
-    MenuItem,
-    Paper,
-    Switch,
-    useMediaQuery,
-    useTheme,
-} from "@mui/material";
+import { Box, FormControlLabel, FormGroup, Menu, MenuItem, Paper, useMediaQuery, useTheme } from "@mui/material";
 import React from "react";
 
 const exportMenuItems = [

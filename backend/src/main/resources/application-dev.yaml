@@ -5,14 +5,45 @@ spring:
     username: postgres
     password: postgres
     show-sql: true
+  data:
+    redis:
+      host: redis
+      port: 6379
+      password: null
+
+frontend-base-url: "http://localhost:5173"
+
+cors:
+  allowed-origins: "http://localhost:5173"
+
+cookie:
+  secure: false
+
+jwt:
+  secret: vh8JBWqYFC2mJwZ4XD9pE7TKq3mN5RxS2HnUcL7VfAy
+  access-token-validity-in-minutes: 30
+  refresh-token-validity-in-days: 7
+
+aws:
+  secrets-manager:
+    region: "ap-northeast-1"
+    endpoint: "http://localstack:4566"
+  ses:
+    region: "ap-northeast-1"
+    endpoint: "http://localstack:4566"
+    from-address: "no-reply@keirekipro.click"
+  s3:
+    region: "ap-northeast-1"
+    endpoint: "http://localstack:4566"
+    bucket-name: "keirekipro-storage"
 
 # ログ設定
 logging:
   level:
-    com.example.demo.mapper: debug        # MyBatisのSQLログを出力
-    org.springframework.web: debug        # Spring Webのログを出力
-    org.flywaydb.core: debug              # Flywayのログを出力
-    org.springframework.security: debug   # Spring Securityのログを出力
+    com.example.keirekipro.infrastructure.repository: trace         # MyBatisのSQLログを出力
+    org.springframework.web: debug                                  # Spring Webのログを出力
+    org.flywaydb.core: debug                                        # Flywayのログを出力
+    org.springframework.security: debug                             # Spring Securityのログを出力
 
 # Sprig Boot Actuator設定
 # /actuator/health: アプリケーションの健康状態を表示
@@ -39,3 +70,5 @@ springdoc:
     enabled: true
   swagger-ui:
     path: /swagger-ui.html
+  packages-to-exclude:
+    - com.example.demo.test.controller

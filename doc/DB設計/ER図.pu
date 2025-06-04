@@ -2,17 +2,14 @@
 
 title ER図
 
-' -----------------------
-' 既存テーブル
-' -----------------------
 entity "ユーザー(users)" as users {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
-    email : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- メールアドレス
-    password : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- パスワード(ハッシュ想定)
+    email : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[UNIQUE]</color> -- メールアドレス
+    password : <color:#1E90FF>VARCHAR(255)</color> -- パスワード
+    username : <color:#1E90FF>VARCHAR(255)</color> -- ユーザー名
+    profile_image : <color:#1E90FF>VARCHAR(255)</color> -- プロフィール画像
     two_factor_auth_enabled : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL, DEFAULT FALSE]</color> -- 二段階認証設定
-    login_fail_count : <color:#1E90FF>SMALLINT</color> <color:#32CD32>[NOT NULL, DEFAULT 0]</color> -- ログイン失敗回数
-    locked_until : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NULL]</color> -- ロック解除予定時刻
     created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
     updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
 }
@@ -21,9 +18,9 @@ entity "外部認証連携(user_auth_providers)" as UserAuthProviders {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     user_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- ユーザーID
-    provider_type : <color:#1E90FF>VARCHAR(50)</color> <color:#32CD32>[NOT NULL]</color> -- プロバイダー種別
-    provider_user_id : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プロバイダ側ID
-    created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 登録日時
+    provider_name : <color:#1E90FF>VARCHAR(50)</color> <color:#32CD32>[NOT NULL]</color> -- プロバイダー名
+    provider_user_id : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プロバイダ側ユーザーID
+    created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
     updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
 }
 
@@ -32,8 +29,8 @@ entity "職務経歴書(resumes)" as Resumes {
     --
     user_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- ユーザーID
     name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書名
-    date : <color:#1E90FF>DATE</color> -- 作成日
-    auto_save_enabled : <color:#1E90FF>BOOLEAN</color> -- 自動保存有効フラグ
+    date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 作成日
+    auto_save_enabled : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 自動保存有効フラグ
     created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
     updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
     order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
@@ -43,10 +40,10 @@ entity "職歴(careers)" as Careers {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
-    company_name : <color:#1E90FF>VARCHAR(255)</color> -- 会社名
-    period_start : <color:#1E90FF>DATE</color> -- 開始日
-    period_end : <color:#1E90FF>DATE</color> -- 終了日
-    is_active : <color:#1E90FF>BOOLEAN</color> -- 在籍中フラグ
+    company_name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 会社名
+    start_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 入社年月
+    end_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 退職年月
+    is_active : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 在籍中フラグ
     order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
@@ -54,14 +51,42 @@ entity "プロジェクト(projects)" as Projects {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
-    company_name : <color:#1E90FF>VARCHAR(255)</color> -- 会社名
-    period_start : <color:#1E90FF>DATE</color> -- 開始日
-    period_end : <color:#1E90FF>DATE</color> -- 終了日
-    is_active : <color:#1E90FF>BOOLEAN</color> -- 継続中フラグ
-    overview : <color:#1E90FF>TEXT</color> -- 概要
-    team_comp : <color:#1E90FF>TEXT</color> -- チーム構成
-    role : <color:#1E90FF>TEXT</color> -- 役割
+    company_name : <color:#1E90FF>VARCHAR(255)</color> -- <color:#32CD32>[NOT NULL]</color> 会社名
+    start_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 開始年月
+    end_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 終了年月
+    is_active : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 継続中フラグ
+    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プロジェクト名
+    overview : <color:#1E90FF>VARCHAR(255)</color> -- 概要
+    team_comp : <color:#1E90FF>VARCHAR(255)</color> -- チーム構成
+    role : <color:#1E90FF>VARCHAR(255)</color> -- 役割
     achievement : <color:#1E90FF>TEXT</color> -- 成果
+    requirements : <color:#1E90FF>BOOLEAN</color> -- 要件定義
+    basic_design : <color:#1E90FF>BOOLEAN</color> -- 基本設計
+    detailed_design : <color:#1E90FF>BOOLEAN</color> -- 詳細設計
+    implementation : <color:#1E90FF>BOOLEAN</color> -- 実装・単体テスト
+    integration_test : <color:#1E90FF>BOOLEAN</color> -- 結合テスト
+    system_test : <color:#1E90FF>BOOLEAN</color> -- 総合テスト
+    maintenance : <color:#1E90FF>BOOLEAN</color> -- 運用・保守
+    languages : <color:#1E90FF>TEXT[]</color> -- 開発言語
+    frameworks : <color:#1E90FF>TEXT[]</color> -- フレームワーク
+    libraries : <color:#1E90FF>TEXT[]</color> -- ライブラリ
+    testing_tools : <color:#1E90FF>TEXT[]</color> -- テストツール
+    orm_tools : <color:#1E90FF>TEXT[]</color> -- ORMツール
+    package_managers : <color:#1E90FF>TEXT[]</color> -- パッケージマネージャー
+    clouds : <color:#1E90FF>TEXT[]</color> -- クラウド
+    containers : <color:#1E90FF>TEXT[]</color> -- コンテナ
+    databases : <color:#1E90FF>TEXT[]</color> -- データベース
+    web_servers : <color:#1E90FF>TEXT[]</color> -- Webサーバー
+    ci_cd_tools : <color:#1E90FF>TEXT[]</color> -- CI/CDツール
+    iac_tools : <color:#1E90FF>TEXT[]</color> -- IaCツール
+    monitoring_tools : <color:#1E90FF>TEXT[]</color> -- 監視ツール
+    logging_tools : <color:#1E90FF>TEXT[]</color> -- ロギングツール
+    source_controls : <color:#1E90FF>TEXT[]</color> -- ソース管理
+    project_managements : <color:#1E90FF>TEXT[]</color> -- プロジェクト管理
+    communication_tools : <color:#1E90FF>TEXT[]</color> -- コミュニケーション
+    documentation_tools : <color:#1E90FF>TEXT[]</color> -- ドキュメント
+    api_development_tools : <color:#1E90FF>TEXT[]</color> -- API開発
+    design_tools : <color:#1E90FF>TEXT[]</color> -- デザイン
     order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
@@ -79,7 +104,7 @@ entity "ポートフォリオ(portfolios)" as Portfolios {
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
     name : <color:#1E90FF>VARCHAR(255)</color> -- ポートフォリオ名
-    overview : <color:#1E90FF>TEXT</color> -- 概要
+    overview : <color:#1E90FF>VARCHAR(255)</color> -- 概要
     tech_stack : <color:#1E90FF>TEXT</color> -- 技術スタック
     link : <color:#1E90FF>VARCHAR(255)</color> -- リンク
     order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
@@ -103,17 +128,32 @@ entity "自己PR(self_promotions)" as SelfPromotions {
     order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
+entity "技術スタックマスタ(tech_stack_mst)" as TechStackMst {
+    + id : <color:#1E90FF>INTEGER</color> -- 識別子 (PK)
+    --
+    name : <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- 技術名
+    category: <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL]</color> -- カテゴリ
+}
+
+entity "技術スタックカテゴリマスタ(tech_stack_category_mst)" as TechStackCategoryMst {
+    + id : <color:#1E90FF>INTEGER</color> -- 識別子 (PK)
+    --
+    name : <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- カテゴリ名
+}
+
 ' ----------------------
 ' リレーション定義
 ' ----------------------
 users ||--o{ Resumes
-users ||--o{ UserAuthProviders
+users ||--|{ UserAuthProviders
 
-Resumes ||--o{ Careers
-Resumes ||--o{ Projects
-Resumes ||--o{ Certifications
-Resumes ||--o{ Portfolios
-Resumes ||--o{ SocialLinks
-Resumes ||--o{ SelfPromotions
+Resumes ||--o| Careers
+Resumes ||--o| Projects
+Resumes ||--o| Certifications
+Resumes ||--o| Portfolios
+Resumes ||--o| SocialLinks
+Resumes ||--o| SelfPromotions
+
+TechStackCategoryMst ||--o{ TechStackMst
 
 @enduml

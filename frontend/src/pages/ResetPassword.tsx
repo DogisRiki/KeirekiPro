@@ -1,4 +1,4 @@
-import { ResetPasswordForm } from "@/features/auth";
+import { ResetPasswordContainer } from "@/features/auth";
 import { Typography } from "@mui/material";
 
 /**
@@ -13,7 +13,7 @@ export const ResetPassword = () => {
             <Typography variant="body1" gutterBottom sx={{ mb: 4 }}>
                 新しいパスワードを設定してください。
             </Typography>
-            <ResetPasswordForm />
+            <ResetPasswordContainer />
         </>
     );
 };

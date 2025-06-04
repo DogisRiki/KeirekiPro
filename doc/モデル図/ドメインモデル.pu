@@ -177,3 +177,49 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         ・スキームはhttpsしか許可しない。
     end note
 }
+
+package "ユーザー集約(UserAggregation)" as UserAggregation {
+
+    ' ------------- エンティティ -------------
+    class "ユーザー(User)" as User << (R,red) RootEntity >> {
+        - ユーザーID: id
+        - メールアドレス: email
+        - パスワード: passwordHash
+        - 二段階認証設定: twoFactorAuthEnabled
+        - 外部認証連携情報: AuthProviders
+        - プロフィール画像: profileImage
+        - ユーザー名: username
+        - 作成日時: createdAt
+        - 更新日時: updatedAt
+        - 新規登録フラグ: isNew
+    }
+
+    ' ------------- 値オブジェクト -------------
+    class "メールアドレス(Email)" as Email << (V,SkyBlue) ValueObject >> {
+    }
+
+    class "外部認証連携(AuthProvider)" as AuthProvider << (V,SkyBlue) ValueObject >> {
+        - プロバイダー名: providerName
+        - プロバイダー側ユーザーID: providerUserId
+    }
+
+    ' ------------- 関連 -------------
+    User "1" *- "0..1" Email
+    User "1" *- "0..n" AuthProvider
+
+    ' ------------- ビジネスルール -------------
+    note bottom of User
+        ・メールアドレスも外部認証もない場合、作成不可。
+        ・パスワード変更時は同じハッシュは不可。ただしリセットは可。
+        ・二段階認証はメールアドレス＋パスワード両方設定時のみ有効化可。
+        ・外部認証連携解除は、連携が複数あるか、メールアドレス＋パスワード設定済みでなければ不可。
+    end note
+
+    note bottom of Email
+        ・RFC5322形式準拠。
+    end note
+
+    note bottom of AuthProvider
+        ・許可プロバイダは "google", "github" のみ。
+    end note
+}

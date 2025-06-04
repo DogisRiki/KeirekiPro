@@ -6,9 +6,12 @@ export const paths = {
     login: "/login",
     register: "/register",
     password: {
-        resetRquest: "/password/reset",
+        resetRequest: "/password/reset",
         reset: "/password/reset/:token",
         change: "/password/change",
+    },
+    emailPassword: {
+        set: "/email-password/set",
     },
     twoFactor: "/two-factor",
     resume: {
@@ -20,4 +23,5 @@ export const paths = {
     contact: "/contact",
     terms: "/terms",
     privacy: "/privacy",
+    serverError: "/500",
 };

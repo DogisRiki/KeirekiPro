@@ -1,4 +1,4 @@
-import { updateUserProfile, User } from "@/types";
+import { User, UserPatch } from "@/types";
 import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
 
@@ -7,7 +7,8 @@ interface UserAuthState {
     isAuthenticated: boolean;
     setLogin: (user: User) => void;
     setLogout: () => void;
-    updateProfile: (params: Partial<updateUserProfile>) => void;
+    setRefresh: () => void;
+    updateUserInfo: (patch: UserPatch) => void;
 }
 
 /**
@@ -19,15 +20,16 @@ export const useUserAuthStore = create<UserAuthState>()(
             (set) => ({
                 user: null,
                 isAuthenticated: false,
-                setLogin: (user) => set({ isAuthenticated: true, user }, false, "setLogin"),
-                setLogout: () => set({ isAuthenticated: false, user: null }, false, "setLogout"),
-                updateProfile: (params) =>
+                setLogin: (user) => set({ user, isAuthenticated: true }, false, "setLogin"),
+                setLogout: () => set({ user: null, isAuthenticated: false }, false, "setLogout"),
+                setRefresh: () => set({ isAuthenticated: true }, false, "setRefresh"),
+                updateUserInfo: (patch) =>
                     set(
                         (state) => ({
-                            user: state.user ? { ...state.user, ...params } : null,
+                            user: state.user ? { ...state.user, ...patch } : null,
                         }),
                         false,
-                        "updateProfile",
+                        "updateUserInfo",
                     ),
             }),
             {
@@ -35,8 +37,6 @@ export const useUserAuthStore = create<UserAuthState>()(
                 storage: createJSONStorage(() => localStorage),
             },
         ),
-        {
-            name: "UserAuthStore",
-        },
+        { name: "UserAuthStore" },
     ),
 );

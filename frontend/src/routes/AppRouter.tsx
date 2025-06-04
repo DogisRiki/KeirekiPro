@@ -1,4 +1,4 @@
-import { NotFound } from "@/components/errors";
+import { ErrorFallback, NotFound, ServerError } from "@/components/errors";
 import { ProtectedLayout, PublicLayout } from "@/components/layouts";
 import { paths } from "@/config/paths";
 import {
@@ -7,8 +7,8 @@ import {
     Login,
     Privacy,
     Register,
+    RequestPasswordReset,
     ResetPassword,
-    ResetRequestPassword,
     Resume,
     ResumeList,
     SettingUser,
@@ -16,6 +16,7 @@ import {
     Top,
     TwoFactor,
 } from "@/pages";
+import { SetEmailAndPassword } from "@/pages/SetEmailAndPassword";
 import { ProtectedLoader, PublicLoader } from "@/routes/AppLoader";
 import { createBrowserRouter, RouterProvider } from "react-router";
 
@@ -27,75 +28,38 @@ const router = createBrowserRouter([
         path: paths.top,
         element: <Top />,
         loader: PublicLoader,
+        errorElement: <ErrorFallback />,
     },
     {
         element: <PublicLayout />,
         loader: PublicLoader,
+        errorElement: <ErrorFallback />,
         children: [
-            {
-                path: paths.login,
-                element: <Login />,
-            },
-            {
-                path: paths.twoFactor,
-                element: <TwoFactor />,
-            },
-            {
-                path: paths.register,
-                element: <Register />,
-            },
-            {
-                path: paths.password.resetRquest,
-                element: <ResetRequestPassword />,
-            },
-            {
-                path: paths.password.reset,
-                element: <ResetPassword />,
-            },
+            { path: paths.login, element: <Login /> },
+            { path: paths.twoFactor, element: <TwoFactor /> },
+            { path: paths.register, element: <Register /> },
+            { path: paths.password.resetRequest, element: <RequestPasswordReset /> },
+            { path: paths.password.reset, element: <ResetPassword /> },
         ],
     },
     {
         element: <ProtectedLayout />,
         loader: ProtectedLoader,
+        errorElement: <ErrorFallback />,
         children: [
-            {
-                path: paths.resume.list,
-                element: <ResumeList />,
-            },
-            {
-                path: paths.resume.new,
-                element: <Resume />,
-            },
-            {
-                path: paths.resume.edit,
-                element: <ResumeList />,
-            },
-            {
-                path: paths.user,
-                element: <SettingUser />,
-            },
-            {
-                path: paths.password.change,
-                element: <ChangePassword />,
-            },
-            {
-                path: paths.contact,
-                element: <Contact />,
-            },
+            { path: paths.resume.list, element: <ResumeList /> },
+            { path: paths.resume.new, element: <Resume /> },
+            { path: paths.resume.edit, element: <ResumeList /> },
+            { path: paths.user, element: <SettingUser /> },
+            { path: paths.password.change, element: <ChangePassword /> },
+            { path: paths.emailPassword.set, element: <SetEmailAndPassword /> },
+            { path: paths.contact, element: <Contact /> },
         ],
     },
-    {
-        path: paths.terms,
-        element: <Terms />,
-    },
-    {
-        path: paths.privacy,
-        element: <Privacy />,
-    },
-    {
-        path: "*",
-        element: <NotFound />,
-    },
+    { path: paths.terms, element: <Terms />, errorElement: <ErrorFallback /> },
+    { path: paths.privacy, element: <Privacy />, errorElement: <ErrorFallback /> },
+    { path: paths.serverError, element: <ServerError />, errorElement: <ErrorFallback /> },
+    { path: "*", element: <NotFound />, errorElement: <ErrorFallback /> },
 ]);
 
 /**

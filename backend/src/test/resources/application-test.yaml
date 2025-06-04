@@ -1,0 +1,26 @@
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+aws:
+  secrets-manager:
+    region: "ap-northeast-1"
+    endpoint: "http://localhost:4566"
+  ses:
+    region: "ap-northeast-1"
+    endpoint: "http://localhost:4566"
+    from-address: "no-reply@keirekipro.click"
+  s3:
+    region: "ap-northeast-1"
+    endpoint: "http://localhost:4566"
+    bucket-name: "test-bucket"
+
+# ログ設定
+logging:
+  level:
+    org.mybatis: DEBUG                                              # MyBatisのログを出力
+    com.example.keirekipro.infrastructure.repository: trace         # MyBatisのSQLログを出力
+    org.springframework.web: debug                                  # Spring Webのログを出力
+    org.flywaydb.core: debug                                        # Flywayのログを出力
+    org.springframework.security: debug                             # Spring Securityのログを出力

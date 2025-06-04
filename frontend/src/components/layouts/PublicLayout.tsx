@@ -1,11 +1,23 @@
 import { Footer } from "@/components/ui";
+import { useGoogleAnalytics } from "@/hooks";
+import { useErrorMessageStore } from "@/stores";
 import { Box, Container } from "@mui/material";
-import { Outlet } from "react-router";
+import { useEffect } from "react";
+import { Outlet, useLocation } from "react-router";
 
 /**
  * 未ログイン時のみアクセス可能な画面の共通レイアウト
  */
 export const PublicLayout = () => {
+    const { clearErrors } = useErrorMessageStore();
+    const { pathname } = useLocation();
+
+    useEffect(() => {
+        clearErrors();
+    }, [pathname, clearErrors]);
+
+    useGoogleAnalytics();
+
     return (
         <>
             <Container

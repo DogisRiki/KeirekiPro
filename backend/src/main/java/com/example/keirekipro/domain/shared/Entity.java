@@ -17,7 +17,7 @@ public abstract class Entity implements Serializable {
      * 識別子
      */
     @EqualsAndHashCode.Include
-    protected final String id;
+    protected final UUID id;
 
     /**
      * 並び順
@@ -30,7 +30,7 @@ public abstract class Entity implements Serializable {
      * @param orderNo 並び順
      */
     protected Entity(int orderNo) {
-        this(UUID.randomUUID().toString(), orderNo);
+        this(UUID.randomUUID(), orderNo);
     }
 
     /**
@@ -39,7 +39,7 @@ public abstract class Entity implements Serializable {
      * @param id      識別子
      * @param orderNo 並び順
      */
-    protected Entity(String id, int orderNo) {
+    protected Entity(UUID id, int orderNo) {
         this.id = id;
         this.orderNo = orderNo;
     }

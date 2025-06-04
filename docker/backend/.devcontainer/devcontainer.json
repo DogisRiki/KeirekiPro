@@ -16,7 +16,6 @@
             "extensions": [
                 "vscjava.vscode-java-pack",
                 "shengchen.vscode-checkstyle",
-                "redhat.vscode-xml",
                 "rangav.vscode-thunder-client",
                 "oderwat.indent-rainbow"
             ],
@@ -50,8 +49,7 @@
                     "editor.tabSize": 4,
                     "editor.codeActionsOnSave": {
                         "source.organizeImports": "explicit"
-                    },
-                    "editor.defaultFormatter": "redhat.java"
+                    }
                 },
                 "[spring-boot-properties-yaml]": {
                     "editor.insertSpaces": true,

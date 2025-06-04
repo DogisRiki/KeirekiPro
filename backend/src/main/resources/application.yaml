@@ -8,9 +8,30 @@ spring:
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
-server:
-  servlet:
-    context-path: /api
+  freemarker:
+    template-loader-path: classpath:/mail/
+    prefer-file-system-access: false
+
 mybatis:
-  configuration:
-    map-underscore-to-camel-case: true
+  config-location: "classpath:/mybatis/mybatis-config.xml"
+
+app:
+  siteName: "KeirekiPro"
+  siteUrl: "https://keirekipro.click"
+
+oidc:
+  providers:
+    google:
+      authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth"
+      tokenEndpoint: "https://oauth2.googleapis.com/token"
+      userInfoEndpoint: "https://openidconnect.googleapis.com/v1/userinfo"
+      scopes: "openid email profile"
+      providerType: "google"
+      secretName: "keirekipro/oidc/google"
+    github:
+      authorizationEndpoint: "https://github.com/login/oauth/authorize"
+      tokenEndpoint: "https://github.com/login/oauth/access_token"
+      userInfoEndpoint: "https://api.github.com/user"
+      scopes: "read:user user:email"
+      providerType: "github"
+      secretName: "keirekipro/oidc/github"

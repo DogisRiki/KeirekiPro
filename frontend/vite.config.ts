@@ -14,6 +14,19 @@ interface ExtendedUserConfig extends UserConfig {
 // https://vite.dev/config/
 export default defineConfig({
     plugins: [react(), tsconfigPaths()],
+    server: {
+        watch: {
+            ignored: [
+                "**/node_modules/**",
+                "**/.git/**",
+                "**/dist/**",
+                "**/coverage/**",
+                "**/.vite/**",
+                "**/.idea/**",
+                "**/.vscode/**",
+            ],
+        },
+    },
     test: {
         globals: true,
         environment: "happy-dom",

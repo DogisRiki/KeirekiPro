@@ -1,5 +1,5 @@
 import { env } from "@/config/env";
-import { LoginForm } from "@/features/auth";
+import { LoginContainer } from "@/features/auth";
 import { Typography } from "@mui/material";
 
 /**
@@ -11,7 +11,7 @@ export const Login = () => {
             <Typography variant="h5" gutterBottom>
                 {env.APP_NAME}
             </Typography>
-            <LoginForm />
+            <LoginContainer />
         </>
     );
 };

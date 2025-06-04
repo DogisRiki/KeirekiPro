@@ -1,17 +1,26 @@
+import { toastMessage } from "@/config/messages";
 import { paths } from "@/config/paths";
-import { baseApiClient } from "@/lib/baseApiClient";
-import { useNotificationStore } from "@/stores";
+import { baseApiClient, createErrorInterceptor } from "@/lib";
+import { useUserAuthStore } from "@/stores";
 import axios from "axios";
+import createAuthRefreshInterceptor from "axios-auth-refresh";
 
 /**
- * 認証が必要なAPIに使用するクライアント
+ * 認証が必要なAPI通信に使用するクライアント
  */
 export const protectedApiClient = axios.create({
     ...baseApiClient.defaults,
     withCredentials: true,
 });
 
-// リクエストインターセプター
+/**
+ * レスポンスインターセプタ
+ */
+protectedApiClient.interceptors.response.use((response) => response, createErrorInterceptor());
+
+/**
+ * リクエストインターセプタ
+ */
 protectedApiClient.interceptors.request.use((config) => {
     const xsrfToken = document.cookie
         .split("; ")
@@ -23,27 +32,25 @@ protectedApiClient.interceptors.request.use((config) => {
     return config;
 });
 
-// レスポンスインターセプター
-protectedApiClient.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        if (axios.isAxiosError(error)) {
-            const originalRequest = error.config;
-            if (!originalRequest) return Promise.reject(error);
-            // 認証エラーの場合はリフレッシュトークンでアクセストークンを更新
-            if (error.response?.status === 401) {
-                try {
-                    await protectedApiClient.post("/auth/refresh-token");
-                    // 元のリクエストを再試行
-                    return protectedApiClient(originalRequest);
-                } catch (refreshError) {
-                    // リフレッシュ失敗時はログイン画面へリダイレクト
-                    useNotificationStore.getState().setNotification(error.response.data?.message, "error");
-                    window.location.href = paths.login;
-                    return Promise.reject(refreshError);
-                }
-            }
-        }
-        return Promise.reject(error);
-    },
-);
+/**
+ * 401受信時のトークンリフレッシュ処理
+ */
+const refreshAuthLogic = async () => {
+    try {
+        // リフレッシュトークンを使ってアクセストークンを再取得（interceptorから除外）
+        await baseApiClient.post("/auth/token/refresh", null, { withCredentials: true, skipAuthRefresh: true });
+    } catch {
+        // 失敗時、トースト内容をセッションに保存（後で表示される）
+        sessionStorage.setItem("global-toast", JSON.stringify({ m: toastMessage.unauthorized, t: "error" }));
+        // ログアウト状態にしてログイン画面へ遷移
+        useUserAuthStore.getState().setLogout();
+        window.location.replace(paths.login);
+        // axios-auth-refresh用に例外を再スロー
+        throw new Error("refresh failed");
+    }
+};
+
+createAuthRefreshInterceptor(protectedApiClient, refreshAuthLogic, {
+    statusCodes: [401],
+    pauseInstanceWhileRefreshing: true,
+});

@@ -32,3 +32,21 @@ export const setNestedValue = (obj: any, path: string[], value: any) => {
     parent[lastKey] = value;
     return obj;
 };
+
+/**
+ * 文字列の配列を「・」区切りの箇条書きテキストに変換する
+ * - 引数がundefinedまたは長さ0の場合は空文字を返す
+ * - 配列の要素が1件のみの場合は、その要素をそのまま返す
+ * - 配列の要素が複数件ある場合は、先頭に「・」を付けて改行で連結した文字列を返す
+ * @param items - 文字列の配列
+ * @returns 「・」付き箇条書き形式に変換された文字列
+ */
+export function stringListToBulletList(items?: string[]): string {
+    if (!items || items.length === 0) {
+        return "";
+    }
+    if (items.length === 1) {
+        return items[0];
+    }
+    return items.map((item) => `・ ${item}`).join("\n");
+}

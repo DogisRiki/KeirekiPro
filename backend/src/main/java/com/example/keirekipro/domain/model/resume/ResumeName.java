@@ -1,6 +1,6 @@
 package com.example.keirekipro.domain.model.resume;
 
-import com.example.keirekipro.domain.shared.Notification;
+import com.example.keirekipro.shared.Notification;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -41,6 +41,10 @@ public class ResumeName {
     }
 
     private void validate(Notification notification, String value) {
+        if (value == null || value.isBlank()) {
+            notification.addError("resumeName", "職務経歴書名は入力必須です。");
+            return;
+        }
         if (isInvalidValue(value)) {
             notification.addError("resumeName", "職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | ");
         }
