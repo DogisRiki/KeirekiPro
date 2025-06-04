@@ -31,8 +31,16 @@ export const ResumeList = () => {
         Array.from({ length: 19 }, (_, i) => ({
             resumeId: String(i + 1),
             resumeName: `職務経歴書 ${i + 1}`,
-            createdAt: `2024/0${Math.floor(i / 3) + 1}/0${(i % 3) + 1} ${String(Math.floor(Math.random() * 24)).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
-            updatedAt: `2024/0${Math.floor(i / 3) + 1}/0${(i % 3) + 1} ${String(Math.floor(Math.random() * 24)).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
+            createdAt: `2024/0${Math.floor(i / 3) + 1}/0${(i % 3) + 1} ${String(
+                Math.floor(Math.random() * 24),
+            ).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}:${String(
+                Math.floor(Math.random() * 60),
+            ).padStart(2, "0")}`,
+            updatedAt: `2024/0${Math.floor(i / 3) + 1}/0${(i % 3) + 1} ${String(
+                Math.floor(Math.random() * 24),
+            ).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}:${String(
+                Math.floor(Math.random() * 60),
+            ).padStart(2, "0")}`,
         })),
     );
 
