@@ -62,7 +62,8 @@ jobs:
         if: always()
         with:
           name: frontend-test-results
-          path: frontend/test-results/
+          path: |
+            frontend/test-results/**
 
   backend-test:
     needs: detect-changes
