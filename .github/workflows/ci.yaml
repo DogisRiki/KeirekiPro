@@ -18,12 +18,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Determine base and head refs
+        id: refs
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "BASE=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+            echo "HEAD=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "BASE=${{ github.event.before }}" >> $GITHUB_OUTPUT
+            echo "HEAD=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Filter changed paths
         id: filter
         uses: dorny/paths-filter@v3
         with:
-          base: ${{ github.event_name == 'pull_request' && github.base_ref || 'main' }}
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+          base: ${{ steps.refs.outputs.BASE }}
+          ref: ${{ steps.refs.outputs.HEAD }}
           filters: |
             frontend:
               - 'frontend/**'
