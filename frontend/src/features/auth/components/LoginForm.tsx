@@ -2,6 +2,7 @@ import { Button, Link, PasswordTextField, TextField } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useErrorMessageStore } from "@/stores";
 import { AuthProvider } from "@/types";
+import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
@@ -28,7 +29,6 @@ export const LoginForm = ({
     onOidcLogin,
     loading = false,
 }: LoginFormProps) => {
-    // ボタンの共通スタイル
     const buttonStyle = { width: "240px" };
     const { errors } = useErrorMessageStore();
 
@@ -49,8 +49,11 @@ export const LoginForm = ({
                 value={email}
                 onChange={(e) => onEmailChange(e.target.value)}
                 error={!!errors.email?.length}
-                helperText={errors.email?.[0] ?? ""}
-                slotProps={{ inputLabel: { shrink: true } }}
+                helperText={stringListToBulletList(errors.email)}
+                slotProps={{
+                    inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
+                }}
                 sx={{ mb: 2 }}
             />
             <PasswordTextField
@@ -61,7 +64,10 @@ export const LoginForm = ({
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
                 error={!!errors.password?.length}
-                helperText={errors.password?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.password)}
+                slotProps={{
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
+                }}
             />
             <Box
                 sx={{

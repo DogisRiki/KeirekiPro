@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui";
 import { useErrorMessageStore } from "@/stores";
+import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 import VerificationInput from "react-verification-input";
 
@@ -42,7 +43,18 @@ export const TwoFactorForm = ({ code, onCodeChange, onSubmit, loading = false }:
                     characterSelected: "verification-character--selected",
                 }}
             />
-            {errors.code && <Box sx={{ mt: 2, color: "error.main", typography: "caption" }}>{errors.code[0]}</Box>}
+            {errors.code && (
+                <Box
+                    sx={{
+                        mt: 2,
+                        color: "error.main",
+                        typography: "caption",
+                        whiteSpace: "pre-line",
+                    }}
+                >
+                    {stringListToBulletList(errors.code)}
+                </Box>
+            )}
             <Box sx={{ mt: 4 }}>
                 <Button type="submit" disabled={code.length !== 6 || loading}>
                     認証

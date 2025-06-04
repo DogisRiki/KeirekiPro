@@ -1,5 +1,6 @@
 import { Button, PasswordTextField, TextField } from "@/components/ui";
 import { useErrorMessageStore } from "@/stores";
+import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 
 export interface SetEmailAndPasswordFormProps {
@@ -29,6 +30,7 @@ export const SetEmailAndPasswordForm = ({
     loading = false,
 }: SetEmailAndPasswordFormProps) => {
     const { errors } = useErrorMessageStore();
+
     return (
         <Box
             component="form"
@@ -47,14 +49,15 @@ export const SetEmailAndPasswordForm = ({
                     value={email}
                     onChange={(e) => onEmailChange(e.target.value)}
                     error={!!errors.email?.length}
-                    helperText={errors.email?.[0] ?? ""}
-                    margin="normal"
+                    helperText={stringListToBulletList(errors.email)}
                     slotProps={{
                         inputLabel: { shrink: true },
                         htmlInput: {
                             maxLength: 255,
                         },
+                        formHelperText: { sx: { whiteSpace: "pre-line" } },
                     }}
+                    margin="normal"
                     sx={{ mb: 4 }}
                 />
             )}
@@ -65,7 +68,10 @@ export const SetEmailAndPasswordForm = ({
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
                 error={!!errors.password?.length}
-                helperText={errors.password?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.password)}
+                slotProps={{
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
+                }}
                 margin="normal"
                 sx={{ mb: 4 }}
             />
@@ -76,7 +82,10 @@ export const SetEmailAndPasswordForm = ({
                 value={confirmPassword}
                 onChange={(e) => onConfirmPasswordChange(e.target.value)}
                 error={!!errors.confirmPassword?.length}
-                helperText={errors.confirmPassword?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.confirmPassword)}
+                slotProps={{
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
+                }}
                 margin="normal"
                 sx={{ mb: 4 }}
             />

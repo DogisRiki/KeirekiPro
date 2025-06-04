@@ -1,5 +1,6 @@
 import { Button, PasswordTextField } from "@/components/ui";
 import { useErrorMessageStore } from "@/stores";
+import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 
 export interface ChangePasswordFormProps {
@@ -42,9 +43,10 @@ export const ChangePasswordForm = ({
                 placeholder="現在のパスワード"
                 onChange={(e) => onNowPasswordChange(e.target.value)}
                 error={!!errors.nowPassword?.length}
-                helperText={errors.nowPassword?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.nowPassword)}
                 slotProps={{
                     inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
                 sx={{ mb: 4 }}
             />
@@ -57,9 +59,10 @@ export const ChangePasswordForm = ({
                 placeholder="新しいパスワード"
                 onChange={(e) => onNewPasswordChange(e.target.value)}
                 error={!!errors.newPassword?.length}
-                helperText={errors.newPassword?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.newPassword)}
                 slotProps={{
                     inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
                 sx={{ mb: 4 }}
             />

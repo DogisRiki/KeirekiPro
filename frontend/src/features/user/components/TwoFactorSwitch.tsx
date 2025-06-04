@@ -28,6 +28,5 @@ export const TwoFactorSwitch = ({ enabled, disabled = false, onToggle }: TwoFact
                 </Typography>
             </Box>
         }
-        sx={{ mb: 4 }}
     />
 );

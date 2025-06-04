@@ -22,7 +22,7 @@ export const AuthProviderField = ({ connected, canRemoveProvider, onRemove }: Au
     };
 
     return (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 4 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
             {(Object.keys(providerIcon) as AuthProvider[]).map((p) => {
                 const isConnected = connected.includes(p);
                 return (

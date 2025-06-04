@@ -9,7 +9,8 @@ import {
 } from "@/features/user";
 import { useErrorMessageStore } from "@/stores";
 import { AuthProvider } from "@/types";
-import { Box } from "@mui/material";
+import { stringListToBulletList } from "@/utils";
+import { Box, FormControl, FormHelperText } from "@mui/material";
 import { useState } from "react";
 
 export interface SettingUserFormProps {
@@ -74,7 +75,12 @@ export const SettingUserForm = ({
                 }}
                 sx={{ position: "relative", width: "fit-content", mx: "auto", my: 4 }}
             >
-                <ProfileImageField currentImage={profileImageUrl} onChange={onProfileImageChange} />
+                <FormControl fullWidth error={!!errors.profileImage?.length}>
+                    <ProfileImageField currentImage={profileImageUrl} onChange={onProfileImageChange} />
+                    <FormHelperText sx={{ whiteSpace: "pre-line" }}>
+                        {stringListToBulletList(errors.profileImage)}
+                    </FormHelperText>
+                </FormControl>
 
                 <TextField
                     type="email"
@@ -84,7 +90,10 @@ export const SettingUserForm = ({
                     disabled
                     margin="normal"
                     error={!!errors.email?.length}
-                    helperText={errors.email?.[0] ?? ""}
+                    helperText={stringListToBulletList(errors.email)}
+                    slotProps={{
+                        formHelperText: { sx: { whiteSpace: "pre-line" } },
+                    }}
                     sx={{ mt: 4, mb: 4 }}
                 />
 
@@ -95,17 +104,25 @@ export const SettingUserForm = ({
                     value={username}
                     onChange={(e) => onUsernameChange(e.target.value)}
                     error={!!errors.username?.length}
-                    helperText={errors.username?.[0] ?? ""}
+                    helperText={stringListToBulletList(errors.username)}
+                    slotProps={{
+                        formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        htmlInput: { maxLength: 50 },
+                    }}
                     margin="normal"
                     sx={{ mb: 4 }}
-                    slotProps={{
-                        htmlInput: {
-                            maxLength: 50,
-                        },
-                    }}
                 />
 
-                <TwoFactorSwitch enabled={twoFactorEnabled} disabled={twoFactorDisabled} onToggle={onToggleTwoFactor} />
+                <FormControl fullWidth sx={{ mb: 4 }} error={!!errors.twoFactorAuthEnabled?.length}>
+                    <TwoFactorSwitch
+                        enabled={twoFactorEnabled}
+                        disabled={twoFactorDisabled}
+                        onToggle={onToggleTwoFactor}
+                    />
+                    <FormHelperText sx={{ whiteSpace: "pre-line" }}>
+                        {stringListToBulletList(errors.twoFactorAuthEnabled)}
+                    </FormHelperText>
+                </FormControl>
 
                 <PasswordStatusBox
                     statusLabel={messages.emailPasswordStatusLabel}
@@ -116,11 +133,16 @@ export const SettingUserForm = ({
 
                 <AuthProviderWarningMessage messages={messages} />
 
-                <AuthProviderField
-                    connected={authProviders}
-                    canRemoveProvider={canRemoveProvider}
-                    onRemove={onRemoveProvider}
-                />
+                <FormControl fullWidth sx={{ mb: 4 }} error={!!errors.authProviders?.length}>
+                    <AuthProviderField
+                        connected={authProviders}
+                        canRemoveProvider={canRemoveProvider}
+                        onRemove={onRemoveProvider}
+                    />
+                    <FormHelperText sx={{ whiteSpace: "pre-line" }}>
+                        {stringListToBulletList(errors.authProviders)}
+                    </FormHelperText>
+                </FormControl>
 
                 <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
                     <Button type="submit" sx={{ width: 240 }} disabled={loading}>

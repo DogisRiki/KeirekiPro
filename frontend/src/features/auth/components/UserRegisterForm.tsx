@@ -1,6 +1,7 @@
 import { Button, Checkbox, Link, PasswordTextField, TextField } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useErrorMessageStore } from "@/stores";
+import { stringListToBulletList } from "@/utils";
 import { Box, FormControlLabel, FormGroup } from "@mui/material";
 import { useState } from "react";
 
@@ -32,12 +33,9 @@ export const UserRegisterForm = ({
     onSubmit,
     loading = false,
 }: UserRegisterFormProps) => {
-    // チェックボックスのチェック状態
     const [isChecked, setIsChecked] = useState({ terms: false, privacy: false });
-
     const { errors } = useErrorMessageStore();
 
-    // チェックボックスのハンドラー
     const handleCheck = (event: React.ChangeEvent<HTMLInputElement>) => {
         const { name, checked } = event.target;
         setIsChecked((prev) => ({
@@ -46,7 +44,6 @@ export const UserRegisterForm = ({
         }));
     };
 
-    // ボタンの共通スタイル
     const buttonStyle = {
         width: "240px",
     };
@@ -67,13 +64,14 @@ export const UserRegisterForm = ({
                 value={email}
                 onChange={(e) => onEmailChange(e.target.value)}
                 error={!!errors.email?.length}
-                helperText={errors.email?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.email)}
                 margin="normal"
                 slotProps={{
                     inputLabel: { shrink: true },
                     htmlInput: {
                         maxLength: 255,
                     },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
                 sx={{ mb: 2 }}
             />
@@ -84,13 +82,14 @@ export const UserRegisterForm = ({
                 value={username}
                 onChange={(e) => onUsernameChange(e.target.value)}
                 error={!!errors.username?.length}
-                helperText={errors.username?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.username)}
                 margin="normal"
                 slotProps={{
                     inputLabel: { shrink: true },
                     htmlInput: {
                         maxLength: 50,
                     },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
             />
             <PasswordTextField
@@ -100,8 +99,11 @@ export const UserRegisterForm = ({
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
                 error={!!errors.password?.length}
-                helperText={errors.password?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.password)}
                 margin="normal"
+                slotProps={{
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
+                }}
             />
             <PasswordTextField
                 label="パスワード（確認）"
@@ -110,8 +112,11 @@ export const UserRegisterForm = ({
                 value={confirmPassword}
                 onChange={(e) => onConfirmPasswordChange(e.target.value)}
                 error={!!errors.confirmPassword?.length}
-                helperText={errors.confirmPassword?.[0] ?? ""}
+                helperText={stringListToBulletList(errors.confirmPassword)}
                 margin="normal"
+                slotProps={{
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
+                }}
             />
             <FormGroup sx={{ mt: 1 }}>
                 <FormControlLabel

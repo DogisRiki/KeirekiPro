@@ -1,6 +1,7 @@
 import { Button, TextField } from "@/components/ui";
 import { env } from "@/config/env";
 import { useErrorMessageStore } from "@/stores";
+import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 
 export interface RequestPasswordResetFormProps {
@@ -38,11 +39,12 @@ export const RequestPasswordResetForm = ({
                 value={email}
                 onChange={(e) => onEmailChange(e.target.value)}
                 error={!!errors.email?.length}
-                helperText={errors.email?.[0] ?? ""}
-                margin="normal"
+                helperText={stringListToBulletList(errors.email)}
                 slotProps={{
                     inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
+                margin="normal"
             />
             <Button type="submit" sx={{ mt: 2 }} disabled={loading}>
                 送信
