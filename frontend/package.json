@@ -25,9 +25,10 @@
         "@mui/icons-material": "^6.3.0",
         "@mui/material": "^6.3.0",
         "@mui/x-date-pickers": "^7.23.3",
+        "@react-router/node": "^7.6.2",
         "@tanstack/react-query": "^5.62.15",
         "@tanstack/react-query-devtools": "^5.62.15",
-        "axios": "^1.7.9",
+        "axios": "^1.9.0",
         "axios-auth-refresh": "^3.3.6",
         "dayjs": "^1.11.13",
         "mui-file-input": "^6.0.0",
@@ -36,7 +37,7 @@
         "react-error-boundary": "^5.0.0",
         "react-ga4": "^2.1.0",
         "react-icons": "^5.4.0",
-        "react-router": "^7.1.1-pre.0",
+        "react-router": "^7.6.2",
         "react-verification-input": "^4.2.0",
         "use-debounce": "^10.0.4",
         "zustand": "^5.0.2"
@@ -44,7 +45,7 @@
     "devDependencies": {
         "@eslint/compat": "^1.2.4",
         "@eslint/js": "^9.17.0",
-        "@react-router/dev": "^7.1.1-pre.0",
+        "@react-router/dev": "^7.6.2",
         "@tanstack/eslint-plugin-query": "^5.62.15",
         "@testing-library/jest-dom": "^6.6.3",
         "@testing-library/react": "^16.1.0",
@@ -54,7 +55,7 @@
         "@typescript-eslint/eslint-plugin": "^8.19.0",
         "@typescript-eslint/parser": "^8.19.0",
         "@vitejs/plugin-react": "^4.3.4",
-        "@vitest/coverage-v8": "^2.1.8",
+        "@vitest/coverage-v8": "^2.1.9",
         "eslint": "^9.17.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-import-resolver-typescript": "^3.7.0",
@@ -73,6 +74,6 @@
         "typescript": "~5.6.2",
         "vite": "^6.0.5",
         "vite-tsconfig-paths": "^5.1.4",
-        "vitest": "^2.1.8"
+        "vitest": "^2.1.9"
     }
 }
