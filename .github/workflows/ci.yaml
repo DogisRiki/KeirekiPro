@@ -7,6 +7,15 @@ on:
     branches: [main]
 
 jobs:
+name: CI Workflow
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -18,28 +27,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine base and head refs
-        id: refs
+      - name: Show event info for debug
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "BASE=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
-            echo "HEAD=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "BASE=${{ github.event.before }}" >> $GITHUB_OUTPUT
-            echo "HEAD=${{ github.sha }}" >> $GITHUB_OUTPUT
-          fi
+          echo "event_name=${{ github.event_name }}"
+          echo "base_ref=${{ github.base_ref }}"
+          echo "head_ref=${{ github.head_ref }}"
 
-      - name: Filter changed paths
+      - name: Run paths-filter
         id: filter
         uses: dorny/paths-filter@v3
         with:
-          base: ${{ steps.refs.outputs.BASE }}
-          ref: ${{ steps.refs.outputs.HEAD }}
           filters: |
             frontend:
               - 'frontend/**'
             backend:
               - 'backend/**'
+
+      - name: Debug outputs
+        run: |
+          echo "frontend_changed=${{ steps.filter.outputs.frontend }}"
+          echo "backend_changed=${{ steps.filter.outputs.backend }}"
 
   frontend-test:
     needs: detect-changes
