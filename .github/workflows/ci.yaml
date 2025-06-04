@@ -31,8 +31,10 @@ jobs:
           filters: |
             frontend:
               - 'frontend/**'
+              - 'frontend/*'
             backend:
               - 'backend/**'
+              - 'backend/*'
 
       - name: Debug outputs
         run: |
