@@ -16,7 +16,7 @@ export const EntryList = () => {
     // エントリーデータ取得
     const entries = useResumeStore((state) => {
         const key = getResumeKey(state.activeSection);
-        return key ? (state.resume?.[key] ?? []) : [];
+        return key ? state.resume?.[key] ?? [] : [];
     });
 
     // タイトル取得
