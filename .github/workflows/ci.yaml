@@ -15,22 +15,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Get changed files
-        id: changed
-        run: |
-          echo "BASE_REF=${{ github.base_ref }}" >> $GITHUB_ENV
-          echo "HEAD_REF=${{ github.sha }}" >> $GITHUB_ENV
+        with:
+          fetch-depth: 0
 
       - name: Filter changed paths
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          base: ${{ github.event_name == 'pull_request' && github.base_ref || 'main' }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
           filters: |
             frontend:
-              - "frontend/**"
+              - 'frontend/**'
             backend:
-              - "backend/**"
+              - 'backend/**'
 
   frontend-test:
     needs: detect-changes
