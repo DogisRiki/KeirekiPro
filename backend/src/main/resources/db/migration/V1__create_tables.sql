@@ -44,6 +44,8 @@ CREATE TABLE resumes (
     user_id UUID NOT NULL REFERENCES users(id),
     name VARCHAR(255) NOT NULL,
     date DATE NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255) NOT NULL,
     auto_save_enabled BOOLEAN NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
@@ -54,6 +56,8 @@ COMMENT ON TABLE resumes IS '職務経歴書';
 COMMENT ON COLUMN resumes.id IS '識別子';
 COMMENT ON COLUMN resumes.user_id IS 'ユーザーID';
 COMMENT ON COLUMN resumes.name IS '職務経歴書名';
+COMMENT ON COLUMN resumes.last_name IS '姓';
+COMMENT ON COLUMN resumes.first_name IS '名';
 COMMENT ON COLUMN resumes.date IS '作成日';
 COMMENT ON COLUMN resumes.auto_save_enabled IS '自動保存有効フラグ';
 COMMENT ON COLUMN resumes.created_at IS '作成日時';

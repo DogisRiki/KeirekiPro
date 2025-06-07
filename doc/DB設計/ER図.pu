@@ -30,6 +30,8 @@ entity "職務経歴書(resumes)" as Resumes {
     user_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- ユーザーID
     name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書名
     date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 作成日
+    last_name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 姓
+    first_name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 名
     auto_save_enabled : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 自動保存有効フラグ
     created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
     updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
