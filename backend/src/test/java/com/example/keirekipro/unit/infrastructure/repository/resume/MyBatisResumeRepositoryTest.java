@@ -333,7 +333,7 @@ class MyBatisResumeRepositoryTest {
     void test5() {
         // 準備
         Resume resume = buildEntity();
-        UUID id = resume.getId();
+        final UUID id = resume.getId();
 
         // 実行
         repository.save(resume);
@@ -361,8 +361,7 @@ class MyBatisResumeRepositoryTest {
         verify(mapper).deleteSocialLinksByResumeId(id);
         verify(mapper).deleteSelfPromotionsByResumeId(id);
 
-        // 子テーブル挿入
-        // Career
+        // Careerインサート
         ArgumentCaptor<ResumeDto.CareerDto> capC = ArgumentCaptor.forClass(ResumeDto.CareerDto.class);
         verify(mapper).insertCareer(capC.capture());
         ResumeDto.CareerDto cd = capC.getValue();
@@ -375,7 +374,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(cd.getIsActive()).isEqualTo(c.getPeriod().isActive());
         assertThat(cd.getOrderNo()).isEqualTo(c.getOrderNo());
 
-        // Project
+        // Projectインサート
         ArgumentCaptor<ResumeDto.ProjectDto> capP = ArgumentCaptor.forClass(ResumeDto.ProjectDto.class);
         verify(mapper).insertProject(capP.capture());
         ResumeDto.ProjectDto pd = capP.getValue();
@@ -419,7 +418,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(pd.getApiDevelopmentTools()).isEqualTo(p.getTechStack().getTools().getApiDevelopmentTools());
         assertThat(pd.getDesignTools()).isEqualTo(p.getTechStack().getTools().getDesignTools());
 
-        // Certification
+        // Certificationインサート
         ArgumentCaptor<ResumeDto.CertificationDto> capCert = ArgumentCaptor.forClass(ResumeDto.CertificationDto.class);
         verify(mapper).insertCertification(capCert.capture());
         ResumeDto.CertificationDto certd = capCert.getValue();
@@ -430,7 +429,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(certd.getDate()).isEqualTo(cert.getDate());
         assertThat(certd.getOrderNo()).isEqualTo(cert.getOrderNo());
 
-        // Portfolio
+        // Portfolioインサート
         ArgumentCaptor<ResumeDto.PortfolioDto> capPort = ArgumentCaptor.forClass(ResumeDto.PortfolioDto.class);
         verify(mapper).insertPortfolio(capPort.capture());
         ResumeDto.PortfolioDto portd = capPort.getValue();
@@ -443,10 +442,11 @@ class MyBatisResumeRepositoryTest {
         assertThat(portd.getLink()).isEqualTo(port.getLink().getValue());
         assertThat(portd.getOrderNo()).isEqualTo(port.getOrderNo());
 
-        // SocialLink
-        ArgumentCaptor<ResumeDto.SocialLinkDto> capSL = ArgumentCaptor.forClass(ResumeDto.SocialLinkDto.class);
-        verify(mapper).insertSocialLink(capSL.capture());
-        ResumeDto.SocialLinkDto sld = capSL.getValue();
+        // SocialLinkインサート
+        ArgumentCaptor<ResumeDto.SocialLinkDto> capSocialLinkDto = ArgumentCaptor
+                .forClass(ResumeDto.SocialLinkDto.class);
+        verify(mapper).insertSocialLink(capSocialLinkDto.capture());
+        ResumeDto.SocialLinkDto sld = capSocialLinkDto.getValue();
         SocialLink sl = resume.getSocialLinks().get(0);
         assertThat(sld.getId()).isEqualTo(sl.getId());
         assertThat(sld.getResumeId()).isEqualTo(id);
@@ -454,10 +454,10 @@ class MyBatisResumeRepositoryTest {
         assertThat(sld.getLink()).isEqualTo(sl.getLink().getValue());
         assertThat(sld.getOrderNo()).isEqualTo(sl.getOrderNo());
 
-        // SelfPromotion
-        ArgumentCaptor<ResumeDto.SelfPromotionDto> capSP = ArgumentCaptor.forClass(ResumeDto.SelfPromotionDto.class);
-        verify(mapper).insertSelfPromotion(capSP.capture());
-        ResumeDto.SelfPromotionDto spd = capSP.getValue();
+        // SelfPromotionインサート
+        ArgumentCaptor<ResumeDto.SelfPromotionDto> capSp = ArgumentCaptor.forClass(ResumeDto.SelfPromotionDto.class);
+        verify(mapper).insertSelfPromotion(capSp.capture());
+        ResumeDto.SelfPromotionDto spd = capSp.getValue();
         SelfPromotion sp = resume.getSelfPromotions().get(0);
         assertThat(spd.getId()).isEqualTo(sp.getId());
         assertThat(spd.getResumeId()).isEqualTo(id);
