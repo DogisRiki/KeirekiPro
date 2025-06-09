@@ -7,6 +7,13 @@
         <setting name="mapUnderscoreToCamelCase" value="true"/>
     </settings>
     <typeHandlers>
-        <typeHandler handler="com.example.keirekipro.infrastructure.shared.mybatis.UUIDTypeHandler" javaType="java.util.UUID"/>
+        <!-- UUIDタイプハンドラ -->
+        <typeHandler
+            handler="com.example.keirekipro.infrastructure.shared.mybatis.UUIDTypeHandler"
+            javaType="java.util.UUID"/>
+        <!-- YearMonthタイプハンドラ -->
+        <typeHandler
+            handler="com.example.keirekipro.infrastructure.shared.mybatis.YearMonthTypeHandler"
+            javaType="java.time.YearMonth" />
     </typeHandlers>
 </configuration>
