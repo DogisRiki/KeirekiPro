@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.keirekipro.infrastructure.repository.resume.ResumeMapper">
+
+    <resultMap id="resumeMap" type="com.example.keirekipro.infrastructure.repository.resume.ResumeDto">
+        <id property="id" column="id" />
+        <result property="userId" column="user_id" />
+        <result property="name" column="name" />
+        <result property="date" column="date" />
+        <result property="lastName" column="last_name" />
+        <result property="firstName" column="first_name" />
+        <result property="autoSaveEnabled" column="auto_save_enabled"/>
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+        <result property="orderNo" column="order_no" />
+    </resultMap>
+
+    <select id="selectAllByUserId" resultMap="resumeMap" parameterType="java.util.UUID">
+        SELECT
+            id,
+            user_id,
+            name,
+            date,
+            last_name,
+            first_name,
+            auto_save_enabled,
+            created_at,
+            updated_at,
+            order_no
+        FROM
+            resumes
+        WHERE
+            user_id = #{userId}
+        ORDER BY
+            order_no
+    </select>
+
+    <select id="selectByResumeId" resultMap="resumeMap" parameterType="java.util.UUID">
+        SELECT
+            id,
+            user_id,
+            name,
+            date,
+            last_name,
+            first_name,
+            auto_save_enabled,
+            created_at,
+            updated_at,
+            order_no
+        FROM
+            resumes
+        WHERE
+            id = #{resumeId}
+    </select>
+
+    <insert id="upsert" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto">
+        INSERT INTO resumes(
+            id,
+            user_id,
+            name,
+            date,
+            last_name,
+            first_name,
+            auto_save_enabled,
+            created_at,
+            updated_at,
+            order_no
+        )
+        VALUES(
+            #{id},
+            #{userId},
+            #{name},
+            #{date},
+            #{lastName},
+            #{firstName},
+            #{autoSaveEnabled},
+            #{createdAt},
+            #{updatedAt},
+            #{orderNo}
+        )
+        ON  CONFLICT(
+                id
+            ) DO
+            UPDATE
+            SET
+                name = EXCLUDED.name,
+                date = EXCLUDED.date,
+                last_name = EXCLUDED.last_name,
+                first_name = EXCLUDED.first_name,
+                auto_save_enabled = EXCLUDED.auto_save_enabled,
+                updated_at = EXCLUDED.updated_at,
+                order_no = EXCLUDED.order_no
+    </insert>
+
+    <delete id="delete" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            resumes
+        WHERE
+            id = #{resumeId}
+    </delete>
+
+    <select id="selectCareersByResumeId"
+            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$CareerDto"
+            parameterType="java.util.UUID">
+        SELECT
+            id,
+            company_name AS companyName,
+            start_date AS startDate,
+            end_date AS endDate,
+            is_active AS isActive,
+            order_no AS orderNo
+        FROM
+            careers
+        WHERE
+            resume_id = #{resumeId}
+        ORDER BY
+            order_no
+    </select>
+
+    <insert id="insertCareer" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$CareerDto">
+        INSERT INTO careers(
+            id,
+            resume_id,
+            company_name,
+            start_date,
+            end_date,
+            is_active,
+            order_no
+        )
+        VALUES(
+            #{dto.id},
+            #{dto.resumeId},
+            #{dto.companyName},
+            #{dto.startDate},
+            #{dto.endDate},
+            #{dto.isActive},
+            #{dto.orderNo}
+        )
+    </insert>
+
+    <update id="updateCareer" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$CareerDto">
+        UPDATE
+            careers
+        SET
+            company_name = #{dto.companyName},
+            start_date = #{dto.startDate},
+            end_date = #{dto.endDate},
+            is_active = #{dto.isActive},
+            order_no = #{dto.orderNo}
+        WHERE
+            id = #{dto.id}
+    </update>
+
+    <delete id="deleteCareer" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            careers
+        WHERE
+            id = #{careerId}
+    </delete>
+
+    <delete id="deleteCareersByResumeId" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            careers
+        WHERE
+            resume_id = #{resumeId}
+    </delete>
+
+    <select id="selectProjectsByResumeId"
+            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$ProjectDto"
+            parameterType="java.util.UUID">
+        SELECT
+            id,
+            company_name AS companyName,
+            start_date AS startDate,
+            end_date AS endDate,
+            is_active AS isActive,
+            name AS name,
+            overview AS overview,
+            team_comp AS teamComp,
+            role AS role,
+            achievement AS achievement,
+            requirements AS requirements,
+            basic_design AS basicDesign,
+            detailed_design AS detailedDesign,
+            implementation AS implementation,
+            integration_test AS integrationTest,
+            system_test AS systemTest,
+            maintenance AS maintenance,
+            languages AS languages,
+            frameworks AS frameworks,
+            libraries AS libraries,
+            testing_tools AS testingTools,
+            orm_tools AS ormTools,
+            package_managers AS packageManagers,
+            clouds AS clouds,
+            containers AS containers,
+            databases AS databases,
+            web_servers AS webServers,
+            ci_cd_tools AS ciCdTools,
+            iac_tools AS iacTools,
+            monitoring_tools AS monitoringTools,
+            logging_tools AS loggingTools,
+            source_controls AS sourceControls,
+            project_managements AS projectManagements,
+            communication_tools AS communicationTools,
+            documentation_tools AS documentationTools,
+            api_development_tools AS apiDevelopmentTools,
+            design_tools AS designTools,
+            order_no AS orderNo
+        FROM
+            projects
+        WHERE
+            resume_id = #{resumeId}
+        ORDER BY
+            order_no
+    </select>
+
+    <insert id="insertProject" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$ProjectDto">
+        INSERT INTO projects(
+            id,
+            resume_id,
+            company_name,
+            start_date,
+            end_date,
+            is_active,
+            name,
+            overview,
+            team_comp,
+            role,
+            achievement,
+            requirements,
+            basic_design,
+            detailed_design,
+            implementation,
+            integration_test,
+            system_test,
+            maintenance,
+            languages,
+            frameworks,
+            libraries,
+            testing_tools,
+            orm_tools,
+            package_managers,
+            clouds,
+            containers,
+            databases,
+            web_servers,
+            ci_cd_tools,
+            iac_tools,
+            monitoring_tools,
+            logging_tools,
+            source_controls,
+            project_managements,
+            communication_tools,
+            documentation_tools,
+            api_development_tools,
+            design_tools,
+            order_no
+        )
+        VALUES(
+            #{dto.id},
+            #{dto.resumeId},
+            #{dto.companyName},
+            #{dto.startDate},
+            #{dto.endDate},
+            #{dto.isActive},
+            #{dto.name},
+            #{dto.overview},
+            #{dto.teamComp},
+            #{dto.role},
+            #{dto.achievement},
+            #{dto.requirements},
+            #{dto.basicDesign},
+            #{dto.detailedDesign},
+            #{dto.implementation},
+            #{dto.integrationTest},
+            #{dto.systemTest},
+            #{dto.maintenance},
+            #{dto.languages, typeHandler=stringListTypeHandler},
+            #{dto.frameworks, typeHandler=stringListTypeHandler},
+            #{dto.libraries, typeHandler=stringListTypeHandler},
+            #{dto.testingTools, typeHandler=stringListTypeHandler},
+            #{dto.ormTools, typeHandler=stringListTypeHandler},
+            #{dto.packageManagers, typeHandler=stringListTypeHandler},
+            #{dto.clouds, typeHandler=stringListTypeHandler},
+            #{dto.containers, typeHandler=stringListTypeHandler},
+            #{dto.databases, typeHandler=stringListTypeHandler},
+            #{dto.webServers, typeHandler=stringListTypeHandler},
+            #{dto.ciCdTools, typeHandler=stringListTypeHandler},
+            #{dto.iacTools, typeHandler=stringListTypeHandler},
+            #{dto.monitoringTools, typeHandler=stringListTypeHandler},
+            #{dto.loggingTools, typeHandler=stringListTypeHandler},
+            #{dto.sourceControls, typeHandler=stringListTypeHandler},
+            #{dto.projectManagements, typeHandler=stringListTypeHandler},
+            #{dto.communicationTools, typeHandler=stringListTypeHandler},
+            #{dto.documentationTools, typeHandler=stringListTypeHandler},
+            #{dto.apiDevelopmentTools, typeHandler=stringListTypeHandler},
+            #{dto.designTools, typeHandler=stringListTypeHandler},
+            #{dto.orderNo}
+        )
+    </insert>
+
+    <update id="updateProject" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$ProjectDto">
+        UPDATE
+            projects
+        SET
+            company_name = #{dto.companyName},
+            start_date = #{dto.startDate},
+            end_date = #{dto.endDate},
+            is_active = #{dto.isActive},
+            name = #{dto.name},
+            overview = #{dto.overview},
+            team_comp = #{dto.teamComp},
+            role = #{dto.role},
+            achievement = #{dto.achievement},
+            requirements = #{dto.requirements},
+            basic_design = #{dto.basicDesign},
+            detailed_design = #{dto.detailedDesign},
+            implementation = #{dto.implementation},
+            integration_test = #{dto.integrationTest},
+            system_test = #{dto.systemTest},
+            maintenance = #{dto.maintenance},
+            languages = #{dto.languages, typeHandler=stringListTypeHandler},
+            frameworks = #{dto.frameworks, typeHandler=stringListTypeHandler},
+            libraries = #{dto.libraries, typeHandler=stringListTypeHandler},
+            testing_tools = #{dto.testingTools, typeHandler=stringListTypeHandler},
+            orm_tools = #{dto.ormTools, typeHandler=stringListTypeHandler},
+            package_managers = #{dto.packageManagers, typeHandler=stringListTypeHandler},
+            clouds = #{dto.clouds, typeHandler=stringListTypeHandler},
+            containers = #{dto.containers, typeHandler=stringListTypeHandler},
+            databases = #{dto.databases, typeHandler=stringListTypeHandler},
+            web_servers = #{dto.webServers, typeHandler=stringListTypeHandler},
+            ci_cd_tools = #{dto.ciCdTools, typeHandler=stringListTypeHandler},
+            iac_tools = #{dto.iacTools, typeHandler=stringListTypeHandler},
+            monitoring_tools = #{dto.monitoringTools, typeHandler=stringListTypeHandler},
+            logging_tools = #{dto.loggingTools, typeHandler=stringListTypeHandler},
+            source_controls = #{dto.sourceControls, typeHandler=stringListTypeHandler},
+            project_managements = #{dto.projectManagements, typeHandler=stringListTypeHandler},
+            communication_tools = #{dto.communicationTools, typeHandler=stringListTypeHandler},
+            documentation_tools = #{dto.documentationTools, typeHandler=stringListTypeHandler},
+            api_development_tools = #{dto.apiDevelopmentTools, typeHandler=stringListTypeHandler},
+            design_tools = #{dto.designTools, typeHandler=stringListTypeHandler},
+            order_no = #{dto.orderNo}
+        WHERE
+            id = #{dto.id}
+    </update>
+
+    <delete id="deleteProject" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            projects
+        WHERE
+            id = #{projectId}
+    </delete>
+
+    <delete id="deleteProjectsByResumeId" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            projects
+        WHERE
+            resume_id = #{resumeId}
+    </delete>
+
+    <select id="selectCertificationsByResumeId"
+            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$CertificationDto"
+            parameterType="java.util.UUID">
+        SELECT
+            id,
+            name AS name,
+            date AS date,
+            order_no AS orderNo
+        FROM
+            certifications
+        WHERE
+            resume_id = #{resumeId}
+        ORDER BY
+            order_no
+    </select>
+
+    <insert id="insertCertification" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$CertificationDto">
+        INSERT INTO certifications(
+            id,
+            resume_id,
+            name,
+            date,
+            order_no
+        )
+        VALUES(
+            #{dto.id},
+            #{dto.resumeId},
+            #{dto.name},
+            #{dto.date},
+            #{dto.orderNo}
+        )
+    </insert>
+
+    <update id="updateCertification" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$CertificationDto">
+        UPDATE
+            certifications
+        SET
+            name = #{dto.name},
+            date = #{dto.date},
+            order_no = #{dto.orderNo}
+        WHERE
+            id = #{dto.id}
+    </update>
+
+    <delete id="deleteCertification" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            certifications
+        WHERE
+            id = #{certificationId}
+    </delete>
+
+    <delete id="deleteCertificationsByResumeId" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            certifications
+        WHERE
+            resume_id = #{resumeId}
+    </delete>
+
+    <select id="selectPortfoliosByResumeId"
+            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$PortfolioDto"
+            parameterType="java.util.UUID">
+        SELECT
+            id,
+            name AS name,
+            overview AS overview,
+            tech_stack AS techStack,
+            link AS link,
+            order_no AS orderNo
+        FROM
+            portfolios
+        WHERE
+            resume_id = #{resumeId}
+        ORDER BY
+            order_no
+    </select>
+
+    <insert id="insertPortfolio" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$PortfolioDto">
+        INSERT INTO portfolios(
+            id,
+            resume_id,
+            name,
+            overview,
+            tech_stack,
+            link,
+            order_no
+        )
+        VALUES(
+            #{dto.id},
+            #{dto.resumeId},
+            #{dto.name},
+            #{dto.overview},
+            #{dto.techStack},
+            #{dto.link},
+            #{dto.orderNo}
+        )
+    </insert>
+
+    <update id="updatePortfolio" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$PortfolioDto">
+        UPDATE
+            portfolios
+        SET
+            name = #{dto.name},
+            overview = #{dto.overview},
+            tech_stack = #{dto.techStack},
+            link = #{dto.link},
+            order_no = #{dto.orderNo}
+        WHERE
+            id = #{dto.id}
+    </update>
+
+    <delete id="deletePortfolio" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            portfolios
+        WHERE
+            id = #{portfolioId}
+    </delete>
+
+    <delete id="deletePortfoliosByResumeId" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            portfolios
+        WHERE
+            resume_id = #{resumeId}
+    </delete>
+
+
+    <select id="selectSocialLinksByResumeId"
+            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SocialLinkDto"
+            parameterType="java.util.UUID">
+        SELECT
+            id,
+            name AS name,
+            link AS link,
+            order_no AS orderNo
+        FROM
+            social_links
+        WHERE
+            resume_id = #{resumeId}
+        ORDER BY
+            order_no
+    </select>
+
+    <insert id="insertSocialLink" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SocialLinkDto">
+        INSERT INTO social_links(
+            id,
+            resume_id,
+            name,
+            link,
+            order_no
+        )
+        VALUES(
+            #{dto.id},
+            #{dto.resumeId},
+            #{dto.name},
+            #{dto.link},
+            #{dto.orderNo}
+        )
+    </insert>
+
+    <update id="updateSocialLink" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SocialLinkDto">
+        UPDATE
+            social_links
+        SET
+            name = #{dto.name},
+            link = #{dto.link},
+            order_no = #{dto.orderNo}
+        WHERE
+            id = #{dto.id}
+    </update>
+
+    <delete id="deleteSocialLink" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            social_links
+        WHERE
+            id = #{socialLinkId}
+    </delete>
+
+    <delete id="deleteSocialLinksByResumeId" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            social_links
+        WHERE
+            resume_id = #{resumeId}
+    </delete>
+
+    <select id="selectSelfPromotionsByResumeId"
+            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SelfPromotionDto"
+            parameterType="java.util.UUID">
+        SELECT
+            id,
+            title AS title,
+            content AS content,
+            order_no AS orderNo
+        FROM
+            self_promotions
+        WHERE
+            resume_id = #{resumeId}
+        ORDER BY
+            order_no
+    </select>
+
+    <insert id="insertSelfPromotion" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SelfPromotionDto">
+        INSERT INTO self_promotions(
+            id,
+            resume_id,
+            title,
+            content,
+            order_no
+        )
+        VALUES(
+            #{dto.id},
+            #{dto.resumeId},
+            #{dto.title},
+            #{dto.content},
+            #{dto.orderNo}
+        )
+    </insert>
+
+    <update id="updateSelfPromotion" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SelfPromotionDto">
+        UPDATE
+            self_promotions
+        SET
+            title = #{dto.title},
+            content = #{dto.content},
+            order_no = #{dto.orderNo}
+        WHERE
+            id = #{dto.id}
+    </update>
+
+    <delete id="deleteSelfPromotion" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            self_promotions
+        WHERE
+            id = #{selfPromotionId}
+    </delete>
+
+    <delete id="deleteSelfPromotionsByResumeId" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            self_promotions
+        WHERE
+            resume_id = #{resumeId}
+    </delete>
+</mapper>
