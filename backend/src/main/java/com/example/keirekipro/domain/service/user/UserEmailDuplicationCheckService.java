@@ -1,10 +1,8 @@
 package com.example.keirekipro.domain.service.user;
 
-import java.util.Optional;
-
 import com.example.keirekipro.domain.model.user.Email;
-import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
+import com.example.keirekipro.domain.shared.exception.DomainException;
 
 import org.springframework.stereotype.Service;
 
@@ -22,20 +20,20 @@ public class UserEmailDuplicationCheckService {
     /**
      * メールアドレスの重複をチェックする
      *
-     * @param user チェック対象のユーザー
-     * @return 重複チェック結果（trueなら重複）
+     * @param email チェック対象のメールアドレス
+     * @throws DomainException メールアドレスが重複している場合
      */
-    public boolean execute(User user) {
-        Email email = user.getEmail();
+    public void execute(Email email) {
+
         // メールアドレスがnullなら重複チェック不要
         if (email == null) {
-            return false;
+            return;
         }
+
         // リポジトリからメールアドレスで検索する
-        Optional<User> existing = userRepository.findByEmail(email.getValue());
-        // 自分自身のIDは除外し、他ユーザーが見つかった場合 => 重複
-        return existing
-                .filter(u -> !u.getId().equals(user.getId()))
-                .isPresent();
+        userRepository.findByEmail(email.getValue())
+                .ifPresent(user -> {
+                    throw new DomainException("このメールアドレスは登録できません。");
+                });
     }
 }

@@ -5,10 +5,10 @@ import java.util.Collections;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
+import com.example.keirekipro.domain.service.user.UserEmailDuplicationCheckService;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
 import com.example.keirekipro.shared.Notification;
-import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,6 +29,8 @@ public class UserRegistrationUseCase {
 
     private final DomainEventPublisher eventPublisher;
 
+    private final UserEmailDuplicationCheckService userEmailDuplicationCheckService;
+
     /**
      * ユーザー新規登録ユースケースを実行する
      *
@@ -37,19 +39,18 @@ public class UserRegistrationUseCase {
     @Transactional
     public void execute(UserRegistrationRequest request) {
 
-        // 重複チェック
-        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
-            Notification notification = new Notification();
-            notification.addError("email", "このメールアドレスは既に登録されています。");
-            throw new UseCaseException(notification.getErrors());
-        });
-
         Notification notification = new Notification();
+
+        // メールアドレス値オブジェクトを作成
+        Email email = Email.create(notification, request.getEmail());
+
+        // メールアドレス重複チェック
+        userEmailDuplicationCheckService.execute(email);
+
         User user = User.create(
                 notification,
                 1,
-                Email.create(
-                        notification, request.getEmail()),
+                email,
                 passwordEncoder.encode(request.getPassword()),
                 false,
                 Collections.emptyMap(),
