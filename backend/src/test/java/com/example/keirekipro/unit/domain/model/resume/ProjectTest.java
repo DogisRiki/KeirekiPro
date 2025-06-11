@@ -29,12 +29,11 @@ class ProjectTest {
         Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
-        Project project = Project.create(0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process,
+        Project project = Project.create("株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process,
                 techStack);
 
         assertThat(project).isNotNull();
         assertThat(project.getId()).isNotNull();
-        assertThat(project.getOrderNo()).isEqualTo(0);
         assertThat(project.getCompanyName()).isEqualTo("株式会社ABC");
         assertThat(project.getPeriod()).isEqualTo(period);
         assertThat(project.getName()).isEqualTo("プロジェクト名");
@@ -53,13 +52,12 @@ class ProjectTest {
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        Project project = Project.reconstruct(id, 0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容",
+        Project project = Project.reconstruct(id, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容",
                 process,
                 techStack);
 
         assertThat(project).isNotNull();
         assertThat(project.getId()).isEqualTo(id);
-        assertThat(project.getOrderNo()).isEqualTo(0);
         assertThat(project.getCompanyName()).isEqualTo("株式会社ABC");
         assertThat(project.getPeriod()).isEqualTo(period);
         assertThat(project.getName()).isEqualTo("プロジェクト名");
@@ -214,7 +212,7 @@ class ProjectTest {
         Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
-        return Project.create(0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
+        return Project.create("株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
     }
 
     private TechStack createSampleTechStack() {

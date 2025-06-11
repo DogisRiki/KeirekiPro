@@ -25,8 +25,8 @@ public class Career extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private Career(int orderNo, String companyName, Period period) {
-        super(orderNo);
+    private Career(String companyName, Period period) {
+        super();
         this.companyName = companyName;
         this.period = period;
     }
@@ -34,8 +34,8 @@ public class Career extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Career(UUID id, int orderNo, String companyName, Period period) {
-        super(id, orderNo);
+    private Career(UUID id, String companyName, Period period) {
+        super(id);
         this.companyName = companyName;
         this.period = period;
     }
@@ -43,26 +43,24 @@ public class Career extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param orderNo     並び順
      * @param companyName 会社名
      * @param period      期間
      * @return 職歴エンティティ
      */
-    public static Career create(int orderNo, String companyName, Period period) {
-        return new Career(orderNo, companyName, period);
+    public static Career create(String companyName, Period period) {
+        return new Career(companyName, period);
     }
 
     /**
      * 再構築用のファクトリーメソッド
      *
      * @param id          識別子
-     * @param orderNo     並び順
      * @param companyName 会社名
      * @param period      期間
      * @return 職歴エンティティ
      */
-    public static Career reconstruct(UUID id, int orderNo, String companyName, Period period) {
-        return new Career(id, orderNo, companyName, period);
+    public static Career reconstruct(UUID id, String companyName, Period period) {
+        return new Career(id, companyName, period);
     }
 
     /**
@@ -72,7 +70,7 @@ public class Career extends Entity {
      * @return 変更後の職歴エンティティ
      */
     public Career changeCompanyName(String companyName) {
-        return new Career(this.id, this.orderNo, companyName, this.period);
+        return new Career(this.id, companyName, this.period);
     }
 
     /**
@@ -82,6 +80,6 @@ public class Career extends Entity {
      * @return 変更後の職歴エンティティ
      */
     public Career changePeriod(Period period) {
-        return new Career(this.id, this.orderNo, this.companyName, period);
+        return new Career(this.id, this.companyName, period);
     }
 }

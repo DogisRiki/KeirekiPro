@@ -50,7 +50,7 @@ public class AuthProvider extends Entity {
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
 
-        super(id, 1);
+        super(id);
         this.providerName = providerName == null ? null : providerName.toLowerCase();
         this.providerUserId = providerUserId;
         this.createdAt = createdAt;

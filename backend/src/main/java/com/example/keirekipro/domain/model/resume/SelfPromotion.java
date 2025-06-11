@@ -25,8 +25,8 @@ public class SelfPromotion extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private SelfPromotion(int orderNo, String title, String content) {
-        super(orderNo);
+    private SelfPromotion(String title, String content) {
+        super();
         this.title = title;
         this.content = content;
     }
@@ -34,8 +34,8 @@ public class SelfPromotion extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private SelfPromotion(UUID id, int orderNo, String title, String content) {
-        super(id, orderNo);
+    private SelfPromotion(UUID id, String title, String content) {
+        super(id);
         this.title = title;
         this.content = content;
     }
@@ -43,26 +43,24 @@ public class SelfPromotion extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param orderNo 並び順
      * @param title   タイトル
      * @param content コンテンツ
      * @return 自己PRエンティティ
      */
-    public static SelfPromotion create(int orderNo, String title, String content) {
-        return new SelfPromotion(orderNo, title, content);
+    public static SelfPromotion create(String title, String content) {
+        return new SelfPromotion(title, content);
     }
 
     /**
      * 再構築用のファクトリーメソッド
      *
      * @param id      識別子
-     * @param orderNo 並び順
      * @param title   タイトル
      * @param content コンテンツ
      * @return 自己PRエンティティ
      */
-    public static SelfPromotion reconstruct(UUID id, int orderNo, String title, String content) {
-        return new SelfPromotion(id, orderNo, title, content);
+    public static SelfPromotion reconstruct(UUID id, String title, String content) {
+        return new SelfPromotion(id, title, content);
     }
 
     /**
@@ -72,7 +70,7 @@ public class SelfPromotion extends Entity {
      * @return 変更後の自己PRエンティティ
      */
     public SelfPromotion changeTitle(String title) {
-        return new SelfPromotion(this.id, this.orderNo, title, this.content);
+        return new SelfPromotion(this.id, title, this.content);
     }
 
     /**
@@ -82,6 +80,6 @@ public class SelfPromotion extends Entity {
      * @return 変更後の自己PRエンティティ
      */
     public SelfPromotion changeContent(String content) {
-        return new SelfPromotion(this.id, this.orderNo, this.title, content);
+        return new SelfPromotion(this.id, this.title, content);
     }
 }

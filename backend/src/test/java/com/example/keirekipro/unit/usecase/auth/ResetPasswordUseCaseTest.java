@@ -52,7 +52,7 @@ class ResetPasswordUseCaseTest {
     @DisplayName("パスワードリセットが正常に完了する")
     void test1() {
         // データ準備
-        User user = User.reconstruct(USER_ID, 1, null, "oldHash", false, null, null, USERNAME, null, null);
+        User user = User.reconstruct(USER_ID, null, "oldHash", false, null, null, USERNAME, null, null);
 
         // モックをセットアップ
         when(redisClient.getValue(REDIS_KEY, String.class)).thenReturn(Optional.of(USER_ID.toString()));

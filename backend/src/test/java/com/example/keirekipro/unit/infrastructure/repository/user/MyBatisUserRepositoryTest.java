@@ -110,7 +110,6 @@ class MyBatisUserRepositoryTest {
         // Userエンティティを再構成（プロバイダーはgoogleのみ）
         User entity = User.reconstruct(
                 USER_ID,
-                1,
                 Email.create(new Notification(), EMAIL),
                 PASSWORD,
                 false,

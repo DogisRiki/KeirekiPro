@@ -59,7 +59,6 @@ class UserEmailDuplicationCheckServiceTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 null,
-                1,
                 email,
                 null,
                 false,

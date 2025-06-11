@@ -95,7 +95,6 @@ class ResumeNameDuplicationCheckServiceTest {
     private Resume createSampleResume(UUID id, UUID userId, String name) {
         return Resume.reconstruct(
                 id,
-                0,
                 userId,
                 ResumeName.create(notification, name),
                 LocalDate.now(),

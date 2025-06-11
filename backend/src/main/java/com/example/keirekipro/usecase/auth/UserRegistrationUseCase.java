@@ -49,8 +49,8 @@ public class UserRegistrationUseCase {
 
         User user = User.create(
                 notification,
-                1,
-                email,
+                Email.create(
+                        notification, request.getEmail()),
                 passwordEncoder.encode(request.getPassword()),
                 false,
                 Collections.emptyMap(),
