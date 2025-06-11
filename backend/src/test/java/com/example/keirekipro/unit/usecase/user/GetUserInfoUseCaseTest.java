@@ -63,7 +63,6 @@ class GetUserInfoUseCaseTest {
                 PROVIDER_USER_ID_VALUE);
         User user = User.reconstruct(
                 USER_ID,
-                1,
                 Email.create(new Notification(), EMAIL),
                 null,
                 false,
@@ -108,7 +107,6 @@ class GetUserInfoUseCaseTest {
                 PROVIDER_USER_ID_VALUE);
         User user = User.reconstruct(
                 USER_ID,
-                1,
                 Email.create(new Notification(), EMAIL),
                 null,
                 false,

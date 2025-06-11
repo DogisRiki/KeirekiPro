@@ -24,11 +24,10 @@ class PortfolioTest {
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
         Link link = Link.create(notification, "https://example.com");
-        Portfolio portfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Portfolio portfolio = Portfolio.create("ポートフォリオ名", "概要説明", "Java, Spring, React", link);
 
         assertThat(portfolio).isNotNull();
         assertThat(portfolio.getId()).isNotNull();
-        assertThat(portfolio.getOrderNo()).isEqualTo(0);
         assertThat(portfolio.getName()).isEqualTo("ポートフォリオ名");
         assertThat(portfolio.getOverview()).isEqualTo("概要説明");
         assertThat(portfolio.getTechStack()).isEqualTo("Java, Spring, React");
@@ -40,11 +39,10 @@ class PortfolioTest {
     void test2() {
         Link link = Link.create(notification, "https://example.com");
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        Portfolio portfolio = Portfolio.reconstruct(id, 0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Portfolio portfolio = Portfolio.reconstruct(id, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
 
         assertThat(portfolio).isNotNull();
         assertThat(portfolio.getId()).isEqualTo(id);
-        assertThat(portfolio.getOrderNo()).isEqualTo(0);
         assertThat(portfolio.getName()).isEqualTo("ポートフォリオ名");
         assertThat(portfolio.getOverview()).isEqualTo("概要説明");
         assertThat(portfolio.getTechStack()).isEqualTo("Java, Spring, React");
@@ -55,7 +53,7 @@ class PortfolioTest {
     @DisplayName("ポートフォリオ名を変更する")
     void test3() {
         Link link = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Portfolio beforePortfolio = Portfolio.create("ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeName("新しいポートフォリオ名");
 
         assertThat(afterPortfolio.getName()).isEqualTo("新しいポートフォリオ名");
@@ -65,7 +63,7 @@ class PortfolioTest {
     @DisplayName("ポートフォリオ概要を変更する")
     void test4() {
         Link link = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Portfolio beforePortfolio = Portfolio.create("ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeOverview("新しい概要説明");
 
         assertThat(afterPortfolio.getOverview()).isEqualTo("新しい概要説明");
@@ -75,7 +73,7 @@ class PortfolioTest {
     @DisplayName("技術スタックを変更する")
     void test5() {
         Link link = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Portfolio beforePortfolio = Portfolio.create("ポートフォリオ名", "概要説明", "Java, Spring, React", link);
         Portfolio afterPortfolio = beforePortfolio.changeTechStack("TypeScript, Node.js");
 
         assertThat(afterPortfolio.getTechStack()).isEqualTo("TypeScript, Node.js");
@@ -85,7 +83,7 @@ class PortfolioTest {
     @DisplayName("リンクを変更する")
     void test6() {
         Link beforeLink = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", beforeLink);
+        Portfolio beforePortfolio = Portfolio.create("ポートフォリオ名", "概要説明", "Java, Spring, React", beforeLink);
         Link afterLink = Link.create(notification, "https://github.com");
         Portfolio afterPortfolio = beforePortfolio.changeLink(afterLink);
 
@@ -96,7 +94,7 @@ class PortfolioTest {
     @DisplayName("ポートフォリオ名、概要、技術スタック、リンクを変更する")
     void test7() {
         Link beforeLink = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(0, "ポートフォリオ名", "概要説明", "Java, Spring, React", beforeLink);
+        Portfolio beforePortfolio = Portfolio.create("ポートフォリオ名", "概要説明", "Java, Spring, React", beforeLink);
         Link afterLink = Link.create(notification, "https://github.com");
         Portfolio afterPortfolio = beforePortfolio.changeName("新しいポートフォリオ名")
                 .changeOverview("新しい概要説明")

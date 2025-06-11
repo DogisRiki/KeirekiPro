@@ -52,10 +52,13 @@ class OidcLoginUseCaseTest {
         Map<String, AuthProvider> providers = Map.of(
                 PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
         User existingUser = User.create(
-                notification, 1,
+                notification,
                 Email.create(notification, EMAIL),
-                null, false, providers,
-                null, USERNAME);
+                null,
+                false,
+                providers,
+                null,
+                USERNAME);
 
         // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
@@ -80,10 +83,13 @@ class OidcLoginUseCaseTest {
         Map<String, AuthProvider> existingProviders = Map.of(
                 "github", AuthProvider.create(notification, "github", "github-id"));
         User existingUser = User.create(
-                notification, 1,
+                notification,
                 Email.create(notification, EMAIL),
-                null, false, existingProviders,
-                null, USERNAME);
+                null,
+                false,
+                existingProviders,
+                null,
+                USERNAME);
 
         // モックをセットアップ
         // プロバイダー検索→空、メール検索→ヒット、ID検索→ヒット
@@ -112,9 +118,13 @@ class OidcLoginUseCaseTest {
         Map<String, AuthProvider> providers = Map.of(
                 PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
         User existingUser = User.create(
-                notification, 1,
-                null, null, false, providers,
-                null, USERNAME);
+                notification,
+                null,
+                null,
+                false,
+                providers,
+                null,
+                USERNAME);
 
         // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
@@ -205,10 +215,13 @@ class OidcLoginUseCaseTest {
         Map<String, AuthProvider> providers = Map.of(
                 PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
         User existingUser = User.create(
-                notification, 1,
+                notification,
                 Email.create(notification, EMAIL),
-                null, false, providers,
-                null, USERNAME);
+                null,
+                false,
+                providers,
+                null,
+                USERNAME);
 
         // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))

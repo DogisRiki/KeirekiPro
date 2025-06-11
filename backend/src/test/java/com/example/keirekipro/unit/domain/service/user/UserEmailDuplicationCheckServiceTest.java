@@ -49,7 +49,6 @@ class UserEmailDuplicationCheckServiceTest {
         // メールアドレスがnullのユーザーを作成
         User user = User.reconstruct(
                 USER_ID_1,
-                1,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -73,7 +72,6 @@ class UserEmailDuplicationCheckServiceTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 USER_ID_1,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,
@@ -100,7 +98,6 @@ class UserEmailDuplicationCheckServiceTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 USER_ID_1,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,
@@ -113,7 +110,6 @@ class UserEmailDuplicationCheckServiceTest {
         // 同じメールアドレスを持つ別ユーザーを作成（IDが異なる）
         User existingUser = User.reconstruct(
                 USER_ID_2,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,
@@ -140,7 +136,6 @@ class UserEmailDuplicationCheckServiceTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 USER_ID_1,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,
@@ -153,7 +148,6 @@ class UserEmailDuplicationCheckServiceTest {
         // リポジトリから返却されるのは同じユーザー（IDが一致）
         User existingUser = User.reconstruct(
                 USER_ID_1,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,

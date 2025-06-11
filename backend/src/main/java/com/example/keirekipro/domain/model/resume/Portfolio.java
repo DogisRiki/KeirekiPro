@@ -35,8 +35,8 @@ public class Portfolio extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private Portfolio(int orderNo, String name, String overview, String techStack, Link link) {
-        super(orderNo);
+    private Portfolio(String name, String overview, String techStack, Link link) {
+        super();
         this.name = name;
         this.overview = overview;
         this.techStack = techStack;
@@ -46,8 +46,8 @@ public class Portfolio extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Portfolio(UUID id, int orderNo, String name, String overview, String techStack, Link link) {
-        super(id, orderNo);
+    private Portfolio(UUID id, String name, String overview, String techStack, Link link) {
+        super(id);
         this.name = name;
         this.overview = overview;
         this.techStack = techStack;
@@ -57,31 +57,29 @@ public class Portfolio extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param orderNo   並び順
      * @param name      ポートフォリオ名
      * @param overview  ポートフォリオ概要
      * @param techStack 技術スタック
      * @param link      リンク
      * @return ポートフォリオエンティティ
      */
-    public static Portfolio create(int orderNo, String name, String overview, String techStack, Link link) {
-        return new Portfolio(orderNo, name, overview, techStack, link);
+    public static Portfolio create(String name, String overview, String techStack, Link link) {
+        return new Portfolio(name, overview, techStack, link);
     }
 
     /**
      * 再構築用のファクトリーメソッド
      *
      * @param id        識別子
-     * @param orderNo   並び順
      * @param name      ポートフォリオ名
      * @param overview  ポートフォリオ概要
      * @param techStack 技術スタック
      * @param link      リンク
      * @return ポートフォリオエンティティ
      */
-    public static Portfolio reconstruct(UUID id, int orderNo, String name, String overview, String techStack,
+    public static Portfolio reconstruct(UUID id, String name, String overview, String techStack,
             Link link) {
-        return new Portfolio(id, orderNo, name, overview, techStack, link);
+        return new Portfolio(id, name, overview, techStack, link);
     }
 
     /**
@@ -91,7 +89,7 @@ public class Portfolio extends Entity {
      * @return 変更後のポートフォリオエンティティ
      */
     public Portfolio changeName(String name) {
-        return new Portfolio(this.id, this.orderNo, name, this.overview, this.techStack, this.link);
+        return new Portfolio(this.id, name, this.overview, this.techStack, this.link);
     }
 
     /**
@@ -101,7 +99,7 @@ public class Portfolio extends Entity {
      * @return 変更後のポートフォリオエンティティ
      */
     public Portfolio changeOverview(String overview) {
-        return new Portfolio(this.id, this.orderNo, this.name, overview, this.techStack, this.link);
+        return new Portfolio(this.id, this.name, overview, this.techStack, this.link);
     }
 
     /**
@@ -111,7 +109,7 @@ public class Portfolio extends Entity {
      * @return 変更後のポートフォリオエンティティ
      */
     public Portfolio changeTechStack(String techStack) {
-        return new Portfolio(this.id, this.orderNo, this.name, this.overview, techStack, this.link);
+        return new Portfolio(this.id, this.name, this.overview, techStack, this.link);
     }
 
     /**
@@ -121,6 +119,6 @@ public class Portfolio extends Entity {
      * @return 変更後のポートフォリオエンティティ
      */
     public Portfolio changeLink(Link link) {
-        return new Portfolio(this.id, this.orderNo, this.name, this.overview, this.techStack, link);
+        return new Portfolio(this.id, this.name, this.overview, this.techStack, link);
     }
 }

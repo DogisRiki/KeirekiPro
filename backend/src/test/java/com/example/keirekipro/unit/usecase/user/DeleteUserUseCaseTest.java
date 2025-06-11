@@ -44,7 +44,7 @@ class DeleteUserUseCaseTest {
     @DisplayName("ユーザー削除が正常に完了する")
     void test1() {
         Notification notification = new Notification();
-        User user = User.create(notification, 1, Email.create(notification, "test@example.com"),
+        User user = User.create(notification, Email.create(notification, "test@example.com"),
                 "passwordHash", false, null, null, "test-user");
 
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));

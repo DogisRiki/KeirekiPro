@@ -55,7 +55,7 @@ class ChangePasswordUseCaseTest {
 
         // テスト用ユーザー生成
         Notification notification = new Notification();
-        User user = User.create(notification, 1, Email.create(notification, "test@keirekipro.click"),
+        User user = User.create(notification, Email.create(notification, "test@keirekipro.click"),
                 HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
 
         // モックをセットアップ
@@ -100,7 +100,7 @@ class ChangePasswordUseCaseTest {
 
         // テスト用ユーザー生成
         Notification notification = new Notification();
-        User user = User.create(notification, 1, Email.create(notification, "test@keirekipro.click"),
+        User user = User.create(notification, Email.create(notification, "test@keirekipro.click"),
                 HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
 
         // モックをセットアップ
@@ -128,7 +128,7 @@ class ChangePasswordUseCaseTest {
 
         // テスト用ユーザー生成
         Notification notification = new Notification();
-        User user = User.create(notification, 1, Email.create(notification, "test@keirekipro.click"),
+        User user = User.create(notification, Email.create(notification, "test@keirekipro.click"),
                 HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
 
         // モックをセットアップ
@@ -158,7 +158,7 @@ class ChangePasswordUseCaseTest {
 
         // テスト用ユーザー生成
         Notification notification = new Notification();
-        User user = User.create(notification, 1, Email.create(notification, "test@keirekipro.click"),
+        User user = User.create(notification, Email.create(notification, "test@keirekipro.click"),
                 HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
 
         // モックをセットアップ

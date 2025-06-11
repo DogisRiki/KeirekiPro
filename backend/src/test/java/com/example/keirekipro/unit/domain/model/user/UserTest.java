@@ -53,7 +53,6 @@ class UserTest {
 
         User user = User.create(
                 notification,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -88,7 +87,6 @@ class UserTest {
 
         User user = User.create(
                 notification,
-                1,
                 email,
                 null,
                 false,
@@ -121,7 +119,6 @@ class UserTest {
         Notification notification = new Notification();
         User user = User.create(
                 notification,
-                1,
                 null,
                 null,
                 false,
@@ -154,7 +151,6 @@ class UserTest {
         Notification notification = new Notification();
         assertThatThrownBy(() -> User.create(
                 notification,
-                1,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -170,7 +166,6 @@ class UserTest {
         Email email = Email.create(new Notification(), EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -201,7 +196,6 @@ class UserTest {
     void test6() {
         User user = User.reconstruct(
                 ID,
-                1,
                 null,
                 PASSWORD_HASH,
                 true,
@@ -225,7 +219,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -250,7 +243,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -274,7 +266,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -298,7 +289,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,
@@ -319,7 +309,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -343,7 +332,6 @@ class UserTest {
         // メールアドレスとパスワードが未設定
         User user1 = User.reconstruct(
                 ID,
-                1,
                 null,
                 null,
                 false,
@@ -361,7 +349,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user2 = User.reconstruct(
                 ID,
-                1,
                 email,
                 null,
                 false,
@@ -385,7 +372,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,
@@ -410,7 +396,6 @@ class UserTest {
 
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 null,
                 false,
@@ -436,7 +421,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,
@@ -461,7 +445,6 @@ class UserTest {
 
         User user = User.reconstruct(
                 ID,
-                1,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -483,7 +466,6 @@ class UserTest {
     void test17() {
         User user = User.reconstruct(
                 ID,
-                1,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -502,7 +484,6 @@ class UserTest {
     void test18() {
         User user = User.reconstruct(
                 ID,
-                1,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -525,7 +506,6 @@ class UserTest {
 
         User user = User.reconstruct(
                 ID,
-                1,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -548,7 +528,6 @@ class UserTest {
     void test20() {
         User user = User.reconstruct(
                 ID,
-                1,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -569,7 +548,6 @@ class UserTest {
     void test21() {
         User user = User.reconstruct(
                 ID,
-                1,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -593,7 +571,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -619,7 +596,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.create(
                 notification,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -643,7 +619,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -663,7 +638,6 @@ class UserTest {
         Email email = Email.create(notification, EMAIL);
         User user = User.reconstruct(
                 ID,
-                1,
                 email,
                 PASSWORD_HASH,
                 false,

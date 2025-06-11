@@ -48,7 +48,6 @@ class ResumeTest {
 
         assertThat(resume).isNotNull();
         assertThat(resume.getId()).isNotNull();
-        assertThat(resume.getOrderNo()).isEqualTo(0);
         assertThat(resume.getUserId()).isEqualTo(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
         assertThat(resume.getName()).isEqualTo(ResumeName.create(notification, "職務経歴書A"));
         assertThat(resume.getDate()).isEqualTo(LocalDate.now());
@@ -69,7 +68,6 @@ class ResumeTest {
         assertThatThrownBy(() -> {
             Resume.create(
                     invalidNotification,
-                    0,
                     userId,
                     null, // 名前がnull
                     LocalDate.now(),
@@ -91,7 +89,6 @@ class ResumeTest {
         UUID userId = UUID.fromString("223e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.reconstruct(
                 id,
-                0,
                 userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.of(2023, 1, 1),
@@ -108,7 +105,6 @@ class ResumeTest {
 
         assertThat(resume).isNotNull();
         assertThat(resume.getId()).isEqualTo(id);
-        assertThat(resume.getOrderNo()).isEqualTo(0);
         assertThat(resume.getUserId()).isEqualTo(userId);
         assertThat(resume.getName()).isEqualTo(ResumeName.create(notification, "職務経歴書A"));
         assertThat(resume.getDate()).isEqualTo(LocalDate.of(2023, 1, 1));
@@ -158,7 +154,7 @@ class ResumeTest {
     @DisplayName("正常な値で職歴を追加する")
     void test7() {
         Resume beforeResume = createSampleResume();
-        Career newCareer = Career.create(1, "株式会社DEF",
+        Career newCareer = Career.create("株式会社DEF",
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
         Resume afterResume = beforeResume.addCareer(notification, newCareer);
 
@@ -175,13 +171,12 @@ class ResumeTest {
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
                 notification,
-                0,
                 userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
                 true,
-                List.of(Career.create(0, "株式会社ABC",
+                List.of(Career.create("株式会社ABC",
                         Period.create(notification, YearMonth.of(2024, 1), null, true))),
                 List.of(),
                 List.of(),
@@ -191,7 +186,7 @@ class ResumeTest {
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create(1, "株式会社DEF",
+            resume.addCareer(notification, Career.create("株式会社DEF",
                     Period.create(notification, YearMonth.of(2024, 2), YearMonth.of(2024, 3), false)));
         }).isInstanceOf(DomainException.class);
 
@@ -211,7 +206,7 @@ class ResumeTest {
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create(1, "株式会社DEF",
+            resume.addCareer(notification, Career.create("株式会社DEF",
                     Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false)));
         }).isInstanceOf(DomainException.class);
 
@@ -230,13 +225,12 @@ class ResumeTest {
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
                 notification,
-                0,
                 userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
                 true,
-                List.of(Career.create(0, "株式会社ABC",
+                List.of(Career.create("株式会社ABC",
                         Period.create(notification, YearMonth.of(2024, 1), null, true))),
                 List.of(),
                 List.of(),
@@ -246,7 +240,7 @@ class ResumeTest {
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create(1, "株式会社DEF",
+            resume.addCareer(notification, Career.create("株式会社DEF",
                     Period.create(notification, YearMonth.of(2024, 2), null, true)));
         }).isInstanceOf(DomainException.class);
 
@@ -266,7 +260,7 @@ class ResumeTest {
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create(1, "株式会社DEF",
+            resume.addCareer(notification, Career.create("株式会社DEF",
                     Period.create(notification, YearMonth.of(2023, 10), YearMonth.of(2024, 11), false)));
         }).isInstanceOf(DomainException.class);
 
@@ -286,7 +280,7 @@ class ResumeTest {
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create(1, "株式会社DEF",
+            resume.addCareer(notification, Career.create("株式会社DEF",
                     Period.create(notification, YearMonth.of(2023, 11), YearMonth.of(2024, 6), false)));
         }).isInstanceOf(DomainException.class);
 
@@ -300,7 +294,7 @@ class ResumeTest {
     @DisplayName("正常な値で職歴を更新する")
     void test13() {
         Resume beforeResume = createSampleResume();
-        Career newCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(), 0, "株式会社DEF",
+        Career newCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(), "株式会社DEF",
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
         Resume afterResume = beforeResume.updateCareer(notification, newCareer);
 
@@ -311,7 +305,6 @@ class ResumeTest {
         // 更新した職歴の値が正しい
         assertThat(afterResume.getCareers().get(0).getCompanyName()).isEqualTo(newCareer.getCompanyName());
         assertThat(afterResume.getCareers().get(0).getPeriod()).isEqualTo(newCareer.getPeriod());
-        assertThat(afterResume.getCareers().get(0).getOrderNo()).isEqualTo(newCareer.getOrderNo());
         assertThat(afterResume.getCareers().get(0).getId()).isEqualTo(beforeResume.getCareers().get(0).getId());
     }
 
@@ -319,7 +312,7 @@ class ResumeTest {
     @DisplayName("職歴を削除する")
     void test14() {
         Resume beforeResume = createSampleResume();
-        Career newCareer = Career.create(1, "株式会社DEF",
+        Career newCareer = Career.create("株式会社DEF",
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
         Resume afterResume = beforeResume.addCareer(notification, newCareer);
         // 削除1回目(2件 → 1件)
@@ -378,7 +371,6 @@ class ResumeTest {
         Project originalProject = beforeResume.getProjects().get(0);
         Project updatedProject = Project.reconstruct(
                 originalProject.getId(),
-                originalProject.getOrderNo(),
                 originalProject.getCompanyName(), // 会社名は変更しない
                 originalProject.getPeriod(),
                 "新しいプロジェクト名",
@@ -448,7 +440,6 @@ class ResumeTest {
 
         // 削除対象のプロジェクトを追加
         Project newProject = Project.create(
-                1,
                 "株式会社DEF",
                 Period.create(notification, YearMonth.of(2022, 1), YearMonth.of(2023, 1), false),
                 "プロジェクト概要",
@@ -501,7 +492,7 @@ class ResumeTest {
     @DisplayName("資格を追加する")
     void test19() {
         Resume beforeResume = createSampleResume();
-        Certification newCertification = Certification.create(1, "応用情報技術者", YearMonth.of(2025, 02));
+        Certification newCertification = Certification.create("応用情報技術者", YearMonth.of(2025, 02));
         Resume afterResume = beforeResume.addCertification(newCertification);
 
         // 新しい資格がリストに含まれている
@@ -514,7 +505,7 @@ class ResumeTest {
     @DisplayName("資格を更新する")
     void test20() {
         Resume beforeResume = createSampleResume();
-        Certification newCertification = Certification.reconstruct(beforeResume.getCertifications().get(0).getId(), 0,
+        Certification newCertification = Certification.reconstruct(beforeResume.getCertifications().get(0).getId(),
                 "応用情報技術者", YearMonth.of(2025, 02));
         Resume afterResume = beforeResume.updateCertification(newCertification);
 
@@ -528,8 +519,6 @@ class ResumeTest {
                         .isEqualTo(newCertification.getName()),
                 () -> assertThat(afterResume.getCertifications().get(0).getDate())
                         .isEqualTo(newCertification.getDate()),
-                () -> assertThat(afterResume.getCertifications().get(0).getOrderNo())
-                        .isEqualTo(newCertification.getOrderNo()),
                 () -> assertThat(afterResume.getCertifications().get(0).getId())
                         .isEqualTo(beforeResume.getCertifications().get(0).getId()));
     }
@@ -538,7 +527,7 @@ class ResumeTest {
     @DisplayName("資格を削除する")
     void test21() {
         Resume beforeResume = createSampleResume();
-        Certification newCertification = Certification.create(1, "応用情報技術者", YearMonth.of(2025, 02));
+        Certification newCertification = Certification.create("応用情報技術者", YearMonth.of(2025, 02));
         Resume afterResume = beforeResume.addCertification(newCertification);
 
         // 削除1回目(2件 → 1件)
@@ -559,7 +548,6 @@ class ResumeTest {
     void test22() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
-                1,
                 "新しいポートフォリオ",
                 "新しいポートフォリオの概要",
                 "新しい技術スタック",
@@ -579,7 +567,6 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         Portfolio updatedPortfolio = Portfolio.reconstruct(
                 beforeResume.getPortfolios().get(0).getId(),
-                0,
                 "更新されたポートフォリオ",
                 "更新されたポートフォリオの概要",
                 "更新された技術スタック",
@@ -608,7 +595,6 @@ class ResumeTest {
     void test24() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
-                1,
                 "削除対象のポートフォリオ",
                 "削除対象の概要",
                 "削除対象の技術スタック",
@@ -634,7 +620,6 @@ class ResumeTest {
     void test25() {
         Resume beforeResume = createSampleResume();
         SocialLink newSocialLink = SocialLink.create(
-                1,
                 "Twitter",
                 Link.create(notification, "https://twitter.com/user"));
 
@@ -652,7 +637,6 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         SocialLink updatedSocialLink = SocialLink.reconstruct(
                 beforeResume.getSocialLinks().get(0).getId(),
-                0,
                 "LinkedIn",
                 Link.create(notification, "https://linkedin.com/in/user"));
 
@@ -673,7 +657,6 @@ class ResumeTest {
     void test27() {
         Resume beforeResume = createSampleResume();
         SocialLink newSocialLink = SocialLink.create(
-                1,
                 "Facebook",
                 Link.create(notification, "https://facebook.com/user"));
 
@@ -697,7 +680,6 @@ class ResumeTest {
     void test28() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
-                1,
                 "新しいタイトル",
                 "新しい自己PRの内容");
 
@@ -715,7 +697,6 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         SelfPromotion updatedSelfPromotion = SelfPromotion.reconstruct(
                 beforeResume.getSelfPromotions().get(0).getId(),
-                0,
                 "更新されたタイトル",
                 "更新された自己PRの内容");
 
@@ -740,7 +721,6 @@ class ResumeTest {
     void test30() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
-                1,
                 "削除対象のタイトル",
                 "削除対象の自己PRの内容");
 
@@ -776,7 +756,6 @@ class ResumeTest {
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         return Resume.create(
                 notification,
-                0,
                 userId,
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
@@ -795,7 +774,7 @@ class ResumeTest {
      */
     private Career createSampleCareer() {
         Period period = Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false);
-        return Career.create(0, "株式会社ABC", period);
+        return Career.create("株式会社ABC", period);
     }
 
     /**
@@ -828,34 +807,34 @@ class ResumeTest {
                         List.of("Postman"),
                         List.of("Figma")));
         Project.Process process = Project.Process.create(true, true, true, true, true, true, true);
-        return Project.create(0, "株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
+        return Project.create("株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
     }
 
     /**
      * 資格のサンプルエンティティを作成する補助メソッド
      */
     private Certification createSampleCertification() {
-        return Certification.create(0, "基本情報技術者", YearMonth.of(2025, 01));
+        return Certification.create("基本情報技術者", YearMonth.of(2025, 01));
     }
 
     /**
      * ポートフォリオのサンプルエンティティを作成する補助メソッド
      */
     private Portfolio createSamplePortfolio() {
-        return Portfolio.create(0, "ポートフォリオ名", "概要", "技術スタック", Link.create(notification, "https://portfolio.com"));
+        return Portfolio.create("ポートフォリオ名", "概要", "技術スタック", Link.create(notification, "https://portfolio.com"));
     }
 
     /**
      * ソーシャルリンクのサンプルエンティティを作成する補助メソッド
      */
     private SocialLink createSampleSociealLink() {
-        return SocialLink.create(0, "GitHub", Link.create(notification, "https://github.com/user"));
+        return SocialLink.create("GitHub", Link.create(notification, "https://github.com/user"));
     }
 
     /**
      * 自己PRのサンプルエンティティを作成する補助メソッド
      */
     private SelfPromotion createSampleSelfPromotion() {
-        return SelfPromotion.create(0, "自己PRタイトル", "自己PR内容");
+        return SelfPromotion.create("自己PRタイトル", "自己PR内容");
     }
 }

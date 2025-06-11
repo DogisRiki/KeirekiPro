@@ -80,7 +80,7 @@ class UpdateUserInfoUseCaseTest {
         Notification notification = new Notification();
         AuthProvider authProvider = AuthProvider.create(notification, "google", "gid-1");
         User existingUser = User.reconstruct(
-                USER_ID, 1,
+                USER_ID,
                 Email.create(notification, EMAIL),
                 PASSWORD_HASH, false,
                 Map.of("google", authProvider),
@@ -236,7 +236,7 @@ class UpdateUserInfoUseCaseTest {
 
         Notification notification = new Notification();
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
-                User.reconstruct(USER_ID, 1, Email.create(notification, "a@b.com"),
+                User.reconstruct(USER_ID, Email.create(notification, "a@b.com"),
                         "pw", false, Map.of(), null, "", LocalDateTime.now(), LocalDateTime.now())));
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);

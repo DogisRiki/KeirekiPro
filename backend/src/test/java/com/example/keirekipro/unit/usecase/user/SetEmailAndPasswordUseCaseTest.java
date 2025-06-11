@@ -53,7 +53,7 @@ class SetEmailAndPasswordUseCaseTest {
     @DisplayName("パスワードのみを設定する")
     void test1() {
         // モックをセットアップ
-        User user = User.reconstruct(USER_ID, 1, Email.create(new Notification(), EMAIL), null, false, Map.of(), null,
+        User user = User.reconstruct(USER_ID, Email.create(new Notification(), EMAIL), null, false, Map.of(), null,
                 USERNAME, null, null);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
@@ -69,7 +69,7 @@ class SetEmailAndPasswordUseCaseTest {
     @DisplayName("メールアドレスとパスワードを設定する")
     void test2() {
         // モックをセットアップ
-        User user = User.reconstruct(USER_ID, 1, null, null, false, Map.of(), null, USERNAME, null, null);
+        User user = User.reconstruct(USER_ID, null, null, false, Map.of(), null, USERNAME, null, null);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
 
