@@ -90,7 +90,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(list).hasSize(1);
         Resume r = list.get(0);
         assertThat(r.getId()).isEqualTo(dto.getId());
-        assertThat(r.getOrderNo()).isEqualTo(dto.getOrderNo());
         assertThat(r.getUserId()).isEqualTo(dto.getUserId());
         assertThat(r.getName().getValue()).isEqualTo(dto.getName());
         assertThat(r.getDate()).isEqualTo(dto.getDate());
@@ -105,7 +104,6 @@ class MyBatisResumeRepositoryTest {
         Career c = r.getCareers().get(0);
         CareerDto cd = dto.getCareers().get(0);
         assertThat(c.getId()).isEqualTo(cd.getId());
-        assertThat(c.getOrderNo()).isEqualTo(cd.getOrderNo());
         assertThat(c.getCompanyName()).isEqualTo(cd.getCompanyName());
         assertThat(c.getPeriod().getStartDate()).isEqualTo(cd.getStartDate());
         assertThat(c.getPeriod().getEndDate()).isEqualTo(cd.getEndDate());
@@ -116,7 +114,6 @@ class MyBatisResumeRepositoryTest {
         Project p = r.getProjects().get(0);
         ProjectDto pd = dto.getProjects().get(0);
         assertThat(p.getId()).isEqualTo(pd.getId());
-        assertThat(p.getOrderNo()).isEqualTo(pd.getOrderNo());
         assertThat(p.getCompanyName()).isEqualTo(pd.getCompanyName());
         assertThat(p.getPeriod().getStartDate()).isEqualTo(pd.getStartDate());
         assertThat(p.getPeriod().getEndDate()).isEqualTo(pd.getEndDate());
@@ -159,7 +156,6 @@ class MyBatisResumeRepositoryTest {
         Certification certEnt = r.getCertifications().get(0);
         CertificationDto certDto = dto.getCertifications().get(0);
         assertThat(certEnt.getId()).isEqualTo(certDto.getId());
-        assertThat(certEnt.getOrderNo()).isEqualTo(certDto.getOrderNo());
         assertThat(certEnt.getName()).isEqualTo(certDto.getName());
         assertThat(certEnt.getDate()).isEqualTo(certDto.getDate());
 
@@ -168,7 +164,6 @@ class MyBatisResumeRepositoryTest {
         Portfolio portEnt = r.getPortfolios().get(0);
         PortfolioDto portDto = dto.getPortfolios().get(0);
         assertThat(portEnt.getId()).isEqualTo(portDto.getId());
-        assertThat(portEnt.getOrderNo()).isEqualTo(portDto.getOrderNo());
         assertThat(portEnt.getName()).isEqualTo(portDto.getName());
         assertThat(portEnt.getOverview()).isEqualTo(portDto.getOverview());
         assertThat(portEnt.getTechStack()).isEqualTo(portDto.getTechStack());
@@ -179,7 +174,6 @@ class MyBatisResumeRepositoryTest {
         SocialLink slEnt = r.getSocialLinks().get(0);
         SocialLinkDto slDto = dto.getSocialLinks().get(0);
         assertThat(slEnt.getId()).isEqualTo(slDto.getId());
-        assertThat(slEnt.getOrderNo()).isEqualTo(slDto.getOrderNo());
         assertThat(slEnt.getName()).isEqualTo(slDto.getName());
         assertThat(slEnt.getLink().getValue()).isEqualTo(slDto.getLink());
 
@@ -188,7 +182,6 @@ class MyBatisResumeRepositoryTest {
         SelfPromotion spEnt = r.getSelfPromotions().get(0);
         SelfPromotionDto spDto = dto.getSelfPromotions().get(0);
         assertThat(spEnt.getId()).isEqualTo(spDto.getId());
-        assertThat(spEnt.getOrderNo()).isEqualTo(spDto.getOrderNo());
         assertThat(spEnt.getTitle()).isEqualTo(spDto.getTitle());
         assertThat(spEnt.getContent()).isEqualTo(spDto.getContent());
     }
@@ -223,7 +216,6 @@ class MyBatisResumeRepositoryTest {
 
         // 親フィールドの検証
         assertThat(r.getId()).isEqualTo(dto.getId());
-        assertThat(r.getOrderNo()).isEqualTo(dto.getOrderNo());
         assertThat(r.getUserId()).isEqualTo(dto.getUserId());
         assertThat(r.getName().getValue()).isEqualTo(dto.getName());
         assertThat(r.getDate()).isEqualTo(dto.getDate());
@@ -238,7 +230,6 @@ class MyBatisResumeRepositoryTest {
         ResumeDto.CareerDto cd = dto.getCareers().get(0);
         Career c = r.getCareers().get(0);
         assertThat(c.getId()).isEqualTo(cd.getId());
-        assertThat(c.getOrderNo()).isEqualTo(cd.getOrderNo());
         assertThat(c.getCompanyName()).isEqualTo(cd.getCompanyName());
         assertThat(c.getPeriod().getStartDate()).isEqualTo(cd.getStartDate());
         assertThat(c.getPeriod().getEndDate()).isEqualTo(cd.getEndDate());
@@ -249,7 +240,6 @@ class MyBatisResumeRepositoryTest {
         ResumeDto.ProjectDto pd = dto.getProjects().get(0);
         Project p = r.getProjects().get(0);
         assertThat(p.getId()).isEqualTo(pd.getId());
-        assertThat(p.getOrderNo()).isEqualTo(pd.getOrderNo());
         assertThat(p.getCompanyName()).isEqualTo(pd.getCompanyName());
         assertThat(p.getPeriod().getStartDate()).isEqualTo(pd.getStartDate());
         assertThat(p.getPeriod().getEndDate()).isEqualTo(pd.getEndDate());
@@ -294,7 +284,6 @@ class MyBatisResumeRepositoryTest {
         ResumeDto.CertificationDto certd = dto.getCertifications().get(0);
         Certification cert = r.getCertifications().get(0);
         assertThat(cert.getId()).isEqualTo(certd.getId());
-        assertThat(cert.getOrderNo()).isEqualTo(certd.getOrderNo());
         assertThat(cert.getName()).isEqualTo(certd.getName());
         assertThat(cert.getDate()).isEqualTo(certd.getDate());
 
@@ -303,7 +292,6 @@ class MyBatisResumeRepositoryTest {
         ResumeDto.PortfolioDto portd = dto.getPortfolios().get(0);
         Portfolio port = r.getPortfolios().get(0);
         assertThat(port.getId()).isEqualTo(portd.getId());
-        assertThat(port.getOrderNo()).isEqualTo(portd.getOrderNo());
         assertThat(port.getName()).isEqualTo(portd.getName());
         assertThat(port.getOverview()).isEqualTo(portd.getOverview());
         assertThat(port.getTechStack()).isEqualTo(portd.getTechStack());
@@ -314,7 +302,6 @@ class MyBatisResumeRepositoryTest {
         ResumeDto.SocialLinkDto sld = dto.getSocialLinks().get(0);
         SocialLink sl = r.getSocialLinks().get(0);
         assertThat(sl.getId()).isEqualTo(sld.getId());
-        assertThat(sl.getOrderNo()).isEqualTo(sld.getOrderNo());
         assertThat(sl.getName()).isEqualTo(sld.getName());
         assertThat(sl.getLink().getValue()).isEqualTo(sld.getLink());
 
@@ -323,7 +310,6 @@ class MyBatisResumeRepositoryTest {
         ResumeDto.SelfPromotionDto spd = dto.getSelfPromotions().get(0);
         SelfPromotion sp = r.getSelfPromotions().get(0);
         assertThat(sp.getId()).isEqualTo(spd.getId());
-        assertThat(sp.getOrderNo()).isEqualTo(spd.getOrderNo());
         assertThat(sp.getTitle()).isEqualTo(spd.getTitle());
         assertThat(sp.getContent()).isEqualTo(spd.getContent());
     }
@@ -343,7 +329,6 @@ class MyBatisResumeRepositoryTest {
         verify(mapper).upsert(dtoCap.capture());
         ResumeDto dto = dtoCap.getValue();
         assertThat(dto.getId()).isEqualTo(resume.getId());
-        assertThat(dto.getOrderNo()).isEqualTo(resume.getOrderNo());
         assertThat(dto.getUserId()).isEqualTo(resume.getUserId());
         assertThat(dto.getName()).isEqualTo(resume.getName().getValue());
         assertThat(dto.getDate()).isEqualTo(resume.getDate());
@@ -372,7 +357,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(cd.getStartDate()).isEqualTo(c.getPeriod().getStartDate());
         assertThat(cd.getEndDate()).isEqualTo(c.getPeriod().getEndDate());
         assertThat(cd.getIsActive()).isEqualTo(c.getPeriod().isActive());
-        assertThat(cd.getOrderNo()).isEqualTo(c.getOrderNo());
 
         // Projectインサート
         ArgumentCaptor<ResumeDto.ProjectDto> capP = ArgumentCaptor.forClass(ResumeDto.ProjectDto.class);
@@ -427,7 +411,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(certd.getResumeId()).isEqualTo(id);
         assertThat(certd.getName()).isEqualTo(cert.getName());
         assertThat(certd.getDate()).isEqualTo(cert.getDate());
-        assertThat(certd.getOrderNo()).isEqualTo(cert.getOrderNo());
 
         // Portfolioインサート
         ArgumentCaptor<ResumeDto.PortfolioDto> capPort = ArgumentCaptor.forClass(ResumeDto.PortfolioDto.class);
@@ -440,7 +423,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(portd.getOverview()).isEqualTo(port.getOverview());
         assertThat(portd.getTechStack()).isEqualTo(port.getTechStack());
         assertThat(portd.getLink()).isEqualTo(port.getLink().getValue());
-        assertThat(portd.getOrderNo()).isEqualTo(port.getOrderNo());
 
         // SocialLinkインサート
         ArgumentCaptor<ResumeDto.SocialLinkDto> capSocialLinkDto = ArgumentCaptor
@@ -452,7 +434,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(sld.getResumeId()).isEqualTo(id);
         assertThat(sld.getName()).isEqualTo(sl.getName());
         assertThat(sld.getLink()).isEqualTo(sl.getLink().getValue());
-        assertThat(sld.getOrderNo()).isEqualTo(sl.getOrderNo());
 
         // SelfPromotionインサート
         ArgumentCaptor<ResumeDto.SelfPromotionDto> capSp = ArgumentCaptor.forClass(ResumeDto.SelfPromotionDto.class);
@@ -463,7 +444,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(spd.getResumeId()).isEqualTo(id);
         assertThat(spd.getTitle()).isEqualTo(sp.getTitle());
         assertThat(spd.getContent()).isEqualTo(sp.getContent());
-        assertThat(spd.getOrderNo()).isEqualTo(sp.getOrderNo());
     }
 
     @Test
@@ -490,7 +470,6 @@ class MyBatisResumeRepositoryTest {
         dto.setAutoSaveEnabled(true);
         dto.setCreatedAt(LocalDateTime.of(2025, 1, 2, 3, 4));
         dto.setUpdatedAt(LocalDateTime.of(2025, 1, 3, 4, 5));
-        dto.setOrderNo(7);
 
         // Career
         CareerDto career = new CareerDto();
@@ -500,7 +479,6 @@ class MyBatisResumeRepositoryTest {
         career.setStartDate(YearMonth.of(2024, 1));
         career.setEndDate(YearMonth.of(2024, 12));
         career.setIsActive(false);
-        career.setOrderNo(1);
         dto.setCareers(List.of(career));
 
         // Project
@@ -516,7 +494,6 @@ class MyBatisResumeRepositoryTest {
         proj.setTeamComp("TeamX");
         proj.setRole("RoleY");
         proj.setAchievement("AchZ");
-        proj.setOrderNo(2);
         proj.setRequirements(true);
         proj.setBasicDesign(false);
         proj.setDetailedDesign(true);
@@ -553,7 +530,6 @@ class MyBatisResumeRepositoryTest {
         cert.setResumeId(RESUME_ID);
         cert.setName("CertX");
         cert.setDate(YearMonth.of(2022, 6));
-        cert.setOrderNo(3);
         dto.setCertifications(List.of(cert));
 
         // Portfolio
@@ -564,7 +540,6 @@ class MyBatisResumeRepositoryTest {
         port.setOverview("PortOverview");
         port.setTechStack("TechStackX");
         port.setLink("http://example.com");
-        port.setOrderNo(4);
         dto.setPortfolios(List.of(port));
 
         // SocialLink
@@ -573,7 +548,6 @@ class MyBatisResumeRepositoryTest {
         sl.setResumeId(RESUME_ID);
         sl.setName("LinkedIn");
         sl.setLink("http://linkedin.com");
-        sl.setOrderNo(5);
         dto.setSocialLinks(List.of(sl));
 
         // SelfPromotion
@@ -582,7 +556,6 @@ class MyBatisResumeRepositoryTest {
         sp.setResumeId(RESUME_ID);
         sp.setTitle("PromoTitle");
         sp.setContent("PromoContent");
-        sp.setOrderNo(6);
         dto.setSelfPromotions(List.of(sp));
 
         return dto;
@@ -594,7 +567,6 @@ class MyBatisResumeRepositoryTest {
         // Career
         Career career = Career.reconstruct(
                 CAREER_ID,
-                1,
                 "CompCo",
                 Period.create(notification, YearMonth.of(2024, 1), YearMonth.of(2024, 12), false));
 
@@ -626,7 +598,6 @@ class MyBatisResumeRepositoryTest {
                         List.of("Figma")));
         Project project = Project.reconstruct(
                 PROJECT_ID,
-                2,
                 "ProjCo",
                 Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false),
                 "ProjName",
@@ -640,14 +611,12 @@ class MyBatisResumeRepositoryTest {
         // Certification
         Certification certification = Certification.reconstruct(
                 CERT_ID,
-                3,
                 "CertX",
                 YearMonth.of(2022, 6));
 
         // Portfolio
         Portfolio portfolio = Portfolio.reconstruct(
                 PORTFOLIO_ID,
-                4,
                 "PortX",
                 "PortOverview",
                 "TechStackX",
@@ -656,20 +625,17 @@ class MyBatisResumeRepositoryTest {
         // SocialLink
         SocialLink socialLink = SocialLink.reconstruct(
                 SOCIALLINK_ID,
-                5,
                 "LinkedIn",
                 Link.create(notification, "http://linkedin.com"));
 
         // SelfPromotion
         SelfPromotion self = SelfPromotion.reconstruct(
                 SELF_ID,
-                6,
                 "PromoTitle",
                 "PromoContent");
 
         return Resume.reconstruct(
                 RESUME_ID,
-                7,
                 USER_ID,
                 ResumeName.create(notification, "Test Resume"),
                 LocalDate.of(2025, 1, 1),

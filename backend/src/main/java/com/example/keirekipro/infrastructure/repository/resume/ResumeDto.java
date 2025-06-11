@@ -23,7 +23,6 @@ public class ResumeDto {
     private Boolean autoSaveEnabled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private Integer orderNo;
     private List<CareerDto> careers;
     private List<ProjectDto> projects;
     private List<CertificationDto> certifications;
@@ -42,7 +41,6 @@ public class ResumeDto {
         private YearMonth startDate;
         private YearMonth endDate;
         private Boolean isActive;
-        private Integer orderNo;
     }
 
     /**
@@ -61,7 +59,6 @@ public class ResumeDto {
         private String teamComp;
         private String role;
         private String achievement;
-        private Integer orderNo;
 
         // Process
         private Boolean requirements;
@@ -110,7 +107,6 @@ public class ResumeDto {
         private UUID resumeId;
         private String name;
         private YearMonth date;
-        private Integer orderNo;
     }
 
     /**
@@ -124,7 +120,6 @@ public class ResumeDto {
         private String overview;
         private String techStack;
         private String link;
-        private Integer orderNo;
     }
 
     /**
@@ -136,7 +131,6 @@ public class ResumeDto {
         private UUID resumeId;
         private String name;
         private String link;
-        private Integer orderNo;
     }
 
     /**
@@ -148,6 +142,5 @@ public class ResumeDto {
         private UUID resumeId;
         private String title;
         private String content;
-        private Integer orderNo;
     }
 }

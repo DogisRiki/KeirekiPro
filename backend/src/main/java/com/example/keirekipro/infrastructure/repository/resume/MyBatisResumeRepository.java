@@ -146,7 +146,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         List<Career> careers = dto.getCareers().stream()
                 .map(d -> Career.reconstruct(
                         d.getId(),
-                        d.getOrderNo(),
                         d.getCompanyName(),
                         Period.create(notification, d.getStartDate(), d.getEndDate(), d.getIsActive())))
                 .toList();
@@ -155,7 +154,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         List<Project> projects = dto.getProjects().stream()
                 .map(d -> Project.reconstruct(
                         d.getId(),
-                        d.getOrderNo(),
                         d.getCompanyName(),
                         Period.create(notification, d.getStartDate(), d.getEndDate(), d.getIsActive()),
                         d.getName(),
@@ -201,7 +199,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         List<Certification> certifications = dto.getCertifications().stream()
                 .map(d -> Certification.reconstruct(
                         d.getId(),
-                        d.getOrderNo(),
                         d.getName(),
                         d.getDate()))
                 .toList();
@@ -210,7 +207,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         List<Portfolio> portfolios = dto.getPortfolios().stream()
                 .map(d -> Portfolio.reconstruct(
                         d.getId(),
-                        d.getOrderNo(),
                         d.getName(),
                         d.getOverview(),
                         d.getTechStack(),
@@ -221,7 +217,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         List<SocialLink> socialLinks = dto.getSocialLinks().stream()
                 .map(d -> SocialLink.reconstruct(
                         d.getId(),
-                        d.getOrderNo(),
                         d.getName(),
                         Link.create(notification, d.getLink())))
                 .toList();
@@ -230,7 +225,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         List<SelfPromotion> selfPromotions = dto.getSelfPromotions().stream()
                 .map(d -> SelfPromotion.reconstruct(
                         d.getId(),
-                        d.getOrderNo(),
                         d.getTitle(),
                         d.getContent()))
                 .toList();
@@ -238,7 +232,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         // Resumeを再構築
         return Resume.reconstruct(
                 dto.getId(),
-                dto.getOrderNo(),
                 dto.getUserId(),
                 ResumeName.create(notification, dto.getName()),
                 dto.getDate(),
@@ -268,7 +261,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         dto.setAutoSaveEnabled(resume.isAutoSaveEnabled());
         dto.setCreatedAt(resume.getCreatedAt());
         dto.setUpdatedAt(resume.getUpdatedAt());
-        dto.setOrderNo(resume.getOrderNo());
 
         UUID resumeId = resume.getId();
 
@@ -282,7 +274,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setStartDate(c.getPeriod().getStartDate());
                     d.setEndDate(c.getPeriod().getEndDate());
                     d.setIsActive(c.getPeriod().isActive());
-                    d.setOrderNo(c.getOrderNo());
                     return d;
                 })
                 .toList();
@@ -303,7 +294,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setTeamComp(p.getTeamComp());
                     d.setRole(p.getRole());
                     d.setAchievement(p.getAchievement());
-                    d.setOrderNo(p.getOrderNo());
                     // Process の各フラグをセット
                     d.setRequirements(p.getProcess().isRequirements());
                     d.setBasicDesign(p.getProcess().isBasicDesign());
@@ -346,7 +336,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setResumeId(resumeId);
                     d.setName(c.getName());
                     d.setDate(c.getDate());
-                    d.setOrderNo(c.getOrderNo());
                     return d;
                 })
                 .toList();
@@ -362,7 +351,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setOverview(pf.getOverview());
                     d.setTechStack(pf.getTechStack());
                     d.setLink(pf.getLink().getValue());
-                    d.setOrderNo(pf.getOrderNo());
                     return d;
                 })
                 .toList();
@@ -376,7 +364,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setResumeId(resumeId);
                     d.setName(sl.getName());
                     d.setLink(sl.getLink().getValue());
-                    d.setOrderNo(sl.getOrderNo());
                     return d;
                 })
                 .toList();
@@ -390,7 +377,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setResumeId(resumeId);
                     d.setTitle(sp.getTitle());
                     d.setContent(sp.getContent());
-                    d.setOrderNo(sp.getOrderNo());
                     return d;
                 })
                 .toList();

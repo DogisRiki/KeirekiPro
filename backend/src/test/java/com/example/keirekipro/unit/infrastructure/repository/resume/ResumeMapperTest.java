@@ -74,26 +74,11 @@ class ResumeMapperTest {
     }
 
     @Test
-    @DisplayName("selectAllByUserId_複数の職務経歴書が存在する場合、各DTOの全フィールドが正しくマッピングされ、order_no順で返る")
+    @DisplayName("selectAllByUserId_複数の職務経歴書が存在する場合、各DTOの全フィールドが正しくマッピングされる")
     void test2() {
         // ユーザー作成
         userMapper.upsertUser(createUserDto());
 
-        // 挿入：orderNo=2のResume
-        ResumeDto dto2 = createResumeDto(
-                RESUME_ID_2,
-                USER_ID,
-                NAME_2,
-                DATE_2,
-                LAST_NAME_2,
-                FIRST_NAME_2,
-                AUTO_SAVE_2,
-                CREATED,
-                UPDATED,
-                2);
-        resumeMapper.upsert(dto2);
-
-        // 挿入：orderNo=1のResume
         ResumeDto dto1 = createResumeDto(
                 RESUME_ID_1,
                 USER_ID,
@@ -103,14 +88,24 @@ class ResumeMapperTest {
                 FIRST_NAME_1,
                 AUTO_SAVE_1,
                 CREATED,
-                UPDATED,
-                1);
+                UPDATED);
         resumeMapper.upsert(dto1);
+
+        ResumeDto dto2 = createResumeDto(
+                RESUME_ID_2,
+                USER_ID,
+                NAME_2,
+                DATE_2,
+                LAST_NAME_2,
+                FIRST_NAME_2,
+                AUTO_SAVE_2,
+                CREATED,
+                UPDATED);
+        resumeMapper.upsert(dto2);
 
         List<ResumeDto> list = resumeMapper.selectAllByUserId(USER_ID);
         assertThat(list).hasSize(2);
 
-        // 先頭はorderNo=1のdto1
         ResumeDto first = list.get(0);
         assertThat(first.getId()).isEqualTo(RESUME_ID_1);
         assertThat(first.getUserId()).isEqualTo(USER_ID);
@@ -121,9 +116,7 @@ class ResumeMapperTest {
         assertThat(first.getAutoSaveEnabled()).isEqualTo(AUTO_SAVE_1);
         assertThat(first.getCreatedAt()).isEqualTo(CREATED);
         assertThat(first.getUpdatedAt()).isEqualTo(UPDATED);
-        assertThat(first.getOrderNo()).isEqualTo(1);
 
-        // 次はorderNo=2のdto2
         ResumeDto second = list.get(1);
         assertThat(second.getId()).isEqualTo(RESUME_ID_2);
         assertThat(second.getUserId()).isEqualTo(USER_ID);
@@ -134,7 +127,6 @@ class ResumeMapperTest {
         assertThat(second.getAutoSaveEnabled()).isEqualTo(AUTO_SAVE_2);
         assertThat(second.getCreatedAt()).isEqualTo(CREATED);
         assertThat(second.getUpdatedAt()).isEqualTo(UPDATED);
-        assertThat(second.getOrderNo()).isEqualTo(2);
     }
 
     @Test
@@ -152,8 +144,7 @@ class ResumeMapperTest {
                 FIRST_NAME_1,
                 AUTO_SAVE_1,
                 CREATED,
-                UPDATED,
-                10);
+                UPDATED);
         resumeMapper.upsert(dto);
 
         Optional<ResumeDto> opt = resumeMapper.selectByResumeId(RESUME_ID_1);
@@ -168,7 +159,6 @@ class ResumeMapperTest {
         assertThat(loaded.getAutoSaveEnabled()).isEqualTo(AUTO_SAVE_1);
         assertThat(loaded.getCreatedAt()).isEqualTo(CREATED);
         assertThat(loaded.getUpdatedAt()).isEqualTo(UPDATED);
-        assertThat(loaded.getOrderNo()).isEqualTo(10);
     }
 
     @Test
@@ -197,8 +187,7 @@ class ResumeMapperTest {
                 "NewFirst",
                 true,
                 CREATED,
-                UPDATED,
-                5);
+                UPDATED);
         resumeMapper.upsert(dto);
 
         // 検証
@@ -214,7 +203,6 @@ class ResumeMapperTest {
         assertThat(loaded.getAutoSaveEnabled()).isTrue();
         assertThat(loaded.getCreatedAt()).isEqualTo(CREATED);
         assertThat(loaded.getUpdatedAt()).isEqualTo(UPDATED);
-        assertThat(loaded.getOrderNo()).isEqualTo(5);
     }
 
     @Test
@@ -233,8 +221,7 @@ class ResumeMapperTest {
                 "OrigFirst",
                 true,
                 CREATED,
-                UPDATED,
-                10);
+                UPDATED);
         resumeMapper.upsert(original);
 
         // 更新用DTO
@@ -248,8 +235,7 @@ class ResumeMapperTest {
                 "UpdFirst",
                 false,
                 CREATED,
-                newUpdated,
-                20);
+                newUpdated);
         resumeMapper.upsert(updated);
 
         // 検証
@@ -265,7 +251,6 @@ class ResumeMapperTest {
         assertThat(loaded2.getLastName()).isEqualTo("UpdLast");
         assertThat(loaded2.getFirstName()).isEqualTo("UpdFirst");
         assertThat(loaded2.getAutoSaveEnabled()).isFalse();
-        assertThat(loaded2.getOrderNo()).isEqualTo(20);
     }
 
     @Test
@@ -284,8 +269,7 @@ class ResumeMapperTest {
                 "DelFirst",
                 true,
                 CREATED,
-                UPDATED,
-                1);
+                UPDATED);
         resumeMapper.upsert(dto);
 
         // 削除実行
@@ -303,7 +287,15 @@ class ResumeMapperTest {
         userMapper.upsertUser(createUserDto());
         // 親レコードのみ登録
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         List<CareerDto> list = resumeMapper.selectCareersByResumeId(RESUME_ID_1);
@@ -316,7 +308,15 @@ class ResumeMapperTest {
         userMapper.upsertUser(createUserDto());
         // 親レコード登録
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID careerId = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
@@ -326,8 +326,7 @@ class ResumeMapperTest {
                 "CompanyX",
                 YearMonth.of(2024, 1),
                 YearMonth.of(2024, 12),
-                true,
-                1);
+                true);
         resumeMapper.insertCareer(career);
 
         List<CareerDto> list = resumeMapper.selectCareersByResumeId(RESUME_ID_1);
@@ -338,7 +337,6 @@ class ResumeMapperTest {
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2024, 1));
         assertThat(loaded.getEndDate()).isEqualTo(YearMonth.of(2024, 12));
         assertThat(loaded.getIsActive()).isTrue();
-        assertThat(loaded.getOrderNo()).isEqualTo(1);
     }
 
     @Test
@@ -347,7 +345,15 @@ class ResumeMapperTest {
         userMapper.upsertUser(createUserDto());
         // 親レコード登録
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID careerId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
@@ -358,8 +364,7 @@ class ResumeMapperTest {
                 "OldCompany",
                 YearMonth.of(2023, 2),
                 YearMonth.of(2023, 8),
-                false,
-                5);
+                false);
         resumeMapper.insertCareer(original);
 
         // 更新
@@ -369,8 +374,7 @@ class ResumeMapperTest {
                 "NewCompany",
                 YearMonth.of(2023, 3),
                 YearMonth.of(2023, 9),
-                true,
-                10);
+                true);
         resumeMapper.updateCareer(updated);
 
         List<CareerDto> list = resumeMapper.selectCareersByResumeId(RESUME_ID_1);
@@ -380,7 +384,6 @@ class ResumeMapperTest {
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2023, 3));
         assertThat(loaded.getEndDate()).isEqualTo(YearMonth.of(2023, 9));
         assertThat(loaded.getIsActive()).isTrue();
-        assertThat(loaded.getOrderNo()).isEqualTo(10);
     }
 
     @Test
@@ -389,7 +392,15 @@ class ResumeMapperTest {
         userMapper.upsertUser(createUserDto());
         // 親レコード登録
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID careerId = UUID.fromString("aaaaaaaa-0000-0000-0000-aaaaaaaa0000");
@@ -399,8 +410,7 @@ class ResumeMapperTest {
                 "DelCompany",
                 YearMonth.of(2022, 5),
                 YearMonth.of(2022, 10),
-                false,
-                2);
+                false);
         resumeMapper.insertCareer(career);
 
         // 削除実行
@@ -416,14 +426,32 @@ class ResumeMapperTest {
         userMapper.upsertUser(createUserDto());
         // 親レコード登録
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         // 複数挿入
         resumeMapper.insertCareer(createCareerDto(
-                UUID.randomUUID(), RESUME_ID_1, "C1", YearMonth.of(2021, 1), YearMonth.of(2021, 6), true, 1));
+                UUID.randomUUID(),
+                RESUME_ID_1,
+                "C1",
+                YearMonth.of(2021, 1),
+                YearMonth.of(2021, 6),
+                true));
         resumeMapper.insertCareer(createCareerDto(
-                UUID.randomUUID(), RESUME_ID_1, "C2", YearMonth.of(2021, 7), YearMonth.of(2021, 12), false, 2));
+                UUID.randomUUID(),
+                RESUME_ID_1,
+                "C2",
+                YearMonth.of(2021, 7),
+                YearMonth.of(2021, 12),
+                false));
 
         // 全削除
         resumeMapper.deleteCareersByResumeId(RESUME_ID_1);
@@ -439,7 +467,15 @@ class ResumeMapperTest {
         userMapper.upsertUser(createUserDto());
         // 親レコードのみ登録
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
@@ -451,7 +487,15 @@ class ResumeMapperTest {
     void test14() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID projectId = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -477,8 +521,7 @@ class ResumeMapperTest {
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                1);
+                Collections.<String>emptyList(), Collections.<String>emptyList());
         resumeMapper.insertProject(project);
 
         List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
@@ -494,7 +537,6 @@ class ResumeMapperTest {
         assertThat(loaded.getTeamComp()).isEqualTo("Team");
         assertThat(loaded.getRole()).isEqualTo("Role");
         assertThat(loaded.getAchievement()).isEqualTo("Achievement");
-        assertThat(loaded.getOrderNo()).isEqualTo(1);
     }
 
     @Test
@@ -502,7 +544,15 @@ class ResumeMapperTest {
     void test15() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID projectId = UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -529,8 +579,7 @@ class ResumeMapperTest {
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                5);
+                Collections.<String>emptyList(), Collections.<String>emptyList());
         resumeMapper.insertProject(original);
 
         // 更新
@@ -556,8 +605,7 @@ class ResumeMapperTest {
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                10);
+                Collections.<String>emptyList(), Collections.<String>emptyList());
         resumeMapper.updateProject(updated);
 
         List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
@@ -572,7 +620,6 @@ class ResumeMapperTest {
         assertThat(loaded.getTeamComp()).isEqualTo("NewTeam");
         assertThat(loaded.getRole()).isEqualTo("NewRole");
         assertThat(loaded.getAchievement()).isEqualTo("NewAch");
-        assertThat(loaded.getOrderNo()).isEqualTo(10);
     }
 
     @Test
@@ -580,7 +627,15 @@ class ResumeMapperTest {
     void test16() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID projectId = UUID.fromString("33333333-3333-3333-3333-333333333333");
@@ -606,8 +661,7 @@ class ResumeMapperTest {
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                2);
+                Collections.<String>emptyList(), Collections.<String>emptyList());
         resumeMapper.insertProject(project);
 
         resumeMapper.deleteProject(projectId);
@@ -621,7 +675,15 @@ class ResumeMapperTest {
     void test17() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         // 複数挿入
@@ -639,8 +701,7 @@ class ResumeMapperTest {
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                1));
+                Collections.<String>emptyList(), Collections.<String>emptyList()));
         resumeMapper.insertProject(createProjectDto(
                 UUID.randomUUID(), RESUME_ID_1,
                 "P2", YearMonth.of(2020, 7), YearMonth.of(2020, 12), false,
@@ -655,8 +716,7 @@ class ResumeMapperTest {
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
                 Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                2));
+                Collections.<String>emptyList(), Collections.<String>emptyList()));
 
         resumeMapper.deleteProjectsByResumeId(RESUME_ID_1);
 
@@ -669,7 +729,15 @@ class ResumeMapperTest {
     void test18() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         List<CertificationDto> list = resumeMapper.selectCertificationsByResumeId(RESUME_ID_1);
@@ -681,7 +749,15 @@ class ResumeMapperTest {
     void test19() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID certId = UUID.fromString("55555555-5555-5555-5555-555555555555");
@@ -689,8 +765,7 @@ class ResumeMapperTest {
                 certId,
                 RESUME_ID_1,
                 "CertName",
-                YearMonth.of(2021, 1),
-                1);
+                YearMonth.of(2021, 1));
         resumeMapper.insertCertification(cert);
 
         List<CertificationDto> list = resumeMapper.selectCertificationsByResumeId(RESUME_ID_1);
@@ -699,7 +774,6 @@ class ResumeMapperTest {
         assertThat(loaded.getId()).isEqualTo(certId);
         assertThat(loaded.getName()).isEqualTo("CertName");
         assertThat(loaded.getDate()).isEqualTo(YearMonth.of(2021, 1));
-        assertThat(loaded.getOrderNo()).isEqualTo(1);
     }
 
     @Test
@@ -707,7 +781,15 @@ class ResumeMapperTest {
     void test20() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID certId = UUID.fromString("66666666-6666-6666-6666-666666666666");
@@ -715,16 +797,14 @@ class ResumeMapperTest {
                 certId,
                 RESUME_ID_1,
                 "OldCert",
-                YearMonth.of(2020, 1),
-                1);
+                YearMonth.of(2020, 1));
         resumeMapper.insertCertification(original);
 
         CertificationDto updated = createCertificationDto(
                 certId,
                 RESUME_ID_1,
                 "NewCert",
-                YearMonth.of(2020, 2),
-                2);
+                YearMonth.of(2020, 2));
         resumeMapper.updateCertification(updated);
 
         List<CertificationDto> list = resumeMapper.selectCertificationsByResumeId(RESUME_ID_1);
@@ -732,7 +812,6 @@ class ResumeMapperTest {
         CertificationDto loaded = list.get(0);
         assertThat(loaded.getName()).isEqualTo("NewCert");
         assertThat(loaded.getDate()).isEqualTo(YearMonth.of(2020, 2));
-        assertThat(loaded.getOrderNo()).isEqualTo(2);
     }
 
     @Test
@@ -740,7 +819,15 @@ class ResumeMapperTest {
     void test21() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID certId = UUID.fromString("77777777-7777-7777-7777-777777777777");
@@ -748,8 +835,7 @@ class ResumeMapperTest {
                 certId,
                 RESUME_ID_1,
                 "ToDelete",
-                YearMonth.of(2019, 1),
-                1);
+                YearMonth.of(2019, 1));
         resumeMapper.insertCertification(cert);
 
         resumeMapper.deleteCertification(certId);
@@ -763,13 +849,21 @@ class ResumeMapperTest {
     void test22() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         resumeMapper.insertCertification(createCertificationDto(
-                UUID.randomUUID(), RESUME_ID_1, "C1", YearMonth.of(2018, 1), 1));
+                UUID.randomUUID(), RESUME_ID_1, "C1", YearMonth.of(2018, 1)));
         resumeMapper.insertCertification(createCertificationDto(
-                UUID.randomUUID(), RESUME_ID_1, "C2", YearMonth.of(2018, 2), 2));
+                UUID.randomUUID(), RESUME_ID_1, "C2", YearMonth.of(2018, 2)));
 
         resumeMapper.deleteCertificationsByResumeId(RESUME_ID_1);
 
@@ -782,7 +876,15 @@ class ResumeMapperTest {
     void test23() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         List<PortfolioDto> list = resumeMapper.selectPortfoliosByResumeId(RESUME_ID_1);
@@ -794,7 +896,15 @@ class ResumeMapperTest {
     void test24() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID portId = UUID.fromString("88888888-8888-8888-8888-888888888888");
@@ -804,8 +914,7 @@ class ResumeMapperTest {
                 "PortName",
                 "PortOverview",
                 "TechStack",
-                "http://link",
-                1);
+                "http://link");
         resumeMapper.insertPortfolio(port);
 
         List<PortfolioDto> list = resumeMapper.selectPortfoliosByResumeId(RESUME_ID_1);
@@ -816,7 +925,6 @@ class ResumeMapperTest {
         assertThat(loaded.getOverview()).isEqualTo("PortOverview");
         assertThat(loaded.getTechStack()).isEqualTo("TechStack");
         assertThat(loaded.getLink()).isEqualTo("http://link");
-        assertThat(loaded.getOrderNo()).isEqualTo(1);
     }
 
     @Test
@@ -824,7 +932,15 @@ class ResumeMapperTest {
     void test25() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID portId = UUID.fromString("99999999-9999-9999-9999-999999999999");
@@ -834,8 +950,7 @@ class ResumeMapperTest {
                 "OldName",
                 "OldOv",
                 "OldTech",
-                "http://old",
-                1);
+                "http://old");
         resumeMapper.insertPortfolio(original);
 
         PortfolioDto updated = createPortfolioDto(
@@ -844,8 +959,7 @@ class ResumeMapperTest {
                 "NewName",
                 "NewOv",
                 "NewTech",
-                "http://new",
-                2);
+                "http://new");
         resumeMapper.updatePortfolio(updated);
 
         List<PortfolioDto> list = resumeMapper.selectPortfoliosByResumeId(RESUME_ID_1);
@@ -855,7 +969,6 @@ class ResumeMapperTest {
         assertThat(loaded.getOverview()).isEqualTo("NewOv");
         assertThat(loaded.getTechStack()).isEqualTo("NewTech");
         assertThat(loaded.getLink()).isEqualTo("http://new");
-        assertThat(loaded.getOrderNo()).isEqualTo(2);
     }
 
     @Test
@@ -863,7 +976,15 @@ class ResumeMapperTest {
     void test26() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                AUTO_SAVE_1,
+                CREATED,
+                UPDATED);
         resumeMapper.upsert(resume);
 
         UUID portId = UUID.fromString("aaaaaaaa-1111-2222-3333-aaaaaaaa1111");
@@ -873,8 +994,7 @@ class ResumeMapperTest {
                 "DelName",
                 "DelOv",
                 "DelTech",
-                "http://del",
-                1);
+                "http://del");
         resumeMapper.insertPortfolio(port);
 
         resumeMapper.deletePortfolio(portId);
@@ -888,13 +1008,13 @@ class ResumeMapperTest {
     void test27() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         resumeMapper.insertPortfolio(createPortfolioDto(
-                UUID.randomUUID(), RESUME_ID_1, "P1", "Ov1", "T1", "L1", 1));
+                UUID.randomUUID(), RESUME_ID_1, "P1", "Ov1", "T1", "L1"));
         resumeMapper.insertPortfolio(createPortfolioDto(
-                UUID.randomUUID(), RESUME_ID_1, "P2", "Ov2", "T2", "L2", 2));
+                UUID.randomUUID(), RESUME_ID_1, "P2", "Ov2", "T2", "L2"));
 
         resumeMapper.deletePortfoliosByResumeId(RESUME_ID_1);
 
@@ -907,7 +1027,7 @@ class ResumeMapperTest {
     void test28() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
@@ -915,11 +1035,11 @@ class ResumeMapperTest {
     }
 
     @Test
-    @DisplayName("insertSocialLink_ソーシャルリンクを挿入後、selectSocialLinksByResumeIdでid, name, link, orderNoが取得できる")
+    @DisplayName("insertSocialLink_ソーシャルリンクを挿入後、selectSocialLinksByResumeIdで各フィールドが取得できる")
     void test29() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("aaaaaaaa-1234-1234-1234-aaaaaaaa1234");
@@ -927,8 +1047,7 @@ class ResumeMapperTest {
                 linkId,
                 RESUME_ID_1,
                 "LinkedIn",
-                "https://linkedin.com/in/test",
-                1);
+                "https://linkedin.com/in/test");
         resumeMapper.insertSocialLink(link);
 
         List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
@@ -937,15 +1056,14 @@ class ResumeMapperTest {
         assertThat(loaded.getId()).isEqualTo(linkId);
         assertThat(loaded.getName()).isEqualTo("LinkedIn");
         assertThat(loaded.getLink()).isEqualTo("https://linkedin.com/in/test");
-        assertThat(loaded.getOrderNo()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("updateSocialLink_既存のソーシャルリンクを更新すると、各フィールド(name, link, orderNo)が反映される")
+    @DisplayName("updateSocialLink_既存のソーシャルリンクを更新すると、各フィールドが反映される")
     void test30() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("bbbbbbbb-2345-2345-2345-bbbbbbbb2345");
@@ -953,16 +1071,14 @@ class ResumeMapperTest {
                 linkId,
                 RESUME_ID_1,
                 "GitHub",
-                "https://github.com/test",
-                1);
+                "https://github.com/test");
         resumeMapper.insertSocialLink(original);
 
         SocialLinkDto updated = createSocialLinkDto(
                 linkId,
                 RESUME_ID_1,
                 "GitHubUpdated",
-                "https://github.com/test-updated",
-                2);
+                "https://github.com/test-updated");
         resumeMapper.updateSocialLink(updated);
 
         List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
@@ -970,7 +1086,6 @@ class ResumeMapperTest {
         SocialLinkDto loaded = list.get(0);
         assertThat(loaded.getName()).isEqualTo("GitHubUpdated");
         assertThat(loaded.getLink()).isEqualTo("https://github.com/test-updated");
-        assertThat(loaded.getOrderNo()).isEqualTo(2);
     }
 
     @Test
@@ -978,7 +1093,7 @@ class ResumeMapperTest {
     void test31() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("cccccccc-3456-3456-3456-cccccccc3456");
@@ -986,8 +1101,7 @@ class ResumeMapperTest {
                 linkId,
                 RESUME_ID_1,
                 "Twitter",
-                "https://twitter.com/test",
-                1);
+                "https://twitter.com/test");
         resumeMapper.insertSocialLink(link);
 
         resumeMapper.deleteSocialLink(linkId);
@@ -1001,13 +1115,13 @@ class ResumeMapperTest {
     void test32() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         resumeMapper.insertSocialLink(createSocialLinkDto(
-                UUID.randomUUID(), RESUME_ID_1, "Link1", "http://l1", 1));
+                UUID.randomUUID(), RESUME_ID_1, "Link1", "http://l1"));
         resumeMapper.insertSocialLink(createSocialLinkDto(
-                UUID.randomUUID(), RESUME_ID_1, "Link2", "http://l2", 2));
+                UUID.randomUUID(), RESUME_ID_1, "Link2", "http://l2"));
 
         resumeMapper.deleteSocialLinksByResumeId(RESUME_ID_1);
 
@@ -1020,7 +1134,7 @@ class ResumeMapperTest {
     void test33() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         List<SelfPromotionDto> list = resumeMapper.selectSelfPromotionsByResumeId(RESUME_ID_1);
@@ -1028,11 +1142,11 @@ class ResumeMapperTest {
     }
 
     @Test
-    @DisplayName("insertSelfPromotion_自己PRを挿入後、selectSelfPromotionsByResumeIdでid, title, content, orderNoが取得できる")
+    @DisplayName("insertSelfPromotion_自己PRを挿入後、selectSelfPromotionsByResumeIdで各フィールドが取得できる")
     void test34() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID promoId = UUID.fromString("dddddddd-4567-4567-4567-dddddddd4567");
@@ -1040,8 +1154,7 @@ class ResumeMapperTest {
                 promoId,
                 RESUME_ID_1,
                 "Title1",
-                "Content1",
-                1);
+                "Content1");
         resumeMapper.insertSelfPromotion(promo);
 
         List<SelfPromotionDto> list = resumeMapper.selectSelfPromotionsByResumeId(RESUME_ID_1);
@@ -1050,15 +1163,14 @@ class ResumeMapperTest {
         assertThat(loaded.getId()).isEqualTo(promoId);
         assertThat(loaded.getTitle()).isEqualTo("Title1");
         assertThat(loaded.getContent()).isEqualTo("Content1");
-        assertThat(loaded.getOrderNo()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("updateSelfPromotion_既存の自己PRを更新すると、各フィールド(title, content, orderNo)が反映される")
+    @DisplayName("updateSelfPromotion_既存の自己PRを更新すると、各フィールド)が反映される")
     void test35() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID promoId = UUID.fromString("eeeeeeee-5678-5678-5678-eeeeeeee5678");
@@ -1066,16 +1178,14 @@ class ResumeMapperTest {
                 promoId,
                 RESUME_ID_1,
                 "OldTitle",
-                "OldContent",
-                1);
+                "OldContent");
         resumeMapper.insertSelfPromotion(original);
 
         SelfPromotionDto updated = createSelfPromotionDto(
                 promoId,
                 RESUME_ID_1,
                 "NewTitle",
-                "NewContent",
-                2);
+                "NewContent");
         resumeMapper.updateSelfPromotion(updated);
 
         List<SelfPromotionDto> list = resumeMapper.selectSelfPromotionsByResumeId(RESUME_ID_1);
@@ -1083,7 +1193,6 @@ class ResumeMapperTest {
         SelfPromotionDto loaded = list.get(0);
         assertThat(loaded.getTitle()).isEqualTo("NewTitle");
         assertThat(loaded.getContent()).isEqualTo("NewContent");
-        assertThat(loaded.getOrderNo()).isEqualTo(2);
     }
 
     @Test
@@ -1091,7 +1200,7 @@ class ResumeMapperTest {
     void test36() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID promoId = UUID.fromString("ffffffff-6789-6789-6789-ffffffff6789");
@@ -1099,8 +1208,7 @@ class ResumeMapperTest {
                 promoId,
                 RESUME_ID_1,
                 "ToDelete",
-                "DelContent",
-                1);
+                "DelContent");
         resumeMapper.insertSelfPromotion(promo);
 
         resumeMapper.deleteSelfPromotion(promoId);
@@ -1114,13 +1222,13 @@ class ResumeMapperTest {
     void test37() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED, 1);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         resumeMapper.insertSelfPromotion(createSelfPromotionDto(
-                UUID.randomUUID(), RESUME_ID_1, "SP1", "C1", 1));
+                UUID.randomUUID(), RESUME_ID_1, "SP1", "C1"));
         resumeMapper.insertSelfPromotion(createSelfPromotionDto(
-                UUID.randomUUID(), RESUME_ID_1, "SP2", "C2", 2));
+                UUID.randomUUID(), RESUME_ID_1, "SP2", "C2"));
 
         resumeMapper.deleteSelfPromotionsByResumeId(RESUME_ID_1);
 
@@ -1137,8 +1245,7 @@ class ResumeMapperTest {
             String firstName,
             Boolean autoSaveEnabled,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt,
-            Integer orderNo) {
+            LocalDateTime updatedAt) {
         ResumeDto dto = new ResumeDto();
         dto.setId(id);
         dto.setUserId(userId);
@@ -1149,7 +1256,6 @@ class ResumeMapperTest {
         dto.setAutoSaveEnabled(autoSaveEnabled);
         dto.setCreatedAt(createdAt);
         dto.setUpdatedAt(updatedAt);
-        dto.setOrderNo(orderNo);
 
         // 子リストは空リストで初期化
         dto.setCareers(Collections.emptyList());
@@ -1167,8 +1273,7 @@ class ResumeMapperTest {
             String companyName,
             YearMonth startDate,
             YearMonth endDate,
-            Boolean isActive,
-            Integer orderNo) {
+            Boolean isActive) {
         CareerDto d = new CareerDto();
         d.setId(id);
         d.setResumeId(resumeId);
@@ -1176,7 +1281,6 @@ class ResumeMapperTest {
         d.setStartDate(startDate);
         d.setEndDate(endDate);
         d.setIsActive(isActive);
-        d.setOrderNo(orderNo);
         return d;
     }
 
@@ -1218,8 +1322,7 @@ class ResumeMapperTest {
             List<String> communicationTools,
             List<String> documentationTools,
             List<String> apiDevelopmentTools,
-            List<String> designTools,
-            Integer orderNo) {
+            List<String> designTools) {
         ProjectDto d = new ProjectDto();
         d.setId(id);
         d.setResumeId(resumeId);
@@ -1259,7 +1362,6 @@ class ResumeMapperTest {
         d.setDocumentationTools(documentationTools);
         d.setApiDevelopmentTools(apiDevelopmentTools);
         d.setDesignTools(designTools);
-        d.setOrderNo(orderNo);
         return d;
     }
 
@@ -1267,14 +1369,12 @@ class ResumeMapperTest {
             UUID id,
             UUID resumeId,
             String name,
-            YearMonth date,
-            Integer orderNo) {
+            YearMonth date) {
         CertificationDto d = new CertificationDto();
         d.setId(id);
         d.setResumeId(resumeId);
         d.setName(name);
         d.setDate(date);
-        d.setOrderNo(orderNo);
         return d;
     }
 
@@ -1284,8 +1384,7 @@ class ResumeMapperTest {
             String name,
             String overview,
             String techStack,
-            String link,
-            Integer orderNo) {
+            String link) {
         PortfolioDto d = new PortfolioDto();
         d.setId(id);
         d.setResumeId(resumeId);
@@ -1293,7 +1392,6 @@ class ResumeMapperTest {
         d.setOverview(overview);
         d.setTechStack(techStack);
         d.setLink(link);
-        d.setOrderNo(orderNo);
         return d;
     }
 
@@ -1301,14 +1399,12 @@ class ResumeMapperTest {
             UUID id,
             UUID resumeId,
             String name,
-            String link,
-            Integer orderNo) {
+            String link) {
         SocialLinkDto d = new SocialLinkDto();
         d.setId(id);
         d.setResumeId(resumeId);
         d.setName(name);
         d.setLink(link);
-        d.setOrderNo(orderNo);
         return d;
     }
 
@@ -1316,14 +1412,12 @@ class ResumeMapperTest {
             UUID id,
             UUID resumeId,
             String title,
-            String content,
-            Integer orderNo) {
+            String content) {
         SelfPromotionDto d = new SelfPromotionDto();
         d.setId(id);
         d.setResumeId(resumeId);
         d.setTitle(title);
         d.setContent(content);
-        d.setOrderNo(orderNo);
         return d;
     }
 

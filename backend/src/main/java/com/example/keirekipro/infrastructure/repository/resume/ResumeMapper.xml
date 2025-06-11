@@ -14,7 +14,6 @@
         <result property="autoSaveEnabled" column="auto_save_enabled"/>
         <result property="createdAt" column="created_at" />
         <result property="updatedAt" column="updated_at" />
-        <result property="orderNo" column="order_no" />
     </resultMap>
 
     <select id="selectAllByUserId" resultMap="resumeMap" parameterType="java.util.UUID">
@@ -27,14 +26,13 @@
             first_name,
             auto_save_enabled,
             created_at,
-            updated_at,
-            order_no
+            updated_at
         FROM
             resumes
         WHERE
             user_id = #{userId}
         ORDER BY
-            order_no
+            created_at
     </select>
 
     <select id="selectByResumeId" resultMap="resumeMap" parameterType="java.util.UUID">
@@ -47,8 +45,7 @@
             first_name,
             auto_save_enabled,
             created_at,
-            updated_at,
-            order_no
+            updated_at
         FROM
             resumes
         WHERE
@@ -65,8 +62,7 @@
             first_name,
             auto_save_enabled,
             created_at,
-            updated_at,
-            order_no
+            updated_at
         )
         VALUES(
             #{id},
@@ -77,8 +73,7 @@
             #{firstName},
             #{autoSaveEnabled},
             #{createdAt},
-            #{updatedAt},
-            #{orderNo}
+            #{updatedAt}
         )
         ON  CONFLICT(
                 id
@@ -90,8 +85,7 @@
                 last_name = EXCLUDED.last_name,
                 first_name = EXCLUDED.first_name,
                 auto_save_enabled = EXCLUDED.auto_save_enabled,
-                updated_at = EXCLUDED.updated_at,
-                order_no = EXCLUDED.order_no
+                updated_at = EXCLUDED.updated_at
     </insert>
 
     <delete id="delete" parameterType="java.util.UUID">
@@ -110,14 +104,11 @@
             company_name AS companyName,
             start_date AS startDate,
             end_date AS endDate,
-            is_active AS isActive,
-            order_no AS orderNo
+            is_active AS isActive
         FROM
             careers
         WHERE
             resume_id = #{resumeId}
-        ORDER BY
-            order_no
     </select>
 
     <insert id="insertCareer" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$CareerDto">
@@ -127,8 +118,7 @@
             company_name,
             start_date,
             end_date,
-            is_active,
-            order_no
+            is_active
         )
         VALUES(
             #{dto.id},
@@ -136,8 +126,7 @@
             #{dto.companyName},
             #{dto.startDate},
             #{dto.endDate},
-            #{dto.isActive},
-            #{dto.orderNo}
+            #{dto.isActive}
         )
     </insert>
 
@@ -148,8 +137,7 @@
             company_name = #{dto.companyName},
             start_date = #{dto.startDate},
             end_date = #{dto.endDate},
-            is_active = #{dto.isActive},
-            order_no = #{dto.orderNo}
+            is_active = #{dto.isActive}
         WHERE
             id = #{dto.id}
     </update>
@@ -210,14 +198,11 @@
             communication_tools AS communicationTools,
             documentation_tools AS documentationTools,
             api_development_tools AS apiDevelopmentTools,
-            design_tools AS designTools,
-            order_no AS orderNo
+            design_tools AS designTools
         FROM
             projects
         WHERE
             resume_id = #{resumeId}
-        ORDER BY
-            order_no
     </select>
 
     <insert id="insertProject" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$ProjectDto">
@@ -259,8 +244,7 @@
             communication_tools,
             documentation_tools,
             api_development_tools,
-            design_tools,
-            order_no
+            design_tools
         )
         VALUES(
             #{dto.id},
@@ -300,8 +284,7 @@
             #{dto.communicationTools, typeHandler=stringListTypeHandler},
             #{dto.documentationTools, typeHandler=stringListTypeHandler},
             #{dto.apiDevelopmentTools, typeHandler=stringListTypeHandler},
-            #{dto.designTools, typeHandler=stringListTypeHandler},
-            #{dto.orderNo}
+            #{dto.designTools, typeHandler=stringListTypeHandler}
         )
     </insert>
 
@@ -344,8 +327,7 @@
             communication_tools = #{dto.communicationTools, typeHandler=stringListTypeHandler},
             documentation_tools = #{dto.documentationTools, typeHandler=stringListTypeHandler},
             api_development_tools = #{dto.apiDevelopmentTools, typeHandler=stringListTypeHandler},
-            design_tools = #{dto.designTools, typeHandler=stringListTypeHandler},
-            order_no = #{dto.orderNo}
+            design_tools = #{dto.designTools, typeHandler=stringListTypeHandler}
         WHERE
             id = #{dto.id}
     </update>
@@ -372,14 +354,11 @@
         SELECT
             id,
             name AS name,
-            date AS date,
-            order_no AS orderNo
+            date AS date
         FROM
             certifications
         WHERE
             resume_id = #{resumeId}
-        ORDER BY
-            order_no
     </select>
 
     <insert id="insertCertification" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$CertificationDto">
@@ -387,15 +366,13 @@
             id,
             resume_id,
             name,
-            date,
-            order_no
+            date
         )
         VALUES(
             #{dto.id},
             #{dto.resumeId},
             #{dto.name},
-            #{dto.date},
-            #{dto.orderNo}
+            #{dto.date}
         )
     </insert>
 
@@ -404,8 +381,7 @@
             certifications
         SET
             name = #{dto.name},
-            date = #{dto.date},
-            order_no = #{dto.orderNo}
+            date = #{dto.date}
         WHERE
             id = #{dto.id}
     </update>
@@ -434,14 +410,11 @@
             name AS name,
             overview AS overview,
             tech_stack AS techStack,
-            link AS link,
-            order_no AS orderNo
+            link AS link
         FROM
             portfolios
         WHERE
             resume_id = #{resumeId}
-        ORDER BY
-            order_no
     </select>
 
     <insert id="insertPortfolio" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$PortfolioDto">
@@ -451,8 +424,7 @@
             name,
             overview,
             tech_stack,
-            link,
-            order_no
+            link
         )
         VALUES(
             #{dto.id},
@@ -460,8 +432,7 @@
             #{dto.name},
             #{dto.overview},
             #{dto.techStack},
-            #{dto.link},
-            #{dto.orderNo}
+            #{dto.link}
         )
     </insert>
 
@@ -472,8 +443,7 @@
             name = #{dto.name},
             overview = #{dto.overview},
             tech_stack = #{dto.techStack},
-            link = #{dto.link},
-            order_no = #{dto.orderNo}
+            link = #{dto.link}
         WHERE
             id = #{dto.id}
     </update>
@@ -501,14 +471,11 @@
         SELECT
             id,
             name AS name,
-            link AS link,
-            order_no AS orderNo
+            link AS link
         FROM
             social_links
         WHERE
             resume_id = #{resumeId}
-        ORDER BY
-            order_no
     </select>
 
     <insert id="insertSocialLink" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SocialLinkDto">
@@ -516,15 +483,13 @@
             id,
             resume_id,
             name,
-            link,
-            order_no
+            link
         )
         VALUES(
             #{dto.id},
             #{dto.resumeId},
             #{dto.name},
-            #{dto.link},
-            #{dto.orderNo}
+            #{dto.link}
         )
     </insert>
 
@@ -533,8 +498,7 @@
             social_links
         SET
             name = #{dto.name},
-            link = #{dto.link},
-            order_no = #{dto.orderNo}
+            link = #{dto.link}
         WHERE
             id = #{dto.id}
     </update>
@@ -561,14 +525,11 @@
         SELECT
             id,
             title AS title,
-            content AS content,
-            order_no AS orderNo
+            content AS content
         FROM
             self_promotions
         WHERE
             resume_id = #{resumeId}
-        ORDER BY
-            order_no
     </select>
 
     <insert id="insertSelfPromotion" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SelfPromotionDto">
@@ -576,15 +537,13 @@
             id,
             resume_id,
             title,
-            content,
-            order_no
+            content
         )
         VALUES(
             #{dto.id},
             #{dto.resumeId},
             #{dto.title},
-            #{dto.content},
-            #{dto.orderNo}
+            #{dto.content}
         )
     </insert>
 
@@ -593,8 +552,7 @@
             self_promotions
         SET
             title = #{dto.title},
-            content = #{dto.content},
-            order_no = #{dto.orderNo}
+            content = #{dto.content}
         WHERE
             id = #{dto.id}
     </update>
