@@ -20,7 +20,6 @@ public class ResumeDto {
     private LocalDate date;
     private String lastName;
     private String firstName;
-    private Boolean autoSaveEnabled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<CareerDto> careers;

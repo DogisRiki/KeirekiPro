@@ -236,7 +236,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
                 ResumeName.create(notification, dto.getName()),
                 dto.getDate(),
                 FullName.create(notification, dto.getLastName(), dto.getFirstName()),
-                dto.getAutoSaveEnabled(),
                 dto.getCreatedAt(),
                 dto.getUpdatedAt(),
                 careers,
@@ -258,7 +257,6 @@ public class MyBatisResumeRepository implements ResumeRepository {
         dto.setDate(resume.getDate());
         dto.setLastName(resume.getFullName().getLastName());
         dto.setFirstName(resume.getFullName().getFirstName());
-        dto.setAutoSaveEnabled(resume.isAutoSaveEnabled());
         dto.setCreatedAt(resume.getCreatedAt());
         dto.setUpdatedAt(resume.getUpdatedAt());
 

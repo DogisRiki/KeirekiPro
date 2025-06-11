@@ -18,7 +18,6 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     class "職務経歴書(Resume)" as Resume << (R,red) RootEntity >> {
         - 職務経歴書ID: id
         - 日付: date
-        - 自動保存設定: autoSaveEnabled
         - 作成日時: createdAt
         - 更新日時: updatedAt
     }

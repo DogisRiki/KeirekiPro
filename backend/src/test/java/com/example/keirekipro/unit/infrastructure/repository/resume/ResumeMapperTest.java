@@ -58,8 +58,6 @@ class ResumeMapperTest {
     private static final String FIRST_NAME_1 = "FirstOne";
     private static final String LAST_NAME_2 = "LastTwo";
     private static final String FIRST_NAME_2 = "FirstTwo";
-    private static final Boolean AUTO_SAVE_1 = true;
-    private static final Boolean AUTO_SAVE_2 = false;
     private static final LocalDateTime CREATED = LocalDateTime.of(2025, 1, 1, 0, 0);
     private static final LocalDateTime UPDATED = LocalDateTime.of(2025, 1, 2, 0, 0);
 
@@ -86,7 +84,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(dto1);
@@ -98,7 +95,6 @@ class ResumeMapperTest {
                 DATE_2,
                 LAST_NAME_2,
                 FIRST_NAME_2,
-                AUTO_SAVE_2,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(dto2);
@@ -113,7 +109,6 @@ class ResumeMapperTest {
         assertThat(first.getDate()).isEqualTo(DATE_1);
         assertThat(first.getLastName()).isEqualTo(LAST_NAME_1);
         assertThat(first.getFirstName()).isEqualTo(FIRST_NAME_1);
-        assertThat(first.getAutoSaveEnabled()).isEqualTo(AUTO_SAVE_1);
         assertThat(first.getCreatedAt()).isEqualTo(CREATED);
         assertThat(first.getUpdatedAt()).isEqualTo(UPDATED);
 
@@ -124,7 +119,6 @@ class ResumeMapperTest {
         assertThat(second.getDate()).isEqualTo(DATE_2);
         assertThat(second.getLastName()).isEqualTo(LAST_NAME_2);
         assertThat(second.getFirstName()).isEqualTo(FIRST_NAME_2);
-        assertThat(second.getAutoSaveEnabled()).isEqualTo(AUTO_SAVE_2);
         assertThat(second.getCreatedAt()).isEqualTo(CREATED);
         assertThat(second.getUpdatedAt()).isEqualTo(UPDATED);
     }
@@ -142,7 +136,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(dto);
@@ -156,7 +149,6 @@ class ResumeMapperTest {
         assertThat(loaded.getDate()).isEqualTo(DATE_1);
         assertThat(loaded.getLastName()).isEqualTo(LAST_NAME_1);
         assertThat(loaded.getFirstName()).isEqualTo(FIRST_NAME_1);
-        assertThat(loaded.getAutoSaveEnabled()).isEqualTo(AUTO_SAVE_1);
         assertThat(loaded.getCreatedAt()).isEqualTo(CREATED);
         assertThat(loaded.getUpdatedAt()).isEqualTo(UPDATED);
     }
@@ -185,7 +177,6 @@ class ResumeMapperTest {
                 LocalDate.of(2025, 3, 3),
                 "NewLast",
                 "NewFirst",
-                true,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(dto);
@@ -200,7 +191,6 @@ class ResumeMapperTest {
         assertThat(loaded.getDate()).isEqualTo(LocalDate.of(2025, 3, 3));
         assertThat(loaded.getLastName()).isEqualTo("NewLast");
         assertThat(loaded.getFirstName()).isEqualTo("NewFirst");
-        assertThat(loaded.getAutoSaveEnabled()).isTrue();
         assertThat(loaded.getCreatedAt()).isEqualTo(CREATED);
         assertThat(loaded.getUpdatedAt()).isEqualTo(UPDATED);
     }
@@ -219,7 +209,6 @@ class ResumeMapperTest {
                 LocalDate.of(2025, 4, 4),
                 "OrigLast",
                 "OrigFirst",
-                true,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(original);
@@ -233,7 +222,6 @@ class ResumeMapperTest {
                 LocalDate.of(2025, 5, 5),
                 "UpdLast",
                 "UpdFirst",
-                false,
                 CREATED,
                 newUpdated);
         resumeMapper.upsert(updated);
@@ -250,7 +238,6 @@ class ResumeMapperTest {
         assertThat(loaded2.getDate()).isEqualTo(LocalDate.of(2025, 5, 5));
         assertThat(loaded2.getLastName()).isEqualTo("UpdLast");
         assertThat(loaded2.getFirstName()).isEqualTo("UpdFirst");
-        assertThat(loaded2.getAutoSaveEnabled()).isFalse();
     }
 
     @Test
@@ -267,7 +254,6 @@ class ResumeMapperTest {
                 LocalDate.of(2025, 6, 6),
                 "DelLast",
                 "DelFirst",
-                true,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(dto);
@@ -293,7 +279,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -314,7 +299,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -351,7 +335,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -398,7 +381,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -432,7 +414,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -473,7 +454,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -493,7 +473,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -550,7 +529,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -633,7 +611,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -681,7 +658,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -735,7 +711,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -755,7 +730,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -787,7 +761,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -825,7 +798,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -855,7 +827,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -882,7 +853,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -902,7 +872,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -938,7 +907,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -982,7 +950,6 @@ class ResumeMapperTest {
                 DATE_1,
                 LAST_NAME_1,
                 FIRST_NAME_1,
-                AUTO_SAVE_1,
                 CREATED,
                 UPDATED);
         resumeMapper.upsert(resume);
@@ -1008,7 +975,7 @@ class ResumeMapperTest {
     void test27() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         resumeMapper.insertPortfolio(createPortfolioDto(
@@ -1027,7 +994,7 @@ class ResumeMapperTest {
     void test28() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
@@ -1039,7 +1006,7 @@ class ResumeMapperTest {
     void test29() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("aaaaaaaa-1234-1234-1234-aaaaaaaa1234");
@@ -1063,7 +1030,7 @@ class ResumeMapperTest {
     void test30() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("bbbbbbbb-2345-2345-2345-bbbbbbbb2345");
@@ -1093,7 +1060,7 @@ class ResumeMapperTest {
     void test31() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("cccccccc-3456-3456-3456-cccccccc3456");
@@ -1115,7 +1082,7 @@ class ResumeMapperTest {
     void test32() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         resumeMapper.insertSocialLink(createSocialLinkDto(
@@ -1134,7 +1101,7 @@ class ResumeMapperTest {
     void test33() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         List<SelfPromotionDto> list = resumeMapper.selectSelfPromotionsByResumeId(RESUME_ID_1);
@@ -1146,7 +1113,7 @@ class ResumeMapperTest {
     void test34() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID promoId = UUID.fromString("dddddddd-4567-4567-4567-dddddddd4567");
@@ -1170,7 +1137,7 @@ class ResumeMapperTest {
     void test35() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID promoId = UUID.fromString("eeeeeeee-5678-5678-5678-eeeeeeee5678");
@@ -1200,7 +1167,7 @@ class ResumeMapperTest {
     void test36() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         UUID promoId = UUID.fromString("ffffffff-6789-6789-6789-ffffffff6789");
@@ -1222,7 +1189,7 @@ class ResumeMapperTest {
     void test37() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
-                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, AUTO_SAVE_1, CREATED, UPDATED);
+                RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
         resumeMapper.insertSelfPromotion(createSelfPromotionDto(
@@ -1243,7 +1210,6 @@ class ResumeMapperTest {
             LocalDate date,
             String lastName,
             String firstName,
-            Boolean autoSaveEnabled,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
         ResumeDto dto = new ResumeDto();
@@ -1253,7 +1219,6 @@ class ResumeMapperTest {
         dto.setDate(date);
         dto.setLastName(lastName);
         dto.setFirstName(firstName);
-        dto.setAutoSaveEnabled(autoSaveEnabled);
         dto.setCreatedAt(createdAt);
         dto.setUpdatedAt(updatedAt);
 

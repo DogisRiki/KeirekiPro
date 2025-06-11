@@ -95,7 +95,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(r.getDate()).isEqualTo(dto.getDate());
         assertThat(r.getFullName().getLastName()).isEqualTo(dto.getLastName());
         assertThat(r.getFullName().getFirstName()).isEqualTo(dto.getFirstName());
-        assertThat(r.isAutoSaveEnabled()).isEqualTo(dto.getAutoSaveEnabled());
         assertThat(r.getCreatedAt()).isEqualTo(dto.getCreatedAt());
         assertThat(r.getUpdatedAt()).isEqualTo(dto.getUpdatedAt());
 
@@ -221,7 +220,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(r.getDate()).isEqualTo(dto.getDate());
         assertThat(r.getFullName().getLastName()).isEqualTo(dto.getLastName());
         assertThat(r.getFullName().getFirstName()).isEqualTo(dto.getFirstName());
-        assertThat(r.isAutoSaveEnabled()).isEqualTo(dto.getAutoSaveEnabled());
         assertThat(r.getCreatedAt()).isEqualTo(dto.getCreatedAt());
         assertThat(r.getUpdatedAt()).isEqualTo(dto.getUpdatedAt());
 
@@ -334,7 +332,6 @@ class MyBatisResumeRepositoryTest {
         assertThat(dto.getDate()).isEqualTo(resume.getDate());
         assertThat(dto.getLastName()).isEqualTo(resume.getFullName().getLastName());
         assertThat(dto.getFirstName()).isEqualTo(resume.getFullName().getFirstName());
-        assertThat(dto.getAutoSaveEnabled()).isEqualTo(resume.isAutoSaveEnabled());
         assertThat(dto.getCreatedAt()).isEqualTo(resume.getCreatedAt());
         assertThat(dto.getUpdatedAt()).isEqualTo(resume.getUpdatedAt());
 
@@ -467,7 +464,6 @@ class MyBatisResumeRepositoryTest {
         dto.setDate(LocalDate.of(2025, 1, 1));
         dto.setLastName("Last");
         dto.setFirstName("First");
-        dto.setAutoSaveEnabled(true);
         dto.setCreatedAt(LocalDateTime.of(2025, 1, 2, 3, 4));
         dto.setUpdatedAt(LocalDateTime.of(2025, 1, 3, 4, 5));
 
@@ -640,7 +636,6 @@ class MyBatisResumeRepositoryTest {
                 ResumeName.create(notification, "Test Resume"),
                 LocalDate.of(2025, 1, 1),
                 FullName.create(notification, "Last", "First"),
-                true,
                 LocalDateTime.of(2025, 1, 2, 3, 4),
                 LocalDateTime.of(2025, 1, 3, 4, 5),
                 List.of(career),

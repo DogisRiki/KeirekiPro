@@ -52,7 +52,6 @@ class ResumeTest {
         assertThat(resume.getName()).isEqualTo(ResumeName.create(notification, "職務経歴書A"));
         assertThat(resume.getDate()).isEqualTo(LocalDate.now());
         assertThat(resume.getFullName()).isEqualTo(FullName.create(notification, "山田", "太郎"));
-        assertThat(resume.isAutoSaveEnabled()).isTrue();
         assertThat(resume.getCreatedAt()).isNotNull();
         assertThat(resume.getUpdatedAt()).isNotNull();
     }
@@ -72,7 +71,6 @@ class ResumeTest {
                     null, // 名前がnull
                     LocalDate.now(),
                     FullName.create(notification, "山田", "太郎"),
-                    true,
                     List.of(),
                     List.of(),
                     List.of(),
@@ -93,7 +91,6 @@ class ResumeTest {
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.of(2023, 1, 1),
                 FullName.create(notification, "山田", "太郎"),
-                true,
                 LocalDateTime.of(2023, 1, 1, 0, 0),
                 LocalDateTime.of(2023, 1, 2, 0, 0),
                 List.of(createSampleCareer()),
@@ -109,7 +106,6 @@ class ResumeTest {
         assertThat(resume.getName()).isEqualTo(ResumeName.create(notification, "職務経歴書A"));
         assertThat(resume.getDate()).isEqualTo(LocalDate.of(2023, 1, 1));
         assertThat(resume.getFullName()).isEqualTo(FullName.create(notification, "山田", "太郎"));
-        assertThat(resume.isAutoSaveEnabled()).isEqualTo(true);
         assertThat(resume.getCreatedAt()).isEqualTo(LocalDateTime.of(2023, 1, 1, 0, 0));
         assertThat(resume.getUpdatedAt()).isEqualTo(LocalDateTime.of(2023, 1, 2, 0, 0));
         assertThat(resume.getCareers().size()).isEqualTo(1);
@@ -141,18 +137,8 @@ class ResumeTest {
     }
 
     @Test
-    @DisplayName("自動保存設定を変更する")
-    void test6() {
-        Resume originalResume = createSampleResume();
-        boolean newAutoSaveEnabled = false;
-        Resume updatedResume = originalResume.changeAutoSaveEnabled(newAutoSaveEnabled);
-
-        assertThat(updatedResume.isAutoSaveEnabled()).isEqualTo(newAutoSaveEnabled);
-    }
-
-    @Test
     @DisplayName("正常な値で職歴を追加する")
-    void test7() {
+    void test6() {
         Resume beforeResume = createSampleResume();
         Career newCareer = Career.create("株式会社DEF",
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
@@ -164,7 +150,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("継続中の職歴と期間が重なる職歴を追加するとDomainExceptionをスローする")
-    void test8() {
+    void test7() {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
@@ -175,7 +161,6 @@ class ResumeTest {
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
-                true,
                 List.of(Career.create("株式会社ABC",
                         Period.create(notification, YearMonth.of(2024, 1), null, true))),
                 List.of(),
@@ -198,7 +183,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("同じ期間の職歴を追加するとDomainExceptionをスローする")
-    void test9() {
+    void test8() {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
@@ -218,7 +203,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("継続中の職歴が存在する状態で、継続中の職歴を追加するとDomainExceptionをスローする")
-    void test10() {
+    void test9() {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
@@ -229,7 +214,6 @@ class ResumeTest {
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
-                true,
                 List.of(Career.create("株式会社ABC",
                         Period.create(notification, YearMonth.of(2024, 1), null, true))),
                 List.of(),
@@ -252,7 +236,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("期間が重なる職歴を追加するとDomainExceptionをスローする")
-    void test11() {
+    void test10() {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
@@ -272,7 +256,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("期間が一部重なる職歴を追加するとDomainExceptionをスローする")
-    void test12() {
+    void test11() {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
@@ -292,7 +276,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("正常な値で職歴を更新する")
-    void test13() {
+    void test12() {
         Resume beforeResume = createSampleResume();
         Career newCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(), "株式会社DEF",
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
@@ -310,7 +294,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("職歴を削除する")
-    void test14() {
+    void test13() {
         Resume beforeResume = createSampleResume();
         Career newCareer = Career.create("株式会社DEF",
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
@@ -331,7 +315,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("正常な値でプロジェクトを追加する")
-    void test15() {
+    void test14() {
         Resume beforeResume = createSampleResume();
         Project newProject = createSampleProject();
         Resume afterResume = beforeResume.addProject(notification, newProject);
@@ -344,7 +328,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("職歴に存在しない会社名のプロジェクトを追加するとDomainExceptionをスローする")
-    void test16() {
+    void test15() {
         // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
         when(notification.hasErrors()).thenReturn(false).thenReturn(true);
 
@@ -364,7 +348,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("正常な値でプロジェクトを更新する")
-    void test17() {
+    void test16() {
         Resume beforeResume = createSampleResume();
 
         // 更新対象のプロジェクトを取得し、値を変更
@@ -435,7 +419,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("プロジェクトを削除する")
-    void test18() {
+    void test17() {
         Resume beforeResume = createSampleResume();
 
         // 削除対象のプロジェクトを追加
@@ -490,7 +474,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("資格を追加する")
-    void test19() {
+    void test18() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.create("応用情報技術者", YearMonth.of(2025, 02));
         Resume afterResume = beforeResume.addCertification(newCertification);
@@ -503,7 +487,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("資格を更新する")
-    void test20() {
+    void test19() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.reconstruct(beforeResume.getCertifications().get(0).getId(),
                 "応用情報技術者", YearMonth.of(2025, 02));
@@ -525,7 +509,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("資格を削除する")
-    void test21() {
+    void test20() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.create("応用情報技術者", YearMonth.of(2025, 02));
         Resume afterResume = beforeResume.addCertification(newCertification);
@@ -545,7 +529,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ポートフォリオを追加する")
-    void test22() {
+    void test21() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
                 "新しいポートフォリオ",
@@ -563,7 +547,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ポートフォリオを更新する")
-    void test23() {
+    void test22() {
         Resume beforeResume = createSampleResume();
         Portfolio updatedPortfolio = Portfolio.reconstruct(
                 beforeResume.getPortfolios().get(0).getId(),
@@ -592,7 +576,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ポートフォリオを削除する")
-    void test24() {
+    void test23() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
                 "削除対象のポートフォリオ",
@@ -617,7 +601,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ソーシャルリンクを追加する")
-    void test25() {
+    void test24() {
         Resume beforeResume = createSampleResume();
         SocialLink newSocialLink = SocialLink.create(
                 "Twitter",
@@ -633,7 +617,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ソーシャルリンクを更新する")
-    void test26() {
+    void test25() {
         Resume beforeResume = createSampleResume();
         SocialLink updatedSocialLink = SocialLink.reconstruct(
                 beforeResume.getSocialLinks().get(0).getId(),
@@ -654,7 +638,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ソーシャルリンクを削除する")
-    void test27() {
+    void test26() {
         Resume beforeResume = createSampleResume();
         SocialLink newSocialLink = SocialLink.create(
                 "Facebook",
@@ -677,7 +661,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("自己PRを追加する")
-    void test28() {
+    void test27() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
                 "新しいタイトル",
@@ -693,7 +677,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("自己PRを更新する")
-    void test29() {
+    void test28() {
         Resume beforeResume = createSampleResume();
         SelfPromotion updatedSelfPromotion = SelfPromotion.reconstruct(
                 beforeResume.getSelfPromotions().get(0).getId(),
@@ -718,7 +702,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("自己PRを削除する")
-    void test30() {
+    void test29() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
                 "削除対象のタイトル",
@@ -741,7 +725,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("氏名を変更する")
-    void test31() {
+    void test30() {
         Resume originalResume = createSampleResume();
         FullName newFullName = FullName.create(notification, "変更", "しました");
         Resume updatedResume = originalResume.ChangeFullName(newFullName);
@@ -760,7 +744,6 @@ class ResumeTest {
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
-                true,
                 List.of(createSampleCareer()),
                 List.of(createSampleProject()),
                 List.of(createSampleCertification()),

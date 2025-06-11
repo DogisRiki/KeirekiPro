@@ -99,7 +99,6 @@ class ResumeNameDuplicationCheckServiceTest {
                 ResumeName.create(notification, name),
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
-                false,
                 LocalDateTime.now(),
                 LocalDateTime.now(),
                 List.of(), // careers
