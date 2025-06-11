@@ -87,7 +87,6 @@ class LoginUseCaseTest {
         Notification n = new Notification();
         return User.reconstruct(
                 USER_ID,
-                1,
                 Email.create(n, EMAIL),
                 passwordHash,
                 false,

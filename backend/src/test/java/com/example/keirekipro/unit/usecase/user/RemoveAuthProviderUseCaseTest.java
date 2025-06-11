@@ -47,7 +47,6 @@ class RemoveAuthProviderUseCaseTest {
         AuthProvider authProvider = AuthProvider.create(notification, PROVIDER, "providerUserId");
         User user = User.reconstruct(
                 USER_ID,
-                1,
                 Email.create(notification, "test@example.com"),
                 "hashedPassword",
                 false,

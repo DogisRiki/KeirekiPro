@@ -79,7 +79,6 @@ public class MyBatisUserRepository implements UserRepository {
 
         return User.reconstruct(
                 dto.getId(),
-                1,
                 dto.getEmail() != null ? Email.create(new Notification(), dto.getEmail()) : null,
                 dto.getPassword(),
                 dto.isTwoFactorAuthEnabled(),

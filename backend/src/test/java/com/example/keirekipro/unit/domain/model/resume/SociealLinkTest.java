@@ -24,11 +24,10 @@ class SociealLinkTest {
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
         Link link = Link.create(notification, "https://example.com");
-        SocialLink sociealLink = SocialLink.create(0, "GitHub", link);
+        SocialLink sociealLink = SocialLink.create("GitHub", link);
 
         assertThat(sociealLink).isNotNull();
         assertThat(sociealLink.getId()).isNotNull();
-        assertThat(sociealLink.getOrderNo()).isEqualTo(0);
         assertThat(sociealLink.getName()).isEqualTo("GitHub");
         assertThat(sociealLink.getLink()).isEqualTo(link);
     }
@@ -38,11 +37,10 @@ class SociealLinkTest {
     void test2() {
         Link link = Link.create(notification, "https://example.com");
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        SocialLink sociealLink = SocialLink.reconstruct(id, 0, "GitHub", link);
+        SocialLink sociealLink = SocialLink.reconstruct(id, "GitHub", link);
 
         assertThat(sociealLink).isNotNull();
         assertThat(sociealLink.getId()).isEqualTo(id);
-        assertThat(sociealLink.getOrderNo()).isEqualTo(0);
         assertThat(sociealLink.getName()).isEqualTo("GitHub");
         assertThat(sociealLink.getLink()).isEqualTo(link);
     }
@@ -51,7 +49,7 @@ class SociealLinkTest {
     @DisplayName("ソーシャル名を変更する")
     void test3() {
         Link link = Link.create(notification, "https://example.com");
-        SocialLink beforeSociealLink = SocialLink.create(0, "GitHub", link);
+        SocialLink beforeSociealLink = SocialLink.create("GitHub", link);
         SocialLink afterSociealLink = beforeSociealLink.changeName("LinkedIn");
 
         assertThat(afterSociealLink.getName()).isEqualTo("LinkedIn");
@@ -61,7 +59,7 @@ class SociealLinkTest {
     @DisplayName("リンクを変更する")
     void test4() {
         Link beforeLink = Link.create(notification, "https://example.com");
-        SocialLink beforeSociealLink = SocialLink.create(0, "GitHub", beforeLink);
+        SocialLink beforeSociealLink = SocialLink.create("GitHub", beforeLink);
         Link afterLink = Link.create(notification, "https://linkedin.com");
         SocialLink afterSociealLink = beforeSociealLink.changeLink(afterLink);
 
@@ -72,7 +70,7 @@ class SociealLinkTest {
     @DisplayName("ソーシャル名、リンクを変更する")
     void test5() {
         Link beforeLink = Link.create(notification, "https://example.com");
-        SocialLink beforeSociealLink = SocialLink.create(0, "GitHub", beforeLink);
+        SocialLink beforeSociealLink = SocialLink.create("GitHub", beforeLink);
         Link afterLink = Link.create(notification, "https://linkedin.com");
         SocialLink afterSociealLink = beforeSociealLink.changeLink(afterLink).changeName("LinkedIn");
 

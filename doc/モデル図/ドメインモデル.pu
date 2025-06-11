@@ -12,7 +12,6 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         ・上記理由から、UIやDB都合の形式チェックや文字数制限バリデーションはプレゼンテーション層で行うものとする。
         【共通ルール】
         ・idはUUIDによって生成された文字列とする。
-        ・orderNoは各項目をソートするために使用するため、各リスト内でユニークでなければならない。
     end note
 
     ' -------------------------------- エンティティの定義 --------------------------------
@@ -27,7 +26,6 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     class "職歴(Career)" as Career << (E,green) Entity >> {
         - 職歴ID: id
         - 会社名: companyName
-        - 並び順: orderNo
     }
 
     class "プロジェクト(Project)" as Project << (E,green) Entity >> {
@@ -39,14 +37,12 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         - 役割: role
         - 成果: achievement
         - 作業工程: process
-        - 並び順: orderNo
     }
 
     class "資格(Certification)" as Certification << (E,green) Entity >> {
         - 資格ID: id
         - 資格名: name
         - 取得年月: date
-        - 並び順: orderNo
     }
 
     class "ポートフォリオ(Portfolio)" as Portfolio << (E,green) Entity >> {
@@ -54,20 +50,17 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         - ポートフォリオ名: name
         - ポートフォリオ概要: overview
         - 技術スタック: techStack
-        - 並び順: orderNo
     }
 
     class "ソーシャルリンク(SocialLink)" as SocialLink << (E,green) Entity >> {
         - ソーシャルリンクID: id
         - ソーシャル名: name
-        - 並び順: orderNo
     }
 
     class "自己PR(SelfPromotion)" as SelfPromotion << (E,green) Entity >> {
         - 自己PRID: id
         - タイトル: title
         - コンテンツ: content
-        - 並び順: orderNo
     }
 
     ' -------------------------------- 値オブジェクトの定義 --------------------------------

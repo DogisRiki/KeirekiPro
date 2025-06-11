@@ -77,14 +77,14 @@ public class User extends Entity {
      * 新規構築用のコンストラクタ
      */
     private User(Notification notification,
-            int orderNo,
             Email email,
             String passwordHash,
             boolean twoFactorAuthEnabled,
             Map<String, AuthProvider> authProviders,
             String profileImage,
             String username) {
-        super(orderNo);
+
+        super();
 
         // バリデーション実行
         validate(notification, email, passwordHash, authProviders);
@@ -109,7 +109,6 @@ public class User extends Entity {
      * 再構築用のコンストラクタ
      */
     private User(UUID id,
-            int orderNo,
             Email email,
             String passwordHash,
             boolean twoFactorAuthEnabled,
@@ -118,7 +117,7 @@ public class User extends Entity {
             String username,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
-        super(id, orderNo);
+        super(id);
         this.email = email;
         this.passwordHash = passwordHash;
         this.twoFactorAuthEnabled = twoFactorAuthEnabled;
@@ -134,7 +133,6 @@ public class User extends Entity {
      * 新規構築用のファクトリーメソッド
      *
      * @param notification         通知オブジェクト
-     * @param orderNo              並び順
      * @param email                メールアドレス
      * @param passwordHash         パスワードハッシュ
      * @param twoFactorAuthEnabled 二段階認証設定
@@ -144,7 +142,6 @@ public class User extends Entity {
      * @return Userエンティティ
      */
     public static User create(Notification notification,
-            int orderNo,
             Email email,
             String passwordHash,
             boolean twoFactorAuthEnabled,
@@ -163,7 +160,6 @@ public class User extends Entity {
 
         return new User(
                 notification,
-                orderNo,
                 email,
                 passwordHash,
                 twoFactorAuthEnabled,
@@ -176,7 +172,6 @@ public class User extends Entity {
      * 再構築用のファクトリーメソッド
      *
      * @param id                   識別子
-     * @param orderNo              並び順
      * @param email                メールアドレス
      * @param passwordHash         パスワードハッシュ
      * @param twoFactorAuthEnabled 二段階認証設定
@@ -188,7 +183,6 @@ public class User extends Entity {
      * @return Userエンティティ
      */
     public static User reconstruct(UUID id,
-            int orderNo,
             Email email,
             String passwordHash,
             boolean twoFactorAuthEnabled,
@@ -206,7 +200,6 @@ public class User extends Entity {
 
         return new User(
                 id,
-                orderNo,
                 email,
                 passwordHash,
                 twoFactorAuthEnabled,
@@ -269,7 +262,6 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                this.orderNo,
                 this.email,
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
@@ -300,7 +292,6 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                this.orderNo,
                 email,
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
@@ -331,7 +322,6 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                this.orderNo,
                 this.email,
                 newPasswordHash,
                 this.twoFactorAuthEnabled,
@@ -352,7 +342,6 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                this.orderNo,
                 this.email,
                 newPasswordHash,
                 this.twoFactorAuthEnabled,
@@ -383,7 +372,6 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                this.orderNo,
                 this.email,
                 this.passwordHash,
                 twoFactorAuthEnabled,
@@ -422,7 +410,6 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                this.orderNo,
                 this.email,
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
@@ -443,7 +430,6 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                this.orderNo,
                 this.email,
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
@@ -482,7 +468,6 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                this.orderNo,
                 this.email,
                 this.passwordHash,
                 this.twoFactorAuthEnabled,

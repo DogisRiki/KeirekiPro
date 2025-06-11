@@ -79,7 +79,7 @@ class UserRegistrationUseCaseTest {
         // データ準備
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
         Notification notification = new Notification();
-        User existing = User.create(notification, 1, Email.create(notification, EMAIL), HASHED_PASSWORD,
+        User existing = User.create(notification, Email.create(notification, EMAIL), HASHED_PASSWORD,
                 false, null, null, USERNAME);
 
         // モックをセットアップ

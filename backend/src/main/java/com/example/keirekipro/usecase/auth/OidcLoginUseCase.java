@@ -62,7 +62,6 @@ public class OidcLoginUseCase {
                     provider, AuthProvider.create(notification, provider, providerUserId));
             User newUser = User.create(
                     notification,
-                    1,
                     userInfo.getEmail() != null ? Email.create(notification, userInfo.getEmail()) : null,
                     null,
                     false,

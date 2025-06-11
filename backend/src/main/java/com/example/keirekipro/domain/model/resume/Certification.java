@@ -26,8 +26,8 @@ public class Certification extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private Certification(int orderNo, String name, YearMonth date) {
-        super(orderNo);
+    private Certification(String name, YearMonth date) {
+        super();
         this.name = name;
         this.date = date;
     }
@@ -35,8 +35,8 @@ public class Certification extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private Certification(UUID id, int orderNo, String name, YearMonth date) {
-        super(id, orderNo);
+    private Certification(UUID id, String name, YearMonth date) {
+        super(id);
         this.name = name;
         this.date = date;
     }
@@ -44,26 +44,24 @@ public class Certification extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param orderNo 並び順
-     * @param name    会社名
-     * @param date    取得年月
+     * @param name 会社名
+     * @param date 取得年月
      * @return 資格エンティティ
      */
-    public static Certification create(int orderNo, String name, YearMonth date) {
-        return new Certification(orderNo, name, date);
+    public static Certification create(String name, YearMonth date) {
+        return new Certification(name, date);
     }
 
     /**
      * 再構築用のファクトリーメソッド
      *
-     * @param id      識別子
-     * @param orderNo 並び順
-     * @param name    会社名
-     * @param date    取得年月
+     * @param id   識別子
+     * @param name 会社名
+     * @param date 取得年月
      * @return 資格エンティティ
      */
-    public static Certification reconstruct(UUID id, int orderNo, String name, YearMonth date) {
-        return new Certification(id, orderNo, name, date);
+    public static Certification reconstruct(UUID id, String name, YearMonth date) {
+        return new Certification(id, name, date);
     }
 
     /**
@@ -73,7 +71,7 @@ public class Certification extends Entity {
      * @return 変更後の資格エンティティ
      */
     public Certification changeName(String name) {
-        return new Certification(this.id, this.orderNo, name, this.date);
+        return new Certification(this.id, name, this.date);
     }
 
     /**
@@ -83,6 +81,6 @@ public class Certification extends Entity {
      * @return 変更後の資格エンティティ
      */
     public Certification changeDate(YearMonth date) {
-        return new Certification(this.id, this.orderNo, this.name, date);
+        return new Certification(this.id, this.name, date);
     }
 }

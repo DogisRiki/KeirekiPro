@@ -25,8 +25,8 @@ public class SocialLink extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private SocialLink(int orderNo, String name, Link link) {
-        super(orderNo);
+    private SocialLink(String name, Link link) {
+        super();
         this.name = name;
         this.link = link;
     }
@@ -34,8 +34,8 @@ public class SocialLink extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private SocialLink(UUID id, int orderNo, String name, Link link) {
-        super(id, orderNo);
+    private SocialLink(UUID id, String name, Link link) {
+        super(id);
         this.name = name;
         this.link = link;
     }
@@ -43,26 +43,24 @@ public class SocialLink extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param orderNo 並び順
-     * @param name    ソーシャル名
-     * @param link    リンク
+     * @param name ソーシャル名
+     * @param link リンク
      * @return ソーシャルリンクエンティティ
      */
-    public static SocialLink create(int orderNo, String name, Link link) {
-        return new SocialLink(orderNo, name, link);
+    public static SocialLink create(String name, Link link) {
+        return new SocialLink(name, link);
     }
 
     /**
      * 再構築用のファクトリーメソッド
      *
-     * @param id      識別子
-     * @param orderNo 並び順
-     * @param name    ソーシャル名
-     * @param link    リンク
+     * @param id   識別子
+     * @param name ソーシャル名
+     * @param link リンク
      * @return ソーシャルリンクエンティティ
      */
-    public static SocialLink reconstruct(UUID id, int orderNo, String name, Link link) {
-        return new SocialLink(id, orderNo, name, link);
+    public static SocialLink reconstruct(UUID id, String name, Link link) {
+        return new SocialLink(id, name, link);
     }
 
     /**
@@ -72,7 +70,7 @@ public class SocialLink extends Entity {
      * @return 変更後のソーシャルリンクエンティティ
      */
     public SocialLink changeName(String name) {
-        return new SocialLink(this.id, this.orderNo, name, this.link);
+        return new SocialLink(this.id, name, this.link);
     }
 
     /**
@@ -82,6 +80,6 @@ public class SocialLink extends Entity {
      * @return 変更後のソーシャルリンクエンティティ
      */
     public SocialLink changeLink(Link link) {
-        return new SocialLink(this.id, this.orderNo, this.name, link);
+        return new SocialLink(this.id, this.name, link);
     }
 }

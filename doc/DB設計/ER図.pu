@@ -33,7 +33,6 @@ entity "職務経歴書(resumes)" as Resumes {
     auto_save_enabled : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 自動保存有効フラグ
     created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
     updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
-    order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
 entity "職歴(careers)" as Careers {
@@ -44,7 +43,6 @@ entity "職歴(careers)" as Careers {
     start_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 入社年月
     end_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 退職年月
     is_active : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 在籍中フラグ
-    order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
 entity "プロジェクト(projects)" as Projects {
@@ -87,7 +85,6 @@ entity "プロジェクト(projects)" as Projects {
     documentation_tools : <color:#1E90FF>TEXT[]</color> -- ドキュメント
     api_development_tools : <color:#1E90FF>TEXT[]</color> -- API開発
     design_tools : <color:#1E90FF>TEXT[]</color> -- デザイン
-    order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
 entity "資格(certifications)" as Certifications {
@@ -96,7 +93,6 @@ entity "資格(certifications)" as Certifications {
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
     name : <color:#1E90FF>VARCHAR(255)</color> -- 資格名
     date : <color:#1E90FF>DATE</color> -- 取得日
-    order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
 entity "ポートフォリオ(portfolios)" as Portfolios {
@@ -107,7 +103,6 @@ entity "ポートフォリオ(portfolios)" as Portfolios {
     overview : <color:#1E90FF>VARCHAR(255)</color> -- 概要
     tech_stack : <color:#1E90FF>TEXT</color> -- 技術スタック
     link : <color:#1E90FF>VARCHAR(255)</color> -- リンク
-    order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
 entity "ソーシャルリンク(social_links)" as SocialLinks {
@@ -116,7 +111,6 @@ entity "ソーシャルリンク(social_links)" as SocialLinks {
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
     name : <color:#1E90FF>VARCHAR(255)</color> -- ソーシャルリンク名
     link : <color:#1E90FF>VARCHAR(255)</color> -- リンク
-    order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
 entity "自己PR(self_promotions)" as SelfPromotions {
@@ -125,7 +119,6 @@ entity "自己PR(self_promotions)" as SelfPromotions {
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
     title : <color:#1E90FF>VARCHAR(255)</color> -- タイトル
     content : <color:#1E90FF>TEXT</color> -- コンテンツ
-    order_no : <color:#1E90FF>INTEGER</color> <color:#32CD32>[NOT NULL]</color> -- 並び順
 }
 
 entity "技術スタックマスタ(tech_stack_mst)" as TechStackMst {

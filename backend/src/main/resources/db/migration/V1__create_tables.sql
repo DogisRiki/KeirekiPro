@@ -46,8 +46,7 @@ CREATE TABLE resumes (
     date DATE NOT NULL,
     auto_save_enabled BOOLEAN NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
-    updated_at TIMESTAMP(6) NOT NULL,
-    order_no INTEGER NOT NULL
+    updated_at TIMESTAMP(6) NOT NULL
 );
 
 COMMENT ON TABLE resumes IS '職務経歴書';
@@ -58,7 +57,6 @@ COMMENT ON COLUMN resumes.date IS '作成日';
 COMMENT ON COLUMN resumes.auto_save_enabled IS '自動保存有効フラグ';
 COMMENT ON COLUMN resumes.created_at IS '作成日時';
 COMMENT ON COLUMN resumes.updated_at IS '更新日時';
-COMMENT ON COLUMN resumes.order_no IS '並び順';
 
 -- 職歴テーブル
 CREATE TABLE careers (
@@ -67,8 +65,7 @@ CREATE TABLE careers (
     company_name VARCHAR(255) NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
-    is_active BOOLEAN NOT NULL,
-    order_no INTEGER NOT NULL
+    is_active BOOLEAN NOT NULL
 );
 
 COMMENT ON TABLE careers IS '職歴';
@@ -78,7 +75,6 @@ COMMENT ON COLUMN careers.company_name IS '会社名';
 COMMENT ON COLUMN careers.start_date IS '入社年月';
 COMMENT ON COLUMN careers.end_date IS '退職年月';
 COMMENT ON COLUMN careers.is_active IS '在籍中フラグ';
-COMMENT ON COLUMN careers.order_no IS '並び順';
 
 -- プロジェクトテーブル
 CREATE TABLE projects (
@@ -119,8 +115,7 @@ CREATE TABLE projects (
     communication_tools TEXT[],
     documentation_tools TEXT[],
     api_development_tools TEXT[],
-    design_tools TEXT[],
-    order_no INTEGER NOT NULL
+    design_tools TEXT[]
 );
 
 COMMENT ON TABLE projects IS 'プロジェクト';
@@ -162,15 +157,13 @@ COMMENT ON COLUMN projects.communication_tools IS 'コミュニケーション';
 COMMENT ON COLUMN projects.documentation_tools IS 'ドキュメント';
 COMMENT ON COLUMN projects.api_development_tools IS 'API開発';
 COMMENT ON COLUMN projects.design_tools IS 'デザイン';
-COMMENT ON COLUMN projects.order_no IS '並び順';
 
 -- 資格テーブル
 CREATE TABLE certifications (
     id UUID PRIMARY KEY,
     resume_id UUID NOT NULL REFERENCES resumes(id),
     name VARCHAR(255),
-    date DATE,
-    order_no INTEGER NOT NULL
+    date DATE
 );
 
 COMMENT ON TABLE certifications IS '資格';
@@ -178,7 +171,6 @@ COMMENT ON COLUMN certifications.id IS '識別子';
 COMMENT ON COLUMN certifications.resume_id IS '職務経歴書ID';
 COMMENT ON COLUMN certifications.name IS '資格名';
 COMMENT ON COLUMN certifications.date IS '取得日';
-COMMENT ON COLUMN certifications.order_no IS '並び順';
 
 -- ポートフォリオテーブル
 CREATE TABLE portfolios (
@@ -187,8 +179,7 @@ CREATE TABLE portfolios (
     name VARCHAR(255),
     overview VARCHAR(255),
     tech_stack TEXT,
-    link VARCHAR(255),
-    order_no INTEGER NOT NULL
+    link VARCHAR(255)
 );
 
 COMMENT ON TABLE portfolios IS 'ポートフォリオ';
@@ -198,15 +189,13 @@ COMMENT ON COLUMN portfolios.name IS 'ポートフォリオ名';
 COMMENT ON COLUMN portfolios.overview IS '概要';
 COMMENT ON COLUMN portfolios.tech_stack IS '技術スタック';
 COMMENT ON COLUMN portfolios.link IS 'リンク';
-COMMENT ON COLUMN portfolios.order_no IS '並び順';
 
 -- ソーシャルリンクテーブル
 CREATE TABLE social_links (
     id UUID PRIMARY KEY,
     resume_id UUID NOT NULL REFERENCES resumes(id),
     name VARCHAR(255),
-    link VARCHAR(255),
-    order_no INTEGER NOT NULL
+    link VARCHAR(255)
 );
 
 COMMENT ON TABLE social_links IS 'ソーシャルリンク';
@@ -214,15 +203,13 @@ COMMENT ON COLUMN social_links.id IS '識別子';
 COMMENT ON COLUMN social_links.resume_id IS '職務経歴書ID';
 COMMENT ON COLUMN social_links.name IS 'ソーシャルリンク名';
 COMMENT ON COLUMN social_links.link IS 'リンク';
-COMMENT ON COLUMN social_links.order_no IS '並び順';
 
 -- 自己PRテーブル
 CREATE TABLE self_promotions (
     id UUID PRIMARY KEY,
     resume_id UUID NOT NULL REFERENCES resumes(id),
     title VARCHAR(255),
-    content TEXT,
-    order_no INTEGER NOT NULL
+    content TEXT
 );
 
 COMMENT ON TABLE self_promotions IS '自己PR';
@@ -230,7 +217,6 @@ COMMENT ON COLUMN self_promotions.id IS '識別子';
 COMMENT ON COLUMN self_promotions.resume_id IS '職務経歴書ID';
 COMMENT ON COLUMN self_promotions.title IS 'タイトル';
 COMMENT ON COLUMN self_promotions.content IS 'コンテンツ';
-COMMENT ON COLUMN self_promotions.order_no IS '並び順';
 
 -- 技術スタックカテゴリマスタテーブル
 CREATE TABLE tech_stack_category_mst (

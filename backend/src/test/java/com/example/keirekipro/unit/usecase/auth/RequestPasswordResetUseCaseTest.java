@@ -64,7 +64,6 @@ class RequestPasswordResetUseCaseTest {
         Notification notification = new Notification();
         User user = User.reconstruct(
                 USER_ID,
-                1,
                 Email.create(notification, EMAIL),
                 "hashedPassword",
                 false,
