@@ -28,7 +28,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/resumes")
 @RequiredArgsConstructor
-@Tag(name = "resume", description = "職務経歴書に関するエンドポイント")
+@Tag(name = "resumes", description = "職務経歴書に関するエンドポイント")
 public class CreateResumeController {
 
     private final CreateResumeUseCase createResumeUseCase;
