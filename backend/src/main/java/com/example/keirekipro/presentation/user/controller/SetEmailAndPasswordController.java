@@ -48,6 +48,6 @@ public class SetEmailAndPasswordController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
         setEmailAndPasswordUseCase.execute(userId, request);
         UserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
-        return dto.convertToResponse(dto);
+        return UserInfoResponse.convertToResponse(dto);
     }
 }

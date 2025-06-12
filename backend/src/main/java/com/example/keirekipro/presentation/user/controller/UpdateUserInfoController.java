@@ -53,6 +53,6 @@ public class UpdateUserInfoController {
         UpdateUserInfoRequest request = new UpdateUserInfoRequest(username, profileImage, twoFactorAuthEnabled);
         updateUserInfoUseCase.execute(request, userId);
         UserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
-        return dto.convertToResponse(dto);
+        return UserInfoResponse.convertToResponse(dto);
     }
 }

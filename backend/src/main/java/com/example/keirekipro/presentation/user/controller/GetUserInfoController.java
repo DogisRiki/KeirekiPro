@@ -40,6 +40,6 @@ public class GetUserInfoController {
     public UserInfoResponse handle() {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
         UserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
-        return dto.convertToResponse(dto);
+        return UserInfoResponse.convertToResponse(dto);
     }
 }
