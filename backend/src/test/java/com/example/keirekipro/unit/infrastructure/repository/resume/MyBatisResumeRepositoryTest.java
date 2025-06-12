@@ -6,7 +6,6 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -14,16 +13,12 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.Certification;
-import com.example.keirekipro.domain.model.resume.FullName;
-import com.example.keirekipro.domain.model.resume.Link;
-import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
-import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.model.resume.SocialLink;
-import com.example.keirekipro.domain.model.resume.TechStack;
+import com.example.keirekipro.helper.ResumeObjectBuilder;
 import com.example.keirekipro.infrastructure.repository.resume.MyBatisResumeRepository;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.CareerDto;
@@ -33,7 +28,6 @@ import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.Project
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SelfPromotionDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SocialLinkDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeMapper;
-import com.example.keirekipro.shared.Notification;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,12 +48,12 @@ class MyBatisResumeRepositoryTest {
 
     private static final UUID USER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID RESUME_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-    private static final UUID CAREER_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
-    private static final UUID PROJECT_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
-    private static final UUID CERT_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
-    private static final UUID PORTFOLIO_ID = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
-    private static final UUID SOCIALLINK_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-    private static final UUID SELF_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final String RESUME_NAME = "Test Resume";
+    private static final LocalDate DATE = LocalDate.of(2025, 1, 1);
+    private static final String LAST_NAME = "Last";
+    private static final String FIRST_NAME = "First";
+    private static final LocalDateTime CREATED_AT = LocalDateTime.of(2025, 1, 2, 3, 4);
+    private static final LocalDateTime UPDATED_AT = LocalDateTime.of(2025, 1, 3, 4, 5);
 
     @Test
     @DisplayName("findAll_該当ユーザーに職務経歴書が存在しない場合、空リストが返る")
@@ -74,7 +68,8 @@ class MyBatisResumeRepositoryTest {
     @DisplayName("findAll_職務経歴書が存在する場合、DTOの全フィールドがエンティティに変換されて返る")
     void test2() {
         // モック設定
-        ResumeDto dto = buildDto();
+        ResumeDto dto = ResumeObjectBuilder.buildResumeDto(
+                RESUME_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
         when(mapper.selectAllByUserId(USER_ID)).thenReturn(List.of(dto));
         when(mapper.selectCareersByResumeId(RESUME_ID)).thenReturn(dto.getCareers());
         when(mapper.selectProjectsByResumeId(RESUME_ID)).thenReturn(dto.getProjects());
@@ -199,7 +194,8 @@ class MyBatisResumeRepositoryTest {
     @DisplayName("find_職務経歴書が存在する場合、DTOの全フィールドがエンティティに変換されて返る")
     void test4() {
         // モック設定
-        ResumeDto dto = buildDto();
+        ResumeDto dto = ResumeObjectBuilder.buildResumeDto(
+                RESUME_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
         when(mapper.selectByResumeId(RESUME_ID)).thenReturn(Optional.of(dto));
         when(mapper.selectCareersByResumeId(RESUME_ID)).thenReturn(dto.getCareers());
         when(mapper.selectProjectsByResumeId(RESUME_ID)).thenReturn(dto.getProjects());
@@ -316,7 +312,8 @@ class MyBatisResumeRepositoryTest {
     @DisplayName("save_新規作成または更新時にupsertと子テーブルの削除・挿入が実行される")
     void test5() {
         // 準備
-        Resume resume = buildEntity();
+        Resume resume = ResumeObjectBuilder.buildResume(
+                RESUME_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
         final UUID id = resume.getId();
 
         // 実行
@@ -454,195 +451,5 @@ class MyBatisResumeRepositoryTest {
         verify(mapper).deleteSocialLinksByResumeId(RESUME_ID);
         verify(mapper).deleteSelfPromotionsByResumeId(RESUME_ID);
         verify(mapper).delete(RESUME_ID);
-    }
-
-    private ResumeDto buildDto() {
-        ResumeDto dto = new ResumeDto();
-        dto.setId(RESUME_ID);
-        dto.setUserId(USER_ID);
-        dto.setName("Test Resume");
-        dto.setDate(LocalDate.of(2025, 1, 1));
-        dto.setLastName("Last");
-        dto.setFirstName("First");
-        dto.setCreatedAt(LocalDateTime.of(2025, 1, 2, 3, 4));
-        dto.setUpdatedAt(LocalDateTime.of(2025, 1, 3, 4, 5));
-
-        // Career
-        CareerDto career = new CareerDto();
-        career.setId(CAREER_ID);
-        career.setResumeId(RESUME_ID);
-        career.setCompanyName("CompCo");
-        career.setStartDate(YearMonth.of(2024, 1));
-        career.setEndDate(YearMonth.of(2024, 12));
-        career.setIsActive(false);
-        dto.setCareers(List.of(career));
-
-        // Project
-        ProjectDto proj = new ProjectDto();
-        proj.setId(PROJECT_ID);
-        proj.setResumeId(RESUME_ID);
-        proj.setCompanyName("ProjCo");
-        proj.setStartDate(YearMonth.of(2023, 1));
-        proj.setEndDate(YearMonth.of(2023, 12));
-        proj.setIsActive(false);
-        proj.setName("ProjName");
-        proj.setOverview("Overview");
-        proj.setTeamComp("TeamX");
-        proj.setRole("RoleY");
-        proj.setAchievement("AchZ");
-        proj.setRequirements(true);
-        proj.setBasicDesign(false);
-        proj.setDetailedDesign(true);
-        proj.setImplementation(false);
-        proj.setIntegrationTest(true);
-        proj.setSystemTest(false);
-        proj.setMaintenance(true);
-        List<String> langs = List.of("Java", "SQL");
-        proj.setLanguages(langs);
-        proj.setFrameworks(List.of("Spring"));
-        proj.setLibraries(List.of("Lib1"));
-        proj.setTestingTools(List.of("Test1"));
-        proj.setOrmTools(List.of("ORM1"));
-        proj.setPackageManagers(List.of("Maven"));
-        proj.setClouds(List.of("AWS"));
-        proj.setContainers(List.of("Docker"));
-        proj.setDatabases(List.of("Postgres"));
-        proj.setWebServers(List.of("Tomcat"));
-        proj.setCiCdTools(List.of("Jenkins"));
-        proj.setIacTools(List.of("Terraform"));
-        proj.setMonitoringTools(List.of("Prometheus"));
-        proj.setLoggingTools(List.of("ELK"));
-        proj.setSourceControls(List.of("Git"));
-        proj.setProjectManagements(List.of("Jira"));
-        proj.setCommunicationTools(List.of("Slack"));
-        proj.setDocumentationTools(List.of("Confluence"));
-        proj.setApiDevelopmentTools(List.of("Postman"));
-        proj.setDesignTools(List.of("Figma"));
-        dto.setProjects(List.of(proj));
-
-        // Certification
-        CertificationDto cert = new CertificationDto();
-        cert.setId(CERT_ID);
-        cert.setResumeId(RESUME_ID);
-        cert.setName("CertX");
-        cert.setDate(YearMonth.of(2022, 6));
-        dto.setCertifications(List.of(cert));
-
-        // Portfolio
-        PortfolioDto port = new PortfolioDto();
-        port.setId(PORTFOLIO_ID);
-        port.setResumeId(RESUME_ID);
-        port.setName("PortX");
-        port.setOverview("PortOverview");
-        port.setTechStack("TechStackX");
-        port.setLink("http://example.com");
-        dto.setPortfolios(List.of(port));
-
-        // SocialLink
-        SocialLinkDto sl = new SocialLinkDto();
-        sl.setId(SOCIALLINK_ID);
-        sl.setResumeId(RESUME_ID);
-        sl.setName("LinkedIn");
-        sl.setLink("http://linkedin.com");
-        dto.setSocialLinks(List.of(sl));
-
-        // SelfPromotion
-        SelfPromotionDto sp = new SelfPromotionDto();
-        sp.setId(SELF_ID);
-        sp.setResumeId(RESUME_ID);
-        sp.setTitle("PromoTitle");
-        sp.setContent("PromoContent");
-        dto.setSelfPromotions(List.of(sp));
-
-        return dto;
-    }
-
-    private Resume buildEntity() {
-        Notification notification = new Notification();
-
-        // Career
-        Career career = Career.reconstruct(
-                CAREER_ID,
-                "CompCo",
-                Period.create(notification, YearMonth.of(2024, 1), YearMonth.of(2024, 12), false));
-
-        // Project
-        var process = Project.Process.create(true, false, true, false, true, false, true);
-        TechStack tech = TechStack.create(
-                List.of("Java", "SQL"),
-                TechStack.Dependencies.create(
-                        List.of("Spring"),
-                        List.of("Lib1"),
-                        List.of("Test1"),
-                        List.of("ORM1"),
-                        List.of("Maven")),
-                TechStack.Infrastructure.create(
-                        List.of("AWS"),
-                        List.of("Docker"),
-                        List.of("Postgres"),
-                        List.of("Tomcat"),
-                        List.of("Jenkins"),
-                        List.of("Terraform"),
-                        List.of("Prometheus"),
-                        List.of("ELK")),
-                TechStack.Tools.create(
-                        List.of("Git"),
-                        List.of("Jira"),
-                        List.of("Slack"),
-                        List.of("Confluence"),
-                        List.of("Postman"),
-                        List.of("Figma")));
-        Project project = Project.reconstruct(
-                PROJECT_ID,
-                "ProjCo",
-                Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false),
-                "ProjName",
-                "Overview",
-                "TeamX",
-                "RoleY",
-                "AchZ",
-                process,
-                tech);
-
-        // Certification
-        Certification certification = Certification.reconstruct(
-                CERT_ID,
-                "CertX",
-                YearMonth.of(2022, 6));
-
-        // Portfolio
-        Portfolio portfolio = Portfolio.reconstruct(
-                PORTFOLIO_ID,
-                "PortX",
-                "PortOverview",
-                "TechStackX",
-                Link.create(notification, "http://example.com"));
-
-        // SocialLink
-        SocialLink socialLink = SocialLink.reconstruct(
-                SOCIALLINK_ID,
-                "LinkedIn",
-                Link.create(notification, "http://linkedin.com"));
-
-        // SelfPromotion
-        SelfPromotion self = SelfPromotion.reconstruct(
-                SELF_ID,
-                "PromoTitle",
-                "PromoContent");
-
-        return Resume.reconstruct(
-                RESUME_ID,
-                USER_ID,
-                ResumeName.create(notification, "Test Resume"),
-                LocalDate.of(2025, 1, 1),
-                FullName.create(notification, "Last", "First"),
-                LocalDateTime.of(2025, 1, 2, 3, 4),
-                LocalDateTime.of(2025, 1, 3, 4, 5),
-                List.of(career),
-                List.of(project),
-                List.of(certification),
-                List.of(portfolio),
-                List.of(socialLink),
-                List.of(self));
     }
 }
