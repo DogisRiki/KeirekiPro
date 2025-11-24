@@ -3,6 +3,7 @@ package com.example.keirekipro.domain.model.resume;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
+import com.example.keirekipro.shared.Notification;
 
 import lombok.Getter;
 
@@ -43,11 +44,13 @@ public class SelfPromotion extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param title   タイトル
-     * @param content コンテンツ
+     * @param notification 通知オブジェクト
+     * @param title        タイトル
+     * @param content      コンテンツ
      * @return 自己PRエンティティ
      */
-    public static SelfPromotion create(String title, String content) {
+    public static SelfPromotion create(Notification notification, String title, String content) {
+        validate(notification, title, content);
         return new SelfPromotion(title, content);
     }
 
@@ -66,20 +69,38 @@ public class SelfPromotion extends Entity {
     /**
      * タイトルを変更する
      *
-     * @param title タイトル
+     * @param notification 通知オブジェクト
+     * @param title        タイトル
      * @return 変更後の自己PRエンティティ
      */
-    public SelfPromotion changeTitle(String title) {
+    public SelfPromotion changeTitle(Notification notification, String title) {
+        validate(notification, title, this.content);
         return new SelfPromotion(this.id, title, this.content);
     }
 
     /**
      * コンテンツを変更する
      *
-     * @param content コンテンツ
+     * @param notification 通知オブジェクト
+     * @param content      コンテンツ
      * @return 変更後の自己PRエンティティ
      */
-    public SelfPromotion changeContent(String content) {
+    public SelfPromotion changeContent(Notification notification, String content) {
+        validate(notification, this.title, content);
         return new SelfPromotion(this.id, this.title, content);
+    }
+
+    private static void validate(Notification notification, String title, String content) {
+        if (title == null || title.isBlank()) {
+            notification.addError("title", "タイトルは入力必須です。");
+        } else if (title.length() > 50) {
+            notification.addError("title", "タイトルは50文字以内で入力してください。");
+        }
+
+        if (content == null || content.isBlank()) {
+            notification.addError("content", "コンテンツは入力必須です。");
+        } else if (content.length() > 1000) {
+            notification.addError("content", "コンテンツは1000文字以内で入力してください。");
+        }
     }
 }

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Resume;
+import com.example.keirekipro.domain.model.resume.TechStack;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -52,55 +53,79 @@ public class ResumeInfoUseCaseDto {
                 .careers(resume.getCareers().stream()
                         .map(c -> new Career(
                                 c.getId(),
-                                c.getCompanyName(),
+                                c.getCompanyName().getValue(),
                                 c.getPeriod().getStartDate(),
                                 c.getPeriod().getEndDate(),
                                 c.getPeriod().isActive()))
                         .toList())
                 .projects(resume.getProjects().stream()
-                        .map(p -> new Project(
-                                p.getId(),
-                                p.getCompanyName(),
-                                p.getPeriod().getStartDate(),
-                                p.getPeriod().getEndDate(),
-                                p.getPeriod().isActive(),
-                                p.getName(),
-                                p.getOverview(),
-                                p.getTeamComp(),
-                                p.getRole(),
-                                p.getAchievement(),
-                                new Process(
-                                        p.getProcess().isRequirements(),
-                                        p.getProcess().isBasicDesign(),
-                                        p.getProcess().isDetailedDesign(),
-                                        p.getProcess().isImplementation(),
-                                        p.getProcess().isIntegrationTest(),
-                                        p.getProcess().isSystemTest(),
-                                        p.getProcess().isMaintenance()),
-                                new TechStack(
-                                        p.getTechStack().getLanguages(),
-                                        new Dependencies(
-                                                p.getTechStack().getDependencies().getFrameworks(),
-                                                p.getTechStack().getDependencies().getLibraries(),
-                                                p.getTechStack().getDependencies().getTestingTools(),
-                                                p.getTechStack().getDependencies().getOrmTools(),
-                                                p.getTechStack().getDependencies().getPackageManagers()),
-                                        new Infrastructure(
-                                                p.getTechStack().getInfrastructure().getClouds(),
-                                                p.getTechStack().getInfrastructure().getContainers(),
-                                                p.getTechStack().getInfrastructure().getDatabases(),
-                                                p.getTechStack().getInfrastructure().getWebServers(),
-                                                p.getTechStack().getInfrastructure().getCiCdTools(),
-                                                p.getTechStack().getInfrastructure().getIacTools(),
-                                                p.getTechStack().getInfrastructure().getMonitoringTools(),
-                                                p.getTechStack().getInfrastructure().getLoggingTools()),
-                                        new Tools(
-                                                p.getTechStack().getTools().getSourceControls(),
-                                                p.getTechStack().getTools().getProjectManagements(),
-                                                p.getTechStack().getTools().getCommunicationTools(),
-                                                p.getTechStack().getTools().getDocumentationTools(),
-                                                p.getTechStack().getTools().getApiDevelopmentTools(),
-                                                p.getTechStack().getTools().getDesignTools()))))
+                        .map(p -> {
+                            TechStack domainTechStack = p.getTechStack();
+                            TechStack.Frontend domainFrontend = domainTechStack.getFrontend();
+                            TechStack.Backend domainBackend = domainTechStack.getBackend();
+                            TechStack.Infrastructure domainInfrastructure = domainTechStack.getInfrastructure();
+                            TechStack.Tools domainTools = domainTechStack.getTools();
+
+                            return new Project(
+                                    p.getId(),
+                                    p.getCompanyName().getValue(),
+                                    p.getPeriod().getStartDate(),
+                                    p.getPeriod().getEndDate(),
+                                    p.getPeriod().isActive(),
+                                    p.getName(),
+                                    p.getOverview(),
+                                    p.getTeamComp(),
+                                    p.getRole(),
+                                    p.getAchievement(),
+                                    new Process(
+                                            p.getProcess().isRequirements(),
+                                            p.getProcess().isBasicDesign(),
+                                            p.getProcess().isDetailedDesign(),
+                                            p.getProcess().isImplementation(),
+                                            p.getProcess().isIntegrationTest(),
+                                            p.getProcess().isSystemTest(),
+                                            p.getProcess().isMaintenance()),
+                                    new TechStackDto(
+                                            new FrontendDto(
+                                                    domainFrontend.getLanguages(),
+                                                    domainFrontend.getFramework(),
+                                                    domainFrontend.getLibraries(),
+                                                    domainFrontend.getBuildTool(),
+                                                    domainFrontend.getPackageManager(),
+                                                    domainFrontend.getLinters(),
+                                                    domainFrontend.getFormatters(),
+                                                    domainFrontend.getTestingTools()),
+                                            new BackendDto(
+                                                    domainBackend.getLanguages(),
+                                                    domainBackend.getFramework(),
+                                                    domainBackend.getLibraries(),
+                                                    domainBackend.getBuildTool(),
+                                                    domainBackend.getPackageManager(),
+                                                    domainBackend.getLinters(),
+                                                    domainBackend.getFormatters(),
+                                                    domainBackend.getTestingTools(),
+                                                    domainBackend.getOrmTools(),
+                                                    domainBackend.getAuth()),
+                                            new InfrastructureDto(
+                                                    domainInfrastructure.getClouds(),
+                                                    domainInfrastructure.getOperatingSystem(),
+                                                    domainInfrastructure.getContainers(),
+                                                    domainInfrastructure.getDatabase(),
+                                                    domainInfrastructure.getWebServer(),
+                                                    domainInfrastructure.getCiCdTool(),
+                                                    domainInfrastructure.getIacTools(),
+                                                    domainInfrastructure.getMonitoringTools(),
+                                                    domainInfrastructure.getLoggingTools()),
+                                            new ToolsDto(
+                                                    domainTools.getSourceControl(),
+                                                    domainTools.getProjectManagement(),
+                                                    domainTools.getCommunicationTool(),
+                                                    domainTools.getDocumentationTools(),
+                                                    domainTools.getApiDevelopmentTools(),
+                                                    domainTools.getDesignTools(),
+                                                    domainTools.getEditor(),
+                                                    domainTools.getDevelopmentEnvironment())));
+                        })
                         .toList())
                 .certifications(resume.getCertifications().stream()
                         .map(c -> new Certification(
@@ -161,7 +186,7 @@ public class ResumeInfoUseCaseDto {
         private final String role;
         private final String achievement;
         private final Process process;
-        private final TechStack techStack;
+        private final TechStackDto techStack;
     }
 
     /**
@@ -180,58 +205,82 @@ public class ResumeInfoUseCaseDto {
     }
 
     /**
-     * 技術スタック
+     * 技術スタックDTO
      */
     @RequiredArgsConstructor
     @Getter
-    public static class TechStack {
-        private final List<String> languages;
-        private final Dependencies dependencies;
-        private final Infrastructure infrastructure;
-        private final Tools tools;
+    public static class TechStackDto {
+        private final FrontendDto frontend;
+        private final BackendDto backend;
+        private final InfrastructureDto infrastructure;
+        private final ToolsDto tools;
     }
 
     /**
-     * 依存関係
+     * フロントエンドDTO
      */
     @RequiredArgsConstructor
     @Getter
-    public static class Dependencies {
-        private final List<String> frameworks;
+    public static class FrontendDto {
+        private final List<String> languages;
+        private final String framework;
         private final List<String> libraries;
+        private final String buildTool;
+        private final String packageManager;
+        private final List<String> linters;
+        private final List<String> formatters;
+        private final List<String> testingTools;
+    }
+
+    /**
+     * バックエンドDTO
+     */
+    @RequiredArgsConstructor
+    @Getter
+    public static class BackendDto {
+        private final List<String> languages;
+        private final String framework;
+        private final List<String> libraries;
+        private final String buildTool;
+        private final String packageManager;
+        private final List<String> linters;
+        private final List<String> formatters;
         private final List<String> testingTools;
         private final List<String> ormTools;
-        private final List<String> packageManagers;
+        private final List<String> auth;
     }
 
     /**
-     * インフラ
+     * インフラDTO
      */
     @RequiredArgsConstructor
     @Getter
-    public static class Infrastructure {
+    public static class InfrastructureDto {
         private final List<String> clouds;
+        private final String operatingSystem;
         private final List<String> containers;
-        private final List<String> databases;
-        private final List<String> webServers;
-        private final List<String> ciCdTools;
+        private final String database;
+        private final String webServer;
+        private final String ciCdTool;
         private final List<String> iacTools;
         private final List<String> monitoringTools;
         private final List<String> loggingTools;
     }
 
     /**
-     * 開発支援ツール
+     * 開発支援ツールDTO
      */
     @RequiredArgsConstructor
     @Getter
-    public static class Tools {
-        private final List<String> sourceControls;
-        private final List<String> projectManagements;
-        private final List<String> communicationTools;
+    public static class ToolsDto {
+        private final String sourceControl;
+        private final String projectManagement;
+        private final String communicationTool;
         private final List<String> documentationTools;
         private final List<String> apiDevelopmentTools;
         private final List<String> designTools;
+        private final String editor;
+        private final String developmentEnvironment;
     }
 
     /**

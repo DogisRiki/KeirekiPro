@@ -13,14 +13,14 @@ import lombok.Getter;
 public class TechStack {
 
     /**
-     * 開発言語
+     * フロントエンド
      */
-    private final List<String> languages;
+    private final Frontend frontend;
 
     /**
-     * 依存関係
+     * バックエンド
      */
-    private final Dependencies dependencies;
+    private final Backend backend;
 
     /**
      * インフラ
@@ -32,9 +32,9 @@ public class TechStack {
      */
     private final Tools tools;
 
-    private TechStack(List<String> languages, Dependencies dependencies, Infrastructure infrastructure, Tools tools) {
-        this.languages = languages;
-        this.dependencies = dependencies;
+    private TechStack(Frontend frontend, Backend backend, Infrastructure infrastructure, Tools tools) {
+        this.frontend = frontend;
+        this.backend = backend;
         this.infrastructure = infrastructure;
         this.tools = tools;
     }
@@ -42,28 +42,33 @@ public class TechStack {
     /**
      * ファクトリーメソッド
      *
-     * @param languages      開発言語
-     * @param dependencies   依存関係
+     * @param frontend       フロントエンド
+     * @param backend        バックエンド
      * @param infrastructure インフラ
      * @param tools          開発支援ツール
      * @return 値オブジェクト
      */
-    public static TechStack create(List<String> languages, Dependencies dependencies, Infrastructure infrastructure,
-            Tools tools) {
-        return new TechStack(languages, dependencies, infrastructure, tools);
+    public static TechStack create(Frontend frontend, Backend backend,
+            Infrastructure infrastructure, Tools tools) {
+        return new TechStack(frontend, backend, infrastructure, tools);
     }
 
     /**
-     * 依存関係
+     * フロントエンド技術スタック
      */
     @Getter
     @EqualsAndHashCode
-    public static class Dependencies {
+    public static class Frontend {
+
+        /**
+         * 開発言語
+         */
+        private final List<String> languages;
 
         /**
          * フレームワーク
          */
-        private final List<String> frameworks;
+        private final String framework;
 
         /**
          * ライブラリ
@@ -71,7 +76,108 @@ public class TechStack {
         private final List<String> libraries;
 
         /**
-         * テスト
+         * ビルドツール
+         */
+        private final String buildTool;
+
+        /**
+         * パッケージマネージャー
+         */
+        private final String packageManager;
+
+        /**
+         * リンター
+         */
+        private final List<String> linters;
+
+        /**
+         * フォーマッター
+         */
+        private final List<String> formatters;
+
+        /**
+         * テストツール
+         */
+        private final List<String> testingTools;
+
+        private Frontend(List<String> languages, String framework, List<String> libraries,
+                String buildTool, String packageManager, List<String> linters,
+                List<String> formatters, List<String> testingTools) {
+            this.languages = languages;
+            this.framework = framework;
+            this.libraries = libraries;
+            this.buildTool = buildTool;
+            this.packageManager = packageManager;
+            this.linters = linters;
+            this.formatters = formatters;
+            this.testingTools = testingTools;
+        }
+
+        /**
+         * ファクトリーメソッド
+         *
+         * @param languages      開発言語
+         * @param framework      フレームワーク
+         * @param libraries      ライブラリ
+         * @param buildTool      ビルドツール
+         * @param packageManager パッケージマネージャー
+         * @param linters        リンター
+         * @param formatters     フォーマッター
+         * @param testingTools   テストツール
+         * @return 値オブジェクト
+         */
+        public static Frontend create(List<String> languages, String framework,
+                List<String> libraries, String buildTool, String packageManager,
+                List<String> linters, List<String> formatters, List<String> testingTools) {
+            return new Frontend(languages, framework, libraries, buildTool,
+                    packageManager, linters, formatters, testingTools);
+        }
+    }
+
+    /**
+     * バックエンド技術スタック
+     */
+    @Getter
+    @EqualsAndHashCode
+    public static class Backend {
+
+        /**
+         * 開発言語
+         */
+        private final List<String> languages;
+
+        /**
+         * フレームワーク
+         */
+        private final String framework;
+
+        /**
+         * ライブラリ
+         */
+        private final List<String> libraries;
+
+        /**
+         * ビルドツール
+         */
+        private final String buildTool;
+
+        /**
+         * パッケージマネージャー
+         */
+        private final String packageManager;
+
+        /**
+         * リンター
+         */
+        private final List<String> linters;
+
+        /**
+         * フォーマッター
+         */
+        private final List<String> formatters;
+
+        /**
+         * テストツール
          */
         private final List<String> testingTools;
 
@@ -81,32 +187,48 @@ public class TechStack {
         private final List<String> ormTools;
 
         /**
-         * パッケージマネージャー
+         * 認証
          */
-        private final List<String> packageManagers;
+        private final List<String> auth;
 
-        private Dependencies(List<String> frameworks, List<String> libraries, List<String> testingTools,
-                List<String> ormTools, List<String> packageManagers) {
-            this.frameworks = frameworks;
+        private Backend(List<String> languages, String framework, List<String> libraries,
+                String buildTool, String packageManager, List<String> linters,
+                List<String> formatters, List<String> testingTools,
+                List<String> ormTools, List<String> auth) {
+            this.languages = languages;
+            this.framework = framework;
             this.libraries = libraries;
+            this.buildTool = buildTool;
+            this.packageManager = packageManager;
+            this.linters = linters;
+            this.formatters = formatters;
             this.testingTools = testingTools;
             this.ormTools = ormTools;
-            this.packageManagers = packageManagers;
+            this.auth = auth;
         }
 
         /**
          * ファクトリーメソッド
          *
-         * @param frameworks      フレームワーク
-         * @param libraries       ライブラリ
-         * @param testingTools    テスト
-         * @param ormTools        ORM
-         * @param packageManagers パッケージマネージャー
+         * @param languages      開発言語
+         * @param framework      フレームワーク
+         * @param libraries      ライブラリ
+         * @param buildTool      ビルドツール
+         * @param packageManager パッケージマネージャー
+         * @param linters        リンター
+         * @param formatters     フォーマッター
+         * @param testingTools   テストツール
+         * @param ormTools       ORM
+         * @param auth           認証
          * @return 値オブジェクト
          */
-        public static Dependencies create(List<String> frameworks, List<String> libraries, List<String> testingTools,
-                List<String> ormTools, List<String> packageManagers) {
-            return new Dependencies(frameworks, libraries, testingTools, ormTools, packageManagers);
+        public static Backend create(List<String> languages, String framework,
+                List<String> libraries, String buildTool, String packageManager,
+                List<String> linters, List<String> formatters, List<String> testingTools,
+                List<String> ormTools, List<String> auth) {
+            return new Backend(languages, framework, libraries, buildTool,
+                    packageManager, linters, formatters, testingTools,
+                    ormTools, auth);
         }
     }
 
@@ -123,6 +245,11 @@ public class TechStack {
         private final List<String> clouds;
 
         /**
+         * OS
+         */
+        private final String operatingSystem;
+
+        /**
          * コンテナ
          */
         private final List<String> containers;
@@ -130,17 +257,17 @@ public class TechStack {
         /**
          * データベース
          */
-        private final List<String> databases;
+        private final String database;
 
         /**
-         * ウェブサーバー
+         * Webサーバー
          */
-        private final List<String> webServers;
+        private final String webServer;
 
         /**
          * CI/CD
          */
-        private final List<String> ciCdTools;
+        private final String ciCdTool;
 
         /**
          * IaC
@@ -157,15 +284,16 @@ public class TechStack {
          */
         private final List<String> loggingTools;
 
-        private Infrastructure(List<String> clouds, List<String> containers, List<String> databases,
-                List<String> webServers,
-                List<String> ciCdTools, List<String> iacTools, List<String> monitoringTools,
+        private Infrastructure(List<String> clouds, String operatingSystem,
+                List<String> containers, String database, String webServer,
+                String ciCdTool, List<String> iacTools, List<String> monitoringTools,
                 List<String> loggingTools) {
             this.clouds = clouds;
+            this.operatingSystem = operatingSystem;
             this.containers = containers;
-            this.databases = databases;
-            this.webServers = webServers;
-            this.ciCdTools = ciCdTools;
+            this.database = database;
+            this.webServer = webServer;
+            this.ciCdTool = ciCdTool;
             this.iacTools = iacTools;
             this.monitoringTools = monitoringTools;
             this.loggingTools = loggingTools;
@@ -175,21 +303,22 @@ public class TechStack {
          * ファクトリーメソッド
          *
          * @param clouds          クラウド
+         * @param operatingSystem OS
          * @param containers      コンテナ
-         * @param databases       データベース
-         * @param webServers      ウェブサーバー
-         * @param ciCdTools       CI/CD
+         * @param database        データベース
+         * @param webServer       Webサーバー
+         * @param ciCdTool        CI/CD
          * @param iacTools        IaC
          * @param monitoringTools 監視
          * @param loggingTools    ロギング
          * @return 値オブジェクト
          */
-        public static Infrastructure create(List<String> clouds, List<String> containers, List<String> databases,
-                List<String> webServers,
-                List<String> ciCdTools, List<String> iacTools, List<String> monitoringTools,
+        public static Infrastructure create(List<String> clouds, String operatingSystem,
+                List<String> containers, String database, String webServer,
+                String ciCdTool, List<String> iacTools, List<String> monitoringTools,
                 List<String> loggingTools) {
-            return new Infrastructure(clouds, containers, databases, webServers, ciCdTools, iacTools, monitoringTools,
-                    loggingTools);
+            return new Infrastructure(clouds, operatingSystem, containers, database,
+                    webServer, ciCdTool, iacTools, monitoringTools, loggingTools);
         }
     }
 
@@ -203,17 +332,17 @@ public class TechStack {
         /**
          * ソース管理
          */
-        private final List<String> sourceControls;
+        private final String sourceControl;
 
         /**
          * プロジェクト管理
          */
-        private final List<String> projectManagements;
+        private final String projectManagement;
 
         /**
          * コミュニケーション
          */
-        private final List<String> communicationTools;
+        private final String communicationTool;
 
         /**
          * ドキュメント
@@ -230,32 +359,50 @@ public class TechStack {
          */
         private final List<String> designTools;
 
-        private Tools(List<String> sourceControls, List<String> projectManagements, List<String> communicationTools,
-                List<String> documentationTools, List<String> apiDevelopmentTools, List<String> designTools) {
-            this.sourceControls = sourceControls;
-            this.projectManagements = projectManagements;
-            this.communicationTools = communicationTools;
+        /**
+         * エディタ
+         */
+        private final String editor;
+
+        /**
+         * 開発環境
+         */
+        private final String developmentEnvironment;
+
+        private Tools(String sourceControl, String projectManagement,
+                String communicationTool, List<String> documentationTools,
+                List<String> apiDevelopmentTools, List<String> designTools,
+                String editor, String developmentEnvironment) {
+            this.sourceControl = sourceControl;
+            this.projectManagement = projectManagement;
+            this.communicationTool = communicationTool;
             this.documentationTools = documentationTools;
             this.apiDevelopmentTools = apiDevelopmentTools;
             this.designTools = designTools;
+            this.editor = editor;
+            this.developmentEnvironment = developmentEnvironment;
         }
 
         /**
          * ファクトリーメソッド
          *
-         * @param sourceControls      ソース管理
-         * @param projectManagements  プロジェクト管理
-         * @param communicationTools  コミュニケーション
-         * @param documentationTools  ドキュメント
-         * @param apiDevelopmentTools API開発
-         * @param designTools         デザイン
+         * @param sourceControl          ソース管理
+         * @param projectManagement      プロジェクト管理
+         * @param communicationTool      コミュニケーション
+         * @param documentationTools     ドキュメント
+         * @param apiDevelopmentTools    API開発
+         * @param designTools            デザイン
+         * @param editor                 エディタ
+         * @param developmentEnvironment 開発環境
          * @return 値オブジェクト
          */
-        public static Tools create(List<String> sourceControls, List<String> projectManagements,
-                List<String> communicationTools,
-                List<String> documentationTools, List<String> apiDevelopmentTools, List<String> designTools) {
-            return new Tools(sourceControls, projectManagements, communicationTools, documentationTools,
-                    apiDevelopmentTools, designTools);
+        public static Tools create(String sourceControl, String projectManagement,
+                String communicationTool, List<String> documentationTools,
+                List<String> apiDevelopmentTools, List<String> designTools,
+                String editor, String developmentEnvironment) {
+            return new Tools(sourceControl, projectManagement, communicationTool,
+                    documentationTools, apiDevelopmentTools, designTools,
+                    editor, developmentEnvironment);
         }
     }
 }

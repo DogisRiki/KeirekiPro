@@ -45,6 +45,9 @@ public class ResumeName {
             notification.addError("resumeName", "職務経歴書名は入力必須です。");
             return;
         }
+        if (value.length() > 50) {
+            notification.addError("resumeName", "職務経歴書名は50文字以内で入力してください。");
+        }
         if (isInvalidValue(value)) {
             notification.addError("resumeName", "職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | ");
         }

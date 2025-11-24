@@ -44,8 +44,8 @@ CREATE TABLE resumes (
     user_id UUID NOT NULL REFERENCES users(id),
     name VARCHAR(255) NOT NULL,
     date DATE NOT NULL,
-    last_name VARCHAR(255) NOT NULL,
-    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255),
+    first_name VARCHAR(255),
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL
 );
@@ -87,37 +87,17 @@ CREATE TABLE projects (
     end_date DATE NOT NULL,
     is_active BOOLEAN NOT NULL,
     name VARCHAR(255) NOT NULL,
-    overview VARCHAR(255),
-    team_comp VARCHAR(255),
-    role VARCHAR(255),
-    achievement TEXT,
-    requirements BOOLEAN,
-    basic_design BOOLEAN,
-    detailed_design BOOLEAN,
-    implementation BOOLEAN,
-    integration_test BOOLEAN,
-    system_test BOOLEAN,
-    maintenance BOOLEAN,
-    languages TEXT[],
-    frameworks TEXT[],
-    libraries TEXT[],
-    testing_tools TEXT[],
-    orm_tools TEXT[],
-    package_managers TEXT[],
-    clouds TEXT[],
-    containers TEXT[],
-    databases TEXT[],
-    web_servers TEXT[],
-    ci_cd_tools TEXT[],
-    iac_tools TEXT[],
-    monitoring_tools TEXT[],
-    logging_tools TEXT[],
-    source_controls TEXT[],
-    project_managements TEXT[],
-    communication_tools TEXT[],
-    documentation_tools TEXT[],
-    api_development_tools TEXT[],
-    design_tools TEXT[]
+    overview VARCHAR(255) NOT NULL,
+    team_comp VARCHAR(255) NOT NULL,
+    role VARCHAR(255) NOT NULL,
+    achievement TEXT NOT NULL,
+    requirements BOOLEAN NOT NULL,
+    basic_design BOOLEAN NOT NULL,
+    detailed_design BOOLEAN NOT NULL,
+    implementation BOOLEAN NOT NULL,
+    integration_test BOOLEAN NOT NULL,
+    system_test BOOLEAN NOT NULL,
+    maintenance BOOLEAN NOT NULL
 );
 
 COMMENT ON TABLE projects IS 'プロジェクト';
@@ -139,33 +119,106 @@ COMMENT ON COLUMN projects.implementation IS '実装・単体テスト';
 COMMENT ON COLUMN projects.integration_test IS '結合テスト';
 COMMENT ON COLUMN projects.system_test IS '総合テスト';
 COMMENT ON COLUMN projects.maintenance IS '運用・保守';
-COMMENT ON COLUMN projects.languages IS '開発言語';
-COMMENT ON COLUMN projects.frameworks IS 'フレームワーク';
-COMMENT ON COLUMN projects.libraries IS 'ライブラリ';
-COMMENT ON COLUMN projects.testing_tools IS 'テストツール';
-COMMENT ON COLUMN projects.orm_tools IS 'ORMツール';
-COMMENT ON COLUMN projects.package_managers IS 'パッケージマネージャー';
-COMMENT ON COLUMN projects.clouds IS 'クラウド';
-COMMENT ON COLUMN projects.containers IS 'コンテナ';
-COMMENT ON COLUMN projects.databases IS 'データベース';
-COMMENT ON COLUMN projects.web_servers IS 'Webサーバー';
-COMMENT ON COLUMN projects.ci_cd_tools IS 'CI/CDツール';
-COMMENT ON COLUMN projects.iac_tools IS 'IaCツール';
-COMMENT ON COLUMN projects.monitoring_tools IS '監視ツール';
-COMMENT ON COLUMN projects.logging_tools IS 'ロギングツール';
-COMMENT ON COLUMN projects.source_controls IS 'ソース管理';
-COMMENT ON COLUMN projects.project_managements IS 'プロジェクト管理';
-COMMENT ON COLUMN projects.communication_tools IS 'コミュニケーション';
-COMMENT ON COLUMN projects.documentation_tools IS 'ドキュメント';
-COMMENT ON COLUMN projects.api_development_tools IS 'API開発';
-COMMENT ON COLUMN projects.design_tools IS 'デザイン';
+
+-- プロジェクト技術スタックテーブル
+CREATE TABLE project_tech_stacks (
+    project_id UUID PRIMARY KEY REFERENCES projects(id),
+
+    -- TechStack - Frontend
+    frontend_languages TEXT[],
+    frontend_framework TEXT[],
+    frontend_libraries TEXT[],
+    frontend_build_tool TEXT[],
+    frontend_package_manager TEXT[],
+    frontend_linters TEXT[],
+    frontend_formatters TEXT[],
+    frontend_testing_tools TEXT[],
+
+    -- TechStack - Backend
+    backend_languages TEXT[],
+    backend_framework TEXT[],
+    backend_libraries TEXT[],
+    backend_build_tool TEXT[],
+    backend_package_manager TEXT[],
+    backend_linters TEXT[],
+    backend_formatters TEXT[],
+    backend_testing_tools TEXT[],
+    orm_tools TEXT[],
+    auth TEXT[],
+
+    -- TechStack - Infrastructure
+    clouds TEXT[],
+    operating_system TEXT[],
+    containers TEXT[],
+    database TEXT[],
+    web_server TEXT[],
+    ci_cd_tool TEXT[],
+    iac_tools TEXT[],
+    monitoring_tools TEXT[],
+    logging_tools TEXT[],
+
+    -- TechStack - Tools
+    source_control TEXT[],
+    project_management TEXT[],
+    communication_tool TEXT[],
+    documentation_tools TEXT[],
+    api_development_tools TEXT[],
+    design_tools TEXT[],
+    editor TEXT[],
+    development_environment TEXT[]
+);
+
+COMMENT ON TABLE project_tech_stacks IS 'プロジェクト技術スタック';
+
+-- TechStack - Frontend
+COMMENT ON COLUMN project_tech_stacks.frontend_languages IS 'フロントエンド開発言語';
+COMMENT ON COLUMN project_tech_stacks.frontend_framework IS 'フロントエンドフレームワーク';
+COMMENT ON COLUMN project_tech_stacks.frontend_libraries IS 'フロントエンドライブラリ';
+COMMENT ON COLUMN project_tech_stacks.frontend_build_tool IS 'フロントエンドビルドツール';
+COMMENT ON COLUMN project_tech_stacks.frontend_package_manager IS 'フロントエンドパッケージマネージャー';
+COMMENT ON COLUMN project_tech_stacks.frontend_linters IS 'フロントエンドリンター';
+COMMENT ON COLUMN project_tech_stacks.frontend_formatters IS 'フロントエンドフォーマッター';
+COMMENT ON COLUMN project_tech_stacks.frontend_testing_tools IS 'フロントエンドテストツール';
+
+-- TechStack - Backend
+COMMENT ON COLUMN project_tech_stacks.backend_languages IS 'バックエンド開発言語';
+COMMENT ON COLUMN project_tech_stacks.backend_framework IS 'バックエンドフレームワーク';
+COMMENT ON COLUMN project_tech_stacks.backend_libraries IS 'バックエンドライブラリ';
+COMMENT ON COLUMN project_tech_stacks.backend_build_tool IS 'バックエンドビルドツール';
+COMMENT ON COLUMN project_tech_stacks.backend_package_manager IS 'バックエンドパッケージマネージャー';
+COMMENT ON COLUMN project_tech_stacks.backend_linters IS 'バックエンドリンター';
+COMMENT ON COLUMN project_tech_stacks.backend_formatters IS 'バックエンドフォーマッター';
+COMMENT ON COLUMN project_tech_stacks.backend_testing_tools IS 'バックエンドテストツール';
+COMMENT ON COLUMN project_tech_stacks.orm_tools IS 'ORMツール';
+COMMENT ON COLUMN project_tech_stacks.auth IS '認証関連技術';
+
+-- TechStack - Infrastructure
+COMMENT ON COLUMN project_tech_stacks.clouds IS 'クラウド';
+COMMENT ON COLUMN project_tech_stacks.operating_system IS 'OS';
+COMMENT ON COLUMN project_tech_stacks.containers IS 'コンテナ';
+COMMENT ON COLUMN project_tech_stacks.database IS 'データベース';
+COMMENT ON COLUMN project_tech_stacks.web_server IS 'Webサーバー';
+COMMENT ON COLUMN project_tech_stacks.ci_cd_tool IS 'CI/CDツール';
+COMMENT ON COLUMN project_tech_stacks.iac_tools IS 'IaCツール';
+COMMENT ON COLUMN project_tech_stacks.monitoring_tools IS '監視ツール';
+COMMENT ON COLUMN project_tech_stacks.logging_tools IS 'ロギングツール';
+
+-- TechStack - Tools
+COMMENT ON COLUMN project_tech_stacks.source_control IS 'ソース管理';
+COMMENT ON COLUMN project_tech_stacks.project_management IS 'プロジェクト管理';
+COMMENT ON COLUMN project_tech_stacks.communication_tool IS 'コミュニケーション';
+COMMENT ON COLUMN project_tech_stacks.documentation_tools IS 'ドキュメント';
+COMMENT ON COLUMN project_tech_stacks.api_development_tools IS 'API開発';
+COMMENT ON COLUMN project_tech_stacks.design_tools IS 'デザイン';
+COMMENT ON COLUMN project_tech_stacks.editor IS 'エディタ';
+COMMENT ON COLUMN project_tech_stacks.development_environment IS '開発環境';
 
 -- 資格テーブル
 CREATE TABLE certifications (
     id UUID PRIMARY KEY,
     resume_id UUID NOT NULL REFERENCES resumes(id),
-    name VARCHAR(255),
-    date DATE
+    name VARCHAR(255) NOT NULL,
+    date DATE NOT NULL
 );
 
 COMMENT ON TABLE certifications IS '資格';
@@ -178,10 +231,10 @@ COMMENT ON COLUMN certifications.date IS '取得日';
 CREATE TABLE portfolios (
     id UUID PRIMARY KEY,
     resume_id UUID NOT NULL REFERENCES resumes(id),
-    name VARCHAR(255),
-    overview VARCHAR(255),
-    tech_stack TEXT,
-    link VARCHAR(255)
+    name VARCHAR(255) NOT NULL,
+    overview VARCHAR(255) NOT NULL,
+    tech_stack TEXT NOT NULL,
+    link VARCHAR(255) NOT NULL
 );
 
 COMMENT ON TABLE portfolios IS 'ポートフォリオ';
@@ -196,8 +249,8 @@ COMMENT ON COLUMN portfolios.link IS 'リンク';
 CREATE TABLE social_links (
     id UUID PRIMARY KEY,
     resume_id UUID NOT NULL REFERENCES resumes(id),
-    name VARCHAR(255),
-    link VARCHAR(255)
+    name VARCHAR(255) NOT NULL,
+    link VARCHAR(255) NOT NULL
 );
 
 COMMENT ON TABLE social_links IS 'ソーシャルリンク';
@@ -210,8 +263,8 @@ COMMENT ON COLUMN social_links.link IS 'リンク';
 CREATE TABLE self_promotions (
     id UUID PRIMARY KEY,
     resume_id UUID NOT NULL REFERENCES resumes(id),
-    title VARCHAR(255),
-    content TEXT
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL
 );
 
 COMMENT ON TABLE self_promotions IS '自己PR';
@@ -222,22 +275,24 @@ COMMENT ON COLUMN self_promotions.content IS 'コンテンツ';
 
 -- 技術スタックカテゴリマスタテーブル
 CREATE TABLE tech_stack_category_mst (
-    id INTEGER PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE
+    code          VARCHAR(64) PRIMARY KEY,
+    main_category VARCHAR(32) NOT NULL,
+    sub_category  VARCHAR(64) NOT NULL
 );
 
 COMMENT ON TABLE tech_stack_category_mst IS '技術スタックカテゴリマスタ';
-COMMENT ON COLUMN tech_stack_category_mst.id IS '識別子';
-COMMENT ON COLUMN tech_stack_category_mst.name IS 'カテゴリ名';
+COMMENT ON COLUMN tech_stack_category_mst.code IS 'カテゴリコード';
+COMMENT ON COLUMN tech_stack_category_mst.main_category IS 'メインカテゴリ';
+COMMENT ON COLUMN tech_stack_category_mst.sub_category IS 'サブカテゴリ';
 
 -- 技術スタックマスタテーブル
 CREATE TABLE tech_stack_mst (
-    id INTEGER PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    category INTEGER NOT NULL REFERENCES tech_stack_category_mst(id)
+    id            INTEGER PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL,
+    category_code VARCHAR(64) NOT NULL REFERENCES tech_stack_category_mst(code)
 );
 
 COMMENT ON TABLE tech_stack_mst IS '技術スタックマスタ';
 COMMENT ON COLUMN tech_stack_mst.id IS '識別子';
 COMMENT ON COLUMN tech_stack_mst.name IS '技術名';
-COMMENT ON COLUMN tech_stack_mst.category IS 'カテゴリ';
+COMMENT ON COLUMN tech_stack_mst.category_code IS 'カテゴリコード';

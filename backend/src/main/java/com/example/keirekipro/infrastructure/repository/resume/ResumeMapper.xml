@@ -156,47 +156,65 @@
             resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$ProjectDto"
             parameterType="java.util.UUID">
         SELECT
-            id,
-            company_name AS companyName,
-            start_date AS startDate,
-            end_date AS endDate,
-            is_active AS isActive,
-            name AS name,
-            overview AS overview,
-            team_comp AS teamComp,
-            role AS role,
-            achievement AS achievement,
-            requirements AS requirements,
-            basic_design AS basicDesign,
-            detailed_design AS detailedDesign,
-            implementation AS implementation,
-            integration_test AS integrationTest,
-            system_test AS systemTest,
-            maintenance AS maintenance,
-            languages AS languages,
-            frameworks AS frameworks,
-            libraries AS libraries,
-            testing_tools AS testingTools,
-            orm_tools AS ormTools,
-            package_managers AS packageManagers,
-            clouds AS clouds,
-            containers AS containers,
-            databases AS databases,
-            web_servers AS webServers,
-            ci_cd_tools AS ciCdTools,
-            iac_tools AS iacTools,
-            monitoring_tools AS monitoringTools,
-            logging_tools AS loggingTools,
-            source_controls AS sourceControls,
-            project_managements AS projectManagements,
-            communication_tools AS communicationTools,
-            documentation_tools AS documentationTools,
-            api_development_tools AS apiDevelopmentTools,
-            design_tools AS designTools
+            p.id,
+            p.company_name AS companyName,
+            p.start_date AS startDate,
+            p.end_date AS endDate,
+            p.is_active AS isActive,
+            p.name AS name,
+            p.overview AS overview,
+            p.team_comp AS teamComp,
+            p.role AS role,
+            p.achievement AS achievement,
+            p.requirements AS requirements,
+            p.basic_design AS basicDesign,
+            p.detailed_design AS detailedDesign,
+            p.implementation AS implementation,
+            p.integration_test AS integrationTest,
+            p.system_test AS systemTest,
+            p.maintenance AS maintenance,
+            pts.frontend_languages AS frontendLanguages,
+            pts.frontend_framework[1] AS frontendFramework,
+            pts.frontend_libraries AS frontendLibraries,
+            pts.frontend_build_tool[1] AS frontendBuildTool,
+            pts.frontend_package_manager[1] AS frontendPackageManager,
+            pts.frontend_linters AS frontendLinters,
+            pts.frontend_formatters AS frontendFormatters,
+            pts.frontend_testing_tools AS frontendTestingTools,
+            pts.backend_languages AS backendLanguages,
+            pts.backend_framework[1] AS backendFramework,
+            pts.backend_libraries AS backendLibraries,
+            pts.backend_build_tool[1] AS backendBuildTool,
+            pts.backend_package_manager[1] AS backendPackageManager,
+            pts.backend_linters AS backendLinters,
+            pts.backend_formatters AS backendFormatters,
+            pts.backend_testing_tools AS backendTestingTools,
+            pts.orm_tools AS ormTools,
+            pts.auth AS auth,
+            pts.clouds AS clouds,
+            pts.operating_system[1] AS operatingSystem,
+            pts.containers AS containers,
+            pts.database[1] AS database,
+            pts.web_server[1] AS webServer,
+            pts.ci_cd_tool[1] AS ciCdTool,
+            pts.iac_tools AS iacTools,
+            pts.monitoring_tools AS monitoringTools,
+            pts.logging_tools AS loggingTools,
+            pts.source_control[1] AS sourceControl,
+            pts.project_management[1] AS projectManagement,
+            pts.communication_tool[1] AS communicationTool,
+            pts.documentation_tools AS documentationTools,
+            pts.api_development_tools AS apiDevelopmentTools,
+            pts.design_tools AS designTools,
+            pts.editor[1] AS editor,
+            pts.development_environment[1] AS developmentEnvironment
         FROM
-            projects
+            projects p
+            LEFT JOIN
+                project_tech_stacks pts
+            ON  pts.project_id = p.id
         WHERE
-            resume_id = #{resumeId}
+            p.resume_id = #{resumeId}
     </select>
 
     <insert id="insertProject" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$ProjectDto">
@@ -218,27 +236,7 @@
             implementation,
             integration_test,
             system_test,
-            maintenance,
-            languages,
-            frameworks,
-            libraries,
-            testing_tools,
-            orm_tools,
-            package_managers,
-            clouds,
-            containers,
-            databases,
-            web_servers,
-            ci_cd_tools,
-            iac_tools,
-            monitoring_tools,
-            logging_tools,
-            source_controls,
-            project_managements,
-            communication_tools,
-            documentation_tools,
-            api_development_tools,
-            design_tools
+            maintenance
         )
         VALUES(
             #{dto.id},
@@ -258,27 +256,92 @@
             #{dto.implementation},
             #{dto.integrationTest},
             #{dto.systemTest},
-            #{dto.maintenance},
-            #{dto.languages, typeHandler=stringListTypeHandler},
-            #{dto.frameworks, typeHandler=stringListTypeHandler},
-            #{dto.libraries, typeHandler=stringListTypeHandler},
-            #{dto.testingTools, typeHandler=stringListTypeHandler},
+            #{dto.maintenance}
+        );
+
+        INSERT INTO project_tech_stacks(
+            project_id,
+
+            -- TechStack - Frontend
+            frontend_languages,
+            frontend_framework,
+            frontend_libraries,
+            frontend_build_tool,
+            frontend_package_manager,
+            frontend_linters,
+            frontend_formatters,
+            frontend_testing_tools,
+
+            -- TechStack - Backend
+            backend_languages,
+            backend_framework,
+            backend_libraries,
+            backend_build_tool,
+            backend_package_manager,
+            backend_linters,
+            backend_formatters,
+            backend_testing_tools,
+            orm_tools,
+            auth,
+
+            -- TechStack - Infrastructure
+            clouds,
+            operating_system,
+            containers,
+            database,
+            web_server,
+            ci_cd_tool,
+            iac_tools,
+            monitoring_tools,
+            logging_tools,
+
+            -- TechStack - Tools
+            source_control,
+            project_management,
+            communication_tool,
+            documentation_tools,
+            api_development_tools,
+            design_tools,
+            editor,
+            development_environment
+        )
+        VALUES(
+            #{dto.id},
+            #{dto.frontendLanguages, typeHandler=stringListTypeHandler},
+            ARRAY[#{dto.frontendFramework}],
+            #{dto.frontendLibraries, typeHandler=stringListTypeHandler},
+            ARRAY[#{dto.frontendBuildTool}],
+            ARRAY[#{dto.frontendPackageManager}],
+            #{dto.frontendLinters, typeHandler=stringListTypeHandler},
+            #{dto.frontendFormatters, typeHandler=stringListTypeHandler},
+            #{dto.frontendTestingTools, typeHandler=stringListTypeHandler},
+            #{dto.backendLanguages, typeHandler=stringListTypeHandler},
+            ARRAY[#{dto.backendFramework}],
+            #{dto.backendLibraries, typeHandler=stringListTypeHandler},
+            ARRAY[#{dto.backendBuildTool}],
+            ARRAY[#{dto.backendPackageManager}],
+            #{dto.backendLinters, typeHandler=stringListTypeHandler},
+            #{dto.backendFormatters, typeHandler=stringListTypeHandler},
+            #{dto.backendTestingTools, typeHandler=stringListTypeHandler},
             #{dto.ormTools, typeHandler=stringListTypeHandler},
-            #{dto.packageManagers, typeHandler=stringListTypeHandler},
+            #{dto.auth, typeHandler=stringListTypeHandler},
             #{dto.clouds, typeHandler=stringListTypeHandler},
+            ARRAY[#{dto.operatingSystem}],
             #{dto.containers, typeHandler=stringListTypeHandler},
-            #{dto.databases, typeHandler=stringListTypeHandler},
-            #{dto.webServers, typeHandler=stringListTypeHandler},
-            #{dto.ciCdTools, typeHandler=stringListTypeHandler},
+            ARRAY[#{dto.database}],
+            ARRAY[#{dto.webServer}],
+            ARRAY[#{dto.ciCdTool}],
             #{dto.iacTools, typeHandler=stringListTypeHandler},
             #{dto.monitoringTools, typeHandler=stringListTypeHandler},
             #{dto.loggingTools, typeHandler=stringListTypeHandler},
-            #{dto.sourceControls, typeHandler=stringListTypeHandler},
-            #{dto.projectManagements, typeHandler=stringListTypeHandler},
-            #{dto.communicationTools, typeHandler=stringListTypeHandler},
+            ARRAY[#{dto.sourceControl}],
+            ARRAY[#{dto.projectManagement}],
+            ARRAY[#{dto.communicationTool}],
             #{dto.documentationTools, typeHandler=stringListTypeHandler},
             #{dto.apiDevelopmentTools, typeHandler=stringListTypeHandler},
-            #{dto.designTools, typeHandler=stringListTypeHandler}
+            #{dto.designTools, typeHandler=stringListTypeHandler},
+            ARRAY[#{dto.editor}],
+            ARRAY[#{dto.developmentEnvironment}]
         )
     </insert>
 
@@ -301,45 +364,85 @@
             implementation = #{dto.implementation},
             integration_test = #{dto.integrationTest},
             system_test = #{dto.systemTest},
-            maintenance = #{dto.maintenance},
-            languages = #{dto.languages, typeHandler=stringListTypeHandler},
-            frameworks = #{dto.frameworks, typeHandler=stringListTypeHandler},
-            libraries = #{dto.libraries, typeHandler=stringListTypeHandler},
-            testing_tools = #{dto.testingTools, typeHandler=stringListTypeHandler},
+            maintenance = #{dto.maintenance}
+        WHERE
+            id = #{dto.id};
+
+        UPDATE
+            project_tech_stacks
+        SET
+            frontend_languages = #{dto.frontendLanguages, typeHandler=stringListTypeHandler},
+            frontend_framework = ARRAY[#{dto.frontendFramework}],
+            frontend_libraries = #{dto.frontendLibraries, typeHandler=stringListTypeHandler},
+            frontend_build_tool = ARRAY[#{dto.frontendBuildTool}],
+            frontend_package_manager = ARRAY[#{dto.frontendPackageManager}],
+            frontend_linters = #{dto.frontendLinters, typeHandler=stringListTypeHandler},
+            frontend_formatters = #{dto.frontendFormatters, typeHandler=stringListTypeHandler},
+            frontend_testing_tools = #{dto.frontendTestingTools, typeHandler=stringListTypeHandler},
+            backend_languages = #{dto.backendLanguages, typeHandler=stringListTypeHandler},
+            backend_framework = ARRAY[#{dto.backendFramework}],
+            backend_libraries = #{dto.backendLibraries, typeHandler=stringListTypeHandler},
+            backend_build_tool = ARRAY[#{dto.backendBuildTool}],
+            backend_package_manager = ARRAY[#{dto.backendPackageManager}],
+            backend_linters = #{dto.backendLinters, typeHandler=stringListTypeHandler},
+            backend_formatters = #{dto.backendFormatters, typeHandler=stringListTypeHandler},
+            backend_testing_tools = #{dto.backendTestingTools, typeHandler=stringListTypeHandler},
             orm_tools = #{dto.ormTools, typeHandler=stringListTypeHandler},
-            package_managers = #{dto.packageManagers, typeHandler=stringListTypeHandler},
+            auth = #{dto.auth, typeHandler=stringListTypeHandler},
             clouds = #{dto.clouds, typeHandler=stringListTypeHandler},
+            operating_system = ARRAY[#{dto.operatingSystem}],
             containers = #{dto.containers, typeHandler=stringListTypeHandler},
-            databases = #{dto.databases, typeHandler=stringListTypeHandler},
-            web_servers = #{dto.webServers, typeHandler=stringListTypeHandler},
-            ci_cd_tools = #{dto.ciCdTools, typeHandler=stringListTypeHandler},
+            database = ARRAY[#{dto.database}],
+            web_server = ARRAY[#{dto.webServer}],
+            ci_cd_tool = ARRAY[#{dto.ciCdTool}],
             iac_tools = #{dto.iacTools, typeHandler=stringListTypeHandler},
             monitoring_tools = #{dto.monitoringTools, typeHandler=stringListTypeHandler},
             logging_tools = #{dto.loggingTools, typeHandler=stringListTypeHandler},
-            source_controls = #{dto.sourceControls, typeHandler=stringListTypeHandler},
-            project_managements = #{dto.projectManagements, typeHandler=stringListTypeHandler},
-            communication_tools = #{dto.communicationTools, typeHandler=stringListTypeHandler},
+            source_control = ARRAY[#{dto.sourceControl}],
+            project_management = ARRAY[#{dto.projectManagement}],
+            communication_tool = ARRAY[#{dto.communicationTool}],
             documentation_tools = #{dto.documentationTools, typeHandler=stringListTypeHandler},
             api_development_tools = #{dto.apiDevelopmentTools, typeHandler=stringListTypeHandler},
-            design_tools = #{dto.designTools, typeHandler=stringListTypeHandler}
+            design_tools = #{dto.designTools, typeHandler=stringListTypeHandler},
+            editor = ARRAY[#{dto.editor}],
+            development_environment = ARRAY[#{dto.developmentEnvironment}]
         WHERE
-            id = #{dto.id}
+            project_id = #{dto.id}
     </update>
 
-    <delete id="deleteProject" parameterType="java.util.UUID">
+    <delete id="deleteProjectsByResumeId" parameterType="java.util.UUID">
         DELETE
         FROM
-            projects
+            project_tech_stacks
         WHERE
-            id = #{projectId}
-    </delete>
+            project_id IN (
+                SELECT
+                    id
+                FROM
+                    projects
+                WHERE
+                    resume_id = #{resumeId}
+            );
 
-    <delete id="deleteProjectsByResumeId" parameterType="java.util.UUID">
         DELETE
         FROM
             projects
         WHERE
             resume_id = #{resumeId}
+    </delete>
+
+    <delete id="deleteProject" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            project_tech_stacks
+        WHERE
+            project_id = #{projectId};
+
+        DELETE
+        FROM
+            projects
+        WHERE
+            id = #{projectId}
     </delete>
 
     <select id="selectCertificationsByResumeId"

@@ -490,17 +490,13 @@ class ResumeMapperTest {
                 "Team",
                 "Role",
                 "Achievement",
-                false, false, false, false, false, false, false,
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList());
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
         resumeMapper.insertProject(project);
 
         List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
@@ -547,17 +543,13 @@ class ResumeMapperTest {
                 "OldTeam",
                 "OldRole",
                 "OldAch",
-                false, false, false, false, false, false, false,
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList());
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
         resumeMapper.insertProject(original);
 
         // 更新
@@ -573,17 +565,13 @@ class ResumeMapperTest {
                 "NewTeam",
                 "NewRole",
                 "NewAch",
-                true, true, true, true, true, true, true,
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList());
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
         resumeMapper.updateProject(updated);
 
         List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
@@ -628,17 +616,13 @@ class ResumeMapperTest {
                 "DelTeam",
                 "DelRole",
                 "DelAch",
-                false, false, false, false, false, false, false,
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList());
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
         resumeMapper.insertProject(project);
 
         resumeMapper.deleteProject(projectId);
@@ -664,35 +648,43 @@ class ResumeMapperTest {
 
         // 複数挿入
         resumeMapper.insertProject(createProjectDto(
-                UUID.randomUUID(), RESUME_ID_1,
-                "P1", YearMonth.of(2020, 1), YearMonth.of(2020, 6), true,
-                "Proj1", "Ov1", "Team1", "Role1", "Ach1",
-                false, false, false, false, false, false, false,
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList()));
+                UUID.randomUUID(),
+                RESUME_ID_1,
+                "P1",
+                YearMonth.of(2020, 1),
+                YearMonth.of(2020, 6),
+                true,
+                "Proj1",
+                "Ov1",
+                "Team1",
+                "Role1",
+                "Ach1",
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false));
         resumeMapper.insertProject(createProjectDto(
-                UUID.randomUUID(), RESUME_ID_1,
-                "P2", YearMonth.of(2020, 7), YearMonth.of(2020, 12), false,
-                "Proj2", "Ov2", "Team2", "Role2", "Ach2",
-                false, false, false, false, false, false, false,
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList(),
-                Collections.<String>emptyList(), Collections.<String>emptyList()));
+                UUID.randomUUID(),
+                RESUME_ID_1,
+                "P2",
+                YearMonth.of(2020, 7),
+                YearMonth.of(2020, 12),
+                false,
+                "Proj2",
+                "Ov2",
+                "Team2",
+                "Role2",
+                "Ach2",
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false));
 
         resumeMapper.deleteProjectsByResumeId(RESUME_ID_1);
 
@@ -1267,27 +1259,7 @@ class ResumeMapperTest {
             Boolean implementation,
             Boolean integrationTest,
             Boolean systemTest,
-            Boolean maintenance,
-            List<String> languages,
-            List<String> frameworks,
-            List<String> libraries,
-            List<String> testingTools,
-            List<String> ormTools,
-            List<String> packageManagers,
-            List<String> clouds,
-            List<String> containers,
-            List<String> databases,
-            List<String> webServers,
-            List<String> ciCdTools,
-            List<String> iacTools,
-            List<String> monitoringTools,
-            List<String> loggingTools,
-            List<String> sourceControls,
-            List<String> projectManagements,
-            List<String> communicationTools,
-            List<String> documentationTools,
-            List<String> apiDevelopmentTools,
-            List<String> designTools) {
+            Boolean maintenance) {
         ProjectDto d = new ProjectDto();
         d.setId(id);
         d.setResumeId(resumeId);
@@ -1307,26 +1279,50 @@ class ResumeMapperTest {
         d.setIntegrationTest(integrationTest);
         d.setSystemTest(systemTest);
         d.setMaintenance(maintenance);
-        d.setLanguages(languages);
-        d.setFrameworks(frameworks);
-        d.setLibraries(libraries);
-        d.setTestingTools(testingTools);
-        d.setOrmTools(ormTools);
-        d.setPackageManagers(packageManagers);
-        d.setClouds(clouds);
-        d.setContainers(containers);
-        d.setDatabases(databases);
-        d.setWebServers(webServers);
-        d.setCiCdTools(ciCdTools);
-        d.setIacTools(iacTools);
-        d.setMonitoringTools(monitoringTools);
-        d.setLoggingTools(loggingTools);
-        d.setSourceControls(sourceControls);
-        d.setProjectManagements(projectManagements);
-        d.setCommunicationTools(communicationTools);
-        d.setDocumentationTools(documentationTools);
-        d.setApiDevelopmentTools(apiDevelopmentTools);
-        d.setDesignTools(designTools);
+
+        // TechStack - Frontend
+        d.setFrontendLanguages(Collections.emptyList());
+        d.setFrontendFramework(null);
+        d.setFrontendLibraries(Collections.emptyList());
+        d.setFrontendBuildTool(null);
+        d.setFrontendPackageManager(null);
+        d.setFrontendLinters(Collections.emptyList());
+        d.setFrontendFormatters(Collections.emptyList());
+        d.setFrontendTestingTools(Collections.emptyList());
+
+        // TechStack - Backend
+        d.setBackendLanguages(Collections.emptyList());
+        d.setBackendFramework(null);
+        d.setBackendLibraries(Collections.emptyList());
+        d.setBackendBuildTool(null);
+        d.setBackendPackageManager(null);
+        d.setBackendLinters(Collections.emptyList());
+        d.setBackendFormatters(Collections.emptyList());
+        d.setBackendTestingTools(Collections.emptyList());
+        d.setOrmTools(Collections.emptyList());
+        d.setAuth(Collections.emptyList());
+
+        // TechStack - Infrastructure
+        d.setClouds(Collections.emptyList());
+        d.setOperatingSystem(null);
+        d.setContainers(Collections.emptyList());
+        d.setDatabase(null);
+        d.setWebServer(null);
+        d.setCiCdTool(null);
+        d.setIacTools(Collections.emptyList());
+        d.setMonitoringTools(Collections.emptyList());
+        d.setLoggingTools(Collections.emptyList());
+
+        // TechStack - Tools
+        d.setSourceControl(null);
+        d.setProjectManagement(null);
+        d.setCommunicationTool(null);
+        d.setDocumentationTools(Collections.emptyList());
+        d.setApiDevelopmentTools(Collections.emptyList());
+        d.setDesignTools(Collections.emptyList());
+        d.setEditor(null);
+        d.setDevelopmentEnvironment(null);
+
         return d;
     }
 

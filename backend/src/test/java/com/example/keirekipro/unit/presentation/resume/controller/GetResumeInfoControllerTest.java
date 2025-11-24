@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.helper.ResumeObjectBuilder;
 import com.example.keirekipro.presentation.resume.controller.GetResumeInfoController;
+import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.usecase.resume.GetResumeInfoUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 
@@ -36,6 +37,9 @@ class GetResumeInfoControllerTest {
     @MockitoBean
     private GetResumeInfoUseCase getResumeInfoUseCase;
 
+    @MockitoBean
+    private CurrentUserFacade currentUserFacade;
+
     private final MockMvc mockMvc;
 
     private static final String ENDPOINT = "/api/resumes/{resumeId}";
@@ -55,7 +59,8 @@ class GetResumeInfoControllerTest {
                 RESUME_ID, USER_ID, NAME, DATE, "山田", "太郎", CREATED_AT, UPDATED_AT);
 
         // モック設定
-        when(getResumeInfoUseCase.execute(eq(RESUME_ID))).thenReturn(dto);
+        when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
+        when(getResumeInfoUseCase.execute(eq(USER_ID), eq(RESUME_ID))).thenReturn(dto);
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID))
                 .andExpect(status().isOk())

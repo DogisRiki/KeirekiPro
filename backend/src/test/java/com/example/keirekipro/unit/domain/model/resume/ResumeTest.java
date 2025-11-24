@@ -3,10 +3,6 @@ package com.example.keirekipro.unit.domain.model.resume;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -16,6 +12,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.Certification;
+import com.example.keirekipro.domain.model.resume.CompanyName;
 import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Period;
@@ -140,9 +137,9 @@ class ResumeTest {
     @DisplayName("正常な値で職歴を追加する")
     void test6() {
         Resume beforeResume = createSampleResume();
-        Career newCareer = Career.create("株式会社DEF",
+        Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Resume afterResume = beforeResume.addCareer(notification, newCareer);
+        Resume afterResume = beforeResume.addCareer(newCareer);
 
         assertThat(afterResume.getCareers().contains(newCareer)).isTrue();
         assertThat(afterResume.getCareers().size()).isEqualTo(beforeResume.getCareers().size() + 1);
@@ -151,9 +148,6 @@ class ResumeTest {
     @Test
     @DisplayName("継続中の職歴と期間が重なる職歴を追加するとDomainExceptionをスローする")
     void test7() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
-        when(notification.hasErrors()).thenReturn(false).thenReturn(true);
-
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
                 notification,
@@ -161,7 +155,7 @@ class ResumeTest {
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
-                List.of(Career.create("株式会社ABC",
+                List.of(Career.create(notification, CompanyName.create(notification, "株式会社ABC"),
                         Period.create(notification, YearMonth.of(2024, 1), null, true))),
                 List.of(),
                 List.of(),
@@ -169,44 +163,30 @@ class ResumeTest {
                 List.of(),
                 List.of());
 
-        // DomainExceptionがスローされる
-        assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create("株式会社DEF",
-                    Period.create(notification, YearMonth.of(2024, 2), YearMonth.of(2024, 3), false)));
-        }).isInstanceOf(DomainException.class);
+        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
+                Period.create(notification, YearMonth.of(2024, 2), YearMonth.of(2024, 3), false));
 
-        // エラーメッセージが登録される
-        verify(notification, times(1)).addError(
-                eq("career"),
-                eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
+        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+                .isInstanceOf(DomainException.class)
+                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
     @DisplayName("同じ期間の職歴を追加するとDomainExceptionをスローする")
     void test8() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
-        when(notification.hasErrors()).thenReturn(false).thenReturn(true);
-
         Resume resume = createSampleResume();
 
-        // DomainExceptionがスローされる
-        assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create("株式会社DEF",
-                    Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false)));
-        }).isInstanceOf(DomainException.class);
+        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
+                Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false));
 
-        // エラーメッセージが登録される
-        verify(notification, times(1)).addError(
-                eq("career"),
-                eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
+        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+                .isInstanceOf(DomainException.class)
+                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
     @DisplayName("継続中の職歴が存在する状態で、継続中の職歴を追加するとDomainExceptionをスローする")
     void test9() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
-        when(notification.hasErrors()).thenReturn(false).thenReturn(true);
-
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
                 notification,
@@ -214,7 +194,7 @@ class ResumeTest {
                 ResumeName.create(notification, "職務経歴書A"),
                 LocalDate.now(),
                 FullName.create(notification, "山田", "太郎"),
-                List.of(Career.create("株式会社ABC",
+                List.of(Career.create(notification, CompanyName.create(notification, "株式会社ABC"),
                         Period.create(notification, YearMonth.of(2024, 1), null, true))),
                 List.of(),
                 List.of(),
@@ -222,65 +202,48 @@ class ResumeTest {
                 List.of(),
                 List.of());
 
-        // DomainExceptionがスローされる
-        assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create("株式会社DEF",
-                    Period.create(notification, YearMonth.of(2024, 2), null, true)));
-        }).isInstanceOf(DomainException.class);
+        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
+                Period.create(notification, YearMonth.of(2024, 2), null, true));
 
-        // エラーメッセージが登録される
-        verify(notification, times(1)).addError(
-                eq("career"),
-                eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
+        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+                .isInstanceOf(DomainException.class)
+                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
     @DisplayName("期間が重なる職歴を追加するとDomainExceptionをスローする")
     void test10() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
-        when(notification.hasErrors()).thenReturn(false).thenReturn(true);
-
         Resume resume = createSampleResume();
 
-        // DomainExceptionがスローされる
-        assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create("株式会社DEF",
-                    Period.create(notification, YearMonth.of(2023, 10), YearMonth.of(2024, 11), false)));
-        }).isInstanceOf(DomainException.class);
+        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
+                Period.create(notification, YearMonth.of(2023, 10), YearMonth.of(2024, 11), false));
 
-        // エラーメッセージが登録される
-        verify(notification, times(1)).addError(
-                eq("career"),
-                eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
+        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+                .isInstanceOf(DomainException.class)
+                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
     @DisplayName("期間が一部重なる職歴を追加するとDomainExceptionをスローする")
     void test11() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する
-        when(notification.hasErrors()).thenReturn(false).thenReturn(true);
-
         Resume resume = createSampleResume();
 
-        // DomainExceptionがスローされる
-        assertThatThrownBy(() -> {
-            resume.addCareer(notification, Career.create("株式会社DEF",
-                    Period.create(notification, YearMonth.of(2023, 11), YearMonth.of(2024, 6), false)));
-        }).isInstanceOf(DomainException.class);
+        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
+                Period.create(notification, YearMonth.of(2023, 11), YearMonth.of(2024, 6), false));
 
-        // エラーメッセージが登録される
-        verify(notification, times(1)).addError(
-                eq("career"),
-                eq("株式会社DEFと株式会社ABCの期間が重複しています。"));
+        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+                .isInstanceOf(DomainException.class)
+                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
     @DisplayName("正常な値で職歴を更新する")
     void test12() {
         Resume beforeResume = createSampleResume();
-        Career newCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(), "株式会社DEF",
+        Career newCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(),
+                CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Resume afterResume = beforeResume.updateCareer(notification, newCareer);
+        Resume afterResume = beforeResume.updateCareer(newCareer);
 
         // 更新した職歴がリストに含まれている
         assertThat(afterResume.getCareers().contains(newCareer)).isTrue();
@@ -296,9 +259,9 @@ class ResumeTest {
     @DisplayName("職歴を削除する")
     void test13() {
         Resume beforeResume = createSampleResume();
-        Career newCareer = Career.create("株式会社DEF",
+        Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Resume afterResume = beforeResume.addCareer(notification, newCareer);
+        Resume afterResume = beforeResume.addCareer(newCareer);
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeCareer(newCareer.getId());
 
@@ -318,7 +281,7 @@ class ResumeTest {
     void test14() {
         Resume beforeResume = createSampleResume();
         Project newProject = createSampleProject();
-        Resume afterResume = beforeResume.addProject(notification, newProject);
+        Resume afterResume = beforeResume.addProject(newProject);
 
         // 新しいプロジェクトがリストに含まれている
         assertThat(afterResume.getProjects().contains(newProject)).isTrue();
@@ -329,21 +292,13 @@ class ResumeTest {
     @Test
     @DisplayName("職歴に存在しない会社名のプロジェクトを追加するとDomainExceptionをスローする")
     void test15() {
-        // 1回目の呼び出しではfalse、2回目の呼び出しではtrueを返すよう設定する。
-        when(notification.hasErrors()).thenReturn(false).thenReturn(true);
-
         Resume resume = createSampleResume();
-        Project notExistProject = createSampleProject().changeCompanyName("株式会社ZZZ");
+        Project notExistProject = createSampleProject().changeCompanyName(notification,
+                CompanyName.create(notification, "株式会社ZZZ"));
 
-        // DomainExceptionがスローされる
-        assertThatThrownBy(() -> {
-            resume.addProject(notification, notExistProject);
-        }).isInstanceOf(DomainException.class);
-
-        // エラーメッセージが登録される
-        verify(notification, times(1)).addError(
-                eq("companyName"),
-                eq("株式会社ZZZは職歴に存在しません。職歴に存在する会社名を選択してください。"));
+        assertThatThrownBy(() -> resume.addProject(notExistProject))
+                .isInstanceOf(DomainException.class)
+                .hasMessage("株式会社ZZZは職歴に存在しません。職歴に存在する会社名を選択してください。");
     }
 
     @Test
@@ -353,6 +308,56 @@ class ResumeTest {
 
         // 更新対象のプロジェクトを取得し、値を変更
         Project originalProject = beforeResume.getProjects().get(0);
+
+        TechStack.Frontend updatedFrontend = TechStack.Frontend.create(
+                List.of("JavaScript", "TypeScript"),
+                "React",
+                List.of("Redux", "Axios", "Lodash"),
+                "Vite",
+                "npm",
+                List.of("ESLint"),
+                List.of("Prettier"),
+                List.of("Jest", "Enzyme"));
+
+        TechStack.Backend updatedBackend = TechStack.Backend.create(
+                List.of("Node.js"),
+                "Express",
+                List.of("Prisma"),
+                "npm",
+                "npm",
+                List.of("ESLint"),
+                List.of("Prettier"),
+                List.of("Jest"),
+                List.of("Prisma ORM"),
+                List.of("JWT"));
+
+        TechStack.Infrastructure updatedInfrastructure = TechStack.Infrastructure.create(
+                List.of("Azure"),
+                "Ubuntu 22.04",
+                List.of("Kubernetes"),
+                "MySQL",
+                "Apache",
+                "CircleCI",
+                List.of("Ansible"),
+                List.of("Grafana"),
+                List.of("Azure Monitor"));
+
+        TechStack.Tools updatedTools = TechStack.Tools.create(
+                "GitLab",
+                "Asana",
+                "Teams",
+                List.of("Notion"),
+                List.of("Insomnia"),
+                List.of("Sketch"),
+                "WebStorm",
+                "Docker Desktop");
+
+        TechStack updatedTechStack = TechStack.create(
+                updatedFrontend,
+                updatedBackend,
+                updatedInfrastructure,
+                updatedTools);
+
         Project updatedProject = Project.reconstruct(
                 originalProject.getId(),
                 originalProject.getCompanyName(), // 会社名は変更しない
@@ -363,32 +368,9 @@ class ResumeTest {
                 "マネージャー",
                 "新しい成果内容",
                 Project.Process.create(false, true, true, false, true, true, false),
-                TechStack.create(
-                        List.of("JavaScript", "TypeScript"),
-                        TechStack.Dependencies.create(
-                                List.of("React", "Redux"),
-                                List.of("Axios", "Lodash"),
-                                List.of("Jest", "Enzyme"),
-                                List.of("Prisma"),
-                                List.of("npm")),
-                        TechStack.Infrastructure.create(
-                                List.of("Azure"),
-                                List.of("Kubernetes"),
-                                List.of("MySQL"),
-                                List.of("Apache"),
-                                List.of("CircleCI"),
-                                List.of("Ansible"),
-                                List.of("Grafana"),
-                                List.of("Azure Monitor")),
-                        TechStack.Tools.create(
-                                List.of("GitLab"),
-                                List.of("Asana"),
-                                List.of("Teams"),
-                                List.of("Notion"),
-                                List.of("Insomnia"),
-                                List.of("Sketch"))));
+                updatedTechStack);
 
-        Resume afterResume = beforeResume.updateProject(notification, updatedProject);
+        Resume afterResume = beforeResume.updateProject(updatedProject);
 
         // 更新したプロジェクトがリストに含まれている
         assertThat(afterResume.getProjects().contains(updatedProject)).isTrue();
@@ -407,14 +389,14 @@ class ResumeTest {
                 () -> assertThat(afterResume.getProjects().get(0).getAchievement()).isEqualTo("新しい成果内容"),
                 () -> assertThat(afterResume.getProjects().get(0).getProcess())
                         .isEqualTo(Project.Process.create(false, true, true, false, true, true, false)),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getLanguages())
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getFrontend().getLanguages())
                         .isEqualTo(List.of("JavaScript", "TypeScript")),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getDependencies().getFrameworks())
-                        .isEqualTo(List.of("React", "Redux")),
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getFrontend().getFramework())
+                        .isEqualTo("React"),
                 () -> assertThat(afterResume.getProjects().get(0).getTechStack().getInfrastructure().getClouds())
                         .isEqualTo(List.of("Azure")),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getTools().getSourceControls())
-                        .isEqualTo(List.of("GitLab")));
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getTools().getSourceControl())
+                        .isEqualTo("GitLab"));
     }
 
     @Test
@@ -422,9 +404,55 @@ class ResumeTest {
     void test17() {
         Resume beforeResume = createSampleResume();
 
-        // 削除対象のプロジェクトを追加
+        TechStack.Frontend frontend = TechStack.Frontend.create(
+                List.of("TypeScript"),
+                "React",
+                List.of("React Query"),
+                "Vite",
+                "npm",
+                List.of("ESLint"),
+                List.of("Prettier"),
+                List.of("Vitest"));
+
+        TechStack.Backend backend = TechStack.Backend.create(
+                List.of("Python"),
+                "Flask",
+                List.of("Requests"),
+                "Poetry",
+                "Poetry",
+                List.of(),
+                List.of(),
+                List.of("Pytest"),
+                List.of("SQLAlchemy"),
+                List.of());
+
+        TechStack.Infrastructure infrastructure = TechStack.Infrastructure.create(
+                List.of("AWS"),
+                "Amazon Linux 2023",
+                List.of("Docker"),
+                "PostgreSQL",
+                "Nginx",
+                "GitHub Actions",
+                List.of("Terraform"),
+                List.of(),
+                List.of());
+
+        TechStack.Tools tools = TechStack.Tools.create(
+                "Git",
+                "Jira",
+                "Slack",
+                List.of("Confluence"),
+                List.of("Postman"),
+                List.of("Figma"),
+                "Visual Studio Code",
+                "Docker Desktop");
+
+        TechStack techStack = TechStack.create(frontend, backend, infrastructure, tools);
+
+        // 削除対象のプロジェクトを追加（職歴に存在する会社名を使用）
         Project newProject = Project.create(
-                "株式会社DEF",
+                notification,
+                CompanyName.create(notification, "株式会社ABC"),
                 Period.create(notification, YearMonth.of(2022, 1), YearMonth.of(2023, 1), false),
                 "プロジェクト概要",
                 "プロジェクト名",
@@ -432,32 +460,9 @@ class ResumeTest {
                 "リーダー",
                 "成果内容",
                 Project.Process.create(true, false, true, false, true, false, true),
-                TechStack.create(
-                        List.of("Python"),
-                        TechStack.Dependencies.create(
-                                List.of("Flask"),
-                                List.of("Requests"),
-                                List.of("Pytest"),
-                                List.of("SQLAlchemy"),
-                                List.of("Pip")),
-                        TechStack.Infrastructure.create(
-                                List.of("AWS"),
-                                List.of("Docker"),
-                                List.of("PostgreSQL"),
-                                List.of("Nginx"),
-                                List.of("GitHub Actions"),
-                                List.of("Terraform"),
-                                List.of("Prometheus"),
-                                List.of("CloudWatch")),
-                        TechStack.Tools.create(
-                                List.of("Git"),
-                                List.of("Jira"),
-                                List.of("Slack"),
-                                List.of("Confluence"),
-                                List.of("Postman"),
-                                List.of("Figma"))));
+                techStack);
 
-        Resume afterResume = beforeResume.addProject(notification, newProject);
+        Resume afterResume = beforeResume.addProject(newProject);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeProject(newProject.getId());
@@ -476,7 +481,7 @@ class ResumeTest {
     @DisplayName("資格を追加する")
     void test18() {
         Resume beforeResume = createSampleResume();
-        Certification newCertification = Certification.create("応用情報技術者", YearMonth.of(2025, 02));
+        Certification newCertification = Certification.create(notification, "応用情報技術者", YearMonth.of(2025, 2));
         Resume afterResume = beforeResume.addCertification(newCertification);
 
         // 新しい資格がリストに含まれている
@@ -490,7 +495,7 @@ class ResumeTest {
     void test19() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.reconstruct(beforeResume.getCertifications().get(0).getId(),
-                "応用情報技術者", YearMonth.of(2025, 02));
+                "応用情報技術者", YearMonth.of(2025, 2));
         Resume afterResume = beforeResume.updateCertification(newCertification);
 
         // 更新した資格がリストに含まれている
@@ -511,7 +516,7 @@ class ResumeTest {
     @DisplayName("資格を削除する")
     void test20() {
         Resume beforeResume = createSampleResume();
-        Certification newCertification = Certification.create("応用情報技術者", YearMonth.of(2025, 02));
+        Certification newCertification = Certification.create(notification, "応用情報技術者", YearMonth.of(2025, 2));
         Resume afterResume = beforeResume.addCertification(newCertification);
 
         // 削除1回目(2件 → 1件)
@@ -532,6 +537,7 @@ class ResumeTest {
     void test21() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
+                notification,
                 "新しいポートフォリオ",
                 "新しいポートフォリオの概要",
                 "新しい技術スタック",
@@ -579,6 +585,7 @@ class ResumeTest {
     void test23() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
+                notification,
                 "削除対象のポートフォリオ",
                 "削除対象の概要",
                 "削除対象の技術スタック",
@@ -604,6 +611,7 @@ class ResumeTest {
     void test24() {
         Resume beforeResume = createSampleResume();
         SocialLink newSocialLink = SocialLink.create(
+                notification,
                 "Twitter",
                 Link.create(notification, "https://twitter.com/user"));
 
@@ -641,6 +649,7 @@ class ResumeTest {
     void test26() {
         Resume beforeResume = createSampleResume();
         SocialLink newSocialLink = SocialLink.create(
+                notification,
                 "Facebook",
                 Link.create(notification, "https://facebook.com/user"));
 
@@ -664,6 +673,7 @@ class ResumeTest {
     void test27() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
+                notification,
                 "新しいタイトル",
                 "新しい自己PRの内容");
 
@@ -705,6 +715,7 @@ class ResumeTest {
     void test29() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
+                notification,
                 "削除対象のタイトル",
                 "削除対象の自己PRの内容");
 
@@ -757,7 +768,8 @@ class ResumeTest {
      */
     private Career createSampleCareer() {
         Period period = Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false);
-        return Career.create("株式会社ABC", period);
+        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
+        return Career.create(notification, companyName, period);
     }
 
     /**
@@ -765,59 +777,84 @@ class ResumeTest {
      */
     private Project createSampleProject() {
         Period period = Period.create(notification, YearMonth.of(2021, 1), YearMonth.of(2023, 12), false);
-        TechStack techStack = TechStack.create(
+        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
+
+        TechStack.Frontend frontend = TechStack.Frontend.create(
+                List.of("TypeScript"),
+                "React",
+                List.of("MUI"),
+                "Vite",
+                "npm",
+                List.of("ESLint"),
+                List.of("Prettier"),
+                List.of("Vitest"));
+
+        TechStack.Backend backend = TechStack.Backend.create(
                 List.of("Java", "Python"),
-                TechStack.Dependencies.create(
-                        List.of("Spring", "Django"),
-                        List.of("Lombok", "Jackson"),
-                        List.of("JUnit", "Mockito"),
-                        List.of("MyBatis"),
-                        List.of("Maven")),
-                TechStack.Infrastructure.create(
-                        List.of("AWS"),
-                        List.of("Docker"),
-                        List.of("PostgreSQL"),
-                        List.of("Nginx"),
-                        List.of("GitHub Actions"),
-                        List.of("Terraform"),
-                        List.of("Prometheus"),
-                        List.of("CloudWatch")),
-                TechStack.Tools.create(
-                        List.of("Git"),
-                        List.of("Jira"),
-                        List.of("Slack"),
-                        List.of("Confluence"),
-                        List.of("Postman"),
-                        List.of("Figma")));
+                "Spring Framework",
+                List.of("Lombok", "Jackson"),
+                "Gradle",
+                "Gradle",
+                List.of("CheckStyle"),
+                List.of("Google Java Format"),
+                List.of("JUnit", "Mockito"),
+                List.of("MyBatis"),
+                List.of("Spring Security"));
+
+        TechStack.Infrastructure infrastructure = TechStack.Infrastructure.create(
+                List.of("AWS"),
+                "RHEL9.4",
+                List.of("Docker"),
+                "PostgreSQL",
+                "Nginx",
+                "GitHub Actions",
+                List.of("Terraform"),
+                List.of("Prometheus"),
+                List.of("CloudWatch"));
+
+        TechStack.Tools tools = TechStack.Tools.create(
+                "Git",
+                "Jira",
+                "Slack",
+                List.of("Confluence"),
+                List.of("Postman"),
+                List.of("Figma"),
+                "Visual Studio Code",
+                "Windows");
+
+        TechStack techStack = TechStack.create(frontend, backend, infrastructure, tools);
+
         Project.Process process = Project.Process.create(true, true, true, true, true, true, true);
-        return Project.create("株式会社ABC", period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
+        return Project.create(
+                notification, companyName, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
     }
 
     /**
      * 資格のサンプルエンティティを作成する補助メソッド
      */
     private Certification createSampleCertification() {
-        return Certification.create("基本情報技術者", YearMonth.of(2025, 01));
+        return Certification.create(notification, "基本情報技術者", YearMonth.of(2025, 1));
     }
 
     /**
      * ポートフォリオのサンプルエンティティを作成する補助メソッド
      */
     private Portfolio createSamplePortfolio() {
-        return Portfolio.create("ポートフォリオ名", "概要", "技術スタック", Link.create(notification, "https://portfolio.com"));
+        return Portfolio.create(notification, "ポートフォリオ名", "概要", "技術スタック",
+                Link.create(notification, "https://portfolio.com"));
     }
 
     /**
      * ソーシャルリンクのサンプルエンティティを作成する補助メソッド
      */
     private SocialLink createSampleSociealLink() {
-        return SocialLink.create("GitHub", Link.create(notification, "https://github.com/user"));
+        return SocialLink.create(notification, "GitHub", Link.create(notification, "https://github.com/user"));
     }
 
     /**
      * 自己PRのサンプルエンティティを作成する補助メソッド
      */
     private SelfPromotion createSampleSelfPromotion() {
-        return SelfPromotion.create("自己PRタイトル", "自己PR内容");
+        return SelfPromotion.create(notification, "自己PRタイトル", "自己PR内容");
     }
 }

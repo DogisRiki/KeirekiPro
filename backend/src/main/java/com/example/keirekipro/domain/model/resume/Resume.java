@@ -116,7 +116,7 @@ public class Resume extends Entity {
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
         super();
-        // サブエンティティや値オブジェクトのドメイン例外を一括でスローする
+        // サブエンティティや値オブジェクト、事前バリデーションのエラーを一括でスローする
         if (notification.hasErrors()) {
             throw new DomainException(notification.getErrors());
         }
@@ -177,27 +177,15 @@ public class Resume extends Entity {
             List<Career> careers,
             List<Project> projects, List<Certification> certifications, List<Portfolio> portfolios,
             List<SocialLink> socialLinks, List<SelfPromotion> selfPromotions) {
+
+        validateOnCreate(notification, name, date);
+
         return new Resume(notification, userId, name, date, fullName, careers, projects, certifications, portfolios,
                 socialLinks, selfPromotions);
     }
 
     /**
      * 再構築用のファクトリーメソッド
-     *
-     * @param id             識別子
-     * @param userId         ユーザーID
-     * @param name           職務経歴書名
-     * @param fullName       氏名
-     * @param date           日付
-     * @param createdAt      作成日時
-     * @param updatedAt      更新日時
-     * @param careers        職歴リスト
-     * @param projects       プロジェクトリスト
-     * @param certifications 資格リスト
-     * @param portfolios     ポートフォリオリスト
-     * @param socialLinks    ソーシャルリンクリスト
-     * @param selfPromotions 自己PRリスト
-     * @return 職務経歴書エンティティ
      */
     public static Resume reconstruct(UUID id, UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
@@ -216,6 +204,9 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume changeName(ResumeName name) {
+        if (name == null) {
+            throw new DomainException("職務経歴書名は入力必須です。");
+        }
         return new Resume(this.id, this.userId, name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -229,6 +220,9 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume ChangeFullName(FullName fullName) {
+        if (fullName == null) {
+            throw new DomainException("氏名は入力必須です。");
+        }
         return new Resume(this.id, this.userId, this.name, this.date, fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -242,6 +236,9 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume changeDate(LocalDate date) {
+        if (date == null) {
+            throw new DomainException("日付は入力必須です。");
+        }
         return new Resume(this.id, this.userId, this.name, date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -254,11 +251,12 @@ public class Resume extends Entity {
      * @param career 追加する職歴
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addCareer(Notification notification, Career career) {
-        validateIsCareerOverlap(notification, career);
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+    public Resume addCareer(Career career) {
+        if (career == null) {
+            throw new DomainException("職歴は入力必須です。");
         }
+        validateIsCareerOverlap(career);
+
         List<Career> updatedCareers = new ArrayList<>(this.careers);
         updatedCareers.add(career);
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
@@ -273,11 +271,12 @@ public class Resume extends Entity {
      * @param updatedCareer 更新後の職歴エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateCareer(Notification notification, Career updatedCareer) {
-        validateIsCareerOverlap(notification, updatedCareer);
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+    public Resume updateCareer(Career updatedCareer) {
+        if (updatedCareer == null) {
+            throw new DomainException("職歴は入力必須です。");
         }
+        validateIsCareerOverlap(updatedCareer);
+
         List<Career> updatedCareers = this.careers.stream()
                 .map(career -> career.getId().equals(updatedCareer.getId()) ? updatedCareer : career)
                 .toList();
@@ -306,11 +305,9 @@ public class Resume extends Entity {
     /**
      * 職歴の在籍期間の重複を検証する
      *
-     * @param notification 通知オブジェクト
      * @param targetCareer 対象の職歴エンティティ
      */
-    private void validateIsCareerOverlap(Notification notification, Career targetCareer) {
-        // 期間被りをしている会社名を格納するリスト
+    private void validateIsCareerOverlap(Career targetCareer) {
         List<String> overlappingCompanies = new ArrayList<>();
 
         for (Career existingCareer : this.careers) {
@@ -321,7 +318,7 @@ public class Resume extends Entity {
 
             // 2つの職歴が両方とも継続中の場合は重複
             if (targetCareer.getPeriod().isActive() && existingCareer.getPeriod().isActive()) {
-                overlappingCompanies.add(existingCareer.getCompanyName());
+                overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 continue;
             }
 
@@ -329,7 +326,7 @@ public class Resume extends Entity {
             if (targetCareer.getPeriod().isActive()) {
                 // 既存の職歴が継続中の職歴の開始日以降にあれば重複
                 if (!existingCareer.getPeriod().getStartDate().isBefore(targetCareer.getPeriod().getStartDate())) {
-                    overlappingCompanies.add(existingCareer.getCompanyName());
+                    overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 }
                 continue;
             }
@@ -338,7 +335,7 @@ public class Resume extends Entity {
             if (existingCareer.getPeriod().isActive()) {
                 // 追加する職歴の開始日が、継続中の職歴の開始日以降なら重複
                 if (!targetCareer.getPeriod().getStartDate().isBefore(existingCareer.getPeriod().getStartDate())) {
-                    overlappingCompanies.add(existingCareer.getCompanyName());
+                    overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 }
                 continue;
             }
@@ -346,15 +343,15 @@ public class Resume extends Entity {
             // どちらも継続中でない場合は期間の重なりをチェック
             if (!existingCareer.getPeriod().getEndDate().isBefore(targetCareer.getPeriod().getStartDate())
                     && !existingCareer.getPeriod().getStartDate().isAfter(targetCareer.getPeriod().getEndDate())) {
-                overlappingCompanies.add(existingCareer.getCompanyName());
+                overlappingCompanies.add(existingCareer.getCompanyName().getValue());
             }
         }
 
         if (!overlappingCompanies.isEmpty()) {
-            notification.addError("career",
-                    String.format("%sと%sの期間が重複しています。",
-                            targetCareer.getCompanyName(),
-                            String.join("、", overlappingCompanies)));
+            String message = String.format("%sと%sの期間が重複しています。",
+                    targetCareer.getCompanyName().getValue(),
+                    String.join("、", overlappingCompanies));
+            throw new DomainException(message);
         }
     }
 
@@ -364,11 +361,13 @@ public class Resume extends Entity {
      * @param project 追加するプロジェクト
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addProject(Notification notification, Project project) {
-        validateProjectInCareer(notification, project);
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+    public Resume addProject(Project project) {
+        if (project == null) {
+            throw new DomainException("プロジェクトは入力必須です。");
         }
+
+        validateProjectInCareer(project);
+
         List<Project> updatedProjects = new ArrayList<>(this.projects);
         updatedProjects.add(project);
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
@@ -383,11 +382,13 @@ public class Resume extends Entity {
      * @param updatedProject 更新するプロジェクトエンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateProject(Notification notification, Project updatedProject) {
-        validateProjectInCareer(notification, updatedProject);
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+    public Resume updateProject(Project updatedProject) {
+        if (updatedProject == null) {
+            throw new DomainException("プロジェクトは入力必須です。");
         }
+
+        validateProjectInCareer(updatedProject);
+
         List<Project> updatedProjects = this.projects.stream()
                 .map(project -> project.getId().equals(updatedProject.getId()) ? updatedProject : project)
                 .toList();
@@ -416,15 +417,16 @@ public class Resume extends Entity {
     /**
      * プロジェクトに追加する会社名が職歴リストに存在する会社名かを検証する
      *
-     * @param notification 通知オブジェクト
-     * @param project      追加するプロジェクト
+     * @param project 追加・更新するプロジェクト
      */
-    private void validateProjectInCareer(Notification notification, Project project) {
+    private void validateProjectInCareer(Project project) {
         boolean exists = this.careers.stream()
                 .anyMatch(career -> career.getCompanyName().equals(project.getCompanyName()));
         if (!exists) {
-            notification.addError("companyName",
-                    String.format("%sは職歴に存在しません。職歴に存在する会社名を選択してください。", project.getCompanyName()));
+            String message = String.format(
+                    "%sは職歴に存在しません。職歴に存在する会社名を選択してください。",
+                    project.getCompanyName().getValue());
+            throw new DomainException(message);
         }
     }
 
@@ -435,6 +437,10 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addCertification(Certification certification) {
+        if (certification == null) {
+            throw new DomainException("資格は入力必須です。");
+        }
+
         List<Certification> updatedCertifications = new ArrayList<>(this.certifications);
         updatedCertifications.add(certification);
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
@@ -450,6 +456,10 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume updateCertification(Certification updatedCertification) {
+        if (updatedCertification == null) {
+            throw new DomainException("資格は入力必須です。");
+        }
+
         List<Certification> updatedCertifications = this.certifications.stream()
                 .map(certification -> certification.getId().equals(updatedCertification.getId()) ? updatedCertification
                         : certification)
@@ -483,6 +493,10 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addPortfolio(Portfolio portfolio) {
+        if (portfolio == null) {
+            throw new DomainException("ポートフォリオは入力必須です。");
+        }
+
         List<Portfolio> updatedPortfolios = new ArrayList<>(this.portfolios);
         updatedPortfolios.add(portfolio);
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
@@ -498,6 +512,10 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume updatePortfolio(Portfolio updatedPortfolio) {
+        if (updatedPortfolio == null) {
+            throw new DomainException("ポートフォリオは入力必須です。");
+        }
+
         List<Portfolio> updatedPortfolios = this.portfolios.stream()
                 .map(portfolio -> portfolio.getId().equals(updatedPortfolio.getId()) ? updatedPortfolio : portfolio)
                 .toList();
@@ -530,6 +548,10 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addSociealLink(SocialLink sociealLink) {
+        if (sociealLink == null) {
+            throw new DomainException("ソーシャルリンクは入力必須です。");
+        }
+
         List<SocialLink> updatedSocialLinks = new ArrayList<>(this.socialLinks);
         updatedSocialLinks.add(sociealLink);
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
@@ -545,6 +567,10 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume updateSociealLink(SocialLink updatedSociealLink) {
+        if (updatedSociealLink == null) {
+            throw new DomainException("ソーシャルリンクは入力必須です。");
+        }
+
         List<SocialLink> updatedSocialLinks = this.socialLinks.stream()
                 .map(sociealLink -> sociealLink.getId().equals(updatedSociealLink.getId()) ? updatedSociealLink
                         : sociealLink)
@@ -578,6 +604,10 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addSelfPromotion(SelfPromotion selfPromotion) {
+        if (selfPromotion == null) {
+            throw new DomainException("自己PRは入力必須です。");
+        }
+
         List<SelfPromotion> updatedSelfPromotions = new ArrayList<>(this.selfPromotions);
         updatedSelfPromotions.add(selfPromotion);
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
@@ -609,6 +639,10 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume updateSelfPromotion(SelfPromotion updatedSelfPromotion) {
+        if (updatedSelfPromotion == null) {
+            throw new DomainException("自己PRは入力必須です。");
+        }
+
         List<SelfPromotion> updatedSelfPromotions = this.selfPromotions.stream()
                 .map(selfPromotion -> selfPromotion.getId().equals(updatedSelfPromotion.getId()) ? updatedSelfPromotion
                         : selfPromotion)
@@ -617,5 +651,17 @@ public class Resume extends Entity {
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 this.portfolios, this.socialLinks, updatedSelfPromotions);
+    }
+
+    /**
+     * 新規作成時の必須チェック
+     */
+    private static void validateOnCreate(Notification notification, ResumeName name, LocalDate date) {
+        if (name == null) {
+            notification.addError("name", "職務経歴書名は入力必須です。");
+        }
+        if (date == null) {
+            notification.addError("date", "日付は入力必須です。");
+        }
     }
 }

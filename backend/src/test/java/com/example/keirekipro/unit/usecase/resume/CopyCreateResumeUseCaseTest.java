@@ -47,6 +47,7 @@ class CopyCreateResumeUseCaseTest {
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID RESUME_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID OTHER_USER_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final String ORIGINAL_NAME = "職務経歴書1";
     private static final String NEW_NAME = "職務経歴書New";
     private static final LocalDate DATE = LocalDate.of(2021, 5, 20);
@@ -101,6 +102,30 @@ class CopyCreateResumeUseCaseTest {
 
         verify(service).execute(eq(USER_ID), any(ResumeName.class));
         verify(repository, never()).find(any());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("ログインユーザー以外が所有する職務経歴書をコピーしようとした場合、UseCaseExceptionがスローされる")
+    void test3() {
+        // リクエスト準備
+        CreateResumeRequest request = new CreateResumeRequest(NEW_NAME, RESUME_ID);
+
+        // コピー元エンティティ（所有者は別ユーザー）
+        Resume source = ResumeObjectBuilder.buildResume(
+                RESUME_ID, OTHER_USER_ID, ORIGINAL_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
+
+        // モック
+        doNothing().when(service).execute(eq(USER_ID), any(ResumeName.class));
+        when(repository.find(RESUME_ID)).thenReturn(Optional.of(source));
+
+        // 実行＆検証
+        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+                .isInstanceOf(UseCaseException.class)
+                .hasMessage("コピー元の職務経歴書が存在しません。");
+
+        verify(service).execute(eq(USER_ID), any(ResumeName.class));
+        verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
     }
 }

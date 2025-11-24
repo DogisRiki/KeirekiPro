@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.Certification;
+import com.example.keirekipro.domain.model.resume.CompanyName;
 import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Period;
@@ -146,7 +147,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
         List<Career> careers = dto.getCareers().stream()
                 .map(d -> Career.reconstruct(
                         d.getId(),
-                        d.getCompanyName(),
+                        CompanyName.create(notification, d.getCompanyName()),
                         Period.create(notification, d.getStartDate(), d.getEndDate(), d.getIsActive())))
                 .toList();
 
@@ -154,7 +155,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
         List<Project> projects = dto.getProjects().stream()
                 .map(d -> Project.reconstruct(
                         d.getId(),
-                        d.getCompanyName(),
+                        CompanyName.create(notification, d.getCompanyName()),
                         Period.create(notification, d.getStartDate(), d.getEndDate(), d.getIsActive()),
                         d.getName(),
                         d.getOverview(),
@@ -170,29 +171,45 @@ public class MyBatisResumeRepository implements ResumeRepository {
                                 d.getSystemTest(),
                                 d.getMaintenance()),
                         TechStack.create(
-                                d.getLanguages(),
-                                TechStack.Dependencies.create(
-                                        d.getFrameworks(),
-                                        d.getLibraries(),
-                                        d.getTestingTools(),
+                                TechStack.Frontend.create(
+                                        d.getFrontendLanguages(),
+                                        d.getFrontendFramework(),
+                                        d.getFrontendLibraries(),
+                                        d.getFrontendBuildTool(),
+                                        d.getFrontendPackageManager(),
+                                        d.getFrontendLinters(),
+                                        d.getFrontendFormatters(),
+                                        d.getFrontendTestingTools()),
+                                TechStack.Backend.create(
+                                        d.getBackendLanguages(),
+                                        d.getBackendFramework(),
+                                        d.getBackendLibraries(),
+                                        d.getBackendBuildTool(),
+                                        d.getBackendPackageManager(),
+                                        d.getBackendLinters(),
+                                        d.getBackendFormatters(),
+                                        d.getBackendTestingTools(),
                                         d.getOrmTools(),
-                                        d.getPackageManagers()),
+                                        d.getAuth()),
                                 TechStack.Infrastructure.create(
                                         d.getClouds(),
+                                        d.getOperatingSystem(),
                                         d.getContainers(),
-                                        d.getDatabases(),
-                                        d.getWebServers(),
-                                        d.getCiCdTools(),
+                                        d.getDatabase(),
+                                        d.getWebServer(),
+                                        d.getCiCdTool(),
                                         d.getIacTools(),
                                         d.getMonitoringTools(),
                                         d.getLoggingTools()),
                                 TechStack.Tools.create(
-                                        d.getSourceControls(),
-                                        d.getProjectManagements(),
-                                        d.getCommunicationTools(),
+                                        d.getSourceControl(),
+                                        d.getProjectManagement(),
+                                        d.getCommunicationTool(),
                                         d.getDocumentationTools(),
                                         d.getApiDevelopmentTools(),
-                                        d.getDesignTools()))))
+                                        d.getDesignTools(),
+                                        d.getEditor(),
+                                        d.getDevelopmentEnvironment()))))
                 .toList();
 
         // 資格
@@ -268,7 +285,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     ResumeDto.CareerDto d = new ResumeDto.CareerDto();
                     d.setId(c.getId());
                     d.setResumeId(resumeId);
-                    d.setCompanyName(c.getCompanyName());
+                    d.setCompanyName(c.getCompanyName().getValue());
                     d.setStartDate(c.getPeriod().getStartDate());
                     d.setEndDate(c.getPeriod().getEndDate());
                     d.setIsActive(c.getPeriod().isActive());
@@ -283,7 +300,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     ResumeDto.ProjectDto d = new ResumeDto.ProjectDto();
                     d.setId(p.getId());
                     d.setResumeId(resumeId);
-                    d.setCompanyName(p.getCompanyName());
+                    d.setCompanyName(p.getCompanyName().getValue());
                     d.setStartDate(p.getPeriod().getStartDate());
                     d.setEndDate(p.getPeriod().getEndDate());
                     d.setIsActive(p.getPeriod().isActive());
@@ -292,6 +309,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setTeamComp(p.getTeamComp());
                     d.setRole(p.getRole());
                     d.setAchievement(p.getAchievement());
+
                     // Process の各フラグをセット
                     d.setRequirements(p.getProcess().isRequirements());
                     d.setBasicDesign(p.getProcess().isBasicDesign());
@@ -300,27 +318,57 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setIntegrationTest(p.getProcess().isIntegrationTest());
                     d.setSystemTest(p.getProcess().isSystemTest());
                     d.setMaintenance(p.getProcess().isMaintenance());
-                    // TechStack の各リストをセット
-                    d.setLanguages(p.getTechStack().getLanguages());
-                    d.setFrameworks(p.getTechStack().getDependencies().getFrameworks());
-                    d.setLibraries(p.getTechStack().getDependencies().getLibraries());
-                    d.setTestingTools(p.getTechStack().getDependencies().getTestingTools());
-                    d.setOrmTools(p.getTechStack().getDependencies().getOrmTools());
-                    d.setPackageManagers(p.getTechStack().getDependencies().getPackageManagers());
-                    d.setClouds(p.getTechStack().getInfrastructure().getClouds());
-                    d.setContainers(p.getTechStack().getInfrastructure().getContainers());
-                    d.setDatabases(p.getTechStack().getInfrastructure().getDatabases());
-                    d.setWebServers(p.getTechStack().getInfrastructure().getWebServers());
-                    d.setCiCdTools(p.getTechStack().getInfrastructure().getCiCdTools());
-                    d.setIacTools(p.getTechStack().getInfrastructure().getIacTools());
-                    d.setMonitoringTools(p.getTechStack().getInfrastructure().getMonitoringTools());
-                    d.setLoggingTools(p.getTechStack().getInfrastructure().getLoggingTools());
-                    d.setSourceControls(p.getTechStack().getTools().getSourceControls());
-                    d.setProjectManagements(p.getTechStack().getTools().getProjectManagements());
-                    d.setCommunicationTools(p.getTechStack().getTools().getCommunicationTools());
-                    d.setDocumentationTools(p.getTechStack().getTools().getDocumentationTools());
-                    d.setApiDevelopmentTools(p.getTechStack().getTools().getApiDevelopmentTools());
-                    d.setDesignTools(p.getTechStack().getTools().getDesignTools());
+
+                    // TechStack
+                    TechStack techStack = p.getTechStack();
+                    TechStack.Frontend frontend = techStack.getFrontend();
+                    TechStack.Backend backend = techStack.getBackend();
+                    TechStack.Infrastructure infra = techStack.getInfrastructure();
+                    TechStack.Tools tools = techStack.getTools();
+
+                    // フロントエンド
+                    d.setFrontendLanguages(frontend.getLanguages());
+                    d.setFrontendFramework(frontend.getFramework());
+                    d.setFrontendLibraries(frontend.getLibraries());
+                    d.setFrontendBuildTool(frontend.getBuildTool());
+                    d.setFrontendPackageManager(frontend.getPackageManager());
+                    d.setFrontendLinters(frontend.getLinters());
+                    d.setFrontendFormatters(frontend.getFormatters());
+                    d.setFrontendTestingTools(frontend.getTestingTools());
+
+                    // バックエンド
+                    d.setBackendLanguages(backend.getLanguages());
+                    d.setBackendFramework(backend.getFramework());
+                    d.setBackendLibraries(backend.getLibraries());
+                    d.setBackendBuildTool(backend.getBuildTool());
+                    d.setBackendPackageManager(backend.getPackageManager());
+                    d.setBackendLinters(backend.getLinters());
+                    d.setBackendFormatters(backend.getFormatters());
+                    d.setBackendTestingTools(backend.getTestingTools());
+                    d.setOrmTools(backend.getOrmTools());
+                    d.setAuth(backend.getAuth());
+
+                    // インフラ
+                    d.setClouds(infra.getClouds());
+                    d.setOperatingSystem(infra.getOperatingSystem());
+                    d.setContainers(infra.getContainers());
+                    d.setDatabase(infra.getDatabase());
+                    d.setWebServer(infra.getWebServer());
+                    d.setCiCdTool(infra.getCiCdTool());
+                    d.setIacTools(infra.getIacTools());
+                    d.setMonitoringTools(infra.getMonitoringTools());
+                    d.setLoggingTools(infra.getLoggingTools());
+
+                    // 開発支援ツール
+                    d.setSourceControl(tools.getSourceControl());
+                    d.setProjectManagement(tools.getProjectManagement());
+                    d.setCommunicationTool(tools.getCommunicationTool());
+                    d.setDocumentationTools(tools.getDocumentationTools());
+                    d.setApiDevelopmentTools(tools.getApiDevelopmentTools());
+                    d.setDesignTools(tools.getDesignTools());
+                    d.setEditor(tools.getEditor());
+                    d.setDevelopmentEnvironment(tools.getDevelopmentEnvironment());
+
                     return d;
                 })
                 .toList();

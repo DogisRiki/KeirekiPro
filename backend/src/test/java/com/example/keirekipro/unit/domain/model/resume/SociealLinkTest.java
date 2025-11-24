@@ -24,7 +24,7 @@ class SociealLinkTest {
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
         Link link = Link.create(notification, "https://example.com");
-        SocialLink sociealLink = SocialLink.create("GitHub", link);
+        SocialLink sociealLink = SocialLink.create(notification, "GitHub", link);
 
         assertThat(sociealLink).isNotNull();
         assertThat(sociealLink.getId()).isNotNull();
@@ -49,8 +49,8 @@ class SociealLinkTest {
     @DisplayName("ソーシャル名を変更する")
     void test3() {
         Link link = Link.create(notification, "https://example.com");
-        SocialLink beforeSociealLink = SocialLink.create("GitHub", link);
-        SocialLink afterSociealLink = beforeSociealLink.changeName("LinkedIn");
+        SocialLink beforeSociealLink = SocialLink.create(notification, "GitHub", link);
+        SocialLink afterSociealLink = beforeSociealLink.changeName(notification, "LinkedIn");
 
         assertThat(afterSociealLink.getName()).isEqualTo("LinkedIn");
     }
@@ -59,9 +59,9 @@ class SociealLinkTest {
     @DisplayName("リンクを変更する")
     void test4() {
         Link beforeLink = Link.create(notification, "https://example.com");
-        SocialLink beforeSociealLink = SocialLink.create("GitHub", beforeLink);
+        SocialLink beforeSociealLink = SocialLink.create(notification, "GitHub", beforeLink);
         Link afterLink = Link.create(notification, "https://linkedin.com");
-        SocialLink afterSociealLink = beforeSociealLink.changeLink(afterLink);
+        SocialLink afterSociealLink = beforeSociealLink.changeLink(notification, afterLink);
 
         assertThat(afterSociealLink.getLink()).isEqualTo(afterLink);
     }
@@ -70,11 +70,36 @@ class SociealLinkTest {
     @DisplayName("ソーシャル名、リンクを変更する")
     void test5() {
         Link beforeLink = Link.create(notification, "https://example.com");
-        SocialLink beforeSociealLink = SocialLink.create("GitHub", beforeLink);
+        SocialLink beforeSociealLink = SocialLink.create(notification, "GitHub", beforeLink);
         Link afterLink = Link.create(notification, "https://linkedin.com");
-        SocialLink afterSociealLink = beforeSociealLink.changeLink(afterLink).changeName("LinkedIn");
+        SocialLink afterSociealLink = beforeSociealLink.changeLink(notification, afterLink).changeName(notification,
+                "LinkedIn");
 
         assertThat(afterSociealLink.getLink()).isEqualTo(afterLink);
         assertThat(afterSociealLink.getName()).isEqualTo("LinkedIn");
+    }
+
+    @Test
+    @DisplayName("必須項目が未入力の場合、エラーが通知される")
+    void test6() {
+        Notification notification = new Notification();
+
+        SocialLink.create(notification, "", null);
+
+        assertThat(notification.getErrors().get("name")).containsExactly("ソーシャル名は入力必須です。");
+        assertThat(notification.getErrors().get("link")).containsExactly("リンクは入力必須です。");
+    }
+
+    @Test
+    @DisplayName("ソーシャル名が最大文字数を超える場合、エラーが通知される")
+    void test7() {
+        Notification notification = new Notification();
+        Notification linkNotification = new Notification();
+        String longName = "a".repeat(51);
+        Link link = Link.create(linkNotification, "https://example.com");
+
+        SocialLink.create(notification, longName, link);
+
+        assertThat(notification.getErrors().get("name")).containsExactly("ソーシャル名は50文字以内で入力してください。");
     }
 }

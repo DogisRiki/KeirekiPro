@@ -23,12 +23,18 @@ public class GetResumeInfoUseCase {
     /**
      * 職務経歴書情報取得ユースケースを実行する
      *
+     * @param userId   ユーザーID
      * @param resumeId 職務経歴書ID
      * @return 職務経歴書ユースケースDTO
      */
-    public ResumeInfoUseCaseDto execute(UUID resumeId) {
+    public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId) {
 
         Resume resume = resumeRepository.find(resumeId).orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
+
+        // 所有者チェック（他人の職務経歴書の場合）
+        if (!resume.getUserId().equals(userId)) {
+            throw new UseCaseException("職務経歴書が存在しません。");
+        }
 
         return ResumeInfoUseCaseDto.convertToUseCaseDto(resume);
     }

@@ -68,33 +68,48 @@ public class ResumeDto {
         private Boolean systemTest;
         private Boolean maintenance;
 
-        // TechStack
-        private List<String> languages;
+        // TechStack - Frontend
+        private List<String> frontendLanguages;
+        private String frontendFramework;
+        private List<String> frontendLibraries;
+        private String frontendBuildTool;
+        private String frontendPackageManager;
+        private List<String> frontendLinters;
+        private List<String> frontendFormatters;
+        private List<String> frontendTestingTools;
 
-        // TechStack - Dependencies
-        private List<String> frameworks;
-        private List<String> libraries;
-        private List<String> testingTools;
+        // TechStack - Backend
+        private List<String> backendLanguages;
+        private String backendFramework;
+        private List<String> backendLibraries;
+        private String backendBuildTool;
+        private String backendPackageManager;
+        private List<String> backendLinters;
+        private List<String> backendFormatters;
+        private List<String> backendTestingTools;
         private List<String> ormTools;
-        private List<String> packageManagers;
+        private List<String> auth;
 
         // TechStack - Infrastructure
         private List<String> clouds;
+        private String operatingSystem;
         private List<String> containers;
-        private List<String> databases;
-        private List<String> webServers;
-        private List<String> ciCdTools;
+        private String database;
+        private String webServer;
+        private String ciCdTool;
         private List<String> iacTools;
         private List<String> monitoringTools;
         private List<String> loggingTools;
 
         // TechStack - Tools
-        private List<String> sourceControls;
-        private List<String> projectManagements;
-        private List<String> communicationTools;
+        private String sourceControl;
+        private String projectManagement;
+        private String communicationTool;
         private List<String> documentationTools;
         private List<String> apiDevelopmentTools;
         private List<String> designTools;
+        private String editor;
+        private String developmentEnvironment;
     }
 
     /**

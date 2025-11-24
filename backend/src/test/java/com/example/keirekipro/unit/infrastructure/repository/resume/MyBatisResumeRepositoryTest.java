@@ -98,7 +98,7 @@ class MyBatisResumeRepositoryTest {
         Career c = r.getCareers().get(0);
         CareerDto cd = dto.getCareers().get(0);
         assertThat(c.getId()).isEqualTo(cd.getId());
-        assertThat(c.getCompanyName()).isEqualTo(cd.getCompanyName());
+        assertThat(c.getCompanyName().getValue()).isEqualTo(cd.getCompanyName());
         assertThat(c.getPeriod().getStartDate()).isEqualTo(cd.getStartDate());
         assertThat(c.getPeriod().getEndDate()).isEqualTo(cd.getEndDate());
         assertThat(c.getPeriod().isActive()).isEqualTo(cd.getIsActive());
@@ -108,7 +108,7 @@ class MyBatisResumeRepositoryTest {
         Project p = r.getProjects().get(0);
         ProjectDto pd = dto.getProjects().get(0);
         assertThat(p.getId()).isEqualTo(pd.getId());
-        assertThat(p.getCompanyName()).isEqualTo(pd.getCompanyName());
+        assertThat(p.getCompanyName().getValue()).isEqualTo(pd.getCompanyName());
         assertThat(p.getPeriod().getStartDate()).isEqualTo(pd.getStartDate());
         assertThat(p.getPeriod().getEndDate()).isEqualTo(pd.getEndDate());
         assertThat(p.getPeriod().isActive()).isEqualTo(pd.getIsActive());
@@ -124,26 +124,50 @@ class MyBatisResumeRepositoryTest {
         assertThat(p.getProcess().isIntegrationTest()).isEqualTo(pd.getIntegrationTest());
         assertThat(p.getProcess().isSystemTest()).isEqualTo(pd.getSystemTest());
         assertThat(p.getProcess().isMaintenance()).isEqualTo(pd.getMaintenance());
-        assertThat(p.getTechStack().getLanguages()).isEqualTo(pd.getLanguages());
-        assertThat(p.getTechStack().getDependencies().getFrameworks()).isEqualTo(pd.getFrameworks());
-        assertThat(p.getTechStack().getDependencies().getLibraries()).isEqualTo(pd.getLibraries());
-        assertThat(p.getTechStack().getDependencies().getTestingTools()).isEqualTo(pd.getTestingTools());
-        assertThat(p.getTechStack().getDependencies().getOrmTools()).isEqualTo(pd.getOrmTools());
-        assertThat(p.getTechStack().getDependencies().getPackageManagers()).isEqualTo(pd.getPackageManagers());
+
+        // TechStack - Frontend
+        assertThat(p.getTechStack().getFrontend().getLanguages()).isEqualTo(pd.getFrontendLanguages());
+        assertThat(p.getTechStack().getFrontend().getFramework()).isEqualTo(pd.getFrontendFramework());
+        assertThat(p.getTechStack().getFrontend().getLibraries()).isEqualTo(pd.getFrontendLibraries());
+        assertThat(p.getTechStack().getFrontend().getBuildTool()).isEqualTo(pd.getFrontendBuildTool());
+        assertThat(p.getTechStack().getFrontend().getPackageManager()).isEqualTo(pd.getFrontendPackageManager());
+        assertThat(p.getTechStack().getFrontend().getLinters()).isEqualTo(pd.getFrontendLinters());
+        assertThat(p.getTechStack().getFrontend().getFormatters()).isEqualTo(pd.getFrontendFormatters());
+        assertThat(p.getTechStack().getFrontend().getTestingTools()).isEqualTo(pd.getFrontendTestingTools());
+
+        // TechStack - Backend
+        assertThat(p.getTechStack().getBackend().getLanguages()).isEqualTo(pd.getBackendLanguages());
+        assertThat(p.getTechStack().getBackend().getFramework()).isEqualTo(pd.getBackendFramework());
+        assertThat(p.getTechStack().getBackend().getLibraries()).isEqualTo(pd.getBackendLibraries());
+        assertThat(p.getTechStack().getBackend().getBuildTool()).isEqualTo(pd.getBackendBuildTool());
+        assertThat(p.getTechStack().getBackend().getPackageManager()).isEqualTo(pd.getBackendPackageManager());
+        assertThat(p.getTechStack().getBackend().getLinters()).isEqualTo(pd.getBackendLinters());
+        assertThat(p.getTechStack().getBackend().getFormatters()).isEqualTo(pd.getBackendFormatters());
+        assertThat(p.getTechStack().getBackend().getTestingTools()).isEqualTo(pd.getBackendTestingTools());
+        assertThat(p.getTechStack().getBackend().getOrmTools()).isEqualTo(pd.getOrmTools());
+        assertThat(p.getTechStack().getBackend().getAuth()).isEqualTo(pd.getAuth());
+
+        // TechStack - Infrastructure
         assertThat(p.getTechStack().getInfrastructure().getClouds()).isEqualTo(pd.getClouds());
+        assertThat(p.getTechStack().getInfrastructure().getOperatingSystem()).isEqualTo(pd.getOperatingSystem());
         assertThat(p.getTechStack().getInfrastructure().getContainers()).isEqualTo(pd.getContainers());
-        assertThat(p.getTechStack().getInfrastructure().getDatabases()).isEqualTo(pd.getDatabases());
-        assertThat(p.getTechStack().getInfrastructure().getWebServers()).isEqualTo(pd.getWebServers());
-        assertThat(p.getTechStack().getInfrastructure().getCiCdTools()).isEqualTo(pd.getCiCdTools());
+        assertThat(p.getTechStack().getInfrastructure().getDatabase()).isEqualTo(pd.getDatabase());
+        assertThat(p.getTechStack().getInfrastructure().getWebServer()).isEqualTo(pd.getWebServer());
+        assertThat(p.getTechStack().getInfrastructure().getCiCdTool()).isEqualTo(pd.getCiCdTool());
         assertThat(p.getTechStack().getInfrastructure().getIacTools()).isEqualTo(pd.getIacTools());
         assertThat(p.getTechStack().getInfrastructure().getMonitoringTools()).isEqualTo(pd.getMonitoringTools());
         assertThat(p.getTechStack().getInfrastructure().getLoggingTools()).isEqualTo(pd.getLoggingTools());
-        assertThat(p.getTechStack().getTools().getSourceControls()).isEqualTo(pd.getSourceControls());
-        assertThat(p.getTechStack().getTools().getProjectManagements()).isEqualTo(pd.getProjectManagements());
-        assertThat(p.getTechStack().getTools().getCommunicationTools()).isEqualTo(pd.getCommunicationTools());
+
+        // TechStack - Tools
+        assertThat(p.getTechStack().getTools().getSourceControl()).isEqualTo(pd.getSourceControl());
+        assertThat(p.getTechStack().getTools().getProjectManagement()).isEqualTo(pd.getProjectManagement());
+        assertThat(p.getTechStack().getTools().getCommunicationTool()).isEqualTo(pd.getCommunicationTool());
         assertThat(p.getTechStack().getTools().getDocumentationTools()).isEqualTo(pd.getDocumentationTools());
         assertThat(p.getTechStack().getTools().getApiDevelopmentTools()).isEqualTo(pd.getApiDevelopmentTools());
         assertThat(p.getTechStack().getTools().getDesignTools()).isEqualTo(pd.getDesignTools());
+        assertThat(p.getTechStack().getTools().getEditor()).isEqualTo(pd.getEditor());
+        assertThat(p.getTechStack().getTools().getDevelopmentEnvironment())
+                .isEqualTo(pd.getDevelopmentEnvironment());
 
         // Certificationの検証
         assertThat(r.getCertifications()).hasSize(1);
@@ -224,7 +248,7 @@ class MyBatisResumeRepositoryTest {
         ResumeDto.CareerDto cd = dto.getCareers().get(0);
         Career c = r.getCareers().get(0);
         assertThat(c.getId()).isEqualTo(cd.getId());
-        assertThat(c.getCompanyName()).isEqualTo(cd.getCompanyName());
+        assertThat(c.getCompanyName().getValue()).isEqualTo(cd.getCompanyName());
         assertThat(c.getPeriod().getStartDate()).isEqualTo(cd.getStartDate());
         assertThat(c.getPeriod().getEndDate()).isEqualTo(cd.getEndDate());
         assertThat(c.getPeriod().isActive()).isEqualTo(cd.getIsActive());
@@ -234,7 +258,7 @@ class MyBatisResumeRepositoryTest {
         ResumeDto.ProjectDto pd = dto.getProjects().get(0);
         Project p = r.getProjects().get(0);
         assertThat(p.getId()).isEqualTo(pd.getId());
-        assertThat(p.getCompanyName()).isEqualTo(pd.getCompanyName());
+        assertThat(p.getCompanyName().getValue()).isEqualTo(pd.getCompanyName());
         assertThat(p.getPeriod().getStartDate()).isEqualTo(pd.getStartDate());
         assertThat(p.getPeriod().getEndDate()).isEqualTo(pd.getEndDate());
         assertThat(p.getPeriod().isActive()).isEqualTo(pd.getIsActive());
@@ -251,27 +275,46 @@ class MyBatisResumeRepositoryTest {
         assertThat(p.getProcess().isIntegrationTest()).isEqualTo(pd.getIntegrationTest());
         assertThat(p.getProcess().isSystemTest()).isEqualTo(pd.getSystemTest());
         assertThat(p.getProcess().isMaintenance()).isEqualTo(pd.getMaintenance());
-        // TechStack
-        assertThat(p.getTechStack().getLanguages()).isEqualTo(pd.getLanguages());
-        assertThat(p.getTechStack().getDependencies().getFrameworks()).isEqualTo(pd.getFrameworks());
-        assertThat(p.getTechStack().getDependencies().getLibraries()).isEqualTo(pd.getLibraries());
-        assertThat(p.getTechStack().getDependencies().getTestingTools()).isEqualTo(pd.getTestingTools());
-        assertThat(p.getTechStack().getDependencies().getOrmTools()).isEqualTo(pd.getOrmTools());
-        assertThat(p.getTechStack().getDependencies().getPackageManagers()).isEqualTo(pd.getPackageManagers());
+        // TechStack - Frontend
+        assertThat(p.getTechStack().getFrontend().getLanguages()).isEqualTo(pd.getFrontendLanguages());
+        assertThat(p.getTechStack().getFrontend().getFramework()).isEqualTo(pd.getFrontendFramework());
+        assertThat(p.getTechStack().getFrontend().getLibraries()).isEqualTo(pd.getFrontendLibraries());
+        assertThat(p.getTechStack().getFrontend().getBuildTool()).isEqualTo(pd.getFrontendBuildTool());
+        assertThat(p.getTechStack().getFrontend().getPackageManager()).isEqualTo(pd.getFrontendPackageManager());
+        assertThat(p.getTechStack().getFrontend().getLinters()).isEqualTo(pd.getFrontendLinters());
+        assertThat(p.getTechStack().getFrontend().getFormatters()).isEqualTo(pd.getFrontendFormatters());
+        assertThat(p.getTechStack().getFrontend().getTestingTools()).isEqualTo(pd.getFrontendTestingTools());
+        // TechStack - Backend
+        assertThat(p.getTechStack().getBackend().getLanguages()).isEqualTo(pd.getBackendLanguages());
+        assertThat(p.getTechStack().getBackend().getFramework()).isEqualTo(pd.getBackendFramework());
+        assertThat(p.getTechStack().getBackend().getLibraries()).isEqualTo(pd.getBackendLibraries());
+        assertThat(p.getTechStack().getBackend().getBuildTool()).isEqualTo(pd.getBackendBuildTool());
+        assertThat(p.getTechStack().getBackend().getPackageManager()).isEqualTo(pd.getBackendPackageManager());
+        assertThat(p.getTechStack().getBackend().getLinters()).isEqualTo(pd.getBackendLinters());
+        assertThat(p.getTechStack().getBackend().getFormatters()).isEqualTo(pd.getBackendFormatters());
+        assertThat(p.getTechStack().getBackend().getTestingTools()).isEqualTo(pd.getBackendTestingTools());
+        assertThat(p.getTechStack().getBackend().getOrmTools()).isEqualTo(pd.getOrmTools());
+        assertThat(p.getTechStack().getBackend().getAuth()).isEqualTo(pd.getAuth());
+        // TechStack - Infrastructure
         assertThat(p.getTechStack().getInfrastructure().getClouds()).isEqualTo(pd.getClouds());
+        assertThat(p.getTechStack().getInfrastructure().getOperatingSystem()).isEqualTo(pd.getOperatingSystem());
         assertThat(p.getTechStack().getInfrastructure().getContainers()).isEqualTo(pd.getContainers());
-        assertThat(p.getTechStack().getInfrastructure().getDatabases()).isEqualTo(pd.getDatabases());
-        assertThat(p.getTechStack().getInfrastructure().getWebServers()).isEqualTo(pd.getWebServers());
-        assertThat(p.getTechStack().getInfrastructure().getCiCdTools()).isEqualTo(pd.getCiCdTools());
+        assertThat(p.getTechStack().getInfrastructure().getDatabase()).isEqualTo(pd.getDatabase());
+        assertThat(p.getTechStack().getInfrastructure().getWebServer()).isEqualTo(pd.getWebServer());
+        assertThat(p.getTechStack().getInfrastructure().getCiCdTool()).isEqualTo(pd.getCiCdTool());
         assertThat(p.getTechStack().getInfrastructure().getIacTools()).isEqualTo(pd.getIacTools());
         assertThat(p.getTechStack().getInfrastructure().getMonitoringTools()).isEqualTo(pd.getMonitoringTools());
         assertThat(p.getTechStack().getInfrastructure().getLoggingTools()).isEqualTo(pd.getLoggingTools());
-        assertThat(p.getTechStack().getTools().getSourceControls()).isEqualTo(pd.getSourceControls());
-        assertThat(p.getTechStack().getTools().getProjectManagements()).isEqualTo(pd.getProjectManagements());
-        assertThat(p.getTechStack().getTools().getCommunicationTools()).isEqualTo(pd.getCommunicationTools());
+        // TechStack - Tools
+        assertThat(p.getTechStack().getTools().getSourceControl()).isEqualTo(pd.getSourceControl());
+        assertThat(p.getTechStack().getTools().getProjectManagement()).isEqualTo(pd.getProjectManagement());
+        assertThat(p.getTechStack().getTools().getCommunicationTool()).isEqualTo(pd.getCommunicationTool());
         assertThat(p.getTechStack().getTools().getDocumentationTools()).isEqualTo(pd.getDocumentationTools());
         assertThat(p.getTechStack().getTools().getApiDevelopmentTools()).isEqualTo(pd.getApiDevelopmentTools());
         assertThat(p.getTechStack().getTools().getDesignTools()).isEqualTo(pd.getDesignTools());
+        assertThat(p.getTechStack().getTools().getEditor()).isEqualTo(pd.getEditor());
+        assertThat(p.getTechStack().getTools().getDevelopmentEnvironment())
+                .isEqualTo(pd.getDevelopmentEnvironment());
 
         // Certificationの検証
         assertThat(r.getCertifications()).hasSize(dto.getCertifications().size());
@@ -347,7 +390,7 @@ class MyBatisResumeRepositoryTest {
         Career c = resume.getCareers().get(0);
         assertThat(cd.getId()).isEqualTo(c.getId());
         assertThat(cd.getResumeId()).isEqualTo(id);
-        assertThat(cd.getCompanyName()).isEqualTo(c.getCompanyName());
+        assertThat(cd.getCompanyName()).isEqualTo(c.getCompanyName().getValue());
         assertThat(cd.getStartDate()).isEqualTo(c.getPeriod().getStartDate());
         assertThat(cd.getEndDate()).isEqualTo(c.getPeriod().getEndDate());
         assertThat(cd.getIsActive()).isEqualTo(c.getPeriod().isActive());
@@ -359,7 +402,7 @@ class MyBatisResumeRepositoryTest {
         Project p = resume.getProjects().get(0);
         assertThat(pd.getId()).isEqualTo(p.getId());
         assertThat(pd.getResumeId()).isEqualTo(id);
-        assertThat(pd.getCompanyName()).isEqualTo(p.getCompanyName());
+        assertThat(pd.getCompanyName()).isEqualTo(p.getCompanyName().getValue());
         assertThat(pd.getStartDate()).isEqualTo(p.getPeriod().getStartDate());
         assertThat(pd.getEndDate()).isEqualTo(p.getPeriod().getEndDate());
         assertThat(pd.getIsActive()).isEqualTo(p.getPeriod().isActive());
@@ -375,26 +418,50 @@ class MyBatisResumeRepositoryTest {
         assertThat(pd.getIntegrationTest()).isEqualTo(p.getProcess().isIntegrationTest());
         assertThat(pd.getSystemTest()).isEqualTo(p.getProcess().isSystemTest());
         assertThat(pd.getMaintenance()).isEqualTo(p.getProcess().isMaintenance());
-        assertThat(pd.getLanguages()).isEqualTo(p.getTechStack().getLanguages());
-        assertThat(pd.getFrameworks()).isEqualTo(p.getTechStack().getDependencies().getFrameworks());
-        assertThat(pd.getLibraries()).isEqualTo(p.getTechStack().getDependencies().getLibraries());
-        assertThat(pd.getTestingTools()).isEqualTo(p.getTechStack().getDependencies().getTestingTools());
-        assertThat(pd.getOrmTools()).isEqualTo(p.getTechStack().getDependencies().getOrmTools());
-        assertThat(pd.getPackageManagers()).isEqualTo(p.getTechStack().getDependencies().getPackageManagers());
+
+        // TechStack - Frontend
+        assertThat(pd.getFrontendLanguages()).isEqualTo(p.getTechStack().getFrontend().getLanguages());
+        assertThat(pd.getFrontendFramework()).isEqualTo(p.getTechStack().getFrontend().getFramework());
+        assertThat(pd.getFrontendLibraries()).isEqualTo(p.getTechStack().getFrontend().getLibraries());
+        assertThat(pd.getFrontendBuildTool()).isEqualTo(p.getTechStack().getFrontend().getBuildTool());
+        assertThat(pd.getFrontendPackageManager()).isEqualTo(p.getTechStack().getFrontend().getPackageManager());
+        assertThat(pd.getFrontendLinters()).isEqualTo(p.getTechStack().getFrontend().getLinters());
+        assertThat(pd.getFrontendFormatters()).isEqualTo(p.getTechStack().getFrontend().getFormatters());
+        assertThat(pd.getFrontendTestingTools()).isEqualTo(p.getTechStack().getFrontend().getTestingTools());
+
+        // TechStack - Backend
+        assertThat(pd.getBackendLanguages()).isEqualTo(p.getTechStack().getBackend().getLanguages());
+        assertThat(pd.getBackendFramework()).isEqualTo(p.getTechStack().getBackend().getFramework());
+        assertThat(pd.getBackendLibraries()).isEqualTo(p.getTechStack().getBackend().getLibraries());
+        assertThat(pd.getBackendBuildTool()).isEqualTo(p.getTechStack().getBackend().getBuildTool());
+        assertThat(pd.getBackendPackageManager()).isEqualTo(p.getTechStack().getBackend().getPackageManager());
+        assertThat(pd.getBackendLinters()).isEqualTo(p.getTechStack().getBackend().getLinters());
+        assertThat(pd.getBackendFormatters()).isEqualTo(p.getTechStack().getBackend().getFormatters());
+        assertThat(pd.getBackendTestingTools()).isEqualTo(p.getTechStack().getBackend().getTestingTools());
+        assertThat(pd.getOrmTools()).isEqualTo(p.getTechStack().getBackend().getOrmTools());
+        assertThat(pd.getAuth()).isEqualTo(p.getTechStack().getBackend().getAuth());
+
+        // TechStack - Infrastructure
         assertThat(pd.getClouds()).isEqualTo(p.getTechStack().getInfrastructure().getClouds());
+        assertThat(pd.getOperatingSystem()).isEqualTo(p.getTechStack().getInfrastructure().getOperatingSystem());
         assertThat(pd.getContainers()).isEqualTo(p.getTechStack().getInfrastructure().getContainers());
-        assertThat(pd.getDatabases()).isEqualTo(p.getTechStack().getInfrastructure().getDatabases());
-        assertThat(pd.getWebServers()).isEqualTo(p.getTechStack().getInfrastructure().getWebServers());
-        assertThat(pd.getCiCdTools()).isEqualTo(p.getTechStack().getInfrastructure().getCiCdTools());
+        assertThat(pd.getDatabase()).isEqualTo(p.getTechStack().getInfrastructure().getDatabase());
+        assertThat(pd.getWebServer()).isEqualTo(p.getTechStack().getInfrastructure().getWebServer());
+        assertThat(pd.getCiCdTool()).isEqualTo(p.getTechStack().getInfrastructure().getCiCdTool());
         assertThat(pd.getIacTools()).isEqualTo(p.getTechStack().getInfrastructure().getIacTools());
         assertThat(pd.getMonitoringTools()).isEqualTo(p.getTechStack().getInfrastructure().getMonitoringTools());
         assertThat(pd.getLoggingTools()).isEqualTo(p.getTechStack().getInfrastructure().getLoggingTools());
-        assertThat(pd.getSourceControls()).isEqualTo(p.getTechStack().getTools().getSourceControls());
-        assertThat(pd.getProjectManagements()).isEqualTo(p.getTechStack().getTools().getProjectManagements());
-        assertThat(pd.getCommunicationTools()).isEqualTo(p.getTechStack().getTools().getCommunicationTools());
+
+        // TechStack - Tools
+        assertThat(pd.getSourceControl()).isEqualTo(p.getTechStack().getTools().getSourceControl());
+        assertThat(pd.getProjectManagement()).isEqualTo(p.getTechStack().getTools().getProjectManagement());
+        assertThat(pd.getCommunicationTool()).isEqualTo(p.getTechStack().getTools().getCommunicationTool());
         assertThat(pd.getDocumentationTools()).isEqualTo(p.getTechStack().getTools().getDocumentationTools());
         assertThat(pd.getApiDevelopmentTools()).isEqualTo(p.getTechStack().getTools().getApiDevelopmentTools());
         assertThat(pd.getDesignTools()).isEqualTo(p.getTechStack().getTools().getDesignTools());
+        assertThat(pd.getEditor()).isEqualTo(p.getTechStack().getTools().getEditor());
+        assertThat(pd.getDevelopmentEnvironment())
+                .isEqualTo(p.getTechStack().getTools().getDevelopmentEnvironment());
 
         // Certificationインサート
         ArgumentCaptor<ResumeDto.CertificationDto> capCert = ArgumentCaptor.forClass(ResumeDto.CertificationDto.class);

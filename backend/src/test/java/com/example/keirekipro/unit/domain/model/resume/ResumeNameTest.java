@@ -170,4 +170,22 @@ class ResumeNameTest {
                     eq("職務経歴書名は入力必須です。"));
         }
     }
+
+    @Test
+    @DisplayName("職務経歴書名が51文字以上の状態でインスタンス化する")
+    void test6() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 51; i++) {
+            sb.append('a');
+        }
+        String longName = sb.toString();
+
+        ResumeName resumeName = ResumeName.create(notification, longName);
+
+        assertThat(resumeName).isNotNull();
+        // 桁数エラーが登録される
+        verify(notification, times(1)).addError(
+                eq("resumeName"),
+                eq("職務経歴書名は50文字以内で入力してください。"));
+    }
 }

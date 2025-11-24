@@ -79,49 +79,73 @@ public class ResumeInfoResponse {
                                 c.isActive()))
                         .collect(Collectors.toList()))
                 .projects(dto.getProjects().stream()
-                        .map(p -> new ProjectResponse(
-                                p.getId().toString(),
-                                p.getCompanyName(),
-                                p.getStartDate(),
-                                p.getEndDate(),
-                                p.isActive(),
-                                p.getName(),
-                                p.getOverview(),
-                                p.getTeamComp(),
-                                p.getRole(),
-                                p.getAchievement(),
-                                new ProcessResponse(
-                                        p.getProcess().isRequirements(),
-                                        p.getProcess().isBasicDesign(),
-                                        p.getProcess().isDetailedDesign(),
-                                        p.getProcess().isImplementation(),
-                                        p.getProcess().isIntegrationTest(),
-                                        p.getProcess().isSystemTest(),
-                                        p.getProcess().isMaintenance()),
-                                new TechStackResponse(
-                                        p.getTechStack().getLanguages(),
-                                        new DependenciesResponse(
-                                                p.getTechStack().getDependencies().getFrameworks(),
-                                                p.getTechStack().getDependencies().getLibraries(),
-                                                p.getTechStack().getDependencies().getTestingTools(),
-                                                p.getTechStack().getDependencies().getOrmTools(),
-                                                p.getTechStack().getDependencies().getPackageManagers()),
-                                        new InfrastructureResponse(
-                                                p.getTechStack().getInfrastructure().getClouds(),
-                                                p.getTechStack().getInfrastructure().getContainers(),
-                                                p.getTechStack().getInfrastructure().getDatabases(),
-                                                p.getTechStack().getInfrastructure().getWebServers(),
-                                                p.getTechStack().getInfrastructure().getCiCdTools(),
-                                                p.getTechStack().getInfrastructure().getIacTools(),
-                                                p.getTechStack().getInfrastructure().getMonitoringTools(),
-                                                p.getTechStack().getInfrastructure().getLoggingTools()),
-                                        new ToolsResponse(
-                                                p.getTechStack().getTools().getSourceControls(),
-                                                p.getTechStack().getTools().getProjectManagements(),
-                                                p.getTechStack().getTools().getCommunicationTools(),
-                                                p.getTechStack().getTools().getDocumentationTools(),
-                                                p.getTechStack().getTools().getApiDevelopmentTools(),
-                                                p.getTechStack().getTools().getDesignTools()))))
+                        .map(p -> {
+                            ResumeInfoUseCaseDto.TechStackDto tech = p.getTechStack();
+                            ResumeInfoUseCaseDto.FrontendDto frontend = tech.getFrontend();
+                            ResumeInfoUseCaseDto.BackendDto backend = tech.getBackend();
+                            ResumeInfoUseCaseDto.InfrastructureDto infra = tech.getInfrastructure();
+                            ResumeInfoUseCaseDto.ToolsDto tools = tech.getTools();
+
+                            return new ProjectResponse(
+                                    p.getId().toString(),
+                                    p.getCompanyName(),
+                                    p.getStartDate(),
+                                    p.getEndDate(),
+                                    p.isActive(),
+                                    p.getName(),
+                                    p.getOverview(),
+                                    p.getTeamComp(),
+                                    p.getRole(),
+                                    p.getAchievement(),
+                                    new ProcessResponse(
+                                            p.getProcess().isRequirements(),
+                                            p.getProcess().isBasicDesign(),
+                                            p.getProcess().isDetailedDesign(),
+                                            p.getProcess().isImplementation(),
+                                            p.getProcess().isIntegrationTest(),
+                                            p.getProcess().isSystemTest(),
+                                            p.getProcess().isMaintenance()),
+                                    new TechStackResponse(
+                                            new FrontendResponse(
+                                                    frontend.getLanguages(),
+                                                    frontend.getFramework(),
+                                                    frontend.getLibraries(),
+                                                    frontend.getBuildTool(),
+                                                    frontend.getPackageManager(),
+                                                    frontend.getLinters(),
+                                                    frontend.getFormatters(),
+                                                    frontend.getTestingTools()),
+                                            new BackendResponse(
+                                                    backend.getLanguages(),
+                                                    backend.getFramework(),
+                                                    backend.getLibraries(),
+                                                    backend.getBuildTool(),
+                                                    backend.getPackageManager(),
+                                                    backend.getLinters(),
+                                                    backend.getFormatters(),
+                                                    backend.getTestingTools(),
+                                                    backend.getOrmTools(),
+                                                    backend.getAuth()),
+                                            new InfrastructureResponse(
+                                                    infra.getClouds(),
+                                                    infra.getOperatingSystem(),
+                                                    infra.getContainers(),
+                                                    infra.getDatabase(),
+                                                    infra.getWebServer(),
+                                                    infra.getCiCdTool(),
+                                                    infra.getIacTools(),
+                                                    infra.getMonitoringTools(),
+                                                    infra.getLoggingTools()),
+                                            new ToolsResponse(
+                                                    tools.getSourceControl(),
+                                                    tools.getProjectManagement(),
+                                                    tools.getCommunicationTool(),
+                                                    tools.getDocumentationTools(),
+                                                    tools.getApiDevelopmentTools(),
+                                                    tools.getDesignTools(),
+                                                    tools.getEditor(),
+                                                    tools.getDevelopmentEnvironment())));
+                        })
                         .collect(Collectors.toList()))
                 .certifications(dto.getCertifications().stream()
                         .map(c -> new CertificationResponse(
@@ -206,23 +230,44 @@ public class ResumeInfoResponse {
     @Getter
     @AllArgsConstructor
     public static class TechStackResponse {
-        private final List<String> languages;
-        private final DependenciesResponse dependencies;
+        private final FrontendResponse frontend;
+        private final BackendResponse backend;
         private final InfrastructureResponse infrastructure;
         private final ToolsResponse tools;
     }
 
     /**
-     * 依存関係
+     * フロントエンド
      */
     @Getter
     @AllArgsConstructor
-    public static class DependenciesResponse {
-        private final List<String> frameworks;
+    public static class FrontendResponse {
+        private final List<String> languages;
+        private final String framework;
         private final List<String> libraries;
+        private final String buildTool;
+        private final String packageManager;
+        private final List<String> linters;
+        private final List<String> formatters;
+        private final List<String> testingTools;
+    }
+
+    /**
+     * バックエンド
+     */
+    @Getter
+    @AllArgsConstructor
+    public static class BackendResponse {
+        private final List<String> languages;
+        private final String framework;
+        private final List<String> libraries;
+        private final String buildTool;
+        private final String packageManager;
+        private final List<String> linters;
+        private final List<String> formatters;
         private final List<String> testingTools;
         private final List<String> ormTools;
-        private final List<String> packageManagers;
+        private final List<String> auth;
     }
 
     /**
@@ -232,10 +277,11 @@ public class ResumeInfoResponse {
     @AllArgsConstructor
     public static class InfrastructureResponse {
         private final List<String> clouds;
+        private final String operatingSystem;
         private final List<String> containers;
-        private final List<String> databases;
-        private final List<String> webServers;
-        private final List<String> ciCdTools;
+        private final String database;
+        private final String webServer;
+        private final String ciCdTools;
         private final List<String> iacTools;
         private final List<String> monitoringTools;
         private final List<String> loggingTools;
@@ -247,12 +293,14 @@ public class ResumeInfoResponse {
     @Getter
     @AllArgsConstructor
     public static class ToolsResponse {
-        private final List<String> sourceControls;
-        private final List<String> projectManagements;
-        private final List<String> communicationTools;
+        private final String sourceControl;
+        private final String projectManagement;
+        private final String communicationTool;
         private final List<String> documentationTools;
         private final List<String> apiDevelopmentTools;
         private final List<String> designTools;
+        private final String editor;
+        private final String developmentEnvironment;
     }
 
     /**

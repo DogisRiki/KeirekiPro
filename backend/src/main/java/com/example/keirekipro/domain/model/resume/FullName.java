@@ -46,11 +46,25 @@ public class FullName {
     }
 
     private void validate(Notification notification, String lastName, String firstName) {
-        if (isInvalidValue(lastName)) {
-            notification.addError("lastName", "姓には英数、ひらがな、カタカナ、漢字のみ使用できます。");
+        if (lastName == null || lastName.isBlank()) {
+            notification.addError("lastName", "姓は入力必須です。");
+        } else {
+            if (lastName.length() > 10) {
+                notification.addError("lastName", "姓は10文字以内で入力してください。");
+            }
+            if (isInvalidValue(lastName)) {
+                notification.addError("lastName", "姓には英数、ひらがな、カタカナ、漢字のみ使用できます。");
+            }
         }
-        if (isInvalidValue(firstName)) {
-            notification.addError("firstName", "名には英数、ひらがな、カタカナ、漢字のみ使用できます。");
+        if (firstName == null || firstName.isBlank()) {
+            notification.addError("firstName", "名は入力必須です。");
+        } else {
+            if (firstName.length() > 10) {
+                notification.addError("firstName", "名は10文字以内で入力してください。");
+            }
+            if (isInvalidValue(firstName)) {
+                notification.addError("firstName", "名には英数、ひらがな、カタカナ、漢字のみ使用できます。");
+            }
         }
     }
 

@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.Certification;
+import com.example.keirekipro.domain.model.resume.CompanyName;
 import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Period;
@@ -19,7 +20,8 @@ import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.model.resume.SocialLink;
 import com.example.keirekipro.domain.model.resume.TechStack;
-import com.example.keirekipro.domain.model.resume.TechStack.Dependencies;
+import com.example.keirekipro.domain.model.resume.TechStack.Backend;
+import com.example.keirekipro.domain.model.resume.TechStack.Frontend;
 import com.example.keirekipro.domain.model.resume.TechStack.Infrastructure;
 import com.example.keirekipro.domain.model.resume.TechStack.Tools;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto;
@@ -57,24 +59,67 @@ public class ResumeObjectBuilder {
         FullName fn = FullName.create(notif, lastName, firstName);
 
         Period period = Period.create(new Notification(), YearMonth.of(2020, 1), YearMonth.of(2020, 12), false);
-        Career career = Career.create("CompanyA", period);
+        CompanyName companyName = CompanyName.create(new Notification(), "CompanyA");
+        Career career = Career.create(notif, companyName, period);
         Project.Process process = Project.Process.create(true, false, false, true, false, false, false);
 
-        Dependencies deps = Dependencies.create(List.of("Spring"), List.of("JUnit"), List.of("Mockito"), List.of("JPA"),
-                List.of("Maven"));
-        Infrastructure infra = Infrastructure.create(List.of("AWS"), List.of("Docker"), List.of("Postgres"),
-                List.of("NGINX"), List.of("Jenkins"), List.of("Terraform"), List.of("Prometheus"), List.of("ELK"));
-        Tools tools = Tools.create(List.of("Git"), List.of("JIRA"), List.of("Slack"), List.of("Confluence"),
-                List.of("Postman"), List.of("Figma"));
-        TechStack tech = TechStack.create(List.of("Java", "Kotlin"), deps, infra, tools);
+        // TechStack（フロントエンド）
+        Frontend frontend = Frontend.create(
+                List.of("HTML", "CSS", "TypeScript"),
+                "React",
+                List.of("MUI", "axios"),
+                "Vite",
+                "npm",
+                List.of("ESLint"),
+                List.of("Prettier"),
+                List.of("Vitest"));
 
-        Project project = Project.create("CompanyA", period, "ProjName", "Overview", "TeamComp", "Role", "Achievement",
+        // TechStack（バックエンド）
+        Backend backend = Backend.create(
+                List.of("Java", "Kotlin"),
+                "Spring Framework",
+                List.of("Jackson", "Flyway"),
+                "Gradle",
+                "Gradle",
+                List.of("CheckStyle"),
+                List.of("Google Java Style"),
+                List.of("JUnit"),
+                List.of("MyBatis"),
+                List.of("Spring Security"));
+
+        // TechStack（インフラ）
+        Infrastructure infra = Infrastructure.create(
+                List.of("AWS"),
+                "RHEL9.4",
+                List.of("Docker"),
+                "Postgres",
+                "NGINX",
+                "Jenkins",
+                List.of("Terraform"),
+                List.of("Prometheus"),
+                List.of("ELK"));
+
+        // TechStack（開発支援ツール）
+        Tools tools = Tools.create(
+                "Git",
+                "JIRA",
+                "Slack",
+                List.of("Confluence"),
+                List.of("Postman"),
+                List.of("Figma"),
+                "Visual Studio Code",
+                "Windows");
+
+        TechStack tech = TechStack.create(frontend, backend, infra, tools);
+
+        Project project = Project.create(notif, companyName, period, "ProjName", "Overview", "TeamComp", "Role",
+                "Achievement",
                 process, tech);
-        Certification cert = Certification.create("Oracle Certified", YearMonth.of(2019, 6));
-        Portfolio port = Portfolio.create("Portfolio1", "Desc", "TechStackDesc",
+        Certification cert = Certification.create(notif, "Oracle Certified", YearMonth.of(2019, 6));
+        Portfolio port = Portfolio.create(notif, "Portfolio1", "Desc", "TechStackDesc",
                 Link.create(new Notification(), "https://example.com"));
-        SocialLink social = SocialLink.create("GitHub", Link.create(new Notification(), "https://github.com"));
-        SelfPromotion self = SelfPromotion.create("Title1", "Content1");
+        SocialLink social = SocialLink.create(notif, "GitHub", Link.create(new Notification(), "https://github.com"));
+        SelfPromotion self = SelfPromotion.create(notif, "Title1", "Content1");
 
         return Resume.reconstruct(
                 resumeId,
@@ -159,7 +204,7 @@ public class ResumeObjectBuilder {
             ResumeDto.CareerDto cd = new ResumeDto.CareerDto();
             cd.setId(c.getId());
             cd.setResumeId(r.getId());
-            cd.setCompanyName(c.getCompanyName());
+            cd.setCompanyName(c.getCompanyName().getValue());
             cd.setStartDate(c.getPeriod().getStartDate());
             cd.setEndDate(c.getPeriod().getEndDate());
             cd.setIsActive(c.getPeriod().isActive());
@@ -171,7 +216,7 @@ public class ResumeObjectBuilder {
             ResumeDto.ProjectDto pd = new ResumeDto.ProjectDto();
             pd.setId(p.getId());
             pd.setResumeId(r.getId());
-            pd.setCompanyName(p.getCompanyName());
+            pd.setCompanyName(p.getCompanyName().getValue());
             pd.setStartDate(p.getPeriod().getStartDate());
             pd.setEndDate(p.getPeriod().getEndDate());
             pd.setIsActive(p.getPeriod().isActive());
@@ -188,34 +233,57 @@ public class ResumeObjectBuilder {
             pd.setIntegrationTest(p.getProcess().isIntegrationTest());
             pd.setSystemTest(p.getProcess().isSystemTest());
             pd.setMaintenance(p.getProcess().isMaintenance());
+
             // TechStack
             TechStack ts = p.getTechStack();
-            pd.setLanguages(ts.getLanguages());
-            // Dependencies
-            Dependencies dep = ts.getDependencies();
-            pd.setFrameworks(dep.getFrameworks());
-            pd.setLibraries(dep.getLibraries());
-            pd.setTestingTools(dep.getTestingTools());
-            pd.setOrmTools(dep.getOrmTools());
-            pd.setPackageManagers(dep.getPackageManagers());
-            // Infrastructure
-            Infrastructure inf = ts.getInfrastructure();
+            TechStack.Frontend fe = ts.getFrontend();
+            TechStack.Backend be = ts.getBackend();
+            TechStack.Infrastructure inf = ts.getInfrastructure();
+            TechStack.Tools tls = ts.getTools();
+
+            // TechStack - Frontend
+            pd.setFrontendLanguages(fe.getLanguages());
+            pd.setFrontendFramework(fe.getFramework());
+            pd.setFrontendLibraries(fe.getLibraries());
+            pd.setFrontendBuildTool(fe.getBuildTool());
+            pd.setFrontendPackageManager(fe.getPackageManager());
+            pd.setFrontendLinters(fe.getLinters());
+            pd.setFrontendFormatters(fe.getFormatters());
+            pd.setFrontendTestingTools(fe.getTestingTools());
+
+            // TechStack - Backend
+            pd.setBackendLanguages(be.getLanguages());
+            pd.setBackendFramework(be.getFramework());
+            pd.setBackendLibraries(be.getLibraries());
+            pd.setBackendBuildTool(be.getBuildTool());
+            pd.setBackendPackageManager(be.getPackageManager());
+            pd.setBackendLinters(be.getLinters());
+            pd.setBackendFormatters(be.getFormatters());
+            pd.setBackendTestingTools(be.getTestingTools());
+            pd.setOrmTools(be.getOrmTools());
+            pd.setAuth(be.getAuth());
+
+            // TechStack - Infrastructure
             pd.setClouds(inf.getClouds());
+            pd.setOperatingSystem(inf.getOperatingSystem());
             pd.setContainers(inf.getContainers());
-            pd.setDatabases(inf.getDatabases());
-            pd.setWebServers(inf.getWebServers());
-            pd.setCiCdTools(inf.getCiCdTools());
+            pd.setDatabase(inf.getDatabase());
+            pd.setWebServer(inf.getWebServer());
+            pd.setCiCdTool(inf.getCiCdTool());
             pd.setIacTools(inf.getIacTools());
             pd.setMonitoringTools(inf.getMonitoringTools());
             pd.setLoggingTools(inf.getLoggingTools());
-            // Tools
-            Tools tls = ts.getTools();
-            pd.setSourceControls(tls.getSourceControls());
-            pd.setProjectManagements(tls.getProjectManagements());
-            pd.setCommunicationTools(tls.getCommunicationTools());
+
+            // TechStack - Tools
+            pd.setSourceControl(tls.getSourceControl());
+            pd.setProjectManagement(tls.getProjectManagement());
+            pd.setCommunicationTool(tls.getCommunicationTool());
             pd.setDocumentationTools(tls.getDocumentationTools());
             pd.setApiDevelopmentTools(tls.getApiDevelopmentTools());
             pd.setDesignTools(tls.getDesignTools());
+            pd.setEditor(tls.getEditor());
+            pd.setDevelopmentEnvironment(tls.getDevelopmentEnvironment());
+
             return pd;
         }).collect(Collectors.toList()));
 

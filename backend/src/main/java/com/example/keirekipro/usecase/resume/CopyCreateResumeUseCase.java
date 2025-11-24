@@ -47,6 +47,11 @@ public class CopyCreateResumeUseCase {
         Resume source = resumeRepository.find(request.getResumeId())
                 .orElseThrow(() -> new UseCaseException("コピー元の職務経歴書が存在しません。"));
 
+        // 所有者チェック（他人の職務経歴書をコピーしようとした場合）
+        if (!source.getUserId().equals(userId)) {
+            throw new UseCaseException("コピー元の職務経歴書が存在しません。");
+        }
+
         // 職務経歴書エンティティ新規構築
         Resume copy = Resume.create(
                 notification,
