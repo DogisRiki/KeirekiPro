@@ -75,6 +75,11 @@ class TestController {
         throw new DomainException("ドメインフィールドエラー", errors);
     }
 
+    @GetMapping("/test9")
+    public void throwUnexpectedException() {
+        throw new RuntimeException("unexpected error");
+    }
+
     @Data
     public static class NotNullDto {
         @NotNull(message = "値1は入力必須です。")

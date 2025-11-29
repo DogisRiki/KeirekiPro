@@ -132,4 +132,15 @@ class AppExceptionHandlerTest {
                 .andExpect(jsonPath("$.errors.field1[0]").value("フィールド1ドメインエラー"))
                 .andExpect(jsonPath("$.errors.field2[0]").value("フィールド2ドメインエラー"));
     }
+
+    @Test
+    @DisplayName("予期せぬエラー発生時、500が返る")
+    void test9() throws Exception {
+        mockMvc.perform(get("/test/test9")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("予期せぬエラーが発生しました。"))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
 }
