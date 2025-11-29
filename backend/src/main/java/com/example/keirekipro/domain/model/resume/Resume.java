@@ -110,16 +110,12 @@ public class Resume extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private Resume(Notification notification, UUID userId, ResumeName name, LocalDate date,
+    private Resume(UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
             List<Career> careers, List<Project> projects,
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
         super();
-        // サブエンティティや値オブジェクト、事前バリデーションのエラーを一括でスローする
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
-        }
         this.userId = userId;
         this.name = name;
         this.date = date;
@@ -179,8 +175,9 @@ public class Resume extends Entity {
             List<SocialLink> socialLinks, List<SelfPromotion> selfPromotions) {
 
         validateOnCreate(notification, name, date);
+        throwIfInvalid(notification);
 
-        return new Resume(notification, userId, name, date, fullName, careers, projects, certifications, portfolios,
+        return new Resume(userId, name, date, fullName, careers, projects, certifications, portfolios,
                 socialLinks, selfPromotions);
     }
 
@@ -200,13 +197,15 @@ public class Resume extends Entity {
     /**
      * 職務経歴書名を変更する
      *
-     * @param name 新しい職務経歴書名
+     * @param notification 通知オブジェクト
+     * @param name         新しい職務経歴書名
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume changeName(ResumeName name) {
+    public Resume changeName(Notification notification, ResumeName name) {
         if (name == null) {
-            throw new DomainException("職務経歴書名は入力必須です。");
+            notification.addError("name", "職務経歴書名は入力必須です。");
         }
+        throwIfInvalid(notification);
         return new Resume(this.id, this.userId, name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -216,13 +215,15 @@ public class Resume extends Entity {
     /**
      * 氏名を変更する
      *
-     * @param fullName 新しい氏名
+     * @param notification 通知オブジェクト
+     * @param fullName     新しい氏名
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume ChangeFullName(FullName fullName) {
+    public Resume ChangeFullName(Notification notification, FullName fullName) {
         if (fullName == null) {
-            throw new DomainException("氏名は入力必須です。");
+            notification.addError("fullName", "氏名は入力必須です。");
         }
+        throwIfInvalid(notification);
         return new Resume(this.id, this.userId, this.name, this.date, fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -232,13 +233,15 @@ public class Resume extends Entity {
     /**
      * 日付を変更する
      *
-     * @param date 新しい日付
+     * @param notification 通知オブジェクト
+     * @param date         新しい日付
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume changeDate(LocalDate date) {
+    public Resume changeDate(Notification notification, LocalDate date) {
         if (date == null) {
-            throw new DomainException("日付は入力必須です。");
+            notification.addError("date", "日付は入力必須です。");
         }
+        throwIfInvalid(notification);
         return new Resume(this.id, this.userId, this.name, date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -248,13 +251,18 @@ public class Resume extends Entity {
     /**
      * 職歴を追加する
      *
-     * @param career 追加する職歴
+     * @param notification 通知オブジェクト
+     * @param career       追加する職歴
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addCareer(Career career) {
+    public Resume addCareer(Notification notification, Career career) {
         if (career == null) {
-            throw new DomainException("職歴は入力必須です。");
+            notification.addError("career", "職歴は入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        // 期間重複は従来どおり DomainException を直接スロー
         validateIsCareerOverlap(career);
 
         List<Career> updatedCareers = new ArrayList<>(this.careers);
@@ -268,13 +276,18 @@ public class Resume extends Entity {
     /**
      * 職歴を更新する
      *
+     * @param notification  通知オブジェクト
      * @param updatedCareer 更新後の職歴エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateCareer(Career updatedCareer) {
+    public Resume updateCareer(Notification notification, Career updatedCareer) {
         if (updatedCareer == null) {
-            throw new DomainException("職歴は入力必須です。");
+            notification.addError("career", "職歴は入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        // 期間重複は従来どおり DomainException を直接スロー
         validateIsCareerOverlap(updatedCareer);
 
         List<Career> updatedCareers = this.careers.stream()
@@ -351,6 +364,7 @@ public class Resume extends Entity {
             String message = String.format("%sと%sの期間が重複しています。",
                     targetCareer.getCompanyName().getValue(),
                     String.join("、", overlappingCompanies));
+            // 元の挙動どおり、ここでは直接 DomainException をスローする
             throw new DomainException(message);
         }
     }
@@ -358,14 +372,18 @@ public class Resume extends Entity {
     /**
      * プロジェクトを追加する
      *
-     * @param project 追加するプロジェクト
+     * @param notification 通知オブジェクト
+     * @param project      追加するプロジェクト
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addProject(Project project) {
+    public Resume addProject(Notification notification, Project project) {
         if (project == null) {
-            throw new DomainException("プロジェクトは入力必須です。");
+            notification.addError("project", "プロジェクトは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
 
+        // 職歴に存在しない会社名チェックは従来どおり DomainException を直接スロー
         validateProjectInCareer(project);
 
         List<Project> updatedProjects = new ArrayList<>(this.projects);
@@ -379,14 +397,18 @@ public class Resume extends Entity {
     /**
      * プロジェクトを更新する
      *
+     * @param notification   通知オブジェクト
      * @param updatedProject 更新するプロジェクトエンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateProject(Project updatedProject) {
+    public Resume updateProject(Notification notification, Project updatedProject) {
         if (updatedProject == null) {
-            throw new DomainException("プロジェクトは入力必須です。");
+            notification.addError("project", "プロジェクトは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
 
+        // 職歴に存在しない会社名チェックは従来どおり DomainException を直接スロー
         validateProjectInCareer(updatedProject);
 
         List<Project> updatedProjects = this.projects.stream()
@@ -426,6 +448,7 @@ public class Resume extends Entity {
             String message = String.format(
                     "%sは職歴に存在しません。職歴に存在する会社名を選択してください。",
                     project.getCompanyName().getValue());
+            // 元の挙動どおり、ここでは直接 DomainException をスローする
             throw new DomainException(message);
         }
     }
@@ -433,13 +456,18 @@ public class Resume extends Entity {
     /**
      * 資格を追加する
      *
+     * @param notification  通知オブジェクト
      * @param certification 追加する資格
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addCertification(Certification certification) {
+    public Resume addCertification(Notification notification, Certification certification) {
         if (certification == null) {
-            throw new DomainException("資格は入力必須です。");
+            notification.addError("certification", "資格は入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
 
         List<Certification> updatedCertifications = new ArrayList<>(this.certifications);
         updatedCertifications.add(certification);
@@ -452,13 +480,18 @@ public class Resume extends Entity {
     /**
      * 資格を更新する
      *
+     * @param notification         通知オブジェクト
      * @param updatedCertification 更新する資格エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateCertification(Certification updatedCertification) {
+    public Resume updateCertification(Notification notification, Certification updatedCertification) {
         if (updatedCertification == null) {
-            throw new DomainException("資格は入力必須です。");
+            notification.addError("certification", "資格は入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
 
         List<Certification> updatedCertifications = this.certifications.stream()
                 .map(certification -> certification.getId().equals(updatedCertification.getId()) ? updatedCertification
@@ -489,13 +522,18 @@ public class Resume extends Entity {
     /**
      * ポートフォリオを追加する
      *
-     * @param portfolio 追加するポートフォリオ
+     * @param notification 通知オブジェクト
+     * @param portfolio    追加するポートフォリオ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addPortfolio(Portfolio portfolio) {
+    public Resume addPortfolio(Notification notification, Portfolio portfolio) {
         if (portfolio == null) {
-            throw new DomainException("ポートフォリオは入力必須です。");
+            notification.addError("portfolio", "ポートフォリオは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
 
         List<Portfolio> updatedPortfolios = new ArrayList<>(this.portfolios);
         updatedPortfolios.add(portfolio);
@@ -508,13 +546,18 @@ public class Resume extends Entity {
     /**
      * ポートフォリオを更新する
      *
+     * @param notification     通知オブジェクト
      * @param updatedPortfolio 更新するポートフォリオ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updatePortfolio(Portfolio updatedPortfolio) {
+    public Resume updatePortfolio(Notification notification, Portfolio updatedPortfolio) {
         if (updatedPortfolio == null) {
-            throw new DomainException("ポートフォリオは入力必須です。");
+            notification.addError("portfolio", "ポートフォリオは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
 
         List<Portfolio> updatedPortfolios = this.portfolios.stream()
                 .map(portfolio -> portfolio.getId().equals(updatedPortfolio.getId()) ? updatedPortfolio : portfolio)
@@ -544,13 +587,18 @@ public class Resume extends Entity {
     /**
      * ソーシャルリンクを追加する
      *
-     * @param sociealLink 追加するソーシャルリンク
+     * @param notification 通知オブジェクト
+     * @param sociealLink  追加するソーシャルリンク
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addSociealLink(SocialLink sociealLink) {
+    public Resume addSociealLink(Notification notification, SocialLink sociealLink) {
         if (sociealLink == null) {
-            throw new DomainException("ソーシャルリンクは入力必須です。");
+            notification.addError("socialLink", "ソーシャルリンクは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
 
         List<SocialLink> updatedSocialLinks = new ArrayList<>(this.socialLinks);
         updatedSocialLinks.add(sociealLink);
@@ -563,13 +611,18 @@ public class Resume extends Entity {
     /**
      * ソーシャルリンクを更新する
      *
+     * @param notification       通知オブジェクト
      * @param updatedSociealLink 更新するソーシャルリンク
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateSociealLink(SocialLink updatedSociealLink) {
+    public Resume updateSociealLink(Notification notification, SocialLink updatedSociealLink) {
         if (updatedSociealLink == null) {
-            throw new DomainException("ソーシャルリンクは入力必須です。");
+            notification.addError("socialLink", "ソーシャルリンクは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
 
         List<SocialLink> updatedSocialLinks = this.socialLinks.stream()
                 .map(sociealLink -> sociealLink.getId().equals(updatedSociealLink.getId()) ? updatedSociealLink
@@ -600,13 +653,18 @@ public class Resume extends Entity {
     /**
      * 自己PRを追加する
      *
+     * @param notification  通知オブジェクト
      * @param selfPromotion 追加する自己PR
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addSelfPromotion(SelfPromotion selfPromotion) {
+    public Resume addSelfPromotion(Notification notification, SelfPromotion selfPromotion) {
         if (selfPromotion == null) {
-            throw new DomainException("自己PRは入力必須です。");
+            notification.addError("selfPromotion", "自己PRは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
 
         List<SelfPromotion> updatedSelfPromotions = new ArrayList<>(this.selfPromotions);
         updatedSelfPromotions.add(selfPromotion);
@@ -635,13 +693,18 @@ public class Resume extends Entity {
     /**
      * 自己PRを更新する
      *
+     * @param notification         通知オブジェクト
      * @param updatedSelfPromotion 更新する自己PR
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateSelfPromotion(SelfPromotion updatedSelfPromotion) {
+    public Resume updateSelfPromotion(Notification notification, SelfPromotion updatedSelfPromotion) {
         if (updatedSelfPromotion == null) {
-            throw new DomainException("自己PRは入力必須です。");
+            notification.addError("selfPromotion", "自己PRは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
 
         List<SelfPromotion> updatedSelfPromotions = this.selfPromotions.stream()
                 .map(selfPromotion -> selfPromotion.getId().equals(updatedSelfPromotion.getId()) ? updatedSelfPromotion
@@ -662,6 +725,17 @@ public class Resume extends Entity {
         }
         if (date == null) {
             notification.addError("date", "日付は入力必須です。");
+        }
+    }
+
+    /**
+     * NotificationにエラーがあればDomainExceptionをスローする
+     *
+     * @param notification 通知オブジェクト
+     */
+    private static void throwIfInvalid(Notification notification) {
+        if (notification != null && notification.hasErrors()) {
+            throw new DomainException(notification.getErrors());
         }
     }
 }

@@ -118,7 +118,9 @@ class ResumeTest {
     void test4() {
         Resume originalResume = createSampleResume();
         ResumeName newName = ResumeName.create(notification, "新しい履歴書名");
-        Resume updatedResume = originalResume.changeName(newName);
+        Notification domainNotification = new Notification();
+
+        Resume updatedResume = originalResume.changeName(domainNotification, newName);
 
         assertThat(updatedResume.getName()).isEqualTo(newName);
     }
@@ -128,7 +130,9 @@ class ResumeTest {
     void test5() {
         Resume originalResume = createSampleResume();
         LocalDate newDate = LocalDate.of(2025, 1, 1);
-        Resume updatedResume = originalResume.changeDate(newDate);
+        Notification domainNotification = new Notification();
+
+        Resume updatedResume = originalResume.changeDate(domainNotification, newDate);
 
         assertThat(updatedResume.getDate()).isEqualTo(newDate);
     }
@@ -139,7 +143,9 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Resume afterResume = beforeResume.addCareer(newCareer);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addCareer(domainNotification, newCareer);
 
         assertThat(afterResume.getCareers().contains(newCareer)).isTrue();
         assertThat(afterResume.getCareers().size()).isEqualTo(beforeResume.getCareers().size() + 1);
@@ -166,9 +172,11 @@ class ResumeTest {
         Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 2), YearMonth.of(2024, 3), false));
 
-        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+        Notification domainNotification = new Notification();
+
+        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
@@ -179,9 +187,11 @@ class ResumeTest {
         Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false));
 
-        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+        Notification domainNotification = new Notification();
+
+        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
@@ -205,9 +215,11 @@ class ResumeTest {
         Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 2), null, true));
 
-        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+        Notification domainNotification = new Notification();
+
+        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
@@ -218,9 +230,11 @@ class ResumeTest {
         Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2023, 10), YearMonth.of(2024, 11), false));
 
-        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+        Notification domainNotification = new Notification();
+
+        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
@@ -231,9 +245,11 @@ class ResumeTest {
         Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2023, 11), YearMonth.of(2024, 6), false));
 
-        assertThatThrownBy(() -> resume.addCareer(overlappingCareer))
+        Notification domainNotification = new Notification();
+
+        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessage("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
     }
 
     @Test
@@ -243,7 +259,9 @@ class ResumeTest {
         Career newCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(),
                 CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Resume afterResume = beforeResume.updateCareer(newCareer);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.updateCareer(domainNotification, newCareer);
 
         // 更新した職歴がリストに含まれている
         assertThat(afterResume.getCareers().contains(newCareer)).isTrue();
@@ -261,7 +279,9 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Resume afterResume = beforeResume.addCareer(newCareer);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addCareer(domainNotification, newCareer);
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeCareer(newCareer.getId());
 
@@ -281,7 +301,9 @@ class ResumeTest {
     void test14() {
         Resume beforeResume = createSampleResume();
         Project newProject = createSampleProject();
-        Resume afterResume = beforeResume.addProject(newProject);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addProject(domainNotification, newProject);
 
         // 新しいプロジェクトがリストに含まれている
         assertThat(afterResume.getProjects().contains(newProject)).isTrue();
@@ -296,9 +318,11 @@ class ResumeTest {
         Project notExistProject = createSampleProject().changeCompanyName(notification,
                 CompanyName.create(notification, "株式会社ZZZ"));
 
-        assertThatThrownBy(() -> resume.addProject(notExistProject))
+        Notification domainNotification = new Notification();
+
+        assertThatThrownBy(() -> resume.addProject(domainNotification, notExistProject))
                 .isInstanceOf(DomainException.class)
-                .hasMessage("株式会社ZZZは職歴に存在しません。職歴に存在する会社名を選択してください。");
+                .hasMessageContaining("株式会社ZZZは職歴に存在しません。職歴に存在する会社名を選択してください。");
     }
 
     @Test
@@ -370,7 +394,9 @@ class ResumeTest {
                 Project.Process.create(false, true, true, false, true, true, false),
                 updatedTechStack);
 
-        Resume afterResume = beforeResume.updateProject(updatedProject);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.updateProject(domainNotification, updatedProject);
 
         // 更新したプロジェクトがリストに含まれている
         assertThat(afterResume.getProjects().contains(updatedProject)).isTrue();
@@ -462,7 +488,9 @@ class ResumeTest {
                 Project.Process.create(true, false, true, false, true, false, true),
                 techStack);
 
-        Resume afterResume = beforeResume.addProject(newProject);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addProject(domainNotification, newProject);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeProject(newProject.getId());
@@ -482,7 +510,9 @@ class ResumeTest {
     void test18() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.create(notification, "応用情報技術者", YearMonth.of(2025, 2));
-        Resume afterResume = beforeResume.addCertification(newCertification);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addCertification(domainNotification, newCertification);
 
         // 新しい資格がリストに含まれている
         assertThat(afterResume.getCertifications().contains(newCertification)).isTrue();
@@ -496,7 +526,9 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.reconstruct(beforeResume.getCertifications().get(0).getId(),
                 "応用情報技術者", YearMonth.of(2025, 2));
-        Resume afterResume = beforeResume.updateCertification(newCertification);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.updateCertification(domainNotification, newCertification);
 
         // 更新した資格がリストに含まれている
         assertThat(afterResume.getCertifications().contains(newCertification)).isTrue();
@@ -517,7 +549,9 @@ class ResumeTest {
     void test20() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.create(notification, "応用情報技術者", YearMonth.of(2025, 2));
-        Resume afterResume = beforeResume.addCertification(newCertification);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addCertification(domainNotification, newCertification);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeCertification(newCertification.getId());
@@ -543,7 +577,9 @@ class ResumeTest {
                 "新しい技術スタック",
                 Link.create(notification, "https://new-portfolio.com"));
 
-        Resume afterResume = beforeResume.addPortfolio(newPortfolio);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addPortfolio(domainNotification, newPortfolio);
 
         // 新しいポートフォリオがリストに含まれている
         assertThat(afterResume.getPortfolios().contains(newPortfolio)).isTrue();
@@ -562,7 +598,9 @@ class ResumeTest {
                 "更新された技術スタック",
                 Link.create(notification, "https://updated-portfolio.com"));
 
-        Resume afterResume = beforeResume.updatePortfolio(updatedPortfolio);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.updatePortfolio(domainNotification, updatedPortfolio);
 
         // 更新したポートフォリオがリストに含まれている
         assertThat(afterResume.getPortfolios().contains(updatedPortfolio)).isTrue();
@@ -591,7 +629,9 @@ class ResumeTest {
                 "削除対象の技術スタック",
                 Link.create(notification, "https://delete-portfolio.com"));
 
-        Resume afterResume = beforeResume.addPortfolio(newPortfolio);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addPortfolio(domainNotification, newPortfolio);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removePortfolio(newPortfolio.getId());
@@ -615,7 +655,9 @@ class ResumeTest {
                 "Twitter",
                 Link.create(notification, "https://twitter.com/user"));
 
-        Resume afterResume = beforeResume.addSociealLink(newSocialLink);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addSociealLink(domainNotification, newSocialLink);
 
         // 新しいソーシャルリンクがリストに含まれている
         assertThat(afterResume.getSocialLinks().contains(newSocialLink)).isTrue();
@@ -632,7 +674,9 @@ class ResumeTest {
                 "LinkedIn",
                 Link.create(notification, "https://linkedin.com/in/user"));
 
-        Resume afterResume = beforeResume.updateSociealLink(updatedSocialLink);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.updateSociealLink(domainNotification, updatedSocialLink);
 
         // 更新したソーシャルリンクがリストに含まれている
         assertThat(afterResume.getSocialLinks().contains(updatedSocialLink)).isTrue();
@@ -653,7 +697,9 @@ class ResumeTest {
                 "Facebook",
                 Link.create(notification, "https://facebook.com/user"));
 
-        Resume afterResume = beforeResume.addSociealLink(newSocialLink);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addSociealLink(domainNotification, newSocialLink);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeSociealLink(newSocialLink.getId());
@@ -677,7 +723,9 @@ class ResumeTest {
                 "新しいタイトル",
                 "新しい自己PRの内容");
 
-        Resume afterResume = beforeResume.addSelfPromotion(newSelfPromotion);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addSelfPromotion(domainNotification, newSelfPromotion);
 
         // 新しい自己PRがリストに含まれている
         assertThat(afterResume.getSelfPromotions().contains(newSelfPromotion)).isTrue();
@@ -694,7 +742,9 @@ class ResumeTest {
                 "更新されたタイトル",
                 "更新された自己PRの内容");
 
-        Resume afterResume = beforeResume.updateSelfPromotion(updatedSelfPromotion);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.updateSelfPromotion(domainNotification, updatedSelfPromotion);
 
         // 更新した自己PRがリストに含まれている
         assertThat(afterResume.getSelfPromotions().contains(updatedSelfPromotion)).isTrue();
@@ -719,7 +769,9 @@ class ResumeTest {
                 "削除対象のタイトル",
                 "削除対象の自己PRの内容");
 
-        Resume afterResume = beforeResume.addSelfPromotion(newSelfPromotion);
+        Notification domainNotification = new Notification();
+
+        Resume afterResume = beforeResume.addSelfPromotion(domainNotification, newSelfPromotion);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeSelfPromotion(newSelfPromotion.getId());
@@ -739,7 +791,9 @@ class ResumeTest {
     void test30() {
         Resume originalResume = createSampleResume();
         FullName newFullName = FullName.create(notification, "変更", "しました");
-        Resume updatedResume = originalResume.ChangeFullName(newFullName);
+        Notification domainNotification = new Notification();
+
+        Resume updatedResume = originalResume.ChangeFullName(domainNotification, newFullName);
 
         assertThat(updatedResume.getFullName()).isEqualTo(newFullName);
     }
