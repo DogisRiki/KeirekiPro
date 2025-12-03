@@ -104,44 +104,63 @@ export interface Process {
     maintenance: boolean; // 運用・保守
 }
 
+export interface TechStackFrontend {
+    // フロントエンド
+    languages: string[];
+    frameworks: string[];
+    libraries: string[];
+    buildTools: string[];
+    packageManagers: string[];
+    linters: string[];
+    formatters: string[];
+    testingTools: string[];
+}
+
+export interface TechStackBackend {
+    // バックエンド
+    languages: string[];
+    frameworks: string[];
+    libraries: string[];
+    buildTools: string[];
+    packageManagers: string[];
+    linters: string[];
+    formatters: string[];
+    testingTools: string[];
+    ormTools: string[];
+    auth: string[];
+}
+
+export interface TechStackInfrastructure {
+    // インフラ
+    clouds: string[];
+    operatingSystems: string[];
+    containers: string[];
+    databases: string[];
+    webServers: string[];
+    ciCdTools: string[];
+    iacTools: string[];
+    monitoringTools: string[];
+    loggingTools: string[];
+}
+
+export interface TechStackTools {
+    // 開発支援ツール
+    sourceControls: string[];
+    projectManagements: string[];
+    communicationTools: string[];
+    documentationTools: string[];
+    apiDevelopmentTools: string[];
+    designTools: string[];
+    editors: string[];
+    developmentEnvironments: string[];
+}
+
 /**
  * 技術スタック
  */
 export interface TechStack {
-    // 開発言語
-    languages: string[]; // プログラミング言語の配列
-
-    // 依存関係
-    dependencies: {
-        frameworks: string[]; // フレームワークのリスト
-        libraries: string[]; // ライブラリのリスト
-        testingTools: string[]; // テストツールのリスト
-        ormTools: string[]; // ORMツールのリスト
-        packageManagers: string[]; // パッケージマネージャーのリスト（例: npm, yarn）
-    };
-
-    // インフラ・開発環境
-    infrastructure: {
-        clouds: string[]; // クラウドサービスの配列
-        containers: string[]; // コンテナ技術の配列
-        databases: string[]; // データベースの配列
-        webServers: string[]; // ウェブサーバーの配列
-        ciCdTools: string[]; // CI/CDツールの配列
-        iacTools: string[]; // IaCツールの配列
-        monitoringTools: string[]; // 監視ツールの配列
-        loggingTools: string[]; // ロギングツールの配列
-    };
-
-    // 開発ツール・プロジェクト管理
-    tools: {
-        sourceControls: string[]; // ソース管理ツールの配列
-        projectManagements: string[]; // プロジェクト管理ツールの配列
-        communicationTools: string[]; // コミュニケーションツールの配列
-        documentationTools: string[]; // ドキュメントツールの配列
-        apiDevelopmentTools: string[]; // API開発ツールの配列
-        designTools: string[]; // デザインツールの配列
-    };
-
-    // その他
-    others?: string[]; // その他の技術やツールの配列
+    frontend: TechStackFrontend;
+    backend: TechStackBackend;
+    infrastructure: TechStackInfrastructure;
+    tools: TechStackTools;
 }

@@ -1,40 +1,9 @@
+// src/features/resume/components/resume/section/TechStackField.tsx
 import { Autocomplete, TextField } from "@/components/ui";
-import { techStackInfo, teckStackList } from "@/features/resume";
-import { TechStack } from "@/types";
-import { getNestedValue, setNestedValue } from "@/utils";
-import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
-import { Accordion, AccordionDetails, AccordionSummary, SxProps, Theme, Typography } from "@mui/material";
-import { useState } from "react";
+import { dedupeIgnoreCase, normalizeForCaseInsensitiveCompare } from "@/utils";
+import React, { useState } from "react";
 
-/**
- * 共通のアコーディオンスタイル
- */
-const accordionStyles: SxProps<Theme> = {
-    mb: 2,
-    boxShadow: "none",
-    "&:before": {
-        display: "none",
-    },
-    "& .MuiAccordionSummary-root": {
-        borderBottom: "1px solid",
-        borderColor: "divider",
-        minHeight: 48,
-        "&.Mui-expanded": {
-            minHeight: 48,
-        },
-    },
-    "& .MuiAccordionSummary-content": {
-        m: 0,
-        "&.Mui-expanded": {
-            m: 0,
-        },
-    },
-    "& .MuiAccordionDetails-root": {
-        p: 3,
-    },
-};
-
-interface TechFieldProps {
+interface TechStackFieldProps {
     label: string;
     value: string[] | null;
     options: string[];
@@ -42,103 +11,113 @@ interface TechFieldProps {
     isLast?: boolean;
 }
 
-const TechField = ({ label, value, options, onChange, isLast = false }: TechFieldProps) => (
-    <Autocomplete
-        multiple
-        options={options}
-        freeSolo
-        value={value ?? []}
-        onChange={(_, value) => {
-            // 型が配列であることを保証
-            if (Array.isArray(value)) {
-                onChange(value);
-            }
-        }}
-        renderInput={(params) => (
-            <TextField
-                {...params}
-                label={label}
-                slotProps={{
-                    inputLabel: { shrink: true },
-                }}
-            />
-        )}
-        sx={!isLast ? { mb: 4 } : undefined}
-    />
-);
-
 /**
- * 技術スタックフィールド
+ * 技術スタック単一フィールド
  */
-export const TechStackField = () => {
-    // 技術スタック
-    const [techStack, setTechStack] = useState<TechStack>({
-        languages: [],
-        dependencies: {
-            frameworks: [],
-            libraries: [],
-            testingTools: [],
-            ormTools: [],
-            packageManagers: [],
-        },
-        infrastructure: {
-            clouds: [],
-            containers: [],
-            databases: [],
-            webServers: [],
-            ciCdTools: [],
-            iacTools: [],
-            monitoringTools: [],
-            loggingTools: [],
-        },
-        tools: {
-            sourceControls: [],
-            projectManagements: [],
-            communicationTools: [],
-            documentationTools: [],
-            apiDevelopmentTools: [],
-            designTools: [],
-        },
-        others: [],
-    });
+export const TechStackField = ({ label, value, options, onChange, isLast = false }: TechStackFieldProps) => {
+    const [inputValue, setInputValue] = useState("");
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [duplicateLabel, setDuplicateLabel] = useState<string | null>(null);
 
-    // 値の更新ハンドラー
-    const handleTeckStackChange = (path: string[], newValue: string[]) => {
-        setTechStack((prev) => {
-            const newTechStack = { ...prev };
-            return setNestedValue(newTechStack, path, newValue);
-        });
+    const currentValues = value ?? [];
+
+    /**
+     * AutocompleteのonChange用ハンドラ
+     */
+    const handleChange = (_event: React.SyntheticEvent, newValue: string[] | string | null) => {
+        if (!Array.isArray(newValue)) {
+            return;
+        }
+        const unique = dedupeIgnoreCase(newValue);
+        onChange(unique);
+    };
+
+    /**
+     * 入力値の変更ハンドラ
+     */
+    const handleInputChange = (_event: React.SyntheticEvent, newInputValue: string) => {
+        setInputValue(newInputValue);
+        // 入力が変わったタイミングでエラーはクリア
+        if (errorMessage || duplicateLabel) {
+            setErrorMessage(null);
+            setDuplicateLabel(null);
+        }
+    };
+
+    /**
+     * Enterキー押下時の重複チェック
+     */
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+        if (event.key !== "Enter") {
+            return;
+        }
+
+        const raw = inputValue;
+        const norm = normalizeForCaseInsensitiveCompare(raw);
+        if (!norm) {
+            return;
+        }
+
+        const existing = currentValues.find((v) => normalizeForCaseInsensitiveCompare(v) === norm);
+        if (existing) {
+            // 既に同一値が存在する場合はAutocompleteの追加処理を止めてエラー表示
+            event.preventDefault();
+            event.stopPropagation();
+            setDuplicateLabel(existing);
+            setErrorMessage("はすでに同一の値が入力されています。");
+        }
     };
 
     return (
-        <>
-            {techStackInfo.map((section) => (
-                <Accordion key={section.title} sx={accordionStyles}>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 2 }}>
-                        <Typography
-                            component="span"
-                            sx={{
-                                fontSize: "0.875rem",
-                                fontWeight: 500,
-                            }}
-                        >
-                            {section.title}
-                        </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                        {section.fields.map((field, index) => (
-                            <TechField
-                                key={field.label}
-                                label={field.label}
-                                value={getNestedValue<TechStack, string[]>(techStack, field.path)}
-                                options={getNestedValue<TechStack, string[]>(teckStackList, field.path)}
-                                onChange={(newValue) => handleTeckStackChange(field.path, newValue)}
-                                isLast={index === section.fields.length - 1}
-                            />
-                        ))}
-                    </AccordionDetails>
-                </Accordion>
-            ))}
-        </>
+        <Autocomplete
+            multiple
+            freeSolo
+            options={options}
+            filterSelectedOptions
+            autoHighlight
+            isOptionEqualToValue={(option, v) =>
+                normalizeForCaseInsensitiveCompare(option) === normalizeForCaseInsensitiveCompare(v)
+            }
+            value={currentValues}
+            onChange={handleChange}
+            inputValue={inputValue}
+            onInputChange={handleInputChange}
+            renderInput={(params) => (
+                <TextField
+                    {...params}
+                    label={label}
+                    error={!!errorMessage}
+                    helperText={
+                        errorMessage && duplicateLabel ? (
+                            <>
+                                <span
+                                    style={{
+                                        color: "#d32f2f",
+                                        fontWeight: 500,
+                                        marginRight: 4,
+                                    }}
+                                >
+                                    「{duplicateLabel}」
+                                </span>
+                                {errorMessage}
+                            </>
+                        ) : (
+                            errorMessage ?? undefined
+                        )
+                    }
+                    onKeyDown={(event) => {
+                        const inputProps = params.inputProps as React.InputHTMLAttributes<HTMLInputElement>;
+                        if (inputProps.onKeyDown) {
+                            inputProps.onKeyDown(event as React.KeyboardEvent<HTMLInputElement>);
+                        }
+                        handleKeyDown(event);
+                    }}
+                    slotProps={{
+                        inputLabel: { shrink: true },
+                    }}
+                />
+            )}
+            sx={!isLast ? { mb: 4 } : undefined}
+        />
     );
 };

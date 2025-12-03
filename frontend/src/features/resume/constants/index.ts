@@ -42,23 +42,38 @@ export const processList: ProcessMap = {
  */
 export const techStackInfo = [
     {
-        title: "開発言語",
-        fields: [{ label: "プログラミング言語", path: ["languages"] }],
-    },
-    {
-        title: "依存関係",
+        title: "フロントエンド",
         fields: [
-            { label: "フレームワーク", path: ["dependencies", "frameworks"] },
-            { label: "ライブラリ", path: ["dependencies", "libraries"] },
-            { label: "テストツール", path: ["dependencies", "testingTools"] },
-            { label: "ORM", path: ["dependencies", "ormTools"] },
-            { label: "パッケージマネージャー", path: ["dependencies", "packageManagers"] },
+            { label: "言語", path: ["frontend", "languages"] },
+            { label: "フレームワーク", path: ["frontend", "frameworks"] },
+            { label: "ライブラリ", path: ["frontend", "libraries"] },
+            { label: "ビルドツール", path: ["frontend", "buildTools"] },
+            { label: "パッケージマネージャー", path: ["frontend", "packageManagers"] },
+            { label: "リンター", path: ["frontend", "linters"] },
+            { label: "フォーマッター", path: ["frontend", "formatters"] },
+            { label: "テストツール", path: ["frontend", "testingTools"] },
         ],
     },
     {
-        title: "インフラ・開発環境",
+        title: "バックエンド",
+        fields: [
+            { label: "言語", path: ["backend", "languages"] },
+            { label: "フレームワーク", path: ["backend", "frameworks"] },
+            { label: "ライブラリ", path: ["backend", "libraries"] },
+            { label: "ビルドツール", path: ["backend", "buildTools"] },
+            { label: "パッケージマネージャー", path: ["backend", "packageManagers"] },
+            { label: "リンター", path: ["backend", "linters"] },
+            { label: "フォーマッター", path: ["backend", "formatters"] },
+            { label: "テストツール", path: ["backend", "testingTools"] },
+            { label: "ORM", path: ["backend", "ormTools"] },
+            { label: "認証/認可", path: ["backend", "auth"] },
+        ],
+    },
+    {
+        title: "インフラ",
         fields: [
             { label: "クラウド", path: ["infrastructure", "clouds"] },
+            { label: "OS", path: ["infrastructure", "operatingSystems"] },
             { label: "コンテナ", path: ["infrastructure", "containers"] },
             { label: "データベース", path: ["infrastructure", "databases"] },
             { label: "Webサーバー", path: ["infrastructure", "webServers"] },
@@ -69,7 +84,7 @@ export const techStackInfo = [
         ],
     },
     {
-        title: "開発ツール・プロジェクト管理",
+        title: "開発支援ツール",
         fields: [
             { label: "ソース管理", path: ["tools", "sourceControls"] },
             { label: "プロジェクト管理", path: ["tools", "projectManagements"] },
@@ -77,8 +92,227 @@ export const techStackInfo = [
             { label: "ドキュメント", path: ["tools", "documentationTools"] },
             { label: "API開発", path: ["tools", "apiDevelopmentTools"] },
             { label: "デザイン", path: ["tools", "designTools"] },
+            { label: "エディタ/IDE", path: ["tools", "editors"] },
+            { label: "開発環境", path: ["tools", "developmentEnvironments"] },
         ],
     },
+] as const;
+
+/**
+ * 共通で利用する候補一覧
+ */
+const commonLanguages = [
+    "TypeScript",
+    "JavaScript",
+    "HTML",
+    "CSS",
+    "Sass/SCSS",
+    "WebAssembly",
+    "Dart",
+    "Go",
+    "Python",
+    "Java",
+    "Ruby",
+    "PHP",
+    "Rust",
+    "Node.js",
+    "C#",
+    "Kotlin",
+    "Scala",
+    "Elixir",
+    "Swift",
+    "C++",
+    "Perl",
+].sort();
+
+const commonFrameworks = [
+    // JavaScript/TypeScript
+    "React",
+    "Angular",
+    "Vue.js",
+    "Svelte",
+    // JavaScript/TypeScript (サーバーサイド)
+    "Express",
+    "NestJS",
+    "Koa",
+    "Hapi",
+    // Python
+    "Django",
+    "Flask",
+    "FastAPI",
+    "Pyramid",
+    // Java
+    "Spring",
+    "Struts",
+    "JSF",
+    "Play Framework",
+    // Ruby
+    "Ruby on Rails",
+    "Sinatra",
+    "Hanami",
+    // PHP
+    "Laravel",
+    "Symfony",
+    "CodeIgniter",
+    "CakePHP",
+    // .NET
+    "ASP.NET Core",
+    "Blazor",
+    "NancyFX",
+    // CSS
+    "Bootstrap",
+    "Tailwind CSS",
+    "Foundation",
+    "Bulma",
+    "Materialize",
+    // その他の言語/プラットフォーム
+    "React Native",
+    "Flutter",
+    "Ionic",
+    "Electron",
+    "Qt",
+].sort();
+
+const commonLibraries = [
+    // JavaScript/TypeScript
+    "ESLint",
+    "Prettier",
+    "Axios",
+    "TanStack Query",
+    "Redux",
+    "Lodash",
+    "Moment.js",
+    "RxJS",
+    "Chart.js",
+    // Python
+    "NumPy",
+    "pandas",
+    "Requests",
+    "Matplotlib",
+    "BeautifulSoup",
+    // Java
+    "Apache Commons",
+    "Guava",
+    "Jackson",
+    "Log4j",
+    "SLF4J",
+    // Ruby
+    "Nokogiri",
+    "Prawn",
+    "Oj",
+    "Faraday",
+    "Sidekiq",
+    // PHP
+    "Guzzle",
+    "Monolog",
+    "Carbon",
+    "SwiftMailer",
+    "Symfony Components",
+];
+
+const commonTestingTools = [
+    // JavaScript/TypeScript
+    "Jest",
+    "Mocha",
+    "Chai",
+    "Jasmine",
+    "Karma",
+    "Cypress",
+    "TestCafe",
+    "Puppeteer",
+    "Playwright",
+    // Java
+    "JUnit",
+    "TestNG",
+    // .NET
+    "NUnit",
+    "xUnit",
+    "MSTest",
+    // Python
+    "pytest",
+    "unittest",
+    "nose",
+    // Ruby
+    "RSpec",
+    "Minitest",
+    "Cucumber",
+    // PHP
+    "PHPUnit",
+    "Behat",
+    // Go
+    "GoConvey",
+    "Testify",
+    // C/C++
+    "Google Test",
+    "CppUnit",
+    // 汎用・クロスプラットフォーム
+    "Selenium",
+    "Robot Framework",
+].sort();
+
+const ormToolsList = [
+    // JavaScript/TypeScript
+    "TypeORM",
+    "Sequelize",
+    "Objection.js",
+    "Prisma",
+    // Python
+    "SQLAlchemy",
+    "Django ORM",
+    "Peewee",
+    // Ruby
+    "ActiveRecord",
+    "Sequel",
+    // Java
+    "Hibernate",
+    "MyBatis",
+    "EclipseLink",
+    // .NET
+    "Entity Framework",
+    "Dapper",
+    // PHP
+    "Doctrine",
+    "Eloquent",
+    // Go
+    "GORM",
+    "Ent",
+    "XORM",
+    // Ruby
+    "ROM",
+    // その他汎用または複数言語対応
+    "SQLAlchemy Core",
+    "Knex.js",
+].sort();
+
+const packageManagersList = [
+    // JavaScript/TypeScript
+    "npm",
+    "Yarn",
+    "pnpm",
+    // Python
+    "pip",
+    "conda",
+    "Poetry",
+    // Ruby
+    "gem",
+    "Bundler",
+    // Java
+    "Maven",
+    "Gradle",
+    // PHP
+    "Composer",
+    // .NET
+    "NuGet",
+    // Rust
+    "Cargo",
+    // Go
+    "Go Modules",
+    // Dart/Flutter
+    "pub",
+    // Swift/Objective-C
+    "CocoaPods",
+    "Carthage",
+    "Swift Package Manager",
 ];
 
 /**
@@ -86,215 +320,27 @@ export const techStackInfo = [
  * ※DB管理にしたい
  */
 export const teckStackList: TechStack = {
-    languages: [
-        "TypeScript",
-        "JavaScript",
-        "HTML",
-        "CSS",
-        "Sass/SCSS",
-        "WebAssembly",
-        "Dart",
-        "Go",
-        "Python",
-        "Java",
-        "Ruby",
-        "PHP",
-        "Rust",
-        "Node.js",
-        "C#",
-        "Kotlin",
-        "Scala",
-        "Elixir",
-        "Swift",
-        "C++",
-        "Perl",
-    ].sort(),
-    dependencies: {
-        frameworks: [
-            // JavaScript/TypeScript
-            "React",
-            "Angular",
-            "Vue.js",
-            "Svelte",
-            // JavaScript/TypeScript
-            "Express",
-            "NestJS",
-            "Koa",
-            "Hapi",
-            // Python
-            "Django",
-            "Flask",
-            "FastAPI",
-            "Pyramid",
-            // Java
-            "Spring",
-            "Struts",
-            "JSF",
-            "Play Framework",
-            // Ruby
-            "Ruby on Rails",
-            "Sinatra",
-            "Hanami",
-            // PHP
-            "Laravel",
-            "Symfony",
-            "CodeIgniter",
-            "CakePHP",
-            // .NET
-            "ASP.NET Core",
-            "Blazor",
-            "NancyFX",
-            // CSS
-            "Bootstrap",
-            "Tailwind CSS",
-            "Foundation",
-            "Bulma",
-            "Materialize",
-            // その他の言語/プラットフォーム
-            "React Native",
-            "Flutter",
-            "Ionic",
-            "Electron",
-            "Qt",
-        ].sort(),
-        libraries: [
-            // JavaScript/TypeScript
-            "ESLint",
-            "Prettier",
-            "Axios",
-            "TanStack Query",
-            "Redux",
-            "Lodash",
-            "Moment.js",
-            "RxJS",
-            "Chart.js",
-            // Python
-            "NumPy",
-            "pandas",
-            "Requests",
-            "Matplotlib",
-            "BeautifulSoup",
-            // Java
-            "Apache Commons",
-            "Guava",
-            "Jackson",
-            "Log4j",
-            "SLF4J",
-            // Ruby
-            "Nokogiri",
-            "Prawn",
-            "Oj",
-            "Faraday",
-            "Sidekiq",
-            // PHP
-            "Guzzle",
-            "Monolog",
-            "Carbon",
-            "SwiftMailer",
-            "Symfony Components",
-        ],
-        testingTools: [
-            // JavaScript/TypeScript
-            "Jest",
-            "Mocha",
-            "Chai",
-            "Jasmine",
-            "Karma",
-            "Cypress",
-            "TestCafe",
-            "Puppeteer",
-            "Playwright",
-            // Java
-            "JUnit",
-            "TestNG",
-            // .NET
-            "NUnit",
-            "xUnit",
-            "MSTest",
-            // Python
-            "pytest",
-            "unittest",
-            "nose",
-            // Ruby
-            "RSpec",
-            "Minitest",
-            "Cucumber",
-            // PHP
-            "PHPUnit",
-            "Behat",
-            // Go
-            "GoConvey",
-            "Testify",
-            // C/C++
-            "Google Test",
-            "CppUnit",
-            // 汎用・クロスプラットフォーム
-            "Selenium",
-            "Robot Framework",
-        ].sort(),
-        ormTools: [
-            // JavaScript/TypeScript
-            "TypeORM",
-            "Sequelize",
-            "Objection.js",
-            "Prisma",
-            // Python
-            "SQLAlchemy",
-            "Django ORM",
-            "Peewee",
-            // Ruby
-            "ActiveRecord",
-            "Sequel",
-            // Java
-            "Hibernate",
-            "MyBatis",
-            "EclipseLink",
-            // .NET
-            "Entity Framework",
-            "Dapper",
-            // PHP
-            "Doctrine",
-            "Eloquent",
-            // Go
-            "GORM",
-            "Ent",
-            "XORM",
-            // Ruby
-            "ROM",
-            // その他汎用または複数言語対応
-            "SQLAlchemy Core",
-            "Knex.js",
-        ].sort(),
-        packageManagers: [
-            // JavaScript/TypeScript
-            "npm",
-            "Yarn",
-            "pnpm",
-            // Python
-            "pip",
-            "conda",
-            "Poetry",
-            // Ruby
-            "gem",
-            "Bundler",
-            // Java
-            "Maven",
-            "Gradle",
-            // PHP
-            "Composer",
-            // .NET
-            "NuGet",
-            // Rust
-            "Cargo",
-            // Go
-            "Go Modules",
-            // Dart/Flutter
-            "pub",
-            // Swift/Objective-C
-            "CocoaPods",
-            "Carthage",
-            "Swift Package Manager",
-        ],
+    frontend: {
+        languages: commonLanguages,
+        frameworks: commonFrameworks,
+        libraries: commonLibraries,
+        buildTools: ["Webpack", "Vite", "Rollup", "Parcel", "Gulp", "Grunt"],
+        packageManagers: packageManagersList,
+        linters: ["ESLint", "TSLint", "Stylelint"],
+        formatters: ["Prettier"],
+        testingTools: commonTestingTools,
+    },
+    backend: {
+        languages: commonLanguages,
+        frameworks: commonFrameworks,
+        libraries: commonLibraries,
+        buildTools: ["Maven", "Gradle", "SBT", "Ant", "Make", "CMake", "Bazel"],
+        packageManagers: packageManagersList,
+        linters: ["Checkstyle", "PMD", "SpotBugs", "SonarQube"],
+        formatters: ["google-java-format", "clang-format", "ktlint"],
+        testingTools: commonTestingTools,
+        ormTools: ormToolsList,
+        auth: ["OAuth2", "OpenID Connect", "JWT", "Keycloak", "Auth0", "AWS Cognito", "Okta"],
     },
     infrastructure: {
         clouds: [
@@ -308,6 +354,18 @@ export const teckStackList: TechStack = {
             "IBM Cloud",
             "Oracle Cloud",
             "Linode",
+        ],
+        operatingSystems: [
+            "Linux",
+            "Ubuntu",
+            "Red Hat Enterprise Linux",
+            "CentOS",
+            "Debian",
+            "Alpine Linux",
+            "Amazon Linux",
+            "Windows",
+            "Windows Server",
+            "macOS",
         ],
         containers: [
             "Docker",
@@ -453,5 +511,26 @@ export const teckStackList: TechStack = {
             "gRPC",
         ],
         designTools: ["Figma", "Adobe XD", "Sketch", "InVision", "Zeplin", "Protopie", "Framer", "Canva", "Balsamiq"],
+        editors: [
+            "Visual Studio Code",
+            "IntelliJ IDEA",
+            "WebStorm",
+            "PyCharm",
+            "Rider",
+            "Eclipse",
+            "NetBeans",
+            "Vim",
+            "Neovim",
+            "Emacs",
+        ],
+        developmentEnvironments: [
+            "Windows",
+            "macOS",
+            "Linux",
+            "WSL",
+            "Docker Desktop",
+            "GitHub Codespaces",
+            "Local VM",
+        ],
     },
 } as const;

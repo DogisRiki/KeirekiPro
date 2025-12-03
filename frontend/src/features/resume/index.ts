@@ -15,6 +15,7 @@ export * from "@/features/resume/components/resume/section/ProjectSection";
 export * from "@/features/resume/components/resume/section/SelfPromotionSection";
 export * from "@/features/resume/components/resume/section/SociealLinkSection";
 export * from "@/features/resume/components/resume/section/TechStackField";
+export * from "@/features/resume/components/resume/section/TechStackFieldList";
 
 export * from "@/features/resume/types";
 

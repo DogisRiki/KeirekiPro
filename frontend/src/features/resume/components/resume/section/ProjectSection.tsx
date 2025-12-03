@@ -1,5 +1,5 @@
 import { Checkbox, DatePicker, Select, TextField } from "@/components/ui";
-import { processList, TechStackField, useResumeStore } from "@/features/resume";
+import { processList, TechStackFieldList, useResumeStore } from "@/features/resume";
 import { Process } from "@/types";
 import {
     Box,
@@ -244,7 +244,7 @@ export const ProjectSection = () => {
                 </Select>
             </FormControl>
             {/* 技術スタック */}
-            <TechStackField />
+            <TechStackFieldList />
         </>
     );
 };
