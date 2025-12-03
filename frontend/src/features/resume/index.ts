@@ -24,3 +24,7 @@ export * from "@/features/resume/stores/resumeStore";
 export * from "@/features/resume/utils";
 
 export * from "@/features/resume/constants";
+
+export * from "@/features/resume/api/getTechStackList";
+
+export * from "@/features/resume/hooks/useTechStackList";

@@ -1,4 +1,4 @@
-import { techStackInfo, teckStackList } from "@/features/resume";
+import { techStackInfo, useTechStackList } from "@/features/resume";
 import { TechStackField } from "@/features/resume/components/resume/section/TechStackField";
 import { TechStack } from "@/types";
 import { getNestedValue, setNestedValue } from "@/utils";
@@ -84,6 +84,8 @@ export const TechStackFieldList = () => {
         },
     });
 
+    const { data } = useTechStackList();
+
     /**
      * 値の更新ハンドラ
      */
@@ -115,7 +117,8 @@ export const TechStackFieldList = () => {
                                 key={field.label}
                                 label={field.label}
                                 value={getNestedValue<TechStack, string[]>(techStack, field.path)}
-                                options={getNestedValue<TechStack, string[]>(teckStackList, field.path)}
+                                // マスタ未取得（初期ロード中など）の場合は空配列
+                                options={data ? getNestedValue<TechStack, string[]>(data, field.path) : []}
                                 onChange={(newValue) => handleTeckStackChange(field.path, newValue)}
                                 isLast={index === section.fields.length - 1}
                             />
