@@ -33,6 +33,24 @@ export const theme = createTheme({
                         borderColor: mainColor,
                     },
                 },
+                // ブラウザ標準のオートフィル時のハイライトを上書き
+                input: {
+                    "&:-webkit-autofill": {
+                        WebkitBoxShadow: "0 0 0 1000px #fff inset", // TextField の背景色に合わせて調整
+                        WebkitTextFillColor: "inherit",
+                        transition: "background-color 9999s ease-out 0s",
+                    },
+                    "&:-webkit-autofill:hover": {
+                        WebkitBoxShadow: "0 0 0 1000px #fff inset",
+                        WebkitTextFillColor: "inherit",
+                        transition: "background-color 9999s ease-out 0s",
+                    },
+                    "&:-webkit-autofill:focus": {
+                        WebkitBoxShadow: "0 0 0 1000px #fff inset",
+                        WebkitTextFillColor: "inherit",
+                        transition: "background-color 9999s ease-out 0s",
+                    },
+                },
             },
         },
         MuiFormLabel: {
