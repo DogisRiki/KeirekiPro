@@ -7,6 +7,7 @@ export * from "@/pages/RequestPasswordReset";
 export * from "@/pages/ResetPassword";
 export * from "@/pages/Resume";
 export * from "@/pages/ResumeList";
+export * from "@/pages/ResumeNew";
 export * from "@/pages/SettingUser";
 export * from "@/pages/Terms";
 export * from "@/pages/Top";

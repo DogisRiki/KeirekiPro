@@ -7,6 +7,8 @@ export * from "@/features/resume/components/resume/EntryList";
 export * from "@/features/resume/components/resume/EntryListItem";
 export * from "@/features/resume/components/resume/SectionTabs";
 
+export * from "@/features/resume/components/resume-new/CreateResumeContainer";
+export * from "@/features/resume/components/resume-new/CreateResumeForm";
 export * from "@/features/resume/components/resume/section/BasicInfoSection";
 export * from "@/features/resume/components/resume/section/CareerSection";
 export * from "@/features/resume/components/resume/section/CertificationSection";
@@ -25,6 +27,10 @@ export * from "@/features/resume/utils";
 
 export * from "@/features/resume/constants";
 
+export * from "@/features/resume/api/createResume";
+export * from "@/features/resume/api/getResumeList";
 export * from "@/features/resume/api/getTechStackList";
 
+export * from "@/features/resume/hooks/useCreateResume";
+export * from "@/features/resume/hooks/useGetResumeList";
 export * from "@/features/resume/hooks/useTechStackList";

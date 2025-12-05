@@ -1,6 +1,6 @@
 import { NoData } from "@/components/errors";
 import { Button } from "@/components/ui";
-import { ResumeCard, SearchForm } from "@/features/resume";
+import { ResumeCard, SearchForm, useGetResumeList } from "@/features/resume";
 import { ExpandLess as ExpandLessIcon, ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
 import { Box } from "@mui/material";
 import Grid from "@mui/material/Grid2";
@@ -26,23 +26,11 @@ export const ResumeList = () => {
     // 現在の表示件数
     const [currentDisplayCount, setCurrentDisplayCount] = useState<number>(itemPerPage);
 
-    // ダミーデータ
-    const [resumeData] = useState(
-        Array.from({ length: 19 }, (_, i) => ({
-            resumeId: String(i + 1),
-            resumeName: `職務経歴書 ${i + 1}`,
-            createdAt: `2024/0${Math.floor(i / 3) + 1}/0${(i % 3) + 1} ${String(
-                Math.floor(Math.random() * 24),
-            ).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}:${String(
-                Math.floor(Math.random() * 60),
-            ).padStart(2, "0")}`,
-            updatedAt: `2024/0${Math.floor(i / 3) + 1}/0${(i % 3) + 1} ${String(
-                Math.floor(Math.random() * 24),
-            ).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}:${String(
-                Math.floor(Math.random() * 60),
-            ).padStart(2, "0")}`,
-        })),
-    );
+    // 職務経歴書一覧取得
+    const { data } = useGetResumeList();
+
+    // APIレスポンスから配列を取り出す
+    const resumeData = data?.resumes ?? [];
 
     /**
      * 表示件数を増やす
@@ -99,10 +87,10 @@ export const ResumeList = () => {
             {filteredResumeData.length > 0 ? (
                 <Grid container spacing={3} sx={{ my: 4 }}>
                     {filteredResumeData.slice(0, currentDisplayCount).map((resume) => (
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={resume.resumeId}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={resume.id}>
                             <ResumeCard
-                                key={resume.resumeId}
-                                resumeId={resume.resumeId}
+                                key={resume.id}
+                                resumeId={resume.id}
                                 resumeName={resume.resumeName}
                                 createdAt={resume.createdAt}
                                 updatedAt={resume.updatedAt}
