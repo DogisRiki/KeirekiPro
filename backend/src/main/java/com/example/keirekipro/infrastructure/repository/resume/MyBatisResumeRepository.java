@@ -272,8 +272,10 @@ public class MyBatisResumeRepository implements ResumeRepository {
         dto.setUserId(resume.getUserId());
         dto.setName(resume.getName().getValue());
         dto.setDate(resume.getDate());
-        dto.setLastName(resume.getFullName().getLastName());
-        dto.setFirstName(resume.getFullName().getFirstName());
+        dto.setLastName(
+                resume.getFullName() != null ? resume.getFullName().getLastName() : null);
+        dto.setFirstName(
+                resume.getFullName() != null ? resume.getFullName().getFirstName() : null);
         dto.setCreatedAt(resume.getCreatedAt());
         dto.setUpdatedAt(resume.getUpdatedAt());
 
