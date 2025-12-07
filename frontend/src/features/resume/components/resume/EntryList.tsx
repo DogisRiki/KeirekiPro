@@ -1,10 +1,138 @@
 import { NoData } from "@/components/errors";
 import { Button } from "@/components/ui";
-import { EntryListItem, getResumeKey, sections, useResumeStore } from "@/features/resume";
-import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core";
-import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { EntryListItem, getResumeKey, SectionName, sections, useResumeStore } from "@/features/resume";
+import type { Career, Certification, Portfolio, Project, SelfPromotion, SocialLink } from "@/types";
 import { Add as AddIcon } from "@mui/icons-material";
 import { Box, Divider, List, Typography } from "@mui/material";
+
+/**
+ * 新規エントリー生成用の型
+ */
+type ListEntry = Career | Project | Certification | Portfolio | SocialLink | SelfPromotion;
+
+/**
+ * セクションごとに新規エントリーを生成する
+ */
+const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
+    switch (section) {
+        case "career": {
+            const entry: Career = {
+                id,
+                companyName: "新しい職歴",
+                startDate: "",
+                endDate: null,
+                isEmployed: false,
+            };
+            return entry;
+        }
+        case "project": {
+            const entry: Project = {
+                id,
+                companyName: "",
+                projectName: "新しい職務内容",
+                startDate: "",
+                endDate: null,
+                isAssigned: false,
+                overview: "",
+                teamComp: "",
+                role: "",
+                achievement: "",
+                process: {
+                    requirements: false,
+                    basicDesign: false,
+                    detailedDesign: false,
+                    implementation: false,
+                    integrationTest: false,
+                    systemTest: false,
+                    maintenance: false,
+                },
+                techStack: {
+                    frontend: {
+                        languages: [],
+                        frameworks: [],
+                        libraries: [],
+                        buildTools: [],
+                        packageManagers: [],
+                        linters: [],
+                        formatters: [],
+                        testingTools: [],
+                    },
+                    backend: {
+                        languages: [],
+                        frameworks: [],
+                        libraries: [],
+                        buildTools: [],
+                        packageManagers: [],
+                        linters: [],
+                        formatters: [],
+                        testingTools: [],
+                        ormTools: [],
+                        auth: [],
+                    },
+                    infrastructure: {
+                        clouds: [],
+                        operatingSystems: [],
+                        containers: [],
+                        databases: [],
+                        webServers: [],
+                        ciCdTools: [],
+                        iacTools: [],
+                        monitoringTools: [],
+                        loggingTools: [],
+                    },
+                    tools: {
+                        sourceControls: [],
+                        projectManagements: [],
+                        communicationTools: [],
+                        documentationTools: [],
+                        apiDevelopmentTools: [],
+                        designTools: [],
+                        editors: [],
+                        developmentEnvironments: [],
+                    },
+                },
+            };
+            return entry;
+        }
+        case "certification": {
+            const entry: Certification = {
+                id,
+                name: "新しい資格",
+                date: "",
+            };
+            return entry;
+        }
+        case "portfolio": {
+            const entry: Portfolio = {
+                id,
+                name: "新しいポートフォリオ",
+                overview: "",
+                link: "",
+                techStack: "",
+            };
+            return entry;
+        }
+        case "socialLink": {
+            const entry: SocialLink = {
+                id,
+                name: "新しいSNS",
+                link: "",
+            };
+            return entry;
+        }
+        case "selfPromotion": {
+            const entry: SelfPromotion = {
+                id,
+                title: "新しい自己PR",
+                content: "",
+            };
+            return entry;
+        }
+        case "basicInfo":
+        default:
+            return null;
+    }
+};
 
 /**
  * エントリーリスト
@@ -12,6 +140,7 @@ import { Box, Divider, List, Typography } from "@mui/material";
 export const EntryList = () => {
     // ストアから必要な状態を取り出す
     const { activeSection, setActiveEntryId, updateSection } = useResumeStore();
+    const resume = useResumeStore((state) => state.resume);
 
     // エントリーデータ取得
     const entries = useResumeStore((state) => {
@@ -26,30 +155,24 @@ export const EntryList = () => {
      * 新規追加
      */
     const handleNewClick = () => {
-        setActiveEntryId(null);
-    };
+        if (!resume) return;
 
-    /**
-     * ドラッグ終了時の処理
-     */
-    const handleDragEnd = ({ active, over }: DragEndEvent) => {
-        if (over && active.id !== over.id) {
-            const oldIndex = (entries as any[]).findIndex((entry) => entry.id === (active.id as string));
-            const newIndex = (entries as any[]).findIndex((entry) => entry.id === (over.id as string));
-            const newEntries = arrayMove(entries as any[], oldIndex, newIndex);
+        const sectionKey = getResumeKey(activeSection);
+        if (!sectionKey) return;
 
-            // orderNoを再計算
-            const updatedEntries = newEntries.map((entry, index) => ({
-                ...entry,
-                orderNo: index,
-            }));
+        const newId =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-            // ストアのデータを更新
-            const sectionKey = getResumeKey(activeSection);
-            if (sectionKey) {
-                updateSection(sectionKey, updatedEntries);
-            }
-        }
+        const newEntry = createNewEntry(activeSection, newId);
+        if (!newEntry) return;
+
+        const currentList = resume[sectionKey];
+        const updatedList = [newEntry, ...currentList] as typeof currentList;
+
+        updateSection(sectionKey, updatedList);
+        setActiveEntryId(newId);
     };
 
     return (
@@ -73,19 +196,12 @@ export const EntryList = () => {
             {/* エントリーリスト */}
             <Box sx={{ p: 2 }}>
                 {entries.length > 0 ? (
-                    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <SortableContext
-                            items={entries.map((entry: { id: string }) => entry.id)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            <List sx={{ width: "100%" }}>
-                                {/* エントリーアイテム */}
-                                {entries.map((entry: { id: string }) => (
-                                    <EntryListItem key={entry.id} entry={entry} />
-                                ))}
-                            </List>
-                        </SortableContext>
-                    </DndContext>
+                    <List sx={{ width: "100%" }}>
+                        {/* エントリーアイテム */}
+                        {entries.map((entry: { id: string }) => (
+                            <EntryListItem key={entry.id} entry={entry} />
+                        ))}
+                    </List>
                 ) : (
                     <Box sx={{ my: 20 }}>
                         <NoData variant="body1" message={"表示するデータがありません。"} />

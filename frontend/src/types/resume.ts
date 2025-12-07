@@ -27,7 +27,6 @@ export interface Career {
     startDate: string; // 入社年月
     endDate: string | null; // 退職年月
     isEmployed: boolean; // 在職中フラグ
-    orderNo: number; // 並び順
 }
 
 /**
@@ -46,7 +45,6 @@ export interface Project {
     achievement: string; // 成果
     process: Process; // 作業工程
     techStack: TechStack; // 技術スタック
-    orderNo: number; // 並び順
 }
 
 /**
@@ -56,7 +54,6 @@ export interface Certification {
     id: string;
     name: string; // 資格名
     date: string; // 取得年月
-    orderNo: number; // 並び順
 }
 
 /**
@@ -67,8 +64,7 @@ export interface Portfolio {
     name: string; // ポートフォリオ名
     overview: string; // ポートフォリオ概要
     link: string; // リンク
-    teckStack: string; // 技術スタック
-    orderNo: number; // 並び順
+    techStack: string; // 技術スタック
 }
 
 /**
@@ -78,7 +74,6 @@ export interface SocialLink {
     id: string;
     name: string; // ソーシャル名
     link: string; // リンク
-    orderNo: number; // 並び順
 }
 
 /**
@@ -88,7 +83,6 @@ export interface SelfPromotion {
     id: string;
     title: string; // タイトル
     content: string; // コンテンツ
-    orderNo: number; // 並び順
 }
 
 /**

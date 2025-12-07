@@ -89,7 +89,7 @@ export const TechStackFieldList = () => {
     /**
      * 値の更新ハンドラ
      */
-    const handleTeckStackChange = (path: readonly string[], newValue: string[]) => {
+    const handleTechStackChange = (path: readonly string[], newValue: string[]) => {
         setTechStack((prev) => {
             const newTechStack = { ...prev };
             return setNestedValue(newTechStack, path, newValue);
@@ -119,7 +119,7 @@ export const TechStackFieldList = () => {
                                 value={getNestedValue<TechStack, string[]>(techStack, field.path)}
                                 // マスタ未取得（初期ロード中など）の場合は空配列
                                 options={data ? getNestedValue<TechStack, string[]>(data, field.path) : []}
-                                onChange={(newValue) => handleTeckStackChange(field.path, newValue)}
+                                onChange={(newValue) => handleTechStackChange(field.path, newValue)}
                                 isLast={index === section.fields.length - 1}
                             />
                         ))}

@@ -26,10 +26,16 @@ const MenuProps = {
  * 職務内容セクション
  */
 export const ProjectSection = () => {
-    // 職歴から会社情報を取得
-    const companies = useResumeStore((state) => state.resume)?.["careers"] ?? [];
+    // ストアから必要な状態を取得
+    const { resume, activeEntryId, updateEntry } = useResumeStore();
 
-    // 会社名
+    // 職歴から会社情報を取得
+    const companies = resume?.careers ?? [];
+
+    // 現在アクティブなプロジェクトエントリー
+    const currentProject = resume?.projects.find((project) => project.id === activeEntryId) ?? null;
+
+    // 会社名（選択用）
     const [companyName, setCompanyName] = useState<string>("");
 
     // 開始年月
@@ -165,6 +171,11 @@ export const ProjectSection = () => {
                 fullWidth
                 required
                 placeholder="ECサイトのマイクロサービス化プロジェクト"
+                value={currentProject?.projectName ?? ""}
+                onChange={(e) => {
+                    if (!currentProject) return;
+                    updateEntry("projects", currentProject.id, { projectName: e.target.value });
+                }}
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}

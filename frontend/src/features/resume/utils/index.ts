@@ -26,7 +26,7 @@ export const getEntryText = (activeSection: SectionName, entry: any) => {
             };
         case "project":
             return {
-                primary: entry.companyName,
+                primary: entry.projectName,
                 secondary: formatPeriod(entry.startDate, entry.endDate, entry.isAssigned),
             };
         case "certification":
@@ -52,12 +52,12 @@ export const getEntryText = (activeSection: SectionName, entry: any) => {
  * @param isCurrent 現在も継続中かどうか。trueの場合、終了日の代わりに「現在」と表示
  * @returns フォーマットされた期間文字列
  * @example
- * // 開始と終了が指定された場合
- * formatPeriod('2022-01-01', '2023-12-31') // '2022/01 - 2023/12'
- * // 現在進行中の場合
- * formatPeriod('2022-01-01', null, true) // '2022/01 - 現在'
- * // 開始日のみの場合
- * formatPeriod('2022-01-01') // '2022/01 - '
+ * 開始と終了が指定された場合
+ *  formatPeriod('2022-01-01', '2023-12-31') // '2022/01 - 2023/12'
+ * 現在進行中の場合
+ *  formatPeriod('2022-01-01', null, true) // '2022/01 - 現在'
+ * 開始日のみの場合
+ *  formatPeriod('2022-01-01') // '2022/01 - '
  */
 const formatPeriod = (startDate: string, endDate?: string | null, isCurrent?: boolean): string => {
     if (!startDate) return "";

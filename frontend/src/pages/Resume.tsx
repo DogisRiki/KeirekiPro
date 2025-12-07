@@ -1,5 +1,14 @@
+// src/pages/Resume.tsx
 import { Button } from "@/components/ui";
-import { BottomMenu, createCurrentSection, EntryList, sections, SectionTabs, useResumeStore } from "@/features/resume";
+import {
+    BottomMenu,
+    createCurrentSection,
+    EntryList,
+    getResumeKey,
+    sections,
+    SectionTabs,
+    useResumeStore,
+} from "@/features/resume";
 import { Resume as ResumeType } from "@/types";
 import { Delete as DeleteIcon, Save as SaveIcon } from "@mui/icons-material";
 import { Box, Divider, Typography } from "@mui/material";
@@ -23,7 +32,6 @@ const dummyResume: ResumeType = {
             startDate: "2015-04-01T00:00:00",
             endDate: "2018-03-31T00:00:00",
             isEmployed: false,
-            orderNo: 0,
         },
         {
             id: "d8c1a23f-4b0d-4ea4-b073-5dcb59f0d76d",
@@ -31,7 +39,6 @@ const dummyResume: ResumeType = {
             startDate: "2018-04-01T00:00:00",
             endDate: "2021-06-30T00:00:00",
             isEmployed: false,
-            orderNo: 1,
         },
         {
             id: "874dc276-bfb1-492f-8433-fbd7b47a4829",
@@ -39,7 +46,6 @@ const dummyResume: ResumeType = {
             startDate: "2021-07-01T00:00:00",
             endDate: null,
             isEmployed: true,
-            orderNo: 2,
         },
     ],
     projects: [
@@ -99,19 +105,16 @@ const dummyResume: ResumeType = {
             id: "d32be9f6-8b3e-4c97-813e-a6c0e72fd993",
             name: "AWS認定ソリューションアーキテクト",
             date: "2020-01-01T00:00:00",
-            orderNo: 0,
         },
         {
             id: "e18c20d7-639c-4d83-b760-5b3e3d479e8e",
             name: "基本情報技術者試験",
             date: "2015-04-01T00:00:00",
-            orderNo: 1,
         },
         {
             id: "a77e02b1-927e-4cd1-82d4-f67b0d6d947b",
             name: "応用情報技術者試験",
             date: "2017-10-01T00:00:00",
-            orderNo: 2,
         },
     ],
     portfolios: [
@@ -120,24 +123,21 @@ const dummyResume: ResumeType = {
             name: "ウェブアプリケーション1",
             overview: "Webアプリケーション開発ポートフォリオ",
             link: "https://portfolio1.com",
-            teckStack: "React, Node.js, AWS",
-            orderNo: 0,
+            techStack: "React, Node.js, AWS",
         },
         {
             id: "2f9f73dc-29f6-5d2f-953e-7f3c1d6e3d92",
             name: "モバイルアプリケーション2",
             overview: "モバイルアプリケーション開発ポートフォリオ",
             link: "https://portfolio2.com",
-            teckStack: "Flutter, Firebase, GCP",
-            orderNo: 1,
+            techStack: "Flutter, Firebase, GCP",
         },
         {
             id: "3g0f84ed-39f7-6d3g-964f-8g4d2e7f4e03",
             name: "IoTシステム3",
             overview: "IoTシステム開発ポートフォリオ",
             link: "https://portfolio3.com",
-            teckStack: "Go, Docker, Azure",
-            orderNo: 2,
+            techStack: "Go, Docker, Azure",
         },
     ],
     socialLinks: [
@@ -145,19 +145,16 @@ const dummyResume: ResumeType = {
             id: "4h1g95fe-49g8-7d4h-975g-9h5e3f8g5f14",
             name: "LinkedIn",
             link: "https://linkedin.com/in/taro-yamada",
-            orderNo: 0,
         },
         {
             id: "5i2h06gf-59h9-8d5i-986h-0i6f4g9h6g25",
             name: "GitHub",
             link: "https://github.com/taro-yamada",
-            orderNo: 1,
         },
         {
             id: "6j3i17hg-69i0-9d6j-097i-1j7g5h0i7h36",
             name: "Twitter",
             link: "https://twitter.com/taro_yamada",
-            orderNo: 2,
         },
     ],
     selfPromotions: [
@@ -165,19 +162,16 @@ const dummyResume: ResumeType = {
             id: "7k4j28ih-79j1-0e7k-1a8j-2k8h6i1j8i47",
             title: "自己PR1",
             content: "新しい技術に積極的に挑戦し、チームに貢献します。",
-            orderNo: 0,
         },
         {
             id: "8l5k39ji-89k2-1f8l-2b9k-3l9i7j2k9j58",
             title: "自己PR2",
             content: "問題解決能力に優れ、複雑な課題にも対応可能です。",
-            orderNo: 1,
         },
         {
             id: "9m6l40kj-99l3-2g9m-3c0l-4m0j8k3l0k69",
             title: "自己PR3",
             content: "コミュニケーション能力を活かして、チーム内外での調整を得意とします。",
-            orderNo: 2,
         },
     ],
 };
@@ -189,7 +183,12 @@ export const Resume = () => {
     // 現在のセクションを監視
     const activeSection = useResumeStore((state) => state.activeSection);
     const currentSection = sections.find((section) => section.key === activeSection)!;
+
     const setResume = useResumeStore((state) => state.setResume);
+    const resume = useResumeStore((state) => state.resume);
+    const activeEntryId = useResumeStore((state) => state.activeEntryId);
+    const updateSection = useResumeStore((state) => state.updateSection);
+    const setActiveEntryId = useResumeStore((state) => state.setActiveEntryId);
 
     // タイトル取得
     const title = currentSection.label + "情報";
@@ -209,11 +208,36 @@ export const Resume = () => {
         }
     }, [bottomMenuRef]);
 
+    /**
+     * 現在アクティブなエントリを削除（ストアのみ更新）
+     */
+    const handleDeleteCurrentEntry = () => {
+        if (!activeEntryId) return;
+        if (!resume) return;
+
+        const sectionKey = getResumeKey(activeSection);
+        if (!sectionKey) return;
+
+        const list = resume[sectionKey];
+        const updated = list.filter((item) => item.id !== activeEntryId) as typeof list;
+
+        updateSection(sectionKey, updated);
+        setActiveEntryId(null);
+    };
+
     return (
         <>
             {/* セクション切り替えタブ */}
             <SectionTabs />
-            <Grid container spacing={3} sx={{ mt: 4, mb: `${bottomMenuHeight}px` }}>
+
+            {/* タブ全体の保存ボタン */}
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+                <Button color="info" startIcon={<SaveIcon />} onClick={() => alert("保存")}>
+                    このタブの情報を保存
+                </Button>
+            </Box>
+
+            <Grid container spacing={3} sx={{ mt: 2, mb: `${bottomMenuHeight}px` }}>
                 {currentSection.type === "list" && (
                     <Grid size={{ xs: 12, md: 4 }}>
                         {/* エントリーリスト */}
@@ -240,14 +264,17 @@ export const Resume = () => {
                             {/* コンテンツタイトル */}
                             <Typography variant="h6">{title}</Typography>
                             <Box>
-                                {/* 保存ボタン */}
-                                <Button color="info" size="small" startIcon={<SaveIcon />} sx={{ mr: 2 }}>
-                                    保存
-                                </Button>
-                                {/* 削除ボタン */}
-                                <Button color="error" size="small" startIcon={<DeleteIcon />}>
-                                    削除
-                                </Button>
+                                {/* 削除ボタン（複数エントリーを持つセクションのみ表示） */}
+                                {currentSection.type === "list" && (
+                                    <Button
+                                        color="error"
+                                        size="small"
+                                        startIcon={<DeleteIcon />}
+                                        onClick={handleDeleteCurrentEntry}
+                                    >
+                                        削除
+                                    </Button>
+                                )}
                             </Box>
                         </Box>
                         <Divider />

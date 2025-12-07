@@ -1,8 +1,7 @@
-import { DraggableIcon } from "@/components/dnd/DraggableIcon";
-import { getEntryText, useResumeStore } from "@/features/resume";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { ListItem, ListItemButton, ListItemText } from "@mui/material";
+import { getEntryText, getResumeKey, useResumeStore } from "@/features/resume";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { IconButton, ListItem, ListItemButton, ListItemText, Menu, MenuItem } from "@mui/material";
+import { useState } from "react";
 
 /**
  * エントリーリストアイテムのProps
@@ -16,19 +15,58 @@ interface EntryListItemProps {
  */
 export const EntryListItem = ({ entry }: EntryListItemProps) => {
     // ストアから必要な状態を取り出す
-    const { activeSection, activeEntryId, setActiveEntryId } = useResumeStore();
+    const { activeSection, activeEntryId, setActiveEntryId, updateSection } = useResumeStore();
+    const resume = useResumeStore((state) => state.resume);
 
-    // sortableの設定
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: entry.id });
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const open = Boolean(anchorEl);
 
-    // スタイル
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
+    /**
+     * メニューオープン
+     */
+    const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation();
+        setAnchorEl(event.currentTarget);
+    };
+
+    /**
+     * メニュークローズ（Menu.onClose 用）
+     */
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
+
+    /**
+     * エントリー削除処理
+     */
+    const handleDelete = (event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation();
+
+        if (!resume) {
+            setAnchorEl(null);
+            return;
+        }
+
+        const sectionKey = getResumeKey(activeSection);
+        if (!sectionKey) {
+            setAnchorEl(null);
+            return;
+        }
+
+        const list = resume[sectionKey];
+        const updated = list.filter((item) => item.id !== entry.id) as typeof list;
+
+        updateSection(sectionKey, updated);
+
+        if (activeEntryId === entry.id) {
+            setActiveEntryId(null);
+        }
+
+        setAnchorEl(null);
     };
 
     return (
-        <div ref={setNodeRef} style={style}>
+        <>
             <ListItem disablePadding sx={{ mb: 1 }}>
                 <ListItemButton
                     selected={activeEntryId === entry.id}
@@ -60,10 +98,31 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
                             },
                         }}
                     />
-                    {/* ドラッグアイコン */}
-                    <DraggableIcon dragHandleProps={{ ...attributes, ...listeners }} />
+                    {/* メニューアイコン */}
+                    <IconButton edge="end" onClick={handleMenuOpen}>
+                        <MoreVertIcon />
+                    </IconButton>
                 </ListItemButton>
             </ListItem>
-        </div>
+
+            {/* メニュー */}
+            <Menu
+                anchorEl={anchorEl}
+                open={open}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                    vertical: "bottom",
+                    horizontal: "right",
+                }}
+                transformOrigin={{
+                    vertical: "top",
+                    horizontal: "right",
+                }}
+            >
+                <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
+                    削除
+                </MenuItem>
+            </Menu>
+        </>
     );
 };

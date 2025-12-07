@@ -1,4 +1,5 @@
 import { Checkbox, DatePicker, TextField } from "@/components/ui";
+import { useResumeStore } from "@/features/resume";
 import { Box, FormControlLabel } from "@mui/material";
 import { Dayjs } from "dayjs";
 import { useState } from "react";
@@ -7,6 +8,12 @@ import { useState } from "react";
  * 職歴セクション
  */
 export const CareerSection = () => {
+    // ストアから必要な状態を取得
+    const { resume, activeEntryId, updateEntry } = useResumeStore();
+
+    // 現在アクティブな職歴エントリー
+    const currentCareer = resume?.careers.find((career) => career.id === activeEntryId) ?? null;
+
     // 入社年月
     const [startDate, setStartDate] = useState<Dayjs | null>(null);
     // 退職年月
@@ -42,6 +49,11 @@ export const CareerSection = () => {
                 fullWidth
                 required
                 placeholder="（例）株式会社ABC"
+                value={currentCareer?.companyName ?? ""}
+                onChange={(e) => {
+                    if (!currentCareer) return;
+                    updateEntry("careers", currentCareer.id, { companyName: e.target.value });
+                }}
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}
