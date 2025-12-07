@@ -1,4 +1,4 @@
-import { Resume } from "@/types"; // 型定義をインポート
+import type { Resume } from "@/features/resume";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 

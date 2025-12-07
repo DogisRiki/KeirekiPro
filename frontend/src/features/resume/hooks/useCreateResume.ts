@@ -1,7 +1,7 @@
 import { paths } from "@/config/paths";
+import type { Resume } from "@/features/resume";
 import { createResume, CreateResumePayload } from "@/features/resume";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
-import { Resume } from "@/types";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError, AxiosResponse } from "axios";
 import { useNavigate } from "react-router";

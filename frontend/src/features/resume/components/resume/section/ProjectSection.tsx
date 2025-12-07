@@ -1,6 +1,5 @@
 import { Checkbox, DatePicker, Select, TextField } from "@/components/ui";
-import { processList, TechStackFieldList, useResumeStore } from "@/features/resume";
-import { Process } from "@/types";
+import { Process, processList, TechStackFieldList, useResumeStore } from "@/features/resume";
 import {
     Box,
     FormControl,
@@ -171,10 +170,10 @@ export const ProjectSection = () => {
                 fullWidth
                 required
                 placeholder="ECサイトのマイクロサービス化プロジェクト"
-                value={currentProject?.projectName ?? ""}
+                value={currentProject?.name ?? ""}
                 onChange={(e) => {
                     if (!currentProject) return;
-                    updateEntry("projects", currentProject.id, { projectName: e.target.value });
+                    updateEntry("projects", currentProject.id, { name: e.target.value });
                 }}
                 slotProps={{
                     inputLabel: { shrink: true },

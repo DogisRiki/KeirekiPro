@@ -1,7 +1,7 @@
 import { NoData } from "@/components/errors";
 import { Button } from "@/components/ui";
+import type { Career, Certification, Portfolio, Project, SelfPromotion, SocialLink } from "@/features/resume";
 import { EntryListItem, getResumeKey, SectionName, sections, useResumeStore } from "@/features/resume";
-import type { Career, Certification, Portfolio, Project, SelfPromotion, SocialLink } from "@/types";
 import { Add as AddIcon } from "@mui/icons-material";
 import { Box, Divider, List, Typography } from "@mui/material";
 
@@ -21,7 +21,7 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
                 companyName: "新しい職歴",
                 startDate: "",
                 endDate: null,
-                isEmployed: false,
+                active: false,
             };
             return entry;
         }
@@ -29,10 +29,10 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
             const entry: Project = {
                 id,
                 companyName: "",
-                projectName: "新しい職務内容",
                 startDate: "",
                 endDate: null,
-                isAssigned: false,
+                active: false,
+                name: "新しい職務内容",
                 overview: "",
                 teamComp: "",
                 role: "",
@@ -49,20 +49,20 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
                 techStack: {
                     frontend: {
                         languages: [],
-                        frameworks: [],
+                        framework: null,
                         libraries: [],
-                        buildTools: [],
-                        packageManagers: [],
+                        buildTool: null,
+                        packageManager: null,
                         linters: [],
                         formatters: [],
                         testingTools: [],
                     },
                     backend: {
                         languages: [],
-                        frameworks: [],
+                        framework: null,
                         libraries: [],
-                        buildTools: [],
-                        packageManagers: [],
+                        buildTool: null,
+                        packageManager: null,
                         linters: [],
                         formatters: [],
                         testingTools: [],
@@ -71,24 +71,24 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
                     },
                     infrastructure: {
                         clouds: [],
-                        operatingSystems: [],
+                        operatingSystem: null,
                         containers: [],
-                        databases: [],
-                        webServers: [],
-                        ciCdTools: [],
+                        database: null,
+                        webServer: null,
+                        ciCdTools: null,
                         iacTools: [],
                         monitoringTools: [],
                         loggingTools: [],
                     },
                     tools: {
-                        sourceControls: [],
-                        projectManagements: [],
-                        communicationTools: [],
+                        sourceControl: null,
+                        projectManagement: null,
+                        communicationTool: null,
                         documentationTools: [],
                         apiDevelopmentTools: [],
                         designTools: [],
-                        editors: [],
-                        developmentEnvironments: [],
+                        editor: null,
+                        developmentEnvironment: null,
                     },
                 },
             };
@@ -107,8 +107,8 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
                 id,
                 name: "新しいポートフォリオ",
                 overview: "",
-                link: "",
                 techStack: "",
+                link: "",
             };
             return entry;
         }

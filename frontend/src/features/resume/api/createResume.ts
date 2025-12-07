@@ -1,5 +1,5 @@
+import type { Resume } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
-import { Resume } from "@/types";
 import { AxiosResponse } from "axios";
 
 /**

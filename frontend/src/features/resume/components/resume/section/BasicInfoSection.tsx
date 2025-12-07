@@ -1,7 +1,7 @@
 import { DatePicker, TextField } from "@/components/ui";
 import { useResumeStore } from "@/features/resume/stores/resumeStore";
 import { Stack } from "@mui/material";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 
 /**
@@ -12,28 +12,33 @@ export const BasicInfoSection = () => {
     const { resume } = useResumeStore();
 
     // フォームの状態
-    const [formState, setFormState] = useState({
-        name: "",
+    const [formState, setFormState] = useState<{
+        resumeName: string;
+        date: Dayjs | null;
+        lastName: string;
+        firstName: string;
+    }>({
+        resumeName: "",
         date: dayjs(),
         lastName: "",
         firstName: "",
     });
 
-    // resume の変更を監視してローカルステートを更新
+    // resumeの変更を監視してローカルステートを更新
     useEffect(() => {
         if (resume) {
             setFormState({
-                name: resume.name || "",
-                date: dayjs(resume.date) || null,
-                lastName: resume.lastName || "",
-                firstName: resume.firstName || "",
+                resumeName: resume.resumeName || "",
+                date: resume.date ? dayjs(resume.date) : null,
+                lastName: resume.lastName ?? "",
+                firstName: resume.firstName ?? "",
             });
         }
     }, [resume]);
 
     // 入力変更ハンドラー
-    const handleInputChange = (key: string, value: any) => {
-        setFormState((prev) => ({ ...prev, [key]: value }));
+    const handleInputChange = (key: keyof typeof formState, value: unknown) => {
+        setFormState((prev) => ({ ...prev, [key]: value } as typeof prev));
     };
 
     return (
@@ -41,8 +46,8 @@ export const BasicInfoSection = () => {
             {/* 職務経歴書名 */}
             <TextField
                 label="職務経歴書名"
-                value={formState.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
+                value={formState.resumeName}
+                onChange={(e) => handleInputChange("resumeName", e.target.value)}
                 fullWidth
                 required
                 placeholder="（例）株式会社ABC用の職務経歴書"
@@ -68,7 +73,7 @@ export const BasicInfoSection = () => {
                     calendarHeader: { format: "YYYY/MM/DD" },
                 }}
             />
-            {/* 姓 */}
+            {/* 姓・名 */}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={4}>
                 <TextField
                     label="姓"
@@ -81,7 +86,6 @@ export const BasicInfoSection = () => {
                         inputLabel: { shrink: true },
                     }}
                 />
-                {/* 名 */}
                 <TextField
                     label="名"
                     value={formState.firstName}

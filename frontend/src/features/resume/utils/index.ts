@@ -22,12 +22,12 @@ export const getEntryText = (activeSection: SectionName, entry: any) => {
         case "career":
             return {
                 primary: entry.companyName,
-                secondary: formatPeriod(entry.startDate, entry.endDate, entry.isEmployed),
+                secondary: formatPeriod(entry.startDate, entry.endDate, entry.active),
             };
         case "project":
             return {
-                primary: entry.projectName,
-                secondary: formatPeriod(entry.startDate, entry.endDate, entry.isAssigned),
+                primary: entry.name,
+                secondary: formatPeriod(entry.startDate, entry.endDate, entry.active),
             };
         case "certification":
             return {
@@ -47,26 +47,18 @@ export const getEntryText = (activeSection: SectionName, entry: any) => {
 
 /**
  * 期間を「YYYY/MM - YYYY/MM」形式または「YYYY/MM - 現在」形式の文字列に変換する
- * @param startDate 開始日（YYYY-MM-DD形式）
- * @param endDate 終了日（YYYY-MM-DD形式）。省略可能
+ * @param startDate 開始日（"yyyy-MM"形式）
+ * @param endDate 終了日（"yyyy-MM"形式）。省略可能
  * @param isCurrent 現在も継続中かどうか。trueの場合、終了日の代わりに「現在」と表示
- * @returns フォーマットされた期間文字列
- * @example
- * 開始と終了が指定された場合
- *  formatPeriod('2022-01-01', '2023-12-31') // '2022/01 - 2023/12'
- * 現在進行中の場合
- *  formatPeriod('2022-01-01', null, true) // '2022/01 - 現在'
- * 開始日のみの場合
- *  formatPeriod('2022-01-01') // '2022/01 - '
  */
 const formatPeriod = (startDate: string, endDate?: string | null, isCurrent?: boolean): string => {
     if (!startDate) return "";
 
-    const formatDate = (date: string) => {
+    const formatYm = (date: string) => {
         return dayjs(date).format("YYYY/MM");
     };
 
-    return `${formatDate(startDate)} - ${isCurrent ? "現在" : endDate ? formatDate(endDate) : ""}`;
+    return `${formatYm(startDate)} - ${isCurrent ? "現在" : endDate ? formatYm(endDate) : ""}`;
 };
 
 /**

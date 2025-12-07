@@ -1,5 +1,5 @@
-// src/pages/Resume.tsx
 import { Button } from "@/components/ui";
+import type { Resume as ResumeType } from "@/features/resume";
 import {
     BottomMenu,
     createCurrentSection,
@@ -9,7 +9,6 @@ import {
     SectionTabs,
     useResumeStore,
 } from "@/features/resume";
-import { Resume as ResumeType } from "@/types";
 import { Delete as DeleteIcon, Save as SaveIcon } from "@mui/icons-material";
 import { Box, Divider, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
@@ -18,44 +17,43 @@ import { useEffect, useRef, useState } from "react";
 // ダミーデータ
 const dummyResume: ResumeType = {
     id: "e8a6baf2-79bf-47d2-8f60-90884c9a7b36",
-    name: "職務経歴書サンプル",
-    date: "2023-01-01T00:00:00",
+    resumeName: "職務経歴書サンプル",
+    date: "2023-01-01",
     lastName: "山田",
     firstName: "太郎",
-    autoSaveEnabled: true,
     createdAt: "2023-01-01T00:00:00",
     updatedAt: "2023-01-01T00:00:00",
     careers: [
         {
             id: "1f3c9b9d-f273-40c3-b6e2-9db75f34d132",
             companyName: "株式会社A",
-            startDate: "2015-04-01T00:00:00",
-            endDate: "2018-03-31T00:00:00",
-            isEmployed: false,
+            startDate: "2015-04",
+            endDate: "2018-03",
+            active: false,
         },
         {
             id: "d8c1a23f-4b0d-4ea4-b073-5dcb59f0d76d",
             companyName: "株式会社B",
-            startDate: "2018-04-01T00:00:00",
-            endDate: "2021-06-30T00:00:00",
-            isEmployed: false,
+            startDate: "2018-04",
+            endDate: "2021-06",
+            active: false,
         },
         {
             id: "874dc276-bfb1-492f-8433-fbd7b47a4829",
             companyName: "株式会社C",
-            startDate: "2021-07-01T00:00:00",
+            startDate: "2021-07",
             endDate: null,
-            isEmployed: true,
+            active: true,
         },
     ],
     projects: [
         {
             id: "2f4a639a-3b90-445c-b58a-d48179f1a8b6",
             companyName: "株式会社A",
-            startDate: "2016-04-01T00:00:00",
-            endDate: "2018-03-31T00:00:00",
-            isAssigned: false,
-            projectName: "顧客管理システム開発",
+            startDate: "2016-04",
+            endDate: "2018-03",
+            active: false,
+            name: "顧客管理システム開発",
             overview: "顧客管理システムの要件定義から実装までを担当",
             teamComp: "6人",
             role: "リーダー",
@@ -70,51 +68,67 @@ const dummyResume: ResumeType = {
                 maintenance: false,
             },
             techStack: {
-                languages: ["Java, Python", "JavaScript, TypeScript"],
-                dependencies: {
-                    frameworks: ["Spring Framework", "Django", "React"],
-                    libraries: ["Jackson", "Flyway", "numpy", "ESLint", "Prettier", "axios", "TanStack Query", "MUI"],
-                    testingTools: ["JUnit", "pytest", "Jest", "Vitest", "React Testing Tools", "Playwright"],
+                frontend: {
+                    languages: ["JavaScript", "TypeScript"],
+                    framework: "React",
+                    libraries: ["MUI", "axios"],
+                    buildTool: "Vite",
+                    packageManager: "npm",
+                    linters: ["ESLint"],
+                    formatters: ["Prettier"],
+                    testingTools: ["Vitest", "React Testing Library"],
+                },
+                backend: {
+                    languages: ["Java"],
+                    framework: "Spring Framework",
+                    libraries: ["Jackson", "Flyway"],
+                    buildTool: "Gradle",
+                    packageManager: "npm",
+                    linters: [],
+                    formatters: [],
+                    testingTools: ["JUnit"],
                     ormTools: ["MyBatis"],
-                    packageManagers: ["npm", "Poetry"],
+                    auth: [],
                 },
                 infrastructure: {
                     clouds: ["AWS"],
+                    operatingSystem: "Linux",
                     containers: ["Docker"],
-                    databases: ["PostgreSQL"],
-                    webServers: ["Nginx"],
-                    ciCdTools: ["Github Actions"],
+                    database: "PostgreSQL",
+                    webServer: "Nginx",
+                    ciCdTools: "GitHub Actions",
                     iacTools: ["Terraform"],
                     monitoringTools: ["Datadog", "Grafana"],
                     loggingTools: ["CloudWatch Logs"],
                 },
                 tools: {
-                    sourceControls: ["Git"],
-                    projectManagements: ["Jira", "Redmine"],
-                    communicationTools: ["Slack", "Microsoft Teams"],
+                    sourceControl: "Git",
+                    projectManagement: "Jira",
+                    communicationTool: "Slack",
                     documentationTools: ["Confluence"],
                     apiDevelopmentTools: ["Postman", "Swagger"],
                     designTools: ["Figma"],
+                    editor: "IntelliJ IDEA",
+                    developmentEnvironment: "Docker",
                 },
             },
-            orderNo: 0,
         },
     ],
     certifications: [
         {
             id: "d32be9f6-8b3e-4c97-813e-a6c0e72fd993",
             name: "AWS認定ソリューションアーキテクト",
-            date: "2020-01-01T00:00:00",
+            date: "2020-01",
         },
         {
             id: "e18c20d7-639c-4d83-b760-5b3e3d479e8e",
             name: "基本情報技術者試験",
-            date: "2015-04-01T00:00:00",
+            date: "2015-04",
         },
         {
             id: "a77e02b1-927e-4cd1-82d4-f67b0d6d947b",
             name: "応用情報技術者試験",
-            date: "2017-10-01T00:00:00",
+            date: "2017-10",
         },
     ],
     portfolios: [
