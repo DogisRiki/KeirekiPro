@@ -1,7 +1,15 @@
 import { NoData } from "@/components/errors";
 import { Button } from "@/components/ui";
-import type { Career, Certification, Portfolio, Project, SelfPromotion, SocialLink } from "@/features/resume";
-import { EntryListItem, getResumeKey, SectionName, sections, useResumeStore } from "@/features/resume";
+import type {
+    Career,
+    Certification,
+    Portfolio,
+    Project,
+    SectionName,
+    SelfPromotion,
+    SocialLink,
+} from "@/features/resume";
+import { EntryListItem, getResumeKey, sections, useResumeStore } from "@/features/resume";
 import { Add as AddIcon } from "@mui/icons-material";
 import { Box, Divider, List, Typography } from "@mui/material";
 

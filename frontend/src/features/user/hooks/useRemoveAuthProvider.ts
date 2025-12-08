@@ -1,8 +1,8 @@
 import { removeAuthProvider } from "@/features/user";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { AuthProvider } from "@/types";
+import type { AuthProvider } from "@/types";
 import { useMutation } from "@tanstack/react-query";
-import { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 
 /**
  * 外部認証連携解除フック

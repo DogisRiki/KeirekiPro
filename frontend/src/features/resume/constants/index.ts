@@ -1,11 +1,10 @@
+import type { ProcessMap, SectionInfo } from "@/features/resume";
 import {
     BasicInfoSection,
     CareerSection,
     CertificationSection,
     PortfolioSection,
-    ProcessMap,
     ProjectSection,
-    SectionInfo,
     SelfPromotionSection,
     SociealLinkSection,
 } from "@/features/resume";

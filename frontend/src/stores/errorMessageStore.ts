@@ -1,4 +1,4 @@
-import { ErrorResponse } from "@/types";
+import type { ErrorResponse } from "@/types";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 

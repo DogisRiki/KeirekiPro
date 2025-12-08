@@ -1,7 +1,8 @@
+import type { TechStack } from "@/features/resume";
 import { getTechStackList } from "@/features/resume";
 import { useErrorMessageStore } from "@/stores";
-import { TechStack } from "@/types";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * 技術スタック一覧を取得フック

@@ -1,14 +1,14 @@
 import { Button, ConfirmDialog, TextField } from "@/components/ui";
+import type { SettingMessages } from "@/features/user";
 import {
     AuthProviderField,
     AuthProviderWarningMessage,
     PasswordStatusBox,
     ProfileImageField,
-    SettingMessages,
     TwoFactorSwitch,
 } from "@/features/user";
 import { useErrorMessageStore } from "@/stores";
-import { AuthProvider } from "@/types";
+import type { AuthProvider } from "@/types";
 import { stringListToBulletList } from "@/utils";
 import { Box, FormControl, FormHelperText } from "@mui/material";
 import { useState } from "react";

@@ -7,13 +7,13 @@ vi.mock("@/lib", () => ({
 }));
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
 import { useAuthorizeOidc } from "@/features/auth";
 import { publicApiClient } from "@/lib";
 import { useErrorMessageStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
-import { AuthProvider } from "@/types";
+import type { AuthProvider } from "@/types";
 
 describe("useAuthorizeOidc", () => {
     const wrapper = createQueryWrapper();

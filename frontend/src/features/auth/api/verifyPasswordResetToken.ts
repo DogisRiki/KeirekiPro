@@ -1,5 +1,5 @@
 import { publicApiClient } from "@/lib";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
 /**
  * パスワードリセットトークン検証リクエスト

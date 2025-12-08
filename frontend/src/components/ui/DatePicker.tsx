@@ -1,5 +1,6 @@
-import { DatePickerProps, DatePicker as MUIDatePicker } from "@mui/x-date-pickers";
-import { Dayjs } from "dayjs";
+import type { DatePickerProps } from "@mui/x-date-pickers";
+import { DatePicker as MUIDatePicker } from "@mui/x-date-pickers";
+import type { Dayjs } from "dayjs";
 
 /**
  * DatePicker

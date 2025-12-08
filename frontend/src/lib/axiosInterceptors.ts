@@ -1,7 +1,7 @@
 import { toastMessage } from "@/config/messages";
 import { paths } from "@/config/paths";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { ErrorResponse } from "@/types";
+import type { ErrorResponse } from "@/types";
 import axios from "axios";
 
 /**

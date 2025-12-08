@@ -1,9 +1,9 @@
-import { techStackInfo, useTechStackList } from "@/features/resume";
-import { TechStackField } from "@/features/resume/components/resume/section/TechStackField";
-import { TechStack } from "@/types";
+import type { TechStack } from "@/features/resume";
+import { TechStackField, techStackInfo, useTechStackList } from "@/features/resume";
 import { getNestedValue, setNestedValue } from "@/utils";
 import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
-import { Accordion, AccordionDetails, AccordionSummary, SxProps, Theme, Typography } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Typography } from "@mui/material";
 import { useState } from "react";
 
 /**

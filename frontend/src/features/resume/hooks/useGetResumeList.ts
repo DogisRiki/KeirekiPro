@@ -1,7 +1,8 @@
 import type { GetResumeListResponse } from "@/features/resume";
 import { getResumeList } from "@/features/resume";
 import { useErrorMessageStore } from "@/stores";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * 職務経歴書一覧取得フック

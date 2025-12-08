@@ -1,4 +1,5 @@
-import { CheckboxProps, Checkbox as MUICheckbox } from "@mui/material";
+import type { CheckboxProps } from "@mui/material";
+import { Checkbox as MUICheckbox } from "@mui/material";
 
 /**
  * チェックボックス

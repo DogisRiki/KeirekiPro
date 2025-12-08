@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 
 /**
  * セクション名
@@ -205,4 +205,65 @@ export interface Resume {
     portfolios: Portfolio[];
     socialLinks: SocialLink[];
     selfPromotions: SelfPromotion[];
+}
+
+export interface TechStackFrontend {
+    // フロントエンド
+    languages: string[];
+    frameworks: string[];
+    libraries: string[];
+    buildTools: string[];
+    packageManagers: string[];
+    linters: string[];
+    formatters: string[];
+    testingTools: string[];
+}
+
+export interface TechStackBackend {
+    // バックエンド
+    languages: string[];
+    frameworks: string[];
+    libraries: string[];
+    buildTools: string[];
+    packageManagers: string[];
+    linters: string[];
+    formatters: string[];
+    testingTools: string[];
+    ormTools: string[];
+    auth: string[];
+}
+
+export interface TechStackInfrastructure {
+    // インフラ
+    clouds: string[];
+    operatingSystems: string[];
+    containers: string[];
+    databases: string[];
+    webServers: string[];
+    ciCdTools: string[];
+    iacTools: string[];
+    monitoringTools: string[];
+    loggingTools: string[];
+}
+
+export interface TechStackTools {
+    // 開発支援ツール
+    sourceControls: string[];
+    projectManagements: string[];
+    communicationTools: string[];
+    documentationTools: string[];
+    apiDevelopmentTools: string[];
+    designTools: string[];
+    editors: string[];
+    developmentEnvironments: string[];
+}
+
+/**
+ * 技術スタック
+ */
+export interface TechStack {
+    frontend: TechStackFrontend;
+    backend: TechStackBackend;
+    infrastructure: TechStackInfrastructure;
+    tools: TechStackTools;
 }

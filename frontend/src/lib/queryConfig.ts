@@ -1,4 +1,4 @@
-import { DefaultOptions } from "@tanstack/react-query";
+import type { DefaultOptions } from "@tanstack/react-query";
 
 /**
  * React Query基本設定

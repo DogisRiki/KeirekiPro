@@ -1,5 +1,5 @@
+import type { TechStack } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
-import { TechStack } from "@/types";
 
 /**
  * 技術スタック一覧取得API

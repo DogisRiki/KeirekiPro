@@ -5,7 +5,7 @@ import { useErrorMessageStore, useUserAuthStore } from "@/stores";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 
-import { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 
 /**
  * 二段階認証コード検証フック

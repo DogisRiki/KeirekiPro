@@ -1,4 +1,3 @@
-// src/features/resume/components/resume/section/TechStackField.tsx
 import { Autocomplete, TextField } from "@/components/ui";
 import { dedupeIgnoreCase, normalizeForCaseInsensitiveCompare } from "@/utils";
 import React, { useState } from "react";

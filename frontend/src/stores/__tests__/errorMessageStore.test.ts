@@ -1,5 +1,5 @@
 import { useErrorMessageStore } from "@/stores";
-import { ErrorResponse } from "@/types";
+import type { ErrorResponse } from "@/types";
 
 describe("useErrorMessageStore", () => {
     beforeEach(() => {

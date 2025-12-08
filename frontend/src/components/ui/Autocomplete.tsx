@@ -1,4 +1,5 @@
-import { AutocompleteProps, Autocomplete as MUIAutocomplete } from "@mui/material";
+import type { AutocompleteProps } from "@mui/material";
+import { Autocomplete as MUIAutocomplete } from "@mui/material";
 
 /**
  * オートコンプリート

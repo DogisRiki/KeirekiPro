@@ -1,7 +1,7 @@
 import { Checkbox, DatePicker, TextField } from "@/components/ui";
 import { useResumeStore } from "@/features/resume";
 import { Box, FormControlLabel } from "@mui/material";
-import { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 import { useState } from "react";
 
 /**

@@ -1,7 +1,8 @@
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore } from "@/stores";
-import { User } from "@/types";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
+import type { User } from "@/types";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * ユーザー情報取得API

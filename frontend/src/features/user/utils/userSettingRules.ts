@@ -1,5 +1,5 @@
 import { UserState } from "@/features/user";
-import { AuthProvider } from "@/types";
+import type { AuthProvider } from "@/types";
 
 /**
  * 2FAスイッチを操作できる状態

@@ -1,6 +1,6 @@
 import { protectedApiClient } from "@/lib";
-import { User } from "@/types";
-import { AxiosResponse } from "axios";
+import type { User } from "@/types";
+import type { AxiosResponse } from "axios";
 
 /**
  * メールアドレス+パスワード設定用ペイロード

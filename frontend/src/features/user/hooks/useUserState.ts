@@ -1,6 +1,6 @@
 import { UserState } from "@/features/user";
 import { useUserAuthStore } from "@/stores";
-import { User } from "@/types";
+import type { User } from "@/types";
 import { useMemo } from "react";
 
 /**

@@ -1,6 +1,6 @@
 import { protectedApiClient } from "@/lib";
-import { AuthProvider } from "@/types";
-import { AxiosResponse } from "axios";
+import type { AuthProvider } from "@/types";
+import type { AxiosResponse } from "axios";
 
 /**
  * 外部認証連携解除API

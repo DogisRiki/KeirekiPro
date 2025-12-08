@@ -1,6 +1,6 @@
 import type { Resume } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
 /**
  * 職務経歴書新規作成用ペイロード

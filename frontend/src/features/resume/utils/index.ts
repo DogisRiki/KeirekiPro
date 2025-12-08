@@ -1,4 +1,5 @@
-import { SectionName, sections } from "@/features/resume";
+import type { SectionName } from "@/features/resume";
+import { sections } from "@/features/resume";
 import { formatDate } from "@/utils";
 import dayjs from "dayjs";
 import React from "react";

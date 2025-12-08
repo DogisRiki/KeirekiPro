@@ -11,10 +11,11 @@ vi.mock("react-router", () => ({
 }));
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
-import { ResetPasswordPayload, useResetPassword } from "@/features/auth";
+import type { ResetPasswordPayload } from "@/features/auth";
+import { useResetPassword } from "@/features/auth";
 import { publicApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";

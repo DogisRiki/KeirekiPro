@@ -1,4 +1,4 @@
-import { User, UserPatch } from "@/types";
+import type { User, UserPatch } from "@/types";
 import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
 

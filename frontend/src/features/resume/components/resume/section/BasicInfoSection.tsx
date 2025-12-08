@@ -1,7 +1,8 @@
 import { DatePicker, TextField } from "@/components/ui";
 import { useResumeStore } from "@/features/resume/stores/resumeStore";
 import { Stack } from "@mui/material";
-import dayjs, { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
 /**

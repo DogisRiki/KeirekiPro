@@ -1,5 +1,5 @@
 import { useUserAuthStore } from "@/stores";
-import { AuthProvider, User, UserPatch } from "@/types";
+import type { AuthProvider, User, UserPatch } from "@/types";
 
 // localStorageのモック
 const localStorageMock = {

@@ -6,7 +6,7 @@ vi.mock("@/lib", () => ({
 }));
 
 import { renderHook, waitFor } from "@testing-library/react";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
 import { useVerifyPasswordResetToken } from "@/features/auth";
 import { publicApiClient } from "@/lib";

@@ -1,7 +1,8 @@
 import { verifyPasswordResetToken } from "@/features/auth";
 import { useErrorMessageStore } from "@/stores";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
-import { AxiosError, AxiosResponse } from "axios";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import type { AxiosError, AxiosResponse } from "axios";
 
 /**
  * パスワードリセットトークン検証フック

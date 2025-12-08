@@ -1,15 +1,9 @@
 import { Checkbox, DatePicker, Select, TextField } from "@/components/ui";
-import { Process, processList, TechStackFieldList, useResumeStore } from "@/features/resume";
-import {
-    Box,
-    FormControl,
-    FormControlLabel,
-    InputLabel,
-    ListItemText,
-    MenuItem,
-    SelectChangeEvent,
-} from "@mui/material";
-import { Dayjs } from "dayjs";
+import type { Process } from "@/features/resume";
+import { processList, TechStackFieldList, useResumeStore } from "@/features/resume";
+import type { SelectChangeEvent } from "@mui/material";
+import { Box, FormControl, FormControlLabel, InputLabel, ListItemText, MenuItem } from "@mui/material";
+import type { Dayjs } from "dayjs";
 import { useState } from "react";
 
 const MenuProps = {

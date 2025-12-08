@@ -1,8 +1,9 @@
 import { paths } from "@/config/paths";
-import { userRegister, UserRegistrationPayload } from "@/features/auth";
+import type { UserRegistrationPayload } from "@/features/auth";
+import { userRegister } from "@/features/auth";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
 import { useMutation } from "@tanstack/react-query";
-import { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { useNavigate } from "react-router";
 
 /**
