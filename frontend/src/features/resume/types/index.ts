@@ -64,75 +64,6 @@ export interface Career {
 }
 
 /**
- * プロジェクト用 技術スタック - フロントエンド
- */
-export interface ProjectTechStackFrontend {
-    languages: string[];
-    framework: string | null;
-    libraries: string[];
-    buildTool: string | null;
-    packageManager: string | null;
-    linters: string[];
-    formatters: string[];
-    testingTools: string[];
-}
-
-/**
- * プロジェクト用 技術スタック - バックエンド
- */
-export interface ProjectTechStackBackend {
-    languages: string[];
-    framework: string | null;
-    libraries: string[];
-    buildTool: string | null;
-    packageManager: string | null;
-    linters: string[];
-    formatters: string[];
-    testingTools: string[];
-    ormTools: string[];
-    auth: string[];
-}
-
-/**
- * プロジェクト用 技術スタック - インフラ
- */
-export interface ProjectTechStackInfrastructure {
-    clouds: string[];
-    operatingSystem: string | null;
-    containers: string[];
-    database: string | null;
-    webServer: string | null;
-    ciCdTools: string | null;
-    iacTools: string[];
-    monitoringTools: string[];
-    loggingTools: string[];
-}
-
-/**
- * プロジェクト用 技術スタック - 開発支援ツール
- */
-export interface ProjectTechStackTools {
-    sourceControl: string | null;
-    projectManagement: string | null;
-    communicationTool: string | null;
-    documentationTools: string[];
-    apiDevelopmentTools: string[];
-    designTools: string[];
-    editor: string | null;
-    developmentEnvironment: string | null;
-}
-
-/**
- * プロジェクト用 技術スタック
- */
-export interface ProjectTechStack {
-    frontend: ProjectTechStackFrontend;
-    backend: ProjectTechStackBackend;
-    infrastructure: ProjectTechStackInfrastructure;
-    tools: ProjectTechStackTools;
-}
-
-/**
  * プロジェクト
  */
 export interface Project {
@@ -147,7 +78,7 @@ export interface Project {
     role: string;
     achievement: string;
     process: Process;
-    techStack: ProjectTechStack;
+    techStack: TechStack;
 }
 
 /**
@@ -207,8 +138,10 @@ export interface Resume {
     selfPromotions: SelfPromotion[];
 }
 
+/**
+ * 技術スタック - フロントエンド
+ */
 export interface TechStackFrontend {
-    // フロントエンド
     languages: string[];
     frameworks: string[];
     libraries: string[];
@@ -219,8 +152,10 @@ export interface TechStackFrontend {
     testingTools: string[];
 }
 
+/**
+ * 技術スタック - バックエンド
+ */
 export interface TechStackBackend {
-    // バックエンド
     languages: string[];
     frameworks: string[];
     libraries: string[];
@@ -233,8 +168,10 @@ export interface TechStackBackend {
     auth: string[];
 }
 
+/**
+ * 技術スタック - インフラ
+ */
 export interface TechStackInfrastructure {
-    // インフラ
     clouds: string[];
     operatingSystems: string[];
     containers: string[];
@@ -246,8 +183,10 @@ export interface TechStackInfrastructure {
     loggingTools: string[];
 }
 
+/**
+ * 技術スタック - 開発支援ツール
+ */
 export interface TechStackTools {
-    // 開発支援ツール
     sourceControls: string[];
     projectManagements: string[];
     communicationTools: string[];

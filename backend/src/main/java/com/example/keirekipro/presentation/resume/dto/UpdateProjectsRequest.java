@@ -94,20 +94,20 @@ public class UpdateProjectsRequest {
 
         // TechStack - Frontend
         private List<String> frontendLanguages;
-        private String frontendFramework;
+        private List<String> frontendFrameworks;
         private List<String> frontendLibraries;
-        private String frontendBuildTool;
-        private String frontendPackageManager;
+        private List<String> frontendBuildTools;
+        private List<String> frontendPackageManagers;
         private List<String> frontendLinters;
         private List<String> frontendFormatters;
         private List<String> frontendTestingTools;
 
         // TechStack - Backend
         private List<String> backendLanguages;
-        private String backendFramework;
+        private List<String> backendFrameworks;
         private List<String> backendLibraries;
-        private String backendBuildTool;
-        private String backendPackageManager;
+        private List<String> backendBuildTools;
+        private List<String> backendPackageManagers;
         private List<String> backendLinters;
         private List<String> backendFormatters;
         private List<String> backendTestingTools;
@@ -116,23 +116,23 @@ public class UpdateProjectsRequest {
 
         // TechStack - Infrastructure
         private List<String> clouds;
-        private String operatingSystem;
+        private List<String> operatingSystems;
         private List<String> containers;
-        private String database;
-        private String webServer;
-        private String ciCdTool;
+        private List<String> databases;
+        private List<String> webServers;
+        private List<String> ciCdTools;
         private List<String> iacTools;
         private List<String> monitoringTools;
         private List<String> loggingTools;
 
         // TechStack - Tools
-        private String sourceControl;
-        private String projectManagement;
-        private String communicationTool;
+        private List<String> sourceControls;
+        private List<String> projectManagements;
+        private List<String> communicationTools;
         private List<String> documentationTools;
         private List<String> apiDevelopmentTools;
         private List<String> designTools;
-        private String editor;
-        private String developmentEnvironment;
+        private List<String> editors;
+        private List<String> developmentEnvironments;
     }
 }

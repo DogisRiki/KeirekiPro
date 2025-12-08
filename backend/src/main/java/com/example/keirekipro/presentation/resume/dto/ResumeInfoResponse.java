@@ -108,19 +108,19 @@ public class ResumeInfoResponse {
                                     new TechStackResponse(
                                             new FrontendResponse(
                                                     frontend.getLanguages(),
-                                                    frontend.getFramework(),
+                                                    frontend.getFrameworks(),
                                                     frontend.getLibraries(),
-                                                    frontend.getBuildTool(),
-                                                    frontend.getPackageManager(),
+                                                    frontend.getBuildTools(),
+                                                    frontend.getPackageManagers(),
                                                     frontend.getLinters(),
                                                     frontend.getFormatters(),
                                                     frontend.getTestingTools()),
                                             new BackendResponse(
                                                     backend.getLanguages(),
-                                                    backend.getFramework(),
+                                                    backend.getFrameworks(),
                                                     backend.getLibraries(),
-                                                    backend.getBuildTool(),
-                                                    backend.getPackageManager(),
+                                                    backend.getBuildTools(),
+                                                    backend.getPackageManagers(),
                                                     backend.getLinters(),
                                                     backend.getFormatters(),
                                                     backend.getTestingTools(),
@@ -128,23 +128,23 @@ public class ResumeInfoResponse {
                                                     backend.getAuth()),
                                             new InfrastructureResponse(
                                                     infra.getClouds(),
-                                                    infra.getOperatingSystem(),
+                                                    infra.getOperatingSystems(),
                                                     infra.getContainers(),
-                                                    infra.getDatabase(),
-                                                    infra.getWebServer(),
-                                                    infra.getCiCdTool(),
+                                                    infra.getDatabases(),
+                                                    infra.getWebServers(),
+                                                    infra.getCiCdTools(),
                                                     infra.getIacTools(),
                                                     infra.getMonitoringTools(),
                                                     infra.getLoggingTools()),
                                             new ToolsResponse(
-                                                    tools.getSourceControl(),
-                                                    tools.getProjectManagement(),
-                                                    tools.getCommunicationTool(),
+                                                    tools.getSourceControls(),
+                                                    tools.getProjectManagements(),
+                                                    tools.getCommunicationTools(),
                                                     tools.getDocumentationTools(),
                                                     tools.getApiDevelopmentTools(),
                                                     tools.getDesignTools(),
-                                                    tools.getEditor(),
-                                                    tools.getDevelopmentEnvironment())));
+                                                    tools.getEditors(),
+                                                    tools.getDevelopmentEnvironments())));
                         })
                         .collect(Collectors.toList()))
                 .certifications(dto.getCertifications().stream()
@@ -220,8 +220,8 @@ public class ResumeInfoResponse {
         private final boolean detailedDesign;
         private final boolean implementation;
         private final boolean integrationTest;
-        private final boolean systemTest;
         private final boolean maintenance;
+        private final boolean systemTest;
     }
 
     /**
@@ -243,10 +243,10 @@ public class ResumeInfoResponse {
     @AllArgsConstructor
     public static class FrontendResponse {
         private final List<String> languages;
-        private final String framework;
+        private final List<String> frameworks;
         private final List<String> libraries;
-        private final String buildTool;
-        private final String packageManager;
+        private final List<String> buildTools;
+        private final List<String> packageManagers;
         private final List<String> linters;
         private final List<String> formatters;
         private final List<String> testingTools;
@@ -259,10 +259,10 @@ public class ResumeInfoResponse {
     @AllArgsConstructor
     public static class BackendResponse {
         private final List<String> languages;
-        private final String framework;
+        private final List<String> frameworks;
         private final List<String> libraries;
-        private final String buildTool;
-        private final String packageManager;
+        private final List<String> buildTools;
+        private final List<String> packageManagers;
         private final List<String> linters;
         private final List<String> formatters;
         private final List<String> testingTools;
@@ -277,11 +277,11 @@ public class ResumeInfoResponse {
     @AllArgsConstructor
     public static class InfrastructureResponse {
         private final List<String> clouds;
-        private final String operatingSystem;
+        private final List<String> operatingSystems;
         private final List<String> containers;
-        private final String database;
-        private final String webServer;
-        private final String ciCdTools;
+        private final List<String> databases;
+        private final List<String> webServers;
+        private final List<String> ciCdTools;
         private final List<String> iacTools;
         private final List<String> monitoringTools;
         private final List<String> loggingTools;
@@ -293,14 +293,14 @@ public class ResumeInfoResponse {
     @Getter
     @AllArgsConstructor
     public static class ToolsResponse {
-        private final String sourceControl;
-        private final String projectManagement;
-        private final String communicationTool;
+        private final List<String> sourceControls;
+        private final List<String> projectManagements;
+        private final List<String> communicationTools;
         private final List<String> documentationTools;
         private final List<String> apiDevelopmentTools;
         private final List<String> designTools;
-        private final String editor;
-        private final String developmentEnvironment;
+        private final List<String> editors;
+        private final List<String> developmentEnvironments;
     }
 
     /**

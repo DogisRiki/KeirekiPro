@@ -70,20 +70,20 @@ const dummyResume: ResumeType = {
             techStack: {
                 frontend: {
                     languages: ["JavaScript", "TypeScript"],
-                    framework: "React",
+                    frameworks: ["React"],
                     libraries: ["MUI", "axios"],
-                    buildTool: "Vite",
-                    packageManager: "npm",
+                    buildTools: ["Vite"],
+                    packageManagers: ["npm"],
                     linters: ["ESLint"],
                     formatters: ["Prettier"],
                     testingTools: ["Vitest", "React Testing Library"],
                 },
                 backend: {
                     languages: ["Java"],
-                    framework: "Spring Framework",
+                    frameworks: ["Spring Framework"],
                     libraries: ["Jackson", "Flyway"],
-                    buildTool: "Gradle",
-                    packageManager: "npm",
+                    buildTools: ["Gradle"],
+                    packageManagers: ["npm"],
                     linters: [],
                     formatters: [],
                     testingTools: ["JUnit"],
@@ -92,24 +92,24 @@ const dummyResume: ResumeType = {
                 },
                 infrastructure: {
                     clouds: ["AWS"],
-                    operatingSystem: "Linux",
+                    operatingSystems: ["Linux"],
                     containers: ["Docker"],
-                    database: "PostgreSQL",
-                    webServer: "Nginx",
-                    ciCdTools: "GitHub Actions",
+                    databases: ["PostgreSQL"],
+                    webServers: ["Nginx"],
+                    ciCdTools: ["GitHub Actions"],
                     iacTools: ["Terraform"],
                     monitoringTools: ["Datadog", "Grafana"],
                     loggingTools: ["CloudWatch Logs"],
                 },
                 tools: {
-                    sourceControl: "Git",
-                    projectManagement: "Jira",
-                    communicationTool: "Slack",
+                    sourceControls: ["Git"],
+                    projectManagements: ["Jira"],
+                    communicationTools: ["Slack"],
                     documentationTools: ["Confluence"],
                     apiDevelopmentTools: ["Postman", "Swagger"],
                     designTools: ["Figma"],
-                    editor: "IntelliJ IDEA",
-                    developmentEnvironment: "Docker",
+                    editors: ["IntelliJ IDEA"],
+                    developmentEnvironments: ["Docker"],
                 },
             },
         },
@@ -207,7 +207,7 @@ export const Resume = () => {
     // タイトル取得
     const title = currentSection.label + "情報";
 
-    // BottomMenu の高さを動的に取得
+    // BottomMenuの高さを動的に取得
     const bottomMenuRef = useRef<HTMLDivElement>(null);
     const [bottomMenuHeight, setBottomMenuHeight] = useState(0);
 

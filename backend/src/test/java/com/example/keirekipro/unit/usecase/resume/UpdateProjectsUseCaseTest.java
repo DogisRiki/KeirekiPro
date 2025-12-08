@@ -87,19 +87,19 @@ class UpdateProjectsUseCaseTest {
         updateRequest.setMaintenance(Boolean.FALSE);
         // TechStack
         updateRequest.setFrontendLanguages(List.of("TypeScript"));
-        updateRequest.setFrontendFramework("React");
+        updateRequest.setFrontendFrameworks(List.of("React"));
         updateRequest.setFrontendLibraries(List.of("MUI"));
-        updateRequest.setFrontendBuildTool("Vite");
-        updateRequest.setFrontendPackageManager("npm");
+        updateRequest.setFrontendBuildTools(List.of("Vite"));
+        updateRequest.setFrontendPackageManagers(List.of("npm"));
         updateRequest.setFrontendLinters(List.of("ESLint"));
         updateRequest.setFrontendFormatters(List.of("Prettier"));
         updateRequest.setFrontendTestingTools(List.of("RTL"));
 
         updateRequest.setBackendLanguages(List.of("Java"));
-        updateRequest.setBackendFramework("Spring Boot");
+        updateRequest.setBackendFrameworks(List.of("Spring Boot"));
         updateRequest.setBackendLibraries(List.of("MyBatis"));
-        updateRequest.setBackendBuildTool("Gradle");
-        updateRequest.setBackendPackageManager("npm");
+        updateRequest.setBackendBuildTools(List.of("Gradle"));
+        updateRequest.setBackendPackageManagers(List.of("npm"));
         updateRequest.setBackendLinters(List.of());
         updateRequest.setBackendFormatters(List.of());
         updateRequest.setBackendTestingTools(List.of("JUnit"));
@@ -107,23 +107,23 @@ class UpdateProjectsUseCaseTest {
         updateRequest.setAuth(List.of("JWT"));
 
         updateRequest.setClouds(List.of("AWS"));
-        updateRequest.setOperatingSystem("Linux");
+        updateRequest.setOperatingSystems(List.of("Linux"));
         updateRequest.setContainers(List.of("Docker"));
-        updateRequest.setDatabase("PostgreSQL");
-        updateRequest.setWebServer("nginx");
-        updateRequest.setCiCdTool("Jenkins");
+        updateRequest.setDatabases(List.of("PostgreSQL"));
+        updateRequest.setWebServers(List.of("nginx"));
+        updateRequest.setCiCdTools(List.of("Jenkins"));
         updateRequest.setIacTools(List.of("Terraform"));
         updateRequest.setMonitoringTools(List.of("CloudWatch"));
         updateRequest.setLoggingTools(List.of("CloudWatch Logs"));
 
-        updateRequest.setSourceControl("Git");
-        updateRequest.setProjectManagement("Redmine");
-        updateRequest.setCommunicationTool("Teams");
+        updateRequest.setSourceControls(List.of("Git"));
+        updateRequest.setProjectManagements(List.of("Redmine"));
+        updateRequest.setCommunicationTools(List.of("Teams"));
         updateRequest.setDocumentationTools(List.of("Confluence"));
         updateRequest.setApiDevelopmentTools(List.of("Postman"));
         updateRequest.setDesignTools(List.of("Figma"));
-        updateRequest.setEditor("VSCode");
-        updateRequest.setDevelopmentEnvironment("Windows");
+        updateRequest.setEditors(List.of("VSCode"));
+        updateRequest.setDevelopmentEnvironments(List.of("Windows"));
 
         // 2件目: 新規プロジェクト追加（IDはnull）
         // 会社名は既存職歴「会社B」に合わせる（ドメイン制約: 職歴に存在する会社名のみ許可）
@@ -148,19 +148,19 @@ class UpdateProjectsUseCaseTest {
         addRequest.setMaintenance(Boolean.FALSE);
         // TechStack
         addRequest.setFrontendLanguages(List.of("JavaScript"));
-        addRequest.setFrontendFramework("Vue");
+        addRequest.setFrontendFrameworks(List.of("Vue"));
         addRequest.setFrontendLibraries(List.of());
-        addRequest.setFrontendBuildTool("Vite");
-        addRequest.setFrontendPackageManager("yarn");
+        addRequest.setFrontendBuildTools(List.of("Vite"));
+        addRequest.setFrontendPackageManagers(List.of("yarn"));
         addRequest.setFrontendLinters(List.of());
         addRequest.setFrontendFormatters(List.of());
         addRequest.setFrontendTestingTools(List.of());
 
         addRequest.setBackendLanguages(List.of("Kotlin"));
-        addRequest.setBackendFramework("Spring Boot");
+        addRequest.setBackendFrameworks(List.of("Spring Boot"));
         addRequest.setBackendLibraries(List.of());
-        addRequest.setBackendBuildTool("Gradle");
-        addRequest.setBackendPackageManager("npm");
+        addRequest.setBackendBuildTools(List.of("Gradle"));
+        addRequest.setBackendPackageManagers(List.of("npm"));
         addRequest.setBackendLinters(List.of());
         addRequest.setBackendFormatters(List.of());
         addRequest.setBackendTestingTools(List.of());
@@ -168,23 +168,23 @@ class UpdateProjectsUseCaseTest {
         addRequest.setAuth(List.of("OAuth2"));
 
         addRequest.setClouds(List.of("GCP"));
-        addRequest.setOperatingSystem("Linux");
+        addRequest.setOperatingSystems(List.of("Linux"));
         addRequest.setContainers(List.of("Docker"));
-        addRequest.setDatabase("MySQL");
-        addRequest.setWebServer("Apache");
-        addRequest.setCiCdTool("GitHub Actions");
+        addRequest.setDatabases(List.of("MySQL"));
+        addRequest.setWebServers(List.of("Apache"));
+        addRequest.setCiCdTools(List.of("GitHub Actions"));
         addRequest.setIacTools(List.of());
         addRequest.setMonitoringTools(List.of());
         addRequest.setLoggingTools(List.of());
 
-        addRequest.setSourceControl("GitHub");
-        addRequest.setProjectManagement("Jira");
-        addRequest.setCommunicationTool("Slack");
+        addRequest.setSourceControls(List.of("GitHub"));
+        addRequest.setProjectManagements(List.of("Jira"));
+        addRequest.setCommunicationTools(List.of("Slack"));
         addRequest.setDocumentationTools(List.of("Confluence"));
         addRequest.setApiDevelopmentTools(List.of("Insomnia"));
         addRequest.setDesignTools(List.of("Figma"));
-        addRequest.setEditor("IntelliJ");
-        addRequest.setDevelopmentEnvironment("macOS");
+        addRequest.setEditors(List.of("IntelliJ"));
+        addRequest.setDevelopmentEnvironments(List.of("macOS"));
 
         UpdateProjectsRequest request = new UpdateProjectsRequest(List.of(updateRequest, addRequest));
 
@@ -480,20 +480,20 @@ class UpdateProjectsUseCaseTest {
 
         TechStack.Frontend frontend = TechStack.Frontend.create(
                 List.of("TypeScript"),
-                "React",
+                List.of("React"),
                 List.of("MUI"),
-                "Vite",
-                "npm",
+                List.of("Vite"),
+                List.of("npm"),
                 List.of("ESLint"),
                 List.of("Prettier"),
                 List.of("RTL"));
 
         TechStack.Backend backend = TechStack.Backend.create(
                 List.of("Java"),
-                "Spring Boot",
+                List.of("Spring Boot"),
                 List.of("MyBatis"),
-                "Gradle",
-                "npm",
+                List.of("Gradle"),
+                List.of("npm"),
                 List.of(),
                 List.of(),
                 List.of("JUnit"),
@@ -502,24 +502,24 @@ class UpdateProjectsUseCaseTest {
 
         TechStack.Infrastructure infrastructure = TechStack.Infrastructure.create(
                 List.of("AWS"),
-                "Linux",
+                List.of("Linux"),
                 List.of("Docker"),
-                "PostgreSQL",
-                "nginx",
-                "Jenkins",
+                List.of("PostgreSQL"),
+                List.of("nginx"),
+                List.of("Jenkins"),
                 List.of("Terraform"),
                 List.of("CloudWatch"),
                 List.of("CloudWatch Logs"));
 
         TechStack.Tools tools = TechStack.Tools.create(
-                "Git",
-                "Redmine",
-                "Teams",
+                List.of("Git"),
+                List.of("Redmine"),
+                List.of("Teams"),
                 List.of("Confluence"),
                 List.of("Postman"),
                 List.of("Figma"),
-                "VSCode",
-                "Windows");
+                List.of("VSCode"),
+                List.of("Windows"));
 
         TechStack techStack = TechStack.create(frontend, backend, infrastructure, tools);
 

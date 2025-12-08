@@ -88,19 +88,19 @@ public class ResumeInfoUseCaseDto {
                                     new TechStackDto(
                                             new FrontendDto(
                                                     domainFrontend.getLanguages(),
-                                                    domainFrontend.getFramework(),
+                                                    domainFrontend.getFrameworks(),
                                                     domainFrontend.getLibraries(),
-                                                    domainFrontend.getBuildTool(),
-                                                    domainFrontend.getPackageManager(),
+                                                    domainFrontend.getBuildTools(),
+                                                    domainFrontend.getPackageManagers(),
                                                     domainFrontend.getLinters(),
                                                     domainFrontend.getFormatters(),
                                                     domainFrontend.getTestingTools()),
                                             new BackendDto(
                                                     domainBackend.getLanguages(),
-                                                    domainBackend.getFramework(),
+                                                    domainBackend.getFrameworks(),
                                                     domainBackend.getLibraries(),
-                                                    domainBackend.getBuildTool(),
-                                                    domainBackend.getPackageManager(),
+                                                    domainBackend.getBuildTools(),
+                                                    domainBackend.getPackageManagers(),
                                                     domainBackend.getLinters(),
                                                     domainBackend.getFormatters(),
                                                     domainBackend.getTestingTools(),
@@ -108,23 +108,23 @@ public class ResumeInfoUseCaseDto {
                                                     domainBackend.getAuth()),
                                             new InfrastructureDto(
                                                     domainInfrastructure.getClouds(),
-                                                    domainInfrastructure.getOperatingSystem(),
+                                                    domainInfrastructure.getOperatingSystems(),
                                                     domainInfrastructure.getContainers(),
-                                                    domainInfrastructure.getDatabase(),
-                                                    domainInfrastructure.getWebServer(),
-                                                    domainInfrastructure.getCiCdTool(),
+                                                    domainInfrastructure.getDatabases(),
+                                                    domainInfrastructure.getWebServers(),
+                                                    domainInfrastructure.getCiCdTools(),
                                                     domainInfrastructure.getIacTools(),
                                                     domainInfrastructure.getMonitoringTools(),
                                                     domainInfrastructure.getLoggingTools()),
                                             new ToolsDto(
-                                                    domainTools.getSourceControl(),
-                                                    domainTools.getProjectManagement(),
-                                                    domainTools.getCommunicationTool(),
+                                                    domainTools.getSourceControls(),
+                                                    domainTools.getProjectManagements(),
+                                                    domainTools.getCommunicationTools(),
                                                     domainTools.getDocumentationTools(),
                                                     domainTools.getApiDevelopmentTools(),
                                                     domainTools.getDesignTools(),
-                                                    domainTools.getEditor(),
-                                                    domainTools.getDevelopmentEnvironment())));
+                                                    domainTools.getEditors(),
+                                                    domainTools.getDevelopmentEnvironments())));
                         })
                         .toList())
                 .certifications(resume.getCertifications().stream()
@@ -223,10 +223,10 @@ public class ResumeInfoUseCaseDto {
     @Getter
     public static class FrontendDto {
         private final List<String> languages;
-        private final String framework;
+        private final List<String> frameworks;
         private final List<String> libraries;
-        private final String buildTool;
-        private final String packageManager;
+        private final List<String> buildTools;
+        private final List<String> packageManagers;
         private final List<String> linters;
         private final List<String> formatters;
         private final List<String> testingTools;
@@ -239,10 +239,10 @@ public class ResumeInfoUseCaseDto {
     @Getter
     public static class BackendDto {
         private final List<String> languages;
-        private final String framework;
+        private final List<String> frameworks;
         private final List<String> libraries;
-        private final String buildTool;
-        private final String packageManager;
+        private final List<String> buildTools;
+        private final List<String> packageManagers;
         private final List<String> linters;
         private final List<String> formatters;
         private final List<String> testingTools;
@@ -257,11 +257,11 @@ public class ResumeInfoUseCaseDto {
     @Getter
     public static class InfrastructureDto {
         private final List<String> clouds;
-        private final String operatingSystem;
+        private final List<String> operatingSystems;
         private final List<String> containers;
-        private final String database;
-        private final String webServer;
-        private final String ciCdTool;
+        private final List<String> databases;
+        private final List<String> webServers;
+        private final List<String> ciCdTools;
         private final List<String> iacTools;
         private final List<String> monitoringTools;
         private final List<String> loggingTools;
@@ -273,14 +273,14 @@ public class ResumeInfoUseCaseDto {
     @RequiredArgsConstructor
     @Getter
     public static class ToolsDto {
-        private final String sourceControl;
-        private final String projectManagement;
-        private final String communicationTool;
+        private final List<String> sourceControls;
+        private final List<String> projectManagements;
+        private final List<String> communicationTools;
         private final List<String> documentationTools;
         private final List<String> apiDevelopmentTools;
         private final List<String> designTools;
-        private final String editor;
-        private final String developmentEnvironment;
+        private final List<String> editors;
+        private final List<String> developmentEnvironments;
     }
 
     /**

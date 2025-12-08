@@ -80,49 +80,52 @@ public class UpdateProjectsUseCase {
                     Boolean.TRUE.equals(projectRequest.getSystemTest()),
                     Boolean.TRUE.equals(projectRequest.getMaintenance()));
 
-            // 技術スタック
+            // 技術スタック - Frontend
             TechStack.Frontend frontend = TechStack.Frontend.create(
                     projectRequest.getFrontendLanguages(),
-                    projectRequest.getFrontendFramework(),
+                    projectRequest.getFrontendFrameworks(),
                     projectRequest.getFrontendLibraries(),
-                    projectRequest.getFrontendBuildTool(),
-                    projectRequest.getFrontendPackageManager(),
+                    projectRequest.getFrontendBuildTools(),
+                    projectRequest.getFrontendPackageManagers(),
                     projectRequest.getFrontendLinters(),
                     projectRequest.getFrontendFormatters(),
                     projectRequest.getFrontendTestingTools());
 
+            // 技術スタック - Backend
             TechStack.Backend backend = TechStack.Backend.create(
                     projectRequest.getBackendLanguages(),
-                    projectRequest.getBackendFramework(),
+                    projectRequest.getBackendFrameworks(),
                     projectRequest.getBackendLibraries(),
-                    projectRequest.getBackendBuildTool(),
-                    projectRequest.getBackendPackageManager(),
+                    projectRequest.getBackendBuildTools(),
+                    projectRequest.getBackendPackageManagers(),
                     projectRequest.getBackendLinters(),
                     projectRequest.getBackendFormatters(),
                     projectRequest.getBackendTestingTools(),
                     projectRequest.getOrmTools(),
                     projectRequest.getAuth());
 
+            // 技術スタック - Infrastructure
             TechStack.Infrastructure infrastructure = TechStack.Infrastructure.create(
                     projectRequest.getClouds(),
-                    projectRequest.getOperatingSystem(),
+                    projectRequest.getOperatingSystems(),
                     projectRequest.getContainers(),
-                    projectRequest.getDatabase(),
-                    projectRequest.getWebServer(),
-                    projectRequest.getCiCdTool(),
+                    projectRequest.getDatabases(),
+                    projectRequest.getWebServers(),
+                    projectRequest.getCiCdTools(),
                     projectRequest.getIacTools(),
                     projectRequest.getMonitoringTools(),
                     projectRequest.getLoggingTools());
 
+            // 技術スタック - Tools
             TechStack.Tools tools = TechStack.Tools.create(
-                    projectRequest.getSourceControl(),
-                    projectRequest.getProjectManagement(),
-                    projectRequest.getCommunicationTool(),
+                    projectRequest.getSourceControls(),
+                    projectRequest.getProjectManagements(),
+                    projectRequest.getCommunicationTools(),
                     projectRequest.getDocumentationTools(),
                     projectRequest.getApiDevelopmentTools(),
                     projectRequest.getDesignTools(),
-                    projectRequest.getEditor(),
-                    projectRequest.getDevelopmentEnvironment());
+                    projectRequest.getEditors(),
+                    projectRequest.getDevelopmentEnvironments());
 
             TechStack techStack = TechStack.create(frontend, backend, infrastructure, tools);
 

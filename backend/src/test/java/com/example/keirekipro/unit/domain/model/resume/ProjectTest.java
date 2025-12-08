@@ -167,20 +167,20 @@ class ProjectTest {
 
         TechStack.Frontend newFrontend = TechStack.Frontend.create(
                 List.of("Kotlin/JS"),
-                "React",
+                List.of("React"),
                 List.of("MUI"),
-                "Vite",
-                "npm",
+                List.of("Vite"),
+                List.of("npm"),
                 List.of("ESLint"),
                 List.of("Prettier"),
                 List.of("Vitest"));
 
         TechStack.Backend newBackend = TechStack.Backend.create(
                 List.of("Kotlin", "Go"),
-                "Spring Boot",
+                List.of("Spring Boot"),
                 List.of("Guava", "Gson"),
-                "Gradle",
-                "Gradle",
+                List.of("Gradle"),
+                List.of("Gradle"),
                 List.of("Detekt"),
                 List.of("Google Java Format"),
                 List.of("JUnit5", "TestNG"),
@@ -189,24 +189,24 @@ class ProjectTest {
 
         TechStack.Infrastructure newInfrastructure = TechStack.Infrastructure.create(
                 List.of("Azure"),
-                "Ubuntu 22.04",
+                List.of("Ubuntu 22.04"),
                 List.of("Podman"),
-                "MySQL",
-                "Apache",
-                "GitLab CI",
+                List.of("MySQL"),
+                List.of("Apache"),
+                List.of("GitLab CI"),
                 List.of("Pulumi"),
                 List.of("Zabbix"),
                 List.of("Splunk"));
 
         TechStack.Tools newTools = TechStack.Tools.create(
-                "Mercurial",
-                "Trello",
-                "Discord",
+                List.of("Mercurial"),
+                List.of("Trello"),
+                List.of("Discord"),
                 List.of("Notion"),
                 List.of("Insomnia"),
                 List.of("Sketch"),
-                "IntelliJ IDEA",
-                "Docker Desktop");
+                List.of("IntelliJ IDEA"),
+                List.of("Docker Desktop"));
 
         TechStack newTechStack = TechStack.create(newFrontend, newBackend, newInfrastructure, newTools);
 
@@ -303,20 +303,20 @@ class ProjectTest {
     private TechStack createSampleTechStack() {
         TechStack.Frontend frontend = TechStack.Frontend.create(
                 List.of("TypeScript"),
-                "React",
+                List.of("React"),
                 List.of("MUI"),
-                "Vite",
-                "npm",
+                List.of("Vite"),
+                List.of("npm"),
                 List.of("ESLint"),
                 List.of("Prettier"),
                 List.of("Vitest"));
 
         TechStack.Backend backend = TechStack.Backend.create(
                 List.of("Java", "Python"),
-                "Spring Framework",
+                List.of("Spring Framework"),
                 List.of("Lombok", "Jackson"),
-                "Gradle",
-                "Gradle",
+                List.of("Gradle"),
+                List.of("Gradle"),
                 List.of("CheckStyle"),
                 List.of("Google Java Format"),
                 List.of("JUnit", "Mockito"),
@@ -325,24 +325,24 @@ class ProjectTest {
 
         TechStack.Infrastructure infrastructure = TechStack.Infrastructure.create(
                 List.of("AWS"),
-                "RHEL9.4",
+                List.of("RHEL9.4"),
                 List.of("Docker"),
-                "PostgreSQL",
-                "Nginx",
-                "GitHub Actions",
+                List.of("PostgreSQL"),
+                List.of("Nginx"),
+                List.of("GitHub Actions"),
                 List.of("Terraform"),
                 List.of("Prometheus"),
                 List.of("CloudWatch"));
 
         TechStack.Tools tools = TechStack.Tools.create(
-                "Git",
-                "Jira",
-                "Slack",
+                List.of("Git"),
+                List.of("Jira"),
+                List.of("Slack"),
                 List.of("Confluence"),
                 List.of("Postman"),
                 List.of("Figma"),
-                "Visual Studio Code",
-                "Windows");
+                List.of("Visual Studio Code"),
+                List.of("Windows"));
 
         return TechStack.create(frontend, backend, infrastructure, tools);
     }

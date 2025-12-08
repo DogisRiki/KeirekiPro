@@ -1282,20 +1282,20 @@ class ResumeMapperTest {
 
         // TechStack - Frontend
         d.setFrontendLanguages(Collections.emptyList());
-        d.setFrontendFramework(null);
+        d.setFrontendFrameworks(null);
         d.setFrontendLibraries(Collections.emptyList());
-        d.setFrontendBuildTool(null);
-        d.setFrontendPackageManager(null);
+        d.setFrontendBuildTools(null);
+        d.setFrontendPackageManagers(null);
         d.setFrontendLinters(Collections.emptyList());
         d.setFrontendFormatters(Collections.emptyList());
         d.setFrontendTestingTools(Collections.emptyList());
 
         // TechStack - Backend
         d.setBackendLanguages(Collections.emptyList());
-        d.setBackendFramework(null);
+        d.setBackendFrameworks(null);
         d.setBackendLibraries(Collections.emptyList());
-        d.setBackendBuildTool(null);
-        d.setBackendPackageManager(null);
+        d.setBackendBuildTools(null);
+        d.setBackendPackageManagers(null);
         d.setBackendLinters(Collections.emptyList());
         d.setBackendFormatters(Collections.emptyList());
         d.setBackendTestingTools(Collections.emptyList());
@@ -1304,24 +1304,24 @@ class ResumeMapperTest {
 
         // TechStack - Infrastructure
         d.setClouds(Collections.emptyList());
-        d.setOperatingSystem(null);
+        d.setOperatingSystems(null);
         d.setContainers(Collections.emptyList());
-        d.setDatabase(null);
-        d.setWebServer(null);
-        d.setCiCdTool(null);
+        d.setDatabases(null);
+        d.setWebServers(null);
+        d.setCiCdTools(null);
         d.setIacTools(Collections.emptyList());
         d.setMonitoringTools(Collections.emptyList());
         d.setLoggingTools(Collections.emptyList());
 
         // TechStack - Tools
-        d.setSourceControl(null);
-        d.setProjectManagement(null);
-        d.setCommunicationTool(null);
+        d.setSourceControls(null);
+        d.setProjectManagements(null);
+        d.setCommunicationTools(null);
         d.setDocumentationTools(Collections.emptyList());
         d.setApiDevelopmentTools(Collections.emptyList());
         d.setDesignTools(Collections.emptyList());
-        d.setEditor(null);
-        d.setDevelopmentEnvironment(null);
+        d.setEditors(null);
+        d.setDevelopmentEnvironments(null);
 
         return d;
     }

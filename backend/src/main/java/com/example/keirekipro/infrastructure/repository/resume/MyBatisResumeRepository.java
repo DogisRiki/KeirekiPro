@@ -173,19 +173,19 @@ public class MyBatisResumeRepository implements ResumeRepository {
                         TechStack.create(
                                 TechStack.Frontend.create(
                                         d.getFrontendLanguages(),
-                                        d.getFrontendFramework(),
+                                        d.getFrontendFrameworks(),
                                         d.getFrontendLibraries(),
-                                        d.getFrontendBuildTool(),
-                                        d.getFrontendPackageManager(),
+                                        d.getFrontendBuildTools(),
+                                        d.getFrontendPackageManagers(),
                                         d.getFrontendLinters(),
                                         d.getFrontendFormatters(),
                                         d.getFrontendTestingTools()),
                                 TechStack.Backend.create(
                                         d.getBackendLanguages(),
-                                        d.getBackendFramework(),
+                                        d.getBackendFrameworks(),
                                         d.getBackendLibraries(),
-                                        d.getBackendBuildTool(),
-                                        d.getBackendPackageManager(),
+                                        d.getBackendBuildTools(),
+                                        d.getBackendPackageManagers(),
                                         d.getBackendLinters(),
                                         d.getBackendFormatters(),
                                         d.getBackendTestingTools(),
@@ -193,23 +193,23 @@ public class MyBatisResumeRepository implements ResumeRepository {
                                         d.getAuth()),
                                 TechStack.Infrastructure.create(
                                         d.getClouds(),
-                                        d.getOperatingSystem(),
+                                        d.getOperatingSystems(),
                                         d.getContainers(),
-                                        d.getDatabase(),
-                                        d.getWebServer(),
-                                        d.getCiCdTool(),
+                                        d.getDatabases(),
+                                        d.getWebServers(),
+                                        d.getCiCdTools(),
                                         d.getIacTools(),
                                         d.getMonitoringTools(),
                                         d.getLoggingTools()),
                                 TechStack.Tools.create(
-                                        d.getSourceControl(),
-                                        d.getProjectManagement(),
-                                        d.getCommunicationTool(),
+                                        d.getSourceControls(),
+                                        d.getProjectManagements(),
+                                        d.getCommunicationTools(),
                                         d.getDocumentationTools(),
                                         d.getApiDevelopmentTools(),
                                         d.getDesignTools(),
-                                        d.getEditor(),
-                                        d.getDevelopmentEnvironment()))))
+                                        d.getEditors(),
+                                        d.getDevelopmentEnvironments()))))
                 .toList();
 
         // 資格
@@ -330,20 +330,20 @@ public class MyBatisResumeRepository implements ResumeRepository {
 
                     // フロントエンド
                     d.setFrontendLanguages(frontend.getLanguages());
-                    d.setFrontendFramework(frontend.getFramework());
+                    d.setFrontendFrameworks(frontend.getFrameworks());
                     d.setFrontendLibraries(frontend.getLibraries());
-                    d.setFrontendBuildTool(frontend.getBuildTool());
-                    d.setFrontendPackageManager(frontend.getPackageManager());
+                    d.setFrontendBuildTools(frontend.getBuildTools());
+                    d.setFrontendPackageManagers(frontend.getPackageManagers());
                     d.setFrontendLinters(frontend.getLinters());
                     d.setFrontendFormatters(frontend.getFormatters());
                     d.setFrontendTestingTools(frontend.getTestingTools());
 
                     // バックエンド
                     d.setBackendLanguages(backend.getLanguages());
-                    d.setBackendFramework(backend.getFramework());
+                    d.setBackendFrameworks(backend.getFrameworks());
                     d.setBackendLibraries(backend.getLibraries());
-                    d.setBackendBuildTool(backend.getBuildTool());
-                    d.setBackendPackageManager(backend.getPackageManager());
+                    d.setBackendBuildTools(backend.getBuildTools());
+                    d.setBackendPackageManagers(backend.getPackageManagers());
                     d.setBackendLinters(backend.getLinters());
                     d.setBackendFormatters(backend.getFormatters());
                     d.setBackendTestingTools(backend.getTestingTools());
@@ -352,24 +352,24 @@ public class MyBatisResumeRepository implements ResumeRepository {
 
                     // インフラ
                     d.setClouds(infra.getClouds());
-                    d.setOperatingSystem(infra.getOperatingSystem());
+                    d.setOperatingSystems(infra.getOperatingSystems());
                     d.setContainers(infra.getContainers());
-                    d.setDatabase(infra.getDatabase());
-                    d.setWebServer(infra.getWebServer());
-                    d.setCiCdTool(infra.getCiCdTool());
+                    d.setDatabases(infra.getDatabases());
+                    d.setWebServers(infra.getWebServers());
+                    d.setCiCdTools(infra.getCiCdTools());
                     d.setIacTools(infra.getIacTools());
                     d.setMonitoringTools(infra.getMonitoringTools());
                     d.setLoggingTools(infra.getLoggingTools());
 
                     // 開発支援ツール
-                    d.setSourceControl(tools.getSourceControl());
-                    d.setProjectManagement(tools.getProjectManagement());
-                    d.setCommunicationTool(tools.getCommunicationTool());
+                    d.setSourceControls(tools.getSourceControls());
+                    d.setProjectManagements(tools.getProjectManagements());
+                    d.setCommunicationTools(tools.getCommunicationTools());
                     d.setDocumentationTools(tools.getDocumentationTools());
                     d.setApiDevelopmentTools(tools.getApiDevelopmentTools());
                     d.setDesignTools(tools.getDesignTools());
-                    d.setEditor(tools.getEditor());
-                    d.setDevelopmentEnvironment(tools.getDevelopmentEnvironment());
+                    d.setEditors(tools.getEditors());
+                    d.setDevelopmentEnvironments(tools.getDevelopmentEnvironments());
 
                     return d;
                 })

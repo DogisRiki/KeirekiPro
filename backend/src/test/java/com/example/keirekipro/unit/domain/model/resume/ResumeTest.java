@@ -335,20 +335,20 @@ class ResumeTest {
 
         TechStack.Frontend updatedFrontend = TechStack.Frontend.create(
                 List.of("JavaScript", "TypeScript"),
-                "React",
+                List.of("React"),
                 List.of("Redux", "Axios", "Lodash"),
-                "Vite",
-                "npm",
+                List.of("Vite"),
+                List.of("npm"),
                 List.of("ESLint"),
                 List.of("Prettier"),
                 List.of("Jest", "Enzyme"));
 
         TechStack.Backend updatedBackend = TechStack.Backend.create(
                 List.of("Node.js"),
-                "Express",
+                List.of("Express"),
                 List.of("Prisma"),
-                "npm",
-                "npm",
+                List.of("npm"),
+                List.of("npm"),
                 List.of("ESLint"),
                 List.of("Prettier"),
                 List.of("Jest"),
@@ -357,24 +357,24 @@ class ResumeTest {
 
         TechStack.Infrastructure updatedInfrastructure = TechStack.Infrastructure.create(
                 List.of("Azure"),
-                "Ubuntu 22.04",
+                List.of("Ubuntu 22.04"),
                 List.of("Kubernetes"),
-                "MySQL",
-                "Apache",
-                "CircleCI",
+                List.of("MySQL"),
+                List.of("Apache"),
+                List.of("CircleCI"),
                 List.of("Ansible"),
                 List.of("Grafana"),
                 List.of("Azure Monitor"));
 
         TechStack.Tools updatedTools = TechStack.Tools.create(
-                "GitLab",
-                "Asana",
-                "Teams",
+                List.of("GitLab"),
+                List.of("Asana"),
+                List.of("Teams"),
                 List.of("Notion"),
                 List.of("Insomnia"),
                 List.of("Sketch"),
-                "WebStorm",
-                "Docker Desktop");
+                List.of("WebStorm"),
+                List.of("Docker Desktop"));
 
         TechStack updatedTechStack = TechStack.create(
                 updatedFrontend,
@@ -417,12 +417,12 @@ class ResumeTest {
                         .isEqualTo(Project.Process.create(false, true, true, false, true, true, false)),
                 () -> assertThat(afterResume.getProjects().get(0).getTechStack().getFrontend().getLanguages())
                         .isEqualTo(List.of("JavaScript", "TypeScript")),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getFrontend().getFramework())
-                        .isEqualTo("React"),
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getFrontend().getFrameworks())
+                        .isEqualTo(List.of("React")),
                 () -> assertThat(afterResume.getProjects().get(0).getTechStack().getInfrastructure().getClouds())
                         .isEqualTo(List.of("Azure")),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getTools().getSourceControl())
-                        .isEqualTo("GitLab"));
+                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getTools().getSourceControls())
+                        .isEqualTo(List.of("GitLab")));
     }
 
     @Test
@@ -432,20 +432,20 @@ class ResumeTest {
 
         TechStack.Frontend frontend = TechStack.Frontend.create(
                 List.of("TypeScript"),
-                "React",
+                List.of("React"),
                 List.of("React Query"),
-                "Vite",
-                "npm",
+                List.of("Vite"),
+                List.of("npm"),
                 List.of("ESLint"),
                 List.of("Prettier"),
                 List.of("Vitest"));
 
         TechStack.Backend backend = TechStack.Backend.create(
                 List.of("Python"),
-                "Flask",
+                List.of("Flask"),
                 List.of("Requests"),
-                "Poetry",
-                "Poetry",
+                List.of("Poetry"),
+                List.of("Poetry"),
                 List.of(),
                 List.of(),
                 List.of("Pytest"),
@@ -454,24 +454,24 @@ class ResumeTest {
 
         TechStack.Infrastructure infrastructure = TechStack.Infrastructure.create(
                 List.of("AWS"),
-                "Amazon Linux 2023",
+                List.of("Amazon Linux 2023"),
                 List.of("Docker"),
-                "PostgreSQL",
-                "Nginx",
-                "GitHub Actions",
+                List.of("PostgreSQL"),
+                List.of("Nginx"),
+                List.of("GitHub Actions"),
                 List.of("Terraform"),
                 List.of(),
                 List.of());
 
         TechStack.Tools tools = TechStack.Tools.create(
-                "Git",
-                "Jira",
-                "Slack",
+                List.of("Git"),
+                List.of("Jira"),
+                List.of("Slack"),
                 List.of("Confluence"),
                 List.of("Postman"),
                 List.of("Figma"),
-                "Visual Studio Code",
-                "Docker Desktop");
+                List.of("Visual Studio Code"),
+                List.of("Docker Desktop"));
 
         TechStack techStack = TechStack.create(frontend, backend, infrastructure, tools);
 
@@ -835,20 +835,20 @@ class ResumeTest {
 
         TechStack.Frontend frontend = TechStack.Frontend.create(
                 List.of("TypeScript"),
-                "React",
+                List.of("React"),
                 List.of("MUI"),
-                "Vite",
-                "npm",
+                List.of("Vite"),
+                List.of("npm"),
                 List.of("ESLint"),
                 List.of("Prettier"),
                 List.of("Vitest"));
 
         TechStack.Backend backend = TechStack.Backend.create(
                 List.of("Java", "Python"),
-                "Spring Framework",
+                List.of("Spring Framework"),
                 List.of("Lombok", "Jackson"),
-                "Gradle",
-                "Gradle",
+                List.of("Gradle"),
+                List.of("Gradle"),
                 List.of("CheckStyle"),
                 List.of("Google Java Format"),
                 List.of("JUnit", "Mockito"),
@@ -857,24 +857,24 @@ class ResumeTest {
 
         TechStack.Infrastructure infrastructure = TechStack.Infrastructure.create(
                 List.of("AWS"),
-                "RHEL9.4",
+                List.of("RHEL9.4"),
                 List.of("Docker"),
-                "PostgreSQL",
-                "Nginx",
-                "GitHub Actions",
+                List.of("PostgreSQL"),
+                List.of("Nginx"),
+                List.of("GitHub Actions"),
                 List.of("Terraform"),
                 List.of("Prometheus"),
                 List.of("CloudWatch"));
 
         TechStack.Tools tools = TechStack.Tools.create(
-                "Git",
-                "Jira",
-                "Slack",
+                List.of("Git"),
+                List.of("Jira"),
+                List.of("Slack"),
                 List.of("Confluence"),
                 List.of("Postman"),
                 List.of("Figma"),
-                "Visual Studio Code",
-                "Windows");
+                List.of("Visual Studio Code"),
+                List.of("Windows"));
 
         TechStack techStack = TechStack.create(frontend, backend, infrastructure, tools);
 

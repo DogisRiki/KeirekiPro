@@ -66,10 +66,10 @@ public class ResumeObjectBuilder {
         // TechStack（フロントエンド）
         Frontend frontend = Frontend.create(
                 List.of("HTML", "CSS", "TypeScript"),
-                "React",
+                List.of("React"),
                 List.of("MUI", "axios"),
-                "Vite",
-                "npm",
+                List.of("Vite"),
+                List.of("npm"),
                 List.of("ESLint"),
                 List.of("Prettier"),
                 List.of("Vitest"));
@@ -77,10 +77,10 @@ public class ResumeObjectBuilder {
         // TechStack（バックエンド）
         Backend backend = Backend.create(
                 List.of("Java", "Kotlin"),
-                "Spring Framework",
+                List.of("Spring Framework"),
                 List.of("Jackson", "Flyway"),
-                "Gradle",
-                "Gradle",
+                List.of("Gradle"),
+                List.of("Gradle"),
                 List.of("CheckStyle"),
                 List.of("Google Java Style"),
                 List.of("JUnit"),
@@ -90,35 +90,51 @@ public class ResumeObjectBuilder {
         // TechStack（インフラ）
         Infrastructure infra = Infrastructure.create(
                 List.of("AWS"),
-                "RHEL9.4",
+                List.of("RHEL9.4"),
                 List.of("Docker"),
-                "Postgres",
-                "NGINX",
-                "Jenkins",
+                List.of("Postgres"),
+                List.of("NGINX"),
+                List.of("Jenkins"),
                 List.of("Terraform"),
                 List.of("Prometheus"),
                 List.of("ELK"));
 
         // TechStack（開発支援ツール）
         Tools tools = Tools.create(
-                "Git",
-                "JIRA",
-                "Slack",
+                List.of("Git"),
+                List.of("JIRA"),
+                List.of("Slack"),
                 List.of("Confluence"),
                 List.of("Postman"),
                 List.of("Figma"),
-                "Visual Studio Code",
-                "Windows");
+                List.of("Visual Studio Code"),
+                List.of("Windows"));
 
         TechStack tech = TechStack.create(frontend, backend, infra, tools);
 
-        Project project = Project.create(notif, companyName, period, "ProjName", "Overview", "TeamComp", "Role",
+        Project project = Project.create(
+                notif,
+                companyName,
+                period,
+                "ProjName",
+                "Overview",
+                "TeamComp",
+                "Role",
                 "Achievement",
-                process, tech);
+                process,
+                tech);
+
         Certification cert = Certification.create(notif, "Oracle Certified", YearMonth.of(2019, 6));
-        Portfolio port = Portfolio.create(notif, "Portfolio1", "Desc", "TechStackDesc",
+        Portfolio port = Portfolio.create(
+                notif,
+                "Portfolio1",
+                "Desc",
+                "TechStackDesc",
                 Link.create(new Notification(), "https://example.com"));
-        SocialLink social = SocialLink.create(notif, "GitHub", Link.create(new Notification(), "https://github.com"));
+        SocialLink social = SocialLink.create(
+                notif,
+                "GitHub",
+                Link.create(new Notification(), "https://github.com"));
         SelfPromotion self = SelfPromotion.create(notif, "Title1", "Content1");
 
         return Resume.reconstruct(
@@ -243,20 +259,20 @@ public class ResumeObjectBuilder {
 
             // TechStack - Frontend
             pd.setFrontendLanguages(fe.getLanguages());
-            pd.setFrontendFramework(fe.getFramework());
+            pd.setFrontendFrameworks(fe.getFrameworks());
             pd.setFrontendLibraries(fe.getLibraries());
-            pd.setFrontendBuildTool(fe.getBuildTool());
-            pd.setFrontendPackageManager(fe.getPackageManager());
+            pd.setFrontendBuildTools(fe.getBuildTools());
+            pd.setFrontendPackageManagers(fe.getPackageManagers());
             pd.setFrontendLinters(fe.getLinters());
             pd.setFrontendFormatters(fe.getFormatters());
             pd.setFrontendTestingTools(fe.getTestingTools());
 
             // TechStack - Backend
             pd.setBackendLanguages(be.getLanguages());
-            pd.setBackendFramework(be.getFramework());
+            pd.setBackendFrameworks(be.getFrameworks());
             pd.setBackendLibraries(be.getLibraries());
-            pd.setBackendBuildTool(be.getBuildTool());
-            pd.setBackendPackageManager(be.getPackageManager());
+            pd.setBackendBuildTools(be.getBuildTools());
+            pd.setBackendPackageManagers(be.getPackageManagers());
             pd.setBackendLinters(be.getLinters());
             pd.setBackendFormatters(be.getFormatters());
             pd.setBackendTestingTools(be.getTestingTools());
@@ -265,24 +281,24 @@ public class ResumeObjectBuilder {
 
             // TechStack - Infrastructure
             pd.setClouds(inf.getClouds());
-            pd.setOperatingSystem(inf.getOperatingSystem());
+            pd.setOperatingSystems(inf.getOperatingSystems());
             pd.setContainers(inf.getContainers());
-            pd.setDatabase(inf.getDatabase());
-            pd.setWebServer(inf.getWebServer());
-            pd.setCiCdTool(inf.getCiCdTool());
+            pd.setDatabases(inf.getDatabases());
+            pd.setWebServers(inf.getWebServers());
+            pd.setCiCdTools(inf.getCiCdTools());
             pd.setIacTools(inf.getIacTools());
             pd.setMonitoringTools(inf.getMonitoringTools());
             pd.setLoggingTools(inf.getLoggingTools());
 
             // TechStack - Tools
-            pd.setSourceControl(tls.getSourceControl());
-            pd.setProjectManagement(tls.getProjectManagement());
-            pd.setCommunicationTool(tls.getCommunicationTool());
+            pd.setSourceControls(tls.getSourceControls());
+            pd.setProjectManagements(tls.getProjectManagements());
+            pd.setCommunicationTools(tls.getCommunicationTools());
             pd.setDocumentationTools(tls.getDocumentationTools());
             pd.setApiDevelopmentTools(tls.getApiDevelopmentTools());
             pd.setDesignTools(tls.getDesignTools());
-            pd.setEditor(tls.getEditor());
-            pd.setDevelopmentEnvironment(tls.getDevelopmentEnvironment());
+            pd.setEditors(tls.getEditors());
+            pd.setDevelopmentEnvironments(tls.getDevelopmentEnvironments());
 
             return pd;
         }).collect(Collectors.toList()));
