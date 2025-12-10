@@ -12,7 +12,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useUpdateSocialLinks = (resumeId: string) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { setResume } = useResumeStore();
+    const { setResume, setDirty } = useResumeStore();
 
     return useMutation<AxiosResponse<Resume>, AxiosError, UpdateSocialLinksPayload>({
         mutationFn: (payload) => updateSocialLinks(resumeId, payload),
@@ -22,6 +22,7 @@ export const useUpdateSocialLinks = (resumeId: string) => {
         onSuccess: (response) => {
             clearErrors();
             setResume(response.data);
+            setDirty(false);
             setNotification("SNS情報を保存しました。", "success");
         },
     });

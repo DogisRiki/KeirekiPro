@@ -1,7 +1,8 @@
-import { Button } from "@/components/ui";
+import { Button, Dialog } from "@/components/ui";
 import type { SectionName } from "@/features/resume";
 import {
     BottomMenu,
+    checkCareerDeletable,
     createCurrentSection,
     EntryList,
     getApiId,
@@ -9,6 +10,7 @@ import {
     sections,
     SectionTabs,
     useGetResumeInfo,
+    useNavigationBlocker,
     useResumeStore,
     useUpdateCareers,
     useUpdateCertifications,
@@ -31,6 +33,9 @@ import { useParams } from "react-router";
 export const ResumeContainer = () => {
     const { id: resumeId } = useParams<{ id: string }>();
 
+    // 離脱防止フック
+    const { dialogProps } = useNavigationBlocker();
+
     // 現在のセクションを監視
     const activeSection = useResumeStore((state) => state.activeSection);
     const currentSection = sections.find((section) => section.key === activeSection)!;
@@ -45,6 +50,10 @@ export const ResumeContainer = () => {
 
     // BottomMenuの高さを動的に取得
     const [bottomMenuHeight, setBottomMenuHeight] = useState(0);
+
+    // 警告ダイアログの状態
+    const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+    const [warningMessage, setWarningMessage] = useState("");
 
     // 職務経歴書詳細情報取得（ストアへのセットはhook内で実施）
     const { isLoading } = useGetResumeInfo(resumeId ?? "");
@@ -75,11 +84,29 @@ export const ResumeContainer = () => {
         const sectionKey = getResumeKey(activeSection);
         if (!sectionKey) return;
 
+        // 職歴の場合、プロジェクトで使用されているかチェック
+        if (sectionKey === "careers") {
+            const checkResult = checkCareerDeletable(resume, activeEntryId);
+            if (!checkResult.canDelete) {
+                setWarningMessage(checkResult.warningMessage ?? "");
+                setWarningDialogOpen(true);
+                return;
+            }
+        }
+
         const list = resume[sectionKey];
         const updated = list.filter((item) => item.id !== activeEntryId) as typeof list;
 
         updateSection(sectionKey, updated);
         setActiveEntryId(null);
+    };
+
+    /**
+     * 警告ダイアログを閉じる
+     */
+    const handleWarningDialogClose = () => {
+        setWarningDialogOpen(false);
+        setWarningMessage("");
     };
 
     /**
@@ -283,6 +310,22 @@ export const ResumeContainer = () => {
             </Grid>
             {/* 下部メニュー */}
             <BottomMenu ref={measuredRef} />
+            {/* 警告ダイアログ */}
+            <Dialog
+                open={warningDialogOpen}
+                variant="warning"
+                title="削除できません"
+                description={warningMessage}
+                onClose={handleWarningDialogClose}
+            />
+            {/* 離脱防止ダイアログ */}
+            <Dialog
+                open={dialogProps.open}
+                variant="confirm"
+                title="このページを離れますか？"
+                description="保存されていない変更があります。このまま離れると、変更内容は失われます。"
+                onClose={dialogProps.onClose}
+            />
         </>
     );
 };

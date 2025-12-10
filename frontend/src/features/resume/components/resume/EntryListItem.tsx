@@ -1,4 +1,5 @@
-import { getEntryText, getResumeKey, useResumeStore } from "@/features/resume";
+import { Dialog } from "@/components/ui";
+import { checkCareerDeletable, getEntryText, getResumeKey, useResumeStore } from "@/features/resume";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { IconButton, ListItem, ListItemButton, ListItemText, Menu, MenuItem } from "@mui/material";
 import { useState } from "react";
@@ -21,6 +22,10 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
 
+    // 警告ダイアログの状態
+    const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+    const [warningMessage, setWarningMessage] = useState("");
+
     /**
      * メニューオープン
      */
@@ -41,16 +46,25 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
      */
     const handleDelete = (event: React.MouseEvent<HTMLElement>) => {
         event.stopPropagation();
+        setAnchorEl(null);
 
         if (!resume) {
-            setAnchorEl(null);
             return;
         }
 
         const sectionKey = getResumeKey(activeSection);
         if (!sectionKey) {
-            setAnchorEl(null);
             return;
+        }
+
+        // 職歴の場合、プロジェクトで使用されているかチェック
+        if (sectionKey === "careers") {
+            const checkResult = checkCareerDeletable(resume, entry.id);
+            if (!checkResult.canDelete) {
+                setWarningMessage(checkResult.warningMessage ?? "");
+                setWarningDialogOpen(true);
+                return;
+            }
         }
 
         const list = resume[sectionKey];
@@ -61,8 +75,14 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
         if (activeEntryId === entry.id) {
             setActiveEntryId(null);
         }
+    };
 
-        setAnchorEl(null);
+    /**
+     * 警告ダイアログを閉じる
+     */
+    const handleWarningDialogClose = () => {
+        setWarningDialogOpen(false);
+        setWarningMessage("");
     };
 
     return (
@@ -123,6 +143,15 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
                     削除
                 </MenuItem>
             </Menu>
+
+            {/* 警告ダイアログ */}
+            <Dialog
+                open={warningDialogOpen}
+                variant="warning"
+                title="削除できません"
+                description={warningMessage}
+                onClose={handleWarningDialogClose}
+            />
         </>
     );
 };

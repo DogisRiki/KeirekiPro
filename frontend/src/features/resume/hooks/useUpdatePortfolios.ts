@@ -12,7 +12,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useUpdatePortfolios = (resumeId: string) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { setResume } = useResumeStore();
+    const { setResume, setDirty } = useResumeStore();
 
     return useMutation<AxiosResponse<Resume>, AxiosError, UpdatePortfoliosPayload>({
         mutationFn: (payload) => updatePortfolios(resumeId, payload),
@@ -22,6 +22,7 @@ export const useUpdatePortfolios = (resumeId: string) => {
         onSuccess: (response) => {
             clearErrors();
             setResume(response.data);
+            setDirty(false);
             setNotification("ポートフォリオ情報を保存しました。", "success");
         },
     });

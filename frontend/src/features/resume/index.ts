@@ -44,6 +44,7 @@ export * from "@/features/resume/hooks/useCreateResume";
 export * from "@/features/resume/hooks/useDeleteResume";
 export * from "@/features/resume/hooks/useGetResumeInfo";
 export * from "@/features/resume/hooks/useGetResumeList";
+export * from "@/features/resume/hooks/useNavigationBlocker";
 export * from "@/features/resume/hooks/useTechStackList";
 export * from "@/features/resume/hooks/useUpdateCareers";
 export * from "@/features/resume/hooks/useUpdateCertifications";

@@ -20,6 +20,9 @@ interface ResumeStoreState {
     // 職務経歴書全体のデータ
     resume: Resume | null;
 
+    // 未保存の変更があるかどうか
+    isDirty: boolean;
+
     // アクション
     setActiveSection: (section: ResumeStoreState["activeSection"]) => void;
     setActiveEntryId: (entryId: string | null) => void;
@@ -32,6 +35,7 @@ interface ResumeStoreState {
         updatedData: Partial<Resume[ResumeArrayKeys][number]>,
     ) => void;
     clearResume: () => void;
+    setDirty: (isDirty: boolean) => void;
 }
 
 /**
@@ -44,6 +48,7 @@ export const useResumeStore = create<ResumeStoreState>()(
             activeSection: "basicInfo",
             activeEntryId: null,
             resume: null,
+            isDirty: false,
 
             // アクション: セクションの切り替え
             setActiveSection: (section) => set({ activeSection: section }, false, "setActiveSection"),
@@ -51,20 +56,21 @@ export const useResumeStore = create<ResumeStoreState>()(
             // アクション: エントリーIDの設定
             setActiveEntryId: (entryId) => set({ activeEntryId: entryId }, false, "setActiveEntryId"),
 
-            // アクション: 職務経歴書全体の設定
-            setResume: (resume) => set({ resume }, false, "setResume"),
+            // アクション: 職務経歴書全体の設定（APIからの取得時はdirtyをfalseに）
+            setResume: (resume) => set({ resume, isDirty: false }, false, "setResume"),
 
-            // アクション: 職務経歴書の部分更新
+            // アクション: 職務経歴書の部分更新（変更時はdirtyをtrueに）
             updateResume: (patch) =>
                 set(
                     (state) => ({
                         resume: state.resume ? { ...state.resume, ...patch } : null,
+                        isDirty: true,
                     }),
                     false,
                     "updateResume",
                 ),
 
-            // アクション: セクションデータの更新
+            // アクション: セクションデータの更新（変更時はdirtyをtrueに）
             updateSection: (section, data) =>
                 set(
                     (state) => ({
@@ -74,12 +80,13 @@ export const useResumeStore = create<ResumeStoreState>()(
                                   [section]: data,
                               }
                             : null,
+                        isDirty: true,
                     }),
                     false,
                     "updateSection",
                 ),
 
-            // アクション: 特定エントリーの更新
+            // アクション: 特定エントリーの更新（変更時はdirtyをtrueに）
             updateEntry: (section, entryId, updatedData) =>
                 set(
                     (state) => {
@@ -92,6 +99,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                                     entry.id === entryId ? { ...entry, ...updatedData } : entry,
                                 ),
                             },
+                            isDirty: true,
                         };
                     },
                     false,
@@ -100,7 +108,14 @@ export const useResumeStore = create<ResumeStoreState>()(
 
             // アクション: ストアのクリア
             clearResume: () =>
-                set({ resume: null, activeSection: "basicInfo", activeEntryId: null }, false, "clearResume"),
+                set(
+                    { resume: null, activeSection: "basicInfo", activeEntryId: null, isDirty: false },
+                    false,
+                    "clearResume",
+                ),
+
+            // アクション: dirty状態の設定
+            setDirty: (isDirty) => set({ isDirty }, false, "setDirty"),
         }),
         { name: "ResumeStore" },
     ),
