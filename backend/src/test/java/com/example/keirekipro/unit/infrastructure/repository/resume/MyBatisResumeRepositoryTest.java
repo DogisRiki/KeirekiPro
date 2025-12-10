@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -13,9 +14,13 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.Certification;
+import com.example.keirekipro.domain.model.resume.CompanyName;
+import com.example.keirekipro.domain.model.resume.FullName;
+import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
+import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.model.resume.SocialLink;
 import com.example.keirekipro.helper.ResumeObjectBuilder;
@@ -28,6 +33,7 @@ import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.Project
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SelfPromotionDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SocialLinkDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeMapper;
+import com.example.keirekipro.shared.Notification;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -519,4 +525,100 @@ class MyBatisResumeRepositoryTest {
         verify(mapper).deleteSelfPromotionsByResumeId(RESUME_ID);
         verify(mapper).delete(RESUME_ID);
     }
+
+    @Test
+    @DisplayName("save_継続中Period(endDate=null)を持つCareerを含むResumeを保存するとDTOのendDateもnullとしてマッピングされる")
+    void test7() {
+        Notification notification = new Notification();
+
+        // 継続中Period (endDate = null, isActive = true)
+        CompanyName companyName = CompanyName.create(notification, "ActiveCompany");
+        Period activePeriod = Period.create(notification, YearMonth.of(2024, 1), null, true);
+        Career activeCareer = Career.reconstruct(
+                UUID.fromString("99999999-aaaa-bbbb-cccc-999999999999"),
+                companyName,
+                activePeriod);
+
+        // 他のコレクションは空でOK
+        Resume resume = Resume.reconstruct(
+                RESUME_ID,
+                USER_ID,
+                ResumeName.create(notification, RESUME_NAME),
+                DATE,
+                FullName.create(notification, LAST_NAME, FIRST_NAME),
+                CREATED_AT,
+                UPDATED_AT,
+                List.of(activeCareer),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                Collections.emptyList());
+
+        // 実行
+        repository.save(resume);
+
+        // CareerDto に endDate = null, isActive = true が渡されていることを確認
+        ArgumentCaptor<CareerDto> capC = ArgumentCaptor.forClass(CareerDto.class);
+        verify(mapper).insertCareer(capC.capture());
+        CareerDto cd = capC.getValue();
+        assertThat(cd.getResumeId()).isEqualTo(RESUME_ID);
+        assertThat(cd.getCompanyName()).isEqualTo("ActiveCompany");
+        assertThat(cd.getStartDate()).isEqualTo(YearMonth.of(2024, 1));
+        assertThat(cd.getEndDate()).isNull();
+        assertThat(cd.getIsActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("find_endDateがnullかつisActive=trueのCareerDtoから継続中Periodが再構築される")
+    void test8() {
+        // DTO を用意（Career のみ 1 件、endDate = null, isActive = true）
+        ResumeDto dto = new ResumeDto();
+        dto.setId(RESUME_ID);
+        dto.setUserId(USER_ID);
+        dto.setName(RESUME_NAME);
+        dto.setDate(DATE);
+        dto.setLastName(LAST_NAME);
+        dto.setFirstName(FIRST_NAME);
+        dto.setCreatedAt(CREATED_AT);
+        dto.setUpdatedAt(UPDATED_AT);
+
+        ResumeDto.CareerDto cd = new CareerDto();
+        cd.setId(UUID.fromString("88888888-aaaa-bbbb-cccc-888888888888"));
+        cd.setResumeId(RESUME_ID);
+        cd.setCompanyName("ActiveCompany");
+        cd.setStartDate(YearMonth.of(2024, 1));
+        cd.setEndDate(null);
+        cd.setIsActive(true);
+
+        dto.setCareers(List.of(cd));
+        dto.setProjects(Collections.emptyList());
+        dto.setCertifications(Collections.emptyList());
+        dto.setPortfolios(Collections.emptyList());
+        dto.setSocialLinks(Collections.emptyList());
+        dto.setSelfPromotions(Collections.emptyList());
+
+        // モック設定
+        when(mapper.selectByResumeId(RESUME_ID)).thenReturn(Optional.of(dto));
+        when(mapper.selectCareersByResumeId(RESUME_ID)).thenReturn(dto.getCareers());
+        when(mapper.selectProjectsByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
+        when(mapper.selectCertificationsByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
+        when(mapper.selectPortfoliosByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
+        when(mapper.selectSocialLinksByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
+        when(mapper.selectSelfPromotionsByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
+
+        // 実行
+        Optional<Resume> opt = repository.find(RESUME_ID);
+        assertThat(opt).isPresent();
+        Resume r = opt.get();
+
+        assertThat(r.getCareers()).hasSize(1);
+        Career c = r.getCareers().get(0);
+        assertThat(c.getCompanyName().getValue()).isEqualTo("ActiveCompany");
+        assertThat(c.getPeriod().getStartDate()).isEqualTo(YearMonth.of(2024, 1));
+        // ここが今回確認したいポイント
+        assertThat(c.getPeriod().getEndDate()).isNull();
+        assertThat(c.getPeriod().isActive()).isTrue();
+    }
+
 }

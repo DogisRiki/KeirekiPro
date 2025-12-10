@@ -1195,6 +1195,100 @@ class ResumeMapperTest {
         assertThat(list).isEmpty();
     }
 
+    @Test
+    @DisplayName("insertCareer_endDateがnullの職歴を挿入後、selectCareersByResumeIdでendDateがnullのまま取得できる")
+    void test38() {
+        // ユーザー作成
+        userMapper.upsertUser(createUserDto());
+
+        // 親レコード登録
+        ResumeDto resume = createResumeDto(
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                CREATED,
+                UPDATED);
+        resumeMapper.upsert(resume);
+
+        // endDate = null, isActive = true の職歴を挿入
+        UUID careerId = UUID.fromString("11111111-aaaa-bbbb-cccc-111111111111");
+        CareerDto career = createCareerDto(
+                careerId,
+                RESUME_ID_1,
+                "ActiveCompany",
+                YearMonth.of(2024, 1),
+                null,
+                true);
+        resumeMapper.insertCareer(career);
+
+        // 取得して検証
+        List<CareerDto> list = resumeMapper.selectCareersByResumeId(RESUME_ID_1);
+        assertThat(list).hasSize(1);
+        CareerDto loaded = list.get(0);
+        assertThat(loaded.getId()).isEqualTo(careerId);
+        assertThat(loaded.getCompanyName()).isEqualTo("ActiveCompany");
+        assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2024, 1));
+        assertThat(loaded.getEndDate()).isNull();
+        assertThat(loaded.getIsActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("insertProject_endDateがnullのプロジェクトを挿入後、selectProjectsByResumeIdでendDateがnullのまま取得できる")
+    void test39() {
+        // ユーザー作成
+        userMapper.upsertUser(createUserDto());
+
+        // 親レコード登録
+        ResumeDto resume = createResumeDto(
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                CREATED,
+                UPDATED);
+        resumeMapper.upsert(resume);
+
+        // endDate = null, isActive = true のプロジェクトを挿入
+        UUID projectId = UUID.fromString("22222222-bbbb-cccc-dddd-222222222222");
+        ProjectDto project = createProjectDto(
+                projectId,
+                RESUME_ID_1,
+                "ActiveCompanyProj",
+                YearMonth.of(2024, 2),
+                null,
+                true,
+                "継続中プロジェクト",
+                "継続中プロジェクト概要",
+                "Team",
+                "Role",
+                "Achievement",
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
+        resumeMapper.insertProject(project);
+
+        // 取得して検証
+        List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
+        assertThat(list).hasSize(1);
+        ProjectDto loaded = list.get(0);
+        assertThat(loaded.getId()).isEqualTo(projectId);
+        assertThat(loaded.getCompanyName()).isEqualTo("ActiveCompanyProj");
+        assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2024, 2));
+        assertThat(loaded.getEndDate()).isNull();
+        assertThat(loaded.getIsActive()).isTrue();
+        assertThat(loaded.getName()).isEqualTo("継続中プロジェクト");
+        assertThat(loaded.getOverview()).isEqualTo("継続中プロジェクト概要");
+    }
+
     private ResumeDto createResumeDto(
             UUID id,
             UUID userId,

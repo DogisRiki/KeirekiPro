@@ -66,7 +66,7 @@ CREATE TABLE careers (
     resume_id UUID NOT NULL REFERENCES resumes(id),
     company_name VARCHAR(255) NOT NULL,
     start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
+    end_date DATE,
     is_active BOOLEAN NOT NULL
 );
 
@@ -84,7 +84,7 @@ CREATE TABLE projects (
     resume_id UUID NOT NULL REFERENCES resumes(id),
     company_name VARCHAR(255) NOT NULL,
     start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
+    end_date DATE,
     is_active BOOLEAN NOT NULL,
     name VARCHAR(255) NOT NULL,
     overview VARCHAR(255) NOT NULL,

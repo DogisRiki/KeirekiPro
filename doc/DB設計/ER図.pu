@@ -42,7 +42,7 @@ entity "職歴(careers)" as Careers {
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
     company_name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 会社名
     start_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 入社年月
-    end_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 退職年月
+    end_date : <color:#1E90FF>DATE</color> -- 退職年月
     is_active : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 在籍中フラグ
 }
 
@@ -52,7 +52,7 @@ entity "プロジェクト(projects)" as Projects {
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
     company_name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 会社名
     start_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 開始年月
-    end_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 終了年月
+    end_date : <color:#1E90FF>DATE</color> -- 終了年月
     is_active : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 継続中フラグ
     name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プロジェクト名
     overview : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 概要
