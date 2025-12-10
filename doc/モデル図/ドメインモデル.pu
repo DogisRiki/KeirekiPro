@@ -7,7 +7,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     note as CommonRules
         【バリデーションの方針】
         ・職務経歴書ファイル出力では、HTMLファイルからPDFファイルやMarkdownファイルへ変換するため、
-          文字数によるレイアウト崩れは考慮しない。
+            文字数によるレイアウト崩れは考慮しない。
         ・ただし、業務上意味のある必須チェック・文字種チェック・最大文字数などはドメイン層で行う。
         ・UIやDB固有の制約に依存するチェックはプレゼンテーション層で行う。
         【共通ルール】
@@ -203,6 +203,9 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
                 → A社が継続中のため、B社がどの期間に存在しても重複。
 
         ・プロジェクトについては兼任があり得るため担当被りチェックを行わない。
+
+        ・プロジェクトで使用されている会社名の職歴は削除できない。
+            ・該当プロジェクトを削除してから職歴を削除すること。
     end note
 
     note bottom of Career

@@ -287,7 +287,7 @@ public class Resume extends Entity {
             return this;
         }
 
-        // 期間重複は従来どおり DomainException を直接スロー
+        // 期間重複チェック
         validateIsCareerOverlap(updatedCareer);
 
         List<Career> updatedCareers = this.careers.stream()
@@ -306,6 +306,14 @@ public class Resume extends Entity {
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume removeCareer(UUID careerId) {
+        Career targetCareer = this.careers.stream()
+                .filter(career -> career.getId().equals(careerId))
+                .findFirst()
+                .orElse(null);
+
+        // プロジェクトで使用されている会社名を持つ職歴は削除できない
+        validateNoProjectUsingCareer(targetCareer);
+
         List<Career> updatedCareers = this.careers.stream()
                 .filter(career -> !career.getId().equals(careerId))
                 .toList();
@@ -313,6 +321,28 @@ public class Resume extends Entity {
                 this.createdAt, LocalDateTime.now(),
                 updatedCareers, this.projects, this.certifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
+    }
+
+    /**
+     * 削除対象の職歴がプロジェクトで使用されていないかを検証する
+     *
+     * @param targetCareer 検証対象の職歴
+     */
+    private void validateNoProjectUsingCareer(Career targetCareer) {
+        if (targetCareer == null) {
+            // 対象の職歴が存在しない場合は何もせず終了（無害な呼び出しとして扱う）
+            return;
+        }
+
+        boolean usedInProject = this.projects.stream()
+                .anyMatch(project -> project.getCompanyName().equals(targetCareer.getCompanyName()));
+
+        if (usedInProject) {
+            String message = String.format(
+                    "%sはプロジェクトで使用されています。該当プロジェクトを削除してから職歴を削除してください。",
+                    targetCareer.getCompanyName().getValue());
+            throw new DomainException(message);
+        }
     }
 
     /**

@@ -276,13 +276,30 @@ class ResumeTest {
     @Test
     @DisplayName("職歴を削除する")
     void test13() {
-        Resume beforeResume = createSampleResume();
+        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        Career baseCareer = createSampleCareer();
+
+        // プロジェクトが存在しない状態の職務経歴書を作成する
+        Resume beforeResume = Resume.create(
+                notification,
+                userId,
+                ResumeName.create(notification, "職務経歴書A"),
+                LocalDate.now(),
+                FullName.create(notification, "山田", "太郎"),
+                List.of(baseCareer),
+                List.of(), // プロジェクトはなし
+                List.of(createSampleCertification()),
+                List.of(createSamplePortfolio()),
+                List.of(createSampleSociealLink()),
+                List.of(createSampleSelfPromotion()));
+
         Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
                 Period.create(notification, YearMonth.of(2024, 1), null, true));
         Notification domainNotification = new Notification();
 
         Resume afterResume = beforeResume.addCareer(domainNotification, newCareer);
-        // 削除1回目(2件 → 1件)
+
+        // 削除1回目(2件 → 1件) - 追加した職歴を削除
         Resume deletedResume = afterResume.removeCareer(newCareer.getId());
 
         // 削除した職歴がリストに含まれていない
@@ -290,8 +307,8 @@ class ResumeTest {
         // 職歴リストのサイズが減少している
         assertThat(deletedResume.getCareers().size()).isEqualTo(afterResume.getCareers().size() - 1);
 
-        // 削除2回目(1件 → 0件)
-        Resume deletedResume2 = deletedResume.removeCareer(deletedResume.getCareers().get(0).getId());
+        // 削除2回目(1件 → 0件) - 残っている既存の職歴を削除
+        Resume deletedResume2 = deletedResume.removeCareer(baseCareer.getId());
         // 職歴リストが空になっている
         assertThat(deletedResume2.getCareers().isEmpty()).isTrue();
     }
@@ -796,6 +813,18 @@ class ResumeTest {
         Resume updatedResume = originalResume.ChangeFullName(domainNotification, newFullName);
 
         assertThat(updatedResume.getFullName()).isEqualTo(newFullName);
+    }
+
+    @Test
+    @DisplayName("プロジェクトで使用されている会社名の職歴を削除しようとするとDomainExceptionをスローする")
+    void test31() {
+        // 初期状態で「株式会社ABC」の職歴と、同じ会社名のプロジェクトが存在する
+        Resume resume = createSampleResume();
+        UUID careerId = resume.getCareers().get(0).getId();
+
+        assertThatThrownBy(() -> resume.removeCareer(careerId))
+                .isInstanceOf(DomainException.class)
+                .hasMessageContaining("株式会社ABCはプロジェクトで使用されています。該当プロジェクトを削除してから職歴を削除してください。");
     }
 
     /**
