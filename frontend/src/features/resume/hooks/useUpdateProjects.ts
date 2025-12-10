@@ -22,7 +22,7 @@ export const useUpdateProjects = (resumeId: string) => {
         onSuccess: (response) => {
             clearErrors();
             setResume(response.data);
-            setNotification("職務内容情報を保存しました。", "success");
+            setNotification("プロジェクト情報を保存しました。", "success");
         },
     });
 };

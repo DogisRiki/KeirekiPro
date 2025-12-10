@@ -16,7 +16,7 @@ const MenuProps = {
 };
 
 /**
- * 職務内容セクション
+ * プロジェクトセクション
  */
 export const ProjectSection = () => {
     // ストアから必要な状態を取得
@@ -32,7 +32,7 @@ export const ProjectSection = () => {
 
     // エントリーが選択されていない場合
     if (!currentProject) {
-        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストから職務内容を選択してください。</Box>;
+        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストからプロジェクトを選択してください。</Box>;
     }
 
     // 作業工程チェックボックス: チェック状態を算出

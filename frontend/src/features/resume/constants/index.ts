@@ -15,7 +15,7 @@ import {
 export const sections: SectionInfo[] = [
     { key: "basicInfo", label: "基本", type: "single", component: BasicInfoSection },
     { key: "career", label: "職歴", type: "list", component: CareerSection },
-    { key: "project", label: "職務内容", type: "list", component: ProjectSection },
+    { key: "project", label: "プロジェクト", type: "list", component: ProjectSection },
     { key: "certification", label: "保有資格", type: "list", component: CertificationSection },
     { key: "portfolio", label: "ポートフォリオ", type: "list", component: PortfolioSection },
     { key: "socialLink", label: "SNS", type: "list", component: SociealLinkSection },

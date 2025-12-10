@@ -41,7 +41,7 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
                 startDate: "",
                 endDate: null,
                 active: false,
-                name: "新しい職務内容",
+                name: "新しいプロジェクト",
                 overview: "",
                 teamComp: "",
                 role: "",

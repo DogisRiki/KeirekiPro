@@ -72,7 +72,7 @@ export const SectionTabs = () => {
                 open={alertDialogOpen}
                 variant="warning"
                 title="警告"
-                description="職務内容を入力するには、先に職歴を登録してください。"
+                description="プロジェクト情報を入力するには、先に職歴情報を登録してください。"
                 onClose={handleAlertDialogClose}
             />
         </>
