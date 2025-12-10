@@ -1,9 +1,16 @@
 package com.example.keirekipro.usecase.resume;
 
+import java.util.List;
 import java.util.UUID;
 
+import com.example.keirekipro.domain.model.resume.Career;
+import com.example.keirekipro.domain.model.resume.Certification;
+import com.example.keirekipro.domain.model.resume.Portfolio;
+import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
+import com.example.keirekipro.domain.model.resume.SelfPromotion;
+import com.example.keirekipro.domain.model.resume.SocialLink;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
@@ -52,6 +59,63 @@ public class CopyCreateResumeUseCase {
             throw new UseCaseException("コピー元の職務経歴書が存在しません。");
         }
 
+        // 職歴
+        List<Career> copiedCareers = source.getCareers().stream()
+                .map(career -> Career.create(
+                        notification,
+                        career.getCompanyName(),
+                        career.getPeriod()))
+                .toList();
+
+        // プロジェクト
+        List<Project> copiedProjects = source.getProjects().stream()
+                .map(project -> Project.create(
+                        notification,
+                        project.getCompanyName(),
+                        project.getPeriod(),
+                        project.getName(),
+                        project.getOverview(),
+                        project.getTeamComp(),
+                        project.getRole(),
+                        project.getAchievement(),
+                        project.getProcess(),
+                        project.getTechStack()))
+                .toList();
+
+        // 資格
+        List<Certification> copiedCertifications = source.getCertifications().stream()
+                .map(certification -> Certification.create(
+                        notification,
+                        certification.getName(),
+                        certification.getDate()))
+                .toList();
+
+        // ポートフォリオ
+        List<Portfolio> copiedPortfolios = source.getPortfolios().stream()
+                .map(portfolio -> Portfolio.create(
+                        notification,
+                        portfolio.getName(),
+                        portfolio.getOverview(),
+                        portfolio.getTechStack(),
+                        portfolio.getLink()))
+                .toList();
+
+        // ソーシャルリンク
+        List<SocialLink> copiedSocialLinks = source.getSocialLinks().stream()
+                .map(socialLink -> SocialLink.create(
+                        notification,
+                        socialLink.getName(),
+                        socialLink.getLink()))
+                .toList();
+
+        // 自己PR
+        List<SelfPromotion> copiedSelfPromotions = source.getSelfPromotions().stream()
+                .map(selfPromotion -> SelfPromotion.create(
+                        notification,
+                        selfPromotion.getTitle(),
+                        selfPromotion.getContent()))
+                .toList();
+
         // 職務経歴書エンティティ新規構築
         Resume copy = Resume.create(
                 notification,
@@ -59,12 +123,12 @@ public class CopyCreateResumeUseCase {
                 resumeName,
                 source.getDate(),
                 source.getFullName(),
-                source.getCareers(),
-                source.getProjects(),
-                source.getCertifications(),
-                source.getPortfolios(),
-                source.getSocialLinks(),
-                source.getSelfPromotions());
+                copiedCareers,
+                copiedProjects,
+                copiedCertifications,
+                copiedPortfolios,
+                copiedSocialLinks,
+                copiedSelfPromotions);
 
         resumeRepository.save(copy);
 
