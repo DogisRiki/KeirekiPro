@@ -95,3 +95,8 @@ export const techStackInfo = [
         ],
     },
 ] as const;
+
+/**
+ * 一時IDのプレフィックス
+ */
+export const TEMP_ID_PREFIX = "temp_";

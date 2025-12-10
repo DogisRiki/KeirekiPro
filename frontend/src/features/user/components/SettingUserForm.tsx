@@ -1,4 +1,4 @@
-import { Button, ConfirmDialog, TextField } from "@/components/ui";
+import { Button, Dialog, TextField } from "@/components/ui";
 import type { SettingMessages } from "@/features/user";
 import {
     AuthProviderField,
@@ -169,8 +169,9 @@ export const SettingUserForm = ({
                 </Box>
             </Box>
 
-            <ConfirmDialog
+            <Dialog
                 open={dialogOpen}
+                variant="confirm"
                 title="退会のご確認"
                 description="本当に退会しますか？この操作は取り消せません。"
                 onClose={handleDialogClose}

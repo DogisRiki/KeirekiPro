@@ -1,11 +1,14 @@
-import { Button, Switch } from "@/components/ui";
+import { Button, Dialog, Switch } from "@/components/ui";
+import { paths } from "@/config/paths";
+import { useDeleteResume, useResumeStore } from "@/features/resume";
 import {
     Delete as DeleteIcon,
     ExpandMore as ExpandMoreIcon,
     FileDownload as FileDownloadIcon,
 } from "@mui/icons-material";
 import { Box, FormControlLabel, FormGroup, Menu, MenuItem, Paper, useMediaQuery, useTheme } from "@mui/material";
-import React from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router";
 
 const exportMenuItems = [
     { label: "PDFでエクスポート", icon: <FileDownloadIcon />, action: () => alert("PDFでエクスポート") },
@@ -18,8 +21,13 @@ const exportMenuItems = [
 export const BottomMenu = React.forwardRef<HTMLDivElement>((_, ref) => {
     const theme = useTheme();
     const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+    const navigate = useNavigate();
 
-    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+    const resume = useResumeStore((state) => state.resume);
+    const deleteMutation = useDeleteResume();
+
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
     const handleExportButtonClick = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
@@ -29,60 +37,97 @@ export const BottomMenu = React.forwardRef<HTMLDivElement>((_, ref) => {
         setAnchorEl(null);
     };
 
+    /**
+     * 削除確認ダイアログを開く
+     */
+    const handleDeleteClick = () => {
+        setDeleteDialogOpen(true);
+    };
+
+    /**
+     * 削除確認ダイアログのコールバック
+     */
+    const handleDeleteDialogClose = (confirmed: boolean) => {
+        setDeleteDialogOpen(false);
+        if (confirmed && resume) {
+            deleteMutation.mutate(resume.id, {
+                onSuccess: () => {
+                    navigate(paths.resume.list);
+                },
+            });
+        }
+    };
+
     return (
-        <Paper
-            ref={ref}
-            elevation={3}
-            sx={{
-                position: "fixed",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                zIndex: 1200,
-                display: "flex",
-                alignItems: "center", // 縦方向の中央揃えを追加
-                gap: 3, // ボタン間の間隔を設定
-                p: 2,
-                bgcolor: "rgba(255, 255, 255, 0.5)",
-            }}
-        >
-            {/* 自動保存 */}
-            <FormGroup>
-                <FormControlLabel control={<Switch color="success" defaultChecked />} label="自動保存" />
-            </FormGroup>
-            <Box sx={{ display: "flex", gap: 2, marginLeft: "auto" }}>
-                {/* エクスポートボタン */}
-                <Button
-                    startIcon={<ExpandMoreIcon />}
-                    size={isXs ? "small" : "medium"}
-                    onClick={handleExportButtonClick}
-                >
-                    エクスポート
-                </Button>
-                {/* エクスポートメニュー */}
-                <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleExportButtonClose}>
-                    {exportMenuItems.map((item, index) => (
-                        <MenuItem
-                            key={index}
-                            onClick={item.action}
-                            sx={{
-                                color: "primary.main",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                            }}
-                        >
-                            {item.icon}
-                            {item.label}
-                        </MenuItem>
-                    ))}
-                </Menu>
-                {/* 職務経歴書を削除ボタン */}
-                <Button color="error" startIcon={<DeleteIcon />} size={isXs ? "small" : "medium"}>
-                    職務経歴書を削除
-                </Button>
-            </Box>
-        </Paper>
+        <>
+            <Paper
+                ref={ref}
+                elevation={3}
+                sx={{
+                    position: "fixed",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 1200,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
+                    p: 2,
+                    bgcolor: "rgba(255, 255, 255, 0.5)",
+                }}
+            >
+                {/* 自動保存 */}
+                <FormGroup>
+                    <FormControlLabel control={<Switch color="success" defaultChecked />} label="自動保存" />
+                </FormGroup>
+                <Box sx={{ display: "flex", gap: 2, marginLeft: "auto" }}>
+                    {/* エクスポートボタン */}
+                    <Button
+                        startIcon={<ExpandMoreIcon />}
+                        size={isXs ? "small" : "medium"}
+                        onClick={handleExportButtonClick}
+                    >
+                        エクスポート
+                    </Button>
+                    {/* エクスポートメニュー */}
+                    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleExportButtonClose}>
+                        {exportMenuItems.map((item, index) => (
+                            <MenuItem
+                                key={index}
+                                onClick={item.action}
+                                sx={{
+                                    color: "primary.main",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                }}
+                            >
+                                {item.icon}
+                                {item.label}
+                            </MenuItem>
+                        ))}
+                    </Menu>
+                    {/* 職務経歴書を削除ボタン */}
+                    <Button
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        size={isXs ? "small" : "medium"}
+                        onClick={handleDeleteClick}
+                        disabled={deleteMutation.isPending}
+                    >
+                        職務経歴書を削除
+                    </Button>
+                </Box>
+            </Paper>
+            {/* 削除確認ダイアログ */}
+            <Dialog
+                open={deleteDialogOpen}
+                variant="confirm"
+                title="削除確認"
+                description={`「${resume?.resumeName ?? ""}」を削除しますか？この操作は取り消せません。`}
+                onClose={handleDeleteDialogClose}
+            />
+        </>
     );
 });
 

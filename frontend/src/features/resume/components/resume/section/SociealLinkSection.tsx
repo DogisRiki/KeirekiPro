@@ -1,16 +1,24 @@
 import { TextField } from "@/components/ui";
 import { env } from "@/config/env";
 import { useResumeStore } from "@/features/resume";
+import { Box } from "@mui/material";
 
 /**
  * ソーシャルリンクセクション
  */
 export const SociealLinkSection = () => {
     // ストアから必要な状態を取得
-    const { resume, activeEntryId, updateEntry } = useResumeStore();
+    const resume = useResumeStore((state) => state.resume);
+    const activeEntryId = useResumeStore((state) => state.activeEntryId);
+    const updateEntry = useResumeStore((state) => state.updateEntry);
 
     // 現在アクティブなソーシャルリンクエントリー
-    const currentSocialLink = resume?.socialLinks.find((socialLink) => socialLink.id === activeEntryId) ?? null;
+    const currentSocialLink = resume?.socialLinks?.find((socialLink) => socialLink.id === activeEntryId) ?? null;
+
+    // エントリーが選択されていない場合
+    if (!currentSocialLink) {
+        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストからSNSを選択してください。</Box>;
+    }
 
     return (
         <>
@@ -20,9 +28,8 @@ export const SociealLinkSection = () => {
                 fullWidth
                 required
                 placeholder="（例）GitHub"
-                value={currentSocialLink?.name ?? ""}
+                value={currentSocialLink.name}
                 onChange={(e) => {
-                    if (!currentSocialLink) return;
                     updateEntry("socialLinks", currentSocialLink.id, { name: e.target.value });
                 }}
                 slotProps={{
@@ -37,9 +44,8 @@ export const SociealLinkSection = () => {
                 fullWidth
                 required
                 placeholder={`（例）${env.APP_URL}`}
-                value={currentSocialLink?.link ?? ""}
+                value={currentSocialLink.link}
                 onChange={(e) => {
-                    if (!currentSocialLink) return;
                     updateEntry("socialLinks", currentSocialLink.id, { link: e.target.value });
                 }}
                 slotProps={{

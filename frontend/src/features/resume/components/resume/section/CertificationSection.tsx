@@ -1,24 +1,32 @@
 import { DatePicker, TextField } from "@/components/ui";
 import { useResumeStore } from "@/features/resume";
+import { Box } from "@mui/material";
 import type { Dayjs } from "dayjs";
-import { useState } from "react";
+import dayjs from "dayjs";
 
 /**
  * 資格セクション
  */
 export const CertificationSection = () => {
     // ストアから必要な状態を取得
-    const { resume, activeEntryId, updateEntry } = useResumeStore();
+    const resume = useResumeStore((state) => state.resume);
+    const activeEntryId = useResumeStore((state) => state.activeEntryId);
+    const updateEntry = useResumeStore((state) => state.updateEntry);
 
     // 現在アクティブな資格エントリー
-    const currentCertification = resume?.certifications.find((cert) => cert.id === activeEntryId) ?? null;
+    const currentCertification = resume?.certifications?.find((cert) => cert.id === activeEntryId) ?? null;
 
-    // 取得年月
-    const [date, setDate] = useState<Dayjs | null>(null);
+    // エントリーが選択されていない場合
+    if (!currentCertification) {
+        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストから資格を選択してください。</Box>;
+    }
 
     // 取得年月ハンドラー
     const handleDateChange = (newValue: Dayjs | null) => {
-        setDate(newValue);
+        if (!currentCertification) return;
+        updateEntry("certifications", currentCertification.id, {
+            date: newValue ? newValue.format("YYYY-MM") : "",
+        });
     };
 
     return (
@@ -29,9 +37,8 @@ export const CertificationSection = () => {
                 fullWidth
                 required
                 placeholder="（例）基本情報処理技術者"
-                value={currentCertification?.name ?? ""}
+                value={currentCertification.name}
                 onChange={(e) => {
-                    if (!currentCertification) return;
                     updateEntry("certifications", currentCertification.id, { name: e.target.value });
                 }}
                 slotProps={{
@@ -42,7 +49,7 @@ export const CertificationSection = () => {
             {/* 取得年月 */}
             <DatePicker
                 label="取得年月"
-                value={date}
+                value={currentCertification.date ? dayjs(currentCertification.date, "YYYY-MM") : null}
                 onChange={handleDateChange}
                 views={["year", "month"]}
                 format="YYYY/MM"

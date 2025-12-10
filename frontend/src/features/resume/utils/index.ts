@@ -1,5 +1,5 @@
 import type { SectionName } from "@/features/resume";
-import { sections } from "@/features/resume";
+import { sections, TEMP_ID_PREFIX } from "@/features/resume";
 import { formatDate } from "@/utils";
 import dayjs from "dayjs";
 import React from "react";
@@ -82,4 +82,25 @@ export const getResumeKey = (activeSection: SectionName) => {
         case "selfPromotion":
             return "selfPromotions";
     }
+};
+
+/**
+ * 一時IDかどうかを判定する
+ * @param id ID文字列
+ * @returns 一時IDの場合true
+ */
+export const isTempId = (id: string | null | undefined): boolean => {
+    if (!id) return true;
+    return id.startsWith(TEMP_ID_PREFIX);
+};
+
+/**
+ * APIに送信する用のIDを取得する
+ * 一時IDの場合はnullを返す
+ * @param id ID文字列
+ * @returns APIに送信するID（一時IDの場合はnull）
+ */
+export const getApiId = (id: string | null | undefined): string | null => {
+    if (!id || isTempId(id)) return null;
+    return id;
 };

@@ -9,9 +9,10 @@ import type {
     SelfPromotion,
     SocialLink,
 } from "@/features/resume";
-import { EntryListItem, getResumeKey, sections, useResumeStore } from "@/features/resume";
+import { EntryListItem, getResumeKey, sections, TEMP_ID_PREFIX, useResumeStore } from "@/features/resume";
 import { Add as AddIcon } from "@mui/icons-material";
 import { Box, Divider, List, Typography } from "@mui/material";
+import { useMemo } from "react";
 
 /**
  * 新規エントリー生成用の型
@@ -147,14 +148,17 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
  */
 export const EntryList = () => {
     // ストアから必要な状態を取り出す
-    const { activeSection, setActiveEntryId, updateSection } = useResumeStore();
+    const activeSection = useResumeStore((state) => state.activeSection);
     const resume = useResumeStore((state) => state.resume);
+    const setActiveEntryId = useResumeStore((state) => state.setActiveEntryId);
+    const updateSection = useResumeStore((state) => state.updateSection);
 
     // エントリーデータ取得
-    const entries = useResumeStore((state) => {
-        const key = getResumeKey(state.activeSection);
-        return key ? state.resume?.[key] ?? [] : [];
-    });
+    const entries = useMemo(() => {
+        if (!resume) return [];
+        const key = getResumeKey(activeSection);
+        return key ? resume[key] ?? [] : [];
+    }, [resume, activeSection]);
 
     // タイトル取得
     const title = sections.find((section) => section.key === activeSection)?.label + "一覧";
@@ -168,19 +172,20 @@ export const EntryList = () => {
         const sectionKey = getResumeKey(activeSection);
         if (!sectionKey) return;
 
-        const newId =
+        // 一時IDを生成（プレフィックス付き）
+        const tempId =
             typeof crypto !== "undefined" && "randomUUID" in crypto
-                ? crypto.randomUUID()
-                : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                ? `${TEMP_ID_PREFIX}${crypto.randomUUID()}`
+                : `${TEMP_ID_PREFIX}${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-        const newEntry = createNewEntry(activeSection, newId);
+        const newEntry = createNewEntry(activeSection, tempId);
         if (!newEntry) return;
 
-        const currentList = resume[sectionKey];
+        const currentList = resume[sectionKey] ?? [];
         const updatedList = [newEntry, ...currentList] as typeof currentList;
 
         updateSection(sectionKey, updatedList);
-        setActiveEntryId(newId);
+        setActiveEntryId(tempId);
     };
 
     return (

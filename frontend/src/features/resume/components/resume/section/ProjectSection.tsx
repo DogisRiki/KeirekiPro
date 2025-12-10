@@ -4,7 +4,7 @@ import { processList, TechStackFieldList, useResumeStore } from "@/features/resu
 import type { SelectChangeEvent } from "@mui/material";
 import { Box, FormControl, FormControlLabel, InputLabel, ListItemText, MenuItem } from "@mui/material";
 import type { Dayjs } from "dayjs";
-import { useState } from "react";
+import dayjs from "dayjs";
 
 const MenuProps = {
     PaperProps: {
@@ -20,85 +20,92 @@ const MenuProps = {
  */
 export const ProjectSection = () => {
     // ストアから必要な状態を取得
-    const { resume, activeEntryId, updateEntry } = useResumeStore();
+    const resume = useResumeStore((state) => state.resume);
+    const activeEntryId = useResumeStore((state) => state.activeEntryId);
+    const updateEntry = useResumeStore((state) => state.updateEntry);
 
     // 職歴から会社情報を取得
     const companies = resume?.careers ?? [];
 
     // 現在アクティブなプロジェクトエントリー
-    const currentProject = resume?.projects.find((project) => project.id === activeEntryId) ?? null;
+    const currentProject = resume?.projects?.find((project) => project.id === activeEntryId) ?? null;
 
-    // 会社名（選択用）
-    const [companyName, setCompanyName] = useState<string>("");
+    // エントリーが選択されていない場合
+    if (!currentProject) {
+        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストから職務内容を選択してください。</Box>;
+    }
 
-    // 開始年月
-    const [startDate, setStartDate] = useState<Dayjs | null>(null);
-
-    // 終了年月
-    const [endDate, setEndDate] = useState<Dayjs | null>(null);
-
-    // 担当中チェックボックス
-    const [isAssigned, setIsAssigned] = useState(false);
-
-    // 作業工程チェックボックス
-    const [process, setProcess] = useState<Process>({
-        requirements: false,
-        basicDesign: false,
-        detailedDesign: false,
-        implementation: false,
-        integrationTest: false,
-        systemTest: false,
-        maintenance: false,
-    });
-
-    // 作業工程チェックボックス: チェック状態
-    const [selectedProcesses, setSelectedProcesses] = useState<string[]>([]);
+    // 作業工程チェックボックス: チェック状態を算出
+    const selectedProcesses = Object.entries(processList)
+        .filter(([key]) => currentProject.process[key as keyof Process])
+        .map(([, label]) => label);
 
     // 会社名ハンドラー
     const handleCompanyNameChange = (event: SelectChangeEvent<string>) => {
-        setCompanyName(event.target.value);
+        if (!currentProject) return;
+        const selectedCompany = companies.find((c) => c.id === event.target.value);
+        updateEntry("projects", currentProject.id, {
+            companyName: selectedCompany?.companyName ?? "",
+        });
     };
 
-    // 入社年月ハンドラー
+    // 開始年月ハンドラー
     const handleStartDateChange = (newValue: Dayjs | null) => {
-        setStartDate(newValue);
+        if (!currentProject) return;
+        updateEntry("projects", currentProject.id, {
+            startDate: newValue ? newValue.format("YYYY-MM") : "",
+        });
     };
 
-    // 退職年月ハンドラー
+    // 終了年月ハンドラー
     const handleEndDateChange = (newValue: Dayjs | null) => {
-        if (!isAssigned) {
-            setEndDate(newValue);
-        }
+        if (!currentProject || currentProject.active) return;
+        updateEntry("projects", currentProject.id, {
+            endDate: newValue ? newValue.format("YYYY-MM") : null,
+        });
     };
 
     // 担当中チェックボックスハンドラー
-    const handleIsAssignedChange = () => {
-        setIsAssigned((prev) => !prev);
-        if (!isAssigned) {
-            setEndDate(null);
-        }
+    const handleIsActiveChange = () => {
+        if (!currentProject) return;
+        const newActive = !currentProject.active;
+        updateEntry("projects", currentProject.id, {
+            active: newActive,
+            endDate: newActive ? null : currentProject.endDate,
+        });
     };
 
     // 作業工程チェックボックスハンドラー
     const handleProcessChange = (event: SelectChangeEvent<string[]>) => {
+        if (!currentProject) return;
         const value = event.target.value;
         const selectedValues = typeof value === "string" ? value.split(",") : value;
-        setSelectedProcesses(selectedValues);
 
-        // Process オブジェクトも更新
-        const newProcess = { ...process };
+        const newProcess: Process = {
+            requirements: false,
+            basicDesign: false,
+            detailedDesign: false,
+            implementation: false,
+            integrationTest: false,
+            systemTest: false,
+            maintenance: false,
+        };
         Object.entries(processList).forEach(([key, label]) => {
             newProcess[key as keyof Process] = selectedValues.includes(label);
         });
-        setProcess(newProcess);
+
+        updateEntry("projects", currentProject.id, { process: newProcess });
     };
+
+    // 会社名の選択値を取得（IDベース）
+    const selectedCompanyId = companies.find((c) => c.companyName === currentProject.companyName)?.id ?? "";
 
     return (
         <>
             {/* 会社名 */}
             <FormControl fullWidth required variant="outlined" sx={{ mb: 4 }}>
                 <InputLabel shrink>会社名</InputLabel>
-                <Select value={companyName} onChange={handleCompanyNameChange} label="会社名" notched>
+                <Select value={selectedCompanyId} onChange={handleCompanyNameChange} label="会社名" notched>
                     {companies.length === 0 ? (
                         <MenuItem disabled>職歴が存在しません</MenuItem>
                     ) : (
@@ -113,7 +120,7 @@ export const ProjectSection = () => {
             {/* 開始年月 */}
             <DatePicker
                 label="プロジェクト開始年月"
-                value={startDate}
+                value={currentProject.startDate ? dayjs(currentProject.startDate, "YYYY-MM") : null}
                 onChange={handleStartDateChange}
                 views={["year", "month"]}
                 format="YYYY/MM"
@@ -130,10 +137,8 @@ export const ProjectSection = () => {
             {/* 担当中チェックボックス */}
             <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                 <FormControlLabel
-                    control={<Checkbox />}
+                    control={<Checkbox checked={currentProject.active} onChange={handleIsActiveChange} />}
                     label="現在も担当中"
-                    checked={isAssigned}
-                    onChange={handleIsAssignedChange}
                     sx={{
                         color: "text.secondary",
                         m: 0,
@@ -144,13 +149,13 @@ export const ProjectSection = () => {
             <DatePicker
                 label="プロジェクト終了年月"
                 format="YYYY/MM"
-                value={endDate}
+                value={currentProject.endDate ? dayjs(currentProject.endDate, "YYYY-MM") : null}
                 onChange={handleEndDateChange}
-                disabled={isAssigned}
+                disabled={currentProject.active}
                 slotProps={{
                     textField: {
                         fullWidth: true,
-                        required: !isAssigned,
+                        required: !currentProject.active,
                         sx: { mb: 4 },
                         InputLabelProps: { shrink: true },
                     },
@@ -164,9 +169,8 @@ export const ProjectSection = () => {
                 fullWidth
                 required
                 placeholder="ECサイトのマイクロサービス化プロジェクト"
-                value={currentProject?.name ?? ""}
+                value={currentProject.name}
                 onChange={(e) => {
-                    if (!currentProject) return;
                     updateEntry("projects", currentProject.id, { name: e.target.value });
                 }}
                 slotProps={{
@@ -182,6 +186,10 @@ export const ProjectSection = () => {
                 multiline
                 minRows={4}
                 placeholder="導入実績25万店舗の大規模ECプラットフォームのマイクロサービス化プロジェクト"
+                value={currentProject.overview}
+                onChange={(e) => {
+                    updateEntry("projects", currentProject.id, { overview: e.target.value });
+                }}
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}
@@ -193,6 +201,10 @@ export const ProjectSection = () => {
                 fullWidth
                 required
                 placeholder="8名（エンジニア6名、デザイナー1名、プロダクトマネージャー1名）"
+                value={currentProject.teamComp}
+                onChange={(e) => {
+                    updateEntry("projects", currentProject.id, { teamComp: e.target.value });
+                }}
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}
@@ -204,6 +216,10 @@ export const ProjectSection = () => {
                 fullWidth
                 required
                 placeholder="テックリード（設計、実装、レビュー、技術選定を担当）"
+                value={currentProject.role}
+                onChange={(e) => {
+                    updateEntry("projects", currentProject.id, { role: e.target.value });
+                }}
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}
@@ -222,6 +238,10 @@ export const ProjectSection = () => {
                     "・新機能のリリースサイクルを2週間から3日に短縮",
                     "・マイクロサービスのリファレンスアーキテクチャを確立し、新規サービス作成時間を70%短縮",
                 ].join("\n")}
+                value={currentProject.achievement}
+                onChange={(e) => {
+                    updateEntry("projects", currentProject.id, { achievement: e.target.value });
+                }}
                 slotProps={{
                     inputLabel: { shrink: true },
                 }}
