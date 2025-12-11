@@ -12,7 +12,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useUpdateSelfPromotions = (resumeId: string) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { setResume, setDirty } = useResumeStore();
+    const { updateResume, setDirty } = useResumeStore();
 
     return useMutation<AxiosResponse<Resume>, AxiosError, UpdateSelfPromotionsPayload>({
         mutationFn: (payload) => updateSelfPromotions(resumeId, payload),
@@ -21,7 +21,9 @@ export const useUpdateSelfPromotions = (resumeId: string) => {
         },
         onSuccess: (response) => {
             clearErrors();
-            setResume(response.data);
+            // 自己PRのみ更新（他のセクションの編集中データを保持）
+            const { selfPromotions, updatedAt } = response.data;
+            updateResume({ selfPromotions, updatedAt });
             setDirty(false);
             setNotification("自己PR情報を保存しました。", "success");
         },

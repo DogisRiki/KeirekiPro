@@ -12,7 +12,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useUpdateProjects = (resumeId: string) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { setResume, setDirty } = useResumeStore();
+    const { updateResume, setDirty } = useResumeStore();
 
     return useMutation<AxiosResponse<Resume>, AxiosError, UpdateProjectsPayload>({
         mutationFn: (payload) => updateProjects(resumeId, payload),
@@ -21,7 +21,9 @@ export const useUpdateProjects = (resumeId: string) => {
         },
         onSuccess: (response) => {
             clearErrors();
-            setResume(response.data);
+            // プロジェクトのみ更新（他のセクションの編集中データを保持）
+            const { projects, updatedAt } = response.data;
+            updateResume({ projects, updatedAt });
             setDirty(false);
             setNotification("プロジェクト情報を保存しました。", "success");
         },

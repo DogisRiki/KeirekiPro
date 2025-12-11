@@ -11,14 +11,14 @@ import { useQuery } from "@tanstack/react-query";
  */
 export const useGetResumeInfo = (resumeId: string): UseQueryResult<Resume, unknown> => {
     const { clearErrors } = useErrorMessageStore();
-    const { setResume } = useResumeStore();
+    const { initializeResume } = useResumeStore();
 
     return useQuery({
         queryKey: ["getResumeInfo", resumeId],
         queryFn: async () => {
             clearErrors();
             const data = await getResumeInfo(resumeId);
-            setResume(data);
+            initializeResume(data);
             return data;
         },
         retry: false,

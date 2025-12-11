@@ -27,6 +27,7 @@ interface ResumeStoreState {
     setActiveSection: (section: ResumeStoreState["activeSection"]) => void;
     setActiveEntryId: (entryId: string | null) => void;
     setResume: (resume: Resume) => void;
+    initializeResume: (resume: Resume) => void;
     updateResume: (patch: Partial<Resume>) => void;
     updateSection: (section: ResumeArrayKeys, data: Resume[ResumeArrayKeys]) => void;
     updateEntry: (
@@ -56,8 +57,21 @@ export const useResumeStore = create<ResumeStoreState>()(
             // アクション: エントリーIDの設定
             setActiveEntryId: (entryId) => set({ activeEntryId: entryId }, false, "setActiveEntryId"),
 
-            // アクション: 職務経歴書全体の設定（APIからの取得時はdirtyをfalseに）
+            // アクション: 職務経歴書全体の設定（保存成功時に使用、isDirtyをfalseに）
             setResume: (resume) => set({ resume, isDirty: false }, false, "setResume"),
+
+            // アクション: 職務経歴書の初期化（画面初期表示時に使用、activeSection/activeEntryIdもリセット）
+            initializeResume: (resume) =>
+                set(
+                    {
+                        resume,
+                        isDirty: false,
+                        activeSection: "basicInfo",
+                        activeEntryId: null,
+                    },
+                    false,
+                    "initializeResume",
+                ),
 
             // アクション: 職務経歴書の部分更新（変更時はdirtyをtrueに）
             updateResume: (patch) =>
