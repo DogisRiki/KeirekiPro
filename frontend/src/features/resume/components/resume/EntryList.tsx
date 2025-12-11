@@ -144,6 +144,16 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
 };
 
 /**
+ * スクロール表示に切り替える件数の閾値
+ */
+const SCROLL_THRESHOLD = 5;
+
+/**
+ * スクロール表示時の最大高さ
+ */
+const MAX_SCROLL_HEIGHT = 400;
+
+/**
  * エントリーリスト
  */
 export const EntryList = () => {
@@ -162,6 +172,9 @@ export const EntryList = () => {
 
     // タイトル取得
     const title = sections.find((section) => section.key === activeSection)?.label + "一覧";
+
+    // スクロール表示が必要かどうか
+    const needsScroll = entries.length > SCROLL_THRESHOLD;
 
     /**
      * 新規追加
@@ -209,12 +222,19 @@ export const EntryList = () => {
             {/* エントリーリスト */}
             <Box sx={{ p: 2 }}>
                 {entries.length > 0 ? (
-                    <List sx={{ width: "100%" }}>
-                        {/* エントリーアイテム */}
-                        {entries.map((entry: { id: string }) => (
-                            <EntryListItem key={entry.id} entry={entry} />
-                        ))}
-                    </List>
+                    <Box
+                        sx={{
+                            maxHeight: needsScroll ? MAX_SCROLL_HEIGHT : "none",
+                            overflowY: needsScroll ? "auto" : "visible",
+                        }}
+                    >
+                        <List sx={{ width: "100%" }}>
+                            {/* エントリーアイテム */}
+                            {entries.map((entry: { id: string }) => (
+                                <EntryListItem key={entry.id} entry={entry} />
+                            ))}
+                        </List>
+                    </Box>
                 ) : (
                     <Box sx={{ my: 20 }}>
                         <NoData variant="body1" message={"表示するデータがありません。"} />
