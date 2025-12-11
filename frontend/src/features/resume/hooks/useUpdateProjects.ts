@@ -12,7 +12,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useUpdateProjects = (resumeId: string) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { updateResume, setDirty } = useResumeStore();
+    const { updateResume, setDirty, clearDirtyEntryIds, resume } = useResumeStore();
 
     return useMutation<AxiosResponse<Resume>, AxiosError, UpdateProjectsPayload>({
         mutationFn: (payload) => updateProjects(resumeId, payload),
@@ -21,9 +21,13 @@ export const useUpdateProjects = (resumeId: string) => {
         },
         onSuccess: (response) => {
             clearErrors();
+            // 保存前のエントリーIDを取得
+            const savedEntryIds = resume?.projects.map((p) => p.id) ?? [];
             // プロジェクトのみ更新（他のセクションの編集中データを保持）
             const { projects, updatedAt } = response.data;
             updateResume({ projects, updatedAt });
+            // 保存されたエントリーのdirtyフラグをクリア
+            clearDirtyEntryIds(savedEntryIds);
             setDirty(false);
             setNotification("プロジェクト情報を保存しました。", "success");
         },

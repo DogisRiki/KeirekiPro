@@ -12,7 +12,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useUpdateCareers = (resumeId: string) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { updateResume, setDirty } = useResumeStore();
+    const { updateResume, setDirty, clearDirtyEntryIds, resume } = useResumeStore();
 
     return useMutation<AxiosResponse<Resume>, AxiosError, UpdateCareersPayload>({
         mutationFn: (payload) => updateCareers(resumeId, payload),
@@ -21,9 +21,13 @@ export const useUpdateCareers = (resumeId: string) => {
         },
         onSuccess: (response) => {
             clearErrors();
+            // 保存前のエントリーIDを取得
+            const savedEntryIds = resume?.careers.map((c) => c.id) ?? [];
             // 職歴のみ更新（他のセクションの編集中データを保持）
             const { careers, updatedAt } = response.data;
             updateResume({ careers, updatedAt });
+            // 保存されたエントリーのdirtyフラグをクリア
+            clearDirtyEntryIds(savedEntryIds);
             setDirty(false);
             setNotification("職歴情報を保存しました。", "success");
         },

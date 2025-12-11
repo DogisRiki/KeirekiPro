@@ -23,6 +23,9 @@ interface ResumeStoreState {
     // 未保存の変更があるかどうか
     isDirty: boolean;
 
+    // 編集されたエントリーIDのSet
+    dirtyEntryIds: Set<string>;
+
     // アクション
     setActiveSection: (section: ResumeStoreState["activeSection"]) => void;
     setActiveEntryId: (entryId: string | null) => void;
@@ -37,6 +40,7 @@ interface ResumeStoreState {
     ) => void;
     clearResume: () => void;
     setDirty: (isDirty: boolean) => void;
+    clearDirtyEntryIds: (entryIds: string[]) => void;
 }
 
 /**
@@ -50,6 +54,7 @@ export const useResumeStore = create<ResumeStoreState>()(
             activeEntryId: null,
             resume: null,
             isDirty: false,
+            dirtyEntryIds: new Set(),
 
             // アクション: セクションの切り替え
             setActiveSection: (section) => set({ activeSection: section }, false, "setActiveSection"),
@@ -68,6 +73,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                         isDirty: false,
                         activeSection: "basicInfo",
                         activeEntryId: null,
+                        dirtyEntryIds: new Set(),
                     },
                     false,
                     "initializeResume",
@@ -84,28 +90,39 @@ export const useResumeStore = create<ResumeStoreState>()(
                     "updateResume",
                 ),
 
-            // アクション: セクションデータの更新（変更時はdirtyをtrueに）
+            // アクション: セクションデータの更新（変更時はdirtyをtrueに、新規エントリーをdirtyEntryIdsに追加）
             updateSection: (section, data) =>
                 set(
-                    (state) => ({
-                        resume: state.resume
-                            ? {
-                                  ...state.resume,
-                                  [section]: data,
-                              }
-                            : null,
-                        isDirty: true,
-                    }),
+                    (state) => {
+                        const currentIds = new Set(state.resume?.[section]?.map((item) => item.id) ?? []);
+                        const newIds = data.map((item) => item.id).filter((id) => !currentIds.has(id));
+                        const newDirtyEntryIds = new Set(state.dirtyEntryIds);
+                        newIds.forEach((id) => newDirtyEntryIds.add(id));
+
+                        return {
+                            resume: state.resume
+                                ? {
+                                      ...state.resume,
+                                      [section]: data,
+                                  }
+                                : null,
+                            isDirty: true,
+                            dirtyEntryIds: newDirtyEntryIds,
+                        };
+                    },
                     false,
                     "updateSection",
                 ),
 
-            // アクション: 特定エントリーの更新（変更時はdirtyをtrueに）
+            // アクション: 特定エントリーの更新（変更時はdirtyをtrueに、entryIdをdirtyEntryIdsに追加）
             updateEntry: (section, entryId, updatedData) =>
                 set(
                     (state) => {
                         if (!state.resume) return { resume: null };
                         const sectionData = state.resume[section];
+                        const newDirtyEntryIds = new Set(state.dirtyEntryIds);
+                        newDirtyEntryIds.add(entryId);
+
                         return {
                             resume: {
                                 ...state.resume,
@@ -114,6 +131,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                                 ),
                             },
                             isDirty: true,
+                            dirtyEntryIds: newDirtyEntryIds,
                         };
                     },
                     false,
@@ -123,13 +141,31 @@ export const useResumeStore = create<ResumeStoreState>()(
             // アクション: ストアのクリア
             clearResume: () =>
                 set(
-                    { resume: null, activeSection: "basicInfo", activeEntryId: null, isDirty: false },
+                    {
+                        resume: null,
+                        activeSection: "basicInfo",
+                        activeEntryId: null,
+                        isDirty: false,
+                        dirtyEntryIds: new Set(),
+                    },
                     false,
                     "clearResume",
                 ),
 
             // アクション: dirty状態の設定
             setDirty: (isDirty) => set({ isDirty }, false, "setDirty"),
+
+            // アクション: 指定されたエントリーIDをdirtyEntryIdsから削除
+            clearDirtyEntryIds: (entryIds) =>
+                set(
+                    (state) => {
+                        const newDirtyEntryIds = new Set(state.dirtyEntryIds);
+                        entryIds.forEach((id) => newDirtyEntryIds.delete(id));
+                        return { dirtyEntryIds: newDirtyEntryIds };
+                    },
+                    false,
+                    "clearDirtyEntryIds",
+                ),
         }),
         { name: "ResumeStore" },
     ),

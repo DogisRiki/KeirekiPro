@@ -1,7 +1,7 @@
 import { Dialog } from "@/components/ui";
 import { checkCareerDeletable, getEntryText, getResumeKey, useResumeStore } from "@/features/resume";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import { IconButton, ListItem, ListItemButton, ListItemText, Menu, MenuItem } from "@mui/material";
+import { FiberManualRecord as FiberManualRecordIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
+import { IconButton, ListItem, ListItemButton, ListItemText, Menu, MenuItem, Tooltip } from "@mui/material";
 import { useState } from "react";
 
 /**
@@ -18,6 +18,7 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
     // ストアから必要な状態を取り出す
     const { activeSection, activeEntryId, setActiveEntryId, updateSection } = useResumeStore();
     const resume = useResumeStore((state) => state.resume);
+    const dirtyEntryIds = useResumeStore((state) => state.dirtyEntryIds);
 
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
@@ -25,6 +26,9 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
     // 警告ダイアログの状態
     const [warningDialogOpen, setWarningDialogOpen] = useState(false);
     const [warningMessage, setWarningMessage] = useState("");
+
+    // 未保存のエントリーかどうか
+    const isUnsaved = dirtyEntryIds.has(entry.id);
 
     /**
      * メニューオープン
@@ -97,6 +101,19 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
                         alignItems: "center",
                     }}
                 >
+                    {/* 未保存アイコン */}
+                    {isUnsaved && (
+                        <Tooltip title="未保存" placement="top">
+                            <FiberManualRecordIcon
+                                sx={{
+                                    fontSize: 12,
+                                    color: "warning.main",
+                                    mr: 1,
+                                    flexShrink: 0,
+                                }}
+                            />
+                        </Tooltip>
+                    )}
                     <ListItemText
                         primary={getEntryText(activeSection, entry)?.primary || ""}
                         secondary={getEntryText(activeSection, entry)?.secondary || ""}

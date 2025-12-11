@@ -12,7 +12,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useUpdateSocialLinks = (resumeId: string) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { updateResume, setDirty } = useResumeStore();
+    const { updateResume, setDirty, clearDirtyEntryIds, resume } = useResumeStore();
 
     return useMutation<AxiosResponse<Resume>, AxiosError, UpdateSocialLinksPayload>({
         mutationFn: (payload) => updateSocialLinks(resumeId, payload),
@@ -21,9 +21,13 @@ export const useUpdateSocialLinks = (resumeId: string) => {
         },
         onSuccess: (response) => {
             clearErrors();
-            // ソーシャルリンクのみ更新（他のセクションの編集中データを保持）
+            // 保存前のエントリーIDを取得
+            const savedEntryIds = resume?.socialLinks.map((s) => s.id) ?? [];
+            // SNSのみ更新（他のセクションの編集中データを保持）
             const { socialLinks, updatedAt } = response.data;
             updateResume({ socialLinks, updatedAt });
+            // 保存されたエントリーのdirtyフラグをクリア
+            clearDirtyEntryIds(savedEntryIds);
             setDirty(false);
             setNotification("SNS情報を保存しました。", "success");
         },
