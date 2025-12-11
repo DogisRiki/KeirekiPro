@@ -9,6 +9,7 @@ import {
     getResumeKey,
     sections,
     SectionTabs,
+    useAutoSave,
     useGetResumeInfo,
     useNavigationBlocker,
     useResumeStore,
@@ -55,6 +56,9 @@ export const ResumeContainer = () => {
     const [warningDialogOpen, setWarningDialogOpen] = useState(false);
     const [warningMessage, setWarningMessage] = useState("");
 
+    // 自動保存の有効/無効状態
+    const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
+
     // 職務経歴書詳細情報取得（ストアへのセットはhook内で実施）
     const { isLoading } = useGetResumeInfo(resumeId ?? "");
 
@@ -66,6 +70,19 @@ export const ResumeContainer = () => {
     const updatePortfoliosMutation = useUpdatePortfolios(resumeId ?? "");
     const updateSocialLinksMutation = useUpdateSocialLinks(resumeId ?? "");
     const updateSelfPromotionsMutation = useUpdateSelfPromotions(resumeId ?? "");
+
+    // 自動保存フック
+    useAutoSave({
+        enabled: autoSaveEnabled,
+        resumeId: resumeId ?? "",
+        updateBasicMutation,
+        updateCareersMutation,
+        updateProjectsMutation,
+        updateCertificationsMutation,
+        updatePortfoliosMutation,
+        updateSocialLinksMutation,
+        updateSelfPromotionsMutation,
+    });
 
     // BottomMenuの高さ計測
     const measuredRef = (node: HTMLDivElement | null) => {
@@ -309,7 +326,7 @@ export const ResumeContainer = () => {
                 </Grid>
             </Grid>
             {/* 下部メニュー */}
-            <BottomMenu ref={measuredRef} />
+            <BottomMenu ref={measuredRef} autoSaveEnabled={autoSaveEnabled} onAutoSaveToggle={setAutoSaveEnabled} />
             {/* 警告ダイアログ */}
             <Dialog
                 open={warningDialogOpen}

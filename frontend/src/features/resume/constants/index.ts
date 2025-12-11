@@ -100,3 +100,8 @@ export const techStackInfo = [
  * 一時IDのプレフィックス
  */
 export const TEMP_ID_PREFIX = "temp_";
+
+/**
+ * 自動保存の間隔（ミリ秒）
+ */
+export const AUTO_SAVE_INTERVAL_MS = 5000;

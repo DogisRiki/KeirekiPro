@@ -40,6 +40,7 @@ export * from "@/features/resume/api/updateResumeBasic";
 export * from "@/features/resume/api/updateSelfPromotions";
 export * from "@/features/resume/api/updateSocialLinks";
 
+export * from "@/features/resume/hooks/useAutoSave";
 export * from "@/features/resume/hooks/useCreateResume";
 export * from "@/features/resume/hooks/useDeleteResume";
 export * from "@/features/resume/hooks/useGetResumeInfo";

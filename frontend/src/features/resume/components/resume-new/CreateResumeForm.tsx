@@ -1,8 +1,8 @@
-import { Button, TextField } from "@/components/ui";
+import { Button, Select, TextField } from "@/components/ui";
 import type { ResumeSummary } from "@/features/resume";
 import { useErrorMessageStore } from "@/stores";
 import { stringListToBulletList } from "@/utils";
-import { Box, FormControl, FormHelperText, InputLabel, MenuItem, Select } from "@mui/material";
+import { Box, FormControl, FormHelperText, InputLabel, MenuItem } from "@mui/material";
 
 export interface CreateResumeFormProps {
     resumeName: string;

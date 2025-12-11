@@ -15,120 +15,141 @@ const exportMenuItems = [
     { label: "Markdownでエクスポート", icon: <FileDownloadIcon />, action: () => alert("Markdownでエクスポート") },
 ];
 
+interface BottomMenuProps {
+    /** 自動保存が有効かどうか */
+    autoSaveEnabled: boolean;
+    /** 自動保存の有効/無効を切り替えるハンドラー */
+    onAutoSaveToggle: (enabled: boolean) => void;
+}
+
 /**
  * 下部に固定されたメニューバー
  */
-export const BottomMenu = React.forwardRef<HTMLDivElement>((_, ref) => {
-    const theme = useTheme();
-    const isXs = useMediaQuery(theme.breakpoints.down("sm"));
-    const navigate = useNavigate();
+export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
+    ({ autoSaveEnabled, onAutoSaveToggle }, ref) => {
+        const theme = useTheme();
+        const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+        const navigate = useNavigate();
 
-    const resume = useResumeStore((state) => state.resume);
-    const deleteMutation = useDeleteResume();
+        const resume = useResumeStore((state) => state.resume);
+        const deleteMutation = useDeleteResume();
 
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+        const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+        const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-    const handleExportButtonClick = (event: React.MouseEvent<HTMLElement>) => {
-        setAnchorEl(event.currentTarget);
-    };
+        const handleExportButtonClick = (event: React.MouseEvent<HTMLElement>) => {
+            setAnchorEl(event.currentTarget);
+        };
 
-    const handleExportButtonClose = () => {
-        setAnchorEl(null);
-    };
+        const handleExportButtonClose = () => {
+            setAnchorEl(null);
+        };
 
-    /**
-     * 削除確認ダイアログを開く
-     */
-    const handleDeleteClick = () => {
-        setDeleteDialogOpen(true);
-    };
+        /**
+         * 削除確認ダイアログを開く
+         */
+        const handleDeleteClick = () => {
+            setDeleteDialogOpen(true);
+        };
 
-    /**
-     * 削除確認ダイアログのコールバック
-     */
-    const handleDeleteDialogClose = (confirmed: boolean) => {
-        setDeleteDialogOpen(false);
-        if (confirmed && resume) {
-            deleteMutation.mutate(resume.id, {
-                onSuccess: () => {
-                    navigate(paths.resume.list);
-                },
-            });
-        }
-    };
+        /**
+         * 削除確認ダイアログのコールバック
+         */
+        const handleDeleteDialogClose = (confirmed: boolean) => {
+            setDeleteDialogOpen(false);
+            if (confirmed && resume) {
+                deleteMutation.mutate(resume.id, {
+                    onSuccess: () => {
+                        navigate(paths.resume.list);
+                    },
+                });
+            }
+        };
 
-    return (
-        <>
-            <Paper
-                ref={ref}
-                elevation={3}
-                sx={{
-                    position: "fixed",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    zIndex: 1200,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 3,
-                    p: 2,
-                    bgcolor: "rgba(255, 255, 255, 0.5)",
-                }}
-            >
-                {/* 自動保存 */}
-                <FormGroup>
-                    <FormControlLabel control={<Switch color="success" defaultChecked />} label="自動保存" />
-                </FormGroup>
-                <Box sx={{ display: "flex", gap: 2, marginLeft: "auto" }}>
-                    {/* エクスポートボタン */}
-                    <Button
-                        startIcon={<ExpandMoreIcon />}
-                        size={isXs ? "small" : "medium"}
-                        onClick={handleExportButtonClick}
-                    >
-                        エクスポート
-                    </Button>
-                    {/* エクスポートメニュー */}
-                    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleExportButtonClose}>
-                        {exportMenuItems.map((item, index) => (
-                            <MenuItem
-                                key={index}
-                                onClick={item.action}
-                                sx={{
-                                    color: "primary.main",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                }}
-                            >
-                                {item.icon}
-                                {item.label}
-                            </MenuItem>
-                        ))}
-                    </Menu>
-                    {/* 職務経歴書を削除ボタン */}
-                    <Button
-                        color="error"
-                        startIcon={<DeleteIcon />}
-                        size={isXs ? "small" : "medium"}
-                        onClick={handleDeleteClick}
-                        disabled={deleteMutation.isPending}
-                    >
-                        職務経歴書を削除
-                    </Button>
-                </Box>
-            </Paper>
-            {/* 削除確認ダイアログ */}
-            <Dialog
-                open={deleteDialogOpen}
-                variant="confirm"
-                title="削除確認"
-                description={`「${resume?.resumeName ?? ""}」を削除しますか？この操作は取り消せません。`}
-                onClose={handleDeleteDialogClose}
-            />
-        </>
-    );
-});
+        /**
+         * 自動保存スイッチの変更ハンドラー
+         */
+        const handleAutoSaveChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+            onAutoSaveToggle(event.target.checked);
+        };
+
+        return (
+            <>
+                <Paper
+                    ref={ref}
+                    elevation={3}
+                    sx={{
+                        position: "fixed",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: 1200,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 3,
+                        p: 2,
+                        bgcolor: "rgba(255, 255, 255, 0.5)",
+                    }}
+                >
+                    {/* 自動保存 */}
+                    <FormGroup>
+                        <FormControlLabel
+                            control={
+                                <Switch color="success" checked={autoSaveEnabled} onChange={handleAutoSaveChange} />
+                            }
+                            label="自動保存"
+                        />
+                    </FormGroup>
+                    <Box sx={{ display: "flex", gap: 2, marginLeft: "auto" }}>
+                        {/* エクスポートボタン */}
+                        <Button
+                            startIcon={<ExpandMoreIcon />}
+                            size={isXs ? "small" : "medium"}
+                            onClick={handleExportButtonClick}
+                        >
+                            エクスポート
+                        </Button>
+                        {/* エクスポートメニュー */}
+                        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleExportButtonClose}>
+                            {exportMenuItems.map((item, index) => (
+                                <MenuItem
+                                    key={index}
+                                    onClick={item.action}
+                                    sx={{
+                                        color: "primary.main",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                    }}
+                                >
+                                    {item.icon}
+                                    {item.label}
+                                </MenuItem>
+                            ))}
+                        </Menu>
+                        {/* 職務経歴書を削除ボタン */}
+                        <Button
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            size={isXs ? "small" : "medium"}
+                            onClick={handleDeleteClick}
+                            disabled={deleteMutation.isPending}
+                        >
+                            職務経歴書を削除
+                        </Button>
+                    </Box>
+                </Paper>
+                {/* 削除確認ダイアログ */}
+                <Dialog
+                    open={deleteDialogOpen}
+                    variant="confirm"
+                    title="削除確認"
+                    description={`「${resume?.resumeName ?? ""}」を削除しますか？この操作は取り消せません。`}
+                    onClose={handleDeleteDialogClose}
+                />
+            </>
+        );
+    },
+);
 
 BottomMenu.displayName = "BottomMenu";
