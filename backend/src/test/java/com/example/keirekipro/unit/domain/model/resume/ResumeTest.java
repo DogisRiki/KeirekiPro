@@ -329,22 +329,8 @@ class ResumeTest {
     }
 
     @Test
-    @DisplayName("職歴に存在しない会社名のプロジェクトを追加するとDomainExceptionをスローする")
-    void test15() {
-        Resume resume = createSampleResume();
-        Project notExistProject = createSampleProject().changeCompanyName(notification,
-                CompanyName.create(notification, "株式会社ZZZ"));
-
-        Notification domainNotification = new Notification();
-
-        assertThatThrownBy(() -> resume.addProject(domainNotification, notExistProject))
-                .isInstanceOf(DomainException.class)
-                .hasMessageContaining("株式会社ZZZは職歴に存在しません。職歴に存在する会社名を選択してください。");
-    }
-
-    @Test
     @DisplayName("正常な値でプロジェクトを更新する")
-    void test16() {
+    void test15() {
         Resume beforeResume = createSampleResume();
 
         // 更新対象のプロジェクトを取得し、値を変更
@@ -444,7 +430,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("プロジェクトを削除する")
-    void test17() {
+    void test16() {
         Resume beforeResume = createSampleResume();
 
         TechStack.Frontend frontend = TechStack.Frontend.create(
@@ -524,7 +510,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("資格を追加する")
-    void test18() {
+    void test17() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.create(notification, "応用情報技術者", YearMonth.of(2025, 2));
         Notification domainNotification = new Notification();
@@ -539,7 +525,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("資格を更新する")
-    void test19() {
+    void test18() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.reconstruct(beforeResume.getCertifications().get(0).getId(),
                 "応用情報技術者", YearMonth.of(2025, 2));
@@ -563,7 +549,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("資格を削除する")
-    void test20() {
+    void test19() {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.create(notification, "応用情報技術者", YearMonth.of(2025, 2));
         Notification domainNotification = new Notification();
@@ -585,7 +571,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ポートフォリオを追加する")
-    void test21() {
+    void test20() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
                 notification,
@@ -606,7 +592,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ポートフォリオを更新する")
-    void test22() {
+    void test21() {
         Resume beforeResume = createSampleResume();
         Portfolio updatedPortfolio = Portfolio.reconstruct(
                 beforeResume.getPortfolios().get(0).getId(),
@@ -637,7 +623,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ポートフォリオを削除する")
-    void test23() {
+    void test22() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
                 notification,
@@ -665,7 +651,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ソーシャルリンクを追加する")
-    void test24() {
+    void test23() {
         Resume beforeResume = createSampleResume();
         SocialLink newSocialLink = SocialLink.create(
                 notification,
@@ -684,7 +670,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ソーシャルリンクを更新する")
-    void test25() {
+    void test24() {
         Resume beforeResume = createSampleResume();
         SocialLink updatedSocialLink = SocialLink.reconstruct(
                 beforeResume.getSocialLinks().get(0).getId(),
@@ -707,7 +693,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("ソーシャルリンクを削除する")
-    void test26() {
+    void test25() {
         Resume beforeResume = createSampleResume();
         SocialLink newSocialLink = SocialLink.create(
                 notification,
@@ -733,7 +719,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("自己PRを追加する")
-    void test27() {
+    void test26() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
                 notification,
@@ -752,7 +738,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("自己PRを更新する")
-    void test28() {
+    void test27() {
         Resume beforeResume = createSampleResume();
         SelfPromotion updatedSelfPromotion = SelfPromotion.reconstruct(
                 beforeResume.getSelfPromotions().get(0).getId(),
@@ -779,7 +765,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("自己PRを削除する")
-    void test29() {
+    void test28() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
                 notification,
@@ -805,7 +791,7 @@ class ResumeTest {
 
     @Test
     @DisplayName("氏名を変更する")
-    void test30() {
+    void test29() {
         Resume originalResume = createSampleResume();
         FullName newFullName = FullName.create(notification, "変更", "しました");
         Notification domainNotification = new Notification();
@@ -813,18 +799,6 @@ class ResumeTest {
         Resume updatedResume = originalResume.ChangeFullName(domainNotification, newFullName);
 
         assertThat(updatedResume.getFullName()).isEqualTo(newFullName);
-    }
-
-    @Test
-    @DisplayName("プロジェクトで使用されている会社名の職歴を削除しようとするとDomainExceptionをスローする")
-    void test31() {
-        // 初期状態で「株式会社ABC」の職歴と、同じ会社名のプロジェクトが存在する
-        Resume resume = createSampleResume();
-        UUID careerId = resume.getCareers().get(0).getId();
-
-        assertThatThrownBy(() -> resume.removeCareer(careerId))
-                .isInstanceOf(DomainException.class)
-                .hasMessageContaining("株式会社ABCはプロジェクトで使用されています。該当プロジェクトを削除してから職歴を削除してください。");
     }
 
     /**

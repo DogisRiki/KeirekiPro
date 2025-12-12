@@ -203,9 +203,6 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
                 → A社が継続中のため、B社がどの期間に存在しても重複。
 
         ・プロジェクトについては兼任があり得るため担当被りチェックを行わない。
-
-        ・プロジェクトで使用されている会社名の職歴は削除できない。
-            ・該当プロジェクトを削除してから職歴を削除すること。
     end note
 
     note bottom of Career
@@ -219,8 +216,6 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         ・チーム構成は必須かつ100文字以内。
         ・役割は必須かつ1000文字以内。
         ・成果は必須かつ1000文字以内。
-        ・職歴に入力された会社名以外は許可しない。
-            (職務経歴書内の整合性担保のため)
     end note
 
     note bottom of Certification
