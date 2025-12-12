@@ -1,4 +1,4 @@
-import type { Resume } from "@/features/resume";
+import type { Resume, SectionName } from "@/features/resume";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
@@ -8,13 +8,38 @@ import { devtools } from "zustand/middleware";
 type ResumeArrayKeys = "careers" | "projects" | "certifications" | "portfolios" | "socialLinks" | "selfPromotions";
 
 /**
+ * リスト型セクション名（エントリーを持つセクション）
+ */
+type ListSectionName = Exclude<SectionName, "basicInfo">;
+
+/**
+ * セクションごとのアクティブエントリーID
+ */
+type ActiveEntryIdsBySection = Record<ListSectionName, string | null>;
+
+/**
+ * アクティブエントリーIDの初期値
+ */
+const initialActiveEntryIdsBySection: ActiveEntryIdsBySection = {
+    career: null,
+    project: null,
+    certification: null,
+    portfolio: null,
+    socialLink: null,
+    selfPromotion: null,
+};
+
+/**
  * ストアの型
  */
 interface ResumeStoreState {
     // 現在のセクション
-    activeSection: "basicInfo" | "career" | "project" | "certification" | "portfolio" | "socialLink" | "selfPromotion";
+    activeSection: SectionName;
 
-    // 選択されているエントリーID
+    // セクションごとの選択されているエントリーID
+    activeEntryIdsBySection: ActiveEntryIdsBySection;
+
+    // 現在のセクションのアクティブエントリーID（派生値として取得）
     activeEntryId: string | null;
 
     // 職務経歴書全体のデータ
@@ -27,7 +52,7 @@ interface ResumeStoreState {
     dirtyEntryIds: Set<string>;
 
     // アクション
-    setActiveSection: (section: ResumeStoreState["activeSection"]) => void;
+    setActiveSection: (section: SectionName) => void;
     setActiveEntryId: (entryId: string | null) => void;
     setResume: (resume: Resume) => void;
     initializeResume: (resume: Resume) => void;
@@ -44,6 +69,19 @@ interface ResumeStoreState {
 }
 
 /**
+ * 現在のセクションのアクティブエントリーIDを取得するヘルパー
+ */
+const getActiveEntryId = (
+    activeSection: SectionName,
+    activeEntryIdsBySection: ActiveEntryIdsBySection,
+): string | null => {
+    if (activeSection === "basicInfo") {
+        return null;
+    }
+    return activeEntryIdsBySection[activeSection];
+};
+
+/**
  * 職務経歴書を管理するストア
  */
 export const useResumeStore = create<ResumeStoreState>()(
@@ -51,16 +89,42 @@ export const useResumeStore = create<ResumeStoreState>()(
         (set) => ({
             // 初期状態
             activeSection: "basicInfo",
+            activeEntryIdsBySection: { ...initialActiveEntryIdsBySection },
             activeEntryId: null,
             resume: null,
             isDirty: false,
             dirtyEntryIds: new Set(),
 
             // アクション: セクションの切り替え
-            setActiveSection: (section) => set({ activeSection: section }, false, "setActiveSection"),
+            setActiveSection: (section) =>
+                set(
+                    (state) => ({
+                        activeSection: section,
+                        activeEntryId: getActiveEntryId(section, state.activeEntryIdsBySection),
+                    }),
+                    false,
+                    "setActiveSection",
+                ),
 
-            // アクション: エントリーIDの設定
-            setActiveEntryId: (entryId) => set({ activeEntryId: entryId }, false, "setActiveEntryId"),
+            // アクション: エントリーIDの設定（現在のセクションに対して設定）
+            setActiveEntryId: (entryId) =>
+                set(
+                    (state) => {
+                        const { activeSection } = state;
+                        if (activeSection === "basicInfo") {
+                            return { activeEntryId: null };
+                        }
+                        return {
+                            activeEntryIdsBySection: {
+                                ...state.activeEntryIdsBySection,
+                                [activeSection]: entryId,
+                            },
+                            activeEntryId: entryId,
+                        };
+                    },
+                    false,
+                    "setActiveEntryId",
+                ),
 
             // アクション: 職務経歴書全体の設定（保存成功時に使用、isDirtyをfalseに）
             setResume: (resume) => set({ resume, isDirty: false }, false, "setResume"),
@@ -72,6 +136,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                         resume,
                         isDirty: false,
                         activeSection: "basicInfo",
+                        activeEntryIdsBySection: { ...initialActiveEntryIdsBySection },
                         activeEntryId: null,
                         dirtyEntryIds: new Set(),
                     },
@@ -144,6 +209,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                     {
                         resume: null,
                         activeSection: "basicInfo",
+                        activeEntryIdsBySection: { ...initialActiveEntryIdsBySection },
                         activeEntryId: null,
                         isDirty: false,
                         dirtyEntryIds: new Set(),

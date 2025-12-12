@@ -8,7 +8,6 @@ export const SectionTabs = () => {
     // ストアから必要な状態を取り出す
     const activeSection = useResumeStore((state) => state.activeSection);
     const setActiveSection = useResumeStore((state) => state.setActiveSection);
-    const setActiveEntryId = useResumeStore((state) => state.setActiveEntryId);
 
     /**
      * タブ変更ハンドラー
@@ -16,7 +15,6 @@ export const SectionTabs = () => {
     const handleChange = (_: React.SyntheticEvent, newValue: number) => {
         const targetSection = sections[newValue].key;
         setActiveSection(targetSection);
-        setActiveEntryId(null);
     };
 
     return (
