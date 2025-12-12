@@ -263,14 +263,20 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updateCareer(domainNotification, newCareer);
 
+        Career actualCareer = afterResume.getCareers().stream()
+                .filter(career -> career.getId().equals(newCareer.getId()))
+                .findFirst()
+                .orElseThrow();
+
         // 更新した職歴がリストに含まれている
         assertThat(afterResume.getCareers().contains(newCareer)).isTrue();
         // 職歴リストのサイズが変わらない
         assertThat(afterResume.getCareers().size()).isEqualTo(beforeResume.getCareers().size());
-        // 更新した職歴の値が正しい
-        assertThat(afterResume.getCareers().get(0).getCompanyName()).isEqualTo(newCareer.getCompanyName());
-        assertThat(afterResume.getCareers().get(0).getPeriod()).isEqualTo(newCareer.getPeriod());
-        assertThat(afterResume.getCareers().get(0).getId()).isEqualTo(beforeResume.getCareers().get(0).getId());
+        // 更新した職歴の値が正しい（順序に依存しない）
+        assertAll(
+                () -> assertThat(actualCareer.getId()).isEqualTo(newCareer.getId()),
+                () -> assertThat(actualCareer.getCompanyName()).isEqualTo(newCareer.getCompanyName()),
+                () -> assertThat(actualCareer.getPeriod()).isEqualTo(newCareer.getPeriod()));
     }
 
     @Test
@@ -401,30 +407,34 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updateProject(domainNotification, updatedProject);
 
+        Project actualProject = afterResume.getProjects().stream()
+                .filter(project -> project.getId().equals(updatedProject.getId()))
+                .findFirst()
+                .orElseThrow();
+
         // 更新したプロジェクトがリストに含まれている
         assertThat(afterResume.getProjects().contains(updatedProject)).isTrue();
         // プロジェクトリストのサイズが変わらない
         assertThat(afterResume.getProjects().size()).isEqualTo(beforeResume.getProjects().size());
-        // 更新したプロジェクトの値が正しい
+        // 更新したプロジェクトの値が正しい（順序に依存しない）
         assertAll(
-                () -> assertThat(afterResume.getProjects().get(0).getId()).isEqualTo(originalProject.getId()),
-                () -> assertThat(afterResume.getProjects().get(0).getCompanyName())
-                        .isEqualTo(originalProject.getCompanyName()),
-                () -> assertThat(afterResume.getProjects().get(0).getPeriod()).isEqualTo(originalProject.getPeriod()),
-                () -> assertThat(afterResume.getProjects().get(0).getName()).isEqualTo("新しいプロジェクト名"),
-                () -> assertThat(afterResume.getProjects().get(0).getOverview()).isEqualTo("新しいプロジェクト概要"),
-                () -> assertThat(afterResume.getProjects().get(0).getTeamComp()).isEqualTo("10人"),
-                () -> assertThat(afterResume.getProjects().get(0).getRole()).isEqualTo("マネージャー"),
-                () -> assertThat(afterResume.getProjects().get(0).getAchievement()).isEqualTo("新しい成果内容"),
-                () -> assertThat(afterResume.getProjects().get(0).getProcess())
+                () -> assertThat(actualProject.getId()).isEqualTo(originalProject.getId()),
+                () -> assertThat(actualProject.getCompanyName()).isEqualTo(originalProject.getCompanyName()),
+                () -> assertThat(actualProject.getPeriod()).isEqualTo(originalProject.getPeriod()),
+                () -> assertThat(actualProject.getName()).isEqualTo("新しいプロジェクト名"),
+                () -> assertThat(actualProject.getOverview()).isEqualTo("新しいプロジェクト概要"),
+                () -> assertThat(actualProject.getTeamComp()).isEqualTo("10人"),
+                () -> assertThat(actualProject.getRole()).isEqualTo("マネージャー"),
+                () -> assertThat(actualProject.getAchievement()).isEqualTo("新しい成果内容"),
+                () -> assertThat(actualProject.getProcess())
                         .isEqualTo(Project.Process.create(false, true, true, false, true, true, false)),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getFrontend().getLanguages())
+                () -> assertThat(actualProject.getTechStack().getFrontend().getLanguages())
                         .isEqualTo(List.of("JavaScript", "TypeScript")),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getFrontend().getFrameworks())
+                () -> assertThat(actualProject.getTechStack().getFrontend().getFrameworks())
                         .isEqualTo(List.of("React")),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getInfrastructure().getClouds())
+                () -> assertThat(actualProject.getTechStack().getInfrastructure().getClouds())
                         .isEqualTo(List.of("Azure")),
-                () -> assertThat(afterResume.getProjects().get(0).getTechStack().getTools().getSourceControls())
+                () -> assertThat(actualProject.getTechStack().getTools().getSourceControls())
                         .isEqualTo(List.of("GitLab")));
     }
 
@@ -502,8 +512,13 @@ class ResumeTest {
         // プロジェクトリストのサイズが減少している
         assertThat(deletedResume.getProjects().size()).isEqualTo(afterResume.getProjects().size() - 1);
 
-        // 削除2回目(1件 → 0件)
-        Resume deletedResume2 = deletedResume.removeProject(deletedResume.getProjects().get(0).getId());
+        // 削除2回目(1件 → 0件) - 残件のIDで削除（順序に依存しない）
+        UUID remainingProjectId = deletedResume.getProjects().stream()
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        Resume deletedResume2 = deletedResume.removeProject(remainingProjectId);
         // プロジェクトリストが空になっている
         assertThat(deletedResume2.getProjects().isEmpty()).isTrue();
     }
@@ -533,18 +548,20 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updateCertification(domainNotification, newCertification);
 
+        Certification actualCertification = afterResume.getCertifications().stream()
+                .filter(certification -> certification.getId().equals(newCertification.getId()))
+                .findFirst()
+                .orElseThrow();
+
         // 更新した資格がリストに含まれている
         assertThat(afterResume.getCertifications().contains(newCertification)).isTrue();
         // 資格リストのサイズが変わらない
         assertThat(afterResume.getCertifications().size()).isEqualTo(beforeResume.getCertifications().size());
-        // 更新した資格の値が正しい
+        // 更新した資格の値が正しい（順序に依存しない）
         assertAll(
-                () -> assertThat(afterResume.getCertifications().get(0).getName())
-                        .isEqualTo(newCertification.getName()),
-                () -> assertThat(afterResume.getCertifications().get(0).getDate())
-                        .isEqualTo(newCertification.getDate()),
-                () -> assertThat(afterResume.getCertifications().get(0).getId())
-                        .isEqualTo(beforeResume.getCertifications().get(0).getId()));
+                () -> assertThat(actualCertification.getName()).isEqualTo(newCertification.getName()),
+                () -> assertThat(actualCertification.getDate()).isEqualTo(newCertification.getDate()),
+                () -> assertThat(actualCertification.getId()).isEqualTo(newCertification.getId()));
     }
 
     @Test
@@ -563,8 +580,13 @@ class ResumeTest {
         // 職歴リストのサイズが減少している
         assertThat(deletedResume.getCertifications().size()).isEqualTo(afterResume.getCertifications().size() - 1);
 
-        // 削除2回目(1件 → 0件)
-        Resume deletedResume2 = deletedResume.removeCertification(deletedResume.getCertifications().get(0).getId());
+        // 削除2回目(1件 → 0件) - 残件のIDで削除（順序に依存しない）
+        UUID remainingCertificationId = deletedResume.getCertifications().stream()
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        Resume deletedResume2 = deletedResume.removeCertification(remainingCertificationId);
         // 職歴リストが空になっている
         assertThat(deletedResume2.getCertifications().isEmpty()).isTrue();
     }
@@ -605,20 +627,22 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updatePortfolio(domainNotification, updatedPortfolio);
 
+        Portfolio actualPortfolio = afterResume.getPortfolios().stream()
+                .filter(portfolio -> portfolio.getId().equals(updatedPortfolio.getId()))
+                .findFirst()
+                .orElseThrow();
+
         // 更新したポートフォリオがリストに含まれている
         assertThat(afterResume.getPortfolios().contains(updatedPortfolio)).isTrue();
         // ポートフォリオリストのサイズが変わらない
         assertThat(afterResume.getPortfolios().size()).isEqualTo(beforeResume.getPortfolios().size());
-        // 更新したポートフォリオの値が正しい
+        // 更新したポートフォリオの値が正しい（順序に依存しない）
         assertAll(
-                () -> assertThat(afterResume.getPortfolios().get(0).getName()).isEqualTo(updatedPortfolio.getName()),
-                () -> assertThat(afterResume.getPortfolios().get(0).getOverview())
-                        .isEqualTo(updatedPortfolio.getOverview()),
-                () -> assertThat(afterResume.getPortfolios().get(0).getTechStack())
-                        .isEqualTo(updatedPortfolio.getTechStack()),
-                () -> assertThat(afterResume.getPortfolios().get(0).getLink()).isEqualTo(updatedPortfolio.getLink()),
-                () -> assertThat(afterResume.getPortfolios().get(0).getId())
-                        .isEqualTo(beforeResume.getPortfolios().get(0).getId()));
+                () -> assertThat(actualPortfolio.getName()).isEqualTo(updatedPortfolio.getName()),
+                () -> assertThat(actualPortfolio.getOverview()).isEqualTo(updatedPortfolio.getOverview()),
+                () -> assertThat(actualPortfolio.getTechStack()).isEqualTo(updatedPortfolio.getTechStack()),
+                () -> assertThat(actualPortfolio.getLink()).isEqualTo(updatedPortfolio.getLink()),
+                () -> assertThat(actualPortfolio.getId()).isEqualTo(updatedPortfolio.getId()));
     }
 
     @Test
@@ -643,8 +667,13 @@ class ResumeTest {
         // ポートフォリオリストのサイズが減少している
         assertThat(deletedResume.getPortfolios().size()).isEqualTo(afterResume.getPortfolios().size() - 1);
 
-        // 削除2回目(1件 → 0件)
-        Resume deletedResume2 = deletedResume.removePortfolio(deletedResume.getPortfolios().get(0).getId());
+        // 削除2回目(1件 → 0件) - 残件のIDで削除（順序に依存しない）
+        UUID remainingPortfolioId = deletedResume.getPortfolios().stream()
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        Resume deletedResume2 = deletedResume.removePortfolio(remainingPortfolioId);
         // ポートフォリオリストが空になっている
         assertThat(deletedResume2.getPortfolios().isEmpty()).isTrue();
     }
@@ -681,14 +710,20 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updateSociealLink(domainNotification, updatedSocialLink);
 
+        SocialLink actualSocialLink = afterResume.getSocialLinks().stream()
+                .filter(socialLink -> socialLink.getId().equals(updatedSocialLink.getId()))
+                .findFirst()
+                .orElseThrow();
+
         // 更新したソーシャルリンクがリストに含まれている
         assertThat(afterResume.getSocialLinks().contains(updatedSocialLink)).isTrue();
         // ソーシャルリンクリストのサイズが変わらない
         assertThat(afterResume.getSocialLinks().size()).isEqualTo(beforeResume.getSocialLinks().size());
-        // 更新したソーシャルリンクの値が正しい
-        assertThat(afterResume.getSocialLinks().get(0).getName()).isEqualTo(updatedSocialLink.getName());
-        assertThat(afterResume.getSocialLinks().get(0).getLink()).isEqualTo(updatedSocialLink.getLink());
-        assertThat(afterResume.getSocialLinks().get(0).getId()).isEqualTo(beforeResume.getSocialLinks().get(0).getId());
+        // 更新したソーシャルリンクの値が正しい（順序に依存しない）
+        assertAll(
+                () -> assertThat(actualSocialLink.getName()).isEqualTo(updatedSocialLink.getName()),
+                () -> assertThat(actualSocialLink.getLink()).isEqualTo(updatedSocialLink.getLink()),
+                () -> assertThat(actualSocialLink.getId()).isEqualTo(updatedSocialLink.getId()));
     }
 
     @Test
@@ -711,8 +746,13 @@ class ResumeTest {
         // ソーシャルリンクリストのサイズが減少している
         assertThat(deletedResume.getSocialLinks().size()).isEqualTo(afterResume.getSocialLinks().size() - 1);
 
-        // 削除2回目(1件 → 0件)
-        Resume deletedResume2 = deletedResume.removeSociealLink(deletedResume.getSocialLinks().get(0).getId());
+        // 削除2回目(1件 → 0件) - 残件のIDで削除（順序に依存しない）
+        UUID remainingSocialLinkId = deletedResume.getSocialLinks().stream()
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        Resume deletedResume2 = deletedResume.removeSociealLink(remainingSocialLinkId);
         // ソーシャルリンクリストが空になっている
         assertThat(deletedResume2.getSocialLinks().isEmpty()).isTrue();
     }
@@ -749,18 +789,20 @@ class ResumeTest {
 
         Resume afterResume = beforeResume.updateSelfPromotion(domainNotification, updatedSelfPromotion);
 
+        SelfPromotion actualSelfPromotion = afterResume.getSelfPromotions().stream()
+                .filter(selfPromotion -> selfPromotion.getId().equals(updatedSelfPromotion.getId()))
+                .findFirst()
+                .orElseThrow();
+
         // 更新した自己PRがリストに含まれている
         assertThat(afterResume.getSelfPromotions().contains(updatedSelfPromotion)).isTrue();
         // 自己PRリストのサイズが変わらない
         assertThat(afterResume.getSelfPromotions().size()).isEqualTo(beforeResume.getSelfPromotions().size());
-        // 更新した自己PRの値が正しい
+        // 更新した自己PRの値が正しい（順序に依存しない）
         assertAll(
-                () -> assertThat(afterResume.getSelfPromotions().get(0).getTitle())
-                        .isEqualTo(updatedSelfPromotion.getTitle()),
-                () -> assertThat(afterResume.getSelfPromotions().get(0).getContent())
-                        .isEqualTo(updatedSelfPromotion.getContent()),
-                () -> assertThat(afterResume.getSelfPromotions().get(0).getId())
-                        .isEqualTo(beforeResume.getSelfPromotions().get(0).getId()));
+                () -> assertThat(actualSelfPromotion.getTitle()).isEqualTo(updatedSelfPromotion.getTitle()),
+                () -> assertThat(actualSelfPromotion.getContent()).isEqualTo(updatedSelfPromotion.getContent()),
+                () -> assertThat(actualSelfPromotion.getId()).isEqualTo(updatedSelfPromotion.getId()));
     }
 
     @Test
@@ -783,8 +825,13 @@ class ResumeTest {
         // 自己PRリストのサイズが減少している
         assertThat(deletedResume.getSelfPromotions().size()).isEqualTo(afterResume.getSelfPromotions().size() - 1);
 
-        // 削除2回目(1件 → 0件)
-        Resume deletedResume2 = deletedResume.removeSelfPromotion(deletedResume.getSelfPromotions().get(0).getId());
+        // 削除2回目(1件 → 0件) - 残件のIDで削除（順序に依存しない）
+        UUID remainingSelfPromotionId = deletedResume.getSelfPromotions().stream()
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        Resume deletedResume2 = deletedResume.removeSelfPromotion(remainingSelfPromotionId);
         // 自己PRリストが空になっている
         assertThat(deletedResume2.getSelfPromotions().isEmpty()).isTrue();
     }

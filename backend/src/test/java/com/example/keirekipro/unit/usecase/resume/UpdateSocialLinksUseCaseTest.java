@@ -59,9 +59,11 @@ class UpdateSocialLinksUseCaseTest {
     void test1() {
         // 既存の職務経歴書とソーシャルリンクを準備
         Resume resume = buildResumeWithSocialLinks(USER_ID);
-        List<SocialLink> originalSocialLinks = resume.getSocialLinks();
-        SocialLink originalSocialLink1 = originalSocialLinks.get(0);
-        UUID originalSocialLink2Id = originalSocialLinks.get(1).getId();
+
+        // getSocialLinks() は並び替え済みのコピーを返すため、固定名に依存せず既存1件を特定する
+        SocialLink originalSocialLink1 = resume.getSocialLinks().stream()
+                .findFirst()
+                .orElseThrow();
 
         // リクエスト準備
         // 1件目: 既存ソーシャルリンク1を更新
@@ -112,7 +114,12 @@ class UpdateSocialLinksUseCaseTest {
                 .orElseThrow();
         assertThat(addedSocialLink.getLink().getValue()).isEqualTo("https://example.com/new-sns");
 
-        // 削除対象だった既存ソーシャルリンク2が存在しないことを検証
+        // 削除対象だった既存ソーシャルリンク（更新対象以外）が存在しないことを検証
+        UUID originalSocialLink2Id = resume.getSocialLinks().stream()
+                .map(SocialLink::getId)
+                .filter(id -> !id.equals(originalSocialLink1.getId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(saved.getSocialLinks().stream()
                 .noneMatch(s -> s.getId().equals(originalSocialLink2Id))).isTrue();
 

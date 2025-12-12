@@ -61,8 +61,11 @@ class UpdateProjectsUseCaseTest {
     void test1() {
         // 既存の職務経歴書とプロジェクトを準備
         Resume resume = buildResumeWithProjects(USER_ID);
-        List<Project> originalProjects = resume.getProjects();
-        Project originalProject1 = originalProjects.get(0);
+
+        // getProjects() は並び替え済みのコピーを返すため、固定名に依存せず既存1件を特定する
+        Project originalProject1 = resume.getProjects().stream()
+                .findFirst()
+                .orElseThrow();
 
         // リクエスト準備
         // 1件目: 既存プロジェクト1を更新
@@ -126,7 +129,6 @@ class UpdateProjectsUseCaseTest {
         updateRequest.setDevelopmentEnvironments(List.of("Windows"));
 
         // 2件目: 新規プロジェクト追加（IDはnull）
-        // 会社名は既存職歴「会社B」に合わせる（ドメイン制約: 職歴に存在する会社名のみ許可）
         UpdateProjectsRequest.ProjectRequest addRequest = new UpdateProjectsRequest.ProjectRequest();
         addRequest.setId(null);
         addRequest.setCompanyName("会社B");
@@ -227,8 +229,12 @@ class UpdateProjectsUseCaseTest {
         assertThat(addedProject.getPeriod().getStartDate()).isEqualTo(YearMonth.of(2020, 1));
         assertThat(addedProject.getPeriod().getEndDate()).isEqualTo(YearMonth.of(2020, 12));
 
-        // 削除対象だった既存プロジェクト2が存在しないことを検証
-        UUID originalProject2Id = originalProjects.get(1).getId();
+        // 削除対象だった既存プロジェクト（更新対象以外）が存在しないことを検証
+        UUID originalProject2Id = resume.getProjects().stream()
+                .map(Project::getId)
+                .filter(id -> !id.equals(originalProject1.getId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(saved.getProjects().stream()
                 .noneMatch(p -> p.getId().equals(originalProject2Id))).isTrue();
 

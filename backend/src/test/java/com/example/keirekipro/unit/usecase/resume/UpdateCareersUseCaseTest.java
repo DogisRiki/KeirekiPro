@@ -60,12 +60,20 @@ class UpdateCareersUseCaseTest {
     void test1() {
         // 既存の職務経歴書と職歴を準備
         Resume resume = buildResumeWithCareers(USER_ID);
-        List<Career> originalCareers = resume.getCareers();
-        Career originalCareer1 = originalCareers.get(0);
-        Career originalCareer2 = originalCareers.get(1);
+
+        // getCareers() は並び替え済みのコピーを返すため、順序に依存せず会社名で特定する
+        Career originalCareer1 = resume.getCareers().stream()
+                .filter(c -> "会社A".equals(c.getCompanyName().getValue()))
+                .findFirst()
+                .orElseThrow();
+
+        Career originalCareer2 = resume.getCareers().stream()
+                .filter(c -> "会社B".equals(c.getCompanyName().getValue()))
+                .findFirst()
+                .orElseThrow();
 
         // リクエスト準備
-        // 1件目: 既存職歴1を更新
+        // 1件目: 既存職歴(会社A:2018年)を更新
         UpdateCareersRequest.CareerRequest updateRequest = new UpdateCareersRequest.CareerRequest(
                 originalCareer1.getId(),
                 "更新後会社",

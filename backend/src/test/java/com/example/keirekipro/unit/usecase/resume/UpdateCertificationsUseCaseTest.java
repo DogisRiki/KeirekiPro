@@ -59,9 +59,17 @@ class UpdateCertificationsUseCaseTest {
     void test1() {
         // 既存の職務経歴書と資格を準備
         Resume resume = buildResumeWithCertifications(USER_ID);
-        List<Certification> originalCertifications = resume.getCertifications();
-        Certification originalCertification1 = originalCertifications.get(0);
-        UUID originalCertification2Id = originalCertifications.get(1).getId();
+
+        // getCertifications() は並び替え済みのコピーを返すため、順序に依存しない特定方法にする
+        Certification originalCertification1 = resume.getCertifications().stream()
+                .filter(c -> "資格A".equals(c.getName()))
+                .findFirst()
+                .orElseThrow();
+        UUID originalCertification2Id = resume.getCertifications().stream()
+                .filter(c -> "資格B".equals(c.getName()))
+                .map(Certification::getId)
+                .findFirst()
+                .orElseThrow();
 
         // リクエスト準備
         // 1件目: 既存資格1を更新

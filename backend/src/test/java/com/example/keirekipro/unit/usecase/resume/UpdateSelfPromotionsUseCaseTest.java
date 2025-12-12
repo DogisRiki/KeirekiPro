@@ -58,9 +58,11 @@ class UpdateSelfPromotionsUseCaseTest {
     void test1() {
         // 既存の職務経歴書と自己PRを準備
         Resume resume = buildResumeWithSelfPromotions(USER_ID);
-        List<SelfPromotion> originalSelfPromotions = resume.getSelfPromotions();
-        SelfPromotion originalSelfPromotion1 = originalSelfPromotions.get(0);
-        UUID originalSelfPromotion2Id = originalSelfPromotions.get(1).getId();
+
+        // getSelfPromotions() は並び替え済みのコピーを返すため、固定タイトルに依存せず既存1件を特定する
+        SelfPromotion originalSelfPromotion1 = resume.getSelfPromotions().stream()
+                .findFirst()
+                .orElseThrow();
 
         // リクエスト準備
         // 1件目: 既存自己PR1を更新
@@ -111,7 +113,12 @@ class UpdateSelfPromotionsUseCaseTest {
                 .orElseThrow();
         assertThat(addedSelfPromotion.getContent()).isEqualTo("新規自己PRコンテンツ");
 
-        // 削除対象だった既存自己PR2が存在しないことを検証
+        // 削除対象だった既存自己PR（更新対象以外）が存在しないことを検証
+        UUID originalSelfPromotion2Id = resume.getSelfPromotions().stream()
+                .map(SelfPromotion::getId)
+                .filter(id -> !id.equals(originalSelfPromotion1.getId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(saved.getSelfPromotions().stream()
                 .noneMatch(s -> s.getId().equals(originalSelfPromotion2Id))).isTrue();
 

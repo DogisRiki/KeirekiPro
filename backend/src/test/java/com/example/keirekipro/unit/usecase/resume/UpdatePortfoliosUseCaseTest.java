@@ -59,9 +59,11 @@ class UpdatePortfoliosUseCaseTest {
     void test1() {
         // 既存の職務経歴書とポートフォリオを準備
         Resume resume = buildResumeWithPortfolios(USER_ID);
-        List<Portfolio> originalPortfolios = resume.getPortfolios();
-        Portfolio originalPortfolio1 = originalPortfolios.get(0);
-        UUID originalPortfolio2Id = originalPortfolios.get(1).getId();
+
+        // getPortfolios() は並び替え済みのコピーを返すため、固定名に依存せず既存1件を特定する
+        Portfolio originalPortfolio1 = resume.getPortfolios().stream()
+                .findFirst()
+                .orElseThrow();
 
         // リクエスト準備
         // 1件目: 既存ポートフォリオ1を更新
@@ -120,7 +122,12 @@ class UpdatePortfoliosUseCaseTest {
         assertThat(addedPortfolio.getTechStack()).isEqualTo("新規技術スタック");
         assertThat(addedPortfolio.getLink().getValue()).isEqualTo("https://example.com/new");
 
-        // 削除対象だった既存ポートフォリオ2が存在しないことを検証
+        // 削除対象だった既存ポートフォリオ（更新対象以外）が存在しないことを検証
+        UUID originalPortfolio2Id = resume.getPortfolios().stream()
+                .map(Portfolio::getId)
+                .filter(id -> !id.equals(originalPortfolio1.getId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(saved.getPortfolios().stream()
                 .noneMatch(p -> p.getId().equals(originalPortfolio2Id))).isTrue();
 

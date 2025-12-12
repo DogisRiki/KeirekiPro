@@ -4,9 +4,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+import com.example.keirekipro.domain.policy.resume.ResumeEntryOrderPolicy;
 import com.example.keirekipro.domain.shared.Entity;
 import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.shared.Notification;
@@ -80,31 +82,45 @@ public class Resume extends Entity {
     private final List<SelfPromotion> selfPromotions;
 
     /**
-     * リストは全てイミュータブルにする
+     * リストは全てイミュータブルにし、リスト内を整列する
      * resume.getCareers().add(new Career()) のような操作を禁止する
      */
     public List<Career> getCareers() {
-        return Collections.unmodifiableList(careers);
+        return unmodifiableSortedCopy(careers, ResumeEntryOrderPolicy.careerDesc());
     }
 
     public List<Project> getProjects() {
-        return Collections.unmodifiableList(projects);
+        return unmodifiableSortedCopy(projects, ResumeEntryOrderPolicy.projectDesc());
     }
 
     public List<Certification> getCertifications() {
-        return Collections.unmodifiableList(certifications);
+        return unmodifiableSortedCopy(certifications, ResumeEntryOrderPolicy.certificationDesc());
     }
 
     public List<Portfolio> getPortfolios() {
-        return Collections.unmodifiableList(portfolios);
+        return unmodifiableSortedCopy(portfolios, ResumeEntryOrderPolicy.portfolioNameAsc());
     }
 
     public List<SocialLink> getSocialLinks() {
-        return Collections.unmodifiableList(socialLinks);
+        return unmodifiableSortedCopy(socialLinks, ResumeEntryOrderPolicy.socialLinkNameAsc());
     }
 
     public List<SelfPromotion> getSelfPromotions() {
-        return Collections.unmodifiableList(selfPromotions);
+        return unmodifiableSortedCopy(selfPromotions, ResumeEntryOrderPolicy.selfPromotionTitleAsc());
+    }
+
+    /**
+     * 指定の比較器で整列したイミュータブルなリストを返す
+     *
+     * @param source     元リスト
+     * @param comparator 並び替え用比較器
+     * @param <T>        要素型
+     * @return 整列済みイミュータブルリスト
+     */
+    private static <T> List<T> unmodifiableSortedCopy(List<T> source, Comparator<? super T> comparator) {
+        List<T> copied = new ArrayList<>(source);
+        copied.sort(comparator);
+        return Collections.unmodifiableList(copied);
     }
 
     /**
