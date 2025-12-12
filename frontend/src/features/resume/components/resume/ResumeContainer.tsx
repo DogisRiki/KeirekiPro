@@ -2,7 +2,6 @@ import { Button, Dialog } from "@/components/ui";
 import type { SectionName } from "@/features/resume";
 import {
     BottomMenu,
-    checkCareerDeletable,
     createCurrentSection,
     EntryList,
     getApiId,
@@ -52,14 +51,10 @@ export const ResumeContainer = () => {
     // BottomMenuの高さを動的に取得
     const [bottomMenuHeight, setBottomMenuHeight] = useState(0);
 
-    // 警告ダイアログの状態
-    const [warningDialogOpen, setWarningDialogOpen] = useState(false);
-    const [warningMessage, setWarningMessage] = useState("");
-
     // 自動保存の有効/無効状態
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
 
-    // 職務経歴書詳細情報取得（ストアへのセットはhook内で実施）
+    // 職務経歴書詳細情報取得
     const { isLoading } = useGetResumeInfo(resumeId ?? "");
 
     // 各セクションの更新ミューテーション
@@ -101,29 +96,11 @@ export const ResumeContainer = () => {
         const sectionKey = getResumeKey(activeSection);
         if (!sectionKey) return;
 
-        // 職歴の場合、プロジェクトで使用されているかチェック
-        if (sectionKey === "careers") {
-            const checkResult = checkCareerDeletable(resume, activeEntryId);
-            if (!checkResult.canDelete) {
-                setWarningMessage(checkResult.warningMessage ?? "");
-                setWarningDialogOpen(true);
-                return;
-            }
-        }
-
         const list = resume[sectionKey];
         const updated = list.filter((item) => item.id !== activeEntryId) as typeof list;
 
         updateSection(sectionKey, updated);
         setActiveEntryId(null);
-    };
-
-    /**
-     * 警告ダイアログを閉じる
-     */
-    const handleWarningDialogClose = () => {
-        setWarningDialogOpen(false);
-        setWarningMessage("");
     };
 
     /**
@@ -327,14 +304,6 @@ export const ResumeContainer = () => {
             </Grid>
             {/* 下部メニュー */}
             <BottomMenu ref={measuredRef} autoSaveEnabled={autoSaveEnabled} onAutoSaveToggle={setAutoSaveEnabled} />
-            {/* 警告ダイアログ */}
-            <Dialog
-                open={warningDialogOpen}
-                variant="warning"
-                title="削除できません"
-                description={warningMessage}
-                onClose={handleWarningDialogClose}
-            />
             {/* 離脱防止ダイアログ */}
             <Dialog
                 open={dialogProps.open}

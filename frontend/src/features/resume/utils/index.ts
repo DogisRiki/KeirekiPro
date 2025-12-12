@@ -1,4 +1,4 @@
-import type { Resume, SectionName } from "@/features/resume";
+import type { SectionName } from "@/features/resume";
 import { sections, TEMP_ID_PREFIX } from "@/features/resume";
 import { formatDate } from "@/utils";
 import dayjs from "dayjs";
@@ -103,40 +103,4 @@ export const isTempId = (id: string | null | undefined): boolean => {
 export const getApiId = (id: string | null | undefined): string | null => {
     if (!id || isTempId(id)) return null;
     return id;
-};
-
-/**
- * 職歴削除チェック結果
- */
-export interface CareerDeleteCheckResult {
-    canDelete: boolean;
-    warningMessage: string | null;
-}
-
-/**
- * 職歴を削除できるかチェックする
- * プロジェクトで使用されている会社名の場合は削除不可
- * @param resume 職務経歴書
- * @param careerId 削除対象の職歴ID
- * @returns チェック結果
- */
-export const checkCareerDeletable = (resume: Resume | null, careerId: string): CareerDeleteCheckResult => {
-    if (!resume) {
-        return { canDelete: false, warningMessage: null };
-    }
-
-    const targetCareer = resume.careers.find((c) => c.id === careerId);
-    if (!targetCareer) {
-        return { canDelete: true, warningMessage: null };
-    }
-
-    const usedInProject = resume.projects.some((p) => p.companyName === targetCareer.companyName);
-    if (usedInProject) {
-        return {
-            canDelete: false,
-            warningMessage: `${targetCareer.companyName}はプロジェクトで使用されています。該当プロジェクトを削除してから職歴を削除してください。`,
-        };
-    }
-
-    return { canDelete: true, warningMessage: null };
 };

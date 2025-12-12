@@ -1,4 +1,4 @@
-import { Checkbox, DatePicker, Select, TextField } from "@/components/ui";
+import { Autocomplete, Checkbox, DatePicker, Select, TextField } from "@/components/ui";
 import type { Process } from "@/features/resume";
 import { processList, TechStackFieldList, useResumeStore } from "@/features/resume";
 import type { SelectChangeEvent } from "@mui/material";
@@ -24,8 +24,8 @@ export const ProjectSection = () => {
     const activeEntryId = useResumeStore((state) => state.activeEntryId);
     const updateEntry = useResumeStore((state) => state.updateEntry);
 
-    // 職歴から会社情報を取得
-    const companies = resume?.careers ?? [];
+    // 職歴から会社名リストを取得
+    const companyNameOptions = resume?.careers?.map((c) => c.companyName) ?? [];
 
     // 現在アクティブなプロジェクトエントリー
     const currentProject = resume?.projects?.find((project) => project.id === activeEntryId) ?? null;
@@ -41,11 +41,11 @@ export const ProjectSection = () => {
         .map(([, label]) => label);
 
     // 会社名ハンドラー
-    const handleCompanyNameChange = (event: SelectChangeEvent<string>) => {
+    const handleCompanyNameChange = (_event: React.SyntheticEvent, newValue: string | string[] | null) => {
         if (!currentProject) return;
-        const selectedCompany = companies.find((c) => c.id === event.target.value);
+        const value = Array.isArray(newValue) ? newValue[0] ?? "" : newValue ?? "";
         updateEntry("projects", currentProject.id, {
-            companyName: selectedCompany?.companyName ?? "",
+            companyName: value,
         });
     };
 
@@ -97,26 +97,33 @@ export const ProjectSection = () => {
         updateEntry("projects", currentProject.id, { process: newProcess });
     };
 
-    // 会社名の選択値を取得（IDベース）
-    const selectedCompanyId = companies.find((c) => c.companyName === currentProject.companyName)?.id ?? "";
-
     return (
         <>
             {/* 会社名 */}
-            <FormControl fullWidth required variant="outlined" sx={{ mb: 4 }}>
-                <InputLabel shrink>会社名</InputLabel>
-                <Select value={selectedCompanyId} onChange={handleCompanyNameChange} label="会社名" notched>
-                    {companies.length === 0 ? (
-                        <MenuItem disabled>職歴が存在しません</MenuItem>
-                    ) : (
-                        companies.map((company) => (
-                            <MenuItem key={company.id} value={company.id}>
-                                {company.companyName}
-                            </MenuItem>
-                        ))
-                    )}
-                </Select>
-            </FormControl>
+            <Autocomplete
+                freeSolo
+                options={companyNameOptions}
+                value={currentProject.companyName}
+                onChange={handleCompanyNameChange}
+                onInputChange={(_event, newInputValue) => {
+                    if (!currentProject) return;
+                    updateEntry("projects", currentProject.id, {
+                        companyName: newInputValue,
+                    });
+                }}
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        label="会社名"
+                        required
+                        placeholder="（例）株式会社ABC"
+                        slotProps={{
+                            inputLabel: { shrink: true },
+                        }}
+                    />
+                )}
+                sx={{ mb: 4 }}
+            />
             {/* 開始年月 */}
             <DatePicker
                 label="プロジェクト開始年月"
