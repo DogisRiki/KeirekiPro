@@ -72,6 +72,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         // Actuator関連のエンドポイントを許可
                         .requestMatchers("/actuator/**").permitAll()
+                        // エラーページ
+                        .requestMatchers("/error").permitAll()
                         // Swagger UI関連のエンドポイントを許可（個別に指定）
                         .requestMatchers(
                                 "/swagger-ui/**",
