@@ -8,6 +8,7 @@ import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -16,8 +17,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -40,13 +43,22 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+        CsrfTokenRepository tokenRepository = csrfTokenRepository();
+
         http
+                // CORSの設定を有効化
+                .cors(cors -> cors
+                        .configurationSource(corsConfigurationSource()))
+
                 // CSRFの設定
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        // マスクしないハンドラを使用
+                        .csrfTokenRepository(tokenRepository)
+                        // 認証成立時のSessionAuthenticationStrategyをno-op化して、CSRFトークンが自動で消される挙動を抑止する
+                        .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy())
+                        // マスクしないハンドラを使用（フロントはCookie値をそのままヘッダへ入れる）
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                        // CSRF保護が不要なパスを設定 - OpenAPI仕様へのアクセスを許可
+                        // CSRF保護が不要なパスを設定
                         .ignoringRequestMatchers(
                                 "/api/auth/**",
                                 "/actuator/**",
@@ -55,12 +67,12 @@ public class SecurityConfig {
                                 "/v3/api-docs",
                                 "/v3/api-docs/**"))
 
-                // CORSの設定を有効化
-                .cors(cors -> cors
-                        .configurationSource(corsConfigurationSource()))
-
                 // セッションを使用しない設定（JWTベースの認証のため）
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // ただし「認証イベントでCSRFトークンを削除する」挙動を止めるため、
+                // SessionAuthenticationStrategy を no-op にする
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))
 
                 // 認証情報が無い場合は401を返す
                 .exceptionHandling(ex -> ex
@@ -68,13 +80,13 @@ public class SecurityConfig {
 
                 // エンドポイントの認可設定
                 .authorizeHttpRequests(auth -> auth
+                        // Preflightは常に許可（CORSのOPTIONSを401にしない）
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // 認証関連のエンドポイントは認証不要
                         .requestMatchers("/api/auth/**").permitAll()
                         // Actuator関連のエンドポイントを許可
                         .requestMatchers("/actuator/**").permitAll()
-                        // エラーページ
-                        .requestMatchers("/error").permitAll()
-                        // Swagger UI関連のエンドポイントを許可（個別に指定）
+                        // Swagger UI関連のエンドポイントを許可
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -84,8 +96,11 @@ public class SecurityConfig {
                         // その他のエンドポイントは認証必要
                         .anyRequest().authenticated())
 
-                // JWT認証フィルター
-                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class);
+                // JWT認証フィルター（OPTIONSはフィルタ側でスキップ）
+                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider), CsrfFilter.class)
+
+                // /api/auth/** 等（CSRF除外）でもXSRF-TOKENを確実にCookieへ出す（SPA向け）
+                .addFilterAfter(new CsrfCookieFilter(tokenRepository), CsrfFilter.class);
 
         return http.build();
     }
@@ -101,6 +116,15 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    @Bean
+    CsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieName("XSRF-TOKEN");
+        repository.setHeaderName("X-XSRF-TOKEN");
+        repository.setCookiePath("/");
+        return repository;
     }
 
     @Bean

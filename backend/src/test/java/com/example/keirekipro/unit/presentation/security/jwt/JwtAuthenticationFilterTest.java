@@ -64,10 +64,10 @@ class JwtAuthenticationFilterTest {
         // フィルタを実行
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // SecurityContextに認証情報が設定されている
+        // SecurityContextに認証情報が設定される
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isEqualTo(authentication);
-        // フィルタチェーンが呼び出されている
+        // フィルタチェーンが呼び出される
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
 
@@ -91,7 +91,7 @@ class JwtAuthenticationFilterTest {
         // 401エラーが返されたことを確認
         assertThat(mockResponse.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
 
-        // SecurityContextに認証情報が設定されていないことを確認
+        // SecurityContextに認証情報が設定されないことを確認
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 
         // フィルタチェーンが呼ばれていないことを確認
@@ -109,10 +109,10 @@ class JwtAuthenticationFilterTest {
         // フィルタを実行
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // SecurityContext に認証情報が設定されていない
+        // SecurityContext に認証情報が設定されない
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isNull();
-        // フィルタチェーンが呼び出されている
+        // フィルタチェーンが呼び出される
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
 
@@ -144,10 +144,10 @@ class JwtAuthenticationFilterTest {
         // 401エラーが返されたことを確認
         assertThat(mockResponse.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
 
-        // SecurityContextに認証情報が設定されていないことを確認
+        // SecurityContextに認証情報が設定されないことを確認
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 
-        // フィルタチェーンが呼ばれていないことを確認
+        // フィルタチェーンが呼ばれないことを確認
         verify(filterChain, org.mockito.Mockito.never()).doFilter(mockRequest, mockResponse);
     }
 
@@ -171,10 +171,10 @@ class JwtAuthenticationFilterTest {
         // フィルタを実行
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // SecurityContext に認証情報が設定されている
+        // SecurityContext に認証情報が設定される
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isEqualTo(authentication);
-        // フィルタチェーンが呼び出されている
+        // フィルタチェーンが呼び出される
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
 
@@ -192,8 +192,32 @@ class JwtAuthenticationFilterTest {
         // SecurityContextに認証情報が設定されていない（スキップされた）
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 
-        // フィルタチェーンがそのまま呼ばれている（doFilterInternalが通っていない）
+        // フィルタチェーンがそのまま呼ばれる（doFilterInternalが通っていない）
         verify(filterChain).doFilter(mockRequest, mockResponse);
     }
 
+    @Test
+    @DisplayName("Preflight(OPTIONS)ではJWT認証がスキップされる")
+    void test7() throws Exception {
+        String validToken = "valid.jwt.token";
+
+        MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+        mockRequest.setMethod("OPTIONS");
+        mockRequest.setServletPath("/api/resumes/xxx/careers/yyy");
+        mockRequest.setCookies(new Cookie("accessToken", validToken));
+
+        MockHttpServletResponse mockResponse = new MockHttpServletResponse();
+
+        // フィルタを実行
+        filter.doFilter(mockRequest, mockResponse, filterChain);
+
+        // SecurityContextに認証情報が設定されない（スキップされた）
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+
+        // jwtProviderが呼ばれない（doFilterInternalが通っていない）
+        verify(jwtProvider, org.mockito.Mockito.never()).getAuthentication(validToken);
+
+        // フィルタチェーンがそのまま呼ばれる
+        verify(filterChain).doFilter(mockRequest, mockResponse);
+    }
 }
