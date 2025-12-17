@@ -90,6 +90,13 @@ export default [
             // consoleの使用を警告する
             "no-console": "warn",
             "no-debugger": "warn",
+            // 型専用インポートは必ず import typeを使用
+            "@typescript-eslint/consistent-type-imports": [
+                "error",
+                {
+                    prefer: "type-imports",
+                },
+            ],
         },
         languageOptions: {
             // グローバル変数の定義

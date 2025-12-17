@@ -9,7 +9,7 @@ import { useGetUserInfo } from "@/hooks";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
-import { User } from "@/types";
+import type { User } from "@/types";
 import { renderHook, waitFor } from "@testing-library/react";
 
 describe("useGetUserInfo", () => {

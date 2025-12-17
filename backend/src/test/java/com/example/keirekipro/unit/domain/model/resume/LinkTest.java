@@ -36,9 +36,9 @@ class LinkTest {
     }
 
     @Test
-    @DisplayName("不正な値でインスタンス化する")
+    @DisplayName("不正なURL形式でインスタンス化する")
     void test2() {
-        List<String> testValues = List.of("http://example.com", "ftp://example.com", "invalid-uri", "");
+        List<String> testValues = List.of("http://example.com", "ftp://example.com", "invalid-uri");
         for (String value : testValues) {
             // 毎回モックをリセットして、呼び出し履歴をクリアする
             reset(notification);
@@ -47,6 +47,66 @@ class LinkTest {
             assertThat(link).isNotNull();
             // リンクに対するエラーメッセージが登録される
             verify(notification, times(1)).addError(
+                    eq("link"),
+                    eq("無効なURLです。HTTPS形式で正しいURLを入力してください。"));
+        }
+    }
+
+    @Test
+    @DisplayName("リンクがnullまたは空白の状態でインスタンス化する")
+    void test3() {
+        // nullのケース
+        {
+            reset(notification);
+            Link link = Link.create(notification, null);
+
+            assertThat(link).isNotNull();
+            verify(notification, times(1)).addError(
+                    eq("link"),
+                    eq("リンクは入力必須です。"));
+            verify(notification, never()).addError(
+                    eq("link"),
+                    eq("無効なURLです。HTTPS形式で正しいURLを入力してください。"));
+        }
+
+        // 空文字のケース
+        {
+            reset(notification);
+            Link link = Link.create(notification, "");
+
+            assertThat(link).isNotNull();
+            verify(notification, times(1)).addError(
+                    eq("link"),
+                    eq("リンクは入力必須です。"));
+            verify(notification, never()).addError(
+                    eq("link"),
+                    eq("無効なURLです。HTTPS形式で正しいURLを入力してください。"));
+        }
+
+        // スペースのみのケース
+        {
+            reset(notification);
+            Link link = Link.create(notification, "   ");
+
+            assertThat(link).isNotNull();
+            verify(notification, times(1)).addError(
+                    eq("link"),
+                    eq("リンクは入力必須です。"));
+            verify(notification, never()).addError(
+                    eq("link"),
+                    eq("無効なURLです。HTTPS形式で正しいURLを入力してください。"));
+        }
+
+        // タブのみのケース
+        {
+            reset(notification);
+            Link link = Link.create(notification, "\t");
+
+            assertThat(link).isNotNull();
+            verify(notification, times(1)).addError(
+                    eq("link"),
+                    eq("リンクは入力必須です。"));
+            verify(notification, never()).addError(
                     eq("link"),
                     eq("無効なURLです。HTTPS形式で正しいURLを入力してください。"));
         }

@@ -1,54 +1,281 @@
 import { NoData } from "@/components/errors";
 import { Button } from "@/components/ui";
-import { EntryListItem, getResumeKey, sections, useResumeStore } from "@/features/resume";
-import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core";
-import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import type {
+    Career,
+    Certification,
+    Portfolio,
+    Project,
+    SectionName,
+    SelfPromotion,
+    SocialLink,
+} from "@/features/resume";
+import {
+    EntryListItem,
+    getResumeKey,
+    isTempId,
+    sections,
+    TEMP_ID_PREFIX,
+    useDeleteCareer,
+    useDeleteCertification,
+    useDeletePortfolio,
+    useDeleteProject,
+    useDeleteSelfPromotion,
+    useDeleteSocialLink,
+    useResumeStore,
+} from "@/features/resume";
 import { Add as AddIcon } from "@mui/icons-material";
 import { Box, Divider, List, Typography } from "@mui/material";
+import { useMemo } from "react";
+import { useParams } from "react-router";
+
+/**
+ * 新規エントリー生成用の型
+ */
+type ListEntry = Career | Project | Certification | Portfolio | SocialLink | SelfPromotion;
+
+/**
+ * セクションごとに新規エントリーを生成する
+ */
+const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
+    switch (section) {
+        case "career": {
+            const entry: Career = {
+                id,
+                companyName: "新しい職歴",
+                startDate: "",
+                endDate: null,
+                active: false,
+            };
+            return entry;
+        }
+        case "project": {
+            const entry: Project = {
+                id,
+                companyName: "",
+                startDate: "",
+                endDate: null,
+                active: false,
+                name: "新しいプロジェクト",
+                overview: "",
+                teamComp: "",
+                role: "",
+                achievement: "",
+                process: {
+                    requirements: false,
+                    basicDesign: false,
+                    detailedDesign: false,
+                    implementation: false,
+                    integrationTest: false,
+                    systemTest: false,
+                    maintenance: false,
+                },
+                techStack: {
+                    frontend: {
+                        languages: [],
+                        frameworks: [],
+                        libraries: [],
+                        buildTools: [],
+                        packageManagers: [],
+                        linters: [],
+                        formatters: [],
+                        testingTools: [],
+                    },
+                    backend: {
+                        languages: [],
+                        frameworks: [],
+                        libraries: [],
+                        buildTools: [],
+                        packageManagers: [],
+                        linters: [],
+                        formatters: [],
+                        testingTools: [],
+                        ormTools: [],
+                        auth: [],
+                    },
+                    infrastructure: {
+                        clouds: [],
+                        operatingSystems: [],
+                        containers: [],
+                        databases: [],
+                        webServers: [],
+                        ciCdTools: [],
+                        iacTools: [],
+                        monitoringTools: [],
+                        loggingTools: [],
+                    },
+                    tools: {
+                        sourceControls: [],
+                        projectManagements: [],
+                        communicationTools: [],
+                        documentationTools: [],
+                        apiDevelopmentTools: [],
+                        designTools: [],
+                        editors: [],
+                        developmentEnvironments: [],
+                    },
+                },
+            };
+            return entry;
+        }
+        case "certification": {
+            const entry: Certification = {
+                id,
+                name: "新しい資格",
+                date: "",
+            };
+            return entry;
+        }
+        case "portfolio": {
+            const entry: Portfolio = {
+                id,
+                name: "新しいポートフォリオ",
+                overview: "",
+                techStack: "",
+                link: "",
+            };
+            return entry;
+        }
+        case "socialLink": {
+            const entry: SocialLink = {
+                id,
+                name: "新しいSNS",
+                link: "",
+            };
+            return entry;
+        }
+        case "selfPromotion": {
+            const entry: SelfPromotion = {
+                id,
+                title: "新しい自己PR",
+                content: "",
+            };
+            return entry;
+        }
+        case "basicInfo":
+        default:
+            return null;
+    }
+};
+
+/**
+ * スクロール表示に切り替える件数の閾値
+ */
+const SCROLL_THRESHOLD = 5;
+
+/**
+ * スクロール表示時の最大高さ
+ */
+const MAX_SCROLL_HEIGHT = 400;
 
 /**
  * エントリーリスト
  */
 export const EntryList = () => {
+    const { id: resumeId } = useParams<{ id: string }>();
+
     // ストアから必要な状態を取り出す
-    const { activeSection, setActiveEntryId, updateSection } = useResumeStore();
+    const activeSection = useResumeStore((state) => state.activeSection);
+    const resume = useResumeStore((state) => state.resume);
+    const setActiveEntryId = useResumeStore((state) => state.setActiveEntryId);
+    const updateSection = useResumeStore((state) => state.updateSection);
+    const activeEntryId = useResumeStore((state) => state.activeEntryId);
+    const removeEntry = useResumeStore((state) => state.removeEntry);
+
+    // 各セクションの削除ミューテーション
+    const deleteCareerMutation = useDeleteCareer(resumeId ?? "");
+    const deleteProjectMutation = useDeleteProject(resumeId ?? "");
+    const deleteCertificationMutation = useDeleteCertification(resumeId ?? "");
+    const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "");
+    const deleteSocialLinkMutation = useDeleteSocialLink(resumeId ?? "");
+    const deleteSelfPromotionMutation = useDeleteSelfPromotion(resumeId ?? "");
 
     // エントリーデータ取得
-    const entries = useResumeStore((state) => {
-        const key = getResumeKey(state.activeSection);
-        return key ? state.resume?.[key] ?? [] : [];
-    });
+    const entries = useMemo(() => {
+        if (!resume) return [];
+        const key = getResumeKey(activeSection);
+        return key ? resume[key] ?? [] : [];
+    }, [resume, activeSection]);
 
     // タイトル取得
     const title = sections.find((section) => section.key === activeSection)?.label + "一覧";
+
+    // スクロール表示が必要かどうか
+    const needsScroll = entries.length > SCROLL_THRESHOLD;
 
     /**
      * 新規追加
      */
     const handleNewClick = () => {
-        setActiveEntryId(null);
+        if (!resume) return;
+
+        const sectionKey = getResumeKey(activeSection);
+        if (!sectionKey) return;
+
+        // 一時IDを生成（プレフィックス付き）
+        const tempId =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? `${TEMP_ID_PREFIX}${crypto.randomUUID()}`
+                : `${TEMP_ID_PREFIX}${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        const newEntry = createNewEntry(activeSection, tempId);
+        if (!newEntry) return;
+
+        const currentList = resume[sectionKey] ?? [];
+        const updatedList = [newEntry, ...currentList] as typeof currentList;
+
+        updateSection(sectionKey, updatedList);
+        setActiveEntryId(tempId);
     };
 
     /**
-     * ドラッグ終了時の処理
+     * エントリー削除ハンドラー
+     * @param entryId 削除対象のエントリーID
+     * @param needsDbSync DBへの同期が必要かどうか（既存エントリーの場合true）
      */
-    const handleDragEnd = ({ active, over }: DragEndEvent) => {
-        if (over && active.id !== over.id) {
-            const oldIndex = (entries as any[]).findIndex((entry) => entry.id === (active.id as string));
-            const newIndex = (entries as any[]).findIndex((entry) => entry.id === (over.id as string));
-            const newEntries = arrayMove(entries as any[], oldIndex, newIndex);
+    const handleDeleteEntry = (entryId: string, needsDbSync: boolean) => {
+        if (!resume) return;
 
-            // orderNoを再計算
-            const updatedEntries = newEntries.map((entry, index) => ({
-                ...entry,
-                orderNo: index,
-            }));
+        const sectionKey = getResumeKey(activeSection);
+        if (!sectionKey) return;
 
-            // ストアのデータを更新
-            const sectionKey = getResumeKey(activeSection);
-            if (sectionKey) {
-                updateSection(sectionKey, updatedEntries);
-            }
+        // アクティブなエントリーが削除された場合はクリア
+        if (activeEntryId === entryId) {
+            setActiveEntryId(null);
+        }
+
+        // 一時IDの場合はストアから削除するのみ
+        if (!needsDbSync || isTempId(entryId)) {
+            removeEntry(sectionKey, entryId);
+            return;
+        }
+
+        // DBへの同期が必要な場合はAPIを呼び出す
+        executeDeleteMutation(entryId);
+    };
+
+    /**
+     * セクションに応じた削除ミューテーションを実行
+     */
+    const executeDeleteMutation = (entryId: string) => {
+        switch (activeSection) {
+            case "career":
+                deleteCareerMutation.mutate(entryId);
+                break;
+            case "project":
+                deleteProjectMutation.mutate(entryId);
+                break;
+            case "certification":
+                deleteCertificationMutation.mutate(entryId);
+                break;
+            case "portfolio":
+                deletePortfolioMutation.mutate(entryId);
+                break;
+            case "socialLink":
+                deleteSocialLinkMutation.mutate(entryId);
+                break;
+            case "selfPromotion":
+                deleteSelfPromotionMutation.mutate(entryId);
+                break;
         }
     };
 
@@ -73,19 +300,19 @@ export const EntryList = () => {
             {/* エントリーリスト */}
             <Box sx={{ p: 2 }}>
                 {entries.length > 0 ? (
-                    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <SortableContext
-                            items={entries.map((entry: { id: string }) => entry.id)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            <List sx={{ width: "100%" }}>
-                                {/* エントリーアイテム */}
-                                {entries.map((entry: { id: string }) => (
-                                    <EntryListItem key={entry.id} entry={entry} />
-                                ))}
-                            </List>
-                        </SortableContext>
-                    </DndContext>
+                    <Box
+                        sx={{
+                            maxHeight: needsScroll ? MAX_SCROLL_HEIGHT : "none",
+                            overflowY: needsScroll ? "auto" : "visible",
+                        }}
+                    >
+                        <List sx={{ width: "100%" }}>
+                            {/* エントリーアイテム */}
+                            {entries.map((entry: { id: string }) => (
+                                <EntryListItem key={entry.id} entry={entry} onDeleteEntry={handleDeleteEntry} />
+                            ))}
+                        </List>
+                    </Box>
                 ) : (
                     <Box sx={{ my: 20 }}>
                         <NoData variant="body1" message={"表示するデータがありません。"} />

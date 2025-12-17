@@ -7,9 +7,9 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     note as CommonRules
         【バリデーションの方針】
         ・職務経歴書ファイル出力では、HTMLファイルからPDFファイルやMarkdownファイルへ変換するため、
-        文字数によるレイアウト崩れが発生しない。
-        ・そのため、文字数制限などはビジネスルール外とする。同様に日付のフォーマットなどもビジネスルール外とする。
-        ・上記理由から、UIやDB都合の形式チェックや文字数制限バリデーションはプレゼンテーション層で行うものとする。
+            文字数によるレイアウト崩れは考慮しない。
+        ・ただし、業務上意味のある必須チェック・文字種チェック・最大文字数などはドメイン層で行う。
+        ・UIやDB固有の制約に依存するチェックはプレゼンテーション層で行う。
         【共通ルール】
         ・idはUUIDによって生成された文字列とする。
     end note
@@ -17,8 +17,10 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     ' -------------------------------- エンティティの定義 --------------------------------
     class "職務経歴書(Resume)" as Resume << (R,red) RootEntity >> {
         - 職務経歴書ID: id
+        - ユーザーID: userId
+        - 職務経歴書名: name
         - 日付: date
-        - 自動保存設定: autoSaveEnabled
+        - 氏名: fullName
         - 作成日時: createdAt
         - 更新日時: updatedAt
     }
@@ -26,17 +28,20 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     class "職歴(Career)" as Career << (E,green) Entity >> {
         - 職歴ID: id
         - 会社名: companyName
+        - 期間: period
     }
 
     class "プロジェクト(Project)" as Project << (E,green) Entity >> {
         - プロジェクトID: id
         - 会社名: companyName
-        - プロジェクト名: projectName
+        - 期間: period
+        - プロジェクト名: name
         - プロジェクト概要: overview
         - チーム構成: teamComp
         - 役割: role
         - 成果: achievement
         - 作業工程: process
+        - 技術スタック: techStack
     }
 
     class "資格(Certification)" as Certification << (E,green) Entity >> {
@@ -49,7 +54,8 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         - ポートフォリオID: id
         - ポートフォリオ名: name
         - ポートフォリオ概要: overview
-        - 技術スタック: techStack
+        - 技術スタック説明: techStack
+        - リンク: link
     }
 
     class "ソーシャルリンク(SocialLink)" as SocialLink << (E,green) Entity >> {
@@ -65,11 +71,16 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
 
     ' -------------------------------- 値オブジェクトの定義 --------------------------------
     class "職務経歴書名(ResumeName)" as ResumeName << (V, SkyBlue) ValueObject >> {
+        - 値: value
     }
 
     class "氏名(FullName)" as FullName << (V, SkyBlue) ValueObject >> {
         - 姓: lastName
         - 名: firstName
+    }
+
+    class "会社名(CompanyName)" as CompanyName << (V, SkyBlue) ValueObject >> {
+        - 会社名: value
     }
 
     class "期間(Period)" as Period << (V, SkyBlue) ValueObject >> {
@@ -79,14 +90,61 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     }
 
     class "リンク(Link)" as Link << (V, SkyBlue) ValueObject >> {
+        - 値: value
     }
 
     class "技術スタック(TechStack)" as TechStack << (V, SkyBlue) ValueObject >> {
-        - 開発言語: languages
-        - 依存関係: dependencies
-        - インフラ: Infrastructire
+        - フロントエンド: frontend
+        - バックエンド: backend
+        - インフラ: infrastructure
         - 開発支援ツール: tools
-        - その他: others
+    }
+
+    class "フロントエンド技術スタック(Frontend)" as FrontendStack << (V, SkyBlue) ValueObject >> {
+        - 開発言語: languages
+        - フレームワーク: framework
+        - ライブラリ: libraries
+        - ビルドツール: buildTool
+        - パッケージマネージャー: packageManager
+        - リンター: linters
+        - フォーマッター: formatters
+        - テストツール: testingTools
+    }
+
+    class "バックエンド技術スタック(Backend)" as BackendStack << (V, SkyBlue) ValueObject >> {
+        - 開発言語: languages
+        - フレームワーク: framework
+        - ライブラリ: libraries
+        - ビルドツール: buildTool
+        - パッケージマネージャー: packageManager
+        - リンター: linters
+        - フォーマッター: formatters
+        - テストツール: testingTools
+        - ORM: ormTools
+        - 認証: auth
+    }
+
+    class "インフラ(Infrastructure)" as TechInfrastructure << (V, SkyBlue) ValueObject >> {
+        - クラウド: clouds
+        - OS: operatingSystem
+        - コンテナ: containers
+        - データベース: database
+        - Webサーバー: webServer
+        - CI/CD: ciCdTool
+        - IaC: iacTools
+        - 監視: monitoringTools
+        - ロギング: loggingTools
+    }
+
+    class "開発支援ツール(Tools)" as DevTools << (V, SkyBlue) ValueObject >> {
+        - ソース管理: sourceControl
+        - プロジェクト管理: projectManagement
+        - コミュニケーション: communicationTool
+        - ドキュメント: documentationTools
+        - API開発: apiDevelopmentTools
+        - デザイン: designTools
+        - エディタ: editor
+        - 開発環境: developmentEnvironment
     }
 
     ' ------------------------------------ 関連線の定義 ------------------------------------
@@ -98,22 +156,31 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     Resume "1" *-down- "0..n" SelfPromotion #Green
     Resume "1" *-down- "0..1" FullName #Green
     Resume "1" *-down- "1" ResumeName #Green
-    Career "1" *-down- "0..1" Period #Green
-    Project "1" *-down- "0..1" Period #Green
+
+    Career "1" *-down- "1" CompanyName #Green
+    Career "1" *-down- "1" Period #Green
+
+    Project "1" *-down- "1" CompanyName #Green
+    Project "1" *-down- "1" Period #Green
     Project "1" *-down- "0..1" TechStack #Green
-    Portfolio "1" *-down- "0..1" Link #Green
-    SocialLink "1" *-down- "0..1" Link #Green
+
+    Portfolio "1" *-down- "1" Link #Green
+    SocialLink "1" *-down- "1" Link #Green
+
+    TechStack "1" *-down- "0..1" FrontendStack #Green
+    TechStack "1" *-down- "0..1" BackendStack #Green
+    TechStack "1" *-down- "0..1" TechInfrastructure #Green
+    TechStack "1" *-down- "0..1" DevTools #Green
 
     ' ----------------------------- ビジネスルールや注釈の定義 -----------------------------
     note bottom of Resume
-        ・職務経歴書をファイルエクスポートする際、以下項目については最低でも１つ以上の入力を必須とする。
-            (不適切な職務経歴書が作成されるのを防止するため。)
-            ・日付
-            ・氏名
-            ・職歴（会社名、期間）
-            ・プロジェクト（プロジェクト名、会社名、プロジェクト概要、チーム構成、役割、成果、作業工程）
-            ・技術スタック（開発言語）
-            ・自己PR
+        ・職務経歴書をファイルエクスポートする際、不適切な職務経歴書が作成されるのを防ぐため、以下の条件を満たしていなければならない。
+            ・日付は必須。
+            ・氏名は必須。
+            ・職歴は少なくとも1件以上登録されていること。（複数件登録可能）
+            ・職務内容（プロジェクト）は少なくとも1件以上登録されていること。（複数件登録可能）
+            ・自己PRは少なくとも1件以上登録されていること。（複数件登録可能）
+            ・資格、ポートフォリオ、SNS（ソーシャルリンク）は任意項目とし、0件でもよい。
 
         ・職務経歴書名はユーザー内で一意でなければならない。
 
@@ -138,34 +205,72 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         ・プロジェクトについては兼任があり得るため担当被りチェックを行わない。
     end note
 
+    note bottom of Career
+        ・会社名および期間は必須。
+    end note
+
     note bottom of Project
-        ・職歴に入力された会社名以外は許可しない。
-            (職務経歴書内の整合性担保のため)
+        ・会社名および期間は必須。
+        ・プロジェクト名は必須かつ50文字以内。
+        ・プロジェクト概要は必須かつ1000文字以内。
+        ・チーム構成は必須かつ100文字以内。
+        ・役割は必須かつ1000文字以内。
+        ・成果は必須かつ1000文字以内。
     end note
 
     note bottom of Certification
+        ・資格名は必須かつ50文字以内。
+        ・取得年月は必須。
         ・取得年月の未来日付は許可する。
             (柔軟性確保のため)
         ・存在しない資格名の入力も許可する。
             (全ての資格をシステム内で網羅するのが現実的でないため。)
     end note
 
+    note bottom of Portfolio
+        ・ポートフォリオ名は必須かつ50文字以内。
+        ・ポートフォリオ概要は必須かつ1000文字以内。
+        ・技術スタック説明は1000文字以内。
+        ・リンクは必須。
+    end note
+
+    note bottom of SocialLink
+        ・ソーシャル名は必須かつ50文字以内。
+        ・リンクは必須。
+    end note
+
+    note bottom of SelfPromotion
+        ・タイトルは必須かつ50文字以内。
+        ・コンテンツは必須かつ1000文字以内。
+    end note
+
     note bottom of ResumeName
+        ・職務経歴書名は必須かつ50文字以内。
         ・職務経歴書名をファイル名として使用するので以下を禁止する。
             ・\ / : * ? " < > | を含むこと。
             ・先頭・末尾が「.(ドット)」であること。
     end note
 
+    note bottom of CompanyName
+        ・会社名は必須。
+        ・会社名は50文字以内。
+    end note
+
     note bottom of FullName
+        ・姓・名ともに必須。
+        ・姓・名ともに10文字以内。
         ・英数、ひらがな、カタカナ、漢字のみ許可する。
     end note
 
     note bottom of Period
-        ・継続中がtrueの場合、終了年月は指定できない(2025年1月 〜 現在)
-        ・終了年月 >= 開始年月
+        ・開始年月は必須。
+        ・継続中がfalseの場合、終了年月は必須。
+        ・継続中がtrueの場合、終了年月は指定できない(2025年1月 〜 現在)。
+        ・終了年月 >= 開始年月。
     end note
 
     note bottom of Link
+        ・リンクは必須。
         ・RFC3986に準拠しなければならない。
         ・スキームはhttpsしか許可しない。
     end note
@@ -216,3 +321,5 @@ package "ユーザー集約(UserAggregation)" as UserAggregation {
         ・許可プロバイダは "google", "github" のみ。
     end note
 }
+
+@enduml

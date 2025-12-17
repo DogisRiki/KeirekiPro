@@ -10,14 +10,15 @@ vi.mock("react-router", () => ({
 }));
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
-import { SetEmailAndPasswordPayload, useSetEmailAndPassword } from "@/features/user";
+import type { SetEmailAndPasswordPayload } from "@/features/user";
+import { useSetEmailAndPassword } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
-import { User } from "@/types";
+import type { User } from "@/types";
 
 describe("useSetEmailAndPassword", () => {
     const wrapper = createQueryWrapper();

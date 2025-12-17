@@ -50,12 +50,24 @@ public class Period {
     }
 
     private void validate(Notification notification, YearMonth startDate, YearMonth endDate, boolean isActive) {
+        // 開始年月は必須
+        if (startDate == null) {
+            notification.addError("startDate", "開始年月は入力必須です。");
+            return;
+        }
+
+        // 継続中でない場合は終了年月も必須
+        if (!isActive && endDate == null) {
+            notification.addError("endDate", "終了年月は入力必須です。");
+            return;
+        }
+
         // 継続中でなければ、開始年月 <= 終了年月 の整合をチェック
-        if (!isActive && isInvalidDateRange(startDate, endDate)) {
+        if (!isActive && endDate != null && isInvalidDateRange(startDate, endDate)) {
             notification.addError("endDate", "終了年月は開始年月より後の日付を指定してください。");
         }
         if (isInvalidEndDateForIsActive(endDate, isActive)) {
-            notification.addError("endDate", "在籍中や担当中の場合は終了年月を指定しないでください。");
+            notification.addError("endDate", "継続中の場合、終了年月を設定できません。");
         }
     }
 

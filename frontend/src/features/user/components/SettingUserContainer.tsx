@@ -1,6 +1,6 @@
+import type { SettingMessages } from "@/features/user";
 import {
     createUserSettingMessages,
-    SettingMessages,
     SettingUserForm,
     useDeleteUser,
     useRemoveAuthProvider,

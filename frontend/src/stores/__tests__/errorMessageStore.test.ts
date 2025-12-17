@@ -1,10 +1,11 @@
-import { useErrorMessageStore } from "@/stores";
-import { ErrorResponse } from "@/types";
+import { useErrorMessageStore, useNotificationStore } from "@/stores";
+import type { ErrorResponse } from "@/types";
 
 describe("useErrorMessageStore", () => {
     beforeEach(() => {
         // テスト前にストアをリセット
         useErrorMessageStore.getState().clearErrors();
+        useNotificationStore.getState().clearNotification();
     });
 
     it("初期状態でmessageがnull、errorsが空オブジェクトであること", () => {

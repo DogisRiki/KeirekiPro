@@ -1,39 +1,31 @@
 import { DatePicker, TextField } from "@/components/ui";
-import { useResumeStore } from "@/features/resume/stores/resumeStore";
-import { Stack } from "@mui/material";
+import { BASIC_INFO_ENTRY_ID, useResumeStore } from "@/features/resume";
+import { stringListToBulletList } from "@/utils";
+import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
 
 /**
  * 基本情報セクション
  */
 export const BasicInfoSection = () => {
-    // データを取り出す
-    const { resume } = useResumeStore();
+    // ストアから必要な状態を取得
+    const resume = useResumeStore((state) => state.resume);
+    const updateResume = useResumeStore((state) => state.updateResume);
+    const getEntryErrors = useResumeStore((state) => state.getEntryErrors);
 
-    // フォームの状態
-    const [formState, setFormState] = useState({
-        name: "",
-        date: dayjs(),
-        lastName: "",
-        firstName: "",
-    });
+    // エラー情報
+    const errors = getEntryErrors(BASIC_INFO_ENTRY_ID);
 
-    // resume の変更を監視してローカルステートを更新
-    useEffect(() => {
-        if (resume) {
-            setFormState({
-                name: resume.name || "",
-                date: dayjs(resume.date) || null,
-                lastName: resume.lastName || "",
-                firstName: resume.firstName || "",
-            });
-        }
-    }, [resume]);
+    // resumeがnullの場合は何も表示しない
+    if (!resume) {
+        return null;
+    }
 
-    // 入力変更ハンドラー
-    const handleInputChange = (key: string, value: any) => {
-        setFormState((prev) => ({ ...prev, [key]: value }));
+    // 日付ハンドラー
+    const handleDateChange = (newValue: Dayjs | null) => {
+        updateResume({
+            date: newValue && newValue.isValid() ? newValue.format("YYYY-MM-DD") : "",
+        });
     };
 
     return (
@@ -41,22 +33,26 @@ export const BasicInfoSection = () => {
             {/* 職務経歴書名 */}
             <TextField
                 label="職務経歴書名"
-                value={formState.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
                 fullWidth
                 required
-                placeholder="（例）株式会社ABC用の職務経歴書"
+                placeholder="（例）KeirekiPro"
+                value={resume.resumeName}
+                onChange={(e) => {
+                    updateResume({ resumeName: e.target.value });
+                }}
+                error={!!errors.resumeName?.length}
+                helperText={stringListToBulletList(errors.resumeName)}
                 slotProps={{
                     inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
                 sx={{ mb: 4 }}
             />
             {/* 日付 */}
             <DatePicker
-                label="作成日"
-                value={formState.date}
-                onChange={(newValue) => handleInputChange("date", newValue)}
-                views={["year", "month", "day"]}
+                label="日付"
+                value={resume.date ? dayjs(resume.date, "YYYY-MM-DD") : null}
+                onChange={handleDateChange}
                 format="YYYY/MM/DD"
                 slotProps={{
                     textField: {
@@ -64,36 +60,47 @@ export const BasicInfoSection = () => {
                         required: true,
                         sx: { mb: 4 },
                         InputLabelProps: { shrink: true },
+                        error: !!errors.date?.length,
+                        helperText: stringListToBulletList(errors.date),
+                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
                     },
-                    calendarHeader: { format: "YYYY/MM/DD" },
                 }}
             />
             {/* 姓 */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={4}>
-                <TextField
-                    label="姓"
-                    value={formState.lastName}
-                    onChange={(e) => handleInputChange("lastName", e.target.value)}
-                    fullWidth
-                    required
-                    placeholder="山田"
-                    slotProps={{
-                        inputLabel: { shrink: true },
-                    }}
-                />
-                {/* 名 */}
-                <TextField
-                    label="名"
-                    value={formState.firstName}
-                    onChange={(e) => handleInputChange("firstName", e.target.value)}
-                    fullWidth
-                    required
-                    placeholder="太郎"
-                    slotProps={{
-                        inputLabel: { shrink: true },
-                    }}
-                />
-            </Stack>
+            <TextField
+                label="姓"
+                fullWidth
+                required
+                placeholder="（例）山田"
+                value={resume.lastName ?? ""}
+                onChange={(e) => {
+                    updateResume({ lastName: e.target.value });
+                }}
+                error={!!errors.lastName?.length}
+                helperText={stringListToBulletList(errors.lastName)}
+                slotProps={{
+                    inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
+                }}
+                sx={{ mb: 4 }}
+            />
+            {/* 名 */}
+            <TextField
+                label="名"
+                fullWidth
+                required
+                placeholder="（例）太郎"
+                value={resume.firstName ?? ""}
+                onChange={(e) => {
+                    updateResume({ firstName: e.target.value });
+                }}
+                error={!!errors.firstName?.length}
+                helperText={stringListToBulletList(errors.firstName)}
+                slotProps={{
+                    inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
+                }}
+            />
         </>
     );
 };

@@ -4,6 +4,7 @@ import java.time.YearMonth;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
+import com.example.keirekipro.shared.Notification;
 
 import lombok.Getter;
 
@@ -44,11 +45,13 @@ public class Certification extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param name 会社名
-     * @param date 取得年月
+     * @param notification 通知オブジェクト
+     * @param name         会社名
+     * @param date         取得年月
      * @return 資格エンティティ
      */
-    public static Certification create(String name, YearMonth date) {
+    public static Certification create(Notification notification, String name, YearMonth date) {
+        validate(notification, name, date);
         return new Certification(name, date);
     }
 
@@ -67,20 +70,36 @@ public class Certification extends Entity {
     /**
      * 資格名を変更する
      *
-     * @param name 資格名
+     * @param notification 通知オブジェクト
+     * @param name         資格名
      * @return 変更後の資格エンティティ
      */
-    public Certification changeName(String name) {
+    public Certification changeName(Notification notification, String name) {
+        validate(notification, name, this.date);
         return new Certification(this.id, name, this.date);
     }
 
     /**
      * 取得年月を変更する
      *
-     * @param date 取得年月
+     * @param notification 通知オブジェクト
+     * @param date         取得年月
      * @return 変更後の資格エンティティ
      */
-    public Certification changeDate(YearMonth date) {
+    public Certification changeDate(Notification notification, YearMonth date) {
+        validate(notification, this.name, date);
         return new Certification(this.id, this.name, date);
+    }
+
+    private static void validate(Notification notification, String name, YearMonth date) {
+        if (name == null || name.isBlank()) {
+            notification.addError("name", "資格名は入力必須です。");
+        } else if (name.length() > 50) {
+            notification.addError("name", "資格名は50文字以内で入力してください。");
+        }
+
+        if (date == null) {
+            notification.addError("date", "取得年月は入力必須です。");
+        }
     }
 }

@@ -6,9 +6,10 @@ vi.mock("@/lib", () => ({
 }));
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
-import { ChangePasswordPayload, useChangePassword } from "@/features/user";
+import type { ChangePasswordPayload } from "@/features/user";
+import { useChangePassword } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";

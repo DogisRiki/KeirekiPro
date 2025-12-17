@@ -1,10 +1,30 @@
 import { TextField } from "@/components/ui";
 import { env } from "@/config/env";
+import { useResumeStore } from "@/features/resume";
+import { stringListToBulletList } from "@/utils";
+import { Box } from "@mui/material";
 
 /**
  * ソーシャルリンクセクション
  */
 export const SociealLinkSection = () => {
+    // ストアから必要な状態を取得
+    const resume = useResumeStore((state) => state.resume);
+    const activeEntryId = useResumeStore((state) => state.activeEntryId);
+    const updateEntry = useResumeStore((state) => state.updateEntry);
+    const getEntryErrors = useResumeStore((state) => state.getEntryErrors);
+
+    // 現在アクティブなエントリー
+    const currentSocialLink = resume?.socialLinks?.find((s) => s.id === activeEntryId) ?? null;
+
+    // エントリーが選択されていない場合
+    if (!currentSocialLink) {
+        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストからSNSを選択してください。</Box>;
+    }
+
+    // 現在のエントリーのエラーを取得
+    const errors = getEntryErrors(currentSocialLink.id);
+
     return (
         <>
             {/* ソーシャル名 */}
@@ -13,9 +33,11 @@ export const SociealLinkSection = () => {
                 fullWidth
                 required
                 placeholder="（例）GitHub"
-                slotProps={{
-                    inputLabel: { shrink: true },
-                }}
+                value={currentSocialLink.name}
+                onChange={(e) => updateEntry("socialLinks", currentSocialLink.id, { name: e.target.value })}
+                error={!!errors.name?.length}
+                helperText={stringListToBulletList(errors.name)}
+                slotProps={{ inputLabel: { shrink: true }, formHelperText: { sx: { whiteSpace: "pre-line" } } }}
                 sx={{ mb: 4 }}
             />
             {/* リンク */}
@@ -25,9 +47,11 @@ export const SociealLinkSection = () => {
                 fullWidth
                 required
                 placeholder={`（例）${env.APP_URL}`}
-                slotProps={{
-                    inputLabel: { shrink: true },
-                }}
+                value={currentSocialLink.link}
+                onChange={(e) => updateEntry("socialLinks", currentSocialLink.id, { link: e.target.value })}
+                error={!!errors.link?.length}
+                helperText={stringListToBulletList(errors.link)}
+                slotProps={{ inputLabel: { shrink: true }, formHelperText: { sx: { whiteSpace: "pre-line" } } }}
             />
         </>
     );

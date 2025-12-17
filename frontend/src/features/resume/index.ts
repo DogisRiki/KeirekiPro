@@ -1,12 +1,13 @@
 export * from "@/features/resume/components/resume-list/ResumeCard";
 export * from "@/features/resume/components/resume-list/ResumeCardMenu";
+export * from "@/features/resume/components/resume-list/ResumeListContainer";
 export * from "@/features/resume/components/resume-list/SearchForm";
-
+export * from "@/features/resume/components/resume-new/CreateResumeContainer";
+export * from "@/features/resume/components/resume-new/CreateResumeForm";
 export * from "@/features/resume/components/resume/BottomMenu";
 export * from "@/features/resume/components/resume/EntryList";
 export * from "@/features/resume/components/resume/EntryListItem";
-export * from "@/features/resume/components/resume/SectionTabs";
-
+export * from "@/features/resume/components/resume/ResumeContainer";
 export * from "@/features/resume/components/resume/section/BasicInfoSection";
 export * from "@/features/resume/components/resume/section/CareerSection";
 export * from "@/features/resume/components/resume/section/CertificationSection";
@@ -15,6 +16,8 @@ export * from "@/features/resume/components/resume/section/ProjectSection";
 export * from "@/features/resume/components/resume/section/SelfPromotionSection";
 export * from "@/features/resume/components/resume/section/SociealLinkSection";
 export * from "@/features/resume/components/resume/section/TechStackField";
+export * from "@/features/resume/components/resume/section/TechStackFieldList";
+export * from "@/features/resume/components/resume/SectionTabs";
 
 export * from "@/features/resume/types";
 
@@ -23,3 +26,55 @@ export * from "@/features/resume/stores/resumeStore";
 export * from "@/features/resume/utils";
 
 export * from "@/features/resume/constants";
+
+export * from "@/features/resume/api/career/createCareer";
+export * from "@/features/resume/api/career/deleteCareer";
+export * from "@/features/resume/api/career/updateCareer";
+export * from "@/features/resume/api/certification/createCertification";
+export * from "@/features/resume/api/certification/deleteCertification";
+export * from "@/features/resume/api/certification/updateCertification";
+export * from "@/features/resume/api/createResume";
+export * from "@/features/resume/api/deleteResume";
+export * from "@/features/resume/api/getResumeInfo";
+export * from "@/features/resume/api/getResumeList";
+export * from "@/features/resume/api/getTechStackList";
+export * from "@/features/resume/api/portfolio/createPortfolio";
+export * from "@/features/resume/api/portfolio/deletePortfolio";
+export * from "@/features/resume/api/portfolio/updatePortfolio";
+export * from "@/features/resume/api/project/createProject";
+export * from "@/features/resume/api/project/deleteProject";
+export * from "@/features/resume/api/project/updateProject";
+export * from "@/features/resume/api/selfPromotion/createSelfPromotion";
+export * from "@/features/resume/api/selfPromotion/deleteSelfPromotion";
+export * from "@/features/resume/api/selfPromotion/updateSelfPromotion";
+export * from "@/features/resume/api/socialLink/createSocialLink";
+export * from "@/features/resume/api/socialLink/deleteSocialLink";
+export * from "@/features/resume/api/socialLink/updateSocialLink";
+export * from "@/features/resume/api/updateResumeBasic";
+
+export * from "@/features/resume/hooks/career/useCreateCareer";
+export * from "@/features/resume/hooks/career/useDeleteCareer";
+export * from "@/features/resume/hooks/career/useUpdateCareer";
+export * from "@/features/resume/hooks/certification/useCreateCertification";
+export * from "@/features/resume/hooks/certification/useDeleteCertification";
+export * from "@/features/resume/hooks/certification/useUpdateCertification";
+export * from "@/features/resume/hooks/portfolio/useCreatePortfolio";
+export * from "@/features/resume/hooks/portfolio/useDeletePortfolio";
+export * from "@/features/resume/hooks/portfolio/useUpdatePortfolio";
+export * from "@/features/resume/hooks/project/useCreateProject";
+export * from "@/features/resume/hooks/project/useDeleteProject";
+export * from "@/features/resume/hooks/project/useUpdateProject";
+export * from "@/features/resume/hooks/selfPromotion/useCreateSelfPromotion";
+export * from "@/features/resume/hooks/selfPromotion/useDeleteSelfPromotion";
+export * from "@/features/resume/hooks/selfPromotion/useUpdateSelfPromotion";
+export * from "@/features/resume/hooks/socialLink/useCreateSocialLink";
+export * from "@/features/resume/hooks/socialLink/useDeleteSocialLink";
+export * from "@/features/resume/hooks/socialLink/useUpdateSocialLink";
+export * from "@/features/resume/hooks/useAutoSave";
+export * from "@/features/resume/hooks/useCreateResume";
+export * from "@/features/resume/hooks/useDeleteResume";
+export * from "@/features/resume/hooks/useGetResumeInfo";
+export * from "@/features/resume/hooks/useGetResumeList";
+export * from "@/features/resume/hooks/useNavigationBlocker";
+export * from "@/features/resume/hooks/useTechStackList";
+export * from "@/features/resume/hooks/useUpdateResumeBasic";

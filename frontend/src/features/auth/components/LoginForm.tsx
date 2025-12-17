@@ -1,7 +1,7 @@
 import { Button, Link, PasswordTextField, TextField } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useErrorMessageStore } from "@/stores";
-import { AuthProvider } from "@/types";
+import type { AuthProvider } from "@/types";
 import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 import { FaGithub } from "react-icons/fa";

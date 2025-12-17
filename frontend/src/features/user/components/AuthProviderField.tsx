@@ -1,4 +1,4 @@
-import { AuthProvider } from "@/types";
+import type { AuthProvider } from "@/types";
 import { Box, Link, Typography } from "@mui/material";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";

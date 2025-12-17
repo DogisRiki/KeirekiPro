@@ -1,5 +1,5 @@
 import { protectedApiClient } from "@/lib";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
 /**
  * ユーザー退会API

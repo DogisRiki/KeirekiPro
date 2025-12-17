@@ -34,6 +34,10 @@ public class Link {
     }
 
     private void validate(Notification notification, String value) {
+        if (value == null || value.isBlank()) {
+            notification.addError("link", "リンクは入力必須です。");
+            return;
+        }
         if (isInvalidUrl(value)) {
             notification.addError("link", "無効なURLです。HTTPS形式で正しいURLを入力してください。");
         }
@@ -53,5 +57,4 @@ public class Link {
             return true;
         }
     }
-
 }

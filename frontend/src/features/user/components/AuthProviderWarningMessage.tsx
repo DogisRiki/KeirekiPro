@@ -1,4 +1,4 @@
-import { SettingMessages } from "@/features/user";
+import type { SettingMessages } from "@/features/user";
 import { Alert, Box } from "@mui/material";
 
 export interface AuthProviderWarningMessageProps {

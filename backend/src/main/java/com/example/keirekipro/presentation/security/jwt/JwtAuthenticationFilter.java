@@ -39,7 +39,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * JWTを検証してSecurityContextに認証情報を設定する
      */
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
@@ -71,13 +73,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (request.getCookies() == null) {
             return Optional.empty();
         }
-        return Arrays.stream(request.getCookies()).filter(cookie -> COOKIE_NAME.equals(cookie.getName()))
-                .map(Cookie::getValue).findFirst();
+        return Arrays.stream(request.getCookies())
+                .filter(cookie -> COOKIE_NAME.equals(cookie.getName()))
+                .map(Cookie::getValue)
+                .findFirst();
     }
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) throws ServletException {
         String path = request.getServletPath();
+
+        // Preflight(OPTIONS)ではJWT認証をスキップ
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
         // /api/auth/ 以下のエンドポイントではフィルタをスキップする
         return path.startsWith("/api/auth");
     }

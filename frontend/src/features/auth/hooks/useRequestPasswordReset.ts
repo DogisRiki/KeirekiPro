@@ -1,7 +1,8 @@
-import { requestPasswordReset, RequestPasswordResetPayload } from "@/features/auth";
+import type { RequestPasswordResetPayload } from "@/features/auth";
+import { requestPasswordReset } from "@/features/auth";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
 import { useMutation } from "@tanstack/react-query";
-import { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 
 /**
  * パスワードリセット要求フック

@@ -19,13 +19,12 @@ public interface ResumeRepository {
     List<Resume> findAll(UUID userId);
 
     /**
-     * 対象ユーザーの単一の職務経歴書を取得する
+     * 単一の職務経歴書を取得する
      *
-     * @param userId   ユーザーID
      * @param resumeId 職務経歴書ID
      * @return 職務経歴書エンティティ
      */
-    Optional<Resume> find(UUID userId, UUID resumeId);
+    Optional<Resume> find(UUID resumeId);
 
     /**
      * 職務経歴書を保存する（新規作成または更新）

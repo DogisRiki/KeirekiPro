@@ -1,5 +1,5 @@
 import { protectedApiClient } from "@/lib";
-import { AxiosResponse } from "axios";
+import type { AxiosResponse } from "axios";
 
 /**
  * パスワード変更用ペイロード

@@ -1,3 +1,6 @@
+import { Dialog } from "@/components/ui";
+import { paths } from "@/config/paths";
+import { useDeleteResume } from "@/features/resume";
 import {
     Delete as DeleteIcon,
     Edit as EditIcon,
@@ -5,8 +8,9 @@ import {
     FileDownload as FileDownloadIcon,
     MoreHoriz as MoreHorizIcon,
 } from "@mui/icons-material";
-import { IconButton, Menu, MenuItem } from "@mui/material";
+import { Box, IconButton, Menu, MenuItem } from "@mui/material";
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router";
 
 const exportMenuList = [
     { label: "PDFでエクスポート", icon: <FileDownloadIcon sx={{ mr: 1 }} />, action: () => alert("PDFでエクスポート") },
@@ -17,20 +21,20 @@ const exportMenuList = [
     },
 ];
 
-const menuList = [
-    { name: "編集", icon: <EditIcon sx={{ mr: 1 }} />, action: () => alert("編集") },
-    { name: "削除", icon: <DeleteIcon sx={{ mr: 1 }} />, action: () => alert("削除") },
-    { name: "エクスポート", icon: <ExpandMoreIcon sx={{ mr: 1 }} />, isNested: true },
-];
-
 interface ResumeCardMenuProps {
     resumeId: string;
+    resumeName: string;
 }
 
 /**
  * 職務経歴書カードメニュー
  */
-export const ResumeCardMenu = ({ resumeId }: ResumeCardMenuProps) => {
+export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) => {
+    const navigate = useNavigate();
+
+    // 削除ミューテーション
+    const deleteMutation = useDeleteResume();
+
     // メインメニューの表示位置を制御する要素
     const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
     // エクスポートメニューの表示位置を制御する要素
@@ -39,6 +43,37 @@ export const ResumeCardMenu = ({ resumeId }: ResumeCardMenuProps) => {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     // マウスイベントのタイミング制御用タイマー
     const timeoutRef = useRef<NodeJS.Timeout>();
+    // 削除確認ダイアログの開閉状態
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+    /**
+     * 編集画面へ遷移
+     */
+    const handleEdit = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        handleCardMenuClose();
+        const editPath = paths.resume.edit.replace(":id", resumeId);
+        navigate(editPath);
+    };
+
+    /**
+     * 削除確認ダイアログを開く
+     */
+    const handleDeleteClick = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        handleCardMenuClose();
+        setDeleteDialogOpen(true);
+    };
+
+    /**
+     * 削除確認ダイアログのコールバック
+     */
+    const handleDeleteDialogClose = (confirmed: boolean) => {
+        setDeleteDialogOpen(false);
+        if (confirmed) {
+            deleteMutation.mutate(resumeId);
+        }
+    };
 
     // メニューを開く
     const handleCardMenuClick = (event: React.MouseEvent<HTMLElement>, resumeId: string) => {
@@ -52,14 +87,6 @@ export const ResumeCardMenu = ({ resumeId }: ResumeCardMenuProps) => {
         setMenuAnchorEl(null);
         setExportMenuAnchorEl(null);
         setOpenMenuId(null);
-    };
-
-    // メニュー項目クリック時の処理
-    const handleMenuItemClick = (action?: () => void) => {
-        if (action) {
-            action();
-        }
-        handleCardMenuClose();
     };
 
     // エクスポートメニューを表示する
@@ -85,6 +112,13 @@ export const ResumeCardMenu = ({ resumeId }: ResumeCardMenuProps) => {
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
         }
+    };
+
+    // エクスポート項目クリック時の処理
+    const handleExportItemClick = (event: React.MouseEvent, action: () => void) => {
+        event.stopPropagation();
+        action();
+        handleCardMenuClose();
     };
 
     return (
@@ -114,24 +148,33 @@ export const ResumeCardMenu = ({ resumeId }: ResumeCardMenuProps) => {
                     horizontal: "right",
                 }}
             >
-                {menuList.map((menu, index) => (
-                    <MenuItem
-                        key={resumeId + index}
-                        onClick={menu.isNested ? undefined : () => handleMenuItemClick(menu.action)}
-                        onMouseEnter={(event) => {
-                            if (menu.isNested) {
-                                handleExportMouseEnter(event);
-                            } else {
-                                handleExportMouseLeave();
-                            }
-                        }}
-                        onMouseLeave={menu.isNested ? handleExportMouseLeave : undefined}
-                        sx={{ color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}
-                    >
-                        {menu.icon}
-                        {menu.name}
-                    </MenuItem>
-                ))}
+                {/* 編集 */}
+                <MenuItem
+                    onClick={handleEdit}
+                    onMouseEnter={handleExportMouseLeave}
+                    sx={{ color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}
+                >
+                    <EditIcon sx={{ mr: 1 }} />
+                    編集
+                </MenuItem>
+                {/* 削除 */}
+                <MenuItem
+                    onClick={handleDeleteClick}
+                    onMouseEnter={handleExportMouseLeave}
+                    sx={{ color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}
+                >
+                    <DeleteIcon sx={{ mr: 1 }} />
+                    削除
+                </MenuItem>
+                {/* エクスポート */}
+                <MenuItem
+                    onMouseEnter={handleExportMouseEnter}
+                    onMouseLeave={handleExportMouseLeave}
+                    sx={{ color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}
+                >
+                    <ExpandMoreIcon sx={{ mr: 1 }} />
+                    エクスポート
+                </MenuItem>
             </Menu>
             {/* ネストメニュー */}
             <Menu
@@ -158,7 +201,7 @@ export const ResumeCardMenu = ({ resumeId }: ResumeCardMenuProps) => {
                 {exportMenuList.map((menu, index) => (
                     <MenuItem
                         key={`export-${index}`}
-                        onClick={() => handleMenuItemClick(menu.action)}
+                        onClick={(event) => handleExportItemClick(event, menu.action)}
                         sx={{ color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}
                     >
                         {menu.icon}
@@ -166,6 +209,16 @@ export const ResumeCardMenu = ({ resumeId }: ResumeCardMenuProps) => {
                     </MenuItem>
                 ))}
             </Menu>
+            {/* 削除確認ダイアログ(イベント伝播を止めるためBoxでラップ) */}
+            <Box onClick={(e) => e.stopPropagation()}>
+                <Dialog
+                    open={deleteDialogOpen}
+                    variant="confirm"
+                    title="削除確認"
+                    description={`「${resumeName}」を削除しますか？この操作は取り消せません。`}
+                    onClose={handleDeleteDialogClose}
+                />
+            </Box>
         </>
     );
 };

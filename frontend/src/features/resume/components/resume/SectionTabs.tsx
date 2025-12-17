@@ -6,11 +6,15 @@ import { Tab, Tabs } from "@mui/material";
  */
 export const SectionTabs = () => {
     // ストアから必要な状態を取り出す
-    const { activeSection, setActiveSection } = useResumeStore();
+    const activeSection = useResumeStore((state) => state.activeSection);
+    const setActiveSection = useResumeStore((state) => state.setActiveSection);
 
-    // セクション変更ハンドラー
+    /**
+     * タブ変更ハンドラー
+     */
     const handleChange = (_: React.SyntheticEvent, newValue: number) => {
-        setActiveSection(sections[newValue].key);
+        const targetSection = sections[newValue].key;
+        setActiveSection(targetSection);
     };
 
     return (

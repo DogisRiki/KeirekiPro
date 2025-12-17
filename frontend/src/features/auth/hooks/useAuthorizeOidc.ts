@@ -1,8 +1,8 @@
 import { authorizeOidc } from "@/features/auth";
 import { useErrorMessageStore } from "@/stores";
-import { AuthProvider } from "@/types";
+import type { AuthProvider } from "@/types";
 import { useMutation } from "@tanstack/react-query";
-import { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 
 /**
  * OIDC認可URLを取得してリダイレクトするフック

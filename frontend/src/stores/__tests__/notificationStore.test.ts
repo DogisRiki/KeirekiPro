@@ -1,9 +1,10 @@
-import { useNotificationStore } from "@/stores";
+import { useErrorMessageStore, useNotificationStore } from "@/stores";
 
 describe("useNotificationStore", () => {
     beforeEach(() => {
         // テスト前にストアをリセット
         useNotificationStore.getState().clearNotification();
+        useErrorMessageStore.getState().clearErrors();
     });
 
     it("初期状態でmessageがnull、typeがundefined、isShowがfalseであること", () => {

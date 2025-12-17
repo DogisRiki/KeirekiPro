@@ -1,6 +1,7 @@
-import { Link as MuiLink, LinkProps as MuiLinkProps } from "@mui/material";
-import { Link as RouterLink, LinkProps as RouterLinkProps } from "react-router";
-
+import type { LinkProps as MuiLinkProps } from "@mui/material";
+import { Link as MuiLink } from "@mui/material";
+import type { LinkProps as RouterLinkProps } from "react-router";
+import { Link as RouterLink } from "react-router";
 /**
  * リンク
  */

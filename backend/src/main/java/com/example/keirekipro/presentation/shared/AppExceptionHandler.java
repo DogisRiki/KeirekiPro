@@ -82,4 +82,17 @@ public class AppExceptionHandler {
     public ErrorResponse handleBaseException(BaseException ex) {
         return new ErrorResponse(ex.getMessage(), ex.getErrors());
     }
+
+    /**
+     * 想定外の例外をハンドリングする
+     *
+     * @param ex 例外オブジェクト
+     * @return エラーレスポンス
+     */
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleUnexpectedException(Exception ex) {
+        // ログ出力などはここで行う
+        return new ErrorResponse("予期せぬエラーが発生しました。", Collections.emptyMap());
+    }
 }

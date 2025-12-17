@@ -13,14 +13,14 @@ import lombok.Getter;
 public class TechStack {
 
     /**
-     * 開発言語
+     * フロントエンド
      */
-    private final List<String> languages;
+    private final Frontend frontend;
 
     /**
-     * 依存関係
+     * バックエンド
      */
-    private final Dependencies dependencies;
+    private final Backend backend;
 
     /**
      * インフラ
@@ -32,9 +32,9 @@ public class TechStack {
      */
     private final Tools tools;
 
-    private TechStack(List<String> languages, Dependencies dependencies, Infrastructure infrastructure, Tools tools) {
-        this.languages = languages;
-        this.dependencies = dependencies;
+    private TechStack(Frontend frontend, Backend backend, Infrastructure infrastructure, Tools tools) {
+        this.frontend = frontend;
+        this.backend = backend;
         this.infrastructure = infrastructure;
         this.tools = tools;
     }
@@ -42,23 +42,28 @@ public class TechStack {
     /**
      * ファクトリーメソッド
      *
-     * @param languages      開発言語
-     * @param dependencies   依存関係
+     * @param frontend       フロントエンド
+     * @param backend        バックエンド
      * @param infrastructure インフラ
      * @param tools          開発支援ツール
      * @return 値オブジェクト
      */
-    public static TechStack create(List<String> languages, Dependencies dependencies, Infrastructure infrastructure,
-            Tools tools) {
-        return new TechStack(languages, dependencies, infrastructure, tools);
+    public static TechStack create(Frontend frontend, Backend backend,
+            Infrastructure infrastructure, Tools tools) {
+        return new TechStack(frontend, backend, infrastructure, tools);
     }
 
     /**
-     * 依存関係
+     * フロントエンド技術スタック
      */
     @Getter
     @EqualsAndHashCode
-    public static class Dependencies {
+    public static class Frontend {
+
+        /**
+         * 開発言語
+         */
+        private final List<String> languages;
 
         /**
          * フレームワーク
@@ -71,7 +76,118 @@ public class TechStack {
         private final List<String> libraries;
 
         /**
-         * テスト
+         * ビルドツール
+         */
+        private final List<String> buildTools;
+
+        /**
+         * パッケージマネージャー
+         */
+        private final List<String> packageManagers;
+
+        /**
+         * リンター
+         */
+        private final List<String> linters;
+
+        /**
+         * フォーマッター
+         */
+        private final List<String> formatters;
+
+        /**
+         * テストツール
+         */
+        private final List<String> testingTools;
+
+        private Frontend(List<String> languages,
+                List<String> frameworks,
+                List<String> libraries,
+                List<String> buildTools,
+                List<String> packageManagers,
+                List<String> linters,
+                List<String> formatters,
+                List<String> testingTools) {
+            this.languages = languages;
+            this.frameworks = frameworks;
+            this.libraries = libraries;
+            this.buildTools = buildTools;
+            this.packageManagers = packageManagers;
+            this.linters = linters;
+            this.formatters = formatters;
+            this.testingTools = testingTools;
+        }
+
+        /**
+         * ファクトリーメソッド
+         *
+         * @param languages       開発言語
+         * @param frameworks      フレームワーク
+         * @param libraries       ライブラリ
+         * @param buildTools      ビルドツール
+         * @param packageManagers パッケージマネージャー
+         * @param linters         リンター
+         * @param formatters      フォーマッター
+         * @param testingTools    テストツール
+         * @return 値オブジェクト
+         */
+        public static Frontend create(List<String> languages,
+                List<String> frameworks,
+                List<String> libraries,
+                List<String> buildTools,
+                List<String> packageManagers,
+                List<String> linters,
+                List<String> formatters,
+                List<String> testingTools) {
+            return new Frontend(languages, frameworks, libraries, buildTools,
+                    packageManagers, linters, formatters, testingTools);
+        }
+    }
+
+    /**
+     * バックエンド技術スタック
+     */
+    @Getter
+    @EqualsAndHashCode
+    public static class Backend {
+
+        /**
+         * 開発言語
+         */
+        private final List<String> languages;
+
+        /**
+         * フレームワーク
+         */
+        private final List<String> frameworks;
+
+        /**
+         * ライブラリ
+         */
+        private final List<String> libraries;
+
+        /**
+         * ビルドツール
+         */
+        private final List<String> buildTools;
+
+        /**
+         * パッケージマネージャー
+         */
+        private final List<String> packageManagers;
+
+        /**
+         * リンター
+         */
+        private final List<String> linters;
+
+        /**
+         * フォーマッター
+         */
+        private final List<String> formatters;
+
+        /**
+         * テストツール
          */
         private final List<String> testingTools;
 
@@ -81,32 +197,60 @@ public class TechStack {
         private final List<String> ormTools;
 
         /**
-         * パッケージマネージャー
+         * 認証
          */
-        private final List<String> packageManagers;
+        private final List<String> auth;
 
-        private Dependencies(List<String> frameworks, List<String> libraries, List<String> testingTools,
-                List<String> ormTools, List<String> packageManagers) {
+        private Backend(List<String> languages,
+                List<String> frameworks,
+                List<String> libraries,
+                List<String> buildTools,
+                List<String> packageManagers,
+                List<String> linters,
+                List<String> formatters,
+                List<String> testingTools,
+                List<String> ormTools,
+                List<String> auth) {
+            this.languages = languages;
             this.frameworks = frameworks;
             this.libraries = libraries;
+            this.buildTools = buildTools;
+            this.packageManagers = packageManagers;
+            this.linters = linters;
+            this.formatters = formatters;
             this.testingTools = testingTools;
             this.ormTools = ormTools;
-            this.packageManagers = packageManagers;
+            this.auth = auth;
         }
 
         /**
          * ファクトリーメソッド
          *
+         * @param languages       開発言語
          * @param frameworks      フレームワーク
          * @param libraries       ライブラリ
-         * @param testingTools    テスト
-         * @param ormTools        ORM
+         * @param buildTools      ビルドツール
          * @param packageManagers パッケージマネージャー
+         * @param linters         リンター
+         * @param formatters      フォーマッター
+         * @param testingTools    テストツール
+         * @param ormTools        ORM
+         * @param auth            認証
          * @return 値オブジェクト
          */
-        public static Dependencies create(List<String> frameworks, List<String> libraries, List<String> testingTools,
-                List<String> ormTools, List<String> packageManagers) {
-            return new Dependencies(frameworks, libraries, testingTools, ormTools, packageManagers);
+        public static Backend create(List<String> languages,
+                List<String> frameworks,
+                List<String> libraries,
+                List<String> buildTools,
+                List<String> packageManagers,
+                List<String> linters,
+                List<String> formatters,
+                List<String> testingTools,
+                List<String> ormTools,
+                List<String> auth) {
+            return new Backend(languages, frameworks, libraries, buildTools,
+                    packageManagers, linters, formatters, testingTools,
+                    ormTools, auth);
         }
     }
 
@@ -123,6 +267,11 @@ public class TechStack {
         private final List<String> clouds;
 
         /**
+         * OS
+         */
+        private final List<String> operatingSystems;
+
+        /**
          * コンテナ
          */
         private final List<String> containers;
@@ -133,7 +282,7 @@ public class TechStack {
         private final List<String> databases;
 
         /**
-         * ウェブサーバー
+         * Webサーバー
          */
         private final List<String> webServers;
 
@@ -157,11 +306,17 @@ public class TechStack {
          */
         private final List<String> loggingTools;
 
-        private Infrastructure(List<String> clouds, List<String> containers, List<String> databases,
+        private Infrastructure(List<String> clouds,
+                List<String> operatingSystems,
+                List<String> containers,
+                List<String> databases,
                 List<String> webServers,
-                List<String> ciCdTools, List<String> iacTools, List<String> monitoringTools,
+                List<String> ciCdTools,
+                List<String> iacTools,
+                List<String> monitoringTools,
                 List<String> loggingTools) {
             this.clouds = clouds;
+            this.operatingSystems = operatingSystems;
             this.containers = containers;
             this.databases = databases;
             this.webServers = webServers;
@@ -174,22 +329,28 @@ public class TechStack {
         /**
          * ファクトリーメソッド
          *
-         * @param clouds          クラウド
-         * @param containers      コンテナ
-         * @param databases       データベース
-         * @param webServers      ウェブサーバー
-         * @param ciCdTools       CI/CD
-         * @param iacTools        IaC
-         * @param monitoringTools 監視
-         * @param loggingTools    ロギング
+         * @param clouds           クラウド
+         * @param operatingSystems OS
+         * @param containers       コンテナ
+         * @param databases        データベース
+         * @param webServers       Webサーバー
+         * @param ciCdTools        CI/CD
+         * @param iacTools         IaC
+         * @param monitoringTools  監視
+         * @param loggingTools     ロギング
          * @return 値オブジェクト
          */
-        public static Infrastructure create(List<String> clouds, List<String> containers, List<String> databases,
+        public static Infrastructure create(List<String> clouds,
+                List<String> operatingSystems,
+                List<String> containers,
+                List<String> databases,
                 List<String> webServers,
-                List<String> ciCdTools, List<String> iacTools, List<String> monitoringTools,
+                List<String> ciCdTools,
+                List<String> iacTools,
+                List<String> monitoringTools,
                 List<String> loggingTools) {
-            return new Infrastructure(clouds, containers, databases, webServers, ciCdTools, iacTools, monitoringTools,
-                    loggingTools);
+            return new Infrastructure(clouds, operatingSystems, containers, databases,
+                    webServers, ciCdTools, iacTools, monitoringTools, loggingTools);
         }
     }
 
@@ -230,32 +391,58 @@ public class TechStack {
          */
         private final List<String> designTools;
 
-        private Tools(List<String> sourceControls, List<String> projectManagements, List<String> communicationTools,
-                List<String> documentationTools, List<String> apiDevelopmentTools, List<String> designTools) {
+        /**
+         * エディタ
+         */
+        private final List<String> editors;
+
+        /**
+         * 開発環境
+         */
+        private final List<String> developmentEnvironments;
+
+        private Tools(List<String> sourceControls,
+                List<String> projectManagements,
+                List<String> communicationTools,
+                List<String> documentationTools,
+                List<String> apiDevelopmentTools,
+                List<String> designTools,
+                List<String> editors,
+                List<String> developmentEnvironments) {
             this.sourceControls = sourceControls;
             this.projectManagements = projectManagements;
             this.communicationTools = communicationTools;
             this.documentationTools = documentationTools;
             this.apiDevelopmentTools = apiDevelopmentTools;
             this.designTools = designTools;
+            this.editors = editors;
+            this.developmentEnvironments = developmentEnvironments;
         }
 
         /**
          * ファクトリーメソッド
          *
-         * @param sourceControls      ソース管理
-         * @param projectManagements  プロジェクト管理
-         * @param communicationTools  コミュニケーション
-         * @param documentationTools  ドキュメント
-         * @param apiDevelopmentTools API開発
-         * @param designTools         デザイン
+         * @param sourceControls          ソース管理
+         * @param projectManagements      プロジェクト管理
+         * @param communicationTools      コミュニケーション
+         * @param documentationTools      ドキュメント
+         * @param apiDevelopmentTools     API開発
+         * @param designTools             デザイン
+         * @param editors                 エディタ
+         * @param developmentEnvironments 開発環境
          * @return 値オブジェクト
          */
-        public static Tools create(List<String> sourceControls, List<String> projectManagements,
+        public static Tools create(List<String> sourceControls,
+                List<String> projectManagements,
                 List<String> communicationTools,
-                List<String> documentationTools, List<String> apiDevelopmentTools, List<String> designTools) {
-            return new Tools(sourceControls, projectManagements, communicationTools, documentationTools,
-                    apiDevelopmentTools, designTools);
+                List<String> documentationTools,
+                List<String> apiDevelopmentTools,
+                List<String> designTools,
+                List<String> editors,
+                List<String> developmentEnvironments) {
+            return new Tools(sourceControls, projectManagements, communicationTools,
+                    documentationTools, apiDevelopmentTools, designTools,
+                    editors, developmentEnvironments);
         }
     }
 }

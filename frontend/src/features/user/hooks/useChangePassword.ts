@@ -1,7 +1,8 @@
-import { changePassword, ChangePasswordPayload } from "@/features/user";
+import type { ChangePasswordPayload } from "@/features/user";
+import { changePassword } from "@/features/user";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
 import { useMutation } from "@tanstack/react-query";
-import { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 
 /**
  * パスワード変更フック

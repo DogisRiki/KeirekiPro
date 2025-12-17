@@ -1,0 +1,137 @@
+package com.example.keirekipro.usecase.resume;
+
+import java.util.List;
+import java.util.UUID;
+
+import com.example.keirekipro.domain.model.resume.Career;
+import com.example.keirekipro.domain.model.resume.Certification;
+import com.example.keirekipro.domain.model.resume.Portfolio;
+import com.example.keirekipro.domain.model.resume.Project;
+import com.example.keirekipro.domain.model.resume.Resume;
+import com.example.keirekipro.domain.model.resume.ResumeName;
+import com.example.keirekipro.domain.model.resume.SelfPromotion;
+import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.repository.resume.ResumeRepository;
+import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
+import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
+import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import lombok.RequiredArgsConstructor;
+
+/**
+ * 職務経歴書コピーして新規作成ユースケース
+ */
+@Service
+@RequiredArgsConstructor
+public class CopyCreateResumeUseCase {
+
+    private final ResumeRepository resumeRepository;
+
+    private final ResumeNameDuplicationCheckService resumeNameDuplicationCheckService;
+
+    /**
+     * 職務経歴書コピーして新規作成ユースケースを実行する
+     *
+     * @param userId  ユーザーID
+     * @param request リクエスト
+     * @return 職務経歴書ユースケースDTO
+     */
+    @Transactional
+    public ResumeInfoUseCaseDto execute(UUID userId, CreateResumeRequest request) {
+
+        Notification notification = new Notification();
+
+        // 職務経歴書名の重複チェック
+        ResumeName resumeName = ResumeName.create(notification, request.getResumeName());
+        resumeNameDuplicationCheckService.execute(userId, resumeName);
+
+        // コピー元を取得
+        Resume source = resumeRepository.find(request.getResumeId())
+                .orElseThrow(() -> new UseCaseException("コピー元の職務経歴書が存在しません。"));
+
+        // 所有者チェック（他人の職務経歴書をコピーしようとした場合）
+        if (!source.getUserId().equals(userId)) {
+            throw new UseCaseException("コピー元の職務経歴書が存在しません。");
+        }
+
+        // 職歴
+        List<Career> copiedCareers = source.getCareers().stream()
+                .map(career -> Career.create(
+                        notification,
+                        career.getCompanyName(),
+                        career.getPeriod()))
+                .toList();
+
+        // プロジェクト
+        List<Project> copiedProjects = source.getProjects().stream()
+                .map(project -> Project.create(
+                        notification,
+                        project.getCompanyName(),
+                        project.getPeriod(),
+                        project.getName(),
+                        project.getOverview(),
+                        project.getTeamComp(),
+                        project.getRole(),
+                        project.getAchievement(),
+                        project.getProcess(),
+                        project.getTechStack()))
+                .toList();
+
+        // 資格
+        List<Certification> copiedCertifications = source.getCertifications().stream()
+                .map(certification -> Certification.create(
+                        notification,
+                        certification.getName(),
+                        certification.getDate()))
+                .toList();
+
+        // ポートフォリオ
+        List<Portfolio> copiedPortfolios = source.getPortfolios().stream()
+                .map(portfolio -> Portfolio.create(
+                        notification,
+                        portfolio.getName(),
+                        portfolio.getOverview(),
+                        portfolio.getTechStack(),
+                        portfolio.getLink()))
+                .toList();
+
+        // ソーシャルリンク
+        List<SocialLink> copiedSocialLinks = source.getSocialLinks().stream()
+                .map(socialLink -> SocialLink.create(
+                        notification,
+                        socialLink.getName(),
+                        socialLink.getLink()))
+                .toList();
+
+        // 自己PR
+        List<SelfPromotion> copiedSelfPromotions = source.getSelfPromotions().stream()
+                .map(selfPromotion -> SelfPromotion.create(
+                        notification,
+                        selfPromotion.getTitle(),
+                        selfPromotion.getContent()))
+                .toList();
+
+        // 職務経歴書エンティティ新規構築
+        Resume copy = Resume.create(
+                notification,
+                userId,
+                resumeName,
+                source.getDate(),
+                source.getFullName(),
+                copiedCareers,
+                copiedProjects,
+                copiedCertifications,
+                copiedPortfolios,
+                copiedSocialLinks,
+                copiedSelfPromotions);
+
+        resumeRepository.save(copy);
+
+        return ResumeInfoUseCaseDto.convertToUseCaseDto(copy);
+    }
+}

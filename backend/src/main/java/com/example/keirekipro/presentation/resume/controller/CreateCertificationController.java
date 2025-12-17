@@ -1,0 +1,53 @@
+package com.example.keirekipro.presentation.resume.controller;
+
+import java.util.UUID;
+
+import com.example.keirekipro.presentation.resume.dto.CreateCertificationRequest;
+import com.example.keirekipro.presentation.resume.dto.ResumeInfoResponse;
+import com.example.keirekipro.presentation.security.CurrentUserFacade;
+import com.example.keirekipro.usecase.resume.CreateCertificationUseCase;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import lombok.RequiredArgsConstructor;
+
+import jakarta.validation.Valid;
+
+/**
+ * 職務経歴書 資格新規作成コントローラー
+ */
+@RestController
+@RequestMapping("/api/resumes")
+@RequiredArgsConstructor
+@Tag(name = "resumes", description = "職務経歴書に関するエンドポイント")
+public class CreateCertificationController {
+
+    private final CreateCertificationUseCase createCertificationUseCase;
+
+    private final CurrentUserFacade currentUserFacade;
+
+    /**
+     * 資格新規作成エンドポイント
+     */
+    @PostMapping("/{resumeId}/certifications")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "職務経歴書 資格新規作成", description = "職務経歴書に資格を新規作成する")
+    public ResumeInfoResponse handle(
+            @PathVariable("resumeId") UUID resumeId,
+            @Valid @RequestBody CreateCertificationRequest request) {
+
+        UUID userId = UUID.fromString(currentUserFacade.getUserId());
+
+        return ResumeInfoResponse.convertToResponse(
+                createCertificationUseCase.execute(userId, resumeId, request));
+    }
+}

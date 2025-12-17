@@ -1,16 +1,18 @@
 package com.example.keirekipro.domain.service.resume;
 
-import java.util.List;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Resume;
+import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
+import com.example.keirekipro.domain.shared.exception.DomainException;
 
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * 職務経歴書の重複チェックドメインサービス
+ * 職務経歴書名の重複チェックドメインサービス
  */
 @Service
 @RequiredArgsConstructor
@@ -19,17 +21,28 @@ public class ResumeNameDuplicationCheckService {
     private final ResumeRepository resumeRepository;
 
     /**
-     * ドメインサービスを実行する
+     * 職務経歴書名の重複をチェックする
      *
-     * @param resume 職務経歴書エンティティ
-     * @return 重複チェック結果
+     * @param userId     ユーザーID
+     * @param resumeName チェック対象の職務経歴書
+     * @throws DomainException 職務経歴書の重複があった場合
      */
-    public boolean execute(Resume resume) {
-        List<Resume> resumeList = resumeRepository.findAll(resume.getUserId());
-        return resumeList.stream()
-                // 「同じID」の場合はスキップ = 自分自身は除外
-                .filter(d -> !d.getId().equals(resume.getId()))
-                // 名前が同じなら重複
-                .anyMatch(d -> d.getName().equals(resume.getName()));
+    public void execute(UUID userId, ResumeName resumeName) {
+
+        // 職務経歴書名がnullなら重複チェック不要
+        if (resumeName == null) {
+            return;
+        }
+
+        resumeRepository.findAll(userId).stream()
+                // ResumeからResumeNameを取り出し
+                .map(Resume::getName)
+                // 引数のresumeNameと同じものを探し
+                .filter(resumeName::equals)
+                // 見つかったら例外を投げる
+                .findAny()
+                .ifPresent(n -> {
+                    throw new DomainException("この職務経歴書名は既に登録されています。");
+                });
     }
 }

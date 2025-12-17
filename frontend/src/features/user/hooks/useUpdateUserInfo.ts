@@ -1,8 +1,9 @@
-import { updateUserInfo, UpdateUserInfoPayload } from "@/features/user";
+import type { UpdateUserInfoPayload } from "@/features/user";
+import { updateUserInfo } from "@/features/user";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { User } from "@/types";
+import type { User } from "@/types";
 import { useMutation } from "@tanstack/react-query";
-import { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 
 /**
  * ユーザー情報更新フック

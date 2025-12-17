@@ -1,15 +1,13 @@
+import type { ProcessMap, SectionInfo } from "@/features/resume";
 import {
     BasicInfoSection,
     CareerSection,
     CertificationSection,
     PortfolioSection,
-    ProcessMap,
     ProjectSection,
-    SectionInfo,
     SelfPromotionSection,
     SociealLinkSection,
 } from "@/features/resume";
-import { TechStack } from "@/types";
 
 /**
  * セクション情報一覧
@@ -17,7 +15,7 @@ import { TechStack } from "@/types";
 export const sections: SectionInfo[] = [
     { key: "basicInfo", label: "基本", type: "single", component: BasicInfoSection },
     { key: "career", label: "職歴", type: "list", component: CareerSection },
-    { key: "project", label: "職務内容", type: "list", component: ProjectSection },
+    { key: "project", label: "プロジェクト", type: "list", component: ProjectSection },
     { key: "certification", label: "保有資格", type: "list", component: CertificationSection },
     { key: "portfolio", label: "ポートフォリオ", type: "list", component: PortfolioSection },
     { key: "socialLink", label: "SNS", type: "list", component: SociealLinkSection },
@@ -42,23 +40,38 @@ export const processList: ProcessMap = {
  */
 export const techStackInfo = [
     {
-        title: "開発言語",
-        fields: [{ label: "プログラミング言語", path: ["languages"] }],
-    },
-    {
-        title: "依存関係",
+        title: "フロントエンド",
         fields: [
-            { label: "フレームワーク", path: ["dependencies", "frameworks"] },
-            { label: "ライブラリ", path: ["dependencies", "libraries"] },
-            { label: "テストツール", path: ["dependencies", "testingTools"] },
-            { label: "ORM", path: ["dependencies", "ormTools"] },
-            { label: "パッケージマネージャー", path: ["dependencies", "packageManagers"] },
+            { label: "言語", path: ["frontend", "languages"] },
+            { label: "フレームワーク", path: ["frontend", "frameworks"] },
+            { label: "ライブラリ", path: ["frontend", "libraries"] },
+            { label: "ビルドツール", path: ["frontend", "buildTools"] },
+            { label: "パッケージマネージャー", path: ["frontend", "packageManagers"] },
+            { label: "リンター", path: ["frontend", "linters"] },
+            { label: "フォーマッター", path: ["frontend", "formatters"] },
+            { label: "テストツール", path: ["frontend", "testingTools"] },
         ],
     },
     {
-        title: "インフラ・開発環境",
+        title: "バックエンド",
+        fields: [
+            { label: "言語", path: ["backend", "languages"] },
+            { label: "フレームワーク", path: ["backend", "frameworks"] },
+            { label: "ライブラリ", path: ["backend", "libraries"] },
+            { label: "ビルドツール", path: ["backend", "buildTools"] },
+            { label: "パッケージマネージャー", path: ["backend", "packageManagers"] },
+            { label: "リンター", path: ["backend", "linters"] },
+            { label: "フォーマッター", path: ["backend", "formatters"] },
+            { label: "テストツール", path: ["backend", "testingTools"] },
+            { label: "ORM", path: ["backend", "ormTools"] },
+            { label: "認証/認可", path: ["backend", "auth"] },
+        ],
+    },
+    {
+        title: "インフラ",
         fields: [
             { label: "クラウド", path: ["infrastructure", "clouds"] },
+            { label: "OS", path: ["infrastructure", "operatingSystems"] },
             { label: "コンテナ", path: ["infrastructure", "containers"] },
             { label: "データベース", path: ["infrastructure", "databases"] },
             { label: "Webサーバー", path: ["infrastructure", "webServers"] },
@@ -69,7 +82,7 @@ export const techStackInfo = [
         ],
     },
     {
-        title: "開発ツール・プロジェクト管理",
+        title: "開発支援ツール",
         fields: [
             { label: "ソース管理", path: ["tools", "sourceControls"] },
             { label: "プロジェクト管理", path: ["tools", "projectManagements"] },
@@ -77,381 +90,18 @@ export const techStackInfo = [
             { label: "ドキュメント", path: ["tools", "documentationTools"] },
             { label: "API開発", path: ["tools", "apiDevelopmentTools"] },
             { label: "デザイン", path: ["tools", "designTools"] },
+            { label: "エディタ/IDE", path: ["tools", "editors"] },
+            { label: "開発環境", path: ["tools", "developmentEnvironments"] },
         ],
     },
-];
+] as const;
 
 /**
- * 技術スタック一覧
- * ※DB管理にしたい
+ * 一時IDのプレフィックス
  */
-export const teckStackList: TechStack = {
-    languages: [
-        "TypeScript",
-        "JavaScript",
-        "HTML",
-        "CSS",
-        "Sass/SCSS",
-        "WebAssembly",
-        "Dart",
-        "Go",
-        "Python",
-        "Java",
-        "Ruby",
-        "PHP",
-        "Rust",
-        "Node.js",
-        "C#",
-        "Kotlin",
-        "Scala",
-        "Elixir",
-        "Swift",
-        "C++",
-        "Perl",
-    ].sort(),
-    dependencies: {
-        frameworks: [
-            // JavaScript/TypeScript
-            "React",
-            "Angular",
-            "Vue.js",
-            "Svelte",
-            // JavaScript/TypeScript
-            "Express",
-            "NestJS",
-            "Koa",
-            "Hapi",
-            // Python
-            "Django",
-            "Flask",
-            "FastAPI",
-            "Pyramid",
-            // Java
-            "Spring",
-            "Struts",
-            "JSF",
-            "Play Framework",
-            // Ruby
-            "Ruby on Rails",
-            "Sinatra",
-            "Hanami",
-            // PHP
-            "Laravel",
-            "Symfony",
-            "CodeIgniter",
-            "CakePHP",
-            // .NET
-            "ASP.NET Core",
-            "Blazor",
-            "NancyFX",
-            // CSS
-            "Bootstrap",
-            "Tailwind CSS",
-            "Foundation",
-            "Bulma",
-            "Materialize",
-            // その他の言語/プラットフォーム
-            "React Native",
-            "Flutter",
-            "Ionic",
-            "Electron",
-            "Qt",
-        ].sort(),
-        libraries: [
-            // JavaScript/TypeScript
-            "ESLint",
-            "Prettier",
-            "Axios",
-            "TanStack Query",
-            "Redux",
-            "Lodash",
-            "Moment.js",
-            "RxJS",
-            "Chart.js",
-            // Python
-            "NumPy",
-            "pandas",
-            "Requests",
-            "Matplotlib",
-            "BeautifulSoup",
-            // Java
-            "Apache Commons",
-            "Guava",
-            "Jackson",
-            "Log4j",
-            "SLF4J",
-            // Ruby
-            "Nokogiri",
-            "Prawn",
-            "Oj",
-            "Faraday",
-            "Sidekiq",
-            // PHP
-            "Guzzle",
-            "Monolog",
-            "Carbon",
-            "SwiftMailer",
-            "Symfony Components",
-        ],
-        testingTools: [
-            // JavaScript/TypeScript
-            "Jest",
-            "Mocha",
-            "Chai",
-            "Jasmine",
-            "Karma",
-            "Cypress",
-            "TestCafe",
-            "Puppeteer",
-            "Playwright",
-            // Java
-            "JUnit",
-            "TestNG",
-            // .NET
-            "NUnit",
-            "xUnit",
-            "MSTest",
-            // Python
-            "pytest",
-            "unittest",
-            "nose",
-            // Ruby
-            "RSpec",
-            "Minitest",
-            "Cucumber",
-            // PHP
-            "PHPUnit",
-            "Behat",
-            // Go
-            "GoConvey",
-            "Testify",
-            // C/C++
-            "Google Test",
-            "CppUnit",
-            // 汎用・クロスプラットフォーム
-            "Selenium",
-            "Robot Framework",
-        ].sort(),
-        ormTools: [
-            // JavaScript/TypeScript
-            "TypeORM",
-            "Sequelize",
-            "Objection.js",
-            "Prisma",
-            // Python
-            "SQLAlchemy",
-            "Django ORM",
-            "Peewee",
-            // Ruby
-            "ActiveRecord",
-            "Sequel",
-            // Java
-            "Hibernate",
-            "MyBatis",
-            "EclipseLink",
-            // .NET
-            "Entity Framework",
-            "Dapper",
-            // PHP
-            "Doctrine",
-            "Eloquent",
-            // Go
-            "GORM",
-            "Ent",
-            "XORM",
-            // Ruby
-            "ROM",
-            // その他汎用または複数言語対応
-            "SQLAlchemy Core",
-            "Knex.js",
-        ].sort(),
-        packageManagers: [
-            // JavaScript/TypeScript
-            "npm",
-            "Yarn",
-            "pnpm",
-            // Python
-            "pip",
-            "conda",
-            "Poetry",
-            // Ruby
-            "gem",
-            "Bundler",
-            // Java
-            "Maven",
-            "Gradle",
-            // PHP
-            "Composer",
-            // .NET
-            "NuGet",
-            // Rust
-            "Cargo",
-            // Go
-            "Go Modules",
-            // Dart/Flutter
-            "pub",
-            // Swift/Objective-C
-            "CocoaPods",
-            "Carthage",
-            "Swift Package Manager",
-        ],
-    },
-    infrastructure: {
-        clouds: [
-            "AWS",
-            "Google Cloud",
-            "Azure",
-            "Heroku",
-            "DigitalOcean",
-            "Vercel",
-            "Firebase",
-            "IBM Cloud",
-            "Oracle Cloud",
-            "Linode",
-        ],
-        containers: [
-            "Docker",
-            "Kubernetes",
-            "Amazon ECS",
-            "Google GKE",
-            "Azure AKS",
-            "Docker Compose",
-            "Podman",
-            "OpenShift",
-            "Nomad",
-        ],
-        databases: [
-            // リレーショナルデータベース
-            "PostgreSQL",
-            "MySQL",
-            "MariaDB",
-            "SQLite",
-            "Microsoft SQL Server",
-            "Oracle Database",
-            "IBM Db2",
-            // NoSQLデータベース
-            "MongoDB",
-            "Cassandra",
-            "Redis",
-            "CouchDB",
-            "Elasticsearch",
-            "Neo4j",
-            // その他
-            "Firebase Realtime Database",
-            "Amazon DynamoDB",
-            "Google Cloud Spanner",
-        ].sort(),
-        webServers: [
-            "Apache",
-            "Nginx",
-            "Microsoft IIS",
-            "Caddy",
-            "LiteSpeed",
-            "Tomcat",
-            "Jetty",
-            "Node.js",
-            "Gunicorn",
-            "uWSGI",
-        ].sort(),
-        ciCdTools: [
-            "GitHub Actions",
-            "CircleCI",
-            "Jenkins",
-            "GitLab CI",
-            "ArgoCD",
-            "Travis CI",
-            "Drone CI",
-            "Azure Pipelines",
-            "AWS CodePipeline",
-            "Bitbucket Pipelines",
-        ],
-        iacTools: [
-            "Terraform",
-            "AWS CDK",
-            "Pulumi",
-            "CloudFormation",
-            "Ansible",
-            "Chef",
-            "Puppet",
-            "SaltStack",
-            "Vagrant",
-        ],
-        monitoringTools: [
-            "Datadog",
-            "Prometheus",
-            "Grafana",
-            "New Relic",
-            "Sentry",
-            "Dynatrace",
-            "AppDynamics",
-            "Nagios",
-            "Zabbix",
-            "Splunk Observability",
-        ],
-        loggingTools: [
-            "CloudWatch Logs",
-            "OpenSearch",
-            "Elasticsearch",
-            "Splunk",
-            "Logstash",
-            "Fluentd",
-            "Loki",
-            "Graylog",
-            "Papertrail",
-        ],
-    },
-    tools: {
-        sourceControls: [
-            "GitHub Enterprise",
-            "GitLab",
-            "Bitbucket",
-            "Azure DevOps",
-            "AWS CodeCommit",
-            "Gerrit",
-            "Gitea",
-            "Perforce",
-        ],
-        projectManagements: [
-            "Jira",
-            "Monday.com",
-            "Trello",
-            "Asana",
-            "ClickUp",
-            "Shortcut",
-            "Azure Boards",
-            "Wrike",
-            "Kanbanize",
-        ],
-        communicationTools: [
-            "Slack",
-            "Microsoft Teams",
-            "Discord",
-            "Zoom",
-            "Google Meet",
-            "Mattermost",
-            "RocketChat",
-            "Webex",
-        ],
-        documentationTools: [
-            "Notion",
-            "Confluence",
-            "GitBook",
-            "DocuSaurus",
-            "VuePress",
-            "MkDocs",
-            "Wiki.js",
-            "Obsidian",
-        ],
-        apiDevelopmentTools: [
-            "OpenAPI (Swagger)",
-            "Postman",
-            "Insomnia",
-            "GraphQL",
-            "Apollo Studio",
-            "Stoplight",
-            "Hoppscotch",
-            "gRPC",
-        ],
-        designTools: ["Figma", "Adobe XD", "Sketch", "InVision", "Zeplin", "Protopie", "Framer", "Canva", "Balsamiq"],
-    },
-} as const;
+export const TEMP_ID_PREFIX = "temp_";
+
+/**
+ * 自動保存の間隔（ミリ秒）
+ */
+export const AUTO_SAVE_INTERVAL_MS = 5000;

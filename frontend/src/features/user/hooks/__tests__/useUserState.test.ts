@@ -1,6 +1,6 @@
 import { getUserState, UserState, useUserState } from "@/features/user";
 import { useUserAuthStore } from "@/stores";
-import { User } from "@/types";
+import type { User } from "@/types";
 import { act, renderHook } from "@testing-library/react";
 
 describe("getUserState", () => {

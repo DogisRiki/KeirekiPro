@@ -1,14 +1,14 @@
-import { Button, ConfirmDialog, TextField } from "@/components/ui";
+import { Button, Dialog, TextField } from "@/components/ui";
+import type { SettingMessages } from "@/features/user";
 import {
     AuthProviderField,
     AuthProviderWarningMessage,
     PasswordStatusBox,
     ProfileImageField,
-    SettingMessages,
     TwoFactorSwitch,
 } from "@/features/user";
 import { useErrorMessageStore } from "@/stores";
-import { AuthProvider } from "@/types";
+import type { AuthProvider } from "@/types";
 import { stringListToBulletList } from "@/utils";
 import { Box, FormControl, FormHelperText } from "@mui/material";
 import { useState } from "react";
@@ -169,8 +169,9 @@ export const SettingUserForm = ({
                 </Box>
             </Box>
 
-            <ConfirmDialog
+            <Dialog
                 open={dialogOpen}
+                variant="confirm"
                 title="退会のご確認"
                 description="本当に退会しますか？この操作は取り消せません。"
                 onClose={handleDialogClose}

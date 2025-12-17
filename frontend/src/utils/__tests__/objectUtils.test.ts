@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { getNestedValue, setNestedValue, stringListToBulletList } from "@/utils";
+import {
+    dedupeIgnoreCase,
+    getNestedValue,
+    normalizeForCaseInsensitiveCompare,
+    setNestedValue,
+    stringListToBulletList,
+} from "@/utils";
 
 describe("getNestedValue", () => {
     const obj = {
@@ -68,5 +74,51 @@ describe("stringListToBulletList", () => {
         const input = ["", "こんにちは", "error: ⚠️"];
         const expected = "・ \n・ こんにちは\n・ error: ⚠️";
         expect(stringListToBulletList(input)).toBe(expected);
+    });
+});
+
+describe("dedupeIgnoreCase", () => {
+    it("大文字小文字を無視して重複を取り除くこと", () => {
+        const input = ["React", "react", "REACT", "Vue"];
+        const result = dedupeIgnoreCase(input);
+        expect(result).toEqual(["React", "Vue"]);
+    });
+
+    it("前後の空白をトリムして比較すること", () => {
+        const input = ["  Go", "go  ", "GO"];
+        const result = dedupeIgnoreCase(input);
+        // 最初に出現したものを残す
+        expect(result).toEqual(["Go"]);
+    });
+
+    it("空文字列は無視されること", () => {
+        const input = ["TypeScript", "", "  ", "typescript"];
+        const result = dedupeIgnoreCase(input);
+        expect(result).toEqual(["TypeScript"]);
+    });
+
+    it("元の配列は破壊しないこと", () => {
+        const input = ["A", "a"];
+        const copy = [...input];
+
+        const result = dedupeIgnoreCase(input);
+
+        expect(input).toEqual(copy);
+        expect(result).not.toBe(input);
+    });
+});
+
+describe("normalizeForCaseInsensitiveCompare", () => {
+    it("前後の空白を取り除き、小文字に変換すること", () => {
+        expect(normalizeForCaseInsensitiveCompare("  React ")).toBe("react");
+        expect(normalizeForCaseInsensitiveCompare("Go")).toBe("go");
+    });
+
+    it("すでに正規化されている文字列はそのまま返すこと", () => {
+        expect(normalizeForCaseInsensitiveCompare("typescript")).toBe("typescript");
+    });
+
+    it("空白のみの文字列は空文字を返すこと", () => {
+        expect(normalizeForCaseInsensitiveCompare("   ")).toBe("");
     });
 });

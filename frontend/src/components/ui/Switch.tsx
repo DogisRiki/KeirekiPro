@@ -1,4 +1,5 @@
-import { Switch as MUISwitch, SwitchProps } from "@mui/material";
+import type { SwitchProps } from "@mui/material";
+import { Switch as MUISwitch } from "@mui/material";
 
 /**
  * Switch

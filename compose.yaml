@@ -1,4 +1,12 @@
 services:
+  # Testcontainers 専用 Docker デーモン
+  dind:
+    image: docker:27-dind
+    privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR= # TLS無効
+    networks:
+      - my-network
   backend:
     container_name: spring
     build:
@@ -9,11 +17,13 @@ services:
     tty: true
     volumes:
       - ./backend:/home/spring/app
-      - /var/run/docker.sock:/var/run/docker.sock
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     environment:
-      - TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal
+      # Testcontainers / docker-java は dind を Docker デーモンとして使う
+      - DOCKER_HOST=tcp://dind:2375
+      # 接続先ホストも dind に固定
+      - TESTCONTAINERS_HOST_OVERRIDE=dind
       - AWS_ACCESS_KEY_ID=dummy
       - AWS_SECRET_ACCESS_KEY=dummy
     networks:

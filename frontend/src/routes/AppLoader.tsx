@@ -1,7 +1,7 @@
 import { paths } from "@/config/paths";
 import { protectedApiClient } from "@/lib";
 import { useUserAuthStore } from "@/stores";
-import { User } from "@/types";
+import type { User } from "@/types";
 import { redirect } from "react-router";
 
 const fetchCurrentUser = async (): Promise<User | null> => {

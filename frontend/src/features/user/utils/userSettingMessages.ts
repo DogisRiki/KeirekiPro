@@ -1,5 +1,6 @@
 import { paths } from "@/config/paths";
-import { SettingMessages, UserState } from "@/features/user";
+import type { SettingMessages } from "@/features/user";
+import { UserState } from "@/features/user";
 
 /**
  * ユーザー状態と外部連携数から表示メッセージを生成する

@@ -4,9 +4,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+import com.example.keirekipro.domain.policy.resume.ResumeEntryOrderPolicy;
 import com.example.keirekipro.domain.shared.Entity;
 import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.shared.Notification;
@@ -38,11 +40,6 @@ public class Resume extends Entity {
      * 氏名
      */
     private final FullName fullName;
-
-    /**
-     * 自動保存設定
-     */
-    private final boolean autoSaveEnabled;
 
     /**
      * 作成日時
@@ -85,52 +82,60 @@ public class Resume extends Entity {
     private final List<SelfPromotion> selfPromotions;
 
     /**
-     * リストは全てイミュータブルにする
+     * リストは全てイミュータブルにし、リスト内を整列する
      * resume.getCareers().add(new Career()) のような操作を禁止する
      */
     public List<Career> getCareers() {
-        return Collections.unmodifiableList(careers);
+        return unmodifiableSortedCopy(careers, ResumeEntryOrderPolicy.careerDesc());
     }
 
     public List<Project> getProjects() {
-        return Collections.unmodifiableList(projects);
+        return unmodifiableSortedCopy(projects, ResumeEntryOrderPolicy.projectDesc());
     }
 
     public List<Certification> getCertifications() {
-        return Collections.unmodifiableList(certifications);
+        return unmodifiableSortedCopy(certifications, ResumeEntryOrderPolicy.certificationDesc());
     }
 
     public List<Portfolio> getPortfolios() {
-        return Collections.unmodifiableList(portfolios);
+        return unmodifiableSortedCopy(portfolios, ResumeEntryOrderPolicy.portfolioNameAsc());
     }
 
     public List<SocialLink> getSocialLinks() {
-        return Collections.unmodifiableList(socialLinks);
+        return unmodifiableSortedCopy(socialLinks, ResumeEntryOrderPolicy.socialLinkNameAsc());
     }
 
     public List<SelfPromotion> getSelfPromotions() {
-        return Collections.unmodifiableList(selfPromotions);
+        return unmodifiableSortedCopy(selfPromotions, ResumeEntryOrderPolicy.selfPromotionTitleAsc());
+    }
+
+    /**
+     * 指定の比較器で整列したイミュータブルなリストを返す
+     *
+     * @param source     元リスト
+     * @param comparator 並び替え用比較器
+     * @param <T>        要素型
+     * @return 整列済みイミュータブルリスト
+     */
+    private static <T> List<T> unmodifiableSortedCopy(List<T> source, Comparator<? super T> comparator) {
+        List<T> copied = new ArrayList<>(source);
+        copied.sort(comparator);
+        return Collections.unmodifiableList(copied);
     }
 
     /**
      * 新規構築用のコンストラクタ
      */
-    private Resume(Notification notification, UUID userId, ResumeName name, LocalDate date,
+    private Resume(UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
-            boolean autoSaveEnabled,
             List<Career> careers, List<Project> projects,
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
         super();
-        // サブエンティティや値オブジェクトのドメイン例外を一括でスローする
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
-        }
         this.userId = userId;
         this.name = name;
         this.date = date;
         this.fullName = fullName;
-        this.autoSaveEnabled = autoSaveEnabled;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         this.careers = careers;
@@ -145,7 +150,6 @@ public class Resume extends Entity {
      * 再構築用のコンストラクタ
      */
     private Resume(UUID id, UUID userId, ResumeName name, LocalDate date, FullName fullName,
-            boolean autoSaveEnabled,
             LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers, List<Project> projects,
             List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
@@ -154,7 +158,6 @@ public class Resume extends Entity {
         this.name = name;
         this.date = date;
         this.fullName = fullName;
-        this.autoSaveEnabled = autoSaveEnabled;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.careers = careers;
@@ -168,69 +171,58 @@ public class Resume extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param notification    通知オブジェクト
-     * @param userId          ユーザーID
-     * @param name            職務経歴書名
-     * @param fullName        氏名
-     * @param date            日付
-     * @param autoSaveEnabled 自動保存設定
-     * @param careers         職歴リスト
-     * @param projects        プロジェクトリスト
-     * @param certifications  資格リスト
-     * @param portfolios      ポートフォリオリスト
-     * @param socialLinks     ソーシャルリンクリスト
-     * @param selfPromotions  自己PRリスト
+     * @param notification   通知オブジェクト
+     * @param userId         ユーザーID
+     * @param name           職務経歴書名
+     * @param fullName       氏名
+     * @param date           日付
+     * @param careers        職歴リスト
+     * @param projects       プロジェクトリスト
+     * @param certifications 資格リスト
+     * @param portfolios     ポートフォリオリスト
+     * @param socialLinks    ソーシャルリンクリスト
+     * @param selfPromotions 自己PRリスト
      * @return 職務経歴書エンティティ
      */
     public static Resume create(Notification notification, UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
-            boolean autoSaveEnabled, List<Career> careers,
+            List<Career> careers,
             List<Project> projects, List<Certification> certifications, List<Portfolio> portfolios,
             List<SocialLink> socialLinks, List<SelfPromotion> selfPromotions) {
-        return new Resume(notification, userId, name, date, fullName, autoSaveEnabled,
-                careers,
-                projects,
-                certifications, portfolios, socialLinks, selfPromotions);
+
+        validateOnCreate(notification, name, date);
+        throwIfInvalid(notification);
+
+        return new Resume(userId, name, date, fullName, careers, projects, certifications, portfolios,
+                socialLinks, selfPromotions);
     }
 
     /**
      * 再構築用のファクトリーメソッド
-     *
-     * @param id              識別子
-     * @param userId          ユーザーID
-     * @param name            職務経歴書名
-     * @param fullName        氏名
-     * @param date            日付
-     * @param autoSaveEnabled 自動保存設定
-     * @param createdAt       作成日時
-     * @param updatedAt       更新日時
-     * @param careers         職歴リスト
-     * @param projects        プロジェクトリスト
-     * @param certifications  資格リスト
-     * @param portfolios      ポートフォリオリスト
-     * @param socialLinks     ソーシャルリンクリスト
-     * @param selfPromotions  自己PRリスト
-     * @return 職務経歴書エンティティ
      */
     public static Resume reconstruct(UUID id, UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
-            boolean autoSaveEnabled, LocalDateTime createdAt, LocalDateTime updatedAt,
+            LocalDateTime createdAt, LocalDateTime updatedAt,
             List<Career> careers, List<Project> projects, List<Certification> certifications,
             List<Portfolio> portfolios, List<SocialLink> socialLinks,
             List<SelfPromotion> selfPromotions) {
-        return new Resume(id, userId, name, date, fullName, autoSaveEnabled, createdAt, updatedAt, careers,
-                projects,
-                certifications, portfolios, socialLinks, selfPromotions);
+        return new Resume(id, userId, name, date, fullName, createdAt, updatedAt, careers, projects, certifications,
+                portfolios, socialLinks, selfPromotions);
     }
 
     /**
      * 職務経歴書名を変更する
      *
-     * @param name 新しい職務経歴書名
+     * @param notification 通知オブジェクト
+     * @param name         新しい職務経歴書名
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume changeName(ResumeName name) {
-        return new Resume(this.id, this.userId, name, this.date, this.fullName, this.autoSaveEnabled,
+    public Resume changeName(Notification notification, ResumeName name) {
+        if (name == null) {
+            notification.addError("name", "職務経歴書名は入力必須です。");
+        }
+        throwIfInvalid(notification);
+        return new Resume(this.id, this.userId, name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
                 this.certifications, this.portfolios, this.socialLinks, this.selfPromotions);
@@ -239,11 +231,16 @@ public class Resume extends Entity {
     /**
      * 氏名を変更する
      *
-     * @param fullName 新しい氏名
+     * @param notification 通知オブジェクト
+     * @param fullName     新しい氏名
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume ChangeFullName(FullName fullName) {
-        return new Resume(this.id, this.userId, this.name, this.date, fullName, this.autoSaveEnabled,
+    public Resume ChangeFullName(Notification notification, FullName fullName) {
+        if (fullName == null) {
+            notification.addError("fullName", "氏名は入力必須です。");
+        }
+        throwIfInvalid(notification);
+        return new Resume(this.id, this.userId, this.name, this.date, fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
                 this.certifications, this.portfolios, this.socialLinks, this.selfPromotions);
@@ -252,24 +249,16 @@ public class Resume extends Entity {
     /**
      * 日付を変更する
      *
-     * @param date 新しい日付
+     * @param notification 通知オブジェクト
+     * @param date         新しい日付
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume changeDate(LocalDate date) {
-        return new Resume(this.id, this.userId, this.name, date, this.fullName, this.autoSaveEnabled,
-                this.createdAt, LocalDateTime.now(),
-                this.careers, this.projects,
-                this.certifications, this.portfolios, this.socialLinks, this.selfPromotions);
-    }
-
-    /**
-     * 自動保存設定を変更する
-     *
-     * @param autoSaveEnabled 新しい自動保存設定
-     * @return 変更後の職務経歴書エンティティ
-     */
-    public Resume changeAutoSaveEnabled(boolean autoSaveEnabled) {
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, autoSaveEnabled,
+    public Resume changeDate(Notification notification, LocalDate date) {
+        if (date == null) {
+            notification.addError("date", "日付は入力必須です。");
+        }
+        throwIfInvalid(notification);
+        return new Resume(this.id, this.userId, this.name, date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
                 this.certifications, this.portfolios, this.socialLinks, this.selfPromotions);
@@ -278,17 +267,25 @@ public class Resume extends Entity {
     /**
      * 職歴を追加する
      *
-     * @param career 追加する職歴
+     * @param notification 通知オブジェクト
+     * @param career       追加する職歴
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addCareer(Notification notification, Career career) {
-        validateIsCareerOverlap(notification, career);
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (career == null) {
+            notification.addError("career", "職歴は入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
+
+        // 期間重複チェック
+        validateIsCareerOverlap(career);
+
         List<Career> updatedCareers = new ArrayList<>(this.careers);
         updatedCareers.add(career);
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 updatedCareers, this.projects, this.certifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
@@ -297,18 +294,26 @@ public class Resume extends Entity {
     /**
      * 職歴を更新する
      *
+     * @param notification  通知オブジェクト
      * @param updatedCareer 更新後の職歴エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume updateCareer(Notification notification, Career updatedCareer) {
-        validateIsCareerOverlap(notification, updatedCareer);
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (updatedCareer == null) {
+            notification.addError("career", "職歴は入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
+
+        // 期間重複チェック
+        validateIsCareerOverlap(updatedCareer);
+
         List<Career> updatedCareers = this.careers.stream()
                 .map(career -> career.getId().equals(updatedCareer.getId()) ? updatedCareer : career)
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 updatedCareers, this.projects, this.certifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
@@ -324,7 +329,7 @@ public class Resume extends Entity {
         List<Career> updatedCareers = this.careers.stream()
                 .filter(career -> !career.getId().equals(careerId))
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 updatedCareers, this.projects, this.certifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
@@ -333,11 +338,9 @@ public class Resume extends Entity {
     /**
      * 職歴の在籍期間の重複を検証する
      *
-     * @param notification 通知オブジェクト
      * @param targetCareer 対象の職歴エンティティ
      */
-    private void validateIsCareerOverlap(Notification notification, Career targetCareer) {
-        // 期間被りをしている会社名を格納するリスト
+    private void validateIsCareerOverlap(Career targetCareer) {
         List<String> overlappingCompanies = new ArrayList<>();
 
         for (Career existingCareer : this.careers) {
@@ -346,59 +349,74 @@ public class Resume extends Entity {
                 continue;
             }
 
+            Period targetPeriod = targetCareer.getPeriod();
+            Period existingPeriod = existingCareer.getPeriod();
+
             // 2つの職歴が両方とも継続中の場合は重複
-            if (targetCareer.getPeriod().isActive() && existingCareer.getPeriod().isActive()) {
-                overlappingCompanies.add(existingCareer.getCompanyName());
+            if (targetPeriod.isActive() && existingPeriod.isActive()) {
+                overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 continue;
             }
 
             // targetCareerのみ継続中の場合
-            if (targetCareer.getPeriod().isActive()) {
-                // 既存の職歴が継続中の職歴の開始日以降にあれば重複
-                if (!existingCareer.getPeriod().getStartDate().isBefore(targetCareer.getPeriod().getStartDate())) {
-                    overlappingCompanies.add(existingCareer.getCompanyName());
+            if (targetPeriod.isActive()) {
+                // 年月粒度では同一月の「退職→入社」が成立しうるため、「既存の終了年月 == 対象の開始年月」は重複扱いしない（終了年月が開始年月より後なら重複）
+                if (existingPeriod.getEndDate().isAfter(targetPeriod.getStartDate())) {
+                    overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 }
                 continue;
             }
 
             // existingCareerのみ継続中の場合
-            if (existingCareer.getPeriod().isActive()) {
-                // 追加する職歴の開始日が、継続中の職歴の開始日以降なら重複
-                if (!targetCareer.getPeriod().getStartDate().isBefore(existingCareer.getPeriod().getStartDate())) {
-                    overlappingCompanies.add(existingCareer.getCompanyName());
+            if (existingPeriod.isActive()) {
+                // 年月粒度では同一月の「退職→入社」が成立しうるため、「対象の終了年月 == 既存の開始年月」は重複扱いしない（終了年月が開始年月より後なら重複）
+                if (targetPeriod.getEndDate().isAfter(existingPeriod.getStartDate())) {
+                    overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 }
                 continue;
             }
 
             // どちらも継続中でない場合は期間の重なりをチェック
-            if (!existingCareer.getPeriod().getEndDate().isBefore(targetCareer.getPeriod().getStartDate())
-                    && !existingCareer.getPeriod().getStartDate().isAfter(targetCareer.getPeriod().getEndDate())) {
-                overlappingCompanies.add(existingCareer.getCompanyName());
+            // 同一月境界（終了年月 == 開始年月）は重複扱いしない
+            if (existingPeriod.getEndDate().equals(targetPeriod.getStartDate())
+                    || targetPeriod.getEndDate().equals(existingPeriod.getStartDate())) {
+                continue;
+            }
+
+            // 期間の重なり（境界一致は上で除外済み）
+            if (!existingPeriod.getEndDate().isBefore(targetPeriod.getStartDate())
+                    && !existingPeriod.getStartDate().isAfter(targetPeriod.getEndDate())) {
+                overlappingCompanies.add(existingCareer.getCompanyName().getValue());
             }
         }
 
         if (!overlappingCompanies.isEmpty()) {
-            notification.addError("career",
-                    String.format("%sと%sの期間が重複しています。",
-                            targetCareer.getCompanyName(),
-                            String.join("、", overlappingCompanies)));
+            String message = String.format("「%s」と「%s」の期間が重複しています。",
+                    targetCareer.getCompanyName().getValue(),
+                    String.join("、", overlappingCompanies));
+            throw new DomainException(message);
         }
     }
 
     /**
      * プロジェクトを追加する
      *
-     * @param project 追加するプロジェクト
+     * @param notification 通知オブジェクト
+     * @param project      追加するプロジェクト
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addProject(Notification notification, Project project) {
-        validateProjectInCareer(notification, project);
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (project == null) {
+            notification.addError("project", "プロジェクトは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
+
         List<Project> updatedProjects = new ArrayList<>(this.projects);
         updatedProjects.add(project);
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, updatedProjects, this.certifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
@@ -407,18 +425,23 @@ public class Resume extends Entity {
     /**
      * プロジェクトを更新する
      *
+     * @param notification   通知オブジェクト
      * @param updatedProject 更新するプロジェクトエンティティ
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume updateProject(Notification notification, Project updatedProject) {
-        validateProjectInCareer(notification, updatedProject);
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (updatedProject == null) {
+            notification.addError("project", "プロジェクトは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
         }
+
+        throwIfInvalid(notification);
+
         List<Project> updatedProjects = this.projects.stream()
                 .map(project -> project.getId().equals(updatedProject.getId()) ? updatedProject : project)
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, updatedProjects, this.certifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
@@ -434,37 +457,31 @@ public class Resume extends Entity {
         List<Project> updatedProjects = this.projects.stream()
                 .filter(project -> !project.getId().equals(projectId))
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, updatedProjects, this.certifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
     }
 
     /**
-     * プロジェクトに追加する会社名が職歴リストに存在する会社名かを検証する
-     *
-     * @param notification 通知オブジェクト
-     * @param project      追加するプロジェクト
-     */
-    private void validateProjectInCareer(Notification notification, Project project) {
-        boolean exists = this.careers.stream()
-                .anyMatch(career -> career.getCompanyName().equals(project.getCompanyName()));
-        if (!exists) {
-            notification.addError("companyName",
-                    String.format("%sは職歴に存在しません。職歴に存在する会社名を選択してください。", project.getCompanyName()));
-        }
-    }
-
-    /**
      * 資格を追加する
      *
+     * @param notification  通知オブジェクト
      * @param certification 追加する資格
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addCertification(Certification certification) {
+    public Resume addCertification(Notification notification, Certification certification) {
+        if (certification == null) {
+            notification.addError("certification", "資格は入力必須です。");
+            throwIfInvalid(notification);
+            return this;
+        }
+
+        throwIfInvalid(notification);
+
         List<Certification> updatedCertifications = new ArrayList<>(this.certifications);
         updatedCertifications.add(certification);
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, updatedCertifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
@@ -473,15 +490,24 @@ public class Resume extends Entity {
     /**
      * 資格を更新する
      *
+     * @param notification         通知オブジェクト
      * @param updatedCertification 更新する資格エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateCertification(Certification updatedCertification) {
+    public Resume updateCertification(Notification notification, Certification updatedCertification) {
+        if (updatedCertification == null) {
+            notification.addError("certification", "資格は入力必須です。");
+            throwIfInvalid(notification);
+            return this;
+        }
+
+        throwIfInvalid(notification);
+
         List<Certification> updatedCertifications = this.certifications.stream()
                 .map(certification -> certification.getId().equals(updatedCertification.getId()) ? updatedCertification
                         : certification)
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, updatedCertifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
@@ -497,7 +523,7 @@ public class Resume extends Entity {
         List<Certification> updatedCertifications = this.certifications.stream()
                 .filter(certification -> !certification.getId().equals(certificationId))
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, updatedCertifications,
                 this.portfolios, this.socialLinks, this.selfPromotions);
@@ -506,13 +532,22 @@ public class Resume extends Entity {
     /**
      * ポートフォリオを追加する
      *
-     * @param portfolio 追加するポートフォリオ
+     * @param notification 通知オブジェクト
+     * @param portfolio    追加するポートフォリオ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addPortfolio(Portfolio portfolio) {
+    public Resume addPortfolio(Notification notification, Portfolio portfolio) {
+        if (portfolio == null) {
+            notification.addError("portfolio", "ポートフォリオは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
+        }
+
+        throwIfInvalid(notification);
+
         List<Portfolio> updatedPortfolios = new ArrayList<>(this.portfolios);
         updatedPortfolios.add(portfolio);
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 updatedPortfolios, this.socialLinks, this.selfPromotions);
@@ -521,14 +556,23 @@ public class Resume extends Entity {
     /**
      * ポートフォリオを更新する
      *
+     * @param notification     通知オブジェクト
      * @param updatedPortfolio 更新するポートフォリオ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updatePortfolio(Portfolio updatedPortfolio) {
+    public Resume updatePortfolio(Notification notification, Portfolio updatedPortfolio) {
+        if (updatedPortfolio == null) {
+            notification.addError("portfolio", "ポートフォリオは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
+        }
+
+        throwIfInvalid(notification);
+
         List<Portfolio> updatedPortfolios = this.portfolios.stream()
                 .map(portfolio -> portfolio.getId().equals(updatedPortfolio.getId()) ? updatedPortfolio : portfolio)
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 updatedPortfolios, this.socialLinks, this.selfPromotions);
@@ -544,7 +588,7 @@ public class Resume extends Entity {
         List<Portfolio> updatedPortfolios = this.portfolios.stream()
                 .filter(portfolio -> !portfolio.getId().equals(portfolioId))
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 updatedPortfolios, this.socialLinks, this.selfPromotions);
@@ -553,13 +597,22 @@ public class Resume extends Entity {
     /**
      * ソーシャルリンクを追加する
      *
-     * @param sociealLink 追加するソーシャルリンク
+     * @param notification 通知オブジェクト
+     * @param sociealLink  追加するソーシャルリンク
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addSociealLink(SocialLink sociealLink) {
+    public Resume addSociealLink(Notification notification, SocialLink sociealLink) {
+        if (sociealLink == null) {
+            notification.addError("socialLink", "ソーシャルリンクは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
+        }
+
+        throwIfInvalid(notification);
+
         List<SocialLink> updatedSocialLinks = new ArrayList<>(this.socialLinks);
         updatedSocialLinks.add(sociealLink);
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 this.portfolios, updatedSocialLinks, this.selfPromotions);
@@ -568,15 +621,24 @@ public class Resume extends Entity {
     /**
      * ソーシャルリンクを更新する
      *
+     * @param notification       通知オブジェクト
      * @param updatedSociealLink 更新するソーシャルリンク
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateSociealLink(SocialLink updatedSociealLink) {
+    public Resume updateSociealLink(Notification notification, SocialLink updatedSociealLink) {
+        if (updatedSociealLink == null) {
+            notification.addError("socialLink", "ソーシャルリンクは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
+        }
+
+        throwIfInvalid(notification);
+
         List<SocialLink> updatedSocialLinks = this.socialLinks.stream()
                 .map(sociealLink -> sociealLink.getId().equals(updatedSociealLink.getId()) ? updatedSociealLink
                         : sociealLink)
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 this.portfolios, updatedSocialLinks, this.selfPromotions);
@@ -592,7 +654,7 @@ public class Resume extends Entity {
         List<SocialLink> updatedSocialLinks = this.socialLinks.stream()
                 .filter(sociealLink -> !sociealLink.getId().equals(sociealLinkId))
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 this.portfolios, updatedSocialLinks, this.selfPromotions);
@@ -601,13 +663,22 @@ public class Resume extends Entity {
     /**
      * 自己PRを追加する
      *
+     * @param notification  通知オブジェクト
      * @param selfPromotion 追加する自己PR
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addSelfPromotion(SelfPromotion selfPromotion) {
+    public Resume addSelfPromotion(Notification notification, SelfPromotion selfPromotion) {
+        if (selfPromotion == null) {
+            notification.addError("selfPromotion", "自己PRは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
+        }
+
+        throwIfInvalid(notification);
+
         List<SelfPromotion> updatedSelfPromotions = new ArrayList<>(this.selfPromotions);
         updatedSelfPromotions.add(selfPromotion);
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 this.portfolios, this.socialLinks, updatedSelfPromotions);
@@ -623,7 +694,7 @@ public class Resume extends Entity {
         List<SelfPromotion> updatedSelfPromotions = this.selfPromotions.stream()
                 .filter(selfPromotion -> !selfPromotion.getId().equals(selfPromotionId))
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 this.portfolios, this.socialLinks, updatedSelfPromotions);
@@ -632,17 +703,49 @@ public class Resume extends Entity {
     /**
      * 自己PRを更新する
      *
+     * @param notification         通知オブジェクト
      * @param updatedSelfPromotion 更新する自己PR
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateSelfPromotion(SelfPromotion updatedSelfPromotion) {
+    public Resume updateSelfPromotion(Notification notification, SelfPromotion updatedSelfPromotion) {
+        if (updatedSelfPromotion == null) {
+            notification.addError("selfPromotion", "自己PRは入力必須です。");
+            throwIfInvalid(notification);
+            return this;
+        }
+
+        throwIfInvalid(notification);
+
         List<SelfPromotion> updatedSelfPromotions = this.selfPromotions.stream()
                 .map(selfPromotion -> selfPromotion.getId().equals(updatedSelfPromotion.getId()) ? updatedSelfPromotion
                         : selfPromotion)
                 .toList();
-        return new Resume(this.id, this.userId, this.name, this.date, this.fullName, this.autoSaveEnabled,
+        return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
                 this.portfolios, this.socialLinks, updatedSelfPromotions);
+    }
+
+    /**
+     * 新規作成時の必須チェック
+     */
+    private static void validateOnCreate(Notification notification, ResumeName name, LocalDate date) {
+        if (name == null) {
+            notification.addError("name", "職務経歴書名は入力必須です。");
+        }
+        if (date == null) {
+            notification.addError("date", "日付は入力必須です。");
+        }
+    }
+
+    /**
+     * NotificationにエラーがあればDomainExceptionをスローする
+     *
+     * @param notification 通知オブジェクト
+     */
+    private static void throwIfInvalid(Notification notification) {
+        if (notification != null && notification.hasErrors()) {
+            throw new DomainException(notification.getErrors());
+        }
     }
 }

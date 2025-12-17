@@ -30,7 +30,8 @@ entity "職務経歴書(resumes)" as Resumes {
     user_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- ユーザーID
     name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書名
     date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 作成日
-    auto_save_enabled : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 自動保存有効フラグ
+    last_name : <color:#1E90FF>VARCHAR(255)</color> -- 姓
+    first_name : <color:#1E90FF>VARCHAR(255)</color> -- 名
     created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
     updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
 }
@@ -41,7 +42,7 @@ entity "職歴(careers)" as Careers {
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
     company_name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 会社名
     start_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 入社年月
-    end_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 退職年月
+    end_date : <color:#1E90FF>DATE</color> -- 退職年月
     is_active : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 在籍中フラグ
 }
 
@@ -49,89 +50,110 @@ entity "プロジェクト(projects)" as Projects {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
-    company_name : <color:#1E90FF>VARCHAR(255)</color> -- <color:#32CD32>[NOT NULL]</color> 会社名
+    company_name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 会社名
     start_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 開始年月
-    end_date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 終了年月
+    end_date : <color:#1E90FF>DATE</color> -- 終了年月
     is_active : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 継続中フラグ
     name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プロジェクト名
-    overview : <color:#1E90FF>VARCHAR(255)</color> -- 概要
-    team_comp : <color:#1E90FF>VARCHAR(255)</color> -- チーム構成
-    role : <color:#1E90FF>VARCHAR(255)</color> -- 役割
-    achievement : <color:#1E90FF>TEXT</color> -- 成果
-    requirements : <color:#1E90FF>BOOLEAN</color> -- 要件定義
-    basic_design : <color:#1E90FF>BOOLEAN</color> -- 基本設計
-    detailed_design : <color:#1E90FF>BOOLEAN</color> -- 詳細設計
-    implementation : <color:#1E90FF>BOOLEAN</color> -- 実装・単体テスト
-    integration_test : <color:#1E90FF>BOOLEAN</color> -- 結合テスト
-    system_test : <color:#1E90FF>BOOLEAN</color> -- 総合テスト
-    maintenance : <color:#1E90FF>BOOLEAN</color> -- 運用・保守
-    languages : <color:#1E90FF>TEXT[]</color> -- 開発言語
-    frameworks : <color:#1E90FF>TEXT[]</color> -- フレームワーク
-    libraries : <color:#1E90FF>TEXT[]</color> -- ライブラリ
-    testing_tools : <color:#1E90FF>TEXT[]</color> -- テストツール
+    overview : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 概要
+    team_comp : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- チーム構成
+    role : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 役割
+    achievement : <color:#1E90FF>TEXT</color> <color:#32CD32>[NOT NULL]</color> -- 成果
+    requirements : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 要件定義
+    basic_design : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 基本設計
+    detailed_design : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 詳細設計
+    implementation : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 実装・単体テスト
+    integration_test : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 結合テスト
+    system_test : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 総合テスト
+    maintenance : <color:#1E90FF>BOOLEAN</color> <color:#32CD32>[NOT NULL]</color> -- 運用・保守
+}
+
+entity "プロジェクト技術スタック(project_tech_stacks)" as ProjectTechStacks {
+    + project_id : <color:#1E90FF>UUID</color> -- プロジェクトID (PK, FK)
+    --
+    frontend_languages : <color:#1E90FF>TEXT[]</color> -- フロントエンド開発言語
+    frontend_framework : <color:#1E90FF>TEXT[]</color> -- フロントエンドフレームワーク
+    frontend_libraries : <color:#1E90FF>TEXT[]</color> -- フロントエンドライブラリ
+    frontend_build_tool : <color:#1E90FF>TEXT[]</color> -- フロントエンドビルドツール
+    frontend_package_manager : <color:#1E90FF>TEXT[]</color> -- フロントエンドパッケージマネージャー
+    frontend_linters : <color:#1E90FF>TEXT[]</color> -- フロントエンドリンター
+    frontend_formatters : <color:#1E90FF>TEXT[]</color> -- フロントエンドフォーマッター
+    frontend_testing_tools : <color:#1E90FF>TEXT[]</color> -- フロントエンドテストツール
+    backend_languages : <color:#1E90FF>TEXT[]</color> -- バックエンド開発言語
+    backend_framework : <color:#1E90FF>TEXT[]</color> -- バックエンドフレームワーク
+    backend_libraries : <color:#1E90FF>TEXT[]</color> -- バックエンドライブラリ
+    backend_build_tool : <color:#1E90FF>TEXT[]</color> -- バックエンドビルドツール
+    backend_package_manager : <color:#1E90FF>TEXT[]</color> -- バックエンドパッケージマネージャー
+    backend_linters : <color:#1E90FF>TEXT[]</color> -- バックエンドリンター
+    backend_formatters : <color:#1E90FF>TEXT[]</color> -- バックエンドフォーマッター
+    backend_testing_tools : <color:#1E90FF>TEXT[]</color> -- バックエンドテストツール
     orm_tools : <color:#1E90FF>TEXT[]</color> -- ORMツール
-    package_managers : <color:#1E90FF>TEXT[]</color> -- パッケージマネージャー
+    auth : <color:#1E90FF>TEXT[]</color> -- 認証関連技術
     clouds : <color:#1E90FF>TEXT[]</color> -- クラウド
+    operating_system : <color:#1E90FF>TEXT[]</color> -- OS
     containers : <color:#1E90FF>TEXT[]</color> -- コンテナ
-    databases : <color:#1E90FF>TEXT[]</color> -- データベース
-    web_servers : <color:#1E90FF>TEXT[]</color> -- Webサーバー
-    ci_cd_tools : <color:#1E90FF>TEXT[]</color> -- CI/CDツール
+    database : <color:#1E90FF>TEXT[]</color> -- データベース
+    web_server : <color:#1E90FF>TEXT[]</color> -- Webサーバー
+    ci_cd_tool : <color:#1E90FF>TEXT[]</color> -- CI/CDツール
     iac_tools : <color:#1E90FF>TEXT[]</color> -- IaCツール
     monitoring_tools : <color:#1E90FF>TEXT[]</color> -- 監視ツール
     logging_tools : <color:#1E90FF>TEXT[]</color> -- ロギングツール
-    source_controls : <color:#1E90FF>TEXT[]</color> -- ソース管理
-    project_managements : <color:#1E90FF>TEXT[]</color> -- プロジェクト管理
-    communication_tools : <color:#1E90FF>TEXT[]</color> -- コミュニケーション
+    source_control : <color:#1E90FF>TEXT[]</color> -- ソース管理
+    project_management : <color:#1E90FF>TEXT[]</color> -- プロジェクト管理
+    communication_tool : <color:#1E90FF>TEXT[]</color> -- コミュニケーション
     documentation_tools : <color:#1E90FF>TEXT[]</color> -- ドキュメント
     api_development_tools : <color:#1E90FF>TEXT[]</color> -- API開発
     design_tools : <color:#1E90FF>TEXT[]</color> -- デザイン
+    editor : <color:#1E90FF>TEXT[]</color> -- エディタ
+    development_environment : <color:#1E90FF>TEXT[]</color> -- 開発環境
 }
 
 entity "資格(certifications)" as Certifications {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
-    name : <color:#1E90FF>VARCHAR(255)</color> -- 資格名
-    date : <color:#1E90FF>DATE</color> -- 取得日
+    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 資格名
+    date : <color:#1E90FF>DATE</color> <color:#32CD32>[NOT NULL]</color> -- 取得日
 }
 
 entity "ポートフォリオ(portfolios)" as Portfolios {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
-    name : <color:#1E90FF>VARCHAR(255)</color> -- ポートフォリオ名
-    overview : <color:#1E90FF>VARCHAR(255)</color> -- 概要
-    tech_stack : <color:#1E90FF>TEXT</color> -- 技術スタック
-    link : <color:#1E90FF>VARCHAR(255)</color> -- リンク
+    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- ポートフォリオ名
+    overview : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 概要
+    tech_stack : <color:#1E90FF>TEXT</color> <color:#32CD32>[NOT NULL]</color> -- 技術スタック
+    link : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- リンク
 }
 
 entity "ソーシャルリンク(social_links)" as SocialLinks {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
-    name : <color:#1E90FF>VARCHAR(255)</color> -- ソーシャルリンク名
-    link : <color:#1E90FF>VARCHAR(255)</color> -- リンク
+    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- ソーシャルリンク名
+    link : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- リンク
 }
 
 entity "自己PR(self_promotions)" as SelfPromotions {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
-    title : <color:#1E90FF>VARCHAR(255)</color> -- タイトル
-    content : <color:#1E90FF>TEXT</color> -- コンテンツ
+    title : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- タイトル
+    content : <color:#1E90FF>TEXT</color> <color:#32CD32>[NOT NULL]</color> -- コンテンツ
+}
+
+entity "技術スタックカテゴリマスタ(tech_stack_category_mst)" as TechStackCategoryMst {
+    + code : <color:#1E90FF>VARCHAR(64)</color> -- カテゴリコード (PK)
+    --
+    main_category : <color:#1E90FF>VARCHAR(32)</color> <color:#32CD32>[NOT NULL]</color> -- メインカテゴリ
+    sub_category  : <color:#1E90FF>VARCHAR(64)</color> <color:#32CD32>[NOT NULL]</color> -- サブカテゴリ
 }
 
 entity "技術スタックマスタ(tech_stack_mst)" as TechStackMst {
     + id : <color:#1E90FF>INTEGER</color> -- 識別子 (PK)
     --
-    name : <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- 技術名
-    category: <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL]</color> -- カテゴリ
-}
-
-entity "技術スタックカテゴリマスタ(tech_stack_category_mst)" as TechStackCategoryMst {
-    + id : <color:#1E90FF>INTEGER</color> -- 識別子 (PK)
-    --
-    name : <color:#1E90FF>String</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- カテゴリ名
+    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 技術名
+    category_code : <color:#1E90FF>VARCHAR(64)</color> <color:#32CD32>[NOT NULL]</color> -- カテゴリコード(FK)
 }
 
 ' ----------------------
@@ -146,6 +168,8 @@ Resumes ||--o| Certifications
 Resumes ||--o| Portfolios
 Resumes ||--o| SocialLinks
 Resumes ||--o| SelfPromotions
+
+Projects ||--|| ProjectTechStacks
 
 TechStackCategoryMst ||--o{ TechStackMst
 

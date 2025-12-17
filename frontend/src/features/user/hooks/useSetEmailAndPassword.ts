@@ -1,9 +1,10 @@
 import { paths } from "@/config/paths";
-import { setEmailAndPassword, SetEmailAndPasswordPayload } from "@/features/user";
+import type { SetEmailAndPasswordPayload } from "@/features/user";
+import { setEmailAndPassword } from "@/features/user";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { User } from "@/types";
+import type { User } from "@/types";
 import { useMutation } from "@tanstack/react-query";
-import { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { useNavigate } from "react-router";
 
 /**

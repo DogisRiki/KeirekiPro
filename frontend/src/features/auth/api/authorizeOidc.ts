@@ -1,6 +1,6 @@
 import { publicApiClient } from "@/lib";
-import { AuthProvider } from "@/types";
-import { AxiosResponse } from "axios";
+import type { AuthProvider } from "@/types";
+import type { AxiosResponse } from "axios";
 
 /**
  * OIDC認可URL取得API

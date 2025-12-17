@@ -1,34 +1,61 @@
-import { DraggableIcon } from "@/components/dnd/DraggableIcon";
-import { getEntryText, useResumeStore } from "@/features/resume";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { ListItem, ListItemButton, ListItemText } from "@mui/material";
+import { Dialog } from "@/components/ui";
+import { getEntryText, isTempId, useResumeStore } from "@/features/resume";
+import { Delete as DeleteIcon, FiberManualRecord as FiberManualRecordIcon } from "@mui/icons-material";
+import { IconButton, ListItem, ListItemButton, ListItemText, Tooltip } from "@mui/material";
+import { useState } from "react";
 
 /**
  * エントリーリストアイテムのProps
  */
 interface EntryListItemProps {
     entry: { id: string };
+    onDeleteEntry: (entryId: string, needsConfirm: boolean) => void;
 }
 
 /**
  * エントリーリストアイテム
  */
-export const EntryListItem = ({ entry }: EntryListItemProps) => {
+export const EntryListItem = ({ entry, onDeleteEntry }: EntryListItemProps) => {
     // ストアから必要な状態を取り出す
     const { activeSection, activeEntryId, setActiveEntryId } = useResumeStore();
+    const dirtyEntryIds = useResumeStore((state) => state.dirtyEntryIds);
 
-    // sortableの設定
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: entry.id });
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-    // スタイル
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
+    // 未保存のエントリーかどうか
+    const isUnsaved = dirtyEntryIds.has(entry.id);
+
+    // 一時IDかどうか（新規追加されたエントリー）
+    const isTemp = isTempId(entry.id);
+
+    /**
+     * ゴミ箱アイコンクリック
+     */
+    const handleDeleteClick = (event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation();
+
+        // 一時IDの場合は確認なしで削除
+        if (isTemp) {
+            onDeleteEntry(entry.id, false);
+            return;
+        }
+
+        // 既存エントリーの場合は確認ダイアログを表示
+        setDeleteDialogOpen(true);
+    };
+
+    /**
+     * 削除確認ダイアログのコールバック
+     */
+    const handleDeleteDialogClose = (confirmed: boolean) => {
+        setDeleteDialogOpen(false);
+        if (confirmed) {
+            onDeleteEntry(entry.id, true);
+        }
     };
 
     return (
-        <div ref={setNodeRef} style={style}>
+        <>
             <ListItem disablePadding sx={{ mb: 1 }}>
                 <ListItemButton
                     selected={activeEntryId === entry.id}
@@ -39,6 +66,19 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
                         alignItems: "center",
                     }}
                 >
+                    {/* 未保存アイコン */}
+                    {isUnsaved && (
+                        <Tooltip title="未保存" placement="top">
+                            <FiberManualRecordIcon
+                                sx={{
+                                    fontSize: 12,
+                                    color: "warning.main",
+                                    mr: 1,
+                                    flexShrink: 0,
+                                }}
+                            />
+                        </Tooltip>
+                    )}
                     <ListItemText
                         primary={getEntryText(activeSection, entry)?.primary || ""}
                         secondary={getEntryText(activeSection, entry)?.secondary || ""}
@@ -60,10 +100,23 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
                             },
                         }}
                     />
-                    {/* ドラッグアイコン */}
-                    <DraggableIcon dragHandleProps={{ ...attributes, ...listeners }} />
+                    {/* ゴミ箱アイコン */}
+                    <Tooltip title="削除" placement="top">
+                        <IconButton edge="end" onClick={handleDeleteClick}>
+                            <DeleteIcon />
+                        </IconButton>
+                    </Tooltip>
                 </ListItemButton>
             </ListItem>
-        </div>
+
+            {/* 削除確認ダイアログ（既存エントリーのみ） */}
+            <Dialog
+                open={deleteDialogOpen}
+                variant="confirm"
+                title="削除確認"
+                description="このエントリーを削除しますか？この操作は取り消せません。"
+                onClose={handleDeleteDialogClose}
+            />
+        </>
     );
 };

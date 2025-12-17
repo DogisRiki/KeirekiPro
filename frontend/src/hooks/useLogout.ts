@@ -2,7 +2,7 @@ import { paths } from "@/config/paths";
 import { protectedApiClient } from "@/lib";
 import { useUserAuthStore } from "@/stores";
 import { useMutation } from "@tanstack/react-query";
-import { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { useNavigate } from "react-router";
 
 /**

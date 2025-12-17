@@ -1,4 +1,5 @@
-import { Select as MUISelect, SelectProps } from "@mui/material";
+import type { SelectProps } from "@mui/material";
+import { Select as MUISelect } from "@mui/material";
 
 /**
  * セレクトボックス
