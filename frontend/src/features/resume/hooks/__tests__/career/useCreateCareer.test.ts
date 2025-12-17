@@ -7,10 +7,10 @@ vi.mock("@/lib", () => ({
 import type { Resume } from "@/features/resume";
 import { TEMP_ID_PREFIX, useCreateCareer, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
-import { useErrorMessageStore, useNotificationStore } from "@/stores";
+import { useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import type { ErrorResponse } from "@/types";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { AxiosResponse } from "axios";
 
 describe("useCreateCareer", () => {
     const wrapper = createQueryWrapper();
@@ -60,17 +60,16 @@ describe("useCreateCareer", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.post).mockReset();
-
-        vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useNotificationStore.getState(), "setNotification");
-
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
         vi.spyOn(useResumeStore.getState(), "setDirty");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
+        vi.spyOn(useResumeStore.getState(), "setEntryErrors");
+        vi.spyOn(useResumeStore.getState(), "clearEntryErrors");
     });
 
-    it("成功時はcareerをマージしてupdateResumeFromServerが呼ばれ、activeEntryId更新・dirty解除・通知が実行されること", async () => {
+    it("成功時はエントリエラーをクリアし、careerをマージしてストア更新・activeEntryId更新・dirty解除・通知が実行されること", async () => {
         // store準備
         useResumeStore.getState().setResume(localResume);
         useResumeStore.getState().setActiveSection("career");
@@ -99,7 +98,7 @@ describe("useCreateCareer", () => {
             ],
         };
 
-        const mockResponse = { status: 201, data: serverResume } as AxiosResponse<Resume>;
+        const mockResponse = { status: 201, data: serverResume };
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce(mockResponse);
 
         const { result } = renderHook(() => useCreateCareer("resume-1"), { wrapper });
@@ -128,7 +127,11 @@ describe("useCreateCareer", () => {
             serverResume.careers.find((c) => c.id === "career-2")!,
         ];
 
-        expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
+        // clearEntryErrorsはonMutateとonSuccessで計2回呼ばれる
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledTimes(2);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(1, tempId);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(2, tempId);
+
         expect(useResumeStore.getState().updateResumeFromServer).toHaveBeenCalledWith({
             careers: expectedCareers,
             updatedAt: serverResume.updatedAt,
@@ -137,5 +140,51 @@ describe("useCreateCareer", () => {
         expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(tempId);
         expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("職歴を作成しました。", "success");
+    });
+
+    it("失敗時はエラーレスポンスのerrorsが存在する場合に、該当エントリへエラーが設定されること", async () => {
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("career");
+        useResumeStore.getState().setActiveEntryId(tempId);
+
+        const mockErrorResponse: ErrorResponse = {
+            message: "入力内容に誤りがあります",
+            errors: {
+                companyName: ["入力してください。"],
+            },
+        };
+        const mockError = {
+            response: {
+                data: mockErrorResponse,
+            },
+        };
+
+        vi.mocked(protectedApiClient.post).mockRejectedValueOnce(mockError);
+
+        const { result } = renderHook(() => useCreateCareer("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({
+                tempId,
+                payload: {
+                    companyName: "",
+                    startDate: "2024-01",
+                    endDate: null,
+                    isActive: true,
+                },
+            });
+        });
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+
+        // clearEntryErrorsはonMutateで1回呼ばれる
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledTimes(1);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledWith(tempId);
+
+        expect(useResumeStore.getState().setEntryErrors).toHaveBeenCalledWith(tempId, mockErrorResponse.errors);
+
+        expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
+        expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
+        expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
     });
 });

@@ -1,5 +1,6 @@
 import { Checkbox, DatePicker, TextField } from "@/components/ui";
 import { useResumeStore } from "@/features/resume";
+import { stringListToBulletList } from "@/utils";
 import { Box, FormControlLabel } from "@mui/material";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
@@ -12,14 +13,18 @@ export const CareerSection = () => {
     const resume = useResumeStore((state) => state.resume);
     const activeEntryId = useResumeStore((state) => state.activeEntryId);
     const updateEntry = useResumeStore((state) => state.updateEntry);
+    const getEntryErrors = useResumeStore((state) => state.getEntryErrors);
 
-    // 現在アクティブな職歴エントリー
+    // 現在アクティブなエントリー
     const currentCareer = resume?.careers?.find((career) => career.id === activeEntryId) ?? null;
 
     // エントリーが選択されていない場合
     if (!currentCareer) {
         return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストから職歴を選択してください。</Box>;
     }
+
+    // 現在のエントリーのエラーを取得
+    const errors = getEntryErrors(currentCareer.id);
 
     // 入社年月ハンドラー
     const handleStartDateChange = (newValue: Dayjs | null) => {
@@ -59,8 +64,11 @@ export const CareerSection = () => {
                 onChange={(e) => {
                     updateEntry("careers", currentCareer.id, { companyName: e.target.value });
                 }}
+                error={!!errors.companyName?.length}
+                helperText={stringListToBulletList(errors.companyName)}
                 slotProps={{
                     inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
                 sx={{ mb: 4 }}
             />
@@ -77,6 +85,9 @@ export const CareerSection = () => {
                         required: true,
                         sx: { mb: 2 },
                         InputLabelProps: { shrink: true },
+                        error: !!errors.startDate?.length,
+                        helperText: stringListToBulletList(errors.startDate),
+                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
                     },
                     calendarHeader: { format: "YYYY/MM" },
                 }}
@@ -104,6 +115,9 @@ export const CareerSection = () => {
                         fullWidth: true,
                         required: !currentCareer.active,
                         InputLabelProps: { shrink: true },
+                        error: !!errors.endDate?.length,
+                        helperText: stringListToBulletList(errors.endDate),
+                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
                     },
                     calendarHeader: { format: "YYYY/MM" },
                 }}

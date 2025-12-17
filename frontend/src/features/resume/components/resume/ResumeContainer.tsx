@@ -193,6 +193,16 @@ export const ResumeContainer = () => {
     };
 
     /**
+     * 日付を安全にフォーマットする
+     * 無効な日付の場合は空文字列を返す
+     */
+    const formatDateSafe = (date: string | null | undefined): string => {
+        if (!date) return "";
+        const parsed = dayjs(date);
+        return parsed.isValid() ? parsed.format("YYYY-MM-DD") : "";
+    };
+
+    /**
      * 現在のアクティブなエントリーのみを保存
      */
     const handleSaveCurrentEntry = () => {
@@ -202,7 +212,7 @@ export const ResumeContainer = () => {
         if (activeSection === "basicInfo") {
             updateBasicMutation.mutate({
                 resumeName: resume.resumeName,
-                date: dayjs(resume.date).format("YYYY-MM-DD"),
+                date: formatDateSafe(resume.date),
                 lastName: resume.lastName ?? "",
                 firstName: resume.firstName ?? "",
             });

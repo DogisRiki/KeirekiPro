@@ -30,6 +30,25 @@ const initialActiveEntryIdsBySection: ActiveEntryIdsBySection = {
 };
 
 /**
+ * フィールドエラーの型
+ */
+export type FieldErrors = {
+    [field: string]: string[];
+};
+
+/**
+ * エントリーIDごとのエラー
+ */
+type ErrorsByEntryId = {
+    [entryId: string]: FieldErrors;
+};
+
+/**
+ * 基本情報セクション用の特別なエントリーID
+ */
+export const BASIC_INFO_ENTRY_ID = "__basicInfo__";
+
+/**
  * ストアの型
  */
 interface ResumeStoreState {
@@ -51,6 +70,9 @@ interface ResumeStoreState {
     // 編集されたエントリーIDのSet
     dirtyEntryIds: Set<string>;
 
+    // エントリーIDごとのバリデーションエラー
+    errorsByEntryId: ErrorsByEntryId;
+
     // アクション
     setActiveSection: (section: SectionName) => void;
     setActiveEntryId: (entryId: string | null) => void;
@@ -70,6 +92,11 @@ interface ResumeStoreState {
     addDirtyEntryId: (entryId: string) => void;
     removeDirtyEntryId: (entryId: string) => void;
     clearDirtyEntryIds: (entryIds: string[]) => void;
+    // エラー管理アクション
+    setEntryErrors: (entryId: string, errors: FieldErrors) => void;
+    clearEntryErrors: (entryId: string) => void;
+    clearAllEntryErrors: () => void;
+    getEntryErrors: (entryId: string) => FieldErrors;
 }
 
 /**
@@ -90,7 +117,7 @@ const getActiveEntryId = (
  */
 export const useResumeStore = create<ResumeStoreState>()(
     devtools(
-        (set) => ({
+        (set, get) => ({
             // 初期状態
             activeSection: "basicInfo",
             activeEntryIdsBySection: { ...initialActiveEntryIdsBySection },
@@ -98,6 +125,7 @@ export const useResumeStore = create<ResumeStoreState>()(
             resume: null,
             isDirty: false,
             dirtyEntryIds: new Set(),
+            errorsByEntryId: {},
 
             // アクション: セクションの切り替え
             setActiveSection: (section) =>
@@ -143,6 +171,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                         activeEntryIdsBySection: { ...initialActiveEntryIdsBySection },
                         activeEntryId: null,
                         dirtyEntryIds: new Set(),
+                        errorsByEntryId: {},
                     },
                     false,
                     "initializeResume",
@@ -226,12 +255,17 @@ export const useResumeStore = create<ResumeStoreState>()(
                         const newDirtyEntryIds = new Set(state.dirtyEntryIds);
                         newDirtyEntryIds.delete(entryId);
 
+                        // エントリー削除時にそのエントリーのエラーもクリア
+                        const newErrorsByEntryId = { ...state.errorsByEntryId };
+                        delete newErrorsByEntryId[entryId];
+
                         return {
                             resume: {
                                 ...state.resume,
                                 [section]: sectionData.filter((entry) => entry.id !== entryId),
                             },
                             dirtyEntryIds: newDirtyEntryIds,
+                            errorsByEntryId: newErrorsByEntryId,
                         };
                     },
                     false,
@@ -248,6 +282,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                         activeEntryId: null,
                         isDirty: false,
                         dirtyEntryIds: new Set(),
+                        errorsByEntryId: {},
                     },
                     false,
                     "clearResume",
@@ -291,6 +326,46 @@ export const useResumeStore = create<ResumeStoreState>()(
                     false,
                     "clearDirtyEntryIds",
                 ),
+
+            // アクション: 特定エントリーのエラーを設定
+            setEntryErrors: (entryId, errors) =>
+                set(
+                    (state) => ({
+                        errorsByEntryId: {
+                            ...state.errorsByEntryId,
+                            [entryId]: errors,
+                        },
+                    }),
+                    false,
+                    "setEntryErrors",
+                ),
+
+            // アクション: 特定エントリーのエラーをクリア
+            clearEntryErrors: (entryId) =>
+                set(
+                    (state) => {
+                        const newErrorsByEntryId = { ...state.errorsByEntryId };
+                        delete newErrorsByEntryId[entryId];
+                        return { errorsByEntryId: newErrorsByEntryId };
+                    },
+                    false,
+                    "clearEntryErrors",
+                ),
+
+            // アクション: 全エントリーのエラーをクリア
+            clearAllEntryErrors: () =>
+                set(
+                    {
+                        errorsByEntryId: {},
+                    },
+                    false,
+                    "clearAllEntryErrors",
+                ),
+
+            // ゲッター: 特定エントリーのエラーを取得
+            getEntryErrors: (entryId) => {
+                return get().errorsByEntryId[entryId] ?? {};
+            },
         }),
         { name: "ResumeStore" },
     ),

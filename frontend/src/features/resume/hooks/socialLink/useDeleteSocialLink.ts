@@ -16,14 +16,18 @@ export const useDeleteSocialLink = (resumeId: string) => {
     return useMutation<AxiosResponse<void>, AxiosError, string>({
         mutationFn: (socialLinkId) => deleteSocialLink(resumeId, socialLinkId),
         onMutate: () => {
+            // リクエスト開始時にエラーをクリア
             clearErrors();
         },
         onSuccess: (_, socialLinkId) => {
+            // エラーをクリア
             clearErrors();
+            // ローカルストアから削除したエントリーを除外
             if (resume) {
                 const updatedSocialLinks = resume.socialLinks.filter((s) => s.id !== socialLinkId);
                 updateResume({ socialLinks: updatedSocialLinks });
             }
+            // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(socialLinkId);
             setActiveEntryId(null);
             setDirty(false);

@@ -7,10 +7,10 @@ vi.mock("@/lib", () => ({
 import type { Resume } from "@/features/resume";
 import { TEMP_ID_PREFIX, useResumeStore, useUpdateSelfPromotion } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
-import { useErrorMessageStore, useNotificationStore } from "@/stores";
+import { useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import type { ErrorResponse } from "@/types";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { AxiosResponse } from "axios";
 
 describe("useUpdateSelfPromotion", () => {
     const wrapper = createQueryWrapper();
@@ -53,16 +53,15 @@ describe("useUpdateSelfPromotion", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.put).mockReset();
-
-        vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useNotificationStore.getState(), "setNotification");
-
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
         vi.spyOn(useResumeStore.getState(), "setDirty");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
+        vi.spyOn(useResumeStore.getState(), "setEntryErrors");
+        vi.spyOn(useResumeStore.getState(), "clearEntryErrors");
     });
 
-    it("成功時はselfPromotionsをマージしてupdateResumeFromServerが呼ばれ、dirty解除・通知が実行されること", async () => {
+    it("成功時はエントリエラーをクリアし、selfPromotionsをマージしてストア更新・dirty解除・通知が実行されること", async () => {
         const selfPromotionId = "self-promotion-1";
 
         // store準備
@@ -93,7 +92,7 @@ describe("useUpdateSelfPromotion", () => {
             ],
         };
 
-        const mockResponse = { status: 200, data: serverResume } as AxiosResponse<Resume>;
+        const mockResponse = { status: 200, data: serverResume };
         vi.mocked(protectedApiClient.put).mockResolvedValueOnce(mockResponse);
 
         const { result } = renderHook(() => useUpdateSelfPromotion("resume-1"), { wrapper });
@@ -121,7 +120,11 @@ describe("useUpdateSelfPromotion", () => {
             localResume.selfPromotions.find((s) => s.id === "self-promotion-3")!, // dirtyなのでローカル優先
         ];
 
-        expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
+        // clearEntryErrorsはonMutateとonSuccessで計2回呼ばれる
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledTimes(2);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(1, selfPromotionId);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(2, selfPromotionId);
+
         expect(useResumeStore.getState().updateResumeFromServer).toHaveBeenCalledWith({
             selfPromotions: expectedSelfPromotions,
             updatedAt: serverResume.updatedAt,
@@ -132,5 +135,53 @@ describe("useUpdateSelfPromotion", () => {
             "自己PRを更新しました。",
             "success",
         );
+    });
+
+    it("失敗時はエラーレスポンスのerrorsが存在する場合に、該当エントリへエラーが設定されること", async () => {
+        const selfPromotionId = "self-promotion-1";
+
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().addDirtyEntryId(selfPromotionId);
+
+        const mockErrorResponse: ErrorResponse = {
+            message: "入力内容に誤りがあります",
+            errors: {
+                title: ["入力してください。"],
+            },
+        };
+        const mockError = {
+            response: {
+                data: mockErrorResponse,
+            },
+        };
+
+        vi.mocked(protectedApiClient.put).mockRejectedValueOnce(mockError);
+
+        const { result } = renderHook(() => useUpdateSelfPromotion("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({
+                selfPromotionId,
+                payload: {
+                    title: "",
+                    content: localResume.selfPromotions.find((s) => s.id === selfPromotionId)!.content,
+                },
+            });
+        });
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+
+        // clearEntryErrorsはonMutateで1回呼ばれる
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledTimes(1);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledWith(selfPromotionId);
+
+        expect(useResumeStore.getState().setEntryErrors).toHaveBeenCalledWith(
+            selfPromotionId,
+            mockErrorResponse.errors,
+        );
+
+        expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
+        expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
+        expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
     });
 });

@@ -16,14 +16,18 @@ export const useDeleteCertification = (resumeId: string) => {
     return useMutation<AxiosResponse<void>, AxiosError, string>({
         mutationFn: (certificationId) => deleteCertification(resumeId, certificationId),
         onMutate: () => {
+            // リクエスト開始時にエラーをクリア
             clearErrors();
         },
         onSuccess: (_, certificationId) => {
+            // エラーをクリア
             clearErrors();
+            // ローカルストアから削除したエントリーを除外
             if (resume) {
                 const updatedCertifications = resume.certifications.filter((c) => c.id !== certificationId);
                 updateResume({ certifications: updatedCertifications });
             }
+            // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(certificationId);
             setActiveEntryId(null);
             setDirty(false);

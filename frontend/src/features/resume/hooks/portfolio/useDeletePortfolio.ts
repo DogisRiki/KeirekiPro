@@ -16,14 +16,18 @@ export const useDeletePortfolio = (resumeId: string) => {
     return useMutation<AxiosResponse<void>, AxiosError, string>({
         mutationFn: (portfolioId) => deletePortfolio(resumeId, portfolioId),
         onMutate: () => {
+            // リクエスト開始時にエラーをクリア
             clearErrors();
         },
         onSuccess: (_, portfolioId) => {
+            // エラーをクリア
             clearErrors();
+            // ローカルストアから削除したエントリーを除外
             if (resume) {
                 const updatedPortfolios = resume.portfolios.filter((p) => p.id !== portfolioId);
                 updateResume({ portfolios: updatedPortfolios });
             }
+            // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(portfolioId);
             setActiveEntryId(null);
             setDirty(false);

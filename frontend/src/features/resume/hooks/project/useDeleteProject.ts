@@ -16,14 +16,18 @@ export const useDeleteProject = (resumeId: string) => {
     return useMutation<AxiosResponse<void>, AxiosError, string>({
         mutationFn: (projectId) => deleteProject(resumeId, projectId),
         onMutate: () => {
+            // リクエスト開始時にエラーをクリア
             clearErrors();
         },
         onSuccess: (_, projectId) => {
+            // エラーをクリア
             clearErrors();
+            // ローカルストアから削除したエントリーを除外
             if (resume) {
                 const updatedProjects = resume.projects.filter((p) => p.id !== projectId);
                 updateResume({ projects: updatedProjects });
             }
+            // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(projectId);
             setActiveEntryId(null);
             setDirty(false);

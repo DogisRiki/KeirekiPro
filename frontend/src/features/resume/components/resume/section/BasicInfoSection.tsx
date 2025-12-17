@@ -1,5 +1,6 @@
 import { DatePicker, TextField } from "@/components/ui";
-import { useResumeStore } from "@/features/resume";
+import { BASIC_INFO_ENTRY_ID, useResumeStore } from "@/features/resume";
+import { stringListToBulletList } from "@/utils";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 
@@ -10,6 +11,10 @@ export const BasicInfoSection = () => {
     // ストアから必要な状態を取得
     const resume = useResumeStore((state) => state.resume);
     const updateResume = useResumeStore((state) => state.updateResume);
+    const getEntryErrors = useResumeStore((state) => state.getEntryErrors);
+
+    // エラー情報
+    const errors = getEntryErrors(BASIC_INFO_ENTRY_ID);
 
     // resumeがnullの場合は何も表示しない
     if (!resume) {
@@ -19,7 +24,7 @@ export const BasicInfoSection = () => {
     // 日付ハンドラー
     const handleDateChange = (newValue: Dayjs | null) => {
         updateResume({
-            date: newValue ? newValue.format("YYYY-MM-DD") : "",
+            date: newValue && newValue.isValid() ? newValue.format("YYYY-MM-DD") : "",
         });
     };
 
@@ -35,8 +40,11 @@ export const BasicInfoSection = () => {
                 onChange={(e) => {
                     updateResume({ resumeName: e.target.value });
                 }}
+                error={!!errors.resumeName?.length}
+                helperText={stringListToBulletList(errors.resumeName)}
                 slotProps={{
                     inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
                 sx={{ mb: 4 }}
             />
@@ -52,6 +60,9 @@ export const BasicInfoSection = () => {
                         required: true,
                         sx: { mb: 4 },
                         InputLabelProps: { shrink: true },
+                        error: !!errors.date?.length,
+                        helperText: stringListToBulletList(errors.date),
+                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
                     },
                 }}
             />
@@ -65,8 +76,11 @@ export const BasicInfoSection = () => {
                 onChange={(e) => {
                     updateResume({ lastName: e.target.value });
                 }}
+                error={!!errors.lastName?.length}
+                helperText={stringListToBulletList(errors.lastName)}
                 slotProps={{
                     inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
                 sx={{ mb: 4 }}
             />
@@ -80,8 +94,11 @@ export const BasicInfoSection = () => {
                 onChange={(e) => {
                     updateResume({ firstName: e.target.value });
                 }}
+                error={!!errors.firstName?.length}
+                helperText={stringListToBulletList(errors.firstName)}
                 slotProps={{
                     inputLabel: { shrink: true },
+                    formHelperText: { sx: { whiteSpace: "pre-line" } },
                 }}
             />
         </>

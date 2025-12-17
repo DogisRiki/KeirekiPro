@@ -16,14 +16,18 @@ export const useDeleteCareer = (resumeId: string) => {
     return useMutation<AxiosResponse<void>, AxiosError, string>({
         mutationFn: (careerId) => deleteCareer(resumeId, careerId),
         onMutate: () => {
+            // リクエスト開始時にエラーをクリア
             clearErrors();
         },
         onSuccess: (_, careerId) => {
+            // エラーをクリア
             clearErrors();
+            // ローカルストアから削除したエントリーを除外
             if (resume) {
                 const updatedCareers = resume.careers.filter((c) => c.id !== careerId);
                 updateResume({ careers: updatedCareers });
             }
+            // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(careerId);
             setActiveEntryId(null);
             setDirty(false);

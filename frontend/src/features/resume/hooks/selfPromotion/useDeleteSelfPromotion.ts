@@ -16,14 +16,18 @@ export const useDeleteSelfPromotion = (resumeId: string) => {
     return useMutation<AxiosResponse<void>, AxiosError, string>({
         mutationFn: (selfPromotionId) => deleteSelfPromotion(resumeId, selfPromotionId),
         onMutate: () => {
+            // リクエスト開始時にエラーをクリア
             clearErrors();
         },
         onSuccess: (_, selfPromotionId) => {
+            // エラーをクリア
             clearErrors();
+            // ローカルストアから削除したエントリーを除外
             if (resume) {
                 const updatedSelfPromotions = resume.selfPromotions.filter((s) => s.id !== selfPromotionId);
                 updateResume({ selfPromotions: updatedSelfPromotions });
             }
+            // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(selfPromotionId);
             setActiveEntryId(null);
             setDirty(false);
