@@ -848,6 +848,65 @@ class ResumeTest {
         assertThat(updatedResume.getFullName()).isEqualTo(newFullName);
     }
 
+    @Test
+    @DisplayName("通知オブジェクト内にエラーがある状態で、職歴を追加するとDomainExceptionをスローする")
+    void test30() {
+        Resume resume = createSampleResume();
+
+        Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
+                Period.create(notification, YearMonth.of(2024, 1), null, true));
+
+        Notification invalidNotification = new Notification();
+        invalidNotification.addError("dummy", "dummy error");
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> resume.addCareer(invalidNotification, newCareer))
+                .isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    @DisplayName("通知オブジェクト内にエラーがある状態で、職歴を更新するとDomainExceptionをスローする")
+    void test31() {
+        Resume beforeResume = createSampleResume();
+
+        Career updatedCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(),
+                CompanyName.create(notification, "株式会社DEF"),
+                Period.create(notification, YearMonth.of(2024, 1), null, true));
+
+        Notification invalidNotification = new Notification();
+        invalidNotification.addError("dummy", "dummy error");
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> beforeResume.updateCareer(invalidNotification, updatedCareer))
+                .isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    @DisplayName("通知オブジェクト内にエラーがある状態で、プロジェクトを更新するとDomainExceptionをスローする")
+    void test33() {
+        Resume beforeResume = createSampleResume();
+        Project originalProject = beforeResume.getProjects().get(0);
+
+        Project updatedProject = Project.reconstruct(
+                originalProject.getId(),
+                originalProject.getCompanyName(),
+                originalProject.getPeriod(),
+                "更新されたプロジェクト名",
+                "更新されたプロジェクト概要",
+                "1人",
+                "メンバー",
+                "更新された成果内容",
+                originalProject.getProcess(),
+                originalProject.getTechStack());
+
+        Notification invalidNotification = new Notification();
+        invalidNotification.addError("dummy", "dummy error");
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> beforeResume.updateProject(invalidNotification, updatedProject))
+                .isInstanceOf(DomainException.class);
+    }
+
     /**
      * 職務経歴書のサンプルエンティティを作成する補助メソッド
      */

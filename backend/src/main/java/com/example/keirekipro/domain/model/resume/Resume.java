@@ -278,7 +278,9 @@ public class Resume extends Entity {
             return this;
         }
 
-        // 期間重複は従来どおり DomainException を直接スロー
+        throwIfInvalid(notification);
+
+        // 期間重複チェック
         validateIsCareerOverlap(career);
 
         List<Career> updatedCareers = new ArrayList<>(this.careers);
@@ -302,6 +304,8 @@ public class Resume extends Entity {
             throwIfInvalid(notification);
             return this;
         }
+
+        throwIfInvalid(notification);
 
         // 期間重複チェック
         validateIsCareerOverlap(updatedCareer);
@@ -380,7 +384,6 @@ public class Resume extends Entity {
             String message = String.format("%sと%sの期間が重複しています。",
                     targetCareer.getCompanyName().getValue(),
                     String.join("、", overlappingCompanies));
-            // 元の挙動どおり、ここでは直接 DomainException をスローする
             throw new DomainException(message);
         }
     }
@@ -398,6 +401,8 @@ public class Resume extends Entity {
             throwIfInvalid(notification);
             return this;
         }
+
+        throwIfInvalid(notification);
 
         List<Project> updatedProjects = new ArrayList<>(this.projects);
         updatedProjects.add(project);
@@ -420,6 +425,8 @@ public class Resume extends Entity {
             throwIfInvalid(notification);
             return this;
         }
+
+        throwIfInvalid(notification);
 
         List<Project> updatedProjects = this.projects.stream()
                 .map(project -> project.getId().equals(updatedProject.getId()) ? updatedProject : project)
