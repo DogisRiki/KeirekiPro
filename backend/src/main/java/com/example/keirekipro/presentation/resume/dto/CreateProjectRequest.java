@@ -3,6 +3,7 @@ package com.example.keirekipro.presentation.resume.dto;
 import java.time.YearMonth;
 import java.util.List;
 
+import com.example.keirekipro.presentation.shared.validator.YearMonthRange;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import lombok.AllArgsConstructor;
@@ -26,9 +27,11 @@ public class CreateProjectRequest {
     private String companyName;
 
     @NotNull(message = "開始年月は入力必須です。")
+    @YearMonthRange(message = "開始年月が不正です。")
     @JsonFormat(pattern = "yyyy-MM")
     private YearMonth startDate;
 
+    @YearMonthRange(message = "終了年月が不正です。")
     @JsonFormat(pattern = "yyyy-MM")
     private YearMonth endDate;
 

@@ -268,4 +268,46 @@ class UpdateResumeBasicControllerTest {
 
         verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
     }
+
+    @Test
+    @DisplayName("日付の年が1900未満の場合、バリデーションエラーとなる")
+    void test9() throws Exception {
+        UpdateResumeBasicRequest req = new UpdateResumeBasicRequest(
+                RESUME_NAME,
+                LocalDate.of(1899, 12, 31),
+                LAST_NAME,
+                FIRST_NAME);
+        String body = objectMapper.writeValueAsString(req);
+
+        mockMvc.perform(put(ENDPOINT, RESUME_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
+                .andExpect(jsonPath("$.errors.date").isArray())
+                .andExpect(jsonPath("$.errors.date", hasItem("日付が不正です。")));
+
+        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("日付の年が2100超の場合、バリデーションエラーとなる")
+    void test10() throws Exception {
+        UpdateResumeBasicRequest req = new UpdateResumeBasicRequest(
+                RESUME_NAME,
+                LocalDate.of(2101, 1, 1),
+                LAST_NAME,
+                FIRST_NAME);
+        String body = objectMapper.writeValueAsString(req);
+
+        mockMvc.perform(put(ENDPOINT, RESUME_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
+                .andExpect(jsonPath("$.errors.date").isArray())
+                .andExpect(jsonPath("$.errors.date", hasItem("日付が不正です。")));
+
+        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+    }
 }

@@ -170,4 +170,76 @@ class CreateCareerControllerTest {
 
         verify(createCareerUseCase, never()).execute(any(), any(), any());
     }
+
+    @Test
+    @DisplayName("開始年月の年が1900未満の場合、バリデーションエラーとなる")
+    void test6() throws Exception {
+        CreateCareerRequest req = buildValidRequest();
+        req.setStartDate(YearMonth.of(1899, 12));
+        String body = objectMapper.writeValueAsString(req);
+
+        mockMvc.perform(post(ENDPOINT, RESUME_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
+                .andExpect(jsonPath("$.errors.startDate").isArray())
+                .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
+
+        verify(createCareerUseCase, never()).execute(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("開始年月の年が2100超の場合、バリデーションエラーとなる")
+    void test7() throws Exception {
+        CreateCareerRequest req = buildValidRequest();
+        req.setStartDate(YearMonth.of(2101, 1));
+        String body = objectMapper.writeValueAsString(req);
+
+        mockMvc.perform(post(ENDPOINT, RESUME_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
+                .andExpect(jsonPath("$.errors.startDate").isArray())
+                .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
+
+        verify(createCareerUseCase, never()).execute(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("終了年月の年が1900未満の場合、バリデーションエラーとなる")
+    void test8() throws Exception {
+        CreateCareerRequest req = buildValidRequest();
+        req.setEndDate(YearMonth.of(1899, 12));
+        String body = objectMapper.writeValueAsString(req);
+
+        mockMvc.perform(post(ENDPOINT, RESUME_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
+                .andExpect(jsonPath("$.errors.endDate").isArray())
+                .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
+
+        verify(createCareerUseCase, never()).execute(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("終了年月の年が2100超の場合、バリデーションエラーとなる")
+    void test9() throws Exception {
+        CreateCareerRequest req = buildValidRequest();
+        req.setEndDate(YearMonth.of(2101, 1));
+        String body = objectMapper.writeValueAsString(req);
+
+        mockMvc.perform(post(ENDPOINT, RESUME_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
+                .andExpect(jsonPath("$.errors.endDate").isArray())
+                .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
+
+        verify(createCareerUseCase, never()).execute(any(), any(), any());
+    }
 }

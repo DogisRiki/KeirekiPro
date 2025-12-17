@@ -165,4 +165,42 @@ class UpdateCertificationControllerTest {
 
         verify(updateCertificationUseCase, never()).execute(any(), any(), any(), any());
     }
+
+    @Test
+    @DisplayName("取得年月の年が1900未満の場合、バリデーションエラーとなる")
+    void test5() throws Exception {
+        UpdateCertificationRequest req = new UpdateCertificationRequest(
+                "基本情報技術者試験",
+                YearMonth.of(1899, 12));
+        String body = objectMapper.writeValueAsString(req);
+
+        mockMvc.perform(put(ENDPOINT, RESUME_ID, CERTIFICATION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
+                .andExpect(jsonPath("$.errors.date").isArray())
+                .andExpect(jsonPath("$.errors.date", hasItem("取得年月が不正です。")));
+
+        verify(updateCertificationUseCase, never()).execute(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("取得年月の年が2100超の場合、バリデーションエラーとなる")
+    void test6() throws Exception {
+        UpdateCertificationRequest req = new UpdateCertificationRequest(
+                "基本情報技術者試験",
+                YearMonth.of(2101, 1));
+        String body = objectMapper.writeValueAsString(req);
+
+        mockMvc.perform(put(ENDPOINT, RESUME_ID, CERTIFICATION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
+                .andExpect(jsonPath("$.errors.date").isArray())
+                .andExpect(jsonPath("$.errors.date", hasItem("取得年月が不正です。")));
+
+        verify(updateCertificationUseCase, never()).execute(any(), any(), any(), any());
+    }
 }

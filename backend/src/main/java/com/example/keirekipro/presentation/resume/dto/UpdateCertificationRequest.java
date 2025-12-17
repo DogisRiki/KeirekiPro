@@ -2,6 +2,7 @@ package com.example.keirekipro.presentation.resume.dto;
 
 import java.time.YearMonth;
 
+import com.example.keirekipro.presentation.shared.validator.YearMonthRange;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import lombok.AllArgsConstructor;
@@ -25,6 +26,7 @@ public class UpdateCertificationRequest {
     private String name;
 
     @NotNull(message = "取得年月は入力必須です。")
+    @YearMonthRange(message = "取得年月が不正です。")
     @JsonFormat(pattern = "yyyy-MM")
     private YearMonth date;
 }

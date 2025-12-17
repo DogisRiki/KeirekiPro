@@ -2,6 +2,8 @@ package com.example.keirekipro.presentation.resume.dto;
 
 import java.time.LocalDate;
 
+import com.example.keirekipro.presentation.shared.validator.LocalDateRange;
+
 import org.springframework.format.annotation.DateTimeFormat;
 
 import lombok.AllArgsConstructor;
@@ -25,6 +27,7 @@ public class UpdateResumeBasicRequest {
     private String resumeName;
 
     @NotNull(message = "日付は入力必須です。")
+    @LocalDateRange(message = "日付が不正です。")
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate date;
 
