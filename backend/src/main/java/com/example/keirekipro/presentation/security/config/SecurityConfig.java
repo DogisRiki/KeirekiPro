@@ -68,8 +68,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**"))
 
                 // セッションを使用しない設定（JWTベースの認証のため）
-                // ただし「認証イベントでCSRFトークンを削除する」挙動を止めるため、
-                // SessionAuthenticationStrategy を no-op にする
+                // ただし「認証イベントでCSRFトークンを削除する」挙動を止めるため、SessionAuthenticationStrategyをno-op化する
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                         .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))

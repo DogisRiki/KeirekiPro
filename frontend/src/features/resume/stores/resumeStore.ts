@@ -57,14 +57,18 @@ interface ResumeStoreState {
     setResume: (resume: Resume) => void;
     initializeResume: (resume: Resume) => void;
     updateResume: (patch: Partial<Resume>) => void;
+    updateResumeFromServer: (patch: Partial<Resume>) => void;
     updateSection: (section: ResumeArrayKeys, data: Resume[ResumeArrayKeys]) => void;
     updateEntry: (
         section: ResumeArrayKeys,
         entryId: string,
         updatedData: Partial<Resume[ResumeArrayKeys][number]>,
     ) => void;
+    removeEntry: (section: ResumeArrayKeys, entryId: string) => void;
     clearResume: () => void;
     setDirty: (isDirty: boolean) => void;
+    addDirtyEntryId: (entryId: string) => void;
+    removeDirtyEntryId: (entryId: string) => void;
     clearDirtyEntryIds: (entryIds: string[]) => void;
 }
 
@@ -155,6 +159,16 @@ export const useResumeStore = create<ResumeStoreState>()(
                     "updateResume",
                 ),
 
+            // アクション: サーバーからのレスポンスで職務経歴書を部分更新（isDirtyは変更しない）
+            updateResumeFromServer: (patch) =>
+                set(
+                    (state) => ({
+                        resume: state.resume ? { ...state.resume, ...patch } : null,
+                    }),
+                    false,
+                    "updateResumeFromServer",
+                ),
+
             // アクション: セクションデータの更新（変更時はdirtyをtrueに、新規エントリーをdirtyEntryIdsに追加）
             updateSection: (section, data) =>
                 set(
@@ -203,6 +217,27 @@ export const useResumeStore = create<ResumeStoreState>()(
                     "updateEntry",
                 ),
 
+            // アクション: 特定エントリーの削除（ストアからのみ削除）
+            removeEntry: (section, entryId) =>
+                set(
+                    (state) => {
+                        if (!state.resume) return { resume: null };
+                        const sectionData = state.resume[section];
+                        const newDirtyEntryIds = new Set(state.dirtyEntryIds);
+                        newDirtyEntryIds.delete(entryId);
+
+                        return {
+                            resume: {
+                                ...state.resume,
+                                [section]: sectionData.filter((entry) => entry.id !== entryId),
+                            },
+                            dirtyEntryIds: newDirtyEntryIds,
+                        };
+                    },
+                    false,
+                    "removeEntry",
+                ),
+
             // アクション: ストアのクリア
             clearResume: () =>
                 set(
@@ -220,6 +255,30 @@ export const useResumeStore = create<ResumeStoreState>()(
 
             // アクション: dirty状態の設定
             setDirty: (isDirty) => set({ isDirty }, false, "setDirty"),
+
+            // アクション: 単一のエントリーIDをdirtyEntryIdsに追加
+            addDirtyEntryId: (entryId) =>
+                set(
+                    (state) => {
+                        const newDirtyEntryIds = new Set(state.dirtyEntryIds);
+                        newDirtyEntryIds.add(entryId);
+                        return { dirtyEntryIds: newDirtyEntryIds };
+                    },
+                    false,
+                    "addDirtyEntryId",
+                ),
+
+            // アクション: 単一のエントリーIDをdirtyEntryIdsから削除
+            removeDirtyEntryId: (entryId) =>
+                set(
+                    (state) => {
+                        const newDirtyEntryIds = new Set(state.dirtyEntryIds);
+                        newDirtyEntryIds.delete(entryId);
+                        return { dirtyEntryIds: newDirtyEntryIds };
+                    },
+                    false,
+                    "removeDirtyEntryId",
+                ),
 
             // アクション: 指定されたエントリーIDをdirtyEntryIdsから削除
             clearDirtyEntryIds: (entryIds) =>

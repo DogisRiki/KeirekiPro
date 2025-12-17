@@ -1,6 +1,7 @@
-import { getEntryText, getResumeKey, useResumeStore } from "@/features/resume";
-import { FiberManualRecord as FiberManualRecordIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
-import { IconButton, ListItem, ListItemButton, ListItemText, Menu, MenuItem, Tooltip } from "@mui/material";
+import { Dialog } from "@/components/ui";
+import { getEntryText, isTempId, useResumeStore } from "@/features/resume";
+import { Delete as DeleteIcon, FiberManualRecord as FiberManualRecordIcon } from "@mui/icons-material";
+import { IconButton, ListItem, ListItemButton, ListItemText, Tooltip } from "@mui/material";
 import { useState } from "react";
 
 /**
@@ -8,61 +9,48 @@ import { useState } from "react";
  */
 interface EntryListItemProps {
     entry: { id: string };
+    onDeleteEntry: (entryId: string, needsConfirm: boolean) => void;
 }
 
 /**
  * エントリーリストアイテム
  */
-export const EntryListItem = ({ entry }: EntryListItemProps) => {
+export const EntryListItem = ({ entry, onDeleteEntry }: EntryListItemProps) => {
     // ストアから必要な状態を取り出す
-    const { activeSection, activeEntryId, setActiveEntryId, updateSection } = useResumeStore();
-    const resume = useResumeStore((state) => state.resume);
+    const { activeSection, activeEntryId, setActiveEntryId } = useResumeStore();
     const dirtyEntryIds = useResumeStore((state) => state.dirtyEntryIds);
 
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const open = Boolean(anchorEl);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
     // 未保存のエントリーかどうか
     const isUnsaved = dirtyEntryIds.has(entry.id);
 
+    // 一時IDかどうか（新規追加されたエントリー）
+    const isTemp = isTempId(entry.id);
+
     /**
-     * メニューオープン
+     * ゴミ箱アイコンクリック
      */
-    const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    const handleDeleteClick = (event: React.MouseEvent<HTMLElement>) => {
         event.stopPropagation();
-        setAnchorEl(event.currentTarget);
-    };
 
-    /**
-     * メニュークローズ
-     */
-    const handleMenuClose = () => {
-        setAnchorEl(null);
-    };
-
-    /**
-     * エントリー削除処理
-     */
-    const handleDelete = (event: React.MouseEvent<HTMLElement>) => {
-        event.stopPropagation();
-        setAnchorEl(null);
-
-        if (!resume) {
+        // 一時IDの場合は確認なしで削除
+        if (isTemp) {
+            onDeleteEntry(entry.id, false);
             return;
         }
 
-        const sectionKey = getResumeKey(activeSection);
-        if (!sectionKey) {
-            return;
-        }
+        // 既存エントリーの場合は確認ダイアログを表示
+        setDeleteDialogOpen(true);
+    };
 
-        const list = resume[sectionKey];
-        const updated = list.filter((item) => item.id !== entry.id) as typeof list;
-
-        updateSection(sectionKey, updated);
-
-        if (activeEntryId === entry.id) {
-            setActiveEntryId(null);
+    /**
+     * 削除確認ダイアログのコールバック
+     */
+    const handleDeleteDialogClose = (confirmed: boolean) => {
+        setDeleteDialogOpen(false);
+        if (confirmed) {
+            onDeleteEntry(entry.id, true);
         }
     };
 
@@ -112,31 +100,23 @@ export const EntryListItem = ({ entry }: EntryListItemProps) => {
                             },
                         }}
                     />
-                    {/* メニューアイコン */}
-                    <IconButton edge="end" onClick={handleMenuOpen}>
-                        <MoreVertIcon />
-                    </IconButton>
+                    {/* ゴミ箱アイコン */}
+                    <Tooltip title="削除" placement="top">
+                        <IconButton edge="end" onClick={handleDeleteClick}>
+                            <DeleteIcon />
+                        </IconButton>
+                    </Tooltip>
                 </ListItemButton>
             </ListItem>
 
-            {/* メニュー */}
-            <Menu
-                anchorEl={anchorEl}
-                open={open}
-                onClose={handleMenuClose}
-                anchorOrigin={{
-                    vertical: "bottom",
-                    horizontal: "right",
-                }}
-                transformOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                }}
-            >
-                <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
-                    削除
-                </MenuItem>
-            </Menu>
+            {/* 削除確認ダイアログ（既存エントリーのみ） */}
+            <Dialog
+                open={deleteDialogOpen}
+                variant="confirm"
+                title="削除確認"
+                description="このエントリーを削除しますか？この操作は取り消せません。"
+                onClose={handleDeleteDialogClose}
+            />
         </>
     );
 };

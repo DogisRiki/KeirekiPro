@@ -1,24 +1,36 @@
 import { Button, Dialog } from "@/components/ui";
-import type { SectionName } from "@/features/resume";
 import {
     BottomMenu,
+    buildPayloadForEntry,
     createCurrentSection,
     EntryList,
-    getApiId,
     getResumeKey,
+    isTempId,
     sections,
     SectionTabs,
     useAutoSave,
+    useCreateCareer,
+    useCreateCertification,
+    useCreatePortfolio,
+    useCreateProject,
+    useCreateSelfPromotion,
+    useCreateSocialLink,
+    useDeleteCareer,
+    useDeleteCertification,
+    useDeletePortfolio,
+    useDeleteProject,
+    useDeleteSelfPromotion,
+    useDeleteSocialLink,
     useGetResumeInfo,
     useNavigationBlocker,
     useResumeStore,
-    useUpdateCareers,
-    useUpdateCertifications,
-    useUpdatePortfolios,
-    useUpdateProjects,
+    useUpdateCareer,
+    useUpdateCertification,
+    useUpdatePortfolio,
+    useUpdateProject,
     useUpdateResumeBasic,
-    useUpdateSelfPromotions,
-    useUpdateSocialLinks,
+    useUpdateSelfPromotion,
+    useUpdateSocialLink,
 } from "@/features/resume";
 import { Delete as DeleteIcon, Save as SaveIcon } from "@mui/icons-material";
 import { Box, Divider, Typography } from "@mui/material";
@@ -42,8 +54,10 @@ export const ResumeContainer = () => {
 
     const resume = useResumeStore((state) => state.resume);
     const activeEntryId = useResumeStore((state) => state.activeEntryId);
-    const updateSection = useResumeStore((state) => state.updateSection);
+    const removeEntry = useResumeStore((state) => state.removeEntry);
     const setActiveEntryId = useResumeStore((state) => state.setActiveEntryId);
+    const isDirty = useResumeStore((state) => state.isDirty);
+    const dirtyEntryIds = useResumeStore((state) => state.dirtyEntryIds);
 
     // タイトル取得
     const title = currentSection.label + "情報";
@@ -54,29 +68,57 @@ export const ResumeContainer = () => {
     // 自動保存の有効/無効状態
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
 
+    // 削除確認ダイアログ
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
     // 職務経歴書詳細情報取得
     const { isLoading } = useGetResumeInfo(resumeId ?? "");
 
-    // 各セクションの更新ミューテーション
+    // 基本情報更新ミューテーション
     const updateBasicMutation = useUpdateResumeBasic(resumeId ?? "");
-    const updateCareersMutation = useUpdateCareers(resumeId ?? "");
-    const updateProjectsMutation = useUpdateProjects(resumeId ?? "");
-    const updateCertificationsMutation = useUpdateCertifications(resumeId ?? "");
-    const updatePortfoliosMutation = useUpdatePortfolios(resumeId ?? "");
-    const updateSocialLinksMutation = useUpdateSocialLinks(resumeId ?? "");
-    const updateSelfPromotionsMutation = useUpdateSelfPromotions(resumeId ?? "");
+
+    // 各セクションの作成・更新・削除ミューテーション
+    const createCareerMutation = useCreateCareer(resumeId ?? "");
+    const updateCareerMutation = useUpdateCareer(resumeId ?? "");
+    const deleteCareerMutation = useDeleteCareer(resumeId ?? "");
+
+    const createProjectMutation = useCreateProject(resumeId ?? "");
+    const updateProjectMutation = useUpdateProject(resumeId ?? "");
+    const deleteProjectMutation = useDeleteProject(resumeId ?? "");
+
+    const createCertificationMutation = useCreateCertification(resumeId ?? "");
+    const updateCertificationMutation = useUpdateCertification(resumeId ?? "");
+    const deleteCertificationMutation = useDeleteCertification(resumeId ?? "");
+
+    const createPortfolioMutation = useCreatePortfolio(resumeId ?? "");
+    const updatePortfolioMutation = useUpdatePortfolio(resumeId ?? "");
+    const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "");
+
+    const createSocialLinkMutation = useCreateSocialLink(resumeId ?? "");
+    const updateSocialLinkMutation = useUpdateSocialLink(resumeId ?? "");
+    const deleteSocialLinkMutation = useDeleteSocialLink(resumeId ?? "");
+
+    const createSelfPromotionMutation = useCreateSelfPromotion(resumeId ?? "");
+    const updateSelfPromotionMutation = useUpdateSelfPromotion(resumeId ?? "");
+    const deleteSelfPromotionMutation = useDeleteSelfPromotion(resumeId ?? "");
 
     // 自動保存フック
     useAutoSave({
         enabled: autoSaveEnabled,
         resumeId: resumeId ?? "",
         updateBasicMutation,
-        updateCareersMutation,
-        updateProjectsMutation,
-        updateCertificationsMutation,
-        updatePortfoliosMutation,
-        updateSocialLinksMutation,
-        updateSelfPromotionsMutation,
+        createCareerMutation,
+        updateCareerMutation,
+        createProjectMutation,
+        updateProjectMutation,
+        createCertificationMutation,
+        updateCertificationMutation,
+        createPortfolioMutation,
+        updatePortfolioMutation,
+        createSocialLinkMutation,
+        updateSocialLinkMutation,
+        createSelfPromotionMutation,
+        updateSelfPromotionMutation,
     });
 
     // BottomMenuの高さ計測
@@ -87,143 +129,183 @@ export const ResumeContainer = () => {
     };
 
     /**
-     * 現在アクティブなエントリを削除（ストアのみ更新）
+     * 削除ボタン押下
      */
     const handleDeleteCurrentEntry = () => {
-        if (!activeEntryId) return;
-        if (!resume) return;
+        if (!activeEntryId || !resume) return;
 
+        // 一時IDの場合は警告なしでストアから削除
+        if (isTempId(activeEntryId)) {
+            deleteFromStore(activeEntryId);
+            return;
+        }
+
+        // 既存エントリーの場合は確認ダイアログを表示
+        setDeleteDialogOpen(true);
+    };
+
+    /**
+     * ストアからエントリーを削除
+     */
+    const deleteFromStore = (entryId: string) => {
         const sectionKey = getResumeKey(activeSection);
-        if (!sectionKey) return;
+        if (!sectionKey || !resume) return;
 
-        const list = resume[sectionKey];
-        const updated = list.filter((item) => item.id !== activeEntryId) as typeof list;
-
-        updateSection(sectionKey, updated);
+        removeEntry(sectionKey, entryId);
         setActiveEntryId(null);
     };
 
     /**
-     * 保存ボタン押下時のハンドラー
+     * 削除確認ダイアログのコールバック
      */
-    const handleSave = () => {
-        if (!resume || !resumeId) return;
+    const handleDeleteDialogClose = (confirmed: boolean) => {
+        setDeleteDialogOpen(false);
+        if (confirmed && activeEntryId && resume) {
+            // APIを呼び出して削除
+            executeDeleteMutation(activeEntryId);
+        }
+    };
 
-        switch (activeSection as SectionName) {
-            case "basicInfo":
-                updateBasicMutation.mutate({
-                    resumeName: resume.resumeName,
-                    date: dayjs(resume.date).format("YYYY-MM-DD"),
-                    lastName: resume.lastName ?? "",
-                    firstName: resume.firstName ?? "",
-                });
-                break;
+    /**
+     * セクションに応じた削除ミューテーションを実行
+     */
+    const executeDeleteMutation = (entryId: string) => {
+        switch (activeSection) {
             case "career":
-                updateCareersMutation.mutate({
-                    careers: resume.careers.map((c) => ({
-                        id: getApiId(c.id),
-                        companyName: c.companyName,
-                        startDate: c.startDate,
-                        endDate: c.endDate,
-                        isActive: c.active,
-                    })),
-                });
+                deleteCareerMutation.mutate(entryId);
                 break;
             case "project":
-                updateProjectsMutation.mutate({
-                    projects: resume.projects.map((p) => ({
-                        id: getApiId(p.id),
-                        companyName: p.companyName,
-                        startDate: p.startDate,
-                        endDate: p.endDate,
-                        isActive: p.active,
-                        name: p.name,
-                        overview: p.overview,
-                        teamComp: p.teamComp,
-                        role: p.role,
-                        achievement: p.achievement,
-                        requirements: p.process.requirements,
-                        basicDesign: p.process.basicDesign,
-                        detailedDesign: p.process.detailedDesign,
-                        implementation: p.process.implementation,
-                        integrationTest: p.process.integrationTest,
-                        systemTest: p.process.systemTest,
-                        maintenance: p.process.maintenance,
-                        frontendLanguages: p.techStack.frontend.languages,
-                        frontendFrameworks: p.techStack.frontend.frameworks,
-                        frontendLibraries: p.techStack.frontend.libraries,
-                        frontendBuildTools: p.techStack.frontend.buildTools,
-                        frontendPackageManagers: p.techStack.frontend.packageManagers,
-                        frontendLinters: p.techStack.frontend.linters,
-                        frontendFormatters: p.techStack.frontend.formatters,
-                        frontendTestingTools: p.techStack.frontend.testingTools,
-                        backendLanguages: p.techStack.backend.languages,
-                        backendFrameworks: p.techStack.backend.frameworks,
-                        backendLibraries: p.techStack.backend.libraries,
-                        backendBuildTools: p.techStack.backend.buildTools,
-                        backendPackageManagers: p.techStack.backend.packageManagers,
-                        backendLinters: p.techStack.backend.linters,
-                        backendFormatters: p.techStack.backend.formatters,
-                        backendTestingTools: p.techStack.backend.testingTools,
-                        ormTools: p.techStack.backend.ormTools,
-                        auth: p.techStack.backend.auth,
-                        clouds: p.techStack.infrastructure.clouds,
-                        operatingSystems: p.techStack.infrastructure.operatingSystems,
-                        containers: p.techStack.infrastructure.containers,
-                        databases: p.techStack.infrastructure.databases,
-                        webServers: p.techStack.infrastructure.webServers,
-                        ciCdTools: p.techStack.infrastructure.ciCdTools,
-                        iacTools: p.techStack.infrastructure.iacTools,
-                        monitoringTools: p.techStack.infrastructure.monitoringTools,
-                        loggingTools: p.techStack.infrastructure.loggingTools,
-                        sourceControls: p.techStack.tools.sourceControls,
-                        projectManagements: p.techStack.tools.projectManagements,
-                        communicationTools: p.techStack.tools.communicationTools,
-                        documentationTools: p.techStack.tools.documentationTools,
-                        apiDevelopmentTools: p.techStack.tools.apiDevelopmentTools,
-                        designTools: p.techStack.tools.designTools,
-                        editors: p.techStack.tools.editors,
-                        developmentEnvironments: p.techStack.tools.developmentEnvironments,
-                    })),
-                });
+                deleteProjectMutation.mutate(entryId);
                 break;
             case "certification":
-                updateCertificationsMutation.mutate({
-                    certifications: resume.certifications.map((c) => ({
-                        id: getApiId(c.id),
-                        name: c.name,
-                        date: c.date,
-                    })),
-                });
+                deleteCertificationMutation.mutate(entryId);
                 break;
             case "portfolio":
-                updatePortfoliosMutation.mutate({
-                    portfolios: resume.portfolios.map((p) => ({
-                        id: getApiId(p.id),
-                        name: p.name,
-                        overview: p.overview,
-                        techStack: p.techStack,
-                        link: p.link,
-                    })),
-                });
+                deletePortfolioMutation.mutate(entryId);
                 break;
             case "socialLink":
-                updateSocialLinksMutation.mutate({
-                    socialLinks: resume.socialLinks.map((s) => ({
-                        id: getApiId(s.id),
-                        name: s.name,
-                        link: s.link,
-                    })),
-                });
+                deleteSocialLinkMutation.mutate(entryId);
                 break;
             case "selfPromotion":
-                updateSelfPromotionsMutation.mutate({
-                    selfPromotions: resume.selfPromotions.map((s) => ({
-                        id: getApiId(s.id),
-                        title: s.title,
-                        content: s.content,
-                    })),
-                });
+                deleteSelfPromotionMutation.mutate(entryId);
+                break;
+        }
+    };
+
+    /**
+     * 現在のアクティブなエントリーのみを保存
+     */
+    const handleSaveCurrentEntry = () => {
+        if (!resume || !resumeId) return;
+
+        // 基本情報セクションの場合
+        if (activeSection === "basicInfo") {
+            updateBasicMutation.mutate({
+                resumeName: resume.resumeName,
+                date: dayjs(resume.date).format("YYYY-MM-DD"),
+                lastName: resume.lastName ?? "",
+                firstName: resume.firstName ?? "",
+            });
+            return;
+        }
+
+        // リスト型セクションの場合
+        const sectionKey = getResumeKey(activeSection);
+        if (!sectionKey || !activeEntryId) return;
+
+        const list = resume[sectionKey];
+        const activeEntry = list.find((item) => item.id === activeEntryId);
+        if (!activeEntry) return;
+
+        // 新規作成か更新かを判定
+        const isNew = isTempId(activeEntryId);
+
+        // セクションに応じてミューテーションを呼び出す
+        executeSaveMutation(activeEntry, activeEntryId, isNew);
+    };
+
+    /**
+     * セクションに応じた保存ミューテーションを実行
+     */
+    const executeSaveMutation = (activeEntry: any, entryId: string, isNew: boolean) => {
+        switch (activeSection) {
+            case "career":
+                if (isNew) {
+                    createCareerMutation.mutate({
+                        tempId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                } else {
+                    updateCareerMutation.mutate({
+                        careerId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                }
+                break;
+            case "project":
+                if (isNew) {
+                    createProjectMutation.mutate({
+                        tempId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                } else {
+                    updateProjectMutation.mutate({
+                        projectId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                }
+                break;
+            case "certification":
+                if (isNew) {
+                    createCertificationMutation.mutate({
+                        tempId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                } else {
+                    updateCertificationMutation.mutate({
+                        certificationId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                }
+                break;
+            case "portfolio":
+                if (isNew) {
+                    createPortfolioMutation.mutate({
+                        tempId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                } else {
+                    updatePortfolioMutation.mutate({
+                        portfolioId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                }
+                break;
+            case "socialLink":
+                if (isNew) {
+                    createSocialLinkMutation.mutate({
+                        tempId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                } else {
+                    updateSocialLinkMutation.mutate({
+                        socialLinkId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                }
+                break;
+            case "selfPromotion":
+                if (isNew) {
+                    createSelfPromotionMutation.mutate({
+                        tempId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                } else {
+                    updateSelfPromotionMutation.mutate({
+                        selfPromotionId: entryId,
+                        payload: buildPayloadForEntry(activeSection, activeEntry),
+                    });
+                }
                 break;
         }
     };
@@ -231,29 +313,41 @@ export const ResumeContainer = () => {
     // ローディング状態
     const isSaving =
         updateBasicMutation.isPending ||
-        updateCareersMutation.isPending ||
-        updateProjectsMutation.isPending ||
-        updateCertificationsMutation.isPending ||
-        updatePortfoliosMutation.isPending ||
-        updateSocialLinksMutation.isPending ||
-        updateSelfPromotionsMutation.isPending;
+        createCareerMutation.isPending ||
+        updateCareerMutation.isPending ||
+        deleteCareerMutation.isPending ||
+        createProjectMutation.isPending ||
+        updateProjectMutation.isPending ||
+        deleteProjectMutation.isPending ||
+        createCertificationMutation.isPending ||
+        updateCertificationMutation.isPending ||
+        deleteCertificationMutation.isPending ||
+        createPortfolioMutation.isPending ||
+        updatePortfolioMutation.isPending ||
+        deletePortfolioMutation.isPending ||
+        createSocialLinkMutation.isPending ||
+        updateSocialLinkMutation.isPending ||
+        deleteSocialLinkMutation.isPending ||
+        createSelfPromotionMutation.isPending ||
+        updateSelfPromotionMutation.isPending ||
+        deleteSelfPromotionMutation.isPending;
 
     // データ取得中またはresumeがnullの場合は何も表示しない
     if (isLoading || !resume) {
         return null;
     }
 
+    // 保存・削除ボタンの表示条件
+    const showButtons = activeSection === "basicInfo" || activeEntryId !== null;
+
+    // アクティブなエントリーが編集状態かどうかを判定
+    const isActiveEntryDirty =
+        activeSection === "basicInfo" ? isDirty : activeEntryId !== null && dirtyEntryIds.has(activeEntryId);
+
     return (
         <>
             {/* セクション切り替えタブ */}
             <SectionTabs />
-
-            {/* タブ全体の保存ボタン */}
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-                <Button color="info" startIcon={<SaveIcon />} onClick={handleSave} disabled={isSaving}>
-                    このタブの情報を保存
-                </Button>
-            </Box>
 
             <Grid container spacing={3} sx={{ mt: 2, mb: `${bottomMenuHeight}px` }}>
                 {currentSection.type === "list" && (
@@ -281,19 +375,31 @@ export const ResumeContainer = () => {
                         >
                             {/* コンテンツタイトル */}
                             <Typography variant="h6">{title}</Typography>
-                            <Box>
-                                {/* 削除ボタン（複数エントリーを持つセクションのみ表示） */}
-                                {currentSection.type === "list" && (
+                            {showButtons && (
+                                <Box sx={{ display: "flex", gap: 1 }}>
+                                    {/* 保存ボタン */}
                                     <Button
-                                        color="error"
+                                        color="info"
                                         size="small"
-                                        startIcon={<DeleteIcon />}
-                                        onClick={handleDeleteCurrentEntry}
+                                        startIcon={<SaveIcon />}
+                                        onClick={handleSaveCurrentEntry}
+                                        disabled={isSaving || !isActiveEntryDirty}
                                     >
-                                        削除
+                                        保存
                                     </Button>
-                                )}
-                            </Box>
+                                    {/* 削除ボタン（リスト型セクションのみ） */}
+                                    {currentSection.type === "list" && (
+                                        <Button
+                                            color="error"
+                                            size="small"
+                                            startIcon={<DeleteIcon />}
+                                            onClick={handleDeleteCurrentEntry}
+                                        >
+                                            削除
+                                        </Button>
+                                    )}
+                                </Box>
+                            )}
                         </Box>
                         <Divider />
                         <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", p: 3 }}>
@@ -303,7 +409,14 @@ export const ResumeContainer = () => {
                 </Grid>
             </Grid>
             {/* 下部メニュー */}
-            <BottomMenu ref={measuredRef} autoSaveEnabled={autoSaveEnabled} onAutoSaveToggle={setAutoSaveEnabled} />
+            <BottomMenu
+                ref={measuredRef}
+                autoSaveEnabled={autoSaveEnabled}
+                onAutoSaveToggle={setAutoSaveEnabled}
+                onSave={handleSaveCurrentEntry}
+                isSaving={isSaving}
+                canSave={isActiveEntryDirty}
+            />
             {/* 離脱防止ダイアログ */}
             <Dialog
                 open={dialogProps.open}
@@ -311,6 +424,14 @@ export const ResumeContainer = () => {
                 title="このページを離れますか？"
                 description="保存されていない変更があります。このまま離れると、変更内容は失われます。"
                 onClose={dialogProps.onClose}
+            />
+            {/* 削除確認ダイアログ */}
+            <Dialog
+                open={deleteDialogOpen}
+                variant="confirm"
+                title="削除確認"
+                description="このエントリーを削除しますか？この操作は取り消せません。"
+                onClose={handleDeleteDialogClose}
             />
         </>
     );

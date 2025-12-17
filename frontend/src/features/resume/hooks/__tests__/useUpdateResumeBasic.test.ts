@@ -37,7 +37,7 @@ describe("useUpdateResumeBasic", () => {
         vi.mocked(protectedApiClient.put).mockReset();
         vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useNotificationStore.getState(), "setNotification");
-        vi.spyOn(useResumeStore.getState(), "updateResume");
+        vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
         vi.spyOn(useResumeStore.getState(), "setDirty");
     });
 
@@ -59,7 +59,7 @@ describe("useUpdateResumeBasic", () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
-        expect(useResumeStore.getState().updateResume).toHaveBeenCalledWith({
+        expect(useResumeStore.getState().updateResumeFromServer).toHaveBeenCalledWith({
             resumeName: mockResume.resumeName,
             date: mockResume.date,
             lastName: mockResume.lastName,

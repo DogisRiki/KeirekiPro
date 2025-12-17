@@ -1,4 +1,5 @@
 import { ResumeCardMenu } from "@/features/resume";
+import { formatDateTimeJa } from "@/utils";
 import { DateRange as DateRangeIcon } from "@mui/icons-material";
 import { Box, Card, CardContent, Typography } from "@mui/material";
 
@@ -46,14 +47,14 @@ export const ResumeCard = ({ resumeId, resumeName, createdAt, updatedAt, onClick
                 <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                     <DateRangeIcon sx={{ mr: 1 }} />
                     <Typography variant="body2" color="text.secondary">
-                        作成日時: {createdAt}
+                        作成日時: {formatDateTimeJa(createdAt)}
                     </Typography>
                 </Box>
                 {/* 更新日時 */}
                 <Box sx={{ display: "flex", alignItems: "center" }}>
                     <DateRangeIcon sx={{ mr: 1 }} />
                     <Typography variant="body2" color="text.secondary">
-                        更新日時: {updatedAt}
+                        更新日時: {formatDateTimeJa(updatedAt)}
                     </Typography>
                 </Box>
             </CardContent>

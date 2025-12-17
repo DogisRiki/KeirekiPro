@@ -1,6 +1,7 @@
 import type { SectionName } from "@/features/resume";
 import {
     TEMP_ID_PREFIX,
+    buildPayloadForEntry,
     createCurrentSection,
     getApiId,
     getEntryText,
@@ -240,6 +241,237 @@ describe("getApiId", () => {
         const result = getApiId("");
 
         expect(result).toBeNull();
+    });
+});
+
+describe("buildPayloadForEntry", () => {
+    it("careerの場合、API送信用のペイロードを返すこと", () => {
+        const entry = {
+            id: "career-1",
+            companyName: "株式会社テスト",
+            startDate: "2020-04",
+            endDate: "2023-12",
+            active: false,
+            // 余計なフィールドがあっても無視されることを確認
+            extra: "ignored",
+        };
+
+        const result = buildPayloadForEntry("career", entry);
+
+        expect(result).toEqual({
+            companyName: "株式会社テスト",
+            startDate: "2020-04",
+            endDate: "2023-12",
+            isActive: false,
+        });
+        expect(result).not.toHaveProperty("id");
+        expect(result).not.toHaveProperty("active");
+        expect(result).not.toHaveProperty("extra");
+    });
+
+    it("projectの場合、process/techStackをフラット化したペイロードを返すこと", () => {
+        const entry = {
+            id: "project-1",
+            companyName: "株式会社テスト",
+            startDate: "2020-04-01",
+            endDate: "2021-03-31",
+            active: false,
+            name: "テストプロジェクト",
+            overview: "テストプロジェクトの概要",
+            teamComp: "5名",
+            role: "バックエンドエンジニア",
+            achievement: "パフォーマンス改善",
+            process: {
+                requirements: true,
+                basicDesign: true,
+                detailedDesign: true,
+                implementation: true,
+                integrationTest: true,
+                systemTest: false,
+                maintenance: false,
+            },
+            techStack: {
+                frontend: {
+                    languages: ["TypeScript"],
+                    frameworks: ["React"],
+                    libraries: ["Redux"],
+                    buildTools: ["Vite"],
+                    packageManagers: ["npm"],
+                    linters: ["ESLint"],
+                    formatters: ["Prettier"],
+                    testingTools: ["Jest"],
+                },
+                backend: {
+                    languages: ["Go"],
+                    frameworks: ["Echo"],
+                    libraries: ["sqlx"],
+                    buildTools: ["Go build"],
+                    packageManagers: ["go mod"],
+                    linters: ["golangci-lint"],
+                    formatters: ["gofmt"],
+                    testingTools: ["testing"],
+                    ormTools: ["GORM"],
+                    auth: ["JWT"],
+                },
+                infrastructure: {
+                    clouds: ["AWS"],
+                    operatingSystems: ["Linux"],
+                    containers: ["Docker"],
+                    databases: ["PostgreSQL"],
+                    webServers: ["Nginx"],
+                    ciCdTools: ["GitHub Actions"],
+                    iacTools: ["Terraform"],
+                    monitoringTools: ["CloudWatch"],
+                    loggingTools: ["CloudWatch Logs"],
+                },
+                tools: {
+                    sourceControls: ["Git"],
+                    projectManagements: ["Jira"],
+                    communicationTools: ["Slack"],
+                    documentationTools: ["Confluence"],
+                    apiDevelopmentTools: ["Postman"],
+                    designTools: ["Figma"],
+                    editors: ["VSCode"],
+                    developmentEnvironments: ["Docker Desktop"],
+                },
+            },
+        };
+
+        const result = buildPayloadForEntry("project", entry);
+
+        expect(result).toEqual({
+            companyName: "株式会社テスト",
+            startDate: "2020-04-01",
+            endDate: "2021-03-31",
+            isActive: false,
+            name: "テストプロジェクト",
+            overview: "テストプロジェクトの概要",
+            teamComp: "5名",
+            role: "バックエンドエンジニア",
+            achievement: "パフォーマンス改善",
+            requirements: true,
+            basicDesign: true,
+            detailedDesign: true,
+            implementation: true,
+            integrationTest: true,
+            systemTest: false,
+            maintenance: false,
+            frontendLanguages: ["TypeScript"],
+            frontendFrameworks: ["React"],
+            frontendLibraries: ["Redux"],
+            frontendBuildTools: ["Vite"],
+            frontendPackageManagers: ["npm"],
+            frontendLinters: ["ESLint"],
+            frontendFormatters: ["Prettier"],
+            frontendTestingTools: ["Jest"],
+            backendLanguages: ["Go"],
+            backendFrameworks: ["Echo"],
+            backendLibraries: ["sqlx"],
+            backendBuildTools: ["Go build"],
+            backendPackageManagers: ["go mod"],
+            backendLinters: ["golangci-lint"],
+            backendFormatters: ["gofmt"],
+            backendTestingTools: ["testing"],
+            ormTools: ["GORM"],
+            auth: ["JWT"],
+            clouds: ["AWS"],
+            operatingSystems: ["Linux"],
+            containers: ["Docker"],
+            databases: ["PostgreSQL"],
+            webServers: ["Nginx"],
+            ciCdTools: ["GitHub Actions"],
+            iacTools: ["Terraform"],
+            monitoringTools: ["CloudWatch"],
+            loggingTools: ["CloudWatch Logs"],
+            sourceControls: ["Git"],
+            projectManagements: ["Jira"],
+            communicationTools: ["Slack"],
+            documentationTools: ["Confluence"],
+            apiDevelopmentTools: ["Postman"],
+            designTools: ["Figma"],
+            editors: ["VSCode"],
+            developmentEnvironments: ["Docker Desktop"],
+        });
+        expect(result).not.toHaveProperty("id");
+        expect(result).not.toHaveProperty("active");
+        expect(result).not.toHaveProperty("process");
+        expect(result).not.toHaveProperty("techStack");
+    });
+
+    it("certificationの場合、API送信用のペイロードを返すこと", () => {
+        const entry = {
+            id: "cert-1",
+            name: "基本情報技術者",
+            date: "2020-06-01",
+        };
+
+        const result = buildPayloadForEntry("certification", entry);
+
+        expect(result).toEqual({
+            name: "基本情報技術者",
+            date: "2020-06-01",
+        });
+        expect(result).not.toHaveProperty("id");
+    });
+
+    it("portfolioの場合、API送信用のペイロードを返すこと", () => {
+        const entry = {
+            id: "portfolio-1",
+            name: "個人ブログ",
+            overview: "技術ブログ",
+            techStack: "Next.js, Vercel",
+            link: "https://example.com/blog",
+        };
+
+        const result = buildPayloadForEntry("portfolio", entry);
+
+        expect(result).toEqual({
+            name: "個人ブログ",
+            overview: "技術ブログ",
+            techStack: "Next.js, Vercel",
+            link: "https://example.com/blog",
+        });
+        expect(result).not.toHaveProperty("id");
+    });
+
+    it("socialLinkの場合、API送信用のペイロードを返すこと", () => {
+        const entry = {
+            id: "social-1",
+            name: "GitHub",
+            link: "https://github.com/example",
+        };
+
+        const result = buildPayloadForEntry("socialLink", entry);
+
+        expect(result).toEqual({
+            name: "GitHub",
+            link: "https://github.com/example",
+        });
+        expect(result).not.toHaveProperty("id");
+    });
+
+    it("selfPromotionの場合、API送信用のペイロードを返すこと", () => {
+        const entry = {
+            id: "pr-1",
+            title: "技術への取り組み",
+            content: "新しい技術を積極的に学んでいます。",
+        };
+
+        const result = buildPayloadForEntry("selfPromotion", entry);
+
+        expect(result).toEqual({
+            title: "技術への取り組み",
+            content: "新しい技術を積極的に学んでいます。",
+        });
+        expect(result).not.toHaveProperty("id");
+    });
+
+    it("SectionName以外（未知の文字列）の場合、entryをそのまま返すこと", () => {
+        const entry = { foo: "bar", nested: { a: 1 } };
+
+        const result = buildPayloadForEntry("unknown-type", entry);
+
+        expect(result).toBe(entry); // 同一参照で返す（default: return entry）
     });
 });
 

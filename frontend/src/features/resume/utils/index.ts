@@ -1,4 +1,4 @@
-import type { SectionName } from "@/features/resume";
+import type { Project, SectionName } from "@/features/resume";
 import { sections, TEMP_ID_PREFIX } from "@/features/resume";
 import { formatDate } from "@/utils";
 import dayjs from "dayjs";
@@ -103,4 +103,102 @@ export const isTempId = (id: string | null | undefined): boolean => {
 export const getApiId = (id: string | null | undefined): string | null => {
     if (!id || isTempId(id)) return null;
     return id;
+};
+
+/**
+ * ペイロードを構築する
+ * @param sectionOrType セクション名またはエントリータイプ
+ * @param entry エントリーデータ
+ * @returns API送信用ペイロード
+ */
+export const buildPayloadForEntry = (sectionOrType: SectionName | string, entry: any): any => {
+    switch (sectionOrType) {
+        case "career":
+            return {
+                companyName: entry.companyName,
+                startDate: entry.startDate,
+                endDate: entry.endDate,
+                isActive: entry.active,
+            };
+        case "project": {
+            const p = entry as Project;
+            return {
+                companyName: p.companyName,
+                startDate: p.startDate,
+                endDate: p.endDate,
+                isActive: p.active,
+                name: p.name,
+                overview: p.overview,
+                teamComp: p.teamComp,
+                role: p.role,
+                achievement: p.achievement,
+                requirements: p.process.requirements,
+                basicDesign: p.process.basicDesign,
+                detailedDesign: p.process.detailedDesign,
+                implementation: p.process.implementation,
+                integrationTest: p.process.integrationTest,
+                systemTest: p.process.systemTest,
+                maintenance: p.process.maintenance,
+                frontendLanguages: p.techStack.frontend.languages,
+                frontendFrameworks: p.techStack.frontend.frameworks,
+                frontendLibraries: p.techStack.frontend.libraries,
+                frontendBuildTools: p.techStack.frontend.buildTools,
+                frontendPackageManagers: p.techStack.frontend.packageManagers,
+                frontendLinters: p.techStack.frontend.linters,
+                frontendFormatters: p.techStack.frontend.formatters,
+                frontendTestingTools: p.techStack.frontend.testingTools,
+                backendLanguages: p.techStack.backend.languages,
+                backendFrameworks: p.techStack.backend.frameworks,
+                backendLibraries: p.techStack.backend.libraries,
+                backendBuildTools: p.techStack.backend.buildTools,
+                backendPackageManagers: p.techStack.backend.packageManagers,
+                backendLinters: p.techStack.backend.linters,
+                backendFormatters: p.techStack.backend.formatters,
+                backendTestingTools: p.techStack.backend.testingTools,
+                ormTools: p.techStack.backend.ormTools,
+                auth: p.techStack.backend.auth,
+                clouds: p.techStack.infrastructure.clouds,
+                operatingSystems: p.techStack.infrastructure.operatingSystems,
+                containers: p.techStack.infrastructure.containers,
+                databases: p.techStack.infrastructure.databases,
+                webServers: p.techStack.infrastructure.webServers,
+                ciCdTools: p.techStack.infrastructure.ciCdTools,
+                iacTools: p.techStack.infrastructure.iacTools,
+                monitoringTools: p.techStack.infrastructure.monitoringTools,
+                loggingTools: p.techStack.infrastructure.loggingTools,
+                sourceControls: p.techStack.tools.sourceControls,
+                projectManagements: p.techStack.tools.projectManagements,
+                communicationTools: p.techStack.tools.communicationTools,
+                documentationTools: p.techStack.tools.documentationTools,
+                apiDevelopmentTools: p.techStack.tools.apiDevelopmentTools,
+                designTools: p.techStack.tools.designTools,
+                editors: p.techStack.tools.editors,
+                developmentEnvironments: p.techStack.tools.developmentEnvironments,
+            };
+        }
+        case "certification":
+            return {
+                name: entry.name,
+                date: entry.date,
+            };
+        case "portfolio":
+            return {
+                name: entry.name,
+                overview: entry.overview,
+                techStack: entry.techStack,
+                link: entry.link,
+            };
+        case "socialLink":
+            return {
+                name: entry.name,
+                link: entry.link,
+            };
+        case "selfPromotion":
+            return {
+                title: entry.title,
+                content: entry.content,
+            };
+        default:
+            return entry;
+    }
 };

@@ -5,8 +5,22 @@ import {
     Delete as DeleteIcon,
     ExpandMore as ExpandMoreIcon,
     FileDownload as FileDownloadIcon,
+    KeyboardArrowDown as KeyboardArrowDownIcon,
+    KeyboardArrowUp as KeyboardArrowUpIcon,
+    Save as SaveIcon,
 } from "@mui/icons-material";
-import { Box, FormControlLabel, FormGroup, Menu, MenuItem, Paper, useMediaQuery, useTheme } from "@mui/material";
+import {
+    Box,
+    FormControlLabel,
+    FormGroup,
+    IconButton,
+    Menu,
+    MenuItem,
+    Paper,
+    Tooltip,
+    useMediaQuery,
+    useTheme,
+} from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -20,13 +34,19 @@ interface BottomMenuProps {
     autoSaveEnabled: boolean;
     /** 自動保存の有効/無効を切り替えるハンドラー */
     onAutoSaveToggle: (enabled: boolean) => void;
+    /** 保存ハンドラー */
+    onSave: () => void;
+    /** 保存中かどうか */
+    isSaving: boolean;
+    /** 保存可能かどうか */
+    canSave: boolean;
 }
 
 /**
  * 下部に固定されたメニューバー
  */
 export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
-    ({ autoSaveEnabled, onAutoSaveToggle }, ref) => {
+    ({ autoSaveEnabled, onAutoSaveToggle, onSave, isSaving, canSave }, ref) => {
         const theme = useTheme();
         const isXs = useMediaQuery(theme.breakpoints.down("sm"));
         const navigate = useNavigate();
@@ -36,6 +56,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
 
         const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+        const [isCollapsed, setIsCollapsed] = useState(false);
 
         const handleExportButtonClick = (event: React.MouseEvent<HTMLElement>) => {
             setAnchorEl(event.currentTarget);
@@ -73,6 +94,41 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
             onAutoSaveToggle(event.target.checked);
         };
 
+        /**
+         * 折りたたみ/展開の切り替え
+         */
+        const handleToggleCollapse = () => {
+            setIsCollapsed(!isCollapsed);
+        };
+
+        // 折りたたみ時の表示
+        if (isCollapsed) {
+            return (
+                <Paper
+                    ref={ref}
+                    elevation={3}
+                    sx={{
+                        position: "fixed",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: 1200,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        p: 0.5,
+                        bgcolor: "rgba(255, 255, 255, 0.9)",
+                    }}
+                >
+                    <Tooltip title="メニューを展開">
+                        <IconButton onClick={handleToggleCollapse} size="small">
+                            <KeyboardArrowUpIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Paper>
+            );
+        }
+
         return (
             <>
                 <Paper
@@ -91,16 +147,50 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                         bgcolor: "rgba(255, 255, 255, 0.5)",
                     }}
                 >
-                    {/* 自動保存 */}
-                    <FormGroup>
-                        <FormControlLabel
-                            control={
-                                <Switch color="success" checked={autoSaveEnabled} onChange={handleAutoSaveChange} />
-                            }
-                            label="自動保存"
-                        />
-                    </FormGroup>
-                    <Box sx={{ display: "flex", gap: 2, marginLeft: "auto" }}>
+                    {/* 折りたたみボタン（中央上部に配置） */}
+                    <Tooltip title="メニューを折りたたむ">
+                        <IconButton
+                            onClick={handleToggleCollapse}
+                            size="small"
+                            sx={{
+                                position: "absolute",
+                                left: "50%",
+                                top: -20,
+                                transform: "translateX(-50%)",
+                                bgcolor: "background.paper",
+                                boxShadow: 1,
+                                "&:hover": {
+                                    bgcolor: "grey.100",
+                                },
+                            }}
+                        >
+                            <KeyboardArrowDownIcon />
+                        </IconButton>
+                    </Tooltip>
+
+                    {/* 職務経歴書を削除（元: 自動保存の位置） */}
+                    <Button
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        size={isXs ? "small" : "medium"}
+                        onClick={handleDeleteClick}
+                        disabled={deleteMutation.isPending}
+                    >
+                        職務経歴書を削除
+                    </Button>
+
+                    <Box sx={{ display: "flex", gap: 2, marginLeft: "auto", alignItems: "center" }}>
+                        {/* 保存ボタン */}
+                        <Button
+                            color="info"
+                            startIcon={<SaveIcon />}
+                            size={isXs ? "small" : "medium"}
+                            onClick={onSave}
+                            disabled={isSaving || !canSave}
+                        >
+                            保存
+                        </Button>
+
                         {/* エクスポートボタン */}
                         <Button
                             startIcon={<ExpandMoreIcon />}
@@ -109,6 +199,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                         >
                             エクスポート
                         </Button>
+
                         {/* エクスポートメニュー */}
                         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleExportButtonClose}>
                             {exportMenuItems.map((item, index) => (
@@ -127,18 +218,19 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                                 </MenuItem>
                             ))}
                         </Menu>
-                        {/* 職務経歴書を削除ボタン */}
-                        <Button
-                            color="error"
-                            startIcon={<DeleteIcon />}
-                            size={isXs ? "small" : "medium"}
-                            onClick={handleDeleteClick}
-                            disabled={deleteMutation.isPending}
-                        >
-                            職務経歴書を削除
-                        </Button>
+
+                        {/* 自動保存（右端：元の削除ボタン位置） */}
+                        <FormGroup>
+                            <FormControlLabel
+                                control={
+                                    <Switch color="success" checked={autoSaveEnabled} onChange={handleAutoSaveChange} />
+                                }
+                                label="自動保存"
+                            />
+                        </FormGroup>
                     </Box>
                 </Paper>
+
                 {/* 削除確認ダイアログ */}
                 <Dialog
                     open={deleteDialogOpen}

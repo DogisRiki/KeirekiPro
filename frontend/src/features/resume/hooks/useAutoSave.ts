@@ -1,5 +1,5 @@
 import type { SectionName } from "@/features/resume";
-import { AUTO_SAVE_INTERVAL_MS, getApiId, useResumeStore } from "@/features/resume";
+import { AUTO_SAVE_INTERVAL_MS, buildPayloadForEntry, getResumeKey, isTempId, useResumeStore } from "@/features/resume";
 import dayjs from "dayjs";
 import { useEffect } from "react";
 import { useDebouncedCallback } from "use-debounce";
@@ -14,41 +14,60 @@ interface UseAutoSaveOptions {
     resumeId: string;
     /** 基本情報更新ミューテーション */
     updateBasicMutation: { mutate: (payload: any) => void; isPending: boolean };
+    /** 職歴作成ミューテーション */
+    createCareerMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** 職歴更新ミューテーション */
-    updateCareersMutation: { mutate: (payload: any) => void; isPending: boolean };
+    updateCareerMutation: { mutate: (payload: any) => void; isPending: boolean };
+    /** プロジェクト作成ミューテーション */
+    createProjectMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** プロジェクト更新ミューテーション */
-    updateProjectsMutation: { mutate: (payload: any) => void; isPending: boolean };
+    updateProjectMutation: { mutate: (payload: any) => void; isPending: boolean };
+    /** 資格作成ミューテーション */
+    createCertificationMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** 資格更新ミューテーション */
-    updateCertificationsMutation: { mutate: (payload: any) => void; isPending: boolean };
+    updateCertificationMutation: { mutate: (payload: any) => void; isPending: boolean };
+    /** ポートフォリオ作成ミューテーション */
+    createPortfolioMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** ポートフォリオ更新ミューテーション */
-    updatePortfoliosMutation: { mutate: (payload: any) => void; isPending: boolean };
+    updatePortfolioMutation: { mutate: (payload: any) => void; isPending: boolean };
+    /** SNS作成ミューテーション */
+    createSocialLinkMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** SNS更新ミューテーション */
-    updateSocialLinksMutation: { mutate: (payload: any) => void; isPending: boolean };
+    updateSocialLinkMutation: { mutate: (payload: any) => void; isPending: boolean };
+    /** 自己PR作成ミューテーション */
+    createSelfPromotionMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** 自己PR更新ミューテーション */
-    updateSelfPromotionsMutation: { mutate: (payload: any) => void; isPending: boolean };
+    updateSelfPromotionMutation: { mutate: (payload: any) => void; isPending: boolean };
 }
 
 /**
- * 自動保存フック（デバウンス方式）
- * 最後の編集から一定時間経過後に現在アクティブなセクションの情報を自動保存する
+ * 自動保存フック（アクティブなエントリー単位・デバウンス方式）
+ * 最後の編集から一定時間経過後に現在アクティブなエントリーのみを自動保存する
  */
 export const useAutoSave = ({
     enabled,
     resumeId,
     updateBasicMutation,
-    updateCareersMutation,
-    updateProjectsMutation,
-    updateCertificationsMutation,
-    updatePortfoliosMutation,
-    updateSocialLinksMutation,
-    updateSelfPromotionsMutation,
+    createCareerMutation,
+    updateCareerMutation,
+    createProjectMutation,
+    updateProjectMutation,
+    createCertificationMutation,
+    updateCertificationMutation,
+    createPortfolioMutation,
+    updatePortfolioMutation,
+    createSocialLinkMutation,
+    updateSocialLinkMutation,
+    createSelfPromotionMutation,
+    updateSelfPromotionMutation,
 }: UseAutoSaveOptions) => {
     const resume = useResumeStore((state) => state.resume);
     const isDirty = useResumeStore((state) => state.isDirty);
+    const activeEntryId = useResumeStore((state) => state.activeEntryId);
 
     // デバウンスされた保存処理
     const debouncedSave = useDebouncedCallback(() => {
-        const { resume, activeSection, isDirty } = useResumeStore.getState();
+        const { resume, activeSection, isDirty, activeEntryId, dirtyEntryIds } = useResumeStore.getState();
 
         if (!resume || !resumeId || !isDirty) {
             return;
@@ -57,142 +76,73 @@ export const useAutoSave = ({
         // いずれかのミューテーションが実行中の場合はスキップ
         const isPending =
             updateBasicMutation.isPending ||
-            updateCareersMutation.isPending ||
-            updateProjectsMutation.isPending ||
-            updateCertificationsMutation.isPending ||
-            updatePortfoliosMutation.isPending ||
-            updateSocialLinksMutation.isPending ||
-            updateSelfPromotionsMutation.isPending;
+            createCareerMutation.isPending ||
+            updateCareerMutation.isPending ||
+            createProjectMutation.isPending ||
+            updateProjectMutation.isPending ||
+            createCertificationMutation.isPending ||
+            updateCertificationMutation.isPending ||
+            createPortfolioMutation.isPending ||
+            updatePortfolioMutation.isPending ||
+            createSocialLinkMutation.isPending ||
+            updateSocialLinkMutation.isPending ||
+            createSelfPromotionMutation.isPending ||
+            updateSelfPromotionMutation.isPending;
 
         if (isPending) {
             return;
         }
 
-        switch (activeSection as SectionName) {
-            case "basicInfo":
-                updateBasicMutation.mutate({
-                    resumeName: resume.resumeName,
-                    date: dayjs(resume.date).format("YYYY-MM-DD"),
-                    lastName: resume.lastName ?? "",
-                    firstName: resume.firstName ?? "",
-                });
-                break;
-            case "career":
-                updateCareersMutation.mutate({
-                    careers: resume.careers.map((c) => ({
-                        id: getApiId(c.id),
-                        companyName: c.companyName,
-                        startDate: c.startDate,
-                        endDate: c.endDate,
-                        isActive: c.active,
-                    })),
-                });
-                break;
-            case "project":
-                updateProjectsMutation.mutate({
-                    projects: resume.projects.map((p) => ({
-                        id: getApiId(p.id),
-                        companyName: p.companyName,
-                        startDate: p.startDate,
-                        endDate: p.endDate,
-                        isActive: p.active,
-                        name: p.name,
-                        overview: p.overview,
-                        teamComp: p.teamComp,
-                        role: p.role,
-                        achievement: p.achievement,
-                        requirements: p.process.requirements,
-                        basicDesign: p.process.basicDesign,
-                        detailedDesign: p.process.detailedDesign,
-                        implementation: p.process.implementation,
-                        integrationTest: p.process.integrationTest,
-                        systemTest: p.process.systemTest,
-                        maintenance: p.process.maintenance,
-                        frontendLanguages: p.techStack.frontend.languages,
-                        frontendFrameworks: p.techStack.frontend.frameworks,
-                        frontendLibraries: p.techStack.frontend.libraries,
-                        frontendBuildTools: p.techStack.frontend.buildTools,
-                        frontendPackageManagers: p.techStack.frontend.packageManagers,
-                        frontendLinters: p.techStack.frontend.linters,
-                        frontendFormatters: p.techStack.frontend.formatters,
-                        frontendTestingTools: p.techStack.frontend.testingTools,
-                        backendLanguages: p.techStack.backend.languages,
-                        backendFrameworks: p.techStack.backend.frameworks,
-                        backendLibraries: p.techStack.backend.libraries,
-                        backendBuildTools: p.techStack.backend.buildTools,
-                        backendPackageManagers: p.techStack.backend.packageManagers,
-                        backendLinters: p.techStack.backend.linters,
-                        backendFormatters: p.techStack.backend.formatters,
-                        backendTestingTools: p.techStack.backend.testingTools,
-                        ormTools: p.techStack.backend.ormTools,
-                        auth: p.techStack.backend.auth,
-                        clouds: p.techStack.infrastructure.clouds,
-                        operatingSystems: p.techStack.infrastructure.operatingSystems,
-                        containers: p.techStack.infrastructure.containers,
-                        databases: p.techStack.infrastructure.databases,
-                        webServers: p.techStack.infrastructure.webServers,
-                        ciCdTools: p.techStack.infrastructure.ciCdTools,
-                        iacTools: p.techStack.infrastructure.iacTools,
-                        monitoringTools: p.techStack.infrastructure.monitoringTools,
-                        loggingTools: p.techStack.infrastructure.loggingTools,
-                        sourceControls: p.techStack.tools.sourceControls,
-                        projectManagements: p.techStack.tools.projectManagements,
-                        communicationTools: p.techStack.tools.communicationTools,
-                        documentationTools: p.techStack.tools.documentationTools,
-                        apiDevelopmentTools: p.techStack.tools.apiDevelopmentTools,
-                        designTools: p.techStack.tools.designTools,
-                        editors: p.techStack.tools.editors,
-                        developmentEnvironments: p.techStack.tools.developmentEnvironments,
-                    })),
-                });
-                break;
-            case "certification":
-                updateCertificationsMutation.mutate({
-                    certifications: resume.certifications.map((c) => ({
-                        id: getApiId(c.id),
-                        name: c.name,
-                        date: c.date,
-                    })),
-                });
-                break;
-            case "portfolio":
-                updatePortfoliosMutation.mutate({
-                    portfolios: resume.portfolios.map((p) => ({
-                        id: getApiId(p.id),
-                        name: p.name,
-                        overview: p.overview,
-                        techStack: p.techStack,
-                        link: p.link,
-                    })),
-                });
-                break;
-            case "socialLink":
-                updateSocialLinksMutation.mutate({
-                    socialLinks: resume.socialLinks.map((s) => ({
-                        id: getApiId(s.id),
-                        name: s.name,
-                        link: s.link,
-                    })),
-                });
-                break;
-            case "selfPromotion":
-                updateSelfPromotionsMutation.mutate({
-                    selfPromotions: resume.selfPromotions.map((s) => ({
-                        id: getApiId(s.id),
-                        title: s.title,
-                        content: s.content,
-                    })),
-                });
-                break;
+        // 基本情報セクションの場合
+        if (activeSection === "basicInfo") {
+            updateBasicMutation.mutate({
+                resumeName: resume.resumeName,
+                date: dayjs(resume.date).format("YYYY-MM-DD"),
+                lastName: resume.lastName ?? "",
+                firstName: resume.firstName ?? "",
+            });
+            return;
         }
+
+        // アクティブなエントリーがない場合、またはアクティブなエントリーがdirtyでない場合はスキップ
+        if (!activeEntryId || !dirtyEntryIds.has(activeEntryId)) {
+            return;
+        }
+
+        // アクティブなエントリーを取得
+        const sectionKey = getResumeKey(activeSection);
+        if (!sectionKey) return;
+
+        const list = resume[sectionKey];
+        const activeEntry = list.find((item) => item.id === activeEntryId);
+        if (!activeEntry) return;
+
+        // 新規作成か更新かを判定
+        const isNew = isTempId(activeEntryId);
+
+        // セクションに応じてミューテーションを呼び出す
+        executeMutation(activeSection, activeEntry, activeEntryId, isNew, {
+            createCareerMutation,
+            updateCareerMutation,
+            createProjectMutation,
+            updateProjectMutation,
+            createCertificationMutation,
+            updateCertificationMutation,
+            createPortfolioMutation,
+            updatePortfolioMutation,
+            createSocialLinkMutation,
+            updateSocialLinkMutation,
+            createSelfPromotionMutation,
+            updateSelfPromotionMutation,
+        });
     }, AUTO_SAVE_INTERVAL_MS);
 
-    // resumeが変更されたらデバウンス保存をトリガー
+    // resumeまたはactiveEntryIdが変更されたらデバウンス保存をトリガー
     useEffect(() => {
         if (enabled && isDirty) {
             debouncedSave();
         }
-    }, [enabled, resume, isDirty, debouncedSave]);
+    }, [enabled, resume, isDirty, activeEntryId, debouncedSave]);
 
     // enabledがfalseになったらキャンセル
     useEffect(() => {
@@ -200,4 +150,109 @@ export const useAutoSave = ({
             debouncedSave.cancel();
         }
     }, [enabled, debouncedSave]);
+};
+
+/**
+ * セクションに応じてミューテーションを実行する
+ */
+const executeMutation = (
+    activeSection: SectionName,
+    activeEntry: any,
+    activeEntryId: string,
+    isNew: boolean,
+    mutations: {
+        createCareerMutation: { mutate: (payload: any) => void };
+        updateCareerMutation: { mutate: (payload: any) => void };
+        createProjectMutation: { mutate: (payload: any) => void };
+        updateProjectMutation: { mutate: (payload: any) => void };
+        createCertificationMutation: { mutate: (payload: any) => void };
+        updateCertificationMutation: { mutate: (payload: any) => void };
+        createPortfolioMutation: { mutate: (payload: any) => void };
+        updatePortfolioMutation: { mutate: (payload: any) => void };
+        createSocialLinkMutation: { mutate: (payload: any) => void };
+        updateSocialLinkMutation: { mutate: (payload: any) => void };
+        createSelfPromotionMutation: { mutate: (payload: any) => void };
+        updateSelfPromotionMutation: { mutate: (payload: any) => void };
+    },
+) => {
+    switch (activeSection) {
+        case "career":
+            if (isNew) {
+                mutations.createCareerMutation.mutate({
+                    tempId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            } else {
+                mutations.updateCareerMutation.mutate({
+                    careerId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            }
+            break;
+        case "project":
+            if (isNew) {
+                mutations.createProjectMutation.mutate({
+                    tempId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            } else {
+                mutations.updateProjectMutation.mutate({
+                    projectId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            }
+            break;
+        case "certification":
+            if (isNew) {
+                mutations.createCertificationMutation.mutate({
+                    tempId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            } else {
+                mutations.updateCertificationMutation.mutate({
+                    certificationId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            }
+            break;
+        case "portfolio":
+            if (isNew) {
+                mutations.createPortfolioMutation.mutate({
+                    tempId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            } else {
+                mutations.updatePortfolioMutation.mutate({
+                    portfolioId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            }
+            break;
+        case "socialLink":
+            if (isNew) {
+                mutations.createSocialLinkMutation.mutate({
+                    tempId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            } else {
+                mutations.updateSocialLinkMutation.mutate({
+                    socialLinkId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            }
+            break;
+        case "selfPromotion":
+            if (isNew) {
+                mutations.createSelfPromotionMutation.mutate({
+                    tempId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            } else {
+                mutations.updateSelfPromotionMutation.mutate({
+                    selfPromotionId: activeEntryId,
+                    payload: buildPayloadForEntry(activeSection, activeEntry),
+                });
+            }
+            break;
+    }
 };

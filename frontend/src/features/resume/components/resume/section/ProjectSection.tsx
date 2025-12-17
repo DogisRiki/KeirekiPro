@@ -49,6 +49,17 @@ export const ProjectSection = () => {
         });
     };
 
+    // 会社名入力ハンドラー（値が変更された場合のみ更新）
+    const handleCompanyNameInputChange = (_event: React.SyntheticEvent, newInputValue: string) => {
+        if (!currentProject) return;
+        // 値が実際に変更された場合のみ更新
+        if (newInputValue !== currentProject.companyName) {
+            updateEntry("projects", currentProject.id, {
+                companyName: newInputValue,
+            });
+        }
+    };
+
     // 開始年月ハンドラー
     const handleStartDateChange = (newValue: Dayjs | null) => {
         if (!currentProject) return;
@@ -105,12 +116,7 @@ export const ProjectSection = () => {
                 options={companyNameOptions}
                 value={currentProject.companyName}
                 onChange={handleCompanyNameChange}
-                onInputChange={(_event, newInputValue) => {
-                    if (!currentProject) return;
-                    updateEntry("projects", currentProject.id, {
-                        companyName: newInputValue,
-                    });
-                }}
+                onInputChange={handleCompanyNameInputChange}
                 renderInput={(params) => (
                     <TextField
                         {...params}

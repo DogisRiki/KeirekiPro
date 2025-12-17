@@ -9,10 +9,24 @@ import type {
     SelfPromotion,
     SocialLink,
 } from "@/features/resume";
-import { EntryListItem, getResumeKey, sections, TEMP_ID_PREFIX, useResumeStore } from "@/features/resume";
+import {
+    EntryListItem,
+    getResumeKey,
+    isTempId,
+    sections,
+    TEMP_ID_PREFIX,
+    useDeleteCareer,
+    useDeleteCertification,
+    useDeletePortfolio,
+    useDeleteProject,
+    useDeleteSelfPromotion,
+    useDeleteSocialLink,
+    useResumeStore,
+} from "@/features/resume";
 import { Add as AddIcon } from "@mui/icons-material";
 import { Box, Divider, List, Typography } from "@mui/material";
 import { useMemo } from "react";
+import { useParams } from "react-router";
 
 /**
  * 新規エントリー生成用の型
@@ -157,11 +171,23 @@ const MAX_SCROLL_HEIGHT = 400;
  * エントリーリスト
  */
 export const EntryList = () => {
+    const { id: resumeId } = useParams<{ id: string }>();
+
     // ストアから必要な状態を取り出す
     const activeSection = useResumeStore((state) => state.activeSection);
     const resume = useResumeStore((state) => state.resume);
     const setActiveEntryId = useResumeStore((state) => state.setActiveEntryId);
     const updateSection = useResumeStore((state) => state.updateSection);
+    const activeEntryId = useResumeStore((state) => state.activeEntryId);
+    const removeEntry = useResumeStore((state) => state.removeEntry);
+
+    // 各セクションの削除ミューテーション
+    const deleteCareerMutation = useDeleteCareer(resumeId ?? "");
+    const deleteProjectMutation = useDeleteProject(resumeId ?? "");
+    const deleteCertificationMutation = useDeleteCertification(resumeId ?? "");
+    const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "");
+    const deleteSocialLinkMutation = useDeleteSocialLink(resumeId ?? "");
+    const deleteSelfPromotionMutation = useDeleteSelfPromotion(resumeId ?? "");
 
     // エントリーデータ取得
     const entries = useMemo(() => {
@@ -201,6 +227,58 @@ export const EntryList = () => {
         setActiveEntryId(tempId);
     };
 
+    /**
+     * エントリー削除ハンドラー
+     * @param entryId 削除対象のエントリーID
+     * @param needsDbSync DBへの同期が必要かどうか（既存エントリーの場合true）
+     */
+    const handleDeleteEntry = (entryId: string, needsDbSync: boolean) => {
+        if (!resume) return;
+
+        const sectionKey = getResumeKey(activeSection);
+        if (!sectionKey) return;
+
+        // アクティブなエントリーが削除された場合はクリア
+        if (activeEntryId === entryId) {
+            setActiveEntryId(null);
+        }
+
+        // 一時IDの場合はストアから削除するのみ
+        if (!needsDbSync || isTempId(entryId)) {
+            removeEntry(sectionKey, entryId);
+            return;
+        }
+
+        // DBへの同期が必要な場合はAPIを呼び出す
+        executeDeleteMutation(entryId);
+    };
+
+    /**
+     * セクションに応じた削除ミューテーションを実行
+     */
+    const executeDeleteMutation = (entryId: string) => {
+        switch (activeSection) {
+            case "career":
+                deleteCareerMutation.mutate(entryId);
+                break;
+            case "project":
+                deleteProjectMutation.mutate(entryId);
+                break;
+            case "certification":
+                deleteCertificationMutation.mutate(entryId);
+                break;
+            case "portfolio":
+                deletePortfolioMutation.mutate(entryId);
+                break;
+            case "socialLink":
+                deleteSocialLinkMutation.mutate(entryId);
+                break;
+            case "selfPromotion":
+                deleteSelfPromotionMutation.mutate(entryId);
+                break;
+        }
+    };
+
     return (
         <Box sx={{ bgcolor: "background.paper", borderRadius: 2, boxShadow: "0px 1px 3px 0px rgba(0, 0, 0, 0.2)" }}>
             {/* ヘッダー */}
@@ -231,7 +309,7 @@ export const EntryList = () => {
                         <List sx={{ width: "100%" }}>
                             {/* エントリーアイテム */}
                             {entries.map((entry: { id: string }) => (
-                                <EntryListItem key={entry.id} entry={entry} />
+                                <EntryListItem key={entry.id} entry={entry} onDeleteEntry={handleDeleteEntry} />
                             ))}
                         </List>
                     </Box>
