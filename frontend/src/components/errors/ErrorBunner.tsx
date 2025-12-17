@@ -19,10 +19,16 @@ export const ErrorBanner = () => {
     const [open, setOpen] = useState(false);
     const [dismissed, setDismissed] = useState(false);
 
+    // 10秒でバナーを自動で閉じる
+    const duration = 10000;
+
     useEffect(() => {
         if (message) {
             setDismissed(false); // 新しいエラーが来たら再表示できるように
             setOpen(true);
+        } else {
+            // messageがクリアされたらバナーを閉じる
+            setOpen(false);
         }
     }, [message]);
 
@@ -39,6 +45,7 @@ export const ErrorBanner = () => {
         <Snackbar
             open={open}
             onClose={handleClose}
+            autoHideDuration={duration}
             TransitionComponent={SlideDown}
             anchorOrigin={{ vertical: "top", horizontal: "center" }}
             sx={{ mt: 2 }}

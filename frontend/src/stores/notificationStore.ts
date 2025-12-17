@@ -18,7 +18,15 @@ export const useNotificationStore = create<NotificationState>()(
             message: null,
             type: undefined,
             isShow: false,
-            setNotification: (message, type) => set({ message, type, isShow: true }, false, "setNotification"),
+            setNotification: (message, type) => {
+                // テスト環境以外でErrorMessageストアをクリア
+                if (import.meta.env.MODE !== "test") {
+                    import("@/stores/errorMessageStore").then(({ useErrorMessageStore }) => {
+                        useErrorMessageStore.getState().clearErrors();
+                    });
+                }
+                set({ message, type, isShow: true }, false, "setNotification");
+            },
             clearNotification: () => set({ message: null, type: undefined, isShow: false }, false, "clearNotification"),
         }),
         {
