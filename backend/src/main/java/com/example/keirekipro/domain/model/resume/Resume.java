@@ -349,33 +349,43 @@ public class Resume extends Entity {
                 continue;
             }
 
+            Period targetPeriod = targetCareer.getPeriod();
+            Period existingPeriod = existingCareer.getPeriod();
+
             // 2つの職歴が両方とも継続中の場合は重複
-            if (targetCareer.getPeriod().isActive() && existingCareer.getPeriod().isActive()) {
+            if (targetPeriod.isActive() && existingPeriod.isActive()) {
                 overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 continue;
             }
 
             // targetCareerのみ継続中の場合
-            if (targetCareer.getPeriod().isActive()) {
-                // 既存の職歴が継続中の職歴の開始日以降にあれば重複
-                if (!existingCareer.getPeriod().getStartDate().isBefore(targetCareer.getPeriod().getStartDate())) {
+            if (targetPeriod.isActive()) {
+                // 年月粒度では同一月の「退職→入社」が成立しうるため、「既存の終了年月 == 対象の開始年月」は重複扱いしない（終了年月が開始年月より後なら重複）
+                if (existingPeriod.getEndDate().isAfter(targetPeriod.getStartDate())) {
                     overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 }
                 continue;
             }
 
             // existingCareerのみ継続中の場合
-            if (existingCareer.getPeriod().isActive()) {
-                // 追加する職歴の開始日が、継続中の職歴の開始日以降なら重複
-                if (!targetCareer.getPeriod().getStartDate().isBefore(existingCareer.getPeriod().getStartDate())) {
+            if (existingPeriod.isActive()) {
+                // 年月粒度では同一月の「退職→入社」が成立しうるため、「対象の終了年月 == 既存の開始年月」は重複扱いしない（終了年月が開始年月より後なら重複）
+                if (targetPeriod.getEndDate().isAfter(existingPeriod.getStartDate())) {
                     overlappingCompanies.add(existingCareer.getCompanyName().getValue());
                 }
                 continue;
             }
 
             // どちらも継続中でない場合は期間の重なりをチェック
-            if (!existingCareer.getPeriod().getEndDate().isBefore(targetCareer.getPeriod().getStartDate())
-                    && !existingCareer.getPeriod().getStartDate().isAfter(targetCareer.getPeriod().getEndDate())) {
+            // 同一月境界（終了年月 == 開始年月）は重複扱いしない
+            if (existingPeriod.getEndDate().equals(targetPeriod.getStartDate())
+                    || targetPeriod.getEndDate().equals(existingPeriod.getStartDate())) {
+                continue;
+            }
+
+            // 期間の重なり（境界一致は上で除外済み）
+            if (!existingPeriod.getEndDate().isBefore(targetPeriod.getStartDate())
+                    && !existingPeriod.getStartDate().isAfter(targetPeriod.getEndDate())) {
                 overlappingCompanies.add(existingCareer.getCompanyName().getValue());
             }
         }

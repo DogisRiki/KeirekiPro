@@ -1,6 +1,7 @@
 package com.example.keirekipro.unit.domain.model.resume;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
@@ -905,6 +906,90 @@ class ResumeTest {
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> beforeResume.updateProject(invalidNotification, updatedProject))
                 .isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    @DisplayName("終了年月と開始年月が同一月でも職歴を追加できる（既存が終了・追加が継続中）")
+    void test34() {
+        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+
+        Career existingCareer = Career.create(
+                notification,
+                CompanyName.create(notification, "会社A"),
+                Period.create(notification, YearMonth.of(2025, 11), YearMonth.of(2025, 12), false));
+
+        Resume resume = Resume.create(
+                notification,
+                userId,
+                ResumeName.create(notification, "職務経歴書A"),
+                LocalDate.now(),
+                FullName.create(notification, "山田", "太郎"),
+                List.of(existingCareer),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
+
+        Career newCareer = Career.create(
+                notification,
+                CompanyName.create(notification, "会社B"),
+                Period.create(notification, YearMonth.of(2025, 12), null, true));
+
+        Notification domainNotification = new Notification();
+
+        assertThatCode(() -> resume.addCareer(domainNotification, newCareer))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("終了年月と開始年月が同一月でも職歴を追加できる（両方が終了）")
+    void test35() {
+        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+
+        Career existingCareer = Career.create(
+                notification,
+                CompanyName.create(notification, "会社A"),
+                Period.create(notification, YearMonth.of(2025, 11), YearMonth.of(2025, 12), false));
+
+        Resume resume = Resume.create(
+                notification,
+                userId,
+                ResumeName.create(notification, "職務経歴書A"),
+                LocalDate.now(),
+                FullName.create(notification, "山田", "太郎"),
+                List.of(existingCareer),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
+
+        Career newCareer = Career.create(
+                notification,
+                CompanyName.create(notification, "会社B"),
+                Period.create(notification, YearMonth.of(2025, 12), YearMonth.of(2025, 12), false));
+
+        Notification domainNotification = new Notification();
+
+        assertThatCode(() -> resume.addCareer(domainNotification, newCareer))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("終了年月と開始年月が同一月でも職歴を追加できる（追加が先・既存が後の境界一致）")
+    void test36() {
+        Resume resume = createSampleResume();
+
+        Career boundaryCareer = Career.create(
+                notification,
+                CompanyName.create(notification, "株式会社XYZ"),
+                Period.create(notification, YearMonth.of(2019, 12), YearMonth.of(2020, 1), false));
+
+        Notification domainNotification = new Notification();
+
+        assertThatCode(() -> resume.addCareer(domainNotification, boundaryCareer))
+                .doesNotThrowAnyException();
     }
 
     /**
