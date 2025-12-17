@@ -176,7 +176,7 @@ class ResumeTest {
 
         assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
     @Test
@@ -191,7 +191,7 @@ class ResumeTest {
 
         assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
     @Test
@@ -219,7 +219,7 @@ class ResumeTest {
 
         assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
     @Test
@@ -234,7 +234,7 @@ class ResumeTest {
 
         assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
     @Test
@@ -249,7 +249,7 @@ class ResumeTest {
 
         assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
                 .isInstanceOf(DomainException.class)
-                .hasMessageContaining("株式会社DEFと株式会社ABCの期間が重複しています。");
+                .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
     @Test

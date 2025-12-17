@@ -381,7 +381,7 @@ public class Resume extends Entity {
         }
 
         if (!overlappingCompanies.isEmpty()) {
-            String message = String.format("%sと%sの期間が重複しています。",
+            String message = String.format("「%s」と「%s」の期間が重複しています。",
                     targetCareer.getCompanyName().getValue(),
                     String.join("、", overlappingCompanies));
             throw new DomainException(message);
