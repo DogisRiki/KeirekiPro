@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import react from "@vitejs/plugin-react";
-import { defineConfig, UserConfig } from "vite";
+import type { UserConfig } from "vite";
+import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 // testプロパティがTypeScriptに認識されないため型を定義
