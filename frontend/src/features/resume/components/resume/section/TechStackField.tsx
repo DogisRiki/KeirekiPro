@@ -101,7 +101,7 @@ export const TechStackField = ({ label, value, options, onChange, isLast = false
                                 {errorMessage}
                             </>
                         ) : (
-                            errorMessage ?? undefined
+                            (errorMessage ?? undefined)
                         )
                     }
                     onKeyDown={(event) => {

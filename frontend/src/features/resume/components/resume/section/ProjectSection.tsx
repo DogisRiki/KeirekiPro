@@ -47,7 +47,7 @@ export const ProjectSection = () => {
 
     // 会社名ハンドラー
     const handleCompanyNameChange = (_: React.SyntheticEvent, newValue: string | string[] | null) => {
-        const value = Array.isArray(newValue) ? newValue[0] ?? "" : newValue ?? "";
+        const value = Array.isArray(newValue) ? (newValue[0] ?? "") : (newValue ?? "");
         updateEntry("projects", currentProject.id, { companyName: value });
     };
 

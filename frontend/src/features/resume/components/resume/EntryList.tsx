@@ -193,7 +193,7 @@ export const EntryList = () => {
     const entries = useMemo(() => {
         if (!resume) return [];
         const key = getResumeKey(activeSection);
-        return key ? resume[key] ?? [] : [];
+        return key ? (resume[key] ?? []) : [];
     }, [resume, activeSection]);
 
     // タイトル取得

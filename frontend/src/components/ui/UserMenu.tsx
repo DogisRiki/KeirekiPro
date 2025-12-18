@@ -73,7 +73,7 @@ export const UserMenu = () => {
                 >
                     {/* プロフィール画像 */}
                     <Avatar
-                        src={!imgError ? user?.profileImage ?? undefined : undefined}
+                        src={!imgError ? (user?.profileImage ?? undefined) : undefined}
                         onError={() => setImgError(true)}
                         sx={{ width: 32, height: 32, bgcolor: "#34495E" }}
                     >
