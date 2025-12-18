@@ -36,7 +36,7 @@ export const ProfileImageField = ({ currentImage, onChange }: ProfileImageFieldP
     return (
         <Box sx={{ position: "relative", width: "fit-content", mx: "auto" }}>
             <Avatar
-                src={!imgError ? previewUrl ?? currentImage ?? undefined : undefined}
+                src={!imgError ? (previewUrl ?? currentImage ?? undefined) : undefined}
                 alt="プロフィール画像"
                 sx={{ width: 120, height: 120 }}
                 onError={() => setImgError(true)}
