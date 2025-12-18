@@ -1,6 +1,15 @@
 import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeAll, vi } from "vitest";
 
-// テスト実行時のランタイム環境変数をダミーで埋める
+beforeAll(() => {
+    vi.stubEnv("MODE", "test");
+});
+
+afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.stubEnv("MODE", "test");
+});
+
 Object.assign(import.meta.env, {
     VITE_API_URL: "http://localhost:8080/api",
     VITE_APP_NAME: "KeirekiPro",
