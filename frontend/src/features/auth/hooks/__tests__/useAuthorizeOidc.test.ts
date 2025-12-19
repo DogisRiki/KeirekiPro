@@ -1,4 +1,3 @@
-// src/features/auth/hooks/__tests__/useAuthorizeOidc.test.ts
 import { vi } from "vitest";
 
 // モックをセット（HTTP クライアント層のみ）
@@ -35,7 +34,7 @@ describe("useAuthorizeOidc", () => {
 
     it("成功時はエラーストアをクリアし、window.location.href が設定されること", async () => {
         // publicApiClient.getの成功レスポンスをセット
-        const mockResponse = { data: mockUrl } as AxiosResponse<string>;
+        const mockResponse = { data: mockUrl } as AxiosResponse;
         vi.mocked(publicApiClient.get).mockResolvedValueOnce(mockResponse);
 
         // フックをレンダリング

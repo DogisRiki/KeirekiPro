@@ -1,4 +1,4 @@
-import { DragIndicator as DragIndicatorIcon } from "@mui/icons-material";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 
 interface DraggableIconProps {
     dragHandleProps?: Record<string, any>;

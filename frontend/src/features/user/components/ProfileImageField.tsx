@@ -1,4 +1,4 @@
-import { PhotoCamera as PhotoCameraIcon } from "@mui/icons-material";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import { Avatar, Box, IconButton } from "@mui/material";
 import { useRef, useState } from "react";
 

@@ -32,7 +32,8 @@ import {
     useUpdateSelfPromotion,
     useUpdateSocialLink,
 } from "@/features/resume";
-import { Delete as DeleteIcon, Save as SaveIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import SaveIcon from "@mui/icons-material/Save";
 import { Box, Divider, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import dayjs from "dayjs";

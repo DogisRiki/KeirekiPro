@@ -1,6 +1,6 @@
 import { ResumeCardMenu } from "@/features/resume";
 import { formatDateTimeJa } from "@/utils";
-import { DateRange as DateRangeIcon } from "@mui/icons-material";
+import DateRangeIcon from "@mui/icons-material/DateRange";
 import { Box, Card, CardContent, Typography } from "@mui/material";
 
 interface resumeCardProps {

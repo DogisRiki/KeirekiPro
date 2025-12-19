@@ -1,7 +1,7 @@
 import type { TechStack } from "@/features/resume";
 import { TechStackField, techStackInfo, useResumeStore, useTechStackList } from "@/features/resume";
 import { getNestedValue, setNestedValue } from "@/utils";
-import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import type { SxProps, Theme } from "@mui/material";
 import { Accordion, AccordionDetails, AccordionSummary, Typography } from "@mui/material";
 

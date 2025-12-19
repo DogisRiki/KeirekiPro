@@ -1,12 +1,18 @@
+import type * as ReactRouter from "react-router";
 import { vi } from "vitest";
 
 vi.mock("@/lib", () => ({
     protectedApiClient: { post: vi.fn() },
 }));
-const mockedNavigate = vi.fn();
-vi.mock("react-router", () => ({
-    useNavigate: () => mockedNavigate,
-}));
+
+const mockedNavigate = vi.hoisted(() => vi.fn());
+vi.mock("react-router", async () => {
+    const actual = await vi.importActual<typeof ReactRouter>("react-router");
+    return {
+        ...actual,
+        useNavigate: () => mockedNavigate,
+    };
+});
 
 import { paths } from "@/config/paths";
 import type { Resume } from "@/features/resume";
