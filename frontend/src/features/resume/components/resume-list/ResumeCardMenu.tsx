@@ -1,13 +1,11 @@
 import { Dialog } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useDeleteResume } from "@/features/resume";
-import {
-    Delete as DeleteIcon,
-    Edit as EditIcon,
-    ExpandMore as ExpandMoreIcon,
-    FileDownload as FileDownloadIcon,
-    MoreHoriz as MoreHorizIcon,
-} from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { Box, IconButton, Menu, MenuItem } from "@mui/material";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -42,7 +40,7 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
     // 開いているメニューのID
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     // マウスイベントのタイミング制御用タイマー
-    const timeoutRef = useRef<NodeJS.Timeout>();
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // 削除確認ダイアログの開閉状態
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 

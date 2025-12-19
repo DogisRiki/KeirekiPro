@@ -1,6 +1,7 @@
 import { Dialog } from "@/components/ui";
 import { getEntryText, isTempId, useResumeStore } from "@/features/resume";
-import { Delete as DeleteIcon, FiberManualRecord as FiberManualRecordIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { IconButton, ListItem, ListItemButton, ListItemText, Tooltip } from "@mui/material";
 import { useState } from "react";
 

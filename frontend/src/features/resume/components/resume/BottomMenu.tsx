@@ -1,14 +1,12 @@
 import { Button, Dialog, Switch } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useDeleteResume, useResumeStore } from "@/features/resume";
-import {
-    Delete as DeleteIcon,
-    ExpandMore as ExpandMoreIcon,
-    FileDownload as FileDownloadIcon,
-    KeyboardArrowDown as KeyboardArrowDownIcon,
-    KeyboardArrowUp as KeyboardArrowUpIcon,
-    Save as SaveIcon,
-} from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import SaveIcon from "@mui/icons-material/Save";
 import {
     Box,
     FormControlLabel,

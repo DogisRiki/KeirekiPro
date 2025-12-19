@@ -1,12 +1,10 @@
 import { paths } from "@/config/paths";
 import { useLogout } from "@/hooks";
 import { useUserAuthStore } from "@/stores";
-import {
-    Lock as LockIcon,
-    Logout as LogoutIcon,
-    ManageAccounts as ManageAccountsIcon,
-    Person as PersonIcon,
-} from "@mui/icons-material";
+import LockIcon from "@mui/icons-material/Lock";
+import LogoutIcon from "@mui/icons-material/Logout";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import PersonIcon from "@mui/icons-material/Person";
 import { Avatar, Box, ButtonBase, Menu, MenuItem, Typography } from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router";

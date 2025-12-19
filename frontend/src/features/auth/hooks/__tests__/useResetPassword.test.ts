@@ -1,3 +1,6 @@
+import { act, renderHook, waitFor } from "@testing-library/react";
+import type { AxiosResponse } from "axios";
+import type * as ReactRouter from "react-router";
 import { vi } from "vitest";
 
 // モックをセット
@@ -5,13 +8,14 @@ vi.mock("@/lib", () => ({
     publicApiClient: { post: vi.fn() },
 }));
 
-const mockedNavigate = vi.fn();
-vi.mock("react-router", () => ({
-    useNavigate: () => mockedNavigate,
-}));
-
-import { act, renderHook, waitFor } from "@testing-library/react";
-import type { AxiosResponse } from "axios";
+const mockedNavigate = vi.hoisted(() => vi.fn());
+vi.mock("react-router", async () => {
+    const actual = await vi.importActual<typeof ReactRouter>("react-router");
+    return {
+        ...actual,
+        useNavigate: () => mockedNavigate,
+    };
+});
 
 import { paths } from "@/config/paths";
 import type { ResetPasswordPayload } from "@/features/auth";

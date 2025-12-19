@@ -1,18 +1,26 @@
-/// <reference types="vitest" />
 import react from "@vitejs/plugin-react";
 import type { UserConfig } from "vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-// testプロパティがTypeScriptに認識されないため型を定義
 interface ExtendedUserConfig extends UserConfig {
     test?: {
+        globals: boolean;
         environment: string;
         setupFiles: string[];
+        reporters: (string | [string, { outputFile: string }])[];
+        pool: string;
+        poolOptions: {
+            forks: {
+                singleFork: boolean;
+            };
+        };
+        deps: {
+            interopDefault: boolean;
+        };
     };
 }
 
-// https://vite.dev/config/
 export default defineConfig({
     plugins: [react(), tsconfigPaths()],
     server: {
@@ -33,5 +41,14 @@ export default defineConfig({
         environment: "happy-dom",
         setupFiles: ["./vitest-setup.ts"],
         reporters: ["default", ["junit", { outputFile: "test-results/junit.xml" }]],
+        pool: "forks",
+        poolOptions: {
+            forks: {
+                singleFork: true,
+            },
+        },
+        deps: {
+            interopDefault: true,
+        },
     },
 } as ExtendedUserConfig);

@@ -1,10 +1,9 @@
 import { paths } from "@/config/paths";
-import {
-    BusinessCenter,
-    ContactMail as ContactMailIcon,
-    Home as HomeIcon,
-    Menu as MenuIcon,
-} from "@mui/icons-material";
+import BusinessCenter from "@mui/icons-material/BusinessCenter";
+import ContactMailIcon from "@mui/icons-material/ContactMail";
+import HomeIcon from "@mui/icons-material/Home";
+import MenuIcon from "@mui/icons-material/Menu";
+
 import { IconButton, Menu, MenuItem } from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router";

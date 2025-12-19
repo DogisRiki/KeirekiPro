@@ -23,7 +23,7 @@ import {
     useDeleteSocialLink,
     useResumeStore,
 } from "@/features/resume";
-import { Add as AddIcon } from "@mui/icons-material";
+import AddIcon from "@mui/icons-material/Add";
 import { Box, Divider, List, Typography } from "@mui/material";
 import { useMemo } from "react";
 import { useParams } from "react-router";

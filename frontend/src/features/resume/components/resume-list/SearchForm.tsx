@@ -1,5 +1,5 @@
 import { Button, TextField } from "@/components/ui";
-import { Sort as SortIcon } from "@mui/icons-material";
+import SortIcon from "@mui/icons-material/Sort";
 import { Box, Menu, MenuItem } from "@mui/material";
 import React, { useState } from "react";
 

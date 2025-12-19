@@ -26,19 +26,22 @@ export const createQueryWrapper = () => {
     const Wrapper = ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
+
     Wrapper.displayName = "TestQueryClientProviderWrapper";
+
     return Wrapper;
 };
 
 /**
  * beforeEachで呼び出し、テスト前にストアをクリアし、引数に渡したモック関数（または spyOn の戻り値）をリセットする
  * @param mocks リセット対象の配列。
- *              - () => vi.mocked(fn).mockReset()を直接渡す
- *              - spyOnの戻り値（.mockReset()を持つオブジェクト）
+ * - () => vi.mocked(fn).mockReset()を直接渡す
+ * - spyOnの戻り値（.mockReset()を持つオブジェクト）
  */
 export const resetStoresAndMocks = (mocks: MockItem[]) => {
     // すべてのモック・スパイの呼び出し履歴をクリア
     vi.clearAllMocks();
+
     // すべてのスパイを元の実装に戻す（前のテストで設定されたスパイを削除）
     vi.restoreAllMocks();
 
