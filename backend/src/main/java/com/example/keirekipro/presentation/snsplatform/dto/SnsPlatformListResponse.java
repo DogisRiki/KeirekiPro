@@ -2,7 +2,7 @@ package com.example.keirekipro.presentation.snsplatform.dto;
 
 import java.util.List;
 
-import com.example.keirekipro.usecase.snsplatform.dto.SnsPlatformListUseCaseDto;
+import com.example.keirekipro.usecase.query.snsplatform.dto.SnsPlatformListItemDto;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -25,7 +25,7 @@ public class SnsPlatformListResponse {
      * @param dto ユースケースDTO
      * @return レスポンスDTO
      */
-    public static SnsPlatformListResponse convertFrom(SnsPlatformListUseCaseDto dto) {
+    public static SnsPlatformListResponse convertFrom(SnsPlatformListItemDto dto) {
         return new SnsPlatformListResponse(dto.getNames());
     }
 }

@@ -9,12 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 
 import com.example.keirekipro.presentation.techstack.controller.GetTechStackListController;
-import com.example.keirekipro.usecase.techstack.GetTechStackListUseCase;
-import com.example.keirekipro.usecase.techstack.dto.TechStackListUseCaseDto;
-import com.example.keirekipro.usecase.techstack.dto.TechStackListUseCaseDto.Backend;
-import com.example.keirekipro.usecase.techstack.dto.TechStackListUseCaseDto.Frontend;
-import com.example.keirekipro.usecase.techstack.dto.TechStackListUseCaseDto.Infrastructure;
-import com.example.keirekipro.usecase.techstack.dto.TechStackListUseCaseDto.Tools;
+import com.example.keirekipro.usecase.query.techstack.GetTechStackListQueryService;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto.Backend;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto.Frontend;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto.Infrastructure;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto.Tools;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ import lombok.RequiredArgsConstructor;
 class GetTechStackListControllerTest {
 
     @MockitoBean
-    private GetTechStackListUseCase getTechStackListUseCase;
+    private GetTechStackListQueryService getTechStackListQueryService;
 
     private final MockMvc mockMvc;
 
@@ -44,7 +44,7 @@ class GetTechStackListControllerTest {
     @DisplayName("正常なリクエストの場合、200と技術スタック一覧がレスポンスとして返る")
     void test1() throws Exception {
         // UseCaseから返却されるDTOを準備
-        TechStackListUseCaseDto.Frontend frontend = Frontend.create(
+        TechStackListItemDto.Frontend frontend = Frontend.create(
                 List.of("JavaScript"),
                 List.of("React"),
                 List.of("Zustand"),
@@ -54,7 +54,7 @@ class GetTechStackListControllerTest {
                 List.of("Prettier"),
                 List.of("Jest"));
 
-        TechStackListUseCaseDto.Backend backend = Backend.create(
+        TechStackListItemDto.Backend backend = Backend.create(
                 List.of("Java"),
                 List.of("Spring Boot"),
                 List.of("Lombok"),
@@ -66,7 +66,7 @@ class GetTechStackListControllerTest {
                 List.of("Hibernate"),
                 List.of("Spring Security"));
 
-        TechStackListUseCaseDto.Infrastructure infrastructure = Infrastructure.create(
+        TechStackListItemDto.Infrastructure infrastructure = Infrastructure.create(
                 List.of("AWS"),
                 List.of("Ubuntu"),
                 List.of("Docker"),
@@ -77,7 +77,7 @@ class GetTechStackListControllerTest {
                 List.of("CloudWatch"),
                 List.of("Fluentd"));
 
-        TechStackListUseCaseDto.Tools tools = Tools.create(
+        TechStackListItemDto.Tools tools = Tools.create(
                 List.of("Git"),
                 List.of("Redmine"),
                 List.of("Slack"),
@@ -87,11 +87,11 @@ class GetTechStackListControllerTest {
                 List.of("VS Code"),
                 List.of("WSL2"));
 
-        TechStackListUseCaseDto dto = TechStackListUseCaseDto.create(
+        TechStackListItemDto dto = TechStackListItemDto.create(
                 frontend, backend, infrastructure, tools);
 
         // モック設定
-        when(getTechStackListUseCase.execute()).thenReturn(dto);
+        when(getTechStackListQueryService.execute()).thenReturn(dto);
 
         // 実行&検証
         mockMvc.perform(get(ENDPOINT))
@@ -139,35 +139,35 @@ class GetTechStackListControllerTest {
                 .andExpect(jsonPath("$.tools.editors[0]").value("VS Code"))
                 .andExpect(jsonPath("$.tools.developmentEnvironments[0]").value("WSL2"));
 
-        verify(getTechStackListUseCase).execute();
+        verify(getTechStackListQueryService).execute();
     }
 
     @Test
     @DisplayName("技術スタックが1つも存在しない場合、200と空リスト群がレスポンスとして返る")
     void test2() throws Exception {
         // すべて空リストのDTOを準備
-        TechStackListUseCaseDto.Frontend frontend = Frontend.create(
+        TechStackListItemDto.Frontend frontend = Frontend.create(
                 List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of());
 
-        TechStackListUseCaseDto.Backend backend = Backend.create(
+        TechStackListItemDto.Backend backend = Backend.create(
                 List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of());
 
-        TechStackListUseCaseDto.Infrastructure infrastructure = Infrastructure.create(
+        TechStackListItemDto.Infrastructure infrastructure = Infrastructure.create(
                 List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of(), List.of());
 
-        TechStackListUseCaseDto.Tools tools = Tools.create(
+        TechStackListItemDto.Tools tools = Tools.create(
                 List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of());
 
-        TechStackListUseCaseDto dto = TechStackListUseCaseDto.create(
+        TechStackListItemDto dto = TechStackListItemDto.create(
                 frontend, backend, infrastructure, tools);
 
         // モック設定
-        when(getTechStackListUseCase.execute()).thenReturn(dto);
+        when(getTechStackListQueryService.execute()).thenReturn(dto);
 
         // 実行&検証
         mockMvc.perform(get(ENDPOINT))
@@ -215,6 +215,6 @@ class GetTechStackListControllerTest {
                 .andExpect(jsonPath("$.tools.editors").isEmpty())
                 .andExpect(jsonPath("$.tools.developmentEnvironments").isEmpty());
 
-        verify(getTechStackListUseCase).execute();
+        verify(getTechStackListQueryService).execute();
     }
 }
