@@ -4,30 +4,23 @@ import java.util.List;
 
 import com.example.keirekipro.usecase.techstack.dto.TechStackListUseCaseDto;
 
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 技術スタック一覧レスポンス
  */
 @Getter
 @EqualsAndHashCode
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class TechStackListResponse {
 
     private final Frontend frontend;
     private final Backend backend;
     private final Infrastructure infrastructure;
     private final Tools tools;
-
-    private TechStackListResponse(Frontend frontend,
-            Backend backend,
-            Infrastructure infrastructure,
-            Tools tools) {
-        this.frontend = frontend;
-        this.backend = backend;
-        this.infrastructure = infrastructure;
-        this.tools = tools;
-    }
 
     /**
      * ユースケースDTOからレスポンスDTOへ変換する

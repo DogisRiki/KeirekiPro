@@ -2,8 +2,10 @@ package com.example.keirekipro.usecase.techstack.dto;
 
 import java.util.List;
 
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 技術スタック一覧ユースケースDTO
@@ -12,22 +14,13 @@ import lombok.Getter;
  */
 @Getter
 @EqualsAndHashCode
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class TechStackListUseCaseDto {
 
     private final Frontend frontend;
     private final Backend backend;
     private final Infrastructure infrastructure;
     private final Tools tools;
-
-    private TechStackListUseCaseDto(Frontend frontend,
-            Backend backend,
-            Infrastructure infrastructure,
-            Tools tools) {
-        this.frontend = frontend;
-        this.backend = backend;
-        this.infrastructure = infrastructure;
-        this.tools = tools;
-    }
 
     /**
      * ファクトリーメソッド

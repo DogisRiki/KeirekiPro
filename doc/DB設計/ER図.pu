@@ -156,6 +156,18 @@ entity "技術スタックマスタ(tech_stack_mst)" as TechStackMst {
     category_code : <color:#1E90FF>VARCHAR(64)</color> <color:#32CD32>[NOT NULL]</color> -- カテゴリコード(FK)
 }
 
+entity "資格マスタ(certification_mst)" as CertificationMst {
+    + id : <color:#1E90FF>INTEGER</color> -- 識別子 (PK)
+    --
+    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 資格名
+}
+
+entity "SNSプラットフォームマスタ(sns_platform_mst)" as SnsPlatformMst {
+    + id : <color:#1E90FF>INTEGER</color> -- 識別子 (PK)
+    --
+    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プラットフォーム名
+}
+
 ' ----------------------
 ' リレーション定義
 ' ----------------------
