@@ -1,5 +1,5 @@
-import { DatePicker, TextField } from "@/components/ui";
-import { useResumeStore } from "@/features/resume";
+import { Autocomplete, DatePicker, TextField } from "@/components/ui";
+import { useCertificationList, useResumeStore } from "@/features/resume";
 import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 import type { Dayjs } from "dayjs";
@@ -14,6 +14,10 @@ export const CertificationSection = () => {
     const activeEntryId = useResumeStore((state) => state.activeEntryId);
     const updateEntry = useResumeStore((state) => state.updateEntry);
     const getEntryErrors = useResumeStore((state) => state.getEntryErrors);
+
+    // 資格一覧を取得
+    const { data: certificationData } = useCertificationList();
+    const certificationOptions = certificationData?.names ?? [];
 
     // 現在アクティブなエントリー
     const currentCertification = resume?.certifications?.find((cert) => cert.id === activeEntryId) ?? null;
@@ -34,24 +38,42 @@ export const CertificationSection = () => {
         });
     };
 
+    // 資格名変更ハンドラー
+    const handleNameChange = (_: React.SyntheticEvent, newValue: string | string[] | null) => {
+        const value = Array.isArray(newValue) ? (newValue[0] ?? "") : (newValue ?? "");
+        updateEntry("certifications", currentCertification.id, { name: value });
+    };
+
+    // 資格名入力ハンドラー（値が変更された場合のみ更新）
+    const handleNameInputChange = (_: React.SyntheticEvent, newInputValue: string) => {
+        if (newInputValue !== currentCertification.name) {
+            updateEntry("certifications", currentCertification.id, { name: newInputValue });
+        }
+    };
+
     return (
         <>
             {/* 資格名 */}
-            <TextField
-                label="資格名"
-                fullWidth
-                required
-                placeholder="（例）基本情報処理技術者"
+            <Autocomplete
+                freeSolo
+                options={certificationOptions}
                 value={currentCertification.name}
-                onChange={(e) => {
-                    updateEntry("certifications", currentCertification.id, { name: e.target.value });
-                }}
-                error={!!errors.name?.length}
-                helperText={stringListToBulletList(errors.name)}
-                slotProps={{
-                    inputLabel: { shrink: true },
-                    formHelperText: { sx: { whiteSpace: "pre-line" } },
-                }}
+                onChange={handleNameChange}
+                onInputChange={handleNameInputChange}
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        label="資格名"
+                        required
+                        placeholder="（例）基本情報処理技術者"
+                        error={!!errors.name?.length}
+                        helperText={stringListToBulletList(errors.name)}
+                        slotProps={{
+                            inputLabel: { shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        }}
+                    />
+                )}
                 sx={{ mb: 4 }}
             />
             {/* 取得年月 */}
