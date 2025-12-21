@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.keirekipro.infrastructure.query.techstack.TechStackMapper">
+
+    <select id="selectAll"
+            resultType="com.example.keirekipro.infrastructure.query.techstack.TechStackDto">
+        SELECT
+            c.main_category AS mainCategory,
+            c.sub_category AS subCategory,
+            m.name AS name
+        FROM
+            tech_stack_category_mst c
+            JOIN
+                tech_stack_mst m
+            ON  m.category_code = c.code
+        ORDER BY
+            c.main_category,
+            c.sub_category,
+            m.id
+    </select>
+
+</mapper>

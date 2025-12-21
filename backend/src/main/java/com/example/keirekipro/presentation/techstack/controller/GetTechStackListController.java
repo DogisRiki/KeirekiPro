@@ -1,7 +1,7 @@
 package com.example.keirekipro.presentation.techstack.controller;
 
 import com.example.keirekipro.presentation.techstack.dto.TechStackListResponse;
-import com.example.keirekipro.usecase.techstack.GetTechStackListUseCase;
+import com.example.keirekipro.usecase.query.techstack.GetTechStackListQueryService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "techstacks", description = "技術スタックに関するエンドポイント")
 public class GetTechStackListController {
 
-    private final GetTechStackListUseCase getTechStackListUseCase;
+    private final GetTechStackListQueryService getTechStackListQueryService;
 
     /**
      * 技術スタック一覧取得エンドポイント
@@ -32,6 +32,6 @@ public class GetTechStackListController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "技術スタック一覧の取得", description = "画面入力補助用の技術スタック一覧を取得する")
     public TechStackListResponse handle() {
-        return TechStackListResponse.convertFrom(getTechStackListUseCase.execute());
+        return TechStackListResponse.convertFrom(getTechStackListQueryService.execute());
     }
 }

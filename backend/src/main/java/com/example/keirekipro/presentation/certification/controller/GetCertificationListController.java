@@ -1,7 +1,7 @@
 package com.example.keirekipro.presentation.certification.controller;
 
 import com.example.keirekipro.presentation.certification.dto.CertificationListResponse;
-import com.example.keirekipro.usecase.certification.GetCertificationListUseCase;
+import com.example.keirekipro.usecase.query.certification.GetCertificationListQueryService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "certifications", description = "資格に関するエンドポイント")
 public class GetCertificationListController {
 
-    private final GetCertificationListUseCase getCertificationListUseCase;
+    private final GetCertificationListQueryService getCertificationListQueryService;
 
     /**
      * 資格一覧取得エンドポイント
@@ -32,6 +32,6 @@ public class GetCertificationListController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "資格一覧の取得", description = "画面入力補助用の資格一覧を取得する")
     public CertificationListResponse handle() {
-        return CertificationListResponse.convertFrom(getCertificationListUseCase.execute());
+        return CertificationListResponse.convertFrom(getCertificationListQueryService.execute());
     }
 }

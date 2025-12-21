@@ -1,8 +1,6 @@
-package com.example.keirekipro.presentation.techstack.dto;
+package com.example.keirekipro.usecase.query.techstack.dto;
 
 import java.util.List;
-
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -10,12 +8,14 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 技術スタック一覧レスポンス
+ * 技術スタック一覧ユースケースDTO
+ *
+ * 画面入力補助用のマスタ一覧を表現するQueryモデル
  */
 @Getter
 @EqualsAndHashCode
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-public class TechStackListResponse {
+public class TechStackListItemDto {
 
     private final Frontend frontend;
     private final Backend backend;
@@ -23,17 +23,13 @@ public class TechStackListResponse {
     private final Tools tools;
 
     /**
-     * ユースケースDTOからレスポンスDTOへ変換する
-     *
-     * @param dto ユースケースDTO
-     * @return レスポンスDTO
+     * ファクトリーメソッド
      */
-    public static TechStackListResponse convertFrom(TechStackListItemDto dto) {
-        return new TechStackListResponse(
-                Frontend.convertFrom(dto.getFrontend()),
-                Backend.convertFrom(dto.getBackend()),
-                Infrastructure.convertFrom(dto.getInfrastructure()),
-                Tools.convertFrom(dto.getTools()));
+    public static TechStackListItemDto create(Frontend frontend,
+            Backend backend,
+            Infrastructure infrastructure,
+            Tools tools) {
+        return new TechStackListItemDto(frontend, backend, infrastructure, tools);
     }
 
     /**
@@ -42,6 +38,7 @@ public class TechStackListResponse {
     @Getter
     @EqualsAndHashCode
     public static class Frontend {
+
         private final List<String> languages;
         private final List<String> frameworks;
         private final List<String> libraries;
@@ -70,18 +67,18 @@ public class TechStackListResponse {
         }
 
         /**
-         * フロントエンド変換
+         * フロントエンドファクトリーメソッド
          */
-        public static Frontend convertFrom(TechStackListItemDto.Frontend src) {
-            return new Frontend(
-                    src.getLanguages(),
-                    src.getFrameworks(),
-                    src.getLibraries(),
-                    src.getBuildTools(),
-                    src.getPackageManagers(),
-                    src.getLinters(),
-                    src.getFormatters(),
-                    src.getTestingTools());
+        public static Frontend create(List<String> languages,
+                List<String> frameworks,
+                List<String> libraries,
+                List<String> buildTools,
+                List<String> packageManagers,
+                List<String> linters,
+                List<String> formatters,
+                List<String> testingTools) {
+            return new Frontend(languages, frameworks, libraries, buildTools,
+                    packageManagers, linters, formatters, testingTools);
         }
     }
 
@@ -91,6 +88,7 @@ public class TechStackListResponse {
     @Getter
     @EqualsAndHashCode
     public static class Backend {
+
         private final List<String> languages;
         private final List<String> frameworks;
         private final List<String> libraries;
@@ -125,20 +123,21 @@ public class TechStackListResponse {
         }
 
         /**
-         * バックエンド変換
+         * バックエンドファクトリーメソッド
          */
-        public static Backend convertFrom(TechStackListItemDto.Backend src) {
-            return new Backend(
-                    src.getLanguages(),
-                    src.getFrameworks(),
-                    src.getLibraries(),
-                    src.getBuildTools(),
-                    src.getPackageManagers(),
-                    src.getLinters(),
-                    src.getFormatters(),
-                    src.getTestingTools(),
-                    src.getOrmTools(),
-                    src.getAuth());
+        public static Backend create(List<String> languages,
+                List<String> frameworks,
+                List<String> libraries,
+                List<String> buildTools,
+                List<String> packageManagers,
+                List<String> linters,
+                List<String> formatters,
+                List<String> testingTools,
+                List<String> ormTools,
+                List<String> auth) {
+            return new Backend(languages, frameworks, libraries, buildTools,
+                    packageManagers, linters, formatters, testingTools,
+                    ormTools, auth);
         }
     }
 
@@ -148,6 +147,7 @@ public class TechStackListResponse {
     @Getter
     @EqualsAndHashCode
     public static class Infrastructure {
+
         private final List<String> clouds;
         private final List<String> operatingSystems;
         private final List<String> containers;
@@ -179,19 +179,20 @@ public class TechStackListResponse {
         }
 
         /**
-         * インフラ変換
+         * インフラファクトリーメソッド
          */
-        public static Infrastructure convertFrom(TechStackListItemDto.Infrastructure src) {
-            return new Infrastructure(
-                    src.getClouds(),
-                    src.getOperatingSystems(),
-                    src.getContainers(),
-                    src.getDatabases(),
-                    src.getWebServers(),
-                    src.getCiCdTools(),
-                    src.getIacTools(),
-                    src.getMonitoringTools(),
-                    src.getLoggingTools());
+        public static Infrastructure create(List<String> clouds,
+                List<String> operatingSystems,
+                List<String> containers,
+                List<String> databases,
+                List<String> webServers,
+                List<String> ciCdTools,
+                List<String> iacTools,
+                List<String> monitoringTools,
+                List<String> loggingTools) {
+            return new Infrastructure(clouds, operatingSystems, containers,
+                    databases, webServers, ciCdTools, iacTools,
+                    monitoringTools, loggingTools);
         }
     }
 
@@ -201,6 +202,7 @@ public class TechStackListResponse {
     @Getter
     @EqualsAndHashCode
     public static class Tools {
+
         private final List<String> sourceControls;
         private final List<String> projectManagements;
         private final List<String> communicationTools;
@@ -229,18 +231,20 @@ public class TechStackListResponse {
         }
 
         /**
-         * 開発支援ツール変換
+         * 開発支援ツールファクトリーメソッド
          */
-        public static Tools convertFrom(TechStackListItemDto.Tools src) {
-            return new Tools(
-                    src.getSourceControls(),
-                    src.getProjectManagements(),
-                    src.getCommunicationTools(),
-                    src.getDocumentationTools(),
-                    src.getApiDevelopmentTools(),
-                    src.getDesignTools(),
-                    src.getEditors(),
-                    src.getDevelopmentEnvironments());
+        public static Tools create(List<String> sourceControls,
+                List<String> projectManagements,
+                List<String> communicationTools,
+                List<String> documentationTools,
+                List<String> apiDevelopmentTools,
+                List<String> designTools,
+                List<String> editors,
+                List<String> developmentEnvironments) {
+            return new Tools(sourceControls, projectManagements,
+                    communicationTools, documentationTools,
+                    apiDevelopmentTools, designTools,
+                    editors, developmentEnvironments);
         }
     }
 }
