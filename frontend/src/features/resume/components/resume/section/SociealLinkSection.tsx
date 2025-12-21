@@ -1,11 +1,11 @@
-import { TextField } from "@/components/ui";
+import { Autocomplete, TextField } from "@/components/ui";
 import { env } from "@/config/env";
-import { useResumeStore } from "@/features/resume";
+import { useResumeStore, useSnsPlatformList } from "@/features/resume";
 import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 
 /**
- * ソーシャルリンクセクション
+ * プラットフォームリンクセクション
  */
 export const SociealLinkSection = () => {
     // ストアから必要な状態を取得
@@ -13,6 +13,10 @@ export const SociealLinkSection = () => {
     const activeEntryId = useResumeStore((state) => state.activeEntryId);
     const updateEntry = useResumeStore((state) => state.updateEntry);
     const getEntryErrors = useResumeStore((state) => state.getEntryErrors);
+
+    // SNSプラットフォーム一覧を取得
+    const { data: snsPlatformData } = useSnsPlatformList();
+    const snsPlatformOptions = snsPlatformData?.names ?? [];
 
     // 現在アクティブなエントリー
     const currentSocialLink = resume?.socialLinks?.find((s) => s.id === activeEntryId) ?? null;
@@ -25,19 +29,42 @@ export const SociealLinkSection = () => {
     // 現在のエントリーのエラーを取得
     const errors = getEntryErrors(currentSocialLink.id);
 
+    // プラットフォーム名変更ハンドラー
+    const handleNameChange = (_: React.SyntheticEvent, newValue: string | string[] | null) => {
+        const value = Array.isArray(newValue) ? (newValue[0] ?? "") : (newValue ?? "");
+        updateEntry("socialLinks", currentSocialLink.id, { name: value });
+    };
+
+    // プラットフォーム名入力ハンドラー（値が変更された場合のみ更新）
+    const handleNameInputChange = (_: React.SyntheticEvent, newInputValue: string) => {
+        if (newInputValue !== currentSocialLink.name) {
+            updateEntry("socialLinks", currentSocialLink.id, { name: newInputValue });
+        }
+    };
+
     return (
         <>
-            {/* ソーシャル名 */}
-            <TextField
-                label="ソーシャル名"
-                fullWidth
-                required
-                placeholder="（例）GitHub"
+            {/* プラットフォーム名 */}
+            <Autocomplete
+                freeSolo
+                options={snsPlatformOptions}
                 value={currentSocialLink.name}
-                onChange={(e) => updateEntry("socialLinks", currentSocialLink.id, { name: e.target.value })}
-                error={!!errors.name?.length}
-                helperText={stringListToBulletList(errors.name)}
-                slotProps={{ inputLabel: { shrink: true }, formHelperText: { sx: { whiteSpace: "pre-line" } } }}
+                onChange={handleNameChange}
+                onInputChange={handleNameInputChange}
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        label="プラットフォーム名"
+                        required
+                        placeholder="（例）GitHub"
+                        error={!!errors.name?.length}
+                        helperText={stringListToBulletList(errors.name)}
+                        slotProps={{
+                            inputLabel: { shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        }}
+                    />
+                )}
                 sx={{ mb: 4 }}
             />
             {/* リンク */}
