@@ -6,13 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Date;
-
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.presentation.security.jwt.JwtAuthenticationFilter;
-import com.example.keirekipro.presentation.security.jwt.JwtProperties;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +24,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
@@ -72,7 +66,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("無効なJWTの場合、401エラーが返されフィルタチェーンが呼ばれない")
+    @DisplayName("無効なJWTの場合、401にせず未認証として継続し、accessToken Cookieを失効させる")
     void test2() throws Exception {
         String invalidToken = "invalid.jwt.token";
 
@@ -88,14 +82,20 @@ class JwtAuthenticationFilterTest {
         // フィルタを実行
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // 401エラーが返されたことを確認
-        assertThat(mockResponse.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        // 変更後は sendError しないため、ステータスはデフォルト(200)のまま
+        assertThat(mockResponse.getStatus()).isEqualTo(200);
 
-        // SecurityContextに認証情報が設定されないことを確認
+        // SecurityContextに認証情報が設定されない（未認証扱い）
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 
-        // フィルタチェーンが呼ばれていないことを確認
-        verify(filterChain, org.mockito.Mockito.never()).doFilter(mockRequest, mockResponse);
+        // 変更後はフィルタチェーンが継続される
+        verify(filterChain).doFilter(mockRequest, mockResponse);
+
+        // 不正トークンCookieを失効させていることを確認
+        Cookie expired = findCookie(mockResponse, "accessToken");
+        assertThat(expired).isNotNull();
+        assertThat(expired.getMaxAge()).isEqualTo(0);
+        assertThat(expired.getPath()).isEqualTo("/");
     }
 
     @Test
@@ -117,17 +117,12 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("有効期限切れのJWTの場合、401エラーが返されフィルタチェーンが呼ばれない")
+    @DisplayName("有効期限切れ等でJWT検証に失敗した場合、401にせず未認証として継続し、accessToken Cookieを失効させる")
     void test4() throws Exception {
-        JwtProperties jwtProperties = new JwtProperties();
-        jwtProperties.setSecret("test-secret");
+        // ※変更後の挙動では、期限切れ/不正JWTでも sendError せず、未認証として続行する
 
-        // 有効期限切れトークン
-        String expiredToken = JWT.create()
-                .withSubject("user_id")
-                .withIssuedAt(new Date(System.currentTimeMillis() - 1000 * 60 * 30)) // 30分前
-                .withExpiresAt(new Date(System.currentTimeMillis() - 1000 * 60)) // 1分前に期限切れ
-                .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
+        // 期限切れ扱いのトークン文字列（中身の生成は不要。jwtProvider側が例外を投げる想定）
+        String expiredToken = "expired.jwt.token";
 
         MockHttpServletRequest mockRequest = new MockHttpServletRequest();
         mockRequest.setCookies(new Cookie("accessToken", expiredToken));
@@ -141,14 +136,20 @@ class JwtAuthenticationFilterTest {
         // フィルタを実行
         filter.doFilter(mockRequest, mockResponse, filterChain);
 
-        // 401エラーが返されたことを確認
-        assertThat(mockResponse.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        // 変更後は sendError しないため、ステータスはデフォルト(200)のまま
+        assertThat(mockResponse.getStatus()).isEqualTo(200);
 
-        // SecurityContextに認証情報が設定されないことを確認
+        // SecurityContextに認証情報が設定されない（未認証扱い）
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 
-        // フィルタチェーンが呼ばれないことを確認
-        verify(filterChain, org.mockito.Mockito.never()).doFilter(mockRequest, mockResponse);
+        // 変更後はフィルタチェーンが継続される
+        verify(filterChain).doFilter(mockRequest, mockResponse);
+
+        // 不正トークンCookieを失効させていることを確認
+        Cookie expired = findCookie(mockResponse, "accessToken");
+        assertThat(expired).isNotNull();
+        assertThat(expired.getMaxAge()).isEqualTo(0);
+        assertThat(expired.getPath()).isEqualTo("/");
     }
 
     @Test
@@ -219,5 +220,56 @@ class JwtAuthenticationFilterTest {
 
         // フィルタチェーンがそのまま呼ばれる
         verify(filterChain).doFilter(mockRequest, mockResponse);
+    }
+
+    @Test
+    @DisplayName("無効なJWTが来た場合、既存のSecurityContextの認証情報もクリアされる")
+    void test8() throws Exception {
+        // 既に認証済みの状態を作る
+        Authentication existingAuth = mock(Authentication.class);
+        SecurityContextHolder.getContext().setAuthentication(existingAuth);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isEqualTo(existingAuth);
+
+        String invalidToken = "invalid.jwt.token";
+
+        MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+        mockRequest.setCookies(new Cookie("accessToken", invalidToken));
+
+        MockHttpServletResponse mockResponse = new MockHttpServletResponse();
+
+        // jwtProviderが無効なトークンで例外をスローするよう設定
+        doThrow(new JWTVerificationException("Invalid token"))
+                .when(jwtProvider).getAuthentication(invalidToken);
+
+        // フィルタを実行
+        filter.doFilter(mockRequest, mockResponse, filterChain);
+
+        // 変更後は SecurityContextHolder.clearContext() される
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+
+        // フィルタチェーンが継続される
+        verify(filterChain).doFilter(mockRequest, mockResponse);
+
+        // 不正トークンCookieを失効させていることを確認
+        Cookie expired = findCookie(mockResponse, "accessToken");
+        assertThat(expired).isNotNull();
+        assertThat(expired.getMaxAge()).isEqualTo(0);
+        assertThat(expired.getPath()).isEqualTo("/");
+    }
+
+    /**
+     * MockHttpServletResponseから指定名のCookieを検索する
+     *
+     * @param response Mockレスポンス
+     * @param name     Cookie名
+     * @return 見つかればCookie、なければnull
+     */
+    private static Cookie findCookie(MockHttpServletResponse response, String name) {
+        for (Cookie c : response.getCookies()) {
+            if (name.equals(c.getName())) {
+                return c;
+            }
+        }
+        return null;
     }
 }

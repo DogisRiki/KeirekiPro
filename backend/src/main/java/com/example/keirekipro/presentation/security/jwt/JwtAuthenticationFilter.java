@@ -56,8 +56,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(auth);
             });
         } catch (JWTVerificationException e) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "トークンが不正です。");
-            return;
+            // 不正JWTは「未認証」として扱う（公開エンドポイントを巻き込んで401にしない）
+            SecurityContextHolder.clearContext();
+
+            // 不正トークンCookieを失効させて再発を防ぐ
+            Cookie expired = new Cookie(COOKIE_NAME, "");
+            expired.setPath("/");
+            expired.setMaxAge(0);
+            response.addCookie(expired);
         }
         // 次のフィルタへ処理を移譲
         filterChain.doFilter(request, response);
