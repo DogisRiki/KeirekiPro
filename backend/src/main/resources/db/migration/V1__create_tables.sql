@@ -275,9 +275,9 @@ COMMENT ON COLUMN self_promotions.content IS 'コンテンツ';
 
 -- 技術スタックカテゴリマスタテーブル
 CREATE TABLE tech_stack_category_mst (
-    code          VARCHAR(64) PRIMARY KEY,
+    code VARCHAR(64) PRIMARY KEY,
     main_category VARCHAR(32) NOT NULL,
-    sub_category  VARCHAR(64) NOT NULL
+    sub_category VARCHAR(64) NOT NULL
 );
 
 COMMENT ON TABLE tech_stack_category_mst IS '技術スタックカテゴリマスタ';
@@ -287,8 +287,8 @@ COMMENT ON COLUMN tech_stack_category_mst.sub_category IS 'サブカテゴリ';
 
 -- 技術スタックマスタテーブル
 CREATE TABLE tech_stack_mst (
-    id            INTEGER PRIMARY KEY,
-    name          VARCHAR(255) NOT NULL,
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
     category_code VARCHAR(64) NOT NULL REFERENCES tech_stack_category_mst(code)
 );
 
@@ -296,3 +296,23 @@ COMMENT ON TABLE tech_stack_mst IS '技術スタックマスタ';
 COMMENT ON COLUMN tech_stack_mst.id IS '識別子';
 COMMENT ON COLUMN tech_stack_mst.name IS '技術名';
 COMMENT ON COLUMN tech_stack_mst.category_code IS 'カテゴリコード';
+
+-- 資格マスタテーブル
+CREATE TABLE certification_mst (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
+);
+
+COMMENT ON TABLE certification_mst IS '資格マスタ';
+COMMENT ON COLUMN certification_mst.id IS '識別子';
+COMMENT ON COLUMN certification_mst.name IS '資格名';
+
+-- SNSプラットフォームマスタテーブル
+CREATE TABLE sns_platform_mst (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
+);
+
+COMMENT ON TABLE sns_platform_mst IS 'SNSプラットフォームマスタ';
+COMMENT ON COLUMN sns_platform_mst.id IS '識別子';
+COMMENT ON COLUMN sns_platform_mst.name IS 'プラットフォーム名';

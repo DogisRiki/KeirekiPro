@@ -487,3 +487,249 @@ INSERT INTO tech_stack_mst (id, name, category_code) VALUES
     (672, 'Docker Compose',        'TOOLS_DEV_ENVIRONMENT'),
     (673, 'Localhost',             'TOOLS_DEV_ENVIRONMENT'),
     (674, 'Kubernetes cluster',    'TOOLS_DEV_ENVIRONMENT');
+
+-- =========================================================
+-- 資格マスタデータ
+-- =========================================================
+INSERT INTO certification_mst (id, name) VALUES
+    ----------------------------------------------------------------
+    -- IPA（情報処理推進機構）
+    ----------------------------------------------------------------
+    (1,  'ITパスポート試験'),
+    (2,  '情報セキュリティマネジメント試験'),
+    (3,  '基本情報技術者試験'),
+    (4,  '応用情報技術者試験'),
+    (5,  'ITストラテジスト試験'),
+    (6,  'システムアーキテクト試験'),
+    (7,  'プロジェクトマネージャ試験'),
+    (8,  'ネットワークスペシャリスト試験'),
+    (9,  'データベーススペシャリスト試験'),
+    (10, 'エンベデッドシステムスペシャリスト試験'),
+    (11, 'ITサービスマネージャ試験'),
+    (12, 'システム監査技術者試験'),
+    (13, '情報処理安全確保支援士試験'),
+
+    ----------------------------------------------------------------
+    -- AWS
+    ----------------------------------------------------------------
+    (101, 'AWS Certified Cloud Practitioner'),
+    (102, 'AWS Certified AI Practitioner'),
+    (103, 'AWS Certified Solutions Architect - Associate'),
+    (104, 'AWS Certified Developer - Associate'),
+    (105, 'AWS Certified CloudOps Engineer - Associate'),
+    (106, 'AWS Certified DevOps Engineer - Professional'),
+    (107, 'AWS Certified Solutions Architect - Professional'),
+    (108, 'AWS Certified Security - Specialty'),
+    (109, 'AWS Certified Machine Learning - Specialty'),
+
+    ----------------------------------------------------------------
+    -- Microsoft
+    ----------------------------------------------------------------
+    (201, 'Microsoft Certified: Azure Fundamentals'),
+    (202, 'Microsoft Certified: Azure Administrator Associate'),
+    (203, 'Microsoft Certified: Azure Data Fundamentals'),
+    (204, 'Microsoft Certified: Security, Compliance, and Identity Fundamentals'),
+    (205, 'Microsoft Certified: Cybersecurity Architect Expert'),
+
+    ----------------------------------------------------------------
+    -- Google Cloud
+    ----------------------------------------------------------------
+    (301, 'Cloud Digital Leader'),
+    (302, 'Generative AI Leader'),
+    (303, 'Cloud Engineer'),
+    (304, 'Google Workspace Administrator'),
+    (305, 'Data Practitioner'),
+    (306, 'Cloud Architect'),
+    (307, 'Cloud Database Engineer'),
+    (308, 'Cloud Developer'),
+    (309, 'Cloud DevOps Engineer'),
+    (310, 'Cloud Network Engineer'),
+    (311, 'Cloud Security Engineer'),
+    (312, 'Cloud Machine Learning Engineer'),
+
+    ----------------------------------------------------------------
+    -- CompTIA
+    ----------------------------------------------------------------
+    (401, 'CompTIA A+'),
+    (402, 'CompTIA Network+'),
+    (403, 'CompTIA Security+'),
+    (404, 'CompTIA CySA+'),
+    (405, 'CompTIA PenTest+'),
+    (406, 'CompTIA Linux+'),
+    (407, 'CompTIA Cloud+'),
+    (408, 'CompTIA Cloud Essentials+'),
+    (409, 'CompTIA Data+'),
+    (410, 'CompTIA Tech+'),
+    (411, 'CompTIA SecurityX'),
+
+    ----------------------------------------------------------------
+    -- CNCF
+    ----------------------------------------------------------------
+    (501, 'Certified Kubernetes Administrator (CKA)'),
+    (502, 'Certified Kubernetes Application Developer (CKAD)'),
+    (503, 'Certified Kubernetes Security Specialist (CKS)'),
+    (504, 'Kubernetes and Cloud Native Associate (KCNA)'),
+    (505, 'Kubernetes and Cloud Native Security Associate (KCSA)'),
+
+    ----------------------------------------------------------------
+    -- HashiCorp
+    ----------------------------------------------------------------
+    (601, 'HashiCorp Certified: Terraform Associate'),
+    (602, 'HashiCorp Certified: Terraform Authoring and Operations Professional'),
+
+    ----------------------------------------------------------------
+    -- GitHub Certifications
+    ----------------------------------------------------------------
+    (701, 'GitHub Foundations Certification'),
+    (702, 'GitHub Administration Certification'),
+    (703, 'GitHub Actions Certification'),
+    (704, 'GitHub Advanced Security Certification'),
+    (705, 'GitHub Copilot Certification'),
+
+    ----------------------------------------------------------------
+    -- ISC2
+    ----------------------------------------------------------------
+    (801, 'CC – Certified in Cybersecurity'),
+    (802, 'SSCP – Systems Security Certified Practitioner'),
+    (803, 'CISSP – Certified Information Systems Security Professional'),
+    (804, 'CCSP – Certified Cloud Security Professional'),
+
+    ----------------------------------------------------------------
+    -- ISACA
+    ----------------------------------------------------------------
+    (901,  'CISA® (Certified Information Systems Auditor®)'),
+    (902,  'CISM® (Certified Information Security Manager®)'),
+    (903,  'CRISC® (Certified in Risk and Information Systems Control®)'),
+    (904,  'CDPSE® (Certified Data Privacy Solutions Engineer®)'),
+
+    ----------------------------------------------------------------
+    -- ITIL
+    ----------------------------------------------------------------
+    (1001, 'ITIL 4 Foundation'),
+    (1002, 'ITIL 4 Managing Professional'),
+    (1003, 'ITIL 4 Strategic Leader'),
+    (1004, 'ITIL 4 Practice Manager'),
+    (1005, 'ITIL 4 Master'),
+
+    ----------------------------------------------------------------
+    -- Linux / Red Hat / LPI / LinuC
+    ----------------------------------------------------------------
+    (1101, 'Red Hat Certified System Administrator (RHCSA)'),
+    (1102, 'Red Hat Certified Engineer (RHCE)'),
+    (1103, 'Linux Essentials'),
+    (1104, 'LPIC-1'),
+    (1105, 'LPIC-2'),
+    (1106, 'LPIC-3 Mixed Environments'),
+    (1107, 'LPIC-3 Security'),
+    (1108, 'LPIC-3 Virtualization and Containerization'),
+    (1109, 'LinuCレベル1'),
+    (1110, 'LinuCレベル2'),
+    (1111, 'LinuCレベル3'),
+    (1112, 'LinuC 300 Mixed Environment Exam'),
+    (1113, 'LinuC Level2 Exam 201'),
+    (1114, 'LinuC Level2 Exam 202'),
+
+    ----------------------------------------------------------------
+    -- 統計検定
+    ----------------------------------------------------------------
+    (1201, '統計検定4級'),
+    (1202, '統計検定3級'),
+    (1203, '統計検定2級'),
+    (1204, '統計検定準1級'),
+    (1205, '統計検定1級'),
+    (1206, '統計調査士'),
+    (1207, '専門統計調査士'),
+    (1208, '統計検定データサイエンス基礎'),
+    (1209, '統計検定データサイエンス発展'),
+    (1210, '統計検定データサイエンスエキスパート'),
+
+    ----------------------------------------------------------------
+    -- 実用数学技能検定
+    ----------------------------------------------------------------
+    (1301, '実用数学技能検定1級'),
+    (1302, '実用数学技能検定準1級'),
+    (1303, '実用数学技能検定2級'),
+    (1304, '実用数学技能検定準2級'),
+    (1305, '実用数学技能検定3級'),
+
+    ----------------------------------------------------------------
+    -- アクチュアリー
+    ----------------------------------------------------------------
+    (1401, '日本アクチュアリー会正会員'),
+    (1402, '日本アクチュアリー会準会員'),
+
+    ----------------------------------------------------------------
+    -- JDLA ディープラーニング関連
+    ----------------------------------------------------------------
+    (1501, 'JDLA Deep Learning for GENERAL（G検定）'),
+    (1502, 'JDLA Deep Learning for ENGINEER（E資格）'),
+    (1503, 'JDLA Generative AI Test'),
+
+    ----------------------------------------------------------------
+    -- Oracle認定Javaプログラマ
+    ----------------------------------------------------------------
+    (1601, 'Oracle Certified Java Programmer, Bronze SE'),
+    (1602, 'Oracle Certified Java Programmer, Silver SE 8'),
+    (1603, 'Oracle Certified Java Programmer, Gold SE 8'),
+    (1604, 'Oracle Certified Java Programmer, Silver SE 11'),
+    (1605, 'Oracle Certified Java Programmer, Gold SE 11'),
+    (1606, 'Oracle Certified Java Programmer, Silver SE 17'),
+    (1607, 'Oracle Certified Java Programmer, Gold SE 17'),
+
+    ----------------------------------------------------------------
+    -- ORACLE MASTER
+    ----------------------------------------------------------------
+    (1701, 'ORACLE MASTER Bronze DBA 2019'),
+    (1702, 'ORACLE MASTER Silver DBA 2019'),
+    (1703, 'ORACLE MASTER Gold DBA 2019'),
+    (1704, 'ORACLE MASTER Platinum DBA 2019'),
+    (1705, 'ORACLE MASTER Silver SQL 2019'),
+
+    ----------------------------------------------------------------
+    -- Oracle Cloud Infrastructure
+    ----------------------------------------------------------------
+    (1801, 'Oracle Cloud Infrastructure 2024 Foundations Associate'),
+    (1802, 'Oracle Cloud Infrastructure 2024 Architect Associate'),
+    (1803, 'Oracle Cloud Infrastructure 2024 Architect Professional'),
+    (1804, 'Oracle Cloud Infrastructure 2024 Developer Professional'),
+    (1805, 'Oracle Cloud Infrastructure 2024 Data Foundations Associate'),
+    (1806, 'Oracle Cloud Infrastructure 2024 AI Foundations Associate'),
+
+    ----------------------------------------------------------------
+    -- Python認定試験
+    ----------------------------------------------------------------
+    (1901, 'Python 3 エンジニア認定基礎試験'),
+    (1902, 'Python 3 エンジニア認定実践試験'),
+    (1903, 'Python 3 エンジニア認定データ分析試験'),
+    (1904, 'Python 3 エンジニア認定データ分析実践試験'),
+    (1905, 'PythonZen & PEP 8 検定試験'),
+
+    ----------------------------------------------------------------
+    -- OSS-DB技術者認定試験
+    ----------------------------------------------------------------
+    (2001, 'OSS-DB Silver'),
+    (2002, 'OSS-DB Gold');
+
+-- =========================================================
+-- SNSプラットフォームマスタデータ
+-- =========================================================
+INSERT INTO sns_platform_mst (id, name) VALUES
+    (1,  'Qiita'),
+    (2,  'Zenn'),
+    (3,  'GitHub'),
+    (4,  'GitLab'),
+    (5,  'Stack Overflow'),
+    (6,  'Dev.to'),
+    (7,  'Hashnode'),
+    (8,  'Medium'),
+    (9,  'note'),
+    (10, 'X'),
+    (11, 'LinkedIn'),
+    (12, 'Dribbble'),
+    (13, 'Behance'),
+    (14, 'CodePen'),
+    (15, 'Kaggle'),
+    (16, 'Speaker Deck'),
+    (17, 'SlideShare'),
+    (18, 'connpass'),
+    (19, 'Hatena Blog');
