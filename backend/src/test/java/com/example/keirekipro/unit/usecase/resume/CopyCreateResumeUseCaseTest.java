@@ -29,6 +29,7 @@ import com.example.keirekipro.helper.ResumeObjectBuilder;
 import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
 import com.example.keirekipro.usecase.resume.CopyCreateResumeUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
@@ -47,6 +48,9 @@ class CopyCreateResumeUseCaseTest {
 
     @Mock
     private ResumeNameDuplicationCheckService service;
+
+    @Mock
+    private ResumeLimitChecker checker;
 
     @InjectMocks
     private CopyCreateResumeUseCase useCase;
@@ -74,6 +78,7 @@ class CopyCreateResumeUseCaseTest {
 
         // モック設定
         doNothing().when(service).execute(eq(USER_ID), any(ResumeName.class));
+        doNothing().when(checker).checkResumeCreateAllowed(USER_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(source));
 
         // 実行
@@ -242,6 +247,26 @@ class CopyCreateResumeUseCaseTest {
 
         verify(service).execute(eq(USER_ID), any(ResumeName.class));
         verify(repository).find(RESUME_ID);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("職務経歴書が上限枚数である場合、例外がスローされ後続処理が行われない")
+    void test5() {
+        // リクエスト準備
+        CreateResumeRequest request = new CreateResumeRequest(NEW_NAME, RESUME_ID);
+
+        // モックをセットアップ：上限チェックでUseCaseExceptionを投げる
+        doThrow(new UseCaseException("上限")).when(checker).checkResumeCreateAllowed(USER_ID);
+
+        // ユースケース実行＆UseCaseExceptionがスローされることを検証
+        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+                .isInstanceOf(UseCaseException.class)
+                .hasMessage("上限");
+
+        // 上限チェックは呼ばれるが、後続処理は行われない
+        verify(checker).checkResumeCreateAllowed(USER_ID);
+        verify(service, never()).execute(any(), any());
         verify(repository, never()).save(any());
     }
 }

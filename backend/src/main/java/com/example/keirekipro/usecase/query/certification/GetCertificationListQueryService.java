@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 資格一覧取得ユースケース
+ * 資格一覧取得クエリサービス
  */
 @Service
 @RequiredArgsConstructor
@@ -17,9 +17,9 @@ public class GetCertificationListQueryService {
     private final CertificationQuery certificationQuery;
 
     /**
-     * 資格一覧取得ユースケースを実行する
+     * 資格一覧取得クエリサービスを実行する
      *
-     * @return 資格一覧ユースケースDTO
+     * @return 資格一覧クエリDTO
      */
     public CertificationListItemDto execute() {
         return certificationQuery.selectCertificationListItem();

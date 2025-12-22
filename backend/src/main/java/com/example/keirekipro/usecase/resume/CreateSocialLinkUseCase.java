@@ -9,6 +9,7 @@ import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreateSocialLinkRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.stereotype.Service;
@@ -17,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 
 /**
- * SNS新規作成ユースケース
+ * SNSプラットフォーム新規作成ユースケース
  */
 @Service
 @RequiredArgsConstructor
@@ -25,8 +26,10 @@ public class CreateSocialLinkUseCase {
 
     private final ResumeRepository resumeRepository;
 
+    private final ResumeLimitChecker resumeLimitChecker;
+
     /**
-     * SNS新規作成ユースケースを実行する
+     * SNSプラットフォーム新規作成ユースケースを実行する
      *
      * @param userId   ユーザーID
      * @param resumeId 職務経歴書ID
@@ -35,6 +38,9 @@ public class CreateSocialLinkUseCase {
      */
     @Transactional
     public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateSocialLinkRequest request) {
+
+        // 上限チェック
+        resumeLimitChecker.checkSnsPlatformAddAllowed(resumeId);
 
         Resume resume = resumeRepository.find(resumeId)
                 .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));

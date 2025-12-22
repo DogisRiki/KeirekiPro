@@ -3,6 +3,8 @@ package com.example.keirekipro.unit.usecase.resume;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,6 +25,7 @@ import com.example.keirekipro.presentation.resume.dto.CreateCareerRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.resume.CreateCareerUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +41,9 @@ class CreateCareerUseCaseTest {
 
     @Mock
     private ResumeRepository repository;
+
+    @Mock
+    private ResumeLimitChecker checker;
 
     @InjectMocks
     private CreateCareerUseCase useCase;
@@ -64,10 +70,14 @@ class CreateCareerUseCaseTest {
         request.setIsActive(Boolean.FALSE);
 
         // モック準備
+        doNothing().when(checker).checkCareerAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(USER_ID)));
 
         // 実行
         ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, request);
+
+        // 上限チェックの検証
+        verify(checker).checkCareerAddAllowed(RESUME_ID);
 
         // find の検証
         verify(repository).find(RESUME_ID);
@@ -98,12 +108,14 @@ class CreateCareerUseCaseTest {
         request.setEndDate(YearMonth.of(2019, 12));
         request.setIsActive(Boolean.FALSE);
 
+        doNothing().when(checker).checkCareerAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("職務経歴書が存在しません。");
 
+        verify(checker).checkCareerAddAllowed(RESUME_ID);
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
     }
@@ -117,13 +129,35 @@ class CreateCareerUseCaseTest {
         request.setEndDate(YearMonth.of(2019, 12));
         request.setIsActive(Boolean.FALSE);
 
+        doNothing().when(checker).checkCareerAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(OTHER_USER_ID)));
 
         assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("職務経歴書が存在しません。");
 
+        verify(checker).checkCareerAddAllowed(RESUME_ID);
         verify(repository).find(RESUME_ID);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("職歴が上限件数である場合、例外がスローされ後続処理が行われない")
+    void test4() {
+        CreateCareerRequest request = new CreateCareerRequest();
+        request.setCompanyName("会社A");
+        request.setStartDate(YearMonth.of(2018, 1));
+        request.setEndDate(YearMonth.of(2019, 12));
+        request.setIsActive(Boolean.FALSE);
+
+        doThrow(new UseCaseException("上限")).when(checker).checkCareerAddAllowed(RESUME_ID);
+
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
+                .isInstanceOf(UseCaseException.class)
+                .hasMessage("上限");
+
+        verify(checker).checkCareerAddAllowed(RESUME_ID);
+        verify(repository, never()).find(any());
         verify(repository, never()).save(any());
     }
 

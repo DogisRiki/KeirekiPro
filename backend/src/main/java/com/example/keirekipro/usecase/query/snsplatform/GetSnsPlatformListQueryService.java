@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 
 /**
- * SNSプラットフォーム一覧取得ユースケース
+ * SNSプラットフォーム一覧取得クエリサービス
  */
 @Service
 @RequiredArgsConstructor
@@ -17,9 +17,9 @@ public class GetSnsPlatformListQueryService {
     private final SnsPlatformQuery snsPlatformQuery;
 
     /**
-     * SNSプラットフォーム一覧取得ユースケースを実行する
+     * SNSプラットフォーム一覧取得クエリサービスを実行する
      *
-     * @return SNSプラットフォーム一覧ユースケースDTO
+     * @return SNSプラットフォーム一覧クエリDTO
      */
     public SnsPlatformListItemDto execute() {
         return snsPlatformQuery.selectSnsPlatformListItem();
