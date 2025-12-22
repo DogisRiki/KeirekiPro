@@ -187,11 +187,11 @@ class ResumeQueryMapperTest {
         insertResume(resumeId1, userId);
         insertResume(resumeId2, userId);
 
-        insertSocialLink(UUID.randomUUID(), resumeId1, "X", "https://x.example");
-        insertSocialLink(UUID.randomUUID(), resumeId1, "Instagram", "https://instagram.example");
-        insertSocialLink(UUID.randomUUID(), resumeId1, "YouTube", "https://youtube.example");
+        insertSnsPlatform(UUID.randomUUID(), resumeId1, "X", "https://x.example");
+        insertSnsPlatform(UUID.randomUUID(), resumeId1, "Instagram", "https://instagram.example");
+        insertSnsPlatform(UUID.randomUUID(), resumeId1, "YouTube", "https://youtube.example");
 
-        insertSocialLink(UUID.randomUUID(), resumeId2, "X", "https://x2.example"); // 別職務経歴書分
+        insertSnsPlatform(UUID.randomUUID(), resumeId2, "X", "https://x2.example"); // 別職務経歴書分
 
         int count = resumeQueryMapper.countSnsPlatformsByResumeId(resumeId1);
 
@@ -378,10 +378,10 @@ class ResumeQueryMapperTest {
                 Date.valueOf("2022-01-01"));
     }
 
-    private void insertSocialLink(UUID socialLinkId, UUID resumeId, String name, String link) {
+    private void insertSnsPlatform(UUID snsPlatformId, UUID resumeId, String name, String link) {
         jdbcTemplate.update(
-                "INSERT INTO social_links (id, resume_id, name, link) VALUES (?, ?, ?, ?)",
-                socialLinkId,
+                "INSERT INTO sns_platforms (id, resume_id, name, link) VALUES (?, ?, ?, ?)",
+                snsPlatformId,
                 resumeId,
                 name,
                 link);

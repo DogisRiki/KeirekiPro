@@ -30,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 class DeleteCareerControllerTest {
 
     @MockitoBean
-    private DeleteCareerUseCase deleteCareerUseCase;
+    private DeleteCareerUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -51,6 +51,6 @@ class DeleteCareerControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(deleteCareerUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID));
     }
 }

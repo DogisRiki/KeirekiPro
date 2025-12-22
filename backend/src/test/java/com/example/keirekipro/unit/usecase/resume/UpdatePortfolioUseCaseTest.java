@@ -215,7 +215,7 @@ class UpdatePortfolioUseCaseTest {
                 List.of(), // projects
                 List.of(), // certifications
                 List.of(), // portfolios
-                List.of(), // socialLinks
+                List.of(), // snsPlatforms
                 List.of() // selfPromotions
         );
 

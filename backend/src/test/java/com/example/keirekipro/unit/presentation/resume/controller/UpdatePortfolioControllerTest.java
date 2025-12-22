@@ -43,7 +43,7 @@ import lombok.RequiredArgsConstructor;
 class UpdatePortfolioControllerTest {
 
     @MockitoBean
-    private UpdatePortfolioUseCase updatePortfolioUseCase;
+    private UpdatePortfolioUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -80,7 +80,7 @@ class UpdatePortfolioControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(updatePortfolioUseCase.execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID),
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID),
                 any(UpdatePortfolioRequest.class)))
                 .thenReturn(dto);
 
@@ -98,11 +98,11 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.certifications.length()").value(1))
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
-                .andExpect(jsonPath("$.socialLinks.length()").value(1))
+                .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(updatePortfolioUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID),
                 any(UpdatePortfolioRequest.class));
     }
 
@@ -125,7 +125,7 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.name",
                         hasItem("ポートフォリオ名は入力必須です。")));
 
-        verify(updatePortfolioUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -148,7 +148,7 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.name",
                         hasItem("ポートフォリオ名は50文字以内で入力してください。")));
 
-        verify(updatePortfolioUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -170,7 +170,7 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.overview",
                         hasItem("ポートフォリオ概要は入力必須です。")));
 
-        verify(updatePortfolioUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -193,7 +193,7 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.overview",
                         hasItem("ポートフォリオ概要は1000文字以内で入力してください。")));
 
-        verify(updatePortfolioUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -216,7 +216,7 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.techStack",
                         hasItem("技術スタックは1000文字以内で入力してください。")));
 
-        verify(updatePortfolioUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -238,7 +238,7 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.link",
                         hasItem("リンクは入力必須です。")));
 
-        verify(updatePortfolioUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -260,7 +260,7 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.link",
                         hasItem("リンクはhttps形式のURLを指定してください。")));
 
-        verify(updatePortfolioUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -283,6 +283,6 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.link",
                         hasItem("リンクは255文字以内で入力してください。")));
 
-        verify(updatePortfolioUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 }

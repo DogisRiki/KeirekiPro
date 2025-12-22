@@ -42,7 +42,7 @@ import lombok.RequiredArgsConstructor;
 class CreateSelfPromotionControllerTest {
 
     @MockitoBean
-    private CreateSelfPromotionUseCase createSelfPromotionUseCase;
+    private CreateSelfPromotionUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -78,7 +78,7 @@ class CreateSelfPromotionControllerTest {
                 RESUME_DTO_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(createSelfPromotionUseCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreateSelfPromotionRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreateSelfPromotionRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
@@ -90,7 +90,7 @@ class CreateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.format(FMT)));
 
         verify(currentUserFacade).getUserId();
-        verify(createSelfPromotionUseCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreateSelfPromotionRequest.class));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreateSelfPromotionRequest.class));
     }
 
     @Test
@@ -106,7 +106,7 @@ class CreateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.errors.title").isArray())
                 .andExpect(jsonPath("$.errors.title", hasItem("タイトルは入力必須です。")));
 
-        verify(createSelfPromotionUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -122,7 +122,7 @@ class CreateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.errors.title").isArray())
                 .andExpect(jsonPath("$.errors.title", hasItem("タイトルは50文字以内で入力してください。")));
 
-        verify(createSelfPromotionUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -138,7 +138,7 @@ class CreateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.errors.content").isArray())
                 .andExpect(jsonPath("$.errors.content", hasItem("コンテンツは入力必須です。")));
 
-        verify(createSelfPromotionUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -154,6 +154,6 @@ class CreateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.errors.content").isArray())
                 .andExpect(jsonPath("$.errors.content", hasItem("コンテンツは1000文字以内で入力してください。")));
 
-        verify(createSelfPromotionUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 }

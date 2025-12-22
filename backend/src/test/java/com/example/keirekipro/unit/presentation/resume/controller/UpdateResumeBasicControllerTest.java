@@ -45,7 +45,7 @@ import lombok.RequiredArgsConstructor;
 class UpdateResumeBasicControllerTest {
 
     @MockitoBean
-    private UpdateResumeBasicUseCase updateResumeBasicUseCase;
+    private UpdateResumeBasicUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -81,7 +81,7 @@ class UpdateResumeBasicControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(updateResumeBasicUseCase.execute(eq(USER_ID), eq(RESUME_ID), any(UpdateResumeBasicRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(UpdateResumeBasicRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(put(ENDPOINT, RESUME_ID)
@@ -100,13 +100,13 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.certifications.length()").value(1))
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
-                .andExpect(jsonPath("$.socialLinks.length()").value(1))
+                .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         // ユースケースに渡されたリクエスト内容を検証
         ArgumentCaptor<UpdateResumeBasicRequest> captor = ArgumentCaptor.forClass(UpdateResumeBasicRequest.class);
         verify(currentUserFacade).getUserId();
-        verify(updateResumeBasicUseCase).execute(eq(USER_ID), eq(RESUME_ID), captor.capture());
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), captor.capture());
 
         UpdateResumeBasicRequest actual = captor.getValue();
         assertEquals(req, actual);
@@ -131,7 +131,7 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.resumeName",
                         hasItem("職務経歴書名は入力必須です。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -154,7 +154,7 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.resumeName",
                         hasItem("職務経歴書名は50文字以内で入力してください。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -176,7 +176,7 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.date",
                         hasItem("日付は入力必須です。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -198,7 +198,7 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.lastName",
                         hasItem("姓は入力必須です。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -221,7 +221,7 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.lastName",
                         hasItem("姓は10文字以内で入力してください。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -243,7 +243,7 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.firstName",
                         hasItem("名は入力必須です。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -266,7 +266,7 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.firstName",
                         hasItem("名は10文字以内で入力してください。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -287,7 +287,7 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.date").isArray())
                 .andExpect(jsonPath("$.errors.date", hasItem("日付が不正です。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -308,6 +308,6 @@ class UpdateResumeBasicControllerTest {
                 .andExpect(jsonPath("$.errors.date").isArray())
                 .andExpect(jsonPath("$.errors.date", hasItem("日付が不正です。")));
 
-        verify(updateResumeBasicUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 }

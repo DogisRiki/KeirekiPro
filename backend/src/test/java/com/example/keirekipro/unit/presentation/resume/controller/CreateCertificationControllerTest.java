@@ -43,7 +43,7 @@ import lombok.RequiredArgsConstructor;
 class CreateCertificationControllerTest {
 
     @MockitoBean
-    private CreateCertificationUseCase createCertificationUseCase;
+    private CreateCertificationUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -79,7 +79,7 @@ class CreateCertificationControllerTest {
                 RESUME_DTO_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(createCertificationUseCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreateCertificationRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreateCertificationRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
@@ -91,7 +91,7 @@ class CreateCertificationControllerTest {
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.format(FMT)));
 
         verify(currentUserFacade).getUserId();
-        verify(createCertificationUseCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreateCertificationRequest.class));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreateCertificationRequest.class));
     }
 
     @Test
@@ -109,7 +109,7 @@ class CreateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.name").isArray())
                 .andExpect(jsonPath("$.errors.name", hasItem("資格名は入力必須です。")));
 
-        verify(createCertificationUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -127,7 +127,7 @@ class CreateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.name").isArray())
                 .andExpect(jsonPath("$.errors.name", hasItem("資格名は50文字以内で入力してください。")));
 
-        verify(createCertificationUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -145,7 +145,7 @@ class CreateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.date").isArray())
                 .andExpect(jsonPath("$.errors.date", hasItem("取得年月は入力必須です。")));
 
-        verify(createCertificationUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -163,7 +163,7 @@ class CreateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.date").isArray())
                 .andExpect(jsonPath("$.errors.date", hasItem("取得年月が不正です。")));
 
-        verify(createCertificationUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -181,6 +181,6 @@ class CreateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.date").isArray())
                 .andExpect(jsonPath("$.errors.date", hasItem("取得年月が不正です。")));
 
-        verify(createCertificationUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 }

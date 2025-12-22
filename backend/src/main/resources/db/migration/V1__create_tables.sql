@@ -245,19 +245,19 @@ COMMENT ON COLUMN portfolios.overview IS '概要';
 COMMENT ON COLUMN portfolios.tech_stack IS '技術スタック';
 COMMENT ON COLUMN portfolios.link IS 'リンク';
 
--- ソーシャルリンクテーブル
-CREATE TABLE social_links (
+-- SNSプラットフォームテーブル
+CREATE TABLE sns_platforms (
     id UUID PRIMARY KEY,
     resume_id UUID NOT NULL REFERENCES resumes(id),
     name VARCHAR(255) NOT NULL,
     link VARCHAR(255) NOT NULL
 );
 
-COMMENT ON TABLE social_links IS 'ソーシャルリンク';
-COMMENT ON COLUMN social_links.id IS '識別子';
-COMMENT ON COLUMN social_links.resume_id IS '職務経歴書ID';
-COMMENT ON COLUMN social_links.name IS 'ソーシャルリンク名';
-COMMENT ON COLUMN social_links.link IS 'リンク';
+COMMENT ON TABLE sns_platforms IS 'SNSプラットフォーム';
+COMMENT ON COLUMN sns_platforms.id IS '識別子';
+COMMENT ON COLUMN sns_platforms.resume_id IS '職務経歴書ID';
+COMMENT ON COLUMN sns_platforms.name IS 'プラットフォーム名';
+COMMENT ON COLUMN sns_platforms.link IS 'リンク';
 
 -- 自己PRテーブル
 CREATE TABLE self_promotions (

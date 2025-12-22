@@ -138,7 +138,7 @@ class DeleteCertificationUseCaseTest {
                 List.of(), // projects
                 List.of(c1, c2), // certifications
                 List.of(), // portfolios
-                List.of(), // socialLinks
+                List.of(), // snsPlatforms
                 List.of() // selfPromotions
         );
     }

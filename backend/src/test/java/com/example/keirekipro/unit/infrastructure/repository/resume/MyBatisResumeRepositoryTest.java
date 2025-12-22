@@ -22,7 +22,7 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.helper.ResumeObjectBuilder;
 import com.example.keirekipro.infrastructure.repository.resume.MyBatisResumeRepository;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto;
@@ -31,7 +31,7 @@ import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.Certifi
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.PortfolioDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.ProjectDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SelfPromotionDto;
-import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SocialLinkDto;
+import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SnsPlatformDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeMapper;
 import com.example.keirekipro.shared.Notification;
 
@@ -81,7 +81,7 @@ class MyBatisResumeRepositoryTest {
         when(mapper.selectProjectsByResumeId(RESUME_ID)).thenReturn(dto.getProjects());
         when(mapper.selectCertificationsByResumeId(RESUME_ID)).thenReturn(dto.getCertifications());
         when(mapper.selectPortfoliosByResumeId(RESUME_ID)).thenReturn(dto.getPortfolios());
-        when(mapper.selectSocialLinksByResumeId(RESUME_ID)).thenReturn(dto.getSocialLinks());
+        when(mapper.selectSnsPlatformsByResumeId(RESUME_ID)).thenReturn(dto.getSnsPlatforms());
         when(mapper.selectSelfPromotionsByResumeId(RESUME_ID)).thenReturn(dto.getSelfPromotions());
 
         // 実行
@@ -193,10 +193,10 @@ class MyBatisResumeRepositoryTest {
         assertThat(portEnt.getTechStack()).isEqualTo(portDto.getTechStack());
         assertThat(portEnt.getLink().getValue()).isEqualTo(portDto.getLink());
 
-        // SocialLinkの検証
-        assertThat(r.getSocialLinks()).hasSize(1);
-        SocialLink slEnt = r.getSocialLinks().get(0);
-        SocialLinkDto slDto = dto.getSocialLinks().get(0);
+        // SnsPlatformの検証
+        assertThat(r.getSnsPlatforms()).hasSize(1);
+        SnsPlatform slEnt = r.getSnsPlatforms().get(0);
+        SnsPlatformDto slDto = dto.getSnsPlatforms().get(0);
         assertThat(slEnt.getId()).isEqualTo(slDto.getId());
         assertThat(slEnt.getName()).isEqualTo(slDto.getName());
         assertThat(slEnt.getLink().getValue()).isEqualTo(slDto.getLink());
@@ -231,7 +231,7 @@ class MyBatisResumeRepositoryTest {
         when(mapper.selectProjectsByResumeId(RESUME_ID)).thenReturn(dto.getProjects());
         when(mapper.selectCertificationsByResumeId(RESUME_ID)).thenReturn(dto.getCertifications());
         when(mapper.selectPortfoliosByResumeId(RESUME_ID)).thenReturn(dto.getPortfolios());
-        when(mapper.selectSocialLinksByResumeId(RESUME_ID)).thenReturn(dto.getSocialLinks());
+        when(mapper.selectSnsPlatformsByResumeId(RESUME_ID)).thenReturn(dto.getSnsPlatforms());
         when(mapper.selectSelfPromotionsByResumeId(RESUME_ID)).thenReturn(dto.getSelfPromotions());
 
         // 実行
@@ -340,13 +340,13 @@ class MyBatisResumeRepositoryTest {
         assertThat(port.getTechStack()).isEqualTo(portd.getTechStack());
         assertThat(port.getLink().getValue()).isEqualTo(portd.getLink());
 
-        // SocialLinkの検証
-        assertThat(r.getSocialLinks()).hasSize(dto.getSocialLinks().size());
-        ResumeDto.SocialLinkDto sld = dto.getSocialLinks().get(0);
-        SocialLink sl = r.getSocialLinks().get(0);
-        assertThat(sl.getId()).isEqualTo(sld.getId());
-        assertThat(sl.getName()).isEqualTo(sld.getName());
-        assertThat(sl.getLink().getValue()).isEqualTo(sld.getLink());
+        // SnsPlatformの検証
+        assertThat(r.getSnsPlatforms()).hasSize(dto.getSnsPlatforms().size());
+        ResumeDto.SnsPlatformDto spfd = dto.getSnsPlatforms().get(0);
+        SnsPlatform sl = r.getSnsPlatforms().get(0);
+        assertThat(sl.getId()).isEqualTo(spfd.getId());
+        assertThat(sl.getName()).isEqualTo(spfd.getName());
+        assertThat(sl.getLink().getValue()).isEqualTo(spfd.getLink());
 
         // SelfPromotionの検証
         assertThat(r.getSelfPromotions()).hasSize(dto.getSelfPromotions().size());
@@ -386,7 +386,7 @@ class MyBatisResumeRepositoryTest {
         verify(mapper).deleteProjectsByResumeId(id);
         verify(mapper).deleteCertificationsByResumeId(id);
         verify(mapper).deletePortfoliosByResumeId(id);
-        verify(mapper).deleteSocialLinksByResumeId(id);
+        verify(mapper).deleteSnsPlatformsByResumeId(id);
         verify(mapper).deleteSelfPromotionsByResumeId(id);
 
         // Careerインサート
@@ -491,16 +491,16 @@ class MyBatisResumeRepositoryTest {
         assertThat(portd.getTechStack()).isEqualTo(port.getTechStack());
         assertThat(portd.getLink()).isEqualTo(port.getLink().getValue());
 
-        // SocialLinkインサート
-        ArgumentCaptor<ResumeDto.SocialLinkDto> capSocialLinkDto = ArgumentCaptor
-                .forClass(ResumeDto.SocialLinkDto.class);
-        verify(mapper).insertSocialLink(capSocialLinkDto.capture());
-        ResumeDto.SocialLinkDto sld = capSocialLinkDto.getValue();
-        SocialLink sl = resume.getSocialLinks().get(0);
-        assertThat(sld.getId()).isEqualTo(sl.getId());
-        assertThat(sld.getResumeId()).isEqualTo(id);
-        assertThat(sld.getName()).isEqualTo(sl.getName());
-        assertThat(sld.getLink()).isEqualTo(sl.getLink().getValue());
+        // SnsPlatformインサート
+        ArgumentCaptor<ResumeDto.SnsPlatformDto> capSnsPlatformDto = ArgumentCaptor
+                .forClass(ResumeDto.SnsPlatformDto.class);
+        verify(mapper).insertSnsPlatform(capSnsPlatformDto.capture());
+        ResumeDto.SnsPlatformDto spfd = capSnsPlatformDto.getValue();
+        SnsPlatform spf = resume.getSnsPlatforms().get(0);
+        assertThat(spfd.getId()).isEqualTo(spf.getId());
+        assertThat(spfd.getResumeId()).isEqualTo(id);
+        assertThat(spfd.getName()).isEqualTo(spf.getName());
+        assertThat(spfd.getLink()).isEqualTo(spf.getLink().getValue());
 
         // SelfPromotionインサート
         ArgumentCaptor<ResumeDto.SelfPromotionDto> capSp = ArgumentCaptor.forClass(ResumeDto.SelfPromotionDto.class);
@@ -521,7 +521,7 @@ class MyBatisResumeRepositoryTest {
         verify(mapper).deleteProjectsByResumeId(RESUME_ID);
         verify(mapper).deleteCertificationsByResumeId(RESUME_ID);
         verify(mapper).deletePortfoliosByResumeId(RESUME_ID);
-        verify(mapper).deleteSocialLinksByResumeId(RESUME_ID);
+        verify(mapper).deleteSnsPlatformsByResumeId(RESUME_ID);
         verify(mapper).deleteSelfPromotionsByResumeId(RESUME_ID);
         verify(mapper).delete(RESUME_ID);
     }
@@ -595,7 +595,7 @@ class MyBatisResumeRepositoryTest {
         dto.setProjects(Collections.emptyList());
         dto.setCertifications(Collections.emptyList());
         dto.setPortfolios(Collections.emptyList());
-        dto.setSocialLinks(Collections.emptyList());
+        dto.setSnsPlatforms(Collections.emptyList());
         dto.setSelfPromotions(Collections.emptyList());
 
         // モック設定
@@ -604,7 +604,7 @@ class MyBatisResumeRepositoryTest {
         when(mapper.selectProjectsByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
         when(mapper.selectCertificationsByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
         when(mapper.selectPortfoliosByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
-        when(mapper.selectSocialLinksByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
+        when(mapper.selectSnsPlatformsByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
         when(mapper.selectSelfPromotionsByResumeId(RESUME_ID)).thenReturn(Collections.emptyList());
 
         // 実行

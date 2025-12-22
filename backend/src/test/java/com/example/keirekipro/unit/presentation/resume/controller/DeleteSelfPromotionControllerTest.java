@@ -30,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 class DeleteSelfPromotionControllerTest {
 
     @MockitoBean
-    private DeleteSelfPromotionUseCase deleteSelfPromotionUseCase;
+    private DeleteSelfPromotionUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -51,6 +51,6 @@ class DeleteSelfPromotionControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(deleteSelfPromotionUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID));
     }
 }

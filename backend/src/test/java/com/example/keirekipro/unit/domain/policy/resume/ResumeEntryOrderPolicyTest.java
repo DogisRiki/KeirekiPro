@@ -15,7 +15,7 @@ import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.policy.resume.ResumeEntryOrderPolicy;
 
 import org.junit.jupiter.api.DisplayName;
@@ -148,16 +148,16 @@ class ResumeEntryOrderPolicyTest {
     }
 
     @Test
-    @DisplayName("SNS: 名前が同一の場合はUUID昇順で安定化されること")
+    @DisplayName("SNSプラットフォーム: 名前が同一の場合はUUID昇順で安定化されること")
     void test10() {
         UUID idSmall = UUID.fromString("523e4567-e89b-12d3-a456-426614174000");
         UUID idLarge = UUID.fromString("523e4567-e89b-12d3-a456-426614174001");
 
-        SocialLink a = socialLinkWithNameAndId("GitHub", idLarge);
-        SocialLink b = socialLinkWithNameAndId("GitHub", idSmall);
+        SnsPlatform a = snsPlatformWithNameAndId("GitHub", idLarge);
+        SnsPlatform b = snsPlatformWithNameAndId("GitHub", idSmall);
 
-        List<SocialLink> list = new ArrayList<>(List.of(a, b));
-        list.sort(ResumeEntryOrderPolicy.socialLinkNameAsc());
+        List<SnsPlatform> list = new ArrayList<>(List.of(a, b));
+        list.sort(ResumeEntryOrderPolicy.snsPlatFormNameAsc());
 
         assertThat(list).containsExactly(b, a);
     }
@@ -232,11 +232,11 @@ class ResumeEntryOrderPolicyTest {
         return portfolio;
     }
 
-    private static SocialLink socialLinkWithNameAndId(String name, UUID id) {
-        SocialLink socialLink = mock(SocialLink.class);
-        when(socialLink.getName()).thenReturn(name);
-        when(socialLink.getId()).thenReturn(id);
-        return socialLink;
+    private static SnsPlatform snsPlatformWithNameAndId(String name, UUID id) {
+        SnsPlatform snsPlatform = mock(SnsPlatform.class);
+        when(snsPlatform.getName()).thenReturn(name);
+        when(snsPlatform.getId()).thenReturn(id);
+        return snsPlatform;
     }
 
     private static SelfPromotion selfPromotionWithTitle(String title) {

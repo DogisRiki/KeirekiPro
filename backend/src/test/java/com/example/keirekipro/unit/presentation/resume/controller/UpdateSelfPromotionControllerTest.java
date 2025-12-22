@@ -43,7 +43,7 @@ import lombok.RequiredArgsConstructor;
 class UpdateSelfPromotionControllerTest {
 
     @MockitoBean
-    private UpdateSelfPromotionUseCase updateSelfPromotionUseCase;
+    private UpdateSelfPromotionUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -78,7 +78,7 @@ class UpdateSelfPromotionControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(updateSelfPromotionUseCase.execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID),
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID),
                 any(UpdateSelfPromotionRequest.class)))
                 .thenReturn(dto);
 
@@ -98,11 +98,11 @@ class UpdateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.certifications.length()").value(1))
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
-                .andExpect(jsonPath("$.socialLinks.length()").value(1))
+                .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(updateSelfPromotionUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID),
                 any(UpdateSelfPromotionRequest.class));
     }
 
@@ -123,7 +123,7 @@ class UpdateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.errors.title",
                         hasItem("タイトルは入力必須です。")));
 
-        verify(updateSelfPromotionUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -143,7 +143,7 @@ class UpdateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.errors.title",
                         hasItem("タイトルは50文字以内で入力してください。")));
 
-        verify(updateSelfPromotionUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -163,7 +163,7 @@ class UpdateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.errors.content",
                         hasItem("コンテンツは入力必須です。")));
 
-        verify(updateSelfPromotionUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -183,6 +183,6 @@ class UpdateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.errors.content",
                         hasItem("コンテンツは1000文字以内で入力してください。")));
 
-        verify(updateSelfPromotionUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 }

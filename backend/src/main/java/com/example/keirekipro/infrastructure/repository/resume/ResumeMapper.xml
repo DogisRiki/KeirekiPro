@@ -570,21 +570,21 @@
     </delete>
 
 
-    <select id="selectSocialLinksByResumeId"
-            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SocialLinkDto"
+    <select id="selectSnsPlatformsByResumeId"
+            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SnsPlatformDto"
             parameterType="java.util.UUID">
         SELECT
             id,
             name AS name,
             link AS link
         FROM
-            social_links
+            sns_platforms
         WHERE
             resume_id = #{resumeId}
     </select>
 
-    <insert id="insertSocialLink" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SocialLinkDto">
-        INSERT INTO social_links(
+    <insert id="insertSnsPlatform" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SnsPlatformDto">
+        INSERT INTO sns_platforms(
             id,
             resume_id,
             name,
@@ -598,9 +598,9 @@
         )
     </insert>
 
-    <update id="updateSocialLink" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SocialLinkDto">
+    <update id="updateSnsPlatform" parameterType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$SnsPlatformDto">
         UPDATE
-            social_links
+            sns_platforms
         SET
             name = #{dto.name},
             link = #{dto.link}
@@ -608,18 +608,18 @@
             id = #{dto.id}
     </update>
 
-    <delete id="deleteSocialLink" parameterType="java.util.UUID">
+    <delete id="deleteSnsPlatform" parameterType="java.util.UUID">
         DELETE
         FROM
-            social_links
+            sns_platforms
         WHERE
-            id = #{socialLinkId}
+            id = #{snsPlatformId}
     </delete>
 
-    <delete id="deleteSocialLinksByResumeId" parameterType="java.util.UUID">
+    <delete id="deleteSnsPlatformsByResumeId" parameterType="java.util.UUID">
         DELETE
         FROM
-            social_links
+            sns_platforms
         WHERE
             resume_id = #{resumeId}
     </delete>

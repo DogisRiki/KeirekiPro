@@ -10,15 +10,15 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * 職務経歴書 SNS新規作成リクエスト
+ * 職務経歴書 SNSプラットフォーム更新リクエスト
  */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class CreateSocialLinkRequest {
+public class UpdateSnsPlatformRequest {
 
-    @NotBlank(message = "ソーシャル名は入力必須です。")
-    @Size(max = 50, message = "ソーシャル名は50文字以内で入力してください。")
+    @NotBlank(message = "プラットフォーム名は入力必須です。")
+    @Size(max = 50, message = "プラットフォーム名は50文字以内で入力してください。")
     private String name;
 
     @NotBlank(message = "リンクは入力必須です。")

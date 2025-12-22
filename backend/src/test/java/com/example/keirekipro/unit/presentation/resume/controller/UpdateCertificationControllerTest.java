@@ -44,7 +44,7 @@ import lombok.RequiredArgsConstructor;
 class UpdateCertificationControllerTest {
 
     @MockitoBean
-    private UpdateCertificationUseCase updateCertificationUseCase;
+    private UpdateCertificationUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -79,7 +79,7 @@ class UpdateCertificationControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(updateCertificationUseCase.execute(eq(USER_ID), eq(RESUME_ID), eq(CERTIFICATION_ID),
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(CERTIFICATION_ID),
                 any(UpdateCertificationRequest.class)))
                 .thenReturn(dto);
 
@@ -97,11 +97,11 @@ class UpdateCertificationControllerTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.certifications.length()").value(1))
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
-                .andExpect(jsonPath("$.socialLinks.length()").value(1))
+                .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(updateCertificationUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CERTIFICATION_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CERTIFICATION_ID),
                 any(UpdateCertificationRequest.class));
     }
 
@@ -122,7 +122,7 @@ class UpdateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.name",
                         hasItem("資格名は入力必須です。")));
 
-        verify(updateCertificationUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -143,7 +143,7 @@ class UpdateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.name",
                         hasItem("資格名は50文字以内で入力してください。")));
 
-        verify(updateCertificationUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -163,7 +163,7 @@ class UpdateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.date",
                         hasItem("取得年月は入力必須です。")));
 
-        verify(updateCertificationUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -182,7 +182,7 @@ class UpdateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.date").isArray())
                 .andExpect(jsonPath("$.errors.date", hasItem("取得年月が不正です。")));
 
-        verify(updateCertificationUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -201,6 +201,6 @@ class UpdateCertificationControllerTest {
                 .andExpect(jsonPath("$.errors.date").isArray())
                 .andExpect(jsonPath("$.errors.date", hasItem("取得年月が不正です。")));
 
-        verify(updateCertificationUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 }

@@ -17,10 +17,10 @@ import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.shared.Notification;
-import com.example.keirekipro.usecase.resume.DeleteSocialLinkUseCase;
+import com.example.keirekipro.usecase.resume.DeleteSnsPlatformUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
@@ -32,13 +32,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class DeleteSocialLinkUseCaseTest {
+class DeleteSnsPlatformUseCaseTest {
 
     @Mock
     private ResumeRepository repository;
 
     @InjectMocks
-    private DeleteSocialLinkUseCase useCase;
+    private DeleteSnsPlatformUseCase useCase;
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID RESUME_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -54,12 +54,12 @@ class DeleteSocialLinkUseCaseTest {
     @Test
     @DisplayName("SNSを削除できる")
     void test1() {
-        Resume resume = buildResumeWithSocialLinks(USER_ID);
-        UUID socialLinkId = resume.getSocialLinks().get(0).getId();
+        Resume resume = buildResumeWithSnsPlatforms(USER_ID);
+        UUID snsPlatformId = resume.getSnsPlatforms().get(0).getId();
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        useCase.execute(USER_ID, RESUME_ID, socialLinkId);
+        useCase.execute(USER_ID, RESUME_ID, snsPlatformId);
 
         verify(repository).find(RESUME_ID);
 
@@ -67,8 +67,8 @@ class DeleteSocialLinkUseCaseTest {
         verify(repository).save(saveCaptor.capture());
         Resume saved = saveCaptor.getValue();
 
-        assertThat(saved.getSocialLinks()).hasSize(1);
-        assertThat(saved.getSocialLinks().stream().anyMatch(s -> s.getId().equals(socialLinkId))).isFalse();
+        assertThat(saved.getSnsPlatforms()).hasSize(1);
+        assertThat(saved.getSnsPlatforms().stream().anyMatch(s -> s.getId().equals(snsPlatformId))).isFalse();
     }
 
     @Test
@@ -76,8 +76,8 @@ class DeleteSocialLinkUseCaseTest {
     void test2() {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
-        UUID socialLinkId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, socialLinkId))
+        UUID snsPlatformId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, snsPlatformId))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("職務経歴書が存在しません。");
 
@@ -88,12 +88,12 @@ class DeleteSocialLinkUseCaseTest {
     @Test
     @DisplayName("ログインユーザー以外が所有する職務経歴書のSNSを削除しようとした場合、UseCaseExceptionがスローされる")
     void test3() {
-        Resume resume = buildResumeWithSocialLinks(OTHER_USER_ID);
-        UUID socialLinkId = resume.getSocialLinks().get(0).getId();
+        Resume resume = buildResumeWithSnsPlatforms(OTHER_USER_ID);
+        UUID snsPlatformId = resume.getSnsPlatforms().get(0).getId();
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, socialLinkId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, snsPlatformId))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("職務経歴書が存在しません。");
 
@@ -104,30 +104,30 @@ class DeleteSocialLinkUseCaseTest {
     @Test
     @DisplayName("削除対象のSNSが存在しない場合、UseCaseExceptionがスローされる")
     void test4() {
-        Resume resume = buildResumeWithSocialLinks(USER_ID);
+        Resume resume = buildResumeWithSnsPlatforms(USER_ID);
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         UUID missingId = UUID.fromString("99999999-9999-9999-9999-999999999999");
         assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingId))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("対象のSNSが存在しません。");
+                .hasMessage("対象のSNSプラットフォームが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
     }
 
-    private Resume buildResumeWithSocialLinks(UUID ownerId) {
+    private Resume buildResumeWithSnsPlatforms(UUID ownerId) {
         Notification notification = new Notification();
 
         ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
         FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
 
         Link link1 = Link.create(notification, "https://github.com/example");
-        SocialLink s1 = SocialLink.create(notification, "GitHub", link1);
+        SnsPlatform s1 = SnsPlatform.create(notification, "GitHub", link1);
 
         Link link2 = Link.create(notification, "https://x.com/example");
-        SocialLink s2 = SocialLink.create(notification, "X", link2);
+        SnsPlatform s2 = SnsPlatform.create(notification, "X", link2);
 
         return Resume.reconstruct(
                 RESUME_ID,
@@ -141,7 +141,7 @@ class DeleteSocialLinkUseCaseTest {
                 List.of(), // projects
                 List.of(), // certifications
                 List.of(), // portfolios
-                List.of(s1, s2), // socialLinks
+                List.of(s1, s2), // snsPlatforms
                 List.of() // selfPromotions
         );
     }

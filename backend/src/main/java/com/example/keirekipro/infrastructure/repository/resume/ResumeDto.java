@@ -26,7 +26,7 @@ public class ResumeDto {
     private List<ProjectDto> projects;
     private List<CertificationDto> certifications;
     private List<PortfolioDto> portfolios;
-    private List<SocialLinkDto> socialLinks;
+    private List<SnsPlatformDto> snsPlatforms;
     private List<SelfPromotionDto> selfPromotions;
 
     /**
@@ -137,10 +137,10 @@ public class ResumeDto {
     }
 
     /**
-     * ソーシャルリンク
+     * SNSプラットフォーム
      */
     @Data
-    public static class SocialLinkDto {
+    public static class SnsPlatformDto {
         private UUID id;
         private UUID resumeId;
         private String name;

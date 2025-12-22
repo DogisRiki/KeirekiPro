@@ -86,7 +86,7 @@ class CreateResumeControllerTest {
                 .projects(List.of())
                 .certifications(List.of())
                 .portfolios(List.of())
-                .socialLinks(List.of())
+                .snsPlatforms(List.of())
                 .selfPromotions(List.of())
                 .build();
 
@@ -109,7 +109,7 @@ class CreateResumeControllerTest {
                 .andExpect(jsonPath("$.projects").doesNotExist())
                 .andExpect(jsonPath("$.certifications").doesNotExist())
                 .andExpect(jsonPath("$.portfolios").doesNotExist())
-                .andExpect(jsonPath("$.socialLinks").doesNotExist())
+                .andExpect(jsonPath("$.snsPlatforms").doesNotExist())
                 .andExpect(jsonPath("$.selfPromotions").doesNotExist());
 
         verify(currentUserFacade).getUserId();
@@ -147,7 +147,7 @@ class CreateResumeControllerTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.certifications.length()").value(1))
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
-                .andExpect(jsonPath("$.socialLinks.length()").value(1))
+                .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();

@@ -141,7 +141,7 @@ class DeletePortfolioUseCaseTest {
                 List.of(), // projects
                 List.of(), // certifications
                 List.of(p1, p2), // portfolios
-                List.of(), // socialLinks
+                List.of(), // snsPlatforms
                 List.of() // selfPromotions
         );
     }

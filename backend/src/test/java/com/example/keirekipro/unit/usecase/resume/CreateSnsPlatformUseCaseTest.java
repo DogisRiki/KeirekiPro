@@ -18,11 +18,11 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreateSocialLinkRequest;
+import com.example.keirekipro.presentation.resume.dto.CreateSnsPlatformRequest;
 import com.example.keirekipro.shared.Notification;
-import com.example.keirekipro.usecase.resume.CreateSocialLinkUseCase;
+import com.example.keirekipro.usecase.resume.CreateSnsPlatformUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -36,7 +36,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class CreateSocialLinkUseCaseTest {
+class CreateSnsPlatformUseCaseTest {
 
     @Mock
     private ResumeRepository repository;
@@ -45,7 +45,7 @@ class CreateSocialLinkUseCaseTest {
     private ResumeLimitChecker checker;
 
     @InjectMocks
-    private CreateSocialLinkUseCase useCase;
+    private CreateSnsPlatformUseCase useCase;
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID RESUME_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -61,7 +61,7 @@ class CreateSocialLinkUseCaseTest {
     @Test
     @DisplayName("SNSを新規作成できる")
     void test1() {
-        CreateSocialLinkRequest request = new CreateSocialLinkRequest();
+        CreateSnsPlatformRequest request = new CreateSnsPlatformRequest();
         request.setName("GitHub");
         request.setLink("https://github.com/example");
 
@@ -79,8 +79,8 @@ class CreateSocialLinkUseCaseTest {
         verify(repository).save(saveCaptor.capture());
         Resume saved = saveCaptor.getValue();
 
-        assertThat(saved.getSocialLinks()).hasSize(1);
-        SocialLink created = saved.getSocialLinks().get(0);
+        assertThat(saved.getSnsPlatforms()).hasSize(1);
+        SnsPlatform created = saved.getSnsPlatforms().get(0);
         assertThat(created.getName()).isEqualTo("GitHub");
         assertThat(created.getLink().getValue()).isEqualTo("https://github.com/example");
 
@@ -91,7 +91,7 @@ class CreateSocialLinkUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        CreateSocialLinkRequest request = new CreateSocialLinkRequest();
+        CreateSnsPlatformRequest request = new CreateSnsPlatformRequest();
         request.setName("GitHub");
         request.setLink("https://github.com/example");
 
@@ -110,7 +110,7 @@ class CreateSocialLinkUseCaseTest {
     @Test
     @DisplayName("ログインユーザー以外が所有する職務経歴書にSNSを作成しようとした場合、UseCaseExceptionがスローされる")
     void test3() {
-        CreateSocialLinkRequest request = new CreateSocialLinkRequest();
+        CreateSnsPlatformRequest request = new CreateSnsPlatformRequest();
         request.setName("GitHub");
         request.setLink("https://github.com/example");
 
@@ -129,7 +129,7 @@ class CreateSocialLinkUseCaseTest {
     @Test
     @DisplayName("SNSが上限件数である場合、例外がスローされ後続処理が行われない")
     void test4() {
-        CreateSocialLinkRequest request = new CreateSocialLinkRequest();
+        CreateSnsPlatformRequest request = new CreateSnsPlatformRequest();
         request.setName("GitHub");
         request.setLink("https://github.com/example");
 
@@ -162,7 +162,7 @@ class CreateSocialLinkUseCaseTest {
                 List.of(), // projects
                 List.of(), // certifications
                 List.of(), // portfolios
-                List.of(), // socialLinks
+                List.of(), // snsPlatforms
                 List.of() // selfPromotions
         );
     }

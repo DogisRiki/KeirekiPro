@@ -45,7 +45,7 @@ import lombok.RequiredArgsConstructor;
 class UpdateProjectControllerTest {
 
     @MockitoBean
-    private UpdateProjectUseCase updateProjectUseCase;
+    private UpdateProjectUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -147,7 +147,7 @@ class UpdateProjectControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(updateProjectUseCase.execute(eq(USER_ID), eq(RESUME_ID), eq(PROJECT_ID), any(UpdateProjectRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(PROJECT_ID), any(UpdateProjectRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(put(ENDPOINT, RESUME_ID, PROJECT_ID)
@@ -164,11 +164,11 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.certifications.length()").value(1))
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
-                .andExpect(jsonPath("$.socialLinks.length()").value(1))
+                .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(updateProjectUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PROJECT_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PROJECT_ID),
                 any(UpdateProjectRequest.class));
     }
 
@@ -188,7 +188,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.companyName",
                         hasItem("会社名は入力必須です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -207,7 +207,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.companyName",
                         hasItem("会社名は50文字以内で入力してください。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -226,7 +226,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.startDate",
                         hasItem("開始年月は入力必須です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -245,7 +245,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.isActive",
                         hasItem("継続中は入力必須です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -264,7 +264,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.name",
                         hasItem("プロジェクト名は入力必須です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -283,7 +283,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.name",
                         hasItem("プロジェクト名は50文字以内で入力してください。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -302,7 +302,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.overview",
                         hasItem("プロジェクト概要は入力必須です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -321,7 +321,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.overview",
                         hasItem("プロジェクト概要は1000文字以内で入力してください。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -340,7 +340,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.teamComp",
                         hasItem("チーム構成は入力必須です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -359,7 +359,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.teamComp",
                         hasItem("チーム構成は100文字以内で入力してください。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -378,7 +378,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.role",
                         hasItem("役割は入力必須です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -397,7 +397,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.role",
                         hasItem("役割は1000文字以内で入力してください。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -416,7 +416,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.achievement",
                         hasItem("成果は入力必須です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -435,7 +435,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.achievement",
                         hasItem("成果は1000文字以内で入力してください。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -453,7 +453,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -471,7 +471,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -489,7 +489,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.endDate").isArray())
                 .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -507,6 +507,6 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.endDate").isArray())
                 .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
 
-        verify(updateProjectUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 }

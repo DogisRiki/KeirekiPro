@@ -30,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 class DeletePortfolioControllerTest {
 
     @MockitoBean
-    private DeletePortfolioUseCase deletePortfolioUseCase;
+    private DeletePortfolioUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -51,6 +51,6 @@ class DeletePortfolioControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(deletePortfolioUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID));
     }
 }
