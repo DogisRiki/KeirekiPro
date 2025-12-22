@@ -9,6 +9,7 @@ import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreatePortfolioRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.stereotype.Service;
@@ -25,6 +26,8 @@ public class CreatePortfolioUseCase {
 
     private final ResumeRepository resumeRepository;
 
+    private final ResumeLimitChecker resumeLimitChecker;
+
     /**
      * ポートフォリオ新規作成ユースケースを実行する
      *
@@ -35,6 +38,9 @@ public class CreatePortfolioUseCase {
      */
     @Transactional
     public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreatePortfolioRequest request) {
+
+        // 上限チェック
+        resumeLimitChecker.checkPortfolioAddAllowed(resumeId);
 
         Resume resume = resumeRepository.find(resumeId)
                 .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));

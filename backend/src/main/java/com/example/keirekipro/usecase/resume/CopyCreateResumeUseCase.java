@@ -16,6 +16,7 @@ import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckSe
 import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.stereotype.Service;
@@ -34,6 +35,8 @@ public class CopyCreateResumeUseCase {
 
     private final ResumeNameDuplicationCheckService resumeNameDuplicationCheckService;
 
+    private final ResumeLimitChecker resumeLimitChecker;
+
     /**
      * 職務経歴書コピーして新規作成ユースケースを実行する
      *
@@ -43,6 +46,9 @@ public class CopyCreateResumeUseCase {
      */
     @Transactional
     public ResumeInfoUseCaseDto execute(UUID userId, CreateResumeRequest request) {
+
+        // 上限チェック
+        resumeLimitChecker.checkResumeCreateAllowed(userId);
 
         Notification notification = new Notification();
 

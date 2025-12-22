@@ -3,6 +3,8 @@ package com.example.keirekipro.unit.usecase.resume;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +24,7 @@ import com.example.keirekipro.presentation.resume.dto.CreatePortfolioRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.resume.CreatePortfolioUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +40,9 @@ class CreatePortfolioUseCaseTest {
 
     @Mock
     private ResumeRepository repository;
+
+    @Mock
+    private ResumeLimitChecker checker;
 
     @InjectMocks
     private CreatePortfolioUseCase useCase;
@@ -61,9 +67,13 @@ class CreatePortfolioUseCaseTest {
         request.setTechStack("React,TypeScript");
         request.setLink("https://example.com");
 
+        doNothing().when(checker).checkPortfolioAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(USER_ID)));
 
         ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, request);
+
+        // 上限チェックの検証
+        verify(checker).checkPortfolioAddAllowed(RESUME_ID);
 
         verify(repository).find(RESUME_ID);
 
@@ -91,12 +101,14 @@ class CreatePortfolioUseCaseTest {
         request.setTechStack("React,TypeScript");
         request.setLink("https://example.com");
 
+        doNothing().when(checker).checkPortfolioAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("職務経歴書が存在しません。");
 
+        verify(checker).checkPortfolioAddAllowed(RESUME_ID);
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
     }
@@ -110,13 +122,35 @@ class CreatePortfolioUseCaseTest {
         request.setTechStack("React,TypeScript");
         request.setLink("https://example.com");
 
+        doNothing().when(checker).checkPortfolioAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(OTHER_USER_ID)));
 
         assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("職務経歴書が存在しません。");
 
+        verify(checker).checkPortfolioAddAllowed(RESUME_ID);
         verify(repository).find(RESUME_ID);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("ポートフォリオが上限件数である場合、例外がスローされ後続処理が行われない")
+    void test4() {
+        CreatePortfolioRequest request = new CreatePortfolioRequest();
+        request.setName("作品1");
+        request.setOverview("概要1");
+        request.setTechStack("React,TypeScript");
+        request.setLink("https://example.com");
+
+        doThrow(new UseCaseException("上限")).when(checker).checkPortfolioAddAllowed(RESUME_ID);
+
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
+                .isInstanceOf(UseCaseException.class)
+                .hasMessage("上限");
+
+        verify(checker).checkPortfolioAddAllowed(RESUME_ID);
+        verify(repository, never()).find(any());
         verify(repository, never()).save(any());
     }
 

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.keirekipro.infrastructure.query.resume.ResumeQueryMapper">
+
+    <select id="countResumesByUserId" resultType="int" parameterType="java.util.UUID">
+        SELECT COUNT(*) FROM resumes WHERE user_id = #{userId}
+    </select>
+
+    <select id="countCareersByResumeId" resultType="int" parameterType="java.util.UUID">
+        SELECT COUNT(*) FROM careers WHERE resume_id = #{resumeId}
+    </select>
+
+    <select id="countProjectsByResumeId" resultType="int" parameterType="java.util.UUID">
+        SELECT COUNT(*) FROM projects WHERE resume_id = #{resumeId}
+    </select>
+
+    <select id="countCertificationsByResumeId" resultType="int" parameterType="java.util.UUID">
+        SELECT COUNT(*) FROM certifications WHERE resume_id = #{resumeId}
+    </select>
+
+    <select id="countSnsPlatformsByResumeId" resultType="int" parameterType="java.util.UUID">
+        SELECT COUNT(*) FROM social_links WHERE resume_id = #{resumeId}
+    </select>
+
+    <select id="countPortfoliosByResumeId" resultType="int" parameterType="java.util.UUID">
+        SELECT COUNT(*) FROM portfolios WHERE resume_id = #{resumeId}
+    </select>
+
+    <select id="countSelfPromotionsByResumeId" resultType="int" parameterType="java.util.UUID">
+        SELECT COUNT(*) FROM self_promotions WHERE resume_id = #{resumeId}
+    </select>
+
+</mapper>

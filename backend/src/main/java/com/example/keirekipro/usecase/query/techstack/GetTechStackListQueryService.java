@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 技術スタック一覧取得ユースケース
+ * 技術スタック一覧取得クエリサービス
  */
 @Service
 @RequiredArgsConstructor
@@ -17,9 +17,9 @@ public class GetTechStackListQueryService {
     private final TechStackQuery techStackQuery;
 
     /**
-     * 技術スタック一覧取得ユースケースを実行する
+     * 技術スタック一覧取得クエリサービスを実行する
      *
-     * @return 技術スタック一覧ユースケースDTO
+     * @return 技術スタック一覧クエリDTO
      */
     public TechStackListItemDto execute() {
         return techStackQuery.selectTechStackListItem();

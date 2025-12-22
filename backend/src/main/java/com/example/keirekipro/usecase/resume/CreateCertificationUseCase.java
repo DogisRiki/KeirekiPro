@@ -8,6 +8,7 @@ import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreateCertificationRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.stereotype.Service;
@@ -24,6 +25,8 @@ public class CreateCertificationUseCase {
 
     private final ResumeRepository resumeRepository;
 
+    private final ResumeLimitChecker resumeLimitChecker;
+
     /**
      * 資格新規作成ユースケースを実行する
      *
@@ -34,6 +37,9 @@ public class CreateCertificationUseCase {
      */
     @Transactional
     public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateCertificationRequest request) {
+
+        // 上限チェック
+        resumeLimitChecker.checkCertificationAddAllowed(resumeId);
 
         Resume resume = resumeRepository.find(resumeId)
                 .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
