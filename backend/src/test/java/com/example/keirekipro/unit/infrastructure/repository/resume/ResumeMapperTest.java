@@ -17,7 +17,7 @@ import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.Certifi
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.PortfolioDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.ProjectDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SelfPromotionDto;
-import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SocialLinkDto;
+import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SnsPlatformDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeMapper;
 import com.example.keirekipro.infrastructure.repository.user.UserDto;
 import com.example.keirekipro.infrastructure.repository.user.UserMapper;
@@ -982,19 +982,19 @@ class ResumeMapperTest {
     }
 
     @Test
-    @DisplayName("selectSocialLinksByResumeId_該当resume_idでソーシャルリンクが存在しない場合、空リストが返る")
+    @DisplayName("selectSnsPlatformsByResumeId_該当resume_idでSNSプラットフォームが存在しない場合、空リストが返る")
     void test28() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
                 RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
-        List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
+        List<SnsPlatformDto> list = resumeMapper.selectSnsPlatformsByResumeId(RESUME_ID_1);
         assertThat(list).isEmpty();
     }
 
     @Test
-    @DisplayName("insertSocialLink_ソーシャルリンクを挿入後、selectSocialLinksByResumeIdで各フィールドが取得できる")
+    @DisplayName("insertSnsPlatform_SNSプラットフォームを挿入後、selectSnsPlatformsByResumeIdで各フィールドが取得できる")
     void test29() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
@@ -1002,23 +1002,23 @@ class ResumeMapperTest {
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("aaaaaaaa-1234-1234-1234-aaaaaaaa1234");
-        SocialLinkDto link = createSocialLinkDto(
+        SnsPlatformDto link = createSnsPlatformDto(
                 linkId,
                 RESUME_ID_1,
                 "LinkedIn",
                 "https://linkedin.com/in/test");
-        resumeMapper.insertSocialLink(link);
+        resumeMapper.insertSnsPlatform(link);
 
-        List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
+        List<SnsPlatformDto> list = resumeMapper.selectSnsPlatformsByResumeId(RESUME_ID_1);
         assertThat(list).hasSize(1);
-        SocialLinkDto loaded = list.get(0);
+        SnsPlatformDto loaded = list.get(0);
         assertThat(loaded.getId()).isEqualTo(linkId);
         assertThat(loaded.getName()).isEqualTo("LinkedIn");
         assertThat(loaded.getLink()).isEqualTo("https://linkedin.com/in/test");
     }
 
     @Test
-    @DisplayName("updateSocialLink_既存のソーシャルリンクを更新すると、各フィールドが反映される")
+    @DisplayName("updateSnsPlatform_既存のSNSプラットフォームを更新すると、各フィールドが反映される")
     void test30() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
@@ -1026,29 +1026,29 @@ class ResumeMapperTest {
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("bbbbbbbb-2345-2345-2345-bbbbbbbb2345");
-        SocialLinkDto original = createSocialLinkDto(
+        SnsPlatformDto original = createSnsPlatformDto(
                 linkId,
                 RESUME_ID_1,
                 "GitHub",
                 "https://github.com/test");
-        resumeMapper.insertSocialLink(original);
+        resumeMapper.insertSnsPlatform(original);
 
-        SocialLinkDto updated = createSocialLinkDto(
+        SnsPlatformDto updated = createSnsPlatformDto(
                 linkId,
                 RESUME_ID_1,
                 "GitHubUpdated",
                 "https://github.com/test-updated");
-        resumeMapper.updateSocialLink(updated);
+        resumeMapper.updateSnsPlatform(updated);
 
-        List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
+        List<SnsPlatformDto> list = resumeMapper.selectSnsPlatformsByResumeId(RESUME_ID_1);
         assertThat(list).hasSize(1);
-        SocialLinkDto loaded = list.get(0);
+        SnsPlatformDto loaded = list.get(0);
         assertThat(loaded.getName()).isEqualTo("GitHubUpdated");
         assertThat(loaded.getLink()).isEqualTo("https://github.com/test-updated");
     }
 
     @Test
-    @DisplayName("deleteSocialLink_特定のsocialLink_idを削除後、selectSocialLinksByResumeIdに含まれなくなる")
+    @DisplayName("deleteSnsPlatform_特定のsnsPlatform_idを削除後、selectPlatformsByResumeIdに含まれなくなる")
     void test31() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
@@ -1056,35 +1056,37 @@ class ResumeMapperTest {
         resumeMapper.upsert(resume);
 
         UUID linkId = UUID.fromString("cccccccc-3456-3456-3456-cccccccc3456");
-        SocialLinkDto link = createSocialLinkDto(
+        SnsPlatformDto link = createSnsPlatformDto(
                 linkId,
                 RESUME_ID_1,
                 "Twitter",
                 "https://twitter.com/test");
-        resumeMapper.insertSocialLink(link);
+        resumeMapper.insertSnsPlatform(link);
 
-        resumeMapper.deleteSocialLink(linkId);
+        resumeMapper.deleteSnsPlatform(linkId);
 
-        List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
+        List<SnsPlatformDto> list = resumeMapper.selectSnsPlatformsByResumeId(RESUME_ID_1);
         assertThat(list).isEmpty();
     }
 
     @Test
-    @DisplayName("deleteSocialLinksByResumeId_すべてのソーシャルリンクを削除後、selectSocialLinksByResumeIdが空リストを返す")
+    @DisplayName("deleteSnsPlatformsByResumeId_すべてのSNSプラットフォームを削除後、selectSnsPlatformsByResumeIdが空リストを返す")
     void test32() {
         userMapper.upsertUser(createUserDto());
         ResumeDto resume = createResumeDto(
                 RESUME_ID_1, USER_ID, NAME_1, DATE_1, LAST_NAME_1, FIRST_NAME_1, CREATED, UPDATED);
         resumeMapper.upsert(resume);
 
-        resumeMapper.insertSocialLink(createSocialLinkDto(
-                UUID.randomUUID(), RESUME_ID_1, "Link1", "http://l1"));
-        resumeMapper.insertSocialLink(createSocialLinkDto(
-                UUID.randomUUID(), RESUME_ID_1, "Link2", "http://l2"));
+        resumeMapper.insertSnsPlatform(
+                createSnsPlatformDto(
+                        UUID.randomUUID(), RESUME_ID_1, "Link1", "http://l1"));
+        resumeMapper.insertSnsPlatform(
+                createSnsPlatformDto(
+                        UUID.randomUUID(), RESUME_ID_1, "Link2", "http://l2"));
 
-        resumeMapper.deleteSocialLinksByResumeId(RESUME_ID_1);
+        resumeMapper.deleteSnsPlatformsByResumeId(RESUME_ID_1);
 
-        List<SocialLinkDto> list = resumeMapper.selectSocialLinksByResumeId(RESUME_ID_1);
+        List<SnsPlatformDto> list = resumeMapper.selectSnsPlatformsByResumeId(RESUME_ID_1);
         assertThat(list).isEmpty();
     }
 
@@ -1313,7 +1315,7 @@ class ResumeMapperTest {
         dto.setProjects(Collections.emptyList());
         dto.setCertifications(Collections.emptyList());
         dto.setPortfolios(Collections.emptyList());
-        dto.setSocialLinks(Collections.emptyList());
+        dto.setSnsPlatforms(Collections.emptyList());
         dto.setSelfPromotions(Collections.emptyList());
         return dto;
     }
@@ -1450,12 +1452,12 @@ class ResumeMapperTest {
         return d;
     }
 
-    private SocialLinkDto createSocialLinkDto(
+    private SnsPlatformDto createSnsPlatformDto(
             UUID id,
             UUID resumeId,
             String name,
             String link) {
-        SocialLinkDto d = new SocialLinkDto();
+        SnsPlatformDto d = new SnsPlatformDto();
         d.setId(id);
         d.setResumeId(resumeId);
         d.setName(name);

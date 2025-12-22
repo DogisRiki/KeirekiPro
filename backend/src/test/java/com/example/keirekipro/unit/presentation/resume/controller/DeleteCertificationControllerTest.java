@@ -30,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 class DeleteCertificationControllerTest {
 
     @MockitoBean
-    private DeleteCertificationUseCase deleteCertificationUseCase;
+    private DeleteCertificationUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -51,6 +51,6 @@ class DeleteCertificationControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(deleteCertificationUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CERTIFICATION_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CERTIFICATION_ID));
     }
 }

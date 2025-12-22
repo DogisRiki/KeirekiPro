@@ -50,7 +50,7 @@ public class ResumeInfoResponse {
     private final List<PortfolioResponse> portfolios;
 
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
-    private final List<SocialLinkResponse> socialLinks;
+    private final List<SnsPlatformResponse> snsPlatforms;
 
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private final List<SelfPromotionResponse> selfPromotions;
@@ -161,11 +161,11 @@ public class ResumeInfoResponse {
                                 pf.getTechStack(),
                                 pf.getLink()))
                         .collect(Collectors.toList()))
-                .socialLinks(dto.getSocialLinks().stream()
-                        .map(sl -> new SocialLinkResponse(
-                                sl.getId().toString(),
-                                sl.getName(),
-                                sl.getLink()))
+                .snsPlatforms(dto.getSnsPlatforms().stream()
+                        .map(sp -> new SnsPlatformResponse(
+                                sp.getId().toString(),
+                                sp.getName(),
+                                sp.getLink()))
                         .collect(Collectors.toList()))
                 .selfPromotions(dto.getSelfPromotions().stream()
                         .map(sp -> new SelfPromotionResponse(
@@ -328,11 +328,11 @@ public class ResumeInfoResponse {
     }
 
     /**
-     * ソーシャルリンク
+     * SNSプラットフォーム
      */
     @Getter
     @AllArgsConstructor
-    public static class SocialLinkResponse {
+    public static class SnsPlatformResponse {
         private final String id;
         private final String name;
         private final String link;

@@ -38,7 +38,7 @@ class GetResumeListControllerTest {
     private CurrentUserFacade currentUserFacade;
 
     @MockitoBean
-    private GetResumeListUseCase getResumeListUseCase;
+    private GetResumeListUseCase useCase;
 
     private final MockMvc mockMvc;
 
@@ -72,7 +72,7 @@ class GetResumeListControllerTest {
                 .updatedAt(UPDATED_AT)
                 .build();
 
-        when(getResumeListUseCase.execute(eq(USER_ID)))
+        when(useCase.execute(eq(USER_ID)))
                 .thenReturn(List.of(dto1, dto2));
 
         // 実行&検証
@@ -88,7 +88,7 @@ class GetResumeListControllerTest {
                 .andExpect(jsonPath("$.resumes[1].updatedAt").value(UPDATED_AT.format(FMT)));
 
         verify(currentUserFacade).getUserId();
-        verify(getResumeListUseCase).execute(eq(USER_ID));
+        verify(useCase).execute(eq(USER_ID));
     }
 
     @Test
@@ -96,7 +96,7 @@ class GetResumeListControllerTest {
     void test2() throws Exception {
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(getResumeListUseCase.execute(eq(USER_ID))).thenReturn(List.of());
+        when(useCase.execute(eq(USER_ID))).thenReturn(List.of());
 
         // 実行&検証
         mockMvc.perform(get(ENDPOINT))
@@ -104,6 +104,6 @@ class GetResumeListControllerTest {
                 .andExpect(jsonPath("$.resumes").isEmpty());
 
         verify(currentUserFacade).getUserId();
-        verify(getResumeListUseCase).execute(eq(USER_ID));
+        verify(useCase).execute(eq(USER_ID));
     }
 }

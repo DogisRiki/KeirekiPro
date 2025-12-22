@@ -22,7 +22,7 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.helper.ResumeObjectBuilder;
@@ -157,16 +157,16 @@ class CopyCreateResumeUseCaseTest {
             assertThat(copiedPortfolio.getLink()).isEqualTo(sourcePortfolio.getLink());
         }
 
-        // ソーシャルリンクのID再採番と内容コピーの検証
-        assertThat(saved.getSocialLinks()).hasSize(source.getSocialLinks().size());
-        for (int i = 0; i < source.getSocialLinks().size(); i++) {
-            SocialLink sourceSocialLink = source.getSocialLinks().get(i);
-            SocialLink copiedSocialLink = saved.getSocialLinks().get(i);
+        // SNSプラットフォームのID再採番と内容コピーの検証
+        assertThat(saved.getSnsPlatforms()).hasSize(source.getSnsPlatforms().size());
+        for (int i = 0; i < source.getSnsPlatforms().size(); i++) {
+            SnsPlatform sourceSnsPlatform = source.getSnsPlatforms().get(i);
+            SnsPlatform copiedSnsPlatForm = saved.getSnsPlatforms().get(i);
 
-            assertThat(copiedSocialLink.getId()).isNotNull();
-            assertThat(copiedSocialLink.getId()).isNotEqualTo(sourceSocialLink.getId());
-            assertThat(copiedSocialLink.getName()).isEqualTo(sourceSocialLink.getName());
-            assertThat(copiedSocialLink.getLink()).isEqualTo(sourceSocialLink.getLink());
+            assertThat(copiedSnsPlatForm.getId()).isNotNull();
+            assertThat(copiedSnsPlatForm.getId()).isNotEqualTo(sourceSnsPlatform.getId());
+            assertThat(copiedSnsPlatForm.getName()).isEqualTo(sourceSnsPlatform.getName());
+            assertThat(copiedSnsPlatForm.getLink()).isEqualTo(sourceSnsPlatform.getLink());
         }
 
         // 自己PRのID再採番と内容コピーの検証

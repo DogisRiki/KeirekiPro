@@ -8,9 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.UUID;
 
-import com.example.keirekipro.presentation.resume.controller.DeleteSocialLinkController;
+import com.example.keirekipro.presentation.resume.controller.DeleteSnsPlatformController;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
-import com.example.keirekipro.usecase.resume.DeleteSocialLinkUseCase;
+import com.example.keirekipro.usecase.resume.DeleteSnsPlatformUseCase;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,34 +23,34 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import lombok.RequiredArgsConstructor;
 
-@WebMvcTest(DeleteSocialLinkController.class)
+@WebMvcTest(DeleteSnsPlatformController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @TestConstructor(autowireMode = AutowireMode.ALL)
 @RequiredArgsConstructor
-class DeleteSocialLinkControllerTest {
+class DeleteSnsPlatformControllerTest {
 
     @MockitoBean
-    private DeleteSocialLinkUseCase deleteSocialLinkUseCase;
+    private DeleteSnsPlatformUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
 
     private final MockMvc mockMvc;
 
-    private static final String ENDPOINT = "/api/resumes/{resumeId}/social-links/{socialLinkId}";
+    private static final String ENDPOINT = "/api/resumes/{resumeId}/sns-platforms/{snsPlatformId}";
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID RESUME_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
-    private static final UUID SOCIAL_LINK_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID SNS_PLATFORM_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
     @Test
     @DisplayName("正常なリクエストの場合、204が返り、ユースケースが呼び出される")
     void test1() throws Exception {
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
 
-        mockMvc.perform(delete(ENDPOINT, RESUME_ID, SOCIAL_LINK_ID))
+        mockMvc.perform(delete(ENDPOINT, RESUME_ID, SNS_PLATFORM_ID))
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(deleteSocialLinkUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SOCIAL_LINK_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SNS_PLATFORM_ID));
     }
 }

@@ -188,40 +188,40 @@ public interface ResumeMapper {
     void deletePortfoliosByResumeId(@Param("resumeId") UUID resumeId);
 
     /**
-     * 職務経歴書IDに紐づくソーシャルリンク一覧を取得する
+     * 職務経歴書IDに紐づくSNSプラットフォーム一覧を取得する
      *
      * @param resumeId 職務経歴書ID
-     * @return ソーシャルリンクDTOリスト
+     * @return SNSプラットフォームDTOリスト
      */
-    List<ResumeDto.SocialLinkDto> selectSocialLinksByResumeId(@Param("resumeId") UUID resumeId);
+    List<ResumeDto.SnsPlatformDto> selectSnsPlatformsByResumeId(@Param("resumeId") UUID resumeId);
 
     /**
-     * ソーシャルリンクを挿入する
+     * SNSプラットフォームを挿入する
      *
-     * @param socialLinkDto ソーシャルリンクDTO
+     * @param snsPlatformDto SNSプラットフォームDTO
      */
-    void insertSocialLink(@Param("dto") ResumeDto.SocialLinkDto socialLinkDto);
+    void insertSnsPlatform(@Param("dto") ResumeDto.SnsPlatformDto snsPlatformDto);
 
     /**
-     * ソーシャルリンクを更新する
+     * SNSプラットフォームを更新する
      *
-     * @param socialLinkDto ソーシャルリンクDTO
+     * @param snsPlatformDto SNSプラットフォームDTO
      */
-    void updateSocialLink(@Param("dto") ResumeDto.SocialLinkDto socialLinkDto);
+    void updateSnsPlatform(@Param("dto") ResumeDto.SnsPlatformDto snsPlatformDto);
 
     /**
-     * ソーシャルリンクを削除する
+     * SNSプラットフォームを削除する
      *
-     * @param socialLinkId ソーシャルリンクID
+     * @param snsPlatformId SNSプラットフォームID
      */
-    void deleteSocialLink(@Param("socialLinkId") UUID socialLinkId);
+    void deleteSnsPlatform(@Param("snsPlatformId") UUID snsPlatformId);
 
     /**
-     * 職務経歴書IDに紐づくすべてのソーシャルリンクを削除する
+     * 職務経歴書IDに紐づくすべてのSNSプラットフォームを削除する
      *
      * @param resumeId 職務経歴書ID
      */
-    void deleteSocialLinksByResumeId(@Param("resumeId") UUID resumeId);
+    void deleteSnsPlatformsByResumeId(@Param("resumeId") UUID resumeId);
 
     /**
      * 職務経歴書IDに紐づく自己PR一覧を取得する

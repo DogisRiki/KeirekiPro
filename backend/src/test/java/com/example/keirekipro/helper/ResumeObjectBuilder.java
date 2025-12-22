@@ -18,7 +18,7 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.model.resume.TechStack.Backend;
 import com.example.keirekipro.domain.model.resume.TechStack.Frontend;
@@ -131,7 +131,7 @@ public class ResumeObjectBuilder {
                 "Desc",
                 "TechStackDesc",
                 Link.create(new Notification(), "https://example.com"));
-        SocialLink social = SocialLink.create(
+        SnsPlatform snsplat = SnsPlatform.create(
                 notif,
                 "GitHub",
                 Link.create(new Notification(), "https://github.com"));
@@ -149,7 +149,7 @@ public class ResumeObjectBuilder {
                 List.of(project),
                 List.of(cert),
                 List.of(port),
-                List.of(social),
+                List.of(snsplat),
                 List.of(self));
     }
 
@@ -325,9 +325,9 @@ public class ResumeObjectBuilder {
             return pod;
         }).collect(Collectors.toList()));
 
-        // ソーシャルリンク
-        dto.setSocialLinks(r.getSocialLinks().stream().map(sl -> {
-            ResumeDto.SocialLinkDto sd = new ResumeDto.SocialLinkDto();
+        // SNSプラットフォーム
+        dto.setSnsPlatforms(r.getSnsPlatforms().stream().map(sl -> {
+            ResumeDto.SnsPlatformDto sd = new ResumeDto.SnsPlatformDto();
             sd.setId(sl.getId());
             sd.setResumeId(r.getId());
             sd.setName(sl.getName());

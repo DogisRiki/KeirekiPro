@@ -12,23 +12,23 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 
 /**
- * SNS削除ユースケース
+ * SNSプラットフォーム削除ユースケース
  */
 @Service
 @RequiredArgsConstructor
-public class DeleteSocialLinkUseCase {
+public class DeleteSnsPlatformUseCase {
 
     private final ResumeRepository resumeRepository;
 
     /**
-     * SNS削除ユースケースを実行する
+     * SNSプラットフォーム削除ユースケースを実行する
      *
-     * @param userId       ユーザーID
-     * @param resumeId     職務経歴書ID
-     * @param socialLinkId SNSID
+     * @param userId        ユーザーID
+     * @param resumeId      職務経歴書ID
+     * @param snsPlatformId SNSプラットフォームID
      */
     @Transactional
-    public void execute(UUID userId, UUID resumeId, UUID socialLinkId) {
+    public void execute(UUID userId, UUID resumeId, UUID snsPlatformId) {
 
         Resume resume = resumeRepository.find(resumeId)
                 .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
@@ -37,12 +37,12 @@ public class DeleteSocialLinkUseCase {
             throw new UseCaseException("職務経歴書が存在しません。");
         }
 
-        boolean exists = resume.getSocialLinks().stream().anyMatch(s -> s.getId().equals(socialLinkId));
+        boolean exists = resume.getSnsPlatforms().stream().anyMatch(s -> s.getId().equals(snsPlatformId));
         if (!exists) {
-            throw new UseCaseException("対象のSNSが存在しません。");
+            throw new UseCaseException("対象のSNSプラットフォームが存在しません。");
         }
 
-        Resume updated = resume.removeSociealLink(socialLinkId);
+        Resume updated = resume.removeSnsPlatform(snsPlatformId);
 
         resumeRepository.save(updated);
     }

@@ -4,12 +4,11 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Resume;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreateSocialLinkRequest;
+import com.example.keirekipro.presentation.resume.dto.UpdateSnsPlatformRequest;
 import com.example.keirekipro.shared.Notification;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
-import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.stereotype.Service;
@@ -18,29 +17,26 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 
 /**
- * SNSプラットフォーム新規作成ユースケース
+ * SNSプラットフォーム更新ユースケース
  */
 @Service
 @RequiredArgsConstructor
-public class CreateSocialLinkUseCase {
+public class UpdateSnsPlatformUseCase {
 
     private final ResumeRepository resumeRepository;
 
-    private final ResumeLimitChecker resumeLimitChecker;
-
     /**
-     * SNSプラットフォーム新規作成ユースケースを実行する
+     * SNS更新ユースケースを実行する
      *
-     * @param userId   ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param request  リクエスト
+     * @param userId        ユーザーID
+     * @param resumeId      職務経歴書ID
+     * @param snsPlatFormId SNSプラットフォームID
+     * @param request       リクエスト
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateSocialLinkRequest request) {
-
-        // 上限チェック
-        resumeLimitChecker.checkSnsPlatformAddAllowed(resumeId);
+    public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UUID snsPlatFormId,
+            UpdateSnsPlatformRequest request) {
 
         Resume resume = resumeRepository.find(resumeId)
                 .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
@@ -49,12 +45,20 @@ public class CreateSocialLinkUseCase {
             throw new UseCaseException("職務経歴書が存在しません。");
         }
 
+        SnsPlatform existing = resume.getSnsPlatforms().stream()
+                .filter(s -> s.getId().equals(snsPlatFormId))
+                .findFirst()
+                .orElseThrow(() -> new UseCaseException("対象のSNSプラットフォームが存在しません。"));
+
         Notification notification = new Notification();
 
         Link link = Link.create(notification, request.getLink());
-        SocialLink socialLink = SocialLink.create(notification, request.getName(), link);
 
-        Resume updated = resume.addSociealLink(notification, socialLink);
+        SnsPlatform updatedSnsPlatform = existing
+                .changeName(notification, request.getName())
+                .changeLink(notification, link);
+
+        Resume updated = resume.updateSnsPlatform(notification, updatedSnsPlatform);
 
         resumeRepository.save(updated);
 

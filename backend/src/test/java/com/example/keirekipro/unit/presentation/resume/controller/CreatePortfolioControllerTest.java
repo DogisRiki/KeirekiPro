@@ -42,7 +42,7 @@ import lombok.RequiredArgsConstructor;
 class CreatePortfolioControllerTest {
 
     @MockitoBean
-    private CreatePortfolioUseCase createPortfolioUseCase;
+    private CreatePortfolioUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -82,7 +82,7 @@ class CreatePortfolioControllerTest {
                 RESUME_DTO_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(createPortfolioUseCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreatePortfolioRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreatePortfolioRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
@@ -94,7 +94,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.format(FMT)));
 
         verify(currentUserFacade).getUserId();
-        verify(createPortfolioUseCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreatePortfolioRequest.class));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreatePortfolioRequest.class));
     }
 
     @Test
@@ -112,7 +112,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.name").isArray())
                 .andExpect(jsonPath("$.errors.name", hasItem("ポートフォリオ名は入力必須です。")));
 
-        verify(createPortfolioUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -130,7 +130,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.name").isArray())
                 .andExpect(jsonPath("$.errors.name", hasItem("ポートフォリオ名は50文字以内で入力してください。")));
 
-        verify(createPortfolioUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -148,7 +148,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.overview").isArray())
                 .andExpect(jsonPath("$.errors.overview", hasItem("ポートフォリオ概要は入力必須です。")));
 
-        verify(createPortfolioUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -166,7 +166,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.overview").isArray())
                 .andExpect(jsonPath("$.errors.overview", hasItem("ポートフォリオ概要は1000文字以内で入力してください。")));
 
-        verify(createPortfolioUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -184,7 +184,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.techStack").isArray())
                 .andExpect(jsonPath("$.errors.techStack", hasItem("技術スタックは1000文字以内で入力してください。")));
 
-        verify(createPortfolioUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -202,7 +202,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクは入力必須です。")));
 
-        verify(createPortfolioUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -220,7 +220,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクはhttps形式のURLを指定してください。")));
 
-        verify(createPortfolioUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -238,6 +238,6 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクは255文字以内で入力してください。")));
 
-        verify(createPortfolioUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 }

@@ -15,7 +15,7 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.shared.Notification;
@@ -45,7 +45,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
             dto.setProjects(resumeMapper.selectProjectsByResumeId(resumeId));
             dto.setCertifications(resumeMapper.selectCertificationsByResumeId(resumeId));
             dto.setPortfolios(resumeMapper.selectPortfoliosByResumeId(resumeId));
-            dto.setSocialLinks(resumeMapper.selectSocialLinksByResumeId(resumeId));
+            dto.setSnsPlatforms(resumeMapper.selectSnsPlatformsByResumeId(resumeId));
             dto.setSelfPromotions(resumeMapper.selectSelfPromotionsByResumeId(resumeId));
         });
 
@@ -69,7 +69,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
         dto.setProjects(resumeMapper.selectProjectsByResumeId(resumeId));
         dto.setCertifications(resumeMapper.selectCertificationsByResumeId(resumeId));
         dto.setPortfolios(resumeMapper.selectPortfoliosByResumeId(resumeId));
-        dto.setSocialLinks(resumeMapper.selectSocialLinksByResumeId(resumeId));
+        dto.setSnsPlatforms(resumeMapper.selectSnsPlatformsByResumeId(resumeId));
         dto.setSelfPromotions(resumeMapper.selectSelfPromotionsByResumeId(resumeId));
 
         // DTO → エンティティ変換
@@ -109,10 +109,10 @@ public class MyBatisResumeRepository implements ResumeRepository {
             resumeMapper.insertPortfolio(portfolioDto);
         }
 
-        // ソーシャルリンク
-        resumeMapper.deleteSocialLinksByResumeId(resumeId);
-        for (ResumeDto.SocialLinkDto socialLinkDto : dto.getSocialLinks()) {
-            resumeMapper.insertSocialLink(socialLinkDto);
+        // SNSプラットフォーム
+        resumeMapper.deleteSnsPlatformsByResumeId(resumeId);
+        for (ResumeDto.SnsPlatformDto snsPlatformDto : dto.getSnsPlatforms()) {
+            resumeMapper.insertSnsPlatform(snsPlatformDto);
         }
 
         // 自己PR
@@ -129,7 +129,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
         resumeMapper.deleteProjectsByResumeId(resumeId);
         resumeMapper.deleteCertificationsByResumeId(resumeId);
         resumeMapper.deletePortfoliosByResumeId(resumeId);
-        resumeMapper.deleteSocialLinksByResumeId(resumeId);
+        resumeMapper.deleteSnsPlatformsByResumeId(resumeId);
         resumeMapper.deleteSelfPromotionsByResumeId(resumeId);
 
         // 親テーブル (resumes) を削除
@@ -230,9 +230,9 @@ public class MyBatisResumeRepository implements ResumeRepository {
                         Link.create(notification, d.getLink())))
                 .toList();
 
-        // ソーシャルリンク
-        List<SocialLink> socialLinks = dto.getSocialLinks().stream()
-                .map(d -> SocialLink.reconstruct(
+        // SNSプラットフォーム
+        List<SnsPlatform> snsPlatforms = dto.getSnsPlatforms().stream()
+                .map(d -> SnsPlatform.reconstruct(
                         d.getId(),
                         d.getName(),
                         Link.create(notification, d.getLink())))
@@ -259,7 +259,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                 projects,
                 certifications,
                 portfolios,
-                socialLinks,
+                snsPlatforms,
                 selfPromotions);
     }
 
@@ -404,18 +404,18 @@ public class MyBatisResumeRepository implements ResumeRepository {
                 .toList();
         dto.setPortfolios(portfolioDtos);
 
-        // ソーシャルリンクリスト
-        List<ResumeDto.SocialLinkDto> socialLinkDtos = resume.getSocialLinks().stream()
-                .map(sl -> {
-                    ResumeDto.SocialLinkDto d = new ResumeDto.SocialLinkDto();
-                    d.setId(sl.getId());
+        // SNSプラットフォームリスト
+        List<ResumeDto.SnsPlatformDto> snsPlatFormDtos = resume.getSnsPlatforms().stream()
+                .map(sp -> {
+                    ResumeDto.SnsPlatformDto d = new ResumeDto.SnsPlatformDto();
+                    d.setId(sp.getId());
                     d.setResumeId(resumeId);
-                    d.setName(sl.getName());
-                    d.setLink(sl.getLink().getValue());
+                    d.setName(sp.getName());
+                    d.setLink(sp.getLink().getValue());
                     return d;
                 })
                 .toList();
-        dto.setSocialLinks(socialLinkDtos);
+        dto.setSnsPlatforms(snsPlatFormDtos);
 
         // 自己PRリスト
         List<ResumeDto.SelfPromotionDto> selfDtos = resume.getSelfPromotions().stream()

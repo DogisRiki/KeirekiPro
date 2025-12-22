@@ -22,7 +22,7 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.shared.Notification;
@@ -95,7 +95,7 @@ class ResumeTest {
                 List.of(createSampleProject()),
                 List.of(createSampleCertification()),
                 List.of(createSamplePortfolio()),
-                List.of(createSampleSociealLink()),
+                List.of(createSampleSnsPlatform()),
                 List.of(createSampleSelfPromotion()));
 
         assertThat(resume).isNotNull();
@@ -110,7 +110,7 @@ class ResumeTest {
         assertThat(resume.getProjects().size()).isEqualTo(1);
         assertThat(resume.getCertifications().size()).isEqualTo(1);
         assertThat(resume.getPortfolios().size()).isEqualTo(1);
-        assertThat(resume.getSocialLinks().size()).isEqualTo(1);
+        assertThat(resume.getSnsPlatforms().size()).isEqualTo(1);
         assertThat(resume.getSelfPromotions().size()).isEqualTo(1);
     }
 
@@ -297,7 +297,7 @@ class ResumeTest {
                 List.of(), // プロジェクトはなし
                 List.of(createSampleCertification()),
                 List.of(createSamplePortfolio()),
-                List.of(createSampleSociealLink()),
+                List.of(createSampleSnsPlatform()),
                 List.of(createSampleSelfPromotion()));
 
         Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
@@ -680,82 +680,82 @@ class ResumeTest {
     }
 
     @Test
-    @DisplayName("ソーシャルリンクを追加する")
+    @DisplayName("SNSプラットフォームを追加する")
     void test23() {
         Resume beforeResume = createSampleResume();
-        SocialLink newSocialLink = SocialLink.create(
+        SnsPlatform newSnsPlatform = SnsPlatform.create(
                 notification,
                 "Twitter",
                 Link.create(notification, "https://twitter.com/user"));
 
         Notification domainNotification = new Notification();
 
-        Resume afterResume = beforeResume.addSociealLink(domainNotification, newSocialLink);
+        Resume afterResume = beforeResume.addSnsPlatform(domainNotification, newSnsPlatform);
 
-        // 新しいソーシャルリンクがリストに含まれている
-        assertThat(afterResume.getSocialLinks().contains(newSocialLink)).isTrue();
-        // ソーシャルリンクリストのサイズが増加している
-        assertThat(afterResume.getSocialLinks().size()).isEqualTo(beforeResume.getSocialLinks().size() + 1);
+        // 新しいSNSプラットフォームがリストに含まれている
+        assertThat(afterResume.getSnsPlatforms().contains(newSnsPlatform)).isTrue();
+        // SNSプラットフォームリストのサイズが増加している
+        assertThat(afterResume.getSnsPlatforms().size()).isEqualTo(beforeResume.getSnsPlatforms().size() + 1);
     }
 
     @Test
-    @DisplayName("ソーシャルリンクを更新する")
+    @DisplayName("SNSプラットフォームを更新する")
     void test24() {
         Resume beforeResume = createSampleResume();
-        SocialLink updatedSocialLink = SocialLink.reconstruct(
-                beforeResume.getSocialLinks().get(0).getId(),
+        SnsPlatform updatedSnsPlatform = SnsPlatform.reconstruct(
+                beforeResume.getSnsPlatforms().get(0).getId(),
                 "LinkedIn",
                 Link.create(notification, "https://linkedin.com/in/user"));
 
         Notification domainNotification = new Notification();
 
-        Resume afterResume = beforeResume.updateSociealLink(domainNotification, updatedSocialLink);
+        Resume afterResume = beforeResume.updateSnsPlatform(domainNotification, updatedSnsPlatform);
 
-        SocialLink actualSocialLink = afterResume.getSocialLinks().stream()
-                .filter(socialLink -> socialLink.getId().equals(updatedSocialLink.getId()))
+        SnsPlatform actualSnsPlatform = afterResume.getSnsPlatforms().stream()
+                .filter(snsPlatform -> snsPlatform.getId().equals(updatedSnsPlatform.getId()))
                 .findFirst()
                 .orElseThrow();
 
-        // 更新したソーシャルリンクがリストに含まれている
-        assertThat(afterResume.getSocialLinks().contains(updatedSocialLink)).isTrue();
-        // ソーシャルリンクリストのサイズが変わらない
-        assertThat(afterResume.getSocialLinks().size()).isEqualTo(beforeResume.getSocialLinks().size());
-        // 更新したソーシャルリンクの値が正しい（順序に依存しない）
+        // 更新したSNSプラットフォームがリストに含まれている
+        assertThat(afterResume.getSnsPlatforms().contains(updatedSnsPlatform)).isTrue();
+        // SNSプラットフォームリストのサイズが変わらない
+        assertThat(afterResume.getSnsPlatforms().size()).isEqualTo(beforeResume.getSnsPlatforms().size());
+        // 更新したSNSプラットフォームの値が正しい（順序に依存しない）
         assertAll(
-                () -> assertThat(actualSocialLink.getName()).isEqualTo(updatedSocialLink.getName()),
-                () -> assertThat(actualSocialLink.getLink()).isEqualTo(updatedSocialLink.getLink()),
-                () -> assertThat(actualSocialLink.getId()).isEqualTo(updatedSocialLink.getId()));
+                () -> assertThat(actualSnsPlatform.getName()).isEqualTo(updatedSnsPlatform.getName()),
+                () -> assertThat(actualSnsPlatform.getLink()).isEqualTo(updatedSnsPlatform.getLink()),
+                () -> assertThat(actualSnsPlatform.getId()).isEqualTo(updatedSnsPlatform.getId()));
     }
 
     @Test
-    @DisplayName("ソーシャルリンクを削除する")
+    @DisplayName("SNSプラットフォームを削除する")
     void test25() {
         Resume beforeResume = createSampleResume();
-        SocialLink newSocialLink = SocialLink.create(
+        SnsPlatform newSnsPlatform = SnsPlatform.create(
                 notification,
                 "Facebook",
                 Link.create(notification, "https://facebook.com/user"));
 
         Notification domainNotification = new Notification();
 
-        Resume afterResume = beforeResume.addSociealLink(domainNotification, newSocialLink);
+        Resume afterResume = beforeResume.addSnsPlatform(domainNotification, newSnsPlatform);
 
         // 削除1回目(2件 → 1件)
-        Resume deletedResume = afterResume.removeSociealLink(newSocialLink.getId());
-        // 削除したソーシャルリンクがリストに含まれていない
-        assertThat(deletedResume.getSocialLinks().contains(newSocialLink)).isFalse();
-        // ソーシャルリンクリストのサイズが減少している
-        assertThat(deletedResume.getSocialLinks().size()).isEqualTo(afterResume.getSocialLinks().size() - 1);
+        Resume deletedResume = afterResume.removeSnsPlatform(newSnsPlatform.getId());
+        // 削除したSNSプラットフォームがリストに含まれていない
+        assertThat(deletedResume.getSnsPlatforms().contains(newSnsPlatform)).isFalse();
+        // SNSプラットフォームリストのサイズが減少している
+        assertThat(deletedResume.getSnsPlatforms().size()).isEqualTo(afterResume.getSnsPlatforms().size() - 1);
 
         // 削除2回目(1件 → 0件) - 残件のIDで削除（順序に依存しない）
-        UUID remainingSocialLinkId = deletedResume.getSocialLinks().stream()
+        UUID remainingSnsPlatformId = deletedResume.getSnsPlatforms().stream()
                 .findFirst()
                 .orElseThrow()
                 .getId();
 
-        Resume deletedResume2 = deletedResume.removeSociealLink(remainingSocialLinkId);
-        // ソーシャルリンクリストが空になっている
-        assertThat(deletedResume2.getSocialLinks().isEmpty()).isTrue();
+        Resume deletedResume2 = deletedResume.removeSnsPlatform(remainingSnsPlatformId);
+        // SNSプラットフォームリストが空になっている
+        assertThat(deletedResume2.getSnsPlatforms().isEmpty()).isTrue();
     }
 
     @Test
@@ -1007,7 +1007,7 @@ class ResumeTest {
                 List.of(createSampleProject()),
                 List.of(createSampleCertification()),
                 List.of(createSamplePortfolio()),
-                List.of(createSampleSociealLink()),
+                List.of(createSampleSnsPlatform()),
                 List.of(createSampleSelfPromotion()));
     }
 
@@ -1093,10 +1093,10 @@ class ResumeTest {
     }
 
     /**
-     * ソーシャルリンクのサンプルエンティティを作成する補助メソッド
+     * SNSプラットフォームのサンプルエンティティを作成する補助メソッド
      */
-    private SocialLink createSampleSociealLink() {
-        return SocialLink.create(notification, "GitHub", Link.create(notification, "https://github.com/user"));
+    private SnsPlatform createSampleSnsPlatform() {
+        return SnsPlatform.create(notification, "GitHub", Link.create(notification, "https://github.com/user"));
     }
 
     /**

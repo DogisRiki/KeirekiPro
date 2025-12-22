@@ -32,7 +32,7 @@ public class ResumeInfoUseCaseDto {
     private final List<Project> projects;
     private final List<Certification> certifications;
     private final List<Portfolio> portfolios;
-    private final List<SocialLink> socialLinks;
+    private final List<SnsPlatform> snsPlatforms;
     private final List<SelfPromotion> selfPromotions;
 
     /**
@@ -141,8 +141,8 @@ public class ResumeInfoUseCaseDto {
                                 pf.getTechStack(),
                                 pf.getLink().getValue()))
                         .toList())
-                .socialLinks(resume.getSocialLinks().stream()
-                        .map(sl -> new SocialLink(
+                .snsPlatforms(resume.getSnsPlatforms().stream()
+                        .map(sl -> new SnsPlatform(
                                 sl.getId(),
                                 sl.getName(),
                                 sl.getLink().getValue()))
@@ -308,11 +308,11 @@ public class ResumeInfoUseCaseDto {
     }
 
     /**
-     * ソーシャルリンク
+     * SNSプラットフォーム
      */
     @RequiredArgsConstructor
     @Getter
-    public static class SocialLink {
+    public static class SnsPlatform {
         private final UUID id;
         private final String name;
         private final String link;

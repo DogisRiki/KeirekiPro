@@ -8,13 +8,13 @@ import com.example.keirekipro.shared.Notification;
 import lombok.Getter;
 
 /**
- * ソーシャルリンク
+ * SNSプラットフォーム
  */
 @Getter
-public class SocialLink extends Entity {
+public class SnsPlatform extends Entity {
 
     /**
-     * ソーシャル名
+     * プラットフォーム名
      */
     private final String name;
 
@@ -26,7 +26,7 @@ public class SocialLink extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private SocialLink(String name, Link link) {
+    private SnsPlatform(String name, Link link) {
         super();
         this.name = name;
         this.link = link;
@@ -35,7 +35,7 @@ public class SocialLink extends Entity {
     /**
      * 再構築用のコンストラクタ
      */
-    private SocialLink(UUID id, String name, Link link) {
+    private SnsPlatform(UUID id, String name, Link link) {
         super(id);
         this.name = name;
         this.link = link;
@@ -45,37 +45,37 @@ public class SocialLink extends Entity {
      * 新規構築用のファクトリーメソッド
      *
      * @param notification 通知オブジェクト
-     * @param name         ソーシャル名
+     * @param name         プラットフォーム名
      * @param link         リンク
-     * @return ソーシャルリンクエンティティ
+     * @return SNSプラットフォームエンティティ
      */
-    public static SocialLink create(Notification notification, String name, Link link) {
+    public static SnsPlatform create(Notification notification, String name, Link link) {
         validate(notification, name, link);
-        return new SocialLink(name, link);
+        return new SnsPlatform(name, link);
     }
 
     /**
      * 再構築用のファクトリーメソッド
      *
      * @param id   識別子
-     * @param name ソーシャル名
+     * @param name プラットフォーム名
      * @param link リンク
-     * @return ソーシャルリンクエンティティ
+     * @return SNSプラットフォームエンティティ
      */
-    public static SocialLink reconstruct(UUID id, String name, Link link) {
-        return new SocialLink(id, name, link);
+    public static SnsPlatform reconstruct(UUID id, String name, Link link) {
+        return new SnsPlatform(id, name, link);
     }
 
     /**
-     * ソーシャル名を変更する
+     * プラットフォーム名を変更する
      *
      * @param notification 通知オブジェクト
-     * @param name         ソーシャル名
-     * @return 変更後のソーシャルリンクエンティティ
+     * @param name         プラットフォーム名
+     * @return 変更後のSNSプラットフォームエンティティ
      */
-    public SocialLink changeName(Notification notification, String name) {
+    public SnsPlatform changeName(Notification notification, String name) {
         validate(notification, name, this.link);
-        return new SocialLink(this.id, name, this.link);
+        return new SnsPlatform(this.id, name, this.link);
     }
 
     /**
@@ -83,18 +83,18 @@ public class SocialLink extends Entity {
      *
      * @param notification 通知オブジェクト
      * @param link         リンク
-     * @return 変更後のソーシャルリンクエンティティ
+     * @return 変更後のSNSプラットフォームエンティティ
      */
-    public SocialLink changeLink(Notification notification, Link link) {
+    public SnsPlatform changeLink(Notification notification, Link link) {
         validate(notification, this.name, link);
-        return new SocialLink(this.id, this.name, link);
+        return new SnsPlatform(this.id, this.name, link);
     }
 
     private static void validate(Notification notification, String name, Link link) {
         if (name == null || name.isBlank()) {
-            notification.addError("name", "ソーシャル名は入力必須です。");
+            notification.addError("name", "プラットフォーム名は入力必須です。");
         } else if (name.length() > 50) {
-            notification.addError("name", "ソーシャル名は50文字以内で入力してください。");
+            notification.addError("name", "プラットフォーム名は50文字以内で入力してください。");
         }
 
         if (link == null) {

@@ -137,7 +137,7 @@ class DeleteSelfPromotionUseCaseTest {
                 List.of(), // projects
                 List.of(), // certifications
                 List.of(), // portfolios
-                List.of(), // socialLinks
+                List.of(), // snsPlatforms
                 List.of(s1, s2) // selfPromotions
         );
     }

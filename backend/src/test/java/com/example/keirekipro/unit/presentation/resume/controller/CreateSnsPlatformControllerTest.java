@@ -16,10 +16,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 import com.example.keirekipro.helper.ResumeObjectBuilder;
-import com.example.keirekipro.presentation.resume.controller.CreateSocialLinkController;
-import com.example.keirekipro.presentation.resume.dto.CreateSocialLinkRequest;
+import com.example.keirekipro.presentation.resume.controller.CreateSnsPlatformController;
+import com.example.keirekipro.presentation.resume.dto.CreateSnsPlatformRequest;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
-import com.example.keirekipro.usecase.resume.CreateSocialLinkUseCase;
+import com.example.keirekipro.usecase.resume.CreateSnsPlatformUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -35,14 +35,14 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import lombok.RequiredArgsConstructor;
 
-@WebMvcTest(CreateSocialLinkController.class)
+@WebMvcTest(CreateSnsPlatformController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @TestConstructor(autowireMode = AutowireMode.ALL)
 @RequiredArgsConstructor
-class CreateSocialLinkControllerTest {
+class CreateSnsPlatformControllerTest {
 
     @MockitoBean
-    private CreateSocialLinkUseCase createSocialLinkUseCase;
+    private CreateSnsPlatformUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -50,7 +50,7 @@ class CreateSocialLinkControllerTest {
     private final MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
-    private static final String ENDPOINT = "/api/resumes/{resumeId}/social-links";
+    private static final String ENDPOINT = "/api/resumes/{resumeId}/sns-platforms";
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID RESUME_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID RESUME_DTO_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
@@ -64,21 +64,21 @@ class CreateSocialLinkControllerTest {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
-    private static CreateSocialLinkRequest buildValidRequest() {
-        return new CreateSocialLinkRequest("GitHub", "https://example.com/github");
+    private static CreateSnsPlatformRequest buildValidRequest() {
+        return new CreateSnsPlatformRequest("GitHub", "https://example.com/github");
     }
 
     @Test
     @DisplayName("正常なリクエストの場合、201と職務経歴書情報がレスポンスとして返る")
     void test1() throws Exception {
-        CreateSocialLinkRequest req = buildValidRequest();
+        CreateSnsPlatformRequest req = buildValidRequest();
         String body = objectMapper.writeValueAsString(req);
 
         ResumeInfoUseCaseDto dto = ResumeObjectBuilder.buildResumeInfoUseCaseDto(
                 RESUME_DTO_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(createSocialLinkUseCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreateSocialLinkRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreateSnsPlatformRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
@@ -90,13 +90,13 @@ class CreateSocialLinkControllerTest {
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.format(FMT)));
 
         verify(currentUserFacade).getUserId();
-        verify(createSocialLinkUseCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreateSocialLinkRequest.class));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreateSnsPlatformRequest.class));
     }
 
     @Test
-    @DisplayName("ソーシャル名が空の場合、バリデーションエラーとなる")
+    @DisplayName("プラットフォーム名が空の場合、バリデーションエラーとなる")
     void test2() throws Exception {
-        CreateSocialLinkRequest req = buildValidRequest();
+        CreateSnsPlatformRequest req = buildValidRequest();
         req.setName("");
         String body = objectMapper.writeValueAsString(req);
 
@@ -104,15 +104,15 @@ class CreateSocialLinkControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.name").isArray())
-                .andExpect(jsonPath("$.errors.name", hasItem("ソーシャル名は入力必須です。")));
+                .andExpect(jsonPath("$.errors.name", hasItem("プラットフォーム名は入力必須です。")));
 
-        verify(createSocialLinkUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
-    @DisplayName("ソーシャル名が50文字超の場合、バリデーションエラーとなる")
+    @DisplayName("プラットフォーム名が50文字超の場合、バリデーションエラーとなる")
     void test3() throws Exception {
-        CreateSocialLinkRequest req = buildValidRequest();
+        CreateSnsPlatformRequest req = buildValidRequest();
         req.setName("a".repeat(51));
         String body = objectMapper.writeValueAsString(req);
 
@@ -120,15 +120,15 @@ class CreateSocialLinkControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.name").isArray())
-                .andExpect(jsonPath("$.errors.name", hasItem("ソーシャル名は50文字以内で入力してください。")));
+                .andExpect(jsonPath("$.errors.name", hasItem("プラットフォーム名は50文字以内で入力してください。")));
 
-        verify(createSocialLinkUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
     @DisplayName("リンクが空の場合、バリデーションエラーとなる")
     void test4() throws Exception {
-        CreateSocialLinkRequest req = buildValidRequest();
+        CreateSnsPlatformRequest req = buildValidRequest();
         req.setLink("");
         String body = objectMapper.writeValueAsString(req);
 
@@ -138,13 +138,13 @@ class CreateSocialLinkControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクは入力必須です。")));
 
-        verify(createSocialLinkUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
     @DisplayName("リンクがhttps形式でない場合、バリデーションエラーとなる")
     void test5() throws Exception {
-        CreateSocialLinkRequest req = buildValidRequest();
+        CreateSnsPlatformRequest req = buildValidRequest();
         req.setLink("http://example.com/github");
         String body = objectMapper.writeValueAsString(req);
 
@@ -154,13 +154,13 @@ class CreateSocialLinkControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクはhttps形式のURLを指定してください。")));
 
-        verify(createSocialLinkUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
     @DisplayName("リンクが255文字超の場合、バリデーションエラーとなる")
     void test6() throws Exception {
-        CreateSocialLinkRequest req = buildValidRequest();
+        CreateSnsPlatformRequest req = buildValidRequest();
         req.setLink("https://example.com/" + "a".repeat(300));
         String body = objectMapper.writeValueAsString(req);
 
@@ -170,6 +170,6 @@ class CreateSocialLinkControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクは255文字以内で入力してください。")));
 
-        verify(createSocialLinkUseCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 }

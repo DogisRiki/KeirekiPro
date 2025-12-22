@@ -72,9 +72,9 @@ public class Resume extends Entity {
     private final List<Portfolio> portfolios;
 
     /**
-     * ソーシャルリンクリスト
+     * SNSプラットフォームリスト
      */
-    private final List<SocialLink> socialLinks;
+    private final List<SnsPlatform> snsPlatforms;
 
     /**
      * 自己PRリスト
@@ -101,8 +101,8 @@ public class Resume extends Entity {
         return unmodifiableSortedCopy(portfolios, ResumeEntryOrderPolicy.portfolioNameAsc());
     }
 
-    public List<SocialLink> getSocialLinks() {
-        return unmodifiableSortedCopy(socialLinks, ResumeEntryOrderPolicy.socialLinkNameAsc());
+    public List<SnsPlatform> getSnsPlatforms() {
+        return unmodifiableSortedCopy(snsPlatforms, ResumeEntryOrderPolicy.snsPlatFormNameAsc());
     }
 
     public List<SelfPromotion> getSelfPromotions() {
@@ -129,7 +129,7 @@ public class Resume extends Entity {
     private Resume(UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
             List<Career> careers, List<Project> projects,
-            List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
+            List<Certification> certifications, List<Portfolio> portfolios, List<SnsPlatform> snsPlatforms,
             List<SelfPromotion> selfPromotions) {
         super();
         this.userId = userId;
@@ -142,7 +142,7 @@ public class Resume extends Entity {
         this.projects = projects;
         this.certifications = certifications;
         this.portfolios = portfolios;
-        this.socialLinks = socialLinks;
+        this.snsPlatforms = snsPlatforms;
         this.selfPromotions = selfPromotions;
     }
 
@@ -151,7 +151,7 @@ public class Resume extends Entity {
      */
     private Resume(UUID id, UUID userId, ResumeName name, LocalDate date, FullName fullName,
             LocalDateTime createdAt, LocalDateTime updatedAt, List<Career> careers, List<Project> projects,
-            List<Certification> certifications, List<Portfolio> portfolios, List<SocialLink> socialLinks,
+            List<Certification> certifications, List<Portfolio> portfolios, List<SnsPlatform> snsPlatforms,
             List<SelfPromotion> selfPromotions) {
         super(id);
         this.userId = userId;
@@ -164,7 +164,7 @@ public class Resume extends Entity {
         this.projects = projects;
         this.certifications = certifications;
         this.portfolios = portfolios;
-        this.socialLinks = socialLinks;
+        this.snsPlatforms = snsPlatforms;
         this.selfPromotions = selfPromotions;
     }
 
@@ -180,7 +180,7 @@ public class Resume extends Entity {
      * @param projects       プロジェクトリスト
      * @param certifications 資格リスト
      * @param portfolios     ポートフォリオリスト
-     * @param socialLinks    ソーシャルリンクリスト
+     * @param snsPlatforms   SNSプラットフォームリスト
      * @param selfPromotions 自己PRリスト
      * @return 職務経歴書エンティティ
      */
@@ -188,13 +188,13 @@ public class Resume extends Entity {
             FullName fullName,
             List<Career> careers,
             List<Project> projects, List<Certification> certifications, List<Portfolio> portfolios,
-            List<SocialLink> socialLinks, List<SelfPromotion> selfPromotions) {
+            List<SnsPlatform> snsPlatforms, List<SelfPromotion> selfPromotions) {
 
         validateOnCreate(notification, name, date);
         throwIfInvalid(notification);
 
         return new Resume(userId, name, date, fullName, careers, projects, certifications, portfolios,
-                socialLinks, selfPromotions);
+                snsPlatforms, selfPromotions);
     }
 
     /**
@@ -204,10 +204,10 @@ public class Resume extends Entity {
             FullName fullName,
             LocalDateTime createdAt, LocalDateTime updatedAt,
             List<Career> careers, List<Project> projects, List<Certification> certifications,
-            List<Portfolio> portfolios, List<SocialLink> socialLinks,
+            List<Portfolio> portfolios, List<SnsPlatform> snsPlatforms,
             List<SelfPromotion> selfPromotions) {
         return new Resume(id, userId, name, date, fullName, createdAt, updatedAt, careers, projects, certifications,
-                portfolios, socialLinks, selfPromotions);
+                portfolios, snsPlatforms, selfPromotions);
     }
 
     /**
@@ -225,7 +225,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
-                this.certifications, this.portfolios, this.socialLinks, this.selfPromotions);
+                this.certifications, this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -243,7 +243,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
-                this.certifications, this.portfolios, this.socialLinks, this.selfPromotions);
+                this.certifications, this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -261,7 +261,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
-                this.certifications, this.portfolios, this.socialLinks, this.selfPromotions);
+                this.certifications, this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -288,7 +288,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 updatedCareers, this.projects, this.certifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -316,7 +316,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 updatedCareers, this.projects, this.certifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -332,7 +332,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 updatedCareers, this.projects, this.certifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -419,7 +419,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, updatedProjects, this.certifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -444,7 +444,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, updatedProjects, this.certifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -460,7 +460,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, updatedProjects, this.certifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -484,7 +484,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, updatedCertifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -510,7 +510,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, updatedCertifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -526,7 +526,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, updatedCertifications,
-                this.portfolios, this.socialLinks, this.selfPromotions);
+                this.portfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -550,7 +550,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                updatedPortfolios, this.socialLinks, this.selfPromotions);
+                updatedPortfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -575,7 +575,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                updatedPortfolios, this.socialLinks, this.selfPromotions);
+                updatedPortfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -591,73 +591,73 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                updatedPortfolios, this.socialLinks, this.selfPromotions);
+                updatedPortfolios, this.snsPlatforms, this.selfPromotions);
     }
 
     /**
-     * ソーシャルリンクを追加する
+     * SNSプラットフォームを追加する
      *
      * @param notification 通知オブジェクト
-     * @param sociealLink  追加するソーシャルリンク
+     * @param snsPlatform  追加するSNSプラットフォーム
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addSociealLink(Notification notification, SocialLink sociealLink) {
-        if (sociealLink == null) {
-            notification.addError("socialLink", "ソーシャルリンクは入力必須です。");
+    public Resume addSnsPlatform(Notification notification, SnsPlatform snsPlatform) {
+        if (snsPlatform == null) {
+            notification.addError("snsPlatform", "SNSプラットフォームは入力必須です。");
             throwIfInvalid(notification);
             return this;
         }
 
         throwIfInvalid(notification);
 
-        List<SocialLink> updatedSocialLinks = new ArrayList<>(this.socialLinks);
-        updatedSocialLinks.add(sociealLink);
+        List<SnsPlatform> updatedSnsPlatforms = new ArrayList<>(this.snsPlatforms);
+        updatedSnsPlatforms.add(snsPlatform);
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                this.portfolios, updatedSocialLinks, this.selfPromotions);
+                this.portfolios, updatedSnsPlatforms, this.selfPromotions);
     }
 
     /**
-     * ソーシャルリンクを更新する
+     * SNSプラットフォームを更新する
      *
      * @param notification       通知オブジェクト
-     * @param updatedSociealLink 更新するソーシャルリンク
+     * @param updatedSnsPlatform 更新するSNSプラットフォーム
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateSociealLink(Notification notification, SocialLink updatedSociealLink) {
-        if (updatedSociealLink == null) {
-            notification.addError("socialLink", "ソーシャルリンクは入力必須です。");
+    public Resume updateSnsPlatform(Notification notification, SnsPlatform updatedSnsPlatform) {
+        if (updatedSnsPlatform == null) {
+            notification.addError("snsPlatform", "SNSプラットフォームは入力必須です。");
             throwIfInvalid(notification);
             return this;
         }
 
         throwIfInvalid(notification);
 
-        List<SocialLink> updatedSocialLinks = this.socialLinks.stream()
-                .map(sociealLink -> sociealLink.getId().equals(updatedSociealLink.getId()) ? updatedSociealLink
-                        : sociealLink)
+        List<SnsPlatform> updatedSnsPlatforms = this.snsPlatforms.stream()
+                .map(snsPlatform -> snsPlatform.getId().equals(updatedSnsPlatform.getId()) ? updatedSnsPlatform
+                        : snsPlatform)
                 .toList();
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                this.portfolios, updatedSocialLinks, this.selfPromotions);
+                this.portfolios, updatedSnsPlatforms, this.selfPromotions);
     }
 
     /**
-     * ソーシャルリンクを削除する
+     * SNSプラットフォームを削除する
      *
-     * @param sociealLinkId 削除するソーシャルリンクの識別子
+     * @param snsPlatformId 削除するSNSプラットフォームの識別子
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume removeSociealLink(UUID sociealLinkId) {
-        List<SocialLink> updatedSocialLinks = this.socialLinks.stream()
-                .filter(sociealLink -> !sociealLink.getId().equals(sociealLinkId))
+    public Resume removeSnsPlatform(UUID snsPlatformId) {
+        List<SnsPlatform> updatedSnsPlatforms = this.snsPlatforms.stream()
+                .filter(snsPlatform -> !snsPlatform.getId().equals(snsPlatformId))
                 .toList();
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                this.portfolios, updatedSocialLinks, this.selfPromotions);
+                this.portfolios, updatedSnsPlatforms, this.selfPromotions);
     }
 
     /**
@@ -681,7 +681,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                this.portfolios, this.socialLinks, updatedSelfPromotions);
+                this.portfolios, this.snsPlatforms, updatedSelfPromotions);
     }
 
     /**
@@ -697,7 +697,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                this.portfolios, this.socialLinks, updatedSelfPromotions);
+                this.portfolios, this.snsPlatforms, updatedSelfPromotions);
     }
 
     /**
@@ -723,7 +723,7 @@ public class Resume extends Entity {
         return new Resume(this.id, this.userId, this.name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects, this.certifications,
-                this.portfolios, this.socialLinks, updatedSelfPromotions);
+                this.portfolios, this.snsPlatforms, updatedSelfPromotions);
     }
 
     /**

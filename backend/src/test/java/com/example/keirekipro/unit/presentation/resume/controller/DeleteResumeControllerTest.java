@@ -30,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 class DeleteResumeControllerTest {
 
     @MockitoBean
-    private DeleteResumeUseCase deleteResumeUseCase;
+    private DeleteResumeUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -52,6 +52,6 @@ class DeleteResumeControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(deleteResumeUseCase).execute(eq(USER_ID), eq(RESUME_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID));
     }
 }

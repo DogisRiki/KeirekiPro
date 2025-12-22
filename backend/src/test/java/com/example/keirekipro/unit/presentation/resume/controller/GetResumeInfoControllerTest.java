@@ -35,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 class GetResumeInfoControllerTest {
 
     @MockitoBean
-    private GetResumeInfoUseCase getResumeInfoUseCase;
+    private GetResumeInfoUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -60,7 +60,7 @@ class GetResumeInfoControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(getResumeInfoUseCase.execute(eq(USER_ID), eq(RESUME_ID))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID))).thenReturn(dto);
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID))
                 .andExpect(status().isOk())
@@ -73,7 +73,7 @@ class GetResumeInfoControllerTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.certifications.length()").value(1))
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
-                .andExpect(jsonPath("$.socialLinks.length()").value(1))
+                .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
     }
 }

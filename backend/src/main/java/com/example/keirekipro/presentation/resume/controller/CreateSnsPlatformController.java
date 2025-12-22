@@ -2,10 +2,10 @@ package com.example.keirekipro.presentation.resume.controller;
 
 import java.util.UUID;
 
-import com.example.keirekipro.presentation.resume.dto.CreateSocialLinkRequest;
+import com.example.keirekipro.presentation.resume.dto.CreateSnsPlatformRequest;
 import com.example.keirekipro.presentation.resume.dto.ResumeInfoResponse;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
-import com.example.keirekipro.usecase.resume.CreateSocialLinkUseCase;
+import com.example.keirekipro.usecase.resume.CreateSnsPlatformUseCase;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,31 +23,31 @@ import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 
 /**
- * 職務経歴書 SNS新規作成コントローラー
+ * 職務経歴書 SNSプラットフォーム新規作成コントローラー
  */
 @RestController
 @RequestMapping("/api/resumes")
 @RequiredArgsConstructor
 @Tag(name = "resumes", description = "職務経歴書に関するエンドポイント")
-public class CreateSocialLinkController {
+public class CreateSnsPlatformController {
 
-    private final CreateSocialLinkUseCase createSocialLinkUseCase;
+    private final CreateSnsPlatformUseCase createSnsPlatformUseCase;
 
     private final CurrentUserFacade currentUserFacade;
 
     /**
-     * SNS新規作成エンドポイント
+     * SNSプラットフォーム新規作成エンドポイント
      */
-    @PostMapping("/{resumeId}/social-links")
+    @PostMapping("/{resumeId}/sns-platforms")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "職務経歴書 SNS新規作成", description = "職務経歴書にSNSを新規作成する")
+    @Operation(summary = "職務経歴書 SNSプラットフォーム新規作成", description = "職務経歴書にSNSプラットフォームを新規作成する")
     public ResumeInfoResponse handle(
             @PathVariable("resumeId") UUID resumeId,
-            @Valid @RequestBody CreateSocialLinkRequest request) {
+            @Valid @RequestBody CreateSnsPlatformRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                createSocialLinkUseCase.execute(userId, resumeId, request));
+                createSnsPlatformUseCase.execute(userId, resumeId, request));
     }
 }

@@ -189,7 +189,7 @@ class DeleteProjectUseCaseTest {
                 List.of(p1, p2), // projects
                 List.of(), // certifications
                 List.of(), // portfolios
-                List.of(), // socialLinks
+                List.of(), // snsPlatforms
                 List.of() // selfPromotions
         );
     }

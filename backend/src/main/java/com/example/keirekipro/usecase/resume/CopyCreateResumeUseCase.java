@@ -10,7 +10,7 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
@@ -106,12 +106,12 @@ public class CopyCreateResumeUseCase {
                         portfolio.getLink()))
                 .toList();
 
-        // ソーシャルリンク
-        List<SocialLink> copiedSocialLinks = source.getSocialLinks().stream()
-                .map(socialLink -> SocialLink.create(
+        // SNSプラットフォーム
+        List<SnsPlatform> copiedSnsPlatforms = source.getSnsPlatforms().stream()
+                .map(snsPlatform -> SnsPlatform.create(
                         notification,
-                        socialLink.getName(),
-                        socialLink.getLink()))
+                        snsPlatform.getName(),
+                        snsPlatform.getLink()))
                 .toList();
 
         // 自己PR
@@ -133,7 +133,7 @@ public class CopyCreateResumeUseCase {
                 copiedProjects,
                 copiedCertifications,
                 copiedPortfolios,
-                copiedSocialLinks,
+                copiedSnsPlatforms,
                 copiedSelfPromotions);
 
         resumeRepository.save(copy);

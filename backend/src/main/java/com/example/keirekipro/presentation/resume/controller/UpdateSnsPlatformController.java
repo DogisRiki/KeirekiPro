@@ -3,9 +3,9 @@ package com.example.keirekipro.presentation.resume.controller;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.resume.dto.ResumeInfoResponse;
-import com.example.keirekipro.presentation.resume.dto.UpdateSocialLinkRequest;
+import com.example.keirekipro.presentation.resume.dto.UpdateSnsPlatformRequest;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
-import com.example.keirekipro.usecase.resume.UpdateSocialLinkUseCase;
+import com.example.keirekipro.usecase.resume.UpdateSnsPlatformUseCase;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,32 +23,32 @@ import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 
 /**
- * 職務経歴書 SNS更新コントローラー
+ * 職務経歴書 SNSプラットフォーム更新コントローラー
  */
 @RestController
 @RequestMapping("/api/resumes")
 @RequiredArgsConstructor
 @Tag(name = "resumes", description = "職務経歴書に関するエンドポイント")
-public class UpdateSocialLinkController {
+public class UpdateSnsPlatformController {
 
-    private final UpdateSocialLinkUseCase updateSocialLinkUseCase;
+    private final UpdateSnsPlatformUseCase updateSnsPlatformUseCase;
 
     private final CurrentUserFacade currentUserFacade;
 
     /**
-     * SNS更新エンドポイント
+     * SNSプラットフォーム更新エンドポイント
      */
-    @PutMapping("/{resumeId}/social-links/{socialLinkId}")
+    @PutMapping("/{resumeId}/sns-platforms/{snsPlatformId}")
     @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "職務経歴書 SNS更新", description = "職務経歴書のSNSを更新する")
+    @Operation(summary = "職務経歴書 SNSプラットフォーム更新", description = "職務経歴書のSNSプラットフォームを更新する")
     public ResumeInfoResponse handle(
             @PathVariable("resumeId") UUID resumeId,
-            @PathVariable("socialLinkId") UUID socialLinkId,
-            @Valid @RequestBody UpdateSocialLinkRequest request) {
+            @PathVariable("snsPlatformId") UUID snsPlatformId,
+            @Valid @RequestBody UpdateSnsPlatformRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                updateSocialLinkUseCase.execute(userId, resumeId, socialLinkId, request));
+                updateSnsPlatformUseCase.execute(userId, resumeId, snsPlatformId, request));
     }
 }

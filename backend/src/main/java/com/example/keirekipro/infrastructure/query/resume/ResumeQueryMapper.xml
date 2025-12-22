@@ -21,7 +21,7 @@
     </select>
 
     <select id="countSnsPlatformsByResumeId" resultType="int" parameterType="java.util.UUID">
-        SELECT COUNT(*) FROM social_links WHERE resume_id = #{resumeId}
+        SELECT COUNT(*) FROM sns_platforms WHERE resume_id = #{resumeId}
     </select>
 
     <select id="countPortfoliosByResumeId" resultType="int" parameterType="java.util.UUID">

@@ -12,7 +12,7 @@ import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -124,7 +124,7 @@ public final class ResumeEntryOrderPolicy {
     }
 
     /**
-     * SNS の並び順（名前の辞書順）の比較規則を返す
+     * SNSプラットフォームの並び順（名前の辞書順）の比較規則を返す
      *
      * <p>
      * ルール:
@@ -133,9 +133,9 @@ public final class ResumeEntryOrderPolicy {
      * <li>名前が同一の場合は UUID の昇順で安定化</li>
      * </ul>
      *
-     * @return SNS の比較規則
+     * @return SNSプラットフォームの比較規則
      */
-    public static Comparator<SocialLink> socialLinkNameAsc() {
+    public static Comparator<SnsPlatform> snsPlatFormNameAsc() {
         return (a, b) -> {
             int nameCmp = compareTextAsc(a != null ? a.getName() : null, b != null ? b.getName() : null);
             if (nameCmp != 0) {

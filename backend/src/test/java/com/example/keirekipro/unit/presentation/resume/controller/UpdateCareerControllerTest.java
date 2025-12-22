@@ -44,7 +44,7 @@ import lombok.RequiredArgsConstructor;
 class UpdateCareerControllerTest {
 
     @MockitoBean
-    private UpdateCareerUseCase updateCareerUseCase;
+    private UpdateCareerUseCase useCase;
 
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
@@ -81,7 +81,7 @@ class UpdateCareerControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(updateCareerUseCase.execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID), any(UpdateCareerRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID), any(UpdateCareerRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(put(ENDPOINT, RESUME_ID, CAREER_ID)
@@ -98,11 +98,11 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.certifications.length()").value(1))
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
-                .andExpect(jsonPath("$.socialLinks.length()").value(1))
+                .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(updateCareerUseCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID), any(UpdateCareerRequest.class));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID), any(UpdateCareerRequest.class));
     }
 
     @Test
@@ -124,7 +124,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.companyName",
                         hasItem("会社名は入力必須です。")));
 
-        verify(updateCareerUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -147,7 +147,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.companyName",
                         hasItem("会社名は50文字以内で入力してください。")));
 
-        verify(updateCareerUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -169,7 +169,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.startDate",
                         hasItem("開始年月は入力必須です。")));
 
-        verify(updateCareerUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -191,7 +191,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.isActive",
                         hasItem("在籍中は入力必須です。")));
 
-        verify(updateCareerUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -212,7 +212,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
 
-        verify(updateCareerUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -233,7 +233,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
 
-        verify(updateCareerUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -254,7 +254,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.endDate").isArray())
                 .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
 
-        verify(updateCareerUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 
     @Test
@@ -275,6 +275,6 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.endDate").isArray())
                 .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
 
-        verify(updateCareerUseCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any(), any(), any(), any());
     }
 }

@@ -17,11 +17,11 @@ import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
-import com.example.keirekipro.domain.model.resume.SocialLink;
+import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateSocialLinkRequest;
+import com.example.keirekipro.presentation.resume.dto.UpdateSnsPlatformRequest;
 import com.example.keirekipro.shared.Notification;
-import com.example.keirekipro.usecase.resume.UpdateSocialLinkUseCase;
+import com.example.keirekipro.usecase.resume.UpdateSnsPlatformUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -34,13 +34,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class UpdateSocialLinkUseCaseTest {
+class UpdateSnsPlatformTest {
 
     @Mock
     private ResumeRepository repository;
 
     @InjectMocks
-    private UpdateSocialLinkUseCase useCase;
+    private UpdateSnsPlatformUseCase useCase;
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID RESUME_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -57,17 +57,17 @@ class UpdateSocialLinkUseCaseTest {
     @DisplayName("SNSを更新できる")
     void test1() {
         // 既存の職務経歴書とSNSを準備
-        Resume resume = buildResumeWithSocialLinks(USER_ID);
+        Resume resume = buildResumeWithSnsPlatforms(USER_ID);
 
         // リクエスト準備
-        UpdateSocialLinkRequest request = new UpdateSocialLinkRequest(
+        UpdateSnsPlatformRequest request = new UpdateSnsPlatformRequest(
                 "更新後SNS",
                 "https://example.com/updated-sns");
 
         // 更新対象IDは、並び順に依存しないよう名前で特定する
-        UUID socialLinkId = resume.getSocialLinks().stream()
+        UUID snsPlatformId = resume.getSnsPlatforms().stream()
                 .filter(sl -> "Twitter".equals(sl.getName()))
-                .map(SocialLink::getId)
+                .map(SnsPlatform::getId)
                 .findFirst()
                 .orElseThrow();
 
@@ -75,7 +75,7 @@ class UpdateSocialLinkUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, socialLinkId, request);
+        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, snsPlatformId, request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -88,11 +88,11 @@ class UpdateSocialLinkUseCaseTest {
         Resume saved = saveCaptor.getValue();
 
         // 件数は変わらない（更新のみ）
-        assertThat(saved.getSocialLinks()).hasSize(2);
+        assertThat(saved.getSnsPlatforms()).hasSize(2);
 
         // 更新対象が更新されていることを検証
-        SocialLink updated = saved.getSocialLinks().stream()
-                .filter(sl -> sl.getId().equals(socialLinkId))
+        SnsPlatform updated = saved.getSnsPlatforms().stream()
+                .filter(sl -> sl.getId().equals(snsPlatformId))
                 .findFirst()
                 .orElseThrow();
 
@@ -100,7 +100,7 @@ class UpdateSocialLinkUseCaseTest {
         assertThat(updated.getLink().getValue()).isEqualTo("https://example.com/updated-sns");
 
         // 他のSNSが保持されていることを検証（GitHub）
-        assertThat(saved.getSocialLinks().stream()
+        assertThat(saved.getSnsPlatforms().stream()
                 .anyMatch(sl -> "GitHub".equals(sl.getName()))).isTrue();
 
         // save() されたエンティティからDTOを組み立てて比較
@@ -114,7 +114,7 @@ class UpdateSocialLinkUseCaseTest {
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
         // リクエスト準備
-        UpdateSocialLinkRequest request = new UpdateSocialLinkRequest(
+        UpdateSnsPlatformRequest request = new UpdateSnsPlatformRequest(
                 "更新後SNS",
                 "https://example.com/updated-sns");
 
@@ -122,8 +122,8 @@ class UpdateSocialLinkUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
-        UUID socialLinkId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, socialLinkId, request))
+        UUID snsPlatformId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, snsPlatformId, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("職務経歴書が存在しません。");
 
@@ -135,10 +135,10 @@ class UpdateSocialLinkUseCaseTest {
     @DisplayName("ログインユーザー以外が所有する職務経歴書のSNSを更新しようとした場合、UseCaseExceptionがスローされる")
     void test3() {
         // 職務経歴書（所有者は別ユーザー）を準備
-        Resume resume = buildResumeWithSocialLinks(OTHER_USER_ID);
+        Resume resume = buildResumeWithSnsPlatforms(OTHER_USER_ID);
 
         // リクエスト準備
-        UpdateSocialLinkRequest request = new UpdateSocialLinkRequest(
+        UpdateSnsPlatformRequest request = new UpdateSnsPlatformRequest(
                 "更新後SNS",
                 "https://example.com/updated-sns");
 
@@ -146,12 +146,12 @@ class UpdateSocialLinkUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
-        UUID socialLinkId = resume.getSocialLinks().stream()
-                .map(SocialLink::getId)
+        UUID snsPlatformId = resume.getSnsPlatforms().stream()
+                .map(SnsPlatform::getId)
                 .findFirst()
                 .orElseThrow();
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, socialLinkId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, snsPlatformId, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("職務経歴書が存在しません。");
 
@@ -163,10 +163,10 @@ class UpdateSocialLinkUseCaseTest {
     @DisplayName("更新対象のSNSが存在しない場合、UseCaseExceptionがスローされる")
     void test4() {
         // 既存の職務経歴書を準備
-        Resume resume = buildResumeWithSocialLinks(USER_ID);
+        Resume resume = buildResumeWithSnsPlatforms(USER_ID);
 
         // リクエスト準備
-        UpdateSocialLinkRequest request = new UpdateSocialLinkRequest(
+        UpdateSnsPlatformRequest request = new UpdateSnsPlatformRequest(
                 "存在しないSNS更新",
                 "https://example.com/dummy");
 
@@ -174,19 +174,19 @@ class UpdateSocialLinkUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
-        UUID missingSocialLinkId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingSocialLinkId, request))
+        UUID missingSnsPlatformId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingSnsPlatformId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("対象のSNSが存在しません。");
+                .hasMessage("対象のSNSプラットフォームが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
     }
 
     /**
-     * ソーシャルリンク2件を持つ職務経歴書を作成するヘルパーメソッド
+     * SNSプラットフォーム2件を持つ職務経歴書を作成するヘルパーメソッド
      */
-    private Resume buildResumeWithSocialLinks(UUID ownerId) {
+    private Resume buildResumeWithSnsPlatforms(UUID ownerId) {
         Notification notification = new Notification();
 
         // 職務経歴書本体を再構築
@@ -205,25 +205,25 @@ class UpdateSocialLinkUseCaseTest {
                 List.of(), // projects
                 List.of(), // certifications
                 List.of(), // portfolios
-                List.of(), // socialLinks
+                List.of(), // snsPlatforms
                 List.of() // selfPromotions
         );
 
         // SNS1
         Link link1 = Link.create(notification, "https://example.com/twitter");
-        SocialLink socialLink1 = SocialLink.create(
+        SnsPlatform snsPlatform1 = SnsPlatform.create(
                 notification,
                 "Twitter",
                 link1);
-        Resume resumeWithSocialLink1 = base.addSociealLink(notification, socialLink1);
+        Resume resumeWithSnsPlaftorm1 = base.addSnsPlatform(notification, snsPlatform1);
 
         // SNS2
         Link link2 = Link.create(notification, "https://example.com/github");
-        SocialLink socialLink2 = SocialLink.create(
+        SnsPlatform snsPlatform2 = SnsPlatform.create(
                 notification,
                 "GitHub",
                 link2);
 
-        return resumeWithSocialLink1.addSociealLink(notification, socialLink2);
+        return resumeWithSnsPlaftorm1.addSnsPlatform(notification, snsPlatform2);
     }
 }
