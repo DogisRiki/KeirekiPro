@@ -126,11 +126,11 @@ entity "ポートフォリオ(portfolios)" as Portfolios {
     link : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- リンク
 }
 
-entity "ソーシャルリンク(social_links)" as SocialLinks {
+entity "SNSプラットフォーム(sns_platforms)" as SnsPlatforms {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
-    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- ソーシャルリンク名
+    name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- プラットフォーム名
     link : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- リンク
 }
 
@@ -178,7 +178,7 @@ Resumes ||--o| Careers
 Resumes ||--o| Projects
 Resumes ||--o| Certifications
 Resumes ||--o| Portfolios
-Resumes ||--o| SocialLinks
+Resumes ||--o| SnsPlatforms
 Resumes ||--o| SelfPromotions
 
 Projects ||--|| ProjectTechStacks

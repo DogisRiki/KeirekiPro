@@ -58,9 +58,9 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         - リンク: link
     }
 
-    class "ソーシャルリンク(SocialLink)" as SocialLink << (E,green) Entity >> {
-        - ソーシャルリンクID: id
-        - ソーシャル名: name
+    class "SNSプラットフォーム(SnsPlatform)" as SnsPlatform << (E,green) Entity >> {
+        - SNSプラットフォームID: id
+        - プラットフォーム名: name
     }
 
     class "自己PR(SelfPromotion)" as SelfPromotion << (E,green) Entity >> {
@@ -152,7 +152,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     Resume "1" *-down- "0..n" Project #Green
     Resume "1" *-down- "0..n" Certification #Green
     Resume "1" *-down- "0..n" Portfolio #Green
-    Resume "1" *-down- "0..n" SocialLink #Green
+    Resume "1" *-down- "0..n" SnsPlatform #Green
     Resume "1" *-down- "0..n" SelfPromotion #Green
     Resume "1" *-down- "0..1" FullName #Green
     Resume "1" *-down- "1" ResumeName #Green
@@ -165,7 +165,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     Project "1" *-down- "0..1" TechStack #Green
 
     Portfolio "1" *-down- "1" Link #Green
-    SocialLink "1" *-down- "1" Link #Green
+    SnsPlatform "1" *-down- "1" Link #Green
 
     TechStack "1" *-down- "0..1" FrontendStack #Green
     TechStack "1" *-down- "0..1" BackendStack #Green
@@ -180,7 +180,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
             ・職歴は少なくとも1件以上登録されていること。（複数件登録可能）
             ・職務内容（プロジェクト）は少なくとも1件以上登録されていること。（複数件登録可能）
             ・自己PRは少なくとも1件以上登録されていること。（複数件登録可能）
-            ・資格、ポートフォリオ、SNS（ソーシャルリンク）は任意項目とし、0件でもよい。
+            ・資格、ポートフォリオ、SNSプラットフォームは任意項目とし、0件でもよい。
 
         ・職務経歴書名はユーザー内で一意でなければならない。
 
@@ -234,8 +234,8 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         ・リンクは必須。
     end note
 
-    note bottom of SocialLink
-        ・ソーシャル名は必須かつ50文字以内。
+    note bottom of SnsPlatform
+        ・プラットフォーム名は必須かつ50文字以内。
         ・リンクは必須。
     end note
 

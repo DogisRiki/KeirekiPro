@@ -14,14 +14,14 @@ package com.example.keirekipro.domain.model.resume {
         - List<Project> projects
         - List<Certification> certifications
         - List<Portfolio> portfolios
-        - List<SocialLink> socialLinks
+        - List<SnsPlatform> SnsPlatforms
         - List<SelfPromotion> selfPromotions
 
         + List<Career> getCareers()
         + List<Project> getProjects()
         + List<Certification> getCertifications()
         + List<Portfolio> getPortfolios()
-        + List<SocialLink> getSocialLinks()
+        + List<SnsPlatform> getSnsPlatforms()
         + List<SelfPromotion> getSelfPromotions()
         + Resume changeName(ResumeName name)
         + Resume changeDate(LocalDate date)
@@ -76,11 +76,11 @@ package com.example.keirekipro.domain.model.resume {
         + Project changeTechStack(TechStack techStack)
     }
 
-    class SocialLink {
+    class SnsPlatform {
         - String name
         - Link link
-        + SocialLink changeName(String name)
-        + SocialLink changeLink(Link link)
+        + SnsPlatform changeName(String name)
+        + SnsPlatform changeLink(Link link)
     }
 
     class SelfPromotion {
@@ -153,12 +153,12 @@ package com.example.keirekipro.domain.model.resume {
     Resume "1" --> "0..n"Project : projects
     Resume "1" --> "0..n"Certification : certifications
     Resume "1" --> "0..n"Portfolio : portfolios
-    Resume "1" --> "0..n"SocialLink : socialLinks
+    Resume "1" --> "0..n"SnsPlatform : SnsPlatforms
     Resume "1" --> "0..n"SelfPromotion : selfPromotions
     Career --> Period
     Project --> Period
     Portfolio --> Link
-    SocialLink --> Link
+    SnsPlatform --> Link
     Resume --> ResumeName : name
     Project --> Process
     Project --> TechStack
@@ -188,7 +188,7 @@ package com.example.keirekipro.domain.shared {
     Entity <|-- Career
     Entity <|-- Certification
     Entity <|-- Portfolio
-    Entity <|-- SocialLink
+    Entity <|-- SnsPlatform
     Entity <|-- SelfPromotion
 }
 
