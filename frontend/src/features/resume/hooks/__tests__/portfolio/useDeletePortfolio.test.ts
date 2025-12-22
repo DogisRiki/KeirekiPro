@@ -42,7 +42,7 @@ describe("useDeletePortfolio", () => {
                 link: "https://example.com/keep",
             },
         ],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

@@ -36,7 +36,7 @@ describe("useAutoSave", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 
@@ -58,8 +58,8 @@ describe("useAutoSave", () => {
             updateCertificationMutation: createMockMutation(),
             createPortfolioMutation: createMockMutation(),
             updatePortfolioMutation: createMockMutation(),
-            createSocialLinkMutation: createMockMutation(),
-            updateSocialLinkMutation: createMockMutation(),
+            createSnsPlatformMutation: createMockMutation(),
+            updateSnsPlatformMutation: createMockMutation(),
             createSelfPromotionMutation: createMockMutation(),
             updateSelfPromotionMutation: createMockMutation(),
         } as const;

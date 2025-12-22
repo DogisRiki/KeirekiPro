@@ -14,13 +14,13 @@ import {
     useCreatePortfolio,
     useCreateProject,
     useCreateSelfPromotion,
-    useCreateSocialLink,
+    useCreateSnsPlatform,
     useDeleteCareer,
     useDeleteCertification,
     useDeletePortfolio,
     useDeleteProject,
     useDeleteSelfPromotion,
-    useDeleteSocialLink,
+    useDeleteSnsPlatform,
     useGetResumeInfo,
     useNavigationBlocker,
     useResumeStore,
@@ -30,7 +30,7 @@ import {
     useUpdateProject,
     useUpdateResumeBasic,
     useUpdateSelfPromotion,
-    useUpdateSocialLink,
+    useUpdateSnsPlatform,
 } from "@/features/resume";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
@@ -95,9 +95,9 @@ export const ResumeContainer = () => {
     const updatePortfolioMutation = useUpdatePortfolio(resumeId ?? "");
     const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "");
 
-    const createSocialLinkMutation = useCreateSocialLink(resumeId ?? "");
-    const updateSocialLinkMutation = useUpdateSocialLink(resumeId ?? "");
-    const deleteSocialLinkMutation = useDeleteSocialLink(resumeId ?? "");
+    const createSnsPlatformMutation = useCreateSnsPlatform(resumeId ?? "");
+    const updateSnsPlatformMutation = useUpdateSnsPlatform(resumeId ?? "");
+    const deleteSnsPlatformMutation = useDeleteSnsPlatform(resumeId ?? "");
 
     const createSelfPromotionMutation = useCreateSelfPromotion(resumeId ?? "");
     const updateSelfPromotionMutation = useUpdateSelfPromotion(resumeId ?? "");
@@ -116,8 +116,8 @@ export const ResumeContainer = () => {
         updateCertificationMutation,
         createPortfolioMutation,
         updatePortfolioMutation,
-        createSocialLinkMutation,
-        updateSocialLinkMutation,
+        createSnsPlatformMutation,
+        updateSnsPlatformMutation,
         createSelfPromotionMutation,
         updateSelfPromotionMutation,
     });
@@ -184,8 +184,8 @@ export const ResumeContainer = () => {
             case "portfolio":
                 deletePortfolioMutation.mutate(entryId);
                 break;
-            case "socialLink":
-                deleteSocialLinkMutation.mutate(entryId);
+            case "snsPlatform":
+                deleteSnsPlatformMutation.mutate(entryId);
                 break;
             case "selfPromotion":
                 deleteSelfPromotionMutation.mutate(entryId);
@@ -292,15 +292,15 @@ export const ResumeContainer = () => {
                     });
                 }
                 break;
-            case "socialLink":
+            case "snsPlatform":
                 if (isNew) {
-                    createSocialLinkMutation.mutate({
+                    createSnsPlatformMutation.mutate({
                         tempId: entryId,
                         payload: buildPayloadForEntry(activeSection, activeEntry),
                     });
                 } else {
-                    updateSocialLinkMutation.mutate({
-                        socialLinkId: entryId,
+                    updateSnsPlatformMutation.mutate({
+                        snsPlatformId: entryId,
                         payload: buildPayloadForEntry(activeSection, activeEntry),
                     });
                 }
@@ -336,9 +336,9 @@ export const ResumeContainer = () => {
         createPortfolioMutation.isPending ||
         updatePortfolioMutation.isPending ||
         deletePortfolioMutation.isPending ||
-        createSocialLinkMutation.isPending ||
-        updateSocialLinkMutation.isPending ||
-        deleteSocialLinkMutation.isPending ||
+        createSnsPlatformMutation.isPending ||
+        updateSnsPlatformMutation.isPending ||
+        deleteSnsPlatformMutation.isPending ||
         createSelfPromotionMutation.isPending ||
         updateSelfPromotionMutation.isPending ||
         deleteSelfPromotionMutation.isPending;

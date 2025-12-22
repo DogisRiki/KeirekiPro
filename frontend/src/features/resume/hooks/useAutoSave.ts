@@ -30,10 +30,10 @@ interface UseAutoSaveOptions {
     createPortfolioMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** ポートフォリオ更新ミューテーション */
     updatePortfolioMutation: { mutate: (payload: any) => void; isPending: boolean };
-    /** SNS作成ミューテーション */
-    createSocialLinkMutation: { mutate: (payload: any) => void; isPending: boolean };
-    /** SNS更新ミューテーション */
-    updateSocialLinkMutation: { mutate: (payload: any) => void; isPending: boolean };
+    /** SNSプラットフォーム作成ミューテーション */
+    createSnsPlatformMutation: { mutate: (payload: any) => void; isPending: boolean };
+    /** SNSプラットフォーム更新ミューテーション */
+    updateSnsPlatformMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** 自己PR作成ミューテーション */
     createSelfPromotionMutation: { mutate: (payload: any) => void; isPending: boolean };
     /** 自己PR更新ミューテーション */
@@ -66,8 +66,8 @@ export const useAutoSave = ({
     updateCertificationMutation,
     createPortfolioMutation,
     updatePortfolioMutation,
-    createSocialLinkMutation,
-    updateSocialLinkMutation,
+    createSnsPlatformMutation,
+    updateSnsPlatformMutation,
     createSelfPromotionMutation,
     updateSelfPromotionMutation,
 }: UseAutoSaveOptions) => {
@@ -94,8 +94,8 @@ export const useAutoSave = ({
             updateCertificationMutation.isPending ||
             createPortfolioMutation.isPending ||
             updatePortfolioMutation.isPending ||
-            createSocialLinkMutation.isPending ||
-            updateSocialLinkMutation.isPending ||
+            createSnsPlatformMutation.isPending ||
+            updateSnsPlatformMutation.isPending ||
             createSelfPromotionMutation.isPending ||
             updateSelfPromotionMutation.isPending;
 
@@ -140,8 +140,8 @@ export const useAutoSave = ({
             updateCertificationMutation,
             createPortfolioMutation,
             updatePortfolioMutation,
-            createSocialLinkMutation,
-            updateSocialLinkMutation,
+            createSnsPlatformMutation,
+            updateSnsPlatformMutation,
             createSelfPromotionMutation,
             updateSelfPromotionMutation,
         });
@@ -179,8 +179,8 @@ const executeMutation = (
         updateCertificationMutation: { mutate: (payload: any) => void };
         createPortfolioMutation: { mutate: (payload: any) => void };
         updatePortfolioMutation: { mutate: (payload: any) => void };
-        createSocialLinkMutation: { mutate: (payload: any) => void };
-        updateSocialLinkMutation: { mutate: (payload: any) => void };
+        createSnsPlatformMutation: { mutate: (payload: any) => void };
+        updateSnsPlatformMutation: { mutate: (payload: any) => void };
         createSelfPromotionMutation: { mutate: (payload: any) => void };
         updateSelfPromotionMutation: { mutate: (payload: any) => void };
     },
@@ -238,15 +238,15 @@ const executeMutation = (
                 });
             }
             break;
-        case "socialLink":
+        case "snsPlatform":
             if (isNew) {
-                mutations.createSocialLinkMutation.mutate({
+                mutations.createSelfPromotionMutation.mutate({
                     tempId: activeEntryId,
                     payload: buildPayloadForEntry(activeSection, activeEntry),
                 });
             } else {
-                mutations.updateSocialLinkMutation.mutate({
-                    socialLinkId: activeEntryId,
+                mutations.updateSnsPlatformMutation.mutate({
+                    snsPlatformId: activeEntryId,
                     payload: buildPayloadForEntry(activeSection, activeEntry),
                 });
             }

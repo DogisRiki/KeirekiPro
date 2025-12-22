@@ -45,7 +45,7 @@ describe("useUpdateCertification", () => {
             },
         ],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

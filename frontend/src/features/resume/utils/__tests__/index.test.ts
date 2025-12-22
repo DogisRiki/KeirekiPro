@@ -110,14 +110,14 @@ describe("getEntryText", () => {
         });
     });
 
-    describe("socialLink", () => {
+    describe("snsPlatform", () => {
         it("SNS名とリンクを返すこと", () => {
             const entry = {
                 name: "GitHub",
                 link: "https://github.com/example",
             };
 
-            const result = getEntryText("socialLink", entry);
+            const result = getEntryText("snsPlatform", entry);
 
             expect(result).toEqual({
                 primary: "GitHub",
@@ -159,7 +159,7 @@ describe("getResumeKey", () => {
         ["project", "projects"],
         ["certification", "certifications"],
         ["portfolio", "portfolios"],
-        ["socialLink", "socialLinks"],
+        ["snsPlatform", "snsPlatforms"],
         ["selfPromotion", "selfPromotions"],
     ] as const)("セクション名「%s」に対して「%s」を返すこと", (sectionName, expectedKey) => {
         const result = getResumeKey(sectionName);
@@ -434,14 +434,14 @@ describe("buildPayloadForEntry", () => {
         expect(result).not.toHaveProperty("id");
     });
 
-    it("socialLinkの場合、API送信用のペイロードを返すこと", () => {
+    it("snsPlatformの場合、API送信用のペイロードを返すこと", () => {
         const entry = {
-            id: "social-1",
+            id: "snsPlatform-1",
             name: "GitHub",
             link: "https://github.com/example",
         };
 
-        const result = buildPayloadForEntry("socialLink", entry);
+        const result = buildPayloadForEntry("snsPlatform", entry);
 
         expect(result).toEqual({
             name: "GitHub",
@@ -483,7 +483,7 @@ describe("createCurrentSection", () => {
             "project",
             "certification",
             "portfolio",
-            "socialLink",
+            "snsPlatform",
             "selfPromotion",
         ];
 

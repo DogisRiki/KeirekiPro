@@ -96,7 +96,7 @@ describe("useDeleteProject", () => {
         ] as any,
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

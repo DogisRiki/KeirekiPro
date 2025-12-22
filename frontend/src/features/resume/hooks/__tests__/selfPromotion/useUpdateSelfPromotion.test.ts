@@ -29,7 +29,7 @@ describe("useUpdateSelfPromotion", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [
             {
                 id: "self-promotion-1",

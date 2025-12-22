@@ -38,7 +38,7 @@ describe("useDeleteCertification", () => {
             },
         ],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

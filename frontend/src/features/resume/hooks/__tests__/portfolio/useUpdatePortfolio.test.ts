@@ -51,7 +51,7 @@ describe("useUpdatePortfolio", () => {
                 link: "https://example.com/temp",
             },
         ],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 
