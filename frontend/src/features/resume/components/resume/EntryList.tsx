@@ -7,7 +7,7 @@ import type {
     Project,
     SectionName,
     SelfPromotion,
-    SocialLink,
+    SnsPlatform,
 } from "@/features/resume";
 import {
     EntryListItem,
@@ -20,7 +20,7 @@ import {
     useDeletePortfolio,
     useDeleteProject,
     useDeleteSelfPromotion,
-    useDeleteSocialLink,
+    useDeleteSnsPlatform,
     useResumeStore,
 } from "@/features/resume";
 import AddIcon from "@mui/icons-material/Add";
@@ -31,7 +31,7 @@ import { useParams } from "react-router";
 /**
  * 新規エントリー生成用の型
  */
-type ListEntry = Career | Project | Certification | Portfolio | SocialLink | SelfPromotion;
+type ListEntry = Career | Project | Certification | Portfolio | SnsPlatform | SelfPromotion;
 
 /**
  * セクションごとに新規エントリーを生成する
@@ -135,10 +135,10 @@ const createNewEntry = (section: SectionName, id: string): ListEntry | null => {
             };
             return entry;
         }
-        case "socialLink": {
-            const entry: SocialLink = {
+        case "snsPlatform": {
+            const entry: SnsPlatform = {
                 id,
-                name: "新しいSNS",
+                name: "新しいSNSプラットフォーム",
                 link: "",
             };
             return entry;
@@ -186,7 +186,7 @@ export const EntryList = () => {
     const deleteProjectMutation = useDeleteProject(resumeId ?? "");
     const deleteCertificationMutation = useDeleteCertification(resumeId ?? "");
     const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "");
-    const deleteSocialLinkMutation = useDeleteSocialLink(resumeId ?? "");
+    const deleteSnsPlatformMutation = useDeleteSnsPlatform(resumeId ?? "");
     const deleteSelfPromotionMutation = useDeleteSelfPromotion(resumeId ?? "");
 
     // エントリーデータ取得
@@ -270,8 +270,8 @@ export const EntryList = () => {
             case "portfolio":
                 deletePortfolioMutation.mutate(entryId);
                 break;
-            case "socialLink":
-                deleteSocialLinkMutation.mutate(entryId);
+            case "snsPlatform":
+                deleteSnsPlatformMutation.mutate(entryId);
                 break;
             case "selfPromotion":
                 deleteSelfPromotionMutation.mutate(entryId);

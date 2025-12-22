@@ -5,7 +5,7 @@ import { devtools } from "zustand/middleware";
 /**
  * Resume型から配列を持つプロパティのみを抽出
  */
-type ResumeArrayKeys = "careers" | "projects" | "certifications" | "portfolios" | "socialLinks" | "selfPromotions";
+type ResumeArrayKeys = "careers" | "projects" | "certifications" | "portfolios" | "snsPlatforms" | "selfPromotions";
 
 /**
  * リスト型セクション名（エントリーを持つセクション）
@@ -25,7 +25,7 @@ const initialActiveEntryIdsBySection: ActiveEntryIdsBySection = {
     project: null,
     certification: null,
     portfolio: null,
-    socialLink: null,
+    snsPlatform: null,
     selfPromotion: null,
 };
 

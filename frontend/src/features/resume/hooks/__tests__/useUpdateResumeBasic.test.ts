@@ -27,7 +27,7 @@ describe("useUpdateResumeBasic", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

@@ -6,7 +6,7 @@ import {
     PortfolioSection,
     ProjectSection,
     SelfPromotionSection,
-    SociealLinkSection,
+    SnsPlatformSection,
 } from "@/features/resume";
 
 /**
@@ -18,7 +18,7 @@ export const sections: SectionInfo[] = [
     { key: "project", label: "プロジェクト", type: "list", component: ProjectSection },
     { key: "certification", label: "保有資格", type: "list", component: CertificationSection },
     { key: "portfolio", label: "ポートフォリオ", type: "list", component: PortfolioSection },
-    { key: "socialLink", label: "SNS", type: "list", component: SociealLinkSection },
+    { key: "snsPlatform", label: "SNS", type: "list", component: SnsPlatformSection },
     { key: "selfPromotion", label: "自己PR", type: "list", component: SelfPromotionSection },
 ] as const;
 

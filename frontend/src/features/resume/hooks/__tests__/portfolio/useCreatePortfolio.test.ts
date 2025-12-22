@@ -52,7 +52,7 @@ describe("useCreatePortfolio", () => {
                 link: "https://example.com/local-only",
             },
         ],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

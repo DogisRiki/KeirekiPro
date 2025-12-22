@@ -30,7 +30,7 @@ describe("useCreateSelfPromotion", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [
             {
                 id: tempId,

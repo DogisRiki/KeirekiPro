@@ -5,17 +5,17 @@ vi.mock("@/lib", () => ({
 }));
 
 import type { Resume } from "@/features/resume";
-import { TEMP_ID_PREFIX, useResumeStore, useUpdateSocialLink } from "@/features/resume";
+import { TEMP_ID_PREFIX, useResumeStore, useUpdateSnsPlatform } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
 import type { ErrorResponse } from "@/types";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-describe("useUpdateSocialLink", () => {
+describe("useUpdateSnsPlatform", () => {
     const wrapper = createQueryWrapper();
 
-    const localOnlyTempId = `${TEMP_ID_PREFIX}social-link-temp-99`;
+    const localOnlyTempId = `${TEMP_ID_PREFIX}sns-platform-temp-99`;
 
     const localResume: Resume = {
         id: "resume-1",
@@ -29,14 +29,14 @@ describe("useUpdateSocialLink", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [
+        snsPlatforms: [
             {
-                id: "social-link-1",
+                id: "sns-platform-1",
                 name: "ローカル（更新対象・dirty）",
                 link: "https://example.com/local-target",
             },
             {
-                id: "social-link-3",
+                id: "sns-platform-3",
                 name: "ローカル（別dirty）",
                 link: "https://example.com/local-other-dirty",
             },
@@ -61,31 +61,31 @@ describe("useUpdateSocialLink", () => {
         vi.spyOn(useResumeStore.getState(), "clearEntryErrors");
     });
 
-    it("成功時はエントリエラーをクリアし、socialLinksをマージしてストア更新・dirty解除・通知が実行されること", async () => {
-        const socialLinkId = "social-link-1";
+    it("成功時はエントリエラーをクリアし、snsPlatformsをマージしてストア更新・dirty解除・通知が実行されること", async () => {
+        const snsPlatformId = "sns-platform-1";
 
         // store準備
         useResumeStore.getState().setResume(localResume);
-        useResumeStore.getState().addDirtyEntryId(socialLinkId);
-        useResumeStore.getState().addDirtyEntryId("social-link-3");
+        useResumeStore.getState().addDirtyEntryId(snsPlatformId);
+        useResumeStore.getState().addDirtyEntryId("sns-platform-3");
         useResumeStore.getState().addDirtyEntryId(localOnlyTempId);
 
         const serverResume: Resume = {
             ...localResume,
             updatedAt: "2024-02-10T00:00:00.000Z",
-            socialLinks: [
+            snsPlatforms: [
                 {
-                    id: "social-link-1",
+                    id: "sns-platform-1",
                     name: "サーバー（更新後）",
                     link: "https://example.com/server-updated",
                 },
                 {
-                    id: "social-link-2",
+                    id: "sns-platform-2",
                     name: "サーバー（別エントリー）",
                     link: "https://example.com/server-other",
                 },
                 {
-                    id: "social-link-3",
+                    id: "sns-platform-3",
                     name: "サーバー（dirtyで上書きされる想定）",
                     link: "https://example.com/server-overwritten",
                 },
@@ -95,14 +95,14 @@ describe("useUpdateSocialLink", () => {
         const mockResponse = { status: 200, data: serverResume };
         vi.mocked(protectedApiClient.put).mockResolvedValueOnce(mockResponse);
 
-        const { result } = renderHook(() => useUpdateSocialLink("resume-1"), { wrapper });
+        const { result } = renderHook(() => useUpdateSnsPlatform("resume-1"), { wrapper });
 
         act(() => {
             result.current.mutate({
-                socialLinkId,
+                snsPlatformId,
                 payload: {
-                    name: localResume.socialLinks.find((s) => s.id === socialLinkId)!.name,
-                    link: localResume.socialLinks.find((s) => s.id === socialLinkId)!.link,
+                    name: localResume.snsPlatforms.find((s) => s.id === snsPlatformId)!.name,
+                    link: localResume.snsPlatforms.find((s) => s.id === snsPlatformId)!.link,
                 },
             });
         });
@@ -111,34 +111,34 @@ describe("useUpdateSocialLink", () => {
 
         // マージ結果：
         // - ローカルのみのエントリー（temp）は先頭へ
-        // - server socialLinksをベースにdirtyな social-link-3はローカルデータで上書き
-        // - 更新対象（socialLinkId=social-link-1）はローカル上書き対象から除外されるため、serverが優先
-        const expectedSocialLinks = [
-            localResume.socialLinks.find((s) => s.id === localOnlyTempId)!,
-            serverResume.socialLinks.find((s) => s.id === "social-link-1")!, // server優先
-            serverResume.socialLinks.find((s) => s.id === "social-link-2")!,
-            localResume.socialLinks.find((s) => s.id === "social-link-3")!, // dirtyなのでローカル優先
+        // - server snsPlatformsをベースにdirtyな sns-platform-3はローカルデータで上書き
+        // - 更新対象（snsPlatformId=sns-platform-1）はローカル上書き対象から除外されるため、serverが優先
+        const expectedSnsPlatforms = [
+            localResume.snsPlatforms.find((s) => s.id === localOnlyTempId)!,
+            serverResume.snsPlatforms.find((s) => s.id === "sns-platform-1")!, // server優先
+            serverResume.snsPlatforms.find((s) => s.id === "sns-platform-2")!,
+            localResume.snsPlatforms.find((s) => s.id === "sns-platform-3")!, // dirtyなのでローカル優先
         ];
 
         // clearEntryErrorsはonMutateとonSuccessで計2回呼ばれる
         expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledTimes(2);
-        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(1, socialLinkId);
-        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(2, socialLinkId);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(1, snsPlatformId);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(2, snsPlatformId);
 
         expect(useResumeStore.getState().updateResumeFromServer).toHaveBeenCalledWith({
-            socialLinks: expectedSocialLinks,
+            snsPlatforms: expectedSnsPlatforms,
             updatedAt: serverResume.updatedAt,
         });
-        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(socialLinkId);
+        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(snsPlatformId);
         expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("SNSを更新しました。", "success");
     });
 
     it("失敗時はエラーレスポンスのerrorsが存在する場合に、該当エントリへエラーが設定されること", async () => {
-        const socialLinkId = "social-link-1";
+        const snsPlatformId = "sns-platform-1";
 
         useResumeStore.getState().setResume(localResume);
-        useResumeStore.getState().addDirtyEntryId(socialLinkId);
+        useResumeStore.getState().addDirtyEntryId(snsPlatformId);
 
         const mockErrorResponse: ErrorResponse = {
             message: "入力内容に誤りがあります",
@@ -154,14 +154,14 @@ describe("useUpdateSocialLink", () => {
 
         vi.mocked(protectedApiClient.put).mockRejectedValueOnce(mockError);
 
-        const { result } = renderHook(() => useUpdateSocialLink("resume-1"), { wrapper });
+        const { result } = renderHook(() => useUpdateSnsPlatform("resume-1"), { wrapper });
 
         act(() => {
             result.current.mutate({
-                socialLinkId,
+                snsPlatformId,
                 payload: {
                     name: "",
-                    link: localResume.socialLinks.find((s) => s.id === socialLinkId)!.link,
+                    link: localResume.snsPlatforms.find((s) => s.id === snsPlatformId)!.link,
                 },
             });
         });
@@ -170,9 +170,9 @@ describe("useUpdateSocialLink", () => {
 
         // clearEntryErrorsはonMutateで1回呼ばれる
         expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledTimes(1);
-        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledWith(socialLinkId);
+        expect(useResumeStore.getState().clearEntryErrors).toHaveBeenCalledWith(snsPlatformId);
 
-        expect(useResumeStore.getState().setEntryErrors).toHaveBeenCalledWith(socialLinkId, mockErrorResponse.errors);
+        expect(useResumeStore.getState().setEntryErrors).toHaveBeenCalledWith(snsPlatformId, mockErrorResponse.errors);
 
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
         expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();

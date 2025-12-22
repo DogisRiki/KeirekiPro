@@ -37,7 +37,7 @@ export const getEntryText = (activeSection: SectionName, entry: any) => {
             };
         case "portfolio":
             return { primary: entry.name, secondary: entry.link };
-        case "socialLink":
+        case "snsPlatform":
             return { primary: entry.name, secondary: entry.link };
         case "selfPromotion":
             return { primary: entry.title, secondary: entry.content };
@@ -77,8 +77,8 @@ export const getResumeKey = (activeSection: SectionName) => {
             return "certifications";
         case "portfolio":
             return "portfolios";
-        case "socialLink":
-            return "socialLinks";
+        case "snsPlatform":
+            return "snsPlatforms";
         case "selfPromotion":
             return "selfPromotions";
     }
@@ -188,7 +188,7 @@ export const buildPayloadForEntry = (sectionOrType: SectionName | string, entry:
                 techStack: entry.techStack,
                 link: entry.link,
             };
-        case "socialLink":
+        case "snsPlatform":
             return {
                 name: entry.name,
                 link: entry.link,

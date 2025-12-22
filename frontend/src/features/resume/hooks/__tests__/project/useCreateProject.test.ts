@@ -110,7 +110,7 @@ describe("useCreateProject", () => {
         ] as any,
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

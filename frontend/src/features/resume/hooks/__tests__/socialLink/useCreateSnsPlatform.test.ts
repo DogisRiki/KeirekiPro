@@ -5,18 +5,18 @@ vi.mock("@/lib", () => ({
 }));
 
 import type { Resume } from "@/features/resume";
-import { TEMP_ID_PREFIX, useCreateSocialLink, useResumeStore } from "@/features/resume";
+import { TEMP_ID_PREFIX, useCreateSnsPlatform, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
 import type { ErrorResponse } from "@/types";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-describe("useCreateSocialLink", () => {
+describe("useCreateSnsPlatform", () => {
     const wrapper = createQueryWrapper();
 
-    const tempId = `${TEMP_ID_PREFIX}social-link-temp-1`;
-    const localOnlyTempId = `${TEMP_ID_PREFIX}social-link-temp-2`;
+    const tempId = `${TEMP_ID_PREFIX}sns-platform-temp-1`;
+    const localOnlyTempId = `${TEMP_ID_PREFIX}sns-platform-temp-2`;
 
     const localResume: Resume = {
         id: "resume-1",
@@ -30,14 +30,14 @@ describe("useCreateSocialLink", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [
+        snsPlatforms: [
             {
                 id: tempId,
                 name: "一時SNS",
                 link: "https://example.com/temp",
             },
             {
-                id: "social-link-1",
+                id: "sns-platform-1",
                 name: "ローカル（dirty）SNS名",
                 link: "https://example.com/local-dirty",
             },
@@ -63,26 +63,26 @@ describe("useCreateSocialLink", () => {
         vi.spyOn(useResumeStore.getState(), "clearEntryErrors");
     });
 
-    it("成功時はエントリエラーをクリアし、socialLinksをマージしてストア更新・activeEntryId更新・dirty解除・通知が実行されること", async () => {
+    it("成功時はエントリエラーをクリアし、snsPlatformsをマージしてストア更新・activeEntryId更新・dirty解除・通知が実行されること", async () => {
         // store準備
         useResumeStore.getState().setResume(localResume);
-        useResumeStore.getState().setActiveSection("socialLink");
+        useResumeStore.getState().setActiveSection("snsPlatform");
         useResumeStore.getState().setActiveEntryId(tempId);
         useResumeStore.getState().addDirtyEntryId(tempId);
-        useResumeStore.getState().addDirtyEntryId("social-link-1"); // serverから返るIDをdirtyとして上書き対象にする
+        useResumeStore.getState().addDirtyEntryId("sns-platform-1"); // serverから返るIDをdirtyとして上書き対象にする
 
         const serverResume: Resume = {
             ...localResume,
             updatedAt: "2024-02-01T00:00:00.000Z",
-            socialLinks: [
+            snsPlatforms: [
                 {
-                    id: "social-link-1",
-                    name: "サーバーSNS名（上書きされる想定）",
+                    id: "sns-platform-1",
+                    name: "サーバーSNSプラットフォーム（上書きされる想定）",
                     link: "https://example.com/server-overwritten",
                 },
                 {
-                    id: "social-link-2",
-                    name: "新規作成されたSNS",
+                    id: "sns-platform-2",
+                    name: "新規作成されたSNSプラットフォーム",
                     link: "https://example.com/new",
                 },
             ],
@@ -91,13 +91,13 @@ describe("useCreateSocialLink", () => {
         const mockResponse = { status: 201, data: serverResume };
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce(mockResponse);
 
-        const { result } = renderHook(() => useCreateSocialLink("resume-1"), { wrapper });
+        const { result } = renderHook(() => useCreateSnsPlatform("resume-1"), { wrapper });
 
         act(() => {
             result.current.mutate({
                 tempId,
                 payload: {
-                    name: "一時SNS",
+                    name: "一時SNSプラットフォーム",
                     link: "https://example.com/temp",
                 },
             });
@@ -105,14 +105,14 @@ describe("useCreateSocialLink", () => {
 
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-        // socialLinksのマージ結果：
+        // snsPlatformsのマージ結果：
         // - 保存対象のtempIdは除外
         // - ローカルのみのエントリー（localOnlyTempId）を先頭へ
-        // - server socialLinksをベースに、dirtyなsocial-link-1はローカルデータで上書き
-        const expectedSocialLinks = [
-            localResume.socialLinks.find((s) => s.id === localOnlyTempId)!,
-            localResume.socialLinks.find((s) => s.id === "social-link-1")!, // dirtyなのでローカルが優先
-            serverResume.socialLinks.find((s) => s.id === "social-link-2")!,
+        // - server snsPlatformsをベースに、dirtyなsns-platform-1はローカルデータで上書き
+        const expectedSnsPlatforms = [
+            localResume.snsPlatforms.find((s) => s.id === localOnlyTempId)!,
+            localResume.snsPlatforms.find((s) => s.id === "sns-platform-1")!, // dirtyなのでローカルが優先
+            serverResume.snsPlatforms.find((s) => s.id === "sns-platform-2")!,
         ];
 
         // clearEntryErrorsはonMutateとonSuccessで計2回呼ばれる
@@ -121,10 +121,10 @@ describe("useCreateSocialLink", () => {
         expect(useResumeStore.getState().clearEntryErrors).toHaveBeenNthCalledWith(2, tempId);
 
         expect(useResumeStore.getState().updateResumeFromServer).toHaveBeenCalledWith({
-            socialLinks: expectedSocialLinks,
+            snsPlatforms: expectedSnsPlatforms,
             updatedAt: serverResume.updatedAt,
         });
-        expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith("social-link-2");
+        expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith("sns-platform-2");
         expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(tempId);
         expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("SNSを作成しました。", "success");
@@ -132,7 +132,7 @@ describe("useCreateSocialLink", () => {
 
     it("失敗時はエラーレスポンスのerrorsが存在する場合に、該当エントリへエラーが設定されること", async () => {
         useResumeStore.getState().setResume(localResume);
-        useResumeStore.getState().setActiveSection("socialLink");
+        useResumeStore.getState().setActiveSection("snsPlatform");
         useResumeStore.getState().setActiveEntryId(tempId);
 
         const mockErrorResponse: ErrorResponse = {
@@ -149,7 +149,7 @@ describe("useCreateSocialLink", () => {
 
         vi.mocked(protectedApiClient.post).mockRejectedValueOnce(mockError);
 
-        const { result } = renderHook(() => useCreateSocialLink("resume-1"), { wrapper });
+        const { result } = renderHook(() => useCreateSnsPlatform("resume-1"), { wrapper });
 
         act(() => {
             result.current.mutate({

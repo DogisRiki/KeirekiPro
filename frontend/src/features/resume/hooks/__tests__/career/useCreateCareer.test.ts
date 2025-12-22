@@ -52,7 +52,7 @@ describe("useCreateCareer", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

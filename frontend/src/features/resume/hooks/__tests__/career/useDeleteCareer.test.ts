@@ -42,7 +42,7 @@ describe("useDeleteCareer", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

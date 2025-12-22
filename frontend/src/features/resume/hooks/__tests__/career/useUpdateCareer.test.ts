@@ -51,7 +51,7 @@ describe("useUpdateCareer", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

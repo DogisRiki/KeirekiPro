@@ -110,9 +110,9 @@ describe("useResumeStore", () => {
                 link: "https://example.com/blog",
             },
         ],
-        socialLinks: [
+        snsPlatforms: [
             {
-                id: "social-1",
+                id: "snsPlatform-1",
                 name: "GitHub",
                 link: "https://github.com/example",
             },
@@ -147,7 +147,7 @@ describe("useResumeStore", () => {
             expect(activeEntryIdsBySection.project).toBeNull();
             expect(activeEntryIdsBySection.certification).toBeNull();
             expect(activeEntryIdsBySection.portfolio).toBeNull();
-            expect(activeEntryIdsBySection.socialLink).toBeNull();
+            expect(activeEntryIdsBySection.snsPlatform).toBeNull();
             expect(activeEntryIdsBySection.selfPromotion).toBeNull();
         });
     });
@@ -580,14 +580,14 @@ describe("useResumeStore", () => {
             useResumeStore.getState().setResume(mockResume);
 
             const sectionTests: Array<{
-                section: "careers" | "projects" | "certifications" | "portfolios" | "socialLinks" | "selfPromotions";
+                section: "careers" | "projects" | "certifications" | "portfolios" | "snsPlatforms" | "selfPromotions";
                 data: unknown[];
             }> = [
                 { section: "careers", data: [] },
                 { section: "projects", data: [] },
                 { section: "certifications", data: [] },
                 { section: "portfolios", data: [] },
-                { section: "socialLinks", data: [] },
+                { section: "snsPlatforms", data: [] },
                 { section: "selfPromotions", data: [] },
             ];
 

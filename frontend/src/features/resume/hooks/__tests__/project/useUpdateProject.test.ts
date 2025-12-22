@@ -114,7 +114,7 @@ describe("useUpdateProject", () => {
         ] as any,
         certifications: [],
         portfolios: [],
-        socialLinks: [],
+        snsPlatforms: [],
         selfPromotions: [],
     };
 

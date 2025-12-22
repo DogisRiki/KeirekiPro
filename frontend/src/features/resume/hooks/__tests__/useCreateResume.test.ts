@@ -47,7 +47,7 @@ describe("useCreateResume", () => {
             projects: [],
             certifications: [],
             portfolios: [],
-            socialLinks: [],
+            snsPlatforms: [],
             selfPromotions: [],
         };
         const mockResponse = { status: 201, data: mockResume } as AxiosResponse<Resume>;

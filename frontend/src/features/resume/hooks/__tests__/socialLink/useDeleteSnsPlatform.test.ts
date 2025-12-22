@@ -5,14 +5,14 @@ vi.mock("@/lib", () => ({
 }));
 
 import type { Resume } from "@/features/resume";
-import { useDeleteSocialLink, useResumeStore } from "@/features/resume";
+import { useDeleteSnsPlatform, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
-describe("useDeleteSocialLink", () => {
+describe("useDeleteSnsPlatform", () => {
     const wrapper = createQueryWrapper();
 
     const localResume: Resume = {
@@ -27,14 +27,14 @@ describe("useDeleteSocialLink", () => {
         projects: [],
         certifications: [],
         portfolios: [],
-        socialLinks: [
+        snsPlatforms: [
             {
-                id: "social-link-1",
+                id: "sns-platform-1",
                 name: "削除対象",
                 link: "https://example.com/delete",
             },
             {
-                id: "social-link-2",
+                id: "sns-platform-2",
                 name: "残るSNS",
                 link: "https://example.com/keep",
             },
@@ -56,31 +56,31 @@ describe("useDeleteSocialLink", () => {
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
     });
 
-    it("成功時はエラーストアをクリアし、socialLink削除・dirty解除・通知が実行されること", async () => {
-        const socialLinkId = "social-link-1";
+    it("成功時はエラーストアをクリアし、snsPlatform削除・dirty解除・通知が実行されること", async () => {
+        const snsPlatformId = "sns-platform-1";
 
-        // useDeleteSocialLinkはuseResumeStore()を参照するため、render前に状態を入れておく
+        // useDeleteSnsPlatformはuseResumeStore()を参照するため、render前に状態を入れておく
         useResumeStore.getState().setResume(localResume);
-        useResumeStore.getState().setActiveSection("socialLink");
-        useResumeStore.getState().setActiveEntryId(socialLinkId);
-        useResumeStore.getState().addDirtyEntryId(socialLinkId);
+        useResumeStore.getState().setActiveSection("snsPlatform");
+        useResumeStore.getState().setActiveEntryId(snsPlatformId);
+        useResumeStore.getState().addDirtyEntryId(snsPlatformId);
 
         const mockResponse = { status: 200, data: undefined } as AxiosResponse<void>;
         vi.mocked(protectedApiClient.delete).mockResolvedValueOnce(mockResponse);
 
-        const { result } = renderHook(() => useDeleteSocialLink("resume-1"), { wrapper });
+        const { result } = renderHook(() => useDeleteSnsPlatform("resume-1"), { wrapper });
 
         act(() => {
-            result.current.mutate(socialLinkId);
+            result.current.mutate(snsPlatformId);
         });
 
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
         expect(useResumeStore.getState().updateResume).toHaveBeenCalledWith({
-            socialLinks: [localResume.socialLinks.find((s) => s.id === "social-link-2")!],
+            snsPlatforms: [localResume.snsPlatforms.find((s) => s.id === "sns-platform-2")!],
         });
-        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(socialLinkId);
+        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(snsPlatformId);
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
         expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("SNSを削除しました。", "success");

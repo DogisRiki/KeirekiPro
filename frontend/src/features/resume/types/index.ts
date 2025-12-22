@@ -9,7 +9,7 @@ export type SectionName =
     | "project"
     | "certification"
     | "portfolio"
-    | "socialLink"
+    | "snsPlatform"
     | "selfPromotion";
 
 /**
@@ -102,9 +102,9 @@ export interface Portfolio {
 }
 
 /**
- * ソーシャルリンク
+ * SNSプラットフォーム
  */
-export interface SocialLink {
+export interface SnsPlatform {
     id: string;
     name: string;
     link: string;
@@ -134,7 +134,7 @@ export interface Resume {
     projects: Project[];
     certifications: Certification[];
     portfolios: Portfolio[];
-    socialLinks: SocialLink[];
+    snsPlatforms: SnsPlatform[];
     selfPromotions: SelfPromotion[];
 }
 
