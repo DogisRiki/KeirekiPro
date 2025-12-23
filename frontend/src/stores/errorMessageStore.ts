@@ -7,6 +7,7 @@ interface ErrorMessageState {
     errors: {
         [field: string]: string[];
     };
+    errorId: string | null;
     setErrors: (errorResponse: ErrorResponse) => void;
     clearErrors: () => void;
 }
@@ -19,6 +20,7 @@ export const useErrorMessageStore = create<ErrorMessageState>()(
         (set) => ({
             message: null,
             errors: {},
+            errorId: null,
             setErrors: (errorResponse: ErrorResponse) => {
                 // テスト環境以外でNotificationストアをクリア
                 if (import.meta.env.MODE !== "test") {
@@ -26,9 +28,17 @@ export const useErrorMessageStore = create<ErrorMessageState>()(
                         useNotificationStore.getState().clearNotification();
                     });
                 }
-                set({ message: errorResponse.message, errors: errorResponse.errors }, false, "setErrors");
+                set(
+                    {
+                        message: errorResponse.message,
+                        errors: errorResponse.errors,
+                        errorId: crypto.randomUUID(),
+                    },
+                    false,
+                    "setErrors",
+                );
             },
-            clearErrors: () => set({ message: null, errors: {} }, false, "clearErrors"),
+            clearErrors: () => set({ message: null, errors: {}, errorId: null }, false, "clearErrors"),
         }),
         {
             name: "ErrorMessageStore",
