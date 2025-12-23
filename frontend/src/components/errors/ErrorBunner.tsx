@@ -15,7 +15,7 @@ const SlideDown = React.forwardRef(function SlideDown(
  * ジェネラルエラー表示バナー
  */
 export const ErrorBanner = () => {
-    const { message } = useErrorMessageStore();
+    const { message, errorId } = useErrorMessageStore();
     const [open, setOpen] = useState(false);
     const [dismissed, setDismissed] = useState(false);
 
@@ -30,7 +30,7 @@ export const ErrorBanner = () => {
             // messageがクリアされたらバナーを閉じる
             setOpen(false);
         }
-    }, [message]);
+    }, [message, errorId]);
 
     const handleClose = (_: React.SyntheticEvent | Event, reason?: string) => {
         if (reason === "clickaway") return;

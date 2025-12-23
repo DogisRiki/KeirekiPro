@@ -8,10 +8,11 @@ describe("useErrorMessageStore", () => {
         useNotificationStore.getState().clearNotification();
     });
 
-    it("初期状態でmessageがnull、errorsが空オブジェクトであること", () => {
-        const { message, errors } = useErrorMessageStore.getState();
+    it("初期状態でmessageがnull、errorsが空オブジェクト、errorIdがnullであること", () => {
+        const { message, errors, errorId } = useErrorMessageStore.getState();
         expect(message).toBeNull();
         expect(errors).toEqual({});
+        expect(errorId).toBeNull();
     });
 
     it("setErrorsでエラーレスポンスを設定できること", () => {
@@ -27,12 +28,13 @@ describe("useErrorMessageStore", () => {
         useErrorMessageStore.getState().setErrors(errorResponse);
 
         // messageとerrorsが設定されていること
-        const { message, errors } = useErrorMessageStore.getState();
+        const { message, errors, errorId } = useErrorMessageStore.getState();
         expect(message).toBe(errorResponse.message);
         expect(errors).toEqual(errorResponse.errors);
+        expect(errorId).not.toBeNull();
     });
 
-    it("clearErrorsでmessageとerrorsがリセットされること", () => {
+    it("clearErrorsでmessageとerrorsとerrorIdがリセットされること", () => {
         const errorResponse: ErrorResponse = {
             message: "エラーメッセージ",
             errors: {
@@ -45,14 +47,16 @@ describe("useErrorMessageStore", () => {
         useErrorMessageStore.getState().setErrors(errorResponse);
         expect(useErrorMessageStore.getState().message).toBe(errorResponse.message);
         expect(useErrorMessageStore.getState().errors).toEqual(errorResponse.errors);
+        expect(useErrorMessageStore.getState().errorId).not.toBeNull();
 
         // clearErrorsを実行
         useErrorMessageStore.getState().clearErrors();
 
-        // messageとerrorsがリセットされていること
-        const { message, errors } = useErrorMessageStore.getState();
+        // messageとerrorsとerrorIdがリセットされていること
+        const { message, errors, errorId } = useErrorMessageStore.getState();
         expect(message).toBeNull();
         expect(errors).toEqual({});
+        expect(errorId).toBeNull();
     });
 
     it("複数回setErrorsを呼び出しても最後の値が保持されること", () => {
@@ -95,5 +99,25 @@ describe("useErrorMessageStore", () => {
         const { message, errors } = useErrorMessageStore.getState();
         expect(message).toBe("");
         expect(errors).toEqual({});
+    });
+
+    it("同じエラーメッセージでもsetErrorsを呼び出すたびにerrorIdが変わること", () => {
+        const errorResponse: ErrorResponse = {
+            message: "同じエラーメッセージ",
+            errors: { field: ["エラー"] },
+        };
+
+        // 1回目のsetErrors
+        useErrorMessageStore.getState().setErrors(errorResponse);
+        const firstErrorId = useErrorMessageStore.getState().errorId;
+
+        // 2回目のsetErrors（同じエラーメッセージ）
+        useErrorMessageStore.getState().setErrors(errorResponse);
+        const secondErrorId = useErrorMessageStore.getState().errorId;
+
+        // errorIdが異なること
+        expect(firstErrorId).not.toBeNull();
+        expect(secondErrorId).not.toBeNull();
+        expect(firstErrorId).not.toBe(secondErrorId);
     });
 });
