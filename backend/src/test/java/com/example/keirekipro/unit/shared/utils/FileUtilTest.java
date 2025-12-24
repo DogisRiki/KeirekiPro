@@ -29,7 +29,7 @@ class FileUtilTest {
     private MultipartFile mockFile;
 
     @Test
-    @DisplayName("ファイルサイズが最大値を超えている場合はfalseを返す")
+    @DisplayName("isFileSizeValid_ファイルサイズが最大値を超えている場合はfalseを返す")
     public void test1() {
         // 準備
         MockMultipartFile file = new MockMultipartFile(
@@ -47,7 +47,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("ファイルサイズが最大値以下の場合はtrueを返す")
+    @DisplayName("isFileSizeValid_ファイルサイズが最大値以下の場合はtrueを返す")
     public void test2() {
         // 準備
         MockMultipartFile file = new MockMultipartFile(
@@ -65,7 +65,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("許可されていない拡張子の場合はfalseを返す")
+    @DisplayName("isExtensionValid_許可されていない拡張子の場合はfalseを返す")
     public void test3() {
         // 準備
         MockMultipartFile file = new MockMultipartFile(
@@ -83,7 +83,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("許可された拡張子の場合はtrueを返す")
+    @DisplayName("isExtensionValid_許可された拡張子の場合はtrueを返す")
     public void test4() {
         // 準備
         MockMultipartFile file = new MockMultipartFile(
@@ -101,7 +101,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("ファイル名がnullの場合はfalseを返す")
+    @DisplayName("isExtensionValid_ファイル名がnullの場合はfalseを返す")
     public void test5() {
         // 準備
         when(mockFile.getOriginalFilename()).thenReturn(null);
@@ -115,7 +115,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("ファイル名に拡張子がない場合はfalseを返す")
+    @DisplayName("isExtensionValid_ファイル名に拡張子がない場合はfalseを返す")
     public void test6() {
         // 準備
         when(mockFile.getOriginalFilename()).thenReturn("testfile");
@@ -129,7 +129,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("許可されていないMIMEタイプの場合はfalseを返す")
+    @DisplayName("isMimeTypeValid_許可されていないMIMEタイプの場合はfalseを返す")
     public void test7() {
         // 準備
         MockMultipartFile file = new MockMultipartFile(
@@ -147,7 +147,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("許可されたMIMEタイプの場合はtrueを返す")
+    @DisplayName("isMimeTypeValid_許可されたMIMEタイプの場合はtrueを返す")
     public void test8() {
         // 準備
         MockMultipartFile file = new MockMultipartFile(
@@ -165,7 +165,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("MIMEタイプがnullの場合はfalseを返す")
+    @DisplayName("isMimeTypeValid_MIMEタイプがnullの場合はfalseを返す")
     public void test9() {
         // 準備
         when(mockFile.getContentType()).thenReturn(null);
@@ -179,7 +179,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("空のMIMEタイプリストが渡された場合はfalseを返す")
+    @DisplayName("isMimeTypeValid_空のMIMEタイプリストが渡された場合はfalseを返す")
     public void test10() {
         // 準備
         MockMultipartFile file = new MockMultipartFile(
@@ -197,7 +197,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("有効な画像ファイルの場合はtrueを返す")
+    @DisplayName("isImageReadValid_有効な画像ファイルの場合はtrueを返す")
     public void test11() throws IOException {
         // 準備: 1x1の正方形の画像を作成
         BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
@@ -219,7 +219,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("画像ではないファイルの場合はfalseを返す")
+    @DisplayName("isImageReadValid_画像ではないファイルの場合はfalseを返す")
     public void test12() {
         // 準備
         MockMultipartFile file = new MockMultipartFile(
@@ -236,7 +236,7 @@ class FileUtilTest {
     }
 
     @Test
-    @DisplayName("画像読み込み時にIOExceptionが発生した場合はfalseを返す")
+    @DisplayName("isImageReadValid_画像読み込み時にIOExceptionが発生した場合はfalseを返す")
     public void test13() throws IOException {
         // 準備
         when(mockFile.getInputStream()).thenThrow(new IOException("テスト用例外"));
@@ -246,5 +246,89 @@ class FileUtilTest {
 
         // 検証
         assertThat(result).isFalse();
+    }
+
+    @Test
+    @DisplayName("sanitizeFileName_正常なファイル名はそのまま返す")
+    public void test14() {
+        // 実行
+        String result = FileUtil.sanitizeFileName("my_resume", "default");
+
+        // 検証
+        assertThat(result).isEqualTo("my_resume");
+    }
+
+    @Test
+    @DisplayName("sanitizeFileName_nullの場合はデフォルト名を返す")
+    public void test15() {
+        // 実行
+        String result = FileUtil.sanitizeFileName(null, "default");
+
+        // 検証
+        assertThat(result).isEqualTo("default");
+    }
+
+    @Test
+    @DisplayName("sanitizeFileName_空白のみの場合はデフォルト名を返す")
+    public void test16() {
+        // 実行
+        String result = FileUtil.sanitizeFileName("   ", "default");
+
+        // 検証
+        assertThat(result).isEqualTo("default");
+    }
+
+    @Test
+    @DisplayName("sanitizeFileName_禁止文字は_に置換される")
+    public void test17() {
+        // 実行
+        String result = FileUtil.sanitizeFileName("file\\name/test:file*name?test\"file<name>test|end", "default");
+
+        // 検証
+        assertThat(result).isEqualTo("file_name_test_file_name_test_file_name_test_end");
+    }
+
+    @Test
+    @DisplayName("sanitizeFileName_制御文字は除去される")
+    public void test18() {
+        // 実行
+        String result = FileUtil.sanitizeFileName("file\tname\ntest", "default");
+
+        // 検証
+        assertThat(result).isEqualTo("filenametest");
+    }
+
+    @Test
+    @DisplayName("sanitizeFileName_禁止文字のみで構成される場合はデフォルト名を返す")
+    public void test19() {
+        // 実行
+        String result = FileUtil.sanitizeFileName("\\/:*?\"<>|", "default");
+
+        // 検証
+        assertThat(result).isEqualTo("default");
+    }
+
+    @Test
+    @DisplayName("sanitizeFileName_255文字を超える場合は255文字に切り捨てる")
+    public void test20() {
+        // 準備
+        String longName = "a".repeat(300);
+
+        // 実行
+        String result = FileUtil.sanitizeFileName(longName, "default");
+
+        // 検証
+        assertThat(result).hasSize(255);
+        assertThat(result).isEqualTo("a".repeat(255));
+    }
+
+    @Test
+    @DisplayName("sanitizeFileName_前後の空白はトリムされる")
+    public void test21() {
+        // 実行
+        String result = FileUtil.sanitizeFileName("  filename  ", "default");
+
+        // 検証
+        assertThat(result).isEqualTo("filename");
     }
 }

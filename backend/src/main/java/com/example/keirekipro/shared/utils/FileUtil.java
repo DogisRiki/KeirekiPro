@@ -8,9 +8,12 @@ import javax.imageio.ImageIO;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import lombok.experimental.UtilityClass;
+
 /**
  * ファイル操作に関するユーティリティクラス
  */
+@UtilityClass
 public class FileUtil {
 
     /**
@@ -65,5 +68,24 @@ public class FileUtil {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    /**
+     * ファイル名として安全な文字列に変換する
+     * ファイル名は最大255文字とし、超える場合は切り捨てる
+     *
+     * @param raw         元のファイル名
+     * @param defaultName nullまたは空白時のデフォルト名
+     * @return サニタイズ後のファイル名
+     */
+    public static String sanitizeFileName(String raw, String defaultName) {
+        String name = (raw == null || raw.isBlank()) ? defaultName : raw.trim();
+        name = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+        name = name.replaceAll("[\\p{Cntrl}]", "");
+        name = name.replaceAll("^_+$", ""); // アンダースコアのみの場合は空にする
+        if (name.isBlank()) {
+            return defaultName;
+        }
+        return name.length() > 255 ? name.substring(0, 255) : name;
     }
 }
