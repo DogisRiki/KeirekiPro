@@ -1,3 +1,4 @@
+// src/lib/axiosInterceptors.ts
 import { toastMessage } from "@/config/messages";
 import { paths } from "@/config/paths";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
@@ -14,7 +15,7 @@ const notFoundMessages = ["職務経歴書が存在しません。"];
  */
 export const createErrorInterceptor =
     () =>
-    (error: unknown): Promise<never> => {
+    async (error: unknown): Promise<never> => {
         if (axios.isAxiosError(error)) {
             const { response } = error;
 
@@ -26,15 +27,33 @@ export const createErrorInterceptor =
 
             // 400(バリデーションエラー)
             if (response?.status === 400 && response.data) {
-                const errorData = response.data as ErrorResponse;
+                const contentType = String(response.headers?.["content-type"] ?? "");
 
-                // 404ページへリダイレクトするエラーメッセージの場合
-                if (notFoundMessages.includes(errorData.message)) {
-                    window.location.href = "/not-found";
-                    return Promise.reject(error);
+                let errorData: ErrorResponse | null = null;
+
+                // responseTypeが"blob"のAPIは、エラーJSONもBlobで来る
+                if (response.data instanceof Blob && contentType.includes("application/json")) {
+                    try {
+                        const text = await response.data.text();
+                        errorData = JSON.parse(text) as ErrorResponse;
+                    } catch {
+                        // JSONとして復元できない場合は何もしない（既存挙動維持）
+                        errorData = null;
+                    }
+                } else {
+                    // 通常のJSON API
+                    errorData = response.data as ErrorResponse;
                 }
 
-                useErrorMessageStore.getState().setErrors(errorData);
+                if (errorData) {
+                    // 404ページへリダイレクトするエラーメッセージの場合
+                    if (notFoundMessages.includes(errorData.message)) {
+                        window.location.href = "/not-found";
+                        return Promise.reject(error);
+                    }
+
+                    useErrorMessageStore.getState().setErrors(errorData);
+                }
             }
 
             // 403(アクセス不正)
