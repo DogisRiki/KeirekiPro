@@ -46,14 +46,17 @@ export const ErrorBanner = () => {
             open={open}
             onClose={handleClose}
             autoHideDuration={duration}
-            TransitionComponent={SlideDown}
+            slots={{ transition: SlideDown }}
             anchorOrigin={{ vertical: "top", horizontal: "center" }}
             sx={{ mt: 2 }}
         >
             <Alert
                 severity="error"
                 variant="filled"
-                sx={{ alignItems: "center" }}
+                sx={{
+                    alignItems: "center",
+                    whiteSpace: "pre-line", // \nを改行として表示
+                }}
                 action={
                     <IconButton aria-label="close" size="small" color="inherit" onClick={handleClose}>
                         <CloseIcon fontSize="small" />
