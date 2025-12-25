@@ -490,18 +490,23 @@ class ResumeMapperTest {
                 "Team",
                 "Role",
                 "Achievement",
+                true,
                 false,
+                true,
                 false,
+                true,
                 false,
-                false,
-                false,
-                false,
-                false);
+                true);
+
+        // TechStackを全項目に詰める
+        fillAllTechStacks(project, "A");
+
         resumeMapper.insertProject(project);
 
         List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
         assertThat(list).hasSize(1);
         ProjectDto loaded = list.get(0);
+
         assertThat(loaded.getId()).isEqualTo(projectId);
         assertThat(loaded.getCompanyName()).isEqualTo("CompanyProj");
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2023, 1));
@@ -512,6 +517,58 @@ class ResumeMapperTest {
         assertThat(loaded.getTeamComp()).isEqualTo("Team");
         assertThat(loaded.getRole()).isEqualTo("Role");
         assertThat(loaded.getAchievement()).isEqualTo("Achievement");
+
+        // Process も検証
+        assertThat(loaded.getRequirements()).isTrue();
+        assertThat(loaded.getBasicDesign()).isFalse();
+        assertThat(loaded.getDetailedDesign()).isTrue();
+        assertThat(loaded.getImplementation()).isFalse();
+        assertThat(loaded.getIntegrationTest()).isTrue();
+        assertThat(loaded.getSystemTest()).isFalse();
+        assertThat(loaded.getMaintenance()).isTrue();
+
+        // TechStack - Frontend
+        assertThat(loaded.getFrontendLanguages()).isEqualTo(List.of("feLang-A"));
+        assertThat(loaded.getFrontendFrameworks()).isEqualTo(List.of("feFw-A"));
+        assertThat(loaded.getFrontendLibraries()).isEqualTo(List.of("feLib-A"));
+        assertThat(loaded.getFrontendBuildTools()).isEqualTo(List.of("feBuild-A"));
+        assertThat(loaded.getFrontendPackageManagers()).isEqualTo(List.of("fePm-A"));
+        assertThat(loaded.getFrontendLinters()).isEqualTo(List.of("feLint-A"));
+        assertThat(loaded.getFrontendFormatters()).isEqualTo(List.of("feFmt-A"));
+        assertThat(loaded.getFrontendTestingTools()).isEqualTo(List.of("feTest-A"));
+
+        // TechStack - Backend
+        assertThat(loaded.getBackendLanguages()).isEqualTo(List.of("beLang-A"));
+        assertThat(loaded.getBackendFrameworks()).isEqualTo(List.of("beFw-A"));
+        assertThat(loaded.getBackendLibraries()).isEqualTo(List.of("beLib-A"));
+        assertThat(loaded.getBackendBuildTools()).isEqualTo(List.of("beBuild-A"));
+        assertThat(loaded.getBackendPackageManagers()).isEqualTo(List.of("bePm-A"));
+        assertThat(loaded.getBackendLinters()).isEqualTo(List.of("beLint-A"));
+        assertThat(loaded.getBackendFormatters()).isEqualTo(List.of("beFmt-A"));
+        assertThat(loaded.getBackendTestingTools()).isEqualTo(List.of("beTest-A"));
+        assertThat(loaded.getOrmTools()).isEqualTo(List.of("orm-A"));
+        assertThat(loaded.getAuth()).isEqualTo(List.of("auth-A"));
+
+        // TechStack - Infrastructure
+        assertThat(loaded.getClouds()).isEqualTo(List.of("cloud-A"));
+        assertThat(loaded.getOperatingSystems()).isEqualTo(List.of("os-A"));
+        assertThat(loaded.getContainers()).isEqualTo(List.of("container-A"));
+        assertThat(loaded.getDatabases()).isEqualTo(List.of("db-A"));
+        assertThat(loaded.getWebServers()).isEqualTo(List.of("web-A"));
+        assertThat(loaded.getCiCdTools()).isEqualTo(List.of("cicd-A"));
+        assertThat(loaded.getIacTools()).isEqualTo(List.of("iac-A"));
+        assertThat(loaded.getMonitoringTools()).isEqualTo(List.of("mon-A"));
+        assertThat(loaded.getLoggingTools()).isEqualTo(List.of("log-A"));
+
+        // TechStack - Tools
+        assertThat(loaded.getSourceControls()).isEqualTo(List.of("scm-A"));
+        assertThat(loaded.getProjectManagements()).isEqualTo(List.of("pm-A"));
+        assertThat(loaded.getCommunicationTools()).isEqualTo(List.of("comm-A"));
+        assertThat(loaded.getDocumentationTools()).isEqualTo(List.of("doc-A"));
+        assertThat(loaded.getApiDevelopmentTools()).isEqualTo(List.of("apiDev-A"));
+        assertThat(loaded.getDesignTools()).isEqualTo(List.of("design-A"));
+        assertThat(loaded.getEditors()).isEqualTo(List.of("editor-A"));
+        assertThat(loaded.getDevelopmentEnvironments()).isEqualTo(List.of("devEnv-A"));
     }
 
     @Test
@@ -550,6 +607,7 @@ class ResumeMapperTest {
                 false,
                 false,
                 false);
+        fillAllTechStacks(original, "OLD");
         resumeMapper.insertProject(original);
 
         // 更新
@@ -572,11 +630,13 @@ class ResumeMapperTest {
                 true,
                 true,
                 true);
+        fillAllTechStacks(updated, "NEW");
         resumeMapper.updateProject(updated);
 
         List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
         assertThat(list).hasSize(1);
         ProjectDto loaded = list.get(0);
+
         assertThat(loaded.getCompanyName()).isEqualTo("NewCompany");
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2022, 3));
         assertThat(loaded.getEndDate()).isEqualTo(YearMonth.of(2022, 9));
@@ -586,6 +646,55 @@ class ResumeMapperTest {
         assertThat(loaded.getTeamComp()).isEqualTo("NewTeam");
         assertThat(loaded.getRole()).isEqualTo("NewRole");
         assertThat(loaded.getAchievement()).isEqualTo("NewAch");
+
+        // Process（全部true）
+        assertThat(loaded.getRequirements()).isTrue();
+        assertThat(loaded.getBasicDesign()).isTrue();
+        assertThat(loaded.getDetailedDesign()).isTrue();
+        assertThat(loaded.getImplementation()).isTrue();
+        assertThat(loaded.getIntegrationTest()).isTrue();
+        assertThat(loaded.getSystemTest()).isTrue();
+        assertThat(loaded.getMaintenance()).isTrue();
+
+        // TechStackがNEWに更新されていること（全項目を検証）
+        assertThat(loaded.getFrontendLanguages()).isEqualTo(List.of("feLang-NEW"));
+        assertThat(loaded.getFrontendFrameworks()).isEqualTo(List.of("feFw-NEW"));
+        assertThat(loaded.getFrontendLibraries()).isEqualTo(List.of("feLib-NEW"));
+        assertThat(loaded.getFrontendBuildTools()).isEqualTo(List.of("feBuild-NEW"));
+        assertThat(loaded.getFrontendPackageManagers()).isEqualTo(List.of("fePm-NEW"));
+        assertThat(loaded.getFrontendLinters()).isEqualTo(List.of("feLint-NEW"));
+        assertThat(loaded.getFrontendFormatters()).isEqualTo(List.of("feFmt-NEW"));
+        assertThat(loaded.getFrontendTestingTools()).isEqualTo(List.of("feTest-NEW"));
+
+        assertThat(loaded.getBackendLanguages()).isEqualTo(List.of("beLang-NEW"));
+        assertThat(loaded.getBackendFrameworks()).isEqualTo(List.of("beFw-NEW"));
+        assertThat(loaded.getBackendLibraries()).isEqualTo(List.of("beLib-NEW"));
+        assertThat(loaded.getBackendBuildTools()).isEqualTo(List.of("beBuild-NEW"));
+        assertThat(loaded.getBackendPackageManagers()).isEqualTo(List.of("bePm-NEW"));
+        assertThat(loaded.getBackendLinters()).isEqualTo(List.of("beLint-NEW"));
+        assertThat(loaded.getBackendFormatters()).isEqualTo(List.of("beFmt-NEW"));
+        assertThat(loaded.getBackendTestingTools()).isEqualTo(List.of("beTest-NEW"));
+        assertThat(loaded.getOrmTools()).isEqualTo(List.of("orm-NEW"));
+        assertThat(loaded.getAuth()).isEqualTo(List.of("auth-NEW"));
+
+        assertThat(loaded.getClouds()).isEqualTo(List.of("cloud-NEW"));
+        assertThat(loaded.getOperatingSystems()).isEqualTo(List.of("os-NEW"));
+        assertThat(loaded.getContainers()).isEqualTo(List.of("container-NEW"));
+        assertThat(loaded.getDatabases()).isEqualTo(List.of("db-NEW"));
+        assertThat(loaded.getWebServers()).isEqualTo(List.of("web-NEW"));
+        assertThat(loaded.getCiCdTools()).isEqualTo(List.of("cicd-NEW"));
+        assertThat(loaded.getIacTools()).isEqualTo(List.of("iac-NEW"));
+        assertThat(loaded.getMonitoringTools()).isEqualTo(List.of("mon-NEW"));
+        assertThat(loaded.getLoggingTools()).isEqualTo(List.of("log-NEW"));
+
+        assertThat(loaded.getSourceControls()).isEqualTo(List.of("scm-NEW"));
+        assertThat(loaded.getProjectManagements()).isEqualTo(List.of("pm-NEW"));
+        assertThat(loaded.getCommunicationTools()).isEqualTo(List.of("comm-NEW"));
+        assertThat(loaded.getDocumentationTools()).isEqualTo(List.of("doc-NEW"));
+        assertThat(loaded.getApiDevelopmentTools()).isEqualTo(List.of("apiDev-NEW"));
+        assertThat(loaded.getDesignTools()).isEqualTo(List.of("design-NEW"));
+        assertThat(loaded.getEditors()).isEqualTo(List.of("editor-NEW"));
+        assertThat(loaded.getDevelopmentEnvironments()).isEqualTo(List.of("devEnv-NEW"));
     }
 
     @Test
@@ -1420,6 +1529,54 @@ class ResumeMapperTest {
         d.setDevelopmentEnvironments(null);
 
         return d;
+    }
+
+    /**
+     * ProjectDtoのTechStack全フィールドに非null/非emptyの値を設定する
+     */
+    private void fillAllTechStacks(ProjectDto d, String suffix) {
+        // TechStack - Frontend
+        d.setFrontendLanguages(List.of("feLang-" + suffix));
+        d.setFrontendFrameworks(List.of("feFw-" + suffix));
+        d.setFrontendLibraries(List.of("feLib-" + suffix));
+        d.setFrontendBuildTools(List.of("feBuild-" + suffix));
+        d.setFrontendPackageManagers(List.of("fePm-" + suffix));
+        d.setFrontendLinters(List.of("feLint-" + suffix));
+        d.setFrontendFormatters(List.of("feFmt-" + suffix));
+        d.setFrontendTestingTools(List.of("feTest-" + suffix));
+
+        // TechStack - Backend
+        d.setBackendLanguages(List.of("beLang-" + suffix));
+        d.setBackendFrameworks(List.of("beFw-" + suffix));
+        d.setBackendLibraries(List.of("beLib-" + suffix));
+        d.setBackendBuildTools(List.of("beBuild-" + suffix));
+        d.setBackendPackageManagers(List.of("bePm-" + suffix));
+        d.setBackendLinters(List.of("beLint-" + suffix));
+        d.setBackendFormatters(List.of("beFmt-" + suffix));
+        d.setBackendTestingTools(List.of("beTest-" + suffix));
+        d.setOrmTools(List.of("orm-" + suffix));
+        d.setAuth(List.of("auth-" + suffix));
+
+        // TechStack - Infrastructure
+        d.setClouds(List.of("cloud-" + suffix));
+        d.setOperatingSystems(List.of("os-" + suffix));
+        d.setContainers(List.of("container-" + suffix));
+        d.setDatabases(List.of("db-" + suffix));
+        d.setWebServers(List.of("web-" + suffix));
+        d.setCiCdTools(List.of("cicd-" + suffix));
+        d.setIacTools(List.of("iac-" + suffix));
+        d.setMonitoringTools(List.of("mon-" + suffix));
+        d.setLoggingTools(List.of("log-" + suffix));
+
+        // TechStack - Tools
+        d.setSourceControls(List.of("scm-" + suffix));
+        d.setProjectManagements(List.of("pm-" + suffix));
+        d.setCommunicationTools(List.of("comm-" + suffix));
+        d.setDocumentationTools(List.of("doc-" + suffix));
+        d.setApiDevelopmentTools(List.of("apiDev-" + suffix));
+        d.setDesignTools(List.of("design-" + suffix));
+        d.setEditors(List.of("editor-" + suffix));
+        d.setDevelopmentEnvironments(List.of("devEnv-" + suffix));
     }
 
     private CertificationDto createCertificationDto(

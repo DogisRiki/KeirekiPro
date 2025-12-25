@@ -15,6 +15,61 @@
         <result property="updatedAt" column="updated_at" />
     </resultMap>
 
+    <resultMap id="projectMap" type="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$ProjectDto">
+        <id property="id" column="id" />
+        <result property="companyName" column="companyName" />
+        <result property="startDate" column="startDate" />
+        <result property="endDate" column="endDate" />
+        <result property="isActive" column="isActive" />
+        <result property="name" column="name" />
+        <result property="overview" column="overview" />
+        <result property="teamComp" column="teamComp" />
+        <result property="role" column="role" />
+        <result property="achievement" column="achievement" />
+        <result property="requirements" column="requirements" />
+        <result property="basicDesign" column="basicDesign" />
+        <result property="detailedDesign" column="detailedDesign" />
+        <result property="implementation" column="implementation" />
+        <result property="integrationTest" column="integrationTest" />
+        <result property="systemTest" column="systemTest" />
+        <result property="maintenance" column="maintenance" />
+        <result property="frontendLanguages" column="frontendLanguages" typeHandler="stringListTypeHandler" />
+        <result property="frontendFrameworks" column="frontendFrameworks" typeHandler="stringListTypeHandler" />
+        <result property="frontendLibraries" column="frontendLibraries" typeHandler="stringListTypeHandler" />
+        <result property="frontendBuildTools" column="frontendBuildTools" typeHandler="stringListTypeHandler" />
+        <result property="frontendPackageManagers" column="frontendPackageManagers" typeHandler="stringListTypeHandler" />
+        <result property="frontendLinters" column="frontendLinters" typeHandler="stringListTypeHandler" />
+        <result property="frontendFormatters" column="frontendFormatters" typeHandler="stringListTypeHandler" />
+        <result property="frontendTestingTools" column="frontendTestingTools" typeHandler="stringListTypeHandler" />
+        <result property="backendLanguages" column="backendLanguages" typeHandler="stringListTypeHandler" />
+        <result property="backendFrameworks" column="backendFrameworks" typeHandler="stringListTypeHandler" />
+        <result property="backendLibraries" column="backendLibraries" typeHandler="stringListTypeHandler" />
+        <result property="backendBuildTools" column="backendBuildTools" typeHandler="stringListTypeHandler" />
+        <result property="backendPackageManagers" column="backendPackageManagers" typeHandler="stringListTypeHandler" />
+        <result property="backendLinters" column="backendLinters" typeHandler="stringListTypeHandler" />
+        <result property="backendFormatters" column="backendFormatters" typeHandler="stringListTypeHandler" />
+        <result property="backendTestingTools" column="backendTestingTools" typeHandler="stringListTypeHandler" />
+        <result property="ormTools" column="ormTools" typeHandler="stringListTypeHandler" />
+        <result property="auth" column="auth" typeHandler="stringListTypeHandler" />
+        <result property="clouds" column="clouds" typeHandler="stringListTypeHandler" />
+        <result property="operatingSystems" column="operatingSystems" typeHandler="stringListTypeHandler" />
+        <result property="containers" column="containers" typeHandler="stringListTypeHandler" />
+        <result property="databases" column="databases" typeHandler="stringListTypeHandler" />
+        <result property="webServers" column="webServers" typeHandler="stringListTypeHandler" />
+        <result property="ciCdTools" column="ciCdTools" typeHandler="stringListTypeHandler" />
+        <result property="iacTools" column="iacTools" typeHandler="stringListTypeHandler" />
+        <result property="monitoringTools" column="monitoringTools" typeHandler="stringListTypeHandler" />
+        <result property="loggingTools" column="loggingTools" typeHandler="stringListTypeHandler" />
+        <result property="sourceControls" column="sourceControls" typeHandler="stringListTypeHandler" />
+        <result property="projectManagements" column="projectManagements" typeHandler="stringListTypeHandler" />
+        <result property="communicationTools" column="communicationTools" typeHandler="stringListTypeHandler" />
+        <result property="documentationTools" column="documentationTools" typeHandler="stringListTypeHandler" />
+        <result property="apiDevelopmentTools" column="apiDevelopmentTools" typeHandler="stringListTypeHandler" />
+        <result property="designTools" column="designTools" typeHandler="stringListTypeHandler" />
+        <result property="editors" column="editors" typeHandler="stringListTypeHandler" />
+        <result property="developmentEnvironments" column="developmentEnvironments" typeHandler="stringListTypeHandler" />
+    </resultMap>
+
     <select id="selectAllByUserId" resultMap="resumeMap" parameterType="java.util.UUID">
         SELECT
             id,
@@ -153,7 +208,7 @@
     </delete>
 
     <select id="selectProjectsByResumeId"
-            resultType="com.example.keirekipro.infrastructure.repository.resume.ResumeDto$ProjectDto"
+            resultMap="projectMap"
             parameterType="java.util.UUID">
         SELECT
             p.id,
