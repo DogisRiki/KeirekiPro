@@ -36,3 +36,7 @@ oidc:
       scopes: "read:user user:email"
       providerType: "github"
       secretName: "keirekipro/oidc/github"
+
+logging:
+  level:
+    org.apache.pdfbox.pdmodel.font.PDType1Font: ERROR
