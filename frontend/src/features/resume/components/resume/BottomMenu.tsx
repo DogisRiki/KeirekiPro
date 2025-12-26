@@ -1,6 +1,6 @@
 import { Button, Dialog, Switch } from "@/components/ui";
 import { paths } from "@/config/paths";
-import { useDeleteResume, useResumeStore } from "@/features/resume";
+import { useDeleteResume, useExportResume, useResumeStore } from "@/features/resume";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
@@ -21,11 +21,6 @@ import {
 } from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
-
-const exportMenuItems = [
-    { label: "PDFでエクスポート", icon: <FileDownloadIcon />, action: () => alert("PDFでエクスポート") },
-    { label: "Markdownでエクスポート", icon: <FileDownloadIcon />, action: () => alert("Markdownでエクスポート") },
-];
 
 interface BottomMenuProps {
     /** 自動保存が有効かどうか */
@@ -51,6 +46,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
 
         const resume = useResumeStore((state) => state.resume);
         const deleteMutation = useDeleteResume();
+        const exportMutation = useExportResume();
 
         const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -63,6 +59,40 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
         const handleExportButtonClose = () => {
             setAnchorEl(null);
         };
+
+        /**
+         * PDFでエクスポート
+         */
+        const handleExportPdf = () => {
+            handleExportButtonClose();
+            if (resume) {
+                exportMutation.mutate({ resumeId: resume.id, format: "pdf" });
+            }
+        };
+
+        /**
+         * Markdownでエクスポート
+         */
+        const handleExportMarkdown = () => {
+            handleExportButtonClose();
+            if (resume) {
+                exportMutation.mutate({ resumeId: resume.id, format: "markdown" });
+            }
+        };
+
+        // エクスポートメニュー項目
+        const exportMenuItems = [
+            {
+                label: "PDFでエクスポート",
+                icon: <FileDownloadIcon />,
+                action: handleExportPdf,
+            },
+            {
+                label: "Markdownでエクスポート",
+                icon: <FileDownloadIcon />,
+                action: handleExportMarkdown,
+            },
+        ];
 
         /**
          * 削除確認ダイアログを開く
@@ -145,7 +175,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                         bgcolor: "rgba(255, 255, 255, 0.5)",
                     }}
                 >
-                    {/* 折りたたみボタン（中央上部に配置） */}
+                    {/* 折りたたみボタン */}
                     <Tooltip title="メニューを折りたたむ">
                         <IconButton
                             onClick={handleToggleCollapse}
@@ -194,6 +224,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                             startIcon={<ExpandMoreIcon />}
                             size={isXs ? "small" : "medium"}
                             onClick={handleExportButtonClick}
+                            disabled={exportMutation.isPending}
                         >
                             エクスポート
                         </Button>
@@ -204,6 +235,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                                 <MenuItem
                                     key={index}
                                     onClick={item.action}
+                                    disabled={exportMutation.isPending}
                                     sx={{
                                         color: "primary.main",
                                         display: "flex",
@@ -217,7 +249,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                             ))}
                         </Menu>
 
-                        {/* 自動保存（右端：元の削除ボタン位置） */}
+                        {/* 自動保存 */}
                         <FormGroup>
                             <FormControlLabel
                                 control={
