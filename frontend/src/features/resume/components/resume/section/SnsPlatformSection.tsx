@@ -3,6 +3,12 @@ import { env } from "@/config/env";
 import { useResumeStore, useSnsPlatformList } from "@/features/resume";
 import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
+import { useState } from "react";
+
+/**
+ * 新規作成時のデフォルト名
+ */
+const DEFAULT_NAME = "新しいSNSプラットフォーム";
 
 /**
  * SNSプラットフォームリンクセクション
@@ -17,6 +23,9 @@ export const SnsPlatformSection = () => {
     // SNSプラットフォーム一覧を取得
     const { data: snsPlatformData } = useSnsPlatformList();
     const snsPlatformOptions = snsPlatformData?.names ?? [];
+
+    // 入力値の状態管理（フォーカス時クリア用）
+    const [inputValue, setInputValue] = useState<string | null>(null);
 
     // 現在アクティブなエントリー
     const currentSnsPlatform = resume?.snsPlatforms?.find((s) => s.id === activeEntryId) ?? null;
@@ -33,12 +42,24 @@ export const SnsPlatformSection = () => {
     const handleNameChange = (_: React.SyntheticEvent, newValue: string | string[] | null) => {
         const value = Array.isArray(newValue) ? (newValue[0] ?? "") : (newValue ?? "");
         updateEntry("snsPlatforms", currentSnsPlatform.id, { name: value });
+        setInputValue(null); // 選択後はinputValueをリセット
     };
 
-    // プラットフォーム名入力ハンドラー（値が変更された場合のみ更新）
+    // プラットフォーム名入力ハンドラー
     const handleNameInputChange = (_: React.SyntheticEvent, newInputValue: string) => {
+        setInputValue(newInputValue);
         if (newInputValue !== currentSnsPlatform.name) {
             updateEntry("snsPlatforms", currentSnsPlatform.id, { name: newInputValue });
+        }
+    };
+
+    /**
+     * フォーカス時にデフォルト名をクリア
+     */
+    const handleNameFocus = () => {
+        if (currentSnsPlatform.name === DEFAULT_NAME) {
+            updateEntry("snsPlatforms", currentSnsPlatform.id, { name: "" });
+            setInputValue("");
         }
     };
 
@@ -49,6 +70,7 @@ export const SnsPlatformSection = () => {
                 freeSolo
                 options={snsPlatformOptions}
                 value={currentSnsPlatform.name}
+                inputValue={inputValue ?? currentSnsPlatform.name}
                 onChange={handleNameChange}
                 onInputChange={handleNameInputChange}
                 renderInput={(params) => (
@@ -59,6 +81,7 @@ export const SnsPlatformSection = () => {
                         placeholder="（例）GitHub"
                         error={!!errors.name?.length}
                         helperText={stringListToBulletList(errors.name)}
+                        onFocus={handleNameFocus}
                         slotProps={{
                             inputLabel: { shrink: true },
                             formHelperText: { sx: { whiteSpace: "pre-line" } },

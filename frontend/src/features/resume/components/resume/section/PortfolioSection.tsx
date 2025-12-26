@@ -5,6 +5,11 @@ import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 
 /**
+ * 新規作成時のデフォルト名
+ */
+const DEFAULT_NAME = "新しいポートフォリオ";
+
+/**
  * ポートフォリオセクション
  */
 export const PortfolioSection = () => {
@@ -25,6 +30,15 @@ export const PortfolioSection = () => {
     // 現在のエントリーのエラーを取得
     const errors = getEntryErrors(currentPortfolio.id);
 
+    /**
+     * フォーカス時にデフォルト名をクリア
+     */
+    const handleNameFocus = () => {
+        if (currentPortfolio.name === DEFAULT_NAME) {
+            updateEntry("portfolios", currentPortfolio.id, { name: "" });
+        }
+    };
+
     return (
         <>
             {/* ポートフォリオ名 */}
@@ -35,6 +49,7 @@ export const PortfolioSection = () => {
                 placeholder="（例）TaskFlow - タスク管理アプリケーション"
                 value={currentPortfolio.name}
                 onChange={(e) => updateEntry("portfolios", currentPortfolio.id, { name: e.target.value })}
+                onFocus={handleNameFocus}
                 error={!!errors.name?.length}
                 helperText={stringListToBulletList(errors.name)}
                 slotProps={{ inputLabel: { shrink: true }, formHelperText: { sx: { whiteSpace: "pre-line" } } }}

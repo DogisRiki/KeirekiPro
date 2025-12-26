@@ -6,6 +6,11 @@ import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 
 /**
+ * 新規作成時のデフォルト名
+ */
+const DEFAULT_NAME = "新しい職歴";
+
+/**
  * 職歴セクション
  */
 export const CareerSection = () => {
@@ -52,6 +57,15 @@ export const CareerSection = () => {
         });
     };
 
+    /**
+     * フォーカス時にデフォルト名をクリア
+     */
+    const handleCompanyNameFocus = () => {
+        if (currentCareer.companyName === DEFAULT_NAME) {
+            updateEntry("careers", currentCareer.id, { companyName: "" });
+        }
+    };
+
     return (
         <>
             {/* 会社名 */}
@@ -64,6 +78,7 @@ export const CareerSection = () => {
                 onChange={(e) => {
                     updateEntry("careers", currentCareer.id, { companyName: e.target.value });
                 }}
+                onFocus={handleCompanyNameFocus}
                 error={!!errors.companyName?.length}
                 helperText={stringListToBulletList(errors.companyName)}
                 slotProps={{

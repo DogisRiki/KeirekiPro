@@ -4,6 +4,11 @@ import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 
 /**
+ * 新規作成時のデフォルト名
+ */
+const DEFAULT_NAME = "新しい自己PR";
+
+/**
  * 自己PRセクション
  */
 export const SelfPromotionSection = () => {
@@ -24,6 +29,15 @@ export const SelfPromotionSection = () => {
     // 現在のエントリーのエラーを取得
     const errors = getEntryErrors(currentSelfPromotion.id);
 
+    /**
+     * フォーカス時にデフォルト名をクリア
+     */
+    const handleTitleFocus = () => {
+        if (currentSelfPromotion.title === DEFAULT_NAME) {
+            updateEntry("selfPromotions", currentSelfPromotion.id, { title: "" });
+        }
+    };
+
     return (
         <>
             {/* タイトル */}
@@ -34,6 +48,7 @@ export const SelfPromotionSection = () => {
                 placeholder="（例）技術的な課題解決能力"
                 value={currentSelfPromotion.title}
                 onChange={(e) => updateEntry("selfPromotions", currentSelfPromotion.id, { title: e.target.value })}
+                onFocus={handleTitleFocus}
                 error={!!errors.title?.length}
                 helperText={stringListToBulletList(errors.title)}
                 slotProps={{ inputLabel: { shrink: true }, formHelperText: { sx: { whiteSpace: "pre-line" } } }}

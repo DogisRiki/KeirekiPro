@@ -17,6 +17,11 @@ const MenuProps = {
 };
 
 /**
+ * 新規作成時のデフォルト名
+ */
+const DEFAULT_NAME = "新しいプロジェクト";
+
+/**
  * プロジェクトセクション
  */
 export const ProjectSection = () => {
@@ -96,6 +101,16 @@ export const ProjectSection = () => {
             newProcess[key as keyof Process] = selectedValues.includes(label);
         });
         updateEntry("projects", currentProject.id, { process: newProcess });
+    };
+
+    /**
+     * フォーカス時にデフォルト名をクリア
+     */
+    const handleNameFocus = () => {
+        // デフォルト名または「（コピー）」で終わる名前の場合はクリア
+        if (currentProject.name === DEFAULT_NAME || currentProject.name.endsWith("（コピー）")) {
+            updateEntry("projects", currentProject.id, { name: "" });
+        }
     };
 
     // 作業工程関連のエラーキーを判定
@@ -189,6 +204,7 @@ export const ProjectSection = () => {
                 placeholder="ECサイトのマイクロサービス化プロジェクト"
                 value={currentProject.name}
                 onChange={(e) => updateEntry("projects", currentProject.id, { name: e.target.value })}
+                onFocus={handleNameFocus}
                 error={!!errors.name?.length}
                 helperText={stringListToBulletList(errors.name)}
                 slotProps={slotProps}
