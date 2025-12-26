@@ -1,6 +1,6 @@
 import { Dialog } from "@/components/ui";
 import { paths } from "@/config/paths";
-import { useDeleteResume } from "@/features/resume";
+import { useDeleteResume, useExportResume } from "@/features/resume";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -9,15 +9,6 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { Box, IconButton, Menu, MenuItem } from "@mui/material";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
-
-const exportMenuList = [
-    { label: "PDFでエクスポート", icon: <FileDownloadIcon sx={{ mr: 1 }} />, action: () => alert("PDFでエクスポート") },
-    {
-        label: "Markdownでエクスポート",
-        icon: <FileDownloadIcon sx={{ mr: 1 }} />,
-        action: () => alert("Markdownでエクスポート"),
-    },
-];
 
 interface ResumeCardMenuProps {
     resumeId: string;
@@ -32,6 +23,9 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
 
     // 削除ミューテーション
     const deleteMutation = useDeleteResume();
+
+    // エクスポートミューテーション
+    const exportMutation = useExportResume();
 
     // メインメニューの表示位置を制御する要素
     const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
@@ -74,10 +68,10 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
     };
 
     // メニューを開く
-    const handleCardMenuClick = (event: React.MouseEvent<HTMLElement>, resumeId: string) => {
+    const handleCardMenuClick = (event: React.MouseEvent<HTMLElement>, targetResumeId: string) => {
         event.stopPropagation();
         setMenuAnchorEl(event.currentTarget);
-        setOpenMenuId(resumeId);
+        setOpenMenuId(targetResumeId);
     };
 
     // 全てのメニューを閉じる
@@ -112,12 +106,37 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
         }
     };
 
-    // エクスポート項目クリック時の処理
-    const handleExportItemClick = (event: React.MouseEvent, action: () => void) => {
+    /**
+     * PDFでエクスポート
+     */
+    const handleExportPdf = (event: React.MouseEvent) => {
         event.stopPropagation();
-        action();
         handleCardMenuClose();
+        exportMutation.mutate({ resumeId, format: "pdf" });
     };
+
+    /**
+     * Markdownでエクスポート
+     */
+    const handleExportMarkdown = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        handleCardMenuClose();
+        exportMutation.mutate({ resumeId, format: "markdown" });
+    };
+
+    // エクスポートメニュー項目
+    const exportMenuList = [
+        {
+            label: "PDFでエクスポート",
+            icon: <FileDownloadIcon sx={{ mr: 1 }} />,
+            action: handleExportPdf,
+        },
+        {
+            label: "Markdownでエクスポート",
+            icon: <FileDownloadIcon sx={{ mr: 1 }} />,
+            action: handleExportMarkdown,
+        },
+    ];
 
     return (
         <>
@@ -199,7 +218,8 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
                 {exportMenuList.map((menu, index) => (
                     <MenuItem
                         key={`export-${index}`}
-                        onClick={(event) => handleExportItemClick(event, menu.action)}
+                        onClick={menu.action}
+                        disabled={exportMutation.isPending}
                         sx={{ color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}
                     >
                         {menu.icon}

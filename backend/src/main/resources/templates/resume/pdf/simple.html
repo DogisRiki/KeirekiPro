@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8" />
+    <title th:text="${export.title}">職務経歴書</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+
+        /* 余白やマージン起因のページ送りを防ぐ */
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        * {
+            font-family: "Noto Sans JP", sans-serif !important;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            color: #333;
+            line-height: 1.4;
+            font-size: 13px;
+        }
+
+        /* ページ送りの事故を抑止 */
+        .section,
+        .company-section,
+        .project,
+        .portfolio-box,
+        .pr-section {
+            page-break-inside: avoid;
+        }
+
+        /* 末尾の余白が次ページを作らないようにする */
+        .section {
+            margin-bottom: 18px;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .company-section {
+            margin-bottom: 14px;
+        }
+
+        .company-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .project {
+            margin-bottom: 10px;
+        }
+
+        .project:last-child {
+            margin-bottom: 0;
+        }
+
+        .portfolio-box {
+            margin-bottom: 10px;
+        }
+
+        .portfolio-box:last-child {
+            margin-bottom: 0;
+        }
+
+        .pr-section {
+            margin-bottom: 10px;
+        }
+
+        .pr-section:last-child {
+            margin-bottom: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        table:last-child {
+            margin-bottom: 0;
+        }
+
+        p {
+            margin: 5px 0;
+        }
+
+        p:last-child {
+            margin-bottom: 0;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 12px;
+        }
+
+        .title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .date {
+            text-align: right;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            background-color: #f5f5f5;
+            padding: 6px 8px;
+            border-left: 3px solid #333;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 12px;
+        }
+
+        th {
+            background-color: #f5f5f5;
+        }
+
+        .basic-info {
+            margin-bottom: 16px;
+        }
+
+        .company-section {
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #1a73e8;
+        }
+
+        .project {
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        .project-title {
+            font-weight: bold;
+            color: #1a73e8;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .process-table {
+            margin: 8px 0;
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .process-table th,
+        .process-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: center;
+            font-size: 11px;
+        }
+
+        .process-table th {
+            background-color: #f5f5f5;
+            font-size: 11px;
+        }
+
+        .achievement-lines {
+            margin: 5px 0;
+            padding: 0;
+        }
+
+        .achievement-line {
+            margin: 0 0 3px 0;
+            font-size: 12px;
+        }
+
+        .achievement-line:last-child {
+            margin-bottom: 0;
+        }
+
+        strong {
+            font-size: 12px;
+        }
+
+        .tech-stack {
+            margin-top: 10px;
+        }
+
+        .tech-stack-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .tech-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+
+        .tech-table:last-child {
+            margin-bottom: 0;
+        }
+
+        .tech-table th {
+            background-color: #f5f5f5;
+            padding: 6px 8px;
+            text-align: left;
+            font-weight: 600;
+            width: 130px;
+            vertical-align: top;
+            border: 1px solid #ddd;
+        }
+
+        .tech-table td {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+
+        .tech-category-header td {
+            background-color: #e8e8e8;
+            font-weight: bold;
+            padding: 5px 8px;
+            border: 1px solid #ddd;
+        }
+
+        .portfolio-box {
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .portfolio-title {
+            font-weight: bold;
+            color: #1a73e8;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .pr-section {
+            background-color: #fff;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .pr-title {
+            font-weight: bold;
+            color: #1a73e8;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .sns-list {
+            list-style: none;
+            margin: 5px 0;
+            padding-left: 0;
+        }
+
+        .sns-list li {
+            position: relative;
+            padding-left: 1em;
+            margin-bottom: 3px;
+            font-size: 12px;
+        }
+
+        .sns-list li:last-child {
+            margin-bottom: 0;
+        }
+
+        .sns-list li::before {
+            content: "・";
+            position: absolute;
+            left: 0;
+            top: 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="title" th:text="${export.title}"></div>
+        <div class="date" th:text="${export.asOfDateLabel}"></div>
+    </div>
+
+    <div class="basic-info">
+        <div class="name">氏名：<span th:text="${export.fullName}"></span></div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">職歴</div>
+        <table>
+            <tr>
+                <th>期間</th>
+                <th>会社名</th>
+            </tr>
+            <tr th:each="career : ${export.careers}">
+                <td th:text="${career.periodLabel}"></td>
+                <td th:text="${career.companyName}"></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">職務内容</div>
+
+        <div class="company-section" th:each="company : ${export.companySections}">
+            <div class="company-name" th:text="${company.companyLabel}"></div>
+
+            <div class="project" th:each="project : ${company.projects}">
+                <div class="project-title" th:text="${project.projectLabel}"></div>
+
+                <p><strong>プロジェクト概要：</strong></p>
+                <p th:text="${project.overview}"></p>
+
+                <p><strong>チーム構成：</strong></p>
+                <p th:text="${project.teamComp}"></p>
+
+                <p><strong>役割：</strong></p>
+                <p th:text="${project.role}"></p>
+
+                <div th:if="${project.achievements != null and !project.achievements.isEmpty()}">
+                    <p><strong>主な成果：</strong></p>
+                    <div class="achievement-lines">
+                        <p class="achievement-line" th:each="a : ${project.achievements}" th:text="${a}"></p>
+                    </div>
+                </div>
+
+                <p><strong>作業工程：</strong></p>
+                <table class="process-table">
+                    <tr>
+                        <th>要件定義</th>
+                        <th>基本設計</th>
+                        <th>詳細設計</th>
+                        <th>実装・単体テスト</th>
+                        <th>結合テスト</th>
+                        <th>総合テスト</th>
+                        <th>運用・保守</th>
+                    </tr>
+                    <tr>
+                        <td th:text="${project.process != null and project.process.requirements ? '○' : ''}"></td>
+                        <td th:text="${project.process != null and project.process.basicDesign ? '○' : ''}"></td>
+                        <td th:text="${project.process != null and project.process.detailedDesign ? '○' : ''}"></td>
+                        <td th:text="${project.process != null and project.process.implementation ? '○' : ''}"></td>
+                        <td th:text="${project.process != null and project.process.integrationTest ? '○' : ''}"></td>
+                        <td th:text="${project.process != null and project.process.systemTest ? '○' : ''}"></td>
+                        <td th:text="${project.process != null and project.process.maintenance ? '○' : ''}"></td>
+                    </tr>
+                </table>
+
+                <div class="tech-stack" th:if="${project.tech != null}" th:with="tech=${project.tech}">
+                    <div class="tech-stack-title">技術スタック</div>
+
+                    <table class="tech-table">
+                        <tr th:if="${tech['frontend'] != null}">
+                            <td class="tech-category-header" colspan="2">フロントエンド</td>
+                        </tr>
+                        <tr
+                            th:if="${tech['frontend'] != null and tech['frontend']['languages'] != null and !#lists.isEmpty(tech['frontend']['languages'])}">
+                            <th>開発言語</th>
+                            <td th:text="${#strings.listJoin(tech['frontend']['languages'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['frontend'] != null and tech['frontend']['frameworks'] != null and !#lists.isEmpty(tech['frontend']['frameworks'])}">
+                            <th>フレームワーク</th>
+                            <td th:text="${#strings.listJoin(tech['frontend']['frameworks'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['frontend'] != null and tech['frontend']['libraries'] != null and !#lists.isEmpty(tech['frontend']['libraries'])}">
+                            <th>ライブラリ</th>
+                            <td th:text="${#strings.listJoin(tech['frontend']['libraries'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['frontend'] != null and tech['frontend']['buildTools'] != null and !#lists.isEmpty(tech['frontend']['buildTools'])}">
+                            <th>ビルドツール</th>
+                            <td th:text="${#strings.listJoin(tech['frontend']['buildTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['frontend'] != null and tech['frontend']['packageManagers'] != null and !#lists.isEmpty(tech['frontend']['packageManagers'])}">
+                            <th>パッケージマネージャー</th>
+                            <td th:text="${#strings.listJoin(tech['frontend']['packageManagers'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['frontend'] != null and tech['frontend']['linters'] != null and !#lists.isEmpty(tech['frontend']['linters'])}">
+                            <th>リンター</th>
+                            <td th:text="${#strings.listJoin(tech['frontend']['linters'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['frontend'] != null and tech['frontend']['formatters'] != null and !#lists.isEmpty(tech['frontend']['formatters'])}">
+                            <th>フォーマッター</th>
+                            <td th:text="${#strings.listJoin(tech['frontend']['formatters'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['frontend'] != null and tech['frontend']['testingTools'] != null and !#lists.isEmpty(tech['frontend']['testingTools'])}">
+                            <th>テストツール</th>
+                            <td th:text="${#strings.listJoin(tech['frontend']['testingTools'], ', ')}"></td>
+                        </tr>
+
+                        <tr th:if="${tech['backend'] != null}">
+                            <td class="tech-category-header" colspan="2">バックエンド</td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['languages'] != null and !#lists.isEmpty(tech['backend']['languages'])}">
+                            <th>開発言語</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['languages'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['frameworks'] != null and !#lists.isEmpty(tech['backend']['frameworks'])}">
+                            <th>フレームワーク</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['frameworks'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['libraries'] != null and !#lists.isEmpty(tech['backend']['libraries'])}">
+                            <th>ライブラリ</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['libraries'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['buildTools'] != null and !#lists.isEmpty(tech['backend']['buildTools'])}">
+                            <th>ビルドツール</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['buildTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['packageManagers'] != null and !#lists.isEmpty(tech['backend']['packageManagers'])}">
+                            <th>パッケージマネージャー</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['packageManagers'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['linters'] != null and !#lists.isEmpty(tech['backend']['linters'])}">
+                            <th>リンター</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['linters'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['formatters'] != null and !#lists.isEmpty(tech['backend']['formatters'])}">
+                            <th>フォーマッター</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['formatters'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['testingTools'] != null and !#lists.isEmpty(tech['backend']['testingTools'])}">
+                            <th>テストツール</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['testingTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['ormTools'] != null and !#lists.isEmpty(tech['backend']['ormTools'])}">
+                            <th>ORM</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['ormTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['backend'] != null and tech['backend']['auth'] != null and !#lists.isEmpty(tech['backend']['auth'])}">
+                            <th>認証</th>
+                            <td th:text="${#strings.listJoin(tech['backend']['auth'], ', ')}"></td>
+                        </tr>
+
+                        <tr th:if="${tech['infrastructure'] != null}">
+                            <td class="tech-category-header" colspan="2">インフラ</td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['clouds'] != null and !#lists.isEmpty(tech['infrastructure']['clouds'])}">
+                            <th>クラウド</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['clouds'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['operatingSystems'] != null and !#lists.isEmpty(tech['infrastructure']['operatingSystems'])}">
+                            <th>OS</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['operatingSystems'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['containers'] != null and !#lists.isEmpty(tech['infrastructure']['containers'])}">
+                            <th>コンテナ</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['containers'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['databases'] != null and !#lists.isEmpty(tech['infrastructure']['databases'])}">
+                            <th>データベース</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['databases'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['webServers'] != null and !#lists.isEmpty(tech['infrastructure']['webServers'])}">
+                            <th>Webサーバー</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['webServers'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['ciCdTools'] != null and !#lists.isEmpty(tech['infrastructure']['ciCdTools'])}">
+                            <th>CI/CD</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['ciCdTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['iacTools'] != null and !#lists.isEmpty(tech['infrastructure']['iacTools'])}">
+                            <th>IaC</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['iacTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['monitoringTools'] != null and !#lists.isEmpty(tech['infrastructure']['monitoringTools'])}">
+                            <th>監視</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['monitoringTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['infrastructure'] != null and tech['infrastructure']['loggingTools'] != null and !#lists.isEmpty(tech['infrastructure']['loggingTools'])}">
+                            <th>ロギング</th>
+                            <td th:text="${#strings.listJoin(tech['infrastructure']['loggingTools'], ', ')}"></td>
+                        </tr>
+
+                        <tr th:if="${tech['tools'] != null}">
+                            <td class="tech-category-header" colspan="2">開発支援ツール</td>
+                        </tr>
+                        <tr
+                            th:if="${tech['tools'] != null and tech['tools']['sourceControls'] != null and !#lists.isEmpty(tech['tools']['sourceControls'])}">
+                            <th>ソース管理</th>
+                            <td th:text="${#strings.listJoin(tech['tools']['sourceControls'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['tools'] != null and tech['tools']['projectManagements'] != null and !#lists.isEmpty(tech['tools']['projectManagements'])}">
+                            <th>プロジェクト管理</th>
+                            <td th:text="${#strings.listJoin(tech['tools']['projectManagements'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['tools'] != null and tech['tools']['communicationTools'] != null and !#lists.isEmpty(tech['tools']['communicationTools'])}">
+                            <th>コミュニケーション</th>
+                            <td th:text="${#strings.listJoin(tech['tools']['communicationTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['tools'] != null and tech['tools']['documentationTools'] != null and !#lists.isEmpty(tech['tools']['documentationTools'])}">
+                            <th>ドキュメント</th>
+                            <td th:text="${#strings.listJoin(tech['tools']['documentationTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['tools'] != null and tech['tools']['apiDevelopmentTools'] != null and !#lists.isEmpty(tech['tools']['apiDevelopmentTools'])}">
+                            <th>API開発</th>
+                            <td th:text="${#strings.listJoin(tech['tools']['apiDevelopmentTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['tools'] != null and tech['tools']['designTools'] != null and !#lists.isEmpty(tech['tools']['designTools'])}">
+                            <th>デザイン</th>
+                            <td th:text="${#strings.listJoin(tech['tools']['designTools'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['tools'] != null and tech['tools']['editors'] != null and !#lists.isEmpty(tech['tools']['editors'])}">
+                            <th>エディタ</th>
+                            <td th:text="${#strings.listJoin(tech['tools']['editors'], ', ')}"></td>
+                        </tr>
+                        <tr
+                            th:if="${tech['tools'] != null and tech['tools']['developmentEnvironments'] != null and !#lists.isEmpty(tech['tools']['developmentEnvironments'])}">
+                            <th>開発環境</th>
+                            <td th:text="${#strings.listJoin(tech['tools']['developmentEnvironments'], ', ')}"></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section" th:if="${export.certifications != null and !export.certifications.isEmpty()}">
+        <div class="section-title">保有資格</div>
+        <table>
+            <tr>
+                <th>取得年月</th>
+                <th>資格名</th>
+            </tr>
+            <tr th:each="c : ${export.certifications}">
+                <td th:text="${c.acquiredAtLabel}"></td>
+                <td th:text="${c.name}"></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section" th:if="${export.portfolios != null and !export.portfolios.isEmpty()}">
+        <div class="section-title">個人開発・成果物</div>
+
+        <div class="portfolio-box" th:each="p : ${export.portfolios}">
+            <div class="portfolio-title" th:text="${p.name}"></div>
+            <p th:text="${p.overview}"></p>
+            <p>URL: <span th:text="${p.url}"></span></p>
+            <p>技術スタック：<span th:text="${p.techStack}"></span></p>
+        </div>
+    </div>
+
+    <div class="section" th:if="${export.snsPlatforms != null and !export.snsPlatforms.isEmpty()}">
+        <div class="section-title">SNS</div>
+        <ul class="sns-list">
+            <li th:each="s : ${export.snsPlatforms}">
+                <span th:text="${s.name}"></span>: <span th:text="${s.url}"></span>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <div class="section-title">自己PR</div>
+        <div class="pr-section" th:each="sp : ${export.selfPromotions}">
+            <div class="pr-title" th:text="${sp.title}"></div>
+            <p th:text="${sp.content}"></p>
+        </div>
+    </div>
+</body>
+
+</html>
