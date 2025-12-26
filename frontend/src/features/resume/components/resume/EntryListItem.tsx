@@ -1,5 +1,7 @@
 import { Dialog } from "@/components/ui";
-import { getEntryText, isTempId, useResumeStore } from "@/features/resume";
+import type { Project } from "@/features/resume";
+import { getEntryText, isTempId, TEMP_ID_PREFIX, useResumeStore } from "@/features/resume";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { IconButton, ListItem, ListItemButton, ListItemText, Tooltip } from "@mui/material";
@@ -11,14 +13,15 @@ import { useState } from "react";
 interface EntryListItemProps {
     entry: { id: string };
     onDeleteEntry: (entryId: string, needsConfirm: boolean) => void;
+    onDuplicate?: () => void;
 }
 
 /**
  * エントリーリストアイテム
  */
-export const EntryListItem = ({ entry, onDeleteEntry }: EntryListItemProps) => {
+export const EntryListItem = ({ entry, onDeleteEntry, onDuplicate }: EntryListItemProps) => {
     // ストアから必要な状態を取り出す
-    const { activeSection, activeEntryId, setActiveEntryId } = useResumeStore();
+    const { activeSection, activeEntryId, setActiveEntryId, resume, updateSection } = useResumeStore();
     const dirtyEntryIds = useResumeStore((state) => state.dirtyEntryIds);
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -28,6 +31,9 @@ export const EntryListItem = ({ entry, onDeleteEntry }: EntryListItemProps) => {
 
     // 一時IDかどうか（新規追加されたエントリー）
     const isTemp = isTempId(entry.id);
+
+    // プロジェクトセクションかどうか
+    const isProjectSection = activeSection === "project";
 
     /**
      * ゴミ箱アイコンクリック
@@ -53,6 +59,49 @@ export const EntryListItem = ({ entry, onDeleteEntry }: EntryListItemProps) => {
         if (confirmed) {
             onDeleteEntry(entry.id, true);
         }
+    };
+
+    /**
+     * 複製アイコンクリック
+     */
+    const handleDuplicateClick = (event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation();
+
+        if (!resume || activeSection !== "project") return;
+
+        // コピー元のプロジェクトを取得
+        const sourceProject = resume.projects.find((p) => p.id === entry.id);
+        if (!sourceProject) return;
+
+        // 一時IDを生成
+        const tempId =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? `${TEMP_ID_PREFIX}${crypto.randomUUID()}`
+                : `${TEMP_ID_PREFIX}${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        // プロジェクトをディープコピーして新規エントリーを作成
+        const duplicatedProject: Project = {
+            ...sourceProject,
+            id: tempId,
+            name: `${sourceProject.name}（コピー）`,
+            process: { ...sourceProject.process },
+            techStack: {
+                frontend: { ...sourceProject.techStack.frontend },
+                backend: { ...sourceProject.techStack.backend },
+                infrastructure: { ...sourceProject.techStack.infrastructure },
+                tools: { ...sourceProject.techStack.tools },
+            },
+        };
+
+        // 現在のリストの先頭に追加
+        const updatedProjects = [duplicatedProject, ...resume.projects];
+        updateSection("projects", updatedProjects);
+
+        // 新規作成されたエントリーをアクティブに設定
+        setActiveEntryId(tempId);
+
+        // リストを先頭にスクロール
+        onDuplicate?.();
     };
 
     return (
@@ -101,6 +150,14 @@ export const EntryListItem = ({ entry, onDeleteEntry }: EntryListItemProps) => {
                             },
                         }}
                     />
+                    {/* 複製アイコン（プロジェクトセクションのみ） */}
+                    {isProjectSection && (
+                        <Tooltip title="複製" placement="top">
+                            <IconButton edge="end" onClick={handleDuplicateClick} sx={{ mr: 0.5 }}>
+                                <ContentCopyIcon />
+                            </IconButton>
+                        </Tooltip>
+                    )}
                     {/* ゴミ箱アイコン */}
                     <Tooltip title="削除" placement="top">
                         <IconButton edge="end" onClick={handleDeleteClick}>
