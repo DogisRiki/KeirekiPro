@@ -4,6 +4,12 @@ import { stringListToBulletList } from "@/utils";
 import { Box } from "@mui/material";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
+import { useState } from "react";
+
+/**
+ * 新規作成時のデフォルト名
+ */
+const DEFAULT_NAME = "新しい資格";
 
 /**
  * 資格セクション
@@ -18,6 +24,9 @@ export const CertificationSection = () => {
     // 資格一覧を取得
     const { data: certificationData } = useCertificationList();
     const certificationOptions = certificationData?.names ?? [];
+
+    // 入力値の状態管理（フォーカス時クリア用）
+    const [inputValue, setInputValue] = useState<string | null>(null);
 
     // 現在アクティブなエントリー
     const currentCertification = resume?.certifications?.find((cert) => cert.id === activeEntryId) ?? null;
@@ -42,12 +51,24 @@ export const CertificationSection = () => {
     const handleNameChange = (_: React.SyntheticEvent, newValue: string | string[] | null) => {
         const value = Array.isArray(newValue) ? (newValue[0] ?? "") : (newValue ?? "");
         updateEntry("certifications", currentCertification.id, { name: value });
+        setInputValue(null); // 選択後はinputValueをリセット
     };
 
-    // 資格名入力ハンドラー（値が変更された場合のみ更新）
+    // 資格名入力ハンドラー
     const handleNameInputChange = (_: React.SyntheticEvent, newInputValue: string) => {
+        setInputValue(newInputValue);
         if (newInputValue !== currentCertification.name) {
             updateEntry("certifications", currentCertification.id, { name: newInputValue });
+        }
+    };
+
+    /**
+     * フォーカス時にデフォルト名をクリア
+     */
+    const handleNameFocus = () => {
+        if (currentCertification.name === DEFAULT_NAME) {
+            updateEntry("certifications", currentCertification.id, { name: "" });
+            setInputValue("");
         }
     };
 
@@ -58,6 +79,7 @@ export const CertificationSection = () => {
                 freeSolo
                 options={certificationOptions}
                 value={currentCertification.name}
+                inputValue={inputValue ?? currentCertification.name}
                 onChange={handleNameChange}
                 onInputChange={handleNameInputChange}
                 renderInput={(params) => (
@@ -68,6 +90,7 @@ export const CertificationSection = () => {
                         placeholder="（例）基本情報処理技術者"
                         error={!!errors.name?.length}
                         helperText={stringListToBulletList(errors.name)}
+                        onFocus={handleNameFocus}
                         slotProps={{
                             inputLabel: { shrink: true },
                             formHelperText: { sx: { whiteSpace: "pre-line" } },

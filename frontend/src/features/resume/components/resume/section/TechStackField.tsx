@@ -1,5 +1,5 @@
 import { Autocomplete, TextField } from "@/components/ui";
-import { dedupeIgnoreCase, normalizeForCaseInsensitiveCompare } from "@/utils";
+import { dedupeIgnoreCase, normalizeForCaseInsensitiveCompare, normalizeToOfficialName } from "@/utils";
 import React, { useState } from "react";
 
 interface TechStackFieldProps {
@@ -27,7 +27,9 @@ export const TechStackField = ({ label, value, options, onChange, isLast = false
         if (!Array.isArray(newValue)) {
             return;
         }
-        const unique = dedupeIgnoreCase(newValue);
+        // 各値を正式名称に置換してから重複排除
+        const normalized = newValue.map((v) => normalizeToOfficialName(v, options));
+        const unique = dedupeIgnoreCase(normalized);
         onChange(unique);
     };
 
@@ -73,7 +75,6 @@ export const TechStackField = ({ label, value, options, onChange, isLast = false
             freeSolo
             options={options}
             filterSelectedOptions
-            autoHighlight
             isOptionEqualToValue={(option, v) =>
                 normalizeForCaseInsensitiveCompare(option) === normalizeForCaseInsensitiveCompare(v)
             }
