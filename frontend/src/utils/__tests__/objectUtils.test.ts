@@ -4,6 +4,7 @@ import {
     dedupeIgnoreCase,
     getNestedValue,
     normalizeForCaseInsensitiveCompare,
+    normalizeToOfficialName,
     setNestedValue,
     stringListToBulletList,
 } from "@/utils";
@@ -120,5 +121,36 @@ describe("normalizeForCaseInsensitiveCompare", () => {
 
     it("空白のみの文字列は空文字を返すこと", () => {
         expect(normalizeForCaseInsensitiveCompare("   ")).toBe("");
+    });
+});
+
+describe("normalizeToOfficialName", () => {
+    const options = ["React", "Vue.js", "Nuxt.js", "Next.js", "TypeScript"];
+
+    it("大文字小文字を無視して完全一致する場合は正式名称を返すこと", () => {
+        expect(normalizeToOfficialName("react", options)).toBe("React");
+        expect(normalizeToOfficialName("REACT", options)).toBe("React");
+        expect(normalizeToOfficialName("nuxt.js", options)).toBe("Nuxt.js");
+        expect(normalizeToOfficialName("NUXT.JS", options)).toBe("Nuxt.js");
+        expect(normalizeToOfficialName("typescript", options)).toBe("TypeScript");
+    });
+
+    it("前後の空白をトリムして比較すること", () => {
+        expect(normalizeToOfficialName("  React  ", options)).toBe("React");
+        expect(normalizeToOfficialName("  vue.js ", options)).toBe("Vue.js");
+    });
+
+    it("完全一致しない場合は入力値をそのまま返すこと", () => {
+        expect(normalizeToOfficialName("Nu", options)).toBe("Nu");
+        expect(normalizeToOfficialName("Rea", options)).toBe("Rea");
+        expect(normalizeToOfficialName("Angular", options)).toBe("Angular");
+    });
+
+    it("空の候補リストの場合は入力値をそのまま返すこと", () => {
+        expect(normalizeToOfficialName("React", [])).toBe("React");
+    });
+
+    it("空文字列の入力の場合は空文字列を返すこと", () => {
+        expect(normalizeToOfficialName("", options)).toBe("");
     });
 });

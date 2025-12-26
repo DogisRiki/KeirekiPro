@@ -90,3 +90,22 @@ export const dedupeIgnoreCase = (values: readonly string[]): string[] => {
 export const normalizeForCaseInsensitiveCompare = (value: string): string => {
     return value.trim().toLowerCase();
 };
+
+/**
+ * 入力値を候補リストの正式名称に置換する
+ * - 大文字小文字を無視して完全一致する候補があれば、その候補の正式名称を返す
+ * - 一致する候補がなければ入力値をそのまま返す
+ *
+ * @param input 入力値
+ * @param options 候補リスト（正式名称の配列）
+ * @returns 正式名称に置換された文字列、または入力値そのまま
+ * @example
+ * normalizeToOfficialName("nuxt.js", ["React", "Vue.js", "Nuxt.js"]); // "Nuxt.js"
+ * normalizeToOfficialName("REACT", ["React", "Vue.js"]); // "React"
+ * normalizeToOfficialName("Nu", ["React", "Nuxt.js"]); // "Nu" (完全一致しないのでそのまま)
+ */
+export const normalizeToOfficialName = (input: string, options: readonly string[]): string => {
+    const normalizedInput = normalizeForCaseInsensitiveCompare(input);
+    const match = options.find((opt) => normalizeForCaseInsensitiveCompare(opt) === normalizedInput);
+    return match ?? input;
+};
