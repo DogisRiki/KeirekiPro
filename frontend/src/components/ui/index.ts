@@ -9,6 +9,7 @@ export * from "@/components/ui/Link";
 export * from "@/components/ui/Loading";
 export * from "@/components/ui/MainMenu";
 export * from "@/components/ui/PasswordTextField";
+export * from "@/components/ui/ScrollToTopButton";
 export * from "@/components/ui/Select";
 export * from "@/components/ui/Switch";
 export * from "@/components/ui/TextField";

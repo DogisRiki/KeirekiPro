@@ -1,4 +1,4 @@
-import { Footer, MainMenu, UserMenu } from "@/components/ui";
+import { Footer, MainMenu, ScrollToTopButton, UserMenu } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useGoogleAnalytics } from "@/hooks";
 import { useErrorMessageStore } from "@/stores";
@@ -52,6 +52,7 @@ export const ProtectedLayout = () => {
                 <Outlet />
             </Container>
             <Footer />
+            <ScrollToTopButton />
         </Box>
     );
 };
