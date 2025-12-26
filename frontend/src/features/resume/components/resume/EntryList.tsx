@@ -25,7 +25,7 @@ import {
 } from "@/features/resume";
 import AddIcon from "@mui/icons-material/Add";
 import { Box, Divider, List, Typography } from "@mui/material";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useParams } from "react-router";
 
 /**
@@ -173,6 +173,9 @@ const MAX_SCROLL_HEIGHT = 400;
 export const EntryList = () => {
     const { id: resumeId } = useParams<{ id: string }>();
 
+    // スクロールコンテナへの参照
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
     // ストアから必要な状態を取り出す
     const activeSection = useResumeStore((state) => state.activeSection);
     const resume = useResumeStore((state) => state.resume);
@@ -203,6 +206,15 @@ export const EntryList = () => {
     const needsScroll = entries.length > SCROLL_THRESHOLD;
 
     /**
+     * スクロールコンテナを先頭にスクロールする
+     */
+    const scrollToTop = () => {
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    };
+
+    /**
      * 新規追加
      */
     const handleNewClick = () => {
@@ -225,6 +237,9 @@ export const EntryList = () => {
 
         updateSection(sectionKey, updatedList);
         setActiveEntryId(tempId);
+
+        // リストを先頭にスクロール
+        scrollToTop();
     };
 
     /**
@@ -301,6 +316,7 @@ export const EntryList = () => {
             <Box sx={{ p: 2 }}>
                 {entries.length > 0 ? (
                     <Box
+                        ref={scrollContainerRef}
                         sx={{
                             maxHeight: needsScroll ? MAX_SCROLL_HEIGHT : "none",
                             overflowY: needsScroll ? "auto" : "visible",
@@ -309,7 +325,12 @@ export const EntryList = () => {
                         <List sx={{ width: "100%" }}>
                             {/* エントリーアイテム */}
                             {entries.map((entry: { id: string }) => (
-                                <EntryListItem key={entry.id} entry={entry} onDeleteEntry={handleDeleteEntry} />
+                                <EntryListItem
+                                    key={entry.id}
+                                    entry={entry}
+                                    onDeleteEntry={handleDeleteEntry}
+                                    onDuplicate={scrollToTop}
+                                />
                             ))}
                         </List>
                     </Box>
