@@ -33,7 +33,7 @@ import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.Project
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SelfPromotionDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto.SnsPlatformDto;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeMapper;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -529,11 +529,11 @@ class MyBatisResumeRepositoryTest {
     @Test
     @DisplayName("save_継続中Period(endDate=null)を持つCareerを含むResumeを保存するとDTOのendDateもnullとしてマッピングされる")
     void test7() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // 継続中Period (endDate = null, isActive = true)
-        CompanyName companyName = CompanyName.create(notification, "ActiveCompany");
-        Period activePeriod = Period.create(notification, YearMonth.of(2024, 1), null, true);
+        CompanyName companyName = CompanyName.create(errorCollector, "ActiveCompany");
+        Period activePeriod = Period.create(errorCollector, YearMonth.of(2024, 1), null, true);
         Career activeCareer = Career.reconstruct(
                 UUID.fromString("99999999-aaaa-bbbb-cccc-999999999999"),
                 companyName,
@@ -543,9 +543,9 @@ class MyBatisResumeRepositoryTest {
         Resume resume = Resume.reconstruct(
                 RESUME_ID,
                 USER_ID,
-                ResumeName.create(notification, RESUME_NAME),
+                ResumeName.create(errorCollector, RESUME_NAME),
                 DATE,
-                FullName.create(notification, LAST_NAME, FIRST_NAME),
+                FullName.create(errorCollector, LAST_NAME, FIRST_NAME),
                 CREATED_AT,
                 UPDATED_AT,
                 List.of(activeCareer),

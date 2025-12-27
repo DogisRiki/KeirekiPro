@@ -1,6 +1,6 @@
 package com.example.keirekipro.domain.model.user;
 
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.apache.commons.validator.routines.EmailValidator;
 
@@ -21,29 +21,29 @@ public class Email {
 
     private final String value;
 
-    private Email(Notification notification, String value) {
-        validate(notification, value);
+    private Email(ErrorCollector errorCollector, String value) {
+        validate(errorCollector, value);
         this.value = value;
     }
 
     /**
      * ファクトリーメソッド
      *
-     * @param notification 通知オブジェクト
-     * @param value        メールアドレス
+     * @param errorCollector エラー収集オブジェクト
+     * @param value          メールアドレス
      * @return 値オブジェクト
      */
-    public static Email create(Notification notification, String value) {
-        return new Email(notification, value);
+    public static Email create(ErrorCollector errorCollector, String value) {
+        return new Email(errorCollector, value);
     }
 
-    private void validate(Notification notification, String value) {
+    private void validate(ErrorCollector errorCollector, String value) {
         if (value == null || value.isBlank()) {
-            notification.addError("email", "メールアドレスが空です。");
+            errorCollector.addError("email", "メールアドレスが空です。");
             return;
         }
         if (!VALIDATOR.isValid(value)) {
-            notification.addError("email", "メールアドレスの形式が不正です。");
+            errorCollector.addError("email", "メールアドレスの形式が不正です。");
         }
     }
 }

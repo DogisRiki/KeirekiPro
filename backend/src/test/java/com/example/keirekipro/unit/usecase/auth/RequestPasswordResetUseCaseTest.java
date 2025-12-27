@@ -19,7 +19,7 @@ import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsSesClient;
 import com.example.keirekipro.infrastructure.shared.mail.FreeMarkerMailTemplate;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.SecurityUtil;
 import com.example.keirekipro.usecase.auth.RequestPasswordResetUseCase;
 
@@ -61,10 +61,10 @@ class RequestPasswordResetUseCaseTest {
     @DisplayName("パスワードリセット要求が正常に行われる")
     void test1() {
         // データ準備
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         User user = User.reconstruct(
                 USER_ID,
-                Email.create(notification, EMAIL),
+                Email.create(errorCollector, EMAIL),
                 "hashedPassword",
                 false,
                 null,

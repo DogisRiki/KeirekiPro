@@ -7,7 +7,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateSnsPlatformRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -50,15 +50,15 @@ public class UpdateSnsPlatformUseCase {
                 .findFirst()
                 .orElseThrow(() -> new UseCaseException("対象のSNSプラットフォームが存在しません。"));
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        Link link = Link.create(notification, request.getLink());
+        Link link = Link.create(errorCollector, request.getLink());
 
         SnsPlatform updatedSnsPlatform = existing
-                .changeName(notification, request.getName())
-                .changeLink(notification, link);
+                .changeName(errorCollector, request.getName())
+                .changeLink(errorCollector, link);
 
-        Resume updated = resume.updateSnsPlatform(notification, updatedSnsPlatform);
+        Resume updated = resume.updateSnsPlatform(errorCollector, updatedSnsPlatform);
 
         resumeRepository.save(updated);
 

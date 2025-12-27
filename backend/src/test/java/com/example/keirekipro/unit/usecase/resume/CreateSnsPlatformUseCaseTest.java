@@ -21,7 +21,7 @@ import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreateSnsPlatformRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.CreateSnsPlatformUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -145,10 +145,10 @@ class CreateSnsPlatformUseCaseTest {
     }
 
     private Resume buildResume(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
         return Resume.reconstruct(
                 RESUME_ID,

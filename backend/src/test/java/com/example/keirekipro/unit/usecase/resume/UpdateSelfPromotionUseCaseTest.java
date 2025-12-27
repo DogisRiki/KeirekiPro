@@ -19,7 +19,7 @@ import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateSelfPromotionRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateSelfPromotionUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -186,11 +186,11 @@ class UpdateSelfPromotionUseCaseTest {
      * 自己PR2件を持つ職務経歴書を作成するヘルパーメソッド
      */
     private Resume buildResumeWithSelfPromotions(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // 職務経歴書本体を再構築
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
         Resume base = Resume.reconstruct(
                 RESUME_ID,
@@ -210,17 +210,17 @@ class UpdateSelfPromotionUseCaseTest {
 
         // 自己PR1
         SelfPromotion selfPromotion1 = SelfPromotion.create(
-                notification,
+                errorCollector,
                 "自己PR1タイトル",
                 "自己PR1コンテンツ");
-        Resume resumeWithSelfPromotion1 = base.addSelfPromotion(notification, selfPromotion1);
+        Resume resumeWithSelfPromotion1 = base.addSelfPromotion(errorCollector, selfPromotion1);
 
         // 自己PR2
         SelfPromotion selfPromotion2 = SelfPromotion.create(
-                notification,
+                errorCollector,
                 "自己PR2タイトル",
                 "自己PR2コンテンツ");
 
-        return resumeWithSelfPromotion1.addSelfPromotion(notification, selfPromotion2);
+        return resumeWithSelfPromotion1.addSelfPromotion(errorCollector, selfPromotion2);
     }
 }

@@ -5,7 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
@@ -35,20 +35,20 @@ public class ChangePasswordUseCase {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         if (!passwordEncoder.matches(request.getNowPassword(), user.getPasswordHash())) {
-            notification.addError("nowPassword", "現在のパスワードが正しくありません。");
+            errorCollector.addError("nowPassword", "現在のパスワードが正しくありません。");
         }
         if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
-            notification.addError("newPassword", "新しいパスワードは現在のパスワードと異なる必要があります。");
+            errorCollector.addError("newPassword", "新しいパスワードは現在のパスワードと異なる必要があります。");
         }
-        if (notification.hasErrors()) {
-            throw new UseCaseException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new UseCaseException(errorCollector.getErrors());
         }
 
         String hashed = passwordEncoder.encode(request.getNewPassword());
-        User updated = user.changePassword(new Notification(), hashed);
+        User updated = user.changePassword(new ErrorCollector(), hashed);
         userRepository.save(updated);
     }
 }

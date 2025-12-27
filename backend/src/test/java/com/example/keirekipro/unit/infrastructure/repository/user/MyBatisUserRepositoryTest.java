@@ -19,7 +19,7 @@ import com.example.keirekipro.infrastructure.repository.user.MyBatisUserReposito
 import com.example.keirekipro.infrastructure.repository.user.UserDto;
 import com.example.keirekipro.infrastructure.repository.user.UserDto.AuthProviderDto;
 import com.example.keirekipro.infrastructure.repository.user.UserMapper;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -70,7 +70,7 @@ class MyBatisUserRepositoryTest {
 
         // 基本フィールド
         assertThat(user.getId()).isEqualTo(USER_ID);
-        assertThat(user.getEmail()).isEqualTo(Email.create(new Notification(), EMAIL));
+        assertThat(user.getEmail()).isEqualTo(Email.create(new ErrorCollector(), EMAIL));
         assertThat(user.getPasswordHash()).isEqualTo(PASSWORD);
         assertThat(user.getUsername()).isEqualTo(USERNAME);
 
@@ -110,7 +110,7 @@ class MyBatisUserRepositoryTest {
         // Userエンティティを再構成（プロバイダーはgoogleのみ）
         User entity = User.reconstruct(
                 USER_ID,
-                Email.create(new Notification(), EMAIL),
+                Email.create(new ErrorCollector(), EMAIL),
                 PASSWORD,
                 false,
                 Collections.singletonMap(GOOGLE_PROVIDER_NAME, authProvider),
@@ -169,7 +169,7 @@ class MyBatisUserRepositoryTest {
 
         // 基本フィールド
         assertThat(user.getId()).isEqualTo(USER_ID);
-        assertThat(user.getEmail()).isEqualTo(Email.create(new Notification(), EMAIL));
+        assertThat(user.getEmail()).isEqualTo(Email.create(new ErrorCollector(), EMAIL));
         assertThat(user.getPasswordHash()).isEqualTo(PASSWORD);
         assertThat(user.getUsername()).isEqualTo(USERNAME);
 

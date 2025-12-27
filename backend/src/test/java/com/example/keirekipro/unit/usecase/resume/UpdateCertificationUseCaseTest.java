@@ -20,7 +20,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateCertificationRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateCertificationUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -187,11 +187,11 @@ class UpdateCertificationUseCaseTest {
      * 資格2件を持つ職務経歴書を作成するヘルパーメソッド
      */
     private Resume buildResumeWithCertifications(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // 職務経歴書本体を再構築
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
         Resume base = Resume.reconstruct(
                 RESUME_ID,
@@ -211,17 +211,17 @@ class UpdateCertificationUseCaseTest {
 
         // 資格1
         Certification certification1 = Certification.create(
-                notification,
+                errorCollector,
                 "資格A",
                 YearMonth.of(2018, 3));
-        Resume resumeWithCertification1 = base.addCertification(notification, certification1);
+        Resume resumeWithCertification1 = base.addCertification(errorCollector, certification1);
 
         // 資格2
         Certification certification2 = Certification.create(
-                notification,
+                errorCollector,
                 "資格B",
                 YearMonth.of(2019, 7));
 
-        return resumeWithCertification1.addCertification(notification, certification2);
+        return resumeWithCertification1.addCertification(errorCollector, certification2);
     }
 }

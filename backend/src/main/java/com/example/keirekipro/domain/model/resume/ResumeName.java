@@ -1,6 +1,6 @@
 package com.example.keirekipro.domain.model.resume;
 
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -24,35 +24,35 @@ public class ResumeName {
 
     private final String value;
 
-    private ResumeName(Notification notification, String value) {
-        validate(notification, value);
+    private ResumeName(ErrorCollector errorCollector, String value) {
+        validate(errorCollector, value);
         this.value = value;
     }
 
     /**
      * ファクトリーメソッド
      *
-     * @param notification 通知オブジェクト
-     * @param value        職務経歴書名
+     * @param errorCollector エラー収集オブジェクト
+     * @param value          職務経歴書名
      * @return 値オブジェクト
      */
-    public static ResumeName create(Notification notification, String value) {
-        return new ResumeName(notification, value);
+    public static ResumeName create(ErrorCollector errorCollector, String value) {
+        return new ResumeName(errorCollector, value);
     }
 
-    private void validate(Notification notification, String value) {
+    private void validate(ErrorCollector errorCollector, String value) {
         if (value == null || value.isBlank()) {
-            notification.addError("resumeName", "職務経歴書名は入力必須です。");
+            errorCollector.addError("resumeName", "職務経歴書名は入力必須です。");
             return;
         }
         if (value.length() > 50) {
-            notification.addError("resumeName", "職務経歴書名は50文字以内で入力してください。");
+            errorCollector.addError("resumeName", "職務経歴書名は50文字以内で入力してください。");
         }
         if (isInvalidValue(value)) {
-            notification.addError("resumeName", "職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | ");
+            errorCollector.addError("resumeName", "職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | ");
         }
         if (isInvalidCharStartOrEnd(value)) {
-            notification.addError("resumeName", "職務経歴書名の先頭または末尾に「.」を使用することはできません。");
+            errorCollector.addError("resumeName", "職務経歴書名の先頭または末尾に「.」を使用することはできません。");
         }
     }
 

@@ -22,7 +22,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateCareerRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateCareerUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -199,11 +199,11 @@ class UpdateCareerUseCaseTest {
      * 職歴2件を持つ職務経歴書を作成するヘルパーメソッド
      */
     private Resume buildResumeWithCareers(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // 職務経歴書本体を再構築（職歴などのリストは空で開始する）
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
         Resume base = Resume.reconstruct(
                 RESUME_ID,
@@ -221,16 +221,16 @@ class UpdateCareerUseCaseTest {
                 List.of());
 
         // 職歴1（2018年）
-        CompanyName company1 = CompanyName.create(notification, "会社A");
-        Period period1 = Period.create(notification, YearMonth.of(2018, 1), YearMonth.of(2018, 12), false);
-        Career career1 = Career.create(notification, company1, period1);
-        Resume resumeWithCareer1 = base.addCareer(notification, career1);
+        CompanyName company1 = CompanyName.create(errorCollector, "会社A");
+        Period period1 = Period.create(errorCollector, YearMonth.of(2018, 1), YearMonth.of(2018, 12), false);
+        Career career1 = Career.create(errorCollector, company1, period1);
+        Resume resumeWithCareer1 = base.addCareer(errorCollector, career1);
 
         // 職歴2（2021年）
-        CompanyName company2 = CompanyName.create(notification, "会社B");
-        Period period2 = Period.create(notification, YearMonth.of(2021, 1), YearMonth.of(2021, 12), false);
-        Career career2 = Career.create(notification, company2, period2);
+        CompanyName company2 = CompanyName.create(errorCollector, "会社B");
+        Period period2 = Period.create(errorCollector, YearMonth.of(2021, 1), YearMonth.of(2021, 12), false);
+        Career career2 = Career.create(errorCollector, company2, period2);
 
-        return resumeWithCareer1.addCareer(notification, career2);
+        return resumeWithCareer1.addCareer(errorCollector, career2);
     }
 }

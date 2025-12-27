@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Portfolio;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,13 +18,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PortfolioTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
-        Link link = Link.create(notification, "https://example.com");
-        Portfolio portfolio = Portfolio.create(notification, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Link link = Link.create(errorCollector, "https://example.com");
+        Portfolio portfolio = Portfolio.create(errorCollector, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
 
         assertThat(portfolio).isNotNull();
         assertThat(portfolio.getId()).isNotNull();
@@ -37,7 +37,7 @@ class PortfolioTest {
     @Test
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
-        Link link = Link.create(notification, "https://example.com");
+        Link link = Link.create(errorCollector, "https://example.com");
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Portfolio portfolio = Portfolio.reconstruct(id, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
 
@@ -52,9 +52,9 @@ class PortfolioTest {
     @Test
     @DisplayName("ポートフォリオ名を変更する")
     void test3() {
-        Link link = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(notification, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
-        Portfolio afterPortfolio = beforePortfolio.changeName(notification, "新しいポートフォリオ名");
+        Link link = Link.create(errorCollector, "https://example.com");
+        Portfolio beforePortfolio = Portfolio.create(errorCollector, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Portfolio afterPortfolio = beforePortfolio.changeName(errorCollector, "新しいポートフォリオ名");
 
         assertThat(afterPortfolio.getName()).isEqualTo("新しいポートフォリオ名");
     }
@@ -62,9 +62,9 @@ class PortfolioTest {
     @Test
     @DisplayName("ポートフォリオ概要を変更する")
     void test4() {
-        Link link = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(notification, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
-        Portfolio afterPortfolio = beforePortfolio.changeOverview(notification, "新しい概要説明");
+        Link link = Link.create(errorCollector, "https://example.com");
+        Portfolio beforePortfolio = Portfolio.create(errorCollector, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Portfolio afterPortfolio = beforePortfolio.changeOverview(errorCollector, "新しい概要説明");
 
         assertThat(afterPortfolio.getOverview()).isEqualTo("新しい概要説明");
     }
@@ -72,9 +72,9 @@ class PortfolioTest {
     @Test
     @DisplayName("技術スタックを変更する")
     void test5() {
-        Link link = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(notification, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
-        Portfolio afterPortfolio = beforePortfolio.changeTechStack(notification, "TypeScript, Node.js");
+        Link link = Link.create(errorCollector, "https://example.com");
+        Portfolio beforePortfolio = Portfolio.create(errorCollector, "ポートフォリオ名", "概要説明", "Java, Spring, React", link);
+        Portfolio afterPortfolio = beforePortfolio.changeTechStack(errorCollector, "TypeScript, Node.js");
 
         assertThat(afterPortfolio.getTechStack()).isEqualTo("TypeScript, Node.js");
     }
@@ -82,11 +82,11 @@ class PortfolioTest {
     @Test
     @DisplayName("リンクを変更する")
     void test6() {
-        Link beforeLink = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(notification, "ポートフォリオ名", "概要説明", "Java, Spring, React",
+        Link beforeLink = Link.create(errorCollector, "https://example.com");
+        Portfolio beforePortfolio = Portfolio.create(errorCollector, "ポートフォリオ名", "概要説明", "Java, Spring, React",
                 beforeLink);
-        Link afterLink = Link.create(notification, "https://github.com");
-        Portfolio afterPortfolio = beforePortfolio.changeLink(notification, afterLink);
+        Link afterLink = Link.create(errorCollector, "https://github.com");
+        Portfolio afterPortfolio = beforePortfolio.changeLink(errorCollector, afterLink);
 
         assertThat(afterPortfolio.getLink()).isEqualTo(afterLink);
     }
@@ -94,14 +94,14 @@ class PortfolioTest {
     @Test
     @DisplayName("ポートフォリオ名、概要、技術スタック、リンクを変更する")
     void test7() {
-        Link beforeLink = Link.create(notification, "https://example.com");
-        Portfolio beforePortfolio = Portfolio.create(notification, "ポートフォリオ名", "概要説明", "Java, Spring, React",
+        Link beforeLink = Link.create(errorCollector, "https://example.com");
+        Portfolio beforePortfolio = Portfolio.create(errorCollector, "ポートフォリオ名", "概要説明", "Java, Spring, React",
                 beforeLink);
-        Link afterLink = Link.create(notification, "https://github.com");
-        Portfolio afterPortfolio = beforePortfolio.changeName(notification, "新しいポートフォリオ名")
-                .changeOverview(notification, "新しい概要説明")
-                .changeTechStack(notification, "TypeScript, Node.js")
-                .changeLink(notification, afterLink);
+        Link afterLink = Link.create(errorCollector, "https://github.com");
+        Portfolio afterPortfolio = beforePortfolio.changeName(errorCollector, "新しいポートフォリオ名")
+                .changeOverview(errorCollector, "新しい概要説明")
+                .changeTechStack(errorCollector, "TypeScript, Node.js")
+                .changeLink(errorCollector, afterLink);
 
         assertThat(afterPortfolio.getName()).isEqualTo("新しいポートフォリオ名");
         assertThat(afterPortfolio.getOverview()).isEqualTo("新しい概要説明");
@@ -110,31 +110,31 @@ class PortfolioTest {
     }
 
     @Test
-    @DisplayName("必須項目が未入力の場合、エラーが通知される")
+    @DisplayName("必須項目が未入力の場合、エラーが収集される")
     void test8() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        Portfolio.create(notification, "", "", null, null);
+        Portfolio.create(errorCollector, "", "", null, null);
 
-        assertThat(notification.getErrors().get("name")).containsExactly("ポートフォリオ名は入力必須です。");
-        assertThat(notification.getErrors().get("overview")).containsExactly("ポートフォリオ概要は入力必須です。");
-        assertThat(notification.getErrors().get("link")).containsExactly("リンクは入力必須です。");
+        assertThat(errorCollector.getErrors().get("name")).containsExactly("ポートフォリオ名は入力必須です。");
+        assertThat(errorCollector.getErrors().get("overview")).containsExactly("ポートフォリオ概要は入力必須です。");
+        assertThat(errorCollector.getErrors().get("link")).containsExactly("リンクは入力必須です。");
     }
 
     @Test
-    @DisplayName("各項目が最大文字数を超える場合、エラーが通知される")
+    @DisplayName("各項目が最大文字数を超える場合、エラーが収集される")
     void test9() {
-        Notification notification = new Notification();
-        Notification linkNotification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
+        ErrorCollector linkerrorCollector = new ErrorCollector();
         String longName = "a".repeat(51);
         String longOverview = "a".repeat(1001);
         String longTechStack = "a".repeat(1001);
-        Link link = Link.create(linkNotification, "https://example.com");
+        Link link = Link.create(linkerrorCollector, "https://example.com");
 
-        Portfolio.create(notification, longName, longOverview, longTechStack, link);
+        Portfolio.create(errorCollector, longName, longOverview, longTechStack, link);
 
-        assertThat(notification.getErrors().get("name")).containsExactly("ポートフォリオ名は50文字以内で入力してください。");
-        assertThat(notification.getErrors().get("overview")).containsExactly("ポートフォリオ概要は1000文字以内で入力してください。");
-        assertThat(notification.getErrors().get("techStack")).containsExactly("技術スタックは1000文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("name")).containsExactly("ポートフォリオ名は50文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("overview")).containsExactly("ポートフォリオ概要は1000文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("techStack")).containsExactly("技術スタックは1000文字以内で入力してください。");
     }
 }

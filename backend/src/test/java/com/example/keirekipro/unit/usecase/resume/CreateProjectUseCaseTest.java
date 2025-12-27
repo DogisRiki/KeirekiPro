@@ -25,7 +25,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreateProjectRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.CreateProjectUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -225,14 +225,14 @@ class CreateProjectUseCaseTest {
     }
 
     private Resume buildResumeWithCareer(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
-        CompanyName companyName = CompanyName.create(notification, "会社A");
-        Period period = Period.create(notification, YearMonth.of(2017, 1), YearMonth.of(2019, 12), false);
-        Career career = Career.create(notification, companyName, period);
+        CompanyName companyName = CompanyName.create(errorCollector, "会社A");
+        Period period = Period.create(errorCollector, YearMonth.of(2017, 1), YearMonth.of(2019, 12), false);
+        Career career = Career.create(errorCollector, companyName, period);
 
         return Resume.reconstruct(
                 RESUME_ID,

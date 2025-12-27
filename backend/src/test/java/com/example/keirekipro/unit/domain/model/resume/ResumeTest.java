@@ -25,7 +25,7 @@ import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +37,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ResumeTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
@@ -47,28 +47,28 @@ class ResumeTest {
         assertThat(resume).isNotNull();
         assertThat(resume.getId()).isNotNull();
         assertThat(resume.getUserId()).isEqualTo(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
-        assertThat(resume.getName()).isEqualTo(ResumeName.create(notification, "職務経歴書A"));
+        assertThat(resume.getName()).isEqualTo(ResumeName.create(errorCollector, "職務経歴書A"));
         assertThat(resume.getDate()).isEqualTo(LocalDate.now());
-        assertThat(resume.getFullName()).isEqualTo(FullName.create(notification, "山田", "太郎"));
+        assertThat(resume.getFullName()).isEqualTo(FullName.create(errorCollector, "山田", "太郎"));
         assertThat(resume.getCreatedAt()).isNotNull();
         assertThat(resume.getUpdatedAt()).isNotNull();
     }
 
     @Test
-    @DisplayName("通知オブジェクト内にエラーがある状態で、新規構築用コンストラクタでインスタンス化するとDomainExceptionをスローする")
+    @DisplayName("エラー収集オブジェクト内にエラーがある状態で、新規構築用コンストラクタでインスタンス化するとDomainExceptionをスローする")
     void test2() {
-        Notification invalidNotification = new Notification();
-        invalidNotification.addError("name", "職務経歴書名は入力必須です。");
+        ErrorCollector invaliderrorCollector = new ErrorCollector();
+        invaliderrorCollector.addError("name", "職務経歴書名は入力必須です。");
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
             Resume.create(
-                    invalidNotification,
+                    invaliderrorCollector,
                     userId,
                     null, // 名前がnull
                     LocalDate.now(),
-                    FullName.create(notification, "山田", "太郎"),
+                    FullName.create(errorCollector, "山田", "太郎"),
                     List.of(),
                     List.of(),
                     List.of(),
@@ -86,9 +86,9 @@ class ResumeTest {
         Resume resume = Resume.reconstruct(
                 id,
                 userId,
-                ResumeName.create(notification, "職務経歴書A"),
+                ResumeName.create(errorCollector, "職務経歴書A"),
                 LocalDate.of(2023, 1, 1),
-                FullName.create(notification, "山田", "太郎"),
+                FullName.create(errorCollector, "山田", "太郎"),
                 LocalDateTime.of(2023, 1, 1, 0, 0),
                 LocalDateTime.of(2023, 1, 2, 0, 0),
                 List.of(createSampleCareer()),
@@ -101,9 +101,9 @@ class ResumeTest {
         assertThat(resume).isNotNull();
         assertThat(resume.getId()).isEqualTo(id);
         assertThat(resume.getUserId()).isEqualTo(userId);
-        assertThat(resume.getName()).isEqualTo(ResumeName.create(notification, "職務経歴書A"));
+        assertThat(resume.getName()).isEqualTo(ResumeName.create(errorCollector, "職務経歴書A"));
         assertThat(resume.getDate()).isEqualTo(LocalDate.of(2023, 1, 1));
-        assertThat(resume.getFullName()).isEqualTo(FullName.create(notification, "山田", "太郎"));
+        assertThat(resume.getFullName()).isEqualTo(FullName.create(errorCollector, "山田", "太郎"));
         assertThat(resume.getCreatedAt()).isEqualTo(LocalDateTime.of(2023, 1, 1, 0, 0));
         assertThat(resume.getUpdatedAt()).isEqualTo(LocalDateTime.of(2023, 1, 2, 0, 0));
         assertThat(resume.getCareers().size()).isEqualTo(1);
@@ -118,10 +118,10 @@ class ResumeTest {
     @DisplayName("職務経歴書名を変更する")
     void test4() {
         Resume originalResume = createSampleResume();
-        ResumeName newName = ResumeName.create(notification, "新しい履歴書名");
-        Notification domainNotification = new Notification();
+        ResumeName newName = ResumeName.create(errorCollector, "新しい履歴書名");
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume updatedResume = originalResume.changeName(domainNotification, newName);
+        Resume updatedResume = originalResume.changeName(domainerrorCollector, newName);
 
         assertThat(updatedResume.getName()).isEqualTo(newName);
     }
@@ -131,9 +131,9 @@ class ResumeTest {
     void test5() {
         Resume originalResume = createSampleResume();
         LocalDate newDate = LocalDate.of(2025, 1, 1);
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume updatedResume = originalResume.changeDate(domainNotification, newDate);
+        Resume updatedResume = originalResume.changeDate(domainerrorCollector, newDate);
 
         assertThat(updatedResume.getDate()).isEqualTo(newDate);
     }
@@ -142,11 +142,11 @@ class ResumeTest {
     @DisplayName("正常な値で職歴を追加する")
     void test6() {
         Resume beforeResume = createSampleResume();
-        Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Notification domainNotification = new Notification();
+        Career newCareer = Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2024, 1), null, true));
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addCareer(domainNotification, newCareer);
+        Resume afterResume = beforeResume.addCareer(domainerrorCollector, newCareer);
 
         assertThat(afterResume.getCareers().contains(newCareer)).isTrue();
         assertThat(afterResume.getCareers().size()).isEqualTo(beforeResume.getCareers().size() + 1);
@@ -157,25 +157,25 @@ class ResumeTest {
     void test7() {
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
-                notification,
+                errorCollector,
                 userId,
-                ResumeName.create(notification, "職務経歴書A"),
+                ResumeName.create(errorCollector, "職務経歴書A"),
                 LocalDate.now(),
-                FullName.create(notification, "山田", "太郎"),
-                List.of(Career.create(notification, CompanyName.create(notification, "株式会社ABC"),
-                        Period.create(notification, YearMonth.of(2024, 1), null, true))),
+                FullName.create(errorCollector, "山田", "太郎"),
+                List.of(Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社ABC"),
+                        Period.create(errorCollector, YearMonth.of(2024, 1), null, true))),
                 List.of(),
                 List.of(),
                 List.of(),
                 List.of(),
                 List.of());
 
-        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2024, 2), YearMonth.of(2024, 3), false));
+        Career overlappingCareer = Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2024, 2), YearMonth.of(2024, 3), false));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
+        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
@@ -185,12 +185,12 @@ class ResumeTest {
     void test8() {
         Resume resume = createSampleResume();
 
-        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false));
+        Career overlappingCareer = Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
+        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
@@ -200,25 +200,25 @@ class ResumeTest {
     void test9() {
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
-                notification,
+                errorCollector,
                 userId,
-                ResumeName.create(notification, "職務経歴書A"),
+                ResumeName.create(errorCollector, "職務経歴書A"),
                 LocalDate.now(),
-                FullName.create(notification, "山田", "太郎"),
-                List.of(Career.create(notification, CompanyName.create(notification, "株式会社ABC"),
-                        Period.create(notification, YearMonth.of(2024, 1), null, true))),
+                FullName.create(errorCollector, "山田", "太郎"),
+                List.of(Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社ABC"),
+                        Period.create(errorCollector, YearMonth.of(2024, 1), null, true))),
                 List.of(),
                 List.of(),
                 List.of(),
                 List.of(),
                 List.of());
 
-        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2024, 2), null, true));
+        Career overlappingCareer = Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2024, 2), null, true));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
+        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
@@ -228,12 +228,12 @@ class ResumeTest {
     void test10() {
         Resume resume = createSampleResume();
 
-        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2023, 10), YearMonth.of(2024, 11), false));
+        Career overlappingCareer = Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2023, 10), YearMonth.of(2024, 11), false));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
+        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
@@ -243,12 +243,12 @@ class ResumeTest {
     void test11() {
         Resume resume = createSampleResume();
 
-        Career overlappingCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2023, 11), YearMonth.of(2024, 6), false));
+        Career overlappingCareer = Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2023, 11), YearMonth.of(2024, 6), false));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainNotification, overlappingCareer))
+        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
@@ -258,11 +258,11 @@ class ResumeTest {
     void test12() {
         Resume beforeResume = createSampleResume();
         Career newCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(),
-                CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Notification domainNotification = new Notification();
+                CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2024, 1), null, true));
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.updateCareer(domainNotification, newCareer);
+        Resume afterResume = beforeResume.updateCareer(domainerrorCollector, newCareer);
 
         Career actualCareer = afterResume.getCareers().stream()
                 .filter(career -> career.getId().equals(newCareer.getId()))
@@ -288,11 +288,11 @@ class ResumeTest {
 
         // プロジェクトが存在しない状態の職務経歴書を作成する
         Resume beforeResume = Resume.create(
-                notification,
+                errorCollector,
                 userId,
-                ResumeName.create(notification, "職務経歴書A"),
+                ResumeName.create(errorCollector, "職務経歴書A"),
                 LocalDate.now(),
-                FullName.create(notification, "山田", "太郎"),
+                FullName.create(errorCollector, "山田", "太郎"),
                 List.of(baseCareer),
                 List.of(), // プロジェクトはなし
                 List.of(createSampleCertification()),
@@ -300,11 +300,11 @@ class ResumeTest {
                 List.of(createSampleSnsPlatform()),
                 List.of(createSampleSelfPromotion()));
 
-        Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2024, 1), null, true));
-        Notification domainNotification = new Notification();
+        Career newCareer = Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2024, 1), null, true));
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addCareer(domainNotification, newCareer);
+        Resume afterResume = beforeResume.addCareer(domainerrorCollector, newCareer);
 
         // 削除1回目(2件 → 1件) - 追加した職歴を削除
         Resume deletedResume = afterResume.removeCareer(newCareer.getId());
@@ -325,9 +325,9 @@ class ResumeTest {
     void test14() {
         Resume beforeResume = createSampleResume();
         Project newProject = createSampleProject();
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addProject(domainNotification, newProject);
+        Resume afterResume = beforeResume.addProject(domainerrorCollector, newProject);
 
         // 新しいプロジェクトがリストに含まれている
         assertThat(afterResume.getProjects().contains(newProject)).isTrue();
@@ -404,9 +404,9 @@ class ResumeTest {
                 Project.Process.create(false, true, true, false, true, true, false),
                 updatedTechStack);
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.updateProject(domainNotification, updatedProject);
+        Resume afterResume = beforeResume.updateProject(domainerrorCollector, updatedProject);
 
         Project actualProject = afterResume.getProjects().stream()
                 .filter(project -> project.getId().equals(updatedProject.getId()))
@@ -491,9 +491,9 @@ class ResumeTest {
 
         // 削除対象のプロジェクトを追加（職歴に存在する会社名を使用）
         Project newProject = Project.create(
-                notification,
-                CompanyName.create(notification, "株式会社ABC"),
-                Period.create(notification, YearMonth.of(2022, 1), YearMonth.of(2023, 1), false),
+                errorCollector,
+                CompanyName.create(errorCollector, "株式会社ABC"),
+                Period.create(errorCollector, YearMonth.of(2022, 1), YearMonth.of(2023, 1), false),
                 "プロジェクト概要",
                 "プロジェクト名",
                 "5人",
@@ -502,9 +502,9 @@ class ResumeTest {
                 Project.Process.create(true, false, true, false, true, false, true),
                 techStack);
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addProject(domainNotification, newProject);
+        Resume afterResume = beforeResume.addProject(domainerrorCollector, newProject);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeProject(newProject.getId());
@@ -528,10 +528,10 @@ class ResumeTest {
     @DisplayName("資格を追加する")
     void test17() {
         Resume beforeResume = createSampleResume();
-        Certification newCertification = Certification.create(notification, "応用情報技術者", YearMonth.of(2025, 2));
-        Notification domainNotification = new Notification();
+        Certification newCertification = Certification.create(errorCollector, "応用情報技術者", YearMonth.of(2025, 2));
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addCertification(domainNotification, newCertification);
+        Resume afterResume = beforeResume.addCertification(domainerrorCollector, newCertification);
 
         // 新しい資格がリストに含まれている
         assertThat(afterResume.getCertifications().contains(newCertification)).isTrue();
@@ -545,9 +545,9 @@ class ResumeTest {
         Resume beforeResume = createSampleResume();
         Certification newCertification = Certification.reconstruct(beforeResume.getCertifications().get(0).getId(),
                 "応用情報技術者", YearMonth.of(2025, 2));
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.updateCertification(domainNotification, newCertification);
+        Resume afterResume = beforeResume.updateCertification(domainerrorCollector, newCertification);
 
         Certification actualCertification = afterResume.getCertifications().stream()
                 .filter(certification -> certification.getId().equals(newCertification.getId()))
@@ -569,10 +569,10 @@ class ResumeTest {
     @DisplayName("資格を削除する")
     void test19() {
         Resume beforeResume = createSampleResume();
-        Certification newCertification = Certification.create(notification, "応用情報技術者", YearMonth.of(2025, 2));
-        Notification domainNotification = new Notification();
+        Certification newCertification = Certification.create(errorCollector, "応用情報技術者", YearMonth.of(2025, 2));
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addCertification(domainNotification, newCertification);
+        Resume afterResume = beforeResume.addCertification(domainerrorCollector, newCertification);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeCertification(newCertification.getId());
@@ -597,15 +597,15 @@ class ResumeTest {
     void test20() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
-                notification,
+                errorCollector,
                 "新しいポートフォリオ",
                 "新しいポートフォリオの概要",
                 "新しい技術スタック",
-                Link.create(notification, "https://new-portfolio.com"));
+                Link.create(errorCollector, "https://new-portfolio.com"));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addPortfolio(domainNotification, newPortfolio);
+        Resume afterResume = beforeResume.addPortfolio(domainerrorCollector, newPortfolio);
 
         // 新しいポートフォリオがリストに含まれている
         assertThat(afterResume.getPortfolios().contains(newPortfolio)).isTrue();
@@ -622,11 +622,11 @@ class ResumeTest {
                 "更新されたポートフォリオ",
                 "更新されたポートフォリオの概要",
                 "更新された技術スタック",
-                Link.create(notification, "https://updated-portfolio.com"));
+                Link.create(errorCollector, "https://updated-portfolio.com"));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.updatePortfolio(domainNotification, updatedPortfolio);
+        Resume afterResume = beforeResume.updatePortfolio(domainerrorCollector, updatedPortfolio);
 
         Portfolio actualPortfolio = afterResume.getPortfolios().stream()
                 .filter(portfolio -> portfolio.getId().equals(updatedPortfolio.getId()))
@@ -651,15 +651,15 @@ class ResumeTest {
     void test22() {
         Resume beforeResume = createSampleResume();
         Portfolio newPortfolio = Portfolio.create(
-                notification,
+                errorCollector,
                 "削除対象のポートフォリオ",
                 "削除対象の概要",
                 "削除対象の技術スタック",
-                Link.create(notification, "https://delete-portfolio.com"));
+                Link.create(errorCollector, "https://delete-portfolio.com"));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addPortfolio(domainNotification, newPortfolio);
+        Resume afterResume = beforeResume.addPortfolio(domainerrorCollector, newPortfolio);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removePortfolio(newPortfolio.getId());
@@ -684,13 +684,13 @@ class ResumeTest {
     void test23() {
         Resume beforeResume = createSampleResume();
         SnsPlatform newSnsPlatform = SnsPlatform.create(
-                notification,
+                errorCollector,
                 "Twitter",
-                Link.create(notification, "https://twitter.com/user"));
+                Link.create(errorCollector, "https://twitter.com/user"));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addSnsPlatform(domainNotification, newSnsPlatform);
+        Resume afterResume = beforeResume.addSnsPlatform(domainerrorCollector, newSnsPlatform);
 
         // 新しいSNSプラットフォームがリストに含まれている
         assertThat(afterResume.getSnsPlatforms().contains(newSnsPlatform)).isTrue();
@@ -705,11 +705,11 @@ class ResumeTest {
         SnsPlatform updatedSnsPlatform = SnsPlatform.reconstruct(
                 beforeResume.getSnsPlatforms().get(0).getId(),
                 "LinkedIn",
-                Link.create(notification, "https://linkedin.com/in/user"));
+                Link.create(errorCollector, "https://linkedin.com/in/user"));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.updateSnsPlatform(domainNotification, updatedSnsPlatform);
+        Resume afterResume = beforeResume.updateSnsPlatform(domainerrorCollector, updatedSnsPlatform);
 
         SnsPlatform actualSnsPlatform = afterResume.getSnsPlatforms().stream()
                 .filter(snsPlatform -> snsPlatform.getId().equals(updatedSnsPlatform.getId()))
@@ -732,13 +732,13 @@ class ResumeTest {
     void test25() {
         Resume beforeResume = createSampleResume();
         SnsPlatform newSnsPlatform = SnsPlatform.create(
-                notification,
+                errorCollector,
                 "Facebook",
-                Link.create(notification, "https://facebook.com/user"));
+                Link.create(errorCollector, "https://facebook.com/user"));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addSnsPlatform(domainNotification, newSnsPlatform);
+        Resume afterResume = beforeResume.addSnsPlatform(domainerrorCollector, newSnsPlatform);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeSnsPlatform(newSnsPlatform.getId());
@@ -763,13 +763,13 @@ class ResumeTest {
     void test26() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
-                notification,
+                errorCollector,
                 "新しいタイトル",
                 "新しい自己PRの内容");
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addSelfPromotion(domainNotification, newSelfPromotion);
+        Resume afterResume = beforeResume.addSelfPromotion(domainerrorCollector, newSelfPromotion);
 
         // 新しい自己PRがリストに含まれている
         assertThat(afterResume.getSelfPromotions().contains(newSelfPromotion)).isTrue();
@@ -786,9 +786,9 @@ class ResumeTest {
                 "更新されたタイトル",
                 "更新された自己PRの内容");
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.updateSelfPromotion(domainNotification, updatedSelfPromotion);
+        Resume afterResume = beforeResume.updateSelfPromotion(domainerrorCollector, updatedSelfPromotion);
 
         SelfPromotion actualSelfPromotion = afterResume.getSelfPromotions().stream()
                 .filter(selfPromotion -> selfPromotion.getId().equals(updatedSelfPromotion.getId()))
@@ -811,13 +811,13 @@ class ResumeTest {
     void test28() {
         Resume beforeResume = createSampleResume();
         SelfPromotion newSelfPromotion = SelfPromotion.create(
-                notification,
+                errorCollector,
                 "削除対象のタイトル",
                 "削除対象の自己PRの内容");
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume afterResume = beforeResume.addSelfPromotion(domainNotification, newSelfPromotion);
+        Resume afterResume = beforeResume.addSelfPromotion(domainerrorCollector, newSelfPromotion);
 
         // 削除1回目(2件 → 1件)
         Resume deletedResume = afterResume.removeSelfPromotion(newSelfPromotion.getId());
@@ -841,49 +841,49 @@ class ResumeTest {
     @DisplayName("氏名を変更する")
     void test29() {
         Resume originalResume = createSampleResume();
-        FullName newFullName = FullName.create(notification, "変更", "しました");
-        Notification domainNotification = new Notification();
+        FullName newFullName = FullName.create(errorCollector, "変更", "しました");
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume updatedResume = originalResume.ChangeFullName(domainNotification, newFullName);
+        Resume updatedResume = originalResume.ChangeFullName(domainerrorCollector, newFullName);
 
         assertThat(updatedResume.getFullName()).isEqualTo(newFullName);
     }
 
     @Test
-    @DisplayName("通知オブジェクト内にエラーがある状態で、職歴を追加するとDomainExceptionをスローする")
+    @DisplayName("エラー収集オブジェクト内にエラーがある状態で、職歴を追加するとDomainExceptionをスローする")
     void test30() {
         Resume resume = createSampleResume();
 
-        Career newCareer = Career.create(notification, CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2024, 1), null, true));
+        Career newCareer = Career.create(errorCollector, CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2024, 1), null, true));
 
-        Notification invalidNotification = new Notification();
-        invalidNotification.addError("dummy", "dummy error");
+        ErrorCollector invaliderrorCollector = new ErrorCollector();
+        invaliderrorCollector.addError("dummy", "dummy error");
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> resume.addCareer(invalidNotification, newCareer))
+        assertThatThrownBy(() -> resume.addCareer(invaliderrorCollector, newCareer))
                 .isInstanceOf(DomainException.class);
     }
 
     @Test
-    @DisplayName("通知オブジェクト内にエラーがある状態で、職歴を更新するとDomainExceptionをスローする")
+    @DisplayName("エラー収集オブジェクト内にエラーがある状態で、職歴を更新するとDomainExceptionをスローする")
     void test31() {
         Resume beforeResume = createSampleResume();
 
         Career updatedCareer = Career.reconstruct(beforeResume.getCareers().get(0).getId(),
-                CompanyName.create(notification, "株式会社DEF"),
-                Period.create(notification, YearMonth.of(2024, 1), null, true));
+                CompanyName.create(errorCollector, "株式会社DEF"),
+                Period.create(errorCollector, YearMonth.of(2024, 1), null, true));
 
-        Notification invalidNotification = new Notification();
-        invalidNotification.addError("dummy", "dummy error");
+        ErrorCollector invaliderrorCollector = new ErrorCollector();
+        invaliderrorCollector.addError("dummy", "dummy error");
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> beforeResume.updateCareer(invalidNotification, updatedCareer))
+        assertThatThrownBy(() -> beforeResume.updateCareer(invaliderrorCollector, updatedCareer))
                 .isInstanceOf(DomainException.class);
     }
 
     @Test
-    @DisplayName("通知オブジェクト内にエラーがある状態で、プロジェクトを更新するとDomainExceptionをスローする")
+    @DisplayName("エラー収集オブジェクト内にエラーがある状態で、プロジェクトを更新するとDomainExceptionをスローする")
     void test33() {
         Resume beforeResume = createSampleResume();
         Project originalProject = beforeResume.getProjects().get(0);
@@ -900,11 +900,11 @@ class ResumeTest {
                 originalProject.getProcess(),
                 originalProject.getTechStack());
 
-        Notification invalidNotification = new Notification();
-        invalidNotification.addError("dummy", "dummy error");
+        ErrorCollector invaliderrorCollector = new ErrorCollector();
+        invaliderrorCollector.addError("dummy", "dummy error");
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> beforeResume.updateProject(invalidNotification, updatedProject))
+        assertThatThrownBy(() -> beforeResume.updateProject(invaliderrorCollector, updatedProject))
                 .isInstanceOf(DomainException.class);
     }
 
@@ -914,16 +914,16 @@ class ResumeTest {
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
         Career existingCareer = Career.create(
-                notification,
-                CompanyName.create(notification, "会社A"),
-                Period.create(notification, YearMonth.of(2025, 11), YearMonth.of(2025, 12), false));
+                errorCollector,
+                CompanyName.create(errorCollector, "会社A"),
+                Period.create(errorCollector, YearMonth.of(2025, 11), YearMonth.of(2025, 12), false));
 
         Resume resume = Resume.create(
-                notification,
+                errorCollector,
                 userId,
-                ResumeName.create(notification, "職務経歴書A"),
+                ResumeName.create(errorCollector, "職務経歴書A"),
                 LocalDate.now(),
-                FullName.create(notification, "山田", "太郎"),
+                FullName.create(errorCollector, "山田", "太郎"),
                 List.of(existingCareer),
                 List.of(),
                 List.of(),
@@ -932,13 +932,13 @@ class ResumeTest {
                 List.of());
 
         Career newCareer = Career.create(
-                notification,
-                CompanyName.create(notification, "会社B"),
-                Period.create(notification, YearMonth.of(2025, 12), null, true));
+                errorCollector,
+                CompanyName.create(errorCollector, "会社B"),
+                Period.create(errorCollector, YearMonth.of(2025, 12), null, true));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatCode(() -> resume.addCareer(domainNotification, newCareer))
+        assertThatCode(() -> resume.addCareer(domainerrorCollector, newCareer))
                 .doesNotThrowAnyException();
     }
 
@@ -948,16 +948,16 @@ class ResumeTest {
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
         Career existingCareer = Career.create(
-                notification,
-                CompanyName.create(notification, "会社A"),
-                Period.create(notification, YearMonth.of(2025, 11), YearMonth.of(2025, 12), false));
+                errorCollector,
+                CompanyName.create(errorCollector, "会社A"),
+                Period.create(errorCollector, YearMonth.of(2025, 11), YearMonth.of(2025, 12), false));
 
         Resume resume = Resume.create(
-                notification,
+                errorCollector,
                 userId,
-                ResumeName.create(notification, "職務経歴書A"),
+                ResumeName.create(errorCollector, "職務経歴書A"),
                 LocalDate.now(),
-                FullName.create(notification, "山田", "太郎"),
+                FullName.create(errorCollector, "山田", "太郎"),
                 List.of(existingCareer),
                 List.of(),
                 List.of(),
@@ -966,13 +966,13 @@ class ResumeTest {
                 List.of());
 
         Career newCareer = Career.create(
-                notification,
-                CompanyName.create(notification, "会社B"),
-                Period.create(notification, YearMonth.of(2025, 12), YearMonth.of(2025, 12), false));
+                errorCollector,
+                CompanyName.create(errorCollector, "会社B"),
+                Period.create(errorCollector, YearMonth.of(2025, 12), YearMonth.of(2025, 12), false));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatCode(() -> resume.addCareer(domainNotification, newCareer))
+        assertThatCode(() -> resume.addCareer(domainerrorCollector, newCareer))
                 .doesNotThrowAnyException();
     }
 
@@ -982,13 +982,13 @@ class ResumeTest {
         Resume resume = createSampleResume();
 
         Career boundaryCareer = Career.create(
-                notification,
-                CompanyName.create(notification, "株式会社XYZ"),
-                Period.create(notification, YearMonth.of(2019, 12), YearMonth.of(2020, 1), false));
+                errorCollector,
+                CompanyName.create(errorCollector, "株式会社XYZ"),
+                Period.create(errorCollector, YearMonth.of(2019, 12), YearMonth.of(2020, 1), false));
 
-        Notification domainNotification = new Notification();
+        ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatCode(() -> resume.addCareer(domainNotification, boundaryCareer))
+        assertThatCode(() -> resume.addCareer(domainerrorCollector, boundaryCareer))
                 .doesNotThrowAnyException();
     }
 
@@ -998,11 +998,11 @@ class ResumeTest {
     private Resume createSampleResume() {
         UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         return Resume.create(
-                notification,
+                errorCollector,
                 userId,
-                ResumeName.create(notification, "職務経歴書A"),
+                ResumeName.create(errorCollector, "職務経歴書A"),
                 LocalDate.now(),
-                FullName.create(notification, "山田", "太郎"),
+                FullName.create(errorCollector, "山田", "太郎"),
                 List.of(createSampleCareer()),
                 List.of(createSampleProject()),
                 List.of(createSampleCertification()),
@@ -1015,17 +1015,17 @@ class ResumeTest {
      * 職歴のサンプルエンティティを作成する補助メソッド
      */
     private Career createSampleCareer() {
-        Period period = Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false);
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
-        return Career.create(notification, companyName, period);
+        Period period = Period.create(errorCollector, YearMonth.of(2020, 1), YearMonth.of(2023, 12), false);
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
+        return Career.create(errorCollector, companyName, period);
     }
 
     /**
      * プロジェクトのサンプルエンティティを作成する補助メソッド
      */
     private Project createSampleProject() {
-        Period period = Period.create(notification, YearMonth.of(2021, 1), YearMonth.of(2023, 12), false);
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
+        Period period = Period.create(errorCollector, YearMonth.of(2021, 1), YearMonth.of(2023, 12), false);
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
 
         TechStack.Frontend frontend = TechStack.Frontend.create(
                 List.of("TypeScript"),
@@ -1074,35 +1074,35 @@ class ResumeTest {
 
         Project.Process process = Project.Process.create(true, true, true, true, true, true, true);
         return Project.create(
-                notification, companyName, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
+                errorCollector, companyName, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
     }
 
     /**
      * 資格のサンプルエンティティを作成する補助メソッド
      */
     private Certification createSampleCertification() {
-        return Certification.create(notification, "基本情報技術者", YearMonth.of(2025, 1));
+        return Certification.create(errorCollector, "基本情報技術者", YearMonth.of(2025, 1));
     }
 
     /**
      * ポートフォリオのサンプルエンティティを作成する補助メソッド
      */
     private Portfolio createSamplePortfolio() {
-        return Portfolio.create(notification, "ポートフォリオ名", "概要", "技術スタック",
-                Link.create(notification, "https://portfolio.com"));
+        return Portfolio.create(errorCollector, "ポートフォリオ名", "概要", "技術スタック",
+                Link.create(errorCollector, "https://portfolio.com"));
     }
 
     /**
      * SNSプラットフォームのサンプルエンティティを作成する補助メソッド
      */
     private SnsPlatform createSampleSnsPlatform() {
-        return SnsPlatform.create(notification, "GitHub", Link.create(notification, "https://github.com/user"));
+        return SnsPlatform.create(errorCollector, "GitHub", Link.create(errorCollector, "https://github.com/user"));
     }
 
     /**
      * 自己PRのサンプルエンティティを作成する補助メソッド
      */
     private SelfPromotion createSampleSelfPromotion() {
-        return SelfPromotion.create(notification, "自己PRタイトル", "自己PR内容");
+        return SelfPromotion.create(errorCollector, "自己PRタイトル", "自己PR内容");
     }
 }

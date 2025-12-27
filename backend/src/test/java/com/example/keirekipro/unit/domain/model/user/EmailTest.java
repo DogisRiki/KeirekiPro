@@ -12,7 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.example.keirekipro.domain.model.user.Email;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,17 +24,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class EmailTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @Test
     @DisplayName("有効な値でインスタンス化する")
     void test1() {
         String validMail = "test-user@example.com";
-        Email email = Email.create(notification, validMail);
+        Email email = Email.create(errorCollector, validMail);
 
         assertThat(email).isNotNull();
         assertThat(email.getValue()).isEqualTo(validMail);
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
@@ -44,12 +44,12 @@ class EmailTest {
 
         for (String value : testValues) {
             // 毎回モックをリセットして、呼び出し履歴をクリアする
-            reset(notification);
-            Email email = Email.create(notification, value);
+            reset(errorCollector);
+            Email email = Email.create(errorCollector, value);
 
             assertThat(email).isNotNull();
             // メールアドレスに対するエラーメッセージが登録される
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("email"),
                     eq("メールアドレスが空です。"));
         }
@@ -66,12 +66,12 @@ class EmailTest {
                 "foo@@example.com");
 
         for (String value : invalidValues) {
-            reset(notification);
-            Email email = Email.create(notification, value);
+            reset(errorCollector);
+            Email email = Email.create(errorCollector, value);
 
             assertThat(email).isNotNull();
             // メールアドレスに対するエラーメッセージが登録される
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("email"),
                     eq("メールアドレスの形式が不正です。"));
         }

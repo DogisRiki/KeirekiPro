@@ -9,7 +9,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
 
 import org.springframework.stereotype.Service;
@@ -36,7 +36,7 @@ public class OidcLoginUseCase {
     @Transactional
     public OidcLoginUseCaseDto execute(OidcUserInfoDto userInfo) {
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         String provider = userInfo.getProviderType().toLowerCase();
         String providerUserId = userInfo.getProviderUserId();
 
@@ -55,14 +55,14 @@ public class OidcLoginUseCase {
 
         User user = existingUser.map(existing -> {
             // すでに当該プロバイダーがある場合は何もせず、なければ追加
-            return existing.addAuthProvider(notification, provider, providerUserId);
+            return existing.addAuthProvider(errorCollector, provider, providerUserId);
         }).orElseGet(() -> {
             // 新規ユーザー登録
             Map<String, AuthProvider> providers = Map.of(
-                    provider, AuthProvider.create(notification, provider, providerUserId));
+                    provider, AuthProvider.create(errorCollector, provider, providerUserId));
             User newUser = User.create(
-                    notification,
-                    userInfo.getEmail() != null ? Email.create(notification, userInfo.getEmail()) : null,
+                    errorCollector,
+                    userInfo.getEmail() != null ? Email.create(errorCollector, userInfo.getEmail()) : null,
                     null,
                     false,
                     providers,

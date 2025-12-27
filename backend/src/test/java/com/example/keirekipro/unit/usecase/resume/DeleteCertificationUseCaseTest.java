@@ -19,7 +19,7 @@ import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.DeleteCertificationUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -118,13 +118,13 @@ class DeleteCertificationUseCaseTest {
     }
 
     private Resume buildResumeWithCertifications(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
-        Certification c1 = Certification.create(notification, "資格1", YearMonth.of(2020, 6));
-        Certification c2 = Certification.create(notification, "資格2", YearMonth.of(2021, 7));
+        Certification c1 = Certification.create(errorCollector, "資格1", YearMonth.of(2020, 6));
+        Certification c2 = Certification.create(errorCollector, "資格2", YearMonth.of(2021, 7));
 
         return Resume.reconstruct(
                 RESUME_ID,

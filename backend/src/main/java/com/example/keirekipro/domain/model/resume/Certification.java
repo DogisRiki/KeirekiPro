@@ -4,7 +4,7 @@ import java.time.YearMonth;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.Getter;
 
@@ -45,13 +45,13 @@ public class Certification extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param notification 通知オブジェクト
-     * @param name         会社名
-     * @param date         取得年月
+     * @param errorCollector エラー収集オブジェクト
+     * @param name           会社名
+     * @param date           取得年月
      * @return 資格エンティティ
      */
-    public static Certification create(Notification notification, String name, YearMonth date) {
-        validate(notification, name, date);
+    public static Certification create(ErrorCollector errorCollector, String name, YearMonth date) {
+        validate(errorCollector, name, date);
         return new Certification(name, date);
     }
 
@@ -70,36 +70,36 @@ public class Certification extends Entity {
     /**
      * 資格名を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param name         資格名
+     * @param errorCollector エラー収集オブジェクト
+     * @param name           資格名
      * @return 変更後の資格エンティティ
      */
-    public Certification changeName(Notification notification, String name) {
-        validate(notification, name, this.date);
+    public Certification changeName(ErrorCollector errorCollector, String name) {
+        validate(errorCollector, name, this.date);
         return new Certification(this.id, name, this.date);
     }
 
     /**
      * 取得年月を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param date         取得年月
+     * @param errorCollector エラー収集オブジェクト
+     * @param date           取得年月
      * @return 変更後の資格エンティティ
      */
-    public Certification changeDate(Notification notification, YearMonth date) {
-        validate(notification, this.name, date);
+    public Certification changeDate(ErrorCollector errorCollector, YearMonth date) {
+        validate(errorCollector, this.name, date);
         return new Certification(this.id, this.name, date);
     }
 
-    private static void validate(Notification notification, String name, YearMonth date) {
+    private static void validate(ErrorCollector errorCollector, String name, YearMonth date) {
         if (name == null || name.isBlank()) {
-            notification.addError("name", "資格名は入力必須です。");
+            errorCollector.addError("name", "資格名は入力必須です。");
         } else if (name.length() > 50) {
-            notification.addError("name", "資格名は50文字以内で入力してください。");
+            errorCollector.addError("name", "資格名は50文字以内で入力してください。");
         }
 
         if (date == null) {
-            notification.addError("date", "取得年月は入力必須です。");
+            errorCollector.addError("date", "取得年月は入力必須です。");
         }
     }
 }

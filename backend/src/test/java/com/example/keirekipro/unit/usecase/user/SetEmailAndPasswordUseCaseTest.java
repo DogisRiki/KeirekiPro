@@ -16,7 +16,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.user.SetEmailAndPasswordUseCase;
 
 import org.junit.jupiter.api.DisplayName;
@@ -53,7 +53,7 @@ class SetEmailAndPasswordUseCaseTest {
     @DisplayName("パスワードのみを設定する")
     void test1() {
         // モックをセットアップ
-        User user = User.reconstruct(USER_ID, Email.create(new Notification(), EMAIL), null, false, Map.of(), null,
+        User user = User.reconstruct(USER_ID, Email.create(new ErrorCollector(), EMAIL), null, false, Map.of(), null,
                 USERNAME, null, null);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);

@@ -19,7 +19,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.DeleteSnsPlatformUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -118,16 +118,16 @@ class DeleteSnsPlatformUseCaseTest {
     }
 
     private Resume buildResumeWithSnsPlatforms(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
-        Link link1 = Link.create(notification, "https://github.com/example");
-        SnsPlatform s1 = SnsPlatform.create(notification, "GitHub", link1);
+        Link link1 = Link.create(errorCollector, "https://github.com/example");
+        SnsPlatform s1 = SnsPlatform.create(errorCollector, "GitHub", link1);
 
-        Link link2 = Link.create(notification, "https://x.com/example");
-        SnsPlatform s2 = SnsPlatform.create(notification, "X", link2);
+        Link link2 = Link.create(errorCollector, "https://x.com/example");
+        SnsPlatform s2 = SnsPlatform.create(errorCollector, "X", link2);
 
         return Resume.reconstruct(
                 RESUME_ID,

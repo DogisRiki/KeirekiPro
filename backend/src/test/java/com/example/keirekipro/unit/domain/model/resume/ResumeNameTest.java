@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import java.util.List;
 
 import com.example.keirekipro.domain.model.resume.ResumeName;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,16 +23,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ResumeNameTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @Test
     @DisplayName("有効な値でインスタンス化する")
     void test1() {
-        ResumeName resumeName = ResumeName.create(notification, "職務経歴書名サンプル");
+        ResumeName resumeName = ResumeName.create(errorCollector, "職務経歴書名サンプル");
 
         assertThat(resumeName).isNotNull();
         assertThat(resumeName.getValue()).isEqualTo("職務経歴書名サンプル");
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
@@ -41,14 +41,14 @@ class ResumeNameTest {
         String invalidChars = ResumeName.INVALID_PATTERN.replace("[", "").replace("]", "");
         for (char c : invalidChars.toCharArray()) {
             // 毎回モックをリセットして、呼び出し履歴をクリアする
-            reset(notification);
+            reset(errorCollector);
             String invalidName = "Valid" + c;
 
-            ResumeName resumeName = ResumeName.create(notification, invalidName);
+            ResumeName resumeName = ResumeName.create(errorCollector, invalidName);
 
             assertThat(resumeName).isNotNull();
             // 職務経歴書名に対するエラーメッセージが登録される
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | "));
         }
@@ -63,13 +63,13 @@ class ResumeNameTest {
                 ".職務経歴書名.");
         for (String value : testValues) {
             // 毎回モックをリセットして、呼び出し履歴をクリアする
-            reset(notification);
+            reset(errorCollector);
 
-            ResumeName resumeName = ResumeName.create(notification, value);
+            ResumeName resumeName = ResumeName.create(errorCollector, value);
 
             assertThat(resumeName).isNotNull();
             // 職務経歴書名に対するエラーメッセージが登録される
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名の先頭または末尾に「.」を使用することはできません。"));
         }
@@ -86,43 +86,43 @@ class ResumeNameTest {
             // 先頭にドット
             {
                 // 毎回モックをリセットして、呼び出し履歴をクリアする
-                reset(notification);
+                reset(errorCollector);
                 String value = "." + "invalid" + c;
-                ResumeName resumeName = ResumeName.create(notification, value);
+                ResumeName resumeName = ResumeName.create(errorCollector, value);
 
                 assertThat(resumeName).isNotNull();
 
                 // 禁止文字エラー + 先頭ドットエラーの2回
-                verify(notification).addError(
+                verify(errorCollector).addError(
                         eq("resumeName"),
                         eq("職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | "));
-                verify(notification).addError(
+                verify(errorCollector).addError(
                         eq("resumeName"),
                         eq("職務経歴書名の先頭または末尾に「.」を使用することはできません。"));
 
                 // 2回呼ばれたことを総数でも確認（呼び出し順が変わる可能性もあるため）
-                verify(notification, times(2)).addError(eq("resumeName"), anyString());
+                verify(errorCollector, times(2)).addError(eq("resumeName"), anyString());
             }
 
             // 末尾にドット
             {
                 // 毎回モックをリセットして、呼び出し履歴をクリアする
-                reset(notification);
+                reset(errorCollector);
                 String value = "invalid" + c + ".";
-                ResumeName resumeName = ResumeName.create(notification, value);
+                ResumeName resumeName = ResumeName.create(errorCollector, value);
 
                 assertThat(resumeName).isNotNull();
 
                 // 禁止文字エラー + 先頭ドットエラーの2回
-                verify(notification).addError(
+                verify(errorCollector).addError(
                         eq("resumeName"),
                         eq("職務経歴書名には次の文字は使用できません。\n" + "\\ / : * ? \" < > | "));
-                verify(notification).addError(
+                verify(errorCollector).addError(
                         eq("resumeName"),
                         eq("職務経歴書名の先頭または末尾に「.」を使用することはできません。"));
 
                 // 2回呼ばれたことを総数でも確認（呼び出し順が変わる可能性もあるため）
-                verify(notification, times(2)).addError(eq("resumeName"), anyString());
+                verify(errorCollector, times(2)).addError(eq("resumeName"), anyString());
             }
         }
     }
@@ -132,40 +132,40 @@ class ResumeNameTest {
     void test5() {
         // nullのケース
         {
-            reset(notification);
-            ResumeName resumeName = ResumeName.create(notification, null);
+            reset(errorCollector);
+            ResumeName resumeName = ResumeName.create(errorCollector, null);
             assertThat(resumeName).isNotNull();
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名は入力必須です。"));
         }
 
         // 空文字のケース
         {
-            reset(notification);
-            ResumeName resumeName = ResumeName.create(notification, "");
+            reset(errorCollector);
+            ResumeName resumeName = ResumeName.create(errorCollector, "");
             assertThat(resumeName).isNotNull();
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名は入力必須です。"));
         }
 
         // スペースのみのケース
         {
-            reset(notification);
-            ResumeName resumeName = ResumeName.create(notification, "   ");
+            reset(errorCollector);
+            ResumeName resumeName = ResumeName.create(errorCollector, "   ");
             assertThat(resumeName).isNotNull();
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名は入力必須です。"));
         }
 
         // タブのみのケース
         {
-            reset(notification);
-            ResumeName resumeName = ResumeName.create(notification, "\t");
+            reset(errorCollector);
+            ResumeName resumeName = ResumeName.create(errorCollector, "\t");
             assertThat(resumeName).isNotNull();
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("resumeName"),
                     eq("職務経歴書名は入力必須です。"));
         }
@@ -180,11 +180,11 @@ class ResumeNameTest {
         }
         String longName = sb.toString();
 
-        ResumeName resumeName = ResumeName.create(notification, longName);
+        ResumeName resumeName = ResumeName.create(errorCollector, longName);
 
         assertThat(resumeName).isNotNull();
         // 桁数エラーが登録される
-        verify(notification, times(1)).addError(
+        verify(errorCollector, times(1)).addError(
                 eq("resumeName"),
                 eq("職務経歴書名は50文字以内で入力してください。"));
     }

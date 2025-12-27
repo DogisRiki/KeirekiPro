@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.resume.Certification;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreateCertificationRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -48,11 +48,11 @@ public class CreateCertificationUseCase {
             throw new UseCaseException("職務経歴書が存在しません。");
         }
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        Certification certification = Certification.create(notification, request.getName(), request.getDate());
+        Certification certification = Certification.create(errorCollector, request.getName(), request.getDate());
 
-        Resume updated = resume.addCertification(notification, certification);
+        Resume updated = resume.addCertification(errorCollector, certification);
 
         resumeRepository.save(updated);
 

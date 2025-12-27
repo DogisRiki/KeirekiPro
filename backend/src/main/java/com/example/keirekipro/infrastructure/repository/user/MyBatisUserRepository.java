@@ -10,7 +10,7 @@ import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.springframework.stereotype.Repository;
 
@@ -79,7 +79,7 @@ public class MyBatisUserRepository implements UserRepository {
 
         return User.reconstruct(
                 dto.getId(),
-                dto.getEmail() != null ? Email.create(new Notification(), dto.getEmail()) : null,
+                dto.getEmail() != null ? Email.create(new ErrorCollector(), dto.getEmail()) : null,
                 dto.getPassword(),
                 dto.isTwoFactorAuthEnabled(),
                 providers,

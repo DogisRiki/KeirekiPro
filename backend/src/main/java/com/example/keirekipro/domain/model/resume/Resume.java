@@ -11,7 +11,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.policy.resume.ResumeEntryOrderPolicy;
 import com.example.keirekipro.domain.shared.Entity;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.Getter;
 
@@ -171,7 +171,7 @@ public class Resume extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param notification   通知オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param userId         ユーザーID
      * @param name           職務経歴書名
      * @param fullName       氏名
@@ -184,14 +184,14 @@ public class Resume extends Entity {
      * @param selfPromotions 自己PRリスト
      * @return 職務経歴書エンティティ
      */
-    public static Resume create(Notification notification, UUID userId, ResumeName name, LocalDate date,
+    public static Resume create(ErrorCollector errorCollector, UUID userId, ResumeName name, LocalDate date,
             FullName fullName,
             List<Career> careers,
             List<Project> projects, List<Certification> certifications, List<Portfolio> portfolios,
             List<SnsPlatform> snsPlatforms, List<SelfPromotion> selfPromotions) {
 
-        validateOnCreate(notification, name, date);
-        throwIfInvalid(notification);
+        validateOnCreate(errorCollector, name, date);
+        throwIfInvalid(errorCollector);
 
         return new Resume(userId, name, date, fullName, careers, projects, certifications, portfolios,
                 snsPlatforms, selfPromotions);
@@ -213,15 +213,15 @@ public class Resume extends Entity {
     /**
      * 職務経歴書名を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param name         新しい職務経歴書名
+     * @param errorCollector エラー収集オブジェクト
+     * @param name           新しい職務経歴書名
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume changeName(Notification notification, ResumeName name) {
+    public Resume changeName(ErrorCollector errorCollector, ResumeName name) {
         if (name == null) {
-            notification.addError("name", "職務経歴書名は入力必須です。");
+            errorCollector.addError("name", "職務経歴書名は入力必須です。");
         }
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
         return new Resume(this.id, this.userId, name, this.date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -231,15 +231,15 @@ public class Resume extends Entity {
     /**
      * 氏名を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param fullName     新しい氏名
+     * @param errorCollector エラー収集オブジェクト
+     * @param fullName       新しい氏名
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume ChangeFullName(Notification notification, FullName fullName) {
+    public Resume ChangeFullName(ErrorCollector errorCollector, FullName fullName) {
         if (fullName == null) {
-            notification.addError("fullName", "氏名は入力必須です。");
+            errorCollector.addError("fullName", "氏名は入力必須です。");
         }
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
         return new Resume(this.id, this.userId, this.name, this.date, fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -249,15 +249,15 @@ public class Resume extends Entity {
     /**
      * 日付を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param date         新しい日付
+     * @param errorCollector エラー収集オブジェクト
+     * @param date           新しい日付
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume changeDate(Notification notification, LocalDate date) {
+    public Resume changeDate(ErrorCollector errorCollector, LocalDate date) {
         if (date == null) {
-            notification.addError("date", "日付は入力必須です。");
+            errorCollector.addError("date", "日付は入力必須です。");
         }
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
         return new Resume(this.id, this.userId, this.name, date, this.fullName,
                 this.createdAt, LocalDateTime.now(),
                 this.careers, this.projects,
@@ -267,18 +267,18 @@ public class Resume extends Entity {
     /**
      * 職歴を追加する
      *
-     * @param notification 通知オブジェクト
-     * @param career       追加する職歴
+     * @param errorCollector エラー収集オブジェクト
+     * @param career         追加する職歴
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addCareer(Notification notification, Career career) {
+    public Resume addCareer(ErrorCollector errorCollector, Career career) {
         if (career == null) {
-            notification.addError("career", "職歴は入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("career", "職歴は入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         // 期間重複チェック
         validateIsCareerOverlap(career);
@@ -294,18 +294,18 @@ public class Resume extends Entity {
     /**
      * 職歴を更新する
      *
-     * @param notification  通知オブジェクト
-     * @param updatedCareer 更新後の職歴エンティティ
+     * @param errorCollector エラー収集オブジェクト
+     * @param updatedCareer  更新後の職歴エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateCareer(Notification notification, Career updatedCareer) {
+    public Resume updateCareer(ErrorCollector errorCollector, Career updatedCareer) {
         if (updatedCareer == null) {
-            notification.addError("career", "職歴は入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("career", "職歴は入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         // 期間重複チェック
         validateIsCareerOverlap(updatedCareer);
@@ -401,18 +401,18 @@ public class Resume extends Entity {
     /**
      * プロジェクトを追加する
      *
-     * @param notification 通知オブジェクト
-     * @param project      追加するプロジェクト
+     * @param errorCollector エラー収集オブジェクト
+     * @param project        追加するプロジェクト
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addProject(Notification notification, Project project) {
+    public Resume addProject(ErrorCollector errorCollector, Project project) {
         if (project == null) {
-            notification.addError("project", "プロジェクトは入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("project", "プロジェクトは入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<Project> updatedProjects = new ArrayList<>(this.projects);
         updatedProjects.add(project);
@@ -425,18 +425,18 @@ public class Resume extends Entity {
     /**
      * プロジェクトを更新する
      *
-     * @param notification   通知オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param updatedProject 更新するプロジェクトエンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateProject(Notification notification, Project updatedProject) {
+    public Resume updateProject(ErrorCollector errorCollector, Project updatedProject) {
         if (updatedProject == null) {
-            notification.addError("project", "プロジェクトは入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("project", "プロジェクトは入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<Project> updatedProjects = this.projects.stream()
                 .map(project -> project.getId().equals(updatedProject.getId()) ? updatedProject : project)
@@ -466,18 +466,18 @@ public class Resume extends Entity {
     /**
      * 資格を追加する
      *
-     * @param notification  通知オブジェクト
-     * @param certification 追加する資格
+     * @param errorCollector エラー収集オブジェクト
+     * @param certification  追加する資格
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addCertification(Notification notification, Certification certification) {
+    public Resume addCertification(ErrorCollector errorCollector, Certification certification) {
         if (certification == null) {
-            notification.addError("certification", "資格は入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("certification", "資格は入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<Certification> updatedCertifications = new ArrayList<>(this.certifications);
         updatedCertifications.add(certification);
@@ -490,18 +490,18 @@ public class Resume extends Entity {
     /**
      * 資格を更新する
      *
-     * @param notification         通知オブジェクト
+     * @param errorCollector       エラー収集オブジェクト
      * @param updatedCertification 更新する資格エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateCertification(Notification notification, Certification updatedCertification) {
+    public Resume updateCertification(ErrorCollector errorCollector, Certification updatedCertification) {
         if (updatedCertification == null) {
-            notification.addError("certification", "資格は入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("certification", "資格は入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<Certification> updatedCertifications = this.certifications.stream()
                 .map(certification -> certification.getId().equals(updatedCertification.getId()) ? updatedCertification
@@ -532,18 +532,18 @@ public class Resume extends Entity {
     /**
      * ポートフォリオを追加する
      *
-     * @param notification 通知オブジェクト
-     * @param portfolio    追加するポートフォリオ
+     * @param errorCollector エラー収集オブジェクト
+     * @param portfolio      追加するポートフォリオ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addPortfolio(Notification notification, Portfolio portfolio) {
+    public Resume addPortfolio(ErrorCollector errorCollector, Portfolio portfolio) {
         if (portfolio == null) {
-            notification.addError("portfolio", "ポートフォリオは入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("portfolio", "ポートフォリオは入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<Portfolio> updatedPortfolios = new ArrayList<>(this.portfolios);
         updatedPortfolios.add(portfolio);
@@ -556,18 +556,18 @@ public class Resume extends Entity {
     /**
      * ポートフォリオを更新する
      *
-     * @param notification     通知オブジェクト
+     * @param errorCollector   エラー収集オブジェクト
      * @param updatedPortfolio 更新するポートフォリオ
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updatePortfolio(Notification notification, Portfolio updatedPortfolio) {
+    public Resume updatePortfolio(ErrorCollector errorCollector, Portfolio updatedPortfolio) {
         if (updatedPortfolio == null) {
-            notification.addError("portfolio", "ポートフォリオは入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("portfolio", "ポートフォリオは入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<Portfolio> updatedPortfolios = this.portfolios.stream()
                 .map(portfolio -> portfolio.getId().equals(updatedPortfolio.getId()) ? updatedPortfolio : portfolio)
@@ -597,18 +597,18 @@ public class Resume extends Entity {
     /**
      * SNSプラットフォームを追加する
      *
-     * @param notification 通知オブジェクト
-     * @param snsPlatform  追加するSNSプラットフォーム
+     * @param errorCollector エラー収集オブジェクト
+     * @param snsPlatform    追加するSNSプラットフォーム
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addSnsPlatform(Notification notification, SnsPlatform snsPlatform) {
+    public Resume addSnsPlatform(ErrorCollector errorCollector, SnsPlatform snsPlatform) {
         if (snsPlatform == null) {
-            notification.addError("snsPlatform", "SNSプラットフォームは入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("snsPlatform", "SNSプラットフォームは入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<SnsPlatform> updatedSnsPlatforms = new ArrayList<>(this.snsPlatforms);
         updatedSnsPlatforms.add(snsPlatform);
@@ -621,18 +621,18 @@ public class Resume extends Entity {
     /**
      * SNSプラットフォームを更新する
      *
-     * @param notification       通知オブジェクト
+     * @param errorCollector     エラー収集オブジェクト
      * @param updatedSnsPlatform 更新するSNSプラットフォーム
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateSnsPlatform(Notification notification, SnsPlatform updatedSnsPlatform) {
+    public Resume updateSnsPlatform(ErrorCollector errorCollector, SnsPlatform updatedSnsPlatform) {
         if (updatedSnsPlatform == null) {
-            notification.addError("snsPlatform", "SNSプラットフォームは入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("snsPlatform", "SNSプラットフォームは入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<SnsPlatform> updatedSnsPlatforms = this.snsPlatforms.stream()
                 .map(snsPlatform -> snsPlatform.getId().equals(updatedSnsPlatform.getId()) ? updatedSnsPlatform
@@ -663,18 +663,18 @@ public class Resume extends Entity {
     /**
      * 自己PRを追加する
      *
-     * @param notification  通知オブジェクト
-     * @param selfPromotion 追加する自己PR
+     * @param errorCollector エラー収集オブジェクト
+     * @param selfPromotion  追加する自己PR
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume addSelfPromotion(Notification notification, SelfPromotion selfPromotion) {
+    public Resume addSelfPromotion(ErrorCollector errorCollector, SelfPromotion selfPromotion) {
         if (selfPromotion == null) {
-            notification.addError("selfPromotion", "自己PRは入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("selfPromotion", "自己PRは入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<SelfPromotion> updatedSelfPromotions = new ArrayList<>(this.selfPromotions);
         updatedSelfPromotions.add(selfPromotion);
@@ -703,18 +703,18 @@ public class Resume extends Entity {
     /**
      * 自己PRを更新する
      *
-     * @param notification         通知オブジェクト
+     * @param errorCollector       エラー収集オブジェクト
      * @param updatedSelfPromotion 更新する自己PR
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume updateSelfPromotion(Notification notification, SelfPromotion updatedSelfPromotion) {
+    public Resume updateSelfPromotion(ErrorCollector errorCollector, SelfPromotion updatedSelfPromotion) {
         if (updatedSelfPromotion == null) {
-            notification.addError("selfPromotion", "自己PRは入力必須です。");
-            throwIfInvalid(notification);
+            errorCollector.addError("selfPromotion", "自己PRは入力必須です。");
+            throwIfInvalid(errorCollector);
             return this;
         }
 
-        throwIfInvalid(notification);
+        throwIfInvalid(errorCollector);
 
         List<SelfPromotion> updatedSelfPromotions = this.selfPromotions.stream()
                 .map(selfPromotion -> selfPromotion.getId().equals(updatedSelfPromotion.getId()) ? updatedSelfPromotion
@@ -729,23 +729,23 @@ public class Resume extends Entity {
     /**
      * 新規作成時の必須チェック
      */
-    private static void validateOnCreate(Notification notification, ResumeName name, LocalDate date) {
+    private static void validateOnCreate(ErrorCollector errorCollector, ResumeName name, LocalDate date) {
         if (name == null) {
-            notification.addError("name", "職務経歴書名は入力必須です。");
+            errorCollector.addError("name", "職務経歴書名は入力必須です。");
         }
         if (date == null) {
-            notification.addError("date", "日付は入力必須です。");
+            errorCollector.addError("date", "日付は入力必須です。");
         }
     }
 
     /**
-     * NotificationにエラーがあればDomainExceptionをスローする
+     * errorCollectorにエラーがあればDomainExceptionをスローする
      *
-     * @param notification 通知オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      */
-    private static void throwIfInvalid(Notification notification) {
-        if (notification != null && notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+    private static void throwIfInvalid(ErrorCollector errorCollector) {
+        if (errorCollector != null && errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
         }
     }
 }

@@ -23,7 +23,7 @@ import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateProjectRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateProjectUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -307,20 +307,20 @@ class UpdateProjectUseCaseTest {
      * 職歴2件・プロジェクト2件を持つ職務経歴書を作成するヘルパーメソッド
      */
     private Resume buildResumeWithProjects(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // 職務経歴書本体を再構築
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
         // 職歴（プロジェクトで使用する会社名に対応させる）
-        CompanyName companyA = CompanyName.create(notification, "会社A");
-        Period careerPeriodA = Period.create(notification, YearMonth.of(2017, 1), YearMonth.of(2019, 12), false);
-        var careerA = com.example.keirekipro.domain.model.resume.Career.create(notification, companyA, careerPeriodA);
+        CompanyName companyA = CompanyName.create(errorCollector, "会社A");
+        Period careerPeriodA = Period.create(errorCollector, YearMonth.of(2017, 1), YearMonth.of(2019, 12), false);
+        var careerA = com.example.keirekipro.domain.model.resume.Career.create(errorCollector, companyA, careerPeriodA);
 
-        CompanyName companyB = CompanyName.create(notification, "会社B");
-        Period careerPeriodB = Period.create(notification, YearMonth.of(2019, 1), YearMonth.of(2021, 12), false);
-        var careerB = com.example.keirekipro.domain.model.resume.Career.create(notification, companyB, careerPeriodB);
+        CompanyName companyB = CompanyName.create(errorCollector, "会社B");
+        Period careerPeriodB = Period.create(errorCollector, YearMonth.of(2019, 1), YearMonth.of(2021, 12), false);
+        var careerB = com.example.keirekipro.domain.model.resume.Career.create(errorCollector, companyB, careerPeriodB);
 
         List<com.example.keirekipro.domain.model.resume.Career> careers = List.of(careerA, careerB);
 
@@ -342,7 +342,7 @@ class UpdateProjectUseCaseTest {
 
         // プロジェクト1（会社A）
         Project project1 = createProject(
-                notification,
+                errorCollector,
                 companyA,
                 YearMonth.of(2018, 1),
                 YearMonth.of(2018, 12),
@@ -355,7 +355,7 @@ class UpdateProjectUseCaseTest {
 
         // プロジェクト2（会社B）
         Project project2 = createProject(
-                notification,
+                errorCollector,
                 companyB,
                 YearMonth.of(2020, 1),
                 YearMonth.of(2020, 12),
@@ -366,15 +366,15 @@ class UpdateProjectUseCaseTest {
                 "役割2",
                 "成果2");
 
-        Resume resumeWithProject1 = base.addProject(notification, project1);
-        return resumeWithProject1.addProject(notification, project2);
+        Resume resumeWithProject1 = base.addProject(errorCollector, project1);
+        return resumeWithProject1.addProject(errorCollector, project2);
     }
 
     /**
      * テスト用プロジェクト生成ヘルパー
      */
     private Project createProject(
-            Notification notification,
+            ErrorCollector errorCollector,
             CompanyName companyName,
             YearMonth start,
             YearMonth end,
@@ -385,7 +385,7 @@ class UpdateProjectUseCaseTest {
             String role,
             String achievement) {
 
-        Period period = Period.create(notification, start, end, isActive);
+        Period period = Period.create(errorCollector, start, end, isActive);
 
         Project.Process process = Project.Process.create(
                 true, // requirements
@@ -443,7 +443,7 @@ class UpdateProjectUseCaseTest {
         TechStack techStack = TechStack.create(frontend, backend, infrastructure, tools);
 
         return Project.create(
-                notification,
+                errorCollector,
                 companyName,
                 period,
                 name,

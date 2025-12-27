@@ -22,7 +22,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.DeleteProjectUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -121,13 +121,13 @@ class DeleteProjectUseCaseTest {
     }
 
     private Resume buildResumeWithProjects(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
-        CompanyName companyA = CompanyName.create(notification, "会社A");
-        Period periodA = Period.create(notification, YearMonth.of(2018, 1), YearMonth.of(2018, 12), false);
+        CompanyName companyA = CompanyName.create(errorCollector, "会社A");
+        Period periodA = Period.create(errorCollector, YearMonth.of(2018, 1), YearMonth.of(2018, 12), false);
 
         Project.Process process = Project.Process.create(true, true, false, true, false, true, false);
 
@@ -172,9 +172,9 @@ class DeleteProjectUseCaseTest {
                         List.of("VSCode"),
                         List.of("Windows")));
 
-        Project p1 = Project.create(notification, companyA, periodA, "プロジェクト1", "概要1", "チーム1", "役割1", "成果1", process,
+        Project p1 = Project.create(errorCollector, companyA, periodA, "プロジェクト1", "概要1", "チーム1", "役割1", "成果1", process,
                 techStack);
-        Project p2 = Project.create(notification, companyA, periodA, "プロジェクト2", "概要2", "チーム2", "役割2", "成果2", process,
+        Project p2 = Project.create(errorCollector, companyA, periodA, "プロジェクト2", "概要2", "チーム2", "役割2", "成果2", process,
                 techStack);
 
         return Resume.reconstruct(

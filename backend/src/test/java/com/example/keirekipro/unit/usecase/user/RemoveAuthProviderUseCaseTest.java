@@ -16,7 +16,7 @@ import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.user.RemoveAuthProviderUseCase;
 
 import org.junit.jupiter.api.DisplayName;
@@ -43,11 +43,11 @@ class RemoveAuthProviderUseCaseTest {
     @DisplayName("外部認証連携解除が正常に完了する")
     void test1() {
         // データ準備
-        Notification notification = new Notification();
-        AuthProvider authProvider = AuthProvider.create(notification, PROVIDER, "providerUserId");
+        ErrorCollector errorCollector = new ErrorCollector();
+        AuthProvider authProvider = AuthProvider.create(errorCollector, PROVIDER, "providerUserId");
         User user = User.reconstruct(
                 USER_ID,
-                Email.create(notification, "test@example.com"),
+                Email.create(errorCollector, "test@example.com"),
                 "hashedPassword",
                 false,
                 Map.of(PROVIDER, authProvider),

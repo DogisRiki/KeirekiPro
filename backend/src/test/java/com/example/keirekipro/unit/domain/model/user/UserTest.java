@@ -21,7 +21,7 @@ import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,14 +33,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UserTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     private static final UUID ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String EMAIL = "test@keirekipro.click";
     private static final String PASSWORD_HASH = "passwordHash";
     private static final String USERNAME = "test-user";
     private static final Map<String, AuthProvider> AUTH_PROVIDERS = Map.of("google",
-            AuthProvider.create(new Notification(), "google", "googleId"));
+            AuthProvider.create(new ErrorCollector(), "google", "googleId"));
     private static final String PROFILE_IMAGE = "profile/test-user.jpg";
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2023, 1, 1, 0, 0);
     private static final LocalDateTime UPDATED_AT = LocalDateTime.of(2023, 1, 2, 0, 0);
@@ -48,11 +48,11 @@ class UserTest {
     @Test
     @DisplayName("メールアドレス+パスワードで新規構築用コンストラクタでインスタンス化する")
     void test1() {
-        Notification notification = new Notification();
-        Email email = Email.create(new Notification(), EMAIL);
+        ErrorCollector errorCollector = new ErrorCollector();
+        Email email = Email.create(new ErrorCollector(), EMAIL);
 
         User user = User.create(
-                notification,
+                errorCollector,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -63,8 +63,8 @@ class UserTest {
         // ユーザーが正しく生成されたことを検証
         assertThat(user).isNotNull();
 
-        // Notification内にエラーが登録されていないことを検証
-        assertThat(notification.hasErrors()).isFalse();
+        // errorCollector内にエラーが登録されていないことを検証
+        assertThat(errorCollector.hasErrors()).isFalse();
 
         // 各フィールドが期待した値になっていることを検証
         assertThat(user.getId()).isNotNull();
@@ -82,11 +82,11 @@ class UserTest {
     @Test
     @DisplayName("外部認証連携で新規構築用コンストラクタでインスタンス化する")
     void test2() {
-        Notification notification = new Notification();
-        Email email = Email.create(new Notification(), EMAIL);
+        ErrorCollector errorCollector = new ErrorCollector();
+        Email email = Email.create(new ErrorCollector(), EMAIL);
 
         User user = User.create(
-                notification,
+                errorCollector,
                 email,
                 null,
                 false,
@@ -97,8 +97,8 @@ class UserTest {
         // ユーザーが正しく生成されたことを検証
         assertThat(user).isNotNull();
 
-        // Notification内にエラーが登録されていないことを検証
-        assertThat(notification.hasErrors()).isFalse();
+        // errorCollector内にエラーが登録されていないことを検証
+        assertThat(errorCollector.hasErrors()).isFalse();
 
         // 各フィールドが期待した値になっていることを検証
         assertThat(user.getId()).isNotNull();
@@ -116,9 +116,9 @@ class UserTest {
     @Test
     @DisplayName("外部認証連携かつメールアドレスなしで新規構築用コンストラクタでインスタンス化する")
     void test3() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         User user = User.create(
-                notification,
+                errorCollector,
                 null,
                 null,
                 false,
@@ -129,8 +129,8 @@ class UserTest {
         // ユーザーが正しく生成されたことを検証
         assertThat(user).isNotNull();
 
-        // Notification内にエラーが登録されていないことを検証
-        assertThat(notification.hasErrors()).isFalse();
+        // errorCollector内にエラーが登録されていないことを検証
+        assertThat(errorCollector.hasErrors()).isFalse();
 
         // 各フィールドが期待した値になっていることを検証
         assertThat(user.getId()).isNotNull();
@@ -148,9 +148,9 @@ class UserTest {
     @Test
     @DisplayName("メールアドレスが未設定かつ外部認証連携がなしの状態で、新規構築用コンストラクタでインスタンス化するとDomainExceptionをスローする")
     void test4() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         assertThatThrownBy(() -> User.create(
-                notification,
+                errorCollector,
                 null,
                 PASSWORD_HASH,
                 false,
@@ -163,7 +163,7 @@ class UserTest {
     @Test
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test5() {
-        Email email = Email.create(new Notification(), EMAIL);
+        Email email = Email.create(new ErrorCollector(), EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -205,18 +205,18 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updatedUser = user.setEmail(notification, Email.create(new Notification(), "new@keirekipro.click"));
+        User updatedUser = user.setEmail(errorCollector, Email.create(new ErrorCollector(), "new@keirekipro.click"));
         assertThat(updatedUser.getEmail().getValue()).isEqualTo("new@keirekipro.click");
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("既にメールアドレスが設定されている状態でメールアドレスを設定するとDomainExceptionをスローする")
     void test7() {
         // モックをセットアップ
-        when(notification.hasErrors()).thenReturn(true);
+        when(errorCollector.hasErrors()).thenReturn(true);
 
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -230,17 +230,17 @@ class UserTest {
 
         // DomainExceptionがスローされる
         assertThatThrownBy(
-                () -> user.setEmail(notification, Email.create(notification, "other@keirekipro.click")))
+                () -> user.setEmail(errorCollector, Email.create(errorCollector, "other@keirekipro.click")))
                 .isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
-        verify(notification, times(1)).addError(eq("email"), eq("メールアドレスが既に設定されているため設定できません。"));
+        verify(errorCollector, times(1)).addError(eq("email"), eq("メールアドレスが既に設定されているため設定できません。"));
     }
 
     @Test
     @DisplayName("パスワードを変更する")
     void test8() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -252,18 +252,18 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updatedUser = user.changePassword(notification, "updatedHashPassword");
+        User updatedUser = user.changePassword(errorCollector, "updatedHashPassword");
         assertThat(updatedUser.getPasswordHash()).isEqualTo("updatedHashPassword");
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("現在と同じパスワードに変更するとDomainExceptionをスローする")
     void test9() {
         // モックをセットアップ
-        when(notification.hasErrors()).thenReturn(true);
+        when(errorCollector.hasErrors()).thenReturn(true);
 
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -276,17 +276,17 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.changePassword(notification, PASSWORD_HASH))
+        assertThatThrownBy(() -> user.changePassword(errorCollector, PASSWORD_HASH))
                 .isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
-        verify(notification, times(1)).addError(eq("password"), eq("現在のパスワードと同じパスワードは設定できません。"));
+        verify(errorCollector, times(1)).addError(eq("password"), eq("現在のパスワードと同じパスワードは設定できません。"));
     }
 
     @Test
     @DisplayName("二段階認証設定を変更する(無効から有効)")
     void test10() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -298,15 +298,15 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updatedUser = user.changeTwoFactorAuthEnabled(notification, true);
+        User updatedUser = user.changeTwoFactorAuthEnabled(errorCollector, true);
         assertThat(updatedUser.isTwoFactorAuthEnabled()).isTrue();
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("二段階認証設定を変更する(有効から無効)")
     void test11() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -318,16 +318,16 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updatedUser = user.changeTwoFactorAuthEnabled(notification, false);
+        User updatedUser = user.changeTwoFactorAuthEnabled(errorCollector, false);
         assertThat(updatedUser.isTwoFactorAuthEnabled()).isFalse();
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("メールアドレスまたはパスワードのどちらか片方でも未設定の状態で二段階認証設定を有効にするとDomainExceptionをスローする")
     void test12() {
         // モックをセットアップ
-        when(notification.hasErrors()).thenReturn(true);
+        when(errorCollector.hasErrors()).thenReturn(true);
 
         // メールアドレスとパスワードが未設定
         User user1 = User.reconstruct(
@@ -342,11 +342,11 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user1.changeTwoFactorAuthEnabled(notification, true))
+        assertThatThrownBy(() -> user1.changeTwoFactorAuthEnabled(errorCollector, true))
                 .isInstanceOf(DomainException.class);
 
         // パスワードが未設定
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user2 = User.reconstruct(
                 ID,
                 email,
@@ -359,17 +359,18 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user2.changeTwoFactorAuthEnabled(notification, true))
+        assertThatThrownBy(() -> user2.changeTwoFactorAuthEnabled(errorCollector, true))
                 .isInstanceOf(DomainException.class);
 
         // 合計2回呼ばれる
-        verify(notification, times(2)).addError(eq("twoFactorAuthEnabled"), eq("メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。"));
+        verify(errorCollector, times(2)).addError(eq("twoFactorAuthEnabled"),
+                eq("メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。"));
     }
 
     @Test
     @DisplayName("外部認証連携が1つ+メールアドレスとパスワードが設定済み状態の場合、外部認証連携を解除できる")
     void test13() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -381,18 +382,18 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updatedUser = user.removeAuthProvider(notification, "google");
+        User updatedUser = user.removeAuthProvider(errorCollector, "google");
         assertThat(updatedUser.getAuthProviders()).isEmpty();
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("外部認証連携が2つの状態の場合、外部認証連携を解除できる")
     void test14() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         Map<String, AuthProvider> providers = new HashMap<>();
-        providers.put("google", AuthProvider.create(new Notification(), "google", "googleId"));
-        providers.put("github", AuthProvider.create(new Notification(), "github", "githubId"));
+        providers.put("google", AuthProvider.create(new ErrorCollector(), "google", "googleId"));
+        providers.put("github", AuthProvider.create(new ErrorCollector(), "github", "githubId"));
 
         User user = User.reconstruct(
                 ID,
@@ -405,20 +406,20 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updated = user.removeAuthProvider(notification, "google");
+        User updated = user.removeAuthProvider(errorCollector, "google");
         assertThat(updated.getAuthProviders()).hasSize(1);
         assertThat(updated.getAuthProviders()).doesNotContainKey("google");
         assertThat(updated.getAuthProviders()).containsKey("github");
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("連携済みでない外部認証連携を解除しようとするとDomainExceptionをスローする")
     void test15() {
         // モックをセットアップ
-        when(notification.hasErrors()).thenReturn(true);
+        when(errorCollector.hasErrors()).thenReturn(true);
 
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -431,17 +432,17 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.removeAuthProvider(notification, "github")).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> user.removeAuthProvider(errorCollector, "github")).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
-        verify(notification, times(1)).addError(eq("authProviders"), eq("連携の解除に失敗しました。"));
+        verify(errorCollector, times(1)).addError(eq("authProviders"), eq("連携の解除に失敗しました。"));
     }
 
     @Test
     @DisplayName("メールアドレスとパスワードが未設定かつ外部認証連携情報が1つしか登録されていない状態で、外部認証連携を解除しようとするとDomainExceptionをスローする")
     void test16() {
         // モックをセットアップ
-        when(notification.hasErrors()).thenReturn(true);
+        when(errorCollector.hasErrors()).thenReturn(true);
 
         User user = User.reconstruct(
                 ID,
@@ -455,10 +456,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.removeAuthProvider(notification, "google")).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> user.removeAuthProvider(errorCollector, "google")).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
-        verify(notification, times(1)).addError(eq("authProviders"), eq("メールアドレスとパスワードが設定済みでないと、連携を解除できません。"));
+        verify(errorCollector, times(1)).addError(eq("authProviders"), eq("メールアドレスとパスワードが設定済みでないと、連携を解除できません。"));
     }
 
     @Test
@@ -493,16 +494,16 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updatedUser = user.changeUsername(notification, "new-name");
+        User updatedUser = user.changeUsername(errorCollector, "new-name");
         assertThat(updatedUser.getUsername()).isEqualTo("new-name");
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("ユーザー名を空文字に変更するとDomainExceptionをスローする")
     void test19() {
         // モックをセットアップ
-        when(notification.hasErrors()).thenReturn(true);
+        when(errorCollector.hasErrors()).thenReturn(true);
 
         User user = User.reconstruct(
                 ID,
@@ -516,11 +517,11 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.changeUsername(notification, " "))
+        assertThatThrownBy(() -> user.changeUsername(errorCollector, " "))
                 .isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
-        verify(notification, times(1)).addError(eq("username"), eq("ユーザー名は必ず指定してください。"));
+        verify(errorCollector, times(1)).addError(eq("username"), eq("ユーザー名は必ず指定してください。"));
     }
 
     @Test
@@ -537,10 +538,10 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        User updatedUser = user.addAuthProvider(notification, "github", "githubId");
+        User updatedUser = user.addAuthProvider(errorCollector, "github", "githubId");
 
         assertThat(updatedUser.getAuthProviders()).containsKey("github");
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
@@ -557,18 +558,18 @@ class UserTest {
                 CREATED_AT,
                 UPDATED_AT);
 
-        user.addAuthProvider(notification, "google", "otherId");
+        user.addAuthProvider(errorCollector, "google", "otherId");
 
         // 変更されていないことを検証
         assertThat(user.getAuthProviders()).hasSize(1);
         assertThat(user.getAuthProviders().get("google").getProviderUserId()).isEqualTo("googleId");
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("パスワードをリセットする")
     void test22() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -587,15 +588,15 @@ class UserTest {
         assertThat(updatedUser.getEmail()).isEqualTo(email);
         assertThat(updatedUser.getUsername()).isEqualTo(USERNAME);
         assertThat(updatedUser.getAuthProviders()).isEqualTo(AUTH_PROVIDERS);
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
     @DisplayName("ユーザー登録でUserRegisteredEventが追加される")
     void test23() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.create(
-                notification,
+                errorCollector,
                 email,
                 PASSWORD_HASH,
                 true,
@@ -616,7 +617,7 @@ class UserTest {
     @Test
     @DisplayName("再構築時にregister()を呼び出すとIllegalStateExceptionがスローされる")
     void test24() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,
@@ -635,7 +636,7 @@ class UserTest {
     @Test
     @DisplayName("ユーザー削除でUserDeletedEventが追加される")
     void test25() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 ID,
                 email,

@@ -9,7 +9,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateProjectRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -51,10 +51,10 @@ public class UpdateProjectUseCase {
                 .findFirst()
                 .orElseThrow(() -> new UseCaseException("対象のプロジェクトが存在しません。"));
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        CompanyName companyName = CompanyName.create(notification, request.getCompanyName());
-        Period period = Period.create(notification, request.getStartDate(), request.getEndDate(),
+        CompanyName companyName = CompanyName.create(errorCollector, request.getCompanyName());
+        Period period = Period.create(errorCollector, request.getStartDate(), request.getEndDate(),
                 request.getIsActive());
 
         Project.Process process = Project.Process.create(
@@ -108,17 +108,17 @@ public class UpdateProjectUseCase {
                         request.getDevelopmentEnvironments()));
 
         Project updatedProject = existing
-                .changeCompanyName(notification, companyName)
-                .changePeriod(notification, period)
-                .changeName(notification, request.getName())
-                .changeOverview(notification, request.getOverview())
-                .changeTeamComp(notification, request.getTeamComp())
-                .changeRole(notification, request.getRole())
-                .changeAchievement(notification, request.getAchievement())
+                .changeCompanyName(errorCollector, companyName)
+                .changePeriod(errorCollector, period)
+                .changeName(errorCollector, request.getName())
+                .changeOverview(errorCollector, request.getOverview())
+                .changeTeamComp(errorCollector, request.getTeamComp())
+                .changeRole(errorCollector, request.getRole())
+                .changeAchievement(errorCollector, request.getAchievement())
                 .changeProcess(process)
                 .changeTechStack(techStack);
 
-        Resume updated = resume.updateProject(notification, updatedProject);
+        Resume updated = resume.updateProject(errorCollector, updatedProject);
 
         resumeRepository.save(updated);
 

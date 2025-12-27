@@ -21,7 +21,7 @@ import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.DeleteCareerUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -120,18 +120,18 @@ class DeleteCareerUseCaseTest {
     }
 
     private Resume buildResumeWithCareers(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
-        CompanyName companyA = CompanyName.create(notification, "会社A");
-        Period periodA = Period.create(notification, YearMonth.of(2017, 1), YearMonth.of(2019, 12), false);
-        Career careerA = Career.create(notification, companyA, periodA);
+        CompanyName companyA = CompanyName.create(errorCollector, "会社A");
+        Period periodA = Period.create(errorCollector, YearMonth.of(2017, 1), YearMonth.of(2019, 12), false);
+        Career careerA = Career.create(errorCollector, companyA, periodA);
 
-        CompanyName companyB = CompanyName.create(notification, "会社B");
-        Period periodB = Period.create(notification, YearMonth.of(2020, 1), YearMonth.of(2021, 12), false);
-        Career careerB = Career.create(notification, companyB, periodB);
+        CompanyName companyB = CompanyName.create(errorCollector, "会社B");
+        Period periodB = Period.create(errorCollector, YearMonth.of(2020, 1), YearMonth.of(2021, 12), false);
+        Career careerB = Career.create(errorCollector, companyB, periodB);
 
         return Resume.reconstruct(
                 RESUME_ID,

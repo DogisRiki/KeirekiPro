@@ -3,7 +3,7 @@ package com.example.keirekipro.domain.model.resume;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -17,29 +17,29 @@ public class Link {
 
     private final String value;
 
-    private Link(Notification notification, String value) {
-        validate(notification, value);
+    private Link(ErrorCollector errorCollector, String value) {
+        validate(errorCollector, value);
         this.value = value;
     }
 
     /**
      * ファクトリーメソッド
      *
-     * @param notification 通知オブジェクト
-     * @param value        リンク
+     * @param errorCollector エラー収集オブジェクト
+     * @param value          リンク
      * @return 値オブジェクト
      */
-    public static Link create(Notification notification, String value) {
-        return new Link(notification, value);
+    public static Link create(ErrorCollector errorCollector, String value) {
+        return new Link(errorCollector, value);
     }
 
-    private void validate(Notification notification, String value) {
+    private void validate(ErrorCollector errorCollector, String value) {
         if (value == null || value.isBlank()) {
-            notification.addError("link", "リンクは入力必須です。");
+            errorCollector.addError("link", "リンクは入力必須です。");
             return;
         }
         if (isInvalidUrl(value)) {
-            notification.addError("link", "無効なURLです。HTTPS形式で正しいURLを入力してください。");
+            errorCollector.addError("link", "無効なURLです。HTTPS形式で正しいURLを入力してください。");
         }
     }
 
