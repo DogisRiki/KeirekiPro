@@ -7,7 +7,7 @@ import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreatePortfolioRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -49,13 +49,13 @@ public class CreatePortfolioUseCase {
             throw new UseCaseException("職務経歴書が存在しません。");
         }
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        Link link = Link.create(notification, request.getLink());
-        Portfolio portfolio = Portfolio.create(notification, request.getName(), request.getOverview(),
+        Link link = Link.create(errorCollector, request.getLink());
+        Portfolio portfolio = Portfolio.create(errorCollector, request.getName(), request.getOverview(),
                 request.getTechStack(), link);
 
-        Resume updated = resume.addPortfolio(notification, portfolio);
+        Resume updated = resume.addPortfolio(errorCollector, portfolio);
 
         resumeRepository.save(updated);
 

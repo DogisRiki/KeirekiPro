@@ -4,7 +4,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
@@ -35,8 +35,8 @@ public class RemoveAuthProviderUseCase {
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
         // プロバイダ解除
-        Notification notification = new Notification();
-        user = user.removeAuthProvider(notification, provider);
+        ErrorCollector errorCollector = new ErrorCollector();
+        user = user.removeAuthProvider(errorCollector, provider);
 
         // 保存
         userRepository.save(user);

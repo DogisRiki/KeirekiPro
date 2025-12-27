@@ -10,7 +10,7 @@ import com.example.keirekipro.domain.model.resume.CompanyName;
 import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.TechStack;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,16 +22,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ProjectTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
-        Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
+        Period period = Period.create(errorCollector, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
-        Project project = Project.create(notification, companyName, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー",
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
+        Project project = Project.create(errorCollector, companyName, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー",
                 "成果内容", process, techStack);
 
         assertThat(project).isNotNull();
@@ -50,10 +50,10 @@ class ProjectTest {
     @Test
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
-        Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
+        Period period = Period.create(errorCollector, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Project project = Project.reconstruct(id, companyName, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー",
                 "成果内容",
@@ -77,8 +77,8 @@ class ProjectTest {
     @DisplayName("会社名を変更する")
     void test3() {
         Project project = createSampleProject();
-        CompanyName newCompanyName = CompanyName.create(notification, "新しい会社名");
-        Project updatedProject = project.changeCompanyName(notification, newCompanyName);
+        CompanyName newCompanyName = CompanyName.create(errorCollector, "新しい会社名");
+        Project updatedProject = project.changeCompanyName(errorCollector, newCompanyName);
 
         assertThat(updatedProject.getCompanyName().getValue()).isEqualTo("新しい会社名");
     }
@@ -87,8 +87,8 @@ class ProjectTest {
     @DisplayName("期間を変更する")
     void test4() {
         Project project = createSampleProject();
-        Period newPeriod = Period.create(notification, YearMonth.of(2025, 1), YearMonth.of(2025, 12), false);
-        Project updatedProject = project.changePeriod(notification, newPeriod);
+        Period newPeriod = Period.create(errorCollector, YearMonth.of(2025, 1), YearMonth.of(2025, 12), false);
+        Project updatedProject = project.changePeriod(errorCollector, newPeriod);
 
         assertThat(updatedProject.getPeriod()).isEqualTo(newPeriod);
     }
@@ -97,7 +97,7 @@ class ProjectTest {
     @DisplayName("プロジェクト概要を変更する")
     void test5() {
         Project project = createSampleProject();
-        Project updatedProject = project.changeOverview(notification, "新しいプロジェクト概要");
+        Project updatedProject = project.changeOverview(errorCollector, "新しいプロジェクト概要");
 
         assertThat(updatedProject.getOverview()).isEqualTo("新しいプロジェクト概要");
     }
@@ -106,7 +106,7 @@ class ProjectTest {
     @DisplayName("チーム構成を変更する")
     void test6() {
         Project project = createSampleProject();
-        Project updatedProject = project.changeTeamComp(notification, "10人");
+        Project updatedProject = project.changeTeamComp(errorCollector, "10人");
 
         assertThat(updatedProject.getTeamComp()).isEqualTo("10人");
     }
@@ -115,7 +115,7 @@ class ProjectTest {
     @DisplayName("役割を変更する")
     void test7() {
         Project project = createSampleProject();
-        Project updatedProject = project.changeRole(notification, "メンバー");
+        Project updatedProject = project.changeRole(errorCollector, "メンバー");
 
         assertThat(updatedProject.getRole()).isEqualTo("メンバー");
     }
@@ -124,7 +124,7 @@ class ProjectTest {
     @DisplayName("成果を変更する")
     void test8() {
         Project project = createSampleProject();
-        Project updatedProject = project.changeAchievement(notification, "新しい成果");
+        Project updatedProject = project.changeAchievement(errorCollector, "新しい成果");
 
         assertThat(updatedProject.getAchievement()).isEqualTo("新しい成果");
     }
@@ -153,7 +153,7 @@ class ProjectTest {
     @DisplayName("プロジェクト名を変更する")
     void test11() {
         Project project = createSampleProject();
-        Project updatedProject = project.changeName(notification, "新しいプロジェクト名");
+        Project updatedProject = project.changeName(errorCollector, "新しいプロジェクト名");
 
         assertThat(updatedProject.getName()).isEqualTo("新しいプロジェクト名");
     }
@@ -163,7 +163,7 @@ class ProjectTest {
     void test12() {
         Project initialProject = createSampleProject();
 
-        Period newPeriod = Period.create(notification, YearMonth.of(2026, 1), YearMonth.of(2027, 12), false);
+        Period newPeriod = Period.create(errorCollector, YearMonth.of(2026, 1), YearMonth.of(2027, 12), false);
 
         TechStack.Frontend newFrontend = TechStack.Frontend.create(
                 List.of("Kotlin/JS"),
@@ -214,13 +214,13 @@ class ProjectTest {
                 true, false, true, false, true, false, true);
 
         Project updatedProject = initialProject
-                .changeCompanyName(notification, CompanyName.create(notification, "新しい会社名"))
-                .changePeriod(notification, newPeriod)
-                .changeName(notification, "新しいプロジェクト名")
-                .changeOverview(notification, "新しいプロジェクト概要")
-                .changeTeamComp(notification, "15人")
-                .changeRole(notification, "プロジェクトマネージャー")
-                .changeAchievement(notification, "大きな成功を達成")
+                .changeCompanyName(errorCollector, CompanyName.create(errorCollector, "新しい会社名"))
+                .changePeriod(errorCollector, newPeriod)
+                .changeName(errorCollector, "新しいプロジェクト名")
+                .changeOverview(errorCollector, "新しいプロジェクト概要")
+                .changeTeamComp(errorCollector, "15人")
+                .changeRole(errorCollector, "プロジェクトマネージャー")
+                .changeAchievement(errorCollector, "大きな成功を達成")
                 .changeProcess(newProcess)
                 .changeTechStack(newTechStack);
 
@@ -236,29 +236,29 @@ class ProjectTest {
     }
 
     @Test
-    @DisplayName("必須項目が未入力の場合、エラーが通知される")
+    @DisplayName("必須項目が未入力の場合、エラーが収集される")
     void test13() {
-        Notification notification = new Notification();
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
-        Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
+        ErrorCollector errorCollector = new ErrorCollector();
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
+        Period period = Period.create(errorCollector, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
 
-        Project.create(notification, companyName, period, "", "", "", "", "", process, techStack);
+        Project.create(errorCollector, companyName, period, "", "", "", "", "", process, techStack);
 
-        assertThat(notification.getErrors().get("name")).containsExactly("プロジェクト名は入力必須です。");
-        assertThat(notification.getErrors().get("overview")).containsExactly("プロジェクト概要は入力必須です。");
-        assertThat(notification.getErrors().get("teamComp")).containsExactly("チーム構成は入力必須です。");
-        assertThat(notification.getErrors().get("role")).containsExactly("役割は入力必須です。");
-        assertThat(notification.getErrors().get("achievement")).containsExactly("成果は入力必須です。");
+        assertThat(errorCollector.getErrors().get("name")).containsExactly("プロジェクト名は入力必須です。");
+        assertThat(errorCollector.getErrors().get("overview")).containsExactly("プロジェクト概要は入力必須です。");
+        assertThat(errorCollector.getErrors().get("teamComp")).containsExactly("チーム構成は入力必須です。");
+        assertThat(errorCollector.getErrors().get("role")).containsExactly("役割は入力必須です。");
+        assertThat(errorCollector.getErrors().get("achievement")).containsExactly("成果は入力必須です。");
     }
 
     @Test
-    @DisplayName("各項目が最大文字数を超える場合、エラーが通知される")
+    @DisplayName("各項目が最大文字数を超える場合、エラーが収集される")
     void test14() {
-        Notification notification = new Notification();
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
-        Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
+        ErrorCollector errorCollector = new ErrorCollector();
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
+        Period period = Period.create(errorCollector, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
 
@@ -268,35 +268,35 @@ class ProjectTest {
         String longRole = "a".repeat(1001);
         String longAchievement = "a".repeat(1001);
 
-        Project.create(notification, companyName, period, longName, longOverview, longTeamComp, longRole,
+        Project.create(errorCollector, companyName, period, longName, longOverview, longTeamComp, longRole,
                 longAchievement, process, techStack);
 
-        assertThat(notification.getErrors().get("name")).containsExactly("プロジェクト名は50文字以内で入力してください。");
-        assertThat(notification.getErrors().get("overview")).containsExactly("プロジェクト概要は1000文字以内で入力してください。");
-        assertThat(notification.getErrors().get("teamComp")).containsExactly("チーム構成は100文字以内で入力してください。");
-        assertThat(notification.getErrors().get("role")).containsExactly("役割は1000文字以内で入力してください。");
-        assertThat(notification.getErrors().get("achievement")).containsExactly("成果は1000文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("name")).containsExactly("プロジェクト名は50文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("overview")).containsExactly("プロジェクト概要は1000文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("teamComp")).containsExactly("チーム構成は100文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("role")).containsExactly("役割は1000文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("achievement")).containsExactly("成果は1000文字以内で入力してください。");
     }
 
     @Test
-    @DisplayName("会社名がnullの場合、エラーが通知される")
+    @DisplayName("会社名がnullの場合、エラーが収集される")
     void test15() {
-        Notification notification = new Notification();
-        Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
+        ErrorCollector errorCollector = new ErrorCollector();
+        Period period = Period.create(errorCollector, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
 
-        Project.create(notification, null, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
+        Project.create(errorCollector, null, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容", process, techStack);
 
-        assertThat(notification.getErrors().get("companyName")).containsExactly("会社名は入力必須です。");
+        assertThat(errorCollector.getErrors().get("companyName")).containsExactly("会社名は入力必須です。");
     }
 
     private Project createSampleProject() {
-        Period period = Period.create(notification, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
+        Period period = Period.create(errorCollector, YearMonth.of(2023, 1), YearMonth.of(2023, 12), false);
         TechStack techStack = createSampleTechStack();
         Project.Process process = createSampleProcess();
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
-        return Project.create(notification, companyName, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容",
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
+        return Project.create(errorCollector, companyName, period, "プロジェクト名", "プロジェクト概要", "5人", "リーダー", "成果内容",
                 process, techStack);
     }
 

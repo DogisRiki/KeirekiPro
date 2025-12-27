@@ -7,7 +7,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreateSnsPlatformRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -49,12 +49,12 @@ public class CreateSnsPlatformUseCase {
             throw new UseCaseException("職務経歴書が存在しません。");
         }
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        Link link = Link.create(notification, request.getLink());
-        SnsPlatform snsPlatform = SnsPlatform.create(notification, request.getName(), link);
+        Link link = Link.create(errorCollector, request.getLink());
+        SnsPlatform snsPlatform = SnsPlatform.create(errorCollector, request.getName(), link);
 
-        Resume updated = resume.addSnsPlatform(notification, snsPlatform);
+        Resume updated = resume.addSnsPlatform(errorCollector, snsPlatform);
 
         resumeRepository.save(updated);
 

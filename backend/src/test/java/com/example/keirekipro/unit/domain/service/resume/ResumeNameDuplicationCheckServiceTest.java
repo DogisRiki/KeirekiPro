@@ -18,7 +18,7 @@ import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.helper.ResumeObjectBuilder;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class ResumeNameDuplicationCheckServiceTest {
     private ResumeRepository repository;
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @InjectMocks
     private ResumeNameDuplicationCheckService service;
@@ -79,7 +79,7 @@ class ResumeNameDuplicationCheckServiceTest {
                         CREATED_AT, UPDATED_AT)));
 
         // 重複する職務経歴書名
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME_1);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME_1);
 
         // 重複チェックを実行
         assertThatThrownBy(() -> service.execute(USER_ID, resumeName))
@@ -98,7 +98,7 @@ class ResumeNameDuplicationCheckServiceTest {
                         CREATED_AT, UPDATED_AT)));
 
         // チェック対象の職務経歴書名
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME_3);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME_3);
 
         // 重複チェックを実行
         assertThatCode(() -> service.execute(USER_ID, resumeName)).doesNotThrowAnyException();

@@ -8,7 +8,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.resume.Career;
 import com.example.keirekipro.domain.model.resume.CompanyName;
 import com.example.keirekipro.domain.model.resume.Period;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,14 +20,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CareerTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
-        Period period = Period.create(notification, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
-        Career career = Career.create(notification, companyName, period);
+        Period period = Period.create(errorCollector, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
+        Career career = Career.create(errorCollector, companyName, period);
 
         assertThat(career).isNotNull();
         assertThat(career.getId()).isNotNull();
@@ -38,8 +38,8 @@ class CareerTest {
     @Test
     @DisplayName("再構築用コンストラクタでインスタンス化する")
     void test2() {
-        Period period = Period.create(notification, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
+        Period period = Period.create(errorCollector, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
         UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Career career = Career.reconstruct(id, companyName, period);
 
@@ -52,12 +52,12 @@ class CareerTest {
     @Test
     @DisplayName("会社名を変更する")
     void test3() {
-        Period period = Period.create(notification, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
-        CompanyName beforeCompanyName = CompanyName.create(notification, "株式会社ABC");
-        Career beforeCareer = Career.create(notification, beforeCompanyName, period);
+        Period period = Period.create(errorCollector, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
+        CompanyName beforeCompanyName = CompanyName.create(errorCollector, "株式会社ABC");
+        Career beforeCareer = Career.create(errorCollector, beforeCompanyName, period);
 
-        CompanyName afterCompanyName = CompanyName.create(notification, "株式会社ZZZ");
-        Career afterCareer = beforeCareer.changeCompanyName(notification, afterCompanyName);
+        CompanyName afterCompanyName = CompanyName.create(errorCollector, "株式会社ZZZ");
+        Career afterCareer = beforeCareer.changeCompanyName(errorCollector, afterCompanyName);
 
         assertThat(afterCareer.getCompanyName()).isEqualTo(afterCompanyName);
     }
@@ -65,12 +65,12 @@ class CareerTest {
     @Test
     @DisplayName("期間を変更する")
     void test4() {
-        Period beforePeriod = Period.create(notification, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
-        Career beforeCareer = Career.create(notification, companyName, beforePeriod);
+        Period beforePeriod = Period.create(errorCollector, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
+        Career beforeCareer = Career.create(errorCollector, companyName, beforePeriod);
 
-        Period afterPeriod = Period.create(notification, YearMonth.of(2030, 1), null, true);
-        Career afterCareer = beforeCareer.changePeriod(notification, afterPeriod);
+        Period afterPeriod = Period.create(errorCollector, YearMonth.of(2030, 1), null, true);
+        Career afterCareer = beforeCareer.changePeriod(errorCollector, afterPeriod);
 
         assertThat(afterCareer.getPeriod()).isEqualTo(afterPeriod);
     }
@@ -78,38 +78,38 @@ class CareerTest {
     @Test
     @DisplayName("会社名、期間を変更する")
     void test5() {
-        Period beforePeriod = Period.create(notification, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
-        CompanyName beforeCompanyName = CompanyName.create(notification, "株式会社ABC");
-        Career beforeCareer = Career.create(notification, beforeCompanyName, beforePeriod);
+        Period beforePeriod = Period.create(errorCollector, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
+        CompanyName beforeCompanyName = CompanyName.create(errorCollector, "株式会社ABC");
+        Career beforeCareer = Career.create(errorCollector, beforeCompanyName, beforePeriod);
 
-        Period afterPeriod = Period.create(notification, YearMonth.of(2030, 1), null, true);
-        CompanyName afterCompanyName = CompanyName.create(notification, "株式会社ZZZ");
-        Career afterCareer = beforeCareer.changePeriod(notification, afterPeriod)
-                .changeCompanyName(notification, afterCompanyName);
+        Period afterPeriod = Period.create(errorCollector, YearMonth.of(2030, 1), null, true);
+        CompanyName afterCompanyName = CompanyName.create(errorCollector, "株式会社ZZZ");
+        Career afterCareer = beforeCareer.changePeriod(errorCollector, afterPeriod)
+                .changeCompanyName(errorCollector, afterCompanyName);
 
         assertThat(afterCareer.getPeriod()).isEqualTo(afterPeriod);
         assertThat(afterCareer.getCompanyName()).isEqualTo(afterCompanyName);
     }
 
     @Test
-    @DisplayName("会社名がnullの場合、エラーが通知される")
+    @DisplayName("会社名がnullの場合、エラーが収集される")
     void test6() {
-        Notification notification = new Notification();
-        Period period = Period.create(notification, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
+        ErrorCollector errorCollector = new ErrorCollector();
+        Period period = Period.create(errorCollector, YearMonth.of(2025, 1), YearMonth.of(2025, 2), false);
 
-        Career.create(notification, null, period);
+        Career.create(errorCollector, null, period);
 
-        assertThat(notification.getErrors().get("companyName")).containsExactly("会社名は入力必須です。");
+        assertThat(errorCollector.getErrors().get("companyName")).containsExactly("会社名は入力必須です。");
     }
 
     @Test
-    @DisplayName("期間がnullの場合、エラーが通知される")
+    @DisplayName("期間がnullの場合、エラーが収集される")
     void test7() {
-        Notification notification = new Notification();
-        CompanyName companyName = CompanyName.create(notification, "株式会社ABC");
+        ErrorCollector errorCollector = new ErrorCollector();
+        CompanyName companyName = CompanyName.create(errorCollector, "株式会社ABC");
 
-        Career.create(notification, companyName, null);
+        Career.create(errorCollector, companyName, null);
 
-        assertThat(notification.getErrors().get("period")).containsExactly("期間は入力必須です。");
+        assertThat(errorCollector.getErrors().get("period")).containsExactly("期間は入力必須です。");
     }
 }

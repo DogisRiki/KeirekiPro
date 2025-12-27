@@ -6,7 +6,7 @@ import java.time.YearMonth;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Certification;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,8 +16,8 @@ class CertificationTest {
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
-        Notification notification = new Notification();
-        Certification certification = Certification.create(notification, "基本情報技術者", YearMonth.of(2025, 1));
+        ErrorCollector errorCollector = new ErrorCollector();
+        Certification certification = Certification.create(errorCollector, "基本情報技術者", YearMonth.of(2025, 1));
 
         assertThat(certification).isNotNull();
         assertThat(certification.getId()).isNotNull();
@@ -40,9 +40,9 @@ class CertificationTest {
     @Test
     @DisplayName("資格名を変更する")
     void test3() {
-        Notification notification = new Notification();
-        Certification beforeCertification = Certification.create(notification, "基本情報技術者", YearMonth.of(2025, 1));
-        Certification afteCertification = beforeCertification.changeName(notification, "応用情報技術者");
+        ErrorCollector errorCollector = new ErrorCollector();
+        Certification beforeCertification = Certification.create(errorCollector, "基本情報技術者", YearMonth.of(2025, 1));
+        Certification afteCertification = beforeCertification.changeName(errorCollector, "応用情報技術者");
 
         assertThat(afteCertification.getName()).isEqualTo("応用情報技術者");
     }
@@ -50,9 +50,9 @@ class CertificationTest {
     @Test
     @DisplayName("取得年月を変更する")
     void test4() {
-        Notification notification = new Notification();
-        Certification beforeCertification = Certification.create(notification, "基本情報技術者", YearMonth.of(2025, 1));
-        Certification afteCertification = beforeCertification.changeDate(notification, YearMonth.of(2030, 1));
+        ErrorCollector errorCollector = new ErrorCollector();
+        Certification beforeCertification = Certification.create(errorCollector, "基本情報技術者", YearMonth.of(2025, 1));
+        Certification afteCertification = beforeCertification.changeDate(errorCollector, YearMonth.of(2030, 1));
 
         assertThat(afteCertification.getDate()).isEqualTo(YearMonth.of(2030, 1));
     }
@@ -60,34 +60,34 @@ class CertificationTest {
     @Test
     @DisplayName("資格名、取得年月を変更する")
     void test5() {
-        Notification notification = new Notification();
-        Certification beforeCertification = Certification.create(notification, "基本情報技術者", YearMonth.of(2025, 1));
-        Certification afteCertification = beforeCertification.changeDate(notification, YearMonth.of(2030, 1))
-                .changeName(notification, "応用情報技術者");
+        ErrorCollector errorCollector = new ErrorCollector();
+        Certification beforeCertification = Certification.create(errorCollector, "基本情報技術者", YearMonth.of(2025, 1));
+        Certification afteCertification = beforeCertification.changeDate(errorCollector, YearMonth.of(2030, 1))
+                .changeName(errorCollector, "応用情報技術者");
 
         assertThat(afteCertification.getDate()).isEqualTo(YearMonth.of(2030, 1));
         assertThat(afteCertification.getName()).isEqualTo("応用情報技術者");
     }
 
     @Test
-    @DisplayName("必須項目が未入力の場合、エラーが通知される")
+    @DisplayName("必須項目が未入力の場合、エラーが収集される")
     void test6() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        Certification.create(notification, "", null);
+        Certification.create(errorCollector, "", null);
 
-        assertThat(notification.getErrors().get("name")).containsExactly("資格名は入力必須です。");
-        assertThat(notification.getErrors().get("date")).containsExactly("取得年月は入力必須です。");
+        assertThat(errorCollector.getErrors().get("name")).containsExactly("資格名は入力必須です。");
+        assertThat(errorCollector.getErrors().get("date")).containsExactly("取得年月は入力必須です。");
     }
 
     @Test
-    @DisplayName("資格名が最大文字数を超える場合、エラーが通知される")
+    @DisplayName("資格名が最大文字数を超える場合、エラーが収集される")
     void test7() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         String longName = "a".repeat(51);
 
-        Certification.create(notification, longName, YearMonth.of(2025, 1));
+        Certification.create(errorCollector, longName, YearMonth.of(2025, 1));
 
-        assertThat(notification.getErrors().get("name")).containsExactly("資格名は50文字以内で入力してください。");
+        assertThat(errorCollector.getErrors().get("name")).containsExactly("資格名は50文字以内で入力してください。");
     }
 }

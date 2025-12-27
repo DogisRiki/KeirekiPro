@@ -19,7 +19,7 @@ import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.DeletePortfolioUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -118,16 +118,16 @@ class DeletePortfolioUseCaseTest {
     }
 
     private Resume buildResumeWithPortfolios(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
-        Link link1 = Link.create(notification, "https://example.com/1");
-        Portfolio p1 = Portfolio.create(notification, "作品1", "概要1", "React", link1);
+        Link link1 = Link.create(errorCollector, "https://example.com/1");
+        Portfolio p1 = Portfolio.create(errorCollector, "作品1", "概要1", "React", link1);
 
-        Link link2 = Link.create(notification, "https://example.com/2");
-        Portfolio p2 = Portfolio.create(notification, "作品2", "概要2", "Spring", link2);
+        Link link2 = Link.create(errorCollector, "https://example.com/2");
+        Portfolio p2 = Portfolio.create(errorCollector, "作品2", "概要2", "Spring", link2);
 
         return Resume.reconstruct(
                 RESUME_ID,

@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,11 +38,11 @@ public class SetEmailAndPasswordUseCase {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         if (request.getEmail() != null) {
-            Email email = Email.create(notification, request.getEmail());
-            user = user.setEmail(notification, email);
+            Email email = Email.create(errorCollector, request.getEmail());
+            user = user.setEmail(errorCollector, email);
         }
 
         if (request.getPassword() != null) {

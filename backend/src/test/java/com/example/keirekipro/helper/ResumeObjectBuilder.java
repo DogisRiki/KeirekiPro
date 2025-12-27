@@ -25,7 +25,7 @@ import com.example.keirekipro.domain.model.resume.TechStack.Frontend;
 import com.example.keirekipro.domain.model.resume.TechStack.Infrastructure;
 import com.example.keirekipro.domain.model.resume.TechStack.Tools;
 import com.example.keirekipro.infrastructure.repository.resume.ResumeDto;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 
 /**
@@ -54,13 +54,13 @@ public class ResumeObjectBuilder {
             String firstName,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
-        Notification notif = new Notification();
-        ResumeName rn = ResumeName.create(notif, name);
-        FullName fn = FullName.create(notif, lastName, firstName);
+        ErrorCollector errorCollector = new ErrorCollector();
+        ResumeName rn = ResumeName.create(errorCollector, name);
+        FullName fn = FullName.create(errorCollector, lastName, firstName);
 
-        Period period = Period.create(new Notification(), YearMonth.of(2020, 1), YearMonth.of(2020, 12), false);
-        CompanyName companyName = CompanyName.create(new Notification(), "CompanyA");
-        Career career = Career.create(notif, companyName, period);
+        Period period = Period.create(new ErrorCollector(), YearMonth.of(2020, 1), YearMonth.of(2020, 12), false);
+        CompanyName companyName = CompanyName.create(new ErrorCollector(), "CompanyA");
+        Career career = Career.create(errorCollector, companyName, period);
         Project.Process process = Project.Process.create(true, false, false, true, false, false, false);
 
         // TechStack（フロントエンド）
@@ -113,7 +113,7 @@ public class ResumeObjectBuilder {
         TechStack tech = TechStack.create(frontend, backend, infra, tools);
 
         Project project = Project.create(
-                notif,
+                errorCollector,
                 companyName,
                 period,
                 "ProjName",
@@ -124,18 +124,18 @@ public class ResumeObjectBuilder {
                 process,
                 tech);
 
-        Certification cert = Certification.create(notif, "Oracle Certified", YearMonth.of(2019, 6));
+        Certification cert = Certification.create(errorCollector, "Oracle Certified", YearMonth.of(2019, 6));
         Portfolio port = Portfolio.create(
-                notif,
+                errorCollector,
                 "Portfolio1",
                 "Desc",
                 "TechStackDesc",
-                Link.create(new Notification(), "https://example.com"));
+                Link.create(new ErrorCollector(), "https://example.com"));
         SnsPlatform snsplat = SnsPlatform.create(
-                notif,
+                errorCollector,
                 "GitHub",
-                Link.create(new Notification(), "https://github.com"));
-        SelfPromotion self = SelfPromotion.create(notif, "Title1", "Content1");
+                Link.create(new ErrorCollector(), "https://github.com"));
+        SelfPromotion self = SelfPromotion.create(errorCollector, "Title1", "Content1");
 
         return Resume.reconstruct(
                 resumeId,

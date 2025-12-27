@@ -18,7 +18,7 @@ import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.springframework.stereotype.Repository;
 
@@ -141,22 +141,22 @@ public class MyBatisResumeRepository implements ResumeRepository {
      */
     private Resume toEntity(ResumeDto dto) {
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // 職歴
         List<Career> careers = dto.getCareers().stream()
                 .map(d -> Career.reconstruct(
                         d.getId(),
-                        CompanyName.create(notification, d.getCompanyName()),
-                        Period.create(notification, d.getStartDate(), d.getEndDate(), d.getIsActive())))
+                        CompanyName.create(errorCollector, d.getCompanyName()),
+                        Period.create(errorCollector, d.getStartDate(), d.getEndDate(), d.getIsActive())))
                 .toList();
 
         // プロジェクト
         List<Project> projects = dto.getProjects().stream()
                 .map(d -> Project.reconstruct(
                         d.getId(),
-                        CompanyName.create(notification, d.getCompanyName()),
-                        Period.create(notification, d.getStartDate(), d.getEndDate(), d.getIsActive()),
+                        CompanyName.create(errorCollector, d.getCompanyName()),
+                        Period.create(errorCollector, d.getStartDate(), d.getEndDate(), d.getIsActive()),
                         d.getName(),
                         d.getOverview(),
                         d.getTeamComp(),
@@ -227,7 +227,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                         d.getName(),
                         d.getOverview(),
                         d.getTechStack(),
-                        Link.create(notification, d.getLink())))
+                        Link.create(errorCollector, d.getLink())))
                 .toList();
 
         // SNSプラットフォーム
@@ -235,7 +235,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                 .map(d -> SnsPlatform.reconstruct(
                         d.getId(),
                         d.getName(),
-                        Link.create(notification, d.getLink())))
+                        Link.create(errorCollector, d.getLink())))
                 .toList();
 
         // 自己PR
@@ -250,9 +250,9 @@ public class MyBatisResumeRepository implements ResumeRepository {
         return Resume.reconstruct(
                 dto.getId(),
                 dto.getUserId(),
-                ResumeName.create(notification, dto.getName()),
+                ResumeName.create(errorCollector, dto.getName()),
                 dto.getDate(),
-                FullName.create(notification, dto.getLastName(), dto.getFirstName()),
+                FullName.create(errorCollector, dto.getLastName(), dto.getFirstName()),
                 dto.getCreatedAt(),
                 dto.getUpdatedAt(),
                 careers,

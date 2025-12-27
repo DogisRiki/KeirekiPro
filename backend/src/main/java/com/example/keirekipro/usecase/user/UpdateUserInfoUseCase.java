@@ -8,7 +8,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
 import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -52,14 +52,14 @@ public class UpdateUserInfoUseCase {
      */
     public void execute(UpdateUserInfoRequest request, UUID userId) {
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // プロフィール画像のバリデーションチェック
         MultipartFile profileImage = request.getProfileImage();
-        validateProfileImage(profileImage, notification);
+        validateProfileImage(profileImage, errorCollector);
 
-        if (notification.hasErrors()) {
-            throw new UseCaseException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new UseCaseException(errorCollector.getErrors());
         }
 
         // ユーザー取得(ユーザーが存在しないのに更新リクエストはできない)
@@ -78,7 +78,7 @@ public class UpdateUserInfoUseCase {
 
         // ユーザー名更新
         if (request.getUsername() != null) {
-            user = user.changeUsername(notification, request.getUsername());
+            user = user.changeUsername(errorCollector, request.getUsername());
         }
 
         // プロフィール画像更新
@@ -87,31 +87,31 @@ public class UpdateUserInfoUseCase {
         }
 
         // 二段階認証設定更新
-        user = user.changeTwoFactorAuthEnabled(notification, request.isTwoFactorAuthEnabled());
+        user = user.changeTwoFactorAuthEnabled(errorCollector, request.isTwoFactorAuthEnabled());
 
-        if (notification.hasErrors()) {
-            throw new UseCaseException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new UseCaseException(errorCollector.getErrors());
         }
 
         // 更新処理実行
         userRepository.save(user);
     }
 
-    private void validateProfileImage(MultipartFile file, Notification notification) {
+    private void validateProfileImage(MultipartFile file, ErrorCollector errorCollector) {
         if (file == null || file.isEmpty()) {
             return;
         }
         if (!FileUtil.isMimeTypeValid(file, ALLOWED_MIME_TYPES)) {
-            notification.addError("profileImage", "許可されていない画像形式です。");
+            errorCollector.addError("profileImage", "許可されていない画像形式です。");
         }
         if (!FileUtil.isExtensionValid(file, ALLOWED_EXTENSIONS)) {
-            notification.addError("profileImage", "許可されていないファイル形式です。jpg, jpeg, png, gifのみ許可されています。");
+            errorCollector.addError("profileImage", "許可されていないファイル形式です。jpg, jpeg, png, gifのみ許可されています。");
         }
         if (!FileUtil.isFileSizeValid(file, ALLOWED_FILE_SIZE)) {
-            notification.addError("profileImage", "プロフィール画像のサイズは1MB以下である必要があります。");
+            errorCollector.addError("profileImage", "プロフィール画像のサイズは1MB以下である必要があります。");
         }
         if (!FileUtil.isImageReadValid(file)) {
-            notification.addError("profileImage", "有効な画像ファイルではありません。");
+            errorCollector.addError("profileImage", "有効な画像ファイルではありません。");
         }
     }
 }

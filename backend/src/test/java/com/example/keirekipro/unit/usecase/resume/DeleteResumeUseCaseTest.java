@@ -16,7 +16,7 @@ import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.DeleteResumeUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -101,11 +101,11 @@ class DeleteResumeUseCaseTest {
      * 職務経歴書1件を作成するヘルパーメソッド
      */
     private Resume buildResume(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // 職務経歴書本体を再構築
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
         return Resume.reconstruct(
                 RESUME_ID,

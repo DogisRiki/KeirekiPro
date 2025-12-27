@@ -13,7 +13,7 @@ import com.example.keirekipro.domain.event.user.UserRegisteredEvent;
 import com.example.keirekipro.domain.shared.Entity;
 import com.example.keirekipro.domain.shared.event.DomainEvent;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.Getter;
 
@@ -76,7 +76,7 @@ public class User extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private User(Notification notification,
+    private User(ErrorCollector errorCollector,
             Email email,
             String passwordHash,
             boolean twoFactorAuthEnabled,
@@ -87,11 +87,11 @@ public class User extends Entity {
         super();
 
         // バリデーション実行
-        validate(notification, email, passwordHash, authProviders);
+        validate(errorCollector, email, passwordHash, authProviders);
 
         // サブエンティティや値オブジェクトのドメイン例外を一括でスローする
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
         }
 
         this.email = email;
@@ -132,7 +132,7 @@ public class User extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param notification         通知オブジェクト
+     * @param errorCollector       エラー収集オブジェクト
      * @param email                メールアドレス
      * @param passwordHash         パスワードハッシュ
      * @param twoFactorAuthEnabled 二段階認証設定
@@ -141,7 +141,7 @@ public class User extends Entity {
      * @param username             ユーザー名
      * @return Userエンティティ
      */
-    public static User create(Notification notification,
+    public static User create(ErrorCollector errorCollector,
             Email email,
             String passwordHash,
             boolean twoFactorAuthEnabled,
@@ -159,7 +159,7 @@ public class User extends Entity {
         twoFactorAuthEnabled = false;
 
         return new User(
-                notification,
+                errorCollector,
                 email,
                 passwordHash,
                 twoFactorAuthEnabled,
@@ -213,7 +213,7 @@ public class User extends Entity {
     /**
      * 新規構築時のバリデーション
      */
-    private static void validate(Notification notification,
+    private static void validate(ErrorCollector errorCollector,
             Email email,
             String passwordHash,
             Map<String, AuthProvider> providers) {
@@ -241,12 +241,12 @@ public class User extends Entity {
     /**
      * 外部認証プロバイダーを追加する
      *
-     * @param notification   通知オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param providerName   プロバイダー名
      * @param providerUserId プロバイダー側ユーザーID
      * @return 変更後のUserエンティティ
      */
-    public User addAuthProvider(Notification notification,
+    public User addAuthProvider(ErrorCollector errorCollector,
             String providerName,
             String providerUserId) {
 
@@ -258,7 +258,7 @@ public class User extends Entity {
         }
 
         Map<String, AuthProvider> updated = new HashMap<>(this.authProviders);
-        updated.put(key, AuthProvider.create(notification, providerName, providerUserId));
+        updated.put(key, AuthProvider.create(errorCollector, providerName, providerUserId));
 
         return new User(
                 this.id,
@@ -275,19 +275,19 @@ public class User extends Entity {
     /**
      * メールアドレスを後から設定する
      *
-     * @param notification 通知オブジェクト
-     * @param email        メールアドレス
+     * @param errorCollector エラー収集オブジェクト
+     * @param email          メールアドレス
      * @return 変更後のUserエンティティ
      */
-    public User setEmail(Notification notification, Email email) {
+    public User setEmail(ErrorCollector errorCollector, Email email) {
 
         // 既にメールアドレスがある場合は設定不可
         if (this.email != null) {
-            notification.addError("email", "メールアドレスが既に設定されているため設定できません。");
+            errorCollector.addError("email", "メールアドレスが既に設定されているため設定できません。");
         }
 
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
         }
 
         return new User(
@@ -305,19 +305,19 @@ public class User extends Entity {
     /**
      * パスワードを変更する
      *
-     * @param notification    通知オブジェクト
+     * @param errorCollector  エラー収集オブジェクト
      * @param newPasswordHash 新しいパスワードハッシュ
      * @return 変更後のUserエンティティ
      */
-    public User changePassword(Notification notification, String newPasswordHash) {
+    public User changePassword(ErrorCollector errorCollector, String newPasswordHash) {
 
         // 同じパスワードの場合はNG
         if (newPasswordHash == this.passwordHash) {
-            notification.addError("password", "現在のパスワードと同じパスワードは設定できません。");
+            errorCollector.addError("password", "現在のパスワードと同じパスワードは設定できません。");
         }
 
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
         }
 
         return new User(
@@ -355,19 +355,19 @@ public class User extends Entity {
     /**
      * 二段階認証設定を変更する
      *
-     * @param notification         通知オブジェクト
+     * @param errorCollector       エラー収集オブジェクト
      * @param twoFactorAuthEnabled 二段階認証設定
      * @return 変更後のUserエンティティ
      */
-    public User changeTwoFactorAuthEnabled(Notification notification, boolean twoFactorAuthEnabled) {
+    public User changeTwoFactorAuthEnabled(ErrorCollector errorCollector, boolean twoFactorAuthEnabled) {
 
         // メールアドレスとパスワードが未設定の場合はNG
         if (twoFactorAuthEnabled && (this.email == null || this.passwordHash == null)) {
-            notification.addError("twoFactorAuthEnabled", "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
+            errorCollector.addError("twoFactorAuthEnabled", "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
         }
 
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
         }
 
         return new User(
@@ -385,24 +385,24 @@ public class User extends Entity {
     /**
      * 外部認証連携を解除する
      *
-     * @param notification 通知オブジェクト
-     * @param providerName 削除するプロバイダ名
+     * @param errorCollector エラー収集オブジェクト
+     * @param providerName   削除するプロバイダ名
      * @return 変更後のUserエンティティ
      */
-    public User removeAuthProvider(Notification notification, String providerName) {
+    public User removeAuthProvider(ErrorCollector errorCollector, String providerName) {
 
         String key = providerName.toLowerCase();
 
         // 対象の外部認証連携情報がない場合NG
         if (!this.authProviders.containsKey(key)) {
-            notification.addError("authProviders", "連携の解除に失敗しました。");
+            errorCollector.addError("authProviders", "連携の解除に失敗しました。");
             // メールアドレスとパスワードのいずれかが未設定 かつ 外部認証連携が1つしかない場合NG
         } else if ((this.email == null || this.passwordHash == null) && this.authProviders.size() == 1) {
-            notification.addError("authProviders", "メールアドレスとパスワードが設定済みでないと、連携を解除できません。");
+            errorCollector.addError("authProviders", "メールアドレスとパスワードが設定済みでないと、連携を解除できません。");
         }
 
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
         }
 
         Map<String, AuthProvider> updated = new HashMap<>(this.authProviders);
@@ -443,22 +443,22 @@ public class User extends Entity {
     /**
      * ユーザー名を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param newUsername  新しいユーザー名
+     * @param errorCollector エラー収集オブジェクト
+     * @param newUsername    新しいユーザー名
      * @return 変更後のUserエンティティ
      */
-    public User changeUsername(Notification notification, String newUsername) {
+    public User changeUsername(ErrorCollector errorCollector, String newUsername) {
 
         String trimmed = newUsername == null ? "" : newUsername.strip();
 
         if (trimmed.isEmpty()) {
-            notification.addError("username", "ユーザー名は必ず指定してください。");
+            errorCollector.addError("username", "ユーザー名は必ず指定してください。");
         } else if (trimmed.length() > 50) {
-            notification.addError("username", "ユーザー名は50文字以内で入力してください。");
+            errorCollector.addError("username", "ユーザー名は50文字以内で入力してください。");
         }
 
-        if (notification.hasErrors()) {
-            throw new DomainException(notification.getErrors());
+        if (errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
         }
 
         // 変更が無い場合はそのまま返す

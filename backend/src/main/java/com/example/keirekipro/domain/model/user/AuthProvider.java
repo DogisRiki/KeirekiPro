@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.Getter;
 
@@ -60,17 +60,17 @@ public class AuthProvider extends Entity {
     /**
      * 新規構築用ファクトリーメソッド
      *
-     * @param notification   通知オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param providerName   プロバイダー名
      * @param providerUserId プロバイダー側ユーザーID
      * @return AuthProviderエンティティ
      */
     public static AuthProvider create(
-            Notification notification,
+            ErrorCollector errorCollector,
             String providerName,
             String providerUserId) {
 
-        validate(notification, providerName, providerUserId);
+        validate(errorCollector, providerName, providerUserId);
 
         return new AuthProvider(
                 UUID.randomUUID(),
@@ -100,18 +100,18 @@ public class AuthProvider extends Entity {
     }
 
     private static void validate(
-            Notification notification,
+            ErrorCollector errorCollector,
             String providerName,
             String providerUserId) {
 
         if (providerName == null || providerName.isBlank()) {
-            notification.addError("providerName", "プロバイダー名が空です。");
+            errorCollector.addError("providerName", "プロバイダー名が空です。");
         } else if (!PROVIDERS.contains(providerName.toLowerCase())) {
-            notification.addError("providerName", "許可されていないプロバイダー名です。");
+            errorCollector.addError("providerName", "許可されていないプロバイダー名です。");
         }
         if (providerUserId == null || providerUserId.isBlank()) {
             String message = String.format("%sでユーザーIDの取得に失敗しました。", providerName);
-            notification.addError("providerUserId", message);
+            errorCollector.addError("providerUserId", message);
         }
     }
 }

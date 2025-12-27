@@ -9,7 +9,7 @@ import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsSesClient;
 import com.example.keirekipro.infrastructure.shared.mail.FreeMarkerMailTemplate;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.SecurityUtil;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -47,7 +47,7 @@ public class RequestPasswordResetUseCase {
      */
     public void execute(String to) {
 
-        Email email = Email.create(new Notification(), to);
+        Email email = Email.create(new ErrorCollector(), to);
 
         // 該当ユーザーを検索（存在しない場合は何もせず終了）
         userRepository.findByEmail(email.getValue())

@@ -13,7 +13,7 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.auth.dto.LoginRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -84,7 +84,7 @@ class LoginUseCaseTest {
 
     // テスト用ユーザー生成ヘルパー
     private static User buildStoredUser(String passwordHash) {
-        Notification n = new Notification();
+        ErrorCollector n = new ErrorCollector();
         return User.reconstruct(
                 USER_ID,
                 Email.create(n, EMAIL),

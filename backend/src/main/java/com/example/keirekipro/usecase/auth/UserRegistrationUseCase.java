@@ -8,7 +8,7 @@ import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.service.user.UserEmailDuplicationCheckService;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -39,18 +39,18 @@ public class UserRegistrationUseCase {
     @Transactional
     public void execute(UserRegistrationRequest request) {
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // メールアドレス値オブジェクトを作成
-        Email email = Email.create(notification, request.getEmail());
+        Email email = Email.create(errorCollector, request.getEmail());
 
         // メールアドレス重複チェック
         userEmailDuplicationCheckService.execute(email);
 
         User user = User.create(
-                notification,
+                errorCollector,
                 Email.create(
-                        notification, request.getEmail()),
+                        errorCollector, request.getEmail()),
                 passwordEncoder.encode(request.getPassword()),
                 false,
                 Collections.emptyMap(),

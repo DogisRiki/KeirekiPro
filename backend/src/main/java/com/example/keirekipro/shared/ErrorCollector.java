@@ -8,10 +8,10 @@ import java.util.Map;
 import lombok.Getter;
 
 /**
- * 複数のフィールドエラーを一時的に蓄積する通知クラス
+ * 複数のフィールドエラーを一時的に蓄積するクラス
  */
 @Getter
-public class Notification {
+public class ErrorCollector {
 
     /**
      * 蓄積したエラー

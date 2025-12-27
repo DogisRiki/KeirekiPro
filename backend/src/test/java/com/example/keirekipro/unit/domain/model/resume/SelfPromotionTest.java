@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,12 +17,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SelfPromotionTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @Test
     @DisplayName("新規構築用コンストラクタでインスタンス化する")
     void test1() {
-        SelfPromotion selfPromotion = SelfPromotion.create(notification, "タイトル", "自己PRコンテンツ");
+        SelfPromotion selfPromotion = SelfPromotion.create(errorCollector, "タイトル", "自己PRコンテンツ");
 
         assertThat(selfPromotion).isNotNull();
         assertThat(selfPromotion.getId()).isNotNull();
@@ -45,8 +45,8 @@ class SelfPromotionTest {
     @Test
     @DisplayName("タイトルを変更する")
     void test3() {
-        SelfPromotion beforeSelfPromotion = SelfPromotion.create(notification, "タイトル", "自己PRコンテンツ");
-        SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeTitle(notification, "新しいタイトル");
+        SelfPromotion beforeSelfPromotion = SelfPromotion.create(errorCollector, "タイトル", "自己PRコンテンツ");
+        SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeTitle(errorCollector, "新しいタイトル");
 
         assertThat(afterSelfPromotion.getTitle()).isEqualTo("新しいタイトル");
     }
@@ -54,8 +54,8 @@ class SelfPromotionTest {
     @Test
     @DisplayName("コンテンツを変更する")
     void test4() {
-        SelfPromotion beforeSelfPromotion = SelfPromotion.create(notification, "タイトル", "自己PRコンテンツ");
-        SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeContent(notification, "新しい自己PRコンテンツ");
+        SelfPromotion beforeSelfPromotion = SelfPromotion.create(errorCollector, "タイトル", "自己PRコンテンツ");
+        SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeContent(errorCollector, "新しい自己PRコンテンツ");
 
         assertThat(afterSelfPromotion.getContent()).isEqualTo("新しい自己PRコンテンツ");
     }
@@ -63,39 +63,39 @@ class SelfPromotionTest {
     @Test
     @DisplayName("タイトル、コンテンツを変更する")
     void test5() {
-        SelfPromotion beforeSelfPromotion = SelfPromotion.create(notification, "タイトル", "自己PRコンテンツ");
-        SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeContent(notification, "新しい自己PRコンテンツ")
-                .changeTitle(notification, "新しいタイトル");
+        SelfPromotion beforeSelfPromotion = SelfPromotion.create(errorCollector, "タイトル", "自己PRコンテンツ");
+        SelfPromotion afterSelfPromotion = beforeSelfPromotion.changeContent(errorCollector, "新しい自己PRコンテンツ")
+                .changeTitle(errorCollector, "新しいタイトル");
 
         assertThat(afterSelfPromotion.getContent()).isEqualTo("新しい自己PRコンテンツ");
         assertThat(afterSelfPromotion.getTitle()).isEqualTo("新しいタイトル");
     }
 
     @Test
-    @DisplayName("必須項目が未入力の場合、エラーが通知される")
+    @DisplayName("必須項目が未入力の場合、エラーが収集される")
     void test6() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        SelfPromotion.create(notification, "", "");
+        SelfPromotion.create(errorCollector, "", "");
 
-        assertThat(notification.getErrors().get("title"))
+        assertThat(errorCollector.getErrors().get("title"))
                 .containsExactly("タイトルは入力必須です。");
-        assertThat(notification.getErrors().get("content"))
+        assertThat(errorCollector.getErrors().get("content"))
                 .containsExactly("コンテンツは入力必須です。");
     }
 
     @Test
-    @DisplayName("各項目が最大文字数を超える場合、エラーが通知される")
+    @DisplayName("各項目が最大文字数を超える場合、エラーが収集される")
     void test7() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         String longTitle = "a".repeat(51);
         String longContent = "a".repeat(1001);
 
-        SelfPromotion.create(notification, longTitle, longContent);
+        SelfPromotion.create(errorCollector, longTitle, longContent);
 
-        assertThat(notification.getErrors().get("title"))
+        assertThat(errorCollector.getErrors().get("title"))
                 .containsExactly("タイトルは50文字以内で入力してください。");
-        assertThat(notification.getErrors().get("content"))
+        assertThat(errorCollector.getErrors().get("content"))
                 .containsExactly("コンテンツは1000文字以内で入力してください。");
     }
 }

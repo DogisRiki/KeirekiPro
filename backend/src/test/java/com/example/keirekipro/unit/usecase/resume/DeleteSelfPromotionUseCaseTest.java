@@ -18,7 +18,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.DeleteSelfPromotionUseCase;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -117,13 +117,13 @@ class DeleteSelfPromotionUseCaseTest {
     }
 
     private Resume buildResumeWithSelfPromotions(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
-        SelfPromotion s1 = SelfPromotion.create(notification, "タイトル1", "本文1");
-        SelfPromotion s2 = SelfPromotion.create(notification, "タイトル2", "本文2");
+        SelfPromotion s1 = SelfPromotion.create(errorCollector, "タイトル1", "本文1");
+        SelfPromotion s2 = SelfPromotion.create(errorCollector, "タイトル2", "本文2");
 
         return Resume.reconstruct(
                 RESUME_ID,

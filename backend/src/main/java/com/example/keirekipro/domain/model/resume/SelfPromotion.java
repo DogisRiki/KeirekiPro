@@ -3,7 +3,7 @@ package com.example.keirekipro.domain.model.resume;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.Getter;
 
@@ -44,13 +44,13 @@ public class SelfPromotion extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param notification 通知オブジェクト
-     * @param title        タイトル
-     * @param content      コンテンツ
+     * @param errorCollector エラー収集オブジェクト
+     * @param title          タイトル
+     * @param content        コンテンツ
      * @return 自己PRエンティティ
      */
-    public static SelfPromotion create(Notification notification, String title, String content) {
-        validate(notification, title, content);
+    public static SelfPromotion create(ErrorCollector errorCollector, String title, String content) {
+        validate(errorCollector, title, content);
         return new SelfPromotion(title, content);
     }
 
@@ -69,38 +69,38 @@ public class SelfPromotion extends Entity {
     /**
      * タイトルを変更する
      *
-     * @param notification 通知オブジェクト
-     * @param title        タイトル
+     * @param errorCollector エラー収集オブジェクト
+     * @param title          タイトル
      * @return 変更後の自己PRエンティティ
      */
-    public SelfPromotion changeTitle(Notification notification, String title) {
-        validate(notification, title, this.content);
+    public SelfPromotion changeTitle(ErrorCollector errorCollector, String title) {
+        validate(errorCollector, title, this.content);
         return new SelfPromotion(this.id, title, this.content);
     }
 
     /**
      * コンテンツを変更する
      *
-     * @param notification 通知オブジェクト
-     * @param content      コンテンツ
+     * @param errorCollector エラー収集オブジェクト
+     * @param content        コンテンツ
      * @return 変更後の自己PRエンティティ
      */
-    public SelfPromotion changeContent(Notification notification, String content) {
-        validate(notification, this.title, content);
+    public SelfPromotion changeContent(ErrorCollector errorCollector, String content) {
+        validate(errorCollector, this.title, content);
         return new SelfPromotion(this.id, this.title, content);
     }
 
-    private static void validate(Notification notification, String title, String content) {
+    private static void validate(ErrorCollector errorCollector, String title, String content) {
         if (title == null || title.isBlank()) {
-            notification.addError("title", "タイトルは入力必須です。");
+            errorCollector.addError("title", "タイトルは入力必須です。");
         } else if (title.length() > 50) {
-            notification.addError("title", "タイトルは50文字以内で入力してください。");
+            errorCollector.addError("title", "タイトルは50文字以内で入力してください。");
         }
 
         if (content == null || content.isBlank()) {
-            notification.addError("content", "コンテンツは入力必須です。");
+            errorCollector.addError("content", "コンテンツは入力必須です。");
         } else if (content.length() > 1000) {
-            notification.addError("content", "コンテンツは1000文字以内で入力してください。");
+            errorCollector.addError("content", "コンテンツは1000文字以内で入力してください。");
         }
     }
 }

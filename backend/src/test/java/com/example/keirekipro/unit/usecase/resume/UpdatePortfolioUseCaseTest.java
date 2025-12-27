@@ -20,7 +20,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdatePortfolioRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdatePortfolioUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -197,11 +197,11 @@ class UpdatePortfolioUseCaseTest {
      * ポートフォリオ2件を持つ職務経歴書を作成するヘルパーメソッド
      */
     private Resume buildResumeWithPortfolios(UUID ownerId) {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         // 職務経歴書本体を再構築
-        ResumeName resumeName = ResumeName.create(notification, RESUME_NAME);
-        FullName fullName = FullName.create(notification, LAST_NAME, FIRST_NAME);
+        ResumeName resumeName = ResumeName.create(errorCollector, RESUME_NAME);
+        FullName fullName = FullName.create(errorCollector, LAST_NAME, FIRST_NAME);
 
         Resume base = Resume.reconstruct(
                 RESUME_ID,
@@ -220,24 +220,24 @@ class UpdatePortfolioUseCaseTest {
         );
 
         // ポートフォリオ1
-        Link link1 = Link.create(notification, "https://example.com/portfolio1");
+        Link link1 = Link.create(errorCollector, "https://example.com/portfolio1");
         Portfolio portfolio1 = Portfolio.create(
-                notification,
+                errorCollector,
                 "ポートフォリオ1",
                 "概要1",
                 "技術スタック1",
                 link1);
-        Resume resumeWithPortfolio1 = base.addPortfolio(notification, portfolio1);
+        Resume resumeWithPortfolio1 = base.addPortfolio(errorCollector, portfolio1);
 
         // ポートフォリオ2
-        Link link2 = Link.create(notification, "https://example.com/portfolio2");
+        Link link2 = Link.create(errorCollector, "https://example.com/portfolio2");
         Portfolio portfolio2 = Portfolio.create(
-                notification,
+                errorCollector,
                 "ポートフォリオ2",
                 "概要2",
                 "技術スタック2",
                 link2);
 
-        return resumeWithPortfolio1.addPortfolio(notification, portfolio2);
+        return resumeWithPortfolio1.addPortfolio(errorCollector, portfolio2);
     }
 }

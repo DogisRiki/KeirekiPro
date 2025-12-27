@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateSelfPromotionRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -49,13 +49,13 @@ public class UpdateSelfPromotionUseCase {
                 .findFirst()
                 .orElseThrow(() -> new UseCaseException("対象の自己PRが存在しません。"));
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         SelfPromotion updatedSelfPromotion = existing
-                .changeTitle(notification, request.getTitle())
-                .changeContent(notification, request.getContent());
+                .changeTitle(errorCollector, request.getTitle())
+                .changeContent(errorCollector, request.getContent());
 
-        Resume updated = resume.updateSelfPromotion(notification, updatedSelfPromotion);
+        Resume updated = resume.updateSelfPromotion(errorCollector, updatedSelfPromotion);
 
         resumeRepository.save(updated);
 

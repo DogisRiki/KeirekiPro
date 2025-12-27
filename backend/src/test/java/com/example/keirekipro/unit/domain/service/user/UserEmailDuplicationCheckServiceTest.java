@@ -16,7 +16,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.service.user.UserEmailDuplicationCheckService;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ class UserEmailDuplicationCheckServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @InjectMocks
     private UserEmailDuplicationCheckService service;
@@ -56,7 +56,7 @@ class UserEmailDuplicationCheckServiceTest {
     @DisplayName("同一のメールアドレスが存在する場合、DomainExceptionをスローする")
     void test2() {
         // テスト対象のユーザーを作成
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
         User user = User.reconstruct(
                 null,
                 email,
@@ -73,14 +73,14 @@ class UserEmailDuplicationCheckServiceTest {
 
         // 重複チェックを実行
         assertThatThrownBy(
-                () -> service.execute(Email.create(notification, EMAIL))).isInstanceOf(DomainException.class)
+                () -> service.execute(Email.create(errorCollector, EMAIL))).isInstanceOf(DomainException.class)
                 .hasMessage("このメールアドレスは登録できません。");
     }
 
     @Test
     @DisplayName("同一のメールアドレスが存在しない場合、DomainExceptionがスローされない")
     void test3() {
-        Email email = Email.create(notification, EMAIL);
+        Email email = Email.create(errorCollector, EMAIL);
 
         // モックをセットアップ
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());

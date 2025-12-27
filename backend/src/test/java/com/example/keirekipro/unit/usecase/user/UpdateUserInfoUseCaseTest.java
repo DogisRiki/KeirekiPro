@@ -23,7 +23,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
 import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
@@ -77,11 +77,11 @@ class UpdateUserInfoUseCaseTest {
         request.setTwoFactorAuthEnabled(true);
 
         // 既存ユーザー
-        Notification notification = new Notification();
-        AuthProvider authProvider = AuthProvider.create(notification, "google", "gid-1");
+        ErrorCollector errorCollector = new ErrorCollector();
+        AuthProvider authProvider = AuthProvider.create(errorCollector, "google", "gid-1");
         User existingUser = User.reconstruct(
                 USER_ID,
-                Email.create(notification, EMAIL),
+                Email.create(errorCollector, EMAIL),
                 PASSWORD_HASH, false,
                 Map.of("google", authProvider),
                 null, "old-name",
@@ -234,9 +234,9 @@ class UpdateUserInfoUseCaseTest {
         req.setProfileImage(PROFILE_IMAGE);
         req.setTwoFactorAuthEnabled(true);
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
-                User.reconstruct(USER_ID, Email.create(notification, "a@b.com"),
+                User.reconstruct(USER_ID, Email.create(errorCollector, "a@b.com"),
                         "pw", false, Map.of(), null, "", LocalDateTime.now(), LocalDateTime.now())));
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);

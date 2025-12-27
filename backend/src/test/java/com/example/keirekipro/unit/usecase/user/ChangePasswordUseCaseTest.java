@@ -15,7 +15,7 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import com.example.keirekipro.usecase.user.ChangePasswordUseCase;
 
@@ -54,8 +54,8 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // テスト用ユーザー生成
-        Notification notification = new Notification();
-        User user = User.create(notification, Email.create(notification, "test@keirekipro.click"),
+        ErrorCollector errorCollector = new ErrorCollector();
+        User user = User.create(errorCollector, Email.create(errorCollector, "test@keirekipro.click"),
                 HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
 
         // モックをセットアップ
@@ -99,8 +99,8 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // テスト用ユーザー生成
-        Notification notification = new Notification();
-        User user = User.create(notification, Email.create(notification, "test@keirekipro.click"),
+        ErrorCollector errorCollector = new ErrorCollector();
+        User user = User.create(errorCollector, Email.create(errorCollector, "test@keirekipro.click"),
                 HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
 
         // モックをセットアップ
@@ -127,8 +127,8 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // テスト用ユーザー生成
-        Notification notification = new Notification();
-        User user = User.create(notification, Email.create(notification, "test@keirekipro.click"),
+        ErrorCollector errorCollector = new ErrorCollector();
+        User user = User.create(errorCollector, Email.create(errorCollector, "test@keirekipro.click"),
                 HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
 
         // モックをセットアップ
@@ -157,8 +157,8 @@ class ChangePasswordUseCaseTest {
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
 
         // テスト用ユーザー生成
-        Notification notification = new Notification();
-        User user = User.create(notification, Email.create(notification, "test@keirekipro.click"),
+        ErrorCollector errorCollector = new ErrorCollector();
+        User user = User.create(errorCollector, Email.create(errorCollector, "test@keirekipro.click"),
                 HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
 
         // モックをセットアップ

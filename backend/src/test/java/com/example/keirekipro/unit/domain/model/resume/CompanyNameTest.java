@@ -9,7 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.example.keirekipro.domain.model.resume.CompanyName;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,16 +21,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CompanyNameTest {
 
     @Mock
-    private Notification notification;
+    private ErrorCollector errorCollector;
 
     @Test
     @DisplayName("有効な値でインスタンス化する")
     void test1() {
-        CompanyName companyName = CompanyName.create(notification, "サンプル株式会社");
+        CompanyName companyName = CompanyName.create(errorCollector, "サンプル株式会社");
 
         assertThat(companyName).isNotNull();
         assertThat(companyName.getValue()).isEqualTo("サンプル株式会社");
-        verify(notification, never()).addError(anyString(), anyString());
+        verify(errorCollector, never()).addError(anyString(), anyString());
     }
 
     @Test
@@ -38,44 +38,44 @@ class CompanyNameTest {
     void test2() {
         // nullのケース
         {
-            reset(notification);
-            CompanyName companyName = CompanyName.create(notification, null);
+            reset(errorCollector);
+            CompanyName companyName = CompanyName.create(errorCollector, null);
 
             assertThat(companyName).isNotNull();
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("companyName"),
                     eq("会社名は入力必須です。"));
         }
 
         // 空文字のケース
         {
-            reset(notification);
-            CompanyName companyName = CompanyName.create(notification, "");
+            reset(errorCollector);
+            CompanyName companyName = CompanyName.create(errorCollector, "");
 
             assertThat(companyName).isNotNull();
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("companyName"),
                     eq("会社名は入力必須です。"));
         }
 
         // スペースのみのケース
         {
-            reset(notification);
-            CompanyName companyName = CompanyName.create(notification, "   ");
+            reset(errorCollector);
+            CompanyName companyName = CompanyName.create(errorCollector, "   ");
 
             assertThat(companyName).isNotNull();
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("companyName"),
                     eq("会社名は入力必須です。"));
         }
 
         // タブのみのケース
         {
-            reset(notification);
-            CompanyName companyName = CompanyName.create(notification, "\t");
+            reset(errorCollector);
+            CompanyName companyName = CompanyName.create(errorCollector, "\t");
 
             assertThat(companyName).isNotNull();
-            verify(notification, times(1)).addError(
+            verify(errorCollector, times(1)).addError(
                     eq("companyName"),
                     eq("会社名は入力必須です。"));
         }
@@ -90,10 +90,10 @@ class CompanyNameTest {
         }
         String longName = sb.toString();
 
-        CompanyName companyName = CompanyName.create(notification, longName);
+        CompanyName companyName = CompanyName.create(errorCollector, longName);
 
         assertThat(companyName).isNotNull();
-        verify(notification, times(1)).addError(
+        verify(errorCollector, times(1)).addError(
                 eq("companyName"),
                 eq("会社名は50文字以内で入力してください。"));
     }

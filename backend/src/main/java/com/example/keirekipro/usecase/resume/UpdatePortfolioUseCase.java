@@ -7,7 +7,7 @@ import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdatePortfolioRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -49,17 +49,17 @@ public class UpdatePortfolioUseCase {
                 .findFirst()
                 .orElseThrow(() -> new UseCaseException("対象のポートフォリオが存在しません。"));
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        Link link = Link.create(notification, request.getLink());
+        Link link = Link.create(errorCollector, request.getLink());
 
         Portfolio updatedPortfolio = existing
-                .changeName(notification, request.getName())
-                .changeOverview(notification, request.getOverview())
-                .changeTechStack(notification, request.getTechStack())
-                .changeLink(notification, link);
+                .changeName(errorCollector, request.getName())
+                .changeOverview(errorCollector, request.getOverview())
+                .changeTechStack(errorCollector, request.getTechStack())
+                .changeLink(errorCollector, link);
 
-        Resume updated = resume.updatePortfolio(notification, updatedPortfolio);
+        Resume updated = resume.updatePortfolio(errorCollector, updatedPortfolio);
 
         resumeRepository.save(updated);
 

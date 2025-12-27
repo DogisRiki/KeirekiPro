@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.resume.Certification;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateCertificationRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -49,13 +49,13 @@ public class UpdateCertificationUseCase {
                 .findFirst()
                 .orElseThrow(() -> new UseCaseException("対象の資格が存在しません。"));
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
         Certification updatedCertification = existing
-                .changeName(notification, request.getName())
-                .changeDate(notification, request.getDate());
+                .changeName(errorCollector, request.getName())
+                .changeDate(errorCollector, request.getDate());
 
-        Resume updated = resume.updateCertification(notification, updatedCertification);
+        Resume updated = resume.updateCertification(errorCollector, updatedCertification);
 
         resumeRepository.save(updated);
 

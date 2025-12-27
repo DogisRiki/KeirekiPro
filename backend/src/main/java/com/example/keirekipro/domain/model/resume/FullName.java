@@ -1,6 +1,6 @@
 package com.example.keirekipro.domain.model.resume;
 
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -27,8 +27,8 @@ public class FullName {
      */
     private final String firstName;
 
-    private FullName(Notification notification, String lastName, String firstName) {
-        validate(notification, lastName, firstName);
+    private FullName(ErrorCollector errorCollector, String lastName, String firstName) {
+        validate(errorCollector, lastName, firstName);
         this.lastName = lastName;
         this.firstName = firstName;
     }
@@ -36,34 +36,34 @@ public class FullName {
     /**
      * ファクトリーメソッド
      *
-     * @param notification 通知オブジェクト
-     * @param lastName     姓
-     * @param firstName    名
+     * @param errorCollector エラー収集オブジェクト
+     * @param lastName       姓
+     * @param firstName      名
      * @return 値オブジェクト
      */
-    public static FullName create(Notification notification, String lastName, String firstName) {
-        return new FullName(notification, lastName, firstName);
+    public static FullName create(ErrorCollector errorCollector, String lastName, String firstName) {
+        return new FullName(errorCollector, lastName, firstName);
     }
 
-    private void validate(Notification notification, String lastName, String firstName) {
+    private void validate(ErrorCollector errorCollector, String lastName, String firstName) {
         if (lastName == null || lastName.isBlank()) {
-            notification.addError("lastName", "姓は入力必須です。");
+            errorCollector.addError("lastName", "姓は入力必須です。");
         } else {
             if (lastName.length() > 10) {
-                notification.addError("lastName", "姓は10文字以内で入力してください。");
+                errorCollector.addError("lastName", "姓は10文字以内で入力してください。");
             }
             if (isInvalidValue(lastName)) {
-                notification.addError("lastName", "姓には英数、ひらがな、カタカナ、漢字のみ使用できます。");
+                errorCollector.addError("lastName", "姓には英数、ひらがな、カタカナ、漢字のみ使用できます。");
             }
         }
         if (firstName == null || firstName.isBlank()) {
-            notification.addError("firstName", "名は入力必須です。");
+            errorCollector.addError("firstName", "名は入力必須です。");
         } else {
             if (firstName.length() > 10) {
-                notification.addError("firstName", "名は10文字以内で入力してください。");
+                errorCollector.addError("firstName", "名は10文字以内で入力してください。");
             }
             if (isInvalidValue(firstName)) {
-                notification.addError("firstName", "名には英数、ひらがな、カタカナ、漢字のみ使用できます。");
+                errorCollector.addError("firstName", "名には英数、ひらがな、カタカナ、漢字のみ使用できます。");
             }
         }
     }

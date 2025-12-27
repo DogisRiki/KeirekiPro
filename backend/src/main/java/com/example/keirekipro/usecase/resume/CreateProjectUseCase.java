@@ -9,7 +9,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.CreateProjectRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -51,10 +51,10 @@ public class CreateProjectUseCase {
             throw new UseCaseException("職務経歴書が存在しません。");
         }
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        CompanyName companyName = CompanyName.create(notification, request.getCompanyName());
-        Period period = Period.create(notification, request.getStartDate(), request.getEndDate(),
+        CompanyName companyName = CompanyName.create(errorCollector, request.getCompanyName());
+        Period period = Period.create(errorCollector, request.getStartDate(), request.getEndDate(),
                 request.getIsActive());
 
         Project.Process process = Project.Process.create(
@@ -108,7 +108,7 @@ public class CreateProjectUseCase {
                         request.getDevelopmentEnvironments()));
 
         Project project = Project.create(
-                notification,
+                errorCollector,
                 companyName,
                 period,
                 request.getName(),
@@ -119,7 +119,7 @@ public class CreateProjectUseCase {
                 process,
                 techStack);
 
-        Resume updated = resume.addProject(notification, project);
+        Resume updated = resume.addProject(errorCollector, project);
 
         resumeRepository.save(updated);
 

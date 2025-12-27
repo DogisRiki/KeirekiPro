@@ -15,7 +15,7 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.user.DeleteUserUseCase;
 
 import org.junit.jupiter.api.DisplayName;
@@ -43,8 +43,8 @@ class DeleteUserUseCaseTest {
     @Test
     @DisplayName("ユーザー削除が正常に完了する")
     void test1() {
-        Notification notification = new Notification();
-        User user = User.create(notification, Email.create(notification, "test@example.com"),
+        ErrorCollector errorCollector = new ErrorCollector();
+        User user = User.create(errorCollector, Email.create(errorCollector, "test@example.com"),
                 "passwordHash", false, null, null, "test-user");
 
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));

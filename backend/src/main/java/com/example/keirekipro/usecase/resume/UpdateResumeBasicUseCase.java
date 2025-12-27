@@ -7,7 +7,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateResumeBasicRequest;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -45,16 +45,16 @@ public class UpdateResumeBasicUseCase {
             throw new UseCaseException("職務経歴書が存在しません。");
         }
 
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
 
-        ResumeName resumeName = ResumeName.create(notification, request.getResumeName());
-        FullName fullName = FullName.create(notification, request.getLastName(), request.getFirstName());
+        ResumeName resumeName = ResumeName.create(errorCollector, request.getResumeName());
+        FullName fullName = FullName.create(errorCollector, request.getLastName(), request.getFirstName());
 
         // オブジェクト更新
         Resume updatedResume = resume
-                .changeName(notification, resumeName)
-                .changeDate(notification, request.getDate())
-                .ChangeFullName(notification, fullName);
+                .changeName(errorCollector, resumeName)
+                .changeDate(errorCollector, request.getDate())
+                .ChangeFullName(errorCollector, fullName);
 
         resumeRepository.save(updatedResume);
 

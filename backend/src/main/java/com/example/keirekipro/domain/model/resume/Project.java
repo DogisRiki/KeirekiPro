@@ -3,7 +3,7 @@ package com.example.keirekipro.domain.model.resume;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -99,24 +99,24 @@ public class Project extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param notification 通知オブジェクト
-     * @param companyName  会社名
-     * @param period       期間
-     * @param name         プロジェクト名
-     * @param overview     プロジェクト概要
-     * @param teamComp     チーム構成
-     * @param role         役割
-     * @param achievement  成果
-     * @param process      作業工程
-     * @param techStack    技術スタック
+     * @param errorCollector エラー収集オブジェクト
+     * @param companyName    会社名
+     * @param period         期間
+     * @param name           プロジェクト名
+     * @param overview       プロジェクト概要
+     * @param teamComp       チーム構成
+     * @param role           役割
+     * @param achievement    成果
+     * @param process        作業工程
+     * @param techStack      技術スタック
      * @return プロジェクトエンティティ
      */
-    public static Project create(Notification notification, CompanyName companyName, Period period, String name,
+    public static Project create(ErrorCollector errorCollector, CompanyName companyName, Period period, String name,
             String overview,
             String teamComp,
             String role,
             String achievement, Process process, TechStack techStack) {
-        validate(notification, companyName, period, name, overview, teamComp, role, achievement);
+        validate(errorCollector, companyName, period, name, overview, teamComp, role, achievement);
         return new Project(companyName, period, name, overview, teamComp, role, achievement, process,
                 techStack);
     }
@@ -148,12 +148,12 @@ public class Project extends Entity {
     /**
      * 会社名を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param companyName  新しい会社名
+     * @param errorCollector エラー収集オブジェクト
+     * @param companyName    新しい会社名
      * @return 変更後のプロジェクトエンティティ
      */
-    public Project changeCompanyName(Notification notification, CompanyName companyName) {
-        validate(notification, companyName, this.period, this.name, this.overview, this.teamComp, this.role,
+    public Project changeCompanyName(ErrorCollector errorCollector, CompanyName companyName) {
+        validate(errorCollector, companyName, this.period, this.name, this.overview, this.teamComp, this.role,
                 this.achievement);
         return new Project(this.id, companyName, this.period, this.name, this.overview, this.teamComp, this.role,
                 this.achievement, this.process, this.techStack);
@@ -162,12 +162,12 @@ public class Project extends Entity {
     /**
      * 期間を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param period       新しい期間
+     * @param errorCollector エラー収集オブジェクト
+     * @param period         新しい期間
      * @return 変更後のプロジェクトエンティティ
      */
-    public Project changePeriod(Notification notification, Period period) {
-        validate(notification, this.companyName, period, this.name, this.overview, this.teamComp, this.role,
+    public Project changePeriod(ErrorCollector errorCollector, Period period) {
+        validate(errorCollector, this.companyName, period, this.name, this.overview, this.teamComp, this.role,
                 this.achievement);
         return new Project(this.id, this.companyName, period, this.name, this.overview, this.teamComp, this.role,
                 this.achievement, this.process, this.techStack);
@@ -176,12 +176,12 @@ public class Project extends Entity {
     /**
      * プロジェクト名を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param name         新しいプロジェクト名
+     * @param errorCollector エラー収集オブジェクト
+     * @param name           新しいプロジェクト名
      * @return 変更後のプロジェクトエンティティ
      */
-    public Project changeName(Notification notification, String name) {
-        validate(notification, this.companyName, this.period, name, this.overview, this.teamComp, this.role,
+    public Project changeName(ErrorCollector errorCollector, String name) {
+        validate(errorCollector, this.companyName, this.period, name, this.overview, this.teamComp, this.role,
                 this.achievement);
         return new Project(this.id, this.companyName, this.period, name, this.overview, this.teamComp, this.role,
                 this.achievement, this.process, this.techStack);
@@ -190,12 +190,12 @@ public class Project extends Entity {
     /**
      * プロジェクト概要を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param overview     新しいプロジェクト概要
+     * @param errorCollector エラー収集オブジェクト
+     * @param overview       新しいプロジェクト概要
      * @return 変更後のプロジェクトエンティティ
      */
-    public Project changeOverview(Notification notification, String overview) {
-        validate(notification, this.companyName, this.period, this.name, overview, this.teamComp, this.role,
+    public Project changeOverview(ErrorCollector errorCollector, String overview) {
+        validate(errorCollector, this.companyName, this.period, this.name, overview, this.teamComp, this.role,
                 this.achievement);
         return new Project(this.id, this.companyName, this.period, this.name, overview, this.teamComp, this.role,
                 this.achievement, this.process, this.techStack);
@@ -204,12 +204,12 @@ public class Project extends Entity {
     /**
      * チーム構成を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param teamComp     新しいチーム構成
+     * @param errorCollector エラー収集オブジェクト
+     * @param teamComp       新しいチーム構成
      * @return 変更後のプロジェクトエンティティ
      */
-    public Project changeTeamComp(Notification notification, String teamComp) {
-        validate(notification, this.companyName, this.period, this.name, this.overview, teamComp, this.role,
+    public Project changeTeamComp(ErrorCollector errorCollector, String teamComp) {
+        validate(errorCollector, this.companyName, this.period, this.name, this.overview, teamComp, this.role,
                 this.achievement);
         return new Project(this.id, this.companyName, this.period, this.name, this.overview, teamComp, this.role,
                 this.achievement, this.process, this.techStack);
@@ -218,12 +218,12 @@ public class Project extends Entity {
     /**
      * 役割を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param role         新しい役割
+     * @param errorCollector エラー収集オブジェクト
+     * @param role           新しい役割
      * @return 変更後のプロジェクトエンティティ
      */
-    public Project changeRole(Notification notification, String role) {
-        validate(notification, this.companyName, this.period, this.name, this.overview, this.teamComp, role,
+    public Project changeRole(ErrorCollector errorCollector, String role) {
+        validate(errorCollector, this.companyName, this.period, this.name, this.overview, this.teamComp, role,
                 this.achievement);
         return new Project(this.id, this.companyName, this.period, this.name, this.overview, this.teamComp, role,
                 this.achievement, this.process, this.techStack);
@@ -232,12 +232,12 @@ public class Project extends Entity {
     /**
      * 成果を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param achievement  新しい成果
+     * @param errorCollector エラー収集オブジェクト
+     * @param achievement    新しい成果
      * @return 変更後のプロジェクトエンティティ
      */
-    public Project changeAchievement(Notification notification, String achievement) {
-        validate(notification, this.companyName, this.period, this.name, this.overview, this.teamComp, this.role,
+    public Project changeAchievement(ErrorCollector errorCollector, String achievement) {
+        validate(errorCollector, this.companyName, this.period, this.name, this.overview, this.teamComp, this.role,
                 achievement);
         return new Project(this.id, this.companyName, this.period, this.name, this.overview, this.teamComp, this.role,
                 achievement, this.process, this.techStack);
@@ -265,45 +265,45 @@ public class Project extends Entity {
                 this.achievement, this.process, techStack);
     }
 
-    private static void validate(Notification notification, CompanyName companyName, Period period, String name,
+    private static void validate(ErrorCollector errorCollector, CompanyName companyName, Period period, String name,
             String overview, String teamComp, String role, String achievement) {
 
         if (companyName == null) {
-            notification.addError("companyName", "会社名は入力必須です。");
+            errorCollector.addError("companyName", "会社名は入力必須です。");
         }
 
         if (period == null) {
-            notification.addError("period", "期間は入力必須です。");
+            errorCollector.addError("period", "期間は入力必須です。");
         }
 
         if (name == null || name.isBlank()) {
-            notification.addError("name", "プロジェクト名は入力必須です。");
+            errorCollector.addError("name", "プロジェクト名は入力必須です。");
         } else if (name.length() > 50) {
-            notification.addError("name", "プロジェクト名は50文字以内で入力してください。");
+            errorCollector.addError("name", "プロジェクト名は50文字以内で入力してください。");
         }
 
         if (overview == null || overview.isBlank()) {
-            notification.addError("overview", "プロジェクト概要は入力必須です。");
+            errorCollector.addError("overview", "プロジェクト概要は入力必須です。");
         } else if (overview.length() > 1000) {
-            notification.addError("overview", "プロジェクト概要は1000文字以内で入力してください。");
+            errorCollector.addError("overview", "プロジェクト概要は1000文字以内で入力してください。");
         }
 
         if (teamComp == null || teamComp.isBlank()) {
-            notification.addError("teamComp", "チーム構成は入力必須です。");
+            errorCollector.addError("teamComp", "チーム構成は入力必須です。");
         } else if (teamComp.length() > 100) {
-            notification.addError("teamComp", "チーム構成は100文字以内で入力してください。");
+            errorCollector.addError("teamComp", "チーム構成は100文字以内で入力してください。");
         }
 
         if (role == null || role.isBlank()) {
-            notification.addError("role", "役割は入力必須です。");
+            errorCollector.addError("role", "役割は入力必須です。");
         } else if (role.length() > 1000) {
-            notification.addError("role", "役割は1000文字以内で入力してください。");
+            errorCollector.addError("role", "役割は1000文字以内で入力してください。");
         }
 
         if (achievement == null || achievement.isBlank()) {
-            notification.addError("achievement", "成果は入力必須です。");
+            errorCollector.addError("achievement", "成果は入力必須です。");
         } else if (achievement.length() > 1000) {
-            notification.addError("achievement", "成果は1000文字以内で入力してください。");
+            errorCollector.addError("achievement", "成果は1000文字以内で入力してください。");
         }
     }
 

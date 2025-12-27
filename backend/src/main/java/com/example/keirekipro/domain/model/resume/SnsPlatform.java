@@ -3,7 +3,7 @@ package com.example.keirekipro.domain.model.resume;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.shared.Entity;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 
 import lombok.Getter;
 
@@ -44,13 +44,13 @@ public class SnsPlatform extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param notification 通知オブジェクト
-     * @param name         プラットフォーム名
-     * @param link         リンク
+     * @param errorCollector エラー収集オブジェクト
+     * @param name           プラットフォーム名
+     * @param link           リンク
      * @return SNSプラットフォームエンティティ
      */
-    public static SnsPlatform create(Notification notification, String name, Link link) {
-        validate(notification, name, link);
+    public static SnsPlatform create(ErrorCollector errorCollector, String name, Link link) {
+        validate(errorCollector, name, link);
         return new SnsPlatform(name, link);
     }
 
@@ -69,36 +69,36 @@ public class SnsPlatform extends Entity {
     /**
      * プラットフォーム名を変更する
      *
-     * @param notification 通知オブジェクト
-     * @param name         プラットフォーム名
+     * @param errorCollector エラー収集オブジェクト
+     * @param name           プラットフォーム名
      * @return 変更後のSNSプラットフォームエンティティ
      */
-    public SnsPlatform changeName(Notification notification, String name) {
-        validate(notification, name, this.link);
+    public SnsPlatform changeName(ErrorCollector errorCollector, String name) {
+        validate(errorCollector, name, this.link);
         return new SnsPlatform(this.id, name, this.link);
     }
 
     /**
      * リンクを変更する
      *
-     * @param notification 通知オブジェクト
-     * @param link         リンク
+     * @param errorCollector エラー収集オブジェクト
+     * @param link           リンク
      * @return 変更後のSNSプラットフォームエンティティ
      */
-    public SnsPlatform changeLink(Notification notification, Link link) {
-        validate(notification, this.name, link);
+    public SnsPlatform changeLink(ErrorCollector errorCollector, Link link) {
+        validate(errorCollector, this.name, link);
         return new SnsPlatform(this.id, this.name, link);
     }
 
-    private static void validate(Notification notification, String name, Link link) {
+    private static void validate(ErrorCollector errorCollector, String name, Link link) {
         if (name == null || name.isBlank()) {
-            notification.addError("name", "プラットフォーム名は入力必須です。");
+            errorCollector.addError("name", "プラットフォーム名は入力必須です。");
         } else if (name.length() > 50) {
-            notification.addError("name", "プラットフォーム名は50文字以内で入力してください。");
+            errorCollector.addError("name", "プラットフォーム名は50文字以内で入力してください。");
         }
 
         if (link == null) {
-            notification.addError("link", "リンクは入力必須です。");
+            errorCollector.addError("link", "リンクは入力必須です。");
         }
     }
 }

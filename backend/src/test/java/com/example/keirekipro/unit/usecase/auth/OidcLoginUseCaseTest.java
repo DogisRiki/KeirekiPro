@@ -17,7 +17,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
-import com.example.keirekipro.shared.Notification;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.OidcLoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
 
@@ -48,12 +48,12 @@ class OidcLoginUseCaseTest {
     @Test
     @DisplayName("同一プロバイダーで既存ユーザーが存在する場合、既存ユーザーを返す（何も変更しない）")
     void test1() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> providers = Map.of(
-                PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
+                PROVIDER_TYPE, AuthProvider.create(errorCollector, PROVIDER_TYPE, PROVIDER_USER_ID));
         User existingUser = User.create(
-                notification,
-                Email.create(notification, EMAIL),
+                errorCollector,
+                Email.create(errorCollector, EMAIL),
                 null,
                 false,
                 providers,
@@ -79,12 +79,12 @@ class OidcLoginUseCaseTest {
     @Test
     @DisplayName("別プロバイダーで既存ユーザーが存在する場合、新しいプロバイダーを追加する")
     void test2() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> existingProviders = Map.of(
-                "github", AuthProvider.create(notification, "github", "github-id"));
+                "github", AuthProvider.create(errorCollector, "github", "github-id"));
         User existingUser = User.create(
-                notification,
-                Email.create(notification, EMAIL),
+                errorCollector,
+                Email.create(errorCollector, EMAIL),
                 null,
                 false,
                 existingProviders,
@@ -114,11 +114,11 @@ class OidcLoginUseCaseTest {
     @Test
     @DisplayName("メールアドレスが無く、同一プロバイダーで既存ユーザーが存在する場合、既存ユーザーを返す")
     void test3() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> providers = Map.of(
-                PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
+                PROVIDER_TYPE, AuthProvider.create(errorCollector, PROVIDER_TYPE, PROVIDER_USER_ID));
         User existingUser = User.create(
-                notification,
+                errorCollector,
                 null,
                 null,
                 false,
@@ -211,12 +211,12 @@ class OidcLoginUseCaseTest {
     @Test
     @DisplayName("プロバイダーもメールも一致する既存ユーザーがいてもプロバイダー追加はされない")
     void test8() {
-        Notification notification = new Notification();
+        ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> providers = Map.of(
-                PROVIDER_TYPE, AuthProvider.create(notification, PROVIDER_TYPE, PROVIDER_USER_ID));
+                PROVIDER_TYPE, AuthProvider.create(errorCollector, PROVIDER_TYPE, PROVIDER_USER_ID));
         User existingUser = User.create(
-                notification,
-                Email.create(notification, EMAIL),
+                errorCollector,
+                Email.create(errorCollector, EMAIL),
                 null,
                 false,
                 providers,
