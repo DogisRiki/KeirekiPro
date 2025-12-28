@@ -18,8 +18,8 @@ import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.shared.store.ObjectStore;
 import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
@@ -38,7 +38,7 @@ class GetUserInfoUseCaseTest {
     private UserRepository userRepository;
 
     @Mock
-    private AwsS3Client awsS3Client;
+    private ObjectStore objectStore;
 
     @InjectMocks
     private GetUserInfoUseCase getUserInfoUseCase;
@@ -74,7 +74,7 @@ class GetUserInfoUseCaseTest {
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        when(awsS3Client.generatePresignedUrl(PROFILE_IMAGE_PATH, Duration.ofMinutes(10)))
+        when(objectStore.issueGetUrl(PROFILE_IMAGE_PATH, Duration.ofMinutes(10)))
                 .thenReturn(SIGNED_URL);
 
         // ユースケース実行
@@ -94,7 +94,7 @@ class GetUserInfoUseCaseTest {
         assertThat(result.getAuthProviders().get(0).getProviderUserId())
                 .isEqualTo(PROVIDER_USER_ID_VALUE);
 
-        verify(awsS3Client).generatePresignedUrl(PROFILE_IMAGE_PATH, Duration.ofMinutes(10));
+        verify(objectStore).issueGetUrl(PROFILE_IMAGE_PATH, Duration.ofMinutes(10));
     }
 
     @Test
@@ -124,7 +124,7 @@ class GetUserInfoUseCaseTest {
 
         // 検証
         assertThat(result.getProfileImage()).isNull();
-        verify(awsS3Client, never()).generatePresignedUrl(anyString(), any());
+        verify(objectStore, never()).issueGetUrl(anyString(), any());
     }
 
     @Test
@@ -138,7 +138,7 @@ class GetUserInfoUseCaseTest {
                 .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                 .hasMessage("不正なアクセスです。");
 
-        // generatePresignedUrl は呼ばれない
-        verify(awsS3Client, never()).generatePresignedUrl(anyString(), any());
+        // issueGetUrl は呼ばれない
+        verify(objectStore, never()).issueGetUrl(anyString(), any());
     }
 }

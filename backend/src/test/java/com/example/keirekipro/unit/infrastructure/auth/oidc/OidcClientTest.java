@@ -2,7 +2,6 @@ package com.example.keirekipro.unit.infrastructure.auth.oidc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -19,7 +18,7 @@ import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcTokenResponse;
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProvider;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProviderFactory;
-import com.example.keirekipro.infrastructure.shared.aws.AwsSecretsManagerClient;
+import com.example.keirekipro.usecase.shared.secret.SecretReader;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -48,7 +47,7 @@ class OidcClientTest {
     private OidcProviderFactory providerFactory;
 
     @Mock
-    private AwsSecretsManagerClient secretsClient;
+    private SecretReader secretReader;
 
     @Mock
     private OidcProvider oidcProvider;
@@ -76,10 +75,10 @@ class OidcClientTest {
         when(oidcProvider.getAuthorizationEndpoint()).thenReturn("https://accounts.google.com/o/oauth2/auth");
         when(oidcProvider.getScopes()).thenReturn("openid email profile");
 
-        // AWS Secrets ManagerからクライアントIDを取得する箇所をモック
+        // SecretReaderからクライアントIDを取得する箇所をモック
         JsonNode jsonNode = objectMapper.createObjectNode();
         ((ObjectNode) jsonNode).put("client_id", "mock-client-id");
-        when(secretsClient.getSecretJson("google-oidc-secret")).thenReturn(jsonNode);
+        when(secretReader.readJson("google-oidc-secret")).thenReturn(jsonNode);
 
         // 認可URLの構築を実行
         String result = oidcClient.buildAuthorizationUrl(PROVIDER_NAME, REDIRECT_URI, STATE, CODE_CHALLENGE);
@@ -108,10 +107,10 @@ class OidcClientTest {
         when(oidcProvider.getAuthorizationEndpoint()).thenReturn("https://accounts.google.com/o/oauth2/auth");
         when(oidcProvider.getScopes()).thenReturn("openid email profile");
 
-        // AWS Secrets ManagerからクライアントIDを取得する箇所をモック
+        // SecretReaderからクライアントIDを取得する箇所をモック
         JsonNode jsonNode = objectMapper.createObjectNode();
         ((ObjectNode) jsonNode).put("client_id", "mock-client-id");
-        when(secretsClient.getSecretJson("google-oidc-secret")).thenReturn(jsonNode);
+        when(secretReader.readJson("google-oidc-secret")).thenReturn(jsonNode);
 
         // doAnswer()の使い方
         // oidcProvider.addAuthorizationUrlParameters(...) が呼ばれたら、そのときは
@@ -158,11 +157,11 @@ class OidcClientTest {
         when(oidcProvider.getSecretName()).thenReturn("google-oidc-secret");
         when(oidcProvider.getTokenEndpoint()).thenReturn("https://oauth2.googleapis.com/token");
 
-        // AWS Secrets ManagerからクライアントIDを取得する箇所をモック
+        // SecretReaderからシークレットJSONを取得する箇所をモック
         JsonNode secretsNode = objectMapper.createObjectNode();
         ((ObjectNode) secretsNode).put("client_id", "mock-client-id");
         ((ObjectNode) secretsNode).put("client_secret", "mock-client-secret");
-        when(secretsClient.getSecretJson("google-oidc-secret")).thenReturn(secretsNode);
+        when(secretReader.readJson("google-oidc-secret")).thenReturn(secretsNode);
 
         // RestClientをモック
         RestClient.RequestBodySpec requestBodySpec = mock(RestClient.RequestBodySpec.class);
@@ -223,11 +222,11 @@ class OidcClientTest {
         when(oidcProvider.getSecretName()).thenReturn("google-oidc-secret");
         when(oidcProvider.getTokenEndpoint()).thenReturn("https://oauth2.googleapis.com/token");
 
-        // AWS Secrets ManagerからクライアントIDを取得する箇所をモック
+        // SecretReaderからシークレットJSONを取得する箇所をモック
         JsonNode secretsNode = objectMapper.createObjectNode();
         ((ObjectNode) secretsNode).put("client_id", "mock-client-id");
         ((ObjectNode) secretsNode).put("client_secret", "mock-client-secret");
-        when(secretsClient.getSecretJson("google-oidc-secret")).thenReturn(secretsNode);
+        when(secretReader.readJson("google-oidc-secret")).thenReturn(secretsNode);
 
         // プロバイダー固有のパラメータをMapに入れる
         doAnswer(invocation -> {
@@ -294,11 +293,11 @@ class OidcClientTest {
         when(oidcProvider.getSecretName()).thenReturn("google-oidc-secret");
         when(oidcProvider.getTokenEndpoint()).thenReturn("https://oauth2.googleapis.com/token");
 
-        // AWS Secrets ManagerからクライアントIDを取得する箇所をモック
+        // SecretReaderからシークレットJSONを取得する箇所をモック
         JsonNode secretsNode = objectMapper.createObjectNode();
         ((ObjectNode) secretsNode).put("client_id", "mock-client-id");
         ((ObjectNode) secretsNode).put("client_secret", "mock-client-secret");
-        when(secretsClient.getSecretJson("google-oidc-secret")).thenReturn(secretsNode);
+        when(secretReader.readJson("google-oidc-secret")).thenReturn(secretsNode);
 
         // RestClientをモック
         RestClient.RequestBodySpec requestBodySpec = mock(RestClient.RequestBodySpec.class);
@@ -308,7 +307,7 @@ class OidcClientTest {
         when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
         when(requestBodySpec.contentType(any(MediaType.class))).thenReturn(requestBodySpec);
         when(requestBodySpec.header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)).thenReturn(requestBodySpec);
-        when(requestBodySpec.body(anyMap())).thenReturn(requestBodySpec);
+        when(requestBodySpec.body(any(MultiValueMap.class))).thenReturn(requestBodySpec);
         // RestClientExceptionをスローするように設定
         when(requestBodySpec.retrieve()).thenThrow(new RestClientException("API call failed"));
 
@@ -412,7 +411,7 @@ class OidcClientTest {
                 .build();
 
         // ユーザー情報変換時、expectedUserInfoを返すように設定
-        when(oidcProvider.convertToStandardUserInfo(userInfoMap)).thenReturn(expectedUserInfo);
+        when(oidcProvider.convertToStandardUserInfo(any(Map.class))).thenReturn(expectedUserInfo);
 
         // ユーザー情報の取得を実行
         OidcUserInfoDto result = oidcClient.getUserInfo("github", ACCESS_TOKEN);

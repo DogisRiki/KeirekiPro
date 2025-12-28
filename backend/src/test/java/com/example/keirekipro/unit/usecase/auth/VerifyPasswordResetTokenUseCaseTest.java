@@ -7,8 +7,8 @@ import static org.mockito.Mockito.when;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.usecase.auth.VerifyPasswordResetTokenUseCase;
+import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class VerifyPasswordResetTokenUseCaseTest {
 
     @Mock
-    private RedisClient redisClient;
+    private PasswordResetTokenStore passwordResetTokenStore;
 
     @InjectMocks
     private VerifyPasswordResetTokenUseCase verifyPasswordResetTokenUseCase;
@@ -34,7 +34,7 @@ class VerifyPasswordResetTokenUseCaseTest {
     @DisplayName("リセットトークンの検証が成功する")
     void test1() {
         // モックセットアップ
-        when(redisClient.getValue("password-reset:" + TOKEN, String.class)).thenReturn(Optional.of(USER_ID.toString()));
+        when(passwordResetTokenStore.findUserId(TOKEN)).thenReturn(Optional.of(USER_ID));
 
         // ユースケース実行
         assertThatCode(() -> verifyPasswordResetTokenUseCase.execute(TOKEN))
@@ -45,7 +45,7 @@ class VerifyPasswordResetTokenUseCaseTest {
     @DisplayName("リセットトークンが無効または期限切れの場合、UseCaseExceptionがスローされる")
     void test2() {
         // モックセットアップ
-        when(redisClient.getValue("password-reset:" + TOKEN, String.class)).thenReturn(Optional.empty());
+        when(passwordResetTokenStore.findUserId(TOKEN)).thenReturn(Optional.empty());
 
         // ユースケース実行
         assertThatThrownBy(() -> verifyPasswordResetTokenUseCase.execute(TOKEN))

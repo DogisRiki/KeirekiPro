@@ -1,8 +1,6 @@
 package com.example.keirekipro.usecase.auth;
 
-import java.util.Optional;
-
-import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
+import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.stereotype.Service;
@@ -16,7 +14,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class VerifyPasswordResetTokenUseCase {
 
-    private final RedisClient redisClient;
+    private final PasswordResetTokenStore passwordResetTokenStore;
 
     /**
      * パスワードリセットトークン検証ユースケースを実行する
@@ -25,11 +23,7 @@ public class VerifyPasswordResetTokenUseCase {
      */
     public void execute(String token) {
 
-        // Redisから取得
-        String key = "password-reset:" + token;
-        Optional<String> userIdOpt = redisClient.getValue(key, String.class);
-
-        if (userIdOpt.isEmpty()) {
+        if (passwordResetTokenStore.findUserId(token).isEmpty()) {
             throw new UseCaseException("リセットリンクが無効または期限切れです。もう一度最初からお試しください。");
         }
     }

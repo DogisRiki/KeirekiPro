@@ -6,11 +6,12 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
 import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.shared.store.ObjectStore;
+import com.example.keirekipro.usecase.shared.store.StoredObject;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class UpdateUserInfoUseCase {
 
     private final UserRepository userRepository;
 
-    private final AwsS3Client awsS3Client;
+    private final ObjectStore objectStore;
 
     /**
      * 許可する最大ファイルサイズ(Byte)
@@ -66,11 +67,15 @@ public class UpdateUserInfoUseCase {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
-        // S3へのアップロード（画像がある場合のみ）
+        // オブジェクトストアへのアップロード（画像がある場合のみ）
         String imageKey = null;
         if (profileImage != null && !profileImage.isEmpty()) {
             try {
-                imageKey = awsS3Client.uploadFile(profileImage, "/profile/image/");
+                StoredObject object = new StoredObject(
+                        profileImage.getBytes(),
+                        profileImage.getContentType(),
+                        profileImage.getOriginalFilename());
+                imageKey = objectStore.put(object, "/profile/image/");
             } catch (IOException e) {
                 throw new UseCaseException("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
             }
@@ -97,6 +102,12 @@ public class UpdateUserInfoUseCase {
         userRepository.save(user);
     }
 
+    /**
+     * プロフィール画像のバリデーションを行う
+     *
+     * @param file           ファイル
+     * @param errorCollector エラー収集
+     */
     private void validateProfileImage(MultipartFile file, ErrorCollector errorCollector) {
         if (file == null || file.isEmpty()) {
             return;
