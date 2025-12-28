@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
+import com.example.keirekipro.usecase.shared.store.ObjectStore;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 
@@ -24,7 +24,7 @@ public class GetUserInfoUseCase {
 
     private final UserRepository userRepository;
 
-    private final AwsS3Client awsS3Client;
+    private final ObjectStore objectStore;
 
     /**
      * ユーザー情報取得ユースケースを実行する
@@ -38,10 +38,10 @@ public class GetUserInfoUseCase {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
-        // S3からプロフィール画像をバイト配列として取得する
+        // オブジェクトストアからプロフィール画像URLを取得する
         String imageUrl = null;
         if (user.getProfileImage() != null) {
-            imageUrl = awsS3Client.generatePresignedUrl(user.getProfileImage(), Duration.ofMinutes(10));
+            imageUrl = objectStore.issueGetUrl(user.getProfileImage(), Duration.ofMinutes(10));
         }
 
         // 外部認証連携情報の変換

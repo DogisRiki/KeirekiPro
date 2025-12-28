@@ -12,8 +12,8 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.usecase.auth.ResetPasswordUseCase;
+import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +36,7 @@ class ResetPasswordUseCaseTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private RedisClient redisClient;
+    private PasswordResetTokenStore passwordResetTokenStore;
 
     @InjectMocks
     private ResetPasswordUseCase resetPasswordUseCase;
@@ -46,7 +46,6 @@ class ResetPasswordUseCaseTest {
     private static final String RAW_PASSWORD = "newPassword";
     private static final String HASHED_PASSWORD = "hashedNewPassword";
     private static final String TOKEN = "reset-token";
-    private static final String REDIS_KEY = "password-reset:" + TOKEN;
 
     @Test
     @DisplayName("パスワードリセットが正常に完了する")
@@ -55,7 +54,7 @@ class ResetPasswordUseCaseTest {
         User user = User.reconstruct(USER_ID, null, "oldHash", false, null, null, USERNAME, null, null);
 
         // モックをセットアップ
-        when(redisClient.getValue(REDIS_KEY, String.class)).thenReturn(Optional.of(USER_ID.toString()));
+        when(passwordResetTokenStore.findUserId(TOKEN)).thenReturn(Optional.of(USER_ID));
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(HASHED_PASSWORD);
 
@@ -71,14 +70,14 @@ class ResetPasswordUseCaseTest {
         assert saved.getPasswordHash().equals(HASHED_PASSWORD);
 
         verify(passwordEncoder).encode(RAW_PASSWORD);
-        verify(redisClient).deleteValue(REDIS_KEY);
+        verify(passwordResetTokenStore).remove(TOKEN);
     }
 
     @Test
     @DisplayName("無効なトークンの場合、UseCaseExceptionがスローされる")
     void test2() {
         // モックをセットアップ
-        when(redisClient.getValue(REDIS_KEY, String.class)).thenReturn(Optional.empty());
+        when(passwordResetTokenStore.findUserId(TOKEN)).thenReturn(Optional.empty());
 
         // ユースケース実行
         assertThatThrownBy(() -> resetPasswordUseCase.execute(TOKEN, RAW_PASSWORD))
@@ -88,13 +87,14 @@ class ResetPasswordUseCaseTest {
         // 検証
         verify(passwordEncoder, never()).encode(RAW_PASSWORD);
         verify(userRepository, never()).save(any());
+        verify(passwordResetTokenStore, never()).remove(any());
     }
 
     @Test
     @DisplayName("ユーザーが存在しない場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
     void test3() {
         // モックをセットアップ：トークンは有効
-        when(redisClient.getValue(REDIS_KEY, String.class)).thenReturn(Optional.of(USER_ID.toString()));
+        when(passwordResetTokenStore.findUserId(TOKEN)).thenReturn(Optional.of(USER_ID));
         // ユーザーが見つからない
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
@@ -106,6 +106,6 @@ class ResetPasswordUseCaseTest {
         // 検証
         verify(passwordEncoder, never()).encode(RAW_PASSWORD);
         verify(userRepository, never()).save(any());
-        verify(redisClient, never()).deleteValue(any());
+        verify(passwordResetTokenStore, never()).remove(any());
     }
 }

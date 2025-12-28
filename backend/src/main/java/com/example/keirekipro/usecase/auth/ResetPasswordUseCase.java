@@ -1,11 +1,10 @@
 package com.example.keirekipro.usecase.auth;
 
-import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
+import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
@@ -26,7 +25,7 @@ public class ResetPasswordUseCase {
 
     private final PasswordEncoder passwordEncoder;
 
-    private final RedisClient redisClient;
+    private final PasswordResetTokenStore passwordResetTokenStore;
 
     /**
      * パスワードリセットユースケースを実行する
@@ -37,15 +36,8 @@ public class ResetPasswordUseCase {
     @Transactional
     public void execute(String token, String newPassword) {
 
-        String key = "password-reset:" + token;
-        Optional<String> userIdOpt = redisClient.getValue(key, String.class);
-
-        if (userIdOpt.isEmpty()) {
-            throw new UseCaseException("リセットリンクが無効または期限切れです。もう一度最初からお試しください。");
-        }
-
-        // ユーザーIDを取得
-        UUID userId = UUID.fromString(userIdOpt.get());
+        UUID userId = passwordResetTokenStore.findUserId(token)
+                .orElseThrow(() -> new UseCaseException("リセットリンクが無効または期限切れです。もう一度最初からお試しください。"));
 
         // 対象ユーザーを取得
         User user = userRepository.findById(userId)
@@ -61,6 +53,6 @@ public class ResetPasswordUseCase {
         userRepository.save(user);
 
         // 再利用防止のため削除
-        redisClient.deleteValue(key);
+        passwordResetTokenStore.remove(token);
     }
 }

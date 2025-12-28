@@ -1,8 +1,8 @@
 package com.example.keirekipro.unit.usecase.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -16,16 +16,17 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.infrastructure.shared.aws.AwsSesClient;
-import com.example.keirekipro.infrastructure.shared.mail.FreeMarkerMailTemplate;
-import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.SecurityUtil;
 import com.example.keirekipro.usecase.auth.RequestPasswordResetUseCase;
+import com.example.keirekipro.usecase.auth.notification.PasswordResetNotification;
+import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
+import com.example.keirekipro.usecase.shared.notification.NotificationDispatcher;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -38,13 +39,10 @@ class RequestPasswordResetUseCaseTest {
     private UserRepository userRepository;
 
     @Mock
-    private RedisClient redisClient;
+    private PasswordResetTokenStore passwordResetTokenStore;
 
     @Mock
-    private AwsSesClient awsSesClient;
-
-    @Mock
-    private FreeMarkerMailTemplate freeMarkerMailTemplate;
+    private NotificationDispatcher notificationDispatcher;
 
     @Mock
     private SecurityUtil securityUtil;
@@ -76,7 +74,6 @@ class RequestPasswordResetUseCaseTest {
         // モックセットアップ
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
         when(securityUtil.generateRandomToken()).thenReturn(TOKEN);
-        when(freeMarkerMailTemplate.create(eq("password-reset.ftl"), anyMap())).thenReturn("テストメール本文");
 
         // 環境変数をセット
         ReflectionTestUtils.setField(requestPasswordResetUseCase, "frontendBaseUrl", "https://frontend.test");
@@ -87,9 +84,17 @@ class RequestPasswordResetUseCaseTest {
 
         // 検証
         verify(userRepository).findByEmail(eq(EMAIL));
-        verify(redisClient).setValue("password-reset:" + TOKEN, USER_ID.toString(), Duration.ofMinutes(10));
-        verify(freeMarkerMailTemplate).create(eq("password-reset.ftl"), anyMap());
-        verify(awsSesClient).sendMail(EMAIL, "【keirekipro】パスワードリセットのご案内", "テストメール本文");
+        verify(passwordResetTokenStore).store(eq(TOKEN), eq(USER_ID), eq(Duration.ofMinutes(10)));
+
+        // 通知内容の検証
+        ArgumentCaptor<PasswordResetNotification> captor = ArgumentCaptor.forClass(PasswordResetNotification.class);
+        verify(notificationDispatcher).dispatch(captor.capture());
+
+        PasswordResetNotification notification = captor.getValue();
+        assertThat(notification.to()).isEqualTo(EMAIL);
+        assertThat(notification.resetLink()).isEqualTo("https://frontend.test/password/reset/" + TOKEN);
+        assertThat(notification.siteName()).isEqualTo("keirekipro");
+        assertThat(notification.siteUrl()).isEqualTo("https://frontend.test");
     }
 
     @Test
@@ -103,8 +108,7 @@ class RequestPasswordResetUseCaseTest {
 
         // 検証
         verify(securityUtil, never()).generateRandomToken();
-        verify(redisClient, never()).setValue(anyString(), anyString(), any());
-        verify(freeMarkerMailTemplate, never()).create(anyString(), anyMap());
-        verify(awsSesClient, never()).sendMail(anyString(), anyString(), anyString());
+        verify(passwordResetTokenStore, never()).store(anyString(), any(), any());
+        verify(notificationDispatcher, never()).dispatch(any());
     }
 }

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,11 +22,12 @@ import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.infrastructure.shared.aws.AwsS3Client;
 import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.shared.store.ObjectStore;
+import com.example.keirekipro.usecase.shared.store.StoredObject;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
 
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +49,7 @@ class UpdateUserInfoUseCaseTest {
     private UserRepository userRepository;
 
     @Mock
-    private AwsS3Client awsS3Client;
+    private ObjectStore objectStore;
 
     @InjectMocks
     private UpdateUserInfoUseCase updateUserInfoUseCase;
@@ -87,9 +89,9 @@ class UpdateUserInfoUseCaseTest {
                 null, "old-name",
                 LocalDateTime.now(), LocalDateTime.now());
 
-        // S3 とリポジトリのモック
+        // オブジェクトストアとリポジトリのモック
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existingUser));
-        when(awsS3Client.uploadFile(any(MultipartFile.class), eq("/profile/image/")))
+        when(objectStore.put(any(StoredObject.class), eq("/profile/image/")))
                 .thenReturn(S3_KEY);
 
         // FileUtil のバリデーションをすべて通過させる
@@ -112,8 +114,14 @@ class UpdateUserInfoUseCaseTest {
             assertThat(saved.isTwoFactorAuthEnabled()).isTrue();
             assertThat(saved.getProfileImage()).isEqualTo(S3_KEY);
 
-            // S3呼び出しの検証
-            verify(awsS3Client).uploadFile(PROFILE_IMAGE, "/profile/image/");
+            // オブジェクトストア呼び出しの検証
+            ArgumentCaptor<StoredObject> objectCaptor = ArgumentCaptor.forClass(StoredObject.class);
+            verify(objectStore).put(objectCaptor.capture(), eq("/profile/image/"));
+            StoredObject stored = objectCaptor.getValue();
+
+            assertThat(stored.bytes()).isEqualTo(PROFILE_IMAGE_BYTES);
+            assertThat(stored.contentType()).isEqualTo("image/png");
+            assertThat(stored.originalFilename()).isEqualTo("test.png");
         }
     }
 
@@ -139,7 +147,7 @@ class UpdateUserInfoUseCaseTest {
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(awsS3Client, never()).uploadFile(any(), any());
+            verify(objectStore, never()).put(any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -166,7 +174,7 @@ class UpdateUserInfoUseCaseTest {
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(awsS3Client, never()).uploadFile(any(), any());
+            verify(objectStore, never()).put(any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -194,7 +202,7 @@ class UpdateUserInfoUseCaseTest {
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(awsS3Client, never()).uploadFile(any(), any());
+            verify(objectStore, never()).put(any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -221,7 +229,7 @@ class UpdateUserInfoUseCaseTest {
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(awsS3Client, never()).uploadFile(any(), any());
+            verify(objectStore, never()).put(any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -231,21 +239,25 @@ class UpdateUserInfoUseCaseTest {
     void test6() throws IOException {
         UpdateUserInfoRequest req = new UpdateUserInfoRequest();
         req.setUsername("Valid");
-        req.setProfileImage(PROFILE_IMAGE);
+
+        // MultipartFile.getBytes()がIOExceptionを投げるケースを作る
+        MultipartFile profileImageMock = mock(MultipartFile.class);
+        when(profileImageMock.isEmpty()).thenReturn(false);
+        when(profileImageMock.getBytes()).thenThrow(new IOException("S3 error"));
+        req.setProfileImage(profileImageMock);
+
         req.setTwoFactorAuthEnabled(true);
 
         ErrorCollector errorCollector = new ErrorCollector();
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
                 User.reconstruct(USER_ID, Email.create(errorCollector, "a@b.com"),
                         "pw", false, Map.of(), null, "", LocalDateTime.now(), LocalDateTime.now())));
+
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
             util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
-
-            when(awsS3Client.uploadFile(eq(PROFILE_IMAGE), eq("/profile/image/")))
-                    .thenThrow(new IOException("S3 error"));
 
             assertThatThrownBy(() -> {
                 updateUserInfoUseCase.execute(req, USER_ID);
@@ -253,6 +265,7 @@ class UpdateUserInfoUseCaseTest {
                     .hasMessage("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
 
             verify(userRepository, never()).save(any());
+            verify(objectStore, never()).put(any(), any());
         }
     }
 
@@ -277,6 +290,7 @@ class UpdateUserInfoUseCaseTest {
                     .hasMessage("不正なアクセスです。");
 
             verify(userRepository, never()).save(any());
+            verify(objectStore, never()).put(any(), any());
         }
     }
 }

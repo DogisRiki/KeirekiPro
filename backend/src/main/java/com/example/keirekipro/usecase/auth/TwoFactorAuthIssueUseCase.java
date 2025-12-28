@@ -1,15 +1,13 @@
 package com.example.keirekipro.usecase.auth;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
-import com.example.keirekipro.infrastructure.shared.aws.AwsSesClient;
-import com.example.keirekipro.infrastructure.shared.mail.FreeMarkerMailTemplate;
-import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.shared.config.AppProperties;
 import com.example.keirekipro.shared.utils.SecurityUtil;
+import com.example.keirekipro.usecase.auth.notification.TwoFactorCodeNotification;
+import com.example.keirekipro.usecase.auth.store.TwoFactorAuthCodeStore;
+import com.example.keirekipro.usecase.shared.notification.NotificationDispatcher;
 
 import org.springframework.stereotype.Service;
 
@@ -22,11 +20,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TwoFactorAuthIssueUseCase {
 
-    private final RedisClient redisClient;
+    private final TwoFactorAuthCodeStore twoFactorAuthCodeStore;
 
-    private final AwsSesClient awsSesClient;
-
-    private final FreeMarkerMailTemplate freeMarkerMailTemplate;
+    private final NotificationDispatcher notificationDispatcher;
 
     private final SecurityUtil securityUtil;
 
@@ -43,18 +39,14 @@ public class TwoFactorAuthIssueUseCase {
         // 6桁のコードを生成
         String code = securityUtil.generateRandomNumber(6);
 
-        // Redisに保存
-        String key = "2fa:" + userId;
-        redisClient.setValue(key, code, Duration.ofMinutes(10));
+        // 保存
+        twoFactorAuthCodeStore.store(userId, code, Duration.ofMinutes(10));
 
-        // メール本文を作成
-        Map<String, Object> dataModel = new HashMap<>();
-        dataModel.put("code", code);
-        dataModel.put("siteName", properties.getSiteName());
-        dataModel.put("siteUrl", properties.getSiteUrl());
-        String body = freeMarkerMailTemplate.create("two-factor-auth.ftl", dataModel);
-
-        // メール送信
-        awsSesClient.sendMail(email, "【" + properties.getSiteName() + "】2段階認証コードのお知らせ", body);
+        // 通知送達
+        notificationDispatcher.dispatch(new TwoFactorCodeNotification(
+                email,
+                code,
+                properties.getSiteName(),
+                properties.getSiteUrl()));
     }
 }

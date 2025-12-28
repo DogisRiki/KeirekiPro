@@ -7,7 +7,7 @@ import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcTokenResponse;
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProvider;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProviderFactory;
-import com.example.keirekipro.infrastructure.shared.aws.AwsSecretsManagerClient;
+import com.example.keirekipro.usecase.shared.secret.SecretReader;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import org.springframework.core.ParameterizedTypeReference;
@@ -42,9 +42,9 @@ public class OidcClient {
     private final OidcProviderFactory providerFactory;
 
     /**
-     * AWS Secrets Managerからシークレット情報を取得するクライアント
+     * シークレット情報を取得するリーダー
      */
-    private final AwsSecretsManagerClient secretsClient;
+    private final SecretReader secretReader;
 
     /**
      * 認可URLを構築する
@@ -60,8 +60,8 @@ public class OidcClient {
         // プロバイダー固有のOIDCプロバイダーを取得
         OidcProvider provider = providerFactory.getProvider(providerName);
 
-        // AWS Secrets ManagerからクライアントIDを取得
-        JsonNode secrets = secretsClient.getSecretJson(provider.getSecretName());
+        // シークレットからクライアントIDを取得
+        JsonNode secrets = secretReader.readJson(provider.getSecretName());
         String clientId = secrets.get("client_id").asText();
 
         // 認可URLを構築
@@ -103,8 +103,8 @@ public class OidcClient {
         formData.put("redirect_uri", redirectUri);
         formData.put("code_verifier", codeVerifier);
 
-        // AWS Secrets Managerからクライアント情報を取得
-        JsonNode secrets = secretsClient.getSecretJson(provider.getSecretName());
+        // シークレット情報を取得
+        JsonNode secrets = secretReader.readJson(provider.getSecretName());
 
         // プロバイダー固有のシークレット情報を処理
         provider.processSecrets(secrets, formData::putAll);
