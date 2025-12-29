@@ -3,17 +3,13 @@ package com.example.keirekipro.presentation.auth.controller;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 
-import com.example.keirekipro.infrastructure.auth.oidc.OidcClient;
-import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcTokenResponse;
-import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
-import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.presentation.shared.utils.UrlUtil;
-import com.example.keirekipro.usecase.auth.OidcLoginUseCase;
-import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
+import com.example.keirekipro.usecase.auth.HandleOidcCallbackUseCase;
+import com.example.keirekipro.usecase.auth.oidc.OidcCallbackError;
+import com.example.keirekipro.usecase.auth.oidc.OidcCallbackResult;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,13 +34,9 @@ import jakarta.servlet.http.HttpServletResponse;
 @Tag(name = "auth", description = "認証・認可に関するエンドポイント")
 public class OidcCallbackController {
 
-    private final OidcClient oidcClient;
-
     private final JwtProvider jwtProvider;
 
-    private final RedisClient redisClient;
-
-    private final OidcLoginUseCase oidcLoginUseCase;
+    private final HandleOidcCallbackUseCase handleOidcCallbackUseCase;
 
     @Value("${cookie.secure:false}")
     private boolean isSecureCookie;
@@ -82,85 +74,37 @@ public class OidcCallbackController {
             HttpServletResponse response) throws IOException {
 
         try {
-            // エラーパラメータの確認
-            if (error != null) {
-                redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
-                return;
-            }
-
-            // 必須パラメータの確認
-            if (code == null || state == null) {
-                redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
-                return;
-            }
-
-            // stateの検証
-            String stateKey = "oidc:state:" + state;
-            if (!redisClient.hasKey(stateKey)) {
-                redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
-                return;
-            }
-
-            // stateに関連付けられた情報を取得
-            String providerKey = "oidc:provider:" + state;
-            String codeVerifierKey = "oidc:code_verifier:" + state;
-
-            Optional<String> providerOpt = redisClient.getValue(providerKey, String.class);
-            Optional<String> codeVerifierOpt = redisClient.getValue(codeVerifierKey, String.class);
-
-            if (providerOpt.isEmpty() || codeVerifierOpt.isEmpty()) {
-                redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
-                return;
-            }
-
-            String provider = providerOpt.get();
-            String codeVerifier = codeVerifierOpt.get();
-
             // リダイレクトURIの構築
             String baseUrl = UrlUtil.getBaseUrl(request);
             String redirectUri = baseUrl + "/api/auth/oidc/callback";
 
-            // アクセストークンの取得
-            OidcTokenResponse tokenResponse = oidcClient.getToken(
-                    provider,
-                    code,
-                    redirectUri,
-                    codeVerifier);
+            // コールバック処理
+            OidcCallbackResult result = handleOidcCallbackUseCase.execute(code, state, error, redirectUri);
 
-            // トークンレスポンスのエラー確認
-            if (tokenResponse.hasError()) {
-                redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
+            if (result instanceof OidcCallbackResult.Success success) {
+                // JWT発行
+                String userId = success.getUserId().toString();
+                String accessToken = jwtProvider.createAccessToken(userId);
+                String refreshToken = jwtProvider.createRefreshToken(userId);
+
+                // レスポンスヘッダーにセット
+                response.addHeader("Set-Cookie",
+                        CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
+                response.addHeader("Set-Cookie",
+                        CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
+
+                // 成功ページへリダイレクト
+                response.sendRedirect(frontendBaseUrl + FRONTEND_REDIRECT_URL);
                 return;
             }
 
-            // ユーザー情報の取得
-            OidcUserInfoDto userInfo = oidcClient.getUserInfo(provider, tokenResponse.getAccessToken());
-
-            if (userInfo == null) {
+            // 失敗時のメッセージ
+            OidcCallbackError err = ((OidcCallbackResult.Failure) result).getError();
+            if (err == OidcCallbackError.USERINFO_FETCH_FAILED) {
                 redirectToErrorPage(response, "ユーザー情報の取得に失敗しました。しばらく時間を置いてから再度お試しください。");
                 return;
             }
-
-            // ログイン処理の実行
-            OidcLoginUseCaseDto loginResult = oidcLoginUseCase.execute(userInfo);
-
-            // 使用済みのstateとpkce関連のデータを削除
-            redisClient.deleteValue(stateKey);
-            redisClient.deleteValue(providerKey);
-            redisClient.deleteValue(codeVerifierKey);
-
-            // JWT発行
-            String accessToken = jwtProvider.createAccessToken(loginResult.getId().toString());
-            String refreshToken = jwtProvider.createRefreshToken(loginResult.getId().toString());
-
-            // レスポンスヘッダーにセット
-            response.addHeader("Set-Cookie",
-                    CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
-            response.addHeader("Set-Cookie",
-                    CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
-
-            // 成功ページへリダイレクト
-            response.sendRedirect(frontendBaseUrl + FRONTEND_REDIRECT_URL);
+            redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
 
         } catch (Exception e) {
             redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");

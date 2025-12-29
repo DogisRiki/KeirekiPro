@@ -8,9 +8,9 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
-import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
+import com.example.keirekipro.usecase.auth.oidc.OidcUserInfo;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 public class OidcLoginUseCase {
 
     private final UserRepository userRepository;
+
     private final DomainEventPublisher eventPublisher;
 
     /**
@@ -34,7 +35,7 @@ public class OidcLoginUseCase {
      * @return ログイン結果
      */
     @Transactional
-    public OidcLoginUseCaseDto execute(OidcUserInfoDto userInfo) {
+    public OidcLoginUseCaseDto execute(OidcUserInfo userInfo) {
 
         ErrorCollector errorCollector = new ErrorCollector();
         String provider = userInfo.getProviderType().toLowerCase();
@@ -43,7 +44,7 @@ public class OidcLoginUseCase {
         // まずはプロバイダーで検索
         Optional<User> byProvider = userRepository.findByProvider(provider, providerUserId);
 
-        // プロバイダーなし or ユーザーは存在するが providers が部分的→ID で改めて全件取得
+        // プロバイダーなし or ユーザーは存在するが、providersが部分的の場合、IDで改めて全件取得
         Optional<User> existingUser = byProvider.map(u -> userRepository.findById(u.getId())
                 .orElseThrow(() -> new IllegalStateException("ユーザー情報取得に失敗しました")));
 
