@@ -88,4 +88,22 @@ public class FileUtil {
         }
         return name.length() > 255 ? name.substring(0, 255) : name;
     }
+
+    /**
+     * 拡張子を取得する
+     *
+     * @param file 対象ファイル
+     * @return 拡張子（例: "png"）。取得できない場合は空文字
+     */
+    public static String getExtension(MultipartFile file) {
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null) {
+            return "";
+        }
+        int lastDot = originalFilename.lastIndexOf(".");
+        if (lastDot == -1 || lastDot == originalFilename.length() - 1) {
+            return "";
+        }
+        return originalFilename.substring(lastDot + 1).toLowerCase();
+    }
 }

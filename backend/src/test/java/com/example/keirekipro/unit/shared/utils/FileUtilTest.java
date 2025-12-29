@@ -331,4 +331,45 @@ class FileUtilTest {
         // 検証
         assertThat(result).isEqualTo("filename");
     }
+
+    @Test
+    @DisplayName("getExtension_拡張子を小文字で返す")
+    public void test22() {
+        MockMultipartFile file = new MockMultipartFile(
+                "testFile",
+                "test.PNG",
+                "image/png",
+                "dummy".getBytes());
+
+        // 実行
+        String result = FileUtil.getExtension(file);
+
+        // 検証
+        assertThat(result).isEqualTo("png");
+    }
+
+    @Test
+    @DisplayName("getExtension_ファイル名がnullの場合は空文字を返す")
+    public void test23() {
+        when(mockFile.getOriginalFilename()).thenReturn(null);
+
+        // 実行
+        String result = FileUtil.getExtension(mockFile);
+
+        // 検証
+        assertThat(result).isEqualTo("");
+    }
+
+    @Test
+    @DisplayName("getExtension_拡張子がない場合は空文字を返す")
+    public void test24() {
+        when(mockFile.getOriginalFilename()).thenReturn("testfile");
+
+        // 実行
+        String result = FileUtil.getExtension(mockFile);
+
+        // 検証
+        assertThat(result).isEqualTo("");
+    }
+
 }

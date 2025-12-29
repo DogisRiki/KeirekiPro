@@ -71,11 +71,16 @@ public class UpdateUserInfoUseCase {
         String imageKey = null;
         if (profileImage != null && !profileImage.isEmpty()) {
             try {
+                String originalFilename = profileImage.getOriginalFilename();
                 StoredObject object = new StoredObject(
                         profileImage.getBytes(),
                         profileImage.getContentType(),
-                        profileImage.getOriginalFilename());
-                imageKey = objectStore.put(object, "/profile/image/");
+                        originalFilename);
+
+                String extension = FileUtil.getExtension(profileImage);
+                String fileName = userId.toString() + (extension.isBlank() ? "" : "." + extension);
+
+                imageKey = objectStore.putAs(object, "/profile/image/", fileName);
             } catch (IOException e) {
                 throw new UseCaseException("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
             }
