@@ -8,12 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.Duration;
-
-import com.example.keirekipro.infrastructure.auth.oidc.OidcClient;
-import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
 import com.example.keirekipro.presentation.auth.controller.OidcAuthorizationController;
-import com.example.keirekipro.shared.utils.SecurityUtil;
+import com.example.keirekipro.usecase.auth.StartOidcAuthorizationUseCase;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,60 +28,33 @@ import lombok.RequiredArgsConstructor;
 class OidcAuthorizationControllerTest {
 
     @MockitoBean
-    private OidcClient oidcClient;
-
-    @MockitoBean
-    private SecurityUtil securityUtil;
-
-    @MockitoBean
-    private RedisClient redisClient;
+    private StartOidcAuthorizationUseCase startOidcAuthorizationUseCase;
 
     private final MockMvc mockMvc;
 
     private static final String ENDPOINT = "/api/auth/oidc/authorize";
 
     private static final String PROVIDER_PARAM = "google";
-    private static final String REDIRECT_URI = "https://keirekipro.click/api/auth/oidc/callback";
-    private static final String CODE_VERIFIER = "randomVerifier";
-    private static final String CODE_CHALLENGE = "randomCodeChallenge";
-    private static final String STATE_VALUE = "randomState";
 
     // 想定する認可URL
-    private static final String EXPECTED_URL = REDIRECT_URI
-            + "?client_id=randomClientId"
-            + "&response_type=code"
-            + "&scope=openid email profile"
-            + "&redirect_uri=/api/auth/oidc/callback"
-            + "&state=" + STATE_VALUE
-            + "&code_challenge=" + CODE_CHALLENGE
-            + "&code_challenge_method=S256";
+    private static final String EXPECTED_URL = "https://accounts.google.com/o/oauth2/auth?...";
 
     @Test
     @DisplayName("認可URLが返却される")
     void test1() throws Exception {
         // モックをセットアップ
-        // securityUtil.generateRandomToken()は2回呼ばれるので、1回目にcodeVerifier、2回目にstateを返す
-        when(securityUtil.generateRandomToken()).thenReturn(CODE_VERIFIER, STATE_VALUE);
-        when(securityUtil.generateCodeChallenge(CODE_VERIFIER)).thenReturn(CODE_CHALLENGE);
-        when(oidcClient.buildAuthorizationUrl(
+        when(startOidcAuthorizationUseCase.execute(
                 eq(PROVIDER_PARAM),
-                anyString(), // 実際のコード上はUrlUtil.getBaseUrl() + "/api/auth/oidc/callback"
-                eq(STATE_VALUE),
-                eq(CODE_CHALLENGE))).thenReturn(EXPECTED_URL);
+                anyString() // 実際のコード上は UrlUtil.getBaseUrl() + "/api/auth/oidc/callback"
+        )).thenReturn(EXPECTED_URL);
 
         // リクエストを実行
-        mockMvc.perform(get(
-                ENDPOINT)
+        mockMvc.perform(get(ENDPOINT)
                 .param("provider", PROVIDER_PARAM))
                 .andExpect(status().isOk())
                 .andExpect(content().string(EXPECTED_URL));
 
         // 呼び出し検証
-        verify(oidcClient).buildAuthorizationUrl(eq(PROVIDER_PARAM), anyString(), eq(STATE_VALUE), eq(CODE_CHALLENGE));
-        verify(redisClient).setValue(eq("oidc:provider:" + STATE_VALUE), eq(PROVIDER_PARAM),
-                eq(Duration.ofMinutes(10)));
-        verify(redisClient).setValue(eq("oidc:state:" + STATE_VALUE), eq(STATE_VALUE), eq(Duration.ofMinutes(10)));
-        verify(redisClient).setValue(eq("oidc:code_verifier:" + STATE_VALUE), eq(CODE_VERIFIER),
-                eq(Duration.ofMinutes(10)));
+        verify(startOidcAuthorizationUseCase).execute(eq(PROVIDER_PARAM), anyString());
     }
 }

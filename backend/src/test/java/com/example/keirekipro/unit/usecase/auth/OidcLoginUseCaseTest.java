@@ -16,10 +16,10 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
-import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.OidcLoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
+import com.example.keirekipro.usecase.auth.oidc.OidcUserInfo;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,8 +66,12 @@ class OidcLoginUseCaseTest {
         when(userRepository.findById(existingUser.getId()))
                 .thenReturn(Optional.of(existingUser));
 
-        OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(OidcUserInfo.builder()
+                .providerUserId(PROVIDER_USER_ID)
+                .email(EMAIL)
+                .username(USERNAME)
+                .providerType(PROVIDER_TYPE)
+                .build());
 
         assertThat(result.getId()).isEqualTo(existingUser.getId());
         verify(userRepository).findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID);
@@ -100,8 +104,12 @@ class OidcLoginUseCaseTest {
         when(userRepository.findById(existingUser.getId()))
                 .thenReturn(Optional.of(existingUser));
 
-        OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(OidcUserInfo.builder()
+                .providerUserId(PROVIDER_USER_ID)
+                .email(EMAIL)
+                .username(USERNAME)
+                .providerType(PROVIDER_TYPE)
+                .build());
 
         assertThat(result.getEmail()).isEqualTo(EMAIL);
         verify(userRepository).findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID);
@@ -132,8 +140,12 @@ class OidcLoginUseCaseTest {
         when(userRepository.findById(existingUser.getId()))
                 .thenReturn(Optional.of(existingUser));
 
-        OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, null, USERNAME, PROVIDER_TYPE));
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(OidcUserInfo.builder()
+                .providerUserId(PROVIDER_USER_ID)
+                .email(null)
+                .username(USERNAME)
+                .providerType(PROVIDER_TYPE)
+                .build());
 
         assertThat(result.getEmail()).isNull();
         verify(userRepository).findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID);
@@ -151,8 +163,12 @@ class OidcLoginUseCaseTest {
         when(userRepository.findByEmail(EMAIL))
                 .thenReturn(Optional.empty());
 
-        OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(OidcUserInfo.builder()
+                .providerUserId(PROVIDER_USER_ID)
+                .email(EMAIL)
+                .username(USERNAME)
+                .providerType(PROVIDER_TYPE)
+                .build());
 
         assertThat(result.getEmail()).isEqualTo(EMAIL);
         verify(userRepository).save(any(User.class));
@@ -166,8 +182,12 @@ class OidcLoginUseCaseTest {
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
 
-        OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, null, USERNAME, PROVIDER_TYPE));
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(OidcUserInfo.builder()
+                .providerUserId(PROVIDER_USER_ID)
+                .email(null)
+                .username(USERNAME)
+                .providerType(PROVIDER_TYPE)
+                .build());
 
         assertThat(result.getEmail()).isNull();
         verify(userRepository).save(any(User.class));
@@ -186,8 +206,12 @@ class OidcLoginUseCaseTest {
                 .when(userRepository).save(any(User.class));
 
         assertThrows(RuntimeException.class, () -> {
-            oidcLoginUseCase.execute(
-                    new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
+            oidcLoginUseCase.execute(OidcUserInfo.builder()
+                    .providerUserId(PROVIDER_USER_ID)
+                    .email(EMAIL)
+                    .username(USERNAME)
+                    .providerType(PROVIDER_TYPE)
+                    .build());
         });
 
         verify(eventPublisher, never()).publish(any());
@@ -200,8 +224,12 @@ class OidcLoginUseCaseTest {
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
 
-        OidcLoginUseCaseDto result = oidcLoginUseCase
-                .execute(new OidcUserInfoDto(PROVIDER_USER_ID, null, USERNAME, PROVIDER_TYPE));
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(OidcUserInfo.builder()
+                .providerUserId(PROVIDER_USER_ID)
+                .email(null)
+                .username(USERNAME)
+                .providerType(PROVIDER_TYPE)
+                .build());
 
         assertThat(result.getEmail()).isNull();
         verify(userRepository).save(any(User.class));
@@ -229,8 +257,12 @@ class OidcLoginUseCaseTest {
         when(userRepository.findById(existingUser.getId()))
                 .thenReturn(Optional.of(existingUser));
 
-        oidcLoginUseCase.execute(
-                new OidcUserInfoDto(PROVIDER_USER_ID, EMAIL, USERNAME, PROVIDER_TYPE));
+        oidcLoginUseCase.execute(OidcUserInfo.builder()
+                .providerUserId(PROVIDER_USER_ID)
+                .email(EMAIL)
+                .username(USERNAME)
+                .providerType(PROVIDER_TYPE)
+                .build());
 
         verify(userRepository).findById(existingUser.getId());
         verify(userRepository).save(existingUser);
