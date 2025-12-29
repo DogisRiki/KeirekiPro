@@ -91,7 +91,10 @@ class UpdateUserInfoUseCaseTest {
 
         // オブジェクトストアとリポジトリのモック
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existingUser));
-        when(objectStore.put(any(StoredObject.class), eq("/profile/image/")))
+
+        // FileUtil.getExtension()から"png"が返る前提でfileNameを固定
+        String expectedFileName = USER_ID.toString() + ".png";
+        when(objectStore.putAs(any(StoredObject.class), eq("/profile/image/"), eq(expectedFileName)))
                 .thenReturn(S3_KEY);
 
         // FileUtil のバリデーションをすべて通過させる
@@ -100,6 +103,7 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
+            util.when(() -> FileUtil.getExtension(any())).thenReturn("png");
 
             // 実行
             updateUserInfoUseCase.execute(request, USER_ID);
@@ -116,12 +120,19 @@ class UpdateUserInfoUseCaseTest {
 
             // オブジェクトストア呼び出しの検証
             ArgumentCaptor<StoredObject> objectCaptor = ArgumentCaptor.forClass(StoredObject.class);
-            verify(objectStore).put(objectCaptor.capture(), eq("/profile/image/"));
+            ArgumentCaptor<String> fileNameCaptor = ArgumentCaptor.forClass(String.class);
+            verify(objectStore).putAs(objectCaptor.capture(), eq("/profile/image/"), fileNameCaptor.capture());
+
             StoredObject stored = objectCaptor.getValue();
+            String actualFileName = fileNameCaptor.getValue();
 
             assertThat(stored.bytes()).isEqualTo(PROFILE_IMAGE_BYTES);
             assertThat(stored.contentType()).isEqualTo("image/png");
+
             assertThat(stored.originalFilename()).isEqualTo("test.png");
+
+            // 保存ファイル名が userId + 拡張子 であること
+            assertThat(actualFileName).isEqualTo(expectedFileName);
         }
     }
 
@@ -147,7 +158,7 @@ class UpdateUserInfoUseCaseTest {
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(objectStore, never()).put(any(), any());
+            verify(objectStore, never()).putAs(any(), any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -174,7 +185,7 @@ class UpdateUserInfoUseCaseTest {
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(objectStore, never()).put(any(), any());
+            verify(objectStore, never()).putAs(any(), any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -229,7 +240,7 @@ class UpdateUserInfoUseCaseTest {
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
-            verify(objectStore, never()).put(any(), any());
+            verify(objectStore, never()).putAs(any(), any(), any());
             verify(userRepository, never()).save(any());
         }
     }
@@ -258,13 +269,14 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isExtensionValid(any(), anyList())).thenReturn(true);
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
+            util.when(() -> FileUtil.getExtension(any())).thenReturn("png");
 
             assertThatThrownBy(() -> {
                 updateUserInfoUseCase.execute(req, USER_ID);
             }).isInstanceOf(UseCaseException.class)
                     .hasMessage("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
 
-            verify(userRepository, never()).save(any());
+            verify(objectStore, never()).putAs(any(), any(), any());
             verify(objectStore, never()).put(any(), any());
         }
     }
@@ -289,7 +301,7 @@ class UpdateUserInfoUseCaseTest {
             }).isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                     .hasMessage("不正なアクセスです。");
 
-            verify(userRepository, never()).save(any());
+            verify(objectStore, never()).putAs(any(), any(), any());
             verify(objectStore, never()).put(any(), any());
         }
     }
