@@ -133,10 +133,118 @@
     <delete id="delete" parameterType="java.util.UUID">
         DELETE
         FROM
+            project_tech_stacks
+        WHERE
+            project_id IN (
+                SELECT
+                    p.id
+                FROM
+                    projects p
+                    INNER JOIN resumes r
+                        ON r.id = p.resume_id
+                WHERE
+                    r.user_id = #{id}
+            )
+        ;
+
+        DELETE
+        FROM
+            projects
+        WHERE
+            resume_id IN (
+                SELECT
+                    id
+                FROM
+                    resumes
+                WHERE
+                    user_id = #{id}
+            )
+        ;
+
+        DELETE
+        FROM
+            careers
+        WHERE
+            resume_id IN (
+                SELECT
+                    id
+                FROM
+                    resumes
+                WHERE
+                    user_id = #{id}
+            )
+        ;
+
+        DELETE
+        FROM
+            certifications
+        WHERE
+            resume_id IN (
+                SELECT
+                    id
+                FROM
+                    resumes
+                WHERE
+                    user_id = #{id}
+            )
+        ;
+
+        DELETE
+        FROM
+            portfolios
+        WHERE
+            resume_id IN (
+                SELECT
+                    id
+                FROM
+                    resumes
+                WHERE
+                    user_id = #{id}
+            )
+        ;
+
+        DELETE
+        FROM
+            sns_platforms
+        WHERE
+            resume_id IN (
+                SELECT
+                    id
+                FROM
+                    resumes
+                WHERE
+                    user_id = #{id}
+            )
+        ;
+
+        DELETE
+        FROM
+            self_promotions
+        WHERE
+            resume_id IN (
+                SELECT
+                    id
+                FROM
+                    resumes
+                WHERE
+                    user_id = #{id}
+            )
+        ;
+
+        DELETE
+        FROM
+            resumes
+        WHERE
+            user_id = #{id}
+        ;
+
+        DELETE
+        FROM
             user_auth_providers
         WHERE
             user_id = #{id}
         ;
+
         DELETE
         FROM
             users
