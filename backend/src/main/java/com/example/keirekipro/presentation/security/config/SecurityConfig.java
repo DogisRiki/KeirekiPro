@@ -4,6 +4,7 @@ import java.util.Arrays;
 
 import com.example.keirekipro.presentation.security.jwt.JwtAuthenticationFilter;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.shared.logging.RequestContextLoggingFilter;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -40,6 +41,9 @@ public class SecurityConfig {
     private String allowedOrigins;
 
     private final JwtProvider jwtProvider;
+
+    // 追加: requestId・アクセスログ用フィルタ
+    private final RequestContextLoggingFilter requestContextLoggingFilter;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -98,6 +102,9 @@ public class SecurityConfig {
                 // JWT認証フィルター（OPTIONSはフィルタ側でスキップ）
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider), CsrfFilter.class)
 
+                // RequestContextLoggingFilter
+                .addFilterAfter(requestContextLoggingFilter, JwtAuthenticationFilter.class)
+
                 // /api/auth/** 等（CSRF除外）でもXSRF-TOKENを確実にCookieへ出す（SPA向け）
                 .addFilterAfter(new CsrfCookieFilter(tokenRepository), CsrfFilter.class);
 
@@ -111,7 +118,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(Arrays.asList("Content-Disposition")); // クライアントからContent-Dispositionを読めるようにする
+        configuration.setExposedHeaders(Arrays.asList("Content-Disposition", "X-Request-Id")); // クライアントから読めるようにする
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

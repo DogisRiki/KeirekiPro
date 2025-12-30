@@ -9,6 +9,8 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.shared.exception.BaseException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
@@ -25,6 +27,8 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 @RestControllerAdvice
 public class AppExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AppExceptionHandler.class);
 
     @Value("${cookie.secure:false}")
     private boolean isSecureCookie;
@@ -72,7 +76,8 @@ public class AppExceptionHandler {
     }
 
     /**
-     * BaseExceptionをハンドリングする
+     * BaseExceptionをハンドリングする（想定内失敗）
+     * ログはUseCaseLoggingAspectで出力済みのため、ここでは出力しない
      *
      * @param ex 例外オブジェクト
      * @return エラーレスポンス
@@ -92,7 +97,35 @@ public class AppExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleUnexpectedException(Exception ex) {
-        // ログ出力などはここで行う
+        // 想定外例外ログ（ERROR、スタックトレース付き）
+        LOGGER.error("unexpected_exception: {} - {}",
+                ex.getClass().getName(),
+                sanitizeErrorMessage(ex.getMessage()),
+                ex);
+
         return new ErrorResponse("予期せぬエラーが発生しました。", Collections.emptyMap());
+    }
+
+    /**
+     * 秘密情報の混入を避けるため、代表的なトークン形式を簡易マスクする
+     */
+    private static String sanitizeErrorMessage(String message) {
+        if (message == null) {
+            return null;
+        }
+        String sanitized = message;
+
+        // Bearer token
+        sanitized = sanitized.replaceAll("(?i)Bearer\\s+[A-Za-z0-9\\-\\._~\\+/]+=*", "Bearer [REDACTED]");
+
+        // JWTっぽい形式（header.payload.signature）
+        sanitized = sanitized.replaceAll(
+                "\\beyJ[A-Za-z0-9_\\-]*\\.[A-Za-z0-9_\\-]*\\.[A-Za-z0-9_\\-]*\\b",
+                "[REDACTED_JWT]");
+
+        // Cookie/Set-Cookie の値（メッセージ内に含まれてしまった場合の保険）
+        sanitized = sanitized.replaceAll("(?i)(Set-Cookie|Cookie):\\s*[^\\r\\n]*", "$1: [REDACTED]");
+
+        return sanitized;
     }
 }

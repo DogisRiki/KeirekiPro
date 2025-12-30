@@ -1,5 +1,6 @@
 package com.example.keirekipro.unit.presentation.shared;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -12,10 +13,13 @@ import java.util.Map;
 import com.example.keirekipro.presentation.shared.AppExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -23,6 +27,11 @@ import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 
 import lombok.RequiredArgsConstructor;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 @WebMvcTest({ TestController.class, AppExceptionHandler.class })
 @AutoConfigureMockMvc(addFilters = false)
@@ -34,6 +43,23 @@ class AppExceptionHandlerTest {
     private final MockMvc mockMvc;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private ListAppender<ILoggingEvent> listAppender;
+
+    private Logger logger;
+
+    @BeforeEach
+    void setUp() {
+        logger = (Logger) LoggerFactory.getLogger(AppExceptionHandler.class);
+        listAppender = new ListAppender<>();
+        listAppender.start();
+        logger.addAppender(listAppender);
+    }
+
+    @AfterEach
+    void tearDown() {
+        logger.detachAppender(listAppender);
+    }
 
     @Test
     @DisplayName("JWT認証エラー発生時、401が返る")
@@ -83,8 +109,10 @@ class AppExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
-                .andExpect(jsonPath("$.errors.value1", containsInAnyOrder("値1は数字でなければなりません", "値1は1～4桁を入力してください")))
-                .andExpect(jsonPath("$.errors.value2", containsInAnyOrder("値2は数字でなければなりません", "値2は1～4桁を入力してください")));
+                .andExpect(jsonPath("$.errors.value1",
+                        containsInAnyOrder("値1は数字でなければなりません", "値1は1～4桁を入力してください")))
+                .andExpect(jsonPath("$.errors.value2",
+                        containsInAnyOrder("値2は数字でなければなりません", "値2は1～4桁を入力してください")));
     }
 
     @Test
@@ -134,7 +162,7 @@ class AppExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("予期せぬエラー発生時、500が返る")
+    @DisplayName("予期せぬエラー発生時、500が返りERRORログが出力される")
     void test9() throws Exception {
         mockMvc.perform(get("/test/test9")
                 .accept(MediaType.APPLICATION_JSON))
@@ -142,5 +170,65 @@ class AppExceptionHandlerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("予期せぬエラーが発生しました。"))
                 .andExpect(jsonPath("$.errors").isEmpty());
+
+        // ERRORログが出力されていることを確認
+        assertThat(listAppender.list).hasSize(1);
+        ILoggingEvent logEvent = listAppender.list.get(0);
+        assertThat(logEvent.getLevel()).isEqualTo(Level.ERROR);
+        assertThat(logEvent.getFormattedMessage()).contains("unexpected_exception");
+        assertThat(logEvent.getFormattedMessage()).contains("RuntimeException");
+        assertThat(logEvent.getThrowableProxy()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("例外メッセージにBearerトークンが含まれる場合、マスクされる")
+    void test10() throws Exception {
+        mockMvc.perform(get("/test/test10")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError());
+
+        assertThat(listAppender.list).hasSize(1);
+        ILoggingEvent logEvent = listAppender.list.get(0);
+        assertThat(logEvent.getFormattedMessage()).contains("Bearer [REDACTED]");
+        assertThat(logEvent.getFormattedMessage()).doesNotContain("secretToken123");
+    }
+
+    @Test
+    @DisplayName("例外メッセージにJWTが含まれる場合、マスクされる")
+    void test11() throws Exception {
+        mockMvc.perform(get("/test/test11")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError());
+
+        assertThat(listAppender.list).hasSize(1);
+        ILoggingEvent logEvent = listAppender.list.get(0);
+        assertThat(logEvent.getFormattedMessage()).contains("[REDACTED_JWT]");
+        assertThat(logEvent.getFormattedMessage()).doesNotContain("eyJhbGciOiJIUzI1NiJ9");
+    }
+
+    @Test
+    @DisplayName("例外メッセージにCookieヘッダが含まれる場合、マスクされる")
+    void test12() throws Exception {
+        mockMvc.perform(get("/test/test12")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError());
+
+        assertThat(listAppender.list).hasSize(1);
+        ILoggingEvent logEvent = listAppender.list.get(0);
+        assertThat(logEvent.getFormattedMessage()).contains("Cookie: [REDACTED]");
+        assertThat(logEvent.getFormattedMessage()).doesNotContain("session=abc123");
+    }
+
+    @Test
+    @DisplayName("例外メッセージがnullの場合でも正常に処理される")
+    void test13() throws Exception {
+        mockMvc.perform(get("/test/test13")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("予期せぬエラーが発生しました。"));
+
+        assertThat(listAppender.list).hasSize(1);
+        ILoggingEvent logEvent = listAppender.list.get(0);
+        assertThat(logEvent.getLevel()).isEqualTo(Level.ERROR);
     }
 }
