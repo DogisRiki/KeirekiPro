@@ -80,6 +80,28 @@ class TestController {
         throw new RuntimeException("unexpected error");
     }
 
+    @GetMapping("/test10")
+    public void throwExceptionWithBearerToken() {
+        throw new RuntimeException("Error with Bearer secretToken123 in message");
+    }
+
+    @GetMapping("/test11")
+    public void throwExceptionWithJwt() {
+        throw new RuntimeException(
+                "Error with eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0."
+                        + "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U in message");
+    }
+
+    @GetMapping("/test12")
+    public void throwExceptionWithCookie() {
+        throw new RuntimeException("Error with Cookie: session=abc123; token=xyz in message");
+    }
+
+    @GetMapping("/test13")
+    public void throwExceptionWithNullMessage() {
+        throw new RuntimeException((String) null);
+    }
+
     @Data
     public static class NotNullDto {
         @NotNull(message = "値1は入力必須です。")

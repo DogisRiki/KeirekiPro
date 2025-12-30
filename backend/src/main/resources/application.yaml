@@ -38,5 +38,26 @@ oidc:
       secretName: "keirekipro/oidc/github"
 
 logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        name: ${spring.application.name}
+        environment: ${SPRING_PROFILES_ACTIVE:local}
+        version: ${APP_VERSION:unknown}
+    json:
+      rename:
+        traceId: trace.id # traceIdをtrace.idとして出力する
+        spanId: span.id # spanIdをspan.idとして出力する
   level:
     org.apache.pdfbox.pdmodel.font.PDType1Font: ERROR
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      export:
+        enabled: false # OTLP exportを無効化
