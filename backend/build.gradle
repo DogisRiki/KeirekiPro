@@ -63,6 +63,9 @@ dependencies {
     implementation 'org.freemarker:freemarker:2.3.34'
     implementation 'commons-validator:commons-validator:1.9.0'
     implementation 'com.github.onozaty:mybatis-postgresql-typehandlers:1.0.2'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 }
 
 configurations.configureEach {
