@@ -9,6 +9,7 @@ export interface User {
     twoFactorAuthEnabled: boolean;
     hasPassword: boolean;
     authProviders: AuthProvider[];
+    roles: string[];
 }
 
 /**

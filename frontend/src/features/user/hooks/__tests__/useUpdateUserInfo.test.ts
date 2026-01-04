@@ -41,6 +41,7 @@ describe("useUpdateUserInfo", () => {
             twoFactorAuthEnabled: false,
             hasPassword: true,
             authProviders: ["github"],
+            roles: ["USER"],
         };
         const mockResponse = { status: 200, data: returnedUser } as AxiosResponse<User>;
         vi.mocked(protectedApiClient.put).mockResolvedValueOnce(mockResponse);
