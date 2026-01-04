@@ -60,6 +60,7 @@ public class GetUserInfoUseCase {
                 .profileImage(imageUrl)
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
                 .authProviders(providers)
+                .roles(user.getRoleNames())
                 .build();
     }
 }

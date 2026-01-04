@@ -3,10 +3,13 @@ package com.example.keirekipro.domain.model.user;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.example.keirekipro.domain.event.user.UserDeletedEvent;
 import com.example.keirekipro.domain.event.user.UserRegisteredEvent;
@@ -42,6 +45,11 @@ public class User extends Entity {
      * 外部認証連携情報
      */
     private final Map<String, AuthProvider> authProviders;
+
+    /**
+     * ロール一覧
+     */
+    private final Set<RoleName> roles;
 
     /**
      * プロフィール画像URL
@@ -81,13 +89,27 @@ public class User extends Entity {
             String passwordHash,
             boolean twoFactorAuthEnabled,
             Map<String, AuthProvider> authProviders,
+            Set<RoleName> roles,
             String profileImage,
             String username) {
 
         super();
 
+        // 新規作成時はデフォルトでUSERロールを付与
+        Set<RoleName> resolvedRoles = (roles == null || roles.isEmpty())
+                ? EnumSet.of(RoleName.defaultRole())
+                : EnumSet.copyOf(roles);
+
         // バリデーション実行
         validate(errorCollector, email, passwordHash, authProviders);
+
+        // 二段階認証が有効な場合、メールアドレスとパスワードが未設定の場合はNG
+        if (twoFactorAuthEnabled && (email == null || passwordHash == null)) {
+            errorCollector.addError("twoFactorAuthEnabled", "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
+        }
+
+        // 管理者の場合は二段階認証が必須
+        validateAdminTwoFactorAuthRequired(errorCollector, resolvedRoles, twoFactorAuthEnabled);
 
         // サブエンティティや値オブジェクトのドメイン例外を一括でスローする
         if (errorCollector.hasErrors()) {
@@ -98,6 +120,7 @@ public class User extends Entity {
         this.passwordHash = passwordHash;
         this.twoFactorAuthEnabled = twoFactorAuthEnabled;
         this.authProviders = authProviders;
+        this.roles = resolvedRoles;
         this.profileImage = profileImage;
         this.username = username;
         this.createdAt = LocalDateTime.now();
@@ -113,15 +136,32 @@ public class User extends Entity {
             String passwordHash,
             boolean twoFactorAuthEnabled,
             Map<String, AuthProvider> authProviders,
+            Set<RoleName> roles,
             String profileImage,
             String username,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
         super(id);
+
+        Set<RoleName> resolvedRoles = (roles == null || roles.isEmpty())
+                ? EnumSet.noneOf(RoleName.class)
+                : EnumSet.copyOf(roles);
+
+        // 二段階認証が有効な場合、メールアドレスとパスワードが未設定の場合はNG
+        if (twoFactorAuthEnabled && (email == null || passwordHash == null)) {
+            throw new DomainException("メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
+        }
+
+        // 管理者の場合は二段階認証が必須
+        if (resolvedRoles.contains(RoleName.ADMIN) && !twoFactorAuthEnabled) {
+            throw new DomainException("管理者の場合は二段階認証が必須です。");
+        }
+
         this.email = email;
         this.passwordHash = passwordHash;
         this.twoFactorAuthEnabled = twoFactorAuthEnabled;
         this.authProviders = authProviders;
+        this.roles = resolvedRoles;
         this.profileImage = profileImage;
         this.username = username;
         this.createdAt = createdAt;
@@ -132,19 +172,17 @@ public class User extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param errorCollector       エラー収集オブジェクト
-     * @param email                メールアドレス
-     * @param passwordHash         パスワードハッシュ
-     * @param twoFactorAuthEnabled 二段階認証設定
-     * @param authProviders        外部認証連携情報
-     * @param profileImageUrl      プロフィール画像
-     * @param username             ユーザー名
+     * @param errorCollector  エラー収集オブジェクト
+     * @param email           メールアドレス
+     * @param passwordHash    パスワードハッシュ
+     * @param authProviders   外部認証連携情報
+     * @param profileImageUrl プロフィール画像
+     * @param username        ユーザー名
      * @return Userエンティティ
      */
     public static User create(ErrorCollector errorCollector,
             Email email,
             String passwordHash,
-            boolean twoFactorAuthEnabled,
             Map<String, AuthProvider> authProviders,
             String profileImageUrl,
             String username) {
@@ -156,7 +194,7 @@ public class User extends Entity {
         }
 
         // 新規構築の場合、デフォルトでfalseにする
-        twoFactorAuthEnabled = false;
+        boolean twoFactorAuthEnabled = false;
 
         return new User(
                 errorCollector,
@@ -164,6 +202,7 @@ public class User extends Entity {
                 passwordHash,
                 twoFactorAuthEnabled,
                 authProviders,
+                EnumSet.of(RoleName.defaultRole()), // デフォルトロール(USER)を明示的に渡す
                 profileImageUrl,
                 username);
     }
@@ -176,6 +215,7 @@ public class User extends Entity {
      * @param passwordHash         パスワードハッシュ
      * @param twoFactorAuthEnabled 二段階認証設定
      * @param authProviders        外部認証連携情報
+     * @param roles                ロール一覧
      * @param profileImageUrl      プロフィール画像URL
      * @param username             ユーザー名
      * @param createdAt            作成日時
@@ -187,6 +227,7 @@ public class User extends Entity {
             String passwordHash,
             boolean twoFactorAuthEnabled,
             Map<String, AuthProvider> authProviders,
+            Set<RoleName> roles,
             String profileImageUrl,
             String username,
             LocalDateTime createdAt,
@@ -204,6 +245,7 @@ public class User extends Entity {
                 passwordHash,
                 twoFactorAuthEnabled,
                 authProviders,
+                roles,
                 profileImageUrl,
                 username,
                 createdAt,
@@ -222,6 +264,143 @@ public class User extends Entity {
         if (email == null && providers.isEmpty()) {
             throw new DomainException("ユーザー情報の作成に失敗しました。");
         }
+    }
+
+    /**
+     * 管理者の場合は二段階認証が必須
+     */
+    private static void validateAdminTwoFactorAuthRequired(ErrorCollector errorCollector,
+            Set<RoleName> roles,
+            boolean twoFactorAuthEnabled) {
+
+        if (roles != null && roles.contains(RoleName.ADMIN) && !twoFactorAuthEnabled) {
+            errorCollector.addError("twoFactorAuthEnabled", "管理者の場合は二段階認証が必須です。");
+        }
+    }
+
+    /**
+     * ロール一覧を取得する
+     *
+     * @return ロール一覧
+     */
+    public Set<RoleName> getRoles() {
+        return Collections.unmodifiableSet(roles);
+    }
+
+    /**
+     * ロール名の一覧を取得する
+     *
+     * @return ロール名のSet
+     */
+    public Set<String> getRoleNames() {
+        return roles.stream()
+                .map(Enum::name)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * 指定したロールを持っているかを判定する
+     *
+     * @param role ロール
+     * @return 指定したロールを持つ場合true
+     */
+    public boolean hasRole(RoleName role) {
+        return roles.contains(role);
+    }
+
+    /**
+     * 管理者権限を持っているかを判定する
+     *
+     * @return 管理者ロールを持つ場合true
+     */
+    public boolean isAdmin() {
+        return roles.contains(RoleName.ADMIN);
+    }
+
+    /**
+     * ロールを追加する
+     *
+     * @param errorCollector エラー収集オブジェクト
+     * @param role           追加するロール
+     * @return 変更後のUserエンティティ
+     */
+    public User addRole(ErrorCollector errorCollector, RoleName role) {
+
+        if (role == null) {
+            errorCollector.addError("roles", "追加するロールが指定されていません。");
+        } else if (this.roles.contains(role)) {
+            // 既に持っている場合はそのまま返す
+            return this;
+        }
+
+        // 管理者ロール付与時は二段階認証が必須
+        if (role == RoleName.ADMIN && !this.twoFactorAuthEnabled) {
+            errorCollector.addError("roles", "管理者ロールを付与するには二段階認証が必須です。");
+        }
+
+        // 二段階認証が有効な場合、メールアドレスとパスワードが未設定の場合はNG
+        if (this.twoFactorAuthEnabled && (this.email == null || this.passwordHash == null)) {
+            errorCollector.addError("twoFactorAuthEnabled", "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
+        }
+
+        if (errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
+        }
+
+        EnumSet<RoleName> updatedRoles = toMutableRoleSet(this.roles);
+        updatedRoles.add(role);
+
+        return new User(
+                this.id,
+                this.email,
+                this.passwordHash,
+                this.twoFactorAuthEnabled,
+                this.authProviders,
+                EnumSet.copyOf(updatedRoles),
+                this.profileImage,
+                this.username,
+                this.createdAt,
+                LocalDateTime.now());
+    }
+
+    /**
+     * ロールを削除する
+     *
+     * @param errorCollector エラー収集オブジェクト
+     * @param role           削除するロール
+     * @return 変更後のUserエンティティ
+     */
+    public User removeRole(ErrorCollector errorCollector, RoleName role) {
+
+        if (role == null) {
+            errorCollector.addError("roles", "削除するロールが指定されていません。");
+        } else if (!this.roles.contains(role)) {
+            errorCollector.addError("roles", "指定されたロールが付与されていないため削除できません。");
+        }
+
+        if (errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
+        }
+
+        EnumSet<RoleName> updatedRoles = toMutableRoleSet(this.roles);
+        updatedRoles.remove(role);
+
+        // ロールが空になる場合はデフォルトロールを付与する
+        if (updatedRoles.isEmpty()) {
+            updatedRoles.add(RoleName.defaultRole());
+        }
+
+        return new User(
+                this.id,
+                this.email,
+                this.passwordHash,
+                this.twoFactorAuthEnabled,
+                this.authProviders,
+                EnumSet.copyOf(updatedRoles),
+                this.profileImage,
+                this.username,
+                this.createdAt,
+                LocalDateTime.now());
     }
 
     /**
@@ -266,6 +445,7 @@ public class User extends Entity {
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
                 Map.copyOf(updated),
+                this.roles,
                 this.profileImage,
                 this.username,
                 this.createdAt,
@@ -296,6 +476,7 @@ public class User extends Entity {
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
                 this.authProviders,
+                this.roles,
                 this.profileImage,
                 this.username,
                 this.createdAt,
@@ -312,7 +493,7 @@ public class User extends Entity {
     public User changePassword(ErrorCollector errorCollector, String newPasswordHash) {
 
         // 同じパスワードの場合はNG
-        if (newPasswordHash == this.passwordHash) {
+        if (java.util.Objects.equals(newPasswordHash, this.passwordHash)) {
             errorCollector.addError("password", "現在のパスワードと同じパスワードは設定できません。");
         }
 
@@ -326,6 +507,7 @@ public class User extends Entity {
                 newPasswordHash,
                 this.twoFactorAuthEnabled,
                 this.authProviders,
+                this.roles,
                 this.profileImage,
                 this.username,
                 this.createdAt,
@@ -346,6 +528,7 @@ public class User extends Entity {
                 newPasswordHash,
                 this.twoFactorAuthEnabled,
                 this.authProviders,
+                this.roles,
                 this.profileImage,
                 this.username,
                 this.createdAt,
@@ -360,6 +543,11 @@ public class User extends Entity {
      * @return 変更後のUserエンティティ
      */
     public User changeTwoFactorAuthEnabled(ErrorCollector errorCollector, boolean twoFactorAuthEnabled) {
+
+        // 管理者の場合は無効化不可
+        if (this.isAdmin() && !twoFactorAuthEnabled) {
+            errorCollector.addError("twoFactorAuthEnabled", "管理者の場合は二段階認証を無効にできません。");
+        }
 
         // メールアドレスとパスワードが未設定の場合はNG
         if (twoFactorAuthEnabled && (this.email == null || this.passwordHash == null)) {
@@ -376,6 +564,7 @@ public class User extends Entity {
                 this.passwordHash,
                 twoFactorAuthEnabled,
                 this.authProviders,
+                this.roles,
                 this.profileImage,
                 this.username,
                 this.createdAt,
@@ -414,6 +603,7 @@ public class User extends Entity {
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
                 Map.copyOf(updated),
+                this.roles,
                 this.profileImage,
                 this.username,
                 this.createdAt,
@@ -434,6 +624,7 @@ public class User extends Entity {
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
                 this.authProviders,
+                this.roles,
                 newProfileImage,
                 this.username,
                 this.createdAt,
@@ -472,6 +663,7 @@ public class User extends Entity {
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
                 this.authProviders,
+                this.roles,
                 this.profileImage,
                 trimmed,
                 this.createdAt,
@@ -501,5 +693,22 @@ public class User extends Entity {
         // 削除イベントを発行
         UserDeletedEvent event = new UserDeletedEvent(this.id, this.email.getValue(), this.username);
         this.domainEvents.add(event);
+    }
+
+    /**
+     * ロールの可変EnumSetを作成する
+     *
+     * @param roles ロール一覧
+     * @return 可変のEnumSet
+     */
+    private static EnumSet<RoleName> toMutableRoleSet(Set<RoleName> roles) {
+
+        EnumSet<RoleName> set = EnumSet.noneOf(RoleName.class);
+
+        if (roles != null) {
+            set.addAll(roles);
+        }
+
+        return set;
     }
 }

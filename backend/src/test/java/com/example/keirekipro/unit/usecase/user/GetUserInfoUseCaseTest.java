@@ -10,12 +10,14 @@ import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.shared.ErrorCollector;
@@ -67,6 +69,7 @@ class GetUserInfoUseCaseTest {
                 null,
                 false,
                 Map.of(PROVIDER_TYPE_VALUE.toLowerCase(), authProvider),
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE_PATH,
                 USERNAME_VALUE,
                 CREATED_AT,
@@ -111,6 +114,7 @@ class GetUserInfoUseCaseTest {
                 null,
                 false,
                 Map.of(PROVIDER_TYPE_VALUE.toLowerCase(), authProvider),
+                EnumSet.of(RoleName.USER),
                 null,
                 USERNAME_VALUE,
                 CREATED_AT,

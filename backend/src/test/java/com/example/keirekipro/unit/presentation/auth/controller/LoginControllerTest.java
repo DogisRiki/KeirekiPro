@@ -3,6 +3,7 @@ package com.example.keirekipro.unit.presentation.auth.controller;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Set;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.auth.controller.LoginController;
@@ -64,11 +66,17 @@ class LoginControllerTest {
     @DisplayName("二段階認証設定が無効の場合、JWTがSet-Cookieに設定される")
     void test1() throws Exception {
         // モックをセットアップ
+        Set<String> roles = Set.of("USER");
         when(loginUseCase.execute(any()))
-                .thenReturn(new LoginUseCaseDto(USER_ID, EMAIL, false));
-        when(jwtProvider.createAccessToken(USER_ID.toString()))
+                .thenReturn(LoginUseCaseDto.builder()
+                        .id(USER_ID)
+                        .email(EMAIL)
+                        .twoFactorAuthEnabled(false)
+                        .roles(roles)
+                        .build());
+        when(jwtProvider.createAccessToken(USER_ID.toString(), roles))
                 .thenReturn(ACCESS_TOKEN);
-        when(jwtProvider.createRefreshToken(USER_ID.toString()))
+        when(jwtProvider.createRefreshToken(USER_ID.toString(), roles))
                 .thenReturn(REFRESH_TOKEN);
 
         // リクエストを準備
@@ -91,16 +99,22 @@ class LoginControllerTest {
         // 呼び出しを検証
         verify(loginUseCase).execute(request);
         verify(twoFactorAuthIssueUseCase, never()).execute(any(), any());
-        verify(jwtProvider).createAccessToken(USER_ID.toString());
-        verify(jwtProvider).createRefreshToken((USER_ID.toString()));
+        verify(jwtProvider).createAccessToken(USER_ID.toString(), roles);
+        verify(jwtProvider).createRefreshToken((USER_ID.toString()), roles);
     }
 
     @Test
     @DisplayName("二段階認証設定が有効の場合、二段階認証発行ユースケースが実行される")
     void test2() throws Exception {
         // モックをセットアップ
+        Set<String> roles = Set.of("USER");
         when(loginUseCase.execute(any()))
-                .thenReturn(new LoginUseCaseDto(USER_ID, EMAIL, true));
+                .thenReturn(LoginUseCaseDto.builder()
+                        .id(USER_ID)
+                        .email(EMAIL)
+                        .twoFactorAuthEnabled(true)
+                        .roles(roles)
+                        .build());
 
         // リクエストを準備
         LoginRequest request = new LoginRequest(EMAIL, PASSWORD);
@@ -119,8 +133,8 @@ class LoginControllerTest {
         // 呼び出しを検証
         verify(loginUseCase).execute(request);
         verify(twoFactorAuthIssueUseCase).execute(USER_ID, EMAIL);
-        verify(jwtProvider, never()).createAccessToken(anyString());
-        verify(jwtProvider, never()).createRefreshToken(anyString());
+        verify(jwtProvider, never()).createAccessToken(anyString(), anySet());
+        verify(jwtProvider, never()).createRefreshToken(anyString(), anySet());
     }
 
     @Test

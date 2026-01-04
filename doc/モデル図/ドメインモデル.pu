@@ -285,6 +285,7 @@ package "ユーザー集約(UserAggregation)" as UserAggregation {
         - パスワード: passwordHash
         - 二段階認証設定: twoFactorAuthEnabled
         - 外部認証連携情報: AuthProviders
+        - ロール一覧: roles
         - プロフィール画像: profileImage
         - ユーザー名: username
         - 作成日時: createdAt
@@ -301,9 +302,15 @@ package "ユーザー集約(UserAggregation)" as UserAggregation {
         - プロバイダー側ユーザーID: providerUserId
     }
 
+    enum "ロール種別(RoleName)" as RoleName << (V,SkyBlue) ValueObject >> {
+        USER
+        ADMIN
+    }
+
     ' ------------- 関連 -------------
     User "1" *- "0..1" Email
     User "1" *- "0..n" AuthProvider
+    User "1" *- "1..n" RoleName
 
     ' ------------- ビジネスルール -------------
     note bottom of User
@@ -311,6 +318,11 @@ package "ユーザー集約(UserAggregation)" as UserAggregation {
         ・パスワード変更時は同じハッシュは不可。ただしリセットは可。
         ・二段階認証はメールアドレス＋パスワード両方設定時のみ有効化可。
         ・外部認証連携解除は、連携が複数あるか、メールアドレス＋パスワード設定済みでなければ不可。
+        ・新規作成時はデフォルトでUSERロールが付与される。
+        ・ロール削除でロールが空になる場合はUSERロールが付与される。
+        ・管理者(ADMIN)の場合は二段階認証が必須。
+        ・管理者(ADMIN)は二段階認証を無効化できない。
+        ・二段階認証が無効な場合、管理者(ADMIN)ロールを付与できない。
     end note
 
     note bottom of Email
@@ -319,6 +331,11 @@ package "ユーザー集約(UserAggregation)" as UserAggregation {
 
     note bottom of AuthProvider
         ・許可プロバイダは "google", "github" のみ。
+    end note
+
+    note bottom of RoleName
+        ・ロール種別は USER, ADMIN。
+        ・デフォルトロールは USER。
     end note
 }
 

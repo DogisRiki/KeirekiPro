@@ -9,9 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Optional;
 
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.service.user.UserEmailDuplicationCheckService;
@@ -63,6 +65,7 @@ class UserEmailDuplicationCheckServiceTest {
                 null,
                 false,
                 Collections.emptyMap(),
+                EnumSet.of(RoleName.USER),
                 null,
                 null,
                 null,

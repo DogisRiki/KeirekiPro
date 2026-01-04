@@ -65,7 +65,6 @@ public class OidcLoginUseCase {
                     errorCollector,
                     userInfo.getEmail() != null ? Email.create(errorCollector, userInfo.getEmail()) : null,
                     null,
-                    false,
                     providers,
                     null,
                     userInfo.getUsername());
@@ -86,6 +85,7 @@ public class OidcLoginUseCase {
                 .username(user.getUsername())
                 .email(user.getEmail() != null ? user.getEmail().getValue() : null)
                 .providerType(userInfo.getProviderType())
+                .roles(user.getRoleNames())
                 .build();
     }
 }

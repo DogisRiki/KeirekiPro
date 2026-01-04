@@ -1,6 +1,7 @@
 package com.example.keirekipro.presentation.user.dto;
 
 import java.util.List;
+import java.util.Set;
 
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 
@@ -32,6 +33,8 @@ public class UserInfoResponse {
 
     private List<String> authProviders;
 
+    private Set<String> roles;
+
     /**
      * ユースケースDTOからレスポンスへの変換を行う
      *
@@ -56,6 +59,7 @@ public class UserInfoResponse {
                 .profileImage(dto.getProfileImage())
                 .twoFactorAuthEnabled(dto.isTwoFactorAuthEnabled())
                 .authProviders(authProviders)
+                .roles(dto.getRoles())
                 .build();
     }
 }

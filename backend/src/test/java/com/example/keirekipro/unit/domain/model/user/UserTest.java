@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import com.example.keirekipro.domain.event.user.UserDeletedEvent;
 import com.example.keirekipro.domain.event.user.UserRegisteredEvent;
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.shared.ErrorCollector;
@@ -55,7 +57,6 @@ class UserTest {
                 errorCollector,
                 email,
                 PASSWORD_HASH,
-                true,
                 Collections.emptyMap(),
                 null,
                 USERNAME);
@@ -70,13 +71,18 @@ class UserTest {
         assertThat(user.getId()).isNotNull();
         assertThat(user.getEmail()).isEqualTo(email);
         assertThat(user.getPasswordHash()).isEqualTo(PASSWORD_HASH);
-        assertThat(user.isTwoFactorAuthEnabled()).isFalse(); // trueにしてもfalseになっていること
+        assertThat(user.isTwoFactorAuthEnabled()).isFalse(); // 新規作成時は常にfalse
         assertThat(user.getAuthProviders()).isEmpty();
         assertThat(user.getProfileImage()).isNull();
         assertThat(user.getUsername()).isEqualTo(USERNAME);
         assertThat(user.getCreatedAt()).isNotNull();
         assertThat(user.getUpdatedAt()).isNotNull();
         assertThat(user.isNew()).isTrue();
+
+        // ロールがデフォルト(USER)で付与されていることを検証
+        assertThat(user.getRoles()).containsExactly(RoleName.USER);
+        assertThat(user.isAdmin()).isFalse();
+        assertThat(user.hasRole(RoleName.USER)).isTrue();
     }
 
     @Test
@@ -89,7 +95,6 @@ class UserTest {
                 errorCollector,
                 email,
                 null,
-                false,
                 AUTH_PROVIDERS,
                 null,
                 USERNAME);
@@ -111,6 +116,10 @@ class UserTest {
         assertThat(user.getCreatedAt()).isNotNull();
         assertThat(user.getUpdatedAt()).isNotNull();
         assertThat(user.isNew()).isTrue();
+
+        // ロールがデフォルト(USER)で付与されていることを検証
+        assertThat(user.getRoles()).containsExactly(RoleName.USER);
+        assertThat(user.isAdmin()).isFalse();
     }
 
     @Test
@@ -121,7 +130,6 @@ class UserTest {
                 errorCollector,
                 null,
                 null,
-                false,
                 AUTH_PROVIDERS,
                 null,
                 USERNAME);
@@ -143,6 +151,10 @@ class UserTest {
         assertThat(user.getCreatedAt()).isNotNull();
         assertThat(user.getUpdatedAt()).isNotNull();
         assertThat(user.isNew()).isTrue();
+
+        // ロールがデフォルト(USER)で付与されていることを検証
+        assertThat(user.getRoles()).containsExactly(RoleName.USER);
+        assertThat(user.isAdmin()).isFalse();
     }
 
     @Test
@@ -153,7 +165,6 @@ class UserTest {
                 errorCollector,
                 null,
                 PASSWORD_HASH,
-                false,
                 Collections.emptyMap(),
                 null,
                 USERNAME)).isInstanceOf(DomainException.class)
@@ -170,6 +181,7 @@ class UserTest {
                 PASSWORD_HASH,
                 true,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -189,6 +201,10 @@ class UserTest {
         assertThat(user.getCreatedAt()).isEqualTo(CREATED_AT);
         assertThat(user.getUpdatedAt()).isEqualTo(UPDATED_AT);
         assertThat(user.isNew()).isFalse();
+
+        // ロールが保持されていることを検証
+        assertThat(user.getRoles()).containsExactly(RoleName.USER);
+        assertThat(user.isAdmin()).isFalse();
     }
 
     @Test
@@ -198,8 +214,9 @@ class UserTest {
                 ID,
                 null,
                 PASSWORD_HASH,
-                true,
+                false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -223,6 +240,7 @@ class UserTest {
                 PASSWORD_HASH,
                 true,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -247,6 +265,7 @@ class UserTest {
                 PASSWORD_HASH,
                 true,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -270,6 +289,7 @@ class UserTest {
                 PASSWORD_HASH,
                 true,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -293,6 +313,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -313,6 +334,7 @@ class UserTest {
                 PASSWORD_HASH,
                 true,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -336,6 +358,7 @@ class UserTest {
                 null,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -353,6 +376,7 @@ class UserTest {
                 null,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -377,6 +401,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -401,6 +426,7 @@ class UserTest {
                 null,
                 false,
                 providers,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -426,6 +452,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -450,6 +477,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -471,6 +499,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -489,6 +518,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -511,6 +541,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -533,6 +564,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 new HashMap<>(AUTH_PROVIDERS),
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -553,6 +585,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 new HashMap<>(AUTH_PROVIDERS),
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -576,6 +609,7 @@ class UserTest {
                 PASSWORD_HASH,
                 true,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -599,7 +633,6 @@ class UserTest {
                 errorCollector,
                 email,
                 PASSWORD_HASH,
-                true,
                 Collections.emptyMap(),
                 null,
                 USERNAME);
@@ -624,6 +657,7 @@ class UserTest {
                 PASSWORD_HASH,
                 true,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -643,6 +677,7 @@ class UserTest {
                 PASSWORD_HASH,
                 false,
                 AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
@@ -656,5 +691,100 @@ class UserTest {
         assertThat(event.getUserId()).isEqualTo(ID);
         assertThat(event.getEmail()).isEqualTo(email.getValue());
         assertThat(event.getUsername()).isEqualTo(USERNAME);
+    }
+
+    @Test
+    @DisplayName("二段階認証が無効な状態で管理者ロールを付与しようとするとDomainExceptionをスローする")
+    void test26() {
+        // モックをセットアップ
+        when(errorCollector.hasErrors()).thenReturn(true);
+
+        Email email = Email.create(new ErrorCollector(), EMAIL);
+        User user = User.reconstruct(
+                ID,
+                email,
+                PASSWORD_HASH,
+                false,
+                AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
+                PROFILE_IMAGE,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT);
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> user.addRole(errorCollector, RoleName.ADMIN))
+                .isInstanceOf(DomainException.class);
+
+        // エラーメッセージが登録される
+        verify(errorCollector, times(1)).addError(eq("roles"), eq("管理者ロールを付与するには二段階認証が必須です。"));
+    }
+
+    @Test
+    @DisplayName("ロールを削除して空になる場合はデフォルトロール(USER)が付与される")
+    void test27() {
+        Email email = Email.create(new ErrorCollector(), EMAIL);
+        User user = User.reconstruct(
+                ID,
+                email,
+                PASSWORD_HASH,
+                false,
+                AUTH_PROVIDERS,
+                EnumSet.of(RoleName.USER),
+                PROFILE_IMAGE,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT);
+
+        User updatedUser = user.removeRole(errorCollector, RoleName.USER);
+
+        assertThat(updatedUser.getRoles()).containsExactly(RoleName.USER);
+        verify(errorCollector, never()).addError(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("管理者ロール付与後に二段階認証を無効化しようとするとDomainExceptionをスローする")
+    void test28() {
+        // モックをセットアップ
+        when(errorCollector.hasErrors()).thenReturn(true);
+
+        Email email = Email.create(new ErrorCollector(), EMAIL);
+        User user = User.reconstruct(
+                ID,
+                email,
+                PASSWORD_HASH,
+                true,
+                AUTH_PROVIDERS,
+                EnumSet.of(RoleName.ADMIN),
+                PROFILE_IMAGE,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT);
+
+        // DomainExceptionがスローされる
+        assertThatThrownBy(() -> user.changeTwoFactorAuthEnabled(errorCollector, false))
+                .isInstanceOf(DomainException.class);
+
+        // エラーメッセージが登録される
+        verify(errorCollector, times(1)).addError(eq("twoFactorAuthEnabled"), eq("管理者の場合は二段階認証を無効にできません。"));
+    }
+
+    @Test
+    @DisplayName("管理者ロールかつ二段階認証が無効の状態で再構築するとDomainExceptionをスローする")
+    void test29() {
+        Email email = Email.create(new ErrorCollector(), EMAIL);
+
+        assertThatThrownBy(() -> User.reconstruct(
+                ID,
+                email,
+                PASSWORD_HASH,
+                false,
+                AUTH_PROVIDERS,
+                EnumSet.of(RoleName.ADMIN),
+                PROFILE_IMAGE,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT)).isInstanceOf(DomainException.class)
+                .hasMessageContaining("管理者の場合は二段階認証が必須です。");
     }
 }

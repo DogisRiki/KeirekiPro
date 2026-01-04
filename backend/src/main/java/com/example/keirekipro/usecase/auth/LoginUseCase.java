@@ -43,6 +43,7 @@ public class LoginUseCase {
                 .id(user.getId())
                 .email(user.getEmail().getValue())
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
+                .roles(user.getRoleNames())
                 .build();
     }
 }

@@ -2,6 +2,7 @@ package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -9,12 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Set;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.auth.controller.TwoFactorAuthController;
 import com.example.keirekipro.presentation.auth.dto.TwoFactorAuthRequest;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
+import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthVerifyResultDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.DisplayName;
@@ -47,21 +50,28 @@ class TwoFactorAuthControllerTest {
     private static final String ENDPOINT = "/api/auth/2fa/verify";
 
     private static final String USER_ID = UUID.randomUUID().toString();
-    private static final String EMAIL = "test@keirekipro.click";
     private static final String ACCESS_TOKEN = "mockAccessToken";
     private static final String REFRESH_TOKEN = "mockRefreshToken";
+
+    private static final String CODE = "123456";
+    private static final Set<String> ROLES = Set.of("USER");
 
     @Test
     @DisplayName("二段階認証コードの検証がOKの場合、JWTがSet-Cookieに設定される")
     void test1() throws Exception {
         // モックをセットアップ
-        when(jwtProvider.createAccessToken(USER_ID))
+        when(twoFactorAuthIssueUseCase.execute(eq(UUID.fromString(USER_ID)), eq(CODE)))
+                .thenReturn(TwoFactorAuthVerifyResultDto.builder()
+                        .userId(UUID.fromString(USER_ID))
+                        .roles(ROLES)
+                        .build());
+        when(jwtProvider.createAccessToken(USER_ID, ROLES))
                 .thenReturn(ACCESS_TOKEN);
-        when(jwtProvider.createRefreshToken(USER_ID))
+        when(jwtProvider.createRefreshToken(USER_ID, ROLES))
                 .thenReturn(REFRESH_TOKEN);
 
         // リクエストを準備
-        TwoFactorAuthRequest request = new TwoFactorAuthRequest(USER_ID, EMAIL);
+        TwoFactorAuthRequest request = new TwoFactorAuthRequest(USER_ID, CODE);
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
@@ -78,9 +88,9 @@ class TwoFactorAuthControllerTest {
                                 containsString("refreshToken=mockRefreshToken"))));
 
         // 呼び出し検証を追加
-        verify(twoFactorAuthIssueUseCase).execute(UUID.fromString(USER_ID), EMAIL);
-        verify(jwtProvider).createAccessToken(USER_ID);
-        verify(jwtProvider).createRefreshToken(USER_ID);
+        verify(twoFactorAuthIssueUseCase).execute(UUID.fromString(USER_ID), CODE);
+        verify(jwtProvider).createAccessToken(USER_ID, ROLES);
+        verify(jwtProvider).createRefreshToken(USER_ID, ROLES);
     }
 
     @Test

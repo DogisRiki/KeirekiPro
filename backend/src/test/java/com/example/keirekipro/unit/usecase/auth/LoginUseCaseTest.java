@@ -6,10 +6,12 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.auth.dto.LoginRequest;
@@ -57,6 +59,9 @@ class LoginUseCaseTest {
         // 検証
         assertThat(dto).isNotNull();
         assertThat(dto.getId()).isEqualTo(USER_ID);
+        assertThat(dto.getEmail()).isEqualTo(EMAIL);
+        assertThat(dto.isTwoFactorAuthEnabled()).isFalse();
+        assertThat(dto.getRoles()).containsExactly(RoleName.USER.name());
     }
 
     @Test
@@ -91,6 +96,7 @@ class LoginUseCaseTest {
                 passwordHash,
                 false,
                 Collections.emptyMap(),
+                EnumSet.of(RoleName.USER),
                 null,
                 "tester",
                 LocalDateTime.now(),

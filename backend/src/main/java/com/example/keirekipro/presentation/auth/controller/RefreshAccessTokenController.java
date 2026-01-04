@@ -1,6 +1,8 @@
 package com.example.keirekipro.presentation.auth.controller;
 
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
@@ -11,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -51,11 +54,17 @@ public class RefreshAccessTokenController {
             throw new JWTVerificationException("リフレッシュトークンが存在しません。");
         }
 
-        // リフレッシュトークンの検証とユーザーIDの取得
-        String userId = (String) jwtProvider.getAuthentication(refreshToken.get()).getPrincipal();
+        // リフレッシュトークンから認証情報を取得
+        Authentication auth = jwtProvider.getAuthentication(refreshToken.get());
+        String userId = (String) auth.getPrincipal();
+
+        // 現在の権限情報からロール名を抽出
+        Set<String> roles = auth.getAuthorities().stream()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .collect(Collectors.toSet());
 
         // 新しいアクセストークンを生成
-        String newAccessToken = jwtProvider.createAccessToken(userId);
+        String newAccessToken = jwtProvider.createAccessToken(userId, roles);
 
         // レスポンスヘッダーにセット
         response.addHeader("Set-Cookie",

@@ -67,10 +67,14 @@ class UserMapperTest {
     private static final LocalDate PROJECT_START_DATE = LocalDate.of(2021, 1, 1);
     private static final LocalDate CERTIFICATION_DATE = LocalDate.of(2022, 6, 1);
 
+    // roles テーブル用（マイグレーションに初期データが無い場合でもテストが成立するようにする）
+    private static final UUID ROLE_USER_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeee1");
+    private static final UUID ROLE_ADMIN_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeee2");
+
     @Test
     @DisplayName("selectById_ユーザーが存在する場合、正しく取得できる")
     void test1() {
-        // セットアップ：ユーザーのみ登録（JdbcTemplateで直接INSERT）
+        // セットアップ：ユーザーのみ登録
         insertUser(
                 USER_ID,
                 EMAIL,
@@ -107,7 +111,7 @@ class UserMapperTest {
     @Test
     @DisplayName("selectByEmail_ユーザーが存在する場合、正しく取得できる")
     void test3() {
-        // セットアップ：ユーザーとgoogleプロバイダーを登録（JdbcTemplateで直接INSERT）
+        // セットアップ：ユーザーとgoogleプロバイダーを登録
         insertUser(
                 USER_ID,
                 EMAIL,
@@ -154,7 +158,7 @@ class UserMapperTest {
     @Test
     @DisplayName("selectByProvider_ユーザーが存在する場合、正しく取得できる")
     void test5() {
-        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録（JdbcTemplateで直接INSERT）
+        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録
         insertUser(
                 USER_ID,
                 EMAIL,
@@ -283,7 +287,7 @@ class UserMapperTest {
     @Test
     @DisplayName("delete_ユーザーとプロバイダー情報を削除できる")
     void test9() {
-        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録（JdbcTemplateで直接INSERT）
+        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録
         insertUser(
                 USER_ID,
                 EMAIL,
@@ -299,12 +303,19 @@ class UserMapperTest {
         insertAuthProvider(googleDto);
         insertAuthProvider(githubDto);
 
+        // セットアップ：ロールマスタを登録（存在しない環境でも insertUserRole が成立するようにする）
+        insertRoleIfAbsent(ROLE_USER_ID, "USER");
+
+        // セットアップ：ユーザーロールも登録（deleteで連鎖削除されることを検証するため）
+        userMapper.insertUserRole(USER_ID, "USER");
+
         // セットアップ：resume関連データも登録（deleteで連鎖削除されることを検証するため）
         insertResumeRelatedData(USER_ID);
 
         // 事前検証：データが存在する
         assertThat(countByUserId("users", "id", USER_ID)).isEqualTo(1);
         assertThat(countByUserId("user_auth_providers", "user_id", USER_ID)).isEqualTo(2);
+        assertThat(countByUserId("user_roles", "user_id", USER_ID)).isEqualTo(1);
         assertThat(countByUserId("resumes", "user_id", USER_ID)).isEqualTo(1);
 
         assertThat(countByResumeId("careers", "resume_id", RESUME_ID)).isEqualTo(1);
@@ -324,6 +335,7 @@ class UserMapperTest {
         // 検証：関連データも削除されている
         assertThat(countByUserId("users", "id", USER_ID)).isEqualTo(0);
         assertThat(countByUserId("user_auth_providers", "user_id", USER_ID)).isEqualTo(0);
+        assertThat(countByUserId("user_roles", "user_id", USER_ID)).isEqualTo(0);
         assertThat(countByUserId("resumes", "user_id", USER_ID)).isEqualTo(0);
 
         assertThat(countByResumeId("careers", "resume_id", RESUME_ID)).isEqualTo(0);
@@ -336,9 +348,40 @@ class UserMapperTest {
     }
 
     @Test
+    @DisplayName("insertUserRole_ユーザーロールを登録できる")
+    void test10() {
+        // セットアップ：ユーザーのみ登録
+        insertUser(
+                USER_ID,
+                EMAIL,
+                PASSWORD,
+                USERNAME,
+                PROFILE_IMAGE,
+                true,
+                CREATED_AT,
+                UPDATED_AT);
+
+        // セットアップ：ロールマスタを登録（存在しない環境でも insertUserRole が成立するようにする）
+        insertRoleIfAbsent(ROLE_ADMIN_ID, "ADMIN");
+
+        // 実行：ロール登録
+        userMapper.insertUserRole(USER_ID, "ADMIN");
+
+        // 検証：user_rolesが登録されている
+        assertThat(countByUserId("user_roles", "user_id", USER_ID)).isEqualTo(1);
+
+        // 検証：selectでロール名が取得できる
+        Optional<UserDto> opt = userMapper.selectById(USER_ID);
+        assertThat(opt).isPresent();
+        UserDto loaded = opt.get();
+        assertThat(loaded.getRoles()).isNotNull();
+        assertThat(loaded.getRoles()).contains("ADMIN");
+    }
+
+    @Test
     @DisplayName("insertAuthProvider_外部連携認証情報を登録できる")
     void test11() {
-        // セットアップ：プロバイダー付きユーザーを登録（JdbcTemplateで直接INSERT）
+        // セットアップ：プロバイダー付きユーザーを登録
         insertUser(
                 USER_ID,
                 EMAIL,
@@ -378,7 +421,7 @@ class UserMapperTest {
     @Test
     @DisplayName("deleteAuthProvidersByUserId_外部連携認証情報を削除できる")
     void test12() {
-        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録（JdbcTemplateで直接INSERT）
+        // セットアップ：ユーザーとgoogleプロバイダー+githubプロバイダーを登録
         insertUser(
                 USER_ID,
                 EMAIL,
@@ -406,6 +449,54 @@ class UserMapperTest {
 
         // DB直接検証：user_auth_providersが0件
         assertThat(countByUserId("user_auth_providers", "user_id", USER_ID)).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("deleteUserRolesByUserId_ユーザーロールを削除できる")
+    void test13() {
+        // セットアップ：ユーザーのみ登録
+        insertUser(
+                USER_ID,
+                EMAIL,
+                PASSWORD,
+                USERNAME,
+                PROFILE_IMAGE,
+                true,
+                CREATED_AT,
+                UPDATED_AT);
+
+        // セットアップ：ロールマスタを登録（存在しない環境でも insertUserRole が成立するようにする）
+        insertRoleIfAbsent(ROLE_USER_ID, "USER");
+        insertRoleIfAbsent(ROLE_ADMIN_ID, "ADMIN");
+
+        // セットアップ：ロール登録
+        userMapper.insertUserRole(USER_ID, "USER");
+        userMapper.insertUserRole(USER_ID, "ADMIN");
+
+        // 事前検証：user_rolesが存在する
+        assertThat(countByUserId("user_roles", "user_id", USER_ID)).isEqualTo(2);
+
+        // 実行：削除
+        userMapper.deleteUserRolesByUserId(USER_ID);
+
+        // 検証：user_rolesが0件
+        assertThat(countByUserId("user_roles", "user_id", USER_ID)).isEqualTo(0);
+
+        // 検証：selectでロールが空になる
+        Optional<UserDto> opt = userMapper.selectById(USER_ID);
+        assertThat(opt).isPresent();
+        UserDto loaded = opt.get();
+        assertThat(loaded.getRoles()).isNullOrEmpty();
+    }
+
+    /**
+     * roles にロールマスタを登録する（既に存在する場合は何もしない）
+     */
+    private void insertRoleIfAbsent(UUID roleId, String roleName) {
+        String sql = "INSERT INTO roles (id, name, created_at, updated_at) "
+                + "VALUES (?, ?, ?, ?) "
+                + "ON CONFLICT (name) DO NOTHING";
+        jdbcTemplate.update(sql, roleId, roleName, CREATED_AT, UPDATED_AT);
     }
 
     /**
@@ -450,6 +541,7 @@ class UserMapperTest {
         dto.setCreatedAt(CREATED_AT);
         dto.setUpdatedAt(UPDATED_AT);
         dto.setAuthProviders(Collections.emptyList());
+        dto.setRoles(Collections.emptyList());
         return dto;
     }
 

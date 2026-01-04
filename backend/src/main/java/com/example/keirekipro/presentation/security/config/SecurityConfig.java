@@ -42,7 +42,6 @@ public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
 
-    // 追加: requestId・アクセスログ用フィルタ
     private final RequestContextLoggingFilter requestContextLoggingFilter;
 
     @Bean
@@ -77,9 +76,16 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                         .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))
 
-                // 認証情報が無い場合は401を返す
+                // 例外ハンドリング
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                        // 認証情報が無い場合は401を返す
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        // 権限不足時は403を返す
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpStatus.FORBIDDEN.value());
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"message\":\"アクセス権限がありません。\"}");
+                        }))
 
                 // エンドポイントの認可設定
                 .authorizeHttpRequests(auth -> auth
@@ -96,6 +102,8 @@ public class SecurityConfig {
                                 "/v3/api-docs",
                                 "/v3/api-docs/**")
                         .permitAll()
+                        // 管理者専用エンドポイント
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // その他のエンドポイントは認証必要
                         .anyRequest().authenticated())
 

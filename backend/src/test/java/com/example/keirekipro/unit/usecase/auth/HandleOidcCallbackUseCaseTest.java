@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.example.keirekipro.usecase.auth.HandleOidcCallbackUseCase;
@@ -152,6 +153,8 @@ class HandleOidcCallbackUseCaseTest {
     @DisplayName("ログイン処理が成功した場合、Success(userId)を返しstateは削除される")
     void test6() {
         UUID userId = UUID.randomUUID();
+        Set<String> roles = Set.of("USER");
+
         when(oidcAuthorizationSessionStore.find(STATE)).thenReturn(Optional.of(OidcAuthorizationSession.builder()
                 .state(STATE)
                 .provider(PROVIDER)
@@ -170,12 +173,14 @@ class HandleOidcCallbackUseCaseTest {
                 .username("test-user")
                 .email("test@keirekipro.click")
                 .providerType(PROVIDER)
+                .roles(roles)
                 .build());
 
         OidcCallbackResult result = handleOidcCallbackUseCase.execute(CODE, STATE, null, REDIRECT_URI);
 
         assertThat(result).isInstanceOf(OidcCallbackResult.Success.class);
         assertThat(((OidcCallbackResult.Success) result).getUserId()).isEqualTo(userId);
+        assertThat(((OidcCallbackResult.Success) result).getRoles()).isEqualTo(roles);
 
         verify(oidcAuthorizationSessionStore).find(STATE);
         verify(oidcGateway).exchangeToken(PROVIDER, CODE, REDIRECT_URI, CODE_VERIFIER);

@@ -21,6 +21,9 @@
             <result property="createdAt" column="p_created_at"/>
             <result property="updatedAt" column="p_updated_at"/>
         </collection>
+        <collection property="roles" ofType="string">
+            <result column="r_name"/>
+        </collection>
     </resultMap>
 
     <select id="selectById" resultMap="userMap" parameterType="java.util.UUID">
@@ -37,12 +40,13 @@
             p.provider_name AS p_provider_name,
             p.provider_user_id AS p_provider_user_id,
             p.created_at AS p_created_at,
-            p.updated_at AS p_updated_at
+            p.updated_at AS p_updated_at,
+            r.name AS r_name
         FROM
             users u
-            LEFT JOIN
-                user_auth_providers p
-            ON  p.user_id = u.id
+            LEFT JOIN user_auth_providers p ON p.user_id = u.id
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id
         WHERE
             u.id = #{id}
     </select>
@@ -61,12 +65,13 @@
             p.provider_name AS p_provider_name,
             p.provider_user_id AS p_provider_user_id,
             p.created_at AS p_created_at,
-            p.updated_at AS p_updated_at
+            p.updated_at AS p_updated_at,
+            r.name AS r_name
         FROM
             users u
-            LEFT JOIN
-                user_auth_providers p
-            ON  p.user_id = u.id
+            LEFT JOIN user_auth_providers p ON p.user_id = u.id
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id
         WHERE
             u.email = #{email}
     </select>
@@ -85,12 +90,13 @@
             p.provider_name AS p_provider_name,
             p.provider_user_id AS p_provider_user_id,
             p.created_at AS p_created_at,
-            p.updated_at AS p_updated_at
+            p.updated_at AS p_updated_at,
+            r.name AS r_name
         FROM
             users u
-            INNER JOIN
-                user_auth_providers p
-            ON  u.id = p.user_id
+            INNER JOIN user_auth_providers p ON u.id = p.user_id
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id
         WHERE
             p.provider_name = #{providerName}
         AND p.provider_user_id = #{providerUserId}
@@ -247,6 +253,13 @@
 
         DELETE
         FROM
+            user_roles
+        WHERE
+            user_id = #{id}
+        ;
+
+        DELETE
+        FROM
             users
         WHERE
             id = #{id}
@@ -279,4 +292,30 @@
         WHERE
             user_id = #{userId}
     </delete>
+
+    <insert id="insertUserRole">
+        INSERT INTO user_roles(
+            user_id,
+            role_id,
+            created_at
+        )
+        SELECT
+            #{userId},
+            id,
+            NOW()
+        FROM
+            roles
+        WHERE
+            name = #{roleName}
+        ON  CONFLICT(user_id, role_id) DO NOTHING
+    </insert>
+
+    <delete id="deleteUserRolesByUserId" parameterType="java.util.UUID">
+        DELETE
+        FROM
+            user_roles
+        WHERE
+            user_id = #{userId}
+    </delete>
+
 </mapper>

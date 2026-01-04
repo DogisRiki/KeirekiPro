@@ -1,5 +1,6 @@
 package com.example.keirekipro.usecase.auth.oidc;
 
+import java.util.Set;
 import java.util.UUID;
 
 import lombok.Getter;
@@ -21,6 +22,11 @@ public interface OidcCallbackResult {
          * ユーザーID
          */
         private final UUID userId;
+
+        /**
+         * ロール
+         */
+        private final Set<String> roles;
     }
 
     /**

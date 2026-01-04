@@ -1,13 +1,16 @@
 package com.example.keirekipro.infrastructure.repository.user;
 
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.shared.ErrorCollector;
@@ -42,16 +45,21 @@ public class MyBatisUserRepository implements UserRepository {
 
     @Override
     public void save(User user) {
-        // UserDTO に変換
         UserDto dto = toDto(user);
 
-        // ユーザー情報の upsert
+        // ユーザー情報のupsert
         mapper.upsertUser(dto);
 
         // 外部認証連携情報を全件削除してから再挿入
         mapper.deleteAuthProvidersByUserId(dto.getId());
         for (UserDto.AuthProviderDto apDto : dto.getAuthProviders()) {
             mapper.insertAuthProvider(apDto);
+        }
+
+        // ロールを全件削除してから再挿入
+        mapper.deleteUserRolesByUserId(dto.getId());
+        for (String roleName : dto.getRoles()) {
+            mapper.insertUserRole(dto.getId(), roleName);
         }
     }
 
@@ -74,8 +82,22 @@ public class MyBatisUserRepository implements UserRepository {
                 .collect(Collectors.toMap(
                         p -> p.getProviderName().toLowerCase(),
                         p -> p,
-                        (p1, p2) -> p2, // 重複無し想定だが念のため後勝ち
+                        (p1, p2) -> p2,
                         HashMap::new));
+
+        // ロールの復元
+        Set<RoleName> roles = EnumSet.noneOf(RoleName.class);
+        if (dto.getRoles() != null) {
+            for (String roleName : dto.getRoles()) {
+                if (roleName != null) {
+                    try {
+                        roles.add(RoleName.valueOf(roleName));
+                    } catch (IllegalArgumentException e) {
+                        // 不明なロール名は無視
+                    }
+                }
+            }
+        }
 
         return User.reconstruct(
                 dto.getId(),
@@ -83,6 +105,7 @@ public class MyBatisUserRepository implements UserRepository {
                 dto.getPassword(),
                 dto.isTwoFactorAuthEnabled(),
                 providers,
+                roles,
                 dto.getProfileImage(),
                 dto.getUsername(),
                 dto.getCreatedAt(),
@@ -116,6 +139,10 @@ public class MyBatisUserRepository implements UserRepository {
                             return ap;
                         })
                         .toList());
+
+        // ロール名のリストを設定
+        dto.setRoles(user.getRoleNames().stream().toList());
+
         return dto;
     }
 }
