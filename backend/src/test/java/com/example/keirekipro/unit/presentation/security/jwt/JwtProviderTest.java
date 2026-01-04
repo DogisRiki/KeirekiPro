@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Set;
 import java.util.UUID;
 
 import com.auth0.jwt.JWT;
@@ -42,11 +43,17 @@ class JwtProviderTest {
     @Test
     @DisplayName("有効なアクセストークンを生成する")
     void test1() {
-        String token = jwtProvider.createAccessToken(USER_ID);
+        Set<String> roles = Set.of("USER");
+        String token = jwtProvider.createAccessToken(USER_ID, roles);
         Authentication auth = jwtProvider.getAuthentication(token);
 
         // ユーザーIDが正しい値である
         assertThat(auth.getPrincipal()).isEqualTo(USER_ID);
+
+        // ロールが正しい値である
+        assertThat(auth.getAuthorities())
+                .extracting("authority")
+                .containsExactlyInAnyOrder("ROLE_USER");
 
         Date expiration = jwtProvider.getExpirationDate(token);
         Date now = new Date();
@@ -69,11 +76,17 @@ class JwtProviderTest {
     @Test
     @DisplayName("有効なリフレッシュトークンを生成する")
     void test2() {
-        String token = jwtProvider.createRefreshToken(USER_ID);
+        Set<String> roles = Set.of("USER");
+        String token = jwtProvider.createRefreshToken(USER_ID, roles);
         Authentication auth = jwtProvider.getAuthentication(token);
 
         // ユーザーIDが正しい値である
         assertThat(auth.getPrincipal()).isEqualTo(USER_ID);
+
+        // ロールが正しい値である
+        assertThat(auth.getAuthorities())
+                .extracting("authority")
+                .containsExactlyInAnyOrder("ROLE_USER");
 
         Date expiration = jwtProvider.getExpirationDate(token);
         Date now = new Date();
@@ -141,5 +154,23 @@ class JwtProviderTest {
         // 有効期限切れのトークンの場合、JWTVerificationExceptionがスローされる
         assertThatThrownBy(() -> jwtProvider.getAuthentication(expiredToken))
                 .isInstanceOf(JWTVerificationException.class);
+    }
+
+    @Test
+    @DisplayName("roles claimが無いトークンは権限が空で認証できる")
+    void test7() {
+        String tokenWithoutRoles = JWT.create()
+                .withSubject(USER_ID)
+                .withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + 30 * 60 * 1000))
+                .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
+
+        Authentication auth = jwtProvider.getAuthentication(tokenWithoutRoles);
+
+        // ユーザーIDが正しい値である
+        assertThat(auth.getPrincipal()).isEqualTo(USER_ID);
+
+        // ロールが空である
+        assertThat(auth.getAuthorities()).isEmpty();
     }
 }

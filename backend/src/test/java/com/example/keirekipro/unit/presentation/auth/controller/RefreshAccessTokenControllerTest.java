@@ -1,6 +1,7 @@
 package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
@@ -22,6 +24,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -52,9 +55,13 @@ class RefreshAccessTokenControllerTest {
     @DisplayName("有効なリフレッシュトークンの場合、新しいアクセストークンが返される")
     void test1() throws Exception {
         // モックをセットアップ
-        when(jwtProvider.createAccessToken(USER_ID.toString())).thenReturn(NEW_ACCESS_TOKEN);
+        Set<String> roles = Set.of("USER");
+        when(jwtProvider.createAccessToken(eq(USER_ID.toString()), eq(roles))).thenReturn(NEW_ACCESS_TOKEN);
         when(jwtProvider.getAuthentication(REFRESH_TOKEN))
-                .thenReturn(new UsernamePasswordAuthenticationToken(USER_ID.toString(), null, List.of()));
+                .thenReturn(new UsernamePasswordAuthenticationToken(
+                        USER_ID.toString(),
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))));
 
         Cookie accessTokenCookie = new Cookie("accessToken", ACCESS_TOKEN);
         Cookie refreshTokenCookie = new Cookie("refreshToken", REFRESH_TOKEN);
@@ -68,7 +75,7 @@ class RefreshAccessTokenControllerTest {
 
         // 呼び出し検証を追加
         verify(jwtProvider).getAuthentication(REFRESH_TOKEN);
-        verify(jwtProvider).createAccessToken(USER_ID.toString());
+        verify(jwtProvider).createAccessToken(USER_ID.toString(), roles);
     }
 
     @Test

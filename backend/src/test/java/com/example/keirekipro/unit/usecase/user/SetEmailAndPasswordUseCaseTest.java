@@ -7,11 +7,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
@@ -53,8 +55,17 @@ class SetEmailAndPasswordUseCaseTest {
     @DisplayName("パスワードのみを設定する")
     void test1() {
         // モックをセットアップ
-        User user = User.reconstruct(USER_ID, Email.create(new ErrorCollector(), EMAIL), null, false, Map.of(), null,
-                USERNAME, null, null);
+        User user = User.reconstruct(
+                USER_ID,
+                Email.create(new ErrorCollector(), EMAIL),
+                null,
+                false,
+                Map.of(),
+                EnumSet.of(RoleName.USER),
+                null,
+                USERNAME,
+                null,
+                null);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
 
@@ -69,7 +80,17 @@ class SetEmailAndPasswordUseCaseTest {
     @DisplayName("メールアドレスとパスワードを設定する")
     void test2() {
         // モックをセットアップ
-        User user = User.reconstruct(USER_ID, null, null, false, Map.of(), null, USERNAME, null, null);
+        User user = User.reconstruct(
+                USER_ID,
+                null,
+                null,
+                false,
+                Map.of(),
+                EnumSet.of(RoleName.USER),
+                null,
+                USERNAME,
+                null,
+                null);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
 

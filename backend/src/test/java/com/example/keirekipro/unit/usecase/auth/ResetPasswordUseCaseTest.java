@@ -7,9 +7,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.EnumSet;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.usecase.auth.ResetPasswordUseCase;
@@ -51,7 +53,17 @@ class ResetPasswordUseCaseTest {
     @DisplayName("パスワードリセットが正常に完了する")
     void test1() {
         // データ準備
-        User user = User.reconstruct(USER_ID, null, "oldHash", false, null, null, USERNAME, null, null);
+        User user = User.reconstruct(
+                USER_ID,
+                null,
+                "oldHash",
+                false,
+                null,
+                EnumSet.of(RoleName.USER),
+                null,
+                USERNAME,
+                null,
+                null);
 
         // モックをセットアップ
         when(passwordResetTokenStore.findUserId(TOKEN)).thenReturn(Optional.of(USER_ID));

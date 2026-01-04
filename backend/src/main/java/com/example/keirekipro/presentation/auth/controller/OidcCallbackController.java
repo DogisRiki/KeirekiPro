@@ -84,8 +84,8 @@ public class OidcCallbackController {
             if (result instanceof OidcCallbackResult.Success success) {
                 // JWT発行
                 String userId = success.getUserId().toString();
-                String accessToken = jwtProvider.createAccessToken(userId);
-                String refreshToken = jwtProvider.createRefreshToken(userId);
+                String accessToken = jwtProvider.createAccessToken(userId, success.getRoles());
+                String refreshToken = jwtProvider.createRefreshToken(userId, success.getRoles());
 
                 // レスポンスヘッダーにセット
                 response.addHeader("Set-Cookie",

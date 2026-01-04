@@ -6,6 +6,7 @@ import com.example.keirekipro.presentation.auth.dto.TwoFactorAuthRequest;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
+import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthVerifyResultDto;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -53,12 +54,18 @@ public class TwoFactorAuthController {
             throw new AuthenticationCredentialsNotFoundException("不正なアクセスです。");
         }
 
+        UUID userId = UUID.fromString(request.getUserId());
+
         // ユースケース実行
-        twoFactorAuthVerifyUseCase.execute(UUID.fromString(request.getUserId()), request.getCode());
+        TwoFactorAuthVerifyResultDto result = twoFactorAuthVerifyUseCase.execute(userId, request.getCode());
 
         // JWT発行
-        String accessToken = jwtProvider.createAccessToken(request.getUserId());
-        String refreshToken = jwtProvider.createRefreshToken(request.getUserId());
+        String accessToken = jwtProvider.createAccessToken(
+                result.getUserId().toString(),
+                result.getRoles());
+        String refreshToken = jwtProvider.createRefreshToken(
+                result.getUserId().toString(),
+                result.getRoles());
 
         // レスポンスヘッダーにセット
         response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));

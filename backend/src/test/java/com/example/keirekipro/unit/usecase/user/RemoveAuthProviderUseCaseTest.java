@@ -8,12 +8,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.shared.ErrorCollector;
@@ -51,6 +53,7 @@ class RemoveAuthProviderUseCaseTest {
                 "hashedPassword",
                 false,
                 Map.of(PROVIDER, authProvider),
+                EnumSet.of(RoleName.USER),
                 null,
                 "test-user",
                 null,

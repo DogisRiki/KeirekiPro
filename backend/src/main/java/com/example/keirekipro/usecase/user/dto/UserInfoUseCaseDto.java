@@ -1,6 +1,7 @@
 package com.example.keirekipro.usecase.user.dto;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import lombok.Builder;
@@ -22,6 +23,7 @@ public class UserInfoUseCaseDto {
     private final String profileImage;
     private final boolean twoFactorAuthEnabled;
     private final List<AuthProviderInfo> authProviders;
+    private final Set<String> roles;
 
     /**
      * 外部認証連携情報

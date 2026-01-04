@@ -1,12 +1,14 @@
 package com.example.keirekipro.unit.infrastructure.repository.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -14,7 +16,9 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
+import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.infrastructure.repository.user.MyBatisUserRepository;
 import com.example.keirekipro.infrastructure.repository.user.UserDto;
 import com.example.keirekipro.infrastructure.repository.user.UserDto.AuthProviderDto;
@@ -74,6 +78,9 @@ class MyBatisUserRepositoryTest {
         assertThat(user.getPasswordHash()).isEqualTo(PASSWORD);
         assertThat(user.getUsername()).isEqualTo(USERNAME);
 
+        // ロール
+        assertThat(user.getRoles()).contains(RoleName.USER);
+
         // 外部認証連携：キーが google と github の 2つであること
         Map<String, AuthProvider> providers = user.getAuthProviders();
         assertThat(providers)
@@ -114,6 +121,7 @@ class MyBatisUserRepositoryTest {
                 PASSWORD,
                 false,
                 Collections.singletonMap(GOOGLE_PROVIDER_NAME, authProvider),
+                EnumSet.of(RoleName.USER),
                 null,
                 USERNAME,
                 CREATED_AT,
@@ -134,6 +142,10 @@ class MyBatisUserRepositoryTest {
         verify(mapper).deleteAuthProvidersByUserId(any());
         verify(mapper).insertAuthProvider(any(UserDto.AuthProviderDto.class));
 
+        // ロール全削除 → 再挿入 が呼ばれること
+        verify(mapper).deleteUserRolesByUserId(USER_ID);
+        verify(mapper).insertUserRole(USER_ID, RoleName.USER.name());
+
         // DTOの内容を検証
         assertThat(dto.getId()).isEqualTo(USER_ID);
         assertThat(dto.getEmail()).isEqualTo(EMAIL);
@@ -142,6 +154,9 @@ class MyBatisUserRepositoryTest {
         assertThat(dto.isTwoFactorAuthEnabled()).isFalse();
         assertThat(dto.getCreatedAt()).isEqualTo(CREATED_AT);
         assertThat(dto.getUpdatedAt()).isEqualTo(UPDATED_AT);
+
+        // rolesの内容を検証
+        assertThat(dto.getRoles()).containsExactly(RoleName.USER.name());
 
         // AuthProviderDtoの内容を検証
         UserDto.AuthProviderDto apDto = dto.getAuthProviders().get(0);
@@ -172,6 +187,9 @@ class MyBatisUserRepositoryTest {
         assertThat(user.getEmail()).isEqualTo(Email.create(new ErrorCollector(), EMAIL));
         assertThat(user.getPasswordHash()).isEqualTo(PASSWORD);
         assertThat(user.getUsername()).isEqualTo(USERNAME);
+
+        // ロール
+        assertThat(user.getRoles()).contains(RoleName.USER);
 
         // 外部認証連携：キーがgoogleとgithubの2つであること
         Map<String, AuthProvider> providers = user.getAuthProviders();
@@ -214,6 +232,9 @@ class MyBatisUserRepositoryTest {
         assertThat(user.getId()).isEqualTo(USER_ID);
         assertThat(user.getUsername()).isEqualTo(USERNAME);
 
+        // ロール
+        assertThat(user.getRoles()).contains(RoleName.USER);
+
         // 外部認証連携：キーがgoogleとgithubの2つであること
         Map<String, AuthProvider> providers = user.getAuthProviders();
         assertThat(providers)
@@ -222,6 +243,28 @@ class MyBatisUserRepositoryTest {
         // 指定したGoogleプロバイダーが含まれていること
         AuthProvider google = providers.get(GOOGLE_PROVIDER_NAME);
         assertThat(google.getProviderUserId()).isEqualTo(GOOGLE_PROVIDER_USER_ID);
+    }
+
+    @Test
+    @DisplayName("findById_管理者ロールかつ二段階認証が無効の場合、DomainExceptionをスローする")
+    void test5() {
+        UserDto dto = new UserDto();
+        dto.setId(USER_ID);
+        dto.setEmail(EMAIL);
+        dto.setPassword(PASSWORD);
+        dto.setUsername(USERNAME);
+        dto.setProfileImage(null);
+        dto.setTwoFactorAuthEnabled(false);
+        dto.setCreatedAt(CREATED_AT);
+        dto.setUpdatedAt(UPDATED_AT);
+        dto.setAuthProviders(Collections.emptyList());
+        dto.setRoles(List.of(RoleName.ADMIN.name()));
+
+        when(mapper.selectById(USER_ID)).thenReturn(Optional.of(dto));
+
+        assertThatThrownBy(() -> repository.findById(USER_ID))
+                .isInstanceOf(DomainException.class)
+                .hasMessage("管理者の場合は二段階認証が必須です。");
     }
 
     /**
@@ -254,6 +297,7 @@ class MyBatisUserRepositoryTest {
         dto.setCreatedAt(CREATED_AT);
         dto.setUpdatedAt(UPDATED_AT);
         dto.setAuthProviders(List.of(googleDto, githubDto));
+        dto.setRoles(List.of(RoleName.USER.name()));
         return dto;
     }
 }

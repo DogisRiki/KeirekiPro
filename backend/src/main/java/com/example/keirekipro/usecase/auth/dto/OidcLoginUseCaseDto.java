@@ -1,5 +1,6 @@
 package com.example.keirekipro.usecase.auth.dto;
 
+import java.util.Set;
 import java.util.UUID;
 
 import lombok.Builder;
@@ -33,4 +34,9 @@ public class OidcLoginUseCaseDto {
      * 認証に使用されたOIDCプロバイダー種別
      */
     private final String providerType;
+
+    /**
+     * ロール
+     */
+    private final Set<String> roles;
 }

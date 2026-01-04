@@ -14,12 +14,14 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
+import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
@@ -86,7 +88,9 @@ class UpdateUserInfoUseCaseTest {
                 Email.create(errorCollector, EMAIL),
                 PASSWORD_HASH, false,
                 Map.of("google", authProvider),
-                null, "old-name",
+                EnumSet.of(RoleName.USER),
+                null,
+                "old-name",
                 LocalDateTime.now(), LocalDateTime.now());
 
         // オブジェクトストアとリポジトリのモック
@@ -261,8 +265,17 @@ class UpdateUserInfoUseCaseTest {
 
         ErrorCollector errorCollector = new ErrorCollector();
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
-                User.reconstruct(USER_ID, Email.create(errorCollector, "a@b.com"),
-                        "pw", false, Map.of(), null, "", LocalDateTime.now(), LocalDateTime.now())));
+                User.reconstruct(
+                        USER_ID,
+                        Email.create(errorCollector, "a@b.com"),
+                        "pw",
+                        false,
+                        Map.of(),
+                        EnumSet.of(RoleName.USER),
+                        null,
+                        "",
+                        LocalDateTime.now(),
+                        LocalDateTime.now())));
 
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);

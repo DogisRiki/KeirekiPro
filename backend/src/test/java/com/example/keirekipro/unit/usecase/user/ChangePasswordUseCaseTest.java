@@ -55,8 +55,13 @@ class ChangePasswordUseCaseTest {
 
         // テスト用ユーザー生成
         ErrorCollector errorCollector = new ErrorCollector();
-        User user = User.create(errorCollector, Email.create(errorCollector, "test@keirekipro.click"),
-                HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
+        User user = User.create(
+                errorCollector,
+                Email.create(errorCollector, "test@keirekipro.click"),
+                HASHED_CURRENT_PASSWORD,
+                Collections.emptyMap(),
+                null,
+                "tester");
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
@@ -100,8 +105,13 @@ class ChangePasswordUseCaseTest {
 
         // テスト用ユーザー生成
         ErrorCollector errorCollector = new ErrorCollector();
-        User user = User.create(errorCollector, Email.create(errorCollector, "test@keirekipro.click"),
-                HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
+        User user = User.create(
+                errorCollector,
+                Email.create(errorCollector, "test@keirekipro.click"),
+                HASHED_CURRENT_PASSWORD,
+                Collections.emptyMap(),
+                null,
+                "tester");
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
@@ -128,8 +138,13 @@ class ChangePasswordUseCaseTest {
 
         // テスト用ユーザー生成
         ErrorCollector errorCollector = new ErrorCollector();
-        User user = User.create(errorCollector, Email.create(errorCollector, "test@keirekipro.click"),
-                HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
+        User user = User.create(
+                errorCollector,
+                Email.create(errorCollector, "test@keirekipro.click"),
+                HASHED_CURRENT_PASSWORD,
+                Collections.emptyMap(),
+                null,
+                "tester");
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
@@ -158,8 +173,13 @@ class ChangePasswordUseCaseTest {
 
         // テスト用ユーザー生成
         ErrorCollector errorCollector = new ErrorCollector();
-        User user = User.create(errorCollector, Email.create(errorCollector, "test@keirekipro.click"),
-                HASHED_CURRENT_PASSWORD, false, Collections.emptyMap(), null, "tester");
+        User user = User.create(
+                errorCollector,
+                Email.create(errorCollector, "test@keirekipro.click"),
+                HASHED_CURRENT_PASSWORD,
+                Collections.emptyMap(),
+                null,
+                "tester");
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));

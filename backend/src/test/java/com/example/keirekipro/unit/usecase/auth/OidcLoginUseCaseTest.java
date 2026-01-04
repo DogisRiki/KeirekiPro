@@ -55,7 +55,6 @@ class OidcLoginUseCaseTest {
                 errorCollector,
                 Email.create(errorCollector, EMAIL),
                 null,
-                false,
                 providers,
                 null,
                 USERNAME);
@@ -74,6 +73,10 @@ class OidcLoginUseCaseTest {
                 .build());
 
         assertThat(result.getId()).isEqualTo(existingUser.getId());
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+        assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID);
         verify(userRepository).findById(existingUser.getId());
         verify(userRepository).save(existingUser);
@@ -90,7 +93,6 @@ class OidcLoginUseCaseTest {
                 errorCollector,
                 Email.create(errorCollector, EMAIL),
                 null,
-                false,
                 existingProviders,
                 null,
                 USERNAME);
@@ -112,6 +114,9 @@ class OidcLoginUseCaseTest {
                 .build());
 
         assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+        assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID);
         verify(userRepository).findByEmail(EMAIL);
         verify(userRepository).findById(existingUser.getId());
@@ -129,7 +134,6 @@ class OidcLoginUseCaseTest {
                 errorCollector,
                 null,
                 null,
-                false,
                 providers,
                 null,
                 USERNAME);
@@ -148,6 +152,9 @@ class OidcLoginUseCaseTest {
                 .build());
 
         assertThat(result.getEmail()).isNull();
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+        assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID);
         verify(userRepository).findById(existingUser.getId());
         verify(userRepository).save(existingUser);
@@ -171,6 +178,9 @@ class OidcLoginUseCaseTest {
                 .build());
 
         assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+        assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).save(any(User.class));
         verify(eventPublisher).publish(any());
     }
@@ -190,6 +200,9 @@ class OidcLoginUseCaseTest {
                 .build());
 
         assertThat(result.getEmail()).isNull();
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+        assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).save(any(User.class));
         verify(eventPublisher, never()).publish(any());
     }
@@ -232,6 +245,9 @@ class OidcLoginUseCaseTest {
                 .build());
 
         assertThat(result.getEmail()).isNull();
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+        assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).save(any(User.class));
         verify(eventPublisher, never()).publish(any());
     }
@@ -246,7 +262,6 @@ class OidcLoginUseCaseTest {
                 errorCollector,
                 Email.create(errorCollector, EMAIL),
                 null,
-                false,
                 providers,
                 null,
                 USERNAME);
@@ -257,13 +272,18 @@ class OidcLoginUseCaseTest {
         when(userRepository.findById(existingUser.getId()))
                 .thenReturn(Optional.of(existingUser));
 
-        oidcLoginUseCase.execute(OidcUserInfo.builder()
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(OidcUserInfo.builder()
                 .providerUserId(PROVIDER_USER_ID)
                 .email(EMAIL)
                 .username(USERNAME)
                 .providerType(PROVIDER_TYPE)
                 .build());
 
+        assertThat(result.getId()).isEqualTo(existingUser.getId());
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        assertThat(result.getProviderType()).isEqualTo(PROVIDER_TYPE);
+        assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).findById(existingUser.getId());
         verify(userRepository).save(existingUser);
         verify(eventPublisher, never()).publish(any());

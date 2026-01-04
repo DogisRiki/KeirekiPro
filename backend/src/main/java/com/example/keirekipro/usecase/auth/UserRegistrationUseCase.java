@@ -50,9 +50,9 @@ public class UserRegistrationUseCase {
         User user = User.create(
                 errorCollector,
                 Email.create(
-                        errorCollector, request.getEmail()),
+                        errorCollector,
+                        request.getEmail()),
                 passwordEncoder.encode(request.getPassword()),
-                false,
                 Collections.emptyMap(),
                 null,
                 request.getUsername());

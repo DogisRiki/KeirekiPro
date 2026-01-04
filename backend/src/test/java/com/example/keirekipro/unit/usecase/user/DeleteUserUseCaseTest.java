@@ -44,8 +44,13 @@ class DeleteUserUseCaseTest {
     @DisplayName("ユーザー削除が正常に完了する")
     void test1() {
         ErrorCollector errorCollector = new ErrorCollector();
-        User user = User.create(errorCollector, Email.create(errorCollector, "test@example.com"),
-                "passwordHash", false, null, null, "test-user");
+        User user = User.create(
+                errorCollector,
+                Email.create(errorCollector, "test@example.com"),
+                "passwordHash",
+                null,
+                null,
+                "test-user");
 
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 

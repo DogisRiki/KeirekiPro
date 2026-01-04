@@ -65,4 +65,19 @@ public interface UserMapper {
      * @param userId ユーザーID
      */
     void deleteAuthProvidersByUserId(@Param("userId") UUID userId);
+
+    /**
+     * ユーザーロールを登録する
+     *
+     * @param userId   ユーザーID
+     * @param roleName ロール名
+     */
+    void insertUserRole(@Param("userId") UUID userId, @Param("roleName") String roleName);
+
+    /**
+     * ユーザーロールを全件削除する
+     *
+     * @param userId ユーザーID
+     */
+    void deleteUserRolesByUserId(@Param("userId") UUID userId);
 }

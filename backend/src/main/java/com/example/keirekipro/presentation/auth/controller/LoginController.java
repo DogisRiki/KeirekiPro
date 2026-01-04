@@ -57,8 +57,8 @@ public class LoginController {
         }
 
         // JWT発行
-        String accessToken = jwtProvider.createAccessToken(user.getId().toString());
-        String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
+        String accessToken = jwtProvider.createAccessToken(user.getId().toString(), user.getRoles());
+        String refreshToken = jwtProvider.createRefreshToken(user.getId().toString(), user.getRoles());
 
         // レスポンスヘッダーにセット
         response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));

@@ -73,7 +73,7 @@ public class HandleOidcCallbackUseCase {
             // ログイン処理の実行
             OidcLoginUseCaseDto loginResult = oidcLoginUseCase.execute(userInfo);
 
-            return new OidcCallbackResult.Success(loginResult.getId());
+            return new OidcCallbackResult.Success(loginResult.getId(), loginResult.getRoles());
 
         } catch (Exception e) {
             return new OidcCallbackResult.Failure(OidcCallbackError.LOGIN_FAILED);

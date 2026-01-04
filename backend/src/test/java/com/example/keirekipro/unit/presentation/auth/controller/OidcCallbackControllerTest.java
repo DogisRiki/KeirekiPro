@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.auth.controller.OidcCallbackController;
@@ -66,11 +67,12 @@ class OidcCallbackControllerTest {
     @DisplayName("OIDCコールバックで認証に成功し、成功ページへリダイレクトされる")
     void test1() throws Exception {
         // モックをセットアップ
+        Set<String> roles = Set.of("USER");
         when(handleOidcCallbackUseCase.execute(eq(CODE_VALUE), eq(STATE_VALUE), eq(null), anyString()))
-                .thenReturn(new OidcCallbackResult.Success(ID));
+                .thenReturn(new OidcCallbackResult.Success(ID, roles));
 
-        when(jwtProvider.createAccessToken(eq(ID.toString()))).thenReturn("mockAccessToken");
-        when(jwtProvider.createRefreshToken(eq(ID.toString()))).thenReturn("mockRefreshToken");
+        when(jwtProvider.createAccessToken(eq(ID.toString()), eq(roles))).thenReturn("mockAccessToken");
+        when(jwtProvider.createRefreshToken(eq(ID.toString()), eq(roles))).thenReturn("mockRefreshToken");
 
         // リクエストを実行
         mockMvc.perform(get(CALLBACK_PATH)
@@ -87,8 +89,8 @@ class OidcCallbackControllerTest {
 
         // 呼び出し検証
         verify(handleOidcCallbackUseCase).execute(eq(CODE_VALUE), eq(STATE_VALUE), eq(null), anyString());
-        verify(jwtProvider).createAccessToken(ID.toString());
-        verify(jwtProvider).createRefreshToken(ID.toString());
+        verify(jwtProvider).createAccessToken(ID.toString(), roles);
+        verify(jwtProvider).createRefreshToken(ID.toString(), roles);
     }
 
     @Test

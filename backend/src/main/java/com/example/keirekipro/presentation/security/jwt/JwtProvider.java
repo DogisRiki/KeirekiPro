@@ -2,6 +2,7 @@ package com.example.keirekipro.presentation.security.jwt;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -10,6 +11,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,11 @@ public class JwtProvider {
     private Algorithm algorithm;
 
     /**
+     * ロール情報を格納するclaim名
+     */
+    private static final String ROLES_CLAIM = "roles";
+
+    /**
      * アルゴリズムを初期化する
      *
      * @return HMC256アルゴリズム
@@ -48,41 +55,43 @@ public class JwtProvider {
      * アクセストークンを生成する
      *
      * @param userId ユーザーのID
+     * @param roles  ロール名のSet
      * @return 生成されたJWTトークン
      */
-    public String createAccessToken(String userId) {
-        return createToken(userId,
-                jwtProperties.getAccessTokenValidityInMinutes());
+    public String createAccessToken(String userId, Set<String> roles) {
+        return createToken(userId, roles, jwtProperties.getAccessTokenValidityInMinutes());
     }
 
     /**
      * リフレッシュトークンを生成する
      *
      * @param userId ユーザーのID
+     * @param roles  ロール名のSet
      * @return 生成されたJWTトークン
      */
-    public String createRefreshToken(String userId) {
-        return createToken(userId,
-                jwtProperties.getRefreshTokenValidityInDays() * 24 * 60);
+    public String createRefreshToken(String userId, Set<String> roles) {
+        return createToken(userId, roles, jwtProperties.getRefreshTokenValidityInDays() * 24 * 60);
     }
 
     /**
      * 実際のトークン生成処理を行う
      *
      * @param userId            ユーザーID
+     * @param roles             ロール名のSet
      * @param validityInMinutes 有効期間（分）
      * @return 生成されたトークン
      */
-    private String createToken(String userId, double validityInMinutes) {
+    private String createToken(String userId, Set<String> roles, double validityInMinutes) {
         Date now = new Date();
-        long millis = (long) (validityInMinutes * 60_000); // 分→ミリ秒
+        long millis = (long) (validityInMinutes * 60_000);
         Date validity = new Date(now.getTime() + millis);
 
         return JWT.create()
-                .withSubject(userId) // ユーザーIDを設定
-                .withIssuedAt(now) // 発行時刻
-                .withExpiresAt(validity) // 有効期限
-                .sign(getAlgorithm()); // 署名
+                .withSubject(userId)
+                .withClaim(ROLES_CLAIM, roles != null ? roles.stream().toList() : List.of())
+                .withIssuedAt(now)
+                .withExpiresAt(validity)
+                .sign(getAlgorithm());
     }
 
     /**
@@ -101,13 +110,20 @@ public class JwtProvider {
         // ユーザーIDを取得
         String userId = jwt.getSubject();
 
+        // JWTからロール情報を取得
+        List<String> roles = jwt.getClaim(ROLES_CLAIM).asList(String.class);
+        if (roles == null) {
+            roles = List.of();
+        }
+
+        // Spring SecurityのGrantedAuthorityに変換
+        // ROLE_プレフィックスを付与
+        List<SimpleGrantedAuthority> authorities = roles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .toList();
+
         // Spring Securityの認証オブジェクトを作成
-        // 今回は簡単のため、権限は設定しない
-        return new UsernamePasswordAuthenticationToken(
-                userId, // principal（ユーザーID）
-                null, // credentials（パスワードなど、ここでは不要）
-                List.of() // authorities（権限リスト、今回は空）
-        );
+        return new UsernamePasswordAuthenticationToken(userId, null, authorities);
     }
 
     /**

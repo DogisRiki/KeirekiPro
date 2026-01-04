@@ -21,9 +21,10 @@ public class UserDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<AuthProviderDto> authProviders;
+    private List<String> roles;
 
     /**
-     * 外部認証連携DTO
+     * 外部認証連携情報DTO
      */
     @Data
     public static class AuthProviderDto {
