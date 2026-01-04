@@ -38,6 +38,33 @@ COMMENT ON COLUMN user_auth_providers.provider_user_id IS 'プロバイダ側ユ
 COMMENT ON COLUMN user_auth_providers.created_at IS '作成日時';
 COMMENT ON COLUMN user_auth_providers.updated_at IS '更新日時';
 
+-- ロールテーブル
+CREATE TABLE roles (
+    id UUID PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL
+);
+
+COMMENT ON TABLE roles IS 'ロール';
+COMMENT ON COLUMN roles.id IS 'ロールID';
+COMMENT ON COLUMN roles.name IS 'ロール名(例: USER, ADMIN)';
+COMMENT ON COLUMN roles.created_at IS '作成日時';
+COMMENT ON COLUMN roles.updated_at IS '更新日時';
+
+-- ユーザーとロールの紐付け
+CREATE TABLE user_roles (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES roles(id),
+    created_at TIMESTAMP(6) NOT NULL,
+    PRIMARY KEY (user_id, role_id)
+);
+
+COMMENT ON TABLE user_roles IS 'ユーザー-ロール紐付け';
+COMMENT ON COLUMN user_roles.user_id IS 'ユーザーID';
+COMMENT ON COLUMN user_roles.role_id IS 'ロールID';
+COMMENT ON COLUMN user_roles.created_at IS '付与日時';
+
 -- 職務経歴書テーブル
 CREATE TABLE resumes (
     id UUID PRIMARY KEY,
