@@ -55,6 +55,7 @@ describe("useSetEmailAndPassword", () => {
             twoFactorAuthEnabled: false,
             hasPassword: true,
             authProviders: [],
+            roles: ["USER"],
         };
         const mockResponse = { status: 200, data: returnedUser } as AxiosResponse<User>;
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce(mockResponse);
@@ -99,6 +100,7 @@ describe("useSetEmailAndPassword", () => {
             twoFactorAuthEnabled: false,
             hasPassword: true,
             authProviders: [],
+            roles: ["USER"],
         };
         const mockResponse = { status: 200, data: returnedUser } as AxiosResponse<User>;
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce(mockResponse);

@@ -22,6 +22,7 @@ describe("useUserAuthStore", () => {
         twoFactorAuthEnabled: false,
         hasPassword: true,
         authProviders: ["github"],
+        roles: ["USER"],
     };
 
     beforeEach(() => {

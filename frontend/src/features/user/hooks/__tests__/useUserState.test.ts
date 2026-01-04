@@ -17,6 +17,7 @@ describe("getUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: true,
             authProviders: [],
+            roles: ["USER"],
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_PASSWORD);
     });
@@ -30,6 +31,7 @@ describe("getUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: false,
             authProviders: ["github"],
+            roles: ["USER"],
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_WITH_PROVIDER);
     });
@@ -43,6 +45,7 @@ describe("getUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: false,
             authProviders: ["google"],
+            roles: ["USER"],
         };
         expect(getUserState(user)).toBe(UserState.PROVIDER_ONLY);
     });
@@ -56,6 +59,7 @@ describe("getUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: true,
             authProviders: ["github", "google"],
+            roles: ["USER"],
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_PASSWORD_WITH_PROVIDER);
     });
@@ -69,6 +73,7 @@ describe("getUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: true,
             authProviders: [],
+            roles: ["USER"],
         };
         expect(getUserState(user)).toBe(UserState.UNKNOWN);
     });
@@ -94,6 +99,7 @@ describe("useUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: true,
             authProviders: [],
+            roles: ["USER"],
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -111,6 +117,7 @@ describe("useUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: false,
             authProviders: ["github"],
+            roles: ["USER"],
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -128,6 +135,7 @@ describe("useUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: false,
             authProviders: ["google"],
+            roles: ["USER"],
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -145,6 +153,7 @@ describe("useUserState", () => {
             twoFactorAuthEnabled: false,
             hasPassword: true,
             authProviders: ["github", "google"],
+            roles: ["USER"],
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
