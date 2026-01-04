@@ -24,6 +24,21 @@ entity "外部認証連携(user_auth_providers)" as UserAuthProviders {
     updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
 }
 
+entity "ロール(roles)" as Roles {
+    + id : <color:#1E90FF>UUID</color> -- ロールID (PK)
+    --
+    name : <color:#1E90FF>VARCHAR(50)</color> <color:#32CD32>[NOT NULL, UNIQUE]</color> -- ロール名
+    created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 作成日時
+    updated_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 更新日時
+}
+
+entity "ユーザー-ロール紐付け(user_roles)" as UserRoles {
+    + user_id : <color:#1E90FF>UUID</color> -- ユーザーID (PK, FK)
+    + role_id : <color:#1E90FF>UUID</color> -- ロールID (PK, FK)
+    --
+    created_at : <color:#1E90FF>TIMESTAMP(6)</color> <color:#32CD32>[NOT NULL]</color> -- 付与日時
+}
+
 entity "職務経歴書(resumes)" as Resumes {
     + id : <color:#1E90FF>UUID</color> -- 識別子 (PK)
     --
@@ -173,6 +188,9 @@ entity "SNSプラットフォームマスタ(sns_platform_mst)" as SnsPlatformMs
 ' ----------------------
 users ||--o{ Resumes
 users ||--|{ UserAuthProviders
+users ||--o{ UserRoles
+
+Roles ||--o{ UserRoles
 
 Resumes ||--o| Careers
 Resumes ||--o| Projects

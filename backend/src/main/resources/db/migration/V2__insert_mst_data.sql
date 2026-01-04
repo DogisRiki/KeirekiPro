@@ -1,4 +1,11 @@
 -- =========================================================
+-- ロールデータ
+-- =========================================================
+INSERT INTO roles (id, name, created_at, updated_at) VALUES
+    (gen_random_uuid(), 'USER', NOW(), NOW()),
+    (gen_random_uuid(), 'ADMIN', NOW(), NOW());
+
+-- =========================================================
 -- 技術スタックカテゴリマスタデータ
 -- =========================================================
 INSERT INTO tech_stack_category_mst (code, main_category, sub_category) VALUES
