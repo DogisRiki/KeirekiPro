@@ -1,4 +1,5 @@
 import { paths } from "@/config/paths";
+import BackupIcon from "@mui/icons-material/Backup";
 import BusinessCenter from "@mui/icons-material/BusinessCenter";
 import ContactMailIcon from "@mui/icons-material/ContactMail";
 import HomeIcon from "@mui/icons-material/Home";
@@ -11,6 +12,7 @@ import { useNavigate } from "react-router";
 const menuItems = [
     { label: "ホーム", icon: <HomeIcon />, path: paths.resume.list },
     { label: "職務経歴書作成", icon: <BusinessCenter />, path: paths.resume.new },
+    { label: "バックアップ", icon: <BackupIcon />, path: paths.backup },
     { label: "お問い合わせ", icon: <ContactMailIcon />, path: paths.contact },
 ];
 

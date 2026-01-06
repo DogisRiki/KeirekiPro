@@ -2,6 +2,7 @@ import { ErrorFallback, NotFound, ServerError } from "@/components/errors";
 import { ProtectedLayout, PublicLayout } from "@/components/layouts";
 import { paths } from "@/config/paths";
 import {
+    Backup,
     ChangePassword,
     Contact,
     Login,
@@ -51,6 +52,7 @@ const router = createBrowserRouter([
             { path: paths.resume.list, element: <ResumeList /> },
             { path: paths.resume.new, element: <ResumeNew /> },
             { path: paths.resume.edit, element: <Resume /> },
+            { path: paths.backup, element: <Backup /> },
             { path: paths.user, element: <SettingUser /> },
             { path: paths.password.change, element: <ChangePassword /> },
             { path: paths.emailPassword.set, element: <SetEmailAndPassword /> },
