@@ -66,6 +66,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect:1.9.22'
 }
 
 configurations.configureEach {
