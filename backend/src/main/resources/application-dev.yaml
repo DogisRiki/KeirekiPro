@@ -44,6 +44,9 @@ logging:
     org.springframework.web: debug                                  # Spring Webのログを出力
     org.flywaydb.core: debug                                        # Flywayのログを出力
     org.springframework.security: debug                             # Spring Securityのログを出力
+  structured:
+    format:
+      console:
 
 # Sprig Boot Actuator設定
 # /actuator/health: アプリケーションの健康状態を表示
