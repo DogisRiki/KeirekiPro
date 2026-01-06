@@ -2,5 +2,4 @@ logging:
   level:
     root: warn
     com.example.keirekipro: info
-    org.apache.pdfbox.pdmodel.font.PDType1Font: error
     org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: error
