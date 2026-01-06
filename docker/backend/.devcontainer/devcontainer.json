@@ -14,7 +14,9 @@
                 }
             ],
             "extensions": [
-                "vscjava.vscode-java-pack",
+                "/opt/vscode-extensions/redhat.java-1.50.0.vsix",
+                "vscjava.vscode-java-debug",
+                "vscjava.vscode-java-test",
                 "shengchen.vscode-checkstyle",
                 "rangav.vscode-thunder-client",
                 "oderwat.indent-rainbow"
@@ -31,7 +33,7 @@
                 "files.insertFinalNewline": true,
                 "files.trimFinalNewlines": true,
                 "files.trimTrailingWhitespace": true,
-                "java.compile.nullAnalysis.mode": "automatic",
+                "java.compile.nullAnalysis.mode": "disabled",
                 "java.configuration.updateBuildConfiguration": "automatic",
                 "java.checkstyle.configuration": "google_checks.xml",
                 "java.checkstyle.version": "10.20.1",
