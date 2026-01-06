@@ -32,4 +32,144 @@
         SELECT COUNT(*) FROM self_promotions WHERE resume_id = #{resumeId}
     </select>
 
+    <select id="selectResumeForBackup" resultType="string">
+        SELECT
+            json_build_object(
+                'resumeName', r.name,
+                'date', r.date,
+                'lastName', r.last_name,
+                'firstName', r.first_name,
+                'careers', COALESCE((
+                    SELECT json_agg(
+                        json_build_object(
+                            'companyName', c.company_name,
+                            'startDate', c.start_date,
+                            'endDate', c.end_date,
+                            'active', c.is_active
+                        )
+                    )
+                    FROM careers c
+                    WHERE c.resume_id = r.id
+                ), '[]'::json),
+                'projects', COALESCE((
+                    SELECT json_agg(
+                        json_build_object(
+                            'companyName', p.company_name,
+                            'startDate', p.start_date,
+                            'endDate', p.end_date,
+                            'active', p.is_active,
+                            'name', p.name,
+                            'overview', p.overview,
+                            'teamComp', p.team_comp,
+                            'role', p.role,
+                            'achievement', p.achievement,
+                            'process', json_build_object(
+                                'requirements', p.requirements,
+                                'basicDesign', p.basic_design,
+                                'detailedDesign', p.detailed_design,
+                                'implementation', p.implementation,
+                                'integrationTest', p.integration_test,
+                                'systemTest', p.system_test,
+                                'maintenance', p.maintenance
+                            ),
+                            'techStack', json_build_object(
+                                'frontend', json_build_object(
+                                    'languages', COALESCE(pts.frontend_languages, ARRAY[]::text[]),
+                                    'frameworks', COALESCE(pts.frontend_framework, ARRAY[]::text[]),
+                                    'libraries', COALESCE(pts.frontend_libraries, ARRAY[]::text[]),
+                                    'buildTools', COALESCE(pts.frontend_build_tool, ARRAY[]::text[]),
+                                    'packageManagers', COALESCE(pts.frontend_package_manager, ARRAY[]::text[]),
+                                    'linters', COALESCE(pts.frontend_linters, ARRAY[]::text[]),
+                                    'formatters', COALESCE(pts.frontend_formatters, ARRAY[]::text[]),
+                                    'testingTools', COALESCE(pts.frontend_testing_tools, ARRAY[]::text[])
+                                ),
+                                'backend', json_build_object(
+                                    'languages', COALESCE(pts.backend_languages, ARRAY[]::text[]),
+                                    'frameworks', COALESCE(pts.backend_framework, ARRAY[]::text[]),
+                                    'libraries', COALESCE(pts.backend_libraries, ARRAY[]::text[]),
+                                    'buildTools', COALESCE(pts.backend_build_tool, ARRAY[]::text[]),
+                                    'packageManagers', COALESCE(pts.backend_package_manager, ARRAY[]::text[]),
+                                    'linters', COALESCE(pts.backend_linters, ARRAY[]::text[]),
+                                    'formatters', COALESCE(pts.backend_formatters, ARRAY[]::text[]),
+                                    'testingTools', COALESCE(pts.backend_testing_tools, ARRAY[]::text[]),
+                                    'ormTools', COALESCE(pts.orm_tools, ARRAY[]::text[]),
+                                    'auth', COALESCE(pts.auth, ARRAY[]::text[])
+                                ),
+                                'infrastructure', json_build_object(
+                                    'clouds', COALESCE(pts.clouds, ARRAY[]::text[]),
+                                    'operatingSystems', COALESCE(pts.operating_system, ARRAY[]::text[]),
+                                    'containers', COALESCE(pts.containers, ARRAY[]::text[]),
+                                    'databases', COALESCE(pts.database, ARRAY[]::text[]),
+                                    'webServers', COALESCE(pts.web_server, ARRAY[]::text[]),
+                                    'ciCdTools', COALESCE(pts.ci_cd_tool, ARRAY[]::text[]),
+                                    'iacTools', COALESCE(pts.iac_tools, ARRAY[]::text[]),
+                                    'monitoringTools', COALESCE(pts.monitoring_tools, ARRAY[]::text[]),
+                                    'loggingTools', COALESCE(pts.logging_tools, ARRAY[]::text[])
+                                ),
+                                'tools', json_build_object(
+                                    'sourceControls', COALESCE(pts.source_control, ARRAY[]::text[]),
+                                    'projectManagements', COALESCE(pts.project_management, ARRAY[]::text[]),
+                                    'communicationTools', COALESCE(pts.communication_tool, ARRAY[]::text[]),
+                                    'documentationTools', COALESCE(pts.documentation_tools, ARRAY[]::text[]),
+                                    'apiDevelopmentTools', COALESCE(pts.api_development_tools, ARRAY[]::text[]),
+                                    'designTools', COALESCE(pts.design_tools, ARRAY[]::text[]),
+                                    'editors', COALESCE(pts.editor, ARRAY[]::text[]),
+                                    'developmentEnvironments', COALESCE(pts.development_environment, ARRAY[]::text[])
+                                )
+                            )
+                        )
+                    )
+                    FROM projects p
+                    LEFT JOIN project_tech_stacks pts ON pts.project_id = p.id
+                    WHERE p.resume_id = r.id
+                ), '[]'::json),
+                'certifications', COALESCE((
+                    SELECT json_agg(
+                        json_build_object(
+                            'name', cert.name,
+                            'date', cert.date
+                        )
+                    )
+                    FROM certifications cert
+                    WHERE cert.resume_id = r.id
+                ), '[]'::json),
+                'portfolios', COALESCE((
+                    SELECT json_agg(
+                        json_build_object(
+                            'name', pf.name,
+                            'overview', pf.overview,
+                            'techStack', pf.tech_stack,
+                            'link', pf.link
+                        )
+                    )
+                    FROM portfolios pf
+                    WHERE pf.resume_id = r.id
+                ), '[]'::json),
+                'snsPlatforms', COALESCE((
+                    SELECT json_agg(
+                        json_build_object(
+                            'name', sp.name,
+                            'link', sp.link
+                        )
+                    )
+                    FROM sns_platforms sp
+                    WHERE sp.resume_id = r.id
+                ), '[]'::json),
+                'selfPromotions', COALESCE((
+                    SELECT json_agg(
+                        json_build_object(
+                            'title', self.title,
+                            'content', self.content
+                        )
+                    )
+                    FROM self_promotions self
+                    WHERE self.resume_id = r.id
+                ), '[]'::json)
+            )::text
+        FROM
+            resumes r
+        WHERE
+            r.id = #{resumeId}
+            AND r.user_id = #{userId}
+    </select>
 </mapper>

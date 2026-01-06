@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
  * 職務経歴書における各種上限値（件数上限など）を定義するクラス
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class ResumeLimits {
+public final class ResumeLimits {
 
     /**
      * 職務経歴書作成上限数
