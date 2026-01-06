@@ -38,7 +38,7 @@ public class OidcAuthorizationController {
     @GetMapping("/authorize")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "OIDC認可フローの開始", description = "OIDCの認可フローを開始し、認可URLを生成する")
-    public String handle(@RequestParam String provider, HttpServletRequest servletRequest) {
+    public String handle(@RequestParam("provider") String provider, HttpServletRequest servletRequest) {
 
         // コールバックURLの構築
         String baseUrl = UrlUtil.getBaseUrl(servletRequest);

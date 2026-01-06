@@ -67,9 +67,9 @@ public class OidcCallbackController {
     @GetMapping("/callback")
     @Operation(summary = "OIDCコールバック", description = "OIDCプロバイダーからのコールバック処理を実行する")
     public void handle(
-            @RequestParam(required = false) String code,
-            @RequestParam(required = false) String state,
-            @RequestParam(required = false) String error,
+            @RequestParam(name = "code", required = false) String code,
+            @RequestParam(name = "state", required = false) String state,
+            @RequestParam(name = "error", required = false) String error,
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
 

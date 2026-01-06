@@ -36,7 +36,7 @@ public class RemoveAuthProviderController {
     @DeleteMapping("/auth-provider/{provider}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "外部認証連携解除", description = "特定の外部認証連携情報を解除する")
-    public void handle(@PathVariable String provider) {
+    public void handle(@PathVariable("provider") String provider) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
         removeAuthProviderUseCase.execute(userId, provider);
     }
