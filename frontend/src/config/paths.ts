@@ -19,6 +19,7 @@ export const paths = {
         new: "/resume/new",
         edit: "/resume/:id",
     },
+    backup: "/backup",
     user: "/user",
     contact: "/contact",
     terms: "/terms",

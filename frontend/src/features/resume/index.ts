@@ -1,3 +1,6 @@
+export * from "@/features/resume/components/backup/BackupContainer";
+export * from "@/features/resume/components/backup/BackupSection";
+export * from "@/features/resume/components/backup/RestoreSection";
 export * from "@/features/resume/components/resume-list/ResumeCard";
 export * from "@/features/resume/components/resume-list/ResumeCardMenu";
 export * from "@/features/resume/components/resume-list/ResumeListContainer";
@@ -27,6 +30,7 @@ export * from "@/features/resume/utils";
 
 export * from "@/features/resume/constants";
 
+export * from "@/features/resume/api/backupResume";
 export * from "@/features/resume/api/career/createCareer";
 export * from "@/features/resume/api/career/deleteCareer";
 export * from "@/features/resume/api/career/updateCareer";
@@ -47,6 +51,7 @@ export * from "@/features/resume/api/portfolio/updatePortfolio";
 export * from "@/features/resume/api/project/createProject";
 export * from "@/features/resume/api/project/deleteProject";
 export * from "@/features/resume/api/project/updateProject";
+export * from "@/features/resume/api/restoreResume";
 export * from "@/features/resume/api/selfPromotion/createSelfPromotion";
 export * from "@/features/resume/api/selfPromotion/deleteSelfPromotion";
 export * from "@/features/resume/api/selfPromotion/updateSelfPromotion";
@@ -74,6 +79,7 @@ export * from "@/features/resume/hooks/snsPlatform/useCreateSnsPlatform";
 export * from "@/features/resume/hooks/snsPlatform/useDeleteSnsPlatform";
 export * from "@/features/resume/hooks/snsPlatform/useUpdateSnsPlatform";
 export * from "@/features/resume/hooks/useAutoSave";
+export * from "@/features/resume/hooks/useBackupResume";
 export * from "@/features/resume/hooks/useCertificationList";
 export * from "@/features/resume/hooks/useCreateResume";
 export * from "@/features/resume/hooks/useDeleteResume";
@@ -81,6 +87,7 @@ export * from "@/features/resume/hooks/useExportResume";
 export * from "@/features/resume/hooks/useGetResumeInfo";
 export * from "@/features/resume/hooks/useGetResumeList";
 export * from "@/features/resume/hooks/useNavigationBlocker";
+export * from "@/features/resume/hooks/useRestoreResume";
 export * from "@/features/resume/hooks/useSnsPlatformList";
 export * from "@/features/resume/hooks/useTechStackList";
 export * from "@/features/resume/hooks/useUpdateResumeBasic";

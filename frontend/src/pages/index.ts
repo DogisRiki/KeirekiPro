@@ -1,3 +1,4 @@
+export * from "@/pages/Backup";
 export * from "@/pages/ChangePassword";
 export * from "@/pages/Contact";
 export * from "@/pages/Login";
