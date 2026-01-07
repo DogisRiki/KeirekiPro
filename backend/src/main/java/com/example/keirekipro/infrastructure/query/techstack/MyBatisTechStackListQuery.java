@@ -3,29 +3,25 @@ package com.example.keirekipro.infrastructure.query.techstack;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto;
+import com.example.keirekipro.usecase.query.techstack.TechStackListQuery;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListQueryDto;
 
 import org.springframework.stereotype.Repository;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * 技術スタック一覧取得クエリ
+ * 技術スタック一覧取得クエリ実装
  */
 @Repository
 @RequiredArgsConstructor
-public class TechStackQuery {
+public class MyBatisTechStackListQuery implements TechStackListQuery {
 
-    private final TechStackMapper techStackMapper;
+    private final TechStackQueryMapper mapper;
 
-    /**
-     * 技術スタック一覧を取得してカテゴリ別に整形して返却する
-     *
-     * @return 技術スタック一覧DTO
-     */
-    public TechStackListItemDto selectTechStackListItem() {
-
-        List<TechStackDto> rows = techStackMapper.selectAll();
+    @Override
+    public TechStackListQueryDto findAll() {
+        List<TechStackQueryMapper.TechStackRow> rows = mapper.selectAll();
 
         // frontend
         List<String> frontendLanguages = new ArrayList<>();
@@ -70,7 +66,7 @@ public class TechStackQuery {
         List<String> toolsEditors = new ArrayList<>();
         List<String> toolsDevelopmentEnvironments = new ArrayList<>();
 
-        for (TechStackDto row : rows) {
+        for (TechStackQueryMapper.TechStackRow row : rows) {
             String main = row.getMainCategory();
             String sub = row.getSubCategory();
             String name = row.getName();
@@ -140,49 +136,58 @@ public class TechStackQuery {
             }
         }
 
-        TechStackListItemDto.Frontend frontend = TechStackListItemDto.Frontend.create(
-                frontendLanguages,
-                frontendFrameworks,
-                frontendLibraries,
-                frontendBuildTools,
-                frontendPackageManagers,
-                frontendLinters,
-                frontendFormatters,
-                frontendTestingTools);
+        TechStackListQueryDto.FrontendDto frontend = TechStackListQueryDto.FrontendDto.builder()
+                .languages(frontendLanguages)
+                .frameworks(frontendFrameworks)
+                .libraries(frontendLibraries)
+                .buildTools(frontendBuildTools)
+                .packageManagers(frontendPackageManagers)
+                .linters(frontendLinters)
+                .formatters(frontendFormatters)
+                .testingTools(frontendTestingTools)
+                .build();
 
-        TechStackListItemDto.Backend backend = TechStackListItemDto.Backend.create(
-                backendLanguages,
-                backendFrameworks,
-                backendLibraries,
-                backendBuildTools,
-                backendPackageManagers,
-                backendLinters,
-                backendFormatters,
-                backendTestingTools,
-                backendOrmTools,
-                backendAuth);
+        TechStackListQueryDto.BackendDto backend = TechStackListQueryDto.BackendDto.builder()
+                .languages(backendLanguages)
+                .frameworks(backendFrameworks)
+                .libraries(backendLibraries)
+                .buildTools(backendBuildTools)
+                .packageManagers(backendPackageManagers)
+                .linters(backendLinters)
+                .formatters(backendFormatters)
+                .testingTools(backendTestingTools)
+                .ormTools(backendOrmTools)
+                .auth(backendAuth)
+                .build();
 
-        TechStackListItemDto.Infrastructure infrastructure = TechStackListItemDto.Infrastructure.create(
-                infraClouds,
-                infraOperatingSystems,
-                infraContainers,
-                infraDatabases,
-                infraWebServers,
-                infraCiCdTools,
-                infraIacTools,
-                infraMonitoringTools,
-                infraLoggingTools);
+        TechStackListQueryDto.InfrastructureDto infrastructure = TechStackListQueryDto.InfrastructureDto.builder()
+                .clouds(infraClouds)
+                .operatingSystems(infraOperatingSystems)
+                .containers(infraContainers)
+                .databases(infraDatabases)
+                .webServers(infraWebServers)
+                .ciCdTools(infraCiCdTools)
+                .iacTools(infraIacTools)
+                .monitoringTools(infraMonitoringTools)
+                .loggingTools(infraLoggingTools)
+                .build();
 
-        TechStackListItemDto.Tools tools = TechStackListItemDto.Tools.create(
-                toolsSourceControls,
-                toolsProjectManagements,
-                toolsCommunicationTools,
-                toolsDocumentationTools,
-                toolsApiDevelopmentTools,
-                toolsDesignTools,
-                toolsEditors,
-                toolsDevelopmentEnvironments);
+        TechStackListQueryDto.ToolsDto tools = TechStackListQueryDto.ToolsDto.builder()
+                .sourceControls(toolsSourceControls)
+                .projectManagements(toolsProjectManagements)
+                .communicationTools(toolsCommunicationTools)
+                .documentationTools(toolsDocumentationTools)
+                .apiDevelopmentTools(toolsApiDevelopmentTools)
+                .designTools(toolsDesignTools)
+                .editors(toolsEditors)
+                .developmentEnvironments(toolsDevelopmentEnvironments)
+                .build();
 
-        return TechStackListItemDto.create(frontend, backend, infrastructure, tools);
+        return TechStackListQueryDto.builder()
+                .frontend(frontend)
+                .backend(backend)
+                .infrastructure(infrastructure)
+                .tools(tools)
+                .build();
     }
 }

@@ -3,10 +3,10 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.example.keirekipro.infrastructure.query.techstack.TechStackMapper">
+<mapper namespace="com.example.keirekipro.infrastructure.query.techstack.TechStackQueryMapper">
 
     <select id="selectAll"
-            resultType="com.example.keirekipro.infrastructure.query.techstack.TechStackDto">
+            resultType="com.example.keirekipro.infrastructure.query.techstack.TechStackQueryMapper$TechStackRow">
         SELECT
             c.main_category AS mainCategory,
             c.sub_category AS subCategory,

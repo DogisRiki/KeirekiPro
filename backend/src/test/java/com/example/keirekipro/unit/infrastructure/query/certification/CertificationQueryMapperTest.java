@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 
 import com.example.keirekipro.config.PostgresTestContainerConfig;
-import com.example.keirekipro.infrastructure.query.certification.CertificationDto;
-import com.example.keirekipro.infrastructure.query.certification.CertificationMapper;
+import com.example.keirekipro.infrastructure.query.certification.CertificationQueryMapper;
+import com.example.keirekipro.infrastructure.query.certification.CertificationQueryMapper.CertificationRow;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,15 +27,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(PostgresTestContainerConfig.class)
-class CertificationMapperTest {
+class CertificationQueryMapperTest {
 
-    private final CertificationMapper certificationMapper;
+    private final CertificationQueryMapper mapper;
     private final JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("selectAll_資格マスタが存在しない場合、空リストが返る")
     void test1() {
-        List<CertificationDto> list = certificationMapper.selectAll();
+        List<CertificationRow> list = mapper.selectAll();
         assertThat(list).isEmpty();
     }
 
@@ -48,13 +48,13 @@ class CertificationMapperTest {
         insertCertification(30, "AWS SAA");
 
         // 実行
-        List<CertificationDto> list = certificationMapper.selectAll();
+        List<CertificationRow> list = mapper.selectAll();
 
         // 件数検証
         assertThat(list).hasSize(3);
 
         // 資格名の検証
-        assertThat(list).extracting(CertificationDto::getName)
+        assertThat(list).extracting(CertificationRow::getName)
                 .containsExactlyInAnyOrder("基本情報技術者", "応用情報技術者", "AWS SAA");
     }
 

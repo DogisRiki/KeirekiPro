@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 
 import com.example.keirekipro.config.PostgresTestContainerConfig;
-import com.example.keirekipro.infrastructure.query.techstack.TechStackDto;
-import com.example.keirekipro.infrastructure.query.techstack.TechStackMapper;
+import com.example.keirekipro.infrastructure.query.techstack.TechStackQueryMapper;
+import com.example.keirekipro.infrastructure.query.techstack.TechStackQueryMapper.TechStackRow;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,9 +27,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(PostgresTestContainerConfig.class)
-class TechStackMapperTest {
+class TechStackQueryMapperTest {
 
-    private final TechStackMapper techStackMapper;
+    private final TechStackQueryMapper mapper;
     private final JdbcTemplate jdbcTemplate;
 
     private static final String CATEGORY_CODE_A = "TEST_CAT_A";
@@ -45,7 +45,7 @@ class TechStackMapperTest {
     @Test
     @DisplayName("selectAll_技術スタックマスタが存在しない場合、空リストが返る")
     void test1() {
-        List<TechStackDto> list = techStackMapper.selectAll();
+        List<TechStackRow> list = mapper.selectAll();
         assertThat(list).isEmpty();
     }
 
@@ -64,28 +64,28 @@ class TechStackMapperTest {
         insertTechStack(40, "C-Only", CATEGORY_CODE_C);
 
         // 実行
-        List<TechStackDto> list = techStackMapper.selectAll();
+        List<TechStackRow> list = mapper.selectAll();
 
         // 件数検証
         assertThat(list).hasSize(4);
 
         // 並び順検証
-        TechStackDto first = list.get(0);
+        TechStackRow first = list.get(0);
         assertThat(first.getMainCategory()).isEqualTo(MAIN_CATEGORY_A);
         assertThat(first.getSubCategory()).isEqualTo(SUB_CATEGORY_A);
         assertThat(first.getName()).isEqualTo("A-First");
 
-        TechStackDto second = list.get(1);
+        TechStackRow second = list.get(1);
         assertThat(second.getMainCategory()).isEqualTo(MAIN_CATEGORY_A);
         assertThat(second.getSubCategory()).isEqualTo(SUB_CATEGORY_A);
         assertThat(second.getName()).isEqualTo("A-Second");
 
-        TechStackDto third = list.get(2);
+        TechStackRow third = list.get(2);
         assertThat(third.getMainCategory()).isEqualTo(MAIN_CATEGORY_A);
         assertThat(third.getSubCategory()).isEqualTo(SUB_CATEGORY_B);
         assertThat(third.getName()).isEqualTo("B-Only");
 
-        TechStackDto fourth = list.get(3);
+        TechStackRow fourth = list.get(3);
         assertThat(fourth.getMainCategory()).isEqualTo(MAIN_CATEGORY_B);
         assertThat(fourth.getSubCategory()).isEqualTo(SUB_CATEGORY_A);
         assertThat(fourth.getName()).isEqualTo("C-Only");

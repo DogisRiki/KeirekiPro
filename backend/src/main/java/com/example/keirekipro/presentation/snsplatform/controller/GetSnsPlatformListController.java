@@ -1,7 +1,7 @@
 package com.example.keirekipro.presentation.snsplatform.controller;
 
 import com.example.keirekipro.presentation.snsplatform.dto.SnsPlatformListResponse;
-import com.example.keirekipro.usecase.query.snsplatform.GetSnsPlatformListQueryService;
+import com.example.keirekipro.usecase.query.snsplatform.SnsPlatformListQuery;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "snsplatforms", description = "SNSプラットフォームに関するエンドポイント")
 public class GetSnsPlatformListController {
 
-    private final GetSnsPlatformListQueryService getSnsPlatformListQueryService;
+    private final SnsPlatformListQuery snsPlatformListQuery;
 
     /**
      * SNSプラットフォーム一覧取得エンドポイント
@@ -32,6 +32,6 @@ public class GetSnsPlatformListController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "SNSプラットフォーム一覧の取得", description = "画面入力補助用のSNSプラットフォーム一覧を取得する")
     public SnsPlatformListResponse handle() {
-        return SnsPlatformListResponse.convertFrom(getSnsPlatformListQueryService.execute());
+        return SnsPlatformListResponse.convertFrom(snsPlatformListQuery.findAll());
     }
 }

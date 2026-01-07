@@ -2,7 +2,7 @@ package com.example.keirekipro.presentation.certification.dto;
 
 import java.util.List;
 
-import com.example.keirekipro.usecase.query.certification.dto.CertificationListItemDto;
+import com.example.keirekipro.usecase.query.certification.dto.CertificationListQueryDto;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -20,12 +20,12 @@ public class CertificationListResponse {
     private final List<String> names;
 
     /**
-     * ユースケースDTOからレスポンスDTOへ変換する
+     * クエリDTOからレスポンスDTOへ変換する
      *
-     * @param dto ユースケースDTO
+     * @param dto クエリDTO
      * @return レスポンスDTO
      */
-    public static CertificationListResponse convertFrom(CertificationListItemDto dto) {
+    public static CertificationListResponse convertFrom(CertificationListQueryDto dto) {
         return new CertificationListResponse(dto.getNames());
     }
 }

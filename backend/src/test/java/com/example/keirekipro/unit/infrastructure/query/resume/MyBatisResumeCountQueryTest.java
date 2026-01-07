@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 
-import com.example.keirekipro.infrastructure.query.resume.ResumeQuery;
+import com.example.keirekipro.infrastructure.query.resume.MyBatisResumeCountQuery;
 import com.example.keirekipro.infrastructure.query.resume.ResumeQueryMapper;
 
 import org.junit.jupiter.api.DisplayName;
@@ -17,27 +17,27 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class ResumeQueryTest {
+class MyBatisResumeCountQueryTest {
 
     @Mock
-    private ResumeQueryMapper resumeQueryMapper;
+    private ResumeQueryMapper mapper;
 
     @InjectMocks
-    private ResumeQuery resumeQuery;
+    private MyBatisResumeCountQuery query;
 
     @Test
     @DisplayName("ユーザーに紐づく職務経歴書数を取得できる")
     void test1() {
         // モック準備
         UUID userId = UUID.randomUUID();
-        when(resumeQueryMapper.countResumesByUserId(userId)).thenReturn(3);
+        when(mapper.countResumesByUserId(userId)).thenReturn(3);
 
         // 実行
-        int actual = resumeQuery.countResumesByUserId(userId);
+        int actual = query.countResumesByUserId(userId);
 
         // 検証
         assertThat(actual).isEqualTo(3);
-        verify(resumeQueryMapper).countResumesByUserId(userId);
+        verify(mapper).countResumesByUserId(userId);
     }
 
     @Test
@@ -45,14 +45,14 @@ class ResumeQueryTest {
     void test2() {
         // モック準備
         UUID resumeId = UUID.randomUUID();
-        when(resumeQueryMapper.countCareersByResumeId(resumeId)).thenReturn(2);
+        when(mapper.countCareersByResumeId(resumeId)).thenReturn(2);
 
         // 実行
-        int actual = resumeQuery.countCareersByResumeId(resumeId);
+        int actual = query.countCareersByResumeId(resumeId);
 
         // 検証
         assertThat(actual).isEqualTo(2);
-        verify(resumeQueryMapper).countCareersByResumeId(resumeId);
+        verify(mapper).countCareersByResumeId(resumeId);
     }
 
     @Test
@@ -60,14 +60,14 @@ class ResumeQueryTest {
     void test3() {
         // モック準備
         UUID resumeId = UUID.randomUUID();
-        when(resumeQueryMapper.countProjectsByResumeId(resumeId)).thenReturn(5);
+        when(mapper.countProjectsByResumeId(resumeId)).thenReturn(5);
 
         // 実行
-        int actual = resumeQuery.countProjectsByResumeId(resumeId);
+        int actual = query.countProjectsByResumeId(resumeId);
 
         // 検証
         assertThat(actual).isEqualTo(5);
-        verify(resumeQueryMapper).countProjectsByResumeId(resumeId);
+        verify(mapper).countProjectsByResumeId(resumeId);
     }
 
     @Test
@@ -75,14 +75,14 @@ class ResumeQueryTest {
     void test4() {
         // モック準備
         UUID resumeId = UUID.randomUUID();
-        when(resumeQueryMapper.countCertificationsByResumeId(resumeId)).thenReturn(4);
+        when(mapper.countCertificationsByResumeId(resumeId)).thenReturn(4);
 
         // 実行
-        int actual = resumeQuery.countCertificationsByResumeId(resumeId);
+        int actual = query.countCertificationsByResumeId(resumeId);
 
         // 検証
         assertThat(actual).isEqualTo(4);
-        verify(resumeQueryMapper).countCertificationsByResumeId(resumeId);
+        verify(mapper).countCertificationsByResumeId(resumeId);
     }
 
     @Test
@@ -90,14 +90,14 @@ class ResumeQueryTest {
     void test5() {
         // モック準備
         UUID resumeId = UUID.randomUUID();
-        when(resumeQueryMapper.countSnsPlatformsByResumeId(resumeId)).thenReturn(3);
+        when(mapper.countSnsPlatformsByResumeId(resumeId)).thenReturn(3);
 
         // 実行
-        int actual = resumeQuery.countSnsPlatformsByResumeId(resumeId);
+        int actual = query.countSnsPlatformsByResumeId(resumeId);
 
         // 検証
         assertThat(actual).isEqualTo(3);
-        verify(resumeQueryMapper).countSnsPlatformsByResumeId(resumeId);
+        verify(mapper).countSnsPlatformsByResumeId(resumeId);
     }
 
     @Test
@@ -105,14 +105,14 @@ class ResumeQueryTest {
     void test6() {
         // モック準備
         UUID resumeId = UUID.randomUUID();
-        when(resumeQueryMapper.countPortfoliosByResumeId(resumeId)).thenReturn(1);
+        when(mapper.countPortfoliosByResumeId(resumeId)).thenReturn(1);
 
         // 実行
-        int actual = resumeQuery.countPortfoliosByResumeId(resumeId);
+        int actual = query.countPortfoliosByResumeId(resumeId);
 
         // 検証
         assertThat(actual).isEqualTo(1);
-        verify(resumeQueryMapper).countPortfoliosByResumeId(resumeId);
+        verify(mapper).countPortfoliosByResumeId(resumeId);
     }
 
     @Test
@@ -120,13 +120,13 @@ class ResumeQueryTest {
     void test7() {
         // モック準備
         UUID resumeId = UUID.randomUUID();
-        when(resumeQueryMapper.countSelfPromotionsByResumeId(resumeId)).thenReturn(6);
+        when(mapper.countSelfPromotionsByResumeId(resumeId)).thenReturn(6);
 
         // 実行
-        int actual = resumeQuery.countSelfPromotionsByResumeId(resumeId);
+        int actual = query.countSelfPromotionsByResumeId(resumeId);
 
         // 検証
         assertThat(actual).isEqualTo(6);
-        verify(resumeQueryMapper).countSelfPromotionsByResumeId(resumeId);
+        verify(mapper).countSelfPromotionsByResumeId(resumeId);
     }
 }

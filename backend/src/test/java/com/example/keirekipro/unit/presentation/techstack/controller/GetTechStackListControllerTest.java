@@ -9,12 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 
 import com.example.keirekipro.presentation.techstack.controller.GetTechStackListController;
-import com.example.keirekipro.usecase.query.techstack.GetTechStackListQueryService;
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto;
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto.Backend;
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto.Frontend;
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto.Infrastructure;
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto.Tools;
+import com.example.keirekipro.usecase.query.techstack.TechStackListQuery;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListQueryDto;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 class GetTechStackListControllerTest {
 
     @MockitoBean
-    private GetTechStackListQueryService getTechStackListQueryService;
+    private TechStackListQuery techStackListQuery;
 
     private final MockMvc mockMvc;
 
@@ -43,55 +39,63 @@ class GetTechStackListControllerTest {
     @Test
     @DisplayName("正常なリクエストの場合、200と技術スタック一覧がレスポンスとして返る")
     void test1() throws Exception {
-        // UseCaseから返却されるDTOを準備
-        TechStackListItemDto.Frontend frontend = Frontend.create(
-                List.of("JavaScript"),
-                List.of("React"),
-                List.of("Zustand"),
-                List.of("Vite"),
-                List.of("npm"),
-                List.of("ESLint"),
-                List.of("Prettier"),
-                List.of("Jest"));
+        // Queryから返却されるDTOを準備
+        TechStackListQueryDto.FrontendDto frontend = TechStackListQueryDto.FrontendDto.builder()
+                .languages(List.of("JavaScript"))
+                .frameworks(List.of("React"))
+                .libraries(List.of("Zustand"))
+                .buildTools(List.of("Vite"))
+                .packageManagers(List.of("npm"))
+                .linters(List.of("ESLint"))
+                .formatters(List.of("Prettier"))
+                .testingTools(List.of("Jest"))
+                .build();
 
-        TechStackListItemDto.Backend backend = Backend.create(
-                List.of("Java"),
-                List.of("Spring Boot"),
-                List.of("Lombok"),
-                List.of("Gradle"),
-                List.of("Maven"),
-                List.of("Checkstyle"),
-                List.of("google-java-format"),
-                List.of("JUnit"),
-                List.of("Hibernate"),
-                List.of("Spring Security"));
+        TechStackListQueryDto.BackendDto backend = TechStackListQueryDto.BackendDto.builder()
+                .languages(List.of("Java"))
+                .frameworks(List.of("Spring Boot"))
+                .libraries(List.of("Lombok"))
+                .buildTools(List.of("Gradle"))
+                .packageManagers(List.of("Maven"))
+                .linters(List.of("Checkstyle"))
+                .formatters(List.of("google-java-format"))
+                .testingTools(List.of("JUnit"))
+                .ormTools(List.of("Hibernate"))
+                .auth(List.of("Spring Security"))
+                .build();
 
-        TechStackListItemDto.Infrastructure infrastructure = Infrastructure.create(
-                List.of("AWS"),
-                List.of("Ubuntu"),
-                List.of("Docker"),
-                List.of("PostgreSQL"),
-                List.of("Nginx"),
-                List.of("GitHub Actions"),
-                List.of("Terraform"),
-                List.of("CloudWatch"),
-                List.of("Fluentd"));
+        TechStackListQueryDto.InfrastructureDto infrastructure = TechStackListQueryDto.InfrastructureDto.builder()
+                .clouds(List.of("AWS"))
+                .operatingSystems(List.of("Ubuntu"))
+                .containers(List.of("Docker"))
+                .databases(List.of("PostgreSQL"))
+                .webServers(List.of("Nginx"))
+                .ciCdTools(List.of("GitHub Actions"))
+                .iacTools(List.of("Terraform"))
+                .monitoringTools(List.of("CloudWatch"))
+                .loggingTools(List.of("Fluentd"))
+                .build();
 
-        TechStackListItemDto.Tools tools = Tools.create(
-                List.of("Git"),
-                List.of("Redmine"),
-                List.of("Slack"),
-                List.of("Confluence"),
-                List.of("Postman"),
-                List.of("Figma"),
-                List.of("VS Code"),
-                List.of("WSL2"));
+        TechStackListQueryDto.ToolsDto tools = TechStackListQueryDto.ToolsDto.builder()
+                .sourceControls(List.of("Git"))
+                .projectManagements(List.of("Redmine"))
+                .communicationTools(List.of("Slack"))
+                .documentationTools(List.of("Confluence"))
+                .apiDevelopmentTools(List.of("Postman"))
+                .designTools(List.of("Figma"))
+                .editors(List.of("VS Code"))
+                .developmentEnvironments(List.of("WSL2"))
+                .build();
 
-        TechStackListItemDto dto = TechStackListItemDto.create(
-                frontend, backend, infrastructure, tools);
+        TechStackListQueryDto dto = TechStackListQueryDto.builder()
+                .frontend(frontend)
+                .backend(backend)
+                .infrastructure(infrastructure)
+                .tools(tools)
+                .build();
 
         // モック設定
-        when(getTechStackListQueryService.execute()).thenReturn(dto);
+        when(techStackListQuery.findAll()).thenReturn(dto);
 
         // 実行&検証
         mockMvc.perform(get(ENDPOINT))
@@ -139,35 +143,69 @@ class GetTechStackListControllerTest {
                 .andExpect(jsonPath("$.tools.editors[0]").value("VS Code"))
                 .andExpect(jsonPath("$.tools.developmentEnvironments[0]").value("WSL2"));
 
-        verify(getTechStackListQueryService).execute();
+        verify(techStackListQuery).findAll();
     }
 
     @Test
     @DisplayName("技術スタックが1つも存在しない場合、200と空リスト群がレスポンスとして返る")
     void test2() throws Exception {
         // すべて空リストのDTOを準備
-        TechStackListItemDto.Frontend frontend = Frontend.create(
-                List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of());
+        TechStackListQueryDto.FrontendDto frontend = TechStackListQueryDto.FrontendDto.builder()
+                .languages(List.of())
+                .frameworks(List.of())
+                .libraries(List.of())
+                .buildTools(List.of())
+                .packageManagers(List.of())
+                .linters(List.of())
+                .formatters(List.of())
+                .testingTools(List.of())
+                .build();
 
-        TechStackListItemDto.Backend backend = Backend.create(
-                List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of());
+        TechStackListQueryDto.BackendDto backend = TechStackListQueryDto.BackendDto.builder()
+                .languages(List.of())
+                .frameworks(List.of())
+                .libraries(List.of())
+                .buildTools(List.of())
+                .packageManagers(List.of())
+                .linters(List.of())
+                .formatters(List.of())
+                .testingTools(List.of())
+                .ormTools(List.of())
+                .auth(List.of())
+                .build();
 
-        TechStackListItemDto.Infrastructure infrastructure = Infrastructure.create(
-                List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of(), List.of());
+        TechStackListQueryDto.InfrastructureDto infrastructure = TechStackListQueryDto.InfrastructureDto.builder()
+                .clouds(List.of())
+                .operatingSystems(List.of())
+                .containers(List.of())
+                .databases(List.of())
+                .webServers(List.of())
+                .ciCdTools(List.of())
+                .iacTools(List.of())
+                .monitoringTools(List.of())
+                .loggingTools(List.of())
+                .build();
 
-        TechStackListItemDto.Tools tools = Tools.create(
-                List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of());
+        TechStackListQueryDto.ToolsDto tools = TechStackListQueryDto.ToolsDto.builder()
+                .sourceControls(List.of())
+                .projectManagements(List.of())
+                .communicationTools(List.of())
+                .documentationTools(List.of())
+                .apiDevelopmentTools(List.of())
+                .designTools(List.of())
+                .editors(List.of())
+                .developmentEnvironments(List.of())
+                .build();
 
-        TechStackListItemDto dto = TechStackListItemDto.create(
-                frontend, backend, infrastructure, tools);
+        TechStackListQueryDto dto = TechStackListQueryDto.builder()
+                .frontend(frontend)
+                .backend(backend)
+                .infrastructure(infrastructure)
+                .tools(tools)
+                .build();
 
         // モック設定
-        when(getTechStackListQueryService.execute()).thenReturn(dto);
+        when(techStackListQuery.findAll()).thenReturn(dto);
 
         // 実行&検証
         mockMvc.perform(get(ENDPOINT))
@@ -215,6 +253,6 @@ class GetTechStackListControllerTest {
                 .andExpect(jsonPath("$.tools.editors").isEmpty())
                 .andExpect(jsonPath("$.tools.developmentEnvironments").isEmpty());
 
-        verify(getTechStackListQueryService).execute();
+        verify(techStackListQuery).findAll();
     }
 }

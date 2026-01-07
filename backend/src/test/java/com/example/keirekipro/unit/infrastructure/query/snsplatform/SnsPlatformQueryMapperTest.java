@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 
 import com.example.keirekipro.config.PostgresTestContainerConfig;
-import com.example.keirekipro.infrastructure.query.snsplatform.SnsPlatformDto;
-import com.example.keirekipro.infrastructure.query.snsplatform.SnsPlatformMapper;
+import com.example.keirekipro.infrastructure.query.snsplatform.SnsPlatformQueryMapper;
+import com.example.keirekipro.infrastructure.query.snsplatform.SnsPlatformQueryMapper.SnsPlatformRow;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,15 +27,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(PostgresTestContainerConfig.class)
-class SnsPlatformMapperTest {
+class SnsPlatformQueryMapperTest {
 
-    private final SnsPlatformMapper snsPlatformMapper;
+    private final SnsPlatformQueryMapper mapper;
     private final JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("selectAll_SNSプラットフォームマスタが存在しない場合、空リストが返る")
     void test1() {
-        List<SnsPlatformDto> list = snsPlatformMapper.selectAll();
+        List<SnsPlatformRow> list = mapper.selectAll();
         assertThat(list).isEmpty();
     }
 
@@ -48,13 +48,13 @@ class SnsPlatformMapperTest {
         insertSnsPlatform(30, "YouTube");
 
         // 実行
-        List<SnsPlatformDto> list = snsPlatformMapper.selectAll();
+        List<SnsPlatformRow> list = mapper.selectAll();
 
         // 件数検証
         assertThat(list).hasSize(3);
 
         // プラットフォーム名の検証
-        assertThat(list).extracting(SnsPlatformDto::getName)
+        assertThat(list).extracting(SnsPlatformRow::getName)
                 .containsExactlyInAnyOrder("X", "Instagram", "YouTube");
     }
 

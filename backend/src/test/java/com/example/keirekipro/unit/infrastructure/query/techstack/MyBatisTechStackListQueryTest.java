@@ -6,10 +6,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 
-import com.example.keirekipro.infrastructure.query.techstack.TechStackDto;
-import com.example.keirekipro.infrastructure.query.techstack.TechStackMapper;
-import com.example.keirekipro.infrastructure.query.techstack.TechStackQuery;
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto;
+import com.example.keirekipro.infrastructure.query.techstack.MyBatisTechStackListQuery;
+import com.example.keirekipro.infrastructure.query.techstack.TechStackQueryMapper;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListQueryDto;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,22 +18,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class TechStackQueryTest {
+class MyBatisTechStackListQueryTest {
 
     @Mock
-    private TechStackMapper techStackMapper;
+    private TechStackQueryMapper techStackQueryMapper;
 
     @InjectMocks
-    private TechStackQuery techStackQuery;
+    private MyBatisTechStackListQuery myBatisTechStackListQuery;
 
     @Test
     @DisplayName("技術スタックマスタが1件も存在しない場合、全てのリストが空で返る")
     void test1() {
         // モック準備
-        when(techStackMapper.selectAll()).thenReturn(List.of());
+        when(techStackQueryMapper.selectAll()).thenReturn(List.of());
 
         // 実行
-        TechStackListItemDto actual = techStackQuery.selectTechStackListItem();
+        TechStackListQueryDto actual = myBatisTechStackListQuery.findAll();
 
         // 検証
         assertThat(actual).isNotNull();
@@ -82,60 +81,60 @@ class TechStackQueryTest {
         assertThat(actual.getTools().getEditors()).isEmpty();
         assertThat(actual.getTools().getDevelopmentEnvironments()).isEmpty();
 
-        verify(techStackMapper).selectAll();
+        verify(techStackQueryMapper).selectAll();
     }
 
     @Test
     @DisplayName("各mainCategory/subCategoryに対応する技術スタックが存在する場合、DTOに正しくマッピングされる")
     void test2() {
         // モック準備
-        List<TechStackDto> rows = List.of(
+        List<TechStackQueryMapper.TechStackRow> rows = List.of(
                 // frontend
-                createTechStack("frontend", "languages", "JavaScript"),
-                createTechStack("frontend", "framework", "React"),
-                createTechStack("frontend", "libraries", "Zustand"),
-                createTechStack("frontend", "buildTool", "Vite"),
-                createTechStack("frontend", "packageManager", "npm"),
-                createTechStack("frontend", "linters", "ESLint"),
-                createTechStack("frontend", "formatters", "Prettier"),
-                createTechStack("frontend", "testingTools", "Jest"),
+                createTechStackRow("frontend", "languages", "JavaScript"),
+                createTechStackRow("frontend", "framework", "React"),
+                createTechStackRow("frontend", "libraries", "Zustand"),
+                createTechStackRow("frontend", "buildTool", "Vite"),
+                createTechStackRow("frontend", "packageManager", "npm"),
+                createTechStackRow("frontend", "linters", "ESLint"),
+                createTechStackRow("frontend", "formatters", "Prettier"),
+                createTechStackRow("frontend", "testingTools", "Jest"),
 
                 // backend
-                createTechStack("backend", "languages", "Java"),
-                createTechStack("backend", "framework", "Spring Boot"),
-                createTechStack("backend", "libraries", "Lombok"),
-                createTechStack("backend", "buildTool", "Gradle"),
-                createTechStack("backend", "packageManager", "Maven"),
-                createTechStack("backend", "linters", "Checkstyle"),
-                createTechStack("backend", "formatters", "google-java-format"),
-                createTechStack("backend", "testingTools", "JUnit"),
-                createTechStack("backend", "ormTools", "Hibernate"),
-                createTechStack("backend", "auth", "Spring Security"),
+                createTechStackRow("backend", "languages", "Java"),
+                createTechStackRow("backend", "framework", "Spring Boot"),
+                createTechStackRow("backend", "libraries", "Lombok"),
+                createTechStackRow("backend", "buildTool", "Gradle"),
+                createTechStackRow("backend", "packageManager", "Maven"),
+                createTechStackRow("backend", "linters", "Checkstyle"),
+                createTechStackRow("backend", "formatters", "google-java-format"),
+                createTechStackRow("backend", "testingTools", "JUnit"),
+                createTechStackRow("backend", "ormTools", "Hibernate"),
+                createTechStackRow("backend", "auth", "Spring Security"),
 
                 // infrastructure
-                createTechStack("infrastructure", "clouds", "AWS"),
-                createTechStack("infrastructure", "operatingSystem", "Ubuntu"),
-                createTechStack("infrastructure", "containers", "Docker"),
-                createTechStack("infrastructure", "database", "PostgreSQL"),
-                createTechStack("infrastructure", "webServer", "Nginx"),
-                createTechStack("infrastructure", "ciCdTool", "GitHub Actions"),
-                createTechStack("infrastructure", "iacTools", "Terraform"),
-                createTechStack("infrastructure", "monitoringTools", "CloudWatch"),
-                createTechStack("infrastructure", "loggingTools", "Fluentd"),
+                createTechStackRow("infrastructure", "clouds", "AWS"),
+                createTechStackRow("infrastructure", "operatingSystem", "Ubuntu"),
+                createTechStackRow("infrastructure", "containers", "Docker"),
+                createTechStackRow("infrastructure", "database", "PostgreSQL"),
+                createTechStackRow("infrastructure", "webServer", "Nginx"),
+                createTechStackRow("infrastructure", "ciCdTool", "GitHub Actions"),
+                createTechStackRow("infrastructure", "iacTools", "Terraform"),
+                createTechStackRow("infrastructure", "monitoringTools", "CloudWatch"),
+                createTechStackRow("infrastructure", "loggingTools", "Fluentd"),
 
                 // tools
-                createTechStack("tools", "sourceControl", "Git"),
-                createTechStack("tools", "projectManagement", "Redmine"),
-                createTechStack("tools", "communicationTool", "Slack"),
-                createTechStack("tools", "documentationTools", "Confluence"),
-                createTechStack("tools", "apiDevelopmentTools", "Postman"),
-                createTechStack("tools", "designTools", "Figma"),
-                createTechStack("tools", "editor", "VS Code"),
-                createTechStack("tools", "developmentEnvironment", "WSL2"));
-        when(techStackMapper.selectAll()).thenReturn(rows);
+                createTechStackRow("tools", "sourceControl", "Git"),
+                createTechStackRow("tools", "projectManagement", "Redmine"),
+                createTechStackRow("tools", "communicationTool", "Slack"),
+                createTechStackRow("tools", "documentationTools", "Confluence"),
+                createTechStackRow("tools", "apiDevelopmentTools", "Postman"),
+                createTechStackRow("tools", "designTools", "Figma"),
+                createTechStackRow("tools", "editor", "VS Code"),
+                createTechStackRow("tools", "developmentEnvironment", "WSL2"));
+        when(techStackQueryMapper.selectAll()).thenReturn(rows);
 
         // 実行
-        TechStackListItemDto actual = techStackQuery.selectTechStackListItem();
+        TechStackListQueryDto actual = myBatisTechStackListQuery.findAll();
 
         // 検証
         assertThat(actual).isNotNull();
@@ -183,28 +182,28 @@ class TechStackQueryTest {
         assertThat(actual.getTools().getEditors()).containsExactly("VS Code");
         assertThat(actual.getTools().getDevelopmentEnvironments()).containsExactly("WSL2");
 
-        verify(techStackMapper).selectAll();
+        verify(techStackQueryMapper).selectAll();
     }
 
     @Test
     @DisplayName("想定外のmainCategoryやsubCategoryは無視される")
     void test3() {
         // モック準備（想定外のmain/subを含む）
-        List<TechStackDto> rows = List.of(
+        List<TechStackQueryMapper.TechStackRow> rows = List.of(
                 // 想定外のmainCategory
-                createTechStack("unknown", "languages", "X-Lang"),
+                createTechStackRow("unknown", "languages", "X-Lang"),
                 // 想定外のsubCategory（frontendの未知サブカテゴリ）
-                createTechStack("frontend", "unknownSub", "Unknown-Frontend"),
+                createTechStackRow("frontend", "unknownSub", "Unknown-Frontend"),
                 // 想定外のsubCategory（backendの未知サブカテゴリ）
-                createTechStack("backend", "unknownSub", "Unknown-Backend"),
+                createTechStackRow("backend", "unknownSub", "Unknown-Backend"),
                 // 想定外のsubCategory（infrastructureの未知サブカテゴリ）
-                createTechStack("infrastructure", "unknownSub", "Unknown-Infra"),
+                createTechStackRow("infrastructure", "unknownSub", "Unknown-Infra"),
                 // 想定外のsubCategory（toolsの未知サブカテゴリ）
-                createTechStack("tools", "unknownSub", "Unknown-Tools"));
-        when(techStackMapper.selectAll()).thenReturn(rows);
+                createTechStackRow("tools", "unknownSub", "Unknown-Tools"));
+        when(techStackQueryMapper.selectAll()).thenReturn(rows);
 
         // 実行
-        TechStackListItemDto actual = techStackQuery.selectTechStackListItem();
+        TechStackListQueryDto actual = myBatisTechStackListQuery.findAll();
 
         // 検証：全て無視され、全リストが空であること
         assertThat(actual.getFrontend().getLanguages()).isEmpty();
@@ -246,17 +245,17 @@ class TechStackQueryTest {
         assertThat(actual.getTools().getEditors()).isEmpty();
         assertThat(actual.getTools().getDevelopmentEnvironments()).isEmpty();
 
-        verify(techStackMapper).selectAll();
+        verify(techStackQueryMapper).selectAll();
     }
 
     /**
-     * TechStackDtoを生成するヘルパーメソッド
+     * TechStackRowを生成するヘルパーメソッド
      */
-    private TechStackDto createTechStack(String mainCategory, String subCategory, String name) {
-        TechStackDto dto = new TechStackDto();
-        dto.setMainCategory(mainCategory);
-        dto.setSubCategory(subCategory);
-        dto.setName(name);
-        return dto;
+    private TechStackQueryMapper.TechStackRow createTechStackRow(String mainCategory, String subCategory, String name) {
+        TechStackQueryMapper.TechStackRow row = new TechStackQueryMapper.TechStackRow();
+        row.setMainCategory(mainCategory);
+        row.setSubCategory(subCategory);
+        row.setName(name);
+        return row;
     }
 }
