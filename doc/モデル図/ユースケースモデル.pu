@@ -29,7 +29,6 @@ package "ユーザー情報" {
     end note
 
     rectangle register_account as "アカウントを登録する" <<auth>>
-
     rectangle delete_account as "アカウントを削除する" <<auth>>
 
     rectangle edit_user as "ユーザー情報を管理する" <<auth>>
@@ -52,9 +51,18 @@ package "職務経歴書" {
     rectangle create_resume as "職務経歴書を作成する" <<resume>>
     rectangle copy_create_resume as "職務経歴書をコピーして作成する" <<resume_child>>
     rectangle auto_save as "自動保存機能を有効化/無効化する" <<resume_child>>
-    rectangle restore_history as "入力履歴を復元する" <<resume_child>>
     rectangle save_resume as "職務経歴書を保存する" <<resume_child>>
     rectangle auto_save_resume as "職務経歴書を自動保存する" <<resume_child>>
+
+    rectangle backup_resume as "職務経歴書をバックアップする" <<resume_child>>
+    rectangle restore_resume as "職務経歴書をリストアする" <<resume_child>>
+    note right of backup_resume
+        ・json
+    end note
+    note right of restore_resume
+        ・json
+    end note
+
     rectangle edit_resume as "職務経歴書を編集する" <<resume>>
     rectangle delete_resume as "職務経歴書を削除する" <<resume>>
     rectangle export_resume as "職務経歴書をファイル出力する" <<resume>>
@@ -67,14 +75,10 @@ package "職務経歴書" {
     create_resume ..> auto_save : <<include>>
     create_resume ..> save_resume : <<include>>
 
-    auto_save ..> restore_history : <<include>>
-
     save_resume ..> auto_save_resume : <<extend>>
 
     edit_resume ..> auto_save : <<include>>
     edit_resume ..> save_resume : <<include>>
-
-    auto_save ..> restore_history : <<include>>
 }
 
 user --> login
@@ -87,5 +91,7 @@ user --> create_resume
 user --> edit_resume
 user --> export_resume
 user --> delete_resume
+user --> backup_resume
+user --> restore_resume
 
 @enduml

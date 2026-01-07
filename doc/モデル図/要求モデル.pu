@@ -29,6 +29,7 @@ rectangle "要望" {
     rectangle "過去に作成した職務経歴書をコピーして新規作成できると楽。" as want_resume_copy_create <<youbou>>
     rectangle "職務経歴書はPDFで出力したい。" as want_pdf <<youbou>>
     rectangle "Markdownでも出力できると他で加工できるから助かる。" as want_md <<youbou>>
+    rectangle "職務経歴書をバックアップして、必要なときにリストアできると安心。" as want_resume_backup_restore <<youbou>>
 
     rectangle "Emailとパスワードによるアカウントの登録をできるようにしたい。" as want_account_create <<youbou>>
     rectangle "パスワードを後で変更できるようにしたい。" as want_pwchange <<youbou>>
@@ -54,6 +55,7 @@ rectangle "要求" {
     rectangle "自動保存（有効/無効切替、100件履歴）機能" as dem_resume_autosave <<youkyuu>>
     rectangle "コピーして新規作成機能" as dem_resume_copy_create <<youkyuu>>
     rectangle "PDF/Markdown出力機能" as dem_resume_export <<youkyuu>>
+    rectangle "バックアップ／リストア機能" as dem_resume_backup_restore <<youkyuu>>
 
     rectangle "アカウント登録機能" as dem_account_create <<youkyuu>>
     rectangle "パスワード変更機能" as dem_pwchange <<youkyuu>>
@@ -78,6 +80,8 @@ rectangle "要件" {
         rectangle "過去に作成した職務経歴書をコピーして新規作成ができること。" as req8 <<youken>>
         rectangle "PDF形式での出力ができること。" as req9 <<youken>>
         rectangle "Markdown形式での出力ができること。" as req10 <<youken>>
+        rectangle "職務経歴書のバックアップができること。" as req22 <<youken>>
+        rectangle "バックアップした職務経歴書のリストアができること。" as req23 <<youken>>
     }
 
     rectangle "ユーザー情報" {
@@ -111,6 +115,7 @@ user -- want_autosave_toggle
 user -- want_resume_copy_create
 user -- want_pdf
 user -- want_md
+user -- want_resume_backup_restore
 user -- want_account_create
 user -- want_pwchange
 user -- want_noemailchange
@@ -135,6 +140,7 @@ want_autosave_toggle -- dem_resume_autosave
 want_resume_copy_create -- dem_resume_copy_create
 want_pdf -- dem_resume_export
 want_md -- dem_resume_export
+want_resume_backup_restore -- dem_resume_backup_restore
 
 want_account_create -- dem_account_create
 want_pwchange -- dem_pwchange
@@ -159,6 +165,8 @@ dem_resume_autosave -- req7
 dem_resume_copy_create -- req8
 dem_resume_export -- req9
 dem_resume_export -- req10
+dem_resume_backup_restore -- req22
+dem_resume_backup_restore -- req23
 
 dem_account_create -- req16
 dem_pwchange -- req17

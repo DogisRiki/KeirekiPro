@@ -1,0 +1,536 @@
+@startuml infrastructure層クラス図
+
+title infrastructure層クラス図
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+'========================================
+' infrastructure.shared.aws.config
+'========================================
+package com.example.keirekipro.infrastructure.shared.aws.config {
+    class AwsS3Properties {
+        - String region
+        - String endpoint
+        - String bucketName
+    }
+
+    class AwsSecretsManagerProperties {
+        - String region
+        - String endpoint
+    }
+
+    class AwsSesProperties {
+        - String region
+        - String endpoint
+        - String fromAddress
+    }
+}
+
+'========================================
+' infrastructure.shared.aws.s3
+'========================================
+package com.example.keirekipro.infrastructure.shared.aws.s3 {
+    interface PresignedUrlTransformer {
+        + String transform(String url)
+    }
+
+    class LocalstackPresignedUrlTransformer {
+        - AwsS3Properties properties
+        --
+        + String transform(String url)
+    }
+
+    class NoopPresignedUrlTransformer {
+        --
+        + String transform(String url)
+    }
+
+    class S3ObjectStore {
+        - AwsS3Properties properties
+        - S3Client s3Client
+        - S3Presigner s3Presigner
+        - PresignedUrlTransformer presignedUrlTransformer
+        --
+        + String put(StoredObject object, String keyPrefix)
+        + String putAs(StoredObject object, String keyPrefix, String fileName)
+        + String issueGetUrl(String key, Duration ttl)
+    }
+
+    LocalstackPresignedUrlTransformer ..|> PresignedUrlTransformer
+    NoopPresignedUrlTransformer ..|> PresignedUrlTransformer
+    S3ObjectStore ..|> ObjectStore
+    S3ObjectStore --> AwsS3Properties
+    S3ObjectStore --> PresignedUrlTransformer
+}
+
+'========================================
+' infrastructure.shared.aws.secrets
+'========================================
+package com.example.keirekipro.infrastructure.shared.aws.secrets {
+    class SecretsManagerSecretReader {
+        - SecretsManagerClient secretsManagerClient
+        - ObjectMapper objectMapper
+        --
+        + JsonNode readJson(String secretName)
+    }
+
+    SecretsManagerSecretReader ..|> SecretReader
+}
+
+'========================================
+' infrastructure.shared.event
+'========================================
+package com.example.keirekipro.infrastructure.shared.event {
+    class SpringDomainEventPublisher {
+        - ApplicationEventPublisher applicationEventPublisher
+        --
+        + void publish(DomainEvent event)
+    }
+
+    SpringDomainEventPublisher ..|> DomainEventPublisher
+}
+
+'========================================
+' infrastructure.shared.mybatis
+'========================================
+package com.example.keirekipro.infrastructure.shared.mybatis {
+    class UUIDTypeHandler {
+        --
+        + UUID getNullableResult(ResultSet rs, String columnName)
+        + UUID getNullableResult(ResultSet rs, int columnIndex)
+        + UUID getNullableResult(CallableStatement cs, int columnIndex)
+    }
+
+    class YearMonthTypeHandler {
+        --
+        + YearMonth getNullableResult(ResultSet rs, String columnName)
+        + YearMonth getNullableResult(ResultSet rs, int columnIndex)
+        + YearMonth getNullableResult(CallableStatement cs, int columnIndex)
+    }
+
+    UUIDTypeHandler --|> BaseTypeHandler
+    YearMonthTypeHandler --|> BaseTypeHandler
+}
+
+'========================================
+' infrastructure.shared.notification
+'========================================
+package com.example.keirekipro.infrastructure.shared.notification {
+    class SesFreeMarkerNotificationDispatcher {
+        - SesClient sesClient
+        - AwsSesProperties sesProperties
+        - Configuration freeMarkerConfiguration
+        --
+        + void dispatch(Notification notification)
+        - String render(String templateName, Map<String, Object> dataModel)
+    }
+
+    SesFreeMarkerNotificationDispatcher ..|> NotificationDispatcher
+    SesFreeMarkerNotificationDispatcher --> AwsSesProperties
+}
+
+'========================================
+' infrastructure.shared.pdf
+'========================================
+package com.example.keirekipro.infrastructure.shared.pdf {
+    interface HtmlToPdfRenderer {
+        + byte[] render(String html)
+    }
+
+    class OpenHtmlToPdfRenderer {
+        - ResourceLoader resourceLoader
+        --
+        + byte[] render(String html)
+        - InputStream openClasspath(String location)
+    }
+
+    OpenHtmlToPdfRenderer ..|> HtmlToPdfRenderer
+}
+
+'========================================
+' infrastructure.shared.redis
+'========================================
+package com.example.keirekipro.infrastructure.shared.redis {
+    class RedisClient {
+        - RedisTemplate<String, Object> redisTemplate
+        --
+        + void set(String key, Object value, Duration ttl)
+        + Optional<Object> get(String key)
+        + void delete(String key)
+    }
+}
+
+'========================================
+' infrastructure.store.auth
+'========================================
+package com.example.keirekipro.infrastructure.store.auth {
+    class RedisOidcAuthorizationSessionStore {
+        - RedisTemplate<String, Object> redisTemplate
+        --
+        + void save(OidcAuthorizationSession session)
+        + Optional<OidcAuthorizationSession> find(String state)
+        + void delete(String state)
+    }
+
+    class RedisPasswordResetTokenStore {
+        - RedisTemplate<String, Object> redisTemplate
+        --
+        + void save(String token, UUID userId, Duration ttl)
+        + Optional<UUID> findUserId(String token)
+        + void delete(String token)
+    }
+
+    class RedisTwoFactorAuthCodeStore {
+        - RedisTemplate<String, Object> redisTemplate
+        --
+        + void save(UUID userId, String code, Duration ttl)
+        + Optional<String> find(UUID userId)
+        + void delete(UUID userId)
+    }
+
+    RedisOidcAuthorizationSessionStore ..|> OidcAuthorizationSessionStore
+    RedisPasswordResetTokenStore ..|> PasswordResetTokenStore
+    RedisTwoFactorAuthCodeStore ..|> TwoFactorAuthCodeStore
+}
+
+'========================================
+' infrastructure.auth.oidc.provider
+'========================================
+package com.example.keirekipro.infrastructure.auth.oidc.provider {
+    interface OidcProvider {
+        + String getProviderType()
+        + String getAuthorizationEndpoint()
+        + String getTokenEndpoint()
+        + String getUserInfoEndpoint()
+        + String getScopes()
+        + String getSecretName()
+        + OidcUserInfoDto convertToStandardUserInfo(Map<String, Object> userInfo)
+    }
+
+    class GoogleOidcProvider {
+        - String authorizationEndpoint
+        - String tokenEndpoint
+        - String userInfoEndpoint
+        - String scopes
+        - String secretName
+        --
+        + String getProviderType()
+        + OidcUserInfoDto convertToStandardUserInfo(Map<String, Object> userInfo)
+    }
+
+    class GithubOidcProvider {
+        - RestClient restClient
+        - ObjectMapper objectMapper
+        - String authorizationEndpoint
+        - String tokenEndpoint
+        - String userInfoEndpoint
+        - String scopes
+        - String secretName
+        --
+        + String getProviderType()
+        + OidcUserInfoDto convertToStandardUserInfo(Map<String, Object> userInfo)
+        - String fetchPrimaryEmail(String accessToken)
+    }
+
+    class OidcProviderFactory {
+        - Map<String, OidcProvider> providersById
+        --
+        + OidcProviderFactory(List<OidcProvider> providers)
+        + OidcProvider getProvider(String providerName)
+    }
+
+    GoogleOidcProvider ..|> OidcProvider
+    GithubOidcProvider ..|> OidcProvider
+    OidcProviderFactory --> OidcProvider
+}
+
+'========================================
+' infrastructure.auth.oidc.dto
+'========================================
+package com.example.keirekipro.infrastructure.auth.oidc.dto {
+    class OidcTokenResponse {
+        - String accessToken
+        - String tokenType
+        - Integer expiresIn
+        - String idToken
+        - String refreshToken
+        - String scope
+        - String error
+        - String errorDescription
+    }
+
+    class OidcUserInfoDto {
+        - String providerUserId
+        - String email
+        - String username
+        - String providerType
+    }
+}
+
+'========================================
+' infrastructure.auth.oidc
+'========================================
+package com.example.keirekipro.infrastructure.auth.oidc {
+    class OidcClient {
+        - RestClient restClient
+        - OidcProviderFactory providerFactory
+        - SecretReader secretReader
+        --
+        + String buildAuthorizationUrl(String providerName, String redirectUri, String state, String codeChallenge)
+        + OidcTokenResponse getToken(String providerName, String code, String redirectUri, String codeVerifier)
+        + OidcUserInfoDto getUserInfo(String providerName, String accessToken)
+    }
+
+    class OidcGatewayAdapter {
+        - OidcClient oidcClient
+        --
+        + String buildAuthorizationUrl(String provider, String redirectUri, String state, String codeChallenge)
+        + OidcToken exchangeToken(String provider, String code, String redirectUri, String codeVerifier)
+        + OidcUserInfo fetchUserInfo(String provider, String accessToken)
+    }
+
+    OidcGatewayAdapter ..|> OidcGateway
+    OidcGatewayAdapter --> OidcClient
+    OidcClient --> OidcProviderFactory
+    OidcClient --> SecretReader
+    OidcClient ..> OidcTokenResponse
+    OidcClient ..> OidcUserInfoDto
+}
+
+'========================================
+' infrastructure.event.user
+'========================================
+package com.example.keirekipro.infrastructure.event.user {
+    class UserDeletedEventListener {
+        - NotificationDispatcher notificationDispatcher
+        - AppProperties properties
+        --
+        + void handle(UserDeletedEvent event)
+    }
+
+    class UserRegisteredEventListener {
+        - NotificationDispatcher notificationDispatcher
+        - AppProperties properties
+        --
+        + void handle(UserRegisteredEvent event)
+    }
+
+    UserDeletedEventListener --> NotificationDispatcher
+    UserRegisteredEventListener --> NotificationDispatcher
+}
+
+'========================================
+' infrastructure.export.resume
+'========================================
+package com.example.keirekipro.infrastructure.export.resume {
+    class ResumeExportModelBuilder {
+        --
+        + Map<String, Object> build(Resume resume)
+    }
+
+    class ThymeleafResumePdfExporter {
+        - TemplateEngine templateEngine
+        - ResumeExportModelBuilder exportModelBuilder
+        - HtmlToPdfRenderer htmlToPdfRenderer
+        --
+        + ExportedFile exportPdf(Resume resume)
+        + ExportedFile exportMarkdown(Resume resume)
+    }
+
+    class ThymeleafResumeMarkdownExporter {
+        - TemplateEngine templateEngine
+        - ResumeExportModelBuilder exportModelBuilder
+        --
+        + ExportedFile exportPdf(Resume resume)
+        + ExportedFile exportMarkdown(Resume resume)
+    }
+
+    ThymeleafResumePdfExporter ..|> ResumeExporter
+    ThymeleafResumeMarkdownExporter ..|> ResumeExporter
+    ThymeleafResumePdfExporter --> ResumeExportModelBuilder
+    ThymeleafResumePdfExporter --> HtmlToPdfRenderer
+    ThymeleafResumeMarkdownExporter --> ResumeExportModelBuilder
+}
+
+'========================================
+' infrastructure.logging
+'========================================
+package com.example.keirekipro.infrastructure.logging {
+    class UseCaseLoggingAspect {
+        --
+        + Object logUsecase(ProceedingJoinPoint pjp)
+    }
+}
+
+'========================================
+' infrastructure.query.certification
+'========================================
+package com.example.keirekipro.infrastructure.query.certification {
+    interface CertificationQueryMapper {
+        + List<CertificationRow> findAll()
+    }
+
+    class MyBatisCertificationListQuery {
+        - CertificationQueryMapper mapper
+        --
+        + CertificationListQueryDto findAll()
+    }
+
+    MyBatisCertificationListQuery ..|> CertificationListQuery
+    MyBatisCertificationListQuery --> CertificationQueryMapper
+}
+
+'========================================
+' infrastructure.query.snsplatform
+'========================================
+package com.example.keirekipro.infrastructure.query.snsplatform {
+    interface SnsPlatformQueryMapper {
+        + List<SnsPlatformRow> findAll()
+    }
+
+    class MyBatisSnsPlatformListQuery {
+        - SnsPlatformQueryMapper mapper
+        --
+        + SnsPlatformListQueryDto findAll()
+    }
+
+    MyBatisSnsPlatformListQuery ..|> SnsPlatformListQuery
+    MyBatisSnsPlatformListQuery --> SnsPlatformQueryMapper
+}
+
+'========================================
+' infrastructure.query.techstack
+'========================================
+package com.example.keirekipro.infrastructure.query.techstack {
+    interface TechStackQueryMapper {
+        + List<TechStackRow> findAll()
+    }
+
+    class MyBatisTechStackListQuery {
+        - TechStackQueryMapper mapper
+        --
+        + TechStackListQueryDto findAll()
+    }
+
+    MyBatisTechStackListQuery ..|> TechStackListQuery
+    MyBatisTechStackListQuery --> TechStackQueryMapper
+}
+
+'========================================
+' infrastructure.query.resume
+'========================================
+package com.example.keirekipro.infrastructure.query.resume {
+    interface ResumeQueryMapper {
+        + String findByIdForBackupAsJson(UUID resumeId, UUID userId)
+        + int countByUserId(UUID userId)
+    }
+
+    class MyBatisResumeBackupQuery {
+        - ResumeQueryMapper mapper
+        - ObjectMapper objectMapper
+        --
+        + Optional<ResumeBackupQueryDto> findByIdForBackup(UUID resumeId, UUID userId)
+        - ResumeBackupQueryDto parseResumeBackupQueryDto(JsonNode root)
+    }
+
+    class MyBatisResumeCountQuery {
+        - ResumeQueryMapper mapper
+        --
+        + int countByUserId(UUID userId)
+    }
+
+    MyBatisResumeBackupQuery ..|> ResumeBackupQuery
+    MyBatisResumeCountQuery ..|> ResumeCountQuery
+    MyBatisResumeBackupQuery --> ResumeQueryMapper
+    MyBatisResumeCountQuery --> ResumeQueryMapper
+}
+
+'========================================
+' infrastructure.repository.resume
+'========================================
+package com.example.keirekipro.infrastructure.repository.resume {
+    interface ResumeMapper {
+        + List<ResumeDto> findAllByUserId(UUID userId)
+        + ResumeDto findById(UUID resumeId)
+        + void insert(ResumeDto dto)
+        + void update(ResumeDto dto)
+        + void delete(UUID userId, UUID resumeId)
+    }
+
+    class ResumeDto {
+        - UUID id
+        - UUID userId
+        - String name
+        - LocalDate date
+        - String lastName
+        - String firstName
+        - LocalDateTime createdAt
+        - LocalDateTime updatedAt
+        - List<CareerDto> careers
+        - List<ProjectDto> projects
+        - List<CertificationDto> certifications
+        - List<PortfolioDto> portfolios
+        - List<SnsPlatformDto> snsPlatforms
+        - List<SelfPromotionDto> selfPromotions
+    }
+
+    class MyBatisResumeRepository {
+        - ResumeMapper resumeMapper
+        --
+        + List<Resume> findAll(UUID userId)
+        + Optional<Resume> find(UUID resumeId)
+        + void save(Resume resume)
+        + void delete(UUID userId, UUID resumeId)
+        - Resume toEntity(ResumeDto dto)
+        - ResumeDto toDto(Resume resume)
+    }
+
+    MyBatisResumeRepository ..|> ResumeRepository
+    MyBatisResumeRepository --> ResumeMapper
+    ResumeMapper ..> ResumeDto
+}
+
+'========================================
+' infrastructure.repository.user
+'========================================
+package com.example.keirekipro.infrastructure.repository.user {
+    interface UserMapper {
+        + UserDto findById(UUID userId)
+        + UserDto findByEmail(String email)
+        + UserDto findByProvider(String providerName, String providerUserId)
+        + void insert(UserDto dto)
+        + void update(UserDto dto)
+        + void delete(UUID userId)
+    }
+
+    class UserDto {
+        - UUID id
+        - String email
+        - String password
+        - String username
+        - String profileImage
+        - LocalDateTime createdAt
+        - LocalDateTime updatedAt
+        - List<AuthProviderDto> authProviders
+        - List<String> roles
+    }
+
+    class MyBatisUserRepository {
+        - UserMapper mapper
+        --
+        + Optional<User> findById(UUID userId)
+        + Optional<User> findByEmail(String email)
+        + Optional<User> findByProvider(String providerName, String providerUserId)
+        + void save(User user)
+        + void delete(UUID userId)
+        - User toEntity(UserDto dto)
+        - UserDto toDto(User user)
+    }
+
+    MyBatisUserRepository ..|> UserRepository
+    MyBatisUserRepository --> UserMapper
+    UserMapper ..> UserDto
+}
+
+@enduml
