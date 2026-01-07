@@ -14,7 +14,7 @@
                 }
             ],
             "extensions": [
-                "/opt/vscode-extensions/redhat.java-1.50.0.vsix",
+                "redhat.java",
                 "vscjava.vscode-java-debug",
                 "vscjava.vscode-java-test",
                 "shengchen.vscode-checkstyle",
