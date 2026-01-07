@@ -6,25 +6,32 @@ participant React
 participant SpringBoot
 participant PostgreSQL
 participant Thymeleaf
-participant PDFBox
+participant PDFBox as PdfEngine
 
 ユーザー -> React: エクスポートボタンを押下
-React -> SpringBoot: 職務経歴書エクスポートリクエスト (職務経歴書ID)
-SpringBoot -> SpringBoot: （任意）JWTトークンからユーザーIDを取得
-SpringBoot -> PostgreSQL: 職務経歴書データ取得 (職務経歴書ID, ユーザーID)
-PostgreSQL --> SpringBoot: 職務経歴書データ
-SpringBoot -> Thymeleaf: テンプレートにデータ埋め込み
+React -> SpringBoot: エクスポートリクエスト\n(職務経歴書ID, Accept: PDF or Markdown)
 
-alt PDFファイルの場合
+SpringBoot -> SpringBoot: ユーザーID取得\n(AUTHコンテキスト/JWT)
+SpringBoot -> SpringBoot: Acceptヘッダから形式判定\n(PDF / Markdown)
+
+SpringBoot -> PostgreSQL: 職務経歴書データ取得\n(職務経歴書ID)
+PostgreSQL --> SpringBoot: 職務経歴書データ
+
+SpringBoot -> SpringBoot: 所有者チェック\n(ユーザーIDと一致)
+SpringBoot -> SpringBoot: エクスポート前提条件チェック\n(氏名/日付/職歴/プロジェクト/自己PR 等)
+
+alt PDFの場合
+    SpringBoot -> Thymeleaf: PDF用HTMLテンプレートにデータ埋め込み
     Thymeleaf --> SpringBoot: HTMLデータ
-    SpringBoot -> PDFBox: HTMLをPDFに変換
-    PDFBox --> SpringBoot: PDFファイル（バイナリ）
-    SpringBoot -> React: PDFファイルをストリーミングレスポンス
-    React --> ユーザー: PDFをブラウザで表示 or ダウンロード
-else Markdownファイルの場合
+    SpringBoot -> PdfEngine: HTMLをPDFに変換
+    PdfEngine --> SpringBoot: PDFバイナリ
+    SpringBoot -> React: PDFをダウンロードレスポンス\n(Content-Type: application/pdf,\nContent-Disposition: attachment)
+    React --> ユーザー: PDFをダウンロード
+else Markdownの場合
+    SpringBoot -> Thymeleaf: Markdownテンプレートにデータ埋め込み
     Thymeleaf --> SpringBoot: Markdownデータ
-    SpringBoot -> React: Markdownファイルをストリーミングレスポンス
-    React --> ユーザー: Markdownファイルを表示 or ダウンロード
+    SpringBoot -> React: Markdownをダウンロードレスポンス\n(Content-Type: text/markdown; charset=utf-8,\nContent-Disposition: attachment)
+    React --> ユーザー: Markdownをダウンロード
 end
 
 @enduml

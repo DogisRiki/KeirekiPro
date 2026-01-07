@@ -1,0 +1,58 @@
+@startuml sharedクラス図
+
+title sharedクラス図
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+'========================================
+' shared.config
+'========================================
+package com.example.keirekipro.shared.config {
+    class AppProperties {
+        - String siteName
+        - String siteUrl
+    }
+}
+
+'========================================
+' shared
+'========================================
+package com.example.keirekipro.shared {
+    class ErrorCollector {
+        - final Map<String, List<String>> errors
+    }
+}
+
+'========================================
+' shared.exception
+'========================================
+package com.example.keirekipro.shared.exception {
+    abstract class BaseException {
+        - final Map<String, List<String>> errors
+        --
+        + BaseException(String message)
+        + BaseException(String message, Map<String, List<String>> errors)
+    }
+
+    BaseException --|> RuntimeException
+}
+
+'========================================
+' shared.utils
+'========================================
+package com.example.keirekipro.shared.utils {
+    class FileUtil {
+    }
+
+    class SecurityUtil {
+        - final SecureRandom secureRandom
+        - final Base64.Encoder base64Encoder
+        --
+        + String generateRandomToken()
+        + String generateCodeChallenge(String codeVerifier)
+        + String generateRandomNumber(int digits)
+    }
+}
+
+@enduml

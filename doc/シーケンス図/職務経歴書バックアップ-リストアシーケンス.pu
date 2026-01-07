@@ -1,0 +1,63 @@
+@startuml 職務経歴書バックアップ-リストアシーケンス
+title 職務経歴書バックアップ-リストアシーケンス
+
+actor ユーザー
+participant React
+participant SpringBoot
+participant PostgreSQL
+
+== バックアップ（JSONダウンロード） ==
+ユーザー -> React: バックアップボタンを押下
+React -> SpringBoot: バックアップリクエスト\n(GET /api/resumes/{resumeId}/backup)
+SpringBoot -> SpringBoot: ユーザーID取得\n(AUTHコンテキスト/JWT)
+SpringBoot -> PostgreSQL: バックアップ用データ取得\n(resumeId, userId)
+PostgreSQL --> SpringBoot: 職務経歴書データ（バックアップ用）
+
+alt 対象が存在しない
+    SpringBoot -> React: エラーレスポンス\n(職務経歴書が存在しません)
+    React --> ユーザー: エラー表示
+else 正常
+    SpringBoot -> React: JSONレスポンス（添付）\nContent-Type: application/json\nContent-Disposition: attachment
+    React --> ユーザー: JSONファイルをダウンロード
+end
+
+== リストア（JSONから新規作成） ==
+ユーザー -> React: リストアボタンを押下\n(バックアップJSONを指定)
+React -> SpringBoot: リストアリクエスト\n(POST /api/resumes/restore, Body: JSON)
+SpringBoot -> SpringBoot: ユーザーID取得\n(AUTHコンテキスト/JWT)
+SpringBoot -> SpringBoot: バックアップバージョンチェック
+
+alt バージョン不一致
+    SpringBoot -> React: エラーレスポンス\n(サポートされていないバックアップバージョン)
+    React --> ユーザー: エラー表示
+else バージョンOK
+    SpringBoot -> PostgreSQL: 作成可能件数チェック\n(ユーザーの職務経歴書数)
+    PostgreSQL --> SpringBoot: 件数
+
+    alt 上限超過
+        SpringBoot -> React: エラーレスポンス\n(職務経歴書の作成可能件数上限)
+        React --> ユーザー: エラー表示
+    else 上限内
+        SpringBoot -> PostgreSQL: 職務経歴書名の重複チェック\n(ユーザーの職務経歴書一覧)
+        PostgreSQL --> SpringBoot: 一覧
+
+        alt 名称重複
+            SpringBoot -> React: エラーレスポンス\n(この職務経歴書名は既に登録されています)
+            React --> ユーザー: エラー表示
+        else 重複なし
+            SpringBoot -> SpringBoot: JSONから職務経歴書を再構築\n(ドメインバリデーション)
+
+            alt JSON不正（破損/改ざん）
+                SpringBoot -> React: エラーレスポンス\n(バックアップファイルが不正なためリストアできません)
+                React --> ユーザー: エラー表示
+            else 正常
+                SpringBoot -> PostgreSQL: 職務経歴書を保存\n(新規作成)
+                PostgreSQL --> SpringBoot: 保存結果
+                SpringBoot -> React: 201 Created\nリストアされた職務経歴書情報
+                React --> ユーザー: リストア結果を表示
+            end
+        end
+    end
+end
+
+@enduml

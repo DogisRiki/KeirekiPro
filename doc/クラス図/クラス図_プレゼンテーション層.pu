@@ -1,0 +1,756 @@
+@startuml presentation層クラス図
+
+title presentation層クラス図
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+'========================================
+' presentation.shared
+'========================================
+package com.example.keirekipro.presentation.shared {
+    class AppExceptionHandler {
+        --
+        + ErrorResponse handleAuthenticationException(AuthenticationCredentialsNotFoundException ex)
+        + ErrorResponse handleJwtVerificationException()
+        + ErrorResponse handleMethodArgumentNotValidException(MethodArgumentNotValidException ex)
+        + ErrorResponse handleBaseException(BaseException ex)
+        + ErrorResponse handleUnexpectedException(Exception ex)
+    }
+
+    class ErrorResponse {
+        - String message
+        - Map<String, List<String>> errors
+    }
+}
+
+package com.example.keirekipro.presentation.shared.logging {
+    class RequestContextLoggingFilter {
+        --
+        # void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    }
+
+    RequestContextLoggingFilter --|> OncePerRequestFilter
+}
+
+package com.example.keirekipro.presentation.shared.utils {
+    class CookieUtil {
+        --
+        + {static} void addCookie(HttpServletResponse response, String name, String value, int maxAge)
+        + {static} void deleteCookie(HttpServletResponse response, String name)
+        + {static} Optional<String> getCookieValue(HttpServletRequest request, String name)
+    }
+
+    class UrlUtil {
+        --
+        + {static} String getBaseUrl(HttpServletRequest request)
+    }
+}
+
+package com.example.keirekipro.presentation.shared.validator {
+    class LocalDateRangeValidator {
+        --
+        + boolean isValid(LocalDate value, ConstraintValidatorContext context)
+    }
+
+    class YearMonthRangeValidator {
+        --
+        + boolean isValid(YearMonth value, ConstraintValidatorContext context)
+    }
+
+    class PasswordMatchesValidator {
+        --
+        + boolean isValid(Object value, ConstraintValidatorContext context)
+    }
+
+    LocalDateRangeValidator ..|> ConstraintValidator
+    YearMonthRangeValidator ..|> ConstraintValidator
+    PasswordMatchesValidator ..|> ConstraintValidator
+}
+
+'========================================
+' presentation.security
+'========================================
+package com.example.keirekipro.presentation.security {
+    class CurrentUserFacade {
+        --
+        + String getUserId()
+    }
+}
+
+package com.example.keirekipro.presentation.security.config {
+    class CsrfCookieFilter {
+        - CsrfTokenRepository csrfTokenRepository
+        --
+        # void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    }
+
+    CsrfCookieFilter --|> OncePerRequestFilter
+}
+
+package com.example.keirekipro.presentation.security.jwt {
+    class JwtProperties {
+        - String secret
+        - long accessTokenValidityMinutes
+        - long refreshTokenValidityMinutes
+    }
+
+    class JwtProvider {
+        - JwtProperties jwtProperties
+        - Algorithm algorithm
+        --
+        + String createAccessToken(String userId, Set<String> roles)
+        + String createRefreshToken(String userId, Set<String> roles)
+        + Authentication getAuthentication(String token)
+        + Date getExpirationDate(String token)
+    }
+
+    class JwtAuthenticationFilter {
+        - JwtProvider jwtProvider
+        --
+        # void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+        - Optional<String> getJwtFromCookies(HttpServletRequest request)
+    }
+
+    JwtAuthenticationFilter --|> OncePerRequestFilter
+    JwtAuthenticationFilter --> JwtProvider
+    JwtProvider --> JwtProperties
+}
+
+'========================================
+' presentation.auth.oidc.config
+'========================================
+package com.example.keirekipro.presentation.auth.oidc.config {
+    class OidcProperties {
+        - Map<String, ProviderConfig> providers
+        --
+        + ProviderConfig getProvider(String providerName)
+    }
+
+    class "OidcProperties.ProviderConfig" as ProviderConfig {
+        - String authorizationEndpoint
+        - String tokenEndpoint
+        - String userInfoEndpoint
+        - String scopes
+        - String providerType
+        - String secretName
+        --
+        + String buildCallbackUrl(String baseUrl)
+    }
+
+    OidcProperties --> ProviderConfig
+}
+
+'========================================
+' presentation.auth.dto
+'========================================
+package com.example.keirekipro.presentation.auth.dto {
+    class LoginRequest {
+        - String email
+        - String password
+    }
+
+    class UserRegistrationRequest {
+        - String email
+        - String username
+        - String password
+        - String confirmPassword
+    }
+
+    class RequestPasswordResetRequest {
+        - String email
+    }
+
+    class RequestPasswordResetVerifyRequest {
+        - String token
+    }
+
+    class ResetPasswordRequest {
+        - String password
+        - String confirmPassword
+        - String token
+    }
+
+    class TwoFactorAuthRequest {
+        - String userId
+        - String code
+    }
+}
+
+'========================================
+' presentation.auth.controller
+'========================================
+package com.example.keirekipro.presentation.auth.controller {
+    class LoginController {
+        - LoginUseCase loginUseCase
+        - TwoFactorAuthIssueUseCase twoFactorAuthIssueUseCase
+        - JwtProvider jwtProvider
+        --
+        + ResponseEntity<String> handle(LoginRequest request, HttpServletResponse response)
+    }
+
+    class LogoutController {
+        --
+        + ResponseEntity<Void> handle(HttpServletResponse response)
+    }
+
+    class UserRegistrationController {
+        - UserRegistrationUseCase userRegistrationUseCase
+        --
+        + ResponseEntity<Void> handle(UserRegistrationRequest request)
+    }
+
+    class OidcAuthorizationController {
+        - StartOidcAuthorizationUseCase startOidcAuthorizationUseCase
+        --
+        + String handle(String provider, HttpServletRequest servletRequest)
+    }
+
+    class OidcCallbackController {
+        - JwtProvider jwtProvider
+        - HandleOidcCallbackUseCase handleOidcCallbackUseCase
+        --
+        + ResponseEntity<Void> handle(String code, String state, String error, HttpServletRequest request, HttpServletResponse response)
+    }
+
+    class RefreshAccessTokenController {
+        - JwtProvider jwtProvider
+        --
+        + ResponseEntity<Void> handle(HttpServletRequest request, HttpServletResponse response)
+    }
+
+    class RequestPasswordResetController {
+        - RequestPasswordResetUseCase requestPasswordResetUseCase
+        --
+        + ResponseEntity<Void> handle(RequestPasswordResetRequest request)
+    }
+
+    class VerifyPasswordResetTokenController {
+        - VerifyPasswordResetTokenUseCase verifyPasswordResetTokenUseCase
+        --
+        + ResponseEntity<Boolean> handle(RequestPasswordResetVerifyRequest request)
+    }
+
+    class ResetPasswordController {
+        - ResetPasswordUseCase resetPasswordUseCase
+        --
+        + ResponseEntity<Void> handle(ResetPasswordRequest request)
+    }
+
+    class TwoFactorAuthController {
+        - TwoFactorAuthVerifyUseCase twoFactorAuthVerifyUseCase
+        - JwtProvider jwtProvider
+        --
+        + ResponseEntity<Void> handle(TwoFactorAuthRequest request, HttpServletResponse response)
+    }
+
+    LoginController --> LoginUseCase
+    LoginController --> TwoFactorAuthIssueUseCase
+    LoginController --> JwtProvider
+    UserRegistrationController --> UserRegistrationUseCase
+    OidcAuthorizationController --> StartOidcAuthorizationUseCase
+    OidcCallbackController --> HandleOidcCallbackUseCase
+    OidcCallbackController --> JwtProvider
+    RefreshAccessTokenController --> JwtProvider
+    RequestPasswordResetController --> RequestPasswordResetUseCase
+    VerifyPasswordResetTokenController --> VerifyPasswordResetTokenUseCase
+    ResetPasswordController --> ResetPasswordUseCase
+    TwoFactorAuthController --> TwoFactorAuthVerifyUseCase
+    TwoFactorAuthController --> JwtProvider
+}
+
+'========================================
+' presentation.user.dto
+'========================================
+package com.example.keirekipro.presentation.user.dto {
+    class ChangePasswordRequest {
+        - String nowPassword
+        - String newPassword
+    }
+
+    class SetEmailAndPasswordRequest {
+        - String email
+        - String password
+        - String confirmPassword
+    }
+
+    class UpdateUserInfoRequest {
+        - String username
+        - MultipartFile profileImage
+    }
+
+    class UserInfoResponse {
+        - String id
+        - String email
+        - String username
+        - String profileImage
+        - List<String> authProviders
+        - Set<String> roles
+    }
+}
+
+'========================================
+' presentation.user.controller
+'========================================
+package com.example.keirekipro.presentation.user.controller {
+    class GetUserInfoController {
+        - GetUserInfoUseCase getUserInfoUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + UserInfoResponse handle()
+    }
+
+    class UpdateUserInfoController {
+        - UpdateUserInfoUseCase updateUserInfoUseCase
+        - GetUserInfoUseCase getUserInfoUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + UserInfoResponse handle(UpdateUserInfoRequest request)
+    }
+
+    class ChangePasswordController {
+        - ChangePasswordUseCase changePasswordUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(ChangePasswordRequest request)
+    }
+
+    class SetEmailAndPasswordController {
+        - SetEmailAndPasswordUseCase setEmailAndPasswordUseCase
+        - GetUserInfoUseCase getUserInfoUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + UserInfoResponse handle(SetEmailAndPasswordRequest request)
+    }
+
+    class RemoveAuthProviderController {
+        - RemoveAuthProviderUseCase removeAuthProviderUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(String providerName)
+    }
+
+    class DeleteUserController {
+        - DeleteUserUseCase deleteUserUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle()
+    }
+
+    GetUserInfoController --> GetUserInfoUseCase
+    GetUserInfoController --> CurrentUserFacade
+    UpdateUserInfoController --> UpdateUserInfoUseCase
+    UpdateUserInfoController --> CurrentUserFacade
+    ChangePasswordController --> ChangePasswordUseCase
+    ChangePasswordController --> CurrentUserFacade
+    SetEmailAndPasswordController --> SetEmailAndPasswordUseCase
+    SetEmailAndPasswordController --> CurrentUserFacade
+    RemoveAuthProviderController --> RemoveAuthProviderUseCase
+    RemoveAuthProviderController --> CurrentUserFacade
+    DeleteUserController --> DeleteUserUseCase
+    DeleteUserController --> CurrentUserFacade
+}
+
+'========================================
+' presentation.resume.dto
+'========================================
+package com.example.keirekipro.presentation.resume.dto {
+    class CreateResumeRequest {
+        - String resumeName
+        - UUID resumeId
+    }
+
+    class UpdateResumeBasicRequest {
+        - String resumeName
+        - LocalDate date
+        - String lastName
+        - String firstName
+    }
+
+    class CreateCareerRequest {
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean isActive
+    }
+
+    class UpdateCareerRequest {
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean isActive
+    }
+
+    class CreateProjectRequest {
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean isActive
+        - String name
+        - String overview
+        - String teamComp
+        - String role
+        - String achievement
+        - Boolean requirements
+        - Boolean basicDesign
+        - Boolean detailedDesign
+        - Boolean implementation
+        - Boolean integrationTest
+        - Boolean systemTest
+        - Boolean maintenance
+        - List<String> frontendLanguages
+        - List<String> backendLanguages
+        ...
+    }
+
+    class UpdateProjectRequest {
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean isActive
+        - String name
+        - String overview
+        ...
+    }
+
+    class CreateCertificationRequest {
+        - String name
+        - YearMonth date
+    }
+
+    class UpdateCertificationRequest {
+        - String name
+        - YearMonth date
+    }
+
+    class CreatePortfolioRequest {
+        - String name
+        - String overview
+        - String techStack
+        - String link
+    }
+
+    class UpdatePortfolioRequest {
+        - String name
+        - String overview
+        - String techStack
+        - String link
+    }
+
+    class CreateSnsPlatformRequest {
+        - String name
+        - String link
+    }
+
+    class UpdateSnsPlatformRequest {
+        - String name
+        - String link
+    }
+
+    class CreateSelfPromotionRequest {
+        - String title
+        - String content
+    }
+
+    class UpdateSelfPromotionRequest {
+        - String title
+        - String content
+    }
+
+    class RestoreResumeRequest {
+        - String version
+        - Instant exportedAt
+        - ResumeDto resume
+    }
+
+    class GetResumeListResponse {
+        - List<ResumeSummary> resumes
+    }
+
+    class ResumeInfoResponse {
+        - String id
+        - String resumeName
+        - LocalDate date
+        - String lastName
+        - String firstName
+        - LocalDateTime createdAt
+        - LocalDateTime updatedAt
+        - List<CareerResponse> careers
+        - List<ProjectResponse> projects
+        - List<CertificationResponse> certifications
+        - List<PortfolioResponse> portfolios
+        - List<SnsPlatformResponse> snsPlatforms
+        - List<SelfPromotionResponse> selfPromotions
+    }
+
+    class BackupResumeResponse {
+        - String version
+        - Instant exportedAt
+        - ResumeDto resume
+    }
+}
+
+'========================================
+' presentation.resume.controller
+'========================================
+package com.example.keirekipro.presentation.resume.controller {
+    class GetResumeListController {
+        - GetResumeListUseCase getResumeListUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + GetResumeListResponse handle()
+    }
+
+    class GetResumeInfoController {
+        - GetResumeInfoUseCase getResumeInfoUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(String resumeId)
+    }
+
+    class CreateResumeController {
+        - CreateResumeUseCase createResumeUseCase
+        - CopyCreateResumeUseCase copyCreateResumeUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(CreateResumeRequest request)
+    }
+
+    class UpdateResumeBasicController {
+        - UpdateResumeBasicUseCase updateResumeBasicUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, UpdateResumeBasicRequest request)
+    }
+
+    class DeleteResumeController {
+        - DeleteResumeUseCase deleteResumeUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(UUID resumeId)
+    }
+
+    class ExportResumeController {
+        - ExportResumeUseCase exportResumeUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<byte[]> handle(UUID resumeId, String format)
+    }
+
+    class BackupResumeController {
+        - BackupResumeUseCase backupResumeUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<BackupResumeResponse> handle(UUID resumeId)
+    }
+
+    class RestoreResumeController {
+        - RestoreResumeUseCase restoreResumeUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(RestoreResumeRequest request)
+    }
+
+    ' Career Controllers
+    class CreateCareerController {
+        - CreateCareerUseCase createCareerUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, CreateCareerRequest request)
+    }
+
+    class UpdateCareerController {
+        - UpdateCareerUseCase updateCareerUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, UUID careerId, UpdateCareerRequest request)
+    }
+
+    class DeleteCareerController {
+        - DeleteCareerUseCase deleteCareerUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(UUID resumeId, UUID careerId)
+    }
+
+    ' Project Controllers
+    class CreateProjectController {
+        - CreateProjectUseCase createProjectUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, CreateProjectRequest request)
+    }
+
+    class UpdateProjectController {
+        - UpdateProjectUseCase updateProjectUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, UUID projectId, UpdateProjectRequest request)
+    }
+
+    class DeleteProjectController {
+        - DeleteProjectUseCase deleteProjectUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(UUID resumeId, UUID projectId)
+    }
+
+    ' Certification Controllers
+    class CreateCertificationController {
+        - CreateCertificationUseCase createCertificationUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, CreateCertificationRequest request)
+    }
+
+    class UpdateCertificationController {
+        - UpdateCertificationUseCase updateCertificationUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, UUID certificationId, UpdateCertificationRequest request)
+    }
+
+    class DeleteCertificationController {
+        - DeleteCertificationUseCase deleteCertificationUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(UUID resumeId, UUID certificationId)
+    }
+
+    ' Portfolio Controllers
+    class CreatePortfolioController {
+        - CreatePortfolioUseCase createPortfolioUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, CreatePortfolioRequest request)
+    }
+
+    class UpdatePortfolioController {
+        - UpdatePortfolioUseCase updatePortfolioUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, UUID portfolioId, UpdatePortfolioRequest request)
+    }
+
+    class DeletePortfolioController {
+        - DeletePortfolioUseCase deletePortfolioUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(UUID resumeId, UUID portfolioId)
+    }
+
+    ' SnsPlatform Controllers
+    class CreateSnsPlatformController {
+        - CreateSnsPlatformUseCase createSnsPlatformUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, CreateSnsPlatformRequest request)
+    }
+
+    class UpdateSnsPlatformController {
+        - UpdateSnsPlatformUseCase updateSnsPlatformUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, UUID snsPlatformId, UpdateSnsPlatformRequest request)
+    }
+
+    class DeleteSnsPlatformController {
+        - DeleteSnsPlatformUseCase deleteSnsPlatformUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(UUID resumeId, UUID snsPlatformId)
+    }
+
+    ' SelfPromotion Controllers
+    class CreateSelfPromotionController {
+        - CreateSelfPromotionUseCase createSelfPromotionUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, CreateSelfPromotionRequest request)
+    }
+
+    class UpdateSelfPromotionController {
+        - UpdateSelfPromotionUseCase updateSelfPromotionUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResumeInfoResponse handle(UUID resumeId, UUID selfPromotionId, UpdateSelfPromotionRequest request)
+    }
+
+    class DeleteSelfPromotionController {
+        - DeleteSelfPromotionUseCase deleteSelfPromotionUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + ResponseEntity<Void> handle(UUID resumeId, UUID selfPromotionId)
+    }
+
+    ' 依存関係（主要なもののみ）
+    GetResumeListController --> GetResumeListUseCase
+    GetResumeListController --> CurrentUserFacade
+    CreateResumeController --> CreateResumeUseCase
+    CreateResumeController --> CopyCreateResumeUseCase
+    ExportResumeController --> ExportResumeUseCase
+    BackupResumeController --> BackupResumeUseCase
+    RestoreResumeController --> RestoreResumeUseCase
+}
+
+'========================================
+' presentation.certification
+'========================================
+package com.example.keirekipro.presentation.certification.dto {
+    class CertificationListResponse {
+        - List<String> names
+    }
+}
+
+package com.example.keirekipro.presentation.certification.controller {
+    class GetCertificationListController {
+        - CertificationListQuery certificationListQuery
+        --
+        + CertificationListResponse handle()
+    }
+
+    GetCertificationListController --> CertificationListQuery
+}
+
+'========================================
+' presentation.snsplatform
+'========================================
+package com.example.keirekipro.presentation.snsplatform.dto {
+    class SnsPlatformListResponse {
+        - List<String> names
+    }
+}
+
+package com.example.keirekipro.presentation.snsplatform.controller {
+    class GetSnsPlatformListController {
+        - SnsPlatformListQuery snsPlatformListQuery
+        --
+        + SnsPlatformListResponse handle()
+    }
+
+    GetSnsPlatformListController --> SnsPlatformListQuery
+}
+
+'========================================
+' presentation.techstack
+'========================================
+package com.example.keirekipro.presentation.techstack.dto {
+    class TechStackListResponse {
+        - Frontend frontend
+        - Backend backend
+        - Infrastructure infrastructure
+        - Tools tools
+    }
+}
+
+package com.example.keirekipro.presentation.techstack.controller {
+    class GetTechStackListController {
+        - TechStackListQuery techStackListQuery
+        --
+        + TechStackListResponse handle()
+    }
+
+    GetTechStackListController --> TechStackListQuery
+}
+
+@enduml

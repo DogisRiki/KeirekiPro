@@ -1,0 +1,715 @@
+@startuml usecase層クラス図
+
+title usecase層クラス図
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+'========================================
+' usecase.shared
+'========================================
+package com.example.keirekipro.usecase.shared.exception {
+    class UseCaseException {
+        --
+        + UseCaseException(Map<String, List<String>> errors)
+        + UseCaseException(String message)
+        + UseCaseException(String message, Map<String, List<String>> errors)
+    }
+}
+
+package com.example.keirekipro.usecase.shared.notification {
+    interface Notification {
+    }
+
+    interface NotificationDispatcher {
+        + void dispatch(Notification notification)
+    }
+
+    NotificationDispatcher ..> Notification
+}
+
+package com.example.keirekipro.usecase.shared.secret {
+    interface SecretReader {
+        + JsonNode readJson(String secretName)
+    }
+}
+
+package com.example.keirekipro.usecase.shared.store {
+    interface ObjectStore {
+        + String put(StoredObject object, String keyPrefix)
+        + String putAs(StoredObject object, String keyPrefix, String fileName)
+        + String issueGetUrl(String key, Duration ttl)
+    }
+
+    class StoredObject <<record>> {
+        + String fileName
+        + String contentType
+        + byte[] data
+    }
+
+    ObjectStore ..> StoredObject
+}
+
+'========================================
+' usecase.auth.store
+'========================================
+package com.example.keirekipro.usecase.auth.store {
+    interface OidcAuthorizationSessionStore {
+        + void save(OidcAuthorizationSession session)
+        + Optional<OidcAuthorizationSession> find(String state)
+        + void delete(String state)
+    }
+
+    interface PasswordResetTokenStore {
+        + void save(String token, UUID userId, Duration ttl)
+        + Optional<UUID> findUserId(String token)
+        + void delete(String token)
+    }
+
+    interface TwoFactorAuthCodeStore {
+        + void save(UUID userId, String code, Duration ttl)
+        + Optional<String> find(UUID userId)
+        + void delete(UUID userId)
+    }
+}
+
+'========================================
+' usecase.auth.oidc
+'========================================
+package com.example.keirekipro.usecase.auth.oidc {
+    interface OidcGateway {
+        + String buildAuthorizationUrl(String provider, String redirectUri, String state, String codeChallenge)
+        + OidcToken exchangeToken(String provider, String code, String redirectUri, String codeVerifier)
+        + OidcUserInfo fetchUserInfo(String provider, String accessToken)
+    }
+
+    class OidcAuthorizationSession {
+        - String state
+        - String provider
+        - String codeVerifier
+    }
+
+    class OidcToken {
+        - String accessToken
+        - String error
+        - String errorDescription
+    }
+
+    class OidcUserInfo {
+        - String providerUserId
+        - String email
+        - String username
+        - String providerType
+    }
+
+    interface OidcCallbackResult {
+    }
+
+    class "OidcCallbackResult.Success" as OidcCallbackSuccess {
+        - UUID userId
+        - Set<String> roles
+    }
+
+    class "OidcCallbackResult.Failure" as OidcCallbackFailure {
+        - OidcCallbackError error
+    }
+
+    enum OidcCallbackError {
+        PROVIDER_ERROR_PARAMETER
+        MISSING_REQUIRED_PARAMETER
+        INVALID_OR_EXPIRED_STATE
+        TOKEN_EXCHANGE_FAILED
+        USERINFO_FETCH_FAILED
+        LOGIN_FAILED
+    }
+
+    OidcCallbackSuccess ..|> OidcCallbackResult
+    OidcCallbackFailure ..|> OidcCallbackResult
+    OidcCallbackFailure --> OidcCallbackError
+    OidcGateway ..> OidcToken
+    OidcGateway ..> OidcUserInfo
+}
+
+'========================================
+' usecase.auth.notification
+'========================================
+package com.example.keirekipro.usecase.auth.notification {
+    class PasswordResetNotification <<record>> {
+        + String to
+        + String resetUrl
+        + String applicationName
+    }
+
+    class TwoFactorCodeNotification <<record>> {
+        + String to
+        + String code
+        + String applicationName
+    }
+
+    PasswordResetNotification ..|> Notification
+    TwoFactorCodeNotification ..|> Notification
+}
+
+'========================================
+' usecase.auth.dto
+'========================================
+package com.example.keirekipro.usecase.auth.dto {
+    class LoginUseCaseDto {
+        - UUID id
+        - String email
+        - Set<String> roles
+    }
+
+    class OidcLoginUseCaseDto {
+        - UUID id
+        - String username
+        - String email
+        - String providerType
+        - Set<String> roles
+    }
+
+    class TwoFactorAuthVerifyResultDto {
+        - UUID userId
+        - Set<String> roles
+    }
+}
+
+'========================================
+' usecase.auth
+'========================================
+package com.example.keirekipro.usecase.auth {
+    class LoginUseCase {
+        - UserRepository userRepository
+        - PasswordEncoder passwordEncoder
+        --
+        + LoginUseCaseDto execute(LoginRequest request)
+    }
+
+    class UserRegistrationUseCase {
+        - UserRepository userRepository
+        - PasswordEncoder passwordEncoder
+        - DomainEventPublisher eventPublisher
+        - UserEmailDuplicationCheckService userEmailDuplicationCheckService
+        --
+        + void execute(UserRegistrationRequest request)
+    }
+
+    class StartOidcAuthorizationUseCase {
+        - OidcGateway oidcGateway
+        - OidcAuthorizationSessionStore oidcAuthorizationSessionStore
+        - SecurityUtil securityUtil
+        --
+        + String execute(String provider, String redirectUri)
+    }
+
+    class HandleOidcCallbackUseCase {
+        - OidcGateway oidcGateway
+        - OidcAuthorizationSessionStore oidcAuthorizationSessionStore
+        - OidcLoginUseCase oidcLoginUseCase
+        --
+        + OidcCallbackResult execute(String code, String state, String error, String redirectUri)
+    }
+
+    class OidcLoginUseCase {
+        - UserRepository userRepository
+        - DomainEventPublisher eventPublisher
+        --
+        + OidcLoginUseCaseDto execute(OidcUserInfo userInfo)
+    }
+
+    class RequestPasswordResetUseCase {
+        - UserRepository userRepository
+        - PasswordResetTokenStore passwordResetTokenStore
+        - NotificationDispatcher notificationDispatcher
+        - SecurityUtil securityUtil
+        --
+        + void execute(String email)
+    }
+
+    class VerifyPasswordResetTokenUseCase {
+        - PasswordResetTokenStore passwordResetTokenStore
+        --
+        + boolean execute(String token)
+    }
+
+    class ResetPasswordUseCase {
+        - UserRepository userRepository
+        - PasswordEncoder passwordEncoder
+        - PasswordResetTokenStore passwordResetTokenStore
+        --
+        + void execute(String token, String newPassword)
+    }
+
+    class TwoFactorAuthIssueUseCase {
+        - TwoFactorAuthCodeStore twoFactorAuthCodeStore
+        - NotificationDispatcher notificationDispatcher
+        - SecurityUtil securityUtil
+        - AppProperties properties
+        --
+        + void execute(UUID userId, String email)
+    }
+
+    class TwoFactorAuthVerifyUseCase {
+        - TwoFactorAuthCodeStore twoFactorAuthCodeStore
+        - UserRepository userRepository
+        --
+        + TwoFactorAuthVerifyResultDto execute(UUID userId, String code)
+    }
+
+    ' 依存関係
+    LoginUseCase ..> LoginUseCaseDto
+    OidcLoginUseCase ..> OidcLoginUseCaseDto
+    TwoFactorAuthVerifyUseCase ..> TwoFactorAuthVerifyResultDto
+    HandleOidcCallbackUseCase --> OidcGateway
+    HandleOidcCallbackUseCase --> OidcAuthorizationSessionStore
+    HandleOidcCallbackUseCase --> OidcLoginUseCase
+    HandleOidcCallbackUseCase ..> OidcCallbackResult
+    StartOidcAuthorizationUseCase --> OidcGateway
+    StartOidcAuthorizationUseCase --> OidcAuthorizationSessionStore
+    RequestPasswordResetUseCase --> PasswordResetTokenStore
+    RequestPasswordResetUseCase --> NotificationDispatcher
+    VerifyPasswordResetTokenUseCase --> PasswordResetTokenStore
+    ResetPasswordUseCase --> PasswordResetTokenStore
+    TwoFactorAuthIssueUseCase --> TwoFactorAuthCodeStore
+    TwoFactorAuthIssueUseCase --> NotificationDispatcher
+    TwoFactorAuthVerifyUseCase --> TwoFactorAuthCodeStore
+}
+
+'========================================
+' usecase.query
+'========================================
+package com.example.keirekipro.usecase.query.certification {
+    interface CertificationListQuery {
+        + CertificationListQueryDto findAll()
+    }
+}
+
+package com.example.keirekipro.usecase.query.certification.dto {
+    class CertificationListQueryDto {
+        - List<String> names
+    }
+}
+
+package com.example.keirekipro.usecase.query.snsplatform {
+    interface SnsPlatformListQuery {
+        + SnsPlatformListQueryDto findAll()
+    }
+}
+
+package com.example.keirekipro.usecase.query.snsplatform.dto {
+    class SnsPlatformListQueryDto {
+        - List<String> names
+    }
+}
+
+package com.example.keirekipro.usecase.query.techstack {
+    interface TechStackListQuery {
+        + TechStackListQueryDto findAll()
+    }
+}
+
+package com.example.keirekipro.usecase.query.techstack.dto {
+    class TechStackListQueryDto {
+        - FrontendDto frontend
+        - BackendDto backend
+        - InfrastructureDto infrastructure
+        - ToolsDto tools
+    }
+}
+
+package com.example.keirekipro.usecase.query.resume {
+    interface ResumeBackupQuery {
+        + Optional<ResumeBackupQueryDto> findByIdForBackup(UUID resumeId, UUID userId)
+    }
+
+    interface ResumeCountQuery {
+        + int countByUserId(UUID userId)
+    }
+}
+
+package com.example.keirekipro.usecase.query.resume.dto {
+    class ResumeBackupQueryDto {
+        - String resumeName
+        - LocalDate date
+        - String lastName
+        - String firstName
+        - List<CareerDto> careers
+        - List<ProjectDto> projects
+        - List<CertificationDto> certifications
+        - List<PortfolioDto> portfolios
+        - List<SnsPlatformDto> snsPlatforms
+        - List<SelfPromotionDto> selfPromotions
+    }
+}
+
+CertificationListQuery ..> CertificationListQueryDto
+SnsPlatformListQuery ..> SnsPlatformListQueryDto
+TechStackListQuery ..> TechStackListQueryDto
+ResumeBackupQuery ..> ResumeBackupQueryDto
+
+'========================================
+' usecase.resume.export
+'========================================
+package com.example.keirekipro.usecase.resume.export {
+    interface ResumeExporter {
+        + ExportedFile exportPdf(Resume resume)
+        + ExportedFile exportMarkdown(Resume resume)
+    }
+
+    class ExportedFile {
+        - String fileName
+        - String contentType
+        - byte[] data
+    }
+
+    enum ExportFormat {
+        PDF
+        MARKDOWN
+    }
+
+    ResumeExporter ..> ExportedFile
+}
+
+'========================================
+' usecase.resume.policy
+'========================================
+package com.example.keirekipro.usecase.resume.policy {
+    class ResumeLimitChecker {
+        - ResumeCountQuery resumeCountQuery
+        --
+        + void check(UUID userId)
+    }
+
+    ResumeLimitChecker --> ResumeCountQuery
+}
+
+'========================================
+' usecase.resume.dto
+'========================================
+package com.example.keirekipro.usecase.resume.dto {
+    class ResumeInfoUseCaseDto {
+        - UUID id
+        - String resumeName
+        - LocalDate date
+        - String lastName
+        - String firstName
+        - LocalDateTime createdAt
+        - LocalDateTime updatedAt
+        - List<Career> careers
+        - List<Project> projects
+        - List<Certification> certifications
+        - List<Portfolio> portfolios
+        - List<SnsPlatform> snsPlatforms
+        - List<SelfPromotion> selfPromotions
+    }
+
+    class ResumeListUseCaseDto {
+        - UUID id
+        - String resumeName
+        - LocalDateTime createdAt
+        - LocalDateTime updatedAt
+    }
+
+    class BackupResumeUseCaseDto {
+        - String fileName
+        - String contentType
+        - String version
+        - Instant exportedAt
+        - ResumeDto resume
+    }
+
+    class ExportResumeUseCaseDto {
+        - String fileName
+        - String contentType
+        - byte[] data
+    }
+}
+
+'========================================
+' usecase.resume
+'========================================
+package com.example.keirekipro.usecase.resume {
+    class CreateResumeUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeNameDuplicationCheckService resumeNameDuplicationCheckService
+        - ResumeLimitChecker resumeLimitChecker
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, CreateResumeRequest request)
+    }
+
+    class CopyCreateResumeUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeNameDuplicationCheckService resumeNameDuplicationCheckService
+        - ResumeLimitChecker resumeLimitChecker
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, CreateResumeRequest request)
+    }
+
+    class GetResumeListUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + List<ResumeListUseCaseDto> execute(UUID userId)
+    }
+
+    class GetResumeInfoUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId)
+    }
+
+    class DeleteResumeUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + void execute(UUID userId, UUID resumeId)
+    }
+
+    class UpdateResumeBasicUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UpdateResumeBasicRequest request)
+    }
+
+    class ExportResumeUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeExportRuleCheckService resumeExportRuleCheckService
+        - ResumeExporter pdfExporter
+        - ResumeExporter markdownExporter
+        --
+        + ExportResumeUseCaseDto execute(UUID userId, UUID resumeId, ExportFormat format)
+    }
+
+    class BackupResumeUseCase {
+        - ResumeBackupQuery resumeBackupQuery
+        --
+        + BackupResumeUseCaseDto execute(UUID userId, UUID resumeId)
+    }
+
+    class RestoreResumeUseCase {
+        - ResumeLimitChecker resumeLimitChecker
+        - ResumeNameDuplicationCheckService resumeNameDuplicationCheckService
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, RestoreResumeRequest request)
+    }
+
+    ' Career CRUD
+    class CreateCareerUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeLimitChecker resumeLimitChecker
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateCareerRequest request)
+    }
+
+    class UpdateCareerUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UUID careerId, UpdateCareerRequest request)
+    }
+
+    class DeleteCareerUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + void execute(UUID userId, UUID resumeId, UUID careerId)
+    }
+
+    ' Project CRUD
+    class CreateProjectUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeLimitChecker resumeLimitChecker
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateProjectRequest request)
+    }
+
+    class UpdateProjectUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UUID projectId, UpdateProjectRequest request)
+    }
+
+    class DeleteProjectUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + void execute(UUID userId, UUID resumeId, UUID projectId)
+    }
+
+    ' Certification CRUD
+    class CreateCertificationUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeLimitChecker resumeLimitChecker
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateCertificationRequest request)
+    }
+
+    class UpdateCertificationUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UUID certificationId, UpdateCertificationRequest request)
+    }
+
+    class DeleteCertificationUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + void execute(UUID userId, UUID resumeId, UUID certificationId)
+    }
+
+    ' Portfolio CRUD
+    class CreatePortfolioUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeLimitChecker resumeLimitChecker
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreatePortfolioRequest request)
+    }
+
+    class UpdatePortfolioUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UUID portfolioId, UpdatePortfolioRequest request)
+    }
+
+    class DeletePortfolioUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + void execute(UUID userId, UUID resumeId, UUID portfolioId)
+    }
+
+    ' SnsPlatform CRUD
+    class CreateSnsPlatformUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeLimitChecker resumeLimitChecker
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateSnsPlatformRequest request)
+    }
+
+    class UpdateSnsPlatformUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UUID snsPlatformId, UpdateSnsPlatformRequest request)
+    }
+
+    class DeleteSnsPlatformUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + void execute(UUID userId, UUID resumeId, UUID snsPlatformId)
+    }
+
+    ' SelfPromotion CRUD
+    class CreateSelfPromotionUseCase {
+        - ResumeRepository resumeRepository
+        - ResumeLimitChecker resumeLimitChecker
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateSelfPromotionRequest request)
+    }
+
+    class UpdateSelfPromotionUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UUID selfPromotionId, UpdateSelfPromotionRequest request)
+    }
+
+    class DeleteSelfPromotionUseCase {
+        - ResumeRepository resumeRepository
+        --
+        + void execute(UUID userId, UUID resumeId, UUID selfPromotionId)
+    }
+
+    ' 依存関係
+    CreateResumeUseCase --> ResumeLimitChecker
+    CopyCreateResumeUseCase --> ResumeLimitChecker
+    CreateCareerUseCase --> ResumeLimitChecker
+    CreateProjectUseCase --> ResumeLimitChecker
+    CreateCertificationUseCase --> ResumeLimitChecker
+    CreatePortfolioUseCase --> ResumeLimitChecker
+    CreateSnsPlatformUseCase --> ResumeLimitChecker
+    CreateSelfPromotionUseCase --> ResumeLimitChecker
+    RestoreResumeUseCase --> ResumeLimitChecker
+
+    ExportResumeUseCase --> ResumeExporter
+    ExportResumeUseCase ..> ExportFormat
+    BackupResumeUseCase --> ResumeBackupQuery
+}
+
+'========================================
+' usecase.user.notification
+'========================================
+package com.example.keirekipro.usecase.user.notification {
+    class UserDeletedNotification <<record>> {
+        + String to
+        + String username
+        + String applicationName
+    }
+
+    class UserRegisteredNotification <<record>> {
+        + String to
+        + String username
+        + String applicationName
+    }
+
+    UserDeletedNotification ..|> Notification
+    UserRegisteredNotification ..|> Notification
+}
+
+'========================================
+' usecase.user.dto
+'========================================
+package com.example.keirekipro.usecase.user.dto {
+    class UserInfoUseCaseDto {
+        - UUID id
+        - String email
+        - String username
+        - String profileImage
+        - List<AuthProviderInfo> authProviders
+        - Set<String> roles
+    }
+}
+
+'========================================
+' usecase.user
+'========================================
+package com.example.keirekipro.usecase.user {
+    class GetUserInfoUseCase {
+        - UserRepository userRepository
+        - ObjectStore objectStore
+        --
+        + UserInfoUseCaseDto execute(UUID userId)
+    }
+
+    class UpdateUserInfoUseCase {
+        - UserRepository userRepository
+        - ObjectStore objectStore
+        --
+        + void execute(UUID userId, UpdateUserInfoRequest request)
+    }
+
+    class ChangePasswordUseCase {
+        - UserRepository userRepository
+        - PasswordEncoder passwordEncoder
+        --
+        + void execute(UUID userId, String currentPassword, String newPassword)
+    }
+
+    class SetEmailAndPasswordUseCase {
+        - UserRepository userRepository
+        - PasswordEncoder passwordEncoder
+        --
+        + void execute(UUID userId, String email, String password)
+    }
+
+    class RemoveAuthProviderUseCase {
+        - UserRepository userRepository
+        --
+        + void execute(UUID userId, String providerName)
+    }
+
+    class DeleteUserUseCase {
+        - UserRepository userRepository
+        - DomainEventPublisher eventPublisher
+        --
+        + void execute(UUID userId)
+    }
+
+    GetUserInfoUseCase ..> UserInfoUseCaseDto
+    GetUserInfoUseCase --> ObjectStore
+    UpdateUserInfoUseCase --> ObjectStore
+}
+
+@enduml
