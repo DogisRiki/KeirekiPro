@@ -3,10 +3,10 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.example.keirekipro.infrastructure.query.certification.CertificationMapper">
+<mapper namespace="com.example.keirekipro.infrastructure.query.certification.CertificationQueryMapper">
 
     <select id="selectAll"
-            resultType="com.example.keirekipro.infrastructure.query.certification.CertificationDto">
+            resultType="com.example.keirekipro.infrastructure.query.certification.CertificationQueryMapper$CertificationRow">
         SELECT
             name
         FROM

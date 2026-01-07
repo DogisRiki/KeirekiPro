@@ -3,10 +3,10 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.example.keirekipro.infrastructure.query.snsplatform.SnsPlatformMapper">
+<mapper namespace="com.example.keirekipro.infrastructure.query.snsplatform.SnsPlatformQueryMapper">
 
     <select id="selectAll"
-            resultType="com.example.keirekipro.infrastructure.query.snsplatform.SnsPlatformDto">
+            resultType="com.example.keirekipro.infrastructure.query.snsplatform.SnsPlatformQueryMapper$SnsPlatformRow">
         SELECT
             name
         FROM

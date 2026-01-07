@@ -2,7 +2,7 @@ package com.example.keirekipro.usecase.resume.policy;
 
 import java.util.UUID;
 
-import com.example.keirekipro.infrastructure.query.resume.ResumeQuery;
+import com.example.keirekipro.usecase.query.resume.ResumeCountQuery;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ResumeLimitChecker {
 
-    private final ResumeQuery resumeQuery;
+    private final ResumeCountQuery resumeCountQuery;
 
     /**
      * 職務経歴書の新規作成が可能かをチェックする
@@ -24,7 +24,7 @@ public class ResumeLimitChecker {
      * @param userId ユーザーID
      */
     public void checkResumeCreateAllowed(UUID userId) {
-        int count = resumeQuery.countResumesByUserId(userId);
+        int count = resumeCountQuery.countResumesByUserId(userId);
         if (count >= ResumeLimits.RESUMES_CREATION_LIMIT) {
             throw new UseCaseException(
                     "職務経歴書の作成可能件数の上限に達しているため作成できません。（現在：" + count + "件／上限：" + ResumeLimits.RESUMES_CREATION_LIMIT
@@ -38,7 +38,7 @@ public class ResumeLimitChecker {
      * @param resumeId 職務経歴書ID
      */
     public void checkCareerAddAllowed(UUID resumeId) {
-        int count = resumeQuery.countCareersByResumeId(resumeId);
+        int count = resumeCountQuery.countCareersByResumeId(resumeId);
         if (count >= ResumeLimits.CAREERS_CREATION_LIMIT) {
             throw new UseCaseException(
                     "職歴の追加可能件数の上限に達しているため追加できません。（現在：" + count + "件／上限：" + ResumeLimits.CAREERS_CREATION_LIMIT + "件）");
@@ -51,7 +51,7 @@ public class ResumeLimitChecker {
      * @param resumeId 職務経歴書ID
      */
     public void checkProjectAddAllowed(UUID resumeId) {
-        int count = resumeQuery.countProjectsByResumeId(resumeId);
+        int count = resumeCountQuery.countProjectsByResumeId(resumeId);
         if (count >= ResumeLimits.PROJECTS_CREATION_LIMIT) {
             throw new UseCaseException(
                     "プロジェクトの追加可能件数の上限に達しているため追加できません。（現在：" + count + "件／上限：" + ResumeLimits.PROJECTS_CREATION_LIMIT
@@ -65,7 +65,7 @@ public class ResumeLimitChecker {
      * @param resumeId 職務経歴書ID
      */
     public void checkCertificationAddAllowed(UUID resumeId) {
-        int count = resumeQuery.countCertificationsByResumeId(resumeId);
+        int count = resumeCountQuery.countCertificationsByResumeId(resumeId);
         if (count >= ResumeLimits.CERTIFICATIONS_CREATION_LIMIT) {
             throw new UseCaseException(
                     "資格の追加可能件数の上限に達しているため追加できません。（現在：" + count + "件／上限：" + ResumeLimits.CERTIFICATIONS_CREATION_LIMIT
@@ -79,7 +79,7 @@ public class ResumeLimitChecker {
      * @param resumeId 職務経歴書ID
      */
     public void checkSnsPlatformAddAllowed(UUID resumeId) {
-        int count = resumeQuery.countSnsPlatformsByResumeId(resumeId);
+        int count = resumeCountQuery.countSnsPlatformsByResumeId(resumeId);
         if (count >= ResumeLimits.SNS_PLATFORMS_CREATION_LIMIT) {
             throw new UseCaseException(
                     "SNSプラットフォームの追加可能件数の上限に達しているため追加できません。（現在：" + count + "件／上限："
@@ -93,7 +93,7 @@ public class ResumeLimitChecker {
      * @param resumeId 職務経歴書ID
      */
     public void checkPortfolioAddAllowed(UUID resumeId) {
-        int count = resumeQuery.countPortfoliosByResumeId(resumeId);
+        int count = resumeCountQuery.countPortfoliosByResumeId(resumeId);
         if (count >= ResumeLimits.PORTFOLIOS_CREATION_LIMIT) {
             throw new UseCaseException(
                     "ポートフォリオの追加可能件数の上限に達しているため追加できません。（現在：" + count + "件／上限：" + ResumeLimits.PORTFOLIOS_CREATION_LIMIT
@@ -107,7 +107,7 @@ public class ResumeLimitChecker {
      * @param resumeId 職務経歴書ID
      */
     public void checkSelfPromotionAddAllowed(UUID resumeId) {
-        int count = resumeQuery.countSelfPromotionsByResumeId(resumeId);
+        int count = resumeCountQuery.countSelfPromotionsByResumeId(resumeId);
         if (count >= ResumeLimits.SELF_PROMOTIONS_CREATION_LIMIT) {
             throw new UseCaseException(
                     "自己PRの追加可能件数の上限に達しているため追加できません。（現在：" + count + "件／上限：" + ResumeLimits.SELF_PROMOTIONS_CREATION_LIMIT

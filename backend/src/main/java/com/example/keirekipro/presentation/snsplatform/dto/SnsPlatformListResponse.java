@@ -2,7 +2,7 @@ package com.example.keirekipro.presentation.snsplatform.dto;
 
 import java.util.List;
 
-import com.example.keirekipro.usecase.query.snsplatform.dto.SnsPlatformListItemDto;
+import com.example.keirekipro.usecase.query.snsplatform.dto.SnsPlatformListQueryDto;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -20,12 +20,12 @@ public class SnsPlatformListResponse {
     private final List<String> names;
 
     /**
-     * ユースケースDTOからレスポンスDTOへ変換する
+     * クエリDTOからレスポンスDTOへ変換する
      *
-     * @param dto ユースケースDTO
+     * @param dto クエリDTO
      * @return レスポンスDTO
      */
-    public static SnsPlatformListResponse convertFrom(SnsPlatformListItemDto dto) {
+    public static SnsPlatformListResponse convertFrom(SnsPlatformListQueryDto dto) {
         return new SnsPlatformListResponse(dto.getNames());
     }
 }

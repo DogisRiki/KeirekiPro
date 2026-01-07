@@ -2,7 +2,7 @@ package com.example.keirekipro.presentation.techstack.dto;
 
 import java.util.List;
 
-import com.example.keirekipro.usecase.query.techstack.dto.TechStackListItemDto;
+import com.example.keirekipro.usecase.query.techstack.dto.TechStackListQueryDto;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -23,12 +23,12 @@ public class TechStackListResponse {
     private final Tools tools;
 
     /**
-     * ユースケースDTOからレスポンスDTOへ変換する
+     * クエリDTOからレスポンスDTOへ変換する
      *
-     * @param dto ユースケースDTO
+     * @param dto クエリDTO
      * @return レスポンスDTO
      */
-    public static TechStackListResponse convertFrom(TechStackListItemDto dto) {
+    public static TechStackListResponse convertFrom(TechStackListQueryDto dto) {
         return new TechStackListResponse(
                 Frontend.convertFrom(dto.getFrontend()),
                 Backend.convertFrom(dto.getBackend()),
@@ -72,7 +72,7 @@ public class TechStackListResponse {
         /**
          * フロントエンド変換
          */
-        public static Frontend convertFrom(TechStackListItemDto.Frontend src) {
+        public static Frontend convertFrom(TechStackListQueryDto.FrontendDto src) {
             return new Frontend(
                     src.getLanguages(),
                     src.getFrameworks(),
@@ -127,7 +127,7 @@ public class TechStackListResponse {
         /**
          * バックエンド変換
          */
-        public static Backend convertFrom(TechStackListItemDto.Backend src) {
+        public static Backend convertFrom(TechStackListQueryDto.BackendDto src) {
             return new Backend(
                     src.getLanguages(),
                     src.getFrameworks(),
@@ -181,7 +181,7 @@ public class TechStackListResponse {
         /**
          * インフラ変換
          */
-        public static Infrastructure convertFrom(TechStackListItemDto.Infrastructure src) {
+        public static Infrastructure convertFrom(TechStackListQueryDto.InfrastructureDto src) {
             return new Infrastructure(
                     src.getClouds(),
                     src.getOperatingSystems(),
@@ -231,7 +231,7 @@ public class TechStackListResponse {
         /**
          * 開発支援ツール変換
          */
-        public static Tools convertFrom(TechStackListItemDto.Tools src) {
+        public static Tools convertFrom(TechStackListQueryDto.ToolsDto src) {
             return new Tools(
                     src.getSourceControls(),
                     src.getProjectManagements(),
