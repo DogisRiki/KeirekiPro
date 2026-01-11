@@ -2,7 +2,8 @@ package com.example.keirekipro.unit.infrastructure.shared.aws.s3;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.keirekipro.infrastructure.shared.aws.config.AwsS3Properties;
+import java.lang.reflect.Field;
+
 import com.example.keirekipro.infrastructure.shared.aws.s3.LocalstackPresignedUrlTransformer;
 
 import org.junit.jupiter.api.DisplayName;
@@ -12,11 +13,13 @@ class LocalstackPresignedUrlTransformerTest {
 
     @Test
     @DisplayName("LocalStackの署名付きURLのホストをlocalhostに補正できる")
-    void test1() {
-        AwsS3Properties props = new AwsS3Properties();
-        props.setEndpoint("http://localstack:4566");
+    void test1() throws Exception {
+        LocalstackPresignedUrlTransformer transformer = new LocalstackPresignedUrlTransformer();
 
-        LocalstackPresignedUrlTransformer transformer = new LocalstackPresignedUrlTransformer(props);
+        // @Valueフィールドにリフレクションで値を設定
+        Field endpointField = LocalstackPresignedUrlTransformer.class.getDeclaredField("endpoint");
+        endpointField.setAccessible(true);
+        endpointField.set(transformer, "http://localstack:4566");
 
         String input = "http://localstack:4566/test-bucket/path/to/file.png?X-Amz-Signature=xxx";
         String output = transformer.transform(input);

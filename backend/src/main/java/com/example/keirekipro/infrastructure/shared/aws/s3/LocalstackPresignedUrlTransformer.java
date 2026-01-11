@@ -2,25 +2,22 @@ package com.example.keirekipro.infrastructure.shared.aws.s3;
 
 import java.net.URI;
 
-import com.example.keirekipro.infrastructure.shared.aws.config.AwsS3Properties;
-
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
-
-import lombok.RequiredArgsConstructor;
 
 /**
  * LocalStack用 署名付きURL変換
  */
 @Component
 @Profile("dev")
-@RequiredArgsConstructor
 public class LocalstackPresignedUrlTransformer implements PresignedUrlTransformer {
 
     /**
-     * S3設定
+     * エンドポイント
      */
-    private final AwsS3Properties properties;
+    @Value("${spring.cloud.aws.endpoint}")
+    private String endpoint;
 
     /**
      * LocalStackの署名付きURLのホストをlocalhostに補正する
@@ -30,7 +27,7 @@ public class LocalstackPresignedUrlTransformer implements PresignedUrlTransforme
      */
     @Override
     public String transform(String url) {
-        String originalHost = URI.create(properties.getEndpoint()).getHost();
+        String originalHost = URI.create(endpoint).getHost();
         return url.replace(originalHost, "localhost");
     }
 }

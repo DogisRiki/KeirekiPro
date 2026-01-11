@@ -1,15 +1,28 @@
 spring:
+  config:
+    import: aws-secretsmanager:keirekipro/rds;keirekipro/redis;keirekipro/jwt
   datasource:
-    driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://db:5432/keireki_pro
-    username: postgres
-    password: postgres
-    show-sql: true
+    url: jdbc:postgresql://${host}:${port}/${database}
+    username: ${username}
+    password: ${password}
   data:
     redis:
-      host: redis
-      port: 6379
-      password: null
+      host: ${redis-host}
+      port: ${redis-port}
+      password: ${redis-password}
+  cloud:
+    aws:
+      endpoint: http://localstack:4566
+      region:
+        static: ap-northeast-1
+      credentials:
+        access-key: dummy
+        secret-key: dummy
+      s3:
+        path-style-access-enabled: true
+
+jwt:
+  secret: ${jwt-secret}
 
 frontend-base-url: "http://localhost:5173"
 
@@ -18,24 +31,6 @@ cors:
 
 cookie:
   secure: false
-
-jwt:
-  secret: vh8JBWqYFC2mJwZ4XD9pE7TKq3mN5RxS2HnUcL7VfAy
-  access-token-validity-in-minutes: 30
-  refresh-token-validity-in-days: 7
-
-aws:
-  secrets-manager:
-    region: "ap-northeast-1"
-    endpoint: "http://localstack:4566"
-  ses:
-    region: "ap-northeast-1"
-    endpoint: "http://localstack:4566"
-    from-address: "no-reply@keirekipro.click"
-  s3:
-    region: "ap-northeast-1"
-    endpoint: "http://localstack:4566"
-    bucket-name: "keirekipro-storage"
 
 # ログ設定
 logging:

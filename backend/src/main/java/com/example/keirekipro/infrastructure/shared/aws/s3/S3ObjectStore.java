@@ -6,10 +6,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import com.example.keirekipro.infrastructure.shared.aws.config.AwsS3Properties;
 import com.example.keirekipro.usecase.shared.store.ObjectStore;
 import com.example.keirekipro.usecase.shared.store.StoredObject;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -33,9 +33,10 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 public class S3ObjectStore implements ObjectStore {
 
     /**
-     * S3設定
+     * バケット名
      */
-    private final AwsS3Properties properties;
+    @Value("${aws.s3.bucket-name}")
+    private String bucketName;
 
     /**
      * S3クライアント
@@ -76,7 +77,7 @@ public class S3ObjectStore implements ObjectStore {
         metadata.put("Original-Filename", originalFilename);
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(properties.getBucketName())
+                .bucket(bucketName)
                 .key(key)
                 .contentType(object.contentType())
                 .metadata(metadata)
@@ -105,7 +106,7 @@ public class S3ObjectStore implements ObjectStore {
         metadata.put("Original-Filename", object.originalFilename());
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(properties.getBucketName())
+                .bucket(bucketName)
                 .key(key)
                 .contentType(object.contentType())
                 .metadata(metadata)
@@ -126,7 +127,7 @@ public class S3ObjectStore implements ObjectStore {
     public byte[] getBytes(String key) {
 
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(properties.getBucketName())
+                .bucket(bucketName)
                 .key(key)
                 .build();
 
@@ -145,7 +146,7 @@ public class S3ObjectStore implements ObjectStore {
     @Override
     public void delete(String key) {
         DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
-                .bucket(properties.getBucketName())
+                .bucket(bucketName)
                 .key(key)
                 .build();
 
@@ -163,7 +164,7 @@ public class S3ObjectStore implements ObjectStore {
     public String issueGetUrl(String key, Duration ttl) {
 
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(properties.getBucketName())
+                .bucket(bucketName)
                 .key(key)
                 .build();
 

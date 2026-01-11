@@ -10,10 +10,10 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.time.Duration;
 
-import com.example.keirekipro.infrastructure.shared.aws.config.AwsS3Properties;
 import com.example.keirekipro.infrastructure.shared.aws.s3.PresignedUrlTransformer;
 import com.example.keirekipro.infrastructure.shared.aws.s3.S3ObjectStore;
 import com.example.keirekipro.usecase.shared.store.StoredObject;
@@ -42,9 +42,6 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 class S3ObjectStoreTest {
 
     @Mock
-    private AwsS3Properties properties;
-
-    @Mock
     private S3Client s3Client;
 
     @Mock
@@ -56,9 +53,13 @@ class S3ObjectStoreTest {
     private S3ObjectStore objectStore;
 
     @BeforeEach
-    void setUp() {
-        when(properties.getBucketName()).thenReturn("test-bucket");
-        objectStore = new S3ObjectStore(properties, s3Client, s3Presigner, presignedUrlTransformer);
+    void setUp() throws Exception {
+        objectStore = new S3ObjectStore(s3Client, s3Presigner, presignedUrlTransformer);
+
+        // @Valueフィールドにリフレクションで値を設定
+        Field bucketNameField = S3ObjectStore.class.getDeclaredField("bucketName");
+        bucketNameField.setAccessible(true);
+        bucketNameField.set(objectStore, "test-bucket");
     }
 
     @Test

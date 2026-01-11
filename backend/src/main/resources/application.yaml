@@ -1,6 +1,16 @@
 spring:
   application:
     name: keirekipro
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:keireki_pro}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   web:
     locale: ja_JP
     locale-resolver: fixed
@@ -20,6 +30,11 @@ app:
   siteName: "KeirekiPro"
   siteUrl: "https://keirekipro.click"
 
+jwt:
+  secret: ${JWT_SECRET:default-jwt-secret-for-development}
+  access-token-validity-in-minutes: 30
+  refresh-token-validity-in-days: 7
+
 oidc:
   providers:
     google:
@@ -36,6 +51,12 @@ oidc:
       scopes: "read:user user:email"
       providerType: "github"
       secretName: "keirekipro/oidc/github"
+
+aws:
+  ses:
+    from-address: "no-reply@keirekipro.click"
+  s3:
+    bucket-name: "keirekipro-storage"
 
 logging:
   structured:
