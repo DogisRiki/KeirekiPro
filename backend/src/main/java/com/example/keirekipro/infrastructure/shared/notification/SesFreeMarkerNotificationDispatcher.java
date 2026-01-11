@@ -4,7 +4,6 @@ import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.example.keirekipro.infrastructure.shared.aws.config.AwsSesProperties;
 import com.example.keirekipro.usecase.auth.notification.PasswordResetNotification;
 import com.example.keirekipro.usecase.auth.notification.TwoFactorCodeNotification;
 import com.example.keirekipro.usecase.shared.notification.Notification;
@@ -12,6 +11,7 @@ import com.example.keirekipro.usecase.shared.notification.NotificationDispatcher
 import com.example.keirekipro.usecase.user.notification.UserDeletedNotification;
 import com.example.keirekipro.usecase.user.notification.UserRegisteredNotification;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -38,14 +38,15 @@ public class SesFreeMarkerNotificationDispatcher implements NotificationDispatch
     private final SesClient sesClient;
 
     /**
-     * SES設定
-     */
-    private final AwsSesProperties sesProperties;
-
-    /**
      * FreeMarker設定
      */
     private final Configuration freeMarkerConfiguration;
+
+    /**
+     * 送信元メールアドレス
+     */
+    @Value("${aws.ses.from-address}")
+    private String fromAddress;
 
     /**
      * 通知を送達する
@@ -118,7 +119,7 @@ public class SesFreeMarkerNotificationDispatcher implements NotificationDispatch
         SendEmailRequest request = SendEmailRequest.builder()
                 .destination(destination)
                 .message(message)
-                .source(sesProperties.getFromAddress())
+                .source(fromAddress)
                 .build();
 
         sesClient.sendEmail(request);

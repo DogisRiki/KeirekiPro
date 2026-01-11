@@ -50,10 +50,12 @@ dependencies {
     implementation 'com.openhtmltopdf:openhtmltopdf-core:1.0.10'
     implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
     implementation 'com.auth0:java-jwt:4.4.0'
-    implementation platform('software.amazon.awssdk:bom:2.30.21')
-    implementation 'software.amazon.awssdk:s3'
-    implementation 'software.amazon.awssdk:ses'
-    implementation 'software.amazon.awssdk:secretsmanager'
+
+    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.3.0')
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-ses'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-secrets-manager'
+
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     testImplementation platform('org.testcontainers:testcontainers-bom:1.19.3')
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'

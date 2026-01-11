@@ -1,5 +1,46 @@
+spring:
+  config:
+    import: aws-secretsmanager:keirekipro/rds;keirekipro/redis;keirekipro/jwt
+  datasource:
+    url: jdbc:postgresql://${host}:${port}/${database}
+    username: ${username}
+    password: ${password}
+  data:
+    redis:
+      host: ${redis-host}
+      port: ${redis-port}
+      password: ${redis-password}
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-1
+
+jwt:
+  secret: ${jwt-secret}
+
+frontend-base-url: "https://app.keirekipro.click"
+
+cors:
+  allowed-origins: "https://app.keirekipro.click"
+
+cookie:
+  secure: true
+
+aws:
+  ses:
+    from-address: "info@keirekipro.click"
+
 logging:
   level:
     root: warn
     com.example.keirekipro: info
     org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: error
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health  # healthエンドポイントのみ公開(ECSヘルスチェック用)
+  endpoint:
+    health:
+      show-details: never  # 詳細情報は非公開（セキュリティ考慮）

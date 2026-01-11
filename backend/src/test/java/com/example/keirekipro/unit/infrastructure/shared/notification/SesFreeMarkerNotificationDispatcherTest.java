@@ -5,15 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.lang.reflect.Field;
 
-import com.example.keirekipro.infrastructure.shared.aws.config.AwsSesProperties;
 import com.example.keirekipro.infrastructure.shared.notification.SesFreeMarkerNotificationDispatcher;
 import com.example.keirekipro.usecase.auth.notification.PasswordResetNotification;
 import com.example.keirekipro.usecase.auth.notification.TwoFactorCodeNotification;
@@ -41,9 +40,6 @@ class SesFreeMarkerNotificationDispatcherTest {
     private SesClient sesClient;
 
     @Mock
-    private AwsSesProperties sesProperties;
-
-    @Mock
     private Configuration freeMarkerConfiguration;
 
     @Mock
@@ -52,10 +48,13 @@ class SesFreeMarkerNotificationDispatcherTest {
     private NotificationDispatcher dispatcher;
 
     @BeforeEach
-    void setUp() {
-        // test5(テンプレート取得失敗) では fromAddress が参照されないため lenient にする
-        lenient().when(sesProperties.getFromAddress()).thenReturn("no-reply@keirekipro.click");
-        dispatcher = new SesFreeMarkerNotificationDispatcher(sesClient, sesProperties, freeMarkerConfiguration);
+    void setUp() throws Exception {
+        dispatcher = new SesFreeMarkerNotificationDispatcher(sesClient, freeMarkerConfiguration);
+
+        // @Valueフィールドにリフレクションで値を設定
+        Field fromAddressField = SesFreeMarkerNotificationDispatcher.class.getDeclaredField("fromAddress");
+        fromAddressField.setAccessible(true);
+        fromAddressField.set(dispatcher, "no-reply@keirekipro.click");
     }
 
     @Test
