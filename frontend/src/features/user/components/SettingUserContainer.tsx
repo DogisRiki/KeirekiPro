@@ -1,6 +1,8 @@
 import type { SettingMessages } from "@/features/user";
 import {
     createUserSettingMessages,
+    isProviderRemovable,
+    isTwoFactorDisabled,
     SettingUserForm,
     useDeleteUser,
     useRemoveAuthProvider,
@@ -8,16 +10,21 @@ import {
     useUpdateUserInfo,
     useUserState,
 } from "@/features/user";
-import { isProviderRemovable, isTwoFactorDisabled } from "@/features/user/utils/userSettingRules";
 import { useGetUserInfo } from "@/hooks";
-import { useUserAuthStore } from "@/stores";
+import { useErrorMessageStore, useUserAuthStore } from "@/stores";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+/**
+ * 許可する最大ファイルサイズ（1MB）
+ */
+const MAX_FILE_SIZE = 1024 * 1024;
 
 /**
  * ユーザー設定コンテナ
  */
 export const SettingUserContainer = () => {
     const { user, setLogin } = useUserAuthStore();
+    const { setErrors } = useErrorMessageStore();
     const userState = useUserState();
 
     const [username, setUsername] = useState(user?.username ?? "");
@@ -25,18 +32,10 @@ export const SettingUserContainer = () => {
     const [profileImageUrl, setProfileImageUrl] = useState<string | null>(user?.profileImage ?? null);
     const [twoFactor, setTwoFactor] = useState<boolean>(user?.twoFactorAuthEnabled ?? false);
 
-    // 二段階認証設定の設定可否
     const twoFactorDisabled = isTwoFactorDisabled(userState);
-
-    // 外部連携認証情報の解除可否
     const canRemoveProvider = isProviderRemovable(userState, user?.authProviders);
-
-    // プロバイダー数
     const providerCount = Array.isArray(user?.authProviders) ? user.authProviders.length : 0;
 
-    /**
-     * 表示用メッセージ生成
-     */
     const messages: SettingMessages = useMemo(
         () => createUserSettingMessages(userState, providerCount),
         [userState, providerCount],
@@ -47,9 +46,6 @@ export const SettingUserContainer = () => {
     const removeProviderMutation = useRemoveAuthProvider();
     const deleteUserMutation = useDeleteUser();
 
-    /**
-     * ユーザー情報を取得
-     */
     useEffect(() => {
         if (isSuccess && data) {
             setLogin(data);
@@ -61,13 +57,19 @@ export const SettingUserContainer = () => {
      */
     const handleProfileImageChange = (file: File | null) => {
         if (!file) return;
+
+        if (file.size > MAX_FILE_SIZE) {
+            setErrors({
+                message: "プロフィール画像のサイズは1MB以下である必要があります。",
+                errors: {},
+            });
+            return;
+        }
+
         setProfileImageFile(file);
         setProfileImageUrl(URL.createObjectURL(file));
     };
 
-    /**
-     * ユーザー情報更新ハンドラ
-     */
     const handleSave = useCallback(() => {
         if (!user) return;
 
@@ -78,14 +80,10 @@ export const SettingUserContainer = () => {
         });
     }, [username, profileImageFile, twoFactor, user, updateMutation]);
 
-    /**
-     * 退会ハンドラ
-     */
     const handleDelete = () => {
         deleteUserMutation.mutate();
     };
 
-    // ユーザー未取得時レンダリングしない
     if (!user || userState === UserState.UNKNOWN) return <></>;
 
     return (

@@ -21,6 +21,10 @@ spring:
   freemarker:
     template-loader-path: classpath:/mail/
     prefer-file-system-access: false
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
 
 mybatis:
   config-location: "classpath:/mybatis/mybatis-config.xml"

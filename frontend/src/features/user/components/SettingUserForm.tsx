@@ -107,7 +107,7 @@ export const SettingUserForm = ({
                     helperText={stringListToBulletList(errors.username)}
                     slotProps={{
                         formHelperText: { sx: { whiteSpace: "pre-line" } },
-                        htmlInput: { maxLength: 50 },
+                        // htmlInput: { maxLength: 50 },
                     }}
                     margin="normal"
                     sx={{ mb: 4 }}
