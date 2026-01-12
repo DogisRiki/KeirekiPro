@@ -1,6 +1,7 @@
 export * from "@/pages/Backup";
 export * from "@/pages/ChangePassword";
 export * from "@/pages/Contact";
+export * from "@/pages/LandingPage";
 export * from "@/pages/Login";
 export * from "@/pages/Privacy";
 export * from "@/pages/Register";
@@ -11,5 +12,4 @@ export * from "@/pages/ResumeList";
 export * from "@/pages/ResumeNew";
 export * from "@/pages/SettingUser";
 export * from "@/pages/Terms";
-export * from "@/pages/Top";
 export * from "@/pages/TwoFactor";

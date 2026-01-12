@@ -5,6 +5,7 @@ import {
     Backup,
     ChangePassword,
     Contact,
+    LandingPage,
     Login,
     Privacy,
     Register,
@@ -15,7 +16,6 @@ import {
     ResumeNew,
     SettingUser,
     Terms,
-    Top,
     TwoFactor,
 } from "@/pages";
 import { SetEmailAndPassword } from "@/pages/SetEmailAndPassword";
@@ -28,7 +28,7 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 const router = createBrowserRouter([
     {
         path: paths.top,
-        element: <Top />,
+        element: <LandingPage />,
         loader: PublicLoader,
         errorElement: <ErrorFallback />,
     },
