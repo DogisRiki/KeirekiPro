@@ -295,7 +295,7 @@ export const EntryList = () => {
     };
 
     return (
-        <Box sx={{ bgcolor: "background.paper", borderRadius: 2, boxShadow: "0px 1px 3px 0px rgba(0, 0, 0, 0.2)" }}>
+        <Box sx={{ bgcolor: "background.paper", borderRadius: 2, boxShadow: 1 }}>
             {/* ヘッダー */}
             <Box
                 sx={{

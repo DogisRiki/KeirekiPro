@@ -73,11 +73,11 @@ export const UserMenu = () => {
                     <Avatar
                         src={!imgError ? (user?.profileImage ?? undefined) : undefined}
                         onError={() => setImgError(true)}
-                        sx={{ width: 32, height: 32, bgcolor: "#34495E" }}
+                        sx={{ width: 32, height: 32, bgcolor: "primary.main" }}
                     >
                         <PersonIcon />
                     </Avatar>
-                    <Typography variant="body2" sx={{ color: "#ffffff", fontSize: "14px" }}>
+                    <Typography variant="body2" sx={{ color: "primary.contrastText", fontSize: "14px" }}>
                         {user?.username}
                     </Typography>
                 </Box>

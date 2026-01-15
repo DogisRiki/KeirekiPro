@@ -23,7 +23,7 @@ export const SectionTabs = () => {
             onChange={handleChange}
             variant="scrollable"
             allowScrollButtonsMobile
-            sx={{ bgcolor: "background.paper", borderRadius: 2, boxShadow: "0px 1px 3px 0px rgba(0, 0, 0, 0.2)" }}
+            sx={{ bgcolor: "background.paper", borderRadius: 2, boxShadow: 1 }}
         >
             {sections.map((section) => (
                 <Tab
@@ -32,7 +32,7 @@ export const SectionTabs = () => {
                     sx={{
                         transition: "0.3s",
                         "&:hover": {
-                            bgcolor: "rgba(0, 0, 0, 0.04)",
+                            bgcolor: "action.hover",
                         },
                     }}
                 />

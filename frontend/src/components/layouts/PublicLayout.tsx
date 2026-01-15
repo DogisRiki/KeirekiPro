@@ -32,10 +32,10 @@ export const PublicLayout = () => {
             >
                 <Box
                     sx={{
-                        bgcolor: "#fff",
+                        bgcolor: "background.paper",
                         p: 10,
                         borderRadius: 1,
-                        boxShadow: "0px 1px 3px 0px rgba(0, 0, 0, 0.2)",
+                        boxShadow: 1,
                         width: "100%",
                         maxWidth: 600,
                     }}

@@ -1,8 +1,9 @@
 import { ErrorBanner, ErrorFallback } from "@/components/errors";
 import { Loading } from "@/components/ui";
-import { theme } from "@/config/theme";
+import { darkTheme, lightTheme } from "@/config/theme";
 import { queryConfig } from "@/lib";
 import { NotificationProvider } from "@/providers/NotificationProvider";
+import { useThemeStore } from "@/stores";
 import { ThemeProvider } from "@emotion/react";
 import { CssBaseline } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers";
@@ -23,8 +24,10 @@ dayjs.locale("ja");
  * アプリケーション全体のProvider
  */
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
-    // Query Clientインスタンス
     const [queryClient] = useState(() => new QueryClient({ defaultOptions: queryConfig }));
+    const mode = useThemeStore((state) => state.mode);
+    const theme = mode === "light" ? lightTheme : darkTheme;
+
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
