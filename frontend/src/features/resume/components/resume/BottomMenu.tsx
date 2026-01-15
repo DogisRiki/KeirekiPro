@@ -1,3 +1,4 @@
+// src/features/resume/components/resume/BottomMenu.tsx
 import { Button, Dialog, Switch } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useDeleteResume, useExportResume, useResumeStore } from "@/features/resume";
@@ -8,6 +9,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import SaveIcon from "@mui/icons-material/Save";
 import {
+    alpha,
     Box,
     FormControlLabel,
     FormGroup,
@@ -145,7 +147,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                         alignItems: "center",
                         justifyContent: "center",
                         p: 0.5,
-                        bgcolor: "rgba(255, 255, 255, 0.9)",
+                        bgcolor: alpha(theme.palette.background.paper, 0.9),
                     }}
                 >
                     <Tooltip title="メニューを展開">
@@ -172,7 +174,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                         alignItems: "center",
                         gap: 3,
                         p: 2,
-                        bgcolor: "rgba(255, 255, 255, 0.5)",
+                        bgcolor: alpha(theme.palette.background.paper, 0.5),
                     }}
                 >
                     {/* 折りたたみボタン */}
@@ -196,7 +198,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                         </IconButton>
                     </Tooltip>
 
-                    {/* 職務経歴書を削除（元: 自動保存の位置） */}
+                    {/* 職務経歴書を削除 */}
                     <Button
                         color="error"
                         startIcon={<DeleteIcon />}

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui";
 import { useErrorMessageStore } from "@/stores";
 import { stringListToBulletList } from "@/utils";
-import { Box } from "@mui/material";
+import { Box, useTheme } from "@mui/material";
 import VerificationInput from "react-verification-input";
 
 export interface TwoFactorFormProps {
@@ -16,6 +16,7 @@ export interface TwoFactorFormProps {
  */
 export const TwoFactorForm = ({ code, onCodeChange, onSubmit, loading = false }: TwoFactorFormProps) => {
     const { errors } = useErrorMessageStore();
+    const theme = useTheme();
 
     return (
         <Box
@@ -63,9 +64,9 @@ export const TwoFactorForm = ({ code, onCodeChange, onSubmit, loading = false }:
             <style>
                 {`
                     .verification-container{display:flex;justify-content:center;gap:16px;}
-                    .verification-character{width:56px!important;height:56px!important;border:1px solid rgba(0,0,0,0.23);border-radius:4px;font-size:1.5rem;display:flex;align-items:center;justify-content:center;}
-                    .verification-character:focus{box-shadow:0 0 0 2px #2C3E50;}
-                    .verification-character--selected{border-color:#2C3E50;border-width:2px;}
+                    .verification-character{width:56px!important;height:56px!important;border:1px solid ${theme.palette.divider};border-radius:4px;font-size:1.5rem;display:flex;align-items:center;justify-content:center;background-color:${theme.palette.background.paper};color:${theme.palette.text.primary};}
+                    .verification-character:focus{box-shadow:0 0 0 2px ${theme.palette.primary.main};}
+                    .verification-character--selected{border-color:${theme.palette.primary.main};border-width:2px;}
                     .verification-character--inactive{background-color:transparent;}
                 `}
             </style>

@@ -92,7 +92,7 @@ export const TechStackField = ({ label, value, options, onChange, isLast = false
                             <>
                                 <span
                                     style={{
-                                        color: "#d32f2f",
+                                        color: "error.main",
                                         fontWeight: 500,
                                         marginRight: 4,
                                     }}

@@ -29,7 +29,7 @@ export const PasswordStatusBox = ({ statusLabel, navigationMessage, isWarning, l
                 gap: 2,
                 p: 2,
                 mb: 4,
-                bgcolor: "grey.50",
+                bgcolor: "background.paper",
                 border: 1,
                 borderRadius: 1,
                 borderColor: isWarning ? "error.light" : "success.light",
