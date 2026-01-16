@@ -3,7 +3,7 @@ import { Loading } from "@/components/ui";
 import { darkTheme, lightTheme } from "@/config/theme";
 import { queryConfig } from "@/lib";
 import { NotificationProvider } from "@/providers/NotificationProvider";
-import { useThemeStore } from "@/stores";
+import { useThemeStore, useUserAuthStore } from "@/stores";
 import { ThemeProvider } from "@emotion/react";
 import { CssBaseline } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers";
@@ -26,7 +26,8 @@ dayjs.locale("ja");
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const [queryClient] = useState(() => new QueryClient({ defaultOptions: queryConfig }));
     const mode = useThemeStore((state) => state.mode);
-    const theme = mode === "light" ? lightTheme : darkTheme;
+    const isAuthenticated = useUserAuthStore((state) => state.isAuthenticated);
+    const theme = isAuthenticated ? (mode === "light" ? lightTheme : darkTheme) : lightTheme;
 
     return (
         <ThemeProvider theme={theme}>
