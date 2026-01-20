@@ -20,7 +20,7 @@ public class RedisTestContainerConfig {
     @SuppressWarnings("resource")
     public GenericContainer<?> redisContainer() {
         return new GenericContainer<>(
-                DockerImageName.parse("redis:7.4.2-alpine"))
+                DockerImageName.parse("redis:7.4.7-alpine"))
                 .withExposedPorts(6379);
     }
 }
