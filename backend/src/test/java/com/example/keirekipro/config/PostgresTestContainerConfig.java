@@ -18,7 +18,7 @@ public class PostgresTestContainerConfig {
     @ServiceConnection(name = "postgres")
     @SuppressWarnings("resource")
     public PostgreSQLContainer<?> postgresContainer() {
-        return new PostgreSQLContainer<>("postgres:17.4-alpine")
+        return new PostgreSQLContainer<>("postgres:17.7-alpine")
                 .withDatabaseName("testdb")
                 .withUsername("test")
                 .withPassword("test")

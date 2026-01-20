@@ -2,6 +2,8 @@ services:
   # Testcontainers 専用 Docker デーモン
   dind:
     image: docker:27-dind
+    container_name: dind
+    restart: always
     privileged: true
     environment:
       - DOCKER_TLS_CERTDIR= # TLS無効
@@ -76,7 +78,7 @@ services:
 
   redis:
     container_name: redis
-    image: redis:7.4.2-alpine
+    image: redis:7.4.7-alpine
     restart: always
     ports:
       - 6379:6379
