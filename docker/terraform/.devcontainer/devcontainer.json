@@ -1,0 +1,42 @@
+{
+    "name": "terraform",
+    "service": "terraform",
+    "workspaceFolder": "/workspace",
+    "dockerComposeFile": "../../../compose.yaml",
+    "shutdownAction": "stopCompose",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "HashiCorp.terraform",
+                "oderwat.indent-rainbow"
+            ],
+            "settings": {
+                "extensions.verifySignature": false,
+                "files.encoding": "utf8",
+                "files.eol": "\n",
+                "editor.detectIndentation": false,
+                "editor.renderWhitespace": "boundary",
+                "editor.insertSpaces": true,
+                "editor.formatOnSave": true,
+                "editor.formatOnPaste": true,
+                "editor.formatOnType": false,
+                "files.insertFinalNewline": true,
+                "files.trimFinalNewlines": true,
+                "files.trimTrailingWhitespace": true,
+                "[terraform]": {
+                    "editor.defaultFormatter": "HashiCorp.terraform",
+                    "editor.tabSize": 2
+                },
+                "[terraform-vars]": {
+                    "editor.defaultFormatter": "HashiCorp.terraform",
+                    "editor.tabSize": 2
+                },
+                "terraform.validation.enableEnhancedValidation": true,
+                "files.watcherExclude": {
+                    "**/.git/objects/**": true,
+                    "**/.terraform/**": true
+                }
+            }
+        }
+    }
+}
