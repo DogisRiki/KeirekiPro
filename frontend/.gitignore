@@ -28,3 +28,7 @@ coverage
 
 # tests
 test-results
+
+# Allow only these mode env files
+!.env.development
+!.env.production
