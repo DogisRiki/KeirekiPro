@@ -1,5 +1,6 @@
 import { ErrorBanner, ErrorFallback } from "@/components/errors";
 import { Loading } from "@/components/ui";
+import { env } from "@/config/env";
 import { darkTheme, lightTheme } from "@/config/theme";
 import { queryConfig } from "@/lib";
 import { NotificationProvider } from "@/providers/NotificationProvider";
@@ -14,11 +15,19 @@ import dayjs from "dayjs";
 import "dayjs/locale/ja";
 import React, { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import ReactGA from "react-ga4";
 
 /**
  * ロケールを日本に変更
  */
 dayjs.locale("ja");
+
+/**
+ * Google Analytics初期化
+ */
+if (env.GA_MEASUREMENT_ID) {
+    ReactGA.initialize(env.GA_MEASUREMENT_ID);
+}
 
 /**
  * アプリケーション全体のProvider
