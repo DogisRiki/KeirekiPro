@@ -9,6 +9,7 @@ services:
       - DOCKER_TLS_CERTDIR= # TLS無効
     networks:
       - my-network
+
   backend:
     container_name: spring
     build:
@@ -49,6 +50,19 @@ services:
       - type: volume
         source: node_modules
         target: /home/node/app/node_modules
+    networks:
+      - my-network
+
+  terraform:
+    container_name: terraform
+    build:
+      context: .
+      dockerfile: docker/terraform/Dockerfile
+    tty: true
+    volumes:
+      - type: bind
+        source: ./terraform
+        target: /workspace
     networks:
       - my-network
 

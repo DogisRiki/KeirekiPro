@@ -1,0 +1,5 @@
+framework:
+  - terraform
+output: cli
+compact: true
+download-external-modules: true
