@@ -5,8 +5,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.shared.utils.BaseUrlResolver;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
-import com.example.keirekipro.presentation.shared.utils.UrlUtil;
 import com.example.keirekipro.usecase.auth.HandleOidcCallbackUseCase;
 import com.example.keirekipro.usecase.auth.oidc.OidcCallbackError;
 import com.example.keirekipro.usecase.auth.oidc.OidcCallbackResult;
@@ -35,8 +35,8 @@ import jakarta.servlet.http.HttpServletResponse;
 public class OidcCallbackController {
 
     private final JwtProvider jwtProvider;
-
     private final HandleOidcCallbackUseCase handleOidcCallbackUseCase;
+    private final BaseUrlResolver baseUrlResolver;
 
     @Value("${cookie.secure:false}")
     private boolean isSecureCookie;
@@ -75,7 +75,7 @@ public class OidcCallbackController {
 
         try {
             // リダイレクトURIの構築
-            String baseUrl = UrlUtil.getBaseUrl(request);
+            String baseUrl = baseUrlResolver.resolve(request);
             String redirectUri = baseUrl + "/api/auth/oidc/callback";
 
             // コールバック処理

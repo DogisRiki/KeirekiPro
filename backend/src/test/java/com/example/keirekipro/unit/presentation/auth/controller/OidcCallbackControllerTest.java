@@ -2,6 +2,7 @@ package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -18,10 +19,12 @@ import java.util.UUID;
 
 import com.example.keirekipro.presentation.auth.controller.OidcCallbackController;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.shared.utils.BaseUrlResolver;
 import com.example.keirekipro.usecase.auth.HandleOidcCallbackUseCase;
 import com.example.keirekipro.usecase.auth.oidc.OidcCallbackError;
 import com.example.keirekipro.usecase.auth.oidc.OidcCallbackResult;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -32,6 +35,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import lombok.RequiredArgsConstructor;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @WebMvcTest(OidcCallbackController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -45,6 +50,9 @@ class OidcCallbackControllerTest {
 
     @MockitoBean
     private HandleOidcCallbackUseCase handleOidcCallbackUseCase;
+
+    @MockitoBean
+    private BaseUrlResolver baseUrlResolver;
 
     private final MockMvc mockMvc;
 
@@ -62,6 +70,12 @@ class OidcCallbackControllerTest {
             + URLEncoder.encode("ユーザー情報の取得に失敗しました。しばらく時間を置いてから再度お試しください。", StandardCharsets.UTF_8);
 
     private static final String FRONTEND_BASE_URL = "http://localhost:3000";
+    private static final String API_BASE_URL = "http://localhost";
+
+    @BeforeEach
+    void setUp() {
+        when(baseUrlResolver.resolve(any(HttpServletRequest.class))).thenReturn(API_BASE_URL);
+    }
 
     @Test
     @DisplayName("OIDCコールバックで認証に成功し、成功ページへリダイレクトされる")

@@ -10,6 +10,8 @@ spring:
       host: ${redis-host}
       port: ${redis-port}
       password: ${redis-password}
+      ssl:
+        enabled: true
   cloud:
     aws:
       region:
@@ -17,6 +19,9 @@ spring:
 
 jwt:
   secret: ${jwt-secret}
+
+app:
+  api-base-url: "https://app.keirekipro.click"
 
 frontend-base-url: "https://app.keirekipro.click"
 
