@@ -1,22 +1,22 @@
 # OIDCログイン設定手順（Google / GitHub）
 
-本アプリケーションでは、Google および GitHub を使ったOIDCログイン機能が存在します。
-利用には、各プロバイダーで発行したクライアントID・クライアントシークレットが必要です。
+本アプリケーションでは、Google および GitHub を使ったOIDCログイン機能が存在する。
+利用には、各プロバイダーで発行したクライアントID・クライアントシークレットが必要。
 
 ---
 
 ## 1. クライアントID / クライアントシークレットの取得
 
-Google および GitHub で OAuth アプリケーションを登録し、それぞれの `client_id` と `client_secret` を取得してください。
+Google および GitHub で OAuth アプリケーションを登録し、それぞれの `client_id` と `client_secret` を取得する。
 
-- リダイレクトURIの設定には以下を使用してください：
+- リダイレクトURIの設定には以下を使用する：
   - 開発用: `http://localhost:8080/api/auth/oidc/callback`
 
 ---
 
 ## 2. `.env.local` ファイルの作成
 
-docker/localstack/内に `.env.local` ファイルを作成し、以下のように記述してください。
+docker/localstack/内に `.env.local` ファイルを作成し、以下のように記述する。
 
 ```dotenv
 GOOGLE_CLIENT_ID=your-google-client-id
@@ -138,5 +138,12 @@ GITHUB_CLIENT_SECRET=your-github-client-secret
     2. ファイル内容を確認（例）
 
         ```bash
-        cat /tmp/localstack/state/ses/v123abc456.json
+        python3 - <<'PY'
+        import json, sys
+        path = "/tmp/localstack/state/ses/1で取得したパス"
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        json.dump(data, sys.stdout, ensure_ascii=False, indent=2)
+        print()
+        PY
         ```
