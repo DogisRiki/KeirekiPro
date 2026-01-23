@@ -1,6 +1,6 @@
 package com.example.keirekipro.presentation.auth.controller;
 
-import com.example.keirekipro.presentation.shared.utils.UrlUtil;
+import com.example.keirekipro.presentation.shared.utils.BaseUrlResolver;
 import com.example.keirekipro.usecase.auth.StartOidcAuthorizationUseCase;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 public class OidcAuthorizationController {
 
     private final StartOidcAuthorizationUseCase startOidcAuthorizationUseCase;
+    private final BaseUrlResolver baseUrlResolver;
 
     /**
      * OIDCプロバイダーへの認可リクエストを開始する
@@ -41,7 +42,7 @@ public class OidcAuthorizationController {
     public String handle(@RequestParam("provider") String provider, HttpServletRequest servletRequest) {
 
         // コールバックURLの構築
-        String baseUrl = UrlUtil.getBaseUrl(servletRequest);
+        String baseUrl = baseUrlResolver.resolve(servletRequest);
         String redirectUri = baseUrl + "/api/auth/oidc/callback";
 
         // 認可URLの構築
