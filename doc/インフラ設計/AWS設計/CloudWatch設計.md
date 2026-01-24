@@ -205,7 +205,7 @@
 | 説明 | Redisのメモリ使用率が高い状態 |
 | 名前空間 | AWS/ElastiCache |
 | メトリクス名 | DatabaseMemoryUsagePercentage |
-| ディメンション | CacheClusterId=keirekipro-redis |
+| ディメンション | CacheClusterId=keirekipro-redis-001 |
 | 統計 | Average |
 | 期間 | 300秒（5分） |
 | 評価期間 | 2 |

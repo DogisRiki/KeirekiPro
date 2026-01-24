@@ -32,7 +32,7 @@ mybatis:
 
 app:
   siteName: "KeirekiPro"
-  siteUrl: "https://keirekipro.click"
+  siteUrl: "https://app.keirekipro.click"
 
 jwt:
   secret: ${JWT_SECRET:default-jwt-secret-for-development}

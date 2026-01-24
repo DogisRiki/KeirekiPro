@@ -100,7 +100,6 @@
 | awslogs-group | /ecs/keirekipro-backend |
 | awslogs-region | ap-northeast-1 |
 | awslogs-stream-prefix | ecs |
-| awslogs-create-group | true |
 
 ### 3.7 ヘルスチェック
 
@@ -189,6 +188,7 @@ RUN chmod +x ./gradlew && ./gradlew bootJar --no-daemon
 # 実行ステージ
 FROM eclipse-temurin:21-jre
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r spring && useradd -r -g spring spring
 COPY --from=builder /app/build/libs/*.jar app.jar
 RUN chown -R spring:spring /app
