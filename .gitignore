@@ -1,3 +1,4 @@
 .env*
+!.env.*.example
 output.sh
 output_result.txt

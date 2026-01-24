@@ -16,13 +16,17 @@ Google および GitHub で OAuth アプリケーションを登録し、それ�
 
 ## 2. `.env.local` ファイルの作成
 
-docker/localstack/内に `.env.local` ファイルを作成し、以下のように記述する。
+`docker/localstack/.env.local` ファイルを作成し、接続情報を設定する。
+```bash
+cp docker/localstack/.env.local.example docker/localstack/.env.local
+```
 
+`.env.local`を編集し、実際の値を設定する。
 ```dotenv
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GITHUB_CLIENT_ID=your-github-client-id
-GITHUB_CLIENT_SECRET=your-github-client-secret
+GOOGLE_CLIENT_ID=<GoogleクライアントID>
+GOOGLE_CLIENT_SECRET=<Googleクライアントシークレット>
+GITHUB_CLIENT_ID=<GithubクライアントID>
+GITHUB_CLIENT_SECRET=<Githubクライアントシークレット>
 ```
 
 ---
