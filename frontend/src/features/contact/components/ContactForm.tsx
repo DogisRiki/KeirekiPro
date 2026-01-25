@@ -9,7 +9,6 @@ export const ContactForm = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         // TODO: API呼び出し
-        alert("送信");
     };
     return (
         <Box
