@@ -59,9 +59,7 @@ jobs:
             -var="google_oauth_client_secret=${{ secrets.TF_VAR_google_oauth_client_secret }}" \
             -var="github_oauth_client_id=${{ secrets.TF_VAR_github_oauth_client_id }}" \
             -var="github_oauth_client_secret=${{ secrets.TF_VAR_github_oauth_client_secret }}" \
-            -var="alert_email_address=${{ secrets.TF_VAR_alert_email_address }}" \
-            -var="github_org=${{ github.repository_owner }}" \
-            -var="github_repo=${{ github.event.repository.name }}"
+            -var="alert_email_address=${{ secrets.TF_VAR_alert_email_address }}"
         continue-on-error: true
 
       - name: Generate Plan Output
@@ -78,46 +76,46 @@ jobs:
             const initOutcome = '${{ steps.init.outcome }}';
             const validateOutcome = '${{ steps.validate.outcome }}';
             const planOutcome = '${{ steps.plan.outcome }}';
-            
+
             let planOutput = `${{ steps.show.outputs.stdout }}`;
-            
+
             // 出力が長すぎる場合は切り詰める
             const maxLength = 60000;
             if (planOutput.length > maxLength) {
               planOutput = planOutput.substring(0, maxLength) + '\n\n... (truncated)';
             }
-            
+
             const output = `## Terraform Plan Results
-            
+
             | Step | Status |
             |------|--------|
             | 🖌️ Format | ${fmtOutcome === 'success' ? '✅ Success' : '⚠️ Check Required'} |
             | ⚙️ Init | ${initOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
             | ✅ Validate | ${validateOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
             | 📖 Plan | ${planOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
-            
+
             <details><summary>📋 Show Plan Output</summary>
-            
+
             \`\`\`hcl
             ${planOutput}
             \`\`\`
-            
+
             </details>
-            
+
             *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-            
+
             // 既存のコメントを探して更新、なければ新規作成
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
               comment.body.includes('## Terraform Plan Results')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,

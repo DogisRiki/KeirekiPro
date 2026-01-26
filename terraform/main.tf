@@ -180,14 +180,9 @@ resource "aws_ecr_lifecycle_policy" "backend" {
 module "iam" {
   source = "./modules/iam"
 
-  project_name                = var.project_name
-  aws_account_id              = data.aws_caller_identity.current.account_id
-  github_org                  = var.github_org
-  github_repo                 = var.github_repo
-  secrets_manager_secret_arns = module.secrets_manager.all_secret_arns
-  s3_storage_bucket_arn       = module.s3.storage_bucket_arn
-  s3_frontend_bucket_arn      = module.s3.frontend_bucket_arn
-  ecr_repository_arn          = aws_ecr_repository.backend.arn
+  project_name          = var.project_name
+  aws_account_id        = data.aws_caller_identity.current.account_id
+  s3_storage_bucket_arn = module.s3.storage_bucket_arn
 }
 
 # ECS Module

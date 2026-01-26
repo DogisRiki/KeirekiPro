@@ -21,11 +21,6 @@ resource "aws_db_parameter_group" "main" {
   }
 
   parameter {
-    name  = "log_timezone"
-    value = "Asia/Tokyo"
-  }
-
-  parameter {
     name  = "log_statement"
     value = "none"
   }
