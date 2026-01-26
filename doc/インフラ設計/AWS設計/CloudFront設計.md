@@ -39,7 +39,7 @@
 | オリジンID | オリジンタイプ | オリジンドメイン | 用途 |
 |-----------|---------------|-----------------|------|
 | S3-frontend | S3 | keirekipro-frontend.s3.ap-northeast-1.amazonaws.com | 静的ファイル配信 |
-| ALB-api | ALB | keirekipro-alb.ap-northeast-1.elb.amazonaws.com | APIリクエスト転送 |
+| ALB-api | ALB | api.keirekipro.click | APIリクエスト転送 |
 | S3-storage | S3 | keirekipro-storage.s3.ap-northeast-1.amazonaws.com | 画像配信 |
 
 ### 2.2 S3-frontend オリジン設定
@@ -62,7 +62,7 @@
 | 項目 | 設定値 |
 |------|--------|
 | オリジンID | ALB-api |
-| オリジンドメイン | keirekipro-alb.ap-northeast-1.elb.amazonaws.com |
+| オリジンドメイン | api.keirekipro.click |
 | オリジンパス | （空） |
 | オリジンプロトコルポリシー | HTTPS only |
 | HTTPSポート | 443 |

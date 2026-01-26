@@ -23,7 +23,8 @@
 |------|--------|
 | プロトコル | HTTPS |
 | ポート | 443 |
-| SSL証明書 | ACM証明書（ap-northeast-1発行） |
+| デフォルトSSL証明書 | ACM証明書（api.keirekipro.click用・ap-northeast-1発行） |
+| 追加SSL証明書 | ACM証明書（app.keirekipro.click用・ap-northeast-1発行） |
 | SSLポリシー | ELBSecurityPolicy-TLS13-1-2-2021-06 |
 | デフォルトアクション | 固定レスポンス（403） |
 
@@ -98,7 +99,18 @@
 | コンテンツタイプ | text/plain |
 | レスポンス本文 | Forbidden |
 
-## 5. アクセスログ設定
+## 5. SSL証明書設計
+
+### 5.1 証明書一覧
+
+| 証明書 | ドメイン名 | 用途 | 設定方法 |
+|--------|-----------|------|---------|
+| デフォルト証明書 | api.keirekipro.click | CloudFrontからのAPI通信 | リスナーのcertificate_arn |
+| 追加証明書 | app.keirekipro.click | 直接アクセス時（拒否用） | aws_lb_listener_certificate |
+
+※ CloudFrontはオリジンとしてapi.keirekipro.clickを使用するため、APIサブドメイン用の証明書をデフォルトとして設定する。
+
+## 6. アクセスログ設定
 
 | 項目 | 設定値 |
 |------|--------|
@@ -106,15 +118,6 @@
 | S3バケット | keirekipro-alb-logs |
 | プレフィックス | alb |
 | ログ間隔 | 5分 |
-
-## 6. ACM証明書設定（ALB用）
-
-| 項目 | 設定値 |
-|------|--------|
-| ドメイン名 | app.keirekipro.click |
-| 検証方法 | DNS検証 |
-| リージョン | ap-northeast-1 |
-| キーアルゴリズム | RSA 2048 |
 
 ## 7. X-Origin-Verifyヘッダー運用
 

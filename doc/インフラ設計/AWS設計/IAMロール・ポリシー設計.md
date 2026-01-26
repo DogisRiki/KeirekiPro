@@ -142,6 +142,8 @@
 
 ## 3. GitHub Actions用IAMロール（OIDC連携）
 
+GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理する。Terraformでは管理しない。
+
 ### 3.1 ロール設計
 
 | 項目 | 設定値 |
@@ -250,16 +252,25 @@
 }
 ```
 
-## 4. Terraformバックエンド用IAMポリシー
+## 4. OIDCプロバイダー設定
 
-### 4.1 ポリシー設計
+OIDCプロバイダーはAWSコンソールから手動で作成・管理する。Terraformでは管理しない。
+
+| 項目 | 設定値 |
+|------|--------|
+| プロバイダーURL | https://token.actions.githubusercontent.com |
+| 対象者（Audience） | sts.amazonaws.com |
+
+## 5. Terraformバックエンド用IAMポリシー
+
+### 5.1 ポリシー設計
 
 | 項目 | 設定値 |
 |------|--------|
 | ポリシー名 | keirekipro-terraform-backend-policy |
 | 用途 | Terraform状態管理 |
 
-### 4.2 ポリシー定義
+### 5.2 ポリシー定義
 
 ```json
 {
@@ -292,10 +303,3 @@
   ]
 }
 ```
-
-## 5. OIDCプロバイダー設定
-
-| 項目 | 設定値 |
-|------|--------|
-| プロバイダーURL | https://token.actions.githubusercontent.com |
-| 対象者（Audience） | sts.amazonaws.com |
