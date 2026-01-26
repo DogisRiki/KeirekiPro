@@ -1,0 +1,87 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+  TF_VERSION: '1.9.0'
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    outputs:
+      ecr_repository_url: ${{ steps.outputs.outputs.ecr_repository_url }}
+      ecs_cluster_name: ${{ steps.outputs.outputs.ecs_cluster_name }}
+      ecs_service_name: ${{ steps.outputs.outputs.ecs_service_name }}
+      s3_frontend_bucket_name: ${{ steps.outputs.outputs.s3_frontend_bucket_name }}
+      cloudfront_distribution_id: ${{ steps.outputs.outputs.cloudfront_distribution_id }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: |
+          terraform apply -var-file=environments/prod/terraform.tfvars -auto-approve \
+            -var="jwt_secret=${{ secrets.TF_VAR_jwt_secret }}" \
+            -var="google_oauth_client_id=${{ secrets.TF_VAR_google_oauth_client_id }}" \
+            -var="google_oauth_client_secret=${{ secrets.TF_VAR_google_oauth_client_secret }}" \
+            -var="github_oauth_client_id=${{ secrets.TF_VAR_github_oauth_client_id }}" \
+            -var="github_oauth_client_secret=${{ secrets.TF_VAR_github_oauth_client_secret }}" \
+            -var="alert_email_address=${{ secrets.TF_VAR_alert_email_address }}" \
+            -var="github_org=${{ github.repository_owner }}" \
+            -var="github_repo=${{ github.event.repository.name }}"
+
+      - name: Get Terraform Outputs
+        id: outputs
+        run: |
+          echo "ecr_repository_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+          echo "ecs_cluster_name=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
+          echo "ecs_service_name=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
+          echo "s3_frontend_bucket_name=$(terraform output -raw s3_frontend_bucket_name)" >> $GITHUB_OUTPUT
+          echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+
+  trigger-backend-deploy:
+    needs: terraform-apply
+    uses: ./.github/workflows/backend-deploy.yaml
+    with:
+      ecr_repository_url: ${{ needs.terraform-apply.outputs.ecr_repository_url }}
+      ecs_cluster_name: ${{ needs.terraform-apply.outputs.ecs_cluster_name }}
+      ecs_service_name: ${{ needs.terraform-apply.outputs.ecs_service_name }}
+    secrets: inherit
+
+  trigger-frontend-deploy:
+    needs: terraform-apply
+    uses: ./.github/workflows/frontend-deploy.yaml
+    with:
+      s3_bucket_name: ${{ needs.terraform-apply.outputs.s3_frontend_bucket_name }}
+      cloudfront_distribution_id: ${{ needs.terraform-apply.outputs.cloudfront_distribution_id }}
+    secrets: inherit

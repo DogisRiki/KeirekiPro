@@ -1,0 +1,100 @@
+name: Frontend Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      s3_bucket_name:
+        description: 'S3 bucket name for frontend'
+        required: false
+        type: string
+      cloudfront_distribution_id:
+        description: 'CloudFront distribution ID'
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+  S3_BUCKET: keirekipro-frontend
+  NODE_VERSION: '22.11.0'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: https://app.keirekipro.click
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set variables
+        id: vars
+        run: |
+          if [ -n "${{ inputs.s3_bucket_name }}" ]; then
+            echo "s3_bucket_name=${{ inputs.s3_bucket_name }}" >> $GITHUB_OUTPUT
+            echo "cloudfront_distribution_id=${{ inputs.cloudfront_distribution_id }}" >> $GITHUB_OUTPUT
+          else
+            echo "s3_bucket_name=${{ env.S3_BUCKET }}" >> $GITHUB_OUTPUT
+            # CloudFront Distribution IDを取得（直接呼び出し時）
+            DIST_ID=$(aws cloudfront list-distributions \
+              --query "DistributionList.Items[?Aliases.Items[?contains(@, 'app.keirekipro.click')]].Id | [0]" \
+              --output text)
+            echo "cloudfront_distribution_id=$DIST_ID" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync dist/ s3://${{ steps.vars.outputs.s3_bucket_name }} \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" \
+            --exclude "*.json"
+          
+          # index.htmlは短いキャッシュを設定
+          aws s3 cp dist/index.html s3://${{ steps.vars.outputs.s3_bucket_name }}/index.html \
+            --cache-control "public, max-age=0, must-revalidate"
+          
+          # JSONファイル（manifest.jsonなど）がある場合
+          find dist -name "*.json" -exec aws s3 cp {} s3://${{ steps.vars.outputs.s3_bucket_name }}/ \
+            --cache-control "public, max-age=0, must-revalidate" \; 2>/dev/null || true
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.vars.outputs.cloudfront_distribution_id }} \
+            --paths "/*"
+
+      - name: Verify deployment
+        run: |
+          echo "Checking S3 bucket contents..."
+          aws s3 ls s3://${{ steps.vars.outputs.s3_bucket_name }}/ --summarize
+          echo "Frontend deployment completed successfully!"

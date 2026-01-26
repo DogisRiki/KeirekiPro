@@ -1,0 +1,167 @@
+name: Backend Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ecr_repository_url:
+        description: 'ECR repository URL'
+        required: false
+        type: string
+      ecs_cluster_name:
+        description: 'ECS cluster name'
+        required: false
+        type: string
+      ecs_service_name:
+        description: 'ECS service name'
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REPOSITORY: keirekipro-backend
+  ECS_CLUSTER: keirekipro-cluster
+  ECS_SERVICE: keirekipro-backend-service
+  ECS_TASK_DEFINITION_FAMILY: keirekipro-backend-task
+  CONTAINER_NAME: keirekipro-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set variables
+        id: vars
+        run: |
+          if [ -n "${{ inputs.ecr_repository_url }}" ]; then
+            echo "ecr_repository_url=${{ inputs.ecr_repository_url }}" >> $GITHUB_OUTPUT
+            echo "ecs_cluster_name=${{ inputs.ecs_cluster_name }}" >> $GITHUB_OUTPUT
+            echo "ecs_service_name=${{ inputs.ecs_service_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "ecr_repository_url=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
+            echo "ecs_cluster_name=${{ env.ECS_CLUSTER }}" >> $GITHUB_OUTPUT
+            echo "ecs_service_name=${{ env.ECS_SERVICE }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./docker/backend/Dockerfile.prod
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.ecr_repository_url }}:${{ github.sha }}
+            ${{ steps.vars.outputs.ecr_repository_url }}:latest
+          platforms: linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Get current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.ECS_TASK_DEFINITION_FAMILY }} \
+            --query 'taskDefinition' \
+            --output json > task-definition.json
+          
+          # 不要なフィールドを削除（新しいタスク定義登録時に必要）
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' task-definition.json > cleaned-task-definition.json
+          mv cleaned-task-definition.json task-definition.json
+
+      - name: Update task definition with new image
+        run: |
+          NEW_IMAGE="${{ steps.vars.outputs.ecr_repository_url }}:${{ github.sha }}"
+          
+          jq --arg IMAGE "$NEW_IMAGE" --arg CONTAINER "${{ env.CONTAINER_NAME }}" \
+            '.containerDefinitions = [.containerDefinitions[] | if .name == $CONTAINER then .image = $IMAGE else . end]' \
+            task-definition.json > new-task-definition.json
+          
+          mv new-task-definition.json task-definition.json
+
+      - name: Register new task definition
+        id: register-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_definition_arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Update ECS service desired count to 1 (if needed)
+        run: |
+          CURRENT_COUNT=$(aws ecs describe-services \
+            --cluster ${{ steps.vars.outputs.ecs_cluster_name }} \
+            --services ${{ steps.vars.outputs.ecs_service_name }} \
+            --query 'services[0].desiredCount' \
+            --output text)
+          
+          if [ "$CURRENT_COUNT" -eq "0" ]; then
+            echo "Updating desired count from 0 to 1..."
+            aws ecs update-service \
+              --cluster ${{ steps.vars.outputs.ecs_cluster_name }} \
+              --service ${{ steps.vars.outputs.ecs_service_name }} \
+              --desired-count 1
+          fi
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ steps.vars.outputs.ecs_cluster_name }} \
+            --service ${{ steps.vars.outputs.ecs_service_name }} \
+            --task-definition ${{ steps.register-task-def.outputs.task_definition_arn }} \
+            --force-new-deployment
+
+      - name: Wait for service stability
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ steps.vars.outputs.ecs_cluster_name }} \
+            --services ${{ steps.vars.outputs.ecs_service_name }}
+          echo "ECS service is now stable."
+
+      - name: Verify deployment
+        run: |
+          RUNNING_COUNT=$(aws ecs describe-services \
+            --cluster ${{ steps.vars.outputs.ecs_cluster_name }} \
+            --services ${{ steps.vars.outputs.ecs_service_name }} \
+            --query 'services[0].runningCount' \
+            --output text)
+          
+          DESIRED_COUNT=$(aws ecs describe-services \
+            --cluster ${{ steps.vars.outputs.ecs_cluster_name }} \
+            --services ${{ steps.vars.outputs.ecs_service_name }} \
+            --query 'services[0].desiredCount' \
+            --output text)
+          
+          echo "Running tasks: $RUNNING_COUNT / Desired tasks: $DESIRED_COUNT"
+          
+          if [ "$RUNNING_COUNT" -ne "$DESIRED_COUNT" ]; then
+            echo "Deployment verification failed!"
+            exit 1
+          fi
+          
+          echo "Deployment completed successfully!"
