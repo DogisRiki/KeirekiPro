@@ -23,8 +23,8 @@ variable "storage_bucket_regional_domain_name" {
   type        = string
 }
 
-variable "alb_dns_name" {
-  description = "ALB DNS name"
+variable "api_domain_name" {
+  description = "API subdomain name for ALB origin"
   type        = string
 }
 

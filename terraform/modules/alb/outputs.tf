@@ -22,3 +22,8 @@ output "target_group_arn_suffix" {
   description = "Target group ARN suffix"
   value       = aws_lb_target_group.backend.arn_suffix
 }
+
+output "alb_zone_id" {
+  description = "ALB hosted zone ID"
+  value       = aws_lb.main.zone_id
+}

@@ -17,3 +17,18 @@ variable "cloudfront_hosted_zone_id" {
   description = "CloudFront hosted zone ID (fixed value: Z2FDTNDATAQYW2)"
   type        = string
 }
+
+variable "api_domain_name" {
+  description = "API subdomain name"
+  type        = string
+}
+
+variable "alb_dns_name" {
+  description = "ALB DNS name"
+  type        = string
+}
+
+variable "alb_zone_id" {
+  description = "ALB hosted zone ID"
+  type        = string
+}

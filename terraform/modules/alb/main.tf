@@ -54,7 +54,7 @@ resource "aws_lb_listener" "https" {
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = var.certificate_arn
+  certificate_arn   = var.api_certificate_arn
 
   default_action {
     type = "fixed-response"
@@ -69,6 +69,11 @@ resource "aws_lb_listener" "https" {
   tags = {
     Name = "${var.project_name}-https-listener"
   }
+}
+
+resource "aws_lb_listener_certificate" "app" {
+  listener_arn    = aws_lb_listener.https.arn
+  certificate_arn = var.certificate_arn
 }
 
 # Listener Rule for X-Origin-Verify
