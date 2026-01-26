@@ -44,7 +44,7 @@ export const Footer = () => {
             }}
         >
             <Typography variant="body2" color="text.secondary">
-                {`© 2025 ${env.APP_NAME}. All rights reserved.`}
+                {`© 2026 ${env.APP_NAME}. All rights reserved.`}
             </Typography>
         </Box>
     );
