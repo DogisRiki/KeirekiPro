@@ -81,7 +81,7 @@ resource "aws_ecs_task_definition" "backend" {
         command     = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
         interval    = 30
         timeout     = 5
-        startPeriod = 60
+        startPeriod = 180
         retries     = 3
       }
 
@@ -105,7 +105,7 @@ resource "aws_ecs_service" "backend" {
 
   deployment_minimum_healthy_percent = 100
   deployment_maximum_percent         = 200
-  health_check_grace_period_seconds  = 60
+  health_check_grace_period_seconds  = 180
 
   network_configuration {
     subnets          = var.private_subnet_ids
