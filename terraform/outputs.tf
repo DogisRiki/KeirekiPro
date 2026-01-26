@@ -47,8 +47,3 @@ output "s3_frontend_bucket_name" {
   description = "Frontend S3 bucket name"
   value       = module.s3.frontend_bucket_name
 }
-
-output "github_actions_role_arn" {
-  description = "GitHub Actions IAM role ARN"
-  value       = module.iam.github_actions_role_arn
-}
