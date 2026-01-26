@@ -1,0 +1,139 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  AWS_REGION: ap-northeast-1
+  TF_VERSION: '1.9.0'
+
+jobs:
+  terraform-plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -var-file=environments/prod/terraform.tfvars -no-color -out=tfplan \
+            -var="jwt_secret=${{ secrets.TF_VAR_jwt_secret }}" \
+            -var="google_oauth_client_id=${{ secrets.TF_VAR_google_oauth_client_id }}" \
+            -var="google_oauth_client_secret=${{ secrets.TF_VAR_google_oauth_client_secret }}" \
+            -var="github_oauth_client_id=${{ secrets.TF_VAR_github_oauth_client_id }}" \
+            -var="github_oauth_client_secret=${{ secrets.TF_VAR_github_oauth_client_secret }}" \
+            -var="alert_email_address=${{ secrets.TF_VAR_alert_email_address }}" \
+            -var="github_org=${{ github.repository_owner }}" \
+            -var="github_repo=${{ github.event.repository.name }}"
+        continue-on-error: true
+
+      - name: Generate Plan Output
+        id: show
+        run: terraform show -no-color tfplan
+        continue-on-error: true
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fmtOutcome = '${{ steps.fmt.outcome }}';
+            const initOutcome = '${{ steps.init.outcome }}';
+            const validateOutcome = '${{ steps.validate.outcome }}';
+            const planOutcome = '${{ steps.plan.outcome }}';
+            
+            let planOutput = `${{ steps.show.outputs.stdout }}`;
+            
+            // 出力が長すぎる場合は切り詰める
+            const maxLength = 60000;
+            if (planOutput.length > maxLength) {
+              planOutput = planOutput.substring(0, maxLength) + '\n\n... (truncated)';
+            }
+            
+            const output = `## Terraform Plan Results
+            
+            | Step | Status |
+            |------|--------|
+            | 🖌️ Format | ${fmtOutcome === 'success' ? '✅ Success' : '⚠️ Check Required'} |
+            | ⚙️ Init | ${initOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
+            | ✅ Validate | ${validateOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
+            | 📖 Plan | ${planOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
+            
+            <details><summary>📋 Show Plan Output</summary>
+            
+            \`\`\`hcl
+            ${planOutput}
+            \`\`\`
+            
+            </details>
+            
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            // 既存のコメントを探して更新、なければ新規作成
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('## Terraform Plan Results')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: output
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: output
+              });
+            }
+
+      - name: Exit on Plan Failure
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

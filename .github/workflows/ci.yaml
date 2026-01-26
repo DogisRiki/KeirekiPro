@@ -64,6 +64,7 @@ jobs:
           name: frontend-test-results
           path: |
             frontend/test-results/**
+          retention-days: 7
 
   backend-test:
     needs: detect-changes
@@ -103,3 +104,4 @@ jobs:
         with:
           name: backend-test-results
           path: backend/build/reports/tests/test/
+          retention-days: 7
