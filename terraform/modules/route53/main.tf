@@ -23,3 +23,16 @@ resource "aws_route53_record" "app_aaaa" {
     evaluate_target_health = false
   }
 }
+
+# A Record (Alias) for ALB API subdomain
+resource "aws_route53_record" "api_a" {
+  zone_id = var.zone_id
+  name    = var.api_domain_name
+  type    = "A"
+
+  alias {
+    name                   = var.alb_dns_name
+    zone_id                = var.alb_zone_id
+    evaluate_target_health = true
+  }
+}

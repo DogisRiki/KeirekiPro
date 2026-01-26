@@ -122,6 +122,7 @@ module "alb" {
   public_subnet_ids          = module.vpc.public_subnet_ids
   security_group_id          = module.vpc.alb_security_group_id
   certificate_arn            = module.acm.alb_certificate_arn
+  api_certificate_arn        = module.acm.alb_api_certificate_arn
   alb_logs_bucket_name       = module.s3.alb_logs_bucket_name
   origin_verify_header_value = module.secrets_manager.alb_origin_verify_header_value
 }
@@ -236,7 +237,7 @@ module "cloudfront" {
   certificate_arn                      = module.acm.cloudfront_certificate_arn
   frontend_bucket_regional_domain_name = module.s3.frontend_bucket_regional_domain_name
   storage_bucket_regional_domain_name  = module.s3.storage_bucket_regional_domain_name
-  alb_dns_name                         = module.alb.alb_dns_name
+  api_domain_name                      = "api.${var.domain_name}"
   origin_verify_header_value           = module.secrets_manager.alb_origin_verify_header_value
   waf_web_acl_arn                      = module.waf.web_acl_arn
 }
@@ -247,8 +248,11 @@ module "route53" {
 
   zone_id                             = data.aws_route53_zone.main.zone_id
   app_domain_name                     = var.app_domain_name
+  api_domain_name                     = "api.${var.domain_name}"
   cloudfront_distribution_domain_name = module.cloudfront.distribution_domain_name
   cloudfront_hosted_zone_id           = "Z2FDTNDATAQYW2"
+  alb_dns_name                        = module.alb.alb_dns_name
+  alb_zone_id                         = module.alb.alb_zone_id
 }
 
 # SES Module

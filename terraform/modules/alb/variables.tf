@@ -33,3 +33,8 @@ variable "origin_verify_header_value" {
   type        = string
   sensitive   = true
 }
+
+variable "api_certificate_arn" {
+  description = "ACM certificate ARN for API subdomain"
+  type        = string
+}
