@@ -27,8 +27,10 @@
 | keirekipro.click | SOA | シンプル | Route 53 SOA | 900 | 権威情報 |
 | app.keirekipro.click | A | シンプル | CloudFront（エイリアス） | - | アプリケーションアクセス |
 | app.keirekipro.click | AAAA | シンプル | CloudFront（エイリアス） | - | IPv6アクセス |
+| api.keirekipro.click | A | シンプル | ALB（エイリアス） | - | APIアクセス（CloudFrontオリジン用） |
 | _xxxxxxxx.app.keirekipro.click | CNAME | シンプル | ACM検証値 | 300 | CloudFront用証明書検証 |
-| _yyyyyyyy.app.keirekipro.click | CNAME | シンプル | ACM検証値 | 300 | ALB用証明書検証 |
+| _yyyyyyyy.app.keirekipro.click | CNAME | シンプル | ACM検証値 | 300 | ALB用証明書検証（app） |
+| _zzzzzzzz.api.keirekipro.click | CNAME | シンプル | ACM検証値 | 300 | ALB用証明書検証（api） |
 
 ### 2.2 Aレコード（CloudFront向けエイリアス）
 
@@ -53,6 +55,18 @@
 | ディストリビューション | keirekipro-distribution |
 | ルーティングポリシー | シンプルルーティング |
 | ターゲットの正常性を評価 | いいえ |
+
+### 2.4 Aレコード（ALB向けエイリアス・APIサブドメイン）
+
+| 項目 | 設定値 |
+|------|--------|
+| レコード名 | api.keirekipro.click |
+| レコードタイプ | A |
+| エイリアス | はい |
+| トラフィックのルーティング先 | Application Load Balancerへのエイリアス |
+| ALB | keirekipro-alb |
+| ルーティングポリシー | シンプルルーティング |
+| ターゲットの正常性を評価 | はい |
 
 ## 3. SES用DNSレコード設計
 
@@ -96,7 +110,8 @@
 | 用途 | リージョン | ドメイン名 | 検証方法 |
 |------|-----------|-----------|---------|
 | CloudFront用 | us-east-1 | app.keirekipro.click | DNS検証 |
-| ALB用 | ap-northeast-1 | app.keirekipro.click | DNS検証 |
+| ALB用（app） | ap-northeast-1 | app.keirekipro.click | DNS検証 |
+| ALB用（api） | ap-northeast-1 | api.keirekipro.click | DNS検証 |
 
 ### 4.2 CloudFront用証明書（us-east-1）
 
@@ -110,7 +125,7 @@
 | 証明書の透明性ログ | 有効 |
 | 自動更新 | 有効（DNS検証のため） |
 
-### 4.3 ALB用証明書（ap-northeast-1）
+### 4.3 ALB用証明書（ap-northeast-1・app）
 
 | 項目 | 設定値 |
 |------|--------|
@@ -122,7 +137,19 @@
 | 証明書の透明性ログ | 有効 |
 | 自動更新 | 有効（DNS検証のため） |
 
-### 4.4 DNS検証レコード
+### 4.4 ALB用証明書（ap-northeast-1・api）
+
+| 項目 | 設定値 |
+|------|--------|
+| ドメイン名 | api.keirekipro.click |
+| 追加の名前（SAN） | なし |
+| 検証方法 | DNS検証 |
+| リージョン | ap-northeast-1（東京） |
+| キーアルゴリズム | RSA 2048 |
+| 証明書の透明性ログ | 有効 |
+| 自動更新 | 有効（DNS検証のため） |
+
+### 4.5 DNS検証レコード
 
 CloudFront用（us-east-1）:
 
@@ -133,13 +160,22 @@ CloudFront用（us-east-1）:
 | 値 | _yyyyyyyy.acm-validations.aws |
 | TTL | 300秒 |
 
-ALB用（ap-northeast-1）:
+ALB用（ap-northeast-1・app）:
 
 | 項目 | 設定値 |
 |------|--------|
 | レコード名 | _aaaaaaaa.app.keirekipro.click |
 | レコードタイプ | CNAME |
 | 値 | _bbbbbbbb.acm-validations.aws |
+| TTL | 300秒 |
+
+ALB用（ap-northeast-1・api）:
+
+| 項目 | 設定値 |
+|------|--------|
+| レコード名 | _cccccccc.api.keirekipro.click |
+| レコードタイプ | CNAME |
+| 値 | _dddddddd.acm-validations.aws |
 | TTL | 300秒 |
 
 ## 5. ヘルスチェック設計
