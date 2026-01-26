@@ -41,6 +41,7 @@ describe("useLogin", () => {
         twoFactorAuthEnabled: false,
         hasPassword: true,
         authProviders: [],
+        roles: [],
     };
 
     beforeEach(() => {
