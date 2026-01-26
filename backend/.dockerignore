@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+*.iml
+.vscode
+*.swp
+*.swo
+
+# Gradle
+.gradle
+build
+!gradle/wrapper/gradle-wrapper.jar
+
+# テスト関連
+**/test-results
+**/reports
+
+# ドキュメント
+*.md
+docs
+doc
+
+# Docker
+Dockerfile
+Dockerfile.*
+docker-compose*.yml
+compose*.yaml
+.dockerignore
+
+# その他
+.env*
+*.log
+tmp

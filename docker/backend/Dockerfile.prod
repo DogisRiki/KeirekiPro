@@ -1,0 +1,53 @@
+# -----------------------------------------------------------------------------
+# ビルドステージ
+# -----------------------------------------------------------------------------
+FROM eclipse-temurin:21-jdk AS builder
+
+WORKDIR /app
+
+# キャッシュ効率化のため、先にGradleラッパーとビルド設定ファイルをコピー
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle settings.gradle ./
+
+# Gradleラッパーに実行権限を付与
+RUN chmod +x ./gradlew
+
+# 依存関係をダウンロード
+RUN ./gradlew dependencies --no-daemon || true
+
+# ソースコードをコピー
+COPY src src
+
+# アプリケーションをビルド（テストはCI/CDで実行済みのためスキップ）
+RUN ./gradlew bootJar --no-daemon -x test
+
+# -----------------------------------------------------------------------------
+# 実行ステージ
+# -----------------------------------------------------------------------------
+FROM eclipse-temurin:21-jre
+
+WORKDIR /app
+
+# ヘルスチェック用にcurlをインストール
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# セキュリティ: 非rootユーザーを作成
+RUN groupadd -r spring && useradd -r -g spring spring
+
+# ビルドステージからJARファイルをコピー
+COPY --from=builder /app/build/libs/*.jar app.jar
+
+# アプリケーションディレクトリの所有権を変更
+RUN chown -R spring:spring /app
+
+# 非rootユーザーに切り替え
+USER spring
+
+# アプリケーションポートを公開
+EXPOSE 8080
+
+# アプリケーション起動
+ENTRYPOINT ["java", "-jar", "app.jar"]
