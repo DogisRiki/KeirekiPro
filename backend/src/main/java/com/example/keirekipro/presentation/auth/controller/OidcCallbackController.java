@@ -84,16 +84,22 @@ public class OidcCallbackController {
             OidcCallbackResult result = handleOidcCallbackUseCase.execute(code, state, error, redirectUri);
 
             if (result instanceof OidcCallbackResult.Success success) {
+                log.info("OIDC success, generating JWT for userId: {}", success.getUserId());
+
                 // JWT発行
                 String userId = success.getUserId().toString();
                 String accessToken = jwtProvider.createAccessToken(userId, success.getRoles());
                 String refreshToken = jwtProvider.createRefreshToken(userId, success.getRoles());
+
+                log.info("JWT generated, setting cookies");
 
                 // レスポンスヘッダーにセット
                 response.addHeader("Set-Cookie",
                         CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
                 response.addHeader("Set-Cookie",
                         CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
+
+                log.info("Cookies set, redirecting to: {}", frontendBaseUrl + FRONTEND_REDIRECT_URL);
 
                 // 成功ページへリダイレクト
                 response.sendRedirect(frontendBaseUrl + FRONTEND_REDIRECT_URL);
