@@ -75,7 +75,6 @@ jobs:
           push: true
           tags: |
             ${{ steps.vars.outputs.ecr_repository_url }}:${{ github.sha }}
-            ${{ steps.vars.outputs.ecr_repository_url }}:latest
           platforms: linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -87,7 +86,7 @@ jobs:
             --task-definition ${{ env.ECS_TASK_DEFINITION_FAMILY }} \
             --query 'taskDefinition' \
             --output json > task-definition.json
-          
+
           # 不要なフィールドを削除（新しいタスク定義登録時に必要）
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' task-definition.json > cleaned-task-definition.json
           mv cleaned-task-definition.json task-definition.json
@@ -95,11 +94,11 @@ jobs:
       - name: Update task definition with new image
         run: |
           NEW_IMAGE="${{ steps.vars.outputs.ecr_repository_url }}:${{ github.sha }}"
-          
+
           jq --arg IMAGE "$NEW_IMAGE" --arg CONTAINER "${{ env.CONTAINER_NAME }}" \
             '.containerDefinitions = [.containerDefinitions[] | if .name == $CONTAINER then .image = $IMAGE else . end]' \
             task-definition.json > new-task-definition.json
-          
+
           mv new-task-definition.json task-definition.json
 
       - name: Register new task definition
@@ -118,7 +117,7 @@ jobs:
             --services ${{ steps.vars.outputs.ecs_service_name }} \
             --query 'services[0].desiredCount' \
             --output text)
-          
+
           if [ "$CURRENT_COUNT" -eq "0" ]; then
             echo "Updating desired count from 0 to 1..."
             aws ecs update-service \
@@ -150,18 +149,18 @@ jobs:
             --services ${{ steps.vars.outputs.ecs_service_name }} \
             --query 'services[0].runningCount' \
             --output text)
-          
+
           DESIRED_COUNT=$(aws ecs describe-services \
             --cluster ${{ steps.vars.outputs.ecs_cluster_name }} \
             --services ${{ steps.vars.outputs.ecs_service_name }} \
             --query 'services[0].desiredCount' \
             --output text)
-          
+
           echo "Running tasks: $RUNNING_COUNT / Desired tasks: $DESIRED_COUNT"
-          
+
           if [ "$RUNNING_COUNT" -ne "$DESIRED_COUNT" ]; then
             echo "Deployment verification failed!"
             exit 1
           fi
-          
+
           echo "Deployment completed successfully!"
