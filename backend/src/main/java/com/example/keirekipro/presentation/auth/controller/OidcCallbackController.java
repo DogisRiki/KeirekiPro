@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,6 +33,7 @@ import jakarta.servlet.http.HttpServletResponse;
 @RequestMapping("/api/auth/oidc")
 @RequiredArgsConstructor
 @Tag(name = "auth", description = "認証・認可に関するエンドポイント")
+@Slf4j
 public class OidcCallbackController {
 
     private final JwtProvider jwtProvider;
@@ -107,6 +109,7 @@ public class OidcCallbackController {
             redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
 
         } catch (Exception e) {
+            log.error("OIDC callback error", e);
             redirectToErrorPage(response, "認証に失敗しました。しばらく時間を置いてから再度お試しください。");
         }
     }
