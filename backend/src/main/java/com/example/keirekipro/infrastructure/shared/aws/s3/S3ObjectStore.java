@@ -74,7 +74,6 @@ public class S3ObjectStore implements ObjectStore {
 
         Map<String, String> metadata = new HashMap<>();
         metadata.put("Content-Type", object.contentType());
-        metadata.put("Original-Filename", originalFilename);
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
@@ -103,7 +102,6 @@ public class S3ObjectStore implements ObjectStore {
 
         Map<String, String> metadata = new HashMap<>();
         metadata.put("Content-Type", object.contentType());
-        metadata.put("Original-Filename", object.originalFilename());
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)

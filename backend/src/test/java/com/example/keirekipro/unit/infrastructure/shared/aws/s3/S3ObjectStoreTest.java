@@ -82,7 +82,6 @@ class S3ObjectStoreTest {
         assertThat(req.bucket()).isEqualTo("test-bucket");
         assertThat(req.key()).isEqualTo(key);
         assertThat(req.contentType()).isEqualTo("image/png");
-        assertThat(req.metadata()).containsEntry("Original-Filename", "photo.png");
     }
 
     @Test
@@ -104,7 +103,6 @@ class S3ObjectStoreTest {
         assertThat(req.bucket()).isEqualTo("test-bucket");
         assertThat(req.key()).isEqualTo("documents/fixed-name.pdf");
         assertThat(req.contentType()).isEqualTo("application/pdf");
-        assertThat(req.metadata()).containsEntry("Original-Filename", "original.pdf");
     }
 
     @Test
