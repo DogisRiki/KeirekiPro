@@ -30,7 +30,7 @@ resource "aws_ecs_task_definition" "backend" {
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
-  memory                   = "512"
+  memory                   = "2048"
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 
@@ -85,7 +85,7 @@ resource "aws_ecs_task_definition" "backend" {
         retries     = 3
       }
 
-      memoryReservation = 448
+      memoryReservation = 1792
     }
   ])
 
