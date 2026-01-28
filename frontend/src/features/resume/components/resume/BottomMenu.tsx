@@ -1,9 +1,7 @@
-// src/features/resume/components/resume/BottomMenu.tsx
 import { Button, Dialog, Switch } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { useDeleteResume, useExportResume, useResumeStore } from "@/features/resume";
 import DeleteIcon from "@mui/icons-material/Delete";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -159,6 +157,129 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
             );
         }
 
+        // スマホ表示: アイコンボタンのみ
+        if (isXs) {
+            return (
+                <>
+                    <Paper
+                        ref={ref}
+                        elevation={3}
+                        sx={{
+                            position: "fixed",
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            zIndex: 1200,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-around",
+                            p: 1,
+                            bgcolor: alpha(theme.palette.background.paper, 0.95),
+                        }}
+                    >
+                        {/* 折りたたみボタン */}
+                        <IconButton
+                            onClick={handleToggleCollapse}
+                            size="small"
+                            sx={{
+                                position: "absolute",
+                                left: "50%",
+                                top: -16,
+                                transform: "translateX(-50%)",
+                                bgcolor: "background.paper",
+                                boxShadow: 1,
+                                width: 24,
+                                height: 24,
+                                "&:hover": {
+                                    bgcolor: "grey.100",
+                                },
+                            }}
+                        >
+                            <KeyboardArrowDownIcon fontSize="small" />
+                        </IconButton>
+
+                        {/* 削除 */}
+                        <Tooltip title="職務経歴書を削除">
+                            <IconButton color="error" onClick={handleDeleteClick} disabled={deleteMutation.isPending}>
+                                <DeleteIcon />
+                            </IconButton>
+                        </Tooltip>
+
+                        {/* 保存 */}
+                        <Tooltip title="保存">
+                            <span>
+                                <IconButton color="info" onClick={onSave} disabled={isSaving || !canSave}>
+                                    <SaveIcon />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+
+                        {/* エクスポート */}
+                        <Tooltip title="エクスポート">
+                            <IconButton
+                                color="primary"
+                                onClick={handleExportButtonClick}
+                                disabled={exportMutation.isPending}
+                            >
+                                <FileDownloadIcon />
+                            </IconButton>
+                        </Tooltip>
+
+                        {/* 自動保存 */}
+                        <FormGroup>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        color="success"
+                                        checked={autoSaveEnabled}
+                                        onChange={handleAutoSaveChange}
+                                        size="small"
+                                    />
+                                }
+                                label="自動"
+                                sx={{
+                                    m: 0,
+                                    "& .MuiFormControlLabel-label": {
+                                        fontSize: "0.75rem",
+                                    },
+                                }}
+                            />
+                        </FormGroup>
+                    </Paper>
+
+                    {/* エクスポートメニュー */}
+                    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleExportButtonClose}>
+                        {exportMenuItems.map((item, index) => (
+                            <MenuItem
+                                key={index}
+                                onClick={item.action}
+                                disabled={exportMutation.isPending}
+                                sx={{
+                                    color: "primary.main",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                }}
+                            >
+                                {item.icon}
+                                {item.label}
+                            </MenuItem>
+                        ))}
+                    </Menu>
+
+                    {/* 削除確認ダイアログ */}
+                    <Dialog
+                        open={deleteDialogOpen}
+                        variant="confirm"
+                        title="削除確認"
+                        description={`「${resume?.resumeName ?? ""}」を削除しますか？この操作は取り消せません。`}
+                        onClose={handleDeleteDialogClose}
+                    />
+                </>
+            );
+        }
+
+        // PC表示: 従来のボタン表示
         return (
             <>
                 <Paper
@@ -202,7 +323,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                     <Button
                         color="error"
                         startIcon={<DeleteIcon />}
-                        size={isXs ? "small" : "medium"}
+                        size="medium"
                         onClick={handleDeleteClick}
                         disabled={deleteMutation.isPending}
                     >
@@ -214,7 +335,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                         <Button
                             color="info"
                             startIcon={<SaveIcon />}
-                            size={isXs ? "small" : "medium"}
+                            size="medium"
                             onClick={onSave}
                             disabled={isSaving || !canSave}
                         >
@@ -223,8 +344,8 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
 
                         {/* エクスポートボタン */}
                         <Button
-                            startIcon={<ExpandMoreIcon />}
-                            size={isXs ? "small" : "medium"}
+                            startIcon={<FileDownloadIcon />}
+                            size="medium"
                             onClick={handleExportButtonClick}
                             disabled={exportMutation.isPending}
                         >

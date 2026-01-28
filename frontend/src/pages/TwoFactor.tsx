@@ -23,11 +23,14 @@ export const TwoFactor = () => {
             <Typography variant="h5" gutterBottom sx={{ mb: 4 }}>
                 2段階認証
             </Typography>
-            <Typography variant="body1" gutterBottom sx={{ mb: 4 }}>
-                登録されたメールアドレスに認証コードを送信しました。
-                <br />
-                メールをご確認のうえ認証コードを入力してください。
-            </Typography>
+            <Box sx={{ mb: 4 }}>
+                <Typography variant="body1" sx={{ fontSize: { xs: "0.7rem", sm: "1rem" } }}>
+                    登録されたメールアドレスに認証コードを送信しました。
+                </Typography>
+                <Typography variant="body1" sx={{ fontSize: { xs: "0.7rem", sm: "1rem" } }}>
+                    メールをご確認のうえ認証コードを入力してください。
+                </Typography>
+            </Box>
             <TwoFactorContainer />
         </>
     );

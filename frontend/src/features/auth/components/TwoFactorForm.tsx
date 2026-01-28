@@ -37,6 +37,13 @@ export const TwoFactorForm = ({ code, onCodeChange, onSubmit, loading = false }:
                 length={6}
                 validChars="0-9"
                 placeholder=""
+                inputProps={{
+                    inputMode: "numeric",
+                    autoComplete: "one-time-code",
+                    style: {
+                        fontSize: "16px", // iOS自動ズーム防止
+                    },
+                }}
                 classNames={{
                     container: "verification-container",
                     character: "verification-character",
@@ -63,11 +70,12 @@ export const TwoFactorForm = ({ code, onCodeChange, onSubmit, loading = false }:
             </Box>
             <style>
                 {`
-                    .verification-container{display:flex;justify-content:center;gap:16px;}
-                    .verification-character{width:56px!important;height:56px!important;border:1px solid ${theme.palette.divider};border-radius:4px;font-size:1.5rem;display:flex;align-items:center;justify-content:center;background-color:${theme.palette.background.paper};color:${theme.palette.text.primary};}
-                    .verification-character:focus{box-shadow:0 0 0 2px ${theme.palette.primary.main};}
-                    .verification-character--selected{border-color:${theme.palette.primary.main};border-width:2px;}
+                    .verification-container{display:flex;justify-content:center;gap:8px;}
+                    .verification-character{width:40px!important;height:48px!important;border:1px solid ${theme.palette.divider};border-radius:4px;font-size:1.25rem;display:flex;align-items:center;justify-content:center;background-color:${theme.palette.background.paper};color:${theme.palette.text.primary};outline:none!important;}
+                    .verification-character:focus{outline:none!important;box-shadow:none!important;}
+                    .verification-character--selected{border-color:${theme.palette.primary.main};border-width:2px;outline:none!important;box-shadow:none!important;}
                     .verification-character--inactive{background-color:transparent;}
+                    @media(min-width:600px){.verification-container{gap:16px;}.verification-character{width:56px!important;height:56px!important;font-size:1.5rem;}}
                 `}
             </style>
         </Box>
