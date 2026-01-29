@@ -24,7 +24,7 @@ export const PortfolioSection = () => {
 
     // エントリーが選択されていない場合
     if (!currentPortfolio) {
-        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストからポートフォリオを選択してください。</Box>;
+        return <Box sx={{ p: 2, color: "text.secondary" }}>一覧からポートフォリオを選択してください。</Box>;
     }
 
     // 現在のエントリーのエラーを取得

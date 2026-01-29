@@ -33,7 +33,7 @@ export const CertificationSection = () => {
 
     // エントリーが選択されていない場合
     if (!currentCertification) {
-        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストから資格を選択してください。</Box>;
+        return <Box sx={{ p: 2, color: "text.secondary" }}>一覧から資格を選択してください。</Box>;
     }
 
     // 現在のエントリーのエラーを取得
