@@ -23,7 +23,7 @@ export const SelfPromotionSection = () => {
 
     // エントリーが選択されていない場合
     if (!currentSelfPromotion) {
-        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストから自己PRを選択してください。</Box>;
+        return <Box sx={{ p: 2, color: "text.secondary" }}>一覧から自己PRを選択してください。</Box>;
     }
 
     // 現在のエントリーのエラーを取得

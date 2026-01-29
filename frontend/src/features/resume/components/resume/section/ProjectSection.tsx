@@ -39,7 +39,7 @@ export const ProjectSection = () => {
 
     // エントリーが選択されていない場合
     if (!currentProject) {
-        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストからプロジェクトを選択してください。</Box>;
+        return <Box sx={{ p: 2, color: "text.secondary" }}>一覧からプロジェクトを選択してください。</Box>;
     }
 
     // 現在のエントリーのエラーを取得

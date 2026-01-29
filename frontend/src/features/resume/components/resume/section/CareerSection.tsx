@@ -25,7 +25,7 @@ export const CareerSection = () => {
 
     // エントリーが選択されていない場合
     if (!currentCareer) {
-        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストから職歴を選択してください。</Box>;
+        return <Box sx={{ p: 2, color: "text.secondary" }}>一覧から職歴を選択してください。</Box>;
     }
 
     // 現在のエントリーのエラーを取得

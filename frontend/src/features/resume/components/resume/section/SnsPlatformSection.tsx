@@ -32,7 +32,7 @@ export const SnsPlatformSection = () => {
 
     // エントリーが選択されていない場合
     if (!currentSnsPlatform) {
-        return <Box sx={{ p: 2, color: "text.secondary" }}>左のリストからSNSを選択してください。</Box>;
+        return <Box sx={{ p: 2, color: "text.secondary" }}>一覧からSNSを選択してください。</Box>;
     }
 
     // 現在のエントリーのエラーを取得
