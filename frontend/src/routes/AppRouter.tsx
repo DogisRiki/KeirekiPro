@@ -7,6 +7,7 @@ import {
     Contact,
     LandingPage,
     Login,
+    Maintenance,
     Privacy,
     Register,
     RequestPasswordReset,
@@ -63,6 +64,7 @@ const router = createBrowserRouter([
     { path: paths.terms, element: <Terms />, errorElement: <ErrorFallback /> },
     { path: paths.privacy, element: <Privacy />, errorElement: <ErrorFallback /> },
     { path: paths.serverError, element: <ServerError />, errorElement: <ErrorFallback /> },
+    { path: paths.maintenance, element: <Maintenance />, errorElement: <ErrorFallback /> },
     { path: "*", element: <NotFound />, errorElement: <ErrorFallback /> },
 ]);
 

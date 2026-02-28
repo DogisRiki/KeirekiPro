@@ -3,6 +3,7 @@ export * from "@/pages/ChangePassword";
 export * from "@/pages/Contact";
 export * from "@/pages/LandingPage";
 export * from "@/pages/Login";
+export * from "@/pages/Maintenance";
 export * from "@/pages/Privacy";
 export * from "@/pages/Register";
 export * from "@/pages/RequestPasswordReset";
