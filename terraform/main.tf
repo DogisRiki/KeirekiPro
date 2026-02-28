@@ -186,14 +186,14 @@ module "iam" {
   s3_storage_bucket_arn = module.s3.storage_bucket_arn
 }
 
-# ECS Module
+# ECS Module - パブリックサブネットに変更
 module "ecs" {
   source = "./modules/ecs"
 
   project_name            = var.project_name
   aws_region              = var.aws_region
   aws_account_id          = data.aws_caller_identity.current.account_id
-  private_subnet_ids      = module.vpc.private_subnet_ids
+  public_subnet_ids       = module.vpc.public_subnet_ids
   security_group_id       = module.vpc.ecs_security_group_id
   task_execution_role_arn = module.iam.ecs_task_execution_role_arn
   task_role_arn           = module.iam.ecs_task_role_arn
