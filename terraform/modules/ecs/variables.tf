@@ -13,8 +13,8 @@ variable "aws_account_id" {
   type        = string
 }
 
-variable "private_subnet_ids" {
-  description = "List of private subnet IDs"
+variable "public_subnet_ids" {
+  description = "List of public subnet IDs"
   type        = list(string)
 }
 

@@ -94,7 +94,7 @@ resource "aws_ecs_task_definition" "backend" {
   }
 }
 
-# ECS Service
+# ECS Service - パブリックサブネットに配置
 resource "aws_ecs_service" "backend" {
   name             = "${var.project_name}-backend-service"
   cluster          = aws_ecs_cluster.main.id
@@ -108,9 +108,9 @@ resource "aws_ecs_service" "backend" {
   health_check_grace_period_seconds  = 180
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.public_subnet_ids
     security_groups  = [var.security_group_id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   load_balancer {
