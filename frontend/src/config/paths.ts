@@ -25,4 +25,5 @@ export const paths = {
     terms: "/terms",
     privacy: "/privacy",
     serverError: "/500",
+    maintenance: "/maintenance",
 };

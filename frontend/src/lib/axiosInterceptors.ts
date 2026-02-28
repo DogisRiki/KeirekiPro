@@ -66,6 +66,12 @@ export const createErrorInterceptor =
             if (response?.status === 500) {
                 useNotificationStore.getState().setNotification(toastMessage.serverError, "error");
             }
+
+            // 503(メンテナンス)
+            if (response?.status === 503) {
+                window.location.assign(paths.maintenance);
+                return Promise.reject(error);
+            }
         }
         return Promise.reject(error);
     };
