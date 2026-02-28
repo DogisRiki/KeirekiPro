@@ -28,9 +28,9 @@ resource "aws_iam_policy" "scheduler" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "ECSAccess"
-        Effect = "Allow"
-        Action = "ecs:UpdateService"
+        Sid      = "ECSAccess"
+        Effect   = "Allow"
+        Action   = "ecs:UpdateService"
         Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/${var.ecs_cluster_name}/${var.ecs_service_name}"
       },
       {
