@@ -323,3 +323,15 @@ resource "aws_s3_bucket_policy" "storage" {
     ]
   })
 }
+
+# Scheduler Module
+module "scheduler" {
+  source = "./modules/scheduler"
+
+  project_name            = var.project_name
+  aws_region              = var.aws_region
+  aws_account_id          = data.aws_caller_identity.current.account_id
+  ecs_cluster_name        = module.ecs.cluster_name
+  ecs_service_name        = module.ecs.service_name
+  rds_instance_identifier = module.rds.instance_identifier
+}
