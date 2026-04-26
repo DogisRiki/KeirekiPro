@@ -24,10 +24,9 @@
         "noFallthroughCasesInSwitch": true,
         "noUncheckedSideEffectImports": true,
         /* Import alias */
-        "baseUrl": "./",
         "paths": {
             "@/*": [
-                "src/*"
+                "./src/*"
             ]
         },
         /* vitest */
