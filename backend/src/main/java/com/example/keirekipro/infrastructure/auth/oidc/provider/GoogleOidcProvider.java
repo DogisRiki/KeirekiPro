@@ -76,9 +76,17 @@ public class GoogleOidcProvider implements OidcProvider {
         if (userInfo == null) {
             return null;
         }
+
+        String email = (String) userInfo.get("email");
+        Boolean emailVerified = (Boolean) userInfo.get("email_verified");
+        // メールアドレスがGoogleで検証済みでない場合は、メール経由のアカウント自動連携を防ぐためnullとする
+        if (!Boolean.TRUE.equals(emailVerified)) {
+            email = null;
+        }
+
         return OidcUserInfoDto.builder()
                 .providerUserId((String) userInfo.get("sub"))
-                .email((String) userInfo.get("email"))
+                .email(email)
                 .username((String) userInfo.get("name"))
                 .providerType(getProviderType())
                 .build();

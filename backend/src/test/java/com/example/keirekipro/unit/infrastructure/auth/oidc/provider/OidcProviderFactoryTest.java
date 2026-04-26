@@ -89,10 +89,11 @@ class OidcProviderFactoryTest {
                 DUMMY_SCOPES,
                 DUMMY_SECRET_NAME);
 
-        // Googleの場合、ユーザー情報のキーは "sub", "email", "name" を利用する
+        // Googleの場合、ユーザー情報のキーは "sub", "email", "email_verified", "name" を利用する
         Map<String, Object> userInfo = Map.of(
                 "sub", "googleSub123",
                 "email", "google@example.com",
+                "email_verified", true,
                 "name", "Google User");
 
         OidcUserInfoDto standardUserInfo = googleProvider.convertToStandardUserInfo(userInfo);
@@ -104,8 +105,55 @@ class OidcProviderFactoryTest {
     }
 
     @Test
-    @DisplayName("GoogleOidcProvider_userInfoがnullの場合、nullを返す")
+    @DisplayName("GoogleOidcProvider_email_verifiedがfalseの場合、emailはnullとなる")
     void test4() {
+        GoogleOidcProvider googleProvider = new GoogleOidcProvider(
+                DUMMY_AUTH_ENDPOINT,
+                DUMMY_TOKEN_ENDPOINT,
+                DUMMY_USERINFO_ENDPOINT,
+                DUMMY_SCOPES,
+                DUMMY_SECRET_NAME);
+
+        Map<String, Object> userInfo = Map.of(
+                "sub", "googleSub123",
+                "email", "google@example.com",
+                "email_verified", false,
+                "name", "Google User");
+
+        OidcUserInfoDto standardUserInfo = googleProvider.convertToStandardUserInfo(userInfo);
+        assertThat(standardUserInfo).isNotNull();
+        assertThat(standardUserInfo.getProviderUserId()).isEqualTo("googleSub123");
+        assertThat(standardUserInfo.getEmail()).isNull();
+        assertThat(standardUserInfo.getUsername()).isEqualTo("Google User");
+        assertThat(standardUserInfo.getProviderType()).isEqualTo("google");
+    }
+
+    @Test
+    @DisplayName("GoogleOidcProvider_email_verifiedが未指定の場合、emailはnullとなる")
+    void test5() {
+        GoogleOidcProvider googleProvider = new GoogleOidcProvider(
+                DUMMY_AUTH_ENDPOINT,
+                DUMMY_TOKEN_ENDPOINT,
+                DUMMY_USERINFO_ENDPOINT,
+                DUMMY_SCOPES,
+                DUMMY_SECRET_NAME);
+
+        Map<String, Object> userInfo = Map.of(
+                "sub", "googleSub123",
+                "email", "google@example.com",
+                "name", "Google User");
+
+        OidcUserInfoDto standardUserInfo = googleProvider.convertToStandardUserInfo(userInfo);
+        assertThat(standardUserInfo).isNotNull();
+        assertThat(standardUserInfo.getProviderUserId()).isEqualTo("googleSub123");
+        assertThat(standardUserInfo.getEmail()).isNull();
+        assertThat(standardUserInfo.getUsername()).isEqualTo("Google User");
+        assertThat(standardUserInfo.getProviderType()).isEqualTo("google");
+    }
+
+    @Test
+    @DisplayName("GoogleOidcProvider_userInfoがnullの場合、nullを返す")
+    void test6() {
         GoogleOidcProvider googleProvider = new GoogleOidcProvider(
                 DUMMY_AUTH_ENDPOINT,
                 DUMMY_TOKEN_ENDPOINT,
@@ -119,7 +167,7 @@ class OidcProviderFactoryTest {
 
     @Test
     @DisplayName("GithubOidcProviderが正しくインスタンス化でき、OidcUserInfoDtoの情報が正しい")
-    void test5() {
+    void test7() {
         RestClient mockRestClient = mock(RestClient.class);
         ObjectMapper mockObjectMapper = mock(ObjectMapper.class);
 
@@ -148,7 +196,7 @@ class OidcProviderFactoryTest {
 
     @Test
     @DisplayName("GithubOidcProvider_userInfoがnullの場合、nullを返す")
-    void test6() {
+    void test8() {
         RestClient mockRestClient = mock(RestClient.class);
         ObjectMapper mockObjectMapper = mock(ObjectMapper.class);
 
@@ -168,7 +216,7 @@ class OidcProviderFactoryTest {
     @Test
     @DisplayName("GithubOidcProvider_emailがnullの場合、fetchPrimaryEmailで補完される")
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    void test7() throws Exception {
+    void test9() throws Exception {
         // userInfoにemailが存在しないがaccess_tokenは存在する
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("id", "githubId999");
