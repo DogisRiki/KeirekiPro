@@ -3,8 +3,8 @@ package com.example.keirekipro.unit.presentation.auth.controller;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anySet;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,7 +18,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.presentation.auth.controller.LoginController;
 import com.example.keirekipro.presentation.auth.dto.LoginRequest;
-import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.security.jwt.AuthCookieIssuer;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthIssueUseCase;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
@@ -35,6 +35,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import lombok.RequiredArgsConstructor;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @WebMvcTest(LoginController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
@@ -48,7 +50,7 @@ class LoginControllerTest {
     private TwoFactorAuthIssueUseCase twoFactorAuthIssueUseCase;
 
     @MockitoBean
-    private JwtProvider jwtProvider;
+    private AuthCookieIssuer authCookieIssuer;
 
     private final MockMvc mockMvc;
 
@@ -59,12 +61,10 @@ class LoginControllerTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String EMAIL = "test@keirekipro.click";
     private static final String PASSWORD = "hashedPassword";
-    private static final String ACCESS_TOKEN = "mockAccessToken";
-    private static final String REFRESH_TOKEN = "mockRefreshToken";
     private static final String CHALLENGE_TOKEN = "mockChallengeToken";
 
     @Test
-    @DisplayName("二段階認証設定が無効の場合、JWTがSet-Cookieに設定される")
+    @DisplayName("二段階認証設定が無効の場合、AuthCookieIssuerが呼び出されJWTがSet-Cookieに設定される")
     void test1() throws Exception {
         // モックをセットアップ
         Set<String> roles = Set.of("USER");
@@ -75,10 +75,14 @@ class LoginControllerTest {
                         .twoFactorAuthEnabled(false)
                         .roles(roles)
                         .build());
-        when(jwtProvider.createAccessToken(USER_ID.toString(), roles))
-                .thenReturn(ACCESS_TOKEN);
-        when(jwtProvider.createRefreshToken(USER_ID.toString(), roles))
-                .thenReturn(REFRESH_TOKEN);
+
+        // AuthCookieIssuerはvoidなので、呼ばれた際にレスポンスへCookieを書き込むよう模擬する
+        doAnswer(invocation -> {
+            HttpServletResponse res = invocation.getArgument(0);
+            res.addHeader("Set-Cookie", "accessToken=mockAccessToken; Path=/; HttpOnly; SameSite=Lax");
+            res.addHeader("Set-Cookie", "refreshToken=mockRefreshToken; Path=/; HttpOnly; SameSite=Lax");
+            return null;
+        }).when(authCookieIssuer).issue(any(), eq(USER_ID), eq(roles));
 
         // リクエストを準備
         LoginRequest request = new LoginRequest(EMAIL, PASSWORD);
@@ -100,8 +104,7 @@ class LoginControllerTest {
         // 呼び出しを検証
         verify(loginUseCase).execute(request);
         verify(twoFactorAuthIssueUseCase, never()).execute(any(), any());
-        verify(jwtProvider).createAccessToken(USER_ID.toString(), roles);
-        verify(jwtProvider).createRefreshToken((USER_ID.toString()), roles);
+        verify(authCookieIssuer).issue(any(), eq(USER_ID), eq(roles));
     }
 
     @Test
@@ -139,8 +142,7 @@ class LoginControllerTest {
         // 呼び出しを検証
         verify(loginUseCase).execute(request);
         verify(twoFactorAuthIssueUseCase).execute(USER_ID, EMAIL);
-        verify(jwtProvider, never()).createAccessToken(anyString(), anySet());
-        verify(jwtProvider, never()).createRefreshToken(anyString(), anySet());
+        verify(authCookieIssuer, never()).issue(any(), any(), any());
     }
 
     @Test

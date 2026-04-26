@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 public class OidcAuthorizationController {
 
     private final StartOidcAuthorizationUseCase startOidcAuthorizationUseCase;
+
     private final BaseUrlResolver baseUrlResolver;
 
     /**

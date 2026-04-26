@@ -1,9 +1,7 @@
 package com.example.keirekipro.presentation.auth.controller;
 
-import java.util.Optional;
-
 import com.example.keirekipro.presentation.auth.dto.LoginRequest;
-import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.security.jwt.AuthCookieIssuer;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthIssueUseCase;
@@ -37,7 +35,7 @@ public class LoginController {
 
     private final TwoFactorAuthIssueUseCase twoFactorAuthIssueUseCase;
 
-    private final JwtProvider jwtProvider;
+    private final AuthCookieIssuer authCookieIssuer;
 
     @Value("${cookie.secure:false}")
     private boolean isSecureCookie;
@@ -56,7 +54,7 @@ public class LoginController {
         if (user.isTwoFactorAuthEnabled()) {
             String challengeToken = twoFactorAuthIssueUseCase.execute(user.getId(), user.getEmail());
 
-            // チャレンジトークンをCookieにセット
+            // チャレンジトークンをHttpOnly Cookieにセット
             response.addHeader("Set-Cookie",
                     CookieUtil.createHttpOnlyCookie(
                             "twoFactorChallenge",
@@ -68,16 +66,8 @@ public class LoginController {
             return ResponseEntity.accepted().build();
         }
 
-        // JWT発行
-        String accessToken = jwtProvider.createAccessToken(user.getId().toString(), user.getRoles());
-        String refreshToken = jwtProvider.createRefreshToken(user.getId().toString(), user.getRoles());
-
-        // レスポンスヘッダーにセット
-        response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
-        response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
-
-        // 未使用変数の警告抑止のため明示的に参照
-        Optional.ofNullable(user.getEmail()).orElse("");
+        // アクセストークン・リフレッシュトークンを発行しCookieにセット
+        authCookieIssuer.issue(response, user.getId(), user.getRoles());
 
         return ResponseEntity.ok().build();
     }

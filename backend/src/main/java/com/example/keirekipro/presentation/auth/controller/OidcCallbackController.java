@@ -4,9 +4,8 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
-import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.security.jwt.AuthCookieIssuer;
 import com.example.keirekipro.presentation.shared.utils.BaseUrlResolver;
-import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.usecase.auth.HandleOidcCallbackUseCase;
 import com.example.keirekipro.usecase.auth.oidc.OidcCallbackError;
 import com.example.keirekipro.usecase.auth.oidc.OidcCallbackResult;
@@ -36,12 +35,11 @@ import jakarta.servlet.http.HttpServletResponse;
 @Slf4j
 public class OidcCallbackController {
 
-    private final JwtProvider jwtProvider;
-    private final HandleOidcCallbackUseCase handleOidcCallbackUseCase;
-    private final BaseUrlResolver baseUrlResolver;
+    private final AuthCookieIssuer authCookieIssuer;
 
-    @Value("${cookie.secure:false}")
-    private boolean isSecureCookie;
+    private final HandleOidcCallbackUseCase handleOidcCallbackUseCase;
+
+    private final BaseUrlResolver baseUrlResolver;
 
     @Value("${frontend-base-url}")
     private String frontendBaseUrl;
@@ -86,18 +84,8 @@ public class OidcCallbackController {
             if (result instanceof OidcCallbackResult.Success success) {
                 log.info("OIDC success, generating JWT for userId: {}", success.getUserId());
 
-                // JWT発行
-                String userId = success.getUserId().toString();
-                String accessToken = jwtProvider.createAccessToken(userId, success.getRoles());
-                String refreshToken = jwtProvider.createRefreshToken(userId, success.getRoles());
-
-                log.info("JWT generated, setting cookies");
-
-                // レスポンスヘッダーにセット
-                response.addHeader("Set-Cookie",
-                        CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
-                response.addHeader("Set-Cookie",
-                        CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
+                // アクセストークン・リフレッシュトークンを発行しCookieにセット
+                authCookieIssuer.issue(response, success.getUserId(), success.getRoles());
 
                 log.info("Cookies set, redirecting to: {}", frontendBaseUrl + FRONTEND_REDIRECT_URL);
 
