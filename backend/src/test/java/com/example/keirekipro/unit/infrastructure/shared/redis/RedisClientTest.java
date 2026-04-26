@@ -7,21 +7,24 @@ import java.util.Optional;
 
 import com.example.keirekipro.config.RedisTestContainerConfig;
 import com.example.keirekipro.infrastructure.shared.redis.RedisClient;
+import com.example.keirekipro.infrastructure.shared.redis.RedisConfig;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestConstructor;
 
 import lombok.RequiredArgsConstructor;
 
 @DataRedisTest
-@Import(RedisTestContainerConfig.class)
+@Import({
+        RedisTestContainerConfig.class,
+        RedisConfig.class,
+        RedisClient.class
+})
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
-@ComponentScan(basePackages = "com.example.keirekipro.infrastructure.shared.redis")
 class RedisClientTest {
 
     private final RedisClient redisClient;

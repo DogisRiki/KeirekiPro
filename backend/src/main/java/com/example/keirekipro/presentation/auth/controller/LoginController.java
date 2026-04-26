@@ -1,5 +1,7 @@
 package com.example.keirekipro.presentation.auth.controller;
 
+import java.util.Optional;
+
 import com.example.keirekipro.presentation.auth.dto.LoginRequest;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
@@ -45,15 +47,25 @@ public class LoginController {
      */
     @PostMapping("/login")
     @Operation(summary = "ログイン", description = "メールアドレスとパスワードによるログイン")
-    public ResponseEntity<String> handle(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+    public ResponseEntity<Void> handle(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
 
         // ユースケース実行
         LoginUseCaseDto user = loginUseCase.execute(request);
 
         // ユーザーの二段階認証設定をチェックし、有効なら二段階認証発行ユースケースを実行
         if (user.isTwoFactorAuthEnabled()) {
-            twoFactorAuthIssueUseCase.execute(user.getId(), user.getEmail());
-            return ResponseEntity.accepted().body(user.getId().toString());
+            String challengeToken = twoFactorAuthIssueUseCase.execute(user.getId(), user.getEmail());
+
+            // チャレンジトークンをCookieにセット
+            response.addHeader("Set-Cookie",
+                    CookieUtil.createHttpOnlyCookie(
+                            "twoFactorChallenge",
+                            challengeToken,
+                            isSecureCookie,
+                            "/api/auth/2fa",
+                            600));
+
+            return ResponseEntity.accepted().build();
         }
 
         // JWT発行
@@ -63,6 +75,9 @@ public class LoginController {
         // レスポンスヘッダーにセット
         response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
         response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
+
+        // 未使用変数の警告抑止のため明示的に参照
+        Optional.ofNullable(user.getEmail()).orElse("");
 
         return ResponseEntity.ok().build();
     }

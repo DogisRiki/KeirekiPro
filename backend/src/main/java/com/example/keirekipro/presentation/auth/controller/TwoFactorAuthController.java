@@ -1,19 +1,19 @@
 package com.example.keirekipro.presentation.auth.controller;
 
-import java.util.UUID;
+import java.util.Optional;
 
 import com.example.keirekipro.presentation.auth.dto.TwoFactorAuthRequest;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
 import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthVerifyResultDto;
+import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
@@ -47,17 +48,17 @@ public class TwoFactorAuthController {
     @PostMapping("/verify")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "二段階認証の実行", description = "二段階認証コードの検証を行う")
-    public void handle(@Valid @RequestBody TwoFactorAuthRequest request, HttpServletResponse response)
+    public void handle(@Valid @RequestBody TwoFactorAuthRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse response)
             throws Exception {
 
-        if (request.getUserId() == null) {
-            throw new AuthenticationCredentialsNotFoundException("不正なアクセスです。");
-        }
-
-        UUID userId = UUID.fromString(request.getUserId());
+        // Cookieからチャレンジトークンを取得
+        String challengeToken = CookieUtil.getCookieValue(servletRequest, "twoFactorChallenge")
+                .orElseThrow(() -> new UseCaseException("認証セッションが無効または期限切れです。もう一度最初からお試しください。"));
 
         // ユースケース実行
-        TwoFactorAuthVerifyResultDto result = twoFactorAuthVerifyUseCase.execute(userId, request.getCode());
+        TwoFactorAuthVerifyResultDto result = twoFactorAuthVerifyUseCase.execute(challengeToken, request.getCode());
 
         // JWT発行
         String accessToken = jwtProvider.createAccessToken(
@@ -70,5 +71,12 @@ public class TwoFactorAuthController {
         // レスポンスヘッダーにセット
         response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
         response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
+
+        // チャレンジトークンCookieを失効させる
+        response.addHeader("Set-Cookie",
+                CookieUtil.deleteCookie("twoFactorChallenge", isSecureCookie, "/api/auth/2fa"));
+
+        // 未使用変数警告抑止
+        Optional.ofNullable(result.getUserId());
     }
 }

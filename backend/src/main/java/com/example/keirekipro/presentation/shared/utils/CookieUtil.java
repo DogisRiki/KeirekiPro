@@ -49,6 +49,28 @@ public class CookieUtil {
     }
 
     /**
+     * HttpOnly属性・Secure属性・Path・有効期限を指定可能なCookie文字列を生成する
+     *
+     * @param name           Cookieのキー
+     * @param value          Cookieの値
+     * @param isSecureCookie セキュア属性を有効にするかどうか
+     * @param path           Cookieのパス
+     * @param maxAgeSeconds  有効期限（秒）
+     * @return 生成されたCookie文字列
+     */
+    public static String createHttpOnlyCookie(String name, String value, boolean isSecureCookie, String path,
+            long maxAgeSeconds) {
+        return ResponseCookie.from(name, value)
+                .httpOnly(true)
+                .secure(isSecureCookie)
+                .sameSite("Lax")
+                .path(path)
+                .maxAge(maxAgeSeconds)
+                .build()
+                .toString();
+    }
+
+    /**
      * Cookie削除用のHttpOnly属性付きCookie文字列を生成する
      *
      * @param name           削除対象のCookie名
@@ -61,6 +83,25 @@ public class CookieUtil {
                 .secure(isSecureCookie)
                 .sameSite("Lax")
                 .path("/")
+                .maxAge(0)
+                .build()
+                .toString();
+    }
+
+    /**
+     * Path指定可能なCookie削除用の文字列を生成する
+     *
+     * @param name           削除対象のCookie名
+     * @param isSecureCookie セキュア属性を有効にするかどうか
+     * @param path           Cookieのパス
+     * @return 有効期限切れのCookie文字列
+     */
+    public static String deleteCookie(String name, boolean isSecureCookie, String path) {
+        return ResponseCookie.from(name, "")
+                .httpOnly(true)
+                .secure(isSecureCookie)
+                .sameSite("Lax")
+                .path(path)
                 .maxAge(0)
                 .build()
                 .toString();

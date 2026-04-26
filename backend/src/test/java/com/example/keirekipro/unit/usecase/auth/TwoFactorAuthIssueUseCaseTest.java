@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.usecase.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +12,7 @@ import com.example.keirekipro.shared.config.AppProperties;
 import com.example.keirekipro.shared.utils.SecurityUtil;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthIssueUseCase;
 import com.example.keirekipro.usecase.auth.notification.TwoFactorCodeNotification;
+import com.example.keirekipro.usecase.auth.store.TwoFactorAuthChallengeStore;
 import com.example.keirekipro.usecase.auth.store.TwoFactorAuthCodeStore;
 import com.example.keirekipro.usecase.shared.notification.NotificationDispatcher;
 
@@ -31,6 +31,9 @@ class TwoFactorAuthIssueUseCaseTest {
     private TwoFactorAuthCodeStore twoFactorAuthCodeStore;
 
     @Mock
+    private TwoFactorAuthChallengeStore twoFactorAuthChallengeStore;
+
+    @Mock
     private NotificationDispatcher notificationDispatcher;
 
     @Mock
@@ -44,23 +47,26 @@ class TwoFactorAuthIssueUseCaseTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String EMAIL = "test@keirekipro.click";
+    private static final String CHALLENGE_TOKEN = "mockChallengeToken";
 
     @Test
-    @DisplayName("2段階認証コードの発行が正しくできる")
+    @DisplayName("2段階認証コードの発行が正しくでき、チャレンジトークンが返却される")
     void test1() {
         // モックのセットアップ
         when(securityUtil.generateRandomNumber(6)).thenReturn("012345");
+        when(securityUtil.generateRandomToken()).thenReturn(CHALLENGE_TOKEN);
         when(properties.getSiteName()).thenReturn("KeirekiPro");
         when(properties.getSiteUrl()).thenReturn("https://keirekipro.click");
 
         // 実行
-        assertThatCode(() -> {
-            twoFactorAuthIssueUseCase.execute(USER_ID, EMAIL);
-        }).doesNotThrowAnyException();
+        String result = twoFactorAuthIssueUseCase.execute(USER_ID, EMAIL);
 
         // 検証
+        assertThat(result).isEqualTo(CHALLENGE_TOKEN);
         verify(securityUtil).generateRandomNumber(eq(6));
+        verify(securityUtil).generateRandomToken();
         verify(twoFactorAuthCodeStore).store(eq(USER_ID), eq("012345"), eq(Duration.ofMinutes(10)));
+        verify(twoFactorAuthChallengeStore).store(eq(CHALLENGE_TOKEN), eq(USER_ID), eq(Duration.ofMinutes(10)));
 
         // 通知内容の検証
         ArgumentCaptor<TwoFactorCodeNotification> captor = ArgumentCaptor.forClass(TwoFactorCodeNotification.class);

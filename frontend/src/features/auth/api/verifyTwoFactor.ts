@@ -5,7 +5,6 @@ import type { AxiosResponse } from "axios";
  * 二段階認証コード検証リクエスト
  */
 export interface VerifyTwoFactorPayload {
-    userId: string;
     code: string;
 }
 

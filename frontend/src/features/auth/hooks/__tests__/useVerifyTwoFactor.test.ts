@@ -20,7 +20,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
-import { useTwoFactorStore, useVerifyTwoFactor } from "@/features/auth";
+import { useVerifyTwoFactor } from "@/features/auth";
 import { protectedApiClient, publicApiClient } from "@/lib";
 import { useErrorMessageStore, useUserAuthStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
@@ -46,14 +46,11 @@ describe("useVerifyTwoFactor", () => {
         vi.mocked(protectedApiClient.get).mockReset();
         // ストアメソッドをスパイ
         vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
-        vi.spyOn(useTwoFactorStore.getState(), "clear");
         vi.spyOn(useUserAuthStore.getState(), "setLogin");
-        // TwoFactorStoreにuserIdをセット
-        useTwoFactorStore.getState().setUserId("uid");
         mockedNavigate.mockReset();
     });
 
-    it("成功時はエラーストアをクリア・TwoFactorStore.clear・ログイン情報取得・認証ストア更新・リダイレクトが実行されること", async () => {
+    it("成功時はエラーストアをクリア・ログイン情報取得・認証ストア更新・リダイレクトが実行されること", async () => {
         // verifyTwoFactorの成功レスポンスをセット
         const postResponse = { status: 204, data: undefined } as AxiosResponse<void>;
         vi.mocked(publicApiClient.post).mockResolvedValueOnce(postResponse);
@@ -74,8 +71,8 @@ describe("useVerifyTwoFactor", () => {
         // clearErrorsがonMutateとonSuccessで計2回呼び出されること
         expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
 
-        // TwoFactorStore.clearが呼び出されること
-        expect(useTwoFactorStore.getState().clear).toHaveBeenCalled();
+        // verifyTwoFactorが正しいパラメータで呼び出されること
+        expect(publicApiClient.post).toHaveBeenCalledWith("/auth/2fa/verify", { code: dummyCode });
 
         // getUserInfoが呼び出されること
         expect(protectedApiClient.get).toHaveBeenCalledWith("/users/me");

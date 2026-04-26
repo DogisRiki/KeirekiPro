@@ -61,6 +61,7 @@ class LoginControllerTest {
     private static final String PASSWORD = "hashedPassword";
     private static final String ACCESS_TOKEN = "mockAccessToken";
     private static final String REFRESH_TOKEN = "mockRefreshToken";
+    private static final String CHALLENGE_TOKEN = "mockChallengeToken";
 
     @Test
     @DisplayName("二段階認証設定が無効の場合、JWTがSet-Cookieに設定される")
@@ -104,7 +105,7 @@ class LoginControllerTest {
     }
 
     @Test
-    @DisplayName("二段階認証設定が有効の場合、二段階認証発行ユースケースが実行される")
+    @DisplayName("二段階認証設定が有効の場合、二段階認証発行ユースケースが実行され、チャレンジトークンCookieが設定される")
     void test2() throws Exception {
         // モックをセットアップ
         Set<String> roles = Set.of("USER");
@@ -115,6 +116,8 @@ class LoginControllerTest {
                         .twoFactorAuthEnabled(true)
                         .roles(roles)
                         .build());
+        when(twoFactorAuthIssueUseCase.execute(USER_ID, EMAIL))
+                .thenReturn(CHALLENGE_TOKEN);
 
         // リクエストを準備
         LoginRequest request = new LoginRequest(EMAIL, PASSWORD);
@@ -126,9 +129,12 @@ class LoginControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isAccepted())
-                // JWTは発行されないためSet-Cookieヘッダーが存在しない
-                .andExpect(header().doesNotExist("Set-Cookie"))
-                .andExpect(jsonPath("$").value(USER_ID.toString()));
+                // チャレンジトークンCookieが設定される
+                .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().stringValues(
+                        "Set-Cookie",
+                        containsInAnyOrder(
+                                containsString("twoFactorChallenge=mockChallengeToken"))));
 
         // 呼び出しを検証
         verify(loginUseCase).execute(request);
