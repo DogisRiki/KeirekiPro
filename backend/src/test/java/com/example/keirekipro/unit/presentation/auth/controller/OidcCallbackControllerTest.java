@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -18,7 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.auth.controller.OidcCallbackController;
-import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.security.jwt.AuthCookieIssuer;
 import com.example.keirekipro.presentation.shared.utils.BaseUrlResolver;
 import com.example.keirekipro.usecase.auth.HandleOidcCallbackUseCase;
 import com.example.keirekipro.usecase.auth.oidc.OidcCallbackError;
@@ -37,6 +38,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import lombok.RequiredArgsConstructor;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @WebMvcTest(OidcCallbackController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -46,7 +48,7 @@ import jakarta.servlet.http.HttpServletRequest;
 class OidcCallbackControllerTest {
 
     @MockitoBean
-    private JwtProvider jwtProvider;
+    private AuthCookieIssuer authCookieIssuer;
 
     @MockitoBean
     private HandleOidcCallbackUseCase handleOidcCallbackUseCase;
@@ -85,8 +87,13 @@ class OidcCallbackControllerTest {
         when(handleOidcCallbackUseCase.execute(eq(CODE_VALUE), eq(STATE_VALUE), eq(null), anyString()))
                 .thenReturn(new OidcCallbackResult.Success(ID, roles));
 
-        when(jwtProvider.createAccessToken(eq(ID.toString()), eq(roles))).thenReturn("mockAccessToken");
-        when(jwtProvider.createRefreshToken(eq(ID.toString()), eq(roles))).thenReturn("mockRefreshToken");
+        // AuthCookieIssuerはvoidなので、呼ばれた際にレスポンスへCookieを書き込むよう模擬する
+        doAnswer(invocation -> {
+            HttpServletResponse res = invocation.getArgument(0);
+            res.addHeader("Set-Cookie", "accessToken=mockAccessToken; Path=/; HttpOnly; SameSite=Lax");
+            res.addHeader("Set-Cookie", "refreshToken=mockRefreshToken; Path=/; HttpOnly; SameSite=Lax");
+            return null;
+        }).when(authCookieIssuer).issue(any(), eq(ID), eq(roles));
 
         // リクエストを実行
         mockMvc.perform(get(CALLBACK_PATH)
@@ -103,8 +110,7 @@ class OidcCallbackControllerTest {
 
         // 呼び出し検証
         verify(handleOidcCallbackUseCase).execute(eq(CODE_VALUE), eq(STATE_VALUE), eq(null), anyString());
-        verify(jwtProvider).createAccessToken(ID.toString(), roles);
-        verify(jwtProvider).createRefreshToken(ID.toString(), roles);
+        verify(authCookieIssuer).issue(any(), eq(ID), eq(roles));
     }
 
     @Test

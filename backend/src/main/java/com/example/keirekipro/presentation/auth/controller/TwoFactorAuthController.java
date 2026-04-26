@@ -1,9 +1,7 @@
 package com.example.keirekipro.presentation.auth.controller;
 
-import java.util.Optional;
-
 import com.example.keirekipro.presentation.auth.dto.TwoFactorAuthRequest;
-import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.security.jwt.AuthCookieIssuer;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
 import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthVerifyResultDto;
@@ -37,7 +35,7 @@ public class TwoFactorAuthController {
 
     private final TwoFactorAuthVerifyUseCase twoFactorAuthVerifyUseCase;
 
-    private final JwtProvider jwtProvider;
+    private final AuthCookieIssuer authCookieIssuer;
 
     @Value("${cookie.secure:false}")
     private boolean isSecureCookie;
@@ -60,23 +58,11 @@ public class TwoFactorAuthController {
         // ユースケース実行
         TwoFactorAuthVerifyResultDto result = twoFactorAuthVerifyUseCase.execute(challengeToken, request.getCode());
 
-        // JWT発行
-        String accessToken = jwtProvider.createAccessToken(
-                result.getUserId().toString(),
-                result.getRoles());
-        String refreshToken = jwtProvider.createRefreshToken(
-                result.getUserId().toString(),
-                result.getRoles());
-
-        // レスポンスヘッダーにセット
-        response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("accessToken", accessToken, isSecureCookie));
-        response.addHeader("Set-Cookie", CookieUtil.createHttpOnlyCookie("refreshToken", refreshToken, isSecureCookie));
+        // アクセストークン・リフレッシュトークンを発行しCookieにセット
+        authCookieIssuer.issue(response, result.getUserId(), result.getRoles());
 
         // チャレンジトークンCookieを失効させる
         response.addHeader("Set-Cookie",
                 CookieUtil.deleteCookie("twoFactorChallenge", isSecureCookie, "/api/auth/2fa"));
-
-        // 未使用変数警告抑止
-        Optional.ofNullable(result.getUserId());
     }
 }

@@ -2,7 +2,9 @@ package com.example.keirekipro.unit.presentation.auth.controller;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -15,7 +17,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.presentation.auth.controller.TwoFactorAuthController;
 import com.example.keirekipro.presentation.auth.dto.TwoFactorAuthRequest;
-import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.presentation.security.jwt.AuthCookieIssuer;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
 import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthVerifyResultDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +34,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import lombok.RequiredArgsConstructor;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @WebMvcTest(TwoFactorAuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
@@ -42,7 +46,7 @@ class TwoFactorAuthControllerTest {
     private TwoFactorAuthVerifyUseCase twoFactorAuthIssueUseCase;
 
     @MockitoBean
-    private JwtProvider jwtProvider;
+    private AuthCookieIssuer authCookieIssuer;
 
     private final MockMvc mockMvc;
 
@@ -50,27 +54,29 @@ class TwoFactorAuthControllerTest {
 
     private static final String ENDPOINT = "/api/auth/2fa/verify";
 
-    private static final String USER_ID = UUID.randomUUID().toString();
-    private static final String ACCESS_TOKEN = "mockAccessToken";
-    private static final String REFRESH_TOKEN = "mockRefreshToken";
+    private static final UUID USER_ID = UUID.randomUUID();
     private static final String CHALLENGE_TOKEN = "mockChallengeToken";
 
     private static final String CODE = "123456";
     private static final Set<String> ROLES = Set.of("USER");
 
     @Test
-    @DisplayName("二段階認証コードの検証がOKの場合、JWTがSet-Cookieに設定され、チャレンジCookieが失効する")
+    @DisplayName("二段階認証コードの検証がOKの場合、AuthCookieIssuerが呼ばれJWTがSet-Cookieに設定され、チャレンジCookieが失効する")
     void test1() throws Exception {
         // モックをセットアップ
         when(twoFactorAuthIssueUseCase.execute(eq(CHALLENGE_TOKEN), eq(CODE)))
                 .thenReturn(TwoFactorAuthVerifyResultDto.builder()
-                        .userId(UUID.fromString(USER_ID))
+                        .userId(USER_ID)
                         .roles(ROLES)
                         .build());
-        when(jwtProvider.createAccessToken(USER_ID, ROLES))
-                .thenReturn(ACCESS_TOKEN);
-        when(jwtProvider.createRefreshToken(USER_ID, ROLES))
-                .thenReturn(REFRESH_TOKEN);
+
+        // AuthCookieIssuerはvoidなので、呼ばれた際にレスポンスへCookieを書き込むよう模擬する
+        doAnswer(invocation -> {
+            HttpServletResponse res = invocation.getArgument(0);
+            res.addHeader("Set-Cookie", "accessToken=mockAccessToken; Path=/; HttpOnly; SameSite=Lax");
+            res.addHeader("Set-Cookie", "refreshToken=mockRefreshToken; Path=/; HttpOnly; SameSite=Lax");
+            return null;
+        }).when(authCookieIssuer).issue(any(), eq(USER_ID), eq(ROLES));
 
         // リクエストを準備
         TwoFactorAuthRequest request = new TwoFactorAuthRequest(CODE);
@@ -93,8 +99,7 @@ class TwoFactorAuthControllerTest {
 
         // 呼び出し検証を追加
         verify(twoFactorAuthIssueUseCase).execute(CHALLENGE_TOKEN, CODE);
-        verify(jwtProvider).createAccessToken(USER_ID, ROLES);
-        verify(jwtProvider).createRefreshToken(USER_ID, ROLES);
+        verify(authCookieIssuer).issue(any(), eq(USER_ID), eq(ROLES));
     }
 
     @Test
