@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockCookie;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -52,15 +53,16 @@ class TwoFactorAuthControllerTest {
     private static final String USER_ID = UUID.randomUUID().toString();
     private static final String ACCESS_TOKEN = "mockAccessToken";
     private static final String REFRESH_TOKEN = "mockRefreshToken";
+    private static final String CHALLENGE_TOKEN = "mockChallengeToken";
 
     private static final String CODE = "123456";
     private static final Set<String> ROLES = Set.of("USER");
 
     @Test
-    @DisplayName("二段階認証コードの検証がOKの場合、JWTがSet-Cookieに設定される")
+    @DisplayName("二段階認証コードの検証がOKの場合、JWTがSet-Cookieに設定され、チャレンジCookieが失効する")
     void test1() throws Exception {
         // モックをセットアップ
-        when(twoFactorAuthIssueUseCase.execute(eq(UUID.fromString(USER_ID)), eq(CODE)))
+        when(twoFactorAuthIssueUseCase.execute(eq(CHALLENGE_TOKEN), eq(CODE)))
                 .thenReturn(TwoFactorAuthVerifyResultDto.builder()
                         .userId(UUID.fromString(USER_ID))
                         .roles(ROLES)
@@ -71,12 +73,13 @@ class TwoFactorAuthControllerTest {
                 .thenReturn(REFRESH_TOKEN);
 
         // リクエストを準備
-        TwoFactorAuthRequest request = new TwoFactorAuthRequest(USER_ID, CODE);
+        TwoFactorAuthRequest request = new TwoFactorAuthRequest(CODE);
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
         mockMvc.perform(post(
                 ENDPOINT)
+                .cookie(new MockCookie("twoFactorChallenge", CHALLENGE_TOKEN))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isOk())
@@ -85,10 +88,11 @@ class TwoFactorAuthControllerTest {
                         "Set-Cookie",
                         containsInAnyOrder(
                                 containsString("accessToken=mockAccessToken"),
-                                containsString("refreshToken=mockRefreshToken"))));
+                                containsString("refreshToken=mockRefreshToken"),
+                                containsString("twoFactorChallenge=; Path=/api/auth/2fa"))));
 
         // 呼び出し検証を追加
-        verify(twoFactorAuthIssueUseCase).execute(UUID.fromString(USER_ID), CODE);
+        verify(twoFactorAuthIssueUseCase).execute(CHALLENGE_TOKEN, CODE);
         verify(jwtProvider).createAccessToken(USER_ID, ROLES);
         verify(jwtProvider).createRefreshToken(USER_ID, ROLES);
     }
@@ -97,12 +101,13 @@ class TwoFactorAuthControllerTest {
     @DisplayName("バリデーションエラーの場合、適切なエラーレスポンスが返される")
     void test2() throws Exception {
         // リクエストを準備(codeが空)
-        TwoFactorAuthRequest request = new TwoFactorAuthRequest(USER_ID, "");
+        TwoFactorAuthRequest request = new TwoFactorAuthRequest("");
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
         mockMvc.perform(post(
                 ENDPOINT)
+                .cookie(new MockCookie("twoFactorChallenge", CHALLENGE_TOKEN))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -112,10 +117,10 @@ class TwoFactorAuthControllerTest {
     }
 
     @Test
-    @DisplayName("userIdがnullの場合、401が返される")
+    @DisplayName("チャレンジトークンCookieが存在しない場合、400が返される")
     void test3() throws Exception {
-        // リクエストを準備（userIdがnull）
-        TwoFactorAuthRequest request = new TwoFactorAuthRequest(null, "123456");
+        // リクエストを準備（チャレンジCookieなし）
+        TwoFactorAuthRequest request = new TwoFactorAuthRequest("123456");
         String requestBody = objectMapper.writeValueAsString(request);
 
         // リクエストを実行
@@ -123,8 +128,7 @@ class TwoFactorAuthControllerTest {
                 ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("不正なアクセスです。"))
-                .andExpect(jsonPath("$.errors").isEmpty());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("認証セッションが無効または期限切れです。もう一度最初からお試しください。"));
     }
 }

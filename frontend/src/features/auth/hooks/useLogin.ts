@@ -1,6 +1,6 @@
 import { paths } from "@/config/paths";
 import type { LoginPayload } from "@/features/auth";
-import { login, useTwoFactorStore } from "@/features/auth";
+import { login } from "@/features/auth";
 import { getUserInfo } from "@/hooks";
 import { useErrorMessageStore, useUserAuthStore } from "@/stores";
 import { useMutation } from "@tanstack/react-query";
@@ -14,7 +14,6 @@ import { useNavigate } from "react-router";
 export const useLogin = () => {
     const navigate = useNavigate();
     const { setLogin } = useUserAuthStore();
-    const { setUserId } = useTwoFactorStore();
     const { clearErrors } = useErrorMessageStore();
 
     return useMutation<AxiosResponse<string>, AxiosError, LoginPayload>({
@@ -32,7 +31,6 @@ export const useLogin = () => {
             }
             // 2FAが有効
             if (response.status === 202) {
-                setUserId(response.data);
                 navigate(paths.twoFactor, { replace: true });
             }
         },

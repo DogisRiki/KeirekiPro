@@ -24,7 +24,7 @@ import type { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
 import type { LoginPayload } from "@/features/auth";
-import { useLogin, useTwoFactorStore } from "@/features/auth";
+import { useLogin } from "@/features/auth";
 import { getUserInfo } from "@/hooks";
 import { publicApiClient } from "@/lib";
 import { useErrorMessageStore, useUserAuthStore } from "@/stores";
@@ -54,7 +54,6 @@ describe("useLogin", () => {
         // 各種ストアをスパイ
         vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useUserAuthStore.getState(), "setLogin");
-        vi.spyOn(useTwoFactorStore.getState(), "setUserId");
         // navigateをリセット
         mockedNavigate.mockReset();
     });
@@ -86,17 +85,13 @@ describe("useLogin", () => {
         // setLoginが正しいユーザ情報で呼び出されること
         expect(useUserAuthStore.getState().setLogin).toHaveBeenCalledWith(fakeUser);
 
-        // setUserId は呼ばれないこと
-        expect(useTwoFactorStore.getState().setUserId).not.toHaveBeenCalled();
-
         // リダイレクトが正しい引数で呼び出されること
         expect(mockedNavigate).toHaveBeenCalledWith(paths.resume.list, { replace: true });
     });
 
-    it("ステータス202時は2FA有効としてユーザIDセット・リダイレクトが行われること", async () => {
+    it("ステータス202時は2FA有効として二段階認証画面へのリダイレクトのみ行われること", async () => {
         // publicApiClient.postの成功レスポンスをセット
-        const twoFaUserId = "2";
-        const mockResponse = { status: 202, data: twoFaUserId } as AxiosResponse<string>;
+        const mockResponse = { status: 202, data: "" } as AxiosResponse<string>;
         vi.mocked(publicApiClient.post).mockResolvedValueOnce(mockResponse);
 
         // フックをレンダリング
@@ -118,9 +113,6 @@ describe("useLogin", () => {
 
         // setLoginは呼ばれないこと
         expect(useUserAuthStore.getState().setLogin).not.toHaveBeenCalled();
-
-        // setUserIdが正しい引数で呼び出されること
-        expect(useTwoFactorStore.getState().setUserId).toHaveBeenCalledWith(twoFaUserId);
 
         // リダイレクトが正しい引数で呼び出されること
         expect(mockedNavigate).toHaveBeenCalledWith(paths.twoFactor, { replace: true });

@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.config.RedisTestContainerConfig;
+import com.example.keirekipro.infrastructure.store.auth.RedisPasswordResetTokenStore;
 import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
 
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -26,11 +26,11 @@ import lombok.RequiredArgsConstructor;
 @DataRedisTest
 @Import({
         RedisTestContainerConfig.class,
-        RedisPasswordResetTokenStoreTest.RedisTemplateTestConfig.class
+        RedisPasswordResetTokenStoreTest.RedisTemplateTestConfig.class,
+        RedisPasswordResetTokenStore.class
 })
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
-@ComponentScan(basePackages = "com.example.keirekipro.infrastructure.store.auth")
 class RedisPasswordResetTokenStoreTest {
 
     private final PasswordResetTokenStore passwordResetTokenStore;

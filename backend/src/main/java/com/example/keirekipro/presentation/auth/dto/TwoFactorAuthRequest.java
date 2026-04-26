@@ -14,8 +14,6 @@ import jakarta.validation.constraints.NotBlank;
 @NoArgsConstructor
 public class TwoFactorAuthRequest {
 
-    private String userId;
-
     @NotBlank(message = "認証コードは入力必須です。")
     private String code;
 }
