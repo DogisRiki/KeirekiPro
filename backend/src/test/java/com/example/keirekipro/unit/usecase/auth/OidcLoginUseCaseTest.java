@@ -20,6 +20,7 @@ import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.OidcLoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
 import com.example.keirekipro.usecase.auth.oidc.OidcUserInfo;
+import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class OidcLoginUseCaseTest {
     @Mock
     private DomainEventPublisher eventPublisher;
 
+    @Mock
+    private UserTokenVersionStore userTokenVersionStore;
+
     @InjectMocks
     private OidcLoginUseCase oidcLoginUseCase;
 
@@ -46,7 +50,7 @@ class OidcLoginUseCaseTest {
     private static final String PROVIDER_TYPE = "google";
 
     @Test
-    @DisplayName("同一プロバイダーで既存ユーザーが存在する場合、既存ユーザーを返す（何も変更しない）")
+    @DisplayName("同一プロバイダーで既存ユーザーが存在する場合、既存ユーザーを返す（トークンバージョン初期化は呼ばれない）")
     void test1() {
         ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> providers = Map.of(
@@ -59,7 +63,6 @@ class OidcLoginUseCaseTest {
                 null,
                 USERNAME);
 
-        // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.of(existingUser));
         when(userRepository.findById(existingUser.getId()))
@@ -81,10 +84,11 @@ class OidcLoginUseCaseTest {
         verify(userRepository).findById(existingUser.getId());
         verify(userRepository).save(existingUser);
         verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore, never()).initialize(any());
     }
 
     @Test
-    @DisplayName("別プロバイダーで既存ユーザーが存在する場合、新しいプロバイダーを追加する")
+    @DisplayName("別プロバイダーで既存ユーザーが存在する場合、新しいプロバイダーを追加する（トークンバージョン初期化は呼ばれない）")
     void test2() {
         ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> existingProviders = Map.of(
@@ -97,8 +101,6 @@ class OidcLoginUseCaseTest {
                 null,
                 USERNAME);
 
-        // モックをセットアップ
-        // プロバイダー検索→空、メール検索→ヒット、ID検索→ヒット
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
         when(userRepository.findByEmail(EMAIL))
@@ -122,10 +124,11 @@ class OidcLoginUseCaseTest {
         verify(userRepository).findById(existingUser.getId());
         verify(userRepository).save(any(User.class));
         verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore, never()).initialize(any());
     }
 
     @Test
-    @DisplayName("メールアドレスが無く、同一プロバイダーで既存ユーザーが存在する場合、既存ユーザーを返す")
+    @DisplayName("メールアドレスが無く、同一プロバイダーで既存ユーザーが存在する場合、既存ユーザーを返す（トークンバージョン初期化は呼ばれない）")
     void test3() {
         ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> providers = Map.of(
@@ -138,7 +141,6 @@ class OidcLoginUseCaseTest {
                 null,
                 USERNAME);
 
-        // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.of(existingUser));
         when(userRepository.findById(existingUser.getId()))
@@ -159,12 +161,12 @@ class OidcLoginUseCaseTest {
         verify(userRepository).findById(existingUser.getId());
         verify(userRepository).save(existingUser);
         verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore, never()).initialize(any());
     }
 
     @Test
-    @DisplayName("プロバイダー・メールアドレスともに未連携の場合、新規ユーザーを作成しイベントを発行する")
+    @DisplayName("プロバイダー・メールアドレスともに未連携の場合、新規ユーザーを作成しトークンバージョンを初期化する")
     void test4() {
-        // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
         when(userRepository.findByEmail(EMAIL))
@@ -183,12 +185,12 @@ class OidcLoginUseCaseTest {
         assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).save(any(User.class));
         verify(eventPublisher).publish(any());
+        verify(userTokenVersionStore).initialize(result.getId());
     }
 
     @Test
-    @DisplayName("メールアドレスが無い新規ユーザーは登録されるがイベントは発行されない")
+    @DisplayName("メールアドレスが無い新規ユーザーは登録されイベントは発行されないが、トークンバージョンは初期化される")
     void test5() {
-        // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
 
@@ -205,12 +207,12 @@ class OidcLoginUseCaseTest {
         assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).save(any(User.class));
         verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore).initialize(result.getId());
     }
 
     @Test
-    @DisplayName("ユーザー保存時に例外が発生した場合、例外をスローしイベントは発行されない")
+    @DisplayName("ユーザー保存時に例外が発生した場合、例外をスローしイベントもトークンバージョン初期化も行われない")
     void test6() {
-        // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
         when(userRepository.findByEmail(EMAIL))
@@ -228,12 +230,12 @@ class OidcLoginUseCaseTest {
         });
 
         verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore, never()).initialize(any());
     }
 
     @Test
-    @DisplayName("別プロバイダー連携済みユーザーがメールなしで存在し、ログインした場合はaddして保存される")
+    @DisplayName("別プロバイダー連携済みユーザーがメールなしで存在し、ログインした場合はaddして保存される（トークンバージョン初期化は呼ばれない）")
     void test7() {
-        // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
 
@@ -250,10 +252,11 @@ class OidcLoginUseCaseTest {
         assertThat(result.getRoles()).containsExactlyInAnyOrder("USER");
         verify(userRepository).save(any(User.class));
         verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore).initialize(result.getId());
     }
 
     @Test
-    @DisplayName("プロバイダーもメールも一致する既存ユーザーがいてもプロバイダー追加はされない")
+    @DisplayName("プロバイダーもメールも一致する既存ユーザーがいてもプロバイダー追加はされない（トークンバージョン初期化は呼ばれない）")
     void test8() {
         ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> providers = Map.of(
@@ -266,7 +269,6 @@ class OidcLoginUseCaseTest {
                 null,
                 USERNAME);
 
-        // モックをセットアップ
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.of(existingUser));
         when(userRepository.findById(existingUser.getId()))
@@ -287,5 +289,6 @@ class OidcLoginUseCaseTest {
         verify(userRepository).findById(existingUser.getId());
         verify(userRepository).save(existingUser);
         verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore, never()).initialize(any());
     }
 }

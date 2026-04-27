@@ -11,6 +11,7 @@ import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
 import com.example.keirekipro.usecase.auth.oidc.OidcUserInfo;
+import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,8 @@ public class OidcLoginUseCase {
     private final UserRepository userRepository;
 
     private final DomainEventPublisher eventPublisher;
+
+    private final UserTokenVersionStore userTokenVersionStore;
 
     /**
      * OIDCログインを実行する
@@ -54,6 +57,8 @@ public class OidcLoginUseCase {
                     .flatMap(u -> userRepository.findById(u.getId()));
         }
 
+        boolean isNewUser = existingUser.isEmpty();
+
         User user = existingUser.map(existing -> {
             // すでに当該プロバイダーがある場合は何もせず、なければ追加
             return existing.addAuthProvider(errorCollector, provider, providerUserId);
@@ -75,6 +80,11 @@ public class OidcLoginUseCase {
         });
 
         userRepository.save(user);
+
+        // 新規ユーザーの場合、トークンバージョンを初期化
+        if (isNewUser) {
+            userTokenVersionStore.initialize(user.getId());
+        }
 
         // ドメインイベントをパブリッシュ
         user.getDomainEvents().forEach(eventPublisher::publish);

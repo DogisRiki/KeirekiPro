@@ -16,6 +16,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
 import com.example.keirekipro.usecase.user.DeleteUserUseCase;
 
 import org.junit.jupiter.api.DisplayName;
@@ -35,13 +36,16 @@ class DeleteUserUseCaseTest {
     @Mock
     private DomainEventPublisher eventPublisher;
 
+    @Mock
+    private AuthSessionInvalidator authSessionInvalidator;
+
     @InjectMocks
     private DeleteUserUseCase deleteUserUseCase;
 
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
     @Test
-    @DisplayName("ユーザー削除が正常に完了する")
+    @DisplayName("ユーザー削除が正常に完了し、認証セッションが無効化される")
     void test1() {
         ErrorCollector errorCollector = new ErrorCollector();
         User user = User.create(
@@ -57,6 +61,7 @@ class DeleteUserUseCaseTest {
         assertThatCode(() -> deleteUserUseCase.execute(USER_ID)).doesNotThrowAnyException();
 
         verify(userRepository).delete(USER_ID);
+        verify(authSessionInvalidator).invalidate(USER_ID);
         verify(eventPublisher, atLeastOnce()).publish(any());
     }
 
@@ -70,6 +75,7 @@ class DeleteUserUseCaseTest {
                 .hasMessage("不正なアクセスです。");
 
         verify(userRepository, never()).delete(any());
+        verify(authSessionInvalidator, never()).invalidate(any());
         verify(eventPublisher, never()).publish(any());
     }
 }

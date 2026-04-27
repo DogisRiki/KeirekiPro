@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.keirekipro.infrastructure.store.auth.UserTokenVersionMapper">
+
+    <select id="selectByUserId" resultType="long" parameterType="java.util.UUID">
+        SELECT
+            token_version
+        FROM
+            user_token_versions
+        WHERE
+            user_id = #{userId}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO user_token_versions(
+            user_id,
+            token_version,
+            updated_at
+        )
+        VALUES(
+            #{userId},
+            0,
+            #{updatedAt}
+        )
+    </insert>
+
+    <update id="incrementByUserId">
+        UPDATE
+            user_token_versions
+        SET
+            token_version = token_version + 1,
+            updated_at = #{updatedAt}
+        WHERE
+            user_id = #{userId}
+    </update>
+
+</mapper>

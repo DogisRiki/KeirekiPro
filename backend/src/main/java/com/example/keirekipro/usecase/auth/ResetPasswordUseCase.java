@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
+import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
 import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -26,6 +27,8 @@ public class ResetPasswordUseCase {
     private final PasswordEncoder passwordEncoder;
 
     private final PasswordResetTokenStore passwordResetTokenStore;
+
+    private final AuthSessionInvalidator authSessionInvalidator;
 
     /**
      * パスワードリセットユースケースを実行する
@@ -54,5 +57,8 @@ public class ResetPasswordUseCase {
 
         // 再利用防止のため削除
         passwordResetTokenStore.remove(token);
+
+        // パスワード変更後、認証セッションを無効化
+        authSessionInvalidator.invalidate(userId);
     }
 }

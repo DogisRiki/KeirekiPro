@@ -15,6 +15,7 @@ import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.usecase.auth.ResetPasswordUseCase;
+import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
 import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -40,6 +41,9 @@ class ResetPasswordUseCaseTest {
     @Mock
     private PasswordResetTokenStore passwordResetTokenStore;
 
+    @Mock
+    private AuthSessionInvalidator authSessionInvalidator;
+
     @InjectMocks
     private ResetPasswordUseCase resetPasswordUseCase;
 
@@ -50,7 +54,7 @@ class ResetPasswordUseCaseTest {
     private static final String TOKEN = "reset-token";
 
     @Test
-    @DisplayName("パスワードリセットが正常に完了する")
+    @DisplayName("パスワードリセットが正常に完了し、認証セッションが無効化される")
     void test1() {
         // データ準備
         User user = User.reconstruct(
@@ -83,6 +87,7 @@ class ResetPasswordUseCaseTest {
 
         verify(passwordEncoder).encode(RAW_PASSWORD);
         verify(passwordResetTokenStore).remove(TOKEN);
+        verify(authSessionInvalidator).invalidate(USER_ID);
     }
 
     @Test
@@ -100,6 +105,7 @@ class ResetPasswordUseCaseTest {
         verify(passwordEncoder, never()).encode(RAW_PASSWORD);
         verify(userRepository, never()).save(any());
         verify(passwordResetTokenStore, never()).remove(any());
+        verify(authSessionInvalidator, never()).invalidate(any());
     }
 
     @Test
@@ -119,5 +125,6 @@ class ResetPasswordUseCaseTest {
         verify(passwordEncoder, never()).encode(RAW_PASSWORD);
         verify(userRepository, never()).save(any());
         verify(passwordResetTokenStore, never()).remove(any());
+        verify(authSessionInvalidator, never()).invalidate(any());
     }
 }

@@ -6,6 +6,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
@@ -24,6 +25,8 @@ public class ChangePasswordUseCase {
     private final UserRepository userRepository;
 
     private final PasswordEncoder passwordEncoder;
+
+    private final AuthSessionInvalidator authSessionInvalidator;
 
     /**
      * パスワード変更ユースケースを実行する
@@ -50,5 +53,8 @@ public class ChangePasswordUseCase {
         String hashed = passwordEncoder.encode(request.getNewPassword());
         User updated = user.changePassword(new ErrorCollector(), hashed);
         userRepository.save(updated);
+
+        // パスワード変更後、認証セッションを無効化
+        authSessionInvalidator.invalidate(userId);
     }
 }

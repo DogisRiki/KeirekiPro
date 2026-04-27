@@ -9,6 +9,7 @@ import com.example.keirekipro.domain.service.user.UserEmailDuplicationCheckServi
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,8 @@ public class UserRegistrationUseCase {
     private final DomainEventPublisher eventPublisher;
 
     private final UserEmailDuplicationCheckService userEmailDuplicationCheckService;
+
+    private final UserTokenVersionStore userTokenVersionStore;
 
     /**
      * ユーザー新規登録ユースケースを実行する
@@ -62,6 +65,9 @@ public class UserRegistrationUseCase {
 
         // ユーザー登録
         userRepository.save(user);
+
+        // トークンバージョンを初期化
+        userTokenVersionStore.initialize(user.getId());
 
         // 新規登録イベントをパブリッシュ
         user.getDomainEvents().forEach(eventPublisher::publish);
