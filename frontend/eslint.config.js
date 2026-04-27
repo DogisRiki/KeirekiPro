@@ -100,7 +100,9 @@ export default [
             "@tanstack/query/exhaustive-deps": [
                 "error",
                 {
-                    allowlist: ["clearErrors", "initializeResume"],
+                    allowlist: {
+                        variables: ["clearErrors", "initializeResume"],
+                    },
                 },
             ],
         },
