@@ -2,6 +2,7 @@ package com.example.keirekipro.unit.presentation.security.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -13,21 +14,30 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.presentation.security.jwt.JwtProperties;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
+@ExtendWith(MockitoExtension.class)
 class JwtProviderTest {
+
+    @Mock
+    private UserTokenVersionStore userTokenVersionStore;
 
     private JwtProvider jwtProvider;
 
     private JwtProperties jwtProperties;
 
-    private static final String USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000").toString();
+    private static final UUID USER_UUID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final String USER_ID = USER_UUID.toString();
     private static final String SECRET_KEY = "vh8JBWqYFC2mJwZ4XD9pE7TKq3mN5RxS2HnUcL7VfAy";
-    private static final long ACCESS_TOKEN_VALIDITY = 30L;
+    private static final long ACCESS_TOKEN_VALIDITY = 10L;
     private static final long REFRESH_TOKEN_VALIDITY = 7L;
     private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
@@ -37,12 +47,14 @@ class JwtProviderTest {
         jwtProperties.setSecret(SECRET_KEY);
         jwtProperties.setAccessTokenValidityInMinutes(ACCESS_TOKEN_VALIDITY);
         jwtProperties.setRefreshTokenValidityInDays(REFRESH_TOKEN_VALIDITY);
-        jwtProvider = new JwtProvider(jwtProperties);
+        jwtProvider = new JwtProvider(jwtProperties, userTokenVersionStore);
     }
 
     @Test
     @DisplayName("有効なアクセストークンを生成する")
     void test1() {
+        when(userTokenVersionStore.get(USER_UUID)).thenReturn(0L);
+
         Set<String> roles = Set.of("USER");
         String token = jwtProvider.createAccessToken(USER_ID, roles);
         Authentication auth = jwtProvider.getAuthentication(token);
@@ -62,11 +74,11 @@ class JwtProviderTest {
         System.out.println("現在時刻 : " + sdf.format(now));
         System.out.println("有効期限 : " + sdf.format(expiration));
 
-        // トークンの有効期限が現在時刻より後で、かつ31分以内である
+        // トークンの有効期限が現在時刻より後で、かつ11分以内である
         // example
         // テスト実行時刻： 15:00:00
-        // 期待される有効期限： 15:30:00 （30分後）
-        // テストの許容範囲： 15:00:00 ～ 15:31:00
+        // 期待される有効期限： 15:10:00 （10分後）
+        // テストの許容範囲： 15:00:00 ～ 15:11:00
         // (トークン生成と有効期限チェックの時間差を考慮し、1分の余裕を持たせる)
         assertThat(expiration)
                 .isAfter(now)
@@ -74,39 +86,21 @@ class JwtProviderTest {
     }
 
     @Test
-    @DisplayName("有効なリフレッシュトークンを生成する")
+    @DisplayName("アクセストークンにtokenVersionクレームが含まれる")
     void test2() {
+        when(userTokenVersionStore.get(USER_UUID)).thenReturn(7L);
+
         Set<String> roles = Set.of("USER");
-        String token = jwtProvider.createRefreshToken(USER_ID, roles);
-        Authentication auth = jwtProvider.getAuthentication(token);
+        String token = jwtProvider.createAccessToken(USER_ID, roles);
 
-        // ユーザーIDが正しい値である
-        assertThat(auth.getPrincipal()).isEqualTo(USER_ID);
+        // tokenVersionクレームを直接デコードして検証
+        long tokenVersion = JWT.require(Algorithm.HMAC256(jwtProperties.getSecret()))
+                .build()
+                .verify(token)
+                .getClaim("tokenVersion")
+                .asLong();
 
-        // ロールが正しい値である
-        assertThat(auth.getAuthorities())
-                .extracting("authority")
-                .containsExactlyInAnyOrder("ROLE_USER");
-
-        Date expiration = jwtProvider.getExpirationDate(token);
-        Date now = new Date();
-
-        // デバッグ用の時刻出力
-        System.out.println("現在時刻 : " + sdf.format(now));
-        System.out.println("有効期限 : " + sdf.format(expiration));
-
-        // 7日間の有効期限をミリ秒に変換(1日=24時間, 1時間=60分, 1分=60秒, 1秒=1000ミリ秒)
-        long daysInMillis = REFRESH_TOKEN_VALIDITY * 24 * 60 * 60 * 1000L;
-
-        // トークンの有効期限が現在時刻より後で、かつ7日と1分以内である
-        // example
-        // テスト実行時刻： 2025/01/01 15:00:00
-        // 期待される有効期限： 2025/01/07 15:00:00 （7日後）
-        // テストの許容範囲： 2025/01/01 15:00:00 ～ 2025/01/07 15:01:00
-        // (トークン生成と有効期限チェックの時間差を考慮し、1分の余裕を持たせる)
-        assertThat(expiration)
-                .isAfter(now)
-                .isBefore(new Date(now.getTime() + daysInMillis + (60 * 1000)));
+        assertThat(tokenVersion).isEqualTo(7L);
     }
 
     @Test
@@ -136,7 +130,7 @@ class JwtProviderTest {
         String invalidToken = JWT.create()
                 .withSubject(USER_ID)
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 30 * 60 * 1000))
+                .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
                 .sign(wrongAlgorithm);
         // 別の秘密鍵で署名されたトークンの場合、JWTVerificationExceptionがスローされる
         assertThatThrownBy(() -> jwtProvider.getAuthentication(invalidToken))
@@ -162,7 +156,7 @@ class JwtProviderTest {
         String tokenWithoutRoles = JWT.create()
                 .withSubject(USER_ID)
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 30 * 60 * 1000))
+                .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
                 .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
 
         Authentication auth = jwtProvider.getAuthentication(tokenWithoutRoles);

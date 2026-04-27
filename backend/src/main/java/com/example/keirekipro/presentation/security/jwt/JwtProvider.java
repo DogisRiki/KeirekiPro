@@ -3,11 +3,13 @@ package com.example.keirekipro.presentation.security.jwt;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -30,6 +32,11 @@ public class JwtProvider {
     private final JwtProperties jwtProperties;
 
     /**
+     * ユーザートークンバージョン保管ストア
+     */
+    private final UserTokenVersionStore userTokenVersionStore;
+
+    /**
      * アルゴリズムのインスタンスをキャッシュ
      */
     private Algorithm algorithm;
@@ -38,6 +45,11 @@ public class JwtProvider {
      * ロール情報を格納するclaim名
      */
     private static final String ROLES_CLAIM = "roles";
+
+    /**
+     * トークンバージョンを格納するclaim名
+     */
+    private static final String TOKEN_VERSION_CLAIM = "tokenVersion";
 
     /**
      * アルゴリズムを初期化する
@@ -59,36 +71,17 @@ public class JwtProvider {
      * @return 生成されたJWTトークン
      */
     public String createAccessToken(String userId, Set<String> roles) {
-        return createToken(userId, roles, jwtProperties.getAccessTokenValidityInMinutes());
-    }
 
-    /**
-     * リフレッシュトークンを生成する
-     *
-     * @param userId ユーザーのID
-     * @param roles  ロール名のSet
-     * @return 生成されたJWTトークン
-     */
-    public String createRefreshToken(String userId, Set<String> roles) {
-        return createToken(userId, roles, jwtProperties.getRefreshTokenValidityInDays() * 24 * 60);
-    }
+        long tokenVersion = userTokenVersionStore.get(UUID.fromString(userId));
 
-    /**
-     * 実際のトークン生成処理を行う
-     *
-     * @param userId            ユーザーID
-     * @param roles             ロール名のSet
-     * @param validityInMinutes 有効期間（分）
-     * @return 生成されたトークン
-     */
-    private String createToken(String userId, Set<String> roles, double validityInMinutes) {
         Date now = new Date();
-        long millis = (long) (validityInMinutes * 60_000);
+        long millis = (long) (jwtProperties.getAccessTokenValidityInMinutes() * 60_000);
         Date validity = new Date(now.getTime() + millis);
 
         return JWT.create()
                 .withSubject(userId)
                 .withClaim(ROLES_CLAIM, roles != null ? roles.stream().toList() : List.of())
+                .withClaim(TOKEN_VERSION_CLAIM, tokenVersion)
                 .withIssuedAt(now)
                 .withExpiresAt(validity)
                 .sign(getAlgorithm());

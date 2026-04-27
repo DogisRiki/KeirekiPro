@@ -16,6 +16,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import com.example.keirekipro.usecase.user.ChangePasswordUseCase;
 
@@ -38,6 +39,9 @@ class ChangePasswordUseCaseTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private AuthSessionInvalidator authSessionInvalidator;
+
     @InjectMocks
     private ChangePasswordUseCase changePasswordUseCase;
 
@@ -48,7 +52,7 @@ class ChangePasswordUseCaseTest {
     private static final String HASHED_NEW_PASSWORD = "hashedNewPassword";
 
     @Test
-    @DisplayName("パスワード変更が正常に完了する")
+    @DisplayName("パスワード変更が正常に完了し、認証セッションが無効化される")
     void test1() {
         // リクエスト作成
         ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
@@ -77,6 +81,9 @@ class ChangePasswordUseCaseTest {
         verify(userRepository).save(captor.capture());
         User saved = captor.getValue();
         assert saved.getPasswordHash().equals(HASHED_NEW_PASSWORD);
+
+        // 認証セッション無効化が呼ばれること
+        verify(authSessionInvalidator).invalidate(USER_ID);
     }
 
     @Test
@@ -95,6 +102,7 @@ class ChangePasswordUseCaseTest {
 
         // 検証
         verify(userRepository, never()).save(any());
+        verify(authSessionInvalidator, never()).invalidate(any());
     }
 
     @Test
@@ -128,6 +136,7 @@ class ChangePasswordUseCaseTest {
 
         // 検証
         verify(userRepository, never()).save(any());
+        verify(authSessionInvalidator, never()).invalidate(any());
     }
 
     @Test
@@ -163,6 +172,7 @@ class ChangePasswordUseCaseTest {
 
         // 検証
         verify(userRepository, never()).save(any());
+        verify(authSessionInvalidator, never()).invalidate(any());
     }
 
     @Test
@@ -200,5 +210,6 @@ class ChangePasswordUseCaseTest {
 
         // 検証
         verify(userRepository, never()).save(any());
+        verify(authSessionInvalidator, never()).invalidate(any());
     }
 }

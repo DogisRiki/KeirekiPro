@@ -36,7 +36,7 @@ app:
 
 jwt:
   secret: ${JWT_SECRET:default-jwt-secret-for-development}
-  access-token-validity-in-minutes: 30
+  access-token-validity-in-minutes: 10
   refresh-token-validity-in-days: 7
 
 oidc:

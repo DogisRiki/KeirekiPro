@@ -10,6 +10,8 @@ import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.jwt.AuthCookieIssuer;
 import com.example.keirekipro.presentation.security.jwt.JwtProvider;
+import com.example.keirekipro.usecase.auth.store.RefreshTokenStore;
+import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,12 @@ class AuthCookieIssuerTest {
     @Mock
     private JwtProvider jwtProvider;
 
+    @Mock
+    private RefreshTokenStore refreshTokenStore;
+
+    @Mock
+    private UserTokenVersionStore userTokenVersionStore;
+
     @InjectMocks
     private AuthCookieIssuer authCookieIssuer;
 
@@ -33,13 +41,15 @@ class AuthCookieIssuerTest {
     private static final Set<String> ROLES = Set.of("USER");
     private static final String ACCESS_TOKEN = "mockAccessToken";
     private static final String REFRESH_TOKEN = "mockRefreshToken";
+    private static final long TOKEN_VERSION = 0L;
 
     @Test
-    @DisplayName("アクセストークン・リフレッシュトークンが発行され、Set-Cookieヘッダにセットされる")
+    @DisplayName("アクセストークンとリフレッシュトークンが発行され、Set-Cookieヘッダにセットされる")
     void test1() {
         // モックをセットアップ
+        when(userTokenVersionStore.get(USER_ID)).thenReturn(TOKEN_VERSION);
         when(jwtProvider.createAccessToken(USER_ID.toString(), ROLES)).thenReturn(ACCESS_TOKEN);
-        when(jwtProvider.createRefreshToken(USER_ID.toString(), ROLES)).thenReturn(REFRESH_TOKEN);
+        when(refreshTokenStore.issue(USER_ID, ROLES, TOKEN_VERSION)).thenReturn(REFRESH_TOKEN);
 
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -52,16 +62,18 @@ class AuthCookieIssuerTest {
         assertThat(cookies).anyMatch(c -> c.contains("accessToken=" + ACCESS_TOKEN));
         assertThat(cookies).anyMatch(c -> c.contains("refreshToken=" + REFRESH_TOKEN));
 
+        verify(userTokenVersionStore).get(USER_ID);
         verify(jwtProvider).createAccessToken(USER_ID.toString(), ROLES);
-        verify(jwtProvider).createRefreshToken(USER_ID.toString(), ROLES);
+        verify(refreshTokenStore).issue(USER_ID, ROLES, TOKEN_VERSION);
     }
 
     @Test
-    @DisplayName("Cookieは HttpOnly・SameSite=Lax 属性が付与される")
+    @DisplayName("CookieはHttpOnly・SameSite=Lax属性が付与される")
     void test2() {
         // モックをセットアップ
+        when(userTokenVersionStore.get(USER_ID)).thenReturn(TOKEN_VERSION);
         when(jwtProvider.createAccessToken(USER_ID.toString(), ROLES)).thenReturn(ACCESS_TOKEN);
-        when(jwtProvider.createRefreshToken(USER_ID.toString(), ROLES)).thenReturn(REFRESH_TOKEN);
+        when(refreshTokenStore.issue(USER_ID, ROLES, TOKEN_VERSION)).thenReturn(REFRESH_TOKEN);
 
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -78,10 +90,10 @@ class AuthCookieIssuerTest {
     @DisplayName("isSecureCookieがtrueの場合、Secure属性が付与される")
     void test3() {
         // モックをセットアップ
+        when(userTokenVersionStore.get(USER_ID)).thenReturn(TOKEN_VERSION);
         when(jwtProvider.createAccessToken(USER_ID.toString(), ROLES)).thenReturn(ACCESS_TOKEN);
-        when(jwtProvider.createRefreshToken(USER_ID.toString(), ROLES)).thenReturn(REFRESH_TOKEN);
+        when(refreshTokenStore.issue(USER_ID, ROLES, TOKEN_VERSION)).thenReturn(REFRESH_TOKEN);
 
-        // isSecureCookieをtrueに設定
         ReflectionTestUtils.setField(authCookieIssuer, "isSecureCookie", true);
 
         MockHttpServletResponse response = new MockHttpServletResponse();

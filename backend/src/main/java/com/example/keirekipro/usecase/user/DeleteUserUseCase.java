@@ -5,6 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
+import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,8 @@ public class DeleteUserUseCase {
 
     private final DomainEventPublisher eventPublisher;
 
+    private final AuthSessionInvalidator authSessionInvalidator;
+
     /**
      * ユーザー退会ユースケースを実行する
      *
@@ -39,6 +42,9 @@ public class DeleteUserUseCase {
 
         // ユーザー削除
         userRepository.delete(userId);
+
+        // 退会後、認証セッションを無効化
+        authSessionInvalidator.invalidate(userId);
 
         // 退会イベントをパブリッシュ
         user.getDomainEvents().forEach(eventPublisher::publish);

@@ -17,6 +17,7 @@ import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
 import com.example.keirekipro.usecase.auth.UserRegistrationUseCase;
+import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,11 +40,14 @@ class UserRegistrationUseCaseTest {
     @Mock
     private UserEmailDuplicationCheckService userEmailDuplicationCheckService;
 
-    @InjectMocks
-    private UserRegistrationUseCase userRegistrationUseCase;
-
     @Mock
     private DomainEventPublisher eventPublisher;
+
+    @Mock
+    private UserTokenVersionStore userTokenVersionStore;
+
+    @InjectMocks
+    private UserRegistrationUseCase userRegistrationUseCase;
 
     private static final String EMAIL = "test@keirekipro.click";
     private static final String USERNAME = "test-user";
@@ -52,7 +56,7 @@ class UserRegistrationUseCaseTest {
     private static final String HASHED_PASSWORD = "hashedPassword";
 
     @Test
-    @DisplayName("ユーザーを新規登録できる")
+    @DisplayName("ユーザーを新規登録でき、トークンバージョンが初期化される")
     void test1() {
         // データ準備
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
@@ -74,6 +78,9 @@ class UserRegistrationUseCaseTest {
         assert saved.getEmail().getValue().equals(EMAIL);
         assert saved.getPasswordHash().equals(HASHED_PASSWORD);
         assert saved.getUsername().equals(USERNAME);
+
+        // トークンバージョン初期化が呼ばれること
+        verify(userTokenVersionStore).initialize(saved.getId());
     }
 
     @Test
@@ -96,5 +103,6 @@ class UserRegistrationUseCaseTest {
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any());
         verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore, never()).initialize(any());
     }
 }
