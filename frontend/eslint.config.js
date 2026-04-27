@@ -97,6 +97,12 @@ export default [
                     prefer: "type-imports",
                 },
             ],
+            "@tanstack/query/exhaustive-deps": [
+                "error",
+                {
+                    allowlist: ["clearErrors", "initializeResume"],
+                },
+            ],
         },
         languageOptions: {
             // グローバル変数の定義
