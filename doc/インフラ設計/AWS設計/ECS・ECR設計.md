@@ -67,6 +67,7 @@
 | イメージ | {AWS_ACCOUNT_ID}.dkr.ecr.ap-northeast-1.amazonaws.com/keirekipro-backend:latest |
 | 必須コンテナ | はい |
 | ポートマッピング | 8080/tcp |
+| stopTimeout | 120秒 |
 
 ### 3.3 リソース制限
 
@@ -153,6 +154,12 @@
 | ロールバック | 有効 |
 | 最小ヘルス率 | 100% |
 | 最大率 | 200% |
+
+※デプロイ時の挙動
+- 新タスク起動およびヘルスチェック通過後、旧タスクをALBターゲットグループから登録解除する
+- 登録解除遅延（120秒）の間、進行中リクエストの完了を待機する
+- 登録解除完了後、ECSがSIGTERMを送信し、Spring Bootのgraceful shutdown（最大90秒）でリクエスト完了後にプロセスを終了する
+- stopTimeout（120秒）を超えた場合はSIGKILLで強制終了する
 
 ### 4.5 オートスケーリング設定
 
