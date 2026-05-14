@@ -22,13 +22,6 @@ jobs:
       run:
         working-directory: terraform
 
-    outputs:
-      ecr_repository_url: ${{ steps.outputs.outputs.ecr_repository_url }}
-      ecs_cluster_name: ${{ steps.outputs.outputs.ecs_cluster_name }}
-      ecs_service_name: ${{ steps.outputs.outputs.ecs_service_name }}
-      s3_frontend_bucket_name: ${{ steps.outputs.outputs.s3_frontend_bucket_name }}
-      cloudfront_distribution_id: ${{ steps.outputs.outputs.cloudfront_distribution_id }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,20 +59,3 @@ jobs:
           echo "ecs_service_name=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
           echo "s3_frontend_bucket_name=$(terraform output -raw s3_frontend_bucket_name)" >> $GITHUB_OUTPUT
           echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
-
-  trigger-backend-deploy:
-    needs: terraform-apply
-    uses: ./.github/workflows/backend-deploy.yaml
-    with:
-      ecr_repository_url: ${{ needs.terraform-apply.outputs.ecr_repository_url }}
-      ecs_cluster_name: ${{ needs.terraform-apply.outputs.ecs_cluster_name }}
-      ecs_service_name: ${{ needs.terraform-apply.outputs.ecs_service_name }}
-    secrets: inherit
-
-  trigger-frontend-deploy:
-    needs: terraform-apply
-    uses: ./.github/workflows/frontend-deploy.yaml
-    with:
-      s3_bucket_name: ${{ needs.terraform-apply.outputs.s3_frontend_bucket_name }}
-      cloudfront_distribution_id: ${{ needs.terraform-apply.outputs.cloudfront_distribution_id }}
-    secrets: inherit
