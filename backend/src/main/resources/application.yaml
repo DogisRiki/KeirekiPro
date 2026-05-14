@@ -1,6 +1,11 @@
+server:
+  shutdown: graceful
+
 spring:
   application:
     name: keirekipro
+  lifecycle:
+    timeout-per-shutdown-phase: 90s
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:keireki_pro}
@@ -86,10 +91,3 @@ management:
     tracing:
       export:
         enabled: false # OTLP exportを無効化
-
-server:
-  shutdown: graceful
-
-spring:
-  lifecycle:
-    timeout-per-shutdown-phase: 90s
