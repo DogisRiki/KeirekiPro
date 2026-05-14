@@ -41,7 +41,7 @@ resource "aws_lb_target_group" "backend" {
     matcher             = "200"
   }
 
-  deregistration_delay = 30
+  deregistration_delay = 120
 
   tags = {
     Name = "${var.project_name}-backend-tg"

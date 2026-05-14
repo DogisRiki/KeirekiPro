@@ -86,6 +86,7 @@ resource "aws_ecs_task_definition" "backend" {
       }
 
       memoryReservation = 1792
+      stopTimeout       = 120
     }
   ])
 

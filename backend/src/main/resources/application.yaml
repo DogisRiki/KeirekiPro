@@ -86,3 +86,10 @@ management:
     tracing:
       export:
         enabled: false # OTLP exportを無効化
+
+server:
+  shutdown: graceful
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 90s
