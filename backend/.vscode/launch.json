@@ -7,6 +7,8 @@
             "request": "launch",
             "cwd": "${workspaceFolder}",
             "mainClass": "com.example.keirekipro.KeirekiProApplication",
+            "console": "integratedTerminal",
+            "postDebugTask": "kill-spring-boot",
             "env": {
                 "SPRING_PROFILES_ACTIVE": "dev"
             }
