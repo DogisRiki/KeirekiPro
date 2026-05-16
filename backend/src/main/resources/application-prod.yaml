@@ -1,4 +1,9 @@
+server:
+  shutdown: graceful
+
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 90s
   config:
     import: aws-secretsmanager:keirekipro/rds;keirekipro/redis;keirekipro/jwt
   datasource:
