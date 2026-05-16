@@ -43,25 +43,40 @@ public class ResumeExportModelBuilder {
                 .toList());
 
         List<Map<String, Object>> companySections = new ArrayList<>();
+        Map<String, Map<String, Object>> companySectionIndex = new LinkedHashMap<>();
         List<Project> projects = safeList(resume.getProjects());
 
         // プロジェクト
         for (Project p : projects) {
             Map<String, Object> projectModel = new LinkedHashMap<>();
+            projectModel.put("periodStartLabel", formatPeriodStart(p.getPeriod()));
+            projectModel.put("periodEndLabel", formatPeriodEnd(p.getPeriod()));
             projectModel.put("projectLabel", formatProjectLabel(p));
+            projectModel.put("projectName", p.getName() != null ? p.getName() : "");
             projectModel.put("overview", p.getOverview());
             projectModel.put("teamComp", p.getTeamComp());
             projectModel.put("role", p.getRole());
             projectModel.put("achievements", splitLines(p.getAchievement()));
-            projectModel.put("process", p.getProcess());
+            projectModel.put("process", buildProcessModel(p.getProcess()));
             projectModel.put("tech", buildTechModel(p.getTechStack()));
+            projectModel.put("techSections", buildTechSections(p.getTechStack()));
 
             final String companyLabel = buildCompanyLabel(p);
 
-            Map<String, Object> companyModel = new LinkedHashMap<>();
-            companyModel.put("companyLabel", companyLabel);
-            companyModel.put("projects", List.of(projectModel));
-            companySections.add(companyModel);
+            // 同一勤務先のプロジェクトは、添付PDFに近い形式で1つの勤務先表にまとめる
+            Map<String, Object> companyModel = companySectionIndex.get(companyLabel);
+            if (companyModel == null) {
+                companyModel = new LinkedHashMap<>();
+                companyModel.put("companyLabel", companyLabel);
+                companyModel.put("companyPeriodLabel", buildCompanyPeriodLabel(companyLabel, resume));
+                companyModel.put("projects", new ArrayList<Map<String, Object>>());
+                companySectionIndex.put(companyLabel, companyModel);
+                companySections.add(companyModel);
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> companyProjects = (List<Map<String, Object>>) companyModel.get("projects");
+            companyProjects.add(projectModel);
         }
 
         export.put("companySections", companySections);
@@ -112,6 +127,58 @@ public class ResumeExportModelBuilder {
             return "";
         }
         return project.getCompanyName() != null ? project.getCompanyName().getValue() : "";
+    }
+
+    /**
+     * 勤務先の期間ラベルを構築する
+     *
+     * @param companyLabel 会社ラベル
+     * @param resume       職務経歴書エンティティ
+     * @return 勤務期間ラベル
+     */
+    private static String buildCompanyPeriodLabel(String companyLabel, Resume resume) {
+        if (companyLabel == null || companyLabel.isBlank() || resume == null) {
+            return "";
+        }
+
+        return safeList(resume.getCareers()).stream()
+                .filter(c -> c.getCompanyName() != null && companyLabel.equals(c.getCompanyName().getValue()))
+                .findFirst()
+                .map(c -> formatPeriod(c.getPeriod()))
+                .orElse("");
+    }
+
+    /**
+     * 作業工程をテンプレート向けに整形する
+     *
+     * @param process 作業工程
+     * @return テンプレート用モデル
+     */
+    private static Map<String, Object> buildProcessModel(Project.Process process) {
+        Map<String, Object> model = new LinkedHashMap<>();
+
+        if (process == null) {
+            model.put("requirements", false);
+            model.put("basicDesign", false);
+            model.put("detailedDesign", false);
+            model.put("implementation", false);
+            model.put("integrationTest", false);
+            model.put("systemTest", false);
+            model.put("maintenance", false);
+            model.put("label", "");
+            return model;
+        }
+
+        model.put("requirements", process.isRequirements());
+        model.put("basicDesign", process.isBasicDesign());
+        model.put("detailedDesign", process.isDetailedDesign());
+        model.put("implementation", process.isImplementation());
+        model.put("integrationTest", process.isIntegrationTest());
+        model.put("systemTest", process.isSystemTest());
+        model.put("maintenance", process.isMaintenance());
+        model.put("label", formatProcess(process));
+
+        return model;
     }
 
     /**
@@ -204,6 +271,119 @@ public class ResumeExportModelBuilder {
     }
 
     /**
+     * 技術スタックを帳票表示向けに整形する。
+     *
+     * @param techStack 技術スタック
+     * @return 帳票表示用の技術スタックセクション
+     */
+    private static List<Map<String, Object>> buildTechSections(TechStack techStack) {
+        if (techStack == null) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> sections = new ArrayList<>();
+
+        TechStack.Frontend fe = techStack.getFrontend();
+        if (fe != null) {
+            List<Map<String, Object>> lines = new ArrayList<>();
+            putTechLine(lines, "開発言語", fe.getLanguages());
+            putTechLine(lines, "フレームワーク", fe.getFrameworks());
+            putTechLine(lines, "ライブラリ", fe.getLibraries());
+            putTechLine(lines, "ビルドツール", fe.getBuildTools());
+            putTechLine(lines, "パッケージマネージャー", fe.getPackageManagers());
+            putTechLine(lines, "リンター", fe.getLinters());
+            putTechLine(lines, "フォーマッター", fe.getFormatters());
+            putTechLine(lines, "テストツール", fe.getTestingTools());
+            putTechSection(sections, "フロントエンド", lines);
+        }
+
+        TechStack.Backend be = techStack.getBackend();
+        if (be != null) {
+            List<Map<String, Object>> lines = new ArrayList<>();
+            putTechLine(lines, "開発言語", be.getLanguages());
+            putTechLine(lines, "フレームワーク", be.getFrameworks());
+            putTechLine(lines, "ライブラリ", be.getLibraries());
+            putTechLine(lines, "ビルドツール", be.getBuildTools());
+            putTechLine(lines, "パッケージマネージャー", be.getPackageManagers());
+            putTechLine(lines, "リンター", be.getLinters());
+            putTechLine(lines, "フォーマッター", be.getFormatters());
+            putTechLine(lines, "テストツール", be.getTestingTools());
+            putTechLine(lines, "ORM", be.getOrmTools());
+            putTechLine(lines, "認証", be.getAuth());
+            putTechSection(sections, "バックエンド", lines);
+        }
+
+        TechStack.Infrastructure infra = techStack.getInfrastructure();
+        if (infra != null) {
+            List<Map<String, Object>> lines = new ArrayList<>();
+            putTechLine(lines, "クラウド", infra.getClouds());
+            putTechLine(lines, "OS", infra.getOperatingSystems());
+            putTechLine(lines, "コンテナ", infra.getContainers());
+            putTechLine(lines, "データベース", infra.getDatabases());
+            putTechLine(lines, "Webサーバー", infra.getWebServers());
+            putTechLine(lines, "CI/CD", infra.getCiCdTools());
+            putTechLine(lines, "IaC", infra.getIacTools());
+            putTechLine(lines, "監視", infra.getMonitoringTools());
+            putTechLine(lines, "ロギング", infra.getLoggingTools());
+            putTechSection(sections, "インフラ", lines);
+        }
+
+        TechStack.Tools tools = techStack.getTools();
+        if (tools != null) {
+            List<Map<String, Object>> lines = new ArrayList<>();
+            putTechLine(lines, "ソース管理", tools.getSourceControls());
+            putTechLine(lines, "プロジェクト管理", tools.getProjectManagements());
+            putTechLine(lines, "コミュニケーション", tools.getCommunicationTools());
+            putTechLine(lines, "ドキュメント", tools.getDocumentationTools());
+            putTechLine(lines, "API開発", tools.getApiDevelopmentTools());
+            putTechLine(lines, "デザイン", tools.getDesignTools());
+            putTechLine(lines, "エディタ", tools.getEditors());
+            putTechLine(lines, "開発環境", tools.getDevelopmentEnvironments());
+            putTechSection(sections, "開発支援ツール", lines);
+        }
+
+        return sections;
+    }
+
+    /**
+     * 技術スタックセクションを追加する
+     *
+     * @param sections 追加先セクションリスト
+     * @param title    セクションタイトル
+     * @param lines    技術スタック行リスト
+     */
+    private static void putTechSection(List<Map<String, Object>> sections, String title,
+            List<Map<String, Object>> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> section = new LinkedHashMap<>();
+        section.put("title", title);
+        section.put("lines", lines);
+        sections.add(section);
+    }
+
+    /**
+     * 技術スタック行を追加する
+     *
+     * @param lines  追加先行リスト
+     * @param label  表示ラベル
+     * @param values 表示値リスト
+     */
+    private static void putTechLine(List<Map<String, Object>> lines, String label, List<String> values) {
+        String value = joinValues(values);
+        if (value == null || value.isBlank()) {
+            return;
+        }
+
+        Map<String, Object> line = new LinkedHashMap<>();
+        line.put("label", label);
+        line.put("value", value);
+        lines.add(line);
+    }
+
+    /**
      * 値がnullでない場合のみMapへ格納する
      *
      * @param map   格納先Map
@@ -256,6 +436,35 @@ public class ResumeExportModelBuilder {
     }
 
     /**
+     * プロジェクト期間の開始年月を生成する
+     *
+     * @param period 期間
+     * @return 表示用開始年月
+     */
+    private static String formatPeriodStart(Period period) {
+        if (period == null || period.getStartDate() == null) {
+            return "";
+        }
+        return formatYearMonth(period.getStartDate());
+    }
+
+    /**
+     * プロジェクト期間の終了年月を生成する
+     *
+     * @param period 期間
+     * @return 表示用終了年月
+     */
+    private static String formatPeriodEnd(Period period) {
+        if (period == null || period.getStartDate() == null) {
+            return "";
+        }
+        if (period.isActive()) {
+            return "現在";
+        }
+        return formatYearMonth(period.getEndDate());
+    }
+
+    /**
      * 期間を「開始年月 〜 終了年月」または「開始年月 〜 現在」形式で生成する
      *
      * @param period 期間
@@ -271,6 +480,44 @@ public class ResumeExportModelBuilder {
         }
         String end = formatYearMonth(period.getEndDate());
         return start + " 〜 " + end;
+    }
+
+    /**
+     * 作業工程を帳票表示用に整形する
+     *
+     * @param process 作業工程
+     * @return 表示用作業工程
+     */
+    private static String formatProcess(Project.Process process) {
+        if (process == null) {
+            return "";
+        }
+
+        List<String> labels = new ArrayList<>();
+
+        if (process.isRequirements()) {
+            labels.add("要件定義");
+        }
+        if (process.isBasicDesign()) {
+            labels.add("基本設計");
+        }
+        if (process.isDetailedDesign()) {
+            labels.add("詳細設計");
+        }
+        if (process.isImplementation()) {
+            labels.add("実装・単体テスト");
+        }
+        if (process.isIntegrationTest()) {
+            labels.add("結合テスト");
+        }
+        if (process.isSystemTest()) {
+            labels.add("総合テスト");
+        }
+        if (process.isMaintenance()) {
+            labels.add("運用・保守");
+        }
+
+        return String.join("、", labels);
     }
 
     /**
@@ -342,6 +589,20 @@ public class ResumeExportModelBuilder {
                 .distinct()
                 .toList();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    /**
+     * 文字列リストを帳票表示用に結合する
+     *
+     * @param values 文字列リスト
+     * @return 結合済み文字列（空の場合はnull）
+     */
+    private static String joinValues(List<String> values) {
+        List<String> normalized = normalizeList(values);
+        if (normalized == null || normalized.isEmpty()) {
+            return null;
+        }
+        return String.join("、", normalized);
     }
 
     /**

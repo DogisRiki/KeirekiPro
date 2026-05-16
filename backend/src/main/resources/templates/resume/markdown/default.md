@@ -50,7 +50,7 @@
 
 | 要件定義 | 基本設計 | 詳細設計 | 実装・単体テスト | 結合テスト | 総合テスト | 運用・保守 |
 |:--------:|:--------:|:--------:|:----------------:|:----------:|:----------:|:----------:|
-| [[${project['process'] != null and project['process'].requirements == true ? '○' : ''}]] | [[${project['process'] != null and project['process'].basicDesign == true ? '○' : ''}]] | [[${project['process'] != null and project['process'].detailedDesign == true ? '○' : ''}]] | [[${project['process'] != null and project['process'].implementation == true ? '○' : ''}]] | [[${project['process'] != null and project['process'].integrationTest == true ? '○' : ''}]] | [[${project['process'] != null and project['process'].systemTest == true ? '○' : ''}]] | [[${project['process'] != null and project['process'].maintenance == true ? '○' : ''}]] |
+| [[${project['process'] != null and project['process']['requirements'] == true ? '○' : ''}]] | [[${project['process'] != null and project['process']['basicDesign'] == true ? '○' : ''}]] | [[${project['process'] != null and project['process']['detailedDesign'] == true ? '○' : ''}]] | [[${project['process'] != null and project['process']['implementation'] == true ? '○' : ''}]] | [[${project['process'] != null and project['process']['integrationTest'] == true ? '○' : ''}]] | [[${project['process'] != null and project['process']['systemTest'] == true ? '○' : ''}]] | [[${project['process'] != null and project['process']['maintenance'] == true ? '○' : ''}]] |
 
 [# th:if="${project['tech'] != null}"]
 **技術スタック：**
