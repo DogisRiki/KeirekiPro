@@ -6,7 +6,11 @@ RUN apk add --no-cache \
     python3 \
     py3-pip \
     git \
-    && pip3 install --no-cache-dir --break-system-packages checkov
+    openssh-client \
+    ca-certificates \
+    && pip3 install --no-cache-dir --break-system-packages checkov \
+    && echo "alias git='git -C /workspace/keirekipro'" >> /root/.bashrc \
+    && git config --global --add safe.directory /workspace/keirekipro
 
 WORKDIR /workspace
 

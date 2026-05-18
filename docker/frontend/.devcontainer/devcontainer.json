@@ -18,6 +18,7 @@
                 "mikestead.dotenv"
             ],
             "settings": {
+                "git.enabled": false,
                 "files.encoding": "utf8",
                 "files.eol": "\n",
                 "editor.detectIndentation": false,
@@ -36,8 +37,8 @@
                 "editor.formatOnType": true,
                 "editor.formatOnPaste": true,
                 "editor.defaultFormatter": "esbenp.prettier-vscode",
-                "typescript.preferences.importModuleSpecifier": "non-relative",
-                "typescript.tsserver.watchOptions": {
+                "js/ts.preferences.importModuleSpecifier": "non-relative",
+                "js/ts.tsserver.watchOptions": {
                     "watchFile": "useFsEvents"
                 },
                 "files.watcherExclude": {
