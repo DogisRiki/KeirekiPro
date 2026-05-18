@@ -11,6 +11,7 @@
                 "oderwat.indent-rainbow"
             ],
             "settings": {
+                "git.enabled": false,
                 "extensions.verifySignature": false,
                 "files.encoding": "utf8",
                 "files.eol": "\n",

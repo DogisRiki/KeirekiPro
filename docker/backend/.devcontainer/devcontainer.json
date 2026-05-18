@@ -22,6 +22,7 @@
                 "oderwat.indent-rainbow"
             ],
             "settings": {
+                "git.enabled": false,
                 "files.encoding": "utf8",
                 "files.eol": "\n",
                 "editor.detectIndentation": false,
