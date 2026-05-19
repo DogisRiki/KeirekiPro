@@ -28,8 +28,8 @@
                 "editor.detectIndentation": false,
                 "editor.renderWhitespace": "boundary",
                 "editor.insertSpaces": true,
-                "editor.formatOnSave": true,
-                "editor.formatOnPaste": true,
+                "editor.formatOnSave": false,
+                "editor.formatOnPaste": false,
                 "editor.formatOnType": false,
                 "files.insertFinalNewline": true,
                 "files.trimFinalNewlines": true,
@@ -50,9 +50,10 @@
                 "[java]": {
                     "editor.insertSpaces": true,
                     "editor.tabSize": 4,
-                    "editor.codeActionsOnSave": {
-                        "source.organizeImports": "explicit"
-                    }
+                    "editor.formatOnSave": false,
+                    "editor.formatOnPaste": false,
+                    "editor.formatOnType": false,
+                    "editor.codeActionsOnSave": {}
                 },
                 "[spring-boot-properties-yaml]": {
                     "editor.insertSpaces": true,
