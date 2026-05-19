@@ -5,14 +5,14 @@ vi.mock("@/lib", () => ({
     protectedApiClient: { patch: vi.fn() },
 }));
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
 import type { ChangePasswordPayload } from "@/features/user";
 import { useChangePassword } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import { createQueryWrapper, mutateHook, resetStoresAndMocks } from "@/test";
 
 describe("useChangePassword", () => {
     const wrapper = createQueryWrapper();
@@ -40,9 +40,7 @@ describe("useChangePassword", () => {
         const { result } = renderHook(() => useChangePassword(), { wrapper });
 
         // ミューテート実行
-        act(() => {
-            result.current.mutate(payload);
-        });
+        mutateHook(result, payload);
 
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));

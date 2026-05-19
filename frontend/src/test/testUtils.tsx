@@ -1,10 +1,21 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
 
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
 
 type MockItem = (() => void) | { mockReset: () => void };
+
+type MutationHookResult<TPayload> = {
+    current: {
+        mutate: (payload: TPayload) => void;
+    };
+};
+
+type AsyncHookResult<TStatus extends "isSuccess" | "isError"> = {
+    current: Record<TStatus, boolean>;
+};
 
 /**
  * React Queryのテスト用ラッパーを生成する
@@ -31,6 +42,20 @@ export const createQueryWrapper = () => {
 
     return Wrapper;
 };
+
+export function mutateHook<TPayload>(result: MutationHookResult<TPayload>, payload: TPayload) {
+    act(() => {
+        result.current.mutate(payload);
+    });
+}
+
+export async function waitForHookSuccess(result: AsyncHookResult<"isSuccess">) {
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+}
+
+export async function waitForHookError(result: AsyncHookResult<"isError">) {
+    await waitFor(() => expect(result.current.isError).toBe(true));
+}
 
 /**
  * beforeEachで呼び出し、テスト前にストアをクリアし、引数に渡したモック関数（または spyOn の戻り値）をリセットする

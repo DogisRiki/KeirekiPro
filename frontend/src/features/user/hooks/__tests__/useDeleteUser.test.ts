@@ -15,14 +15,14 @@ vi.mock("react-router", async () => {
     };
 });
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
 import { useDeleteUser } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import { createQueryWrapper, mutateHook, resetStoresAndMocks } from "@/test";
 
 describe("useDeleteUser", () => {
     const wrapper = createQueryWrapper();
@@ -47,9 +47,7 @@ describe("useDeleteUser", () => {
         const { result } = renderHook(() => useDeleteUser(), { wrapper });
 
         // ミューテート実行
-        act(() => {
-            result.current.mutate();
-        });
+        mutateHook(result, undefined);
 
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));

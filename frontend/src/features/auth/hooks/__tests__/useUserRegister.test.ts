@@ -15,7 +15,7 @@ vi.mock("react-router", async () => {
     };
 });
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
@@ -23,7 +23,7 @@ import type { UserRegistrationPayload } from "@/features/auth";
 import { useUserRegister } from "@/features/auth";
 import { publicApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import { createQueryWrapper, mutateHook, resetStoresAndMocks } from "@/test";
 
 describe("useUserRegister", () => {
     const wrapper = createQueryWrapper();
@@ -55,9 +55,7 @@ describe("useUserRegister", () => {
         const { result } = renderHook(() => useUserRegister(), { wrapper });
 
         // ミューテート実行
-        act(() => {
-            result.current.mutate(payload);
-        });
+        mutateHook(result, payload);
 
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
