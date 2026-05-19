@@ -29,7 +29,7 @@ public class SetEmailAndPasswordUseCase {
     /**
      * メールアドレス+パスワードの設定ユースケースを実行する
      *
-     * @param userId  ユーザーID
+     * @param userId ユーザーID
      * @param request リクエスト
      */
     @Transactional

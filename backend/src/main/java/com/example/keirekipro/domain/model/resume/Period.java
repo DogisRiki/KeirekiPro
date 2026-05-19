@@ -40,9 +40,9 @@ public class Period {
      * ファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param startDate      開始年月
-     * @param endDate        終了年月
-     * @param isActive       継続中フラグ
+     * @param startDate 開始年月
+     * @param endDate 終了年月
+     * @param isActive 継続中フラグ
      * @return 値オブジェクト
      */
     public static Period create(ErrorCollector errorCollector, YearMonth startDate, YearMonth endDate,
@@ -76,7 +76,7 @@ public class Period {
      * 開始年月が終了年月より大きいかを検証
      *
      * @param startDate 開始年月
-     * @param endDate   終了年月
+     * @param endDate 終了年月
      * @return 検証結果
      */
     private boolean isInvalidDateRange(YearMonth startDate, YearMonth endDate) {
@@ -86,7 +86,7 @@ public class Period {
     /**
      * 継続中である場合、終了年月が指定されていないかを検証
      *
-     * @param endDate  終了年月
+     * @param endDate 終了年月
      * @param isActive 継続中フラグ
      * @return 検証結果
      */

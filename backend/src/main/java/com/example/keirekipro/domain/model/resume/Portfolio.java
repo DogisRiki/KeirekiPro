@@ -59,10 +59,10 @@ public class Portfolio extends Entity {
      * 新規構築用のファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param name           ポートフォリオ名
-     * @param overview       ポートフォリオ概要
-     * @param techStack      技術スタック
-     * @param link           リンク
+     * @param name ポートフォリオ名
+     * @param overview ポートフォリオ概要
+     * @param techStack 技術スタック
+     * @param link リンク
      * @return ポートフォリオエンティティ
      */
     public static Portfolio create(ErrorCollector errorCollector, String name, String overview, String techStack,
@@ -74,11 +74,11 @@ public class Portfolio extends Entity {
     /**
      * 再構築用のファクトリーメソッド
      *
-     * @param id        識別子
-     * @param name      ポートフォリオ名
-     * @param overview  ポートフォリオ概要
+     * @param id 識別子
+     * @param name ポートフォリオ名
+     * @param overview ポートフォリオ概要
      * @param techStack 技術スタック
-     * @param link      リンク
+     * @param link リンク
      * @return ポートフォリオエンティティ
      */
     public static Portfolio reconstruct(UUID id, String name, String overview, String techStack,
@@ -90,7 +90,7 @@ public class Portfolio extends Entity {
      * ポートフォリオ名を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param name           ポートフォリオ名
+     * @param name ポートフォリオ名
      * @return 変更後のポートフォリオエンティティ
      */
     public Portfolio changeName(ErrorCollector errorCollector, String name) {
@@ -102,7 +102,7 @@ public class Portfolio extends Entity {
      * ポートフォリオ概要を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param overview       ポートフォリオ概要
+     * @param overview ポートフォリオ概要
      * @return 変更後のポートフォリオエンティティ
      */
     public Portfolio changeOverview(ErrorCollector errorCollector, String overview) {
@@ -114,7 +114,7 @@ public class Portfolio extends Entity {
      * 技術スタックを変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param techStack      技術スタック
+     * @param techStack 技術スタック
      * @return 変更後のポートフォリオエンティティ
      */
     public Portfolio changeTechStack(ErrorCollector errorCollector, String techStack) {
@@ -126,7 +126,7 @@ public class Portfolio extends Entity {
      * リンクを変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param link           リンク
+     * @param link リンク
      * @return 変更後のポートフォリオエンティティ
      */
     public Portfolio changeLink(ErrorCollector errorCollector, Link link) {

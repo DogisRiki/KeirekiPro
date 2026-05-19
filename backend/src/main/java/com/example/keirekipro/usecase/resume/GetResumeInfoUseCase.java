@@ -23,7 +23,7 @@ public class GetResumeInfoUseCase {
     /**
      * 職務経歴書情報取得ユースケースを実行する
      *
-     * @param userId   ユーザーID
+     * @param userId ユーザーID
      * @param resumeId 職務経歴書ID
      * @return 職務経歴書ユースケースDTO
      */

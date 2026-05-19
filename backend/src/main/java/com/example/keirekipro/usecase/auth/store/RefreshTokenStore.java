@@ -14,8 +14,8 @@ public interface RefreshTokenStore {
     /**
      * 不透明なリフレッシュトークンを発行し保存する
      *
-     * @param userId       ユーザーID
-     * @param roles        ロール
+     * @param userId ユーザーID
+     * @param roles ロール
      * @param tokenVersion トークンバージョン
      * @return 発行されたリフレッシュトークン
      */

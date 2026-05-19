@@ -21,7 +21,7 @@ public abstract class BaseException extends RuntimeException {
      * メッセージとフィールドエラーを指定するコンストラクタ
      *
      * @param message エラーメッセージ
-     * @param errors  フィールドエラーのマップ
+     * @param errors フィールドエラーのマップ
      */
     public BaseException(String message, Map<String, List<String>> errors) {
         super(message);

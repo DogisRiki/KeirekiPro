@@ -29,7 +29,7 @@ public interface UserRepository {
     /**
      * プロバイダー情報でユーザーを取得する
      *
-     * @param providerName   プロバイダー名
+     * @param providerName プロバイダー名
      * @param providerUserId プロバイダー側ユーザーID
      * @return ユーザーエンティティ
      */

@@ -31,9 +31,9 @@ public class CreateSnsPlatformUseCase {
     /**
      * SNSプラットフォーム新規作成ユースケースを実行する
      *
-     * @param userId   ユーザーID
+     * @param userId ユーザーID
      * @param resumeId 職務経歴書ID
-     * @param request  リクエスト
+     * @param request リクエスト
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional

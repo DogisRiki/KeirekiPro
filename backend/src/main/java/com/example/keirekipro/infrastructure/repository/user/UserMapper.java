@@ -31,7 +31,7 @@ public interface UserMapper {
     /**
      * プロバイダー情報でユーザーを取得する
      *
-     * @param providerName   プロバイダー名
+     * @param providerName プロバイダー名
      * @param providerUserId プロバイダー側ユーザーID
      * @return ユーザーDTO
      */
@@ -69,7 +69,7 @@ public interface UserMapper {
     /**
      * ユーザーロールを登録する
      *
-     * @param userId   ユーザーID
+     * @param userId ユーザーID
      * @param roleName ロール名
      */
     void insertUserRole(@Param("userId") UUID userId, @Param("roleName") String roleName);

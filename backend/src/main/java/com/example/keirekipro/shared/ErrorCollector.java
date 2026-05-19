@@ -21,7 +21,7 @@ public class ErrorCollector {
     /**
      * エラーを追加する
      *
-     * @param fieldName    フィールド名
+     * @param fieldName フィールド名
      * @param errorMessage エラーメッセージ
      */
     public void addError(String fieldName, String errorMessage) {

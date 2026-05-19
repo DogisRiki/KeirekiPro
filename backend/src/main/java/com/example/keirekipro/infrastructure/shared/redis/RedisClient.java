@@ -20,7 +20,7 @@ public class RedisClient {
     /**
      * 値をRedisに保存する
      *
-     * @param key   キー
+     * @param key キー
      * @param value 値
      */
     public void setValue(String key, Object value) {
@@ -30,8 +30,8 @@ public class RedisClient {
     /**
      * 値をRedisに保存し、有効期限を設定する
      *
-     * @param key     キー
-     * @param value   値
+     * @param key キー
+     * @param value 値
      * @param timeout 有効期限
      */
     public void setValue(String key, Object value, Duration timeout) {
@@ -66,7 +66,7 @@ public class RedisClient {
     /**
      * キーの有効期限を設定する
      *
-     * @param key     キー
+     * @param key キー
      * @param timeout 有効期限
      * @return 成功した場合はtrue
      */

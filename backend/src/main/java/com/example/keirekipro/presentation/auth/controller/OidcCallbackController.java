@@ -58,10 +58,10 @@ public class OidcCallbackController {
      * OIDCプロバイダーからのコールバックを処理する
      * 認可コードを受け取り、アクセストークン取得・ユーザー情報取得・ログイン処理を行う
      *
-     * @param code     認可コード
-     * @param state    state値
-     * @param error    エラーメッセージ（エラー発生時のみ）
-     * @param request  HTTPリクエスト
+     * @param code 認可コード
+     * @param state state値
+     * @param error エラーメッセージ（エラー発生時のみ）
+     * @param request HTTPリクエスト
      * @param response HTTPレスポンス
      */
     @GetMapping("/callback")
@@ -111,7 +111,7 @@ public class OidcCallbackController {
     /**
      * エラーページへリダイレクトする
      *
-     * @param response     HTTPレスポンス
+     * @param response HTTPレスポンス
      * @param errorMessage エラーメッセージ
      */
     private void redirectToErrorPage(HttpServletResponse response, String errorMessage)

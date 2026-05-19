@@ -61,7 +61,7 @@ public class AuthProvider extends Entity {
      * 新規構築用ファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param providerName   プロバイダー名
+     * @param providerName プロバイダー名
      * @param providerUserId プロバイダー側ユーザーID
      * @return AuthProviderエンティティ
      */
@@ -82,11 +82,11 @@ public class AuthProvider extends Entity {
 
     /**
      *
-     * @param id             識別子
-     * @param providerName   プロバイダー名
+     * @param id 識別子
+     * @param providerName プロバイダー名
      * @param providerUserId プロバイダー側ユーザーID
-     * @param createdAt      作成日時
-     * @param updatedAt      更新日時
+     * @param createdAt 作成日時
+     * @param updatedAt 更新日時
      * @return AuthProviderエンティティ
      */
     public static AuthProvider reconstruct(

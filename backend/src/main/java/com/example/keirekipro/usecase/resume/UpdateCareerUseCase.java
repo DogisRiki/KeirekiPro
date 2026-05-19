@@ -29,10 +29,10 @@ public class UpdateCareerUseCase {
     /**
      * 職歴更新ユースケースを実行する
      *
-     * @param userId   ユーザーID
+     * @param userId ユーザーID
      * @param resumeId 職務経歴書ID
      * @param careerId 職歴ID
-     * @param request  リクエスト
+     * @param request リクエスト
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional

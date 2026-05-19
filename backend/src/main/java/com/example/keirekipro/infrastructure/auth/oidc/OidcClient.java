@@ -50,9 +50,9 @@ public class OidcClient {
      * 認可URLを構築する
      * ユーザーがOIDCプロバイダーへリダイレクトされる際のURLを生成する
      *
-     * @param providerName  プロバイダー名（"google", "github"など）
-     * @param redirectUri   コールバックURI
-     * @param state         CSRF対策用のstate値
+     * @param providerName プロバイダー名（"google", "github"など）
+     * @param redirectUri コールバックURI
+     * @param state CSRF対策用のstate値
      * @param codeChallenge PKCE用のcode_challenge
      * @return 構築された認可URL
      */
@@ -87,8 +87,8 @@ public class OidcClient {
      * 認可コードを使用してアクセストークンを取得する
      *
      * @param providerName プロバイダー名
-     * @param code         認可コード
-     * @param redirectUri  リダイレクトURI
+     * @param code 認可コード
+     * @param redirectUri リダイレクトURI
      * @param codeVerifier PKCE用のcode_verifier
      * @return トークンレスポンス
      */
@@ -135,7 +135,7 @@ public class OidcClient {
      * 各プロバイダーから取得した異なる形式のユーザー情報を標準化して返す
      *
      * @param providerName プロバイダー名
-     * @param accessToken  アクセストークン
+     * @param accessToken アクセストークン
      * @return 標準化されたユーザー情報
      */
     public OidcUserInfoDto getUserInfo(String providerName, String accessToken) {

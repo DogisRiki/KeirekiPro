@@ -96,10 +96,10 @@ public class SesFreeMarkerNotificationDispatcher implements NotificationDispatch
     /**
      * テンプレートをレンダリングしてSESで送信する
      *
-     * @param to           宛先
-     * @param subject      件名
+     * @param to 宛先
+     * @param subject 件名
      * @param templateName テンプレート名
-     * @param dataModel    テンプレートデータ
+     * @param dataModel テンプレートデータ
      */
     private void send(String to, String subject, String templateName, Map<String, Object> dataModel) {
 
@@ -129,7 +129,7 @@ public class SesFreeMarkerNotificationDispatcher implements NotificationDispatch
      * FreeMarkerテンプレートをレンダリングする
      *
      * @param templateName テンプレート名
-     * @param dataModel    テンプレートデータ
+     * @param dataModel テンプレートデータ
      * @return 本文
      */
     private String render(String templateName, Map<String, Object> dataModel) {

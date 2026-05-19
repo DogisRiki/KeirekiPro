@@ -71,7 +71,7 @@ public interface ResumeQueryMapper {
      * バックアップ用に職務経歴書データをJSON文字列として取得する
      *
      * @param resumeId 職務経歴書ID
-     * @param userId   ユーザーID
+     * @param userId ユーザーID
      * @return 職務経歴書データのJSON文字列
      */
     String selectResumeForBackup(@Param("resumeId") UUID resumeId, @Param("userId") UUID userId);

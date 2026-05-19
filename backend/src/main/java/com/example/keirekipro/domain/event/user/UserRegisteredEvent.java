@@ -20,8 +20,8 @@ public class UserRegisteredEvent extends AbstractDomainEvent implements DomainEv
     /**
      * コンストラクタ
      *
-     * @param userId   ユーザーID
-     * @param email    メールアドレス
+     * @param userId ユーザーID
+     * @param email メールアドレス
      * @param username ユーザー名
      */
     public UserRegisteredEvent(UUID userId, String email, String username) {

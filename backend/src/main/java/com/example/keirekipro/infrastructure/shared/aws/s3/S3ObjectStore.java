@@ -56,7 +56,7 @@ public class S3ObjectStore implements ObjectStore {
     /**
      * オブジェクトを保存し、保存先キーを返す
      *
-     * @param object    保存対象
+     * @param object 保存対象
      * @param keyPrefix 保存プレフィックス（末尾に/必須）
      * @return 保存されたキー
      */
@@ -90,9 +90,9 @@ public class S3ObjectStore implements ObjectStore {
     /**
      * 任意のファイル名を指定して保存し、保存先キーを返す
      *
-     * @param object    保存対象
+     * @param object 保存対象
      * @param keyPrefix 保存プレフィックス（末尾に/必須）
-     * @param fileName  保存ファイル名（拡張子含む）
+     * @param fileName 保存ファイル名（拡張子含む）
      * @return 保存されたキー
      */
     @Override

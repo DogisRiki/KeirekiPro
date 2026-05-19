@@ -40,7 +40,7 @@ public class CopyCreateResumeUseCase {
     /**
      * 職務経歴書コピーして新規作成ユースケースを実行する
      *
-     * @param userId  ユーザーID
+     * @param userId ユーザーID
      * @param request リクエスト
      * @return 職務経歴書ユースケースDTO
      */

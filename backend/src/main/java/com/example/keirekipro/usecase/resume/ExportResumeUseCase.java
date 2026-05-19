@@ -47,9 +47,9 @@ public class ExportResumeUseCase {
     /**
      * 職務経歴書をエクスポートする
      *
-     * @param userId   ユーザーID
+     * @param userId ユーザーID
      * @param resumeId 職務経歴書ID
-     * @param format   形式
+     * @param format 形式
      * @return エクスポート結果DTO
      */
     @Transactional(readOnly = true)

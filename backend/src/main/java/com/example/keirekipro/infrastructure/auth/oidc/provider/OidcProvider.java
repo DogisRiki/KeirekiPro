@@ -82,7 +82,7 @@ public interface OidcProvider {
     /**
      * Secrets Managerから取得したプロバイダー固有のシークレット情報を処理する
      *
-     * @param secrets  シークレット情報のJsonNode
+     * @param secrets シークレット情報のJsonNode
      * @param formData フォームデータに追加するコンシューマ
      */
     default void processSecrets(JsonNode secrets, Consumer<Map<String, String>> formData) {

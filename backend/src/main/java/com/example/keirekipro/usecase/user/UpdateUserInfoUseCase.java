@@ -49,7 +49,7 @@ public class UpdateUserInfoUseCase {
      * ユーザー情報更新ユースケースを実行する
      *
      * @param request リクエスト
-     * @param userId  ユーザーID
+     * @param userId ユーザーID
      */
     public void execute(UpdateUserInfoRequest request, UUID userId) {
 
@@ -110,7 +110,7 @@ public class UpdateUserInfoUseCase {
     /**
      * プロフィール画像のバリデーションを行う
      *
-     * @param file           ファイル
+     * @param file ファイル
      * @param errorCollector エラー収集
      */
     private void validateProfileImage(MultipartFile file, ErrorCollector errorCollector) {

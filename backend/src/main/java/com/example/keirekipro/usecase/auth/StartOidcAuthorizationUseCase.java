@@ -24,7 +24,7 @@ public class StartOidcAuthorizationUseCase {
     /**
      * OIDC認可フローを開始し、認可URLを返す
      *
-     * @param provider    プロバイダー名
+     * @param provider プロバイダー名
      * @param redirectUri コールバックURI
      * @return 認可URL
      */

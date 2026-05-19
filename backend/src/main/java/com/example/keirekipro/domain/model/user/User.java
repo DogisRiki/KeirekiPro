@@ -172,12 +172,12 @@ public class User extends Entity {
     /**
      * 新規構築用のファクトリーメソッド
      *
-     * @param errorCollector  エラー収集オブジェクト
-     * @param email           メールアドレス
-     * @param passwordHash    パスワードハッシュ
-     * @param authProviders   外部認証連携情報
+     * @param errorCollector エラー収集オブジェクト
+     * @param email メールアドレス
+     * @param passwordHash パスワードハッシュ
+     * @param authProviders 外部認証連携情報
      * @param profileImageUrl プロフィール画像
-     * @param username        ユーザー名
+     * @param username ユーザー名
      * @return Userエンティティ
      */
     public static User create(ErrorCollector errorCollector,
@@ -210,16 +210,16 @@ public class User extends Entity {
     /**
      * 再構築用のファクトリーメソッド
      *
-     * @param id                   識別子
-     * @param email                メールアドレス
-     * @param passwordHash         パスワードハッシュ
+     * @param id 識別子
+     * @param email メールアドレス
+     * @param passwordHash パスワードハッシュ
      * @param twoFactorAuthEnabled 二段階認証設定
-     * @param authProviders        外部認証連携情報
-     * @param roles                ロール一覧
-     * @param profileImageUrl      プロフィール画像URL
-     * @param username             ユーザー名
-     * @param createdAt            作成日時
-     * @param updatedAt            更新日時
+     * @param authProviders 外部認証連携情報
+     * @param roles ロール一覧
+     * @param profileImageUrl プロフィール画像URL
+     * @param username ユーザー名
+     * @param createdAt 作成日時
+     * @param updatedAt 更新日時
      * @return Userエンティティ
      */
     public static User reconstruct(UUID id,
@@ -321,7 +321,7 @@ public class User extends Entity {
      * ロールを追加する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param role           追加するロール
+     * @param role 追加するロール
      * @return 変更後のUserエンティティ
      */
     public User addRole(ErrorCollector errorCollector, RoleName role) {
@@ -367,7 +367,7 @@ public class User extends Entity {
      * ロールを削除する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param role           削除するロール
+     * @param role 削除するロール
      * @return 変更後のUserエンティティ
      */
     public User removeRole(ErrorCollector errorCollector, RoleName role) {
@@ -421,7 +421,7 @@ public class User extends Entity {
      * 外部認証プロバイダーを追加する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param providerName   プロバイダー名
+     * @param providerName プロバイダー名
      * @param providerUserId プロバイダー側ユーザーID
      * @return 変更後のUserエンティティ
      */
@@ -456,7 +456,7 @@ public class User extends Entity {
      * メールアドレスを後から設定する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param email          メールアドレス
+     * @param email メールアドレス
      * @return 変更後のUserエンティティ
      */
     public User setEmail(ErrorCollector errorCollector, Email email) {
@@ -486,7 +486,7 @@ public class User extends Entity {
     /**
      * パスワードを変更する
      *
-     * @param errorCollector  エラー収集オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param newPasswordHash 新しいパスワードハッシュ
      * @return 変更後のUserエンティティ
      */
@@ -538,7 +538,7 @@ public class User extends Entity {
     /**
      * 二段階認証設定を変更する
      *
-     * @param errorCollector       エラー収集オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param twoFactorAuthEnabled 二段階認証設定
      * @return 変更後のUserエンティティ
      */
@@ -575,7 +575,7 @@ public class User extends Entity {
      * 外部認証連携を解除する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param providerName   削除するプロバイダ名
+     * @param providerName 削除するプロバイダ名
      * @return 変更後のUserエンティティ
      */
     public User removeAuthProvider(ErrorCollector errorCollector, String providerName) {
@@ -635,7 +635,7 @@ public class User extends Entity {
      * ユーザー名を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param newUsername    新しいユーザー名
+     * @param newUsername 新しいユーザー名
      * @return 変更後のUserエンティティ
      */
     public User changeUsername(ErrorCollector errorCollector, String newUsername) {

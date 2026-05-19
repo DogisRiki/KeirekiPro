@@ -23,7 +23,7 @@ public class CompanyName {
      * ファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param value          会社名
+     * @param value 会社名
      * @return 値オブジェクト
      */
     public static CompanyName create(ErrorCollector errorCollector, String value) {

@@ -33,7 +33,7 @@ public class ResetPasswordUseCase {
     /**
      * パスワードリセットユースケースを実行する
      *
-     * @param token       トークン
+     * @param token トークン
      * @param newPassword 新しいパスワード
      */
     @Transactional

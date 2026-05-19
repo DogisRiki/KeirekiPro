@@ -34,8 +34,8 @@ public class AuthCookieIssuer {
      * アクセストークン・リフレッシュトークンを発行し、HttpOnly Cookieにセットする
      *
      * @param response HTTPレスポンス
-     * @param userId   ユーザーID
-     * @param roles    ロール
+     * @param userId ユーザーID
+     * @param roles ロール
      */
     public void issue(HttpServletResponse response, UUID userId, Set<String> roles) {
 

@@ -27,10 +27,10 @@ public class UpdateCertificationUseCase {
     /**
      * 資格更新ユースケースを実行する
      *
-     * @param userId          ユーザーID
-     * @param resumeId        職務経歴書ID
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
      * @param certificationId 資格ID
-     * @param request         リクエスト
+     * @param request リクエスト
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional

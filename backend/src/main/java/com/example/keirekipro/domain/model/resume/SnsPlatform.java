@@ -45,8 +45,8 @@ public class SnsPlatform extends Entity {
      * 新規構築用のファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param name           プラットフォーム名
-     * @param link           リンク
+     * @param name プラットフォーム名
+     * @param link リンク
      * @return SNSプラットフォームエンティティ
      */
     public static SnsPlatform create(ErrorCollector errorCollector, String name, Link link) {
@@ -57,7 +57,7 @@ public class SnsPlatform extends Entity {
     /**
      * 再構築用のファクトリーメソッド
      *
-     * @param id   識別子
+     * @param id 識別子
      * @param name プラットフォーム名
      * @param link リンク
      * @return SNSプラットフォームエンティティ
@@ -70,7 +70,7 @@ public class SnsPlatform extends Entity {
      * プラットフォーム名を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param name           プラットフォーム名
+     * @param name プラットフォーム名
      * @return 変更後のSNSプラットフォームエンティティ
      */
     public SnsPlatform changeName(ErrorCollector errorCollector, String name) {
@@ -82,7 +82,7 @@ public class SnsPlatform extends Entity {
      * リンクを変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param link           リンク
+     * @param link リンク
      * @return 変更後のSNSプラットフォームエンティティ
      */
     public SnsPlatform changeLink(ErrorCollector errorCollector, Link link) {

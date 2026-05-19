@@ -34,7 +34,7 @@ public class UseCaseException extends BaseException {
      * メッセージとフィールドエラーを指定するコンストラクタ
      *
      * @param message エラーメッセージ
-     * @param errors  フィールドエラーのマップ
+     * @param errors フィールドエラーのマップ
      */
     public UseCaseException(String message, Map<String, List<String>> errors) {
         super(message, errors);

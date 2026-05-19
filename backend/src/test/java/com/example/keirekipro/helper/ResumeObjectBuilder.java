@@ -36,11 +36,11 @@ public class ResumeObjectBuilder {
     /**
      * Resumeエンティティを生成するヘルパーメソッド
      *
-     * @param resumeId  職務経歴書ID
-     * @param userId    ユーザーID
-     * @param name      職務経歴書名
-     * @param date      日付
-     * @param lastName  姓
+     * @param resumeId 職務経歴書ID
+     * @param userId ユーザーID
+     * @param name 職務経歴書名
+     * @param date 日付
+     * @param lastName 姓
      * @param firstName 名
      * @param createdAt 作成日時
      * @param updatedAt 更新日時
@@ -156,11 +156,11 @@ public class ResumeObjectBuilder {
     /**
      * ResumeInfoUseCaseDtoを生成するヘルパーメソッド
      *
-     * @param resumeId  職務経歴書ID
-     * @param userId    ユーザーID
-     * @param name      職務経歴書名
-     * @param date      日付
-     * @param lastName  姓
+     * @param resumeId 職務経歴書ID
+     * @param userId ユーザーID
+     * @param name 職務経歴書名
+     * @param date 日付
+     * @param lastName 姓
      * @param firstName 名
      * @param createdAt 作成日時
      * @param updatedAt 更新日時
@@ -181,11 +181,11 @@ public class ResumeObjectBuilder {
     /**
      * ResumeDtoを生成するヘルパーメソッド
      *
-     * @param resumeId  職務経歴書ID
-     * @param userId    ユーザーID
-     * @param name      職務経歴書名
-     * @param date      日付
-     * @param lastName  姓
+     * @param resumeId 職務経歴書ID
+     * @param userId ユーザーID
+     * @param name 職務経歴書名
+     * @param date 日付
+     * @param lastName 姓
      * @param firstName 名
      * @param createdAt 作成日時
      * @param updatedAt 更新日時

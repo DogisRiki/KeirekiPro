@@ -67,7 +67,7 @@ public class JwtProvider {
      * アクセストークンを生成する
      *
      * @param userId ユーザーのID
-     * @param roles  ロール名のSet
+     * @param roles ロール名のSet
      * @return 生成されたJWTトークン
      */
     public String createAccessToken(String userId, Set<String> roles) {

@@ -47,7 +47,7 @@ public class RestoreResumeUseCase {
     /**
      * 職務経歴書リストアユースケースを実行する
      *
-     * @param userId  ユーザーID
+     * @param userId ユーザーID
      * @param request リストアリクエスト
      * @return リストアされた職務経歴書情報
      */
@@ -88,9 +88,9 @@ public class RestoreResumeUseCase {
      * </p>
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param userId         ユーザーID
-     * @param resumeDto      リクエストの職務経歴書DTO
-     * @param resumeName     職務経歴書名
+     * @param userId ユーザーID
+     * @param resumeDto リクエストの職務経歴書DTO
+     * @param resumeName 職務経歴書名
      * @return 職務経歴書エンティティ
      * @throws UseCaseException ファイルが破損または改ざんされている場合
      */
