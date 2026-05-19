@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.resume.controller.ExportResumeController;
@@ -50,7 +51,7 @@ class ExportResumeControllerTest {
     @Test
     @DisplayName("Accept: application/pdfの場合、PDFファイルがダウンロードできる")
     void test1() throws Exception {
-        byte[] pdfContent = "PDF content".getBytes();
+        byte[] pdfContent = "PDF content".getBytes(StandardCharsets.UTF_8);
         ExportResumeUseCaseDto dto = new ExportResumeUseCaseDto(
                 "職務経歴書.pdf",
                 "application/pdf",
@@ -73,7 +74,7 @@ class ExportResumeControllerTest {
     @Test
     @DisplayName("Accept: text/markdownの場合、Markdownファイルがダウンロードできる")
     void test2() throws Exception {
-        byte[] mdContent = "# Markdown content".getBytes();
+        byte[] mdContent = "# Markdown content".getBytes(StandardCharsets.UTF_8);
         ExportResumeUseCaseDto dto = new ExportResumeUseCaseDto(
                 "職務経歴書.md",
                 "text/markdown",

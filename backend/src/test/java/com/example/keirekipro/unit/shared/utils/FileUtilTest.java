@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -36,7 +37,7 @@ class FileUtilTest {
                 "testFile",
                 "test.txt",
                 "text/plain",
-                "テストコンテンツ".getBytes());
+                "テストコンテンツ".getBytes(StandardCharsets.UTF_8));
         long maxFileSize = 5L; // 5バイト
 
         // 実行
@@ -54,7 +55,7 @@ class FileUtilTest {
                 "testFile",
                 "test.txt",
                 "text/plain",
-                "テスト".getBytes());
+                "テスト".getBytes(StandardCharsets.UTF_8));
         long maxFileSize = 100L; // 100バイト
 
         // 実行
@@ -72,7 +73,7 @@ class FileUtilTest {
                 "testFile",
                 "test.txt",
                 "text/plain",
-                "テストコンテンツ".getBytes());
+                "テスト".getBytes(StandardCharsets.UTF_8));
         List<String> allowedExtensions = Arrays.asList("jpg", "png", "gif");
 
         // 実行
@@ -90,7 +91,7 @@ class FileUtilTest {
                 "testFile",
                 "test.jpg",
                 "image/jpeg",
-                "テストコンテンツ".getBytes());
+                "テスト".getBytes(StandardCharsets.UTF_8));
         List<String> allowedExtensions = Arrays.asList("jpg", "png", "gif");
 
         // 実行
@@ -136,7 +137,7 @@ class FileUtilTest {
                 "testFile",
                 "test.txt",
                 "text/plain",
-                "テストコンテンツ".getBytes());
+                "テスト".getBytes(StandardCharsets.UTF_8));
         List<String> allowedMimeTypes = Arrays.asList("image/jpeg", "image/png", "image/gif");
 
         // 実行
@@ -154,7 +155,7 @@ class FileUtilTest {
                 "testFile",
                 "test.jpg",
                 "image/jpeg",
-                "テストコンテンツ".getBytes());
+                "テスト".getBytes(StandardCharsets.UTF_8));
         List<String> allowedMimeTypes = Arrays.asList("image/jpeg", "image/png", "image/gif");
 
         // 実行
@@ -186,7 +187,7 @@ class FileUtilTest {
                 "testFile",
                 "test.jpg",
                 "image/jpeg",
-                "テストコンテンツ".getBytes());
+                "テスト".getBytes(StandardCharsets.UTF_8));
         List<String> allowedMimeTypes = Collections.emptyList();
 
         // 実行
@@ -226,7 +227,7 @@ class FileUtilTest {
                 "testFile",
                 "test.txt",
                 "text/plain",
-                "noImage".getBytes());
+                "noImage".getBytes(StandardCharsets.UTF_8));
 
         // 実行
         boolean result = FileUtil.isImageReadValid(file);
@@ -339,7 +340,7 @@ class FileUtilTest {
                 "testFile",
                 "test.PNG",
                 "image/png",
-                "dummy".getBytes());
+                "dummy".getBytes(StandardCharsets.UTF_8));
 
         // 実行
         String result = FileUtil.getExtension(file);

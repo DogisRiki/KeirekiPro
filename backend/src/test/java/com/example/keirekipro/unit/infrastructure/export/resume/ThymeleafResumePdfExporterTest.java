@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -57,7 +58,7 @@ class ThymeleafResumePdfExporterTest {
                 .thenReturn("<html>test</html>");
 
         // PDF renderer
-        byte[] pdfBytes = "PDF".getBytes();
+        byte[] pdfBytes = "PDF".getBytes(StandardCharsets.UTF_8);
         when(htmlToPdfRenderer.render("<html>test</html>")).thenReturn(pdfBytes);
 
         // Contextキャプチャ

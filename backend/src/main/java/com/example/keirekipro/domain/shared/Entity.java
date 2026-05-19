@@ -1,6 +1,5 @@
 package com.example.keirekipro.domain.shared;
 
-import java.io.Serializable;
 import java.util.UUID;
 
 import lombok.EqualsAndHashCode;
@@ -11,7 +10,7 @@ import lombok.Getter;
  */
 @Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public abstract class Entity implements Serializable {
+public abstract class Entity {
 
     /**
      * 識別子

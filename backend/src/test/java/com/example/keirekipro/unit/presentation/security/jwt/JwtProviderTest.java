@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Set;
 import java.util.UUID;
@@ -39,7 +38,6 @@ class JwtProviderTest {
     private static final String SECRET_KEY = "vh8JBWqYFC2mJwZ4XD9pE7TKq3mN5RxS2HnUcL7VfAy";
     private static final long ACCESS_TOKEN_VALIDITY = 10L;
     private static final long REFRESH_TOKEN_VALIDITY = 7L;
-    private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
     @BeforeEach
     void setUp() {
@@ -69,10 +67,6 @@ class JwtProviderTest {
 
         Date expiration = jwtProvider.getExpirationDate(token);
         Date now = new Date();
-
-        // デバッグ用の時刻出力
-        System.out.println("現在時刻 : " + sdf.format(now));
-        System.out.println("有効期限 : " + sdf.format(expiration));
 
         // トークンの有効期限が現在時刻より後で、かつ11分以内である
         // example

@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.model.resume;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
@@ -175,8 +174,10 @@ class ResumeTest {
 
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
-                .isInstanceOf(DomainException.class)
+        assertThatThrownBy(() -> {
+            Resume ignored = resume.addCareer(domainerrorCollector, overlappingCareer);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
@@ -190,8 +191,10 @@ class ResumeTest {
 
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
-                .isInstanceOf(DomainException.class)
+        assertThatThrownBy(() -> {
+            Resume ignored = resume.addCareer(domainerrorCollector, overlappingCareer);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
@@ -218,8 +221,10 @@ class ResumeTest {
 
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
-                .isInstanceOf(DomainException.class)
+        assertThatThrownBy(() -> {
+            Resume ignored = resume.addCareer(domainerrorCollector, overlappingCareer);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
@@ -233,8 +238,10 @@ class ResumeTest {
 
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
-                .isInstanceOf(DomainException.class)
+        assertThatThrownBy(() -> {
+            Resume ignored = resume.addCareer(domainerrorCollector, overlappingCareer);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
@@ -248,8 +255,10 @@ class ResumeTest {
 
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatThrownBy(() -> resume.addCareer(domainerrorCollector, overlappingCareer))
-                .isInstanceOf(DomainException.class)
+        assertThatThrownBy(() -> {
+            Resume ignored = resume.addCareer(domainerrorCollector, overlappingCareer);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class)
                 .hasMessageContaining("「株式会社DEF」と「株式会社ABC」の期間が重複しています。");
     }
 
@@ -844,7 +853,7 @@ class ResumeTest {
         FullName newFullName = FullName.create(errorCollector, "変更", "しました");
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        Resume updatedResume = originalResume.ChangeFullName(domainerrorCollector, newFullName);
+        Resume updatedResume = originalResume.changeFullName(domainerrorCollector, newFullName);
 
         assertThat(updatedResume.getFullName()).isEqualTo(newFullName);
     }
@@ -861,8 +870,10 @@ class ResumeTest {
         invaliderrorCollector.addError("dummy", "dummy error");
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> resume.addCareer(invaliderrorCollector, newCareer))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            Resume ignored = resume.addCareer(invaliderrorCollector, newCareer);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
     }
 
     @Test
@@ -878,34 +889,27 @@ class ResumeTest {
         invaliderrorCollector.addError("dummy", "dummy error");
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> beforeResume.updateCareer(invaliderrorCollector, updatedCareer))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            Resume ignored = beforeResume.updateCareer(invaliderrorCollector, updatedCareer);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
     }
 
     @Test
     @DisplayName("エラー収集オブジェクト内にエラーがある状態で、プロジェクトを更新するとDomainExceptionをスローする")
     void test33() {
         Resume beforeResume = createSampleResume();
-        Project originalProject = beforeResume.getProjects().get(0);
 
-        Project updatedProject = Project.reconstruct(
-                originalProject.getId(),
-                originalProject.getCompanyName(),
-                originalProject.getPeriod(),
-                "更新されたプロジェクト名",
-                "更新されたプロジェクト概要",
-                "1人",
-                "メンバー",
-                "更新された成果内容",
-                originalProject.getProcess(),
-                originalProject.getTechStack());
+        Project updatedProject = beforeResume.getProjects().get(0);
 
         ErrorCollector invaliderrorCollector = new ErrorCollector();
         invaliderrorCollector.addError("dummy", "dummy error");
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> beforeResume.updateProject(invaliderrorCollector, updatedProject))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            Resume ignored = beforeResume.updateProject(invaliderrorCollector, updatedProject);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
     }
 
     @Test
@@ -938,20 +942,20 @@ class ResumeTest {
 
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatCode(() -> resume.addCareer(domainerrorCollector, newCareer))
-                .doesNotThrowAnyException();
+        Resume updatedResume = resume.addCareer(domainerrorCollector, newCareer);
+
+        assertThat(updatedResume.getCareers()).contains(newCareer);
     }
 
     @Test
-    @DisplayName("終了年月と開始年月が同一月でも職歴を追加できる（両方が終了）")
+    @DisplayName("終了年月と開始年月が同一月でも職歴を追加できる（既存が先・追加が後の境界一致）")
     void test35() {
-        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-
         Career existingCareer = Career.create(
                 errorCollector,
                 CompanyName.create(errorCollector, "会社A"),
-                Period.create(errorCollector, YearMonth.of(2025, 11), YearMonth.of(2025, 12), false));
+                Period.create(errorCollector, YearMonth.of(2025, 1), YearMonth.of(2025, 12), false));
 
+        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
         Resume resume = Resume.create(
                 errorCollector,
                 userId,
@@ -972,8 +976,9 @@ class ResumeTest {
 
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatCode(() -> resume.addCareer(domainerrorCollector, newCareer))
-                .doesNotThrowAnyException();
+        Resume updatedResume = resume.addCareer(domainerrorCollector, newCareer);
+
+        assertThat(updatedResume.getCareers()).contains(newCareer);
     }
 
     @Test
@@ -988,8 +993,9 @@ class ResumeTest {
 
         ErrorCollector domainerrorCollector = new ErrorCollector();
 
-        assertThatCode(() -> resume.addCareer(domainerrorCollector, boundaryCareer))
-                .doesNotThrowAnyException();
+        Resume updatedResume = resume.addCareer(domainerrorCollector, boundaryCareer);
+
+        assertThat(updatedResume.getCareers()).contains(boundaryCareer);
     }
 
     /**

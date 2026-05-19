@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 import com.example.keirekipro.infrastructure.shared.aws.s3.PresignedUrlTransformer;
@@ -68,7 +69,7 @@ class S3ObjectStoreTest {
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenReturn(PutObjectResponse.builder().build());
 
-        StoredObject obj = new StoredObject("content".getBytes(), "image/png", "photo.png");
+        StoredObject obj = new StoredObject("content".getBytes(StandardCharsets.UTF_8), "image/png", "photo.png");
 
         String key = objectStore.put(obj, "profile/");
 
@@ -90,7 +91,8 @@ class S3ObjectStoreTest {
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenReturn(PutObjectResponse.builder().build());
 
-        StoredObject obj = new StoredObject("content".getBytes(), "application/pdf", "original.pdf");
+        StoredObject obj = new StoredObject("content".getBytes(StandardCharsets.UTF_8), "application/pdf",
+                "original.pdf");
 
         String key = objectStore.putAs(obj, "documents/", "fixed-name.pdf");
 
@@ -108,7 +110,7 @@ class S3ObjectStoreTest {
     @Test
     @DisplayName("getBytes_S3から取得すると、正しくバイト配列が返される")
     void test3() throws Exception {
-        byte[] testData = "test file content".getBytes();
+        byte[] testData = "test file content".getBytes(StandardCharsets.UTF_8);
         String key = "path/to/file.txt";
 
         GetObjectResponse response = GetObjectResponse.builder().contentType("text/plain").build();
