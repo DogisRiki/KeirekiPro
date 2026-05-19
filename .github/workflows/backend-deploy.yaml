@@ -1,10 +1,6 @@
 name: Backend Deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/**'
   workflow_dispatch:
   workflow_call:
     inputs:
