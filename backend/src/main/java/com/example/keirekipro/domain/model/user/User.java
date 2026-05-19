@@ -84,8 +84,7 @@ public class User extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private User(ErrorCollector errorCollector,
-            Email email,
+    private User(Email email,
             String passwordHash,
             boolean twoFactorAuthEnabled,
             Map<String, AuthProvider> authProviders,
@@ -99,22 +98,6 @@ public class User extends Entity {
         Set<RoleName> resolvedRoles = (roles == null || roles.isEmpty())
                 ? EnumSet.of(RoleName.defaultRole())
                 : EnumSet.copyOf(roles);
-
-        // バリデーション実行
-        validate(errorCollector, email, passwordHash, authProviders);
-
-        // 二段階認証が有効な場合、メールアドレスとパスワードが未設定の場合はNG
-        if (twoFactorAuthEnabled && (email == null || passwordHash == null)) {
-            errorCollector.addError("twoFactorAuthEnabled", "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
-        }
-
-        // 管理者の場合は二段階認証が必須
-        validateAdminTwoFactorAuthRequired(errorCollector, resolvedRoles, twoFactorAuthEnabled);
-
-        // サブエンティティや値オブジェクトのドメイン例外を一括でスローする
-        if (errorCollector.hasErrors()) {
-            throw new DomainException(errorCollector.getErrors());
-        }
 
         this.email = email;
         this.passwordHash = passwordHash;
@@ -146,16 +129,6 @@ public class User extends Entity {
         Set<RoleName> resolvedRoles = (roles == null || roles.isEmpty())
                 ? EnumSet.noneOf(RoleName.class)
                 : EnumSet.copyOf(roles);
-
-        // 二段階認証が有効な場合、メールアドレスとパスワードが未設定の場合はNG
-        if (twoFactorAuthEnabled && (email == null || passwordHash == null)) {
-            throw new DomainException("メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
-        }
-
-        // 管理者の場合は二段階認証が必須
-        if (resolvedRoles.contains(RoleName.ADMIN) && !twoFactorAuthEnabled) {
-            throw new DomainException("管理者の場合は二段階認証が必須です。");
-        }
 
         this.email = email;
         this.passwordHash = passwordHash;
@@ -196,13 +169,27 @@ public class User extends Entity {
         // 新規構築の場合、デフォルトでfalseにする
         boolean twoFactorAuthEnabled = false;
 
+        Set<RoleName> resolvedRoles = EnumSet.of(RoleName.defaultRole()); // デフォルトロール(USER)を明示的に渡す
+
+        // バリデーション実行
+        validate(errorCollector, email, passwordHash, authProviders);
+
+        // 二段階認証が有効な場合、メールアドレスとパスワードが未設定の場合はNG
+        if (twoFactorAuthEnabled && (email == null || passwordHash == null)) {
+            errorCollector.addError("twoFactorAuthEnabled", "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
+        }
+
+        // 管理者の場合は二段階認証が必須
+        validateAdminTwoFactorAuthRequired(errorCollector, resolvedRoles, twoFactorAuthEnabled);
+
+        throwIfInvalid(errorCollector);
+
         return new User(
-                errorCollector,
                 email,
                 passwordHash,
                 twoFactorAuthEnabled,
                 authProviders,
-                EnumSet.of(RoleName.defaultRole()), // デフォルトロール(USER)を明示的に渡す
+                resolvedRoles,
                 profileImageUrl,
                 username);
     }
@@ -239,13 +226,27 @@ public class User extends Entity {
             authProviders = Map.copyOf(authProviders);
         }
 
+        Set<RoleName> resolvedRoles = (roles == null || roles.isEmpty())
+                ? EnumSet.noneOf(RoleName.class)
+                : EnumSet.copyOf(roles);
+
+        // 二段階認証が有効な場合、メールアドレスとパスワードが未設定の場合はNG
+        if (twoFactorAuthEnabled && (email == null || passwordHash == null)) {
+            throw new DomainException("メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
+        }
+
+        // 管理者の場合は二段階認証が必須
+        if (resolvedRoles.contains(RoleName.ADMIN) && !twoFactorAuthEnabled) {
+            throw new DomainException("管理者の場合は二段階認証が必須です。");
+        }
+
         return new User(
                 id,
                 email,
                 passwordHash,
                 twoFactorAuthEnabled,
                 authProviders,
-                roles,
+                resolvedRoles,
                 profileImageUrl,
                 username,
                 createdAt,
@@ -262,7 +263,7 @@ public class User extends Entity {
 
         // メールアドレス未設定かつ外部認証連携情報がなしの場合はログイン手段がないためNG
         if (email == null && providers.isEmpty()) {
-            throw new DomainException("ユーザー情報の作成に失敗しました。");
+            errorCollector.addError("user", "ユーザー情報の作成に失敗しました。");
         }
     }
 
@@ -275,6 +276,17 @@ public class User extends Entity {
 
         if (roles != null && roles.contains(RoleName.ADMIN) && !twoFactorAuthEnabled) {
             errorCollector.addError("twoFactorAuthEnabled", "管理者の場合は二段階認証が必須です。");
+        }
+    }
+
+    /**
+     * errorCollectorにエラーがあればDomainExceptionをスローする
+     *
+     * @param errorCollector エラー収集オブジェクト
+     */
+    private static void throwIfInvalid(ErrorCollector errorCollector) {
+        if (errorCollector != null && errorCollector.hasErrors()) {
+            throw new DomainException(errorCollector.getErrors());
         }
     }
 

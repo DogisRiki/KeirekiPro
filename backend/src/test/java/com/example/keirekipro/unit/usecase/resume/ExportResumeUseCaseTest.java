@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -75,7 +76,7 @@ class ExportResumeUseCaseTest {
         Resume resume = ResumeObjectBuilder.buildResume(
                 RESUME_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
-        byte[] pdfContent = "PDF content".getBytes();
+        byte[] pdfContent = "PDF content".getBytes(StandardCharsets.UTF_8);
         ExportedFile exportedFile = new ExportedFile("dummy.pdf", "application/pdf", pdfContent);
 
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.of(resume));
@@ -100,7 +101,7 @@ class ExportResumeUseCaseTest {
         Resume resume = ResumeObjectBuilder.buildResume(
                 RESUME_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
-        byte[] mdContent = "# Markdown content".getBytes();
+        byte[] mdContent = "# Markdown content".getBytes(StandardCharsets.UTF_8);
         ExportedFile exportedFile = new ExportedFile("dummy.md", "text/markdown", mdContent);
 
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.of(resume));

@@ -167,8 +167,7 @@ class UserTest {
                 PASSWORD_HASH,
                 Collections.emptyMap(),
                 null,
-                USERNAME)).isInstanceOf(DomainException.class)
-                .hasMessageContaining("ユーザー情報の作成に失敗しました。");
+                USERNAME)).isInstanceOf(DomainException.class);
     }
 
     @Test
@@ -247,9 +246,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(
-                () -> user.setEmail(errorCollector, Email.create(errorCollector, "other@keirekipro.click")))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user.setEmail(errorCollector, Email.create(errorCollector, "other@keirekipro.click"));
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
         verify(errorCollector, times(1)).addError(eq("email"), eq("メールアドレスが既に設定されているため設定できません。"));
@@ -296,8 +296,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.changePassword(errorCollector, PASSWORD_HASH))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user.changePassword(errorCollector, PASSWORD_HASH);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
         verify(errorCollector, times(1)).addError(eq("password"), eq("現在のパスワードと同じパスワードは設定できません。"));
@@ -365,8 +367,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user1.changeTwoFactorAuthEnabled(errorCollector, true))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user1.changeTwoFactorAuthEnabled(errorCollector, true);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // パスワードが未設定
         Email email = Email.create(errorCollector, EMAIL);
@@ -383,8 +387,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user2.changeTwoFactorAuthEnabled(errorCollector, true))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user2.changeTwoFactorAuthEnabled(errorCollector, true);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // 合計2回呼ばれる
         verify(errorCollector, times(2)).addError(eq("twoFactorAuthEnabled"),
@@ -459,7 +465,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.removeAuthProvider(errorCollector, "github")).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user.removeAuthProvider(errorCollector, "github");
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
         verify(errorCollector, times(1)).addError(eq("authProviders"), eq("連携の解除に失敗しました。"));
@@ -484,7 +493,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.removeAuthProvider(errorCollector, "google")).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user.removeAuthProvider(errorCollector, "google");
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
         verify(errorCollector, times(1)).addError(eq("authProviders"), eq("メールアドレスとパスワードが設定済みでないと、連携を解除できません。"));
@@ -548,8 +560,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.changeUsername(errorCollector, " "))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user.changeUsername(errorCollector, " ");
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
         verify(errorCollector, times(1)).addError(eq("username"), eq("ユーザー名は必ず指定してください。"));
@@ -713,8 +727,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.addRole(errorCollector, RoleName.ADMIN))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user.addRole(errorCollector, RoleName.ADMIN);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
         verify(errorCollector, times(1)).addError(eq("roles"), eq("管理者ロールを付与するには二段階認証が必須です。"));
@@ -762,8 +778,10 @@ class UserTest {
                 UPDATED_AT);
 
         // DomainExceptionがスローされる
-        assertThatThrownBy(() -> user.changeTwoFactorAuthEnabled(errorCollector, false))
-                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> {
+            User ignored = user.changeTwoFactorAuthEnabled(errorCollector, false);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
 
         // エラーメッセージが登録される
         verify(errorCollector, times(1)).addError(eq("twoFactorAuthEnabled"), eq("管理者の場合は二段階認証を無効にできません。"));

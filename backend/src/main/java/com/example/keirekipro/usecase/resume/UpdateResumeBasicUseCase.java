@@ -54,7 +54,7 @@ public class UpdateResumeBasicUseCase {
         Resume updatedResume = resume
                 .changeName(errorCollector, resumeName)
                 .changeDate(errorCollector, request.getDate())
-                .ChangeFullName(errorCollector, fullName);
+                .changeFullName(errorCollector, fullName);
 
         resumeRepository.save(updatedResume);
 

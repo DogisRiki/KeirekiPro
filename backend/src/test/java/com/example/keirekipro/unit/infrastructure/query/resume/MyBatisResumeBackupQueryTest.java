@@ -16,12 +16,11 @@ import com.example.keirekipro.infrastructure.query.resume.ResumeQueryMapper;
 import com.example.keirekipro.usecase.query.resume.dto.ResumeBackupQueryDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,11 +29,12 @@ class MyBatisResumeBackupQueryTest {
     @Mock
     private ResumeQueryMapper mapper;
 
-    @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
-
-    @InjectMocks
     private MyBatisResumeBackupQuery query;
+
+    @BeforeEach
+    void setUp() {
+        query = new MyBatisResumeBackupQuery(mapper, new ObjectMapper());
+    }
 
     private static final UUID USER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID RESUME_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");

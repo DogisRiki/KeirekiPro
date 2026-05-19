@@ -1,5 +1,6 @@
 package com.example.keirekipro.presentation.shared.validator;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import jakarta.validation.ConstraintValidator;
@@ -32,7 +33,7 @@ public class PasswordMatchesValidator implements ConstraintValidator<PasswordMat
             }
 
             return matched;
-        } catch (Exception e) {
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             // メソッドが存在しない、アクセス不可など
             return false;
         }

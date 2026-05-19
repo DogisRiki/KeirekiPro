@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Map;
@@ -226,7 +227,7 @@ class UpdateUserInfoUseCaseTest {
     @DisplayName("無効な画像ファイルの場合はUseCaseExceptionがスローされる")
     void test5() throws Exception {
         MockMultipartFile badImg = new MockMultipartFile(
-                "profileImage", "test.png", "image/png", "dummy".getBytes());
+                "profileImage", "test.png", "image/png", "dummy".getBytes(StandardCharsets.UTF_8));
 
         UpdateUserInfoRequest req = new UpdateUserInfoRequest();
         req.setUsername("User");

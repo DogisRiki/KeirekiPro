@@ -235,7 +235,7 @@ public class Resume extends Entity {
      * @param fullName 新しい氏名
      * @return 変更後の職務経歴書エンティティ
      */
-    public Resume ChangeFullName(ErrorCollector errorCollector, FullName fullName) {
+    public Resume changeFullName(ErrorCollector errorCollector, FullName fullName) {
         if (fullName == null) {
             errorCollector.addError("fullName", "氏名は入力必須です。");
         }

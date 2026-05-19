@@ -5,6 +5,7 @@ import java.util.Map;
 
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -134,7 +135,7 @@ public class GithubOidcProvider implements OidcProvider {
                     .map(e -> (String) e.get("email"))
                     .findFirst()
                     .orElse(null);
-        } catch (Exception e) {
+        } catch (JsonProcessingException | RuntimeException e) {
             return null;
         }
     }
