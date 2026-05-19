@@ -35,7 +35,7 @@ public class TwoFactorAuthVerifyUseCase {
     /**
      *
      * @param challengeToken チャレンジトークン
-     * @param code           認証コード
+     * @param code 認証コード
      * @return 検証結果
      */
     public TwoFactorAuthVerifyResultDto execute(String challengeToken, String code) {

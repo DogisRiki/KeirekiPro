@@ -45,8 +45,8 @@ public class Career extends Entity {
      * 新規構築用のファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param companyName    会社名
-     * @param period         期間
+     * @param companyName 会社名
+     * @param period 期間
      * @return 職歴エンティティ
      */
     public static Career create(ErrorCollector errorCollector, CompanyName companyName, Period period) {
@@ -57,9 +57,9 @@ public class Career extends Entity {
     /**
      * 再構築用のファクトリーメソッド
      *
-     * @param id          識別子
+     * @param id 識別子
      * @param companyName 会社名
-     * @param period      期間
+     * @param period 期間
      * @return 職歴エンティティ
      */
     public static Career reconstruct(UUID id, CompanyName companyName, Period period) {
@@ -70,7 +70,7 @@ public class Career extends Entity {
      * 会社名を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param companyName    会社名
+     * @param companyName 会社名
      * @return 変更後の職歴エンティティ
      */
     public Career changeCompanyName(ErrorCollector errorCollector, CompanyName companyName) {
@@ -82,7 +82,7 @@ public class Career extends Entity {
      * 期間を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param period         期間
+     * @param period 期間
      * @return 変更後の職歴エンティティ
      */
     public Career changePeriod(ErrorCollector errorCollector, Period period) {

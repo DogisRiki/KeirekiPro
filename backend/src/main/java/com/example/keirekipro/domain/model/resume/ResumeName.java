@@ -33,7 +33,7 @@ public class ResumeName {
      * ファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param value          職務経歴書名
+     * @param value 職務経歴書名
      * @return 値オブジェクト
      */
     public static ResumeName create(ErrorCollector errorCollector, String value) {

@@ -29,9 +29,9 @@ public class HandleOidcCallbackUseCase {
     /**
      * OIDCプロバイダーからのコールバックを処理する
      *
-     * @param code        認可コード
-     * @param state       state値
-     * @param error       エラーパラメータ
+     * @param code 認可コード
+     * @param state state値
+     * @param error エラーパラメータ
      * @param redirectUri リダイレクトURI
      * @return 処理結果
      */

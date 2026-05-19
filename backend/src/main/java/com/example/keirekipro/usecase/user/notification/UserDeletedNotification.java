@@ -5,10 +5,10 @@ import com.example.keirekipro.usecase.shared.notification.Notification;
 /**
  * ユーザー削除通知
  *
- * @param to       送達先
+ * @param to 送達先
  * @param username ユーザー名
  * @param siteName サイト名
- * @param siteUrl  サイトURL
+ * @param siteUrl サイトURL
  */
 public record UserDeletedNotification(
         String to,

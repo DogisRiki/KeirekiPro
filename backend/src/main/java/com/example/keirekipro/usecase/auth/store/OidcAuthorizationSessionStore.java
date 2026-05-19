@@ -13,10 +13,10 @@ public interface OidcAuthorizationSessionStore {
     /**
      * 認可セッションを保存する
      *
-     * @param state        state値
-     * @param provider     プロバイダー名
+     * @param state state値
+     * @param provider プロバイダー名
      * @param codeVerifier code_verifier
-     * @param ttl          有効期限
+     * @param ttl 有効期限
      */
     void store(String state, String provider, String codeVerifier, Duration ttl);
 

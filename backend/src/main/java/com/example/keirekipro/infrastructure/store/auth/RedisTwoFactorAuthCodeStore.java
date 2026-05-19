@@ -32,8 +32,8 @@ public class RedisTwoFactorAuthCodeStore implements TwoFactorAuthCodeStore {
      * 認証コードを保存する
      *
      * @param userId ユーザーID
-     * @param code   認証コード
-     * @param ttl    有効期限
+     * @param code 認証コード
+     * @param ttl 有効期限
      */
     @Override
     public void store(UUID userId, String code, Duration ttl) {

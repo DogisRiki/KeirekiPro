@@ -133,7 +133,7 @@ public class ResumeExportModelBuilder {
      * 勤務先の期間ラベルを構築する
      *
      * @param companyLabel 会社ラベル
-     * @param resume       職務経歴書エンティティ
+     * @param resume 職務経歴書エンティティ
      * @return 勤務期間ラベル
      */
     private static String buildCompanyPeriodLabel(String companyLabel, Resume resume) {
@@ -349,8 +349,8 @@ public class ResumeExportModelBuilder {
      * 技術スタックセクションを追加する
      *
      * @param sections 追加先セクションリスト
-     * @param title    セクションタイトル
-     * @param lines    技術スタック行リスト
+     * @param title セクションタイトル
+     * @param lines 技術スタック行リスト
      */
     private static void putTechSection(List<Map<String, Object>> sections, String title,
             List<Map<String, Object>> lines) {
@@ -367,8 +367,8 @@ public class ResumeExportModelBuilder {
     /**
      * 技術スタック行を追加する
      *
-     * @param lines  追加先行リスト
-     * @param label  表示ラベル
+     * @param lines 追加先行リスト
+     * @param label 表示ラベル
      * @param values 表示値リスト
      */
     private static void putTechLine(List<Map<String, Object>> lines, String label, List<String> values) {
@@ -386,8 +386,8 @@ public class ResumeExportModelBuilder {
     /**
      * 値がnullでない場合のみMapへ格納する
      *
-     * @param map   格納先Map
-     * @param key   キー
+     * @param map 格納先Map
+     * @param key キー
      * @param value 値（nullの場合は格納しない）
      */
     private static void putIfNotNull(Map<String, Object> map, String key, Object value) {
@@ -609,7 +609,7 @@ public class ResumeExportModelBuilder {
      * nullの場合に空リストを返す
      *
      * @param list 対象リスト
-     * @param <T>  要素型
+     * @param <T> 要素型
      * @return nullの場合は空リスト、それ以外は元リスト
      */
     private static <T> List<T> safeList(List<T> list) {

@@ -42,10 +42,10 @@ public class TechStack {
     /**
      * ファクトリーメソッド
      *
-     * @param frontend       フロントエンド
-     * @param backend        バックエンド
+     * @param frontend フロントエンド
+     * @param backend バックエンド
      * @param infrastructure インフラ
-     * @param tools          開発支援ツール
+     * @param tools 開発支援ツール
      * @return 値オブジェクト
      */
     public static TechStack create(Frontend frontend, Backend backend,
@@ -121,14 +121,14 @@ public class TechStack {
         /**
          * ファクトリーメソッド
          *
-         * @param languages       開発言語
-         * @param frameworks      フレームワーク
-         * @param libraries       ライブラリ
-         * @param buildTools      ビルドツール
+         * @param languages 開発言語
+         * @param frameworks フレームワーク
+         * @param libraries ライブラリ
+         * @param buildTools ビルドツール
          * @param packageManagers パッケージマネージャー
-         * @param linters         リンター
-         * @param formatters      フォーマッター
-         * @param testingTools    テストツール
+         * @param linters リンター
+         * @param formatters フォーマッター
+         * @param testingTools テストツール
          * @return 値オブジェクト
          */
         public static Frontend create(List<String> languages,
@@ -226,16 +226,16 @@ public class TechStack {
         /**
          * ファクトリーメソッド
          *
-         * @param languages       開発言語
-         * @param frameworks      フレームワーク
-         * @param libraries       ライブラリ
-         * @param buildTools      ビルドツール
+         * @param languages 開発言語
+         * @param frameworks フレームワーク
+         * @param libraries ライブラリ
+         * @param buildTools ビルドツール
          * @param packageManagers パッケージマネージャー
-         * @param linters         リンター
-         * @param formatters      フォーマッター
-         * @param testingTools    テストツール
-         * @param ormTools        ORM
-         * @param auth            認証
+         * @param linters リンター
+         * @param formatters フォーマッター
+         * @param testingTools テストツール
+         * @param ormTools ORM
+         * @param auth 認証
          * @return 値オブジェクト
          */
         public static Backend create(List<String> languages,
@@ -329,15 +329,15 @@ public class TechStack {
         /**
          * ファクトリーメソッド
          *
-         * @param clouds           クラウド
+         * @param clouds クラウド
          * @param operatingSystems OS
-         * @param containers       コンテナ
-         * @param databases        データベース
-         * @param webServers       Webサーバー
-         * @param ciCdTools        CI/CD
-         * @param iacTools         IaC
-         * @param monitoringTools  監視
-         * @param loggingTools     ロギング
+         * @param containers コンテナ
+         * @param databases データベース
+         * @param webServers Webサーバー
+         * @param ciCdTools CI/CD
+         * @param iacTools IaC
+         * @param monitoringTools 監視
+         * @param loggingTools ロギング
          * @return 値オブジェクト
          */
         public static Infrastructure create(List<String> clouds,
@@ -422,13 +422,13 @@ public class TechStack {
         /**
          * ファクトリーメソッド
          *
-         * @param sourceControls          ソース管理
-         * @param projectManagements      プロジェクト管理
-         * @param communicationTools      コミュニケーション
-         * @param documentationTools      ドキュメント
-         * @param apiDevelopmentTools     API開発
-         * @param designTools             デザイン
-         * @param editors                 エディタ
+         * @param sourceControls ソース管理
+         * @param projectManagements プロジェクト管理
+         * @param communicationTools コミュニケーション
+         * @param documentationTools ドキュメント
+         * @param apiDevelopmentTools API開発
+         * @param designTools デザイン
+         * @param editors エディタ
          * @param developmentEnvironments 開発環境
          * @return 値オブジェクト
          */

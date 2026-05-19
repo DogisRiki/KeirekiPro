@@ -14,9 +14,9 @@ public interface TwoFactorAuthChallengeStore {
     /**
      * チャレンジトークンを保存する
      *
-     * @param token  チャレンジトークン
+     * @param token チャレンジトークン
      * @param userId ユーザーID
-     * @param ttl    有効期限
+     * @param ttl 有効期限
      */
     void store(String token, UUID userId, Duration ttl);
 

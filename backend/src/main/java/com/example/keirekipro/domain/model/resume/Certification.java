@@ -46,8 +46,8 @@ public class Certification extends Entity {
      * 新規構築用のファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param name           会社名
-     * @param date           取得年月
+     * @param name 会社名
+     * @param date 取得年月
      * @return 資格エンティティ
      */
     public static Certification create(ErrorCollector errorCollector, String name, YearMonth date) {
@@ -58,7 +58,7 @@ public class Certification extends Entity {
     /**
      * 再構築用のファクトリーメソッド
      *
-     * @param id   識別子
+     * @param id 識別子
      * @param name 会社名
      * @param date 取得年月
      * @return 資格エンティティ
@@ -71,7 +71,7 @@ public class Certification extends Entity {
      * 資格名を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param name           資格名
+     * @param name 資格名
      * @return 変更後の資格エンティティ
      */
     public Certification changeName(ErrorCollector errorCollector, String name) {
@@ -83,7 +83,7 @@ public class Certification extends Entity {
      * 取得年月を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param date           取得年月
+     * @param date 取得年月
      * @return 変更後の資格エンティティ
      */
     public Certification changeDate(ErrorCollector errorCollector, YearMonth date) {

@@ -35,7 +35,7 @@ public class TwoFactorAuthIssueUseCase {
      * 2段階認証コード発行ユースケースを実行する
      *
      * @param userId ユーザーID
-     * @param email  送信先メールアドレス
+     * @param email 送信先メールアドレス
      * @return チャレンジトークン
      */
     public String execute(UUID userId, String email) {

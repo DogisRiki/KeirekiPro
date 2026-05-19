@@ -23,7 +23,7 @@ public class ResumeNameDuplicationCheckService {
     /**
      * 職務経歴書名の重複をチェックする
      *
-     * @param userId     ユーザーID
+     * @param userId ユーザーID
      * @param resumeName チェック対象の職務経歴書
      * @throws DomainException 職務経歴書の重複があった場合
      */

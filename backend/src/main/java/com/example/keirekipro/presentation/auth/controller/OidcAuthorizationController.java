@@ -33,7 +33,7 @@ public class OidcAuthorizationController {
     /**
      * OIDCプロバイダーへの認可リクエストを開始する
      *
-     * @param provider       プロバイダー名
+     * @param provider プロバイダー名
      * @param servletRequest HTTPサーブレットリクエスト
      * @return 認可URL
      */

@@ -32,7 +32,7 @@ public class BackupResumeUseCase {
     /**
      * 職務経歴書バックアップユースケースを実行する
      *
-     * @param userId   ユーザーID
+     * @param userId ユーザーID
      * @param resumeId 職務経歴書ID
      * @return バックアップ用ユースケースDTO
      */

@@ -19,7 +19,7 @@ public class FileUtil {
     /**
      * ファイルサイズが最大サイズ以内かどうかをチェックする
      *
-     * @param file        対象ファイル
+     * @param file 対象ファイル
      * @param maxFileSize 最大サイズ(バイト単位)
      * @return チェック結果 (制限内ならtrue / 超えていればfalse)
      */
@@ -30,7 +30,7 @@ public class FileUtil {
     /**
      * 拡張子が許可されているかどうかをチェックする
      *
-     * @param file              対象ファイル
+     * @param file 対象ファイル
      * @param allowedExtensions 許可する拡張子リスト
      * @return チェック結果 (許可する拡張子ならtrue / 許可されていない場合はfalse)
      */
@@ -46,7 +46,7 @@ public class FileUtil {
     /**
      * MIMEタイプが許可されているかどうかをチェックする
      *
-     * @param file             対象ファイル
+     * @param file 対象ファイル
      * @param allowedMimeTypes 許可するMIMEタイプリスト
      * @return チェック結果 (許可するMIMEタイプならtrue / 許可されていない場合はfalse)
      */
@@ -74,7 +74,7 @@ public class FileUtil {
      * ファイル名として安全な文字列に変換する
      * ファイル名は最大255文字とし、超える場合は切り捨てる
      *
-     * @param raw         元のファイル名
+     * @param raw 元のファイル名
      * @param defaultName nullまたは空白時のデフォルト名
      * @return サニタイズ後のファイル名
      */

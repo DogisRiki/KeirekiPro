@@ -261,7 +261,7 @@ class JwtAuthenticationFilterTest {
      * MockHttpServletResponseから指定名のCookieを検索する
      *
      * @param response Mockレスポンス
-     * @param name     Cookie名
+     * @param name Cookie名
      * @return 見つかればCookie、なければnull
      */
     private static Cookie findCookie(MockHttpServletResponse response, String name) {

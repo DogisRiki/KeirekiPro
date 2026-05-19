@@ -23,7 +23,7 @@ public class DeleteCareerUseCase {
     /**
      * 職歴削除ユースケースを実行する
      *
-     * @param userId   ユーザーID
+     * @param userId ユーザーID
      * @param resumeId 職務経歴書ID
      * @param careerId 職歴ID
      */

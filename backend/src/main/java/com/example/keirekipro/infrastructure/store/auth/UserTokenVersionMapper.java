@@ -24,7 +24,7 @@ public interface UserTokenVersionMapper {
     /**
      * トークンバージョンを新規登録する
      *
-     * @param userId    ユーザーID
+     * @param userId ユーザーID
      * @param updatedAt 更新日時
      */
     void insert(@Param("userId") UUID userId, @Param("updatedAt") LocalDateTime updatedAt);
@@ -32,7 +32,7 @@ public interface UserTokenVersionMapper {
     /**
      * トークンバージョンをインクリメントする
      *
-     * @param userId    ユーザーID
+     * @param userId ユーザーID
      * @param updatedAt 更新日時
      */
     void incrementByUserId(@Param("userId") UUID userId, @Param("updatedAt") LocalDateTime updatedAt);

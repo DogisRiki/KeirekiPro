@@ -24,7 +24,7 @@ public class RemoveAuthProviderUseCase {
     /**
      * 外部認証連携解除ユースケースを実行する
      *
-     * @param userId   対象ユーザーID
+     * @param userId 対象ユーザーID
      * @param provider 解除対象のプロバイダ
      */
     @Transactional

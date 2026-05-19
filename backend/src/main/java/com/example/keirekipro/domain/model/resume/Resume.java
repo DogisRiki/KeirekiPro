@@ -112,9 +112,9 @@ public class Resume extends Entity {
     /**
      * 指定の比較器で整列したイミュータブルなリストを返す
      *
-     * @param source     元リスト
+     * @param source 元リスト
      * @param comparator 並び替え用比較器
-     * @param <T>        要素型
+     * @param <T> 要素型
      * @return 整列済みイミュータブルリスト
      */
     private static <T> List<T> unmodifiableSortedCopy(List<T> source, Comparator<? super T> comparator) {
@@ -172,15 +172,15 @@ public class Resume extends Entity {
      * 新規構築用のファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param userId         ユーザーID
-     * @param name           職務経歴書名
-     * @param fullName       氏名
-     * @param date           日付
-     * @param careers        職歴リスト
-     * @param projects       プロジェクトリスト
+     * @param userId ユーザーID
+     * @param name 職務経歴書名
+     * @param fullName 氏名
+     * @param date 日付
+     * @param careers 職歴リスト
+     * @param projects プロジェクトリスト
      * @param certifications 資格リスト
-     * @param portfolios     ポートフォリオリスト
-     * @param snsPlatforms   SNSプラットフォームリスト
+     * @param portfolios ポートフォリオリスト
+     * @param snsPlatforms SNSプラットフォームリスト
      * @param selfPromotions 自己PRリスト
      * @return 職務経歴書エンティティ
      */
@@ -214,7 +214,7 @@ public class Resume extends Entity {
      * 職務経歴書名を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param name           新しい職務経歴書名
+     * @param name 新しい職務経歴書名
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume changeName(ErrorCollector errorCollector, ResumeName name) {
@@ -232,7 +232,7 @@ public class Resume extends Entity {
      * 氏名を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param fullName       新しい氏名
+     * @param fullName 新しい氏名
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume ChangeFullName(ErrorCollector errorCollector, FullName fullName) {
@@ -250,7 +250,7 @@ public class Resume extends Entity {
      * 日付を変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param date           新しい日付
+     * @param date 新しい日付
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume changeDate(ErrorCollector errorCollector, LocalDate date) {
@@ -268,7 +268,7 @@ public class Resume extends Entity {
      * 職歴を追加する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param career         追加する職歴
+     * @param career 追加する職歴
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addCareer(ErrorCollector errorCollector, Career career) {
@@ -295,7 +295,7 @@ public class Resume extends Entity {
      * 職歴を更新する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param updatedCareer  更新後の職歴エンティティ
+     * @param updatedCareer 更新後の職歴エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume updateCareer(ErrorCollector errorCollector, Career updatedCareer) {
@@ -402,7 +402,7 @@ public class Resume extends Entity {
      * プロジェクトを追加する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param project        追加するプロジェクト
+     * @param project 追加するプロジェクト
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addProject(ErrorCollector errorCollector, Project project) {
@@ -467,7 +467,7 @@ public class Resume extends Entity {
      * 資格を追加する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param certification  追加する資格
+     * @param certification 追加する資格
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addCertification(ErrorCollector errorCollector, Certification certification) {
@@ -490,7 +490,7 @@ public class Resume extends Entity {
     /**
      * 資格を更新する
      *
-     * @param errorCollector       エラー収集オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param updatedCertification 更新する資格エンティティ
      * @return 変更後の職務経歴書エンティティ
      */
@@ -533,7 +533,7 @@ public class Resume extends Entity {
      * ポートフォリオを追加する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param portfolio      追加するポートフォリオ
+     * @param portfolio 追加するポートフォリオ
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addPortfolio(ErrorCollector errorCollector, Portfolio portfolio) {
@@ -556,7 +556,7 @@ public class Resume extends Entity {
     /**
      * ポートフォリオを更新する
      *
-     * @param errorCollector   エラー収集オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param updatedPortfolio 更新するポートフォリオ
      * @return 変更後の職務経歴書エンティティ
      */
@@ -598,7 +598,7 @@ public class Resume extends Entity {
      * SNSプラットフォームを追加する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param snsPlatform    追加するSNSプラットフォーム
+     * @param snsPlatform 追加するSNSプラットフォーム
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addSnsPlatform(ErrorCollector errorCollector, SnsPlatform snsPlatform) {
@@ -621,7 +621,7 @@ public class Resume extends Entity {
     /**
      * SNSプラットフォームを更新する
      *
-     * @param errorCollector     エラー収集オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param updatedSnsPlatform 更新するSNSプラットフォーム
      * @return 変更後の職務経歴書エンティティ
      */
@@ -664,7 +664,7 @@ public class Resume extends Entity {
      * 自己PRを追加する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param selfPromotion  追加する自己PR
+     * @param selfPromotion 追加する自己PR
      * @return 変更後の職務経歴書エンティティ
      */
     public Resume addSelfPromotion(ErrorCollector errorCollector, SelfPromotion selfPromotion) {
@@ -703,7 +703,7 @@ public class Resume extends Entity {
     /**
      * 自己PRを更新する
      *
-     * @param errorCollector       エラー収集オブジェクト
+     * @param errorCollector エラー収集オブジェクト
      * @param updatedSelfPromotion 更新する自己PR
      * @return 変更後の職務経歴書エンティティ
      */

@@ -26,7 +26,7 @@ public class Link {
      * ファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param value          リンク
+     * @param value リンク
      * @return 値オブジェクト
      */
     public static Link create(ErrorCollector errorCollector, String value) {

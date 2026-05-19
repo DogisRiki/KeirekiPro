@@ -23,8 +23,8 @@ public class DeletePortfolioUseCase {
     /**
      * ポートフォリオ削除ユースケースを実行する
      *
-     * @param userId      ユーザーID
-     * @param resumeId    職務経歴書ID
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
      * @param portfolioId ポートフォリオID
      */
     @Transactional

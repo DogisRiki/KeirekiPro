@@ -20,8 +20,8 @@ public class UserDeletedEvent extends AbstractDomainEvent implements DomainEvent
     /**
      * コンストラクタ
      *
-     * @param userId   ユーザーID
-     * @param email    メールアドレス
+     * @param userId ユーザーID
+     * @param email メールアドレス
      * @param username ユーザー名
      */
     public UserDeletedEvent(UUID userId, String email, String username) {

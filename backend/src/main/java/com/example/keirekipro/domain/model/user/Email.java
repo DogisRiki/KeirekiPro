@@ -30,7 +30,7 @@ public class Email {
      * ファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param value          メールアドレス
+     * @param value メールアドレス
      * @return 値オブジェクト
      */
     public static Email create(ErrorCollector errorCollector, String value) {

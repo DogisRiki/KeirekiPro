@@ -31,9 +31,9 @@ public class RedisPasswordResetTokenStore implements PasswordResetTokenStore {
     /**
      * トークンを保存する
      *
-     * @param token  トークン
+     * @param token トークン
      * @param userId ユーザーID
-     * @param ttl    有効期限
+     * @param ttl 有効期限
      */
     @Override
     public void store(String token, UUID userId, Duration ttl) {

@@ -37,8 +37,8 @@ public class FullName {
      * ファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param lastName       姓
-     * @param firstName      名
+     * @param lastName 姓
+     * @param firstName 名
      * @return 値オブジェクト
      */
     public static FullName create(ErrorCollector errorCollector, String lastName, String firstName) {
@@ -71,7 +71,7 @@ public class FullName {
     /**
      * 禁止文字が含まれているかを検証する
      *
-     * @param lastName  姓
+     * @param lastName 姓
      * @param firstName 名
      * @return 検証結果
      */

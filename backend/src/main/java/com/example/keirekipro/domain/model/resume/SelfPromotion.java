@@ -45,8 +45,8 @@ public class SelfPromotion extends Entity {
      * 新規構築用のファクトリーメソッド
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param title          タイトル
-     * @param content        コンテンツ
+     * @param title タイトル
+     * @param content コンテンツ
      * @return 自己PRエンティティ
      */
     public static SelfPromotion create(ErrorCollector errorCollector, String title, String content) {
@@ -57,8 +57,8 @@ public class SelfPromotion extends Entity {
     /**
      * 再構築用のファクトリーメソッド
      *
-     * @param id      識別子
-     * @param title   タイトル
+     * @param id 識別子
+     * @param title タイトル
      * @param content コンテンツ
      * @return 自己PRエンティティ
      */
@@ -70,7 +70,7 @@ public class SelfPromotion extends Entity {
      * タイトルを変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param title          タイトル
+     * @param title タイトル
      * @return 変更後の自己PRエンティティ
      */
     public SelfPromotion changeTitle(ErrorCollector errorCollector, String title) {
@@ -82,7 +82,7 @@ public class SelfPromotion extends Entity {
      * コンテンツを変更する
      *
      * @param errorCollector エラー収集オブジェクト
-     * @param content        コンテンツ
+     * @param content コンテンツ
      * @return 変更後の自己PRエンティティ
      */
     public SelfPromotion changeContent(ErrorCollector errorCollector, String content) {
