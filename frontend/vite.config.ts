@@ -10,11 +10,6 @@ interface ExtendedUserConfig extends UserConfig {
         setupFiles: string[];
         reporters: (string | [string, { outputFile: string }])[];
         pool: string;
-        poolOptions: {
-            forks: {
-                singleFork: boolean;
-            };
-        };
         deps: {
             interopDefault: boolean;
         };
@@ -42,11 +37,6 @@ export default defineConfig({
         setupFiles: ["./vitest-setup.ts"],
         reporters: ["default", ["junit", { outputFile: "test-results/junit.xml" }]],
         pool: "forks",
-        poolOptions: {
-            forks: {
-                singleFork: true,
-            },
-        },
         deps: {
             interopDefault: true,
         },

@@ -5,13 +5,13 @@ vi.mock("@/lib", () => ({
     publicApiClient: { get: vi.fn() },
 }));
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
 import { useAuthorizeOidc } from "@/features/auth";
 import { publicApiClient } from "@/lib";
 import { useErrorMessageStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import { createQueryWrapper, mutateHook, resetStoresAndMocks } from "@/test";
 import type { AuthProvider } from "@/types";
 
 describe("useAuthorizeOidc", () => {
@@ -41,9 +41,7 @@ describe("useAuthorizeOidc", () => {
         const { result } = renderHook(() => useAuthorizeOidc(), { wrapper });
 
         // ミューテート実行
-        act(() => {
-            result.current.mutate("github" as AuthProvider);
-        });
+        mutateHook(result, "github" as AuthProvider);
 
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));

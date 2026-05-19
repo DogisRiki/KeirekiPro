@@ -15,7 +15,7 @@ vi.mock("react-router", async () => {
     };
 });
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
@@ -23,7 +23,7 @@ import type { SetEmailAndPasswordPayload } from "@/features/user";
 import { useSetEmailAndPassword } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import { createQueryWrapper, mutateHook, resetStoresAndMocks } from "@/test";
 import type { User } from "@/types";
 
 describe("useSetEmailAndPassword", () => {
@@ -64,9 +64,7 @@ describe("useSetEmailAndPassword", () => {
         const { result } = renderHook(() => useSetEmailAndPassword(), { wrapper });
 
         // ミューテート実行
-        act(() => {
-            result.current.mutate(payload);
-        });
+        mutateHook(result, payload);
 
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -109,9 +107,7 @@ describe("useSetEmailAndPassword", () => {
         const { result } = renderHook(() => useSetEmailAndPassword(), { wrapper });
 
         // ミューテート実行
-        act(() => {
-            result.current.mutate(payload);
-        });
+        mutateHook(result, payload);
 
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));

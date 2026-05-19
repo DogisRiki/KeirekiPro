@@ -5,13 +5,13 @@ vi.mock("@/lib", () => ({
     protectedApiClient: { delete: vi.fn() },
 }));
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
 import { useRemoveAuthProvider } from "@/features/user";
 import { protectedApiClient } from "@/lib";
 import { useErrorMessageStore, useNotificationStore, useUserAuthStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import { createQueryWrapper, mutateHook, resetStoresAndMocks } from "@/test";
 import type { AuthProvider, User } from "@/types";
 
 describe("useRemoveAuthProvider", () => {
@@ -50,9 +50,7 @@ describe("useRemoveAuthProvider", () => {
         const { result } = renderHook(() => useRemoveAuthProvider(), { wrapper });
 
         // ミューテート実行（"google"を解除）
-        act(() => {
-            result.current.mutate("google" as AuthProvider);
-        });
+        mutateHook(result, "google" as AuthProvider);
 
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));

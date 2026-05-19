@@ -10,14 +10,14 @@ vi.mock("react-router", () => ({
     useNavigate: () => mockedNavigate,
 }));
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 
 import { paths } from "@/config/paths";
 import { useLogout } from "@/hooks";
 import { protectedApiClient } from "@/lib";
 import { useUserAuthStore } from "@/stores";
-import { createQueryWrapper, resetStoresAndMocks } from "@/test";
+import { createQueryWrapper, mutateHook, resetStoresAndMocks } from "@/test";
 
 describe("useLogout", () => {
     const wrapper = createQueryWrapper();
@@ -40,9 +40,7 @@ describe("useLogout", () => {
         const { result } = renderHook(() => useLogout(), { wrapper });
 
         // ミューテート実行
-        act(() => {
-            result.current.mutate();
-        });
+        mutateHook(result, undefined);
 
         // 成功状態になるまで待機
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
