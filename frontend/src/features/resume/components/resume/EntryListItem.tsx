@@ -34,6 +34,7 @@ export const EntryListItem = ({ entry, onDeleteEntry, onDuplicate }: EntryListIt
 
     // プロジェクトセクションかどうか
     const isProjectSection = activeSection === "project";
+    const entryLabel = getEntryText(activeSection, entry)?.primary || "エントリー";
 
     /**
      * ゴミ箱アイコンクリック
@@ -130,7 +131,7 @@ export const EntryListItem = ({ entry, onDeleteEntry, onDuplicate }: EntryListIt
                         </Tooltip>
                     )}
                     <ListItemText
-                        primary={getEntryText(activeSection, entry)?.primary || ""}
+                        primary={entryLabel}
                         secondary={getEntryText(activeSection, entry)?.secondary || ""}
                         slotProps={{
                             primary: {
@@ -153,14 +154,19 @@ export const EntryListItem = ({ entry, onDeleteEntry, onDuplicate }: EntryListIt
                     {/* 複製アイコン（プロジェクトセクションのみ） */}
                     {isProjectSection && (
                         <Tooltip title="複製" placement="top">
-                            <IconButton edge="end" onClick={handleDuplicateClick} sx={{ mr: 0.5 }}>
+                            <IconButton
+                                aria-label={`${entryLabel}を複製`}
+                                edge="end"
+                                onClick={handleDuplicateClick}
+                                sx={{ mr: 0.5 }}
+                            >
                                 <ContentCopyIcon />
                             </IconButton>
                         </Tooltip>
                     )}
                     {/* ゴミ箱アイコン */}
                     <Tooltip title="削除" placement="top">
-                        <IconButton edge="end" onClick={handleDeleteClick}>
+                        <IconButton aria-label={`${entryLabel}を削除`} edge="end" onClick={handleDeleteClick}>
                             <DeleteIcon />
                         </IconButton>
                     </Tooltip>

@@ -390,6 +390,7 @@ export const ResumeContainer = () => {
                                 <Box sx={{ display: "flex", gap: 1 }}>
                                     {/* 保存ボタン */}
                                     <Button
+                                        aria-label={`${title}を保存`}
                                         color="info"
                                         size="small"
                                         startIcon={<SaveIcon />}
@@ -401,6 +402,7 @@ export const ResumeContainer = () => {
                                     {/* 削除ボタン（リスト型セクションのみ） */}
                                     {currentSection.type === "list" && (
                                         <Button
+                                            aria-label={`${title}を削除`}
                                             color="error"
                                             size="small"
                                             startIcon={<DeleteIcon />}

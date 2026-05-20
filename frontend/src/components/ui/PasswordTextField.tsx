@@ -25,7 +25,11 @@ export const PasswordTextField = (props: TextFieldProps) => {
                         transform: "translateX(-8px)", // アイコンを左に8px移動
                     }}
                 >
-                    <IconButton onClick={handleTogglePasswordVisibility} edge="end">
+                    <IconButton
+                        aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+                        onClick={handleTogglePasswordVisibility}
+                        edge="end"
+                    >
                         {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                 </InputAdornment>

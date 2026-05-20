@@ -1,0 +1,122 @@
+# KeirekiPro command allowlist.
+# Purpose: allow AGENTS.md quality-gate commands without repeated approval prompts.
+# Keep these rules narrow. Do not add deploy, push, merge, rm, or broad shell patterns here.
+
+# --- Frontend quality gates ---
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "npm", "run", ["format", "lint", "coverage"]],
+    decision = "allow",
+    justification = "KeirekiPro frontend quality-gate commands from AGENTS.md",
+    match = [
+        "docker compose exec -u node -w /home/node/app frontend npm run format",
+        "docker compose exec -u node -w /home/node/app frontend npm run lint",
+        "docker compose exec -u node -w /home/node/app frontend npm run coverage",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "npm", "test"],
+    decision = "allow",
+    justification = "KeirekiPro frontend test command from AGENTS.md",
+    match = [
+        "docker compose exec -u node -w /home/node/app frontend npm test",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "npx", "tsc", "-b"],
+    decision = "allow",
+    justification = "KeirekiPro frontend typecheck command",
+    match = [
+        "docker compose exec -u node -w /home/node/app frontend npx tsc -b",
+    ],
+)
+
+# --- Backend quality gates ---
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-w", "/home/spring/app", "backend", "./gradlew", ["spotlessApply", "check", "test", "spotlessCheck", "jacocoTestReport"]],
+    decision = "allow",
+    justification = "KeirekiPro backend Gradle quality-gate commands from AGENTS.md",
+    match = [
+        "docker compose exec -w /home/spring/app backend ./gradlew spotlessApply",
+        "docker compose exec -w /home/spring/app backend ./gradlew check",
+        "docker compose exec -w /home/spring/app backend ./gradlew test",
+        "docker compose exec -w /home/spring/app backend ./gradlew spotlessCheck",
+        "docker compose exec -w /home/spring/app backend ./gradlew jacocoTestReport",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-w", "/home/spring/app", "backend", "./gradlew", "checkstyleMain", "checkstyleTest"],
+    decision = "allow",
+    justification = "KeirekiPro backend Checkstyle quality-gate command from AGENTS.md",
+    match = [
+        "docker compose exec -w /home/spring/app backend ./gradlew checkstyleMain checkstyleTest",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-w", "/home/spring/app", "backend", "./gradlew", "spotbugsMain", "spotbugsTest"],
+    decision = "allow",
+    justification = "KeirekiPro backend SpotBugs quality-gate command from AGENTS.md",
+    match = [
+        "docker compose exec -w /home/spring/app backend ./gradlew spotbugsMain spotbugsTest",
+    ],
+)
+
+# --- Terraform quality gates ---
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-w", "/workspace", "terraform", "terraform", "fmt", "-check", "-recursive"],
+    decision = "allow",
+    justification = "KeirekiPro Terraform fmt quality-gate command from AGENTS.md",
+    match = [
+        "docker compose exec -w /workspace terraform terraform fmt -check -recursive",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-w", "/workspace", "terraform", "terraform", "validate"],
+    decision = "allow",
+    justification = "KeirekiPro Terraform validate quality-gate command from AGENTS.md",
+    match = [
+        "docker compose exec -w /workspace terraform terraform validate",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-w", "/workspace", "terraform", "tflint", "--recursive"],
+    decision = "allow",
+    justification = "KeirekiPro Terraform tflint quality-gate command from AGENTS.md",
+    match = [
+        "docker compose exec -w /workspace terraform tflint --recursive",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-w", "/workspace", "terraform", "checkov", "-d", "."],
+    decision = "allow",
+    justification = "KeirekiPro Terraform checkov quality-gate command from AGENTS.md",
+    match = [
+        "docker compose exec -w /workspace terraform checkov -d .",
+    ],
+)
+
+# --- Safe final inspection commands ---
+prefix_rule(
+    pattern = ["git", "status", "--short"],
+    decision = "allow",
+    justification = "Read-only final diff inspection command from AGENTS.md",
+    match = [
+        "git status --short",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "diff"],
+    decision = "allow",
+    justification = "Read-only final diff inspection command from AGENTS.md",
+    match = [
+        "git diff",
+        "git diff --stat",
+    ],
+)
