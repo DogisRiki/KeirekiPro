@@ -1,9 +1,18 @@
+import { ThemeProvider } from "@mui/material";
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router";
 import { vi } from "vitest";
 
+import { lightTheme } from "@/config/theme";
+import { useResumeStore } from "@/features/resume";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
+import { useThemeStore } from "@/stores/themeStore";
+import { useUserAuthStore } from "@/stores/userAuthStore";
 
 type MockItem = (() => void) | { mockReset: () => void };
 
@@ -43,6 +52,35 @@ export const createQueryWrapper = () => {
     return Wrapper;
 };
 
+export const createTestQueryClient = () =>
+    new QueryClient({
+        defaultOptions: {
+            queries: {
+                retry: false,
+            },
+            mutations: {
+                retry: false,
+            },
+        },
+    });
+
+export const renderWithProviders = (ui: ReactNode, { route = "/" }: { route?: string } = {}) => {
+    const queryClient = createTestQueryClient();
+    const user = userEvent.setup();
+
+    const utils = render(
+        <QueryClientProvider client={queryClient}>
+            <ThemeProvider theme={lightTheme}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>
+                </LocalizationProvider>
+            </ThemeProvider>
+        </QueryClientProvider>,
+    );
+
+    return { user, queryClient, ...utils };
+};
+
 export function mutateHook<TPayload>(result: MutationHookResult<TPayload>, payload: TPayload) {
     act(() => {
         result.current.mutate(payload);
@@ -73,6 +111,9 @@ export const resetStoresAndMocks = (mocks: MockItem[]) => {
     // Zustandストアをクリア（action を呼ばずに setState で部分更新）
     useErrorMessageStore.setState({ message: null, errors: {} });
     useNotificationStore.setState({ message: null, type: undefined, isShow: false });
+    useUserAuthStore.setState({ user: null, isAuthenticated: false });
+    useThemeStore.setState({ mode: "light" });
+    useResumeStore.getState().clearResume();
 
     mocks.forEach((m: MockItem) => {
         // 関数型でmockResetプロパティを持たない場合は直接実行
