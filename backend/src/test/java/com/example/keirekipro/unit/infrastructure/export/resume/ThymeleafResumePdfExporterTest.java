@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -17,6 +18,7 @@ import com.example.keirekipro.infrastructure.export.resume.ResumeExportModelBuil
 import com.example.keirekipro.infrastructure.export.resume.ThymeleafResumePdfExporter;
 import com.example.keirekipro.infrastructure.shared.pdf.HtmlToPdfRenderer;
 import com.example.keirekipro.usecase.resume.export.ExportedFile;
+import com.example.keirekipro.usecase.resume.export.ResumePdfExportSettings;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,12 +71,20 @@ class ThymeleafResumePdfExporterTest {
                 templateEngine,
                 exportModelBuilder,
                 htmlToPdfRenderer);
-        ExportedFile result = exporter.exportPdf(resume);
+        ResumePdfExportSettings settings = new ResumePdfExportSettings(
+                "Noto Serif JP",
+                BigDecimal.valueOf(16),
+                BigDecimal.valueOf(10),
+                BigDecimal.valueOf(10),
+                BigDecimal.valueOf(11.5),
+                "#d9d9d9");
+        ExportedFile result = exporter.export(resume, settings);
 
         // 検証（templateEngine呼び出し）
         verify(templateEngine).process(eq("resume/pdf/simple"), contextCaptor.capture());
         Context capturedContext = contextCaptor.getValue();
         assertThat(capturedContext.getVariable("export")).isEqualTo(model);
+        assertThat(capturedContext.getVariable("pdfSettings")).isEqualTo(settings);
 
         // 検証（PDF変換呼び出し）
         verify(htmlToPdfRenderer).render("<html>test</html>");

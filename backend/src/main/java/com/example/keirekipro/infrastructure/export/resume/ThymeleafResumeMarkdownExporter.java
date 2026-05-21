@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.usecase.resume.export.ExportedFile;
-import com.example.keirekipro.usecase.resume.export.ResumeExporter;
+import com.example.keirekipro.usecase.resume.export.ResumeMarkdownExporter;
 
 import org.springframework.stereotype.Component;
 import org.thymeleaf.TemplateEngine;
@@ -13,11 +13,11 @@ import org.thymeleaf.context.Context;
 import lombok.RequiredArgsConstructor;
 
 /**
- * thymeleafでMarkdownテンプレートをレンダリングして返すResumeExporter実装
+ * thymeleafでMarkdownテンプレートをレンダリングして返すMarkdownエクスポート実装
  */
 @Component("thymeleafResumeMarkdownExporter")
 @RequiredArgsConstructor
-public class ThymeleafResumeMarkdownExporter implements ResumeExporter {
+public class ThymeleafResumeMarkdownExporter implements ResumeMarkdownExporter {
 
     private static final String CONTENT_TYPE = "text/markdown; charset=utf-8";
     private static final String TEMPLATE_NAME = "resume/markdown/default";
@@ -32,7 +32,7 @@ public class ThymeleafResumeMarkdownExporter implements ResumeExporter {
      * @return エクスポートしたファイル情報
      */
     @Override
-    public ExportedFile exportMarkdown(Resume resume) {
+    public ExportedFile export(Resume resume) {
         // テンプレートに渡すモデルを構築する
         Context context = new Context();
         context.setVariable("export", exportModelBuilder.build(resume));
@@ -42,16 +42,5 @@ public class ThymeleafResumeMarkdownExporter implements ResumeExporter {
         byte[] content = markdown.getBytes(StandardCharsets.UTF_8);
 
         return new ExportedFile(resume.getName().getValue() + ".md", CONTENT_TYPE, content);
-    }
-
-    /**
-     * PDFエクスポートは対象外
-     *
-     * @param resume 職務経歴書エンティティ
-     * @return 常にUnsupportedOperationExceptionをスロー
-     */
-    @Override
-    public ExportedFile exportPdf(Resume resume) {
-        throw new UnsupportedOperationException("PDFエクスポートは対象外です。");
     }
 }

@@ -1,6 +1,7 @@
 export * from "@/features/resume/components/backup/BackupContainer";
 export * from "@/features/resume/components/backup/BackupSection";
 export * from "@/features/resume/components/backup/RestoreSection";
+export * from "@/features/resume/components/export/ResumePdfPreviewModal";
 export * from "@/features/resume/components/resume-list/ResumeCard";
 export * from "@/features/resume/components/resume-list/ResumeCardMenu";
 export * from "@/features/resume/components/resume-list/ResumeListContainer";
@@ -88,6 +89,7 @@ export * from "@/features/resume/hooks/useGetResumeInfo";
 export * from "@/features/resume/hooks/useGetResumeList";
 export * from "@/features/resume/hooks/useNavigationBlocker";
 export * from "@/features/resume/hooks/useRestoreResume";
+export * from "@/features/resume/hooks/useResumePdfPreview";
 export * from "@/features/resume/hooks/useSnsPlatformList";
 export * from "@/features/resume/hooks/useTechStackList";
 export * from "@/features/resume/hooks/useUpdateResumeBasic";

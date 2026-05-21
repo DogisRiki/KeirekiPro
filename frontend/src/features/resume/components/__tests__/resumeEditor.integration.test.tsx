@@ -14,9 +14,9 @@ const debounceMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("use-debounce", () => ({
-    useDebouncedCallback: (callback: () => void) =>
+    useDebouncedCallback: (callback: (...args: unknown[]) => void) =>
         Object.assign(
-            vi.fn(() => callback()),
+            vi.fn((...args: unknown[]) => callback(...args)),
             { cancel: debounceMocks.cancel },
         ),
 }));
@@ -71,6 +71,8 @@ describe("resume editor", () => {
         resetStoresAndMocks([]);
         debounceMocks.cancel.mockClear();
         vi.mocked(saveAs).mockReset();
+        URL.createObjectURL = vi.fn(() => "data:application/pdf;base64,JVBERi0=");
+        URL.revokeObjectURL = vi.fn();
         vi.mocked(protectedApiClient.get).mockReset();
         vi.mocked(protectedApiClient.post).mockReset();
         vi.mocked(protectedApiClient.put).mockReset();
@@ -94,7 +96,15 @@ describe("resume editor", () => {
             }
             return Promise.resolve({ data: undefined } as AxiosResponse<void>);
         });
-        vi.mocked(protectedApiClient.post).mockResolvedValue({ data: cloneResume() } as AxiosResponse<Resume>);
+        vi.mocked(protectedApiClient.post).mockImplementation((url: string) => {
+            if (url === "/resumes/resume-1/export") {
+                return Promise.resolve({
+                    data: new Blob(["pdf"], { type: "application/pdf" }),
+                    headers: { "content-disposition": 'attachment; filename="resume.pdf"' },
+                } as unknown as AxiosResponse<Blob>);
+            }
+            return Promise.resolve({ data: cloneResume() } as AxiosResponse<Resume>);
+        });
         vi.mocked(protectedApiClient.put).mockImplementation((url: string, payload: unknown) => {
             if (url === "/resumes/resume-1/basic") {
                 return Promise.resolve({ data: cloneResume(payload as Partial<Resume>) } as AxiosResponse<Resume>);
@@ -186,7 +196,7 @@ describe("resume editor", () => {
         );
     });
 
-    it("export menuはPDFとMarkdownでAPI headerと保存形式を分岐すること", async () => {
+    it("export menuはPDFプレビューを開き、Markdownは直接ダウンロードすること", async () => {
         const { user } = renderEditor();
 
         await screen.findByRole("button", { name: "エクスポート" });
@@ -194,20 +204,48 @@ describe("resume editor", () => {
         await user.click(screen.getByRole("menuitem", { name: /PDFでエクスポート/ }));
 
         await waitFor(() =>
-            expect(protectedApiClient.get).toHaveBeenCalledWith(
+            expect(protectedApiClient.post).toHaveBeenCalledWith(
                 "/resumes/resume-1/export",
                 expect.objectContaining({
+                    format: "pdf",
+                    disposition: "inline",
+                }),
+                expect.objectContaining({
                     headers: { Accept: "application/pdf, application/json" },
-                    responseType: "blob",
+                }),
+            ),
+        );
+        expect(await screen.findByRole("dialog", { name: "PDFプレビュー" })).toBeInTheDocument();
+        expect(screen.getByTitle("PDFプレビュー")).toHaveAttribute("src", expect.stringContaining("navpanes=0"));
+        expect(screen.getByTitle("PDFプレビュー")).toHaveAttribute("src", expect.stringContaining("zoom=100"));
+        expect(saveAs).not.toHaveBeenCalled();
+
+        await user.click(
+            within(screen.getByRole("dialog", { name: "PDFプレビュー" })).getByRole("button", { name: "エクスポート" }),
+        );
+        await waitFor(() =>
+            expect(protectedApiClient.post).toHaveBeenCalledWith(
+                "/resumes/resume-1/export",
+                expect.objectContaining({
+                    format: "pdf",
+                    disposition: "attachment",
+                }),
+                expect.objectContaining({
+                    headers: { Accept: "application/pdf, application/json" },
                 }),
             ),
         );
         await waitFor(() => expect(saveAs).toHaveBeenCalled());
         const pdfBlob = vi.mocked(saveAs).mock.calls[vi.mocked(saveAs).mock.calls.length - 1]?.[0] as Blob;
         expect(pdfBlob.type).toBe("application/pdf");
+        expect(screen.getByRole("dialog", { name: "PDFプレビュー" })).toBeInTheDocument();
+        await user.click(
+            within(screen.getByRole("dialog", { name: "PDFプレビュー" })).getByRole("button", { name: "とじる" }),
+        );
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "PDFプレビュー" })).not.toBeInTheDocument());
 
         await user.click(screen.getByRole("button", { name: "エクスポート" }));
-        await user.click(screen.getByRole("menuitem", { name: /Markdownでエクスポート/ }));
+        await user.click(await screen.findByRole("menuitem", { name: /Markdownでエクスポート/ }));
 
         await waitFor(() =>
             expect(protectedApiClient.get).toHaveBeenCalledWith(
@@ -221,6 +259,23 @@ describe("resume editor", () => {
         await waitFor(() => expect(saveAs).toHaveBeenCalledTimes(2));
         const markdownBlob = vi.mocked(saveAs).mock.calls[vi.mocked(saveAs).mock.calls.length - 1]?.[0] as Blob;
         expect(markdownBlob.type).toBe("text/markdown");
+    });
+
+    it("PDFプレビューで表ヘッダー色を変更後に設定値リセットしてもモーダルを維持すること", async () => {
+        const { user } = renderEditor();
+
+        await screen.findByRole("button", { name: "エクスポート" });
+        await user.click(screen.getByRole("button", { name: "エクスポート" }));
+        await user.click(screen.getByRole("menuitem", { name: /PDFでエクスポート/ }));
+
+        const dialog = await screen.findByRole("dialog", { name: "PDFプレビュー" });
+        const colorCodeInput = within(dialog).getByLabelText("カラーコード");
+        await user.clear(colorCodeInput);
+        await user.type(colorCodeInput, "ff0000");
+        await user.click(within(dialog).getByRole("button", { name: "設定値リセット" }));
+
+        await waitFor(() => expect(colorCodeInput).toHaveValue("d9d9d9"));
+        expect(screen.getByRole("dialog", { name: "PDFプレビュー" })).toBeInTheDocument();
     });
 
     it("保存APIのfield errorを該当フォームへ表示すること", async () => {

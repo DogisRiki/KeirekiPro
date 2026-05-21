@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.domain.service.resume;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -19,7 +18,6 @@ import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.service.resume.ResumeExportRuleCheckService;
-import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.shared.ErrorCollector;
 
 import org.junit.jupiter.api.DisplayName;
@@ -51,11 +49,11 @@ class ResumeExportRuleCheckServiceTest {
                 List.of(buildProject()),
                 List.of(buildSelfPromotion()));
 
-        assertThatCode(() -> service.execute(resume)).doesNotThrowAnyException();
+        assertThat(service.execute(resume)).isEmpty();
     }
 
     @Test
-    @DisplayName("必須条件が不足している場合、箇条書きメッセージでDomainExceptionをスローする")
+    @DisplayName("必須条件が不足している場合、エラー理由を返す")
     void test2() {
         Resume resume = buildResume(
                 null,
@@ -65,20 +63,17 @@ class ResumeExportRuleCheckServiceTest {
                 List.of(),
                 List.of());
 
-        assertThatThrownBy(() -> service.execute(resume))
-                .isInstanceOf(DomainException.class)
-                .hasMessage(String.join("\n",
-                        "職務経歴書をエクスポートできません。",
-                        "- 職務経歴書名を入力してください。",
-                        "- 日付を設定してください。",
-                        "- 氏名（姓・名）を入力してください。",
-                        "- 職歴を1件以上登録してください。",
-                        "- プロジェクトを1件以上登録してください。",
-                        "- 自己PRを1件以上登録してください。"));
+        assertThat(service.execute(resume)).containsExactly(
+                "職務経歴書名を入力してください。",
+                "日付を設定してください。",
+                "氏名（姓・名）を入力してください。",
+                "職歴を1件以上登録してください。",
+                "プロジェクトを1件以上登録してください。",
+                "自己PRを1件以上登録してください。");
     }
 
     @Test
-    @DisplayName("氏名の姓のみ不足している場合、姓のエラーメッセージを含めてDomainExceptionをスローする")
+    @DisplayName("氏名の姓のみ不足している場合、姓のエラー理由を返す")
     void test3() {
         FullName fullName = FullName.create(new ErrorCollector(), "", FIRST_NAME);
 
@@ -90,11 +85,7 @@ class ResumeExportRuleCheckServiceTest {
                 List.of(buildProject()),
                 List.of(buildSelfPromotion()));
 
-        assertThatThrownBy(() -> service.execute(resume))
-                .isInstanceOf(DomainException.class)
-                .hasMessage(String.join("\n",
-                        "職務経歴書をエクスポートできません。",
-                        "- 姓を入力してください。"));
+        assertThat(service.execute(resume)).containsExactly("姓を入力してください。");
     }
 
     private static Resume buildResume(

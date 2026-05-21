@@ -1,6 +1,6 @@
 import { Dialog } from "@/components/ui";
 import { paths } from "@/config/paths";
-import { useDeleteResume, useExportResume } from "@/features/resume";
+import { ResumePdfPreviewModal, useDeleteResume, useExportResume, useResumePdfPreview } from "@/features/resume";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -26,6 +26,7 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
 
     // エクスポートミューテーション
     const exportMutation = useExportResume();
+    const pdfPreview = useResumePdfPreview();
 
     // メインメニューの表示位置を制御する要素
     const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
@@ -112,7 +113,7 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
     const handleExportPdf = (event: React.MouseEvent) => {
         event.stopPropagation();
         handleCardMenuClose();
-        exportMutation.mutate({ resumeId, format: "pdf" });
+        pdfPreview.openPreview(resumeId);
     };
 
     /**
@@ -139,9 +140,10 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
     ];
 
     return (
-        <>
+        <Box component="span" onClick={(event) => event.stopPropagation()}>
             {/* 3点アイコン */}
             <IconButton
+                aria-label="職務経歴書メニューを開く"
                 onClick={(event) => handleCardMenuClick(event, resumeId)}
                 sx={{
                     position: "absolute",
@@ -219,7 +221,7 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
                     <MenuItem
                         key={`export-${index}`}
                         onClick={menu.action}
-                        disabled={exportMutation.isPending}
+                        disabled={exportMutation.isPending || pdfPreview.isPending}
                         sx={{ color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}
                     >
                         {menu.icon}
@@ -237,6 +239,16 @@ export const ResumeCardMenu = ({ resumeId, resumeName }: ResumeCardMenuProps) =>
                     onClose={handleDeleteDialogClose}
                 />
             </Box>
-        </>
+            <ResumePdfPreviewModal
+                open={pdfPreview.open}
+                previewUrl={pdfPreview.previewUrl}
+                settings={pdfPreview.settings}
+                onSettingsChange={pdfPreview.updateSettings}
+                onRefresh={pdfPreview.refresh}
+                onReset={pdfPreview.resetSettings}
+                onExport={pdfPreview.exportPdf}
+                onClose={pdfPreview.close}
+            />
+        </Box>
     );
 };

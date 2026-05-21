@@ -61,7 +61,7 @@ class ThymeleafResumeMarkdownExporterTest {
         final ThymeleafResumeMarkdownExporter exporter = new ThymeleafResumeMarkdownExporter(
                 templateEngine,
                 exportModelBuilder);
-        ExportedFile result = exporter.exportMarkdown(resume);
+        ExportedFile result = exporter.export(resume);
 
         // 検証（templateEngine呼び出し）
         verify(templateEngine).process(eq("resume/markdown/default"), contextCaptor.capture());

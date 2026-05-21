@@ -21,14 +21,24 @@ import { cloneResume, resumeSummaries } from "./resumeTestData";
 describe("resume list", () => {
     beforeEach(() => {
         resetStoresAndMocks([]);
+        URL.createObjectURL = vi.fn(() => "data:application/pdf;base64,JVBERi0=");
+        URL.revokeObjectURL = vi.fn();
         vi.mocked(protectedApiClient.get).mockReset();
         vi.mocked(protectedApiClient.post).mockReset();
         vi.mocked(protectedApiClient.get).mockResolvedValue({
             data: { resumes: resumeSummaries },
         } as AxiosResponse<GetResumeListResponse>);
-        vi.mocked(protectedApiClient.post).mockResolvedValue({
-            data: cloneResume({ id: "created-resume" }),
-        } as AxiosResponse<Resume>);
+        vi.mocked(protectedApiClient.post).mockImplementation((url: string) => {
+            if (url === "/resumes/resume-1/export") {
+                return Promise.resolve({
+                    data: new Blob(["pdf"], { type: "application/pdf" }),
+                    headers: {},
+                } as AxiosResponse<Blob>);
+            }
+            return Promise.resolve({
+                data: cloneResume({ id: "created-resume" }),
+            } as AxiosResponse<Resume>);
+        });
     });
 
     it("ResumeListContainerは一覧取得後にカードを表示しクリックで編集画面へ遷移すること", async () => {
@@ -84,5 +94,36 @@ describe("resume list", () => {
             type: "success",
             isShow: true,
         });
+    });
+
+    it("ResumeCardMenuからPDFエクスポートを選んでも編集画面へ遷移せずPDFプレビューモーダルを操作できること", async () => {
+        const { user } = renderWithProviders(
+            <Routes>
+                <Route path="/resume/list" element={<ResumeListContainer />} />
+                <Route path="/resume/:id" element={<div>edit destination</div>} />
+            </Routes>,
+            { route: "/resume/list" },
+        );
+
+        await screen.findByText("Alpha Resume");
+        await user.click(screen.getAllByRole("button", { name: "職務経歴書メニューを開く" })[0]);
+        await user.hover(screen.getByRole("menuitem", { name: "エクスポート" }));
+        await user.click(await screen.findByRole("menuitem", { name: "PDFでエクスポート" }));
+
+        const dialog = await screen.findByRole("dialog", { name: "PDFプレビュー" });
+        await user.click(screen.getByLabelText("カラーコード"));
+
+        expect(dialog).toBeInTheDocument();
+        expect(screen.queryByText("edit destination")).not.toBeInTheDocument();
+        expect(protectedApiClient.post).toHaveBeenCalledWith(
+            expect.stringMatching(/^\/resumes\/resume-[12]\/export$/),
+            expect.objectContaining({
+                format: "pdf",
+                disposition: "inline",
+            }),
+            expect.objectContaining({
+                headers: { Accept: "application/pdf, application/json" },
+            }),
+        );
     });
 });
