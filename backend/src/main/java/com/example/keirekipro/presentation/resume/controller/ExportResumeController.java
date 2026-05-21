@@ -3,8 +3,10 @@ package com.example.keirekipro.presentation.resume.controller;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+import com.example.keirekipro.presentation.resume.dto.ExportResumeRequest;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.usecase.resume.ExportResumeUseCase;
+import com.example.keirekipro.usecase.resume.dto.ExportResumeCommand.ExportDisposition;
 import com.example.keirekipro.usecase.resume.dto.ExportResumeUseCaseDto;
 import com.example.keirekipro.usecase.resume.export.ExportFormat;
 
@@ -17,10 +19,13 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -69,5 +74,34 @@ public class ExportResumeController {
                 .contentType(MediaType.parseMediaType(exported.getContentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
                 .body(exported.getContent());
+    }
+
+    /**
+     * 職務経歴書エクスポートエンドポイント
+     */
+    @PostMapping("/{resumeId}/export")
+    @Operation(summary = "職務経歴書エクスポート", description = "職務経歴書を指定された設定でエクスポートする")
+    public ResponseEntity<byte[]> handle(
+            @PathVariable("resumeId") UUID resumeId,
+            @Valid @RequestBody ExportResumeRequest request) {
+
+        UUID userId = UUID.fromString(currentUserFacade.getUserId());
+        var command = request.toCommand();
+        ExportResumeUseCaseDto exported = exportResumeUseCase.execute(userId, resumeId, command);
+
+        ContentDisposition contentDisposition = buildContentDisposition(exported.getFileName(),
+                command.getDisposition());
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(exported.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
+                .body(exported.getContent());
+    }
+
+    private ContentDisposition buildContentDisposition(String fileName, ExportDisposition disposition) {
+        ContentDisposition.Builder builder = disposition == ExportDisposition.INLINE
+                ? ContentDisposition.inline()
+                : ContentDisposition.attachment();
+        return builder.filename(fileName, StandardCharsets.UTF_8).build();
     }
 }

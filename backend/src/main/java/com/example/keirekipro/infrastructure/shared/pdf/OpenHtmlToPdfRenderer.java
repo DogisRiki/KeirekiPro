@@ -32,19 +32,10 @@ public class OpenHtmlToPdfRenderer implements HtmlToPdfRenderer {
             builder.withHtmlContent(html, null);
 
             // 日本語フォントを埋め込み登録する（実体に合わせてNORMALで登録）
-            builder.useFont(
-                    () -> openClasspath("classpath:/fonts/NotoSansJP-Regular.ttf"),
-                    "Noto Sans JP",
-                    400,
-                    PdfRendererBuilder.FontStyle.NORMAL,
-                    true);
-
-            builder.useFont(
-                    () -> openClasspath("classpath:/fonts/NotoSansJP-Bold.ttf"),
-                    "Noto Sans JP",
-                    700,
-                    PdfRendererBuilder.FontStyle.NORMAL,
-                    true);
+            registerFont(builder, "classpath:/fonts/NotoSansJP-Regular.ttf", "Noto Sans JP", 400);
+            registerFont(builder, "classpath:/fonts/NotoSansJP-Bold.ttf", "Noto Sans JP", 700);
+            registerFont(builder, "classpath:/fonts/NotoSerifJP-Regular.ttf", "Noto Serif JP", 400);
+            registerFont(builder, "classpath:/fonts/NotoSerifJP-Bold.ttf", "Noto Serif JP", 700);
 
             builder.toStream(out);
             builder.useFastMode();
@@ -53,6 +44,15 @@ public class OpenHtmlToPdfRenderer implements HtmlToPdfRenderer {
         } catch (Exception e) {
             throw new IllegalStateException("PDF生成に失敗しました。", e);
         }
+    }
+
+    private void registerFont(PdfRendererBuilder builder, String location, String family, int weight) {
+        builder.useFont(
+                () -> openClasspath(location),
+                family,
+                weight,
+                PdfRendererBuilder.FontStyle.NORMAL,
+                true);
     }
 
     private InputStream openClasspath(String location) {

@@ -32,6 +32,25 @@ prefix_rule(
     ],
 )
 
+# --- Frontend targeted local checks ---
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "npx", "prettier", "--write"],
+    decision = "allow",
+    justification = "Allow targeted Prettier formatting inside frontend container",
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "npx", "eslint"],
+    decision = "allow",
+    justification = "Allow targeted ESLint checks inside frontend container",
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "npx", "vitest", "run"],
+    decision = "allow",
+    justification = "Allow targeted Vitest runs inside frontend container",
+)
+
 # --- Backend quality gates ---
 prefix_rule(
     pattern = ["docker", "compose", "exec", "-w", "/home/spring/app", "backend", "./gradlew", ["spotlessApply", "check", "test", "spotlessCheck", "jacocoTestReport"]],

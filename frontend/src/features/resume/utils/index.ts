@@ -4,6 +4,8 @@ import { formatDate } from "@/utils";
 import dayjs from "dayjs";
 import React from "react";
 
+export * from "@/features/resume/utils/pdfPreview";
+
 /**
  * アクティブなセクションを生成するファクトリー
  */

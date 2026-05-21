@@ -8,29 +8,60 @@ participant PostgreSQL
 participant Thymeleaf
 participant PDFBox as PdfEngine
 
-ユーザー -> React: エクスポートボタンを押下
-React -> SpringBoot: エクスポートリクエスト\n(職務経歴書ID, Accept: PDF or Markdown)
-
-SpringBoot -> SpringBoot: ユーザーID取得\n(AUTHコンテキスト/JWT)
-SpringBoot -> SpringBoot: Acceptヘッダから形式判定\n(PDF / Markdown)
-
-SpringBoot -> PostgreSQL: 職務経歴書データ取得\n(職務経歴書ID)
-PostgreSQL --> SpringBoot: 職務経歴書データ
-
-SpringBoot -> SpringBoot: 所有者チェック\n(ユーザーIDと一致)
-SpringBoot -> SpringBoot: エクスポート前提条件チェック\n(氏名/日付/職歴/プロジェクト/自己PR 等)
+ユーザー -> React: エクスポートメニューを開く
 
 alt PDFの場合
-    SpringBoot -> Thymeleaf: PDF用HTMLテンプレートにデータ埋め込み
+    ユーザー -> React: PDFでエクスポートを選択
+    React -> React: PDFプレビューモーダルを表示\n(デフォルトスタイルで初期化)
+    React -> SpringBoot: プレビュー生成リクエスト\n(職務経歴書ID, Accept: application/pdf,\nfontFamily, fontSize, tableHeaderColor)
+
+    SpringBoot -> SpringBoot: ユーザーID取得\n(AUTHコンテキスト/JWT)
+    SpringBoot -> SpringBoot: PDFスタイル指定をBean Validationで検証
+    SpringBoot -> PostgreSQL: 職務経歴書データ取得\n(職務経歴書ID)
+    PostgreSQL --> SpringBoot: 職務経歴書データ
+    SpringBoot -> SpringBoot: 所有者チェック\n(ユーザーIDと一致)
+    SpringBoot -> SpringBoot: エクスポート前提条件チェック
+    SpringBoot -> SpringBoot: フォントサイズを0.5刻みに補正
+    SpringBoot -> Thymeleaf: PDF用HTMLテンプレートへ\nデータとスタイルを埋め込み
     Thymeleaf --> SpringBoot: HTMLデータ
     SpringBoot -> PdfEngine: HTMLをPDFに変換
     PdfEngine --> SpringBoot: PDFバイナリ
-    SpringBoot -> React: PDFをダウンロードレスポンス\n(Content-Type: application/pdf,\nContent-Disposition: attachment)
-    React --> ユーザー: PDFをダウンロード
+    SpringBoot -> React: PDFレスポンス\n(Content-Type: application/pdf,\nContent-Disposition: attachment)
+    React -> React: Blob URLを作成してモーダル内に表示
+
+    loop スタイル変更時
+        ユーザー -> React: フォント/サイズ/表ヘッダー色を変更
+        React -> React: debounce後に再生成を予約
+        React -> SpringBoot: プレビュー再生成リクエスト\n(変更後スタイル)
+        SpringBoot -> Thymeleaf: PDF用HTMLテンプレートへ\nデータとスタイルを埋め込み
+        Thymeleaf --> SpringBoot: HTMLデータ
+        SpringBoot -> PdfEngine: HTMLをPDFに変換
+        PdfEngine --> SpringBoot: PDFバイナリ
+        SpringBoot -> React: PDFレスポンス
+        React -> React: プレビューを差し替え
+    end
+
+    ユーザー -> React: モーダル内のエクスポートを押下
+    React -> SpringBoot: PDFダウンロードリクエスト\n(プレビューと同じスタイル)
+    SpringBoot -> Thymeleaf: PDF用HTMLテンプレートへ\nデータとスタイルを埋め込み
+    Thymeleaf --> SpringBoot: HTMLデータ
+    SpringBoot -> PdfEngine: HTMLをPDFに変換
+    PdfEngine --> SpringBoot: PDFバイナリ
+    SpringBoot -> React: PDFレスポンス\n(Content-Type: application/pdf,\nContent-Disposition: attachment)
+    React --> ユーザー: PDFをダウンロード\n(モーダルは閉じない)
+    ユーザー -> React: ×とじる
+    React -> React: PDFプレビューモーダルを閉じる
 else Markdownの場合
-    SpringBoot -> Thymeleaf: Markdownテンプレートにデータ埋め込み
+    ユーザー -> React: Markdownでエクスポートを選択
+    React -> SpringBoot: エクスポートリクエスト\n(職務経歴書ID, Accept: text/markdown)
+    SpringBoot -> SpringBoot: ユーザーID取得\n(AUTHコンテキスト/JWT)
+    SpringBoot -> PostgreSQL: 職務経歴書データ取得\n(職務経歴書ID)
+    PostgreSQL --> SpringBoot: 職務経歴書データ
+    SpringBoot -> SpringBoot: 所有者チェック\n(ユーザーIDと一致)
+    SpringBoot -> SpringBoot: エクスポート前提条件チェック
+    SpringBoot -> Thymeleaf: Markdownテンプレートへデータ埋め込み
     Thymeleaf --> SpringBoot: Markdownデータ
-    SpringBoot -> React: Markdownをダウンロードレスポンス\n(Content-Type: text/markdown; charset=utf-8,\nContent-Disposition: attachment)
+    SpringBoot -> React: Markdownレスポンス\n(Content-Type: text/markdown; charset=utf-8,\nContent-Disposition: attachment)
     React --> ユーザー: Markdownをダウンロード
 end
 

@@ -1,6 +1,12 @@
 import { Button, Dialog, Switch } from "@/components/ui";
 import { paths } from "@/config/paths";
-import { useDeleteResume, useExportResume, useResumeStore } from "@/features/resume";
+import {
+    ResumePdfPreviewModal,
+    useDeleteResume,
+    useExportResume,
+    useResumePdfPreview,
+    useResumeStore,
+} from "@/features/resume";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -47,6 +53,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
         const resume = useResumeStore((state) => state.resume);
         const deleteMutation = useDeleteResume();
         const exportMutation = useExportResume();
+        const pdfPreview = useResumePdfPreview();
 
         const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -66,7 +73,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
         const handleExportPdf = () => {
             handleExportButtonClose();
             if (resume) {
-                exportMutation.mutate({ resumeId: resume.id, format: "pdf" });
+                pdfPreview.openPreview(resume.id);
             }
         };
 
@@ -129,31 +136,47 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
             setIsCollapsed(!isCollapsed);
         };
 
+        const pdfPreviewModal = (
+            <ResumePdfPreviewModal
+                open={pdfPreview.open}
+                previewUrl={pdfPreview.previewUrl}
+                settings={pdfPreview.settings}
+                onSettingsChange={pdfPreview.updateSettings}
+                onRefresh={pdfPreview.refresh}
+                onReset={pdfPreview.resetSettings}
+                onExport={pdfPreview.exportPdf}
+                onClose={pdfPreview.close}
+            />
+        );
+
         // 折りたたみ時の表示
         if (isCollapsed) {
             return (
-                <Paper
-                    ref={ref}
-                    elevation={3}
-                    sx={{
-                        position: "fixed",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        zIndex: 1200,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        p: 0.5,
-                        bgcolor: alpha(theme.palette.background.paper, 0.9),
-                    }}
-                >
-                    <Tooltip title="メニューを展開">
-                        <IconButton onClick={handleToggleCollapse} size="small">
-                            <KeyboardArrowUpIcon />
-                        </IconButton>
-                    </Tooltip>
-                </Paper>
+                <>
+                    <Paper
+                        ref={ref}
+                        elevation={3}
+                        sx={{
+                            position: "fixed",
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            zIndex: 1200,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            p: 0.5,
+                            bgcolor: alpha(theme.palette.background.paper, 0.9),
+                        }}
+                    >
+                        <Tooltip title="メニューを展開">
+                            <IconButton onClick={handleToggleCollapse} size="small">
+                                <KeyboardArrowUpIcon />
+                            </IconButton>
+                        </Tooltip>
+                    </Paper>
+                    {pdfPreviewModal}
+                </>
             );
         }
 
@@ -219,7 +242,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                             <IconButton
                                 color="primary"
                                 onClick={handleExportButtonClick}
-                                disabled={exportMutation.isPending}
+                                disabled={exportMutation.isPending || pdfPreview.isPending}
                             >
                                 <FileDownloadIcon />
                             </IconButton>
@@ -253,7 +276,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                             <MenuItem
                                 key={index}
                                 onClick={item.action}
-                                disabled={exportMutation.isPending}
+                                disabled={exportMutation.isPending || pdfPreview.isPending}
                                 sx={{
                                     color: "primary.main",
                                     display: "flex",
@@ -275,6 +298,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                         description={`「${resume?.resumeName ?? ""}」を削除しますか？この操作は取り消せません。`}
                         onClose={handleDeleteDialogClose}
                     />
+                    {pdfPreviewModal}
                 </>
             );
         }
@@ -347,7 +371,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                             startIcon={<FileDownloadIcon />}
                             size="medium"
                             onClick={handleExportButtonClick}
-                            disabled={exportMutation.isPending}
+                            disabled={exportMutation.isPending || pdfPreview.isPending}
                         >
                             エクスポート
                         </Button>
@@ -358,7 +382,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                                 <MenuItem
                                     key={index}
                                     onClick={item.action}
-                                    disabled={exportMutation.isPending}
+                                    disabled={exportMutation.isPending || pdfPreview.isPending}
                                     sx={{
                                         color: "primary.main",
                                         display: "flex",
@@ -392,6 +416,7 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
                     description={`「${resume?.resumeName ?? ""}」を削除しますか？この操作は取り消せません。`}
                     onClose={handleDeleteDialogClose}
                 />
+                {pdfPreviewModal}
             </>
         );
     },

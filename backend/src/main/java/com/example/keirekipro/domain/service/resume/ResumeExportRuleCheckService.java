@@ -5,7 +5,6 @@ import java.util.List;
 
 import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Resume;
-import com.example.keirekipro.domain.shared.exception.DomainException;
 
 import org.springframework.stereotype.Service;
 
@@ -19,9 +18,9 @@ public class ResumeExportRuleCheckService {
      * 職務経歴書エクスポート前提条件をチェックする
      *
      * @param resume 職務経歴書エンティティ
-     * @throws DomainException エクスポート前提条件を満たさない場合
+     * @return エクスポート前提条件を満たさない理由
      */
-    public void execute(Resume resume) {
+    public List<String> execute(Resume resume) {
 
         List<String> errors = new ArrayList<>();
 
@@ -57,8 +56,6 @@ public class ResumeExportRuleCheckService {
             errors.add("自己PRを1件以上登録してください。");
         }
 
-        if (!errors.isEmpty()) {
-            throw new DomainException("職務経歴書をエクスポートできません。\n- " + String.join("\n- ", errors));
-        }
+        return errors;
     }
 }

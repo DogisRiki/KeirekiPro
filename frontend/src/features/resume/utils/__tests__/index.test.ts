@@ -2,11 +2,16 @@ import type { SectionName } from "@/features/resume";
 import {
     TEMP_ID_PREFIX,
     buildPayloadForEntry,
+    buildResumePdfSettingsPayload,
     createCurrentSection,
     getApiId,
     getEntryText,
     getResumeKey,
+    hexToRgb,
+    isSameResumePdfSettings,
     isTempId,
+    normalizePdfFontSize,
+    rgbToHex,
 } from "@/features/resume";
 
 describe("getEntryText", () => {
@@ -492,5 +497,70 @@ describe("createCurrentSection", () => {
             expect(result).toBeDefined();
             expect(result.type).toBeDefined();
         }
+    });
+});
+
+describe("PDFプレビュー設定ユーティリティ", () => {
+    it.each([
+        [11.0, 11],
+        [11.2, 11],
+        [11.3, 11.5],
+        [11.4, 11.5],
+        [11.6, 11.5],
+        [11.7, 11.5],
+        [11.8, 12],
+        [11.9, 12],
+    ])("フォントサイズ%sを%sへ補正すること", (input, expected) => {
+        expect(normalizePdfFontSize(input)).toBe(expected);
+    });
+
+    it("カラーコードとRGBを相互変換できること", () => {
+        expect(hexToRgb("d9d9d9")).toEqual({ r: 217, g: 217, b: 217 });
+        expect(rgbToHex(217, 217, 217)).toBe("d9d9d9");
+    });
+
+    it("PDF設定を補正済みAPIペイロードへ変換すること", () => {
+        const result = buildResumePdfSettingsPayload({
+            fontFamily: "NotoSansJP",
+            fontSizes: {
+                title: 16,
+                date: 10.2,
+                fullName: 10.8,
+                sectionHeading: 11.4,
+            },
+            tableHeaderColor: {
+                rgb: { r: 217, g: 217, b: 217 },
+            },
+        });
+
+        expect(result).toEqual({
+            fontFamily: "NotoSansJP",
+            fontSizes: {
+                title: 16,
+                date: 10,
+                fullName: 11,
+                sectionHeading: 11.5,
+            },
+            tableHeaderColor: {
+                hex: "d9d9d9",
+            },
+        });
+    });
+
+    it("同じPDF設定は同一として判定すること", () => {
+        expect(
+            isSameResumePdfSettings(
+                {
+                    fontFamily: "NotoSansJP",
+                    fontSizes: { title: 16, date: 10, fullName: 10, sectionHeading: 11.5 },
+                    tableHeaderColor: { hex: "d9d9d9" },
+                },
+                {
+                    fontFamily: "NotoSansJP",
+                    fontSizes: { title: 16, date: 10, fullName: 10, sectionHeading: 11.5 },
+                    tableHeaderColor: { rgb: { r: 217, g: 217, b: 217 } },
+                },
+            ),
+        ).toBe(true);
     });
 });

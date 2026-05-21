@@ -88,7 +88,7 @@ class OpenHtmlToPdfRendererTest {
 
             PdfRendererBuilder constructed = mocked.constructed().get(0);
             verify(constructed).withHtmlContent(anyString(), any());
-            verify(constructed, times(2))
+            verify(constructed, times(4))
                     .useFont(
                             (FSSupplier<InputStream>) any(FSSupplier.class),
                             anyString(),
