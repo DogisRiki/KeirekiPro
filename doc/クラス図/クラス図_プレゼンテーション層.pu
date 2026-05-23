@@ -34,6 +34,10 @@ package com.example.keirekipro.presentation.shared.logging {
 }
 
 package com.example.keirekipro.presentation.shared.utils {
+    interface BaseUrlResolver {
+        + String resolve(HttpServletRequest request)
+    }
+
     class CookieUtil {
         --
         + {static} void addCookie(HttpServletResponse response, String name, String value, int maxAge)
@@ -41,21 +45,39 @@ package com.example.keirekipro.presentation.shared.utils {
         + {static} Optional<String> getCookieValue(HttpServletRequest request, String name)
     }
 
-    class UrlUtil {
+    class DevBaseUrlResolver {
         --
-        + {static} String getBaseUrl(HttpServletRequest request)
+        + String resolve(HttpServletRequest request)
     }
+
+    class ProdBaseUrlResolver {
+        - String apiBaseUrl
+        --
+        + String resolve(HttpServletRequest request)
+    }
+
+    DevBaseUrlResolver ..|> BaseUrlResolver
+    ProdBaseUrlResolver ..|> BaseUrlResolver
 }
 
 package com.example.keirekipro.presentation.shared.validator {
+    annotation LocalDateRange {
+    }
+
     class LocalDateRangeValidator {
         --
         + boolean isValid(LocalDate value, ConstraintValidatorContext context)
     }
 
+    annotation YearMonthRange {
+    }
+
     class YearMonthRangeValidator {
         --
         + boolean isValid(YearMonth value, ConstraintValidatorContext context)
+    }
+
+    annotation PasswordMatches {
     }
 
     class PasswordMatchesValidator {
@@ -79,6 +101,17 @@ package com.example.keirekipro.presentation.security {
 }
 
 package com.example.keirekipro.presentation.security.config {
+    class SecurityConfig {
+        - String allowedOrigins
+        - JwtProvider jwtProvider
+        - RequestContextLoggingFilter requestContextLoggingFilter
+        --
+        + SecurityFilterChain securityFilterChain(HttpSecurity http)
+        + CorsConfigurationSource corsConfigurationSource()
+        + CsrfTokenRepository csrfTokenRepository()
+        + PasswordEncoder passwordEncoder()
+    }
+
     class CsrfCookieFilter {
         - CsrfTokenRepository csrfTokenRepository
         --
@@ -86,6 +119,8 @@ package com.example.keirekipro.presentation.security.config {
     }
 
     CsrfCookieFilter --|> OncePerRequestFilter
+    SecurityConfig --> JwtProvider
+    SecurityConfig --> RequestContextLoggingFilter
 }
 
 package com.example.keirekipro.presentation.security.jwt {
@@ -112,9 +147,21 @@ package com.example.keirekipro.presentation.security.jwt {
         - Optional<String> getJwtFromCookies(HttpServletRequest request)
     }
 
+    class AuthCookieIssuer {
+        - JwtProvider jwtProvider
+        - RefreshTokenStore refreshTokenStore
+        - UserTokenVersionStore userTokenVersionStore
+        - boolean isSecureCookie
+        --
+        + void issue(HttpServletResponse response, UUID userId, Set<String> roles)
+    }
+
     JwtAuthenticationFilter --|> OncePerRequestFilter
     JwtAuthenticationFilter --> JwtProvider
     JwtProvider --> JwtProperties
+    AuthCookieIssuer --> JwtProvider
+    AuthCookieIssuer --> RefreshTokenStore
+    AuthCookieIssuer --> UserTokenVersionStore
 }
 
 '========================================
@@ -172,7 +219,7 @@ package com.example.keirekipro.presentation.auth.dto {
     }
 
     class TwoFactorAuthRequest {
-        - String userId
+        - String challengeToken
         - String code
     }
 }
@@ -184,14 +231,15 @@ package com.example.keirekipro.presentation.auth.controller {
     class LoginController {
         - LoginUseCase loginUseCase
         - TwoFactorAuthIssueUseCase twoFactorAuthIssueUseCase
-        - JwtProvider jwtProvider
+        - AuthCookieIssuer authCookieIssuer
         --
-        + ResponseEntity<String> handle(LoginRequest request, HttpServletResponse response)
+        + ResponseEntity<Void> handle(LoginRequest request, HttpServletResponse response)
     }
 
     class LogoutController {
+        - RefreshTokenStore refreshTokenStore
         --
-        + ResponseEntity<Void> handle(HttpServletResponse response)
+        + void handle(HttpServletRequest request, HttpServletResponse response)
     }
 
     class UserRegistrationController {
@@ -202,61 +250,70 @@ package com.example.keirekipro.presentation.auth.controller {
 
     class OidcAuthorizationController {
         - StartOidcAuthorizationUseCase startOidcAuthorizationUseCase
+        - BaseUrlResolver baseUrlResolver
         --
         + String handle(String provider, HttpServletRequest servletRequest)
     }
 
     class OidcCallbackController {
-        - JwtProvider jwtProvider
+        - AuthCookieIssuer authCookieIssuer
         - HandleOidcCallbackUseCase handleOidcCallbackUseCase
+        - BaseUrlResolver baseUrlResolver
         --
-        + ResponseEntity<Void> handle(String code, String state, String error, HttpServletRequest request, HttpServletResponse response)
+        + void handle(String code, String state, String error, HttpServletRequest request, HttpServletResponse response)
     }
 
     class RefreshAccessTokenController {
         - JwtProvider jwtProvider
+        - RefreshTokenStore refreshTokenStore
+        - UserTokenVersionStore userTokenVersionStore
         --
-        + ResponseEntity<Void> handle(HttpServletRequest request, HttpServletResponse response)
+        + void handle(HttpServletRequest request, HttpServletResponse response)
     }
 
     class RequestPasswordResetController {
         - RequestPasswordResetUseCase requestPasswordResetUseCase
         --
-        + ResponseEntity<Void> handle(RequestPasswordResetRequest request)
+        + void handle(RequestPasswordResetRequest request)
     }
 
     class VerifyPasswordResetTokenController {
         - VerifyPasswordResetTokenUseCase verifyPasswordResetTokenUseCase
         --
-        + ResponseEntity<Boolean> handle(RequestPasswordResetVerifyRequest request)
+        + void handle(RequestPasswordResetVerifyRequest request)
     }
 
     class ResetPasswordController {
         - ResetPasswordUseCase resetPasswordUseCase
         --
-        + ResponseEntity<Void> handle(ResetPasswordRequest request)
+        + void handle(ResetPasswordRequest request)
     }
 
     class TwoFactorAuthController {
         - TwoFactorAuthVerifyUseCase twoFactorAuthVerifyUseCase
-        - JwtProvider jwtProvider
+        - AuthCookieIssuer authCookieIssuer
         --
-        + ResponseEntity<Void> handle(TwoFactorAuthRequest request, HttpServletResponse response)
+        + void handle(TwoFactorAuthRequest request, HttpServletResponse response)
     }
 
     LoginController --> LoginUseCase
     LoginController --> TwoFactorAuthIssueUseCase
-    LoginController --> JwtProvider
+    LoginController --> AuthCookieIssuer
+    LogoutController --> RefreshTokenStore
     UserRegistrationController --> UserRegistrationUseCase
     OidcAuthorizationController --> StartOidcAuthorizationUseCase
+    OidcAuthorizationController --> BaseUrlResolver
     OidcCallbackController --> HandleOidcCallbackUseCase
-    OidcCallbackController --> JwtProvider
+    OidcCallbackController --> AuthCookieIssuer
+    OidcCallbackController --> BaseUrlResolver
     RefreshAccessTokenController --> JwtProvider
+    RefreshAccessTokenController --> RefreshTokenStore
+    RefreshAccessTokenController --> UserTokenVersionStore
     RequestPasswordResetController --> RequestPasswordResetUseCase
     VerifyPasswordResetTokenController --> VerifyPasswordResetTokenUseCase
     ResetPasswordController --> ResetPasswordUseCase
     TwoFactorAuthController --> TwoFactorAuthVerifyUseCase
-    TwoFactorAuthController --> JwtProvider
+    TwoFactorAuthController --> AuthCookieIssuer
 }
 
 '========================================
@@ -463,6 +520,38 @@ package com.example.keirekipro.presentation.resume.dto {
         - ResumeDto resume
     }
 
+    class ExportResumeRequest {
+        - String format
+        - String disposition
+        - PdfSettingsRequest pdfSettings
+        --
+        + ExportResumeCommand toCommand()
+    }
+
+    class "ExportResumeRequest.PdfSettingsRequest" as ExportResumePdfSettingsRequest {
+        - String fontFamily
+        - FontSizesRequest fontSizes
+        - TableHeaderColorRequest tableHeaderColor
+    }
+
+    class "ExportResumeRequest.FontSizesRequest" as ExportResumeFontSizesRequest {
+        - BigDecimal title
+        - BigDecimal date
+        - BigDecimal fullName
+        - BigDecimal sectionHeading
+    }
+
+    class "ExportResumeRequest.TableHeaderColorRequest" as ExportResumeTableHeaderColorRequest {
+        - String hex
+        - RgbRequest rgb
+    }
+
+    class "ExportResumeRequest.RgbRequest" as ExportResumeRgbRequest {
+        - Integer red
+        - Integer green
+        - Integer blue
+    }
+
     class GetResumeListResponse {
         - List<ResumeSummary> resumes
     }
@@ -488,6 +577,11 @@ package com.example.keirekipro.presentation.resume.dto {
         - Instant exportedAt
         - ResumeDto resume
     }
+
+    ExportResumeRequest --> ExportResumePdfSettingsRequest
+    ExportResumePdfSettingsRequest --> ExportResumeFontSizesRequest
+    ExportResumePdfSettingsRequest --> ExportResumeTableHeaderColorRequest
+    ExportResumeTableHeaderColorRequest --> ExportResumeRgbRequest
 }
 
 '========================================
@@ -535,6 +629,7 @@ package com.example.keirekipro.presentation.resume.controller {
         - CurrentUserFacade currentUserFacade
         --
         + ResponseEntity<byte[]> handle(UUID resumeId, String format)
+        + ResponseEntity<byte[]> handle(UUID resumeId, ExportResumeRequest request)
     }
 
     class BackupResumeController {

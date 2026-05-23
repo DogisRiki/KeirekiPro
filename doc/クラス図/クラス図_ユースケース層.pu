@@ -55,21 +55,41 @@ package com.example.keirekipro.usecase.shared.store {
 '========================================
 package com.example.keirekipro.usecase.auth.store {
     interface OidcAuthorizationSessionStore {
-        + void save(OidcAuthorizationSession session)
+        + void store(String state, String provider, String codeVerifier, Duration ttl)
         + Optional<OidcAuthorizationSession> find(String state)
-        + void delete(String state)
+        + void remove(String state)
     }
 
     interface PasswordResetTokenStore {
-        + void save(String token, UUID userId, Duration ttl)
+        + void store(String token, UUID userId, Duration ttl)
         + Optional<UUID> findUserId(String token)
-        + void delete(String token)
+        + void remove(String token)
+    }
+
+    interface RefreshTokenStore {
+        + String issue(UUID userId, Set<String> roles, long tokenVersion)
+        + Optional<RefreshTokenInfo> find(String token)
+        + void remove(String token)
+        + void removeAllByUser(UUID userId)
     }
 
     interface TwoFactorAuthCodeStore {
-        + void save(UUID userId, String code, Duration ttl)
+        + void store(UUID userId, String code, Duration ttl)
         + Optional<String> find(UUID userId)
-        + void delete(UUID userId)
+        + void remove(UUID userId)
+    }
+
+    interface TwoFactorAuthChallengeStore {
+        + void store(String token, UUID userId, Duration ttl)
+        + Optional<TwoFactorAuthChallenge> find(String token)
+        + int incrementAttempts(String token)
+        + void remove(String token)
+    }
+
+    interface UserTokenVersionStore {
+        + long get(UUID userId)
+        + void increment(UUID userId)
+        + void initialize(UUID userId)
     }
 }
 
@@ -154,6 +174,17 @@ package com.example.keirekipro.usecase.auth.notification {
 ' usecase.auth.dto
 '========================================
 package com.example.keirekipro.usecase.auth.dto {
+    class RefreshTokenInfo {
+        - UUID userId
+        - Set<String> roles
+        - long tokenVersion
+    }
+
+    class TwoFactorAuthChallenge {
+        - UUID userId
+        - int attempts
+    }
+
     class LoginUseCaseDto {
         - UUID id
         - String email
@@ -175,6 +206,21 @@ package com.example.keirekipro.usecase.auth.dto {
 }
 
 '========================================
+' usecase.auth.session
+'========================================
+package com.example.keirekipro.usecase.auth.session {
+    class AuthSessionInvalidator {
+        - UserTokenVersionStore userTokenVersionStore
+        - RefreshTokenStore refreshTokenStore
+        --
+        + void invalidate(UUID userId)
+    }
+
+    AuthSessionInvalidator --> UserTokenVersionStore
+    AuthSessionInvalidator --> RefreshTokenStore
+}
+
+'========================================
 ' usecase.auth
 '========================================
 package com.example.keirekipro.usecase.auth {
@@ -190,6 +236,7 @@ package com.example.keirekipro.usecase.auth {
         - PasswordEncoder passwordEncoder
         - DomainEventPublisher eventPublisher
         - UserEmailDuplicationCheckService userEmailDuplicationCheckService
+        - UserTokenVersionStore userTokenVersionStore
         --
         + void execute(UserRegistrationRequest request)
     }
@@ -213,6 +260,7 @@ package com.example.keirekipro.usecase.auth {
     class OidcLoginUseCase {
         - UserRepository userRepository
         - DomainEventPublisher eventPublisher
+        - UserTokenVersionStore userTokenVersionStore
         --
         + OidcLoginUseCaseDto execute(OidcUserInfo userInfo)
     }
@@ -236,29 +284,33 @@ package com.example.keirekipro.usecase.auth {
         - UserRepository userRepository
         - PasswordEncoder passwordEncoder
         - PasswordResetTokenStore passwordResetTokenStore
+        - AuthSessionInvalidator authSessionInvalidator
         --
         + void execute(String token, String newPassword)
     }
 
     class TwoFactorAuthIssueUseCase {
         - TwoFactorAuthCodeStore twoFactorAuthCodeStore
+        - TwoFactorAuthChallengeStore twoFactorAuthChallengeStore
         - NotificationDispatcher notificationDispatcher
         - SecurityUtil securityUtil
         - AppProperties properties
         --
-        + void execute(UUID userId, String email)
+        + String execute(UUID userId, String email)
     }
 
     class TwoFactorAuthVerifyUseCase {
         - TwoFactorAuthCodeStore twoFactorAuthCodeStore
+        - TwoFactorAuthChallengeStore twoFactorAuthChallengeStore
         - UserRepository userRepository
         --
-        + TwoFactorAuthVerifyResultDto execute(UUID userId, String code)
+        + TwoFactorAuthVerifyResultDto execute(String challengeToken, String code)
     }
 
     ' 依存関係
     LoginUseCase ..> LoginUseCaseDto
     OidcLoginUseCase ..> OidcLoginUseCaseDto
+    OidcLoginUseCase --> UserTokenVersionStore
     TwoFactorAuthVerifyUseCase ..> TwoFactorAuthVerifyResultDto
     HandleOidcCallbackUseCase --> OidcGateway
     HandleOidcCallbackUseCase --> OidcAuthorizationSessionStore
@@ -270,9 +322,13 @@ package com.example.keirekipro.usecase.auth {
     RequestPasswordResetUseCase --> NotificationDispatcher
     VerifyPasswordResetTokenUseCase --> PasswordResetTokenStore
     ResetPasswordUseCase --> PasswordResetTokenStore
+    ResetPasswordUseCase --> AuthSessionInvalidator
     TwoFactorAuthIssueUseCase --> TwoFactorAuthCodeStore
+    TwoFactorAuthIssueUseCase --> TwoFactorAuthChallengeStore
     TwoFactorAuthIssueUseCase --> NotificationDispatcher
     TwoFactorAuthVerifyUseCase --> TwoFactorAuthCodeStore
+    TwoFactorAuthVerifyUseCase --> TwoFactorAuthChallengeStore
+    UserRegistrationUseCase --> UserTokenVersionStore
 }
 
 '========================================
@@ -351,9 +407,12 @@ ResumeBackupQuery ..> ResumeBackupQueryDto
 ' usecase.resume.export
 '========================================
 package com.example.keirekipro.usecase.resume.export {
-    interface ResumeExporter {
-        + ExportedFile exportPdf(Resume resume)
-        + ExportedFile exportMarkdown(Resume resume)
+    interface ResumePdfExporter {
+        + ExportedFile export(Resume resume, ResumePdfExportSettings settings)
+    }
+
+    interface ResumeMarkdownExporter {
+        + ExportedFile export(Resume resume)
     }
 
     class ExportedFile {
@@ -367,13 +426,41 @@ package com.example.keirekipro.usecase.resume.export {
         MARKDOWN
     }
 
-    ResumeExporter ..> ExportedFile
+    class ResumePdfExportSettings <<record>> {
+        + String fontFamily
+        + BigDecimal titleFontSize
+        + BigDecimal dateFontSize
+        + BigDecimal fullNameFontSize
+        + BigDecimal sectionHeadingFontSize
+        + String tableHeaderColor
+        --
+        + {static} ResumePdfExportSettings defaults()
+        + {static} ResumePdfExportSettings normalize(...)
+    }
+
+    ResumePdfExporter ..> ExportedFile
+    ResumePdfExporter ..> ResumePdfExportSettings
+    ResumeMarkdownExporter ..> ExportedFile
 }
 
 '========================================
 ' usecase.resume.policy
 '========================================
 package com.example.keirekipro.usecase.resume.policy {
+    class ResumeLimits {
+        + {static} int RESUMES_CREATION_LIMIT
+        + {static} int CAREERS_CREATION_LIMIT
+        + {static} int PROJECTS_CREATION_LIMIT
+        + {static} int CERTIFICATIONS_CREATION_LIMIT
+        + {static} int SNS_PLATFORMS_CREATION_LIMIT
+        + {static} int PORTFOLIOS_CREATION_LIMIT
+        + {static} int SELF_PROMOTIONS_CREATION_LIMIT
+    }
+
+    class ResumeBackupVersion {
+        + {static} String SUPPORTED_VERSION
+    }
+
     class ResumeLimitChecker {
         - ResumeCountQuery resumeCountQuery
         --
@@ -423,6 +510,32 @@ package com.example.keirekipro.usecase.resume.dto {
         - String contentType
         - byte[] data
     }
+
+    class ExportResumeCommand {
+        - ExportFormat format
+        - ExportDisposition disposition
+        - PdfSettings pdfSettings
+        --
+        + boolean isPreview()
+    }
+
+    enum "ExportResumeCommand.ExportDisposition" as ExportDisposition {
+        INLINE
+        ATTACHMENT
+    }
+
+    class "ExportResumeCommand.PdfSettings" as PdfSettings <<record>> {
+        + String fontFamily
+        + BigDecimal titleFontSize
+        + BigDecimal dateFontSize
+        + BigDecimal fullNameFontSize
+        + BigDecimal sectionHeadingFontSize
+        + String tableHeaderColor
+    }
+
+    ExportResumeCommand --> ExportFormat
+    ExportResumeCommand --> ExportDisposition
+    ExportResumeCommand --> PdfSettings
 }
 
 '========================================
@@ -472,10 +585,11 @@ package com.example.keirekipro.usecase.resume {
     class ExportResumeUseCase {
         - ResumeRepository resumeRepository
         - ResumeExportRuleCheckService resumeExportRuleCheckService
-        - ResumeExporter pdfExporter
-        - ResumeExporter markdownExporter
+        - ResumePdfExporter pdfExporter
+        - ResumeMarkdownExporter markdownExporter
         --
         + ExportResumeUseCaseDto execute(UUID userId, UUID resumeId, ExportFormat format)
+        + ExportResumeUseCaseDto execute(UUID userId, UUID resumeId, ExportResumeCommand command)
     }
 
     class BackupResumeUseCase {
@@ -623,8 +737,10 @@ package com.example.keirekipro.usecase.resume {
     CreateSelfPromotionUseCase --> ResumeLimitChecker
     RestoreResumeUseCase --> ResumeLimitChecker
 
-    ExportResumeUseCase --> ResumeExporter
+    ExportResumeUseCase --> ResumePdfExporter
+    ExportResumeUseCase --> ResumeMarkdownExporter
     ExportResumeUseCase ..> ExportFormat
+    ExportResumeUseCase ..> ExportResumeCommand
     BackupResumeUseCase --> ResumeBackupQuery
 }
 

@@ -1,0 +1,35 @@
+# Branch Name Template
+
+## Format
+
+<type>/<short-description>
+
+## Type
+
+type は変更内容に応じて以下から選択する。
+
+- feat
+- fix
+- refactor
+- docs
+- test
+- chore
+
+## Short description
+
+short-description は以下のルールに従う。
+
+- 英小文字、数字、ハイフンのみを使用する
+- kebab-case にする
+- 作業内容を簡潔に表す
+- 日本語を使わない
+- スペースを使わない
+
+## Examples
+
+feat/add-resume-export
+fix/resume-not-found-handling
+refactor/split-usecase-exceptions
+docs/update-agent-guidelines
+test/add-resume-update-tests
+chore/update-codex-skills
