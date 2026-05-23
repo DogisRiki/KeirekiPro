@@ -382,6 +382,27 @@ package com.example.keirekipro.domain.repository.user {
 }
 
 '========================================
+' domain.policy
+'========================================
+package com.example.keirekipro.domain.policy.resume {
+    class ResumeEntryOrderPolicy {
+        + {static} Comparator<Career> careerDesc()
+        + {static} Comparator<Project> projectDesc()
+        + {static} Comparator<Certification> certificationDesc()
+        + {static} Comparator<Portfolio> portfolioNameAsc()
+        + {static} Comparator<SnsPlatform> snsPlatFormNameAsc()
+        + {static} Comparator<SelfPromotion> selfPromotionTitleAsc()
+    }
+
+    ResumeEntryOrderPolicy ..> Career
+    ResumeEntryOrderPolicy ..> Project
+    ResumeEntryOrderPolicy ..> Certification
+    ResumeEntryOrderPolicy ..> Portfolio
+    ResumeEntryOrderPolicy ..> SnsPlatform
+    ResumeEntryOrderPolicy ..> SelfPromotion
+}
+
+'========================================
 ' domain.service
 '========================================
 package com.example.keirekipro.domain.service.resume {
