@@ -19,9 +19,9 @@ services:
     tty: true
     volumes:
       - ./backend:/home/spring/app
-      - type: bind
-        source: .
-        target: /workspace/keirekipro
+      - type: volume
+        source: backend-gradle-cache
+        target: /home/spring/app/.gradle
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     environment:
@@ -49,9 +49,6 @@ services:
       - type: bind
         source: ./frontend
         target: /home/node/app
-      - type: bind
-        source: .
-        target: /workspace/keirekipro
       - type: volume
         source: node_modules
         target: /home/node/app/node_modules
@@ -68,9 +65,6 @@ services:
       - type: bind
         source: ./terraform
         target: /workspace
-      - type: bind
-        source: .
-        target: /workspace/keirekipro
     env_file:
       - ./docker/terraform/.env.local
     networks:
@@ -139,6 +133,8 @@ volumes:
     name: named-vendor
   localstack-data:
     name: named-localstack
+  backend-gradle-cache:
+    name: named-backend-gradle-cache
 
 configs:
   postgres_config:
