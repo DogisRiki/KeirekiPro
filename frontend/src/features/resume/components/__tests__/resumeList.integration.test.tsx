@@ -10,11 +10,11 @@ vi.mock("@/lib", () => ({
     },
 }));
 
-import type { GetResumeListResponse, Resume } from "@/features/resume";
+import type { GetResumeListResponse } from "@/features/resume";
 import { CreateResumeContainer, ResumeListContainer } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { useNotificationStore } from "@/stores";
-import { renderWithProviders, resetStoresAndMocks } from "@/test";
+import { createAxiosResponse, renderWithProviders, resetStoresAndMocks } from "@/test";
 
 import { cloneResume, resumeSummaries } from "./resumeTestData";
 
@@ -25,19 +25,16 @@ describe("resume list", () => {
         URL.revokeObjectURL = vi.fn();
         vi.mocked(protectedApiClient.get).mockReset();
         vi.mocked(protectedApiClient.post).mockReset();
-        vi.mocked(protectedApiClient.get).mockResolvedValue({
-            data: { resumes: resumeSummaries },
-        } as AxiosResponse<GetResumeListResponse>);
+        vi.mocked(protectedApiClient.get).mockResolvedValue(createAxiosResponse({ resumes: resumeSummaries }));
         vi.mocked(protectedApiClient.post).mockImplementation((url: string) => {
             if (url === "/resumes/resume-1/export") {
-                return Promise.resolve({
-                    data: new Blob(["pdf"], { type: "application/pdf" }),
-                    headers: {},
-                } as AxiosResponse<Blob>);
+                return Promise.resolve(
+                    createAxiosResponse(new Blob(["pdf"], { type: "application/pdf" }), {
+                        headers: {},
+                    }),
+                );
             }
-            return Promise.resolve({
-                data: cloneResume({ id: "created-resume" }),
-            } as AxiosResponse<Resume>);
+            return Promise.resolve(createAxiosResponse(cloneResume({ id: "created-resume" })));
         });
     });
 
@@ -60,9 +57,7 @@ describe("resume list", () => {
     });
 
     it("ResumeListContainerはempty時にNoData表示に切り替わること", async () => {
-        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({
-            data: { resumes: [] },
-        } as unknown as AxiosResponse<GetResumeListResponse>);
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce(createAxiosResponse({ resumes: [] }));
 
         renderWithProviders(<ResumeListContainer />);
 
@@ -83,7 +78,7 @@ describe("resume list", () => {
         expect(screen.queryByText("表示するデータがありません。")).not.toBeInTheDocument();
 
         act(() => {
-            resolveListRequest({ data: { resumes: [] } } as AxiosResponse<GetResumeListResponse>);
+            resolveListRequest(createAxiosResponse({ resumes: [] }));
         });
 
         expect(await screen.findByText("表示するデータがありません。")).toBeInTheDocument();
@@ -176,9 +171,9 @@ describe("resume list", () => {
         vi.mocked(protectedApiClient.get).mockImplementation((url: string) => {
             if (url === "/resumes") {
                 listRequestCount += 1;
-                return Promise.resolve({
-                    data: { resumes: listRequestCount === 1 ? resumeSummaries : [resumeSummaries[1]] },
-                } as AxiosResponse<GetResumeListResponse>);
+                return Promise.resolve(
+                    createAxiosResponse({ resumes: listRequestCount === 1 ? resumeSummaries : [resumeSummaries[1]] }),
+                );
             }
             if (url === "/resumes/resume-1/export") {
                 return Promise.reject({
@@ -189,7 +184,7 @@ describe("resume list", () => {
                     },
                 });
             }
-            return Promise.resolve({ data: undefined } as AxiosResponse<void>);
+            return Promise.resolve(createAxiosResponse(undefined));
         });
 
         const { user } = renderWithProviders(<ResumeListContainer />, { route: "/resume/list" });
@@ -210,11 +205,11 @@ describe("resume list", () => {
         vi.mocked(protectedApiClient.get).mockImplementation((url: string) => {
             if (url === "/resumes") {
                 listRequestCount += 1;
-                return Promise.resolve({
-                    data: { resumes: listRequestCount === 1 ? resumeSummaries : [resumeSummaries[1]] },
-                } as AxiosResponse<GetResumeListResponse>);
+                return Promise.resolve(
+                    createAxiosResponse({ resumes: listRequestCount === 1 ? resumeSummaries : [resumeSummaries[1]] }),
+                );
             }
-            return Promise.resolve({ data: undefined } as AxiosResponse<void>);
+            return Promise.resolve(createAxiosResponse(undefined));
         });
         vi.mocked(protectedApiClient.post).mockImplementationOnce(
             () =>

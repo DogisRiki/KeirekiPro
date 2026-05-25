@@ -1,5 +1,4 @@
 import { screen, waitFor, within } from "@testing-library/react";
-import type { AxiosResponse } from "axios";
 import { vi } from "vitest";
 
 vi.mock("@/lib", () => ({
@@ -12,10 +11,9 @@ vi.mock("file-saver", () => ({
     saveAs: vi.fn(),
 }));
 
-import type { GetResumeListResponse } from "@/features/resume";
 import { BackupContainer, BackupSection } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
-import { renderWithProviders, resetStoresAndMocks } from "@/test";
+import { createAxiosResponse, renderWithProviders, resetStoresAndMocks } from "@/test";
 
 import { resumeSummaries } from "./resumeTestData";
 
@@ -23,10 +21,11 @@ describe("resume backup", () => {
     beforeEach(() => {
         resetStoresAndMocks([]);
         vi.mocked(protectedApiClient.get).mockReset();
-        vi.mocked(protectedApiClient.get).mockResolvedValue({
-            data: new Blob(["{}"], { type: "application/json" }),
-            headers: { "content-disposition": 'attachment; filename="backup.json"' },
-        } as unknown as AxiosResponse<Blob>);
+        vi.mocked(protectedApiClient.get).mockResolvedValue(
+            createAxiosResponse(new Blob(["{}"], { type: "application/json" }), {
+                headers: { "content-disposition": 'attachment; filename="backup.json"' },
+            }),
+        );
     });
 
     it("BackupSectionは未選択では実行できずconfirm時だけバックアップAPIを呼ぶこと", async () => {
@@ -64,9 +63,7 @@ describe("resume backup", () => {
     });
 
     it("BackupContainerは一覧取得後に対象がない場合だけ空表示を出すこと", async () => {
-        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({
-            data: { resumes: [] },
-        } as AxiosResponse<GetResumeListResponse>);
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce(createAxiosResponse({ resumes: [] }));
 
         renderWithProviders(<BackupContainer />);
 
