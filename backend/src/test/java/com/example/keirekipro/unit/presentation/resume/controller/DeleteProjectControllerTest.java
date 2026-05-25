@@ -51,6 +51,6 @@ class DeleteProjectControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PROJECT_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(PROJECT_ID));
     }
 }

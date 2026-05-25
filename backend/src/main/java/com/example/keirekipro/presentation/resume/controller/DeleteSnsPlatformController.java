@@ -37,7 +37,7 @@ public class DeleteSnsPlatformController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "職務経歴書 SNSプラットフォーム削除", description = "職務経歴書のSNSプラットフォームを削除する")
     public void handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("snsPlatformId") UUID snsPlatformId) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

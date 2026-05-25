@@ -61,7 +61,7 @@ class DeleteCareerUseCaseTest {
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        useCase.execute(USER_ID, RESUME_ID, careerId);
+        useCase.execute(USER_ID, RESUME_ID.toString(), careerId);
 
         verify(repository).find(RESUME_ID);
 
@@ -79,9 +79,9 @@ class DeleteCareerUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         UUID careerId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, careerId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), careerId))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -95,9 +95,9 @@ class DeleteCareerUseCaseTest {
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, careerId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), careerId))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -111,7 +111,7 @@ class DeleteCareerUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         UUID missingCareerId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingCareerId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingCareerId))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職歴が存在しません。");
 

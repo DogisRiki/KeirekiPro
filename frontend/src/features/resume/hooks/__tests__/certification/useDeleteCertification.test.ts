@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 vi.mock("@/lib", () => ({
-    protectedApiClient: { post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+    protectedApiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 import type { Resume } from "@/features/resume";
@@ -46,6 +46,7 @@ describe("useDeleteCertification", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.delete).mockReset();
+        vi.mocked(protectedApiClient.get).mockReset();
 
         vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useNotificationStore.getState(), "setNotification");
@@ -84,5 +85,49 @@ describe("useDeleteCertification", () => {
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
         expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("資格を削除しました。", "success");
+    });
+
+    it("資格不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
+        const certificationId = "cert-1";
+        const staleResume: Resume = {
+            ...localResume,
+            certifications: [localResume.certifications[0]],
+        };
+        const responseWithoutSections = {
+            id: staleResume.id,
+            resumeName: staleResume.resumeName,
+            date: staleResume.date,
+            lastName: staleResume.lastName,
+            firstName: staleResume.firstName,
+            createdAt: staleResume.createdAt,
+            updatedAt: staleResume.updatedAt,
+        };
+
+        useResumeStore.getState().setResume(staleResume);
+        useResumeStore.getState().setActiveSection("certification");
+        useResumeStore.getState().setActiveEntryId(certificationId);
+
+        vi.mocked(protectedApiClient.delete).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                status: 404,
+                data: { message: "対象の資格が存在しません。", errors: {} },
+            },
+        });
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({
+            data: responseWithoutSections,
+        } as unknown as AxiosResponse<Resume>);
+
+        const { result } = renderHook(() => useDeleteCertification("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate(certificationId);
+        });
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        await waitFor(() => expect(useResumeStore.getState().resume?.certifications).toEqual([]));
+
+        expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes/resume-1");
+        expect(useResumeStore.getState().activeEntryId).toBeNull();
     });
 });

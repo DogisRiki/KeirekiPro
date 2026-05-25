@@ -11,9 +11,11 @@ skinparam linetype ortho
 package com.example.keirekipro.presentation.shared {
     class AppExceptionHandler {
         --
-        + ErrorResponse handleAuthenticationException(AuthenticationCredentialsNotFoundException ex)
+        + ErrorResponse handleAuthenticationException(AuthenticationCredentialsNotFoundException ex, HttpServletResponse response)
         + ErrorResponse handleJwtVerificationException()
         + ErrorResponse handleMethodArgumentNotValidException(MethodArgumentNotValidException ex)
+        + ErrorResponse handleHttpMessageNotReadableException()
+        + ErrorResponse handleResourceNotFoundUseCaseException(ResourceNotFoundUseCaseException ex)
         + ErrorResponse handleBaseException(BaseException ex)
         + ErrorResponse handleUnexpectedException(Exception ex)
     }
@@ -614,29 +616,29 @@ package com.example.keirekipro.presentation.resume.controller {
         - UpdateResumeBasicUseCase updateResumeBasicUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, UpdateResumeBasicRequest request)
+        + ResumeInfoResponse handle(String resumeId, UpdateResumeBasicRequest request)
     }
 
     class DeleteResumeController {
         - DeleteResumeUseCase deleteResumeUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<Void> handle(UUID resumeId)
+        + ResponseEntity<Void> handle(String resumeId)
     }
 
     class ExportResumeController {
         - ExportResumeUseCase exportResumeUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<byte[]> handle(UUID resumeId, String format)
-        + ResponseEntity<byte[]> handle(UUID resumeId, ExportResumeRequest request)
+        + ResponseEntity<byte[]> handle(String resumeId, String format)
+        + ResponseEntity<byte[]> handle(String resumeId, ExportResumeRequest request)
     }
 
     class BackupResumeController {
         - BackupResumeUseCase backupResumeUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<BackupResumeResponse> handle(UUID resumeId)
+        + ResponseEntity<BackupResumeResponse> handle(String resumeId)
     }
 
     class RestoreResumeController {
@@ -651,21 +653,21 @@ package com.example.keirekipro.presentation.resume.controller {
         - CreateCareerUseCase createCareerUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, CreateCareerRequest request)
+        + ResumeInfoResponse handle(String resumeId, CreateCareerRequest request)
     }
 
     class UpdateCareerController {
         - UpdateCareerUseCase updateCareerUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, UUID careerId, UpdateCareerRequest request)
+        + ResumeInfoResponse handle(String resumeId, UUID careerId, UpdateCareerRequest request)
     }
 
     class DeleteCareerController {
         - DeleteCareerUseCase deleteCareerUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<Void> handle(UUID resumeId, UUID careerId)
+        + ResponseEntity<Void> handle(String resumeId, UUID careerId)
     }
 
     ' Project Controllers
@@ -673,21 +675,21 @@ package com.example.keirekipro.presentation.resume.controller {
         - CreateProjectUseCase createProjectUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, CreateProjectRequest request)
+        + ResumeInfoResponse handle(String resumeId, CreateProjectRequest request)
     }
 
     class UpdateProjectController {
         - UpdateProjectUseCase updateProjectUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, UUID projectId, UpdateProjectRequest request)
+        + ResumeInfoResponse handle(String resumeId, UUID projectId, UpdateProjectRequest request)
     }
 
     class DeleteProjectController {
         - DeleteProjectUseCase deleteProjectUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<Void> handle(UUID resumeId, UUID projectId)
+        + ResponseEntity<Void> handle(String resumeId, UUID projectId)
     }
 
     ' Certification Controllers
@@ -695,21 +697,21 @@ package com.example.keirekipro.presentation.resume.controller {
         - CreateCertificationUseCase createCertificationUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, CreateCertificationRequest request)
+        + ResumeInfoResponse handle(String resumeId, CreateCertificationRequest request)
     }
 
     class UpdateCertificationController {
         - UpdateCertificationUseCase updateCertificationUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, UUID certificationId, UpdateCertificationRequest request)
+        + ResumeInfoResponse handle(String resumeId, UUID certificationId, UpdateCertificationRequest request)
     }
 
     class DeleteCertificationController {
         - DeleteCertificationUseCase deleteCertificationUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<Void> handle(UUID resumeId, UUID certificationId)
+        + ResponseEntity<Void> handle(String resumeId, UUID certificationId)
     }
 
     ' Portfolio Controllers
@@ -717,21 +719,21 @@ package com.example.keirekipro.presentation.resume.controller {
         - CreatePortfolioUseCase createPortfolioUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, CreatePortfolioRequest request)
+        + ResumeInfoResponse handle(String resumeId, CreatePortfolioRequest request)
     }
 
     class UpdatePortfolioController {
         - UpdatePortfolioUseCase updatePortfolioUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, UUID portfolioId, UpdatePortfolioRequest request)
+        + ResumeInfoResponse handle(String resumeId, UUID portfolioId, UpdatePortfolioRequest request)
     }
 
     class DeletePortfolioController {
         - DeletePortfolioUseCase deletePortfolioUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<Void> handle(UUID resumeId, UUID portfolioId)
+        + ResponseEntity<Void> handle(String resumeId, UUID portfolioId)
     }
 
     ' SnsPlatform Controllers
@@ -739,21 +741,21 @@ package com.example.keirekipro.presentation.resume.controller {
         - CreateSnsPlatformUseCase createSnsPlatformUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, CreateSnsPlatformRequest request)
+        + ResumeInfoResponse handle(String resumeId, CreateSnsPlatformRequest request)
     }
 
     class UpdateSnsPlatformController {
         - UpdateSnsPlatformUseCase updateSnsPlatformUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, UUID snsPlatformId, UpdateSnsPlatformRequest request)
+        + ResumeInfoResponse handle(String resumeId, UUID snsPlatformId, UpdateSnsPlatformRequest request)
     }
 
     class DeleteSnsPlatformController {
         - DeleteSnsPlatformUseCase deleteSnsPlatformUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<Void> handle(UUID resumeId, UUID snsPlatformId)
+        + ResponseEntity<Void> handle(String resumeId, UUID snsPlatformId)
     }
 
     ' SelfPromotion Controllers
@@ -761,21 +763,21 @@ package com.example.keirekipro.presentation.resume.controller {
         - CreateSelfPromotionUseCase createSelfPromotionUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, CreateSelfPromotionRequest request)
+        + ResumeInfoResponse handle(String resumeId, CreateSelfPromotionRequest request)
     }
 
     class UpdateSelfPromotionController {
         - UpdateSelfPromotionUseCase updateSelfPromotionUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResumeInfoResponse handle(UUID resumeId, UUID selfPromotionId, UpdateSelfPromotionRequest request)
+        + ResumeInfoResponse handle(String resumeId, UUID selfPromotionId, UpdateSelfPromotionRequest request)
     }
 
     class DeleteSelfPromotionController {
         - DeleteSelfPromotionUseCase deleteSelfPromotionUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<Void> handle(UUID resumeId, UUID selfPromotionId)
+        + ResponseEntity<Void> handle(String resumeId, UUID selfPromotionId)
     }
 
     ' 依存関係（主要なもののみ）

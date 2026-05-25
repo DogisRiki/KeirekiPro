@@ -43,7 +43,7 @@ public class BackupResumeController {
      */
     @GetMapping("/{resumeId}/backup")
     @Operation(summary = "職務経歴書バックアップ", description = "職務経歴書をJSON形式でバックアップする")
-    public ResponseEntity<BackupResumeResponse> handle(@PathVariable("resumeId") UUID resumeId) {
+    public ResponseEntity<BackupResumeResponse> handle(@PathVariable("resumeId") String resumeId) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 

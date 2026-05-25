@@ -13,6 +13,7 @@ import com.example.keirekipro.usecase.resume.export.ExportedFile;
 import com.example.keirekipro.usecase.resume.export.ResumeMarkdownExporter;
 import com.example.keirekipro.usecase.resume.export.ResumePdfExportSettings;
 import com.example.keirekipro.usecase.resume.export.ResumePdfExporter;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -56,7 +57,7 @@ public class ExportResumeUseCase {
      * @return エクスポート結果DTO
      */
     @Transactional(readOnly = true)
-    public ExportResumeUseCaseDto execute(UUID userId, UUID resumeId, ExportFormat format) {
+    public ExportResumeUseCaseDto execute(UUID userId, String resumeId, ExportFormat format) {
         ExportResumeCommand command = new ExportResumeCommand(
                 format,
                 ExportResumeCommand.ExportDisposition.ATTACHMENT,
@@ -73,14 +74,15 @@ public class ExportResumeUseCase {
      * @return エクスポート結果DTO
      */
     @Transactional(readOnly = true)
-    public ExportResumeUseCaseDto execute(UUID userId, UUID resumeId, ExportResumeCommand command) {
+    public ExportResumeUseCaseDto execute(UUID userId, String resumeId, ExportResumeCommand command) {
+        UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
-        Resume resume = resumeRepository.find(resumeId)
-                .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
+        Resume resume = resumeRepository.find(resolvedResumeId)
+                .orElseThrow(() -> new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。"));
 
         // 所有者チェック
         if (!resume.getUserId().equals(userId)) {
-            throw new UseCaseException("職務経歴書が存在しません。");
+            throw new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。");
         }
 
         // エクスポート条件前提チェック

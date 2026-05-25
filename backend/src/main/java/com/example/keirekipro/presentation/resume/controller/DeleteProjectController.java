@@ -37,7 +37,7 @@ public class DeleteProjectController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "職務経歴書 プロジェクト削除", description = "職務経歴書のプロジェクトを削除する")
     public void handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("projectId") UUID projectId) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

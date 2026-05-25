@@ -223,7 +223,7 @@ class CopyCreateResumeUseCaseTest {
         // 実行＆検証
         assertThatThrownBy(() -> useCase.execute(USER_ID, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("コピー元の職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(service).execute(eq(USER_ID), any(ResumeName.class));
         verify(repository).find(RESUME_ID);
@@ -243,7 +243,7 @@ class CopyCreateResumeUseCaseTest {
         // 実行＆検証
         assertThatThrownBy(() -> useCase.execute(USER_ID, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("コピー元の職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(service).execute(eq(USER_ID), any(ResumeName.class));
         verify(repository).find(RESUME_ID);

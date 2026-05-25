@@ -39,6 +39,6 @@ public class GetResumeInfoController {
     @Operation(summary = "職務経歴書情報の取得", description = "単一の職務経歴書情報の取得を行う")
     public ResumeInfoResponse handle(@PathVariable("resumeId") String resumeId) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
-        return ResumeInfoResponse.convertToResponse(getResumeInfoUseCase.execute(userId, UUID.fromString(resumeId)));
+        return ResumeInfoResponse.convertToResponse(getResumeInfoUseCase.execute(userId, resumeId));
     }
 }

@@ -219,6 +219,33 @@ describe("useResumeStore", () => {
         });
     });
 
+    describe("syncResumeFromServer", () => {
+        it("現在のセクションを維持し、存在しなくなったactive entryを解除してサーバーデータに同期すること", () => {
+            useResumeStore.getState().initializeResume(mockResume);
+            useResumeStore.getState().setActiveSection("project");
+            useResumeStore.getState().setActiveEntryId("project-1");
+            useResumeStore.getState().addDirtyEntryId("project-1");
+            useResumeStore.getState().setEntryErrors("project-1", { name: ["エラー"] });
+
+            const syncedResume: Resume = {
+                ...mockResume,
+                updatedAt: "2024-02-01T00:00:00.000Z",
+                projects: [],
+            };
+
+            useResumeStore.getState().syncResumeFromServer(syncedResume);
+
+            const state = useResumeStore.getState();
+            expect(state.resume).toEqual(syncedResume);
+            expect(state.activeSection).toBe("project");
+            expect(state.activeEntryId).toBeNull();
+            expect(state.activeEntryIdsBySection.project).toBeNull();
+            expect(state.isDirty).toBe(false);
+            expect(state.dirtyEntryIds.size).toBe(0);
+            expect(state.errorsByEntryId).toEqual({});
+        });
+    });
+
     describe("setResume", () => {
         it("setResumeで職務経歴書を設定しisDirtyがfalseになること", () => {
             useResumeStore.getState().setResume(mockResume);

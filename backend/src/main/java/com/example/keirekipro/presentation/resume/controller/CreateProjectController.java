@@ -42,7 +42,7 @@ public class CreateProjectController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "職務経歴書 プロジェクト新規作成", description = "職務経歴書にプロジェクトを新規作成する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @Valid @RequestBody CreateProjectRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

@@ -81,7 +81,7 @@ class UpdateResumeBasicControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(UpdateResumeBasicRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), any(UpdateResumeBasicRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(put(ENDPOINT, RESUME_ID)
@@ -106,7 +106,7 @@ class UpdateResumeBasicControllerTest {
         // ユースケースに渡されたリクエスト内容を検証
         ArgumentCaptor<UpdateResumeBasicRequest> captor = ArgumentCaptor.forClass(UpdateResumeBasicRequest.class);
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), captor.capture());
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), captor.capture());
 
         UpdateResumeBasicRequest actual = captor.getValue();
         assertEquals(req, actual);

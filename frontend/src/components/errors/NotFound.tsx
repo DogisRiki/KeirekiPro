@@ -5,15 +5,21 @@ import { Box, Typography } from "@mui/material";
 /**
  * 404
  */
-export const NotFound = () => {
+type NotFoundProps = {
+    variant?: "page" | "content";
+};
+
+export const NotFound = ({ variant = "page" }: NotFoundProps) => {
+    const isContent = variant === "content";
+
     return (
         <Box
             display={"flex"}
             flexDirection={"column"}
             alignItems={"center"}
             justifyContent={"center"}
-            height={"100vh"}
-            width={"100vw"}
+            minHeight={isContent ? "calc(100dvh - 128px)" : "100dvh"}
+            width={"100%"}
             textAlign={"center"}
             role={"alert"}
         >

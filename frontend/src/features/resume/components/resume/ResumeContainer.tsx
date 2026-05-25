@@ -1,3 +1,4 @@
+import { NotFound } from "@/components/errors";
 import { Button, Dialog } from "@/components/ui";
 import {
     BottomMenu,
@@ -5,6 +6,7 @@ import {
     createCurrentSection,
     EntryList,
     getResumeKey,
+    isResumeNotFoundError,
     isTempId,
     sections,
     SectionTabs,
@@ -69,39 +71,80 @@ export const ResumeContainer = () => {
     // 自動保存の有効/無効状態
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
 
+    // 職務経歴書本体が存在しない場合の表示状態
+    const [isResumeNotFound, setIsResumeNotFound] = useState(false);
+
     // 削除確認ダイアログ
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
     // 職務経歴書詳細情報取得
-    const { isLoading } = useGetResumeInfo(resumeId ?? "");
+    const { isLoading, error } = useGetResumeInfo(resumeId ?? "");
 
     // 基本情報更新ミューテーション
-    const updateBasicMutation = useUpdateResumeBasic(resumeId ?? "");
+    const updateBasicMutation = useUpdateResumeBasic(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
 
     // 各セクションの作成・更新・削除ミューテーション
-    const createCareerMutation = useCreateCareer(resumeId ?? "");
-    const updateCareerMutation = useUpdateCareer(resumeId ?? "");
-    const deleteCareerMutation = useDeleteCareer(resumeId ?? "");
+    const createCareerMutation = useCreateCareer(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const updateCareerMutation = useUpdateCareer(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const deleteCareerMutation = useDeleteCareer(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
 
-    const createProjectMutation = useCreateProject(resumeId ?? "");
-    const updateProjectMutation = useUpdateProject(resumeId ?? "");
-    const deleteProjectMutation = useDeleteProject(resumeId ?? "");
+    const createProjectMutation = useCreateProject(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const updateProjectMutation = useUpdateProject(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const deleteProjectMutation = useDeleteProject(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
 
-    const createCertificationMutation = useCreateCertification(resumeId ?? "");
-    const updateCertificationMutation = useUpdateCertification(resumeId ?? "");
-    const deleteCertificationMutation = useDeleteCertification(resumeId ?? "");
+    const createCertificationMutation = useCreateCertification(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const updateCertificationMutation = useUpdateCertification(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const deleteCertificationMutation = useDeleteCertification(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
 
-    const createPortfolioMutation = useCreatePortfolio(resumeId ?? "");
-    const updatePortfolioMutation = useUpdatePortfolio(resumeId ?? "");
-    const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "");
+    const createPortfolioMutation = useCreatePortfolio(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const updatePortfolioMutation = useUpdatePortfolio(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
 
-    const createSnsPlatformMutation = useCreateSnsPlatform(resumeId ?? "");
-    const updateSnsPlatformMutation = useUpdateSnsPlatform(resumeId ?? "");
-    const deleteSnsPlatformMutation = useDeleteSnsPlatform(resumeId ?? "");
+    const createSnsPlatformMutation = useCreateSnsPlatform(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const updateSnsPlatformMutation = useUpdateSnsPlatform(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const deleteSnsPlatformMutation = useDeleteSnsPlatform(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
 
-    const createSelfPromotionMutation = useCreateSelfPromotion(resumeId ?? "");
-    const updateSelfPromotionMutation = useUpdateSelfPromotion(resumeId ?? "");
-    const deleteSelfPromotionMutation = useDeleteSelfPromotion(resumeId ?? "");
+    const createSelfPromotionMutation = useCreateSelfPromotion(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const updateSelfPromotionMutation = useUpdateSelfPromotion(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
+    const deleteSelfPromotionMutation = useDeleteSelfPromotion(resumeId ?? "", {
+        onResumeNotFound: () => setIsResumeNotFound(true),
+    });
 
     // 自動保存フック
     useAutoSave({
@@ -343,6 +386,10 @@ export const ResumeContainer = () => {
         updateSelfPromotionMutation.isPending ||
         deleteSelfPromotionMutation.isPending;
 
+    if (isResumeNotFound || isResumeNotFoundError(error)) {
+        return <NotFound variant="content" />;
+    }
+
     // データ取得中またはresumeがnullの場合は何も表示しない
     if (isLoading || !resume) {
         return null;
@@ -364,7 +411,7 @@ export const ResumeContainer = () => {
                 {currentSection.type === "list" && (
                     <Grid size={{ xs: 12, md: 4 }}>
                         {/* エントリーリスト */}
-                        <EntryList />
+                        <EntryList onResumeNotFound={() => setIsResumeNotFound(true)} />
                     </Grid>
                 )}
                 <Grid size={{ xs: 12, md: currentSection.type === "list" ? 8 : 12 }}>

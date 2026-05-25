@@ -3,7 +3,7 @@
     "service": "terraform",
     "workspaceFolder": "/workspace",
     "dockerComposeFile": "../../../compose.yaml",
-    "shutdownAction": "stopCompose",
+    "shutdownAction": "none",
     "customizations": {
         "vscode": {
             "extensions": [

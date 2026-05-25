@@ -147,7 +147,7 @@ class UpdateProjectControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(PROJECT_ID), any(UpdateProjectRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(PROJECT_ID), any(UpdateProjectRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(put(ENDPOINT, RESUME_ID, PROJECT_ID)
@@ -168,7 +168,7 @@ class UpdateProjectControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PROJECT_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(PROJECT_ID),
                 any(UpdateProjectRequest.class));
     }
 

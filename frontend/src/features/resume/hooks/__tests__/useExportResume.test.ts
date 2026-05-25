@@ -121,4 +121,25 @@ describe("useExportResume", () => {
 
         expect(mockSaveAs).not.toHaveBeenCalled();
     });
+
+    it("職務経歴書不存在404の場合、呼び出し元の不存在ハンドラーを実行すること", async () => {
+        const onResumeNotFound = vi.fn();
+        vi.mocked(protectedApiClient.get).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                status: 404,
+                data: { message: "対象の職務経歴書データが存在しません。", errors: {} },
+            },
+        });
+
+        const { result } = renderHook(() => useExportResume({ onResumeNotFound }), { wrapper });
+
+        act(() => {
+            result.current.mutate({ resumeId: "resume-1", format: "markdown" });
+        });
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        expect(onResumeNotFound).toHaveBeenCalledOnce();
+        expect(mockSaveAs).not.toHaveBeenCalled();
+    });
 });

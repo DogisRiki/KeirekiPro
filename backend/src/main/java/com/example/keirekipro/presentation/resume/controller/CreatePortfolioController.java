@@ -42,7 +42,7 @@ public class CreatePortfolioController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "職務経歴書 ポートフォリオ新規作成", description = "職務経歴書にポートフォリオを新規作成する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @Valid @RequestBody CreatePortfolioRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

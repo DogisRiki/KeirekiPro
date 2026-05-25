@@ -81,7 +81,7 @@ class UpdateCareerControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID), any(UpdateCareerRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(CAREER_ID), any(UpdateCareerRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(put(ENDPOINT, RESUME_ID, CAREER_ID)
@@ -102,7 +102,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID), any(UpdateCareerRequest.class));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(CAREER_ID), any(UpdateCareerRequest.class));
     }
 
     @Test

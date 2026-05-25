@@ -19,6 +19,8 @@ interface ExtendedUserConfig extends UserConfig {
 export default defineConfig({
     plugins: [react(), tsconfigPaths()],
     server: {
+        host: true,
+        allowedHosts: ["host.docker.internal"],
         watch: {
             ignored: [
                 "**/node_modules/**",

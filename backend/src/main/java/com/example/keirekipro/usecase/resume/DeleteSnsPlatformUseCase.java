@@ -4,7 +4,7 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,18 +28,19 @@ public class DeleteSnsPlatformUseCase {
      * @param snsPlatformId SNSプラットフォームID
      */
     @Transactional
-    public void execute(UUID userId, UUID resumeId, UUID snsPlatformId) {
+    public void execute(UUID userId, String resumeId, UUID snsPlatformId) {
+        UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
-        Resume resume = resumeRepository.find(resumeId)
-                .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
+        Resume resume = resumeRepository.find(resolvedResumeId)
+                .orElseThrow(() -> new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。"));
 
         if (!resume.getUserId().equals(userId)) {
-            throw new UseCaseException("職務経歴書が存在しません。");
+            throw new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。");
         }
 
         boolean exists = resume.getSnsPlatforms().stream().anyMatch(s -> s.getId().equals(snsPlatformId));
         if (!exists) {
-            throw new UseCaseException("対象のSNSプラットフォームが存在しません。");
+            throw new ResourceNotFoundUseCaseException("対象のSNSプラットフォームが存在しません。");
         }
 
         Resume updated = resume.removeSnsPlatform(snsPlatformId);

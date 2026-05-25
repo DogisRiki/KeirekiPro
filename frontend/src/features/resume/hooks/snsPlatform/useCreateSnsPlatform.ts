@@ -1,5 +1,11 @@
-import type { CreateSnsPlatformPayload, Resume } from "@/features/resume";
-import { createSnsPlatform, useResumeStore } from "@/features/resume";
+import {
+    createSnsPlatform,
+    isResumeNotFoundError,
+    useResumeStore,
+    type CreateSnsPlatformPayload,
+    type Resume,
+    type ResumeNotFoundHandler,
+} from "@/features/resume";
 import { useNotificationStore } from "@/stores";
 import type { ErrorResponse } from "@/types";
 import { useMutation } from "@tanstack/react-query";
@@ -10,7 +16,7 @@ import type { AxiosError, AxiosResponse } from "axios";
  * @param resumeId 職務経歴書ID
  * @returns SNSプラットフォーム新規作成ミューテーション
  */
-export const useCreateSnsPlatform = (resumeId: string) => {
+export const useCreateSnsPlatform = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { setNotification } = useNotificationStore();
 
     return useMutation<
@@ -77,6 +83,11 @@ export const useCreateSnsPlatform = (resumeId: string) => {
             setNotification("SNSを作成しました。", "success");
         },
         onError: (error, { tempId }) => {
+            if (isResumeNotFoundError(error)) {
+                options?.onResumeNotFound?.();
+                return;
+            }
+
             // バリデーションエラーをストアに保存
             const errorData = error.response?.data;
             if (errorData?.errors) {

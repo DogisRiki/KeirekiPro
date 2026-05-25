@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 vi.mock("@/lib", () => ({
-    protectedApiClient: { post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+    protectedApiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 import type { Resume } from "@/features/resume";
@@ -50,6 +50,7 @@ describe("useDeleteCareer", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.delete).mockReset();
+        vi.mocked(protectedApiClient.get).mockReset();
 
         vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useNotificationStore.getState(), "setNotification");
@@ -88,5 +89,35 @@ describe("useDeleteCareer", () => {
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
         expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("職歴を削除しました。", "success");
+    });
+
+    it("職歴不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
+        const careerId = "career-1";
+        useResumeStore.getState().setResume({ ...localResume, careers: [localResume.careers[0]] });
+        useResumeStore.getState().setActiveSection("career");
+        useResumeStore.getState().setActiveEntryId(careerId);
+
+        vi.mocked(protectedApiClient.delete).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: { status: 404, data: { message: "対象の職歴が存在しません。", errors: {} } },
+        });
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({
+            data: {
+                id: localResume.id,
+                resumeName: localResume.resumeName,
+                date: localResume.date,
+                createdAt: localResume.createdAt,
+                updatedAt: localResume.updatedAt,
+            },
+        } as unknown as AxiosResponse<Resume>);
+
+        const { result } = renderHook(() => useDeleteCareer("resume-1"), { wrapper });
+
+        act(() => result.current.mutate(careerId));
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        await waitFor(() => expect(useResumeStore.getState().resume?.careers).toEqual([]));
+        expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes/resume-1");
+        expect(useResumeStore.getState().activeEntryId).toBeNull();
     });
 });

@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 vi.mock("@/lib", () => ({
-    protectedApiClient: { post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+    protectedApiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 import type { Resume } from "@/features/resume";
@@ -50,6 +50,7 @@ describe("useDeletePortfolio", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.delete).mockReset();
+        vi.mocked(protectedApiClient.get).mockReset();
 
         vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useNotificationStore.getState(), "setNotification");
@@ -91,5 +92,35 @@ describe("useDeletePortfolio", () => {
             "ポートフォリオを削除しました。",
             "success",
         );
+    });
+
+    it("ポートフォリオ不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
+        const portfolioId = "portfolio-1";
+        useResumeStore.getState().setResume({ ...localResume, portfolios: [localResume.portfolios[0]] });
+        useResumeStore.getState().setActiveSection("portfolio");
+        useResumeStore.getState().setActiveEntryId(portfolioId);
+
+        vi.mocked(protectedApiClient.delete).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: { status: 404, data: { message: "対象のポートフォリオが存在しません。", errors: {} } },
+        });
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({
+            data: {
+                id: localResume.id,
+                resumeName: localResume.resumeName,
+                date: localResume.date,
+                createdAt: localResume.createdAt,
+                updatedAt: localResume.updatedAt,
+            },
+        } as unknown as AxiosResponse<Resume>);
+
+        const { result } = renderHook(() => useDeletePortfolio("resume-1"), { wrapper });
+
+        act(() => result.current.mutate(portfolioId));
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        await waitFor(() => expect(useResumeStore.getState().resume?.portfolios).toEqual([]));
+        expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes/resume-1");
+        expect(useResumeStore.getState().activeEntryId).toBeNull();
     });
 });

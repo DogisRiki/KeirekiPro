@@ -7,6 +7,7 @@ import {
     useResumePdfPreview,
     useResumeStore,
 } from "@/features/resume";
+import type { ErrorResponse } from "@/types";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -52,8 +53,12 @@ export const BottomMenu = React.forwardRef<HTMLDivElement, BottomMenuProps>(
 
         const resume = useResumeStore((state) => state.resume);
         const deleteMutation = useDeleteResume();
-        const exportMutation = useExportResume();
-        const pdfPreview = useResumePdfPreview();
+        const handleExportResumeNotFound = React.useCallback(
+            (errorResponse?: ErrorResponse) => navigate(paths.resume.list, { state: { errorResponse } }),
+            [navigate],
+        );
+        const exportMutation = useExportResume({ onResumeNotFound: handleExportResumeNotFound });
+        const pdfPreview = useResumePdfPreview({ onResumeNotFound: handleExportResumeNotFound });
 
         const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);

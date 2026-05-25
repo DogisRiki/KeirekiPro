@@ -12,7 +12,7 @@ import com.example.keirekipro.presentation.resume.dto.CreateProjectRequest;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
-import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,16 +39,17 @@ public class CreateProjectUseCase {
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, CreateProjectRequest request) {
+    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateProjectRequest request) {
+        UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         // 上限チェック
-        resumeLimitChecker.checkProjectAddAllowed(resumeId);
+        resumeLimitChecker.checkProjectAddAllowed(resolvedResumeId);
 
-        Resume resume = resumeRepository.find(resumeId)
-                .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
+        Resume resume = resumeRepository.find(resolvedResumeId)
+                .orElseThrow(() -> new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。"));
 
         if (!resume.getUserId().equals(userId)) {
-            throw new UseCaseException("職務経歴書が存在しません。");
+            throw new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。");
         }
 
         ErrorCollector errorCollector = new ErrorCollector();

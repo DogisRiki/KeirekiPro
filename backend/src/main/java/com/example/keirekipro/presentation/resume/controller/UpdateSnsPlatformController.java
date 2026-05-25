@@ -42,7 +42,7 @@ public class UpdateSnsPlatformController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "職務経歴書 SNSプラットフォーム更新", description = "職務経歴書のSNSプラットフォームを更新する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("snsPlatformId") UUID snsPlatformId,
             @Valid @RequestBody UpdateSnsPlatformRequest request) {
 

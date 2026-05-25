@@ -120,4 +120,20 @@ describe("useErrorMessageStore", () => {
         expect(secondErrorId).not.toBeNull();
         expect(firstErrorId).not.toBe(secondErrorId);
     });
+
+    it("randomUUIDが利用できない環境でもエラーを設定できること", () => {
+        vi.stubGlobal("crypto", {});
+
+        try {
+            useErrorMessageStore.getState().setErrors({
+                message: "HTTP環境でのエラー",
+                errors: {},
+            });
+
+            expect(useErrorMessageStore.getState().message).toBe("HTTP環境でのエラー");
+            expect(useErrorMessageStore.getState().errorId).not.toBeNull();
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
 });

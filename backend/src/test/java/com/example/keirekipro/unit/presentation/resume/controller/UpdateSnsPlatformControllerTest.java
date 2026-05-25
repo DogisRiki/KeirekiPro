@@ -78,7 +78,7 @@ class UpdateSnsPlatformControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(SNS_PLATFORM_ID),
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(SNS_PLATFORM_ID),
                 any(UpdateSnsPlatformRequest.class)))
                 .thenReturn(dto);
 
@@ -102,7 +102,7 @@ class UpdateSnsPlatformControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SNS_PLATFORM_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(SNS_PLATFORM_ID),
                 any(UpdateSnsPlatformRequest.class));
     }
 

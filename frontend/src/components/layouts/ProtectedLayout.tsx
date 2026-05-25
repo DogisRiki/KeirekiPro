@@ -2,21 +2,40 @@ import { Footer, MainMenu, ScrollToTopButton, ThemeSwitch, UserMenu } from "@/co
 import { paths } from "@/config/paths";
 import { useGoogleAnalytics } from "@/hooks";
 import { useErrorMessageStore } from "@/stores";
+import type { ErrorResponse } from "@/types";
 import { AppBar, Box, Container, Toolbar, Typography } from "@mui/material";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
+
+interface ProtectedNavigationState {
+    errorResponse?: ErrorResponse;
+}
 
 /**
  * ログイン時のみアクセス可能な画面の共通レイアウト
  */
 export const ProtectedLayout = () => {
-    const { clearErrors } = useErrorMessageStore();
-    const { pathname } = useLocation();
+    const { clearErrors, setErrors } = useErrorMessageStore();
+    const { pathname, search, hash, state } = useLocation();
     const navigate = useNavigate();
+    const navigationError = (state as ProtectedNavigationState | null)?.errorResponse;
+    const currentLocation = `${pathname}${search}${hash}`;
+    const consumedErrorLocationRef = useRef<string | null>(null);
 
     useEffect(() => {
+        if (navigationError) {
+            clearErrors();
+            setErrors(navigationError);
+            consumedErrorLocationRef.current = currentLocation;
+            navigate({ pathname, search, hash }, { replace: true, state: null });
+            return;
+        }
+        if (consumedErrorLocationRef.current === currentLocation) {
+            consumedErrorLocationRef.current = null;
+            return;
+        }
         clearErrors();
-    }, [pathname, clearErrors]);
+    }, [currentLocation, navigationError, pathname, search, hash, clearErrors, navigate, setErrors]);
 
     useGoogleAnalytics();
 

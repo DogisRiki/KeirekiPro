@@ -42,7 +42,7 @@ public class CreateSnsPlatformController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "職務経歴書 SNSプラットフォーム新規作成", description = "職務経歴書にSNSプラットフォームを新規作成する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @Valid @RequestBody CreateSnsPlatformRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

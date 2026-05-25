@@ -35,19 +35,40 @@ describe("useGetResumeInfo", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.get).mockReset();
-        vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useResumeStore.getState(), "initializeResume");
     });
 
-    it("成功時はエラーストアをクリアし、initializeResumeが呼ばれること", async () => {
+    it("取得開始時に既存エラーを消去せず、initializeResumeが呼ばれること", async () => {
         const mockResponse = { status: 200, data: mockResume } as AxiosResponse<Resume>;
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce(mockResponse);
+        useErrorMessageStore.getState().setErrors({ message: "維持するエラー", errors: {} });
+
+        const { result } = renderHook(() => useGetResumeInfo("resume-1"), { wrapper });
+
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        expect(useErrorMessageStore.getState().message).toBe("維持するエラー");
+        expect(useResumeStore.getState().initializeResume).toHaveBeenCalledWith(mockResume);
+        expect(result.current.data).toEqual(mockResume);
+    });
+
+    it("空セクションがレスポンスから省略された場合は空配列に正規化すること", async () => {
+        const responseData = {
+            id: mockResume.id,
+            resumeName: mockResume.resumeName,
+            date: mockResume.date,
+            lastName: mockResume.lastName,
+            firstName: mockResume.firstName,
+            createdAt: mockResume.createdAt,
+            updatedAt: mockResume.updatedAt,
+        };
+        const mockResponse = { status: 200, data: responseData } as unknown as AxiosResponse<Resume>;
         vi.mocked(protectedApiClient.get).mockResolvedValueOnce(mockResponse);
 
         const { result } = renderHook(() => useGetResumeInfo("resume-1"), { wrapper });
 
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-        expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalled();
         expect(useResumeStore.getState().initializeResume).toHaveBeenCalledWith(mockResume);
         expect(result.current.data).toEqual(mockResume);
     });

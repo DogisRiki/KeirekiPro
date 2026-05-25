@@ -28,6 +28,7 @@ export * from "@/features/resume/types";
 export * from "@/features/resume/stores/resumeStore";
 
 export * from "@/features/resume/utils";
+export * from "@/features/resume/utils/notFoundError";
 
 export * from "@/features/resume/constants";
 

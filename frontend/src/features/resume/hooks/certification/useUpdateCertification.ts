@@ -1,5 +1,13 @@
-import type { Resume, UpdateCertificationPayload } from "@/features/resume";
-import { updateCertification, useResumeStore } from "@/features/resume";
+import {
+    isResumeNotFoundError,
+    isSectionNotFoundError,
+    syncResumeInfoFromServer,
+    updateCertification,
+    useResumeStore,
+    type Resume,
+    type ResumeNotFoundHandler,
+    type UpdateCertificationPayload,
+} from "@/features/resume";
 import { useNotificationStore } from "@/stores";
 import type { ErrorResponse } from "@/types";
 import { useMutation } from "@tanstack/react-query";
@@ -10,7 +18,7 @@ import type { AxiosError, AxiosResponse } from "axios";
  * @param resumeId 職務経歴書ID
  * @returns 資格更新ミューテーション
  */
-export const useUpdateCertification = (resumeId: string) => {
+export const useUpdateCertification = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { setNotification } = useNotificationStore();
 
     return useMutation<
@@ -61,7 +69,16 @@ export const useUpdateCertification = (resumeId: string) => {
             setDirty(false);
             setNotification("資格を更新しました。", "success");
         },
-        onError: (error, { certificationId }) => {
+        onError: async (error, { certificationId }) => {
+            if (isResumeNotFoundError(error)) {
+                options?.onResumeNotFound?.();
+                return;
+            }
+            if (isSectionNotFoundError(error)) {
+                await syncResumeInfoFromServer(resumeId);
+                return;
+            }
+
             // バリデーションエラーをストアに保存
             const errorData = error.response?.data;
             if (errorData?.errors) {

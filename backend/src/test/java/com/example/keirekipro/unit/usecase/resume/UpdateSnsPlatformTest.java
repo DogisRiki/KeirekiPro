@@ -75,7 +75,7 @@ class UpdateSnsPlatformTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, snsPlatformId, request);
+        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId, request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -123,9 +123,9 @@ class UpdateSnsPlatformTest {
 
         // 実行＆検証
         UUID snsPlatformId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, snsPlatformId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -151,9 +151,9 @@ class UpdateSnsPlatformTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, snsPlatformId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -175,7 +175,7 @@ class UpdateSnsPlatformTest {
 
         // 実行＆検証
         UUID missingSnsPlatformId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingSnsPlatformId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingSnsPlatformId, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象のSNSプラットフォームが存在しません。");
 

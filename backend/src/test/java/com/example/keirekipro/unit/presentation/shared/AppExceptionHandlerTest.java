@@ -231,4 +231,16 @@ class AppExceptionHandlerTest {
         ILoggingEvent logEvent = listAppender.list.get(0);
         assertThat(logEvent.getLevel()).isEqualTo(Level.ERROR);
     }
+
+    @Test
+    @DisplayName("ResourceNotFoundUseCaseException発生時、404が返る")
+    void test14() throws Exception {
+        mockMvc.perform(get("/test/test14")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("対象の職務経歴書データが存在しません。"))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
 }

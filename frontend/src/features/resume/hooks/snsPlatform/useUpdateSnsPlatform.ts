@@ -1,5 +1,13 @@
-import type { Resume, UpdateSnsPlatformPayload } from "@/features/resume";
-import { updateSnsPlatform, useResumeStore } from "@/features/resume";
+import {
+    isResumeNotFoundError,
+    isSectionNotFoundError,
+    syncResumeInfoFromServer,
+    updateSnsPlatform,
+    useResumeStore,
+    type Resume,
+    type ResumeNotFoundHandler,
+    type UpdateSnsPlatformPayload,
+} from "@/features/resume";
 import { useNotificationStore } from "@/stores";
 import type { ErrorResponse } from "@/types";
 import { useMutation } from "@tanstack/react-query";
@@ -10,7 +18,7 @@ import type { AxiosError, AxiosResponse } from "axios";
  * @param resumeId 職務経歴書ID
  * @returns SNSプラットフォーム更新ミューテーション
  */
-export const useUpdateSnsPlatform = (resumeId: string) => {
+export const useUpdateSnsPlatform = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { setNotification } = useNotificationStore();
 
     return useMutation<
@@ -61,7 +69,16 @@ export const useUpdateSnsPlatform = (resumeId: string) => {
             setDirty(false);
             setNotification("SNSを更新しました。", "success");
         },
-        onError: (error, { snsPlatformId }) => {
+        onError: async (error, { snsPlatformId }) => {
+            if (isResumeNotFoundError(error)) {
+                options?.onResumeNotFound?.();
+                return;
+            }
+            if (isSectionNotFoundError(error)) {
+                await syncResumeInfoFromServer(resumeId);
+                return;
+            }
+
             // バリデーションエラーをストアに保存
             const errorData = error.response?.data;
             if (errorData?.errors) {

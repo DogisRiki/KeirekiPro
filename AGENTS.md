@@ -103,6 +103,13 @@ docker compose exec -w /home/spring/app backend ./gradlew jacocoTestReport
 - SpotBugs warning は、実際の正しさや設計上の問題を示している場合はコードで修正してください。
 - SpotBugs exclusion は、ツールまたは framework 由来の誤検知と確認できた場合だけ使用してください。
 
+### Backend 例外ルール
+
+- アプリケーション例外は、その例外を定義している層の失敗を表す場合にのみ送出してください。
+- `presentation`、`usecase`、`domain`、`infrastructure` は、他層で定義されたアプリケーション例外を送出しないでください。
+- Java標準例外、ライブラリ例外、framework例外はこの制限の対象外です。
+- 横断的な処理には、特定機能・特定リソースに依存した判定や文言を入れないでください。
+
 ## Frontend
 
 フロントエンドは TypeScript、React 18、Vite、React Router v7、MUI、Zustand、TanStack Query、ESLint、Prettier、Vitest、Testing Library を使用します。
@@ -146,6 +153,15 @@ git diff --stat
 - formatting は Prettier で確認されます。
 - linting は ESLint で確認されます。
 - test と coverage は Vitest で確認されます。
+
+### Playwright MCP
+
+- UI挙動やレイアウト確認が必要な場合は、Playwright MCP を使用してよいです。
+- 使用前に `docker compose exec -d -u node -w /home/node/app frontend npm run dev` を起動してください。
+- API通信を伴う画面を確認する場合は、`docker compose exec -d -w /home/spring/app backend ./gradlew bootRun --args=--spring.profiles.active=dev` も起動してください。
+- Playwright MCP では `http://host.docker.internal:5173` を使用してください。
+- 確認後は、起動した dev server に応じて `docker compose restart frontend` または `docker compose restart backend` を実行してください。
+- Playwright MCP から接続できない場合は、実画面確認済みとして扱わないでください。
 
 ## Terraform
 

@@ -2,12 +2,15 @@ import {
     buildResumePdfSettingsPayload,
     DEFAULT_RESUME_PDF_SETTINGS,
     exportResumePdf,
+    isResumeNotFoundError,
     isSameResumePdfSettings,
+    type ResumeNotFoundHandler,
     type ResumePdfSettings,
 } from "@/features/resume";
 import { useErrorMessageStore } from "@/stores";
+import type { ErrorResponse } from "@/types";
 import { extractFileName } from "@/utils";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AxiosResponse } from "axios";
 import axios from "axios";
 import { saveAs } from "file-saver";
@@ -17,8 +20,10 @@ import { useDebouncedCallback } from "use-debounce";
 /**
  * 職務経歴書PDFプレビューを管理するフック
  */
-export const useResumePdfPreview = () => {
+export const useResumePdfPreview = (options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { clearErrors } = useErrorMessageStore();
+    const queryClient = useQueryClient();
+    const onResumeNotFound = options?.onResumeNotFound;
     const [open, setOpen] = useState(false);
     const [resumeId, setResumeId] = useState<string | null>(null);
     const [settings, setSettings] = useState<ResumePdfSettings>(DEFAULT_RESUME_PDF_SETTINGS);
@@ -28,6 +33,7 @@ export const useResumePdfPreview = () => {
     const previewAbortRef = useRef<AbortController | null>(null);
     const requestIdRef = useRef(0);
     const skipNextDebounceRef = useRef(false);
+    const skipNextOpenEffectRef = useRef(false);
 
     /**
      * 現在保持しているプレビューURLを破棄する
@@ -87,6 +93,8 @@ export const useResumePdfPreview = () => {
         previewAbortRef.current?.abort();
         previewAbortRef.current = null;
         requestIdRef.current += 1;
+        skipNextDebounceRef.current = false;
+        skipNextOpenEffectRef.current = false;
         revokePreviewUrl();
         setOpen(false);
         setResumeId(null);
@@ -96,12 +104,21 @@ export const useResumePdfPreview = () => {
     }, [resetExportMutation, resetPreviewMutation, revokePreviewUrl]);
 
     /**
+     * 不存在となった職務経歴書に関する表示状態を更新する
+     */
+    const handleResumeNotFound = useCallback(
+        async (errorData: ErrorResponse) => {
+            await queryClient.refetchQueries({ queryKey: ["getResumeList"], type: "active" });
+            await onResumeNotFound?.(errorData);
+        },
+        [onResumeNotFound, queryClient],
+    );
+
+    /**
      * 現在の設定でPDFプレビューを生成する
      */
     const generatePreview = useCallback(
-        async (targetSettings: ResumePdfSettings) => {
-            if (!resumeId) return;
-
+        async (targetResumeId: string, targetSettings: ResumePdfSettings, openWhenReady = false) => {
             previewAbortRef.current?.abort();
             const controller = new AbortController();
             previewAbortRef.current = controller;
@@ -110,7 +127,7 @@ export const useResumePdfPreview = () => {
 
             try {
                 const response = await generatePreviewAsync({
-                    resumeId,
+                    resumeId: targetResumeId,
                     settings: targetSettings,
                     signal: controller.signal,
                 });
@@ -124,23 +141,38 @@ export const useResumePdfPreview = () => {
                 revokePreviewUrl();
                 previewUrlRef.current = url;
                 setPreviewUrl(url);
+                if (openWhenReady) {
+                    skipNextOpenEffectRef.current = true;
+                    setOpen(true);
+                }
                 clearErrors();
             } catch (error) {
                 if (axios.isCancel(error) || (axios.isAxiosError(error) && error.code === "ERR_CANCELED")) {
                     return;
                 }
+                if (isResumeNotFoundError(error)) {
+                    const errorData = axios.isAxiosError<ErrorResponse>(error) ? error.response?.data : undefined;
+                    if (errorData) {
+                        await handleResumeNotFound(errorData);
+                    }
+                }
                 close();
             }
         },
-        [clearErrors, close, generatePreviewAsync, resumeId, revokePreviewUrl],
+        [clearErrors, close, generatePreviewAsync, handleResumeNotFound, revokePreviewUrl],
     );
+    const generatePreviewRef = useRef(generatePreview);
+
+    useEffect(() => {
+        generatePreviewRef.current = generatePreview;
+    }, [generatePreview]);
 
     /**
      * PDFプレビュー生成を500ms遅延させる
      */
     const debouncedGeneratePreview = useDebouncedCallback((targetSettings?: ResumePdfSettings) => {
-        if (!targetSettings) return;
-        void generatePreview(targetSettings);
+        if (!resumeId || !targetSettings) return;
+        void generatePreview(resumeId, targetSettings);
     }, 500);
     const debouncedGeneratePreviewRef = useRef(debouncedGeneratePreview);
 
@@ -153,13 +185,13 @@ export const useResumePdfPreview = () => {
      */
     const openPreview = useCallback(
         (targetResumeId: string) => {
+            close();
             clearErrors();
-            skipNextDebounceRef.current = true;
             setResumeId(targetResumeId);
             setSettings(DEFAULT_RESUME_PDF_SETTINGS);
-            setOpen(true);
+            void generatePreview(targetResumeId, DEFAULT_RESUME_PDF_SETTINGS, true);
         },
-        [clearErrors],
+        [clearErrors, close, generatePreview],
     );
 
     /**
@@ -176,8 +208,10 @@ export const useResumePdfPreview = () => {
      */
     const refresh = useCallback(() => {
         debouncedGeneratePreview.cancel();
-        void generatePreview(settings);
-    }, [debouncedGeneratePreview, generatePreview, settings]);
+        if (resumeId) {
+            void generatePreview(resumeId, settings);
+        }
+    }, [debouncedGeneratePreview, generatePreview, resumeId, settings]);
 
     /**
      * PDF設定を初期値へ戻す
@@ -199,21 +233,31 @@ export const useResumePdfPreview = () => {
             if (axios.isCancel(error) || (axios.isAxiosError(error) && error.code === "ERR_CANCELED")) {
                 return;
             }
+            if (isResumeNotFoundError(error)) {
+                const errorData = axios.isAxiosError<ErrorResponse>(error) ? error.response?.data : undefined;
+                if (errorData) {
+                    await handleResumeNotFound(errorData);
+                }
+            }
             close();
         }
-    }, [close, exportPdfAsync, resumeId, settings]);
+    }, [close, exportPdfAsync, handleResumeNotFound, resumeId, settings]);
 
     useEffect(() => {
         if (!open || !resumeId) {
             return;
         }
+        if (skipNextOpenEffectRef.current) {
+            skipNextOpenEffectRef.current = false;
+            return;
+        }
         if (skipNextDebounceRef.current) {
             skipNextDebounceRef.current = false;
-            void generatePreview(settings);
+            void generatePreviewRef.current(resumeId, settings);
             return;
         }
         debouncedGeneratePreviewRef.current(settings);
-    }, [generatePreview, open, resumeId, settings]);
+    }, [open, resumeId, settings]);
 
     useEffect(() => {
         return () => {

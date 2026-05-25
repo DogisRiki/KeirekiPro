@@ -51,6 +51,55 @@ prefix_rule(
     justification = "Allow targeted Vitest runs inside frontend container",
 )
 
+# --- Dev server control for Playwright MCP ---
+prefix_rule(
+    pattern = [
+        "docker", "compose", "exec", "-d",
+        "-u", "node",
+        "-w", "/home/node/app",
+        "frontend",
+        "npm", "run", "dev",
+    ],
+    decision = "allow",
+    justification = "Allow starting Vite dev server for Playwright MCP UI verification",
+    match = [
+        "docker compose exec -d -u node -w /home/node/app frontend npm run dev",
+    ],
+)
+
+prefix_rule(
+    pattern = [
+        "docker", "compose", "exec", "-d",
+        "-w", "/home/spring/app",
+        "backend",
+        "./gradlew", "bootRun",
+        "--args=--spring.profiles.active=dev",
+    ],
+    decision = "allow",
+    justification = "Allow starting Spring Boot dev server for Playwright MCP UI verification",
+    match = [
+        "docker compose exec -d -w /home/spring/app backend ./gradlew bootRun --args=--spring.profiles.active=dev",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "restart", "frontend"],
+    decision = "allow",
+    justification = "Allow stopping Vite dev server after Playwright MCP UI verification",
+    match = [
+        "docker compose restart frontend",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "restart", "backend"],
+    decision = "allow",
+    justification = "Allow stopping Spring Boot dev server after Playwright MCP UI verification",
+    match = [
+        "docker compose restart backend",
+    ],
+)
+
 # --- Backend quality gates ---
 prefix_rule(
     pattern = ["docker", "compose", "exec", "-w", "/home/spring/app", "backend", "./gradlew", ["spotlessApply", "check", "test", "spotlessCheck", "jacocoTestReport"]],
@@ -137,5 +186,32 @@ prefix_rule(
     match = [
         "git diff",
         "git diff --stat",
+    ],
+)
+
+# --- Git branch creation ---
+prefix_rule(
+    pattern = ["git", "switch", "-c"],
+    decision = "allow",
+    justification = "Allow creating task branches according to AGENTS.md",
+)
+
+# --- Safe Docker inspection commands ---
+prefix_rule(
+    pattern = ["docker", "ps"],
+    decision = "allow",
+    justification = "Read-only Docker container inspection command",
+    match = [
+        "docker ps",
+        "docker ps -a",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "ps"],
+    decision = "allow",
+    justification = "Read-only Docker Compose service inspection command",
+    match = [
+        "docker compose ps",
     ],
 )

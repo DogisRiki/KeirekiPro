@@ -78,7 +78,7 @@ class UpdateSelfPromotionControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID),
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(SELF_PROMOTION_ID),
                 any(UpdateSelfPromotionRequest.class)))
                 .thenReturn(dto);
 
@@ -102,7 +102,7 @@ class UpdateSelfPromotionControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(SELF_PROMOTION_ID),
                 any(UpdateSelfPromotionRequest.class));
     }
 

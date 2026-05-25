@@ -47,7 +47,7 @@ public class ExportResumeController {
     @GetMapping("/{resumeId}/export")
     @Operation(summary = "職務経歴書エクスポート", description = "職務経歴書をファイルとしてエクスポートしダウンロードする")
     public ResponseEntity<byte[]> handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
@@ -82,7 +82,7 @@ public class ExportResumeController {
     @PostMapping("/{resumeId}/export")
     @Operation(summary = "職務経歴書エクスポート", description = "職務経歴書を指定された設定でエクスポートする")
     public ResponseEntity<byte[]> handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @Valid @RequestBody ExportResumeRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

@@ -3,10 +3,6 @@ import { vi } from "vitest";
 vi.mock("@/lib", () => ({
     protectedApiClient: { delete: vi.fn() },
 }));
-const mockRefetch = vi.fn();
-vi.mock("@/features/resume/hooks/useGetResumeList", () => ({
-    useGetResumeList: () => ({ refetch: mockRefetch }),
-}));
 
 import { useDeleteResume } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
@@ -21,12 +17,11 @@ describe("useDeleteResume", () => {
     beforeEach(() => {
         resetStoresAndMocks([]);
         vi.mocked(protectedApiClient.delete).mockReset();
-        mockRefetch.mockReset();
         vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useNotificationStore.getState(), "setNotification");
     });
 
-    it("成功時はエラーストアをクリアし、成功通知とrefetchが実行されること", async () => {
+    it("成功時はエラーストアをクリアし、成功通知が実行されること", async () => {
         const mockResponse = { status: 204, data: undefined } as AxiosResponse<void>;
         vi.mocked(protectedApiClient.delete).mockResolvedValueOnce(mockResponse);
 
@@ -43,6 +38,6 @@ describe("useDeleteResume", () => {
             "職務経歴書を削除しました。",
             "success",
         );
-        expect(mockRefetch).toHaveBeenCalled();
+        expect(protectedApiClient.delete).toHaveBeenCalledWith("/resumes/resume-1");
     });
 });

@@ -11,7 +11,7 @@ import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.presentation.resume.dto.UpdateProjectRequest;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
-import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,19 +37,20 @@ public class UpdateProjectUseCase {
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId, UUID projectId, UpdateProjectRequest request) {
+    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID projectId, UpdateProjectRequest request) {
+        UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
-        Resume resume = resumeRepository.find(resumeId)
-                .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
+        Resume resume = resumeRepository.find(resolvedResumeId)
+                .orElseThrow(() -> new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。"));
 
         if (!resume.getUserId().equals(userId)) {
-            throw new UseCaseException("職務経歴書が存在しません。");
+            throw new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。");
         }
 
         Project existing = resume.getProjects().stream()
                 .filter(p -> p.getId().equals(projectId))
                 .findFirst()
-                .orElseThrow(() -> new UseCaseException("対象のプロジェクトが存在しません。"));
+                .orElseThrow(() -> new ResourceNotFoundUseCaseException("対象のプロジェクトが存在しません。"));
 
         ErrorCollector errorCollector = new ErrorCollector();
 

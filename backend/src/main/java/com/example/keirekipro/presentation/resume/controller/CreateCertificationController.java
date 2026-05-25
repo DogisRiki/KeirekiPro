@@ -42,7 +42,7 @@ public class CreateCertificationController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "職務経歴書 資格新規作成", description = "職務経歴書に資格を新規作成する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @Valid @RequestBody CreateCertificationRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

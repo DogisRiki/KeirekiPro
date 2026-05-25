@@ -51,6 +51,6 @@ class DeleteSnsPlatformControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SNS_PLATFORM_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(SNS_PLATFORM_ID));
     }
 }

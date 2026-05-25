@@ -51,6 +51,6 @@ class DeleteSelfPromotionControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(SELF_PROMOTION_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(SELF_PROMOTION_ID));
     }
 }

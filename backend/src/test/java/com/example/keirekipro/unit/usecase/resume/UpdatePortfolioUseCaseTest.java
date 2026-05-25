@@ -77,7 +77,7 @@ class UpdatePortfolioUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, portfolioId, request);
+        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), portfolioId, request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -129,9 +129,9 @@ class UpdatePortfolioUseCaseTest {
 
         // 実行＆検証
         UUID portfolioId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, portfolioId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), portfolioId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -159,9 +159,9 @@ class UpdatePortfolioUseCaseTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, portfolioId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), portfolioId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -185,7 +185,7 @@ class UpdatePortfolioUseCaseTest {
 
         // 実行＆検証
         UUID missingPortfolioId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingPortfolioId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingPortfolioId, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象のポートフォリオが存在しません。");
 

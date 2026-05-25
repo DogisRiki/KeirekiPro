@@ -8,7 +8,9 @@ export const CreateResumeContainer = () => {
     const [resumeName, setResumeName] = useState("");
     const [copySourceId, setCopySourceId] = useState("");
 
-    const createResumeMutation = useCreateResume();
+    const createResumeMutation = useCreateResume({
+        onCopySourceNotFound: () => setCopySourceId(""),
+    });
     const { data } = useGetResumeList();
 
     /**

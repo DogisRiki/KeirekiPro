@@ -78,6 +78,7 @@ interface ResumeStoreState {
     setActiveEntryId: (entryId: string | null) => void;
     setResume: (resume: Resume) => void;
     initializeResume: (resume: Resume) => void;
+    syncResumeFromServer: (resume: Resume) => void;
     updateResume: (patch: Partial<Resume>) => void;
     updateResumeFromServer: (patch: Partial<Resume>) => void;
     updateSection: (section: ResumeArrayKeys, data: Resume[ResumeArrayKeys]) => void;
@@ -175,6 +176,47 @@ export const useResumeStore = create<ResumeStoreState>()(
                     },
                     false,
                     "initializeResume",
+                ),
+
+            // アクション: サーバーの最新データで同期（現在のセクションは維持）
+            syncResumeFromServer: (resume) =>
+                set(
+                    (state) => {
+                        const nextActiveEntryIdsBySection: ActiveEntryIdsBySection = {
+                            ...state.activeEntryIdsBySection,
+                        };
+
+                        const sectionKeys: Record<ListSectionName, ResumeArrayKeys> = {
+                            career: "careers",
+                            project: "projects",
+                            certification: "certifications",
+                            portfolio: "portfolios",
+                            snsPlatform: "snsPlatforms",
+                            selfPromotion: "selfPromotions",
+                        };
+
+                        (Object.keys(sectionKeys) as ListSectionName[]).forEach((section) => {
+                            const currentEntryId = nextActiveEntryIdsBySection[section];
+                            if (!currentEntryId) return;
+
+                            const resumeKey = sectionKeys[section];
+                            const exists = resume[resumeKey].some((entry) => entry.id === currentEntryId);
+                            if (!exists) {
+                                nextActiveEntryIdsBySection[section] = null;
+                            }
+                        });
+
+                        return {
+                            resume,
+                            isDirty: false,
+                            activeEntryIdsBySection: nextActiveEntryIdsBySection,
+                            activeEntryId: getActiveEntryId(state.activeSection, nextActiveEntryIdsBySection),
+                            dirtyEntryIds: new Set<string>(),
+                            errorsByEntryId: {},
+                        };
+                    },
+                    false,
+                    "syncResumeFromServer",
                 ),
 
             // アクション: 職務経歴書の部分更新（変更時はdirtyをtrueに）

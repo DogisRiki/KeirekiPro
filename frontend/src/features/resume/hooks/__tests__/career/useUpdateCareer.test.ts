@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 vi.mock("@/lib", () => ({
-    protectedApiClient: { post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+    protectedApiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 import type { Resume } from "@/features/resume";
@@ -59,8 +59,10 @@ describe("useUpdateCareer", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.put).mockReset();
+        vi.mocked(protectedApiClient.get).mockReset();
         vi.spyOn(useNotificationStore.getState(), "setNotification");
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
+        vi.spyOn(useResumeStore.getState(), "syncResumeFromServer");
         vi.spyOn(useResumeStore.getState(), "setDirty");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setEntryErrors");
@@ -193,5 +195,52 @@ describe("useUpdateCareer", () => {
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
         expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
+    });
+
+    it("職歴不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
+        const careerId = "career-1";
+        const responseWithoutSections = {
+            id: localResume.id,
+            resumeName: localResume.resumeName,
+            date: localResume.date,
+            lastName: localResume.lastName,
+            firstName: localResume.firstName,
+            createdAt: localResume.createdAt,
+            updatedAt: localResume.updatedAt,
+        };
+
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("career");
+        useResumeStore.getState().setActiveEntryId(careerId);
+        useResumeStore.getState().addDirtyEntryId(careerId);
+
+        vi.mocked(protectedApiClient.put).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                status: 404,
+                data: { message: "対象の職歴が存在しません。", errors: {} },
+            },
+        });
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({ data: responseWithoutSections });
+
+        const { result } = renderHook(() => useUpdateCareer("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({
+                careerId,
+                payload: {
+                    companyName: "ローカル（更新対象・dirty）",
+                    startDate: "2020-04",
+                    endDate: null,
+                    isActive: true,
+                },
+            });
+        });
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        await waitFor(() => expect(useResumeStore.getState().resume?.careers).toEqual([]));
+
+        expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes/resume-1");
+        expect(useResumeStore.getState().activeEntryId).toBeNull();
     });
 });
