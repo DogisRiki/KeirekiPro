@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.shared.exception.BaseException;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +86,18 @@ public class AppExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleHttpMessageNotReadableException() {
         return new ErrorResponse("入力エラーがあります。", Collections.emptyMap());
+    }
+
+    /**
+     * ResourceNotFoundUseCaseExceptionをハンドリングする
+     *
+     * @param ex 例外オブジェクト
+     * @return エラーレスポンス
+     */
+    @ExceptionHandler(ResourceNotFoundUseCaseException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleResourceNotFoundUseCaseException(ResourceNotFoundUseCaseException ex) {
+        return new ErrorResponse(ex.getMessage(), ex.getErrors());
     }
 
     /**

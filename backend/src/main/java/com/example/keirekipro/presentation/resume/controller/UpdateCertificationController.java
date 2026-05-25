@@ -42,7 +42,7 @@ public class UpdateCertificationController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "職務経歴書 資格更新", description = "職務経歴書の資格を更新する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("certificationId") UUID certificationId,
             @Valid @RequestBody UpdateCertificationRequest request) {
 

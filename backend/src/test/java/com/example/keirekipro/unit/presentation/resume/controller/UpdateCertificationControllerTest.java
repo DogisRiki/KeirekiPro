@@ -79,7 +79,7 @@ class UpdateCertificationControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(CERTIFICATION_ID),
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(CERTIFICATION_ID),
                 any(UpdateCertificationRequest.class)))
                 .thenReturn(dto);
 
@@ -101,7 +101,7 @@ class UpdateCertificationControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CERTIFICATION_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(CERTIFICATION_ID),
                 any(UpdateCertificationRequest.class));
     }
 

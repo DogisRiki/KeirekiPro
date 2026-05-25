@@ -12,6 +12,14 @@ interface ErrorMessageState {
     clearErrors: () => void;
 }
 
+const createErrorId = (): string => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 /**
  * エラーメッセージを管理するストア
  */
@@ -32,7 +40,7 @@ export const useErrorMessageStore = create<ErrorMessageState>()(
                     {
                         message: errorResponse.message,
                         errors: errorResponse.errors,
-                        errorId: crypto.randomUUID(),
+                        errorId: createErrorId(),
                     },
                     false,
                     "setErrors",

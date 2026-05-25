@@ -17,7 +17,7 @@ import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
-import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,11 +58,11 @@ public class CopyCreateResumeUseCase {
 
         // コピー元を取得
         Resume source = resumeRepository.find(request.getResumeId())
-                .orElseThrow(() -> new UseCaseException("コピー元の職務経歴書が存在しません。"));
+                .orElseThrow(() -> new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。"));
 
         // 所有者チェック（他人の職務経歴書をコピーしようとした場合）
         if (!source.getUserId().equals(userId)) {
-            throw new UseCaseException("コピー元の職務経歴書が存在しません。");
+            throw new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。");
         }
 
         // 職歴

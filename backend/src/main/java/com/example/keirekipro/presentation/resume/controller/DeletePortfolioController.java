@@ -37,7 +37,7 @@ public class DeletePortfolioController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "職務経歴書 ポートフォリオ削除", description = "職務経歴書のポートフォリオを削除する")
     public void handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("portfolioId") UUID portfolioId) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

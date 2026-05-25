@@ -28,18 +28,18 @@ describe("useCertificationList", () => {
     beforeEach(() => {
         resetStoresAndMocks([]);
         vi.mocked(protectedApiClient.get).mockReset();
-        vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
     });
 
-    it("成功時はエラーストアをクリアし、データが取得されること", async () => {
+    it("取得開始時に既存エラーを消去せず、データが取得されること", async () => {
         const mockResponse = { status: 200, data: mockCertificationList } as AxiosResponse<CertificationListResponse>;
         vi.mocked(protectedApiClient.get).mockResolvedValueOnce(mockResponse);
+        useErrorMessageStore.getState().setErrors({ message: "維持するエラー", errors: {} });
 
         const { result } = renderHook(() => useCertificationList(), { wrapper });
 
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-        expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalled();
+        expect(useErrorMessageStore.getState().message).toBe("維持するエラー");
         expect(result.current.data).toEqual(mockCertificationList);
     });
 });

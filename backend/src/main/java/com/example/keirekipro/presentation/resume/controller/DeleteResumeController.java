@@ -36,7 +36,7 @@ public class DeleteResumeController {
     @DeleteMapping("/{resumeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "職務経歴書削除", description = "職務経歴書を削除する")
-    public void handle(@PathVariable("resumeId") UUID resumeId) {
+    public void handle(@PathVariable("resumeId") String resumeId) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
         deleteResumeUseCase.execute(userId, resumeId);
     }

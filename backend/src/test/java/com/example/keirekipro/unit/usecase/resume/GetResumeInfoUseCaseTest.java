@@ -53,7 +53,7 @@ class GetResumeInfoUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID);
+        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString());
 
         // 期待値DTOは同一Resumeから変換する（IDの不一致を防止）
         var expected = ResumeInfoUseCaseDto.convertToUseCaseDto(resume);
@@ -76,9 +76,9 @@ class GetResumeInfoUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString()))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
     }
@@ -92,9 +92,9 @@ class GetResumeInfoUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString()))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
     }

@@ -4,7 +4,7 @@
     "workspaceFolder": "/home/node/app",
     "dockerComposeFile": "../../../compose.yaml",
     "remoteUser": "node",
-    "shutdownAction": "stopCompose",
+    "shutdownAction": "none",
     "customizations": {
         "vscode": {
             "extensions": [

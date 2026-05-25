@@ -42,7 +42,7 @@ public class CreateCareerController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "職務経歴書 職歴新規作成", description = "職務経歴書に職歴を新規作成する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @Valid @RequestBody CreateCareerRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

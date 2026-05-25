@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.domain.shared.exception.DomainException;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
 import io.swagger.v3.oas.annotations.Hidden;
@@ -100,6 +101,11 @@ class TestController {
     @GetMapping("/test13")
     public void throwExceptionWithNullMessage() {
         throw new RuntimeException((String) null);
+    }
+
+    @GetMapping("/test14")
+    public void throwResourceNotFoundUseCaseException() {
+        throw new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。");
     }
 
     @Data

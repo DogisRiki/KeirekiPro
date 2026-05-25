@@ -57,7 +57,7 @@ class DeleteResumeUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        useCase.execute(USER_ID, RESUME_ID);
+        useCase.execute(USER_ID, RESUME_ID.toString());
 
         // 検証：find が呼ばれ、delete が適切なIDで呼ばれていること
         verify(repository).find(RESUME_ID);
@@ -71,9 +71,9 @@ class DeleteResumeUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString()))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).delete(any());
@@ -89,9 +89,9 @@ class DeleteResumeUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString()))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).delete(any());

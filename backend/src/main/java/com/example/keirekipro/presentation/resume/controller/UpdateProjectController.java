@@ -42,7 +42,7 @@ public class UpdateProjectController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "職務経歴書 プロジェクト更新", description = "職務経歴書のプロジェクトを更新する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody UpdateProjectRequest request) {
 

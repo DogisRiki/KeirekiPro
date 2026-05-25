@@ -32,7 +32,7 @@ export const ResumeListContainer = () => {
     const [currentDisplayCount, setCurrentDisplayCount] = useState<number>(itemPerPage);
 
     // 職務経歴書一覧取得
-    const { data } = useGetResumeList();
+    const { data, isSuccess } = useGetResumeList();
 
     // APIレスポンスから配列を取り出す
     const resumeData = data?.resumes ?? [];
@@ -97,7 +97,7 @@ export const ResumeListContainer = () => {
                 setSortType={setSortType}
             />
             {/* 職務経歴書カード */}
-            {filteredResumeData.length > 0 ? (
+            {!isSuccess ? null : filteredResumeData.length > 0 ? (
                 <Grid container spacing={3} sx={{ my: 4 }}>
                     {filteredResumeData.slice(0, currentDisplayCount).map((resume) => (
                         <Grid size={{ xs: 12, sm: 6, md: 4 }} key={resume.id}>

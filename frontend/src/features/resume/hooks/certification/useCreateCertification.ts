@@ -1,5 +1,11 @@
-import type { CreateCertificationPayload, Resume } from "@/features/resume";
-import { createCertification, useResumeStore } from "@/features/resume";
+import {
+    createCertification,
+    isResumeNotFoundError,
+    useResumeStore,
+    type CreateCertificationPayload,
+    type Resume,
+    type ResumeNotFoundHandler,
+} from "@/features/resume";
 import { useNotificationStore } from "@/stores";
 import type { ErrorResponse } from "@/types";
 import { useMutation } from "@tanstack/react-query";
@@ -10,7 +16,7 @@ import type { AxiosError, AxiosResponse } from "axios";
  * @param resumeId 職務経歴書ID
  * @returns 資格新規作成ミューテーション
  */
-export const useCreateCertification = (resumeId: string) => {
+export const useCreateCertification = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { setNotification } = useNotificationStore();
 
     return useMutation<
@@ -77,6 +83,11 @@ export const useCreateCertification = (resumeId: string) => {
             setNotification("資格を作成しました。", "success");
         },
         onError: (error, { tempId }) => {
+            if (isResumeNotFoundError(error)) {
+                options?.onResumeNotFound?.();
+                return;
+            }
+
             // バリデーションエラーをストアに保存
             const errorData = error.response?.data;
             if (errorData?.errors) {

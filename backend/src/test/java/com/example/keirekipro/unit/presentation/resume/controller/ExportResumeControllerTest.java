@@ -62,7 +62,7 @@ class ExportResumeControllerTest {
                 pdfContent);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(ExportFormat.PDF))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(ExportFormat.PDF))).thenReturn(dto);
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID)
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_PDF_VALUE))
@@ -72,7 +72,7 @@ class ExportResumeControllerTest {
                 .andExpect(content().bytes(pdfContent));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(ExportFormat.PDF));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(ExportFormat.PDF));
     }
 
     @Test
@@ -85,7 +85,7 @@ class ExportResumeControllerTest {
                 mdContent);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(ExportFormat.MARKDOWN))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(ExportFormat.MARKDOWN))).thenReturn(dto);
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID)
                 .header(HttpHeaders.ACCEPT, "text/markdown"))
@@ -95,7 +95,7 @@ class ExportResumeControllerTest {
                 .andExpect(content().bytes(mdContent));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(ExportFormat.MARKDOWN));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(ExportFormat.MARKDOWN));
     }
 
     @Test
@@ -131,7 +131,7 @@ class ExportResumeControllerTest {
                 pdfContent);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(ExportResumeCommand.class))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), any(ExportResumeCommand.class))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -169,7 +169,7 @@ class ExportResumeControllerTest {
                 pdfContent);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(ExportResumeCommand.class))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), any(ExportResumeCommand.class))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
                 .contentType(MediaType.APPLICATION_JSON)

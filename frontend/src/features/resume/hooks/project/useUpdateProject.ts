@@ -1,5 +1,13 @@
-import type { Resume, UpdateProjectPayload } from "@/features/resume";
-import { updateProject, useResumeStore } from "@/features/resume";
+import {
+    isResumeNotFoundError,
+    isSectionNotFoundError,
+    syncResumeInfoFromServer,
+    updateProject,
+    useResumeStore,
+    type Resume,
+    type ResumeNotFoundHandler,
+    type UpdateProjectPayload,
+} from "@/features/resume";
 import { useNotificationStore } from "@/stores";
 import type { ErrorResponse } from "@/types";
 import { useMutation } from "@tanstack/react-query";
@@ -10,7 +18,7 @@ import type { AxiosError, AxiosResponse } from "axios";
  * @param resumeId 職務経歴書ID
  * @returns プロジェクト更新ミューテーション
  */
-export const useUpdateProject = (resumeId: string) => {
+export const useUpdateProject = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { setNotification } = useNotificationStore();
 
     return useMutation<
@@ -59,7 +67,16 @@ export const useUpdateProject = (resumeId: string) => {
             setDirty(false);
             setNotification("プロジェクトを更新しました。", "success");
         },
-        onError: (error, { projectId }) => {
+        onError: async (error, { projectId }) => {
+            if (isResumeNotFoundError(error)) {
+                options?.onResumeNotFound?.();
+                return;
+            }
+            if (isSectionNotFoundError(error)) {
+                await syncResumeInfoFromServer(resumeId);
+                return;
+            }
+
             // バリデーションエラーをストアに保存
             const errorData = error.response?.data;
             if (errorData?.errors) {

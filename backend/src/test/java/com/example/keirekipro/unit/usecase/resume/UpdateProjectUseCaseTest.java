@@ -132,7 +132,7 @@ class UpdateProjectUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, projectId, request);
+        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), projectId, request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -215,9 +215,9 @@ class UpdateProjectUseCaseTest {
 
         // 実行＆検証
         UUID projectId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, projectId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), projectId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -257,9 +257,9 @@ class UpdateProjectUseCaseTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, projectId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), projectId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -295,7 +295,7 @@ class UpdateProjectUseCaseTest {
 
         // 実行＆検証
         UUID missingProjectId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingProjectId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingProjectId, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象のプロジェクトが存在しません。");
 

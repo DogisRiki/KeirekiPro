@@ -5,7 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
-import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 import org.springframework.stereotype.Service;
 
@@ -27,13 +27,15 @@ public class GetResumeInfoUseCase {
      * @param resumeId 職務経歴書ID
      * @return 職務経歴書ユースケースDTO
      */
-    public ResumeInfoUseCaseDto execute(UUID userId, UUID resumeId) {
+    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId) {
+        UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
-        Resume resume = resumeRepository.find(resumeId).orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
+        Resume resume = resumeRepository.find(resolvedResumeId)
+                .orElseThrow(() -> new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。"));
 
         // 所有者チェック（他人の職務経歴書の場合）
         if (!resume.getUserId().equals(userId)) {
-            throw new UseCaseException("職務経歴書が存在しません。");
+            throw new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。");
         }
 
         return ResumeInfoUseCaseDto.convertToUseCaseDto(resume);

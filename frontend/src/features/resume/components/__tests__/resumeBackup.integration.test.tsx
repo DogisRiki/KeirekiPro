@@ -12,7 +12,8 @@ vi.mock("file-saver", () => ({
     saveAs: vi.fn(),
 }));
 
-import { BackupSection } from "@/features/resume";
+import type { GetResumeListResponse } from "@/features/resume";
+import { BackupContainer, BackupSection } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { renderWithProviders, resetStoresAndMocks } from "@/test";
 
@@ -52,5 +53,23 @@ describe("resume backup", () => {
                 expect.objectContaining({ responseType: "blob" }),
             ),
         );
+    });
+
+    it("BackupContainerは一覧の初回取得中に空表示を出さないこと", () => {
+        vi.mocked(protectedApiClient.get).mockImplementationOnce(() => new Promise(() => {}));
+
+        renderWithProviders(<BackupContainer />);
+
+        expect(screen.queryByText("バックアップ可能な職務経歴書がありません。")).not.toBeInTheDocument();
+    });
+
+    it("BackupContainerは一覧取得後に対象がない場合だけ空表示を出すこと", async () => {
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({
+            data: { resumes: [] },
+        } as AxiosResponse<GetResumeListResponse>);
+
+        renderWithProviders(<BackupContainer />);
+
+        expect(await screen.findByText("バックアップ可能な職務経歴書がありません。")).toBeInTheDocument();
     });
 });

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 import { Route, Routes } from "react-router";
 import { vi } from "vitest";
@@ -69,6 +69,26 @@ describe("resume list", () => {
         expect(await screen.findByText("表示するデータがありません。")).toBeInTheDocument();
     });
 
+    it("ResumeListContainerは一覧の初回取得中にNoDataを表示しないこと", async () => {
+        let resolveListRequest!: (response: AxiosResponse<GetResumeListResponse>) => void;
+        vi.mocked(protectedApiClient.get).mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    resolveListRequest = resolve;
+                }),
+        );
+
+        renderWithProviders(<ResumeListContainer />);
+
+        expect(screen.queryByText("表示するデータがありません。")).not.toBeInTheDocument();
+
+        act(() => {
+            resolveListRequest({ data: { resumes: [] } } as AxiosResponse<GetResumeListResponse>);
+        });
+
+        expect(await screen.findByText("表示するデータがありません。")).toBeInTheDocument();
+    });
+
     it("CreateResumeContainerはAPI結果のIDで編集画面へ遷移しsuccess通知を設定すること", async () => {
         const { user } = renderWithProviders(
             <Routes>
@@ -93,6 +113,30 @@ describe("resume list", () => {
             message: "職務経歴書を作成しました。",
             type: "success",
             isShow: true,
+        });
+    });
+
+    it("コピー元が存在しない場合はコピー元を未選択に戻すこと", async () => {
+        vi.mocked(protectedApiClient.post).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                status: 404,
+                data: { message: "対象の職務経歴書データが存在しません。", errors: {} },
+            },
+        });
+
+        const { user } = renderWithProviders(<CreateResumeContainer />);
+
+        await screen.findByRole("combobox");
+        await user.type(screen.getByRole("textbox", { name: /職務経歴書名/ }), "Copied Resume");
+        await user.click(screen.getByRole("combobox"));
+        await user.click(screen.getByRole("option", { name: "Alpha Resume" }));
+        await user.click(screen.getByRole("button", { name: "作成" }));
+
+        await waitFor(() => expect(screen.getByRole("combobox")).toHaveTextContent("未選択"));
+        expect(protectedApiClient.post).toHaveBeenCalledWith("/resumes", {
+            resumeName: "Copied Resume",
+            resumeId: "resume-1",
         });
     });
 
@@ -125,5 +169,83 @@ describe("resume list", () => {
                 headers: { Accept: "application/pdf, application/json" },
             }),
         );
+    });
+
+    it("一覧画面でMarkdownエクスポート対象が存在しない場合は一覧を再取得すること", async () => {
+        let listRequestCount = 0;
+        vi.mocked(protectedApiClient.get).mockImplementation((url: string) => {
+            if (url === "/resumes") {
+                listRequestCount += 1;
+                return Promise.resolve({
+                    data: { resumes: listRequestCount === 1 ? resumeSummaries : [resumeSummaries[1]] },
+                } as AxiosResponse<GetResumeListResponse>);
+            }
+            if (url === "/resumes/resume-1/export") {
+                return Promise.reject({
+                    isAxiosError: true,
+                    response: {
+                        status: 404,
+                        data: { message: "対象の職務経歴書データが存在しません。", errors: {} },
+                    },
+                });
+            }
+            return Promise.resolve({ data: undefined } as AxiosResponse<void>);
+        });
+
+        const { user } = renderWithProviders(<ResumeListContainer />, { route: "/resume/list" });
+
+        await screen.findByText("Alpha Resume");
+        await user.click(screen.getAllByRole("button", { name: "職務経歴書メニューを開く" })[1]);
+        await user.hover(screen.getByRole("menuitem", { name: "エクスポート" }));
+        await user.click(await screen.findByRole("menuitem", { name: "Markdownでエクスポート" }));
+
+        await waitFor(() => expect(screen.queryByText("Alpha Resume")).not.toBeInTheDocument());
+        expect(screen.getByText("Beta Resume")).toBeInTheDocument();
+        expect(listRequestCount).toBe(2);
+    });
+
+    it("一覧画面でPDFプレビュー対象が存在しない場合は一覧を再取得すること", async () => {
+        let listRequestCount = 0;
+        let rejectPreviewRequest!: (error: unknown) => void;
+        vi.mocked(protectedApiClient.get).mockImplementation((url: string) => {
+            if (url === "/resumes") {
+                listRequestCount += 1;
+                return Promise.resolve({
+                    data: { resumes: listRequestCount === 1 ? resumeSummaries : [resumeSummaries[1]] },
+                } as AxiosResponse<GetResumeListResponse>);
+            }
+            return Promise.resolve({ data: undefined } as AxiosResponse<void>);
+        });
+        vi.mocked(protectedApiClient.post).mockImplementationOnce(
+            () =>
+                new Promise((_, reject) => {
+                    rejectPreviewRequest = reject;
+                }),
+        );
+
+        const { user } = renderWithProviders(<ResumeListContainer />, { route: "/resume/list" });
+
+        await screen.findByText("Alpha Resume");
+        await user.click(screen.getAllByRole("button", { name: "職務経歴書メニューを開く" })[1]);
+        await user.hover(screen.getByRole("menuitem", { name: "エクスポート" }));
+        await user.click(await screen.findByRole("menuitem", { name: "PDFでエクスポート" }));
+
+        expect(screen.queryByRole("dialog", { name: "PDFプレビュー" })).not.toBeInTheDocument();
+
+        act(() => {
+            rejectPreviewRequest({
+                isAxiosError: true,
+                response: {
+                    status: 404,
+                    data: { message: "対象の職務経歴書データが存在しません。", errors: {} },
+                },
+            });
+        });
+
+        await waitFor(() => expect(screen.queryByText("Alpha Resume")).not.toBeInTheDocument());
+        expect(screen.getByText("Beta Resume")).toBeInTheDocument();
+        expect(screen.queryByRole("dialog", { name: "PDFプレビュー" })).not.toBeInTheDocument();
+        expect(protectedApiClient.post).toHaveBeenCalledTimes(1);
+        expect(listRequestCount).toBeGreaterThanOrEqual(2);
     });
 });

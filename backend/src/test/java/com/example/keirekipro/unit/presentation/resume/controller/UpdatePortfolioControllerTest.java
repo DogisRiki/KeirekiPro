@@ -80,7 +80,7 @@ class UpdatePortfolioControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID),
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(PORTFOLIO_ID),
                 any(UpdatePortfolioRequest.class)))
                 .thenReturn(dto);
 
@@ -102,7 +102,7 @@ class UpdatePortfolioControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID),
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(PORTFOLIO_ID),
                 any(UpdatePortfolioRequest.class));
     }
 

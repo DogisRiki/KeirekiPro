@@ -170,7 +170,11 @@ const MAX_SCROLL_HEIGHT = 400;
 /**
  * エントリーリスト
  */
-export const EntryList = () => {
+interface EntryListProps {
+    onResumeNotFound?: () => void;
+}
+
+export const EntryList = ({ onResumeNotFound }: EntryListProps) => {
     const { id: resumeId } = useParams<{ id: string }>();
 
     // スクロールコンテナへの参照
@@ -185,12 +189,12 @@ export const EntryList = () => {
     const removeEntry = useResumeStore((state) => state.removeEntry);
 
     // 各セクションの削除ミューテーション
-    const deleteCareerMutation = useDeleteCareer(resumeId ?? "");
-    const deleteProjectMutation = useDeleteProject(resumeId ?? "");
-    const deleteCertificationMutation = useDeleteCertification(resumeId ?? "");
-    const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "");
-    const deleteSnsPlatformMutation = useDeleteSnsPlatform(resumeId ?? "");
-    const deleteSelfPromotionMutation = useDeleteSelfPromotion(resumeId ?? "");
+    const deleteCareerMutation = useDeleteCareer(resumeId ?? "", { onResumeNotFound });
+    const deleteProjectMutation = useDeleteProject(resumeId ?? "", { onResumeNotFound });
+    const deleteCertificationMutation = useDeleteCertification(resumeId ?? "", { onResumeNotFound });
+    const deletePortfolioMutation = useDeletePortfolio(resumeId ?? "", { onResumeNotFound });
+    const deleteSnsPlatformMutation = useDeleteSnsPlatform(resumeId ?? "", { onResumeNotFound });
+    const deleteSelfPromotionMutation = useDeleteSelfPromotion(resumeId ?? "", { onResumeNotFound });
 
     // エントリーデータ取得
     const entries = useMemo(() => {

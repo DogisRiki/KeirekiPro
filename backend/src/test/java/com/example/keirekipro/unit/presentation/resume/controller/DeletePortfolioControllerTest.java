@@ -51,6 +51,6 @@ class DeletePortfolioControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(PORTFOLIO_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(PORTFOLIO_ID));
     }
 }

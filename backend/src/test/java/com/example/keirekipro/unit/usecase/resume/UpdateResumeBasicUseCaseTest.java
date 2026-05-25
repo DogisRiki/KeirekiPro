@@ -73,7 +73,7 @@ class UpdateResumeBasicUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, request);
+        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -116,9 +116,9 @@ class UpdateResumeBasicUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -143,9 +143,9 @@ class UpdateResumeBasicUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());

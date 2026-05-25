@@ -82,7 +82,7 @@ class CreatePortfolioControllerTest {
                 RESUME_DTO_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID), any(CreatePortfolioRequest.class)))
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), any(CreatePortfolioRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
@@ -94,7 +94,7 @@ class CreatePortfolioControllerTest {
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.format(FMT)));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), any(CreatePortfolioRequest.class));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), any(CreatePortfolioRequest.class));
     }
 
     @Test

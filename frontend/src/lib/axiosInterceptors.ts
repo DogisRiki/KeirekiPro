@@ -6,11 +6,6 @@ import type { ErrorResponse } from "@/types";
 import axios from "axios";
 
 /**
- * 404ページへリダイレクトするエラーメッセージ
- */
-const notFoundMessages = ["職務経歴書が存在しません。"];
-
-/**
  * 共通エラーインターセプタ
  */
 export const createErrorInterceptor =
@@ -25,8 +20,8 @@ export const createErrorInterceptor =
                 return Promise.reject(error);
             }
 
-            // 400(バリデーションエラー)
-            if (response?.status === 400 && response.data) {
+            // 400(バリデーションエラー) / 404(リソース未存在)
+            if ((response?.status === 400 || response?.status === 404) && response.data) {
                 const contentType = String(response.headers?.["content-type"] ?? "");
 
                 let errorData: ErrorResponse | null = null;
@@ -46,12 +41,7 @@ export const createErrorInterceptor =
                 }
 
                 if (errorData) {
-                    // 404ページへリダイレクトするエラーメッセージの場合
-                    if (notFoundMessages.includes(errorData.message)) {
-                        window.location.href = "/not-found";
-                        return Promise.reject(error);
-                    }
-
+                    response.data = errorData;
                     useErrorMessageStore.getState().setErrors(errorData);
                 }
             }

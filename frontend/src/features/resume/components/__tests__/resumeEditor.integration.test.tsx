@@ -2,7 +2,7 @@ import { ThemeProvider } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AxiosResponse } from "axios";
 import { saveAs } from "file-saver";
@@ -34,9 +34,11 @@ vi.mock("file-saver", () => ({
     saveAs: vi.fn(),
 }));
 
+import { ErrorBanner } from "@/components/errors";
+import { ProtectedLayout } from "@/components/layouts";
 import { lightTheme } from "@/config/theme";
 import type { Resume } from "@/features/resume";
-import { ResumeContainer, useResumeStore } from "@/features/resume";
+import { ResumeContainer, useGetResumeList, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { createTestQueryClient, resetStoresAndMocks } from "@/test";
 
@@ -57,6 +59,41 @@ const renderEditor = () => {
         <QueryClientProvider client={queryClient}>
             <ThemeProvider theme={lightTheme}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <RouterProvider router={router} />
+                </LocalizationProvider>
+            </ThemeProvider>
+        </QueryClientProvider>,
+    );
+
+    return { user, queryClient, router, ...utils };
+};
+
+const ResumeListDestination = () => {
+    useGetResumeList();
+    return <div>resume list destination</div>;
+};
+
+const renderEditorWithProtectedLayout = () => {
+    const queryClient = createTestQueryClient();
+    const user = userEvent.setup();
+    const router = createMemoryRouter(
+        [
+            {
+                element: <ProtectedLayout />,
+                children: [
+                    { path: "/resume/:id", element: <ResumeContainer /> },
+                    { path: "/resume/list", element: <ResumeListDestination /> },
+                ],
+            },
+        ],
+        { initialEntries: ["/resume/resume-1"] },
+    );
+
+    const utils = render(
+        <QueryClientProvider client={queryClient}>
+            <ThemeProvider theme={lightTheme}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <ErrorBanner />
                     <RouterProvider router={router} />
                 </LocalizationProvider>
             </ThemeProvider>
@@ -261,6 +298,33 @@ describe("resume editor", () => {
         expect(markdownBlob.type).toBe("text/markdown");
     });
 
+    it("PDFプレビューは初回PDFの取得完了後にだけモーダルを表示すること", async () => {
+        let resolvePreviewRequest!: (response: AxiosResponse<Blob>) => void;
+        vi.mocked(protectedApiClient.post).mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    resolvePreviewRequest = resolve;
+                }),
+        );
+
+        const { user } = renderEditor();
+
+        await screen.findByRole("button", { name: "エクスポート" });
+        await user.click(screen.getByRole("button", { name: "エクスポート" }));
+        await user.click(screen.getByRole("menuitem", { name: /PDFでエクスポート/ }));
+
+        expect(screen.queryByRole("dialog", { name: "PDFプレビュー" })).not.toBeInTheDocument();
+
+        act(() => {
+            resolvePreviewRequest({
+                data: new Blob(["pdf"], { type: "application/pdf" }),
+                headers: {},
+            } as AxiosResponse<Blob>);
+        });
+
+        expect(await screen.findByRole("dialog", { name: "PDFプレビュー" })).toBeInTheDocument();
+    });
+
     it("PDFプレビューで表ヘッダー色を変更後に設定値リセットしてもモーダルを維持すること", async () => {
         const { user } = renderEditor();
 
@@ -276,6 +340,57 @@ describe("resume editor", () => {
 
         await waitFor(() => expect(colorCodeInput).toHaveValue("d9d9d9"));
         expect(screen.getByRole("dialog", { name: "PDFプレビュー" })).toBeInTheDocument();
+    });
+
+    it("詳細画面でMarkdownエクスポート対象が存在しない場合は一覧画面へ遷移すること", async () => {
+        const { user } = renderEditorWithProtectedLayout();
+
+        await screen.findByRole("button", { name: "エクスポート" });
+        vi.mocked(protectedApiClient.get).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                status: 404,
+                data: { message: "対象の職務経歴書データが存在しません。", errors: {} },
+            },
+        });
+
+        await user.click(screen.getByRole("button", { name: "エクスポート" }));
+        await user.click(await screen.findByRole("menuitem", { name: /Markdownでエクスポート/ }));
+
+        expect(await screen.findByText("resume list destination")).toBeInTheDocument();
+        expect(await screen.findByText("対象の職務経歴書データが存在しません。")).toBeInTheDocument();
+    });
+
+    it("詳細画面でPDFプレビュー対象が存在しない場合は一覧画面へ遷移すること", async () => {
+        let rejectPreviewRequest!: (error: unknown) => void;
+        const { user } = renderEditorWithProtectedLayout();
+
+        await screen.findByRole("button", { name: "エクスポート" });
+        vi.mocked(protectedApiClient.post).mockImplementationOnce(
+            () =>
+                new Promise((_, reject) => {
+                    rejectPreviewRequest = reject;
+                }),
+        );
+
+        await user.click(screen.getByRole("button", { name: "エクスポート" }));
+        await user.click(await screen.findByRole("menuitem", { name: /PDFでエクスポート/ }));
+
+        expect(screen.queryByRole("dialog", { name: "PDFプレビュー" })).not.toBeInTheDocument();
+
+        act(() => {
+            rejectPreviewRequest({
+                isAxiosError: true,
+                response: {
+                    status: 404,
+                    data: { message: "対象の職務経歴書データが存在しません。", errors: {} },
+                },
+            });
+        });
+
+        expect(await screen.findByText("resume list destination")).toBeInTheDocument();
+        expect(await screen.findByText("対象の職務経歴書データが存在しません。")).toBeInTheDocument();
+        expect(screen.queryByRole("dialog", { name: "PDFプレビュー" })).not.toBeInTheDocument();
     });
 
     it("保存APIのfield errorを該当フォームへ表示すること", async () => {

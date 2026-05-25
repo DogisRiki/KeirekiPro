@@ -85,7 +85,7 @@ class ExportResumeUseCaseTest {
         when(resumeExportRuleCheckService.execute(resume)).thenReturn(List.of());
         when(pdfExporter.export(resume, ResumePdfExportSettings.defaults())).thenReturn(exportedFile);
 
-        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, ExportFormat.PDF);
+        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.PDF);
 
         verify(resumeRepository).find(RESUME_ID);
         verify(resumeExportRuleCheckService).execute(resume);
@@ -110,7 +110,7 @@ class ExportResumeUseCaseTest {
         when(resumeExportRuleCheckService.execute(resume)).thenReturn(List.of());
         when(markdownExporter.export(resume)).thenReturn(exportedFile);
 
-        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, ExportFormat.MARKDOWN);
+        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.MARKDOWN);
 
         verify(resumeRepository).find(RESUME_ID);
         verify(resumeExportRuleCheckService).execute(resume);
@@ -127,9 +127,9 @@ class ExportResumeUseCaseTest {
     void test3() {
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, ExportFormat.PDF))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.PDF))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(resumeRepository).find(RESUME_ID);
         verify(resumeExportRuleCheckService, never()).execute(any());
@@ -145,9 +145,9 @@ class ExportResumeUseCaseTest {
 
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, ExportFormat.PDF))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.PDF))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(resumeRepository).find(RESUME_ID);
         verify(resumeExportRuleCheckService, never()).execute(any());
@@ -164,7 +164,7 @@ class ExportResumeUseCaseTest {
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.of(resume));
         when(resumeExportRuleCheckService.execute(resume)).thenReturn(List.of("職歴を1件以上登録してください。"));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, ExportFormat.PDF))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.PDF))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessageContaining("職務経歴書をエクスポートできません。");
 
@@ -204,7 +204,7 @@ class ExportResumeUseCaseTest {
         when(resumeExportRuleCheckService.execute(resume)).thenReturn(List.of());
         when(pdfExporter.export(resume, expectedSettings)).thenReturn(exportedFile);
 
-        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, command);
+        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), command);
 
         verify(pdfExporter).export(resume, expectedSettings);
         assertThat(actual.getContent()).isEqualTo(pdfContent);
@@ -229,7 +229,7 @@ class ExportResumeUseCaseTest {
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.of(resume));
         when(resumeExportRuleCheckService.execute(resume)).thenReturn(List.of("自己PRを1件以上登録してください。"));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, command))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), command))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessageContaining("入力エラーがあるため、PDFプレビューを表示できません。");
 

@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 vi.mock("@/lib", () => ({
-    protectedApiClient: { post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+    protectedApiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 import type { Resume } from "@/features/resume";
@@ -53,6 +53,7 @@ describe("useUpdateSelfPromotion", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.put).mockReset();
+        vi.mocked(protectedApiClient.get).mockReset();
         vi.spyOn(useNotificationStore.getState(), "setNotification");
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
         vi.spyOn(useResumeStore.getState(), "setDirty");
@@ -183,5 +184,40 @@ describe("useUpdateSelfPromotion", () => {
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
         expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
+    });
+
+    it("自己PR不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
+        const selfPromotionId = "self-promotion-1";
+        useResumeStore.getState().setResume({ ...localResume, selfPromotions: [localResume.selfPromotions[0]] });
+        useResumeStore.getState().setActiveSection("selfPromotion");
+        useResumeStore.getState().setActiveEntryId(selfPromotionId);
+
+        vi.mocked(protectedApiClient.put).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: { status: 404, data: { message: "対象の自己PRが存在しません。", errors: {} } },
+        });
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({
+            data: {
+                id: localResume.id,
+                resumeName: localResume.resumeName,
+                date: localResume.date,
+                createdAt: localResume.createdAt,
+                updatedAt: localResume.updatedAt,
+            },
+        });
+
+        const { result } = renderHook(() => useUpdateSelfPromotion("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({
+                selfPromotionId,
+                payload: { title: "自己PR", content: "本文" },
+            });
+        });
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        await waitFor(() => expect(useResumeStore.getState().resume?.selfPromotions).toEqual([]));
+        expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes/resume-1");
+        expect(useResumeStore.getState().activeEntryId).toBeNull();
     });
 });

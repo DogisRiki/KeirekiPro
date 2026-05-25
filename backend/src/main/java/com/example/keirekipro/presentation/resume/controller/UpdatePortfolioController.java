@@ -42,7 +42,7 @@ public class UpdatePortfolioController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "職務経歴書 ポートフォリオ更新", description = "職務経歴書のポートフォリオを更新する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("portfolioId") UUID portfolioId,
             @Valid @RequestBody UpdatePortfolioRequest request) {
 

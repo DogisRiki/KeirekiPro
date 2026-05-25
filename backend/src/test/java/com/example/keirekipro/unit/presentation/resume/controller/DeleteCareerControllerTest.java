@@ -51,6 +51,6 @@ class DeleteCareerControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID), eq(CAREER_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(CAREER_ID));
     }
 }

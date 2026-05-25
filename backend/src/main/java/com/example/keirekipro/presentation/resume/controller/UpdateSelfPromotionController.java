@@ -42,7 +42,7 @@ public class UpdateSelfPromotionController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "職務経歴書 自己PR更新", description = "職務経歴書の自己PRを更新する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("selfPromotionId") UUID selfPromotionId,
             @Valid @RequestBody UpdateSelfPromotionRequest request) {
 

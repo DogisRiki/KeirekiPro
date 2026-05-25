@@ -16,6 +16,7 @@ import com.example.keirekipro.presentation.resume.controller.GetResumeInfoContro
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.usecase.resume.GetResumeInfoUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,7 @@ class GetResumeInfoControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()))).thenReturn(dto);
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID))
                 .andExpect(status().isOk())
@@ -75,5 +76,18 @@ class GetResumeInfoControllerTest {
                 .andExpect(jsonPath("$.portfolios.length()").value(1))
                 .andExpect(jsonPath("$.snsPlatforms.length()").value(1))
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("職務経歴書IDの形式によらずユースケースの不存在例外は404として返る")
+    void test2() throws Exception {
+        String opaqueResumeId = "2d077060-0af8-4c8f-85b3-7c75b5b2ce677";
+        when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
+        when(useCase.execute(USER_ID, opaqueResumeId))
+                .thenThrow(new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。"));
+
+        mockMvc.perform(get(ENDPOINT, opaqueResumeId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("対象の職務経歴書データが存在しません。"));
     }
 }

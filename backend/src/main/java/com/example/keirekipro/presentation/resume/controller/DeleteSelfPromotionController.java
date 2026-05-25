@@ -37,7 +37,7 @@ public class DeleteSelfPromotionController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "職務経歴書 自己PR削除", description = "職務経歴書の自己PRを削除する")
     public void handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("selfPromotionId") UUID selfPromotionId) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

@@ -3,7 +3,7 @@
     "service": "backend",
     "workspaceFolder": "/home/spring/app",
     "dockerComposeFile": "../../../compose.yaml",
-    "shutdownAction": "stopCompose",
+    "shutdownAction": "none",
     "customizations": {
         "vscode": {
             "keybindings": [

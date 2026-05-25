@@ -42,7 +42,7 @@ public class CreateSelfPromotionController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "職務経歴書 自己PR新規作成", description = "職務経歴書に自己PRを新規作成する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @Valid @RequestBody CreateSelfPromotionRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

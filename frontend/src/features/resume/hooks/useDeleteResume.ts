@@ -1,6 +1,7 @@
-import { deleteResume, useGetResumeList } from "@/features/resume";
+import { deleteResume, isResumeNotFoundError } from "@/features/resume";
 import { useErrorMessageStore, useNotificationStore } from "@/stores";
-import { useMutation } from "@tanstack/react-query";
+import type { ErrorResponse } from "@/types";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError, AxiosResponse } from "axios";
 
 /**
@@ -10,17 +11,24 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useDeleteResume = () => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { refetch } = useGetResumeList();
+    const queryClient = useQueryClient();
 
-    return useMutation<AxiosResponse<void>, AxiosError, string>({
+    return useMutation<AxiosResponse<void>, AxiosError<ErrorResponse>, string>({
         mutationFn: (resumeId) => deleteResume(resumeId),
         onMutate: () => {
             clearErrors();
         },
-        onSuccess: () => {
+        onSuccess: async () => {
             clearErrors();
             setNotification("職務経歴書を削除しました。", "success");
-            refetch();
+            await queryClient.refetchQueries({ queryKey: ["getResumeList"], type: "active" });
+        },
+        onError: async (error) => {
+            if (!isResumeNotFoundError(error)) {
+                return;
+            }
+
+            await queryClient.refetchQueries({ queryKey: ["getResumeList"], type: "active" });
         },
     });
 };

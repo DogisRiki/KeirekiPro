@@ -55,7 +55,7 @@ class BackupResumeUseCaseTest {
         Instant before = Instant.now();
 
         // 実行
-        BackupResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID);
+        BackupResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString());
 
         Instant after = Instant.now();
 
@@ -146,9 +146,9 @@ class BackupResumeUseCaseTest {
     void test2() {
         when(resumeBackupQuery.findByIdForBackup(RESUME_ID, USER_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString()))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(resumeBackupQuery).findByIdForBackup(RESUME_ID, USER_ID);
         verify(resumeBackupQuery, never()).findByIdForBackup(RESUME_ID, UUID.randomUUID());

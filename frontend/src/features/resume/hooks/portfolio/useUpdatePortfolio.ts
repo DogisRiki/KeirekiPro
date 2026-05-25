@@ -1,5 +1,13 @@
-import type { Resume, UpdatePortfolioPayload } from "@/features/resume";
-import { updatePortfolio, useResumeStore } from "@/features/resume";
+import {
+    isResumeNotFoundError,
+    isSectionNotFoundError,
+    syncResumeInfoFromServer,
+    updatePortfolio,
+    useResumeStore,
+    type Resume,
+    type ResumeNotFoundHandler,
+    type UpdatePortfolioPayload,
+} from "@/features/resume";
 import { useNotificationStore } from "@/stores";
 import type { ErrorResponse } from "@/types";
 import { useMutation } from "@tanstack/react-query";
@@ -10,7 +18,7 @@ import type { AxiosError, AxiosResponse } from "axios";
  * @param resumeId 職務経歴書ID
  * @returns ポートフォリオ更新ミューテーション
  */
-export const useUpdatePortfolio = (resumeId: string) => {
+export const useUpdatePortfolio = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { setNotification } = useNotificationStore();
 
     return useMutation<
@@ -59,7 +67,16 @@ export const useUpdatePortfolio = (resumeId: string) => {
             setDirty(false);
             setNotification("ポートフォリオを更新しました。", "success");
         },
-        onError: (error, { portfolioId }) => {
+        onError: async (error, { portfolioId }) => {
+            if (isResumeNotFoundError(error)) {
+                options?.onResumeNotFound?.();
+                return;
+            }
+            if (isSectionNotFoundError(error)) {
+                await syncResumeInfoFromServer(resumeId);
+                return;
+            }
+
             // バリデーションエラーをストアに保存
             const errorData = error.response?.data;
             if (errorData?.errors) {

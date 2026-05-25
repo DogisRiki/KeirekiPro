@@ -6,13 +6,13 @@ import { Box, Divider, Paper, Typography } from "@mui/material";
  * バックアップコンテナ
  */
 export const BackupContainer = () => {
-    const { data } = useGetResumeList();
+    const { data, isSuccess } = useGetResumeList();
     const resumeList = data?.resumes ?? [];
 
     return (
         <Paper elevation={1} sx={{ p: 3 }}>
             {/* バックアップセクション */}
-            {resumeList.length > 0 ? (
+            {!isSuccess ? null : resumeList.length > 0 ? (
                 <BackupSection resumeList={resumeList} />
             ) : (
                 <Box>

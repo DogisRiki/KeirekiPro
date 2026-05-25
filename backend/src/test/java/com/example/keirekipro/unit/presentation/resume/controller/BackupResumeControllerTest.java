@@ -183,7 +183,7 @@ class BackupResumeControllerTest {
         BackupResumeUseCaseDto dto = buildUseCaseDto(exportedAt);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()))).thenReturn(dto);
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID))
                 .andExpect(status().isOk())
@@ -249,6 +249,6 @@ class BackupResumeControllerTest {
                 .andExpect(jsonPath("$.resume.selfPromotions[0].content").value("content"));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()));
     }
 }

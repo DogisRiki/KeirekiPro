@@ -46,9 +46,8 @@ public class UpdateResumeBasicController {
             @Valid @RequestBody UpdateResumeBasicRequest request) {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
-        UUID resumeUuid = UUID.fromString(resumeId);
 
         return ResumeInfoResponse.convertToResponse(
-                updateResumeBasicUseCase.execute(userId, resumeUuid, request));
+                updateResumeBasicUseCase.execute(userId, resumeId, request));
     }
 }

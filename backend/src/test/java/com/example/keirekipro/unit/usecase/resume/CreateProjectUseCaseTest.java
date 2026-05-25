@@ -70,7 +70,7 @@ class CreateProjectUseCaseTest {
         doNothing().when(checker).checkProjectAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResumeWithCareer(USER_ID)));
 
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, request);
+        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), request);
 
         // 上限チェックの検証
         verify(checker).checkProjectAddAllowed(RESUME_ID);
@@ -119,9 +119,9 @@ class CreateProjectUseCaseTest {
         doNothing().when(checker).checkProjectAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(checker).checkProjectAddAllowed(RESUME_ID);
         verify(repository).find(RESUME_ID);
@@ -136,9 +136,9 @@ class CreateProjectUseCaseTest {
         doNothing().when(checker).checkProjectAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResumeWithCareer(OTHER_USER_ID)));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(checker).checkProjectAddAllowed(RESUME_ID);
         verify(repository).find(RESUME_ID);
@@ -152,7 +152,7 @@ class CreateProjectUseCaseTest {
 
         doThrow(new UseCaseException("上限")).when(checker).checkProjectAddAllowed(RESUME_ID);
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("上限");
 

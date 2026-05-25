@@ -74,7 +74,7 @@ class UpdateSelfPromotionUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID, selfPromotionId, request);
+        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId, request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -122,9 +122,9 @@ class UpdateSelfPromotionUseCaseTest {
 
         // 実行＆検証
         UUID selfPromotionId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, selfPromotionId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -150,9 +150,9 @@ class UpdateSelfPromotionUseCaseTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, selfPromotionId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId, request))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -174,7 +174,7 @@ class UpdateSelfPromotionUseCaseTest {
 
         // 実行＆検証
         UUID missingSelfPromotionId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingSelfPromotionId, request))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingSelfPromotionId, request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の自己PRが存在しません。");
 

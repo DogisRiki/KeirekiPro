@@ -42,7 +42,7 @@ public class UpdateCareerController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "職務経歴書 職歴更新", description = "職務経歴書の職歴を更新する")
     public ResumeInfoResponse handle(
-            @PathVariable("resumeId") UUID resumeId,
+            @PathVariable("resumeId") String resumeId,
             @PathVariable("careerId") UUID careerId,
             @Valid @RequestBody UpdateCareerRequest request) {
 

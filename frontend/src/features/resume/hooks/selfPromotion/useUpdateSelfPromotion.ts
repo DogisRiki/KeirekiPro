@@ -1,5 +1,13 @@
-import type { Resume, UpdateSelfPromotionPayload } from "@/features/resume";
-import { updateSelfPromotion, useResumeStore } from "@/features/resume";
+import {
+    isResumeNotFoundError,
+    isSectionNotFoundError,
+    syncResumeInfoFromServer,
+    updateSelfPromotion,
+    useResumeStore,
+    type Resume,
+    type ResumeNotFoundHandler,
+    type UpdateSelfPromotionPayload,
+} from "@/features/resume";
 import { useNotificationStore } from "@/stores";
 import type { ErrorResponse } from "@/types";
 import { useMutation } from "@tanstack/react-query";
@@ -10,7 +18,7 @@ import type { AxiosError, AxiosResponse } from "axios";
  * @param resumeId 職務経歴書ID
  * @returns 自己PR更新ミューテーション
  */
-export const useUpdateSelfPromotion = (resumeId: string) => {
+export const useUpdateSelfPromotion = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { setNotification } = useNotificationStore();
 
     return useMutation<
@@ -61,7 +69,16 @@ export const useUpdateSelfPromotion = (resumeId: string) => {
             setDirty(false);
             setNotification("自己PRを更新しました。", "success");
         },
-        onError: (error, { selfPromotionId }) => {
+        onError: async (error, { selfPromotionId }) => {
+            if (isResumeNotFoundError(error)) {
+                options?.onResumeNotFound?.();
+                return;
+            }
+            if (isSectionNotFoundError(error)) {
+                await syncResumeInfoFromServer(resumeId);
+                return;
+            }
+
             // バリデーションエラーをストアに保存
             const errorData = error.response?.data;
             if (errorData?.errors) {

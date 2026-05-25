@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 vi.mock("@/lib", () => ({
-    protectedApiClient: { post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+    protectedApiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 import type { Resume } from "@/features/resume";
@@ -46,6 +46,7 @@ describe("useDeleteSnsPlatform", () => {
         resetStoresAndMocks([]);
         useResumeStore.getState().clearResume();
         vi.mocked(protectedApiClient.delete).mockReset();
+        vi.mocked(protectedApiClient.get).mockReset();
 
         vi.spyOn(useErrorMessageStore.getState(), "clearErrors");
         vi.spyOn(useNotificationStore.getState(), "setNotification");
@@ -84,5 +85,35 @@ describe("useDeleteSnsPlatform", () => {
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
         expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("SNSを削除しました。", "success");
+    });
+
+    it("SNSプラットフォーム不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
+        const snsPlatformId = "sns-platform-1";
+        useResumeStore.getState().setResume({ ...localResume, snsPlatforms: [localResume.snsPlatforms[0]] });
+        useResumeStore.getState().setActiveSection("snsPlatform");
+        useResumeStore.getState().setActiveEntryId(snsPlatformId);
+
+        vi.mocked(protectedApiClient.delete).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: { status: 404, data: { message: "対象のSNSプラットフォームが存在しません。", errors: {} } },
+        });
+        vi.mocked(protectedApiClient.get).mockResolvedValueOnce({
+            data: {
+                id: localResume.id,
+                resumeName: localResume.resumeName,
+                date: localResume.date,
+                createdAt: localResume.createdAt,
+                updatedAt: localResume.updatedAt,
+            },
+        } as unknown as AxiosResponse<Resume>);
+
+        const { result } = renderHook(() => useDeleteSnsPlatform("resume-1"), { wrapper });
+
+        act(() => result.current.mutate(snsPlatformId));
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        await waitFor(() => expect(useResumeStore.getState().resume?.snsPlatforms).toEqual([]));
+        expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes/resume-1");
+        expect(useResumeStore.getState().activeEntryId).toBeNull();
     });
 });

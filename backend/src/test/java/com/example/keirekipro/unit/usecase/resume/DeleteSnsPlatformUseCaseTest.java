@@ -59,7 +59,7 @@ class DeleteSnsPlatformUseCaseTest {
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        useCase.execute(USER_ID, RESUME_ID, snsPlatformId);
+        useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId);
 
         verify(repository).find(RESUME_ID);
 
@@ -77,9 +77,9 @@ class DeleteSnsPlatformUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         UUID snsPlatformId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, snsPlatformId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -93,9 +93,9 @@ class DeleteSnsPlatformUseCaseTest {
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, snsPlatformId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -109,7 +109,7 @@ class DeleteSnsPlatformUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         UUID missingId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingId))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象のSNSプラットフォームが存在しません。");
 

@@ -8,7 +8,7 @@ import com.example.keirekipro.usecase.query.resume.ResumeBackupQuery;
 import com.example.keirekipro.usecase.query.resume.dto.ResumeBackupQueryDto;
 import com.example.keirekipro.usecase.resume.dto.BackupResumeUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeBackupVersion;
-import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -36,11 +36,12 @@ public class BackupResumeUseCase {
      * @param resumeId 職務経歴書ID
      * @return バックアップ用ユースケースDTO
      */
-    public BackupResumeUseCaseDto execute(UUID userId, UUID resumeId) {
+    public BackupResumeUseCaseDto execute(UUID userId, String resumeId) {
+        UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         // データ取得
-        ResumeBackupQueryDto resumeData = resumeBackupQuery.findByIdForBackup(resumeId, userId)
-                .orElseThrow(() -> new UseCaseException("職務経歴書が存在しません。"));
+        ResumeBackupQueryDto resumeData = resumeBackupQuery.findByIdForBackup(resolvedResumeId, userId)
+                .orElseThrow(() -> new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。"));
 
         // ファイル名作成
         String baseName = FileUtil.sanitizeFileName(resumeData.getResumeName(), "resume");

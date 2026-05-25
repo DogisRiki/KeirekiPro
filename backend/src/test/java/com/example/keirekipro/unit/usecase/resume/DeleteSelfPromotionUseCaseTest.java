@@ -58,7 +58,7 @@ class DeleteSelfPromotionUseCaseTest {
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        useCase.execute(USER_ID, RESUME_ID, selfPromotionId);
+        useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId);
 
         verify(repository).find(RESUME_ID);
 
@@ -76,9 +76,9 @@ class DeleteSelfPromotionUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         UUID selfPromotionId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, selfPromotionId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -92,9 +92,9 @@ class DeleteSelfPromotionUseCaseTest {
 
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, selfPromotionId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId))
                 .isInstanceOf(UseCaseException.class)
-                .hasMessage("職務経歴書が存在しません。");
+                .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
@@ -108,7 +108,7 @@ class DeleteSelfPromotionUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         UUID missingId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID, missingId))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingId))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の自己PRが存在しません。");
 
