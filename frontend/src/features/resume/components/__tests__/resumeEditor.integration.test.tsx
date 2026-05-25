@@ -40,7 +40,7 @@ import { lightTheme } from "@/config/theme";
 import type { Resume } from "@/features/resume";
 import { ResumeContainer, useGetResumeList, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
-import { createTestQueryClient, resetStoresAndMocks } from "@/test";
+import { createAxiosResponse, createTestQueryClient, resetStoresAndMocks } from "@/test";
 
 import { cloneResume, emptyTechStack, resumeSummaries } from "./resumeTestData";
 
@@ -117,38 +117,40 @@ describe("resume editor", () => {
 
         vi.mocked(protectedApiClient.get).mockImplementation((url: string) => {
             if (url === "/resumes/resume-1") {
-                return Promise.resolve({ data: cloneResume() } as AxiosResponse<Resume>);
+                return Promise.resolve(createAxiosResponse(cloneResume()));
             }
             if (url === "/resumes") {
-                return Promise.resolve({ data: { resumes: resumeSummaries } });
+                return Promise.resolve(createAxiosResponse({ resumes: resumeSummaries }));
             }
             if (url === "/tech-stacks") {
-                return Promise.resolve({ data: emptyTechStack } as AxiosResponse<typeof emptyTechStack>);
+                return Promise.resolve(createAxiosResponse(emptyTechStack));
             }
             if (url === "/resumes/resume-1/export") {
-                return Promise.resolve({
-                    data: new Blob(["exported"]),
-                    headers: {},
-                } as AxiosResponse<Blob>);
+                return Promise.resolve(
+                    createAxiosResponse(new Blob(["exported"]), {
+                        headers: {},
+                    }),
+                );
             }
-            return Promise.resolve({ data: undefined } as AxiosResponse<void>);
+            return Promise.resolve(createAxiosResponse(undefined));
         });
         vi.mocked(protectedApiClient.post).mockImplementation((url: string) => {
             if (url === "/resumes/resume-1/export") {
-                return Promise.resolve({
-                    data: new Blob(["pdf"], { type: "application/pdf" }),
-                    headers: { "content-disposition": 'attachment; filename="resume.pdf"' },
-                } as unknown as AxiosResponse<Blob>);
+                return Promise.resolve(
+                    createAxiosResponse(new Blob(["pdf"], { type: "application/pdf" }), {
+                        headers: { "content-disposition": 'attachment; filename="resume.pdf"' },
+                    }),
+                );
             }
-            return Promise.resolve({ data: cloneResume() } as AxiosResponse<Resume>);
+            return Promise.resolve(createAxiosResponse(cloneResume()));
         });
         vi.mocked(protectedApiClient.put).mockImplementation((url: string, payload: unknown) => {
             if (url === "/resumes/resume-1/basic") {
-                return Promise.resolve({ data: cloneResume(payload as Partial<Resume>) } as AxiosResponse<Resume>);
+                return Promise.resolve(createAxiosResponse(cloneResume(payload as Partial<Resume>)));
             }
-            return Promise.resolve({ data: cloneResume() } as AxiosResponse<Resume>);
+            return Promise.resolve(createAxiosResponse(cloneResume()));
         });
-        vi.mocked(protectedApiClient.delete).mockResolvedValue({ data: undefined } as AxiosResponse<void>);
+        vi.mocked(protectedApiClient.delete).mockResolvedValue(createAxiosResponse(undefined));
     });
 
     it("section tab切り替えで表示セクションとstoreを更新すること", async () => {
@@ -316,10 +318,11 @@ describe("resume editor", () => {
         expect(screen.queryByRole("dialog", { name: "PDFプレビュー" })).not.toBeInTheDocument();
 
         act(() => {
-            resolvePreviewRequest({
-                data: new Blob(["pdf"], { type: "application/pdf" }),
-                headers: {},
-            } as AxiosResponse<Blob>);
+            resolvePreviewRequest(
+                createAxiosResponse(new Blob(["pdf"], { type: "application/pdf" }), {
+                    headers: {},
+                }),
+            );
         });
 
         expect(await screen.findByRole("dialog", { name: "PDFプレビュー" })).toBeInTheDocument();

@@ -4,6 +4,8 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { AxiosResponse } from "axios";
+import { AxiosHeaders } from "axios";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { vi } from "vitest";
@@ -25,6 +27,20 @@ type MutationHookResult<TPayload> = {
 type AsyncHookResult<TStatus extends "isSuccess" | "isError"> = {
     current: Record<TStatus, boolean>;
 };
+
+export const createAxiosResponse = <T,>(
+    data: T,
+    overrides: Partial<Omit<AxiosResponse<T>, "data">> = {},
+): AxiosResponse<T> => ({
+    data,
+    status: 200,
+    statusText: "OK",
+    headers: {},
+    config: {
+        headers: new AxiosHeaders(),
+    },
+    ...overrides,
+});
 
 /**
  * React Queryのテスト用ラッパーを生成する
