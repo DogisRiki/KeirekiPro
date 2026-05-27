@@ -1,7 +1,6 @@
 name: Backend Deploy
 
 on:
-  workflow_dispatch:
   workflow_call:
     inputs:
       ecr_repository_url:
