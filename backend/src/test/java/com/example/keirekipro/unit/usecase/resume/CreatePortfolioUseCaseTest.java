@@ -93,6 +93,25 @@ class CreatePortfolioUseCaseTest {
     }
 
     @Test
+    @DisplayName("技術スタックが未入力でもポートフォリオを新規作成できる")
+    void test1_1() {
+        CreatePortfolioRequest request = new CreatePortfolioRequest();
+        request.setName("作品1");
+        request.setOverview("概要1");
+        request.setTechStack(null);
+        request.setLink("https://example.com");
+
+        doNothing().when(checker).checkPortfolioAddAllowed(RESUME_ID);
+        when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(USER_ID)));
+
+        useCase.execute(USER_ID, RESUME_ID.toString(), request);
+
+        ArgumentCaptor<Resume> saveCaptor = ArgumentCaptor.forClass(Resume.class);
+        verify(repository).save(saveCaptor.capture());
+        assertThat(saveCaptor.getValue().getPortfolios().get(0).getTechStack()).isNull();
+    }
+
+    @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
         CreatePortfolioRequest request = new CreatePortfolioRequest();

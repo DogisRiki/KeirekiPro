@@ -97,7 +97,7 @@ export interface Portfolio {
     id: string;
     name: string;
     overview: string;
-    techStack: string;
+    techStack: string | null;
     link: string;
 }
 

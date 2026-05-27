@@ -35,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 
 @MybatisTest
 @ActiveProfiles("test")
-@TestPropertySource(properties = "spring.flyway.target=1")
+@TestPropertySource(properties = "spring.flyway.target=5")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -998,6 +998,36 @@ class ResumeMapperTest {
     }
 
     @Test
+    @DisplayName("insertPortfolio_技術スタックがNULLのポートフォリオを挿入して取得できる")
+    void test24_1() {
+        userMapper.upsertUser(createUserDto());
+        ResumeDto resume = createResumeDto(
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                CREATED,
+                UPDATED);
+        resumeMapper.upsert(resume);
+
+        UUID portId = UUID.fromString("87878787-8787-8787-8787-878787878787");
+        PortfolioDto port = createPortfolioDto(
+                portId,
+                RESUME_ID_1,
+                "PortName",
+                "PortOverview",
+                null,
+                "http://link");
+        resumeMapper.insertPortfolio(port);
+
+        List<PortfolioDto> list = resumeMapper.selectPortfoliosByResumeId(RESUME_ID_1);
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getTechStack()).isNull();
+    }
+
+    @Test
     @DisplayName("updatePortfolio_既存のポートフォリオを更新すると、各フィールドが反映される")
     void test25() {
         userMapper.upsertUser(createUserDto());
@@ -1038,6 +1068,45 @@ class ResumeMapperTest {
         assertThat(loaded.getOverview()).isEqualTo("NewOv");
         assertThat(loaded.getTechStack()).isEqualTo("NewTech");
         assertThat(loaded.getLink()).isEqualTo("http://new");
+    }
+
+    @Test
+    @DisplayName("updatePortfolio_技術スタックをNULLに更新して取得できる")
+    void test25_1() {
+        userMapper.upsertUser(createUserDto());
+        ResumeDto resume = createResumeDto(
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                CREATED,
+                UPDATED);
+        resumeMapper.upsert(resume);
+
+        UUID portId = UUID.fromString("89898989-8989-8989-8989-898989898989");
+        PortfolioDto original = createPortfolioDto(
+                portId,
+                RESUME_ID_1,
+                "OldName",
+                "OldOv",
+                "OldTech",
+                "http://old");
+        resumeMapper.insertPortfolio(original);
+
+        PortfolioDto updated = createPortfolioDto(
+                portId,
+                RESUME_ID_1,
+                "NewName",
+                "NewOv",
+                null,
+                "http://new");
+        resumeMapper.updatePortfolio(updated);
+
+        List<PortfolioDto> list = resumeMapper.selectPortfoliosByResumeId(RESUME_ID_1);
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getTechStack()).isNull();
     }
 
     @Test

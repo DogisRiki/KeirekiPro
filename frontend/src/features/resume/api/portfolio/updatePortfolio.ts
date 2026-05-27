@@ -8,7 +8,7 @@ import type { AxiosResponse } from "axios";
 export interface UpdatePortfolioPayload {
     name: string;
     overview: string;
-    techStack?: string;
+    techStack: string | null;
     link: string;
 }
 

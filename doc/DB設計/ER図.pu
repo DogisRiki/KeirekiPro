@@ -137,7 +137,7 @@ entity "ポートフォリオ(portfolios)" as Portfolios {
     resume_id : <color:#1E90FF>UUID</color> <color:#32CD32>[NOT NULL]</color> -- 職務経歴書ID
     name : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- ポートフォリオ名
     overview : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- 概要
-    tech_stack : <color:#1E90FF>TEXT</color> <color:#32CD32>[NOT NULL]</color> -- 技術スタック
+    tech_stack : <color:#1E90FF>TEXT</color> -- 技術スタック
     link : <color:#1E90FF>VARCHAR(255)</color> <color:#32CD32>[NOT NULL]</color> -- リンク
 }
 
