@@ -1,0 +1,73 @@
+name: Frontend Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Successful main CI Workflow run ID containing frontend-dist'
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  validate-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate rollback artifact source
+        uses: actions/github-script@v7
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        with:
+          script: |
+            const sourceRunId = Number(process.env.SOURCE_RUN_ID);
+            if (!Number.isSafeInteger(sourceRunId) || sourceRunId <= 0) {
+              core.setFailed('source_run_id must be a positive workflow run ID.');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              owner,
+              repo,
+              run_id: sourceRunId,
+            });
+
+            if (
+              run.name !== 'CI Workflow' ||
+              run.event !== 'push' ||
+              run.head_branch !== 'main' ||
+              run.conclusion !== 'success'
+            ) {
+              core.setFailed('Rollback source must be a successful CI Workflow push run on main.');
+              return;
+            }
+
+            const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              { owner, repo, run_id: sourceRunId, per_page: 100 },
+            );
+            const artifact = artifacts.find(
+              ({ name, expired }) => name === 'frontend-dist' && !expired,
+            );
+
+            if (!artifact) {
+              core.setFailed('The selected run does not contain an available frontend-dist artifact.');
+            }
+
+  deploy:
+    needs: validate-source
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
+    uses: ./.github/workflows/frontend-deploy.yaml
+    with:
+      artifact_run_id: ${{ inputs.source_run_id }}
+    secrets: inherit

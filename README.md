@@ -53,18 +53,23 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 
 | フェーズ | ワークフロー | トリガー | 処理内容 |
 |---------|-------------|---------|---------|
-| CI | ci.yaml | push / PR | paths-filterでfrontend/backendの変更検知、Frontend: Format → Lint → Test → Coverage → Artifact Upload、Backend: Gradle check → Artifact Upload |
+| CI | ci.yaml | push / PR | paths-filterでfrontend/backendの変更検知、Frontend: Format → Lint → Test → Coverage → Production Build、Backend: Gradle check |
 | Infrastructure | terraform-plan.yaml | PR (terraform/**) | Terraform Plan実行、PRにplan結果をコメント |
-| Infrastructure | terraform-apply.yaml | push to main (terraform/**) | Terraform Apply実行、Backend/Frontend Deployをトリガー |
-| Backend CD | ci.yaml → backend-deploy.yaml | push to main (backend/**) | Backend CI通過後、Docker Build → ECR Push → ECS Deploy → Wait Stable |
-| Frontend CD | ci.yaml → frontend-deploy.yaml | push to main (frontend/**) | Frontend CI通過後、npm build → S3 Sync → CloudFront Cache Invalidate |
+| Infrastructure | terraform-apply.yaml | push to main (terraform/**) | Terraform Apply実行（アプリケーションデプロイとは独立） |
+| Backend CD | ci.yaml → backend-deploy.yaml | push to main (backend/**) | 変更対象のCI通過後、Docker Build → ECR Push → ECS Deploy → Wait Stable |
+| Frontend CD | ci.yaml → frontend-deploy.yaml | push to main (frontend/**) | CIで生成した`frontend-dist`をS3へ配布 → CloudFront Cache Invalidate |
+| Frontend Rollback | frontend-rollback.yaml | manual | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
+
+frontend/backendの両方に変更がある場合は、両方のCIが成功してからbackend、frontendの順にデプロイします。backendのデプロイに失敗した場合はfrontendを公開せず、frontendの公開失敗時は成功済みartifactを再配布して復旧します。
 
 | 特徴 | 説明 |
 |------|------|
 | OIDC認証 | GitHub ActionsからAWSへのアクセスキーレス認証 |
 | 変更検知 | paths-filterによる変更ファイルに応じた条件付き実行 |
-| ローリングアップデート | ECSサービスの無停止デプロイ（最小ヘルス率100%） |
-| キャッシュ無効化 | フロントエンドデプロイ時のCloudFrontキャッシュ自動無効化 |
+| デプロイゲート | 変更対象のCIがすべて成功するまで本番デプロイを開始しない |
+| Build once / Deploy same artifact | Frontendのproduction buildをCIで行い、検証済みartifactを配布・rollbackに再利用 |
+| ローリングアップデート | ECSサービスの無停止デプロイと回路ブレーカーによるbackend自動rollback |
+| キャッシュ無効化 | フロントエンド配布・rollback時のCloudFrontキャッシュ自動無効化 |
 | State管理 | Terraform StateのS3保存とDynamoDBによるロック制御 |
 
 ### セキュリティ対策
@@ -222,6 +227,7 @@ keirekipro/
 ├── .github/workflows/        # CI/CD定義
 │   ├── ci.yaml
 │   ├── frontend-deploy.yaml
+│   ├── frontend-rollback.yaml
 │   ├── backend-deploy.yaml
 │   ├── terraform-plan.yaml
 │   └── terraform-apply.yaml
@@ -305,3 +311,5 @@ Codex IDE に許可しない操作は以下です。
 | `diff-db-er-diagram-sync` | Git差分に含まれる DB マイグレーションファイル の変更を、ER図へ同期する |
 | `full-db-er-diagram-sync` | DB マイグレーションファイル 全体を正として、ER図全体を同期する |
 | `draft-branch-name-and-commit-message` | 現在の Git 差分から、ブランチ名とコミットメッセージ案を作成する |
+| `draft-issue-plan` | GitHub Issue の本文とコメントを読み、実装 Plan を作成する |
+| `post-issue-plan-comment` | 作成済みの Plan を指定した GitHub Issue にコメント投稿する |

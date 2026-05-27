@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'production-release' || format('ci-{0}', github.run_id) }}
+  cancel-in-progress: false
+
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
@@ -64,6 +68,18 @@ jobs:
       - name: Run coverage
         run: npm run coverage
 
+      - name: Build for production
+        run: npm run build
+
+      - name: Upload frontend deployment artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Upload frontend test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -116,24 +132,48 @@ jobs:
             backend/build/test-results/**
           retention-days: 7
 
-  frontend-deploy:
+  deploy-gate:
     needs:
       - detect-changes
       - frontend-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.frontend_changed == 'true'
-    permissions:
-      id-token: write
-      contents: read
-    uses: ./.github/workflows/frontend-deploy.yaml
-    secrets: inherit
+      - backend-test
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.result == 'success' &&
+      (needs.detect-changes.outputs.frontend_changed != 'true' || needs.frontend-test.result == 'success') &&
+      (needs.detect-changes.outputs.backend_changed != 'true' || needs.backend-test.result == 'success') &&
+      (needs.detect-changes.outputs.frontend_changed == 'true' || needs.detect-changes.outputs.backend_changed == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm deployment prerequisites
+        run: echo "All checks required for this release have succeeded."
 
   backend-deploy:
     needs:
       - detect-changes
-      - backend-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.backend_changed == 'true'
+      - deploy-gate
+    if: needs.detect-changes.outputs.backend_changed == 'true'
     permissions:
       id-token: write
       contents: read
     uses: ./.github/workflows/backend-deploy.yaml
+    secrets: inherit
+
+  frontend-deploy:
+    needs:
+      - detect-changes
+      - deploy-gate
+      - backend-deploy
+    if: >-
+      always() &&
+      needs.deploy-gate.result == 'success' &&
+      needs.detect-changes.outputs.frontend_changed == 'true' &&
+      (needs.detect-changes.outputs.backend_changed != 'true' || needs.backend-deploy.result == 'success')
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
+    uses: ./.github/workflows/frontend-deploy.yaml
     secrets: inherit
