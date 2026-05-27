@@ -88,11 +88,10 @@ export const PortfolioSection = () => {
             <TextField
                 label="技術スタック"
                 fullWidth
-                required
                 multiline
                 minRows={4}
                 placeholder="（例）React, TypeScript, Firebase"
-                value={currentPortfolio.techStack}
+                value={currentPortfolio.techStack ?? ""}
                 onChange={(e) => updateEntry("portfolios", currentPortfolio.id, { techStack: e.target.value })}
                 error={!!errors.techStack?.length}
                 helperText={stringListToBulletList(errors.techStack)}

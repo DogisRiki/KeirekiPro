@@ -187,7 +187,7 @@ export const buildPayloadForEntry = (sectionOrType: SectionName | string, entry:
             return {
                 name: entry.name,
                 overview: entry.overview,
-                techStack: entry.techStack,
+                techStack: entry.techStack === "" ? null : entry.techStack,
                 link: entry.link,
             };
         case "snsPlatform":

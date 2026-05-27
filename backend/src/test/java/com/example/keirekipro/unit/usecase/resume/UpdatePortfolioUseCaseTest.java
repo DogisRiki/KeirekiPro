@@ -115,6 +115,33 @@ class UpdatePortfolioUseCaseTest {
     }
 
     @Test
+    @DisplayName("技術スタックが未入力でもポートフォリオを更新できる")
+    void test1_1() {
+        Resume resume = buildResumeWithPortfolios(USER_ID);
+        UUID portfolioId = resume.getPortfolios().stream()
+                .filter(p -> "ポートフォリオ1".equals(p.getName()))
+                .map(Portfolio::getId)
+                .findFirst()
+                .orElseThrow();
+        UpdatePortfolioRequest request = new UpdatePortfolioRequest(
+                "更新後ポートフォリオ",
+                "更新後概要",
+                null,
+                "https://example.com/updated");
+        when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
+
+        useCase.execute(USER_ID, RESUME_ID.toString(), portfolioId, request);
+
+        ArgumentCaptor<Resume> saveCaptor = ArgumentCaptor.forClass(Resume.class);
+        verify(repository).save(saveCaptor.capture());
+        Portfolio updated = saveCaptor.getValue().getPortfolios().stream()
+                .filter(p -> p.getId().equals(portfolioId))
+                .findFirst()
+                .orElseThrow();
+        assertThat(updated.getTechStack()).isNull();
+    }
+
+    @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
         // リクエスト準備

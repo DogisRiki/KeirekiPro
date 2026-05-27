@@ -439,6 +439,25 @@ describe("buildPayloadForEntry", () => {
         expect(result).not.toHaveProperty("id");
     });
 
+    it("portfolioの技術スタックが空文字の場合、nullを含むAPI送信用ペイロードを返すこと", () => {
+        const entry = {
+            id: "portfolio-1",
+            name: "個人ブログ",
+            overview: "技術ブログ",
+            techStack: "",
+            link: "https://example.com/blog",
+        };
+
+        const result = buildPayloadForEntry("portfolio", entry);
+
+        expect(result).toEqual({
+            name: "個人ブログ",
+            overview: "技術ブログ",
+            techStack: null,
+            link: "https://example.com/blog",
+        });
+    });
+
     it("snsPlatformの場合、API送信用のペイロードを返すこと", () => {
         const entry = {
             id: "snsPlatform-1",
