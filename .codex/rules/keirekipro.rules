@@ -191,6 +191,15 @@ prefix_rule(
 
 # --- Git branch creation ---
 prefix_rule(
+    pattern = ["git", "branch", "--show-current"],
+    decision = "allow",
+    justification = "Read-only current branch inspection command",
+    match = [
+        "git branch --show-current",
+    ],
+)
+
+prefix_rule(
     pattern = ["git", "switch", "-c"],
     decision = "allow",
     justification = "Allow creating task branches according to AGENTS.md",
