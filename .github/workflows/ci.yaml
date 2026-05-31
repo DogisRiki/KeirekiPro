@@ -154,7 +154,10 @@ jobs:
     needs:
       - detect-changes
       - deploy-gate
-    if: needs.detect-changes.outputs.backend_changed == 'true'
+    if: >-
+      always() &&
+      needs.deploy-gate.result == 'success' &&
+      needs.detect-changes.outputs.backend_changed == 'true'
     permissions:
       id-token: write
       contents: read
