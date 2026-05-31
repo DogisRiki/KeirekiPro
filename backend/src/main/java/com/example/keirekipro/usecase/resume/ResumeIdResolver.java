@@ -5,7 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 
 /**
- * API境界で受け取った職務経歴書リソースIDを内部IDへ解決する。
+ * API境界で受け取った職務経歴書IDを内部IDへ解決する
  */
 public final class ResumeIdResolver {
 
@@ -15,9 +15,9 @@ public final class ResumeIdResolver {
     }
 
     /**
-     * 職務経歴書リソースIDをUUIDへ解決する。
+     * 職務経歴書IDをUUIDへ解決する
      *
-     * @param resumeId 職務経歴書リソースID
+     * @param resumeId 職務経歴書ID
      * @return 内部で利用するUUID
      */
     public static UUID resolve(String resumeId) {

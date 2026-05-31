@@ -1,6 +1,7 @@
 package com.example.keirekipro.presentation.auth.dto;
 
 import com.example.keirekipro.presentation.shared.validator.PasswordMatches;
+import com.example.keirekipro.usecase.auth.command.UserRegistrationCommand;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -36,4 +37,13 @@ public class UserRegistrationRequest {
 
     @NotBlank(message = "パスワード(確認)は入力必須です。")
     private String confirmPassword;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @return ユーザー登録コマンド
+     */
+    public UserRegistrationCommand toCommand() {
+        return new UserRegistrationCommand(email, username, password);
+    }
 }

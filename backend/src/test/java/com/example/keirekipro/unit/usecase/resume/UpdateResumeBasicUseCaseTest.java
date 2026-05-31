@@ -17,7 +17,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.helper.ResumeObjectBuilder;
-import com.example.keirekipro.presentation.resume.dto.UpdateResumeBasicRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateResumeBasicCommand;
 import com.example.keirekipro.usecase.resume.UpdateResumeBasicUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -58,7 +58,9 @@ class UpdateResumeBasicUseCaseTest {
     @DisplayName("職務経歴書の基本情報を更新できる")
     void test1() {
         // リクエスト準備
-        UpdateResumeBasicRequest request = new UpdateResumeBasicRequest(
+        UpdateResumeBasicCommand request = new UpdateResumeBasicCommand(
+                USER_ID,
+                RESUME_ID.toString(),
                 NEW_RESUME_NAME,
                 NEW_DATE,
                 NEW_LAST_NAME,
@@ -73,7 +75,7 @@ class UpdateResumeBasicUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), request);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -106,7 +108,9 @@ class UpdateResumeBasicUseCaseTest {
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
         // リクエスト準備
-        UpdateResumeBasicRequest request = new UpdateResumeBasicRequest(
+        UpdateResumeBasicCommand request = new UpdateResumeBasicCommand(
+                USER_ID,
+                RESUME_ID.toString(),
                 NEW_RESUME_NAME,
                 NEW_DATE,
                 NEW_LAST_NAME,
@@ -116,7 +120,7 @@ class UpdateResumeBasicUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -128,7 +132,9 @@ class UpdateResumeBasicUseCaseTest {
     @DisplayName("ログインユーザー以外が所有する職務経歴書の基本情報を更新しようとした場合、UseCaseExceptionがスローされる")
     void test3() {
         // リクエスト準備
-        UpdateResumeBasicRequest request = new UpdateResumeBasicRequest(
+        UpdateResumeBasicCommand request = new UpdateResumeBasicCommand(
+                USER_ID,
+                RESUME_ID.toString(),
                 NEW_RESUME_NAME,
                 NEW_DATE,
                 NEW_LAST_NAME,
@@ -143,7 +149,7 @@ class UpdateResumeBasicUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 

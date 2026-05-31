@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,6 +14,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
@@ -25,7 +25,8 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
+import com.example.keirekipro.usecase.user.command.UpdateUserInfoCommand;
+import com.example.keirekipro.usecase.user.command.UpdateUserInfoCommand.ProfileImageCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -63,9 +64,8 @@ class UpdateUserInfoUseCaseTest {
     private static final String PASSWORD_HASH = "Password123";
 
     // ダミーのPNGヘッダバイト列
-    private static final byte[] PROFILE_IMAGE_BYTES = new byte[] {
-            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-    };
+    private static final byte[] PROFILE_IMAGE_BYTES = Base64.getDecoder()
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
     private static final MockMultipartFile PROFILE_IMAGE = new MockMultipartFile("profileImage", "test.png",
             "image/png", PROFILE_IMAGE_BYTES);
 
@@ -76,10 +76,8 @@ class UpdateUserInfoUseCaseTest {
     @DisplayName("正常にユーザー情報更新ができる")
     void test1() throws IOException {
         // リクエスト準備
-        UpdateUserInfoRequest request = new UpdateUserInfoRequest();
-        request.setUsername(USERNAME);
-        request.setProfileImage(PROFILE_IMAGE);
-        request.setTwoFactorAuthEnabled(true);
+        UpdateUserInfoCommand request = new UpdateUserInfoCommand(USER_ID, USERNAME, toProfileImage(PROFILE_IMAGE),
+                true);
 
         // 既存ユーザー
         ErrorCollector errorCollector = new ErrorCollector();
@@ -111,7 +109,7 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.getExtension(any())).thenReturn("png");
 
             // 実行
-            updateUserInfoUseCase.execute(request, USER_ID);
+            updateUserInfoUseCase.execute(request);
 
             // 保存されたUserの検証
             ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
@@ -147,10 +145,7 @@ class UpdateUserInfoUseCaseTest {
         MockMultipartFile badFile = new MockMultipartFile(
                 "profileImage", "test.png", "text/plain", PROFILE_IMAGE_BYTES);
 
-        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
-        req.setUsername("User");
-        req.setProfileImage(badFile);
-        req.setTwoFactorAuthEnabled(false);
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, "User", toProfileImage(badFile), false);
 
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(false);
@@ -159,7 +154,7 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
             assertThatThrownBy(() -> {
-                updateUserInfoUseCase.execute(req, USER_ID);
+                updateUserInfoUseCase.execute(req);
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
@@ -174,10 +169,7 @@ class UpdateUserInfoUseCaseTest {
         MockMultipartFile badExt = new MockMultipartFile(
                 "profileImage", "test.txt", "image/png", PROFILE_IMAGE_BYTES);
 
-        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
-        req.setUsername("User");
-        req.setProfileImage(badExt);
-        req.setTwoFactorAuthEnabled(false);
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, "User", toProfileImage(badExt), false);
 
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
@@ -186,7 +178,7 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
             assertThatThrownBy(() -> {
-                updateUserInfoUseCase.execute(req, USER_ID);
+                updateUserInfoUseCase.execute(req);
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
@@ -202,10 +194,7 @@ class UpdateUserInfoUseCaseTest {
         MockMultipartFile bigFile = new MockMultipartFile(
                 "profileImage", "test.png", "image/png", tooBig);
 
-        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
-        req.setUsername("User");
-        req.setProfileImage(bigFile);
-        req.setTwoFactorAuthEnabled(false);
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, "User", toProfileImage(bigFile), false);
 
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
@@ -214,7 +203,7 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
             assertThatThrownBy(() -> {
-                updateUserInfoUseCase.execute(req, USER_ID);
+                updateUserInfoUseCase.execute(req);
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
@@ -229,10 +218,7 @@ class UpdateUserInfoUseCaseTest {
         MockMultipartFile badImg = new MockMultipartFile(
                 "profileImage", "test.png", "image/png", "dummy".getBytes(StandardCharsets.UTF_8));
 
-        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
-        req.setUsername("User");
-        req.setProfileImage(badImg);
-        req.setTwoFactorAuthEnabled(false);
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, "User", toProfileImage(badImg), false);
 
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
@@ -241,7 +227,7 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(false);
 
             assertThatThrownBy(() -> {
-                updateUserInfoUseCase.execute(req, USER_ID);
+                updateUserInfoUseCase.execute(req);
             }).isInstanceOf(UseCaseException.class)
                     .matches(e -> ((UseCaseException) e).getErrors().containsKey("profileImage"));
 
@@ -253,16 +239,11 @@ class UpdateUserInfoUseCaseTest {
     @Test
     @DisplayName("S3へのアップロードに失敗した場合、UseCaseExceptionがスローされる")
     void test6() throws IOException {
-        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
-        req.setUsername("Valid");
-
-        // MultipartFile.getBytes()がIOExceptionを投げるケースを作る
-        MultipartFile profileImageMock = mock(MultipartFile.class);
-        when(profileImageMock.isEmpty()).thenReturn(false);
-        when(profileImageMock.getBytes()).thenThrow(new IOException("S3 error"));
-        req.setProfileImage(profileImageMock);
-
-        req.setTwoFactorAuthEnabled(true);
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(
+                USER_ID,
+                "Valid",
+                toProfileImage(PROFILE_IMAGE),
+                true);
 
         ErrorCollector errorCollector = new ErrorCollector();
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
@@ -284,13 +265,14 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isFileSizeValid(any(), anyLong())).thenReturn(true);
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
             util.when(() -> FileUtil.getExtension(any())).thenReturn("png");
+            when(objectStore.putAs(any(StoredObject.class), eq("/profile/image/"), eq(USER_ID + ".png")))
+                    .thenThrow(new UseCaseException("S3 error"));
 
             assertThatThrownBy(() -> {
-                updateUserInfoUseCase.execute(req, USER_ID);
+                updateUserInfoUseCase.execute(req);
             }).isInstanceOf(UseCaseException.class)
-                    .hasMessage("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
+                    .hasMessage("S3 error");
 
-            verify(objectStore, never()).putAs(any(), any(), any());
             verify(objectStore, never()).put(any(), any());
         }
     }
@@ -298,10 +280,7 @@ class UpdateUserInfoUseCaseTest {
     @Test
     @DisplayName("ユーザーが存在しない場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
     void test7() {
-        UpdateUserInfoRequest req = new UpdateUserInfoRequest();
-        req.setUsername("Valid");
-        req.setProfileImage(PROFILE_IMAGE);
-        req.setTwoFactorAuthEnabled(true);
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, "Valid", toProfileImage(PROFILE_IMAGE), true);
 
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
@@ -311,7 +290,7 @@ class UpdateUserInfoUseCaseTest {
             util.when(() -> FileUtil.isImageReadValid(any())).thenReturn(true);
 
             assertThatThrownBy(() -> {
-                updateUserInfoUseCase.execute(req, USER_ID);
+                updateUserInfoUseCase.execute(req);
             }).isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                     .hasMessage("不正なアクセスです。");
 
@@ -319,4 +298,13 @@ class UpdateUserInfoUseCaseTest {
             verify(objectStore, never()).put(any(), any());
         }
     }
+
+    private ProfileImageCommand toProfileImage(MultipartFile file) {
+        try {
+            return new ProfileImageCommand(file.getBytes(), file.getContentType(), file.getOriginalFilename());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

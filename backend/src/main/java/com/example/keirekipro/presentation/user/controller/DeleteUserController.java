@@ -42,7 +42,7 @@ public class DeleteUserController {
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "ユーザー退会", description = "ユーザーの退会処理を実行し、ユーザー情報を削除する")
-    public void deleteUser(HttpServletResponse response) {
+    public void handle(HttpServletResponse response) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
         deleteUserUseCase.execute(userId);
         response.addHeader("Set-Cookie", CookieUtil.deleteCookie("accessToken", isSecureCookie));

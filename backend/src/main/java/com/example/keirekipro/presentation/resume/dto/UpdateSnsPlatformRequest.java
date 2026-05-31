@@ -1,5 +1,9 @@
 package com.example.keirekipro.presentation.resume.dto;
 
+import java.util.UUID;
+
+import com.example.keirekipro.usecase.resume.command.UpdateSnsPlatformCommand;
+
 import org.hibernate.validator.constraints.URL;
 
 import lombok.AllArgsConstructor;
@@ -25,4 +29,16 @@ public class UpdateSnsPlatformRequest {
     @URL(protocol = "https", message = "リンクはhttps形式のURLを指定してください。")
     @Size(max = 255, message = "リンクは255文字以内で入力してください。")
     private String link;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
+     * @param snsPlatformId SNSプラットフォームID
+     * @return SNSプラットフォーム更新コマンド
+     */
+    public UpdateSnsPlatformCommand toCommand(UUID userId, String resumeId, UUID snsPlatformId) {
+        return new UpdateSnsPlatformCommand(userId, resumeId, snsPlatformId, name, link);
+    }
 }

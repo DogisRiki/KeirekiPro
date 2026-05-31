@@ -515,6 +515,30 @@ package com.example.keirekipro.infrastructure.repository.resume {
         - List<SelfPromotionDto> selfPromotions
     }
 
+    class "ResumeDto.CareerDto" as ResumeCareerDto {
+        - UUID id
+        - UUID resumeId
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean active
+    }
+
+    class "ResumeDto.ProjectDto" as ResumeProjectDto {
+        - UUID id
+        - UUID resumeId
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean active
+        - String name
+        - String overview
+        - String teamComp
+        - String role
+        - String achievement
+        ...
+    }
+
     class MyBatisResumeRepository {
         - ResumeMapper resumeMapper
         --
@@ -529,6 +553,8 @@ package com.example.keirekipro.infrastructure.repository.resume {
     MyBatisResumeRepository ..|> ResumeRepository
     MyBatisResumeRepository --> ResumeMapper
     ResumeMapper ..> ResumeDto
+    ResumeDto --> ResumeCareerDto
+    ResumeDto --> ResumeProjectDto
 }
 
 '========================================

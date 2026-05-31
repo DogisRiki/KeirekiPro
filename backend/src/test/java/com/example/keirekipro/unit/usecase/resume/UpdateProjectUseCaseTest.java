@@ -22,7 +22,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateProjectRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateProjectCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateProjectUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -59,65 +59,6 @@ class UpdateProjectUseCaseTest {
     @Test
     @DisplayName("プロジェクトを更新できる")
     void test1() {
-        // リクエスト準備
-        UpdateProjectRequest request = new UpdateProjectRequest();
-        request.setCompanyName("会社A");
-        request.setStartDate(YearMonth.of(2018, 1));
-        request.setEndDate(YearMonth.of(2018, 12));
-        request.setIsActive(Boolean.FALSE);
-        request.setName("更新後プロジェクト");
-        request.setOverview("更新後概要");
-        request.setTeamComp("更新後チーム構成");
-        request.setRole("更新後役割");
-        request.setAchievement("更新後成果");
-        // 工程
-        request.setRequirements(Boolean.TRUE);
-        request.setBasicDesign(Boolean.TRUE);
-        request.setDetailedDesign(Boolean.FALSE);
-        request.setImplementation(Boolean.TRUE);
-        request.setIntegrationTest(Boolean.FALSE);
-        request.setSystemTest(Boolean.TRUE);
-        request.setMaintenance(Boolean.FALSE);
-        // TechStack
-        request.setFrontendLanguages(List.of("TypeScript"));
-        request.setFrontendFrameworks(List.of("React"));
-        request.setFrontendLibraries(List.of("MUI"));
-        request.setFrontendBuildTools(List.of("Vite"));
-        request.setFrontendPackageManagers(List.of("npm"));
-        request.setFrontendLinters(List.of("ESLint"));
-        request.setFrontendFormatters(List.of("Prettier"));
-        request.setFrontendTestingTools(List.of("RTL"));
-
-        request.setBackendLanguages(List.of("Java"));
-        request.setBackendFrameworks(List.of("Spring Boot"));
-        request.setBackendLibraries(List.of("MyBatis"));
-        request.setBackendBuildTools(List.of("Gradle"));
-        request.setBackendPackageManagers(List.of("npm"));
-        request.setBackendLinters(List.of());
-        request.setBackendFormatters(List.of());
-        request.setBackendTestingTools(List.of("JUnit"));
-        request.setOrmTools(List.of("MyBatis"));
-        request.setAuth(List.of("JWT"));
-
-        request.setClouds(List.of("AWS"));
-        request.setOperatingSystems(List.of("Linux"));
-        request.setContainers(List.of("Docker"));
-        request.setDatabases(List.of("PostgreSQL"));
-        request.setWebServers(List.of("nginx"));
-        request.setCiCdTools(List.of("Jenkins"));
-        request.setIacTools(List.of("Terraform"));
-        request.setMonitoringTools(List.of("CloudWatch"));
-        request.setLoggingTools(List.of("CloudWatch Logs"));
-
-        request.setSourceControls(List.of("Git"));
-        request.setProjectManagements(List.of("Redmine"));
-        request.setCommunicationTools(List.of("Teams"));
-        request.setDocumentationTools(List.of("Confluence"));
-        request.setApiDevelopmentTools(List.of("Postman"));
-        request.setDesignTools(List.of("Figma"));
-        request.setEditors(List.of("VSCode"));
-        request.setDevelopmentEnvironments(List.of("Windows"));
-
         // 既存の職務経歴書とプロジェクトを準備（宣言位置を使用直前へ寄せる）
         Resume resume = buildResumeWithProjects(USER_ID);
 
@@ -132,7 +73,8 @@ class UpdateProjectUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), projectId, request);
+        UpdateProjectCommand request = buildUpdateProjectCommand(projectId);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -191,31 +133,13 @@ class UpdateProjectUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        // リクエスト準備
-        UpdateProjectRequest request = new UpdateProjectRequest();
-        request.setCompanyName("会社A");
-        request.setStartDate(YearMonth.of(2018, 1));
-        request.setEndDate(YearMonth.of(2018, 12));
-        request.setIsActive(Boolean.FALSE);
-        request.setName("更新後プロジェクト");
-        request.setOverview("更新後概要");
-        request.setTeamComp("更新後チーム構成");
-        request.setRole("更新後役割");
-        request.setAchievement("更新後成果");
-        request.setRequirements(Boolean.TRUE);
-        request.setBasicDesign(Boolean.TRUE);
-        request.setDetailedDesign(Boolean.FALSE);
-        request.setImplementation(Boolean.TRUE);
-        request.setIntegrationTest(Boolean.FALSE);
-        request.setSystemTest(Boolean.TRUE);
-        request.setMaintenance(Boolean.FALSE);
-
         // モック準備（対象の職務経歴書が存在しない）
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
         UUID projectId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), projectId, request))
+        UpdateProjectCommand request = buildUpdateProjectCommand(projectId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -226,25 +150,6 @@ class UpdateProjectUseCaseTest {
     @Test
     @DisplayName("ログインユーザー以外が所有する職務経歴書のプロジェクトを更新しようとした場合、UseCaseExceptionがスローされる")
     void test3() {
-        // リクエスト準備
-        UpdateProjectRequest request = new UpdateProjectRequest();
-        request.setCompanyName("会社A");
-        request.setStartDate(YearMonth.of(2018, 1));
-        request.setEndDate(YearMonth.of(2018, 12));
-        request.setIsActive(Boolean.FALSE);
-        request.setName("更新後プロジェクト");
-        request.setOverview("更新後概要");
-        request.setTeamComp("更新後チーム構成");
-        request.setRole("更新後役割");
-        request.setAchievement("更新後成果");
-        request.setRequirements(Boolean.TRUE);
-        request.setBasicDesign(Boolean.TRUE);
-        request.setDetailedDesign(Boolean.FALSE);
-        request.setImplementation(Boolean.TRUE);
-        request.setIntegrationTest(Boolean.FALSE);
-        request.setSystemTest(Boolean.TRUE);
-        request.setMaintenance(Boolean.FALSE);
-
         // 職務経歴書（所有者は別ユーザー）を準備（宣言位置を使用直前へ寄せる）
         Resume resume = buildResumeWithProjects(OTHER_USER_ID);
 
@@ -257,7 +162,8 @@ class UpdateProjectUseCaseTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), projectId, request))
+        UpdateProjectCommand request = buildUpdateProjectCommand(projectId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -268,25 +174,6 @@ class UpdateProjectUseCaseTest {
     @Test
     @DisplayName("更新対象のプロジェクトが存在しない場合、UseCaseExceptionがスローされる")
     void test4() {
-        // リクエスト準備
-        UpdateProjectRequest request = new UpdateProjectRequest();
-        request.setCompanyName("会社A");
-        request.setStartDate(YearMonth.of(2018, 1));
-        request.setEndDate(YearMonth.of(2018, 12));
-        request.setIsActive(Boolean.FALSE);
-        request.setName("存在しないプロジェクト更新");
-        request.setOverview("ダミー概要");
-        request.setTeamComp("ダミーチーム構成");
-        request.setRole("ダミー役割");
-        request.setAchievement("ダミー成果");
-        request.setRequirements(Boolean.TRUE);
-        request.setBasicDesign(Boolean.FALSE);
-        request.setDetailedDesign(Boolean.FALSE);
-        request.setImplementation(Boolean.TRUE);
-        request.setIntegrationTest(Boolean.FALSE);
-        request.setSystemTest(Boolean.FALSE);
-        request.setMaintenance(Boolean.FALSE);
-
         // 既存の職務経歴書を準備（宣言位置を使用直前へ寄せる）
         Resume resume = buildResumeWithProjects(USER_ID);
 
@@ -295,12 +182,96 @@ class UpdateProjectUseCaseTest {
 
         // 実行＆検証
         UUID missingProjectId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingProjectId, request))
+        UpdateProjectCommand request = buildMissingProjectCommand(missingProjectId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象のプロジェクトが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
+    }
+
+    /**
+     * テスト用のプロジェクト更新Commandを作成する
+     *
+     * @param projectId 更新対象プロジェクトID
+     * @return プロジェクト更新Command
+     */
+    private UpdateProjectCommand buildUpdateProjectCommand(UUID projectId) {
+        return new UpdateProjectCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                projectId,
+                "会社A",
+                YearMonth.of(2018, 1),
+                YearMonth.of(2018, 12),
+                Boolean.FALSE,
+                "更新後プロジェクト",
+                "更新後概要",
+                "更新後チーム構成",
+                "更新後役割",
+                "更新後成果",
+                Boolean.TRUE,
+                Boolean.TRUE,
+                Boolean.FALSE,
+                Boolean.TRUE,
+                Boolean.FALSE,
+                Boolean.TRUE,
+                Boolean.FALSE,
+                List.of("TypeScript"),
+                List.of("React"),
+                List.of("MUI"),
+                List.of("Vite"),
+                List.of("npm"),
+                List.of("ESLint"),
+                List.of("Prettier"),
+                List.of("RTL"),
+                List.of("Java"),
+                List.of("Spring Boot"),
+                List.of("MyBatis"),
+                List.of("Gradle"),
+                List.of("npm"),
+                List.of(),
+                List.of(),
+                List.of("JUnit"),
+                List.of("MyBatis"),
+                List.of("JWT"),
+                List.of("AWS"),
+                List.of("Linux"),
+                List.of("Docker"),
+                List.of("PostgreSQL"),
+                List.of("nginx"),
+                List.of("Jenkins"),
+                List.of("Terraform"),
+                List.of("CloudWatch"),
+                List.of("CloudWatch Logs"),
+                List.of("Git"),
+                List.of("Redmine"),
+                List.of("Teams"),
+                List.of("Confluence"),
+                List.of("Postman"),
+                List.of("Figma"),
+                List.of("VSCode"),
+                List.of("Windows"));
+    }
+
+    /**
+     * 存在しないプロジェクト更新検証用のCommandを作成する
+     *
+     * @param projectId 更新対象プロジェクトID
+     * @return プロジェクト更新Command
+     */
+    private UpdateProjectCommand buildMissingProjectCommand(UUID projectId) {
+        UpdateProjectCommand request = buildUpdateProjectCommand(projectId);
+        request.setName("存在しないプロジェクト更新");
+        request.setOverview("ダミー概要");
+        request.setTeamComp("ダミーチーム構成");
+        request.setRole("ダミー役割");
+        request.setAchievement("ダミー成果");
+        request.setBasicDesign(Boolean.FALSE);
+        request.setDetailedDesign(Boolean.FALSE);
+        request.setSystemTest(Boolean.FALSE);
+        return request;
     }
 
     /**
@@ -378,14 +349,14 @@ class UpdateProjectUseCaseTest {
             CompanyName companyName,
             YearMonth start,
             YearMonth end,
-            boolean isActive,
+            boolean active,
             String name,
             String overview,
             String teamComp,
             String role,
             String achievement) {
 
-        Period period = Period.create(errorCollector, start, end, isActive);
+        Period period = Period.create(errorCollector, start, end, active);
 
         Project.Process process = Project.Process.create(
                 true, // requirements

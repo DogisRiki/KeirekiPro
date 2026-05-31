@@ -15,7 +15,7 @@ import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.service.user.UserEmailDuplicationCheckService;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
+import com.example.keirekipro.usecase.auth.command.UserRegistrationCommand;
 import com.example.keirekipro.usecase.auth.UserRegistrationUseCase;
 import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
@@ -59,7 +59,7 @@ class UserRegistrationUseCaseTest {
     @DisplayName("ユーザーを新規登録でき、トークンバージョンが初期化される")
     void test1() {
         // データ準備
-        UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
+        UserRegistrationCommand request = new UserRegistrationCommand(EMAIL, USERNAME, PASSWORD);
 
         // モックをセットアップ
         doNothing().when(userEmailDuplicationCheckService).execute(any());
@@ -87,7 +87,7 @@ class UserRegistrationUseCaseTest {
     @DisplayName("既にメールアドレスが登録されている場合、DomainExceptionがスローされ、後続の処理が行われない")
     void test2() {
         // データ準備
-        UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
+        UserRegistrationCommand request = new UserRegistrationCommand(EMAIL, USERNAME, PASSWORD);
 
         // モックをセットアップ
         doThrow(new DomainException("このメールアドレスは登録できません。"))

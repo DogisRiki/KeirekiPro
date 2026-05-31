@@ -48,7 +48,7 @@ public class LoginController {
     public ResponseEntity<Void> handle(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
 
         // ユースケース実行
-        LoginUseCaseDto user = loginUseCase.execute(request);
+        LoginUseCaseDto user = loginUseCase.execute(request.toCommand());
 
         // ユーザーの二段階認証設定をチェックし、有効なら二段階認証発行ユースケースを実行
         if (user.isTwoFactorAuthEnabled()) {

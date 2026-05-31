@@ -21,7 +21,7 @@ import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateCareerRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateCareerCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateCareerUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -61,13 +61,6 @@ class UpdateCareerUseCaseTest {
         // 既存の職務経歴書と職歴を準備
         Resume resume = buildResumeWithCareers(USER_ID);
 
-        // リクエスト準備
-        UpdateCareerRequest request = new UpdateCareerRequest(
-                "更新後会社",
-                YearMonth.of(2018, 1),
-                YearMonth.of(2018, 12),
-                Boolean.FALSE);
-
         // 更新対象IDは、並び順に依存しないよう会社名で特定する
         UUID careerId = resume.getCareers().stream()
                 .filter(c -> "会社A".equals(c.getCompanyName().getValue()))
@@ -79,7 +72,8 @@ class UpdateCareerUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), careerId, request);
+        UpdateCareerCommand request = buildUpdateCareerCommand(careerId);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -119,19 +113,13 @@ class UpdateCareerUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        // リクエスト準備
-        UpdateCareerRequest request = new UpdateCareerRequest(
-                "更新後会社",
-                YearMonth.of(2018, 1),
-                YearMonth.of(2018, 12),
-                Boolean.FALSE);
-
         // モック準備（対象の職務経歴書が存在しない）
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
         UUID careerId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), careerId, request))
+        UpdateCareerCommand request = buildUpdateCareerCommand(careerId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -145,13 +133,6 @@ class UpdateCareerUseCaseTest {
         // 職務経歴書（所有者は別ユーザー）を準備
         Resume resume = buildResumeWithCareers(OTHER_USER_ID);
 
-        // リクエスト準備
-        UpdateCareerRequest request = new UpdateCareerRequest(
-                "更新後会社",
-                YearMonth.of(2018, 1),
-                YearMonth.of(2018, 12),
-                Boolean.FALSE);
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
@@ -160,8 +141,8 @@ class UpdateCareerUseCaseTest {
                 .map(Career::getId)
                 .findFirst()
                 .orElseThrow();
-
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), careerId, request))
+        UpdateCareerCommand request = buildUpdateCareerCommand(careerId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -175,24 +156,52 @@ class UpdateCareerUseCaseTest {
         // 既存の職務経歴書を準備
         Resume resume = buildResumeWithCareers(USER_ID);
 
-        // リクエスト準備
-        UpdateCareerRequest request = new UpdateCareerRequest(
-                "存在しない職歴更新",
-                YearMonth.of(2020, 1),
-                YearMonth.of(2020, 12),
-                Boolean.FALSE);
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
         UUID missingCareerId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingCareerId, request))
+        UpdateCareerCommand request = buildMissingCareerCommand(missingCareerId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職歴が存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
+    }
+
+    /**
+     * テスト用の職歴更新Commandを作成する
+     *
+     * @param careerId 更新対象職歴ID
+     * @return 職歴更新Command
+     */
+    private UpdateCareerCommand buildUpdateCareerCommand(UUID careerId) {
+        return new UpdateCareerCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                careerId,
+                "更新後会社",
+                YearMonth.of(2018, 1),
+                YearMonth.of(2018, 12),
+                Boolean.FALSE);
+    }
+
+    /**
+     * 存在しない職歴更新検証用のCommandを作成する
+     *
+     * @param careerId 更新対象職歴ID
+     * @return 職歴更新Command
+     */
+    private UpdateCareerCommand buildMissingCareerCommand(UUID careerId) {
+        return new UpdateCareerCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                careerId,
+                "存在しない職歴更新",
+                YearMonth.of(2020, 1),
+                YearMonth.of(2020, 12),
+                Boolean.FALSE);
     }
 
     /**

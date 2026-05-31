@@ -49,6 +49,6 @@ public class UpdateCareerController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                updateCareerUseCase.execute(userId, resumeId, careerId, request));
+                updateCareerUseCase.execute(request.toCommand(userId, resumeId, careerId)));
     }
 }

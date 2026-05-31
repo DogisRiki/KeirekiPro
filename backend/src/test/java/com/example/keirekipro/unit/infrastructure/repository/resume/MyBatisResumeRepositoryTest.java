@@ -107,7 +107,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(c.getCompanyName().getValue()).isEqualTo(cd.getCompanyName());
         assertThat(c.getPeriod().getStartDate()).isEqualTo(cd.getStartDate());
         assertThat(c.getPeriod().getEndDate()).isEqualTo(cd.getEndDate());
-        assertThat(c.getPeriod().isActive()).isEqualTo(cd.getIsActive());
+        assertThat(c.getPeriod().isActive()).isEqualTo(cd.getActive());
 
         // Projectの検証
         assertThat(r.getProjects()).hasSize(1);
@@ -117,7 +117,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(p.getCompanyName().getValue()).isEqualTo(pd.getCompanyName());
         assertThat(p.getPeriod().getStartDate()).isEqualTo(pd.getStartDate());
         assertThat(p.getPeriod().getEndDate()).isEqualTo(pd.getEndDate());
-        assertThat(p.getPeriod().isActive()).isEqualTo(pd.getIsActive());
+        assertThat(p.getPeriod().isActive()).isEqualTo(pd.getActive());
         assertThat(p.getName()).isEqualTo(pd.getName());
         assertThat(p.getOverview()).isEqualTo(pd.getOverview());
         assertThat(p.getTeamComp()).isEqualTo(pd.getTeamComp());
@@ -257,7 +257,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(c.getCompanyName().getValue()).isEqualTo(cd.getCompanyName());
         assertThat(c.getPeriod().getStartDate()).isEqualTo(cd.getStartDate());
         assertThat(c.getPeriod().getEndDate()).isEqualTo(cd.getEndDate());
-        assertThat(c.getPeriod().isActive()).isEqualTo(cd.getIsActive());
+        assertThat(c.getPeriod().isActive()).isEqualTo(cd.getActive());
 
         // Projectの検証
         assertThat(r.getProjects()).hasSize(dto.getProjects().size());
@@ -267,7 +267,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(p.getCompanyName().getValue()).isEqualTo(pd.getCompanyName());
         assertThat(p.getPeriod().getStartDate()).isEqualTo(pd.getStartDate());
         assertThat(p.getPeriod().getEndDate()).isEqualTo(pd.getEndDate());
-        assertThat(p.getPeriod().isActive()).isEqualTo(pd.getIsActive());
+        assertThat(p.getPeriod().isActive()).isEqualTo(pd.getActive());
         assertThat(p.getName()).isEqualTo(pd.getName());
         assertThat(p.getOverview()).isEqualTo(pd.getOverview());
         assertThat(p.getTeamComp()).isEqualTo(pd.getTeamComp());
@@ -399,7 +399,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(cd.getCompanyName()).isEqualTo(c.getCompanyName().getValue());
         assertThat(cd.getStartDate()).isEqualTo(c.getPeriod().getStartDate());
         assertThat(cd.getEndDate()).isEqualTo(c.getPeriod().getEndDate());
-        assertThat(cd.getIsActive()).isEqualTo(c.getPeriod().isActive());
+        assertThat(cd.getActive()).isEqualTo(c.getPeriod().isActive());
 
         // Projectインサート
         ArgumentCaptor<ResumeDto.ProjectDto> capP = ArgumentCaptor.forClass(ResumeDto.ProjectDto.class);
@@ -411,7 +411,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(pd.getCompanyName()).isEqualTo(p.getCompanyName().getValue());
         assertThat(pd.getStartDate()).isEqualTo(p.getPeriod().getStartDate());
         assertThat(pd.getEndDate()).isEqualTo(p.getPeriod().getEndDate());
-        assertThat(pd.getIsActive()).isEqualTo(p.getPeriod().isActive());
+        assertThat(pd.getActive()).isEqualTo(p.getPeriod().isActive());
         assertThat(pd.getName()).isEqualTo(p.getName());
         assertThat(pd.getOverview()).isEqualTo(p.getOverview());
         assertThat(pd.getTeamComp()).isEqualTo(p.getTeamComp());
@@ -566,7 +566,7 @@ class MyBatisResumeRepositoryTest {
         assertThat(cd.getCompanyName()).isEqualTo("ActiveCompany");
         assertThat(cd.getStartDate()).isEqualTo(YearMonth.of(2024, 1));
         assertThat(cd.getEndDate()).isNull();
-        assertThat(cd.getIsActive()).isTrue();
+        assertThat(cd.getActive()).isTrue();
     }
 
     @Test
@@ -589,7 +589,7 @@ class MyBatisResumeRepositoryTest {
         cd.setCompanyName("ActiveCompany");
         cd.setStartDate(YearMonth.of(2024, 1));
         cd.setEndDate(null);
-        cd.setIsActive(true);
+        cd.setActive(true);
 
         dto.setCareers(List.of(cd));
         dto.setProjects(Collections.emptyList());

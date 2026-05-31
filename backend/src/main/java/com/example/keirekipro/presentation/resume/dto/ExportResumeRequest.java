@@ -3,7 +3,7 @@ package com.example.keirekipro.presentation.resume.dto;
 import java.math.BigDecimal;
 import java.util.Locale;
 
-import com.example.keirekipro.usecase.resume.dto.ExportResumeCommand;
+import com.example.keirekipro.usecase.resume.command.ExportResumeCommand;
 import com.example.keirekipro.usecase.resume.export.ExportFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 

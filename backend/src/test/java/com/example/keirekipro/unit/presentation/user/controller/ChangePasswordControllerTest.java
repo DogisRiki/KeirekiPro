@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.util.UUID;
 
@@ -68,7 +69,7 @@ class ChangePasswordControllerTest {
 
         // 呼び出しを検証
         verify(currentUserFacade).getUserId();
-        verify(changePasswordUseCase).execute(request, USER_ID);
+        verify(changePasswordUseCase).execute(eq(request.toCommand(USER_ID)));
     }
 
     @Test

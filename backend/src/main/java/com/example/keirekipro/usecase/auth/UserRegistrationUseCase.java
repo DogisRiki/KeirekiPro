@@ -7,8 +7,8 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.service.user.UserEmailDuplicationCheckService;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
-import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.auth.command.UserRegistrationCommand;
 import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -37,15 +37,15 @@ public class UserRegistrationUseCase {
     /**
      * ユーザー新規登録ユースケースを実行する
      *
-     * @param request リクエスト
+     * @param command コマンド
      */
     @Transactional
-    public void execute(UserRegistrationRequest request) {
+    public void execute(UserRegistrationCommand command) {
 
         ErrorCollector errorCollector = new ErrorCollector();
 
         // メールアドレス値オブジェクトを作成
-        Email email = Email.create(errorCollector, request.getEmail());
+        Email email = Email.create(errorCollector, command.getEmail());
 
         // メールアドレス重複チェック
         userEmailDuplicationCheckService.execute(email);
@@ -54,11 +54,11 @@ public class UserRegistrationUseCase {
                 errorCollector,
                 Email.create(
                         errorCollector,
-                        request.getEmail()),
-                passwordEncoder.encode(request.getPassword()),
+                        command.getEmail()),
+                passwordEncoder.encode(command.getPassword()),
                 Collections.emptyMap(),
                 null,
-                request.getUsername());
+                command.getUsername());
 
         // 新規登録イベントを発行する
         user.register();

@@ -5,7 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.resume.Certification;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateCertificationRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateCertificationCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
@@ -27,15 +27,14 @@ public class UpdateCertificationUseCase {
     /**
      * 資格更新ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param certificationId 資格ID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID certificationId,
-            UpdateCertificationRequest request) {
+    public ResumeInfoUseCaseDto execute(UpdateCertificationCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
+        UUID certificationId = command.getCertificationId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         Resume resume = resumeRepository.find(resolvedResumeId)
@@ -53,8 +52,8 @@ public class UpdateCertificationUseCase {
         ErrorCollector errorCollector = new ErrorCollector();
 
         Certification updatedCertification = existing
-                .changeName(errorCollector, request.getName())
-                .changeDate(errorCollector, request.getDate());
+                .changeName(errorCollector, command.getName())
+                .changeDate(errorCollector, command.getDate());
 
         Resume updated = resume.updateCertification(errorCollector, updatedCertification);
 

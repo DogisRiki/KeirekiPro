@@ -1,41 +1,38 @@
-package com.example.keirekipro.usecase.resume.dto;
+package com.example.keirekipro.usecase.resume.command;
 
 import java.math.BigDecimal;
 
 import com.example.keirekipro.usecase.resume.export.ExportFormat;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
 /**
- * 職務経歴書エクスポートコマンド
+ * 職務経歴書エクスポートユースケースの入力コマンド
  */
-@Getter
-@RequiredArgsConstructor
+@Data
+@AllArgsConstructor
 public class ExportResumeCommand {
 
-    private final ExportFormat format;
+    private ExportFormat format;
 
-    private final ExportDisposition disposition;
+    private ExportDisposition disposition;
 
-    private final PdfSettings pdfSettings;
+    private PdfSettings pdfSettings;
 
-    /**
-     * PDFプレビューかどうか
-     */
     public boolean isPreview() {
         return disposition == ExportDisposition.INLINE;
     }
 
     /**
-     * エクスポート時のContent-Disposition
+     * エクスポートレスポンスのContent-Disposition種別
      */
     public enum ExportDisposition {
         INLINE, ATTACHMENT
     }
 
     /**
-     * PDF設定
+     * エクスポートリクエストで指定されたPDF描画設定
      */
     public record PdfSettings(
             String fontFamily,

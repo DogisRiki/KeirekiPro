@@ -19,8 +19,8 @@ import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.presentation.resume.dto.RestoreResumeRequest;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.resume.command.RestoreResumeCommand;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeBackupVersion;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -47,15 +47,15 @@ public class RestoreResumeUseCase {
     /**
      * 職務経歴書リストアユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param request リストアリクエスト
+     * @param command コマンド
      * @return リストアされた職務経歴書情報
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, RestoreResumeRequest request) {
+    public ResumeInfoUseCaseDto execute(RestoreResumeCommand command) {
+        UUID userId = command.getUserId();
 
         // バージョンチェック
-        if (!ResumeBackupVersion.SUPPORTED_VERSION.equals(request.getVersion())) {
+        if (!ResumeBackupVersion.SUPPORTED_VERSION.equals(command.getVersion())) {
             throw new UseCaseException("サポートされていないバックアップバージョンです。");
         }
 
@@ -63,16 +63,16 @@ public class RestoreResumeUseCase {
         resumeLimitChecker.checkResumeCreateAllowed(userId);
 
         ErrorCollector errorCollector = new ErrorCollector();
-        RestoreResumeRequest.ResumeDto resumeDto = request.getResume();
+        RestoreResumeCommand.ResumeCommand resumeCommand = command.getResume();
 
         // 職務経歴書名の構築
-        ResumeName resumeName = ResumeName.create(errorCollector, resumeDto.getResumeName());
+        ResumeName resumeName = ResumeName.create(errorCollector, resumeCommand.getResumeName());
 
         // 重複チェック（このDomainExceptionはそのまま伝播させる）
         resumeNameDuplicationCheckService.execute(userId, resumeName);
 
         // ドメインモデル再構築（ここで発生するDomainExceptionは破損/改ざんとみなす）
-        Resume resume = buildResumeFromRequest(errorCollector, userId, resumeDto, resumeName);
+        Resume resume = buildResumeFromCommand(errorCollector, userId, resumeCommand, resumeName);
 
         // 保存
         resumeRepository.save(resume);
@@ -84,46 +84,47 @@ public class RestoreResumeUseCase {
      * リクエストからドメインモデルを構築する
      * <p>
      * バックアップファイルから復元する際、ドメインバリデーションに失敗した場合は
-     * ファイルが破損または改ざんされているとみなしUseCaseExceptionをスローする。
+     * ファイルが破損または改ざんされているとみなしUseCaseExceptionをスローする
      * </p>
      *
      * @param errorCollector エラー収集オブジェクト
      * @param userId ユーザーID
-     * @param resumeDto リクエストの職務経歴書DTO
+     * @param resumeCommand 復元対象の職務経歴書コマンド
      * @param resumeName 職務経歴書名
      * @return 職務経歴書エンティティ
      * @throws UseCaseException ファイルが破損または改ざんされている場合
      */
-    private Resume buildResumeFromRequest(ErrorCollector errorCollector, UUID userId,
-            RestoreResumeRequest.ResumeDto resumeDto, ResumeName resumeName) {
+    private Resume buildResumeFromCommand(ErrorCollector errorCollector, UUID userId,
+            RestoreResumeCommand.ResumeCommand resumeCommand, ResumeName resumeName) {
         try {
             // 氏名
-            FullName fullName = FullName.create(errorCollector, resumeDto.getLastName(), resumeDto.getFirstName());
+            FullName fullName = FullName.create(errorCollector, resumeCommand.getLastName(),
+                    resumeCommand.getFirstName());
 
             // 職歴
-            List<Career> careers = buildCareers(errorCollector, resumeDto.getCareers());
+            List<Career> careers = buildCareers(errorCollector, resumeCommand.getCareers());
 
             // プロジェクト
-            List<Project> projects = buildProjects(errorCollector, resumeDto.getProjects());
+            List<Project> projects = buildProjects(errorCollector, resumeCommand.getProjects());
 
             // 資格
-            List<Certification> certifications = buildCertifications(errorCollector, resumeDto.getCertifications());
+            List<Certification> certifications = buildCertifications(errorCollector, resumeCommand.getCertifications());
 
             // ポートフォリオ
-            List<Portfolio> portfolios = buildPortfolios(errorCollector, resumeDto.getPortfolios());
+            List<Portfolio> portfolios = buildPortfolios(errorCollector, resumeCommand.getPortfolios());
 
             // SNSプラットフォーム
-            List<SnsPlatform> snsPlatforms = buildSnsPlatforms(errorCollector, resumeDto.getSnsPlatforms());
+            List<SnsPlatform> snsPlatforms = buildSnsPlatforms(errorCollector, resumeCommand.getSnsPlatforms());
 
             // 自己PR
-            List<SelfPromotion> selfPromotions = buildSelfPromotions(errorCollector, resumeDto.getSelfPromotions());
+            List<SelfPromotion> selfPromotions = buildSelfPromotions(errorCollector, resumeCommand.getSelfPromotions());
 
             // 職務経歴書エンティティ新規構築
             return Resume.create(
                     errorCollector,
                     userId,
                     resumeName,
-                    resumeDto.getDate(),
+                    resumeCommand.getDate(),
                     fullName,
                     careers,
                     projects,
@@ -141,11 +142,11 @@ public class RestoreResumeUseCase {
      * 職歴リストを構築する
      */
     private List<Career> buildCareers(ErrorCollector errorCollector,
-            List<RestoreResumeRequest.CareerDto> careerDtos) {
-        if (careerDtos == null) {
+            List<RestoreResumeCommand.CareerCommand> careerCommands) {
+        if (careerCommands == null) {
             return List.of();
         }
-        return careerDtos.stream()
+        return careerCommands.stream()
                 .map(c -> Career.create(
                         errorCollector,
                         CompanyName.create(errorCollector, c.getCompanyName()),
@@ -157,14 +158,14 @@ public class RestoreResumeUseCase {
      * プロジェクトリストを構築する
      */
     private List<Project> buildProjects(ErrorCollector errorCollector,
-            List<RestoreResumeRequest.ProjectDto> projectDtos) {
-        if (projectDtos == null) {
+            List<RestoreResumeCommand.ProjectCommand> projectCommands) {
+        if (projectCommands == null) {
             return List.of();
         }
-        return projectDtos.stream()
+        return projectCommands.stream()
                 .map(p -> {
-                    RestoreResumeRequest.ProcessDto processDto = p.getProcess();
-                    RestoreResumeRequest.TechStackDto techStackDto = p.getTechStack();
+                    RestoreResumeCommand.ProcessCommand processDto = p.getProcess();
+                    RestoreResumeCommand.TechStackCommand techStackDto = p.getTechStack();
 
                     Project.Process process = Project.Process.create(
                             processDto != null && processDto.isRequirements(),
@@ -195,7 +196,7 @@ public class RestoreResumeUseCase {
     /**
      * 技術スタックを構築する
      */
-    private TechStack buildTechStack(RestoreResumeRequest.TechStackDto techStackDto) {
+    private TechStack buildTechStack(RestoreResumeCommand.TechStackCommand techStackDto) {
         if (techStackDto == null) {
             return TechStack.create(
                     TechStack.Frontend.create(
@@ -213,10 +214,10 @@ public class RestoreResumeUseCase {
                             List.of(), List.of(), List.of(), List.of()));
         }
 
-        RestoreResumeRequest.FrontendDto frontendDto = techStackDto.getFrontend();
-        RestoreResumeRequest.BackendDto backendDto = techStackDto.getBackend();
-        RestoreResumeRequest.InfrastructureDto infraDto = techStackDto.getInfrastructure();
-        RestoreResumeRequest.ToolsDto toolsDto = techStackDto.getTools();
+        RestoreResumeCommand.FrontendCommand frontendDto = techStackDto.getFrontend();
+        RestoreResumeCommand.BackendCommand backendDto = techStackDto.getBackend();
+        RestoreResumeCommand.InfrastructureCommand infraDto = techStackDto.getInfrastructure();
+        RestoreResumeCommand.ToolsCommand toolsDto = techStackDto.getTools();
 
         TechStack.Frontend frontend = TechStack.Frontend.create(
                 nullSafeList(frontendDto != null ? frontendDto.getLanguages() : null),
@@ -268,11 +269,11 @@ public class RestoreResumeUseCase {
      * 資格リストを構築する
      */
     private List<Certification> buildCertifications(ErrorCollector errorCollector,
-            List<RestoreResumeRequest.CertificationDto> certificationDtos) {
-        if (certificationDtos == null) {
+            List<RestoreResumeCommand.CertificationCommand> certificationCommands) {
+        if (certificationCommands == null) {
             return List.of();
         }
-        return certificationDtos.stream()
+        return certificationCommands.stream()
                 .map(c -> Certification.create(
                         errorCollector,
                         c.getName(),
@@ -284,11 +285,11 @@ public class RestoreResumeUseCase {
      * ポートフォリオリストを構築する
      */
     private List<Portfolio> buildPortfolios(ErrorCollector errorCollector,
-            List<RestoreResumeRequest.PortfolioDto> portfolioDtos) {
-        if (portfolioDtos == null) {
+            List<RestoreResumeCommand.PortfolioCommand> portfolioCommands) {
+        if (portfolioCommands == null) {
             return List.of();
         }
-        return portfolioDtos.stream()
+        return portfolioCommands.stream()
                 .map(pf -> Portfolio.create(
                         errorCollector,
                         pf.getName(),
@@ -302,11 +303,11 @@ public class RestoreResumeUseCase {
      * SNSプラットフォームリストを構築する
      */
     private List<SnsPlatform> buildSnsPlatforms(ErrorCollector errorCollector,
-            List<RestoreResumeRequest.SnsPlatformDto> snsPlatformDtos) {
-        if (snsPlatformDtos == null) {
+            List<RestoreResumeCommand.SnsPlatformCommand> snsPlatformCommands) {
+        if (snsPlatformCommands == null) {
             return List.of();
         }
-        return snsPlatformDtos.stream()
+        return snsPlatformCommands.stream()
                 .map(sp -> SnsPlatform.create(
                         errorCollector,
                         sp.getName(),
@@ -318,11 +319,11 @@ public class RestoreResumeUseCase {
      * 自己PRリストを構築する
      */
     private List<SelfPromotion> buildSelfPromotions(ErrorCollector errorCollector,
-            List<RestoreResumeRequest.SelfPromotionDto> selfPromotionDtos) {
-        if (selfPromotionDtos == null) {
+            List<RestoreResumeCommand.SelfPromotionCommand> selfPromotionCommands) {
+        if (selfPromotionCommands == null) {
             return List.of();
         }
-        return selfPromotionDtos.stream()
+        return selfPromotionCommands.stream()
                 .map(sp -> SelfPromotion.create(
                         errorCollector,
                         sp.getTitle(),

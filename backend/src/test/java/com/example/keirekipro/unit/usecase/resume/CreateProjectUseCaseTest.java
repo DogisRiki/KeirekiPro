@@ -24,7 +24,7 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreateProjectRequest;
+import com.example.keirekipro.usecase.resume.command.CreateProjectCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.CreateProjectUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -65,12 +65,12 @@ class CreateProjectUseCaseTest {
     @Test
     @DisplayName("プロジェクトを新規作成できる")
     void test1() {
-        CreateProjectRequest request = buildRequest();
+        CreateProjectCommand request = buildRequest();
 
         doNothing().when(checker).checkProjectAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResumeWithCareer(USER_ID)));
 
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), request);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // 上限チェックの検証
         verify(checker).checkProjectAddAllowed(RESUME_ID);
@@ -114,12 +114,12 @@ class CreateProjectUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        CreateProjectRequest request = buildRequest();
+        CreateProjectCommand request = buildRequest();
 
         doNothing().when(checker).checkProjectAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -131,12 +131,12 @@ class CreateProjectUseCaseTest {
     @Test
     @DisplayName("ログインユーザー以外が所有する職務経歴書にプロジェクトを作成しようとした場合、UseCaseExceptionがスローされる")
     void test3() {
-        CreateProjectRequest request = buildRequest();
+        CreateProjectCommand request = buildRequest();
 
         doNothing().when(checker).checkProjectAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResumeWithCareer(OTHER_USER_ID)));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -148,11 +148,11 @@ class CreateProjectUseCaseTest {
     @Test
     @DisplayName("プロジェクトが上限件数である場合、例外がスローされ後続処理が行われない")
     void test4() {
-        CreateProjectRequest request = buildRequest();
+        CreateProjectCommand request = buildRequest();
 
         doThrow(new UseCaseException("上限")).when(checker).checkProjectAddAllowed(RESUME_ID);
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("上限");
 
@@ -161,67 +161,61 @@ class CreateProjectUseCaseTest {
         verify(repository, never()).save(any());
     }
 
-    private CreateProjectRequest buildRequest() {
-        CreateProjectRequest request = new CreateProjectRequest();
-        request.setCompanyName("会社A");
-        request.setStartDate(YearMonth.of(2018, 1));
-        request.setEndDate(YearMonth.of(2018, 12));
-        request.setIsActive(Boolean.FALSE);
-
-        request.setName("プロジェクト1");
-        request.setOverview("概要1");
-        request.setTeamComp("チーム1");
-        request.setRole("役割1");
-        request.setAchievement("成果1");
-
-        request.setRequirements(Boolean.TRUE);
-        request.setBasicDesign(Boolean.TRUE);
-        request.setDetailedDesign(Boolean.FALSE);
-        request.setImplementation(Boolean.TRUE);
-        request.setIntegrationTest(Boolean.FALSE);
-        request.setSystemTest(Boolean.TRUE);
-        request.setMaintenance(Boolean.FALSE);
-
-        request.setFrontendLanguages(List.of("TypeScript"));
-        request.setFrontendFrameworks(List.of("React"));
-        request.setFrontendLibraries(List.of("MUI"));
-        request.setFrontendBuildTools(List.of("Vite"));
-        request.setFrontendPackageManagers(List.of("npm"));
-        request.setFrontendLinters(List.of("ESLint"));
-        request.setFrontendFormatters(List.of("Prettier"));
-        request.setFrontendTestingTools(List.of("RTL"));
-
-        request.setBackendLanguages(List.of("Java"));
-        request.setBackendFrameworks(List.of("Spring Boot"));
-        request.setBackendLibraries(List.of("MyBatis"));
-        request.setBackendBuildTools(List.of("Gradle"));
-        request.setBackendPackageManagers(List.of("npm"));
-        request.setBackendLinters(List.of());
-        request.setBackendFormatters(List.of());
-        request.setBackendTestingTools(List.of("JUnit"));
-        request.setOrmTools(List.of("MyBatis"));
-        request.setAuth(List.of("JWT"));
-
-        request.setClouds(List.of("AWS"));
-        request.setOperatingSystems(List.of("Linux"));
-        request.setContainers(List.of("Docker"));
-        request.setDatabases(List.of("PostgreSQL"));
-        request.setWebServers(List.of("nginx"));
-        request.setCiCdTools(List.of("Jenkins"));
-        request.setIacTools(List.of("Terraform"));
-        request.setMonitoringTools(List.of("CloudWatch"));
-        request.setLoggingTools(List.of("CloudWatch Logs"));
-
-        request.setSourceControls(List.of("Git"));
-        request.setProjectManagements(List.of("Redmine"));
-        request.setCommunicationTools(List.of("Teams"));
-        request.setDocumentationTools(List.of("Confluence"));
-        request.setApiDevelopmentTools(List.of("Postman"));
-        request.setDesignTools(List.of("Figma"));
-        request.setEditors(List.of("VSCode"));
-        request.setDevelopmentEnvironments(List.of("Windows"));
-
-        return request;
+    private CreateProjectCommand buildRequest() {
+        return new CreateProjectCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                "会社A",
+                YearMonth.of(2018, 1),
+                YearMonth.of(2018, 12),
+                Boolean.FALSE,
+                "プロジェクト1",
+                "概要1",
+                "チーム1",
+                "役割1",
+                "成果1",
+                Boolean.TRUE,
+                Boolean.TRUE,
+                Boolean.FALSE,
+                Boolean.TRUE,
+                Boolean.FALSE,
+                Boolean.TRUE,
+                Boolean.FALSE,
+                List.of("TypeScript"),
+                List.of("React"),
+                List.of("MUI"),
+                List.of("Vite"),
+                List.of("npm"),
+                List.of("ESLint"),
+                List.of("Prettier"),
+                List.of("RTL"),
+                List.of("Java"),
+                List.of("Spring Boot"),
+                List.of("MyBatis"),
+                List.of("Gradle"),
+                List.of("npm"),
+                List.of(),
+                List.of(),
+                List.of("JUnit"),
+                List.of("MyBatis"),
+                List.of("JWT"),
+                List.of("AWS"),
+                List.of("Linux"),
+                List.of("Docker"),
+                List.of("PostgreSQL"),
+                List.of("nginx"),
+                List.of("Jenkins"),
+                List.of("Terraform"),
+                List.of("CloudWatch"),
+                List.of("CloudWatch Logs"),
+                List.of("Git"),
+                List.of("Redmine"),
+                List.of("Teams"),
+                List.of("Confluence"),
+                List.of("Postman"),
+                List.of("Figma"),
+                List.of("VSCode"),
+                List.of("Windows"));
     }
 
     private Resume buildResumeWithCareer(UUID ownerId) {

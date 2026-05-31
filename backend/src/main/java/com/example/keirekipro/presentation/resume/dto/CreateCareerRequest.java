@@ -1,9 +1,12 @@
 package com.example.keirekipro.presentation.resume.dto;
 
 import java.time.YearMonth;
+import java.util.UUID;
 
 import com.example.keirekipro.presentation.shared.validator.YearMonthRange;
+import com.example.keirekipro.usecase.resume.command.CreateCareerCommand;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -35,5 +38,17 @@ public class CreateCareerRequest {
     private YearMonth endDate;
 
     @NotNull(message = "在籍中は入力必須です。")
-    private Boolean isActive;
+    @JsonProperty("isActive")
+    private Boolean active;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
+     * @return 職歴作成コマンド
+     */
+    public CreateCareerCommand toCommand(UUID userId, String resumeId) {
+        return new CreateCareerCommand(userId, resumeId, companyName, startDate, endDate, active);
+    }
 }

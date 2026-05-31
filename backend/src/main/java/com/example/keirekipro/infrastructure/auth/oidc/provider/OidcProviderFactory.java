@@ -30,7 +30,7 @@ public class OidcProviderFactory {
     }
 
     /**
-     * プロバイダー名からプロバイダーを取得する。
+     * プロバイダー名からプロバイダーを取得する
      *
      * @param providerName プロバイダー名（google, github）
      * @return 対応するプロバイダー

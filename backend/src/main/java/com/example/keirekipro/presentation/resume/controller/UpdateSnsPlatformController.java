@@ -49,6 +49,6 @@ public class UpdateSnsPlatformController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                updateSnsPlatformUseCase.execute(userId, resumeId, snsPlatformId, request));
+                updateSnsPlatformUseCase.execute(request.toCommand(userId, resumeId, snsPlatformId)));
     }
 }

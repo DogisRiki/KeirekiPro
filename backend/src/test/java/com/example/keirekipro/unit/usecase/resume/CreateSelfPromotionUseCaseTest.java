@@ -20,7 +20,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreateSelfPromotionRequest;
+import com.example.keirekipro.usecase.resume.command.CreateSelfPromotionCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.CreateSelfPromotionUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -61,14 +61,13 @@ class CreateSelfPromotionUseCaseTest {
     @Test
     @DisplayName("自己PRを新規作成できる")
     void test1() {
-        CreateSelfPromotionRequest request = new CreateSelfPromotionRequest();
-        request.setTitle("自己PRタイトル");
-        request.setContent("自己PR本文");
+        CreateSelfPromotionCommand request = new CreateSelfPromotionCommand(USER_ID, RESUME_ID.toString(), "自己PRタイトル",
+                "自己PR本文");
 
         doNothing().when(checker).checkSelfPromotionAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(USER_ID)));
 
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), request);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // 上限チェックの検証
         verify(checker).checkSelfPromotionAddAllowed(RESUME_ID);
@@ -91,14 +90,13 @@ class CreateSelfPromotionUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        CreateSelfPromotionRequest request = new CreateSelfPromotionRequest();
-        request.setTitle("自己PRタイトル");
-        request.setContent("自己PR本文");
+        CreateSelfPromotionCommand request = new CreateSelfPromotionCommand(USER_ID, RESUME_ID.toString(), "自己PRタイトル",
+                "自己PR本文");
 
         doNothing().when(checker).checkSelfPromotionAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -110,14 +108,13 @@ class CreateSelfPromotionUseCaseTest {
     @Test
     @DisplayName("ログインユーザー以外が所有する職務経歴書に自己PRを作成しようとした場合、UseCaseExceptionがスローされる")
     void test3() {
-        CreateSelfPromotionRequest request = new CreateSelfPromotionRequest();
-        request.setTitle("自己PRタイトル");
-        request.setContent("自己PR本文");
+        CreateSelfPromotionCommand request = new CreateSelfPromotionCommand(USER_ID, RESUME_ID.toString(), "自己PRタイトル",
+                "自己PR本文");
 
         doNothing().when(checker).checkSelfPromotionAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(OTHER_USER_ID)));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -129,13 +126,12 @@ class CreateSelfPromotionUseCaseTest {
     @Test
     @DisplayName("自己PRが上限件数である場合、例外がスローされ後続処理が行われない")
     void test4() {
-        CreateSelfPromotionRequest request = new CreateSelfPromotionRequest();
-        request.setTitle("自己PRタイトル");
-        request.setContent("自己PR本文");
+        CreateSelfPromotionCommand request = new CreateSelfPromotionCommand(USER_ID, RESUME_ID.toString(), "自己PRタイトル",
+                "自己PR本文");
 
         doThrow(new UseCaseException("上限")).when(checker).checkSelfPromotionAddAllowed(RESUME_ID);
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("上限");
 

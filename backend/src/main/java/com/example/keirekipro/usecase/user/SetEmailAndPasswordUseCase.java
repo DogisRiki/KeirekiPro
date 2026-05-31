@@ -5,8 +5,8 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.user.command.SetEmailAndPasswordCommand;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,24 +29,24 @@ public class SetEmailAndPasswordUseCase {
     /**
      * メールアドレス+パスワードの設定ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param request リクエスト
+     * @param command コマンド
      */
     @Transactional
-    public void execute(UUID userId, SetEmailAndPasswordRequest request) {
+    public void execute(SetEmailAndPasswordCommand command) {
+        UUID userId = command.getUserId();
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        if (request.getEmail() != null) {
-            Email email = Email.create(errorCollector, request.getEmail());
+        if (command.getEmail() != null) {
+            Email email = Email.create(errorCollector, command.getEmail());
             user = user.setEmail(errorCollector, email);
         }
 
-        if (request.getPassword() != null) {
-            String passwordHash = passwordEncoder.encode(request.getPassword());
+        if (command.getPassword() != null) {
+            String passwordHash = passwordEncoder.encode(command.getPassword());
             user = user.resetPassword(passwordHash);
         }
 

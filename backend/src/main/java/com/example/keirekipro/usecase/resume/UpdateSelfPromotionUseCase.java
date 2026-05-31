@@ -5,7 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateSelfPromotionRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateSelfPromotionCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
@@ -27,15 +27,14 @@ public class UpdateSelfPromotionUseCase {
     /**
      * 自己PR更新ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param selfPromotionId 自己PRID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID selfPromotionId,
-            UpdateSelfPromotionRequest request) {
+    public ResumeInfoUseCaseDto execute(UpdateSelfPromotionCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
+        UUID selfPromotionId = command.getSelfPromotionId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         Resume resume = resumeRepository.find(resolvedResumeId)
@@ -53,8 +52,8 @@ public class UpdateSelfPromotionUseCase {
         ErrorCollector errorCollector = new ErrorCollector();
 
         SelfPromotion updatedSelfPromotion = existing
-                .changeTitle(errorCollector, request.getTitle())
-                .changeContent(errorCollector, request.getContent());
+                .changeTitle(errorCollector, command.getTitle())
+                .changeContent(errorCollector, command.getContent());
 
         Resume updated = resume.updateSelfPromotion(errorCollector, updatedSelfPromotion);
 

@@ -1,5 +1,9 @@
 package com.example.keirekipro.presentation.user.dto;
 
+import java.util.UUID;
+
+import com.example.keirekipro.usecase.user.command.ChangePasswordCommand;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -23,4 +27,14 @@ public class ChangePasswordRequest {
     @Size(min = 8, max = 20, message = "新しいパスワードは8文字以上20文字以内で入力してください。")
     @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$", message = "新しいパスワードには英小文字、英大文字、数字をそれぞれ1文字以上含める必要があります。")
     private String newPassword;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @return パスワード変更コマンド
+     */
+    public ChangePasswordCommand toCommand(UUID userId) {
+        return new ChangePasswordCommand(userId, nowPassword, newPassword);
+    }
 }

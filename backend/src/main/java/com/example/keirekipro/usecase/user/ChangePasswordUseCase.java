@@ -4,10 +4,10 @@ import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
+import com.example.keirekipro.usecase.user.command.ChangePasswordCommand;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,26 +31,27 @@ public class ChangePasswordUseCase {
     /**
      * パスワード変更ユースケースを実行する
      *
-     * @param request リクエスト
+     * @param command コマンド
      */
-    public void execute(ChangePasswordRequest request, UUID userId) {
+    public void execute(ChangePasswordCommand command) {
+        UUID userId = command.getUserId();
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("不正なアクセスです。"));
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        if (!passwordEncoder.matches(request.getNowPassword(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(command.getNowPassword(), user.getPasswordHash())) {
             errorCollector.addError("nowPassword", "現在のパスワードが正しくありません。");
         }
-        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+        if (passwordEncoder.matches(command.getNewPassword(), user.getPasswordHash())) {
             errorCollector.addError("newPassword", "新しいパスワードは現在のパスワードと異なる必要があります。");
         }
         if (errorCollector.hasErrors()) {
             throw new UseCaseException(errorCollector.getErrors());
         }
 
-        String hashed = passwordEncoder.encode(request.getNewPassword());
+        String hashed = passwordEncoder.encode(command.getNewPassword());
         User updated = user.changePassword(new ErrorCollector(), hashed);
         userRepository.save(updated);
 

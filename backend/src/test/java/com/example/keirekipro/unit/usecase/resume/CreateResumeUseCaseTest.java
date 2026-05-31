@@ -18,7 +18,7 @@ import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
+import com.example.keirekipro.usecase.resume.command.CreateResumeCommand;
 import com.example.keirekipro.usecase.resume.CreateResumeUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -54,7 +54,7 @@ class CreateResumeUseCaseTest {
     void test1() {
         // データ準備
         UUID userId = UUID.randomUUID();
-        CreateResumeRequest request = new CreateResumeRequest(RESUME_NAME, null);
+        CreateResumeCommand request = new CreateResumeCommand(userId, RESUME_NAME, null);
 
         // モックをセットアップ：重複チェックは何も起こさない
         doNothing().when(service).execute(eq(userId), any(ResumeName.class));
@@ -62,7 +62,7 @@ class CreateResumeUseCaseTest {
         doNothing().when(checker).checkResumeCreateAllowed(userId);
 
         // ユースケース実行
-        assertThatCode(() -> useCase.execute(userId, request)).doesNotThrowAnyException();
+        assertThatCode(() -> useCase.execute(request)).doesNotThrowAnyException();
 
         // 重複チェックが呼び出される
         verify(service).execute(eq(userId), any(ResumeName.class));
@@ -78,7 +78,7 @@ class CreateResumeUseCaseTest {
         assertThat(saved.getDate()).isEqualTo(LocalDate.now());
 
         // 戻り値のDTOの内容を検証
-        ResumeInfoUseCaseDto dto = useCase.execute(userId, request);
+        ResumeInfoUseCaseDto dto = useCase.execute(request);
         assertThat(dto.getResumeName()).isEqualTo(RESUME_NAME);
         assertThat(dto.getDate()).isNotNull();
         assertThat(dto.getCreatedAt()).isNotNull();
@@ -94,14 +94,14 @@ class CreateResumeUseCaseTest {
     void test2() {
         // データ準備
         UUID userId = UUID.randomUUID();
-        CreateResumeRequest request = new CreateResumeRequest("重複職務経歴書", null);
+        CreateResumeCommand request = new CreateResumeCommand(userId, "重複職務経歴書", null);
 
         // モックをセットアップ：重複チェックでDomainExceptionを投げる
         doThrow(new DomainException("この職務経歴書名は既に登録されています。"))
                 .when(service).execute(eq(userId), any(ResumeName.class));
 
         // ユースケース実行＆DomainExceptionがスローされることを検証
-        assertThatThrownBy(() -> useCase.execute(userId, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(DomainException.class)
                 .hasMessage("この職務経歴書名は既に登録されています。");
 
@@ -115,13 +115,13 @@ class CreateResumeUseCaseTest {
     void test3() {
         // データ準備
         UUID userId = UUID.randomUUID();
-        CreateResumeRequest request = new CreateResumeRequest("上限超職務経歴書", null);
+        CreateResumeCommand request = new CreateResumeCommand(userId, "上限超職務経歴書", null);
 
         // モックをセットアップ：上限チェックでUseCaseExceptionを投げる
         doThrow(new UseCaseException("上限")).when(checker).checkResumeCreateAllowed(userId);
 
         // ユースケース実行＆UseCaseExceptionがスローされることを検証
-        assertThatThrownBy(() -> useCase.execute(userId, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("上限");
 

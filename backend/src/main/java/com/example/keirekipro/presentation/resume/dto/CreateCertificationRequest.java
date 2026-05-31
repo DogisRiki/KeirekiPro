@@ -1,8 +1,10 @@
 package com.example.keirekipro.presentation.resume.dto;
 
 import java.time.YearMonth;
+import java.util.UUID;
 
 import com.example.keirekipro.presentation.shared.validator.YearMonthRange;
+import com.example.keirekipro.usecase.resume.command.CreateCertificationCommand;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import lombok.AllArgsConstructor;
@@ -29,4 +31,15 @@ public class CreateCertificationRequest {
     @YearMonthRange(message = "取得年月が不正です。")
     @JsonFormat(pattern = "yyyy-MM")
     private YearMonth date;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
+     * @return 資格作成コマンド
+     */
+    public CreateCertificationCommand toCommand(UUID userId, String resumeId) {
+        return new CreateCertificationCommand(userId, resumeId, name, date);
+    }
 }

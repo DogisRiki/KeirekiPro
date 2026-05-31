@@ -148,7 +148,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                 .map(d -> Career.reconstruct(
                         d.getId(),
                         CompanyName.create(errorCollector, d.getCompanyName()),
-                        Period.create(errorCollector, d.getStartDate(), d.getEndDate(), d.getIsActive())))
+                        Period.create(errorCollector, d.getStartDate(), d.getEndDate(), d.getActive())))
                 .toList();
 
         // プロジェクト
@@ -156,7 +156,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                 .map(d -> Project.reconstruct(
                         d.getId(),
                         CompanyName.create(errorCollector, d.getCompanyName()),
-                        Period.create(errorCollector, d.getStartDate(), d.getEndDate(), d.getIsActive()),
+                        Period.create(errorCollector, d.getStartDate(), d.getEndDate(), d.getActive()),
                         d.getName(),
                         d.getOverview(),
                         d.getTeamComp(),
@@ -290,7 +290,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setCompanyName(c.getCompanyName().getValue());
                     d.setStartDate(c.getPeriod().getStartDate());
                     d.setEndDate(c.getPeriod().getEndDate());
-                    d.setIsActive(c.getPeriod().isActive());
+                    d.setActive(c.getPeriod().isActive());
                     return d;
                 })
                 .toList();
@@ -305,7 +305,7 @@ public class MyBatisResumeRepository implements ResumeRepository {
                     d.setCompanyName(p.getCompanyName().getValue());
                     d.setStartDate(p.getPeriod().getStartDate());
                     d.setEndDate(p.getPeriod().getEndDate());
-                    d.setIsActive(p.getPeriod().isActive());
+                    d.setActive(p.getPeriod().isActive());
                     d.setName(p.getName());
                     d.setOverview(p.getOverview());
                     d.setTeamComp(p.getTeamComp());

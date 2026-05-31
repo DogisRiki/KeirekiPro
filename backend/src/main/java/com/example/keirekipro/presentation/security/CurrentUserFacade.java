@@ -5,7 +5,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
- * 認証済みユーザーIDを取得するファサードクラス
+ * ユーザーIDを取得するファサードクラス
  */
 @Component
 public class CurrentUserFacade {

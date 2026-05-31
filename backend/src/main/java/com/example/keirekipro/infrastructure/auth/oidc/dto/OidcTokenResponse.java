@@ -58,7 +58,7 @@ public class OidcTokenResponse {
     private String errorDescription;
 
     /**
-     * トークンレスポンスがエラーを含むかどうかを判定する。
+     * トークンレスポンスがエラーを含むかどうかを判定する
      *
      * @return エラーが含まれている場合はtrue
      */

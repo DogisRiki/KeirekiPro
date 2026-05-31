@@ -2,13 +2,13 @@ package com.example.keirekipro.unit.presentation.resume.controller;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -72,7 +72,7 @@ class CreateProjectControllerTest {
         req.setCompanyName("株式会社テスト");
         req.setStartDate(YearMonth.of(2021, 1));
         req.setEndDate(null);
-        req.setIsActive(true);
+        req.setActive(true);
 
         req.setName("プロジェクト名");
         req.setOverview("プロジェクト概要");
@@ -140,7 +140,7 @@ class CreateProjectControllerTest {
                 RESUME_DTO_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), any(CreateProjectRequest.class))).thenReturn(dto);
+        when(useCase.execute(eq(req.toCommand(USER_ID, RESUME_ID.toString())))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -151,7 +151,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.format(FMT)));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), any(CreateProjectRequest.class));
+        verify(useCase).execute(eq(req.toCommand(USER_ID, RESUME_ID.toString())));
     }
 
     @Test
@@ -167,7 +167,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.companyName").isArray())
                 .andExpect(jsonPath("$.errors.companyName", hasItem("会社名は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -183,7 +183,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.companyName").isArray())
                 .andExpect(jsonPath("$.errors.companyName", hasItem("会社名は50文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -199,14 +199,14 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
     @DisplayName("継続中がnullの場合、バリデーションエラーとなる")
     void test5() throws Exception {
         CreateProjectRequest req = buildValidRequest();
-        req.setIsActive(null);
+        req.setActive(null);
         String body = objectMapper.writeValueAsString(req);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID).contentType(MediaType.APPLICATION_JSON).content(body))
@@ -215,7 +215,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.isActive").isArray())
                 .andExpect(jsonPath("$.errors.isActive", hasItem("継続中は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -231,7 +231,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.name").isArray())
                 .andExpect(jsonPath("$.errors.name", hasItem("プロジェクト名は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -247,7 +247,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.name").isArray())
                 .andExpect(jsonPath("$.errors.name", hasItem("プロジェクト名は50文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -263,7 +263,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.overview").isArray())
                 .andExpect(jsonPath("$.errors.overview", hasItem("プロジェクト概要は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -279,7 +279,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.overview").isArray())
                 .andExpect(jsonPath("$.errors.overview", hasItem("プロジェクト概要は1000文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -295,7 +295,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.teamComp").isArray())
                 .andExpect(jsonPath("$.errors.teamComp", hasItem("チーム構成は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -311,7 +311,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.teamComp").isArray())
                 .andExpect(jsonPath("$.errors.teamComp", hasItem("チーム構成は100文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -327,7 +327,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.role").isArray())
                 .andExpect(jsonPath("$.errors.role", hasItem("役割は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -343,7 +343,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.role").isArray())
                 .andExpect(jsonPath("$.errors.role", hasItem("役割は1000文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -359,7 +359,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.achievement").isArray())
                 .andExpect(jsonPath("$.errors.achievement", hasItem("成果は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -375,7 +375,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.achievement").isArray())
                 .andExpect(jsonPath("$.errors.achievement", hasItem("成果は1000文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -390,7 +390,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.requirements").isArray());
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -405,7 +405,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.basicDesign").isArray());
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -420,7 +420,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.detailedDesign").isArray());
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -435,7 +435,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.implementation").isArray());
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -450,7 +450,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.integrationTest").isArray());
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -465,7 +465,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.systemTest").isArray());
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -480,7 +480,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.maintenance").isArray());
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -496,7 +496,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -512,7 +512,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -528,7 +528,7 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.endDate").isArray())
                 .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -544,6 +544,6 @@ class CreateProjectControllerTest {
                 .andExpect(jsonPath("$.errors.endDate").isArray())
                 .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 }

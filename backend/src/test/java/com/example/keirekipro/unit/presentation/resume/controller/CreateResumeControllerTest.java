@@ -2,13 +2,13 @@ package com.example.keirekipro.unit.presentation.resume.controller;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -91,7 +91,7 @@ class CreateResumeControllerTest {
                 .build();
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(createResumeUseCase.execute(eq(USER_ID), any(CreateResumeRequest.class))).thenReturn(dto);
+        when(createResumeUseCase.execute(eq(req.toCreateCommand(USER_ID)))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -113,8 +113,8 @@ class CreateResumeControllerTest {
                 .andExpect(jsonPath("$.selfPromotions").doesNotExist());
 
         verify(currentUserFacade).getUserId();
-        verify(createResumeUseCase).execute(eq(USER_ID), any(CreateResumeRequest.class));
-        verify(copyCreateResumeUseCase, never()).execute(any(), any());
+        verify(createResumeUseCase).execute(eq(req.toCreateCommand(USER_ID)));
+        verify(copyCreateResumeUseCase, never()).execute(any());
     }
 
     @Test
@@ -129,7 +129,7 @@ class CreateResumeControllerTest {
                 EXISTING_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(copyCreateResumeUseCase.execute(eq(USER_ID), any(CreateResumeRequest.class))).thenReturn(dto);
+        when(copyCreateResumeUseCase.execute(eq(req.toCopyCommand(USER_ID)))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -151,8 +151,8 @@ class CreateResumeControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(copyCreateResumeUseCase).execute(eq(USER_ID), any(CreateResumeRequest.class));
-        verify(createResumeUseCase, never()).execute(any(), any());
+        verify(copyCreateResumeUseCase).execute(eq(req.toCopyCommand(USER_ID)));
+        verify(createResumeUseCase, never()).execute(any());
     }
 
     @Test
@@ -169,8 +169,8 @@ class CreateResumeControllerTest {
                 .andExpect(jsonPath("$.errors.resumeName").isArray())
                 .andExpect(jsonPath("$.errors.resumeName", hasItem("職務経歴書名は入力必須です。")));
 
-        verify(createResumeUseCase, never()).execute(any(), any());
-        verify(copyCreateResumeUseCase, never()).execute(any(), any());
+        verify(createResumeUseCase, never()).execute(any());
+        verify(copyCreateResumeUseCase, never()).execute(any());
     }
 
     @Test
@@ -188,7 +188,7 @@ class CreateResumeControllerTest {
                 .andExpect(jsonPath("$.errors.resumeName").isArray())
                 .andExpect(jsonPath("$.errors.resumeName", hasItem("職務経歴書名は50文字以内で入力してください。")));
 
-        verify(createResumeUseCase, never()).execute(any(), any());
-        verify(copyCreateResumeUseCase, never()).execute(any(), any());
+        verify(createResumeUseCase, never()).execute(any());
+        verify(copyCreateResumeUseCase, never()).execute(any());
     }
 }

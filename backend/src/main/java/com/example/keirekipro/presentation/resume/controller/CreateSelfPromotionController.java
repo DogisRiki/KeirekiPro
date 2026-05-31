@@ -48,6 +48,6 @@ public class CreateSelfPromotionController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                createSelfPromotionUseCase.execute(userId, resumeId, request));
+                createSelfPromotionUseCase.execute(request.toCommand(userId, resumeId)));
     }
 }

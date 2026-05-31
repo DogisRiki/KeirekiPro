@@ -320,7 +320,7 @@ class ResumeMapperTest {
         assertThat(loaded.getCompanyName()).isEqualTo("CompanyX");
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2024, 1));
         assertThat(loaded.getEndDate()).isEqualTo(YearMonth.of(2024, 12));
-        assertThat(loaded.getIsActive()).isTrue();
+        assertThat(loaded.getActive()).isTrue();
     }
 
     @Test
@@ -366,7 +366,7 @@ class ResumeMapperTest {
         assertThat(loaded.getCompanyName()).isEqualTo("NewCompany");
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2023, 3));
         assertThat(loaded.getEndDate()).isEqualTo(YearMonth.of(2023, 9));
-        assertThat(loaded.getIsActive()).isTrue();
+        assertThat(loaded.getActive()).isTrue();
     }
 
     @Test
@@ -511,7 +511,7 @@ class ResumeMapperTest {
         assertThat(loaded.getCompanyName()).isEqualTo("CompanyProj");
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2023, 1));
         assertThat(loaded.getEndDate()).isEqualTo(YearMonth.of(2023, 12));
-        assertThat(loaded.getIsActive()).isTrue();
+        assertThat(loaded.getActive()).isTrue();
         assertThat(loaded.getName()).isEqualTo("ProjName");
         assertThat(loaded.getOverview()).isEqualTo("Overview");
         assertThat(loaded.getTeamComp()).isEqualTo("Team");
@@ -640,7 +640,7 @@ class ResumeMapperTest {
         assertThat(loaded.getCompanyName()).isEqualTo("NewCompany");
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2022, 3));
         assertThat(loaded.getEndDate()).isEqualTo(YearMonth.of(2022, 9));
-        assertThat(loaded.getIsActive()).isTrue();
+        assertThat(loaded.getActive()).isTrue();
         assertThat(loaded.getName()).isEqualTo("NewProj");
         assertThat(loaded.getOverview()).isEqualTo("NewOverview");
         assertThat(loaded.getTeamComp()).isEqualTo("NewTeam");
@@ -1412,7 +1412,7 @@ class ResumeMapperTest {
         assertThat(loaded.getCompanyName()).isEqualTo("ActiveCompany");
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2024, 1));
         assertThat(loaded.getEndDate()).isNull();
-        assertThat(loaded.getIsActive()).isTrue();
+        assertThat(loaded.getActive()).isTrue();
     }
 
     @Test
@@ -1464,7 +1464,7 @@ class ResumeMapperTest {
         assertThat(loaded.getCompanyName()).isEqualTo("ActiveCompanyProj");
         assertThat(loaded.getStartDate()).isEqualTo(YearMonth.of(2024, 2));
         assertThat(loaded.getEndDate()).isNull();
-        assertThat(loaded.getIsActive()).isTrue();
+        assertThat(loaded.getActive()).isTrue();
         assertThat(loaded.getName()).isEqualTo("継続中プロジェクト");
         assertThat(loaded.getOverview()).isEqualTo("継続中プロジェクト概要");
     }
@@ -1504,14 +1504,14 @@ class ResumeMapperTest {
             String companyName,
             YearMonth startDate,
             YearMonth endDate,
-            Boolean isActive) {
+            Boolean active) {
         CareerDto d = new CareerDto();
         d.setId(id);
         d.setResumeId(resumeId);
         d.setCompanyName(companyName);
         d.setStartDate(startDate);
         d.setEndDate(endDate);
-        d.setIsActive(isActive);
+        d.setActive(active);
         return d;
     }
 
@@ -1521,7 +1521,7 @@ class ResumeMapperTest {
             String companyName,
             YearMonth startDate,
             YearMonth endDate,
-            Boolean isActive,
+            Boolean active,
             String name,
             String overview,
             String teamComp,
@@ -1540,7 +1540,7 @@ class ResumeMapperTest {
         d.setCompanyName(companyName);
         d.setStartDate(startDate);
         d.setEndDate(endDate);
-        d.setIsActive(isActive);
+        d.setActive(active);
         d.setName(name);
         d.setOverview(overview);
         d.setTeamComp(teamComp);

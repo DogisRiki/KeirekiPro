@@ -48,6 +48,6 @@ public class CreateProjectController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                createProjectUseCase.execute(userId, resumeId, request));
+                createProjectUseCase.execute(request.toCommand(userId, resumeId)));
     }
 }

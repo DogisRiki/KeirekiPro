@@ -1,8 +1,10 @@
 package com.example.keirekipro.presentation.resume.dto;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 import com.example.keirekipro.presentation.shared.validator.LocalDateRange;
+import com.example.keirekipro.usecase.resume.command.UpdateResumeBasicCommand;
 
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -38,4 +40,15 @@ public class UpdateResumeBasicRequest {
     @NotBlank(message = "名は入力必須です。")
     @Size(max = 10, message = "名は10文字以内で入力してください。")
     private String firstName;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
+     * @return 職務経歴書基本情報更新コマンド
+     */
+    public UpdateResumeBasicCommand toCommand(UUID userId, String resumeId) {
+        return new UpdateResumeBasicCommand(userId, resumeId, resumeName, date, lastName, firstName);
+    }
 }

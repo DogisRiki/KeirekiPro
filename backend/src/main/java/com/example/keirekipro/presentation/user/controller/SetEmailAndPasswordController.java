@@ -46,7 +46,7 @@ public class SetEmailAndPasswordController {
     @Operation(summary = "メールアドレスとパスワードの設定", description = "メールアドレスとパスワードの設定を実行する")
     public UserInfoResponse handle(@Valid @RequestBody SetEmailAndPasswordRequest request) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
-        setEmailAndPasswordUseCase.execute(userId, request);
+        setEmailAndPasswordUseCase.execute(request.toCommand(userId));
         UserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
         return UserInfoResponse.convertToResponse(dto);
     }

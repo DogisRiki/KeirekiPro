@@ -1,5 +1,6 @@
 package com.example.keirekipro.presentation.user.controller;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
@@ -47,11 +48,12 @@ public class UpdateUserInfoController {
     public UserInfoResponse handle(
             @RequestParam(name = "username", required = false) String username,
             @RequestParam(name = "profileImage", required = false) MultipartFile profileImage,
-            @RequestParam(name = "twoFactorAuthEnabled", required = false) boolean twoFactorAuthEnabled) {
+            @RequestParam(name = "twoFactorAuthEnabled", required = false) boolean twoFactorAuthEnabled)
+            throws IOException {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
         UpdateUserInfoRequest request = new UpdateUserInfoRequest(username, profileImage, twoFactorAuthEnabled);
-        updateUserInfoUseCase.execute(request, userId);
+        updateUserInfoUseCase.execute(request.toCommand(userId));
         UserInfoUseCaseDto dto = getUserInfoUseCase.execute(userId);
         return UserInfoResponse.convertToResponse(dto);
     }

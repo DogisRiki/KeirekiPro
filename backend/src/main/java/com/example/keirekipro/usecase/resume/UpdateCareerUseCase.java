@@ -7,7 +7,7 @@ import com.example.keirekipro.domain.model.resume.CompanyName;
 import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateCareerRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateCareerCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
@@ -29,14 +29,14 @@ public class UpdateCareerUseCase {
     /**
      * 職歴更新ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param careerId 職歴ID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID careerId, UpdateCareerRequest request) {
+    public ResumeInfoUseCaseDto execute(UpdateCareerCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
+        UUID careerId = command.getCareerId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         Resume resume = resumeRepository.find(resolvedResumeId)
@@ -53,9 +53,9 @@ public class UpdateCareerUseCase {
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        CompanyName companyName = CompanyName.create(errorCollector, request.getCompanyName());
-        Period period = Period.create(errorCollector, request.getStartDate(), request.getEndDate(),
-                request.getIsActive());
+        CompanyName companyName = CompanyName.create(errorCollector, command.getCompanyName());
+        Period period = Period.create(errorCollector, command.getStartDate(), command.getEndDate(),
+                command.getActive());
 
         Career updatedCareer = existing
                 .changeCompanyName(errorCollector, companyName)

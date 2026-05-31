@@ -1,5 +1,6 @@
 package com.example.keirekipro.presentation.shared;
 
+import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.shared.exception.BaseException;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +74,7 @@ public class AppExceptionHandler {
     public ErrorResponse handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
         Map<String, List<String>> errors = ex.getBindingResult().getFieldErrors().stream()
                 .collect(Collectors.groupingBy(
-                        FieldError::getField,
+                        fieldError -> resolveJsonPropertyName(fieldError.getField(), ex.getBindingResult().getTarget()),
                         Collectors.mapping(FieldError::getDefaultMessage, Collectors.toList())));
         return new ErrorResponse("入力エラーがあります。", errors);
     }
@@ -98,6 +100,29 @@ public class AppExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleResourceNotFoundUseCaseException(ResourceNotFoundUseCaseException ex) {
         return new ErrorResponse(ex.getMessage(), ex.getErrors());
+    }
+
+    /**
+     * Javaフィールド名をJSONプロパティ名へ変換する。
+     *
+     * @param fieldName Javaフィールド名
+     * @param target 検証対象オブジェクト
+     * @return JSONプロパティ名
+     */
+    private static String resolveJsonPropertyName(String fieldName, Object target) {
+        if (target == null) {
+            return fieldName;
+        }
+        try {
+            Field field = target.getClass().getDeclaredField(fieldName);
+            JsonProperty jsonProperty = field.getAnnotation(JsonProperty.class);
+            if (jsonProperty != null && !jsonProperty.value().isBlank()) {
+                return jsonProperty.value();
+            }
+        } catch (NoSuchFieldException ex) {
+            return fieldName;
+        }
+        return fieldName;
     }
 
     /**

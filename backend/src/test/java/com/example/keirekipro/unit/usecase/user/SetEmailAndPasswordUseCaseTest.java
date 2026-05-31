@@ -17,7 +17,7 @@ import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
-import com.example.keirekipro.presentation.user.dto.SetEmailAndPasswordRequest;
+import com.example.keirekipro.usecase.user.command.SetEmailAndPasswordCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.user.SetEmailAndPasswordUseCase;
 
@@ -69,8 +69,8 @@ class SetEmailAndPasswordUseCaseTest {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
 
-        SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(null, RAW_PASSWORD, RAW_PASSWORD);
-        setEmailAndPasswordUseCase.execute(USER_ID, request);
+        SetEmailAndPasswordCommand request = new SetEmailAndPasswordCommand(USER_ID, null, RAW_PASSWORD);
+        setEmailAndPasswordUseCase.execute(request);
 
         // 検証
         verify(userRepository).save(any(User.class));
@@ -94,8 +94,8 @@ class SetEmailAndPasswordUseCaseTest {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
 
-        SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(EMAIL, RAW_PASSWORD, RAW_PASSWORD);
-        setEmailAndPasswordUseCase.execute(USER_ID, request);
+        SetEmailAndPasswordCommand request = new SetEmailAndPasswordCommand(USER_ID, EMAIL, RAW_PASSWORD);
+        setEmailAndPasswordUseCase.execute(request);
 
         // 検証
         verify(userRepository).save(any(User.class));
@@ -107,7 +107,8 @@ class SetEmailAndPasswordUseCaseTest {
         // モックをセットアップ
         when(userRepository.findById(eq(USER_ID))).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> setEmailAndPasswordUseCase.execute(USER_ID, any()))
+        SetEmailAndPasswordCommand request = new SetEmailAndPasswordCommand(USER_ID, null, RAW_PASSWORD);
+        assertThatThrownBy(() -> setEmailAndPasswordUseCase.execute(request))
                 .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                 .hasMessage("不正なアクセスです。");
 

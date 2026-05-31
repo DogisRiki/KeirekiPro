@@ -20,7 +20,7 @@
         <result property="companyName" column="companyName" />
         <result property="startDate" column="startDate" />
         <result property="endDate" column="endDate" />
-        <result property="isActive" column="isActive" />
+        <result property="active" column="active" />
         <result property="name" column="name" />
         <result property="overview" column="overview" />
         <result property="teamComp" column="teamComp" />
@@ -153,7 +153,7 @@
             company_name AS companyName,
             start_date AS startDate,
             end_date AS endDate,
-            is_active AS isActive
+            is_active AS active
         FROM
             careers
         WHERE
@@ -175,7 +175,7 @@
             #{dto.companyName},
             #{dto.startDate},
             #{dto.endDate},
-            #{dto.isActive}
+            #{dto.active}
         )
     </insert>
 
@@ -186,7 +186,7 @@
             company_name = #{dto.companyName},
             start_date = #{dto.startDate},
             end_date = #{dto.endDate},
-            is_active = #{dto.isActive}
+            is_active = #{dto.active}
         WHERE
             id = #{dto.id}
     </update>
@@ -215,7 +215,7 @@
             p.company_name AS companyName,
             p.start_date AS startDate,
             p.end_date AS endDate,
-            p.is_active AS isActive,
+            p.is_active AS active,
             p.name AS name,
             p.overview AS overview,
             p.team_comp AS teamComp,
@@ -299,7 +299,7 @@
             #{dto.companyName},
             #{dto.startDate},
             #{dto.endDate},
-            #{dto.isActive},
+            #{dto.active},
             #{dto.name},
             #{dto.overview},
             #{dto.teamComp},
@@ -415,7 +415,7 @@
             company_name = #{dto.companyName},
             start_date = #{dto.startDate},
             end_date = #{dto.endDate},
-            is_active = #{dto.isActive},
+            is_active = #{dto.active},
             name = #{dto.name},
             overview = #{dto.overview},
             team_comp = #{dto.teamComp},

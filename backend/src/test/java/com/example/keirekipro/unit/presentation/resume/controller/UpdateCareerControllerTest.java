@@ -2,13 +2,13 @@ package com.example.keirekipro.unit.presentation.resume.controller;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -81,7 +81,7 @@ class UpdateCareerControllerTest {
 
         // モック設定
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(CAREER_ID), any(UpdateCareerRequest.class)))
+        when(useCase.execute(eq(req.toCommand(USER_ID, RESUME_ID.toString(), CAREER_ID))))
                 .thenReturn(dto);
 
         mockMvc.perform(put(ENDPOINT, RESUME_ID, CAREER_ID)
@@ -102,7 +102,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(CAREER_ID), any(UpdateCareerRequest.class));
+        verify(useCase).execute(eq(req.toCommand(USER_ID, RESUME_ID.toString(), CAREER_ID)));
     }
 
     @Test
@@ -124,7 +124,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.companyName",
                         hasItem("会社名は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -147,7 +147,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.companyName",
                         hasItem("会社名は50文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -169,7 +169,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.startDate",
                         hasItem("開始年月は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -191,7 +191,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.isActive",
                         hasItem("在籍中は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -212,7 +212,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
 
-        verify(useCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -233,7 +233,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.startDate").isArray())
                 .andExpect(jsonPath("$.errors.startDate", hasItem("開始年月が不正です。")));
 
-        verify(useCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -254,7 +254,7 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.endDate").isArray())
                 .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
 
-        verify(useCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -275,6 +275,6 @@ class UpdateCareerControllerTest {
                 .andExpect(jsonPath("$.errors.endDate").isArray())
                 .andExpect(jsonPath("$.errors.endDate", hasItem("終了年月が不正です。")));
 
-        verify(useCase, never()).execute(any(), any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 }

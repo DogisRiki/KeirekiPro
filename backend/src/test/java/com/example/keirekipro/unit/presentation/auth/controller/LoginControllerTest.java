@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.example.keirekipro.usecase.auth.command.LoginCommand;
 
 import java.util.Set;
 import java.util.UUID;
@@ -68,7 +69,7 @@ class LoginControllerTest {
     void test1() throws Exception {
         // モックをセットアップ
         Set<String> roles = Set.of("USER");
-        when(loginUseCase.execute(any()))
+        when(loginUseCase.execute(eq(new LoginCommand(EMAIL, PASSWORD))))
                 .thenReturn(LoginUseCaseDto.builder()
                         .id(USER_ID)
                         .email(EMAIL)
@@ -102,7 +103,7 @@ class LoginControllerTest {
                                 containsString("refreshToken=mockRefreshToken"))));
 
         // 呼び出しを検証
-        verify(loginUseCase).execute(request);
+        verify(loginUseCase).execute(eq(new LoginCommand(EMAIL, PASSWORD)));
         verify(twoFactorAuthIssueUseCase, never()).execute(any(), any());
         verify(authCookieIssuer).issue(any(), eq(USER_ID), eq(roles));
     }
@@ -112,7 +113,7 @@ class LoginControllerTest {
     void test2() throws Exception {
         // モックをセットアップ
         Set<String> roles = Set.of("USER");
-        when(loginUseCase.execute(any()))
+        when(loginUseCase.execute(eq(new LoginCommand(EMAIL, PASSWORD))))
                 .thenReturn(LoginUseCaseDto.builder()
                         .id(USER_ID)
                         .email(EMAIL)
@@ -140,7 +141,7 @@ class LoginControllerTest {
                                 containsString("twoFactorChallenge=mockChallengeToken"))));
 
         // 呼び出しを検証
-        verify(loginUseCase).execute(request);
+        verify(loginUseCase).execute(eq(new LoginCommand(EMAIL, PASSWORD)));
         verify(twoFactorAuthIssueUseCase).execute(USER_ID, EMAIL);
         verify(authCookieIssuer, never()).issue(any(), any(), any());
     }
