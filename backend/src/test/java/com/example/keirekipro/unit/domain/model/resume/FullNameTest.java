@@ -43,7 +43,7 @@ class FullNameTest {
         // 姓に対するエラーメッセージが登録される
         verify(errorCollector, times(1)).addError(
                 eq("lastName"),
-                eq("姓には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
+                eq("姓には英字、ひらがな、カタカナ、漢字のみ使用できます。"));
         // 名に対するエラーメッセージは登録されない
         verify(errorCollector, never()).addError(eq("firstName"), anyString());
     }
@@ -57,7 +57,7 @@ class FullNameTest {
         // 名に対するエラーメッセージが登録される
         verify(errorCollector, times(1)).addError(
                 eq("firstName"),
-                eq("名には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
+                eq("名には英字、ひらがな、カタカナ、漢字のみ使用できます。"));
         // 姓に対するエラーメッセージは登録されない
         verify(errorCollector, never()).addError(eq("lastName"), anyString());
     }
@@ -71,11 +71,11 @@ class FullNameTest {
         // 姓に対するエラーメッセージが登録される
         verify(errorCollector, times(1)).addError(
                 eq("lastName"),
-                eq("姓には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
+                eq("姓には英字、ひらがな、カタカナ、漢字のみ使用できます。"));
         // 名に対するエラーメッセージが登録される
         verify(errorCollector, times(1)).addError(
                 eq("firstName"),
-                eq("名には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
+                eq("名には英字、ひらがな、カタカナ、漢字のみ使用できます。"));
     }
 
     @Test
@@ -237,10 +237,24 @@ class FullNameTest {
                 eq("姓は10文字以内で入力してください。"));
         verify(errorCollector).addError(
                 eq("lastName"),
-                eq("姓には英数、ひらがな、カタカナ、漢字のみ使用できます。"));
+                eq("姓には英字、ひらがな、カタカナ、漢字のみ使用できます。"));
         verify(errorCollector, times(2)).addError(eq("lastName"), anyString());
 
         // 名に対するエラーメッセージは登録されない
         verify(errorCollector, never()).addError(eq("firstName"), anyString());
+    }
+
+    @Test
+    @DisplayName("姓または名に数字が含まれる場合、エラーが収集される")
+    void test10() {
+        FullName fullName = FullName.create(errorCollector, "山田1", "太郎2");
+
+        assertThat(fullName).isNotNull();
+        verify(errorCollector, times(1)).addError(
+                eq("lastName"),
+                eq("姓には英字、ひらがな、カタカナ、漢字のみ使用できます。"));
+        verify(errorCollector, times(1)).addError(
+                eq("firstName"),
+                eq("名には英字、ひらがな、カタカナ、漢字のみ使用できます。"));
     }
 }

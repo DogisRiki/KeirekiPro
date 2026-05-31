@@ -272,7 +272,7 @@ export const ProjectSection = () => {
                 sx={{ mb: 4 }}
             />
             {/* 作業工程 */}
-            <FormControl fullWidth required variant="outlined" sx={{ mb: 4 }} error={hasProcessError}>
+            <FormControl fullWidth variant="outlined" sx={{ mb: 4 }} error={hasProcessError}>
                 <InputLabel shrink>作業工程</InputLabel>
                 <Select
                     multiple

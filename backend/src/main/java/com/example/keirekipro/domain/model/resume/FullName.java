@@ -53,7 +53,7 @@ public class FullName {
                 errorCollector.addError("lastName", "姓は10文字以内で入力してください。");
             }
             if (isInvalidValue(lastName)) {
-                errorCollector.addError("lastName", "姓には英数、ひらがな、カタカナ、漢字のみ使用できます。");
+                errorCollector.addError("lastName", "姓には英字、ひらがな、カタカナ、漢字のみ使用できます。");
             }
         }
         if (firstName == null || firstName.isBlank()) {
@@ -63,7 +63,7 @@ public class FullName {
                 errorCollector.addError("firstName", "名は10文字以内で入力してください。");
             }
             if (isInvalidValue(firstName)) {
-                errorCollector.addError("firstName", "名には英数、ひらがな、カタカナ、漢字のみ使用できます。");
+                errorCollector.addError("firstName", "名には英字、ひらがな、カタカナ、漢字のみ使用できます。");
             }
         }
     }

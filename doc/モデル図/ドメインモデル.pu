@@ -216,6 +216,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
         ・チーム構成は必須かつ100文字以内。
         ・役割は必須かつ1000文字以内。
         ・成果は必須かつ1000文字以内。
+        ・作業工程は任意。
     end note
 
     note bottom of Certification
@@ -259,7 +260,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     note bottom of FullName
         ・姓・名ともに必須。
         ・姓・名ともに10文字以内。
-        ・英数、ひらがな、カタカナ、漢字のみ許可する。
+        ・英字、ひらがな、カタカナ、漢字のみ許可する。
     end note
 
     note bottom of Period
