@@ -48,6 +48,6 @@ public class CreatePortfolioController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                createPortfolioUseCase.execute(userId, resumeId, request));
+                createPortfolioUseCase.execute(request.toCommand(userId, resumeId)));
     }
 }

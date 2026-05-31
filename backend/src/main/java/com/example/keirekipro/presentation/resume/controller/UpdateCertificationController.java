@@ -49,6 +49,6 @@ public class UpdateCertificationController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                updateCertificationUseCase.execute(userId, resumeId, certificationId, request));
+                updateCertificationUseCase.execute(request.toCommand(userId, resumeId, certificationId)));
     }
 }

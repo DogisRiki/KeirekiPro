@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreateSnsPlatformRequest;
+import com.example.keirekipro.usecase.resume.command.CreateSnsPlatformCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -31,13 +31,13 @@ public class CreateSnsPlatformUseCase {
     /**
      * SNSプラットフォーム新規作成ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateSnsPlatformRequest request) {
+    public ResumeInfoUseCaseDto execute(CreateSnsPlatformCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         // 上限チェック
@@ -52,8 +52,8 @@ public class CreateSnsPlatformUseCase {
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        Link link = Link.create(errorCollector, request.getLink());
-        SnsPlatform snsPlatform = SnsPlatform.create(errorCollector, request.getName(), link);
+        Link link = Link.create(errorCollector, command.getLink());
+        SnsPlatform snsPlatform = SnsPlatform.create(errorCollector, command.getName(), link);
 
         Resume updated = resume.addSnsPlatform(errorCollector, snsPlatform);
 

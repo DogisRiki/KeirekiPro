@@ -49,6 +49,6 @@ public class UpdatePortfolioController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                updatePortfolioUseCase.execute(userId, resumeId, portfolioId, request));
+                updatePortfolioUseCase.execute(request.toCommand(userId, resumeId, portfolioId)));
     }
 }

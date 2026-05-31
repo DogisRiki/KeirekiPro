@@ -1,8 +1,7 @@
 package com.example.keirekipro.unit.presentation.resume.controller;
 
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.any;
 import static org.hamcrest.Matchers.startsWith;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -11,13 +10,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.resume.controller.ExportResumeController;
+import com.example.keirekipro.presentation.resume.controller.ExportResumeWithSettingsController;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.usecase.resume.ExportResumeUseCase;
-import com.example.keirekipro.usecase.resume.dto.ExportResumeCommand;
+import com.example.keirekipro.usecase.resume.command.ExportResumeCommand;
+import com.example.keirekipro.usecase.resume.command.ExportResumeCommand.ExportDisposition;
 import com.example.keirekipro.usecase.resume.dto.ExportResumeUseCaseDto;
 import com.example.keirekipro.usecase.resume.export.ExportFormat;
 
@@ -34,7 +36,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import lombok.RequiredArgsConstructor;
 
-@WebMvcTest(ExportResumeController.class)
+@WebMvcTest({ ExportResumeController.class, ExportResumeWithSettingsController.class })
 @AutoConfigureMockMvc(addFilters = false)
 @TestConstructor(autowireMode = AutowireMode.ALL)
 @RequiredArgsConstructor
@@ -52,6 +54,10 @@ class ExportResumeControllerTest {
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID RESUME_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
+    private static ExportResumeCommand command(ExportFormat format, ExportDisposition disposition) {
+        return new ExportResumeCommand(format, disposition, null);
+    }
+
     @Test
     @DisplayName("Accept: application/pdfの場合、PDFファイルがダウンロードできる")
     void test1() throws Exception {
@@ -62,7 +68,9 @@ class ExportResumeControllerTest {
                 pdfContent);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(ExportFormat.PDF))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()),
+                eq(command(ExportFormat.PDF, ExportDisposition.ATTACHMENT))))
+                .thenReturn(dto);
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID)
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_PDF_VALUE))
@@ -72,7 +80,8 @@ class ExportResumeControllerTest {
                 .andExpect(content().bytes(pdfContent));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(ExportFormat.PDF));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()),
+                eq(command(ExportFormat.PDF, ExportDisposition.ATTACHMENT)));
     }
 
     @Test
@@ -85,7 +94,9 @@ class ExportResumeControllerTest {
                 mdContent);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(ExportFormat.MARKDOWN))).thenReturn(dto);
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()),
+                eq(command(ExportFormat.MARKDOWN, ExportDisposition.ATTACHMENT))))
+                .thenReturn(dto);
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID)
                 .header(HttpHeaders.ACCEPT, "text/markdown"))
@@ -95,7 +106,8 @@ class ExportResumeControllerTest {
                 .andExpect(content().bytes(mdContent));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(ExportFormat.MARKDOWN));
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()),
+                eq(command(ExportFormat.MARKDOWN, ExportDisposition.ATTACHMENT)));
     }
 
     @Test
@@ -131,7 +143,17 @@ class ExportResumeControllerTest {
                 pdfContent);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), any(ExportResumeCommand.class))).thenReturn(dto);
+        ExportResumeCommand expectedCommand = new ExportResumeCommand(
+                ExportFormat.PDF,
+                ExportDisposition.INLINE,
+                new ExportResumeCommand.PdfSettings(
+                        "NotoSansJP",
+                        new BigDecimal("16"),
+                        new BigDecimal("10"),
+                        new BigDecimal("10"),
+                        new BigDecimal("11.5"),
+                        "#d9d9d9"));
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(expectedCommand))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -157,6 +179,9 @@ class ExportResumeControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF))
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, startsWith("inline")))
                 .andExpect(content().bytes(pdfContent));
+
+        verify(currentUserFacade).getUserId();
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(expectedCommand));
     }
 
     @Test
@@ -169,7 +194,17 @@ class ExportResumeControllerTest {
                 pdfContent);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), any(ExportResumeCommand.class))).thenReturn(dto);
+        ExportResumeCommand expectedCommand = new ExportResumeCommand(
+                ExportFormat.PDF,
+                ExportDisposition.ATTACHMENT,
+                new ExportResumeCommand.PdfSettings(
+                        "NotoSerifJP",
+                        new BigDecimal("16"),
+                        new BigDecimal("10"),
+                        new BigDecimal("10"),
+                        new BigDecimal("11.5"),
+                        "#d9d9d9"));
+        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(expectedCommand))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -195,6 +230,9 @@ class ExportResumeControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF))
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, startsWith("attachment")))
                 .andExpect(content().bytes(pdfContent));
+
+        verify(currentUserFacade).getUserId();
+        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), eq(expectedCommand));
     }
 
     @Test

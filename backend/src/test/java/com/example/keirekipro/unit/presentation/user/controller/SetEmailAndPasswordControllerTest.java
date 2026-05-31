@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.util.List;
 import java.util.UUID;
@@ -97,7 +98,7 @@ class SetEmailAndPasswordControllerTest {
                 .andExpect(jsonPath("$.twoFactorAuthEnabled").value(true))
                 .andExpect(jsonPath("$.authProviders[0]").value(PROVIDER_NAME));
 
-        verify(setEmailAndPasswordUseCase).execute(UUID.fromString(USER_ID), request);
+        verify(setEmailAndPasswordUseCase).execute(eq(request.toCommand(UUID.fromString(USER_ID))));
     }
 
     @Test
@@ -177,7 +178,7 @@ class SetEmailAndPasswordControllerTest {
                 .andExpect(jsonPath("$.twoFactorAuthEnabled").value(false))
                 .andExpect(jsonPath("$.authProviders").isArray());
 
-        verify(setEmailAndPasswordUseCase).execute(UUID.fromString(USER_ID), request);
+        verify(setEmailAndPasswordUseCase).execute(eq(request.toCommand(UUID.fromString(USER_ID))));
     }
 
     @Test

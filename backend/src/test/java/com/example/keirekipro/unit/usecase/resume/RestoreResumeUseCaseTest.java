@@ -9,7 +9,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -20,7 +19,7 @@ import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.domain.shared.exception.DomainException;
-import com.example.keirekipro.presentation.resume.dto.RestoreResumeRequest;
+import com.example.keirekipro.usecase.resume.command.RestoreResumeCommand;
 import com.example.keirekipro.usecase.resume.RestoreResumeUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeBackupVersion;
@@ -60,7 +59,7 @@ class RestoreResumeUseCaseTest {
     @DisplayName("正常にリストアできる")
     void test1() {
         // リクエスト準備
-        RestoreResumeRequest request = buildValidRequest();
+        RestoreResumeCommand request = buildValidRequest();
 
         // モック設定（上限OK、重複なし）
         doNothing().when(resumeLimitChecker).checkResumeCreateAllowed(USER_ID);
@@ -68,7 +67,7 @@ class RestoreResumeUseCaseTest {
 
         // 実行
         ArgumentCaptor<Resume> captor = ArgumentCaptor.forClass(Resume.class);
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, request);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // 検証
         verify(resumeLimitChecker).checkResumeCreateAllowed(USER_ID);
@@ -124,10 +123,10 @@ class RestoreResumeUseCaseTest {
     @DisplayName("バックアップバージョンがサポート外の場合、UseCaseExceptionがスローされ後続処理が行われない")
     void test2() {
         // リクエスト準備（バージョン不正）
-        RestoreResumeRequest request = buildValidRequest();
+        RestoreResumeCommand request = buildValidRequest();
         request.setVersion("unsupported-version");
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("サポートされていないバックアップバージョンです。");
 
@@ -139,12 +138,12 @@ class RestoreResumeUseCaseTest {
     @Test
     @DisplayName("職務経歴書が上限枚数である場合、UseCaseExceptionがスローされ後続処理が行われない")
     void test3() {
-        RestoreResumeRequest request = buildValidRequest();
+        RestoreResumeCommand request = buildValidRequest();
 
         doThrow(new UseCaseException("上限"))
                 .when(resumeLimitChecker).checkResumeCreateAllowed(USER_ID);
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("上限");
 
@@ -156,13 +155,13 @@ class RestoreResumeUseCaseTest {
     @Test
     @DisplayName("職務経歴書名が重複していた場合、DomainExceptionがスローされ後続処理が行われない")
     void test4() {
-        RestoreResumeRequest request = buildValidRequest();
+        RestoreResumeCommand request = buildValidRequest();
 
         doNothing().when(resumeLimitChecker).checkResumeCreateAllowed(USER_ID);
         doThrow(new DomainException("この職務経歴書名は既に登録されています。"))
                 .when(resumeNameDuplicationCheckService).execute(eq(USER_ID), any(ResumeName.class));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(DomainException.class)
                 .hasMessage("この職務経歴書名は既に登録されています。");
 
@@ -175,12 +174,12 @@ class RestoreResumeUseCaseTest {
     @DisplayName("バックアップファイルが破損または改ざんされている場合、UseCaseExceptionがスローされる")
     void test5() {
         // リクエスト準備（Periodが不正：endDate < startDate）
-        RestoreResumeRequest request = buildInvalidRequest();
+        RestoreResumeCommand request = buildInvalidRequest();
 
         doNothing().when(resumeLimitChecker).checkResumeCreateAllowed(USER_ID);
         doNothing().when(resumeNameDuplicationCheckService).execute(eq(USER_ID), any(ResumeName.class));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("バックアップファイルが不正なためリストアできません。\n別のバックアップファイルでお試しください。");
 
@@ -189,18 +188,18 @@ class RestoreResumeUseCaseTest {
         verify(resumeRepository, never()).save(any());
     }
 
-    private static RestoreResumeRequest buildValidRequest() {
-        RestoreResumeRequest.CareerDto career = new RestoreResumeRequest.CareerDto(
+    private static RestoreResumeCommand buildValidRequest() {
+        RestoreResumeCommand.CareerCommand career = new RestoreResumeCommand.CareerCommand(
                 "Company",
                 YearMonth.of(2020, 1),
                 null,
                 true);
 
-        RestoreResumeRequest.ProcessDto process = new RestoreResumeRequest.ProcessDto(
+        RestoreResumeCommand.ProcessCommand process = new RestoreResumeCommand.ProcessCommand(
                 true, true, true, true, true, true, true);
 
-        RestoreResumeRequest.TechStackDto techStack = new RestoreResumeRequest.TechStackDto(
-                new RestoreResumeRequest.FrontendDto(
+        RestoreResumeCommand.TechStackCommand techStack = new RestoreResumeCommand.TechStackCommand(
+                new RestoreResumeCommand.FrontendCommand(
                         List.of("TypeScript", "JavaScript"),
                         List.of("React"),
                         List.of("Redux"),
@@ -209,7 +208,7 @@ class RestoreResumeUseCaseTest {
                         List.of("ESLint"),
                         List.of("Prettier"),
                         List.of("Jest")),
-                new RestoreResumeRequest.BackendDto(
+                new RestoreResumeCommand.BackendCommand(
                         List.of("Java"),
                         List.of("Spring Boot"),
                         List.of("Jackson"),
@@ -220,7 +219,7 @@ class RestoreResumeUseCaseTest {
                         List.of("JUnit"),
                         List.of("MyBatis"),
                         List.of("JWT")),
-                new RestoreResumeRequest.InfrastructureDto(
+                new RestoreResumeCommand.InfrastructureCommand(
                         List.of("AWS"),
                         List.of("Linux"),
                         List.of("Docker"),
@@ -230,7 +229,7 @@ class RestoreResumeUseCaseTest {
                         List.of("Terraform"),
                         List.of("CloudWatch"),
                         List.of("OpenSearch")),
-                new RestoreResumeRequest.ToolsDto(
+                new RestoreResumeCommand.ToolsCommand(
                         List.of("Git"),
                         List.of("Jira"),
                         List.of("Slack"),
@@ -240,7 +239,7 @@ class RestoreResumeUseCaseTest {
                         List.of("IntelliJ IDEA"),
                         List.of("Docker Compose")));
 
-        RestoreResumeRequest.ProjectDto project = new RestoreResumeRequest.ProjectDto(
+        RestoreResumeCommand.ProjectCommand project = new RestoreResumeCommand.ProjectCommand(
                 "Company",
                 YearMonth.of(2021, 1),
                 null,
@@ -253,25 +252,25 @@ class RestoreResumeUseCaseTest {
                 process,
                 techStack);
 
-        RestoreResumeRequest.CertificationDto cert = new RestoreResumeRequest.CertificationDto(
+        RestoreResumeCommand.CertificationCommand cert = new RestoreResumeCommand.CertificationCommand(
                 "基本情報技術者",
                 YearMonth.of(2022, 1));
 
-        RestoreResumeRequest.PortfolioDto portfolio = new RestoreResumeRequest.PortfolioDto(
+        RestoreResumeCommand.PortfolioCommand portfolio = new RestoreResumeCommand.PortfolioCommand(
                 "PF1",
                 "overview",
                 "tech",
                 "https://portfolio.example");
 
-        RestoreResumeRequest.SnsPlatformDto sns = new RestoreResumeRequest.SnsPlatformDto(
+        RestoreResumeCommand.SnsPlatformCommand sns = new RestoreResumeCommand.SnsPlatformCommand(
                 "X",
                 "https://x.example");
 
-        RestoreResumeRequest.SelfPromotionDto sp = new RestoreResumeRequest.SelfPromotionDto(
+        RestoreResumeCommand.SelfPromotionCommand sp = new RestoreResumeCommand.SelfPromotionCommand(
                 "PR1",
                 "content");
 
-        RestoreResumeRequest.ResumeDto resume = new RestoreResumeRequest.ResumeDto(
+        RestoreResumeCommand.ResumeCommand resume = new RestoreResumeCommand.ResumeCommand(
                 RESUME_NAME,
                 DATE,
                 LAST_NAME,
@@ -283,21 +282,21 @@ class RestoreResumeUseCaseTest {
                 List.of(sns),
                 List.of(sp));
 
-        return new RestoreResumeRequest(
+        return new RestoreResumeCommand(
+                USER_ID,
                 ResumeBackupVersion.SUPPORTED_VERSION,
-                Instant.now(),
                 resume);
     }
 
-    private static RestoreResumeRequest buildInvalidRequest() {
+    private static RestoreResumeCommand buildInvalidRequest() {
         // endDate < startDate を作ってPeriod.createのDomainExceptionを誘発する
-        RestoreResumeRequest.CareerDto invalidCareer = new RestoreResumeRequest.CareerDto(
+        RestoreResumeCommand.CareerCommand invalidCareer = new RestoreResumeCommand.CareerCommand(
                 "Company",
                 YearMonth.of(2025, 2),
                 YearMonth.of(2024, 1),
                 false);
 
-        RestoreResumeRequest.ResumeDto resume = new RestoreResumeRequest.ResumeDto(
+        RestoreResumeCommand.ResumeCommand resume = new RestoreResumeCommand.ResumeCommand(
                 RESUME_NAME,
                 DATE,
                 LAST_NAME,
@@ -309,9 +308,9 @@ class RestoreResumeUseCaseTest {
                 List.of(),
                 List.of());
 
-        return new RestoreResumeRequest(
+        return new RestoreResumeCommand(
+                USER_ID,
                 ResumeBackupVersion.SUPPORTED_VERSION,
-                Instant.now(),
                 resume);
     }
 }

@@ -2,6 +2,8 @@ package com.example.keirekipro.presentation.resume.dto;
 
 import java.util.UUID;
 
+import com.example.keirekipro.usecase.resume.command.CreateResumeCommand;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,4 +24,24 @@ public class CreateResumeRequest {
     private String resumeName;
 
     private UUID resumeId;
+
+    /**
+     * 職務経歴書新規作成コマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @return 職務経歴書作成コマンド
+     */
+    public CreateResumeCommand toCreateCommand(UUID userId) {
+        return new CreateResumeCommand(userId, resumeName, null);
+    }
+
+    /**
+     * 職務経歴書コピー作成コマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @return 職務経歴書コピー作成コマンド
+     */
+    public CreateResumeCommand toCopyCommand(UUID userId) {
+        return new CreateResumeCommand(userId, resumeName, resumeId);
+    }
 }

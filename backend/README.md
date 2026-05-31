@@ -82,36 +82,3 @@ resources
 ### テストの実行
 
 VSCodeのサイドバーからフラスコアイコン（Testing）をクリックし、実行したいテストを選択して実行する。
-
-## 設計原則
-
-### レイヤー間の依存関係
-```
-presentation → usecase → domain
-                 ↑          ↑
-             infrastructure
-
-shared（すべての層から参照可能）
-```
-
-- 内側のレイヤーは外側のレイヤーを知らない
-- 依存性逆転の原則により、infrastructureはdomain/usecaseのインターフェースを実装
-- presentationはusecaseのみを参照し、infrastructureを直接参照しない
-- sharedはすべての層から参照可能な共通モジュール
-
-### コントローラーの設計
-
-- 1クラス1パブリックメソッドの原則
-- メソッド名は `handle()`
-- 例: `CreateResumeController`, `UpdateResumeBasicController`, `DeleteResumeController`
-
-### ユースケースの設計
-
-- 1クラス1パブリックメソッドの原則
-- メソッド名は `execute()`
-- 例: `CreateResumeUseCase`, `UpdateResumeBasicUseCase`, `DeleteResumeUseCase`
-
-### CQRS
-
-- 更新系: `usecase/{feature}/`配下のUseCaseクラス → Repository
-- 参照系: `usecase/query/`配下のQueryインターフェース → `infrastructure/query/`で実装

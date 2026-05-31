@@ -19,7 +19,7 @@ import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdatePortfolioRequest;
+import com.example.keirekipro.usecase.resume.command.UpdatePortfolioCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdatePortfolioUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -59,13 +59,6 @@ class UpdatePortfolioUseCaseTest {
         // 既存の職務経歴書とポートフォリオを準備
         Resume resume = buildResumeWithPortfolios(USER_ID);
 
-        // リクエスト準備
-        UpdatePortfolioRequest request = new UpdatePortfolioRequest(
-                "更新後ポートフォリオ",
-                "更新後概要",
-                "更新後技術スタック",
-                "https://example.com/updated");
-
         // 更新対象IDは、並び順に依存しないよう名前で特定する
         UUID portfolioId = resume.getPortfolios().stream()
                 .filter(p -> "ポートフォリオ1".equals(p.getName()))
@@ -77,7 +70,8 @@ class UpdatePortfolioUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), portfolioId, request);
+        UpdatePortfolioCommand request = buildUpdatePortfolioCommand(portfolioId, "更新後技術スタック");
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -123,14 +117,9 @@ class UpdatePortfolioUseCaseTest {
                 .map(Portfolio::getId)
                 .findFirst()
                 .orElseThrow();
-        UpdatePortfolioRequest request = new UpdatePortfolioRequest(
-                "更新後ポートフォリオ",
-                "更新後概要",
-                null,
-                "https://example.com/updated");
+        UpdatePortfolioCommand request = buildUpdatePortfolioCommand(portfolioId, null);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
-
-        useCase.execute(USER_ID, RESUME_ID.toString(), portfolioId, request);
+        useCase.execute(request);
 
         ArgumentCaptor<Resume> saveCaptor = ArgumentCaptor.forClass(Resume.class);
         verify(repository).save(saveCaptor.capture());
@@ -144,19 +133,13 @@ class UpdatePortfolioUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        // リクエスト準備
-        UpdatePortfolioRequest request = new UpdatePortfolioRequest(
-                "更新後ポートフォリオ",
-                "更新後概要",
-                "更新後技術スタック",
-                "https://example.com/updated");
-
         // モック準備（対象の職務経歴書が存在しない）
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
         UUID portfolioId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), portfolioId, request))
+        UpdatePortfolioCommand request = buildUpdatePortfolioCommand(portfolioId, "更新後技術スタック");
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -170,13 +153,6 @@ class UpdatePortfolioUseCaseTest {
         // 職務経歴書（所有者は別ユーザー）を準備
         Resume resume = buildResumeWithPortfolios(OTHER_USER_ID);
 
-        // リクエスト準備
-        UpdatePortfolioRequest request = new UpdatePortfolioRequest(
-                "更新後ポートフォリオ",
-                "更新後概要",
-                "更新後技術スタック",
-                "https://example.com/updated");
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
@@ -185,8 +161,8 @@ class UpdatePortfolioUseCaseTest {
                 .map(Portfolio::getId)
                 .findFirst()
                 .orElseThrow();
-
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), portfolioId, request))
+        UpdatePortfolioCommand request = buildUpdatePortfolioCommand(portfolioId, "更新後技術スタック");
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -200,24 +176,53 @@ class UpdatePortfolioUseCaseTest {
         // 既存の職務経歴書を準備
         Resume resume = buildResumeWithPortfolios(USER_ID);
 
-        // リクエスト準備
-        UpdatePortfolioRequest request = new UpdatePortfolioRequest(
-                "存在しないポートフォリオ更新",
-                "ダミー概要",
-                "ダミー技術スタック",
-                "https://example.com/dummy");
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
         UUID missingPortfolioId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingPortfolioId, request))
+        UpdatePortfolioCommand request = buildMissingPortfolioCommand(missingPortfolioId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象のポートフォリオが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
+    }
+
+    /**
+     * テスト用のポートフォリオ更新Commandを作成する
+     *
+     * @param portfolioId 更新対象ポートフォリオID
+     * @param techStack 技術スタック
+     * @return ポートフォリオ更新Command
+     */
+    private UpdatePortfolioCommand buildUpdatePortfolioCommand(UUID portfolioId, String techStack) {
+        return new UpdatePortfolioCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                portfolioId,
+                "更新後ポートフォリオ",
+                "更新後概要",
+                techStack,
+                "https://example.com/updated");
+    }
+
+    /**
+     * 存在しないポートフォリオ更新検証用のCommandを作成する
+     *
+     * @param portfolioId 更新対象ポートフォリオID
+     * @return ポートフォリオ更新Command
+     */
+    private UpdatePortfolioCommand buildMissingPortfolioCommand(UUID portfolioId) {
+        return new UpdatePortfolioCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                portfolioId,
+                "存在しないポートフォリオ更新",
+                "ダミー概要",
+                "ダミー技術スタック",
+                "https://example.com/dummy");
     }
 
     /**

@@ -8,8 +8,8 @@ import com.example.keirekipro.domain.model.resume.Project;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.TechStack;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreateProjectRequest;
 import com.example.keirekipro.shared.ErrorCollector;
+import com.example.keirekipro.usecase.resume.command.CreateProjectCommand;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
@@ -33,13 +33,13 @@ public class CreateProjectUseCase {
     /**
      * プロジェクト新規作成ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param request リクエスト
+     * @param command コマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateProjectRequest request) {
+    public ResumeInfoUseCaseDto execute(CreateProjectCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         // 上限チェック
@@ -54,69 +54,69 @@ public class CreateProjectUseCase {
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        CompanyName companyName = CompanyName.create(errorCollector, request.getCompanyName());
-        Period period = Period.create(errorCollector, request.getStartDate(), request.getEndDate(),
-                request.getIsActive());
+        CompanyName companyName = CompanyName.create(errorCollector, command.getCompanyName());
+        Period period = Period.create(errorCollector, command.getStartDate(), command.getEndDate(),
+                command.getActive());
 
         Project.Process process = Project.Process.create(
-                request.getRequirements(),
-                request.getBasicDesign(),
-                request.getDetailedDesign(),
-                request.getImplementation(),
-                request.getIntegrationTest(),
-                request.getSystemTest(),
-                request.getMaintenance());
+                command.getRequirements(),
+                command.getBasicDesign(),
+                command.getDetailedDesign(),
+                command.getImplementation(),
+                command.getIntegrationTest(),
+                command.getSystemTest(),
+                command.getMaintenance());
 
         TechStack techStack = TechStack.create(
                 TechStack.Frontend.create(
-                        request.getFrontendLanguages(),
-                        request.getFrontendFrameworks(),
-                        request.getFrontendLibraries(),
-                        request.getFrontendBuildTools(),
-                        request.getFrontendPackageManagers(),
-                        request.getFrontendLinters(),
-                        request.getFrontendFormatters(),
-                        request.getFrontendTestingTools()),
+                        command.getFrontendLanguages(),
+                        command.getFrontendFrameworks(),
+                        command.getFrontendLibraries(),
+                        command.getFrontendBuildTools(),
+                        command.getFrontendPackageManagers(),
+                        command.getFrontendLinters(),
+                        command.getFrontendFormatters(),
+                        command.getFrontendTestingTools()),
                 TechStack.Backend.create(
-                        request.getBackendLanguages(),
-                        request.getBackendFrameworks(),
-                        request.getBackendLibraries(),
-                        request.getBackendBuildTools(),
-                        request.getBackendPackageManagers(),
-                        request.getBackendLinters(),
-                        request.getBackendFormatters(),
-                        request.getBackendTestingTools(),
-                        request.getOrmTools(),
-                        request.getAuth()),
+                        command.getBackendLanguages(),
+                        command.getBackendFrameworks(),
+                        command.getBackendLibraries(),
+                        command.getBackendBuildTools(),
+                        command.getBackendPackageManagers(),
+                        command.getBackendLinters(),
+                        command.getBackendFormatters(),
+                        command.getBackendTestingTools(),
+                        command.getOrmTools(),
+                        command.getAuth()),
                 TechStack.Infrastructure.create(
-                        request.getClouds(),
-                        request.getOperatingSystems(),
-                        request.getContainers(),
-                        request.getDatabases(),
-                        request.getWebServers(),
-                        request.getCiCdTools(),
-                        request.getIacTools(),
-                        request.getMonitoringTools(),
-                        request.getLoggingTools()),
+                        command.getClouds(),
+                        command.getOperatingSystems(),
+                        command.getContainers(),
+                        command.getDatabases(),
+                        command.getWebServers(),
+                        command.getCiCdTools(),
+                        command.getIacTools(),
+                        command.getMonitoringTools(),
+                        command.getLoggingTools()),
                 TechStack.Tools.create(
-                        request.getSourceControls(),
-                        request.getProjectManagements(),
-                        request.getCommunicationTools(),
-                        request.getDocumentationTools(),
-                        request.getApiDevelopmentTools(),
-                        request.getDesignTools(),
-                        request.getEditors(),
-                        request.getDevelopmentEnvironments()));
+                        command.getSourceControls(),
+                        command.getProjectManagements(),
+                        command.getCommunicationTools(),
+                        command.getDocumentationTools(),
+                        command.getApiDevelopmentTools(),
+                        command.getDesignTools(),
+                        command.getEditors(),
+                        command.getDevelopmentEnvironments()));
 
         Project project = Project.create(
                 errorCollector,
                 companyName,
                 period,
-                request.getName(),
-                request.getOverview(),
-                request.getTeamComp(),
-                request.getRole(),
-                request.getAchievement(),
+                command.getName(),
+                command.getOverview(),
+                command.getTeamComp(),
+                command.getRole(),
+                command.getAchievement(),
                 process,
                 techStack);
 

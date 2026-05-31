@@ -48,6 +48,6 @@ public class CreateCareerController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                createCareerUseCase.execute(userId, resumeId, request));
+                createCareerUseCase.execute(request.toCommand(userId, resumeId)));
     }
 }

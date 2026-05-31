@@ -223,7 +223,7 @@ public class ResumeObjectBuilder {
             cd.setCompanyName(c.getCompanyName().getValue());
             cd.setStartDate(c.getPeriod().getStartDate());
             cd.setEndDate(c.getPeriod().getEndDate());
-            cd.setIsActive(c.getPeriod().isActive());
+            cd.setActive(c.getPeriod().isActive());
             return cd;
         }).collect(Collectors.toList()));
 
@@ -235,7 +235,7 @@ public class ResumeObjectBuilder {
             pd.setCompanyName(p.getCompanyName().getValue());
             pd.setStartDate(p.getPeriod().getStartDate());
             pd.setEndDate(p.getPeriod().getEndDate());
-            pd.setIsActive(p.getPeriod().isActive());
+            pd.setActive(p.getPeriod().isActive());
             pd.setName(p.getName());
             pd.setOverview(p.getOverview());
             pd.setTeamComp(p.getTeamComp());

@@ -19,7 +19,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateSnsPlatformRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateSnsPlatformCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateSnsPlatformUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -59,11 +59,6 @@ class UpdateSnsPlatformTest {
         // 既存の職務経歴書とSNSを準備
         Resume resume = buildResumeWithSnsPlatforms(USER_ID);
 
-        // リクエスト準備
-        UpdateSnsPlatformRequest request = new UpdateSnsPlatformRequest(
-                "更新後SNS",
-                "https://example.com/updated-sns");
-
         // 更新対象IDは、並び順に依存しないよう名前で特定する
         UUID snsPlatformId = resume.getSnsPlatforms().stream()
                 .filter(sl -> "Twitter".equals(sl.getName()))
@@ -75,7 +70,8 @@ class UpdateSnsPlatformTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId, request);
+        UpdateSnsPlatformCommand request = buildUpdateSnsPlatformCommand(snsPlatformId);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -113,17 +109,13 @@ class UpdateSnsPlatformTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        // リクエスト準備
-        UpdateSnsPlatformRequest request = new UpdateSnsPlatformRequest(
-                "更新後SNS",
-                "https://example.com/updated-sns");
-
         // モック準備（対象の職務経歴書が存在しない）
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
         UUID snsPlatformId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId, request))
+        UpdateSnsPlatformCommand request = buildUpdateSnsPlatformCommand(snsPlatformId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -137,11 +129,6 @@ class UpdateSnsPlatformTest {
         // 職務経歴書（所有者は別ユーザー）を準備
         Resume resume = buildResumeWithSnsPlatforms(OTHER_USER_ID);
 
-        // リクエスト準備
-        UpdateSnsPlatformRequest request = new UpdateSnsPlatformRequest(
-                "更新後SNS",
-                "https://example.com/updated-sns");
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
@@ -150,8 +137,8 @@ class UpdateSnsPlatformTest {
                 .map(SnsPlatform::getId)
                 .findFirst()
                 .orElseThrow();
-
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), snsPlatformId, request))
+        UpdateSnsPlatformCommand request = buildUpdateSnsPlatformCommand(snsPlatformId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -165,22 +152,48 @@ class UpdateSnsPlatformTest {
         // 既存の職務経歴書を準備
         Resume resume = buildResumeWithSnsPlatforms(USER_ID);
 
-        // リクエスト準備
-        UpdateSnsPlatformRequest request = new UpdateSnsPlatformRequest(
-                "存在しないSNS更新",
-                "https://example.com/dummy");
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
         UUID missingSnsPlatformId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingSnsPlatformId, request))
+        UpdateSnsPlatformCommand request = buildMissingSnsPlatformCommand(missingSnsPlatformId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象のSNSプラットフォームが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
+    }
+
+    /**
+     * テスト用のSNS更新Commandを作成する
+     *
+     * @param snsPlatformId 更新対象SNS ID
+     * @return SNS更新Command
+     */
+    private UpdateSnsPlatformCommand buildUpdateSnsPlatformCommand(UUID snsPlatformId) {
+        return new UpdateSnsPlatformCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                snsPlatformId,
+                "更新後SNS",
+                "https://example.com/updated-sns");
+    }
+
+    /**
+     * 存在しないSNS更新検証用のCommandを作成する
+     *
+     * @param snsPlatformId 更新対象SNS ID
+     * @return SNS更新Command
+     */
+    private UpdateSnsPlatformCommand buildMissingSnsPlatformCommand(UUID snsPlatformId) {
+        return new UpdateSnsPlatformCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                snsPlatformId,
+                "存在しないSNS更新",
+                "https://example.com/dummy");
     }
 
     /**

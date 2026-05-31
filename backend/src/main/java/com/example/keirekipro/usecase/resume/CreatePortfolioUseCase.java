@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreatePortfolioRequest;
+import com.example.keirekipro.usecase.resume.command.CreatePortfolioCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -31,13 +31,13 @@ public class CreatePortfolioUseCase {
     /**
      * ポートフォリオ新規作成ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreatePortfolioRequest request) {
+    public ResumeInfoUseCaseDto execute(CreatePortfolioCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         // 上限チェック
@@ -52,9 +52,9 @@ public class CreatePortfolioUseCase {
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        Link link = Link.create(errorCollector, request.getLink());
-        Portfolio portfolio = Portfolio.create(errorCollector, request.getName(), request.getOverview(),
-                request.getTechStack(), link);
+        Link link = Link.create(errorCollector, command.getLink());
+        Portfolio portfolio = Portfolio.create(errorCollector, command.getName(), command.getOverview(),
+                command.getTechStack(), link);
 
         Resume updated = resume.addPortfolio(errorCollector, portfolio);
 

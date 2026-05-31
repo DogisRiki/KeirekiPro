@@ -39,7 +39,7 @@ public class ResumeDto {
         private String companyName;
         private YearMonth startDate;
         private YearMonth endDate;
-        private Boolean isActive;
+        private Boolean active;
     }
 
     /**
@@ -52,7 +52,7 @@ public class ResumeDto {
         private String companyName;
         private YearMonth startDate;
         private YearMonth endDate;
-        private Boolean isActive;
+        private Boolean active;
         private String name;
         private String overview;
         private String teamComp;

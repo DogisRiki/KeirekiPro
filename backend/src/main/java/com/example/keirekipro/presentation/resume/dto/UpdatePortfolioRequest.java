@@ -1,5 +1,9 @@
 package com.example.keirekipro.presentation.resume.dto;
 
+import java.util.UUID;
+
+import com.example.keirekipro.usecase.resume.command.UpdatePortfolioCommand;
+
 import org.hibernate.validator.constraints.URL;
 
 import lombok.AllArgsConstructor;
@@ -32,4 +36,16 @@ public class UpdatePortfolioRequest {
     @URL(protocol = "https", message = "リンクはhttps形式のURLを指定してください。")
     @Size(max = 255, message = "リンクは255文字以内で入力してください。")
     private String link;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
+     * @param portfolioId ポートフォリオID
+     * @return ポートフォリオ更新コマンド
+     */
+    public UpdatePortfolioCommand toCommand(UUID userId, String resumeId, UUID portfolioId) {
+        return new UpdatePortfolioCommand(userId, resumeId, portfolioId, name, overview, techStack, link);
+    }
 }

@@ -41,6 +41,6 @@ public class ChangePasswordController {
     @Operation(summary = "パスワード変更", description = "パスワードの変更を実行する")
     public void handle(@Valid @RequestBody ChangePasswordRequest request) {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
-        changePasswordUseCase.execute(request, userId);
+        changePasswordUseCase.execute(request.toCommand(userId));
     }
 }

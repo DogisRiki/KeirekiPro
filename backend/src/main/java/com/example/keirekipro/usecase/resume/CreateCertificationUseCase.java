@@ -5,7 +5,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.resume.Certification;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreateCertificationRequest;
+import com.example.keirekipro.usecase.resume.command.CreateCertificationCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -30,13 +30,13 @@ public class CreateCertificationUseCase {
     /**
      * 資格新規作成ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateCertificationRequest request) {
+    public ResumeInfoUseCaseDto execute(CreateCertificationCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         // 上限チェック
@@ -51,7 +51,7 @@ public class CreateCertificationUseCase {
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        Certification certification = Certification.create(errorCollector, request.getName(), request.getDate());
+        Certification certification = Certification.create(errorCollector, command.getName(), command.getDate());
 
         Resume updated = resume.addCertification(errorCollector, certification);
 

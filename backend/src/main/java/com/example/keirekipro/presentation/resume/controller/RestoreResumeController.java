@@ -47,6 +47,6 @@ public class RestoreResumeController {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
-        return ResumeInfoResponse.convertToResponse(restoreResumeUseCase.execute(userId, request));
+        return ResumeInfoResponse.convertToResponse(restoreResumeUseCase.execute(request.toCommand(userId)));
     }
 }

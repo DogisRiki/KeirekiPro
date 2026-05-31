@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.resume.Link;
 import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdatePortfolioRequest;
+import com.example.keirekipro.usecase.resume.command.UpdatePortfolioCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
@@ -28,15 +28,14 @@ public class UpdatePortfolioUseCase {
     /**
      * ポートフォリオ更新ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param portfolioId ポートフォリオID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID portfolioId,
-            UpdatePortfolioRequest request) {
+    public ResumeInfoUseCaseDto execute(UpdatePortfolioCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
+        UUID portfolioId = command.getPortfolioId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         Resume resume = resumeRepository.find(resolvedResumeId)
@@ -53,12 +52,12 @@ public class UpdatePortfolioUseCase {
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        Link link = Link.create(errorCollector, request.getLink());
+        Link link = Link.create(errorCollector, command.getLink());
 
         Portfolio updatedPortfolio = existing
-                .changeName(errorCollector, request.getName())
-                .changeOverview(errorCollector, request.getOverview())
-                .changeTechStack(errorCollector, request.getTechStack())
+                .changeName(errorCollector, command.getName())
+                .changeOverview(errorCollector, command.getOverview())
+                .changeTechStack(errorCollector, command.getTechStack())
                 .changeLink(errorCollector, link);
 
         Resume updated = resume.updatePortfolio(errorCollector, updatedPortfolio);

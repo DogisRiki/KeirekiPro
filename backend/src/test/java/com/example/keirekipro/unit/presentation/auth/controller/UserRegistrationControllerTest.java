@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.eq;
 
 import com.example.keirekipro.presentation.auth.controller.UserRegistrationController;
 import com.example.keirekipro.presentation.auth.dto.UserRegistrationRequest;
@@ -58,7 +59,7 @@ class UserRegistrationControllerTest {
                 .andExpect(status().isCreated());
 
         // 呼び出し検証を追加
-        verify(userRegistrationUseCase).execute(request);
+        verify(userRegistrationUseCase).execute(eq(request.toCommand()));
     }
 
     @Test

@@ -1,8 +1,10 @@
 package com.example.keirekipro.presentation.resume.dto;
 
 import java.time.YearMonth;
+import java.util.UUID;
 
 import com.example.keirekipro.presentation.shared.validator.YearMonthRange;
+import com.example.keirekipro.usecase.resume.command.UpdateCertificationCommand;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import lombok.AllArgsConstructor;
@@ -29,4 +31,16 @@ public class UpdateCertificationRequest {
     @YearMonthRange(message = "取得年月が不正です。")
     @JsonFormat(pattern = "yyyy-MM")
     private YearMonth date;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
+     * @param certificationId 資格ID
+     * @return 資格更新コマンド
+     */
+    public UpdateCertificationCommand toCommand(UUID userId, String resumeId, UUID certificationId) {
+        return new UpdateCertificationCommand(userId, resumeId, certificationId, name, date);
+    }
 }

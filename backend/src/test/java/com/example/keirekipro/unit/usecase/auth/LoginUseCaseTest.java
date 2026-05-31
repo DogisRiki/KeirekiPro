@@ -14,7 +14,7 @@ import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.RoleName;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.presentation.auth.dto.LoginRequest;
+import com.example.keirekipro.usecase.auth.command.LoginCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.LoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
@@ -54,7 +54,7 @@ class LoginUseCaseTest {
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PWD)).thenReturn(true);
 
         // ユースケース実行
-        LoginUseCaseDto dto = loginUseCase.execute(new LoginRequest(EMAIL, RAW_PASSWORD));
+        LoginUseCaseDto dto = loginUseCase.execute(new LoginCommand(EMAIL, RAW_PASSWORD));
 
         // 検証
         assertThat(dto).isNotNull();
@@ -69,7 +69,7 @@ class LoginUseCaseTest {
     void test2() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> loginUseCase.execute(new LoginRequest(EMAIL, RAW_PASSWORD)))
+        assertThatThrownBy(() -> loginUseCase.execute(new LoginCommand(EMAIL, RAW_PASSWORD)))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("メールアドレスまたはパスワードが正しくありません。");
     }
@@ -81,7 +81,7 @@ class LoginUseCaseTest {
                 .thenReturn(Optional.of(buildStoredUser(HASHED_PWD)));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PWD)).thenReturn(false);
 
-        assertThatThrownBy(() -> loginUseCase.execute(new LoginRequest(EMAIL, RAW_PASSWORD)))
+        assertThatThrownBy(() -> loginUseCase.execute(new LoginCommand(EMAIL, RAW_PASSWORD)))
                 .isInstanceOf(
                         UseCaseException.class)
                 .hasMessage("メールアドレスまたはパスワードが正しくありません。");

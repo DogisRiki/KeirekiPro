@@ -91,7 +91,7 @@ package com.example.keirekipro.domain.model.resume {
     class Period <<Value Object>> {
         - YearMonth startDate
         - YearMonth endDate
-        - boolean isActive
+        - boolean active
     }
 
     class TechStack <<Value Object>> {

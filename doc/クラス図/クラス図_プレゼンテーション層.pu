@@ -18,6 +18,7 @@ package com.example.keirekipro.presentation.shared {
         + ErrorResponse handleResourceNotFoundUseCaseException(ResourceNotFoundUseCaseException ex)
         + ErrorResponse handleBaseException(BaseException ex)
         + ErrorResponse handleUnexpectedException(Exception ex)
+        - String resolveJsonPropertyName(String fieldName, Object target)
     }
 
     class ErrorResponse {
@@ -197,6 +198,8 @@ package com.example.keirekipro.presentation.auth.dto {
     class LoginRequest {
         - String email
         - String password
+        --
+        + LoginCommand toCommand()
     }
 
     class UserRegistrationRequest {
@@ -204,6 +207,8 @@ package com.example.keirekipro.presentation.auth.dto {
         - String username
         - String password
         - String confirmPassword
+        --
+        + UserRegistrationCommand toCommand()
     }
 
     class RequestPasswordResetRequest {
@@ -224,6 +229,9 @@ package com.example.keirekipro.presentation.auth.dto {
         - String challengeToken
         - String code
     }
+
+    LoginRequest ..> LoginCommand
+    UserRegistrationRequest ..> UserRegistrationCommand
 }
 
 '========================================
@@ -234,6 +242,7 @@ package com.example.keirekipro.presentation.auth.controller {
         - LoginUseCase loginUseCase
         - TwoFactorAuthIssueUseCase twoFactorAuthIssueUseCase
         - AuthCookieIssuer authCookieIssuer
+        - boolean isSecureCookie
         --
         + ResponseEntity<Void> handle(LoginRequest request, HttpServletResponse response)
     }
@@ -247,7 +256,7 @@ package com.example.keirekipro.presentation.auth.controller {
     class UserRegistrationController {
         - UserRegistrationUseCase userRegistrationUseCase
         --
-        + ResponseEntity<Void> handle(UserRegistrationRequest request)
+        + void handle(UserRegistrationRequest request)
     }
 
     class OidcAuthorizationController {
@@ -325,17 +334,24 @@ package com.example.keirekipro.presentation.user.dto {
     class ChangePasswordRequest {
         - String nowPassword
         - String newPassword
+        --
+        + ChangePasswordCommand toCommand(UUID userId)
     }
 
     class SetEmailAndPasswordRequest {
         - String email
         - String password
         - String confirmPassword
+        --
+        + SetEmailAndPasswordCommand toCommand(UUID userId)
     }
 
     class UpdateUserInfoRequest {
         - String username
         - MultipartFile profileImage
+        - boolean twoFactorAuthEnabled
+        --
+        + UpdateUserInfoCommand toCommand(UUID userId)
     }
 
     class UserInfoResponse {
@@ -346,6 +362,10 @@ package com.example.keirekipro.presentation.user.dto {
         - List<String> authProviders
         - Set<String> roles
     }
+
+    ChangePasswordRequest ..> ChangePasswordCommand
+    SetEmailAndPasswordRequest ..> SetEmailAndPasswordCommand
+    UpdateUserInfoRequest ..> UpdateUserInfoCommand
 }
 
 '========================================
@@ -364,14 +384,14 @@ package com.example.keirekipro.presentation.user.controller {
         - GetUserInfoUseCase getUserInfoUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + UserInfoResponse handle(UpdateUserInfoRequest request)
+        + UserInfoResponse handle(String username, MultipartFile profileImage, boolean twoFactorAuthEnabled)
     }
 
     class ChangePasswordController {
         - ChangePasswordUseCase changePasswordUseCase
         - CurrentUserFacade currentUserFacade
         --
-        + ResponseEntity<Void> handle(ChangePasswordRequest request)
+        + void handle(ChangePasswordRequest request)
     }
 
     class SetEmailAndPasswordController {
@@ -424,27 +444,33 @@ package com.example.keirekipro.presentation.resume.dto {
         - LocalDate date
         - String lastName
         - String firstName
+        --
+        + UpdateResumeBasicCommand toCommand(UUID userId, String resumeId)
     }
 
     class CreateCareerRequest {
         - String companyName
         - YearMonth startDate
         - YearMonth endDate
-        - Boolean isActive
+        - Boolean active
+        --
+        + CreateCareerCommand toCommand(UUID userId, String resumeId)
     }
 
     class UpdateCareerRequest {
         - String companyName
         - YearMonth startDate
         - YearMonth endDate
-        - Boolean isActive
+        - Boolean active
+        --
+        + UpdateCareerCommand toCommand(UUID userId, String resumeId, UUID careerId)
     }
 
     class CreateProjectRequest {
         - String companyName
         - YearMonth startDate
         - YearMonth endDate
-        - Boolean isActive
+        - Boolean active
         - String name
         - String overview
         - String teamComp
@@ -460,26 +486,34 @@ package com.example.keirekipro.presentation.resume.dto {
         - List<String> frontendLanguages
         - List<String> backendLanguages
         ...
+        --
+        + CreateProjectCommand toCommand(UUID userId, String resumeId)
     }
 
     class UpdateProjectRequest {
         - String companyName
         - YearMonth startDate
         - YearMonth endDate
-        - Boolean isActive
+        - Boolean active
         - String name
         - String overview
         ...
+        --
+        + UpdateProjectCommand toCommand(UUID userId, String resumeId, UUID projectId)
     }
 
     class CreateCertificationRequest {
         - String name
         - YearMonth date
+        --
+        + CreateCertificationCommand toCommand(UUID userId, String resumeId)
     }
 
     class UpdateCertificationRequest {
         - String name
         - YearMonth date
+        --
+        + UpdateCertificationCommand toCommand(UUID userId, String resumeId, UUID certificationId)
     }
 
     class CreatePortfolioRequest {
@@ -487,6 +521,8 @@ package com.example.keirekipro.presentation.resume.dto {
         - String overview
         - String techStack
         - String link
+        --
+        + CreatePortfolioCommand toCommand(UUID userId, String resumeId)
     }
 
     class UpdatePortfolioRequest {
@@ -494,32 +530,44 @@ package com.example.keirekipro.presentation.resume.dto {
         - String overview
         - String techStack
         - String link
+        --
+        + UpdatePortfolioCommand toCommand(UUID userId, String resumeId, UUID portfolioId)
     }
 
     class CreateSnsPlatformRequest {
         - String name
         - String link
+        --
+        + CreateSnsPlatformCommand toCommand(UUID userId, String resumeId)
     }
 
     class UpdateSnsPlatformRequest {
         - String name
         - String link
+        --
+        + UpdateSnsPlatformCommand toCommand(UUID userId, String resumeId, UUID snsPlatformId)
     }
 
     class CreateSelfPromotionRequest {
         - String title
         - String content
+        --
+        + CreateSelfPromotionCommand toCommand(UUID userId, String resumeId)
     }
 
     class UpdateSelfPromotionRequest {
         - String title
         - String content
+        --
+        + UpdateSelfPromotionCommand toCommand(UUID userId, String resumeId, UUID selfPromotionId)
     }
 
     class RestoreResumeRequest {
         - String version
         - Instant exportedAt
         - ResumeDto resume
+        --
+        + RestoreResumeCommand toCommand(UUID userId)
     }
 
     class ExportResumeRequest {
@@ -584,6 +632,20 @@ package com.example.keirekipro.presentation.resume.dto {
     ExportResumePdfSettingsRequest --> ExportResumeFontSizesRequest
     ExportResumePdfSettingsRequest --> ExportResumeTableHeaderColorRequest
     ExportResumeTableHeaderColorRequest --> ExportResumeRgbRequest
+    CreateCareerRequest ..> CreateCareerCommand
+    UpdateCareerRequest ..> UpdateCareerCommand
+    CreateProjectRequest ..> CreateProjectCommand
+    UpdateProjectRequest ..> UpdateProjectCommand
+    CreateCertificationRequest ..> CreateCertificationCommand
+    UpdateCertificationRequest ..> UpdateCertificationCommand
+    CreatePortfolioRequest ..> CreatePortfolioCommand
+    UpdatePortfolioRequest ..> UpdatePortfolioCommand
+    CreateSnsPlatformRequest ..> CreateSnsPlatformCommand
+    UpdateSnsPlatformRequest ..> UpdateSnsPlatformCommand
+    CreateSelfPromotionRequest ..> CreateSelfPromotionCommand
+    UpdateSelfPromotionRequest ..> UpdateSelfPromotionCommand
+    UpdateResumeBasicRequest ..> UpdateResumeBasicCommand
+    RestoreResumeRequest ..> RestoreResumeCommand
 }
 
 '========================================
@@ -631,6 +693,12 @@ package com.example.keirekipro.presentation.resume.controller {
         - CurrentUserFacade currentUserFacade
         --
         + ResponseEntity<byte[]> handle(String resumeId, String format)
+    }
+
+    class ExportResumeWithSettingsController {
+        - ExportResumeUseCase exportResumeUseCase
+        - CurrentUserFacade currentUserFacade
+        --
         + ResponseEntity<byte[]> handle(String resumeId, ExportResumeRequest request)
     }
 
@@ -786,6 +854,7 @@ package com.example.keirekipro.presentation.resume.controller {
     CreateResumeController --> CreateResumeUseCase
     CreateResumeController --> CopyCreateResumeUseCase
     ExportResumeController --> ExportResumeUseCase
+    ExportResumeWithSettingsController --> ExportResumeUseCase
     BackupResumeController --> BackupResumeUseCase
     RestoreResumeController --> RestoreResumeUseCase
 }

@@ -2,7 +2,7 @@ package com.example.keirekipro.usecase.auth;
 
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.presentation.auth.dto.LoginRequest;
+import com.example.keirekipro.usecase.auth.command.LoginCommand;
 import com.example.keirekipro.usecase.auth.dto.LoginUseCaseDto;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -25,17 +25,17 @@ public class LoginUseCase {
     /**
      * ログインのユースケースを実行する
      *
-     * @param request リクエスト
+     * @param command コマンド
      * @return ユーザー認証情報
      */
-    public LoginUseCaseDto execute(LoginRequest request) {
+    public LoginUseCaseDto execute(LoginCommand command) {
 
         // ユーザーが存在するか
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(command.getEmail())
                 .orElseThrow(() -> new UseCaseException("メールアドレスまたはパスワードが正しくありません。"));
 
         // パスワードが一致するか
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(command.getPassword(), user.getPasswordHash())) {
             throw new UseCaseException("メールアドレスまたはパスワードが正しくありません。");
         }
 

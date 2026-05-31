@@ -1,22 +1,24 @@
 package com.example.keirekipro.usecase.user;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
+import javax.imageio.ImageIO;
+
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.presentation.user.dto.UpdateUserInfoRequest;
 import com.example.keirekipro.shared.ErrorCollector;
-import com.example.keirekipro.shared.utils.FileUtil;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import com.example.keirekipro.usecase.shared.store.ObjectStore;
 import com.example.keirekipro.usecase.shared.store.StoredObject;
+import com.example.keirekipro.usecase.user.command.UpdateUserInfoCommand;
+import com.example.keirekipro.usecase.user.command.UpdateUserInfoCommand.ProfileImageCommand;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -48,15 +50,15 @@ public class UpdateUserInfoUseCase {
     /**
      * ユーザー情報更新ユースケースを実行する
      *
-     * @param request リクエスト
-     * @param userId ユーザーID
+     * @param command コマンド
      */
-    public void execute(UpdateUserInfoRequest request, UUID userId) {
+    public void execute(UpdateUserInfoCommand command) {
+        UUID userId = command.getUserId();
 
         ErrorCollector errorCollector = new ErrorCollector();
 
         // プロフィール画像のバリデーションチェック
-        MultipartFile profileImage = request.getProfileImage();
+        ProfileImageCommand profileImage = command.getProfileImage();
         validateProfileImage(profileImage, errorCollector);
 
         if (errorCollector.hasErrors()) {
@@ -70,25 +72,21 @@ public class UpdateUserInfoUseCase {
         // オブジェクトストアへのアップロード（画像がある場合のみ）
         String imageKey = null;
         if (profileImage != null && !profileImage.isEmpty()) {
-            try {
-                String originalFilename = profileImage.getOriginalFilename();
-                StoredObject object = new StoredObject(
-                        profileImage.getBytes(),
-                        profileImage.getContentType(),
-                        originalFilename);
+            String originalFilename = profileImage.getOriginalFilename();
+            StoredObject object = new StoredObject(
+                    profileImage.getContent(),
+                    profileImage.getContentType(),
+                    originalFilename);
 
-                String extension = FileUtil.getExtension(profileImage);
-                String fileName = userId.toString() + (extension.isBlank() ? "" : "." + extension);
+            String extension = getExtension(originalFilename);
+            String fileName = userId.toString() + (extension.isBlank() ? "" : "." + extension);
 
-                imageKey = objectStore.putAs(object, "/profile/image/", fileName);
-            } catch (IOException e) {
-                throw new UseCaseException("プロフィール画像のアップロードに失敗しました。しばらく時間を置いてから再度お試しください。");
-            }
+            imageKey = objectStore.putAs(object, "/profile/image/", fileName);
         }
 
         // ユーザー名更新
-        if (request.getUsername() != null) {
-            user = user.changeUsername(errorCollector, request.getUsername());
+        if (command.getUsername() != null) {
+            user = user.changeUsername(errorCollector, command.getUsername());
         }
 
         // プロフィール画像更新
@@ -97,7 +95,7 @@ public class UpdateUserInfoUseCase {
         }
 
         // 二段階認証設定更新
-        user = user.changeTwoFactorAuthEnabled(errorCollector, request.isTwoFactorAuthEnabled());
+        user = user.changeTwoFactorAuthEnabled(errorCollector, command.isTwoFactorAuthEnabled());
 
         if (errorCollector.hasErrors()) {
             throw new UseCaseException(errorCollector.getErrors());
@@ -113,21 +111,41 @@ public class UpdateUserInfoUseCase {
      * @param file ファイル
      * @param errorCollector エラー収集
      */
-    private void validateProfileImage(MultipartFile file, ErrorCollector errorCollector) {
+    private void validateProfileImage(ProfileImageCommand file, ErrorCollector errorCollector) {
         if (file == null || file.isEmpty()) {
             return;
         }
-        if (!FileUtil.isMimeTypeValid(file, ALLOWED_MIME_TYPES)) {
+        if (!ALLOWED_MIME_TYPES.contains(file.getContentType())) {
             errorCollector.addError("profileImage", "許可されていない画像形式です。");
         }
-        if (!FileUtil.isExtensionValid(file, ALLOWED_EXTENSIONS)) {
+        if (!ALLOWED_EXTENSIONS.contains(getExtension(file.getOriginalFilename()))) {
             errorCollector.addError("profileImage", "許可されていないファイル形式です。jpg, jpeg, png, gifのみ許可されています。");
         }
-        if (!FileUtil.isFileSizeValid(file, ALLOWED_FILE_SIZE)) {
+        if (file.getSize() > ALLOWED_FILE_SIZE) {
             errorCollector.addError("profileImage", "プロフィール画像のサイズは1MB以下である必要があります。");
         }
-        if (!FileUtil.isImageReadValid(file)) {
+        if (!isImageReadValid(file)) {
             errorCollector.addError("profileImage", "有効な画像ファイルではありません。");
         }
+    }
+
+    private boolean isImageReadValid(ProfileImageCommand file) {
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(file.getContent()));
+            return image != null;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private String getExtension(String originalFilename) {
+        if (originalFilename == null) {
+            return "";
+        }
+        int lastDot = originalFilename.lastIndexOf(".");
+        if (lastDot == -1 || lastDot == originalFilename.length() - 1) {
+            return "";
+        }
+        return originalFilename.substring(lastDot + 1).toLowerCase();
     }
 }

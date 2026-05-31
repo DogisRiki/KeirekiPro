@@ -48,6 +48,6 @@ public class CreateSnsPlatformController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                createSnsPlatformUseCase.execute(userId, resumeId, request));
+                createSnsPlatformUseCase.execute(request.toCommand(userId, resumeId)));
     }
 }

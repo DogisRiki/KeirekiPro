@@ -2,9 +2,12 @@ package com.example.keirekipro.presentation.resume.dto;
 
 import java.time.YearMonth;
 import java.util.List;
+import java.util.UUID;
 
 import com.example.keirekipro.presentation.shared.validator.YearMonthRange;
+import com.example.keirekipro.usecase.resume.command.CreateProjectCommand;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -36,7 +39,8 @@ public class CreateProjectRequest {
     private YearMonth endDate;
 
     @NotNull(message = "継続中は入力必須です。")
-    private Boolean isActive;
+    @JsonProperty("isActive")
+    private Boolean active;
 
     @NotBlank(message = "プロジェクト名は入力必須です。")
     @Size(max = 50, message = "プロジェクト名は50文字以内で入力してください。")
@@ -122,4 +126,68 @@ public class CreateProjectRequest {
     private List<String> designTools;
     private List<String> editors;
     private List<String> developmentEnvironments;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
+     * @return プロジェクト作成コマンド
+     */
+    public CreateProjectCommand toCommand(UUID userId, String resumeId) {
+        return new CreateProjectCommand(
+                userId,
+                resumeId,
+                companyName,
+                startDate,
+                endDate,
+                active,
+                name,
+                overview,
+                teamComp,
+                role,
+                achievement,
+                requirements,
+                basicDesign,
+                detailedDesign,
+                implementation,
+                integrationTest,
+                systemTest,
+                maintenance,
+                frontendLanguages,
+                frontendFrameworks,
+                frontendLibraries,
+                frontendBuildTools,
+                frontendPackageManagers,
+                frontendLinters,
+                frontendFormatters,
+                frontendTestingTools,
+                backendLanguages,
+                backendFrameworks,
+                backendLibraries,
+                backendBuildTools,
+                backendPackageManagers,
+                backendLinters,
+                backendFormatters,
+                backendTestingTools,
+                ormTools,
+                auth,
+                clouds,
+                operatingSystems,
+                containers,
+                databases,
+                webServers,
+                ciCdTools,
+                iacTools,
+                monitoringTools,
+                loggingTools,
+                sourceControls,
+                projectManagements,
+                communicationTools,
+                documentationTools,
+                apiDevelopmentTools,
+                designTools,
+                editors,
+                developmentEnvironments);
+    }
 }

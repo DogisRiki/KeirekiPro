@@ -2,13 +2,13 @@ package com.example.keirekipro.unit.presentation.resume.controller;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -78,7 +78,7 @@ class CreateSnsPlatformControllerTest {
                 RESUME_DTO_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(useCase.execute(eq(USER_ID), eq(RESUME_ID.toString()), any(CreateSnsPlatformRequest.class)))
+        when(useCase.execute(eq(req.toCommand(USER_ID, RESUME_ID.toString()))))
                 .thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
@@ -90,7 +90,7 @@ class CreateSnsPlatformControllerTest {
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.format(FMT)));
 
         verify(currentUserFacade).getUserId();
-        verify(useCase).execute(eq(USER_ID), eq(RESUME_ID.toString()), any(CreateSnsPlatformRequest.class));
+        verify(useCase).execute(eq(req.toCommand(USER_ID, RESUME_ID.toString())));
     }
 
     @Test
@@ -106,7 +106,7 @@ class CreateSnsPlatformControllerTest {
                 .andExpect(jsonPath("$.errors.name").isArray())
                 .andExpect(jsonPath("$.errors.name", hasItem("プラットフォーム名は入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -122,7 +122,7 @@ class CreateSnsPlatformControllerTest {
                 .andExpect(jsonPath("$.errors.name").isArray())
                 .andExpect(jsonPath("$.errors.name", hasItem("プラットフォーム名は50文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -138,7 +138,7 @@ class CreateSnsPlatformControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクは入力必須です。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -154,7 +154,7 @@ class CreateSnsPlatformControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクはhttps形式のURLを指定してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 
     @Test
@@ -170,6 +170,6 @@ class CreateSnsPlatformControllerTest {
                 .andExpect(jsonPath("$.errors.link").isArray())
                 .andExpect(jsonPath("$.errors.link", hasItem("リンクは255文字以内で入力してください。")));
 
-        verify(useCase, never()).execute(any(), any(), any());
+        verify(useCase, never()).execute(any());
     }
 }

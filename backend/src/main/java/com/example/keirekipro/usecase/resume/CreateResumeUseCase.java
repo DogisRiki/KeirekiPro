@@ -8,7 +8,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
-import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
+import com.example.keirekipro.usecase.resume.command.CreateResumeCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -34,12 +34,12 @@ public class CreateResumeUseCase {
     /**
      * 職務経歴書新規作成ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, CreateResumeRequest request) {
+    public ResumeInfoUseCaseDto execute(CreateResumeCommand command) {
+        UUID userId = command.getUserId();
 
         // 上限チェック
         resumeLimitChecker.checkResumeCreateAllowed(userId);
@@ -47,7 +47,7 @@ public class CreateResumeUseCase {
         ErrorCollector errorCollector = new ErrorCollector();
 
         // 職務経歴書名の重複チェック
-        ResumeName resumeName = ResumeName.create(errorCollector, request.getResumeName());
+        ResumeName resumeName = ResumeName.create(errorCollector, command.getResumeName());
         resumeNameDuplicationCheckService.execute(userId, resumeName);
 
         // 職務経歴書エンティティ新規構築

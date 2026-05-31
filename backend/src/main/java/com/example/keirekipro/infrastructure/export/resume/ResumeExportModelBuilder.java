@@ -182,7 +182,7 @@ public class ResumeExportModelBuilder {
     }
 
     /**
-     * 技術スタックをテンプレート向けに整形する。
+     * 技術スタックをテンプレート向けに整形する
      *
      * @param techStack 技術スタック
      * @return テンプレート用モデル（表示可能な値が無い場合はnull）
@@ -271,7 +271,7 @@ public class ResumeExportModelBuilder {
     }
 
     /**
-     * 技術スタックを帳票表示向けに整形する。
+     * 技術スタックを帳票表示向けに整形する
      *
      * @param techStack 技術スタック
      * @return 帳票表示用の技術スタックセクション

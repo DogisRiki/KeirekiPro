@@ -1,12 +1,11 @@
 package com.example.keirekipro.unit.presentation.resume.controller;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -179,7 +178,7 @@ class RestoreResumeControllerTest {
                 RESUME_DTO_ID, USER_ID, RESUME_NAME, DATE, LAST_NAME, FIRST_NAME, CREATED_AT, UPDATED_AT);
 
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
-        when(restoreResumeUseCase.execute(eq(USER_ID), any(RestoreResumeRequest.class))).thenReturn(dto);
+        when(restoreResumeUseCase.execute(eq(req.toCommand(USER_ID)))).thenReturn(dto);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -200,6 +199,6 @@ class RestoreResumeControllerTest {
                 .andExpect(jsonPath("$.selfPromotions.length()").value(1));
 
         verify(currentUserFacade).getUserId();
-        verify(restoreResumeUseCase).execute(eq(USER_ID), any(RestoreResumeRequest.class));
+        verify(restoreResumeUseCase).execute(eq(req.toCommand(USER_ID)));
     }
 }

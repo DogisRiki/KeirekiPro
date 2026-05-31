@@ -35,6 +35,6 @@ public class UserRegistrationController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "ユーザー新規登録", description = "メールアドレスとパスワードによるユーザーの新規登録を行う")
     public void handle(@Valid @RequestBody UserRegistrationRequest request) {
-        userRegistrationUseCase.execute(request);
+        userRegistrationUseCase.execute(request.toCommand());
     }
 }

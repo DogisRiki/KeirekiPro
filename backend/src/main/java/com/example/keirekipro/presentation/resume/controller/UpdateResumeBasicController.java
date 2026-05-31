@@ -48,6 +48,6 @@ public class UpdateResumeBasicController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                updateResumeBasicUseCase.execute(userId, resumeId, request));
+                updateResumeBasicUseCase.execute(request.toCommand(userId, resumeId)));
     }
 }

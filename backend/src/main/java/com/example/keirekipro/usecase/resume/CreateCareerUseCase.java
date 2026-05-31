@@ -7,7 +7,7 @@ import com.example.keirekipro.domain.model.resume.CompanyName;
 import com.example.keirekipro.domain.model.resume.Period;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreateCareerRequest;
+import com.example.keirekipro.usecase.resume.command.CreateCareerCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -32,13 +32,13 @@ public class CreateCareerUseCase {
     /**
      * 職歴新規作成ユースケースを実行する
      *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param request リクエスト
+     * @param command ユースケースコマンド
      * @return 職務経歴書ユースケースDTO
      */
     @Transactional
-    public ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateCareerRequest request) {
+    public ResumeInfoUseCaseDto execute(CreateCareerCommand command) {
+        UUID userId = command.getUserId();
+        String resumeId = command.getResumeId();
         UUID resolvedResumeId = ResumeIdResolver.resolve(resumeId);
 
         // 上限チェック
@@ -53,9 +53,9 @@ public class CreateCareerUseCase {
 
         ErrorCollector errorCollector = new ErrorCollector();
 
-        CompanyName companyName = CompanyName.create(errorCollector, request.getCompanyName());
-        Period period = Period.create(errorCollector, request.getStartDate(), request.getEndDate(),
-                request.getIsActive());
+        CompanyName companyName = CompanyName.create(errorCollector, command.getCompanyName());
+        Period period = Period.create(errorCollector, command.getStartDate(), command.getEndDate(),
+                command.getActive());
         Career career = Career.create(errorCollector, companyName, period);
 
         Resume updated = resume.addCareer(errorCollector, career);

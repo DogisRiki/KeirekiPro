@@ -49,6 +49,6 @@ public class UpdateSelfPromotionController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                updateSelfPromotionUseCase.execute(userId, resumeId, selfPromotionId, request));
+                updateSelfPromotionUseCase.execute(request.toCommand(userId, resumeId, selfPromotionId)));
     }
 }

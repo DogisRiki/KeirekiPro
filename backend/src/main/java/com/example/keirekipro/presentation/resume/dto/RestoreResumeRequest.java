@@ -4,6 +4,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.UUID;
+import java.util.function.Function;
+
+import com.example.keirekipro.usecase.resume.command.RestoreResumeCommand;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,6 +35,160 @@ public class RestoreResumeRequest {
      * 職務経歴書データ
      */
     private ResumeDto resume;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @return 職務経歴書復元コマンド
+     */
+    public RestoreResumeCommand toCommand(UUID userId) {
+        return new RestoreResumeCommand(userId, version, toResumeCommand(resume));
+    }
+
+    private static RestoreResumeCommand.ResumeCommand toResumeCommand(ResumeDto src) {
+        if (src == null) {
+            return null;
+        }
+        return new RestoreResumeCommand.ResumeCommand(
+                src.resumeName,
+                src.date,
+                src.lastName,
+                src.firstName,
+                map(src.careers, RestoreResumeRequest::toCareerCommand),
+                map(src.projects, RestoreResumeRequest::toProjectCommand),
+                map(src.certifications, RestoreResumeRequest::toCertificationCommand),
+                map(src.portfolios, RestoreResumeRequest::toPortfolioCommand),
+                map(src.snsPlatforms, RestoreResumeRequest::toSnsPlatformCommand),
+                map(src.selfPromotions, RestoreResumeRequest::toSelfPromotionCommand));
+    }
+
+    private static RestoreResumeCommand.CareerCommand toCareerCommand(CareerDto src) {
+        return new RestoreResumeCommand.CareerCommand(src.companyName, src.startDate, src.endDate, src.active);
+    }
+
+    private static RestoreResumeCommand.ProjectCommand toProjectCommand(ProjectDto src) {
+        return new RestoreResumeCommand.ProjectCommand(
+                src.companyName,
+                src.startDate,
+                src.endDate,
+                src.active,
+                src.name,
+                src.overview,
+                src.teamComp,
+                src.role,
+                src.achievement,
+                toProcessCommand(src.process),
+                toTechStackCommand(src.techStack));
+    }
+
+    private static RestoreResumeCommand.ProcessCommand toProcessCommand(ProcessDto src) {
+        if (src == null) {
+            return null;
+        }
+        return new RestoreResumeCommand.ProcessCommand(
+                src.requirements,
+                src.basicDesign,
+                src.detailedDesign,
+                src.implementation,
+                src.integrationTest,
+                src.systemTest,
+                src.maintenance);
+    }
+
+    private static RestoreResumeCommand.TechStackCommand toTechStackCommand(TechStackDto src) {
+        if (src == null) {
+            return null;
+        }
+        return new RestoreResumeCommand.TechStackCommand(
+                toFrontendCommand(src.frontend),
+                toBackendCommand(src.backend),
+                toInfrastructureCommand(src.infrastructure),
+                toToolsCommand(src.tools));
+    }
+
+    private static RestoreResumeCommand.FrontendCommand toFrontendCommand(FrontendDto src) {
+        if (src == null) {
+            return null;
+        }
+        return new RestoreResumeCommand.FrontendCommand(
+                src.languages,
+                src.frameworks,
+                src.libraries,
+                src.buildTools,
+                src.packageManagers,
+                src.linters,
+                src.formatters,
+                src.testingTools);
+    }
+
+    private static RestoreResumeCommand.BackendCommand toBackendCommand(BackendDto src) {
+        if (src == null) {
+            return null;
+        }
+        return new RestoreResumeCommand.BackendCommand(
+                src.languages,
+                src.frameworks,
+                src.libraries,
+                src.buildTools,
+                src.packageManagers,
+                src.linters,
+                src.formatters,
+                src.testingTools,
+                src.ormTools,
+                src.auth);
+    }
+
+    private static RestoreResumeCommand.InfrastructureCommand toInfrastructureCommand(InfrastructureDto src) {
+        if (src == null) {
+            return null;
+        }
+        return new RestoreResumeCommand.InfrastructureCommand(
+                src.clouds,
+                src.operatingSystems,
+                src.containers,
+                src.databases,
+                src.webServers,
+                src.ciCdTools,
+                src.iacTools,
+                src.monitoringTools,
+                src.loggingTools);
+    }
+
+    private static RestoreResumeCommand.ToolsCommand toToolsCommand(ToolsDto src) {
+        if (src == null) {
+            return null;
+        }
+        return new RestoreResumeCommand.ToolsCommand(
+                src.sourceControls,
+                src.projectManagements,
+                src.communicationTools,
+                src.documentationTools,
+                src.apiDevelopmentTools,
+                src.designTools,
+                src.editors,
+                src.developmentEnvironments);
+    }
+
+    private static RestoreResumeCommand.CertificationCommand toCertificationCommand(CertificationDto src) {
+        return new RestoreResumeCommand.CertificationCommand(src.name, src.date);
+    }
+
+    private static RestoreResumeCommand.PortfolioCommand toPortfolioCommand(PortfolioDto src) {
+        return new RestoreResumeCommand.PortfolioCommand(src.name, src.overview, src.techStack, src.link);
+    }
+
+    private static RestoreResumeCommand.SnsPlatformCommand toSnsPlatformCommand(SnsPlatformDto src) {
+        return new RestoreResumeCommand.SnsPlatformCommand(src.name, src.link);
+    }
+
+    private static RestoreResumeCommand.SelfPromotionCommand toSelfPromotionCommand(SelfPromotionDto src) {
+        return new RestoreResumeCommand.SelfPromotionCommand(src.title, src.content);
+    }
+
+    private static <T, R> List<R> map(List<T> source, Function<T, R> mapper) {
+        return source == null ? null : source.stream().map(mapper).toList();
+    }
 
     /**
      * 職務経歴書DTO

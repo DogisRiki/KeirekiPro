@@ -14,7 +14,7 @@ import java.util.UUID;
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
-import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
+import com.example.keirekipro.usecase.user.command.ChangePasswordCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
@@ -55,7 +55,7 @@ class ChangePasswordUseCaseTest {
     @DisplayName("パスワード変更が正常に完了し、認証セッションが無効化される")
     void test1() {
         // リクエスト作成
-        ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
+        ChangePasswordCommand request = new ChangePasswordCommand(USER_ID, CURRENT_PASSWORD, NEW_PASSWORD);
 
         // テスト用ユーザー生成
         ErrorCollector errorCollector = new ErrorCollector();
@@ -74,7 +74,7 @@ class ChangePasswordUseCaseTest {
         when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(HASHED_NEW_PASSWORD);
 
         // ユースケース実行
-        assertThatCode(() -> changePasswordUseCase.execute(request, USER_ID)).doesNotThrowAnyException();
+        assertThatCode(() -> changePasswordUseCase.execute(request)).doesNotThrowAnyException();
 
         // 検証
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
@@ -90,13 +90,13 @@ class ChangePasswordUseCaseTest {
     @DisplayName("ユーザーが存在しない場合、AuthenticationCredentialsNotFoundExceptionがスローされる")
     void test2() {
         // リクエスト作成
-        ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
+        ChangePasswordCommand request = new ChangePasswordCommand(USER_ID, CURRENT_PASSWORD, NEW_PASSWORD);
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         // ユースケース実行
-        assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
+        assertThatThrownBy(() -> changePasswordUseCase.execute(request))
                 .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
                 .hasMessage("不正なアクセスです。");
 
@@ -109,7 +109,7 @@ class ChangePasswordUseCaseTest {
     @DisplayName("現在のパスワードが一致しない場合、UseCaseExceptionがスローされる")
     void test3() {
         // リクエスト作成
-        ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
+        ChangePasswordCommand request = new ChangePasswordCommand(USER_ID, CURRENT_PASSWORD, NEW_PASSWORD);
 
         // テスト用ユーザー生成
         ErrorCollector errorCollector = new ErrorCollector();
@@ -126,7 +126,7 @@ class ChangePasswordUseCaseTest {
         when(passwordEncoder.matches(CURRENT_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(false);
 
         // ユースケース実行
-        assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
+        assertThatThrownBy(() -> changePasswordUseCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .matches(e -> {
                     UseCaseException ex = (UseCaseException) e;
@@ -143,7 +143,7 @@ class ChangePasswordUseCaseTest {
     @DisplayName("新しいパスワードが現在のパスワードと同じ場合、UseCaseExceptionがスローされる")
     void test4() {
         // リクエスト作成
-        ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
+        ChangePasswordCommand request = new ChangePasswordCommand(USER_ID, CURRENT_PASSWORD, NEW_PASSWORD);
 
         // テスト用ユーザー生成
         ErrorCollector errorCollector = new ErrorCollector();
@@ -161,7 +161,7 @@ class ChangePasswordUseCaseTest {
         when(passwordEncoder.matches(NEW_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
 
         // ユースケース実行
-        assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
+        assertThatThrownBy(() -> changePasswordUseCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .matches(e -> {
                     UseCaseException ex = (UseCaseException) e;
@@ -179,7 +179,7 @@ class ChangePasswordUseCaseTest {
     @DisplayName("現在のパスワードが一致せず、新しいパスワードも現在のパスワードと同じ場合、UseCaseExceptionがスローされる")
     void test5() {
         // リクエスト作成
-        ChangePasswordRequest request = new ChangePasswordRequest(CURRENT_PASSWORD, NEW_PASSWORD);
+        ChangePasswordCommand request = new ChangePasswordCommand(USER_ID, CURRENT_PASSWORD, NEW_PASSWORD);
 
         // テスト用ユーザー生成
         ErrorCollector errorCollector = new ErrorCollector();
@@ -197,7 +197,7 @@ class ChangePasswordUseCaseTest {
         when(passwordEncoder.matches(NEW_PASSWORD, HASHED_CURRENT_PASSWORD)).thenReturn(true);
 
         // ユースケース実行
-        assertThatThrownBy(() -> changePasswordUseCase.execute(request, USER_ID))
+        assertThatThrownBy(() -> changePasswordUseCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .matches(e -> {
                     UseCaseException ex = (UseCaseException) e;

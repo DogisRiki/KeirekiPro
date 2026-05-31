@@ -1,6 +1,9 @@
 package com.example.keirekipro.presentation.user.dto;
 
+import java.util.UUID;
+
 import com.example.keirekipro.presentation.shared.validator.PasswordMatches;
+import com.example.keirekipro.usecase.user.command.SetEmailAndPasswordCommand;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -30,4 +33,14 @@ public class SetEmailAndPasswordRequest {
     private String password;
 
     private String confirmPassword;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @return メールアドレス・パスワード設定コマンド
+     */
+    public SetEmailAndPasswordCommand toCommand(UUID userId) {
+        return new SetEmailAndPasswordCommand(userId, email, password);
+    }
 }

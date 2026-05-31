@@ -26,7 +26,7 @@ import com.example.keirekipro.domain.model.resume.SnsPlatform;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.helper.ResumeObjectBuilder;
-import com.example.keirekipro.presentation.resume.dto.CreateResumeRequest;
+import com.example.keirekipro.usecase.resume.command.CreateResumeCommand;
 import com.example.keirekipro.usecase.resume.CopyCreateResumeUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
 import com.example.keirekipro.usecase.resume.policy.ResumeLimitChecker;
@@ -70,7 +70,7 @@ class CopyCreateResumeUseCaseTest {
     @DisplayName("職務経歴書をコピーして新規作成でき、ResumeおよびサブエンティティのIDが再採番される")
     void test1() {
         // リクエスト準備
-        CreateResumeRequest request = new CreateResumeRequest(NEW_NAME, RESUME_ID);
+        CreateResumeCommand request = new CreateResumeCommand(USER_ID, NEW_NAME, RESUME_ID);
 
         // コピー元エンティティをヘルパーで生成
         Resume source = ResumeObjectBuilder.buildResume(
@@ -83,7 +83,7 @@ class CopyCreateResumeUseCaseTest {
 
         // 実行
         ArgumentCaptor<Resume> captor = ArgumentCaptor.forClass(Resume.class);
-        final ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, request);
+        final ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // 検証
         verify(service).execute(eq(USER_ID), any(ResumeName.class));
@@ -192,12 +192,12 @@ class CopyCreateResumeUseCaseTest {
     @Test
     @DisplayName("職務経歴書名が重複していた場合、例外がスローされ後続処理が行われない")
     void test2() {
-        CreateResumeRequest request = new CreateResumeRequest(NEW_NAME, RESUME_ID);
+        CreateResumeCommand request = new CreateResumeCommand(USER_ID, NEW_NAME, RESUME_ID);
 
         doThrow(new UseCaseException("この職務経歴書名は既に登録されています。"))
                 .when(service).execute(eq(USER_ID), any(ResumeName.class));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("この職務経歴書名は既に登録されています。");
 
@@ -210,7 +210,7 @@ class CopyCreateResumeUseCaseTest {
     @DisplayName("ログインユーザー以外が所有する職務経歴書をコピーしようとした場合、UseCaseExceptionがスローされる")
     void test3() {
         // リクエスト準備
-        CreateResumeRequest request = new CreateResumeRequest(NEW_NAME, RESUME_ID);
+        CreateResumeCommand request = new CreateResumeCommand(USER_ID, NEW_NAME, RESUME_ID);
 
         // コピー元エンティティ（所有者は別ユーザー）
         Resume source = ResumeObjectBuilder.buildResume(
@@ -221,7 +221,7 @@ class CopyCreateResumeUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(source));
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -234,14 +234,14 @@ class CopyCreateResumeUseCaseTest {
     @DisplayName("コピー元の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test4() {
         // リクエスト準備
-        CreateResumeRequest request = new CreateResumeRequest(NEW_NAME, RESUME_ID);
+        CreateResumeCommand request = new CreateResumeCommand(USER_ID, NEW_NAME, RESUME_ID);
 
         // モック（コピー元なし）
         doNothing().when(service).execute(eq(USER_ID), any(ResumeName.class));
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -254,13 +254,13 @@ class CopyCreateResumeUseCaseTest {
     @DisplayName("職務経歴書が上限枚数である場合、例外がスローされ後続処理が行われない")
     void test5() {
         // リクエスト準備
-        CreateResumeRequest request = new CreateResumeRequest(NEW_NAME, RESUME_ID);
+        CreateResumeCommand request = new CreateResumeCommand(USER_ID, NEW_NAME, RESUME_ID);
 
         // モックをセットアップ：上限チェックでUseCaseExceptionを投げる
         doThrow(new UseCaseException("上限")).when(checker).checkResumeCreateAllowed(USER_ID);
 
         // ユースケース実行＆UseCaseExceptionがスローされることを検証
-        assertThatThrownBy(() -> useCase.execute(USER_ID, request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("上限");
 

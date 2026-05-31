@@ -195,6 +195,7 @@ package com.example.keirekipro.usecase.auth.dto {
     class LoginUseCaseDto {
         - UUID id
         - String email
+        - boolean twoFactorAuthEnabled
         - Set<String> roles
     }
 
@@ -209,6 +210,22 @@ package com.example.keirekipro.usecase.auth.dto {
     class TwoFactorAuthVerifyResultDto {
         - UUID userId
         - Set<String> roles
+    }
+}
+
+'========================================
+' usecase.auth.command
+'========================================
+package com.example.keirekipro.usecase.auth.command {
+    class LoginCommand {
+        - String email
+        - String password
+    }
+
+    class UserRegistrationCommand {
+        - String email
+        - String username
+        - String password
     }
 }
 
@@ -235,7 +252,7 @@ package com.example.keirekipro.usecase.auth {
         - UserRepository userRepository
         - PasswordEncoder passwordEncoder
         --
-        + LoginUseCaseDto execute(LoginRequest request)
+        + LoginUseCaseDto execute(LoginCommand command)
     }
 
     class UserRegistrationUseCase {
@@ -245,7 +262,7 @@ package com.example.keirekipro.usecase.auth {
         - UserEmailDuplicationCheckService userEmailDuplicationCheckService
         - UserTokenVersionStore userTokenVersionStore
         --
-        + void execute(UserRegistrationRequest request)
+        + void execute(UserRegistrationCommand command)
     }
 
     class StartOidcAuthorizationUseCase {
@@ -517,7 +534,12 @@ package com.example.keirekipro.usecase.resume.dto {
         - String contentType
         - byte[] data
     }
+}
 
+'========================================
+' usecase.resume.command
+'========================================
+package com.example.keirekipro.usecase.resume.command {
     class ExportResumeCommand {
         - ExportFormat format
         - ExportDisposition disposition
@@ -543,6 +565,166 @@ package com.example.keirekipro.usecase.resume.dto {
     ExportResumeCommand --> ExportFormat
     ExportResumeCommand --> ExportDisposition
     ExportResumeCommand --> PdfSettings
+
+    class CreateResumeCommand {
+        - UUID userId
+        - String resumeName
+        - UUID resumeId
+    }
+
+    class CreateCareerCommand {
+        - UUID userId
+        - String resumeId
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean active
+    }
+
+    class CreateCertificationCommand {
+        - UUID userId
+        - String resumeId
+        - String name
+        - YearMonth date
+    }
+
+    class UpdateCertificationCommand {
+        - UUID userId
+        - String resumeId
+        - UUID certificationId
+        - String name
+        - YearMonth date
+    }
+
+    class CreatePortfolioCommand {
+        - UUID userId
+        - String resumeId
+        - String name
+        - String overview
+        - String techStack
+        - String link
+    }
+
+    class UpdatePortfolioCommand {
+        - UUID userId
+        - String resumeId
+        - UUID portfolioId
+        - String name
+        - String overview
+        - String techStack
+        - String link
+    }
+
+    class UpdateCareerCommand {
+        - UUID userId
+        - String resumeId
+        - UUID careerId
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean active
+    }
+
+    class CreateProjectCommand {
+        - UUID userId
+        - String resumeId
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean active
+        - String name
+        - String overview
+        ...
+    }
+
+    class UpdateProjectCommand {
+        - UUID userId
+        - String resumeId
+        - UUID projectId
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - Boolean active
+        - String name
+        - String overview
+        ...
+    }
+
+    class RestoreResumeCommand {
+        - UUID userId
+        - String version
+        - ResumeCommand resume
+    }
+
+    class UpdateResumeBasicCommand {
+        - UUID userId
+        - String resumeId
+        - String resumeName
+        - LocalDate date
+        - String lastName
+        - String firstName
+    }
+
+    class CreateSnsPlatformCommand {
+        - UUID userId
+        - String resumeId
+        - String name
+        - String link
+    }
+
+    class UpdateSnsPlatformCommand {
+        - UUID userId
+        - String resumeId
+        - UUID snsPlatformId
+        - String name
+        - String link
+    }
+
+    class CreateSelfPromotionCommand {
+        - UUID userId
+        - String resumeId
+        - String title
+        - String content
+    }
+
+    class UpdateSelfPromotionCommand {
+        - UUID userId
+        - String resumeId
+        - UUID selfPromotionId
+        - String title
+        - String content
+    }
+
+    class "RestoreResumeCommand.ResumeCommand" as RestoreResumeCommandResume {
+        - String resumeName
+        - LocalDate date
+        - String lastName
+        - String firstName
+        - List<CareerCommand> careers
+        - List<ProjectCommand> projects
+        ...
+    }
+
+    class "RestoreResumeCommand.CareerCommand" as RestoreCareerCommand {
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - boolean active
+    }
+
+    class "RestoreResumeCommand.ProjectCommand" as RestoreProjectCommand {
+        - String companyName
+        - YearMonth startDate
+        - YearMonth endDate
+        - boolean active
+        - String name
+        - String overview
+        ...
+    }
+
+    RestoreResumeCommand --> RestoreResumeCommandResume
+    RestoreResumeCommandResume --> RestoreCareerCommand
+    RestoreResumeCommandResume --> RestoreProjectCommand
 }
 
 '========================================
@@ -554,7 +736,7 @@ package com.example.keirekipro.usecase.resume {
         - ResumeNameDuplicationCheckService resumeNameDuplicationCheckService
         - ResumeLimitChecker resumeLimitChecker
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, CreateResumeRequest request)
+        + ResumeInfoUseCaseDto execute(CreateResumeCommand command)
     }
 
     class CopyCreateResumeUseCase {
@@ -562,7 +744,7 @@ package com.example.keirekipro.usecase.resume {
         - ResumeNameDuplicationCheckService resumeNameDuplicationCheckService
         - ResumeLimitChecker resumeLimitChecker
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, CreateResumeRequest request)
+        + ResumeInfoUseCaseDto execute(CreateResumeCommand command)
     }
 
     class GetResumeListUseCase {
@@ -586,7 +768,7 @@ package com.example.keirekipro.usecase.resume {
     class UpdateResumeBasicUseCase {
         - ResumeRepository resumeRepository
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UpdateResumeBasicRequest request)
+        + ResumeInfoUseCaseDto execute(UpdateResumeBasicCommand command)
     }
 
     class ExportResumeUseCase {
@@ -595,7 +777,6 @@ package com.example.keirekipro.usecase.resume {
         - ResumePdfExporter pdfExporter
         - ResumeMarkdownExporter markdownExporter
         --
-        + ExportResumeUseCaseDto execute(UUID userId, String resumeId, ExportFormat format)
         + ExportResumeUseCaseDto execute(UUID userId, String resumeId, ExportResumeCommand command)
     }
 
@@ -610,7 +791,7 @@ package com.example.keirekipro.usecase.resume {
         - ResumeNameDuplicationCheckService resumeNameDuplicationCheckService
         - ResumeRepository resumeRepository
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, RestoreResumeRequest request)
+        + ResumeInfoUseCaseDto execute(RestoreResumeCommand command)
     }
 
     ' Career CRUD
@@ -618,13 +799,13 @@ package com.example.keirekipro.usecase.resume {
         - ResumeRepository resumeRepository
         - ResumeLimitChecker resumeLimitChecker
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateCareerRequest request)
+        + ResumeInfoUseCaseDto execute(CreateCareerCommand command)
     }
 
     class UpdateCareerUseCase {
         - ResumeRepository resumeRepository
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID careerId, UpdateCareerRequest request)
+        + ResumeInfoUseCaseDto execute(UpdateCareerCommand command)
     }
 
     class DeleteCareerUseCase {
@@ -638,13 +819,13 @@ package com.example.keirekipro.usecase.resume {
         - ResumeRepository resumeRepository
         - ResumeLimitChecker resumeLimitChecker
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateProjectRequest request)
+        + ResumeInfoUseCaseDto execute(CreateProjectCommand command)
     }
 
     class UpdateProjectUseCase {
         - ResumeRepository resumeRepository
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID projectId, UpdateProjectRequest request)
+        + ResumeInfoUseCaseDto execute(UpdateProjectCommand command)
     }
 
     class DeleteProjectUseCase {
@@ -658,13 +839,13 @@ package com.example.keirekipro.usecase.resume {
         - ResumeRepository resumeRepository
         - ResumeLimitChecker resumeLimitChecker
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateCertificationRequest request)
+        + ResumeInfoUseCaseDto execute(CreateCertificationCommand command)
     }
 
     class UpdateCertificationUseCase {
         - ResumeRepository resumeRepository
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID certificationId, UpdateCertificationRequest request)
+        + ResumeInfoUseCaseDto execute(UpdateCertificationCommand command)
     }
 
     class DeleteCertificationUseCase {
@@ -678,13 +859,13 @@ package com.example.keirekipro.usecase.resume {
         - ResumeRepository resumeRepository
         - ResumeLimitChecker resumeLimitChecker
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreatePortfolioRequest request)
+        + ResumeInfoUseCaseDto execute(CreatePortfolioCommand command)
     }
 
     class UpdatePortfolioUseCase {
         - ResumeRepository resumeRepository
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID portfolioId, UpdatePortfolioRequest request)
+        + ResumeInfoUseCaseDto execute(UpdatePortfolioCommand command)
     }
 
     class DeletePortfolioUseCase {
@@ -698,13 +879,13 @@ package com.example.keirekipro.usecase.resume {
         - ResumeRepository resumeRepository
         - ResumeLimitChecker resumeLimitChecker
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateSnsPlatformRequest request)
+        + ResumeInfoUseCaseDto execute(CreateSnsPlatformCommand command)
     }
 
     class UpdateSnsPlatformUseCase {
         - ResumeRepository resumeRepository
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID snsPlatformId, UpdateSnsPlatformRequest request)
+        + ResumeInfoUseCaseDto execute(UpdateSnsPlatformCommand command)
     }
 
     class DeleteSnsPlatformUseCase {
@@ -718,13 +899,13 @@ package com.example.keirekipro.usecase.resume {
         - ResumeRepository resumeRepository
         - ResumeLimitChecker resumeLimitChecker
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, CreateSelfPromotionRequest request)
+        + ResumeInfoUseCaseDto execute(CreateSelfPromotionCommand command)
     }
 
     class UpdateSelfPromotionUseCase {
         - ResumeRepository resumeRepository
         --
-        + ResumeInfoUseCaseDto execute(UUID userId, String resumeId, UUID selfPromotionId, UpdateSelfPromotionRequest request)
+        + ResumeInfoUseCaseDto execute(UpdateSelfPromotionCommand command)
     }
 
     class DeleteSelfPromotionUseCase {
@@ -814,6 +995,38 @@ package com.example.keirekipro.usecase.user.dto {
 }
 
 '========================================
+' usecase.user.command
+'========================================
+package com.example.keirekipro.usecase.user.command {
+    class ChangePasswordCommand {
+        - UUID userId
+        - String nowPassword
+        - String newPassword
+    }
+
+    class SetEmailAndPasswordCommand {
+        - UUID userId
+        - String email
+        - String password
+    }
+
+    class UpdateUserInfoCommand {
+        - UUID userId
+        - String username
+        - ProfileImageCommand profileImage
+        - boolean twoFactorAuthEnabled
+    }
+
+    class "UpdateUserInfoCommand.ProfileImageCommand" as ProfileImageCommand {
+        - byte[] content
+        - String contentType
+        - String originalFilename
+    }
+
+    UpdateUserInfoCommand --> ProfileImageCommand
+}
+
+'========================================
 ' usecase.user
 '========================================
 package com.example.keirekipro.usecase.user {
@@ -828,21 +1041,21 @@ package com.example.keirekipro.usecase.user {
         - UserRepository userRepository
         - ObjectStore objectStore
         --
-        + void execute(UUID userId, UpdateUserInfoRequest request)
+        + void execute(UpdateUserInfoCommand command)
     }
 
     class ChangePasswordUseCase {
         - UserRepository userRepository
         - PasswordEncoder passwordEncoder
         --
-        + void execute(UUID userId, String currentPassword, String newPassword)
+        + void execute(ChangePasswordCommand command)
     }
 
     class SetEmailAndPasswordUseCase {
         - UserRepository userRepository
         - PasswordEncoder passwordEncoder
         --
-        + void execute(UUID userId, String email, String password)
+        + void execute(SetEmailAndPasswordCommand command)
     }
 
     class RemoveAuthProviderUseCase {

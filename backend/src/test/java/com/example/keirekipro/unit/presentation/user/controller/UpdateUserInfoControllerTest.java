@@ -1,7 +1,6 @@
 package com.example.keirekipro.unit.presentation.user.controller;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -15,11 +14,14 @@ import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.controller.UpdateUserInfoController;
 import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.UpdateUserInfoUseCase;
+import com.example.keirekipro.usecase.user.command.UpdateUserInfoCommand;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.mock.web.MockMultipartFile;
@@ -45,6 +47,7 @@ class UpdateUserInfoControllerTest {
     private CurrentUserFacade currentUserFacade;
 
     private final MockMvc mockMvc;
+    private ArgumentCaptor<UpdateUserInfoCommand> commandCaptor;
 
     private static final String ENDPOINT = "/api/users/me";
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
@@ -64,6 +67,11 @@ class UpdateUserInfoControllerTest {
                     (byte) 0x89, 0x50, 0x4E, 0x47,
                     0x0D, 0x0A, 0x1A, 0x0A
             });
+
+    @BeforeEach
+    void setUp() {
+        commandCaptor = ArgumentCaptor.forClass(UpdateUserInfoCommand.class);
+    }
 
     @Test
     @DisplayName("正常なリクエストの場合、200が返される")
@@ -105,6 +113,14 @@ class UpdateUserInfoControllerTest {
 
         // 呼び出しを検証
         verify(currentUserFacade).getUserId();
-        verify(updateUserInfoUseCase).execute(any(), eq(USER_ID));
+        verify(updateUserInfoUseCase).execute(commandCaptor.capture());
+        UpdateUserInfoCommand command = commandCaptor.getValue();
+        assertThat(command.getUserId()).isEqualTo(USER_ID);
+        assertThat(command.getUsername()).isEqualTo(USERNAME);
+        assertThat(command.isTwoFactorAuthEnabled()).isTrue();
+        assertThat(command.getProfileImage()).isNotNull();
+        assertThat(command.getProfileImage().getContent()).containsExactly(PROFILE_IMAGE.getBytes());
+        assertThat(command.getProfileImage().getContentType()).isEqualTo(PROFILE_IMAGE.getContentType());
+        assertThat(command.getProfileImage().getOriginalFilename()).isEqualTo(PROFILE_IMAGE.getOriginalFilename());
     }
 }

@@ -49,6 +49,6 @@ public class UpdateProjectController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                updateProjectUseCase.execute(userId, resumeId, projectId, request));
+                updateProjectUseCase.execute(request.toCommand(userId, resumeId, projectId)));
     }
 }

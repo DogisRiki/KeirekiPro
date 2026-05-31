@@ -48,6 +48,6 @@ public class CreateCertificationController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         return ResumeInfoResponse.convertToResponse(
-                createCertificationUseCase.execute(userId, resumeId, request));
+                createCertificationUseCase.execute(request.toCommand(userId, resumeId)));
     }
 }

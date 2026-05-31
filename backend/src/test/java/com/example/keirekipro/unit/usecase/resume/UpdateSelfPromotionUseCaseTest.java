@@ -18,7 +18,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.model.resume.SelfPromotion;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateSelfPromotionRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateSelfPromotionCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateSelfPromotionUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -58,11 +58,6 @@ class UpdateSelfPromotionUseCaseTest {
         // 既存の職務経歴書と自己PRを準備
         Resume resume = buildResumeWithSelfPromotions(USER_ID);
 
-        // リクエスト準備
-        UpdateSelfPromotionRequest request = new UpdateSelfPromotionRequest(
-                "更新後自己PRタイトル",
-                "更新後自己PRコンテンツ");
-
         // 更新対象IDは、並び順に依存しないようタイトルで特定する
         UUID selfPromotionId = resume.getSelfPromotions().stream()
                 .filter(sp -> "自己PR1タイトル".equals(sp.getTitle()))
@@ -74,7 +69,8 @@ class UpdateSelfPromotionUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId, request);
+        UpdateSelfPromotionCommand request = buildUpdateSelfPromotionCommand(selfPromotionId);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -112,17 +108,13 @@ class UpdateSelfPromotionUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        // リクエスト準備
-        UpdateSelfPromotionRequest request = new UpdateSelfPromotionRequest(
-                "更新後自己PRタイトル",
-                "更新後自己PRコンテンツ");
-
         // モック準備（対象の職務経歴書が存在しない）
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
         UUID selfPromotionId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId, request))
+        UpdateSelfPromotionCommand request = buildUpdateSelfPromotionCommand(selfPromotionId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -136,11 +128,6 @@ class UpdateSelfPromotionUseCaseTest {
         // 職務経歴書（所有者は別ユーザー）を準備
         Resume resume = buildResumeWithSelfPromotions(OTHER_USER_ID);
 
-        // リクエスト準備
-        UpdateSelfPromotionRequest request = new UpdateSelfPromotionRequest(
-                "更新後自己PRタイトル",
-                "更新後自己PRコンテンツ");
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
@@ -149,8 +136,8 @@ class UpdateSelfPromotionUseCaseTest {
                 .map(SelfPromotion::getId)
                 .findFirst()
                 .orElseThrow();
-
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), selfPromotionId, request))
+        UpdateSelfPromotionCommand request = buildUpdateSelfPromotionCommand(selfPromotionId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -164,22 +151,48 @@ class UpdateSelfPromotionUseCaseTest {
         // 既存の職務経歴書を準備
         Resume resume = buildResumeWithSelfPromotions(USER_ID);
 
-        // リクエスト準備
-        UpdateSelfPromotionRequest request = new UpdateSelfPromotionRequest(
-                "存在しない自己PRタイトル",
-                "存在しない自己PRコンテンツ");
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
         UUID missingSelfPromotionId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingSelfPromotionId, request))
+        UpdateSelfPromotionCommand request = buildMissingSelfPromotionCommand(missingSelfPromotionId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の自己PRが存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
+    }
+
+    /**
+     * テスト用の自己PR更新Commandを作成する
+     *
+     * @param selfPromotionId 更新対象自己PR ID
+     * @return 自己PR更新Command
+     */
+    private UpdateSelfPromotionCommand buildUpdateSelfPromotionCommand(UUID selfPromotionId) {
+        return new UpdateSelfPromotionCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                selfPromotionId,
+                "更新後自己PRタイトル",
+                "更新後自己PRコンテンツ");
+    }
+
+    /**
+     * 存在しない自己PR更新検証用のCommandを作成する
+     *
+     * @param selfPromotionId 更新対象自己PR ID
+     * @return 自己PR更新Command
+     */
+    private UpdateSelfPromotionCommand buildMissingSelfPromotionCommand(UUID selfPromotionId) {
+        return new UpdateSelfPromotionCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                selfPromotionId,
+                "存在しない自己PRタイトル",
+                "存在しない自己PRコンテンツ");
     }
 
     /**

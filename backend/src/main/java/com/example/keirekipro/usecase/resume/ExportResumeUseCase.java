@@ -6,7 +6,7 @@ import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeExportRuleCheckService;
 import com.example.keirekipro.shared.utils.FileUtil;
-import com.example.keirekipro.usecase.resume.dto.ExportResumeCommand;
+import com.example.keirekipro.usecase.resume.command.ExportResumeCommand;
 import com.example.keirekipro.usecase.resume.dto.ExportResumeUseCaseDto;
 import com.example.keirekipro.usecase.resume.export.ExportFormat;
 import com.example.keirekipro.usecase.resume.export.ExportedFile;
@@ -53,24 +53,7 @@ public class ExportResumeUseCase {
      *
      * @param userId ユーザーID
      * @param resumeId 職務経歴書ID
-     * @param format 形式
-     * @return エクスポート結果DTO
-     */
-    @Transactional(readOnly = true)
-    public ExportResumeUseCaseDto execute(UUID userId, String resumeId, ExportFormat format) {
-        ExportResumeCommand command = new ExportResumeCommand(
-                format,
-                ExportResumeCommand.ExportDisposition.ATTACHMENT,
-                null);
-        return execute(userId, resumeId, command);
-    }
-
-    /**
-     * 職務経歴書をエクスポートする
-     *
-     * @param userId ユーザーID
-     * @param resumeId 職務経歴書ID
-     * @param command エクスポートコマンド
+     * @param command コマンド
      * @return エクスポート結果DTO
      */
     @Transactional(readOnly = true)

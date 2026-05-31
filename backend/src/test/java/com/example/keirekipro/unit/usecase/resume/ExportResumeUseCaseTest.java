@@ -20,7 +20,7 @@ import com.example.keirekipro.domain.repository.resume.ResumeRepository;
 import com.example.keirekipro.domain.service.resume.ResumeExportRuleCheckService;
 import com.example.keirekipro.helper.ResumeObjectBuilder;
 import com.example.keirekipro.usecase.resume.ExportResumeUseCase;
-import com.example.keirekipro.usecase.resume.dto.ExportResumeCommand;
+import com.example.keirekipro.usecase.resume.command.ExportResumeCommand;
 import com.example.keirekipro.usecase.resume.dto.ExportResumeUseCaseDto;
 import com.example.keirekipro.usecase.resume.export.ExportFormat;
 import com.example.keirekipro.usecase.resume.export.ExportedFile;
@@ -85,7 +85,7 @@ class ExportResumeUseCaseTest {
         when(resumeExportRuleCheckService.execute(resume)).thenReturn(List.of());
         when(pdfExporter.export(resume, ResumePdfExportSettings.defaults())).thenReturn(exportedFile);
 
-        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.PDF);
+        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), command(ExportFormat.PDF));
 
         verify(resumeRepository).find(RESUME_ID);
         verify(resumeExportRuleCheckService).execute(resume);
@@ -110,7 +110,7 @@ class ExportResumeUseCaseTest {
         when(resumeExportRuleCheckService.execute(resume)).thenReturn(List.of());
         when(markdownExporter.export(resume)).thenReturn(exportedFile);
 
-        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.MARKDOWN);
+        ExportResumeUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), command(ExportFormat.MARKDOWN));
 
         verify(resumeRepository).find(RESUME_ID);
         verify(resumeExportRuleCheckService).execute(resume);
@@ -127,7 +127,7 @@ class ExportResumeUseCaseTest {
     void test3() {
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.PDF))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), command(ExportFormat.PDF)))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -145,7 +145,7 @@ class ExportResumeUseCaseTest {
 
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.PDF))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), command(ExportFormat.PDF)))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -164,7 +164,7 @@ class ExportResumeUseCaseTest {
         when(resumeRepository.find(RESUME_ID)).thenReturn(Optional.of(resume));
         when(resumeExportRuleCheckService.execute(resume)).thenReturn(List.of("職歴を1件以上登録してください。"));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), ExportFormat.PDF))
+        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), command(ExportFormat.PDF)))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessageContaining("職務経歴書をエクスポートできません。");
 
@@ -234,6 +234,13 @@ class ExportResumeUseCaseTest {
                 .hasMessageContaining("入力エラーがあるため、PDFプレビューを表示できません。");
 
         verify(pdfExporter, never()).export(any(), any());
+    }
+
+    private static ExportResumeCommand command(ExportFormat format) {
+        return new ExportResumeCommand(
+                format,
+                ExportResumeCommand.ExportDisposition.ATTACHMENT,
+                null);
     }
 
 }

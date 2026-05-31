@@ -20,7 +20,7 @@ public class RedisConfig {
      * RedisTemplateをカスタマイズしたBeanを提供する
      *
      * キーには文字列シリアライザを、値にはJacksonのJSONシリアライザを使用することで、
-     * 効率的なデータの保存と取得を実現する。
+     * 効率的なデータの保存と取得を実現する
      *
      * @param connectionFactory 接続ファクトリ
      * @return RedisTemplateオブジェクト

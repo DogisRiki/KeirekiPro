@@ -20,7 +20,7 @@ import com.example.keirekipro.domain.model.resume.Portfolio;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.CreatePortfolioRequest;
+import com.example.keirekipro.usecase.resume.command.CreatePortfolioCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.CreatePortfolioUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -61,16 +61,18 @@ class CreatePortfolioUseCaseTest {
     @Test
     @DisplayName("ポートフォリオを新規作成できる")
     void test1() {
-        CreatePortfolioRequest request = new CreatePortfolioRequest();
-        request.setName("作品1");
-        request.setOverview("概要1");
-        request.setTechStack("React,TypeScript");
-        request.setLink("https://example.com");
+        CreatePortfolioCommand request = new CreatePortfolioCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                "作品1",
+                "概要1",
+                "React,TypeScript",
+                "https://example.com");
 
         doNothing().when(checker).checkPortfolioAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(USER_ID)));
 
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), request);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // 上限チェックの検証
         verify(checker).checkPortfolioAddAllowed(RESUME_ID);
@@ -95,16 +97,18 @@ class CreatePortfolioUseCaseTest {
     @Test
     @DisplayName("技術スタックが未入力でもポートフォリオを新規作成できる")
     void test1_1() {
-        CreatePortfolioRequest request = new CreatePortfolioRequest();
-        request.setName("作品1");
-        request.setOverview("概要1");
-        request.setTechStack(null);
-        request.setLink("https://example.com");
+        CreatePortfolioCommand request = new CreatePortfolioCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                "作品1",
+                "概要1",
+                null,
+                "https://example.com");
 
         doNothing().when(checker).checkPortfolioAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(USER_ID)));
 
-        useCase.execute(USER_ID, RESUME_ID.toString(), request);
+        useCase.execute(request);
 
         ArgumentCaptor<Resume> saveCaptor = ArgumentCaptor.forClass(Resume.class);
         verify(repository).save(saveCaptor.capture());
@@ -114,16 +118,18 @@ class CreatePortfolioUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        CreatePortfolioRequest request = new CreatePortfolioRequest();
-        request.setName("作品1");
-        request.setOverview("概要1");
-        request.setTechStack("React,TypeScript");
-        request.setLink("https://example.com");
+        CreatePortfolioCommand request = new CreatePortfolioCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                "作品1",
+                "概要1",
+                "React,TypeScript",
+                "https://example.com");
 
         doNothing().when(checker).checkPortfolioAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -135,16 +141,18 @@ class CreatePortfolioUseCaseTest {
     @Test
     @DisplayName("ログインユーザー以外が所有する職務経歴書にポートフォリオを作成しようとした場合、UseCaseExceptionがスローされる")
     void test3() {
-        CreatePortfolioRequest request = new CreatePortfolioRequest();
-        request.setName("作品1");
-        request.setOverview("概要1");
-        request.setTechStack("React,TypeScript");
-        request.setLink("https://example.com");
+        CreatePortfolioCommand request = new CreatePortfolioCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                "作品1",
+                "概要1",
+                "React,TypeScript",
+                "https://example.com");
 
         doNothing().when(checker).checkPortfolioAddAllowed(RESUME_ID);
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(buildResume(OTHER_USER_ID)));
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -156,15 +164,17 @@ class CreatePortfolioUseCaseTest {
     @Test
     @DisplayName("ポートフォリオが上限件数である場合、例外がスローされ後続処理が行われない")
     void test4() {
-        CreatePortfolioRequest request = new CreatePortfolioRequest();
-        request.setName("作品1");
-        request.setOverview("概要1");
-        request.setTechStack("React,TypeScript");
-        request.setLink("https://example.com");
+        CreatePortfolioCommand request = new CreatePortfolioCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                "作品1",
+                "概要1",
+                "React,TypeScript",
+                "https://example.com");
 
         doThrow(new UseCaseException("上限")).when(checker).checkPortfolioAddAllowed(RESUME_ID);
 
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), request))
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("上限");
 

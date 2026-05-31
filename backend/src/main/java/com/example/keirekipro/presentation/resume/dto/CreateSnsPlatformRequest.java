@@ -1,5 +1,9 @@
 package com.example.keirekipro.presentation.resume.dto;
 
+import java.util.UUID;
+
+import com.example.keirekipro.usecase.resume.command.CreateSnsPlatformCommand;
+
 import org.hibernate.validator.constraints.URL;
 
 import lombok.AllArgsConstructor;
@@ -25,4 +29,15 @@ public class CreateSnsPlatformRequest {
     @URL(protocol = "https", message = "リンクはhttps形式のURLを指定してください。")
     @Size(max = 255, message = "リンクは255文字以内で入力してください。")
     private String link;
+
+    /**
+     * ユースケースコマンドへ変換する
+     *
+     * @param userId ユーザーID
+     * @param resumeId 職務経歴書ID
+     * @return SNSプラットフォーム作成コマンド
+     */
+    public CreateSnsPlatformCommand toCommand(UUID userId, String resumeId) {
+        return new CreateSnsPlatformCommand(userId, resumeId, name, link);
+    }
 }

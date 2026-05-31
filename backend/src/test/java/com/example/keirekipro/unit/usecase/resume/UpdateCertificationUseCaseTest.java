@@ -19,7 +19,7 @@ import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
-import com.example.keirekipro.presentation.resume.dto.UpdateCertificationRequest;
+import com.example.keirekipro.usecase.resume.command.UpdateCertificationCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.UpdateCertificationUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -59,11 +59,6 @@ class UpdateCertificationUseCaseTest {
         // 既存の職務経歴書と資格を準備
         Resume resume = buildResumeWithCertifications(USER_ID);
 
-        // リクエスト準備
-        UpdateCertificationRequest request = new UpdateCertificationRequest(
-                "更新後資格",
-                YearMonth.of(2020, 10));
-
         // 更新対象IDは、並び順に依存しないよう資格名で特定する
         UUID certificationId = resume.getCertifications().stream()
                 .filter(c -> "資格A".equals(c.getName()))
@@ -75,7 +70,8 @@ class UpdateCertificationUseCaseTest {
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行
-        ResumeInfoUseCaseDto actual = useCase.execute(USER_ID, RESUME_ID.toString(), certificationId, request);
+        UpdateCertificationCommand request = buildUpdateCertificationCommand(certificationId);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
 
         // repository.find に渡された引数を検証
         ArgumentCaptor<UUID> findCaptor = ArgumentCaptor.forClass(UUID.class);
@@ -113,17 +109,13 @@ class UpdateCertificationUseCaseTest {
     @Test
     @DisplayName("対象の職務経歴書が存在しない場合、UseCaseExceptionがスローされる")
     void test2() {
-        // リクエスト準備
-        UpdateCertificationRequest request = new UpdateCertificationRequest(
-                "更新後資格",
-                YearMonth.of(2020, 10));
-
         // モック準備（対象の職務経歴書が存在しない）
         when(repository.find(RESUME_ID)).thenReturn(Optional.empty());
 
         // 実行＆検証
         UUID certificationId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), certificationId, request))
+        UpdateCertificationCommand request = buildUpdateCertificationCommand(certificationId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -137,11 +129,6 @@ class UpdateCertificationUseCaseTest {
         // 職務経歴書（所有者は別ユーザー）を準備
         Resume resume = buildResumeWithCertifications(OTHER_USER_ID);
 
-        // リクエスト準備
-        UpdateCertificationRequest request = new UpdateCertificationRequest(
-                "更新後資格",
-                YearMonth.of(2020, 10));
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
@@ -150,8 +137,8 @@ class UpdateCertificationUseCaseTest {
                 .map(Certification::getId)
                 .findFirst()
                 .orElseThrow();
-
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), certificationId, request))
+        UpdateCertificationCommand request = buildUpdateCertificationCommand(certificationId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
@@ -165,22 +152,48 @@ class UpdateCertificationUseCaseTest {
         // 既存の職務経歴書を準備
         Resume resume = buildResumeWithCertifications(USER_ID);
 
-        // リクエスト準備
-        UpdateCertificationRequest request = new UpdateCertificationRequest(
-                "存在しない資格更新",
-                YearMonth.of(2020, 1));
-
         // モック準備
         when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
 
         // 実行＆検証
         UUID missingCertificationId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        assertThatThrownBy(() -> useCase.execute(USER_ID, RESUME_ID.toString(), missingCertificationId, request))
+        UpdateCertificationCommand request = buildMissingCertificationCommand(missingCertificationId);
+        assertThatThrownBy(() -> useCase.execute(request))
                 .isInstanceOf(UseCaseException.class)
                 .hasMessage("対象の資格が存在しません。");
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
+    }
+
+    /**
+     * テスト用の資格更新Commandを作成する
+     *
+     * @param certificationId 更新対象資格ID
+     * @return 資格更新Command
+     */
+    private UpdateCertificationCommand buildUpdateCertificationCommand(UUID certificationId) {
+        return new UpdateCertificationCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                certificationId,
+                "更新後資格",
+                YearMonth.of(2020, 10));
+    }
+
+    /**
+     * 存在しない資格更新検証用のCommandを作成する
+     *
+     * @param certificationId 更新対象資格ID
+     * @return 資格更新Command
+     */
+    private UpdateCertificationCommand buildMissingCertificationCommand(UUID certificationId) {
+        return new UpdateCertificationCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                certificationId,
+                "存在しない資格更新",
+                YearMonth.of(2020, 1));
     }
 
     /**

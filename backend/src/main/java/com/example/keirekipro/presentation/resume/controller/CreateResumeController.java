@@ -47,9 +47,9 @@ public class CreateResumeController {
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
         if (request.getResumeId() == null) {
-            return ResumeInfoResponse.convertToResponse(createResumeUseCase.execute(userId, request));
+            return ResumeInfoResponse.convertToResponse(createResumeUseCase.execute(request.toCreateCommand(userId)));
         } else {
-            return ResumeInfoResponse.convertToResponse(copyCreateResumeUseCase.execute(userId, request));
+            return ResumeInfoResponse.convertToResponse(copyCreateResumeUseCase.execute(request.toCopyCommand(userId)));
         }
     }
 }
