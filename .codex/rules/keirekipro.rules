@@ -4,22 +4,22 @@
 
 # --- Frontend quality gates ---
 prefix_rule(
-    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "npm", "run", ["format", "lint", "coverage"]],
+    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "pnpm", "run", ["format", "lint", "coverage"]],
     decision = "allow",
     justification = "KeirekiPro frontend quality-gate commands from AGENTS.md",
     match = [
-        "docker compose exec -u node -w /home/node/app frontend npm run format",
-        "docker compose exec -u node -w /home/node/app frontend npm run lint",
-        "docker compose exec -u node -w /home/node/app frontend npm run coverage",
+        "docker compose exec -u node -w /home/node/app frontend pnpm run format",
+        "docker compose exec -u node -w /home/node/app frontend pnpm run lint",
+        "docker compose exec -u node -w /home/node/app frontend pnpm run coverage",
     ],
 )
 
 prefix_rule(
-    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "npm", "test"],
+    pattern = ["docker", "compose", "exec", "-u", "node", "-w", "/home/node/app", "frontend", "pnpm", "test"],
     decision = "allow",
     justification = "KeirekiPro frontend test command from AGENTS.md",
     match = [
-        "docker compose exec -u node -w /home/node/app frontend npm test",
+        "docker compose exec -u node -w /home/node/app frontend pnpm test",
     ],
 )
 
@@ -58,12 +58,12 @@ prefix_rule(
         "-u", "node",
         "-w", "/home/node/app",
         "frontend",
-        "npm", "run", "dev",
+        "pnpm", "run", "dev",
     ],
     decision = "allow",
     justification = "Allow starting Vite dev server for Playwright MCP UI verification",
     match = [
-        "docker compose exec -d -u node -w /home/node/app frontend npm run dev",
+        "docker compose exec -d -u node -w /home/node/app frontend pnpm run dev",
     ],
 )
 

@@ -43,16 +43,16 @@
 frontend を変更した場合は順番に実行してください。
 
 ```bash
-docker compose exec -u node -w /home/node/app frontend npm run format
-docker compose exec -u node -w /home/node/app frontend npm run lint
-docker compose exec -u node -w /home/node/app frontend npm test
-docker compose exec -u node -w /home/node/app frontend npm run coverage
+docker compose exec -u node -w /home/node/app frontend pnpm run format
+docker compose exec -u node -w /home/node/app frontend pnpm run lint
+docker compose exec -u node -w /home/node/app frontend pnpm test
+docker compose exec -u node -w /home/node/app frontend pnpm run coverage
 ```
 
-`npm run coverage` は frontend 品質ゲートとして必須です。`npm run build` で代替しないでください。
+`pnpm run coverage` は frontend 品質ゲートとして必須です。`pnpm run build` で代替しないでください。
 
 ビルド出力、routing、環境変数、デプロイ挙動に影響する変更の場合のみ、production build を実行してください。
 
 ```bash
-docker compose exec -u node -w /home/node/app frontend npm run build
+docker compose exec -u node -w /home/node/app frontend pnpm run build
 ```
