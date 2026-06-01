@@ -70,7 +70,7 @@ src/features/{feature-name}
 基本となるディレクトリ構造を作成するには：
 
 ```bash
-npm run init
+pnpm run init
 ```
 
 このコマンドを実行すると、`src/` 配下に必要なすべてのディレクトリが自動的に作成される。
@@ -80,7 +80,7 @@ npm run init
 新しい機能モジュールを作成するには：
 
 ```bash
-npm run new
+pnpm run new
 ```
 
 実行すると、以下のプロンプトが表示される。
@@ -98,7 +98,7 @@ features配下に作成するディレクトリ名を入力してください:
 1. 以下のコマンドを実行：
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 2. ブラウザで以下のURLにアクセス：
@@ -112,7 +112,7 @@ http://localhost:5173/
 1. 以下のコマンドを実行：
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 2. VSCodeで`F5`キーを押下

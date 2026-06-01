@@ -36,6 +36,6 @@ for i in {1..60}; do
 done
 
 echo "[frontend] starting..."
-docker compose exec -d -u node -w /home/node/app frontend npm run dev
+docker compose exec -d -u node -w /home/node/app frontend pnpm run dev
 
 echo "[frontend] ready: http://localhost:5173"
