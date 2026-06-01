@@ -47,6 +47,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -54,9 +59,6 @@ jobs:
           check-latest: true
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Enable pnpm
-        run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
