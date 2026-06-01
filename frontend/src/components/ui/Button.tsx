@@ -1,6 +1,6 @@
 import type { ButtonProps } from "@mui/material";
 import { Button as MuiButton } from "@mui/material";
-import type { SxProps, Theme } from "@mui/system";
+import type { SxProps, Theme } from "@mui/material/styles";
 
 /**
  * ボタン

@@ -1,6 +1,6 @@
 import type { TypographyProps } from "@mui/material";
 import { Typography } from "@mui/material";
-import type { SxProps, Theme } from "@mui/system";
+import type { SxProps, Theme } from "@mui/material/styles";
 
 interface NoDataProps extends Omit<TypographyProps, "children"> {
     message: string;
