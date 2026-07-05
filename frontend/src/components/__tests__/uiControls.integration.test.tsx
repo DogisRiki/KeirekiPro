@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { useState } from "react";
@@ -7,7 +7,6 @@ import { vi } from "vitest";
 import { DatePicker, Dialog, Loading, PasswordTextField, ScrollToTopButton, ThemeSwitch } from "@/components/ui";
 import { useThemeStore } from "@/stores";
 import { renderWithProviders, resetStoresAndMocks } from "@/test";
-import { useMutation, useQuery } from "@tanstack/react-query";
 
 describe("ui controls", () => {
     beforeEach(() => {
@@ -103,44 +102,26 @@ describe("ui controls", () => {
         expect(selectedValue?.format("YYYY-MM-DD")).toBe("2024-01-15");
     });
 
-    it("LoadingはReact Queryのfetch/mutation中だけ表示されること", async () => {
-        let resolveQuery: (value: string) => void = () => {};
-        let resolveMutation: () => void = () => {};
+    it("Loadingはactiveに応じて表示を切り替えること", () => {
+        const { rerender } = renderWithProviders(<Loading active />);
 
-        const QueryAndMutation = () => {
-            const mutation = useMutation({
-                mutationFn: () =>
-                    new Promise<void>((resolve) => {
-                        resolveMutation = resolve;
-                    }),
-            });
-            useQuery({
-                queryKey: ["loading-test"],
-                queryFn: () =>
-                    new Promise<string>((resolve) => {
-                        resolveQuery = resolve;
-                    }),
-            });
-            return <button onClick={() => mutation.mutate()}>mutate</button>;
-        };
+        expect(screen.getByRole("progressbar")).toBeVisible();
 
-        const { user } = renderWithProviders(
-            <>
-                <Loading />
-                <QueryAndMutation />
-            </>,
+        rerender(<Loading active={false} />);
+
+        expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    });
+
+    it("Loadingのoverlayは対象領域内に表示すること", () => {
+        renderWithProviders(
+            <div style={{ position: "relative", minHeight: 120 }}>
+                <button>対象操作</button>
+                <Loading active variant="overlay" />
+            </div>,
         );
 
-        const queryProgress = await screen.findByRole("progressbar", { hidden: true });
-        expect(queryProgress).toBeVisible();
-        act(() => resolveQuery("done"));
-        await waitFor(() => expect(queryProgress).not.toBeVisible());
-
-        await user.click(screen.getByRole("button", { name: "mutate" }));
-        const mutationProgress = await screen.findByRole("progressbar", { hidden: true });
-        expect(mutationProgress).toBeVisible();
-        act(() => resolveMutation());
-        await waitFor(() => expect(mutationProgress).not.toBeVisible());
+        expect(screen.getByRole("button", { name: "対象操作" })).toBeInTheDocument();
+        expect(screen.getByRole("progressbar")).toBeVisible();
     });
 
     it("ScrollToTopButtonはスクロール後に表示されクリックで先頭へ戻すこと", async () => {

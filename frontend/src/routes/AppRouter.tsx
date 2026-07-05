@@ -1,8 +1,8 @@
 import { ErrorFallback, NotFound, ServerError } from "@/components/errors";
 import { ProtectedLayout, PublicLayout } from "@/components/layouts";
+import { Loading } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { ProtectedLoader, PublicLoader } from "@/routes/AppLoader";
-import { Box, CircularProgress } from "@mui/material";
 import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
@@ -31,11 +31,7 @@ const SettingUser = lazy(() => import("@/pages/SettingUser").then((module) => ({
 const Terms = lazy(() => import("@/pages/Terms").then((module) => ({ default: module.Terms })));
 const TwoFactor = lazy(() => import("@/pages/TwoFactor").then((module) => ({ default: module.TwoFactor })));
 
-const routeFallback = (
-    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 240 }}>
-        <CircularProgress size={40} />
-    </Box>
-);
+const routeFallback = <Loading active variant="content" />;
 
 /**
  * ルーティング

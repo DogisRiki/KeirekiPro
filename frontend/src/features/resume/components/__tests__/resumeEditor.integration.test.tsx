@@ -154,6 +154,20 @@ describe("resume editor", () => {
         vi.mocked(protectedApiClient.delete).mockResolvedValue(createAxiosResponse(undefined));
     });
 
+    it("詳細取得中は詳細領域のローディングを表示すること", () => {
+        vi.mocked(protectedApiClient.get).mockImplementation((url: string) => {
+            if (url === "/resumes/resume-1") {
+                return new Promise(() => {});
+            }
+            return Promise.resolve(createAxiosResponse(undefined));
+        });
+
+        renderEditor();
+
+        expect(screen.getByRole("progressbar")).toBeVisible();
+        expect(screen.queryByRole("tab", { name: "基本" })).not.toBeInTheDocument();
+    });
+
     it("section tab切り替えで表示セクションとstoreを更新すること", async () => {
         const { user } = renderEditor();
 

@@ -1,4 +1,5 @@
 import { NoData } from "@/components/errors";
+import { Loading } from "@/components/ui";
 import { BackupSection, RestoreSection, useGetResumeList } from "@/features/resume";
 import { Box, Divider, Paper, Typography } from "@mui/material";
 
@@ -6,13 +7,15 @@ import { Box, Divider, Paper, Typography } from "@mui/material";
  * バックアップコンテナ
  */
 export const BackupContainer = () => {
-    const { data, isSuccess } = useGetResumeList();
+    const { data, isLoading, isSuccess } = useGetResumeList();
     const resumeList = data?.resumes ?? [];
 
     return (
         <Paper elevation={1} sx={{ p: 3 }}>
             {/* バックアップセクション */}
-            {!isSuccess ? null : resumeList.length > 0 ? (
+            {isLoading ? (
+                <Loading active variant="content" sx={{ minHeight: 160 }} />
+            ) : !isSuccess ? null : resumeList.length > 0 ? (
                 <BackupSection resumeList={resumeList} />
             ) : (
                 <Box>

@@ -1,5 +1,5 @@
 import { NoData } from "@/components/errors";
-import { Button } from "@/components/ui";
+import { Button, Loading } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { ResumeCard, SearchForm, useGetResumeList } from "@/features/resume";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
@@ -32,7 +32,7 @@ export const ResumeListContainer = () => {
     const [currentDisplayCount, setCurrentDisplayCount] = useState<number>(itemPerPage);
 
     // 職務経歴書一覧取得
-    const { data, isSuccess } = useGetResumeList();
+    const { data, isLoading, isSuccess } = useGetResumeList();
 
     // APIレスポンスから配列を取り出す
     const resumeData = data?.resumes ?? [];
@@ -97,7 +97,9 @@ export const ResumeListContainer = () => {
                 setSortType={setSortType}
             />
             {/* 職務経歴書カード */}
-            {!isSuccess ? null : filteredResumeData.length > 0 ? (
+            {isLoading ? (
+                <Loading active variant="content" sx={{ minHeight: "calc(100vh - 300px)" }} />
+            ) : !isSuccess ? null : filteredResumeData.length > 0 ? (
                 <Grid container spacing={3} sx={{ my: 4 }}>
                     {filteredResumeData.slice(0, currentDisplayCount).map((resume) => (
                         <Grid size={{ xs: 12, sm: 6, md: 4 }} key={resume.id}>
