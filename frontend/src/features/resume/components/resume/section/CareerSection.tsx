@@ -99,10 +99,12 @@ export const CareerSection = () => {
                         fullWidth: true,
                         required: true,
                         sx: { mb: 2 },
-                        InputLabelProps: { shrink: true },
                         error: !!errors.startDate?.length,
                         helperText: stringListToBulletList(errors.startDate),
-                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
+                        slotProps: {
+                            inputLabel: { shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        },
                     },
                     calendarHeader: { format: "YYYY/MM" },
                 }}
@@ -129,10 +131,12 @@ export const CareerSection = () => {
                     textField: {
                         fullWidth: true,
                         required: !currentCareer.active,
-                        InputLabelProps: { shrink: true },
                         error: !!errors.endDate?.length,
                         helperText: stringListToBulletList(errors.endDate),
-                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
+                        slotProps: {
+                            inputLabel: { shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        },
                     },
                     calendarHeader: { format: "YYYY/MM" },
                 }}

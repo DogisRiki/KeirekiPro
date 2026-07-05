@@ -72,11 +72,13 @@ export const SectionTabs = () => {
                         },
                     }}
                     MenuProps={{
-                        PaperProps: {
-                            sx: {
-                                mt: 1,
-                                borderRadius: 2,
-                                boxShadow: 3,
+                        slotProps: {
+                            paper: {
+                                sx: {
+                                    mt: 1,
+                                    borderRadius: 2,
+                                    boxShadow: 3,
+                                },
                             },
                         },
                     }}

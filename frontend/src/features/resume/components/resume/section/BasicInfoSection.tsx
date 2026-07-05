@@ -59,10 +59,12 @@ export const BasicInfoSection = () => {
                         fullWidth: true,
                         required: true,
                         sx: { mb: 4 },
-                        InputLabelProps: { shrink: true },
                         error: !!errors.date?.length,
                         helperText: stringListToBulletList(errors.date),
-                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
+                        slotProps: {
+                            inputLabel: { shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        },
                     },
                 }}
             />
