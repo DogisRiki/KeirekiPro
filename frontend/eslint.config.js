@@ -105,6 +105,7 @@ export default [
                     },
                 },
             ],
+            "@typescript-eslint/no-deprecated": "error",
         },
         languageOptions: {
             // グローバル変数の定義
@@ -116,6 +117,9 @@ export default [
             },
             // TypeScript用のパーサーを指定
             parser: typeScriptESLintParser, // パーサーオブジェクトを設定
+            parserOptions: {
+                projectService: true,
+            },
         },
     },
 

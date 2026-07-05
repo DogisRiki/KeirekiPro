@@ -46,8 +46,6 @@ export const useNavigationBlocker = (): UseNavigationBlockerReturn => {
         const handleBeforeUnload = (event: BeforeUnloadEvent) => {
             if (isDirty) {
                 event.preventDefault();
-                event.returnValue = "";
-                return "";
             }
         };
 

@@ -1,5 +1,6 @@
 import type { AuthProvider } from "@/types";
 import { Box, Link, Typography } from "@mui/material";
+import type * as React from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 
@@ -16,7 +17,7 @@ export interface AuthProviderFieldProps {
  * 外部連携アイコン表示
  */
 export const AuthProviderField = ({ connected, canRemoveProvider, onRemove }: AuthProviderFieldProps) => {
-    const providerIcon: Record<AuthProvider, JSX.Element> = {
+    const providerIcon: Record<AuthProvider, React.JSX.Element> = {
         google: <FcGoogle size={24} />,
         github: <FaGithub size={22} />,
     };

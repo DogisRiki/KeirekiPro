@@ -8,10 +8,12 @@ import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 
 const MenuProps = {
-    PaperProps: {
-        style: {
-            maxHeight: 48 * 4.5 + 8,
-            width: 250,
+    slotProps: {
+        paper: {
+            style: {
+                maxHeight: 48 * 4.5 + 8,
+                width: 250,
+            },
         },
     },
 };
@@ -159,10 +161,12 @@ export const ProjectSection = () => {
                         fullWidth: true,
                         required: true,
                         sx: { mb: 2 },
-                        InputLabelProps: { shrink: true },
                         error: !!errors.startDate?.length,
                         helperText: stringListToBulletList(errors.startDate),
-                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
+                        slotProps: {
+                            inputLabel: { shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        },
                     },
                     calendarHeader: { format: "YYYY/MM" },
                 }}
@@ -188,10 +192,12 @@ export const ProjectSection = () => {
                         fullWidth: true,
                         required: !currentProject.active,
                         sx: { mb: 4 },
-                        InputLabelProps: { shrink: true },
                         error: !!errors.endDate?.length,
                         helperText: stringListToBulletList(errors.endDate),
-                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
+                        slotProps: {
+                            inputLabel: { shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        },
                     },
                     calendarHeader: { format: "YYYY/MM" },
                 }}

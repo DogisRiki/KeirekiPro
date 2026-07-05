@@ -110,10 +110,12 @@ export const CertificationSection = () => {
                     textField: {
                         fullWidth: true,
                         required: true,
-                        InputLabelProps: { shrink: true },
                         error: !!errors.date?.length,
                         helperText: stringListToBulletList(errors.date),
-                        FormHelperTextProps: { sx: { whiteSpace: "pre-line" } },
+                        slotProps: {
+                            inputLabel: { shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        },
                     },
                     calendarHeader: { format: "YYYY/MM" },
                 }}
