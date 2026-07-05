@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
+import { clearErrorMessagesFromStoreCoordinator, registerNotificationStoreClear } from "./storeCoordinator";
 
 interface NotificationState {
     message: string | null;
@@ -21,9 +22,7 @@ export const useNotificationStore = create<NotificationState>()(
             setNotification: (message, type) => {
                 // テスト環境以外でErrorMessageストアをクリア
                 if (import.meta.env.MODE !== "test") {
-                    import("@/stores/errorMessageStore").then(({ useErrorMessageStore }) => {
-                        useErrorMessageStore.getState().clearErrors();
-                    });
+                    clearErrorMessagesFromStoreCoordinator();
                 }
                 set({ message, type, isShow: true }, false, "setNotification");
             },
@@ -34,3 +33,7 @@ export const useNotificationStore = create<NotificationState>()(
         },
     ),
 );
+
+registerNotificationStoreClear(() => {
+    useNotificationStore.getState().clearNotification();
+});
