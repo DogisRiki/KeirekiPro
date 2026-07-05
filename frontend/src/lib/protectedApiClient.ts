@@ -52,5 +52,4 @@ const refreshAuthLogic = async () => {
 
 createAuthRefreshInterceptor(protectedApiClient, refreshAuthLogic, {
     statusCodes: [401],
-    pauseInstanceWhileRefreshing: true,
 });

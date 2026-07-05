@@ -105,15 +105,10 @@ export const TechStackField = ({ label, value, options, onChange, isLast = false
                             (errorMessage ?? undefined)
                         )
                     }
-                    onKeyDown={(event) => {
-                        const inputProps = params.inputProps as React.InputHTMLAttributes<HTMLInputElement>;
-                        if (inputProps.onKeyDown) {
-                            inputProps.onKeyDown(event as React.KeyboardEvent<HTMLInputElement>);
-                        }
-                        handleKeyDown(event);
-                    }}
+                    onKeyDown={handleKeyDown}
                     slotProps={{
-                        inputLabel: { shrink: true },
+                        ...params.slotProps,
+                        inputLabel: { ...params.slotProps.inputLabel, shrink: true },
                     }}
                 />
             )}

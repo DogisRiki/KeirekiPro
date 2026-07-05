@@ -37,7 +37,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
 import { Box, Divider, Typography } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
 import { useState } from "react";
 import { useParams } from "react-router";

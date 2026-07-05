@@ -5,7 +5,7 @@ import { ResumeCard, SearchForm, useGetResumeList } from "@/features/resume";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Box } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import Grid from "@mui/material/Grid";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useDebounce } from "use-debounce";

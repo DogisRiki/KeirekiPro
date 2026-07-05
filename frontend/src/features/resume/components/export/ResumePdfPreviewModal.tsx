@@ -26,7 +26,7 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { HexColorPicker } from "react-colorful";
 
 interface ResumePdfPreviewModalProps {
@@ -90,11 +90,8 @@ export const ResumePdfPreviewModal = ({
         [settings.tableHeaderColor.hex, settings.tableHeaderColor.rgb],
     );
     const rgb = useMemo(() => hexToRgb(hex), [hex]);
-    const [hexInput, setHexInput] = useState(hex);
-
-    useEffect(() => {
-        setHexInput(hex);
-    }, [hex]);
+    const [hexInputState, setHexInputState] = useState({ committedHex: hex, value: hex });
+    const hexInput = hexInputState.committedHex === hex ? hexInputState.value : hex;
 
     /**
      * PDF設定を部分更新する
@@ -130,7 +127,7 @@ export const ResumePdfPreviewModal = ({
             .replace(/[^0-9a-fA-F]/g, "")
             .slice(0, 6)
             .toLowerCase();
-        setHexInput(nextHex);
+        setHexInputState({ committedHex: nextHex.length === 6 ? nextHex : hex, value: nextHex });
         if (nextHex.length === 6) {
             updateSettings({ tableHeaderColor: { hex: nextHex } });
         }

@@ -14,16 +14,18 @@ export const NotFound = ({ variant = "page" }: NotFoundProps) => {
 
     return (
         <Box
-            display={"flex"}
-            flexDirection={"column"}
-            alignItems={"center"}
-            justifyContent={"center"}
-            minHeight={isContent ? "calc(100dvh - 128px)" : "100dvh"}
-            width={"100%"}
-            textAlign={"center"}
             role={"alert"}
+            sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: isContent ? "calc(100dvh - 128px)" : "100dvh",
+                width: "100%",
+                textAlign: "center",
+            }}
         >
-            <Typography variant="h3" fontWeight={"bold"} sx={{ mb: 4 }}>
+            <Typography variant="h3" sx={{ mb: 4, fontWeight: "bold" }}>
                 404&nbsp;&nbsp;Not&nbsp;&nbsp;Found
             </Typography>
             <Button

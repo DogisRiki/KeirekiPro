@@ -7,12 +7,14 @@ import { Box, Typography } from "@mui/material";
 export const Maintenance = () => {
     return (
         <Box
-            display="flex"
-            flexDirection="column"
-            alignItems="center"
-            justifyContent="center"
-            height="100vh"
-            textAlign="center"
+            sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100vh",
+                textAlign: "center",
+            }}
         >
             <BuildIcon sx={{ fontSize: 64, color: "text.secondary", mb: 2 }} />
             <Typography variant="h4" gutterBottom>

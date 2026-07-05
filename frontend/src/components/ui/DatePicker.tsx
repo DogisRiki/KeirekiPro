@@ -1,9 +1,8 @@
 import type { DatePickerProps } from "@mui/x-date-pickers";
 import { DatePicker as MUIDatePicker } from "@mui/x-date-pickers";
-import type { Dayjs } from "dayjs";
 import * as React from "react";
 
-type DatePickerSlotProps = NonNullable<DatePickerProps<Dayjs>["slotProps"]>;
+type DatePickerSlotProps = NonNullable<DatePickerProps["slotProps"]>;
 type DatePickerTextFieldSlotProps = Exclude<DatePickerSlotProps["textField"], (...args: never[]) => unknown>;
 
 /**
@@ -11,7 +10,7 @@ type DatePickerTextFieldSlotProps = Exclude<DatePickerSlotProps["textField"], (.
  * - キーボード入力（打鍵/貼り付け）を無効化
  * - フィールドのどこをクリックしてもpickerを開く
  */
-export const DatePicker = (props: DatePickerProps<Dayjs>) => {
+export const DatePicker = (props: DatePickerProps) => {
     const { slotProps, open: openProp, onOpen, onClose, ...rest } = props;
 
     const isControlled = openProp !== undefined;

@@ -8,16 +8,18 @@ import { Box, Typography } from "@mui/material";
 export const ErrorFallback = () => {
     return (
         <Box
-            display={"flex"}
-            flexDirection={"column"}
-            alignItems={"center"}
-            justifyContent={"center"}
-            height={"100vh"}
-            width={"100vw"}
-            textAlign={"center"}
             role={"alert"}
+            sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100vh",
+                width: "100vw",
+                textAlign: "center",
+            }}
         >
-            <Typography variant="h6" fontWeight={"bold"} sx={{ mb: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
                 Ooops, something went wrong :(
             </Typography>
             <Button startIcon={<RefreshIcon />} onClick={() => window.location.assign(window.location.origin)}>

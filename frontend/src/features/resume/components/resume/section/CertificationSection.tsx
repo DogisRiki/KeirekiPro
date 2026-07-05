@@ -92,7 +92,8 @@ export const CertificationSection = () => {
                         helperText={stringListToBulletList(errors.name)}
                         onFocus={handleNameFocus}
                         slotProps={{
-                            inputLabel: { shrink: true },
+                            ...params.slotProps,
+                            inputLabel: { ...params.slotProps.inputLabel, shrink: true },
                             formHelperText: { sx: { whiteSpace: "pre-line" } },
                         }}
                     />

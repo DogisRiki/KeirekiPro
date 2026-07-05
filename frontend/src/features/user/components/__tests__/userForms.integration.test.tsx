@@ -66,7 +66,7 @@ describe("user forms", () => {
         const usernameInput = await screen.findByRole("textbox", { name: /ユーザー名/ });
         await user.clear(usernameInput);
         await user.type(usernameInput, "updated-user");
-        await user.click(screen.getByRole("checkbox", { name: /二段階認証/ }));
+        await user.click(screen.getByRole("switch", { name: /二段階認証/ }));
         await user.click(screen.getByRole("button", { name: "保存" }));
 
         await waitFor(() =>

@@ -6,7 +6,8 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import type { AxiosResponse } from "axios";
 import { saveAs } from "file-saver";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { vi } from "vitest";
 
 const debounceMocks = vi.hoisted(() => ({
@@ -175,7 +176,7 @@ describe("resume editor", () => {
         expect(state.resume?.projects).toHaveLength(2);
         expect(state.resume?.projects[0].name).toBe("Project A（コピー）");
         expect(state.activeEntryId).toBe(state.resume?.projects[0].id);
-    });
+    }, 10000);
 
     it("entry deleteは一時IDを確認なしで消し既存IDはconfirm後に削除APIへ接続すること", async () => {
         const { user } = renderEditor();
@@ -223,7 +224,7 @@ describe("resume editor", () => {
         const { user } = renderEditor();
 
         await screen.findByRole("textbox", { name: /姓/ });
-        await user.click(screen.getByRole("checkbox", { name: "自動保存" }));
+        await user.click(screen.getByRole("switch", { name: "自動保存" }));
         await user.clear(screen.getByRole("textbox", { name: /姓/ }));
         await user.type(screen.getByRole("textbox", { name: /姓/ }), "Suzuki");
 

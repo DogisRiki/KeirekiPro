@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { useState } from "react";
 import { vi } from "vitest";
@@ -59,12 +60,12 @@ describe("ui controls", () => {
 
     it("DatePickerは入力欄操作で開き直接入力では値を変えないこと", async () => {
         const onOpen = vi.fn();
+        const onChange = vi.fn();
         const { user } = renderWithProviders(
-            <DatePicker label="日付" value={dayjs("2024-01-01")} onChange={vi.fn()} open={false} onOpen={onOpen} />,
+            <DatePicker label="日付" value={dayjs("2024-01-01")} onChange={onChange} open={false} onOpen={onOpen} />,
         );
 
-        const input = screen.getByLabelText("日付");
-        const initialValue = input.getAttribute("value");
+        const input = screen.getByRole("group", { name: "日付" });
 
         await user.click(input);
         fireEvent.keyDown(input, { key: "Enter" });
@@ -72,7 +73,34 @@ describe("ui controls", () => {
         fireEvent.paste(input, { clipboardData: { getData: () => "2024/03/01" } });
 
         expect(onOpen).toHaveBeenCalled();
-        expect(input).toHaveValue(initialValue);
+        expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("DatePickerはカレンダー選択で値を更新できること", async () => {
+        const onChange = vi.fn<(newValue: Dayjs | null) => void>();
+        const Wrapper = () => {
+            const [value, setValue] = useState<Dayjs | null>(dayjs("2024-01-01"));
+
+            return (
+                <DatePicker
+                    label="日付"
+                    value={value}
+                    onChange={(newValue) => {
+                        onChange(newValue);
+                        setValue(newValue);
+                    }}
+                />
+            );
+        };
+
+        const { user } = renderWithProviders(<Wrapper />);
+
+        await user.click(screen.getByRole("group", { name: "日付" }));
+        await user.click(await screen.findByRole("gridcell", { name: "15" }));
+
+        await waitFor(() => expect(onChange).toHaveBeenCalled());
+        const selectedValue = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0];
+        expect(selectedValue?.format("YYYY-MM-DD")).toBe("2024-01-15");
     });
 
     it("LoadingはReact Queryのfetch/mutation中だけ表示されること", async () => {
@@ -133,7 +161,7 @@ describe("ui controls", () => {
     it("ThemeSwitchはclickでtheme storeのmodeを更新すること", async () => {
         const { user } = renderWithProviders(<ThemeSwitch />);
 
-        await user.click(screen.getByRole("checkbox"));
+        await user.click(screen.getByRole("switch"));
 
         expect(useThemeStore.getState().mode).toBe("dark");
     });

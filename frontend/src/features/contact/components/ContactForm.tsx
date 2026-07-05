@@ -6,7 +6,7 @@ import { Box } from "@mui/material";
  */
 export const ContactForm = () => {
     // 送信処理
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         // TODO: API呼び出し
     };

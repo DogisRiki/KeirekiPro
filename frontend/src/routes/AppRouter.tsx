@@ -4,7 +4,8 @@ import { paths } from "@/config/paths";
 import { ProtectedLoader, PublicLoader } from "@/routes/AppLoader";
 import { Box, CircularProgress } from "@mui/material";
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { createBrowserRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 
 const Backup = lazy(() => import("@/pages/Backup").then((module) => ({ default: module.Backup })));
 const ChangePassword = lazy(() =>
