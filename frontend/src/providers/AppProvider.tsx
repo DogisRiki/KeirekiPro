@@ -1,5 +1,4 @@
 import { ErrorBanner, ErrorFallback } from "@/components/errors";
-import { Loading } from "@/components/ui";
 import { env } from "@/config/env";
 import { darkTheme, lightTheme } from "@/config/theme";
 import { queryConfig } from "@/lib";
@@ -44,7 +43,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 <ErrorBoundary FallbackComponent={ErrorFallback}>
                     <QueryClientProvider client={queryClient}>
                         <NotificationProvider />
-                        <Loading />
                         <ErrorBanner />
                         {children}
                         <ReactQueryDevtools initialIsOpen={false} />

@@ -1,5 +1,5 @@
 import { NotFound } from "@/components/errors";
-import { Button, Dialog } from "@/components/ui";
+import { Button, Dialog, Loading } from "@/components/ui";
 import {
     BottomMenu,
     buildPayloadForEntry,
@@ -390,9 +390,9 @@ export const ResumeContainer = () => {
         return <NotFound variant="content" />;
     }
 
-    // データ取得中またはresumeがnullの場合は何も表示しない
+    // データ取得中またはresumeがnullの場合は詳細領域内にローディングを表示する
     if (isLoading || !resume) {
-        return null;
+        return <Loading active variant="content" sx={{ minHeight: "calc(100vh - 240px)" }} />;
     }
 
     // 保存・削除ボタンの表示条件

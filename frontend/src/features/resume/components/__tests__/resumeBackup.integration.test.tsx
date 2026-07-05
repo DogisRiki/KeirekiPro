@@ -59,6 +59,7 @@ describe("resume backup", () => {
 
         renderWithProviders(<BackupContainer />);
 
+        expect(screen.getByRole("progressbar")).toBeVisible();
         expect(screen.queryByText("バックアップ可能な職務経歴書がありません。")).not.toBeInTheDocument();
     });
 

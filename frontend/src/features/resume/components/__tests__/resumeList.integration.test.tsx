@@ -75,6 +75,8 @@ describe("resume list", () => {
 
         renderWithProviders(<ResumeListContainer />);
 
+        expect(screen.getByRole("progressbar")).toBeVisible();
+        expect(screen.getByPlaceholderText("職務経歴書名で検索...")).toBeInTheDocument();
         expect(screen.queryByText("表示するデータがありません。")).not.toBeInTheDocument();
 
         act(() => {

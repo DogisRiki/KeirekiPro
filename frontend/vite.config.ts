@@ -12,6 +12,11 @@ interface ExtendedUserConfig extends UserConfig {
         deps: {
             interopDefault: boolean;
         };
+        server: {
+            deps: {
+                external: string[];
+            };
+        };
     };
 }
 
@@ -61,6 +66,11 @@ export default defineConfig({
         pool: "forks",
         deps: {
             interopDefault: true,
+        },
+        server: {
+            deps: {
+                external: ["axios-auth-refresh"],
+            },
         },
     },
 } as ExtendedUserConfig);
