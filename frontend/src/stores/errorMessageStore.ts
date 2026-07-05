@@ -1,6 +1,7 @@
 import type { ErrorResponse } from "@/types";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
+import { clearNotificationFromStoreCoordinator, registerErrorMessageStoreClear } from "./storeCoordinator";
 
 interface ErrorMessageState {
     message: string | null;
@@ -32,9 +33,7 @@ export const useErrorMessageStore = create<ErrorMessageState>()(
             setErrors: (errorResponse: ErrorResponse) => {
                 // テスト環境以外でNotificationストアをクリア
                 if (import.meta.env.MODE !== "test") {
-                    import("@/stores/notificationStore").then(({ useNotificationStore }) => {
-                        useNotificationStore.getState().clearNotification();
-                    });
+                    clearNotificationFromStoreCoordinator();
                 }
                 set(
                     {
@@ -53,3 +52,7 @@ export const useErrorMessageStore = create<ErrorMessageState>()(
         },
     ),
 );
+
+registerErrorMessageStoreClear(() => {
+    useErrorMessageStore.getState().clearErrors();
+});
