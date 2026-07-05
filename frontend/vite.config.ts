@@ -1,7 +1,6 @@
 import react from "@vitejs/plugin-react";
 import type { UserConfig } from "vite";
 import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 interface ExtendedUserConfig extends UserConfig {
     test?: {
@@ -17,7 +16,10 @@ interface ExtendedUserConfig extends UserConfig {
 }
 
 export default defineConfig({
-    plugins: [react(), tsconfigPaths()],
+    plugins: [react()],
+    resolve: {
+        tsconfigPaths: true,
+    },
     build: {
         rollupOptions: {
             output: {

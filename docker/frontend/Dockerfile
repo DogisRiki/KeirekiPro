@@ -1,6 +1,6 @@
-FROM node:22.22.2-bookworm-slim
+FROM node:24.16.0-bookworm-slim
 
-RUN corepack enable && corepack prepare pnpm@11.5.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.10.0 --activate
 
 USER node
 WORKDIR /home/node/app

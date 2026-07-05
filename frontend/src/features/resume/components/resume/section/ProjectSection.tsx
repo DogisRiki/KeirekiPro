@@ -144,7 +144,11 @@ export const ProjectSection = () => {
                         placeholder="（例）株式会社ABC"
                         error={!!errors.companyName?.length}
                         helperText={stringListToBulletList(errors.companyName)}
-                        slotProps={slotProps}
+                        slotProps={{
+                            ...params.slotProps,
+                            inputLabel: { ...params.slotProps.inputLabel, shrink: true },
+                            formHelperText: { sx: { whiteSpace: "pre-line" } },
+                        }}
                     />
                 )}
                 sx={{ mb: 4 }}

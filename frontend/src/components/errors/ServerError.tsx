@@ -7,12 +7,14 @@ import { Box, Typography } from "@mui/material";
 export const ServerError = () => {
     return (
         <Box
-            display="flex"
-            flexDirection="column"
-            alignItems="center"
-            justifyContent="center"
-            height="100vh"
-            textAlign="center"
+            sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100vh",
+                textAlign: "center",
+            }}
         >
             <Typography variant="h4" gutterBottom>
                 サーバーで問題が発生しました

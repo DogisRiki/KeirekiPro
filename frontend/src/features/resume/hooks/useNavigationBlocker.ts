@@ -1,5 +1,5 @@
 import { useResumeStore } from "@/features/resume";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import type { BlockerFunction } from "react-router";
 import { useBlocker } from "react-router";
 
@@ -19,7 +19,6 @@ interface UseNavigationBlockerReturn {
  */
 export const useNavigationBlocker = (): UseNavigationBlockerReturn => {
     const isDirty = useResumeStore((state) => state.isDirty);
-    const [showDialog, setShowDialog] = useState(false);
 
     // React Router内のナビゲーションをブロック
     const shouldBlock = useCallback<BlockerFunction>(
@@ -33,13 +32,6 @@ export const useNavigationBlocker = (): UseNavigationBlockerReturn => {
     );
 
     const blocker = useBlocker(shouldBlock);
-
-    // blockerがブロック状態になったらダイアログを表示
-    useEffect(() => {
-        if (blocker.state === "blocked") {
-            setShowDialog(true);
-        }
-    }, [blocker.state]);
 
     // ブラウザのbeforeunloadイベント
     useEffect(() => {
@@ -57,7 +49,6 @@ export const useNavigationBlocker = (): UseNavigationBlockerReturn => {
 
     const handleDialogClose = useCallback(
         (confirmed: boolean) => {
-            setShowDialog(false);
             if (confirmed) {
                 blocker.proceed?.();
             } else {
@@ -69,7 +60,7 @@ export const useNavigationBlocker = (): UseNavigationBlockerReturn => {
 
     return {
         dialogProps: {
-            open: showDialog,
+            open: blocker.state === "blocked",
             onClose: handleDialogClose,
         },
     };

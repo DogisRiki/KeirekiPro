@@ -14,7 +14,7 @@ import SecurityIcon from "@mui/icons-material/Security";
 import StarIcon from "@mui/icons-material/Star";
 import WorkIcon from "@mui/icons-material/Work";
 import { alpha, Box, Button, Container, Paper, Typography, useTheme } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import Grid from "@mui/material/Grid";
 import { useNavigate } from "react-router";
 
 /**
@@ -368,7 +368,7 @@ export const LandingPage = () => {
                     >
                         キャリアのすべてを体系的に整理
                     </Typography>
-                    <Grid container spacing={3} justifyContent="center">
+                    <Grid container spacing={3} sx={{ justifyContent: "center" }}>
                         {sections.map((section, index) => (
                             <Grid size={{ xs: 6, sm: 4, md: 2 }} key={index}>
                                 <Paper

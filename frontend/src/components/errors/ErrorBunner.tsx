@@ -2,7 +2,7 @@ import { useErrorMessageStore } from "@/stores";
 import CloseIcon from "@mui/icons-material/Close";
 import { Alert, IconButton, Slide, Snackbar } from "@mui/material";
 import type { TransitionProps } from "@mui/material/transitions";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 const SlideDown = React.forwardRef(function SlideDown(
     props: TransitionProps & { children: React.ReactElement<any, any> },
@@ -16,30 +16,19 @@ const SlideDown = React.forwardRef(function SlideDown(
  */
 export const ErrorBanner = () => {
     const { message, errorId } = useErrorMessageStore();
-    const [open, setOpen] = useState(false);
-    const [dismissed, setDismissed] = useState(false);
+    const [dismissedErrorId, setDismissedErrorId] = useState<string | null>(null);
 
     // 10秒でバナーを自動で閉じる
     const duration = 10000;
-
-    useEffect(() => {
-        if (message) {
-            setDismissed(false); // 新しいエラーが来たら再表示できるように
-            setOpen(true);
-        } else {
-            // messageがクリアされたらバナーを閉じる
-            setOpen(false);
-        }
-    }, [message, errorId]);
+    const open = Boolean(message && errorId !== dismissedErrorId);
 
     const handleClose = (_: React.SyntheticEvent | Event, reason?: string) => {
         if (reason === "clickaway") return;
-        setOpen(false); // バナーを閉じる
-        setDismissed(true); // 閉じたことを記憶
+        setDismissedErrorId(errorId); // 閉じたエラーを記憶
     };
 
-    // 表示条件：メッセージがあり、まだ手動で閉じられていない
-    if (!message || dismissed) return null;
+    // 表示条件：メッセージがある
+    if (!message) return null;
 
     return (
         <Snackbar
