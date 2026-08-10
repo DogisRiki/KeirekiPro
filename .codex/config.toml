@@ -1,5 +1,0 @@
-default_permissions = ":workspace"
-approval_policy = "on-request"
-
-[features]
-skills = true

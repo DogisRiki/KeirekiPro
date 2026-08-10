@@ -6,6 +6,7 @@ interface ExtendedUserConfig extends UserConfig {
     test?: {
         globals: boolean;
         environment: string;
+        include: string[];
         setupFiles: string[];
         reporters: (string | [string, { outputFile: string }])[];
         pool: string;
@@ -15,6 +16,15 @@ interface ExtendedUserConfig extends UserConfig {
         server: {
             deps: {
                 external: string[];
+            };
+        };
+        coverage: {
+            reporter: string[];
+            thresholds: {
+                statements: number;
+                branches: number;
+                functions: number;
+                lines: number;
             };
         };
     };
@@ -61,6 +71,8 @@ export default defineConfig({
     test: {
         globals: true,
         environment: "happy-dom",
+        // ユニットテストは src 配下の *.test.* のみ(e2e/ は Playwright 管轄のため除外)
+        include: ["src/**/*.test.{ts,tsx}"],
         setupFiles: ["./vitest-setup.ts"],
         reporters: ["default", ["junit", { outputFile: "test-results/junit.xml" }]],
         pool: "forks",
@@ -70,6 +82,19 @@ export default defineConfig({
         server: {
             deps: {
                 external: ["axios-auth-refresh"],
+            },
+        },
+        // カバレッジ閾値(drain-then-ratchet 運用)
+        // 初期値は 2026-08-10 時点の実測値(Stmts 79.31 / Branch 59.65 / Funcs 80.6 / Lines 80.86)を
+        // わずかに下回る値で固定。下げる変更は禁止、実測の向上に合わせて段階的に引き上げる。
+        // このファイルは CODEOWNERS 保護対象。
+        coverage: {
+            reporter: ["text", "html", "json-summary"],
+            thresholds: {
+                statements: 79,
+                branches: 59,
+                functions: 80,
+                lines: 80,
             },
         },
     },

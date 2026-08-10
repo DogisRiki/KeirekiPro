@@ -1,0 +1,43 @@
+name: Canary Gate Check
+
+# ゲートの健康診断(月次): 3種のカナリアPRを自動生成し、
+# CI・Codexレビューが全て赤にできることを確認する。
+# 結果の確認と後始末(PRクローズ)は月次監査で行う(doc/開発フロー/監査手順.md)。
+
+on:
+  schedule:
+    # 毎月1日 09:00 JST (00:00 UTC)
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: canary
+  cancel-in-progress: false
+
+jobs:
+  create-canaries:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          # デフォルトのGITHUB_TOKENではカナリアPRのCIが発火しないため、botのPATを使う
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+
+      - name: Configure bot identity
+        run: |
+          git config user.name "keirekipro-canary-bot"
+          git config user.email "canary-bot@users.noreply.github.com"
+
+      - name: Create canary PRs
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: |
+          chmod +x .github/scripts/create-canary-prs.sh
+          .github/scripts/create-canary-prs.sh

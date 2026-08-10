@@ -1,1 +1,35 @@
-* @DogisRiki
+# =====================================================================
+# ゲート設定ファイルの保護(見張りを守る見張り)
+#
+# ここに列挙したパスを含むPRは、ブランチ保護の
+# "Require review from Code Owners" によりリポジトリ所有者(人間)の
+# 承認が必須になる。それ以外のPRは全自動マージの対象。
+#
+# 注意: ワイルドカード(*)での全体割り当ては行わないこと。
+#       全ファイルがレビュー必須になり自律マージが機能しなくなる。
+# =====================================================================
+
+# CI/CDワークフローと検知ジョブ(ゲートの実行主体)
+/.github/                                       @DogisRiki
+
+# Claude Code ハーネス(permissions/hooks/skills/設定)
+/.claude/                                       @DogisRiki
+
+# frontend 品質ゲート定義
+/frontend/eslint.config.js                      @DogisRiki
+/frontend/vite.config.ts                        @DogisRiki
+
+# backend 品質ゲート定義(build.gradle から分離。apply from 行の存在は guardrails CI が検証)
+/backend/gradle/quality.gradle                  @DogisRiki
+
+# backend 品質ゲートの外部設定(checkstyle/formatter/spotbugs除外)
+/backend/config/                                @DogisRiki
+
+# アーキテクチャ境界の機械強制(ArchUnit)
+/backend/src/test/java/com/example/keirekipro/unit/architecture/  @DogisRiki
+
+# DBマイグレーション(人間ゲート: 承認前にローカルDBで適用・巻き戻しを確認する)
+/backend/src/main/resources/db/migration/       @DogisRiki
+
+# このファイル自身
+/.github/CODEOWNERS                             @DogisRiki

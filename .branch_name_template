@@ -32,4 +32,4 @@ fix/resume-not-found-handling
 refactor/split-usecase-exceptions
 docs/update-agent-guidelines
 test/add-resume-update-tests
-chore/update-codex-skills
+chore/update-claude-skills

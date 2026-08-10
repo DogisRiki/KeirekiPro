@@ -53,14 +53,19 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 
 | フェーズ | ワークフロー | トリガー | 処理内容 |
 |---------|-------------|---------|---------|
-| CI | ci.yaml | push / PR | paths-filterでfrontend/backendの変更検知、Frontend: Format → Lint → Test → Coverage → Production Build、Backend: Gradle check |
+| CI | ci.yaml | push / PR | paths-filterで変更検知、Frontend: Format → Lint → Test → Coverage → Build、E2Eスモーク(Playwright)、Backend: Gradle check(カバレッジ閾値込み) |
+| ガードレール | guardrails.yaml | PR | 逃げ道封鎖(skip/除外/型抑止の検知)、PRサイズ検査、migrationラベル、gitleaks、品質レポート(knip/jscpd/Javaアサーション) |
+| 依存ゲート | dependency-gate.yaml | PR / review | 依存パッケージ「追加」の検知(所有者Approveで緑に再評価) |
+| クロスAIレビュー | codex-review.yml | PR | Codexによる自動レビュー(コード品質・spec適合の2軸VERDICT。required check) |
 | Infrastructure | terraform-plan.yaml | PR (terraform/**) | Terraform Plan実行、PRにplan結果をコメント |
 | Infrastructure | terraform-apply.yaml | push to main (terraform/**) | Terraform Apply実行（アプリケーションデプロイとは独立） |
-| Backend CD | ci.yaml → backend-deploy.yaml | push to main (backend/**) | 変更対象のCI通過後、Docker Build → ECR Push → ECS Deploy → Wait Stable |
-| Frontend CD | ci.yaml → frontend-deploy.yaml | push to main (frontend/**) | CIで生成した`frontend-dist`をS3へ配布 → CloudFront Cache Invalidate |
+| **本番リリース** | **release.yaml** | **manual (workflow_dispatch)** | 人間の手動トリガーでのみ本番デプロイ(backend → frontendの順)。mainマージ ≠ 本番反映 |
 | Frontend Rollback | frontend-rollback.yaml | manual | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
+| Claude | claude.yml | @claudeメンション / 週次 | Issue/PRからのCI上での作業、週次依存バージョン更新レーン |
+| Mutation Report | mutation-report.yaml | 週次 | Stryker(frontend)/PIT(backend)のmutation testingレポート |
+| Canary | canary.yaml | 月次 | ゲート健康診断用カナリアPRを3種自動生成 |
 
-frontend/backendの両方に変更がある場合は、両方のCIが成功してからbackend、frontendの順にデプロイします。backendのデプロイに失敗した場合はfrontendを公開せず、frontendの公開失敗時は成功済みartifactを再配布して復旧します。
+mainへのマージは「デプロイ可能な状態の確定」であり、本番反映はrelease.yamlの手動トリガーでのみ行います。frontend/backendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開失敗時は成功済みartifactを再配布して復旧します。
 
 | 特徴 | 説明 |
 |------|------|
@@ -222,101 +227,75 @@ frontend/src/
 keirekipro/
 ├── frontend/                 # フロントエンド (React/TypeScript)
 ├── backend/                  # バックエンド (Spring Boot/Java)
+│   └── gradle/quality.gradle #   品質ゲート定義(CODEOWNERS保護)
 ├── terraform/                # インフラ定義
-│   ├── modules/              # Terraformモジュール
-│   ├── main.tf
-│   └── variables.tf
-├── .github/workflows/        # CI/CD定義
-│   ├── ci.yaml
-│   ├── frontend-deploy.yaml
-│   ├── frontend-rollback.yaml
-│   ├── backend-deploy.yaml
-│   ├── terraform-plan.yaml
-│   └── terraform-apply.yaml
+├── .github/                  # CI/CD・ガードレール(CODEOWNERS保護)
+│   ├── workflows/            #   ci / guardrails / dependency-gate / codex-review /
+│   │                         #   release / claude / mutation-report / canary / deploy系
+│   ├── scripts/              #   検知スクリプト群
+│   └── CODEOWNERS            #   ゲート設定ファイルの保護定義
+├── .claude/                  # Claude Codeハーネス(skills / hooks / loop.md)
+├── .kiro/                    # spec駆動開発(specs=仕様書, steering=プロジェクト知識)
 ├── docker/                   # Docker設定
-├── docs/                     # 設計ドキュメント
+├── doc/                      # 設計ドキュメント・開発フロー・監査手順
+├── CLAUDE.md                 # AIエージェント向けプロジェクトガイド
+├── REVIEW.md                 # /code-review のカスタマイズ
 └── compose.yaml
 ```
 
-## AI駆動開発
+## 自律開発パイプライン(AI駆動開発)
 
-本プロジェクトでは、Codex IDE と MCP（Model Context Protocol）を利用し、Issue 起点の計画作成・レビュー・実装支援を行います。
+本プロジェクトの開発は **Claude Code** を基盤とした「人間はコードを読まない」前提の自律パイプラインで行います。
+安全は人間のコードレビューではなく、多層の機械ゲートとクロスAIレビューが担保します。
+詳細は [開発フロー](doc/開発フロー/開発フロー.md) / [ループ契約](doc/開発フロー/ループ契約.md) / [監査手順](doc/開発フロー/監査手順.md) を参照してください。
 
-AI エージェントには、リポジトリ全体を無制限に操作させず、GitHub MCP の利用範囲を Issue / Pull Request / GitHub Actions の読み取りと、承認済み Plan の Issue コメント投稿に限定しています。
+### 人間の役割(5つだけ)
+
+1. **意図の定義** — Issue起票(1〜2行)とspec承認(仕様の意思決定。コードは読まない)
+2. **ループの設計・監視・改善** — 週次・月次監査でゲートとループの健全性を確認し、すり抜けをゲート強化へ還元
+3. **体験検証** — 本番デプロイ前にローカルでmainを起動して触って確認
+4. **例外ゲートの承認** — DBマイグレーション・依存追加・ゲート設定変更を含むPRのみ承認
+5. **リリース判断** — 本番デプロイの手動トリガー(マージには関与しない)
+
+マージ判定は機械的: **Codexレビュー(コード品質・spec適合)両軸LGTM + 必須チェック全グリーン → auto-merge**
+
+### 3つの開発レーン
+
+| レーン | 対象 | フロー |
+|-------|------|-------|
+| **Lane A** | 新機能・複数層の変更 | Issue → spec駆動(cc-sdd: `/kiro-discovery`→requirements→design→tasks を人間が承認)→ `/kiro-impl`+`/goal` 自律実装 → `/ship` → クロスAIレビュー → auto-merge |
+| **Lane B** | 小修正(コード差分200行以内) | Issue → 直接実装 → `/ship` → 同上(200行超はCIがLane Aへ差し戻し) |
+| **Lane C** | 自律メンテ | `/loop`(定期verify・PR監視)、`@claude`メンション、週次依存更新、週次mutationレポート、月次カナリア |
+
+### ガードレール(「読まない」を成立させる多層防御)
+
+| 層 | 内容 |
+|---|------|
+| テスト+閾値 | Vitest/JUnit+Testcontainers、カバレッジ閾値(下回るとCI赤) |
+| 静的解析 | ESLint(アーキテクチャ境界+アサーション必須)、tsc、ArchUnit 18ルール、Checkstyle/SpotBugs、tflint/checkov |
+| 逃げ道封鎖 | テストskip・アサーション削除・`@ts-ignore`・インラインdisable・ゲート配線破壊をCIが検知して赤 |
+| 人間ゲート | DBマイグレーション/依存追加/ゲート設定変更のみ人間承認必須(CODEOWNERS + dependency-gate) |
+| クロスAIレビュー | **Claudeが書き、Codexが読む**。2軸VERDICTをジョブ自身が判定(コメント偽装無効)。最大5往復の修正ループ、収束しなければ人間へエスカレーション(spec差し戻し/分割/破棄の3択) |
+| ゲート自体の保護 | CODEOWNERSで設定ファイルを保護し、エージェントは別アイデンティティ(bot)でPRを作成 |
+| リリース分離 | mainマージ ≠ 本番反映。デプロイは人間の手動トリガーのみ |
+| 健康診断 | 月次カナリアPR(既知バグ・アサーション無しテスト・skip)でゲートの検出能力を検証 |
+
+### MCP
 
 | MCP | 用途 |
 |-----|------|
-| GitHub MCP | Issue / PR / Actions の参照、Approved Plan の Issue コメント投稿 |
 | Context7 MCP | ライブラリ・フレームワーク公式ドキュメントの参照 |
-| Playwright MCP | ブラウザ操作を伴う動作確認・E2E観点の検証 |
+| Playwright MCP | `/verify-ui` でのブラウザ実機検証(スクリーンショット・コンソール確認) |
 
-### AI駆動開発フロー
+GitHub操作はMCPではなく `gh` CLI(botプロファイル)で行います。
 
-| ステップ | 担当 | 内容 |
-|---------|------|------|
-| 1 | 開発者 | Issue を作成する |
-| 2 | Codex IDE | GitHub MCP で Issue を読む |
-| 3 | Codex IDE | 実装 Plan を作成する |
-| 4 | 開発者 | Plan を確認する |
-| 5 | Claude / ChatGPT | Plan をレビューする |
-| 6 | Codex IDE | 指摘があれば Plan を修正する |
-| 7 | 開発者 | Plan を承認する |
-| 8 | Codex IDE | Approved Plan を Issue コメントに投稿する |
-| 9 | 開発者 | 実装開始を承認する |
-| 10 | Codex IDE | ローカル作業ツリーで実装する |
-| 11 | 開発者 | 任意のタイミングで `code-review` Skill によるレビューを依頼する |
-| 12 | Codex IDE | staged / unstaged / untracked の現在差分を読み、修正担当 AI エージェント向けのレビュー結果を出す |
-| 13 | Codex IDE | レビュー指摘をもとに必要な修正を行う |
-| 14 | 開発者 | 最終差分と検証結果を確認する |
-
-### GitHub MCPの権限制御
-
-GitHub MCP には Fine-grained Personal Access Token を使用し、以下の権限に限定します。
-
-| Permission | Access |
-|-----------|--------|
-| Contents | Read-only |
-| Issues | Read and write |
-| Pull requests | Read-only |
-| Actions | Read-only |
-| Metadata | Read-only |
-
-Codex IDE に許可する操作は以下です。
-
-- Issue を読む
-- Issue コメントを読む
-- Issue に Approved Plan をコメント投稿する
-- PR を読む
-- PR の diff / files / comments / reviews / check runs を読む
-- GitHub Actions の workflow / run / job / logs を読む
-- GitHub 上のファイル内容を読む
-
-Codex IDE に許可しない操作は以下です。
-
-- GitHub 上でコードを直接変更する
-- branch を作成する
-- commit を作成する
-- push する
-- PR を作成する
-- PR を更新する
-- PR review を投稿する
-- merge する
-- workflow を手動実行する
-- deploy する
-
-## Codex Skills
-
-本プロジェクトでは、Codex Skills を利用し、繰り返し発生する作業を定型化しています。
-
-現在、本プロジェクトでは以下のスキルを使用します。
+### Claude Code Skills
 
 | Skill | 用途 |
 |------|------|
-| `diff-backend-class-diagram-sync` | Git差分に含まれるバックエンドソースの変更を、クラス図へ同期する |
-| `full-backend-class-diagram-sync` | バックエンドソース全体を正として、クラス図全体を同期する |
-| `diff-db-er-diagram-sync` | Git差分に含まれる DB マイグレーションファイル の変更を、ER図へ同期する |
-| `full-db-er-diagram-sync` | DB マイグレーションファイル 全体を正として、ER図全体を同期する |
-| `draft-branch-name-and-commit-message` | 現在の Git 差分から、ブランチ名とコミットメッセージ案を作成する |
-| `draft-issue-plan` | GitHub Issue の本文とコメントを読み、実装 Plan を作成する |
-| `post-issue-plan-comment` | 作成済みの Plan を指定した GitHub Issue にコメント投稿する |
-| `code-review` | 現在の Git 差分を読み、レビュー結果を作成する |
+| `/verify-frontend` `/verify-backend` `/verify-terraform` `/verify-all` | 品質ゲートの直列実行(ゴールハック禁止則付き)。ループの検証端点 |
+| `/verify-ui` | devサーバ起動+Playwright MCPでの実画面検証 |
+| `/ship` | verify → commit → push → PR作成 → auto-merge予約 → CI監視 |
+| `/review-loop` | Codex指摘の分類(本修正/妥当nit/誤検知)と修正ループ(最大5往復) |
+| `/retrospective` | ゲートすり抜けの「ゲート追加・強化」への還元 |
+| `/kiro-*` | spec駆動開発(cc-sdd): discovery / requirements / design / tasks / impl 等 |

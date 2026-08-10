@@ -29,6 +29,7 @@ coverage
 
 # tests
 test-results
+playwright-report
 
 # Allow only these mode env files
 !.env.development

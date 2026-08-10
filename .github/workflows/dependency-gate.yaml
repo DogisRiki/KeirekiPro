@@ -1,0 +1,57 @@
+name: Dependency Gate
+
+# 依存パッケージ「追加」の人間ゲート(required check に指定する)。
+#
+# 判定: 依存追加あり かつ リポジトリ所有者のApproveなし -> 赤
+#       所有者がApproveした時点で pull_request_review 発火により再評価され緑になる
+#       (auto-merge が自然成立する)。バージョン更新のみのPRは常に緑(週次自動レーン用)。
+# Approve判定は所有者アカウントで照合し、bot・第三者のApproveは無効。
+
+on:
+  pull_request:
+    branches: [main]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dependency-gate-${{ github.event.pull_request.number }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-gate:
+    name: dependency-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check owner approval
+        id: approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          owner="${{ github.repository_owner }}"
+          verdict=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate \
+            --jq "[.[] | select(.user.login == \"$owner\") | select(.state == \"APPROVED\" or .state == \"CHANGES_REQUESTED\" or .state == \"DISMISSED\")] | sort_by(.submitted_at) | last | .state // \"NONE\"")
+          echo "Owner review verdict: $verdict"
+          if [ "$verdict" = "APPROVED" ]; then
+            echo "approved=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "approved=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run dependency addition check
+        env:
+          OWNER_APPROVED: ${{ steps.approval.outputs.approved }}
+        run: |
+          chmod +x .github/scripts/check-dependency-additions.sh
+          .github/scripts/check-dependency-additions.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"

@@ -1,5 +1,9 @@
 name: CI Workflow
 
+# 本番デプロイはこのワークフローからは行わない。
+# mainへのマージ = デプロイ可能な状態の確定(成果物artifactの保存)であり、
+# 実際の本番反映は release.yaml (workflow_dispatch) の手動トリガーでのみ行う。
+
 on:
   push:
     branches: [main]
@@ -97,6 +101,51 @@ jobs:
             frontend/coverage/**
           retention-days: 7
 
+  e2e-smoke:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.16.0'
+          check-latest: true
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build for production
+        run: pnpm run build
+
+      - name: Run E2E smoke tests
+        run: pnpm exec playwright test
+
+      - name: Upload E2E report
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: e2e-smoke-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
   backend-test:
     needs: detect-changes
     if: needs.detect-changes.outputs.backend_changed == 'true'
@@ -138,52 +187,3 @@ jobs:
             backend/build/reports/**
             backend/build/test-results/**
           retention-days: 7
-
-  deploy-gate:
-    needs:
-      - detect-changes
-      - frontend-test
-      - backend-test
-    if: >-
-      always() &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      needs.detect-changes.result == 'success' &&
-      (needs.detect-changes.outputs.frontend_changed != 'true' || needs.frontend-test.result == 'success') &&
-      (needs.detect-changes.outputs.backend_changed != 'true' || needs.backend-test.result == 'success') &&
-      (needs.detect-changes.outputs.frontend_changed == 'true' || needs.detect-changes.outputs.backend_changed == 'true')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Confirm deployment prerequisites
-        run: echo "All checks required for this release have succeeded."
-
-  backend-deploy:
-    needs:
-      - detect-changes
-      - deploy-gate
-    if: >-
-      always() &&
-      needs.deploy-gate.result == 'success' &&
-      needs.detect-changes.outputs.backend_changed == 'true'
-    permissions:
-      id-token: write
-      contents: read
-    uses: ./.github/workflows/backend-deploy.yaml
-    secrets: inherit
-
-  frontend-deploy:
-    needs:
-      - detect-changes
-      - deploy-gate
-      - backend-deploy
-    if: >-
-      always() &&
-      needs.deploy-gate.result == 'success' &&
-      needs.detect-changes.outputs.frontend_changed == 'true' &&
-      (needs.detect-changes.outputs.backend_changed != 'true' || needs.backend-deploy.result == 'success')
-    permissions:
-      id-token: write
-      actions: read
-      contents: read
-    uses: ./.github/workflows/frontend-deploy.yaml
-    secrets: inherit

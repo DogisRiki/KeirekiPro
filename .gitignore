@@ -2,3 +2,7 @@
 !.env.*.example
 output.sh
 output_result.txt
+
+# Claude Code セッションローカル状態(hooks用)
+.claude/.state/
+.claude/settings.local.json

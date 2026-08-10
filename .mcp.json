@@ -1,0 +1,16 @@
+{
+    "mcpServers": {
+        "playwright": {
+            "type": "stdio",
+            "command": "docker",
+            "args": ["run", "-i", "--rm", "--add-host=host.docker.internal:host-gateway", "mcr.microsoft.com/playwright/mcp"]
+        },
+        "context7": {
+            "type": "http",
+            "url": "https://mcp.context7.com/mcp",
+            "headers": {
+                "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+            }
+        }
+    }
+}
