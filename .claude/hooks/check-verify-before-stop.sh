@@ -1,0 +1,89 @@
+#!/bin/bash
+# =====================================================================
+# Stop hook: 品質ゲート未実行の注意喚起
+#
+# 未コミットの変更がある領域(frontend/backend/terraform)について、
+# 最終変更(epoch秒)より後に品質ゲートの完了コマンドが実行されて
+# いなければ停止をブロックして注意喚起する(exit 2)。
+# 無限ループ防止のため stop_hook_active のときは常に通す。
+# 前提: Git for Windows(Git Bash同梱)。JSON解析は同梱perl(JSON::PP)を使用。
+# =====================================================================
+set -u
+
+payload=$(cat)
+
+extract() {
+    printf '%s' "$payload" | perl -MJSON::PP -e '
+        local $/; my $d = eval { JSON::PP::decode_json(<STDIN>) };
+        exit 0 unless ref $d;
+        my $v = $d;
+        for my $k (@ARGV) { $v = eval { $v->{$k} }; last unless defined $v; }
+        if (defined $v && !ref $v) { print $v }
+        elsif (defined $v && JSON::PP::is_bool($v)) { print $v ? "true" : "false" }
+    ' -- "$@" 2>/dev/null
+}
+
+# Stop hookからの継続中は再ブロックしない(無限ループ防止)
+stop_active=$(extract stop_hook_active)
+case "$stop_active" in
+    true | 1) exit 0 ;;
+esac
+
+project_dir="${CLAUDE_PROJECT_DIR:-}"
+[ -z "$project_dir" ] && project_dir=$(extract cwd)
+[ -z "$project_dir" ] && exit 0
+project_dir=${project_dir//\\//}
+[ -d "$project_dir" ] || exit 0
+cd "$project_dir" || exit 0
+
+state_dir="$project_dir/.claude/.state"
+
+changed=$(git status --porcelain 2>/dev/null)
+[ -z "$changed" ] && exit 0
+
+pending_areas=""
+for area in frontend backend terraform; do
+    # porcelain形式の3文字目以降がパス(リネームは「old -> new」の new 側を使う)
+    area_files=$(printf '%s\n' "$changed" | cut -c4- | sed 's/^.* -> //' | grep -E "^$area/" || true)
+    [ -z "$area_files" ] && continue
+
+    stamp_file="$state_dir/gate-run-$area.txt"
+    if [ ! -f "$stamp_file" ]; then
+        pending_areas="$pending_areas $area"
+        continue
+    fi
+
+    gate_run_at=$(cat "$stamp_file" 2>/dev/null)
+    case "$gate_run_at" in
+        '' | *[!0-9]*)
+            # epoch秒として読めない(旧形式・破損)場合はスタンプ無し扱い
+            pending_areas="$pending_areas $area"
+            continue
+            ;;
+    esac
+
+    latest_change=0
+    while IFS= read -r f; do
+        [ -e "$f" ] || continue
+        mtime=$(stat -c %Y "$f" 2>/dev/null) || continue
+        if [ "$mtime" -gt "$latest_change" ]; then
+            latest_change=$mtime
+        fi
+    done <<<"$area_files"
+
+    if [ "$latest_change" -gt "$gate_run_at" ]; then
+        pending_areas="$pending_areas $area"
+    fi
+done
+
+pending_areas=${pending_areas# }
+if [ -n "$pending_areas" ]; then
+    areas=$(printf '%s' "$pending_areas" | sed 's/ /, /g')
+    {
+        echo "品質ゲート未実行の変更があります: $areas"
+        echo "完了報告の前に、該当領域の verify(/verify-all)を実行してください。実行不要な理由がある場合はその旨を報告に含めてください。"
+    } >&2
+    exit 2
+fi
+
+exit 0

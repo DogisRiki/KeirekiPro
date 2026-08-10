@@ -90,7 +90,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/protect-main.ps1",
+                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/protect-main.sh",
                         "timeout": 15
                     }
                 ]
@@ -102,7 +102,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/check-encoding.ps1",
+                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/check-encoding.sh",
                         "timeout": 15
                     }
                 ]
@@ -112,7 +112,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/record-gate-run.ps1",
+                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/record-gate-run.sh",
                         "timeout": 10
                     }
                 ]
@@ -123,7 +123,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/check-verify-before-stop.ps1",
+                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/check-verify-before-stop.sh",
                         "timeout": 20
                     }
                 ]

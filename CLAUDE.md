@@ -57,6 +57,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 ## Git規約
 
+- 前提: ホストOSに **Git for Windows(Git Bash同梱)が必須**(`.claude/hooks/` のフックはGit Bashで実行される。シェルスクリプトは `.gitattributes` でLF強制)
 - Git操作はホストOSのリポジトリルートで実行する(devcontainer内Gitは無効)
 - ブランチ名は `.branch_name_template`、コミットメッセージは `.commit_template` に従う
 - PR本文には必ず `Refs: #<Issue番号>` を含める。テストのアサーションを意図的に変更した場合は

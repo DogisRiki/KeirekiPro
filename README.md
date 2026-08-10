@@ -33,6 +33,8 @@
 
 Docker Composeで7コンテナを起動し、DevContainerで開発を行います。
 
+**前提条件**: ホストOSに **Git for Windows(Git Bash同梱)が必須**です(Git操作はホストOSで実行する運用のため。また `.claude/hooks/` のフックはGit Bashで実行されます)。
+
 ![Development Environment](doc/インフラ設計/構成図/開発環境構成/開発環境構成図.drawio.svg)
 
 | コンテナ | 用途 |
