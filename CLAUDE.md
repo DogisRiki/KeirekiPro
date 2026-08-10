@@ -1,7 +1,10 @@
 # KeirekiPro
 
 エンジニア向け職務経歴書の作成・管理を行うフルスタックWebアプリケーション。
-開発は「人間はコードを読まない」前提の自律パイプラインで行う(詳細: `doc/開発フロー/開発フロー.md`)。
+開発は、人間がコードをレビューしないことを前提とした自律パイプラインで行う。
+実装からマージまでを自律的に進め、品質は自動チェック(テスト・静的解析・カバレッジ閾値・
+Codexによるクロスレビュー)で担保する。人間が関与するのは、Issue起票・specの承認・
+影響の大きい変更の承認・デプロイ前確認・デプロイ実行のみ。
 
 ## リポジトリ構成
 
@@ -14,7 +17,7 @@
 | `.github/` | CI/CD・ガードレール(CODEOWNERS保護) | - |
 | `.kiro/specs/` | spec(仕様書。監査証跡としてコミット) | - |
 | `.kiro/steering/` | steering(プロジェクト知識) | - |
-| `doc/` | 設計図・開発フロー・監査手順 | - |
+| `doc/` | 設計図(クラス図・ER図・インフラ設計等)と人間向けの運用文書 | - |
 
 ## 品質ゲート(すべて Docker Compose 経由・この順で直列実行。並列実行禁止)
 
@@ -50,10 +53,13 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 - 作業は必ずfeatureブランチで行う。mainブランチではcommit/pushしない(hookでもブロックされる)
 - ゲート設定ファイル(`.github/` `.claude/` `eslint.config.js` `vite.config.ts` `backend/gradle/quality.gradle` `backend/config/` ArchUnitテスト `CODEOWNERS`)は変更しない。変更が必要なときは理由を添えて人間に提案する
-- 依存パッケージの追加・DBマイグレーションを含むPRは人間の承認が必要(dependency-gate / CODEOWNERSが機械強制)
+- 人間の承認が必要な変更: 依存パッケージの追加・DBスキーマ変更(マイグレーション)・ゲート設定の変更・リポジトリ外部へのデータ送信。これらを含むPRは承認まで自動マージされない(dependency-gate / CODEOWNERSが機械強制)
 - テストのskip化・アサーション削除・カバレッジ/lint除外の追加で「見かけの合格」を作らない(escape-hatchチェックが機械検知)
 - 200行(コード差分)を超える変更はspec駆動(Lane A)で行い、PR本文に `Spec: .kiro/specs/<feature>` を記載する
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
+- 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)
+- 依頼範囲外の問題を見つけたら報告のみ行う(勝手に直さない)
+- `/loop` などの定期実行ループの中からはcommit/pushしない(出荷は明示的な `/ship` でのみ行う)
 
 ## Git規約
 
