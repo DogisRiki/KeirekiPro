@@ -38,8 +38,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           owner="${{ github.repository_owner }}"
-          verdict=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate \
-            --jq "[.[] | select(.user.login == \"$owner\") | select(.state == \"APPROVED\" or .state == \"CHANGES_REQUESTED\" or .state == \"DISMISSED\")] | sort_by(.submitted_at) | last | .state // \"NONE\"")
+          verdict=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate --slurp \
+            --jq "[.[][] | select(.user.login == \"$owner\") | select(.state == \"APPROVED\" or .state == \"CHANGES_REQUESTED\" or .state == \"DISMISSED\")] | sort_by(.submitted_at) | last | .state // \"NONE\"")
           echo "Owner review verdict: $verdict"
           if [ "$verdict" = "APPROVED" ]; then
             echo "approved=true" >> "$GITHUB_OUTPUT"
