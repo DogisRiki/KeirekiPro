@@ -1,0 +1,63 @@
+name: Pre-merge Check
+
+# マージ前の人間確認(選択式)。
+#
+# 人間がIssueに pre-merge-check ラベルを付けると、/ship が作るPRへ引き継がれる
+# (PRに直接付けてもよい)。ラベル付きPRは、リポジトリ所有者のApproveがあるまで
+# このチェックが赤になり、マージが保留される(required check に指定する)。
+# 用途: マージ前にローカルで画面を確認したい変更。確認して問題があれば
+# PRコメントで差し戻す(Issueの再起票はしない)。
+#
+# 判定は dependency-gate と同方式: 所有者アカウント名で照合し、bot・第三者の
+# Approveは無効。承認後にコミットが積まれると承認は自動で無効になり(Dismiss stale
+# approvals)、このチェックも再び赤に戻る。
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches: [main]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: pre-merge-check-${{ github.event.pull_request.number }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  pre-merge-check:
+    name: pre-merge-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate pre-merge-check label and owner approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          OWNER_LOGIN: ${{ github.repository_owner }}
+        run: |
+          # ラベルはイベントペイロードではなくAPIから取得する(古い情報を見ない)
+          has_label=$(gh api "repos/$REPO/issues/$PR_NUMBER/labels" \
+            --jq '[.[].name] | contains(["pre-merge-check"])')
+
+          if [ "$has_label" != "true" ]; then
+            echo "pre-merge-check ラベルなし。確認は不要のため通過します。"
+            exit 0
+          fi
+
+          # --paginate は --slurp を併用する(ページ単位でjqが適用され判定を誤るため)
+          verdict=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" --paginate --slurp \
+            --jq "[.[][] | select(.user.login == \"$OWNER_LOGIN\") | select(.state == \"APPROVED\" or .state == \"CHANGES_REQUESTED\" or .state == \"DISMISSED\")] | sort_by(.submitted_at) | last | .state // \"NONE\"")
+          echo "Owner review verdict: $verdict"
+
+          if [ "$verdict" = "APPROVED" ]; then
+            echo "pre-merge-check ラベル付きPRですが、リポジトリ所有者のApprove済みのため通過します。"
+            exit 0
+          fi
+
+          echo "::error::このPRには pre-merge-check ラベルが付いています。所有者がローカルで確認してApproveするまでマージは保留されます(問題があればPRコメントで差し戻してください)。"
+          exit 1

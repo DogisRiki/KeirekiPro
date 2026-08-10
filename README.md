@@ -282,9 +282,10 @@ sequenceDiagram
     end
 
     alt レビューが収束したとき
-        alt DBマイグレーション・依存ライブラリの追加・チェック設定の変更を含むとき
+        alt DBマイグレーション・依存ライブラリの追加・チェック設定の変更・Issueに付けた pre-merge-check ラベルを含むとき
             CI->>Human: 該当の必須チェックが人間の承認待ちとなり、マージが保留される
             Human->>Human: DBマイグレーションを含むときは、対象ブランチを ./start-dev.sh でローカル起動して適用と動作を確認する
+            Human->>Human: pre-merge-check ラベルのときは、対象ブランチを ./start-dev.sh でローカル起動して画面を確認する
             Human-->>CI: GitHubのプルリクエスト画面で Review changes から Approve する
             CI->>CI: 必須チェックがすべて成功したことを確認し、auto-mergeでmainブランチへ取り込む
         else 通常の変更のとき

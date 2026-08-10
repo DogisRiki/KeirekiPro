@@ -29,11 +29,16 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
    - テストのアサーションを意図的に変更した場合: `Test-Change-Justification: <理由>`
    - 変更概要・検証結果(verifyのReport)
 
+   対応するIssue(Refs: #<Issue番号>)に `pre-merge-check` ラベルが付いている場合は、
+   PRにも同じラベルを付与する(ラベルが無ければ
+   `gh label create pre-merge-check --description "マージ前に人間がローカルで確認するPR" --color 1D76DB` で作成)。
+   このラベルのPRは、所有者がローカル確認してApproveするまで pre-merge-check チェックが赤のままになる。
+
 6. **auto-merge予約**: `gh pr merge --auto --squash <PR番号>`
 
 7. **CI監視**: `gh pr checks <PR番号> --watch` で必須チェックの結果を見届ける。
    - 赤になったら修正してpushする(以降のレビュー対応は `/review-loop` に従う)
-   - `dependency-gate` / CODEOWNERS起因の待ちは人間の承認待ちなので、その旨を報告して終了する
+   - `dependency-gate` / `pre-merge-check` / CODEOWNERS起因の待ちは人間の承認待ちなので、その旨を報告して終了する
 
 ## Rules
 
