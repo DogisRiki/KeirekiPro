@@ -46,6 +46,30 @@ spotbugs {
     excludeFilter.set(file("${rootDir}/config/spotbugs/exclude.xml"))
 }
 
+// 何も検証していないテストの検出(PMD: UnitTestShouldIncludeAssert 1本のみ)
+pmd {
+    toolVersion = '7.14.0'
+    ruleSets = []
+    ruleSetFiles = files("${rootDir}/config/pmd/ruleset.xml")
+    consoleOutput = true
+    // 警告のみで開始(ビルドを失敗させない)。誤検知の設定整理(config/pmd/ruleset.xml の
+    // extraAssertMethodNames)が完了して実検出が0になったら、false へ変更してビルド失敗へ昇格する
+    // (判定は監査手順の週次項目で行う)
+    ignoreFailures = true
+}
+
+// 対象はテストコードのみ(ルールがテスト専用のため、main側の実行は無効化)
+tasks.named('pmdMain') {
+    enabled = false
+}
+
+tasks.withType(Pmd).configureEach {
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+
 tasks.named('jacocoTestReport') {
     dependsOn test
 

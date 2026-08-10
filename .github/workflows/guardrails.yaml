@@ -184,8 +184,76 @@ jobs:
           npx --yes jscpd frontend/src backend/src/main/java --min-lines 10 --reporters console 2>&1 | tail -30 >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Java test assertion report
+  java-assertion-report:
+    name: java-assertion-report (non-blocking)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Detect backend changes
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+
+      - name: Set up JDK 21
+        if: steps.filter.outputs.backend == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle dependencies
+        if: steps.filter.outputs.backend == 'true'
+        uses: actions/cache@v5
+        with:
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Run PMD UnitTestShouldIncludeAssert (report mode)
+        if: steps.filter.outputs.backend == 'true'
+        continue-on-error: true
+        working-directory: backend
+        run: |
+          chmod +x ./gradlew
+          ./gradlew pmdTest
+
+      - name: Summarize PMD report
+        if: steps.filter.outputs.backend == 'true'
         continue-on-error: true
         run: |
-          chmod +x .github/scripts/report-java-test-assertions.sh
-          .github/scripts/report-java-test-assertions.sh
+          report="backend/build/reports/pmd/test.xml"
+          count=0
+          if [ -f "$report" ]; then
+            count=$(grep -c "<violation" "$report" || true)
+          fi
+          {
+            echo "### :mag: 何も検証していないJavaテストのレポート(PMD UnitTestShouldIncludeAssert・警告のみ)"
+            echo ""
+            echo "検出件数: **${count} 件**"
+            if [ "$count" -gt 0 ]; then
+              echo ""
+              echo "誤検知(ヘルパーメソッド経由で検証しているテスト)は、backend/config/pmd/ruleset.xml の"
+              echo "extraAssertMethodNames に検証メソッド名を追加して抑える。"
+            fi
+            echo ""
+            echo "> 昇格条件: 誤検知の設定整理が完了して実検出が0になったら、backend/gradle/quality.gradle の"
+            echo "> PMD設定 ignoreFailures を false にしてビルド失敗へ昇格する(監査手順の週次項目で判定)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload PMD report
+        if: steps.filter.outputs.backend == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: pmd-test-report
+          path: backend/build/reports/pmd/
+          retention-days: 7
+          if-no-files-found: ignore
