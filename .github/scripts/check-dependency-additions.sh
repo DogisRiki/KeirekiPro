@@ -21,6 +21,12 @@ BASE_SHA="${1:?base sha required}"
 HEAD_SHA="${2:?head sha required}"
 OWNER_APPROVED="${OWNER_APPROVED:-false}"
 
+# fail-closed: 解析ツールが無い環境で黙って合格させない
+if ! command -v jq >/dev/null 2>&1; then
+    echo "::error::jq が見つかりません。依存追加の判定ができないため fail-closed で失敗します。"
+    exit 1
+fi
+
 MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
 
 additions=""
