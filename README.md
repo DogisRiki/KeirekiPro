@@ -33,8 +33,6 @@
 
 Docker Composeで7コンテナを起動し、DevContainerで開発を行います。
 
-**前提条件**: ホストOSに **Git for Windows(Git Bash同梱)が必須**です(Git操作はホストOSで実行する運用のため。また `.claude/hooks/` のフックはGit Bashで実行されます)。
-
 ![Development Environment](doc/インフラ設計/構成図/開発環境構成/開発環境構成図.drawio.svg)
 
 | コンテナ | 用途 |
@@ -55,25 +53,25 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 
 | フェーズ | ワークフロー | トリガー | 処理内容 |
 |---------|-------------|---------|---------|
-| CI | ci.yaml | push / PR | paths-filterで変更検知、Frontend: Format → Lint → Test → Coverage → Build、E2Eスモーク(Playwright)、Backend: Gradle check(カバレッジ閾値込み) |
-| ガードレール | guardrails.yaml | PR | 逃げ道封鎖(skip/除外/型抑止の検知)、PRサイズ検査、migrationラベル、gitleaks、品質レポート(knip/jscpd/Javaアサーション) |
-| 依存ゲート | dependency-gate.yaml | PR / review | 依存パッケージ「追加」の検知(所有者Approveで緑に再評価) |
-| クロスAIレビュー | codex-review.yml | PR | Codexによる自動レビュー(コード品質・spec適合の2軸VERDICT。required check) |
+| CI | ci.yaml | push / PR | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行 |
+| 品質検査 | guardrails.yaml | PR | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査、シークレットスキャン、各種品質レポートの生成 |
+| 依存関係の検査 | dependency-gate.yaml | PR | 依存パッケージの新規追加を検知し、リポジトリ所有者が承認するまでマージを保留 |
+| AIレビュー | codex-review.yml | PR | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
 | Infrastructure | terraform-plan.yaml | PR (terraform/**) | Terraform Plan実行、PRにplan結果をコメント |
 | Infrastructure | terraform-apply.yaml | push to main (terraform/**) | Terraform Apply実行（アプリケーションデプロイとは独立） |
-| **本番リリース** | **release.yaml** | **manual (workflow_dispatch)** | 人間の手動トリガーでのみ本番デプロイ(backend → frontendの順)。mainマージ ≠ 本番反映 |
+| 本番リリース | release.yaml | manual | 本番環境へのデプロイ。人間が手動で実行し、backend、frontendの順に配布 |
 | Frontend Rollback | frontend-rollback.yaml | manual | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
-| Claude | claude.yml | @claudeメンション / 週次 | Issue/PRからのCI上での作業、週次依存バージョン更新レーン |
-| Mutation Report | mutation-report.yaml | 週次 | Stryker(frontend)/PIT(backend)のmutation testingレポート |
-| Canary | canary.yaml | 月次 | ゲート健康診断用カナリアPRを3種自動生成 |
+| Claude | claude.yml | @claudeメンション / 週次 | IssueやPRのコメントからClaude Codeを起動。週次で依存パッケージのバージョン更新も実行 |
+| Mutation Report | mutation-report.yaml | 週次 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
+| Canary | canary.yaml | 月次 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
 
-mainへのマージは「デプロイ可能な状態の確定」であり、本番反映はrelease.yamlの手動トリガーでのみ行います。frontend/backendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開失敗時は成功済みartifactを再配布して復旧します。
+mainブランチへのマージだけでは本番環境に反映されません。本番リリースはrelease.yamlを人間が手動で実行したときにのみ行われます。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 
 | 特徴 | 説明 |
 |------|------|
 | OIDC認証 | GitHub ActionsからAWSへのアクセスキーレス認証 |
 | 変更検知 | paths-filterによる変更ファイルに応じた条件付き実行 |
-| デプロイゲート | 変更対象のCIがすべて成功するまで本番デプロイを開始しない |
+| 検証済みリリース | 本番デプロイの対象は、CIがすべて成功したmainブランチの成果物に限定される |
 | Build once / Deploy same artifact | Frontendのproduction buildをCIで行い、検証済みartifactを配布・rollbackに再利用 |
 | ローリングアップデート | ECSサービスの無停止デプロイと回路ブレーカーによるbackend自動rollback |
 | キャッシュ無効化 | フロントエンド配布・rollback時のCloudFrontキャッシュ自動無効化 |
@@ -229,15 +227,14 @@ frontend/src/
 keirekipro/
 ├── frontend/                 # フロントエンド (React/TypeScript)
 ├── backend/                  # バックエンド (Spring Boot/Java)
-│   └── gradle/quality.gradle #   品質ゲート定義(CODEOWNERS保護)
+│   └── gradle/quality.gradle #   品質チェックの設定(CODEOWNERS保護)
 ├── terraform/                # インフラ定義
-├── .github/                  # CI/CD・ガードレール(CODEOWNERS保護)
-│   ├── workflows/            #   ci / guardrails / dependency-gate / codex-review /
-│   │                         #   release / claude / mutation-report / canary / deploy系
-│   ├── scripts/              #   検知スクリプト群
-│   └── CODEOWNERS            #   ゲート設定ファイルの保護定義
-├── .claude/                  # Claude Codeハーネス(skills / hooks / loop.md)
-├── .kiro/                    # spec駆動開発(specs=仕様書, steering=プロジェクト知識)
+├── .github/                  # CI/CDと品質検査のワークフロー(CODEOWNERS保護)
+│   ├── workflows/            #   CI・品質検査・AIレビュー・リリース・定期実行の各定義
+│   ├── scripts/              #   ワークフローから呼び出す検査スクリプト
+│   └── CODEOWNERS            #   保護対象ファイルの定義
+├── .claude/                  # Claude Codeの設定(スキル・フック)
+├── .kiro/                    # spec駆動開発の仕様書とプロジェクト知識
 ├── docker/                   # Docker設定
 ├── doc/                      # 設計ドキュメント・開発フロー・監査手順
 ├── CLAUDE.md                 # AIエージェント向けプロジェクトガイド
@@ -245,59 +242,65 @@ keirekipro/
 └── compose.yaml
 ```
 
-## 自律開発パイプライン(AI駆動開発)
+## 開発スタイル(AI駆動開発)
 
-本プロジェクトの開発は **Claude Code** を基盤とした「人間はコードを読まない」前提の自律パイプラインで行います。
-安全は人間のコードレビューではなく、多層の機械ゲートとクロスAIレビューが担保します。
-詳細は [開発フロー](doc/開発フロー/開発フロー.md) / [ループ契約](doc/開発フロー/ループ契約.md) / [監査手順](doc/開発フロー/監査手順.md) を参照してください。
+本プロジェクトでは、AIコーディングエージェントのClaude Codeが実装からマージまでを担う、自動化された開発パイプラインを採用しています。人間はコードそのものをレビューせず、仕様の判断とリリースの判断に専念します。コードの品質は、テスト・静的解析・カバレッジ基準・別のAIによるレビューといった自動チェックの積み重ねで担保します。
 
-### 人間の役割(5つだけ)
+運用の詳細は次のドキュメントにまとめています。
 
-1. **意図の定義** — Issue起票(1〜2行)とspec承認(仕様の意思決定。コードは読まない)
-2. **ループの設計・監視・改善** — 週次・月次監査でゲートとループの健全性を確認し、すり抜けをゲート強化へ還元
-3. **体験検証** — 本番デプロイ前にローカルでmainを起動して触って確認
-4. **例外ゲートの承認** — DBマイグレーション・依存追加・ゲート設定変更を含むPRのみ承認
-5. **リリース判断** — 本番デプロイの手動トリガー(マージには関与しない)
+- [開発フロー](doc/開発フロー/開発フロー.md)
+- [ループ契約](doc/開発フロー/ループ契約.md)
+- [監査手順](doc/開発フロー/監査手順.md)
 
-マージ判定は機械的: **Codexレビュー(コード品質・spec適合)両軸LGTM + 必須チェック全グリーン → auto-merge**
+### 人間とAIの分担
 
-### 3つの開発レーン
+人間が行うのは次の作業です。
 
-| レーン | 対象 | フロー |
-|-------|------|-------|
-| **Lane A** | 新機能・複数層の変更 | Issue → spec駆動(cc-sdd: `/kiro-discovery`→requirements→design→tasks を人間が承認)→ `/kiro-impl`+`/goal` 自律実装 → `/ship` → クロスAIレビュー → auto-merge |
-| **Lane B** | 小修正(コード差分200行以内) | Issue → 直接実装 → `/ship` → 同上(200行超はCIがLane Aへ差し戻し) |
-| **Lane C** | 自律メンテ | `/loop`(定期verify・PR監視)、`@claude`メンション、週次依存更新、週次mutationレポート、月次カナリア |
+- 何を作るか・何を直すかを決めて、Issueとして起票する
+- spec駆動開発における要件・設計ドキュメントを承認する
+- 自動チェックの仕組みが正しく機能し続けているかを、週次・月次で監査する
+- データベースのマイグレーションや依存ライブラリの追加など、影響の大きい変更を含むプルリクエストを承認する
+- 本番デプロイの前にローカル環境で動作を確かめ、デプロイを実行する
 
-### ガードレール(「読まない」を成立させる多層防御)
+それ以外の作業(実装・テスト・コミット・プルリクエストの作成・レビュー指摘への対応)はClaude Codeが行います。プルリクエストは、Codexによる自動レビューがコード品質と仕様適合の両方を問題なしと判定し、CIの必須チェックがすべて成功すると、自動的にマージされます。
 
-| 層 | 内容 |
+### 開発の進め方
+
+| 変更の種類 | 進め方 |
+|---|---|
+| 新機能・大きな変更 | cc-sddによるspec駆動開発。要件定義・設計・タスク分解の各ドキュメントを人間が承認したうえで、Claude Codeが自律的に実装する |
+| 小規模な修正 | Issueをもとに直接実装する。コード差分が200行を超える場合はCIが検知し、spec駆動での進行を求める |
+| 定常メンテナンス | 定期実行の仕組みが、品質チェック・依存パッケージの更新・プルリクエストの監視などを自動で行う |
+
+### 品質を担保する仕組み
+
+人間がコードをレビューしない代わりに、次の自動チェックを何層にも重ねています。
+
+| 仕組み | 内容 |
 |---|------|
-| テスト+閾値 | Vitest/JUnit+Testcontainers、カバレッジ閾値(下回るとCI赤) |
-| 静的解析 | ESLint(アーキテクチャ境界+アサーション必須)、tsc、ArchUnit 18ルール、Checkstyle/SpotBugs、tflint/checkov |
-| 逃げ道封鎖 | テストskip・アサーション削除・`@ts-ignore`・インラインdisable・ゲート配線破壊をCIが検知して赤 |
-| 人間ゲート | DBマイグレーション/依存追加/ゲート設定変更のみ人間承認必須(CODEOWNERS + dependency-gate) |
-| クロスAIレビュー | **Claudeが書き、Codexが読む**。2軸VERDICTをジョブ自身が判定(コメント偽装無効)。最大5往復の修正ループ、収束しなければ人間へエスカレーション(spec差し戻し/分割/破棄の3択) |
-| ゲート自体の保護 | CODEOWNERSで設定ファイルを保護し、エージェントは別アイデンティティ(bot)でPRを作成 |
-| リリース分離 | mainマージ ≠ 本番反映。デプロイは人間の手動トリガーのみ |
-| 健康診断 | 月次カナリアPR(既知バグ・アサーション無しテスト・skip)でゲートの検出能力を検証 |
+| テストとカバレッジ基準 | VitestとJUnit(Testcontainers)によるテストに加え、カバレッジが基準値を下回るとCIが失敗する |
+| 静的解析 | ESLint・TypeScript・ArchUnit・Checkstyle・SpotBugs・tflint・Checkovで、アーキテクチャ境界の違反やコードの問題を機械的に検査する |
+| 検査回避の検知 | テストのスキップ化・アサーションの削除・型チェックの抑止コメントなど、チェックを形だけ通すための変更をCIが検知して失敗させる |
+| 別のAIによるレビュー | 実装したClaude Codeとは別系統のAIであるCodexが、すべてのプルリクエストをレビューする。指摘への対応は自動で行い、5往復しても収束しない場合は人間が判断する |
+| 影響の大きい変更の承認 | DBマイグレーション・依存ライブラリの追加・品質チェック設定の変更は、人間が承認しなければマージされない |
+| チェック設定自体の保護 | 品質チェックの設定ファイルはCODEOWNERSで保護されており、AIエージェントが自分の判断で変更することはできない |
+| リリースの分離 | mainブランチへのマージだけでは本番に反映されず、デプロイは人間が手動で実行する |
+| 定期的な健全性確認 | 問題のある変更をわざと含めたプルリクエストを毎月自動生成し、チェックの仕組みが正しく検知できることを確かめる |
 
-### MCP
+### 利用しているMCP
 
 | MCP | 用途 |
 |-----|------|
-| Context7 MCP | ライブラリ・フレームワーク公式ドキュメントの参照 |
-| Playwright MCP | `/verify-ui` でのブラウザ実機検証(スクリーンショット・コンソール確認) |
+| Context7 MCP | ライブラリ・フレームワークの公式ドキュメント参照 |
+| Playwright MCP | ブラウザを実際に操作しての画面確認 |
 
-GitHub操作はMCPではなく `gh` CLI(botプロファイル)で行います。
-
-### Claude Code Skills
+### 主なカスタムスキル
 
 | Skill | 用途 |
 |------|------|
-| `/verify-frontend` `/verify-backend` `/verify-terraform` `/verify-all` | 品質ゲートの直列実行(ゴールハック禁止則付き)。ループの検証端点 |
-| `/verify-ui` | devサーバ起動+Playwright MCPでの実画面検証 |
-| `/ship` | verify → commit → push → PR作成 → auto-merge予約 → CI監視 |
-| `/review-loop` | Codex指摘の分類(本修正/妥当nit/誤検知)と修正ループ(最大5往復) |
-| `/retrospective` | ゲートすり抜けの「ゲート追加・強化」への還元 |
-| `/kiro-*` | spec駆動開発(cc-sdd): discovery / requirements / design / tasks / impl 等 |
+| `/verify-frontend` `/verify-backend` `/verify-terraform` `/verify-all` | 品質チェック一式の実行と結果報告 |
+| `/verify-ui` | 開発サーバを起動して実際の画面を確認 |
+| `/ship` | 検証からコミット・プルリクエスト作成・マージ予約までの一連の出荷作業 |
+| `/review-loop` | Codexレビューの指摘への対応 |
+| `/retrospective` | チェックをすり抜けた問題を仕組みの改善につなげる振り返り |
+| `/kiro-*` | spec駆動開発(cc-sdd)の各工程 |
