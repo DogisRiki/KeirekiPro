@@ -1,3 +1,13 @@
+// Flyway Gradleプラグイン(10系)はDB別モジュールをbuildscriptクラスパスに要求する
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.flywaydb:flyway-database-postgresql:10.20.1'
+    }
+}
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.1'
@@ -8,6 +18,7 @@ plugins {
     id 'com.diffplug.spotless' version '7.0.2'
     id 'com.github.spotbugs' version '6.1.7'
     id 'info.solidsoft.pitest' version '1.15.0'
+    id 'org.flywaydb.flyway' version '10.20.1'
 }
 
 group = 'com.example'
@@ -89,6 +100,15 @@ tasks.named('test') {
 // 品質ゲート定義(checkstyle/jacoco/spotless/spotbugs/カバレッジ閾値/checkタスク構成)は
 // CODEOWNERS保護対象の gradle/quality.gradle に分離している。この行を削除しないこと(guardrails CIが検証)。
 apply from: 'gradle/quality.gradle'
+
+// ローカルDBに対するマイグレーション確認用(./gradlew flywayInfo 等)。
+// 接続先は開発用コンテナのデフォルト(シークレットは置かない。環境変数で上書き可能)
+flyway {
+    url = "jdbc:postgresql://${System.getenv('DB_HOST') ?: 'db'}:${System.getenv('DB_PORT') ?: '5432'}/${System.getenv('DB_NAME') ?: 'keireki_pro'}"
+    user = System.getenv('DB_USERNAME') ?: 'postgres'
+    password = System.getenv('DB_PASSWORD') ?: 'postgres'
+    locations = ['filesystem:src/main/resources/db/migration']
+}
 
 sourceSets {
     main {

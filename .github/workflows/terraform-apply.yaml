@@ -1,15 +1,20 @@
 name: Terraform Apply
 
+# インフラの本番反映は人間の手動実行でのみ行う(アプリのrelease.yamlと同じ方針)。
+# mainへのマージだけではapplyされない。terraform/** のPRは terraform-plan.yaml が
+# plan結果をコメントするので、それを確認してマージし、反映したいタイミングで
+# このワークフローを実行する。
+
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'terraform/**'
   workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
+
+concurrency:
+  group: terraform-apply
+  cancel-in-progress: false
 
 env:
   AWS_REGION: ap-northeast-1
@@ -41,9 +46,12 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Apply
+      # マージからapply実行までの間にmainが進んでいた場合の確認用に、
+      # apply直前の差分をログへ表示する。-out で保存したplanをそのまま適用することで、
+      # 表示した差分と適用内容の厳密一致を保証する
+      - name: Terraform Plan (差分の事前表示)
         run: |
-          terraform apply -var-file=environments/prod/terraform.tfvars -auto-approve \
+          terraform plan -var-file=environments/prod/terraform.tfvars -no-color -out=tfplan \
             -var="jwt_secret=${{ secrets.TF_VAR_jwt_secret }}" \
             -var="google_oauth_client_id=${{ secrets.TF_VAR_google_oauth_client_id }}" \
             -var="google_oauth_client_secret=${{ secrets.TF_VAR_google_oauth_client_secret }}" \
@@ -51,11 +59,5 @@ jobs:
             -var="github_oauth_client_secret=${{ secrets.TF_VAR_github_oauth_client_secret }}" \
             -var="alert_email_address=${{ secrets.TF_VAR_alert_email_address }}"
 
-      - name: Get Terraform Outputs
-        id: outputs
-        run: |
-          echo "ecr_repository_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
-          echo "ecs_cluster_name=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
-          echo "ecs_service_name=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
-          echo "s3_frontend_bucket_name=$(terraform output -raw s3_frontend_bucket_name)" >> $GITHUB_OUTPUT
-          echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan

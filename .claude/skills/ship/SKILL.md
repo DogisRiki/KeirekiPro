@@ -39,6 +39,9 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
 7. **CI監視**: `gh pr checks <PR番号> --watch` で必須チェックの結果を見届ける。
    - 赤になったら修正してpushする(以降のレビュー対応は `/review-loop` に従う)
    - `dependency-gate` / `pre-merge-check` / CODEOWNERS起因の待ちは人間の承認待ちなので、その旨を報告して終了する
+   - チェックは緑なのにブランチが out of date でマージが進まない場合は、
+     `git fetch origin && git merge origin/main` してpushする(または `gh pr update-branch <PR番号>`)。
+     コンフリクトが出たら解消し、verifyを再実行してからpushする
 
 ## Rules
 

@@ -83,14 +83,20 @@ jobs:
             }
 
             // 最新の成功した main push の CI Workflow run から frontend-dist を探す
-            const runs = await github.paginate(
+            // (経年でrunが増えても遅くならないよう、探索は直近100件で打ち切る)
+            const collected = [];
+            await github.paginate(
               github.rest.actions.listWorkflowRunsForRepo,
-              { owner, repo, branch: 'main', event: 'push', status: 'success', per_page: 30 },
+              { owner, repo, branch: 'main', event: 'push', status: 'success', per_page: 100 },
               (response, done) => {
+                collected.push(...response.data);
+                if (collected.length >= 100) {
+                  done();
+                }
                 return response.data;
               },
             );
-            for (const candidate of runs.filter((r) => r.name === 'CI Workflow')) {
+            for (const candidate of collected.slice(0, 100).filter((r) => r.name === 'CI Workflow')) {
               const run = await validateRun(candidate.id);
               if (run) {
                 core.setOutput('artifact_run_id', String(candidate.id));
@@ -98,7 +104,7 @@ jobs:
                 return;
               }
             }
-            core.setFailed('No successful main CI Workflow run with an available frontend-dist artifact was found.');
+            core.setFailed('No successful main CI Workflow run with an available frontend-dist artifact was found in the latest 100 runs.');
 
   backend-release:
     needs: resolve-source

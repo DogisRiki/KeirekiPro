@@ -12,7 +12,7 @@ terraform配下・CI/CD(`.github/workflows/`)に関わる変更のとき常に�
 
 ## 安全不変条件(絶対に守る)
 
-- **`terraform apply` をローカルで実行しない**。applyはCI(terraform-apply.yaml)の専権
+- **`terraform apply` をローカルで実行しない**。applyは人間が手動実行するワークフロー(terraform-apply.yaml)でのみ行う
 - デプロイゲートを弱めない: release.yaml の手動トリガー構造、ブランチ保護のrequired checks、
   CI内の検証ステップを削除・緩和しない
 - CIのbypass(`--no-verify`、requiredチェックのskip条件追加等)を仕込まない

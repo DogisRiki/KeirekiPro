@@ -8,6 +8,8 @@
 4. `doc/` の設計図(クラス図・ER図)と実装の乖離が変更範囲にあるか確認し、乖離があれば更新を提案する
    (勝手に大規模更新はしない。乖離箇所の指摘まで)。
 5. 開いているPRがあれば `gh pr checks` で状態を確認し、赤があれば修正、Codex指摘があれば `/review-loop` に従う。
+   チェックは緑なのにブランチが out of date でマージが進まない場合は、
+   `git fetch origin && git merge origin/main` してpushする(または `gh pr update-branch`)。
 6. すべて正常なら「全ゲート正常 / PR状態」を1行で報告する。
 
 制約:

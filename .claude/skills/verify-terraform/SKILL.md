@@ -23,7 +23,7 @@ docker compose exec -w /workspace terraform checkov -d .
 
 ## Rules
 
-- **`terraform apply` を実行しない**(applyはCIの専権。permissions/denyでもブロックされる)
+- **`terraform apply` を実行しない**(applyは人間が手動実行するワークフローのみ。permissions/denyでもブロックされる)
 - checkovの指摘を `.checkov.yaml` のskip追加で消さない。設定変更が必要なときは理由を添えて人間に提案する
 - デプロイゲート・CI検証ステップを弱める変更をしない(`terraform/CLAUDE.md` の安全不変条件)
 

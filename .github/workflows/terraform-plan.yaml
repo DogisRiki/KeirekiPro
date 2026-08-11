@@ -79,6 +79,11 @@ jobs:
 
             let planOutput = `${{ steps.show.outputs.stdout }}`;
 
+            const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+            const failureNote = planOutcome === 'success'
+              ? ''
+              : `\n> :x: Planが失敗しました。詳細は [Actionsの実行ログ](${runUrl}) を参照してください。\n`;
+
             // 出力が長すぎる場合は切り詰める
             const maxLength = 60000;
             if (planOutput.length > maxLength) {
@@ -93,7 +98,7 @@ jobs:
             | ⚙️ Init | ${initOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
             | ✅ Validate | ${validateOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
             | 📖 Plan | ${planOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
-
+            ${failureNote}
             <details><summary>📋 Show Plan Output</summary>
 
             \`\`\`hcl

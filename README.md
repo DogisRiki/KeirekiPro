@@ -58,7 +58,7 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 | 依存関係の検査 | dependency-gate.yaml | PR | 依存パッケージの新規追加を検知し、リポジトリ所有者が承認するまでマージを保留 |
 | AIレビュー | codex-review.yml | PR | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
 | Infrastructure | terraform-plan.yaml | PR (terraform/**) | Terraform Plan実行、PRにplan結果をコメント |
-| Infrastructure | terraform-apply.yaml | push to main (terraform/**) | Terraform Apply実行（アプリケーションデプロイとは独立） |
+| Infrastructure | terraform-apply.yaml | manual | インフラの本番反映。人間が手動で実行する（アプリケーションデプロイとは独立） |
 | 本番リリース | release.yaml | manual | 本番環境へのデプロイ。人間が手動で実行し、backend、frontendの順に配布 |
 | Frontend Rollback | frontend-rollback.yaml | manual | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
 | Claude | claude.yml | @claudeメンション / 週次 | IssueやPRのコメントからClaude Codeを起動。週次で依存パッケージのバージョン更新も実行 |

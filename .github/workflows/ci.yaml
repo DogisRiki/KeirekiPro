@@ -14,8 +14,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'production-release' || format('ci-{0}', github.run_id) }}
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'production-release' || format('ci-pr-{0}', github.event.pull_request.number || github.run_id) }}
+  # PRは同一PRの並走をキャンセルする(mainへのpushはキャンセルしない)
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   detect-changes:
