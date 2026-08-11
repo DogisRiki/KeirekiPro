@@ -47,6 +47,7 @@
             "Bash(gh pr comment *)",
             "Bash(gh pr edit *)",
             "Bash(gh pr merge --auto *)",
+            "Bash(gh pr update-branch *)",
             "Bash(gh issue view *)",
             "Bash(gh issue list *)",
             "Bash(gh issue comment *)",
@@ -61,10 +62,15 @@
             "Bash(git push -f*)",
             "Bash(git push origin main)",
             "Bash(git push -u origin main)",
+            "Bash(git push origin HEAD:main)",
+            "Bash(git push -u origin HEAD:main)",
+            "Bash(git push origin main:main)",
             "Bash(rm -rf *)",
+            "Bash(rm -fr *)",
             "Bash(terraform apply *)",
             "Bash(docker compose exec -w /workspace terraform terraform apply *)",
             "Bash(gh workflow run release.yaml *)",
+            "Bash(gh workflow run terraform-apply.yaml *)",
             "Edit(.github/**)",
             "Write(.github/**)",
             "Edit(.claude/settings.json)",
@@ -90,7 +96,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/protect-main.sh",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/protect-main.sh\"",
                         "timeout": 15
                     }
                 ]
@@ -102,7 +108,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/check-encoding.sh",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-encoding.sh\"",
                         "timeout": 15
                     }
                 ]
@@ -112,7 +118,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/record-gate-run.sh",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/record-gate-run.sh\"",
                         "timeout": 10
                     }
                 ]
@@ -123,7 +129,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/check-verify-before-stop.sh",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-verify-before-stop.sh\"",
                         "timeout": 20
                     }
                 ]

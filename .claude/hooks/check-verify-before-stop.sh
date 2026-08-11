@@ -5,6 +5,9 @@
 # 未コミットの変更がある領域(frontend/backend/terraform)について、
 # 最終変更(epoch秒)より後に品質ゲートの完了コマンドが実行されて
 # いなければ停止をブロックして注意喚起する(exit 2)。
+# ファイル一覧は git status --porcelain -z で取得する
+# (日本語ファイル名が引用符でエスケープされ、更新時刻の比較が
+# スキップされる問題を避けるため)。
 # 無限ループ防止のため stop_hook_active のときは常に通す。
 # 前提: Git for Windows(Git Bash同梱)。JSON解析は同梱perl(JSON::PP)を使用。
 # =====================================================================
@@ -38,14 +41,33 @@ cd "$project_dir" || exit 0
 
 state_dir="$project_dir/.claude/.state"
 
-changed=$(git status --porcelain 2>/dev/null)
-[ -z "$changed" ] && exit 0
+# NUL区切りで変更ファイル一覧を取得する(リネームは新パスの直後に旧パスが続くため読み飛ばす)
+changed_paths=()
+skip_next=0
+while IFS= read -r -d '' entry; do
+    if [ "$skip_next" = 1 ]; then
+        skip_next=0
+        continue
+    fi
+    status=${entry:0:2}
+    path=${entry:3}
+    case "$status" in
+        R* | C*) skip_next=1 ;;
+    esac
+    [ -n "$path" ] && changed_paths+=("$path")
+done < <(git status --porcelain -z 2>/dev/null)
+
+[ "${#changed_paths[@]}" -eq 0 ] && exit 0
 
 pending_areas=""
 for area in frontend backend terraform; do
-    # porcelain形式の3文字目以降がパス(リネームは「old -> new」の new 側を使う)
-    area_files=$(printf '%s\n' "$changed" | cut -c4- | sed 's/^.* -> //' | grep -E "^$area/" || true)
-    [ -z "$area_files" ] && continue
+    area_files=()
+    for p in "${changed_paths[@]}"; do
+        case "$p" in
+            "$area"/*) area_files+=("$p") ;;
+        esac
+    done
+    [ "${#area_files[@]}" -eq 0 ] && continue
 
     stamp_file="$state_dir/gate-run-$area.txt"
     if [ ! -f "$stamp_file" ]; then
@@ -63,13 +85,13 @@ for area in frontend backend terraform; do
     esac
 
     latest_change=0
-    while IFS= read -r f; do
+    for f in "${area_files[@]}"; do
         [ -e "$f" ] || continue
         mtime=$(stat -c %Y "$f" 2>/dev/null) || continue
         if [ "$mtime" -gt "$latest_change" ]; then
             latest_change=$mtime
         fi
-    done <<<"$area_files"
+    done
 
     if [ "$latest_change" -gt "$gate_run_at" ]; then
         pending_areas="$pending_areas $area"

@@ -10,6 +10,11 @@
 #   依存追加あり + 所有者Approveなし     -> exit 1(赤)
 #   依存追加あり + 所有者Approveあり     -> exit 0(緑)
 #
+# 走査対象:
+#   - frontend/package.json(dependencies + devDependencies)
+#   - backend/**/*.gradle と *.gradle.kts(quality.gradle を除く全gradleファイル。
+#     新規gradleファイル経由の依存追加も検知する)
+#
 # 環境変数:
 #   OWNER_APPROVED : "true" ならリポジトリ所有者のApprove済み
 #
@@ -45,23 +50,35 @@ if git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -q '^frontend/package\.
     fi
 fi
 
-# --- backend/build.gradle: 依存座標(group:artifact)の集合を比較 ---
+# --- backend/**/*.gradle: 依存座標(group:artifact)の集合を比較 ---
 gradle_coords() {
-    # implementation 'group:artifact:version' / platform('group:artifact:version') 等から
+    # implementation 'group:artifact:version' / classpath / platform(...) 等から
     # group:artifact を抽出する(バージョン部は無視 = 更新は追加扱いにしない)
-    grep -oE "(implementation|api|compileOnly|runtimeOnly|developmentOnly|annotationProcessor|testImplementation|testCompileOnly|testRuntimeOnly|testAnnotationProcessor)[^'\"]*['\"][^'\"]+['\"]" 2>/dev/null |
+    grep -oE "(implementation|api|compileOnly|runtimeOnly|developmentOnly|annotationProcessor|testImplementation|testCompileOnly|testRuntimeOnly|testAnnotationProcessor|classpath)[^'\"]*['\"][^'\"]+['\"]" 2>/dev/null |
         grep -oE "['\"][^'\"]+['\"]$" |
         tr -d "'\"" |
         awk -F: 'NF >= 2 { print $1 ":" $2 }' |
         sort -u
 }
 
-if git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -q '^backend/build\.gradle$'; then
-    base_coords=$(git show "$MERGE_BASE:backend/build.gradle" | gradle_coords || true)
-    head_coords=$(git show "$HEAD_SHA:backend/build.gradle" | gradle_coords || true)
+# 指定リビジョンの backend 配下の全gradleファイル(quality.gradle除く)を連結して座標を抽出する
+gradle_coords_at() {
+    local ref="$1"
+    git ls-tree -r --name-only "$ref" -- backend 2>/dev/null |
+        grep -E '\.gradle(\.kts)?$' |
+        grep -v '^backend/gradle/quality\.gradle$' |
+        while IFS= read -r f; do
+            git show "$ref:$f" 2>/dev/null || true
+        done | gradle_coords
+}
+
+gradle_changed=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -E '^backend/.*\.gradle(\.kts)?$' | grep -v '^backend/gradle/quality\.gradle$' || true)
+if [ -n "$gradle_changed" ]; then
+    base_coords=$(gradle_coords_at "$MERGE_BASE" || true)
+    head_coords=$(gradle_coords_at "$HEAD_SHA" || true)
     new_gradle=$(comm -13 <(echo "$base_coords") <(echo "$head_coords") || true)
     if [ -n "$new_gradle" ]; then
-        additions+="[backend/build.gradle]"$'\n'"$new_gradle"$'\n'
+        additions+="[backend/**/*.gradle]"$'\n'"$new_gradle"$'\n'
     fi
 fi
 

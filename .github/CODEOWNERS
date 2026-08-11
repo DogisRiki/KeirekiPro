@@ -19,10 +19,13 @@
 /frontend/eslint.config.js                      @DogisRiki
 /frontend/vite.config.ts                        @DogisRiki
 
+# E2Eスモークの実行設定(スモークの無力化防止)
+/frontend/playwright.config.ts                  @DogisRiki
+
 # backend 品質ゲート定義(build.gradle から分離。apply from 行の存在は guardrails CI が検証)
 /backend/gradle/quality.gradle                  @DogisRiki
 
-# backend 品質ゲートの外部設定(checkstyle/formatter/spotbugs除外)
+# backend 品質ゲートの外部設定(checkstyle/formatter/spotbugs除外/pmd)
 /backend/config/                                @DogisRiki
 
 # アーキテクチャ境界の機械強制(ArchUnit)
