@@ -76,6 +76,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - 依頼範囲外のファイルを変更しない。スタイル調整目的の全面書き換えをしない
 - `.github/workflows/` のワークフローを追加・変更・削除したPRでは、READMEのワークフロー一覧表とMermaid図も更新する
 - 外部技術の仕様は Context7 MCP または公式ドキュメントで現行版を確認してから使う
+- 外部ツールの仕様やエラーは、記憶で判断せず公式ドキュメントとissueを調査してから実装・提案する(根拠URLを添える)
 - ユーザーへの報告・PR本文・コミットメッセージは日本語(コミットprefix等の規約語は除く)
 - テキストファイルはUTF-8。文字化けを検知したら保存せず停止して報告する(hookでもブロックされる)
 - Think in English, generate responses in Japanese. `.kiro/` 配下に生成するMarkdown(requirements.md,
