@@ -33,10 +33,32 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.16.0'
+          check-latest: true
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # 既定のGITHUB_TOKENで作成したPRはワークフローを起動しない(GitHubの再帰防止仕様)。
+          # botのPATを渡すことで、作成されたPRで必須チェックが発火する。
+          github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          # Bashは既定で無効のため、必要なコマンドだけを明示的に許可する。
+          # 用途は Issue/PR からの調査・小修正・PR作成に限定する。
+          # 参照: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md
+          claude_args: |
+            --max-turns 60
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm:*),Bash(git:*),Bash(gh:*)"
 
   weekly-dependency-update:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -53,25 +75,54 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.16.0'
+          check-latest: true
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
       - name: Run Claude Code (dependency updates)
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # 既定のGITHUB_TOKENで作成したPRはワークフローを起動しない(GitHubの再帰防止仕様)。
+          # botのPATを渡すことで、作成されたPRで必須チェックが発火する。
+          github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          # Bashは既定で無効のため、必要なコマンドだけを明示的に許可する。
+          # backendは pnpm outdated 相当の手段が無いため、WebFetch/WebSearch で
+          # Maven Central の最新バージョンを確認させる。
+          # 参照: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md
+          claude_args: |
+            --max-turns 60
+            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Bash(pnpm:*),Bash(git:*),Bash(gh:*)"
           prompt: |
             週次の依存バージョン更新レーンです。以下を実施してください。
 
             1. frontend: `cd frontend && pnpm outdated` で更新可能な依存を確認し、
                既存依存の「バージョン更新のみ」を patch/minor 範囲で適用する
-               (`pnpm update --latest` は使わず、メジャー更新と新規追加はしない)
-            2. backend: `backend/build.gradle` の既存依存のバージョンを最新の patch/minor に更新する
-               (新規依存の追加はしない)
-            3. セキュリティアドバイザリ(`gh api` の Dependabot alerts か `pnpm audit`)を確認し、
-               該当があれば優先的に更新する
-            4. CLAUDE.md の品質ゲート(CI環境ではネイティブ実行)を通す
-            5. 変更があれば `.commit_template` 準拠でコミットし、featureブランチ
-               (`chore/weekly-dependency-update-<日付>`)へpushしてPRを作成、
+               (`pnpm update --latest` は使わず、メジャー更新と新規追加はしない)。
+               適用後は `cd frontend && pnpm install` で pnpm-lock.yaml を更新する
+            2. backend: `backend/build.gradle` の既存依存について、WebFetch または WebSearch で
+               Maven Central の最新バージョンを確認し、patch/minor の範囲で更新する
+               (新規依存の追加はしない)。バージョンは必ず実在を確認し、推測で書かないこと
+            3. セキュリティアドバイザリ(`gh api` の Dependabot alerts か `cd frontend && pnpm audit`)を
+               確認し、該当があれば優先的に更新する
+            4. 変更があれば `.commit_template` 準拠でコミットし、featureブランチ
+               `chore/weekly-dependency-update-${{ github.run_number }}` へpushしてPRを作成、
                PR本文に更新内容の一覧と `Refs: N/A` を記載し、auto-merge(squash)を予約する
-            6. 更新対象が無ければ何もせず終了する
+            5. 更新対象が無ければ何もせず終了する
+
+            品質ゲートはこのレーンでは実行しない。作成したPRのCIで実行され、
+            auto-mergeは必須チェックが全て緑になるまでマージしない。
+            backendはこのレーンでビルドを行わないため、バージョンの妥当性はCIの
+            backend-test(依存解決を含む)で検証される。
 
             注意: 依存の「追加」を行うと dependency-gate が人間承認を要求します。
             このレーンでは追加を行わないでください。メジャー更新が必要な場合はIssueを起票してください。
