@@ -47,23 +47,57 @@ Docker Composeで7コンテナを起動し、DevContainerで開発を行いま�
 
 ### CI/CDパイプライン
 
-![Workflow](doc/インフラ設計/構成図/CICDワークフロー/CICDワークフロー図.drawio.svg)
-
 GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/CDパイプラインを構築しています。
+プルリクエストは4つの系統で並列に検査され、流れの骨格は次のとおりです。
 
-| フェーズ | ワークフロー | トリガー | 処理内容 |
-|---------|-------------|---------|---------|
-| CI | ci.yaml | push / PR | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行 |
-| 品質検査 | guardrails.yaml | PR | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査、シークレットスキャン、各種品質レポートの生成 |
-| 依存関係の検査 | dependency-gate.yaml | PR | 依存パッケージの新規追加を検知し、リポジトリ所有者が承認するまでマージを保留 |
-| AIレビュー | codex-review.yml | PR | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
-| Infrastructure | terraform-plan.yaml | PR (terraform/**) | Terraform Plan実行、PRにplan結果をコメント |
-| Infrastructure | terraform-apply.yaml | manual | インフラの本番反映。人間が手動で実行する（アプリケーションデプロイとは独立） |
-| 本番リリース | release.yaml | manual | 本番環境へのデプロイ。人間が手動で実行し、backend、frontendの順に配布 |
-| Frontend Rollback | frontend-rollback.yaml | manual | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
-| Claude | claude.yml | @claudeメンション / 週次 | IssueやPRのコメントからClaude Codeを起動。週次で依存パッケージのバージョン更新も実行 |
-| Mutation Report | mutation-report.yaml | 週次 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
-| Canary | canary.yaml | 月次 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
+```mermaid
+flowchart LR
+    PR[プルリクエスト]
+
+    subgraph s1[系統1: 品質の検査]
+        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク]
+    end
+    subgraph s2[系統2: ずるの検査]
+        Z[検査回避の検知・差分サイズ・<br>シークレットスキャン]
+    end
+    subgraph s3[系統3: 人間の関門]
+        H[依存追加・pre-merge-checkラベル・<br>保護パスの変更は<br>所有者がApproveするまで赤]
+    end
+    subgraph s4[系統4: AIレビュー]
+        A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回]
+    end
+
+    PR --> Q
+    PR --> Z
+    PR --> H
+    PR --> A
+
+    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ]
+
+    M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
+    M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
+```
+
+4つの系統がすべて緑になるまで、プルリクエストはマージされません。マージされても本番への反映は行われず、人間による手動実行だけが本番を更新できます。
+
+各ワークフローの詳細は次のとおりです。
+
+| 系統 | ワークフロー名 | 発火条件 | 役割 |
+|---|---|---|---|
+| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。mainへのpush時はデプロイ用成果物を保存 |
+| 品質の検査 | terraform-plan.yaml | pull_request (terraform/**) | Terraform Planを実行し、結果をPRにコメント |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成 |
+| 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | 依存パッケージの新規追加を検知し、リポジトリ所有者が承認するまでマージを保留 |
+| 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
+| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
+| リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。backend、frontendの順に配布 |
+| リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
+| リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
+| リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
+| リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
+| 定期 | claude.yml | @claudeメンション / 週次 (schedule) / 手動 | IssueやPRのコメントからClaude Codeを起動。週次で依存パッケージのバージョン更新も実行 |
+| 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
+| 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
 
 mainブランチへのマージだけでは本番環境に反映されません。本番リリースはrelease.yamlを人間が手動で実行したときにのみ行われます。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 
