@@ -41,7 +41,16 @@ jobs:
           node-version: '24.16.0'
 
       - name: Install Codex CLI
-        run: npm install -g @openai/codex
+        # バージョンは固定する(未固定だと実行のたびに最新版が入り、
+        # CLI側の仕様変更でリポジトリの変更が無くてもゲートの挙動が変わるため)
+        run: npm install -g @openai/codex@0.147.0
+
+      - name: Authenticate Codex
+        # Codex CLIは環境変数のOPENAI_API_KEYでは認証せず、$CODEX_HOME/auth.json を参照する。
+        # 標準入力から渡すことでキーがコマンドライン・ログに現れない
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: printenv OPENAI_API_KEY | codex login --with-api-key
 
       - name: Prepare review context
         env:
