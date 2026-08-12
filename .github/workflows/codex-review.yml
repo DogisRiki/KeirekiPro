@@ -52,6 +52,30 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: printenv OPENAI_API_KEY | codex login --with-api-key
 
+      - name: Enable Linux user namespaces for bubblewrap
+        # Ubuntu 24.04以降のGitHubホストランナーは、AppArmorにより非特権ユーザー名前空間の
+        # 作成を禁止している。--sandbox read-only のときCodexはbubblewrapでサンドボックスを作り、
+        # その中でネットワーク名前空間を分離してループバックを立ち上げるため、この制限に当たって
+        # `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted` で失敗する。
+        # 結果としてCodexがdiffもリポジトリも読めず、レビューが成立しない。
+        # 公式の openai/codex-action が同じ2つのsysctlをセットで設定しているのに倣う。
+        # 参照: https://github.com/openai/codex-action (action.yml)
+        if: runner.environment == 'github-hosted'
+        run: |
+          set -euo pipefail
+
+          current_userns="$(sysctl -n kernel.unprivileged_userns_clone 2>/dev/null || true)"
+          if [ -n "$current_userns" ] && [ "$current_userns" != "1" ]; then
+            echo "kernel.unprivileged_userns_clone を 1 に設定します。"
+            sudo sysctl -w kernel.unprivileged_userns_clone=1
+          fi
+
+          current_apparmor="$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || true)"
+          if [ -n "$current_apparmor" ] && [ "$current_apparmor" != "0" ]; then
+            echo "kernel.apparmor_restrict_unprivileged_userns を 0 に設定します。"
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
       - name: Prepare review context
         env:
           GH_TOKEN: ${{ github.token }}
