@@ -40,6 +40,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           OWNER_LOGIN: ${{ github.repository_owner }}
         run: |
+          set -euo pipefail
           # ラベルはイベントペイロードではなくAPIから取得する(古い情報を見ない)
           has_label=$(gh api "repos/$REPO/issues/$PR_NUMBER/labels" \
             --jq '[.[].name] | contains(["pre-merge-check"])')
@@ -49,9 +50,10 @@ jobs:
             exit 0
           fi
 
-          # --paginate は --slurp を併用する(ページ単位でjqが適用され判定を誤るため)
+          # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
+          # gh の --jq は --slurp と併用できない仕様のため、jq へパイプして評価する。
           verdict=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" --paginate --slurp \
-            --jq "[.[][] | select(.user.login == \"$OWNER_LOGIN\") | select(.state == \"APPROVED\" or .state == \"CHANGES_REQUESTED\" or .state == \"DISMISSED\")] | sort_by(.submitted_at) | last | .state // \"NONE\"")
+            | jq -r --arg owner "$OWNER_LOGIN" '[.[][] | select(.user.login == $owner) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
           echo "Owner review verdict: $verdict"
 
           if [ "$verdict" = "APPROVED" ]; then

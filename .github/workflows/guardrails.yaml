@@ -38,9 +38,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           owner="${{ github.repository_owner }}"
+          # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
+          # gh の --jq は --slurp と併用できない仕様のため、jq へパイプして評価する。
           verdict=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate --slurp \
-            --jq "[.[][] | select(.user.login == \"$owner\") | select(.state == \"APPROVED\" or .state == \"CHANGES_REQUESTED\" or .state == \"DISMISSED\")] | sort_by(.submitted_at) | last | .state // \"NONE\"")
+            | jq -r --arg owner "$owner" '[.[][] | select(.user.login == $owner) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
           echo "Owner review verdict: $verdict"
           if [ "$verdict" = "APPROVED" ]; then
             echo "approved=true" >> "$GITHUB_OUTPUT"
