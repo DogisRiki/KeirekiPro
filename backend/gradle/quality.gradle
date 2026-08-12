@@ -1,0 +1,139 @@
+// =====================================================================
+// 品質ゲート定義(CODEOWNERS保護対象)
+//
+// このファイルはマージ判定の根拠となる品質ゲートを定義する。
+// 変更にはリポジトリ所有者の承認が必須。
+// build.gradle 側の `apply from: 'gradle/quality.gradle'` 行の存在と、
+// このファイル外での violationRules 定義が無いことは guardrails CI が検証する。
+// =====================================================================
+
+// 注: apply from: のスクリプトプラグインは plugins ブロックのクラスをコンパイル時に
+// import できない(Gradleの制約)ため、SpotBugs のクラスは実行時に動的ロードする。
+def spotbugsClassLoader = project.extensions.getByName('spotbugs').getClass().classLoader
+def spotbugsEffort = spotbugsClassLoader.loadClass('com.github.spotbugs.snom.Effort')
+def spotbugsConfidence = spotbugsClassLoader.loadClass('com.github.spotbugs.snom.Confidence')
+def spotbugsTaskClass = spotbugsClassLoader.loadClass('com.github.spotbugs.snom.SpotBugsTask')
+
+checkstyle {
+    toolVersion = '10.20.1'
+    configFile = file("${rootDir}/config/checkstyle/google_checks.xml")
+}
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        eclipse().configFile("${rootDir}/config/formatter/eclipse-formatter.xml")
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    format 'gradle', {
+        target '*.gradle'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+spotbugs {
+    toolVersion = '4.8.6'
+    effort.set(spotbugsEffort.valueOf('MAX'))
+    reportLevel.set(spotbugsConfidence.valueOf('MEDIUM'))
+    excludeFilter.set(file("${rootDir}/config/spotbugs/exclude.xml"))
+}
+
+// 何も検証していないテストの検出(PMD: UnitTestShouldIncludeAssert 1本のみ)
+pmd {
+    toolVersion = '7.14.0'
+    ruleSets = []
+    ruleSetFiles = files("${rootDir}/config/pmd/ruleset.xml")
+    consoleOutput = true
+    // 警告のみで開始(ビルドを失敗させない)。誤検知の設定整理(config/pmd/ruleset.xml の
+    // extraAssertMethodNames)が完了して実検出が0になったら、false へ変更してビルド失敗へ昇格する
+    // (判定は監査手順の週次項目で行う)
+    ignoreFailures = true
+}
+
+// 対象はテストコードのみ(ルールがテスト専用のため、main側の実行は無効化)
+tasks.named('pmdMain') {
+    enabled = false
+}
+
+tasks.withType(Pmd).configureEach {
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn test
+
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+// カバレッジ閾値(drain-then-ratchet 運用)
+// 初期値は 2026-08-10 時点の実測値(LINE 93.54% / BRANCH 73.89% / INSTRUCTION 93.81%)を
+// わずかに下回る値で固定。下げる変更は禁止、実測の向上に合わせて段階的に引き上げる。
+tasks.named('jacocoTestCoverageVerification') {
+    dependsOn test
+
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.93
+            }
+        }
+        rule {
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.73
+            }
+        }
+        rule {
+            limit {
+                counter = 'INSTRUCTION'
+                value = 'COVEREDRATIO'
+                minimum = 0.93
+            }
+        }
+    }
+}
+
+tasks.withType(spotbugsTaskClass).configureEach {
+    reports {
+        html.required.set(true)
+        xml.required.set(false)
+    }
+}
+
+tasks.named('check') {
+    dependsOn 'spotlessCheck'
+    dependsOn 'jacocoTestReport'
+    dependsOn 'jacocoTestCoverageVerification'
+    dependsOn 'spotbugsMain'
+    dependsOn 'spotbugsTest'
+}
+
+// mutation testing(週次レポートモード。checkには含めない)
+// 対象は純粋ユニットテストを持つ domain/usecase のみ(Testcontainers系は実行時間の都合で除外)
+pitest {
+    junit5PluginVersion = '1.2.1'
+    targetClasses = ['com.example.keirekipro.domain.*', 'com.example.keirekipro.usecase.*']
+    targetTests = ['com.example.keirekipro.unit.domain.*', 'com.example.keirekipro.unit.usecase.*']
+    threads = 2
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
+    failWhenNoMutations = false
+}

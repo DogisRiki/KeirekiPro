@@ -1,0 +1,14 @@
+{
+    "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/core/schema/stryker-schema.json",
+    "testRunner": "vitest",
+    "mutate": ["src/**/*.{ts,tsx}", "!src/**/*.test.{ts,tsx}", "!src/**/__tests__/**", "!src/test/**"],
+    "reporters": ["clear-text", "json", "html"],
+    "coverageAnalysis": "perTest",
+    "thresholds": {
+        "high": 80,
+        "low": 60,
+        "break": null
+    },
+    "tempDirName": ".stryker-tmp",
+    "cleanTempDir": true
+}

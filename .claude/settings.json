@@ -1,0 +1,139 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run format)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run format:fix)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run lint)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run lint:fix)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm test)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run coverage)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend npx tsc -b)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend npx eslint *)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend npx prettier *)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend npx vitest run *)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm exec knip *)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm exec playwright *)",
+            "Bash(docker compose exec -w /home/spring/app backend ./gradlew spotlessApply)",
+            "Bash(docker compose exec -w /home/spring/app backend ./gradlew check)",
+            "Bash(docker compose exec -w /home/spring/app backend ./gradlew test *)",
+            "Bash(docker compose exec -w /home/spring/app backend ./gradlew flywayInfo)",
+            "Bash(docker compose exec -w /workspace terraform terraform fmt *)",
+            "Bash(docker compose exec -w /workspace terraform terraform validate)",
+            "Bash(docker compose exec -w /workspace terraform tflint *)",
+            "Bash(docker compose exec -w /workspace terraform checkov *)",
+            "Bash(docker compose exec -d -u node -w /home/node/app frontend pnpm run dev)",
+            "Bash(docker compose exec -d -w /home/spring/app backend ./gradlew bootRun *)",
+            "Bash(docker compose up -d *)",
+            "Bash(docker compose ps *)",
+            "Bash(docker ps *)",
+            "Bash(git status *)",
+            "Bash(git status)",
+            "Bash(git diff *)",
+            "Bash(git diff)",
+            "Bash(git log *)",
+            "Bash(git branch *)",
+            "Bash(git switch *)",
+            "Bash(git add *)",
+            "Bash(git commit *)",
+            "Bash(git push -u origin *)",
+            "Bash(git push origin *)",
+            "Bash(git fetch *)",
+            "Bash(git merge origin/main)",
+            "Bash(gh pr create *)",
+            "Bash(gh pr view *)",
+            "Bash(gh pr list *)",
+            "Bash(gh pr checks *)",
+            "Bash(gh pr diff *)",
+            "Bash(gh pr comment *)",
+            "Bash(gh pr edit *)",
+            "Bash(gh pr merge --auto *)",
+            "Bash(gh pr update-branch *)",
+            "Bash(gh issue view *)",
+            "Bash(gh issue list *)",
+            "Bash(gh issue comment *)",
+            "Bash(gh issue create *)",
+            "Bash(gh run view *)",
+            "Bash(gh run list *)",
+            "Bash(gh run watch *)",
+            "Bash(gh label create *)"
+        ],
+        "deny": [
+            "Bash(git push --force*)",
+            "Bash(git push -f*)",
+            "Bash(git push origin main)",
+            "Bash(git push -u origin main)",
+            "Bash(git push origin HEAD:main)",
+            "Bash(git push -u origin HEAD:main)",
+            "Bash(git push origin main:main)",
+            "Bash(rm -rf *)",
+            "Bash(rm -fr *)",
+            "Bash(terraform apply *)",
+            "Bash(docker compose exec -w /workspace terraform terraform apply *)",
+            "Bash(gh workflow run release.yaml *)",
+            "Bash(gh workflow run terraform-apply.yaml *)",
+            "Edit(.github/**)",
+            "Write(.github/**)",
+            "Edit(.claude/settings.json)",
+            "Write(.claude/settings.json)",
+            "Edit(.claude/hooks/**)",
+            "Write(.claude/hooks/**)",
+            "Edit(frontend/eslint.config.js)",
+            "Write(frontend/eslint.config.js)",
+            "Edit(frontend/vite.config.ts)",
+            "Write(frontend/vite.config.ts)",
+            "Edit(backend/gradle/quality.gradle)",
+            "Write(backend/gradle/quality.gradle)",
+            "Edit(backend/config/**)",
+            "Write(backend/config/**)",
+            "Edit(backend/src/test/java/com/example/keirekipro/unit/architecture/**)",
+            "Write(backend/src/test/java/com/example/keirekipro/unit/architecture/**)"
+        ]
+    },
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/protect-main.sh\"",
+                        "timeout": 15
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-encoding.sh\"",
+                        "timeout": 15
+                    }
+                ]
+            },
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/record-gate-run.sh\"",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-verify-before-stop.sh\"",
+                        "timeout": 20
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -47,26 +47,65 @@ Docker Composeで7コンテナを起動し、DevContainerで開発を行いま�
 
 ### CI/CDパイプライン
 
-![Workflow](doc/インフラ設計/構成図/CICDワークフロー/CICDワークフロー図.drawio.svg)
-
 GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/CDパイプラインを構築しています。
+プルリクエストは4つの系統で並列に検査され、流れの骨格は次のとおりです。
 
-| フェーズ | ワークフロー | トリガー | 処理内容 |
-|---------|-------------|---------|---------|
-| CI | ci.yaml | push / PR | paths-filterでfrontend/backendの変更検知、Frontend: Format → Lint → Test → Coverage → Production Build、Backend: Gradle check |
-| Infrastructure | terraform-plan.yaml | PR (terraform/**) | Terraform Plan実行、PRにplan結果をコメント |
-| Infrastructure | terraform-apply.yaml | push to main (terraform/**) | Terraform Apply実行（アプリケーションデプロイとは独立） |
-| Backend CD | ci.yaml → backend-deploy.yaml | push to main (backend/**) | 変更対象のCI通過後、Docker Build → ECR Push → ECS Deploy → Wait Stable |
-| Frontend CD | ci.yaml → frontend-deploy.yaml | push to main (frontend/**) | CIで生成した`frontend-dist`をS3へ配布 → CloudFront Cache Invalidate |
-| Frontend Rollback | frontend-rollback.yaml | manual | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
+```mermaid
+flowchart LR
+    PR[プルリクエスト]
 
-frontend/backendの両方に変更がある場合は、両方のCIが成功してからbackend、frontendの順にデプロイします。backendのデプロイに失敗した場合はfrontendを公開せず、frontendの公開失敗時は成功済みartifactを再配布して復旧します。
+    subgraph s1[系統1: 品質の検査]
+        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク]
+    end
+    subgraph s2[系統2: ずるの検査]
+        Z[検査回避の検知・差分サイズ・<br>シークレットスキャン]
+    end
+    subgraph s3[系統3: 人間の関門]
+        H[依存追加・pre-merge-checkラベル・<br>保護パスの変更は<br>所有者がApproveするまで赤]
+    end
+    subgraph s4[系統4: AIレビュー]
+        A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回]
+    end
+
+    PR --> Q
+    PR --> Z
+    PR --> H
+    PR --> A
+
+    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ]
+
+    M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
+    M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
+```
+
+4つの系統がすべて緑になるまで、プルリクエストはマージされません。マージされても本番への反映は行われず、人間による手動実行だけが本番を更新できます。
+
+各ワークフローの詳細は次のとおりです。
+
+| 系統 | ワークフロー名 | 発火条件 | 役割 |
+|---|---|---|---|
+| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。mainへのpush時はデプロイ用成果物を保存 |
+| 品質の検査 | terraform-plan.yaml | pull_request (terraform/**) | Terraform Planを実行し、結果をPRにコメント |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成 |
+| 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | 依存パッケージの新規追加を検知し、リポジトリ所有者が承認するまでマージを保留 |
+| 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
+| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
+| リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。backend、frontendの順に配布 |
+| リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
+| リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
+| リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
+| リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
+| 定期 | claude.yml | @claudeメンション / 週次 (schedule) / 手動 | IssueやPRのコメントからClaude Codeを起動。週次で依存パッケージのバージョン更新も実行 |
+| 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
+| 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
+
+mainブランチへのマージだけでは本番環境に反映されません。本番リリースはrelease.yamlを人間が手動で実行したときにのみ行われます。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 
 | 特徴 | 説明 |
 |------|------|
 | OIDC認証 | GitHub ActionsからAWSへのアクセスキーレス認証 |
 | 変更検知 | paths-filterによる変更ファイルに応じた条件付き実行 |
-| デプロイゲート | 変更対象のCIがすべて成功するまで本番デプロイを開始しない |
+| 検証済みリリース | 本番デプロイの対象は、CIがすべて成功したmainブランチの成果物に限定される |
 | Build once / Deploy same artifact | Frontendのproduction buildをCIで行い、検証済みartifactを配布・rollbackに再利用 |
 | ローリングアップデート | ECSサービスの無停止デプロイと回路ブレーカーによるbackend自動rollback |
 | キャッシュ無効化 | フロントエンド配布・rollback時のCloudFrontキャッシュ自動無効化 |
@@ -222,101 +261,138 @@ frontend/src/
 keirekipro/
 ├── frontend/                 # フロントエンド (React/TypeScript)
 ├── backend/                  # バックエンド (Spring Boot/Java)
+│   └── gradle/quality.gradle #   品質チェックの設定(CODEOWNERS保護)
 ├── terraform/                # インフラ定義
-│   ├── modules/              # Terraformモジュール
-│   ├── main.tf
-│   └── variables.tf
-├── .github/workflows/        # CI/CD定義
-│   ├── ci.yaml
-│   ├── frontend-deploy.yaml
-│   ├── frontend-rollback.yaml
-│   ├── backend-deploy.yaml
-│   ├── terraform-plan.yaml
-│   └── terraform-apply.yaml
+├── .github/                  # CI/CDと品質検査のワークフロー(CODEOWNERS保護)
+│   ├── workflows/            #   CI・品質検査・AIレビュー・リリース・定期実行の各定義
+│   ├── scripts/              #   ワークフローから呼び出す検査スクリプト
+│   └── CODEOWNERS            #   保護対象ファイルの定義
+├── .claude/                  # Claude Codeの設定(スキル・フック)
+├── .kiro/                    # spec駆動開発の仕様書とプロジェクト知識
 ├── docker/                   # Docker設定
-├── docs/                     # 設計ドキュメント
+├── doc/                      # 設計ドキュメント・開発フロー・監査手順
+├── CLAUDE.md                 # AIエージェント向けプロジェクトガイド
+├── REVIEW.md                 # /code-review のカスタマイズ
 └── compose.yaml
 ```
 
-## AI駆動開発
+## 開発スタイル(AI駆動開発)
 
-本プロジェクトでは、Codex IDE と MCP（Model Context Protocol）を利用し、Issue 起点の計画作成・レビュー・実装支援を行います。
+本プロジェクトでは、AIコーディングエージェントのClaude Codeが実装からマージまでを担う、自動化された開発パイプラインを採用しています。人間はコードそのものをレビューせず、仕様の判断とリリースの判断に専念します。コードの品質は、テスト・静的解析・カバレッジ基準・別のAIによるレビューといった自動チェックの積み重ねで担保します。
 
-AI エージェントには、リポジトリ全体を無制限に操作させず、GitHub MCP の利用範囲を Issue / Pull Request / GitHub Actions の読み取りと、承認済み Plan の Issue コメント投稿に限定しています。
+開発の流れは次の図の通りです。人間が登場するのは、Issueの起票・仕様書の承認・影響の大きい変更の承認・デプロイ前のローカル確認・デプロイの実行の5箇所だけです。
+
+```mermaid
+sequenceDiagram
+    actor Human as 人間
+    participant Claude as Claude Code<br/>開発を担当するAI
+    participant CI as 自動チェック<br/>GitHub ActionsのCI
+    participant Codex as Codex<br/>レビューを担当する別のAI
+    participant Prod as 本番環境
+
+    Human->>Claude: タイトルと1〜2行の説明でGitHubにIssueを作成し、Claude CodeにIssue番号を伝えて対応を依頼する
+
+    alt 新機能や大きな変更のとき
+        Human->>Claude: Claude Codeで /kiro-spec-init を実行して仕様づくりを始める
+        Claude->>Human: .kiro/specs/ に要件の文書 requirements.md を作成して確認を求める
+        Human-->>Claude: 要件を確認し、/kiro-spec-design を実行して承認する
+        Claude->>Human: 設計の文書 design.md を作成して確認を求める
+        Human-->>Claude: 設計を確認し、/kiro-spec-tasks を実行して承認する
+        Claude->>Human: タスクの文書 tasks.md を作成して確認を求める
+        Human-->>Claude: タスクを確認し、/kiro-impl を実行して実装を開始する
+    else 小規模な修正のとき(コード差分200行以内)
+        Claude->>Claude: 仕様書は作成せず、Issueとコードベースを読んで実装方針を決める
+    end
+
+    rect rgb(232, 240, 254)
+        Note over Claude,Codex: ここからマージまでは全自動。人間はマージに関与しない
+        Claude->>Claude: 実装し、/verify-all でテスト・静的解析・カバレッジを検証する
+        Claude->>CI: /ship を実行し、コミットとpushを経てプルリクエストを作成し、auto-mergeを予約する
+        CI-->>Claude: テスト・検査回避の検知・シークレットスキャンの結果を返す
+        loop 指摘が無くなるまで、最大5往復
+            Codex->>Claude: コード品質と仕様への適合をレビューし、PRコメントで指摘を返す
+            Claude->>Codex: /review-loop で指摘を修正してpushし、再レビューを受ける
+        end
+    end
+
+    alt レビューが収束したとき
+        alt DBマイグレーション・依存ライブラリの追加・チェック設定の変更・Issueに付けた pre-merge-check ラベルを含むとき
+            CI->>Human: 該当の必須チェックが人間の承認待ちとなり、マージが保留される
+            Human->>Human: DBマイグレーションを含むときは、対象ブランチを ./start-dev.sh でローカル起動して適用と動作を確認する
+            Human->>Human: pre-merge-check ラベルのときは、対象ブランチを ./start-dev.sh でローカル起動して画面を確認する
+            Human-->>CI: GitHubのプルリクエスト画面で Review changes から Approve する
+            CI->>CI: 必須チェックがすべて成功したことを確認し、auto-mergeでmainブランチへ取り込む
+        else 通常の変更のとき
+            CI->>CI: 必須チェックがすべて成功したことを確認し、auto-mergeでmainブランチへ取り込む
+        end
+    else レビューが5往復で決着しないとき
+        Claude->>Human: 作業セッションで停止し、Codexとの対立点を要約して報告する
+        Human-->>Claude: .kiro/specs/ の仕様書とPRコメントの往復履歴を読み、仕様の差し戻し・タスクの分割・PR破棄のどれかをClaude Codeに指示する
+    end
+
+    rect rgb(255, 243, 224)
+        Note over Human,Prod: マージだけでは本番に反映されない。ここから先は人間だけが実行できる
+        Human->>Human: mainブランチを ./start-dev.sh でローカル起動し、実際に触って動作を確認する
+        Human->>Prod: GitHubのActionsタブから Production Release を実行して本番にデプロイする
+    end
+```
+
+運用の詳細は次のドキュメントにまとめています。
+
+- [監査手順](doc/開発フロー/監査手順.md)
+- [初期セットアップ手順](doc/開発フロー/初期セットアップ手順.md)
+
+### 人間とAIの分担
+
+人間が行うのは次の5つです。
+
+| 人間の作業 | 内容 |
+|---|---|
+| 作るものを決める | 何を作るか・何を直すかを決めて、Issueとして起票する(1〜2行でよく、詳細化はAIが行う) |
+| 仕様を承認する | spec駆動開発で作成される要件・設計・タスクのドキュメントを読んで承認する(コードではなく仕様を判断する) |
+| 仕組みを監査する | 自動チェックが正しく機能し続けているかを週次・月次で確認し、すり抜けた問題はチェックの追加・強化につなげる([監査手順](doc/開発フロー/監査手順.md)) |
+| 影響の大きい変更を承認する | DBマイグレーション・依存ライブラリの追加・チェック設定の変更を含むプルリクエストに限り、承認ボタンを押す |
+| リリースを判断する | 本番デプロイの前にローカル環境で動作を確かめ、問題がなければデプロイを手動で実行する |
+
+それ以外の作業(実装・テスト・コミット・プルリクエストの作成・レビュー指摘への対応)はClaude Codeが行います。プルリクエストは、Codexによる自動レビューがコード品質と仕様適合の両方を問題なしと判定し、CIの必須チェックがすべて成功すると、自動的にマージされます。
+
+### 開発の進め方
+
+| 変更の種類 | 進め方 |
+|---|---|
+| 新機能・大きな変更 | cc-sddによるspec駆動開発。要件定義・設計・タスク分解の各ドキュメントを人間が承認したうえで、Claude Codeが自律的に実装する |
+| 小規模な修正 | Issueをもとに直接実装する。コード差分が200行を超える場合はCIが検知し、spec駆動での進行を求める |
+| 定常メンテナンス | 定期実行の仕組みが、品質チェック・依存パッケージの更新・プルリクエストの監視などを自動で行う |
+
+### 品質を担保する仕組み
+
+人間がコードをレビューしない代わりに、次の自動チェックを何層にも重ねています。
+
+| 仕組み | 内容 |
+|---|------|
+| テストとカバレッジ基準 | VitestとJUnit(Testcontainers)によるテストに加え、カバレッジが基準値を下回るとCIが失敗する |
+| 静的解析 | ESLint・TypeScript・ArchUnit・Checkstyle・SpotBugs・tflint・Checkovで、アーキテクチャ境界の違反やコードの問題を機械的に検査する |
+| 検査回避の検知 | テストのスキップ化・アサーションの削除・型チェックの抑止コメントなど、チェックを形だけ通すための変更をCIが検知して失敗させる |
+| 別のAIによるレビュー | 実装したClaude Codeとは別系統のAIであるCodexが、すべてのプルリクエストをレビューする。指摘への対応は自動で行い、5往復しても収束しない場合は人間が判断する |
+| 影響の大きい変更の承認 | DBマイグレーション・依存ライブラリの追加・品質チェック設定の変更は、人間が承認しなければマージされない |
+| チェック設定自体の保護 | 品質チェックの設定ファイルはCODEOWNERSで保護されており、AIエージェントが自分の判断で変更することはできない |
+| リリースの分離 | mainブランチへのマージだけでは本番に反映されず、デプロイは人間が手動で実行する |
+| 定期的な健全性確認 | 問題のある変更をわざと含めたプルリクエストを毎月自動生成し、チェックの仕組みが正しく検知できることを確かめる |
+
+### 利用しているMCP
 
 | MCP | 用途 |
 |-----|------|
-| GitHub MCP | Issue / PR / Actions の参照、Approved Plan の Issue コメント投稿 |
-| Context7 MCP | ライブラリ・フレームワーク公式ドキュメントの参照 |
-| Playwright MCP | ブラウザ操作を伴う動作確認・E2E観点の検証 |
+| Context7 MCP | ライブラリ・フレームワークの公式ドキュメント参照 |
+| Playwright MCP | ブラウザを実際に操作しての画面確認 |
 
-### AI駆動開発フロー
-
-| ステップ | 担当 | 内容 |
-|---------|------|------|
-| 1 | 開発者 | Issue を作成する |
-| 2 | Codex IDE | GitHub MCP で Issue を読む |
-| 3 | Codex IDE | 実装 Plan を作成する |
-| 4 | 開発者 | Plan を確認する |
-| 5 | Claude / ChatGPT | Plan をレビューする |
-| 6 | Codex IDE | 指摘があれば Plan を修正する |
-| 7 | 開発者 | Plan を承認する |
-| 8 | Codex IDE | Approved Plan を Issue コメントに投稿する |
-| 9 | 開発者 | 実装開始を承認する |
-| 10 | Codex IDE | ローカル作業ツリーで実装する |
-| 11 | 開発者 | 任意のタイミングで `code-review` Skill によるレビューを依頼する |
-| 12 | Codex IDE | staged / unstaged / untracked の現在差分を読み、修正担当 AI エージェント向けのレビュー結果を出す |
-| 13 | Codex IDE | レビュー指摘をもとに必要な修正を行う |
-| 14 | 開発者 | 最終差分と検証結果を確認する |
-
-### GitHub MCPの権限制御
-
-GitHub MCP には Fine-grained Personal Access Token を使用し、以下の権限に限定します。
-
-| Permission | Access |
-|-----------|--------|
-| Contents | Read-only |
-| Issues | Read and write |
-| Pull requests | Read-only |
-| Actions | Read-only |
-| Metadata | Read-only |
-
-Codex IDE に許可する操作は以下です。
-
-- Issue を読む
-- Issue コメントを読む
-- Issue に Approved Plan をコメント投稿する
-- PR を読む
-- PR の diff / files / comments / reviews / check runs を読む
-- GitHub Actions の workflow / run / job / logs を読む
-- GitHub 上のファイル内容を読む
-
-Codex IDE に許可しない操作は以下です。
-
-- GitHub 上でコードを直接変更する
-- branch を作成する
-- commit を作成する
-- push する
-- PR を作成する
-- PR を更新する
-- PR review を投稿する
-- merge する
-- workflow を手動実行する
-- deploy する
-
-## Codex Skills
-
-本プロジェクトでは、Codex Skills を利用し、繰り返し発生する作業を定型化しています。
-
-現在、本プロジェクトでは以下のスキルを使用します。
+### 主なカスタムスキル
 
 | Skill | 用途 |
 |------|------|
-| `diff-backend-class-diagram-sync` | Git差分に含まれるバックエンドソースの変更を、クラス図へ同期する |
-| `full-backend-class-diagram-sync` | バックエンドソース全体を正として、クラス図全体を同期する |
-| `diff-db-er-diagram-sync` | Git差分に含まれる DB マイグレーションファイル の変更を、ER図へ同期する |
-| `full-db-er-diagram-sync` | DB マイグレーションファイル 全体を正として、ER図全体を同期する |
-| `draft-branch-name-and-commit-message` | 現在の Git 差分から、ブランチ名とコミットメッセージ案を作成する |
-| `draft-issue-plan` | GitHub Issue の本文とコメントを読み、実装 Plan を作成する |
-| `post-issue-plan-comment` | 作成済みの Plan を指定した GitHub Issue にコメント投稿する |
-| `code-review` | 現在の Git 差分を読み、レビュー結果を作成する |
+| `/verify-frontend` `/verify-backend` `/verify-terraform` `/verify-all` | 品質チェック一式の実行と結果報告 |
+| `/verify-ui` | 開発サーバを起動して実際の画面を確認 |
+| `/ship` | 検証からコミット・プルリクエスト作成・マージ予約までの一連の出荷作業 |
+| `/review-loop` | Codexレビューの指摘への対応 |
+| `/retrospective` | チェックをすり抜けた問題を仕組みの改善につなげる振り返り |
+| `/kiro-*` | spec駆動開発(cc-sdd)の各工程 |

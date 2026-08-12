@@ -1,0 +1,2 @@
+# シェルスクリプトは常にLF(CRLF混入でGit Bash実行が壊れるWindows固有の罠の封鎖)
+*.sh text eol=lf

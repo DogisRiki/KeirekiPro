@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="KeirekiPro test quality"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        何も検証していないテストの検出。有効にするルールは UnitTestShouldIncludeAssert の1本のみ
+        (検査の追加は別途判断する)。
+        ヘルパーメソッド経由で検証しているテストの誤検知は、除外ではなく
+        extraAssertMethodNames に検証メソッド名を追加して抑える。
+        このファイルは CODEOWNERS 保護対象。
+    </description>
+
+    <rule ref="category/java/bestpractices.xml/UnitTestShouldIncludeAssert">
+        <properties>
+            <!-- ヘルパーメソッド経由で検証を行うメソッド名をカンマ区切りで追加する -->
+            <!-- andExpect: MockMvcの標準の検証メソッド(presentation層テストで使用) -->
+            <property name="extraAssertMethodNames" value="andExpect" />
+        </properties>
+    </rule>
+
+</ruleset>

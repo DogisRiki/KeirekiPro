@@ -1,6 +1,7 @@
 import { FlatCompat } from "@eslint/eslintrc";
 import js from "@eslint/js";
 import typeScriptESLintParser from "@typescript-eslint/parser";
+import sonarjs from "eslint-plugin-sonarjs";
 import { readdirSync, statSync } from "fs";
 import globals from "globals";
 import { join } from "path";
@@ -120,6 +121,19 @@ export default [
             parserOptions: {
                 projectService: true,
             },
+        },
+    },
+
+    // テストの質の担保(品質ゲート: アサーション無しテストの禁止)
+    // 「カバレッジは通るが何も検証しないテスト」を機械的に拒否する。
+    // このルールの無効化・緩和は禁止(このファイルはCODEOWNERS保護対象)。
+    {
+        files: ["src/**/*.test.{js,jsx,ts,tsx}"],
+        plugins: {
+            sonarjs,
+        },
+        rules: {
+            "sonarjs/assertions-in-tests": "error",
         },
     },
 

@@ -1,0 +1,134 @@
+name: Production Release
+
+# 本番デプロイの唯一の入口(人間の手動トリガー専用)。
+# mainブランチへのマージだけでは本番に反映されない。デプロイ前に人間がローカルで
+# mainを起動して動作確認してから、このワークフローを起動する。
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'frontend-dist を含む main の CI Workflow run ID(空なら最新の成功runを自動選択)'
+        required: false
+        type: string
+        default: ''
+      deploy_backend:
+        description: 'バックエンドをデプロイする'
+        required: false
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: 'フロントエンドをデプロイする'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  resolve-source:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_run_id: ${{ steps.resolve.outputs.artifact_run_id }}
+    steps:
+      - name: Resolve frontend artifact source run
+        id: resolve
+        if: inputs.deploy_frontend
+        uses: actions/github-script@v8
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            const validateRun = async (runId) => {
+              const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId });
+              if (
+                run.name !== 'CI Workflow' ||
+                run.event !== 'push' ||
+                run.head_branch !== 'main' ||
+                run.conclusion !== 'success'
+              ) {
+                return null;
+              }
+              const artifacts = await github.paginate(
+                github.rest.actions.listWorkflowRunArtifacts,
+                { owner, repo, run_id: runId, per_page: 100 },
+              );
+              const artifact = artifacts.find(({ name, expired }) => name === 'frontend-dist' && !expired);
+              return artifact ? run : null;
+            };
+
+            const explicit = process.env.SOURCE_RUN_ID.trim();
+            if (explicit !== '') {
+              const runId = Number(explicit);
+              if (!Number.isSafeInteger(runId) || runId <= 0) {
+                core.setFailed('source_run_id must be a positive workflow run ID.');
+                return;
+              }
+              const run = await validateRun(runId);
+              if (!run) {
+                core.setFailed('Specified run is not a successful main CI Workflow run with a frontend-dist artifact.');
+                return;
+              }
+              core.setOutput('artifact_run_id', String(runId));
+              core.info(`Using explicitly specified run ${runId} (${run.head_sha}).`);
+              return;
+            }
+
+            // 最新の成功した main push の CI Workflow run から frontend-dist を探す
+            // (経年でrunが増えても遅くならないよう、探索は直近100件で打ち切る)
+            const collected = [];
+            await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              { owner, repo, branch: 'main', event: 'push', status: 'success', per_page: 100 },
+              (response, done) => {
+                collected.push(...response.data);
+                if (collected.length >= 100) {
+                  done();
+                }
+                return response.data;
+              },
+            );
+            for (const candidate of collected.slice(0, 100).filter((r) => r.name === 'CI Workflow')) {
+              const run = await validateRun(candidate.id);
+              if (run) {
+                core.setOutput('artifact_run_id', String(candidate.id));
+                core.info(`Auto-selected run ${candidate.id} (${run.head_sha}).`);
+                return;
+              }
+            }
+            core.setFailed('No successful main CI Workflow run with an available frontend-dist artifact was found in the latest 100 runs.');
+
+  backend-release:
+    needs: resolve-source
+    if: inputs.deploy_backend
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/backend-deploy.yaml
+    secrets: inherit
+
+  frontend-release:
+    needs:
+      - resolve-source
+      - backend-release
+    if: >-
+      always() &&
+      inputs.deploy_frontend &&
+      needs.resolve-source.result == 'success' &&
+      (inputs.deploy_backend == false || needs.backend-release.result == 'success')
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
+    uses: ./.github/workflows/frontend-deploy.yaml
+    with:
+      artifact_run_id: ${{ needs.resolve-source.outputs.artifact_run_id }}
+    secrets: inherit

@@ -1,0 +1,265 @@
+name: Guardrails
+
+# 「人間がコードを読まなくても壊れない」を成立させる機械ゲート群。
+# escape-hatch / size-check はブランチ保護の required check に指定する。
+# 所有者のApprove有無で再評価するため pull_request_review でも発火する。
+
+on:
+  pull_request:
+    branches: [main]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: guardrails-${{ github.event.pull_request.number }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+env:
+  PR_SIZE_LIMIT: '200'
+
+jobs:
+  escape-hatch:
+    name: escape-hatch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check owner approval
+        id: approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          owner="${{ github.repository_owner }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
+          # gh の --jq は --slurp と併用できない仕様のため、jq へパイプして評価する。
+          # commit_id で現在のhead SHAに対するレビューだけに絞る(承認後にコミットを積んで
+          # ゲートを迂回されないようにする。ブランチ保護のDismiss stale approvals頼みにしない)。
+          verdict=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate --slurp \
+            | jq -r --arg owner "$owner" --arg head "$head_sha" '[.[][] | select(.user.login == $owner) | select(.commit_id == $head) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
+          echo "Owner review verdict: $verdict"
+          if [ "$verdict" = "APPROVED" ]; then
+            echo "approved=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "approved=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run escape hatch check
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          OWNER_APPROVED: ${{ steps.approval.outputs.approved }}
+        run: |
+          chmod +x .github/scripts/check-escape-hatches.sh
+          .github/scripts/check-escape-hatches.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
+
+  size-check:
+    name: size-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check PR size (Lane B gate)
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          merge_base=$(git merge-base "${{ github.event.pull_request.base.sha }}" HEAD)
+          # コード行のみを対象にする(lockfile / ドキュメント / spec / 図は除外)
+          lines=$(git diff --numstat "$merge_base" HEAD -- . \
+            ':(exclude)frontend/pnpm-lock.yaml' \
+            ':(exclude)**/*.md' \
+            ':(exclude)doc/**' \
+            ':(exclude).kiro/**' \
+            ':(exclude)**/*.svg' \
+            ':(exclude)**/*.drawio' \
+            | awk '{ add += $1; del += $2 } END { print add + del + 0 }')
+          echo "コード差分行数: $lines (上限: $PR_SIZE_LIMIT)"
+
+          if [ "$lines" -le "$PR_SIZE_LIMIT" ]; then
+            echo "サイズ上限内。Lane B(小修正)として通過します。"
+            exit 0
+          fi
+
+          # 上限超過: spec に裏付けられた Lane A の PR のみ許可する
+          spec_path=$(echo "$PR_BODY" | grep -oE 'Spec: *\.kiro/specs/[A-Za-z0-9._/-]+' | head -1 | sed 's/Spec: *//' || true)
+          if [ -n "$spec_path" ] && [ -e "$spec_path" ]; then
+            echo "差分 ${lines} 行 > 上限 ${PR_SIZE_LIMIT} 行ですが、spec(${spec_path})に裏付けられた Lane A の PR のため通過します。"
+            exit 0
+          fi
+
+          echo "::error::コード差分 ${lines} 行が上限 ${PR_SIZE_LIMIT} 行を超えています。この規模の変更は spec 駆動(Lane A)で行ってください: /kiro-spec-init で spec を作成し、PR 本文に「Spec: .kiro/specs/<feature>」を記載します。"
+          exit 1
+
+  migration-label:
+    name: migration-label
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Label migration changes (non-blocking)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          merge_base=$(git merge-base "${{ github.event.pull_request.base.sha }}" HEAD)
+          if git diff --name-only "$merge_base" HEAD | grep -q '^backend/src/main/resources/db/migration/'; then
+            gh label create migration \
+              --description "DBマイグレーション変更あり。承認前にローカルDBで適用・巻き戻しを確認すること" \
+              --color D93F0B 2>/dev/null || true
+            gh pr edit "${{ github.event.pull_request.number }}" --add-label migration
+            echo "migration ラベルを付与しました。CODEOWNERS により所有者の承認が必須です。"
+          else
+            echo "マイグレーション変更なし。"
+          fi
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Run gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  quality-reports:
+    name: quality-reports (non-blocking)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.16.0'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Dead code report (knip)
+        continue-on-error: true
+        working-directory: frontend
+        run: |
+          echo "### :wastebasket: 未使用コードレポート (knip)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          pnpm exec knip --no-exit-code >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Duplication report (jscpd)
+        continue-on-error: true
+        run: |
+          echo "### :clipboard: コード重複レポート (jscpd)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          npx --yes jscpd frontend/src backend/src/main/java --min-lines 10 --reporters console 2>&1 | tail -30 >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  java-assertion-report:
+    name: java-assertion-report (non-blocking)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Detect backend changes
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+
+      - name: Set up JDK 21
+        if: steps.filter.outputs.backend == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle dependencies
+        if: steps.filter.outputs.backend == 'true'
+        uses: actions/cache@v5
+        with:
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Run PMD UnitTestShouldIncludeAssert (report mode)
+        if: steps.filter.outputs.backend == 'true'
+        continue-on-error: true
+        working-directory: backend
+        run: |
+          chmod +x ./gradlew
+          ./gradlew pmdTest
+
+      - name: Summarize PMD report
+        if: steps.filter.outputs.backend == 'true'
+        continue-on-error: true
+        run: |
+          report="backend/build/reports/pmd/test.xml"
+          count=0
+          if [ -f "$report" ]; then
+            count=$(grep -c "<violation" "$report" || true)
+          fi
+          {
+            echo "### :mag: 何も検証していないJavaテストのレポート(PMD UnitTestShouldIncludeAssert・警告のみ)"
+            echo ""
+            echo "検出件数: **${count} 件**"
+            if [ "$count" -gt 0 ]; then
+              echo ""
+              echo "誤検知(ヘルパーメソッド経由で検証しているテスト)は、backend/config/pmd/ruleset.xml の"
+              echo "extraAssertMethodNames に検証メソッド名を追加して抑える。"
+            fi
+            echo ""
+            echo "> 昇格条件: 誤検知の設定整理が完了して実検出が0になったら、backend/gradle/quality.gradle の"
+            echo "> PMD設定 ignoreFailures を false にしてビルド失敗へ昇格する(監査手順の週次項目で判定)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload PMD report
+        if: steps.filter.outputs.backend == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: pmd-test-report
+          path: backend/build/reports/pmd/
+          retention-days: 7
+          if-no-files-found: ignore
