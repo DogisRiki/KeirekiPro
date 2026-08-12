@@ -39,6 +39,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           OWNER_LOGIN: ${{ github.repository_owner }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           # ラベルはイベントペイロードではなくAPIから取得する(古い情報を見ない)
@@ -52,8 +53,10 @@ jobs:
 
           # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
           # gh の --jq は --slurp と併用できない仕様のため、jq へパイプして評価する。
+          # commit_id で現在のhead SHAに対するレビューだけに絞る(承認後にコミットを積んで
+          # ゲートを迂回されないようにする。ブランチ保護のDismiss stale approvals頼みにしない)。
           verdict=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" --paginate --slurp \
-            | jq -r --arg owner "$OWNER_LOGIN" '[.[][] | select(.user.login == $owner) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
+            | jq -r --arg owner "$OWNER_LOGIN" --arg head "$HEAD_SHA" '[.[][] | select(.user.login == $owner) | select(.commit_id == $head) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
           echo "Owner review verdict: $verdict"
 
           if [ "$verdict" = "APPROVED" ]; then

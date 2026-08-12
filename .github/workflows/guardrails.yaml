@@ -40,10 +40,13 @@ jobs:
         run: |
           set -euo pipefail
           owner="${{ github.repository_owner }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
           # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
           # gh の --jq は --slurp と併用できない仕様のため、jq へパイプして評価する。
+          # commit_id で現在のhead SHAに対するレビューだけに絞る(承認後にコミットを積んで
+          # ゲートを迂回されないようにする。ブランチ保護のDismiss stale approvals頼みにしない)。
           verdict=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate --slurp \
-            | jq -r --arg owner "$owner" '[.[][] | select(.user.login == $owner) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
+            | jq -r --arg owner "$owner" --arg head "$head_sha" '[.[][] | select(.user.login == $owner) | select(.commit_id == $head) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
           echo "Owner review verdict: $verdict"
           if [ "$verdict" = "APPROVED" ]; then
             echo "approved=true" >> "$GITHUB_OUTPUT"
