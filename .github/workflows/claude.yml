@@ -58,7 +58,8 @@ jobs:
           # 参照: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md
           claude_args: |
             --max-turns 60
-            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm:*),Bash(git:*),Bash(gh:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(cd:*),Bash(pnpm:*),Bash(git:*),Bash(gh:*)"
+            --disallowedTools "Bash(gh extension:*),Bash(git config:*)"
 
   weekly-dependency-update:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -101,18 +102,19 @@ jobs:
           # 参照: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md
           claude_args: |
             --max-turns 60
-            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Bash(pnpm:*),Bash(git:*),Bash(gh:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Bash(cd:*),Bash(pnpm:*),Bash(git:*),Bash(gh:*)"
+            --disallowedTools "Bash(gh extension:*),Bash(git config:*)"
           prompt: |
             週次の依存バージョン更新レーンです。以下を実施してください。
 
-            1. frontend: `cd frontend && pnpm outdated` で更新可能な依存を確認し、
+            1. frontend: `pnpm --dir frontend outdated` で更新可能な依存を確認し、
                既存依存の「バージョン更新のみ」を patch/minor 範囲で適用する
                (`pnpm update --latest` は使わず、メジャー更新と新規追加はしない)。
-               適用後は `cd frontend && pnpm install` で pnpm-lock.yaml を更新する
+               適用後は `pnpm --dir frontend install` で pnpm-lock.yaml を更新する
             2. backend: `backend/build.gradle` の既存依存について、WebFetch または WebSearch で
                Maven Central の最新バージョンを確認し、patch/minor の範囲で更新する
                (新規依存の追加はしない)。バージョンは必ず実在を確認し、推測で書かないこと
-            3. セキュリティアドバイザリ(`gh api` の Dependabot alerts か `cd frontend && pnpm audit`)を
+            3. セキュリティアドバイザリ(`gh api` の Dependabot alerts か `pnpm --dir frontend audit`)を
                確認し、該当があれば優先的に更新する
             4. 変更があれば `.commit_template` 準拠でコミットし、featureブランチ
                `chore/weekly-dependency-update-${{ github.run_number }}` へpushしてPRを作成、
