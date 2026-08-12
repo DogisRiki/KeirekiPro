@@ -142,7 +142,13 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
+          # モデルとreasoningは明示固定する(CLI未指定時の既定は公式に明記されておらず、
+          # バージョンごとに変わるため)。gpt-5.6-terra + reasoning high の構成。
+          # 提供状況の見直しは監査手順の半期項目で行う。
+          # 設定キーがCLIバージョンで異なる場合は、初回実行の検証(初期セットアップ手順)で実態に合わせる
           codex exec \
+            --model gpt-5.6-terra \
+            -c model_reasoning_effort='"high"' \
             --sandbox read-only \
             --skip-git-repo-check \
             --output-last-message "$RUNNER_TEMP/review/verdict.md" \
