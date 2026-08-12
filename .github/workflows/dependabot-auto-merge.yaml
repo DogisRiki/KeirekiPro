@@ -1,16 +1,26 @@
 name: Dependabot Auto-merge
 
-# Dependabotが作成したPRにauto-merge(squash)を予約する。
-# Dependabot自身は予約しないため、これが無いと必須チェックが全て緑になっても
-# PRが開いたまま放置される。
+# Dependabotの「脆弱性修正」のPRにだけ auto-merge(squash)を予約する。
 #
-# Dependabot発のイベントではGITHUB_TOKENが既定で読み取り専用になるが、
-# permissions を明示すれば昇格する(secretsが遮断される制約とは別)。
-# このためauto-mergeの予約は pull_request で成立し、pull_request_target は不要。
-# 参照: https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/automate-dependabot-with-actions
+# DependabotのPRは2種類あり、要求が正反対のため扱いを分ける。
+#   security updates: lockfileのみの更新が大半でレビュー対象の差分が無い。
+#                     Criticalの対応であり、人手を挟まず流す
+#   version updates : バージョン文字列という読める差分がある。
+#                     独立レビューを経ないまま自動マージしないため、所有者がマージする
+#
+# 判別には fetch-metadata の alert-state を使う。値が入っていれば脆弱性修正、
+# 空ならバージョン更新。この参照には alert-lookup: true とPATが必要で、
+# 既定のGITHUB_TOKENでは動かない。
+# Dependabot発の pull_request ではActions secretsが遮断されPATを参照できないため、
+# pull_request_target で起動する。PRのコードはcheckoutしない(pwn request対策)。
+# 他のPRではジョブ自体がスキップされ、昇格した権限で動くコードは存在しない。
+#
+# 参照:
+#   https://github.com/dependabot/fetch-metadata
+#   https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-on-actions
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize]
     branches: [main]
 
@@ -25,12 +35,28 @@ concurrency:
 jobs:
   auto-merge:
     name: auto-merge
-    # 作成者の判定に使う user.login はGitHubが設定する値で、PR作成者は詐称できない
+    # user.login はGitHubが設定する値で、PR作成者は詐称できない
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Enable auto-merge
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          alert-lookup: true
+          github-token: ${{ secrets.BOT_GITHUB_TOKEN }}
+
+      - name: Enable auto-merge for security updates
+        # alert-state が空でなければ脆弱性修正のPR
+        if: steps.metadata.outputs.alert-state != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PR_URL"
+        run: |
+          echo "脆弱性修正のPR(alert-state: ${{ steps.metadata.outputs.alert-state }})のため auto-merge を予約します。"
+          gh pr merge --auto --squash "$PR_URL"
+
+      - name: Skip auto-merge for version updates
+        if: steps.metadata.outputs.alert-state == ''
+        run: |
+          echo "バージョン更新のPRのため auto-merge は予約しません。所有者がマージしてください。"
