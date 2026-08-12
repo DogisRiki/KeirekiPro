@@ -52,7 +52,7 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 
 ```mermaid
 flowchart LR
-    PR[プルリクエスト]
+    PR[プルリクエスト<br>Claude Code または Dependabot]
 
     subgraph s1[系統1: 品質の検査]
         Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク]
@@ -64,7 +64,7 @@ flowchart LR
         H[依存追加・pre-merge-checkラベル・<br>保護パスの変更は<br>所有者がApproveするまで赤]
     end
     subgraph s4[系統4: AIレビュー]
-        A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回]
+        A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回<br>Dependabotのプルリクエストは対象外]
     end
 
     PR --> Q
@@ -95,9 +95,12 @@ flowchart LR
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
-| 定期 | claude.yml | @claudeメンション / 週次 (schedule) / 手動 | IssueやPRのコメントからClaude Codeを起動。週次で依存パッケージのバージョン更新も実行 |
+| 定期 | claude.yml | @claudeメンション | IssueやPRのコメントからClaude Codeを起動 |
+| 定期 | dependabot-auto-merge.yaml | pull_request (Dependabot) | Dependabotが作成したプルリクエストにauto-mergeを予約。通常のプルリクエストではジョブがスキップされる |
 | 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
 | 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
+
+依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあり、frontend(npm)、backend(Gradle)、GitHub Actionsのアクションを対象に、メジャー更新を除いたバージョン更新のプルリクエストを週次で作成します。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストが作成されます。これらのプルリクエストも通常と同じ検査を受け、すべて緑になってからマージされます。
 
 mainブランチへのマージだけでは本番環境に反映されません。本番リリースはrelease.yamlを人間が手動で実行したときにのみ行われます。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 

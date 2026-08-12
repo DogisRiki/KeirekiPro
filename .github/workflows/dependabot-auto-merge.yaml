@@ -1,0 +1,36 @@
+name: Dependabot Auto-merge
+
+# Dependabotが作成したPRにauto-merge(squash)を予約する。
+# Dependabot自身は予約しないため、これが無いと必須チェックが全て緑になっても
+# PRが開いたまま放置される。
+#
+# Dependabot発のイベントではGITHUB_TOKENが既定で読み取り専用になるが、
+# permissions を明示すれば昇格する(secretsが遮断される制約とは別)。
+# このためauto-mergeの予約は pull_request で成立し、pull_request_target は不要。
+# 参照: https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/automate-dependabot-with-actions
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    name: auto-merge
+    # 作成者の判定に使う user.login はGitHubが設定する値で、PR作成者は詐称できない
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
