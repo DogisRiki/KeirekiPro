@@ -40,6 +40,10 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
+  # アクションの更新は月次にする。npm/Gradleほど頻繁に変わらないため。
+  # メジャー更新を除外しないのは、アクションの通常の更新経路がメジャー版の切り替え
+  # (v5からv6など)であり、除外すると更新が事実上止まるため。
+  # .github/workflows/ はCODEOWNERS保護対象で、所有者の承認なしにはマージされない。
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
