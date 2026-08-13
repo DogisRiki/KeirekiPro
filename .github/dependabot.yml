@@ -7,8 +7,9 @@
 # (https://github.com/dependabot/dependabot-core/issues/14794 は現在open)。
 # 対応後にレーンを追加する。それまでのfrontendのバージョン更新は通常のPRで行う。
 #
-# security updates はこの設定ファイルに依存せずアラート起点で作成されるため、
-# frontendでも作成される。
+# security updates はこの設定ファイルに依存せずアラート起点で動くため、
+# frontendでもPRの作成が試みられる。実際に作成されるかは、そのアラートが修正可能で、
+# マニフェストまたはlockfileから更新できるかによる。
 #
 # 参照: https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
 
