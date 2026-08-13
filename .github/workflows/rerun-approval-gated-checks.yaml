@@ -20,10 +20,13 @@ jobs:
   rerun:
     name: rerun
     # 所有者のApproveのみを対象にする。publicリポジトリのため第三者もApproveでき、
-    # そのたびに再実行が走るのを避ける(結果は変わらず実行時間だけ消費するため)
+    # そのたびに再実行が走るのを避ける(結果は変わらず実行時間だけ消費するため)。
+    # fork からのPRは対象外にする。fork PRでは GITHUB_TOKEN が読み取り専用になり
+    # 再実行APIが403になるため、実行しても解消できない(手動での再実行が必要)
     if: >-
       github.event.review.state == 'approved' &&
-      github.event.review.user.login == github.repository_owner
+      github.event.review.user.login == github.repository_owner &&
+      github.event.pull_request.head.repo.full_name == github.repository
     # concurrency はジョブに置く。ワークフローに置くと、所有者以外のレビュー提出でも
     # 同じグループの実行が作られ、進行中の再実行を取り消してしまう
     concurrency:
