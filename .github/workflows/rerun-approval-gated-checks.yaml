@@ -1,0 +1,67 @@
+name: Rerun Approval Gated Checks
+
+# 所有者のApproveで結果が変わるチェック(escape-hatch / dependency-gate / pre-merge-check)は、
+# 承認前の pull_request イベントで一度失敗する。これは正しい動作だが、承認後に
+# pull_request_review で成功の実行が生まれても、先の失敗した実行が残り続ける。
+# 同一SHAに同名のチェックが複数あると、1つでも失敗していればマージがブロックされるため、
+# 承認しても手動で再実行するまでマージできない。
+#
+# このワークフローは、承認時に失敗している実行を再実行して解消する。
+# 判定ロジックには手を入れないため、承認前に赤になる挙動はそのまま維持される。
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  actions: write
+
+concurrency:
+  group: rerun-approval-gated-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  rerun:
+    name: rerun
+    # 所有者のApproveのみを対象にする。publicリポジトリのため第三者もApproveでき、
+    # そのたびに再実行が走るのを避ける(結果は変わらず実行時間だけ消費するため)
+    if: >-
+      github.event.review.state == 'approved' &&
+      github.event.review.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rerun failed approval-gated runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          workflows="guardrails.yaml dependency-gate.yaml pre-merge-check.yaml"
+
+          # 承認がゲートの実行完了より先に届くことがある。実行中のものが残ったまま
+          # 検索すると失敗が見つからず、何もしないまま成功で終わってしまうため、
+          # 完了するまで待つ(最大5分)。
+          for i in $(seq 1 30); do
+            running=0
+            for wf in $workflows; do
+              n=$(gh api "repos/$REPO/actions/workflows/$wf/runs?head_sha=$HEAD_SHA" \
+                --jq '[.workflow_runs[] | select(.status != "completed")] | length')
+              running=$((running + n))
+            done
+            [ "$running" -eq 0 ] && break
+            if [ "$i" -eq 30 ]; then
+              echo "::error::ゲートの実行が5分以内に完了しなかった。手動で再実行してください。"
+              exit 1
+            fi
+            sleep 10
+          done
+
+          for wf in $workflows; do
+            ids=$(gh api "repos/$REPO/actions/workflows/$wf/runs?head_sha=$HEAD_SHA&status=failure" \
+              --jq '.workflow_runs[].id')
+            for id in $ids; do
+              echo "再実行: $wf run=$id"
+              gh api -X POST "repos/$REPO/actions/runs/$id/rerun-failed-jobs"
+            done
+          done
