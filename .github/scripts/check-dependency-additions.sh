@@ -14,6 +14,9 @@
 #   - frontend/package.json(dependencies + devDependencies)
 #   - backend/**/*.gradle と *.gradle.kts(quality.gradle を除く全gradleファイル。
 #     新規gradleファイル経由の依存追加も検知する)
+#     依存座標に加え、プラグインID(plugins / pluginManagement / apply plugin)も対象。
+#     Gradleプラグインはビルド時に任意のコードを実行するため、依存ライブラリと同格に扱う。
+#   - backend/**/*.versions.toml(version catalog の libraries / plugins / bundles のキー)
 #
 # 環境変数:
 #   OWNER_APPROVED : "true" ならリポジトリ所有者のApprove済み
@@ -50,6 +53,22 @@ if git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -q '^frontend/package\.
     fi
 fi
 
+# 指定リビジョンの backend 配下の対象ファイルを連結して標準出力に流す
+# 使い方: cat_backend_files <ref> <ファイル名の正規表現>
+cat_backend_files() {
+    local ref="$1"
+    local pattern="$2"
+    git ls-tree -r --name-only "$ref" -- backend 2>/dev/null |
+        grep -E "$pattern" |
+        grep -v '^backend/gradle/quality\.gradle$' |
+        while IFS= read -r f; do
+            git show "$ref:$f" 2>/dev/null || true
+        done
+}
+
+GRADLE_FILE_RE='\.gradle(\.kts)?$'
+CATALOG_FILE_RE='\.versions\.toml$'
+
 # --- backend/**/*.gradle: 依存座標(group:artifact)の集合を比較 ---
 gradle_coords() {
     # implementation 'group:artifact:version' / classpath / platform(...) 等から
@@ -61,26 +80,61 @@ gradle_coords() {
         sort -u
 }
 
-# 指定リビジョンの backend 配下の全gradleファイル(quality.gradle除く)を連結して座標を抽出する
-gradle_coords_at() {
-    local ref="$1"
-    git ls-tree -r --name-only "$ref" -- backend 2>/dev/null |
-        grep -E '\.gradle(\.kts)?$' |
-        grep -v '^backend/gradle/quality\.gradle$' |
-        while IFS= read -r f; do
-            git show "$ref:$f" 2>/dev/null || true
-        done | gradle_coords
+# --- backend/**/*.gradle: プラグインIDの集合を比較 ---
+gradle_plugin_ids() {
+    # plugins {} と pluginManagement {} の id 宣言、および旧来の apply plugin: を抽出する
+    #   id 'org.foo.bar' / id("org.foo.bar") / apply plugin: 'org.foo.bar'
+    # version 部は含めない(バージョン更新を追加扱いにしないため)
+    grep -oE "(\bid[[:space:]]*\(?|\bapply[[:space:]]+plugin:)[[:space:]]*['\"][^'\"]+['\"]" 2>/dev/null |
+        grep -oE "['\"][^'\"]+['\"]$" |
+        tr -d "'\"" |
+        sort -u
 }
 
-gradle_changed=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -E '^backend/.*\.gradle(\.kts)?$' | grep -v '^backend/gradle/quality\.gradle$' || true)
-if [ -n "$gradle_changed" ]; then
-    base_coords=$(gradle_coords_at "$MERGE_BASE" || true)
-    head_coords=$(gradle_coords_at "$HEAD_SHA" || true)
-    new_gradle=$(comm -13 <(echo "$base_coords") <(echo "$head_coords") || true)
-    if [ -n "$new_gradle" ]; then
-        additions+="[backend/**/*.gradle]"$'\n'"$new_gradle"$'\n'
+# --- backend/**/*.versions.toml: version catalog のキー集合を比較 ---
+catalog_keys() {
+    # [libraries] [plugins] [bundles] の各セクションのキーを抽出する
+    # (値にはバージョンが含まれるため、キーのみを比較対象にする)
+    awk '
+        /^[[:space:]]*\[/ {
+            section = $0
+            gsub(/[][[:space:]]/, "", section)
+            next
+        }
+        (section == "libraries" || section == "plugins" || section == "bundles") &&
+        /^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*=/ {
+            key = $0
+            sub(/[[:space:]]*=.*/, "", key)
+            gsub(/[[:space:]]/, "", key)
+            print section "/" key
+        }
+    ' 2>/dev/null | sort -u
+}
+
+# base と head の集合を比較し、増えた要素があれば additions に積む
+# 使い方: collect_additions <見出し> <ファイル名の正規表現> <抽出関数名>
+collect_additions() {
+    local label="$1"
+    local file_re="$2"
+    local extractor="$3"
+    local changed base_set head_set added
+
+    changed=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
+        grep -E "^backend/.*$file_re" |
+        grep -v '^backend/gradle/quality\.gradle$' || true)
+    [ -n "$changed" ] || return 0
+
+    base_set=$(cat_backend_files "$MERGE_BASE" "$file_re" | "$extractor" || true)
+    head_set=$(cat_backend_files "$HEAD_SHA" "$file_re" | "$extractor" || true)
+    added=$(comm -13 <(echo "$base_set") <(echo "$head_set") || true)
+    if [ -n "$added" ]; then
+        additions+="[$label]"$'\n'"$added"$'\n'
     fi
-fi
+}
+
+collect_additions "backend/**/*.gradle 依存座標" "$GRADLE_FILE_RE" gradle_coords
+collect_additions "backend/**/*.gradle プラグイン" "$GRADLE_FILE_RE" gradle_plugin_ids
+collect_additions "backend/**/*.versions.toml" "$CATALOG_FILE_RE" catalog_keys
 
 if [ -z "$additions" ]; then
     echo "依存パッケージの追加なし。"
