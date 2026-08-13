@@ -80,14 +80,11 @@ jobs:
         run: |
           merge_base=$(git merge-base "${{ github.event.pull_request.base.sha }}" HEAD)
           # コード行のみを対象にする(lockfile / ドキュメント / spec / 図は除外)
-          # ゲート用スクリプトのテストも除外する。.github/ 配下は CODEOWNERS により
-          # 常に所有者の承認が要るため、上限を外しても無審査の経路は生まれない。
           lines=$(git diff --numstat "$merge_base" HEAD -- . \
             ':(exclude)frontend/pnpm-lock.yaml' \
             ':(exclude)**/*.md' \
             ':(exclude)doc/**' \
             ':(exclude).kiro/**' \
-            ':(exclude).github/scripts/tests/**' \
             ':(exclude)**/*.svg' \
             ':(exclude)**/*.drawio' \
             ':(exclude)backend/gradlew' \

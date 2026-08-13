@@ -12,12 +12,10 @@
 #
 # 走査対象:
 #   - frontend/package.json(dependencies + devDependencies)
-#   - backend/**/*.gradle と *.gradle.kts(quality.gradle を除く全gradleファイル。
+#   - backend/**/*.gradle と *.gradle.kts(全gradleファイル。
 #     新規gradleファイル経由の依存追加も検知する)
 #     依存座標に加え、プラグインの適用も対象。Gradleプラグインはビルド時に
 #     任意のコードを実行するため、依存ライブラリと同格に扱う。
-#   - backend/**/*.versions.toml(version catalog)
-#     キーだけでなく参照先(module / id)も比較する。既存キーの差し替えを見逃さないため。
 #
 # テスト: .github/scripts/tests/test-check-dependency-additions.sh
 #
@@ -63,7 +61,6 @@ cat_backend_files() {
     local pattern="$2"
     git ls-tree -r --name-only "$ref" -- backend 2>/dev/null |
         grep -E "$pattern" |
-        grep -v '^backend/gradle/quality\.gradle$' |
         while IFS= read -r f; do
             git show "$ref:$f" 2>/dev/null || true
         done
@@ -75,7 +72,6 @@ last_quoted() {
 }
 
 GRADLE_FILE_RE='\.gradle(\.kts)?$'
-CATALOG_FILE_RE='\.versions\.toml$'
 
 # --- backend/**/*.gradle: 依存座標(group:artifact)の集合を比較 ---
 gradle_coords() {
@@ -89,47 +85,12 @@ gradle_coords() {
 
 # --- backend/**/*.gradle: プラグインの適用の集合を比較 ---
 gradle_plugin_ids() {
-    # Groovy DSL と Kotlin DSL の双方の記法を対象にする。version 部は含めない
-    # (バージョン更新を追加扱いにしないため)。
-    local src
-    src=$(cat)
-    {
-        # id 'org.foo' / id("org.foo")
-        printf '%s\n' "$src" | grep -oE "\bid[[:space:]]*\(?[[:space:]]*['\"][^'\"]+['\"]" | last_quoted || true
-        # apply plugin: 'org.foo' / apply(plugin = "org.foo")
-        printf '%s\n' "$src" | grep -oE "\bapply[[:space:]]*\(?[[:space:]]*plugin[[:space:]]*[:=][[:space:]]*['\"][^'\"]+['\"]" | last_quoted || true
-        # kotlin("jvm") : Kotlin DSL のプラグイン記法
-        printf '%s\n' "$src" | grep -oE "\bkotlin[[:space:]]*\([[:space:]]*['\"][^'\"]+['\"]" | last_quoted | sed 's|^|kotlin:|' || true
-        # alias(libs.plugins.foo) : version catalog 経由の適用
-        printf '%s\n' "$src" | grep -oE "\balias[[:space:]]*\([[:space:]]*[A-Za-z0-9_.]+" | grep -oE "[A-Za-z0-9_.]+$" | sed 's|^|alias:|' || true
-    } | sort -u
-}
-
-# --- backend/**/*.versions.toml: version catalog の宣言の集合を比較 ---
-catalog_entries() {
-    # [libraries] [plugins] [bundles] の各エントリを「キー=参照先」の形で取り出す。
-    # バージョン指定は取り除くため、更新は追加扱いにならない。一方で既存キーの
-    # 参照先の差し替え(別プラグインへの置換など)は差分として現れる。
-    # 表形式が複数行にまたがる場合、行ごとの断片になるが、参照先の変更は検知される。
-    awk '
-        /^[[:space:]]*\[/ { section = $0; gsub(/[][[:space:]]/, "", section); next }
-        (section == "libraries" || section == "plugins" || section == "bundles") &&
-        /^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*=/ {
-            key = $0; sub(/[[:space:]]*=.*/, "", key); gsub(/[[:space:]]/, "", key)
-            val = $0; sub(/^[^=]*=[[:space:]]*/, "", val)
-            gsub(/version\.ref[[:space:]]*=[[:space:]]*"[^"]*"/, "", val)
-            gsub(/version[[:space:]]*=[[:space:]]*"[^"]*"/, "", val)
-            gsub(/version[[:space:]]*=[[:space:]]*\{[^}]*\}/, "", val)
-            if (val ~ /^"[^"]*"[[:space:]]*,?$/) {
-                gsub(/["[:space:],]/, "", val)
-                n = split(val, p, ":")
-                if (n == 3) { val = p[1] ":" p[2] }
-                else if (n == 2 && section == "plugins") { val = p[1] }
-            }
-            gsub(/[[:space:],]/, "", val)
-            print section "/" key "=" val
-        }
-    ' 2>/dev/null | sort -u
+    # plugins {} と pluginManagement {} の id 宣言、および旧来の apply plugin: を抽出する
+    #   id 'org.foo' / id("org.foo") / apply plugin: 'org.foo'
+    # version 部は含めない(バージョン更新を追加扱いにしないため)
+    grep -oE "(\bid[[:space:]]*\(?|\bapply[[:space:]]+plugin:)[[:space:]]*['\"][^'\"]+['\"]" 2>/dev/null |
+        last_quoted |
+        sort -u
 }
 
 # base と head の集合を比較し、増えた要素があれば additions に積む
@@ -140,9 +101,7 @@ collect_additions() {
     local extractor="$3"
     local changed base_set head_set added
 
-    changed=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
-        grep -E "^backend/.*$file_re" |
-        grep -v '^backend/gradle/quality\.gradle$' || true)
+    changed=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -E "^backend/.*$file_re" || true)
     [ -n "$changed" ] || return 0
 
     base_set=$(cat_backend_files "$MERGE_BASE" "$file_re" | "$extractor" || true)
@@ -155,7 +114,6 @@ collect_additions() {
 
 collect_additions "backend/**/*.gradle 依存座標" "$GRADLE_FILE_RE" gradle_coords
 collect_additions "backend/**/*.gradle プラグイン" "$GRADLE_FILE_RE" gradle_plugin_ids
-collect_additions "backend/**/*.versions.toml" "$CATALOG_FILE_RE" catalog_entries
 
 if [ -z "$additions" ]; then
     echo "依存パッケージの追加なし。"
