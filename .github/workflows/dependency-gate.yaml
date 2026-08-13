@@ -32,6 +32,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      # 検知スクリプト自身のテスト。落ちた場合はゲートも失敗させる(fail-closed)。
+      - name: Test dependency addition detector
+        run: bash .github/scripts/tests/test-check-dependency-additions.sh
+
       - name: Check owner approval
         id: approval
         env:
