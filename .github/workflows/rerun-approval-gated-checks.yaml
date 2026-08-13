@@ -1,0 +1,76 @@
+name: Rerun Approval Gated Checks
+
+# 所有者のApproveで結果が変わるチェック(escape-hatch / dependency-gate / pre-merge-check)は、
+# 承認前の pull_request イベントで一度失敗する。これは正しい動作だが、承認後に
+# pull_request_review で成功の実行が生まれても、先の失敗した実行が残り続ける。
+# 同一SHAに同名のチェックが複数あると、1つでも失敗していればマージがブロックされるため、
+# 承認しても手動で再実行するまでマージできない。
+#
+# このワークフローは、承認時に失敗している対象ジョブだけを再実行して解消する。
+# 判定ロジックには手を入れないため、承認前に赤になる挙動はそのまま維持される。
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  actions: write
+  checks: read
+
+jobs:
+  rerun:
+    name: rerun
+    # 所有者のApproveのみを対象にする。publicリポジトリのため第三者もApproveでき、
+    # そのたびに再実行が走るのを避ける(結果は変わらず実行時間だけ消費するため)。
+    # fork からのPRは対象外にする。fork PRでは GITHUB_TOKEN が読み取り専用になり
+    # 再実行APIが403になるため、実行しても解消できない(手動での再実行が必要)
+    if: >-
+      github.event.review.state == 'approved' &&
+      github.event.review.user.login == github.repository_owner &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    # concurrency はジョブに置く。ワークフローに置くと、所有者以外のレビュー提出でも
+    # 同じグループの実行が作られ、進行中の再実行を取り消してしまう
+    concurrency:
+      group: rerun-approval-gated-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rerun failed approval-gated jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # filter=all を指定する。既定は最新のチェックだけを返すため、
+          # 承認後は成功したチェックだけが残り、解消すべき失敗を取りこぼす。
+          # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
+          # gh の --jq は --slurp と併用できない仕様のため、jq へパイプして評価する。
+          fetch_targets() {
+            gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100&filter=all" \
+              --paginate --slurp \
+              | jq '[.[].check_runs[] | .name as $n | select(["escape-hatch","dependency-gate","pre-merge-check"] | index($n))]'
+          }
+
+          # 承認がゲートの実行完了より先に届くことがある。実行中のまま検索すると
+          # 失敗が見つからず、何もしないまま成功で終わってしまうため完了を待つ。
+          # ジョブ単位の再実行はrunの完了を前提とするため、runが完了するまで待つ。
+          for i in $(seq 1 60); do
+            pending=$(fetch_targets | jq 'map(select(.status != "completed")) | length')
+            [ "$pending" -eq 0 ] && break
+            if [ "$i" -eq 60 ]; then
+              echo "::error::対象ジョブが10分以内に完了しなかった。手動で再実行してください。"
+              exit 1
+            fi
+            sleep 10
+          done
+
+          # 失敗している対象ジョブだけを再実行する。
+          # details_url は .../actions/runs/<runId>/job/<jobId> の形式
+          urls=$(fetch_targets | jq -r 'map(select(.conclusion == "failure") | .details_url) | .[]')
+          for url in $urls; do
+            job_id=${url##*/}
+            echo "再実行: job=$job_id ($url)"
+            gh api -X POST "repos/$REPO/actions/jobs/$job_id/rerun"
+          done
