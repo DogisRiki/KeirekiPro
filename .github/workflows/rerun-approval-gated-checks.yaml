@@ -46,7 +46,7 @@ jobs:
           fetch_targets() {
             gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100&filter=all" \
               --paginate --slurp \
-              | jq '[.[].check_runs[] | select(["escape-hatch","dependency-gate","pre-merge-check"] | index(.name))]'
+              | jq '[.[].check_runs[] | .name as $n | select(["escape-hatch","dependency-gate","pre-merge-check"] | index($n))]'
           }
 
           # 承認がゲートの実行完了より先に届くことがある。実行中のまま検索すると
