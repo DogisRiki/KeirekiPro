@@ -4,21 +4,21 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.flywaydb:flyway-database-postgresql:10.20.1'
+        classpath 'org.flywaydb:flyway-database-postgresql:10.22.0'
     }
 }
 
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.4.1'
+    id 'org.springframework.boot' version '3.5.16'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'checkstyle'
     id 'jacoco'
     id 'pmd'
-    id 'com.diffplug.spotless' version '7.0.2'
-    id 'com.github.spotbugs' version '6.1.7'
-    id 'info.solidsoft.pitest' version '1.15.0'
-    id 'org.flywaydb.flyway' version '10.20.1'
+    id 'com.diffplug.spotless' version '7.2.1'
+    id 'com.github.spotbugs' version '6.5.10'
+    id 'info.solidsoft.pitest' version '1.19.0'
+    id 'org.flywaydb.flyway' version '10.22.0'
 }
 
 group = 'com.example'
@@ -49,7 +49,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -58,30 +58,30 @@ dependencies {
         // JUnit Vintage（JUnit4）を除外
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
-    testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.4'
+    testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5'
     testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.0'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.1'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.0'
     implementation 'com.openhtmltopdf:openhtmltopdf-core:1.0.10'
     implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
-    implementation 'com.auth0:java-jwt:4.4.0'
+    implementation 'com.auth0:java-jwt:4.6.0'
 
-    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.3.0')
+    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.4.2')
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-ses'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-secrets-manager'
 
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    testImplementation platform('org.testcontainers:testcontainers-bom:1.19.3')
+    testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:localstack'
     implementation 'org.freemarker:freemarker:2.3.34'
-    implementation 'commons-validator:commons-validator:1.9.0'
+    implementation 'commons-validator:commons-validator:1.11.0'
     implementation 'com.github.onozaty:mybatis-postgresql-typehandlers:1.0.2'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
