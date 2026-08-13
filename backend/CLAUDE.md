@@ -36,6 +36,8 @@ backend配下を変更するとき常に適用する。アーキテクチャ境�
 - テストデータは `helper/`(例: `ResumeObjectBuilder`)を再利用する
 - 新規テストは対象コードを一時的に壊して赤くなることを確認してから戻す(assertの実効性確認)
 - `@Disabled`・アサーション削除で「見かけの合格」を作らない(escape-hatchチェックが検知)
+- Spring Bootのバージョンを上げるときは、`build.gradle` の `ext['junit-jupiter.version']` が
+  まだ必要かを確認する(判定方法はその行のコメントに記載)
 
 ## 完了前コマンド(この順で直列実行)
 
