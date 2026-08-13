@@ -26,6 +26,7 @@ seed() {
 plugins {
     id 'java'
     id 'com.diffplug.spotless' version '7.2.1'
+    id 'com.deferred.only' version '1.0' apply false
 }
 dependencies {
     implementation 'org.example:lib:1.0.0'
@@ -69,6 +70,8 @@ m_plugin_bump() { sed -i 's|7.2.1|7.2.2|' backend/build.gradle; }
 m_apply() { echo "apply plugin: 'com.new.legacy'" >>backend/build.gradle; }
 m_apply_paren() { echo "apply(plugin: 'com.new.parenapply')" >>backend/build.gradle; }
 m_plugin_add_paren() { sed -i "s|    id 'java'|    id 'java'\n    id(\"com.new.paren\")|" backend/build.gradle; }
+m_apply_deferred() { echo "apply plugin: 'com.deferred.only'" >>backend/build.gradle; }
+m_drop_apply_false() { sed -i "s|    id 'com.deferred.only' version '1.0' apply false|    id 'com.deferred.only' version '1.0'|" backend/build.gradle; }
 m_apply_declared() { sed -i "s|    id 'java'|    id 'java'\n    id 'com.declared.only'|" backend/build.gradle; }
 m_settings() { sed -i "s|        id 'com.declared.only' version '1.0'|        id 'com.declared.only' version '1.0'\n        id 'com.new.settings' version '1.0'|" backend/settings.gradle; }
 m_quality() { echo "apply plugin: 'com.new.inquality'" >>backend/gradle/quality.gradle; }
@@ -81,6 +84,8 @@ check 0 false "依存ライブラリのバージョン更新のみ" m_dep_bump
 check 1 false "プラグインの追加(plugins DSL)" m_plugin_add
 check 1 false "プラグインの追加(id(\"x\") 形式)" m_plugin_add_paren
 check 1 false "他ファイルで宣言済みのIDの適用" m_apply_declared
+check 1 false "同一ファイルの apply false 宣言の適用" m_apply_deferred
+check 1 false "apply false の削除による適用" m_drop_apply_false
 check 0 false "プラグインのバージョン更新のみ" m_plugin_bump
 check 1 false "apply plugin: での適用" m_apply
 check 1 false "apply(plugin: ...) での適用" m_apply_paren

@@ -90,10 +90,17 @@ gradle_plugin_ids() {
     # plugins {} と pluginManagement {} の id 宣言、および旧来の apply plugin: を抽出する
     #   id 'org.foo' / id("org.foo")
     #   apply plugin: 'org.foo' / apply(plugin: 'org.foo')
-    # version 部は含めない(バージョン更新を追加扱いにしないため)
-    grep -oE "(\bid[[:space:]]*\(?|\bapply[[:space:]]*\(?[[:space:]]*plugin[[:space:]]*:)[[:space:]]*['\"][^'\"]+['\"]" 2>/dev/null |
-        last_quoted |
-        sort -u
+    # version 部は含めない(バージョン更新を追加扱いにしないため)。
+    # 宣言(id:)と適用(apply:)は別のトークンにし、apply false の有無も区別する。
+    # 同じIDでも「宣言のみ」から「適用」への変更はコードを実行可能にする変更のため。
+    local src
+    src=$(sed 's|//.*||')
+    {
+        printf '%s\n' "$src" | grep -oE "\bid[[:space:]]*\(?[[:space:]]*['\"][^'\"]+['\"].*" |
+            awk -F"['\"]" '{ print "id:" $2 (($0 ~ /apply[[:space:]]+false/) ? ":apply-false" : "") }' || true
+        printf '%s\n' "$src" | grep -oE "\bapply[[:space:]]*\(?[[:space:]]*plugin[[:space:]]*:[[:space:]]*['\"][^'\"]+['\"]" |
+            last_quoted | sed 's|^|apply:|' || true
+    } | sort -u
 }
 
 # base と head の集合を比較し、増えた要素があれば additions に積む
