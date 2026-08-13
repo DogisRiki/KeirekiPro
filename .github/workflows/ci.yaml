@@ -85,7 +85,7 @@ jobs:
 
       - name: Upload frontend deployment artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist/
@@ -93,7 +93,7 @@ jobs:
           retention-days: 90
 
       - name: Upload frontend test results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: frontend-test-results
@@ -140,7 +140,7 @@ jobs:
         run: pnpm exec playwright test
 
       - name: Upload E2E report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-smoke-report
@@ -180,7 +180,7 @@ jobs:
         run: ./gradlew check
 
       - name: Upload backend check results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-check-results
