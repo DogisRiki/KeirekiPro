@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -42,7 +42,7 @@ jobs:
           pnpm exec stryker run 2>&1 | tail -50 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Stryker report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: stryker-report
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -78,7 +78,7 @@ jobs:
           ./gradlew pitest 2>&1 | tail -30 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload PIT report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: pitest-report
