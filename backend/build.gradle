@@ -24,6 +24,16 @@ plugins {
 group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 
+// ArchUnit が junit-bom 5.14.4 を持ち込み junit-platform-launcher が 1.14.4 になる一方、
+// Spring Boot は junit-platform-engine を 1.12.2 に固定するため、両者が噛み合わず
+// テスト実行時に NoClassDefFoundError: org/junit/platform/engine/OutputDirectoryCreator になる。
+// Spring Boot の管理バージョンを上書きして揃える。
+//
+// 解除の判定: Spring Boot を上げたらこの行を削除し、次を実行する。
+//   docker compose exec -w /home/spring/app backend ./gradlew test
+// 通れば削除したままでよい。落ちればまだ必要なので戻す。
+ext['junit-jupiter.version'] = '5.14.4'
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
