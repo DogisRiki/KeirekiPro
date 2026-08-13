@@ -1,0 +1,45 @@
+# 依存パッケージの更新はDependabotが担当する。
+# メジャー更新は ignore で除外し、必要な場合は人間がIssueを起票して個別に扱う。
+# ignore の update-types はバージョン更新にのみ適用され、脆弱性対応のPRは抑制されない。
+#
+# frontend(npm)は対象外にしている。Dependabotのサポート対象はpnpm 10までで、
+# このリポジトリが指定する pnpm 11 は未対応のため
+# (https://github.com/dependabot/dependabot-core/issues/14794 は現在open)。
+# 対応後にレーンを追加する。それまでのfrontendの脆弱性対応は通常のPRで行う。
+#
+# 参照: https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
+
+version: 2
+
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    groups:
+      backend-dependencies:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # アクションの更新は月次にする。npm/Gradleほど頻繁に変わらないため。
+  # メジャー更新を除外しないのは、アクションの通常の更新経路がメジャー版の切り替え
+  # (v5からv6など)であり、除外すると更新が事実上止まるため。
+  # .github/workflows/ はCODEOWNERS保護対象で、所有者の承認なしにはマージされない。
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        update-types: ["minor", "patch"]
