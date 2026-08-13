@@ -8,7 +8,10 @@
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-dependency-additions.sh"
-WORK=$(mktemp -d)
+# 一時領域の確保に失敗したまま進むと rm -rf が意図しない絶対パスを対象にするため、
+# ディレクトリが実在することを確認してから trap を設定する
+WORK=$(mktemp -d) || exit 1
+[ -n "$WORK" ] && [ -d "$WORK" ] || exit 1
 trap 'rm -rf "$WORK"' EXIT
 export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com
 export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
