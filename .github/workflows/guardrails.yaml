@@ -87,6 +87,9 @@ jobs:
             ':(exclude).kiro/**' \
             ':(exclude)**/*.svg' \
             ':(exclude)**/*.drawio' \
+            ':(exclude)backend/gradlew' \
+            ':(exclude)backend/gradlew.bat' \
+            ':(exclude)backend/gradle/wrapper/**' \
             | awk '{ add += $1; del += $2 } END { print add + del + 0 }')
           echo "コード差分行数: $lines (上限: $PR_SIZE_LIMIT)"
 
