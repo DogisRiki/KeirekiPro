@@ -54,16 +54,18 @@ if git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -q '^frontend/package\.
     fi
 fi
 
-# 指定リビジョンの backend 配下の対象ファイルを連結して標準出力に流す
-# 使い方: cat_backend_files <ref> <ファイル名の正規表現>
-cat_backend_files() {
-    local ref="$1"
-    local pattern="$2"
+# 指定リビジョンの backend 配下の対象ファイルごとに抽出し、「パス 値」の形で出力する
+# ファイル単位で比較する。全ファイルを連結して比較すると、settings.gradle の
+# pluginManagement で宣言済みのIDを build.gradle で新たに適用しても集合が変わらず、
+# プラグインを実行可能にする変更を見逃すため。
+# 使い方: extract_at <ref> <ファイル名の正規表現> <抽出関数名>
+extract_at() {
+    local ref="$1" pattern="$2" extractor="$3" f
     git ls-tree -r --name-only "$ref" -- backend 2>/dev/null |
         grep -E "$pattern" |
         while IFS= read -r f; do
-            git show "$ref:$f" 2>/dev/null || true
-        done
+            git show "$ref:$f" 2>/dev/null | "$extractor" | sed "s|^|$f |" || true
+        done | sort -u
 }
 
 # 引用符で囲まれた最後の値だけを取り出す
@@ -104,8 +106,8 @@ collect_additions() {
     changed=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -E "^backend/.*$file_re" || true)
     [ -n "$changed" ] || return 0
 
-    base_set=$(cat_backend_files "$MERGE_BASE" "$file_re" | "$extractor" || true)
-    head_set=$(cat_backend_files "$HEAD_SHA" "$file_re" | "$extractor" || true)
+    base_set=$(extract_at "$MERGE_BASE" "$file_re" "$extractor" || true)
+    head_set=$(extract_at "$HEAD_SHA" "$file_re" "$extractor" || true)
     added=$(comm -13 <(echo "$base_set") <(echo "$head_set") || true)
     if [ -n "$added" ]; then
         additions+="[$label]"$'\n'"$added"$'\n'

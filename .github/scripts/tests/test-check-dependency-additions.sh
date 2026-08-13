@@ -28,7 +28,14 @@ dependencies {
     implementation 'org.example:lib:1.0.0'
 }
 EOF
-    echo "rootProject.name = 'test'" >backend/settings.gradle
+    cat >backend/settings.gradle <<'EOF'
+rootProject.name = 'test'
+pluginManagement {
+    plugins {
+        id 'com.declared.only' version '1.0'
+    }
+}
+EOF
     echo "dependencies { implementation 'org.quality:only:1.0.0' }" >backend/gradle/quality.gradle
     echo '{"dependencies":{"react":"^19.0.0"},"devDependencies":{}}' >frontend/package.json
     git add -A && git commit -qm base
@@ -55,10 +62,12 @@ m_none() { echo "# comment" >>README.md; }
 m_dep_add() { echo "dependencies { implementation 'org.new:dep:1.0.0' }" >>backend/build.gradle; }
 m_dep_bump() { sed -i 's|org.example:lib:1.0.0|org.example:lib:2.0.0|' backend/build.gradle; }
 m_plugin_add() { sed -i "s|    id 'java'|    id 'java'\n    id 'com.new.plugin' version '1.0'|" backend/build.gradle; }
+m_plugin_add_paren() { sed -i "s|    id 'java'|    id 'java'\n    id(\"com.new.paren\")|" backend/build.gradle; }
+m_apply_declared() { sed -i "s|    id 'java'|    id 'java'\n    id 'com.declared.only'|" backend/build.gradle; }
 m_plugin_bump() { sed -i 's|7.2.1|7.2.2|' backend/build.gradle; }
 m_apply() { echo "apply plugin: 'com.new.legacy'" >>backend/build.gradle; }
-m_settings() { echo "pluginManagement { plugins { id 'com.new.settings' version '1.0' } }" >>backend/settings.gradle; }
-m_quality() { sed -i "s|'org.quality:only:1.0.0'|'org.quality:only:1.0.0'\n    id 'com.new.inquality'|" backend/gradle/quality.gradle; }
+m_settings() { sed -i "s|        id 'com.declared.only' version '1.0'|        id 'com.declared.only' version '1.0'\n        id 'com.new.settings' version '1.0'|" backend/settings.gradle; }
+m_quality() { echo "apply plugin: 'com.new.inquality'" >>backend/gradle/quality.gradle; }
 m_npm_add() { sed -i 's|"react":"\^19.0.0"|"react":"^19.0.0","new-pkg":"^1.0.0"|' frontend/package.json; }
 m_npm_bump() { sed -i 's|\^19.0.0|^19.1.0|' frontend/package.json; }
 
@@ -66,6 +75,8 @@ check 0 false "gradle以外のみの変更" m_none
 check 1 false "依存ライブラリの追加" m_dep_add
 check 0 false "依存ライブラリのバージョン更新のみ" m_dep_bump
 check 1 false "プラグインの追加(plugins DSL)" m_plugin_add
+check 1 false "プラグインの追加(id(\"x\") 形式)" m_plugin_add_paren
+check 1 false "他ファイルで宣言済みのIDの適用" m_apply_declared
 check 0 false "プラグインのバージョン更新のみ" m_plugin_bump
 check 1 false "apply plugin: での適用" m_apply
 check 1 false "settings.gradle 経由の適用" m_settings
