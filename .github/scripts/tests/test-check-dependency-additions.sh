@@ -62,10 +62,11 @@ m_none() { echo "# comment" >>README.md; }
 m_dep_add() { echo "dependencies { implementation 'org.new:dep:1.0.0' }" >>backend/build.gradle; }
 m_dep_bump() { sed -i 's|org.example:lib:1.0.0|org.example:lib:2.0.0|' backend/build.gradle; }
 m_plugin_add() { sed -i "s|    id 'java'|    id 'java'\n    id 'com.new.plugin' version '1.0'|" backend/build.gradle; }
-m_plugin_add_paren() { sed -i "s|    id 'java'|    id 'java'\n    id(\"com.new.paren\")|" backend/build.gradle; }
-m_apply_declared() { sed -i "s|    id 'java'|    id 'java'\n    id 'com.declared.only'|" backend/build.gradle; }
 m_plugin_bump() { sed -i 's|7.2.1|7.2.2|' backend/build.gradle; }
 m_apply() { echo "apply plugin: 'com.new.legacy'" >>backend/build.gradle; }
+m_apply_paren() { echo "apply(plugin: 'com.new.parenapply')" >>backend/build.gradle; }
+m_plugin_add_paren() { sed -i "s|    id 'java'|    id 'java'\n    id(\"com.new.paren\")|" backend/build.gradle; }
+m_apply_declared() { sed -i "s|    id 'java'|    id 'java'\n    id 'com.declared.only'|" backend/build.gradle; }
 m_settings() { sed -i "s|        id 'com.declared.only' version '1.0'|        id 'com.declared.only' version '1.0'\n        id 'com.new.settings' version '1.0'|" backend/settings.gradle; }
 m_quality() { echo "apply plugin: 'com.new.inquality'" >>backend/gradle/quality.gradle; }
 m_npm_add() { sed -i 's|"react":"\^19.0.0"|"react":"^19.0.0","new-pkg":"^1.0.0"|' frontend/package.json; }
@@ -79,6 +80,7 @@ check 1 false "プラグインの追加(id(\"x\") 形式)" m_plugin_add_paren
 check 1 false "他ファイルで宣言済みのIDの適用" m_apply_declared
 check 0 false "プラグインのバージョン更新のみ" m_plugin_bump
 check 1 false "apply plugin: での適用" m_apply
+check 1 false "apply(plugin: ...) での適用" m_apply_paren
 check 1 false "settings.gradle 経由の適用" m_settings
 check 1 false "quality.gradle へのプラグイン追加" m_quality
 check 1 false "npm依存の追加" m_npm_add

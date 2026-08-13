@@ -88,9 +88,10 @@ gradle_coords() {
 # --- backend/**/*.gradle: プラグインの適用の集合を比較 ---
 gradle_plugin_ids() {
     # plugins {} と pluginManagement {} の id 宣言、および旧来の apply plugin: を抽出する
-    #   id 'org.foo' / id("org.foo") / apply plugin: 'org.foo'
+    #   id 'org.foo' / id("org.foo")
+    #   apply plugin: 'org.foo' / apply(plugin: 'org.foo')
     # version 部は含めない(バージョン更新を追加扱いにしないため)
-    grep -oE "(\bid[[:space:]]*\(?|\bapply[[:space:]]+plugin:)[[:space:]]*['\"][^'\"]+['\"]" 2>/dev/null |
+    grep -oE "(\bid[[:space:]]*\(?|\bapply[[:space:]]*\(?[[:space:]]*plugin[[:space:]]*:)[[:space:]]*['\"][^'\"]+['\"]" 2>/dev/null |
         last_quoted |
         sort -u
 }
