@@ -1,21 +1,37 @@
 #!/usr/bin/env bash
 # =====================================================================
-# 依存パッケージ追加の検知(dependency-gate CI から実行)
-#
-# 「追加」のみを人間ゲートにする。既存依存のバージョン更新は検知しない
-# (週次の自動更新レーンを妨げないため)。
+# 依存追加の人間ゲート(dependency-gate CI から実行)
 #
 # 判定:
-#   依存追加なし                        -> exit 0(緑)
-#   依存追加あり + 所有者Approveなし     -> exit 1(赤)
-#   依存追加あり + 所有者Approveあり     -> exit 0(緑)
+#   対象の変更なし                      -> exit 0(緑)
+#   対象の変更あり + 所有者Approveなし   -> exit 1(赤)
+#   対象の変更あり + 所有者Approveあり   -> exit 0(緑)
 #
-# 走査対象:
-#   - frontend/package.json(dependencies + devDependencies)
-#   - backend/**/*.gradle と *.gradle.kts(全gradleファイル。
-#     新規gradleファイル経由の依存追加も検知する)
-#     依存座標に加え、プラグインの適用も対象。Gradleプラグインはビルド時に
-#     任意のコードを実行するため、依存ライブラリと同格に扱う。
+# 判定対象:
+#   - frontend/package.json
+#     dependencies と devDependencies のキー集合を比較し、増えた場合に検知する。
+#     JSONを構造化して読むため、書き方による取りこぼしは生じない。
+#     バージョン更新のみは検知しない。
+#   - backend のビルド定義ファイル
+#     (*.gradle / *.gradle.kts / *.versions.toml / gradle/wrapper/gradle-wrapper.properties)
+#     中身は解析せず、変更されたこと自体を検知する。バージョン更新も対象になる。
+#     wrapper のプロパティを含めるのは、Gradle本体の配布物が変われば実行される
+#     コードも変わり、ビルド定義と同じ性質を持つため。
+#
+# なぜ backend は中身を解析しないのか:
+#   以前は正規表現で依存座標とプラグインIDを抽出していた。しかしGradleのビルド定義は
+#   変数・条件分岐・Kotlin DSL・version catalog・動的な指定を許すため、静的な文字列
+#   一致では原理的に網羅できない。実際にレビューで apply(plugin:) / apply false /
+#   同一行の複数宣言 / 他ファイルで宣言済みIDの適用 といった迂回経路が次々に見つかり、
+#   パターンを足し続ける状態になっていた。
+#
+#   Gradle自身に解決結果を出力させる方式(buildEnvironment や dependency locking)も
+#   検討したが、apply false の区別ができず、環境依存の条件分岐も残る。加えて判定対象の
+#   ビルドに自己申告させる構造になり、判定根拠がPR側の制御下に入る。
+#
+#   バージョン更新を緑に保つ設計は、削除済みの週次自動更新レーン(claude.yml)のための
+#   ものだった。現在のDependabotのPRは所有者の手動マージであり、承認を求めても
+#   運用は止まらない。このため取りこぼしの生じない「変更されたかどうか」の判定に変えた。
 #
 # テスト: .github/scripts/tests/test-check-dependency-additions.sh
 #
@@ -32,118 +48,55 @@ OWNER_APPROVED="${OWNER_APPROVED:-false}"
 
 # fail-closed: 解析ツールが無い環境で黙って合格させない
 if ! command -v jq >/dev/null 2>&1; then
-    echo "::error::jq が見つかりません。依存追加の判定ができないため fail-closed で失敗します。"
+    echo "::error::jq が見つかりません。判定ができないため fail-closed で失敗します。"
     exit 1
 fi
 
 MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+changed_files=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA")
 
-additions=""
+detected=""
 
 # --- frontend/package.json: dependencies + devDependencies のキー集合を比較 ---
 pkg_keys() {
     jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' 2>/dev/null | sort -u
 }
 
-if git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -q '^frontend/package\.json$'; then
+if printf '%s\n' "$changed_files" | grep -q '^frontend/package\.json$'; then
     base_keys=$(git show "$MERGE_BASE:frontend/package.json" | pkg_keys || true)
     head_keys=$(git show "$HEAD_SHA:frontend/package.json" | pkg_keys || true)
     new_npm=$(comm -13 <(echo "$base_keys") <(echo "$head_keys") || true)
     if [ -n "$new_npm" ]; then
-        additions+="[frontend/package.json]"$'\n'"$new_npm"$'\n'
+        detected+="[frontend/package.json に追加された依存]"$'\n'"$new_npm"$'\n'
     fi
 fi
 
-# 指定リビジョンの backend 配下の対象ファイルごとに抽出し、「パス 値」の形で出力する
-# ファイル単位で比較する。全ファイルを連結して比較すると、settings.gradle の
-# pluginManagement で宣言済みのIDを build.gradle で新たに適用しても集合が変わらず、
-# プラグインを実行可能にする変更を見逃すため。
-# 使い方: extract_at <ref> <ファイル名の正規表現> <抽出関数名>
-extract_at() {
-    local ref="$1" pattern="$2" extractor="$3" f
-    git ls-tree -r --name-only "$ref" -- backend 2>/dev/null |
-        grep -E "$pattern" |
-        while IFS= read -r f; do
-            git show "$ref:$f" 2>/dev/null | "$extractor" | sed "s|^|$f |" || true
-        done | sort -u
-}
+# --- backend のビルド定義ファイル: 変更されたこと自体を検知する ---
+changed_build=$(printf '%s\n' "$changed_files" |
+    grep -E '^backend/(.*\.(gradle|gradle\.kts|versions\.toml)|gradle/wrapper/gradle-wrapper\.properties)$' || true)
+if [ -n "$changed_build" ]; then
+    detected+="[変更された backend のビルド定義ファイル]"$'\n'"$changed_build"$'\n'
+fi
 
-# 引用符で囲まれた最後の値だけを取り出す
-last_quoted() {
-    grep -oE "['\"][^'\"]+['\"]$" | tr -d "'\""
-}
-
-GRADLE_FILE_RE='\.gradle(\.kts)?$'
-
-# --- backend/**/*.gradle: 依存座標(group:artifact)の集合を比較 ---
-gradle_coords() {
-    # implementation 'group:artifact:version' / classpath / platform(...) 等から
-    # group:artifact を抽出する(バージョン部は無視 = 更新は追加扱いにしない)
-    grep -oE "(implementation|api|compileOnly|runtimeOnly|developmentOnly|annotationProcessor|testImplementation|testCompileOnly|testRuntimeOnly|testAnnotationProcessor|classpath)[^'\"]*['\"][^'\"]+['\"]" 2>/dev/null |
-        last_quoted |
-        awk -F: 'NF >= 2 { print $1 ":" $2 }' |
-        sort -u
-}
-
-# --- backend/**/*.gradle: プラグインの適用の集合を比較 ---
-gradle_plugin_ids() {
-    # plugins {} と pluginManagement {} の id 宣言、および旧来の apply plugin: を抽出する
-    #   id 'org.foo' / id("org.foo")
-    #   apply plugin: 'org.foo' / apply(plugin: 'org.foo')
-    # version 部は含めない(バージョン更新を追加扱いにしないため)。
-    # 宣言(id:)と適用(apply:)は別のトークンにし、apply false の有無も区別する。
-    # 同じIDでも「宣言のみ」から「適用」への変更はコードを実行可能にする変更のため。
-    local src
-    src=$(sed 's|//.*||')
-    {
-        printf '%s\n' "$src" | grep -oE "\bid[[:space:]]*\(?[[:space:]]*['\"][^'\"]+['\"].*" |
-            awk -F"['\"]" '{ print "id:" $2 (($0 ~ /apply[[:space:]]+false/) ? ":apply-false" : "") }' || true
-        printf '%s\n' "$src" | grep -oE "\bapply[[:space:]]*\(?[[:space:]]*plugin[[:space:]]*:[[:space:]]*['\"][^'\"]+['\"]" |
-            last_quoted | sed 's|^|apply:|' || true
-    } | sort -u
-}
-
-# base と head の集合を比較し、増えた要素があれば additions に積む
-# 使い方: collect_additions <見出し> <ファイル名の正規表現> <抽出関数名>
-collect_additions() {
-    local label="$1"
-    local file_re="$2"
-    local extractor="$3"
-    local changed base_set head_set added
-
-    changed=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" | grep -E "^backend/.*$file_re" || true)
-    [ -n "$changed" ] || return 0
-
-    base_set=$(extract_at "$MERGE_BASE" "$file_re" "$extractor" || true)
-    head_set=$(extract_at "$HEAD_SHA" "$file_re" "$extractor" || true)
-    added=$(comm -13 <(echo "$base_set") <(echo "$head_set") || true)
-    if [ -n "$added" ]; then
-        additions+="[$label]"$'\n'"$added"$'\n'
-    fi
-}
-
-collect_additions "backend/**/*.gradle 依存座標" "$GRADLE_FILE_RE" gradle_coords
-collect_additions "backend/**/*.gradle プラグイン" "$GRADLE_FILE_RE" gradle_plugin_ids
-
-if [ -z "$additions" ]; then
-    echo "依存パッケージの追加なし。"
+if [ -z "$detected" ]; then
+    echo "承認が必要な変更なし。"
     exit 0
 fi
 
 {
-    echo "### :package: 依存パッケージの追加を検出"
+    echo "### :package: 承認が必要な変更を検出"
     echo ""
     echo '```'
-    echo "$additions"
+    echo "$detected"
     echo '```'
 } >>"${GITHUB_STEP_SUMMARY:-/dev/null}"
 
 if [ "$OWNER_APPROVED" = "true" ]; then
-    echo "依存追加を検出しましたが、リポジトリ所有者のApprove済みのため通過します。"
-    echo "$additions"
+    echo "変更を検出しましたが、リポジトリ所有者のApprove済みのため通過します。"
+    echo "$detected"
     exit 0
 fi
 
-echo "::error::依存パッケージの追加が検出されました。リポジトリ所有者のApproveレビュー後にこのチェックは緑になります。"
-echo "$additions"
+echo "::error::依存の追加、またはbackendのビルド定義の変更が検出されました。リポジトリ所有者のApproveレビュー後にこのチェックは緑になります。"
+echo "$detected"
 exit 1
