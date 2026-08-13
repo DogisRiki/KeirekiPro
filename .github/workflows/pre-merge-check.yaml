@@ -15,7 +15,7 @@ name: Pre-merge Check
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-    branches: [main]
+    branches: [main, test/rerun-base]
   pull_request_review:
     types: [submitted, dismissed]
 
