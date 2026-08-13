@@ -52,7 +52,7 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 
 ```mermaid
 flowchart LR
-    PR[プルリクエスト]
+    PR[プルリクエスト<br>Claude Code または Dependabot]
 
     subgraph s1[系統1: 品質の検査]
         Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク]
@@ -64,7 +64,7 @@ flowchart LR
         H[依存追加・pre-merge-checkラベル・<br>保護パスの変更は<br>所有者がApproveするまで赤]
     end
     subgraph s4[系統4: AIレビュー]
-        A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回]
+        A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回<br>Dependabotのプルリクエストは対象外]
     end
 
     PR --> Q
@@ -72,7 +72,7 @@ flowchart LR
     PR --> H
     PR --> A
 
-    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ]
+    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ<br>Dependabotのバージョン更新のみ所有者がマージ]
 
     M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
     M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
@@ -96,8 +96,13 @@ flowchart LR
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
 | 定期 | claude.yml | @claudeメンション / 週次 (schedule) / 手動 | IssueやPRのコメントからClaude Codeを起動。週次で依存パッケージのバージョン更新も実行 |
+| 定期 | dependabot-auto-merge.yaml | pull_request_target (Dependabot) | Dependabotの脆弱性修正プルリクエストにauto-mergeを予約。バージョン更新のプルリクエストと通常のプルリクエストではジョブがスキップされる |
 | 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
 | 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
+
+依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。frontend(npm)とbackend(Gradle)は週次で、メジャー更新を除いたバージョン更新のプルリクエストを作成します。GitHub Actionsのアクションは月次で、メジャー更新も対象に含めます。アクションはメジャー版の切り替えが通常の更新経路であり、除外すると更新が止まるためです。ワークフローの変更は所有者の承認なしにマージされない仕組みになっているため、この扱いでも自動でマージされることはありません。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストが作成されます。
+
+Dependabotのプルリクエストは2種類あり、扱いが分かれます。脆弱性の修正はlockfileだけの更新になることが大半で、AIレビューが読む差分が存在しないため、検査がすべて緑になり次第そのままマージされます。バージョン更新はバージョン文字列という読める差分があるため、独立したレビューを経ないまま自動マージすることはせず、所有者がマージします。どちらも検査の内容は通常のプルリクエストと同じです。
 
 mainブランチへのマージだけでは本番環境に反映されません。本番リリースはrelease.yamlを人間が手動で実行したときにのみ行われます。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 

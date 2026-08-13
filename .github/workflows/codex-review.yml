@@ -27,7 +27,12 @@ jobs:
   codex-review:
     name: codex-review
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    # DependabotのPRは対象外にする。lockfileはレビュー対象のdiffから除外しているため
+    # 実質的に空のdiffになり、レビューが成立しない。またDependabot発のイベントでは
+    # Actions secretsが遮断され OPENAI_API_KEY を参照できない。
+    # ジョブがスキップされた場合、必須チェックは成功として扱われる。
+    if: github.event.pull_request.draft == false &&
+        github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v6
