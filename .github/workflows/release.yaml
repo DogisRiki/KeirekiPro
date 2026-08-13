@@ -40,7 +40,7 @@ jobs:
       - name: Resolve frontend artifact source run
         id: resolve
         if: inputs.deploy_frontend
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
         with:
