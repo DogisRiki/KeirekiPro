@@ -25,7 +25,7 @@ concurrency:
 
 env:
   # レビューの往復上限。到達したら以降はCodexを呼ばず、赤のまま所有者の判断に委ねる
-  REVIEW_ROUND_LIMIT: '1'
+  REVIEW_ROUND_LIMIT: '5'
 
 jobs:
   codex-review:
