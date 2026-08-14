@@ -229,11 +229,40 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
 
 ### 3.4 信頼ポリシー
 
+用途ごとにStatementを分け、引き受けられる条件を絞る。
+
+| Statement | 用途 | 条件 |
+|---|---|---|
+| DeployFromMainProductionEnvironment | backend / frontend の本番デプロイ | mainブランチ、かつ production 環境を経由するジョブ |
+| TerraformPlanOnPullRequest | PRでのTerraform Plan | プルリクエストで動くジョブ |
+| TerraformApplyFromMain | 手動のTerraform Apply | mainブランチで動くジョブ |
+
+条件の組み立てには2つの制約がある。
+
+1. **全Statementに `sub` が必要**。GitHubのOIDCプロバイダーを信頼するロールでは、IAMが
+   信頼ポリシーの保存時に `token.actions.githubusercontent.com:sub` の存在を検査する。
+   無い場合、またはワイルドカードだけの場合は保存が失敗する
+   ([Create a role for OpenID Connect federation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html))
+2. **`sub` だけでは「mainブランチかつproduction環境」を表せない**。environmentを指定した
+   ジョブの `sub` は `repo:ORG/REPO:environment:production` になり、refの情報が失われる
+
+そのため、デプロイ用のStatementでは `sub` に `ref` を併用する。AWSはGitHubのOIDCトークンの
+`repository` `ref` `environment` などを個別の条件キーとして扱える
+([IAM and AWS STS condition context keys](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html)
+の「Available keys for AWS OIDC federation」→ GitHubタブ)。
+
+Terraformの2つのStatementは `sub` だけで絞る。ワークフローを限定する `job_workflow_ref` は
+再利用可能ワークフローを使うジョブにしか含まれないクレームであり、直接起動する
+terraform-plan.yaml と terraform-apply.yaml のジョブでは条件が一致しない
+([OIDC claims](https://docs.github.com/en/actions/reference/security/oidc))。
+`workflow_ref` はAWSの条件キーとして提供されていないため代替にできない。
+
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "DeployFromMainProductionEnvironment",
       "Effect": "Allow",
       "Principal": {
         "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
@@ -241,16 +270,50 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-        },
-        "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:*"
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:environment:production",
+          "token.actions.githubusercontent.com:ref": "refs/heads/main"
+        }
+      }
+    },
+    {
+      "Sid": "TerraformPlanOnPullRequest",
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:pull_request"
+        }
+      }
+    },
+    {
+      "Sid": "TerraformApplyFromMain",
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:ref:refs/heads/main"
         }
       }
     }
   ]
 }
 ```
+
+1つ目のStatementの `ref` 条件が、`sub` では表せない「mainブランチであること」を補う。
+ワークフローから `environment: production` の行を消した実行は `sub` が
+`repo:ORG/REPO:ref:refs/heads/main` になり、1つ目のStatementに一致しない。
+
+> このロールの権限はデプロイとTerraformの和集合になっている。Terraform Plan の実行が
+> ECS・ECRの権限も持つ状態は残る。用途ごとにロールを分けるのが本来の形。
 
 ## 4. OIDCプロバイダー設定
 

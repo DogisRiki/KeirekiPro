@@ -91,7 +91,7 @@ flowchart LR
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
 | AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
-| リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。backend、frontendの順に配布 |
+| リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
 | リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
@@ -105,7 +105,7 @@ frontend(npm)はバージョン更新の対象に含めていません。Dependa
 
 Dependabotのプルリクエストは自動マージされません。検査の内容は通常のプルリクエストと同じで、すべて緑になったものを所有者がマージします。バージョン文字列という読める差分がある変更を、独立したレビューを経ないまま自動マージしないためです。
 
-mainブランチへのマージだけでは本番環境に反映されません。本番リリースはrelease.yamlを人間が手動で実行したときにのみ行われます。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
+mainブランチへのマージだけでは本番環境に反映されません。本番リリースはrelease.yamlを人間が手動で実行したときにのみ行われます。デプロイの対象はmainブランチのCIが成功したコミットに限られます。この制限はワークフロー内の検査だけでなく、production環境のブランチ制限と、AWSのIAM信頼ポリシー(refとenvironmentの条件)でも強制しています。featureブランチ上でワークフローを書き換えても迂回できません。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 
 | 特徴 | 説明 |
 |------|------|
