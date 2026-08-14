@@ -55,9 +55,12 @@ jobs:
           # コメントは投稿者がこのワークフロー(github-actions[bot])のものだけを数える。
           # 見出しの一致だけで数えると、第三者が同じ見出しのコメントを投稿するだけで
           # 上限に到達させ、レビューされていないPRを恒久的に赤にできる。
+          # クエリは手で組み立てず gh のパラメータで渡す。ブランチ名には & # % を使えるため、
+          # 連結するとクエリが分断されたりURLの解析に失敗する。
           header='## Codex Review(自動クロスレビュー)'
           rounds=0
-          for n in $(gh api "repos/$REPO/pulls?state=all&head=${HEAD_OWNER}:${HEAD_REF}&per_page=100" \
+          for n in $(gh api --method GET "repos/$REPO/pulls" \
+            -f state=all -f "head=${HEAD_OWNER}:${HEAD_REF}" \
             --paginate --jq '.[].number'); do
             c=$(gh api "repos/$REPO/issues/$n/comments" --paginate --slurp \
               | jq --arg h "$header" '[.[][]
