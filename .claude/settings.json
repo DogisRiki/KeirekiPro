@@ -75,6 +75,8 @@
             "Write(.github/**)",
             "Edit(.claude/settings.json)",
             "Write(.claude/settings.json)",
+            "Edit(.claude/settings.local.json)",
+            "Write(.claude/settings.local.json)",
             "Edit(.claude/hooks/**)",
             "Write(.claude/hooks/**)",
             "Edit(frontend/eslint.config.js)",
