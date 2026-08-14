@@ -54,13 +54,17 @@ jobs:
         id: vars
         run: |
           if [ -n "${{ inputs.ecr_repository_url }}" ]; then
-            echo "ecr_repository_url=${{ inputs.ecr_repository_url }}" >> $GITHUB_OUTPUT
-            echo "ecs_cluster_name=${{ inputs.ecs_cluster_name }}" >> $GITHUB_OUTPUT
-            echo "ecs_service_name=${{ inputs.ecs_service_name }}" >> $GITHUB_OUTPUT
+            {
+              echo "ecr_repository_url=${{ inputs.ecr_repository_url }}"
+              echo "ecs_cluster_name=${{ inputs.ecs_cluster_name }}"
+              echo "ecs_service_name=${{ inputs.ecs_service_name }}"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "ecr_repository_url=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
-            echo "ecs_cluster_name=${{ env.ECS_CLUSTER }}" >> $GITHUB_OUTPUT
-            echo "ecs_service_name=${{ env.ECS_SERVICE }}" >> $GITHUB_OUTPUT
+            {
+              echo "ecr_repository_url=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
+              echo "ecs_cluster_name=${{ env.ECS_CLUSTER }}"
+              echo "ecs_service_name=${{ env.ECS_SERVICE }}"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push Docker image
@@ -104,7 +108,7 @@ jobs:
             --cli-input-json file://task-definition.json \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
-          echo "task_definition_arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          echo "task_definition_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Update ECS service desired count to 1 (if needed)
         run: |

@@ -59,15 +59,19 @@ jobs:
         id: vars
         run: |
           if [ -n "${{ inputs.s3_bucket_name }}" ]; then
-            echo "s3_bucket_name=${{ inputs.s3_bucket_name }}" >> $GITHUB_OUTPUT
-            echo "cloudfront_distribution_id=${{ inputs.cloudfront_distribution_id }}" >> $GITHUB_OUTPUT
+            {
+              echo "s3_bucket_name=${{ inputs.s3_bucket_name }}"
+              echo "cloudfront_distribution_id=${{ inputs.cloudfront_distribution_id }}"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "s3_bucket_name=${{ env.S3_BUCKET }}" >> $GITHUB_OUTPUT
             # 既定の本番配布先に対応するDistribution IDを取得
             DIST_ID=$(aws cloudfront list-distributions \
               --query "DistributionList.Items[?Aliases.Items[?contains(@, 'app.keirekipro.click')]].Id | [0]" \
               --output text)
-            echo "cloudfront_distribution_id=$DIST_ID" >> $GITHUB_OUTPUT
+            {
+              echo "s3_bucket_name=${{ env.S3_BUCKET }}"
+              echo "cloudfront_distribution_id=$DIST_ID"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload versioned static assets

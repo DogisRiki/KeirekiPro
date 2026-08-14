@@ -58,7 +58,7 @@ flowchart LR
         Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク]
     end
     subgraph s2[系統2: ずるの検査]
-        Z[検査回避の検知・差分サイズ・<br>シークレットスキャン]
+        Z[検査回避の検知・差分サイズ・<br>シークレットスキャン・<br>ワークフローの静的検証]
     end
     subgraph s3[系統3: 人間の関門]
         H[依存追加・backendのビルド定義の変更・<br>pre-merge-checkラベル・保護パスの変更は<br>所有者がApproveするまで赤]
@@ -86,7 +86,7 @@ flowchart LR
 |---|---|---|---|
 | 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。mainへのpush時はデプロイ用成果物を保存 |
 | 品質の検査 | terraform-plan.yaml | pull_request (terraform/**) | Terraform Planを実行し、結果をPRにコメント |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査、ワークフローの静的検証(actionlint)とリリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | フロントエンドの依存の新規追加と、バックエンドのビルド定義ファイルの変更を検知し、リポジトリ所有者が承認するまでマージを保留 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
