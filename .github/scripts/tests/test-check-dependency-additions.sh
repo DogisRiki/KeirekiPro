@@ -58,6 +58,8 @@ m_kts_new() { echo 'plugins { kotlin("jvm") }' >backend/build.gradle.kts; }
 m_catalog_new() { printf '[plugins]\nevil = { id = "com.evil", version = "1.0" }\n' >backend/gradle/libs.versions.toml; }
 m_wrapper() { sed -i 's|gradle-9.0.0-bin.zip|gradle-9.1.0-bin.zip|' backend/gradle/wrapper/gradle-wrapper.properties; }
 m_npm_add() { sed -i 's|"react":"\^19.0.0"|"react":"^19.0.0","new-pkg":"^1.0.0"|' frontend/package.json; }
+# 変更ファイル一覧を数百KBにする。パイプ経由で判定しているとSIGPIPEで見落とす
+m_npm_add_many() { m_npm_add; d="frontend/src/$(printf 'x%.0s' $(seq 1 120))"; mkdir -p "$d"; for i in $(seq 1 2000); do echo x >"$d/f$i.ts"; done; }
 m_npm_bump() { sed -i 's|\^19.0.0|^19.1.0|' frontend/package.json; }
 
 check 0 false "ビルド定義以外のみの変更" m_none
@@ -71,6 +73,7 @@ check 1 false "build.gradle.kts の追加" m_kts_new
 check 1 false "version catalog の追加" m_catalog_new
 check 1 false "gradle-wrapper.properties の変更" m_wrapper
 check 1 false "npm依存の追加" m_npm_add
+check 1 false "npm依存の追加(変更ファイルが大量)" m_npm_add_many
 check 0 false "npm依存のバージョン更新のみ" m_npm_bump
 check 0 true "build.gradle の変更 + 所有者Approve済み" m_dep_add
 

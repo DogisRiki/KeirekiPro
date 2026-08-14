@@ -2,18 +2,11 @@ name: Dependency Gate
 
 # 依存追加とビルド定義の変更に対する人間ゲート(required check に指定する)。
 #
-# 判定対象:
-#   - frontend/package.json の dependencies / devDependencies に増えたキー
-#     (バージョン更新のみは対象外)
-#   - backend のビルド定義ファイルの変更そのもの
-#     (*.gradle / *.gradle.kts / *.versions.toml / gradle-wrapper.properties)
-#     中身は解析しないため、バージョン更新やコメントのみの変更も対象になる
-#
 # 判定: 対象の変更あり かつ リポジトリ所有者のApproveなし -> 赤
-#       所有者がApproveした時点で pull_request_review 発火により再評価され緑になる。
+#       所有者がApproveすると pull_request_review 発火により再評価され緑になる。
+#       判定対象と、backendのビルド定義を解析しない理由は
+#       check-dependency-additions.sh の冒頭に記載。
 # Approve判定は所有者アカウントで照合し、bot・第三者のApproveは無効。
-#
-# backendのビルド定義を解析しない理由は check-dependency-additions.sh の冒頭に記載。
 
 on:
   pull_request:
