@@ -25,6 +25,8 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
 
 5. **PR作成**: `gh pr create` で作成する。PR本文に必ず含めるもの:
    - `Refs: #<Issue番号>`
+   - `Closes #<Issue番号>`(マージ時にGitHubがIssueを自動で閉じる。
+     書かない条件は下の Rules を見る)
    - Lane A(spec駆動)の場合: `Spec: .kiro/specs/<feature>`(size-checkがこの行で判定する)
    - テストのアサーションを意図的に変更した場合: `Test-Change-Justification: <理由>`
    - 変更概要・検証結果(verifyのReport)
@@ -48,6 +50,12 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
 - verify全PASSまでpushしない
 - 1つのPRに複数の関心事を混ぜない(200行のsize-checkは分割のシグナル)
 - マイグレーション・依存追加・ゲート設定変更を含む場合は、PR本文冒頭に「人間承認が必要な変更」として明記する
+- `Closes #<Issue番号>` を省くのは、Issueの完了条件にエージェントが実行できない操作
+  (設定ファイルの差し替え・リポジトリ設定の変更・本番環境での実行・ローカルでの画面確認など)が
+  含まれる場合だけ。その場合はマージ後、その作業が完了したことを確認した時点で
+  `gh issue close <Issue番号>` する。人間はIssueを閉じない
+- `Refs: #<Issue番号>` は `Closes` と併記しても消さない。codex-reviewがこの行からIssue本文を
+  取得してspec適合の判定基準にしている
 
 ## Report
 
@@ -58,4 +66,5 @@ ship:
 - commit     -> <コミットハッシュ> <サブジェクト>
 - PR         -> <PR URL>(auto-merge予約済み)
 - checks     -> 監視結果 / 人間承認待ちの有無
+- issue      -> Closes記載でマージ時に自動クローズ / 人間の作業待ち(後でエージェントが閉じる)
 ```

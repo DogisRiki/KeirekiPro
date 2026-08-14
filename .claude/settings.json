@@ -52,6 +52,7 @@
             "Bash(gh issue list *)",
             "Bash(gh issue comment *)",
             "Bash(gh issue create *)",
+            "Bash(gh issue close *)",
             "Bash(gh run view *)",
             "Bash(gh run list *)",
             "Bash(gh run watch *)",
