@@ -229,11 +229,26 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
 
 ### 3.4 信頼ポリシー
 
+用途ごとにStatementを分け、引き受けられる条件を絞る。AWSはGitHubのOIDCトークンの
+`repository` `ref` `environment` `job_workflow_ref` を個別の条件キーとして扱える
+([IAM and AWS STS condition context keys](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html))。
+
+| Statement | 用途 | 条件 |
+|---|---|---|
+| DeployFromMainProductionEnvironment | backend / frontend の本番デプロイ | mainブランチ、かつ production 環境を経由するジョブ |
+| TerraformPlanOnPullRequest | PRでのTerraform Plan | terraform-plan.yaml のジョブ |
+| TerraformApplyFromMain | 手動のTerraform Apply | mainブランチの terraform-apply.yaml のジョブ |
+
+デプロイ用のStatementは `ref` と `environment` の両方を要求する。`sub` 一本では
+environment指定時にrefの情報が失われるため、この2つを同時に強制できない。
+`environment` の条件を入れると、環境を宣言しないジョブはクレームを持たないため引き受けに失敗する。
+
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "DeployFromMainProductionEnvironment",
       "Effect": "Allow",
       "Principal": {
         "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
@@ -241,16 +256,51 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:repository": "${GITHUB_ORG}/${GITHUB_REPO}",
+          "token.actions.githubusercontent.com:ref": "refs/heads/main",
+          "token.actions.githubusercontent.com:environment": "production"
+        }
+      }
+    },
+    {
+      "Sid": "TerraformPlanOnPullRequest",
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:repository": "${GITHUB_ORG}/${GITHUB_REPO}"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:*"
+          "token.actions.githubusercontent.com:job_workflow_ref": "${GITHUB_ORG}/${GITHUB_REPO}/.github/workflows/terraform-plan.yaml@*"
+        }
+      }
+    },
+    {
+      "Sid": "TerraformApplyFromMain",
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:repository": "${GITHUB_ORG}/${GITHUB_REPO}",
+          "token.actions.githubusercontent.com:job_workflow_ref": "${GITHUB_ORG}/${GITHUB_REPO}/.github/workflows/terraform-apply.yaml@refs/heads/main"
         }
       }
     }
   ]
 }
 ```
+
+> このロールの権限はデプロイとTerraformの和集合になっている。Terraform Plan の実行が
+> ECS・ECRの権限も持つ状態は残る。用途ごとにロールを分けるのが本来の形。
 
 ## 4. OIDCプロバイダー設定
 
