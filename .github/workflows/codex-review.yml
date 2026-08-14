@@ -35,7 +35,12 @@ jobs:
     # 実質的に空のdiffになり、レビューが成立しない。またDependabot発のイベントでは
     # Actions secretsが遮断され OPENAI_API_KEY を参照できない。
     # ジョブがスキップされた場合、必須チェックは成功として扱われる。
-    if: github.event.pull_request.draft == false &&
+    #
+    # CODEX_REVIEW_ENABLED が true でない間はCIでのレビューを行わない。
+    # 再開は Settings → Secrets and variables → Actions → Variables で
+    # CODEX_REVIEW_ENABLED を true にする。ワークフローの変更は不要。
+    if: vars.CODEX_REVIEW_ENABLED == 'true' &&
+        github.event.pull_request.draft == false &&
         github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
       # 往復上限の判定はチェックアウトより前に行う(上限到達時にランナー時間を使わない)
