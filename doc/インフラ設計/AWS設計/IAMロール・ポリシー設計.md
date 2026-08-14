@@ -229,9 +229,7 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
 
 ### 3.4 信頼ポリシー
 
-用途ごとにStatementを分け、引き受けられる条件を絞る。AWSはGitHubのOIDCトークンの
-`repository` `ref` `environment` `job_workflow_ref` を個別の条件キーとして扱える
-([IAM and AWS STS condition context keys](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html))。
+用途ごとにStatementを分け、引き受けられる条件を絞る。
 
 | Statement | 用途 | 条件 |
 |---|---|---|
@@ -239,9 +237,19 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
 | TerraformPlanOnPullRequest | PRでのTerraform Plan | terraform-plan.yaml のジョブ |
 | TerraformApplyFromMain | 手動のTerraform Apply | mainブランチの terraform-apply.yaml のジョブ |
 
-デプロイ用のStatementは `ref` と `environment` の両方を要求する。`sub` 一本では
-environment指定時にrefの情報が失われるため、この2つを同時に強制できない。
-`environment` の条件を入れると、環境を宣言しないジョブはクレームを持たないため引き受けに失敗する。
+条件の組み立てには2つの制約がある。
+
+1. **全Statementに `sub` が必要**。GitHubのOIDCプロバイダーを信頼するロールでは、IAMが
+   信頼ポリシーの保存時に `token.actions.githubusercontent.com:sub` の存在を検査する。
+   無い場合、またはワイルドカードだけの場合は保存が失敗する
+   ([Create a role for OpenID Connect federation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html))
+2. **`sub` だけでは「mainブランチかつproduction環境」を表せない**。environmentを指定した
+   ジョブの `sub` は `repo:ORG/REPO:environment:production` になり、refの情報が失われる
+
+そのため、`sub` に加えて `ref` や `job_workflow_ref` を併用する。AWSはGitHubのOIDCトークンの
+`repository` `ref` `environment` `job_workflow_ref` などを個別の条件キーとして扱える
+([IAM and AWS STS condition context keys](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html)
+の「Available keys for AWS OIDC federation」→ GitHubタブ)。
 
 ```json
 {
@@ -257,9 +265,8 @@ environment指定時にrefの情報が失われるため、この2つを同時�
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:repository": "${GITHUB_ORG}/${GITHUB_REPO}",
-          "token.actions.githubusercontent.com:ref": "refs/heads/main",
-          "token.actions.githubusercontent.com:environment": "production"
+          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:environment:production",
+          "token.actions.githubusercontent.com:ref": "refs/heads/main"
         }
       }
     },
@@ -273,7 +280,7 @@ environment指定時にrefの情報が失われるため、この2つを同時�
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:repository": "${GITHUB_ORG}/${GITHUB_REPO}"
+          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:pull_request"
         },
         "StringLike": {
           "token.actions.githubusercontent.com:job_workflow_ref": "${GITHUB_ORG}/${GITHUB_REPO}/.github/workflows/terraform-plan.yaml@*"
@@ -290,7 +297,7 @@ environment指定時にrefの情報が失われるため、この2つを同時�
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:repository": "${GITHUB_ORG}/${GITHUB_REPO}",
+          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:ref:refs/heads/main",
           "token.actions.githubusercontent.com:job_workflow_ref": "${GITHUB_ORG}/${GITHUB_REPO}/.github/workflows/terraform-apply.yaml@refs/heads/main"
         }
       }
@@ -298,6 +305,10 @@ environment指定時にrefの情報が失われるため、この2つを同時�
   ]
 }
 ```
+
+1つ目のStatementの `ref` 条件が、`sub` では表せない「mainブランチであること」を補う。
+ワークフローから `environment: production` の行を消した実行は `sub` が
+`repo:ORG/REPO:ref:refs/heads/main` になり、1つ目のStatementに一致しない。
 
 > このロールの権限はデプロイとTerraformの和集合になっている。Terraform Plan の実行が
 > ECS・ECRの権限も持つ状態は残る。用途ごとにロールを分けるのが本来の形。
