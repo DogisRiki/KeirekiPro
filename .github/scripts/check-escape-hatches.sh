@@ -86,6 +86,9 @@ ${build_applies:-（apply from がありません = 品質ゲート定義が無�
 fi
 
 # build.gradle 以外の backend 配下 *.gradle / *.gradle.kts: apply from は0本
+# awkのプログラム中の $0 はawkの変数であり、シェルに展開させてはならない。
+# パターンは ENVIRON 経由で渡しているため、シングルクォートは意図どおり。
+# shellcheck disable=SC2016
 other_applies=$(find backend -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
     ! -path 'backend/build.gradle' ! -path '*/build/*' ! -path '*/.gradle/*' -print0 |
     APPLY_PAT="$apply_pattern" xargs -0 -r awk '

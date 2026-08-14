@@ -45,6 +45,13 @@ jobs:
       - name: Test release deploy gate
         run: node .github/scripts/tests/test-release-gate.mjs
 
+      - name: Lint shell scripts (shellcheck)
+        # ゲートの実体であるスクリプトを検査する。actionlintがshellcheckをかけるのは
+        # ワークフローの inline run: のみで、これらのファイルは対象外のため
+        run: |
+          git ls-files -z '*.sh' \
+            | xargs -0 docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:v0.11.0
+
       - name: Check owner approval
         id: approval
         env:
