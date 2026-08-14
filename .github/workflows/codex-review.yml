@@ -43,18 +43,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          HEAD_OWNER: ${{ github.event.pull_request.head.repo.owner.login }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           # PR単位で数えるとPRを閉じて開き直すだけで上限を回避できる。
-          # headブランチに紐づく全PR(state=all)のレビュー回数を合算する。
-          # 見出しは完全一致で数える(下の打ち切りコメントを数えないため)。
+          # 同じheadリポジトリ・同じブランチの全PR(state=all)のレビュー回数を合算する。
+          # head は owner:branch で指定する。ブランチ名だけで絞ると、同名ブランチの
+          # fork PR のレビュー回数まで合算されてしまう。
+          # コメントは投稿者がこのワークフロー(github-actions[bot])のものだけを数える。
+          # 見出しの一致だけで数えると、第三者が同じ見出しのコメントを投稿するだけで
+          # 上限に到達させ、レビューされていないPRを恒久的に赤にできる。
           header='## Codex Review(自動クロスレビュー)'
           rounds=0
-          for n in $(gh pr list --repo "$REPO" --head "$HEAD_REF" --state all --json number --jq '.[].number'); do
+          for n in $(gh api "repos/$REPO/pulls?state=all&head=${HEAD_OWNER}:${HEAD_REF}&per_page=100" \
+            --paginate --jq '.[].number'); do
             c=$(gh api "repos/$REPO/issues/$n/comments" --paginate --slurp \
-              | jq --arg h "$header" '[.[][] | select(.body | startswith($h))] | length')
+              | jq --arg h "$header" '[.[][]
+                  | select(.user.login == "github-actions[bot]")
+                  | select(.body | startswith($h))] | length')
             rounds=$((rounds + c))
           done
           echo "このブランチのレビュー回数: ${rounds} / 上限: ${REVIEW_ROUND_LIMIT}"
