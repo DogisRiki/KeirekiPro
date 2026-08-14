@@ -68,6 +68,10 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - ブランチ名は `.branch_name_template`、コミットメッセージは `.commit_template` に従う
 - PR本文には必ず `Refs: #<Issue番号>` を含める。テストのアサーションを意図的に変更した場合は
   `Test-Change-Justification: <理由>` を記載する
+- PR本文には `Closes #<Issue番号>` も併記し、マージ時にIssueが自動で閉じるようにする。
+  人間はIssueを閉じない
+- `Refs: #<Issue番号>` は `Closes` と併記しても消さない。codex-reviewがこの行からIssue本文を
+  取得してspec適合の判定基準にしている
 - push先はfeatureブランチのみ。マージはauto-merge(ゲート全通過で自動)に任せ、`gh pr merge --auto --squash` を予約する
 - 出荷手順(verify→commit→push→PR→auto-merge予約)は `/ship` に従う
 

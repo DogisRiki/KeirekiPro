@@ -25,6 +25,7 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
 
 5. **PR作成**: `gh pr create` で作成する。PR本文に必ず含めるもの:
    - `Refs: #<Issue番号>`
+   - `Closes #<Issue番号>`(例外なく必須。マージ時にGitHubがIssueを自動で閉じる)
    - Lane A(spec駆動)の場合: `Spec: .kiro/specs/<feature>`(size-checkがこの行で判定する)
    - テストのアサーションを意図的に変更した場合: `Test-Change-Justification: <理由>`
    - 変更概要・検証結果(verifyのReport)
@@ -48,6 +49,8 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
 - verify全PASSまでpushしない
 - 1つのPRに複数の関心事を混ぜない(200行のsize-checkは分割のシグナル)
 - マイグレーション・依存追加・ゲート設定変更を含む場合は、PR本文冒頭に「人間承認が必要な変更」として明記する
+- `Refs: #<Issue番号>` は `Closes` と併記しても消さない。codex-reviewがこの行からIssue本文を
+  取得してspec適合の判定基準にしている
 
 ## Report
 
@@ -58,4 +61,5 @@ ship:
 - commit     -> <コミットハッシュ> <サブジェクト>
 - PR         -> <PR URL>(auto-merge予約済み)
 - checks     -> 監視結果 / 人間承認待ちの有無
+- issue      -> Closes #<Issue番号> 記載済み(マージ時に自動クローズ)
 ```
