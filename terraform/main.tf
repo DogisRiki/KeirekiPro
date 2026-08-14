@@ -1,4 +1,5 @@
 # Provider configuration
+# 検証用の一時的なコメント(IAM信頼ポリシー差し替え後のterraform-plan確認。このPRはマージしない)
 provider "aws" {
   region = var.aws_region
 
