@@ -234,8 +234,8 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
 | Statement | 用途 | 条件 |
 |---|---|---|
 | DeployFromMainProductionEnvironment | backend / frontend の本番デプロイ | mainブランチ、かつ production 環境を経由するジョブ |
-| TerraformPlanOnPullRequest | PRでのTerraform Plan | terraform-plan.yaml のジョブ |
-| TerraformApplyFromMain | 手動のTerraform Apply | mainブランチの terraform-apply.yaml のジョブ |
+| TerraformPlanOnPullRequest | PRでのTerraform Plan | プルリクエストで動くジョブ |
+| TerraformApplyFromMain | 手動のTerraform Apply | mainブランチで動くジョブ |
 
 条件の組み立てには2つの制約がある。
 
@@ -246,10 +246,16 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
 2. **`sub` だけでは「mainブランチかつproduction環境」を表せない**。environmentを指定した
    ジョブの `sub` は `repo:ORG/REPO:environment:production` になり、refの情報が失われる
 
-そのため、`sub` に加えて `ref` や `job_workflow_ref` を併用する。AWSはGitHubのOIDCトークンの
-`repository` `ref` `environment` `job_workflow_ref` などを個別の条件キーとして扱える
+そのため、デプロイ用のStatementでは `sub` に `ref` を併用する。AWSはGitHubのOIDCトークンの
+`repository` `ref` `environment` などを個別の条件キーとして扱える
 ([IAM and AWS STS condition context keys](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html)
 の「Available keys for AWS OIDC federation」→ GitHubタブ)。
+
+Terraformの2つのStatementは `sub` だけで絞る。ワークフローを限定する `job_workflow_ref` は
+再利用可能ワークフローを使うジョブにしか含まれないクレームであり、直接起動する
+terraform-plan.yaml と terraform-apply.yaml のジョブでは条件が一致しない
+([OIDC claims](https://docs.github.com/en/actions/reference/security/oidc))。
+`workflow_ref` はAWSの条件キーとして提供されていないため代替にできない。
 
 ```json
 {
@@ -281,9 +287,6 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:pull_request"
-        },
-        "StringLike": {
-          "token.actions.githubusercontent.com:job_workflow_ref": "${GITHUB_ORG}/${GITHUB_REPO}/.github/workflows/terraform-plan.yaml@*"
         }
       }
     },
@@ -297,8 +300,7 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:ref:refs/heads/main",
-          "token.actions.githubusercontent.com:job_workflow_ref": "${GITHUB_ORG}/${GITHUB_REPO}/.github/workflows/terraform-apply.yaml@refs/heads/main"
+          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:ref:refs/heads/main"
         }
       }
     }
