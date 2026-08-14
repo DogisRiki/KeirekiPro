@@ -64,6 +64,9 @@ jobs:
             "${{ github.event.pull_request.base.sha }}" \
             "${{ github.event.pull_request.head.sha }}"
 
+      - name: Test release deploy gate
+        run: node .github/scripts/tests/test-release-gate.mjs
+
   size-check:
     name: size-check
     runs-on: ubuntu-latest
