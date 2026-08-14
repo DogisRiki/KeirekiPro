@@ -1,10 +1,11 @@
 name: Dependency Gate
 
-# 依存パッケージ「追加」の人間ゲート(required check に指定する)。
+# 依存追加とビルド定義の変更に対する人間ゲート(required check に指定する)。
 #
-# 判定: 依存追加あり かつ リポジトリ所有者のApproveなし -> 赤
-#       所有者がApproveした時点で pull_request_review 発火により再評価され緑になる
-#       (auto-merge が自然成立する)。バージョン更新のみのPRは常に緑(週次自動レーン用)。
+# 判定: 対象の変更あり かつ リポジトリ所有者のApproveなし -> 赤
+#       所有者がApproveすると pull_request_review 発火により再評価され緑になる。
+#       判定対象と、backendのビルド定義を解析しない理由は
+#       check-dependency-additions.sh の冒頭に記載。
 # Approve判定は所有者アカウントで照合し、bot・第三者のApproveは無効。
 
 on:
@@ -31,6 +32,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      # 検知スクリプト自身のテスト。落ちた場合はゲートも失敗させる(fail-closed)。
+      - name: Test dependency addition detector
+        run: bash .github/scripts/tests/test-check-dependency-additions.sh
 
       - name: Check owner approval
         id: approval
