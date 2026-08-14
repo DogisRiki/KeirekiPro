@@ -3,6 +3,14 @@ packages:
 
 overrides:
   follow-redirects: ">=1.16.0"
+  # 開発依存の推移的パッケージの脆弱性解消。直接依存のバージョン変更では解消せず、
+  # Dependabotが修正PRを作成できないため上書きで対応する
+  brace-expansion@1: "^1.1.16"
+  brace-expansion@2: "^2.1.2"
+  js-yaml@3: "^3.15.1"
+  js-yaml@4: "^4.3.1"
+  postcss@8: "^8.5.23"
+  qs@6: "^6.15.2"
 
 allowBuilds:
   esbuild: false
