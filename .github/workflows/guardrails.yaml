@@ -33,6 +33,18 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      # 所有者の承認とは無関係な検査は、承認待ちで失敗するステップより前に置く。
+      # 後ろに置くと、ワークフローを変更したPR(=この検査が最も必要なPR)で
+      # 先行ステップが承認待ちで落ち、初回のCIでは一度も実行されない
+      - name: Lint workflows (actionlint)
+        # shellcheckの info / style も失敗扱いになる。inline run: で
+        # 変数を引用符で囲まないと赤くなる(例: >> $GITHUB_OUTPUT)
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+
+      - name: Test release deploy gate
+        run: node .github/scripts/tests/test-release-gate.mjs
+
       - name: Check owner approval
         id: approval
         env:
@@ -63,9 +75,6 @@ jobs:
           .github/scripts/check-escape-hatches.sh \
             "${{ github.event.pull_request.base.sha }}" \
             "${{ github.event.pull_request.head.sha }}"
-
-      - name: Test release deploy gate
-        run: node .github/scripts/tests/test-release-gate.mjs
 
   size-check:
     name: size-check
