@@ -10,15 +10,10 @@
 5. 開いているPRがあれば `gh pr checks` で状態を確認し、赤があれば修正、Codex指摘があれば `/review-loop` に従う。
    チェックは緑なのにブランチが out of date でマージが進まない場合は、
    `git fetch origin && git merge origin/main` してpushする(または `gh pr update-branch`)。
-6. `gh issue list --label human-followup --state open` で、マージ後の人間の作業待ちのIssueを確認する。
-   各Issueの完了条件のうち人間が行う分が済んでいるかを実際に検証し、済んでいれば
-   `gh issue edit <番号> --remove-label human-followup` してから `gh issue close <番号>` する。
-   済んでいなければ残作業を1行報告する(催促のコメントはしない)。
-7. すべて正常なら「全ゲート正常 / PR状態」を1行で報告する。
+6. すべて正常なら「全ゲート正常 / PR状態」を1行で報告する。
 
 制約:
-- このループの作業範囲は、未コミット変更のverify・設計図との乖離の指摘・開いているPRの状態確認・
-  人間の作業待ちIssueの完了確認とクローズのみ。
+- このループの作業範囲は、未コミット変更のverify・設計図との乖離の指摘・開いているPRの状態確認のみ。
   それ以外の作業(新規実装・リファクタリング等)はこのループから始めない
 - 品質ゲートコマンドは直列実行(並列禁止)
 - このループからは commit/push しない(出荷は明示的な /ship でのみ行う)

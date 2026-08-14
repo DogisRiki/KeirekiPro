@@ -69,10 +69,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - PR本文には必ず `Refs: #<Issue番号>` を含める。テストのアサーションを意図的に変更した場合は
   `Test-Change-Justification: <理由>` を記載する
 - PR本文には `Closes #<Issue番号>` も併記し、マージ時にIssueが自動で閉じるようにする。
-  ただしIssueの完了条件にマージ後の人間の作業(設定ファイルの差し替え・リポジトリ設定の変更・
-  本番環境での実行・ローカルでの画面確認など)が含まれる場合は書かず、Issueに `human-followup`
-  ラベルを付けて残作業をコメントする。ラベルの付いたIssueは定期ループ(`.claude/loop.md`)が
-  完了を確認して閉じる。人間はIssueを閉じない
+  人間はIssueを閉じない
 - `Refs: #<Issue番号>` は `Closes` と併記しても消さない。codex-reviewがこの行からIssue本文を
   取得してspec適合の判定基準にしている
 - push先はfeatureブランチのみ。マージはauto-merge(ゲート全通過で自動)に任せ、`gh pr merge --auto --squash` を予約する

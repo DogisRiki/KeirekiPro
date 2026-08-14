@@ -50,14 +50,6 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
 - verify全PASSまでpushしない
 - 1つのPRに複数の関心事を混ぜない(200行のsize-checkは分割のシグナル)
 - マイグレーション・依存追加・ゲート設定変更を含む場合は、PR本文冒頭に「人間承認が必要な変更」として明記する
-- `Closes #<Issue番号>` を省くのは、Issueの完了条件にエージェントが実行できない操作
-  (設定ファイルの差し替え・リポジトリ設定の変更・本番環境での実行・ローカルでの画面確認など)が
-  含まれる場合だけ。その場合はPR作成時に次の2つを行う
-  - Issueに `human-followup` ラベルを付ける(ラベルが無ければ
-    `gh label create human-followup --description "マージ後に人間の作業が残っているIssue。完了を確認したエージェントが閉じる" --color 0E8A16` で作成)
-  - 残っている人間の作業をIssueにコメントする
-- `human-followup` のIssueは、定期ループ(`.claude/loop.md` の手順6)が拾って完了を確認し、
-  条件を満たしていればエージェントが閉じる。人間はIssueを閉じない
 - `Refs: #<Issue番号>` は `Closes` と併記しても消さない。codex-reviewがこの行からIssue本文を
   取得してspec適合の判定基準にしている
 
