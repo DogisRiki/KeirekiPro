@@ -108,6 +108,19 @@ jobs:
           echo "::error::コード差分 ${lines} 行が上限 ${PR_SIZE_LIMIT} 行を超えています。この規模の変更は spec 駆動(Lane A)で行ってください: /kiro-spec-init で spec を作成し、PR 本文に「Spec: .kiro/specs/<feature>」を記載します。"
           exit 1
 
+  release-gate-test:
+    name: release-gate-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Test release deploy gate
+        run: node .github/scripts/tests/test-release-gate.mjs
+
   migration-label:
     name: migration-label
     runs-on: ubuntu-latest
