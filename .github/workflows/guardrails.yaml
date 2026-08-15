@@ -52,6 +52,14 @@ jobs:
           git ls-files -z '*.sh' \
             | xargs -0 docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:v0.11.0
 
+      - name: Test action pinning check
+        run: bash .github/scripts/tests/test-check-action-pinning.sh
+
+      - name: Check action pinning
+        # ワークフローが参照するアクションがコミットSHAで固定されているかを検査する。
+        # actionlintはこの形式を検査しないため、独立した検査として持つ
+        run: bash .github/scripts/check-action-pinning.sh
+
       - name: Check owner approval
         id: approval
         env:
