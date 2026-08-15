@@ -79,6 +79,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 - 依頼範囲外のファイルを変更しない。スタイル調整目的の全面書き換えをしない
 - `.github/workflows/` のワークフローを追加・変更・削除したPRでは、READMEのワークフロー一覧表とMermaid図も更新する
+- ワークフローで参照するアクションはコミットSHAで固定し、`uses: owner/repo@<sha> # vX.Y.Z` の形式でバージョンをコメントに併記する。タグ参照(`@v6` など)は使わない。タグは上流で差し替え可能なため、こちらを変更しなくても実行内容が変わり得る。SHAの取得は `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`
 - 外部技術の仕様は Context7 MCP または公式ドキュメントで現行版を確認してから使う
 - 外部ツールの仕様やエラーは、記憶で判断せず公式ドキュメントとissueを調査してから実装・提案する(根拠URLを添える)
 - ユーザーへの報告・PR本文・コミットメッセージは日本語(コミットprefix等の規約語は除く)
