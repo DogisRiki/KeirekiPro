@@ -1,6 +1,21 @@
 packages:
   - .
 
+# 公開直後の版を入れない。悪意ある版は公開から数時間で削除されることが多く、
+# 寝かせるだけで大半を避けられる。既定の1440(24時間)より長くしているのは、
+# 著名事例の検知までの時間の中央値が4〜48時間と報告されており、24時間では
+# 分布の端をカバーできないため。Dependabotの既定クールダウン(3日)とも揃う。
+# 明示することで minimumReleaseAgeStrict が true になり、条件を満たす版が無いとき
+# 黙って非準拠の版へ落ちるのではなく解決が失敗する。
+#
+# 注意: pnpm 11.1.3 以降、この制約は --frozen-lockfile のインストールでも検証される。
+# lockfileに72時間以内の版が含まれると ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION でCIが落ちる。
+# Dependabotは独自リゾルバでこの設定に従わず、security updates にはクールダウンが
+# 適用されないため、DependabotのfrontendのPRがこれに当たることがある。
+# 時間の経過で解消するため、通常は再実行を待てばよい。
+# 急いで通す必要がある場合のみ minimumReleaseAgeExclude に対象を一時的に追加する。
+minimumReleaseAge: 4320
+
 overrides:
   follow-redirects: ">=1.16.0"
   # 開発依存の推移的パッケージの脆弱性解消。直接依存のバージョン変更では解消せず、
