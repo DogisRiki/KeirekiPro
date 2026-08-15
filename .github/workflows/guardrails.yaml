@@ -101,6 +101,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Test spec backing check
+        run: bash .github/scripts/tests/test-check-spec-backing.sh
+
       - name: Check PR size (Lane B gate)
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -153,15 +156,12 @@ jobs:
             exit 0
           fi
 
-          # 上限超過: spec に裏付けられた Lane A の PR のみ許可する
-          spec_path=$(echo "$PR_BODY" | grep -oE 'Spec: *\.kiro/specs/[A-Za-z0-9._/-]+' | head -1 | sed 's/Spec: *//' || true)
-          if [ -n "$spec_path" ] && [ -e "$spec_path" ]; then
-            echo "実装差分 ${lines} 行 > 上限 ${PR_SIZE_LIMIT} 行ですが、spec(${spec_path})に裏付けられた Lane A の PR のため通過します。"
-            exit 0
-          fi
-
-          echo "::error::実装のコード差分 ${lines} 行が上限 ${PR_SIZE_LIMIT} 行を超えています(テスト ${test_lines} 行は計上対象外)。この規模の変更は spec 駆動(Lane A)で行ってください: /kiro-spec-init で spec を作成し、PR 本文に「Spec: .kiro/specs/<feature>」を記載します。"
-          exit 1
+          # 上限超過: spec に裏付けられた Lane A の PR のみ許可する。
+          # spec の実在・必須ファイル・プレースホルダ・承認フラグの検証は
+          # check-spec-backing.sh が行う(フラグは自己申告であり人間承認の
+          # 証明にはならない。#177 で受容済み)
+          echo "実装差分 ${lines} 行 > 上限 ${PR_SIZE_LIMIT} 行のため、spec の裏付けを検証します(テスト ${test_lines} 行は計上対象外)。"
+          bash .github/scripts/check-spec-backing.sh
 
   migration-label:
     name: migration-label

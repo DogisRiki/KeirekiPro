@@ -7,6 +7,11 @@ argument-hint: <project-description> [--auto]
 
 # Quick Spec Generator
 
+> **This skill auto-approves all three spec phases via `-y`, which CLAUDE.md prohibits.**
+> Do NOT invoke it on your own initiative. Run it only when the user explicitly
+> asks for this skill by name, and tell them in the same turn that every approval
+> it records will be `auto:-y`, not a human approval.
+
 <instructions>
 ## CRITICAL: Automatic Mode Execution Rules
 

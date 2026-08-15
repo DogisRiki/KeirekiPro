@@ -32,7 +32,10 @@ Otherwise, load all necessary context:
   - `sequential = (sequential flag is true)`
 
 **Validate approvals**:
-- If auto-approve flag (`-y`) is true: Auto-approve requirements and design in spec.json. Tasks approval is also handled automatically in Step 4.
+- If auto-approve flag (`-y`) is true: Auto-approve requirements and design in spec.json,
+  recording `approved_by: "auto:-y"` and `approved_at` (ISO 8601) in each approval
+  object — auto-approval must never be recorded under a human's name.
+  Tasks approval is also handled automatically in Step 4.
 - Otherwise: Verify both approved (stop if not, see Safety & Fallback)
 
 ### Step 2: Generate Implementation Tasks
@@ -107,18 +110,27 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
   - Set `approvals.tasks.generated: true, approved: false`
   - Set `approvals.requirements.approved: true`
   - Set `approvals.design.approved: true`
+  - Whenever setting any `approvals.*.approved: true`, also set `approved_by`
+    and `approved_at` (ISO 8601) in the same object: `"DogisRiki"` when the
+    user approved interactively in this conversation, `"auto:-y"` when via
+    auto-approve. Never record auto-approval under a human's name, and never
+    overwrite an existing `approved_by` / `approved_at`. If an approval is
+    already `true` but carries no `approved_by` (approved in an earlier
+    conversation), record `"unknown:pre-existing"` rather than a human's name
   - Update `updated_at` timestamp
 
 **Approval**:
 - If auto-approve flag (`-y`) is true:
-  - Set `approvals.tasks.approved: true` in spec.json
+  - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "auto:-y"`
+    and `approved_at` (ISO 8601)
   - Display task summary (task count, major groups, parallel markers)
   - Respond: "Tasks generated and auto-approved. Start implementation with `/kiro-impl {feature}`"
 - Otherwise (interactive):
   - Display a summary of the generated tasks (task count, major groups, parallel markers)
   - Ask the user: "Tasks generated. Approve and proceed to implementation?"
   - If the user approves:
-    - Set `approvals.tasks.approved: true` in spec.json
+    - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "DogisRiki"`
+      and `approved_at` (ISO 8601)
     - Respond: "Tasks approved. Start implementation with `/kiro-impl {feature}`"
   - If the user wants changes:
     - Keep `approvals.tasks.approved: false`
@@ -159,7 +171,7 @@ Provide brief summary in the language specified in spec.json:
 **Requirements or Design Not Approved**:
 - **Stop Execution**: Cannot proceed without approved requirements and design
 - **User Message**: "Requirements and design must be approved before task generation"
-- **Suggested Action**: "Run `/kiro-spec-tasks {feature} -y` to auto-approve all (requirements, design, and tasks) and proceed"
+- **Suggested Action**: "Ask the user to review and approve the outstanding documents, then re-run this skill. Do not use `-y`: auto-approval is prohibited by CLAUDE.md"
 
 **Missing Requirements or Design**:
 - **Stop Execution**: Both documents must exist

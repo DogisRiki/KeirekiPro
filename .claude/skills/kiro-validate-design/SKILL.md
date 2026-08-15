@@ -92,7 +92,6 @@ Provide output in the language specified in spec.json with:
 **If Design Passes Validation (GO Decision)**:
 - Apply any suggested improvements if agreed
 - Run `/kiro-spec-tasks {feature}` to generate implementation tasks
-- Or `/kiro-spec-tasks {feature} -y` to auto-approve and proceed directly
 
 **If Design Needs Revision (NO-GO Decision)**:
 - Address critical issues identified in review

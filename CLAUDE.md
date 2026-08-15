@@ -108,7 +108,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 ### ルール
 
-- 3段階承認: Requirements → Design → Tasks の各段階で人間の承認を得る(`-y` は意図的なfast-trackのみ)
+- 3段階承認: Requirements → Design → Tasks の各段階で人間の承認を得る。`-y` による自動承認は使用しない(/kiro-spec-batch 等による同等の自動承認も同様)。承認を記録するときは spec.json に承認者名と日時(`approved_by` / `approved_at`)を残す
 - 各タスクの完了条件に該当verify Skillの実行を含める(タスクテンプレートに定義済み)
 - Skills は `.claude/skills/kiro-*/SKILL.md`。適用可能性が1%でもあればスキルを起動する
 - steeringは常に最新に保つ(`/kiro-steering` で更新)
