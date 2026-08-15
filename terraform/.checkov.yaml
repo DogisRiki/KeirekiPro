@@ -3,3 +3,16 @@ framework:
 output: cli
 compact: true
 download-external-modules: true
+
+# 既存の指摘を凍結し、新規に増えた指摘だけを失敗させる。
+# 凍結した67件は「AWSの構成を変更するときに扱う」ものとして .checkov.baseline に
+# 記録してある(#124)。baselineに載っていない指摘が出たら、それはこのPRで
+# 増やした指摘なので直す。
+# baselineを作り直すときは、この baseline 行を一時的に外してから実行する。
+# 有効なまま --create-baseline すると、baseline適用後(=指摘0件)の結果が
+# 書き出されて .checkov.baseline が空になり、次の実行で既存67件が
+# 新規扱いになる。
+#   1. 下の baseline 行をコメントアウトする
+#   2. docker compose exec -w /workspace terraform checkov -d . --create-baseline
+#   3. baseline 行を戻し、差分をレビューする
+baseline: .checkov.baseline

@@ -85,7 +85,7 @@ flowchart LR
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
 |---|---|---|---|
 | 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。mainへのpush時はデプロイ用成果物を保存 |
-| 品質の検査 | terraform-plan.yaml | pull_request (terraform/**) | Terraform Planを実行し、結果をPRにコメント |
+| 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査(AWS認証不要)と、Terraform Planの実行および結果のPRコメント。terraform関連の変更が無いPRでは各ジョブをスキップする |
 | ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | フロントエンドの依存定義ファイル(lockfileとoverridesを含む)とバックエンドのビルド定義ファイルの変更を検知し、リポジトリ所有者が承認するまでマージを保留 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
