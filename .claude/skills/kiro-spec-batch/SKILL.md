@@ -6,6 +6,11 @@ allowed-tools: Read, Glob, Grep, Agent
 
 # kiro-spec-batch Skill
 
+> **This skill auto-approves all three spec phases, which CLAUDE.md prohibits.**
+> Do NOT invoke it on your own initiative. Run it only when the user explicitly
+> asks for this skill by name, and tell them in the same turn that every approval
+> it records will be `auto:batch`, not a human approval.
+
 ## Core Mission
 - **Success Criteria**:
   - All features have complete spec files (spec.json, requirements.md, design.md, tasks.md)
@@ -68,7 +73,10 @@ Create a complete specification for feature "{feature-name}".
    b. Generate requirements: Read .claude/skills/kiro-spec-requirements/SKILL.md, then follow its steps
    c. Generate design: Read .claude/skills/kiro-spec-design/SKILL.md, then follow its steps
    d. Generate tasks: Read .claude/skills/kiro-spec-tasks/SKILL.md, then follow its steps
-4. Set all approvals to true in spec.json (auto-approve mode, equivalent of -y flag)
+4. Set all approvals to true in spec.json (auto-approve mode, equivalent of -y flag).
+   For each approval set this way, also record `approved_by: "auto:batch"` and
+   `approved_at` (ISO 8601) in the same object — auto-approval must never be
+   recorded under a human's name
 5. Report completion with file list and task count
 ```
 

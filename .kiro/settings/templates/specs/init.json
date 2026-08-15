@@ -7,15 +7,21 @@
   "approvals": {
     "requirements": {
       "generated": false,
-      "approved": false
+      "approved": false,
+      "approved_by": null,
+      "approved_at": null
     },
     "design": {
       "generated": false,
-      "approved": false
+      "approved": false,
+      "approved_by": null,
+      "approved_at": null
     },
     "tasks": {
       "generated": false,
-      "approved": false
+      "approved": false,
+      "approved_by": null,
+      "approved_at": null
     }
   },
   "ready_for_implementation": false

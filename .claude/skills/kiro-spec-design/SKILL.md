@@ -32,7 +32,9 @@ Otherwise, load all necessary context:
 - `.kiro/settings/templates/specs/research.md` for discovery log structure
 
 **Validate requirements approval**:
-- If auto-approve flag is true: Auto-approve requirements in spec.json
+- If auto-approve flag is true: Auto-approve requirements in spec.json,
+  recording `approved_by: "auto:-y"` and `approved_at` (ISO 8601) in the same
+  object — auto-approval must never be recorded under a human's name
 - Otherwise: Verify approval status (stop if unapproved, see Safety & Fallback)
 
 ### Step 2: Discovery & Analysis
@@ -131,6 +133,11 @@ After all findings return, synthesize in main context before proceeding.
    - Set `phase: "design-generated"`
    - Set `approvals.design.generated: true, approved: false`
    - Set `approvals.requirements.approved: true`
+   - Whenever setting any `approvals.*.approved: true`, also set `approved_by`
+     and `approved_at` (ISO 8601) in the same object: `"DogisRiki"` when the
+     user approved interactively in this conversation, `"auto:-y"` when via
+     auto-approve. Never record auto-approval under a human's name, and never
+     overwrite an existing `approved_by` / `approved_at`
    - Update `updated_at` timestamp
 
 ## Critical Constraints
@@ -166,7 +173,7 @@ Provide brief summary in the language specified in spec.json:
 **Requirements Not Approved**:
 - **Stop Execution**: Cannot proceed without approved requirements
 - **User Message**: "Requirements not yet approved. Approval required before design generation."
-- **Suggested Action**: "Run `/kiro-spec-design {feature} -y` to auto-approve requirements and proceed"
+- **Suggested Action**: "Ask the user to review `requirements.md` and approve it, then re-run this skill. Do not use `-y`: auto-approval is prohibited by CLAUDE.md"
 
 **Missing Requirements**:
 - **Stop Execution**: Requirements document must exist
@@ -195,7 +202,6 @@ Provide brief summary in the language specified in spec.json:
 **If Design Approved**:
 - **Optional**: Run `/kiro-validate-design {feature}` for interactive quality review
 - Run `/kiro-spec-tasks {feature}` to generate implementation tasks
-- Or `/kiro-spec-tasks {feature} -y` to auto-approve and proceed directly
 
 **If Modifications Needed**:
 - Provide feedback and re-run `/kiro-spec-design {feature}`

@@ -34,13 +34,15 @@ seed() {
     BASE=$(git rev-parse HEAD)
 }
 
+# 失敗させるケースが本物のジョブSummaryへ追記されないよう、
+# 検査対象のSummaryは捨てる(内容の検証は check_summary が行う)
 # 使い方: check <期待exit> <所有者Approve> <説明> <変更を加える関数>
 check() {
     local want="$1" approved="$2" name="$3" mutate="$4" got
     seed
     "$mutate"
     git add -A && git commit -qm head --allow-empty
-    OWNER_APPROVED="$approved" bash "$SCRIPT" "$BASE" "$(git rev-parse HEAD)" >/dev/null 2>&1
+    GITHUB_STEP_SUMMARY=/dev/null OWNER_APPROVED="$approved" bash "$SCRIPT" "$BASE" "$(git rev-parse HEAD)" >/dev/null 2>&1
     got=$?
     if [ "$got" = "$want" ]; then
         printf 'ok   %s\n' "$name"
