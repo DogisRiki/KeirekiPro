@@ -25,6 +25,10 @@ docker compose exec -w /workspace terraform checkov -d .
 
 - **`terraform apply` を実行しない**(applyは人間が手動実行するワークフローのみ。permissions/denyでもブロックされる)
 - checkovの指摘を `.checkov.yaml` のskip追加で消さない。設定変更が必要なときは理由を添えて人間に提案する
+- checkovが失敗したら、それは `terraform/.checkov.baseline` に無い新規の指摘なので直す。
+  **baselineを作り直して消さない。** `.checkov.yaml` の `baseline:` が有効なまま
+  `--create-baseline` を実行するとbaselineが空になり、凍結済みの既存指摘が
+  すべて新規扱いに戻る。baselineの作り直しが必要なときは人間に提案する
 - デプロイゲート・CI検証ステップを弱める変更をしない(`terraform/CLAUDE.md` の安全不変条件)
 
 ## Report

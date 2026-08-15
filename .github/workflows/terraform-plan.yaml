@@ -1,10 +1,8 @@
-name: Terraform Plan
+name: Terraform
 
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'terraform/**'
 
 permissions:
   id-token: write
@@ -16,7 +14,75 @@ env:
   TF_VERSION: '1.9.0'
 
 jobs:
+  # ワークフロー単位の paths フィルタは使わない。フィルタでワークフロー自体が
+  # 起動しないと、必須チェックに指定したときにステータスが報告されず、
+  # terraform を触らないPRが「Waiting for status to be reported」で止まる。
+  # ジョブ単位のスキップは成功として報告されるため、ci.yaml と同じ方式にする。
+  detect-terraform-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      terraform_changed: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Run paths-filter
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            terraform:
+              - 'terraform/**'
+              - 'docker/terraform/**'
+              - '.github/workflows/terraform-plan.yaml'
+
+  # AWS認証を必要としない検査。plan と分けているのは、認証やsecretsが無い状況でも
+  # 動かせるようにするため。ローカルの /verify-terraform と同じイメージを使い、
+  # tflint と checkov のバージョンをCIとローカルで一致させる。
+  terraform-static:
+    name: terraform-static
+    needs: detect-terraform-changes
+    if: needs.detect-terraform-changes.outputs.terraform_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build terraform tooling image
+        run: docker build -f docker/terraform/Dockerfile -t keirekipro-terraform .
+
+      - name: Terraform Format Check
+        run: |
+          docker run --rm -v "$PWD/terraform:/workspace" -w /workspace \
+            --entrypoint terraform keirekipro-terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        # backend=false でS3バックエンドの初期化を省く。構文と参照の検証には要らない
+        run: |
+          docker run --rm -v "$PWD/terraform:/workspace" -w /workspace \
+            --entrypoint sh keirekipro-terraform -c \
+            'terraform init -backend=false -input=false >/dev/null && terraform validate'
+
+      - name: tflint
+        run: |
+          docker run --rm -v "$PWD/terraform:/workspace" -w /workspace \
+            --entrypoint tflint keirekipro-terraform --recursive
+
+      - name: checkov
+        # 既存の指摘は .checkov.baseline で凍結してある(#124)。
+        # baselineに無い指摘が出たら失敗する
+        run: |
+          docker run --rm -v "$PWD/terraform:/workspace" -w /workspace \
+            --entrypoint checkov keirekipro-terraform -d .
+
   terraform-plan:
+    needs: detect-terraform-changes
+    if: needs.detect-terraform-changes.outputs.terraform_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,11 +102,6 @@ jobs:
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
-
-      - name: Terraform Format Check
-        id: fmt
-        run: terraform fmt -check -recursive
-        continue-on-error: true
 
       - name: Terraform Init
         id: init
@@ -72,7 +133,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fmtOutcome = '${{ steps.fmt.outcome }}';
             const initOutcome = '${{ steps.init.outcome }}';
             const validateOutcome = '${{ steps.validate.outcome }}';
             const planOutcome = '${{ steps.plan.outcome }}';
@@ -94,7 +154,6 @@ jobs:
 
             | Step | Status |
             |------|--------|
-            | 🖌️ Format | ${fmtOutcome === 'success' ? '✅ Success' : '⚠️ Check Required'} |
             | ⚙️ Init | ${initOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
             | ✅ Validate | ${validateOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
             | 📖 Plan | ${planOutcome === 'success' ? '✅ Success' : '❌ Failed'} |

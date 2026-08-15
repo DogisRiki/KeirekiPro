@@ -34,5 +34,8 @@
 # DBマイグレーション(人間ゲート: 承認前にローカルDBで適用・巻き戻しを確認する)
 /backend/src/main/resources/db/migration/       @DogisRiki
 
+# checkovの既知指摘の凍結データ(抑止リスト。backend/config/ の各種除外設定と同格)
+/terraform/.checkov.baseline                    @DogisRiki
+
 # このファイル自身
 /.github/CODEOWNERS                             @DogisRiki

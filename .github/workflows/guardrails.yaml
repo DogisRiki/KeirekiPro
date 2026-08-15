@@ -114,7 +114,8 @@ jobs:
 
           merge_base=$(git merge-base "${{ github.event.pull_request.base.sha }}" HEAD)
 
-          # 計上対象外: lockfile / ドキュメント / spec / 図 / Gradle wrapper
+          # 計上対象外: lockfile / ドキュメント / spec / 図 / Gradle wrapper /
+          # 静的解析のbaseline
           # gitのpathspecでは '*' が '/' を跨ぐため、'*.md' だけで入れ子も含む全ての .md に一致する
           common_excludes=(
             ':(exclude)frontend/pnpm-lock.yaml'
@@ -126,6 +127,12 @@ jobs:
             ':(exclude)backend/gradlew'
             ':(exclude)backend/gradlew.bat'
             ':(exclude)backend/gradle/wrapper/**'
+            # checkovが --create-baseline で生成する既知指摘の凍結データ。
+            # 人が書いた実装ではないため行数には数えない。書き換えは CODEOWNERS で
+            # 所有者承認を必須にしてあり、size-check とは別に守る。
+            # ワイルドカードにはしない(ファイル名を .baseline にするだけで
+            # 無承認で計上を外せるようになるため)。増やすときはここに1件ずつ足す
+            ':(exclude)terraform/.checkov.baseline'
           )
 
           # テストは上限の対象外にする。この体制はテストに品質を負わせているため、
