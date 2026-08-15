@@ -4,26 +4,33 @@
 #
 # 判定: 対象の変更あり かつ 所有者のApproveなし -> exit 1(赤)。それ以外は exit 0(緑)
 #
-# 判定対象:
-#   - frontend/package.json の dependencies / devDependencies に増えたキー。
-#     JSONを構造化して読むため取りこぼしが無く、バージョン更新は検知しない
-#   - backend のビルド定義ファイルの変更そのもの。中身は解析しないため、
-#     バージョン更新やコメントのみの変更も対象になる
+# 判定対象(いずれも「変更されたこと自体」を見る。中身は解析しない):
+#   - frontend の依存定義ファイル
+#     (package.json / pnpm-lock.yaml / pnpm-workspace.yaml / .npmrc / .pnpmfile.cjs / .pnpmfile.mjs)
+#   - backend のビルド定義ファイル
 #     (*.gradle / *.gradle.kts / *.versions.toml / gradle-wrapper.properties。
 #     wrapperを含めるのは、Gradle本体の配布物が変われば実行されるコードも変わるため)
 #
-# なぜ backend は中身を解析しないのか:
-#   以前は正規表現で依存座標とプラグインIDを抽出していたが、Gradleのビルド定義は
-#   変数・条件分岐・Kotlin DSL・version catalog・動的な指定を許すため、静的な文字列
-#   一致では原理的に網羅できない。実際にレビューで apply(plugin:) / apply false /
-#   同一行の複数宣言 / 他ファイルで宣言済みIDの適用 といった迂回経路が次々に見つかり、
-#   パターンを足し続ける状態になっていた。
-#   Gradle自身に解決結果を出力させる方式(buildEnvironment / dependency locking)も
-#   検討したが、apply false の区別ができず環境依存の条件分岐も残る。加えて判定対象の
-#   ビルドに自己申告させる構造になり、判定根拠がPR側の制御下に入る。
-#   バージョン更新を緑に保つ設計は削除済みの週次自動更新レーン(claude.yml)のための
-#   ものだった。現在のDependabotのPRは所有者の手動マージであり、承認を求めても運用は
-#   止まらない。このため取りこぼしの生じない「変更されたかどうか」の判定に変えた。
+# なぜ中身を解析しないのか:
+#   backend では以前、正規表現で依存座標とプラグインIDを抽出していたが、Gradleのビルド定義は
+#   変数・条件分岐・Kotlin DSL・version catalog・動的な指定を許すため、静的な文字列一致では
+#   原理的に網羅できない。実際にレビューで apply(plugin:) / apply false / 同一行の複数宣言 /
+#   他ファイルで宣言済みIDの適用 といった迂回経路が次々に見つかり、パターンを足し続ける
+#   状態になっていた。このため取りこぼしの生じない「変更されたかどうか」の判定に変えた。
+#
+#   frontend も同じ理由で同じ方式にした。以前は package.json の dependencies /
+#   devDependencies のキー集合だけを比較しており、次の3つが素通りしていた。
+#     - バージョン更新(意図的に通していた)
+#     - 推移的依存の変化(pnpm-lock.yaml にしか現れない)
+#     - overrides による差し替え(pnpm-workspace.yaml。npm alias 構文を使えば
+#       任意の依存を別のパッケージに置き換えられる)
+#   2026-03-31 の axios 改ざんは、悪意あるコードが推移的依存として入った事例であり、
+#   キー集合の比較では検知できない。
+#
+# 報告について:
+#   pnpm-lock.yaml から新しく増えたパッケージ名を抽出してSummaryに出す。所有者が承認する
+#   ときに見るべきものを提供するためのもので、判定には一切使わない。解析に漏れがあっても
+#   ゲートは緩まない(判定はファイルが変更されたかどうかで既に決まっている)。
 #
 # テスト: .github/scripts/tests/test-check-dependency-additions.sh
 # 環境変数: OWNER_APPROVED が "true" ならリポジトリ所有者のApprove済み
@@ -35,32 +42,17 @@ BASE_SHA="${1:?base sha required}"
 HEAD_SHA="${2:?head sha required}"
 OWNER_APPROVED="${OWNER_APPROVED:-false}"
 
-# fail-closed: 解析ツールが無い環境で黙って合格させない
-if ! command -v jq >/dev/null 2>&1; then
-    echo "::error::jq が見つかりません。判定ができないため fail-closed で失敗します。"
-    exit 1
-fi
-
 MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
 
 detected=""
 
-# --- frontend/package.json: dependencies + devDependencies のキー集合を比較 ---
-pkg_keys() {
-    jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' 2>/dev/null | sort -u
-}
-
-# grep -q へパイプしない。早期終了で書き手がSIGPIPEを受け偽になることがある
-if ! git diff --quiet "$MERGE_BASE" "$HEAD_SHA" -- frontend/package.json; then
-    base_keys=$(git show "$MERGE_BASE:frontend/package.json" | pkg_keys || true)
-    head_keys=$(git show "$HEAD_SHA:frontend/package.json" | pkg_keys || true)
-    new_npm=$(comm -13 <(echo "$base_keys") <(echo "$head_keys") || true)
-    if [ -n "$new_npm" ]; then
-        detected+="[frontend/package.json に追加された依存]"$'\n'"$new_npm"$'\n'
-    fi
+# --- 変更されたこと自体を検知する対象(grep は -q 無しで全入力を読む) ---
+changed_frontend=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
+    grep -E '^frontend/(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.(c|m)?js)$' || true)
+if [ -n "$changed_frontend" ]; then
+    detected+="[変更された frontend の依存定義ファイル]"$'\n'"$changed_frontend"$'\n'
 fi
 
-# --- backend のビルド定義ファイル: 変更されたこと自体を検知する(grep は -q 無しで全入力を読む) ---
 changed_build=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
     grep -E '^backend/(.*\.(gradle|gradle\.kts|versions\.toml)|gradle/wrapper/gradle-wrapper\.properties)$' || true)
 if [ -n "$changed_build" ]; then
@@ -71,6 +63,39 @@ if [ -z "$detected" ]; then
     echo "承認が必要な変更なし。"
     exit 0
 fi
+
+# --- 報告用: pnpm-lock.yaml に新しく現れたパッケージ名(判定には使わない) ---
+# packages: セクションのキー "  name@version:" から name を取り出す。
+# スコープ付き("@scope/pkg@1.0.0")に対応するため、最後の @ より前を名前とする。
+# スコープ付きの名前は lockfile 上で '...' と引用されるため、引用符を剥がしてから返す
+# (剥がさないと、承認者が一覧の名前をそのまま npm で検索しても見つからない)。
+lock_names() {
+    awk -v q="'" '/^packages:/ { inpkg = 1; next }
+         /^[a-z]/ { inpkg = 0 }
+         inpkg && /^  [^ ].*:$/ {
+             line = $0
+             sub(/^  /, "", line)
+             sub(/:$/, "", line)
+             sub("^" q, "", line)
+             sub(q "$", "", line)
+             pos = 0
+             for (i = length(line); i > 1; i--) {
+                 if (substr(line, i, 1) == "@") { pos = i; break }
+             }
+             if (pos > 1) { print substr(line, 1, pos - 1) }
+         }' | sort -u
+}
+
+case "$changed_frontend" in
+*frontend/pnpm-lock.yaml*)
+    base_names=$(git show "$MERGE_BASE:frontend/pnpm-lock.yaml" 2>/dev/null | lock_names || true)
+    head_names=$(git show "$HEAD_SHA:frontend/pnpm-lock.yaml" 2>/dev/null | lock_names || true)
+    new_names=$(comm -13 <(printf '%s\n' "$base_names") <(printf '%s\n' "$head_names") || true)
+    if [ -n "$new_names" ]; then
+        detected+="[pnpm-lock.yaml に新しく現れたパッケージ(報告のみ・判定には使わない)]"$'\n'"$new_names"$'\n'
+    fi
+    ;;
+esac
 
 {
     echo "### :package: 承認が必要な変更を検出"
@@ -86,6 +111,6 @@ if [ "$OWNER_APPROVED" = "true" ]; then
     exit 0
 fi
 
-echo "::error::依存の追加、またはbackendのビルド定義の変更が検出されました。リポジトリ所有者のApproveレビュー後にこのチェックは緑になります。"
+echo "::error::依存定義ファイルの変更が検出されました。リポジトリ所有者のApproveレビュー後にこのチェックは緑になります。"
 echo "$detected"
 exit 1

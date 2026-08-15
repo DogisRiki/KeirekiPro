@@ -87,7 +87,7 @@ flowchart LR
 | 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。mainへのpush時はデプロイ用成果物を保存 |
 | 品質の検査 | terraform-plan.yaml | pull_request (terraform/**) | Terraform Planを実行し、結果をPRにコメント |
 | ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査、ワークフローの静的検証(actionlint)とリリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成 |
-| 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | フロントエンドの依存の新規追加と、バックエンドのビルド定義ファイルの変更を検知し、リポジトリ所有者が承認するまでマージを保留 |
+| 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | フロントエンドの依存定義ファイル(lockfileとoverridesを含む)とバックエンドのビルド定義ファイルの変更を検知し、リポジトリ所有者が承認するまでマージを保留 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
 | AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
