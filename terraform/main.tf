@@ -192,7 +192,6 @@ module "ecs" {
 
   project_name            = var.project_name
   aws_region              = var.aws_region
-  aws_account_id          = data.aws_caller_identity.current.account_id
   public_subnet_ids       = module.vpc.public_subnet_ids
   security_group_id       = module.vpc.ecs_security_group_id
   task_execution_role_arn = module.iam.ecs_task_execution_role_arn
