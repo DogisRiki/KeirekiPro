@@ -1,6 +1,8 @@
 services:
   dind:
-    image: docker:27-dind
+    build:
+      context: .
+      dockerfile: docker/dind/Dockerfile
     container_name: dind
     restart: always
     privileged: true
@@ -96,7 +98,9 @@ services:
 
   redis:
     container_name: redis
-    image: redis:7.4.7-alpine
+    build:
+      context: .
+      dockerfile: docker/redis/Dockerfile
     restart: always
     ports:
       - 6379:6379
@@ -105,7 +109,9 @@ services:
 
   localstack:
     container_name: localstack
-    image: localstack/localstack
+    build:
+      context: .
+      dockerfile: docker/localstack/Dockerfile
     ports:
       - 4566:4566
     environment:
