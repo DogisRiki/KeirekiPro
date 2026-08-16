@@ -53,7 +53,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 - 作業は必ずfeatureブランチで行う。mainブランチではcommit/pushしない(hookでもブロックされる)
 - ゲート設定ファイル(`.github/` `.claude/` `eslint.config.js` `vite.config.ts` `backend/gradle/quality.gradle` `backend/config/` ArchUnitテスト `CODEOWNERS`)は変更しない。変更が必要なときは理由を添えて人間に提案する
-- 人間の承認が必要な変更: frontendの依存定義(`package.json` `pnpm-lock.yaml` `pnpm-workspace.yaml` `.npmrc` `.pnpmfile.cjs`)の変更・backendのビルド定義(`*.gradle` `*.gradle.kts` `*.versions.toml` `gradle-wrapper.properties`)の変更・DBスキーマ変更(マイグレーション)・ゲート設定の変更・リポジトリ外部へのデータ送信。これらを含むPRは承認まで自動マージされない(dependency-gate / CODEOWNERSが機械強制)。frontendは推移的依存の変化とバージョン更新も対象になるため、`pnpm install` でlockfileが動いた時点で承認待ちになる
+- 人間の承認が必要な変更: ライブラリの入手先と実行設定(`frontend/.npmrc` `.pnpmfile.cjs` `.pnpmfile.mjs` `pnpm-workspace.yaml`)の変更・backendのビルドスクリプト(`*.gradle` `*.gradle.kts`)の変更・DBスキーマ変更(マイグレーション)・ゲート設定の変更・リポジトリ外部へのデータ送信。これらを含むPRは承認まで自動マージされない(dependency-gate / CODEOWNERSが機械強制)
+- 依存のバージョン宣言(`package.json` `pnpm-lock.yaml` `libs.versions.toml` `gradle-wrapper.properties`)は承認の対象外。dependency-review(新規の脆弱性)・dependency-cooldown(公開から72時間未満)・gradle-wrapper(配布元と公表チェックサム)が代わりに止める。**バージョンは `backend/gradle/libs.versions.toml` に集約し、`build.gradle` に直書きしない**(直書きすると承認が必要な側に戻る)
 - テストのskip化・アサーション削除・カバレッジ/lint除外の追加で「見かけの合格」を作らない(escape-hatchチェックが機械検知)
 - 200行(実装のコード差分。テストとドキュメントは計上しない)を超える変更はspec駆動(Lane A)で行い、PR本文に `Spec: .kiro/specs/<feature>` を記載する
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)

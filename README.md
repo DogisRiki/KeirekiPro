@@ -55,13 +55,13 @@ flowchart LR
     PR[プルリクエスト<br>Claude Code または Dependabot]
 
     subgraph s1[系統1: 品質の検査]
-        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>依存の脆弱性検査]
+        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>依存の脆弱性検査・<br>公開直後のライブラリの遮断]
     end
     subgraph s2[系統2: ずるの検査]
-        Z[検査回避の検知・差分サイズ・<br>シークレットスキャン・<br>ワークフローの静的検証]
+        Z[検査回避の検知・差分サイズ・<br>シークレットスキャン・<br>ワークフローの静的検証・<br>Gradle本体の検証]
     end
     subgraph s3[系統3: 人間の関門]
-        H[依存追加・backendのビルド定義の変更・<br>pre-merge-checkラベル・保護パスの変更は<br>所有者がApproveするまで赤]
+        H[ビルド設定・ライブラリの入手先・<br>pre-merge-checkラベル・保護パスの変更は<br>所有者がApproveするまで赤]
     end
     subgraph s4[系統4: AIレビュー]
         A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回<br>Dependabotのプルリクエストは対象外]
@@ -86,10 +86,10 @@ flowchart LR
 |---|---|---|---|
 | 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。mainへのpush時はデプロイ用成果物を保存 |
 | 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査(AWS認証不要)と、Terraform Planの実行および結果のPRコメント。terraform関連の変更が無いPRでは各ジョブをスキップする |
-| 品質の検査 | dependency-review.yaml | pull_request | 依存の脆弱性検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性だけを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
+| 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成 |
-| 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | フロントエンドの依存定義ファイル(lockfileとoverridesを含む)とバックエンドのビルド定義ファイルの変更を検知し、リポジトリ所有者が承認するまでマージを保留 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証 |
+| 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
 | AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
@@ -335,7 +335,7 @@ flowchart LR
 | 作るものを決める | 何を作るか・何を直すかを決めて、Issueとして起票する(1〜2行でよく、詳細化はAIが行う) |
 | 仕様を承認する | spec駆動開発で作成される要件・設計・タスクのドキュメントを読んで承認する(コードではなく仕様を判断する) |
 | 仕組みを監査する | 自動チェックが正しく機能し続けているかを週次・月次で確認し、すり抜けた問題はチェックの追加・強化につなげる([監査手順](doc/開発フロー/監査手順.md)) |
-| 影響の大きい変更を承認する | DBマイグレーション・依存ライブラリの追加・チェック設定の変更を含むプルリクエストに限り、承認ボタンを押す |
+| 影響の大きい変更を承認する | DBマイグレーション・ビルド設定・ライブラリの入手先・チェック設定の変更を含むプルリクエストに限り、承認ボタンを押す |
 | リリースを判断する | 本番デプロイの前にローカル環境で動作を確かめ、問題がなければデプロイを手動で実行する |
 
 それ以外の作業(実装・テスト・コミット・プルリクエストの作成・レビュー指摘への対応)はClaude Codeが行います。プルリクエストは、Codexによる自動レビューがコード品質と仕様適合の両方を問題なしと判定し、CIの必須チェックがすべて成功すると、自動的にマージされます。
@@ -358,7 +358,7 @@ flowchart LR
 | 静的解析 | ESLint・TypeScript・ArchUnit・Checkstyle・SpotBugs・tflint・Checkovで、アーキテクチャ境界の違反やコードの問題を機械的に検査する |
 | 検査回避の検知 | テストのスキップ化・アサーションの削除・型チェックの抑止コメントなど、チェックを形だけ通すための変更をCIが検知して失敗させる |
 | 別のAIによるレビュー | 実装したClaude Codeとは別系統のAIであるCodexが、すべてのプルリクエストをレビューする。レビュアーには過去の指摘を渡さず、毎回まっさらな状態で審査させる。指摘への対応は自動で行い、5往復で機械的に打ち切って人間が判断する |
-| 影響の大きい変更の承認 | DBマイグレーション・依存ライブラリの追加・品質チェック設定の変更は、人間が承認しなければマージされない |
+| 影響の大きい変更の承認 | DBマイグレーション・ビルド設定・ライブラリの入手先・品質チェック設定の変更は、人間が承認しなければマージされない |
 | チェック設定自体の保護 | 品質チェックの設定ファイルはCODEOWNERSで保護されており、AIエージェントが自分の判断で変更することはできない |
 | リリースの分離 | mainブランチへのマージだけでは本番に反映されず、デプロイは人間が手動で実行する |
 | 定期的な健全性確認 | 問題のある変更をわざと含めたプルリクエストを毎月自動生成し、チェックの仕組みが正しく検知できることを確かめる |
