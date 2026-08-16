@@ -61,6 +61,16 @@ MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
 changed=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA")
 relevant=$(printf '%s\n' "$changed" | grep -E '(^|/)gradle/wrapper/|\.jar$' || true)
 
+# 実行条件をワークフローへ渡す。jar の照合も同じ条件で動かす必要があるため、
+# 条件をワークフロー側にも書くと判定が2箇所に分かれて食い違う。ここだけを根拠にする。
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    if [ -n "$relevant" ]; then
+        echo "relevant=true" >>"$GITHUB_OUTPUT"
+    else
+        echo "relevant=false" >>"$GITHUB_OUTPUT"
+    fi
+fi
+
 if [ -z "$relevant" ]; then
     echo "wrapper 関連の変更がないため、配布元への問い合わせを行いません。"
     exit 0

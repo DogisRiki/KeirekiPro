@@ -328,3 +328,44 @@ jobs:
           path: backend/build/reports/pmd/
           retention-days: 7
           if-no-files-found: ignore
+
+  # Gradle wrapper の配布物検査。アクション参照のSHA固定検査と目的が同じで、
+  # 「ビルドが取得する外部成果物の同一性」を守る。required check に指定する。
+  #
+  # ジョブは常時実行し、実行条件の判定はスクリプトに任せる。wrapper 関連の変更が
+  # 無ければスクリプトが外部への問い合わせを行わずに成功で終える。条件を付けないと
+  # 全PRが毎回 services.gradle.org へ問い合わせ、外部ホストの不調時に全PRが赤になる。
+  gradle-wrapper:
+    name: gradle-wrapper
+    runs-on: ubuntu-latest
+    # PR head から取得したスクリプトを実行するため、書き込み権限を継承させない。
+    # ジョブ単位の宣言はワークフローレベルの設定を丸ごと置き換える
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      # 判定スクリプト自身のテスト。落ちた場合は検査も失敗させる(fail-closed)
+      - name: Test gradle wrapper check
+        run: bash .github/scripts/tests/test-check-gradle-wrapper.sh
+
+      # 配布元のホスト、公表チェックサムとの一致、チェックサム項目の存在を検証する。
+      # 実行条件の判定結果を出力し、後続の jar 照合ステップがそれを使う
+      - name: Check gradle wrapper
+        id: wrapper
+        run: |
+          chmod +x .github/scripts/check-gradle-wrapper.sh
+          .github/scripts/check-gradle-wrapper.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
+
+      # jar の公式チェックサムとの照合。ホモグリフ偽装されたファイル名も探す。
+      # このアクションも公式のチェックサム一覧を取得するため、スクリプトと同じ
+      # 実行条件を付ける。条件は上のステップの出力だけを根拠にし、ここには書かない
+      - name: Validate wrapper jar
+        if: steps.wrapper.outputs.relevant == 'true'
+        uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0

@@ -60,10 +60,12 @@ run_check() {
     git add -A && git commit -qm head --allow-empty
     : >"$WORK/calls.log"
     : >"$WORK/summary.md"
+    : >"$WORK/output.txt"
     printf '%s\n' "$sha" >"$WORK/sha.txt"
     PATH="$WORK/bin:$PATH" \
         STUB_CALLS="$WORK/calls.log" STUB_SHA="$WORK/sha.txt" \
         GRADLE_DIST_HOST="$HOST" GITHUB_STEP_SUMMARY="$WORK/summary.md" \
+        GITHUB_OUTPUT="$WORK/output.txt" \
         bash "$SCRIPT" "$BASE" "$(git rev-parse HEAD)" >/dev/null 2>&1
     got=$?
     if [ "$got" -eq "$want" ]; then
@@ -101,6 +103,16 @@ check_calls() {
     fi
 }
 
+# ワークフローの jar 照合ステップが使う実行条件の出力を検証する
+check_output() {
+    if grep -qF "relevant=$1" "$WORK/output.txt"; then
+        echo "PASS: $2"
+    else
+        echo "FAIL: $2 (出力に 'relevant=$1' が現れない)"
+        FAILED=1
+    fi
+}
+
 # --- 変更を加える関数 -----------------------------------------------------------
 touch_unrelated() { echo "changed" >src/main.txt; }
 touch_wrapper_noop() { printf '\n# comment\n' >>backend/gradle/wrapper/gradle-wrapper.properties; }
@@ -125,6 +137,7 @@ seed
 touch_unrelated
 run_check 0 "wrapper 関連の変更がなければ成功する" "$OFFICIAL"
 check_no_calls "対象外の差分では外部へ問い合わせない"
+check_output false "対象外のとき実行条件を false で出力する"
 
 seed
 touch_wrapper_noop
@@ -135,6 +148,7 @@ seed
 add_jar_outside
 run_check 0 "wrapper ディレクトリ外の jar 追加でも検査が走る" "$OFFICIAL"
 check_calls "ディレクトリ外の jar でも外部へ問い合わせる"
+check_output true "対象のとき実行条件を true で出力する"
 
 echo "--- 検査1: 配布元のホスト ---"
 seed
