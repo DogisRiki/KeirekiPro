@@ -44,7 +44,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout PR head
+      # pull_request トリガで ref を指定しない場合、取得されるのは PR head ではなく
+      # main へのマージ結果。依存解決の対象としてはそちらが正しい
+      - name: Checkout merge commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Java
@@ -94,8 +96,8 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Checkout PR head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # checkout しない。dependency-review-action はAPIのみで動作し、
+      # リポジトリの中身を読まないため(config-file にローカルパスを渡す場合は必要)
 
       # base と head の依存グラフを比較し、このPRで新しく増えた脆弱性だけを落とす。
       # 既存の依存に対しては赤にならない。
