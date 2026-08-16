@@ -284,66 +284,42 @@ keirekipro/
 
 本プロジェクトでは、AIコーディングエージェントのClaude Codeが実装からマージまでを担う、自動化された開発パイプラインを採用しています。人間はコードそのものをレビューせず、仕様の判断とリリースの判断に専念します。コードの品質は、テスト・静的解析・カバレッジ基準・別のAIによるレビューといった自動チェックの積み重ねで担保します。
 
-開発の流れは次の図の通りです。人間が登場するのは、Issueの起票・仕様書の承認・影響の大きい変更の承認・デプロイ前のローカル確認・デプロイの実行の5箇所だけです。
+開発の流れは次のとおりです。人間が手を動かすのは青の4箇所だけで、それ以外はAIと自動チェックが進めます。
 
 ```mermaid
-sequenceDiagram
-    actor Human as 人間
-    participant Claude as Claude Code<br/>開発を担当するAI
-    participant CI as 自動チェック<br/>GitHub ActionsのCI
-    participant Codex as Codex<br/>レビューを担当する別のAI
-    participant Prod as 本番環境
+flowchart LR
+    H1["👤 人間<br/>Issueで依頼"]
+    A1["🤖 AI<br/>仕様書を作成"]
+    H2["👤 人間<br/>要件・設計・タスクを<br/>3段階で承認"]
+    A2["🤖 AI<br/>実装・テスト・PR作成"]
+    C1["⚙️ 自動チェック<br/>品質・検査回避・脆弱性・<br/>別AIのレビュー"]
+    H4["👤 人間<br/>承認"]
+    M["✅ 自動マージ"]
+    H3["👤 人間<br/>動作確認して<br/>リリース実行"]
 
-    Human->>Claude: タイトルと1〜2行の説明でGitHubにIssueを作成し、Claude CodeにIssue番号を伝えて対応を依頼する
+    H1 --> A1 --> H2 --> A2 --> C1 --> M --> H3
+    C1 -->|影響の大きい変更のみ| H4 --> M
+    H1 -.小修正は仕様書なしで直接.-> A2
 
-    alt 新機能や大きな変更のとき
-        Human->>Claude: Claude Codeで /kiro-spec-init を実行して仕様づくりを始める
-        Claude->>Human: .kiro/specs/ に仕様の雛形を作成する(requirements.mdは説明文のみで要件は未記入)
-        Human->>Claude: /kiro-spec-requirements を実行して要件を作成させる
-        Claude->>Human: 要件の文書 requirements.md を作成して確認を求める
-        Human-->>Claude: 要件を確認し、/kiro-spec-design を実行して承認する
-        Claude->>Human: 設計の文書 design.md を作成して確認を求める
-        Human-->>Claude: 設計を確認し、/kiro-spec-tasks を実行して承認する
-        Claude->>Human: タスクの文書 tasks.md を作成して確認を求める
-        Human-->>Claude: タスクを確認し、/kiro-impl を実行して実装を開始する
-    else 小規模な修正のとき(コード差分200行以内)
-        Claude->>Claude: 仕様書は作成せず、Issueとコードベースを読んで実装方針を決める
-    end
-
-    rect rgb(232, 240, 254)
-        Note over Claude,Codex: ここからマージまでは全自動。人間はマージに関与しない
-        Claude->>Claude: 実装し、/verify-all でテスト・静的解析・カバレッジを検証する
-        Claude->>CI: /ship を実行し、コミットとpushを経てプルリクエストを作成し、auto-mergeを予約する
-        CI-->>Claude: テスト・検査回避の検知・シークレットスキャンの結果を返す
-        loop 指摘が無くなるまで、最大5往復
-            Codex->>Claude: コード品質と仕様への適合をレビューし、PRコメントで指摘を返す
-            Claude->>Codex: /review-loop で指摘を修正してpushし、再レビューを受ける
-        end
-    end
-
-    alt レビューが収束したとき
-        alt DBマイグレーション・依存ライブラリの追加・チェック設定の変更・Issueに付けた pre-merge-check ラベルを含むとき
-            CI->>Human: 該当の必須チェックが人間の承認待ちとなり、マージが保留される
-            Human->>Human: DBマイグレーションを含むときは、対象ブランチを ./start-dev.sh でローカル起動して適用と動作を確認する
-            Human->>Human: pre-merge-check ラベルのときは、対象ブランチを ./start-dev.sh でローカル起動して画面を確認する
-            Human-->>CI: GitHubのプルリクエスト画面で Review changes から Approve する
-            CI->>CI: 必須チェックがすべて成功したことを確認し、auto-mergeでmainブランチへ取り込む
-        else 通常の変更のとき
-            CI->>CI: 必須チェックがすべて成功したことを確認し、auto-mergeでmainブランチへ取り込む
-        end
-    else レビューが5往復で決着しないとき
-        CI->>Human: 6回目以降はレビューを実行せず、打ち切りのコメントを出してチェックを赤のままにする
-        Claude->>Human: 作業セッションで停止し、Codexとの対立点を要約して報告する
-        Human-->>Claude: .kiro/specs/ の仕様書とPRコメントの往復履歴を読み、仕様の差し戻し・タスクの分割・PR破棄のどれかをClaude Codeに指示する
-        Note over Claude,Human: いずれの場合もこのプルリクエストは閉じ、新しいブランチでやり直す
-    end
-
-    rect rgb(255, 243, 224)
-        Note over Human,Prod: マージだけでは本番に反映されない。ここから先は人間だけが実行できる
-        Human->>Human: mainブランチを ./start-dev.sh でローカル起動し、実際に触って動作を確認する
-        Human->>Prod: GitHubのActionsタブから Production Release を実行して本番にデプロイする
-    end
+    classDef human fill:#dbeafe,stroke:#1d4ed8
+    classDef ai fill:#f3e8ff,stroke:#7c3aed
+    classDef auto fill:#dcfce7,stroke:#15803d
+    class H1,H2,H3,H4 human
+    class A1,A2 ai
+    class C1,M auto
 ```
+
+青 = 人間、紫 = AI、緑 = 自動。マージまでのコード作業に人間は一切関与せず、本番反映は人間の手動実行だけが行えます。
+
+仕様づくりは、AIが書いた文書を確認しながらチャットのコマンドで進めます。コマンドの実行がそのまま前段階の承認になります。
+
+| 順 | 操作 | 起きること |
+|---|---|---|
+| 1 | `/kiro-spec-init #Issue番号` | AIがIssueを読んで説明文を組み立て、`.kiro/specs/{feature名}/` を用意してfeature名を知らせる |
+| 2 | `/kiro-spec-requirements {feature名}` | AIが要件(requirements.md)を書く → 内容を確認する |
+| 3 | `/kiro-spec-design {feature名}` | 要件を承認したことになり、AIが設計(design.md)を書く → 内容を確認する |
+| 4 | `/kiro-spec-tasks {feature名}` | 設計を承認したことになり、AIがタスク(tasks.md)を書く → 内容を確認する |
+| 5 | `/kiro-impl {feature名}` | タスクを承認したことになり、AIが実装を始める。以降マージまで自動で進む |
 
 運用の詳細は次のドキュメントにまとめています。
 
