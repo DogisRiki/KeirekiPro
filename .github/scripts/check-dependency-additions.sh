@@ -5,11 +5,24 @@
 # 判定: 対象の変更あり かつ 所有者のApproveなし -> exit 1(赤)。それ以外は exit 0(緑)
 #
 # 判定対象(いずれも「変更されたこと自体」を見る。中身は解析しない):
-#   - frontend の依存定義ファイル
-#     (package.json / pnpm-lock.yaml / pnpm-workspace.yaml / .npmrc / .pnpmfile.cjs / .pnpmfile.mjs)
-#   - backend のビルド定義ファイル
-#     (*.gradle / *.gradle.kts / *.versions.toml / gradle-wrapper.properties。
-#     wrapperを含めるのは、Gradle本体の配布物が変われば実行されるコードも変わるため)
+#   - frontend の取得元と防御設定
+#     (pnpm-workspace.yaml / .npmrc / .pnpmfile.cjs / .pnpmfile.mjs)
+#   - backend のビルドスクリプト
+#     (*.gradle / *.gradle.kts。取得元の定義 repositories {} を含むため)
+#
+# 判定対象から外したもの(#182 で機械の関門に置き換えた):
+#   - frontend/package.json / frontend/pnpm-lock.yaml
+#   - backend の version catalog(*.versions.toml)
+#   - backend/gradle/wrapper/gradle-wrapper.properties
+#
+#   これらは依存のバージョン宣言であり、次の3つが承認の代わりを務める。
+#     - dependency-review: このPRで新しく増えた脆弱性を落とす
+#     - dependency-cooldown: 公開から72時間を経過していないパッケージを落とす
+#     - gradle-wrapper: 配布元のホストと公表チェックサムの一致を検証する
+#
+#   残した対象にはこれらの関門が効かない。dependency-review はレジストリを検証せず、
+#   pnpm-workspace.yaml は overrides と供給網対策の設定そのものを含み、
+#   ビルドスクリプトは任意コードで取得元の定義を持つ。
 #
 # なぜ中身を解析しないのか:
 #   backend では以前、正規表現で依存座標とプラグインIDを抽出していたが、Gradleのビルド定義は
@@ -27,11 +40,6 @@
 #   2026-03-31 の axios 改ざんは、悪意あるコードが推移的依存として入った事例であり、
 #   キー集合の比較では検知できない。
 #
-# 報告について:
-#   pnpm-lock.yaml から新しく増えたパッケージ名を抽出してSummaryに出す。所有者が承認する
-#   ときに見るべきものを提供するためのもので、判定には一切使わない。解析に漏れがあっても
-#   ゲートは緩まない(判定はファイルが変更されたかどうかで既に決まっている)。
-#
 # テスト: .github/scripts/tests/test-check-dependency-additions.sh
 # 環境変数: OWNER_APPROVED が "true" ならリポジトリ所有者のApprove済み
 # 使い方: check-dependency-additions.sh <base_sha> <head_sha>
@@ -48,54 +56,21 @@ detected=""
 
 # --- 変更されたこと自体を検知する対象(grep は -q 無しで全入力を読む) ---
 changed_frontend=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
-    grep -E '^frontend/(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.(c|m)?js)$' || true)
+    grep -E '^frontend/(pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.(c|m)?js)$' || true)
 if [ -n "$changed_frontend" ]; then
-    detected+="[変更された frontend の依存定義ファイル]"$'\n'"$changed_frontend"$'\n'
+    detected+="[変更された frontend の取得元・防御設定]"$'\n'"$changed_frontend"$'\n'
 fi
 
 changed_build=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
-    grep -E '^backend/(.*\.(gradle|gradle\.kts|versions\.toml)|gradle/wrapper/gradle-wrapper\.properties)$' || true)
+    grep -E '^backend/.*\.(gradle|gradle\.kts)$' || true)
 if [ -n "$changed_build" ]; then
-    detected+="[変更された backend のビルド定義ファイル]"$'\n'"$changed_build"$'\n'
+    detected+="[変更された backend のビルドスクリプト]"$'\n'"$changed_build"$'\n'
 fi
 
 if [ -z "$detected" ]; then
     echo "承認が必要な変更なし。"
     exit 0
 fi
-
-# --- 報告用: pnpm-lock.yaml に新しく現れたパッケージ名(判定には使わない) ---
-# packages: セクションのキー "  name@version:" から name を取り出す。
-# スコープ付き("@scope/pkg@1.0.0")に対応するため、最後の @ より前を名前とする。
-# スコープ付きの名前は lockfile 上で '...' と引用されるため、引用符を剥がしてから返す
-# (剥がさないと、承認者が一覧の名前をそのまま npm で検索しても見つからない)。
-lock_names() {
-    awk -v q="'" '/^packages:/ { inpkg = 1; next }
-         /^[a-z]/ { inpkg = 0 }
-         inpkg && /^  [^ ].*:$/ {
-             line = $0
-             sub(/^  /, "", line)
-             sub(/:$/, "", line)
-             sub("^" q, "", line)
-             sub(q "$", "", line)
-             pos = 0
-             for (i = length(line); i > 1; i--) {
-                 if (substr(line, i, 1) == "@") { pos = i; break }
-             }
-             if (pos > 1) { print substr(line, 1, pos - 1) }
-         }' | sort -u
-}
-
-case "$changed_frontend" in
-*frontend/pnpm-lock.yaml*)
-    base_names=$(git show "$MERGE_BASE:frontend/pnpm-lock.yaml" 2>/dev/null | lock_names || true)
-    head_names=$(git show "$HEAD_SHA:frontend/pnpm-lock.yaml" 2>/dev/null | lock_names || true)
-    new_names=$(comm -13 <(printf '%s\n' "$base_names") <(printf '%s\n' "$head_names") || true)
-    if [ -n "$new_names" ]; then
-        detected+="[pnpm-lock.yaml に新しく現れたパッケージ(報告のみ・判定には使わない)]"$'\n'"$new_names"$'\n'
-    fi
-    ;;
-esac
 
 {
     echo "### :package: 承認が必要な変更を検出"
