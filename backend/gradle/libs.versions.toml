@@ -1,41 +1,74 @@
 # =====================================================================
 # Gradle version catalog
 #
-# 現在はDependabotの拾い上げを確認するためのprobeのみを置いている。
-# 本移行(build.gradle の依存とプラグインのバージョンをここへ移す)は別PRで行う。
+# build.gradle に直書きしていた依存とプラグインのバージョンをここへ集約する。
 #
-# probeの目的は次の3点を実測することにある。
+# 目的は宣言と実行の分離にある。build.gradle はプログラムであり、静的解析で
+# 「バージョンだけの変更」と「ビルドロジックの変更」を区別することが原理的にできない。
+# TOMLは純粋な宣言なのでその区別が要らず、ゲートの扱いを分けられる。
 #
-# 1. dependabot-core が backend/gradle/libs.versions.toml を認識するか
-#    file_fetcher.rb の SUPPORTED_VERSION_CATALOG_FILE_PATH は /gradle/libs.versions.toml で
-#    固定されており、version_catalog_file に `return nil unless root_dir == "."` がある。
-#    エントリポイントの fetch_files は必ず all_buildfiles_in_build(".") から始まり、
-#    root_dir が "." 以外になるのは included_builds への再帰時だけなので、
-#    directory: "/backend" のレーンでは拾われるはずだが、実測で確かめる
+#   このファイル      : 宣言。人間の承認を外す対象
+#   build.gradle 等   : プログラム。取得先(repositories)の定義を含むため承認を残す
 #
-# 2. version.ref 形式のライブラリを更新できるか
-#    file_parser.rb は version が Hash のとき "$<ref名>" というプロパティ参照として扱う。
-#    本移行では flyway のバージョンを buildscript の classpath と plugins の両方から
-#    参照して単一管理にするため、この形式が更新対象になることが前提になる
+# バージョンを書く場所はこのファイルだけにする。build.gradle に versionを直書きすると
+# 承認が必要な側に戻ってしまう。
 #
-# 3. 更新PRが [versions] と [libraries] のどちらの行を書き換えるか
-#    プロパティ参照の実体を書き換えないと更新が成立しないため [versions] 側になるはずだが、
-#    一次情報では確定できなかった。実際のPRの差分で確認する
+# flyway は buildscript の classpath と plugins の両方が同じバージョンを要求する。
+# [versions] の1箇所を参照させることで、2箇所がずれることを構造的に防いでいる。
+# buildscript ブロックから参照できるのは [versions] だけで、[libraries] と [bundles] は
+# 参照できない(gradle/gradle#18105)。flyway に必要なのはバージョンの単一管理なので成立する。
 #
-# probeの選定条件:
-#   - どこからも参照しない(依存グラフに載らず、ビルドにも影響しない)
-#   - 最新版が3日以上前に公開済み(Dependabotの既定クールダウンを満了している)
-#   - メジャー更新にならない(gradleレーンは semver-major を ignore しているため)
-#   - 固定する版に既知の脆弱性が無い
-#
-# org.slf4j:slf4j-api 2.0.16 は 2024-08-10 公開で、2.0.18 への更新はパッチ相当。
-# アドバイザリは1件も登録されていない。
-#
-# 確認後、本移行のPRでこのprobeは削除する。
+# Dependabotの挙動は PR #184 のprobeで実測済み。
+#   - backend/gradle/libs.versions.toml を認識する(directory: "/backend" のレーン)
+#   - version.ref 形式のエントリを更新できる
+#   - 更新PRは [versions] の行を書き換える([libraries] / [plugins] の行は変えない)
 # =====================================================================
 
 [versions]
-probe-slf4j = "2.0.16"
+# プラグイン
+spring-boot = "3.5.16"
+spring-dependency-management = "1.1.7"
+spotless = "7.2.1"
+spotbugs = "6.5.10"
+pitest = "1.19.0"
+# buildscript の classpath と plugins の両方から参照する。ずれを防ぐため1箇所にする
+flyway = "10.22.0"
+
+# 依存
+mybatis-spring-boot = "3.0.5"
+archunit = "1.5.0"
+springdoc = "2.9.0"
+openhtmltopdf = "1.0.10"
+java-jwt = "4.6.0"
+spring-cloud-aws = "3.4.2"
+testcontainers = "1.21.4"
+freemarker = "2.3.34"
+commons-validator = "1.11.0"
+mybatis-postgresql-typehandlers = "1.0.2"
 
 [libraries]
-probe-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "probe-slf4j" }
+# Flyway Gradleプラグイン(10系)がDB別モジュールをbuildscriptクラスパスに要求するためのもの。
+# implementation 側の flyway-core / flyway-database-postgresql は Spring Boot のBOM管理下にあり
+# バージョンを持たないため、ここには含めない
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+
+mybatis-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter", version.ref = "mybatis-spring-boot" }
+mybatis-test-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter-test", version.ref = "mybatis-spring-boot" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+openhtmltopdf-core = { module = "com.openhtmltopdf:openhtmltopdf-core", version.ref = "openhtmltopdf" }
+openhtmltopdf-pdfbox = { module = "com.openhtmltopdf:openhtmltopdf-pdfbox", version.ref = "openhtmltopdf" }
+java-jwt = { module = "com.auth0:java-jwt", version.ref = "java-jwt" }
+spring-cloud-aws-dependencies = { module = "io.awspring.cloud:spring-cloud-aws-dependencies", version.ref = "spring-cloud-aws" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+freemarker = { module = "org.freemarker:freemarker", version.ref = "freemarker" }
+commons-validator = { module = "commons-validator:commons-validator", version.ref = "commons-validator" }
+mybatis-postgresql-typehandlers = { module = "com.github.onozaty:mybatis-postgresql-typehandlers", version.ref = "mybatis-postgresql-typehandlers" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+spotbugs = { id = "com.github.spotbugs", version.ref = "spotbugs" }
+pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
+flyway = { id = "org.flywaydb.flyway", version.ref = "flyway" }

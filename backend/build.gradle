@@ -1,24 +1,29 @@
-// Flyway Gradleプラグイン(10系)はDB別モジュールをbuildscriptクラスパスに要求する
+// Flyway Gradleプラグイン(10系)はDB別モジュールをbuildscriptクラスパスに要求する。
+// バージョンは gradle/libs.versions.toml の [versions] flyway を参照し、
+// 下の plugins ブロックと同じ値になるようにしている。
+// buildscript から参照できるのは [versions] だけで、[libraries] は参照できない
+// (gradle/gradle#18105)。
 buildscript {
     repositories {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.flywaydb:flyway-database-postgresql:10.22.0'
+        classpath "org.flywaydb:flyway-database-postgresql:${libs.versions.flyway.get()}"
     }
 }
 
+// バージョンは gradle/libs.versions.toml に集約している。ここに version を直書きしない
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.16'
-    id 'io.spring.dependency-management' version '1.1.7'
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
     id 'checkstyle'
     id 'jacoco'
     id 'pmd'
-    id 'com.diffplug.spotless' version '7.2.1'
-    id 'com.github.spotbugs' version '6.5.10'
-    id 'info.solidsoft.pitest' version '1.19.0'
-    id 'org.flywaydb.flyway' version '10.22.0'
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.spotbugs)
+    alias(libs.plugins.pitest)
+    alias(libs.plugins.flyway)
 }
 
 group = 'com.example'
@@ -59,7 +64,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
+    implementation libs.mybatis.starter
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -68,31 +73,31 @@ dependencies {
         // JUnit Vintage（JUnit4）を除外
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
-    testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5'
+    testImplementation libs.mybatis.test.starter
     testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.0'
+    testImplementation libs.archunit.junit5
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.0'
-    implementation 'com.openhtmltopdf:openhtmltopdf-core:1.0.10'
-    implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
-    implementation 'com.auth0:java-jwt:4.6.0'
+    implementation libs.springdoc.openapi.starter.webmvc.ui
+    implementation libs.openhtmltopdf.core
+    implementation libs.openhtmltopdf.pdfbox
+    implementation libs.java.jwt
 
-    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.4.2')
+    implementation platform(libs.spring.cloud.aws.dependencies)
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-ses'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-secrets-manager'
 
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
+    testImplementation platform(libs.testcontainers.bom)
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:localstack'
-    implementation 'org.freemarker:freemarker:2.3.34'
-    implementation 'commons-validator:commons-validator:1.11.0'
-    implementation 'com.github.onozaty:mybatis-postgresql-typehandlers:1.0.2'
+    implementation libs.freemarker
+    implementation libs.commons.validator
+    implementation libs.mybatis.postgresql.typehandlers
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
