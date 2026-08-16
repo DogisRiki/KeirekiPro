@@ -1,5 +1,5 @@
 # =====================================================================
-# 依存の脆弱性をマージ前に止める関門(PR)
+# 依存の脆弱性とクールダウンをマージ前に止める関門(PR)
 #
 # backendの依存グラフは build.gradle を実行しないと作れず、GitHubへの送信には
 # contents: write が要る。素直に書くと「PRが持ち込んだビルドスクリプトを
@@ -7,17 +7,18 @@
 #
 #   generate: build.gradle を実行する。contents: read のみ
 #   submit  : スナップショットを送るだけ。Gradleもcheckoutも実行しない
-#   review  : 送信完了後に base と head の依存グラフを差分比較する
+#   review  : 送信完了後に base と head の依存グラフを差分比較し、脆弱性を見る
+#   cooldown: 同じ差分から、追加されたパッケージの公開経過時間を見る
 #
-# needs で直列化しているため、送信前にレビューが走る競合は構造的に起きない。
+# needs で直列化しているため、送信前に後段が走る競合は構造的に起きない。
 #
 # paths フィルタは付けない。ワークフローごとスキップされた場合、required status
 # check は Pending のまま残りマージがブロックされるため(ジョブ単位のスキップは
 # Success 扱いになるのとは挙動が異なる)。
 #
-# required status check には generate / submit / review の3つすべてを指定する。
-# 1つでも外すと、そのジョブが失敗したときに後続がスキップ(= Success 扱い)になり、
-# 検査されないままマージされる。
+# required status check には generate / submit / review / cooldown の4つすべてを
+# 指定する。1つでも外すと、そのジョブが失敗したときに後続がスキップ
+# (= Success 扱い)になり、検査されないままマージされる。
 #
 # baseブランチ側のスナップショットは dependency-graph.yaml がmainへのpushで送る。
 # mainで最低1回それが走るまで、Gradle側のレビューは機能しない。
@@ -114,3 +115,50 @@ jobs:
           fail-on-scopes: runtime,development
           comment-summary-in-pr: on-failure
           retry-on-snapshot-warnings: true
+
+  cooldown:
+    name: dependency-cooldown
+    needs: [generate, submit]
+    runs-on: ubuntu-latest
+    # 対象外にする条件が review ジョブと異なる。
+    #
+    # 依存更新の自動化が作成したPRは対象外にする。バージョン更新には自動化側の
+    # 既定クールダウンが効いており二重になる。脆弱性対応の更新にはクールダウンが
+    # 適用されないため、一律に適用すると修正のマージを最大72時間遅らせることになる。
+    #
+    # フォークPRも対象外になる。submit がスキップされ head 側のスナップショットが
+    # 無いため、追加されたパッケージを特定する経路そのものが成立しない。
+    # ここでは submit の成功を要求することでそれを表す(review は submit が
+    # スキップでも frontend を検査できるため条件が緩い)。
+    if: >-
+      ${{ !cancelled()
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+      && needs.generate.result == 'success'
+      && needs.submit.result == 'success' }}
+    permissions:
+      contents: read
+    steps:
+      # 検査スクリプトを取得するために checkout する。判定は依存グラフの差分比較API
+      # だけを入力にするため、履歴の深さは要らない
+      - name: Checkout PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # 判定スクリプト自身のテスト。落ちた場合は検査も失敗させる(fail-closed)。
+      # 外部への問い合わせはスタブするためネットワークを必要としない
+      - name: Test dependency cooldown check
+        run: bash .github/scripts/tests/test-check-dependency-cooldown.sh
+
+      # 比較する2点は dependency-review-action の既定と揃える。送信された
+      # スナップショットがこの2点に対応していることは、同じrunのreviewジョブが
+      # 追加パッケージを検出できている実績で確認できる
+      - name: Check dependency cooldown
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x .github/scripts/check-dependency-cooldown.sh
+          .github/scripts/check-dependency-cooldown.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
