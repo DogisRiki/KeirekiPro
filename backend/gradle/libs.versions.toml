@@ -1,0 +1,41 @@
+# =====================================================================
+# Gradle version catalog
+#
+# 現在はDependabotの拾い上げを確認するためのprobeのみを置いている。
+# 本移行(build.gradle の依存とプラグインのバージョンをここへ移す)は別PRで行う。
+#
+# probeの目的は次の3点を実測することにある。
+#
+# 1. dependabot-core が backend/gradle/libs.versions.toml を認識するか
+#    file_fetcher.rb の SUPPORTED_VERSION_CATALOG_FILE_PATH は /gradle/libs.versions.toml で
+#    固定されており、version_catalog_file に `return nil unless root_dir == "."` がある。
+#    エントリポイントの fetch_files は必ず all_buildfiles_in_build(".") から始まり、
+#    root_dir が "." 以外になるのは included_builds への再帰時だけなので、
+#    directory: "/backend" のレーンでは拾われるはずだが、実測で確かめる
+#
+# 2. version.ref 形式のライブラリを更新できるか
+#    file_parser.rb は version が Hash のとき "$<ref名>" というプロパティ参照として扱う。
+#    本移行では flyway のバージョンを buildscript の classpath と plugins の両方から
+#    参照して単一管理にするため、この形式が更新対象になることが前提になる
+#
+# 3. 更新PRが [versions] と [libraries] のどちらの行を書き換えるか
+#    プロパティ参照の実体を書き換えないと更新が成立しないため [versions] 側になるはずだが、
+#    一次情報では確定できなかった。実際のPRの差分で確認する
+#
+# probeの選定条件:
+#   - どこからも参照しない(依存グラフに載らず、ビルドにも影響しない)
+#   - 最新版が3日以上前に公開済み(Dependabotの既定クールダウンを満了している)
+#   - メジャー更新にならない(gradleレーンは semver-major を ignore しているため)
+#   - 固定する版に既知の脆弱性が無い
+#
+# org.slf4j:slf4j-api 2.0.16 は 2024-08-10 公開で、2.0.18 への更新はパッチ相当。
+# アドバイザリは1件も登録されていない。
+#
+# 確認後、本移行のPRでこのprobeは削除する。
+# =====================================================================
+
+[versions]
+probe-slf4j = "2.0.16"
+
+[libraries]
+probe-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "probe-slf4j" }
