@@ -1,0 +1,29 @@
+{
+  "feature_name": "machine-gated-dependency-updates",
+  "issue": 182,
+  "created_at": "2026-08-16T02:42:17Z",
+  "updated_at": "2026-08-16T03:58:00Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-08-16T03:35:00Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-08-16T03:50:00Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-08-16T03:58:00Z"
+    }
+  },
+  "ready_for_implementation": true
+}
