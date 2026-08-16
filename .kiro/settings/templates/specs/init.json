@@ -1,5 +1,6 @@
 {
   "feature_name": "{{FEATURE_NAME}}",
+  "issue": {{ISSUE_NUMBER}},
   "created_at": "{{TIMESTAMP}}",
   "updated_at": "{{TIMESTAMP}}",
   "language": "ja",

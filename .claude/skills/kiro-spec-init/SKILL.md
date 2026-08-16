@@ -2,7 +2,7 @@
 name: kiro-spec-init
 description: Initialize a new specification with detailed project description
 allowed-tools: Bash, Read, Write, Glob, AskUserQuestion
-argument-hint: <project-description>
+argument-hint: <project-description | #issue-number>
 ---
 
 # Spec Initialization
@@ -12,8 +12,9 @@ argument-hint: <project-description>
 Generate a unique feature name from the project description ($ARGUMENTS) and initialize the specification structure.
 
 ## Execution Steps
+0. **Resolve Issue Reference**: If $ARGUMENTS is (or contains) a GitHub Issue reference such as `#182`, fetch the issue with `gh issue view <number>` and construct the project description from its title and body before proceeding.
 1. **Check for Brief**: If `.kiro/specs/{feature-name}/brief.md` exists (created by `/kiro-discovery`), read it. The brief contains problem, approach, scope, and constraints from the discovery session. Use this to pre-fill the project description and skip clarification questions that the brief already answers.
-2. **Clarify Intent**: The Project Description in requirements.md must contain three elements: (a) who has the problem, (b) current situation, (c) what should change. If a brief.md exists and covers these, skip to step 3. Otherwise, ask the user to clarify before proceeding. Ask as many questions as needed; do not fill in gaps with your own assumptions.
+2. **Clarify Intent**: The Project Description in requirements.md must contain three elements: (a) who has the problem, (b) current situation, (c) what should change. If a brief.md or the referenced Issue covers these, skip to step 3. Otherwise, ask the user to clarify before proceeding. Ask as many questions as needed; do not fill in gaps with your own assumptions.
 3. **Check Uniqueness**: Verify `.kiro/specs/` for naming conflicts. If the directory already exists with only `brief.md` (no `spec.json`), use that directory (discovery created it).
 4. **Create Directory**: `.kiro/specs/[feature-name]/` (skip if already exists from discovery)
 5. **Initialize Files Using Templates**:
@@ -21,6 +22,7 @@ Generate a unique feature name from the project description ($ARGUMENTS) and ini
    - Read `.kiro/settings/templates/specs/requirements-init.md`
    - Replace placeholders:
      - `{{FEATURE_NAME}}` → generated feature name
+     - `{{ISSUE_NUMBER}}` → the GitHub Issue number resolved in step 0, or `null` if no issue was referenced. This ties issue → spec → PR (`Refs:` / `Closes:`) together with one number
      - `{{TIMESTAMP}}` → current ISO 8601 timestamp
      - `{{PROJECT_DESCRIPTION}}` → from brief.md if available, otherwise $ARGUMENTS
      - `ja` → language code (detect from user's input language, default to `en`)
