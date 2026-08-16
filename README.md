@@ -55,7 +55,7 @@ flowchart LR
     PR[プルリクエスト<br>Claude Code または Dependabot]
 
     subgraph s1[系統1: 品質の検査]
-        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク]
+        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>依存の脆弱性検査]
     end
     subgraph s2[系統2: ずるの検査]
         Z[検査回避の検知・差分サイズ・<br>シークレットスキャン・<br>ワークフローの静的検証]
@@ -86,6 +86,8 @@ flowchart LR
 |---|---|---|---|
 | 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。mainへのpush時はデプロイ用成果物を保存 |
 | 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査(AWS認証不要)と、Terraform Planの実行および結果のPRコメント。terraform関連の変更が無いPRでは各ジョブをスキップする |
+| 品質の検査 | dependency-review.yaml | pull_request | 依存の脆弱性検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性だけを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
+| 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする |
 | ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | フロントエンドの依存定義ファイル(lockfileとoverridesを含む)とバックエンドのビルド定義ファイルの変更を検知し、リポジトリ所有者が承認するまでマージを保留 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |

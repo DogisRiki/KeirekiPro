@@ -1,0 +1,116 @@
+# =====================================================================
+# 依存の脆弱性をマージ前に止める関門(PR)
+#
+# backendの依存グラフは build.gradle を実行しないと作れず、GitHubへの送信には
+# contents: write が要る。素直に書くと「PRが持ち込んだビルドスクリプトを
+# 書き込み権限付きトークンの下で実行する」構成になるため、ジョブを分ける。
+#
+#   generate: build.gradle を実行する。contents: read のみ
+#   submit  : スナップショットを送るだけ。Gradleもcheckoutも実行しない
+#   review  : 送信完了後に base と head の依存グラフを差分比較する
+#
+# needs で直列化しているため、送信前にレビューが走る競合は構造的に起きない。
+#
+# paths フィルタは付けない。ワークフローごとスキップされた場合、required status
+# check は Pending のまま残りマージがブロックされるため(ジョブ単位のスキップは
+# Success 扱いになるのとは挙動が異なる)。
+#
+# required status check には generate / submit / review の3つすべてを指定する。
+# 1つでも外すと、そのジョブが失敗したときに後続がスキップ(= Success 扱い)になり、
+# 検査されないままマージされる。
+#
+# baseブランチ側のスナップショットは dependency-graph.yaml がmainへのpushで送る。
+# mainで最低1回それが走るまで、Gradle側のレビューは機能しない。
+#
+# 参照: https://github.com/gradle/actions/blob/main/docs/dependency-submission.md
+# =====================================================================
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: dependency-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    name: dependency-graph-generate
+    runs-on: ubuntu-latest
+    # 信頼できないビルドスクリプトを実行するジョブ。書き込み権限を持たせない
+    permissions:
+      contents: read
+    steps:
+      # pull_request トリガで ref を指定しない場合、取得されるのは PR head ではなく
+      # main へのマージ結果。依存解決の対象としてはそちらが正しい
+      - name: Checkout merge commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # 依存解決のみを行い、ビルドとテストは実行しない。
+      # 生成したスナップショットはアーティファクトとして保存し、送信は次のジョブが行う
+      - name: Generate dependency graph
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          build-root-directory: backend
+          dependency-graph: generate-and-upload
+
+  submit:
+    name: dependency-graph-submit
+    needs: generate
+    runs-on: ubuntu-latest
+    # フォークPRでは GITHUB_TOKEN がrun全体で読み取り専用になり送信できないため、
+    # 同一リポジトリのPRに限定する。スキップされたジョブは Success として報告され
+    # required status check を満たすので、フォークPRが赤で止まることはない。
+    # 代わりにフォークPRのGradle差分は未検査になる(受容済み)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      # checkout しない。信頼できないコードを一切実行せず、
+      # アーティファクトを取得してAPIへ送るだけにする
+      - name: Submit dependency graph
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          dependency-graph: download-and-submit
+
+  review:
+    name: dependency-review
+    needs: [generate, submit]
+    runs-on: ubuntu-latest
+    # submit がスキップ(フォークPR)でも走らせる。if を明示しない限り、
+    # スキップされたジョブに依存するジョブもスキップされるため。
+    # generate は成功を明示的に要求する。generate が失敗すると submit は
+    # skipped になり、skipped は failure ではないので条件をすり抜けるため
+    if: ${{ !cancelled() && needs.generate.result == 'success' && needs.submit.result != 'failure' }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # checkout しない。dependency-review-action はAPIのみで動作し、
+      # リポジトリの中身を読まないため(config-file にローカルパスを渡す場合は必要)
+
+      # base と head の依存グラフを比較し、このPRで新しく増えた脆弱性だけを落とす。
+      # 既存の依存に対しては赤にならない。
+      #
+      # fail-on-scopes に development を含めるのは、既定の runtime だけだと
+      # 開発依存の推移的パッケージを見逃すため(#130 で解消した7件がそれに当たる)。
+      # comment-summary-in-pr は pull-requests: write を要求する。
+      # retry-on-snapshot-warnings は、同一ワークフロー化しても
+      # スナップショットの取り込み自体は非同期であることに対する保険
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          fail-on-scopes: runtime,development
+          comment-summary-in-pr: on-failure
+          retry-on-snapshot-warnings: true
