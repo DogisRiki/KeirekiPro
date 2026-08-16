@@ -298,7 +298,7 @@ sequenceDiagram
 
     alt 新機能や大きな変更のとき
         Human->>Claude: Claude Codeで /kiro-spec-init を実行して仕様づくりを始める
-        Claude->>Human: .kiro/specs/ に仕様の雛形(spec.jsonと空のrequirements.md)を作成する
+        Claude->>Human: .kiro/specs/ に仕様の雛形を作成する(requirements.mdは説明文のみで要件は未記入)
         Human->>Claude: /kiro-spec-requirements を実行して要件を作成させる
         Claude->>Human: 要件の文書 requirements.md を作成して確認を求める
         Human-->>Claude: 要件を確認し、/kiro-spec-design を実行して承認する
