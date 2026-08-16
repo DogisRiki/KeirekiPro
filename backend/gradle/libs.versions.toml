@@ -35,7 +35,7 @@
 # =====================================================================
 
 [versions]
-probe-slf4j = "2.0.16"
+probe-slf4j = "2.0.18"
 
 [libraries]
 probe-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "probe-slf4j" }
