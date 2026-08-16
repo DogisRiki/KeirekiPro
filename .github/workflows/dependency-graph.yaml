@@ -1,0 +1,53 @@
+# =====================================================================
+# mainの依存グラフをGitHubへ送信する
+#
+# 目的は2つある。
+#
+# 1. dependency-review.yaml が比較する基準(base)側のスナップショットを用意する。
+#    これが無いとGradleの全依存が「新規」扱いになり、レビューが成立しない
+# 2. backendのDependabotアラートを有効にする。GitHubの依存グラフはGradleの
+#    静的解析に対応しておらず、送信しない限りMaven/Gradleのパッケージは
+#    1件も登録されない(アラートも出ない)
+#
+# mainのコードは承認済みなので、ここでは権限を分ける必要がない。
+# 単一ジョブで生成と送信をまとめて行う。
+#
+# paths フィルタは付けない。依存グラフはコミット単位で記録されるため、
+# backend以外の変更でmainが進んだときにスナップショットが欠けると、
+# その時点をbaseにするPRの比較対象が失われる。
+#
+# 参照: https://github.com/gradle/actions/blob/main/docs/dependency-submission.md
+# =====================================================================
+name: Dependency Graph
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: dependency-graph-main
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    name: dependency-graph-main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # dependency-graph の既定は generate-and-submit
+      - name: Generate and submit dependency graph
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          build-root-directory: backend
