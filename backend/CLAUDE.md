@@ -17,6 +17,23 @@ backend配下を変更するとき常に適用する。アーキテクチャ境�
 - 迷ったら: ビジネスルールはdomain、手順の編成はusecase、技術詳細はinfrastructure
 - 例外は `shared` の共通例外体系を使う。HTTPステータスへの変換はpresentationの責務
 
+## 依存とプラグインのバージョン
+
+バージョンは `gradle/libs.versions.toml`(version catalog)の `[versions]` に集約する。
+**`build.gradle` に version を直書きしない。**
+
+- 依存を追加するとき: `[versions]` と `[libraries]` にエントリを足し、`build.gradle` からは
+  `libs.<alias>` で参照する
+- プラグインを追加するとき: `[versions]` と `[plugins]` に足し、`alias(libs.plugins.<alias>)` で参照する
+- `buildscript` ブロックから参照できるのは `[versions]` だけ(`libs.versions.x.get()`)。
+  `[libraries]` と `[bundles]` は参照できない
+- flyway は `buildscript` の classpath と `plugins` の両方が同じ版を要求するため、
+  `[versions] flyway` の1箇所を両方から参照している。片方だけ書き換えない
+
+分離の理由は、`build.gradle` がプログラムであり「バージョンだけの変更」と
+「ビルドロジックの変更」を静的解析で区別できないため。TOMLは宣言なので区別でき、
+バージョン更新を人間の承認なしに通せる。直書きすると承認が必要な側に戻る。
+
 ## DBスキーマ変更(expand-contract規約)
 
 本番DBは1つだけでロールバックが困難なため、スキーマ変更は必ず後方互換を保つ2段階で行う:
