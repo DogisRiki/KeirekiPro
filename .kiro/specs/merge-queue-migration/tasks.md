@@ -115,7 +115,7 @@
   - _Boundary: dependabot-auto-merge.yaml_
 
 - [ ] 3. 文書の更新
-- [ ] 3.1 監査手順を更新する (P)
+- [x] 3.1 監査手順を更新する (P)
   - 週次項目6の「Update branch を押す」を削除する
   - キューが詰まった場合の手順を追加する(Remove from queue、gh CLIでは取り出せない、
     キュー無効化後は `gh pr merge --auto --squash` で予約し直す)
@@ -125,7 +125,7 @@
   - _Requirements: 6.1, 6.3_
   - _Boundary: 監査手順.md_
 
-- [ ] 3.2 README を更新する (P)
+- [x] 3.2 README を更新する (P)
   - ワークフロー一覧表とMermaid図を実態に合わせる
   - 完了条件: 図と表がマージ列を経由する流れを表している
   - _Requirements: 6.2_
@@ -173,6 +173,9 @@
 - 2.1〜2.3: `escape-hatch` と `size-check` は元々ジョブレベルの `if:` が無く、
   `!= 'merge_group'` を足すだけで `pull_request` と `pull_request_review` の
   両方が保持される。`== 'pull_request'` に限定してはいけない
+- 3.2: 改行コードの確認は `git ls-files --eol` を使う。`grep -c $''` は Git Bash の
+  テキストモードが CR を剥がすため常に0を返し、判定に使えない。Python で書き出すときは
+  `newline=""` で読み書きして元の改行を保つ(README だけが CRLF、他の文書は LF)
 - 2.8: `GITHUB_TOKEN` は `env:` で明示的に渡さない限り環境変数として存在しない。
   `gh` が `GH_TOKEN` 空のとき `GITHUB_TOKEN` へフォールバックする挙動はあるが、
   このワークフローにはフォールバック先が無く、鍵未登録ならトークン未設定のエラーで止まる。
