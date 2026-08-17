@@ -9,12 +9,23 @@
 #    静的解析に対応しておらず、送信しない限りMaven/Gradleのパッケージは
 #    1件も登録されない(アラートも出ない)
 #
-# mainのコードは承認済みなので、ここでは権限を分ける必要がない。
-# 単一ジョブで生成と送信をまとめて行う。
-#
 # paths フィルタは付けない。依存グラフはコミット単位で記録されるため、
 # backend以外の変更でmainが進んだときにスナップショットが欠けると、
 # その時点をbaseにするPRの比較対象が失われる。
+#
+# 生成と送信はジョブを分ける。依存解決が空でもアクションは exit 0 で終わるため、
+# 送信前に中身を確認する。空のスナップショットがbaseになると、以降のPRの
+# 脆弱性検査が「追加0件」で素通りし、backendのDependabotアラートも出なくなる。
+#
+# 分割が「ジョブ単位」なのはアクションの制約による。generate-and-upload は
+# 生成したJSONに処理済みマーカー(.processed)を付けるため、同一ジョブ内で
+# download-and-submit を続けると、ダウンロード後の検索がマーカー付きの
+# ファイルを除外して「送信対象0件」のまま緑で終わる(何も送信されない)。
+# 別ジョブなら作業ディレクトリが新しく、マーカーが存在しないため送信される。
+# dependency-review.yaml の generate / submit と同じ、アクションが想定する構成。
+#
+# mainのコードは承認済みなので、権限分離そのものが目的ではない
+# (dependency-review.yaml とは分割の理由が異なる)。
 #
 # 参照: https://github.com/gradle/actions/blob/main/docs/dependency-submission.md
 # =====================================================================
@@ -31,11 +42,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  submit:
-    name: dependency-graph-main
+  generate:
+    name: dependency-graph-main-generate
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,8 +57,33 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # dependency-graph の既定は generate-and-submit
-      - name: Generate and submit dependency graph
+      - name: Generate dependency graph
         uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
           build-root-directory: backend
+          dependency-graph: generate-and-upload
+          # 出力先を明示する。既定値に依存すると、次の検査が探す場所とずれたときに
+          # 「ファイルが無い」ことに気づけない
+          dependency-graph-report-dir: ${{ github.workspace }}/dependency-graph-reports
+
+      - name: Test dependency snapshot check
+        run: bash .github/scripts/tests/test-check-dependency-snapshot.sh
+
+      # 依存解決が空でもこのアクションは exit 0 で終わる。空のまま送信されると
+      # base側のスナップショットが欠け、以降のPRの検査が成立しなくなる
+      - name: Check dependency snapshot
+        run: bash .github/scripts/check-dependency-snapshot.sh "${{ github.workspace }}/dependency-graph-reports"
+
+  submit:
+    name: dependency-graph-main
+    needs: generate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      # checkout しない。アーティファクトを取得してAPIへ送るだけにする
+      - name: Submit dependency graph
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          dependency-graph: download-and-submit
