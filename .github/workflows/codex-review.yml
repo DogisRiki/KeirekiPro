@@ -12,10 +12,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
-  # マージ列でも必須チェックとして結果を報告する。レビューはPRに紐づくため
-  # ここでは実行せず、スキップ(=成功)を同名で報告する
-  merge_group:
-    types: [checks_requested]
 
 permissions:
   contents: read
@@ -24,9 +20,7 @@ permissions:
 
 # 連続pushは最新1回に畳む
 concurrency:
-  # merge_group には pull_request.number が無い。フォールバックが無いとキューの各項目が
-  # 同一グループになり、後から入った項目が先行する項目をキャンセルする
-  group: codex-review-${{ github.event.pull_request.number || github.run_id }}
+  group: codex-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
@@ -45,13 +39,7 @@ jobs:
     # CODEX_REVIEW_ENABLED が true でない間はCIでのレビューを行わない。
     # 再開は Settings → Secrets and variables → Actions → Variables で
     # CODEX_REVIEW_ENABLED を true にする。ワークフローの変更は不要。
-    #
-    # merge_group の除外は独立した条件として先頭に置く。マージ列では draft が null になり、
-    # 式の比較では null も false も 0 に型強制されるため draft == false が真になってしまう。
-    # この条件が無いと、CODEX_REVIEW_ENABLED 有効時にジョブがマージ列で実行され、
-    # pull_request.number の参照に失敗してキューを塞ぐ。
-    if: github.event_name != 'merge_group' &&
-        vars.CODEX_REVIEW_ENABLED == 'true' &&
+    if: vars.CODEX_REVIEW_ENABLED == 'true' &&
         github.event.pull_request.draft == false &&
         github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
