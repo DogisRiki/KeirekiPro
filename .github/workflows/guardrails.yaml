@@ -81,6 +81,11 @@ jobs:
             echo "approved=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # 検知スクリプトのテストを先に走らせる。テストが落ちれば検査は実行されない
+      # (fail-closed)。他の検知スクリプトと同じ構成。
+      - name: Test escape hatch check
+        run: bash .github/scripts/tests/test-check-escape-hatches.sh
+
       - name: Run escape hatch check
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
