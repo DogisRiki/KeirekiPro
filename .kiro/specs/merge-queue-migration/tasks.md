@@ -36,7 +36,7 @@
   - _Requirements: 1.2, 1.3, 3.4_
 
 - [ ] 2. ワークフローの merge_group 対応
-- [ ] 2.1 ci.yaml を対応させる (P)
+- [x] 2.1 ci.yaml を対応させる (P)
   - `on:` に `merge_group: types: [checks_requested]` を追加する
   - `paths-filter` は `merge_group` をネイティブに扱うため入力の追加は不要
   - concurrency は既に `|| github.run_id` のフォールバックを持つため変更しない
@@ -46,7 +46,7 @@
   - _Requirements: 1.1, 2.1, 2.2, 5.3_
   - _Boundary: ci.yaml_
 
-- [ ] 2.2 terraform-plan.yaml を対応させる (P)
+- [x] 2.2 terraform-plan.yaml を対応させる (P)
   - `on:` に `merge_group` を追加する
   - `terraform-plan` ジョブ(非必須)に `github.event_name != 'merge_group'` を付ける
   - 完了条件: `actionlint` がPASSし、`terraform-plan` ジョブにのみ merge_group 除外が付き、
@@ -54,7 +54,7 @@
   - _Requirements: 1.1, 2.1, 2.2_
   - _Boundary: terraform-plan.yaml_
 
-- [ ] 2.3 guardrails.yaml を対応させる (P)
+- [x] 2.3 guardrails.yaml を対応させる (P)
   - `on:` に `merge_group` を追加する
   - `gradle-wrapper`(群1)は base/head を `merge_group` の値へ切り替える
   - `escape-hatch` `size-check`(群2)に `!= 'merge_group'` を足す。
@@ -169,6 +169,12 @@
   - _Depends: 4.2_
 
 ## Implementation Notes
+
+- 2.1〜2.3: `escape-hatch` と `size-check` は元々ジョブレベルの `if:` が無く、
+  `!= 'merge_group'` を足すだけで `pull_request` と `pull_request_review` の
+  両方が保持される。`== 'pull_request'` に限定してはいけない
+- 2.2: `terraform-plan` ジョブは AWS OIDC のため `id-token: write` を要し、
+  ワークフローレベルの権限を継承したままでよい(merge_group では実行されない)
 
 - 1.2: Rulesets API(id 2986186)の必須チェック18本と design.md の群の割り付け表が
   差分なしで一致。群2の引き継ぎ理由の表も7本すべてを覆っている。design.md の修正は不要だった

@@ -3,6 +3,10 @@ name: Terraform
 on:
   pull_request:
     branches: [main]
+  # マージ列でも terraform の静的検査を必須チェックとして報告する。
+  # 報告しないチェックが残るとキュー側のタイムアウトで失敗扱いになる
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   id-token: write
@@ -20,6 +24,10 @@ jobs:
   # ジョブ単位のスキップは成功として報告されるため、ci.yaml と同じ方式にする。
   detect-terraform-changes:
     runs-on: ubuntu-latest
+    # merge_group でも実行されるため、ワークフローレベルの id-token / pull-requests を
+    # 継承させずに必要な権限だけを明示する
+    permissions:
+      contents: read
     outputs:
       terraform_changed: ${{ steps.filter.outputs.terraform }}
     steps:
@@ -80,9 +88,15 @@ jobs:
           docker run --rm -v "$PWD/terraform:/workspace" -w /workspace \
             --entrypoint checkov keirekipro-terraform -d .
 
+  # plan結果はPRのコメントとして人間が読むためのもので、マージ列には要らない。
+  # Comment on PR が使う context.issue.number が merge_group では未定義になり
+  # API呼び出しが失敗するため、マージ列では実行しない。必須チェックではないので
+  # キューは詰まらないが、terraformを触るPRのマージ列が毎回赤バッジ付きになるのを避ける
   terraform-plan:
     needs: detect-terraform-changes
-    if: needs.detect-terraform-changes.outputs.terraform_changed == 'true'
+    if: >-
+      github.event_name != 'merge_group' &&
+      needs.detect-terraform-changes.outputs.terraform_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
