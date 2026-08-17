@@ -63,6 +63,17 @@ jobs:
         with:
           build-root-directory: backend
           dependency-graph: generate-and-upload
+          # 出力先を明示する。既定値に依存すると、次の検査が探す場所とずれたときに
+          # 「ファイルが無い」ことに気づけない
+          dependency-graph-report-dir: ${{ github.workspace }}/dependency-graph-reports
+
+      - name: Test dependency snapshot check
+        run: bash .github/scripts/tests/test-check-dependency-snapshot.sh
+
+      # 依存解決が空でもこのアクションは exit 0 で終わる。空のまま送信されると
+      # 後続の review と cooldown が「追加0件」と判定して緑になる
+      - name: Check dependency snapshot
+        run: bash .github/scripts/check-dependency-snapshot.sh "${{ github.workspace }}/dependency-graph-reports"
 
   submit:
     name: dependency-graph-submit
