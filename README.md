@@ -72,30 +72,29 @@ flowchart LR
     PR --> H
     PR --> A
 
-    Q & Z & H & A --> QU[4系統すべて成功したら<br>マージ列へ]
-    QU --> RC[最新のmainと先行するPRを<br>重ねた状態で再検査]
-    RC --> M[すべて成功したら<br>squashでmainブランチへ]
+    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ]
 
     M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
     M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
 ```
 
-4つの系統がすべて緑になるまで、プルリクエストはマージ列に入りません。マージ列では、最新のmainと先行するプルリクエストの変更を重ねた状態で必須チェックが再び実行され、すべて緑になったものだけがマージされます。マージされても本番への反映は行われず、人間による手動実行だけが本番を更新できます。
+4つの系統がすべて緑になるまで、プルリクエストはマージされません。mainが進むとプルリクエストのブランチは自動で最新化され、検査が再実行されます。マージされても本番への反映は行われず、人間による手動実行だけが本番を更新できます。
 
 各ワークフローの詳細は次のとおりです。
 
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
 |---|---|---|---|
-| 品質の検査 | ci.yaml | push (main) / pull_request / merge_group | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存 |
-| 品質の検査 | terraform-plan.yaml | pull_request / merge_group | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査(AWS認証不要)と、Terraform Planの実行および結果のPRコメント。terraform関連の変更が無いPRでは各ジョブをスキップする |
-| 品質の検査 | dependency-review.yaml | pull_request / merge_group | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
+| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存 |
+| 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査(AWS認証不要)と、Terraform Planの実行および結果のPRコメント。terraform関連の変更が無いPRでは各ジョブをスキップする |
+| 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review / merge_group | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証 |
-| 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review / merge_group | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
-| 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review / merge_group | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証 |
+| 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
+| 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
-| AIレビュー | codex-review.yml | pull_request / merge_group | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
-| 依存の更新 | dependabot-auto-merge.yaml | pull_request | Dependabotが作成したプルリクエストにauto-mergeを予約し、検査が緑になり次第マージ列へ入れる |
+| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
+| 依存の更新 | dependabot-auto-merge.yaml | pull_request | Dependabotが作成したプルリクエストにauto-mergeを予約する |
+| 依存の更新 | update-pr-branches.yaml | push (main) | 開いているプルリクエストのブランチをmainの最新に合わせる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
 | リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |

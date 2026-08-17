@@ -73,6 +73,12 @@ List the kinds of changes that should force dependent specs or consumers to re-c
 - [ ] **依存追加**: 新規ライブラリ追加の有無を明記(有る場合は人間承認ゲート対象。代替検討を記載)
 - [ ] **ゲート設定**: `.github/` `eslint.config.js` `vite.config.ts` `quality.gradle` 等の
       ゲート設定ファイルの変更を必要としない設計である(必要な場合は人間への提案として分離)
+- [ ] **前提機能の利用可否**: 設計が依存する外部サービスの機能が、**このリポジトリの
+      条件で実際に使えること**を確認した。確認する軸は、アカウント種別
+      (個人 / Organization)・プラン・リポジトリの可視性・地域や有効化の要否。
+      「設定項目が何か」ではなく「そもそも使えるか」を、公式の提供条件と
+      実際のリポジトリの属性(`gh api repos/:owner/:repo` の `owner.type` など)の
+      両方で確認する。使えない場合は設計に進まず、代替案の比較からやり直す
 
 ## Architecture
 

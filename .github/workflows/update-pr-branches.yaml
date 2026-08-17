@@ -1,0 +1,80 @@
+# =====================================================================
+# 開いているPRのブランチをmainの最新に合わせる
+#
+# ブランチ保護の Require branches to be up to date を有効にすると、先行するPRが
+# マージされるたびに残りのPRが out-of-date になりマージできなくなる。auto-merge は
+# ブランチを自動で最新化せず、Dependabot も衝突が無い限り rebase しない。
+# 人間が Update branch を押す運用を避けるため、mainへのpushを起点にここで更新する。
+#
+# GITHUB_TOKEN ではなくPATを使う。GITHUB_TOKEN によるpushは後続のワークフローを
+# 起動しないため、ブランチを最新化しても検査が再実行されず、必須チェックが古いSHAの
+# ままになってマージできない。
+# https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/trigger-a-workflow#triggering-a-workflow-from-a-workflow
+#
+# 更新に失敗したPRは out-of-date のまま残り、必須チェックの設定によりマージされない。
+# 失敗は実行ログに残す。
+# =====================================================================
+name: Update PR Branches
+
+on:
+  push:
+    branches: [main]
+
+# GITHUB_TOKEN には何も与えない。更新は BOT_GITHUB_TOKEN で行う
+permissions: {}
+
+concurrency:
+  group: update-pr-branches
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: update-pr-branches
+    runs-on: ubuntu-latest
+    steps:
+      # checkout しない。APIを呼ぶだけで、PRのコードを一切実行しない
+      - name: Update out-of-date PR branches
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # forkのブランチには書き込めないため同一リポジトリのPRに限る。
+          # draft は検査を回す段階に無いため除く。
+          # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
+          numbers=$(gh api "repos/${REPO}/pulls?state=open&base=main&per_page=100"             --paginate --slurp             | jq -r --arg repo "$REPO"               '[.[][] | select(.draft == false) | select(.head.repo.full_name == $repo) | .number] | .[]')
+
+          if [ -z "$numbers" ]; then
+            echo "対象のPRはありません。"
+            exit 0
+          fi
+
+          failed=0
+
+          for n in $numbers; do
+            if out=$(gh api -X PUT "repos/${REPO}/pulls/${n}/update-branch" 2>&1); then
+              echo "最新化しました: #${n}"
+              continue
+            fi
+
+            case "$out" in
+              *"not behind"* | *"up to date"* | *up-to-date*)
+                echo "すでに最新です: #${n}"
+                ;;
+              *conflict*)
+                echo "::warning::#${n} は衝突しているため最新化できません。解決が要ります。"
+                ;;
+              *)
+                echo "::warning::#${n} の最新化に失敗しました: ${out}"
+                failed=$((failed + 1))
+                ;;
+            esac
+          done
+
+          # 想定外の失敗はジョブを赤にする。更新されなかったPRは out-of-date のまま
+          # 残りマージされないため、見落としても取り込まれることはない。
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::${failed} 件のPRで想定外の失敗が起きました。"
+            exit 1
+          fi
