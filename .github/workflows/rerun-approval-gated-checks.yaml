@@ -66,11 +66,44 @@ jobs:
             sleep 10
           done
 
-          # 失敗している対象ジョブだけを再実行する。
-          # details_url は .../actions/runs/<runId>/job/<jobId> の形式
-          urls=$(fetch_targets | jq -r 'map(select(.conclusion == "failure") | .details_url) | .[]')
-          for url in $urls; do
-            job_id=${url##*/}
-            echo "再実行: job=$job_id ($url)"
-            gh api -X POST "repos/$REPO/actions/jobs/$job_id/rerun"
+          # 失敗している対象ジョブを含む run を、run単位で再実行する。
+          # details_url は .../actions/runs/<runId>/job/<jobId> の形式。
+          #
+          # ジョブ単位の再実行(actions/jobs/<jobId>/rerun)は使わない。filter=all は
+          # 過去の attempt の check-run も返すため、すでに再実行済みの run に属する
+          # ジョブを指すと「現在の attempt のジョブしか再実行できない」で403になる。
+          # run単位の rerun-failed-jobs は常に最新の attempt を対象にするため起きない。
+          run_ids=$(fetch_targets |
+            jq -r 'map(select(.conclusion == "failure") | .details_url) | .[]' |
+            awk -F'/' '{ for (i = 1; i < NF; i++) if ($i == "runs") print $(i + 1) }' |
+            sort -u)
+
+          if [ -z "$run_ids" ]; then
+            echo "再実行が必要な対象ジョブはありません。"
+            exit 0
+          fi
+
+          failed=0
+
+          for run_id in $run_ids; do
+            echo "再実行: run=$run_id"
+            if out=$(gh api -X POST "repos/$REPO/actions/runs/${run_id}/rerun-failed-jobs" 2>&1); then
+              continue
+            fi
+            # 別の経路で既に解消している場合は失敗ジョブが無く、その旨のエラーになる。
+            # 承認の反映という目的は達しているため赤にしない。
+            case "$out" in
+              *"failed jobs"* | *"failed_jobs"*)
+                echo "すでに解消しています: run=$run_id"
+                ;;
+              *)
+                echo "::warning::run=$run_id の再実行に失敗しました: ${out}"
+                failed=$((failed + 1))
+                ;;
+            esac
           done
+
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::${failed} 件の run で再実行に失敗しました。手動で再実行してください。"
+            exit 1
+          fi
