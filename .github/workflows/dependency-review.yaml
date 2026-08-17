@@ -12,6 +12,9 @@
 #
 # needs で直列化しているため、送信前に後段が走る競合は構造的に起きない。
 #
+# マージ列(merge queue)では generate / submit / review をマージ列のコミットに対して
+# 再実行し、cooldown だけはPR段階で確定した判定を引き継ぐ(スキップ=成功)。
+#
 # paths フィルタは付けない。ワークフローごとスキップされた場合、required status
 # check は Pending のまま残りマージがブロックされるため(ジョブ単位のスキップは
 # Success 扱いになるのとは挙動が異なる)。
@@ -30,11 +33,17 @@ name: Dependency Review
 on:
   pull_request:
     branches: [main]
+  # マージ列でも必須チェックとして結果を報告する。報告しないチェックが1本でも残ると
+  # キュー側のタイムアウトで失敗扱いになり、すべてのPRがマージ不能になる
+  merge_group:
+    types: [checks_requested]
 
 permissions: {}
 
 concurrency:
-  group: dependency-review-${{ github.event.pull_request.number }}
+  # merge_group には pull_request.number が無い。フォールバックが無いとキューの各項目が
+  # 同一グループになり、後から入った項目が先行する項目をキャンセルする
+  group: dependency-review-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -46,7 +55,9 @@ jobs:
       contents: read
     steps:
       # pull_request トリガで ref を指定しない場合、取得されるのは PR head ではなく
-      # main へのマージ結果。依存解決の対象としてはそちらが正しい
+      # main へのマージ結果。依存解決の対象としてはそちらが正しい。
+      # merge_group では GITHUB_SHA(マージ列の一時コミット)になり、これも
+      # マージ後に成立する状態そのものにあたる
       - name: Checkout merge commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -83,7 +94,15 @@ jobs:
     # 同一リポジトリのPRに限定する。スキップされたジョブは Success として報告され
     # required status check を満たすので、フォークPRが赤で止まることはない。
     # 代わりにフォークPRのGradle差分は未検査になる(受容済み)
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    #
+    # マージ列では無条件に実行する。merge_group には pull_request が存在せず、
+    # 既存の判定だけでは常に false になって submit がスキップされ、head 側の
+    # スナップショットが未送信のまま review が「差分なし」で緑を返す。
+    # マージ列の ref はbaseリポジトリ上にありトークンもbaseリポジトリのものなので、
+    # fork由来の読み取り専用制約は構造的に発生しない
+    if: >-
+      github.event_name == 'merge_group' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: write
       actions: read
@@ -112,13 +131,17 @@ jobs:
       # リポジトリの中身を読まないため(config-file にローカルパスを渡す場合は必要)
 
       # base と head の依存グラフを比較し、このPRで新しく増えた脆弱性だけを落とす。
-      # 既存の依存に対しては赤にならない。
+      # 既存の依存に対しては赤にならない。マージ列では base_sha / head_sha を
+      # アクションが自動採用するため、比較対象の指定は要らない。
       #
       # fail-on-scopes に development を含めるのは、既定の runtime だけだと
       # 開発依存の推移的パッケージを見逃すため(#130 で解消した7件がそれに当たる)。
-      # comment-summary-in-pr は pull-requests: write を要求する。
+      # comment-summary-in-pr は pull-requests: write を要求する
+      # (マージ列にはPRが無く、アクション側がコメント投稿を自分でスキップする)。
       # retry-on-snapshot-warnings は、同一ワークフロー化しても
-      # スナップショットの取り込み自体は非同期であることに対する保険
+      # スナップショットの取り込み自体は非同期であることに対する保険。
+      # 待ち時間の既定は120秒で、超過しても失敗せず不完全な比較のまま続行する。
+      # 複数PRを同時にキューへ入れると先行項目の送信が間に合わない窓があるため明示する
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
@@ -126,12 +149,18 @@ jobs:
           fail-on-scopes: runtime,development
           comment-summary-in-pr: on-failure
           retry-on-snapshot-warnings: true
+          retry-on-snapshot-warnings-timeout: 600
 
   cooldown:
     name: dependency-cooldown
     needs: [generate, submit]
     runs-on: ubuntu-latest
     # 対象外にする条件が review ジョブと異なる。
+    #
+    # マージ列では実行しない。下記の除外判定がいずれもPRの作成者と持ち主に依存し、
+    # マージ列にはそれが存在しない。除外を外すとDependabotの脆弱性対応PRが
+    # 恒久的にマージ不能になるため、PR段階で確定した判定を引き継ぐ(スキップ=成功)。
+    # 重ね合わせで依存解決が変わる場合を検出できないことは残余リスクとして受容する。
     #
     # 依存更新の自動化が作成したPRは対象外にする。バージョン更新には自動化側の
     # 既定クールダウンが効いており二重になる。脆弱性対応の更新にはクールダウンが
@@ -143,6 +172,7 @@ jobs:
     # スキップでも frontend を検査できるため条件が緩い)。
     if: >-
       ${{ !cancelled()
+      && github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
       && github.event.pull_request.user.login != 'dependabot[bot]'
       && needs.generate.result == 'success'

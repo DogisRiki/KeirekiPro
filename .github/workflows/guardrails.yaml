@@ -9,6 +9,10 @@ on:
     branches: [main]
   pull_request_review:
     types: [submitted, dismissed]
+  # マージ列でも必須チェックとして結果を報告する。gradle-wrapper はマージ列の
+  # base/head で再実行し、escape-hatch / size-check はPR段階の判定を引き継ぐ
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -16,7 +20,9 @@ permissions:
   issues: write
 
 concurrency:
-  group: guardrails-${{ github.event.pull_request.number }}-${{ github.event_name }}
+  # merge_group には pull_request.number が無い。フォールバックが無いとキューの各項目が
+  # 同一グループになり、後から入った項目が先行する項目をキャンセルする
+  group: guardrails-${{ github.event.pull_request.number || github.run_id }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
@@ -26,6 +32,10 @@ jobs:
   escape-hatch:
     name: escape-hatch
     runs-on: ubuntu-latest
+    # PR本文の Test-Change-Justification と所有者の承認状態を参照するため、
+    # マージ列では同じ判定にならない。PR段階で確定した結果を引き継ぐ(スキップ=成功)。
+    # pull_request_review での発火は残す。承認の取り消しを赤へ戻す唯一の経路のため
+    if: github.event_name != 'merge_group'
     steps:
       - name: Checkout PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -99,6 +109,10 @@ jobs:
   size-check:
     name: size-check
     runs-on: ubuntu-latest
+    # 上限超過時のspec裏付け検証がPR本文の Spec: 行を要するため、マージ列では
+    # 同じ判定にならない。PR段階で確定した結果を引き継ぐ(スキップ=成功)。
+    # escape-hatch と同じく pull_request_review での発火は残す
+    if: github.event_name != 'merge_group'
     steps:
       - name: Checkout PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -348,10 +362,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout PR head
+      # マージ列では検証対象がPRのheadではなくキューの一時コミットになる。
+      # merge_group の値を先に評価し、pull_request では従来どおりPRのSHAを使う。
+      # ステップ名もイベントに依らない形にする
+      - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       # 判定スクリプト自身のテスト。落ちた場合は検査も失敗させる(fail-closed)
@@ -364,9 +381,10 @@ jobs:
         id: wrapper
         run: |
           chmod +x .github/scripts/check-gradle-wrapper.sh
+          # マージ列では base_sha..head_sha がそのPR1本分の差分にあたる
           .github/scripts/check-gradle-wrapper.sh \
-            "${{ github.event.pull_request.base.sha }}" \
-            "${{ github.event.pull_request.head.sha }}"
+            "${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}" \
+            "${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha }}"
 
       # jar の公式チェックサムとの照合。ホモグリフ偽装されたファイル名も探す。
       # このアクションも公式のチェックサム一覧を取得するため、スクリプトと同じ
