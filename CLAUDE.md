@@ -58,6 +58,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - テストのskip化・アサーション削除・カバレッジ/lint除外の追加で「見かけの合格」を作らない(escape-hatchチェックが機械検知)
 - 200行(実装のコード差分。テストとドキュメントは計上しない)を超える変更はspec駆動(Lane A)で行い、PR本文に `Spec: .kiro/specs/<feature>` を記載する
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
+- DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う
 - 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)
 - 依頼範囲外の問題を見つけたら報告のみ行う(勝手に直さない)
 - `/loop` などの定期実行ループの中からはcommit/pushしない(出荷は明示的な `/ship` でのみ行う)

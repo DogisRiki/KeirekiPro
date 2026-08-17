@@ -24,6 +24,8 @@ jobs:
     outputs:
       frontend_changed: ${{ steps.filter.outputs.frontend }}
       backend_changed: ${{ steps.filter.outputs.backend }}
+      dockerfile_changed: ${{ steps.filter.outputs.dockerfile }}
+      dockerfile_files: ${{ steps.filter.outputs.dockerfile_files }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,11 +36,20 @@ jobs:
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          # dockerfile だけ変更ファイルの一覧も受け取る。ビルドし直す対象を
+          # このジョブの判定結果だけから決めるため(条件が2箇所に分かれないようにする)。
+          #
+          # 形式はjsonにする。shell形式は特殊文字を含むパスをクォートで包むが、
+          # そのクォートは非クォート展開では解釈されず、該当ファイルが「存在しないパス」
+          # として黙ってスキップされる(= ビルドされないまま緑になる)ため使わない。
+          list-files: json
           filters: |
             frontend:
               - 'frontend/**'
             backend:
               - 'backend/**'
+            dockerfile:
+              - 'docker/**/Dockerfile*'
 
   frontend-test:
     needs: detect-changes
@@ -188,3 +199,58 @@ jobs:
             backend/build/reports/**
             backend/build/test-results/**
           retention-days: 7
+
+  # Dockerfileの変更だけでは frontend-test / backend-test / e2e-smoke がどれも動かない。
+  # ベースイメージの更新はDependabotによって自動マージされるため、このジョブが無いと
+  # 本番イメージのベース更新が一度もビルドされないままmainに入る。
+  #
+  # 検証はamd64で行う。本番のデプロイ先はarm64だが、書いてあるのはmanifest listの
+  # digestであり、arm64のmanifestが存在することは固定時に確認している。
+  # ここで捉えるのは、Dockerfileの記述の破綻とベースイメージの中身の変化。
+  # arm64に固有の破綻は release.yaml のビルドで検知する。
+  docker-smoke:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.dockerfile_changed == 'true'
+    runs-on: ubuntu-latest
+    # 既定の360分は、配布元が応答しなくなったときに6時間握り続けることを意味する。
+    # auto-mergeの待ち時間に直結するため明示する。全Dockerfileを一括変更するPRでも
+    # 逐次ビルドの合計が収まる値にする(Dockerfile.prodのGradleビルドが最長で10分強)。
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build changed Dockerfiles
+        env:
+          DOCKERFILES: ${{ needs.detect-changes.outputs.dockerfile_files }}
+        run: |
+          set -euo pipefail
+
+          # ガードは jq -e で行う。出力が空文字列・空配列・JSONとして不正の
+          # いずれの場合も非ゼロ終了になり、ここで確実に赤にする。
+          # ("$(jq 'length' ...)" を [ -eq 0 ] にかける形は、空入力でjqが
+          #  出力なしのexit 0となり、ifの条件部のエラーはset -eでも止まらないため、
+          #  ガードを素通りして「何もビルドしないまま緑」になる)
+          if ! jq -e 'type == "array" and length > 0' >/dev/null <<<"$DOCKERFILES"; then
+            echo "::error::変更されたDockerfileを特定できませんでした。"
+            exit 1
+          fi
+
+          while IFS= read -r f; do
+            if [ ! -f "$f" ]; then
+              echo "削除されたためスキップします: $f"
+              continue
+            fi
+
+            # ビルドコンテキストは compose.yaml と backend-deploy.yaml の指定に合わせる。
+            # 食い違うと、ここが通ってもデプロイ時のビルドが落ちる。
+            case "$f" in
+              docker/backend/Dockerfile.prod) context="./backend" ;;
+              *) context="." ;;
+            esac
+
+            echo "::group::docker build -f $f $context"
+            docker build --file "$f" "$context"
+            echo "::endgroup::"
+          done < <(jq -r '.[]' <<<"$DOCKERFILES")
