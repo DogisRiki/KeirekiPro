@@ -17,10 +17,31 @@
 #   6. ゲート隣接ファイルの変更(リポジトリ所有者のApproveが無ければ赤。
 #      CODEOWNERSの必須レビューと二重の防御)
 #
+# 差分の読み方について:
+#   ファイル名は `git diff -z --name-only` でNUL区切りの生のパスとして取得し、
+#   行の抽出はファイルごとに `git diff` を回して行う。
+#
+#   `diff --git a/X b/X` のヘッダ行を空白で分割してファイル名を取り出す方式は使わない。
+#   その方式では、空白を含むパスでフィールドがずれ、非ASCIIを含むパスでは
+#   Gitの既定(core.quotepath=true)によりパスが引用符と8進エスケープに変換されるため、
+#   どちらもパスの正規表現に一致せず「検知0件」のまま緑になる。エラーは出ない。
+#   検査が静かに素通りする形になるため、ファイル名を解析しない形にしてある。
+#
+#   -z はこの引用そのものを無効にする。開発機に core.quotepath=false が設定されていると
+#   手元では正しく動いて見えるため、この違いはCIでのみ現れる。
+#
+#   リネームの扱い: 変更ファイルの一覧は新しいパスだけを返し、ファイル単位の diff では
+#   リネームの検出が効かないため、純リネームでも全行が追加行として現れる。つまり
+#   「既にハッチを含むファイル」を動かすと、内容を変えていなくても赤になる。
+#   これは意図した挙動として受け入れる。ハッチが残ったままのファイルを動かすときに
+#   精算を求めるのは、この検査の趣旨に沿うため。ハッチを含まないファイルの
+#   リネームは通る。
+#
 # 環境変数:
 #   PR_BODY        : PR本文(5の理由記載チェックに使用)
 #   OWNER_APPROVED : "true" なら所有者Approve済み(6の判定に使用)
 #
+# テスト: .github/scripts/tests/test-check-escape-hatches.sh
 # 使い方: check-escape-hatches.sh <base_sha> <head_sha>
 # =====================================================================
 set -euo pipefail
@@ -31,7 +52,22 @@ PR_BODY="${PR_BODY:-}"
 OWNER_APPROVED="${OWNER_APPROVED:-false}"
 
 MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
-DIFF=$(git diff --unified=0 "$MERGE_BASE" "$HEAD_SHA")
+
+# 変更ファイルの一覧。NUL区切りで受けるため、空白も非ASCIIもそのまま扱える。
+#
+# プロセス置換の中のコマンドの失敗は set -e に拾われず、mapfile は空配列のまま
+# 正常終了する。そのままだと「変更ファイル0件 = 検知0件 = 緑」になり、
+# この検査が塞ごうとしている fail-open そのものを作ってしまう。
+# 末尾に番兵を付けて、git diff が最後まで成功したことをこの場で確認する。
+CHANGED_FILES=()
+mapfile -d '' -t CHANGED_FILES < <(
+    git diff -z --name-only "$MERGE_BASE" "$HEAD_SHA" && printf '__GIT_DIFF_OK__\0'
+)
+if [ "${#CHANGED_FILES[@]}" -eq 0 ] || [ "${CHANGED_FILES[-1]}" != "__GIT_DIFF_OK__" ]; then
+    echo "::error::git diff --name-only が失敗しました。検査が素通りするのを防ぐため停止します。"
+    exit 1
+fi
+unset 'CHANGED_FILES[-1]'
 
 violations=0
 
@@ -47,26 +83,39 @@ report() {
     } >>"${GITHUB_STEP_SUMMARY:-/dev/null}"
 }
 
-# 追加行(+ で始まり +++ でない)を「ファイル名: 行」形式で抽出する
-# 注: 正規表現は -v ではなく環境変数で渡す(-v はバックスラッシュを二重処理するため)
+# 指定した符号の行を「ファイル名: 行」形式で抽出する。
+# sign が + なら追加行、- なら削除行。
+#
+# ヘッダ行(--- a/x, +++ b/x)は最初のハンク(@@)より必ず前に出るため、
+# @@ 以降だけを走査すれば除外できる。符号の重なりで判定すると、
+# 中身が -- や ++ で始まる行(例: 削除された `--i;`)を取りこぼす。
+#
+# pathspec に :(literal) を付けるのは、ファイル名に * や [ が含まれる場合に
+# Gitがグロブとして解釈するのを防ぐため。
+diff_lines_for() {
+    local sign="$1" pat="$2" f
+    for f in ${CHANGED_FILES[@]+"${CHANGED_FILES[@]}"}; do
+        [[ "$f" =~ $pat ]] || continue
+        git diff --unified=0 "$MERGE_BASE" "$HEAD_SHA" -- ":(literal)$f" |
+            SIGN="$sign" FNAME="$f" awk '
+                BEGIN { sign = ENVIRON["SIGN"]; name = ENVIRON["FNAME"] }
+                /^@@/ { inhunk = 1; next }
+                inhunk && substr($0, 1, 1) == sign {
+                    print name ": " substr($0, 2)
+                }
+            '
+    done
+}
+
 added_lines_for() {
-    PATH_REGEX="$1" awk '
-        BEGIN { pat = ENVIRON["PATH_REGEX"] }
-        /^diff --git/ { file=$4; sub(/^b\//, "", file); matched = (file ~ pat) }
-        matched && /^\+/ && !/^\+\+\+/ { print file ": " substr($0, 2) }
-    ' <<<"$DIFF"
+    diff_lines_for '+' "$1"
 }
 
-# 削除行(- で始まり --- でない)を「ファイル名: 行」形式で抽出する
 removed_lines_for() {
-    PATH_REGEX="$1" awk '
-        BEGIN { pat = ENVIRON["PATH_REGEX"] }
-        /^diff --git/ { file=$4; sub(/^b\//, "", file); matched = (file ~ pat) }
-        matched && /^-/ && !/^---/ { print file ": " substr($0, 2) }
-    ' <<<"$DIFF"
+    diff_lines_for '-' "$1"
 }
 
-changed_files=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA")
+changed_files=$(printf '%s\n' ${CHANGED_FILES[@]+"${CHANGED_FILES[@]}"})
 
 # --- 1. 品質ゲート配線(差分の有無に関係なく常時検証) ---
 # Groovy形式(apply from: 'x')とKotlin形式(apply(from = "x"))の両方を捕捉する
