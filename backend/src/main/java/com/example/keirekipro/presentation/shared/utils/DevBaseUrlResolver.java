@@ -8,9 +8,13 @@ import jakarta.servlet.http.HttpServletRequest;
 /**
  * 開発環境用のベースURL解決
  * リクエストから動的にベースURLを取得する
+ *
+ * test プロファイルでも有効にする。BaseUrlResolver の実装は dev と prod にしか無く、
+ * 有効にしないとコンテキスト起動テストが組み上がらない。リクエストから解決する
+ * 方式はテストでもそのまま成立する。
  */
 @Component
-@Profile("dev")
+@Profile({ "dev", "test" })
 public class DevBaseUrlResolver implements BaseUrlResolver {
 
     @Override
