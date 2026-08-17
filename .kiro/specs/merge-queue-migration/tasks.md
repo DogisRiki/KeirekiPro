@@ -25,7 +25,7 @@
   - _Requirements: 5.1, 5.6, 6.4, 6.5, 6.6_
   - _Boundary: 基盤構築手順.md_
 
-- [ ] 1.2 必須チェック一覧と対照表を突き合わせる
+- [x] 1.2 必須チェック一覧と対照表を突き合わせる
   - `gh api repos/:owner/:repo/rulesets/2986186` の `required_status_checks` を取得する
   - design.md の群の割り付け表と、名前・件数の両方が一致することを確認する
   - design.md の「群2の引き継ぎ理由」表に、群2の7本すべてについて再実行できない理由と
@@ -167,3 +167,11 @@
   - 完了条件: concurrency が互いをキャンセルせず、人間の操作なしに順にマージされる
   - _Requirements: 5.2, 5.4_
   - _Depends: 4.2_
+
+## Implementation Notes
+
+- 1.2: Rulesets API(id 2986186)の必須チェック18本と design.md の群の割り付け表が
+  差分なしで一致。群2の引き継ぎ理由の表も7本すべてを覆っている。design.md の修正は不要だった
+- 1.1: 基盤構築手順の設定画面の導線は Settings → Branches ではなく
+  Settings → Rules → Rulesets。branch protection API は404を返し、保護の実体は
+  ルールセットのみになっている
