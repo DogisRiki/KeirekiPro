@@ -94,7 +94,7 @@
   - _Requirements: 1.1, 3.1, 3.2, 5.2_
   - _Boundary: codex-review.yml_
 
-- [ ] 2.7 dependency-review.yaml を対応させる (P)
+- [x] 2.7 dependency-review.yaml を対応させる (P)
   - `on:` に `merge_group` を追加する
   - submit の fork 判定を `github.event_name == 'merge_group' || 既存条件` に書き換える
   - cooldown に `github.event_name == 'pull_request'` を足す(群2)
@@ -106,7 +106,7 @@
   - _Requirements: 1.1, 4.1, 4.2, 4.3, 5.2, 5.3_
   - _Boundary: dependency-review.yaml_
 
-- [ ] 2.8 dependabot-auto-merge.yaml のトークンを切り替える (P)
+- [x] 2.8 dependabot-auto-merge.yaml のトークンを切り替える (P)
   - `GH_TOKEN` を `secrets.BOT_GITHUB_TOKEN` にする
   - `--squash` は残す(キュー無効時に非対話でエラーになるため)
   - 完了条件: `actionlint` がPASSし、`GH_TOKEN` が `secrets.BOT_GITHUB_TOKEN` を
@@ -173,6 +173,10 @@
 - 2.1〜2.3: `escape-hatch` と `size-check` は元々ジョブレベルの `if:` が無く、
   `!= 'merge_group'` を足すだけで `pull_request` と `pull_request_review` の
   両方が保持される。`== 'pull_request'` に限定してはいけない
+- 2.8: `GITHUB_TOKEN` は `env:` で明示的に渡さない限り環境変数として存在しない。
+  `gh` が `GH_TOKEN` 空のとき `GITHUB_TOKEN` へフォールバックする挙動はあるが、
+  このワークフローにはフォールバック先が無く、鍵未登録ならトークン未設定のエラーで止まる。
+  `permissions: {}` は将来 `env:` に渡す変更が入ったときの保険
 - 2.2: `terraform-plan` ジョブは AWS OIDC のため `id-token: write` を要し、
   ワークフローレベルの権限を継承したままでよい(merge_group では実行されない)
 
