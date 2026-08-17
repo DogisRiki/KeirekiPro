@@ -14,6 +14,15 @@ spring:
 jwt:
   secret: dummy
 
+# コンテキスト起動テスト用。dev/prodのプロファイルにしか無い設定を補う
+frontend-base-url: "http://localhost:5173"
+
+cors:
+  allowed-origins: "http://localhost:5173"
+
+cookie:
+  secure: false
+
 aws:
   ses:
     from-address: "no-reply@test.example.com"
