@@ -1,7 +1,7 @@
 name: Dependabot Auto Merge
 
 # DependabotのPRにauto-mergeを予約する。予約後は、必須チェックがすべて緑になり
-# 必要な承認が揃った時点でGitHubがマージ列へ投入し、マージ列での再検証を経てマージする。
+# 必要な承認が揃った時点でGitHubが自動でマージする。
 #
 # レーンごとに扱いを分けない。承認が要るレーンは既存のゲートがそのまま押さえるため。
 # .github/ を変更する github-actions レーンは CODEOWNERS により所有者の承認まで、
@@ -13,26 +13,20 @@ name: Dependabot Auto Merge
 # https://github.com/dependabot/dependabot-core/issues/9024
 # https://github.com/dependabot/dependabot-core/issues/7387
 #
-# merge_group トリガは足さない。このワークフローは必須ステータスチェックではなく、
-# マージ列に対して報告する義務が無いため。
-#
 # 参照: https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/automate-dependabot-with-actions
 
 on:
   pull_request:
     types: [opened, reopened, synchronize]
 
-# GITHUB_TOKEN には何も与えない。予約は BOT_GITHUB_TOKEN で行い、このワークフローは
-# checkout もアクションの呼び出しもしないため GITHUB_TOKEN を使う経路が無い。
-# 鍵が未登録だと GH_TOKEN は空文字になり、gh は空文字を未設定として扱って
-# 環境変数 GITHUB_TOKEN へフォールバックする(go-gh の tokenForHost)。ただし
-# GITHUB_TOKEN は env で明示的に渡さない限り環境変数として存在しないため、
-# このワークフローではフォールバック先が無く、gh はトークン未設定のエラーで止まる。
-# permissions を空にするのは、将来 GITHUB_TOKEN を env に渡す変更が入っても、
-# 借りた権限で予約だけ通って鍵の不備が隠れないようにするための保険。
+# Dependabot発のイベントでは GITHUB_TOKEN が既定で読み取り専用になるが、
+# permissions を明示すれば昇格する。Actions secrets は参照できないままだが、
+# auto-mergeの予約に秘密情報は要らない。
 # pull_request_target は使わない。Dependabot発のPRには例外があり、
 # secretsも書き込み権限も得られないうえ、PRのコードを特権で実行する危険がある。
-permissions: {}
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   auto-merge:
@@ -50,12 +44,7 @@ jobs:
     steps:
       - name: Enable auto-merge
         env:
-          # マージ列が有効なブランチでは、組み込みの GITHUB_TOKEN ではPRをキューへ
-          # 投入できない(公式明記)。かつDependabot発のイベントは Actions secrets を
-          # 参照できないため、使えるのは Dependabot secrets に登録した鍵だけになる。
-          # 未登録のまま切り替えると、このジョブが赤(非必須)になるだけで
-          # DependabotのPRが静かに滞留する
-          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           set -euo pipefail
@@ -64,8 +53,4 @@ jobs:
           # 付かなかった場合に付け直すため。
           # (auto-mergeが解除されるのは書き込み権限の無い者によるpushとbase切り替えの
           #  ときだけで、Dependabotのforce-pushでは解除されない)
-          #
-          # --squash はマージ列が有効な間は警告が出るだけで無視される(方式はキュー側の
-          # 設定で決まる)。外してはいけない。キューを緊急に無効化したときに、
-          # 非対話環境でメソッド指定が無いと gh がエラーになり予約手段が壊れる
           gh pr merge --auto --squash "$PR_URL"
