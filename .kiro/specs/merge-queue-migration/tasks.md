@@ -68,7 +68,7 @@
   - _Requirements: 1.1, 2.1, 3.1, 3.2, 5.2, 5.3, 5.5_
   - _Boundary: guardrails.yaml_
 
-- [ ] 2.4 dependency-gate.yaml を対応させる (P)
+- [x] 2.4 dependency-gate.yaml を対応させる (P)
   - `on:` に `merge_group` を追加し、ジョブに `!= 'merge_group'` を足す
   - `pull_request_review` の発火条件を保持する
   - concurrency にフォールバックを足す
@@ -77,14 +77,14 @@
   - _Requirements: 1.1, 3.1, 3.2, 5.2, 5.5_
   - _Boundary: dependency-gate.yaml_
 
-- [ ] 2.5 pre-merge-check.yaml を対応させる (P)
+- [x] 2.5 pre-merge-check.yaml を対応させる (P)
   - 2.4 と同じ形
   - 完了条件: `actionlint` がPASSし、ジョブの `if:` に `!= 'merge_group'` が
     既存の条件を保持したまま追加されている
   - _Requirements: 1.1, 3.1, 3.2, 5.2, 5.5_
   - _Boundary: pre-merge-check.yaml_
 
-- [ ] 2.6 codex-review.yml を対応させる (P)
+- [x] 2.6 codex-review.yml を対応させる (P)
   - `on:` に `merge_group` を追加し、ジョブに `!= 'merge_group'` を**明示的に**足す
   - `draft == false` は merge_group で `null == false` が true になるため、
     このガードが無いとジョブが実行されてキューを塞ぐ

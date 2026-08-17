@@ -18,6 +18,10 @@ on:
     branches: [main]
   pull_request_review:
     types: [submitted, dismissed]
+  # マージ列でも必須チェックとして結果を報告する。判定はPR段階で確定するため
+  # ここでは実行せず、スキップ(=成功)を同名で報告する
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -25,13 +29,19 @@ permissions:
   issues: read
 
 concurrency:
-  group: pre-merge-check-${{ github.event.pull_request.number }}-${{ github.event_name }}
+  # merge_group には pull_request.number が無い。フォールバックが無いとキューの各項目が
+  # 同一グループになり、後から入った項目が先行する項目をキャンセルする
+  group: pre-merge-check-${{ github.event.pull_request.number || github.run_id }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
   pre-merge-check:
     name: pre-merge-check
     runs-on: ubuntu-latest
+    # ラベルと所有者の承認状態はPR単位の概念で、マージ列では同じ判定にならない。
+    # PR段階で確定した結果を引き継ぐ(スキップ=成功)。
+    # pull_request_review での発火は残す。承認の取り消しを赤へ戻す唯一の経路のため
+    if: github.event_name != 'merge_group'
     steps:
       - name: Evaluate pre-merge-check label and owner approval
         env:
