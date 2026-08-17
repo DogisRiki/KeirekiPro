@@ -1,0 +1,56 @@
+name: Dependabot Auto Merge
+
+# DependabotのPRにauto-mergeを予約する。予約後は、必須チェックがすべて緑になり
+# 必要な承認が揃った時点でGitHubが自動でマージする。
+#
+# レーンごとに扱いを分けない。承認が要るレーンは既存のゲートがそのまま押さえるため。
+# .github/ を変更する github-actions レーンは CODEOWNERS により所有者の承認まで、
+# ゲート設定に触れるPRは dependency-gate により承認まで、それぞれ止まったままになる。
+#
+# 導入の主目的は docker レーンの滞留防止。digest固定運用では、PRをcloseすると
+# 同じタグの更新が恒久的にブロックされ、開いたままのPRも定期ジョブでは更新されない。
+# つまり滞留がそのままイメージの更新停止を意味する。
+# https://github.com/dependabot/dependabot-core/issues/9024
+# https://github.com/dependabot/dependabot-core/issues/7387
+#
+# 参照: https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/automate-dependabot-with-actions
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+# Dependabot発のイベントでは GITHUB_TOKEN が既定で読み取り専用になるが、
+# permissions を明示すれば昇格する。Actions secrets は参照できないままだが、
+# auto-mergeの予約に秘密情報は要らない。
+# pull_request_target は使わない。Dependabot発のPRには例外があり、
+# secretsも書き込み権限も得られないうえ、PRのコードを特権で実行する危険がある。
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: auto-merge
+    # PRの作成者で判定する。github.actor は「最後にイベントを起こした人」であり、
+    # ブランチ名の書き換えやマージ衝突の解決を経由して偽装できるため使わない。
+    # forkからのPRは対象外にする(Dependabotは同一リポジトリにブランチを作る)。
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    concurrency:
+      group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+
+          # 予約は冪等。synchronize でも実行するのは、初回の予約が一時的な失敗で
+          # 付かなかった場合に付け直すため。
+          # (auto-mergeが解除されるのは書き込み権限の無い者によるpushとbase切り替えの
+          #  ときだけで、Dependabotのforce-pushでは解除されない)
+          gh pr merge --auto --squash "$PR_URL"

@@ -11,6 +11,9 @@
 # frontendでもPRの作成が試みられる。実際に作成されるかは、そのアラートが修正可能で、
 # マニフェストまたはlockfileから更新できるかによる。
 #
+# cooldown は書かない。2026-07-14 から、新しいリリースがレジストリで最低3日
+# 利用可能になるまで version update のPRを開かないのがデフォルトになっている。
+#
 # 参照: https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
 
 version: 2
@@ -47,3 +50,34 @@ updates:
     groups:
       github-actions:
         update-types: ["minor", "patch"]
+
+  # Dockerfileは docker/ 配下の7ディレクトリに集約しているため、globの1行で全て対象になる。
+  # ベースイメージは digest 固定してあり、タグが動かなくても digest 比較で更新PRが出る。
+  #
+  # メジャー更新の除外は必須。eclipse-temurin の `21-jre` は Dependabot のタグ比較で
+  # version=21 / suffix=-jre と解釈されるため、除外しないと Java の次期メジャー版への
+  # 昇格PRが飛んでくる。除外した分は監査手順の半期項目で棚卸しする。
+  #
+  # このレーンのPRはcloseしないこと。closeするとそのタグの更新が恒久的にブロックされ、
+  # 復旧経路が限られる(照合キーにdigestが含まれないため)。
+  # 詳細と出口は doc/開発フロー/監査手順.md に記載している。
+  #
+  # digest更新はgroupsに入らず(現在バージョンと最新が同じタグ文字列になるため)、
+  # ディレクトリごとの個別PRになる。上限はディレクトリ数を下回らない値にする。
+  - package-ecosystem: "docker"
+    directories:
+      - "/docker/*"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore"
+    groups:
+      docker-base-images:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
