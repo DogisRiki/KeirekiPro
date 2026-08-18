@@ -1,0 +1,58 @@
+name: TMP arm64 Probe
+
+# 使い捨ての確認用ワークフロー。spec container-image-vulnerability-scanning の
+# タスク1.1 / 1.2 のためだけに存在し、測定が済んだら削除する。
+#
+# 目的: arm64 標準ランナー(ubuntu-24.04-arm)が、個人アカウント所有の
+# パブリックリポジトリで実際に起動するかを確認する。公式ドキュメントには
+# 「パブリックリポジトリで無料・無制限」とあるがアカウント種別への言及が無く、
+# 使えるとも使えないとも書かれていないため実機で確かめる。
+#
+# control ジョブを併置するのは、arm64 ジョブが動かなかったときに
+# 「ワークフローが発火しなかった」のか「ランナーが割り当たらなかった」のかを
+# 切り分けるため。
+
+on:
+  push:
+    branches: [ci/container-image-vuln-scan]
+
+permissions:
+  contents: read
+
+jobs:
+  control:
+    name: control-amd64
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Print runner facts
+        run: |
+          set -euo pipefail
+          echo "arch=$(uname -m)"
+          echo "nproc=$(nproc)"
+          echo "os=$(. /etc/os-release && echo "$PRETTY_NAME")"
+
+  arm64:
+    name: probe-arm64
+    runs-on: ubuntu-24.04-arm
+    # ランナーが割り当たらない場合に6時間握らないよう短く切る。
+    # このタイムアウトで落ちた場合は「使えない」と判定する。
+    timeout-minutes: 10
+    steps:
+      - name: Print runner facts
+        run: |
+          set -euo pipefail
+          echo "arch=$(uname -m)"
+          echo "nproc=$(nproc)"
+          echo "mem=$(free -h | awk '/^Mem:/ {print $2}')"
+          echo "os=$(. /etc/os-release && echo "$PRETTY_NAME")"
+
+      - name: Assert aarch64
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          if [ "$actual" != "aarch64" ]; then
+            echo "::error::arm64 ランナーを要求したが $actual で実行された"
+            exit 1
+          fi
+          echo "arm64 ランナーで実行されている。"
