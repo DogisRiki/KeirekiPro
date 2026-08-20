@@ -106,6 +106,16 @@ check_output() {
     fi
 }
 
+# 使い方: check_no_output <出てはいけない文字列> <説明>
+check_no_output() {
+    if grep -qF "$1" "$OUT"; then
+        echo "FAIL $2 (出力に '$1' が出ている)"
+        FAILED=1
+    else
+        echo "ok   $2"
+    fi
+}
+
 check_summary() {
     if grep -qF "$1" "$SUM"; then
         echo "ok   $2"
@@ -122,7 +132,8 @@ reset_outputs
 scan_with "[{\"Target\":\"t\",\"Class\":\"os-pkgs\",\"Vulnerabilities\":[$(vuln CVE-1 CRITICAL pkgA ',"FixedVersion":"1.1"')]}]"
 check 1 "修正版のある CRITICAL は止める"
 # 赤の原因を実行結果から特定できること(要件 3.2)。件数まで固定する。
-check_output "::error::修正版のある CRITICAL / HIGH の脆弱性が 1 件あります。"     "止めるときは ::error:: で件数を出す"
+check_output "::error::修正版のある CRITICAL / HIGH の脆弱性が 1 件あります。"     "judge では ::error:: で件数を出す"
+check_no_output "::warning::修正版のある" "judge では ::warning:: に落とさない"
 check_summary "マージを止める" "止める判定がSummaryに出る"
 # 表の列構成そのものを固定する。列がずれた表が出続けても
 # 「マージを止める」の部分一致だけでは気づけない。
@@ -347,6 +358,10 @@ reset_outputs
 sup_with '[{"id":"CVE-10","reason":"上流に修正版が無い","expires":"2099-12-31"}]'
 scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-10 CRITICAL pkgJ ',"FixedVersion":"1.1"')]}]"
 check 1 "report では有効期限内の抑制でも止める" report
+# 週次は終了コード1でもジョブを成功で終える。成功した run に ::error:: が並ぶと
+# 結論と注釈が食い違って読めるため、report では注釈を ::warning:: に落とす。
+check_output "::warning::修正版のある CRITICAL / HIGH の脆弱性が 1 件あります。"     "report では ::warning:: で件数を出す"
+check_no_output "::error::修正版のある" "report では ::error:: を出さない"
 check_summary "| CVE-10 | CRITICAL | pkgJ 1.0 | 1.1 | 有効期限内(2099-12-31 まで) | マージを止める |" \
     "report でも抑制列は有効期限内のまま"
 check_file "$BLK" 'length == 1 and .[0].id == "CVE-10"' "report では抑制した件も blocking-out に入る"

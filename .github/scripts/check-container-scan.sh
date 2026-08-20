@@ -353,7 +353,16 @@ fi
 
 echo "検出 ${detected_count} 件 / マージを止めるもの ${blocking_count} 件"
 
+# 注釈の種別はモードで変える。終了コード1の意味はどちらも同じだが、
+# 呼び出し側での扱いが違う。judge はこの件数がそのままジョブの失敗になるため
+# ::error:: が実態と一致する。report は終了コード1でもジョブを成功で終える
+# 設計であり、成功した run に ::error:: が並ぶと、週次の点検で結論と注釈が
+# 食い違って読める。
 if [ "$blocking_count" -gt 0 ]; then
-    echo "::error::修正版のある CRITICAL / HIGH の脆弱性が ${blocking_count} 件あります。"
+    if [ "$APPLY_MODE" = "judge" ]; then
+        echo "::error::修正版のある CRITICAL / HIGH の脆弱性が ${blocking_count} 件あります。"
+    else
+        echo "::warning::修正版のある CRITICAL / HIGH の脆弱性が ${blocking_count} 件あります。"
+    fi
     exit 1
 fi
