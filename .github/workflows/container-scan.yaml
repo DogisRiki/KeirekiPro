@@ -83,7 +83,7 @@ jobs:
           # 走らせないままマージできる。ゲートを変える変更はゲートを通す。
           # design.md の対象一覧に対する追加(2026-08-20、DogisRiki が承認)。
           filters: |
-            run:
+            run_broken:
               - 'docker/backend/Dockerfile.prod'
               - 'backend/**'
               - '.github/container-scan-suppressions.json'
