@@ -46,6 +46,14 @@ freemarker = "2.3.34"
 commons-validator = "1.11.0"
 mybatis-postgresql-typehandlers = "1.0.2"
 
+# Spring Boot の BOM が管理する版を上書きするためのもの(build.gradle の ext で参照)。
+# BOM の版に脆弱性があり、Spring Boot 側がまだ追いついていない場合に使う。
+# 解除の判定: Spring Boot を上げたときに BOM の版がここ以上になっていれば、
+# この行と build.gradle の対応する ext を削除する。
+# BOM の版は spring-boot-dependencies-<版>.pom の netty.version / postgresql.version で見る。
+netty = "4.1.137.Final"
+postgresql = "42.7.13"
+
 [libraries]
 # Flyway Gradleプラグイン(10系)がDB別モジュールをbuildscriptクラスパスに要求するためのもの。
 # implementation 側の flyway-core / flyway-database-postgresql は Spring Boot のBOM管理下にあり
