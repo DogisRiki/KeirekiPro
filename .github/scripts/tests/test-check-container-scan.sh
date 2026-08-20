@@ -23,6 +23,7 @@ SUP="$WORK/sup.json"
 BLK="$WORK/blocking.json"
 DET="$WORK/detected.json"
 SUM="$WORK/summary.md"
+OUT="$WORK/output.txt"
 
 # 使い方: scan_with <Results の中身>
 scan_with() {
@@ -48,10 +49,16 @@ reset_outputs() {
     printf '{"suppressions": []}' >"$SUP"
 }
 
+# 使い方: sup_with <suppressions 配列のJSON>
+# reset_outputs のあとに呼ぶ。空の記録を上書きする。
+sup_with() {
+    printf '{"suppressions": %s}' "$1" >"$SUP"
+}
+
 # 使い方: run [apply-mode] [expected-arch]
 run() {
     GITHUB_STEP_SUMMARY="$SUM" bash "$SCRIPT" \
-        "$SCAN" "${2:-arm64}" "$SUP" "${1:-judge}" "$BLK" "$DET" >/dev/null 2>&1
+        "$SCAN" "${2:-arm64}" "$SUP" "${1:-judge}" "$BLK" "$DET" >"$OUT" 2>&1
 }
 
 # 使い方: check <期待exit> <説明> [apply-mode] [expected-arch]
@@ -87,6 +94,18 @@ check_no_file() {
     fi
 }
 
+# 使い方: check_output <期待する文字列> <説明>
+# 注釈の種別(::error:: か ::warning:: か)まで含めて突き合わせる。
+# 終了コードだけでは judge と report の書き分けが崩れても気づけない。
+check_output() {
+    if grep -qF "$1" "$OUT"; then
+        echo "ok   $2"
+    else
+        echo "FAIL $2 (出力に '$1' が無い)"
+        FAILED=1
+    fi
+}
+
 check_summary() {
     if grep -qF "$1" "$SUM"; then
         echo "ok   $2"
@@ -102,6 +121,8 @@ check_summary() {
 reset_outputs
 scan_with "[{\"Target\":\"t\",\"Class\":\"os-pkgs\",\"Vulnerabilities\":[$(vuln CVE-1 CRITICAL pkgA ',"FixedVersion":"1.1"')]}]"
 check 1 "修正版のある CRITICAL は止める"
+# 赤の原因を実行結果から特定できること(要件 3.2)。件数まで固定する。
+check_output "::error::修正版のある CRITICAL / HIGH の脆弱性が 1 件あります。"     "止めるときは ::error:: で件数を出す"
 check_summary "マージを止める" "止める判定がSummaryに出る"
 # 表の列構成そのものを固定する。列がずれた表が出続けても
 # 「マージを止める」の部分一致だけでは気づけない。
@@ -280,6 +301,278 @@ scan_with '[]'
 check 0 "report モードでも動く" report
 check 2 "未知の apply-mode は入力不正" bogus
 
+
+# ---------------------------------------------------------------------
+# 抑制の適用
+#
+# 有効期限内は 2099-12-31、期限切れは 2000-01-01 を使う。実行日を挟んで
+# 動かない値にすることで、テストが日付演算を持たなくて済む。境界(実行日
+# と同じ日)だけは本体と同じ式で求める。
+# ---------------------------------------------------------------------
+TODAY=$(date -u +%Y-%m-%d)
+
+reset_outputs
+sup_with '[{"id":"CVE-10","reason":"上流に修正版が無い","expires":"2099-12-31"}]'
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-10 CRITICAL pkgJ ',"FixedVersion":"1.1"')]}]"
+check 0 "judge では有効期限内の抑制で止めない"
+check_summary "| CVE-10 | CRITICAL | pkgJ 1.0 | 1.1 | 有効期限内(2099-12-31 まで) | 止めない |" \
+    "抑制列が有効期限内、判定列が止めない"
+check_file "$BLK" 'length == 0' "抑制した件は blocking-out に入らない"
+check_file "$DET" 'length == 1' "抑制しても detected-out には残る"
+
+reset_outputs
+sup_with '[{"id":"CVE-11","reason":"期限が切れている","expires":"2000-01-01"}]'
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-11 CRITICAL pkgK ',"FixedVersion":"1.1"')]}]"
+check 1 "期限切れの抑制は止める側に戻る"
+check_summary "| CVE-11 | CRITICAL | pkgK 1.0 | 1.1 | 期限切れ(2000-01-01) | マージを止める |" \
+    "抑制列が期限切れ、判定列がマージを止める"
+check_file "$BLK" 'length == 1 and .[0].id == "CVE-11"' "期限切れは blocking-out に入る"
+
+reset_outputs
+sup_with "[{\"id\":\"CVE-12\",\"reason\":\"当日は有効\",\"expires\":\"${TODAY}\"}]"
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-12 CRITICAL pkgL ',"FixedVersion":"1.1"')]}]"
+check 0 "expires が実行日と同じなら有効"
+check_summary "有効期限内(${TODAY} まで)" "当日の抑制も有効期限内と表示される"
+
+reset_outputs
+sup_with '[{"id":"CVE-13","reason":"別のIDの抑制","expires":"2099-12-31"}]'
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-14 CRITICAL pkgM ',"FixedVersion":"1.1"')]}]"
+check 1 "IDが一致しない抑制は効かない"
+check_summary "| CVE-14 | CRITICAL | pkgM 1.0 | 1.1 | なし | マージを止める |" "一致しなければ抑制列はなし"
+
+# ---------------------------------------------------------------------
+# report モードは抑制を判定に用いない(要件 4.4)。ただし表には出す(要件 3.1)。
+# ---------------------------------------------------------------------
+reset_outputs
+sup_with '[{"id":"CVE-10","reason":"上流に修正版が無い","expires":"2099-12-31"}]'
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-10 CRITICAL pkgJ ',"FixedVersion":"1.1"')]}]"
+check 1 "report では有効期限内の抑制でも止める" report
+check_summary "| CVE-10 | CRITICAL | pkgJ 1.0 | 1.1 | 有効期限内(2099-12-31 まで) | マージを止める |" \
+    "report でも抑制列は有効期限内のまま"
+check_file "$BLK" 'length == 1 and .[0].id == "CVE-10"' "report では抑制した件も blocking-out に入る"
+
+# report は抑制の記録が読めなくても止まらない。週次で止めると、再検査が
+# 完走しているのに起票が行われない状態が生じる。
+reset_outputs
+printf 'not json' >"$SUP"
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-15 CRITICAL pkgN ',"FixedVersion":"1.1"')]}]"
+check 1 "report では抑制の記録が不正でも続行する" report
+check_output "::warning::抑制の記録が不正です" "report は ::warning:: を残して続ける"
+check_summary "| CVE-15 | CRITICAL | pkgN 1.0 | 1.1 | 取得できず | マージを止める |" \
+    "読めないときは抑制列が取得できず"
+
+reset_outputs
+rm -f "$SUP"
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-16 CRITICAL pkgO ',"FixedVersion":"1.1"')]}]"
+check 1 "report では抑制の記録が無くても続行する" report
+check_summary "取得できず" "記録が無いときも抑制列が取得できず"
+
+reset_outputs
+sup_with '[{"id":"CVE-17","reason":"","expires":"2099-12-31"}]'
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-17 CRITICAL pkgP ',"FixedVersion":"1.1"')]}]"
+check 1 "report では記録の不備でも続行する" report
+check_summary "取得できず" "不備のあるときも抑制列が取得できず"
+
+# ---------------------------------------------------------------------
+# 抑制の記録の検証。judge ではいずれも入力不正(要件 4.1)。
+# ---------------------------------------------------------------------
+reset_outputs
+scan_with '[]'
+sup_with '[{"reason":"idが無い","expires":"2099-12-31"}]'
+check 2 "id が無ければ入力不正"
+check_output "::error::抑制の記録が不正です: 1 件目: id が無い、または空です"     "judge は ::error:: で位置と理由を名指しする"
+check_no_file "$DET" "記録の不備のとき detected-out を生成しない"
+check_no_file "$BLK" "記録の不備のとき blocking-out を生成しない"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"","reason":"idが空","expires":"2099-12-31"}]'
+check 2 "id が空文字列なら入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-18","expires":"2099-12-31"}]'
+check 2 "reason が無ければ入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-18","reason":"","expires":"2099-12-31"}]'
+check 2 "reason が空文字列なら入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-18","reason":"期限が無い"}]'
+check 2 "expires が無ければ入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-18","reason":"重複","expires":"2099-12-31"},{"id":"CVE-18","reason":"重複","expires":"2099-01-01"}]'
+check 2 "id が重複すれば入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-18","reason":"要素が文字列","expires":"2099-12-31"},"x"]'
+check 2 "要素がオブジェクトでなければ入力不正"
+check_output "::error::抑制の記録が不正です: 2 件目: オブジェクトではありません"     "オブジェクトでない要素をその位置で名指しする"
+
+# ---------------------------------------------------------------------
+# 日付の妥当性。形式だけの検査では 2026-13-45 を通してしまう。
+# ---------------------------------------------------------------------
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"存在しない日付","expires":"2026-13-45"}]'
+check 2 "存在しない日付なら入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"2月30日","expires":"2026-02-30"}]'
+check 2 "その月に無い日なら入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"0月","expires":"2026-00-15"}]'
+check 2 "月が 00 なら入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"13月","expires":"2026-13-01"}]'
+check 2 "月が 13 なら入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"平年の2月29日","expires":"2100-02-29"}]'
+check 2 "100年で割り切れる年は閏年でない"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"閏年の2月29日","expires":"2400-02-29"}]'
+check 0 "400年で割り切れる年は閏年"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"区切りが違う","expires":"2099/12/31"}]'
+check 2 "区切りが違えば入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"桁が足りない","expires":"2099-1-1"}]'
+check 2 "桁が揃っていなければ入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-19","reason":"日付でない","expires":20991231}]'
+check 2 "expires が文字列でなければ入力不正"
+
+# 修正版が無い、あるいは深刻度が低い件に抑制が付いていても、
+# 判定は変わらず表にも状態が出る。
+reset_outputs
+sup_with '[{"id":"CVE-20","reason":"修正版が無い件への抑制","expires":"2099-12-31"}]'
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-20 CRITICAL pkgQ '')]}]"
+check 0 "修正版が無ければ抑制の有無によらず止めない"
+check_summary "| CVE-20 | CRITICAL | pkgQ 1.0 | なし | 有効期限内(2099-12-31 まで) | 止めない |" \
+    "抑制の状態は判定に関わらず表に出る"
+
+# ---------------------------------------------------------------------
+# 入力不正のときは注釈の文言まで固定する。終了コードだけでは、
+# 理由が入れ替わっても気づけない。
+# ---------------------------------------------------------------------
+reset_outputs
+scan_with '[]'
+rm -f "$SUP"
+check 2 "抑制の記録が無ければ入力不正(再掲・文言つき)"
+check_output "::error::抑制の記録が不正です: 抑制の記録がありません" "記録の不在を名指しする"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-21","reason":"重複","expires":"2099-12-31"},{"id":"CVE-21","reason":"重複","expires":"2099-01-01"}]'
+check 2 "id の重複(文言つき)"
+check_output "::error::抑制の記録が不正です: id が重複しています: CVE-21" "重複した id を名指しする"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-21","reason":"日付が不正","expires":"2026-13-45"}]'
+check 2 "日付が不正(文言つき)"
+check_output "expires が YYYY-MM-DD の実在する日付ではありません: 2026-13-45" "不正な日付をそのまま示す"
+
+reset_outputs
+cat >"$SCAN" <<'JSON'
+{"SchemaVersion":2,"Metadata":{"ImageConfig":{"architecture":"amd64"}},"Results":[]}
+JSON
+check 2 "アーキテクチャ不一致(文言つき)"
+check_output "::error::検査対象のアーキテクチャが期待と一致しません。期待=arm64 実際=amd64" \
+    "期待と実際の両方を出す"
+
+# ---------------------------------------------------------------------
+# 終了コード2のときは、どの経路でも出力ファイルを作らない。
+# 検証を通す前に書き出す実装に変わると、週次が古い結果でIssueを操作する。
+# ---------------------------------------------------------------------
+for bad in \
+    '{"Results":[]}' \
+    'not json' \
+    '{"SchemaVersion":2,"Metadata":{"ImageConfig":{}},"Results":[]}' \
+    '{"SchemaVersion":2,"Metadata":{"ImageConfig":{"architecture":"arm64"}},"Results":"str"}'; do
+    reset_outputs
+    printf '%s' "$bad" >"$SCAN"
+    check 2 "入力不正: ${bad}"
+    check_no_file "$DET" "この経路で detected-out を作らない"
+    check_no_file "$BLK" "この経路で blocking-out を作らない"
+done
+
+reset_outputs
+scan_with '[]'
+check 2 "未知の apply-mode でも出力ファイルを作らない" bogus
+check_no_file "$DET" "apply-mode 不正で detected-out を作らない"
+check_no_file "$BLK" "apply-mode 不正で blocking-out を作らない"
+
+# .Results が配列でない場合を検出0件の緑にしない。
+# .Results[]? は器の型が崩れていても黙って空を返す。
+reset_outputs
+printf '{"SchemaVersion":2,"Metadata":{"ImageConfig":{"architecture":"arm64"}},"Results":"str"}' >"$SCAN"
+check 2 "Results が配列でなければ入力不正"
+check_output "::error::スキャン結果の Results が配列ではありません" "器の型崩れを名指しする"
+
+# ---------------------------------------------------------------------
+# Summary が書けない場合。設定されていて書けないと、表の追記で
+# リダイレクトが失敗し、判定に関わらず終了コード1が漏れる。
+# ---------------------------------------------------------------------
+reset_outputs
+scan_with '[]'
+GITHUB_STEP_SUMMARY="$WORK/nodir/summary.md" bash "$SCRIPT" \
+    "$SCAN" arm64 "$SUP" judge "$BLK" "$DET" >/dev/null 2>&1
+if [ $? -eq 2 ]; then
+    echo "ok   Summary が書けなければ入力不正"
+else
+    echo "FAIL Summary が書けなければ入力不正"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------
+# 終了コード0で検出がある状態(抑制で止めなかった場合)の出力の契約。
+# 5キーの検証を exit 1 の経路だけに置くと、exit 0 側の書き出しが
+# 崩れても気づけない。
+# ---------------------------------------------------------------------
+reset_outputs
+sup_with '[{"id":"CVE-22","reason":"上流に修正版が無い","expires":"2099-12-31"}]'
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-22 CRITICAL pkgR ',"FixedVersion":"1.1"')]}]"
+check 0 "抑制により終了コード0になる"
+check_file "$DET" 'length == 1 and all(keys | length == 5)' "終了コード0でも detected-out は5キー"
+check_file "$DET" 'all(has("id") and has("severity") and has("pkgName") and has("installedVersion") and has("fixedVersion"))' \
+    "終了コード0でもキー名が契約どおり"
+check_file "$BLK" 'length == 0' "抑制した件は blocking-out に残らない"
+
+# ---------------------------------------------------------------------
+# expires の末尾の改行。jq の正規表現は $ が末尾の改行の手前にも
+# マッチするため、形式検証だけでは通ってしまう。
+# ---------------------------------------------------------------------
+reset_outputs
+sup_with '[{"id":"CVE-23","reason":"末尾に改行","expires":"2099-12-31\n"}]'
+scan_with "[{\"Target\":\"t\",\"Vulnerabilities\":[$(vuln CVE-23 CRITICAL pkgS ',"FixedVersion":"1.1"')]}]"
+check 2 "expires の末尾に改行があれば入力不正"
+
+reset_outputs
+scan_with '[]'
+sup_with '[{"id":"CVE-23","reason":"前後に空白","expires":" 2099-12-31"}]'
+check 2 "expires の前に空白があれば入力不正"
 # ---------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then
     echo "::error::check-container-scan.sh のテストに失敗しました。"
