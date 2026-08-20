@@ -55,7 +55,7 @@ flowchart LR
     PR[プルリクエスト<br>Claude Code または Dependabot]
 
     subgraph s1[系統1: 品質の検査]
-        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>依存の脆弱性検査・<br>公開直後のライブラリの遮断]
+        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>依存の脆弱性検査・<br>コンテナイメージの脆弱性検査・<br>公開直後のライブラリの遮断]
     end
     subgraph s2[系統2: ずるの検査]
         Z[検査回避の検知・差分サイズ・<br>シークレットスキャン・<br>ワークフローの静的検証・<br>Gradle本体の検証]
@@ -88,6 +88,7 @@ flowchart LR
 | 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査(AWS認証不要)と、Terraform Planの実行および結果のPRコメント。terraform関連の変更が無いPRでは各ジョブをスキップする |
 | 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする |
+| 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。本番用のイメージをarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
 | ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
@@ -101,6 +102,7 @@ flowchart LR
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
 | 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
+| 定期 | container-scan-scheduled.yaml | 週次 (schedule) / 手動 | 稼働中の本番イメージをECSのサービス定義から特定してTrivyで再検査し、検出した脆弱性をIssueに反映する。イメージから検出されなくなった脆弱性のIssueは自動でクローズする |
 | 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
 
 依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)とDockerのベースイメージは週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。frontend(npm)はバージョン更新の対象に含めていません。脆弱性が検知された場合は、スケジュールに関係なく、frontendを含めて修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます)。

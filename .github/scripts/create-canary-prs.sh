@@ -2,7 +2,7 @@
 # =====================================================================
 # カナリアPR生成(ゲートの健康診断・月次)
 #
-# 3種の「わざと問題のある変更」をPRとして作成し、ゲート群が全て赤に
+# 6種の「わざと問題のある変更」をPRとして作成し、ゲート群が全て赤に
 # できることを確認する。検出漏れは retrospective 経由でゲート追加が必須。
 #
 #   1. known-bug        : もっともらしいロジックバグ(+バグと整合するテスト)
@@ -17,9 +17,12 @@
 #   5. vulnerable-dep   : 脆弱な推移的依存を引く版への差し替え
 #                         -> 依存グラフの生成から送信・取り込み・比較・
 #                            アドバイザリ照合までの全区間が動いているか
+#   6. container-vuln   : 脆弱性を含む jar を本番イメージに持ち込む
+#                         -> container-scan が本番イメージを組み立てて検査し、
+#                            修正版のある CRITICAL を赤にできるか
 #
-# 4と5は1〜3と役割が違う。1〜3は検査そのものの検出能力を見るが、
-# 4と5は「検査が実行されているか」を見る。
+# 4〜6は1〜3と役割が違う。1〜3は検査そのものの検出能力を見るが、
+# 4〜6は「検査が実行されているか」を見る。
 #
 # 4: ci.yaml の paths-filter が backend/** を拾わなくなると backend-test は
 #    スキップされ、スキップは Success として報告されるため、テストが1本も
@@ -214,4 +217,84 @@ gh pr create \
 Refs: N/A"
 git switch - >/dev/null
 
-echo "カナリアPRを5件作成しました。各PRのチェックが期待通り赤になることを監査で確認してください。"
+# --- 6. container-vuln: 脆弱性を含む jar を本番イメージに持ち込む ---
+# log4j-core 2.14.1 は CVE-2021-44228(CRITICAL / 修正版 2.15.0)の対象。
+# 2026-08-20 時点で修正版が存在することを確認済み。アドバイザリが取り下げ・
+# 格下げされた場合は版を選び直すこと(vulnerable-dep と同じ扱い)。
+#
+# 期待するのは、CVE-2021-44228 が blocking(修正版あり かつ CRITICAL/HIGH)に
+# 入り、container-scan が赤になること。
+#
+# jar の中身は pom.properties だけでよい。Trivy は
+# META-INF/maven/<groupId>/<artifactId>/pom.properties から座標を特定するため、
+# sha1 照合(java-db の内容に依存する経路)に落ちない。
+#
+# create_canary() は使わない。ヘルパーはテキスト1ファイルしか書けず、
+# ここではバイナリを含む2ファイルを1コミットに入れる必要があるため。
+#
+# 副作用: docker/**/Dockerfile* に該当するため docker-smoke も同時に走る。
+# 監査手順の期待失敗には container-scan だけを書く。
+branch="canary/container-vuln-${STAMP}"
+git switch -c "$branch" origin/main
+
+if ! python3 - <<'PYEOF'
+import zipfile
+
+with zipfile.ZipFile("backend/canary-vuln.jar", "w") as jar:
+    jar.writestr(
+        "META-INF/maven/org.apache.logging.log4j/log4j-core/pom.properties",
+        "groupId=org.apache.logging.log4j\n"
+        "artifactId=log4j-core\n"
+        "version=2.14.1\n",
+    )
+PYEOF
+then
+    echo "::error::カナリア用の jar を生成できませんでした。python3 の zipfile が使えるか確認してください。"
+    exit 1
+fi
+
+# 実行ステージの COPY --from=builder の直後に1行入れる。
+# 空振りしたまま緑のPRが作られると、月次監査は「実行されたが失敗しなかった」
+# = 検出漏れと記録し、カナリア側の故障がゲート側の故障に化ける。
+# 原因が分かるのは翌月になるため、ここで即座に止める。
+python3 - <<'PYEOF' || true
+import io
+
+path = "docker/backend/Dockerfile.prod"
+anchor = "COPY --from=builder /app/build/libs/*.jar app.jar\n"
+body = io.open(path, encoding="utf-8", newline="").read()
+if body.count(anchor) == 1:
+    io.open(path, "w", encoding="utf-8", newline="").write(
+        body.replace(anchor, anchor + "COPY canary-vuln.jar /app/canary-vuln.jar\n")
+    )
+PYEOF
+if ! grep -q '^COPY canary-vuln\.jar /app/canary-vuln\.jar$' docker/backend/Dockerfile.prod; then
+    echo "::error::Dockerfile.prod の実行ステージに挿入できませんでした。COPY --from=builder の行が変わっていないか確認してください。"
+    exit 1
+fi
+
+git add backend/canary-vuln.jar docker/backend/Dockerfile.prod
+git commit -m "test: canary container-vuln (${STAMP})" \
+    -m "Changes:
+- ゲート健康診断用のカナリア変更(container-vuln)
+Reason:
+- 月次のゲート検出能力確認
+BREAKING CHANGE: N/A
+Related: N/A
+Refs: N/A"
+git push -u origin "$branch"
+gh pr create \
+    --title "[canary] 本番イメージへの脆弱な jar の持ち込み" \
+    --label canary \
+    --body "## カナリアPR(マージ禁止)
+
+ゲート健康診断(月次)の自動生成PR。**マージしないこと**。
+
+- 種別: container-vuln
+- 期待される検出: container-scan が CVE-2021-44228 で赤になること(スキップは検出漏れ)
+- 監査手順: doc/開発フロー/監査手順.md
+
+Refs: N/A"
+git switch - >/dev/null
+
+echo "カナリアPRを6件作成しました。各PRのチェックが期待通り赤になることを監査で確認してください。"

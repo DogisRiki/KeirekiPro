@@ -1,0 +1,310 @@
+name: Container Image Vulnerability Scan
+
+# PRの内容で本番イメージを arm64 で組み立て、脆弱性を検査してマージ可否を報告する。
+#
+# 判定そのものは .github/scripts/check-container-scan.sh が持つ。
+# ここが持つのは実行前提の検証(Trivyのバージョン一致・30分の上限)だけで、
+# 脆弱性の合否ロジックはワークフロー側に置かない。
+#
+# 採用する外部部品について:
+#   2026-03-19、aquasecurity/trivy-action の77タグ中76タグと
+#   aquasecurity/setup-trivy の全7タグが情報窃取マルウェアへ force-push された
+#   (GHSA-69fq-xp46-6x23 / CVE-2026-33634、Critical)。
+#   出典: https://github.com/advisories/GHSA-69fq-xp46-6x23
+#   露出期間は 2026-03-19 ~17:43 〜 ~21:44 の約4時間。
+#
+#   採用する aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567
+#   (v0.3.1)のコミット日時は 2026-06-03T12:03:56Z で、露出期間の終了から
+#   2ヶ月半後にあたる。署名は verified、リリースは immutable。
+#   採用の根拠の全文は
+#   .kiro/specs/container-image-vulnerability-scanning/design.md の
+#   Security Considerations にある。
+#
+#   アクションをSHAで固定してもTrivy本体は固定されない。setup-trivy の
+#   version 入力の既定は latest のため、env.TRIVY_VERSION を明示し、
+#   導入直後に check-trivy-version.sh で実行時の版を突き合わせる。
+
+on:
+  pull_request:
+    # reopened を含めるのは、close→reopen で検査が一度も走らないまま
+    # 緑が残る経路を塞ぐため。同一SHAでも新しい run が発火する。
+    types: [opened, reopened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # 最長30分のジョブが synchronize のたびに積み上がるのを避ける。
+  group: container-scan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  # Trivy 本体のバージョン。v は付けない(check-trivy-version.sh の引数の形式)。
+  # ここ1箇所だけに書く。監査手順の「バージョン固定の確認」の対象。
+  TRIVY_VERSION: '0.74.0'
+
+jobs:
+  # 既存の必須チェック名 detect-changes (ci.yaml:22) と衝突させないため、
+  # このワークフロー専用の名前にする。
+  detect-container-scan-changes:
+    runs-on: ubuntu-latest
+    # dorny/paths-filter は変更ファイルの一覧を REST API から取得するため、
+    # README で pull-requests: read を要求している。public リポジトリでは
+    # 無くても通るが、フィルタのステップに continue-on-error を付けている
+    # 関係で、権限不足になっても赤にならず「判定不能」に倒れる。そうなると
+    # 要件 1.8(対象外の変更ではスキップ)が静かに効かなくなり、全PRで
+    # 30分枠の arm64 ビルドが回る状態へ移行する。明示して曖昧さを消す。
+    # ジョブレベルの permissions はワークフローレベルを上書きするため、
+    # contents: read も併記する。
+    permissions:
+      contents: read
+      pull-requests: read
+    timeout-minutes: 10
+    outputs:
+      run: ${{ steps.normalize.outputs.run }}
+      scripts: ${{ steps.normalize.outputs.scripts }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Run paths-filter
+        id: filter
+        # 判定できなかった場合はジョブを失敗させず、検査を実行する側に倒す
+        # (要件 1.9)。倒し先は次のステップで決める。
+        continue-on-error: true
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          # このワークフロー自身を両方の対象に入れている。入れないと、
+          # 検査を弱める変更(--severity で絞る、--ignore-unfixed を足す、
+          # judge を report に変える、テストの起動を消す)が、検査を一度も
+          # 走らせないままマージできる。ゲートを変える変更はゲートを通す。
+          # design.md の対象一覧に対する追加(2026-08-20、DogisRiki が承認)。
+          filters: |
+            run:
+              - 'docker/backend/Dockerfile.prod'
+              - 'backend/**'
+              - '.github/container-scan-suppressions.json'
+              - '.github/workflows/container-scan.yaml'
+            scripts:
+              - '.github/scripts/check-container-scan.sh'
+              - '.github/scripts/check-trivy-version.sh'
+              - '.github/scripts/container-scan-issue.sh'
+              - '.github/scripts/tests/test-check-container-scan.sh'
+              - '.github/scripts/tests/test-check-trivy-version.sh'
+              - '.github/scripts/tests/test-container-scan-issue.sh'
+              - '.github/workflows/container-scan.yaml'
+
+      - name: Normalize and validate outputs
+        id: normalize
+        env:
+          FILTER_OUTCOME: ${{ steps.filter.outcome }}
+          FILTER_RUN: ${{ steps.filter.outputs.run }}
+          FILTER_SCRIPTS: ${{ steps.filter.outputs.scripts }}
+        run: |
+          set -euo pipefail
+
+          # 1. 変更範囲を判定できなかった場合は、失敗させず true に倒す(要件 1.9)。
+          if [ "$FILTER_OUTCOME" != "success" ]; then
+            echo "::warning::変更範囲を判定できませんでした。両方の検査を実行します。"
+            {
+              echo "run=true"
+              echo "scripts=true"
+            } >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 2. 判定は成立したのに出力が true / false のいずれでもない場合は、
+          #    判定結果として信用できないためこのジョブを失敗させる。
+          #
+          #    この検査が無いと、フィルタのキー名と outputs: の参照名が食い違う・
+          #    outputs: を書き忘れる・リネームで片方だけ直す、といった場合に
+          #    ワークフローは成功したまま出力が空になり、後続2ジョブが
+          #    同時に skipped = Success として恒久的に失効する。
+          #    後続の条件に result != 'success' を含めているため、ここで
+          #    失敗させれば2ジョブとも実行される側に倒れる。
+          for pair in "run=${FILTER_RUN}" "scripts=${FILTER_SCRIPTS}"; do
+            name="${pair%%=*}"
+            value="${pair#*=}"
+            case "$value" in
+              true | false) ;;
+              *)
+                echo "::error::変更検出の出力 ${name} が true / false のいずれでもありません: '${value}'"
+                exit 1
+                ;;
+            esac
+          done
+
+          {
+            echo "run=${FILTER_RUN}"
+            echo "scripts=${FILTER_SCRIPTS}"
+          } >>"$GITHUB_OUTPUT"
+
+  # 必須ステータスチェックに登録される名前。変更するとブランチ保護の設定と
+  # 食い違い、Pending のまま全PRが止まる。
+  container-scan:
+    needs: detect-container-scan-changes
+    # always() は使わない。キャンセルされた run でジョブが走ると、必須チェックに
+    # 失敗が残ってマージがブロックされる(dependency-review.yaml:106 と同じ理由)。
+    # 先行ジョブが成功していないときは、判定結果を信用せず実行する側に倒す。
+    if: ${{ !cancelled() && (needs.detect-container-scan-changes.result != 'success' || needs.detect-container-scan-changes.outputs.run == 'true') }}
+    runs-on: ubuntu-24.04-arm
+    # 既定の360分は、配布元が応答しなくなったときに6時間握り続けることを意味する。
+    # auto-merge の待ち時間に直結するため明示する(要件 1.10)。
+    # 内訳はベースイメージの pull、Gradle ビルド、tar 書き出し、脆弱性DBの取得、
+    # fat jar の入れ子解析。実測は合計91秒(タスク1.2、research.md の実測記録)。
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 作業用のファイルはリポジトリの作業ツリーの外に置く。中に置くと、tar が
+      # ビルドコンテキストや後続の検査の対象に紛れうる。
+      # runner コンテキストは jobs.<id>.env では使えないため、ここで環境変数にする。
+      - name: Prepare work paths
+        run: |
+          set -euo pipefail
+          {
+            echo "IMAGE_TAR=${RUNNER_TEMP}/container-scan-image.tar"
+            echo "SCAN_JSON=${RUNNER_TEMP}/container-scan-result.json"
+            echo "BLOCKING_JSON=${RUNNER_TEMP}/container-scan-blocking.json"
+            echo "DETECTED_JSON=${RUNNER_TEMP}/container-scan-detected.json"
+          } >>"$GITHUB_ENV"
+
+      # バージョンの検証はビルドの前に置く。組み立てに10分掛けたあとで
+      # 前提の不一致に気づく形にしない。
+      #
+      # cache は有効にしない。setup-trivy v0.3.1 はキャッシュヒット時に
+      # インストールのステップ自体を飛ばすため、SHA固定したインストール
+      # スクリプトを通らず、復元したバイナリがそのまま PATH に入る。
+      # check-trivy-version.sh が見るのは trivy の自己申告のみで、この2経路を
+      # 区別できない。この spec は Trivy 系ツールの供給網侵害を発端とするため、
+      # バイナリの入手経路を増やさない。
+      - name: Setup Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+
+      - name: Verify Trivy version
+        env:
+          EXPECTED_TRIVY_VERSION: ${{ env.TRIVY_VERSION }}
+        run: bash .github/scripts/check-trivy-version.sh "$EXPECTED_TRIVY_VERSION"
+
+      # type=docker エクスポータは docker-container ドライバを要求する。
+      # 既定の docker ドライバでは使えない。
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # --platform はアサーションにならないため、検査対象が arm64 であることの
+      # 保証は判定スクリプト側の architecture の突き合わせが担う。ここでの
+      # type=docker(単一プラットフォーム専用)はその前提を作るためのもの。
+      - name: Build production image for arm64
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+
+          docker buildx build \
+            --platform linux/arm64 \
+            --file docker/backend/Dockerfile.prod \
+            --tag keirekipro-backend:container-scan \
+            --output "type=docker,dest=${IMAGE_TAR}" \
+            ./backend
+
+          elapsed=$(( $(date +%s) - start ))
+          echo "BUILD_SECONDS=${elapsed}" >>"$GITHUB_ENV"
+          echo "::notice::イメージの組み立てに ${elapsed} 秒かかりました。"
+
+      # --ignore-unfixed も --severity も付けない。付けると出力から件が消え、
+      # 「全件を、抑制中かどうか区別できる形で提示する」を満たせない。
+      - name: Scan image
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+
+          trivy image \
+            --input "${IMAGE_TAR}" \
+            --format json \
+            --output "${SCAN_JSON}"
+
+          elapsed=$(( $(date +%s) - start ))
+          echo "SCAN_SECONDS=${elapsed}" >>"$GITHUB_ENV"
+          echo "::notice::脆弱性データベースの取得を含むスキャンに ${elapsed} 秒かかりました。"
+
+      # 終了コードは 0 / 1 / 2 の3値。ここでは 0 以外をすべて失敗として扱うが、
+      # 所要時間を残すために set -e には飲ませず捕捉する。
+      - name: Judge scan result
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+
+          rc=0
+          bash .github/scripts/check-container-scan.sh \
+            "${SCAN_JSON}" \
+            arm64 \
+            .github/container-scan-suppressions.json \
+            judge \
+            "${BLOCKING_JSON}" \
+            "${DETECTED_JSON}" || rc=$?
+
+          elapsed=$(( $(date +%s) - start ))
+          echo "JUDGE_SECONDS=${elapsed}" >>"$GITHUB_ENV"
+          echo "::notice::判定に ${elapsed} 秒かかりました。"
+
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::コンテナイメージの脆弱性検査に失敗しました(終了コード ${rc})。"
+            exit 1
+          fi
+
+      # 赤で終わった場合も所要時間を残す(要件 1.12)。cancelled のときは出さない。
+      - name: Report elapsed time
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### 検査の所要時間"
+            echo ""
+            echo "| 区間 | 秒 |"
+            echo "|---|---|"
+            echo "| 組み立て | ${BUILD_SECONDS:-未実行} |"
+            echo "| スキャン | ${SCAN_SECONDS:-未実行} |"
+            echo "| 判定 | ${JUDGE_SECONDS:-未実行} |"
+            echo ""
+          } >>"$GITHUB_STEP_SUMMARY"
+
+  # 判定スクリプトの変更が単体テストを一度も通らずに main へ入る経路を塞ぐ。
+  # スクリプトだけの変更で30分の arm64 ビルドを回さないよう、container-scan とは
+  # 別のジョブに分ける。このジョブも必須ステータスチェックに登録する。
+  container-scan-script-tests:
+    needs: detect-container-scan-changes
+    # 条件は container-scan と同型。always() は使わない(理由は上と同じ)。
+    if: ${{ !cancelled() && (needs.detect-container-scan-changes.result != 'success' || needs.detect-container-scan-changes.outputs.scripts == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # スクリプトには実行ビットが無い(core.fileMode=false で 100644 として
+      # 記録される)。直接起動すると exit 126 になるため bash 経由で起動する。
+      #
+      # 1本ずつ別ステップにすると、最初に落ちた時点で残りが実行されず、
+      # 1回の run で全体像が見えない。3本すべてを走らせてから結果をまとめる。
+      - name: Test judgement scripts
+        run: |
+          set -uo pipefail
+          failed=0
+          for t in test-check-container-scan test-check-trivy-version test-container-scan-issue; do
+            echo "::group::${t}.sh"
+            if ! bash ".github/scripts/tests/${t}.sh"; then
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::判定スクリプトのテストに失敗しました。"
+            exit 1
+          fi

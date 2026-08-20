@@ -1,0 +1,299 @@
+name: Scheduled Container Image Vulnerability Scan
+
+# 稼働中の本番イメージを週1回再検査し、結果をIssueに反映する。
+#
+# PRゲート(container-scan.yaml)との違いは、イメージの入手方法と
+# 抑制の適用モードだけ。判定は同じ check-container-scan.sh が行う。
+#
+#   PRゲート  PRの内容から組み立てた tar を検査し、judge モードで抑制を適用する
+#   ここ      ECR にある稼働中のイメージを検査し、report モードで抑制を適用しない
+#
+# 抑制を適用しないのは、抑制が「マージを止めるかどうか」の判断であって
+# 「危険が無くなった」という意味ではないため。抑制中の脆弱性も毎週見える。
+#
+# ジョブの結論について:
+#   脆弱性の有無は結論に影響しない。結論が表すのは検査を完走できたかだけ。
+#   判定スクリプトの終了コード 0(検出なし)と 1(検出あり)はどちらも成功で
+#   終える。失敗になるのは終了コード 2(検査不能)、イメージの特定・取得の失敗、
+#   Issue操作の失敗の3つ。
+#
+#   ここを2値に潰すと、検査不能を検出0件と取り違えて未解消のIssueを
+#   一括クローズする。終了コードを3値のまま扱うのはそのため。
+#
+# environment: を指定しないこと:
+#   指定すると OIDC の sub が repo:OWNER/REPO:environment:NAME になり、
+#   ロールの信頼ポリシーの該当条件に合致しなくなる。
+#
+# 採用する外部部品について:
+#   aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567(v0.3.1)を使う。
+#   このアクションは 2026-03-19 に全7タグが情報窃取マルウェアへ force-push された
+#   (GHSA-69fq-xp46-6x23 / CVE-2026-33634、Critical。露出は同日 ~17:43 〜 ~21:44 の約4時間)。
+#   出典: https://github.com/advisories/GHSA-69fq-xp46-6x23
+#   採用SHAのコミット日時は 2026-06-03T12:03:56Z で露出期間の終了から2ヶ月半後、
+#   署名は verified、リリースは immutable。
+#   選定の全文は design.md の Security Considerations にある。
+
+on:
+  schedule:
+    # 水曜 03:17 UTC(12:17 JST)。
+    #
+    # 曜日は mutation-report.yaml(土曜)・canary.yaml(月初)・Dependabot(月曜)の
+    # いずれとも重ならないものを選ぶ。
+    #
+    # **時刻は稼働時間帯に合わせている。** このサービスは常時起動ではない。
+    # terraform/modules/scheduler/main.tf の ecs_start / ecs_stop により
+    # 平日 08:00〜20:00 JST だけ起動し、それ以外は desiredCount が 0 になる。
+    # 12:17 JST はその窓の中にある。この時刻を窓の外へ動かすと、
+    # 何も動いていない状態のタスク定義を検査することになる。
+    - cron: '17 3 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+concurrency:
+  # 実行中に次が走るとIssue操作が交錯する。走行中は後発を待たせる。
+  # cancel-in-progress を true にすると、起票の途中で止まる経路ができる。
+  group: container-scan-scheduled
+  cancel-in-progress: false
+
+env:
+  # Trivy 本体のバージョン。v は付けない(check-trivy-version.sh の引数の形式)。
+  # ここ1箇所だけに書く。監査手順の「バージョン固定の確認」の対象。
+  TRIVY_VERSION: '0.74.0'
+  AWS_REGION: ap-northeast-1
+  ECS_CLUSTER: keirekipro-cluster
+  ECS_SERVICE: keirekipro-backend-service
+  CONTAINER_NAME: keirekipro-backend
+
+jobs:
+  scheduled-container-scan:
+    runs-on: ubuntu-latest
+    # 検査対象はレジストリにある成果物で、ここでは組み立てを行わない。
+    # 既定の360分を握らせないために明示する。
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # テストを先頭に置く。container-scan-issue.sh は Issue のクローズという
+      # 後戻りしにくい操作を持つため、スクリプトが壊れている状態で
+      # Issue に触らせない(dependency-gate.yaml:37-38 と同じ型)。
+      #
+      # スクリプトには実行ビットが無い(core.fileMode=false で 100644 として
+      # 記録される)。直接起動すると exit 126 になるため bash 経由で起動する。
+      - name: Test judgement scripts
+        run: |
+          set -uo pipefail
+          failed=0
+          for t in test-check-container-scan test-check-trivy-version test-container-scan-issue; do
+            echo "::group::${t}.sh"
+            if ! bash ".github/scripts/tests/${t}.sh"; then
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::判定スクリプトのテストに失敗しました。Issue は操作しません。"
+            exit 1
+          fi
+
+      - name: Prepare work paths
+        run: |
+          set -euo pipefail
+          {
+            echo "SCAN_JSON=${RUNNER_TEMP}/container-scan-result.json"
+            echo "BLOCKING_JSON=${RUNNER_TEMP}/container-scan-blocking.json"
+            echo "DETECTED_JSON=${RUNNER_TEMP}/container-scan-detected.json"
+          } >>"$GITHUB_ENV"
+
+      # cache は有効にしない。理由は container-scan.yaml の同じステップの
+      # コメントを参照(キャッシュヒット時に固定したインストール経路を通らない)。
+      - name: Setup Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+
+      - name: Verify Trivy version
+        env:
+          EXPECTED_TRIVY_VERSION: ${{ env.TRIVY_VERSION }}
+        run: bash .github/scripts/check-trivy-version.sh "$EXPECTED_TRIVY_VERSION"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+
+      # 稼働中イメージは ECS のサービスとタスク定義から辿る。
+      # ecr:DescribeImages でタグ一覧から選ぶ方法は採らない。「最新のタグ」と
+      # 「稼働中のイメージ」は一致するとは限らないため。
+      #
+      # コンテナは添字ではなく名前で選ぶ。サイドカーが追加されたときに
+      # 別のコンテナを検査して緑になることを防ぐ。要素数がちょうど1でなければ失敗させる。
+      - name: Identify running image
+        run: |
+          set -euo pipefail
+
+          if ! services=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --output json); then
+            echo "::error::ECS のサービスを取得できませんでした: ${ECS_CLUSTER}/${ECS_SERVICE}"
+            exit 1
+          fi
+
+          # failures にはアクセス不可・存在しないサービスが入る。
+          # services が1件返っていても failures が残る形があるため両方見る。
+          failure_count=$(jq '.failures | length' <<<"$services")
+          service_count=$(jq '.services | length' <<<"$services")
+          if [ "$failure_count" -ne 0 ] || [ "$service_count" -ne 1 ]; then
+            echo "::error::ECS のサービスがちょうど1つに定まりません(services=${service_count} failures=${failure_count})。"
+            exit 1
+          fi
+
+          # 削除直後のサービスは status: INACTIVE のまま taskDefinition を伴って返り、
+          # failures には落ちない。そのまま進むと、もう使われていない設定値を
+          # 「稼働中イメージ」として検査して緑で終わる。
+          service_status=$(jq -r '.services[0].status // ""' <<<"$services")
+          if [ "$service_status" != "ACTIVE" ]; then
+            echo "::error::ECS のサービスが ACTIVE ではありません: ${service_status:-取得できず}"
+            exit 1
+          fi
+
+          # 稼働数は失敗事由にしない。タスク定義に書かれているイメージは、
+          # 停止中であっても次に起動するイメージそのものであり、検査の対象として
+          # 正しい。ただし「稼働中を検査した」と読めてしまうため記録は残す。
+          desired_count=$(jq -r '.services[0].desiredCount // 0' <<<"$services")
+          running_count=$(jq -r '.services[0].runningCount // 0' <<<"$services")
+          if [ "$running_count" -eq 0 ]; then
+            echo "::warning::実行中のタスクが 0 件です。検査対象はタスク定義に記録されたイメージです。"
+          fi
+
+          task_definition=$(jq -r '.services[0].taskDefinition // ""' <<<"$services")
+          if [ -z "$task_definition" ] || [ "$task_definition" = "null" ]; then
+            echo "::error::稼働中のタスク定義を特定できませんでした。"
+            exit 1
+          fi
+
+          if ! task_def_json=$(aws ecs describe-task-definition \
+            --task-definition "$task_definition" \
+            --output json); then
+            echo "::error::タスク定義を取得できませんでした: ${task_definition}"
+            exit 1
+          fi
+
+          images=$(jq -c --arg name "$CONTAINER_NAME" \
+            '[.taskDefinition.containerDefinitions[]? | select(.name == $name) | .image]' \
+            <<<"$task_def_json")
+          image_count=$(jq 'length' <<<"$images")
+          if [ "$image_count" -ne 1 ]; then
+            echo "::error::コンテナ ${CONTAINER_NAME} のイメージがちょうど1つに定まりません(${image_count} 件)。"
+            exit 1
+          fi
+
+          # 要素数1でも .image キー自体が無ければ null が1件入る。ここを素通りすると
+          # Trivy に文字列 "null" が渡り、Docker Hub の認証エラーとして落ちる。
+          # 原因がタスク定義であることがログから読めなくなるため、手前で止める。
+          image_ref=$(jq -r '.[0] // ""' <<<"$images")
+          if [ -z "$image_ref" ] || [ "$image_ref" = "null" ]; then
+            echo "::error::コンテナ ${CONTAINER_NAME} の image が記録されていません。"
+            exit 1
+          fi
+
+          echo "IMAGE_REF=${image_ref}" >>"$GITHUB_ENV"
+          echo "::notice::稼働中のイメージ: ${image_ref}"
+          {
+            echo "### 稼働中イメージの脆弱性検査"
+            echo ""
+            echo "| 項目 | 値 |"
+            echo "|---|---|"
+            echo "| タスク定義 | \`${task_definition}\` |"
+            echo "| イメージ | \`${image_ref}\` |"
+            echo "| 実行中 / 目標 | ${running_count} / ${desired_count} |"
+            echo ""
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      # --image-src remote でレジストリから直接取得する。ローカルの
+      # docker デーモンには存在しないため、既定の探索順に任せない。
+      # --ignore-unfixed も --severity も付けない(全件を提示するため)。
+      - name: Scan running image
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+
+          trivy image \
+            --image-src remote \
+            --format json \
+            --output "${SCAN_JSON}" \
+            "${IMAGE_REF}"
+
+          echo "::notice::スキャンに $(( $(date +%s) - start )) 秒かかりました。"
+
+      # 終了コードは 0 / 1 / 2 の3値。set -e に飲ませると 1 と 2 が同じ扱いになり、
+      # 検査不能(2)を検出あり(1)と取り違えて Issue 操作へ進んでしまう。
+      #
+      # report モードなので抑制は判定に適用しない。表の「抑制」列には状態が出る。
+      - name: Judge scan result
+        run: |
+          set -euo pipefail
+
+          rc=0
+          bash .github/scripts/check-container-scan.sh \
+            "${SCAN_JSON}" \
+            arm64 \
+            .github/container-scan-suppressions.json \
+            report \
+            "${BLOCKING_JSON}" \
+            "${DETECTED_JSON}" || rc=$?
+
+          # 件数は判定スクリプトの素の標準出力にしか出ない。週次の監査は注釈と
+          # ジョブの結論を見るため、注釈にも件数を載せる。
+          detected_count=0
+          blocking_count=0
+          if [ -f "${DETECTED_JSON}" ]; then
+            detected_count=$(jq 'length' "${DETECTED_JSON}")
+          fi
+          if [ -f "${BLOCKING_JSON}" ]; then
+            blocking_count=$(jq 'length' "${BLOCKING_JSON}")
+          fi
+
+          case "$rc" in
+            0)
+              echo "::notice::検出 ${detected_count} 件。修正版のある CRITICAL / HIGH は 0 件でした。"
+              ;;
+            1)
+              echo "::notice::検出 ${detected_count} 件。うち修正版のある CRITICAL / HIGH が ${blocking_count} 件あります。"
+              ;;
+            2)
+              echo "::error::検査を完了できませんでした。Issue は一切操作しません。"
+              exit 1
+              ;;
+            *)
+              echo "::error::判定スクリプトが契約外の終了コードを返しました: ${rc}"
+              exit 1
+              ;;
+          esac
+
+      # ここに到達するのは終了コードが 0 か 1 のときだけ。
+      # 0 のときも実行する。検出されなくなった脆弱性のIssueを閉じるため。
+      - name: Update issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          bash .github/scripts/container-scan-issue.sh \
+            "${BLOCKING_JSON}" \
+            "${DETECTED_JSON}" \
+            "${IMAGE_REF}"
+
+          # 判定の注釈は「反映する予定」を意味する。実際に反映できたかは
+          # このステップの成否でしか分からないため、完了をここで残す。
+          echo "::notice::Issue への反映が完了しました。"
