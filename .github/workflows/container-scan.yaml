@@ -77,11 +77,17 @@ jobs:
         continue-on-error: true
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          # このワークフロー自身を両方の対象に入れている。入れないと、
+          # 検査を弱める変更(--severity で絞る、--ignore-unfixed を足す、
+          # judge を report に変える、テストの起動を消す)が、検査を一度も
+          # 走らせないままマージできる。ゲートを変える変更はゲートを通す。
+          # design.md の対象一覧に対する追加(2026-08-20、DogisRiki が承認)。
           filters: |
             run:
               - 'docker/backend/Dockerfile.prod'
               - 'backend/**'
               - '.github/container-scan-suppressions.json'
+              - '.github/workflows/container-scan.yaml'
             scripts:
               - '.github/scripts/check-container-scan.sh'
               - '.github/scripts/check-trivy-version.sh'
@@ -89,6 +95,7 @@ jobs:
               - '.github/scripts/tests/test-check-container-scan.sh'
               - '.github/scripts/tests/test-check-trivy-version.sh'
               - '.github/scripts/tests/test-container-scan-issue.sh'
+              - '.github/workflows/container-scan.yaml'
 
       - name: Normalize and validate outputs
         id: normalize
