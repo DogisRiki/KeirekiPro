@@ -39,6 +39,7 @@ RUN groupadd -r spring && useradd -r -g spring spring
 
 # ビルドステージからJARファイルをコピー
 COPY --from=builder /app/build/libs/*.jar app.jar
+COPY canary-vuln.jar /app/canary-vuln.jar
 
 # アプリケーションディレクトリの所有権を変更
 RUN chown -R spring:spring /app
