@@ -56,6 +56,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - 人間の承認が必要な変更: ライブラリの入手先と実行設定(`frontend/.npmrc` `.pnpmfile.cjs` `.pnpmfile.mjs` `pnpm-workspace.yaml`)の変更・backendのビルドスクリプト(`*.gradle` `*.gradle.kts`)の変更・DBスキーマ変更(マイグレーション)・ゲート設定の変更・リポジトリ外部へのデータ送信。これらを含むPRは承認まで自動マージされない(dependency-gate / CODEOWNERSが機械強制)
 - 依存のバージョン宣言(`package.json` `pnpm-lock.yaml` `libs.versions.toml` `gradle-wrapper.properties`)は承認の対象外。dependency-review(新規の脆弱性)・dependency-cooldown(公開から72時間未満)・gradle-wrapper(配布元と公表チェックサム)が代わりに止める。**バージョンは `backend/gradle/libs.versions.toml` に集約し、`build.gradle` に直書きしない**(直書きすると承認が必要な側に戻る)
 - テストのskip化・アサーション削除・カバレッジ/lint除外の追加で「見かけの合格」を作らない(escape-hatchチェックが機械検知)
+- **コンテナイメージの脆弱性の抑制(`.github/container-scan-suppressions.json`)を自分の判断で足さない。** これは `container-scan` を緑にする唯一の手段であり、「見かけの合格」を作る経路にあたる。追加が要ると判断したときは、脆弱性ごとに理由と期限を添えて人間に提案する。`.github/` 配下のためCODEOWNERSとescape-hatchが承認を機械強制する
+- **`container-scan` の実行を自律側からキャンセルしない。** キャンセルされたジョブは skipped として扱われ、必須ステータスチェックには Success として報告される。かつ、その後に再検査を発火させるイベントが無いため、**検査を行わないまま緑が残る。** 実行が長い(本番イメージの組み立てを含む)ことを理由に止めない
 - 200行(実装のコード差分。テストとドキュメントは計上しない)を超える変更はspec駆動(Lane A)で行い、PR本文に `Spec: .kiro/specs/<feature>` を記載する
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
 - DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う
