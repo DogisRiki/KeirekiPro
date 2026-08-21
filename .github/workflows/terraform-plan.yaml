@@ -98,7 +98,11 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-role
+          # plan は状態と現状を読むだけで、書き換えを行わない。PRから引き受ける経路は
+          # ブランチで絞れない(pull_request の sub にブランチ名が入らない)ため、
+          # ここが広い権限を持つと、PRを出せる者が構築・削除まで行えることになる。
+          # 参照専用のロールに分けている(#222)。
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-plan-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform

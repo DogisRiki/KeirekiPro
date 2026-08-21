@@ -125,7 +125,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-role
+          # 必要なのは ECS の参照と ECR からの取得だけ。無人で毎週動くジョブに
+          # 構築用の権限を持たせない(#222)。
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-scan-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
