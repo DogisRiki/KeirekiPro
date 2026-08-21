@@ -144,20 +144,45 @@
 
 GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理する。Terraformでは管理しない。
 
+**用途ごとに3本に分かれている（2026-08-21、Issue #222）。** 以前は1本が構築・デプロイ・Plan・週次監視を兼ねていたが、`pull_request` から引き受けられる経路に構築権限が付いた状態だったため分割した。分割の理由は 3.5 に書く。
+
 ### 3.1 ロール設計
 
-| 項目 | 設定値 |
-|------|--------|
-| ロール名 | keirekipro-github-actions-role |
-| 信頼されたエンティティ | token.actions.githubusercontent.com（OIDC） |
+いずれも信頼されたエンティティは `token.actions.githubusercontent.com`（OIDC）。
+
+| ロール名 | 用途 | 引き受けられる条件 |
+|------|------|------|
+| keirekipro-github-actions-role | 本番デプロイ、Terraform Apply | mainブランチのみ |
+| keirekipro-github-actions-plan-role | PRでのTerraform Plan | プルリクエストで動くジョブ |
+| keirekipro-github-actions-scan-role | 週次のコンテナイメージ監視 | mainブランチのみ |
 
 ### 3.2 アタッチポリシー
 
-| ポリシー名 | 種別 | 用途 |
-|-----------|------|------|
-| keirekipro-github-actions-policy | カスタム | CI/CDに必要な権限 |
+| ロール名 | ポリシー名 | 種別 |
+|------|-----------|------|
+| keirekipro-github-actions-role | keirekipro-github-actions-policy | カスタム |
+| keirekipro-github-actions-plan-role | ReadOnlyAccess | AWS管理 |
+| keirekipro-github-actions-plan-role | keirekipro-terraform-plan-support | インライン |
+| keirekipro-github-actions-scan-role | keirekipro-container-scan-read | インライン |
+
+**`keirekipro-terraform-plan-support`** は、`ReadOnlyAccess` に無い2つを補う。状態ファイルのロックに要る `dynamodb:GetItem` / `PutItem` / `DeleteItem`（`keirekipro-terraform-lock` のみ）と、`secretsmanager:GetSecretValue`（`keirekipro/*` のみ）。
+
+後者が要るのは、この構成が `aws_secretsmanager_secret_version` を**リソースとして管理**しており、Planの段階で現在の値の取得が発生するため。無いとPlanが `AccessDeniedException` で落ちる（2026-08-21 実測）。なお `ReadOnlyAccess` は状態ファイルの置き場（S3）の読み取りを許しており、状態ファイルには同じ値が保存されているため、ここを絞っても秘密情報の露出は変わらない。
+
+**`keirekipro-container-scan-read`** は `ecs:DescribeServices` / `ecs:DescribeTaskDefinition`、`ecr:GetAuthorizationToken`、および `keirekipro-backend` からの取得（`ecr:BatchGetImage` / `GetDownloadUrlForLayer` / `BatchCheckLayerAvailability`）だけを持つ。
 
 ### 3.3 カスタムポリシー: keirekipro-github-actions-policy
+
+> **この節に書いてあるのは設計上の最小権限であり、実物はこれより広い。** 2026-08-21 に実物を確認したところ、構築に必要な権限をまとめた Statement が含まれており、この文書の記述と一致していなかった。ロールがコード管理外のため、差が生じても機械では気づけない。
+>
+> **権限の実物はコンソールで確認する。** 被害範囲をそのまま公開しないため、ここには書かない。
+>
+> ```bash
+> aws iam get-policy-version --policy-arn <ポリシーARN> >   --version-id $(aws iam get-policy --policy-arn <ポリシーARN> --query 'Policy.DefaultVersionId' --output text) >   --query 'PolicyVersion.Document'
+> ```
+>
+> 最小権限へ寄せる作業は未着手。このロールを引き受けられるのは main からのみのため、緊急度は下がっている。
+
 
 ```json
 {
@@ -231,11 +256,21 @@ GitHub Actions用IAMロールはAWSコンソールから手動で作成・管理
 
 用途ごとにStatementを分け、引き受けられる条件を絞る。
 
+`keirekipro-github-actions-role` の信頼ポリシーには2つのStatementがある。
+
 | Statement | 用途 | 条件 |
 |---|---|---|
 | DeployFromMainProductionEnvironment | backend / frontend の本番デプロイ | mainブランチ、かつ production 環境を経由するジョブ |
-| TerraformPlanOnPullRequest | PRでのTerraform Plan | プルリクエストで動くジョブ |
 | TerraformApplyFromMain | 手動のTerraform Apply | mainブランチで動くジョブ |
+
+**`TerraformPlanOnPullRequest` は 2026-08-21 に削除した。** PRでのPlanは `keirekipro-github-actions-plan-role` が引き受ける。理由は 3.5 に書く。
+
+参照専用の2本の信頼ポリシーは、それぞれStatementが1つだけ。
+
+| ロール | Statement | `sub` の条件 |
+|---|---|---|
+| keirekipro-github-actions-plan-role | TerraformPlanOnPullRequest | `repo:ORG/REPO:pull_request` |
+| keirekipro-github-actions-scan-role | ContainerScanFromMain | `repo:ORG/REPO:ref:refs/heads/main` |
 
 条件の組み立てには2つの制約がある。
 
@@ -277,20 +312,6 @@ terraform-plan.yaml と terraform-apply.yaml のジョブでは条件が一致�
       }
     },
     {
-      "Sid": "TerraformPlanOnPullRequest",
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_ORG}/${GITHUB_REPO}:pull_request"
-        }
-      }
-    },
-    {
       "Sid": "TerraformApplyFromMain",
       "Effect": "Allow",
       "Principal": {
@@ -312,8 +333,24 @@ terraform-plan.yaml と terraform-apply.yaml のジョブでは条件が一致�
 ワークフローから `environment: production` の行を消した実行は `sub` が
 `repo:ORG/REPO:ref:refs/heads/main` になり、1つ目のStatementに一致しない。
 
-> このロールの権限はデプロイとTerraformの和集合になっている。Terraform Plan の実行が
-> ECS・ECRの権限も持つ状態は残る。用途ごとにロールを分けるのが本来の形。
+### 3.5 用途ごとに分けている理由
+
+**`pull_request` から引き受ける経路は、ブランチで絞れない。** GitHubのOIDCトークンの `sub` は、`pull_request` イベントでは `repo:ORG/REPO:pull_request` になり、**どのブランチのPRかという情報を持たない**（3.4 の制約2と同じ性質）。書き忘れではなく、条件として書けない。
+
+このため、1本のロールが構築権限を持ったまま `pull_request` を信頼していると、**リポジトリにブランチをpushできる者が、PRを出した時点で構築権限を持つジョブを動かせる。** CODEOWNERSはマージを止めるが、PRで動くワークフローの実行は止めない。
+
+分割後は、`pull_request` から引き受けられるのが参照専用の `keirekipro-github-actions-plan-role` だけになる。構築権限を持つロールは main からしか引き受けられず、mainへの変更には所有者の承認が要る。
+
+**残る露出は読み取りである。** Planは状態ファイルと秘密情報を読む必要があり（3.2 参照）、そこは分割しても塞がらない。塞がるのは作成・変更・削除の側。
+
+| 操作 | plan-role での判定（2026-08-21 実測） |
+|---|---|
+| iam:CreateUser / iam:AttachRolePolicy | implicitDeny |
+| ec2:TerminateInstances / rds:DeleteDBInstance | implicitDeny |
+| ecs:UpdateService / ecr:PutImage / s3:DeleteObject | implicitDeny |
+| secretsmanager:GetSecretValue（`keirekipro/*`） | allowed（Planに必要） |
+
+確認は `aws iam simulate-principal-policy` で行う。
 
 ## 4. OIDCプロバイダー設定
 
