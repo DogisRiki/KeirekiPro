@@ -23,6 +23,19 @@ env:
 jobs:
   terraform-apply:
     runs-on: ubuntu-latest
+    # production environment を経由させることで、Settings に登録した承認者の
+    # 承認が済むまでジョブが開始しない。開始前に止まるため、AWS の認証情報は
+    # まだ発行されていない。
+    #
+    # 手元の禁止設定(.claude/settings.json の deny)は Claude Code 側の仕組みで、
+    # 打ち方によっては素通りしうる。こちらは GitHub 側で強制されるため、
+    # 誰がどう起動しても承認を挟む。
+    #
+    # environment を指定すると OIDC の sub が
+    # repo:OWNER/REPO:environment:production になり、ref は refs/heads/main の
+    # まま残る。信頼ポリシーの DeployFromMainProductionEnvironment が
+    # この組み合わせを許可しているため、ロール側の変更は要らない。
+    environment: production
     defaults:
       run:
         working-directory: terraform
