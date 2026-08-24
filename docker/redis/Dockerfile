@@ -3,4 +3,4 @@
 # compose.yaml に image: を直書きせずDockerfileに置いているのは、Dependabotの
 # dockerレーンが docker/*/Dockerfile を対象にしており、直書きのままでは
 # 更新経路が存在しないため。ベースイメージを差し替えるだけで中身は追加しない。
-FROM redis:7.4.10-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+FROM redis:7.4.11-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
