@@ -196,7 +196,7 @@ jobs:
       # type=docker エクスポータは docker-container ドライバを要求する。
       # 既定の docker ドライバでは使えない。
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       # --platform はアサーションにならないため、検査対象が arm64 であることの
       # 保証は判定スクリプト側の architecture の突き合わせが担う。ここでの
