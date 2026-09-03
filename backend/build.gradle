@@ -107,6 +107,9 @@ dependencies {
     implementation libs.java.jwt
 
     implementation platform(libs.spring.cloud.aws.dependencies)
+    // dependency-cooldown の実物検証用(#195)。公開72時間未満の版を意図的に解決させる。
+    // このブランチはマージ禁止
+    testRuntimeOnly libs.cooldown.probe.awssdk.s3
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-ses'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-secrets-manager'

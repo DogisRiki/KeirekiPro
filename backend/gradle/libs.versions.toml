@@ -56,6 +56,10 @@ netty = "4.1.137.Final"
 postgresql = "42.7.13"
 tomcat = "10.1.59"
 
+# dependency-cooldown の実物検証用(#195)。公開から72時間未満の版を意図的に入れる。
+# このブランチはマージ禁止。s3 2.54.11 は 2026-09-02T20:30Z 公開
+cooldown-probe-awssdk = "2.54.11"
+
 [libraries]
 # Flyway Gradleプラグイン(10系)がDB別モジュールをbuildscriptクラスパスに要求するためのもの。
 # implementation 側の flyway-core / flyway-database-postgresql は Spring Boot のBOM管理下にあり
@@ -70,6 +74,8 @@ openhtmltopdf-core = { module = "com.openhtmltopdf:openhtmltopdf-core", version.
 openhtmltopdf-pdfbox = { module = "com.openhtmltopdf:openhtmltopdf-pdfbox", version.ref = "openhtmltopdf" }
 java-jwt = { module = "com.auth0:java-jwt", version.ref = "java-jwt" }
 spring-cloud-aws-dependencies = { module = "io.awspring.cloud:spring-cloud-aws-dependencies", version.ref = "spring-cloud-aws" }
+# dependency-cooldown の実物検証用(#195)。マージ禁止
+cooldown-probe-awssdk-s3 = { module = "software.amazon.awssdk:s3", version.ref = "cooldown-probe-awssdk" }
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 freemarker = { module = "org.freemarker:freemarker", version.ref = "freemarker" }
 commons-validator = { module = "commons-validator:commons-validator", version.ref = "commons-validator" }
