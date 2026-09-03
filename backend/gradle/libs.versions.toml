@@ -29,7 +29,7 @@
 spring-boot = "3.5.16"
 spring-dependency-management = "1.1.7"
 spotless = "7.2.1"
-spotbugs = "6.5.10"
+spotbugs = "6.5.11"
 pitest = "1.19.0"
 # buildscript の classpath と plugins の両方から参照する。ずれを防ぐため1箇所にする
 flyway = "10.22.0"
@@ -42,7 +42,7 @@ openhtmltopdf = "1.0.10"
 java-jwt = "4.6.0"
 spring-cloud-aws = "3.4.2"
 testcontainers = "1.21.4"
-freemarker = "2.3.34"
+freemarker = "2.3.35"
 commons-validator = "1.11.0"
 mybatis-postgresql-typehandlers = "1.0.2"
 
