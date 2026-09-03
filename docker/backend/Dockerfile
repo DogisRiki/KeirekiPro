@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jdk@sha256:57865c22b954cf920cb05a610af81d577e89783282514ba071e99c7357f6c769
+FROM eclipse-temurin:21-jdk@sha256:85f00967bcc624fc19fa9c2cf124ea426a5363898e267141726f31f358c2e14b
 
 COPY ./backend /home/spring/app
 WORKDIR /home/spring/app
