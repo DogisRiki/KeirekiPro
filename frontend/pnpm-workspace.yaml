@@ -26,6 +26,9 @@ overrides:
   js-yaml@4: "^4.3.1"
   postcss@8: "^8.5.23"
   qs@6: "^6.15.2"
+  # CVE-2026-73088(ReDoS)。修正版は 4.28.7 以降。babel経由の推移的依存で、
+  # pnpm は推移的依存の狙い撃ち更新を非対応(pnpm/pnpm#12744)のため上書きする
+  browserslist: "^4.28.7"
 
 allowBuilds:
   esbuild: false
