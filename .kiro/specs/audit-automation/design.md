@@ -200,7 +200,8 @@ graph TB
 **Batch Contract**
 - Trigger: audit-weekly.yaml から実行。引数: 期待一覧のパス
 - Input: openのDependabot PR一覧(`author: dependabot[bot]`)→各PRのheadの check-runs
-- 判定: 各PRについて、期待一覧に載る context の結論を集計。`failure` があり、かつその context が `approval_gated: false` → 滞留として記録。1件以上でexit 1(PR番号+チェック名を列挙)。`approval_gated: true` の failure は「承認待ち」として報告のみ(2.3)
+- 判定: 各PRについて、期待一覧に載る context の結論を集計。**滞留結論(`failure` / `cancelled` / `timed_out` / `action_required`)** があり、かつその context が `approval_gated: false` → 滞留として記録。1件以上でexit 1(PR番号+チェック名+結論を列挙)。`approval_gated: true` の滞留結論は「承認待ち」として報告のみ(2.3)
+  - 滞留結論を failure のみにしない理由(2026-09-06 所有者判断): cancelled は本リポジトリで実測済みの滞留形態(キャンセルされた必須チェックは成功にならず、再検査イベントが無いためPRが赤のまま進まなくなる)。timed_out / action_required も「緑でも実行中でもない」状態で、放置検知の目的上見逃せない
 - 実行中(結論なし)・全緑・承認待ちのみ → exit 0。件数しきい値は持たない(2.4)。チェック失敗以外の滞留は見ない(2.5)
 
 ### check-audit-skipped-required.sh

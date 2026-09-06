@@ -162,11 +162,11 @@ echo "--- 滞留(非approval_gatedのfailure) ---"
 set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"failure"' "2026-01-01T00:00:00Z")")"
 check 1 "非approval_gatedのfailureが1件あれば赤にする"
 check_summary "#101" "対象のPR番号が報告に出る"
-check_summary "gitleaks" "失敗しているチェック名が報告に出る"
+check_summary "gitleaks (failure)" "失敗しているチェック名と結論が報告に出る"
 
 set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"failure"' "2026-01-01T00:00:00Z"),$(crun 2 backend-test completed '"failure"' "2026-01-01T00:00:00Z")")"
 check 1 "複数のfailureがあれば赤にする"
-check_summary "#101: backend-test, gitleaks" "失敗しているチェック名がすべて列挙される"
+check_summary "#101: backend-test (failure), gitleaks (failure)" "失敗しているチェック名と結論がすべて列挙される"
 
 set_pulls "[$(pull 101 "$DEPENDABOT" sha101),$(pull 102 "$DEPENDABOT" sha102)]"
 set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"failure"' "2026-01-01T00:00:00Z")")"
@@ -174,6 +174,26 @@ set_checkruns sha102 "$(runs "$(crun 1 dependency-gate completed '"failure"' "20
 check 1 "滞留と承認待ちが混在していれば赤にする(滞留が優先)"
 check_summary "#101" "滞留しているPR番号が報告に出る"
 check_summary "#102: dependency-gate" "承認待ちのPRも一覧に出る"
+
+echo "--- 滞留(failure以外の滞留結論) ---"
+set_pulls "[$(pull 101 "$DEPENDABOT" sha101)]"
+set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"cancelled"' "2026-01-01T00:00:00Z")")"
+check 1 "非approval_gatedのcancelledは滞留として赤にする"
+check_summary "#101" "対象のPR番号が報告に出る"
+check_summary "gitleaks (cancelled)" "cancelledの結論がチェック名に併記される"
+
+set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"timed_out"' "2026-01-01T00:00:00Z")")"
+check 1 "非approval_gatedのtimed_outは滞留として赤にする"
+
+set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"action_required"' "2026-01-01T00:00:00Z")")"
+check 1 "非approval_gatedのaction_requiredは滞留として赤にする"
+
+set_checkruns sha101 "$(runs "$(crun 1 dependency-gate completed '"cancelled"' "2026-01-01T00:00:00Z")")"
+check 0 "approval_gatedのcancelledは緑にする(承認待ち扱い)"
+check_summary "#101: dependency-gate (cancelled)" "承認待ちのPR番号とチェック名と結論が報告に出る"
+
+set_checkruns sha101 "$(runs "$(crun 1 backend-test completed '"neutral"' "2026-01-01T00:00:00Z")")"
+check 0 "neutralは滞留として扱わない"
 
 echo "--- 承認待ちのみ(approval_gatedのfailure) ---"
 set_pulls "[$(pull 101 "$DEPENDABOT" sha101)]"

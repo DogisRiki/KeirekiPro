@@ -82,7 +82,7 @@
 ## Implementation Notes
 
 - (Task 2.2) check-runs取得はper_page=100単発。イベント多重発火でスイートが100件を超えると101件目以降を見落とす(fail-open)。低確率だが次回触る際は --paginate を検討
-- (Task 2.2) 滞留判定の結論は現設計では failure のみ。cancelled / timed_out / action_required の扱いは所有者判断待ち(レビュー指摘。cancelledは本リポジトリで実測済みの滞留形態)
+- (Task 2.2) 滞留結論は所有者判断(2026-09-06「Aで」)により failure / cancelled / timed_out / action_required の4つに拡大済み(design.md改訂・スクリプト修正・再レビュー承認済み)。既存テスト2件の期待文字列を結論併記の新書式に更新したため、**PR本文に Test-Change-Justification が必要**(弱体化ではなく強化。レビューで確認済み)。requirements.md 2.2/2.3の「失敗」の文言は未同期(所有者判断で据え置き可)
 - (Task 2.3) PR一覧走査は全closed PRを--paginateで取得(期間打ち切りなし)。PR総数に比例してAPI呼び出しが増えるため、将来は sort=updated&direction=desc による打ち切りが改善候補。conclusion null(実行中)のみのcontextは違反=赤(fail-closed。固定テストは無し)
 
 - (Task 1) guardrails.yaml は pull_request_review イベントでも発火し、gitleaks等が同一head SHAに skipped のcheck-runを残す。タスク2.3のスキップ検知は「コンテキストごとに成功/完了の結論が存在するか」で判定しないと、承認操作のあったPRで偽赤になる

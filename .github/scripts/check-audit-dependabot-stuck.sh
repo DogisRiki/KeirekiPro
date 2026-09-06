@@ -4,15 +4,23 @@
 #
 # 判定: openのDependabot PR(author: dependabot[bot])ごとにheadコミットの
 #       check-runsを集計し、期待一覧(required-checks.json)に載るcontextの
-#       最新の結論を調べる。
-#         approval_gated: false のcontextに failure → 滞留。1件以上で exit 1
-#                          (対象のPR番号と失敗しているチェック名を列挙)
-#         approval_gated: true のcontextの failure → 「承認待ち」として報告のみ
-#         実行中(結論なし)・すべて緑・承認待ちのみ・open PRゼロ → exit 0
+#       最新の結論を調べる。滞留と数える結論は
+#       failure / cancelled / timed_out / action_required の4つ。
+#         approval_gated: false のcontextに滞留結論 → 滞留。1件以上で exit 1
+#                          (対象のPR番号とチェック名と結論を列挙)
+#         approval_gated: true のcontextの滞留結論 → 「承認待ち」として報告のみ
+#         実行中(結論なし)・すべて緑・skipped・neutral・承認待ちのみ・
+#         open PRゼロ → exit 0
 #         期待一覧のスキーマ不正・API失敗 → 判定不能として exit 1(fail closed)
-#       件数のしきい値は持たない(失敗で止まっているPRの有無だけで判定する)。
+#       件数のしきい値は持たない(滞留結論で止まっているPRの有無だけで判定する)。
 #       チェック失敗以外の滞留(mainより遅れたまま緑で停止・自動更新の失敗・
 #       マージ衝突等)は判定の対象にしない。
+#
+# なぜ滞留結論を failure だけにしないのか:
+#   cancelled は本リポジトリで実測済みの滞留形態(キャンセルされた必須チェック
+#   は成功として残らず、再検査イベントも無いためPRが赤のまま進まなくなる。
+#   #310系の監査知見)。timed_out / action_required も緑でも実行中でもない
+#   停止状態のため、放置検知の目的上あわせて滞留と数える。
 #
 # なぜ必要か:
 #   Dependabot PRが必須チェックの失敗で止まっても、GitHubの通知には「失敗
@@ -20,9 +28,9 @@
 #   分からなかった(旧・週次6)。とくにdockerレーンの滞留はイメージの更新
 #   停止を意味する。この検査がそれを置き換え、滞留を週次監査の赤にする。
 #
-# なぜ approval_gated のfailureを滞留にしないのか:
+# なぜ approval_gated の滞留結論を滞留にしないのか:
 #   dependency-gate / escape-hatch / pre-merge-check は所有者の承認で緑になる
-#   設計のチェックで、そのfailureは「承認待ち」という正常な停止。ただしこの
+#   設計のチェックで、その滞留結論は「承認待ち」という正常な停止。ただしこの
 #   静的な分類では、これらのチェック自体の故障によるfailureも除外されて
 #   しまう(受容済みの残余リスク)。緩和策として、承認待ちPRの一覧を
 #   Job Summaryへ常時出力し、長期の滞留が人間の目に入るようにする。
@@ -144,22 +152,24 @@ while [ "$i" -lt "$pr_count" ]; do
     fi
 
     # 期待一覧に載るcontextだけを対象に、同一contextの複数check-runは
-    # started_at(同時刻はid)が最新のものの結論で判定し、failureだけを残す。
+    # started_at(同時刻はid)が最新のものの結論で判定し、滞留結論
+    # (failure / cancelled / timed_out / action_required)だけを残す。
     failures_json=""
     if ! failures_json=$(printf '%s' "$runs_json" | jq -ce --argjson expected "$expected_map" '
         if (.check_runs | type) == "array" then
             [.check_runs[] | select(((.name? | type) == "string") and (.name as $n | $expected | has($n)))]
             | group_by(.name)
             | map(max_by([(.started_at // ""), (.id // 0)]))
-            | map(select(.conclusion? == "failure"))
-            | map({name: .name, gated: $expected[.name]})
+            | map(select(.conclusion? | IN("failure", "cancelled", "timed_out", "action_required")))
+            | map({name: .name, gated: $expected[.name], conclusion: .conclusion})
             | sort_by(.name)
         else empty end' 2>/dev/null); then
         report_undecidable "PR #${number} のcheck-runs APIの応答を解釈できませんでした。"
     fi
 
-    stuck_names=$(jq -r '[.[] | select(.gated | not) | .name] | join(", ")' <<<"$failures_json")
-    waiting_names=$(jq -r '[.[] | select(.gated) | .name] | join(", ")' <<<"$failures_json")
+    # 報告には結論を併記する(cancelledとfailureでは人間の対処が違うため)。
+    stuck_names=$(jq -r '[.[] | select(.gated | not) | "\(.name) (\(.conclusion))"] | join(", ")' <<<"$failures_json")
+    waiting_names=$(jq -r '[.[] | select(.gated) | "\(.name) (\(.conclusion))"] | join(", ")' <<<"$failures_json")
 
     if [ -n "$stuck_names" ]; then
         stuck_report="${stuck_report}- #${number}: ${stuck_names}"$'\n'
@@ -181,7 +191,7 @@ emit_waiting_section() {
         if [ -n "$waiting_report" ]; then
             printf '%s' "$waiting_report"
             echo ""
-            echo "承認で緑になる設計のチェック(approval_gated)のfailureのため、滞留とは扱いません。"
+            echo "承認で緑になる設計のチェック(approval_gated)が承認前の状態で止まっているため、滞留とは扱いません。"
             echo "長く残っている場合は、承認の要否を人間が判断してください。"
         else
             echo "- なし"
@@ -192,19 +202,19 @@ emit_waiting_section() {
 
 if [ -n "$stuck_report" ]; then
     {
-        echo "### :rotating_light: 必須チェックの失敗で止まっているDependabot PRがあります"
+        echo "### :rotating_light: 必須チェックが通らないまま止まっているDependabot PRがあります"
         echo ""
         printf '%s' "$stuck_report"
         echo ""
-        echo "失敗しているチェックの原因を確認し、\`doc/開発フロー/監査手順.md\` の手順で対処してください。"
+        echo "括弧内はチェックの結論です。結論に応じて \`doc/開発フロー/監査手順.md\` の手順で対処してください。"
         echo ""
     } >>"$SUMMARY"
     emit_waiting_section
-    echo "必須チェックの失敗で止まっているDependabot PRがあります:" >&2
+    echo "必須チェックが通らないまま止まっているDependabot PRがあります:" >&2
     printf '%s' "$stuck_report" >&2
     exit 1
 fi
 
 emit_waiting_section
-echo "必須チェックの失敗で止まっているDependabot PRはありません(open: ${pr_count}件)。"
+echo "必須チェックが通らないまま止まっているDependabot PRはありません(open: ${pr_count}件)。"
 exit 0
