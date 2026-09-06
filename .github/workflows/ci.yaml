@@ -80,9 +80,17 @@ jobs:
 
           # status=success で絞り、最新1件だけを取る(1リクエスト)。
           # 取得の失敗を「成功ゼロ」と混同しない(API障害を「導入直後」と誤読しない)。
+          # ただし 404(ワークフロー未登録)だけは導入前の正常な状態として通過させる。
+          # audit-weekly.yaml を追加するPR自身のCIがこのステップを含むため、404 を
+          # 判定不能扱いにすると導入PRが構造的にマージできなくなる(2026-09-06 実測)。
+          # gh api はHTTPエラーでも応答ボディをstdoutへ出すので、失敗時はボディで判別する。
           runs_json=""
           if ! runs_json=$(gh api \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/audit-weekly.yaml/runs?status=success&per_page=1" 2>/dev/null); then
+            if printf '%s' "$runs_json" | jq -e '(.message? // "") == "Not Found"' >/dev/null 2>&1; then
+              echo "audit-weekly はまだ登録されていないため通過します(導入前の許容。マージ後に workflow_dispatch で初回成功を作る)。"
+              exit 0
+            fi
             echo "::error::週次監査(audit-weekly)の実行履歴を取得できませんでした(判定不能)。成功に倒さず失敗にしています。このジョブを再実行してください。"
             exit 1
           fi

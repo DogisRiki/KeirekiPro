@@ -277,7 +277,7 @@ graph TB
 - 配置: detect-changes ジョブ末尾の1ステップ(全PRで必ず実行される必須チェック内。追加ランナーなし)
 - **イベント限定**: `if: github.event_name == 'pull_request'` を必ず付ける。ci.yaml はmainへのpushでも起動するが、push実行でこのステップが落ちると frontend-test がスキップされデプロイ用artifactの保存が欠落する(マージ後経路の破壊。#326と同型の事故)。要件4.1も「PRのCI」に限定している
 - Input: `GET /repos/{owner}/{repo}/actions/workflows/audit-weekly.yaml/runs?status=success&per_page=1`(1リクエスト)
-- 判定: 成功ゼロ→pass(導入直後=4.3)。直近成功が10日以上前→`::error::` でステップ失敗(4.2)。10日未満→pass
+- 判定: 成功ゼロ→pass(導入直後=4.3)。**404(ワークフロー未登録)→pass(導入前=4.3の適用。audit-weekly.yaml を追加するPR自身のCIがこのステップを含むため、404を判定不能にすると導入PRが構造的にマージ不能になる。2026-09-06 のPR #331 で実測し修正)**。直近成功が10日以上前→`::error::` でステップ失敗(4.2)。10日未満→pass。その他のAPI失敗→判定不能で失敗(fail-closed)
   - 「成功ゼロ→pass」は要件4.3(一度も実行されていない)より広く、「実行はあるが一度も成功していない」も素通りする。このため**マージ後に workflow_dispatch で audit-weekly の成功を1件作ることを導入手順の必須ステップとする**(Testing Strategy の実地確認と同一。以後は成功が存在するため空振りしない)
 - PRが無い期間は実行自体が無い(4.4は構造的に満たされる)
 - 権限影響: detect-changes ジョブに `actions: read` を追加(現在は contents: read のみ)
