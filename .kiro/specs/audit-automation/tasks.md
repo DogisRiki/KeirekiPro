@@ -30,7 +30,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
   - _Boundary: check-audit-dependabot-stuck.sh_
   - _Depends: 1_
-- [ ] 2.3 (P) 必須チェックの集合照合とスキップ検知のスクリプトとテストを作成する
+- [x] 2.3 (P) 必須チェックの集合照合とスキップ検知のスクリプトとテストを作成する
   - 集合照合: rulesetと期待一覧のcontext集合の差分で赤(状態は照合に使わない)。期待一覧のスキーマ検証は自前で行う(受入基準 3.4〜3.8 を test-check-audit-skipped-required.sh が検証)
   - スキップ検知: 対象期間(現在のGITHUB_RUN_IDを除いた自ワークフローの直近実行以降、無ければ7日)にマージされたPRの head.sha のcheck-runsを走査。mode: always かつ state: active の skipped/実行なしで赤。pausedは非違反+停止中報告。conditionalは対象外。merge_commit_sha は使わない
   - 失敗時の報告文面に「判定不能の赤は失敗したrunのre-runで再実行する(新規dispatchは検知の窓を狭める)」の指示を含める
@@ -83,6 +83,7 @@
 
 - (Task 2.2) check-runs取得はper_page=100単発。イベント多重発火でスイートが100件を超えると101件目以降を見落とす(fail-open)。低確率だが次回触る際は --paginate を検討
 - (Task 2.2) 滞留判定の結論は現設計では failure のみ。cancelled / timed_out / action_required の扱いは所有者判断待ち(レビュー指摘。cancelledは本リポジトリで実測済みの滞留形態)
+- (Task 2.3) PR一覧走査は全closed PRを--paginateで取得(期間打ち切りなし)。PR総数に比例してAPI呼び出しが増えるため、将来は sort=updated&direction=desc による打ち切りが改善候補。conclusion null(実行中)のみのcontextは違反=赤(fail-closed。固定テストは無し)
 
 - (Task 1) guardrails.yaml は pull_request_review イベントでも発火し、gitleaks等が同一head SHAに skipped のcheck-runを残す。タスク2.3のスキップ検知は「コンテキストごとに成功/完了の結論が存在するか」で判定しないと、承認操作のあったPRで偽赤になる
 - (Task 1) codex-review は mode: always だが、そのif条件はDependabot PRも除外する。将来 paused を解除すると、マージ済みDependabot PRが2.3で違反扱いになる潜在偽赤がある(現状はpausedのため実害なし。解除時に期待一覧かスクリプトの扱いを見直すこと)
