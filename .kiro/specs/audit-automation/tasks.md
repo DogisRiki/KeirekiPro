@@ -61,7 +61,7 @@
   - 完了の観測条件: 本spec実装PR自身のCI(PRイベント)でステップが実行されpassすること、および `if` 条件が設計の契約どおりであること(レビュー突合)。push側の実測はマージ後の導入手順(design.mdのTesting Strategy)で行う
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Boundary: ci.yaml detect-changes_
-- [ ] 3.3 (P) カナリア照合ワークフローを作成する
+- [x] 3.3 (P) カナリア照合ワークフローを作成する
   - cron(毎月4日)+workflow_dispatch、permissionsはread系のみ。自テスト→本判定のパターン
   - 完了の観測条件: ワークフローファイルが存在し、判定の呼び出し・権限・トリガーが設計の契約どおりであること
   - _Requirements: 5.1, 6.1, 6.2, 6.3, 6.4, 6.5_
