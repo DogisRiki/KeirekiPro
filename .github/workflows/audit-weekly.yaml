@@ -1,0 +1,145 @@
+name: Audit Weekly
+
+# 週次監査(#310 段階1): 人間が画面を開いて行っていた定期監査のうち、
+# 機械判定できる3項目を読み取り専用の自動判定に置き換える。
+#
+#   scan-freshness   定期スキャン(container-scan-scheduled.yaml)の直近成功が
+#                    8日未満かを確認する(旧・週次8)
+#   dependabot-stuck 必須チェックの失敗で止まっているDependabot PRを検知する
+#                    (旧・週次6)
+#   skipped-required 期待一覧とrulesetの集合照合と、必須チェックがスキップの
+#                    ままマージされたPRの検知(新規)
+#
+# なぜこの設計か(#310 の要点):
+#   - 逸脱はこのワークフローを赤で終わらせるだけ。修正PRの自動作成・
+#     Dependabotへの操作・Issue起票は行わない(監査が直す対象はゲート自身で
+#     あり、自己検査の循環を作らないため)。通知はGitHub既定の失敗通知に乗る
+#   - AI呼び出し0回・外部サービスへの問い合わせなし・履歴保存なし・書き込みAPI
+#     なし。入力はGitHub REST APIの読み取りだけ
+#   - このワークフロー自体が止まったことの検知(死活)はci.yaml側の
+#     audit-liveness ステップが担う。監査を監視する専用の仕組みは作らない
+#
+# 判定不能(API障害等)の赤は、失敗したrunのre-run(同じrunの再実行)で
+# 再判定する。新規のworkflow_dispatchで流し直すと、skipped-required の
+# 対象期間の下限が「失敗したrunの時刻」になり、未走査の穴が恒久的に残る。
+#
+# 判定の基準と報告の文面はスクリプト側が持つ。ここは実行編成と集約のみ。
+
+on:
+  schedule:
+    # 毎週月曜 00:17 UTC(09:17 JST)。skipped-required の対象期間は
+    # 「前回実行以降」のため、週1回の定期実行で走査の窓が連続する。
+    - cron: '17 0 * * 1'
+  # 手動検証用。判定不能の赤の再実行には使わない(上記のとおりre-runを使う)
+  workflow_dispatch:
+
+# read系のみ。書き込み権限もsecretsも持たない(判定と報告だけのワークフロー)
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  checks: read
+
+concurrency:
+  # 同時に走ると skipped-required の「前回実行以降」の窓の解釈が交錯するため、
+  # 走行中は後発を待たせる。cancel-in-progress を true にすると cancelled の
+  # 実行が履歴に残り、赤でも緑でもない結論ができる。
+  group: audit-weekly
+  cancel-in-progress: false
+
+jobs:
+  audit-weekly:
+    # ジョブ名は死活ステップ(ci.yaml の audit-liveness)がAPIで実行履歴を
+    # 引くときの識別に使う。実行履歴はワークフローファイル名
+    # (audit-weekly.yaml)で引くため、ファイル名の変更は死活側の追随が必要。
+    name: audit-weekly
+    runs-on: ubuntu-latest
+    # 判定はAPIの読み取りとjqの集計だけ。既定の360分を握らせないために明示する
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 期待一覧の paused 一覧は判定結果にかかわらず常時Job Summaryへ出す。
+      # 記録された停止はここに現れ続け、記録の無い停止は判定の赤で現れる
+      # (記録の有無で意図的な停止と事故を見分ける)。判定より前に出すのは、
+      # 後続のどのステップが失敗しても一覧が欠けないようにするため。
+      # 期待一覧を解釈できない場合もここでは止めない(スキーマ検証は
+      # skipped-required の判定が持ち、判定不能=赤として報告する)。
+      - name: Report paused checks
+        run: |
+          set -uo pipefail
+          {
+            echo "### 停止中と記録されている必須チェック(期待一覧)"
+            echo ""
+            if paused=$(jq -er '[.checks[] | select(.state == "paused")
+                | "- \(.context)(理由: \(.reason) / 参照: #\(.issue))"] | join("\n")' \
+                .github/audit/required-checks.json 2>/dev/null); then
+              if [ -n "$paused" ]; then
+                printf '%s\n' "$paused"
+              else
+                echo "- なし"
+              fi
+            else
+              echo "- 期待一覧を解釈できませんでした(skipped-required の判定が判定不能=赤で報告します)"
+            fi
+            echo ""
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      # テストを先頭に置く。壊れた判定スクリプトの結論(緑も赤も)を信用しない
+      # (dependency-review.yaml の cooldown ジョブと同じ、自テスト後に本判定の型)。
+      # 3本は途中で失敗しても全部実行し、最後に集約して落とす
+      # (container-scan-scheduled.yaml のテスト集約と同じ方式)。
+      #
+      # スクリプトには実行ビットが無い(core.fileMode=false で 100644 として
+      # 記録される)。直接起動すると exit 126 になるため bash 経由で起動する。
+      - name: Test audit scripts
+        run: |
+          set -uo pipefail
+          failed=0
+          for t in test-check-audit-scan-freshness test-check-audit-dependabot-stuck test-check-audit-skipped-required; do
+            echo "::group::${t}.sh"
+            if ! bash ".github/scripts/tests/${t}.sh"; then
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::判定スクリプトのテストに失敗しました。本判定は実行しません。"
+            exit 1
+          fi
+
+      # 本判定3本。1本目が赤でも残りを実行し、最後に集約して失敗させる。
+      # 途中で止めると、最初の赤の陰に残りの逸脱が隠れて翌週まで見えなくなる。
+      # 各スクリプトは GITHUB_REPOSITORY / GITHUB_RUN_ID(ランナーの既定環境変数)
+      # と GH_TOKEN を前提とする。secrets は使わない(github.token のみ)。
+      - name: Run audit checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          failed=0
+
+          echo "::group::scan-freshness(定期スキャンの稼働確認)"
+          if ! bash .github/scripts/check-audit-scan-freshness.sh container-scan-scheduled.yaml 8; then
+            failed=1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::dependabot-stuck(Dependabot PRの滞留検知)"
+          if ! bash .github/scripts/check-audit-dependabot-stuck.sh .github/audit/required-checks.json; then
+            failed=1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::skipped-required(必須チェックの集合照合とスキップ検知)"
+          if ! bash .github/scripts/check-audit-skipped-required.sh .github/audit/required-checks.json; then
+            failed=1
+          fi
+          echo "::endgroup::"
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::週次監査で逸脱または判定不能を検知しました。基準と対処は Job Summary を確認してください。"
+            exit 1
+          fi
