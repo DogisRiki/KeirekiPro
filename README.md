@@ -76,6 +76,13 @@ flowchart LR
 
     M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
     M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
+
+    subgraph s5[定期の監査]
+        AW[audit-weekly<br>週次で定期スキャンの鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜けを判定]
+        CV[canary-verify<br>月次でカナリアPRが<br>期待どおり赤になったかを照合]
+    end
+
+    AW & CV -.検査の仕組みを読み取り専用で監視.-> M
 ```
 
 4つの系統がすべて緑になるまで、プルリクエストはマージされません。mainが進むとプルリクエストのブランチは自動で最新化され、検査が再実行されます。マージされても本番への反映は行われず、人間による手動実行だけが本番を更新できます。
@@ -104,6 +111,8 @@ flowchart LR
 | 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
 | 定期 | container-scan-scheduled.yaml | 週次 (schedule) / 手動 | 稼働中の本番イメージをECSのサービス定義から特定してTrivyで再検査し、検出した脆弱性をIssueに反映する。イメージから検出されなくなった脆弱性のIssueは自動でクローズする |
 | 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
+| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる3項目を読み取り専用で自動判定する。定期スキャンの直近成功が8日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いかを確認し、逸脱があればワークフローを失敗として終了する |
+| 定期 | canary-verify.yaml | 月次 (schedule) / 手動 | canary.yamlが生成したカナリアPR6件が期待どおりのチェックで赤になっているかを読み取り専用で照合する。実行の長いチェックの結論が出揃うよう生成の3日後に発火し、逸脱があればワークフローを失敗として終了する |
 
 依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)とDockerのベースイメージは週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。frontend(npm)はバージョン更新の対象に含めていません。脆弱性が検知された場合は、スケジュールに関係なく、frontendを含めて修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます)。
 

@@ -66,7 +66,7 @@
   - 完了の観測条件: ワークフローファイルが存在し、判定の呼び出し・権限・トリガーが設計の契約どおりであること
   - _Requirements: 5.1, 6.1, 6.2, 6.3, 6.4, 6.5_
   - _Depends: 2.4_
-- [ ] 3.4 READMEのワークフロー一覧表とMermaid図へ2本を追記する
+- [x] 3.4 READMEのワークフロー一覧表とMermaid図へ2本を追記する
   - audit-weekly と canary-verify の行と図ノードを追加(作業規約: ワークフロー追加PRはREADMEも更新する)
   - 完了の観測条件: READMEの一覧表と図に2本が含まれ、既存の記載形式と一致している
   - _Requirements: 6.5_
@@ -88,6 +88,9 @@
 - (Task 1) guardrails.yaml は pull_request_review イベントでも発火し、gitleaks等が同一head SHAに skipped のcheck-runを残す。タスク2.3のスキップ検知は「コンテキストごとに成功/完了の結論が存在するか」で判定しないと、承認操作のあったPRで偽赤になる
 - (Task 1) codex-review は mode: always だが、そのif条件はDependabot PRも除外する。将来 paused を解除すると、マージ済みDependabot PRが2.3で違反扱いになる潜在偽赤がある(現状はpausedのため実害なし。解除時に期待一覧かスクリプトの扱いを見直すこと)
 - (Task 1) dependency-cooldown / dependency-graph-submit の conditional は変更検知でなくactor/fork条件由来(cooldownはDependabot PRを除外)。分類としては運用上これが唯一正しい選択
+
+- (Task 3.4) レビューのREJECTは `.claude/settings.json` の未コミット変更(deny 2行の一時解除)の出所確認のみが理由で、README自体は全項目合格。出所は所有者の明示指示(2026-09-06「解除した」)であり、コミットには含めない。**/ship後に所有者が2行を復元する**
+- (Task 3.4) README.md は既存がCRLF主体(混在)。追記はCRLFで整合済み
 
 ## 補足
 
