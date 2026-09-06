@@ -96,6 +96,19 @@
 
 - (Task 3.2 追補) 出荷後のPR #331 のCIで死活ステップが赤になった(audit-weekly.yaml がmain未登録のためAPIが404→判定不能扱い)。404のみ「導入前の許容」として通過する分岐を追加し、5分岐をコンテナ実測で確認して修正(通信断・その他のAPI失敗は引き続き赤)。ドライラン(Task 4)で唯一手製フィクスチャに置き換えた箇所が実態と食い違っていた教訓: 実APIが404を返した時点でフィクスチャ化でなく仕様の穴を疑うべきだった
 
+## マージ後の実測(2026-09-06)
+
+- PR #331 は所有者Approve後にauto-mergeでマージ(マージコミット d64c2a38)。マージ後の dependency-graph.yaml も正常発火(bot名義予約)
+- audit-weekly を workflow_dispatch で初回実行(run 34038432029)→ **success**。実測結果:
+  - 自テスト3本: 全PASS(CI環境=ubuntuランナーでも成立)
+  - scan-freshness: 「定期スキャン(container-scan-scheduled.yaml)は稼働しています(最終成功: 2026-09-02 07:57 UTC)」
+  - dependabot-stuck: 「必須チェックが通らないまま止まっているDependabot PRはありません(open: 0件)」
+  - skipped-required: 「必須チェックの集合は一致し、スキップのままマージされたPRはありません(対象PR: 10件)」(PR #331自身を含む10件を走査)
+  - paused報告: codex-review(停止中: #166)をSummaryに常時表示
+- これにより死活ステップ(要件4)の前提となる成功実行が存在する状態になった
+- 出荷時に検知した不具合2件はマージ前に修正済み: (1) 死活ステップの404(導入前)未許容 → 許容分岐を追加(コミット ae2e31e)。(2) shellcheck SC2181 → 修正(コミット b6ea690)。escape-hatchジョブが .github/scripts のシェルスクリプトにshellcheckを流すことが判明(今後の実装知見)
+- 残る実地確認は canary-verify の初発火(2026-10-04)のみ
+
 ## 補足
 
 - マージ後の実地確認(workflow_dispatchでaudit-weeklyの成功を1件作る=死活ステップの前提。実施主体はbot。canary-verifyは次の月初サイクル10/1生成→10/4発火で確認)は、実装タスクではなく design.md の Testing Strategy(導入手順)に定義済みのため tasks.md には含めない。/ship後にbotが実施し、specへ実測を追記する
