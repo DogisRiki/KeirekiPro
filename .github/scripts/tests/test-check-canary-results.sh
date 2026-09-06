@@ -302,12 +302,11 @@ echo "--- 対象年月の既定値 ---"
 CUR_MONTH=$(date -u +%Y%m)
 : >"$WORK/calls.log"
 : >"$WORK/summary.md"
-PATH="$WORK/bin:$PATH" \
+if PATH="$WORK/bin:$PATH" \
     STUB_CALLS="$WORK/calls.log" STUB_DIR="$WORK" \
     GITHUB_REPOSITORY="owner/repo" GH_TOKEN="dummy" \
     GITHUB_STEP_SUMMARY="$WORK/summary.md" \
-    bash "$SCRIPT" "$WORK/checks.json" >/dev/null 2>&1
-if [ $? -eq 0 ]; then
+    bash "$SCRIPT" "$WORK/checks.json" >/dev/null 2>&1; then
     echo "PASS: 対象年月を省略しても実行できる"
 else
     echo "FAIL: 対象年月を省略しても実行できる"
