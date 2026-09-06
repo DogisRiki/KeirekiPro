@@ -21,6 +21,12 @@ concurrency:
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
+    # ジョブ単位のpermissionsはワークフロー全体の指定を置き換えるため、
+    # checkout用の contents: read もここに明示する。
+    # actions: read は audit-liveness ステップが実行履歴APIを読むためだけに要る。
+    permissions:
+      contents: read
+      actions: read
     outputs:
       frontend_changed: ${{ steps.filter.outputs.frontend }}
       backend_changed: ${{ steps.filter.outputs.backend }}
@@ -50,6 +56,78 @@ jobs:
               - 'backend/**'
             dockerfile:
               - 'docker/**/Dockerfile*'
+
+      # 週次監査(audit-weekly.yaml)自体が止まったことを次のPRで検知する(死活確認)。
+      # 監査を監視する専用の仕組みは「それを誰が監視するか」の入れ子になるため作らず、
+      # 全PRで必ず実行されるこのジョブの末尾に1ステップだけ置く。
+      #
+      # pull_request 限定の理由: ci.yaml はmainへのpushでも起動するが、push実行で
+      # このステップが落ちると frontend-test がスキップされ、デプロイ用artifactの
+      # 保存が欠落する(マージ後経路の破壊。#326と同型の事故)。要件もPRのCIに限定している。
+      #
+      # 成功ゼロ=pass の理由: 導入直後は成功実行が存在しないため。ただしこの判定は
+      # 「実行はあるが一度も成功していない」場合も素通りするため、マージ後に
+      # workflow_dispatch で audit-weekly の成功を1件作ることを導入手順の必須ステップとする。
+      #
+      # 判定不能(API失敗・応答を解釈できない)は成功に倒さず赤にする(fail closed)。
+      # 判定はAPI 1リクエストだけのため、再実行は安価。
+      - name: Check audit liveness
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # status=success で絞り、最新1件だけを取る(1リクエスト)。
+          # 取得の失敗を「成功ゼロ」と混同しない(API障害を「導入直後」と誤読しない)。
+          # ただし 404(ワークフロー未登録)だけは導入前の正常な状態として通過させる。
+          # audit-weekly.yaml を追加するPR自身のCIがこのステップを含むため、404 を
+          # 判定不能扱いにすると導入PRが構造的にマージできなくなる(2026-09-06 実測)。
+          # gh api はHTTPエラーでも応答ボディをstdoutへ出すので、失敗時はボディで判別する。
+          runs_json=""
+          if ! runs_json=$(gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/audit-weekly.yaml/runs?status=success&per_page=1" 2>/dev/null); then
+            if printf '%s' "$runs_json" | jq -e '(.message? // "") == "Not Found"' >/dev/null 2>&1; then
+              echo "audit-weekly はまだ登録されていないため通過します(導入前の許容。マージ後に workflow_dispatch で初回成功を作る)。"
+              exit 0
+            fi
+            echo "::error::週次監査(audit-weekly)の実行履歴を取得できませんでした(判定不能)。成功に倒さず失敗にしています。このジョブを再実行してください。"
+            exit 1
+          fi
+
+          # workflow_runs が配列であることを確かめてから読む。エラーメッセージの
+          # JSON(例: {"message":"Not Found"})を「成功ゼロ」と誤読しないため。
+          latest=""
+          if ! latest=$(printf '%s' "$runs_json" | jq -er \
+              'if (.workflow_runs | type) == "array" then
+                 (if (.workflow_runs | length) == 0 then "none" else .workflow_runs[0].created_at end)
+               else empty end' 2>/dev/null); then
+            echo "::error::週次監査(audit-weekly)の実行履歴の応答を解釈できませんでした(判定不能)。成功に倒さず失敗にしています。このジョブを再実行してください。"
+            exit 1
+          fi
+
+          if [ "$latest" = "none" ]; then
+            echo "audit-weekly の成功実行はまだ存在しないため通過します(導入直後の許容)。"
+            exit 0
+          fi
+
+          latest_epoch=""
+          if ! latest_epoch=$(date -u -d "$latest" +%s 2>/dev/null); then
+            echo "::error::週次監査(audit-weekly)の直近成功の日時(${latest})を解釈できませんでした(判定不能)。成功に倒さず失敗にしています。"
+            exit 1
+          fi
+
+          now_epoch=$(date -u +%s)
+          age_seconds=$((now_epoch - latest_epoch))
+
+          # 10日 = 864000秒(UTCの秒差)。週1回の監査が1回分丸ごと欠けても
+          # 7日+実行遅延に収まるため、10日空いたら「監査が止まった」とみなす。
+          if [ "$age_seconds" -ge 864000 ]; then
+            echo "::error::週次監査(audit-weekly)の成功が10日以上ありません(直近成功: ${latest})。監査が止まっています。audit-weekly の状態を確認してください。"
+            exit 1
+          fi
+
+          echo "audit-weekly の直近成功: ${latest}(10日未満のため通過)"
 
   frontend-test:
     needs: detect-changes

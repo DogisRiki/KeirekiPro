@@ -1,0 +1,30 @@
+{
+  "checks": [
+    { "context": "frontend-test", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "backend-test", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "e2e-smoke", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "escape-hatch", "mode": "always", "state": "active", "approval_gated": true },
+    { "context": "size-check", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "gitleaks", "mode": "always", "state": "active", "approval_gated": false },
+    {
+      "context": "codex-review",
+      "mode": "always",
+      "state": "paused",
+      "approval_gated": false,
+      "reason": "CODEX_REVIEW_ENABLED が true でない間はCIでのレビューを行わない",
+      "issue": 166
+    },
+    { "context": "dependency-gate", "mode": "always", "state": "active", "approval_gated": true },
+    { "context": "pre-merge-check", "mode": "always", "state": "active", "approval_gated": true },
+    { "context": "terraform-static", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "dependency-graph-generate", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "dependency-graph-submit", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "dependency-review", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "dependency-cooldown", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "gradle-wrapper", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "docker-smoke", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "detect-changes", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "detect-terraform-changes", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "container-scan-script-tests", "mode": "conditional", "state": "active", "approval_gated": false }
+  ]
+}

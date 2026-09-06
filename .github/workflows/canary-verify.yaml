@@ -1,0 +1,87 @@
+name: Canary Verify
+
+# カナリア照合(#310 段階3): 毎月1日に自動生成されるカナリアPR6件が、
+# 期待どおりのチェックで赤になっているかを読み取り専用で照合する
+# (旧・月次1の確認部分の置き換え)。
+#
+# なぜ毎月4日(生成の3日後)に発火するのか:
+#   カナリアPRは毎月1日(canary.yaml)に生成される。期待チェックには
+#   実行の長い container-scan(本番イメージの組み立てを含む)が含まれるため、
+#   全PRのチェックの結論が出揃うのに十分な猶予として3日を置いてから照合する。
+#
+# なぜこの設計か(#310 の要点):
+#   - 逸脱はこのワークフローを赤で終わらせるだけ。修正PRの自動作成・
+#     Issue起票・カナリアPRへのコメントは行わない。通知はGitHub既定の
+#     失敗通知に乗る
+#   - カナリアPRのcloseはしない(翌月の生成側 create-canary-prs.sh が
+#     新サイクル開始時に前月分をcloseする)。照合はclosed済みのPRでも
+#     行える(スクリプトが state=all で検索する)
+#   - AI呼び出し0回・外部サービスへの問い合わせなし・履歴保存なし・書き込みAPI
+#     なし。入力はGitHub REST APIの読み取りだけ
+#
+# 判定不能(API障害等)の赤は、失敗したrunのre-runでも新規の
+# workflow_dispatchでもよい(週次のスキップ検知と違い「前回実行以降」の
+# 対象期間の窓を持たないため。対象は常に実行時のUTC年月のカナリア6件)。
+#
+# 判定の基準と報告の文面はスクリプト側が持つ。ここは実行編成のみ。
+
+on:
+  schedule:
+    # 毎月4日 00:17 UTC(09:17 JST)。毎月1日の生成の3日後(理由は上記)。
+    - cron: '17 0 4 * *'
+  # 手動検証用。判定不能の赤の流し直しにも使える(上記のとおり窓が無い)
+  workflow_dispatch:
+
+# read系のみ。書き込み権限もsecretsも持たない(判定と報告だけのワークフロー)。
+# 権限セットは audit-weekly.yaml と同一。
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  checks: read
+
+concurrency:
+  # 同時に走ると Job Summary の報告が交錯するため、走行中は後発を待たせる。
+  # cancel-in-progress を true にすると cancelled の実行が履歴に残り、
+  # 赤でも緑でもない結論ができる(audit-weekly.yaml と同じ判断)。
+  group: canary-verify
+  cancel-in-progress: false
+
+jobs:
+  canary-verify:
+    name: canary-verify
+    runs-on: ubuntu-latest
+    # 判定はAPIの読み取りとjqの集計だけ。既定の360分を握らせないために明示する
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # テストを先頭に置く。壊れた判定スクリプトの結論(緑も赤も)を信用しない
+      # (audit-weekly.yaml と同じ、自テスト後に本判定の型)。本判定は1本
+      # だけのため、テスト・本判定とも集約ループは持たない。
+      #
+      # スクリプトには実行ビットが無い(core.fileMode=false で 100644 として
+      # 記録される)。直接起動すると exit 126 になるため bash 経由で起動する。
+      - name: Test canary script
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/tests/test-check-canary-results.sh; then
+            echo "::error::判定スクリプトのテストに失敗しました。本判定は実行しません。"
+            exit 1
+          fi
+
+      # 本判定。対象年月の引数は省略し、実行時のUTC年月のカナリア6件を照合する
+      # (スクリプトの既定値)。スクリプトは GITHUB_REPOSITORY(ランナーの
+      # 既定環境変数)と GH_TOKEN を前提とする。secrets は使わない
+      # (github.token のみ)。
+      - name: Verify canary results
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/check-canary-results.sh .github/audit/required-checks.json; then
+            echo "::error::カナリア点検で逸脱または判定不能を検知しました。基準と対処は Job Summary を確認してください。"
+            exit 1
+          fi
