@@ -22,7 +22,7 @@
   - 完了の観測条件: 対応するテストがコンテナ内で全PASS
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
   - _Boundary: check-audit-scan-freshness.sh_
-- [ ] 2.2 (P) Dependabot滞留検知スクリプトとテストを作成する
+- [x] 2.2 (P) Dependabot滞留検知スクリプトとテストを作成する
   - openのDependabot PRのheadのcheck-runsを集計し、approval_gatedでないcontextのfailureがあれば赤(PR番号+チェック名を列挙)。approval_gatedのfailureは「承認待ち」として報告のみ。実行中・全緑は緑。しきい値なし(受入基準 2.1〜2.5 を test-check-audit-dependabot-stuck.sh が検証)
   - 期待一覧のスキーマ検証(必須フィールド欠落・未知の値=判定不能で赤)を自前で行う(共有ライブラリは作らず、一覧を読む各スクリプトが自己完結で検証する。2.3・2.4も同じ)
   - 新規テストは対象を一時的に壊して赤を確認してから戻す
@@ -80,6 +80,9 @@
   - _Depends: 3.1, 3.2, 3.3_
 
 ## Implementation Notes
+
+- (Task 2.2) check-runs取得はper_page=100単発。イベント多重発火でスイートが100件を超えると101件目以降を見落とす(fail-open)。低確率だが次回触る際は --paginate を検討
+- (Task 2.2) 滞留判定の結論は現設計では failure のみ。cancelled / timed_out / action_required の扱いは所有者判断待ち(レビュー指摘。cancelledは本リポジトリで実測済みの滞留形態)
 
 - (Task 1) guardrails.yaml は pull_request_review イベントでも発火し、gitleaks等が同一head SHAに skipped のcheck-runを残す。タスク2.3のスキップ検知は「コンテキストごとに成功/完了の結論が存在するか」で判定しないと、承認操作のあったPRで偽赤になる
 - (Task 1) codex-review は mode: always だが、そのif条件はDependabot PRも除外する。将来 paused を解除すると、マージ済みDependabot PRが2.3で違反扱いになる潜在偽赤がある(現状はpausedのため実害なし。解除時に期待一覧かスクリプトの扱いを見直すこと)
