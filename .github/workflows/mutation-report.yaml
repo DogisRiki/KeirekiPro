@@ -1,7 +1,7 @@
 name: Mutation Report
 
 # 週次のmutation testingレポート(レポートモード。PR必須ゲートにはしない)。
-# スコア低下は retrospective の入力とし、月次監査で確認する。
+# スコア低下は月次監査(項目2)で確認する。
 
 on:
   schedule:
