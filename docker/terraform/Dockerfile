@@ -1,4 +1,4 @@
-FROM hashicorp/terraform:1.16.1@sha256:f4d9594d2c8010c03f0149352682166410c58c21d46344cf256fd5a4b721a011
+FROM hashicorp/terraform:1.16.2@sha256:c3308fcbb530627c102c4c4b993e226b202429084328c3cc505cc2a69342e883
 
 COPY --from=ghcr.io/terraform-linters/tflint:v0.60.0 /usr/local/bin/tflint /usr/local/bin/tflint
 
