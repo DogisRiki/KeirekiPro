@@ -21,7 +21,7 @@
   - 完了の観測条件: test-check-audit-scan-freshness.sh がコンテナ内で全PASSし、逸脱ケースは引き続き1、判定不能ケースは2を返す
   - _Requirements: 1.1, 1.2, 1.6, 5.2_
   - _Boundary: CheckScripts_
-- [ ] 1.2 (P) Dependabot滞留検知の終了コードを3値にする
+- [x] 1.2 (P) Dependabot滞留検知の終了コードを3値にする
   - 1.1と同じ規則で終了コードを分ける。承認待ちのみのPRは従来どおり逸脱にしない
   - ヘッダの終了コードの説明と、通知の経路に関する誤った記述を訂正する
   - テストの判定不能ケース(11件)の期待値を2に変え、追加ケースは1.1と同じ3種(受入基準 1.1, 1.2, 1.6, 2.5 を test-check-audit-dependabot-stuck.sh が検証)
