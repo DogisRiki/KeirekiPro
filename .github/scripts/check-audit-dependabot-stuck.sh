@@ -7,14 +7,20 @@
 #       最新の結論を調べる。滞留と数える結論は
 #       failure / cancelled / timed_out / action_required の4つ。
 #         approval_gated: false のcontextに滞留結論 → 滞留。1件以上で exit 1
-#                          (対象のPR番号とチェック名と結論を列挙)
+#                          (逸脱あり。対象のPR番号とチェック名と結論を列挙)
 #         approval_gated: true のcontextの滞留結論 → 「承認待ち」として報告のみ
 #         実行中(結論なし)・すべて緑・skipped・neutral・承認待ちのみ・
-#         open PRゼロ → exit 0
-#         期待一覧のスキーマ不正・API失敗 → 判定不能として exit 1(fail closed)
+#         open PRゼロ → exit 0(逸脱なし)
+#         期待一覧のスキーマ不正・API失敗 → exit 2(判定不能。fail closed)
 #       件数のしきい値は持たない(滞留結論で止まっているPRの有無だけで判定する)。
 #       チェック失敗以外の滞留(mainより遅れたまま緑で停止・自動更新の失敗・
 #       マージ衝突等)は判定の対象にしない。
+#
+# 終了コード:
+#   0 = 逸脱なし / 1 = 逸脱あり / 2 = 判定不能
+#   1 は滞留を報告したうえでの明示的な exit 1 だけが返す。引数・必須環境変数の
+#   欠落と、ガードしていないコマンドの想定外の失敗もすべて 2 に倒す。
+#   1 に混ぜると、判定が一度も完了していないのに「逸脱あり」として扱われる。
 #
 # なぜ滞留結論を failure だけにしないのか:
 #   cancelled は本リポジトリで実測済みの滞留形態(キャンセルされた必須チェック
@@ -23,10 +29,12 @@
 #   停止状態のため、放置検知の目的上あわせて滞留と数える。
 #
 # なぜ必要か:
-#   Dependabot PRが必須チェックの失敗で止まっても、GitHubの通知には「失敗
-#   した実行」しか出ず、PRが止まり続けていることは一覧画面を開かないと
-#   分からなかった(旧・週次6)。とくにdockerレーンの滞留はイメージの更新
-#   停止を意味する。この検査がそれを置き換え、滞留を週次監査の赤にする。
+#   Dependabot PRが必須チェックの失敗で止まっても、PRが止まり続けていることは
+#   誰にも通知されず、一覧画面を開かないと分からなかった(旧・週次6)。
+#   定期実行の失敗通知もcronを最後に書き換えた利用者にしか届かない
+#   (https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)。
+#   とくにdockerレーンの滞留はイメージの更新停止を意味する。この検査がそれを
+#   置き換え、滞留を週次監査の逸脱としてIssueで知らせる。
 #
 # なぜ approval_gated の滞留結論を滞留にしないのか:
 #   dependency-gate / escape-hatch / pre-merge-check は所有者の承認で緑になる
@@ -50,11 +58,28 @@
 # 使い方: check-audit-dependabot-stuck.sh <期待一覧(required-checks.json)のパス>
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須)
 # =====================================================================
-set -euo pipefail
+set -Eeuo pipefail
+# ガードしていないコマンドの失敗は、逸脱(1)ではなく判定不能(2)にする。
+# -E で関数・コマンド置換の中の失敗にも適用する。
+trap 'exit 2' ERR
 
-CHECKS_FILE="${1:?required checks file required}"
-REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY required}"
-: "${GH_TOKEN:?GH_TOKEN required}"
+# 引数・環境変数の欠落を ${n:?} に任せると終了コード1(逸脱あり)になるため、
+# 明示的に検査して判定不能(2)に倒す。
+if [ "$#" -lt 1 ] || [ -z "$1" ]; then
+    echo "::error::引数は1個必要です: <期待一覧(required-checks.json)のパス>"
+    exit 2
+fi
+if [ -z "${GITHUB_REPOSITORY:-}" ]; then
+    echo "::error::環境変数 GITHUB_REPOSITORY が必要です"
+    exit 2
+fi
+if [ -z "${GH_TOKEN:-}" ]; then
+    echo "::error::環境変数 GH_TOKEN が必要です"
+    exit 2
+fi
+
+CHECKS_FILE="$1"
+REPO="$GITHUB_REPOSITORY"
 
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
@@ -73,7 +98,7 @@ report_undecidable() {
         echo ""
     } >>"$SUMMARY"
     echo "Dependabot PRの滞留状況を確認できませんでした(判定不能): ${reason}" >&2
-    exit 1
+    exit 2
 }
 
 # --- 期待一覧のスキーマ検証 ------------------------------------------------------
