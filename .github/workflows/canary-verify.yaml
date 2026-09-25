@@ -1,7 +1,7 @@
 name: Canary Verify
 
 # カナリア照合(#310 段階3): 毎月1日に自動生成されるカナリアPR6件が、
-# 期待どおりのチェックで赤になっているかを読み取り専用で照合する
+# 期待どおりのチェックで赤になっているかを照合する
 # (旧・月次1の確認部分の置き換え)。
 #
 # なぜ毎月4日(生成の3日後)に発火するのか:
@@ -9,21 +9,35 @@ name: Canary Verify
 #   実行の長い container-scan(本番イメージの組み立てを含む)が含まれるため、
 #   全PRのチェックの結論が出揃うのに十分な猶予として3日を置いてから照合する。
 #
-# なぜこの設計か(#310 の要点):
-#   - 逸脱はこのワークフローを赤で終わらせるだけ。修正PRの自動作成・
-#     Issue起票・カナリアPRへのコメントは行わない。通知はGitHub既定の
-#     失敗通知に乗る
+# 判定・通知・結論の3段で動く(#347。audit-weekly.yaml と同じ構成):
+#   - 判定: 判定スクリプトの終了コードを 0=逸脱なし / 1=逸脱あり /
+#     それ以外(2を含む)=判定不能 と読む。自己テストの失敗も判定不能とする
+#   - 通知: 結果を audit-issue.sh が監査通知Issue(カナリア照合: 逸脱あり /
+#     カナリア照合: 判定不能)に反映する。起票・追記・解消時のクローズを行い、
+#     所有者を担当者に割り当てる
+#   - 結論: 逸脱なし・逸脱ありで、かつ通知が成功したときだけ成功で終わる。
+#     逸脱の内容はIssueで届く
+#
+# なぜIssueで通知するか:
+#   定期実行(schedule)の失敗通知は、cronの記述を最後に書き換えた利用者にしか
+#   届かない(https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)。
+#   このワークフローを書いたのはbotのため、赤で終わっても所有者には届いて
+#   いなかった(#347)。Issueの担当者への割り当てとメンションで所有者に届ける。
+#
+# なぜこの設計か(#310 の要点。#347 で書き込みの範囲を改めた):
+#   - 書き込みはIssueの起票・追記・クローズと担当者の割り当てに限る。修正PRの
+#     自動作成・カナリアPRへのコメント・リポジトリ内容への書き込みは行わない
 #   - カナリアPRのcloseはしない(翌月の生成側 create-canary-prs.sh が
 #     新サイクル開始時に前月分をcloseする)。照合はclosed済みのPRでも
 #     行える(スクリプトが state=all で検索する)
-#   - AI呼び出し0回・外部サービスへの問い合わせなし・履歴保存なし・書き込みAPI
-#     なし。入力はGitHub REST APIの読み取りだけ
+#   - AI呼び出し0回・GitHub以外の外部サービスへの問い合わせなし・履歴保存なし
 #
-# 判定不能(API障害等)の赤は、失敗したrunのre-runでも新規の
+# 判定不能・通知失敗の赤は、失敗したrunのre-runでも新規の
 # workflow_dispatchでもよい(週次のスキップ検知と違い「前回実行以降」の
 # 対象期間の窓を持たないため。対象は常に実行時のUTC年月のカナリア6件)。
 #
-# 判定の基準と報告の文面はスクリプト側が持つ。ここは実行編成のみ。
+# 判定の基準と報告の文面は判定スクリプト側、Issueの操作と本文は
+# audit-issue.sh 側が持つ。ここは実行編成と集約のみ。
 
 on:
   schedule:
@@ -32,18 +46,21 @@ on:
   # 手動検証用。判定不能の赤の流し直しにも使える(上記のとおり窓が無い)
   workflow_dispatch:
 
-# read系のみ。書き込み権限もsecretsも持たない(判定と報告だけのワークフロー)。
+# 判定はread系のみ。書き込みは通知のための issues: write だけを加える
+# (contents・pull-requests への書き込みは持たない)。secrets は使わない。
 # 権限セットは audit-weekly.yaml と同一。
 permissions:
   contents: read
   actions: read
   pull-requests: read
   checks: read
+  issues: write
 
 concurrency:
-  # 同時に走ると Job Summary の報告が交錯するため、走行中は後発を待たせる。
-  # cancel-in-progress を true にすると cancelled の実行が履歴に残り、
-  # 赤でも緑でもない結論ができる(audit-weekly.yaml と同じ判断)。
+  # 同時に走ると Job Summary の報告と監査通知Issueの操作が交錯するため、
+  # 走行中は後発を待たせる。cancel-in-progress を true にすると cancelled の
+  # 実行が履歴に残り、赤でも緑でもない結論ができる(audit-weekly.yaml と
+  # 同じ判断)。
   group: canary-verify
   cancel-in-progress: false
 
@@ -58,30 +75,167 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # テストを先頭に置く。壊れた判定スクリプトの結論(緑も赤も)を信用しない
-      # (audit-weekly.yaml と同じ、自テスト後に本判定の型)。本判定は1本
-      # だけのため、テスト・本判定とも集約ループは持たない。
+      # 判定。自己テスト → 本判定 の順に行い、結果をステップ出力
+      # result(none / deviation / undecidable)に書く。このステップ自体は
+      # 常に成功で終わり(set +e で途中の失敗でも止めない)、成否は Conclude が
+      # 決める。
       #
-      # スクリプトには実行ビットが無い(core.fileMode=false で 100644 として
-      # 記録される)。直接起動すると exit 126 になるため bash 経由で起動する。
-      - name: Test canary script
-        run: |
-          set -uo pipefail
-          if ! bash .github/scripts/tests/test-check-canary-results.sh; then
-            echo "::error::判定スクリプトのテストに失敗しました。本判定は実行しません。"
-            exit 1
-          fi
-
-      # 本判定。対象年月の引数は省略し、実行時のUTC年月のカナリア6件を照合する
+      # 自己テストを先に置く。壊れた判定スクリプトの結論(緑も赤も)を信用せず、
+      # 失敗したら本判定を行わずに判定不能とする(audit-weekly.yaml と同じ、
+      # 自テスト後に本判定の型)。本判定は1本だけのため集約ループは持たない。
+      #
+      # 判定スクリプトの報告は GITHUB_STEP_SUMMARY を一時ファイルへ向けて受け、
+      # 本来の Job Summary と報告ファイル(Issue本文に載せる)の両方へ写す。
+      # 報告ファイルへの書き込みに失敗したら、Issueで内容を伝えられないため
+      # 判定不能に倒す。
+      #
+      # 本判定の対象年月の引数は省略し、実行時のUTC年月のカナリア6件を照合する
       # (スクリプトの既定値)。スクリプトは GITHUB_REPOSITORY(ランナーの
       # 既定環境変数)と GH_TOKEN を前提とする。secrets は使わない
-      # (github.token のみ)。
-      - name: Verify canary results
+      # (github.token のみ)。スクリプトには実行ビットが無い
+      # (core.fileMode=false で 100644 として記録される)。直接起動すると
+      # exit 126 になるため bash 経由で起動する。
+      - name: Judge
+        id: judge
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set +e
           set -uo pipefail
-          if ! bash .github/scripts/check-canary-results.sh .github/audit/required-checks.json; then
-            echo "::error::カナリア点検で逸脱または判定不能を検知しました。基準と対処は Job Summary を確認してください。"
-            exit 1
+          report="${RUNNER_TEMP}/audit-report.md"
+          overall=none
+
+          # 報告ファイルが作れないと、通知で内容を伝えられない
+          if ! : >"$report"; then
+            echo "::error::報告ファイルを作成できませんでした: ${report}"
+            overall=undecidable
           fi
+
+          # 報告を Job Summary と報告ファイルの両方へ追記する
+          emit() {
+            printf '%s\n' "$1" >>"$GITHUB_STEP_SUMMARY"
+            if ! printf '%s\n' "$1" >>"$report"; then
+              echo "::error::報告ファイルへの書き込みに失敗しました: ${report}"
+              overall=undecidable
+            fi
+          }
+
+          echo "::group::test-check-canary-results.sh"
+          bash .github/scripts/tests/test-check-canary-results.sh
+          selftest_rc=$?
+          echo "::endgroup::"
+
+          if [ "$selftest_rc" -ne 0 ]; then
+            echo "::error::test-check-canary-results.sh が失敗しました。"
+            emit "### 判定スクリプトの自己テストの失敗"
+            emit ""
+            emit "判定スクリプトのテストに失敗したため、本判定を実行しませんでした(判定不能)。失敗したテストは実行ログの Judge ステップで確認できます。"
+            overall=undecidable
+          else
+            part="${RUNNER_TEMP}/audit-summary-canary.md"
+            : >"$part"
+            echo "::group::canary(カナリア照合)"
+            GITHUB_STEP_SUMMARY="$part" bash .github/scripts/check-canary-results.sh .github/audit/required-checks.json
+            rc=$?
+            echo "::endgroup::"
+            if ! cat "$part" >>"$GITHUB_STEP_SUMMARY"; then
+              echo "::warning::canary の報告を Job Summary に写せませんでした。"
+            fi
+            if ! cat "$part" >>"$report"; then
+              echo "::error::canary の報告を報告ファイルに写せませんでした。"
+              overall=undecidable
+            fi
+            case "$rc" in
+              0)
+                echo "canary: 逸脱なし"
+                ;;
+              1)
+                echo "canary: 逸脱あり"
+                if [ "$overall" = none ]; then
+                  overall=deviation
+                fi
+                ;;
+              2)
+                echo "canary: 判定不能"
+                overall=undecidable
+                ;;
+              *)
+                # 契約外の終了コードでは判定スクリプトの報告が無いことがあるため、
+                # 理由をここで補う
+                echo "::error::canary が想定外の終了コード ${rc} で終了しました。"
+                emit ""
+                emit "- canary: 判定スクリプトが想定外の終了コード ${rc} で終了したため、判定不能として扱います。"
+                overall=undecidable
+                ;;
+            esac
+          fi
+
+          echo "カナリア照合の結果: ${overall}"
+          # 書けなければ result は空になり、Notify と Conclude が判定不能として扱う
+          if ! echo "result=${overall}" >>"$GITHUB_OUTPUT"; then
+            echo "::error::判定結果をステップ出力に書けませんでした。判定不能として扱われます。"
+          fi
+          exit 0
+
+      # 通知スクリプトのテスト。判定の後に置くのは、ここが落ちても判定結果を
+      # Job Summary に残すため。失敗したら通知せず、Conclude で赤になる。
+      - name: Test notifier
+        id: test-notifier
+        if: always()
+        run: bash .github/scripts/tests/test-audit-issue.sh
+
+      # 結果を監査通知Issueに反映する。結果は env 経由で渡し、式を run: に
+      # 直接埋め込まない。結果が空(Judge が想定外に終了した)なら判定不能として
+      # 通知する。audit-issue.sh が失敗したらこのステップも失敗する。
+      - name: Notify
+        id: notify
+        if: always() && steps.test-notifier.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ steps.judge.outputs.result }}
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/audit-report.md"
+          result="${RESULT:-}"
+          if [ -z "$result" ]; then
+            echo "::warning::判定ステップが結果を出力しませんでした。判定不能として通知します。"
+            result=undecidable
+            {
+              echo ""
+              echo "- 判定ステップが結果を出力せずに終了しました(判定不能)。実行ログの Judge ステップを確認してください。"
+            } >>"$report"
+          fi
+          bash .github/scripts/audit-issue.sh canary "$result" "$report"
+
+      # 実行の結論。逸脱なし・逸脱ありで、かつ通知が成功したときだけ成功する。
+      # 判定不能と通知の失敗は赤で終わらせる(再判定は re-run でも新規の
+      # 手動実行でもよい)。
+      - name: Conclude
+        if: always()
+        env:
+          RESULT: ${{ steps.judge.outputs.result }}
+          NOTIFY_OUTCOME: ${{ steps.notify.outcome }}
+        run: |
+          set -uo pipefail
+          failed=0
+          case "${RESULT:-}" in
+            none)
+              echo "カナリア照合: 逸脱なし"
+              ;;
+            deviation)
+              echo "::notice::カナリア照合で逸脱を検知しました。内容はIssue「カナリア照合: 逸脱あり」と Job Summary を確認してください。"
+              ;;
+            undecidable)
+              echo "::error::カナリア照合は判定不能でした。理由はIssue「カナリア照合: 判定不能」と Job Summary を確認し、この実行の Re-run か新規の手動実行で再実行してください。"
+              failed=1
+              ;;
+            *)
+              echo "::error::判定ステップが結果を出力しませんでした(判定不能)。実行ログの Judge ステップを確認し、この実行の Re-run か新規の手動実行で再実行してください。"
+              failed=1
+              ;;
+          esac
+          if [ "${NOTIFY_OUTCOME:-}" != success ]; then
+            echo "::error::監査通知Issueへの反映が成功しませんでした(Notify: ${NOTIFY_OUTCOME:-未実行})。Issueは更新されていないか、途中までしか更新されていません。判定の結果は Job Summary を、原因は実行ログの Test notifier / Notify ステップを確認し、この実行の Re-run か新規の手動実行で再実行してください。"
+            failed=1
+          fi
+          exit "$failed"

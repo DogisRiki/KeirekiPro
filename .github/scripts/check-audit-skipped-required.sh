@@ -6,17 +6,25 @@
 #   1. 集合照合: mainブランチのruleset(rules/branches/main)の
 #      required_status_checks の context 集合と、期待一覧
 #      (required-checks.json)の context 集合を双方向に比較する。
-#      差分があれば exit 1(差分を列挙)。状態(active/paused)は
+#      差分があれば exit 1(逸脱あり。差分を列挙)。状態(active/paused)は
 #      この照合には使わない(照合は名前の集合のみで行う)。
 #   2. スキップ検知: 対象期間内にmainへマージされたPRごとに、PRの
 #      headコミット(pulls APIの head.sha)の check-runs を走査する。
 #        mode: always かつ state: active の context に「実行の証拠」が
 #          無い(全check-runがskipped、または1件も無い)→ 違反。
-#          1件以上で exit 1(PR番号+チェック名を列挙)
+#          1件以上で exit 1(逸脱あり。PR番号+チェック名を列挙)
 #        mode: always かつ state: paused の同状況 → 非違反。
 #          「停止中(参照Issue)」として報告にのみ明示する
 #        mode: conditional → 対象外(変更検知による正当なスキップ)
-#   期待一覧のスキーマ不正・API失敗 → 判定不能として exit 1(fail closed)
+#   差分も違反も無ければ exit 0(逸脱なし)
+#   期待一覧のスキーマ不正・API失敗 → exit 2(判定不能。fail closed)
+#
+# 終了コード:
+#   0 = 逸脱なし / 1 = 逸脱あり / 2 = 判定不能
+#   1 は集合の差分またはスキップ違反を報告したうえでの明示的な exit 1 だけが
+#   返す。引数・必須環境変数の欠落と不正、ガードしていないコマンドの想定外の
+#   失敗もすべて 2 に倒す。1 に混ぜると、判定が一度も完了していないのに
+#   「逸脱あり」として扱われる。
 #
 # なぜ必要か:
 #   必須チェックのスキップはGitHub上では成功として扱われるため、意図的に
@@ -54,14 +62,43 @@
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須) / GITHUB_RUN_ID(必須)
 #   NOW_EPOCH(テスト用の時刻固定)
 # =====================================================================
-set -euo pipefail
+set -Eeuo pipefail
+# ガードしていないコマンドの失敗は、逸脱(1)ではなく判定不能(2)にする。
+# -E で関数・コマンド置換の中の失敗にも適用する。
+trap 'exit 2' ERR
 
-CHECKS_FILE="${1:?required checks file required}"
-REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY required}"
-RUN_ID="${GITHUB_RUN_ID:?GITHUB_RUN_ID required}"
-: "${GH_TOKEN:?GH_TOKEN required}"
+# 引数・環境変数の欠落を ${n:?} に任せると終了コード1(逸脱あり)になるため、
+# 明示的に検査して判定不能(2)に倒す。
+if [ "$#" -lt 1 ] || [ -z "$1" ]; then
+    echo "::error::引数は1個必要です: <期待一覧(required-checks.json)のパス>"
+    exit 2
+fi
+if [ -z "${GITHUB_REPOSITORY:-}" ]; then
+    echo "::error::環境変数 GITHUB_REPOSITORY が必要です"
+    exit 2
+fi
+if [ -z "${GITHUB_RUN_ID:-}" ]; then
+    echo "::error::環境変数 GITHUB_RUN_ID が必要です"
+    exit 2
+fi
+if [ -z "${GH_TOKEN:-}" ]; then
+    echo "::error::環境変数 GH_TOKEN が必要です"
+    exit 2
+fi
+
+CHECKS_FILE="$1"
+REPO="$GITHUB_REPOSITORY"
+RUN_ID="$GITHUB_RUN_ID"
 
 NOW_EPOCH="${NOW_EPOCH:-$(date -u +%s)}"
+# 7日窓の下限の算術展開に入るため、APIへ問い合わせる前に形を確かめる。
+# 英字は未定義変数、先頭0は8進数として扱われ、算術展開の誤りになるか
+# (010 のように)別の値として黙って通る。桁数が多すぎると64ビットを
+# 溢れて折り返す。先頭0なし・12桁までに限る。
+if ! [[ "$NOW_EPOCH" =~ ^[1-9][0-9]{0,11}$ ]]; then
+    echo "::error::NOW_EPOCH はエポック秒(先頭0なし・12桁まで)で指定してください: ${NOW_EPOCH}"
+    exit 2
+fi
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 AUDIT_WORKFLOW_FILE="audit-weekly.yaml"
 
@@ -81,7 +118,7 @@ report_undecidable() {
         echo ""
     } >>"$SUMMARY"
     echo "必須チェックの構成とスキップ状況を確認できませんでした(判定不能): ${reason}" >&2
-    exit 1
+    exit 2
 }
 
 # --- 期待一覧のスキーマ検証 ------------------------------------------------------

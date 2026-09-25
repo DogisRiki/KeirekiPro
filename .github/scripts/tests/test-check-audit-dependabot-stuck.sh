@@ -3,7 +3,7 @@
 # check-audit-dependabot-stuck.sh の自動テスト(audit-weekly CI から実行)
 #
 # gh をスタブし、終了コードと報告の内容を検証する。
-#   0 = 緑(通過) / 1 = 赤
+#   0 = 逸脱なし / 1 = 逸脱あり / 2 = 判定不能
 #
 # gh のスタブは実APIの形のJSONをそのまま返し、応答の解釈(配列であることの
 # 検査・check-runs の集計・最新の選択)は本体側に実行させる。整形済みの値を
@@ -54,22 +54,70 @@ esac
 STUB
 chmod +x "$WORK/bin/gh"
 
-# 使い方: run <期待一覧パス> [pulls失敗] [check-runs失敗]
+# --- jq のラッパ -----------------------------------------------------------------
+# STUB_JQ_FAIL が設定されているときだけ、滞留の列挙(select(.gated | not))を
+# 行う呼び出しを異常終了させる。本体でガードしていないコマンドが想定外に
+# 失敗した状況の再現。それ以外の呼び出しは本物の jq に渡す。
+REAL_JQ=$(command -v jq) || exit 1
+cat >"$WORK/bin/jq" <<STUB
+#!/usr/bin/env bash
+if [ -n "\${STUB_JQ_FAIL:-}" ]; then
+    for arg in "\$@"; do
+        case "\$arg" in
+        *"select(.gated | not)"*)
+            echo "stub: jq failure" >&2
+            exit 1
+            ;;
+        esac
+    done
+fi
+exec "$REAL_JQ" "\$@"
+STUB
+chmod +x "$WORK/bin/jq"
+
+# 使い方: run <期待一覧パス> [pulls失敗] [check-runs失敗] [jq失敗]
 run() {
     : >"$WORK/calls.log"
     : >"$WORK/summary.md"
     PATH="$WORK/bin:$PATH" \
         STUB_CALLS="$WORK/calls.log" STUB_PULLS="$WORK/pulls.json" STUB_DIR="$WORK" \
-        STUB_FAIL_PULLS="${2:-}" STUB_FAIL_CHECKRUNS="${3:-}" \
+        STUB_FAIL_PULLS="${2:-}" STUB_FAIL_CHECKRUNS="${3:-}" STUB_JQ_FAIL="${4:-}" \
         GITHUB_REPOSITORY="owner/repo" GH_TOKEN="dummy" \
         GITHUB_STEP_SUMMARY="$WORK/summary.md" \
         bash "$SCRIPT" "$1" >/dev/null 2>&1
 }
 
-# 使い方: check <期待exit> <説明> [期待一覧パス] [pulls失敗] [check-runs失敗]
+# 使い方: check <期待exit> <説明> [期待一覧パス] [pulls失敗] [check-runs失敗] [jq失敗]
 check() {
     local want="$1" name="$2" checks="${3:-$WORK/checks.json}" got
-    run "$checks" "${4:-}" "${5:-}"
+    run "$checks" "${4:-}" "${5:-}" "${6:-}"
+    got=$?
+    if [ "$got" -eq "$want" ]; then
+        echo "PASS: $name"
+    else
+        echo "FAIL: $name (expected exit $want, got $got)"
+        FAILED=1
+    fi
+}
+
+# 引数・環境変数を任意に与えて起動する。gh は正常な応答を返す状態にしておき、
+# 終了コードが入力の検査だけで決まることを確かめる。
+# 使い方: check_invocation <期待exit> <説明> <与えない必須環境変数名 または ""> [引数...]
+check_invocation() {
+    local want="$1" name="$2" omit_var="$3" got
+    shift 3
+    : >"$WORK/calls.log"
+    : >"$WORK/summary.md"
+    local required=() var
+    for var in GITHUB_REPOSITORY=owner/repo GH_TOKEN=dummy; do
+        [ "${var%%=*}" = "$omit_var" ] || required+=("$var")
+    done
+    env -u GITHUB_REPOSITORY -u GH_TOKEN "${required[@]}" \
+        PATH="$WORK/bin:$PATH" \
+        STUB_CALLS="$WORK/calls.log" STUB_PULLS="$WORK/pulls.json" STUB_DIR="$WORK" \
+        STUB_FAIL_PULLS="" STUB_FAIL_CHECKRUNS="" STUB_JQ_FAIL="" \
+        GITHUB_STEP_SUMMARY="$WORK/summary.md" \
+        bash "$SCRIPT" "$@" >/dev/null 2>&1
     got=$?
     if [ "$got" -eq "$want" ]; then
         echo "PASS: $name"
@@ -216,28 +264,28 @@ check 0 "期待一覧に載らないcontextのfailureは判定に使わない"
 echo "--- 期待一覧のスキーマ検証 ---"
 set_pulls "[]"
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"active"}]}'
-check 1 "必須フィールド(approval_gated)の欠落は判定不能として赤にする"
+check 2 "必須フィールド(approval_gated)の欠落は判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 check_no_calls "pulls" "スキーマ検証はAPIへの問い合わせより先に行われる"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"disabled","approval_gated":false}]}'
-check 1 "未知のstateは判定不能として赤にする"
+check 2 "未知のstateは判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"sometimes","state":"active","approval_gated":false}]}'
-check 1 "未知のmodeは判定不能として赤にする"
+check 2 "未知のmodeは判定不能として2を返す"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"paused","approval_gated":false}]}'
-check 1 "pausedなのにreason/issueが無ければ判定不能として赤にする"
+check 2 "pausedなのにreason/issueが無ければ判定不能として2を返す"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"active","approval_gated":false,"note":"x"}]}'
-check 1 "未知のフィールドは判定不能として赤にする"
+check 2 "未知のフィールドは判定不能として2を返す"
 
 set_checks '{"checks":{"context":"gitleaks"}}'
-check 1 "checksが配列でなければ判定不能として赤にする"
+check 2 "checksが配列でなければ判定不能として2を返す"
 
 set_checks 'not-json'
-check 1 "期待一覧をJSONとして解釈できなければ判定不能として赤にする"
+check 2 "期待一覧をJSONとして解釈できなければ判定不能として2を返す"
 
 check 0 "実物の期待一覧(required-checks.json)はスキーマ検証を通過する" "$REAL_CHECKS"
 
@@ -245,22 +293,55 @@ set_checks "$VALID_CHECKS"
 
 echo "--- 判定不能(API失敗・想定外の応答) ---"
 set_pulls "[]"
-check 1 "PR一覧APIへの問い合わせに失敗したら判定不能として赤にする(fail closed)" "$WORK/checks.json" "yes"
+check 2 "PR一覧APIへの問い合わせに失敗したら判定不能として2を返す(fail closed)" "$WORK/checks.json" "yes"
 check_summary "判定不能" "判定不能の見出しが出る"
 check_summary "re-run" "失敗したrunのre-runで再実行する指示が出る"
 
 set_pulls '{"message":"Not Found"}'
-check 1 "PR一覧の応答が配列でなければ判定不能として赤にする"
+check 2 "PR一覧の応答が配列でなければ判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 
 set_pulls "[$(pull 101 "$DEPENDABOT" sha101)]"
 set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"success"' "2026-01-01T00:00:00Z")")"
-check 1 "check-runs APIへの問い合わせに失敗したら判定不能として赤にする" "$WORK/checks.json" "" "yes"
+check 2 "check-runs APIへの問い合わせに失敗したら判定不能として2を返す" "$WORK/checks.json" "" "yes"
 check_summary "判定不能" "判定不能の見出しが出る"
 
 set_checkruns sha101 '{"message":"Not Found"}'
-check 1 "check-runsの応答を解釈できなければ判定不能として赤にする"
+check 2 "check-runsの応答を解釈できなければ判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
+
+echo "--- 入力の欠落 ---"
+set_checks "$VALID_CHECKS"
+set_pulls "[]"
+check_invocation 2 "期待一覧の引数が無ければ判定不能として2を返す" ""
+check_no_calls "repos/" "引数が無ければAPIへ問い合わせない"
+
+check_invocation 2 "期待一覧の引数が空文字なら判定不能として2を返す" "" ""
+check_no_calls "repos/" "引数が空文字ならAPIへ問い合わせない"
+
+check_invocation 2 "GITHUB_REPOSITORY が無ければ判定不能として2を返す" GITHUB_REPOSITORY "$WORK/checks.json"
+check_no_calls "repos/" "GITHUB_REPOSITORY が無ければAPIへ問い合わせない"
+
+check_invocation 2 "GH_TOKEN が無ければ判定不能として2を返す" GH_TOKEN "$WORK/checks.json"
+check_no_calls "repos/" "GH_TOKEN が無ければAPIへ問い合わせない"
+
+check_invocation 0 "引数と環境変数がそろっていれば判定まで進む(入力検査の対照)" "" "$WORK/checks.json"
+check_calls "repos/owner/repo/pulls" "入力がそろっていればPR一覧へ問い合わせる"
+
+echo "--- 想定外の失敗 ---"
+set_pulls "[$(pull 101 "$DEPENDABOT" sha101)]"
+set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"failure"' "2026-01-01T00:00:00Z")")"
+check 2 "ガードしていないコマンドが失敗したら逸脱ではなく判定不能として2を返す" \
+    "$WORK/checks.json" "" "" "yes"
+if grep -qF "必須チェックが通らないまま止まっている" "$WORK/summary.md"; then
+    echo "FAIL: 想定外の失敗を逸脱として報告しない (逸脱の見出しが出ている)"
+    FAILED=1
+else
+    echo "PASS: 想定外の失敗を逸脱として報告しない"
+fi
+# 対照: 同じ入力で jq を失敗させなければ逸脱(1)になる。上の2が入力の違いで
+# 出たのではなく、想定外の失敗によるものであることを確かめる。
+check 1 "同じ入力で想定外の失敗が無ければ逸脱として1を返す(対照)"
 
 if [ "$FAILED" -eq 0 ]; then
     echo "すべてのテストがPASSしました。"
