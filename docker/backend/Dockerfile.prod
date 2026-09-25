@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------------------
 # ビルドステージ
 # -----------------------------------------------------------------------------
-FROM eclipse-temurin:21-jdk@sha256:1f79c73404fb0cccf9a3459eda22892f368d994b1028d6fb1ae871c1f49749a6 AS builder
+FROM eclipse-temurin:21-jdk@sha256:92a2a4d7a928d057e7bd999c418d66c26a34eb9a0442f3ab67721c3f88110b2d AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN ./gradlew bootJar --no-daemon -x test
 # -----------------------------------------------------------------------------
 # 実行ステージ
 # -----------------------------------------------------------------------------
-FROM eclipse-temurin:21-jre@sha256:a80c51f2d09a3e7e00d521f1c817bbceb6b3be94109b4a784d46078099882dda
+FROM eclipse-temurin:21-jre@sha256:49e21e16e3c86eb7816a44a67549910ed090fbeb40c29c525d58bf5e02e91b0f
 
 WORKDIR /app
 
