@@ -114,7 +114,7 @@ flowchart LR
 | 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる3項目を自動判定する。定期スキャンの直近成功が8日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いかを確認する。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 | 定期 | canary-verify.yaml | 月次 (schedule) / 手動 | canary.yamlが生成したカナリアPR6件が期待どおりのチェックで赤になっているかを照合する。実行の長いチェックの結論が出揃うよう生成の3日後に発火する。逸脱があればIssue「カナリア照合: 逸脱あり」、判定できなければIssue「カナリア照合: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 
-依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)とDockerのベースイメージは週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。frontend(npm)はバージョン更新の対象に含めていません。脆弱性が検知された場合は、スケジュールに関係なく、frontendを含めて修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます)。
+依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)・frontend(npm)・Dockerのベースイメージは週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます)。
 
 本番リリースは、release.yamlを人間が手動で実行したときにのみ行われます。対象はmainブランチのCIが成功したコミットに限られ、featureブランチからは起動できません。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 
