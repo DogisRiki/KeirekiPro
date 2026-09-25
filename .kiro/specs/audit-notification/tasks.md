@@ -96,7 +96,7 @@
   - _Requirements: 5.2_
   - _Boundary: README, audit-automation spec_
 
-- [ ] 5. 全体の検証
+- [x] 5. 全体の検証
   - `.github/scripts/tests/` の全テスト(本specで変更・追加したものと、既存のその他のテスト)をコンテナ内で実行して全PASSを確かめる
   - `.github/scripts` のシェルスクリプトに shellcheck を、全ワークフローに actionlint を流して指摘が無いことを確かめる
   - 受入基準 1.1〜6.4 のすべてについて、検証したテストまたは突合の結果を対応表にまとめ、テストの無い受入基準が残っていないことを確かめる
@@ -123,3 +123,5 @@
 - (2.1/2.2) 2.1 のテストの担当者欄の期待値を変えた。PR本文の `Test-Change-Justification` に記載する
 - (3.1) ステップの本文を取り出して動かす使い捨ての検査スクリプトは、ステップ名(Judge / Test notifier / Notify / Conclude)で取り出す。3.2 でも同じ名前にそろえる。報告ファイルは `${RUNNER_TEMP}/audit-report.md` を Judge と Notify で共有する
 - (3.1) Judge は既定の `bash -e` を `set +e` で打ち消し、最後に `exit 0`。後続は `always()`。キャンセル時も判定不能として通知される(故障を知らせる目的に沿うため許容)
+- (5) git を使う既存テスト(action-pinning など)をコンテナで流すときは `apk add` に git も加える。全体の検証では15本すべて PASS、shellcheck と actionlint の指摘0件、受入基準30件の対応表に空欄なし
+- (5) 要件5.2 は README にも事実と根拠の記載を求めるように読めるが、承認済みの設計では README の変更を図と一覧表の更新に限っている(README はアプリ紹介に徹する方針)。PR本文にこの解釈を明記する
