@@ -1,7 +1,8 @@
 name: Mutation Report
 
 # 週次のmutation testingレポート(レポートモード。PR必須ゲートにはしない)。
-# スコア低下は月次監査(項目2)で確認する。
+# スコア低下は月次監査(項目2)で確認する。比較の材料として、実行のたびに
+# スコアを台帳のIssue「メトリクス台帳: mutationスコア」に1行追記する(#334)。
 
 on:
   schedule:
@@ -85,3 +86,50 @@ jobs:
           path: backend/build/reports/pitest/
           retention-days: 90
           if-no-files-found: ignore
+
+  # スコアを台帳のIssueに1行追記する。レポートが無い側は「取得できず」と記録し、
+  # 測定が止まったことを台帳の上で見えるようにする(実例: #372)。
+  # 監査のワークフローは状態を持たない(audit-automation の要件6-3)ため、
+  # 記録は測定したこのワークフローが行う。
+  record-metrics:
+    needs: [frontend-mutation, backend-mutation]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    # 手動実行と定期実行が重なっても、台帳の本文の読み書きが交差しないようにする
+    concurrency:
+      group: mutation-metrics-ledger
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # レポートが無い(測定が失敗した)ときはダウンロードも失敗する。
+      # その場合も記録は行うため、ここでは止めない
+      - name: Download PIT report
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pitest-report
+          path: ${{ runner.temp }}/pitest-report
+
+      - name: Download Stryker report
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: stryker-report
+          path: ${{ runner.temp }}/stryker-report
+
+      # 記録の前にスクリプトのテストを行う。壊れたスクリプトで台帳を書き換えない
+      - name: Test recorder
+        run: bash .github/scripts/tests/test-record-mutation-metrics.sh
+
+      - name: Record scores
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash .github/scripts/record-mutation-metrics.sh \
+            "${RUNNER_TEMP}/pitest-report/mutations.xml" \
+            "${RUNNER_TEMP}/stryker-report/mutation/mutation.json"
