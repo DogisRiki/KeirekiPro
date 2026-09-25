@@ -25,6 +25,7 @@
     { "context": "docker-smoke", "mode": "conditional", "state": "active", "approval_gated": false },
     { "context": "detect-changes", "mode": "always", "state": "active", "approval_gated": false },
     { "context": "detect-terraform-changes", "mode": "always", "state": "active", "approval_gated": false },
-    { "context": "container-scan-script-tests", "mode": "conditional", "state": "active", "approval_gated": false }
+    { "context": "container-scan-script-tests", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "container-scan", "mode": "conditional", "state": "active", "approval_gated": false }
   ]
 }
