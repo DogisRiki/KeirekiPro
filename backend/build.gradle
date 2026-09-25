@@ -54,12 +54,32 @@ ext['junit-jupiter.version'] = '5.14.4'
 // postgresql は JDBC ドライバとして、tomcat は spring-boot-starter-web の
 // 組み込みサーバ(BOM 3.5.16 の管理版は 10.1.55)として本番イメージに入る。
 //
+// 以下の4つも同じ理由で上書きする(#358)。BOM 3.5.16 の管理版に修正版が公開済みの
+// 脆弱性があり、いずれも productionRuntimeClasspath に入る。
+//
+//   jackson-bom    CVE-2026-54515 / CVE-2026-59889 /
+//                  GHSA-mhm7-754m-9p8w              -> 2.21.5 以降で修正(BOM は 2.21.4)
+//   opentelemetry  CVE-2026-45292                   -> 1.62.0 以降で修正(BOM は 1.49.0)
+//   log4j2         CVE-2026-49844                   -> 2.25.5 以降で修正(BOM は 2.24.3)
+//   commons-lang3  CVE-2025-48924                   -> 3.18.0 以降で修正(BOM は 3.17.0)
+//
+// jackson は同じ系列の最新パッチを、opentelemetry と log4j2 は修正の入った最小の版を指定している。
+// commons-lang3 は最新の 3.20.0 を指定している。3.20.0 を要求する推移的依存があり、
+// 3.18.0 にするとその依存に古い版を押し付けることになるため。
+// opentelemetry は micrometer-tracing-bridge-otel と opentelemetry-exporter-otlp 経由、
+// log4j-api は spring-boot-starter-logging の log4j-to-slf4j 経由で入る。
+//
 // 解除の判定: Spring Boot を上げたとき、その BOM の netty.version /
-// postgresql.version / tomcat.version がここの値以上なら、この3行と
+// postgresql.version / tomcat.version / jackson-bom.version / opentelemetry.version /
+// log4j2.version / commons-lang3.version がここの値以上なら、該当する行と
 // libs.versions.toml の対応する [versions] を削除する。
 ext['netty.version'] = libs.versions.netty.get()
 ext['postgresql.version'] = libs.versions.postgresql.get()
 ext['tomcat.version'] = libs.versions.tomcat.get()
+ext['jackson-bom.version'] = libs.versions.jackson.bom.get()
+ext['opentelemetry.version'] = libs.versions.opentelemetry.get()
+ext['log4j2.version'] = libs.versions.log4j2.get()
+ext['commons-lang3.version'] = libs.versions.commons.lang3.get()
 
 java {
     toolchain {
