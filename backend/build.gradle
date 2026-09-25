@@ -9,6 +9,22 @@ buildscript {
     }
     dependencies {
         classpath "org.flywaydb:flyway-database-postgresql:${libs.versions.flyway.get()}"
+
+        // ビルド用プラグイン(Flyway / Spring Boot)が持ち込む依存の版を引き上げる(#361)。
+        // buildscript のクラスパスには Spring Boot の BOM が効かないため、下の ext の上書きとは
+        // 別にここで指定する。版は本番側の上書きと同じ [versions] を参照する。
+        //   jackson-databind 2.21.4 -> CVE-2026-54515 / CVE-2026-59889 / GHSA-mhm7-754m-9p8w
+        //   commons-lang3    3.16.0 -> CVE-2025-48924
+        //   httpclient5      5.5.2  -> CVE-2026-64607
+        //   httpcore5 5.3.6 -> CVE-2026-54399 / httpcore5-h2 5.3.6 -> CVE-2026-54428
+        // 解除の判定: ./gradlew -q buildEnvironment で、制約を外しても各版がここ以上なら削除する。
+        constraints {
+            classpath "com.fasterxml.jackson.core:jackson-databind:${libs.versions.jackson.bom.get()}"
+            classpath "org.apache.commons:commons-lang3:${libs.versions.commons.lang3.get()}"
+            classpath "org.apache.httpcomponents.client5:httpclient5:${libs.versions.httpclient5.get()}"
+            classpath "org.apache.httpcomponents.core5:httpcore5:${libs.versions.httpcore5.get()}"
+            classpath "org.apache.httpcomponents.core5:httpcore5-h2:${libs.versions.httpcore5.get()}"
+        }
     }
 }
 
@@ -69,10 +85,18 @@ ext['junit-jupiter.version'] = '5.14.4'
 // opentelemetry は micrometer-tracing-bridge-otel と opentelemetry-exporter-otlp 経由、
 // log4j-api は spring-boot-starter-logging の log4j-to-slf4j 経由で入る。
 //
+// httpclient5 / httpcore5 は本番には入らないが、BOM の管理版が checkstyle / pmd / spotbugs の
+// 実行時依存(Saxon の xmlresolver 経由)にも適用されるため、同じ方法で上書きする(#361)。
+//
+//   httpclient5    CVE-2026-64607                   -> 5.6.3 以降で修正(BOM は 5.5.2)
+//   httpcore5      CVE-2026-54399 / CVE-2026-54428  -> 5.4.3 以降で修正(BOM は 5.3.6)
+//
+// いずれも修正の入った系列の最新パッチを指定している。
+//
 // 解除の判定: Spring Boot を上げたとき、その BOM の netty.version /
 // postgresql.version / tomcat.version / jackson-bom.version / opentelemetry.version /
-// log4j2.version / commons-lang3.version がここの値以上なら、該当する行と
-// libs.versions.toml の対応する [versions] を削除する。
+// log4j2.version / commons-lang3.version / httpclient5.version / httpcore5.version が
+// ここの値以上なら、該当する行と libs.versions.toml の対応する [versions] を削除する。
 ext['netty.version'] = libs.versions.netty.get()
 ext['postgresql.version'] = libs.versions.postgresql.get()
 ext['tomcat.version'] = libs.versions.tomcat.get()
@@ -80,6 +104,8 @@ ext['jackson-bom.version'] = libs.versions.jackson.bom.get()
 ext['opentelemetry.version'] = libs.versions.opentelemetry.get()
 ext['log4j2.version'] = libs.versions.log4j2.get()
 ext['commons-lang3.version'] = libs.versions.commons.lang3.get()
+ext['httpclient5.version'] = libs.versions.httpclient5.get()
+ext['httpcore5.version'] = libs.versions.httpcore5.get()
 
 java {
     toolchain {
@@ -143,6 +169,17 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+
+    // BOM の管理外で推移的に入る版を引き上げる(#361)。どちらも本番には入らない。
+    //   commons-compress 1.24.0 -> CVE-2024-26308 / CVE-2024-25710(testcontainers 1.21.4 経由。
+    //                              1.x の最新が 1.21.4 のため、testcontainers 側では解消しない)
+    //   plexus-utils     3.3.0  -> CVE-2025-67030(checkstyle の doxia 1.12.0 経由。11 系でも残り、
+    //                              14 系では外れている。メジャー更新は設定の互換性の確認が要る)
+    // 解除の判定は libs.versions.toml の該当行のコメントを参照する。
+    constraints {
+        testImplementation "org.apache.commons:commons-compress:${libs.versions.commons.compress.get()}"
+        checkstyle "org.codehaus.plexus:plexus-utils:${libs.versions.plexus.utils.get()}"
+    }
 }
 
 configurations.configureEach {

@@ -15,7 +15,7 @@ def spotbugsConfidence = spotbugsClassLoader.loadClass('com.github.spotbugs.snom
 def spotbugsTaskClass = spotbugsClassLoader.loadClass('com.github.spotbugs.snom.SpotBugsTask')
 
 checkstyle {
-    toolVersion = '10.20.1'
+    toolVersion = '10.26.1'
     configFile = file("${rootDir}/config/checkstyle/google_checks.xml")
 }
 
@@ -48,7 +48,7 @@ spotbugs {
 
 // 何も検証していないテストの検出(PMD: UnitTestShouldIncludeAssert 1本のみ)
 pmd {
-    toolVersion = '7.14.0'
+    toolVersion = '7.27.0'
     ruleSets = []
     ruleSetFiles = files("${rootDir}/config/pmd/ruleset.xml")
     consoleOutput = true

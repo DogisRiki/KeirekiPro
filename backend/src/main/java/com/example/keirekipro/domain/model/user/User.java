@@ -94,16 +94,14 @@ public class User extends Entity {
 
         super();
 
-        // 新規作成時はデフォルトでUSERロールを付与
-        Set<RoleName> resolvedRoles = (roles == null || roles.isEmpty())
-                ? EnumSet.of(RoleName.defaultRole())
-                : EnumSet.copyOf(roles);
-
         this.email = email;
         this.passwordHash = passwordHash;
         this.twoFactorAuthEnabled = twoFactorAuthEnabled;
         this.authProviders = authProviders;
-        this.roles = resolvedRoles;
+        // 新規作成時はデフォルトでUSERロールを付与
+        this.roles = (roles == null || roles.isEmpty())
+                ? EnumSet.of(RoleName.defaultRole())
+                : EnumSet.copyOf(roles);
         this.profileImage = profileImage;
         this.username = username;
         this.createdAt = LocalDateTime.now();
@@ -126,15 +124,13 @@ public class User extends Entity {
             LocalDateTime updatedAt) {
         super(id);
 
-        Set<RoleName> resolvedRoles = (roles == null || roles.isEmpty())
-                ? EnumSet.noneOf(RoleName.class)
-                : EnumSet.copyOf(roles);
-
         this.email = email;
         this.passwordHash = passwordHash;
         this.twoFactorAuthEnabled = twoFactorAuthEnabled;
         this.authProviders = authProviders;
-        this.roles = resolvedRoles;
+        this.roles = (roles == null || roles.isEmpty())
+                ? EnumSet.noneOf(RoleName.class)
+                : EnumSet.copyOf(roles);
         this.profileImage = profileImage;
         this.username = username;
         this.createdAt = createdAt;
