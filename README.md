@@ -108,10 +108,10 @@ flowchart LR
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
-| 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート |
+| 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート。レポートは90日間保持する |
 | 定期 | container-scan-scheduled.yaml | 週次 (schedule) / 手動 | 稼働中の本番イメージをECSのサービス定義から特定してTrivyで再検査し、検出した脆弱性をIssueに反映する。イメージから検出されなくなった脆弱性のIssueは自動でクローズする |
 | 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
-| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる3項目を自動判定する。定期スキャンの直近成功が8日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いかを確認する。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
+| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる4項目を自動判定する。定期スキャンの直近成功が8日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いか、PRの検査と定期検査でTrivyの版が揃っているかを確認する。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 | 定期 | canary-verify.yaml | 月次 (schedule) / 手動 | canary.yamlが生成したカナリアPR6件が期待どおりのチェックで赤になっているかを照合する。実行の長いチェックの結論が出揃うよう生成の3日後に発火する。逸脱があればIssue「カナリア照合: 逸脱あり」、判定できなければIssue「カナリア照合: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 
 依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)・frontend(npm)・Dockerのベースイメージは週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます)。

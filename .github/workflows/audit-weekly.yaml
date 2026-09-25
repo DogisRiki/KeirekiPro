@@ -1,7 +1,7 @@
 name: Audit Weekly
 
 # 週次監査(#310 段階1): 人間が画面を開いて行っていた定期監査のうち、
-# 機械判定できる3項目を自動判定に置き換える。
+# 機械判定できる4項目を自動判定に置き換える。
 #
 #   scan-freshness   定期スキャン(container-scan-scheduled.yaml)の直近成功が
 #                    8日未満かを確認する(旧・週次8)
@@ -9,6 +9,8 @@ name: Audit Weekly
 #                    (旧・週次6)
 #   skipped-required 期待一覧とrulesetの集合照合と、必須チェックがスキップの
 #                    ままマージされたPRの検知(新規)
+#   trivy-version    PRの検査と定期検査の TRIVY_VERSION が一致しているかを
+#                    確認する(旧・月次4の一部。#334)
 #
 # 判定・通知・結論の3段で動く(#347):
 #   - 判定: 各判定スクリプトの終了コードを 0=逸脱なし / 1=逸脱あり /
@@ -106,14 +108,14 @@ jobs:
             echo ""
           } >>"$GITHUB_STEP_SUMMARY"
 
-      # 判定。自己テスト → 本判定3本 → 集約 の順に行い、結果をステップ出力
+      # 判定。自己テスト → 本判定4本 → 集約 の順に行い、結果をステップ出力
       # result(none / deviation / undecidable)に書く。このステップ自体は
       # 常に成功で終わり(set +e で途中の失敗でも止めない)、成否は Conclude が
       # 決める。
       #
       # 自己テストを先に置く。壊れた判定スクリプトの結論(緑も赤も)を信用せず、
       # 1本でも失敗したら本判定を行わずに判定不能とする(dependency-review.yaml
-      # の cooldown ジョブと同じ、自テスト後に本判定の型)。3本は途中で失敗しても
+      # の cooldown ジョブと同じ、自テスト後に本判定の型)。4本は途中で失敗しても
       # 全部実行する(container-scan-scheduled.yaml のテスト集約と同じ方式)。
       #
       # 本判定は1本目が逸脱・判定不能でも残りを実行する。途中で止めると、
@@ -195,7 +197,7 @@ jobs:
           }
 
           selftest_failed=0
-          for t in test-check-audit-scan-freshness test-check-audit-dependabot-stuck test-check-audit-skipped-required; do
+          for t in test-check-audit-scan-freshness test-check-audit-dependabot-stuck test-check-audit-skipped-required test-check-audit-trivy-version; do
             echo "::group::${t}.sh"
             if ! bash ".github/scripts/tests/${t}.sh"; then
               echo "::error::${t}.sh が失敗しました。"
@@ -216,6 +218,9 @@ jobs:
               .github/scripts/check-audit-dependabot-stuck.sh .github/audit/required-checks.json
             run_check skipped-required "必須チェックの集合照合とスキップ検知" \
               .github/scripts/check-audit-skipped-required.sh .github/audit/required-checks.json
+            run_check trivy-version "Trivy の版の一致" \
+              .github/scripts/check-audit-trivy-version.sh \
+              .github/workflows/container-scan.yaml .github/workflows/container-scan-scheduled.yaml
           fi
 
           echo "週次監査の結果: ${overall}"
