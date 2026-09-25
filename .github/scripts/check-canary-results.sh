@@ -7,8 +7,17 @@
 #   failure            → 正常(検査が問題を検知した)
 #   success            → 実行されたが検知しなかった(判定側の故障)= 失敗
 #   skipped・実行なし  → 検査が実行されていない = 失敗(故障と区別して報告)
-# いずれかの種別が失敗判定なら exit 1。全種別の判定一覧は判定結果に
+# いずれかの種別が失敗判定なら exit 1(逸脱あり)。全種別が正常または
+# 停止中(記録済み)なら exit 0(逸脱なし)。全種別の判定一覧は判定結果に
 # かかわらず常にJob Summaryへ出力する。
+#
+# 終了コード:
+#   0 = 逸脱なし / 1 = 逸脱あり / 2 = 判定不能
+#   1 は失敗判定の種別(判定側の故障・実行されていない・想定外の結論・
+#   PR欠落。6件そろっていない場合を含む)を報告したうえでの明示的な exit 1
+#   だけが返す。引数・必須環境変数の欠落、対象年月の書式不正、ガードして
+#   いないコマンドの想定外の失敗もすべて 2 に倒す。1 に混ぜると、判定が
+#   一度も完了していないのに「逸脱あり」として扱われる。
 #
 # 種別→期待チェックの対応(生成側 create-canary-prs.sh の6種と対):
 #   known-bug       → codex-review
@@ -39,9 +48,9 @@
 #   (=実行の証拠)のうち最新のものの結論で判定し、後発のskippedによる
 #   偽判定を防ぐ。全てskippedまたは1件も無ければ「実行されていない」。
 #
-# なぜ判定不能を赤にするのか:
+# なぜ判定不能を逸脱なしにしないのか:
 #   判定できないまま通すと、ゲートの故障が翌月まで見えない。API失敗・
-#   スキーマ不正は判定不能として exit 1(fail closed)。週次と違い対象
+#   スキーマ不正は判定不能として exit 2(fail closed)。週次と違い対象
 #   期間の窓が無いため、復旧はre-runでも新規のworkflow_dispatchでもよい。
 #
 # 書き込みAPI・PR操作(close・コメント等)は一切行わない(判定と報告のみ)。
@@ -50,12 +59,29 @@
 # 使い方: check-canary-results.sh <期待一覧(required-checks.json)のパス> [対象年月(YYYYMM。既定: 実行時のUTC年月)]
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須)
 # =====================================================================
-set -euo pipefail
+set -Eeuo pipefail
+# ガードしていないコマンドの失敗は、逸脱(1)ではなく判定不能(2)にする。
+# -E で関数・コマンド置換の中の失敗にも適用する。
+trap 'exit 2' ERR
 
-CHECKS_FILE="${1:?required checks file required}"
+# 引数・環境変数の欠落を ${n:?} に任せると終了コード1(逸脱あり)になるため、
+# 明示的に検査して判定不能(2)に倒す。
+if [ "$#" -lt 1 ] || [ -z "$1" ]; then
+    echo "::error::引数が必要です: <期待一覧(required-checks.json)のパス> [対象年月(YYYYMM)]"
+    exit 2
+fi
+if [ -z "${GITHUB_REPOSITORY:-}" ]; then
+    echo "::error::環境変数 GITHUB_REPOSITORY が必要です"
+    exit 2
+fi
+if [ -z "${GH_TOKEN:-}" ]; then
+    echo "::error::環境変数 GH_TOKEN が必要です"
+    exit 2
+fi
+
+CHECKS_FILE="$1"
 TARGET_MONTH="${2:-$(date -u +%Y%m)}"
-REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY required}"
-: "${GH_TOKEN:?GH_TOKEN required}"
+REPO="$GITHUB_REPOSITORY"
 
 OWNER="${REPO%%/*}"
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
@@ -90,14 +116,15 @@ report_undecidable() {
         echo ""
     } >>"$SUMMARY"
     echo "カナリア点検の結果を照合できませんでした(判定不能): ${reason}" >&2
-    exit 1
+    exit 2
 }
 
 # --- 引数の検証 -----------------------------------------------------------------
-case "$TARGET_MONTH" in
-[0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-*) report_undecidable "対象年月の書式が不正です(YYYYMM を期待): ${TARGET_MONTH}" ;;
-esac
+# 対象年月はブランチ名に入る。6桁でも月が 01〜12 でなければ(202613 等)
+# 存在しないブランチを探して全種別がPR欠落(逸脱)に化けるため、先に弾く。
+if ! [[ "$TARGET_MONTH" =~ ^[0-9]{4}(0[1-9]|1[0-2])$ ]]; then
+    report_undecidable "対象年月の書式が不正です(YYYYMM を期待): ${TARGET_MONTH}"
+fi
 
 # --- 期待一覧のスキーマ検証 ------------------------------------------------------
 # 判定の基準となるデータが壊れていたら、照合に進まず判定不能で止める。
@@ -161,7 +188,11 @@ for type in $CANARY_TYPES; do
         report_undecidable "カナリアPRの検索APIの応答を解釈できませんでした(${branch})。"
     fi
 
-    if [ "$(jq -r '.found' <<<"$pr_info")" != "true" ]; then
+    # 取り出しを代入に分けるのは、失敗を ERR トラップ(判定不能)に通すため。
+    # 比較の引数の中で置換すると、失敗が空文字として比較に流れ、PR欠落の
+    # 逸脱に化ける。
+    found=$(jq -r '.found' <<<"$pr_info")
+    if [ "$found" != "true" ]; then
         rows="${rows}| ${type} | ${expected} | :rotating_light: PR欠落(ブランチ ${branch} のPRが見つからない) |"$'\n'
         fail_report="${fail_report}- ${type}: PR欠落(${branch})"$'\n'
         continue
