@@ -107,10 +107,19 @@ fi
 #
 # 取得の失敗を握りつぶさない。失敗して空になったものを「追加なし」と扱うと、
 # 比較APIがエラーを返す場合に静かに緑になる。fail closed の破れにあたる。
+#
+# 座標は name ではなく package_url から取る。比較APIの name は artifactId を
+# 小文字にして返すことがあり(例: biz.aQute.bnd:biz.aqute.bnd.annotation)、
+# Maven Central のパスは大文字小文字を区別するため 404 になって判定不能で止まる。
+# package_url(pkg:maven/<groupId>/<artifactId>@<version>)は元の表記を保っている。
+# package_url が無いエントリに限り name を使う。
 compare_out=""
 if ! compare_out=$(gh api --paginate \
     "repos/${REPO}/dependency-graph/compare/${BASE_SHA}...${HEAD_SHA}" \
-    --jq '.[] | select(.change_type == "added") | select(.ecosystem == "maven") | "\(.name)\t\(.version)"'); then
+    --jq '.[] | select(.change_type == "added") | select(.ecosystem == "maven")
+        | "\(if ((.package_url // "") | startswith("pkg:maven/"))
+             then (.package_url | ltrimstr("pkg:maven/") | sub("[@?#].*"; "") | sub("/"; ":"))
+             else .name end)\t\(.version)"'); then
     {
         echo "### :warning: 追加パッケージの一覧を取得できませんでした(判定不能)"
         echo ""

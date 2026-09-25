@@ -268,6 +268,31 @@ org/example/b/2.0.0/b-2.0.0.pom	200	404	$LM_OLD
 org/example/c/3.0.0/c-3.0.0.pom	200	404	$LM_OLD
 "
 
+echo "--- 座標の取り出し ---"
+# 比較APIの実際の応答(2026-09-25、PR #362)。name は artifactId が小文字になり、
+# package_url は元の表記を保っている
+entry_purl() {
+    printf '{"change_type":"added","ecosystem":"maven","name":"%s","version":"%s","package_url":"%s","manifest":"backend/settings.gradle"}' \
+        "$1" "$2" "$3"
+}
+check 0 "name が小文字でも package_url の表記でパスを組み立てる" \
+    "[$(entry_purl biz.aQute.bnd:biz.aqute.bnd.annotation 7.1.0 pkg:maven/biz.aQute.bnd/biz.aQute.bnd.annotation@7.1.0)]" \
+    "biz/aQute/bnd/biz.aQute.bnd.annotation/7.1.0/biz.aQute.bnd.annotation-7.1.0.pom	200	404	$LM_OLD
+"
+check_calls "/biz/aQute/bnd/biz.aQute.bnd.annotation/7.1.0/" "元の表記のパスへ問い合わせている"
+check_no_call_to "/biz.aqute.bnd.annotation/" "小文字のパスへは問い合わせない"
+
+check 0 "package_url に修飾子が付いていても座標を取り出す" \
+    "[$(entry_purl org.example:lib 1.0.0 'pkg:maven/org.example/lib@1.0.0?type=jar')]" \
+    "org/example/lib/1.0.0/lib-1.0.0.pom	200	404	$LM_OLD
+"
+
+check 1 "package_url の座標でも72時間未満なら落とす" \
+    "[$(entry_purl org.example:lib 1.0.0 pkg:maven/org.example/Lib@1.0.0)]" \
+    "org/example/Lib/1.0.0/Lib-1.0.0.pom	200	404	$LM_JUST_UNDER_72
+"
+check_summary "org.example:Lib:1.0.0" "package_url の表記で報告される"
+
 if [ "$FAILED" -eq 0 ]; then
     echo "すべてのテストがPASSしました。"
 else
