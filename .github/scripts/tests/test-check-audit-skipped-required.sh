@@ -360,8 +360,8 @@ check 2 "checksが配列でなければ判定不能として2を返す"
 set_checks 'not-json'
 check 2 "期待一覧をJSONとして解釈できなければ判定不能として2を返す"
 
-# 実物の期待一覧はrulesetの現行19コンテキストと一致する前提(design該当節)。
-set_rules "$(rules_with frontend-test backend-test e2e-smoke escape-hatch size-check gitleaks codex-review dependency-gate pre-merge-check terraform-static dependency-graph-generate dependency-graph-submit dependency-review dependency-cooldown gradle-wrapper docker-smoke detect-changes detect-terraform-changes container-scan-script-tests)"
+# 実物の期待一覧はrulesetの現行20コンテキストと一致する前提(design該当節)。
+set_rules "$(rules_with frontend-test backend-test e2e-smoke escape-hatch size-check gitleaks codex-review dependency-gate pre-merge-check terraform-static dependency-graph-generate dependency-graph-submit dependency-review dependency-cooldown gradle-wrapper docker-smoke detect-changes detect-terraform-changes container-scan-script-tests container-scan)"
 check 0 "実物の期待一覧(required-checks.json)はスキーマ検証と集合照合を通過する" "$REAL_CHECKS"
 
 reset_defaults
