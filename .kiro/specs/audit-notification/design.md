@@ -266,7 +266,7 @@ stateDiagram-v2
 | `canary` | `カナリア照合: 逸脱あり` | `カナリア照合: 判定不能` |
 
 - 状態遷移は System Flows の表に従う。同じタイトルの open なIssueが複数あれば、警告を出したうえで全部を操作対象にする(container-scan-issue.sh と同じ扱い)
-- 起票時にラベル `audit` と担当者 `GITHUB_REPOSITORY_OWNER` を付ける。ラベルは `gh label create audit ... || true` で冪等に作る
+- 起票時にラベル `audit` を付ける。担当者 `GITHUB_REPOSITORY_OWNER` は、起票の直後に REST(`POST repos/{repo}/issues/{n}/assignees`)で追加する(`gh issue create --assignee` は担当者を解決できないと起票そのものが失敗しうるため。実装時のレビューで判明)。ラベルは `gh label create audit ... || true` で冪等に作る
 - 起票後に担当者を読み戻し、所有者が付いていなければ `::warning::` を出して続行する(割り当ては黙って無視されうるため。本文のメンションが代わりの経路になる)
 - 本文の構成:
   - 冒頭: 所有者へのメンション(`@<owner>`)と、結果の1行要約

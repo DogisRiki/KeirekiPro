@@ -5,6 +5,7 @@
 # 判定: 状態遷移表どおりの操作をすべて終えれば exit 0。
 #       引数・環境変数の不正、Issueの検索・起票・追記・クローズの
 #       いずれかの失敗は exit 1(赤)。ラベル作成の失敗は無視する。
+#       担当者を割り当てられなかったときは警告を出して exit 0。
 #       判定スクリプトの 0/1/2 とは契約が違う。このスクリプトは判定をせず、
 #       受け取った結果をIssueに写すだけなので、成功か失敗かの2値で足りる。
 #
@@ -29,7 +30,7 @@
 #
 # 何を捉えないか:
 #   判定は行わない。結果は判定スクリプトと集約の手順が決める。
-#   書き込みはIssueの起票・追記・クローズとラベル作成に限る。
+#   書き込みはIssueの起票・追記・クローズ、担当者の割り当て、ラベル作成に限る。
 #
 # テスト: .github/scripts/tests/test-audit-issue.sh
 # 使い方: audit-issue.sh <kind> <result> [report-file]
@@ -86,25 +87,77 @@ fi
 REPO="$GITHUB_REPOSITORY"
 OWNER="$GITHUB_REPOSITORY_OWNER"
 RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+# 監査手順書(main の doc/開発フロー/監査手順.md)。日本語のパスは
+# パーセントエンコードしておく(URLとして自動リンクされる範囲を途切れさせない)
+DOC_URL="${GITHUB_SERVER_URL}/${REPO}/blob/main/doc/%E9%96%8B%E7%99%BA%E3%83%95%E3%83%AD%E3%83%BC/%E7%9B%A3%E6%9F%BB%E6%89%8B%E9%A0%86.md"
+DOC_SECTION="監査の通知Issueを受けたとき"
 
 DEVIATION_TITLE="${KIND_NAME}: 逸脱あり"
 UNDECIDABLE_TITLE="${KIND_NAME}: 判定不能"
+
+# --- 報告の読み込みと切り詰め -------------------------------------------
+# Issue本文の上限は 65,536 文字。報告以外の部分(要約・リンク・案内)の分を
+# 残すため、報告は 60,000 文字で切る。
+# 数えるのは「文字」(Unicode のコードポイント)で、バイトではない。
+# bash の ${#var} はロケール次第でバイト数になり(C ロケールの alpine など)、
+# head -c はバイトで切るので多バイト文字の途中で切れる。jq の文字列は
+# コードポイント単位で length と .[:n] を扱うので、ロケールに依らない。
+# GitHub が上限を何の単位で数えるかは公式に書かれていない。絵文字のような
+# BMP 外の文字を UTF-16 で2つと数える場合でも、上限との差の 5,536 文字が
+# その分の余裕になる。
+REPORT_MAX_CHARS=60000
+REPORT_TEXT=""
+REPORT_TRUNCATED=0
+if [ "$RESULT" != "none" ]; then
+    if ! report_len=$(jq -Rs 'length' <"$REPORT_FILE" 2>/dev/null); then
+        die "報告ファイルを読めませんでした: '${REPORT_FILE}'"
+    fi
+    if [ "$report_len" -gt "$REPORT_MAX_CHARS" ]; then
+        REPORT_TRUNCATED=1
+    fi
+    # -j は末尾に改行を足さない。コマンド置換は末尾の改行を落とすので、
+    # 目印の x を付けて読み、外す(報告の末尾の改行も保つ)
+    if ! REPORT_TEXT=$(jq -Rsj --argjson max "$REPORT_MAX_CHARS" '.[:$max]' <"$REPORT_FILE" 2>/dev/null && printf x); then
+        die "報告ファイルを読めませんでした: '${REPORT_FILE}'"
+    fi
+    REPORT_TEXT="${REPORT_TEXT%x}"
+fi
 
 # --- 本文 -------------------------------------------------------------
 # 本文の組み立てはこの関数に閉じる。呼び出し側は「どの場面か」だけを渡す。
 #   new      起票(title の種別で逸脱か判定不能かが決まる)
 #   recheck  既存のIssueへの今回の内容の追記
 #   resolved 解消の追記(閉じる直前)
+#
+# 起票と追記は同じ構成にする。追記にもメンションを付けるのは、追記が
+# 「前回から逸脱・故障が続いている」ことを伝えるもので、所有者が購読を
+# 外していても届けたいため。頻度は監査の周期(週1回・月1回)に限られる。
+# 解消の追記には付けない。対処が要らない知らせで、購読していれば届く。
+#
+# 報告は最後に置く。切り詰めで Markdown の囲み(```)が閉じないまま
+# 終わっても、後ろに続く案内やリンクが囲みに飲まれないようにするため。
 # 使い方: build_body <mode> <title>
 build_body() {
     local mode="$1" title="$2"
     case "$mode" in
         new | recheck)
+            printf '@%s ' "$OWNER"
             summary_line "$title"
             printf '\n- 実行: %s\n\n' "$RUN_URL"
+            printf '## 対処\n\n'
+            printf '監査手順書の「%s」の節に従って対処する。\n\n' "$DOC_SECTION"
+            printf -- '- 監査手順書: %s\n\n' "$DOC_URL"
+            if [ "$title" = "$UNDECIDABLE_TITLE" ]; then
+                printf '## 再実行の方法\n\n'
+                rerun_guide
+                printf '\n'
+            fi
             printf '## 報告\n\n'
-            cat "$REPORT_FILE"
-            printf '\n'
+            if [ "$REPORT_TRUNCATED" -eq 1 ]; then
+                printf '報告が%s文字を超えたため、先頭の%s文字だけを載せる。' "60,000" "60,000"
+                printf '全文は実行の Job Summary を見ること: %s\n\n' "$RUN_URL"
+            fi
+            printf '%s\n' "$REPORT_TEXT"
             ;;
         resolved)
             printf '今回の実行で解消を確認した。このIssueを閉じる。\n\n'
@@ -120,6 +173,30 @@ summary_line() {
     else
         printf '%sが判定できなかった(監査そのものの故障)。\n' "$KIND_NAME"
     fi
+}
+
+# 判定不能のときの再実行の方法。監査の種類で異なる
+rerun_guide() {
+    case "$KIND" in
+        weekly)
+            printf '失敗した実行を Re-run で再実行する。新規の手動実行(workflow_dispatch)は使わない(skipped-required の対象期間に穴が空くため)。\n'
+            ;;
+        canary)
+            printf 'Re-run と新規の手動実行のどちらでもよい。\n'
+            ;;
+    esac
+}
+
+# 本文は一時ファイルに書き、--body-file で渡す。
+# 報告は最大 60,000 文字で、多バイト文字なら 180,000 バイトを超える。
+# --body の引数で渡すと Linux の引数1つあたりの上限(MAX_ARG_STRLEN、128KiB)を
+# 超えて起動できない。https://man7.org/linux/man-pages/man2/execve.2.html
+BODY_FILE=$(mktemp) || die "一時ファイルを作れませんでした。"
+trap 'rm -f "$BODY_FILE"' EXIT
+
+# 使い方: write_body <mode> <title>
+write_body() {
+    build_body "$1" "$2" >"$BODY_FILE" || die "本文を組み立てられませんでした: $2"
 }
 
 # --- 既存のIssueの検索 -------------------------------------------------
@@ -163,26 +240,63 @@ created=0
 commented=0
 closed=0
 
+# 使い方: assign_owner <gh issue create の出力>
+# 起票したIssueに所有者を担当者として追加し、応答を読み戻して確かめる。
+# 付かなかったとき・確かめられなかったときは警告だけ出して続行する。
+# 通知は起票と本文のメンションで既に届いているので、ここで赤にしても
+# 届く経路は増えない(research.md「担当者の割り当てとメンションを併用する」)。
+#
+# gh issue create --assignee を使わないのは、担当者を解決できないと
+# 起票そのものが失敗しうるため。通知が失われる方がずっと悪い。
+# REST の担当者の追加は、push 権限の無い相手を黙って無視し、Issue 全体を
+# assignees 付きで返す。応答の assignees に所有者がいるかで判定できる。
+#   https://docs.github.com/en/rest/issues/assignees#add-assignees-to-an-issue
+# gh api の -f 'key[]=value' は配列の要素として送られる。
+#   https://cli.github.com/manual/gh_api
+assign_owner() {
+    local created_output="$1" number resp
+    # gh issue create は成功時に作ったIssueのURLを標準出力に出す
+    #   https://cli.github.com/manual/gh_issue_create
+    # 他の行が混ざっても拾えるよう、…/issues/<番号> で終わる最後の行から取る
+    number=$(printf '%s\n' "$created_output" |
+        sed -n 's#^.*/issues/\([1-9][0-9]*\)[[:space:]]*$#\1#p' | tail -n 1)
+    if [ -z "$number" ]; then
+        echo "::warning::起票したIssueの番号を読み取れず、担当者 ${OWNER} を割り当てられませんでした。起票は済んでいます: ${created_output}"
+        return 0
+    fi
+    if ! resp=$(gh api -X POST "repos/${REPO}/issues/${number}/assignees" \
+        -f "assignees[]=${OWNER}" 2>/dev/null); then
+        echo "::warning::担当者 ${OWNER} を #${number} に割り当てられませんでした(APIの失敗)。本文のメンションで通知は届きます。"
+        return 0
+    fi
+    if ! printf '%s' "$resp" | jq -e --arg o "$OWNER" \
+        'any(.assignees[]?; .login == $o)' >/dev/null 2>&1; then
+        echo "::warning::担当者 ${OWNER} が #${number} に付いていません(割り当てが無視された可能性)。本文のメンションで通知は届きます。"
+        return 0
+    fi
+    echo "担当者: #${number} ${OWNER}"
+}
+
 # 使い方: open_or_append <title>
 # 開いていなければ起票し、開いていれば今回の内容を追記する。
 open_or_append() {
-    local title="$1" numbers number body url
+    local title="$1" numbers number url
     numbers=$(numbers_for "$title")
     if [ -z "$numbers" ]; then
-        body=$(build_body new "$title")
+        write_body new "$title"
         url=$(gh issue create \
             --title "$title" \
             --label "$LABEL" \
-            --assignee "$OWNER" \
-            --body "$body") || die "Issueを起票できませんでした: ${title}"
+            --body-file "$BODY_FILE") || die "Issueを起票できませんでした: ${title}"
         echo "起票: ${title} ${url}"
         created=$((created + 1))
+        assign_owner "$url"
         return 0
     fi
-    body=$(build_body recheck "$title")
+    write_body recheck "$title"
     while IFS= read -r number; do
         [ -n "$number" ] || continue
-        gh issue comment "$number" --body "$body" >/dev/null ||
+        gh issue comment "$number" --body-file "$BODY_FILE" >/dev/null ||
             die "Issueに追記できませんでした: #${number} ${title}"
         echo "追記: #${number} ${title}"
         commented=$((commented + 1))
@@ -195,13 +309,13 @@ NUMBERS
 # 開いていれば解消を追記して閉じる。追記に失敗したら閉じない。
 # 記録の無いクローズは、なぜ閉じたかを後から辿れなくするため。
 resolve_all() {
-    local title="$1" numbers number body
+    local title="$1" numbers number
     numbers=$(numbers_for "$title")
     [ -n "$numbers" ] || return 0
-    body=$(build_body resolved "$title")
+    write_body resolved "$title"
     while IFS= read -r number; do
         [ -n "$number" ] || continue
-        gh issue comment "$number" --body "$body" >/dev/null ||
+        gh issue comment "$number" --body-file "$BODY_FILE" >/dev/null ||
             die "Issueに解消を追記できませんでした: #${number} ${title}"
         gh issue close "$number" >/dev/null ||
             die "Issueを閉じられませんでした: #${number} ${title}"

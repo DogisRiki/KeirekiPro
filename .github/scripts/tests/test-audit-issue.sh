@@ -3,7 +3,7 @@
 # audit-issue.sh の自動テスト
 #
 # gh をシムして、呼ばれたIssue操作の列と終了コードを検証する。
-# シムは呼び出しを1行1件で記録し、--body の中身は呼び出しごとに
+# シムは呼び出しを1行1件で記録し、本文(--body / --body-file)は呼び出しごとに
 # 別ファイルへ保存する。テスト側はその記録を突き合わせる。
 #
 # 実際のAPIは叩かない。監査の通知は「起票・追記・クローズ」の
@@ -34,15 +34,25 @@ RUN_URL="https://github.com/owner/repo/actions/runs/12345"
 #     issue close <番号>
 #     label create <名前>
 #     api <引数をそのまま空白区切り>
-# - --body の中身は「記録の行番号.txt」に保存する
+# - --body の中身、または --body-file で渡したファイルの中身を
+#   「記録の行番号.txt」に保存する
 # - GH_FAIL_ON に「サブコマンド」か「サブコマンド 操作」を指定すると失敗させる。
-#   終了コードは GH_FAIL_CODE(既定 1)
-# - api の応答は $API_FIXTURE_PATH の内容を返す
+#   終了コードは GH_FAIL_CODE(既定 1)。api の操作は、引数に /assignees を
+#   含めば「assignees」、それ以外は「search」とする
+# - 担当者の追加(api .../assignees)の応答は $ASSIGN_FIXTURE_PATH の内容を、
+#   それ以外の api の応答は $API_FIXTURE_PATH の内容を返す
+# - issue create の出力は GH_CREATE_OUTPUT があればそれ、無ければ Issue のURL
 cat >"$WORK/bin/gh" <<'SHIM'
 #!/usr/bin/env bash
 sub="${1:-}"
 action="${2:-}"
 title="" label="" assignee="" body="" has_body=0 positional=""
+if [ "$sub" = "api" ]; then
+    action="search"
+    case " $* " in
+        */assignees*) action="assignees" ;;
+    esac
+fi
 if [ "$sub" = "issue" ] || [ "$sub" = "label" ]; then
     shift 2
     while [ $# -gt 0 ]; do
@@ -51,6 +61,7 @@ if [ "$sub" = "issue" ] || [ "$sub" = "label" ]; then
             --label) label="$2"; shift ;;
             --assignee) assignee="$2"; shift ;;
             --body) body="$2"; has_body=1; shift ;;
+            --body-file) body=$(cat "$2"; printf x); body="${body%x}"; has_body=1; shift ;;
             --*) shift ;;
             *) [ -n "$positional" ] || positional="$1" ;;
         esac
@@ -78,14 +89,26 @@ if [ -n "${GH_FAIL_ON:-}" ] && { [ "$GH_FAIL_ON" = "$sub" ] || [ "$GH_FAIL_ON" =
     exit "${GH_FAIL_CODE:-1}"
 fi
 case "$sub" in
-    api) cat "$API_FIXTURE_PATH" ;;
-    issue) [ "$action" = "create" ] && echo "https://github.com/owner/repo/issues/100" ;;
+    api)
+        if [ "$action" = "assignees" ]; then
+            cat "$ASSIGN_FIXTURE_PATH"
+        else
+            cat "$API_FIXTURE_PATH"
+        fi
+        ;;
+    issue)
+        if [ "$action" = "create" ]; then
+            printf '%s\n' "${GH_CREATE_OUTPUT-https://github.com/owner/repo/issues/100}"
+        fi
+        ;;
 esac
 exit 0
 SHIM
 chmod +x "$WORK/bin/gh"
+ASSIGN_FIXTURE="$WORK/assign.json"
 export CALLS_LOG="$CALLS"
 export API_FIXTURE_PATH="$API_FIXTURE"
+export ASSIGN_FIXTURE_PATH="$ASSIGN_FIXTURE"
 export BODY_DIR="$WORK/bodies"
 
 set_env() {
@@ -102,6 +125,8 @@ setup() {
     # gh api --paginate --slurp は「ページの配列」を返す。
     # ページ1つの中にIssueの配列が入るので2段包む。
     printf '[[%s]]' "$1" >"$API_FIXTURE"
+    # 担当者の追加の応答は、既定では所有者が付いた Issue を返す
+    printf '{"number":100,"assignees":[{"login":"owner"}]}' >"$ASSIGN_FIXTURE"
     printf '## 判定項目\n\nREPORT-MARKER-7f3a: PR #342 が滞留している\n' >"$REPORT"
     : >"$CALLS"
     rm -f "$WORK"/bodies/*.txt
@@ -155,23 +180,26 @@ check_no_gh() {
     fi
 }
 
-# 使い方: body_of <記録の行に完全一致する文字列>
-# その呼び出しに渡された --body の中身を出力する
-body_of() {
+# 使い方: body_file_of <記録の行に完全一致する文字列>
+# その呼び出しに渡された本文を保存したファイルのパスを出力する(無ければ失敗)。
+# 検索はファイルに対して行う。printf "$body" | grep -q の形は、grep が
+# 一致した時点で抜けて printf が SIGPIPE を受け、pipefail で偽になりうる
+# (本文が大きい切り詰めのケースで起きる)
+body_file_of() {
     local n
     n=$(grep -nxF "$1" "$CALLS" | head -n 1 | cut -d: -f1)
-    [ -n "$n" ] && [ -f "$WORK/bodies/${n}.txt" ] && cat "$WORK/bodies/${n}.txt"
+    [ -n "$n" ] && [ -f "$WORK/bodies/${n}.txt" ] && printf '%s' "$WORK/bodies/${n}.txt"
 }
 
 # 使い方: check_body_has <記録の行> <含むべき文字列> <説明>
 check_body_has() {
-    local body
-    body=$(body_of "$1" || true)
-    if printf '%s' "$body" | grep -qF -- "$2"; then
+    local f
+    f=$(body_file_of "$1" || true)
+    if [ -n "$f" ] && grep -qF -- "$2" "$f"; then
         pass "$3"
     else
         fail "$3"
-        echo "     本文: $(printf '%s' "$body" | head -c 300 | tr '\n' '|')"
+        [ -z "$f" ] || echo "     本文: $(head -c 300 "$f" | tr '\n' '|')"
     fi
 }
 
@@ -183,9 +211,13 @@ C_UND="カナリア照合: 判定不能"
 DEV='{"number":10,"title":"週次監査: 逸脱あり"}'
 UND='{"number":20,"title":"週次監査: 判定不能"}'
 
-CREATE_W_DEV="issue create title=${W_DEV} label=audit assignee=owner"
-CREATE_W_UND="issue create title=${W_UND} label=audit assignee=owner"
-CREATE_C_DEV="issue create title=${C_DEV} label=audit assignee=owner"
+# 起票では --assignee を渡さない(assignee= が空)。担当者は起票の後に
+# REST で追加する。--assignee は担当者を解決できないと起票そのものを
+# 失敗させうるため(2.2 で変更)
+CREATE_W_DEV="issue create title=${W_DEV} label=audit assignee="
+CREATE_W_UND="issue create title=${W_UND} label=audit assignee="
+CREATE_C_DEV="issue create title=${C_DEV} label=audit assignee="
+CREATE_C_UND="issue create title=${C_UND} label=audit assignee="
 
 # ---------------------------------------------------------------------
 # 1. 状態遷移表: 結果「逸脱なし」(要件 2.4, 3.4)
@@ -221,7 +253,7 @@ issue close 20" "逸脱なし・両方あり: 両方に解消を追記して閉�
 setup ""
 run weekly deviation "$REPORT"
 check_exit 0 "逸脱あり・既存なし: 正常終了する"
-check_calls "$CREATE_W_DEV" "逸脱あり・既存なし: ラベルと担当者を付けて逸脱のIssueを起票する"
+check_calls "$CREATE_W_DEV" "逸脱あり・既存なし: ラベルを付けて逸脱のIssueを起票する"
 
 setup "$DEV"
 run weekly deviation "$REPORT"
@@ -249,7 +281,7 @@ issue close 20" "逸脱あり・両方あり: 逸脱に追記し、判定不能�
 setup ""
 run weekly undecidable "$REPORT"
 check_exit 0 "判定不能・既存なし: 正常終了する"
-check_calls "$CREATE_W_UND" "判定不能・既存なし: ラベルと担当者を付けて判定不能のIssueを起票する"
+check_calls "$CREATE_W_UND" "判定不能・既存なし: ラベルを付けて判定不能のIssueを起票する"
 
 setup "$DEV"
 run weekly undecidable "$REPORT"
@@ -278,7 +310,7 @@ check_calls "$CREATE_C_DEV" "カナリア・逸脱あり: カナリアのタイ�
 setup "${DEV}, ${UND}"
 run canary undecidable "$REPORT"
 check_exit 0 "カナリア・判定不能: 正常終了する"
-check_calls "issue create title=${C_UND} label=audit assignee=owner" "カナリア・判定不能: カナリアのタイトルで起票し、週次のIssueには触らない"
+check_calls "$CREATE_C_UND" "カナリア・判定不能: カナリアのタイトルで起票し、週次のIssueには触らない"
 
 C_DEV_ISSUE='{"number":30,"title":"カナリア照合: 逸脱あり"}'
 C_UND_ISSUE='{"number":31,"title":"カナリア照合: 判定不能"}'
@@ -370,25 +402,315 @@ issue comment 20
 issue close 20" "複数ページ: 2ページ目のIssueも対象にする"
 
 # ---------------------------------------------------------------------
-# 8. 本文(2.2 で内容を拡充する。ここでは報告と実行へのリンクだけ確かめる)
+# 8. 本文(要件 2.3, 2.5, 3.3)
 # ---------------------------------------------------------------------
-setup ""
-run weekly deviation "$REPORT"
-check_body_has "$CREATE_W_DEV" "REPORT-MARKER-7f3a" "起票の本文に報告の内容が入る"
-check_body_has "$CREATE_W_DEV" "$RUN_URL" "起票の本文に実行へのリンクが入る"
+# 監査手順書(main の doc/開発フロー/監査手順.md)へのリンク。日本語のパスは
+# パーセントエンコードする
+DOC_URL="https://github.com/owner/repo/blob/main/doc/%E9%96%8B%E7%99%BA%E3%83%95%E3%83%AD%E3%83%BC/%E7%9B%A3%E6%9F%BB%E6%89%8B%E9%A0%86.md"
+DOC_SECTION="「監査の通知Issueを受けたとき」"
+RERUN_HEADING="## 再実行の方法"
+W_RERUN="失敗した実行を Re-run で再実行する。新規の手動実行(workflow_dispatch)は使わない(skipped-required の対象期間に穴が空くため)"
+C_RERUN="Re-run と新規の手動実行のどちらでもよい"
 
+# 使い方: check_body_lacks <記録の行> <含まないべき文字列> <説明>
+check_body_lacks() {
+    local f
+    f=$(body_file_of "$1" || true)
+    if [ -z "$f" ] || [ ! -s "$f" ]; then
+        fail "$3 (本文が見つからない)"
+    elif grep -qF -- "$2" "$f"; then
+        fail "$3"
+        echo "     本文: $(head -c 300 "$f" | tr '\n' '|')"
+    else
+        pass "$3"
+    fi
+}
+
+# 使い方: check_first_line <記録の行> <1行目の先頭に来るべき文字列> <説明>
+check_first_line() {
+    local f first=""
+    f=$(body_file_of "$1" || true)
+    [ -z "$f" ] || first=$(head -n 1 "$f")
+    case "$first" in
+        "$2"*) pass "$3" ;;
+        *)
+            fail "$3"
+            echo "     1行目: ${first}"
+            ;;
+    esac
+}
+
+# 8-1. 起票の本文(種類 × 結果)
+for kind in weekly canary; do
+    for result in deviation undecidable; do
+        case "$kind" in
+            weekly) kname="週次監査" own_rerun="$W_RERUN" other_rerun="$C_RERUN" ;;
+            canary) kname="カナリア照合" own_rerun="$C_RERUN" other_rerun="$W_RERUN" ;;
+        esac
+        case "$result" in
+            deviation) title="${kname}: 逸脱あり" summary="${kname}で逸脱が見つかった。" ;;
+            undecidable) title="${kname}: 判定不能" summary="${kname}が判定できなかった" ;;
+        esac
+        line="issue create title=${title} label=audit assignee="
+        tag="起票(${kind}・${result})"
+        setup ""
+        run "$kind" "$result" "$REPORT"
+        check_exit 0 "${tag}: 正常終了する"
+        check_first_line "$line" "@owner " "${tag}: 1行目の先頭で所有者にメンションする"
+        check_body_has "$line" "$summary" "${tag}: 結果の1行要約が入る"
+        check_body_has "$line" "$RUN_URL" "${tag}: 実行へのリンクが入る"
+        check_body_has "$line" "REPORT-MARKER-7f3a" "${tag}: 報告の内容が入る"
+        check_body_has "$line" "$DOC_URL" "${tag}: 監査手順書へのリンクが入る"
+        check_body_has "$line" "$DOC_SECTION" "${tag}: 監査手順書の節の名前が入る"
+        if [ "$result" = "undecidable" ]; then
+            check_body_has "$line" "$RERUN_HEADING" "${tag}: 再実行の方法が入る"
+            check_body_has "$line" "$own_rerun" "${tag}: 種類に合った再実行の方法が入る"
+            check_body_lacks "$line" "$other_rerun" "${tag}: 他の種類の再実行の方法は入らない"
+        else
+            check_body_lacks "$line" "$RERUN_HEADING" "${tag}: 再実行の方法は入らない"
+            check_body_lacks "$line" "Re-run" "${tag}: Re-run の案内は入らない"
+        fi
+    done
+done
+
+# 承認待ちの一覧は報告の一部なので、報告全体が本文に入れば一覧も入る(要件 2.5)
+setup ""
+printf '## 所有者の承認待ち\n\n- PR #346 APPROVAL-PENDING-MARKER\n' >"$REPORT"
+run weekly deviation "$REPORT"
+check_body_has "$CREATE_W_DEV" "APPROVAL-PENDING-MARKER" "起票の本文に承認待ちの一覧が入る"
+
+# 8-2. 追記の本文(起票と同じ構成。メンションも付ける)
 setup "$DEV"
 run weekly deviation "$REPORT"
-check_body_has "issue comment 10" "REPORT-MARKER-7f3a" "追記の本文に報告の内容が入る"
-check_body_has "issue comment 10" "$RUN_URL" "追記の本文に実行へのリンクが入る"
+check_first_line "issue comment 10" "@owner " "逸脱の追記: 1行目の先頭で所有者にメンションする"
+check_body_has "issue comment 10" "週次監査で逸脱が見つかった。" "逸脱の追記: 結果の1行要約が入る"
+check_body_has "issue comment 10" "REPORT-MARKER-7f3a" "逸脱の追記: 今回の報告の内容が入る"
+check_body_has "issue comment 10" "$RUN_URL" "逸脱の追記: 実行へのリンクが入る"
+check_body_has "issue comment 10" "$DOC_URL" "逸脱の追記: 監査手順書へのリンクが入る"
+check_body_lacks "issue comment 10" "$RERUN_HEADING" "逸脱の追記: 再実行の方法は入らない"
 
 setup "$UND"
 run weekly undecidable "$REPORT"
-check_body_has "issue comment 20" "REPORT-MARKER-7f3a" "判定不能の追記の本文に報告の内容が入る"
+check_first_line "issue comment 20" "@owner " "判定不能の追記: 1行目の先頭で所有者にメンションする"
+check_body_has "issue comment 20" "REPORT-MARKER-7f3a" "判定不能の追記: 今回の報告の内容が入る"
+check_body_has "issue comment 20" "$RUN_URL" "判定不能の追記: 実行へのリンクが入る"
+check_body_has "issue comment 20" "$RERUN_HEADING" "判定不能の追記: 再実行の方法の節が入る"
+check_body_has "issue comment 20" "$W_RERUN" "判定不能の追記(週次): 週次の再実行の方法が入る"
 
+setup '{"number":31,"title":"カナリア照合: 判定不能"}'
+run canary undecidable "$REPORT"
+check_body_has "issue comment 31" "$C_RERUN" "判定不能の追記(カナリア): カナリアの再実行の方法が入る"
+check_body_lacks "issue comment 31" "$W_RERUN" "判定不能の追記(カナリア): 週次の再実行の方法は入らない"
+
+# 8-3. 解消の追記
+for fixture in "$DEV" "$UND"; do
+    setup "$fixture"
+    run weekly none "$REPORT"
+    n=$(printf '%s' "$fixture" | jq -r .number)
+    check_body_has "issue comment ${n}" "今回の実行で解消を確認した" "解消の追記(#${n}): 解消を確認した旨が入る"
+    check_body_has "issue comment ${n}" "$RUN_URL" "解消の追記(#${n}): 実行へのリンクが入る"
+    check_body_lacks "issue comment ${n}" "REPORT-MARKER-7f3a" "解消の追記(#${n}): 報告は入らない"
+    # 対処の要らない知らせなので、メンションで改めて呼び出さない
+    check_body_lacks "issue comment ${n}" "@owner" "解消の追記(#${n}): 所有者へのメンションは付けない"
+done
+
+# ---------------------------------------------------------------------
+# 8-4. 報告の切り詰め(60,000文字。バイト数ではなく文字数で数える)
+# ---------------------------------------------------------------------
+TRUNC_NOTE="Job Summary"
+
+# 使い方: repeat <回数> <文字>
+repeat() {
+    local i=0 s=""
+    while [ "$i" -lt "$1" ]; do
+        s="${s}$2"
+        i=$((i + 1))
+    done
+    printf '%s' "$s"
+}
+# 1000文字の塊を組み立ててから繰り返し、ループの回数を抑える
+# 使い方: make_report <文字> <文字数(1000の倍数+余り)> (末尾に目印 Z を1文字足す)
+make_report() {
+    local ch="$1" total="$2" block rest i=0
+    block=$(repeat 1000 "$ch")
+    {
+        while [ "$i" -lt $((total / 1000)) ]; do
+            printf '%s' "$block"
+            i=$((i + 1))
+        done
+        repeat $((total % 1000)) "$ch"
+        printf 'Z'
+    } >"$REPORT"
+}
+
+# 使い方: count_of <記録の行> <文字>
+count_of() {
+    # busybox の grep -o は1行に複数の一致を数えないので jq で数える。
+    # jq は UTF-8 として読むので、文字の途中で切れていれば一致しない
+    local f
+    f=$(body_file_of "$1") || return 0
+    jq -Rs --arg c "$2" '(split($c) | length) - 1' <"$f"
+}
+
+# ASCII: 59,999 + 目印 = 60,000文字は切り詰めない
+setup ""
+make_report q 59999
+run weekly deviation "$REPORT"
+check_exit 0 "60,000文字の報告: 正常終了する"
+check_body_has "$CREATE_W_DEV" "qZ" "60,000文字の報告: 切り詰めず末尾まで入る"
+check_body_lacks "$CREATE_W_DEV" "$TRUNC_NOTE" "60,000文字の報告: 切り詰めの案内は入らない"
+
+# ASCII: 60,000 + 目印 = 60,001文字は先頭の60,000文字に切り詰める
+setup ""
+make_report q 60000
+run weekly deviation "$REPORT"
+check_exit 0 "60,001文字の報告: 正常終了する"
+check_body_lacks "$CREATE_W_DEV" "qZ" "60,001文字の報告: 60,001文字目以降は入らない"
+got=$(count_of "$CREATE_W_DEV" q)
+if [ "$got" = "60000" ]; then
+    pass "60,001文字の報告: 先頭の60,000文字が入る"
+else
+    fail "60,001文字の報告: 先頭の60,000文字が入る (実際 ${got})"
+fi
+check_body_has "$CREATE_W_DEV" "$TRUNC_NOTE" "60,001文字の報告: Job Summary を見るよう案内する"
+check_body_has "$CREATE_W_DEV" "$RUN_URL" "60,001文字の報告: 実行へのリンクは残る"
+check_body_has "$CREATE_W_DEV" "$DOC_URL" "60,001文字の報告: 監査手順書へのリンクは残る"
+
+# 多バイト文字(UTF-8 で3バイト)。60,000文字は180,000バイトだが切り詰めない
+MB="鱻"
+setup ""
+make_report "$MB" 59999
+run weekly deviation "$REPORT"
+check_exit 0 "多バイト60,000文字の報告: 正常終了する"
+check_body_has "$CREATE_W_DEV" "${MB}Z" "多バイト60,000文字の報告: 切り詰めず末尾まで入る"
+check_body_lacks "$CREATE_W_DEV" "$TRUNC_NOTE" "多バイト60,000文字の報告: 切り詰めの案内は入らない"
+
+setup ""
+make_report "$MB" 60000
+run weekly deviation "$REPORT"
+check_exit 0 "多バイト60,001文字の報告: 正常終了する"
+check_body_lacks "$CREATE_W_DEV" "${MB}Z" "多バイト60,001文字の報告: 60,001文字目以降は入らない"
+got=$(count_of "$CREATE_W_DEV" "$MB")
+if [ "$got" = "60000" ]; then
+    pass "多バイト60,001文字の報告: 文字の途中で切らずに先頭の60,000文字が入る"
+else
+    fail "多バイト60,001文字の報告: 文字の途中で切らずに先頭の60,000文字が入る (実際 ${got})"
+fi
+check_body_has "$CREATE_W_DEV" "$TRUNC_NOTE" "多バイト60,001文字の報告: Job Summary を見るよう案内する"
+
+# 追記でも同じく切り詰める
 setup "$UND"
-run weekly none "$REPORT"
-check_body_has "issue comment 20" "$RUN_URL" "解消の追記に実行へのリンクが入る"
+make_report q 60000
+run weekly undecidable "$REPORT"
+check_exit 0 "追記・60,001文字の報告: 正常終了する"
+check_body_lacks "issue comment 20" "qZ" "追記・60,001文字の報告: 切り詰める"
+check_body_has "issue comment 20" "$TRUNC_NOTE" "追記・60,001文字の報告: Job Summary を見るよう案内する"
+check_body_has "issue comment 20" "$W_RERUN" "追記・60,001文字の報告: 再実行の方法は残る"
+
+# ---------------------------------------------------------------------
+# 8-5. 担当者の割り当て(要件 2.1, 3.1)
+#   起票の後に REST で所有者を追加し、応答の assignees を読み戻す。
+#   付いていなくても通知は起票とメンションで届いているので、警告だけで exit 0
+# ---------------------------------------------------------------------
+ASSIGN_CALL="api -X POST repos/owner/repo/issues/100/assignees -f assignees[]=owner"
+
+# 使い方: check_output_has <文字列> <説明> / check_output_lacks <文字列> <説明>
+check_output_has() {
+    if grep -qF -- "$1" "$OUT"; then
+        pass "$2"
+    else
+        fail "$2"
+        sed 's/^/     | /' "$OUT"
+    fi
+}
+check_output_lacks() {
+    if grep -qF -- "$1" "$OUT"; then
+        fail "$2"
+        sed 's/^/     | /' "$OUT"
+    else
+        pass "$2"
+    fi
+}
+check_assign_called() {
+    if grep -qxF "$1" "$CALLS"; then
+        pass "$2"
+    else
+        fail "$2"
+        echo "     実際: $(tr '\n' '|' <"$CALLS")"
+    fi
+}
+
+setup ""
+run weekly deviation "$REPORT"
+check_exit 0 "担当者が付く: 正常終了する"
+check_assign_called "$ASSIGN_CALL" "担当者が付く: 起票したIssueに所有者を追加する"
+check_output_lacks "::warning::" "担当者が付く: 警告を出さない"
+if [ "$(grep -n -xF "$CREATE_W_DEV" "$CALLS" | cut -d: -f1)" -lt "$(grep -n -xF "$ASSIGN_CALL" "$CALLS" | cut -d: -f1)" ]; then
+    pass "担当者が付く: 追加は起票の後に行う"
+else
+    fail "担当者が付く: 追加は起票の後に行う"
+fi
+
+setup ""
+run weekly undecidable "$REPORT"
+check_assign_called "$ASSIGN_CALL" "判定不能の起票でも所有者を追加する"
+
+setup ""
+printf '{"number":100,"assignees":[]}' >"$ASSIGN_FIXTURE"
+run weekly deviation "$REPORT"
+check_exit 0 "割り当てが黙って無視された: exit 0"
+check_calls "$CREATE_W_DEV" "割り当てが黙って無視された: 起票は済んでいる"
+check_output_has "::warning::" "割り当てが黙って無視された: 警告を出す"
+check_output_has "owner" "割り当てが黙って無視された: 警告に所有者の名前が入る"
+
+setup ""
+printf '{"number":100,"assignees":[{"login":"someone-else"}]}' >"$ASSIGN_FIXTURE"
+run weekly deviation "$REPORT"
+check_exit 0 "所有者以外だけが付いた: exit 0"
+check_output_has "::warning::" "所有者以外だけが付いた: 警告を出す"
+
+setup ""
+GH_FAIL_ON="api assignees" run weekly deviation "$REPORT"
+check_exit 0 "担当者の追加が失敗: exit 0"
+check_calls "$CREATE_W_DEV" "担当者の追加が失敗: 起票は済んでいる"
+check_output_has "::warning::" "担当者の追加が失敗: 警告を出す"
+
+setup ""
+printf 'not json' >"$ASSIGN_FIXTURE"
+run weekly deviation "$REPORT"
+check_exit 0 "担当者の追加の応答が解釈できない: exit 0"
+check_output_has "::warning::" "担当者の追加の応答が解釈できない: 警告を出す"
+
+setup ""
+GH_CREATE_OUTPUT="https://github.com/owner/repo/issues/7" run weekly deviation "$REPORT"
+check_assign_called "api -X POST repos/owner/repo/issues/7/assignees -f assignees[]=owner" \
+    "起票の出力のURLから番号を取り、そのIssueに所有者を追加する"
+
+setup ""
+GH_CREATE_OUTPUT="起票しました" run weekly deviation "$REPORT"
+check_exit 0 "起票の出力から番号を取れない: exit 0"
+check_output_has "::warning::" "起票の出力から番号を取れない: 警告を出す"
+if grep -qF "/assignees" "$CALLS"; then
+    fail "起票の出力から番号を取れない: 担当者の追加を呼ばない"
+else
+    pass "起票の出力から番号を取れない: 担当者の追加を呼ばない"
+fi
+
+setup "$DEV"
+run weekly deviation "$REPORT"
+if grep -qF "/assignees" "$CALLS"; then
+    fail "追記では担当者の追加を呼ばない"
+else
+    pass "追記では担当者の追加を呼ばない"
+fi
+
+setup ""
+GH_FAIL_ON="issue create" run weekly deviation "$REPORT"
+if grep -qF "/assignees" "$CALLS"; then
+    fail "起票が失敗したら担当者の追加を呼ばない"
+else
+    pass "起票が失敗したら担当者の追加を呼ばない"
+fi
 
 # ---------------------------------------------------------------------
 # 9. gh の失敗(要件 3.5)
