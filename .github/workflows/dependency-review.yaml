@@ -66,6 +66,12 @@ jobs:
           # 出力先を明示する。既定値に依存すると、次の検査が探す場所とずれたときに
           # 「ファイルが無い」ことに気づけない
           dependency-graph-report-dir: ${{ github.workspace }}/dependency-graph-reports
+          # Spring Bootの版管理プラグイン(io.spring.dependency-management)がビルドの内部で作る
+          # 一時的な読み込み(detachedConfiguration<番号>)を記録から外す。この読み込みには
+          # build.gradle で上書きした管理版が反映されず、実際には使われない古い版が記録されて
+          # Dependabotの誤検知になる(#358)。照合は名前全体への一致(Kotlin の Regex.matches)。
+          # 参照: https://github.com/gradle/actions/blob/main/docs/dependency-submission.md
+          dependency-graph-exclude-configurations: 'detachedConfiguration[0-9]+'
 
       - name: Test dependency snapshot check
         run: bash .github/scripts/tests/test-check-dependency-snapshot.sh
