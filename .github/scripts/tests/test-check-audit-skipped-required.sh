@@ -3,7 +3,7 @@
 # check-audit-skipped-required.sh の自動テスト(audit-weekly CI から実行)
 #
 # gh をスタブし、終了コードと報告の内容を検証する。
-#   0 = 緑(通過) / 1 = 赤
+#   0 = 逸脱なし / 1 = 逸脱あり / 2 = 判定不能
 #
 # gh のスタブは実APIの形のJSONをそのまま返し、応答の解釈(ruleset応答からの
 # context抽出・実行一覧からの前回run選択・check-runs の集計)は本体側に実行
@@ -78,7 +78,28 @@ chmod +x "$WORK/bin/gh"
 # 現在のrunのID。テスト側から変更できる(既定 9999)。
 RUN_ID=9999
 
-# 使い方: run <期待一覧パス> [rules失敗] [wfruns失敗] [pulls失敗] [check-runs失敗]
+# --- jq のラッパ -----------------------------------------------------------------
+# STUB_JQ_FAIL が設定されているときだけ、違反の列挙(.violations | join)を
+# 行う呼び出しを異常終了させる。本体でガードしていないコマンドが想定外に
+# 失敗した状況の再現。それ以外の呼び出しは本物の jq に渡す。
+REAL_JQ=$(command -v jq) || exit 1
+cat >"$WORK/bin/jq" <<STUB
+#!/usr/bin/env bash
+if [ -n "\${STUB_JQ_FAIL:-}" ]; then
+    for arg in "\$@"; do
+        case "\$arg" in
+        *".violations | join"*)
+            echo "stub: jq failure" >&2
+            exit 1
+            ;;
+        esac
+    done
+fi
+exec "$REAL_JQ" "\$@"
+STUB
+chmod +x "$WORK/bin/jq"
+
+# 使い方: run <期待一覧パス> [rules失敗] [wfruns失敗] [pulls失敗] [check-runs失敗] [jq失敗]
 run() {
     : >"$WORK/calls.log"
     : >"$WORK/summary.md"
@@ -86,17 +107,47 @@ run() {
         STUB_CALLS="$WORK/calls.log" STUB_RULES="$WORK/rules.json" \
         STUB_WFRUNS="$WORK/wfruns.json" STUB_PULLS="$WORK/pulls.json" STUB_DIR="$WORK" \
         STUB_FAIL_RULES="${2:-}" STUB_FAIL_WFRUNS="${3:-}" \
-        STUB_FAIL_PULLS="${4:-}" STUB_FAIL_CHECKRUNS="${5:-}" \
+        STUB_FAIL_PULLS="${4:-}" STUB_FAIL_CHECKRUNS="${5:-}" STUB_JQ_FAIL="${6:-}" \
         GITHUB_REPOSITORY="owner/repo" GH_TOKEN="dummy" \
         GITHUB_RUN_ID="$RUN_ID" NOW_EPOCH="$NOW" \
-        GITHUB_STEP_SUMMARY="$WORK/summary.md" \
+        GITHUB_STEP_SUMMARY="${RUN_SUMMARY-$WORK/summary.md}" \
         bash "$SCRIPT" "$1" >/dev/null 2>&1
 }
 
-# 使い方: check <期待exit> <説明> [期待一覧パス] [rules失敗] [wfruns失敗] [pulls失敗] [check-runs失敗]
+# 使い方: check <期待exit> <説明> [期待一覧パス] [rules失敗] [wfruns失敗] [pulls失敗] [check-runs失敗] [jq失敗]
 check() {
     local want="$1" name="$2" checks="${3:-$WORK/checks.json}" got
-    run "$checks" "${4:-}" "${5:-}" "${6:-}" "${7:-}"
+    run "$checks" "${4:-}" "${5:-}" "${6:-}" "${7:-}" "${8:-}"
+    got=$?
+    if [ "$got" -eq "$want" ]; then
+        echo "PASS: $name"
+    else
+        echo "FAIL: $name (expected exit $want, got $got)"
+        FAILED=1
+    fi
+}
+
+# 引数・環境変数を任意に与えて起動する。gh は正常な応答を返す状態にしておき、
+# 終了コードが入力の検査だけで決まることを確かめる。
+# 時刻固定の値は INVOKE_NOW で差し替えられる(既定は $NOW)。
+# 使い方: [INVOKE_NOW=<値>] check_invocation <期待exit> <説明> <与えない必須環境変数名 または ""> [引数...]
+check_invocation() {
+    local want="$1" name="$2" omit_var="$3" got
+    shift 3
+    : >"$WORK/calls.log"
+    : >"$WORK/summary.md"
+    local required=() var
+    for var in GITHUB_REPOSITORY=owner/repo GH_TOKEN=dummy "GITHUB_RUN_ID=$RUN_ID"; do
+        [ "${var%%=*}" = "$omit_var" ] || required+=("$var")
+    done
+    env -u GITHUB_REPOSITORY -u GH_TOKEN -u GITHUB_RUN_ID "${required[@]}" \
+        PATH="$WORK/bin:$PATH" \
+        STUB_CALLS="$WORK/calls.log" STUB_RULES="$WORK/rules.json" \
+        STUB_WFRUNS="$WORK/wfruns.json" STUB_PULLS="$WORK/pulls.json" STUB_DIR="$WORK" \
+        STUB_FAIL_RULES="" STUB_FAIL_WFRUNS="" STUB_FAIL_PULLS="" STUB_FAIL_CHECKRUNS="" \
+        STUB_JQ_FAIL="" NOW_EPOCH="${INVOKE_NOW-$NOW}" \
+        GITHUB_STEP_SUMMARY="$WORK/summary.md" \
+        bash "$SCRIPT" "$@" >/dev/null 2>&1
     got=$?
     if [ "$got" -eq "$want" ]; then
         echo "PASS: $name"
@@ -287,27 +338,27 @@ reset_defaults
 
 echo "--- 期待一覧のスキーマ検証 ---"
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"active"}]}'
-check 1 "必須フィールド(approval_gated)の欠落は判定不能として赤にする"
+check 2 "必須フィールド(approval_gated)の欠落は判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 check_no_calls "rules/branches" "スキーマ検証はAPIへの問い合わせより先に行われる"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"disabled","approval_gated":false}]}'
-check 1 "未知のstateは判定不能として赤にする"
+check 2 "未知のstateは判定不能として2を返す"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"sometimes","state":"active","approval_gated":false}]}'
-check 1 "未知のmodeは判定不能として赤にする"
+check 2 "未知のmodeは判定不能として2を返す"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"paused","approval_gated":false}]}'
-check 1 "pausedなのにreason/issueが無ければ判定不能として赤にする"
+check 2 "pausedなのにreason/issueが無ければ判定不能として2を返す"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"active","approval_gated":false,"note":"x"}]}'
-check 1 "未知のフィールドは判定不能として赤にする"
+check 2 "未知のフィールドは判定不能として2を返す"
 
 set_checks '{"checks":{"context":"gitleaks"}}'
-check 1 "checksが配列でなければ判定不能として赤にする"
+check 2 "checksが配列でなければ判定不能として2を返す"
 
 set_checks 'not-json'
-check 1 "期待一覧をJSONとして解釈できなければ判定不能として赤にする"
+check 2 "期待一覧をJSONとして解釈できなければ判定不能として2を返す"
 
 # 実物の期待一覧はrulesetの現行19コンテキストと一致する前提(design該当節)。
 set_rules "$(rules_with frontend-test backend-test e2e-smoke escape-hatch size-check gitleaks codex-review dependency-gate pre-merge-check terraform-static dependency-graph-generate dependency-graph-submit dependency-review dependency-cooldown gradle-wrapper docker-smoke detect-changes detect-terraform-changes container-scan-script-tests)"
@@ -316,40 +367,107 @@ check 0 "実物の期待一覧(required-checks.json)はスキーマ検証と集�
 reset_defaults
 
 echo "--- 判定不能(API失敗・想定外の応答) ---"
-check 1 "ruleset APIへの問い合わせに失敗したら判定不能として赤にする(fail closed)" "$WORK/checks.json" "yes"
+check 2 "ruleset APIへの問い合わせに失敗したら判定不能として2を返す(fail closed)" "$WORK/checks.json" "yes"
 check_summary "判定不能" "判定不能の見出しが出る"
 check_summary "re-run" "失敗したrunのre-runで再実行する指示が出る"
 check_summary "新規の手動実行" "新規dispatchが検知の窓を狭めることの説明が出る"
 
 set_rules '{"message":"Not Found"}'
-check 1 "rulesetの応答が配列でなければ判定不能として赤にする"
+check 2 "rulesetの応答が配列でなければ判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 reset_defaults
 
-check 1 "実行一覧APIへの問い合わせに失敗したら判定不能として赤にする" "$WORK/checks.json" "" "yes"
+check 2 "実行一覧APIへの問い合わせに失敗したら判定不能として2を返す" "$WORK/checks.json" "" "yes"
 check_summary "判定不能" "判定不能の見出しが出る"
 
 set_wfruns '{"message":"Not Found"}'
-check 1 "実行一覧の応答を解釈できなければ判定不能として赤にする"
+check 2 "実行一覧の応答を解釈できなければ判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 reset_defaults
 
-check 1 "PR一覧APIへの問い合わせに失敗したら判定不能として赤にする" "$WORK/checks.json" "" "" "yes"
+check 2 "PR一覧APIへの問い合わせに失敗したら判定不能として2を返す" "$WORK/checks.json" "" "" "yes"
 check_summary "判定不能" "判定不能の見出しが出る"
 
 set_pulls '{"message":"Not Found"}'
-check 1 "PR一覧の応答が配列でなければ判定不能として赤にする"
+check 2 "PR一覧の応答が配列でなければ判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 reset_defaults
 
 set_pulls "[$(pull 401 '"2026-01-09T00:00:00Z"' sha401 mrg401)]"
 set_checkruns sha401 "$(runs "$(crun 1 gitleaks completed '"success"' "2026-01-09T00:00:00Z"),$(crun 2 dependency-gate completed '"success"' "2026-01-09T00:00:00Z")")"
-check 1 "check-runs APIへの問い合わせに失敗したら判定不能として赤にする" "$WORK/checks.json" "" "" "" "yes"
+check 2 "check-runs APIへの問い合わせに失敗したら判定不能として2を返す" "$WORK/checks.json" "" "" "" "yes"
 check_summary "判定不能" "判定不能の見出しが出る"
 
 set_checkruns sha401 '{"message":"Not Found"}'
-check 1 "check-runsの応答を解釈できなければ判定不能として赤にする"
+check 2 "check-runsの応答を解釈できなければ判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
+
+echo "--- 入力の欠落・不正 ---"
+reset_defaults
+check_invocation 2 "期待一覧の引数が無ければ判定不能として2を返す" ""
+check_no_calls "repos/" "引数が無ければAPIへ問い合わせない"
+
+check_invocation 2 "期待一覧の引数が空文字なら判定不能として2を返す" "" ""
+check_no_calls "repos/" "引数が空文字ならAPIへ問い合わせない"
+
+check_invocation 2 "GITHUB_REPOSITORY が無ければ判定不能として2を返す" GITHUB_REPOSITORY "$WORK/checks.json"
+check_no_calls "repos/" "GITHUB_REPOSITORY が無ければAPIへ問い合わせない"
+
+check_invocation 2 "GH_TOKEN が無ければ判定不能として2を返す" GH_TOKEN "$WORK/checks.json"
+check_no_calls "repos/" "GH_TOKEN が無ければAPIへ問い合わせない"
+
+check_invocation 2 "GITHUB_RUN_ID が無ければ判定不能として2を返す" GITHUB_RUN_ID "$WORK/checks.json"
+check_no_calls "repos/" "GITHUB_RUN_ID が無ければAPIへ問い合わせない"
+
+# NOW_EPOCH は7日窓の下限の算術展開に入る。英字は未定義変数、先頭0は8進数と
+# して扱われ、変更前は終了コード1で止まっていた(010 のように別の値として
+# 黙って通るものもある)。前回runの無い実行一覧にして、算術展開まで到達する
+# 状態で確かめる。検査はAPIへの問い合わせより前に行うため、問い合わせが
+# 無いことで入力検査が止めたこと(算術展開の失敗で止まったのではないこと)を
+# 確かめる。
+set_wfruns "$(wfruns "$(wfrun 9999 "2026-01-10T00:00:00Z")")"
+INVOKE_NOW=abc check_invocation 2 "NOW_EPOCH が数値でなければ判定不能として2を返す" "" "$WORK/checks.json"
+check_no_calls "repos/" "NOW_EPOCH が数値でなければAPIへ問い合わせない"
+
+INVOKE_NOW=1e5 check_invocation 2 "NOW_EPOCH が指数表記なら判定不能として2を返す" "" "$WORK/checks.json"
+check_no_calls "repos/" "NOW_EPOCH が指数表記ならAPIへ問い合わせない"
+
+INVOKE_NOW=01768003200 check_invocation 2 "NOW_EPOCH が先頭0なら判定不能として2を返す" "" "$WORK/checks.json"
+check_no_calls "repos/" "NOW_EPOCH が先頭0ならAPIへ問い合わせない"
+
+INVOKE_NOW=123456789012345678901 check_invocation 2 "NOW_EPOCH の桁数が上限を超えれば判定不能として2を返す" "" \
+    "$WORK/checks.json"
+check_no_calls "repos/" "NOW_EPOCH の桁数が上限を超えればAPIへ問い合わせない"
+
+check_invocation 0 "引数と環境変数がそろっていれば判定まで進む(入力検査の対照)" "" "$WORK/checks.json"
+check_calls "repos/owner/repo/rules/branches/main" "入力がそろっていればrulesetへ問い合わせる"
+check_summary "直近7日間" "NOW_EPOCH から7日窓の下限を求めている"
+reset_defaults
+
+echo "--- 想定外の失敗 ---"
+set_pulls "[$(pull 501 '"2026-01-09T00:00:00Z"' sha501 mrg501)]"
+set_checkruns sha501 "$(runs "$(crun 1 gitleaks completed '"skipped"' "2026-01-09T00:00:00Z"),$(crun 2 dependency-gate completed '"success"' "2026-01-09T00:00:00Z")")"
+check 2 "ガードしていないコマンドが失敗したら逸脱ではなく判定不能として2を返す" \
+    "$WORK/checks.json" "" "" "" "" "yes"
+if grep -qF "スキップのままマージされたPRがあります" "$WORK/summary.md"; then
+    echo "FAIL: 想定外の失敗を逸脱として報告しない (逸脱の見出しが出ている)"
+    FAILED=1
+else
+    echo "PASS: 想定外の失敗を逸脱として報告しない"
+fi
+# 対照: 同じ入力で jq を失敗させなければ逸脱(1)になる。上の2が入力の違いで
+# 出たのではなく、想定外の失敗によるものであることを確かめる。
+check 1 "同じ入力で想定外の失敗が無ければ逸脱として1を返す(対照)"
+check_summary "#501: gitleaks" "対照では違反のPR番号とチェック名が報告に出る"
+
+# 関数の中で起きた失敗も2にする(set -E が無いと ERR トラップが関数へ
+# 引き継がれず、errexit により終了コード1で止まる)。逸脱の無い入力で、
+# 報告の書き込み(関数 emit_scope_and_paused_sections の中)だけを失敗させる。
+reset_defaults
+mkdir -p "$WORK/summary_dir"
+RUN_SUMMARY="$WORK/summary_dir" check 2 "関数の中でガードしていないコマンドが失敗しても判定不能として2を返す"
+# 対照: 書き込める報告先なら同じ入力で逸脱なし(0)になる。
+check 0 "同じ入力で報告先に書き込めれば逸脱なしとして0を返す(対照)"
 
 if [ "$FAILED" -eq 0 ]; then
     echo "すべてのテストがPASSしました。"

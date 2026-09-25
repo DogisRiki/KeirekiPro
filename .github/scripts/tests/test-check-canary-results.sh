@@ -3,7 +3,7 @@
 # check-canary-results.sh の自動テスト(canary-verify CI から実行)
 #
 # gh をスタブし、終了コードと報告の内容を検証する。
-#   0 = 緑(通過) / 1 = 赤
+#   0 = 逸脱なし / 1 = 逸脱あり / 2 = 判定不能
 #
 # gh のスタブは実APIの形のJSONをそのまま返し、応答の解釈(PR検索応答からの
 # PR特定・check-runs からの最新結論の選択)は本体側に実行させる。整形済みの
@@ -62,22 +62,81 @@ esac
 STUB
 chmod +x "$WORK/bin/gh"
 
-# 使い方: run <期待一覧パス> [pulls失敗] [check-runs失敗]
+# --- jq・date のラッパ -----------------------------------------------------------
+# 本体でガードしていないコマンドが想定外に失敗した状況を再現する。
+# STUB_JQ_FAIL が設定されているときだけ、PR検索結果の有無(.found)を
+# 取り出す呼び出しを異常終了させる。STUB_DATE_FAIL が設定されているときは
+# date を異常終了させる(対象年月の既定値の算出)。それ以外は本物に渡す。
+REAL_JQ=$(command -v jq) || exit 1
+REAL_DATE=$(command -v date) || exit 1
+cat >"$WORK/bin/jq" <<STUB
+#!/usr/bin/env bash
+if [ -n "\${STUB_JQ_FAIL:-}" ]; then
+    for arg in "\$@"; do
+        if [ "\$arg" = ".found" ]; then
+            echo "stub: jq failure" >&2
+            exit 1
+        fi
+    done
+fi
+exec "$REAL_JQ" "\$@"
+STUB
+chmod +x "$WORK/bin/jq"
+cat >"$WORK/bin/date" <<STUB
+#!/usr/bin/env bash
+if [ -n "\${STUB_DATE_FAIL:-}" ]; then
+    echo "stub: date failure" >&2
+    exit 1
+fi
+exec "$REAL_DATE" "\$@"
+STUB
+chmod +x "$WORK/bin/date"
+
+# 使い方: run <期待一覧パス> [pulls失敗] [check-runs失敗] [jq失敗]
 run() {
     : >"$WORK/calls.log"
     : >"$WORK/summary.md"
     PATH="$WORK/bin:$PATH" \
         STUB_CALLS="$WORK/calls.log" STUB_DIR="$WORK" \
-        STUB_FAIL_PULLS="${2:-}" STUB_FAIL_CHECKRUNS="${3:-}" \
+        STUB_FAIL_PULLS="${2:-}" STUB_FAIL_CHECKRUNS="${3:-}" STUB_JQ_FAIL="${4:-}" \
         GITHUB_REPOSITORY="owner/repo" GH_TOKEN="dummy" \
-        GITHUB_STEP_SUMMARY="$WORK/summary.md" \
+        GITHUB_STEP_SUMMARY="${RUN_SUMMARY-$WORK/summary.md}" \
         bash "$SCRIPT" "$1" "202601" >/dev/null 2>&1
 }
 
-# 使い方: check <期待exit> <説明> [期待一覧パス] [pulls失敗] [check-runs失敗]
+# 使い方: check <期待exit> <説明> [期待一覧パス] [pulls失敗] [check-runs失敗] [jq失敗]
 check() {
     local want="$1" name="$2" checks="${3:-$WORK/checks.json}" got
-    run "$checks" "${4:-}" "${5:-}"
+    run "$checks" "${4:-}" "${5:-}" "${6:-}"
+    got=$?
+    if [ "$got" -eq "$want" ]; then
+        echo "PASS: $name"
+    else
+        echo "FAIL: $name (expected exit $want, got $got)"
+        FAILED=1
+    fi
+}
+
+# 引数・環境変数を任意に与えて起動する。gh は正常な応答を返す状態にしておき、
+# 終了コードが入力の検査だけで決まることを確かめる。
+# date を失敗させるときは INVOKE_DATE_FAIL を設定する。
+# 使い方: [INVOKE_DATE_FAIL=yes] check_invocation <期待exit> <説明> <与えない必須環境変数名 または ""> [引数...]
+check_invocation() {
+    local want="$1" name="$2" omit_var="$3" got
+    shift 3
+    : >"$WORK/calls.log"
+    : >"$WORK/summary.md"
+    local required=() var
+    for var in GITHUB_REPOSITORY=owner/repo GH_TOKEN=dummy; do
+        [ "${var%%=*}" = "$omit_var" ] || required+=("$var")
+    done
+    env -u GITHUB_REPOSITORY -u GH_TOKEN "${required[@]}" \
+        PATH="$WORK/bin:$PATH" \
+        STUB_CALLS="$WORK/calls.log" STUB_DIR="$WORK" \
+        STUB_FAIL_PULLS="" STUB_FAIL_CHECKRUNS="" STUB_JQ_FAIL="" \
+        STUB_DATE_FAIL="${INVOKE_DATE_FAIL:-}" \
+        GITHUB_STEP_SUMMARY="$WORK/summary.md" \
+        bash "$SCRIPT" "$@" >/dev/null 2>&1
     got=$?
     if [ "$got" -eq "$want" ]; then
         echo "PASS: $name"
@@ -316,27 +375,27 @@ check_calls "canary/known-bug-${CUR_MONTH}" "省略時は実行時のUTC年月�
 
 echo "--- 期待一覧のスキーマ検証 ---"
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"active"}]}'
-check 1 "必須フィールド(approval_gated)の欠落は判定不能として赤にする"
+check 2 "必須フィールド(approval_gated)の欠落は判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 check_no_calls "pulls" "スキーマ検証はAPIへの問い合わせより先に行われる"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"disabled","approval_gated":false}]}'
-check 1 "未知のstateは判定不能として赤にする"
+check 2 "未知のstateは判定不能として2を返す"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"sometimes","state":"active","approval_gated":false}]}'
-check 1 "未知のmodeは判定不能として赤にする"
+check 2 "未知のmodeは判定不能として2を返す"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"paused","approval_gated":false}]}'
-check 1 "pausedなのにreason/issueが無ければ判定不能として赤にする"
+check 2 "pausedなのにreason/issueが無ければ判定不能として2を返す"
 
 set_checks '{"checks":[{"context":"gitleaks","mode":"always","state":"active","approval_gated":false,"note":"x"}]}'
-check 1 "未知のフィールドは判定不能として赤にする"
+check 2 "未知のフィールドは判定不能として2を返す"
 
 set_checks '{"checks":{"context":"gitleaks"}}'
-check 1 "checksが配列でなければ判定不能として赤にする"
+check 2 "checksが配列でなければ判定不能として2を返す"
 
 set_checks 'not-json'
-check 1 "期待一覧をJSONとして解釈できなければ判定不能として赤にする"
+check 2 "期待一覧をJSONとして解釈できなければ判定不能として2を返す"
 
 # 実物の期待一覧(codex-review が paused)でも動く。known-bug は停止中扱い、
 # 他5種が正常なら緑(container-scan が一覧に無くてもスキーマ検証を通過する)。
@@ -347,21 +406,76 @@ check_summary "停止中(記録済み・#166)" "実物の期待一覧のpaused�
 reset_defaults
 
 echo "--- 判定不能(API失敗・想定外の応答) ---"
-check 1 "PR検索APIへの問い合わせに失敗したら判定不能として赤にする(fail closed)" "$WORK/checks.json" "yes"
+check 2 "PR検索APIへの問い合わせに失敗したら判定不能として2を返す(fail closed)" "$WORK/checks.json" "yes"
 check_summary "判定不能" "判定不能の見出しが出る"
 check_summary "再実行" "re-runまたはworkflow_dispatchで再実行する指示が出る"
 
 set_pr known-bug '{"message":"Not Found"}'
-check 1 "PR検索の応答が配列でなければ判定不能として赤にする"
+check 2 "PR検索の応答が配列でなければ判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
 reset_defaults
 
-check 1 "check-runs APIへの問い合わせに失敗したら判定不能として赤にする" "$WORK/checks.json" "" "yes"
+check 2 "check-runs APIへの問い合わせに失敗したら判定不能として2を返す" "$WORK/checks.json" "" "yes"
 check_summary "判定不能" "判定不能の見出しが出る"
 
 set_checkruns sha_known-bug '{"message":"Not Found"}'
-check 1 "check-runsの応答を解釈できなければ判定不能として赤にする"
+check 2 "check-runsの応答を解釈できなければ判定不能として2を返す"
 check_summary "判定不能" "判定不能の見出しが出る"
+reset_defaults
+
+echo "--- 入力の欠落・不正 ---"
+check_invocation 2 "期待一覧の引数が無ければ判定不能として2を返す" ""
+check_no_calls "repos/" "引数が無ければAPIへ問い合わせない"
+
+check_invocation 2 "期待一覧の引数が空文字なら判定不能として2を返す" "" "" "202601"
+check_no_calls "repos/" "引数が空文字ならAPIへ問い合わせない"
+
+check_invocation 2 "GITHUB_REPOSITORY が無ければ判定不能として2を返す" GITHUB_REPOSITORY "$WORK/checks.json" "202601"
+check_no_calls "repos/" "GITHUB_REPOSITORY が無ければAPIへ問い合わせない"
+
+check_invocation 2 "GH_TOKEN が無ければ判定不能として2を返す" GH_TOKEN "$WORK/checks.json" "202601"
+check_no_calls "repos/" "GH_TOKEN が無ければAPIへ問い合わせない"
+
+# 対象年月はブランチ名に入る。書式が不正なら照合に進まず判定不能にする。
+# 13月・0月のように6桁でも月として成り立たないものも弾く。
+for bad in 2026-09 202613 202600 26091 2026011 abc; do
+    check_invocation 2 "対象年月の書式が不正(${bad})なら判定不能として2を返す" "" "$WORK/checks.json" "$bad"
+    check_no_calls "repos/" "対象年月の書式が不正(${bad})ならAPIへ問い合わせない"
+done
+check_summary "対象年月の書式が不正" "対象年月の書式が不正である旨が報告に出る"
+
+check_invocation 0 "引数と環境変数がそろっていれば判定まで進む(入力検査の対照)" "" "$WORK/checks.json" "202612"
+check_calls "head=owner:canary/known-bug-202612" "入力がそろっていれば指定の対象年月でPRを検索する"
+
+# 対象年月の既定値の算出(date)が失敗したら、照合に進まず判定不能にする。
+INVOKE_DATE_FAIL=yes check_invocation 2 "対象年月の既定値を算出できなければ判定不能として2を返す" "" \
+    "$WORK/checks.json"
+check_no_calls "repos/" "対象年月の既定値を算出できなければAPIへ問い合わせない"
+
+echo "--- 想定外の失敗 ---"
+# PR検索結果の有無を取り出す jq が失敗したら、PR欠落(逸脱)ではなく判定不能に
+# する。変更前は失敗が空文字として比較に流れ、PR欠落の逸脱(1)に化けていた。
+check 2 "PR検索結果の有無を取り出せなければ逸脱ではなく判定不能として2を返す" \
+    "$WORK/checks.json" "" "" "yes"
+check_no_summary "PR欠落" "想定外の失敗をPR欠落として報告しない"
+# 対照: 同じ入力で jq を失敗させなければ逸脱なし(0)になる。
+check 0 "同じ入力で想定外の失敗が無ければ逸脱なしとして0を返す(対照)"
+
+# 逸脱のある入力で、報告の書き込みだけを失敗させる(報告先をディレクトリに
+# する)。逸脱の報告が完了していないため 1 を返してはならない。
+set_checkruns sha_backend-failure "$(runs "$(crun 1 backend-test completed '"success"' "2026-01-04T00:00:00Z")")"
+mkdir -p "$WORK/summary_dir"
+RUN_SUMMARY="$WORK/summary_dir" check 2 "報告を書き込めなければ逸脱の入力でも判定不能として2を返す"
+# 対照: 書き込める報告先なら同じ入力で逸脱(1)になる。
+check 1 "同じ入力で報告先に書き込めれば逸脱として1を返す(対照)"
+check_summary "判定側の故障" "対照では逸脱の内容が報告に出る"
+reset_defaults
+
+# 関数の中で起きた失敗も2にする(set -E が無いと ERR トラップが関数へ
+# 引き継がれず、errexit により終了コード1で止まる)。判定不能の報告を行う
+# 関数 report_undecidable の中の書き込みだけを失敗させる。
+set_pr known-bug '{"message":"Not Found"}'
+RUN_SUMMARY="$WORK/summary_dir" check 2 "関数の中でガードしていないコマンドが失敗しても判定不能として2を返す"
 reset_defaults
 
 if [ "$FAILED" -eq 0 ]; then
