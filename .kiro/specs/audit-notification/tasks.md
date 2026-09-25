@@ -28,7 +28,7 @@
   - 完了の観測条件: test-check-audit-dependabot-stuck.sh がコンテナ内で全PASSし、承認待ちのみのケースは0を返す
   - _Requirements: 1.1, 1.2, 1.6, 2.5, 5.2_
   - _Boundary: CheckScripts_
-- [ ] 1.3 (P) スキップ検知の終了コードを3値にする
+- [x] 1.3 (P) スキップ検知の終了コードを3値にする
   - 1.1と同じ規則で終了コードを分ける。対象期間の算出(前回の実行を結論を問わず下限にする)は変えない。ヘッダの終了コードの説明を訂正する
   - テストの判定不能ケース(15件)の期待値を2に変え、追加ケースは1.1と同じ3種(受入基準 1.1, 1.2, 1.6 を test-check-audit-skipped-required.sh が検証)
   - 完了の観測条件: test-check-audit-skipped-required.sh がコンテナ内で全PASSする
@@ -114,3 +114,4 @@
 
 - (1.1) コンテナでのテストは `apk add bash jq coreutils` とする。alpine の busybox 版 date は ISO 8601(`2026-01-02T00:00:00Z`)を読めず、変更前のスクリプトでも失敗する。CI は ubuntu(GNU date)なので影響しない
 - (1.1) bash の算術展開のエラー(`08` のような先頭0・非数値・unbound variable)は ERR トラップを通らず終了コード1で止まる。算術に入る外部由来の値(引数・環境変数)は `^[1-9][0-9]{0,N}$` の形で先に検査して exit 2 にする。1.2〜1.4 でも同じ形を使う
+- (1.3) `set -E`(errtrace)が無いと、関数の中の失敗が ERR トラップを通らず終了コード1になる(alpine の bash で実測)。関数内の失敗を再現するテストには、報告先 GITHUB_STEP_SUMMARY をディレクトリにする手が使える
