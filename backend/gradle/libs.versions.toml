@@ -52,7 +52,7 @@ mybatis-postgresql-typehandlers = "1.0.2"
 # この行と build.gradle の対応する ext を削除する。
 # BOM の版は spring-boot-dependencies-<版>.pom の netty.version / postgresql.version /
 # tomcat.version / jackson-bom.version / opentelemetry.version / log4j2.version /
-# commons-lang3.version で見る。
+# commons-lang3.version / httpclient5.version / httpcore5.version で見る。
 netty = "4.1.137.Final"
 postgresql = "42.7.13"
 tomcat = "10.1.59"
@@ -60,6 +60,14 @@ jackson-bom = "2.21.7"
 opentelemetry = "1.62.0"
 log4j2 = "2.25.5"
 commons-lang3 = "3.20.0"
+httpclient5 = "5.6.4"
+httpcore5 = "5.4.4"
+
+# BOM の管理外で、推移的に入る版を引き上げるためのもの(build.gradle の constraints で参照)。
+# 解除の判定: 持ち込んでいる側(testcontainers / checkstyle)を上げたときに、
+# 解決される版がここ以上になっていれば、この行と build.gradle の対応する constraints を削除する。
+commons-compress = "1.28.0"
+plexus-utils = "3.6.2"
 
 [libraries]
 # Flyway Gradleプラグイン(10系)がDB別モジュールをbuildscriptクラスパスに要求するためのもの。
