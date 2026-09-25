@@ -47,7 +47,7 @@ jobs:
         with:
           name: stryker-report
           path: frontend/reports/
-          retention-days: 30
+          retention-days: 90
           if-no-files-found: ignore
 
   backend-mutation:
@@ -83,5 +83,5 @@ jobs:
         with:
           name: pitest-report
           path: backend/build/reports/pitest/
-          retention-days: 30
+          retention-days: 90
           if-no-files-found: ignore
