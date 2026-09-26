@@ -37,6 +37,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Stryker (report mode)
+        shell: bash
         working-directory: frontend
         continue-on-error: true
         run: |
@@ -72,6 +73,7 @@ jobs:
             gradle-${{ runner.os }}-
 
       - name: Run PIT (report mode)
+        shell: bash
         working-directory: backend
         continue-on-error: true
         run: |
