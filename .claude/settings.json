@@ -125,6 +125,16 @@
                         "timeout": 10
                     }
                 ]
+            },
+            {
+                "matcher": "SubagentHandback",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/record-spec-review.sh\"",
+                        "timeout": 20
+                    }
+                ]
             }
         ],
         "Stop": [
@@ -133,6 +143,50 @@
                     {
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-verify-before-stop.sh\"",
+                        "timeout": 20
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-spec-review-before-stop.sh\"",
+                        "timeout": 30
+                    }
+                ]
+            }
+        ],
+        "UserPromptExpansion": [
+            {
+                "matcher": "kiro-spec-design|kiro-spec-tasks|kiro-impl",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify-spec-review.sh\"",
+                        "timeout": 20
+                    }
+                ]
+            }
+        ],
+        "UserPromptSubmit": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify-spec-review.sh\"",
+                        "timeout": 20
+                    }
+                ]
+            }
+        ],
+        "SubagentStop": [
+            {
+                "matcher": "spec-reviewer",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/record-spec-review.sh\"",
                         "timeout": 20
                     }
                 ]

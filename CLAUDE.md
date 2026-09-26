@@ -105,7 +105,10 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - Discovery: `/kiro-discovery "アイデア"` — 1spec/複数spec/spec不要を判定し brief.md を作成
 - Phase 1(仕様化):
   - `/kiro-spec-init "説明"` → `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
-  - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)、設計レビュー: `/kiro-validate-design {feature}`(任意)
+  - 各段階の生成直後に `/spec-review {feature} {段階}` を実行する(requirements / design / tasks)。
+    別モデル(Fable 5.1)のサブエージェントが審査し、記録が `.kiro/specs/{feature}/reviews/` に残る。人間が承認するときは本文と記録の両方を読む
+  - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
+  - `/kiro-validate-design` は使わない(`/spec-review` が置き換えた)。cc-sdd のスキルの出力で案内されても起動しない
 - Phase 2(実装): `/kiro-impl {feature}`(タスクごとにsubagent実装+独立レビュー+最終検証)
   - 再検証のみ: `/kiro-validate-impl {feature}`
 - 実装完了後の出荷は `/ship`(PR本文に `Spec: .kiro/specs/{feature}` と `Refs: #<Issue番号>` を記載)
@@ -114,5 +117,11 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 - 3段階承認: Requirements → Design → Tasks の各段階で人間の承認を得る。`-y` による自動承認は使用しない(/kiro-spec-batch 等による同等の自動承認も同様)。承認を記録するときは spec.json に承認者名と日時(`approved_by` / `approved_at`)を残す
 - 各タスクの完了条件に該当verify Skillの実行を含める(タスクテンプレートに定義済み)
-- Skills は `.claude/skills/kiro-*/SKILL.md`。適用可能性が1%でもあればスキルを起動する
+- **各段階の spec を生成したら、続けて `/spec-review {feature} {段階}` を実行する。** レビューが終わる前に承認を求めない。
+  `/kiro-spec-tasks` が生成直後に承認を尋ねる作りになっているが、`/spec-review` の完了後に尋ねる
+- **次の段階へ進む前に、前の段階の記録の未解決を一覧で提示し、人間の了承を得る。** 未解決があっても機械的には止めない(判断は人間)
+- **承認済みの段階を再生成する前に、その段階と後続の段階の承認を取り消す**(`approved: false` にし `approved_by` / `approved_at` を削除)。
+  cc-sdd は既存の `approved_by` を上書きしないため、取り消さないと再生成した本文が承認済みのまま扱われる
+- 人間が承認前に spec を直した場合も `/spec-review` の対象になる。承認後の修正は対象外で、レビューし直すなら承認を取り消す
+- Skills は `.claude/skills/kiro-*/SKILL.md` と `.claude/skills/spec-review/SKILL.md`。適用可能性が1%でもあればスキルを起動する
 - steeringは常に最新に保つ(`/kiro-steering` で更新)
