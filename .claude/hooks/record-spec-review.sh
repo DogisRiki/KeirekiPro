@@ -15,7 +15,8 @@
 # 証跡にはreviewファイルのハッシュを含める。レビュー完了後に
 # メインセッションがreviewファイルを書き換えた場合、Stop hookが検知する。
 #
-# 前提: Git for Windows(Git Bash同梱)。JSON解析は同梱perl(JSON::PP)を使用。
+# 前提: bash と perl(JSON::PP)。jqには依存しない。
+# Windowsでは Git for Windows(Git Bash同梱)がこれらを提供する。macOS/Linuxは標準。
 # 判定不能・不整合は証跡を書かずに終了する(fail-closed。Stop hookが止める)。
 # =====================================================================
 set -u
@@ -91,8 +92,13 @@ if [ -n "$agent_transcript" ] && [ -f "$agent_transcript" ]; then
 fi
 
 # reviewファイルのハッシュ(完了後の書き換えの検知に使う)
+# ハッシュの取得。環境で使える実装が異なるため順に試す
+# (Linux/Git Bash: sha256sum、macOS: shasum、いずれも無ければ cksum)
+# spec-review-scan.sh の照合と同じ順にすること
 if command -v sha256sum >/dev/null 2>&1; then
     hash=$(sha256sum "$abs" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+    hash=$(shasum -a 256 "$abs" | awk '{print $1}')
 else
     hash=$(cksum "$abs" | awk '{print $1"-"$2}')
 fi

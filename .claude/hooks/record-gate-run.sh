@@ -4,7 +4,8 @@
 #
 # 品質ゲートコマンドの実行を領域別に記録する(Stop hookの検知材料)。
 # 状態は .claude/.state/ 配下(gitignore済み)に epoch秒 で保存する。
-# 前提: Git for Windows(Git Bash同梱)。JSON解析は同梱perl(JSON::PP)を使用。
+# 前提: bash と perl(JSON::PP)。jqには依存しない。
+# Windowsでは Git for Windows(Git Bash同梱)がこれらを提供する。macOS/Linuxは標準。
 # =====================================================================
 set -u
 

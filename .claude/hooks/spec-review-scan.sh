@@ -14,6 +14,8 @@
 #   approved_by が空、または ':' を含む → 人の承認ではない
 #     (auto:-y / auto:batch / unknown:pre-existing はいずれも ':' を含む)
 #   phase が initialized の spec は対象外(/kiro-spec-init 直後)
+#
+# 前提: bash と perl(JSON::PP)。jqには依存しない。
 # =====================================================================
 
 # spec.json から値を取り出す。$1=ファイル $2... = キーの並び
@@ -31,12 +33,21 @@ _sr_json() {
     ' -- "$f" "$@" 2>/dev/null
 }
 
-# reviewファイルの最新サイクル・往復の節に現れる指摘IDを列挙する
+# reviewファイルの最新の節で「新しく出た」指摘IDを列挙する。
+# 最新の節の見出し "## サイクル<N> 往復<M>" から接頭辞を作り、それに一致するIDだけを返す。
+# 節が前の往復のIDを引用していても(修正の確認表など)拾わない。
+# $1=reviewファイル $2=段階の記号(R/D/T)
 _sr_latest_ids() {
-    local f="$1"
+    local f="$1" letter="$2"
     [ -f "$f" ] || return 0
-    awk '/^## サイクル/ { buf = "" } { buf = buf $0 "\n" } END { printf "%s", buf }' "$f" \
-        | grep -oE '\b[RDT][0-9]+-[0-9]+-[0-9]+\b' | sort -u
+    local head cycle round
+    head=$(grep -E '^## サイクル[0-9]+ 往復[0-9]+' "$f" | tail -1)
+    [ -z "$head" ] && return 0
+    cycle=$(printf '%s' "$head" | grep -oE 'サイクル[0-9]+' | grep -oE '[0-9]+')
+    round=$(printf '%s' "$head" | grep -oE '往復[0-9]+' | grep -oE '[0-9]+')
+    { [ -z "$cycle" ] || [ -z "$round" ]; } && return 0
+    grep -oE '\b[RDT][0-9]+-[0-9]+-[0-9]+\b' "$f" \
+        | grep -E "^${letter}${cycle}-${round}-[0-9]+$" | sort -u
 }
 
 spec_review_scan() {
@@ -88,10 +99,29 @@ spec_review_scan() {
             elif [ -f "$review" ]; then
                 local id missing fixed
                 missing=""; fixed=""
-                for id in $(_sr_latest_ids "$review"); do
-                    if ! grep -q "$id" "$response"; then
+                local letter
+                case "$stage" in
+                    requirements) letter=R ;;
+                    design) letter=D ;;
+                    tasks) letter=T ;;
+                esac
+                for id in $(_sr_latest_ids "$review" "$letter"); do
+                    # 表の行 "| ID | 処置 | 内容 |" の1列目がIDと完全一致する行の
+                    # 2列目(処置)を取る。部分一致(R1-1-1 と R1-1-10)と、
+                    # 内容の文章に含まれる「修正」を拾わないようにする
+                    local disp
+                    disp=$(awk -F'|' -v id="$id" '
+                        {
+                            c1 = $2; c2 = $3
+                            gsub(/^[[:space:]]+|[[:space:]]+$/, "", c1)
+                            gsub(/^[[:space:]]+|[[:space:]]+$/, "", c2)
+                            if (c1 == id) last = c2
+                        }
+                        END { print last }
+                    ' "$response")
+                    if [ -z "$disp" ]; then
                         missing="${missing:+$missing }$id"
-                    elif grep "$id" "$response" | grep -q '修正'; then
+                    elif [ "$disp" = "修正" ]; then
                         fixed="${fixed:+$fixed }$id"
                     fi
                 done
@@ -106,8 +136,11 @@ spec_review_scan() {
             elif [ -f "$review" ]; then
                 local recorded current
                 recorded=$(sed -n 's/^review_hash=//p' "$evidence" | head -1)
+                # record-spec-review.sh と同じ順で取得する
                 if command -v sha256sum >/dev/null 2>&1; then
                     current=$(sha256sum "$review" | awk '{print $1}')
+                elif command -v shasum >/dev/null 2>&1; then
+                    current=$(shasum -a 256 "$review" | awk '{print $1}')
                 else
                     current=$(cksum "$review" | awk '{print $1"-"$2}')
                 fi

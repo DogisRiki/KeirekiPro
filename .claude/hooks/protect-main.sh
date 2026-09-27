@@ -5,7 +5,8 @@
 # mainブランチ上での git commit / git push、および強制pushを
 # 実行前にブロックする(exit 2 = ブロック)。
 # git -C <path> commit/push の形式も捕捉する。
-# 前提: Git for Windows(Git Bash同梱)。JSON解析は同梱perl(JSON::PP)を使用。
+# 前提: bash と perl(JSON::PP)。jqには依存しない。
+# Windowsでは Git for Windows(Git Bash同梱)がこれらを提供する。macOS/Linuxは標準。
 # =====================================================================
 set -u
 

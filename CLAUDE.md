@@ -67,7 +67,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 ## Git規約
 
-- 前提: ホストOSに **Git for Windows(Git Bash同梱)が必須**(`.claude/hooks/` のフックはGit Bashで実行される。シェルスクリプトは `.gitattributes` でLF強制)
+- 前提: ホストOSに **bash と perl(JSON::PP)が必要。jqには依存しない。**(`.claude/hooks/` のフックはこれらで実行される。シェルスクリプトは `.gitattributes` でLF強制)。
+  **Windowsでは Git for Windows(Git Bash同梱)を入れることで満たす。** macOS / Linux は標準で満たす
 - Git操作はホストOSのリポジトリルートで実行する(devcontainer内Gitは無効)
 - ブランチ名は `.branch_name_template`、コミットメッセージは `.commit_template` に従う
 - PR本文には必ず `Refs: #<Issue番号>` を含める。テストのアサーションを意図的に変更した場合は
@@ -120,8 +121,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - **各段階の spec を生成したら、続けて `/spec-review {feature} {段階}` を実行する。** レビューが終わる前に承認を求めない。
   `/kiro-spec-tasks` が生成直後に承認を尋ねる作りになっているが、`/spec-review` の完了後に尋ねる
 - **次の段階へ進む前に、前の段階の記録の未解決を一覧で提示し、人間の了承を得る。** 未解決があっても機械的には止めない(判断は人間)
-- **承認済みの段階を再生成する前に、その段階と後続の段階の承認を取り消す**(`approved: false` にし `approved_by` / `approved_at` を削除)。
+- **承認済みの段階の本文を再生成または修正する前に、その段階と後続の段階の承認を取り消す**(`approved: false` にし `approved_by` / `approved_at` を削除)。
   cc-sdd は既存の `approved_by` を上書きしないため、取り消さないと再生成した本文が承認済みのまま扱われる
-- 人間が承認前に spec を直した場合も `/spec-review` の対象になる。承認後の修正は対象外で、レビューし直すなら承認を取り消す
+- 人間が承認前に spec を直した場合も `/spec-review` の対象になる。承認後に直す場合は、上のとおり承認を取り消してから直す(取り消せばレビューの対象に戻る)
 - Skills は `.claude/skills/kiro-*/SKILL.md` と `.claude/skills/spec-review/SKILL.md`。適用可能性が1%でもあればスキルを起動する
 - steeringは常に最新に保つ(`/kiro-steering` で更新)
