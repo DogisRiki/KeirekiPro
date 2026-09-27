@@ -5,7 +5,8 @@
 # 書き込まれたテキストファイルに不正なUTF-8バイト列、または
 # 置換文字(U+FFFD)が含まれる場合にブロックする(exit 2)。
 # 日本語×Windows環境での文字化けの機械的検知。
-# 前提: Git for Windows(Git Bash同梱)。JSON解析は同梱perl(JSON::PP)を使用。
+# 前提: bash と perl(JSON::PP)。jqには依存しない。
+# Windowsでは Git for Windows(Git Bash同梱)がこれらを提供する。macOS/Linuxは標準。
 # =====================================================================
 set -u
 
