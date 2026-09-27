@@ -329,10 +329,12 @@ flowchart LR
 | 順 | 操作 | 起きること |
 |---|---|---|
 | 1 | `/kiro-spec-init #Issue番号` | AIがIssueを読んで説明文を組み立て、`.kiro/specs/{feature名}/` を用意してfeature名を知らせる |
-| 2 | `/kiro-spec-requirements {feature名}` | AIが要件(requirements.md)を書く → 内容を確認する |
-| 3 | `/kiro-spec-design {feature名}` | 要件を承認したことになり、AIが設計(design.md)を書く → 内容を確認する |
-| 4 | `/kiro-spec-tasks {feature名}` | 設計を承認したことになり、AIがタスク(tasks.md)を書く → 内容を確認する |
+| 2 | `/kiro-spec-requirements {feature名}` | AIが要件(requirements.md)を書き、別のAIがレビューする → 要件とレビュー結果を確認する |
+| 3 | `/kiro-spec-design {feature名}` | 要件を承認したことになり、AIが設計(design.md)を書き、別のAIがレビューする → 設計とレビュー結果を確認する |
+| 4 | `/kiro-spec-tasks {feature名}` | 設計を承認したことになり、AIがタスク(tasks.md)を書き、別のAIがレビューする → タスクとレビュー結果を確認する |
 | 5 | `/kiro-impl {feature名}` | タスクを承認したことになり、AIが実装を始める。以降マージまで自動で進む |
+
+仕様書を書くAIと、それをレビューするAIは別のモデルです。書いた本人が見直すと同じ勘違いを繰り返すため、レビューは独立したAIが行い、指摘と対応が `.kiro/specs/{feature名}/reviews/` に残ります。
 
 運用の詳細は次のドキュメントにまとめています。
 
@@ -392,5 +394,6 @@ flowchart LR
 | `/verify-ui` | 開発サーバを起動して実際の画面を確認 |
 | `/ship` | 検証からコミット・プルリクエスト作成・マージ予約までの一連の出荷作業 |
 | `/review-loop` | Codexレビューの指摘への対応 |
+| `/spec-review` | 仕様書を別のAIにレビューさせ、指摘と対応を記録に残す |
 | `/retrospective` | チェックをすり抜けた問題を仕組みの改善につなげる振り返り |
 | `/kiro-*` | spec駆動開発(cc-sdd)の各工程 |

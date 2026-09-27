@@ -9,7 +9,8 @@
 # (日本語ファイル名が引用符でエスケープされ、更新時刻の比較が
 # スキップされる問題を避けるため)。
 # 無限ループ防止のため stop_hook_active のときは常に通す。
-# 前提: Git for Windows(Git Bash同梱)。JSON解析は同梱perl(JSON::PP)を使用。
+# 前提: bash と perl(JSON::PP)。jqには依存しない。
+# Windowsでは Git for Windows(Git Bash同梱)がこれらを提供する。macOS/Linuxは標準。
 # =====================================================================
 set -u
 
@@ -87,7 +88,18 @@ for area in frontend backend terraform; do
     latest_change=0
     for f in "${area_files[@]}"; do
         [ -e "$f" ] || continue
-        mtime=$(stat -c %Y "$f" 2>/dev/null) || continue
+        # 更新時刻の取得。GNU coreutils は -c %Y、BSD(macOS)は -f %m。
+        # 取れなかったファイルを黙って飛ばすと、品質ゲート未実行の検知が
+        # 無言で通るため、両方を試す。
+        # GNUの -f は --file-system の意味になり数字以外を返すため、
+        # epoch秒として使える値かを必ず確かめる
+        mtime=$(stat -c %Y "$f" 2>/dev/null)
+        case "$mtime" in
+            ''|*[!0-9]*) mtime=$(stat -f %m "$f" 2>/dev/null) ;;
+        esac
+        case "$mtime" in
+            ''|*[!0-9]*) continue ;;
+        esac
         if [ "$mtime" -gt "$latest_change" ]; then
             latest_change=$mtime
         fi
