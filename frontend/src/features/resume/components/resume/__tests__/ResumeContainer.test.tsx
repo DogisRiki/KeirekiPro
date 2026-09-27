@@ -10,7 +10,7 @@ vi.mock("@/lib", () => ({
 }));
 
 import { lightTheme } from "@/config/theme";
-import type { Resume, ResumeArrayKeys, SectionName } from "@/features/resume";
+import type { Resume, SectionName } from "@/features/resume";
 import { RESUME_NOT_FOUND_MESSAGE, ResumeContainer, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { createAxiosResponse, createTestQueryClient, resetStoresAndMocks } from "@/test";
@@ -24,6 +24,9 @@ import { createMemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 
 import { cloneResume, emptyTechStack } from "../../__tests__/resumeTestData";
+
+/** 一覧型セクションの、職務経歴書上のキー(ストアの型は公開されていないため、updateSection の引数から取る) */
+type ResumeArrayKeys = Parameters<ReturnType<typeof useResumeStore.getState>["updateSection"]>[0];
 
 /** 各セクションに既存のエントリーを1件ずつ持つ職務経歴書 */
 const fullResume = (): Resume =>
