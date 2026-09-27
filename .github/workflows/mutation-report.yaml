@@ -9,13 +9,25 @@ on:
     # 毎週土曜 09:00 JST (00:00 UTC)
     - cron: '0 0 * * 6'
   workflow_dispatch:
+    inputs:
+      full:
+        description: 'frontendの前回の結果を使わず、全件を測り直す'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  # 全件の測定は4時間半ほどかかり、ジョブの上限(6時間)に近い(#377)。
+  # そのため、前回の結果を使い回し、変わった箇所だけを測り直す(Stryker の incremental モード)。
+  # 前回の結果は、main で実行したときの成果物 stryker-report(保持90日)から取り出す。
+  # actions/cache は7日アクセスが無いと消え、週次の間隔と境目が重なるため使わない。
   frontend-mutation:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,12 +48,42 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      # incremental モードは、依存の更新など、変異させる対象とテスト以外の変更を検出しない。
+      # 古い結果を使い回し続けないように、毎月最初の定期実行(と、手動実行で full を
+      # 選んだとき)は前回の結果を使わず、全件を測り直す。月次監査の前に全件の値がそろう
+      - name: Download previous Stryker report
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FULL_INPUT: ${{ inputs.full }}
+        run: |
+          if [ "$FULL_INPUT" = true ] || { [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$(date -u +%-d)" -le 7 ]; }; then
+            echo "全件を測り直す(前回の結果を使わない)" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=stryker-report&per_page=100" \
+            --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_branch == "main")]
+                  | sort_by(.created_at) | last | .workflow_run.id // empty') || run_id=""
+          # 取り出せないときは全件の測定になる(Stryker は結果ファイルが無ければ全件を測る)
+          if [ -z "$run_id" ] || ! gh run download "$run_id" -n stryker-report -D "${RUNNER_TEMP}/previous-stryker"; then
+            echo "前回の結果が見つからないため、全件を測る" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ -f "${RUNNER_TEMP}/previous-stryker/mutation/mutation.json" ]; then
+            cp "${RUNNER_TEMP}/previous-stryker/mutation/mutation.json" "${RUNNER_TEMP}/stryker-incremental.json"
+            echo "前回の結果(run ${run_id})を使い、変わった箇所だけを測り直す" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "前回の成果物(run ${run_id})に結果が無いため、全件を測る" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # 前回の結果が無いときも --incremental はそのまま渡してよい(全件の測定になる)
       - name: Run Stryker (report mode)
         shell: bash
         working-directory: frontend
         continue-on-error: true
         run: |
-          pnpm exec stryker run 2>&1 | tail -50 | tee -a "$GITHUB_STEP_SUMMARY"
+          pnpm exec stryker run --incremental --incrementalFile "${RUNNER_TEMP}/stryker-incremental.json" 2>&1 \
+            | tail -50 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Stryker report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
