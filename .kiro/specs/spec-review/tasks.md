@@ -151,6 +151,7 @@
   - PR 本文に `Spec: .kiro/specs/spec-review` を記載する(200行を超えるため spec の裏付けが要る)
   - `.claude/settings.json` の変更と、既存フック4本および `CLAUDE.md` の Git規約の変更(要件8.5〜8.7。所有者が手で置いた分を含む)を PR 本文で説明する
   - 完了の観測条件: size-check と escape-hatch が緑になり、所有者の Approve の後にマージされる
+  - 実施結果(2026-09-27): PR #376 の本文に `Spec: .kiro/specs/spec-review` を記載。escape-hatch は所有者の Approve 後に緑。size-check は、本文の編集ではワークフローが再実行されず(トリガーは `pull_request` と `pull_request_review`)、本文の更新後に走った実行で緑になることを確認した
   - _Requirements: 8.1_
   - _Depends: 6.2_
 
