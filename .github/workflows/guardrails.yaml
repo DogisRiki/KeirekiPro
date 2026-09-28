@@ -322,7 +322,7 @@ jobs:
             fi
             echo ""
             echo "> 昇格条件: 誤検知の設定整理が完了して実検出が0になったら、backend/gradle/quality.gradle の"
-            echo "> PMD設定 ignoreFailures を false にしてビルド失敗へ昇格する(監査手順の週次項目で判定)"
+            echo "> PMD設定 ignoreFailures を false にしてビルド失敗へ昇格する(昇格はIssueを起票して行う)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload PMD report
