@@ -14,28 +14,11 @@ Terraformコードの開発・静的解析を行うためのdevcontainer環境�
 
 ## セットアップ
 
-### AWS認証情報の設定
+### AWS認証情報
 
-`docker/terraform/.env.local`ファイルを作成し、AWS認証情報を設定する。
-```bash
-cp docker/terraform/.env.local.example docker/terraform/.env.local
-```
+このコンテナにはAWSの認証情報を渡さない。形式・構文・tflint・checkov の検査は認証情報を使わず、AWSへの操作(plan・apply)は GitHub Actions が OIDC で行う。
 
-`.env.local`を編集し、実際の値を設定する。
-```
-AWS_ACCESS_KEY_ID=<アクセスキーID>
-AWS_SECRET_ACCESS_KEY=<シークレットアクセスキー>
-AWS_DEFAULT_REGION=ap-northeast-1
-```
-
-**注意**：`.env.local`はGit管理対象外。絶対にコミットしないこと。
-
-### コンテナ起動後の確認
-
-devcontainerに接続後、以下のコマンドでAWS認証が通っているか確認する。
-```bash
-aws sts get-caller-identity
-```
+`terraform init` をやり直すときは、認証情報なしで初期化できる `terraform init -backend=false` を使う。
 
 ## フォーマット
 

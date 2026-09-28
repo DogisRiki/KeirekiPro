@@ -70,8 +70,6 @@ services:
       - type: bind
         source: ./terraform
         target: /workspace
-    env_file:
-      - ./docker/terraform/.env.local
     networks:
       - my-network
 
