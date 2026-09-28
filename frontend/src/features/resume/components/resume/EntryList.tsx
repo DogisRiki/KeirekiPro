@@ -321,6 +321,8 @@ export const EntryList = ({ onResumeNotFound }: EntryListProps) => {
                 {entries.length > 0 ? (
                     <Box
                         ref={scrollContainerRef}
+                        role="region"
+                        aria-label={title}
                         sx={{
                             maxHeight: needsScroll ? MAX_SCROLL_HEIGHT : "none",
                             overflowY: needsScroll ? "auto" : "visible",

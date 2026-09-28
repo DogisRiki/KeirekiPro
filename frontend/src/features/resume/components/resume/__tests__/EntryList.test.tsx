@@ -158,6 +158,30 @@ describe("EntryList", () => {
         expect(screen.queryByRole("list")).not.toBeInTheDocument();
     });
 
+    it("項目の一覧に、見出しと同じ名前を付けること", () => {
+        renderList({ section: "career" });
+
+        expect(screen.getByRole("region", { name: "職歴一覧" })).toContainElement(screen.getByRole("list"));
+    });
+
+    it.each([
+        { count: 5, maxHeight: "none", overflowY: "visible" },
+        { count: 6, maxHeight: "400px", overflowY: "auto" },
+    ])(
+        "項目が $count 件のときは、一覧の高さを $maxHeight までにし、はみ出しを $overflowY にすること",
+        ({ count, maxHeight, overflowY }) => {
+            const certifications = Array.from({ length: count }, (_, index) => ({
+                id: `certification-${index + 1}`,
+                name: `資格${index + 1}`,
+                date: "2020-04",
+            }));
+            renderList({ section: "certification", resume: cloneResume({ certifications }) });
+
+            expect(screen.getAllByRole("listitem")).toHaveLength(count);
+            expect(screen.getByRole("region", { name: "保有資格一覧" })).toHaveStyle({ maxHeight, overflowY });
+        },
+    );
+
     it.each(sectionCases)(
         "$section で新規追加を押すと、一時IDを付けた初期値の項目を先頭に足して選択すること",
         async ({ section, key, existingId, newEntry }) => {
