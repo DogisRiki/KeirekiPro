@@ -152,6 +152,12 @@ export const RestoreSection = () => {
                         </>
                     )}
                 </Box>
+                {/* 選べなかった理由 */}
+                {fileError && (
+                    <Typography role="alert" variant="body2" color="error">
+                        {fileError}
+                    </Typography>
+                )}
                 <Button
                     startIcon={<RestoreIcon />}
                     onClick={handleRestore}

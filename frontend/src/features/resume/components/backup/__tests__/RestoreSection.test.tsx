@@ -74,6 +74,38 @@ describe("RestoreSection", () => {
         expect(restoreButton()).toBeDisabled();
     });
 
+    it("ファイルを選ぶ前とJSONのファイルを選んだときは、選べなかった理由を出さないこと", async () => {
+        renderWithProviders(<RestoreSection />);
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+        selectFiles([createJsonFile()]);
+
+        await screen.findByText("backup.json");
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it.each([
+        ["JSON以外のファイル", () => [createTextFile()]],
+        ["複数のファイル", () => [createJsonFile("first.json"), createJsonFile("second.json")]],
+    ])("%sを選んだときは、JSONファイルしか選べないことを出すこと", async (_, files) => {
+        renderWithProviders(<RestoreSection />);
+
+        selectFiles(files());
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("JSONファイルのみ選択可能です。");
+    });
+
+    it("選べなかった後にJSONのファイルを選び直すと、理由の表示を消すこと", async () => {
+        renderWithProviders(<RestoreSection />);
+        selectFiles([createTextFile()]);
+        await screen.findByRole("alert");
+
+        selectFiles([createJsonFile()]);
+
+        await screen.findByText("backup.json");
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
     it("選択解除を押すと、選択を取り消し、ファイル選択の画面は開かないこと", async () => {
         const { user } = renderWithProviders(<RestoreSection />);
         selectFiles([createJsonFile()]);
