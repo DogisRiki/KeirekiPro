@@ -1,5 +1,5 @@
 ---
-description: frontendの品質ゲート(format→lint→test→coverage)を順次実行し、結果を要約報告する。frontend配下を変更したら完了報告前に必ず実行する。
+description: frontendの品質ゲート(format→lint→typecheck→test→coverage)を順次実行し、結果を要約報告する。frontend配下を変更したら完了報告前に必ず実行する。
 ---
 
 # verify-frontend
@@ -15,11 +15,13 @@ frontendの品質ゲートを規定の順序で直列実行し、PASS/FAILを判
 ```
 docker compose exec -u node -w /home/node/app frontend pnpm run format
 docker compose exec -u node -w /home/node/app frontend pnpm run lint
+docker compose exec -u node -w /home/node/app frontend pnpm run typecheck
 docker compose exec -u node -w /home/node/app frontend pnpm test
 docker compose exec -u node -w /home/node/app frontend pnpm run coverage
 ```
 
 - format失敗時は `pnpm run format:fix`、lint失敗時は `pnpm run lint:fix` で自動修正を先に試す
+- vitestはテスト実行時に型を検査しない。型の誤りは `pnpm run typecheck`(`tsc -b`。CIの `pnpm run build` と同じ型検査)で検出する
 - CI環境(Docker Compose無し)では `docker compose exec ...` を外し `frontend/` でネイティブ実行する
 
 ## Rules(ゴールハック禁止則)
@@ -41,6 +43,7 @@ docker compose exec -u node -w /home/node/app frontend pnpm run coverage
 verify-frontend:
 - format   -> PASS/FAIL
 - lint     -> PASS/FAIL
+- typecheck -> PASS/FAIL
 - test     -> PASS/FAIL (件数)
 - coverage -> PASS/FAIL (Stmts/Branch/Funcs/Lines の各%)
 ```
