@@ -54,7 +54,7 @@ pmd {
     consoleOutput = true
     // 警告のみで開始(ビルドを失敗させない)。誤検知の設定整理(config/pmd/ruleset.xml の
     // extraAssertMethodNames)が完了して実検出が0になったら、false へ変更してビルド失敗へ昇格する
-    // (判定は監査手順の週次項目で行う)
+    // (昇格はIssueを起票して行う)
     ignoreFailures = true
 }
 
