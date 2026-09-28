@@ -4,6 +4,7 @@ import { Loading } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { ProtectedLoader, PublicLoader } from "@/routes/AppLoader";
 import { lazy, Suspense } from "react";
+import type { RouteObject } from "react-router";
 import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 
@@ -34,9 +35,9 @@ const TwoFactor = lazy(() => import("@/pages/TwoFactor").then((module) => ({ def
 const routeFallback = <Loading active variant="content" />;
 
 /**
- * ルーティング
+ * ルート定義
  */
-const router = createBrowserRouter([
+export const routes: RouteObject[] = [
     {
         path: paths.top,
         element: <LandingPage />,
@@ -76,7 +77,12 @@ const router = createBrowserRouter([
     { path: paths.serverError, element: <ServerError />, errorElement: <ErrorFallback /> },
     { path: paths.maintenance, element: <Maintenance />, errorElement: <ErrorFallback /> },
     { path: "*", element: <NotFound />, errorElement: <ErrorFallback /> },
-]);
+];
+
+/**
+ * ルーティング
+ */
+const router = createBrowserRouter(routes);
 
 /**
  * ルータープロバイダー
