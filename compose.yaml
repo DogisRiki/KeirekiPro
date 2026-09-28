@@ -44,8 +44,11 @@ services:
     ports:
       - 5173:5173
       - 6006:6006
-    # environment:
-    #   CHOKIDAR_USEPOLLING: true
+    environment:
+      # vitest の並列数。指定しないと「CPUの数−1」で動き、Docker のメモリを使い切って
+      # テストが時間切れや強制終了になる(#404)。開発サーバと同時に動いても余裕が残る数にする
+      VITEST_MAX_WORKERS: 8
+      # CHOKIDAR_USEPOLLING: true
     tty: true
     volumes:
       - type: bind
