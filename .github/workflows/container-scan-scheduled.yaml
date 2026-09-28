@@ -61,7 +61,7 @@ concurrency:
 
 env:
   # Trivy 本体のバージョン。v は付けない(check-trivy-version.sh の引数の形式)。
-  # ここ1箇所だけに書く。監査手順の「バージョン固定の確認」の対象。
+  # ここ1箇所だけに書く。監査手順の「版の確認先」の対象(月次)。
   TRIVY_VERSION: '0.74.0'
   AWS_REGION: ap-northeast-1
   ECS_CLUSTER: keirekipro-cluster
