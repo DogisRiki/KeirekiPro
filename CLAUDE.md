@@ -26,6 +26,7 @@ frontend(`/verify-frontend`):
 ```
 docker compose exec -u node -w /home/node/app frontend pnpm run format
 docker compose exec -u node -w /home/node/app frontend pnpm run lint
+docker compose exec -u node -w /home/node/app frontend pnpm run typecheck
 docker compose exec -u node -w /home/node/app frontend pnpm test
 docker compose exec -u node -w /home/node/app frontend pnpm run coverage
 ```

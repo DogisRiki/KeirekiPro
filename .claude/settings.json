@@ -5,6 +5,7 @@
             "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run format:fix)",
             "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run lint)",
             "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run lint:fix)",
+            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run typecheck)",
             "Bash(docker compose exec -u node -w /home/node/app frontend pnpm test)",
             "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run coverage)",
             "Bash(docker compose exec -u node -w /home/node/app frontend npx tsc -b)",
