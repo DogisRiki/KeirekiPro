@@ -99,7 +99,7 @@
   - _Boundary: ci.yaml_
 
 - [ ] 4. tflint の更新PRの公開から72時間の保留
-- [ ] 4.1 tflint の更新PRを自動マージしてよいかを判定する
+- [x] 4.1 tflint の更新PRを自動マージしてよいかを判定する
   - PR の差分から tflint の `FROM` 行の前後のタグと digest を取り出し、`reserve` / `wait` / `notify` と理由を返す。公開日時は GitHub のリリースの `published_at` だけを使う
   - tflint の行が差分にあるのにタグや digest を読み取れないときは、design の「判定できなかった」として終了コード 2 にし、予約に倒さない(D2-1-2)
   - `notify` のときは、先頭に所有者へのメンション、末尾に理由ごとの目印を付けて PR にコメントする。同じ目印のコメントがあれば重ねない
@@ -163,3 +163,4 @@
 - 2.4: audit-inventory.yaml のヘッダは、週次監査の鮮度確認(35日)を前提に書いている。タスク5を必ず同じPRに入れる
 - 3.1: test-collect-coverage.sh は実物の vite.config.ts と quality.gradle を読む。書き方を変えるとこのテストが赤になるため、3.3 ではこのテストの失敗で記録を止めない
 - 3.2: record-mutation-metrics.sh は MUTATION_MODE が無いと終了コード 2 になる。3.3(ワークフローが MUTATION_MODE を渡す)と同じPRで出荷する。既存のテストの期待値を5か所変えたため、PR本文に Test-Change-Justification を書く(台帳の作成が共通の関数に変わり、行は作成後に追記する形になった/行に測定方式の列が入った/必須の環境変数が増えた/gh の偽物を拡張した)
+- 4.1: 重複を防ぐ目印は、トークンの利用者(gh api user)が書いたコメントに限る。BOT_GITHUB_TOKEN が利用者のトークン(PAT)であることが前提で、GitHub App のトークンに替えると notify の場面が終了コード 2 になる
