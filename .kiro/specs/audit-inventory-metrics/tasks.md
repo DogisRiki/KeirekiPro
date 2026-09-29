@@ -78,7 +78,7 @@
   - 完了の観測条件: test-collect-coverage.sh がコンテナ内で全PASSし、shellcheck に警告が無い
   - _Requirements: 3.4, 3.6, 3.8, 6.5_
   - _Boundary: collect-coverage.sh_
-- [ ] 3.2 mutation の台帳に測定方式を記録し、全件の回に差をコメントする
+- [x] 3.2 mutation の台帳に測定方式を記録し、全件の回に差をコメントする
   - 測定方式(4値)を受け取り、不正な値は終了コード 2。本文に新しい見出しと5列の表の頭が無ければ末尾に足し、以後はそこへ追記する。既存の表は変えない
   - 全件の回は、新しい表の直前の全件の行との差を出し、今回・前回・差・全件になった理由・カバレッジの Markdown をコメントする。前の行が無い・欄が取得できずなら「比較対象なし」。差分の回はコメントしない
   - 台帳の探し方と作成を 1.1 の共通の関数に置き換える(タイトルは変えず、ラベルは付けない)
@@ -162,3 +162,4 @@
 - 2.2: endoflife.date は LTS の考え方が無い製品(Terraform・PostgreSQL・Redis・Valkey・Docker)にも isLts: false を返すため、「(LTS ではない)」が付く。設計の規則どおりだが、表の例とは食い違う。所有者の判断事項
 - 2.4: audit-inventory.yaml のヘッダは、週次監査の鮮度確認(35日)を前提に書いている。タスク5を必ず同じPRに入れる
 - 3.1: test-collect-coverage.sh は実物の vite.config.ts と quality.gradle を読む。書き方を変えるとこのテストが赤になるため、3.3 ではこのテストの失敗で記録を止めない
+- 3.2: record-mutation-metrics.sh は MUTATION_MODE が無いと終了コード 2 になる。3.3(ワークフローが MUTATION_MODE を渡す)と同じPRで出荷する。既存のテストの期待値を5か所変えたため、PR本文に Test-Change-Justification を書く(台帳の作成が共通の関数に変わり、行は作成後に追記する形になった/行に測定方式の列が入った/必須の環境変数が増えた/gh の偽物を拡張した)
