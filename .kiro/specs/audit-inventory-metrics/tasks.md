@@ -28,7 +28,7 @@
   - 完了の観測条件: test-check-audit-scan-freshness.sh がコンテナ内で全PASSする
   - _Requirements: 5.1, 6.5_
   - _Boundary: check-audit-scan-freshness.sh_
-- [ ] 1.3 (P) tflint と checkov の版の宣言を Dependabot が読める形にする
+- [x] 1.3 (P) tflint と checkov の版の宣言を Dependabot が読める形にする
   - tflint を、版と digest で固定した `FROM` のステージにする。digest は ghcr.io から取り、Dependabot が書く形(マルチアーキテクチャのイメージでは manifest list の digest)に合わせる
   - checkov の版を Python の依存ファイルに移し、Dockerfile はそれを入れる形にする。版は今のまま
   - Dependabot の設定に pip のレーンを足し、docker のまとめPRから tflint を外す。古くなったコメントを直す
