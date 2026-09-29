@@ -10,6 +10,9 @@
 # 整形済みの値を返すスタブにすると、応答形式の検証が範囲から外れ、
 # 解釈を壊しても緑のままになる。
 #
+# 3つ目の引数(表示名)は、渡したときと省略したときの両方で報告の文面を
+# 1バイト単位で比べる。省略したときは今の文面から変わらないことを確かめる。
+#
 # 外部への問い合わせを行わないため、実行にネットワークを必要としない。
 # 時刻は NOW_EPOCH で固定し、8日ちょうどの境界値を再現可能にする。
 # =====================================================================
@@ -62,8 +65,15 @@ exec "$REAL_DATE" "\$@"
 STUB
 chmod +x "$WORK/bin/date"
 
-# 使い方: run <APIレスポンスJSON> [gh失敗] [date失敗]
+# 使い方: [RUN_LABEL=<表示名>] run <APIレスポンスJSON> [gh失敗] [date失敗]
+# RUN_LABEL が設定されているときだけ、3つ目の引数(表示名)として渡す。
+# 設定されていなければ引数を2個にし、今の呼び出し(定期スキャン、8日)を再現する。
+# 標準出力と標準エラーは、報告の文面を確かめるためにファイルへ残す。
 run() {
+    local label_args=()
+    if [ -n "${RUN_LABEL+x}" ]; then
+        label_args=("$RUN_LABEL")
+    fi
     printf '%s' "$1" >"$WORK/runs.json"
     : >"$WORK/calls.log"
     : >"$WORK/summary.md"
@@ -72,7 +82,8 @@ run() {
         STUB_GH_FAIL="${2:-}" STUB_DATE_FAIL="${3:-}" \
         GITHUB_REPOSITORY="owner/repo" GH_TOKEN="dummy" NOW_EPOCH="$NOW" \
         GITHUB_STEP_SUMMARY="$WORK/summary.md" \
-        bash "$SCRIPT" container-scan-scheduled.yaml 8 >/dev/null 2>&1
+        bash "$SCRIPT" container-scan-scheduled.yaml 8 "${label_args[@]}" \
+        >"$WORK/stdout.log" 2>"$WORK/stderr.log"
 }
 
 # 使い方: check <期待exit> <説明> <APIレスポンスJSON> [gh失敗] [date失敗]
@@ -131,6 +142,20 @@ check_summary() {
         echo "PASS: $2"
     else
         echo "FAIL: $2 (Summaryに '$1' が現れない)"
+        FAILED=1
+    fi
+}
+
+# 出力のファイルが、標準入力で渡した期待の文面と1バイト単位で一致するか確かめる。
+# 使い方: check_exact <ファイル> <説明> <<'EOF' ... EOF
+check_exact() {
+    local file="$1" name="$2"
+    cat >"$WORK/expected.txt"
+    if cmp -s "$WORK/expected.txt" "$file"; then
+        echo "PASS: $name"
+    else
+        echo "FAIL: $name (文面が期待と一致しない)"
+        diff "$WORK/expected.txt" "$file" | sed 's/^/    /'
         FAILED=1
     fi
 }
@@ -250,6 +275,153 @@ if grep -qF "定期スキャンが止まっています" "$WORK/summary.md"; the
 else
     echo "PASS: 想定外の失敗を逸脱として報告しない"
 fi
+
+echo "--- 表示名を省略したとき(今の文面のまま) ---"
+# 既存の呼び出し(container-scan-scheduled.yaml 8)の報告が、表示名の引数を
+# 足す前と1バイトも変わらないことを、4つの結果それぞれで確かめる。
+check 0 "表示名を省略しても、8日未満なら緑にする" "$(runs_json "$CREATED_JUST_UNDER_8D")"
+check_exact "$WORK/stdout.log" "表示名を省略したとき、緑の文面は今のまま" <<'EOF'
+定期スキャン(container-scan-scheduled.yaml)は稼働しています(最終成功: 2026-01-02 00:01 UTC)。
+EOF
+check_exact "$WORK/summary.md" "表示名を省略したとき、緑ではSummaryに何も書かない" </dev/null
+
+check 1 "表示名を省略しても、8日ちょうどなら赤にする" "$(runs_json "$CREATED_EXACTLY_8D")"
+check_exact "$WORK/summary.md" "表示名を省略したとき、鮮度切れのSummaryは今のまま" <<'EOF'
+### :rotating_light: 定期スキャンが止まっています
+
+対象: `container-scan-scheduled.yaml`
+
+直近の成功から 8 日以上経過しています。
+**最終成功日時: 2026-01-02 00:00 UTC**
+
+スケジュール実行が止まった原因(ワークフローの無効化・失敗の連続等)を
+対象ワークフローの実行履歴から人間が確認してください。
+
+EOF
+check_exact "$WORK/stderr.log" "表示名を省略したとき、鮮度切れの標準エラーは今のまま" <<'EOF'
+定期スキャン(container-scan-scheduled.yaml)の直近の成功から 8 日以上経過しています。
+最終成功日時: 2026-01-02 00:00 UTC
+EOF
+
+check 1 "表示名を省略しても、成功ゼロなら赤にする" "$EMPTY_RUNS"
+check_exact "$WORK/summary.md" "表示名を省略したとき、成功ゼロのSummaryは今のまま" <<'EOF'
+### :rotating_light: 定期スキャンに成功した実行が存在しません
+
+対象: `container-scan-scheduled.yaml`
+
+スキャンが一度も成功していないか、実行履歴が失われています。
+対象ワークフローの実行履歴と設定を人間が確認してください。
+
+EOF
+check_exact "$WORK/stderr.log" "表示名を省略したとき、成功ゼロの標準エラーは今のまま" <<'EOF'
+定期スキャン(container-scan-scheduled.yaml)に成功した実行が存在しません。
+EOF
+
+check 2 "表示名を省略しても、APIの失敗は判定不能として2を返す" "" "yes"
+check_exact "$WORK/summary.md" "表示名を省略したとき、判定不能のSummaryは今のまま" <<'EOF'
+### :warning: 定期スキャンの稼働状況を確認できませんでした(判定不能)
+
+実行一覧APIへの問い合わせに失敗しました。
+対象: `repos/owner/repo/actions/workflows/container-scan-scheduled.yaml/runs`
+
+**成功に倒さず赤にしています。**
+失敗したこのrunをre-run(同じrunの再実行)してください。
+新規の手動実行で流し直すと、スキップ検知の対象期間に未走査の穴が空きます。
+繰り返し失敗する場合はAPIの応答を人間が確認してください。
+
+EOF
+check_exact "$WORK/stderr.log" "表示名を省略したとき、判定不能の標準エラーは今のまま" <<'EOF'
+定期スキャンの稼働状況を確認できませんでした(判定不能): 実行一覧APIへの問い合わせに失敗しました。
+EOF
+
+echo "--- 表示名を渡したとき ---"
+# 見出しと本文の「定期スキャン」が表示名に置き換わり、「定期スキャン」が
+# どこにも残らないことを、4つの結果それぞれで確かめる。終了コードは変わらない。
+RUN_LABEL=棚卸し check 0 "表示名を渡しても、8日未満なら緑にする" "$(runs_json "$CREATED_JUST_UNDER_8D")"
+check_exact "$WORK/stdout.log" "表示名を渡したとき、緑の文面に表示名が使われる" <<'EOF'
+棚卸し(container-scan-scheduled.yaml)は稼働しています(最終成功: 2026-01-02 00:01 UTC)。
+EOF
+
+RUN_LABEL=棚卸し check 1 "表示名を渡しても、8日ちょうどなら赤にする" "$(runs_json "$CREATED_EXACTLY_8D")"
+check_exact "$WORK/summary.md" "表示名を渡したとき、鮮度切れの見出しと本文に表示名が使われる" <<'EOF'
+### :rotating_light: 棚卸しが止まっています
+
+対象: `container-scan-scheduled.yaml`
+
+直近の成功から 8 日以上経過しています。
+**最終成功日時: 2026-01-02 00:00 UTC**
+
+スケジュール実行が止まった原因(ワークフローの無効化・失敗の連続等)を
+対象ワークフローの実行履歴から人間が確認してください。
+
+EOF
+check_exact "$WORK/stderr.log" "表示名を渡したとき、鮮度切れの標準エラーに表示名が使われる" <<'EOF'
+棚卸し(container-scan-scheduled.yaml)の直近の成功から 8 日以上経過しています。
+最終成功日時: 2026-01-02 00:00 UTC
+EOF
+
+RUN_LABEL=棚卸し check 1 "表示名を渡しても、成功ゼロなら赤にする" "$EMPTY_RUNS"
+check_exact "$WORK/summary.md" "表示名を渡したとき、成功ゼロの見出しと本文に表示名が使われる" <<'EOF'
+### :rotating_light: 棚卸しに成功した実行が存在しません
+
+対象: `container-scan-scheduled.yaml`
+
+棚卸しが一度も成功していないか、実行履歴が失われています。
+対象ワークフローの実行履歴と設定を人間が確認してください。
+
+EOF
+check_exact "$WORK/stderr.log" "表示名を渡したとき、成功ゼロの標準エラーに表示名が使われる" <<'EOF'
+棚卸し(container-scan-scheduled.yaml)に成功した実行が存在しません。
+EOF
+
+RUN_LABEL=棚卸し check 2 "表示名を渡しても、APIの失敗は判定不能として2を返す" "" "yes"
+check_exact "$WORK/summary.md" "表示名を渡したとき、判定不能の見出しに表示名が使われる" <<'EOF'
+### :warning: 棚卸しの稼働状況を確認できませんでした(判定不能)
+
+実行一覧APIへの問い合わせに失敗しました。
+対象: `repos/owner/repo/actions/workflows/container-scan-scheduled.yaml/runs`
+
+**成功に倒さず赤にしています。**
+失敗したこのrunをre-run(同じrunの再実行)してください。
+新規の手動実行で流し直すと、スキップ検知の対象期間に未走査の穴が空きます。
+繰り返し失敗する場合はAPIの応答を人間が確認してください。
+
+EOF
+check_exact "$WORK/stderr.log" "表示名を渡したとき、判定不能の標準エラーに表示名が使われる" <<'EOF'
+棚卸しの稼働状況を確認できませんでした(判定不能): 実行一覧APIへの問い合わせに失敗しました。
+EOF
+
+echo "--- 表示名の検査 ---"
+# 表示名は Summary と Issue の見出しの行にそのまま入る。改行が入ると見出しが
+# 切れて偽の行を足せ、Markdown の記号や @ が入ると強調・リンク・HTML・
+# メンションとして解釈される。こうした値は問い合わせの前に判定不能(2)に倒す。
+check_invocation 2 "表示名が空なら判定不能として2を返す" "" container-scan-scheduled.yaml 8 ""
+check_no_calls "表示名が空ならAPIへ問い合わせない"
+
+check_invocation 2 "表示名に改行が入っていれば判定不能として2を返す" "" \
+    container-scan-scheduled.yaml 8 $'棚卸し\n偽の行'
+check_no_calls "表示名に改行が入っていればAPIへ問い合わせない"
+
+check_invocation 2 "表示名に復帰(CR)が入っていれば判定不能として2を返す" "" \
+    container-scan-scheduled.yaml 8 $'棚卸し\r'
+
+check_invocation 2 "表示名にタブが入っていれば判定不能として2を返す" "" \
+    container-scan-scheduled.yaml 8 $'棚\t卸し'
+
+for bad in '#' '`' '*' '_' '[' ']' '<' '>' '|' "\\" '~' '@' '&'; do
+    check_invocation 2 "表示名に記号 ${bad} が入っていれば判定不能として2を返す" "" \
+        container-scan-scheduled.yaml 8 "棚卸し${bad}"
+    check_no_calls "表示名に ${bad} が入っていればAPIへ問い合わせない"
+done
+
+check_invocation 2 "引数が4個以上なら判定不能として2を返す" "" \
+    container-scan-scheduled.yaml 8 棚卸し extra
+check_no_calls "引数が4個以上ならAPIへ問い合わせない"
+
+check_invocation 0 "表示名が日本語の語なら判定まで進む(表示名の検査の対照)" "" \
+    container-scan-scheduled.yaml 8 棚卸し
+check_invocation 0 "表示名に空白や括弧が入っていても判定まで進む" "" \
+    container-scan-scheduled.yaml 8 "棚卸し (月次)"
 
 if [ "$FAILED" -eq 0 ]; then
     echo "すべてのテストがPASSしました。"

@@ -1,0 +1,168 @@
+{
+  "targets": [
+    {
+      "name": "tflint",
+      "declarations": [
+        {
+          "files": ["docker/terraform/Dockerfile"],
+          "pattern": "(?m)^FROM ghcr\\.io/terraform-linters/tflint:(?<version>v[0-9]+\\.[0-9]+\\.[0-9]+)"
+        }
+      ],
+      "latest": { "type": "github-release", "repo": "terraform-linters/tflint" },
+      "support": null
+    },
+    {
+      "name": "tflint の AWS 用ルールセット",
+      "declarations": [
+        {
+          "files": ["terraform/.tflint.hcl"],
+          "pattern": "plugin \"aws\" \\{[^}]*?\\bversion[ \\t]*=[ \\t]*\"(?<version>[0-9][^\"]*)\""
+        }
+      ],
+      "latest": { "type": "github-release", "repo": "terraform-linters/tflint-ruleset-aws" },
+      "support": null
+    },
+    {
+      "name": "checkov",
+      "declarations": [
+        {
+          "files": ["docker/terraform/requirements.txt"],
+          "pattern": "(?m)^checkov==(?<version>[0-9][0-9A-Za-z.]*)"
+        }
+      ],
+      "latest": { "type": "pypi", "package": "checkov" },
+      "support": null
+    },
+    {
+      "name": "Trivy",
+      "declarations": [
+        {
+          "files": [".github/workflows/container-scan.yaml", ".github/workflows/container-scan-scheduled.yaml"],
+          "pattern": "(?m)^[ \\t]*TRIVY_VERSION:[ \\t]*['\"]?(?<version>[0-9][0-9.]*)"
+        }
+      ],
+      "latest": { "type": "github-release", "repo": "aquasecurity/trivy" },
+      "support": null
+    },
+    {
+      "name": "Java",
+      "declarations": [
+        {
+          "files": ["docker/backend/Dockerfile", "docker/backend/Dockerfile.prod"],
+          "pattern": "(?m)^FROM eclipse-temurin:(?<version>[0-9][^@ \\t\\r\\n]*)"
+        },
+        {
+          "files": ["backend/build.gradle"],
+          "pattern": "JavaLanguageVersion\\.of\\((?<version>[0-9]+)\\)"
+        }
+      ],
+      "latest": { "type": "endoflife", "product": "eclipse-temurin" },
+      "support": { "type": "endoflife", "product": "eclipse-temurin", "cycle_pattern": "^(?<cycle>[0-9]+)" }
+    },
+    {
+      "name": "Node.js",
+      "declarations": [
+        {
+          "files": ["docker/frontend/Dockerfile"],
+          "pattern": "(?m)^FROM node:(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)"
+        },
+        {
+          "files": [
+            ".github/workflows/ci.yaml",
+            ".github/workflows/mutation-report.yaml",
+            ".github/workflows/codex-review.yml",
+            ".github/workflows/guardrails.yaml"
+          ],
+          "pattern": "(?m)^[ \\t]*node-version:[ \\t]*['\"]?(?<version>[0-9][0-9.]*)"
+        }
+      ],
+      "latest": { "type": "endoflife", "product": "nodejs" },
+      "support": { "type": "endoflife", "product": "nodejs", "cycle_pattern": "^(?<cycle>[0-9]+)" }
+    },
+    {
+      "name": "PostgreSQL(開発)",
+      "declarations": [
+        {
+          "files": ["docker/db/Dockerfile"],
+          "pattern": "(?m)^FROM postgres:(?<version>[0-9]+(?:\\.[0-9]+)*)"
+        }
+      ],
+      "latest": { "type": "endoflife", "product": "postgresql" },
+      "support": { "type": "endoflife", "product": "postgresql", "cycle_pattern": "^(?<cycle>[0-9]+)" }
+    },
+    {
+      "name": "PostgreSQL(本番)",
+      "declarations": [
+        {
+          "files": ["terraform/modules/rds/main.tf"],
+          "pattern": "(?m)^[ \\t]*engine_version[ \\t]*=[ \\t]*\"(?<version>[0-9][^\"]*)\""
+        }
+      ],
+      "latest": { "type": "endoflife", "product": "amazon-rds-postgresql" },
+      "support": { "type": "endoflife", "product": "amazon-rds-postgresql", "cycle_pattern": "^(?<cycle>[0-9]+)" }
+    },
+    {
+      "name": "Redis(開発)",
+      "declarations": [
+        {
+          "files": ["docker/redis/Dockerfile"],
+          "pattern": "(?m)^FROM redis:(?<version>[0-9]+(?:\\.[0-9]+)*)"
+        }
+      ],
+      "latest": { "type": "endoflife", "product": "redis" },
+      "support": { "type": "endoflife", "product": "redis", "cycle_pattern": "^(?<cycle>[0-9]+\\.[0-9]+)" }
+    },
+    {
+      "name": "Valkey(本番)",
+      "declarations": [
+        {
+          "files": ["terraform/modules/elasticache/main.tf"],
+          "pattern": "(?m)^[ \\t]*engine_version[ \\t]*=[ \\t]*\"(?<version>[0-9][^\"]*)\""
+        }
+      ],
+      "latest": { "type": "endoflife", "product": "valkey" },
+      "support": { "type": "endoflife", "product": "valkey", "cycle_pattern": "^(?<cycle>[0-9]+\\.[0-9]+)" }
+    },
+    {
+      "name": "Terraform",
+      "declarations": [
+        {
+          "files": ["docker/terraform/Dockerfile"],
+          "pattern": "(?m)^FROM hashicorp/terraform:(?<version>[0-9]+(?:\\.[0-9]+)*)"
+        },
+        {
+          "files": [".github/workflows/terraform-plan.yaml", ".github/workflows/terraform-apply.yaml"],
+          "pattern": "(?m)^[ \\t]*TF_VERSION:[ \\t]*['\"]?(?<version>[0-9][0-9.]*)"
+        }
+      ],
+      "latest": { "type": "endoflife", "product": "terraform" },
+      "support": { "type": "endoflife", "product": "terraform", "cycle_pattern": "^(?<cycle>[0-9]+\\.[0-9]+)" }
+    },
+    {
+      "name": "Docker(dind)",
+      "declarations": [
+        {
+          "files": ["docker/dind/Dockerfile"],
+          "pattern": "(?m)^FROM docker:(?<version>[0-9][^@ \\t\\r\\n]*)"
+        }
+      ],
+      "latest": { "type": "endoflife", "product": "docker-engine" },
+      "support": { "type": "endoflife", "product": "docker-engine", "cycle_pattern": "^(?<cycle>[0-9]+)" }
+    },
+    {
+      "name": "LocalStack",
+      "declarations": [
+        {
+          "files": ["docker/localstack/Dockerfile"],
+          "pattern": "(?m)^FROM localstack/localstack:(?<version>[0-9][^@ \\t\\r\\n]*)"
+        }
+      ],
+      "latest": {
+        "type": "dockerhub-tags",
+        "repository": "localstack/localstack",
+        "tag_pattern": "^[0-9]{4}\\.[1-9][0-9]?\\.[0-9]+$"
+      },
+      "support": null
+    }
+  ]
+}

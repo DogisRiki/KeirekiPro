@@ -13,11 +13,36 @@ name: Dependabot Auto Merge
 # https://github.com/dependabot/dependabot-core/issues/9024
 # https://github.com/dependabot/dependabot-core/issues/7387
 #
+# 予約の前に check-release-age.sh で判定し、reserve のときだけ予約する(#415)。
+# tflint(ghcr.io)の更新には Dependabot の既定の待ち期間が効かないため、
+# GitHub のリリースの公開から72時間経つまで予約を保留する。tflint 以外の更新は
+# 判定が reserve を返し、今までどおり予約される。判定の基準は判定スクリプト側が持つ。
+#
+#   auto-merge  PR のイベントで判定し、reserve なら予約する。reserve 以外
+#               (wait・notify・判定できない・自己テストの失敗)なら付いている予約を外す
+#   recheck     1日1回と手動で、予約されていない Dependabot のPRを判定し直し、
+#               公開から72時間経ったものを予約する
+#
+# 判定できない(終了コード 2)ときは予約せずに赤で終える(安全側)。
+# 判定できずに予約を外した tflint 以外のPRは、翌日の見直しで判定し直され、
+# reserve なら予約が付け直される。
+# 予約は判定したときの PR の head のコミットに限る(--match-head-commit)。
+# 判定と予約の間に push されたら予約は付かず、次のイベントか見直しで判定し直す。
+# auto-merge の各ステップに時間の上限を付けるのは、止まったステップが job ごと
+# 取り消しにならず、予約の取り消しが動くようにするため。
+# 1日1回の見直しが止まると、保留した tflint の更新PRが開いたまま残る。PR の
+# チェックは緑のため週次監査の滞留検知には掛からない(残余リスクとして記録済み)。
+#
 # 参照: https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/automate-dependabot-with-actions
 
 on:
   pull_request:
     types: [opened, reopened, synchronize]
+  schedule:
+    # 毎日 01:37 UTC(10:37 JST)。公開から72時間経った tflint の更新PRを予約する
+    - cron: '37 1 * * *'
+  # 手動の見直し。導入直後の動作確認と、判定できなかったPRの流し直しに使う
+  workflow_dispatch:
 
 # Dependabot発のイベントでは GITHUB_TOKEN が既定で読み取り専用になるが、
 # permissions を明示すれば昇格する。Actions secrets は参照できないままだが、
@@ -31,21 +56,88 @@ permissions:
 jobs:
   auto-merge:
     name: auto-merge
+    # PR のイベントだけで動かす(定期実行と手動には PR の情報が無い)。
     # PRの作成者で判定する。github.actor は「最後にイベントを起こした人」であり、
     # ブランチ名の書き換えやマージ衝突の解決を経由して偽装できるため使わない。
     # forkからのPRは対象外にする(Dependabotは同一リポジトリにブランチを作る)。
     if: >-
-      github.event.pull_request.user.login == 'dependabot[bot]'
+      github.event_name == 'pull_request'
+      && github.event.pull_request.user.login == 'dependabot[bot]'
       && github.event.pull_request.head.repo.full_name == github.repository
     concurrency:
       group: dependabot-auto-merge-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
+    # gh api には時間の上限が無い。応答が返らないときに既定の360分を握らせない。
+    # 時間の上限は各ステップにも付け、その合計(17分)より job の上限を大きくする。
+    # job の上限に達すると job は取り消し扱いになり、!cancelled() の予約の取り消しが
+    # 動かない。ステップの上限で止まればそのステップの失敗になり、取り消しは動く。
+    # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+    # (jobs.<job_id>.timeout-minutes と jobs.<job_id>.steps[*].timeout-minutes)
+    timeout-minutes: 20
     steps:
+      # PR のコードは実行しない。判定スクリプトは base(main)のコミットのものを使う。
+      # pull_request のイベントで ref を指定しないと PR とのマージ結果が取得され、
+      # PR が書き換えた判定スクリプトを書き込み権限つきで実行することになる。
+      # 認証情報は .git に残さない(後続のステップは gh だけで API を呼ぶ)。
+      # 各ステップの timeout-minutes は、止まっても job を取り消しにせず、予約の
+      # 取り消しを動かすため(job の timeout-minutes のコメントを参照)。
+      - name: Checkout base
+        timeout-minutes: 3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      # 判定の前にスクリプトのテストを行う。壊れた判定で予約しない
+      # (テストは gh を偽物に置き換えるため、ネットワークを使わない)。
+      # スクリプトには実行ビットが無いため bash 経由で起動する。
+      - name: Test release-age script
+        id: selftest
+        timeout-minutes: 3
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/tests/test-check-release-age.sh; then
+            echo "::error::test-check-release-age.sh が失敗しました。自動マージは予約しません。"
+            exit 1
+          fi
+
+      # 判定。decision(reserve / wait / notify)をステップ出力に書く。
+      # 判定できない(終了コード 2 など)ときは予約せずに赤で終える。
+      # notify のときのPRへのコメントは判定スクリプトが付ける。
+      - name: Check release age
+        id: judge
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          if ! out=$(bash .github/scripts/check-release-age.sh "$PR_NUMBER"); then
+            echo "::error::PR #${PR_NUMBER} の自動マージを予約してよいかを判定できませんでした。予約しません。"
+            exit 1
+          fi
+          decision=$(printf '%s\n' "$out" | sed -n 's/^decision=//p')
+          reason=$(printf '%s\n' "$out" | sed -n 's/^reason=//p')
+          case "$decision" in
+          reserve | wait | notify) ;;
+          *)
+            echo "::error::判定の出力の形が想定と違います。予約しません。"
+            printf '%s\n' "$out"
+            exit 1
+            ;;
+          esac
+          echo "判定: ${decision}(${reason})"
+          echo "decision=${decision}" >>"$GITHUB_OUTPUT"
+
       - name: Enable auto-merge
+        id: enable
+        if: steps.judge.outputs.decision == 'reserve'
+        timeout-minutes: 3
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
 
@@ -53,4 +145,168 @@ jobs:
           # 付かなかった場合に付け直すため。
           # (auto-mergeが解除されるのは書き込み権限の無い者によるpushとbase切り替えの
           #  ときだけで、Dependabotのforce-pushでは解除されない)
-          gh pr merge --auto --squash "$PR_URL"
+          # 判定したコミットにだけ予約する。判定の後に push されていたら予約は付かない
+          # (--match-head-commit は予約の要求にも head のコミットの条件として渡る。
+          #  https://github.com/cli/cli/blob/trunk/pkg/cmd/pr/merge/http.go)
+          gh pr merge --auto --squash --match-head-commit "$HEAD_SHA" "$PR_URL"
+
+      # reserve 以外のときは、予約が付いていれば外す。予約済みのPRに新しい版が
+      # push されても、Dependabot の force-push では予約が解除されないため
+      # (上のコメントのとおり)、外さないと72時間を待たずにマージされる。
+      # checkout・自己テスト・判定のどれかが失敗したとき(decision が空)も外す
+      # (判定できないときは予約に倒さない。auto-merge は必須チェックではないため、
+      #  このjobが赤でも予約が残ればマージが進む)。前のステップの失敗で job は
+      # 赤のまま終わる。gh は PR の URL で動くため checkout に依らない。
+      # always() ではなく !cancelled() にする。同じPRの concurrency で取り消された
+      # 古い実行が、新しい実行の付けた予約を外さないようにするため。
+      # 予約の有無を取れない、または予約があるのに外せないときは赤で終える。
+      # https://cli.github.com/manual/gh_pr_merge (--disable-auto)
+      - name: Disable auto-merge
+        id: disable
+        if: ${{ !cancelled() && steps.judge.outputs.decision != 'reserve' }}
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -uo pipefail
+          if ! reserved=$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null'); then
+            echo "::error::自動マージの予約の有無を取れませんでした。"
+            exit 1
+          fi
+          case "$reserved" in
+          false)
+            echo "自動マージは予約されていません。"
+            ;;
+          true)
+            if ! gh pr merge --disable-auto "$PR_URL"; then
+              echo "::error::自動マージの予約を外せませんでした。"
+              exit 1
+            fi
+            echo "自動マージの予約を外しました。"
+            ;;
+          *)
+            echo "::error::自動マージの予約の有無の形が想定と違います。"
+            exit 1
+            ;;
+          esac
+
+  recheck:
+    name: recheck
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    concurrency:
+      # 同時に走ると同じPRへの判定とコメントが重なる。走行中は後発を待たせる
+      group: dependabot-auto-merge-recheck
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    # 最大100件のPRを1件ずつ判定する。gh api の応答が返らないときに
+    # 既定の360分を握らせない
+    timeout-minutes: 30
+    steps:
+      # 定期実行では既定のブランチ(main)のコミットを取得する
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test release-age script
+        id: selftest
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/tests/test-check-release-age.sh; then
+            echo "::error::test-check-release-age.sh が失敗しました。自動マージは予約しません。"
+            exit 1
+          fi
+
+      # 予約されていない Dependabot のPRごとに判定し、reserve なら予約する。
+      #   - 中身だけの更新の目印のコメントがあるPRは判定しない(人が確かめるまで
+      #     自動では予約しない)。目印は、このトークンの利用者(bot。判定スクリプトが
+      #     知らせのコメントを付ける利用者)が書いたものに限る。他人が偽の目印を
+      #     置くと、所有者に知らされないまま見直しから外れ続けるため
+      #   - 公開日時を取れなかったPR(notify)と判定できなかったPRは予約されずに
+      #     残るため、翌日の見直しで再び判定される
+      #   - 1件が判定できなくても残りのPRの判定を続け、最後に赤で終える
+      #   - PRごとの呼び出しには timeout を付ける(判定 300 秒、gh 60 秒)。1件が
+      #     止まったまま job の上限に達し、残りのPRが見直されないことを避けるため。
+      #     時間切れ(終了コード 124)は判定できなかったPRとして扱う
+      - name: Recheck unreserved PRs
+        id: recheck
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          marker='<!-- release-age: digest-only -->'
+          failed=0
+
+          if ! me=$(gh api user --jq .login) || [ -z "$me" ]; then
+            echo "::error::トークンの利用者を取れませんでした。"
+            exit 1
+          fi
+
+          if ! list=$(gh pr list --repo "$GITHUB_REPOSITORY" --author app/dependabot --state open \
+              --json number,autoMergeRequest,headRefOid --limit 100) ||
+            ! prs=$(printf '%s' "$list" | jq -s -r '
+                .[0] | if type == "array" then . else error("形式が想定と違う") end
+                | .[] | select(.autoMergeRequest == null) | "\(.number) \(.headRefOid // "")"'); then
+            echo "::error::Dependabot のPRの一覧を取れませんでした。"
+            exit 1
+          fi
+
+          # 一覧は fd 3 から読む(ループの中の gh と判定スクリプトが標準入力を読んでも
+          # 一覧を食わないように)
+          while read -r pr head <&3; do
+            [ -n "$pr" ] || continue
+            echo "::group::PR #${pr}"
+            # 予約は判定したときの head のコミットに限る。head を読めないPRは判定しない
+            if ! [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::PR #${pr} の head のコミットを読めませんでした。予約しません。"
+              failed=1
+              echo "::endgroup::"
+              continue
+            fi
+            # 中身だけの更新の目印(トークンの利用者のコメントに限る)を確かめる。
+            # 読めないときは判定せずに次へ進む
+            if ! comments=$(timeout 60 gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments") ||
+              ! skip=$(printf '%s' "$comments" | jq -s -r --arg m "$marker" --arg me "$me" '
+                  if all(.[]; type == "array") then . else error("形式が想定と違う") end
+                  | [.[][] | select((.user.login // "") == $me) | (.body // "") | contains($m)] | any'); then
+              echo "::error::PR #${pr} のコメントを読めませんでした。予約しません。"
+              failed=1
+              echo "::endgroup::"
+              continue
+            fi
+            if [ "$skip" = "true" ]; then
+              echo "中身だけの更新の目印があるため、判定しません。"
+              echo "::endgroup::"
+              continue
+            fi
+
+            if ! out=$(timeout 300 bash .github/scripts/check-release-age.sh "$pr"); then
+              echo "::error::PR #${pr} を判定できませんでした。予約しません(翌日の見直しで再び判定します)。"
+              failed=1
+              echo "::endgroup::"
+              continue
+            fi
+            decision=$(printf '%s\n' "$out" | sed -n 's/^decision=//p')
+            reason=$(printf '%s\n' "$out" | sed -n 's/^reason=//p')
+            echo "判定: ${decision}(${reason})"
+            case "$decision" in
+            reserve)
+              if ! timeout 60 gh pr merge --auto --squash --match-head-commit "$head" --repo "$GITHUB_REPOSITORY" "$pr"; then
+                echo "::error::PR #${pr} の自動マージを予約できませんでした(判定の後に push された場合を含む)。"
+                failed=1
+              fi
+              ;;
+            wait | notify) ;;
+            *)
+              echo "::error::PR #${pr} の判定の出力の形が想定と違います。予約しません。"
+              failed=1
+              ;;
+            esac
+            echo "::endgroup::"
+          done 3<<<"$prs"
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::判定または予約できなかったPRがあります。上のログを確かめてください。"
+            exit 1
+          fi
