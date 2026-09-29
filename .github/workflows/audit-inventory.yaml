@@ -1,0 +1,113 @@
+name: Audit Inventory
+
+# 棚卸し(#415): 開発環境・本番・検査ツールの版とサポート期限を月1回集め、
+# 1つの表にして棚卸しの台帳のIssue(棚卸し台帳: 版とサポート期限)に
+# コメントする(旧・月次と半期の、版の確認先を人間が見て回る作業の置き換え)。
+#
+#   対象の一覧     .github/audit/inventory-targets.json
+#   収集と報告     .github/scripts/collect-inventory.sh
+#   台帳の操作     .github/scripts/lib-ledger-issue.sh
+#
+# 値の良し悪しは判定しない。版の食い違いや期限切れがあっても赤にせず、
+# 事実の表として届ける。判断は表を読んだ人間が行う。
+#
+# 終了の扱い:
+#   - 成功: 表を台帳のIssueにコメントできたとき。外部の取得元から取れな
+#     かった欄は「取得できず」とし、理由を表の下に書き、実行は成功で終える
+#   - 失敗(赤): 自己テストの失敗と、台帳のIssueに書けなかったとき
+#     (collect-inventory.sh の終了コード 2)
+#
+# なぜ週次監査(audit-weekly.yaml)と別のワークフローにするか:
+#   棚卸しは GitHub 以外の外部サービス(endoflife.date・PyPI・Docker Hub)に
+#   問い合わせる。週次監査は判定の1つでも判定不能になると全体を判定不能にし、
+#   逸脱のIssueに触らなくなる。外部サービスの不調で週次監査を判定不能に
+#   しないため、実行を分ける。週次監査とカナリア照合は、今までどおり
+#   GitHub 以外に問い合わせない。
+#
+# 止まったことの検知:
+#   赤で終わっても、定期実行(schedule)の失敗通知は cron の記述を最後に
+#   書き換えた利用者(bot)にしか届かない。専用の見張りは作らず、週次監査の
+#   鮮度確認(inventory-freshness)が、このワークフローの最後の成功から
+#   35日以上経ったら逸脱として届ける。鮮度確認は実行履歴をワークフローの
+#   ファイル名(audit-inventory.yaml)で引くため、ファイル名の変更は
+#   audit-weekly.yaml の追随が必要。
+#
+# なぜこの設計か:
+#   - 書き込みは台帳のIssueの作成(ラベルが無ければラベルの作成を含む)・
+#     コメント・担当者の割り当てに限る
+#   - GitHub 以外への問い合わせは公開情報の読み取りに限り、認証情報も
+#     リポジトリの内容も送らない(送るのは製品やパッケージの名前だけ)
+#   - AI呼び出し0回
+#
+# 赤の流し直しは、失敗したrunのre-runでも新規のworkflow_dispatchでもよい
+# (前回実行以降の窓を持たないため)。同じ月に2回成功すると、台帳の
+# コメントが2件になる(新しい事実として扱い、重複は除かない)。
+
+on:
+  schedule:
+    # 毎月2日 00:17 UTC(09:17 JST)。毎月1日のカナリア生成(canary.yaml)と
+    # 4日のカナリア照合(canary-verify.yaml)の日を避ける。
+    - cron: '17 0 2 * *'
+  # 手動実行。導入直後の最初の成功の記録づくりと、赤の流し直しに使う
+  workflow_dispatch:
+
+# 書き込みは台帳のIssueのための issues: write だけを加える
+# (contents・pull-requests への書き込みは持たない)。secrets は使わない。
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # 同時に走ると台帳のIssueを探す・作る処理が交錯し、台帳が2件できることが
+  # ある。走行中は後発を待たせる。cancel-in-progress を true にすると
+  # cancelled の実行が履歴に残り、赤でも緑でもない結論ができる
+  # (audit-weekly.yaml と同じ判断)。
+  group: audit-inventory
+  cancel-in-progress: false
+
+jobs:
+  audit-inventory:
+    name: audit-inventory
+    runs-on: ubuntu-latest
+    # gh api には時間の上限が無い(curl は1回20秒で打ち切る)。応答が返らない
+    # ときに既定の360分を握らせないため、上限を明示する
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 本処理の前にスクリプトのテストを行う。壊れたスクリプトで台帳に
+      # コメントしない。2本は途中で失敗しても両方実行し、1本でも失敗したら
+      # 赤で終える(container-scan-scheduled.yaml のテスト集約と同じ方式)。
+      # テストは gh と curl を偽物に置き換えるため、ネットワークを使わない。
+      #
+      # 今のリポジトリの宣言を読む検査(INVENTORY_CHECK_REPO=1)はここでは
+      # 有効にしない。宣言の書き方が後で変わっても、表は「読み取れず」の欄つきで
+      # 届けるため。この検査は出荷前の確認で使う。
+      - name: Test inventory scripts
+        run: |
+          set -uo pipefail
+          failed=0
+          for t in test-lib-ledger-issue test-collect-inventory; do
+            echo "::group::${t}.sh"
+            if ! bash ".github/scripts/tests/${t}.sh"; then
+              echo "::error::${t}.sh が失敗しました。"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::棚卸しのスクリプトのテストに失敗しました。台帳のIssueは操作しません。"
+            exit 1
+          fi
+
+      # 収集と報告。GITHUB_REPOSITORY / GITHUB_REPOSITORY_OWNER /
+      # GITHUB_SERVER_URL / GITHUB_RUN_ID はランナーの既定の環境変数を使い、
+      # GH_TOKEN だけを渡す(github.token のみ。secrets は使わない)。
+      # スクリプトには実行ビットが無い(core.fileMode=false で 100644 として
+      # 記録される)。直接起動すると exit 126 になるため bash 経由で起動する。
+      - name: Collect inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/collect-inventory.sh .github/audit/inventory-targets.json

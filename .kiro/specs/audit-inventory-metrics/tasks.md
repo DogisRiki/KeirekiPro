@@ -63,7 +63,7 @@
   - 完了の観測条件: test-collect-inventory.sh がコンテナ内で全PASSし、shellcheck に警告が無い
   - _Requirements: 1.6, 2.2, 2.3, 2.4, 2.7, 2.8, 6.3, 6.5_
   - _Depends: 1.1_
-- [ ] 2.4 棚卸しのワークフローを作る
+- [x] 2.4 棚卸しのワークフローを作る
   - 毎月2日と手動で起動する。権限は `contents: read` と `issues: write` だけにし、AI のアクションを使わない
   - 本処理の前に test-lib-ledger-issue.sh と test-collect-inventory.sh を流し、失敗したら赤で終える。今のリポジトリの宣言を読む検査は有効にしない
   - 完了の観測条件: actionlint が通り、ワークフローの内容が設計の契約(起動条件・権限・concurrency・タイムアウト・自己テスト)と一致する
@@ -160,3 +160,4 @@
 - 2.2: inv_build_table は内部で JSON を扱えなかったときだけ 1 を返す。2.3 の main はこれを終了コード 2 に対応させる
 - 2.2: gh api には時間の上限が無い(curl は20秒)。2.4 でワークフローの timeout-minutes を必ず付ける
 - 2.2: endoflife.date は LTS の考え方が無い製品(Terraform・PostgreSQL・Redis・Valkey・Docker)にも isLts: false を返すため、「(LTS ではない)」が付く。設計の規則どおりだが、表の例とは食い違う。所有者の判断事項
+- 2.4: audit-inventory.yaml のヘッダは、週次監査の鮮度確認(35日)を前提に書いている。タスク5を必ず同じPRに入れる
