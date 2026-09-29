@@ -7,6 +7,36 @@
 # 値の良し悪しは判定しない。版の食い違いや期限切れにも記号を付けず、
 # 事実の列として並べる(要件1-7)。
 #
+# 使い方: collect-inventory.sh <targets.json のパス>
+#   環境変数 GH_TOKEN GITHUB_REPOSITORY GITHUB_REPOSITORY_OWNER GITHUB_SERVER_URL
+#   GITHUB_RUN_ID(必須)、ENDOFLIFE_BASE PYPI_BASE DOCKERHUB_BASE(任意。テスト用)
+#   宣言のファイルは、このスクリプトの置き場所の2つ上(リポジトリのルート)から読む。
+#   表を組み立て、棚卸しの台帳のIssue(タイトル「棚卸し台帳: 版とサポート期限」、
+#   ラベル audit)にコメントする。台帳が無ければ作る。台帳の操作は
+#   lib-ledger-issue.sh の関数だけで行う(書き込みは台帳の作成・コメント・
+#   担当者の割り当てに限る。要件6-3)。
+#
+# 終了コード:
+#   0 = 台帳にコメントを書けた(取得できなかった欄があっても 0。要件2-8)
+#   2 = 書けなかった(引数・環境変数の不足、設定ファイルの形の違反、表を
+#       組み立てられない、台帳のIssueを探せない・作れない・コメントできない。要件2-7)
+#   1 は使わない(値の良し悪しを判定しないため。要件1-7)
+#
+# コメントの形:
+#   1行目は1行の説明にする。lib-ledger-issue.sh の ledger_comment は本文の
+#   1行目の頭に「@<所有者> 」を付けるため、1行目が表の見出しだと列の数が
+#   合わず、表として表示されない。
+#     <1行の説明>
+#     (空行)
+#     <表>
+#     (空行)
+#     取得できなかった欄の理由:(あれば)
+#     - ...
+#     (空行)
+#     振り返りのIssue: ...
+#     (空行)
+#     実行の記録: <実行へのリンク>
+#
 # 表の形(要件2-1):
 #   | 対象 | 使っている版(書いてある場所) | 最新のリリース | 使っている系列のサポート期限 | 期限切れ | 最新の系列 |
 #   「使っている版」の欄は、宣言から読んだ版を、最初に現れた順に <br> で並べる。
@@ -58,7 +88,8 @@
 #   200 以外・タイムアウト・JSON として読めない・期待のキーが無いときは、その欄を
 #   「取得できず」にし、理由を表の下に書いて、他の欄と対象の取得を続ける(要件2-5)。
 #
-# 関数と戻り値(source して使う。シェルの設定と trap を変えない):
+# 関数と戻り値(source して使う。シェルの設定と trap を変えない。
+# 直接実行したときだけ inv_main を動かす):
 #   inv_validate_targets <targets.json>
 #     設定ファイルの形を確かめる。0 = 正しい / 1 = 読めない・形が違う
 #   inv_read_target <repo_root> <target_json>
@@ -79,6 +110,10 @@
 #     全ての対象の表を出し、取得できなかった欄があれば、空行に続けて
 #     「取得できなかった欄の理由:」と1件1行の箇条書きを出す。
 #     0 = 出した / 1 = 設定ファイルや記録を扱えなかった
+#   inv_retrospective_line
+#     振り返りのIssueの件数を1行で出す。取得の失敗も1行に書く。常に 0
+#   inv_main <targets.json>
+#     表を台帳のIssueにコメントする。戻り値は上の終了コードと同じ(0 / 2)
 #
 # テスト: .github/scripts/tests/test-collect-inventory.sh
 # =====================================================================
@@ -487,3 +522,146 @@ inv_build_table() {
     jq -r 'if length > 0 then "", "取得できなかった欄の理由:", (.[] | "- " + gsub("[|\r\n]"; "")) else empty end' \
         <<<"$reasons" || return 1
 }
+
+# ---------------------------------------------------------------------
+# 振り返りのIssueの件数と、台帳へのコメント
+# ---------------------------------------------------------------------
+
+_INV_LEDGER_TITLE='棚卸し台帳: 版とサポート期限'
+_INV_LEDGER_LABEL='audit'
+_INV_LEDGER_INITIAL_BODY='月1回、audit-inventory.yaml がコメントで表を届ける。人が編集しない。'
+_INV_COMMENT_LEAD='棚卸しの結果です。値の良し悪しは判定していません。'
+_INV_WORK=""
+
+# inv_retrospective_line
+# 振り返り(retrospective ラベル)のIssueの件数を1行で出す(要件1-6)。
+#   ラベルがある  振り返りのIssue: 全N件(未完了M件)  PR は数えない
+#   ラベルが無い  振り返りのIssue: 0件(retrospective ラベルが存在しない)
+#   取得の失敗    振り返りのIssue: 取得できず(理由)
+# ラベルの有無は labels/retrospective の応答が 404 かで見分ける。Issue の一覧は
+# ラベルが無くても空で返るため、一覧だけでは「ラベルが無い」と「0件」を区別できない。
+# gh api は 400 以上の応答で、標準エラーに「gh: <メッセージ> (HTTP <状態コード>)」を出す
+#   https://github.com/cli/cli/blob/trunk/pkg/cmd/api/api.go
+# 取得の失敗は表の欄と同じく事実として書き、実行を失敗にしない。常に 0
+inv_retrospective_line() {
+    local repo="${GITHUB_REPOSITORY:-}" prefix='振り返りのIssue: ' out rc=0 err errfile counts
+    errfile=$(mktemp) || {
+        printf '%s取得できず(一時ファイルを作れない)\n' "$prefix"
+        return 0
+    }
+    gh api "repos/${repo}/labels/retrospective" >/dev/null 2>"$errfile" || rc=$?
+    err=$(grep -oE 'HTTP [0-9]+' "$errfile" | tail -n 1 || true)
+    if [ "$rc" -ne 0 ]; then
+        rm -f "$errfile"
+        if [ "$err" = "HTTP 404" ]; then
+            printf '%s0件(retrospective ラベルが存在しない)\n' "$prefix"
+        else
+            printf '%s取得できず(%s)\n' "$prefix" "${err:-gh api の失敗(終了コード ${rc})}"
+        fi
+        return 0
+    fi
+    # Issues API は PR も返すため pull_request を持つ要素を除く。--paginate(--slurp なし)は
+    # ページごとの配列を続けて出すので、jq -s で束ねる
+    out=$(gh api --paginate "repos/${repo}/issues?labels=retrospective&state=all&per_page=100" 2>"$errfile") || rc=$?
+    err=$(grep -oE 'HTTP [0-9]+' "$errfile" | tail -n 1 || true)
+    rm -f "$errfile"
+    if [ "$rc" -ne 0 ]; then
+        printf '%s取得できず(%s)\n' "$prefix" "${err:-gh api の失敗(終了コード ${rc})}"
+        return 0
+    fi
+    if ! counts=$(jq -s -r -e '
+        if length > 0 and all(.[]; type == "array") then
+            [.[][] | select(type == "object" and .pull_request == null)]
+            | "全\(length)件(未完了\(map(select(.state == "open")) | length)件)"
+        else error("配列でない") end' <<<"$out" 2>/dev/null); then
+        printf '%s取得できず(形式が想定と違う(Issue の一覧が配列でない))\n' "$prefix"
+        return 0
+    fi
+    printf '%s%s\n' "$prefix" "$counts"
+}
+
+# inv_main <targets.json>
+# 表を組み立て、棚卸しの台帳のIssueにコメントする。戻り値は 0 / 2(ファイルの頭の
+# 終了コードを参照)。台帳に触る前に、引数・環境変数・設定ファイル・表を確かめる
+# (足りないまま gh を呼ばない)。
+inv_main() {
+    local targets self_dir root v table retro number
+    if [ "$#" -ne 1 ]; then
+        echo "::error::引数は1個必要です: <targets.json のパス>" >&2
+        return 2
+    fi
+    targets="$1"
+    for v in GH_TOKEN GITHUB_REPOSITORY GITHUB_REPOSITORY_OWNER GITHUB_SERVER_URL GITHUB_RUN_ID; do
+        if [ -z "${!v:-}" ]; then
+            echo "::error::環境変数 ${v} が必要です" >&2
+            return 2
+        fi
+    done
+    if ! self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) \
+        || ! root=$(cd "${self_dir}/../.." && pwd); then
+        echo "::error::スクリプトの置き場所からリポジトリのルートを決められません" >&2
+        return 2
+    fi
+    # shellcheck source=.github/scripts/lib-ledger-issue.sh
+    if ! source "${self_dir}/lib-ledger-issue.sh"; then
+        echo "::error::lib-ledger-issue.sh を読み込めません" >&2
+        return 2
+    fi
+    inv_validate_targets "$targets" || return 2
+
+    if ! table=$(inv_build_table "$root" "$targets"); then
+        echo "::error::表を組み立てられませんでした(設定ファイルか記録を扱えない)" >&2
+        return 2
+    fi
+    retro=$(inv_retrospective_line)
+
+    if ! _INV_WORK=$(mktemp -d) || [ -z "$_INV_WORK" ]; then
+        echo "::error::一時ディレクトリを作れませんでした" >&2
+        return 2
+    fi
+    # 1行目は説明にする(ledger_comment が1行目の頭にメンションを付けるため)。
+    # 箇条書きの直後に続けて書くと箇条書きの一部になるため、段ごとに空行を挟む
+    if ! {
+        printf '%s\n\n' "$_INV_COMMENT_LEAD"
+        printf '%s\n\n' "$table"
+        printf '%s\n\n' "$retro"
+        printf '実行の記録: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+    } >"${_INV_WORK}/comment.md" \
+        || ! printf '%s\n' "$_INV_LEDGER_INITIAL_BODY" >"${_INV_WORK}/initial.md"; then
+        echo "::error::コメントの本文を組み立てられませんでした" >&2
+        return 2
+    fi
+    echo "--- コメントの本文 ---"
+    cat "${_INV_WORK}/comment.md"
+    echo "---"
+
+    if ! number=$(ledger_find_or_create "$_INV_LEDGER_TITLE" "${_INV_WORK}/initial.md" "$_INV_LEDGER_LABEL"); then
+        echo "::error::棚卸しの台帳のIssueを探せない、または作れませんでした" >&2
+        return 2
+    fi
+    if ! ledger_comment "$number" "${_INV_WORK}/comment.md"; then
+        echo "::error::棚卸しの台帳のIssue #${number} に表を書けませんでした" >&2
+        return 2
+    fi
+    return 0
+}
+
+# 終了時の後始末。一時ディレクトリを消し、0 以外の終わり方を 2 にそろえる
+# (set -u の未定義の変数など、想定外の終わり方でも 1 を使わないため)
+_inv_on_exit() {
+    local rc=$?
+    rm -rf "${_INV_WORK:-}"
+    if [ "$rc" -ne 0 ]; then
+        exit 2
+    fi
+}
+
+# 直接実行したときだけ動かす(テストは source して関数だけを使う)。
+# set -e は使わない。取得の失敗は欄に閉じ込め、台帳に書けない失敗だけを
+# inv_main が 2 で返すため。
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    set -uo pipefail
+    trap _inv_on_exit EXIT
+    inv_main "$@"
+    exit $?
+fi

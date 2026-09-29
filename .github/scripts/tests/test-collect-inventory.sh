@@ -14,6 +14,9 @@
 #     最新版とサポート期限の取得。curl と gh は PATH の先頭の偽物に置き換える
 #     (応答の値の変換、複数の系列、タグの選び方、取得の失敗の「取得できず」と
 #     表の下の理由、curl の呼び出しに認証ヘッダが無いこと)
+#   - 実行の全体。スクリプトを仮のリポジトリに写して実行し、振り返りのIssueの
+#     件数、台帳のIssueの探し方と作成、コメントの本文の形(先頭行のメンション)、
+#     終了コード(書けたら 0、書けない・設定や環境変数の不足は 2)を確かめる
 # 外部への問い合わせを行わないため、実行にネットワークを必要としない。
 #
 # 今のリポジトリの宣言を読む検査:
@@ -771,6 +774,321 @@ else
 fi
 check_eq "0" "$(printf '%s\n' "$curl_calls" | awk '!/ -sS / || !/ --max-time 20 /' | grep -c .)" "curl は全て -sS --max-time 20 で呼ぶ"
 check_eq "0" "$(printf '%s\n' "$curl_calls" | grep -cvE ' https://(eol|pypi|hub)\.invalid/')" "curl の接続先は差し替えた取得元だけ"
+
+# ---------------------------------------------------------------------------
+echo "--- 実行の全体(台帳へのコメントと終了コード) ---"
+
+# スクリプトとライブラリを仮のリポジトリの .github/scripts に写し、別のディレクトリ
+# から実行する(スクリプトは自分の置き場所の2つ上をリポジトリのルートとして読む)。
+LIB="$(dirname "$SCRIPT")/lib-ledger-issue.sh"
+if [ ! -f "$LIB" ]; then
+    echo "FAIL: ${LIB} がありません"
+    exit 1
+fi
+mkdir -p "$ROOT/.github/scripts" "$WORK/mainbin" "$WORK/posted"
+cp "$SCRIPT" "$LIB" "$ROOT/.github/scripts/" || exit 1
+MAIN_SCRIPT="$ROOT/.github/scripts/collect-inventory.sh"
+LEDGER_TITLE="棚卸し台帳: 版とサポート期限"
+RUN_URL="https://github.example/owner/repo/actions/runs/12345"
+jq '{targets: [.targets[] | select(.name == "Node.js" or .name == "tflint")]}' "$WORK/targets.json" >"$WORK/main-targets.json"
+
+# 実行の全体で使う偽の gh。上の偽の gh と同じ応答のファイルを使い、次を足す。
+#   api のパスは、オプションとその値を飛ばした最初の引数。名前は / ? & = を _ にしたもの
+#     例 gh api --paginate "repos/o/r/issues?state=all&per_page=100"
+#        → gh_repos_o_r_issues_state_all_per_page_100
+#   issue create / issue comment / label create は成功し、--body-file の本文を
+#   $STUB_POSTED の下に create.txt / comment.txt として写す。issue create は
+#   作ったIssueのURL(番号 100)を出す。$STUB_FAIL_ON に create / comment / label を
+#   入れると、その操作だけ失敗させる。
+cat >"$WORK/mainbin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf 'gh %s\n' "$*" >>"${STUB_CALLS:?}"
+kind=""
+case "${1:-} ${2:-}" in
+"issue create") kind=create ;;
+"issue comment") kind=comment ;;
+"label create") kind=label ;;
+esac
+if [ -n "$kind" ]; then
+    body_file=""
+    prev=""
+    for a in "$@"; do
+        [ "$prev" = "--body-file" ] && body_file="$a"
+        prev="$a"
+    done
+    if [ -n "$body_file" ]; then
+        cp "$body_file" "${STUB_POSTED:?}/${kind}.txt" || exit 1
+    fi
+    if [ "${STUB_FAIL_ON:-}" = "$kind" ]; then
+        echo "gh: 失敗をシミュレート" >&2
+        exit 1
+    fi
+    if [ "$kind" = "create" ]; then
+        echo "https://github.com/owner/repo/issues/100"
+    fi
+    exit 0
+fi
+if [ "${1:-}" != "api" ]; then
+    echo "stub: 想定していない呼び出し: $*" >&2
+    exit 1
+fi
+shift
+path=""
+skip=""
+for a in "$@"; do
+    if [ -n "$skip" ]; then
+        skip=""
+        continue
+    fi
+    case "$a" in
+    -X | -f | -F | -H | --jq) skip=1 ;;
+    -*) ;;
+    *) [ -n "$path" ] || path="$a" ;;
+    esac
+done
+key="gh_$(printf '%s' "$path" | tr '/?&=' '____')"
+code=404
+body='{"message":"Not Found","status":"404"}'
+if [ -f "${STUB_RESP:?}/${key}.code" ]; then
+    code=$(cat "${STUB_RESP}/${key}.code")
+    body=$(cat "${STUB_RESP}/${key}.body")
+fi
+printf '%s\n' "$body"
+if [ "$code" != "200" ]; then
+    echo "gh: Not Found (HTTP ${code})" >&2
+    exit 1
+fi
+STUB
+chmod +x "$WORK/mainbin/gh"
+
+# 応答の名前
+R_LEDGER_LIST="gh_repos_owner_repo_issues_state_all_per_page_100"
+R_RETRO_LABEL="gh_repos_owner_repo_labels_retrospective"
+R_RETRO_LIST="gh_repos_owner_repo_issues_labels_retrospective_state_all_per_page_100"
+
+# 呼び出しの記録と写した本文を空にし、台帳のIssue(#7)がある状態にする。
+# 外部の取得元と振り返りのIssueの応答は置かない(置かなければ 404)
+reset_main() {
+    reset_stub
+    rm -f "$WORK/posted/"*
+    unset STUB_FAIL_ON
+    MAIN_UNSET=""
+    resp "$R_LEDGER_LIST" 200 "[{\"number\": 3, \"title\": \"別のIssue\"}, {\"number\": 7, \"title\": \"${LEDGER_TITLE}\"}]"
+    resp gh_repos_owner_repo_issues_7_assignees 200 '{"number":7,"assignees":[{"login":"owner"}]}'
+    resp gh_repos_owner_repo_issues_100_assignees 200 '{"number":100,"assignees":[{"login":"owner"}]}'
+}
+# 外部の取得元が全て答える状態にする
+ok_externals() {
+    resp products_nodejs_releases_24 200 "$(eol 24 false '"2028-04-30"' true 24.21.0)"
+    resp products_nodejs_releases_22 200 "$(eol 22 false '"2027-04-30"' true 22.22.0)"
+    resp products_nodejs_releases_latest 200 "$(eol 26 false '"2029-04-30"' false 26.10.0)"
+    resp gh_repos_terraform-linters_tflint_releases_latest 200 '{"tag_name":"v0.64.0"}'
+}
+
+# 使い方: run_main <引数...>
+# 写したスクリプトを、必須の環境変数をそろえて実行する。MAIN_UNSET に名前を
+# 入れると、その環境変数だけを渡さない(CI の実行環境の値も消してから渡す)。
+MAIN_EXIT=0
+MAIN_UNSET=""
+run_main() {
+    local v
+    local -a envs=()
+    for v in "GH_TOKEN=${GH_TOKEN}" "GITHUB_REPOSITORY=owner/repo" "GITHUB_REPOSITORY_OWNER=owner" \
+        "GITHUB_SERVER_URL=https://github.example" "GITHUB_RUN_ID=12345"; do
+        [ "${v%%=*}" = "$MAIN_UNSET" ] || envs+=("$v")
+    done
+    (cd "$WORK" && env -u GH_TOKEN -u GITHUB_REPOSITORY -u GITHUB_REPOSITORY_OWNER \
+        -u GITHUB_SERVER_URL -u GITHUB_RUN_ID "${envs[@]}" \
+        PATH="$WORK/mainbin:$PATH" STUB_POSTED="$WORK/posted" \
+        bash "$MAIN_SCRIPT" "$@") >"$WORK/main.out" 2>"$WORK/main.err"
+    MAIN_EXIT=$?
+}
+# 使い方: gh_calls <正規表現>  その正規表現に一致する gh の呼び出しの回数
+gh_calls() {
+    grep -cE -- "$1" "$WORK/calls.log"
+}
+# 使い方: line_of <探す文字列> <ファイル>  最初に一致した行の番号(無ければ 0)
+line_of() {
+    local n
+    n=$(grep -nF -- "$1" "$2" | head -n 1 | cut -d: -f1)
+    printf '%s' "${n:-0}"
+}
+# 使い方: line_before <行の番号> <ファイル>  その前の行(前の行が無ければ「(前の行が無い)」)
+line_before() {
+    if [ "$1" -le 1 ]; then
+        printf '(前の行が無い)'
+        return
+    fi
+    sed -n "$(($1 - 1))p" "$2"
+}
+# 台帳の操作と読み取り以外の gh の呼び出しの回数(要件6-3)
+other_gh_calls() {
+    grep '^gh ' "$WORK/calls.log" |
+        grep -cvE '^gh (api (repos/[^ ]+/releases/latest|repos/owner/repo/labels/retrospective|--paginate repos/owner/repo/issues\?[^ ]+|-X POST repos/owner/repo/issues/[0-9]+/assignees -f assignees\[\]=owner)|issue create --repo owner/repo |issue comment [0-9]+ --repo owner/repo |label create audit --repo owner/repo)'
+}
+
+# --- 台帳があり、振り返りのラベルがあり、PR が混ざる ---
+reset_main
+ok_externals
+resp "$R_RETRO_LABEL" 200 '{"name":"retrospective"}'
+resp "$R_RETRO_LIST" 200 '[{"number":1,"state":"open"},{"number":2,"state":"closed"},{"number":3,"state":"open","pull_request":{}}]
+[{"number":4,"state":"closed"},{"number":5,"state":"open","pull_request":{}},{"number":6,"state":"open"}]'
+run_main "$WORK/main-targets.json"
+check_rc 0 "$MAIN_EXIT" "台帳にコメントを書けたら終了コード 0(要件2-8)"
+check_eq "1" "$(gh_calls '^gh issue comment 7 ')" "既存の台帳のIssue(#7)に1回コメントする(要件2-2)"
+check_eq "0" "$(gh_calls '^gh (issue create|label create)')" "台帳があるときは作らない"
+check_eq "1" "$(gh_calls '^gh api -X POST repos/owner/repo/issues/7/assignees ')" "所有者を台帳の担当者に割り当てる(要件2-3)"
+COMMENT="$WORK/posted/comment.txt"
+first=$(sed -n 1p "$COMMENT" 2>/dev/null)
+case "$first" in
+"@owner "*) pass "コメントの先頭行で所有者にメンションする(要件2-3)" ;;
+*) fail "コメントの先頭行で所有者にメンションする(要件2-3) 実際: ${first}" ;;
+esac
+case "$first" in
+"@owner |"* | "@owner " | "") fail "コメントの先頭行は表ではなく1行の説明にする(実際: ${first})" ;;
+*) pass "コメントの先頭行は表ではなく1行の説明にする" ;;
+esac
+check_eq "" "$(sed -n 2p "$COMMENT" 2>/dev/null)" "説明の次は空行"
+check_eq "$(inv_table_header)" "$(sed -n 3,4p "$COMMENT" 2>/dev/null)" "空行の次から表を置く(要件2-1)"
+check_eq "| Node.js | ${NODE_ROW_USED} | 26.10.0 | 24: 2028-04-30<br>22: 2027-04-30 | 24: いいえ<br>22: いいえ | 26(LTS ではない) |" \
+    "$(sed -n 5p "$COMMENT" 2>/dev/null)" "表の行は設定ファイルの対象の順"
+check_eq "4" "$(grep -c '^|' "$COMMENT" 2>/dev/null)" "表は見出しの2行と対象ごとの1行"
+check_eq "0" "$(grep -c '^取得できなかった欄の理由:' "$COMMENT" 2>/dev/null)" "全て取得できたときは理由の見出しを出さない"
+check_has "振り返りのIssue: 全4件(未完了2件)" "$(cat "$COMMENT" 2>/dev/null)" \
+    "振り返りのIssueの件数は PR を除き、ページをまたいで全件と未完了を数える(要件1-6)"
+check_has "$RUN_URL" "$(cat "$COMMENT" 2>/dev/null)" "コメントに実行へのリンクを載せる"
+table_end=$(grep -n '^|' "$COMMENT" 2>/dev/null | tail -n 1 | cut -d: -f1)
+retro_at=$(line_of "振り返りのIssue:" "$COMMENT")
+link_at=$(line_of "$RUN_URL" "$COMMENT")
+if [ "${table_end:-0}" -gt 0 ] && [ "$retro_at" -gt "$((table_end + 1))" ] && [ "$link_at" -gt "$retro_at" ]; then
+    pass "表の下に空行を置いてから振り返りの件数、その後に実行へのリンクを置く"
+else
+    fail "表の下に空行を置いてから振り返りの件数、その後に実行へのリンクを置く(表の終わり ${table_end:-なし} / 振り返り ${retro_at} / リンク ${link_at})"
+fi
+check_eq "" "$(line_before "$retro_at" "$COMMENT")" "表と振り返りの件数の間に空行を置く"
+check_eq "" "$(line_before "$link_at" "$COMMENT")" "振り返りの件数と実行へのリンクの間に空行を置く(1つの段落にしない)"
+check_eq "0" "$(other_gh_calls)" "gh の呼び出しは読み取りと台帳の操作だけ(要件6-3)"
+check_eq "0" "$(grep '^curl ' "$WORK/calls.log" | grep -c 'stub-token')" "実行の全体でも curl に認証情報を渡さない(要件6-1)"
+
+# --- 振り返りのラベルが無い ---
+reset_main
+ok_externals
+run_main "$WORK/main-targets.json"
+check_rc 0 "$MAIN_EXIT" "振り返りのラベルが無くても終了コード 0"
+check_has "振り返りのIssue: 0件(retrospective ラベルが存在しない)" "$(cat "$WORK/posted/comment.txt" 2>/dev/null)" \
+    "振り返りのラベルが無いときは0件とし、ラベルが無いことを書く(要件1-6)"
+check_eq "0" "$(gh_calls 'labels=retrospective')" "ラベルが無いときは Issue の一覧を問い合わせない"
+
+# --- 振り返りの件数を取れない(ラベルの確認と一覧の失敗) ---
+reset_main
+ok_externals
+resp "$R_RETRO_LABEL" 500 '{"message":"Server Error"}'
+run_main "$WORK/main-targets.json"
+check_rc 0 "$MAIN_EXIT" "振り返りのラベルを確かめられなくても終了コード 0"
+check_has "振り返りのIssue: 取得できず(HTTP 500)" "$(cat "$WORK/posted/comment.txt" 2>/dev/null)" \
+    "振り返りのラベルを確かめられないときは「取得できず」と理由を書く(0件にしない)"
+reset_main
+ok_externals
+resp "$R_RETRO_LABEL" 200 '{"name":"retrospective"}'
+resp "$R_RETRO_LIST" 502 '{"message":"Bad Gateway"}'
+run_main "$WORK/main-targets.json"
+check_rc 0 "$MAIN_EXIT" "振り返りのIssueの一覧を取れなくても終了コード 0"
+check_has "振り返りのIssue: 取得できず(HTTP 502)" "$(cat "$WORK/posted/comment.txt" 2>/dev/null)" \
+    "振り返りのIssueの一覧を取れないときは「取得できず」と理由を書く"
+reset_main
+ok_externals
+resp "$R_RETRO_LABEL" 200 '{"name":"retrospective"}'
+resp "$R_RETRO_LIST" 200 '{"message":"not a list"}'
+run_main "$WORK/main-targets.json"
+check_has "振り返りのIssue: 取得できず(形式が想定と違う" "$(cat "$WORK/posted/comment.txt" 2>/dev/null)" \
+    "振り返りのIssueの一覧が配列でないときは「取得できず」と理由を書く"
+
+# --- 台帳のIssueが無い ---
+reset_main
+ok_externals
+resp "$R_LEDGER_LIST" 200 "[{\"number\": 3, \"title\": \"別のIssue\"}, {\"number\": 4, \"title\": \"${LEDGER_TITLE}(旧)\"}, {\"number\": 5, \"title\": \"${LEDGER_TITLE}\", \"pull_request\": {}}]"
+run_main "$WORK/main-targets.json"
+check_rc 0 "$MAIN_EXIT" "台帳を作ってコメントできたら終了コード 0"
+check_eq "1" "$(gh_calls "^gh issue create --repo owner/repo --title ${LEDGER_TITLE} --label audit --body-file ")" \
+    "台帳が無いときは決まったタイトルとラベル audit で作る(要件2-4)"
+check_eq "1" "$(gh_calls '^gh label create audit ')" "台帳を作るときはラベル audit を用意する"
+check_has "audit-inventory.yaml がコメントで表を届ける" "$(cat "$WORK/posted/create.txt" 2>/dev/null)" \
+    "台帳の本文に、コメントで表が届くことと人が編集しないことを書く"
+check_has "人が編集しない" "$(cat "$WORK/posted/create.txt" 2>/dev/null)" "台帳の本文に、人が編集しないことを書く"
+check_eq "1" "$(gh_calls '^gh issue comment 100 ')" "作った台帳のIssue(#100)にコメントする"
+check_eq "0" "$(gh_calls '^gh issue comment (3|4|5) ')" "タイトルが違うIssueと PR にはコメントしない(要件6-4)"
+check_eq "0" "$(other_gh_calls)" "台帳を作るときも、gh の呼び出しは読み取りと台帳の操作だけ(要件6-3)"
+
+# --- 外部の取得元が全て失敗する ---
+reset_main
+run_main "$WORK/main-targets.json"
+check_rc 0 "$MAIN_EXIT" "外部の取得元が全て失敗しても、台帳に書けたら終了コード 0(要件2-8)"
+COMMENT="$WORK/posted/comment.txt"
+check_eq "1" "$(gh_calls '^gh issue comment 7 ')" "外部の取得元が全て失敗してもコメントする"
+check_has "| Node.js | ${NODE_ROW_USED} | 取得できず | 24: 取得できず<br>22: 取得できず | 24: 取得できず<br>22: 取得できず | 取得できず |" \
+    "$(cat "$COMMENT" 2>/dev/null)" "取得できなかった欄は「取得できず」で届ける(要件2-5)"
+reasons_at=$(line_of "取得できなかった欄の理由:" "$COMMENT")
+retro_at=$(line_of "振り返りのIssue:" "$COMMENT")
+link_at=$(line_of "$RUN_URL" "$COMMENT")
+if [ "$reasons_at" -gt 4 ] && [ "$retro_at" -gt "$reasons_at" ] && [ "$link_at" -gt "$retro_at" ]; then
+    pass "表の下に、取得できなかった欄の理由、振り返りの件数、実行へのリンクの順に置く"
+else
+    fail "表の下に、取得できなかった欄の理由、振り返りの件数、実行へのリンクの順に置く(理由 ${reasons_at} / 振り返り ${retro_at} / リンク ${link_at})"
+fi
+check_eq "" "$(line_before "$retro_at" "$COMMENT")" "理由の箇条書きと振り返りの件数の間に空行を置く(箇条書きに続けない)"
+check_has "- tflint の最新のリリース: HTTP 404" "$(cat "$COMMENT" 2>/dev/null)" "取得できなかった理由をコメントに載せる"
+
+# --- 台帳に書けない ---
+reset_main
+ok_externals
+export STUB_FAIL_ON=comment
+run_main "$WORK/main-targets.json"
+check_rc 2 "$MAIN_EXIT" "コメントに失敗したら終了コード 2(要件2-7)"
+reset_main
+ok_externals
+resp "$R_LEDGER_LIST" 200 '[]'
+export STUB_FAIL_ON=create
+run_main "$WORK/main-targets.json"
+check_rc 2 "$MAIN_EXIT" "台帳の作成に失敗したら終了コード 2(要件2-7)"
+check_eq "0" "$(gh_calls '^gh issue comment ')" "台帳を作れなかったときはコメントしない"
+reset_main
+ok_externals
+resp "$R_LEDGER_LIST" 500 '{"message":"Server Error"}'
+run_main "$WORK/main-targets.json"
+check_rc 2 "$MAIN_EXIT" "台帳を探せなかったら終了コード 2(要件2-7)"
+check_eq "0" "$(gh_calls '^gh (issue create|issue comment|label create) ')" "台帳を探せなかったときは作らず、コメントもしない"
+reset_main
+ok_externals
+export STUB_FAIL_ON=label
+resp "$R_LEDGER_LIST" 200 '[]'
+run_main "$WORK/main-targets.json"
+check_rc 0 "$MAIN_EXIT" "ラベルの作成の失敗(既にある場合を含む)だけでは止めない"
+
+# --- 環境変数の不足 ---
+for v in GH_TOKEN GITHUB_REPOSITORY GITHUB_REPOSITORY_OWNER GITHUB_SERVER_URL GITHUB_RUN_ID; do
+    reset_main
+    ok_externals
+    MAIN_UNSET="$v"
+    run_main "$WORK/main-targets.json"
+    check_rc 2 "$MAIN_EXIT" "環境変数 ${v} が無いと終了コード 2"
+    check_eq "0" "$(grep -cE '^(gh|curl) ' "$WORK/calls.log")" "環境変数 ${v} が無いときは gh も curl も呼ばない"
+done
+
+# --- 引数と設定ファイルの誤り ---
+reset_main
+run_main
+check_rc 2 "$MAIN_EXIT" "引数が無いと終了コード 2"
+reset_main
+run_main "$WORK/main-targets.json" extra
+check_rc 2 "$MAIN_EXIT" "引数が2つ以上だと終了コード 2"
+reset_main
+run_main "$WORK/none.json"
+check_rc 2 "$MAIN_EXIT" "設定ファイルが無いと終了コード 2"
+reset_main
+jq '.targets[0].latest = {"type": "npm", "package": "x"}' "$WORK/main-targets.json" >"$WORK/main-bad.json"
+run_main "$WORK/main-bad.json"
+check_rc 2 "$MAIN_EXIT" "設定ファイルの形が違うと終了コード 2"
+check_eq "0" "$(grep -cE '^(gh|curl) ' "$WORK/calls.log")" "設定ファイルの形が違うときは gh も curl も呼ばない"
 
 # ---------------------------------------------------------------------------
 if [ "${INVENTORY_CHECK_REPO:-}" = "1" ]; then
