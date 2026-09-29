@@ -102,15 +102,19 @@
       "support": { "type": "endoflife", "product": "amazon-rds-postgresql", "cycle_pattern": "^(?<cycle>[0-9]+)" }
     },
     {
-      "name": "Redis(開発)",
+      "name": "Valkey(開発)",
       "declarations": [
         {
           "files": ["docker/redis/Dockerfile"],
-          "pattern": "(?m)^FROM redis:(?<version>[0-9]+(?:\\.[0-9]+)*)"
+          "pattern": "(?m)^FROM valkey/valkey:(?<version>[0-9]+(?:\\.[0-9]+)*)"
+        },
+        {
+          "files": ["backend/src/test/java/com/example/keirekipro/config/RedisTestContainerConfig.java"],
+          "pattern": "\"valkey/valkey:(?<version>[0-9]+(?:\\.[0-9]+)*)"
         }
       ],
-      "latest": { "type": "endoflife", "product": "redis" },
-      "support": { "type": "endoflife", "product": "redis", "cycle_pattern": "^(?<cycle>[0-9]+\\.[0-9]+)" }
+      "latest": { "type": "endoflife", "product": "valkey" },
+      "support": { "type": "endoflife", "product": "valkey", "cycle_pattern": "^(?<cycle>[0-9]+\\.[0-9]+)" }
     },
     {
       "name": "Valkey(本番)",
