@@ -18,10 +18,22 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
    - featureブランチにいる場合: 作業内容と合っているか確認
 
 3. **commit**: `.commit_template` の形式に従う(prefix / subject / Changes / Reason / BREAKING CHANGE / Refs)。
-   - `git add` は変更したファイルを個別に指定する(`-A` で無関係なファイルを巻き込まない)
+   次の3つを、それぞれ単独のコマンドとして順に実行する。
+   1. コミットメッセージを scratchpad のファイルに Write で書く
+   2. `git add <ファイル1> <ファイル2> ...`(変更したファイルを個別に指定する。`-A` で無関係なファイルを巻き込まない)
+   3. `git commit -F <メッセージのファイル>`
    - `Refs: #<Issue番号>` を必ず入れる
 
-4. **push**: `git push -u origin <ブランチ名>`(mainへのpushはhookでブロックされる)
+4. **push**: `git push -u origin <ブランチ名>` を単独のコマンドとして実行する。
+
+   commit と push は、上の形から変えない。`-q` などのオプションを足さない、`cd` や `git log` や
+   `| tail` を `&&` `;` `|` でつながない、`-m` やヒアドキュメントでメッセージを渡さない。
+   この形は `.claude/settings.json` の許可ルールにそのまま当たり、auto mode の判定に回らない。
+   形がずれると判定に回り、ゲート設定(`.github/` `.claude/`)を含む変更は止められることがある。
+   形は `.claude/hooks/protect-main.sh` が実行前に確かめ、外れていれば止めて正しい形を案内する
+   (mainへのcommit/pushと強制pushも止める)。結果を確かめたいときは、`git log --oneline -1` を
+   別のコマンドとして実行する。リモートのブランチの削除(`git push origin --delete`)も止まるので、
+   削除が要るときは人間に依頼する。
 
 5. **PR作成**: `gh pr create` で作成する。PR本文に必ず含めるもの:
    - `Refs: #<Issue番号>`
@@ -42,7 +54,8 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
    - `dependency-gate` / `pre-merge-check` / CODEOWNERS起因の待ちは人間の承認待ちなので、その旨を報告して終了する
    - チェックは緑なのにブランチが out of date でマージが進まない場合は、
      `git fetch origin && git merge origin/main` してpushする(または `gh pr update-branch <PR番号>`)。
-     コンフリクトが出たら解消し、verifyを再実行してからpushする
+     コンフリクトが出たら解消し、verifyを再実行してから、`git add <解消したファイル>` と
+     `git commit -F .git/MERGE_MSG` でマージを完了し、手順4の形でpushする
 
 ## Rules
 

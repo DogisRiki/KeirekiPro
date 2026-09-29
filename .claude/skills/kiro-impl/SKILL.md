@@ -122,6 +122,7 @@ For each task (one at a time):
 - **NEVER** use `git add -A` or `git add .`
 - Use `git add <file1> <file2> ...` with explicit file paths
 - Commit message format: `feat(<feature-name>): <task description>`
+- Write the commit message to a file in the scratchpad first, then run `git commit -F <message-file>` as a standalone command. Do not use `-m`, a heredoc, extra options such as `-q`, or chain it with `&&` / `;` / `|` (e.g. `cd ... && git commit`). `.claude/hooks/protect-main.sh` blocks any other form, because only this form matches the `Bash(git commit *)` allow rule and stays out of the auto mode classifier. Run `git add` and `git log` as separate commands
 
 **f) Record learnings**:
 - If this task revealed cross-cutting insights, append a one-line note to the `## Implementation Notes` section at the bottom of tasks.md
