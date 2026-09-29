@@ -92,7 +92,7 @@
   - 完了の観測条件: actionlint が通り、ワークフローの内容が設計の契約と一致する
   - _Requirements: 3.1, 3.4, 3.7_
   - _Depends: 3.1, 3.2_
-- [ ] 3.4 (P) CI の成果物のうち、main への push で作られたものを90日保存する
+- [x] 3.4 (P) CI の成果物のうち、main への push で作られたものを90日保存する
   - `frontend-test-results` と `backend-check-results` の保存期間を、main への push では90日、PR では7日にする
   - 完了の観測条件: actionlint が通り、2つの成果物の保存期間の式が設計どおりになっている
   - _Requirements: 3.9_

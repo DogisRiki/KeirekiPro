@@ -197,7 +197,9 @@ jobs:
           path: |
             frontend/test-results/**
             frontend/coverage/**
-          retention-days: 7
+          # 月1回の mutation の記録が main の直近のカバレッジを読むため、main への push は
+          # 公開リポジトリの上限の90日残す(ci.yaml の push は main だけで起動する)。PR は7日のまま。
+          retention-days: ${{ github.event_name == 'push' && 90 || 7 }}
 
   e2e-smoke:
     needs: detect-changes
@@ -284,7 +286,9 @@ jobs:
           path: |
             backend/build/reports/**
             backend/build/test-results/**
-          retention-days: 7
+          # 月1回の mutation の記録が main の直近のカバレッジを読むため、main への push は
+          # 公開リポジトリの上限の90日残す(ci.yaml の push は main だけで起動する)。PR は7日のまま。
+          retention-days: ${{ github.event_name == 'push' && 90 || 7 }}
 
   # Dockerfileの変更だけでは frontend-test / backend-test / e2e-smoke がどれも動かない。
   # ベースイメージの更新はDependabotによって自動マージされるため、このジョブが無いと
