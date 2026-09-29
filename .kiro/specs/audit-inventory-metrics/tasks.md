@@ -128,7 +128,7 @@
   - README: ワークフロー一覧の表と Mermaid の図に棚卸しを足す。変えるワークフロー5本(audit-inventory・audit-weekly・dependabot-auto-merge・mutation-report・ci)の行と図の記述が、変更後の起動条件と役割に合っているかを確かめて直す(CLAUDE.md の規約)
   - 完了の観測条件: 受入基準 7.1・7.2・7.3 の各項目に対応する記述が手順書にあり、README の表と図に新しいワークフローが載っている
   - _Requirements: 7.1, 7.2, 7.3_
-- [ ] 6.2 (P) 既存の spec とプロジェクト知識を更新する
+- [x] 6.2 (P) 既存の spec とプロジェクト知識を更新する
   - audit-automation の要件6-2 と audit-notification の要件6-1 に、本specで棚卸しに限って外部への問い合わせを改めた旨と理由を注記する(本文は監査証跡として残す)
   - `/kiro-steering` で tech.md の「checkov 等は Dockerfile で固定し人間が明示的に上げる」を、Dependabot のPRで上げ、tflint は公開から72時間待つ形に直す
   - 完了の観測条件: 2つの requirements.md に注記があり、steering に古い記述が残っていない
