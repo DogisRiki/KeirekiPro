@@ -25,6 +25,7 @@ Otherwise, load all necessary context:
 - Read `.kiro/specs/{feature}/spec.json` for language and metadata
 - Read `.kiro/specs/{feature}/brief.md` if it exists (discovery context: problem, approach, scope decisions, boundary candidates)
 - Read `.kiro/specs/{feature}/requirements.md` for project description
+- If `spec.json` has an `issue` number, read the Issue's comment starting with `## 検討メモ(要望ではない)` if it exists (`gh issue view <number> --comments`). It records the owner's discussion (facts, approach ideas, rejected alternatives) and is NOT the request. Anything taken from it that the Issue body does not state is an interpretation, not a requirement given by the owner
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to feature scope, user personas, business/domain rules, compliance/security constraints, operational constraints, or existing product boundaries
 - Relevant local agent skills or playbooks only when they clearly match the feature's host environment or use case and contain domain terminology or workflow rules that shape user-observable requirements
