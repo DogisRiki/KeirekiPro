@@ -13,14 +13,14 @@ import org.testcontainers.utility.DockerImageName;
 public class RedisTestContainerConfig {
 
     /**
-     * Redisコンテナ
+     * Redisコンテナ(本番のElastiCacheと同じValkey 8.0を使う)
      */
     @Bean
     @ServiceConnection(name = "redis")
     @SuppressWarnings("resource")
     public GenericContainer<?> redisContainer() {
         return new GenericContainer<>(
-                DockerImageName.parse("redis:7.4.7-alpine"))
+                DockerImageName.parse("valkey/valkey:8.0.11-alpine"))
                 .withExposedPorts(6379);
     }
 }

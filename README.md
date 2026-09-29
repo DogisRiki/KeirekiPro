@@ -41,7 +41,7 @@ Docker Composeで7コンテナを起動し、DevContainerで開発を行いま�
 | frontend (React) | フロントエンド開発 |
 | terraform | IaC開発 |
 | db (PostgreSQL) | データベース |
-| redis | キャッシュ |
+| redis (Valkey) | キャッシュ |
 | localstack | AWS サービスエミュレーション（S3, Secrets Manager, SES） |
 | dind | Testcontainers用Docker-in-Docker |
 
