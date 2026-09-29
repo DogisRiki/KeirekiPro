@@ -77,7 +77,7 @@ updates:
   #
   # メジャー更新の除外は必須。eclipse-temurin の `21-jre` は Dependabot のタグ比較で
   # version=21 / suffix=-jre と解釈されるため、除外しないと Java の次期メジャー版への
-  # 昇格PRが飛んでくる。除外した分は監査手順の「版の確認先」で半期ごとに棚卸しする。
+  # 昇格PRが飛んでくる。除外した分は棚卸し(audit-inventory.yaml)が月1回届ける。
   #
   # このレーンのPRはcloseしないこと。closeするとそのタグの更新が恒久的にブロックされ、
   # 復旧経路が限られる(照合キーにdigestが含まれないため)。
@@ -99,6 +99,27 @@ updates:
     groups:
       docker-base-images:
         update-types: ["minor", "patch"]
+        # tflint はまとめPRに入れず、個別のPRにする。依存名はレジストリを含まない。
+        # tflint は 0.x のため、minor の更新でルールが増えて terraform-static が赤になりうる。
+        # このレーンのPRはcloseできないので、赤のPRに他のイメージの更新を巻き込まないよう分ける。
+        exclude-patterns: ["terraform-linters/tflint"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # checkov の版は docker/terraform/requirements.txt で固定し、更新はこのレーンのPRで届く。
+  # 新しい版でルールが増えると、そのPRの terraform-static が赤になって自動マージされない。
+  # pip には既定のクールダウン(3日)が効く。
+  - package-ecosystem: "pip"
+    directory: "/docker/terraform"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]

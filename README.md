@@ -78,11 +78,13 @@ flowchart LR
     M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
 
     subgraph s5[定期の監査]
-        AW[audit-weekly<br>週次で定期スキャンの鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜けを判定し<br>結果をIssueで通知]
+        AW[audit-weekly<br>週次で定期スキャンと棚卸しの鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜けを判定し<br>結果をIssueで通知]
         CV[canary-verify<br>月次でカナリアPRが<br>期待どおり赤になったかを照合し<br>結果をIssueで通知]
+        AI[audit-inventory<br>月次で版とサポート期限を集め<br>判定せずに台帳のIssueへ報告]
     end
 
     AW & CV -.検査の仕組みを監視.-> M
+    AW -.止まっていないかを確認.-> AI
 ```
 
 4つの系統がすべて緑になるまで、プルリクエストはマージされません。mainが進むとプルリクエストのブランチは自動で最新化され、検査が再実行されます。マージされても本番への反映は行われず、人間による手動実行だけが本番を更新できます。
@@ -91,7 +93,7 @@ flowchart LR
 
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
 |---|---|---|---|
-| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存 |
+| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存。テスト結果とカバレッジの成果物は、mainへのpushでは90日、プルリクエストでは7日保持する |
 | 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査(AWS認証不要)と、Terraform Planの実行および結果のPRコメント。terraform関連の変更が無いPRでは各ジョブをスキップする |
 | 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする |
@@ -101,20 +103,21 @@ flowchart LR
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
 | AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
-| 依存の更新 | dependabot-auto-merge.yaml | pull_request | Dependabotが作成したプルリクエストにauto-mergeを予約する |
+| 依存の更新 | dependabot-auto-merge.yaml | pull_request / 日次 (schedule) / 手動 | Dependabotが作成したプルリクエストにauto-mergeを予約する。tflintの更新は、GitHubのリリースの公開から72時間経つまで予約を保留し、毎日の見直しで予約する。公開日時を取れない更新と、版が同じで中身だけが変わった更新は予約せず、プルリクエストへのコメントで所有者に知らせる |
 | 依存の更新 | update-pr-branches.yaml | push (main) | 開いているプルリクエストのブランチをmainの最新に合わせる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
 | リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
-| 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート。frontendは前回の結果を使い回して変わった箇所だけを測り直し、毎月最初の定期実行で全件を測り直す。レポートは90日間保持する。実行のたびにスコアをIssue「メトリクス台帳: mutationスコア」に1行追記する |
+| 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート。frontendは前回の結果を使い回して変わった箇所だけを測り直し、毎月最初の定期実行で全件を測り直す。レポートは90日間保持する。実行のたびにスコアと測定方式(全件か差分か)をIssue「メトリクス台帳: mutationスコア」に1行追記する。全件を測り直した回は、前回の全件の回との差と、mainで最後にテストを実行したCIのカバレッジ(実測と基準値)を同じIssueにコメントして所有者に知らせる。良し悪しの判定はしない |
 | 定期 | container-scan-scheduled.yaml | 週次 (schedule) / 手動 | 稼働中の本番イメージをECSのサービス定義から特定してTrivyで再検査し、検出した脆弱性をIssueに反映する。イメージから検出されなくなった脆弱性のIssueは自動でクローズする |
 | 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
-| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる4項目を自動判定する。定期スキャンの直近成功が8日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いか、PRの検査と定期検査でTrivyの版が揃っているかを確認する。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
+| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる5項目を自動判定する。定期スキャンの直近成功が8日未満か、棚卸し(audit-inventory.yaml)の直近成功が35日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いか、PRの検査と定期検査でTrivyの版が揃っているかを確認する。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 | 定期 | canary-verify.yaml | 月次 (schedule) / 手動 | canary.yamlが生成したカナリアPR6件が期待どおりのチェックで赤になっているかを照合する。実行の長いチェックの結論が出揃うよう生成の3日後に発火する。逸脱があればIssue「カナリア照合: 逸脱あり」、判定できなければIssue「カナリア照合: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
+| 定期 | audit-inventory.yaml | 月次 (schedule) / 手動 | 開発環境・本番・検査ツールの版とサポート期限を集め、使っている版・最新のリリース・サポート期限の表をIssue「棚卸し台帳: 版とサポート期限」にコメントして所有者に知らせる。良し悪しの判定はせず、取得できなかった欄は理由を添えて表に残す。実行が失敗で終わるのは、スクリプトの自己テストに失敗したときと、Issueへの書き込みに失敗したときに限る |
 
-依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)・frontend(npm)・Dockerのベースイメージは週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます)。
+依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)・frontend(npm)・Dockerのベースイメージ・terraformの検査ツール(tflintとcheckov)は週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます。tflintの更新は、公開から72時間経つまでauto-mergeが予約されません)。Dependabotが扱わないメジャー更新とサポート期限は、audit-inventory.yamlが月1回まとめて所有者に報告します。
 
 本番リリースは、release.yamlを人間が手動で実行したときにのみ行われます。対象はmainブランチのCIが成功したコミットに限られ、featureブランチからは起動できません。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 

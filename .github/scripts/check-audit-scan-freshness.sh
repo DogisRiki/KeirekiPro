@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================
-# 定期スキャンの鮮度判定(audit-weekly CI から実行)
+# 定期実行の鮮度判定(audit-weekly CI から実行)
 #
 # 判定: 引数のワークフローの直近の成功実行を1件取得し、
 #       成功が一度も存在しない → exit 1(逸脱あり)
@@ -32,8 +32,18 @@
 #   で流し直すと、同じ週次監査内のスキップ検知の対象期間に未走査の穴が空く
 #   ため、報告文面でre-runを指示する。
 #
+# 表示名(3つ目の引数)について:
+#   定期スキャン以外の定期実行(例: 月1回の棚卸し)にも同じ判定を使うため、
+#   報告の見出しと本文の「定期スキャン」を表示名に置き換えられるようにする。
+#   省略したときは今の「定期スキャン」のままで、報告の文面は1バイトも変わらない。
+#   表示名は Summary の見出しの行にそのまま入るため、改行などの制御文字と、
+#   Markdown の記号・メンション(` * _ [ ] < > # | \ ~ @ &)を含む値は
+#   判定不能(2)として受け付けない。見出しが切れたり、強調・リンク・HTML・
+#   メンションとして解釈されたりするのを防ぐ。
+#
 # テスト: .github/scripts/tests/test-check-audit-scan-freshness.sh
-# 使い方: check-audit-scan-freshness.sh <workflow_file> <threshold_days>
+# 使い方: check-audit-scan-freshness.sh <workflow_file> <threshold_days> [表示名]
+#   表示名 省略時は「定期スキャン」
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須)
 #   NOW_EPOCH(テスト用の時刻固定)
 # =====================================================================
@@ -44,9 +54,22 @@ trap 'exit 2' ERR
 
 # 引数・環境変数の欠落を ${n:?} に任せると終了コード1(逸脱あり)になるため、
 # 明示的に検査して判定不能(2)に倒す。
-if [ "$#" -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]; then
-    echo "::error::引数は2個必要です: <workflow_file> <threshold_days>"
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ] || [ -z "$1" ] || [ -z "$2" ]; then
+    echo "::error::引数は2個か3個で指定してください: <workflow_file> <threshold_days> [表示名]"
     exit 2
+fi
+# 表示名は渡したときだけ検査する。空の値を渡したときは、省略とみなさず
+# 誤った呼び出しとして止める(見出しが「が止まっています」だけになるため)。
+if [ "$#" -eq 3 ]; then
+    if [ -z "$3" ]; then
+        echo "::error::表示名を渡すときは空にしないでください"
+        exit 2
+    fi
+    md_meta='[][`*_<>#|\~@&]'
+    if [[ "$3" =~ [[:cntrl:]] ]] || [[ "$3" =~ $md_meta ]]; then
+        echo "::error::表示名に改行などの制御文字と Markdown の記号・メンション(\` * _ [ ] < > # | \\ ~ @ &)は使えません"
+        exit 2
+    fi
 fi
 # 算術展開に渡す外部由来の値は、先に形を確かめる。英字は未定義変数、
 # 先頭0は8進数(08・09 は範囲外)として扱われ、いずれも ERR トラップを
@@ -68,6 +91,10 @@ fi
 WORKFLOW_FILE="$1"
 THRESHOLD_DAYS="$2"
 REPO="$GITHUB_REPOSITORY"
+# 報告に使う名前。LABEL は見出しと本文の「定期スキャン」を、SUBJECT は
+# 成功ゼロの本文の「スキャン」を置き換える。省略時は今の文面をそのまま出す。
+LABEL="${3:-定期スキャン}"
+SUBJECT="${3:-スキャン}"
 
 NOW_EPOCH="${NOW_EPOCH:-$(date -u +%s)}"
 # 算術展開に入るため、threshold_days と同じ理由で形を確かめる(12桁まで)。
@@ -82,7 +109,7 @@ THRESHOLD_SECONDS=$((THRESHOLD_DAYS * 86400))
 report_undecidable() {
     local reason="$1"
     {
-        echo "### :warning: 定期スキャンの稼働状況を確認できませんでした(判定不能)"
+        echo "### :warning: ${LABEL}の稼働状況を確認できませんでした(判定不能)"
         echo ""
         echo "$reason"
         echo "対象: \`repos/${REPO}/actions/workflows/${WORKFLOW_FILE}/runs\`"
@@ -93,7 +120,7 @@ report_undecidable() {
         echo "繰り返し失敗する場合はAPIの応答を人間が確認してください。"
         echo ""
     } >>"$SUMMARY"
-    echo "定期スキャンの稼働状況を確認できませんでした(判定不能): ${reason}" >&2
+    echo "${LABEL}の稼働状況を確認できませんでした(判定不能): ${reason}" >&2
     exit 2
 }
 
@@ -117,15 +144,15 @@ fi
 
 if [ "$count" -eq 0 ]; then
     {
-        echo "### :rotating_light: 定期スキャンに成功した実行が存在しません"
+        echo "### :rotating_light: ${LABEL}に成功した実行が存在しません"
         echo ""
         echo "対象: \`${WORKFLOW_FILE}\`"
         echo ""
-        echo "スキャンが一度も成功していないか、実行履歴が失われています。"
+        echo "${SUBJECT}が一度も成功していないか、実行履歴が失われています。"
         echo "対象ワークフローの実行履歴と設定を人間が確認してください。"
         echo ""
     } >>"$SUMMARY"
-    echo "定期スキャン(${WORKFLOW_FILE})に成功した実行が存在しません。" >&2
+    echo "${LABEL}(${WORKFLOW_FILE})に成功した実行が存在しません。" >&2
     exit 1
 fi
 
@@ -141,7 +168,7 @@ last_success=$(date -u -d "@${published}" +'%Y-%m-%d %H:%M UTC')
 
 if [ "$age" -ge "$THRESHOLD_SECONDS" ]; then
     {
-        echo "### :rotating_light: 定期スキャンが止まっています"
+        echo "### :rotating_light: ${LABEL}が止まっています"
         echo ""
         echo "対象: \`${WORKFLOW_FILE}\`"
         echo ""
@@ -152,10 +179,10 @@ if [ "$age" -ge "$THRESHOLD_SECONDS" ]; then
         echo "対象ワークフローの実行履歴から人間が確認してください。"
         echo ""
     } >>"$SUMMARY"
-    echo "定期スキャン(${WORKFLOW_FILE})の直近の成功から ${THRESHOLD_DAYS} 日以上経過しています。" >&2
+    echo "${LABEL}(${WORKFLOW_FILE})の直近の成功から ${THRESHOLD_DAYS} 日以上経過しています。" >&2
     echo "最終成功日時: ${last_success}" >&2
     exit 1
 fi
 
-echo "定期スキャン(${WORKFLOW_FILE})は稼働しています(最終成功: ${last_success})。"
+echo "${LABEL}(${WORKFLOW_FILE})は稼働しています(最終成功: ${last_success})。"
 exit 0

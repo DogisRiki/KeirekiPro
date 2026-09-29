@@ -3,6 +3,10 @@ name: Mutation Report
 # 週次のmutation testingレポート(レポートモード。PR必須ゲートにはしない)。
 # スコア低下は月次監査(項目2)で確認する。比較の材料として、実行のたびに
 # スコアを台帳のIssue「メトリクス台帳: mutationスコア」に1行追記する(#334)。
+# 行には測定方式(全件か、前回の結果を使った差分か)を残す。全件の回だけ、
+# 直前の全件の回との差と、main で最後にテストを実行した CI のカバレッジ
+# (値と基準値)を台帳のIssueにコメントし、所有者にメンションする(#415)。
+# 差分の回は追記だけで、コメントしない。良し悪しは判定しない。
 
 on:
   schedule:
@@ -28,6 +32,8 @@ jobs:
     permissions:
       contents: read
       actions: read
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,14 +57,29 @@ jobs:
       # incremental モードは、依存の更新など、変異させる対象とテスト以外の変更を検出しない。
       # 古い結果を使い回し続けないように、毎月最初の定期実行(と、手動実行で full を
       # 選んだとき)は前回の結果を使わず、全件を測り直す。月次監査の前に全件の値がそろう
+      #
+      # 決めた測定方式は出力 mode に書き、job の出力で record-metrics に渡す
+      # (台帳の行の測定方式の列と、全件の回だけのコメントに使う)。どの分岐で
+      # 終わっても1回だけ書く。
+      #   full-scheduled    毎月最初の定期実行(UTC の1〜7日)
+      #   full-manual       手動実行で full を選んだ
+      #   full-no-previous  前回の結果が見つからない・取得に失敗した・成果物に結果が無い
+      #   incremental       前回の結果を使う(差分)
       - name: Download previous Stryker report
+        id: mode
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           FULL_INPUT: ${{ inputs.full }}
         run: |
-          if [ "$FULL_INPUT" = true ] || { [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$(date -u +%-d)" -le 7 ]; }; then
-            echo "全件を測り直す(前回の結果を使わない)" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$FULL_INPUT" = true ]; then
+            echo "mode=full-manual" >>"$GITHUB_OUTPUT"
+            echo "全件を測り直す(手動実行で full を選んだため、前回の結果を使わない)" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$(date -u +%-d)" -le 7 ]; then
+            echo "mode=full-scheduled" >>"$GITHUB_OUTPUT"
+            echo "全件を測り直す(毎月最初の定期実行のため、前回の結果を使わない)" | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=stryker-report&per_page=100" \
@@ -66,13 +87,16 @@ jobs:
                   | sort_by(.created_at) | last | .workflow_run.id // empty') || run_id=""
           # 取り出せないときは全件の測定になる(Stryker は結果ファイルが無ければ全件を測る)
           if [ -z "$run_id" ] || ! gh run download "$run_id" -n stryker-report -D "${RUNNER_TEMP}/previous-stryker"; then
+            echo "mode=full-no-previous" >>"$GITHUB_OUTPUT"
             echo "前回の結果が見つからないため、全件を測る" | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           if [ -f "${RUNNER_TEMP}/previous-stryker/mutation/mutation.json" ]; then
             cp "${RUNNER_TEMP}/previous-stryker/mutation/mutation.json" "${RUNNER_TEMP}/stryker-incremental.json"
+            echo "mode=incremental" >>"$GITHUB_OUTPUT"
             echo "前回の結果(run ${run_id})を使い、変わった箇所だけを測り直す" | tee -a "$GITHUB_STEP_SUMMARY"
           else
+            echo "mode=full-no-previous" >>"$GITHUB_OUTPUT"
             echo "前回の成果物(run ${run_id})に結果が無いため、全件を測る" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -135,13 +159,25 @@ jobs:
   # 測定が止まったことを台帳の上で見えるようにする(実例: #372)。
   # 監査のワークフローは状態を持たない(audit-automation の要件6-3)ため、
   # 記録は測定したこのワークフローが行う。
+  #
+  # 測定方式(MUTATION_MODE)は frontend-mutation の出力 mode を使う。frontend の
+  # job が途中で失敗して出力が無いときは、前回の結果なしの全件として扱う
+  # (backend の PIT は毎回全件を測るため)。全件の回は、直前の全件の回との差と
+  # カバレッジを台帳のIssueにコメントし、差分の回は行の追記だけにする。
+  # カバレッジは測り直さず、main で最後にテストを実行した CI の成果物と
+  # ゲート設定の基準値を読む(collect-coverage.sh)。カバレッジを読めなくても
+  # 記録とコメントは止めず、コメントのカバレッジの欄を「取得できず」にする。
   record-metrics:
     needs: [frontend-mutation, backend-mutation]
     if: always()
     runs-on: ubuntu-latest
+    # actions: read は、カバレッジを載せた CI の成果物の一覧と取得に使う
     permissions:
       contents: read
+      actions: read
       issues: write
+    env:
+      MUTATION_MODE: ${{ needs.frontend-mutation.outputs.mode || 'full-no-previous' }}
     # 手動実行と定期実行が重なっても、台帳の本文の読み書きが交差しないようにする
     concurrency:
       group: mutation-metrics-ledger
@@ -166,13 +202,55 @@ jobs:
           name: stryker-report
           path: ${{ runner.temp }}/stryker-report
 
-      # 記録の前にスクリプトのテストを行う。壊れたスクリプトで台帳を書き換えない
+      # 記録の前にスクリプトのテストを行う。壊れたスクリプトで台帳を書き換えない。
+      # 2本は途中で失敗しても両方実行し、1本でも失敗したら赤で終える
+      # (以降の記録は行わない)
       - name: Test recorder
-        run: bash .github/scripts/tests/test-record-mutation-metrics.sh
+        run: |
+          set -uo pipefail
+          failed=0
+          for t in test-lib-ledger-issue test-record-mutation-metrics; do
+            echo "::group::${t}.sh"
+            if ! bash ".github/scripts/tests/${t}.sh"; then
+              echo "::error::${t}.sh が失敗しました。"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::記録のスクリプトのテストに失敗しました。台帳のIssueは操作しません。"
+            exit 1
+          fi
 
+      # カバレッジの読み取りのテスト。このテストは今のリポジトリのゲート設定
+      # (vite.config.ts と quality.gradle)も読むため、設定の書き方が変わると
+      # 失敗する。失敗しても記録は止めず(continue-on-error)、カバレッジの
+      # 読み取りだけを行わない(コメントのカバレッジの欄が「取得できず」になる)
+      - name: Test coverage collector
+        id: test-coverage
+        continue-on-error: true
+        run: bash .github/scripts/tests/test-collect-coverage.sh
+
+      # 全件の回だけ、カバレッジを読む。失敗・時間切れでも記録は止めない
+      # (continue-on-error)。成功したときだけ Record scores に COVERAGE_FILE を渡す。
+      # gh api には時間の上限が無いため、ステップに上限を付ける
+      - name: Collect coverage
+        id: coverage
+        if: startsWith(env.MUTATION_MODE, 'full') && steps.test-coverage.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/collect-coverage.sh "${RUNNER_TEMP}/coverage.md"
+
+      # 終了コードの契約は record-mutation-metrics.sh の冒頭を参照。
+      # GITHUB_REPOSITORY_OWNER と GITHUB_RUN_ID はランナーの既定の環境変数を使う。
+      # COVERAGE_FILE が空(カバレッジを読まなかった・読めなかった)のときは、
+      # コメントのカバレッジの欄が「取得できず」になる
       - name: Record scores
         env:
           GH_TOKEN: ${{ github.token }}
+          COVERAGE_FILE: ${{ steps.coverage.outcome == 'success' && format('{0}/coverage.md', runner.temp) || '' }}
         run: |
           bash .github/scripts/record-mutation-metrics.sh \
             "${RUNNER_TEMP}/pitest-report/mutations.xml" \

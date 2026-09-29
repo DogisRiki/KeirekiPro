@@ -88,4 +88,8 @@ steeringには転記しない(更新のたびに乖離するため)。
 5. **DBマイグレーションはexpand-contract**: 後方互換を保つ2段階変更。expandとcontractを
    同一PRに入れない。マイグレーションPRは人間承認ゲートを通る
 6. **チェックツールのバージョン固定**: checkov等は無断更新で新ルールが有効になり
-   全PRが赤くなるため、Dockerfileで固定し人間が明示的に上げる
+   全PRが赤くなるため、明示的な版で固定する(tflint は digest も)。更新は Dependabot の
+   PRで届き(checkov は `docker/terraform/requirements.txt` の pip レーン、tflint は docker
+   レーンのまとめPRから外した個別のPR)、増えた指摘はそのPRの terraform-static が赤で示す。
+   tflint は ghcr.io にあり Dependabot の既定の待ち期間(公開から3日)が効かないため、
+   GitHub のリリースの公開から72時間経つまで自動マージを予約しない(`dependabot-auto-merge.yaml`)

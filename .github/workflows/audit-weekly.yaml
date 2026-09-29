@@ -1,10 +1,13 @@
 name: Audit Weekly
 
 # 週次監査(#310 段階1): 人間が画面を開いて行っていた定期監査のうち、
-# 機械判定できる4項目を自動判定に置き換える。
+# 機械判定できる5項目を自動判定に置き換える。
 #
 #   scan-freshness   定期スキャン(container-scan-scheduled.yaml)の直近成功が
 #                    8日未満かを確認する(旧・週次8)
+#   inventory-freshness
+#                    棚卸し(audit-inventory.yaml)の直近成功が35日未満かを
+#                    確認する。月1回の実行が1回欠けたら逸脱とする(新規。#415)
 #   dependabot-stuck 必須チェックの失敗で止まっているDependabot PRを検知する
 #                    (旧・週次6)
 #   skipped-required 期待一覧とrulesetの集合照合と、必須チェックがスキップの
@@ -108,15 +111,17 @@ jobs:
             echo ""
           } >>"$GITHUB_STEP_SUMMARY"
 
-      # 判定。自己テスト → 本判定4本 → 集約 の順に行い、結果をステップ出力
+      # 判定。自己テスト → 本判定5本 → 集約 の順に行い、結果をステップ出力
       # result(none / deviation / undecidable)に書く。このステップ自体は
       # 常に成功で終わり(set +e で途中の失敗でも止めない)、成否は Conclude が
       # 決める。
       #
       # 自己テストを先に置く。壊れた判定スクリプトの結論(緑も赤も)を信用せず、
       # 1本でも失敗したら本判定を行わずに判定不能とする(dependency-review.yaml
-      # の cooldown ジョブと同じ、自テスト後に本判定の型)。4本は途中で失敗しても
-      # 全部実行する(container-scan-scheduled.yaml のテスト集約と同じ方式)。
+      # の cooldown ジョブと同じ、自テスト後に本判定の型)。自己テストの4本は
+      # 途中で失敗しても全部実行する(container-scan-scheduled.yaml のテスト
+      # 集約と同じ方式)。scan-freshness と inventory-freshness は同じ判定
+      # スクリプトを使うため、自己テストは1本で両方を受け持つ。
       #
       # 本判定は1本目が逸脱・判定不能でも残りを実行する。途中で止めると、
       # 最初の結果の陰に残りの逸脱が隠れて翌週まで見えなくなる。各スクリプトの
@@ -214,6 +219,8 @@ jobs:
           else
             run_check scan-freshness "定期スキャンの稼働確認" \
               .github/scripts/check-audit-scan-freshness.sh container-scan-scheduled.yaml 8
+            run_check inventory-freshness "棚卸しの稼働確認" \
+              .github/scripts/check-audit-scan-freshness.sh audit-inventory.yaml 35 棚卸し
             run_check dependabot-stuck "Dependabot PRの滞留検知" \
               .github/scripts/check-audit-dependabot-stuck.sh .github/audit/required-checks.json
             run_check skipped-required "必須チェックの集合照合とスキップ検知" \
