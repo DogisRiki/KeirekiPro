@@ -106,6 +106,12 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # 開発環境のキャッシュ(docker/redis)は本番の ElastiCache と同じ系列に揃えている(#409)。
+      # 本番は terraform/modules/elasticache/main.tf の engine_version で系列(8.0 など)を指定している。
+      # 開発環境だけが次の系列(8.1 など)に上がらないよう、minor の更新も除外する。
+      # 系列を上げるときは、本番の engine_version と一緒に人間が上げる。
+      - dependency-name: "valkey/valkey"
+        update-types: ["version-update:semver-minor"]
 
   # checkov の版は docker/terraform/requirements.txt で固定し、更新はこのレーンのPRで届く。
   # 新しい版でルールが増えると、そのPRの terraform-static が赤になって自動マージされない。

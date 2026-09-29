@@ -233,7 +233,7 @@ count=$(jq '.targets | length' "$REAL_TARGETS" 2>/dev/null)
 check_eq "13" "$count" "今のリポジトリの設定ファイルの対象は13件"
 
 names=$(jq -r '[.targets[].name] | join(",")' "$REAL_TARGETS" 2>/dev/null)
-check_eq "tflint,tflint の AWS 用ルールセット,checkov,Trivy,Java,Node.js,PostgreSQL(開発),PostgreSQL(本番),Redis(開発),Valkey(本番),Terraform,Docker(dind),LocalStack" \
+check_eq "tflint,tflint の AWS 用ルールセット,checkov,Trivy,Java,Node.js,PostgreSQL(開発),PostgreSQL(本番),Valkey(開発),Valkey(本番),Terraform,Docker(dind),LocalStack" \
     "$names" "対象は設計の一覧のとおり(要件1-1)"
 
 got=$(jq -r '.targets[] | select(.name == "LocalStack") | .latest.tag_pattern' "$REAL_TARGETS" 2>/dev/null)
