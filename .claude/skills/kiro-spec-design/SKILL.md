@@ -25,6 +25,7 @@ If steering/spec context is already available from conversation, skip redundant 
 Otherwise, load all necessary context:
 - `.kiro/specs/{feature}/spec.json`, `requirements.md`, `design.md` (if exists)
 - `.kiro/specs/{feature}/research.md` (if exists, contains gap analysis from `/kiro-validate-gap`)
+- If `spec.json` has an `issue` number, the Issue's comment starting with `## 検討メモ(要望ではない)` if it exists (`gh issue view <number> --comments`). It records facts, approach ideas, and rejected alternatives from the owner's discussion. Treat approach ideas as candidates, not decisions. If the design adopts a rejected alternative, state why in design.md
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to requirement coverage, architecture boundaries, integrations, runtime prerequisites, security/performance constraints, or team conventions that affect implementation readiness
 - `.kiro/settings/templates/specs/design.md` for document structure

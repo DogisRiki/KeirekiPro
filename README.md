@@ -304,7 +304,8 @@ keirekipro/
 
 ```mermaid
 flowchart LR
-    H1["👤 人間<br/>Issueで依頼"]
+    H1["👤 人間<br/>AIと壁打ちして<br/>作るものを決める"]
+    A0["🤖 AI<br/>要望をIssueに起票"]
     A1["🤖 AI<br/>仕様書を作成"]
     H2["👤 人間<br/>要件・設計・タスクを<br/>3段階で承認"]
     A2["🤖 AI<br/>実装・テスト・PR作成"]
@@ -313,15 +314,15 @@ flowchart LR
     M["✅ 自動マージ"]
     H3["👤 人間<br/>動作確認して<br/>リリース実行"]
 
-    H1 --> A1 --> H2 --> A2 --> C1 --> M --> H3
+    H1 --> A0 --> A1 --> H2 --> A2 --> C1 --> M --> H3
     C1 -->|影響の大きい変更のみ| H4 --> M
-    H1 -.小修正は仕様書なしで直接.-> A2
+    A0 -.小修正は仕様書なしで直接.-> A2
 
     classDef human fill:#dbeafe,stroke:#1d4ed8
     classDef ai fill:#f3e8ff,stroke:#7c3aed
     classDef auto fill:#dcfce7,stroke:#15803d
     class H1,H2,H3,H4 human
-    class A1,A2 ai
+    class A0,A1,A2 ai
     class C1,M auto
 ```
 
@@ -331,6 +332,7 @@ flowchart LR
 
 | 順 | 操作 | 起きること |
 |---|---|---|
+| 0 | `/request` | 壁打ちで作るものが決まったら打つ。AIが要望のIssue案と検討メモを作って見せ、了承すると起票する |
 | 1 | `/kiro-spec-init #Issue番号` | AIがIssueを読んで説明文を組み立て、`.kiro/specs/{feature名}/` を用意してfeature名を知らせる |
 | 2 | `/kiro-spec-requirements {feature名}` | AIが要件(requirements.md)を書き、別のAIがレビューする → 要件とレビュー結果を確認する |
 | 3 | `/kiro-spec-design {feature名}` | 要件を承認したことになり、AIが設計(design.md)を書き、別のAIがレビューする → 設計とレビュー結果を確認する |
@@ -351,7 +353,7 @@ flowchart LR
 
 | 人間の作業 | 内容 |
 |---|---|
-| 作るものを決める | 何を作るか・何を直すかを決めて、Issueとして起票する(1〜2行でよく、詳細化はAIが行う) |
+| 作るものを決める | AIと壁打ちして何を作るか・何を直すかを決め、`/request` でAIに要望のIssueを起票させる。起票の前に案を確認する |
 | 仕様を承認する | spec駆動開発で作成される要件・設計・タスクのドキュメントを読んで承認する(コードではなく仕様を判断する) |
 | 仕組みを監査する | 自動チェックが正しく機能し続けているかを、監査の通知Issueと週次・月次・半期の点検で確認し、すり抜けた問題はチェックの追加・強化につなげる([監査手順](doc/開発フロー/監査手順.md)) |
 | 影響の大きい変更を承認する | DBマイグレーション・ビルド設定・ライブラリの入手先・チェック設定の変更を含むプルリクエストに限り、承認ボタンを押す |

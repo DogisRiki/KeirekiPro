@@ -3,7 +3,7 @@
 エンジニア向け職務経歴書の作成・管理を行うフルスタックWebアプリケーション。
 開発は、人間がコードをレビューしないことを前提とした自律パイプラインで行う。
 実装からマージまでを自律的に進め、品質は自動チェック(テスト・静的解析・カバレッジ閾値・
-Codexによるクロスレビュー)で担保する。人間が関与するのは、Issue起票・specの承認・
+Codexによるクロスレビュー)で担保する。人間が関与するのは、作るものの決定(壁打ちのあと `/request` でAIが要望を起票)・specの承認・
 影響の大きい変更の承認・デプロイ前確認・デプロイ実行のみ。
 
 ## リポジトリ構成
@@ -105,7 +105,10 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 ### ワークフロー
 
-- Discovery: `/kiro-discovery "アイデア"` — 1spec/複数spec/spec不要を判定し brief.md を作成
+- 起票: 壁打ちで作るものが決まったら、人間が `/request` を打ち、AIが要望のIssueを起票する。
+  Issue本文は要望だけにし、方式の案や調べた事実はコメントの検討メモ(`## 検討メモ(要望ではない)`)に分ける。
+  spec-reviewer と codex-review は本文だけを判定の基準にする。小修正(Lane B)の実装でも検討メモを読む。
+  `/kiro-discovery` は使わない
 - Phase 1(仕様化):
   - `/kiro-spec-init "説明"` → `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
   - 各段階の生成直後に `/spec-review {feature} {段階}` を実行する(requirements / design / tasks)。
