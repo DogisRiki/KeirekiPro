@@ -27,7 +27,7 @@ model: claude-fable-5-1
    - `.kiro/specs/{FEATURE}/spec.json`(`issue` 番号と承認の状態)
    - 当該段階の spec 本文と、その前の段階の本文
    - `.kiro/specs/{FEATURE}/brief.md`(あれば)
-   - Issue 本文: `gh issue view <番号> --repo DogisRiki/KeirekiPro`(`--comments` を付けない。コメントの検討メモは要望ではない。申告・取りこぼし・勝手な追加は Issue 本文だけを基準に判定する)
+   - Issue 本文: `gh issue view <番号> --repo DogisRiki/KeirekiPro`(`--comments` を付けない。コメントは要望ではない。申告・取りこぼし・勝手な追加は Issue 本文だけを基準に判定する)
    - `.kiro/steering/product.md` `tech.md` `structure.md`
    - リポジトリの実ファイル(設計の前提が成り立つかを確かめるため)
 4. `rules/{STAGE}.md` の観点で審査する
