@@ -43,7 +43,7 @@ steeringには転記しない(更新のたびに乖離するため)。
   サーバー状態をストアに写さない。フォーム状態はコンポーネントローカル
   (zod・フォームライブラリは不使用)
 - **axios + axios-auth-refresh**: HTTPクライアントとトークンリフレッシュ
-- **dnd-kit**(並べ替え)、**dayjs**、**Hygen**(`pnpm run new` でfeatureの雛形生成)
+- **dnd-kit**(並べ替え)、**dayjs**
 
 ## テスト
 

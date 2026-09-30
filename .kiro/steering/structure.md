@@ -41,7 +41,6 @@
 | `lib/` | 外部ライブラリの設定 | `protectedApiClient.ts`, `queryConfig.ts` |
 | `config/` | パス・環境変数・テーマ・メッセージ | `paths.ts` |
 | `test/` | 共有テストユーティリティ | `testUtils.tsx` |
-| `_templates/` | Hygenの雛形(`pnpm run new`) | `_templates/feature/new/` |
 
 ## 命名規約
 

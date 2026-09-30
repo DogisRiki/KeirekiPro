@@ -2,6 +2,6 @@
     "$schema": "https://unpkg.com/knip@latest/schema.json",
     "entry": ["src/main.tsx", "e2e/**/*.spec.ts", "playwright.config.ts", "vite.config.ts", "eslint.config.js"],
     "project": ["src/**/*.{ts,tsx}"],
-    "ignore": ["src/test/**", "_templates/**"],
+    "ignore": ["src/test/**"],
     "ignoreDependencies": ["@react-router/node", "@react-router/dev"]
 }
