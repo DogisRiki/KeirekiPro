@@ -3,12 +3,15 @@ package com.example.keirekipro.unit.usecase.user;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,28 +52,25 @@ class DeleteUserUseCaseTest {
 
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
-    private static final String PROFILE_IMAGE_KEY = "/profile/image/123e4567-e89b-12d3-a456-426614174000.png";
+    /**
+     * ユーザーのプロフィール画像が取り得るキー(許可する拡張子ごと)
+     */
+    private static final List<String> CANDIDATE_KEYS = List.of(
+            "/profile/image/123e4567-e89b-12d3-a456-426614174000.jpg",
+            "/profile/image/123e4567-e89b-12d3-a456-426614174000.jpeg",
+            "/profile/image/123e4567-e89b-12d3-a456-426614174000.png",
+            "/profile/image/123e4567-e89b-12d3-a456-426614174000.gif");
 
     @Test
     @DisplayName("ユーザー削除が正常に完了し、認証セッションが無効化される")
     void test1() {
-        ErrorCollector errorCollector = new ErrorCollector();
-        User user = User.create(
-                errorCollector,
-                Email.create(errorCollector, "test@example.com"),
-                "passwordHash",
-                null,
-                null,
-                "test-user");
-
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(null)));
 
         assertThatCode(() -> deleteUserUseCase.execute(USER_ID)).doesNotThrowAnyException();
 
         verify(userRepository).delete(USER_ID);
         verify(authSessionInvalidator).invalidate(USER_ID);
         verify(eventPublisher, atLeastOnce()).publish(any());
-        verify(objectStore, never()).delete(any());
     }
 
     @Test
@@ -89,23 +89,47 @@ class DeleteUserUseCaseTest {
     }
 
     @Test
-    @DisplayName("プロフィール画像があるユーザーの場合、ストレージの画像も削除される")
+    @DisplayName("プロフィール画像を登録しているユーザーの場合、以前の拡張子の画像も含めて取り得るキーをすべて1回ずつ削除する")
     void test3() {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(userWithProfileImage()));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(CANDIDATE_KEYS.get(2))));
 
         assertThatCode(() -> deleteUserUseCase.execute(USER_ID)).doesNotThrowAnyException();
 
+        CANDIDATE_KEYS.forEach(key -> verify(objectStore, times(1)).delete(key));
+        verifyNoMoreInteractions(objectStore);
         verify(userRepository).delete(USER_ID);
-        verify(objectStore).delete(PROFILE_IMAGE_KEY);
         verify(authSessionInvalidator).invalidate(USER_ID);
-        verify(eventPublisher, atLeastOnce()).publish(any());
+    }
+
+    @Test
+    @DisplayName("プロフィール画像を登録していないユーザーの場合も、以前に登録した画像が残らないよう取り得るキーをすべて削除する")
+    void test4() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(null)));
+
+        deleteUserUseCase.execute(USER_ID);
+
+        CANDIDATE_KEYS.forEach(key -> verify(objectStore).delete(key));
+        verifyNoMoreInteractions(objectStore);
+    }
+
+    @Test
+    @DisplayName("命名規則の導入前に保存された画像を登録している場合、そのキーも削除する")
+    void test5() {
+        String legacyKey = "/profile/image/9b2f6c1e-0000-4000-8000-000000000000.png";
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(legacyKey)));
+
+        deleteUserUseCase.execute(USER_ID);
+
+        verify(objectStore).delete(legacyKey);
+        CANDIDATE_KEYS.forEach(key -> verify(objectStore).delete(key));
+        verifyNoMoreInteractions(objectStore);
     }
 
     @Test
     @DisplayName("ストレージの画像削除に失敗した場合、例外が伝播し認証セッションの無効化とイベント発行は行われない")
-    void test4() {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(userWithProfileImage()));
-        doThrow(new RuntimeException("storage error")).when(objectStore).delete(PROFILE_IMAGE_KEY);
+    void test6() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(CANDIDATE_KEYS.get(2))));
+        doThrow(new RuntimeException("storage error")).when(objectStore).delete(any());
 
         assertThatThrownBy(() -> deleteUserUseCase.execute(USER_ID))
                 .isInstanceOf(RuntimeException.class)
@@ -115,14 +139,14 @@ class DeleteUserUseCaseTest {
         verify(eventPublisher, never()).publish(any());
     }
 
-    private static User userWithProfileImage() {
+    private static User user(String profileImage) {
         ErrorCollector errorCollector = new ErrorCollector();
         return User.create(
                 errorCollector,
                 Email.create(errorCollector, "test@example.com"),
                 "passwordHash",
                 null,
-                PROFILE_IMAGE_KEY,
+                profileImage,
                 "test-user");
     }
 }

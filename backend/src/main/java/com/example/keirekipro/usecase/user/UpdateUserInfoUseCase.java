@@ -43,11 +43,6 @@ public class UpdateUserInfoUseCase {
     private static final List<String> ALLOWED_MIME_TYPES = List.of("image/jpeg", "image/png", "image/gif");
 
     /**
-     * 許可するファイル拡張子
-     */
-    private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "gif");
-
-    /**
      * ユーザー情報更新ユースケースを実行する
      *
      * @param command コマンド
@@ -79,9 +74,9 @@ public class UpdateUserInfoUseCase {
                     originalFilename);
 
             String extension = getExtension(originalFilename);
-            String fileName = userId.toString() + (extension.isBlank() ? "" : "." + extension);
+            String fileName = ProfileImageKeys.fileName(userId, extension);
 
-            imageKey = objectStore.putAs(object, "/profile/image/", fileName);
+            imageKey = objectStore.putAs(object, ProfileImageKeys.PREFIX, fileName);
         }
 
         // ユーザー名更新
@@ -118,7 +113,7 @@ public class UpdateUserInfoUseCase {
         if (!ALLOWED_MIME_TYPES.contains(file.getContentType())) {
             errorCollector.addError("profileImage", "許可されていない画像形式です。");
         }
-        if (!ALLOWED_EXTENSIONS.contains(getExtension(file.getOriginalFilename()))) {
+        if (!ProfileImageKeys.ALLOWED_EXTENSIONS.contains(getExtension(file.getOriginalFilename()))) {
             errorCollector.addError("profileImage", "許可されていないファイル形式です。jpg, jpeg, png, gifのみ許可されています。");
         }
         if (file.getSize() > ALLOWED_FILE_SIZE) {

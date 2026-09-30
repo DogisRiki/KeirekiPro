@@ -1,5 +1,7 @@
 package com.example.keirekipro.usecase.user;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.User;
@@ -47,9 +49,13 @@ public class DeleteUserUseCase {
         userRepository.delete(userId);
 
         // プロフィール画像を削除(ストレージの削除に失敗した場合はユーザー削除もロールバックする)
+        // 拡張子の違う画像に替えた場合は以前の画像も別のキーで残っているため、取り得るキーをすべて削除する
+        // 命名規則の導入前に保存された画像はキーがユーザーIDと異なるため、登録中の画像のキーも加える
+        Set<String> keys = new LinkedHashSet<>(ProfileImageKeys.keysOf(userId));
         if (user.getProfileImage() != null) {
-            objectStore.delete(user.getProfileImage());
+            keys.add(user.getProfileImage());
         }
+        keys.forEach(objectStore::delete);
 
         // 退会後、認証セッションを無効化
         authSessionInvalidator.invalidate(userId);
