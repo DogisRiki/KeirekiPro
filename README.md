@@ -72,7 +72,7 @@ flowchart LR
     PR --> H
     PR --> A
 
-    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ]
+    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ<br>ルール違反で外れた予約はかけ直す]
 
     M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
     M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
@@ -102,6 +102,7 @@ flowchart LR
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
+| 人間の関門 | rearm-auto-merge.yaml | pull_request (auto_merge_disabled) | ルール違反の理由でauto-mergeの予約が外れたとき、予約をかけ直す。所有者が手で外した場合などほかの理由で外れたときと、forkのPRは対象外。DependabotのPRも対象外で、dependabot-auto-merge.yamlの毎日の見直しが予約し直す。同じコミットで3回を超えて外れたら、かけ直さずに失敗で知らせる |
 | AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
 | 依存の更新 | dependabot-auto-merge.yaml | pull_request / 日次 (schedule) / 手動 | Dependabotが作成したプルリクエストにauto-mergeを予約する。tflintの更新は、GitHubのリリースの公開から72時間経つまで予約を保留し、毎日の見直しで予約する。公開日時を取れない更新と、版が同じで中身だけが変わった更新は予約せず、プルリクエストへのコメントで所有者に知らせる |
 | 依存の更新 | update-pr-branches.yaml | push (main) | 開いているプルリクエストのブランチをmainの最新に合わせる |
