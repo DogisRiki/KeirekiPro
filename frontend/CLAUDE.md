@@ -16,7 +16,6 @@ frontend配下を変更するとき常に適用する。ディレクトリ間の
 | `src/config/` | パス定義(`paths.ts`)・環境設定 |
 
 - featureの公開はそのfeatureの `index.ts` 経由のみ(深いimportはESLintが検知)
-- 新しいfeature/構造のひな形はHygenで生成する: `pnpm run new`(feature)/ `pnpm run init`(構造)
 
 ## 状態管理
 
