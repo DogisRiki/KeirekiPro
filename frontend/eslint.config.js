@@ -25,7 +25,7 @@ export default [
 
     // Lintの対象外とするファイルを指定
     {
-        ignores: ["**/build/", "**/public/", "**/node_modules/", "**/*.min.js", "**/.*lintrc.js", "**/_templates/"],
+        ignores: ["**/build/", "**/public/", "**/node_modules/", "**/*.min.js", "**/.*lintrc.js"],
     },
 
     // プラグインの推奨設定を適用
