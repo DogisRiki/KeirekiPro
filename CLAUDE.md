@@ -107,8 +107,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 - 要望の壁打ち: 人間が `/request` を打って始める。AIが聞き取りと決定の記録を行い、最後に要望のIssueを起票する
 - 起票: `gh issue create` を実行する前に `.claude/skills/file-issue/SKILL.md` を読み、その決まりに従う(`/request` を通らない起票も同じ。監査の通知と振り返りはそれぞれの様式に従う)。
-  Issue本文には所有者が決めたことだけを書き、調べた事実や方式の案はコメントの検討メモ(`## 検討メモ(要望ではない)`)に分ける。
-  spec-reviewer と codex-review は本文だけを判定の基準にする。小修正(Lane B)の実装でも検討メモを読む。
+  Issueは本文だけにし、所有者が決めたことだけを書く。調べた事実・原因の調査結果・方式の案はIssueに書き残さない(方式は design で考え、事実は仕様づくりや実装のときに調べ直す)。
+  spec-reviewer と codex-review は本文だけを判定の基準にする。Issueのコメントは要望として読まない。
   `/kiro-discovery` は使わない
 - Phase 1(仕様化):
   - `/kiro-spec-init "説明"` → `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`

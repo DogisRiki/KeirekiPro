@@ -332,7 +332,7 @@ flowchart LR
 
 | 順 | 操作 | 起きること |
 |---|---|---|
-| 0 | `/request` | 要望の壁打ちを始める。AIが調べたうえで、決めることが尽きるまで推奨を添えて聞き、決まったことを記録する。最後に要望のIssue案と検討メモを見せ、了承すると起票する |
+| 0 | `/request` | 要望の壁打ちを始める。AIが調べたうえで、決めることが尽きるまで推奨を添えて聞き、決まったことを記録する。最後に要望のIssue案を見せ、了承すると起票する |
 | 1 | `/kiro-spec-init #Issue番号` | AIがIssueを読んで説明文を組み立て、`.kiro/specs/{feature名}/` を用意してfeature名を知らせる |
 | 2 | `/kiro-spec-requirements {feature名}` | AIが要件(requirements.md)を書き、別のAIがレビューする → 要件とレビュー結果を確認する |
 | 3 | `/kiro-spec-design {feature名}` | 要件を承認したことになり、AIが設計(design.md)を書き、別のAIがレビューする → 設計とレビュー結果を確認する |
