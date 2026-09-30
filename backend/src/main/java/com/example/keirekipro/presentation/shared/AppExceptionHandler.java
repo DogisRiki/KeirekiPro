@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -88,6 +89,17 @@ public class AppExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleHttpMessageNotReadableException() {
         return new ErrorResponse("入力エラーがあります。", Collections.emptyMap());
+    }
+
+    /**
+     * HttpMediaTypeNotAcceptableExceptionをハンドリングする
+     *
+     * @return エラーレスポンス
+     */
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    @ResponseStatus(HttpStatus.NOT_ACCEPTABLE)
+    public ErrorResponse handleHttpMediaTypeNotAcceptableException() {
+        return new ErrorResponse("対応していない形式が指定されました。", Collections.emptyMap());
     }
 
     /**
