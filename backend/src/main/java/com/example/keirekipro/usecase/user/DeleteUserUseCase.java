@@ -6,6 +6,7 @@ import com.example.keirekipro.domain.model.user.User;
 import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.usecase.auth.session.AuthSessionInvalidator;
+import com.example.keirekipro.usecase.shared.store.ObjectStore;
 
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,8 @@ public class DeleteUserUseCase {
 
     private final AuthSessionInvalidator authSessionInvalidator;
 
+    private final ObjectStore objectStore;
+
     /**
      * ユーザー退会ユースケースを実行する
      *
@@ -42,6 +45,11 @@ public class DeleteUserUseCase {
 
         // ユーザー削除
         userRepository.delete(userId);
+
+        // プロフィール画像を削除(ストレージの削除に失敗した場合はユーザー削除もロールバックする)
+        if (user.getProfileImage() != null) {
+            objectStore.delete(user.getProfileImage());
+        }
 
         // 退会後、認証セッションを無効化
         authSessionInvalidator.invalidate(userId);
