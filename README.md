@@ -159,7 +159,6 @@ flowchart LR
 | カバレッジ | Vitest Coverage V8 |
 | リンター | ESLint |
 | フォーマッター | Prettier, prettier-plugin-organize-imports |
-| コード生成 | Hygen |
 | アナリティクス | Google Analytics 4 |
 
 ### バックエンド
