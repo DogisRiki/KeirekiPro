@@ -1,6 +1,7 @@
 package com.example.keirekipro.presentation.resume.controller;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
@@ -16,6 +17,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -44,7 +46,8 @@ public class ExportResumeController {
     @Operation(summary = "職務経歴書エクスポート", description = "職務経歴書をファイルとしてエクスポートしダウンロードする")
     public ResponseEntity<byte[]> handle(
             @PathVariable("resumeId") String resumeId,
-            @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) {
+            @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept)
+            throws HttpMediaTypeNotAcceptableException {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());
 
@@ -56,7 +59,9 @@ public class ExportResumeController {
         } else if (acceptValue.contains("text/markdown")) {
             format = ExportFormat.MARKDOWN;
         } else {
-            throw new IllegalStateException("想定外のAcceptです: " + acceptValue);
+            // 対応していない形式の指定は利用者側の誤りとして扱う
+            throw new HttpMediaTypeNotAcceptableException(
+                    List.of(MediaType.APPLICATION_PDF, MediaType.parseMediaType("text/markdown")));
         }
 
         var command = new ExportResumeCommand(
