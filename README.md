@@ -72,7 +72,7 @@ flowchart LR
     PR --> H
     PR --> A
 
-    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ<br>ルール違反で外れた予約はかけ直す]
+    Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ<br>予約はワークフローが行い、外れたら付け直す<br>マージ後は対応するIssueを閉じる]
 
     M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
     M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
@@ -102,8 +102,9 @@ flowchart LR
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
-| 人間の関門 | rearm-auto-merge.yaml | pull_request (auto_merge_disabled) | ルール違反の理由でauto-mergeの予約が外れたとき、予約をかけ直す。所有者が手で外した場合などほかの理由で外れたときと、forkのPRは対象外。DependabotのPRも対象外で、dependabot-auto-merge.yamlの毎日の見直しが予約し直す。同じコミットで3回を超えて外れたら、かけ直さずに失敗で知らせる |
 | AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
+| マージ | auto-merge.yaml | pull_request (opened / reopened / ready_for_review / synchronize / auto_merge_disabled) / 30分ごと (schedule) / 手動 | main向けのプルリクエストにauto-mergeを予約する。作成者がAIか所有者かに依らず予約し、下書きの間は予約しない。予約が外れたときは、所有者が手で外した場合も含めて理由を問わず付け直し、30分ごとの見直しで予約の無いプルリクエストにも予約する。マージを保留するときはpre-merge-checkラベルを付けるか下書きにする。DependabotのPR・カナリアPR・forkのPRは対象外で、DependabotのPRはdependabot-auto-merge.yamlが予約する。予約に失敗したときと、同じコミットで3回を超えて外れて付け直しを止めたときは、プルリクエストへのコメントで所有者に知らせる |
+| マージ | close-linked-issues.yaml | pull_request (closed) / 毎時 (schedule) / 手動 | mainへマージされたプルリクエストの本文に`Closes #番号`で書かれたIssueが開いたままなら閉じ、どのプルリクエストのマージで閉じたかをIssueにコメントで記録する。マージされずに閉じたプルリクエストでは動かない。閉じられなかったときと、`Refs: #番号`にだけ書かれたIssueが開いたままのときは、Issueへのコメントで所有者に知らせる。毎時の見直しで、マージから7日以内のプルリクエストの閉じ漏れを拾う |
 | 依存の更新 | dependabot-auto-merge.yaml | pull_request / 日次 (schedule) / 手動 | Dependabotが作成したプルリクエストにauto-mergeを予約する。tflintの更新は、GitHubのリリースの公開から72時間経つまで予約を保留し、毎日の見直しで予約する。公開日時を取れない更新と、版が同じで中身だけが変わった更新は予約せず、プルリクエストへのコメントで所有者に知らせる |
 | 依存の更新 | update-pr-branches.yaml | push (main) | 開いているプルリクエストのブランチをmainの最新に合わせる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
@@ -398,7 +399,7 @@ flowchart LR
 | `/request` | 要望の壁打ちを始め、決まったことを記録して要望のIssueを起票する |
 | `/verify-frontend` `/verify-backend` `/verify-terraform` `/verify-all` | 品質チェック一式の実行と結果報告 |
 | `/verify-ui` | 開発サーバを起動して実際の画面を確認 |
-| `/ship` | 検証からコミット・プルリクエスト作成・マージ予約までの一連の出荷作業 |
+| `/ship` | 検証からコミット・プルリクエスト作成までの一連の出荷作業。自動マージの予約はワークフローが行い、予約が付いたことを確かめる |
 | `/review-loop` | Codexレビューの指摘への対応 |
 | `/spec-review` | 仕様書を別のAIにレビューさせ、指摘と対応を記録に残す |
 | `/retrospective` | チェックをすり抜けた問題を仕組みの改善につなげる振り返り |
