@@ -60,6 +60,20 @@ jobs:
         # actionlintはこの形式を検査しないため、独立した検査として持つ
         run: bash .github/scripts/check-action-pinning.sh
 
+      # 自動マージの予約と Issue クローズの判定スクリプトのテスト。
+      # これらのスクリプトは、使う側のワークフロー(auto-merge / close-linked-issues)の
+      # 中でも実行の直前に自己テストされる。ただしそちらが動くのはPRの作成後や
+      # マージ後で、テストが落ちても気づくのが遅れる。PRの時点で確かめるために
+      # ここでも流す。gh は偽物に置き換えて走るため、権限もネットワークも使わない
+      - name: Test notice comment lib
+        run: bash .github/scripts/tests/test-lib-notice-comment.sh
+
+      - name: Test reserve auto merge
+        run: bash .github/scripts/tests/test-reserve-auto-merge.sh
+
+      - name: Test close linked issues
+        run: bash .github/scripts/tests/test-close-linked-issues.sh
+
       - name: Check owner approval
         id: approval
         env:

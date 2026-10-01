@@ -1,12 +1,13 @@
 ---
-description: verify-all→ブランチ確認→規約準拠commit→push→PR作成→auto-merge予約→CI監視まで、実装完了からマージ予約までを一気通貫で行う。
+description: verify-all→ブランチ確認→規約準拠commit→push→PR作成→auto-mergeの予約の確認→CI監視まで、実装完了からCIの見届けまでを一気通貫で行う。auto-mergeは仕組みが予約する。
 ---
 
 # ship
 
 ## Job
 
-実装完了後の出荷手順。verify → commit → push → PR作成 → auto-merge予約 → CI監視。
+実装完了後の出荷手順。verify → commit → push → PR作成 → auto-mergeの予約の確認 → CI監視。
+auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する。AIは予約の操作をせず、予約されたことを確かめる。
 人間はマージに関与しない(ゲート全通過で自動マージされる)。
 
 ## Steps
@@ -37,17 +38,25 @@ description: verify-all→ブランチ確認→規約準拠commit→push→PR作
 
 5. **PR作成**: `gh pr create` で作成する。PR本文に必ず含めるもの:
    - `Refs: #<Issue番号>`
-   - `Closes #<Issue番号>`(例外なく必須。マージ時にGitHubがIssueを自動で閉じる)
+   - `Closes #<Issue番号>`(例外なく必須。マージ時にGitHubがIssueを自動で閉じる。GitHubが閉じなかったときは仕組みが閉じる)
    - Lane A(spec駆動)の場合: `Spec: .kiro/specs/<feature>`(size-checkがこの行で判定する)
    - テストのアサーションを意図的に変更した場合: `Test-Change-Justification: <理由>`
    - 変更概要・検証結果(verifyのReport)
 
-   対応するIssue(Refs: #<Issue番号>)に `pre-merge-check` ラベルが付いている場合は、
-   PRにも同じラベルを付与する(ラベルが無ければ
+   対応するIssue(Refs: #<Issue番号>)に `pre-merge-check` ラベルが付いているかを、PRを作る前に確かめる。
+   付いている場合は、`gh pr create` に `--label pre-merge-check` を付け、PRの作成と同時に同じラベルを付ける
+   (リポジトリにラベルが無ければ、先に
    `gh label create pre-merge-check --description "マージ前に人間がローカルで確認するPR" --color 1D76DB` で作成)。
+   PRを作った後からラベルを付ける形にしない。仕組みがPRの作成の直後にauto-mergeを予約するため、
+   後から付けると、付くまでの間は保留が効かない。
    このラベルのPRは、所有者がローカル確認してApproveするまで pre-merge-check チェックが赤のままになる。
 
-6. **auto-merge予約**: `gh pr merge --auto --squash <PR番号>`
+6. **auto-mergeの予約の確認**: auto-mergeは仕組みが予約する。AIは `gh pr merge` で予約の操作をしない。
+   予約されたことを次のコマンドで確かめる(`true` なら予約済み)。
+   `gh pr view <PR番号> --json autoMergeRequest --jq '.autoMergeRequest != null'`
+   - PRの作成の直後はまだ付いていないことがある(ワークフローが動くまで1分ほど)。`false` のときは少し待って確かめ直す
+   - 数分たっても付かないとき、またはPRに予約の失敗を知らせるコメントが付いたときは、
+     自分で予約の操作をせず、その旨を報告する(手順7のCI監視は続ける)
 
 7. **CI監視**: `gh pr checks <PR番号> --watch` で必須チェックの結果を見届ける。
    - 赤になったら修正してpushする(以降のレビュー対応は `/review-loop` に従う)
@@ -72,7 +81,8 @@ ship:
 - verify-all -> PASS
 - branch     -> <ブランチ名>
 - commit     -> <コミットハッシュ> <サブジェクト>
-- PR         -> <PR URL>(auto-merge予約済み)
+- PR         -> <PR URL>
+- auto-merge -> 仕組みによる予約を確認済み / 未予約(確かめた結果と、失敗の知らせの有無)
 - checks     -> 監視結果 / 人間承認待ちの有無
-- issue      -> Closes #<Issue番号> 記載済み(マージ時に自動クローズ)
+- issue      -> Closes #<Issue番号> 記載済み(マージ時に自動クローズ。GitHubが閉じなかったときは仕組みが閉じる)
 ```
