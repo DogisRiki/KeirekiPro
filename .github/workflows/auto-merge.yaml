@@ -1,0 +1,183 @@
+# =====================================================================
+# main 向けのPRに auto-merge を予約し、外れたら付け直す(#455)
+#
+# 予約を、AIの操作(/ship の手順)にもPRの作成者にも依らず、この仕組みが行う。
+# 所有者のアカウントで作ったPRには誰も予約せず、予約が外れたPRは誰かが予約し直す
+# まで止まっていた。予約後は、必須チェックがすべて緑になり必要な承認が揃った時点で
+# GitHub が自動でマージする。予約そのものはゲートを飛ばさない(bot に ruleset の
+# 迂回の権限は無く、スクリプトも迂回の指定を使わない)。
+#
+#   reserve  PRのイベント(作成・開き直し・下書き解除・コミット・予約外れ)で、
+#            そのPRの番号を渡して reserve-auto-merge.sh を呼ぶ
+#   sweep    30分ごとと手動で、reserve-auto-merge.sh --sweep を1回呼ぶ(見直し)
+#
+# ここは「いつ・どのPRについて動かすか」だけを持つ。対象かどうかの判定、予約の操作、
+# 知らせのコメントは reserve-auto-merge.sh が持つ(テストは
+# tests/test-reserve-auto-merge.sh)。スクリプトは起点のイベントを見ず、
+# その時点のPRの状態を照会して決める。
+#
+# 予約が外れたら、理由を問わず付け直す:
+#   所有者の承認後、rerun-approval-gated-checks.yaml が承認前に失敗したゲートの
+#   実行をやり直した直後に、GitHub が auto-merge の予約を外すことがある。
+#   記録上の理由は「Repository rule violations found」(reasonCode:
+#   repository_rule_violation)で、外れたまま誰かが予約し直すまでPRが止まる
+#   (#348 #371 #379 #437 で発生。#440)。
+#   以前の rearm-auto-merge.yaml はこの理由のときだけ付け直していた。いまは手で
+#   外した場合も付け直す。マージを保留したいときは、予約を外すのではなく
+#   pre-merge-check ラベルを付けるか、PRを下書きにする。
+#   同じコミットで3回を超えて外れたPRには付け直さず、PRへのコメントで所有者に
+#   知らせる。新しいコミットが積まれると再開する(synchronize を起点に含める理由)。
+#
+# なぜ GITHUB_TOKEN ではなくPATで予約するか:
+#   GITHUB_TOKEN で予約した auto-merge のマージpushは後続のワークフローを起動せず、
+#   依存グラフのスナップショットが欠けて以降のPRが赤になる(#326)。
+#   PAT(BOT_GITHUB_TOKEN)は予約の操作にだけ渡す(RESERVE_TOKEN)。
+#
+# なぜ照会と知らせは github.token で行うか:
+#   PATを使う範囲を予約の操作1つに絞るため。また、知らせのコメントが重ならない
+#   ようにする判定は、github-actions[bot] が書いたコメントだけを数える
+#   (lib-notice-comment.sh)。第三者が同じ目印を書いても知らせは抑えられない。
+#   知らせは先頭行の所有者へのメンションで届く。
+#
+# 対象から除くPR:
+#   - Dependabot のPR: dependabot-auto-merge.yaml が予約の時期を決めている
+#     (公開から72時間の待ち)。ここで予約すると待ちを飛ばす
+#   - カナリアPR(ブランチ名 canary/、ラベル canary): マージしてはならない
+#   - fork からのPR: シークレットが渡らないため予約できない
+#   Dependabot と fork は、イベントにシークレットが渡らないため、ジョブの条件で
+#   スクリプトより前に除く。スクリプトも同じ条件を判定するため、見直しでも除かれる。
+#   カナリアPRはスクリプトが除く。
+#
+# 見直し(sweep)の役割:
+#   予約が外れたことのイベントを受け取れなかったPR、イベントの実行が失敗したPRを
+#   拾う。予約の無い状態は、長くても次の見直しまでで終わる。
+#   定期実行(schedule)の失敗通知は、cronの記述を最後に書き換えた利用者にしか
+#   届かない(https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)。
+#   このワークフローを書いたのはbotのため、赤で終わっても所有者には届かない。
+#   所有者への経路はPRへの知らせのコメントである。見直しそのものが止まったこと
+#   (60日間活動が無いと定期実行は自動で止まる)は検知しない(残余リスクとして
+#   運用文書に記録)。
+# =====================================================================
+name: Auto Merge
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, ready_for_review, synchronize, auto_merge_disabled]
+  schedule:
+    # 毎時 07分と37分(UTC)。予約の無いPRを30分ごとに見直す
+    - cron: '7,37 * * * *'
+  # 手動の見直し。導入直後の動作確認と、見直しが赤で終わったあとの流し直しに使う
+  workflow_dispatch:
+
+# GITHUB_TOKEN は、スクリプトの取得(contents: read)と、PRの照会・知らせのコメント
+# (pull-requests: write)にだけ使う。予約は BOT_GITHUB_TOKEN で行う。
+# pull_request_target は使わない(PRのコードを特権で実行する危険がある)
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  reserve:
+    name: reserve
+    # PRのイベントだけで動かす(定期実行と手動にはPRの情報が無い)。
+    # fork のPRではシークレットを使えないため同一リポジトリのPRに限る。
+    # Dependabot のPRは dependabot-auto-merge.yaml が予約の時期を決めているため除く
+    # (Dependabot 発のイベントにもシークレットは渡らない)。
+    # PRの作成者で判定する。github.actor は「最後にイベントを起こした人」であり、
+    # 偽装できるため使わない
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    concurrency:
+      # 同じPRのイベントが重なると、予約と知らせのコメントが重なる。走行中は後発を
+      # 待たせる。取り消すと、予約の操作の途中で止まった実行が残る
+      group: auto-merge-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    # gh api には時間の上限が無い。応答が返らないときに既定の360分を握らせない
+    timeout-minutes: 10
+    steps:
+      # PRのコードは実行しない。スクリプトは base(main)のコミットのものを使う。
+      # pull_request のイベントで ref を指定しないとPRとのマージ結果が取得され、
+      # PRが書き換えたスクリプトを書き込み権限とPATつきで実行することになる。
+      # 認証情報は .git に残さない(後続のステップは gh だけでAPIを呼ぶ)
+      - name: Checkout base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      # 予約の前にスクリプトのテストを行う。壊れた判定で予約しない
+      # (テストは gh を偽物に置き換えるため、ネットワークを使わない)。
+      # スクリプトには実行ビットが無いため bash 経由で起動する
+      - name: Test reserve scripts
+        run: |
+          set -uo pipefail
+          for t in test-lib-notice-comment.sh test-reserve-auto-merge.sh; do
+            if ! bash ".github/scripts/tests/${t}"; then
+              echo "::error::${t} が失敗しました。自動マージは予約しません。"
+              exit 1
+            fi
+          done
+
+      # 判定・予約・知らせはスクリプトが行う。予約できなかったときは、スクリプトが
+      # PRへのコメントで所有者に知らせ、知らせを付けられたら終了コード 0 で終える。
+      # 赤で終わるのは、PRを照会できない・知らせを付けられないときである
+      - name: Reserve auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESERVE_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/reserve-auto-merge.sh "$PR_NUMBER"; then
+            echo "::error::PR #${PR_NUMBER} の自動マージの予約を判定できなかったか、知らせを付けられませんでした。次の見直しで判定し直します。"
+            exit 1
+          fi
+
+  sweep:
+    name: sweep
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    concurrency:
+      # 同時に走ると同じPRへの予約と知らせのコメントが重なる。走行中は後発を待たせる
+      group: auto-merge-sweep
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    # 最大100件のPRを1件ずつ判定する(1件ごとの時間の上限はスクリプトが付ける)。
+    # 応答が返らないときに既定の360分を握らせない
+    timeout-minutes: 30
+    steps:
+      # 定期実行は既定のブランチ(main)で動くが、手動の実行はブランチを選んで起動できる。
+      # ブランチ名を明示し、どちらの起動でも main のスクリプトだけを bot のトークンつきで
+      # 動かす(ref を省くと、手動で選んだブランチのスクリプトが動く)。
+      # 認証情報は .git に残さない
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Test reserve scripts
+        run: |
+          set -uo pipefail
+          for t in test-lib-notice-comment.sh test-reserve-auto-merge.sh; do
+            if ! bash ".github/scripts/tests/${t}"; then
+              echo "::error::${t} が失敗しました。自動マージは予約しません。"
+              exit 1
+            fi
+          done
+
+      # 見直しの対象の一覧と、1件ごとの判定はスクリプトが行う。ここではPRを選ばない。
+      # 1件が失敗しても残りのPRを続け、失敗が1件でもあれば赤で終える
+      - name: Sweep open PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESERVE_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/reserve-auto-merge.sh --sweep; then
+            echo "::error::見直しで処理できなかったPRがあります。上のログを確かめてください。"
+            exit 1
+          fi
