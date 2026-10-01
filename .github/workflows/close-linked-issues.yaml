@@ -1,0 +1,181 @@
+name: Close Linked Issues
+
+# マージされたPRに対応するIssueを閉じる。
+#
+# 何をするか:
+#   main へマージされたPRの本文に `Closes #<番号>` で書かれたIssueが開いたままなら
+#   閉じ、どのPRのマージで閉じたかをIssueにコメントで記録する。
+#   閉じられなかったときと、`Refs: #<番号>` にだけ書かれたIssueが開いたままのときは、
+#   そのIssueに知らせのコメントを1回だけ付けて、所有者に知らせる。
+#   `Refs:` だけのIssueは閉じない(続きの作業が残っていることがあるため。ただし
+#   `Closes` の書き忘れとは見分けられないので、開いたままであることを知らせる)。
+#
+# なぜ要るか:
+#   Issueが閉じるかどうかは、GitHubがPR本文の `Closes` を紐づけるかどうかに
+#   任されていた。紐づかないことがあり、マージ後もIssueが開いたまま残った
+#   (#448。Issue #455)。GitHubの紐づけの成否に依らず、本文に書かれたIssueを閉じる。
+#   マージの方法(自動マージか手動か)とPRの作成者には依らない。
+#
+#   on-merge  PRがマージされたときに、そのPRのIssueを閉じる。
+#             マージされずに閉じたPRでは動かない
+#   sweep     1時間ごとと手動で、マージ済みのPRをまとめて見直す
+#
+# なぜ60秒待つか(on-merge):
+#   GitHub自身も、紐づけたIssueをマージの直後に閉じる。先に動くと、GitHubが
+#   閉じるはずのIssueをこちらが閉じ、記録のコメントが余分に付く。60秒待ってから
+#   Issueの状態を読み、すでに閉じていれば何も書き込まない。
+#
+# 見直し(sweep)の役割と対象の期間:
+#   マージのイベントで起動したジョブが動かなかった・途中で失敗したときに備える。
+#   main へマージされたPRのうち、マージが7日前から5分前までのものを見直し、
+#   開いたままの `Closes` のIssueを閉じ、`Refs:` だけのIssueの知らせが無ければ付ける。
+#   直近5分を除くのは、on-merge と同じPRを同時に扱わないため。
+#   マージの後に一度でも閉じられたIssueには、開き直されていても触らない。
+#   同じ知らせは重ねない(何度動いても結果は同じ)。
+#
+# なぜシークレットを使わないか:
+#   Issueのクローズとコメントは github.token でできる。bot のトークン
+#   (BOT_GITHUB_TOKEN)に頼ると、その期限が切れたときにIssueが閉じなくなる。
+#   github.token だけで動かし、bot のトークンが切れても動き続けるようにする。
+#   github.token での操作は後続のワークフローを起動しないが、Issueのクローズを
+#   起点とするワークフローは無い。
+#
+# 所有者への経路:
+#   知らせはIssueへのコメント(所有者へのメンション付き)で届ける。
+#   定期実行(schedule)の失敗通知は、cronの記述を最後に書き換えた利用者にしか
+#   届かない(https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)。
+#   このワークフローを書いたのはbotのため、sweep が赤で終わっても所有者には
+#   届かない。見直しが止まったことと、知らせのコメントを付けられなかったことは
+#   検知しない(残ったリスクとして運用文書に記録)。
+#
+# 判定の基準・本文の読み取り規則・知らせの文面は close-linked-issues.sh 側が持つ。
+# ここは起動の条件と権限のみ。
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  schedule:
+    # 毎時23分。マージのイベントで閉じ漏れたIssueを、1時間以内に見直す
+    - cron: '23 * * * *'
+  # 手動の見直し。導入直後の閉じ漏れの回収と、動作確認に使う
+  workflow_dispatch:
+
+# 書き込みはIssueのクローズとコメントのための issues: write だけ。
+# contents は checkout、pull-requests はPRの本文とマージ日時の読み取りに使う。
+# PR・リポジトリの内容には書き込まない。secrets は使わない。
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  on-merge:
+    name: on-merge
+    # マージされたPRだけで動かす。マージされずに閉じたPRではIssueを閉じない。
+    # スクリプトもPRがマージ済みであることを照会して確かめる(二重の確認)。
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.merged == true
+    concurrency:
+      # 同じPRの処理を重ねない。走行中のものは取り消さず、後発を待たせる
+      # (取り消すと、閉じたあと記録のコメントを付ける前に止まりうる)
+      group: close-linked-issues-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    # 60秒の待ちと自己テストを含む。gh の応答が返らないときに既定の360分を握らせない
+    timeout-minutes: 10
+    steps:
+      # PR のコードは実行しない。スクリプトは main のものを使う。
+      # ref を指定しないと、イベントのコミットが取得される。ブランチ名を明示して、
+      # どのイベントでも main のスクリプトだけを Issue の書き込み権限つきで動かす。
+      # 認証情報は .git に残さない(後続のステップは gh だけで API を呼ぶ)。
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      # 実行の前にスクリプトのテストを行う。壊れた判定でIssueを閉じない
+      # (テストは gh を偽物に置き換えるため、ネットワークを使わない)。
+      # スクリプトには実行ビットが無いため bash 経由で起動する。
+      - name: Test close-linked-issues script
+        id: selftest
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/tests/test-lib-notice-comment.sh; then
+            echo "::error::test-lib-notice-comment.sh が失敗しました。Issueは閉じません。"
+            exit 1
+          fi
+          if ! bash .github/scripts/tests/test-close-linked-issues.sh; then
+            echo "::error::test-close-linked-issues.sh が失敗しました。Issueは閉じません。"
+            exit 1
+          fi
+
+      # GitHub 自身のクローズを待つ(冒頭の「なぜ60秒待つか」を参照)
+      - name: Wait for GitHub to close linked issues
+        run: sleep 60
+
+      # PR番号は env 経由で渡す(run の中にイベントの値を直接埋め込まない)。
+      # GITHUB_REPOSITORY と GITHUB_REPOSITORY_OWNER はランナーが既定で入れる。
+      # 閉じる操作に失敗しても、知らせを付けられたら緑で終わる(所有者への経路は
+      # 知らせのコメント)。照会できない・知らせを付けられないときは赤で終わり、
+      # 次の sweep が見直す。
+      - name: Close linked issues
+        id: close
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/close-linked-issues.sh "$PR_NUMBER"; then
+            echo "::error::PR #${PR_NUMBER} に対応するIssueの処理を終えられませんでした。定期の見直しが処理し直します。"
+            exit 1
+          fi
+
+  sweep:
+    name: sweep
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    concurrency:
+      # 同時に走ると同じIssueへのクローズとコメントが重なる。走行中は後発を待たせる
+      group: close-linked-issues-sweep
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    # 最大200件のPRを1件ずつ見直す(1件ごとの時間の上限はスクリプトが付ける)。
+    # gh の応答が返らないときに既定の360分を握らせない
+    timeout-minutes: 30
+    steps:
+      # 定期実行は既定のブランチ(main)で動くが、手動の実行はブランチを選べる。
+      # ブランチ名を明示して、どちらでも main のスクリプトだけを動かす
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Test close-linked-issues script
+        id: selftest
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/tests/test-lib-notice-comment.sh; then
+            echo "::error::test-lib-notice-comment.sh が失敗しました。Issueは閉じません。"
+            exit 1
+          fi
+          if ! bash .github/scripts/tests/test-close-linked-issues.sh; then
+            echo "::error::test-close-linked-issues.sh が失敗しました。Issueは閉じません。"
+            exit 1
+          fi
+
+      # 見直しの入口を1回呼ぶ。対象のPRの一覧と期間の判定はスクリプトが持ち、
+      # ワークフローはPRを選ばない。1件が失敗しても残りを続け、失敗が1件でも
+      # あれば赤で終わる(次の見直しが同じPRを処理し直す)。
+      - name: Sweep merged PRs
+        id: sweep
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/close-linked-issues.sh --sweep; then
+            echo "::error::処理を終えられなかったPRがあります。上のログを確かめてください(次の見直しが処理し直します)。"
+            exit 1
+          fi
