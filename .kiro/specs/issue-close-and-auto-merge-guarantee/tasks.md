@@ -118,7 +118,7 @@
   - 完了の観測条件: リポジトリの中に、AI に予約の操作を求める記述が残っていない(`gh pr merge --auto` の検索で、仕組みのスクリプト・Dependabot のワークフロー・`.claude/settings.json` の許可設定のほかに、手順としての記述が無い)
   - _Requirements: 7.1, 7.2_
   - _Boundary: ship SKILL.md, CLAUDE.md_
-- [ ] 5.2 (P) README のワークフロー一覧表と Mermaid 図を直す
+- [x] 5.2 (P) README のワークフロー一覧表と Mermaid 図を直す
   - `rearm-auto-merge.yaml` の行を新しい予約のワークフローの行に置き換え、Issue クローズのワークフローの行を足す。Mermaid 図の予約の記述を直す
   - コマンド一覧の `/ship` の説明(「マージ予約までの一連の出荷作業」)を、仕組みが予約する前提に合わせる
   - 受入基準 7.1(README の `/ship` の説明)と 7.3 を、表と図が 4.1・4.2 のワークフローの起点と内容に一致することで確かめる
