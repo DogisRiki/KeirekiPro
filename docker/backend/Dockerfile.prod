@@ -29,8 +29,11 @@ FROM eclipse-temurin:21-jre@sha256:d7051a45dd955e4d5d1db4d3f4269fe13d1c6dff8cc6b
 
 WORKDIR /app
 
-# ヘルスチェック用にcurlをインストール
+# OSパッケージを最新にし、ヘルスチェック用にcurlをインストール
+# ベースイメージの作り直しは、OSの配布元が修正版を出してから遅れる。
+# その間も修正版を取り込むため、ビルドのたびに upgrade する(#453)。
 RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
