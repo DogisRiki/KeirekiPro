@@ -3,11 +3,13 @@ package com.example.keirekipro.unit.presentation.resume.controller;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
@@ -111,26 +113,45 @@ class ExportResumeControllerTest {
     }
 
     @Test
-    @DisplayName("Acceptヘッダーが想定外の場合、500エラーとなる")
+    @DisplayName("Acceptヘッダーが対応していない形式の場合、406エラーとなる")
     void test3() throws Exception {
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID)
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isNotAcceptable())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("対応していない形式が指定されました。"))
+                .andExpect(jsonPath("$.errors").isEmpty());
 
         verify(currentUserFacade).getUserId();
+        verifyNoInteractions(useCase);
     }
 
     @Test
-    @DisplayName("Acceptヘッダーがない場合、500エラーとなる")
+    @DisplayName("Acceptヘッダーがない場合、406エラーとなる")
     void test4() throws Exception {
         when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
 
         mockMvc.perform(get(ENDPOINT, RESUME_ID))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isNotAcceptable())
+                .andExpect(jsonPath("$.message").value("対応していない形式が指定されました。"));
 
         verify(currentUserFacade).getUserId();
+        verifyNoInteractions(useCase);
+    }
+
+    @Test
+    @DisplayName("AcceptヘッダーがJSONを含まない対応外の形式の場合も、406エラーとなる")
+    void test8() throws Exception {
+        when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
+
+        mockMvc.perform(get(ENDPOINT, RESUME_ID)
+                .header(HttpHeaders.ACCEPT, MediaType.TEXT_HTML_VALUE))
+                .andExpect(status().isNotAcceptable());
+
+        verify(currentUserFacade).getUserId();
+        verifyNoInteractions(useCase);
     }
 
     @Test
