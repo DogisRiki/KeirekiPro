@@ -14,7 +14,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
 
 - [ ] 1. 書き方の決まりのファイルと古い雛形を用意する
 
-- [ ] 1.1 今の雛形を古い雛形の置き場所に写す
+- [x] 1.1 今の雛形を古い雛形の置き場所に写す
 
   Claude は、`.kiro/settings/templates/specs/` の requirements-init.md・requirements.md・design.md・tasks.md を、中身を変えずに `.kiro/settings/templates/specs-v1/` に写す。Claude は init.json と research.md を写さない。research.md は、新旧どちらの spec でも同じ雛形を使うからである。
   - 完了の確かめ方: `specs-v1/` の4つのファイルが、写す前の `specs/` の4つのファイルと1文字も違わない
