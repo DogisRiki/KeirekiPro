@@ -13,7 +13,7 @@
 
 ## Tasks
 
-- [ ] 1. 親のIssueを閉じる処理(close-linked-issues)
+- [x] 1. 親のIssueを閉じる処理(close-linked-issues)
 - [x] 1.1 Issueの問い合わせで親と子の数を取れるようにする
   - Issueの問い合わせ(ISSUE_QUERY)に、子の数(`subIssuesSummary` の `total` と `completed`)と親の番号(`parent.number`)を足す。親の問い合わせにも同じクエリを使う
   - テストの偽の `gh` が返すIssueの応答に、`subIssuesSummary` と `parent` を持たせられるようにする。持たせないIssueは、子が0件で親が無いIssueとして返す
@@ -38,7 +38,7 @@
   - _Requirements: 9.6_
   - _Boundary: close-linked-issues.sh_
 
-- [ ] 2. spec を作る手順の変更
+- [x] 2. spec を作る手順の変更
 - [x] 2.1 (P) spec の各段階のコマンドを、AIが自分では起動できないようにする
   - kiro-spec-requirements / -design / -tasks の SKILL.md の冒頭に `disable-model-invocation: true` を足す
   - kiro-impl にはすでに付いているため、変えない(design の Out of Boundary の「4つのスキル」は、init・requirements・design・tasks を指す。init は 2.2 が受け持つ)
@@ -65,7 +65,7 @@
   - _Requirements: 5.7, 5.9, 10.6, 10.7_
   - _Boundary: spec-reviewer, spec-review_
 
-- [ ] 3. 起票と出荷の決まりの変更
+- [x] 3. 起票と出荷の決まりの変更
 - [x] 3.1 (P) 起票の決まりに、起票後の案内とサブIssueの起票を足す
   - Step 6 の spec の要否の案内を消し、「着手するときは `/start #<番号>` を打ってください」とだけ案内する
   - 「分けた部分のIssue」の節を足す: `gh issue create --parent <元の番号>` で起票する。本文の最初に「#<元の番号> を分けた部分です。」と書く。所有者が了承した分け方(要件6)では、元のIssueの本文のうちその部分の項目と、了承された分け方のその部分の範囲だけで本文を作り、分け方の提案で案を見せているので Step 4 を改めて行わない。実装の途中の分割(要件7)では、元のIssueの本文からの抜き出しだけで作り、言い換えず、項目を足さず、出どころの印も写す。これを「了承を得ずに起票しない」の例外として明記し、起票したら番号と題名を所有者に示す
@@ -84,7 +84,7 @@
   - _Requirements: 7.7, 9.4_
   - _Boundary: ship_
 
-- [ ] 4. 着手の手順(`/start`)
+- [x] 4. 着手の手順(`/start`)
 - [x] 4.1 Issueを読み、すでに進んでいるものを見分ける部分を作る
   - 新しいスキル `start` を作る。冒頭は `name: start`、`argument-hint: <#Issue番号>`、`disable-model-invocation` は付けない。説明文に「Issueへの着手を頼まれたら必ず使う」と書く。引数が無いか読めないときは番号を尋ねる
   - `gh issue view <N> --json number,title,body,state,parent,subIssues,subIssuesSummary` で読み、コメントは取得しない。無いIssueと閉じたIssueには着手せずに伝える。gh の問い合わせに失敗したときは、判断せずに失敗したことを伝えて終える。書く前に、この `gh issue view` を #472 で1回実行し(読み取りだけ)、返る欄の形を確かめる
@@ -120,7 +120,7 @@
   - 完了の観測条件: `start` の SKILL.md に、見直しの時点・止めたあとの2つの道・200行の検査で止まったとき・spec の途中の扱いが書かれている
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 8.2_
 
-- [ ] 5. 文書の変更
+- [x] 5. 文書の変更
 - [x] 5.1 (P) CLAUDE.md を新しい進め方に合わせる
   - spec駆動開発の節の Lane A/B の定義を、着手時に `/start` が進め方を決め、基準は4つの観点、という内容に書き換え、観点の表を載せる(`/start` の表と同じ内容)
   - 200行の項を、着手時の判断をすり抜けた変更を止める最後の網で、着手時の判断の基準ではない、と書き直す。ワークフローの節に、着手は `/start #N` で始め、spec の各段階のコマンドは所有者が打つと書く
@@ -146,7 +146,7 @@
   - _Requirements: 9.6_
   - _Boundary: 監査手順_
 
-- [ ] 6. 検証と出荷の準備
+- [x] 6. 検証と出荷の準備
 - [x] 6.1 すべての検査と、受入基準ごとの突き合わせを行う
   - test-close-linked-issues.sh と test-lib-notice-comment.sh をコンテナ内で流し、close-linked-issues.sh と test-close-linked-issues.sh に shellcheck を流す。新しいテストは対象を一時的に壊して赤くなることを確かめてから戻す
   - 要件1〜10 の受入基準ごとに、確かめる場所(テスト名、または SKILL.md と文書の節)を一覧にし、抜けが無いことを確かめる

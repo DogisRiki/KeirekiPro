@@ -140,7 +140,7 @@ AIは、Step 6 で示した判断に応じて、次のとおり進む。どの�
 
 AIは、判断を示したら、所有者の返事を待たずに実装を始める。
 
-1. AIは `.branch_name_template` に従って、最新の main からブランチを作る。`git fetch origin` を実行してから、`git switch --no-track -c <type>/<short-description> origin/main` で作る。いまいるブランチから作らない(別の feature ブランチにいるときに `/start` を打たれると、そのブランチのコミットを引き継いでしまうため)。作業ツリーにコミットしていない変更があるときは、AIはブランチを作らず、そのことを所有者に伝えて止まる(`origin/main` から作っても、コミットしていない変更は新しいブランチへ持ち越され、持ち越せないときは `git switch` が失敗するため)
+1. AIは `.branch_name_template` に従って、最新の main からブランチを作る。`git fetch origin` を実行してから、`git switch --no-track -c <type>/<short-description> origin/main` で作る。いまいるブランチから作らない(別の feature ブランチにいるときに `/start` を打たれると、そのブランチのコミットを引き継いでしまうため)。git が管理しているファイルにコミットしていない変更があるとき(`git status --porcelain --untracked-files=no` の出力があるとき)は、AIはブランチを作らず、そのことを所有者に伝えて止まる(`origin/main` から作っても、コミットしていない変更は新しいブランチへ持ち越され、持ち越せないときは `git switch` が失敗するため)。git が管理していないファイル(別の会話が作りかけの spec のフォルダなど)は、この判定に含めない
 2. AIはIssueの本文のとおりに実装する。実装の途中は、「途中で見立てが外れたとき」の見直しの時点で、4つの観点を当て直す
 3. AIは `/verify-all` の手順で、変更した領域の verify を通す
 4. AIは `/ship` を自分で実行して出荷する。所有者に `/ship` を打つよう頼まない

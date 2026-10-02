@@ -35,7 +35,7 @@ Decide the mode from $ARGUMENTS before doing anything else:
      - `ja` → language code (detect from user's input language, default to `en`)
    - Write `spec.json` and `requirements.md` to spec directory
 
-## Update Mode Steps
+## Update Mode Steps(更新の形)
 Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-2 only read; nothing is written until step 3.
 
 1. **Read the new Issue**: Run `gh issue view <N> --json number,title,body,state`. The body is the owner's request. Do NOT read the comments (no `comments` field, no `--comments`), for the same reason as step 0 of the Execution Steps. If the command fails or the Issue does not exist, report it and write nothing.
