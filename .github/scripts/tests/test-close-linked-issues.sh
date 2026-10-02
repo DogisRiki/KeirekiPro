@@ -7,12 +7,16 @@
 # 見直しの入口(--sweep)は、現在時刻を NOW_EPOCH で固定し、対象の期間(マージが7日前から
 # 5分前まで)の境界と、標準出力(pr=<PR番号> issue=<番号> result=<...> の行)を確かめる。
 #   終了コード 0 = すべての Issue について判定と、必要な操作・知らせを終えた
-#                  (閉じる操作が失敗しても、知らせを付けられたら 0)
+#                  (Issue や親の Issue を閉じる操作・親の照会が失敗しても、知らせを付けられたら 0)
 #   終了コード 1 = 照会できない、応答の形が想定と違う、記録または知らせを付けられない、使い方の誤り
 #
 # gh の偽物は実APIの形のJSONをそのまま返し、応答の解釈は本体に任せる
 # (応答の形は 2026-10-01 に実物の GraphQL で確かめたもの。存在しない番号と PR の番号は、
-#  どちらも errors に NOT_FOUND を持つ応答と終了コード 1 になる)。
+#  どちらも errors に NOT_FOUND を持つ応答と終了コード 1 になる。Issue の子の数と親の番号は
+#  2026-10-02 に #472 で確かめたもの。subIssuesSummary は子が無くても {"total":0,"completed":0} で
+#  返り、親が無ければ parent は null になる。親のリポジトリ(parent.repository.nameWithOwner)は、同じ日に
+#  #472 の repository { nameWithOwner } で欄の形を確かめた。このリポジトリに親を持つ Issue が無いため、
+#  親の欄の中の形は GraphQL のスキーマ(parent は Issue 型)に合わせている)。
 # 想定していない呼び出しは失敗させ、記録を残す。
 #
 # 外部への問い合わせを行わないため、実行にネットワークを必要としない。
@@ -42,8 +46,11 @@ mkdir -p "$WORK/bin"
 #              検索条件では絞らず、ファイルの中身をそのまま返す(期間の判定は本体が行う)
 #   Issue の照会: $STUB_ISSUES/<番号>.json があればその中身。
 #                 $STUB_ISSUES/<番号>.fail があればその中身を出して失敗。
-#                 どちらも無ければ「存在しない、または PR を指している」の応答で失敗
-#   Issue のクローズ: STUB_FAIL_CLOSE の番号なら失敗
+#                 どちらも無ければ「存在しない、または PR を指している」の応答で失敗。
+#                 照会のクエリは $STUB_ISSUE_QUERY に保存する(最後の1件)
+#   Issue のクローズ: STUB_FAIL_CLOSE の番号なら失敗。
+#                     成功したら $STUB_ISSUES/<番号>.json の state を CLOSED にし、その Issue にこのリポジトリの親があれば、
+#                     親の応答の閉じた子の数(subIssuesSummary.completed)を1つ増やす(実物の照会の結果に合わせる)
 #   Issue へのコメント: 本文を $STUB_POSTED/comment_<番号>.md に保存(STUB_FAIL_COMMENT の番号なら失敗)
 #   コメントの一覧: $STUB_COMMENTS/<番号>.json があればその中身、無ければ [](STUB_FAIL_LIST の番号なら失敗)。
 #                   実物の REST の形(.user.login が github-actions[bot]、.created_at、.body)で置く
@@ -99,6 +106,7 @@ if [ "${1:-} ${2:-}" = "api graphql" ]; then
         ;;
     *"issue(number:"*)
         printf 'graphql issue %s\n' "$number" >>"${STUB_CALLS:?}"
+        printf '%s\n' "$query" >"${STUB_ISSUE_QUERY:?}"
         if [ -f "${STUB_ISSUES:?}/${number}.json" ]; then
             cat "$STUB_ISSUES/${number}.json"
         elif [ -f "$STUB_ISSUES/${number}.fail" ]; then
@@ -157,6 +165,19 @@ case "$*" in
         echo "gh: Resource not accessible by integration (HTTP 403)" >&2
         exit 1
     fi
+    # 実物と同じく、閉じた Issue のその後の照会は CLOSED を返し、親の閉じた子の数は1つ増える
+    issue_file="${STUB_ISSUES:?}/$3.json"
+    if [ -f "$issue_file" ]; then
+        parent=$(jq -r '.data.repository.issue.parent
+            | if . != null and (.repository.nameWithOwner | ascii_downcase) == "owner/repo" then .number else empty end' "$issue_file") &&
+            jq '.data.repository.issue.state = "CLOSED"' "$issue_file" >"$issue_file.tmp" &&
+            mv "$issue_file.tmp" "$issue_file" || unexpected "$@"
+        parent_file="$STUB_ISSUES/${parent}.json"
+        if [ -n "$parent" ] && [ -f "$parent_file" ]; then
+            jq '.data.repository.issue.subIssuesSummary.completed += 1' "$parent_file" >"$parent_file.tmp" &&
+                mv "$parent_file.tmp" "$parent_file" || unexpected "$@"
+        fi
+    fi
     echo "✓ Closed issue owner/repo#$3" >&2
     ;;
 "issue comment "*" --repo owner/repo --body-file "*)
@@ -194,14 +215,30 @@ pr_json() {
 }
 
 # 使い方: issue <番号> <OPEN|CLOSED> [<閉じた日時> ...]
+# 子が0件で親の無い Issue にする(子と親は family で足す)。
 issue() {
     local n="$1" state="$2"
     shift 2
     printf '%s\n' "$@" | jq -R -s --arg state "$state" '
         {data: {repository: {issue: {
             state: $state,
-            timelineItems: {nodes: (split("\n") | map(select(length > 0) | {createdAt: .}))}}}}}' \
+            timelineItems: {nodes: (split("\n") | map(select(length > 0) | {createdAt: .}))},
+            subIssuesSummary: {total: 0, completed: 0},
+            parent: null}}}}' \
         >"$WORK/issues/${n}.json"
+}
+
+# 使い方: family <番号> <親の番号、親が無ければ -> <子の数> <閉じた子の数> [<親のリポジトリ>]
+# issue で置いた Issue の応答に、親の番号と子の数を書き込む。
+# 親のリポジトリを省くと、このリポジトリ(owner/repo)にする。
+family() {
+    local file="$WORK/issues/$1.json"
+    jq --arg parent "$2" --argjson total "$3" --argjson completed "$4" --arg repo "${5:-owner/repo}" '
+        .data.repository.issue += {
+            subIssuesSummary: {total: $total, completed: $completed},
+            parent: (if $parent == "-" then null
+                     else {number: ($parent | tonumber), repository: {nameWithOwner: $repo}} end)}' \
+        "$file" >"$file.tmp" && mv "$file.tmp" "$file"
 }
 
 # 使い方: comments <番号> <作成者> <本文のファイル>
@@ -236,11 +273,13 @@ reset_scenario() {
 
 run() {
     : >"$WORK/calls.log"
+    : >"$WORK/issue-query.txt"
     rm -rf "$WORK/posted"
     mkdir -p "$WORK/posted"
     PATH="$WORK/bin:$PATH" \
         STUB_CALLS="$WORK/calls.log" STUB_UNEXPECTED="$WORK/unexpected.log" \
-        STUB_PR="$WORK/pr.json" STUB_ISSUES="$WORK/issues" STUB_POSTED="$WORK/posted" \
+        STUB_PR="$WORK/pr.json" STUB_ISSUES="$WORK/issues" STUB_ISSUE_QUERY="$WORK/issue-query.txt" \
+        STUB_POSTED="$WORK/posted" \
         STUB_COMMENTS="$WORK/comments" STUB_FAIL_LIST="$FAIL_LIST" STUB_FAIL_NOTICE="$FAIL_NOTICE" \
         STUB_PR_MODE="$PR_MODE" STUB_FAIL_CLOSE="$FAIL_CLOSE" STUB_FAIL_COMMENT="$FAIL_COMMENT" \
         STUB_PRS="$WORK/prs" STUB_PR_LIST="$WORK/pr-list.json" STUB_PR_LIST_MODE="$PR_LIST_MODE" \
@@ -323,6 +362,15 @@ expect_no_notice() {
         ok "$1"
     else
         ng "$1 (知らせが無いか、本文に「$3」がある)"
+    fi
+}
+
+# 使い方: expect_mention <説明> <番号>(知らせの先頭行が所有者へのメンションで始まる)
+expect_mention() {
+    if head -n 1 "$WORK/posted/notice_$2.md" 2>/dev/null | grep -q '^@owner-name '; then
+        ok "$1"
+    else
+        ng "$1 (知らせの先頭行が「@owner-name 」で始まらない)"
     fi
 }
 
@@ -444,6 +492,495 @@ reset_scenario
 issue 21 CLOSED
 run
 check "閉じている Issue(閉じた記録が読めない)にも書き込まない" 0 "issue=21 result=untouched" ""
+
+# =====================================================================
+# Issue の照会で子の数と親の番号を読む(9.5, 9.6)
+# =====================================================================
+reset_scenario
+issue 21 OPEN
+run
+query_text=$(tr -s '[:space:]' ' ' <"$WORK/issue-query.txt")
+for want in 'subIssuesSummary { total completed }' 'parent { number repository { nameWithOwner } }'; do
+    case "$query_text" in
+    *"$want"*) ok "Issue の照会で「$want」を求める" ;;
+    *) ng "Issue の照会で「$want」を求める (照会: $query_text)" ;;
+    esac
+done
+
+reset_scenario
+issue 21 OPEN
+family 21 - 2 1
+run
+check "子を持つ(親の無い)Closes の Issue も、今と同じく閉じて記録する" 0 "issue=21 result=closed" "$(closing 21)"
+
+reset_scenario
+pr_json true "$MERGED_AT" main "Refs: #8"
+issue 8 OPEN
+family 8 30 0 0
+run
+check "親を持つ Refs だけの開いた Issue も、今と同じく閉じずに知らせる" 0 \
+    "issue=8 result=refs-only-noticed" "api POST comments 8"
+expect_queried "Refs だけの Issue の親は照会しない" "8"
+
+# =====================================================================
+# 子がすべて閉じた親を閉じる(9.5, 9.6)
+# =====================================================================
+# 使い方: parent_record <最後に閉じた子の番号> [<PR番号>](親に付ける記録の文面)
+parent_record() {
+    printf 'この Issue から分けた Issue がすべて閉じたため閉じました(最後に閉じたのは #%s、PR #%s のマージによる)。' "$1" "${2:-7}"
+}
+
+# 使い方: expect_record <説明> <番号> <記録の全文>
+expect_record() {
+    if [ "$(cat "$WORK/posted/comment_$2.md" 2>/dev/null)" = "$3" ]; then
+        ok "$1"
+    else
+        ng "$1 (#$2 の記録の期待: $3)"
+        sed 's/^/  | /' "$WORK/posted/comment_$2.md" 2>/dev/null
+    fi
+}
+
+# 最後の子を閉じると、親の子がすべて閉じる
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 2 1
+run
+check "最後の子の Closes の PR がマージされると、親を閉じて記録を付け、parent-closed を出す(9.6)" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-closed')" "$(closing 21 30)"
+expect_record "親の記録に、最後に閉じた子と PR の番号が書いてある" 30 "$(parent_record 21)"
+expect_queried "親は子を閉じた後に照会する" "21 30"
+
+# 同じ実行をもう一度しても(定期の見直しで同じ PR に再び当たっても)、何も書き込まない
+run
+check "同じ PR をもう一度処理しても、閉じた子にも閉じた親にも書き込まない" 0 "issue=21 result=untouched" ""
+expect_queried "もう一度の処理でも、閉じていた子の親を照会する(閉じていれば何もしない)" "21 30"
+
+# 子が残っている親
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 3 1
+run
+check "閉じていない子が残っている親は閉じず、親に書き込まない(9.5)" 0 "issue=21 result=closed" "$(closing 21)"
+expect_queried "子が残っている親も、子を閉じた後に照会して確かめる" "21 30"
+
+# 親がすでに閉じている(子がすべて閉じても何もしない)
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 CLOSED "$BEFORE_MERGE"
+family 30 - 1 0
+run
+check "親がすでに閉じていれば、子がすべて閉じても親に何もしない" 0 "issue=21 result=closed" "$(closing 21)"
+
+# 開き直された親(マージ以後に閉じた記録があり、いまは開いている)
+reopened_parent_case() {
+    reset_scenario
+    issue 21 OPEN
+    family 21 30 0 0
+    issue 30 OPEN "$2"
+    family 30 - 1 0
+    run
+    check "$1" 0 "issue=21 result=closed" "$(closing 21)"
+}
+reopened_parent_case "マージより後に閉じた記録がある開いた親(開き直された親)は、子がすべて閉じても閉じない" "$AFTER_MERGE"
+reopened_parent_case "親の閉じた記録がマージとちょうど同じ日時でも、開き直された親とみなして閉じない" "$MERGED_AT"
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN "$BEFORE_MERGE"
+family 30 - 1 0
+run
+check "マージより前の閉じた記録しか無い開いた親は、子がすべて閉じたら閉じる" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-closed')" "$(closing 21 30)"
+
+# 子・親・親の親の3段
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 40 1 0
+issue 40 OPEN
+family 40 - 2 1
+run
+check "子・親・親の親の3段で、子が閉じると親と親の親を順に閉じる" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-closed\nissue=40 result=parent-closed')" \
+    "$(closing 21 30 40)"
+expect_record "親の親の記録には、最後に閉じた子として親の番号が書いてある" 40 "$(parent_record 30)"
+expect_queried "子・親・親の親の順に照会する" "21 30 40"
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 40 1 0
+issue 40 OPEN
+family 40 - 2 0
+run
+check "親を閉じても、親の親に閉じていない子が残っていれば親の親は閉じない" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-closed')" "$(closing 21 30)"
+
+# GitHub が先に閉じていた子(untouched)
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 2 2
+run
+check "GitHub が先に閉じていた子(untouched)でも、子がすべて閉じていれば親を閉じる" 0 \
+    "$(printf 'issue=21 result=untouched\nissue=30 result=parent-closed')" "$(closing 30)"
+expect_record "先に閉じていた子でも、親の記録にその子と PR の番号が書いてある" 30 "$(parent_record 21)"
+
+# 子の数が0件と返る親(閉じた子の数と等しくても、子が1件以上でなければ閉じない)
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 0 0
+run
+check "子の数が0件と返る親は、閉じた子の数と等しくても閉じない" 0 "issue=21 result=untouched" ""
+expect_queried "子の数が0件と返る親も照会して確かめる" "21 30"
+
+# 開き直された子(untouched だが開いている)の親は確かめない
+reset_scenario
+issue 21 OPEN "$AFTER_MERGE"
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 1
+run
+check "開き直された子の親には何もしない" 0 "issue=21 result=untouched" ""
+expect_queried "開き直された子の親は照会しない" "21"
+
+# 同じ親を持つ子が2つ
+reset_scenario
+pr_json true "$MERGED_AT" main "$(printf 'Closes #21\nCloses #22\n')"
+issue 21 OPEN
+family 21 30 0 0
+issue 22 OPEN
+family 22 30 0 0
+issue 30 OPEN
+family 30 - 2 0
+run
+check "同じ親を持つ子をどちらも閉じたら、親を1回だけ閉じる" 0 \
+    "$(printf 'issue=21 result=closed\nissue=22 result=closed\nissue=30 result=parent-closed')" \
+    "$(closing 21 22 30)"
+expect_record "同じ親を持つ子が複数なら、親の記録には並びの最後の子を書く" 30 "$(parent_record 22)"
+expect_queried "同じ親は1回だけ照会する" "21 22 30"
+
+# 子を閉じられなかった(close-failed)・記録を付けられなかったときは、親を判定しない
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+FAIL_CLOSE=21
+run
+check "子を閉じられなかったら、親は照会も書き込みもしない" 0 \
+    "issue=21 result=close-failed" "$(printf 'issue close 21 --repo owner/repo\napi POST comments 21')"
+expect_queried "子を閉じられなかったら、親を照会しない" "21"
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+FAIL_COMMENT=21
+run
+check "子の記録を付けられなかったら、親は照会も書き込みもしない(終了コード 1)" 1 "" "$(closing 21)"
+expect_queried "子の記録を付けられなかったら、親を照会しない" "21"
+
+# Refs だけの Issue は、閉じていても親を判定する対象にしない
+reset_scenario
+pr_json true "$MERGED_AT" main "$(printf 'Closes #21\nRefs: #8\n')"
+issue 21 OPEN
+issue 8 CLOSED "$BEFORE_MERGE"
+family 8 30 0 0
+issue 30 OPEN
+family 30 - 1 1
+run
+check "閉じている Refs だけの Issue の親は、子がすべて閉じていても閉じない" 0 \
+    "$(printf 'issue=21 result=closed\nissue=8 result=untouched')" "$(closing 21)"
+expect_queried "閉じている Refs だけの Issue の親は照会しない" "21 8"
+
+# 親は8段までたどる(子 #21 の上に、#31 から #39 の9段の親)
+reset_scenario
+issue 21 OPEN
+family 21 31 0 0
+for n in 31 32 33 34 35 36 37 38 39; do
+    issue "$n" OPEN
+    if [ "$n" -lt 39 ]; then family "$n" "$((n + 1))" 1 0; else family "$n" - 1 0; fi
+done
+run
+check "親は8段までたどり、9段目の親は閉じない" 0 \
+    "$(echo "issue=21 result=closed"; for n in 31 32 33 34 35 36 37 38; do echo "issue=$n result=parent-closed"; done)" \
+    "$(closing 21 31 32 33 34 35 36 37 38)"
+expect_queried "9段目の親は照会しない" "21 31 32 33 34 35 36 37 38"
+expect_err "たどる段の上限に達したことを標準エラーに出す" "親を8段たどりました"
+
+# 親が別のリポジトリにあるときは、その親を扱わない(このリポジトリの同じ番号の Issue・PR に触れない)
+# 使い方: keep_stub <番号>(実行の前の偽物の Issue の応答を残す)
+keep_stub() { cp "$WORK/issues/$1.json" "$WORK/before_$1.json"; }
+# 使い方: expect_untouched_stub <説明> <番号>
+# 偽物の Issue の応答が、keep_stub で残した実行の前と同じ(閉じられず、閉じた子の数も増えていない)ことを確かめる。
+expect_untouched_stub() {
+    if cmp -s "$WORK/before_$2.json" "$WORK/issues/$2.json"; then
+        ok "$1"
+    else
+        ng "$1 (#$2 の状態が変わった)"
+    fi
+}
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0 other-owner/other-repo
+# このリポジトリの #30 は、照会されれば閉じる条件を満たす無関係な Issue
+issue 30 OPEN
+family 30 - 1 1
+keep_stub 30
+run
+check "親が別のリポジトリにあれば、子だけを閉じ、親を照会も書き込みもしない" 0 "issue=21 result=closed" "$(closing 21)"
+expect_queried "別のリポジトリの親の番号で、このリポジトリの Issue を照会しない" "21"
+expect_untouched_stub "このリポジトリの同じ番号の Issue に触れない" 30
+expect_err "親が別のリポジトリにあることを標準エラーに出す" "Issue #21 の親は別のリポジトリにあります"
+
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 30 0 0 other-owner/other-repo
+issue 30 OPEN
+family 30 - 1 1
+run
+check "閉じていた子の親が別のリポジトリにあっても、親を照会も書き込みもしない" 0 "issue=21 result=untouched" ""
+expect_queried "閉じていた子でも、別のリポジトリの親の番号で照会しない" "21"
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 40 1 0 other-owner/other-repo
+issue 40 OPEN
+family 40 - 1 1
+keep_stub 40
+run
+check "閉じた親の親が別のリポジトリにあれば、親までを閉じ、それより上を照会も書き込みもしない" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-closed')" "$(closing 21 30)"
+expect_queried "別のリポジトリの親の親の番号で、このリポジトリの Issue を照会しない" "21 30"
+expect_untouched_stub "このリポジトリの、親の親と同じ番号の Issue に触れない" 40
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0 Owner/Repo
+issue 30 OPEN
+family 30 - 1 0
+run
+check "親のリポジトリの名前は大文字小文字を区別せずに比べ、このリポジトリなら親を閉じる" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-closed')" "$(closing 21 30)"
+
+# 親を照会できない・応答の形が違う・閉じられない: 子の結果は出し、親に知らせを1回だけ付ける(9.6)
+# 知らせを付けられたら parent-close-failed を出して終了コード 0、付けられなければ終了コード 1。
+PARENT_CLOSE_FAILED_MARKER='<!-- issue-close-notice pr=7 kind=parent-close-failed -->'
+# 子がすべて閉じたと確かめられたとき(閉じる操作の失敗)の文面
+PARENT_ALL_CLOSED_TEXT='この Issue から分けた Issue はすべて閉じましたが、この Issue を自動で閉じられませんでした。'
+# 親を照会できない・応答の形が違うとき(子がすべて閉じたかを確かめられていない)の文面
+PARENT_UNCHECKED_TEXT='分けた Issue がすべて閉じたかを自動で確かめられなかったため、この Issue を閉じていません。'
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+: >"$WORK/issues/30.fail"
+run
+check "親を照会できなければ、親に知らせを付けて parent-close-failed を出し終了コード 0(子は閉じる)" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-close-failed')" \
+    "$(printf '%s\napi POST comments 30' "$(closing 21)")"
+expect_err "親を照会できないことを標準エラーに出す" "親の Issue #30 を照会できません"
+expect_notice "親を照会できないときの知らせに、閉じた子・PR 番号・確かめられなかったこと・してほしいこと・目印がある" 30 \
+    '#21' 'PR #7' "$PARENT_UNCHECKED_TEXT" 'すべて閉じていれば、この Issue を手で閉じてください' "$PARENT_CLOSE_FAILED_MARKER"
+expect_no_notice "親を照会できないときの知らせは、子がすべて閉じたと言い切らない" 30 'すべて閉じましたが'
+expect_mention "親を照会できないときの知らせは所有者へのメンションで始まる" 30
+
+# 2度目の実行(1度目の知らせが一覧にある。子は閉じていて、親はまた照会できない)
+keep_notice 30
+run
+check "2度目の実行では、親を照会できなくても知らせを増やさない(終了コード 0)" 0 \
+    "$(printf 'issue=21 result=untouched\nissue=30 result=parent-close-failed')" ""
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+printf '%s\n' '{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[]},"parent":null}}}}' >"$WORK/issues/30.json"
+run
+check "親の応答に子の数が無ければ、親を閉じずに知らせを付けて parent-close-failed を出し終了コード 0" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-close-failed')" \
+    "$(printf '%s\napi POST comments 30' "$(closing 21)")"
+expect_err "親の応答の形が想定と違うことを標準エラーに出す" "親の Issue #30 の応答の形が想定と違います"
+expect_notice "親の応答の形が違うときの知らせに、確かめられなかったことと目印がある" 30 \
+    '#21' 'PR #7' "$PARENT_UNCHECKED_TEXT" "$PARENT_CLOSE_FAILED_MARKER"
+expect_no_notice "親の応答の形が違うときの知らせは、子がすべて閉じたと言い切らない" 30 'すべて閉じましたが'
+expect_mention "親の応答の形が違うときの知らせは所有者へのメンションで始まる" 30
+
+keep_notice 30
+run
+check "2度目の実行では、親の応答の形が違っても知らせを増やさない(終了コード 0)" 0 \
+    "$(printf 'issue=21 result=untouched\nissue=30 result=parent-close-failed')" ""
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+FAIL_CLOSE=30
+run
+check "親を閉じられなければ、記録を付けずに知らせを付けて parent-close-failed を出し終了コード 0" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-close-failed')" \
+    "$(printf '%s\nissue close 30 --repo owner/repo\napi POST comments 30' "$(closing 21)")"
+expect_err "親を閉じられないことを標準エラーに出す" "親の Issue #30 を閉じられません"
+expect_notice "親を閉じられないときの知らせに、起きたこと・閉じた子・PR 番号・してほしいこと・目印がある" 30 \
+    "$PARENT_ALL_CLOSED_TEXT" '#21' 'PR #7' 'この Issue を手で閉じてください' "$PARENT_CLOSE_FAILED_MARKER"
+expect_no_notice "親を閉じられないときの知らせは、確かめられなかったとは書かない" 30 '確かめられなかった'
+expect_mention "親を閉じられないときの知らせは所有者へのメンションで始まる" 30
+
+# 親を閉じられなければ、その親より上はたどらない(親の親は照会も書き込みもしない)
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 40 1 0
+issue 40 OPEN
+family 40 - 1 1
+FAIL_CLOSE=30
+run
+check "親を閉じられなければ、親の親を閉じない" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-close-failed')" \
+    "$(printf '%s\nissue close 30 --repo owner/repo\napi POST comments 30' "$(closing 21)")"
+expect_queried "親を閉じられなければ、親の親を照会しない" "21 30"
+
+# 2度目の実行(1度目の知らせが一覧にある。親はまだ開いていて、閉じる操作はまた失敗する)
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+FAIL_CLOSE=30
+run
+keep_notice 30
+run
+check "2度目の実行では、親を閉じられなくても知らせを増やさない(終了コード 0)" 0 \
+    "$(printf 'issue=21 result=untouched\nissue=30 result=parent-close-failed')" \
+    "issue close 30 --repo owner/repo"
+
+# 閉じた親の親を閉じられないときは、親の親に知らせる(最後に閉じた子として親の番号を書く)
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 40 1 0
+issue 40 OPEN
+family 40 - 1 0
+FAIL_CLOSE=40
+run
+check "親の親を閉じられなければ、親の親に知らせを付けて parent-close-failed を出す(終了コード 0)" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-closed\nissue=40 result=parent-close-failed')" \
+    "$(printf '%s\nissue close 40 --repo owner/repo\napi POST comments 40' "$(closing 21 30)")"
+expect_notice "親の親への知らせには、最後に閉じた子として親の番号が書いてある" 40 \
+    "$PARENT_ALL_CLOSED_TEXT" '#30' "$PARENT_CLOSE_FAILED_MARKER"
+
+# 知らせを付けられない: parent-close-failed と出さず終了コード 1
+parent_notice_fails() {
+    run
+    check "$1" 1 "issue=21 result=closed" "$2"
+    expect_err "$1(理由を標準エラーに出す)" "親の Issue #30 に知らせのコメントを付けられません"
+}
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+FAIL_CLOSE=30
+FAIL_NOTICE=30
+parent_notice_fails "親を閉じられず、知らせも付けられなければ終了コード 1(parent-close-failed と出さない)" \
+    "$(printf '%s\nissue close 30 --repo owner/repo\napi POST comments 30' "$(closing 21)")"
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+: >"$WORK/issues/30.fail"
+FAIL_NOTICE=30
+parent_notice_fails "親を照会できず、知らせも付けられなければ終了コード 1(parent-close-failed と出さない)" \
+    "$(printf '%s\napi POST comments 30' "$(closing 21)")"
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+FAIL_CLOSE=30
+FAIL_LIST=30
+parent_notice_fails "親を閉じられず、親のコメントの一覧を読めなければ知らせを付けず終了コード 1" \
+    "$(printf '%s\nissue close 30 --repo owner/repo' "$(closing 21)")"
+
+# 他人が同じ目印を書いていても、親への知らせは抑えられない
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+FAIL_CLOSE=30
+printf '%s\n' "$PARENT_CLOSE_FAILED_MARKER" >"$WORK/forged.md"
+comments 30 'someone-else' "$WORK/forged.md"
+run
+check "他人が書いた同じ目印のコメントがあっても、親に知らせを付ける" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-close-failed')" \
+    "$(printf '%s\nissue close 30 --repo owner/repo\napi POST comments 30' "$(closing 21)")"
+
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 40 1 0
+issue 40 OPEN
+family 40 - 1 0
+FAIL_COMMENT=30
+run
+check "親の記録を付けられなくても、閉じた親の親は判定して閉じる(終了コード 1)" 1 \
+    "$(printf 'issue=21 result=closed\nissue=40 result=parent-closed')" "$(closing 21 30 40)"
+expect_err "親の記録を付けられないことを標準エラーに出す" "親の Issue #30 に記録のコメントを付けられません"
+
+# 子の応答の親の欄が想定と違えば、どの Issue にも書き込まない
+bad_parent_field() {
+    reset_scenario
+    issue 21 OPEN
+    jq "$2" "$WORK/issues/21.json" >"$WORK/issues/21.tmp" && mv "$WORK/issues/21.tmp" "$WORK/issues/21.json"
+    run
+    check "$1" 1 "" ""
+}
+bad_parent_field "Issue の応答に parent の欄が無ければ、何も書き込まず終了コード 1" 'del(.data.repository.issue.parent)'
+bad_parent_field "Issue の応答の親の番号が数でなければ、何も書き込まず終了コード 1" \
+    '.data.repository.issue.parent = {number: "30", repository: {nameWithOwner: "owner/repo"}}'
+bad_parent_field "Issue の応答の親にリポジトリの欄が無ければ、何も書き込まず終了コード 1" \
+    '.data.repository.issue.parent = {number: 30}'
+bad_parent_field "Issue の応答の親のリポジトリが null なら、何も書き込まず終了コード 1" \
+    '.data.repository.issue.parent = {number: 30, repository: null}'
+bad_parent_field "Issue の応答の親のリポジトリに nameWithOwner が無ければ、何も書き込まず終了コード 1" \
+    '.data.repository.issue.parent = {number: 30, repository: {}}'
+bad_parent_field "Issue の応答の親のリポジトリの名前が文字列でなければ、何も書き込まず終了コード 1" \
+    '.data.repository.issue.parent = {number: 30, repository: {nameWithOwner: 1}}'
+
+# 親の親の欄の形が想定と違うときは、閉じた子の親の照会の失敗として親に知らせる
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 40 1 0
+jq '.data.repository.issue.parent.repository = {}' "$WORK/issues/30.json" >"$WORK/issues/30.tmp" &&
+    mv "$WORK/issues/30.tmp" "$WORK/issues/30.json"
+run
+check "親の応答の親のリポジトリの名前が無ければ、親を閉じずに知らせを付ける" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-close-failed')" \
+    "$(printf '%s\napi POST comments 30' "$(closing 21)")"
+expect_queried "親の応答の形が違えば、親の親を照会しない" "21 30"
 
 # =====================================================================
 # 複数の Issue(1.5)、存在しない番号・PR を指す番号
@@ -586,16 +1123,16 @@ bad_issue() {
 bad_issue "Issue の応答が JSON でなければ終了コード 1" json 'not json'
 bad_issue "Issue の応答に issue が無ければ終了コード 1" json '{"data":{"repository":{"issue":null}}}'
 bad_issue "Issue の state が想定と違えば終了コード 1" json \
-    '{"data":{"repository":{"issue":{"state":"LOCKED","timelineItems":{"nodes":[]}}}}}'
+    '{"data":{"repository":{"issue":{"state":"LOCKED","timelineItems":{"nodes":[]},"subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}'
 bad_issue "Issue の応答に閉じた記録の一覧が無ければ終了コード 1" json \
-    '{"data":{"repository":{"issue":{"state":"OPEN"}}}}'
+    '{"data":{"repository":{"issue":{"state":"OPEN","subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}'
 bad_issue "閉じた記録の日時を読めなければ終了コード 1(閉じる側に倒さない)" json \
-    '{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[{"createdAt":null}]}}}}}'
+    '{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[{"createdAt":null}]},"subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}'
 bad_issue "照会の失敗が NOT_FOUND 以外の理由を含むなら、not-an-issue にせず終了コード 1" fail \
     '{"data":{"repository":{"issue":null}},"errors":[{"type":"NOT_FOUND","path":["repository","issue"],"message":"x"},{"type":"RATE_LIMITED","message":"y"}]}'
 bad_issue "リポジトリごと見つからない応答は、not-an-issue にせず終了コード 1" fail \
     '{"data":{"repository":null},"errors":[{"type":"NOT_FOUND","path":["repository"],"message":"x"}]}'
-ISSUE_DOC_OPEN='{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[]}}}}}'
+ISSUE_DOC_OPEN='{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[]},"subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}'
 ISSUE_DOC_NOT_FOUND='{"data":{"repository":{"issue":null}},"errors":[{"type":"NOT_FOUND","path":["repository","issue"],"message":"x"}]}'
 bad_issue "Issue の照会が成功したのに応答が空(改行だけ)なら終了コード 1" json ''
 bad_issue "Issue の応答に JSON が2つ並んでいれば終了コード 1" json "$(printf '%s\n%s' "$ISSUE_DOC_OPEN" "$ISSUE_DOC_OPEN")"
@@ -613,15 +1150,6 @@ check "Issue の照会が成功したのに応答が空(0バイト)なら終了�
 # =====================================================================
 CLOSE_FAILED_MARKER='<!-- issue-close-notice pr=7 kind=close-failed -->'
 REFS_ONLY_MARKER='<!-- issue-close-notice pr=7 kind=refs-only -->'
-
-# 使い方: expect_mention <説明> <番号>(知らせの先頭行が所有者へのメンションで始まる)
-expect_mention() {
-    if head -n 1 "$WORK/posted/notice_$2.md" 2>/dev/null | grep -q '^@owner-name '; then
-        ok "$1"
-    else
-        ng "$1 (知らせの先頭行が「@owner-name 」で始まらない)"
-    fi
-}
 
 reset_scenario
 pr_json true "$MERGED_AT" main "$(printf 'Closes #21\nCloses #22\n')"
@@ -771,7 +1299,7 @@ check "Refs だけの Issue を照会できなければ、Closes の開いてい
 reset_scenario
 pr_json true "$MERGED_AT" main "$(printf 'Closes #21\nRefs: #8\n')"
 issue 21 OPEN
-printf '%s\n' '{"data":{"repository":{"issue":{"state":"OPEN"}}}}' >"$WORK/issues/8.json"
+printf '%s\n' '{"data":{"repository":{"issue":{"state":"OPEN","subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}' >"$WORK/issues/8.json"
 run
 check "Refs だけの Issue の応答の形が想定と違えば、何も書き込まず終了コード 1" 1 "" ""
 
@@ -906,6 +1434,20 @@ check "見直しで閉じる操作が失敗したら close-failed の知らせ�
     "pr=113 issue=21 result=close-failed" "$(printf 'issue close 21 --repo owner/repo\napi POST comments 21')"
 expect_notice "見直しで付けた close-failed の知らせに、その PR の番号と目印がある" 21 \
     'PR #113' '<!-- issue-close-notice pr=113 kind=close-failed -->'
+
+# 見直しでも、子がすべて閉じた親を閉じる。次の見直しでは何も書き込まない(9.6)
+reset_scenario
+sweep_pr 150 3600 "Closes #21"
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+sweep
+check "見直しでも、子がすべて閉じた親を閉じる(行の先頭に pr=<PR番号> が付く)" 0 \
+    "$(printf 'pr=150 issue=21 result=closed\npr=150 issue=30 result=parent-closed')" "$(closing 21 30)"
+expect_record "見直しで閉じた親の記録に、その PR の番号が書いてある" 30 "$(parent_record 21 150)"
+sweep
+check "次の見直しでは、閉じた子にも閉じた親にも書き込まない" 0 "pr=150 issue=21 result=untouched" ""
 
 # 一覧に base が main でない PR が混ざっても、PR ごとの処理が何もしない(判定は PR ごとの経路に任せる)
 reset_scenario
@@ -1062,7 +1604,8 @@ check_invocation() {
     env -u GITHUB_REPOSITORY -u GITHUB_REPOSITORY_OWNER -u GH_TOKEN "${envs[@]}" \
         PATH="$WORK/bin:$PATH" \
         STUB_CALLS="$WORK/calls.log" STUB_UNEXPECTED="$WORK/unexpected.log" \
-        STUB_PR="$WORK/pr.json" STUB_ISSUES="$WORK/issues" STUB_POSTED="$WORK/posted" \
+        STUB_PR="$WORK/pr.json" STUB_ISSUES="$WORK/issues" STUB_ISSUE_QUERY="$WORK/issue-query.txt" \
+        STUB_POSTED="$WORK/posted" \
         STUB_PRS="$WORK/prs" STUB_PR_LIST="$WORK/pr-list.json" \
         bash "$SCRIPT" "$@" >"$WORK/out.txt" 2>"$WORK/err.txt"
     RC=$?
@@ -1113,11 +1656,11 @@ else
     FAILED=1
 fi
 # 見直し(--sweep)の行だけ、先頭に pr=<PR番号> が付く
-bad_lines=$(grep -Ev '^(pr=[1-9][0-9]* )?issue=[1-9][0-9]* result=(untouched|closed|close-failed|refs-only-noticed|not-an-issue)$' "$WORK/all-out.log" || true)
+bad_lines=$(grep -Ev '^(pr=[1-9][0-9]* )?issue=[1-9][0-9]* result=(untouched|closed|close-failed|refs-only-noticed|not-an-issue|parent-closed|parent-close-failed)$' "$WORK/all-out.log" || true)
 if [ -z "$bad_lines" ] && [ -s "$WORK/all-out.log" ]; then
-    ok "標準出力は [pr=<PR番号> ]issue=<番号> result=<untouched|closed|close-failed|refs-only-noticed|not-an-issue> の行だけ"
+    ok "標準出力は [pr=<PR番号> ]issue=<番号> result=<untouched|closed|close-failed|refs-only-noticed|not-an-issue|parent-closed|parent-close-failed> の行だけ"
 else
-    echo "FAIL: 標準出力は [pr=<PR番号> ]issue=<番号> result=<untouched|closed|close-failed|refs-only-noticed|not-an-issue> の行だけ"
+    echo "FAIL: 標準出力は [pr=<PR番号> ]issue=<番号> result=<untouched|closed|close-failed|refs-only-noticed|not-an-issue|parent-closed|parent-close-failed> の行だけ"
     printf '%s\n' "$bad_lines" | sed 's/^/  /'
     FAILED=1
 fi
