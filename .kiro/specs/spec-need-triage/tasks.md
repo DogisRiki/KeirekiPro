@@ -39,7 +39,7 @@
   - _Boundary: close-linked-issues.sh_
 
 - [ ] 2. spec を作る手順の変更
-- [ ] 2.1 (P) spec の各段階のコマンドを、AIが自分では起動できないようにする
+- [x] 2.1 (P) spec の各段階のコマンドを、AIが自分では起動できないようにする
   - kiro-spec-requirements / -design / -tasks の SKILL.md の冒頭に `disable-model-invocation: true` を足す
   - kiro-impl にはすでに付いているため、変えない(design の Out of Boundary の「4つのスキル」は、init・requirements・design・tasks を指す。init は 2.2 が受け持つ)
   - kiro-spec-requirements の生成の手順に、spec.json に `additional_issues` があるときは既存の要件と受入基準を番号ごと残し、新しい要件を既存の最後の番号の次から足し、CLAUDE.md の印の決まりに従う、という2行を足す

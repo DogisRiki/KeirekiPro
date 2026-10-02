@@ -1,6 +1,7 @@
 ---
 name: kiro-spec-requirements
 description: Generate EARS-format requirements based on project description and steering context. Use when generating requirements from project description.
+disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion
 metadata:
   shared-rules: "ears-format.md, requirements-review-gate.md"
@@ -59,6 +60,8 @@ After all research completes, synthesize findings in main context before generat
   - tasks = `_Boundary:_`
 - If scope could be misread, add lightweight boundary context without introducing implementation or architecture ownership detail
 - Keep this as a draft until the review gate passes; do not write `requirements.md` yet
+- If spec.json has `additional_issues`, keep every existing requirement and acceptance criterion with its number unchanged, and add new requirements numbered after the last existing one
+- Mark new, changed, and withdrawn items following the 「Issueの印」 rules in CLAUDE.md
 
 ### Step 4: Review Requirements Draft
 - Run the `Requirements Review Gate` from `rules/requirements-review-gate.md`
