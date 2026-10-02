@@ -1,32 +1,28 @@
-# Requirements Document
+# 要件
 
-## Introduction
+<!-- Claude は、この雛形で書く spec の文と組み立てを、.kiro/settings/rules/spec-writing.md の決まりと見本1に合わせる。 -->
+
+## はじめに
+
 {{INTRODUCTION}}
 
-<!-- Optional when scope could be misread or the feature touches adjacent systems/specs -->
-## Boundary Context (Optional)
-- **In scope**: {{IN_SCOPE_BEHAVIORS}}
-- **Out of scope**: {{OUT_OF_SCOPE_BEHAVIORS}}
-- **Adjacent expectations**: {{ADJACENT_SYSTEM_OR_SPEC_EXPECTATIONS}}
+<!-- 範囲の節は、範囲を読み違えるおそれがあるときだけ書く。たとえば、この spec が隣の仕組みや別の spec に触れるときに、Claude はこの節を書く。読み違えるおそれが無いときは、Claude はこの節を見出しごと書かない。 -->
+## 範囲
 
-## Requirements
+- この spec で決めること: {{IN_SCOPE}}
+- この spec で決めないこと: {{OUT_OF_SCOPE}}
+- この spec が前提にしていること: {{ASSUMPTIONS}}
 
-### Requirement 1: {{REQUIREMENT_AREA_1}}
-<!-- Requirement headings MUST include a leading numeric ID only (for example: "Requirement 1: ...", "1. Overview", "2 Feature: ..."). Alphabetic IDs like "Requirement A" are not allowed. -->
-**Objective:** As a {{ROLE}}, I want {{CAPABILITY}}, so that {{BENEFIT}}
+## 要件
 
-#### Acceptance Criteria
-1. When [event], the [system] shall [response/action]
-2. If [trigger], then the [system] shall [response/action]
-3. While [precondition], the [system] shall [response/action]
-4. Where [feature is included], the [system] shall [response/action]
-5. The [system] shall [response/action]
+<!-- Claude は、要件ごとに、見出し、理由の段落、番号付きの項目の順で書く。Claude は、見出しの番号を1から始まる数字にし、「要件A」のような英字の番号を使わない。Claude は、「所有者として、…したい」のような利用者の立場を名乗る行と、「受入基準」の小見出しを書かない。 -->
+### 要件{{NUMBER}} {{TITLE}}
 
-### Requirement 2: {{REQUIREMENT_AREA_2}}
-**Objective:** As a {{ROLE}}, I want {{CAPABILITY}}, so that {{BENEFIT}}
+<!-- Claude は、この段落に、所有者がなぜこの要件を望むのかを書く。 -->
+{{REASON}}
 
-#### Acceptance Criteria
-1. When [event], the [system] shall [response/action]
-2. When [event] and [condition], the [system] shall [response/action]
+<!-- Claude は、項目ごとに、誰が何をするのかを主語と目的語のある文で書く。条件があるときは、Claude は「〜したら、Claude は〜する。」のように条件を文の頭に置く。 -->
+1. {{ITEM}}
+2. {{ITEM}}
 
-<!-- Additional requirements follow the same pattern -->
+<!-- 要件が2つ以上あるときは、Claude は同じ組み立てを番号を1つずつ増やして繰り返す。 -->

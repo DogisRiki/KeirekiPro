@@ -63,6 +63,7 @@ After all parallel research completes, synthesize implementation brief before st
 - If no task numbers: **autonomous mode** (all pending tasks)
 
 **Build task queue**:
+- spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。tasks.md の目印は、`_Depends:_` を `_依存:_`、`_Boundary:_` を `_対象の部品:_`、`_Blocked:_` を `_保留:_`、`(P)` を `(並行可)`、`_Requirements:_` を `_要件:_`、`## Implementation Notes` を `## 実装のメモ` と読み替える。タスクの箱(`- [ ]` `- [x]` `- [ ]*`)とタスク番号(`1.` `1.1`)の形は変わらない。`spec_format` の欄が無い spec では、この節の今の名前のまま読む
 - Read tasks.md, identify actionable sub-tasks (X.Y numbering like 1.1, 2.3)
 - Major tasks (1., 2.) are grouping headers, not execution units
 - Skip tasks with `_Blocked:_` annotation
@@ -126,6 +127,7 @@ For each task (one at a time):
 
 **f) Record learnings**:
 - If this task revealed cross-cutting insights, append a one-line note to the `## Implementation Notes` section at the bottom of tasks.md
+- `spec_format` が2の spec では、`## Implementation Notes` ではなく `## 実装のメモ` の節に書き足す。この節の後に出てくる `## Implementation Notes` への書き込みと読み取りも、同じく `## 実装のメモ` で行う
 
 **g) Debug subagent** (triggered by BLOCKED, NEEDS_CONTEXT unresolved, or REJECTED after 2 remediation rounds):
 
@@ -144,6 +146,7 @@ The debug subagent runs in a **fresh context** — it receives only the error in
 
 **Handle debug report**:
 - Parse `NEXT_ACTION` from the debug report's exact structured field.
+- `spec_format` が2の spec では、下の `_Blocked: ..._` の書き込みを `_保留: <理由>_` の形で行う(例: `_保留: <ROOT_CAUSE>_`、`_保留: debug attempted twice, still failing — <ROOT_CAUSE>_`)
 - If `NEXT_ACTION: STOP_FOR_HUMAN` → append `_Blocked: <ROOT_CAUSE>_` to tasks.md, stop the feature run, and report that human review is required before continuing
 - If `NEXT_ACTION: BLOCK_TASK` → append `_Blocked: <ROOT_CAUSE>_` to tasks.md, skip to next task
 - If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Spawn a **new** implementer subagent with the debug report's `FIX_PLAN`, `NOTES`, and the current `git diff`, and require it to repair the task with explicit edits only
@@ -152,7 +155,7 @@ The debug subagent runs in a **fresh context** — it receives only the error in
 - **Max 2 debug rounds per task**. Each round: fresh debug subagent → fresh implementer. If still failing after 2 rounds, the task is blocked.
 - Record debug findings in `## Implementation Notes` (this helps subsequent tasks avoid the same issue)
 
-**`(P)` markers**: Tasks marked `(P)` in tasks.md indicate they have no inter-dependencies and could theoretically run in parallel. However, kiro-impl processes them sequentially (one at a time) to avoid git conflicts and simplify review. The `(P)` marker is informational for task planning, not an execution directive.
+**`(P)` markers** (`spec_format` が2の spec では `(並行可)`): Tasks marked `(P)` in tasks.md indicate they have no inter-dependencies and could theoretically run in parallel. However, kiro-impl processes them sequentially (one at a time) to avoid git conflicts and simplify review. The `(P)` marker is informational for task planning, not an execution directive.
 
 **Completion check**: If all remaining tasks are BLOCKED, stop and report blocked tasks with reasons to the user.
 
@@ -237,7 +240,7 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 - Human review needed to resolve blockers
 
 **Spec Conflicts with Reality**:
-- If a requirement or design conflicts with reality (API doesn't exist, platform limitation), block the task with `_Blocked: <reason>_` -- do not silently work around it
+- If a requirement or design conflicts with reality (API doesn't exist, platform limitation), block the task with `_Blocked: <reason>_` (`spec_format` が2の spec では `_保留: <理由>_`) -- do not silently work around it
 
 **Upstream Ownership Detected**:
 - If review, debug, or validation shows that the root cause belongs to an upstream, foundation, shared-platform, or dependency spec, do not patch around it inside the downstream feature

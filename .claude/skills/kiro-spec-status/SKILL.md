@@ -33,6 +33,7 @@ argument-hint: <feature-name>
 - **Boundary context**:
   - From brief.md: note `Boundary Candidates`, `Upstream / Downstream`, and `Existing Spec Touchpoints` if present
   - From design.md: note `Boundary Commitments`, `Out of Boundary`, `Allowed Dependencies`, and `Revalidation Triggers` if present
+  - spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。requirements.md は、`### Requirement N: 題名` を `### 要件N 題名` と読み、`#### Acceptance Criteria` の見出しが無いので、受入基準は各要件の番号付きの項目で数える。design.md は、`Boundary Commitments` を `## 作るものと作らないもの`・`## 使う既存の仕組み`・`## 設計を見直すきっかけ` の3つの節、`Out of Boundary` を `### 作らないもの`、`Allowed Dependencies` を `## 使う既存の仕組み`、`Revalidation Triggers` を `## 設計を見直すきっかけ` と読み替える。brief.md と roadmap.md の名前は変わらない。タスクの箱(`- [x]` `- [ ]`)の形も変わらない。`spec_format` の欄が無い spec では、今の名前のまま読む
   - From roadmap.md: note upstream dependencies and whether this spec is adjacent to `Existing Spec Updates`
 - **Revalidation watchlist**:
   - Identify downstream specs, neighboring existing-spec updates, or rollout-sensitive design notes that may need revalidation if this spec changes

@@ -1,6 +1,6 @@
 ---
 name: kiro-spec-design
-description: Generate comprehensive technical design translating requirements (WHAT) into architecture (HOW) with discovery process. Use when creating architecture from requirements.
+description: Generate comprehensive technical design translating requirements (WHAT) into architecture (HOW) with discovery process (written per .kiro/settings/rules/spec-writing.md when spec.json has spec_format 2, otherwise with the old template). Use when creating architecture from requirements.
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent
 argument-hint: <feature-name> [-y]
@@ -25,12 +25,17 @@ metadata:
 If steering/spec context is already available from conversation, skip redundant file reads.
 Otherwise, load all necessary context:
 - `.kiro/specs/{feature}/spec.json`, `requirements.md`, `design.md` (if exists)
+  - From spec.json, read the `spec_format` field. `spec_format` is `2` for a new-format spec; the field is absent for a spec created before the new format. This field decides which template and rules the later steps use. Do NOT add, remove, or change `spec_format` (a spec without the field stays in the old format and is never rewritten in the new format)
 - `.kiro/specs/{feature}/research.md` (if exists, contains gap analysis from `/kiro-validate-gap`)
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to requirement coverage, architecture boundaries, integrations, runtime prerequisites, security/performance constraints, or team conventions that affect implementation readiness
-- `.kiro/settings/templates/specs/design.md` for document structure
-- Read `rules/design-principles.md` from this skill's directory for design principles
-- `.kiro/settings/templates/specs/research.md` for discovery log structure
+- Template for document structure, chosen by `spec_format`:
+  - `spec_format` is `2`: `.kiro/settings/templates/specs/design.md`
+  - `spec_format` is absent: `.kiro/settings/templates/specs-v1/design.md`
+  - `spec_format` has any other value: stop and report it to the user; do not guess the format
+- Writing rules: when `spec_format` is `2`, read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, design.md の書き方, 繰り返しの扱い, the sample 見本2, and the 新旧の見出しと目印の対応表 are the writing standard for this spec's `design.md`
+- Read `rules/design-principles.md` from this skill's directory for design principles (for both formats; it says which items read differently when `spec_format` is `2`)
+- `.kiro/settings/templates/specs/research.md` for discovery log structure (for both formats; `research.md` has no old-format template and its writing is not changed by `spec_format`)
 
 **Validate requirements approval**:
 - If auto-approve flag is true: Auto-approve requirements in spec.json,
@@ -88,7 +93,7 @@ After all findings return, synthesize in main context before proceeding.
    - Boundary candidates, out-of-boundary decisions, and likely revalidation triggers
 
 4. **Persist Findings to Research Log**:
-   - Create or update `.kiro/specs/{feature}/research.md` using the shared template
+   - Create or update `.kiro/specs/{feature}/research.md` using the shared template `.kiro/settings/templates/specs/research.md` (the same template regardless of `spec_format`)
    - Summarize discovery scope and key findings
    - Record investigations with sources and implications
    - Document architecture pattern evaluation, design decisions, and risks
@@ -105,13 +110,13 @@ After all findings return, synthesize in main context before proceeding.
 ### Step 4: Generate Design Draft
 
 1. **Generate Design Draft**:
-   - **Follow specs/design.md template structure and generation instructions strictly**
-   - **Boundary-first requirement**: Before expanding supporting sections, make the boundary explicit. The draft must clearly define what this spec owns, what it does not own, which dependencies are allowed, and what changes would require downstream revalidation.
+   - `spec_format` が2の spec では、この指示の代わりに `.kiro/settings/rules/spec-writing.md` の design.md の書き方の節と、新しい design.md の雛形(`.kiro/settings/templates/specs/design.md`)に従う(follow its headings, its component block of 対応する要件 line plus Japanese fields, and the notes in its comments, which allow omitting fields and sections that do not apply). For specs without `spec_format`: **Follow specs-v1/design.md template structure and generation instructions strictly**
+   - `spec_format` が2の spec では、この指示の代わりに `.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表に従う(the boundary is written in `## 作るものと作らないもの` with `### 作るもの` and `### 作らないもの`, `## 使う既存の仕組み`, and `## 設計を見直すきっかけ`; a boundary section that does not apply to this spec may be omitted instead of left empty). For specs without `spec_format`: **Boundary-first requirement**: Before expanding supporting sections, make the boundary explicit. The draft must clearly define what this spec owns, what it does not own, which dependencies are allowed, and what changes would require downstream revalidation.
    - **Integrate all discovery findings and synthesis outcomes**: Use researched information (APIs, patterns, technologies) and synthesis decisions (generalizations, build-vs-adopt, simplifications) throughout component definitions, architecture decisions, and integration points
-   - **File Structure Plan** (required): Populate the File Structure Plan section with concrete file paths and responsibilities. Analyze the codebase to determine which files need to be created vs. modified. Each file must have one clear responsibility. This section directly drives task `_Boundary:_` annotations and implementation Task Briefs — vague file structures produce vague implementations.
+   - `spec_format` が2の spec では、この指示の代わりに `.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表と、新しい design.md の雛形に従う(populate `## ファイルの構成` with concrete file paths and responsibilities; it drives the task `_対象の部品:_` annotations and implementation Task Briefs, and the rest of this instruction applies to it). For specs without `spec_format`: **File Structure Plan** (required): Populate the File Structure Plan section with concrete file paths and responsibilities. Analyze the codebase to determine which files need to be created vs. modified. Each file must have one clear responsibility. This section directly drives task `_Boundary:_` annotations and implementation Task Briefs — vague file structures produce vague implementations.
    - **Testing Strategy**: Derive test items from requirements' acceptance criteria, not generic patterns. Each test item should reference specific components and behaviors from this design. E2E paths must map to the critical user flows identified in requirements. Avoid vague entries like "test login works" -- instead specify what is being verified and why it matters.
    - If existing design.md found in Step 1, use it as reference context (merge mode)
-   - Apply design rules: Type Safety, Visual Communication, Formal Tone
+   - Apply design rules: Type Safety, Visual Communication, Formal Tone. `spec_format` が2の spec では、Formal Tone の代わりに `.kiro/settings/rules/spec-writing.md` の文の書き方の節に従う
    - Use language specified in spec.json
    - Keep this as a draft until the review gate passes; do not write `design.md` yet
 
@@ -160,12 +165,12 @@ Provide brief summary in the language specified in spec.json:
 2. **Discovery Type**: Which discovery process was executed (full/light/minimal)
 3. **Key Findings**: 2-3 critical insights from discovery that shaped the design
 4. **Review Gate**: Confirm the design review gate passed
-5. **Next Action**: Approval workflow guidance (see Safety & Fallback)
+5. **Next Action**: State that `/spec-review {feature} design` runs next, right after generation and before approval (CLAUDE.md requires running it immediately and not asking for approval until the review is complete). Then give approval workflow guidance for after the review (see Safety & Fallback)
 6. **Research Log**: Confirm `research.md` updated with latest decisions
 
 **Format**: Concise Markdown (under 200 words) - this is the command output, NOT the design document itself
 
-**Note**: The actual design document follows `.kiro/settings/templates/specs/design.md` structure.
+**Note**: The actual design document follows `.kiro/settings/templates/specs/design.md` structure when `spec_format` is `2`, and `.kiro/settings/templates/specs-v1/design.md` structure when `spec_format` is absent.
 
 ## Safety & Fallback
 
@@ -182,7 +187,7 @@ Provide brief summary in the language specified in spec.json:
 - **Suggested Action**: "Run `/kiro-spec-requirements {feature}` to generate requirements first"
 
 **Template Missing**:
-- **User Message**: "Template file missing at `.kiro/settings/templates/specs/design.md`"
+- **User Message**: "Template file missing at `.kiro/settings/templates/specs/design.md`" (or `.kiro/settings/templates/specs-v1/design.md` for a spec without `spec_format`)
 - **Suggested Action**: "Check repository setup or restore template file"
 - **Fallback**: Use inline basic structure with warning
 
@@ -199,6 +204,9 @@ Provide brief summary in the language specified in spec.json:
 - **Suggested Action**: Clarify or fix `requirements.md`, then re-run `/kiro-spec-design {feature}`
 
 ### Next Phase: Task Generation
+
+**Right After Generation (before approval)**:
+- Run `/spec-review {feature} design`. Do NOT ask for approval until the review is complete
 
 **If Design Approved**:
 - **Optional**: Run `/kiro-validate-design {feature}` for interactive quality review
