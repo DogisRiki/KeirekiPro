@@ -24,10 +24,11 @@ model: claude-fable-5-1
 1. 起動時に渡された `FEATURE` `STAGE` `CYCLE` `ROUND` `REVIEW_FILE` と、前回の記録(あれば)を確認する
 2. `.claude/skills/spec-review/rules/common.md` と `.claude/skills/spec-review/rules/{STAGE}.md` を読む
 3. 審査の材料を自分で読む。**親がまとめた要約に頼らない**
-   - `.kiro/specs/{FEATURE}/spec.json`(`issue` 番号と承認の状態)
+   - `.kiro/specs/{FEATURE}/spec.json`(`issue` 番号、`additional_issues` の番号(あれば)、承認の状態)
    - 当該段階の spec 本文と、その前の段階の本文
    - `.kiro/specs/{FEATURE}/brief.md`(あれば)
    - Issue 本文: `gh issue view <番号> --repo DogisRiki/KeirekiPro`(`--comments` を付けない。コメントは要望ではない。申告・取りこぼし・勝手な追加は Issue 本文だけを基準に判定する)
+     - `issue` の番号(元のIssue)に加えて、spec.json に `additional_issues` があれば、その番号ごとに同じコマンドで本文を読む(どれもコメントは読まない)。`additional_issues` は、既存の spec を新しいIssueのために更新したときに足される番号で、更新した spec はすべてのIssueの本文を基準に審査する
    - `.kiro/steering/product.md` `tech.md` `structure.md`
    - リポジトリの実ファイル(設計の前提が成り立つかを確かめるため)
 4. `rules/{STAGE}.md` の観点で審査する
