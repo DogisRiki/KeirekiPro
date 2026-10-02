@@ -80,15 +80,15 @@
 ## Section Authoring Guidance
 
 ### Global Ordering
-- Default flow: Overview → Goals/Non-Goals → Boundary Commitments → Architecture → File Structure Plan → Components & Interfaces → Optional sections.
-- Teams may swap Traceability earlier or place Data Models nearer Architecture when it improves clarity, but keep section headings intact.
+- `spec_format` が2の spec では、この指示の代わりに新しい design.md の雛形(`.kiro/settings/templates/specs/design.md`)の節の並びと、`.kiro/settings/rules/spec-writing.md` の design.md の書き方の節に従う(概要 → 作るものと作らないもの → 使う既存の仕組み → 設計を見直すきっかけ → プロジェクトの決まりを守っているか → 全体の構成 → ファイルの構成 → 処理の流れ → 部品 → the sections that apply). For specs without `spec_format`: Default flow: Overview → Goals/Non-Goals → Boundary Commitments → Architecture → File Structure Plan → Components & Interfaces → Optional sections.
+- `spec_format` が2の spec では、この指示の「keep section headings intact」を「使っている雛形(`.kiro/settings/templates/specs/design.md`)の見出しを保つ」と読み替え、新しい design.md の雛形の注記に従う(a section the template marks as optional, or a boundary section that does not apply, is omitted with its heading; a section not in the template may be added before `## 移行`). For specs without `spec_format`: Teams may swap Traceability earlier or place Data Models nearer Architecture when it improves clarity, but keep section headings intact.
 - Within each section, follow **Summary → Scope → Decisions → Impacts/Risks** so reviewers can scan consistently.
 
 ### Requirement IDs
 - Reference requirements as `2.1, 2.3` without prefixes (no “Requirement 2.1”).
 - All requirements MUST have numeric IDs. If a requirement lacks a numeric ID, stop and fix `requirements.md` before continuing.
 - Use `N.M`-style numeric IDs where `N` is the top-level requirement number from requirements.md (for example, Requirement 1 → 1.1, 1.2; Requirement 2 → 2.1, 2.2).
-- Every component, task, and traceability row must reference the same canonical numeric ID.
+- Every component, task, and traceability row must reference the same canonical numeric ID. When `spec_format` is `2`, there is no traceability table; the 対応する要件 line of each component carries the IDs.
 
 ### Technology Stack
 - Include ONLY layers impacted by this feature (frontend, backend, data, messaging, infra).
@@ -103,20 +103,22 @@
 - Always use pure Mermaid. If no complex flow exists, omit the entire section.
 
 ### Requirements Traceability
+- `spec_format` が2の spec では、この節の指示の代わりに `.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表と対応の行の決まり(文の書き方の節の「対応の行だけは要件の番号で書く」)に従う(no `## Requirements Traceability` table; each component's 「対応する要件」 line lists the numeric IDs, and the mapping is re-checked whenever requirements or components change). The rest of this section applies to specs without `spec_format`.
 - Use the standard table (`Requirement | Summary | Components | Interfaces | Flows`) to prove coverage.
 - Collapse to bullet form only when a single requirement maps 1:1 to a component.
 - Prefer the component summary table for simple mappings; reserve the full traceability table for complex or compliance-sensitive requirements.
 - Re-run this mapping whenever requirements or components change to avoid drift.
 
 ### Components & Interfaces Authoring
-- Boundary Commitments should already make the ownership seam explicit before this section begins.
+- Boundary Commitments should already make the ownership seam explicit before this section begins. When `spec_format` is `2`, read Boundary Commitments as the sections `## 作るものと作らないもの`, `## 使う既存の仕組み`, and `## 設計を見直すきっかけ` (the 新旧の見出しと目印の対応表 in `.kiro/settings/rules/spec-writing.md`).
 - Group components by domain/layer and provide one block per component.
+- `spec_format` が2の spec では、次の3つの指示(summary table, table fields, dependency criticality)の代わりに新しい design.md の雛形(`.kiro/settings/templates/specs/design.md`)の部品の節と、`.kiro/settings/rules/spec-writing.md` の design.md の書き方の節に従う(no summary table and no P0/P1/P2 labels; each component has a heading, a 対応する要件 line, and the fields 役割 / 権限 / いつ動くか / 使う部品 / 呼び出し方 / 状態の持ち方 / 失敗したとき that apply, and 使う部品 says in sentences what each dependency is used for). For specs without `spec_format`:
 - Begin with a summary table listing Component, Domain, Intent, Requirement coverage, key dependencies, and selected contracts.
 - Table fields: Intent (one line), Requirements (`2.1, 2.3`), Owner/Reviewers (optional).
 - Dependencies table must mark each entry as Inbound/Outbound/External and assign Criticality (`P0` blocking, `P1` high-risk, `P2` informational).
 - Summaries of external dependency research stay here; detailed investigation (API signatures, rate limits, migration notes) belongs in `research.md`.
 - design.md must remain a self-contained reviewer artifact. Reference `research.md` only for background, and restate any conclusions or decisions here.
-- Contracts: tick only the relevant types (Service/API/Event/Batch/State). Unchecked types should not appear later in the component section.
+- `spec_format` が2の spec では、この指示の代わりに新しい design.md の雛形の部品の節に従う(there are no contract checkboxes; write the 呼び出し方 field only with the contracts that apply, and omit fields that do not apply). For specs without `spec_format`: Contracts: tick only the relevant types (Service/API/Event/Batch/State). Unchecked types should not appear later in the component section.
 - Service interfaces must declare method signatures, inputs/outputs, and error envelopes. API/Event/Batch contracts require schema tables or bullet lists covering trigger, payload, delivery, idempotency.
 - Use **Integration & Migration Notes**, **Validation Hooks**, and **Open Questions / Risks** to document rollout strategy, observability, and unresolved decisions.
 - Detail density rules:
