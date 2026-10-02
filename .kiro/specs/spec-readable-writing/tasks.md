@@ -108,7 +108,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - _対象の部品: spec-style-checker_
   - _依存: 1.2_
 
-- [ ] 4.2 `/spec-review` に点検の工程を足す
+- [x] 4.2 `/spec-review` に点検の工程を足す
 
   Claude は、`spec-review/SKILL.md` の Step 1 と Step 2 の間に点検の工程を置く。Claude は、Step 5 で次の往復に進むときと、Step 6 で本文を直して審査をやり直すときにも `/spec-review` が点検の工程に戻るように、SKILL.md を直す。Claude は、SKILL.md に、点検の記録 `reviews/{段階}-style.md` の書式と、Step 7 の報告に足す内容を書く。Claude は、`spec_format` の欄が無い spec では `/spec-review` が点検の工程を飛ばすように書く。
   - 完了の確かめ方: SKILL.md の手順で、Step 4 で本文を直して Step 5 から次の往復に進む道筋と、Step 6 で本文を直して審査をやり直す道筋のどちらでも、審査役の起動より前に点検の工程がある
