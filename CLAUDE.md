@@ -60,7 +60,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - 必須チェックを新しく足すときは、期待一覧(`.github/audit/required-checks.json`)への登録も同じ変更に含めて人間に提案する。スキップのままマージされたことを週次監査が見つけられるのは、期待一覧に登録したチェックだけである(登録が漏れると、rulesetとの食い違いとして週次監査が報告する)
 - **コンテナイメージの脆弱性の抑制(`.github/container-scan-suppressions.json`)を自分の判断で足さない。** これは `container-scan` を緑にする唯一の手段であり、「見かけの合格」を作る経路にあたる。追加が要ると判断したときは、脆弱性ごとに理由と期限を添えて人間に提案する。`.github/` 配下のためCODEOWNERSとescape-hatchが承認を機械強制する
 - **`container-scan` の実行を自律側からキャンセルしない。** キャンセルされたジョブは `cancelled` として報告され、必須ステータスチェックは成功にならない(2026-08-20 実測。緑は残らない)。ただしその後に再検査を発火させるイベントが無いため、**再実行するまでPRは赤のまま進まなくなる。** 実行が長い(本番イメージの組み立てを含む)ことを理由に止めない
-- 200行(実装のコード差分。テストとドキュメントは計上しない)を超える変更はspec駆動(Lane A)で行い、PR本文に `Spec: .kiro/specs/<feature>` を記載する
+- 200行(実装のコード差分。テストとドキュメントは計上しない)を超えるPRは、spec駆動(Lane A)のPRとしてPR本文に `Spec: .kiro/specs/<feature>` を記載したものしか通らない(size-checkが機械判定する)。
+  この200行の検査は、着手時の判断(`/start`)をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
 - DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う
 - 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)
@@ -79,6 +80,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
   (GitHubが閉じなかったときは仕組みが閉じる)。人間はIssueを閉じない
 - `Refs: #<Issue番号>` は `Closes` と併記しても消さない。codex-reviewがこの行からIssue本文を
   取得してspec適合の判定基準にしている
+- 分けた部分のIssue(サブIssue)のPRでは、`Refs:` と `Closes` にサブIssueの番号を書き、元のIssue(親)の番号は書かない。
+  親は、サブIssueがすべて閉じたときに仕組み(close-linked-issues)が閉じる
 - push先はfeatureブランチのみ。マージはauto-merge(ゲート全通過で自動)に任せる。auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する。
   AIは予約の操作(`gh pr merge`)をせず、予約されたことを確かめる。予約が付かないときは自分で予約せず報告する
 - 出荷手順(verify→commit→push→PR→auto-mergeの予約の確認)は `/ship` に従う
@@ -96,7 +99,20 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 ## spec駆動開発(cc-sdd / Kiro-style)
 
-新機能・複数層にまたがる変更(Lane A)はspec駆動で行う。小修正(Lane B)にspecは不要。
+spec で進めるか(Lane A)、spec 無しで進めるか(Lane B)は、着手時に `/start` が決める。
+AIがIssueの本文とその時点のコードを調べ、下の4つの観点で判断し、判断と観点ごとの理由を所有者に示す。
+
+- 4つの観点のうち1つでも当たれば spec が要る(Lane A)。どれにも当たらなければ spec は要らない(Lane B)
+- 変更の行数の見込みは、着手時の判断に使わない(200行の検査は最後の網。「自律動作の境界」を参照)
+
+**観点の定義**
+
+| 観点 | 当たる | 当たらない |
+|---|---|---|
+| 1. 新しい機能か | 今は無い機能や動きを足す(画面・API・ワークフロー・手順の新設など) | 今ある機能を本来の動きに直す。今ある動きを意図して変えるだけの変更は、この観点では当たらないとし、観点2と3で判断する |
+| 2. 作り方を選ぶ必要があるか | 作り方が複数考えられ、どれを選ぶかで出来上がるものや後からの直しやすさが変わる | 作り方がほぼ1つに決まる |
+| 3. Issueの本文だけで完成の形が決まらないか | 所有者が決めていない動き(失敗したときにどうするか、誰に何が届くか など)を、AIが補わないと作れない | Issueの本文で、完成したときの動きが決まる |
+| 4. マージを取り消しても元に戻らないか | 保存されているデータの形を変える・消す(DBのマイグレーションなど)、外部に何かを送る、本番の設定を変える | PRを取り消せば元の状態に戻る |
 
 ### パスと役割分担
 
@@ -111,8 +127,12 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
   Issueは本文だけにし、所有者が決めたことだけを書く。調べた事実・原因の調査結果・方式の案はIssueに書き残さない(方式は design で考え、事実は仕様づくりや実装のときに調べ直す)。
   spec-reviewer と codex-review は本文だけを判定の基準にする。Issueのコメントは要望として読まない。
   `/kiro-discovery` は使わない
+- 着手: Issueへの着手は、所有者が `/start #N` を打って始める。所有者が「#N をやって」のように言葉で着手を頼んだときも、AIは `/start` に従う。
+  spec が要らないときは、AIは判断を示したあと返事を待たずに実装し、`/ship` で出荷する。spec が要るときは、所有者が打つコマンドを示して止まる。Issueを分けるときは、分け方を示して所有者の了承を待つ
+- spec の各段階のコマンド(`/kiro-spec-init` `/kiro-spec-requirements` `/kiro-spec-design` `/kiro-spec-tasks` `/kiro-impl`)は所有者が打つ。
+  AIは起動しない(`disable-model-invocation` により、AIからは起動できない)。必要なときは所有者に打つよう依頼する
 - Phase 1(仕様化):
-  - `/kiro-spec-init "説明"` → `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
+  - `/kiro-spec-init #N`(既存の spec を新しいIssueのために直すときは `/kiro-spec-init #N <feature>`)→ `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
   - 各段階の生成直後に `/spec-review {feature} {段階}` を実行する(requirements / design / tasks)。
     別モデル(Fable 5.1)のサブエージェントが審査し、記録が `.kiro/specs/{feature}/reviews/` に残る。人間が承認するときは本文と記録の両方を読む
   - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
@@ -130,6 +150,23 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 - **次の段階へ進む前に、前の段階の記録の未解決を一覧で提示し、人間の了承を得る。** 未解決があっても機械的には止めない(判断は人間)
 - **承認済みの段階の本文を再生成または修正する前に、その段階と後続の段階の承認を取り消す**(`approved: false` にし `approved_by` / `approved_at` を削除)。
   cc-sdd は既存の `approved_by` を上書きしないため、取り消さないと再生成した本文が承認済みのまま扱われる
+- **承認を取り消す前に、取り消す段階のうち `approved` が `true` の段階ごとに、その承認を spec.json の `approval_history` に1つずつ追記する**(配列が無ければ作る)。
+  要素は `stage` `approved_by` `approved_at` `issues`(その承認のときに spec が対象にしていたIssue。`issue` と、その時点の `additional_issues`)`revoked_at` `revoked_for`(取り消した理由)を持つ。
+  `approval_history` は追記だけにし、書いてある要素を書き換えたり消したりしない。手順は spec-review の Step 6(差し戻し)と kiro-spec-init の更新の形(新しいIssueのための更新)にある
 - 人間が承認前に spec を直した場合も `/spec-review` の対象になる。承認後に直す場合は、上のとおり承認を取り消してから直す(取り消せばレビューの対象に戻る)
-- Skills は `.claude/skills/kiro-*/SKILL.md` と `.claude/skills/spec-review/SKILL.md`。適用可能性が1%でもあればスキルを起動する
+- spec で進めている途中で、ごく小さい変更だと分かっても、spec の段階を省かず spec で最後まで進める。spec 無しへの切り替えを所有者に提案しない
+- Skills は `.claude/skills/kiro-*/SKILL.md` と `.claude/skills/spec-review/SKILL.md`。適用可能性が1%でもあればスキルを起動する(spec の各段階のコマンドは除く。上のワークフローのとおり所有者が打つ)
 - steeringは常に最新に保つ(`/kiro-steering` で更新)
+
+#### Issueの印
+
+既存の spec を新しいIssueのために直したとき(`/kiro-spec-init #N <feature>` で開き直し、spec.json に `additional_issues` があるとき)は、
+要件・受入基準・設計の節・タスクがどのIssueに対するものかを、次の印で本文の中に示す。
+
+- 追加のIssue #N のために足した項目は、末尾に `(#N)` を付ける
+- 既存の項目を直したときは、直した項目の末尾に `(#N で変更)` を付ける
+- 既存の項目を取りやめるときは、本文を消さず、先頭に `(#N で取りやめ)` を付ける
+- 印の無い項目は、spec.json の `issue`(元のIssue)に対するものとする
+- 既存の要件・受入基準・タスクの番号は変えない。新しい要件は既存の最後の番号の次から足す(実装済みのタスクの `_Requirements:_` が指す番号をずらさないため)
+- tasks.md のタスクの行では、`(P)` があればその後に、無ければ説明の末尾に `(#N)` を置く。`_Requirements:_` の行には付けない
+- 実装済みのタスクの完了の印(`[x]`)は外さない
