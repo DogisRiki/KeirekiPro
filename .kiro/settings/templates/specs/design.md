@@ -1,353 +1,178 @@
-# Design Document Template
+# 設計
 
----
-**Purpose**: Provide sufficient detail to ensure implementation consistency across different implementers, preventing interpretation drift.
+<!--
+Claude は、この雛形で書く spec の文と組み立てを、.kiro/settings/rules/spec-writing.md の決まりと見本2に合わせる。Claude は、この雛形の書き方について、次の3つの注記に従う。
 
-**Approach**:
-- Include essential sections that directly inform implementation decisions
-- Omit optional sections unless critical to preventing implementation errors
-- Match detail level to feature complexity
-- Use diagrams and tables over lengthy prose
+- 部品の節では、Claude は、その部品に当てはまる欄だけを書く。当てはまらない欄は、Claude は欄の名前ごと書かない。
+- 処理の流れ、データの形、失敗したときの扱い、安全、性能、移行の節は、その spec に当てはまるときだけ書く。当てはまらないときは、Claude は見出しごと書かない。雛形が安全と移行の節を残しているのは、認証やデータベースに触れる spec で、その内容を書く場所が無くならないようにするためである。
+- 雛形に無い節が要るときは、Claude は、その節を移行の節の前に足してよい。
+-->
 
-**Warning**: Approaching 1000 lines indicates excessive feature complexity that may require design simplification or splitting into multiple specs.
----
+## 概要
 
-> Sections may be reordered (e.g., surfacing Requirements Traceability earlier or moving Data Models nearer Architecture) when it improves clarity. Within each section, keep the flow **Summary → Scope → Decisions → Impacts/Risks** so reviewers can scan consistently.
+<!-- Claude は、この節に、この設計が何を変えるのかを2〜3段落で書く。Claude は、この機能が誰にどんな価値を届けるのか、利用者がどの作業でこの機能を使うのか、今の仕組みのどこをどう変えるのかを書く。Claude は、requirements.md の決めごとを書き写さず、その決めごとをどう実現するのかを書く。 -->
+{{OVERVIEW}}
 
-## Overview 
-2-3 paragraphs max
-**Purpose**: This feature delivers [specific value] to [target users].
-**Users**: [Target user groups] will utilize this for [specific workflows].
-**Impact** (if applicable): Changes the current [system state] by [specific modifications].
+## 作るものと作らないもの
 
+<!-- Claude は、この節を、設計、タスク、あとの検証で責任の範囲を判断するときのよりどころにする。Claude は、範囲を具体的な言葉で書く。 -->
+### 作るもの
 
-### Goals
-- Primary objective 1
-- Primary objective 2  
-- Success criteria
+<!-- Claude は、この spec が責任を持つ機能と振る舞い、この spec が持つデータ、この spec が定める呼び出し方の取り決めを書く。 -->
+- {{OWNED_ITEM}}
 
-### Non-Goals
-- Explicitly excluded functionality
-- Future considerations outside current scope
-- Integration points deferred
+### 作らないもの
 
-## Boundary Commitments
+<!-- Claude は、関係はあるがこの spec が持たないもの、別の spec や既存の仕組みやあとの段階に回すもの、「ついでに」取り込んではいけない変更を書く。 -->
+- {{OUT_OF_SCOPE_ITEM}}
 
-State the responsibility boundary of this spec in concrete terms. Treat this as the anchor for architecture, tasks, and later validation.
+## 使う既存の仕組み
 
-### This Spec Owns
-- Capabilities and behaviors this spec is responsible for
-- Data it owns or is authoritative for
-- Interfaces or contracts it defines or stabilizes
+<!-- Claude は、この設計が頼ってよい既存の仕組み・spec・部品と、共有の基盤を書く。依存の向きに守るべき制約があるときは、Claude はその制約も書く。 -->
+- {{ALLOWED_DEPENDENCY}}
 
-### Out of Boundary
-- Related concerns this spec explicitly does NOT own
-- Work deferred to another spec, existing subsystem, or later phase
-- Changes this spec must not absorb as "just one more thing"
+## 設計を見直すきっかけ
 
-### Allowed Dependencies
-- Upstream systems/specs/components this design may depend on
-- Shared infrastructure this design may use
-- Dependency constraints that must not be violated
+<!-- Claude は、どんな変更があったら、この spec に頼る spec や利用する側が、つなぎ目を確かめ直すべきかを書く。たとえば、呼び出し方の取り決めの形が変わったとき、データの持ち主が変わったとき、依存の向きが変わったとき、起動や実行の前提が変わったときである。 -->
+- {{REVALIDATION_TRIGGER}}
 
-### Revalidation Triggers
-List the kinds of changes that should force dependent specs or consumers to re-check integration.
+## プロジェクトの決まりを守っているか
 
-- Contract shape changes
-- Data ownership changes
-- Dependency direction changes
-- Startup/runtime prerequisite changes
+<!--
+Claude は、この設計がリポジトリで機械的に強制される決まりに合っていることを、設計の段階で確かめる。Claude は、その spec に関係のある項目だけを、項目の名前と、設計がその決まりをどう守るかを1行ずつ書く。Claude は、関係のない項目を、理由を書かずに名前だけ「関係のない項目:」の1行に並べる。
 
-## KeirekiPro Compliance Check (必須)
+各項目で確かめることは、次のとおりである。
 
-設計がリポジトリの機械強制ルールに適合していることを、設計段階で明示的に確認する。
-各項目にチェックを入れ、該当しない場合は N/A と理由を書く。
+- backend のコードを置く層: 新しく作るクラスと変えるクラスを、オニオン・DDD・CQRS の層の役割(`backend/CLAUDE.md`)どおりの層に置いているか。ArchUnit のルールに反していないか。ArchUnit は、パッケージの依存の向き、名前の付け方、置き場所をテストで検査するライブラリである。
+- frontend の機能ごとの境界: 新しく作るモジュールと変えるモジュールを、feature の境界(`frontend/CLAUDE.md`)どおりに置いているか。ESLint の境界のルールに反していないか。このルールは、ある feature から別の feature を直接 import することを禁じ、feature の外へは index からだけ公開させる。
+- frontend の状態の持ち方: サーバーから取るデータ(server state)を TanStack Query に置き、画面の中だけで持つデータ(client state)を Zustand に置いているか。
+- データベースの表の形: マイグレーションが expand-contract の決まりに従っているか。expand-contract とは、古い形と新しい形の両方で動く段階を挟み、表の形を2段階で変えることを指す。マイグレーションを含むときは、Claude はその旨を書く。マイグレーションを含む PR は、所有者が承認するまでマージされない。
+- 新しいライブラリの追加: 新しいライブラリを足すかどうか。足すときは、Claude はほかの選択肢と比べた結果を書く。Claude は、ライブラリのためにどのファイルを変えるかも書く。backend のビルドスクリプト(`*.gradle` `*.gradle.kts`)か、frontend のライブラリの入手先と実行の設定(`frontend/.npmrc` `.pnpmfile.cjs` `.pnpmfile.mjs` `pnpm-workspace.yaml`)を変える PR は、所有者が承認するまでマージされない。ライブラリの版を宣言するファイル(`package.json` `pnpm-lock.yaml` `libs.versions.toml` `gradle-wrapper.properties`)の変更は、所有者の承認を待たない。その変更は、所有者の承認の代わりに、`dependency-review`(新しく増えた脆弱性)、`dependency-cooldown`(公開から72時間たっていない版)、`gradle-wrapper`(配布元と公表されたチェックサム)の自動の検査が確かめる。Claude は、backend のライブラリの版を `backend/gradle/libs.versions.toml` に書き、`build.gradle` に直接書かない。直接書くと、その PR は所有者の承認を待つ側に入る。
+- 品質チェックの設定: `.github/` `eslint.config.js` `vite.config.ts` `quality.gradle` などの品質チェックの設定ファイルを変えずに済む設計か。変える必要があるときは、Claude はその変更を所有者への提案として設計から分けて書く。
+- 使う外部の機能がこのリポジトリで使えるか: 設計が頼る外部のサービスの機能が、このリポジトリの条件で実際に使えるか。Claude は、アカウントの種類(個人か Organization か)、プラン、リポジトリの公開範囲、地域、有効にする操作が要るかどうかを確かめる。Claude は、「設定の項目が何か」ではなく「そもそも使えるか」を、公式の提供条件と、実際のリポジトリの属性(`gh api repos/:owner/:repo` の `owner.type` など)の両方で確かめる。使えないときは、Claude は設計に進まず、代わりの案を比べるところからやり直す。
+-->
+- {{RELEVANT_ITEM}}: {{HOW_THE_DESIGN_KEEPS_IT}}
+- 関係のない項目: {{UNRELATED_ITEM_NAMES}}
 
-- [ ] **backend層配置**: 新規/変更クラスの配置がオニオン+DDD+CQRSの層責務(`backend/CLAUDE.md`)に従い、
-      ArchUnitルール(パッケージ依存・命名・配置)に違反しない
-- [ ] **frontend境界**: 新規/変更モジュールの配置が feature 境界(`frontend/CLAUDE.md`)に従い、
-      ESLintの境界ルール(feature間import禁止・index経由公開)に違反しない
-- [ ] **状態管理**: server state は TanStack Query、client state は Zustand に配置している
-- [ ] **DBスキーマ**: マイグレーションが expand-contract 規約(後方互換の2段階変更)に従う。
-      マイグレーションを含む場合はその旨を明記(人間承認ゲート対象)
-- [ ] **依存追加**: 新規ライブラリ追加の有無を明記(有る場合は人間承認ゲート対象。代替検討を記載)
-- [ ] **ゲート設定**: `.github/` `eslint.config.js` `vite.config.ts` `quality.gradle` 等の
-      ゲート設定ファイルの変更を必要としない設計である(必要な場合は人間への提案として分離)
-- [ ] **前提機能の利用可否**: 設計が依存する外部サービスの機能が、**このリポジトリの
-      条件で実際に使えること**を確認した。確認する軸は、アカウント種別
-      (個人 / Organization)・プラン・リポジトリの可視性・地域や有効化の要否。
-      「設定項目が何か」ではなく「そもそも使えるか」を、公式の提供条件と
-      実際のリポジトリの属性(`gh api repos/:owner/:repo` の `owner.type` など)の
-      両方で確認する。使えない場合は設計に進まず、代替案の比較からやり直す
+## 全体の構成
 
-## Architecture
-
-> Reference detailed discovery notes in `research.md` only for background; keep design.md self-contained for reviewers by capturing all decisions and contracts here.
-> Capture key decisions in text and let diagrams carry structural detail—avoid repeating the same information in prose.
-> Supporting sections below should remain as light as possible unless they materially clarify the responsibility boundary, dependency rules, or integration seams.
-
-### Existing Architecture Analysis (if applicable)
-When modifying existing systems:
-- Current architecture patterns and constraints
-- Existing domain boundaries to be respected
-- Integration points that must be maintained
-- Technical debt addressed or worked around
-
-### Architecture Pattern & Boundary Map
-**RECOMMENDED**: Include Mermaid diagram showing the chosen architecture pattern and system boundaries (required for complex features, optional for simple additions)
-
-**Architecture Integration**:
-- Selected pattern: [name and brief rationale]
-- Domain/feature boundaries: [how responsibilities are separated to avoid conflicts]
-- Existing patterns preserved: [list key patterns]
-- New components rationale: [why each is needed]
-- Steering compliance: [principles maintained]
-
-### Technology Stack
-
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Frontend / CLI | | | |
-| Backend / Services | | | |
-| Data / Storage | | | |
-| Messaging / Events | | | |
-| Infrastructure / Runtime | | | |
-
-> Keep rationale concise here and, when more depth is required (trade-offs, benchmarks), add a short summary plus pointer to the Supporting References section and `research.md` for raw investigation notes.
-
-## File Structure Plan
-
-Map the directory structure and file responsibilities for this feature. This section directly drives task `_Boundary:_` annotations and implementation Task Briefs. Use the appropriate level of detail:
-
-- **Small features**: List individual files with responsibilities
-- **Large features**: Describe directory-level structure + per-domain/module pattern, list only non-obvious files individually
-
-### Directory Structure
-```
-src/
-├── domain-a/              # Domain A responsibility
-│   ├── controller.ts      # Endpoint handlers
-│   ├── service.ts         # Business logic
-│   └── types.ts           # Domain types
-├── domain-b/              # Domain B (same pattern as domain-a)
-└── shared/
-    └── cross-cutting.ts   # Non-obvious: why this exists
+<!-- Claude は、選んだ構成と仕組みの境界を Mermaid の図で示す。図には、Claude は飾りを付けず、構造だけを描く。ノードの ID は英数字と下線だけにする。ノードの名前には、括弧、角括弧、引用符、スラッシュを入れない。Claude は、図に描いた構造を文で繰り返さず、図のあとに、選んだ構成とその理由、部品の責任の分け方、守る既存の作り、新しい部品が要る理由を書く。調べた経緯と比べた案は research.md に書き、Claude は design.md にその結論だけを書く。 -->
+```mermaid
+{{ARCHITECTURE_DIAGRAM}}
 ```
 
-> For repeated structures, describe the pattern once (e.g., "domain-b follows same pattern as domain-a"). List individual files only when their responsibility isn't obvious from the path.
+{{ARCHITECTURE_DECISIONS}}
 
-### Modified Files
-- `path/to/existing.ts` — What changes and why
+<!-- Claude は、「使う技術」の欄に、この機能で使う技術を層ごとに書く。層は、画面、サーバー、データの保存、イベントのやり取り、実行環境などである。Claude は、層ごとに、選んだ技術とその版と、この機能での役割を書く。この機能で使わない層は書かない。 -->
+**使う技術**:
+- {{LAYER}}: {{TECHNOLOGY_AND_VERSION}}。{{ROLE_IN_FEATURE}}
 
-> Each file should have one clear responsibility. Group files that change together. For repeated structures, describe the pattern once rather than listing every file.
-> Avoid duplicating what Components and Interfaces already describes — focus on the physical file layout that Components maps to.
+## ファイルの構成
 
-## System Flows
+<!-- Claude は、この機能で作るファイルと変えるファイルと、それぞれの役割を書く。tasks.md のタスクが扱うファイルの範囲は、この節をもとに決まる。小さな機能では、Claude はファイルを1つずつ書く。大きな機能では、Claude はディレクトリごとの構成と繰り返しの型を1度だけ書き、役割がパスから分からないファイルだけを1つずつ書く。Claude は、部品の節に書く内容をこの節で繰り返さず、部品がどのファイルに置かれるかを書く。 -->
+Claude が新しく作るファイル:
 
-Provide only the diagrams needed to explain non-trivial flows. Use pure Mermaid syntax. Common patterns:
-- Sequence (multi-party interactions)
-- Process / state (branching logic or lifecycle)
-- Data / event flow (pipelines, async messaging)
+- `{{NEW_FILE_PATH}}`: {{NEW_FILE_ROLE}}
 
-Skip this section entirely for simple CRUD changes.
-> Describe flow-level decisions (e.g., gating conditions, retries) briefly after the diagram instead of restating each step.
+Claude が変えるファイル:
 
-## Requirements Traceability
+- `{{MODIFIED_FILE_PATH}}`: {{WHAT_CHANGES_AND_WHY}}
 
-Use this section for complex or compliance-sensitive features where requirements span multiple domains. Straightforward 1:1 mappings can rely on the Components summary table.
+## 処理の流れ
 
-Map each requirement ID (e.g., `2.1`) to the design elements that realize it.
-
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1 | | | | |
-| 1.2 | | | | |
-
-> Omit this section only when a single component satisfies a single requirement without cross-cutting concerns.
-
-## Components and Interfaces
-
-Provide a quick reference before diving into per-component details.
-
-- Summaries can be a table or compact list. Example table:
-  | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
-  |-----------|--------------|--------|--------------|--------------------------|-----------|
-  | ExampleComponent | UI | Displays XYZ | 1, 2 | GameProvider (P0), MapPanel (P1) | Service, State |
-- Only components introducing new boundaries (e.g., logic hooks, external integrations, persistence) require full detail blocks. Simple presentation components can rely on the summary row plus a short Implementation Note.
-
-Group detailed blocks by domain or architectural layer. For each detailed component, list requirement IDs as `2.1, 2.3` (omit “Requirement”). When multiple UI components share the same contract, reference a base interface/props definition instead of duplicating code blocks.
-
-### [Domain / Layer]
-
-#### [Component Name]
-
-| Field | Detail |
-|-------|--------|
-| Intent | 1-line description of the responsibility |
-| Requirements | 2.1, 2.3 |
-| Owner / Reviewers | (optional) |
-
-**Responsibilities & Constraints**
-- Primary responsibility
-- Domain boundary and transaction scope
-- Data ownership / invariants
-
-**Dependencies**
-- Inbound: Component/service name — purpose (Criticality)
-- Outbound: Component/service name — purpose (Criticality)
-- External: Service/library — purpose (Criticality)
-
-Summarize external dependency findings here; deeper investigation (API signatures, rate limits, migration notes) lives in `research.md`.
-
-**Contracts**: Service [ ] / API [ ] / Event [ ] / Batch [ ] / State [ ]  ← check only the ones that apply.
-
-##### Service Interface
-```typescript
-interface [ComponentName]Service {
-  methodName(input: InputType): Result<OutputType, ErrorType>;
-}
+<!-- Claude は、込み入った処理の流れだけを Mermaid の図で示す。複数の部品がやり取りするときはシーケンス図、分岐や状態の移り変わりがあるときは状態図かフローチャート、データやイベントが流れるときはデータの流れの図を使う。Claude は、図の各段を文で繰り返さず、図のあとに、先へ進む条件や再試行のような流れの上の決めごとを書く。 -->
+```mermaid
+{{FLOW_DIAGRAM}}
 ```
-- Preconditions:
-- Postconditions:
-- Invariants:
 
-##### API Contract
-| Method | Endpoint | Request | Response | Errors |
-|--------|----------|---------|----------|--------|
-| POST | /api/resource | CreateRequest | Resource | 400, 409, 500 |
+{{FLOW_DECISIONS}}
 
-##### Event Contract
-- Published events:  
-- Subscribed events:  
-- Ordering / delivery guarantees:
+## 部品
 
-##### Batch / Job Contract
-- Trigger:  
-- Input / validation:  
-- Output / destination:  
-- Idempotency & recovery:
+<!--
+Claude は、部品の節をドメインか層ごとに並べ、部品ごとに次の組み立てで書く。部品の名前とその部品が何かを括弧で添えた見出し、対応する要件の行、日本語の欄の順である。Claude は、対応する要件の行を、要件の番号だけで書く。Claude は、各欄に、その部品が何をして何をしないのかを、主語と目的語のある文で書く。Claude は、イベント名、権限、設定の値、時間の上限、コマンドの引数のように、実装に要る情報を欄に書く。
 
-##### State Management
-- State model:  
-- Persistence & consistency:  
-- Concurrency strategy:
+各欄に書くことは、次のとおりである。
 
-**Implementation Notes**
-- Integration: 
-- Validation: 
-- Risks:
+- 役割: その部品が受け持つことと、受け持たないこと。守るドメインの境界とトランザクションの範囲、その部品が持つデータと、常に成り立たせる条件
+- 権限: その部品に与える権限と、使うトークンや資格情報
+- いつ動くか: その部品を起動するイベント、定期実行の間隔、呼び出す側。動かす条件と、同時に動いたときの扱い
+- 使う部品: その部品を呼ぶ部品、その部品が呼ぶ部品、外部のサービスやライブラリと、それぞれを使う目的。外部の仕様を詳しく調べた結果は research.md に書き、Claude はこの欄に結論だけを書く
+- 呼び出し方: 関数やメソッドの形(引数、戻り値、返すエラー)と、呼ぶ前と呼んだあとに成り立つ条件。API の経路、要求と応答の形、返すステータス。発行するイベントと購読するイベント、届く順番の保証。一括処理の起動のしかた、入力の検証、出力先、同じ入力で何度動いても結果が変わらないかどうかと、途中で止まったときの戻し方
+- 状態の持ち方: 状態の形、保存のしかたと食い違いを防ぐ方法、同時に書き込まれたときの扱い
+- 失敗したとき: その部品が失敗をどう扱うか、打ち切る時間、再試行するかどうか
 
-## Data Models
+複数の画面の部品が同じ呼び出し方を共有するときは、Claude は呼び出し方を1つの部品の節にだけ書き、ほかの部品の節ではその部品の節を名前で指す。新しい境界を作らない単純な表示の部品は、Claude は役割の欄だけを書く。
+-->
+### {{COMPONENT_NAME}}({{WHAT_IT_IS}})
 
-Focus on the portions of the data landscape that change with this feature.
+対応する要件: {{REQUIREMENT_IDS}}
 
-### Domain Model
-- Aggregates and transactional boundaries
-- Entities, value objects, domain events
-- Business rules & invariants
-- Optional Mermaid diagram for complex relationships
+**役割**: {{RESPONSIBILITY}}
 
-### Logical Data Model
+**権限**: {{PERMISSIONS}}
 
-**Structure Definition**:
-- Entity relationships and cardinality
-- Attributes and their types
-- Natural keys and identifiers
-- Referential integrity rules
+**いつ動くか**: {{TRIGGER}}
 
-**Consistency & Integrity**:
-- Transaction boundaries
-- Cascading rules
-- Temporal aspects (versioning, audit)
+**使う部品**: {{DEPENDENCIES}}
 
-### Physical Data Model
-**When to include**: When implementation requires specific storage design decisions
+**呼び出し方**: {{INTERFACE}}
 
-**For Relational Databases**:
-- Table definitions with data types
-- Primary/foreign keys and constraints
-- Indexes and performance optimizations
-- Partitioning strategy for scale
+**状態の持ち方**: {{STATE}}
 
-**For Document Stores**:
-- Collection structures
-- Embedding vs referencing decisions
-- Sharding key design
-- Index definitions
+**失敗したとき**: {{FAILURE_HANDLING}}
 
-**For Event Stores**:
-- Event schema definitions
-- Stream aggregation strategies
-- Snapshot policies
-- Projection definitions
+## データの形
 
-**For Key-Value/Wide-Column Stores**:
-- Key design patterns
-- Column families or value structures
-- TTL and compaction strategies
+<!--
+Claude は、この機能で変わるデータだけを書く。Claude は、この機能に関係のある観点だけを選んで書く。観点は次のとおりである。
 
-### Data Contracts & Integration
+- ドメインのモデル: 集約とトランザクションの境界、エンティティ、値オブジェクト、ドメインイベント、業務の決まりと常に成り立たせる条件。関係が込み入っているときは、Claude は Mermaid の図を添える
+- 論理的なデータの形: エンティティどうしの関係と数の対応、属性とその型、自然キーと識別子、参照の整合性の決まり、トランザクションの境界、削除や更新を関連するデータへ広げる決まり、版の管理や監査のための履歴
+- 物理的なデータの形: 保存のしかたを具体的に決める必要があるときに書く。リレーショナルデータベースでは、表の定義とデータの型、主キーと外部キーと制約、索引、分割のしかた。ドキュメントストアでは、コレクションの構造、埋め込むか参照するか、分散のキー、索引。イベントストアでは、イベントの形、ストリームのまとめ方、スナップショットの方針、読み出し用の形。キーと値のストアでは、キーの組み立て方、値の構造、有効期限と圧縮の方針
+- やり取りするデータ: API の要求と応答の形、入力の検証の決まり、直列化の形式(JSON など)。発行するイベントの形、形の版の管理、古い版と新しい版の互換の決まり。サービスをまたぐときの、分散トランザクションの方式、データの同期のしかた、最終的に整合させるときの扱い
+-->
+{{DATA_MODEL}}
 
-**API Data Transfer**
-- Request/response schemas
-- Validation rules
-- Serialization format (JSON, Protobuf, etc.)
+## 失敗したときの扱い
 
-**Event Schemas**
-- Published event structures
-- Schema versioning strategy
-- Backward/forward compatibility rules
+<!--
+Claude は、失敗の種類ごとに、どの部品が何をするかと、どう回復するかを書く。部品の「失敗したとき」の欄に書いた扱いは、Claude はこの節で繰り返さず、部品をまたぐ扱いだけを書く。失敗の種類は、たとえば次のとおりである。
 
-**Cross-Service Data Management**
-- Distributed transaction patterns (Saga, 2PC)
-- Data synchronization strategies
-- Eventual consistency handling
+- 利用者の誤り(4xx): 入力が不正なら入力欄ごとに検証の結果を返す。権限が無ければ認証の案内を返す。見つからなければ移動先の案内を返す
+- システムの失敗(5xx): 基盤が故障したら機能を落として動き続ける。時間切れならサーキットブレーカーで呼び出しを止める。サーキットブレーカーとは、失敗が続く呼び出し先への呼び出しを一定の間止める仕組みである。資源が尽きたら呼び出しの回数を制限する
+- 業務の決まりに反する操作(422): 決まりに反したら、どの条件に反したかを説明する。状態が食い違ったら、どの状態へ移れるかを案内する
 
-Skip subsections that are not relevant to this feature.
+業務の流れを含む込み入った失敗の扱いがあるときは、Claude は Mermaid のフローチャートを添える。Claude は、失敗の追跡、ログ、死活の監視をどう作るかも書く。
+-->
+{{ERROR_HANDLING}}
 
-## Error Handling
+## テストの方針
 
-### Error Strategy
-Concrete error handling patterns and recovery mechanisms for each error type.
+<!--
+Claude は、テストの種類ごとに、確かめることを書く。Claude は、テストの種類の名前と分け方を機能の領域に合わせて変えてよい。
 
-### Error Categories and Responses
-**User Errors** (4xx): Invalid input → field-level validation; Unauthorized → auth guidance; Not found → navigation help
-**System Errors** (5xx): Infrastructure failures → graceful degradation; Timeouts → circuit breakers; Exhaustion → rate limiting  
-**Business Logic Errors** (422): Rule violations → condition explanations; State conflicts → transition guidance
+- 単体テスト: 中心になる関数やモジュールから3〜5項目
+- 結合テスト: 部品をまたぐ流れから3〜5項目
+- 画面を通しで操作するテスト: 画面があるときに、利用者が必ず通る道筋から3〜5項目
+- 性能と負荷のテスト: 性能の目標があるときに、同時実行や大量の処理から3〜4項目
+-->
+- 単体テスト: {{UNIT_TESTS}}
+- 結合テスト: {{INTEGRATION_TESTS}}
+- 画面を通しで操作するテスト: {{E2E_TESTS}}
+- 性能と負荷のテスト: {{PERFORMANCE_TESTS}}
 
-**Process Flow Visualization** (when complex business logic exists):
-Include Mermaid flowchart only for complex error scenarios with business workflows.
+## 安全
 
-### Monitoring
-Error tracking, logging, and health monitoring implementation.
+<!-- Claude は、認証、機密のデータ、外部とのつなぎ込み、利用者の権限を扱う機能について、この機能に固有の決めごとだけを書く。全体に共通する対策は steering に任せる。Claude は、想定する脅威と対策、守るべき規制、認証と認可のしかた、データの保護とプライバシーの扱いを書く。 -->
+{{SECURITY}}
 
-## Testing Strategy
+## 性能
 
-### Default sections (adapt names/sections to fit the domain)
-- Unit Tests: 3–5 items from core functions/modules (e.g., auth methods, subscription logic)
-- Integration Tests: 3–5 cross-component flows (e.g., webhook handling, notifications)
-- E2E/UI Tests (if applicable): 3–5 critical user paths (e.g., forms, dashboards)
-- Performance/Load (if applicable): 3–4 items (e.g., concurrency, high-volume ops)
+<!-- Claude は、性能の目標、高い負荷、規模の拡大に関わる、この機能に固有の目標と取捨選択だけを書く。一般的なやり方は steering に任せる。Claude は、目標の数値とその測り方、規模の広げ方(台数を増やすか、1台の能力を上げるか)、キャッシュと最適化のしかたを書く。 -->
+{{PERFORMANCE}}
 
-## Optional Sections (include when relevant)
+## 移行
 
-### Security Considerations
-_Use this section for features handling auth, sensitive data, external integrations, or user permissions. Capture only decisions unique to this feature; defer baseline controls to steering docs._
-- Threat modeling, security controls, compliance requirements
-- Authentication and authorization patterns
-- Data protection and privacy considerations
-
-### Performance & Scalability
-_Use this section when performance targets, high load, or scaling concerns exist. Record only feature-specific targets or trade-offs and rely on steering documents for general practices._
-- Target metrics and measurement strategies
-- Scaling approaches (horizontal/vertical)
-- Caching strategies and optimization techniques
-
-### Migration Strategy
-Include a Mermaid flowchart showing migration phases when schema/data movement is required.
-- Phase breakdown, rollback triggers, validation checkpoints
-
-## Supporting References (Optional)
-- Create this section only when keeping the information in the main body would hurt readability (e.g., very long TypeScript definitions, vendor option matrices, exhaustive schema tables). Keep decision-making context in the main sections so the design stays self-contained.
-- Link to the supporting references from the main text instead of inlining large snippets.
-- Background research notes and comparisons continue to live in `research.md`, but their conclusions must be summarized in the main design.
+<!-- Claude は、表の形やデータを移すときに、移行の段階を Mermaid のフローチャートで示す。Claude は、段階の分け方、元に戻す条件、段階ごとに確かめる点を書く。 -->
+{{MIGRATION}}
