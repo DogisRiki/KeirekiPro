@@ -88,7 +88,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - _対象の部品: spec を書くスキル_
   - _依存: 1.2, 2.2_
 
-- [ ] 3.4 `/kiro-spec-tasks` を新しい書き方に対応させ、承認を尋ねる時点を直す (並行可)
+- [x] 3.4 `/kiro-spec-tasks` を新しい書き方に対応させ、承認を尋ねる時点を直す (並行可)
 
   Claude は、`kiro-spec-tasks/SKILL.md` が雛形を読む箇所を、`spec_format` で `specs/` と `specs-v1/` を選び分けるように直す。Claude は、`kiro-spec-tasks/SKILL.md`、`tasks-generation.md`、`tasks-parallel-analysis.md` の、読み替えの指示の一覧に挙げた指示のそれぞれに、読み替えの1文を足す。Claude は、SKILL.md の Step 4 を、生成の直後に承認を尋ねず `/spec-review` を実行し、審査が終わってから承認を尋ねて spec.json に書く手順に直す。
   - 完了の確かめ方: 雛形を読む箇所に `spec_format` による選び分けがある。Step 4 に、`/spec-review` のあとで承認を尋ねる手順と、承認を spec.json に書く手順の両方がある。一覧に挙げた指示のそれぞれに、読み替えの1文がある。最後の案内に `/spec-review` がある
@@ -189,3 +189,5 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
 - この spec の実装中に動く `/kiro-impl` は、タスク5.1で直す前のものである。直す前の `/kiro-impl` は `_Depends:_` と `_Blocked:_` と `## Implementation Notes` の名前を読み書きする。そこで、この spec の実装では、Claude はタスクを番号の順に1つずつ進め、`_依存:_` に挙げたタスクが終わっていることを自分で確かめる。Claude は、保留の理由と実装中に分かったことを、`## Implementation Notes` ではなく、この節に書く
 - タスク4.1の完了の確かめ(点検役を起動して見本の本文を渡す)、タスク6.2(`/spec-review` を流し、所有者に会話の始め直しを頼むことがある)、タスク6.3(所有者にコマンドを打ってもらう)は、サブエージェントを起動したり所有者に頼んだりする。`/kiro-impl` が自律で起動する実装役のサブエージェントは、どちらもできない。そこで、Claude は、この3つの作業を `/kiro-impl` の実装役に任せず、メインの会話で行う
 - タスク2.3: 新しい tasks.md の雛形の完了条件の節には、design の指定(中身を変えない)に従い、「上記フォーマット」「detail item に記載する」「受け入れ基準」の言い回しが残っている。審査役は、これらが指すものが分かりにくいと指摘した。Claude は、直すかどうかを所有者に提案する
+- タスク3.4: spec.json の `ready_for_implementation` を true にするスキルが無い(`/kiro-spec-init` は true に戻さないと書き、`/kiro-spec-tasks` も書かない)。一方で `check-spec-backing.sh` は true を求める。この食い違いはこの spec の前からあり、この spec の範囲外なので、Claude は所有者に報告だけを行う
+- タスク3.4: `tasks-generation.md` の2か所が、今の design の見出し「Architecture Pattern & Boundary Map」を名指ししている。design の読み替えの一覧に入っていないので、Claude はこのタスクでは直していない
