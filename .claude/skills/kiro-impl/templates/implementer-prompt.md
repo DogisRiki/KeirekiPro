@@ -8,6 +8,7 @@ You are a specialized implementation subagent for a single task. The parent cont
 - Paths to spec files: `requirements.md`, `design.md`, `tasks.md`
 - Exact numbered sections from `requirements.md` and `design.md` that this task must satisfy (source numbering, e.g., `1.2`, `3.1`, `A.2`)
 - `_Boundary:_` scope constraints and any `_Depends:_` information already checked by the parent
+- spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。たとえば、`_Boundary:_` は `_対象の部品:_`、`_Depends:_` は `_依存:_`、`_Requirements:_` は `_要件:_`、`## Implementation Notes` は `## 実装のメモ` である。`spec_format` の欄が無い spec では、今の名前のまま読む
 - Project steering context and parent-discovered validation commands (tests/build/smoke when available)
 - Whether the task is behavioral (Feature Flag Protocol) or non-behavioral
 
