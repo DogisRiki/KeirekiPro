@@ -86,10 +86,24 @@ response の書式:
    - **その spec で何回目の差し戻しか**(review ファイルの再レビューの節を数える)
    - **2回目以降は、直す以外の選択肢も並べる**: spec を分割する / requirements から作り直す
 3. 所有者が直すと判断した場合
+   - **取り消す前に、承認を `approval_history` に写す。** 戻る段階とその後続の段階のうち、`approved` が `true` の段階ごとに、spec.json の `approval_history` に次の要素を1つ追記する(配列が無ければ作る)。書式は kiro-spec-init の更新の形と同じ
+     ```json
+     {
+       "stage": "requirements",
+       "approved_by": "<approvals.requirements.approved_by>",
+       "approved_at": "<approvals.requirements.approved_at>",
+       "issues": [<issue>, <additional_issues の各番号>],
+       "revoked_at": "<現在の ISO 8601 の日時>",
+       "revoked_for": "<差し戻しの理由。指摘のIDと1行の要約>"
+     }
+     ```
+     - `issues` には、その承認のときに spec が対象にしていたIssue(`issue` と、いまの `additional_issues`)を入れる
+     - `revoked_for` の例: `"D1-1-3 による requirements への差し戻し: 要件4の受入基準が design の前提と食い違う"`
+     - `approval_history` は追記だけにし、書いてある要素を書き換えたり消したりしない
    - 戻る段階とその後続の段階について、spec.json の `approved` を `false` にし、`approved_by` と `approved_at` を削除する
    - 本文を直す
    - その段階について、`CYCLE` を 1 増やして Step 2 からやり直す(往復は新たに最大3回)
-   - 後続の段階を作り直し、それぞれレビューする
+   - 後続の段階は自分で作り直さない。所有者に、後続の段階のコマンドを順に打つよう依頼する(requirements に戻るときは `/kiro-spec-design <feature>` と `/kiro-spec-tasks <feature>`、design に戻るときは `/kiro-spec-tasks <feature>`)。各段階のコマンドには `disable-model-invocation` が付いており、AIからは起動できない。所有者が打って生成された段階は、それぞれこのスキルでレビューする
 
 ### Step 7: 所有者への報告
 
