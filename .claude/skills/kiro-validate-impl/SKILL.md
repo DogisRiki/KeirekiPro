@@ -57,6 +57,7 @@ Otherwise, for each detected feature:
 - Read `.kiro/specs/<feature>/requirements.md` for requirements
 - Read `.kiro/specs/<feature>/design.md` for design structure
 - Read `.kiro/specs/<feature>/tasks.md` for task list and Implementation Notes
+- spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。design.md は、`Boundary Commitments` を `## 作るものと作らないもの`・`## 使う既存の仕組み`・`## 設計を見直すきっかけ` の3つの節、`This Spec Owns` を `### 作るもの`、`Out of Boundary` を `### 作らないもの`、`Allowed Dependencies` を `## 使う既存の仕組み`、`Revalidation Triggers` を `## 設計を見直すきっかけ`、`File Structure Plan` を `## ファイルの構成` と読み替える。tasks.md は、`_Boundary:_` を `_対象の部品:_`、`_Blocked:_` を `_保留:_`、`## Implementation Notes` を `## 実装のメモ` と読み替える。タスクの箱(`- [ ]` `- [x]` `- [ ]*`)の形は変わらない。`spec_format` の欄が無い spec では、このスキルの今の名前のまま読む
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to the validated boundaries, runtime prerequisites, integrations, domain rules, security/performance constraints, or team conventions that affect the GO/NO-GO call
 

@@ -1,34 +1,39 @@
-# Implementation Plan
+# タスク
 
-## Task Format Template
+<!--
+Claude は、この雛形で書く spec の文と組み立てを、.kiro/settings/rules/spec-writing.md の決まりと tasks.md の見本に合わせる。Claude は、この雛形の書き方について、次の注記に従う。
 
-Use whichever pattern fits the work breakdown:
+- Claude は、大タスクと小タスクの最初の行を、どちらもタスクの箱と番号と題名にする。Claude は、タスクの箱(`- [ ]` `- [x]` `- [ ]*`)とタスク番号(`1.` `1.1`)の形を変えない。
+- Claude は、ほかのタスクと並行に進められるタスクの題名の末尾に、` (並行可)` を付ける。Claude は、`--sequential` の指定でタスクを作るときは、`(並行可)` を付けない。
+- Claude は、既存の spec に追加の Issue #N のためにタスクを足したとき、そのタスクの題名の末尾に印 `(#N)` を置く。題名に `(並行可)` があるときは、Claude は `(#N)` を `(並行可)` のあとに置く。
+- Claude は、小タスクの題名の行のあとに空行を1つ置き、その次の行に、誰が何を作るかを主語と目的語のある文で書く。大タスクに説明の文を書くときも、Claude は同じ形にする。小タスクを持たない大タスクでは、Claude は、大タスクの題名の行のあとに同じ形で説明の文と箇条書きを書く。
+- Claude は、説明の文の下の箇条書きに、完了の確かめ方、受入基準とテストの対応、`_要件:_`・`_対象の部品:_`・`_依存:_` の目印を書く。Claude は、受入基準を、説明の文ではなく「受入基準とテストの対応」の行で引く。
+- 受入基準に結び付いた、あとに回してよいテストの小タスクでは、Claude はタスクの箱を `- [ ]*` にし、箇条書きにそのタスクが確かめる受入基準を書く。
+-->
 
-### Major task only
-- [ ] {{NUMBER}}. {{TASK_DESCRIPTION}}{{PARALLEL_MARK}}
-  - {{DETAIL_ITEM_1}} *(Include details only when needed. If the task stands alone, omit bullet items.)*
-  - _Requirements: {{REQUIREMENT_IDS}}_
+- [ ] {{MAJOR_NUMBER}}. {{MAJOR_TASK_TITLE}}
+- [ ] {{MAJOR_NUMBER}}.{{SUB_NUMBER}} {{SUB_TASK_TITLE}}{{PARALLEL_MARK}}
 
-### Major + Sub-task structure
-- [ ] {{MAJOR_NUMBER}}. {{MAJOR_TASK_SUMMARY}}
-- [ ] {{MAJOR_NUMBER}}.{{SUB_NUMBER}} {{SUB_TASK_DESCRIPTION}}{{SUB_PARALLEL_MARK}}
-  - {{DETAIL_ITEM_1}}
-  - {{DETAIL_ITEM_2}}
-  - {{OBSERVABLE_COMPLETION_ITEM}} *(At least one detail item should state the observable completion condition for this task.)*
-  - _Requirements: {{REQUIREMENT_IDS}}_ *(IDs only; do not add descriptions or parentheses.)*
-  - _Boundary: {{COMPONENT_NAMES}}_ *(Only for (P) tasks. Omit when scope is obvious.)*
-  - _Depends: {{TASK_IDS}}_ *(Only for non-obvious cross-boundary dependencies. Most tasks omit this.)*
+  {{TASK_DESCRIPTION}}
+  - 完了の確かめ方: {{COMPLETION_CHECK}}
+  - 受入基準とテストの対応: {{CRITERIA_TEST_MAPPING}}
+  - _要件: {{REQUIREMENT_IDS}}_
+  - _対象の部品: {{COMPONENT_NAMES}}_
+  - _依存: {{TASK_IDS}}_
 
-> **Parallel marker**: Append ` (P)` only to tasks that can be executed in parallel. Omit the marker when running in `--sequential` mode.
->
-> **Optional test coverage**: When a sub-task is deferrable test work tied to acceptance criteria, mark the checkbox as `- [ ]*` and explain the referenced requirements in the detail bullets.
+<!--
+- `_要件:_` の行には、Claude は要件の番号だけを書く。Claude は、番号に説明や括弧を添えない。
+- `_対象の部品:_` の行には、Claude は design.md の部品の名前を書く。Claude は、この行を `(並行可)` のタスクにだけ書き、範囲が明らかなときは書かない。
+- `_依存:_` の行には、Claude は先に終えるべきタスクの番号を書く。Claude は、この行を、部品の境界をまたぐ分かりにくい依存があるときにだけ書く。ほとんどのタスクでは、Claude はこの行を書かない。
+- タスクが2つ以上あるときは、Claude は同じ組み立てを番号を1つずつ増やして繰り返す。
+-->
 
-## KeirekiPro 完了条件(全タスク共通)
+## 完了条件(全タスク共通)
 
 各タスクの完了条件には、上記フォーマットに加えて必ず次を含める:
 
-1. **acceptance criteria の引用とテスト対応付け**: タスクが実現する requirements.md の
-   acceptance criteria を引用し、それを検証するテスト(ファイル名・テスト名)との対応を
+1. **受入基準の引用とテスト対応付け**: タスクが実現する requirements.md の
+   受入基準を引用し、それを検証するテスト(ファイル名・テスト名)との対応を
    detail item に記載する。テストが無い受け入れ基準を残さない
 2. **verify の実行**: タスクの変更領域に応じた verify Skill
    (`/verify-frontend` / `/verify-backend` / `/verify-terraform`)が全てPASSしていること
