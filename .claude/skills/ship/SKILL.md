@@ -43,6 +43,14 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
    - テストのアサーションを意図的に変更した場合: `Test-Change-Justification: <理由>`
    - 変更概要・検証結果(verifyのReport)
 
+   分けた部分のIssue(サブIssue)のPRでは、`Refs:` と `Closes` にサブIssueの番号を書き、元のIssue(親)の番号は書かない。
+   codex-review はサブIssueの本文を判定の基準にし、close-linked-issues は元のIssueに「`Refs:` だけ」の知らせを出さない。
+   元のIssueは、サブIssueがすべて閉じたときに仕組みが閉じる。
+
+   更新した spec(spec.json に `additional_issues` がある)のPRでは、本文に
+   「このPRが実装するのは `(#N)` の印の付いた項目です。印の無い項目は以前のPRで実装済みです」と書き、
+   `Refs:` と `Closes` には追加のIssueの番号を書く。
+
    対応するIssue(Refs: #<Issue番号>)に `pre-merge-check` ラベルが付いているかを、PRを作る前に確かめる。
    付いている場合は、`gh pr create` に `--label pre-merge-check` を付け、PRの作成と同時に同じラベルを付ける
    (リポジトリにラベルが無ければ、先に
@@ -60,6 +68,8 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
 
 7. **CI監視**: `gh pr checks <PR番号> --watch` で必須チェックの結果を見届ける。
    - 赤になったら修正してpushする(以降のレビュー対応は `/review-loop` に従う)
+   - ただし、spec 無しのPRが `size-check` で赤になったときは、修正してpushしない。
+     `/start` の「途中で見立てが外れたとき」に従い、spec に切り替えるか小さく分けるかを決めて理由を示す
    - `dependency-gate` / `pre-merge-check` / CODEOWNERS起因の待ちは人間の承認待ちなので、その旨を報告して終了する
    - チェックは緑なのにブランチが out of date でマージが進まない場合は、
      `git fetch origin && git merge origin/main` してpushする(または `gh pr update-branch <PR番号>`)。
