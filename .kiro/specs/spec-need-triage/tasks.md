@@ -56,7 +56,7 @@
   - 完了の観測条件: kiro-spec-init の SKILL.md に更新の形の手順があり、設計の spec.json の形(`additional_issues`、`approval_history`)と一致する
   - _Requirements: 5.3, 5.5, 5.8, 5.9_
   - _Boundary: kiro-spec-init_
-- [ ] 2.3 (P) spec の審査を、更新した spec の基準と取り消しの履歴に合わせる
+- [x] 2.3 (P) spec の審査を、更新した spec の基準と取り消しの履歴に合わせる
   - spec-reviewer の定義で、spec.json の `issue` に加えて `additional_issues` の番号ごとにIssueの本文を読む(コメントは読まない)
   - 審査の観点(requirements)に、`additional_issues` があるときは、追加のIssueの「やりたいこと」に対応する要件が `(#N)` の印付きで無いものを取りこぼし、どのIssueの本文にも無いものを勝手な追加とし、印の無い要件は元のIssueを基準に見る、を足す
   - spec-review の Step 6 で、承認を取り消す前に `approval_history` に写す手順を足す(`revoked_for` に差し戻しの理由を書く)。「後続の段階を作り直し」を、所有者に各段階のコマンドを打つよう依頼する文面に直す(各段階のコマンドはAIが起動できなくなるため)。この文面の変更は 2.1 の決定に依るもので、design の審査の対応記録 D1-1-8 で、このタスクで行うと決めた
