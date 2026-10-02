@@ -47,7 +47,7 @@
   - 完了の観測条件: 3つの SKILL.md の冒頭に `disable-model-invocation: true` があり、kiro-spec-requirements に更新のときの2行がある
   - _Requirements: 5.3, 5.8_
   - _Boundary: kiro-spec-requirements, kiro-spec-design, kiro-spec-tasks_
-- [ ] 2.2 (P) kiro-spec-init に、既存の spec を新しいIssueのために開き直す形を足す
+- [x] 2.2 (P) kiro-spec-init に、既存の spec を新しいIssueのために開き直す形を足す
   - 冒頭に `disable-model-invocation: true` を足す
   - 引数の1つ目が `#<番号>`、2つ目が既存の feature 名で、その spec.json があるときに更新の形で動く。feature が無ければ誤りとして伝えて何も書かない。更新の形では、名前の重複を避けて別の名前を付ける扱い(Directory Conflict)を使わない。番号がすでに `issue` か `additional_issues` にあれば、何も書かずに進み具合を伝える
   - 新しいIssueを本文だけで読み(コメントは読まない)、承認済みの段階を `approval_history` に写し(`stage`、`approved_by`、`approved_at`、`issues`、`revoked_at`、`revoked_for`)、3段階を `generated: false`・`approved: false` にして `approved_by` と `approved_at` を消し、`phase` を `initialized` にする。`ready_for_implementation` には触れない
