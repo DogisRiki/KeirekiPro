@@ -70,7 +70,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - _対象の部品: spec を書くスキル_
   - _依存: 2.1_
 
-- [ ] 3.2 `/kiro-spec-requirements` を新しい書き方に対応させる (並行可)
+- [x] 3.2 `/kiro-spec-requirements` を新しい書き方に対応させる (並行可)
 
   Claude は、`kiro-spec-requirements/SKILL.md` が雛形を読む箇所を、`spec_format` が2なら `specs/` を、欄が無ければ `specs-v1/` を読むように直す。Claude は、`kiro-spec-requirements/SKILL.md` と `requirements-review-gate.md` の、design の「`spec_format` が2のときに読み替える指示」の一覧に挙げた指示のそれぞれに、「`spec_format` が2の spec では、この指示の代わりに `spec-writing.md` の◯◯に従う」という1文を足す。以下、この1文を「読み替えの1文」と呼ぶ。Claude は、`requirements-review-gate.md` にある、spec の受け持ち範囲(英語では Boundary)を表す用語の説明文にも、読み替えの1文を足す。Claude は、最後の案内に `/spec-review` を実行することを書く。
   - 完了の確かめ方: 雛形を読む箇所のすべてに、`spec_format` による `specs/` と `specs-v1/` の選び分けがある。一覧に挙げた指示のそれぞれに、読み替えの1文がある。最後の案内に `/spec-review` がある
