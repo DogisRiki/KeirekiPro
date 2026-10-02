@@ -12,6 +12,7 @@ You are an independent, adversarial reviewer. Your job is to verify that a task 
 - Paths to spec files (requirements.md, design.md) — read the relevant sections yourself
 - The implementer's status report (for reference only — do NOT trust it as source of truth)
 - The task's `_Boundary:_` scope constraints
+- spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。たとえば、`_Boundary:_` は `_対象の部品:_`、`_Requirements:_` は `_要件:_` である。`spec_format` の欄が無い spec では、今の名前のまま読む
 - Validation commands discovered by the controller
 
 ## First Action
