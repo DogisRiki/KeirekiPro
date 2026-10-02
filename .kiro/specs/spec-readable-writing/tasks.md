@@ -61,7 +61,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
 
 - [ ] 3. spec を書くスキルを直す
 
-- [ ] 3.1 `/kiro-spec-init` を新旧の見出しに対応させる (並行可)
+- [x] 3.1 `/kiro-spec-init` を新旧の見出しに対応させる (並行可)
 
   Claude は、`/kiro-spec-init` が新しい雛形で spec を作るように直す。Claude は、`/kiro-spec-init` が追加の要望を足すときに、`spec_format` で目印の行(`## 元の要望` か `## Project Description (Input)` か)を選ぶように直す。
   - 完了の確かめ方: SKILL.md に、2つの目印の行と、`spec_format` による選び方が書かれている
