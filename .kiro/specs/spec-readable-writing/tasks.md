@@ -79,7 +79,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - _対象の部品: spec を書くスキル_
   - _依存: 1.2_
 
-- [ ] 3.3 `/kiro-spec-design` を新しい書き方に対応させる (並行可)
+- [x] 3.3 `/kiro-spec-design` を新しい書き方に対応させる (並行可)
 
   Claude は、`kiro-spec-design/SKILL.md` が design.md の雛形を読む箇所を、`spec_format` で `specs/` と `specs-v1/` を選び分けるように直す。Claude は、`kiro-spec-design/SKILL.md` が research.md の雛形を、`spec_format` に関係なく `specs/` から読むようにする。Claude は、`kiro-spec-design/SKILL.md`、`design-principles.md`、`design-review-gate.md` の、読み替えの指示の一覧に挙げた指示のそれぞれに、読み替えの1文を足す。Claude は、`design-review-gate.md` の、spec の受け持ち範囲の4つの節を確かめる手順を、`spec-writing.md` の対応表の新しい名前でも読めるように直す。Claude は、その spec に当てはまらない受け持ち範囲の節は省いてよいと、`design-review-gate.md` に書き足す。Claude は、最後の案内に `/spec-review` を実行することを書く。
   - 完了の確かめ方: design.md の雛形を読む箇所のすべてに、`spec_format` による選び分けがある。一覧に挙げた指示のそれぞれに、読み替えの1文がある。最後の案内に `/spec-review` がある
