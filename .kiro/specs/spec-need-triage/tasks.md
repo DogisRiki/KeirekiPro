@@ -147,7 +147,7 @@
   - _Boundary: 監査手順_
 
 - [ ] 6. 検証と出荷の準備
-- [ ] 6.1 すべての検査と、受入基準ごとの突き合わせを行う
+- [x] 6.1 すべての検査と、受入基準ごとの突き合わせを行う
   - test-close-linked-issues.sh と test-lib-notice-comment.sh をコンテナ内で流し、close-linked-issues.sh と test-close-linked-issues.sh に shellcheck を流す。新しいテストは対象を一時的に壊して赤くなることを確かめてから戻す
   - 要件1〜10 の受入基準ごとに、確かめる場所(テスト名、または SKILL.md と文書の節)を一覧にし、抜けが無いことを確かめる
   - 4つの観点の定義が `/start`、CLAUDE.md、README の3か所で同じであること、kiro-spec-init / -requirements / -design / -tasks の冒頭に `disable-model-invocation: true` があること、kiro-spec-requirements に更新のときの2行があること、`/start` の spec の進み具合の表が、設計の表に design の審査の対応記録 D1-2-2 の行(各段階が承認済みで次の段階が未生成)を足したものと一致することを確かめる
@@ -155,7 +155,7 @@
   - `grep` で、CLAUDE.md、README、file-issue に「200行を超える見込み」を spec の要否の基準とする記述が残っていないことを確かめる
   - 完了の観測条件: テストと shellcheck がすべて通り、受入基準の一覧に確かめる場所の無い行が無い
   - _Requirements: 1.1, 2.1, 5.3, 5.8, 9.5, 9.6, 10.1, 10.2_
-- [ ] 6.2 PR本文に書く、出荷後の確認の手順を用意する
+- [x] 6.2 PR本文に書く、出荷後の確認の手順を用意する
   - spec の要らない小さなIssueで `/start` を打ち、判断の報告が書式どおりに出て、返事を待たずに実装が始まることを確かめる手順
   - spec の要るIssue(例: #473)で `/start` を打ち、`/kiro-spec-init #473` の依頼が出て、AIが実装を始めないことを確かめる手順
   - 分けたIssueが出たときに、サブIssueが親に紐づき、最後の部分のマージで親が閉じることを確かめる手順
