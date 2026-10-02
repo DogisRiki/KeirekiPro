@@ -4,6 +4,8 @@ Before writing `requirements.md`, review the draft requirements and repair local
 
 ## Boundary Continuity
 
+`spec_format` が2の spec では、この指示の代わりに `.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表に従う(requirements = the `## 範囲` section with 「この spec で決めること」/「この spec で決めないこと」/「この spec が前提にしていること」; design = `## 作るものと作らないもの`, `## 使う既存の仕組み`, `## 設計を見直すきっかけ`; tasks = `_対象の部品:_`). The rest of this section applies to specs without `spec_format`.
+
 Use boundary terminology consistently across phases without turning requirements into design:
 
 - **Discovery** identifies `Boundary Candidates`
@@ -23,6 +25,8 @@ Requirements should clarify the feature boundary in user- or operator-observable
 
 ## EARS and Testability Review
 
+`spec_format` が2の spec では、この節の最初の指示(EARS rules)の代わりに `.kiro/settings/rules/spec-writing.md` の文書の組み立ての節に従う(each requirement is a `### 要件N 題名` heading, a paragraph on why the owner wants it, then numbered items). The other items of this section apply to both formats.
+
 - Every acceptance criterion must follow the EARS rules defined in `ears-format.md`.
 - Every requirement must be testable, observable, and specific enough that later design and validation can verify it.
 - Remove implementation details that belong in `design.md` rather than `requirements.md`.
@@ -40,7 +44,7 @@ Requirements should clarify the feature boundary in user- or operator-observable
 
 Before applying judgment, verify these mechanically:
 - **Numeric IDs present**: Every requirement heading has a numeric ID (1, 1.1, 2, etc.). Scan the draft for headings without IDs.
-- **Acceptance criteria exist**: Every requirement has at least one EARS-format acceptance criterion. Scan for requirements with no "When/If/While/Where" acceptance statements.
+- **Acceptance criteria exist**: `spec_format` が2の spec では、この指示の代わりに `.kiro/settings/rules/spec-writing.md` の文書の組み立ての節に従い、この点検を「各要件に番号付きの項目が1つ以上あるか」と読み替える(scan for `### 要件N` headings with no numbered item). For specs without `spec_format`: Every requirement has at least one EARS-format acceptance criterion. Scan for requirements with no "When/If/While/Where" acceptance statements.
 - **No implementation language**: Scan for technology-specific terms (database names, framework names, API patterns) that belong in design, not requirements. Flag any found.
 
 ## Review Loop
