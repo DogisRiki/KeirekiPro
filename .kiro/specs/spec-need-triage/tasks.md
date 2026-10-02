@@ -14,14 +14,14 @@
 ## Tasks
 
 - [ ] 1. 親のIssueを閉じる処理(close-linked-issues)
-- [ ] 1.1 Issueの問い合わせで親と子の数を取れるようにする
+- [x] 1.1 Issueの問い合わせで親と子の数を取れるようにする
   - Issueの問い合わせ(ISSUE_QUERY)に、子の数(`subIssuesSummary` の `total` と `completed`)と親の番号(`parent.number`)を足す。親の問い合わせにも同じクエリを使う
   - テストの偽の `gh` が返すIssueの応答に、`subIssuesSummary` と `parent` を持たせられるようにする。持たせないIssueは、子が0件で親が無いIssueとして返す
   - `gh api graphql` で、このリポジトリのIssue1件(#472)について `parent { number }` と `subIssuesSummary { total completed }` を読み取りだけで引き、実物の応答の形を確かめる。偽の `gh` の応答はこの形に合わせる
   - 完了の観測条件: 既存の test-close-linked-issues.sh がコンテナ内で全PASSし、出力が変わらない(親の無いIssueの扱いが今と同じ)
   - _Requirements: 9.5, 9.6_
   - _Boundary: close-linked-issues.sh_
-- [ ] 1.2 子がすべて閉じた親を閉じる
+- [x] 1.2 子がすべて閉じた親を閉じる
   - 書き込みの繰り返しの後に動く処理を足す。対象は、この実行の `Closes` のIssueのうち、閉じた(`closed`)ものと、すでに閉じていた(`untouched`)もの
   - 親が開いていて、子の数が1以上で、閉じた子の数が子の数と等しいときだけ、親を閉じて記録のコメント(「この Issue から分けた Issue がすべて閉じたため閉じました(最後に閉じたのは #<子>、PR #<番号> のマージによる)。」)を付け、`issue=<親> result=parent-closed` を出す。閉じた親にさらに親があれば、同じことを上へ繰り返す(最大8段)
   - 親にPRのマージ以後の閉じた記録があり、いまは開いているとき(開き直された親)は閉じない。親が閉じていれば何もしない
@@ -30,7 +30,7 @@
   - 完了の観測条件: test-close-linked-issues.sh の上のケースがコンテナ内で全PASSする
   - _Requirements: 9.5, 9.6_
   - _Boundary: close-linked-issues.sh_
-- [ ] 1.3 親を閉じられなかったときに知らせる
+- [x] 1.3 親を閉じられなかったときに知らせる
   - 親の問い合わせ、または親を閉じる操作に失敗したら、`notice_post` で目印 `<!-- issue-close-notice pr=<番号> kind=parent-close-failed -->` を付けた、所有者へのメンション付きのコメント(「この Issue から分けた Issue はすべて閉じましたが、この Issue を自動で閉じられませんでした。」)を親に出し、`issue=<親> result=parent-close-failed` を出す。終了コードは今の失敗と同じ扱いにする
   - 冒頭の判定表に親を閉じられなかった行を、知らせの説明に親の知らせを書く
   - 受入基準 9.6 の失敗時の扱いを test-close-linked-issues.sh が検証する(知らせが1回だけ出る、同じ実行をもう一度しても知らせが増えない、終了コード)
@@ -75,7 +75,7 @@
   - 完了の観測条件: file-issue の Step 6 が `/start` の案内だけになり、「分けた部分のIssue」の節と例外が書かれている
   - _Requirements: 1.7, 7.5, 9.1, 9.2, 9.3, 10.4, 10.5_
   - _Boundary: file-issue_
-- [ ] 3.2 (P) 出荷手順に、部分のPRと更新した spec のPRと、200行の検査で止まったときの扱いを足す
+- [x] 3.2 (P) 出荷手順に、部分のPRと更新した spec のPRと、200行の検査で止まったときの扱いを足す
   - サブIssueのPRでは、`Refs:` と `Closes` にサブIssueの番号を書き、元のIssueの番号は書かない
   - 更新した spec のPRでは、本文に「このPRが実装するのは `(#N)` の印の付いた項目です。印の無い項目は以前のPRで実装済みです」と書き、`Refs:` と `Closes` に追加のIssueの番号を書く
   - spec 無しのPRが size-check で止まったときは、修正して push せず、`/start` の「途中で見立てが外れたとき」に従う
