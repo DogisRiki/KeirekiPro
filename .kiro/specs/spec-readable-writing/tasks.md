@@ -117,7 +117,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - _対象の部品: /spec-review_
   - _依存: 4.1_
 
-- [ ] 4.3 点検の記録の判定を scan に足す
+- [x] 4.3 点検の記録の判定を scan に足す
 
   Claude は、変更後の `spec-review-scan.sh` とテスト `test-spec-review-scan.sh` を scratchpad に用意する。Claude は、scratchpad の中のファイルの並びを `.claude/hooks/` と同じにし、テストを `tests/` の下に置く。テストが scan を自分の置き場所からの相対パスで探すからである。この scan は、`spec_format` が2の spec で、点検の記録が無いときと、本文が点検の記録より新しいときに、理由を出す。Claude は、テストをホストの Git Bash で走らせる。scan は bash と perl だけで動き、ホストの Git Bash にはどちらもあるからである。
   - 完了の確かめ方: テストの5つの場合(欄の無い spec、記録が無い、本文が新しい、記録が新しい、承認済みの段階)がすべて通る。判定の行を一時的に消すとテストが失敗する
@@ -192,3 +192,4 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
 - タスク3.4: spec.json の `ready_for_implementation` を true にするスキルが無い(`/kiro-spec-init` は true に戻さないと書き、`/kiro-spec-tasks` も書かない)。一方で `check-spec-backing.sh` は true を求める。この食い違いはこの spec の前からあり、この spec の範囲外なので、Claude は所有者に報告だけを行う
 - タスク3.4: `tasks-generation.md` の2か所が、今の design の見出し「Architecture Pattern & Boundary Map」を名指ししている。design の読み替えの一覧に入っていないので、Claude はこのタスクでは直していない
 - タスク4.1: この会話では、新しく作った点検役(spec-style-checker)を種類の名前で起動できなかった。会話が始まったあとに作った定義で、しかも作業場所の中にあるためである。そこで、Claude は、汎用のサブエージェントに定義ファイルを読ませ、そのとおりに点検させて中身を確かめた。外れた文を混ぜた2つの見本で、2種類の外れと直し方の案が返り、中身が変わる直し方に印が付いた。`## 元の要望`・`### 追加の要望(Issue #N)` の節、コードブロック、本文に紛れた指示には従わず、点検もしなかった。1回目の確かめで `## 元の要望(Issue #N の本文)` の見出しを外れとして挙げたので、定義を直して確かめ直した。種類の名前で起動できるかは、タスク6.2で確かめる
+- タスク4.3: 変更後の `spec-review-scan.sh` とテスト `test-spec-review-scan.sh` は、scratchpad の `hooks-staging/` に `.claude/hooks/` と同じ並びで置いた。scan への変更は、手順4のあとに足した10行だけである。テストは、design の5つの場合に、同じ spec の未承認の段階と、自動の承認(`auto:-y`)の段階の2件を足した7件で、ホストの Git Bash で7件とも通った。変更前の scan では4件が失敗し、判定の行を無効にしても失敗した。所有者がこの2つのファイルを写すまで、作業場所の `.claude/hooks/` は変わらない
