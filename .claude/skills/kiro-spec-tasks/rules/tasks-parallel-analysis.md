@@ -3,6 +3,8 @@
 ## Purpose
 Provide a consistent way to identify implementation tasks that can be safely executed in parallel while generating `tasks.md`.
 
+`spec_format` が2の spec では、この文書の `(P)` と `_Boundary:_` を使った規則と例の代わりに、`.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表の `(並行可)` と `_対象の部品:_`に従う(read `(P)` as `(並行可)`, `_Boundary:_` as `_対象の部品:_`, which holds design.md component names as `_Boundary:_` did, and `_Depends:_` as `_依存:_`). The criteria for judging whether a task can run in parallel are the same for both formats. Specs without `spec_format` keep the names used below.
+
 ## Relationship to Task Ordering
 
 `(P)` means: this task has no dependency on its immediately preceding peers and can run concurrently with them. The Task Ordering Principle (see tasks-generation.md) ensures Foundation-phase tasks run first, making Core-phase tasks the primary `(P)` candidates.
@@ -17,6 +19,9 @@ Only mark a task as parallel-capable when **all** of the following are true:
 5. **Non-overlapping boundaries**: `_Boundary:_` annotations confirm tasks operate on separate components.
 
 ## Marking Convention
+
+`spec_format` が2の spec では、この節の指示の代わりに `.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表の `(並行可)` と `_対象の部品:_`と、新しい tasks.md の雛形(`.kiro/settings/templates/specs/tasks.md`)に従う(append ` (並行可)` to the end of the task title, for example `- [ ] 2.1 メールを送るバックグラウンドの処理を作る (並行可)`; omit it in sequential mode; keep it outside the checkbox brackets). For specs without `spec_format`:
+
 - Append `(P)` immediately after the numeric identifier for each qualifying task.
   - Example: `- [ ] 2.1 (P) Build background worker for emails`
 - Apply `(P)` to both major tasks and sub-tasks when appropriate.

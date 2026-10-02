@@ -11,6 +11,8 @@ tasks は実装の順序と粒度を決める。requirements と design の両�
 
 **Step 3.5 と重なる観点も出してよい。** Step 3.5 は書いたのと同じモデルで走り、書く前に1回だけで、結果が残らない。ただし、Step 3.5 が既に潰しているだけの指摘を機械的に並べない。実際の本文を見て判断する。
 
+spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。tasks.md は、`_Requirements:_` を `_要件:_`、`_Boundary:_` を `_対象の部品:_`、`_Depends:_` を `_依存:_`、`(P)` を `(並行可)`、`## KeirekiPro 完了条件(全タスク共通)` を `## 完了条件(全タスク共通)` と読み替える。requirements.md の `Out of scope` は `## 範囲` の節の「この spec で決めないこと」である。design.md の `File Structure Plan` は `## ファイルの構成`、`Non-Goals` と `Out of Boundary` は `## 作るものと作らないもの` の節の `### 作らないもの` である。タスクの箱(`- [ ]` `- [x]` `- [ ]*`)の形は変わらない。`spec_format` の欄が無い spec では、今の名前のまま読む。
+
 ## 観点
 
 ### 1. 申告
@@ -36,7 +38,7 @@ requirements の `Out of scope` や design の `Non-Goals` `Out of Boundary` に
 
 ### 5. 完了条件の4項目
 
-`.kiro/settings/templates/specs/tasks.md` が全タスク共通の完了条件として定める4項目(受入基準の引用とテストの対応付け、verify の実行、ゴールハック禁止、新規テストの赤の確認)について、次を見る。
+`spec_format` の欄が無い spec では `.kiro/settings/templates/specs-v1/tasks.md`、`spec_format` が2の spec では `.kiro/settings/templates/specs/tasks.md` が全タスク共通の完了条件として定める4項目(受入基準の引用とテストの対応付け、verify の実行、ゴールハック禁止、新規テストの赤の確認)について、次を見る。
 
 - 4項目が書かれているか
 - **置き換えている場合に理由が書かれているか。** 変更領域に該当する verify Skill が無い場合など、理由を添えた置き換えは正当である。理由の無い欠落だけを指摘する

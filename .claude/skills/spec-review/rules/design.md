@@ -8,6 +8,8 @@ requirements と違い、**照合できる相手がある**(requirements.md)。�
 
 生成側には書く前の自己点検(`.claude/skills/kiro-spec-design/rules/design-review-gate.md`)がある。**その点検は `KeirekiPro Compliance Check` のセクションに一切言及していない。** ここが最も空いている。
 
+spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。`KeirekiPro Compliance Check` は `## プロジェクトの決まりを守っているか`、`File Structure Plan` は `## ファイルの構成` である。`Boundary Commitments` は `## 作るものと作らないもの`・`## 使う既存の仕組み`・`## 設計を見直すきっかけ` の3つの節に分かれる。`This Spec Owns` は `## 作るものと作らないもの` の節の `### 作るもの`、`Out of Boundary` と `Non-Goals` は同じ節の `### 作らないもの` である。`spec_format` の欄が無い spec では、今の名前のまま読む。
+
 ## 観点
 
 ### 1. 申告
@@ -26,9 +28,10 @@ requirements と違い、**照合できる相手がある**(requirements.md)。�
 
 ### 3. KeirekiPro Compliance Check と本文の矛盾
 
-`.kiro/settings/templates/specs/design.md` が定める7項目のチェックリストについて、次を見る。
+審査の基準にする雛形は、`spec_format` の欄が無い spec では `.kiro/settings/templates/specs-v1/design.md`、`spec_format` が2の spec では `.kiro/settings/templates/specs/design.md` である。その雛形が定める7項目について、次を見る。
 
 - 7項目すべてにチェックが入っているか。該当しない項目に N/A と理由が書かれているか
+- `spec_format` が2の spec では、7項目の名前が「backend のコードを置く層」「frontend の機能ごとの境界」「frontend の状態の持ち方」「データベースの表の形」「新しいライブラリの追加」「品質チェックの設定」「使う外部の機能がこのリポジトリで使えるか」に変わる。この spec では、チェックと N/A の代わりに、関係のある項目に中身が書かれていること、関係のない項目が「関係のない項目:」の1行に名前だけで並んでいること、7つの項目のすべてがどちらかに出ていることを確かめる
 - **チェックの記載と設計本文が矛盾していないか。** 例: 「ゲート設定の変更を必要としない」と書きながら File Structure Plan に `.github/` のファイルが並んでいる。「依存追加なし」と書きながら新しいライブラリが出てくる
 - 7項目目「前提機能の利用可否」について、**実測したという主張に、いつ何をどう確かめたかが書かれているか。** 「実測済み」の一言で済ませていないか
 
