@@ -1,9 +1,7 @@
-# Requirements Document
+# 要件
 
-## Project Description (Input)
+## 元の要望
 {{PROJECT_DESCRIPTION}}
 
-## Requirements
-<!-- Will be generated in /kiro-spec-requirements phase -->
-
-
+## 要件
+<!-- Claude は、この節を /kiro-spec-requirements の段階で書く。 -->

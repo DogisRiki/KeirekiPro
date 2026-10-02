@@ -32,7 +32,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
 
 - [ ] 2. 新しい雛形を作る
 
-- [ ] 2.1 requirements の雛形を新しい書き方にする (並行可)
+- [x] 2.1 requirements の雛形を新しい書き方にする (並行可)
 
   Claude は、`specs/` の init.json に `"spec_format": 2` の欄を足す。Claude は、`specs/` の requirements-init.md と requirements.md の見出しを、`spec-writing.md` の対応表の新しい名前に書き換える。Claude は、requirements.md の要件の節を、「要件N 題名」の見出し、理由の段落、番号付きの項目の順の組み立てにする。Claude は、requirements.md の雛形に、「範囲の節は、範囲を読み違えるおそれがあるときだけ書く」という注記を入れる。
   - 完了の確かめ方: 2つの雛形に「shall」「When」と英語の見出しが無い。プレースホルダが `{{英大文字}}` の形である。init.json が JSON として読める
