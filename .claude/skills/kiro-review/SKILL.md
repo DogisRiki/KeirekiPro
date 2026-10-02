@@ -38,6 +38,7 @@ Provide:
 - Validation commands discovered by the controller
 - Relevant steering excerpts when applicable
 - Relevant `## Implementation Notes` entries when applicable
+- spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。tasks.md は、`_Boundary:_` を `_対象の部品:_`、`## Implementation Notes` を `## 実装のメモ` と読み替える。design.md の境界の記述(boundary commitments、out-of-boundary statements)は、`## 作るものと作らないもの` の節の `### 作るもの` と `### 作らないもの`、`## 使う既存の仕組み`、`## 設計を見直すきっかけ` で読む。`spec_format` の欄が無い spec では、このスキルの今の名前のまま読む
 
 ## Outputs
 
