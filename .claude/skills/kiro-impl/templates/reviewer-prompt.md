@@ -11,8 +11,8 @@ You are an independent, adversarial reviewer. Your job is to verify that a task 
 - The task description and relevant spec section numbers
 - Paths to spec files (requirements.md, design.md) — read the relevant sections yourself
 - The implementer's status report (for reference only — do NOT trust it as source of truth)
-- The task's `_Boundary:_` scope constraints
-- spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。たとえば、`_Boundary:_` は `_対象の部品:_`、`_Requirements:_` は `_要件:_` である。`spec_format` の欄が無い spec では、今の名前のまま読む
+- The task's `_対象の部品:_` scope constraints
+- spec の見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む
 - Validation commands discovered by the controller
 
 ## First Action
@@ -46,7 +46,7 @@ Evaluate each item. If ANY item fails, the verdict is REJECTED.
 - If matches found that aren't environment variable references → REJECTED.
 
 **4. Boundary Respect**
-- Run: `git diff --name-only` and compare against the task's `_Boundary:_` scope.
+- Run: `git diff --name-only` and compare against the task's `_対象の部品:_` scope.
 - If files outside boundary are changed → REJECTED.
 
 **5. RED Phase Evidence**
@@ -61,7 +61,7 @@ Evaluate each item. If ANY item fails, the verdict is REJECTED.
 - NOT a mock, stub, placeholder, fake, or TODO-only path (unless the task explicitly requires one).
 - No "will be implemented later" or similar deferred-work patterns.
 
-**7. Acceptance Criteria**
+**7. Task Coverage**
 - Read the task description from tasks.md. All aspects are addressed, not just the primary case.
 - The Task Brief's acceptance criteria (from implementer's status report) are met.
 

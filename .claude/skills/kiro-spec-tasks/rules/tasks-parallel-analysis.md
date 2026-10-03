@@ -3,11 +3,11 @@
 ## Purpose
 Provide a consistent way to identify implementation tasks that can be safely executed in parallel while generating `tasks.md`.
 
-`spec_format` が2の spec では、この文書の `(P)` と `_Boundary:_` を使った規則と例の代わりに、`.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表の `(並行可)` と `_対象の部品:_`に従う(read `(P)` as `(並行可)`, `_Boundary:_` as `_対象の部品:_`, which holds design.md component names as `_Boundary:_` did, and `_Depends:_` as `_依存:_`). The criteria for judging whether a task can run in parallel are the same for both formats. Specs without `spec_format` keep the names used below.
+この文書の印と目印は、`.kiro/settings/rules/spec-writing.md` の見出しと目印の一覧の名前で書く(`(並行可)`, `_対象の部品:_`, which holds design.md component names, and `_依存:_`).
 
 ## Relationship to Task Ordering
 
-`(P)` means: this task has no dependency on its immediately preceding peers and can run concurrently with them. The Task Ordering Principle (see tasks-generation.md) ensures Foundation-phase tasks run first, making Core-phase tasks the primary `(P)` candidates.
+`(並行可)` means: this task has no dependency on its immediately preceding peers and can run concurrently with them. The Task Ordering Principle (see tasks-generation.md) ensures Foundation-phase tasks run first, making Core-phase tasks the primary `(並行可)` candidates.
 
 ## When to Consider Tasks Parallel
 Only mark a task as parallel-capable when **all** of the following are true:
@@ -16,31 +16,31 @@ Only mark a task as parallel-capable when **all** of the following are true:
 2. **No conflicting files or shared mutable resources** are touched.
 3. **No prerequisite review/approval** from another task is required beforehand.
 4. **Foundation work complete**: Environment/setup work needed by this task is already satisfied by earlier Foundation-phase tasks.
-5. **Non-overlapping boundaries**: `_Boundary:_` annotations confirm tasks operate on separate components.
+5. **Non-overlapping boundaries**: `_対象の部品:_` annotations confirm tasks operate on separate components.
 
 ## Marking Convention
 
-`spec_format` が2の spec では、この節の指示の代わりに `.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表の `(並行可)` と `_対象の部品:_`と、新しい tasks.md の雛形(`.kiro/settings/templates/specs/tasks.md`)に従う(append ` (並行可)` to the end of the task title, for example `- [ ] 2.1 メールを送るバックグラウンドの処理を作る (並行可)`; omit it in sequential mode; keep it outside the checkbox brackets). For specs without `spec_format`:
+tasks.md の雛形(`.kiro/settings/templates/specs/tasks.md`)に従う。
 
-- Append `(P)` immediately after the numeric identifier for each qualifying task.
-  - Example: `- [ ] 2.1 (P) Build background worker for emails`
-- Apply `(P)` to both major tasks and sub-tasks when appropriate.
-- If sequential execution is requested (e.g. via `--sequential` flag), omit `(P)` markers entirely.
-- Keep `(P)` **outside** of checkbox brackets to avoid confusion with completion state.
+- Append ` (並行可)` to the end of the task title for each qualifying task.
+  - Example: `- [ ] 2.1 メールを送るバックグラウンドの処理を作る (並行可)`
+- Apply `(並行可)` to both major tasks and sub-tasks when appropriate.
+- If sequential execution is requested (e.g. via `--sequential` flag), omit `(並行可)` markers entirely.
+- Keep `(並行可)` **outside** of checkbox brackets to avoid confusion with completion state.
 
 ## Grouping & Ordering Guidelines
 - Group parallel tasks under the same parent whenever the work belongs to the same theme.
 - List obvious prerequisites or caveats in the detail bullets (e.g., "Requires schema migration from 1.2").
 - When two tasks look similar but are not parallel-safe, call out the blocking dependency explicitly.
-- Skip marking container-only major tasks (those without their own actionable detail bullets) with `(P)`—evaluate parallel execution at the sub-task level instead.
+- Skip marking container-only major tasks (those without their own actionable detail bullets) with `(並行可)`—evaluate parallel execution at the sub-task level instead.
 
 ## Quality Checklist
-Before marking a task with `(P)`, ensure you have:
+Before marking a task with `(並行可)`, ensure you have:
 
 - Verified that running this task concurrently will not create merge or deployment conflicts.
-- Confirmed `_Boundary:_` annotations show non-overlapping component scopes.
+- Confirmed `_対象の部品:_` annotations show non-overlapping component scopes.
 - Captured any shared state expectations in the detail bullets.
 - Confirmed that the implementation can be tested independently.
-- Added `_Depends: X.X_` if this `(P)` task still requires specific prior work from a different major-task group.
+- Added `_依存: X.X_` if this `(並行可)` task still requires specific prior work from a different major-task group.
 
-If any check fails, **do not** mark the task with `(P)` and explain the dependency in the task details.
+If any check fails, **do not** mark the task with `(並行可)` and explain the dependency in the task details.

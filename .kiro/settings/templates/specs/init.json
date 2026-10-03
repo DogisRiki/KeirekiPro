@@ -4,7 +4,6 @@
   "created_at": "{{TIMESTAMP}}",
   "updated_at": "{{TIMESTAMP}}",
   "language": "ja",
-  "spec_format": 2,
   "phase": "initialized",
   "approvals": {
     "requirements": {
@@ -25,8 +24,7 @@
       "approved_by": null,
       "approved_at": null
     }
-  },
-  "ready_for_implementation": false
+  }
 }
 
 
