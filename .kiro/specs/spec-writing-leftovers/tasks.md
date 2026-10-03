@@ -124,7 +124,7 @@
   - _要件: 4.2, 6.1_
   - _依存: 2.1_
 
-- [ ] 2.5 spec を読むスキルから読み分けを消す
+- [x] 2.5 spec を読むスキルから読み分けを消す
 
   Claude は、`/kiro-impl`(雛形2つを含む)・`/kiro-validate-impl`・`/kiro-review`・`/kiro-debug`・`/kiro-spec-status`・`/start`・`/kiro-spec-batch`・`/kiro-spec-quick` の SKILL.md と、`kiro-validate-gap/rules/gap-analysis.md` から、読み分けと古い名前を消す。Claude は、対応表を指していた文を、「見出しと目印の一覧」を指す文にする。
   - 完了の確かめ方: 道具の点検をこれらのファイルに流して出力が無い
