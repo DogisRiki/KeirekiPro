@@ -93,7 +93,7 @@
 
   タスク2の小タスクの完了の確かめ方で使う「道具の点検」は、design.md のテストの方針の2つの grep に、`grep -rn "新旧の見出しと目印の対応表\|対応表の新しい名前"` を加えた3つを、その小タスクで直したファイルに流し、出力が無いことを指す。
 
-- [ ] 2.1 書き方の決まりと雛形を新しい書き方だけにする
+- [x] 2.1 書き方の決まりと雛形を新しい書き方だけにする
 
   Claude は、design.md の「spec-writing.md と雛形と CLAUDE.md」の節のうち spec-writing.md と雛形の部分のとおりに、spec-writing.md と雛形を変える。Claude は、spec-writing.md の冒頭の段落と対応表を直し、tasks.md の見本の説明の文(「`spec_format` が2の spec で、…」)も印に触れない文にする。Claude は、`init.json` から `spec_format` と `ready_for_implementation` の欄を消し、`.kiro/settings/templates/specs-v1/` の4つのファイルを消す。
   - 完了の確かめ方: 始める前に、tasks.md のタスク1.1〜1.10がすべて `[x]` で `_保留:_` が無いことを確かめてある。`grep -rn "spec_format\|specs-v1\|今の名前" .kiro/settings` の出力が無く、spec-writing.md に「見出しと目印の一覧」の表がある。spec-writing.md の見本1・見本2の本文は変わっていない
@@ -203,3 +203,5 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 書き換えのタスク(1.1〜1.10)では、Claude は、`/kiro-impl` の手順に加えて、確かめ役を起動し、特例の承認を記録する(design.md の処理の流れの節)
 - Claude がタスク2.8と2.9の試験をコンテナの中で流すのは、ローカルには jq が無く、実行の権限の扱いも違うからである。
 - Claude は、PR本文の「人間承認が必要な変更」に、`.claude/hooks/` と `.github/scripts/` に加えて、`.claude/skills/` と `.claude/agents/` も CODEOWNERS の承認の対象として挙げる。試験の期待を変えたので、Claude は PR本文に `Test-Change-Justification:` も書く。
+- `.kiro/settings/rules/spec-writing.md` の「requirements.md の要件の組み立て」の節の「外れた文の例」のコードブロックには、`#### Acceptance Criteria` がわざと外れた書き方の例として残る。タスク3.2で道具の点検の grep をかけたとき、Claude はこの1行を対象外として扱う(タスク2.1の審査で、残すのが正しいと確かめた)
+- 書き換えでは、Fable 5.1 の確かめ役が食い違いを返したのは1件(spec-review の1回目)だけだった。審査役の差し戻しは4件(1.3・1.4・1.7・1.8)で、どれも直したあとの確かめで「同じ」になった
