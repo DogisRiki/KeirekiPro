@@ -156,7 +156,7 @@
   - _要件: 3.5, 4.2_
   - _対象の部品: spec-review-scan.sh_
 
-- [ ] 2.9 200行を超えるPRの検査と試験の変更を用意する (並行可)
+- [x] 2.9 200行を超えるPRの検査と試験の変更を用意する (並行可)
 
   Claude は、変更後の `check-spec-backing.sh` と `test-check-spec-backing.sh` を、design.md の「check-spec-backing.sh」の節のとおりに scratchpad に用意する。Claude は、試験に、開き直しの形の場合(`approval_history` を持ち、`approved` が false で `approved_by` の無い段階がある spec。期待 1)も足す。
   - 完了の確かめ方: scratchpad の版をコンテナの中で流し、全ケースが成功する。変更前の検査に対しては、足した「ready_for_implementation が false でも3段階が承認済みなら通る」と「欄が無くても通る」の場合が失敗する
@@ -164,7 +164,7 @@
   - _要件: 7.1, 7.2, 7.3, 3.5_
   - _対象の部品: check-spec-backing.sh_
 
-- [ ] 2.10 所有者が写したファイルを確かめる
+- [x] 2.10 所有者が写したファイルを確かめる
 
   Claude は、タスク2.8と2.9で用意した4つのファイルを作業場所へ写すコマンドを、1つの依頼にまとめて所有者に示す。所有者が写したあと、Claude は、写したファイルと scratchpad の版を `diff` で比べ、写した場所で2つの試験をコンテナの中で流す。
   - 完了の確かめ方: 4つのファイルで `diff` の出力が無く、2つの試験がすべて成功する
