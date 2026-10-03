@@ -25,10 +25,10 @@ Decide the mode from $ARGUMENTS before doing anything else:
 3. **Check Uniqueness**: Verify `.kiro/specs/` for naming conflicts. If the directory already exists with only `brief.md` (no `spec.json`), use that directory (discovery created it).
 4. **Create Directory**: `.kiro/specs/[feature-name]/` (skip if already exists from discovery)
 5. **Initialize Files Using Templates**:
-   - Every new spec is created in the new format (`"spec_format": 2`). Use the templates in `.kiro/settings/templates/specs/` only. Do NOT use `.kiro/settings/templates/specs-v1/` (those are for specs created before the new format, and this skill never creates such a spec)
+   - Use the templates in `.kiro/settings/templates/specs/`
    - Read `.kiro/settings/templates/specs/init.json`
    - Read `.kiro/settings/templates/specs/requirements-init.md` (headings: `# 要件`, `## 元の要望`, `## 要件`)
-   - Keep every key of init.json as it is, including `"spec_format": 2`. Keep every heading and comment of requirements-init.md as it is. Change only the placeholders below
+   - Keep every key of init.json as it is. Keep every heading and comment of requirements-init.md as it is. Change only the placeholders below
    - Replace placeholders:
      - `{{FEATURE_NAME}}` → generated feature name
      - `{{ISSUE_NUMBER}}` → the GitHub Issue number resolved in step 0, or `null` if no issue was referenced. This ties issue → spec → PR (`Refs:` / `Closes:`) together with one number
@@ -42,12 +42,9 @@ Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-
 
 1. **Read the new Issue**: Run `gh issue view <N> --json number,title,body,state`. The body is the owner's request. Do NOT read the comments (no `comments` field, no `--comments`), for the same reason as step 0 of the Execution Steps. If the command fails or the Issue does not exist, report it and write nothing.
 2. **Check the existing files** (read only):
-   - Read `spec.json` and choose the **anchor line** (the line that starts the section where requests are recorded) by its `spec_format` field:
-     - `spec_format` is `2` (new format): the anchor line is the first line of `requirements.md` that starts with `## 元の要望` (the line may continue after these characters, e.g. `## 元の要望(Issue #474 の本文)`)
-     - `spec_format` is absent (a spec created before the new format): the anchor line is the line that is exactly `## Project Description (Input)`, as before
-     - `spec_format` has any other value: report it as an error and write nothing
-   - Read `requirements.md`. If it has no anchor line, report it as an error (name the expected anchor) and write nothing (there is no place to append the new request). Do NOT fall back to the other format's anchor.
-   - Using the same `spec.json`: if N equals `issue` or is already in `additional_issues`:
+   - The **anchor line** (the line that starts the section where requests are recorded) is the first line of `requirements.md` that starts with `## 元の要望` (the line may continue after these characters, e.g. `## 元の要望(Issue #474 の本文)`)
+   - Read `requirements.md`. If it has no anchor line, report it as an error (name the expected anchor) and write nothing (there is no place to append the new request).
+   - Read `spec.json`: if N equals `issue` or is already in `additional_issues`:
      - If `requirements.md` already has the heading `### 追加の要望(Issue #<N>)` (or N equals `issue`), write nothing. Report that the spec already covers #N, its current progress (`phase` and each stage's `generated` / `approved`), and the next command the owner should type.
      - If N is in `additional_issues` but `requirements.md` has no `### 追加の要望(Issue #<N>)` heading, the previous run wrote `spec.json` but failed to write `requirements.md`. Do NOT redo step 3 (the approvals are already revoked and recorded). Redo only step 4, then step 5, and say that this run repaired the missing request in requirements.md.
 3. **Update `spec.json` (write this file first)**:
@@ -66,13 +63,11 @@ Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-
      - `approval_history` is append-only. Never rewrite or remove an existing element
    - **Revoke all three stages**: Set `generated: false` and `approved: false` on `requirements`, `design`, and `tasks`, and delete the `approved_by` and `approved_at` keys from each
    - Set `phase` to `"initialized"` and `updated_at` to the current ISO 8601 timestamp
-   - Do NOT touch `ready_for_implementation`. No skill sets it back to `true`, so setting it to `false` would keep the 200-line check (`check-spec-backing.sh`) failing even after the stages are re-approved. Whether implementation may proceed is judged by the three stage approvals
    - Append N to `additional_issues` (create the array if missing). Do NOT change `issue` (the original Issue)
-   - Do NOT add, remove, or change `spec_format`. A spec without the field stays in the old format (it is not converted to the new format by this update)
    - Write `spec.json`. **If this write fails, stop and report the error. Do NOT edit `requirements.md`.**
 4. **Append to `requirements.md`**:
    - **Demote the headings in the Issue body by two levels**: Issue bodies use `##` headings (file-issue format), which would otherwise end the anchor section (the section that starts at the anchor line chosen in step 2). In the body, change every Markdown heading line by two levels: `#` → `###`, `##` → `####`, `###` → `#####`, `####` or deeper → `######`. Lines inside code blocks (```` ``` ```` fences) are not headings; leave them. Apart from demoting headings, do NOT change the body (no rewording, no additions, no removals).
-   - **Find the insertion point in the current file, before inserting**: the end of the anchor section is the line just before the first line after the anchor line (`## 元の要望...` when `spec_format` is 2, `## Project Description (Input)` when the field is absent) that starts with `## ` (exactly two `#` and a space, e.g. `## 要件` in a new-format spec or `## Requirements` in an old one). If there is no such line, the section ends at the end of the file. Earlier `### 追加の要望(...)` blocks and their demoted headings (`####` or deeper) are part of the section, so a new block always goes after them.
+   - **Find the insertion point in the current file, before inserting**: the end of the anchor section is the line just before the first line after the anchor line (`## 元の要望...`) that starts with `## ` (exactly two `#` and a space, e.g. `## 要件`). If there is no such line, the section ends at the end of the file. Earlier `### 追加の要望(...)` blocks and their demoted headings (`####` or deeper) are part of the section, so a new block always goes after them.
    - Insert this block there (keep one blank line before it and before the next `## ` heading):
      ```markdown
      ### 追加の要望(Issue #<N>)
@@ -80,7 +75,7 @@ Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-
 
      <new Issue body, with headings demoted by two levels>
      ```
-   - Do not change anything else in requirements.md (existing requirements, acceptance criteria, and their numbers stay as they are).
+   - Do not change anything else in requirements.md (existing requirements, their numbered items, and their numbers stay as they are).
 5. **Show the next step**: Show `/kiro-spec-requirements <feature>` as the command the owner types next, and list which stage approvals were revoked (with their approver and date as recorded in `approval_history`).
 
 ## Important Constraints

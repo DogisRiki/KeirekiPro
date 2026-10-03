@@ -154,14 +154,12 @@ spec_review_scan() {
                 blockers="${blockers:+$blockers,}本文がレビューより新しい"
             fi
 
-            # 5. 書き方の点検の記録(spec_format が2の spec だけ。欄の無い spec は判定しない)
-            if [ "$(_sr_json "$spec_json" spec_format)" = "2" ]; then
-                local style="$project_dir/.kiro/specs/$feature/reviews/${stage}-style.md"
-                if [ ! -f "$style" ]; then
-                    blockers="${blockers:+$blockers,}書き方の点検の記録がない"
-                elif [ -f "$body" ] && [ "$body" -nt "$style" ]; then
-                    blockers="${blockers:+$blockers,}本文が書き方の点検より新しい"
-                fi
+            # 5. 書き方の点検の記録(spec.json の欄に依らず、すべての spec で判定する)
+            local style="$project_dir/.kiro/specs/$feature/reviews/${stage}-style.md"
+            if [ ! -f "$style" ]; then
+                blockers="${blockers:+$blockers,}書き方の点検の記録がない"
+            elif [ -f "$body" ] && [ "$body" -nt "$style" ]; then
+                blockers="${blockers:+$blockers,}本文が書き方の点検より新しい"
             fi
 
             printf '%s|%s|%s|%s\n' "$feature" "$stage" "$blockers" "$unresolved"

@@ -98,10 +98,10 @@ You are a cross-spec reviewer. Read ALL generated specs and check for consistenc
 Read these files for every feature in the roadmap:
 - .kiro/specs/*/design.md (primary: contains interfaces, data models, architecture)
 - .kiro/specs/*/requirements.md (for scope and acceptance criteria)
-- .kiro/specs/*/tasks.md (for boundary annotations only -- read _Boundary:_ lines, skip task descriptions)
+- .kiro/specs/*/tasks.md (for boundary annotations only -- read _対象の部品:_ lines, skip task descriptions)
 - .kiro/steering/roadmap.md
 
-Reading priority: Focus on design.md files (they contain interfaces, data models, architecture). For requirements.md, focus on section headings and acceptance criteria. For tasks.md, focus on _Boundary:_ annotations.
+Reading priority: Focus on design.md files (they contain interfaces, data models, architecture). For requirements.md, focus on section headings and acceptance criteria. For tasks.md, focus on _対象の部品:_ annotations.
 
 Check the following:
 
@@ -117,7 +117,7 @@ Check the following:
 
 6. **Shared infrastructure**: Are shared concerns (authentication, error handling, logging, configuration) handled in one spec and correctly referenced by others?
 
-7. **Task boundary alignment**: Do task _Boundary:_ annotations across specs partition the codebase cleanly? Are there files claimed by multiple specs?
+7. **Task boundary alignment**: Do task _対象の部品:_ annotations across specs partition the codebase cleanly? Are there files claimed by multiple specs?
 8. **Roadmap boundary continuity**: If roadmap includes `Existing Spec Updates` or `Direct Implementation Candidates`, do the generated new specs avoid absorbing that work by accident?
 9. **Architecture boundary integrity**: Do the specs preserve clean responsibility seams, avoid shared ownership, keep dependency direction coherent, and include enough revalidation triggers to catch downstream impact?
 10. **Change-friendly decomposition**: Has any spec absorbed multiple independent seams that should probably be split instead of kept together?

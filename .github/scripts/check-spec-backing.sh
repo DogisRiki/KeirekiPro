@@ -10,8 +10,7 @@
 #      すべて存在し、空でない
 #   3. 4ファイルにテンプレートのプレースホルダ({{...}})が残っていない
 #      (テンプレートは {{DETAIL_ITEM_1}} のように数字を含む名前も使う)
-#   4. spec.json で approvals.requirements / design / tasks の approved がすべて
-#      true、かつ ready_for_implementation が true
+#   4. spec.json で approvals.requirements / design / tasks の approved がすべて true
 #
 # 限界(承知のうえでの設計):
 #   4の承認フラグはAIの自己申告であり、人間が承認した証明にはならない(#177)。
@@ -73,9 +72,8 @@ fi
 
 if ! jq -e '(.approvals.requirements.approved == true)
     and (.approvals.design.approved == true)
-    and (.approvals.tasks.approved == true)
-    and (.ready_for_implementation == true)' "$spec_path/spec.json" >/dev/null 2>&1; then
-    fail "spec.json の3段階承認が完了していません(approvals.*.approved と ready_for_implementation がすべて true である必要があります)。承認は /kiro-spec-requirements → /kiro-spec-design → /kiro-spec-tasks の各段階で人間から得てください。"
+    and (.approvals.tasks.approved == true)' "$spec_path/spec.json" >/dev/null 2>&1; then
+    fail "spec.json の3段階承認が完了していません(approvals.*.approved がすべて true である必要があります)。承認は /kiro-spec-requirements → /kiro-spec-design → /kiro-spec-tasks の各段階で人間から得てください。"
 fi
 
 echo "spec(${spec_path})の裏付けを確認しました(必須ファイル・プレースホルダ・承認フラグ)。"

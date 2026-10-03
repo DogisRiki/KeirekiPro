@@ -7,7 +7,7 @@ Conduct comprehensive research and analysis to ensure the technical design is ba
 
 ### 1. Requirements Analysis
 **Map Requirements to Technical Needs**
-- Extract all functional requirements from EARS format
+- Extract all functional requirements from the numbered items of the requirements
 - Identify non-functional requirements (performance, security, scalability)
 - Determine technical constraints and dependencies
 - List core technical challenges
@@ -88,6 +88,6 @@ Capture all findings that impact design decisions in `research.md` using the sha
 - Constraints discovered during research
 - Recommended approaches and selected architecture pattern with rationale
 - Rejected alternatives and trade-offs (documented in the Design Decisions section)
-- Updated domain boundaries that inform Components & Interface Contracts
+- Updated domain boundaries that inform `## 部品` of design.md
 - Risks and mitigation strategies
 - Gaps requiring further investigation during implementation
