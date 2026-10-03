@@ -119,8 +119,7 @@ AIがIssueの本文とその時点のコードを調べ、下の4つの観点で
 - Steering: `.kiro/steering/`(プロジェクト全体の知識。`product.md` `tech.md` `structure.md`。
   作業規約はこのCLAUDE.mdとスコープ別CLAUDE.mdに書き、steeringと二重記述しない)
 - Specs: `.kiro/specs/`(機能単位の要件・設計・タスク。進捗は `/kiro-spec-status {feature}`)
-- spec の書き方の基準: `.kiro/settings/rules/spec-writing.md`(書き方の決まり・見本・新旧の見出しと目印の対応表)。
-  この新しい書き方は、spec.json に `"spec_format": 2` を持つ spec に当てはまる。この欄の無い spec は今の書き方のまま進める
+- spec の書き方の基準: `.kiro/settings/rules/spec-writing.md`(書き方の決まり・見本・見出しと目印の一覧)
 
 ### ワークフロー
 
@@ -137,7 +136,7 @@ AIがIssueの本文とその時点のコードを調べ、下の4つの観点で
   - `/kiro-spec-init #N`(既存の spec を新しいIssueのために直すときは `/kiro-spec-init #N <feature>`)→ `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
   - 各段階の生成直後に `/spec-review {feature} {段階}` を実行する(requirements / design / tasks)。
     別モデル(Fable 5.1)のサブエージェントが審査し、記録が `.kiro/specs/{feature}/reviews/` に残る。人間が承認するときは本文と記録の両方を読む
-  - 新しい書き方の spec(spec.json に `"spec_format": 2` を持つ spec)では、`/spec-review` は審査役(spec-reviewer)の前に毎回、
+  - `/spec-review` は審査役(spec-reviewer)の前に毎回、
     点検役(spec-style-checker)に本文の書き方を点検させ、点検の記録を `reviews/{段階}-style.md` に残す
   - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
   - `/kiro-validate-design` は使わない(`/spec-review` が置き換えた)。cc-sdd のスキルの出力で案内されても起動しない
@@ -171,8 +170,6 @@ AIがIssueの本文とその時点のコードを調べ、下の4つの観点で
 - 既存の項目を直したときは、直した項目の末尾に `(#N で変更)` を付ける
 - 既存の項目を取りやめるときは、本文を消さず、先頭に `(#N で取りやめ)` を付ける
 - 印の無い項目は、spec.json の `issue`(元のIssue)に対するものとする
-- 既存の要件・受入基準・タスクの番号は変えない。新しい要件は既存の最後の番号の次から足す(実装済みのタスクの `_Requirements:_` が指す番号をずらさないため)
-- tasks.md のタスクの行では、`(P)` があればその後に、無ければ説明の末尾に `(#N)` を置く。`_Requirements:_` の行には付けない
-- 新しい書き方の spec(spec.json に `"spec_format": 2` を持つ spec)では、目印の名前は `_Requirements:_` が `_要件:_`、`(P)` が `(並行可)` になる。
-  tasks.md では、`(#N)` をタスクの題名の末尾に置き、題名に `(並行可)` があるときはそのあとに置く。`_要件:_` の行には付けない
+- 既存の要件・受入基準・タスクの番号は変えない。新しい要件は既存の最後の番号の次から足す(実装済みのタスクの `_要件:_` が指す番号をずらさないため)
+- tasks.md では、`(#N)` をタスクの題名の末尾に置き、題名に `(並行可)` があるときはそのあとに置く。`_要件:_` の行には付けない
 - 実装済みのタスクの完了の印(`[x]`)は外さない

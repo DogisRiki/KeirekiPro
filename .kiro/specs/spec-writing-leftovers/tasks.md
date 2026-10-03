@@ -140,7 +140,7 @@
   - _要件: 4.2_
   - _依存: 2.1_
 
-- [ ] 2.7 CLAUDE.md から印と古い名前の記述を消す
+- [x] 2.7 CLAUDE.md から印と古い名前の記述を消す
 
   Claude は、CLAUDE.md の spec 駆動開発の節とIssueの印の節を、design.md の「spec-writing.md と雛形と CLAUDE.md」の節のとおりに直す。Claude は、対応表を指していた文を、「見出しと目印の一覧」を指す文にする。
   - 完了の確かめ方: 道具の点検と `grep -n "spec_format\|_Requirements:_\|(P)" CLAUDE.md` の出力が無い。CLAUDE.md の承認を取り消す決まりと `approval_history` の決まりは、`git diff` で見て変わっていない
