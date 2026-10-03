@@ -173,7 +173,7 @@
   - _依存: 2.8, 2.9_
 
 - [ ] 3. spec.json から印と使われない欄を消し、全体を確かめる
-- [ ] 3.1 すべての spec.json から `spec_format` と `ready_for_implementation` を消す
+- [x] 3.1 すべての spec.json から `spec_format` と `ready_for_implementation` を消す
 
   Claude は、design.md の移行の節のとおりに、`.kiro/specs/*/spec.json` のすべてから2つの欄を消す。この spec 自身の spec.json も対象にする。
   - 完了の確かめ方: `grep -rn "spec_format\|ready_for_implementation" .kiro/specs/*/spec.json` の出力が無く、すべての spec.json が JSON として読める(`perl -MJSON::PP` で読み込める)

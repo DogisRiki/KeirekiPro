@@ -4,7 +4,6 @@
   "created_at": "2026-10-02T02:33:27Z",
   "updated_at": "2026-10-02T08:36:47Z",
   "language": "ja",
-  "spec_format": 2,
   "phase": "tasks-generated",
   "approvals": {
     "requirements": {
@@ -26,7 +25,6 @@
       "approved_at": "2026-10-02T08:36:47Z"
     }
   },
-  "ready_for_implementation": true,
   "approval_history": [
     {
       "stage": "design",
