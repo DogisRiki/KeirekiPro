@@ -31,7 +31,7 @@ Provide:
 - Reviewer feedback, if the failure came from review rejection
 - Relevant spec file paths (`requirements.md`, `design.md`)
 - Relevant requirement/design section numbers
-- Relevant `## Implementation Notes`(spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読み、この節は `## 実装のメモ` である。`spec_format` の欄が無い spec では、今の名前のまま読む)
+- Relevant `## 実装のメモ` entries in tasks.md(spec の見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む)
 - Runtime or environment constraints already known
 
 ## Outputs

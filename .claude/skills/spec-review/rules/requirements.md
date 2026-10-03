@@ -6,7 +6,7 @@ Issue は要望の水準で書かれている(あれをやりたい、これを�
 
 生成側には書く前の自己点検(`.claude/skills/kiro-spec-requirements/rules/requirements-review-gate.md`)がある。そこに書かれている機械的な検査(数値ID、受入基準の存在、実装語の混入)と重なる指摘は出さなくてよい。**ただし「gate にあるから効いている」とは考えない。** 実際の本文を見て判断する。
 
-spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。要件は `### 要件N 題名` の見出しで始まる。`#### Acceptance Criteria` の見出しが無いので、受入基準は各要件の番号付きの項目である。`spec_format` の欄が無い spec では、今の名前のまま読む。
+見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む。要件は `### 要件N 題名` の見出しで始まる。受入基準は各要件の番号付きの項目である。
 
 ## 観点
 

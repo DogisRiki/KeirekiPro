@@ -18,7 +18,7 @@ FAILED=0
 
 SPEC_DIR=".kiro/specs/demo-feature"
 
-# 使い方: write_spec_json <req承認> <design承認> <tasks承認> <ready>
+# 使い方: write_spec_json <req承認> <design承認> <tasks承認>
 write_spec_json() {
     cat >"$SPEC_DIR/spec.json" <<EOF
 {
@@ -29,8 +29,7 @@ write_spec_json() {
     "requirements": { "generated": true, "approved": $1, "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z" },
     "design": { "generated": true, "approved": $2, "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z" },
     "tasks": { "generated": true, "approved": $3, "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z" }
-  },
-  "ready_for_implementation": $4
+  }
 }
 EOF
 }
@@ -42,7 +41,7 @@ seed() {
     # 作っておく。パスの制限が緩むと解決されて通ってしまうことを検出するため
     mkdir -p "$WORK/repo/.kiro/specs/x"
     cd "$WORK/repo" || exit 1
-    write_spec_json true true true true
+    write_spec_json true true true
     printf '# Requirements Document\n\n## Requirements\n\n本文。\n' >"$SPEC_DIR/requirements.md"
     printf '# Design Document\n\n## Overview\n\n本文。\n' >"$SPEC_DIR/design.md"
     printf '# Implementation Plan\n\n- [ ] 1. タスク\n' >"$SPEC_DIR/tasks.md"
@@ -101,11 +100,53 @@ m_placeholder_tasks() { printf -- '- [ ] 2. {{TASK_DESCRIPTION}}\n' >>"$SPEC_DIR
 # テンプレートが実際に使う数字入りの名前(tasks.md の {{DETAIL_ITEM_1}} など)
 m_placeholder_digit() { printf -- '  - {{DETAIL_ITEM_1}}\n' >>"$SPEC_DIR/tasks.md"; }
 m_placeholder_json() { sed -i 's/"demo-feature"/"{{FEATURE_NAME}}"/' "$SPEC_DIR/spec.json"; }
-m_tasks_unapproved() { write_spec_json true true false true; }
-m_design_unapproved() { write_spec_json true false true true; }
-m_not_ready() { write_spec_json true true true false; }
+m_tasks_unapproved() { write_spec_json true true false; }
+m_design_unapproved() { write_spec_json true false true; }
+m_requirements_unapproved() { write_spec_json false true true; }
+# ready_for_implementation の欄を持たない spec(write_spec_json はこの欄を出さない)
+m_no_ready_field() { write_spec_json true true true; }
+# 3段階が承認済みのまま ready_for_implementation だけが false の spec
+m_ready_false() {
+    cat >"$SPEC_DIR/spec.json" <<'EOF'
+{
+  "feature_name": "demo-feature",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": { "generated": true, "approved": true, "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z" },
+    "design": { "generated": true, "approved": true, "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z" },
+    "tasks": { "generated": true, "approved": true, "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z" }
+  },
+  "ready_for_implementation": false
+}
+EOF
+}
+# 新しいIssueのために開き直した spec。3段階の承認を approval_history へ移して
+# 取り消したあと、requirements だけを承認し直した状態(design と tasks は
+# approved が false で approved_by が無い)
+m_reopened() {
+    cat >"$SPEC_DIR/spec.json" <<'EOF'
+{
+  "feature_name": "demo-feature",
+  "language": "ja",
+  "phase": "design-generated",
+  "issue": 100,
+  "additional_issues": [200],
+  "approvals": {
+    "requirements": { "generated": true, "approved": true, "approved_by": "DogisRiki", "approved_at": "2026-09-02T00:00:00Z" },
+    "design": { "generated": true, "approved": false },
+    "tasks": { "generated": false, "approved": false }
+  },
+  "approval_history": [
+    { "stage": "requirements", "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z", "issues": [100], "revoked_at": "2026-09-01T00:00:00Z", "revoked_for": "Issue #200 のための更新" },
+    { "stage": "design", "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z", "issues": [100], "revoked_at": "2026-09-01T00:00:00Z", "revoked_for": "Issue #200 のための更新" },
+    { "stage": "tasks", "approved_by": "DogisRiki", "approved_at": "2026-08-15T00:00:00Z", "issues": [100], "revoked_at": "2026-09-01T00:00:00Z", "revoked_for": "Issue #200 のための更新" }
+  ]
+}
+EOF
+}
 m_broken_json() { echo '{ broken' >"$SPEC_DIR/spec.json"; }
-m_no_approvals_key() { echo '{ "ready_for_implementation": true }' >"$SPEC_DIR/spec.json"; }
+m_no_approvals_key() { echo '{}' >"$SPEC_DIR/spec.json"; }
 
 check 0 "承認済みspecの裏付けあり" "$BODY_OK" m_valid
 check 1 "PR本文にSpec行が無い" "$BODY_NONE" m_valid
@@ -119,7 +160,10 @@ check 1 "数字を含むプレースホルダが残っている" "$BODY_OK" m_pl
 check 1 "design.md がディレクトリ" "$BODY_OK" m_dir_design
 check 1 "tasks が未承認" "$BODY_OK" m_tasks_unapproved
 check 1 "design が未承認" "$BODY_OK" m_design_unapproved
-check 1 "ready_for_implementation が false" "$BODY_OK" m_not_ready
+check 1 "requirements が未承認" "$BODY_OK" m_requirements_unapproved
+check 0 "3段階が承認済みなら ready_for_implementation の欄が無くても通る" "$BODY_OK" m_no_ready_field
+check 0 "ready_for_implementation が false でも3段階が承認済みなら通る" "$BODY_OK" m_ready_false
+check 1 "開き直して承認を取り消した段階がある" "$BODY_OK" m_reopened
 check 1 "spec.json が壊れたJSON" "$BODY_OK" m_broken_json
 check 1 "spec.json に approvals が無い" "$BODY_OK" m_no_approvals_key
 
