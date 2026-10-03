@@ -108,7 +108,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1〜4(完了条件の節の文が指す先の分からない言葉を使わず、欄を欄の名前で指し、「受入基準」の表記をそろえ、節が決める中身を変えない)は、上の4つの言い回しが無いことを確かめる grep と、4つの決めごとの読み合わせで確かめる
   - _要件: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 2.3 spec を作るスキルと要件を書くスキルから読み分けを消す
+- [x] 2.3 spec を作るスキルと要件を書くスキルから読み分けを消す
 
   Claude は、`/kiro-spec-init` と `/kiro-spec-requirements` の SKILL.md と、`kiro-spec-requirements/rules/requirements-review-gate.md` から、design.md の「書き方を読み分けないスキルと点検役」の節のとおりに読み分けと古い名前を消す。Claude は、`rules/ears-format.md` を消し、`kiro-spec-init` の `ready_for_implementation` に触れないよう指示する文と、新しい spec に `spec_format` を書く指示を消す。Claude は、対応表を指していた文を、spec-writing.md の「見出しと目印の一覧」を指す文にする。
   - 完了の確かめ方: 道具の点検を2つのスキルのディレクトリに流して出力が無い
