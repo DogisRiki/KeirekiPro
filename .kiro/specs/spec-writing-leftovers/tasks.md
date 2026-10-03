@@ -17,7 +17,7 @@
   - 目印の行: `grep -nE '^\s*- _(Requirements|Boundary|Depends|Blocked):' <tasks.md>`
   - 並行の印: `grep -nE '^- \[.\] [0-9.]+ .*\(P\)' <tasks.md>`
 
-- [ ] 1.1 audit-automation を書き換える
+- [x] 1.1 audit-automation を書き換える
 
   書き換えの実装役は、`.kiro/specs/audit-automation/` の requirements.md・design.md・tasks.md を新しい書き方に書き換える。
   - 完了の確かめ方: `reviews/rewrite-check.md` の最後の節の結果が「同じ」で、spec.json の `approval_history` に3つの段階の要素が1つずつある。古い見出しと目印の点検に、引用でない行が出ない
