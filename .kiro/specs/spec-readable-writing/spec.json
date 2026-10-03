@@ -17,7 +17,7 @@
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-02T08:36:47Z"
+      "approved_at": "2026-10-03T02:26:41Z"
     },
     "tasks": {
       "generated": true,
@@ -26,7 +26,15 @@
       "approved_at": "2026-10-02T08:36:47Z"
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": true,
+  "approval_history": [
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-02T08:36:47Z",
+      "issues": [474],
+      "revoked_at": "2026-10-03T02:26:41Z",
+      "revoked_for": "Issue #477 の特例: design.md の、雛形の説明に書いた空欄の目印を書き換えた。書き換えの前後で中身が同じと Fable 5.1 が確かめた(reviews/rewrite-check.md)。この時点からの承認は特例によるもので、所有者は本文を読んで承認し直していない"
+    }
+  ]
 }
-
-

@@ -80,7 +80,7 @@
   - 受入基準とテストの対応: タスク1.1と同じ
   - _要件: 1.1, 1.2, 1.3, 1.4, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.4_
 
-- [ ] 1.10 spec-readable-writing の design.md の空欄の目印を書き換える
+- [x] 1.10 spec-readable-writing の design.md の空欄の目印を書き換える
 
   書き換えの実装役は、`.kiro/specs/spec-readable-writing/design.md` の189行目にある空欄の目印2つ(NUMBER と TITLE を二重の波括弧で囲んだもの)を、この spec の design.md の「書き換えの実装役」の節のとおりに書き換える。実装役は、ほかの行とほかのファイルを書き換えない。
   - 完了の確かめ方: `grep -nE '\{\{[A-Z0-9_]+\}\}'` を spec-readable-writing の spec.json・requirements.md・design.md・tasks.md に流して出力が無い。`reviews/rewrite-check.md` の最後の節の結果が「同じ」で、spec.json の `approval_history` に design の段階の要素が1つだけあり、requirements と tasks の承認の欄が書き換えの前と同じである
