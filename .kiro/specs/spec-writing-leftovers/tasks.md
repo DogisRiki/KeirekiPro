@@ -116,7 +116,7 @@
   - _要件: 4.1, 4.2, 4.3_
   - _依存: 2.1_
 
-- [ ] 2.4 設計とタスクを書くスキルから読み分けを消す
+- [x] 2.4 設計とタスクを書くスキルから読み分けを消す
 
   Claude は、`/kiro-spec-design` と `/kiro-spec-tasks` の SKILL.md と、それぞれの `rules/` のファイル(`design-principles.md`、`design-review-gate.md`、`design-discovery-full.md`、`tasks-generation.md`、`tasks-parallel-analysis.md`)から、読み分けと古い名前を消す。Claude は、`tasks-generation.md` の42行目と181行目が指す見出しを新しい design.md の雛形の見出しにし、`design-discovery-full.md` の EARS の文言を design.md のファイルの構成の節のとおりに直す。Claude は、対応表を指していた文を、「見出しと目印の一覧」を指す文にする。
   - 完了の確かめ方: 道具の点検を2つのスキルのディレクトリに流して出力が無く、`tasks-generation.md` に「Architecture Pattern & Boundary Map」が無い
