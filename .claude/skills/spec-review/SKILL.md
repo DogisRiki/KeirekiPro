@@ -7,13 +7,13 @@ argument-hint: <feature-name> <requirements|design|tasks>
 
 # spec-review Skill
 
-spec 文書を `spec-reviewer`(Fable 5.1)にレビューさせ、指摘に対応して記録を残す。spec.json の `spec_format` が2の spec では、審査の前に毎往復、`spec-style-checker` に本文の書き方を点検させる。**各段階の生成直後に実行する。** 所有者が承認するときに、本文と記録の両方が手元にある状態を作るのが目的。
+spec 文書を `spec-reviewer`(Fable 5.1)にレビューさせ、指摘に対応して記録を残す。審査の前には毎往復、`spec-style-checker` に本文の書き方を点検させる。**各段階の生成直後に実行する。** 所有者が承認するときに、本文と記録の両方が手元にある状態を作るのが目的。
 
 ## 役割の分担
 
 | 誰が | 何をするか | 書くファイル |
 |---|---|---|
-| spec-style-checker(サブエージェント) | 本文の書き方を点検し、外れと直し方の案を返す(`spec_format` が2の spec だけ) | なし |
+| spec-style-checker(サブエージェント) | 本文の書き方を点検し、外れと直し方の案を返す | なし |
 | spec-reviewer(サブエージェント) | 審査して指摘を書く | `reviews/{段階}-review.md` だけ |
 | このスキル(メインセッション) | 点検の案と指摘に対応して本文を直す | spec 本文、`reviews/{段階}-style.md`、`reviews/{段階}-response.md` |
 
@@ -27,9 +27,8 @@ spec 文書を `spec-reviewer`(Fable 5.1)にレビューさせ、指摘に対応
 2. `.kiro/specs/{FEATURE}/reviews/` が無ければ作る
 3. `CYCLE` を決める: `reviews/{STAGE}-review.md` にある最大のサイクル番号 + 1。ファイルが無ければ 1
 4. `ROUND` を 1 にする
-5. `.kiro/specs/{FEATURE}/spec.json` の `spec_format` を読む。値が `2` なら、各往復で Step 2 の前に Step 1.5 を行う。`spec_format` の欄が無い spec(値が2でない spec)では Step 1.5 を飛ばし、今までどおり Step 2 へ進む
 
-### Step 1.5: 書き方の点検(`spec_format` が2の spec だけ)
+### Step 1.5: 書き方の点検
 
 審査役を起動する前に、本文の書き方を点検し、中身の変わらない直しを本文に入れる。この工程は審査役の起動の前にだけ行い、最終往復の審査役の後には行わない。
 
@@ -107,7 +106,7 @@ response の書式:
 ### Step 5: 往復の判定
 
 - `STATUS` が `converged`(高と中が0件)なら終了。Step 7 へ
-- `unresolved` で `ROUND` が 3 未満なら、`ROUND` を 1 増やして Step 1.5 へ(`spec_format` が2でない spec は Step 2 へ)。Step 4 で直した本文を、審査役の前にもう一度点検するためである
+- `unresolved` で `ROUND` が 3 未満なら、`ROUND` を 1 増やして Step 1.5 へ。Step 4 で直した本文を、審査役の前にもう一度点検するためである
 - `unresolved` で `ROUND` が 3 なら、**本文を直さずに**終了する。残った高と中を「未解決」として response に書き、Step 7 へ
 
 **最終往復の後に本文を直さない。** 直すと、直した内容を誰もレビューしないまま承認に上がる。Step 1.5 の点検も、終了した後には行わない。
@@ -136,12 +135,12 @@ response の書式:
      - `approval_history` は追記だけにし、書いてある要素を書き換えたり消したりしない
    - 戻る段階とその後続の段階について、spec.json の `approved` を `false` にし、`approved_by` と `approved_at` を削除する
    - 本文を直す
-   - その段階について、`CYCLE` を 1 増やして Step 1.5 からやり直す(`spec_format` が2でない spec は Step 2 から。往復は新たに最大3回)
+   - その段階について、`CYCLE` を 1 増やして Step 1.5 からやり直す(往復は新たに最大3回)
    - 後続の段階は自分で作り直さない。所有者に、後続の段階のコマンドを順に打つよう依頼する(requirements に戻るときは `/kiro-spec-design <feature>` と `/kiro-spec-tasks <feature>`、design に戻るときは `/kiro-spec-tasks <feature>`)。各段階のコマンドには `disable-model-invocation` が付いており、AIからは起動できない。所有者が打って生成された段階は、それぞれこのスキルでレビューする
 
 ### Step 7: 所有者への報告
 
-チャットには件数と場所だけ出す。`spec_format` が2の spec では、次の2つを足す。
+チャットには件数と場所だけ出す。あわせて、次の2つを出す。
 
 - 書き方の点検で直した文と節の数。この回の `/spec-review` の全往復の合計を出す
 - 直さなかった外れのすべて。1件ごとに、該当する文や節と、直さなかった理由を示す
@@ -158,8 +157,6 @@ requirements のレビューが終わりました(サイクル1、往復2で収�
 .kiro/specs/{feature}/reviews/requirements-response.md
 .kiro/specs/{feature}/reviews/requirements-style.md
 ```
-
-`spec_format` の欄が無い spec では、「書き方の点検」の行と `-style.md` の行を出さない。
 
 ## 制約
 
