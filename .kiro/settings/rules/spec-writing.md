@@ -1,8 +1,8 @@
 # spec の書き方
 
-このファイルは、Claude が spec の requirements.md・design.md・tasks.md を書くときと、書いた本文を点検するときに従う書き方の決まりを定める。このファイルの決まりは、spec.json に `"spec_format": 2` の欄を持つ spec にだけ当てはまる。欄の無い spec では、Claude はこのファイルを使わず、今までの決まり(`ears-format.md` など)と `.kiro/settings/templates/specs-v1/` の雛形に従う。
+このファイルは、Claude が spec の requirements.md・design.md・tasks.md を書くときと、書いた本文を点検するときに従う書き方の決まりを定める。このファイルの決まりは、すべての spec に当てはまる。
 
-spec を書くスキル(`/kiro-spec-init` `/kiro-spec-requirements` `/kiro-spec-design` `/kiro-spec-tasks`)、点検役 `spec-style-checker`、spec を読むスキル(`/kiro-impl` など)は、新しい書き方の spec を扱うときにこのファイルを読む。所有者は、Claude が書いた spec の書き方を確かめるときに、このファイルを基準にできる。
+spec を書くスキル(`/kiro-spec-init` `/kiro-spec-requirements` `/kiro-spec-design` `/kiro-spec-tasks`)、点検役 `spec-style-checker`、spec を読むスキル(`/kiro-impl` など)は、spec を扱うときにこのファイルを読む。所有者は、Claude が書いた spec の書き方を確かめるときに、このファイルを基準にできる。
 
 Claude は、Issue本文や既存の文書から引用した部分を、このファイルの決まりに合わせて書き直さない。Claude は、引用した部分を引用元のまま残す。
 
@@ -239,7 +239,7 @@ Claude は、次の3つの見本を、spec の書き方の基準として読む�
 - [ ] 3. 点検の記録が古いまま承認に進めないようにする
 - [ ] 3.1 点検の記録の判定を scan に足す (並行可)
 
-  Claude は、変更後の `spec-review-scan.sh` を scratchpad に用意する。この scan は、`spec_format` が2の spec で、点検の記録が無いときと、本文が点検の記録より新しいときに、理由を出す。
+  Claude は、変更後の `spec-review-scan.sh` を scratchpad に用意する。この scan は、点検の記録が無いときと、本文が点検の記録より新しいときに、理由を出す。
   - 完了の確かめ方: テスト `test-spec-review-scan.sh` の場合がすべて通る
   - 受入基準とテストの対応: 要件6の受入基準6(本文を直したあとの点検の記録が無いまま承認を求めると止まる)は、テストの「本文が点検の記録より新しければ理由を出す」で確かめる
   - _要件: 1.2, 6.6_
@@ -249,49 +249,46 @@ Claude は、次の3つの見本を、spec の書き方の基準として読む�
 
 Claude は、大タスクと小タスクの最初の行を、どちらもタスクの箱と番号と題名にする。Claude は、ほかのタスクと並行に進められる小タスクの題名の末尾に、`(並行可)` を付ける。Claude は、既存の spec に追加の Issue #N のためにタスクを足したとき、そのタスクの題名の末尾に印 `(#N)` を置く。題名に `(並行可)` があるときは、Claude は `(#N)` を `(並行可)` のあとに置く。Claude は、小タスクの題名の行のあとに空行を1つ置き、その次の行に、誰が何を作るかを主語と目的語のある文で書く。大タスクに説明の文を書くときも、Claude は同じ形にする。空行を置くのは、tasks.md を Markdown として表示したときに、説明の文が題名と同じ段落につながらないようにするためである。Claude は、その下の箇条書きに、完了の確かめ方、受入基準とテストの対応、`_要件:_`・`_対象の部品:_`・`_依存:_` の目印を書く。
 
-## 新旧の見出しと目印の対応表
+## 見出しと目印の一覧
 
-Claude は、新しい書き方の spec で、見出しと目印を次の表の「新しい名前」の列のとおりに書く。spec を読むスキル(`/kiro-impl`、`/kiro-validate-impl`、`/spec-review` など)は、`spec_format` が2の spec の見出しと目印を、この表の「新しい名前」の列の名前で読む。表の「今の名前」の列は、今の書き方の spec が使う名前である。点検役は、「今の名前」の列を点検しない。
+Claude は、spec の見出しと目印を、次の一覧の「見出しと目印」の列のとおりに書く。spec を読むスキル(`/kiro-impl`、`/kiro-validate-impl`、`/spec-review` など)は、spec の見出しと目印を、この一覧の名前で読む。
 
-| 文書 | 今の名前 | 新しい名前 |
-|---|---|---|
-| requirements.md | `# Requirements Document` | `# 要件` |
-| requirements.md | `## Project Description (Input)` | `## 元の要望` |
-| requirements.md | `## Introduction` | `## はじめに` |
-| requirements.md | `## Boundary Context` | `## 範囲` |
-| requirements.md | `In scope` / `Out of scope` / `Adjacent expectations` | 「この spec で決めること」/「この spec で決めないこと」/「この spec が前提にしていること」 |
-| requirements.md | `## Requirements` | `## 要件` |
-| requirements.md | `### Requirement N: 題名` | `### 要件N 題名` |
-| requirements.md | `**Objective:**` の行と `#### Acceptance Criteria` | なし(理由の段落と番号付きの項目で書く) |
-| design.md | `# Design Document` | `# 設計` |
-| design.md | `## Overview` | `## 概要` |
-| design.md | `### Goals`、`### This Spec Owns` | `### 作るもの`(「作るものと作らないもの」の節の中) |
-| design.md | `## Boundary Commitments` | `## 作るものと作らないもの`、`## 使う既存の仕組み`、`## 設計を見直すきっかけ` の3つの節に分ける |
-| design.md | `### Out of Boundary`、`### Non-Goals` | `### 作らないもの` |
-| design.md | `### Allowed Dependencies` | `## 使う既存の仕組み` |
-| design.md | `### Revalidation Triggers` | `## 設計を見直すきっかけ` |
-| design.md | `## KeirekiPro Compliance Check` | `## プロジェクトの決まりを守っているか` |
-| design.md | 確かめる項目「backend層配置」「frontend境界」「状態管理」「DBスキーマ」「依存追加」「ゲート設定」「前提機能の利用可否」 | 「backend のコードを置く層」「frontend の機能ごとの境界」「frontend の状態の持ち方」「データベースの表の形」「新しいライブラリの追加」「品質チェックの設定」「使う外部の機能がこのリポジトリで使えるか」 |
-| design.md | `## Architecture` | `## 全体の構成` |
-| design.md | `### Technology Stack` | 全体の構成の節の「使う技術」の欄 |
-| design.md | `### Existing Architecture Analysis`、`## Supporting References` | なし(research.md に書く) |
-| design.md | `## File Structure Plan` | `## ファイルの構成` |
-| design.md | `## System Flows` | `## 処理の流れ` |
-| design.md | `## Requirements Traceability` | なし(各部品の「対応する要件」の行で示す) |
-| design.md | `## Components and Interfaces` | `## 部品` |
-| design.md | `## Data Models` | `## データの形` |
-| design.md | `## Error Handling` | `## 失敗したときの扱い` |
-| design.md | `## Testing Strategy` | `## テストの方針` |
-| design.md | `### Security Considerations` | `## 安全` |
-| design.md | `### Performance & Scalability` | `## 性能` |
-| design.md | `### Migration Strategy` | `## 移行` |
-| tasks.md | `# Implementation Plan` | `# タスク` |
-| tasks.md | `_Requirements:_` | `_要件:_` |
-| tasks.md | `_Boundary:_` | `_対象の部品:_` |
-| tasks.md | `_Depends:_` | `_依存:_` |
-| tasks.md | `_Blocked:_` | `_保留:_` |
-| tasks.md | `(P)` | `(並行可)` |
-| tasks.md | `## Implementation Notes` | `## 実装のメモ` |
-| tasks.md | `## KeirekiPro 完了条件(全タスク共通)` | `## 完了条件(全タスク共通)` |
+| 文書 | 見出しと目印 |
+|---|---|
+| requirements.md | `# 要件` |
+| requirements.md | `## 元の要望` |
+| requirements.md | `## はじめに` |
+| requirements.md | `## 範囲` |
+| requirements.md | 範囲の節の項目「この spec で決めること」「この spec で決めないこと」「この spec が前提にしていること」 |
+| requirements.md | `## 要件` |
+| requirements.md | `### 要件N 題名` |
+| design.md | `# 設計` |
+| design.md | `## 概要` |
+| design.md | `## 作るものと作らないもの` |
+| design.md | `### 作るもの`(「作るものと作らないもの」の節の中) |
+| design.md | `### 作らないもの`(「作るものと作らないもの」の節の中) |
+| design.md | `## 使う既存の仕組み` |
+| design.md | `## 設計を見直すきっかけ` |
+| design.md | `## プロジェクトの決まりを守っているか` |
+| design.md | プロジェクトの決まりを守っているかの節で確かめる項目「backend のコードを置く層」「frontend の機能ごとの境界」「frontend の状態の持ち方」「データベースの表の形」「新しいライブラリの追加」「品質チェックの設定」「使う外部の機能がこのリポジトリで使えるか」 |
+| design.md | `## 全体の構成` |
+| design.md | 全体の構成の節の「使う技術」の欄 |
+| design.md | `## ファイルの構成` |
+| design.md | `## 処理の流れ` |
+| design.md | `## 部品` |
+| design.md | `## データの形` |
+| design.md | `## 失敗したときの扱い` |
+| design.md | `## テストの方針` |
+| design.md | `## 安全` |
+| design.md | `## 性能` |
+| design.md | `## 移行` |
+| tasks.md | `# タスク` |
+| tasks.md | `_要件:_` |
+| tasks.md | `_対象の部品:_` |
+| tasks.md | `_依存:_` |
+| tasks.md | `_保留:_` |
+| tasks.md | `(並行可)` |
+| tasks.md | `## 実装のメモ` |
+| tasks.md | `## 完了条件(全タスク共通)` |
 
-Claude は、新しい書き方でも、タスクの箱(`- [ ]` `- [x]` `- [ ]*`)とタスク番号(`1.` `1.1`)の形を変えない。
+Claude は、タスクの箱(`- [ ]` `- [x]` `- [ ]*`)とタスク番号(`1.` `1.1`)を、この形のとおりに書く。
