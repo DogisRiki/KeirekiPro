@@ -10,22 +10,45 @@
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-02T02:01:53Z"
+      "approved_at": "2026-10-03T02:06:41Z"
     },
     "design": {
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-02T02:44:56Z"
+      "approved_at": "2026-10-03T02:06:41Z"
     },
     "tasks": {
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-02T03:01:09Z"
+      "approved_at": "2026-10-03T02:06:41Z"
     }
   },
-  "ready_for_implementation": true
+  "approval_history": [
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-02T02:01:53Z",
+      "issues": [472],
+      "revoked_at": "2026-10-03T02:06:41Z",
+      "revoked_for": "Issue #477 の特例: 新しい書き方へ書き換えた。書き換えの前後で中身が同じと Fable 5.1 が確かめた(reviews/rewrite-check.md)。この時点からの承認は特例によるもので、所有者は本文を読んで承認し直していない"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-02T02:44:56Z",
+      "issues": [472],
+      "revoked_at": "2026-10-03T02:06:41Z",
+      "revoked_for": "Issue #477 の特例: 新しい書き方へ書き換えた。書き換えの前後で中身が同じと Fable 5.1 が確かめた(reviews/rewrite-check.md)。この時点からの承認は特例によるもので、所有者は本文を読んで承認し直していない"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-02T03:01:09Z",
+      "issues": [472],
+      "revoked_at": "2026-10-03T02:06:41Z",
+      "revoked_for": "Issue #477 の特例: 新しい書き方へ書き換えた。書き換えの前後で中身が同じと Fable 5.1 が確かめた(reviews/rewrite-check.md)。この時点からの承認は特例によるもので、所有者は本文を読んで承認し直していない"
+    }
+  ]
 }
-
-

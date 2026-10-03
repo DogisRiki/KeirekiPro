@@ -158,7 +158,7 @@ After Phase 4, run a lightweight sanity review before claiming completion.
 - Review focus:
   - Do requirements, design, and tasks tell a coherent story?
   - Are there obvious contradictions, missing prerequisites, or missing task coverage for required design work?
-  - Are `_Depends:_`, `_Boundary:_`, and `(P)` markers plausible for implementation?
+  - Are `_依存:_`, `_対象の部品:_`, and `(並行可)` markers plausible for implementation?
 - If the review finds only task-plan-local issues, repair or update the generated `tasks.md` once, then re-run the sanity review.
 - If the review finds a real requirements/design gap or contradiction, stop and report follow-up instead of claiming the quick spec is implementation-ready.
 

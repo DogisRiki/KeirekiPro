@@ -6,7 +6,10 @@
 # 一時的なプロジェクトのディレクトリを場合ごとに作り、check-spec-review-before-stop.sh と
 # 同じく scan を source して spec_review_scan を呼び、出力の理由の欄を確かめる。
 # 審査の記録・対応の記録・証跡は、審査についての理由が出ない状態にそろえ、
-# 点検の記録と本文の変更日時だけを場合ごとに変える。
+# 点検の記録と本文の変更日時と承認の記録だけを場合ごとに変える。
+# 点検の記録は、spec.json の欄に依らず、人の承認の無い段階のすべてで判定される。
+# 人の承認には、所有者が出した承認のほか、特例で承認済みにした段階
+# (approved_by が DogisRiki で、approval_history に特例の要素を持つ段階)も含まれる。
 # 前提: bash・perl(JSON::PP)。
 # =====================================================================
 set -u
@@ -107,49 +110,58 @@ expect_no_style_reason() {
     esac
 }
 
-SPEC_V1='{"feature_name":"f","phase":"requirements-generated","approvals":{"requirements":{"generated":true,"approved":false}}}'
-SPEC_V2='{"feature_name":"f","spec_format":2,"phase":"requirements-generated","approvals":{"requirements":{"generated":true,"approved":false}}}'
+# requirements が生成済みで未承認の spec
+SPEC_UNAPPROVED='{"feature_name":"f","phase":"requirements-generated","approvals":{"requirements":{"generated":true,"approved":false}}}'
 
-echo "--- 1. spec_format の欄が無い spec では、点検の記録が無くても理由を出さない"
+echo "--- 1. 印の無い spec でも、点検の記録が無ければ「$NO_RECORD」を出す"
 P="$WORK/case1"
-make_spec "$P" v1spec "$SPEC_V1"
-make_stage "$P" v1spec requirements
-expect_reasons "欄の無い spec・記録なし" "$P" v1spec requirements ""
+make_spec "$P" plain "$SPEC_UNAPPROVED"
+make_stage "$P" plain requirements
+expect_reasons "印の無い spec・記録なし" "$P" plain requirements "$NO_RECORD"
 
-echo "--- 2. spec_format が2の spec で点検の記録が無ければ「$NO_RECORD」を出す"
+echo "--- 2. 点検の記録が無ければ「$NO_RECORD」を出す"
 P="$WORK/case2"
-make_spec "$P" v2spec "$SPEC_V2"
-make_stage "$P" v2spec requirements
-expect_reasons "記録なし" "$P" v2spec requirements "$NO_RECORD"
+make_spec "$P" spec "$SPEC_UNAPPROVED"
+make_stage "$P" spec requirements
+expect_reasons "記録なし" "$P" spec requirements "$NO_RECORD"
 
 echo "--- 3. 本文が点検の記録より新しければ「$BODY_NEWER」を出す"
 P="$WORK/case3"
-make_spec "$P" v2spec "$SPEC_V2"
-make_stage "$P" v2spec requirements
-make_style "$P" v2spec requirements "2025-12-31 00:00:00"
-expect_reasons "本文が記録より新しい" "$P" v2spec requirements "$BODY_NEWER"
+make_spec "$P" spec "$SPEC_UNAPPROVED"
+make_stage "$P" spec requirements
+make_style "$P" spec requirements "2025-12-31 00:00:00"
+expect_reasons "本文が記録より新しい" "$P" spec requirements "$BODY_NEWER"
 
 echo "--- 4. 点検の記録が本文より新しければ、点検についての理由を出さない"
 P="$WORK/case4"
-make_spec "$P" v2spec "$SPEC_V2"
-make_stage "$P" v2spec requirements
-make_style "$P" v2spec requirements "2026-01-03 00:00:00"
-expect_reasons "記録が本文より新しい" "$P" v2spec requirements ""
+make_spec "$P" spec "$SPEC_UNAPPROVED"
+make_stage "$P" spec requirements
+make_style "$P" spec requirements "2026-01-03 00:00:00"
+expect_reasons "記録が本文より新しい" "$P" spec requirements ""
 
 echo "--- 5. 人が承認した段階では、点検の記録が無くても理由を出さない"
 P="$WORK/case5"
-make_spec "$P" v2spec '{"feature_name":"f","spec_format":2,"phase":"design-generated","approvals":{"requirements":{"generated":true,"approved":true,"approved_by":"dogis","approved_at":"2026-01-01T00:00:00Z"},"design":{"generated":true,"approved":false}}}'
-make_stage "$P" v2spec requirements
-make_stage "$P" v2spec design
-expect_no_style_reason "人が承認した段階・記録なし" "$P" v2spec requirements
+make_spec "$P" spec '{"feature_name":"f","phase":"design-generated","approvals":{"requirements":{"generated":true,"approved":true,"approved_by":"dogis","approved_at":"2026-01-01T00:00:00Z"},"design":{"generated":true,"approved":false}}}'
+make_stage "$P" spec requirements
+make_stage "$P" spec design
+expect_no_style_reason "人が承認した段階・記録なし" "$P" spec requirements
 # 同じ spec の未承認の段階は判定される(承認の有無だけで分かれていることの確かめ)
-expect_reasons "同じ spec の未承認の段階・記録なし" "$P" v2spec design "$NO_RECORD"
+expect_reasons "同じ spec の未承認の段階・記録なし" "$P" spec design "$NO_RECORD"
 
 echo "--- 5b. approved_by が ':' を含む承認(自動の承認)は人の承認ではないので判定する"
 P="$WORK/case5b"
-make_spec "$P" v2spec '{"feature_name":"f","spec_format":2,"phase":"requirements-generated","approvals":{"requirements":{"generated":true,"approved":true,"approved_by":"auto:-y"}}}'
-make_stage "$P" v2spec requirements
-expect_reasons "自動の承認・記録なし" "$P" v2spec requirements "$NO_RECORD"
+make_spec "$P" spec '{"feature_name":"f","phase":"requirements-generated","approvals":{"requirements":{"generated":true,"approved":true,"approved_by":"auto:-y"}}}'
+make_stage "$P" spec requirements
+expect_reasons "自動の承認・記録なし" "$P" spec requirements "$NO_RECORD"
+
+echo "--- 6. 特例で承認済みにした段階では、点検の記録が無くても理由を出さない"
+P="$WORK/case6"
+make_spec "$P" spec '{"feature_name":"f","issue":100,"phase":"design-generated","approvals":{"requirements":{"generated":true,"approved":true,"approved_by":"DogisRiki","approved_at":"2026-02-01T00:00:00Z"},"design":{"generated":true,"approved":false}},"approval_history":[{"stage":"requirements","approved_by":"dogis","approved_at":"2026-01-01T00:00:00Z","issues":[100],"revoked_at":"2026-02-01T00:00:00Z","revoked_for":"Issue #477 の特例: 新しい書き方へ書き換えた。書き換えの前後で中身が同じと Fable 5.1 が確かめた(reviews/rewrite-check.md)。この時点からの承認は特例によるもので、所有者は本文を読んで承認し直していない"}]}'
+make_stage "$P" spec requirements
+make_stage "$P" spec design
+expect_no_style_reason "特例で承認済みにした段階・記録なし" "$P" spec requirements
+# 同じ spec の未承認の段階は判定される(承認の有無だけで分かれていることの確かめ)
+expect_reasons "特例の spec の未承認の段階・記録なし" "$P" spec design "$NO_RECORD"
 
 echo
 printf '結果: 成功 %d / 失敗 %d\n' "$pass" "$fail"
