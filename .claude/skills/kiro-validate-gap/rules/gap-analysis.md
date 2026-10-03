@@ -22,7 +22,7 @@ Analyze the gap between requirements and existing codebase to inform implementat
 
 ### 2. Requirements Feasibility Analysis
 
-- From EARS requirements, list technical needs:
+- From the numbered items of the requirements, list technical needs:
   - Data models, APIs/services, UI/components
   - Business rules/validation
   - Non-functionals: security, performance, scalability, reliability

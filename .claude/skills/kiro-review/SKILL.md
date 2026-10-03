@@ -13,8 +13,8 @@ This skill performs task-local adversarial review. It verifies that the implemen
 
 Boundary terminology continuity:
 - discovery identifies `Boundary Candidates`
-- design fixes `Boundary Commitments`
-- tasks constrain execution with `_Boundary:_`
+- design fixes the boundary in `## 作るものと作らないもの`, `## 使う既存の仕組み`, and `## 設計を見直すきっかけ`
+- tasks constrain execution with `_対象の部品:_`
 - review rejects concrete `Boundary Violations`
 
 ## When to Use
@@ -34,11 +34,11 @@ Provide:
 - Relevant design section numbers
 - Spec file paths (`requirements.md`, `design.md`, optionally `tasks.md`)
 - The implementer's status report
-- The task `_Boundary:_` scope constraints
+- The task `_対象の部品:_` scope constraints
 - Validation commands discovered by the controller
 - Relevant steering excerpts when applicable
-- Relevant `## Implementation Notes` entries when applicable
-- spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。tasks.md は、`_Boundary:_` を `_対象の部品:_`、`## Implementation Notes` を `## 実装のメモ` と読み替える。design.md の境界の記述(boundary commitments、out-of-boundary statements)は、`## 作るものと作らないもの` の節の `### 作るもの` と `### 作らないもの`、`## 使う既存の仕組み`、`## 設計を見直すきっかけ` で読む。`spec_format` の欄が無い spec では、このスキルの今の名前のまま読む
+- Relevant `## 実装のメモ` entries when applicable
+- spec の見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む。design.md の境界の記述(boundary commitments、out-of-boundary statements)は、`## 作るものと作らないもの` の節の `### 作るもの` と `### 作らないもの`、`## 使う既存の仕組み`、`## 設計を見直すきっかけ` で読む
 
 ## Outputs
 
@@ -80,7 +80,7 @@ Run these checks and use the result as primary signal.
 - Reject if concrete secret patterns are introduced.
 
 ### 4. Boundary Respect
-- Compare changed files against the task `_Boundary:_` scope.
+- Compare changed files against the task `_対象の部品:_` scope.
 - Reject if the change spills outside the approved boundary without explicit justification.
 - Reject if the implementation introduces hidden cross-boundary coordination inside what should be a local task.
 
@@ -99,7 +99,7 @@ Run these checks and use the result as primary signal.
 ### 7. Reality Check
 - Confirm the implementation is real production code, not a placeholder, stub, fake path, or deferred-work shell.
 
-### 8. Acceptance Criteria Coverage
+### 8. Task Coverage
 - Read the task description and confirm all aspects are implemented, not only the primary happy path.
 
 ### 9. Requirements Alignment
