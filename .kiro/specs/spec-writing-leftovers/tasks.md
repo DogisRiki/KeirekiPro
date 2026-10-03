@@ -66,7 +66,7 @@
   - 受入基準とテストの対応: タスク1.1と同じ
   - _要件: 1.1, 1.2, 1.3, 1.4, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.4_
 
-- [ ] 1.8 spec-need-triage を書き換える
+- [x] 1.8 spec-need-triage を書き換える
 
   書き換えの実装役は、`.kiro/specs/spec-need-triage/` の requirements.md・design.md・tasks.md を新しい書き方に書き換える。
   - 完了の確かめ方: タスク1.1と同じ

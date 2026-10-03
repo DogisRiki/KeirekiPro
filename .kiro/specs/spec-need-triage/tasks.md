@@ -1,116 +1,150 @@
-# Implementation Plan
+# タスク
 
-## KeirekiPro 完了条件(全タスク共通)
+## 完了条件(全タスク共通)
 
-1. **acceptance criteria の引用とテスト対応付け**: 各タスクは、対応する requirements.md の受入基準と、それを確かめる手段を detail に持つ。シェルスクリプトの受入基準(9.5、9.6)は `.github/scripts/tests/test-close-linked-issues.sh` のテストで確かめる。スキルと文書の受入基準は自動テストを持てないため、タスク6.1 で、受入基準ごとに SKILL.md と文書の該当箇所を突き合わせて確かめる。出荷後に実際のIssueで確かめる項目は、タスク6.2 でPR本文に書く
-2. **verify の実行**: 変更領域は `.github/scripts/`・`.claude/`・`doc/`・`README.md`・`CLAUDE.md`・`.kiro/` で、既存の verify Skill(frontend / backend / terraform)の対象外。代わりに、guardrails.yaml と同じ検査を手元で通す
-   - 同梱テスト: ホストで直接実行しない(ホストに jq が無く、赤を期待するテストが誤った理由で通るため)。alpine コンテナ(`bash jq coreutils grep git` を入れる)へリポジトリをマウントし、`bash` で起動する
-   - shellcheck: 変更したシェルスクリプトに `koalaman/shellcheck:v0.11.0` を流す(警告を残さない)
-3. **ゴールハック禁止**: テストのskip化・アサーション削除で完了条件を満たさない
-4. 新規テストは対象コードを一時的に壊して赤くなることを確認してから戻す
-5. **着手前の前提**: `.github/` と `.claude/` への書き込みは、このセッションからは止められる。止められたら回避せず、作業用の場所(scratchpad)でファイルを作り、置くためのコマンドをまとめて所有者に示す。置かれたあとで検査を流す。PRは `.github/` とゲート設定を含むため、所有者の承認が要る
-6. スクリプトのテストは `gh` を PATH の先頭の偽物に置き換え、ネットワークを使わない。偽物は実APIの応答の形を返し、想定していない呼び出しは失敗させて記録する(既存の test-close-linked-issues.sh の作法)
+Claude は、各タスクを終えたと判断する前に、次のすべてを満たす。
 
-## Tasks
+1. **受入基準の引用とテスト対応付け**: 各タスクは、対応する requirements.md の受入基準と、それを確かめる手段を、タスクの箇条書きに持つ。シェルスクリプトの受入基準(9.5、9.6)は、`.github/scripts/tests/test-close-linked-issues.sh` のテストで確かめる。スキルと文書の受入基準は自動テストを持てないため、Claude は、タスク6.1 で、受入基準ごとに SKILL.md と文書の該当箇所を突き合わせて確かめる。出荷後に実際のIssueで確かめる項目は、Claude がタスク6.2 でPR本文に書く
+2. **verify の実行**: 変更領域は `.github/scripts/`・`.claude/`・`doc/`・`README.md`・`CLAUDE.md`・`.kiro/` で、既存の verify Skill(frontend / backend / terraform)の対象外である。Claude は、代わりに、guardrails.yaml と同じ検査を手元で通す
+   - 同梱テスト: Claude は、同梱テストをホストで直接実行しない(ホストに jq が無く、赤を期待するテストが誤った理由で通るため)。Claude は、alpine コンテナ(`bash jq coreutils grep git` を入れる)へリポジトリをマウントし、同梱テストを `bash` で起動する
+   - shellcheck: Claude は、変更したシェルスクリプトに `koalaman/shellcheck:v0.11.0` を流す(警告を残さない)
+3. **ゴールハック禁止**: Claude は、テストのskip化・アサーション削除で完了条件を満たしたことにしない
+4. Claude は、新規テストを書いたら、対象コードを一時的に壊して赤くなることを確認してから戻す
+5. **着手前の前提**: このセッションからの `.github/` と `.claude/` への書き込みは止められる。止められたら、Claude は回避せず、作業用の場所(scratchpad)でファイルを作り、置くためのコマンドをまとめて所有者に示す。Claude は、ファイルが置かれたあとで検査を流す。PRは `.github/` とゲート設定を含むため、所有者の承認が要る
+6. スクリプトのテストは、`gh` を PATH の先頭の偽物に置き換え、ネットワークを使わない。偽物は実APIの応答の形を返し、想定していない呼び出しを失敗させて記録する(既存の test-close-linked-issues.sh の作法)
+
+## タスクの一覧
 
 - [x] 1. 親のIssueを閉じる処理(close-linked-issues)
 - [x] 1.1 Issueの問い合わせで親と子の数を取れるようにする
+
+  Claude は、close-linked-issues.sh のIssueの問い合わせ(ISSUE_QUERY)で親の番号と子の数を取れるようにし、テストの偽の `gh` が返すIssueの応答をその形に合わせる。
   - Issueの問い合わせ(ISSUE_QUERY)に、子の数(`subIssuesSummary` の `total` と `completed`)と親の番号(`parent.number`)を足す。親の問い合わせにも同じクエリを使う
   - テストの偽の `gh` が返すIssueの応答に、`subIssuesSummary` と `parent` を持たせられるようにする。持たせないIssueは、子が0件で親が無いIssueとして返す
   - `gh api graphql` で、このリポジトリのIssue1件(#472)について `parent { number }` と `subIssuesSummary { total completed }` を読み取りだけで引き、実物の応答の形を確かめる。偽の `gh` の応答はこの形に合わせる
   - 完了の観測条件: 既存の test-close-linked-issues.sh がコンテナ内で全PASSし、出力が変わらない(親の無いIssueの扱いが今と同じ)
-  - _Requirements: 9.5, 9.6_
-  - _Boundary: close-linked-issues.sh_
+  - _要件: 9.5, 9.6_
+  - _対象の部品: close-linked-issues.sh_
+
 - [x] 1.2 子がすべて閉じた親を閉じる
+
+  Claude は、close-linked-issues.sh に、子がすべて閉じた親のIssueを閉じる処理を足し、test-close-linked-issues.sh にその場合のテストを足す。
   - 書き込みの繰り返しの後に動く処理を足す。対象は、この実行の `Closes` のIssueのうち、閉じた(`closed`)ものと、すでに閉じていた(`untouched`)もの
   - 親が開いていて、子の数が1以上で、閉じた子の数が子の数と等しいときだけ、親を閉じて記録のコメント(「この Issue から分けた Issue がすべて閉じたため閉じました(最後に閉じたのは #<子>、PR #<番号> のマージによる)。」)を付け、`issue=<親> result=parent-closed` を出す。閉じた親にさらに親があれば、同じことを上へ繰り返す(最大8段)
   - 親にPRのマージ以後の閉じた記録があり、いまは開いているとき(開き直された親)は閉じない。親が閉じていれば何もしない
   - スクリプトの冒頭の判定表に、親を閉じる行(閉じる・何もしない)を書く
   - 受入基準 9.5「分けた部分のIssueのうち、まだ閉じていないものがある間、元のIssueは開いたままである」と 9.6「分けた部分のIssueがすべて閉じたとき、元のIssueは閉じる」を test-close-linked-issues.sh が検証する(子がすべて閉じた親が閉じて記録が付く、子が残っている親に書き込みが無い、閉じている親に何もしない、開き直された親を閉じない、子・親・親の親の3段で順に閉じる、GitHub が先に閉じていた子でも親を閉じる)
   - 完了の観測条件: test-close-linked-issues.sh の上のケースがコンテナ内で全PASSする
-  - _Requirements: 9.5, 9.6_
-  - _Boundary: close-linked-issues.sh_
+  - _要件: 9.5, 9.6_
+  - _対象の部品: close-linked-issues.sh_
+
 - [x] 1.3 親を閉じられなかったときに知らせる
+
+  Claude は、close-linked-issues.sh に、親のIssueを閉じられなかったときの知らせを足し、test-close-linked-issues.sh にその場合のテストを足す。
   - 親の問い合わせ、または親を閉じる操作に失敗したら、`notice_post` で目印 `<!-- issue-close-notice pr=<番号> kind=parent-close-failed -->` を付けた、所有者へのメンション付きのコメント(「この Issue から分けた Issue はすべて閉じましたが、この Issue を自動で閉じられませんでした。」)を親に出し、`issue=<親> result=parent-close-failed` を出す。終了コードは今の失敗と同じ扱いにする
   - 冒頭の判定表に親を閉じられなかった行を、知らせの説明に親の知らせを書く
   - 受入基準 9.6 の失敗時の扱いを test-close-linked-issues.sh が検証する(知らせが1回だけ出る、同じ実行をもう一度しても知らせが増えない、終了コード)
   - 完了の観測条件: test-close-linked-issues.sh と test-lib-notice-comment.sh がコンテナ内で全PASSし、close-linked-issues.sh と test-close-linked-issues.sh に shellcheck の警告が無い
-  - _Requirements: 9.6_
-  - _Boundary: close-linked-issues.sh_
+  - _要件: 9.6_
+  - _対象の部品: close-linked-issues.sh_
 
 - [x] 2. spec を作る手順の変更
-- [x] 2.1 (P) spec の各段階のコマンドを、AIが自分では起動できないようにする
+- [x] 2.1 spec の各段階のコマンドを、AIが自分では起動できないようにする (並行可)
+
+  Claude は、kiro-spec-requirements・kiro-spec-design・kiro-spec-tasks の SKILL.md を Claude が自分では起動できない形に直し、kiro-spec-requirements の生成の手順に更新のときの2行を足す。
   - kiro-spec-requirements / -design / -tasks の SKILL.md の冒頭に `disable-model-invocation: true` を足す
-  - kiro-impl にはすでに付いているため、変えない(design の Out of Boundary の「4つのスキル」は、init・requirements・design・tasks を指す。init は 2.2 が受け持つ)
+  - kiro-impl にはすでに付いているため、変えない(design の「作らないもの」の「4つのスキル」は、init・requirements・design・tasks を指す。init は 2.2 が受け持つ)
   - kiro-spec-requirements の生成の手順に、spec.json に `additional_issues` があるときは既存の要件と受入基準を番号ごと残し、新しい要件を既存の最後の番号の次から足し、CLAUDE.md の印の決まりに従う、という2行を足す
   - 受入基準 5.3「spec を始めるコマンドと spec の各段階のコマンドを、所有者に代わって実行しない」と 5.8「要件・設計・タスクのそれぞれが、どちらのIssueに対するものかを本文の中で見分けられる形にする」に対応する。3つのファイルの冒頭の行と、足した2行を、タスク6.1 で突き合わせる
   - 完了の観測条件: 3つの SKILL.md の冒頭に `disable-model-invocation: true` があり、kiro-spec-requirements に更新のときの2行がある
-  - _Requirements: 5.3, 5.8_
-  - _Boundary: kiro-spec-requirements, kiro-spec-design, kiro-spec-tasks_
-- [x] 2.2 (P) kiro-spec-init に、既存の spec を新しいIssueのために開き直す形を足す
+  - _要件: 5.3, 5.8_
+  - _対象の部品: kiro-spec-requirements, kiro-spec-design, kiro-spec-tasks_
+
+- [x] 2.2 kiro-spec-init に、既存の spec を新しいIssueのために開き直す形を足す (並行可)
+
+  Claude は、kiro-spec-init の SKILL.md に、既存の spec を新しいIssueのために開き直す更新の形の手順を足す。
   - 冒頭に `disable-model-invocation: true` を足す
   - 引数の1つ目が `#<番号>`、2つ目が既存の feature 名で、その spec.json があるときに更新の形で動く。feature が無ければ誤りとして伝えて何も書かない。更新の形では、名前の重複を避けて別の名前を付ける扱い(Directory Conflict)を使わない。番号がすでに `issue` か `additional_issues` にあれば、何も書かずに進み具合を伝える
   - 新しいIssueを本文だけで読み(コメントは読まない)、承認済みの段階を `approval_history` に写し(`stage`、`approved_by`、`approved_at`、`issues`、`revoked_at`、`revoked_for`)、3段階を `generated: false`・`approved: false` にして `approved_by` と `approved_at` を消し、`phase` を `initialized` にする。`ready_for_implementation` には触れない
   - `additional_issues` に番号を足し、requirements.md の要望の欄の最後に `### 追加の要望(Issue #<番号>)` の見出しで題名と本文を足す。書き込みは spec.json を先にし、失敗したら requirements.md を書き換えない。最後に `/kiro-spec-requirements <feature>` を示す
   - 受入基準 5.5「所有者が打つコマンドと、取り消される承認の段階を示す」と 5.9「取り消す段階の承認者・日時・対象のIssueを、取り消しのあとも読める形で残す」に対応する。手順を、タスク6.1 で設計の「kiro-spec-init の更新の形」と突き合わせる
   - 完了の観測条件: kiro-spec-init の SKILL.md に更新の形の手順があり、設計の spec.json の形(`additional_issues`、`approval_history`)と一致する
-  - _Requirements: 5.3, 5.5, 5.8, 5.9_
-  - _Boundary: kiro-spec-init_
-- [x] 2.3 (P) spec の審査を、更新した spec の基準と取り消しの履歴に合わせる
+  - _要件: 5.3, 5.5, 5.8, 5.9_
+  - _対象の部品: kiro-spec-init_
+
+- [x] 2.3 spec の審査を、更新した spec の基準と取り消しの履歴に合わせる (並行可)
+
+  Claude は、spec-reviewer の定義と、spec-review の審査の観点と Step 6 を、更新した spec の審査の基準と承認の取り消しの履歴に合わせて直す。
   - spec-reviewer の定義で、spec.json の `issue` に加えて `additional_issues` の番号ごとにIssueの本文を読む(コメントは読まない)
   - 審査の観点(requirements)に、`additional_issues` があるときは、追加のIssueの「やりたいこと」に対応する要件が `(#N)` の印付きで無いものを取りこぼし、どのIssueの本文にも無いものを勝手な追加とし、印の無い要件は元のIssueを基準に見る、を足す
   - spec-review の Step 6 で、承認を取り消す前に `approval_history` に写す手順を足す(`revoked_for` に差し戻しの理由を書く)。「後続の段階を作り直し」を、所有者に各段階のコマンドを打つよう依頼する文面に直す(各段階のコマンドはAIが起動できなくなるため)。この文面の変更は 2.1 の決定に依るもので、design の審査の対応記録 D1-1-8 で、このタスクで行うと決めた
   - 受入基準 5.7「元のIssueと新しいIssueの両方の本文を基準にし、新しいIssueの要望の取りこぼしと、どちらのIssueにも無い追加を判定する」、5.9、10.6、10.7 に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: spec-reviewer の定義が `additional_issues` を読み、審査の観点と Step 6 に上の手順がある
-  - _Requirements: 5.7, 5.9, 10.6, 10.7_
-  - _Boundary: spec-reviewer, spec-review_
+  - _要件: 5.7, 5.9, 10.6, 10.7_
+  - _対象の部品: spec-reviewer, spec-review_
 
 - [x] 3. 起票と出荷の決まりの変更
-- [x] 3.1 (P) 起票の決まりに、起票後の案内とサブIssueの起票を足す
+- [x] 3.1 起票の決まりに、起票後の案内とサブIssueの起票を足す (並行可)
+
+  Claude は、起票の決まり file-issue の SKILL.md に、起票後の `/start` の案内と、分けた部分のIssue(サブIssue)の起票の節を足す。
   - Step 6 の spec の要否の案内を消し、「着手するときは `/start #<番号>` を打ってください」とだけ案内する
   - 「分けた部分のIssue」の節を足す: `gh issue create --parent <元の番号>` で起票する。本文の最初に「#<元の番号> を分けた部分です。」と書く。所有者が了承した分け方(要件6)では、元のIssueの本文のうちその部分の項目と、了承された分け方のその部分の範囲だけで本文を作り、分け方の提案で案を見せているので Step 4 を改めて行わない。実装の途中の分割(要件7)では、元のIssueの本文からの抜き出しだけで作り、言い換えず、項目を足さず、出どころの印も写す。これを「了承を得ずに起票しない」の例外として明記し、起票したら番号と題名を所有者に示す
   - 制約の節に、上の例外への参照を足す
   - `gh issue create --help` に `--parent` があることを確かめる(Issueは作らない)
   - 受入基準 1.7、7.5「起票する部分のIssueの本文を、元のIssueの本文からの抜き出しだけで構成し、元のIssueに無い要望を加えない」、9.1〜9.3、10.4、10.5 に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: file-issue の Step 6 が `/start` の案内だけになり、「分けた部分のIssue」の節と例外が書かれている
-  - _Requirements: 1.7, 7.5, 9.1, 9.2, 9.3, 10.4, 10.5_
-  - _Boundary: file-issue_
-- [x] 3.2 (P) 出荷手順に、部分のPRと更新した spec のPRと、200行の検査で止まったときの扱いを足す
+  - _要件: 1.7, 7.5, 9.1, 9.2, 9.3, 10.4, 10.5_
+  - _対象の部品: file-issue_
+
+- [x] 3.2 出荷手順に、部分のPRと更新した spec のPRと、200行の検査で止まったときの扱いを足す (並行可)
+
+  Claude は、出荷手順 ship の SKILL.md に、サブIssueのPRと更新した spec のPRの本文の決まりと、spec 無しのPRが200行の検査で止まったときの扱いを足す。
   - サブIssueのPRでは、`Refs:` と `Closes` にサブIssueの番号を書き、元のIssueの番号は書かない
   - 更新した spec のPRでは、本文に「このPRが実装するのは `(#N)` の印の付いた項目です。印の無い項目は以前のPRで実装済みです」と書き、`Refs:` と `Closes` に追加のIssueの番号を書く
   - spec 無しのPRが size-check で止まったときは、修正して push せず、`/start` の「途中で見立てが外れたとき」に従う
   - 受入基準 7.7「spec 無しで出したPRが200行の検査で止まった場合、spec に切り替えるか小さく分けるかを決めて理由を示す」と 9.4「分けた部分の進め方の判断と出荷を、その部分のIssueを対象にして行う」に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: ship の SKILL.md の PR 本文の決まりと赤のときの扱いに、上の3点が書かれている
-  - _Requirements: 7.7, 9.4_
-  - _Boundary: ship_
+  - _要件: 7.7, 9.4_
+  - _対象の部品: ship_
 
 - [x] 4. 着手の手順(`/start`)
 - [x] 4.1 Issueを読み、すでに進んでいるものを見分ける部分を作る
+
+  Claude は、新しいスキル `start` を作り、Issueを読む部分と、すでに進んでいるIssue(対応する spec があるIssue、すでに分けてあるIssue)を見分ける部分を書く。
   - 新しいスキル `start` を作る。冒頭は `name: start`、`argument-hint: <#Issue番号>`、`disable-model-invocation` は付けない。説明文に「Issueへの着手を頼まれたら必ず使う」と書く。引数が無いか読めないときは番号を尋ねる
   - `gh issue view <N> --json number,title,body,state,parent,subIssues,subIssuesSummary` で読み、コメントは取得しない。無いIssueと閉じたIssueには着手せずに伝える。gh の問い合わせに失敗したときは、判断せずに失敗したことを伝えて終える。書く前に、この `gh issue view` を #472 で1回実行し(読み取りだけ)、返る欄の形を確かめる
   - `issue` または `additional_issues` に番号を持つ spec を探し、見つかれば進み具合と次のコマンドを示して終える。表には、`phase` が `initialized`、各段階が生成済みで未承認、各段階が承認済みで次の段階が未生成、tasks が承認済みで未完了あり、すべて完了の各行を持つ。すべて完了の行だけは終えずに出荷の状況を確かめる
   - 子が1件以上あれば、サブIssueの番号・題名・開閉を一覧で示し、分け方を決め直さずに終える。サブIssueごとに `/start` を打つよう案内する
   - 受入基準 1.1「操作を、spec の要否に依らず1つにする」、1.2〜1.6 に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: `start` の SKILL.md に、Issueの読み取り・閉じたIssue・spec の進み具合の表・分けてあるIssueの手順が書かれている
-  - _Depends: 2.2_
-  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
+  - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
+  - _依存: 2.2_
+
 - [x] 4.2 4つの観点で判断し、判断を示す部分を作る
+
+  Claude は、`start` の SKILL.md に、4つの観点で spec の要否を判断する部分と、判断の報告の書式を書く。
   - 設計の「観点の定義」の表(当たる・当たらない)を載せる。観点4は「マージを取り消しても元に戻らないか」と書き、要件の「差し戻しても」と同じ意味であることを添える
   - 1つでも当たれば spec が要り、どれにも当たらなければ要らない、行数の見込みは使わない、と書く。spec が要るときは、1つの spec に収まるか(別々に出荷できる、spec の要る大きさの関心事が2つ以上あれば収まらない)と、既存の spec の範囲か(design.md の「This Spec Owns」に入るか)を続けて決める
   - 判断の報告の書式(してほしいことを最初に、判断、観点ごとの当たるか・根拠)を載せる。根拠にはファイルと行かIssue本文の見出しを書く。専門用語を使わず、主語を立てた文で書く
   - 受入基準 2.1〜2.4、3.1〜3.3、5.4、6.1 に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: `start` の SKILL.md に、観点の定義・判断の決まり・報告の書式が書かれている
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 5.4, 6.1_
+  - _要件: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 5.4, 6.1_
+
 - [x] 4.3 判断ごとの進み方を作る
+
+  Claude は、`start` の SKILL.md に、判断ごとの進み方と、Issueを分けたあとの進め方を書く。
   - spec 不要: 報告のあと返事を待たずに実装し、verify を通して `/ship` で出荷する。所有者が止めたら実装を止め、変更をローカルにコミットして残し、指示に従って決め直す
   - 新しい spec: `/kiro-spec-init #N` を依頼して終え、実装を始めない。既存の spec の更新: `/kiro-spec-init #N <feature>` を依頼し、取り消される承認の段階を添えて終える。既存の spec に関わるが spec 不要: spec 不要と同じく進める。spec の各段階のコマンドを自分で起動しない
   - 1つの spec に収まらない: 分け方・部分ごとの進め方・理由・サブIssueの題名と本文の案を示して止まる。了承されたら file-issue の「分けた部分のIssue」の手順で起票する。修正を求められたら直した案を示して改めて待つ。サブIssueの起票が途中で失敗したら、起票できた番号と失敗した部分を示して止まり、起票できた分は残す
   - 分けたあと: 同じ会話の中で、spec の要らない部分を1つずつ、部分ごとのブランチとPRで進める。spec が要る部分は `/kiro-spec-init #<サブIssue>` を依頼する。会話が途切れたらサブIssueごとの `/start` で続く
   - 受入基準 4.1「判断と理由を示したあと、所有者の返事を待たずに実装を始める」、4.2、5.1〜5.3、5.5、5.6、6.2〜6.4、9.1、9.4 に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: `start` の SKILL.md に、5つの判断それぞれの進み方と、分けたあとの進め方が書かれている
-  - _Depends: 3.1_
-  - _Requirements: 4.1, 4.2, 5.1, 5.2, 5.3, 5.5, 5.6, 6.2, 6.3, 6.4, 9.1, 9.4_
+  - _要件: 4.1, 4.2, 5.1, 5.2, 5.3, 5.5, 5.6, 6.2, 6.3, 6.4, 9.1, 9.4_
+  - _依存: 3.1_
+
 - [x] 4.4 途中で見立てが外れたときの扱いを作る
+
+  Claude は、`start` の SKILL.md に、spec 無しの実装の途中で見立てが外れたときの扱いと、spec で進めている途中で小さい変更だと分かったときの扱いを書く。
   - 見直しの時点(方針を決めた・変えたとき、Issueに無い動きを決める必要が出たとき、保存されたデータ・外部への送信・本番の設定に触れるとき、`/ship` の前)で観点を当て直す
   - 当たったら止め、どの部分も観点に当たらないなら小さく分け、そうでなければ spec に切り替えると決めて理由を示す。spec に切り替えるときは、変更をいまのブランチにコミットして push せず、ブランチ名を示し、`/kiro-spec-init #N` を依頼し、`/kiro-impl` まで実装を再開しない
   - 小さく分けるときは、返事を待たずにサブIssueを起票し(本文は元の本文の抜き出しだけ)、部分ごとにブランチとPRを分けて進める。ブランチの扱いは design のとおりに書き分ける(実装の途中で分けるときは、いまのブランチに最初の部分だけを残し、ほかの部分の変更を取り除く。200行の検査で止まったときは、PRを閉じて部分ごとに新しいブランチを作る)。書き分けは、どちらの場合かが一読で分かる同じ形の文で書く(design の審査の対応記録 D1-1-5)
@@ -118,58 +152,71 @@
   - spec で進めている途中で小さい変更だと分かっても、spec 無しへの切り替えを提案しない、と書く
   - 受入基準 7.1「4つの観点のいずれかに当たると分かったとき、その時点で実装を止める」、7.2〜7.7、8.2 に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: `start` の SKILL.md に、見直しの時点・止めたあとの2つの道・200行の検査で止まったとき・spec の途中の扱いが書かれている
-  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 8.2_
+  - _要件: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 8.2_
 
 - [x] 5. 文書の変更
-- [x] 5.1 (P) CLAUDE.md を新しい進め方に合わせる
+- [x] 5.1 CLAUDE.md を新しい進め方に合わせる (並行可)
+
+  Claude は、CLAUDE.md の記述を、着手時に `/start` が進め方を決める新しい進め方に合わせて直す。
   - spec駆動開発の節の Lane A/B の定義を、着手時に `/start` が進め方を決め、基準は4つの観点、という内容に書き換え、観点の表を載せる(`/start` の表と同じ内容)
   - 200行の項を、着手時の判断をすり抜けた変更を止める最後の網で、着手時の判断の基準ではない、と書き直す。ワークフローの節に、着手は `/start #N` で始め、spec の各段階のコマンドは所有者が打つと書く
   - ルールの節に、spec で進めている途中で小さいと分かっても spec で最後まで進めて切り替えを提案しないこと、Issueの印の決まり(新しい項目の末尾に `(#N)`、直した項目に `(#N で変更)`、取りやめは本文を残して `(#N で取りやめ)`、印の無い項目は元のIssue、番号を変えない、タスクの行では `(P)` の後に `(#N)` を置き `_Requirements:_` の行には付けない、完了の印を外さない)、承認を取り消す前に `approval_history` に写すことを書く
   - Git規約の節に、サブIssueのPRでは `Refs:` と `Closes` にサブIssueの番号を書くと書く
   - 受入基準 8.1、10.1「着手の入口が1つであること、AIが着手時に進め方を決めること、判断の基準が要件2の4つの観点であることを記載する」、10.2、10.7、5.8 に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: CLAUDE.md に上の内容があり、「200行を超える見込み」を spec の要否の基準とする記述が無い
-  - _Requirements: 5.8, 8.1, 10.1, 10.2, 10.7_
-  - _Boundary: CLAUDE.md_
-- [x] 5.2 (P) README を新しい進め方に合わせる
+  - _要件: 5.8, 8.1, 10.1, 10.2, 10.7_
+  - _対象の部品: CLAUDE.md_
+
+- [x] 5.2 README を新しい進め方に合わせる (並行可)
+
+  Claude は、README の記述を、着手時に `/start` が進め方を決める新しい進め方に合わせて直す。
   - 人間が打つコマンドの表の先頭を `/start #Issue番号`(着手。AIが進め方を決める)にし、`/kiro-spec-init` を「AIに頼まれたときに打つ」とする
   - 進め方の図に、起票の後の「所有者が `/start` を打つ」「AIが進め方を決める」を入れ、spec の道と spec 無しの道をそこから分ける
   - 開発の進め方の表を、4つの観点による着手時の判断と、最後の網としての200行の検査に書き換える。スキルの表に `/start` の行を足す。ワークフローの表の close-linked-issues の行に、分けた部分のIssueがすべて閉じたら親も閉じること、閉じられなかったら知らせることを足す
   - 受入基準 10.1、10.2、10.3「人間が打つコマンドの表は、着手させるときの操作を含む」に対応する。タスク6.1 で突き合わせる
   - 完了の観測条件: README の上の5か所が直っており、図が Mermaid として崩れていない
-  - _Requirements: 10.1, 10.2, 10.3_
-  - _Boundary: README_
-- [x] 5.3 (P) 監査手順に、親のIssueを閉じられなかったときの対処を足す
+  - _要件: 10.1, 10.2, 10.3_
+  - _対象の部品: README_
+
+- [x] 5.3 監査手順に、親のIssueを閉じられなかったときの対処を足す (並行可)
+
+  Claude は、監査手順(`doc/開発フロー/監査手順.md`)の知らせの表に、親のIssueを閉じられなかったときの知らせの行と、所有者がする対処を足す。
   - 知らせの表に、「この Issue から分けた Issue はすべて閉じましたが、この Issue を自動で閉じられませんでした。」の行と、対処(子がすべて閉じていることを確かめて手で閉じる)を足す
   - 受入基準 9.6 の失敗時に所有者がすることを示す。タスク6.1 で、1.3 の知らせの文面と一致することを確かめる
   - 完了の観測条件: 監査手順の知らせの表に上の行があり、文面が close-linked-issues.sh の知らせと一致する
-  - _Depends: 1.3_
-  - _Requirements: 9.6_
-  - _Boundary: 監査手順_
+  - _要件: 9.6_
+  - _対象の部品: 監査手順_
+  - _依存: 1.3_
 
 - [x] 6. 検証と出荷の準備
 - [x] 6.1 すべての検査と、受入基準ごとの突き合わせを行う
+
+  Claude は、変更したスクリプトのテストと shellcheck を流し、受入基準ごとに確かめる場所を一覧にして、抜けが無いことを確かめる。
   - test-close-linked-issues.sh と test-lib-notice-comment.sh をコンテナ内で流し、close-linked-issues.sh と test-close-linked-issues.sh に shellcheck を流す。新しいテストは対象を一時的に壊して赤くなることを確かめてから戻す
   - 要件1〜10 の受入基準ごとに、確かめる場所(テスト名、または SKILL.md と文書の節)を一覧にし、抜けが無いことを確かめる
   - 4つの観点の定義が `/start`、CLAUDE.md、README の3か所で同じであること、kiro-spec-init / -requirements / -design / -tasks の冒頭に `disable-model-invocation: true` があること、kiro-spec-requirements に更新のときの2行があること、`/start` の spec の進み具合の表が、設計の表に design の審査の対応記録 D1-2-2 の行(各段階が承認済みで次の段階が未生成)を足したものと一致することを確かめる
   - CLAUDE.md(5.1)と spec-review の Step 6(2.3)の承認の取り消しの決まりが食い違わないこと(10.7)、別のタスクが参照する見出し(CLAUDE.md の印の決まり、`/start` の「途中で見立てが外れたとき」、file-issue の「分けた部分のIssue」)が実在し、参照する側の名前と一致することを確かめる
   - `grep` で、CLAUDE.md、README、file-issue に「200行を超える見込み」を spec の要否の基準とする記述が残っていないことを確かめる
   - 完了の観測条件: テストと shellcheck がすべて通り、受入基準の一覧に確かめる場所の無い行が無い
-  - _Requirements: 1.1, 2.1, 5.3, 5.8, 9.5, 9.6, 10.1, 10.2_
+  - _要件: 1.1, 2.1, 5.3, 5.8, 9.5, 9.6, 10.1, 10.2_
+
 - [x] 6.2 PR本文に書く、出荷後の確認の手順を用意する
+
+  Claude は、出荷後に実際のIssueで確かめる3つの手順を、PR本文に貼れる形で用意する。
   - spec の要らない小さなIssueで `/start` を打ち、判断の報告が書式どおりに出て、返事を待たずに実装が始まることを確かめる手順
   - spec の要るIssue(例: #473)で `/start` を打ち、`/kiro-spec-init #473` の依頼が出て、AIが実装を始めないことを確かめる手順
   - 分けたIssueが出たときに、サブIssueが親に紐づき、最後の部分のマージで親が閉じることを確かめる手順
   - これらは運用文書に書かず、PR本文にだけ書く
   - 完了の観測条件: 上の3つの手順の文面が、出荷のときにPR本文へ貼れる形で用意されている
-  - _Requirements: 4.1, 5.2, 9.6_
+  - _要件: 4.1, 5.2, 9.6_
 
-## Implementation Notes
+## 実装のメモ
 
-- 1.1〜1.3: `.github/` への書き込みは止められるため、scratchpad の `impl/.github/scripts/` で作り、テストはリポジトリの `.github` に重ねたコンテナで流した。所有者が置いたあとにまとめてコミットする
-- 1.2: 子を閉じた直後に親の `subIssuesSummary.completed` がすぐ増えるかは実物で未確認(偽の gh はすぐ増える前提)。6.2 の出荷後の確認で、3段の親子が1回のマージで上まで閉じるかを見る
-- 1.3: 親の知らせの文面は、失敗の種類で2通りに書き分けた(閉じる操作の失敗は「すべて閉じましたが…閉じられませんでした」、照会の失敗は「すべて閉じたかを自動で確かめられなかったため…閉じていません」)。5.3 の監査手順の表は2つの文面を載せる
-- 1.3: サブIssueの親が別のリポジトリにあると、このリポジトリの同じ番号のIssueを誤って扱うため、親のリポジトリ(`nameWithOwner`)を読み、違えば扱わない(照会・書き込み・知らせ・上へたどることをしない)ようにした
-- 3.2: ship の SKILL.md の手順7への2行(size-check で止まったとき)は自動モードに書き込みを止められた。3点すべてを入れた版を scratchpad の `impl/.claude/skills/ship/SKILL.md` に置き、所有者が置いたあとにコミットする。`.claude/` への書き込みは止められることがあるので、止められたら同じく scratchpad の `impl/` に同じパスで置く
-- 4.1: `gh issue view` はPRの番号も失敗せずに読め、開いているPRは `state: OPEN` を返す。PRを見分けるため取得する欄に `url` を足し、`/pull/` を含むときは着手しない。サブIssueを持つIssueがまだ無いため、`subIssues.nodes` の各要素の欄名は実物で未確認(6.2 で見る)
-- 4.4: 実装の途中で spec に切り替えるときは、design(手順3)のとおり常に `/kiro-spec-init #N`(新しい spec)を依頼する。変更が既存の spec の範囲に入る場合の「更新」への振り分けは design に無く、範囲が重なる spec ができうる(審査で報告のみ。所有者の判断事項)。`gh pr close` は settings.json の許可一覧に無いため、自動モードの判定に回る
-- 5.2: README は観点の名前だけを載せ、定義は CLAUDE.md の「spec駆動開発」の節に案内した(3か所で定義がずれないため)。6.1 の「3か所で同じ」は、README を名前の一致で確かめる。README は CRLF でコミットされているため CRLF のまま直した
+- 1.1〜1.3: `.github/` への書き込みは止められるため、Claude は scratchpad の `impl/.github/scripts/` でファイルを作り、リポジトリの `.github` に重ねたコンテナでテストを流した。所有者がファイルを置いたあとに、Claude がまとめてコミットする
+- 1.2: 子を閉じた直後に親の `subIssuesSummary.completed` がすぐ増えるかは、実物で未確認である(偽の gh はすぐ増える前提)。Claude は、6.2 の出荷後の確認で、3段の親子が1回のマージで上まで閉じるかを見る
+- 1.3: Claude は、親の知らせの文面を、失敗の種類で2通りに書き分けた(閉じる操作の失敗は「すべて閉じましたが…閉じられませんでした」、照会の失敗は「すべて閉じたかを自動で確かめられなかったため…閉じていません」)。5.3 の監査手順の表は、2つの文面を載せる
+- 1.3: サブIssueの親が別のリポジトリにあると、スクリプトがこのリポジトリの同じ番号のIssueを誤って扱う。そのため、Claude は、スクリプトが親のリポジトリ(`nameWithOwner`)を読み、違えば扱わない(照会・書き込み・知らせ・上へたどることをしない)ようにした
+- 3.2: ship の SKILL.md の手順7への2行(size-check で止まったとき)は、自動モードに書き込みを止められた。Claude は、3点すべてを入れた版を scratchpad の `impl/.claude/skills/ship/SKILL.md` に置き、所有者が置いたあとにコミットする。`.claude/` への書き込みは止められることがあるので、止められたら、Claude は同じく scratchpad の `impl/` に同じパスで置く
+- 4.1: `gh issue view` はPRの番号も失敗せずに読め、開いているPRには `state: OPEN` を返す。Claude は、PRを見分けるため取得する欄に `url` を足し、`url` が `/pull/` を含むときは着手しないようにした。サブIssueを持つIssueがまだ無いため、`subIssues.nodes` の各要素の欄名は実物で未確認である(6.2 で見る)
+- 4.4: 実装の途中で spec に切り替えるときは、Claude は、design(手順3)のとおり常に `/kiro-spec-init #N`(新しい spec)を依頼する。変更が既存の spec の範囲に入る場合の「更新」への振り分けは design に無いため、範囲が重なる spec ができうる(審査で報告のみ。所有者の判断事項)。`gh pr close` は settings.json の許可一覧に無いため、自動モードの判定に回る
+- 5.2: Claude は、README に観点の名前だけを載せ、定義は CLAUDE.md の「spec駆動開発」の節に案内した(3か所で定義がずれないため)。6.1 の「3か所で同じ」は、README を名前の一致で確かめる。README は CRLF でコミットされているため、Claude は CRLF のまま直した
