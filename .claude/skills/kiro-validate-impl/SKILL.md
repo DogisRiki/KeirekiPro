@@ -12,8 +12,8 @@ Individual tasks have already been reviewed by the per-task reviewer during impl
 
 Boundary terminology continuity:
 - discovery identifies `Boundary Candidates`
-- design fixes `Boundary Commitments`
-- tasks constrain execution with `_Boundary:_`
+- design fixes the boundary in `## 作るものと作らないもの`, `## 使う既存の仕組み`, and `## 設計を見直すきっかけ`
+- tasks constrain execution with `_対象の部品:_`
 - feature validation checks for cross-task `Boundary Violations`
 
 ## Core Mission
@@ -56,8 +56,8 @@ Otherwise, for each detected feature:
 - Read `.kiro/specs/<feature>/spec.json` for metadata
 - Read `.kiro/specs/<feature>/requirements.md` for requirements
 - Read `.kiro/specs/<feature>/design.md` for design structure
-- Read `.kiro/specs/<feature>/tasks.md` for task list and Implementation Notes
-- spec.json の `spec_format` が2の spec では、見出しと目印を `.kiro/settings/rules/spec-writing.md` の対応表の新しい名前で読む。design.md は、`Boundary Commitments` を `## 作るものと作らないもの`・`## 使う既存の仕組み`・`## 設計を見直すきっかけ` の3つの節、`This Spec Owns` を `### 作るもの`、`Out of Boundary` を `### 作らないもの`、`Allowed Dependencies` を `## 使う既存の仕組み`、`Revalidation Triggers` を `## 設計を見直すきっかけ`、`File Structure Plan` を `## ファイルの構成` と読み替える。tasks.md は、`_Boundary:_` を `_対象の部品:_`、`_Blocked:_` を `_保留:_`、`## Implementation Notes` を `## 実装のメモ` と読み替える。タスクの箱(`- [ ]` `- [x]` `- [ ]*`)の形は変わらない。`spec_format` の欄が無い spec では、このスキルの今の名前のまま読む
+- Read `.kiro/specs/<feature>/tasks.md` for task list and `## 実装のメモ`
+- spec の見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to the validated boundaries, runtime prerequisites, integrations, domain rules, security/performance constraints, or team conventions that affect the GO/NO-GO call
 
@@ -124,20 +124,20 @@ These checks apply at the feature level. Use command output as the primary signa
 - Verify the overall component graph matches design.md
 - Check that integration patterns (event flow, API boundaries, dependency injection) work as designed
 - Verify dependency direction follows design.md's architecture (no upward imports)
-- Verify File Structure Plan matches the actual file layout
+- Verify `## ファイルの構成` matches the actual file layout
 - Identify any architectural drift from the original design
 - Use the original section numbering from `design.md`
 
 **G.5 Boundary Audit**
-- Compare completed work against the design's `Boundary Commitments`, `Out of Boundary`, `Allowed Dependencies`, and `Revalidation Triggers`
+- Compare completed work against the design's `### 作るもの`, `### 作らないもの`, `## 使う既存の仕組み`, and `## 設計を見直すきっかけ`
 - Identify cross-task spillover where one area quietly absorbed another boundary's responsibility
 - Identify downstream-specific workarounds embedded upstream "to make integration easier"
 - Identify new hidden dependencies or shared ownership that were not declared in the design
-- If a revalidation trigger fired, verify the affected adjacent specs or integration points were actually re-checked
+- If a trigger listed in `## 設計を見直すきっかけ` fired, verify the affected adjacent specs or integration points were actually re-checked
 
-**H. Blocked Tasks & Implementation Notes**
-- Check for any tasks still marked `_Blocked:_` — report why and assess impact on feature completeness
-- Review `## Implementation Notes` in tasks.md for cross-cutting insights that need attention
+**H. Blocked Tasks & 実装のメモ**
+- Check for any tasks still marked `_保留:_` — report why and assess impact on feature completeness
+- Review `## 実装のメモ` in tasks.md for cross-cutting insights that need attention
 
 ### Step 4: Generate Report
 
@@ -170,7 +170,7 @@ Provide summary in the language specified in spec.json:
 - DESIGN:
   - Architecture drift: <findings>
   - Dependency direction: <violations if any>
-  - File Structure Plan vs actual: <match/mismatch>
+  - ファイルの構成 vs actual: <match/mismatch>
 - OWNERSHIP: LOCAL | UPSTREAM | UNCLEAR
 - UPSTREAM_SPEC: <feature-name | N/A>
 - BLOCKED_TASKS: <list and impact assessment>

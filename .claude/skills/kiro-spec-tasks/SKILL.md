@@ -1,6 +1,6 @@
 ---
 name: kiro-spec-tasks
-description: Generate implementation tasks from requirements and design (written per .kiro/settings/rules/spec-writing.md when spec.json has spec_format 2, otherwise with the old template). Use when creating actionable task lists.
+description: Generate implementation tasks from requirements and design (written per .kiro/settings/rules/spec-writing.md). Use when creating actionable task lists.
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Agent
 argument-hint: <feature-name> [-y] [--sequential]
@@ -25,7 +25,6 @@ metadata:
 If steering/spec context is already available from conversation, skip redundant file reads.
 Otherwise, load all necessary context:
 - `.kiro/specs/{feature}/spec.json`, `requirements.md`, `design.md`
-  - From spec.json, read the `spec_format` field. `spec_format` is `2` for a new-format spec; the field is absent for a spec created before the new format. This field decides which template and rules the later steps use. Do NOT add, remove, or change `spec_format` (a spec without the field stays in the old format and is never rewritten in the new format)
 - `.kiro/specs/{feature}/tasks.md` (if exists, for merge mode)
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to requirements coverage, design boundaries, runtime prerequisites, or team conventions that affect task executability
@@ -44,17 +43,14 @@ Otherwise, load all necessary context:
 
 - Read `rules/tasks-generation.md` from this skill's directory for principles
 - Read `rules/tasks-parallel-analysis.md` from this skill's directory for parallel judgement criteria
-- Template for format, chosen by the `spec_format` field read in Step 1:
-  - `spec_format` is `2`: Read `.kiro/settings/templates/specs/tasks.md` (supports `(並行可)` markers)
-  - `spec_format` is absent: Read `.kiro/settings/templates/specs-v1/tasks.md` (supports `(P)` markers)
-  - `spec_format` has any other value: stop and report it to the user; do not guess the format
-- Writing rules: when `spec_format` is `2`, read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, 繰り返しの扱い, the sample tasks.md の見本, and the 新旧の見出しと目印の対応表 are the writing standard for this spec's `tasks.md`
+- Template for format: Read `.kiro/settings/templates/specs/tasks.md` (supports `(並行可)` markers)
+- Writing rules: read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, 繰り返しの扱い, the sample tasks.md の見本, and the 見出しと目印の一覧 are the writing standard for this spec's `tasks.md`
 
 #### Parallel Research
 
 The following research areas are independent and can be executed in parallel:
 1. **Context loading**: Spec documents (requirements.md, design.md), steering files
-2. **Rules loading**: tasks-generation.md, tasks-parallel-analysis.md, tasks template (and spec-writing.md when `spec_format` is `2`)
+2. **Rules loading**: tasks-generation.md, tasks-parallel-analysis.md, tasks template, and spec-writing.md
 
 After all parallel research completes, synthesize findings before generating tasks.
 
@@ -65,10 +61,10 @@ After all parallel research completes, synthesize findings before generating tas
 - Verify task progression is logical and incremental
 - Ensure each executable sub-task includes at least one detail bullet that states what "done" looks like in observable terms
 - Keep normal implementation tasks within a single responsibility boundary; if work crosses boundaries, make it an explicit integration task
-- `spec_format` が2の spec では、次の3つの指示の代わりに新しい tasks.md の雛形(`.kiro/settings/templates/specs/tasks.md`)と `.kiro/settings/rules/spec-writing.md` の tasks.md の見本に従う(append ` (並行可)` to the end of the title of each task that satisfies the parallel criteria when `!sequential`, explicitly note dependencies preventing `(並行可)`, and omit `(並行可)` entirely in sequential mode; the parallel criteria themselves are unchanged). For specs without `spec_format`:
-- Apply `(P)` markers to tasks that satisfy parallel criteria when `!sequential`
-- Explicitly note dependencies preventing `(P)` when tasks appear parallel but are not safe
-- If sequential mode is true, omit `(P)` entirely
+- tasks.md の雛形(`.kiro/settings/templates/specs/tasks.md`)と `.kiro/settings/rules/spec-writing.md` の tasks.md の見本に従い、`(並行可)` の印を付ける:
+- Append ` (並行可)` to the end of the title of each task that satisfies parallel criteria when `!sequential`
+- Explicitly note dependencies preventing `(並行可)` when tasks appear parallel but are not safe
+- If sequential mode is true, omit `(並行可)` entirely
 - If existing tasks.md found, merge with new content
 
 ### Step 3: Review Task Plan
@@ -83,7 +79,7 @@ After all parallel research completes, synthesize findings before generating tas
   - Each sub-task has a verifiable deliverable
   - Each executable sub-task includes an observable completion bullet
   - No implicit prerequisites remain hidden
-  - `_Depends:_`, `_Boundary:_`, and `(P)` markers still match the dependency graph and architecture boundaries. `spec_format` が2の spec では、この指示の代わりに `.kiro/settings/rules/spec-writing.md` の新旧の見出しと目印の対応表に従い、`_依存:_`、`_対象の部品:_`、`(並行可)` について同じことを点検する
+  - `_依存:_`, `_対象の部品:_`, and `(並行可)` markers still match the dependency graph and architecture boundaries (the 見出しと目印の一覧 in `.kiro/settings/rules/spec-writing.md`)
 - If issues are task-plan-local, repair the draft and re-run the review gate before writing
 - Keep the review bounded to at most 2 repair passes
 - If review exposes a real requirements/design gap or contradiction, stop and send the user back to requirements/design instead of inventing filler tasks
@@ -128,7 +124,7 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
 
 **Approval**:
 
-The order below applies regardless of `spec_format`. CLAUDE.md requires running `/spec-review` right after generation and not asking for approval until the review is complete, so this skill does NOT ask for approval right after writing `tasks.md`.
+CLAUDE.md requires running `/spec-review` right after generation and not asking for approval until the review is complete, so this skill does NOT ask for approval right after writing `tasks.md`.
 
 - If auto-approve flag (`-y`) is true:
   - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "auto:-y"`
@@ -150,8 +146,8 @@ The order below applies regardless of `spec_format`. CLAUDE.md requires running 
 
 ## Critical Constraints
 - **Task Integration**: Every task must connect to the system (no orphaned work)
-- **Boundary annotations**: `spec_format` が2の spec では、この指示の代わりに新しい tasks.md の雛形の注記と `.kiro/settings/rules/spec-writing.md` の tasks.md の見本に従う(write `_対象の部品: ComponentName_` with design.md component names, as `_Boundary:_` did, on `(並行可)` tasks; omit it when the scope is obvious). For specs without `spec_format`: Required for `(P)` tasks, recommended for all (`_Boundary: ComponentName_`)
-- **Explicit dependencies**: `spec_format` が2の spec では、この指示の代わりに新しい tasks.md の雛形の注記に従う(declare cross-boundary non-obvious dependencies with `_依存: X.X_`). For specs without `spec_format`: Cross-boundary non-obvious dependencies declared with `_Depends: X.X_`
+- **Boundary annotations**: tasks.md の雛形の注記と `.kiro/settings/rules/spec-writing.md` の tasks.md の見本に従う(write `_対象の部品: ComponentName_` with design.md component names on `(並行可)` tasks; omit it when the scope is obvious)
+- **Explicit dependencies**: tasks.md の雛形の注記に従う(declare cross-boundary non-obvious dependencies with `_依存: X.X_`)
 - **Executable deliverable granularity**: Each task must produce a verifiable deliverable (file, endpoint, UI component, config). Infrastructure tasks (project scaffolding, manifest, host integration, build config) must be explicit — never assume they exist
 - **Observable done state**: Each executable sub-task must include at least one detail bullet that makes the completed state visible without adding new bookkeeping fields
 - **No implicit prerequisites**: If a task requires a runtime, SDK, framework setup, or config file, that setup must be a separate preceding task
@@ -176,7 +172,7 @@ Provide brief summary in the language specified in spec.json:
 
 **Format**: Concise (under 200 words)
 
-**Note**: The actual tasks document follows `.kiro/settings/templates/specs/tasks.md` structure when `spec_format` is `2`, and `.kiro/settings/templates/specs-v1/tasks.md` structure when `spec_format` is absent.
+**Note**: The actual tasks document follows `.kiro/settings/templates/specs/tasks.md` structure.
 
 ## Safety & Fallback
 
@@ -202,7 +198,7 @@ Provide brief summary in the language specified in spec.json:
 - **Suggested Action**: "Refine requirements.md or design.md, then re-run `/kiro-spec-tasks {feature}`"
 
 **Template/Rules Missing**:
-- **User Message**: "Template or rules files missing in `.kiro/settings/`" (the template is `.kiro/settings/templates/specs/tasks.md` when `spec_format` is `2`, and `.kiro/settings/templates/specs-v1/tasks.md` when `spec_format` is absent)
+- **User Message**: "Template or rules files missing in `.kiro/settings/`" (the template is `.kiro/settings/templates/specs/tasks.md`)
 - **Fallback**: Use inline basic structure with warning
 - **Suggested Action**: "Check repository setup or restore template files"
 - **Missing Numeric Requirement IDs**:
