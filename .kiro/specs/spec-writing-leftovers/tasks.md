@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 古い書き方の spec を新しい書き方に書き換える
+- [x] 1. 古い書き方の spec を新しい書き方に書き換える
 
   Claude は、spec ごとに1つのタスクで、design.md の「書き換えの実装役」「書き換えの確かめ役」「書き換えの進め役」の節のとおりに書き換えと確かめと特例の承認の記録を進める。Claude は、タスクを1つずつ進め、spec ごとにコミットする。どのタスクでも、Claude は次の5つを守る。
   - 確かめ役への指示: Claude は、design.md の指示文に、記録 `rewrite-check.md` の書式(design.md の「状態の持ち方」の欄)と、食い違いが無いときは表を書かないことを足し、ファイルを作業場所の絶対パスで渡す
@@ -87,7 +87,7 @@
   - 受入基準とテストの対応: 要件1の受入基準5(雛形の説明の文字を、残った空欄と取り違えられない書き方にする)は、上の grep で確かめる。要件3の受入基準3(書き換えなかった段階の承認を変えない)は、spec.json の requirements と tasks の承認の欄で確かめる
   - _要件: 1.5, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 2. 道具から書き方の読み分けを消す
+- [x] 2. 道具から書き方の読み分けを消す
 
   Claude は、タスク1のすべてが完了してから、このタスクに進む。タスク1のどれかに `_保留:_` が付いたら、Claude はこのタスクにもタスク3にも進まず、所有者の判断を待つ。
 
@@ -172,7 +172,7 @@
   - _要件: 3.5, 4.2, 7.1, 7.2, 7.3_
   - _依存: 2.8, 2.9_
 
-- [ ] 3. spec.json から印と使われない欄を消し、全体を確かめる
+- [x] 3. spec.json から印と使われない欄を消し、全体を確かめる
 - [x] 3.1 すべての spec.json から `spec_format` と `ready_for_implementation` を消す
 
   Claude は、design.md の移行の節のとおりに、`.kiro/specs/*/spec.json` のすべてから2つの欄を消す。この spec 自身の spec.json も対象にする。
@@ -181,7 +181,7 @@
   - _要件: 4.1_
   - _依存: 2.3, 2.4, 2.5, 2.6, 2.7, 2.10_
 
-- [ ] 3.2 全体を確かめる
+- [x] 3.2 全体を確かめる
 
   Claude は、design.md のテストの方針の項目と道具の点検を、`.claude` と `.kiro/settings` と `CLAUDE.md` の全体に流し、結果をこのタスクの完了の記録に残す。あわせて、Claude は、このブランチの変更のうち200行の検査で数えられる行数を、`guardrails.yaml` と同じ除外で数える。数えた行数が200行を超えていたら、Claude は出荷せずに止め、200行を超えたことを所有者に知らせる。この spec の requirements.md は、Issue の本文の引用に空欄の目印の形を含むので、200行を超えるとこの spec を `Spec:` に書くPRが検査で赤になる。
   - 完了の確かめ方: design.md のテストの方針の節の grep と道具の点検の出力が、design.md の「作らないもの」の節に挙げたファイルだけである。書き換えた10件の spec の spec.json・requirements.md・design.md・tasks.md にプレースホルダの形が無い。数えた行数が200行以下である
@@ -205,3 +205,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - Claude は、PR本文の「人間承認が必要な変更」に、`.claude/hooks/` と `.github/scripts/` に加えて、`.claude/skills/` と `.claude/agents/` も CODEOWNERS の承認の対象として挙げる。試験の期待を変えたので、Claude は PR本文に `Test-Change-Justification:` も書く。
 - `.kiro/settings/rules/spec-writing.md` の「requirements.md の要件の組み立て」の節の「外れた文の例」のコードブロックには、`#### Acceptance Criteria` がわざと外れた書き方の例として残る。タスク3.2で道具の点検の grep をかけたとき、Claude はこの1行を対象外として扱う(タスク2.1の審査で、残すのが正しいと確かめた)
 - 書き換えでは、Fable 5.1 の確かめ役が食い違いを返したのは1件(spec-review の1回目)だけだった。審査役の差し戻しは4件(1.3・1.4・1.7・1.8)で、どれも直したあとの確かめで「同じ」になった
+- タスク3.2の全体の確かめ(2026-10-03): テストの方針の grep のうち、`spec_format`・対応表と specs-v1 と ears-format・spec.json の2つの欄・雛形の完了条件の4つの言い回し・「Architecture Pattern & Boundary Map」の grep は、どれも出力が無かった。古い名前の grep は `.kiro/settings/rules/spec-writing.md` の「外れた文の例」の1行(`#### Acceptance Criteria`)だけを出し、これは上のメモのとおり対象外である。書き換えた10件の spec の spec.json・requirements.md・design.md・tasks.md に空欄の目印の形は無かった。200行の検査で数えられる行は88行(`spec-review-scan.sh` 14、`test-spec-review-scan.sh` 66、`check-spec-backing.sh` 8)で、200行以下だった
