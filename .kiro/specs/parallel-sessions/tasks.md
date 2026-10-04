@@ -18,7 +18,7 @@
   - _対象の部品: worktree に写すファイルと compose の読み込み_
 
 - [ ] 2. スクリプトとフックを作る
-- [ ] 2.1 品質チェックのコマンドを1回きりのコンテナで動かすスクリプトを作る (並行可)
+- [x] 2.1 品質チェックのコマンドを1回きりのコンテナで動かすスクリプトを作る (並行可)
 
   Claude は、部品「run-check.sh」のスクリプトと、そのテスト `test-run-check.sh` を作る。Claude は、スクリプトを、「コマンドの前にすること」が空の領域でも `sh -c` の区切りが壊れない形にする。Claude は、`run-check.sh` が枠を取った直後に `chown` を動かす別の1回きりのコンテナにも、同じ枠のラベル(`--label keirekipro.slot=<k>`)を付ける。Claude は、frontend の準備(pnpm のストアのボリュームの持ち主を変えることと、node_modules の確かめ)を、2.2 の `ui.sh` からも使えるように、`run-check.sh` の中で1つの関数にまとめ、読み込んで呼べる形にする。`run-check.sh` は、`BASH_SOURCE` と `$0` を比べ、読み込まれただけのときは本体の処理を動かさないようにする。テストは、待ちの上限を環境変数で短くできるようにする。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-run-check.sh` の場合がすべて通る
@@ -155,6 +155,7 @@
 - 着手から出荷までの通しの確かめ(2つの worktree のセッションで別々のIssueを `/start` から `/ship` まで進める)は、新しいスキルが main に入ってからでないとできない。マージのあと、Claude は、所有者と一緒に、この通しの確かめを1回行う
 - design.md の「設計を見直すきっかけ」には、`VITEST_MAX_WORKERS` の基準の8が `compose.yaml` の `frontend` の環境変数に由来することが書かれていない(design の審査の D2-1-4)。`compose.yaml` の値を変えるときは、`run-check.sh` の割り算の基準も合わせて変える
 - 1.1 で作った `lib.sh` の使い方の決まり: 枠を取る関数は、セッションのIDを環境変数 `KP_SESSION_ID`(`--session` の値)から受け取る。`kp_slot_holders` は1行ずつタブ区切りで「枠の番号、作業フォルダ、Issueの番号、種類、始めた時刻」を出す。取り戻しを単独で呼べる `kp_slot_reclaim` がある(2.4 の `prune` で使う)。`kp_json_write` は `キー=値` で文字列を、`キー:=JSON` で数や配列を書き、ファイルが既にあれば中身を残して書き足す。終了コード69の関数は `exit` で終わるので、呼ぶ側を止めたくないときはサブシェルで呼ぶ
+- 2.1 で作った `run-check.sh` の決まり: frontend の準備は `kp_frontend_prepare <k>` で、結果を `KP_FRONTEND_ARGS` `KP_FRONTEND_PRE` `KP_FRONTEND_ERROR` に返す(2.2 の `ui.sh` はこれを読み込んで使う)。コンテナの中の準備(`pnpm install`、`terraform init`)の失敗は終了コード197で見分け、外で69に読み替える。Docker のデーモンにつながるかは、枠を取ったあとに `docker version` で確かめる
 - design.md の lib.sh の節は、`kp_main_folder` を「`kp_state_dir` の親のディレクトリ」と書いているが、文字どおりだと `.git` になる。実装は意図どおり `.git` の親(本体フォルダ)を返す(1.1 の確認役も同じ判断)。design.md の書き方の誤りで、直すかどうかは所有者が決める
 
 ## 完了条件(全タスク共通)
