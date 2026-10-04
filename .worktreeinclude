@@ -1,0 +1,5 @@
+# Claude Code が worktree を作るときに、本体フォルダから写すファイル(.gitignore の書き方)
+# gh が使うボットの資格情報の場所(GH_CONFIG_DIR)を持つ設定
+.claude/settings.local.json
+# localstack の環境変数
+docker/localstack/.env.local

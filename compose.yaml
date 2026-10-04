@@ -127,7 +127,9 @@ services:
         source: localstack-data
         target: /var/lib/localstack
     env_file:
-      - ./docker/localstack/.env.local
+      # .env.local の無い worktree でも compose の読み込みが通るようにする
+      - path: ./docker/localstack/.env.local
+        required: false
     networks:
       - my-network
 

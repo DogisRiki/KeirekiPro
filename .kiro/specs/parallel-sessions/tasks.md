@@ -9,7 +9,7 @@
   - _要件: 1.5, 3.1, 3.2, 3.4_
   - _対象の部品: lib.sh_
 
-- [ ] 1.2 worktree でも compose の読み込みが通るようにする
+- [x] 1.2 worktree でも compose の読み込みが通るようにする
 
   Claude は、部品「worktree に写すファイルと compose の読み込み」のとおり、`compose.yaml` の localstack の `env_file` を `required: false` の長い書き方にし、`.worktreeinclude` に `.claude/settings.local.json` と `docker/localstack/.env.local` を書き、`.gitignore` に `.claude/worktrees/` を足す。
   - 完了の確かめ方: `.env.local` の無い一時的な worktree の最上位で `docker compose -p keirekipro -f compose.yaml config -q` が終了コード0で終わる。本体フォルダで `git check-ignore -v .claude/worktrees/x` を打つと、無視の出どころとして `.gitignore` の行が出る(`.git/info/exclude` ではない)
