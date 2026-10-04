@@ -26,7 +26,7 @@
   - _要件: 2.1, 2.4, 2.5, 2.6, 3.2, 3.3, 3.4, 3.5_
   - _対象の部品: run-check.sh_
 
-- [ ] 2.2 画面確認の開発サーバを1回きりのコンテナで動かすスクリプトを作る
+- [x] 2.2 画面確認の開発サーバを1回きりのコンテナで動かすスクリプトを作る
 
   Claude は、部品「ui.sh」のスクリプトと、そのテスト `test-ui.sh` を作る。`ui.sh` は、frontend の準備に、2.1 で `run-check.sh` にまとめた関数を読み込んで使う。`ui.sh` は、frontend が起動したか(TCP でつながるか)を、`perl` の `IO::Socket::INET` で確かめる。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-ui.sh` の場合がすべて通る
@@ -156,7 +156,8 @@
 - design.md の「設計を見直すきっかけ」には、`VITEST_MAX_WORKERS` の基準の8が `compose.yaml` の `frontend` の環境変数に由来することが書かれていない(design の審査の D2-1-4)。`compose.yaml` の値を変えるときは、`run-check.sh` の割り算の基準も合わせて変える
 - 1.1 で作った `lib.sh` の使い方の決まり: 枠を取る関数は、セッションのIDを環境変数 `KP_SESSION_ID`(`--session` の値)から受け取る。`kp_slot_holders` は1行ずつタブ区切りで「枠の番号、作業フォルダ、Issueの番号、種類、始めた時刻」を出す。取り戻しを単独で呼べる `kp_slot_reclaim` がある(2.4 の `prune` で使う)。`kp_json_write` は `キー=値` で文字列を、`キー:=JSON` で数や配列を書き、ファイルが既にあれば中身を残して書き足す。終了コード69の関数は `exit` で終わるので、呼ぶ側を止めたくないときはサブシェルで呼ぶ
 - 2.1 で作った `run-check.sh` の決まり: frontend の準備は `kp_frontend_prepare <k>` で、結果を `KP_FRONTEND_ARGS` `KP_FRONTEND_PRE` `KP_FRONTEND_ERROR` に返す(2.2 の `ui.sh` はこれを読み込んで使う)。コンテナの中の準備(`pnpm install`、`terraform init`)の失敗は終了コード197で見分け、外で69に読み替える。Docker のデーモンにつながるかは、枠を取ったあとに `docker version` で確かめる
-- design.md の lib.sh の節は、`kp_main_folder` を「`kp_state_dir` の親のディレクトリ」と書いているが、文字どおりだと `.git` になる。実装は意図どおり `.git` の親(本体フォルダ)を返す(1.1 の確認役も同じ判断)。design.md の書き方の誤りで、直すかどうかは所有者が決める
+- design.md の lib.sh の節の `kp_main_folder` の書き方の誤り(「`kp_state_dir` の親」は `.git` になる)は、design のサイクル3で「git の共通ディレクトリの親、つまり本体フォルダ」に直した。実装は 1.1 のとおりで変えない
+- 2.2 の確認役の申し送り: `ui.sh` は `run-check.sh` の内部の関数(`_kp_rc_print_holders` `_kp_rc_seconds`)を使うので、名前を変えるときは両方を直す。frontend の TCP の確かめ(1秒ごとに60回)は、node_modules のボリュームが空で `pnpm install` が長いと足りないおそれがあり、db を起こした直後の `psql` の確かめも失敗しうる。3.2 と 5.1 の本物の docker での確かめで見る
 
 ## 完了条件(全タスク共通)
 
