@@ -20,7 +20,7 @@
 - [ ] 2. スクリプトとフックを作る
 - [x] 2.1 品質チェックのコマンドを1回きりのコンテナで動かすスクリプトを作る (並行可)
 
-  Claude は、部品「run-check.sh」のスクリプトと、そのテスト `test-run-check.sh` を作る。Claude は、スクリプトを、「コマンドの前にすること」が空の領域でも `sh -c` の区切りが壊れない形にする。Claude は、`run-check.sh` が枠を取った直後に `chown` を動かす別の1回きりのコンテナにも、同じ枠のラベル(`--label keirekipro.slot=<k>`)を付ける。Claude は、frontend の準備(pnpm のストアのボリュームの持ち主を変えることと、node_modules の確かめ)を、2.2 の `ui.sh` からも使えるように、`run-check.sh` の中で1つの関数にまとめ、読み込んで呼べる形にする。`run-check.sh` は、`BASH_SOURCE` と `$0` を比べ、読み込まれただけのときは本体の処理を動かさないようにする。テストは、待ちの上限を環境変数で短くできるようにする。
+  Claude は、部品「run-check.sh」のスクリプトと、そのテスト `test-run-check.sh` を作る。Claude は、スクリプトを、「コマンドの前にすること」が空の領域でも `sh -c` の区切りが壊れない形にする。Claude は、`run-check.sh` が枠を取った直後に `chown` を動かす別の1回きりのコンテナにも、同じ枠のラベル(`--label keirekipro.slot=<k>`)を付ける。Claude は、frontend の準備(pnpm のストアのボリュームの持ち主を変えることと、node_modules の確かめ)を、2.2 の `ui.sh` からも使えるように、`run-check.sh` の中で1つの関数にまとめ、読み込んで呼べる形にする。`run-check.sh` は、`BASH_SOURCE` と `$0` を比べ、読み込まれただけのときは本体の処理を動かさないようにする。Claude は、テストが待ちの上限を環境変数で短くできるようにする。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-run-check.sh` の場合がすべて通る
   - 受入基準とテストの対応: 要件2の受入基準1(そのセッションの作業フォルダを検査する)は、テストの「worktree で呼ぶとその最上位で -p keirekipro run --rm --no-deps と枠のラベルが渡る」で確かめる。要件2の受入基準4(検査できないときは合格にしない)は、テストの「compose の読み込みに失敗すると終了コード69で記録を書かない」で確かめる。要件2の受入基準5(そのセッションの品質チェックだけを数える)は、テストの「coverage が0で終わったときだけ worktree の gate-run-frontend.txt を書き、本体フォルダには書かない」で確かめる。要件2の受入基準6(結果を上書きしない)は、テストの「作業フォルダごとの node_modules のボリューム名が鍵で分かれる」で確かめる。要件3の受入基準2と3(待つ、待ちを示す)は、テストの「枠が埋まっていて --wait が無ければ終了コード10と持ち主の一覧を出し、docker を呼ばない」「--wait では空いたあとに動く」で確かめる。要件3の受入基準4(同時に走っても失敗しない)は、テストの「VITEST_MAX_WORKERS が 8 ÷ 設定の数になる」「Gradle のユーザーのキャッシュのボリュームが枠ごとに分かれる」で確かめる。要件3の受入基準5(待ちの上限で合格にしない)は、テストの「待ちの上限で終了コード75になり記録を書かない」で確かめる
   - _要件: 2.1, 2.4, 2.5, 2.6, 3.2, 3.3, 3.4, 3.5_
@@ -80,7 +80,7 @@
 - [ ] 3. スキルと設定をつなぐ
 - [ ] 3.1 品質チェックのスキルを新しいスクリプトにつなぐ
 
-  Claude は、部品「品質チェックと画面確認のスキルの変更」のとおり、`/verify-frontend` `/verify-backend` `/verify-terraform` と `.claude/commands/goal-fix-tests.md` の品質チェックと自動の直しのコマンドを `run-check.sh` 経由に変え、`/verify-all` の説明を合わせる。単発のテストや検査(`npx vitest run` や `./gradlew test` など)も `run-check.sh` で打つと書く。`--wait` を `run_in_background` で呼ぶときは、Bash の時間の上限を待ちの上限より長くすると書く。
+  Claude は、部品「品質チェックと画面確認のスキルの変更」のとおり、`/verify-frontend` `/verify-backend` `/verify-terraform` と `.claude/commands/goal-fix-tests.md` の品質チェックと自動の直しのコマンドを `run-check.sh` 経由に変え、`/verify-all` の説明を合わせる。単発のテストや検査(`npx vitest run` や `./gradlew test` など)も `run-check.sh` で打つと書く。`--wait` を `run_in_background` で呼ぶときは、Bash の時間の上限を、待ちの上限(1800秒)とそのコマンドの実行時間の和より長くすると書く。`--wait` は、待ったあとに同じ呼び出しの中でコマンドを動かすためである(backend の `./gradlew check` では最悪で約40分になり、`run_in_background` の既定の30分では足りない)。
   - 完了の確かめ方: 3つのスキルと goal-fix-tests に、常駐コンテナへの `docker compose exec` が残っていない(`grep` で0件)。本体フォルダで `/verify-terraform` の手順を `run-check.sh` 経由で流すと、4つのコマンドがすべて合格する
   - 受入基準とテストの対応: 要件2の受入基準1(品質チェックはそのセッションの作業フォルダを検査する)、4(検査できないときは合格にしない)と、要件3の受入基準3(待っていることを示す)、5(待ちの上限で合格にしない)のスキルの側の扱いは、この完了の確かめ方と、5.1 の結合テストで確かめる
   - _要件: 2.1, 2.4, 3.3, 3.5_
@@ -144,7 +144,7 @@
 
   Claude は、本体フォルダと、scratchpad に作った一時的な worktree の2つで、実際の Docker を使って結合テストを流し、結果を記録する。backend の `./gradlew check` を2回順に走らせる確かめは10分を超えるので、Claude は Bash を `run_in_background` で動かす。テストのために壊したコードと、作った worktree・ボリューム・DB は、終わったら元に戻して片付ける。
   - 完了の確かめ方: 次の4つがすべて期待どおりになり、その出力を記録に残す。設定を一時的に2にし、worktree でだけテストを壊して2つで同時に frontend の品質チェックを走らせると、2つは待たずに同時に走り、worktree の側だけが失敗する(frontend の品質チェックは2つ同時でもメモリに収まる。確かめのあと、設定を1に戻す)。設定1で2つ同時に品質チェックを呼ぶと片方が終了コード10を返し、`--wait` で前の片方のあとに始まる。worktree で `ui.sh start` を打つと worktree の画面の変更が出て、`ui.sh stop` のあとも本体フォルダの常駐コンテナの開発サーバが動いている。設定1で2つ同時に backend の `./gradlew check` を走らせると、重ならずに順に走ってどちらも合格する
-  - 受入基準とテストの対応: 要件2の受入基準3(壊した側のセッションだけが失敗する)と、要件3の受入基準2のうち設定の数に達していなければ待たずに始まる側と、要件3の受入基準4(同時に走っても失敗や合格が出ない)の同時に走る側は「設定2で worktree でだけテストを壊す」で、要件3の受入基準2のうち設定の数に達していれば待つ側は「設定1で2つ同時に呼ぶ」で、要件2の受入基準2(画面確認の画面にそのセッションの変更が出る)と要件1の受入基準5(ほかのセッションの開発サーバを止めない)は「worktree で ui.sh start を打つ」で、要件3の受入基準4(同時に走っても失敗や合格が出ない)は「設定1で2つ同時に backend の check を走らせる」で確かめる。worktree から `-p keirekipro run` で本体のプロジェクトの `dind` につながることも、この結合テストで確かめる
+  - 受入基準とテストの対応: 要件2の受入基準3(壊した側のセッションだけが失敗する)と、要件3の受入基準2のうち設定の数に達していなければ待たずに始まる側と、要件3の受入基準4(同時に走っても失敗や合格が出ない)の同時に走る側は、「設定2で worktree でだけテストを壊す」で確かめる。要件3の受入基準2のうち設定の数に達していれば待つ側は、「設定1で2つ同時に呼ぶ」で確かめる。要件2の受入基準2(画面確認の画面にそのセッションの変更が出る)と要件1の受入基準5(ほかのセッションの開発サーバを止めない)は、「worktree で ui.sh start を打つ」で確かめる。要件3の受入基準4(同時に走っても失敗や合格が出ない)は、「設定1で2つ同時に backend の check を走らせる」で確かめる。worktree から `-p keirekipro run` で本体のプロジェクトの `dind` につながることも、この結合テストで確かめる
   - _要件: 1.5, 2.1, 2.2, 2.3, 3.2, 3.4_
   - _依存: 3.5_
 
@@ -155,9 +155,9 @@
 - 着手から出荷までの通しの確かめ(2つの worktree のセッションで別々のIssueを `/start` から `/ship` まで進める)は、新しいスキルが main に入ってからでないとできない。マージのあと、Claude は、所有者と一緒に、この通しの確かめを1回行う
 - design.md の「設計を見直すきっかけ」には、`VITEST_MAX_WORKERS` の基準の8が `compose.yaml` の `frontend` の環境変数に由来することが書かれていない(design の審査の D2-1-4)。`compose.yaml` の値を変えるときは、`run-check.sh` の割り算の基準も合わせて変える
 - 1.1 で作った `lib.sh` の使い方の決まり: 枠を取る関数は、セッションのIDを環境変数 `KP_SESSION_ID`(`--session` の値)から受け取る。`kp_slot_holders` は1行ずつタブ区切りで「枠の番号、作業フォルダ、Issueの番号、種類、始めた時刻」を出す。取り戻しを単独で呼べる `kp_slot_reclaim` がある(2.4 の `prune` で使う)。`kp_json_write` は `キー=値` で文字列を、`キー:=JSON` で数や配列を書き、ファイルが既にあれば中身を残して書き足す。終了コード69の関数は `exit` で終わるので、呼ぶ側を止めたくないときはサブシェルで呼ぶ
-- 2.1 で作った `run-check.sh` の決まり: frontend の準備は `kp_frontend_prepare <k>` で、結果を `KP_FRONTEND_ARGS` `KP_FRONTEND_PRE` `KP_FRONTEND_ERROR` に返す(2.2 の `ui.sh` はこれを読み込んで使う)。コンテナの中の準備(`pnpm install`、`terraform init`)の失敗は終了コード197で見分け、外で69に読み替える。Docker のデーモンにつながるかは、枠を取ったあとに `docker version` で確かめる
-- design.md の lib.sh の節の `kp_main_folder` の書き方の誤り(「`kp_state_dir` の親」は `.git` になる)は、design のサイクル3で「git の共通ディレクトリの親、つまり本体フォルダ」に直した。実装は 1.1 のとおりで変えない
-- 2.2 の確認役の申し送り: `ui.sh` は `run-check.sh` の内部の関数(`_kp_rc_print_holders` `_kp_rc_seconds`)を使うので、名前を変えるときは両方を直す。frontend の TCP の確かめ(1秒ごとに60回)は、node_modules のボリュームが空で `pnpm install` が長いと足りないおそれがあり、db を起こした直後の `psql` の確かめも失敗しうる。3.2 と 5.1 の本物の docker での確かめで見る
+- 2.1 で作った `run-check.sh` の決まり: frontend の準備は `kp_frontend_prepare <k>` で、結果を `KP_FRONTEND_ARGS` `KP_FRONTEND_PRE` `KP_FRONTEND_ERROR` に返す。コンテナの中の準備(`pnpm install`、`terraform init`)の失敗は終了コード197で見分け、外で69に読み替える。Docker のデーモンにつながるかは、枠を取ったあとに `docker version` で確かめる
+- design.md の lib.sh の節の `kp_main_folder` の書き方の誤り(「`kp_state_dir` の親」は `.git` になる)は、design のサイクル3で「git の共通ディレクトリの親、つまり本体フォルダ」に直した。Claude は、`kp_main_folder` の実装を 1.1 で作ったとおりのままにし、変えない
+- 2.2 の確認役の申し送り: `ui.sh` は `run-check.sh` の内部の関数(`_kp_rc_print_holders` `_kp_rc_seconds`)を使うので、名前を変えるときは両方を直す。frontend の TCP の確かめ(1秒ごとに60回)は、node_modules のボリュームが空で `pnpm install` が長いと足りないおそれがあり、db を起こした直後の `psql` の確かめも失敗しうる。この2つの確かめで足りるかどうかは、3.2 と 5.1 の本物の docker での確かめで見る。
 
 ## 完了条件(全タスク共通)
 
