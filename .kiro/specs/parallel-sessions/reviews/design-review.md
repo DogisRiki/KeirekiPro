@@ -249,3 +249,84 @@
 - Issue 本文との突き合わせ: この往復の変更で、Issue に無い振る舞いは足されていない
 
 - 往復: 2回で収束 / 未解決: 0件
+
+## サイクル3 往復1(2026-10-05)
+
+審査の材料: Issue #481 本文(2行の言い回しを直したあとの本文。コメントは読んでいない)、`requirements.md`(サイクル5で収束し、2026-10-05 に再承認)、`design.md`(本文は変えず、書き方の点検で文3件と節6件を直したもの)、`tasks.md`(1.1・1.2・2.1 の完了の印と「実装のメモ」まで)、`spec.json`(`approval_history` の4件)、`reviews/design-response.md`(「承認の取り消しのあとの作り直し(2026-10-05)」まで)、`reviews/design-style.md`(6回目の点検 2026-10-04T22:51Z)、`research.md`、雛形 `.kiro/settings/templates/specs/design.md`、steering 3本。設計の前提の確認に読んだ実ファイル: コミット済みの実装 `.claude/scripts/parallel/lib.sh`(1.1)、`.claude/scripts/parallel/run-check.sh`(2.1)、`compose.yaml` `.worktreeinclude` `.gitignore`(1.2)。未コミットの `.claude/scripts/parallel/ui.sh` は、`kp_main_folder` の使い方だけを見た。
+
+サイクル3で見るもの: (1) 直した Issue 本文と requirements の「元の要望」と design が食い違っていないか。(2) 書き方の点検の直しで design の中身が変わっていないか。(3) 実装済みの 1.1・1.2・2.1 と design の食い違いのうち、design の側の書き方の誤りになるもの(tasks.md の「実装のメモ」が挙げる `kp_main_folder` を含む)。サイクル1・2で記録のみとした低の20件は、この往復では出し直さない。
+
+(1) Issue 本文と requirements と design の突き合わせ:
+
+- Issue 本文の「どうなれば解決か」の1項目目「品質チェックと画面確認を同時に走らせられるセッションの数は、所有者が設定で変えられる」と5項目目「設定した数のセッションの品質チェックが走っているときに、…設定した数までのセッションの品質チェックは、待たずに同時に走る」は、requirements.md の「元の要望」と一字一句同じになっている。要件3.1・3.2・3.6 の本文は変わっていない
+- design は、設定 `keirekipro.parallelSlots` の数を「同時に走る品質チェックと画面確認の数」(`lib.sh` の枠)として数え、着手のときの「作業中のセッションの数」(`check-start` の `capacity`)は、同じ数を上限にして別に数える。直したあとの言い回し(「同時に動かせるセッションの数」ではなく「品質チェックと画面確認を同時に走らせられるセッションの数」)は、設計のこの数え方を言い表したものであり、design の側に直す前の言い回しは残っていない。食い違いは無い
+
+(2) 書き方の点検の直しの確認: 私は `git diff` を打てない(実行できるのは `gh issue view` だけ)ので、サイクル1・2の記録が引用した箇所と、tasks.md が design の中身に依存している箇所を、いまの本文と突き合わせた。start スキルの変更の表(tasks 3.3 が「同じ6行」と指す。6行ある)、目安の式(tasks 4.2)、`takeover` の手順1〜8と先祖の確かめ(tasks 2.5)、`prune` の記録の残し方(tasks 2.4)、`kp_session_id` の規則(D1-2-1)、`ui` の枠の取り戻しと取り直し(D1-1-5)、`run-check.sh` 手順4の形と `chown` の別コンテナ(D1-2-2)、Compose 2.24.0 と出典(D2-1-1)、「失敗したときの扱い」(`run-check.sh` と `ui.sh` の 69・75 をスキルが不合格として扱う)、`end` と `takeover` のあとに `check-start` を呼び直すこと(D1-1-6。図の `EndFolder --> Check` と `Take --> Check`、start スキルの節の文)は、いずれも残っている。「流れの上の決めごと」は1文(同じ作業フォルダの調べを先に行う)だけになっているが、呼び直しの決めごとは図と start スキルの節に残っているので、決めごとは失われていない。足された文は用語の説明(`dind`、Testcontainers、`trap`、索引、CORS、`run_in_background`)で、新しい決めごとは無い。中身の変わった箇所は見つからなかった
+
+(3) 実装と design の突き合わせ: `lib.sh` の関数の名前・引数・終了コード69・枠の取り方と取り戻しの条件・`ui` の枠の取り直し・`kp_folder_id` の `core.ignorecase` の分岐、`run-check.sh` の手順1〜6・終了コード10/69/75・領域ごとの引数・`.kp-lock-hash`・`gate-run-<領域>.txt`、`compose.yaml` の `env_file` の長い書き方、`.worktreeinclude` の2行、`.gitignore` の `.claude/worktrees/` は、design のとおりになっている。design と違うのは次の3つで、いずれも実装の側が正しい。`MSYS_NO_PATHCONV=1` を `lib.sh` が自分で設定する(D2-1-2 の案のとおり。記録のみのまま)。`kp_main_folder` が `.git` の親を返す(下の D3-1-1)。`up -d dind` に `-p keirekipro` が付いている(下の D3-1-2)。
+
+### 申告
+
+サイクル1の申告1〜8は変わらない。この往復で見た変更(Issue 本文の言い回し、書き方の点検、実装に合わせた記録)で新しく決まったことは無い。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D3-1-1 | 低 | design.md `lib.sh` の「役割」の「本体フォルダ: `kp_main_folder` は、`kp_state_dir` の親のディレクトリを返す」 | `kp_state_dir` は `<git の共通ディレクトリ>/keirekipro-parallel` を返すので、その親は `.git`(共通ディレクトリ)であり、本体フォルダではない。文字どおりに組むと、`run-check.sh` 手順2と `ui.sh` 手順1の `--project-directory <本体>` と `-f <本体>/compose.yaml` が `.git/compose.yaml` を指して、共有のサービスを起こせず終了コード69になる。コミット済みの `lib.sh` は `.git` の親(本体フォルダ)を返しており(1.1 の確認役も同じ判断。tasks.md の「実装のメモ」に記録済み)、未コミットの `ui.sh` もこの関数を使っているので、実装には影響しない。ただし、design の承認が取り消されていて本文を直せるいまのうちに直さないと、承認されたあとは codex-review が「設計と実装が違う」と見る材料になり、説明の往復が要る | 「`kp_main_folder` は、`kp_state_dir` が指す git の共通ディレクトリ(`.git`)の親のディレクトリ、つまり本体フォルダを返す」に直す。tasks.md の「実装のメモ」の最後の行は、直したあとに所有者の判断で消してよい |
+| D3-1-2 | 低 | design.md `run-check.sh` 手順2の `docker compose --project-directory <本体> -f <本体>/compose.yaml up -d dind` と `ui.sh start` 手順1の `docker compose ... up -d <止まっているサービス>`、「設計を見直すきっかけ」 | この2つのコマンドにだけ `-p keirekipro` が無い。Compose は `-p` が無いとき、プロジェクト名を `--project-directory` のフォルダの名前(小文字にしたもの)から決めるので、本体フォルダが `KeirekiPro` という名前のあいだは `keirekipro` になって偶然合うが、別の名前のフォルダに置いた作業PCでは、`run` が入る `keirekipro` のプロジェクトとは別のプロジェクトに `dind` が起き、1回きりのコンテナからつながらない。コミット済みの `run-check.sh` と未コミットの `ui.sh` は `-p keirekipro` を付けており、実装には影響しない。あわせて、設計全体が「本体フォルダで `docker compose up -d` を打つと共有のサービスがプロジェクト `keirekipro` に入る」(部品「文書」の最初に一度だけ行う準備)ことを、本体フォルダの名前に頼って成り立たせているが、「設計を見直すきっかけ」にはその前提が無い | 手順2と `ui.sh` 手順1のコマンドに `-p keirekipro` を書く。「設計を見直すきっかけ」に「本体フォルダの名前(compose のプロジェクト名 `keirekipro` の由来)を変えたとき」を足す。フォルダの名前に頼らない形にするなら、`compose.yaml` の最上位に `name: keirekipro` を書く案があるが、それは「作るもの」に無い変更なので、採るなら「作るもの」と「ファイルの構成」に足す |
+
+### 前の段階への指摘
+
+この往復では無い。Issue 本文の2行の直しは、要件3.1・3.2・3.6 の本文を変えずに「元の要望」の写しだけをそろえる変更で、設計に落として新しく見つかった requirements の不足・曖昧さ・矛盾は無い。
+
+### 要件カバレッジと決まりの確認
+
+- 要件1.1〜6.4 の裏付けは、サイクル2 往復2の時点から変わっていない。実装済みの 1.1・1.2・2.1 が裏付ける要件(1.3、1.5、2.1、2.4、2.5、2.6、3.1〜3.5、6.1)は、設計の手順どおりに作られている
+- 「プロジェクトの決まりを守っているか」は7項目がそろったまま。本文との食い違いは、サイクル1の D1-1-7(`curl`)のほかに増えていない。`run-check.sh` と `lib.sh` は、`bash` `perl` `git` `docker` のほかに `grep` `tr` `sort` `date` `mkdir` `mv` などの coreutils を使うが、これらは `bash` と同じ前提(Git for Windows、macOS / Linux 標準)で満たされる
+- 「作らないもの」を本文が破っている箇所は無い。1.2 の `compose.yaml` の変更は localstack の `env_file` だけで、サービスの定義のほかの部分は変わっていない
+- 設計内の矛盾: 新しく増えたものは無い。上の D3-1-2 は、同じ本文の中でほかのコマンドにはすべて `-p keirekipro` が付いているのに、2つだけ無いという書き方の不ぞろいでもある
+- 実現できるかの確認: 2.1 の `run-check.sh` が設計の形(`-p keirekipro -f compose.yaml run --rm --no-deps -T --label ... --entrypoint sh <サービス> -c '<前処理>; exec "$@"' -- <コマンド>`)のまま組まれていて、`tasks.md` の 2.1 が「場合がすべて通る」で完了になっているので、設計の中核の形が偽物の `docker` の単体テストで組み立てられることまでは確かめられた。実際の Docker で worktree から動くかは、設計のとおり 5.1 の結合テストが見る場のまま
+- Issue 本文との突き合わせ: 2行の直しは、設計が既に持っている数え方(品質チェックと画面確認の枠の数)を Issue の側がより正確に言い表したもので、Issue に無い振る舞いは足されていない。Issue の「やらないこと」の2項目(同じ作業フォルダでの複数のセッション、設定の数を超える同時実行)に反する設計は無い
+
+- 往復: 1回で収束 / 未解決: 0件
+
+## サイクル3 往復2(2026-10-05)
+
+審査の材料: Issue #481 本文(コメントは読んでいない)、サイクル3 往復1の記録と `reviews/design-response.md` の「サイクル3 往復1 への対応」、修正後の `design.md`、`requirements.md`(承認済み)、`spec.json`、`reviews/design-style.md`(7回目の点検 2026-10-04T23:05Z。文3件・節1件)、`tasks.md`(「実装のメモ」)、steering の `tech.md` `structure.md`。設計の前提の確認に読んだ実ファイル: コミット済みの `.claude/scripts/parallel/lib.sh` と `.claude/scripts/parallel/run-check.sh`(全文)、未コミットの `.claude/scripts/parallel/ui.sh`(全文)、`compose.yaml`(最上位に `name:` が無いこと)、`start-dev.sh`(`docker compose` を `-p` 無しで打っていること)。
+
+往復1の修正の確認:
+
+- D3-1-1: `lib.sh` の節の `kp_main_folder` は「git の共通ディレクトリ(`git rev-parse --path-format=absolute --git-common-dir` が返す `.git`)の親、つまり本体フォルダを返す」になった。コミット済みの `lib.sh` の `kp_main_folder` は、`kp_state_dir` の値(`<共通ディレクトリ>/keirekipro-parallel`)に `dirname` を2回かけて共通ディレクトリの親を返しており、同じものを指す。`run-check.sh` 手順2と `ui.sh` 手順1の `--project-directory <本体> -f <本体>/compose.yaml` は、この値で本体フォルダの `compose.yaml` を指す。あわせて直した「呼び出し方」の「`lib.sh` は、読み込まれたときに自分で `MSYS_NO_PATHCONV=1` を設定する」は、`lib.sh` の冒頭の `export MSYS_NO_PATHCONV=1` と一致する。「前提にする」の書き方は本文に残っていない。直っている
+- D3-1-2: `run-check.sh` 手順2(`docker compose -p keirekipro --project-directory <本体> -f <本体>/compose.yaml up -d dind`)と `ui.sh start` 手順1(同じ形で `up -d <止まっているサービス>`)に `-p keirekipro` が入り、コミット済みの `run-check.sh` の `up -d dind` と、未コミットの `ui.sh` の `up -d $stopped` の形と一致する。スクリプトが打つ `docker compose` のコマンドは、本文のどれにも `-p keirekipro` が付いた。直っている。ただし、往復1の案の後半(「設計を見直すきっかけ」への追記)は入っておらず、response の「本体フォルダの名前に頼らない」は、スクリプトについては正しいが、設計の全体については下の D3-2-1 のとおり言い過ぎになっている
+
+書き方の点検の直し(文3件・節1件)の確認: 私は `git diff` を打てないので、サイクル1〜3の記録が引用した箇所と、tasks.md が design に依存する箇所を、いまの本文と突き合わせた。`kp_session_id` の規則、`ui` の枠の取り戻しと取り直し、`run-check.sh` 手順4の形と `chown` の別コンテナ、`takeover` の手順1〜8と先祖の確かめ、`prune` の記録の残し方、start スキルの表の6行、`end` と `takeover` のあとの `check-start` の呼び直し、Compose 2.24.0 と出典、目安の式、「失敗したときの扱い」、テストの方針の各項は、いずれも残っている。`session-registry.sh` の「状態の持ち方」は、点検役が6回にわたり直さなかった「`session.sh` が所有者に尋ねて消す」が、「Claude が `/start` のときに所有者に尋ね、所有者が「やめた」と答えたら `session.sh end` が消す」になった。これは start スキルの表(`folder_conflict` → 「やめた」なら `session.sh end`)と `session.sh` の「所有者とやり取りしない」に合う書き方で、決めごとは変わっていない。中身の変わった箇所は見つからなかった。
+
+実装と design のそのほかの突き合わせ: `lib.sh` と `run-check.sh` は、往復1で見たとおり design と合っている。未コミットの `ui.sh` は、design の `start` の手順1〜8(共有のサービスの起こし方、`ui` の枠、前のコンテナの削除、DB `kp_<鍵>` の作成、backend と frontend の `run -d` の引数と `SPRING_APPLICATION_JSON` の中身、健康の確かめの回数と間隔、URL の出力)と `stop` の手順のとおりに組まれている。`ui.sh stop` が `[--session <ID>]` を受け付けることと、`ui.sh` が `run-check.sh` を読み込んで frontend の準備の関数を使うことは design に書かれていないが、design の決めごと(`stop` が消すのはいまの作業フォルダのコンテナだけ、frontend の準備は `run-check.sh` と同じにする)に反しない。2.2 は未完了なので、ここでは指摘にしない。
+
+サイクル1・2で記録のみとした低の20件は、この往復では出し直さない。
+
+### 申告
+
+サイクル1の申告1〜8は変わらない。この往復の変更(`kp_main_folder` の言い直し、`MSYS_NO_PATHCONV=1` を設定する者、`-p keirekipro` の追記、書き方の点検)で新しく決まったことは無い。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D3-2-1 | 低 | design.md 部品「文書」の「最初に一度だけ行う準備は、本体フォルダで `docker compose up -d` を打って共有のサービスを起こしておくことである」と「設計を見直すきっかけ」 | 往復1の D3-1-2 の案の後半(「設計を見直すきっかけ」に本体フォルダの名前の前提を足す)が入っていない。response は「プロジェクト名を明示するので、本体フォルダの名前に頼らない」とするが、頼らなくなったのはスクリプトが打つコマンドだけで、所有者が打つ準備の `docker compose up -d` には `-p` が無く、`compose.yaml` の最上位にも `name:` が無いので、共有のサービスがプロジェクト `keirekipro` に入るかは、本体フォルダの名前が `KeirekiPro` であることに今も頼っている。別の名前のフォルダに置いた作業PCでは、所有者の準備で起きた `db` `redis` `localstack` は別のプロジェクトに入り、`ui.sh` 手順1が `-p keirekipro` で起こそうとする同じサービスは、ホストのポート(5432、6379、4566)が先のものと重なって起きず、終了コード69になる(`run-check.sh` の `dind` はホストのポートを持たないので、2つ目が起きて動く)。この前提は `start-dev.sh` と CLAUDE.md の品質ゲートのコマンド(どちらも `-p` 無し)が以前から持っているもので、この設計が新しく作ったものではなく、いまの作業PCでは起きないので低 | 「設計を見直すきっかけ」に「本体フォルダの名前(compose のプロジェクト名 `keirekipro` の由来)を変えたとき」を足す。フォルダの名前に頼らない形にするなら `compose.yaml` の最上位に `name: keirekipro` を書く案があるが、「作るもの」に無い変更なので、採るなら「作るもの」と「ファイルの構成」に足す |
+
+### 前の段階への指摘
+
+この往復では無い。
+
+### 要件カバレッジと決まりの確認
+
+- 要件1.1〜6.4 の裏付けは、サイクル3 往復1の時点から変わっていない。この往復の変更は `lib.sh` の節の2文、`run-check.sh` 手順2、`ui.sh` 手順1、書き方の直しに収まり、どの要件の裏付けも外していない
+- 「プロジェクトの決まりを守っているか」は7項目がそろったまま。本文との食い違いは、サイクル1の D1-1-7(`curl`)のほかに増えていない。`MSYS_NO_PATHCONV=1` を `lib.sh` が設定する形にしたことで、呼ぶ側(スキル、`settings.json` のフックの登録)に Windows だけの書き方は要らなくなり、「ホストOSの bash と perl」の前提と合う
+- 「作らないもの」を本文が破っている箇所は無い
+- 設計内の矛盾: 新しく増えたものは無い。`kp_state_dir`(共通ディレクトリの下)と `kp_main_folder`(共通ディレクトリの親)の関係は、`lib.sh` の節の中で一貫している。スクリプトが打つ `docker compose` のコマンドの `-p keirekipro` はそろい、残るのは上の D3-2-1 の所有者の準備の1つだけ
+- 実現できるかの確認: `git rev-parse --path-format=absolute --git-common-dir` は、worktree から呼んでも本体の `.git` を絶対パスで返すので、その親は本体フォルダになる(テストの方針の「worktree と本体のどちらから呼んでも `kp_state_dir` が同じパスを返す」が、同じ値から導く `kp_main_folder` も裏付ける)。`docker compose -p <名前> --project-directory <本体> -f <本体>/compose.yaml up -d <サービス>` の組み合わせは、Compose 2.24.0 より前からある
+- Issue 本文との突き合わせ: この往復の変更で、Issue に無い振る舞いは足されていない
+
+- 往復: 2回で収束 / 未解決: 0件

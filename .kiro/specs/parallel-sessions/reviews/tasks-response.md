@@ -19,3 +19,8 @@
 | ID | 処置 | 内容 |
 |---|---|---|
 | T1-2-1 | 記録のみ | `core.ignorecase` による `kp_folder_id` の分岐のテストは、1.1 の実装のときに `test-lib.sh` に足す(「core.ignorecase が false なら大文字と小文字を区別したまま比べる」) |
+
+## 実装の途中の本文の変更(2026-10-05)
+
+- `/kiro-impl` の進行で、tasks.md の完了の印(1.1、1.2、2.1)と「実装のメモ」の行を足した。タスクの中身は変えていない
+- requirements の承認の取り消しに伴い、tasks の承認も取り消した。所有者が `/kiro-spec-tasks` を打ってタスクを作り直したあとに、tasks の /spec-review を流し直す
