@@ -32,6 +32,10 @@ if [ "$1" = rm ] && [ -n "${FAKE_DOCKER_WATCH:-}" ]; then
         printf 'watch: none\n' >>"$FAKE_DOCKER_LOG"
     fi
 fi
+if [ "$1" = rm ] && [ -n "${FAKE_DOCKER_RM_FAIL:-}" ]; then
+    echo "Error response from daemon: fake rm failure" >&2
+    exit 1
+fi
 exit 0
 EOF
 chmod +x "$WORK/bin/docker"
@@ -39,6 +43,25 @@ chmod +x "$WORK/bin/docker"
 export PATH="$TMP_ROOT/bin:$PATH"
 export FAKE_DOCKER_LOG="$WORK/docker.log"
 export FAKE_DOCKER_PS="$WORK/docker-ps.out"
+
+# --- git worktree list だけを差し替える偽物の git(使うテストだけが PATH の先頭に置く)
+# FAKE_GIT_WORKTREE_ONLY にパスがあればその作業フォルダだけを出して成功し、無ければ失敗する
+REAL_GIT=$(command -v git)
+export REAL_GIT
+mkdir -p "$WORK/gitbin"
+cat >"$WORK/gitbin/git" <<'EOF'
+#!/bin/bash
+if [ "$1" = worktree ] && [ "${2:-}" = list ]; then
+    if [ -n "${FAKE_GIT_WORKTREE_ONLY:-}" ]; then
+        printf 'worktree %s\nHEAD 0000000000000000000000000000000000000000\nbranch refs/heads/x\n' "$FAKE_GIT_WORKTREE_ONLY"
+        exit 0
+    fi
+    echo "fatal: fake worktree list failure" >&2
+    exit 128
+fi
+exec "$REAL_GIT" "$@"
+EOF
+chmod +x "$WORK/gitbin/git"
 
 # --- 一時的なリポジトリ(大文字を含む名前にして core.ignorecase の分岐を確かめる)
 MAIN_DIR="$WORK/RepoMain"
@@ -105,7 +128,24 @@ reset_state() {
     fi
     : >"$FAKE_DOCKER_LOG"
     rm -f "$FAKE_DOCKER_PS" "$WORK/go"
-    unset FAKE_DOCKER_WATCH KP_SESSION_ID
+    unset FAKE_DOCKER_WATCH FAKE_DOCKER_RM_FAIL KP_SESSION_ID
+    # 前のテストで消した worktree を、git の記録からも外す
+    git -C "$MAIN_DIR" worktree prune
+}
+
+# 消した作業フォルダを作る: make_gone <名前> <rmdir|remove>
+# worktree を作って最上位のパスと鍵を GONE と GONE_KEY に入れてから、
+# rmdir はディレクトリだけを消し(git の一覧には prunable として残る)、remove は git worktree remove で消す。
+make_gone() {
+    local dir="$WORK/$1"
+    git -C "$MAIN_DIR" worktree add -q "$dir" -b "feat/$1" || return 1
+    GONE=$(git -C "$dir" rev-parse --show-toplevel)
+    GONE_KEY=$(fkey "$dir")
+    case "$2" in
+        rmdir) rm -rf "$dir" ;;
+        remove) git -C "$MAIN_DIR" worktree remove --force "$dir" ;;
+    esac
+    [ ! -d "$dir" ] || return 1
 }
 slots() { git -C "$MAIN_DIR" config keirekipro.parallelSlots "$1"; }
 
@@ -373,6 +413,128 @@ t_reclaim_ui_without_session() {
     [ "$key" = "$(fkey "$MAIN_DIR")" ] || die "持ち主が書き換わっていない: '$key'"
 }
 
+t_reclaim_ui_gone_folder() {
+    local mode got key
+    slots 1
+    for mode in rmdir remove; do
+        reset_state
+        slots 1
+        make_gone "GoneUi-$mode" "$mode" || die "$mode: 消した作業フォルダを作れない"
+        put_session s-gone "$GONE" "$GONE_KEY" 100
+        put_owner 1 "$GONE" "$GONE_KEY" ui "$(now)" s-gone
+        echo cid-ui-gone >"$FAKE_DOCKER_PS"
+        export FAKE_DOCKER_WATCH="$STATE/slots/1/owner.json"
+        got=$(inside "$MAIN_DIR" 'kp_slot_acquire ui "ui.sh start"') || die "$mode: 取れない: 終了コード $?"
+        [ "$got" = 1 ] || die "$mode: 番号: '$got'"
+        grep -q '^rm -f cid-ui-gone$' "$FAKE_DOCKER_LOG" \
+            || die "$mode: docker rm -f を呼んでいない: $(cat "$FAKE_DOCKER_LOG")"
+        grep -q '^watch: .*"session_id":"s-gone"' "$FAKE_DOCKER_LOG" \
+            || die "$mode: 取り戻したあとに rm を呼んだ: $(cat "$FAKE_DOCKER_LOG")"
+        key=$(inside "$MAIN_DIR" 'kp_json_get "$(kp_state_dir)/slots/1/owner.json" folder_key')
+        [ "$key" = "$(fkey "$MAIN_DIR")" ] || die "$mode: 持ち主が書き換わっていない: '$key'"
+        [ -f "$STATE/sessions/s-gone.json" ] || die "$mode: セッションの記録を消した"
+    done
+}
+
+t_keep_ui_gone_rm_fails() {
+    local got rc
+    slots 1
+    make_gone GoneRmFail rmdir || die "消した作業フォルダを作れない"
+    put_session s-gone "$GONE" "$GONE_KEY" 100
+    put_owner 1 "$GONE" "$GONE_KEY" ui "$(now)" s-gone
+    echo cid-ui-stuck >"$FAKE_DOCKER_PS"
+    export FAKE_DOCKER_RM_FAIL=1
+    got=$(inside "$MAIN_DIR" 'kp_slot_acquire ui x' 2>/dev/null)
+    rc=$?
+    [ "$rc" != 0 ] || die "docker rm -f が失敗したのに取れた: '$got'"
+    grep -q '^rm -f cid-ui-stuck$' "$FAKE_DOCKER_LOG" || die "docker rm -f を呼んでいない: $(cat "$FAKE_DOCKER_LOG")"
+    grep -q '"session_id":"s-gone"' "$STATE/slots/1/owner.json" || die "持ち主が書き換わった"
+}
+
+t_keep_ui_list_unavailable() {
+    local got rc
+    slots 1
+    put_session s-alive "$WT" "$(fkey "$WT_DIR")" 100
+    put_owner 1 "$WT" "$(fkey "$WT_DIR")" ui "$(now)" s-alive
+    echo cid-ui >"$FAKE_DOCKER_PS"
+    got=$(
+        export PATH="$TMP_ROOT/gitbin:$PATH"
+        inside "$MAIN_DIR" 'kp_slot_acquire ui x' 2>/dev/null
+    )
+    rc=$?
+    [ "$rc" != 0 ] || die "作業フォルダの一覧を取れないのに取れた: '$got'"
+    if grep -q '^rm' "$FAKE_DOCKER_LOG"; then
+        die "docker rm を呼んだ: $(cat "$FAKE_DOCKER_LOG")"
+    fi
+    grep -q '"session_id":"s-alive"' "$STATE/slots/1/owner.json" || die "持ち主が書き換わった"
+}
+
+# =====================================================================
+# 作業フォルダが無くなったかの判定(session.sh の prune と同じ判定)
+# =====================================================================
+t_live_folders() {
+    local got want
+    make_gone GoneList rmdir || die "消した作業フォルダを作れない"
+    want=$(printf '%s\t%s\n%s\t%s' "$MAIN" "$(fkey "$MAIN_DIR")" "$WT" "$(fkey "$WT_DIR")")
+    got=$(inside "$MAIN_DIR" 'kp_live_folders') || die "本体: 終了コード $?"
+    [ "$got" = "$want" ] || die "本体からの一覧が違う: '$got'"
+    got=$(inside "$WT_DIR" 'kp_live_folders') || die "worktree: 終了コード $?"
+    [ "$got" = "$want" ] || die "worktree からの一覧が違う: '$got'"
+}
+
+t_folder_gone() {
+    local rc lower live
+    rc_of() { inside "$MAIN_DIR" "$1" >/dev/null 2>&1; echo $?; }
+    make_gone GoneDir rmdir || die "rmdir: 作れない"
+    [ "$(rc_of "kp_folder_gone '$GONE' '$GONE_KEY'")" = 0 ] || die "ディレクトリだけ消した worktree を無くなったとみなさない"
+    [ "$(rc_of "kp_folder_gone '$GONE' ''")" = 0 ] || die "鍵が空の記録で無くなったとみなさない"
+    make_gone GoneRemoved remove || die "remove: 作れない"
+    [ "$(rc_of "kp_folder_gone '$GONE' '$GONE_KEY'")" = 0 ] || die "git worktree remove で消した worktree を無くなったとみなさない"
+    # 作業フォルダか鍵のどちらかが当たれば残っている
+    [ "$(rc_of "kp_folder_gone '$WT' 000000000000")" = 1 ] || die "作業フォルダが当たるのに無くなったとみなした"
+    [ "$(rc_of "kp_folder_gone '$WORK/elsewhere' '$(fkey "$WT_DIR")'")" = 1 ] || die "鍵が当たるのに無くなったとみなした"
+    [ "$(rc_of "kp_folder_gone '' '$(fkey "$MAIN_DIR")'")" = 1 ] || die "作業フォルダが空で鍵が当たるのに無くなったとみなした"
+    [ "$(rc_of "kp_folder_gone '$MAIN' ''")" = 1 ] || die "本体フォルダを無くなったとみなした"
+    [ "$(rc_of "kp_folder_gone '' ''")" = 1 ] || die "作業フォルダも鍵も空の記録を無くなったとみなした"
+    # 大文字と小文字は core.ignorecase のとおりに比べる
+    lower=$(printf '%s' "$WT" | tr 'A-Z' 'a-z')
+    git -C "$MAIN_DIR" config core.ignorecase true
+    [ "$(rc_of "kp_folder_gone '$lower' 000000000000")" = 1 ] || die "true なのに小文字の作業フォルダを無くなったとみなした"
+    git -C "$MAIN_DIR" config core.ignorecase false
+    [ "$(rc_of "kp_folder_gone '$lower' 000000000000")" = 0 ] || die "false なのに小文字の作業フォルダを残っているとみなした"
+    [ "$(rc_of "kp_folder_gone '$WT' 000000000000")" = 1 ] || die "false で作業フォルダが当たるのに無くなったとみなした"
+    git -C "$MAIN_DIR" config core.ignorecase "${ORIG_IGNORECASE:-false}"
+    # 一覧を渡せば、その一覧で判定する(渡した一覧に無い作業フォルダは無くなったとみなす)
+    live=$(printf '%s\t%s' "$MAIN" "$(fkey "$MAIN_DIR")")
+    [ "$(rc_of "kp_folder_gone '$WT' '$(fkey "$WT_DIR")' '$live'")" = 0 ] || die "渡した一覧で判定していない"
+    [ "$(rc_of "kp_folder_gone '$MAIN' '' '$live'")" = 1 ] || die "渡した一覧に当たるのに無くなったとみなした"
+    [ "$(rc_of "kp_folder_gone '$WT' '$(fkey "$WT_DIR")' ''")" = 2 ] || die "空の一覧で判定した"
+}
+
+t_folder_gone_list_unavailable() {
+    local rc
+    make_gone GoneNoList rmdir || die "作れない"
+    (
+        export PATH="$TMP_ROOT/gitbin:$PATH"
+        inside "$MAIN_DIR" "kp_folder_gone '$GONE' '$GONE_KEY'" >/dev/null 2>&1
+    )
+    rc=$?
+    [ "$rc" = 2 ] || die "kp_folder_gone: 期待 2 / 実際 $rc"
+    (
+        export PATH="$TMP_ROOT/gitbin:$PATH"
+        inside "$MAIN_DIR" 'kp_live_folders' >/dev/null 2>&1
+    )
+    rc=$?
+    [ "$rc" = 2 ] || die "kp_live_folders: 期待 2 / 実際 $rc"
+    # 一覧にいまの作業フォルダが無いときも、一覧を取れないとみなす
+    (
+        export PATH="$TMP_ROOT/gitbin:$PATH" FAKE_GIT_WORKTREE_ONLY="$WT"
+        inside "$MAIN_DIR" "kp_folder_gone '$GONE' '$GONE_KEY'" >/dev/null 2>&1
+    )
+    rc=$?
+    [ "$rc" = 2 ] || die "いまの作業フォルダが無い一覧の kp_folder_gone: 期待 2 / 実際 $rc"
+}
+
 t_reacquire_own_ui() {
     local a b c rc
     slots 2
@@ -472,10 +634,18 @@ run_test "動いているコンテナがある古い check の枠は取り戻さ
 run_test "始めて120秒以内の check の枠は取り戻さない" t_keep_young_check
 run_test "持ち主のセッションの記録が残っている ui の枠は取り戻さず docker rm -f を呼ばない" t_keep_ui_with_session
 run_test "持ち主の記録が無い ui の枠は docker rm -f を呼んでから取り戻す" t_reclaim_ui_without_session
+run_test "持ち主のセッションの記録が残っていても、記録の作業フォルダが無くなっている ui の枠は docker rm -f を呼んでから取り戻す" t_reclaim_ui_gone_folder
+run_test "記録の作業フォルダが無くなっている ui の枠でも、docker rm -f で消せなければ取り戻さない" t_keep_ui_gone_rm_fails
+run_test "作業フォルダの一覧を取れないときは、記録が残っている ui の枠を取り戻さず docker rm -f を呼ばない" t_keep_ui_list_unavailable
 run_test "いまの作業フォルダが持つ ui の枠は同じ番号で取り直せる" t_reacquire_own_ui
 run_test "枠を返せるのは持ち主の作業フォルダだけ" t_release_only_own
 run_test "枠の持ち主の一覧に、Issueの記録から引いたIssueの番号が出る" t_holders_issue
 run_test "設定を減らすと、数より大きい番号の空いた枠は取らず、埋まっている枠は数える" t_shrink_slots
+
+echo "--- 作業フォルダが無くなったかの判定"
+run_test "残っている作業フォルダの一覧に、ディレクトリが無い worktree は出ない" t_live_folders
+run_test "作業フォルダと鍵のどちらも一覧に当たらない記録だけを、無くなったとみなす" t_folder_gone
+run_test "作業フォルダの一覧を取れないときと、一覧にいまの作業フォルダが無いときは、終了コード2で判定しない" t_folder_gone_list_unavailable
 
 echo "--- JSON"
 run_test "JSON の読み書きが往復し、一時ファイルを残さない" t_json_roundtrip

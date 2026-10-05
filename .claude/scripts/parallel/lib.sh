@@ -76,6 +76,71 @@ kp_main_folder() {
     dirname "$state"
 }
 
+# パスを、core.ignorecase の値(先に1回だけ読んだもの)に合わせて比べる形にする
+_kp_norm_with() { # <core.ignorecase の値> <パス>
+    if [ "$1" = true ]; then
+        printf '%s' "$2" | tr 'A-Z' 'a-z'
+    else
+        printf '%s' "$2"
+    fi
+}
+
+# 残っている作業フォルダの一覧: git worktree list --porcelain の作業フォルダのうち、
+# ディレクトリがあり bare でないものを、1行ずつ「<作業フォルダ><タブ><鍵>」で出す。
+# 一覧を取れないとき(git worktree list が失敗したとき、いまの作業フォルダが一覧に無いとき)は、
+# 何も出さずに終了コード2で終わる(残っている作業フォルダまで無くなったとみなさないため)。
+kp_live_folders() {
+    local me list paths p hash ic out="" found=0
+    me=$(kp_folder_key) || exit $?
+    list=$(git worktree list --porcelain 2>/dev/null) || return 2
+    paths=$(printf '%s\n' "$list" | perl -e '
+        my ($path, $bare);
+        my $flush = sub { print "$path\n" if defined $path && !$bare; ($path, $bare) = (undef, 0) };
+        while (my $line = <STDIN>) {
+            chomp $line;
+            if ($line =~ /\Aworktree (.+)\z/) { $flush->(); $path = $1 }
+            elsif ($line eq "bare") { $bare = 1 }
+        }
+        $flush->();
+    ') || return 2
+    ic=$(git config --get core.ignorecase 2>/dev/null)
+    while IFS= read -r p; do
+        [ -n "$p" ] && [ -d "$p" ] || continue
+        hash=$(_kp_norm_with "$ic" "$p" | git hash-object --stdin) || return 2
+        out+="$p"$'\t'"${hash:0:12}"$'\n'
+        [ "${hash:0:12}" = "$me" ] && found=1
+    done <<<"$paths"
+    [ "$found" = 1 ] || return 2
+    printf '%s' "$out"
+}
+
+# 記録の作業フォルダが無くなったか: kp_folder_gone <作業フォルダ> <鍵> [<kp_live_folders の出力>]
+# 残っている作業フォルダの一覧(kp_live_folders)に、記録の作業フォルダか鍵のどちらも当たらなければ、
+# 無くなったとみなす(session.sh の prune と同じ判定)。一覧を3つ目の引数で渡せば、一覧を取り直さない。
+# 終了コード: 0(無くなった)、1(残っている。作業フォルダも鍵も空のときも1)、2(一覧を取れない)。
+kp_folder_gone() {
+    local folder="${1:-}" key="${2:-}" live rc ic id p k
+    [ -n "$folder" ] || [ -n "$key" ] || return 1
+    if [ $# -ge 3 ]; then
+        live=$3
+    else
+        live=$(kp_live_folders)
+        rc=$?
+        [ "$rc" = 69 ] && exit 69
+        [ "$rc" = 0 ] || return 2
+    fi
+    # 一覧には必ずいまの作業フォルダが入るので、空の一覧では判定しない
+    [ -n "$live" ] || return 2
+    ic=$(git config --get core.ignorecase 2>/dev/null)
+    id=$(_kp_norm_with "$ic" "$folder")
+    while IFS=$'\t' read -r p k; do
+        [ -n "$p" ] || [ -n "$k" ] || continue
+        [ -n "$folder" ] && [ "$(_kp_norm_with "$ic" "$p")" = "$id" ] && return 1
+        [ -n "$key" ] && [ "$k" = "$key" ] && return 1
+    done <<<"$live"
+    return 0
+}
+
 # JSON の1つのキーの値を出す。文字列と数はそのまま、真偽は true/false、配列と表は JSON で出す。
 # キーが無ければ何も出さない。ファイルが無いか読めなければ終了コード1。
 kp_json_get() {
@@ -201,6 +266,9 @@ _kp_write_owner() { # <枠のディレクトリ> <種類> <説明> <作業フォ
 }
 
 # 枠 k が取り戻しの条件に当たるかを確かめ、当たれば(ui なら枠のコンテナを消してから)取り戻す。
+# 条件: check は始めて120秒より長く、枠のラベルの動いているコンテナが無いとき。
+#       ui は持ち主のセッションの記録が無いときと、記録の作業フォルダが無くなっているとき(kp_folder_gone)。
+#       ui の枠のコンテナを docker rm -f で消せなければ取り戻さない。
 # 取り戻したら終了コード0。
 _kp_reclaim_one() { # <記録の置き場所> <k>
     local state="$1" k="$2" dir owner kind started sid now ids before trash
@@ -222,7 +290,12 @@ _kp_reclaim_one() { # <記録の置き場所> <k>
     before=$(cat "$owner" 2>/dev/null)
     case "$kind" in
         ui)
-            [ -n "$sid" ] && [ -f "$state/sessions/$sid.json" ] && return 1
+            # 持ち主のセッションの記録が残っていれば、記録の作業フォルダが無くなっているときだけ取り戻す
+            # (サブシェルで呼ぶ: 終了コード69で exit しても取り戻しの錠を残さないため)
+            if [ -n "$sid" ] && [ -f "$state/sessions/$sid.json" ]; then
+                ( kp_folder_gone "$(kp_json_get "$state/sessions/$sid.json" folder)" \
+                    "$(kp_json_get "$state/sessions/$sid.json" folder_key)" ) || return 1
+            fi
             ids=$(docker ps -aq --filter "label=keirekipro.slot=$k" --filter label=keirekipro.kind=ui) || return 1
             if [ -n "$ids" ]; then
                 # shellcheck disable=SC2086
