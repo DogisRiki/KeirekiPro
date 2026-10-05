@@ -24,6 +24,12 @@ Codexによるクロスレビュー)で担保する。人間が関与するの�
 Claude は、1つのセッションの中では品質チェックを順に1つずつ動かす。セッションをまたぐ同時実行は `run-check.sh` が設定の数までに抑える。
 `run-check.sh` は、そのセッションの作業フォルダを読み込んだ1回きりのコンテナでコマンドを動かす。
 
+同時に走らせる数は、作業PCごとの設定 `keirekipro.parallelSlots`(初期値1)で決まる。所有者に数を変えるよう頼まれたら、Claude は次の順で設定する。
+
+1. `docker info --format '{{.MemTotal}}'` で Docker に割り当てたメモリ(バイト)を読む
+2. 目安の数を求める。目安は、(割り当てたメモリ − 約1GB)÷ 約4.2GB の小数点以下を切り捨てた数(最小1)。約1GBは共有のサービスの分、約4.2GBは backend の品質チェック1回分
+3. 数と求め方を所有者に示してから、`git config keirekipro.parallelSlots <数>` で設定する
+
 frontend(`/verify-frontend`):
 
 ```
