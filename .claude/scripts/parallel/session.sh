@@ -9,7 +9,7 @@
 #         leftovers        Issue #N の作りかけ(folder is_self kinds branch active_session)
 #         branch_only      Issue #N のブランチのうち、どの作業フォルダでも開かれていないもの(branch where)
 #         capacity         limit(設定の数)と active(ほかに作業中のセッション。issue folder last_seen)
-#       最初に prune を行う。
+#       最初に prune を行う(prune の標準出力は捨て、消せなかった名前などの標準エラーはそのまま出す)。
 #   claim <N> --branch <ブランチ> [--session <ID>]
 #       Issueの記録 issues/<N>.json を書く。すでにあれば folder branch session_id updated_at を書き直す。
 #   end <session_id>
@@ -35,17 +35,23 @@
 #       作業フォルダが無くなった記録と、残った枠と、作業フォルダごとのボリュームと DB を片付け、
 #       片付けたことを標準出力に出す。所有者が手で打っても使える。
 #         最初に git worktree prune を打ち、ディレクトリが消えた worktree を git の記録から外す
-#         sessions/ の記録のうち、folder が無くなったものを消す
-#         issues/<N>.json は、folder が無くなっていても branch がローカルかリモートに残っていれば、
-#           folder と session_id を空にして残す(check-start の branch_only はこれを引く)。branch がどこにも無ければ消す
 #         枠は、lib.sh の取り戻しの条件に当たるものを取り戻す(kp_slot_reclaim)
-#         無くなった作業フォルダの鍵のボリューム(kp-nm-<鍵> kp-gradle-project-<鍵>)と DB(kp_<鍵>)を消す。
-#           Docker につながらなければ何も消さず、消していない名前を標準エラーに出す。
-#           db が動いていなければ DB の片付けだけを飛ばす
+#         sessions/ と issues/ の記録から、folder が無くなったもの(lib.sh の kp_folder_gone)を探し、
+#           無くなった作業フォルダの鍵(セッションの記録の folder_key か、folder から求めた鍵)ごとに、
+#           ラベル keirekipro.folder=<鍵> のコンテナを docker rm -f で消し、owner.json の folder_key が
+#           その鍵の枠を種類によらず取り戻す(コンテナを消せなければ枠は取り戻さない)。
+#           続けてボリューム(kp-nm-<鍵> kp-gradle-project-<鍵>)と DB(kp_<鍵>)を消す
+#         ボリュームと DB を消し終えた鍵の作業フォルダについてだけ、記録を片付ける。
+#           セッションの記録は消す。issues/<N>.json は、branch がローカルかリモートに残っていれば
+#           folder と session_id を空にして残し(check-start の branch_only はこれを引く)、branch がどこにも無ければ消す
+#         消し終えていない鍵(Docker につながらない、db が動いていない、消せなかった)の記録は書き換えずに残し、
+#           消せなかった名前と理由を標準エラーに出す。次の prune がもう一度消しにいく
+#         folder が空の issues/<N>.json は鍵が無いので、鍵の片付けを待たずに同じ規則で扱う
 #
 # セッションのIDは、--session の値か環境変数 KP_SESSION_ID で渡す。どちらも無ければ、
 # いまの作業フォルダのセッションの記録のうち started_at がいちばん古いもの(lib.sh の kp_session_id)。
 # 作業中のセッションは、sessions/ の記録のうち、issues/ に同じ session_id か同じ folder の記録があるもの。
+# ただし、folder の作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は数えない。
 # このスクリプトは所有者とやり取りしない。docker を呼ぶのは prune(片付けるものがあるとき)だけ。
 #
 # 終了コード: 0(成功)、1(takeover が引き継げなかった)、64(呼び方の誤り)、
@@ -97,100 +103,192 @@ _kp_ss_one_line() {
     printf '%s' "${s% }"
 }
 
-# 作業フォルダが無くなった鍵のボリュームと DB を消す。
-# 標準出力の「消した」には実際に消せたものだけを書き、無いもの以外の失敗(使用中など)は名前つきで標準エラーに出す。
-# Docker につながらなければ何も消さず、db が動いていなければ DB の片付けだけを飛ばす。
-# どちらのときも、所有者が手で消すときの名前を標準エラーに出す。
-_kp_ss_remove_folder_data() { # <鍵>...
-    [ $# -gt 0 ] || return 0
-    local key name db out db_up=0 manual_vols="" manual_dbs="" removed=""
-    for key in "$@"; do
-        manual_vols+=" kp-nm-$key kp-gradle-project-$key"
-        manual_dbs+=" kp_$key"
+# 消せなかったボリュームと DB の名前を標準エラーに出し、次の片付けがもう一度消しにいくことを添える
+_kp_ss_report_left() { # <ボリュームの名前(先頭に空白)> <DB の名前(先頭に空白)>
+    local what=""
+    [ -n "$1" ] && what="ボリューム$1"
+    [ -n "$2" ] && what+="${what:+、}DB$2"
+    printf '[parallel] 消せなかった名前: %s。その作業フォルダの記録を残したので、次の片付け(/start のときの check-start か、session.sh prune)が自動でもう一度消しにいく\n' \
+        "$what" >&2
+}
+
+# 鍵のラベル(keirekipro.folder=<鍵>)のコンテナを docker rm -f で消す。
+# 消せなければ、理由を標準出力に出して終了コード1。
+_kp_ss_remove_folder_containers() { # <鍵>
+    local out
+    local -a ids=()
+    out=$(docker ps -aq --filter "label=keirekipro.folder=$1" 2>&1) || {
+        printf '%s' "$out"
+        return 1
+    }
+    # コンテナの ID か名前の形の行だけを使う(注意の文などを混ぜない)
+    mapfile -t ids < <(printf '%s\n' "$out" | tr -d '\r' | grep -E '^[[:alnum:]_.-]+$')
+    [ "${#ids[@]}" -gt 0 ] || return 0
+    out=$(docker rm -f "${ids[@]}" 2>&1) || {
+        printf '%s' "$out"
+        return 1
+    }
+}
+
+# 鍵の作業フォルダが持つ枠を、種類によらず取り戻す。
+# lib.sh の取り戻しと同じ錠を使い、名前を変えてから持ち主を確かめる(確かめている間に取り直された枠を消さないため)。
+_kp_ss_reclaim_key_slots() { # <記録の置き場所> <鍵>
+    local state="$1" key="$2" k dir trash lock
+    [ -d "$state/slots" ] || return 0
+    lock="$state/slots/.reclaim.lock"
+    _kp_lock "$lock" || return 1
+    for k in $(_kp_slot_numbers "$state"); do
+        dir="$state/slots/$k"
+        [ "$(kp_json_get "$dir/owner.json" folder_key 2>/dev/null)" = "$key" ] || continue
+        trash="$state/slots/.reclaim-$k-$$"
+        mv "$dir" "$trash" 2>/dev/null || continue
+        if [ "$(kp_json_get "$trash/owner.json" folder_key 2>/dev/null)" != "$key" ]; then
+            mv -T "$trash" "$dir" 2>/dev/null
+            continue
+        fi
+        rm -rf "$trash"
+        printf '[parallel] 片付け: 作業フォルダが無くなった枠 %s を取り戻した\n' "$k"
     done
+    rmdir "$lock" 2>/dev/null
+    return 0
+}
+
+# 作業フォルダが無くなった鍵ごとに、ラベルのコンテナを消して枠を取り戻し、ボリュームと DB を消す。
+# 消し終えた鍵を _KP_SS_DONE(鍵を改行で挟んで並べた一覧)に入れる。
+# ボリュームは、docker volume rm が成功したときと、ボリュームが無かったときに消し終えたとみなす。
+# DB は、db の中にその DB が無かったときと、DROP DATABASE が成功したときに消し終えたとみなす。
+# Docker につながらないときと db が動いていないときは、消し終えていないとみなす。
+# 標準出力の「消した」には実際に消せたものだけを書き、消せなかった名前と理由は標準エラーに出す。
+_kp_ss_remove_folder_data() { # <記録の置き場所> <鍵>...
+    local state="$1"
+    shift
+    local nl=$'\n' key name db out ok db_up=0 removed="" left_vols="" left_dbs=""
+    _KP_SS_DONE=$nl
+    [ $# -gt 0 ] || return 0
     if ! out=$(docker version --format '{{.Server.Version}}' 2>&1); then
-        printf '[parallel] Docker につながらないので、作業フォルダごとのボリュームと DB を消していない(鍵 %s): %s\n' \
+        for key in "$@"; do
+            left_vols+=" kp-nm-$key kp-gradle-project-$key"
+            left_dbs+=" kp_$key"
+        done
+        printf '[parallel] Docker につながらないので、作業フォルダごとのコンテナとボリュームと DB を消していない(鍵 %s): %s\n' \
             "$*" "$(_kp_ss_one_line "$out")" >&2
-        printf '[parallel] 手で消すときの名前: ボリューム%s、DB%s\n' "$manual_vols" "$manual_dbs" >&2
+        _kp_ss_report_left "$left_vols" "$left_dbs"
         return 0
     fi
+    out=$(docker compose -p keirekipro ps --status running -q db 2>/dev/null) && [ -n "$out" ] && db_up=1
+    [ "$db_up" = 1 ] || printf '[parallel] db が動いていないので、DB を消していない\n' >&2
     for key in "$@"; do
+        ok=1
+        # 先にコンテナを消す(ボリュームを使っているコンテナが残っていると消せないため)
+        if out=$(_kp_ss_remove_folder_containers "$key"); then
+            _kp_ss_reclaim_key_slots "$state" "$key"
+        else
+            printf '[parallel] 作業フォルダ(鍵 %s)のコンテナを消せないので、その鍵の枠を取り戻していない: %s\n' \
+                "$key" "$(_kp_ss_one_line "$out")" >&2
+        fi
         for name in "kp-nm-$key" "kp-gradle-project-$key"; do
             if out=$(docker volume rm "$name" 2>&1); then
                 removed+=" $name"
             else
                 case "$out" in
                     *[Nn]o\ such\ volume*) ;;
-                    *) printf '[parallel] ボリューム %s を消せない: %s\n' "$name" "$(_kp_ss_one_line "$out")" >&2 ;;
+                    *)
+                        printf '[parallel] ボリューム %s を消せない: %s\n' "$name" "$(_kp_ss_one_line "$out")" >&2
+                        left_vols+=" $name"
+                        ok=0
+                        ;;
                 esac
             fi
         done
-    done
-    out=$(docker compose -p keirekipro ps --status running -q db 2>/dev/null) && [ -n "$out" ] && db_up=1
-    if [ "$db_up" = 1 ]; then
-        for key in "$@"; do
-            db="kp_$key"
-            if ! out=$(docker compose -p keirekipro exec -T db psql -U postgres -tAc \
-                "SELECT 1 FROM pg_database WHERE datname='$db'" 2>&1); then
-                printf '[parallel] DB %s があるかを確かめられない: %s\n' "$db" "$(_kp_ss_one_line "$out")" >&2
-                continue
-            fi
-            [ "$(_kp_ss_one_line "$out")" = 1 ] || continue
+        db="kp_$key"
+        if [ "$db_up" != 1 ]; then
+            left_dbs+=" $db"
+            ok=0
+        elif ! out=$(docker compose -p keirekipro exec -T db psql -U postgres -tAc \
+            "SELECT 1 FROM pg_database WHERE datname='$db'" 2>&1); then
+            printf '[parallel] DB %s があるかを確かめられない: %s\n' "$db" "$(_kp_ss_one_line "$out")" >&2
+            left_dbs+=" $db"
+            ok=0
+        elif [ "$(_kp_ss_one_line "$out")" = 1 ]; then
             if out=$(docker compose -p keirekipro exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS $db" 2>&1); then
                 removed+=" $db"
             else
                 printf '[parallel] DB %s を消せない: %s\n' "$db" "$(_kp_ss_one_line "$out")" >&2
+                left_dbs+=" $db"
+                ok=0
             fi
-        done
-    else
-        printf '[parallel] db が動いていないので、DB を消していない(手で消すときの名前: DB%s)\n' "$manual_dbs" >&2
-    fi
+        fi
+        [ "$ok" = 1 ] && _KP_SS_DONE+="$key$nl"
+    done
     if [ -n "$removed" ]; then
         printf '[parallel] 片付け: 作業フォルダごとのボリュームと DB を消した:%s\n' "$removed"
     fi
+    if [ -n "$left_vols$left_dbs" ]; then
+        _kp_ss_report_left "$left_vols" "$left_dbs"
+    fi
+    return 0
+}
+
+# 作業フォルダが無くなった1つの記録を片付ける
+#   S: セッションの記録を消す
+#   I: Issueの記録は、branch がローカルかリモートに残っていれば folder と session_id を空にして残し、
+#      どこにも無ければ消す。調べている間に別のセッションが書き直した記録(folder が変わったもの)は変えない
+_kp_ss_tidy_record() { # <S|I> <ファイル> <folder> <branch> <session_id>
+    local cur
+    case "$1" in
+        S)
+            rm -f "$2" && printf '[parallel] 片付け: セッションの記録 %s を消した\n' "${2##*/}"
+            ;;
+        I)
+            cur=$(kp_json_get "$2" folder) || return 0
+            [ "$cur" = "$3" ] || return 0
+            if [ -n "$4" ] && { git show-ref --verify --quiet "refs/heads/$4" \
+                || git show-ref --verify --quiet "refs/remotes/origin/$4"; }; then
+                [ -n "$3$5" ] || return 0
+                kp_json_write "$2" folder= session_id= \
+                    || _kp_die69 "[parallel] Issueの記録 $2 を書けない"
+                printf '[parallel] 片付け: Issueの記録 %s の作業フォルダを空にした(ブランチが残っている)\n' "${2##*/}"
+            else
+                rm -f "$2" && printf '[parallel] 片付け: Issueの記録 %s を消した\n' "${2##*/}"
+            fi
+            ;;
+    esac
+    return 0
 }
 
 # 作業フォルダが無くなった記録と、残った枠と、作業フォルダごとのボリュームと DB を片付ける。
 # 片付けたことを標準出力に出す(check-start から呼ぶときは捨てる)。
 kp_session_prune() {
     [ $# -eq 0 ] || _kp_ss_usage "prune は引数を取らない"
-    local nl=$'\n'
-    # alive_keys と seen は、鍵を改行で挟んで並べた一覧(連想配列を使わない)
-    local state ic p key alive="" alive_keys="$nl" seen="$nl" actions kind file old value cur
-    local -a keys=() folders=() gone=()
+    local nl=$'\n' sep=$'\x1f'
+    # gone_keys は、鍵を改行で挟んで並べた一覧(連想配列を使わない)
+    local state alive rc records kind file f b sid key entry gone_keys="$nl"
+    local -a gone=() pending=()
     state=$(kp_state_dir) || exit $?
-    ic=$(git config --get core.ignorecase 2>/dev/null)
 
     # ディレクトリが消えた worktree を git の記録から外す(そのブランチを開けるようにする)
     git worktree prune 2>/dev/null
 
-    # 残っている作業フォルダと鍵
-    while IFS= read -r p; do
-        key=$(_kp_ss_key_of "$p") || continue
-        alive+="$p"$'\t'"$key"$'\n'
-        alive_keys+="$key$nl"
-    done < <(_kp_ss_worktree_paths)
-    # 作業フォルダの一覧を取れなかったとき(いまの作業フォルダが一覧に無いとき)は、
+    # 残っている作業フォルダと鍵。一覧を取れなかったとき(いまの作業フォルダが一覧に無いときも)は、
     # 残っている作業フォルダの記録まで消さないよう、何もせずに終わる
-    key=$(kp_folder_key) || exit $?
-    case "$alive_keys" in
-        *"$nl$key$nl"*) ;;
+    alive=$(kp_live_folders)
+    rc=$?
+    case "$rc" in
+        0) ;;
+        69) exit 69 ;;
         *)
             printf '[parallel] 片付けを飛ばした: 作業フォルダの一覧(git worktree list)を取れない\n' >&2
             return 0
             ;;
     esac
 
-    # 記録を調べ、片付けを1行ずつ出す(perl は記録を書き換えない)
-    #   session <ファイル>          セッションの記録を消す
-    #   clear <ファイル> <folder>   Issueの記録の folder と session_id を空にする
-    #   drop <ファイル> <folder>    Issueの記録を消す
-    #   key <鍵> / folder <パス>    無くなった作業フォルダ
-    actions=$(printf '%s' "$alive" | perl -MJSON::PP -e '
+    # 記録を1行ずつ出す(perl は記録を読むだけ。欄は \x1f で区切る)
+    #   S <ファイル> <folder> <folder_key>
+    #   I <ファイル> <folder> <branch> <session_id>
+    records=$(perl -MJSON::PP -e '
         use strict; use warnings;
-        my ($state, $ic) = @ARGV;
+        my ($state) = @ARGV;
         my $json = JSON::PP->new->utf8;
-        sub norm { my $p = $_[0] // ""; $p =~ tr/A-Z/a-z/ if $ic eq "true"; $p }
         sub str { my $v = $_[0]; defined $v && !ref $v ? $v : "" }
         sub load {
             open my $fh, "<:raw", $_[0] or return undef;
@@ -198,17 +296,7 @@ kp_session_prune() {
             my $d = eval { $json->decode($text) };
             return ref $d eq "HASH" ? $d : undef;
         }
-        sub out { my $line = join("\t", @_) . "\n"; utf8::encode($line) if utf8::is_utf8($line); print $line }
-        sub has_ref { system("git", "show-ref", "--verify", "--quiet", $_[0]) == 0 }
-        my (%alive_id, %alive_key);
-        while (my $line = <STDIN>) {
-            chomp $line;
-            utf8::decode($line);
-            my ($p, $k) = split /\t/, $line, 2;
-            next unless defined $k;
-            $alive_id{ norm($p) } = 1;
-            $alive_key{$k} = 1;
-        }
+        sub out { my $line = join("\x1f", @_) . "\n"; utf8::encode($line) if utf8::is_utf8($line); print $line }
         sub files {
             my $dir = shift;
             opendir my $dh, $dir or return ();
@@ -216,69 +304,68 @@ kp_session_prune() {
         }
         for my $file (files("$state/sessions")) {
             my $d = load($file) or next;
-            my $f = str($d->{folder});
-            my $k = str($d->{folder_key});
-            next unless length $f || length $k;
-            next if (length $f && $alive_id{ norm($f) }) || (length $k && $alive_key{$k});
-            out("session", $file);
-            if (length $k) { out("key", $k) } else { out("folder", $f) }
+            out("S", $file, str($d->{folder}), str($d->{folder_key}));
         }
         for my $file (files("$state/issues")) {
             my $d = load($file) or next;
-            my $f = str($d->{folder});
-            next if length $f && $alive_id{ norm($f) };
-            out("folder", $f) if length $f;
-            my $b = str($d->{branch});
-            my $kept = length $b && (has_ref("refs/heads/$b") || has_ref("refs/remotes/origin/$b"));
-            if ($kept) {
-                out("clear", $file, $f) if length $f || length str($d->{session_id});
-            } else {
-                out("drop", $file, $f);
-            }
+            out("I", $file, str($d->{folder}), str($d->{branch}), str($d->{session_id}));
         }
-    ' -- "$state" "$ic") || _kp_die69 "[parallel] 記録を読めない: $state"
+    ' -- "$state") || _kp_die69 "[parallel] 記録を読めない: $state"
 
-    while IFS=$'\t' read -r kind file old; do
+    # 作業フォルダが無くなった記録と、その鍵を集める。Issueの記録の handed_over_from からは鍵を求めない
+    while IFS="$sep" read -r -u 3 kind file f b sid; do
         case "$kind" in
-            session)
-                rm -f "$file" && printf '[parallel] 片付け: セッションの記録 %s を消した\n' "${file##*/}"
+            S)
+                # b はセッションの記録の folder_key
+                kp_folder_gone "$f" "$b" "$alive" || continue
+                key=$b
+                [ -n "$key" ] || key=$(_kp_ss_key_of "$f") || continue
                 ;;
-            clear | drop)
-                # 調べている間に別のセッションが書き直した記録は変えない
-                cur=$(kp_json_get "$file" folder) || continue
-                [ "$cur" = "$old" ] || continue
-                if [ "$kind" = clear ]; then
-                    kp_json_write "$file" folder= session_id= \
-                        || _kp_die69 "[parallel] Issueの記録 $file を書けない"
-                    printf '[parallel] 片付け: Issueの記録 %s の作業フォルダを空にした(ブランチが残っている)\n' "${file##*/}"
-                else
-                    rm -f "$file" && printf '[parallel] 片付け: Issueの記録 %s を消した\n' "${file##*/}"
+            I)
+                if [ -z "$f" ]; then
+                    # folder が空のIssueの記録は鍵が無いので、鍵の片付けを待たずに扱う
+                    _kp_ss_tidy_record I "$file" "" "$b" "$sid"
+                    continue
                 fi
+                kp_folder_gone "$f" "" "$alive" || continue
+                key=$(_kp_ss_key_of "$f") || continue
                 ;;
-            key) keys+=("$file") ;;
-            folder) folders+=("$file") ;;
+            *) continue ;;
         esac
-    done <<<"$actions"
+        # 鍵の形(16進の12文字)でない記録は、消すボリュームと DB の名前が無いので、そのまま片付ける
+        if ! [[ "$key" =~ ^[0-9a-f]{12}$ ]]; then
+            _kp_ss_tidy_record "$kind" "$file" "$f" "$b" "$sid"
+            continue
+        fi
+        case "$gone_keys" in
+            *"$nl$key$nl"*) ;;
+            *)
+                gone_keys+="$key$nl"
+                gone+=("$key")
+                ;;
+        esac
+        pending+=("$key$sep$kind$sep$file$sep$f$sep$b$sep$sid")
+    done 3<<<"$records"
 
-    # 枠は lib.sh の取り戻しの条件で取り戻す(消えた作業フォルダの ui のコンテナもここで消える)
+    # 枠は lib.sh の取り戻しの条件で取り戻す
     kp_slot_reclaim || true
 
-    for value in "${folders[@]}"; do
-        key=$(_kp_ss_key_of "$value") && keys+=("$key")
+    # 鍵ごとにコンテナを消して枠を取り戻し、ボリュームと DB を消す
+    _kp_ss_remove_folder_data "$state" "${gone[@]}"
+
+    # ボリュームと DB を消し終えた鍵の作業フォルダについてだけ、記録を片付ける。
+    # 消し終えていない鍵の記録は書き換えずに残す(次の prune がもう一度消しにいく)
+    for entry in "${pending[@]}"; do
+        IFS="$sep" read -r key kind file f b sid <<<"$entry"
+        case "$_KP_SS_DONE" in
+            *"$nl$key$nl"*) _kp_ss_tidy_record "$kind" "$file" "$f" "$b" "$sid" ;;
+        esac
     done
-    for key in "${keys[@]}"; do
-        # 鍵の形(16進の12文字)でないものは名前に使わない
-        [[ "$key" =~ ^[0-9a-f]{12}$ ]] || continue
-        case "$alive_keys$seen" in *"$nl$key$nl"*) continue ;; esac
-        seen+="$key$nl"
-        gone+=("$key")
-    done
-    _kp_ss_remove_folder_data "${gone[@]}"
     return 0
 }
 
 kp_session_check_start() {
-    local n="" session="" state sid limit me key ic
+    local n="" session="" state sid limit me key ic alive rc file gone_sessions=""
     while [ $# -gt 0 ]; do
         case "$1" in
             --session)
@@ -304,9 +391,22 @@ kp_session_check_start() {
     key=$(kp_folder_key) || exit $?
     ic=$(git config --get core.ignorecase 2>/dev/null)
 
+    # 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は作業中に数えない。
+    # 作業フォルダの一覧を取れないときは、どの記録も無くなったとはみなさない(作業中のセッションを見落とさないため)
+    alive=$(kp_live_folders)
+    rc=$?
+    [ "$rc" = 69 ] && exit 69
+    if [ "$rc" = 0 ]; then
+        for file in "$state"/sessions/*.json; do
+            [ -f "$file" ] || continue
+            kp_folder_gone "$(kp_json_get "$file" folder)" "$(kp_json_get "$file" folder_key)" "$alive" \
+                && gone_sessions+="${file##*/}"$'\n'
+        done
+    fi
+
     perl -MJSON::PP -e '
         use strict; use warnings;
-        my ($state, $n, $sid, $limit, $me, $me_key, $ic) = @ARGV;
+        my ($state, $n, $sid, $limit, $me, $me_key, $ic, $gone_list) = @ARGV;
         utf8::decode($_) for ($state, $sid, $me);
         my $json = JSON::PP->new->utf8;
 
@@ -317,12 +417,15 @@ kp_session_check_start() {
             my $d = eval { $json->decode($text) };
             return ref $d eq "HASH" ? $d : undef;
         }
+        # 作業フォルダが無くなったセッションの記録のファイル名
+        my %gone_session = map { ($_ => 1) } grep { length } split /\n/, $gone_list;
         sub load_dir {
-            my $dir = shift;
+            my ($dir, $skip) = @_;
             opendir my $dh, $dir or return ();
             my @out;
             for my $name (sort readdir $dh) {
                 next unless $name =~ /\.json\z/;
+                next if $skip && $skip->{$name};
                 my $d = load("$dir/$name") or next;
                 push @out, $d;
             }
@@ -370,7 +473,7 @@ kp_session_check_start() {
         }
         @worktrees = grep { !$_->{bare} && -d $_->{path} } @worktrees;
 
-        my @sessions = load_dir("$state/sessions");
+        my @sessions = load_dir("$state/sessions", \%gone_session);
         my @issues = load_dir("$state/issues");
         my $iss = load("$state/issues/$n.json");
 
@@ -468,7 +571,7 @@ kp_session_check_start() {
             branch_only => \@branch_only,
             capacity => { limit => $limit + 0, active => \@active },
         }), "\n";
-    ' -- "$state" "$n" "$sid" "$limit" "$me" "$key" "$ic" || exit 69
+    ' -- "$state" "$n" "$sid" "$limit" "$me" "$key" "$ic" "$gone_sessions" || exit 69
 }
 
 kp_session_claim() {
