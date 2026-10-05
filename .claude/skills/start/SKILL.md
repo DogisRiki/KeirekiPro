@@ -38,6 +38,40 @@ gh issue view <N> --json number,title,body,state,url,parent,subIssues,subIssuesS
 - `state` が `OPEN` でないとき(閉じたIssue)は、AIは着手せず、そのIssueが閉じていることを所有者に伝えて終える
 - それ以外の理由で gh の問い合わせに失敗したとき(認証やネットワークの失敗など)は、AIは進め方を判断せず、問い合わせに失敗したことと gh のエラーの文面を所有者に伝えて終える。推測で進めない
 
+### Step 1.5: ほかのセッションとIssueの作りかけを調べる
+
+AIは、同じ作業フォルダで作業中のほかのセッションと、Issue #N の作りかけ(spec、ブランチ、コミットしていない変更)が残っていないかを調べる。調べ終わるまで、AIは spec もブランチも作らない。
+
+1. AIは、このセッションのIDを、会話の始めに SessionStart のフックが渡した `[parallel] このセッションのID: <ID>(並行作業のスクリプトに --session で渡す)` の文から取る。文が見つからなければ、AIは、この Step と Step 7 で呼ぶ `session.sh` のどのサブコマンドにも `--session <ID>` を付けずに呼ぶ
+2. AIは次のコマンドで調べる。標準出力に JSON が1行出る。`check-start` は最初に片付け(`prune`)を行うので、終了コード0でも、片付けられなかったものの文が標準エラーに出ることがある。AIは、その文を JSON として読まない
+
+   ```bash
+   bash .claude/scripts/parallel/session.sh check-start <N> --session <ID>
+   ```
+
+   終了コードが0でないとき(64 は呼び方の誤り、69 は git のリポジトリの外・設定の値の誤り・記録を書けない)は、AIは着手せず、終了コードと標準エラーの文を所有者に伝えて止まる。推測で進めない
+3. AIは、JSON の欄ごとに、次の表で所有者に出す問いと、答えに応じて呼ぶサブコマンドを決める。表の `session.sh` は `bash .claude/scripts/parallel/session.sh` を指し、どのサブコマンドにも1で取ったIDを `--session <ID>` で付ける(`end` は除く)
+
+| JSON の欄 | AIが所有者に出す問い | 答えに応じて呼ぶサブコマンド |
+|---|---|---|
+| `folder_conflict` が空でない | やめたか | 「やめた」なら `session.sh end <ID>`(`<ID>` は要素の `session_id`) |
+| `leftovers` の要素で `is_self` が真 | 続きから進めるか | 「進める」なら `session.sh takeover <N> --from <いまの作業フォルダ>`(要素の `folder` と同じ) |
+| `leftovers` の要素で `is_self` が偽、`active_session` が `null` でない | やめたか | 「やめた」なら `session.sh takeover <N> --from <folder>` |
+| `leftovers` の要素で `is_self` が偽、`active_session` が `null` | 続きから進めるか | 「進める」なら `session.sh takeover <N> --from <folder>` |
+| `branch_only` が空でない | ブランチ <branch> の続きから進めるか | 「進める」なら `session.sh takeover <N> --branch <branch>` |
+| `capacity.active` の数が `capacity.limit` 以上 | 問いは出さない | なし |
+
+- AIは、表の上の行から順に扱う。`folder_conflict` を、Issueの作りかけ(`leftovers` と `branch_only`)より先に扱う
+- 問いを出すときは、AIは止まって所有者の答えを待つ。問いには、相手のセッションか作りかけを特定できることを添える。`folder_conflict` では、要素の `session_id` と、`started_at`(始めた時刻)と `last_seen`(最後に操作された時刻)を読める日時にしたもの。`leftovers` では、作りかけが残っている作業フォルダの場所(`folder`)、作りかけの種類(`kinds`)、ブランチ(`branch`)、その作業フォルダで作業中のセッションがあるかどうか(`active_session`)。`branch_only` では、残っているブランチの名前(`branch`)
+- `folder_conflict` の問いには、同じ作業フォルダで別のセッションが作業中であることと、そのセッションをやめていないなら worktree を選んでセッションを開き直してほしいことを添える。要素が複数あるときは、要素ごとに尋ねる
+- `leftovers` の要素が複数あるときは、AIはすべての場所を示したうえで、要素ごとに1つずつ尋ねる
+- 所有者が問いに「やめた」「進める」以外で答えたら(「まだ進めている」「進めない」など)、AIはこのセッションではIssue #N の作業をせず、spec もブランチも作らずに止まる。止まるときは、`folder_conflict` では worktree を選んでセッションを開き直すよう、`leftovers` では作りかけが残っている作業フォルダの場所を、`branch_only` では残っているブランチの名前を、所有者に示す
+- `end` か `takeover` を呼んだら、AIは結果を示してから `check-start` を呼び直し、残りの欄を同じ表で扱う。`takeover` が終了コード0で終わったときは、標準出力の、写したファイル(いまの作業フォルダのまま引き継いだときは作りかけ)の一覧と、いまのブランチを示す。標準エラーに注意の文が出ていれば、それも示す
+- このセッションの Step 1.5 で `takeover` が終了コード0で終わったあとに呼び直した `check-start` に、`is_self` が真の要素(引き継いだいまの作業フォルダ)が出ても、AIは尋ね直さず、引き継いだものとして扱う。セッションのIDが無いと(`--session` を付けずに呼び、いまの作業フォルダのセッションの記録も無いとき)、`check-start` は自分の作りかけを除けず、引き継いだ作りかけを `is_self` の要素として出し続けるためである
+- `end` か `takeover` が0でない終了コードで終わったら、AIは先へ進まず、終了コードと標準エラーの文を所有者に伝えて止まる。`takeover` は、引き継げなかったときに終了コード1で終わり、引き継げなかった理由と、あれば次の手を `[parallel] 引き継げない:` で始まる文で標準エラーに出す
+- `capacity.active` の数が `capacity.limit` 以上のときは、AIは着手を続けたうえで、セッションが埋まっていることを所有者に報告する。報告には、`capacity.active` の要素の `issue`(作業中のセッションのIssueの番号)と、このセッションの品質チェックと画面確認が順番待ちになることがあることを含める
+- `check-start` の `folder_conflict` `leftovers` `branch_only` がすべて空のとき(呼び直したときも含む。上の箇条で引き継いだものとして扱う `is_self` の要素は、無いものとみなす)は、AIは `capacity` の行を扱ってから Step 2 へ進む。引き継いだときは、Step 2 以降が、引き継いだ spec の進み具合と次の手順を所有者に示す
+
 ### Step 2: 対応する spec を探す
 
 AIは `.kiro/specs/*/spec.json` のうち、`issue` が N のもの、または `additional_issues` に N を含むものを探す。
@@ -130,6 +164,7 @@ AIは、決めた判断を次の書式で所有者に示す。
 - 理由の表には、4つの観点すべてを、当たるか当たらないかと根拠を添えて書く。当たらない観点も省かない
 - 根拠には、AIが調べたファイルと行(例: `.claude/skills/ship/SKILL.md` L42)、またはIssue本文の見出しを書く
 - 判断が「spec <feature> を直す」のときは、「してほしいこと」に、コマンドを打つと取り消される承認の段階(その spec の spec.json で承認済みになっている要件・設計・タスクのうちのどれか)を添える
+- 判断が「新しい spec を作る」「spec <feature> を直す」のときは、AIは、コマンドを打つよう依頼するこの報告を示す前に、Step 7 の「spec を作らずに実装する」の手順1と同じく、ブランチを作って記録する。ブランチを作らずに止まったときは、AIはコマンドを打つ依頼を出さず、止まった理由を所有者に伝える
 - 専門用語を使わず、主語(所有者・AI)を立てた文で書く。「誰が」「どれを」するのかを、文ごとに分かるようにする
 
 ### Step 7: 判断ごとに進む
@@ -140,18 +175,19 @@ AIは、Step 6 で示した判断に応じて、次のとおり進む。どの�
 
 AIは、判断を示したら、所有者の返事を待たずに実装を始める。
 
-1. AIは `.branch_name_template` に従って、最新の main からブランチを作る。`git fetch origin` を実行してから、`git switch --no-track -c <type>/<short-description> origin/main` で作る。いまいるブランチから作らない(別の feature ブランチにいるときに `/start` を打たれると、そのブランチのコミットを引き継いでしまうため)。git が管理しているファイルにコミットしていない変更があるとき(`git status --porcelain --untracked-files=no` の出力があるとき)は、AIはブランチを作らず、そのことを所有者に伝えて止まる(`origin/main` から作っても、コミットしていない変更は新しいブランチへ持ち越され、持ち越せないときは `git switch` が失敗するため)。git が管理していないファイル(別の会話が作りかけの spec のフォルダなど)は、この判定に含めない
+1. AIは `.branch_name_template` に従って、最新の main からブランチを作る。`git fetch origin` を実行してから、`git switch --no-track -c <type>/<short-description> origin/main` で作る。いまいるブランチから作らない(別の feature ブランチにいるときに `/start` を打たれると、そのブランチのコミットを引き継いでしまうため)。git が管理しているファイルにコミットしていない変更があるとき(`git status --porcelain --untracked-files=no` の出力があるとき)は、AIはブランチを作らず、そのことを所有者に伝えて止まる(`origin/main` から作っても、コミットしていない変更は新しいブランチへ持ち越され、持ち越せないときは `git switch` が失敗するため)。git が管理していないファイルは、この判定に含めない。ブランチを作ったら、AIはすぐに `bash .claude/scripts/parallel/session.sh claim <N> --branch <作ったブランチ> --session <ID>` を呼び、Issue #N のブランチとして記録する(`--session` は Step 1.5 の1のとおりに付ける)。`claim` が0でない終了コードで終わったら、AIは先へ進まず、終了コードと標準エラーの文を所有者に伝えて止まる
+   - Step 1.5 で引き継いだ(`session.sh takeover` を呼んだ)あとで、いまのブランチ(`git branch --show-current` の出力)が、Issueの記録 `issues/<N>.json` の `branch` と同じときは、AIはこの手順1を丸ごと飛ばす。新しいブランチを作らず、`session.sh claim` も呼ばずに、いまのブランチで進む。引き継いだブランチのコミットを置き去りにしないためである。Issueの記録は、`git rev-parse --path-format=absolute --git-common-dir` の出力のディレクトリの下の `keirekipro-parallel/issues/<N>.json` にある。記録が無いとき、または記録の `branch` が空のときは、同じとはみなさず、この手順1のとおり新しいブランチを作る
 2. AIはIssueの本文のとおりに実装する。実装の途中は、「途中で見立てが外れたとき」の見直しの時点で、4つの観点を当て直す
 3. AIは `/verify-all` の手順で、変更した領域の verify を通す
 4. AIは `/ship` を自分で実行して出荷する。所有者に `/ship` を打つよう頼まない
 
 **新しい spec を作る**
 
-AIは、所有者に `/kiro-spec-init #<N>` を打つよう依頼して終える。所有者がコマンドを打つまで、AIは実装を始めない。
+AIは、依頼の前に、「spec を作らずに実装する」の手順1と同じく、最新の main からブランチを作り、`session.sh claim` で記録する。引き継いだあとで手順1を丸ごと飛ばす決まりも、ここに当てはめる。続けて、AIは、所有者に `/kiro-spec-init #<N>` を打つよう依頼して終える。所有者がコマンドを打つまで、AIは実装を始めない。
 
 **spec <feature> を直す**
 
-AIは、所有者に `/kiro-spec-init #<N> <feature>` を打つよう依頼して終える。依頼には、コマンドを打つと取り消される承認の段階を添える。取り消される段階は、その spec の spec.json の `approvals` で承認済み(`approved` が true)になっている要件・設計・タスクである。所有者がコマンドを打つまで、AIは実装を始めない。
+AIは、依頼の前に、「spec を作らずに実装する」の手順1と同じく、最新の main からブランチを作り、`session.sh claim` で記録する。引き継いだあとで手順1を丸ごと飛ばす決まりも、ここに当てはめる。続けて、AIは、所有者に `/kiro-spec-init #<N> <feature>` を打つよう依頼して終える。依頼には、コマンドを打つと取り消される承認の段階を添える。取り消される段階は、その spec の spec.json の `approvals` で承認済み(`approved` が true)になっている要件・設計・タスクである。所有者がコマンドを打つまで、AIは実装を始めない。
 
 **すでに spec がある機能を spec 無しで直す**
 
