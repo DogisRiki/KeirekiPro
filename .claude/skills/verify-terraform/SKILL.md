@@ -38,7 +38,7 @@ bash .claude/scripts/parallel/run-check.sh terraform checkov -d .
 
 ## Rules
 
-- **`terraform apply` を実行しない**(applyは人間が手動実行するワークフローのみ。permissions/denyでもブロックされる)
+- **`terraform apply` を実行しない**(applyは人間が手動実行するワークフローのみ。設定の禁止の一覧は打ち方によっては当たらないので、Claude はこの決まりを自分で守る)
 - checkovの指摘を `.checkov.yaml` のskip追加で消さない。設定変更が必要なときは理由を添えて人間に提案する
 - checkovが失敗したら、それは `terraform/.checkov.baseline` に無い新規の指摘なので直す。
   **baselineを作り直して消さない。** `.checkov.yaml` の `baseline:` が有効なまま
