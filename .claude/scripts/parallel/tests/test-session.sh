@@ -4,6 +4,7 @@
 #
 # 実行: bash .claude/scripts/parallel/tests/test-session.sh
 # 一時的な git のリポジトリ(本体)と worktree を2つ(prune のテストではもう1つ)作り、その中で session.sh を呼ぶ。
+# takeover --branch のテストでは、一時的な裸のリポジトリをリモート origin にする。
 # docker は、呼ばれた引数を記録するだけの偽物(PATH の先頭に置く)に差し替える。
 # 本物のリポジトリの記録(.git/keirekipro-parallel)と git の設定には触れない。
 # 前提: bash・perl(JSON::PP)・git。ホストの Git Bash から流す。
@@ -71,6 +72,8 @@ WT_DIR="$WORK/RepoWT"
 WT2_DIR="$WORK/RepoWT2"
 # prune のテストで作って消す worktree
 WT3_DIR="$WORK/RepoWT3"
+# takeover --branch のテストで作るリモート(裸のリポジトリ)
+ORIGIN_DIR="$WORK/origin.git"
 GITC=(-c user.name=t -c user.email=t@example.com -c commit.gpgsign=false)
 git init -q "$MAIN_DIR"
 git -C "$MAIN_DIR" checkout -q -B main
@@ -139,6 +142,9 @@ reset_state() {
     local d b
     rm -rf "$STATE"
     git -C "$MAIN_DIR" config --unset keirekipro.parallelSlots 2>/dev/null
+    # takeover のテストで足したリモートを外す
+    git -C "$MAIN_DIR" remote remove origin 2>/dev/null
+    rm -rf "$ORIGIN_DIR"
     # prune のテストで作った worktree を外す
     git -C "$MAIN_DIR" worktree remove --force "$WT3_DIR" 2>/dev/null
     rm -rf "$WT3_DIR"
@@ -147,14 +153,18 @@ reset_state() {
         git -C "$d" reset -q --hard
         git -C "$d" clean -fdq
     done
-    # ブランチを最初のコミットに戻す(前のテストのコミットを持ち越さない)
+    # ブランチを最初のコミットに戻す(前のテストのコミットを持ち越さない)。
+    # takeover のテストでブランチが別の作業フォルダに移っていることがあるので、先にすべて手放させる
+    for d in "$MAIN_DIR" "$WT_DIR" "$WT2_DIR"; do
+        git -C "$d" switch -q --detach 2>/dev/null
+    done
     git -C "$MAIN_DIR" switch -q main 2>/dev/null
     git -C "$WT_DIR" switch -q feat/wt 2>/dev/null
     git -C "$WT2_DIR" switch -q feat/wt2 2>/dev/null
     for d in "$MAIN_DIR" "$WT_DIR" "$WT2_DIR"; do
         git -C "$d" reset -q --hard "$SEED_SHA"
     done
-    for b in $(git -C "$MAIN_DIR" for-each-ref --format='%(refname)' refs/remotes refs/heads/feat/extra); do
+    for b in $(git -C "$MAIN_DIR" for-each-ref --format='%(refname)' refs/remotes 'refs/heads/feat/extra*'); do
         git -C "$MAIN_DIR" update-ref -d "$b"
     done
     : >"$FAKE_DOCKER_LOG"
@@ -675,6 +685,275 @@ t_no_docker_in_check_start() {
     [ ! -s "$FAKE_DOCKER_LOG" ] || die "docker が呼ばれた: $(cat "$FAKE_DOCKER_LOG")"
 }
 
+# =====================================================================
+# takeover(要件1.1・1.2・4.3〜4.6)
+# =====================================================================
+# 作業フォルダのいまのブランチ(detached なら空)
+cur_branch() { git -C "$1" symbolic-ref -q --short HEAD; }
+# 作業フォルダのコミットしていない変更と git の管理外のファイル
+wt_status() { git -C "$1" status --porcelain --untracked-files=all; }
+# Issueの記録の欄を | でつないで出す(handed_over_from は , でつなぐ)
+issue_fields() { # <N>
+    pj "$(cat "$STATE/issues/$1.json")" \
+        'join "|", $d->{issue}, $d->{folder}, $d->{branch}, $d->{session_id}, join(",", @{$d->{handed_over_from}})'
+}
+
+# WT で Issue 42 を進めていた形: feat/wt にコミットが1つあり、コミットしていない spec と変更と、
+# 索引に載せた git の管理外のファイル(中身は2進)が残っている。WT のセッション s-wt は作業中
+make_wt_leftover() {
+    echo committed >"$WT_DIR/wt-commit.txt"
+    git -C "$WT_DIR" add -A
+    git -C "$WT_DIR" "${GITC[@]}" commit -q -m wt-commit
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 100
+    put_issue 42 "$WT" feat/wt s-wt
+    put_spec "$WT_DIR" beta 42
+    printf 'seed\nwt-change\n' >"$WT_DIR/seed.txt"
+    printf '\000\001\002\377' >"$WT_DIR/bin.dat"
+    git -C "$WT_DIR" add bin.dat
+}
+
+t_takeover_copies_from_other_worktree() {
+    local out before head
+    make_wt_leftover
+    before=$(wt_status "$WT_DIR")
+    head=$(git -C "$WT_DIR" rev-parse HEAD)
+    out=$(ss "$WT2_DIR" takeover 42 --from "$WT" --session s-me) || die "takeover の終了コード $?: $out"
+    # ブランチと、コミットしていない spec と変更が写る
+    [ "$(cur_branch "$WT2_DIR")" = feat/wt ] || die "いまの作業フォルダが feat/wt に切り替わっていない: $(cur_branch "$WT2_DIR")"
+    [ "$(git -C "$WT2_DIR" rev-parse HEAD)" = "$head" ] || die "いまの作業フォルダの HEAD が前の作業フォルダの HEAD でない"
+    for f in .kiro/specs/beta/spec.json seed.txt bin.dat wt-commit.txt; do
+        cmp -s "$WT_DIR/$f" "$WT2_DIR/$f" || die "$f が写っていない"
+    done
+    # 前の作業フォルダの中身と索引は消えない
+    [ "$(wt_status "$WT_DIR")" = "$before" ] || die "前の作業フォルダの変更が変わった: $(wt_status "$WT_DIR")"
+    [ "$(cat "$WT_DIR/seed.txt")" = "$(printf 'seed\nwt-change')" ] || die "前の作業フォルダの seed.txt が変わった"
+    [ -f "$WT_DIR/.kiro/specs/beta/spec.json" ] || die "前の作業フォルダの spec が消えた"
+    # Issueの記録が、いまの作業フォルダとセッションに書き直され、前の作業フォルダが handed_over_from に入る
+    [ "$(issue_fields 42)" = "42|$WT2|feat/wt|s-me|$WT" ] || die "Issueの記録が違う: $(cat "$STATE/issues/42.json")"
+    # 写したファイルの一覧といまのブランチを出す
+    for f in .kiro/specs/beta/spec.json seed.txt bin.dat; do
+        printf '%s' "$out" | grep -qF "$f" || die "写したファイルの一覧に $f が無い: $out"
+    done
+    printf '%s' "$out" | grep -q "いまのブランチ: feat/wt\$" || die "いまのブランチが出ない: $out"
+}
+
+t_takeover_releases_branch() {
+    local head
+    make_wt_leftover
+    head=$(git -C "$WT_DIR" rev-parse HEAD)
+    ss "$WT2_DIR" takeover 42 --from "$WT" --session s-me >/dev/null || die "takeover の終了コード $?"
+    [ -z "$(cur_branch "$WT_DIR")" ] || die "前の作業フォルダがブランチを手放していない: $(cur_branch "$WT_DIR")"
+    [ "$(git -C "$WT_DIR" rev-parse HEAD)" = "$head" ] || die "前の作業フォルダの HEAD が動いた"
+    [ "$(git -C "$WT_DIR" worktree list --porcelain | grep -c '^branch refs/heads/feat/wt$')" = 1 ] \
+        || die "feat/wt を開いている作業フォルダが1つでない"
+    [ "$(cur_branch "$WT2_DIR")" = feat/wt ] || die "いまの作業フォルダが feat/wt を開いていない"
+}
+
+t_takeover_keeps_newer_main() {
+    local new_main
+    # 新しい main: seed.txt を直し、newmain.txt を足す
+    printf 'seed-new\n' >"$MAIN_DIR/seed.txt"
+    echo newmain >"$MAIN_DIR/newmain.txt"
+    git -C "$MAIN_DIR" add -A
+    git -C "$MAIN_DIR" "${GITC[@]}" commit -q -m newmain
+    new_main=$(git -C "$MAIN_DIR" rev-parse HEAD)
+    # いまの作業フォルダ(WT)は新しい main から切ったブランチ、前の作業フォルダ(WT2)は古い main のまま。
+    # Issueの記録は無い(移行の前からある作りかけ)
+    git -C "$WT_DIR" reset -q --hard "$new_main"
+    put_spec "$WT2_DIR" beta 42
+    ss "$WT_DIR" takeover 42 --from "$WT2" --session s-me >/dev/null || die "takeover の終了コード $?"
+    [ "$(cur_branch "$WT_DIR")" = feat/wt ] || die "いまのブランチが変わった: $(cur_branch "$WT_DIR")"
+    [ "$(cat "$WT_DIR/seed.txt")" = seed-new ] || die "新しい main の seed.txt の直しが取り消された: $(cat "$WT_DIR/seed.txt")"
+    [ -f "$WT_DIR/newmain.txt" ] || die "新しい main の newmain.txt が消された"
+    cmp -s "$WT2_DIR/.kiro/specs/beta/spec.json" "$WT_DIR/.kiro/specs/beta/spec.json" || die "spec が写っていない"
+    [ "$(git -C "$WT_DIR" status --porcelain --untracked-files=all | sed 's/^...//')" = .kiro/specs/beta/spec.json ] \
+        || die "spec のほかの変更が入った: $(wt_status "$WT_DIR")"
+    # 前の作業フォルダはIssueのブランチを開いていないので、ブランチも中身もそのまま
+    [ "$(cur_branch "$WT2_DIR")" = feat/wt2 ] || die "前の作業フォルダのブランチが変わった"
+    [ -f "$WT2_DIR/.kiro/specs/beta/spec.json" ] || die "前の作業フォルダの spec が消えた"
+    # Issueの記録が無ければ作る(branch は空)
+    [ "$(issue_fields 42)" = "42|$WT||s-me|$WT2" ] || die "作ったIssueの記録が違う: $(cat "$STATE/issues/42.json")"
+}
+
+t_takeover_not_ancestor() {
+    local err rc wt2_head
+    # 前の作業フォルダ(WT2)のブランチに、いまの作業フォルダ(WT)に無いコミットがある
+    echo only >"$WT2_DIR/wt2-only.txt"
+    git -C "$WT2_DIR" add -A
+    git -C "$WT2_DIR" "${GITC[@]}" commit -q -m wt2-only
+    wt2_head=$(git -C "$WT2_DIR" rev-parse HEAD)
+    put_spec "$WT2_DIR" beta 42
+    err=$(ss "$WT_DIR" takeover 42 --from "$WT2" --session s-me 2>&1 >/dev/null)
+    rc=$?
+    [ "$rc" = 1 ] || die "終了コードが1でない: $rc: $err"
+    [ -z "$(wt_status "$WT_DIR")" ] || die "何かを写した: $(wt_status "$WT_DIR")"
+    [ "$(cur_branch "$WT_DIR")" = feat/wt ] || die "いまのブランチが変わった"
+    [ "$(cur_branch "$WT2_DIR")" = feat/wt2 ] || die "前の作業フォルダのブランチが変わった"
+    [ -f "$WT2_DIR/.kiro/specs/beta/spec.json" ] || die "前の作業フォルダの spec が消えた"
+    [ ! -f "$STATE/issues/42.json" ] || die "止まったのにIssueの記録を書いた"
+    # 次の手: いまの作業フォルダのブランチに前の HEAD を取り込んでから、もう一度 /start を打つ
+    printf '%s' "$err" | grep -q "含まれていない" || die "土台が含まれていないことを出さない: $err"
+    printf '%s' "$err" | grep -q "取り込んでから" || die "次の手(取り込む)を出さない: $err"
+    printf '%s' "$err" | grep -qF "/start" || die "次の手(/start)を出さない: $err"
+    printf '%s' "$err" | grep -qF "$wt2_head" || die "前の作業フォルダの HEAD を出さない: $err"
+}
+
+t_takeover_from_self() {
+    local out before
+    put_session s-old "$WT" "$(fkey "$WT_DIR")" 100
+    put_issue 42 "$WT" feat/wt s-old
+    put_spec "$WT_DIR" beta 42
+    echo change >"$WT_DIR/work.txt"
+    before=$(wt_status "$WT_DIR")
+    out=$(ss "$WT_DIR" takeover 42 --from "$WT" --session s-new) || die "takeover の終了コード $?: $out"
+    [ "$(wt_status "$WT_DIR")" = "$before" ] || die "作りかけが変わった: $(wt_status "$WT_DIR")"
+    [ "$(cur_branch "$WT_DIR")" = feat/wt ] || die "ブランチが変わった"
+    [ "$(issue_fields 42)" = "42|$WT|feat/wt|s-new|" ] || die "Issueの記録が session_id だけの書き換えでない: $(cat "$STATE/issues/42.json")"
+    [ "$(pj "$(cat "$STATE/issues/42.json")" '$d->{updated_at}')" != 1 ] || die "updated_at が書き直されていない"
+    printf '%s' "$out" | grep -qF .kiro/specs/beta || die "作りかけの一覧に spec が無い: $out"
+    printf '%s' "$out" | grep -qF work.txt || die "作りかけの一覧に work.txt が無い: $out"
+    printf '%s' "$out" | grep -q "いまのブランチ: feat/wt\$" || die "いまのブランチが出ない: $out"
+    out=$(check_start "$WT_DIR" check-start 42 --session s-new) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "引き継いだ作りかけが leftovers に出た: $out"
+    # Issueの記録のブランチがいまのブランチでなければ、コミットしていない変更を持ったまま切り替える
+    git -C "$MAIN_DIR" branch -q feat/extra "$SEED_SHA"
+    put_issue 43 "$WT" feat/extra s-old
+    ss "$WT_DIR" takeover 43 --from "$WT_DIR" --session s-new >/dev/null || die "ブランチの違う takeover の終了コード $?"
+    [ "$(cur_branch "$WT_DIR")" = feat/extra ] || die "Issueの記録のブランチに切り替わっていない: $(cur_branch "$WT_DIR")"
+    [ "$(wt_status "$WT_DIR")" = "$before" ] || die "切り替えで作りかけが変わった: $(wt_status "$WT_DIR")"
+}
+
+t_takeover_branch_remote() {
+    local remote_sha rc
+    # リモートにだけ feat/extra がある(リモートのブランチの記録もまだ無い)
+    git init -q --bare "$ORIGIN_DIR"
+    git -C "$MAIN_DIR" remote add origin "$ORIGIN_DIR"
+    remote_sha=$(git -C "$MAIN_DIR" "${GITC[@]}" commit-tree -p "$SEED_SHA" -m remote "$SEED_SHA^{tree}")
+    git -C "$MAIN_DIR" push -q "$ORIGIN_DIR" "$remote_sha:refs/heads/feat/extra" || die "リモートに push できない"
+    ! git -C "$MAIN_DIR" show-ref --quiet feat/extra || die "前提: ローカルに feat/extra の記録がある"
+    put_issue 42 "" feat/extra ""
+    # いまの作業フォルダがきれいでなければ、何もせずに終了コード1
+    echo dirty >"$WT2_DIR/dirty.txt"
+    ss "$WT2_DIR" takeover 42 --branch feat/extra --session s-me >/dev/null 2>&1
+    rc=$?
+    [ "$rc" = 1 ] || die "きれいでないときの終了コードが1でない: $rc"
+    [ "$(cur_branch "$WT2_DIR")" = feat/wt2 ] || die "きれいでないのに切り替えた"
+    ! git -C "$MAIN_DIR" show-ref --verify --quiet refs/heads/feat/extra || die "きれいでないのにブランチを作った"
+    rm -f "$WT2_DIR/dirty.txt"
+    # リモートから取得して切り替える
+    ss "$WT2_DIR" takeover 42 --branch feat/extra --session s-me >/dev/null || die "takeover の終了コード $?"
+    [ "$(cur_branch "$WT2_DIR")" = feat/extra ] || die "feat/extra に切り替わっていない: $(cur_branch "$WT2_DIR")"
+    [ "$(git -C "$WT2_DIR" rev-parse HEAD)" = "$remote_sha" ] || die "リモートのブランチのコミットでない"
+    [ "$(git -C "$WT2_DIR" rev-parse --abbrev-ref 'feat/extra@{upstream}')" = origin/feat/extra ] || die "リモートのブランチを追っていない"
+    [ "$(issue_fields 42)" = "42|$WT2|feat/extra|s-me|" ] || die "Issueの記録が違う: $(cat "$STATE/issues/42.json")"
+    # ローカルにあるブランチには、そのまま切り替える
+    git -C "$MAIN_DIR" branch -q feat/extra2 "$SEED_SHA"
+    put_issue 43 "" feat/extra2 ""
+    ss "$MAIN_DIR" takeover 43 --branch feat/extra2 --session s-x >/dev/null || die "ローカルのブランチの takeover の終了コード $?"
+    [ "$(cur_branch "$MAIN_DIR")" = feat/extra2 ] || die "ローカルの feat/extra2 に切り替わっていない"
+}
+
+t_takeover_then_check_start() {
+    local out
+    make_wt_leftover
+    put_session s-me "$WT2" "$(fkey "$WT2_DIR")" 200
+    ss "$WT2_DIR" takeover 42 --from "$WT" --session s-me >/dev/null || die "takeover の終了コード $?"
+    out=$(check_start "$WT2_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "引き継いだあとに前の worktree か自分の作りかけが出た: $out"
+    [ "$(pj "$out" '$d->{branch_only}')" = '[]' ] || die "引き継いだブランチが branch_only に出た: $out"
+    # さらに別のセッションから見ると、引き継いだセッションの作業フォルダだけが出る
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-x) || die "$out"
+    [ "$(pj "$out" 'join ",", map { $_->{folder} } @{$d->{leftovers}}')" = "$WT2" ] || die "引き継いだ作業フォルダだけが出ていない: $out"
+    [ "$(pj "$out" '$d->{leftovers}[0]{active_session}{session_id}')" = s-me ] || die "引き継いだセッションが active_session に出ない: $out"
+}
+
+t_takeover_back_unhides_receiver() {
+    local out
+    make_wt_leftover
+    # 前に WT2 から WT へ引き継いでいた(WT2 が handed_over_from に入っている)
+    put_issue 42 "$WT" feat/wt s-wt "[\"$WT2\"]"
+    ss "$WT2_DIR" takeover 42 --from "$WT" --session s-me >/dev/null || die "takeover の終了コード $?"
+    [ "$(issue_fields 42)" = "42|$WT2|feat/wt|s-me|$WT" ] || die "引き継いだ先が handed_over_from から外れていない: $(cat "$STATE/issues/42.json")"
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-x) || die "$out"
+    [ "$(pj "$out" 'join ",", map { $_->{folder} } @{$d->{leftovers}}')" = "$WT2" ] || die "引き継いだ先の作りかけが隠れた: $out"
+}
+
+t_takeover_apply_conflict_restores() {
+    local err rc
+    # いまの作業フォルダ(WT)は seed.txt を直したコミットを持ち、前の作業フォルダ(WT2)は同じ行を別に直している
+    printf 'seed-wt\n' >"$WT_DIR/seed.txt"
+    git -C "$WT_DIR" add -A
+    git -C "$WT_DIR" "${GITC[@]}" commit -q -m seed-wt
+    printf 'seed-wt2\n' >"$WT2_DIR/seed.txt"
+    put_spec "$WT2_DIR" beta 42
+    err=$(ss "$WT_DIR" takeover 42 --from "$WT2" --session s-me 2>&1 >/dev/null)
+    rc=$?
+    [ "$rc" = 1 ] || die "終了コードが1でない: $rc: $err"
+    [ -z "$(wt_status "$WT_DIR")" ] || die "いまの作業フォルダが元に戻っていない: $(wt_status "$WT_DIR")"
+    [ "$(cat "$WT_DIR/seed.txt")" = seed-wt ] || die "いまの作業フォルダの seed.txt が戻っていない"
+    [ ! -e "$WT_DIR/.kiro/specs/beta" ] || die "写したファイルが消えていない"
+    [ "$(cur_branch "$WT_DIR")" = feat/wt ] || die "いまのブランチが変わった"
+    [ "$(cat "$WT2_DIR/seed.txt")" = seed-wt2 ] || die "前の作業フォルダの seed.txt が変わった"
+    [ -f "$WT2_DIR/.kiro/specs/beta/spec.json" ] || die "前の作業フォルダの spec が消えた"
+    [ ! -f "$STATE/issues/42.json" ] || die "失敗したのにIssueの記録を書いた"
+}
+
+t_takeover_apply_failure_reopens_branch() {
+    local real_git rc
+    make_wt_leftover
+    real_git=$(command -v git)
+    mkdir -p "$TMP_ROOT/gitapplyfail"
+    # apply だけが失敗する git
+    cat >"$TMP_ROOT/gitapplyfail/git" <<EOF
+#!/bin/bash
+case " \$* " in *" apply "*) echo "error: patch failed" >&2; exit 1 ;; esac
+exec "$real_git" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/gitapplyfail/git"
+    (PATH="$TMP_ROOT/gitapplyfail:$PATH" ss "$WT2_DIR" takeover 42 --from "$WT" --session s-me >/dev/null 2>&1)
+    rc=$?
+    [ "$rc" = 1 ] || die "終了コードが1でない: $rc"
+    [ "$(cur_branch "$WT2_DIR")" = feat/wt2 ] || die "いまの作業フォルダが前のブランチに戻っていない: $(cur_branch "$WT2_DIR")"
+    [ -z "$(wt_status "$WT2_DIR")" ] || die "いまの作業フォルダに写したものが残っている: $(wt_status "$WT2_DIR")"
+    [ "$(cur_branch "$WT_DIR")" = feat/wt ] || die "前の作業フォルダがブランチを開き直していない"
+    [ -f "$WT_DIR/.kiro/specs/beta/spec.json" ] || die "前の作業フォルダの spec が消えた"
+    [ "$(issue_fields 42)" = "42|$WT|feat/wt|s-wt|" ] || die "失敗したのにIssueの記録を書き直した: $(cat "$STATE/issues/42.json")"
+}
+
+t_takeover_dirty_refused() {
+    local rc exclude
+    make_wt_leftover
+    # 無視されているファイルは、きれいさの確かめに数えない
+    exclude="$(git -C "$MAIN_DIR" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+    mkdir -p "${exclude%/*}"
+    echo ignored.txt >>"$exclude"
+    echo x >"$WT2_DIR/ignored.txt"
+    echo x >"$WT2_DIR/untracked.txt"
+    ss "$WT2_DIR" takeover 42 --from "$WT" --session s-me >/dev/null 2>&1
+    rc=$?
+    [ "$rc" = 1 ] || die "git の管理外のファイルがあるときの終了コードが1でない: $rc"
+    [ "$(cur_branch "$WT_DIR")" = feat/wt ] || die "止まったのに前の作業フォルダのブランチを手放させた"
+    [ "$(cur_branch "$WT2_DIR")" = feat/wt2 ] || die "止まったのに切り替えた"
+    [ "$(issue_fields 42)" = "42|$WT|feat/wt|s-wt|" ] || die "止まったのにIssueの記録を書き直した"
+    rm -f "$WT2_DIR/untracked.txt"
+    ss "$WT2_DIR" takeover 42 --from "$WT" --session s-me >/dev/null || die "無視されているファイルだけのときに止まった: $?"
+    rm -f "$WT2_DIR/ignored.txt"
+}
+
+t_takeover_usage() {
+    local rc
+    put_issue 42 "$WT" feat/wt s-wt
+    for args in "takeover 42" "takeover 42 --from $WT --branch feat/wt" "takeover --from $WT" \
+        "takeover 42 --from $WORK/NoSuchFolder" "takeover 42 --branch"; do
+        # shellcheck disable=SC2086
+        ss "$WT2_DIR" $args >/dev/null 2>&1
+        rc=$?
+        [ "$rc" = 64 ] || die "'$args' の終了コードが64でない: $rc"
+    done
+    [ "$(cur_branch "$WT2_DIR")" = feat/wt2 ] || die "誤った呼び方で切り替えた"
+    [ "$(issue_fields 42)" = "42|$WT|feat/wt|s-wt|" ] || die "誤った呼び方でIssueの記録を書き直した"
+}
+
 echo "--- check-start: 同じ作業フォルダの別のセッション(要件5.1・5.2)"
 run_test "同じ作業フォルダに別の作業中のセッションの記録があると folder_conflict に出る" t_folder_conflict
 run_test "同じ作業フォルダの、Issueの記録の無いセッション(着手していない記録)は folder_conflict に出ない" t_folder_conflict_idle_ignored
@@ -714,6 +993,20 @@ run_test "使用中で消せなかったボリュームを名前つきで標準�
 run_test "取り戻しの条件に当たる残った枠を取り戻し、ui のコンテナを消してからボリュームを消す" t_prune_slots
 run_test "check-start は最初に prune を行い、手で打った prune は片付けたことを出す" t_prune_quiet_in_check_start
 run_test "作業フォルダの一覧を取れないときは、記録もボリュームも消さない" t_prune_skips_without_worktree_list
+
+echo "--- takeover(要件1.1・1.2・4.3〜4.6)"
+run_test "別の worktree のコミットしていない spec とブランチが写り、前の worktree の中身は消えない" t_takeover_copies_from_other_worktree
+run_test "前の worktree はブランチを手放して detached になる" t_takeover_releases_branch
+run_test "古い main にいた前の作業フォルダからの引き継ぎで、新しい main のコミットが取り消されない" t_takeover_keeps_newer_main
+run_test "前の HEAD がいまの HEAD の先祖でなければ、何も写さずに終了コード1で止まり、次の手を出す" t_takeover_not_ancestor
+run_test "--from がいまの作業フォルダのとき、作りかけが残ったまま記録の session_id だけが書き換わる" t_takeover_from_self
+run_test "--branch でリモートにだけあるブランチを取得して切り替える" t_takeover_branch_remote
+run_test "引き継いだあとの check-start は前の worktree も自分の作りかけも出さない" t_takeover_then_check_start
+run_test "引き継ぎを戻したときは、引き継いだ先の作業フォルダが handed_over_from から外れる" t_takeover_back_unhides_receiver
+run_test "写しが食い違って git apply が失敗したら、いまの作業フォルダを元に戻して終了コード1で終わる" t_takeover_apply_conflict_restores
+run_test "git apply が失敗したら、前の作業フォルダにブランチを開き直させる" t_takeover_apply_failure_reopens_branch
+run_test "いまの作業フォルダに無視されていない git の管理外のファイルがあれば、何もせずに終了コード1で終わる" t_takeover_dirty_refused
+run_test "takeover は誤った呼び方で何も変えない" t_takeover_usage
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"

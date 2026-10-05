@@ -52,7 +52,7 @@
   - _対象の部品: session.sh_
   - _依存: 2.3_
 
-- [ ] 2.5 作りかけの引き継ぎを作る
+- [x] 2.5 作りかけの引き継ぎを作る
 
   Claude は、部品「session.sh」の `takeover` のサブコマンドと、そのテストを `test-session.sh` に足す。Issueの記録が無いときの `--from`(移行の前からある作りかけ)と、`--branch` のときのいまの作業フォルダのきれいさの確かめとリモートの取得も扱う。前の HEAD がいまの HEAD の先祖でないときは、Claude は、`takeover` が出す文に「いまの作業フォルダのブランチに前の作業フォルダの HEAD(前の土台)を取り込んでから、もう一度 `/start` を打つ」という次の手を含める。前の HEAD がいまの HEAD の先祖でない食い違いは、前の土台を含んでいない、いまの作業フォルダの側でしか直せないからである。この小タスクで Claude が変えるファイルは 2.4 と同じなので、Claude は、この小タスクを 2.4 のあとに行う。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の takeover の場合がすべて通る
@@ -163,10 +163,14 @@
 - 設計への書き足しの貯め方(所有者が 2026-10-05 に決めた): 実装で見つかった、design.md に書き足しが要る細部は、見つかるたびに design を直さず、この下の一覧に貯める。全タスクが終わったあと、出荷の前に、まとめて1回で design.md に書き足し、design と tasks の承認を1回でやり直す
 - 設計への書き足しの一覧:
   - (2.3・2.4、tasks の審査の T3-1-2)Claude は、2.3 の確認役の申し送りに書いた、ディレクトリだけが消えた worktree の数え方と、2.4 の説明に書いた `prune` の最初の `git worktree prune` を、design の「作りかけの見つけ方」と、`prune` の箇条書きと「使う部品」に足す
-  - (2.4 の確認役)`prune` が消すボリュームと DB の鍵は、記録(sessions の `folder_key`、issues の `folder`)からしか求めない。記録が先に消えた作業フォルダ(引き継いだ元、`/start` をしなかった worktree)の分は片付けから漏れる。Docker のボリュームの一覧から求めると、同じプロジェクト名の別の clone のボリュームを消すおそれがあるため、Claude は、記録から求める形を design に書き、漏れることを「失敗したときの扱い」か `prune` の節に書く
+  - (2.4 の確認役)`prune` は、消すボリュームと DB の鍵を、記録(sessions の `folder_key`、issues の `folder`)からしか求めない。記録が先に消えた作業フォルダ(引き継いだ元、`/start` をしなかった worktree)の分は片付けから漏れる。Docker のボリュームの一覧から求めると、同じプロジェクト名の別の clone のボリュームを消すおそれがあるため、Claude は、記録から求める形を design に書き、漏れることを「失敗したときの扱い」か `prune` の節に書く
   - (2.3 の確認役)Claude は、2.3 の確認役の申し送りに書いた、セッションのIDが空のときの `check-start` の照合の扱いを、design の「作りかけの見つけ方」に書く
   - (tasks の審査の T1-1-8)Claude は、`ui.sh` が frontend の準備のために `run-check.sh` を読み込むことを、design の「使う既存の仕組み」の依存の向きに書く
   - (design の審査の D2-1-4)Claude は、実装のメモに書いた `VITEST_MAX_WORKERS` の基準の8の由来を、design の「設計を見直すきっかけ」に書く
+  - (2.5 の確認役)Claude は、`takeover` が `handed_over_from` から引き継いだ先(いまの作業フォルダ)を外すことを、design の `takeover` の手順7と「作りかけの見つけ方」に書く。外さないと、引き継ぎを戻したときに、引き継いだ先の作りかけがほかのセッションから見えなくなるためである
+  - (2.5 の確認役)Claude は、Issueの記録が無いときに `takeover` が作る記録の形(`branch` は空)と、`takeover` が `branch` を書き換えるのは `--branch` のときと前の作業フォルダからブランチを移したときだけであることを、design の `takeover` の手順7と「データの形」に書く。あわせて、start スキルの「いまのブランチが記録の `branch` と同じなら新しいブランチを作らない」の判定で、`branch` が空のときは新しいブランチを作ることを、design の「start スキルの変更」に書く
+  - (2.5 の確認役)Claude は、`takeover --branch` でローカルにブランチが無いときに `git fetch origin +refs/heads/<ブランチ>:refs/remotes/origin/<ブランチ>` で取得し、取得に失敗しても手元のリモート追跡ブランチがあれば注意を出して使うことを、design の `takeover` の手順6に書く
+  - (2.5 の確認役)Claude は、`takeover` が終了コード1の文を標準エラーに出すことと、`--from` がこのリポジトリの作業フォルダでないときに終了コード64で終わることを、design の `takeover` の手順8に書く
 
 ## 完了条件(全タスク共通)
 
