@@ -27,7 +27,7 @@
 KP_UI_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # frontend の準備(kp_frontend_prepare)と、順番待ちの知らせ・秒の読み方を run-check.sh と同じにするため読み込む。
 # run-check.sh は lib.sh も読み込む
-# shellcheck source=run-check.sh
+# shellcheck source=.claude/scripts/parallel/run-check.sh
 . "$KP_UI_DIR/run-check.sh"
 
 # 本体のプロジェクトの、画面確認が使う共有のサービス

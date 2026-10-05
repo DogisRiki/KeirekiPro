@@ -156,7 +156,7 @@ fkey() {
     local f
     f=$(git -C "$1" rev-parse --show-toplevel)
     if [ "$(git -C "$1" config --get core.ignorecase)" = true ]; then
-        f=$(printf '%s' "$f" | tr 'A-Z' 'a-z')
+        f=$(printf '%s' "$f" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
     fi
     printf '%s' "$f" | git hash-object --stdin | cut -c1-12
 }
@@ -408,7 +408,7 @@ t_full_no_wait_no_issue() {
 }
 
 t_wait_then_run() {
-    local pid out_file rc_file i
+    local pid out_file rc_file
     put_issue 481 "$WT" feat/wt
     put_owner 1 "$WT" "$(fkey "$WT_DIR")" check "$(now)"
     export KP_WAIT_INTERVAL_SECONDS=1 KP_WAIT_LIMIT_SECONDS=60
@@ -426,7 +426,7 @@ t_wait_then_run() {
     grep -q '^\[parallel\] 順番待ち: 設定の数 1 の枠を、#481(' "$out_file" || die "待ちの知らせが無い: $(cat "$out_file")"
     echo 'released' >>"$FAKE_DOCKER_LOG"
     rm -rf "$STATE/slots/1"
-    for i in $(seq 1 100); do
+    for _ in $(seq 1 100); do
         [ -f "$rc_file" ] && break
         sleep 0.1
     done
@@ -460,7 +460,7 @@ t_gradle_home_per_slot() {
     put_owner 1 "$MAIN" "$(fkey "$MAIN_DIR")" check "$(now)"
     rc "$WT_DIR" backend ./gradlew check
     [ "$RC" = 0 ] || die "終了コード $RC: $OUT"
-    grep -qx -- "--label" "$FAKE_LAST_RUN" && grep -qx -- "keirekipro.slot=2" "$FAKE_LAST_RUN" \
+    { grep -qx -- "--label" "$FAKE_LAST_RUN" && grep -qx -- "keirekipro.slot=2" "$FAKE_LAST_RUN"; } \
         || die "枠2を取っていない: $(tr '\n' ' ' <"$FAKE_LAST_RUN")"
     grep -qx -- "kp-gradle-home-2:/root/.gradle" "$FAKE_LAST_RUN" \
         || die "枠2の Gradle のキャッシュが枠ごとでない: $(tr '\n' ' ' <"$FAKE_LAST_RUN")"
@@ -548,6 +548,7 @@ t_node_modules_check() {
 t_backend_empty_prelude() {
     local exec_dir="$WORK/exec"
     mkdir -p "$exec_dir"
+    # shellcheck disable=SC2016 # $* などは書き出す偽物の gradlew の中で展開させる
     printf '#!/bin/sh\nprintf "gradlew %%s\\n" "$*" >>"$FAKE_TOOL_LOG"\nexit 3\n' >"$exec_dir/gradlew"
     chmod +x "$exec_dir/gradlew"
     export FAKE_EXEC_DIR="$exec_dir"
@@ -626,11 +627,11 @@ t_prepare_for_ui() {
 # 途中で止められたとき
 # =====================================================================
 t_trap_release() {
-    local pid i dpid
+    local pid dpid
     export FAKE_RUN_HOLD="$WORK/hold"
     (cd "$WT_DIR" && exec bash "$RUN_CHECK" frontend pnpm run coverage >"$WORK/trap.out" 2>&1) &
     pid=$!
-    for i in $(seq 1 100); do
+    for _ in $(seq 1 100); do
         [ -f "$WORK/hold.pid" ] && break
         sleep 0.1
     done

@@ -47,7 +47,7 @@ kp_folder() {
 # パスを、記録の中で比べるための形にする(core.ignorecase が true のときだけ小文字にする)
 _kp_norm_path() {
     if [ "$(git config --get core.ignorecase 2>/dev/null)" = true ]; then
-        printf '%s' "$1" | tr 'A-Z' 'a-z'
+        printf '%s' "$1" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'
     else
         printf '%s' "$1"
     fi
@@ -79,7 +79,7 @@ kp_main_folder() {
 # パスを、core.ignorecase の値(先に1回だけ読んだもの)に合わせて比べる形にする
 _kp_norm_with() { # <core.ignorecase の値> <パス>
     if [ "$1" = true ]; then
-        printf '%s' "$2" | tr 'A-Z' 'a-z'
+        printf '%s' "$2" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'
     else
         printf '%s' "$2"
     fi

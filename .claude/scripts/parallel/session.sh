@@ -60,7 +60,7 @@
 # =====================================================================
 
 KP_SESSION_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-# shellcheck source=lib.sh
+# shellcheck source=.claude/scripts/parallel/lib.sh
 . "$KP_SESSION_SCRIPT_DIR/lib.sh"
 
 _kp_ss_usage() {

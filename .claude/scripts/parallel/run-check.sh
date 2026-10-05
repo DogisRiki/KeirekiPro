@@ -23,7 +23,7 @@
 # =====================================================================
 
 KP_RUN_CHECK_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-# shellcheck source=lib.sh
+# shellcheck source=.claude/scripts/parallel/lib.sh
 . "$KP_RUN_CHECK_DIR/lib.sh"
 
 # コンテナの中のコマンドの前にすること(pnpm install、terraform init)が失敗したときの終了コード。

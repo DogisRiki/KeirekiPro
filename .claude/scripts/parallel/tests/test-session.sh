@@ -104,7 +104,7 @@ SEED_SHA=$(git -C "$MAIN_DIR" rev-parse HEAD)
 # 記録の中で作業フォルダを比べる形(design.md の規則どおりに求める)
 fid() {
     if [ "$(git -C "$MAIN_DIR" config --get core.ignorecase)" = true ]; then
-        printf '%s' "$1" | tr 'A-Z' 'a-z'
+        printf '%s' "$1" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'
     else
         printf '%s' "$1"
     fi
@@ -218,6 +218,7 @@ check_start() { # <フォルダ> <引数>...
 # =====================================================================
 # check-start: 同じ作業フォルダの別のセッション(要件5.1・5.2)
 # =====================================================================
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_folder_conflict() {
     local out
     put_session s-old "$MAIN" "$(fkey "$MAIN_DIR")" 100
@@ -235,6 +236,7 @@ t_folder_conflict() {
     [ "$(pj "$out" '$d->{folder_conflict}')" = '[]' ] || die "worktree で folder_conflict が空でない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_folder_conflict_without_session() {
     local out
     put_session s-old "$MAIN" "$(fkey "$MAIN_DIR")" 100
@@ -251,6 +253,7 @@ t_folder_conflict_without_session() {
         || die "KP_SESSION_ID=s-new のときの folder_conflict が s-old だけでない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_end_clears_conflict() {
     local out
     put_session s-old "$MAIN" "$(fkey "$MAIN_DIR")" 100
@@ -265,6 +268,7 @@ t_end_clears_conflict() {
     [ "$(pj "$out" '$d->{folder_conflict}')" = '[]' ] || die "end のあとも folder_conflict が空でない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_folder_conflict_idle_ignored() {
     local out
     put_session s-old "$MAIN" "$(fkey "$MAIN_DIR")" 100
@@ -289,6 +293,7 @@ t_end_rejects_path() {
 # =====================================================================
 # check-start: Issueの作りかけ(要件4.1・4.2)
 # =====================================================================
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_leftover_other_worktree_spec() {
     local out
     put_spec "$WT_DIR" beta 42
@@ -313,6 +318,7 @@ t_leftover_other_worktree_spec() {
     [ "$(pj "$out" '$d->{leftovers}[0]{active_session}')" = null ] || die "作業中でないセッションが active_session に出た: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_leftover_committed_spec_ignored() {
     local out
     put_spec "$WT_DIR" beta 42
@@ -326,6 +332,7 @@ t_leftover_committed_spec_ignored() {
     [ "$(pj "$out" '$d->{leftovers}[0]{folder}')" = "$WT" ] || die "直した spec が leftovers に出ない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_leftover_additional_issue() {
     local out
     put_spec "$WT2_DIR" gamma 5 '[42]'
@@ -335,6 +342,7 @@ t_leftover_additional_issue() {
         || die "additional_issues に 42 を含む spec だけが出ていない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_leftover_self() {
     local out
     put_spec "$MAIN_DIR" beta 42
@@ -346,6 +354,7 @@ t_leftover_self() {
     [ "$(pj "$out" '$d->{leftovers}[0]{active_session}')" = null ] || die "自分が active_session に出た: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_leftover_own_claim_excluded() {
     local out
     put_spec "$MAIN_DIR" beta 42
@@ -361,6 +370,7 @@ t_leftover_own_claim_excluded() {
     [ "$(pj "$out" 'join ",", @{$d->{leftovers}[0]{kinds}}')" = spec,changes,branch ] || die "kinds が spec,changes,branch でない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_leftover_branch_without_spec() {
     local out
     put_issue 43 "$WT" feat/wt s-wt
@@ -379,6 +389,7 @@ t_leftover_branch_without_spec() {
     [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "ほかのIssueの番号で leftovers が出た: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_leftover_handed_over_excluded() {
     local out
     put_spec "$WT_DIR" beta 42
@@ -389,6 +400,7 @@ t_leftover_handed_over_excluded() {
         || die "handed_over_from の作業フォルダが除かれていない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_branch_only() {
     local out
     git -C "$MAIN_DIR" branch -q feat/extra "$SEED_SHA"
@@ -408,6 +420,7 @@ t_branch_only() {
 # =====================================================================
 # check-start: 作業中のセッションの数(要件3.6)
 # =====================================================================
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_capacity() {
     local out
     put_session s-me "$MAIN" "$(fkey "$MAIN_DIR")" 100
@@ -433,6 +446,7 @@ t_capacity() {
 # =====================================================================
 # claim
 # =====================================================================
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_claim() {
     local f got
     put_session s-me "$WT" "$(fkey "$WT_DIR")" 100
@@ -504,6 +518,7 @@ make_wt3_claimed() {
     ss "$WT3_DIR" claim 42 --branch feat/extra --session s-3 || die "claim が失敗した"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_prune_branch_kept() {
     local out f
     # db が動いている(記録の片付けはボリュームと DB を消し終えた作業フォルダだけ)
@@ -526,6 +541,7 @@ t_prune_branch_kept() {
     [ "$(pj "$out" '$d->{branch_only}')" = '[{"branch":"feat/extra","where":"remote"}]' ] || die "branch_only にリモートのブランチが出ない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_prune_branch_gone() {
     local out
     # db が動いている(記録の片付けはボリュームと DB を消し終えた作業フォルダだけ)
@@ -544,6 +560,7 @@ t_prune_branch_gone() {
     [ ! -f "$STATE/issues/43.json" ] || die "作業フォルダもブランチも無い issues/43.json が残っている"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_prune_worktree_prune() {
     # db が動いている(記録の片付けはボリュームと DB を消し終えた作業フォルダだけ)
     export FAKE_DB_RUNNING=1
@@ -665,6 +682,7 @@ t_prune_slots() {
         || die "ui のコンテナを消してからボリュームを消していない: $(cat "$FAKE_DOCKER_LOG")"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_prune_skips_without_worktree_list() {
     local real_git
     real_git=$(command -v git)
@@ -842,6 +860,7 @@ cur_branch() { git -C "$1" symbolic-ref -q --short HEAD; }
 # 作業フォルダのコミットしていない変更と git の管理外のファイル
 wt_status() { git -C "$1" status --porcelain --untracked-files=all; }
 # Issueの記録の欄を | でつないで出す(handed_over_from は , でつなぐ)
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 issue_fields() { # <N>
     pj "$(cat "$STATE/issues/$1.json")" \
         'join "|", $d->{issue}, $d->{folder}, $d->{branch}, $d->{session_id}, join(",", @{$d->{handed_over_from}})'
@@ -947,6 +966,7 @@ t_takeover_not_ancestor() {
     printf '%s' "$err" | grep -qF "$wt2_head" || die "前の作業フォルダの HEAD を出さない: $err"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_takeover_from_self() {
     local out before
     put_session s-old "$WT" "$(fkey "$WT_DIR")" 100
@@ -1002,6 +1022,7 @@ t_takeover_branch_remote() {
     [ "$(cur_branch "$MAIN_DIR")" = feat/extra2 ] || die "ローカルの feat/extra2 に切り替わっていない"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_takeover_then_check_start() {
     local out
     make_wt_leftover
@@ -1016,6 +1037,7 @@ t_takeover_then_check_start() {
     [ "$(pj "$out" '$d->{leftovers}[0]{active_session}{session_id}')" = s-me ] || die "引き継いだセッションが active_session に出ない: $out"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_takeover_back_unhides_receiver() {
     local out
     make_wt_leftover

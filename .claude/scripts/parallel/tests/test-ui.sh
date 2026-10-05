@@ -188,7 +188,7 @@ fkey() {
     local f
     f=$(git -C "$1" rev-parse --show-toplevel)
     if [ "$(git -C "$1" config --get core.ignorecase)" = true ]; then
-        f=$(printf '%s' "$f" | tr 'A-Z' 'a-z')
+        f=$(printf '%s' "$f" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
     fi
     printf '%s' "$f" | git hash-object --stdin | cut -c1-12
 }

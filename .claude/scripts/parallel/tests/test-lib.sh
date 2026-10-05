@@ -84,7 +84,7 @@ fid() {
     local f
     f=$(git -C "$1" rev-parse --show-toplevel)
     if [ "$(git -C "$1" config --get core.ignorecase)" = true ]; then
-        printf '%s' "$f" | tr 'A-Z' 'a-z'
+        printf '%s' "$f" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'
     else
         printf '%s' "$f"
     fi
@@ -230,7 +230,7 @@ t_ignorecase_false() {
     key=$(inside "$MAIN_DIR" 'kp_folder_key')
     [ "$key" = "$(printf '%s' "$MAIN" | git hash-object --stdin | cut -c1-12)" ] || die "鍵が違う: '$key'"
     # 大文字と小文字だけが違う作業フォルダの枠は、自分の枠とみなさない
-    lower=$(printf '%s' "$MAIN" | tr 'A-Z' 'a-z')
+    lower=$(printf '%s' "$MAIN" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
     put_owner 1 "$lower" "$(printf '%s' "$lower" | git hash-object --stdin | cut -c1-12)" check "$(now)" s-x
     inside "$MAIN_DIR" 'kp_slot_release 1' >/dev/null 2>&1
     [ -d "$STATE/slots/1" ] || die "false なのに大文字と小文字が違う作業フォルダの枠を返した"
@@ -258,6 +258,7 @@ t_outside_repo() {
         (
             cd "$OUTSIDE" || exit 98
             export GIT_CEILING_DIRECTORIES="$WORK"
+            # shellcheck source=/dev/null
             . "$LIB"
             "$f" >/dev/null 2>&1
         )
@@ -268,6 +269,7 @@ t_outside_repo() {
 
 t_msys_no_pathconv() {
     local got
+    # shellcheck disable=SC2016 # $1 などは子の bash の中で展開させる
     got=$(env -u MSYS_NO_PATHCONV bash -c '. "$1"; printf "%s" "${MSYS_NO_PATHCONV:-}"' _ "$LIB")
     [ "$got" = 1 ] || die "MSYS_NO_PATHCONV が '$got'"
 }
@@ -317,6 +319,7 @@ t_concurrent_acquire() {
             for i in 1 2; do
                 (
                     cd "$MAIN_DIR" || exit 98
+                    # shellcheck source=/dev/null
                     . "$LIB"
                     while [ ! -f "$WORK/go" ]; do sleep 0.05; done
                     kp_slot_acquire check "c$i" >"$WORK/out$i" 2>/dev/null
@@ -351,6 +354,7 @@ t_reclaim_old_check() {
     put_owner 1 "$WT" "$(fkey "$WT_DIR")" check "$(($(now) - 300))" s-gone
     got=$(inside "$MAIN_DIR" 'kp_slot_acquire check "pnpm run lint"') || die "取れない: 終了コード $?"
     [ "$got" = 1 ] || die "番号: '$got'"
+    # shellcheck disable=SC2016 # $(kp_state_dir) は inside が lib.sh を読み込んだサブシェルの中で展開させる
     key=$(inside "$MAIN_DIR" 'kp_json_get "$(kp_state_dir)/slots/1/owner.json" folder_key')
     [ "$key" = "$(fkey "$MAIN_DIR")" ] || die "持ち主が書き換わっていない: '$key'"
     grep -q 'ps .*label=keirekipro.slot=1.*status=running' "$FAKE_DOCKER_LOG" \
@@ -409,6 +413,7 @@ t_reclaim_ui_without_session() {
     grep -q '^rm -f cid-ui-1$' "$FAKE_DOCKER_LOG" || die "docker rm -f を呼んでいない: $(cat "$FAKE_DOCKER_LOG")"
     grep -q '^watch: .*"session_id":"s-closed"' "$FAKE_DOCKER_LOG" \
         || die "取り戻したあとに rm を呼んだ: $(cat "$FAKE_DOCKER_LOG")"
+    # shellcheck disable=SC2016 # $(kp_state_dir) は inside が lib.sh を読み込んだサブシェルの中で展開させる
     key=$(inside "$MAIN_DIR" 'kp_json_get "$(kp_state_dir)/slots/1/owner.json" folder_key')
     [ "$key" = "$(fkey "$MAIN_DIR")" ] || die "持ち主が書き換わっていない: '$key'"
 }
@@ -430,6 +435,7 @@ t_reclaim_ui_gone_folder() {
             || die "$mode: docker rm -f を呼んでいない: $(cat "$FAKE_DOCKER_LOG")"
         grep -q '^watch: .*"session_id":"s-gone"' "$FAKE_DOCKER_LOG" \
             || die "$mode: 取り戻したあとに rm を呼んだ: $(cat "$FAKE_DOCKER_LOG")"
+        # shellcheck disable=SC2016 # $(kp_state_dir) は inside が lib.sh を読み込んだサブシェルの中で展開させる
         key=$(inside "$MAIN_DIR" 'kp_json_get "$(kp_state_dir)/slots/1/owner.json" folder_key')
         [ "$key" = "$(fkey "$MAIN_DIR")" ] || die "$mode: 持ち主が書き換わっていない: '$key'"
         [ -f "$STATE/sessions/s-gone.json" ] || die "$mode: セッションの記録を消した"
@@ -457,10 +463,7 @@ t_keep_ui_list_unavailable() {
     put_session s-alive "$WT" "$(fkey "$WT_DIR")" 100
     put_owner 1 "$WT" "$(fkey "$WT_DIR")" ui "$(now)" s-alive
     echo cid-ui >"$FAKE_DOCKER_PS"
-    got=$(
-        export PATH="$TMP_ROOT/gitbin:$PATH"
-        inside "$MAIN_DIR" 'kp_slot_acquire ui x' 2>/dev/null
-    )
+    got=$(PATH="$TMP_ROOT/gitbin:$PATH" inside "$MAIN_DIR" 'kp_slot_acquire ui x' 2>/dev/null)
     rc=$?
     [ "$rc" != 0 ] || die "作業フォルダの一覧を取れないのに取れた: '$got'"
     if grep -q '^rm' "$FAKE_DOCKER_LOG"; then
@@ -497,7 +500,7 @@ t_folder_gone() {
     [ "$(rc_of "kp_folder_gone '$MAIN' ''")" = 1 ] || die "本体フォルダを無くなったとみなした"
     [ "$(rc_of "kp_folder_gone '' ''")" = 1 ] || die "作業フォルダも鍵も空の記録を無くなったとみなした"
     # 大文字と小文字は core.ignorecase のとおりに比べる
-    lower=$(printf '%s' "$WT" | tr 'A-Z' 'a-z')
+    lower=$(printf '%s' "$WT" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
     git -C "$MAIN_DIR" config core.ignorecase true
     [ "$(rc_of "kp_folder_gone '$lower' 000000000000")" = 1 ] || die "true なのに小文字の作業フォルダを無くなったとみなした"
     git -C "$MAIN_DIR" config core.ignorecase false
@@ -514,23 +517,15 @@ t_folder_gone() {
 t_folder_gone_list_unavailable() {
     local rc
     make_gone GoneNoList rmdir || die "作れない"
-    (
-        export PATH="$TMP_ROOT/gitbin:$PATH"
-        inside "$MAIN_DIR" "kp_folder_gone '$GONE' '$GONE_KEY'" >/dev/null 2>&1
-    )
+    PATH="$TMP_ROOT/gitbin:$PATH" inside "$MAIN_DIR" "kp_folder_gone '$GONE' '$GONE_KEY'" >/dev/null 2>&1
     rc=$?
     [ "$rc" = 2 ] || die "kp_folder_gone: 期待 2 / 実際 $rc"
-    (
-        export PATH="$TMP_ROOT/gitbin:$PATH"
-        inside "$MAIN_DIR" 'kp_live_folders' >/dev/null 2>&1
-    )
+    PATH="$TMP_ROOT/gitbin:$PATH" inside "$MAIN_DIR" 'kp_live_folders' >/dev/null 2>&1
     rc=$?
     [ "$rc" = 2 ] || die "kp_live_folders: 期待 2 / 実際 $rc"
     # 一覧にいまの作業フォルダが無いときも、一覧を取れないとみなす
-    (
-        export PATH="$TMP_ROOT/gitbin:$PATH" FAKE_GIT_WORKTREE_ONLY="$WT"
+    PATH="$TMP_ROOT/gitbin:$PATH" FAKE_GIT_WORKTREE_ONLY="$WT" \
         inside "$MAIN_DIR" "kp_folder_gone '$GONE' '$GONE_KEY'" >/dev/null 2>&1
-    )
     rc=$?
     [ "$rc" = 2 ] || die "いまの作業フォルダが無い一覧の kp_folder_gone: 期待 2 / 実際 $rc"
 }
@@ -592,7 +587,7 @@ t_shrink_slots() {
 }
 
 t_json_roundtrip() {
-    local f got
+    local f got p
     mkdir -p "$STATE"
     f="$STATE/t.json"
     inside "$MAIN_DIR" "kp_json_write '$f' folder='C:/作業/フォルダ' started_at:=123 list:='[\"a\"]'" || die "書けない"
@@ -608,9 +603,10 @@ t_json_roundtrip() {
     [ "$got" = feat/x ] || die "書き足した値: '$got'"
     got=$(inside "$MAIN_DIR" "kp_json_get '$f' missing")
     [ -z "$got" ] || die "無いキー: '$got'"
-    if ls "$STATE" | grep -v '^t\.json$' | grep -q .; then
-        die "一時ファイルが残った: $(ls "$STATE")"
-    fi
+    for p in "$STATE"/*; do
+        [ -e "$p" ] || [ -L "$p" ] || continue
+        [ "${p##*/}" = t.json ] || die "一時ファイルが残った: $(ls "$STATE")"
+    done
 }
 
 echo "--- 設定の数(要件3.1)"
