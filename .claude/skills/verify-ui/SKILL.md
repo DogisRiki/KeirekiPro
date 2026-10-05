@@ -11,19 +11,19 @@ UI変更を実画面で検証する。人間が触る前の一次スクリーニ
 
 ## Steps
 
-1. devサーバを起動する(既に起動済みなら再利用):
+1. devサーバを起動する:
 
 ```
-docker compose exec -d -w /home/spring/app backend ./gradlew bootRun --args=--spring.profiles.active=dev
+bash .claude/scripts/parallel/ui.sh start --session <ID>
 ```
 
-```
-docker compose exec -d -u node -w /home/node/app frontend pnpm run dev
-```
+   - `ui.sh` は、いまの作業フォルダ(worktree のセッションでは worktree の最上位)を読み込んだ backend と frontend のdevサーバを、1回きりのコンテナで起動する。Claude は、起動したままの常駐コンテナの中でdevサーバを起動しない
+   - Claude は、セッションのIDを、SessionStart のフックが渡した `[parallel] このセッションのID` の文から取る。文が見つからなければ、`--session` を付けずに呼ぶ
+   - `ui.sh` は、backend の `actuator/health` が200を返し、frontend に TCP でつながるまで待ってから、終了コード0で終わる。最初の1回は、Gradle のライブラリの取得と `pnpm install` が走るので数分かかる(2026-10-05 の本体フォルダでの最初の1回は約3分)。健康の確かめが上限まで続くと、Bash を前面で動かすときの上限600秒を超えるおそれがあるので、Claude は、`--wait` を付けないときも Bash の `run_in_background` で呼び、`timeout` を2400000ミリ秒にする(健康の確かめだけで最大約1230秒かかり、その前の DB の確かめとコンテナの起動の時間も加わるため)
+   - 終了コード0のとき、`ui.sh` は `[parallel] 画面確認の URL: http://host.docker.internal:<ポート>` と `[parallel] backend の URL: ...` を出す。ポートは枠ごとに変わるので、Claude は URL を決め打ちせず、この出力から取る
+   - 終了コードが0でないときは、下の「順番待ちと検査できないとき」に従う
 
-   backendは `http://localhost:8080/actuator/health` が200になるまで待つ。
-
-2. Playwright MCPで `http://host.docker.internal:5173`(コンテナ内から)または `http://localhost:5173` を開き、**変更した画面**へ遷移する。
+2. Playwright MCPで、手順1で出された画面確認の URL を開き、**変更した画面**へ遷移する。Playwright のブラウザは別のコンテナで動くので、`localhost` ではなく出された `host.docker.internal` の URL をそのまま使う。
 
 3. 変更したコントロールを実際に操作する(入力・クリック・ドラッグ等)。状態変化を前後のスクリーンショットで記録する。
 
@@ -31,11 +31,30 @@ docker compose exec -d -u node -w /home/node/app frontend pnpm run dev
 
 5. 変更がレスポンシブ表示に影響する場合はビューポートを変えて再確認する。
 
+6. 確認を終えたら、devサーバを止める:
+
+```
+bash .claude/scripts/parallel/ui.sh stop
+```
+
+   - `ui.sh stop` は、いまの作業フォルダの画面確認のコンテナだけを消し、枠を返す。ほかのセッションのdevサーバと常駐コンテナは止めない
+   - Claude は、確認の途中で失敗したときも、手順を打ち切る前に `ui.sh stop` を呼ぶ。止めないと、枠が埋まったままになり、ほかのセッションの品質チェックと画面確認が順番待ちになる
+   - Claude は、見つけた問題のコードを直す前と、品質チェック(`/verify-frontend` など)を走らせる前に、`ui.sh stop` を呼ぶ。画面確認の枠を持ったまま品質チェックを呼ぶと、設定の数が1のときは、品質チェックが自分の画面確認の枠の空きを待ち、待ちの上限(30分)に達して終了コード75で終わるためである。直したあとは、手順1から画面確認をやり直す
+
+## 順番待ちと検査できないとき
+
+`ui.sh start` が次の3つの終了コードで終わったときは、devサーバは動いていない。扱いは品質チェックのスキル(`/verify-frontend` など)と同じにする。
+
+- 終了コード10(枠が埋まっていて待たなかった): Claude は、出された `[parallel] 順番待ち:` の行(どのIssueのチェックを待つか)を所有者に伝え、`--wait` を付けて(`bash .claude/scripts/parallel/ui.sh start --wait --session <ID>`)、Bash の `run_in_background` で呼び直す。Claude は、このときの Bash の `timeout` を、待ちの上限(1800秒)と起動にかかる時間の和より長くする(目安は3600000ミリ秒)。呼び直した結果の終了コードを、`ui.sh start` の結果として扱う
+- 終了コード69(起動しなかった、健康の確かめが上限に達した): Claude は、画面確認を不合格として扱い、出された `[parallel] 検査できない:` の理由(健康の確かめが上限に達したときは、出された backend と frontend のログの末尾も)を所有者に報告する。`ui.sh` は自分のコンテナを消して枠を返してから終わるので、`ui.sh stop` は要らない。Claude は修正の繰り返しに入らない
+- 終了コード75(待ちの上限に達した): Claude は、画面確認を不合格として扱い、どのIssueのチェックを待っていたか(出された `[parallel] 順番待ち:` の行)を所有者に報告する。Claude は修正の繰り返しに入らない
+- これら以外の0でない終了コード(Bash の時間の上限や中断で止められたときの130や143など): Claude は、画面確認を不合格として扱い、終了コードと出された文を所有者に報告する。止められたときも `ui.sh` は後片付けをしてから終わるが、Claude は念のため `ui.sh stop` を呼ぶ
+
 ## Rules
 
 - スクリーンショットは「操作前」「操作後」の両方を取得する
 - コンソールエラーが出たら、それを修正してから再検証する(握りつぶさない)
-- 検証後、自分が起動したdevサーバのプロセスを放置してよい(常駐開発サーバのため)
+- 検証を終えたら、Claude は `ui.sh stop` でdevサーバを止める。画面確認の枠は `ui.sh stop` まで埋まったままになる
 
 ## Report
 

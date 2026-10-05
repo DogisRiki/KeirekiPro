@@ -35,11 +35,11 @@ frontend配下を変更するとき常に適用する。ディレクトリ間の
 ## 完了前コマンド(この順で直列実行。coverageは必須でbuildで代替不可)
 
 ```
-docker compose exec -u node -w /home/node/app frontend pnpm run format
-docker compose exec -u node -w /home/node/app frontend pnpm run lint
-docker compose exec -u node -w /home/node/app frontend pnpm run typecheck
-docker compose exec -u node -w /home/node/app frontend pnpm test
-docker compose exec -u node -w /home/node/app frontend pnpm run coverage
+bash .claude/scripts/parallel/run-check.sh frontend pnpm run format
+bash .claude/scripts/parallel/run-check.sh frontend pnpm run lint
+bash .claude/scripts/parallel/run-check.sh frontend pnpm run typecheck
+bash .claude/scripts/parallel/run-check.sh frontend pnpm test
+bash .claude/scripts/parallel/run-check.sh frontend pnpm run coverage
 ```
 
 カバレッジ閾値は `vite.config.ts`(CODEOWNERS保護・編集禁止)に定義。
