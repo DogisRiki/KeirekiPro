@@ -194,6 +194,45 @@ describe("useAutoSave", () => {
         expect(opts.updateCareerMutation.mutate).not.toHaveBeenCalled();
     });
 
+    it("snsPlatformセクションでactiveEntryIdがdirtyの場合、一時IDならcreateSnsPlatformMutationが呼ばれること", async () => {
+        const tempSnsPlatformId = `${TEMP_ID_PREFIX}sns-temp-1`;
+        const resume: Resume = {
+            ...baseResume,
+            snsPlatforms: [
+                {
+                    id: tempSnsPlatformId,
+                    name: "GitHub",
+                    link: "https://github.com/example",
+                },
+            ],
+        };
+
+        useResumeStore.getState().setResume(resume);
+        useResumeStore.getState().setActiveSection("snsPlatform");
+        useResumeStore.getState().setActiveEntryId(tempSnsPlatformId);
+        useResumeStore.getState().addDirtyEntryId(tempSnsPlatformId);
+        useResumeStore.getState().setDirty(true);
+
+        const opts = buildOptions();
+
+        renderHook(() => useAutoSave(opts));
+
+        await waitFor(() => {
+            expect(opts.createSnsPlatformMutation.mutate).toHaveBeenCalledTimes(1);
+        });
+
+        expect(opts.createSnsPlatformMutation.mutate).toHaveBeenCalledWith({
+            tempId: tempSnsPlatformId,
+            payload: {
+                name: "GitHub",
+                link: "https://github.com/example",
+            },
+        });
+
+        expect(opts.updateSnsPlatformMutation.mutate).not.toHaveBeenCalled();
+        expect(opts.createSelfPromotionMutation.mutate).not.toHaveBeenCalled();
+    });
+
     it("listセクションでactiveEntryIdが未設定、またはdirtyでない場合は保存ミューテーションが呼ばれないこと", async () => {
         useResumeStore.getState().setResume(baseResume);
         useResumeStore.getState().setActiveSection("career");
