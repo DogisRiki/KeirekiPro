@@ -29,7 +29,12 @@ git diff --name-only origin/main...HEAD
    - `terraform/` に変更あり → `/verify-terraform` の手順
    - 上記以外のみ(doc/.github等) → コマンド実行は不要。その旨を報告する
 
+   各verifyの手順は、コマンドを `bash .claude/scripts/parallel/run-check.sh <領域> <コマンド>` で呼び、いまの作業フォルダ(worktree のセッションでは worktree の最上位)を1回きりのコンテナで検査する。
+   変更領域の判定の `git` も、いまの作業フォルダで打つ。
+
 3. いずれかがFAILなら修正し、**修正した領域のverifyを最初から**やり直す。
+   ただし、`run-check.sh` の終了コード69(検査の環境を用意できなかった)と75(待ちの上限に達した)によるFAILは、コードを直しても解けない。
+   Claude は、そのFAILの理由を所有者に報告し、修正の繰り返しに入らない。終了コード10(順番待ち)の扱いは、各verifyの「順番待ちと検査できないとき」に従う。
 
 ## Rules
 

@@ -65,8 +65,8 @@ Dependabotの更新対象にならないため。この行はSpring Bootを上�
 ## 完了前コマンド(この順で直列実行)
 
 ```
-docker compose exec -w /home/spring/app backend ./gradlew spotlessApply
-docker compose exec -w /home/spring/app backend ./gradlew check
+bash .claude/scripts/parallel/run-check.sh backend ./gradlew spotlessApply
+bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 ```
 
 `check` = spotlessCheck + test + jacocoTestReport + **jacocoTestCoverageVerification(カバレッジ閾値)** + spotbugsMain/Test。

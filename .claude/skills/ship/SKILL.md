@@ -59,6 +59,9 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
    後から付けると、付くまでの間は保留が効かない。
    このラベルのPRは、所有者がローカル確認してApproveするまで pre-merge-check チェックが赤のままになる。
 
+   PRを作ったら、`gh pr view --json number -q .number` を単独のコマンドとして実行し、いまのブランチのPRの番号を得る。
+   以降の手順の `<PR番号>` には、この番号を使う。ほかのPRの番号を使わない(並行して動くほかのセッションのPRを扱わないため)。
+
 6. **auto-mergeの予約の確認**: auto-mergeは仕組みが予約する。AIは `gh pr merge` で予約の操作をしない。
    予約されたことを次のコマンドで確かめる(`true` なら予約済み)。
    `gh pr view <PR番号> --json autoMergeRequest --jq '.autoMergeRequest != null'`
@@ -73,8 +76,11 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
    - `dependency-gate` / `pre-merge-check` / CODEOWNERS起因の待ちは人間の承認待ちなので、その旨を報告して終了する
    - チェックは緑なのにブランチが out of date でマージが進まない場合は、
      `git fetch origin && git merge origin/main` してpushする(または `gh pr update-branch <PR番号>`)。
-     コンフリクトが出たら解消し、verifyを再実行してから、`git add <解消したファイル>` と
-     `git commit -F .git/MERGE_MSG` でマージを完了し、手順4の形でpushする
+     コンフリクトが出たら解消し、verifyを再実行してから、次の3つを、それぞれ単独のコマンドとして順に実行してマージを完了し、手順4の形でpushする。
+     1. `git rev-parse --git-path MERGE_MSG` でマージのメッセージのファイルのパスを得る
+        (worktree の作業フォルダと本体フォルダとでパスが違うため、パスを決め打ちしない)
+     2. `git add <解消したファイル>`
+     3. `git commit -F <手順1で得たパス>`(手順3と同じく、コマンドの置き換え `$(...)` でパスを渡さない)
 
 ## Rules
 
