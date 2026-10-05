@@ -35,11 +35,11 @@
   - _対象の部品: ui.sh_
   - _依存: 2.1_
 
-- [ ] 2.3 着手のときの調べと記録のスクリプトを作る (並行可)
+- [x] 2.3 着手のときの調べと記録のスクリプトを作る (並行可)
 
   Claude は、部品「session.sh」のうち、`check-start`、`claim`、`end`、`spec-names` のサブコマンドと、そのテスト `test-session.sh` を作る。Claude は、`check-start` が最初に呼ぶ `prune` を、この小タスクでは何もしない形にしておき、2.4 で `prune` の中身を作る。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の check-start・claim・end・spec-names の場合がすべて通る
-  - 受入基準とテストの対応: 要件5の受入基準1(同じ作業フォルダの別のセッションで止まる)は、テストの「同じ作業フォルダに別のセッションの記録があると folder_conflict に出る」で確かめる。要件5の受入基準2(やめたと答えたら続ける)は、テストの「end のあとの check-start では folder_conflict が空になる」で確かめる。要件4の受入基準1と2(どの作業フォルダの作りかけでも、セッションの開閉を問わず止まる)は、テストの「別の worktree のコミットしていない spec が leftovers に出て、セッションの記録の有無が active_session に出る」「いまの作業フォルダの作りかけは is_self が真で出る」「spec の無いIssueもIssueの記録のブランチで見つかる」で確かめる。要件3の受入基準6(埋まっていることを報告する)は、テストの「capacity に自分以外の作業中のセッションが出る」で確かめる。要件1の受入基準1の spec の名前の重なりは、テストの「spec-names がほかの worktree の spec の名前も出す」で確かめる
+  - 受入基準とテストの対応: 要件5の受入基準1(同じ作業フォルダの別のセッションで止まる)は、テストの「同じ作業フォルダに別の作業中のセッションの記録があると folder_conflict に出る」「同じ作業フォルダの、Issueの記録の無いセッション(着手していない記録)は folder_conflict に出ない」で確かめる。要件5の受入基準2(やめたと答えたら続ける)は、テストの「end のあとの check-start では folder_conflict が空になる」で確かめる。要件4の受入基準1と2(どの作業フォルダの作りかけでも、セッションの開閉を問わず止まる)は、テストの「別の worktree のコミットしていない spec が leftovers に出て、セッションの記録の有無が active_session に出る」「いまの作業フォルダの作りかけは is_self が真で出る」「spec の無いIssueもIssueの記録のブランチで見つかる」で確かめる。要件3の受入基準6(埋まっていることを報告する)は、テストの「capacity に自分以外の作業中のセッションが出る」で確かめる。要件1の受入基準1の spec の名前の重なりは、テストの「spec-names がほかの worktree の spec の名前も出す」で確かめる
   - _要件: 1.1, 3.6, 4.1, 4.2, 5.1, 5.2_
   - _対象の部品: session.sh_
 
@@ -157,6 +157,7 @@
 - 1.1 で作った `lib.sh` の使い方の決まり: 枠を取る関数は、セッションのIDを環境変数 `KP_SESSION_ID`(`--session` の値)から受け取る。`kp_slot_holders` は1行ずつタブ区切りで「枠の番号、作業フォルダ、Issueの番号、種類、始めた時刻」を出す。取り戻しを単独で呼べる `kp_slot_reclaim` がある(2.4 の `prune` で使う)。`kp_json_write` は `キー=値` で文字列を、`キー:=JSON` で数や配列を書き、ファイルが既にあれば中身を残して書き足す。終了コード69の関数は `exit` で終わるので、呼ぶ側を止めたくないときはサブシェルで呼ぶ
 - 2.1 で作った `run-check.sh` の決まり: frontend の準備は `kp_frontend_prepare <k>` で、結果を `KP_FRONTEND_ARGS` `KP_FRONTEND_PRE` `KP_FRONTEND_ERROR` に返す。コンテナの中の準備(`pnpm install`、`terraform init`)の失敗は終了コード197で見分け、外で69に読み替える。Docker のデーモンにつながるかは、枠を取ったあとに `docker version` で確かめる
 - design.md の lib.sh の節の `kp_main_folder` の書き方の誤り(「`kp_state_dir` の親」は `.git` になる)は、design のサイクル3で「git の共通ディレクトリの親、つまり本体フォルダ」に直した。Claude は、`kp_main_folder` の実装を 1.1 で作ったとおりのままにし、変えない
+- 2.3 の確認役の申し送り: `check-start` は、セッションのIDが空のときは、Issueの記録の `session_id` との照合で自分の作りかけを除かない(空どうしを同じとみなすと、閉じた前のセッションの作りかけを見落とすため)。作業フォルダのディレクトリが消えた worktree(git では prunable)は作業フォルダとして数えず、そこで開かれていたブランチは `branch_only` に出るが、git はそのブランチを開いたままとみなすので `git switch` が「already checked out」で失敗する。2.4 の `prune` で `git worktree prune` を打つか、2.5 の `takeover --branch` で手当てする
 - 2.2 の確認役の申し送り: `ui.sh` は `run-check.sh` の内部の関数(`_kp_rc_print_holders` `_kp_rc_seconds`)を使うので、名前を変えるときは両方を直す。frontend の TCP の確かめ(1秒ごとに60回)は、node_modules のボリュームが空で `pnpm install` が長いと足りないおそれがあり、db を起こした直後の `psql` の確かめも失敗しうる。この2つの確かめで足りるかどうかは、3.2 と 5.1 の本物の docker での確かめで見る。
 
 ## 完了条件(全タスク共通)
