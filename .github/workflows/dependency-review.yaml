@@ -59,7 +59,7 @@ jobs:
       # 依存解決のみを行い、ビルドとテストは実行しない。
       # 生成したスナップショットはアーティファクトとして保存し、送信は次のジョブが行う
       - name: Generate dependency graph
-        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/dependency-submission@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           build-root-directory: backend
           dependency-graph: generate-and-upload
@@ -97,7 +97,7 @@ jobs:
       # checkout しない。信頼できないコードを一切実行せず、
       # アーティファクトを取得してAPIへ送るだけにする
       - name: Submit dependency graph
-        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/dependency-submission@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           dependency-graph: download-and-submit
 
