@@ -82,13 +82,15 @@ _kp_rc_fail69() {
 _kp_rc_print_holders() { # <設定の数>
     local n="$1" now k folder issue kind started label
     now=$(date +%s)
-    while IFS=$'\t' read -r k folder issue kind started; do
+    # タブは IFS の空白の扱いで続いた区切りが1つにまとまり、空の欄(Issueの番号が無いとき)が消える。
+    # 空白でない区切り(\037)に替えてから読み、空の欄を保つ
+    while IFS=$'\037' read -r k folder issue kind started; do
         [ -n "$k" ] || continue
         case "$started" in '' | *[!0-9]*) started=$now ;; esac
         if [ -n "$issue" ]; then label="#$issue"; else label="Issue不明"; fi
         printf '[parallel] 順番待ち: 設定の数 %s の枠を、%s(%s、%s、%s分前から)が使っている\n' \
             "$n" "$label" "$folder" "$kind" "$(((now - started) / 60))"
-    done < <(kp_slot_holders 2>/dev/null)
+    done < <(kp_slot_holders 2>/dev/null | tr '\t' '\037')
 }
 
 # 秒の環境変数を読む(1以上の整数でなければ既定の値)

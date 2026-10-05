@@ -398,6 +398,15 @@ t_full_no_wait() {
     grep -q '"folder_key":"'"$(fkey "$WT_DIR")"'"' "$STATE/slots/1/owner.json" || die "ほかの枠を書き換えた"
 }
 
+t_full_no_wait_no_issue() {
+    local want
+    put_owner 1 "$WT" "$(fkey "$WT_DIR")" check "$(($(now) - 90))"
+    rc "$MAIN_DIR" frontend pnpm run lint
+    [ "$RC" = 10 ] || die "期待 10 / 実際 $RC: $OUT"
+    want="[parallel] 順番待ち: 設定の数 1 の枠を、Issue不明($WT、check、1分前から)が使っている"
+    [ "$OUT" = "$want" ] || die "持ち主の一覧が違う: '$OUT' / 期待 '$want'"
+}
+
 t_wait_then_run() {
     local pid out_file rc_file i
     put_issue 481 "$WT" feat/wt
@@ -656,6 +665,7 @@ run_test "作業フォルダごとの node_modules のボリューム名が鍵�
 
 echo "--- 待つ、待ちを示す(要件3.2・3.3)"
 run_test "枠が埋まっていて --wait が無ければ終了コード10と持ち主の一覧を出し、docker を呼ばない" t_full_no_wait
+run_test "Issueの記録が無い作業フォルダが枠を持っていれば Issue不明 と出し、欄がずれない" t_full_no_wait_no_issue
 run_test "--wait では空いたあとに動く" t_wait_then_run
 
 echo "--- 同時に走っても失敗しない(要件3.4)"
