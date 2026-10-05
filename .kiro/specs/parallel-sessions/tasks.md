@@ -87,7 +87,7 @@
   - _対象の部品: 品質チェックと画面確認のスキルの変更_
   - _依存: 2.1_
 
-- [ ] 3.2 画面確認のスキルを新しいスクリプトにつなぐ
+- [x] 3.2 画面確認のスキルを新しいスクリプトにつなぐ
 
   Claude は、`/verify-ui` の開発サーバの起動と停止を `ui.sh start --session <ID>` と `ui.sh stop` に変え、Playwright で開く URL を `ui.sh` の出力から取るようにする。`ui.sh` の終了コード10・69・75の扱いは、品質チェックのスキルと同じにする。「自分が起動したdevサーバのプロセスを放置してよい」の決まりを消す。
   - 完了の確かめ方: `/verify-ui` に常駐コンテナへの `docker compose exec` が残っていない。本体フォルダで `/verify-ui` の手順を流すと、出された URL の画面を Playwright で開け、`ui.sh stop` のあと `docker ps --filter label=keirekipro.kind=ui` が空になる
@@ -175,6 +175,7 @@
   - (2.6 の確認役)Claude は、`session-registry.sh` が、記録が壊れていれば作り直すこと、空のIDや `.` `..` `/` `\` を含むIDでは何もしないこと、失敗したときは additionalContext も出さないことを、design の session-registry.sh の「失敗したとき」に書く
   - (2.7 の確認役)Claude は、作業の終わりのフックが、入力の `cwd` から作業フォルダが決まらないとき(git のリポジトリの外、無いディレクトリ)は `CLAUDE_PROJECT_DIR` の最上位を見て、それも決まらないときだけ通すことを、design の「check-verify-before-stop.sh の変更」と「テストの方針」に書く。「`cwd` が無いときだけ `CLAUDE_PROJECT_DIR` を使う」の文も、これに合わせて直す。Claude が scratchpad に移ったまま作業を終えたときに、作業フォルダの検証していない変更を見逃さないためである
   - (3.1 の確認役)Claude は、`/verify-backend` が `./gradlew check` を `--wait` を付けないときも Bash の `run_in_background` で呼ぶことを、design の「品質チェックと画面確認のスキルの変更」に書く。1回きりのコンテナでの最初の1回は約10分(「性能」)で、Bash を前面で動かすときの上限600秒を超えるおそれがあるためである
+  - (3.2 の確認役)Claude は、`/verify-ui` が `ui.sh start` を `--wait` を付けないときも Bash の `run_in_background` で呼ぶこと(健康の確かめが上限まで続くと600秒を超えるため)と、10・69・75以外の0でない終了コードを不合格として報告することを、design の「品質チェックと画面確認のスキルの変更」に書く
   - (2.6 の確認役)Claude は、セッションの途中で cwd が別の worktree に移っても記録の `folder` は最初の作業フォルダのままであることを、design の session-registry.sh の節に書く。あわせて、SessionEnd の登録には `timeout` を書くこと(書かないと1.5秒で打ち切られる)を、design の「いつ動くか」に書く
 
 ## 完了条件(全タスク共通)
