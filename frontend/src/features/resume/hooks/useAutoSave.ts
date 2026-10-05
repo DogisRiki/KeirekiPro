@@ -240,7 +240,7 @@ const executeMutation = (
             break;
         case "snsPlatform":
             if (isNew) {
-                mutations.createSelfPromotionMutation.mutate({
+                mutations.createSnsPlatformMutation.mutate({
                     tempId: activeEntryId,
                     payload: buildPayloadForEntry(activeSection, activeEntry),
                 });
