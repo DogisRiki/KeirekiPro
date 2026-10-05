@@ -148,7 +148,7 @@
   - _要件: 1.5, 2.1, 2.2, 2.3, 3.2, 3.4_
   - _依存: 3.5_
 
-- [ ] 6. 設計の書き足しに合わせて直す
+- [x] 6. 設計の書き足しに合わせて直す
 - [x] 6.1 作業フォルダが無くなった持ち主の画面確認の枠を取り戻す
 
   Claude は、部品「lib.sh」の枠を取り戻す条件のとおり、種類が `ui` の枠を、持ち主のセッションの記録が無いときに加えて、記録の `folder` の作業フォルダが無くなっているときにも取り戻すようにし、そのテストを `test-lib.sh` に足す。Claude は、作業フォルダが無くなったかどうかを、`prune` と同じ判定(`git worktree list --porcelain` の、ディレクトリがある worktree の一覧に、記録の `folder` か `folder_key` が当たらないこと)で決め、その判定を `lib.sh` の関数1つにまとめる。Claude は、枠のコンテナを `docker rm -f` で消せなかったときは枠を取り戻さないという今の動きを変えない(design の審査の D5-2-1)。Claude は、「テストの方針」の `lib.sh` の2か所(持ち主のセッションの記録が残っている `ui` の枠は取り戻さない、記録があるときは `docker rm -f` が渡らない)の既存のテストを、作業フォルダが残っている記録の場合のテストとして残す(design の審査の D5-2-2)。
@@ -191,7 +191,7 @@
   - _対象の部品: 文書_
   - _依存: 6.2, 6.3_
 
-- [ ] 6.5 実際の Docker で、消した作業フォルダの片付けを確かめる
+- [x] 6.5 実際の Docker で、消した作業フォルダの片付けを確かめる
 
   Claude は、本体フォルダと、scratchpad に作った一時的な worktree で、実際の Docker を使って次を流し、結果を記録する。scratchpad の worktree はセッションとして開いたものではなくセッションの記録ができないので、Claude は、テスト用のIDで worktree のセッションの記録を `lib.sh` の書き込みで置き、worktree で `session.sh claim <テスト用の番号> --branch <worktree のブランチ> --session <そのID>` を呼んでから、`ui.sh start --session <そのID>` を `/verify-ui` と同じく Bash の `run_in_background` で打ち、終了コード0で終わるのを待つ。Claude は、`prune` の前に、`docker ps --filter label=keirekipro.kind=ui` に worktree の鍵のラベルのコンテナが動いていること、枠の置き場所に worktree の鍵の `ui` の枠があること、worktree の鍵のボリューム2つと DB があることを確かめて記録する。続けて、`ui.sh stop` を打たずに worktree を `git worktree remove --force` で消し、本体フォルダで `session.sh prune` と `session.sh check-start <テスト用の番号>` を打つ。終わったら、作った worktree・ブランチ・ボリューム・DB と、置いたセッションの記録とIssueの記録が、本物の記録の置き場所に残っていないことを確かめる(残ると、所有者の次の `/start` に、ありもしない作業中のセッションやブランチが出るため)。あわせて、`test-lib.sh` `test-run-check.sh` `test-ui.sh` `test-session.sh` と、`.claude/hooks/tests/` のテストを、すべて流し直す。
   - 完了の確かめ方: `ui.sh start` が終了コード0で終わり、`prune` の前に、worktree の鍵のラベルのコンテナが動いていて、その鍵の `ui` の枠とボリューム2つと DB がある。`prune` のあと、`docker ps -a --filter label=keirekipro.kind=ui` が空で、枠の置き場所に枠が残っておらず、消した worktree の鍵のボリューム2つと DB が無く、その worktree のセッションの記録が無い。続く `check-start` の `branch_only` に worktree のブランチが出る。片付けのあと、置いた記録・ブランチ・ボリューム・DB が残っていない。流し直したテストがすべて通る
