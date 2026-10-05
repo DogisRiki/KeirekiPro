@@ -63,7 +63,7 @@
 
 - [ ] 2.6 セッションの記録を付けるフックを作る (並行可)
 
-  Claude は、部品「session-registry.sh」のフックと、そのテスト `test-session-registry.sh` を作る。`.claude/hooks/` は Claude が書けないので、Claude は scratchpad に、リポジトリと同じ並び(`.claude/hooks/session-registry.sh`、`.claude/hooks/tests/test-session-registry.sh`、`.claude/scripts/parallel/lib.sh` の写し)を作り、その中でテストを流す。フックが `lib.sh` を `$(dirname "$0")/../scripts/parallel/lib.sh` で読み込み、テストがフックを `$(dirname "$0")/..` で探すためである。Claude は、scratchpad に作ったファイルを本来の場所に置く作業を、3.5 で所有者に頼む。
+  Claude は、部品「session-registry.sh」のフックと、そのテスト `test-session-registry.sh` を作る。Claude は scratchpad に、リポジトリと同じ並び(`.claude/hooks/session-registry.sh`、`.claude/hooks/tests/test-session-registry.sh`、`.claude/scripts/parallel/lib.sh` の写し)を作り、その中でテストを流す。フックが `lib.sh` を `$(dirname "$0")/../scripts/parallel/lib.sh` で読み込み、テストがフックを `$(dirname "$0")/..` で探すためである。Claude は、scratchpad に作ったファイルを本来の場所に置く作業を、3.5 で所有者に頼む。
   - 完了の確かめ方: scratchpad のリポジトリと同じ並びの中で、`bash .claude/hooks/tests/test-session-registry.sh` の場合がすべて通る
   - 受入基準とテストの対応: 要件5の受入基準1と要件4の受入基準3(作業中のセッションを見分ける)は、テストの「SessionStart で記録ができ additionalContext にIDが出る」「SessionEnd で記録が消える」「cwd が worktree なら記録の folder が worktree になる」で確かめる。要件3の受入基準6(セッションが埋まっていることを報告する)は、テストの「UserPromptSubmit で記録が無ければ作る」で確かめる
   - _要件: 3.6, 4.3, 5.1_
@@ -162,8 +162,11 @@
 
 - 設計への書き足しの貯め方(所有者が 2026-10-05 に決めた): 実装で見つかった、design.md に書き足しが要る細部は、見つかるたびに design を直さず、この下の一覧に貯める。全タスクが終わったあと、出荷の前に、まとめて1回で design.md に書き足し、design と tasks の承認を1回でやり直す
 - 設計への書き足しの一覧:
-  - (2.3・2.4、tasks の審査の T3-1-2)作業フォルダのディレクトリだけが消えた worktree は、作りかけの見つけ方で作業フォルダとして数えない。`prune` は最初に `git worktree prune` を打つ。design の「作りかけの見つけ方」と、`prune` の箇条書きと「使う部品」に足す
-  - (2.4 の確認役)`prune` が消すボリュームと DB の鍵は、記録(sessions の `folder_key`、issues の `folder`)からしか求めない。記録が先に消えた作業フォルダ(引き継いだ元、`/start` をしなかった worktree)の分は片付けから漏れる。Docker のボリュームの一覧から求めると、同じプロジェクト名の別の clone のボリュームを消すおそれがあるため、記録から求める形を design に書き、漏れることを「失敗したときの扱い」か `prune` の節に書く
+  - (2.3・2.4、tasks の審査の T3-1-2)Claude は、2.3 の確認役の申し送りに書いた、ディレクトリだけが消えた worktree の数え方と、2.4 の説明に書いた `prune` の最初の `git worktree prune` を、design の「作りかけの見つけ方」と、`prune` の箇条書きと「使う部品」に足す
+  - (2.4 の確認役)`prune` が消すボリュームと DB の鍵は、記録(sessions の `folder_key`、issues の `folder`)からしか求めない。記録が先に消えた作業フォルダ(引き継いだ元、`/start` をしなかった worktree)の分は片付けから漏れる。Docker のボリュームの一覧から求めると、同じプロジェクト名の別の clone のボリュームを消すおそれがあるため、Claude は、記録から求める形を design に書き、漏れることを「失敗したときの扱い」か `prune` の節に書く
+  - (2.3 の確認役)Claude は、2.3 の確認役の申し送りに書いた、セッションのIDが空のときの `check-start` の照合の扱いを、design の「作りかけの見つけ方」に書く
+  - (tasks の審査の T1-1-8)Claude は、`ui.sh` が frontend の準備のために `run-check.sh` を読み込むことを、design の「使う既存の仕組み」の依存の向きに書く
+  - (design の審査の D2-1-4)Claude は、実装のメモに書いた `VITEST_MAX_WORKERS` の基準の8の由来を、design の「設計を見直すきっかけ」に書く
 
 ## 完了条件(全タスク共通)
 
