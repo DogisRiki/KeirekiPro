@@ -74,7 +74,8 @@ steeringには転記しない(更新のたびに乖離するため)。
 `localstack` / `dind`(Testcontainers用のDockerデーモン)。起動は `./start-dev.sh`。
 
 品質ゲートのコマンドはルートCLAUDE.mdの `/verify-frontend` `/verify-backend`
-`/verify-terraform` が正(直列実行・並列禁止)。
+`/verify-terraform` が正。Claude は、1つのセッションの中では品質チェックを順に1つずつ動かす。
+セッションをまたぐ同時実行は `run-check.sh` が設定の数までに抑える。
 
 ## 主要な技術的意思決定
 
