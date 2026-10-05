@@ -327,7 +327,7 @@ flowchart TD
   7. `session.sh` は、`issues/<N>.json` の `folder` と `session_id` をいまのものに書き直す。前の作業フォルダがほかの作業フォルダなら、それを `handed_over_from` に足す。いまの作業フォルダが `handed_over_from` に入っていれば、`session.sh` はそれを外す。外さないと、引き継ぎを戻したとき(前に引き継いだ元の作業フォルダへ引き継ぎ直したとき)に、引き継いだ先の作りかけがほかのセッションの `check-start` から見えなくなるためである。`session.sh` が `branch` を書き換えるのは、`--branch` のときと、手順4で前の作業フォルダからブランチ B を移したときだけである。Issueの記録が無いときは(移行の前からある作りかけを `--from` で引き継ぐときなど)、`session.sh` は、`branch` を空にした記録を作る
   8. `session.sh` は、標準出力に、写したファイルの一覧(`--from` がいまの作業フォルダのときは作りかけの一覧)と、いまのブランチを出す。引き継げずに終了コード1で終わるときは、`session.sh` は、引き継げなかった理由と、あれば次の手を `[parallel] 引き継げない:` で始まる文で標準エラーに出す。`--from` の値がこのリポジトリの作業フォルダでないとき(git の作業フォルダでないとき、git の共通ディレクトリがいまの作業フォルダと違うとき)は、`session.sh` は呼び方の誤りとして終了コード64で終わる
 - `spec-names`: すべての作業フォルダの `.kiro/specs/` のディレクトリ名を、重ならないように1行ずつ出す
-- `prune`: 作業フォルダが無くなった記録と、残った枠と、作業フォルダごとのボリュームと DB を片付ける。`check-start` は、最初に `prune` を行う。`check-start` は、`prune` の標準出力を捨て、標準エラーはそのまま出す。所有者が手で片付けるときも、`bash .claude/scripts/parallel/session.sh prune` を打つ
+- `prune`: 作業フォルダが無くなった記録と、残った枠と、作業フォルダごとのボリュームと DB を片付ける。`check-start` は、最初に `prune` を行う。`check-start` は、`prune` の標準出力を捨て、標準エラーはそのまま出す。所有者は手で片付けない(Claude は、運用の文書に片付けの手順を書かない)
   - `prune` は、最初に `git worktree prune` を打ち、ディレクトリが消えた worktree を git の記録から外す。git は、ディレクトリが消えた worktree で開かれていたブランチを開いたままとみなし、そのブランチへの `git switch` を「already checked out」で断る。外すと、ほかの作業フォルダからそのブランチに切り替えられる
   - 枠は、`lib.sh` の取り戻しの条件に当たるものを取り戻す
   - `prune` は、`sessions/` の記録と `issues/` の記録から、`folder` が無くなったものを探す。無くなった作業フォルダの鍵は、セッションの記録の `folder_key`(無ければ `folder` から求めた鍵)と、Issueの記録の `folder` から求めた鍵である。`prune` は、Issueの記録の `handed_over_from` からは鍵を求めない
@@ -410,7 +410,8 @@ flowchart TD
 
 - Claude は、`CLAUDE.md` の「品質ゲート」の節のコマンドを `run-check.sh` 経由の形に書き直し、「並列実行禁止」を「1つのセッションの中では順に1つずつ動かす。セッションをまたぐ同時実行は `run-check.sh` が設定の数までに抑える」に直す。「Git操作はホストOSのリポジトリルートで実行する」は「Git操作は、ホストOSで、そのセッションの作業フォルダの最上位で実行する」に直す
 - Claude は、スコープ別の CLAUDE.md と `.kiro/steering/tech.md` の品質チェックのコマンドと「直列実行・並列禁止」を同じく直す
-- Claude は、`doc/開発フロー/並行作業の手順.md` に、所有者の操作と、最初に一度だけ行う準備を書く。所有者の操作は、セッションを worktree を選んで開くことと、同時に走らせる数を `git config keirekipro.parallelSlots <数>` で変えることである。最初に一度だけ行う準備は、本体フォルダで `docker compose up -d` を打って共有のサービスを起こしておくことである
+- Claude は、`CLAUDE.md` の「品質ゲート」の節に、同時に走らせる数の設定 `keirekipro.parallelSlots`(初期値1)と、所有者に数を変えるよう頼まれたときの手順を書く。手順は、Claude が `docker info --format '{{.MemTotal}}'` で Docker に割り当てたメモリを読み、下の目安で数を求め、数と求め方を所有者に示してから `git config keirekipro.parallelSlots <数>` で設定する、とする。Claude は運用の文書に Claude がすることを書かないので、Claude は、この手順を、Claude が会話のたびに読む `CLAUDE.md` に書く
+- Claude は、`doc/開発フロー/並行作業の手順.md` に、所有者の操作と、最初に一度だけ行う準備を書く。所有者の操作は、セッションを worktree を選んで開くことと、同時に走らせる数を `git config keirekipro.parallelSlots <数>` で変えるか Claude に頼んで変えることである(頼まれたときの Claude の手順は、この節の上の箇条のとおり、Claude が `CLAUDE.md` に書く)。運用の文書は所有者が操作のときに読む手順書なので、Claude は、所有者の操作とその順番だけを書き、仕組みの動きや Claude がすることの説明を書かない。最初に一度だけ行う準備は、本体フォルダで `docker compose up -d` を打って共有のサービスを起こしておくことである
 - Claude は、同じ文書に、同時に走らせる数の目安を書く。目安は、Docker に割り当てたメモリから共有のサービスの分(約1GB)を引いた残りを、backend の品質チェック1回分(約4.2GB)で割った数(切り捨て、最小1)とする。根拠は「性能」の節の測定である
 
 ## データの形
