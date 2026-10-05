@@ -1,29 +1,10 @@
 {
     "permissions": {
         "allow": [
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run format)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run format:fix)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run lint)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run lint:fix)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run typecheck)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm test)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm run coverage)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend npx tsc -b)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend npx eslint *)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend npx prettier *)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend npx vitest run *)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm exec knip *)",
-            "Bash(docker compose exec -u node -w /home/node/app frontend pnpm exec playwright *)",
-            "Bash(docker compose exec -w /home/spring/app backend ./gradlew spotlessApply)",
-            "Bash(docker compose exec -w /home/spring/app backend ./gradlew check)",
-            "Bash(docker compose exec -w /home/spring/app backend ./gradlew test *)",
+            "Bash(bash .claude/scripts/parallel/run-check.sh *)",
+            "Bash(bash .claude/scripts/parallel/ui.sh *)",
+            "Bash(bash .claude/scripts/parallel/session.sh *)",
             "Bash(docker compose exec -w /home/spring/app backend ./gradlew flywayInfo)",
-            "Bash(docker compose exec -w /workspace terraform terraform fmt *)",
-            "Bash(docker compose exec -w /workspace terraform terraform validate)",
-            "Bash(docker compose exec -w /workspace terraform tflint *)",
-            "Bash(docker compose exec -w /workspace terraform checkov *)",
-            "Bash(docker compose exec -d -u node -w /home/node/app frontend pnpm run dev)",
-            "Bash(docker compose exec -d -w /home/spring/app backend ./gradlew bootRun *)",
             "Bash(docker compose up -d *)",
             "Bash(docker compose ps *)",
             "Bash(docker ps *)",
@@ -40,6 +21,7 @@
             "Bash(git push origin *)",
             "Bash(git fetch *)",
             "Bash(git merge origin/main)",
+            "Bash(git rev-parse *)",
             "Bash(gh pr create *)",
             "Bash(gh pr view *)",
             "Bash(gh pr list *)",
@@ -94,6 +76,28 @@
         ]
     },
     "hooks": {
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-registry.sh\"",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "SessionEnd": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-registry.sh\"",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
         "PreToolUse": [
             {
                 "matcher": "Bash",
@@ -114,16 +118,6 @@
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-encoding.sh\"",
                         "timeout": 15
-                    }
-                ]
-            },
-            {
-                "matcher": "Bash",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/record-gate-run.sh\"",
-                        "timeout": 10
                     }
                 ]
             },
@@ -177,6 +171,15 @@
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify-spec-review.sh\"",
                         "timeout": 20
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-registry.sh\"",
+                        "timeout": 10
                     }
                 ]
             }
