@@ -77,7 +77,7 @@
   - _要件: 2.5_
   - _対象の部品: check-verify-before-stop.sh の変更_
 
-- [ ] 3. スキルと設定をつなぐ
+- [x] 3. スキルと設定をつなぐ
 - [x] 3.1 品質チェックのスキルを新しいスクリプトにつなぐ
 
   Claude は、部品「品質チェックと画面確認のスキルの変更」のとおり、`/verify-frontend` `/verify-backend` `/verify-terraform` と `.claude/commands/goal-fix-tests.md` の品質チェックと自動の直しのコマンドを `run-check.sh` 経由に変え、`/verify-all` の説明を合わせる。単発のテストや検査(`npx vitest run` や `./gradlew test` など)も `run-check.sh` で打つと書く。`--wait` を `run_in_background` で呼ぶときは、Bash の時間の上限を、待ちの上限(1800秒)とそのコマンドの実行時間の和より長くすると書く。Bash の時間の上限を長くするのは、`--wait` が、待ったあとに同じ呼び出しの中でコマンドを動かすためである(backend の `./gradlew check` では最悪で約40分になり、`run_in_background` の既定の30分では足りない)。
@@ -114,7 +114,7 @@
   - _対象の部品: ship と review-loop の変更_
   - _依存: 2.3_
 
-- [ ] 3.5 設定とフックの置き換えを所有者に頼む
+- [x] 3.5 設定とフックの置き換えを所有者に頼む
 
   Claude は、`.claude/settings.json` の変更(`session-registry.sh` を SessionStart・UserPromptSubmit・SessionEnd に登録し、`record-gate-run.sh` の登録を外し、新しいスクリプトの許可を足し、常駐コンテナへの品質チェック・単発のテスト・開発サーバの `exec` の許可を外す)を scratchpad に用意する。続けて Claude は、2.6 と 2.7 で作ったフックとテストと、この `settings.json` を置くコマンドと、`record-gate-run.sh` を消すコマンドを、所有者にまとめて示す。所有者が置いたら、Claude は置かれたフックのテストを本来の場所で流し、品質チェックの記録が `run-check.sh` だけから書かれることを確かめる。
   - 完了の確かめ方: 所有者が置いたあと、`bash .claude/hooks/tests/test-session-registry.sh` と `bash .claude/hooks/tests/test-check-verify-before-stop.sh` が通り、`.claude/hooks/record-gate-run.sh` が無く、`settings.json` に `record-gate-run.sh` も常駐コンテナへの品質チェックの `exec` の許可も無い。本体フォルダで `run-check.sh terraform checkov -d .` が合格すると `.claude/.state/gate-run-terraform.txt` が書き直され、`PATH` の先に必ず失敗する偽物の `docker` を置いて同じコマンドが終了コード69で終わったときは書き直されない
