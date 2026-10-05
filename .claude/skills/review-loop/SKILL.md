@@ -17,6 +17,9 @@ Codexクロスレビューの指摘対応ループ。指摘の分類・修正・
 
 ## Steps(1往復 = 以下の1〜6)
 
+扱うPRの番号は、`gh pr view --json number -q .number`(いまのブランチのPR)を単独のコマンドとして実行して得る。
+以下の `<PR番号>` には、この番号を使う。ほかのPRの番号を使わない(並行して動くほかのセッションのPRを直さないため)。
+
 1. **指摘の取得**: `gh pr view <PR番号> --comments` で最新の「Codex Review」コメントを読む。
    `gh pr checks <PR番号>` で codex-review ジョブの状態も確認する。
 

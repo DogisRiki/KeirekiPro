@@ -105,7 +105,7 @@
   - _対象の部品: start スキルの変更_
   - _依存: 2.3, 2.5_
 
-- [ ] 3.4 出荷のスキルと spec を始めるスキルを作業フォルダに依らない形にする
+- [x] 3.4 出荷のスキルと spec を始めるスキルを作業フォルダに依らない形にする
 
   Claude は、部品「ship と review-loop の変更」のとおり、`/ship` と `/review-loop` を直す。マージのメッセージのファイルは、`git rev-parse --git-path MERGE_MSG` を別のコマンドとして先に打ってパスを得てから、そのパスを指定してコミットする形にする。design.md は、マージのメッセージのファイルの指定を、コマンドの置き換え(`$(...)`)を使う形で書いている。Claude がこの形を採らないのは、`/ship` の手順4のとおり、コミットのコマンドが `settings.json` の許可にそのまま当たる形でないと auto mode の判定に回るためである(design の審査の D1-1-10)。Claude は、`/ship` と `/review-loop` が扱うPRの番号を `gh pr view --json number -q .number` で取るようにする。あわせて、Claude は、`/kiro-spec-init` が spec の名前の重なりを確かめるときに `session.sh spec-names` の一覧を使うように直す。
   - 完了の確かめ方: `/ship` に `.git/MERGE_MSG` の固定のパスも `$(git rev-parse` も残っていない。一時的な worktree で `git rev-parse --git-path MERGE_MSG` が worktree 用のパス(`.git/worktrees/<名前>/MERGE_MSG`)を返す。`/kiro-spec-init` の名前の確かめが、ほかの worktree の spec の名前も見る
@@ -180,6 +180,7 @@
   - (3.3 の確認役)Claude は、`/start` が `check-start` `end` `claim` `takeover` の0でない終了コードで止まり、終了コードと標準エラーの文を所有者に伝えることを、design の「start スキルの変更」に書く
   - (3.3 の確認役)前の作業フォルダがブランチを開いていなかった引き継ぎでは、記録の `branch` が空のままになり、写したものに git が管理しているファイルの変更があると、`/start` の Step 7 の手順1の「コミットしていない変更があれば止まる」で止まる。作りかけは失われないが続けられない。Claude は、この場合の扱いを design の「start スキルの変更」で決めることを、design の書き足しのときに所有者に提案する
   - (3.3 の確認役)「分けたあとの進め方」で、spec が要る部分に `/kiro-spec-init` を頼むときにブランチを作って `claim` するかを、design の「start スキルの変更」の「役割(ブランチ)」は決めていない。Claude は、この扱いを design の書き足しのときに所有者に提案する
+  - (3.4 の確認役)Claude は、design の「ship と review-loop の変更」のマージのメッセージのファイルの指定を、tasks 3.4 の決め(`git rev-parse --git-path MERGE_MSG` を別のコマンドとして先に打ち、得たパスで `git commit -F` する)に合わせて直す。あわせて、`/kiro-spec-init` が `session.sh spec-names` の失敗で止まり、手元の `.kiro/specs/` だけを見る形に戻らないことを、design に書く
   - (2.6 の確認役)Claude は、セッションの途中で cwd が別の worktree に移っても記録の `folder` は最初の作業フォルダのままであることを、design の session-registry.sh の節に書く。あわせて、SessionEnd の登録には `timeout` を書くこと(書かないと1.5秒で打ち切られる)を、design の「いつ動くか」に書く
 
 ## 完了条件(全タスク共通)
