@@ -3,7 +3,7 @@
 # session.sh(着手のときの調べと記録のスクリプト)のテスト
 #
 # 実行: bash .claude/scripts/parallel/tests/test-session.sh
-# 一時的な git のリポジトリ(本体)と worktree を2つ作り、その中で session.sh を呼ぶ。
+# 一時的な git のリポジトリ(本体)と worktree を2つ(prune のテストではもう1つ)作り、その中で session.sh を呼ぶ。
 # docker は、呼ばれた引数を記録するだけの偽物(PATH の先頭に置く)に差し替える。
 # 本物のリポジトリの記録(.git/keirekipro-parallel)と git の設定には触れない。
 # 前提: bash・perl(JSON::PP)・git。ホストの Git Bash から流す。
@@ -19,9 +19,45 @@ WORK=$(cd "$TMP_ROOT" && { pwd -W 2>/dev/null || pwd; })
 
 # --- 偽物の docker
 mkdir -p "$WORK/bin"
+# FAKE_DB_RUNNING を設定すると、db が動いているときの答え(コンテナのID)を返し、
+#   DB があるかの問いには、FAKE_DB_ABSENT に挙げた名前のほかは「ある」(1)と答える。
+# FAKE_UI_CONTAINER を設定すると、ui のコンテナを探す問いに、そのコンテナの名前を返す。
+# FAKE_DOCKER_FAIL を設定すると、どの呼び出しも Docker につながらないときのように終了コード1で終わる。
+# FAKE_VOLUME_INUSE / FAKE_VOLUME_MISSING に挙げたボリュームの volume rm は、使用中 / 無いの文で失敗する。
 cat >"$WORK/bin/docker" <<'EOF'
 #!/bin/bash
 printf '%s\n' "$*" >>"$FAKE_DOCKER_LOG"
+if [ -n "${FAKE_DOCKER_FAIL:-}" ]; then
+    echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?" >&2
+    exit 1
+fi
+case "$*" in
+    "compose -p keirekipro ps --status running -q db")
+        [ -n "${FAKE_DB_RUNNING:-}" ] && echo fake-db-id
+        ;;
+    "compose -p keirekipro exec -T db psql -U postgres -tAc SELECT 1 FROM pg_database WHERE datname="*)
+        all="$*"
+        db=${all##*datname=\'}
+        db=${db%\'}
+        case " ${FAKE_DB_ABSENT:-} " in *" $db "*) ;; *) echo 1 ;; esac
+        ;;
+    "volume rm "*)
+        case " ${FAKE_VOLUME_INUSE:-} " in *" $3 "*)
+            echo "Error response from daemon: remove $3: volume is in use - [abc123]" >&2
+            exit 1
+            ;;
+        esac
+        case " ${FAKE_VOLUME_MISSING:-} " in *" $3 "*)
+            echo "Error response from daemon: get $3: no such volume" >&2
+            exit 1
+            ;;
+        esac
+        echo "$3"
+        ;;
+    "ps -aq --filter label=keirekipro.slot="*" --filter label=keirekipro.kind=ui")
+        [ -n "${FAKE_UI_CONTAINER:-}" ] && echo "$FAKE_UI_CONTAINER"
+        ;;
+esac
 exit 0
 EOF
 chmod +x "$WORK/bin/docker"
@@ -33,6 +69,8 @@ export FAKE_DOCKER_LOG="$WORK/docker.log"
 MAIN_DIR="$WORK/RepoMain"
 WT_DIR="$WORK/RepoWT"
 WT2_DIR="$WORK/RepoWT2"
+# prune のテストで作って消す worktree
+WT3_DIR="$WORK/RepoWT3"
 GITC=(-c user.name=t -c user.email=t@example.com -c commit.gpgsign=false)
 git init -q "$MAIN_DIR"
 git -C "$MAIN_DIR" checkout -q -B main
@@ -58,6 +96,8 @@ fid() {
     fi
 }
 fkey() { fid "$(git -C "$1" rev-parse --show-toplevel)" | git hash-object --stdin | cut -c1-12; }
+# 無くなった作業フォルダの鍵(パスから直に求める)
+fkey_path() { fid "$1" | git -C "$MAIN_DIR" hash-object --stdin | cut -c1-12; }
 
 # ss <フォルダ> <引数>...: そのフォルダで session.sh を呼ぶ
 ss() {
@@ -99,6 +139,10 @@ reset_state() {
     local d b
     rm -rf "$STATE"
     git -C "$MAIN_DIR" config --unset keirekipro.parallelSlots 2>/dev/null
+    # prune のテストで作った worktree を外す
+    git -C "$MAIN_DIR" worktree remove --force "$WT3_DIR" 2>/dev/null
+    rm -rf "$WT3_DIR"
+    git -C "$MAIN_DIR" worktree prune
     for d in "$MAIN_DIR" "$WT_DIR" "$WT2_DIR"; do
         git -C "$d" reset -q --hard
         git -C "$d" clean -fdq
@@ -414,12 +458,212 @@ t_spec_names() {
 }
 
 # =====================================================================
-# prune(この小タスクでは呼べて何もしない)と docker
+# prune(要件4.5)と docker
 # =====================================================================
 t_prune_callable() {
+    local before rc
     put_session s-x "$WT" "$(fkey "$WT_DIR")" 100
-    ss "$MAIN_DIR" prune || die "prune の終了コード $?"
+    put_issue 42 "$WT" feat/wt s-x
+    before=$(cat "$STATE/issues/42.json")
+    ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
     [ -f "$STATE/sessions/s-x.json" ] || die "prune が記録を消した"
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "prune が残っている作業フォルダのIssueの記録を変えた: $(cat "$STATE/issues/42.json")"
+    [ ! -s "$FAKE_DOCKER_LOG" ] || die "片付けるものが無いのに docker が呼ばれた: $(cat "$FAKE_DOCKER_LOG")"
+    ss "$MAIN_DIR" prune extra >/dev/null 2>&1
+    rc=$?
+    [ "$rc" = 64 ] || die "引数の付いた prune の終了コードが64でない: $rc"
+}
+
+# WT3 を feat/extra で作り、Issue 42 を claim してセッションの記録を置く
+make_wt3_claimed() {
+    git -C "$MAIN_DIR" worktree add -q "$WT3_DIR" -b feat/extra || die "worktree を作れない"
+    WT3=$(git -C "$WT3_DIR" rev-parse --show-toplevel)
+    WT3_KEY=$(fkey "$WT3_DIR")
+    put_session s-3 "$WT3" "$WT3_KEY" 100
+    ss "$WT3_DIR" claim 42 --branch feat/extra --session s-3 || die "claim が失敗した"
+}
+
+t_prune_branch_kept() {
+    local out f
+    make_wt3_claimed
+    git -C "$MAIN_DIR" worktree remove "$WT3_DIR" || die "git worktree remove が失敗した"
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    f="$STATE/issues/42.json"
+    [ -f "$f" ] || die "ブランチが残っているのに issues/42.json が消えた"
+    [ "$(pj "$(cat "$f")" 'join "|", $d->{issue}, $d->{folder}, $d->{branch}, $d->{session_id}')" = "42||feat/extra|" ] \
+        || die "Issueの記録の folder と session_id が空になっていない: $(cat "$f")"
+    [ ! -f "$STATE/sessions/s-3.json" ] || die "消えた作業フォルダのセッションの記録が残っている"
+    [ "$(pj "$out" '$d->{branch_only}')" = '[{"branch":"feat/extra","where":"local"}]' ] || die "branch_only にブランチが出ない: $out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "消えた作業フォルダが leftovers に出た: $out"
+    # リモートにだけ残っているときも残す
+    git -C "$MAIN_DIR" update-ref refs/remotes/origin/feat/extra "$SEED_SHA"
+    git -C "$MAIN_DIR" branch -q -D feat/extra
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    [ -f "$f" ] || die "リモートにブランチが残っているのに issues/42.json が消えた"
+    [ "$(pj "$out" '$d->{branch_only}')" = '[{"branch":"feat/extra","where":"remote"}]' ] || die "branch_only にリモートのブランチが出ない: $out"
+}
+
+t_prune_branch_gone() {
+    local out
+    make_wt3_claimed
+    git -C "$MAIN_DIR" worktree remove "$WT3_DIR" || die "git worktree remove が失敗した"
+    ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
+    [ -f "$STATE/issues/42.json" ] || die "ブランチが残っているのに issues/42.json が消えた"
+    git -C "$MAIN_DIR" branch -q -D feat/extra
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    [ ! -f "$STATE/issues/42.json" ] || die "ブランチも消したのに issues/42.json が残っている: $(cat "$STATE/issues/42.json")"
+    [ "$(pj "$out" '$d->{branch_only}')" = '[]' ] || die "消したブランチが branch_only に出た: $out"
+    # 作業フォルダとブランチが一度に無くなったときも消す
+    put_issue 43 "$WORK/RepoGone" feat/none s-gone
+    ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
+    [ ! -f "$STATE/issues/43.json" ] || die "作業フォルダもブランチも無い issues/43.json が残っている"
+}
+
+t_prune_worktree_prune() {
+    make_wt3_claimed
+    # ディレクトリだけを消した worktree(git では prunable)
+    rm -rf "$WT3_DIR"
+    git -C "$MAIN_DIR" worktree list --porcelain | grep -qx "worktree $WT3" || die "前提: 消した worktree が git の記録に残っていない"
+    ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
+    ! git -C "$MAIN_DIR" worktree list --porcelain | grep -qx "worktree $WT3" || die "git worktree prune で外れていない"
+    git -C "$WT_DIR" switch -q feat/extra || die "残ったブランチに git switch できない"
+    [ "$(pj "$(cat "$STATE/issues/42.json")" '$d->{folder}')" = "" ] || die "Issueの記録の folder が空になっていない"
+}
+
+t_prune_sessions() {
+    local gone_key
+    gone_key=$(fkey_path "$WORK/RepoGone")
+    put_session s-gone "$WORK/RepoGone" "$gone_key" 100
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 200
+    put_session s-main "$MAIN" "$(fkey "$MAIN_DIR")" 300
+    ss "$WT_DIR" prune >/dev/null || die "prune の終了コード $?"
+    [ ! -f "$STATE/sessions/s-gone.json" ] || die "消えた作業フォルダのセッションの記録が残っている"
+    [ -f "$STATE/sessions/s-wt.json" ] || die "worktree のセッションの記録が消えた"
+    [ -f "$STATE/sessions/s-main.json" ] || die "本体フォルダのセッションの記録が消えた"
+}
+
+t_prune_volumes_and_db() {
+    local k1 k2 k_wt k_main line
+    k1=$(fkey_path "$WORK/RepoGone")
+    k2=$(fkey_path "$WORK/RepoGone2")
+    k_wt=$(fkey "$WT_DIR")
+    k_main=$(fkey "$MAIN_DIR")
+    put_session s-gone "$WORK/RepoGone" "$k1" 100
+    put_issue 44 "$WORK/RepoGone2" feat/none s-gone2
+    put_session s-wt "$WT" "$k_wt" 200
+    put_issue 45 "$WT" feat/wt s-wt
+    FAKE_DB_RUNNING=1 ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
+    for line in "volume rm kp-nm-$k1" "volume rm kp-gradle-project-$k1" \
+        "volume rm kp-nm-$k2" "volume rm kp-gradle-project-$k2" \
+        "compose -p keirekipro exec -T db psql -U postgres -c DROP DATABASE IF EXISTS kp_$k1" \
+        "compose -p keirekipro exec -T db psql -U postgres -c DROP DATABASE IF EXISTS kp_$k2"; do
+        grep -qxF "$line" "$FAKE_DOCKER_LOG" || die "docker に '$line' が渡っていない: $(cat "$FAKE_DOCKER_LOG")"
+    done
+    ! grep -qe "$k_wt" -e "$k_main" "$FAKE_DOCKER_LOG" || die "残っている作業フォルダのボリュームか DB を消した: $(cat "$FAKE_DOCKER_LOG")"
+    [ "$(grep -c "volume rm kp-nm-$k1" "$FAKE_DOCKER_LOG")" = 1 ] || die "同じ鍵のボリュームを2回以上消した"
+}
+
+t_prune_db_not_running() {
+    local k1
+    k1=$(fkey_path "$WORK/RepoGone")
+    put_session s-gone "$WORK/RepoGone" "$k1" 100
+    ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
+    ! grep -q "DROP DATABASE" "$FAKE_DOCKER_LOG" || die "db が動いていないのに DROP DATABASE を打った: $(cat "$FAKE_DOCKER_LOG")"
+    grep -qxF "volume rm kp-nm-$k1" "$FAKE_DOCKER_LOG" || die "db が動いていないときにボリュームの片付けまで飛ばした: $(cat "$FAKE_DOCKER_LOG")"
+    [ ! -f "$STATE/sessions/s-gone.json" ] || die "db が動いていないときに記録の片付けまで飛ばした"
+}
+
+t_prune_docker_unreachable() {
+    local k1 out err
+    k1=$(fkey_path "$WORK/RepoGone")
+    put_session s-gone "$WORK/RepoGone" "$k1" 100
+    out=$(FAKE_DOCKER_FAIL=1 FAKE_DB_RUNNING=1 ss "$MAIN_DIR" prune 2>"$TMP_ROOT/err.txt") || die "prune の終了コード $?"
+    err=$(cat "$TMP_ROOT/err.txt")
+    ! printf '%s' "$out" | grep -q "ボリューム" || die "Docker につながらないのにボリュームを消したと出した: $out"
+    printf '%s' "$err" | grep -q "Docker につながらない" || die "Docker につながらないことを標準エラーに出さない: $err"
+    printf '%s' "$err" | grep -q "鍵 $k1" || die "標準エラーに鍵が出ない: $err"
+    printf '%s' "$err" | grep -q "kp-nm-$k1 kp-gradle-project-$k1" || die "標準エラーに手で消すボリュームの名前が出ない: $err"
+    printf '%s' "$err" | grep -q "kp_$k1" || die "標準エラーに手で消す DB の名前が出ない: $err"
+    ! grep -qE "volume rm|DROP DATABASE" "$FAKE_DOCKER_LOG" || die "Docker につながらないのに消そうとした: $(cat "$FAKE_DOCKER_LOG")"
+    [ ! -f "$STATE/sessions/s-gone.json" ] || die "Docker につながらないときに記録の片付けまで飛ばした"
+}
+
+t_prune_volume_failures_reported() {
+    local k1 out err
+    k1=$(fkey_path "$WORK/RepoGone")
+    put_session s-gone "$WORK/RepoGone" "$k1" 100
+    out=$(FAKE_DB_RUNNING=1 FAKE_DB_ABSENT="kp_$k1" FAKE_VOLUME_INUSE="kp-nm-$k1" \
+        FAKE_VOLUME_MISSING="kp-gradle-project-$k1" ss "$MAIN_DIR" prune 2>"$TMP_ROOT/err.txt") \
+        || die "prune の終了コード $?"
+    err=$(cat "$TMP_ROOT/err.txt")
+    # 使用中で消せなかったボリュームは、名前つきで標準エラーに出す
+    printf '%s' "$err" | grep -q "kp-nm-$k1 を消せない: .*volume is in use" || die "使用中のボリュームを標準エラーに出さない: $err"
+    # 無いものは失敗として出さない
+    ! printf '%s' "$err" | grep -q "kp-gradle-project-$k1" || die "無いボリュームを失敗として出した: $err"
+    ! printf '%s' "$err" | grep -q "kp_$k1" || die "無い DB を失敗として出した: $err"
+    # 消せたものが無いので、「消した」は出さない
+    ! printf '%s' "$out" | grep -q "ボリュームと DB を消した" || die "消せなかったのに消したと出した: $out"
+    ! grep -q "DROP DATABASE" "$FAKE_DOCKER_LOG" || die "無い DB に DROP DATABASE を打った"
+    # 一部が消せたときは、消せたものだけを出す
+    put_session s-gone "$WORK/RepoGone" "$k1" 100
+    out=$(FAKE_DB_RUNNING=1 FAKE_VOLUME_INUSE="kp-nm-$k1" ss "$MAIN_DIR" prune 2>/dev/null) || die "prune の終了コード $?"
+    printf '%s' "$out" | grep -qx "\[parallel\] 片付け: 作業フォルダごとのボリュームと DB を消した: kp-gradle-project-$k1 kp_$k1" \
+        || die "消せたものだけを出していない: $out"
+}
+
+t_prune_slots() {
+    local now k_gone
+    now=$(date +%s)
+    k_gone=$(fkey_path "$WORK/RepoGone")
+    mkdir -p "$STATE/slots/1" "$STATE/slots/2" "$STATE/slots/3"
+    # 古い check の枠(動いているコンテナは無い)
+    printf '{"folder":"%s","folder_key":"%s","kind":"check","command":"x","started_at":1,"session_id":"s-wt"}\n' \
+        "$WT" "$(fkey "$WT_DIR")" >"$STATE/slots/1/owner.json"
+    # 消えた作業フォルダのセッションが持っていた ui の枠
+    printf '{"folder":"%s","folder_key":"%s","kind":"ui","command":"ui","started_at":%s,"session_id":"s-gone"}\n' \
+        "$WORK/RepoGone" "$k_gone" "$now" >"$STATE/slots/2/owner.json"
+    put_session s-gone "$WORK/RepoGone" "$k_gone" 100
+    # 始めたばかりの check の枠は取り戻さない
+    printf '{"folder":"%s","folder_key":"%s","kind":"check","command":"x","started_at":%s,"session_id":"s-wt"}\n' \
+        "$WT" "$(fkey "$WT_DIR")" "$now" >"$STATE/slots/3/owner.json"
+    FAKE_UI_CONTAINER=kp-ui-2-backend ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
+    [ ! -d "$STATE/slots/1" ] || die "古い check の枠が取り戻されていない"
+    [ ! -d "$STATE/slots/2" ] || die "消えた作業フォルダの ui の枠が取り戻されていない"
+    [ -d "$STATE/slots/3" ] || die "始めたばかりの check の枠を取り戻した"
+    # ui のコンテナを消してから、そのボリュームを消す
+    awk -v a="rm -f kp-ui-2-backend" -v b="volume rm kp-nm-$k_gone" \
+        '$0 == a && !ra { ra = NR } $0 == b && !rb { rb = NR } END { exit !(ra && rb && ra < rb) }' "$FAKE_DOCKER_LOG" \
+        || die "ui のコンテナを消してからボリュームを消していない: $(cat "$FAKE_DOCKER_LOG")"
+}
+
+t_prune_skips_without_worktree_list() {
+    local real_git
+    real_git=$(command -v git)
+    mkdir -p "$TMP_ROOT/gitfail"
+    # worktree list だけが失敗する git
+    cat >"$TMP_ROOT/gitfail/git" <<EOF
+#!/bin/bash
+case " \$* " in *" worktree list "*) exit 128 ;; esac
+exec "$real_git" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/gitfail/git"
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 100
+    put_issue 42 "$WT" feat/wt s-wt
+    (PATH="$TMP_ROOT/gitfail:$PATH" ss "$MAIN_DIR" prune >/dev/null 2>&1) || die "prune の終了コード $?"
+    [ -f "$STATE/sessions/s-wt.json" ] || die "作業フォルダの一覧を取れないときにセッションの記録を消した"
+    [ "$(pj "$(cat "$STATE/issues/42.json")" '$d->{folder}')" = "$WT" ] || die "作業フォルダの一覧を取れないときにIssueの記録を変えた"
+    [ ! -s "$FAKE_DOCKER_LOG" ] || die "作業フォルダの一覧を取れないときに docker を呼んだ: $(cat "$FAKE_DOCKER_LOG")"
+}
+
+t_prune_quiet_in_check_start() {
+    local out
+    put_session s-gone "$WORK/RepoGone" "$(fkey_path "$WORK/RepoGone")" 100
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    [ ! -f "$STATE/sessions/s-gone.json" ] || die "check-start が最初に prune を行っていない"
+    # 手で打った prune は、片付けたことを標準出力に出す
+    put_session s-gone "$WORK/RepoGone" "$(fkey_path "$WORK/RepoGone")" 100
+    out=$(ss "$MAIN_DIR" prune) || die "prune の終了コード $?"
+    printf '%s' "$out" | grep -q '^\[parallel\] 片付け' || die "prune が片付けたことを出さない: $out"
 }
 
 t_no_docker_in_check_start() {
@@ -451,12 +695,25 @@ run_test "どこでも開かれていないIssueのブランチが branch_only �
 echo "--- check-start: 作業中のセッションの数(要件3.6)"
 run_test "capacity に自分以外の作業中のセッションが出る" t_capacity
 
-echo "--- claim・spec-names・prune"
+echo "--- claim・spec-names"
 run_test "claim がIssueの記録を書き、すでにあれば書き直す" t_claim
 run_test "claim は誤った呼び方で記録を書かない" t_claim_usage
 run_test "spec-names がほかの worktree の spec の名前も出す" t_spec_names
-run_test "prune は呼べて、記録を変えない" t_prune_callable
 run_test "check-start・claim・spec-names は docker を呼ばない" t_no_docker_in_check_start
+
+echo "--- prune(要件4.5)"
+run_test "prune は、作業フォルダが残っている記録を変えず、片付けるものが無ければ docker を呼ばない" t_prune_callable
+run_test "worktree を git worktree remove で消したあとも、ブランチが残っていれば issues の記録が folder を空にして残り、check-start の branch_only に出る" t_prune_branch_kept
+run_test "ブランチも消したあとは記録が消える" t_prune_branch_gone
+run_test "ディレクトリだけを消した worktree は git worktree prune で外れ、そのブランチに git switch できる" t_prune_worktree_prune
+run_test "消えた作業フォルダのセッションの記録が消え、残っている作業フォルダの記録は残る" t_prune_sessions
+run_test "消えた作業フォルダの鍵のボリュームと DB が消え、残っている作業フォルダのものは消えない" t_prune_volumes_and_db
+run_test "db が動いていなければ DB の片付けだけを飛ばし、ほかは続ける" t_prune_db_not_running
+run_test "Docker につながらなければボリュームも DB も消さず、鍵と名前を標準エラーに出し、記録の片付けは続ける" t_prune_docker_unreachable
+run_test "使用中で消せなかったボリュームを名前つきで標準エラーに出し、消せたものだけを消したと出す" t_prune_volume_failures_reported
+run_test "取り戻しの条件に当たる残った枠を取り戻し、ui のコンテナを消してからボリュームを消す" t_prune_slots
+run_test "check-start は最初に prune を行い、手で打った prune は片付けたことを出す" t_prune_quiet_in_check_start
+run_test "作業フォルダの一覧を取れないときは、記録もボリュームも消さない" t_prune_skips_without_worktree_list
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"

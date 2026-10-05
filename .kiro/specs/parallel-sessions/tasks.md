@@ -43,7 +43,7 @@
   - _要件: 1.1, 3.6, 4.1, 4.2, 5.1, 5.2_
   - _対象の部品: session.sh_
 
-- [ ] 2.4 記録と残ったものの片付けを作る
+- [x] 2.4 記録と残ったものの片付けを作る
 
   Claude は、部品「session.sh」の `prune` のサブコマンドと、そのテストを `test-session.sh` に足す。`prune` は、最初に `git worktree prune` を打ってディレクトリが消えた worktree を git の記録から外し、作業フォルダが無くなった記録とボリュームと DB を片付け、ブランチが残っているIssueの記録は `folder` を空にして残し、取り戻せる枠を取り戻す。この小タスクで Claude が変えるファイルは 2.3 と同じなので、Claude は、この小タスクを 2.3 のあとに行う。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の prune の場合がすべて通る
