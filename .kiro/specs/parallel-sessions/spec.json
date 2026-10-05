@@ -2,9 +2,9 @@
   "feature_name": "parallel-sessions",
   "issue": 481,
   "created_at": "2026-10-04T14:24:32+09:00",
-  "updated_at": "2026-10-05T16:59:08+09:00",
+  "updated_at": "2026-10-05T17:55:31+09:00",
   "language": "ja",
-  "phase": "design-generated",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -14,7 +14,9 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-05T17:47:48+09:00"
     },
     "tasks": {
       "generated": true,
