@@ -8,8 +8,10 @@ argument-hint: [frontend|backend] [対象テストの説明(任意)]
 ## 達成条件(満たしたら終了する)
 
 - 対象領域のテストコマンドが exit 0 で成功している
-  - frontend: `docker compose exec -u node -w /home/node/app frontend pnpm test`
-  - backend: `docker compose exec -w /home/spring/app backend ./gradlew test`
+  - frontend: `bash .claude/scripts/parallel/run-check.sh frontend pnpm test`
+  - backend: `bash .claude/scripts/parallel/run-check.sh backend ./gradlew test`
+  - 単発のテスト(`npx vitest run <ファイル>`、`./gradlew test --tests <テストクラス>` など)も、`run-check.sh` で打つ
+  - `run-check.sh` の終了コード10・69・75は、コマンドを動かしていない。これらの扱いは `/verify-frontend` と `/verify-backend` の「順番待ちと検査できないとき」に従う。Claude は、69と75をテストの成功として数えず、修正のターンを使わずに理由を所有者に報告する
 - 既存テストファイルの削除・skip化・アサーション削除を行っていない
 
 ## 上限

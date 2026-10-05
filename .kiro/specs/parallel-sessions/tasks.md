@@ -78,7 +78,7 @@
   - _対象の部品: check-verify-before-stop.sh の変更_
 
 - [ ] 3. スキルと設定をつなぐ
-- [ ] 3.1 品質チェックのスキルを新しいスクリプトにつなぐ
+- [x] 3.1 品質チェックのスキルを新しいスクリプトにつなぐ
 
   Claude は、部品「品質チェックと画面確認のスキルの変更」のとおり、`/verify-frontend` `/verify-backend` `/verify-terraform` と `.claude/commands/goal-fix-tests.md` の品質チェックと自動の直しのコマンドを `run-check.sh` 経由に変え、`/verify-all` の説明を合わせる。単発のテストや検査(`npx vitest run` や `./gradlew test` など)も `run-check.sh` で打つと書く。`--wait` を `run_in_background` で呼ぶときは、Bash の時間の上限を、待ちの上限(1800秒)とそのコマンドの実行時間の和より長くすると書く。Bash の時間の上限を長くするのは、`--wait` が、待ったあとに同じ呼び出しの中でコマンドを動かすためである(backend の `./gradlew check` では最悪で約40分になり、`run_in_background` の既定の30分では足りない)。
   - 完了の確かめ方: 3つのスキルと goal-fix-tests に、常駐コンテナへの `docker compose exec` が残っていない(`grep` で0件)。本体フォルダで `/verify-terraform` の手順を `run-check.sh` 経由で流すと、4つのコマンドがすべて合格する
@@ -174,6 +174,7 @@
   - (2.5 の確認役)Claude は、`takeover` が終了コード1の文を標準エラーに出すことと、`--from` がこのリポジトリの作業フォルダでないときに終了コード64で終わることを、design の `takeover` の手順8に書く
   - (2.6 の確認役)Claude は、`session-registry.sh` が、記録が壊れていれば作り直すこと、空のIDや `.` `..` `/` `\` を含むIDでは何もしないこと、失敗したときは additionalContext も出さないことを、design の session-registry.sh の「失敗したとき」に書く
   - (2.7 の確認役)Claude は、作業の終わりのフックが、入力の `cwd` から作業フォルダが決まらないとき(git のリポジトリの外、無いディレクトリ)は `CLAUDE_PROJECT_DIR` の最上位を見て、それも決まらないときだけ通すことを、design の「check-verify-before-stop.sh の変更」と「テストの方針」に書く。「`cwd` が無いときだけ `CLAUDE_PROJECT_DIR` を使う」の文も、これに合わせて直す。Claude が scratchpad に移ったまま作業を終えたときに、作業フォルダの検証していない変更を見逃さないためである
+  - (3.1 の確認役)Claude は、`/verify-backend` が `./gradlew check` を `--wait` を付けないときも Bash の `run_in_background` で呼ぶことを、design の「品質チェックと画面確認のスキルの変更」に書く。1回きりのコンテナでの最初の1回は約10分(「性能」)で、Bash を前面で動かすときの上限600秒を超えるおそれがあるためである
   - (2.6 の確認役)Claude は、セッションの途中で cwd が別の worktree に移っても記録の `folder` は最初の作業フォルダのままであることを、design の session-registry.sh の節に書く。あわせて、SessionEnd の登録には `timeout` を書くこと(書かないと1.5秒で打ち切られる)を、design の「いつ動くか」に書く
 
 ## 完了条件(全タスク共通)
