@@ -54,7 +54,7 @@ cd "$top" 2>/dev/null || exit 0
 
 lib="$(dirname "$0")/../scripts/parallel/lib.sh"
 [ -f "$lib" ] || exit 0
-# shellcheck source=../scripts/parallel/lib.sh
+# shellcheck source=.claude/scripts/parallel/lib.sh
 . "$lib" || exit 0
 
 # lib.sh の関数は失敗すると exit 69 で終わるので、サブシェルで呼ぶ
