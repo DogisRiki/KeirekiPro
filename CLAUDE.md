@@ -19,35 +19,38 @@ Codexによるクロスレビュー)で担保する。人間が関与するの�
 | `.kiro/steering/` | steering(プロジェクト知識) | - |
 | `doc/` | 設計図(クラス図・ER図・インフラ設計等)と人間向けの運用文書 | - |
 
-## 品質ゲート(すべて Docker Compose 経由・この順で直列実行。並列実行禁止)
+## 品質ゲート(すべて `run-check.sh` 経由・この順で実行)
+
+Claude は、1つのセッションの中では品質チェックを順に1つずつ動かす。セッションをまたぐ同時実行は `run-check.sh` が設定の数までに抑える。
+`run-check.sh` は、そのセッションの作業フォルダを読み込んだ1回きりのコンテナでコマンドを動かす。
 
 frontend(`/verify-frontend`):
 
 ```
-docker compose exec -u node -w /home/node/app frontend pnpm run format
-docker compose exec -u node -w /home/node/app frontend pnpm run lint
-docker compose exec -u node -w /home/node/app frontend pnpm run typecheck
-docker compose exec -u node -w /home/node/app frontend pnpm test
-docker compose exec -u node -w /home/node/app frontend pnpm run coverage
+bash .claude/scripts/parallel/run-check.sh frontend pnpm run format
+bash .claude/scripts/parallel/run-check.sh frontend pnpm run lint
+bash .claude/scripts/parallel/run-check.sh frontend pnpm run typecheck
+bash .claude/scripts/parallel/run-check.sh frontend pnpm test
+bash .claude/scripts/parallel/run-check.sh frontend pnpm run coverage
 ```
 
 backend(`/verify-backend`):
 
 ```
-docker compose exec -w /home/spring/app backend ./gradlew spotlessApply
-docker compose exec -w /home/spring/app backend ./gradlew check
+bash .claude/scripts/parallel/run-check.sh backend ./gradlew spotlessApply
+bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 ```
 
 terraform(`/verify-terraform`):
 
 ```
-docker compose exec -w /workspace terraform terraform fmt -check -recursive
-docker compose exec -w /workspace terraform terraform validate
-docker compose exec -w /workspace terraform tflint --recursive
-docker compose exec -w /workspace terraform checkov -d .
+bash .claude/scripts/parallel/run-check.sh terraform terraform fmt -check -recursive
+bash .claude/scripts/parallel/run-check.sh terraform terraform validate
+bash .claude/scripts/parallel/run-check.sh terraform tflint --recursive
+bash .claude/scripts/parallel/run-check.sh terraform checkov -d .
 ```
 
-CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` を外し、
+CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/parallel/run-check.sh <領域>` を外し、
 `frontend/` `backend/` 各ディレクトリでネイティブにコマンドを実行する。
 
 ## 自律動作の境界
@@ -72,7 +75,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `docker compose exec ...` 
 
 - 前提: ホストOSに **bash と perl(JSON::PP)が必要。jqには依存しない。**(`.claude/hooks/` のフックはこれらで実行される。シェルスクリプトは `.gitattributes` でLF強制)。
   **Windowsでは Git for Windows(Git Bash同梱)を入れることで満たす。** macOS / Linux は標準で満たす
-- Git操作はホストOSのリポジトリルートで実行する(devcontainer内Gitは無効)
+- Git操作は、ホストOSで、そのセッションの作業フォルダの最上位で実行する(devcontainer内Gitは無効)
 - ブランチ名は `.branch_name_template`、コミットメッセージは `.commit_template` に従う
 - PR本文には必ず `Refs: #<Issue番号>` を含める。テストのアサーションを意図的に変更した場合は
   `Test-Change-Justification: <理由>` を記載する
