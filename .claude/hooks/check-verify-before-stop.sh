@@ -8,11 +8,19 @@
 # ファイル一覧は git status --porcelain -z で取得する
 # (日本語ファイル名が引用符でエスケープされ、更新時刻の比較が
 # スキップされる問題を避けるため)。
+# 作業フォルダは入力の cwd の git の最上位(git -C <cwd> rev-parse --show-toplevel)で決め、
+# cwd が無いとき、または cwd から決まらない(git のリポジトリの外、無いディレクトリ)ときは、
+# CLAUDE_PROJECT_DIR の git の最上位を使う。CLAUDE_PROJECT_DIR はセッションを始めた場所のまま
+# 変わらないので、worktree で作業するセッションはそれぞれの作業フォルダの変更と記録を見る。
+# 品質ゲートが通った記録(その作業フォルダの .claude/.state/gate-run-<領域>.txt)は
+# .claude/scripts/parallel/run-check.sh だけが書く。
+# cwd からも CLAUDE_PROJECT_DIR からも作業フォルダが決まらないときだけ通す。
 # 無限ループ防止のため stop_hook_active のときは常に通す。
 # 前提: bash と perl(JSON::PP)。jqには依存しない。
 # Windowsでは Git for Windows(Git Bash同梱)がこれらを提供する。macOS/Linuxは標準。
 # =====================================================================
 set -u
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
 
 payload=$(cat)
 
@@ -33,11 +41,21 @@ case "$stop_active" in
     true | 1) exit 0 ;;
 esac
 
-project_dir="${CLAUDE_PROJECT_DIR:-}"
-[ -z "$project_dir" ] && project_dir=$(extract cwd)
-[ -z "$project_dir" ] && exit 0
-project_dir=${project_dir//\\//}
-[ -d "$project_dir" ] || exit 0
+# 与えたディレクトリの git の最上位を出す。決まらなければ終了コード1
+toplevel_of() {
+    local dir="${1//\\//}" top
+    [ -n "$dir" ] && [ -d "$dir" ] || return 1
+    top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
+    top=${top//\\//}
+    [ -n "$top" ] || return 1
+    printf '%s' "$top"
+}
+
+# 作業フォルダ: 入力の cwd の git の最上位。cwd が無いときと、cwd から決まらないとき
+# (Claude が作業フォルダの外へ cd したままなど)は、CLAUDE_PROJECT_DIR の git の最上位を使う
+project_dir=$(toplevel_of "$(extract cwd)") \
+    || project_dir=$(toplevel_of "${CLAUDE_PROJECT_DIR:-}") \
+    || exit 0
 cd "$project_dir" || exit 0
 
 state_dir="$project_dir/.claude/.state"

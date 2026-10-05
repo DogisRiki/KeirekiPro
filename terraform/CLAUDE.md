@@ -27,10 +27,10 @@ terraform配下・CI/CD(`.github/workflows/`)に関わる変更のとき常に�
 ## 完了前コマンド(この順で直列実行)
 
 ```
-docker compose exec -w /workspace terraform terraform fmt -check -recursive
-docker compose exec -w /workspace terraform terraform validate
-docker compose exec -w /workspace terraform tflint --recursive
-docker compose exec -w /workspace terraform checkov -d .
+bash .claude/scripts/parallel/run-check.sh terraform terraform fmt -check -recursive
+bash .claude/scripts/parallel/run-check.sh terraform terraform validate
+bash .claude/scripts/parallel/run-check.sh terraform tflint --recursive
+bash .claude/scripts/parallel/run-check.sh terraform checkov -d .
 ```
 
 fmtで差分が出た場合は `-check` を外して整形してから再実行する。
