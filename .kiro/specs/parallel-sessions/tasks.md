@@ -17,7 +17,7 @@
   - _要件: 1.3, 6.1_
   - _対象の部品: worktree に写すファイルと compose の読み込み_
 
-- [ ] 2. スクリプトとフックを作る
+- [x] 2. スクリプトとフックを作る
 - [x] 2.1 品質チェックのコマンドを1回きりのコンテナで動かすスクリプトを作る (並行可)
 
   Claude は、部品「run-check.sh」のスクリプトと、そのテスト `test-run-check.sh` を作る。Claude は、スクリプトを、「コマンドの前にすること」が空の領域でも `sh -c` の区切りが壊れない形にする。Claude は、`run-check.sh` が枠を取った直後に `chown` を動かす別の1回きりのコンテナにも、同じ枠のラベル(`--label keirekipro.slot=<k>`)を付ける。Claude は、frontend の準備(pnpm のストアのボリュームの持ち主を変えることと、node_modules の確かめ)を、2.2 の `ui.sh` からも使えるように、`run-check.sh` の中で1つの関数にまとめ、読み込んで呼べる形にする。`run-check.sh` は、`BASH_SOURCE` と `$0` を比べ、読み込まれただけのときは本体の処理を動かさないようにする。Claude は、テストが待ちの上限を環境変数で短くできるようにする。
@@ -69,7 +69,7 @@
   - _要件: 3.6, 4.3, 5.1_
   - _対象の部品: session-registry.sh_
 
-- [ ] 2.7 作業の終わりのフックがそのセッションの作業フォルダを見るようにする (並行可)
+- [x] 2.7 作業の終わりのフックがそのセッションの作業フォルダを見るようにする (並行可)
 
   Claude は、部品「check-verify-before-stop.sh の変更」のとおりに直したフックと、そのテスト `test-check-verify-before-stop.sh` を、2.6 と同じく scratchpad のリポジトリと同じ並びの中に作り、その中でテストを流す。`record-gate-run.sh` を消すことも、3.5 で所有者に頼む。
   - 完了の確かめ方: scratchpad のリポジトリと同じ並びの中で、`bash .claude/hooks/tests/test-check-verify-before-stop.sh` の場合がすべて通る
@@ -173,6 +173,7 @@
   - (2.5 の確認役)Claude は、`takeover --branch` でローカルにブランチが無いときに `git fetch origin +refs/heads/<ブランチ>:refs/remotes/origin/<ブランチ>` で取得し、取得に失敗しても手元のリモート追跡ブランチがあれば注意を出して使うことを、design の `takeover` の手順6に書く
   - (2.5 の確認役)Claude は、`takeover` が終了コード1の文を標準エラーに出すことと、`--from` がこのリポジトリの作業フォルダでないときに終了コード64で終わることを、design の `takeover` の手順8に書く
   - (2.6 の確認役)Claude は、`session-registry.sh` が、記録が壊れていれば作り直すこと、空のIDや `.` `..` `/` `\` を含むIDでは何もしないこと、失敗したときは additionalContext も出さないことを、design の session-registry.sh の「失敗したとき」に書く
+  - (2.7 の確認役)Claude は、作業の終わりのフックが、入力の `cwd` から作業フォルダが決まらないとき(git のリポジトリの外、無いディレクトリ)は `CLAUDE_PROJECT_DIR` の最上位を見て、それも決まらないときだけ通すことを、design の「check-verify-before-stop.sh の変更」と「テストの方針」に書く。「`cwd` が無いときだけ `CLAUDE_PROJECT_DIR` を使う」の文も、これに合わせて直す。Claude が scratchpad に移ったまま作業を終えたときに、作業フォルダの検証していない変更を見逃さないためである
   - (2.6 の確認役)Claude は、セッションの途中で cwd が別の worktree に移っても記録の `folder` は最初の作業フォルダのままであることを、design の session-registry.sh の節に書く。あわせて、SessionEnd の登録には `timeout` を書くこと(書かないと1.5秒で打ち切られる)を、design の「いつ動くか」に書く
 
 ## 完了条件(全タスク共通)
