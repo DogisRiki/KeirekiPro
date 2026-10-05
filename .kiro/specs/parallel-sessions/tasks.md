@@ -61,7 +61,7 @@
   - _対象の部品: session.sh_
   - _依存: 2.4_
 
-- [ ] 2.6 セッションの記録を付けるフックを作る (並行可)
+- [x] 2.6 セッションの記録を付けるフックを作る (並行可)
 
   Claude は、部品「session-registry.sh」のフックと、そのテスト `test-session-registry.sh` を作る。Claude は scratchpad に、リポジトリと同じ並び(`.claude/hooks/session-registry.sh`、`.claude/hooks/tests/test-session-registry.sh`、`.claude/scripts/parallel/lib.sh` の写し)を作り、その中でテストを流す。フックが `lib.sh` を `$(dirname "$0")/../scripts/parallel/lib.sh` で読み込み、テストがフックを `$(dirname "$0")/..` で探すためである。Claude は、scratchpad に作ったファイルを本来の場所に置く作業を、3.5 で所有者に頼む。
   - 完了の確かめ方: scratchpad のリポジトリと同じ並びの中で、`bash .claude/hooks/tests/test-session-registry.sh` の場合がすべて通る
@@ -159,6 +159,7 @@
 - design.md の lib.sh の節の `kp_main_folder` の書き方は、design のサイクル3で、誤り(「`kp_state_dir` の親」は `.git` になる)から「git の共通ディレクトリの親、つまり本体フォルダ」に直っている。Claude は、`kp_main_folder` の実装を 1.1 で作ったとおりのままにし、変えない
 - 2.3 の確認役の申し送り: `check-start` は、セッションのIDが空のときは、Issueの記録の `session_id` との照合で自分の作りかけを除かない(空どうしを同じとみなすと、閉じた前のセッションの作りかけを見落とすため)。作業フォルダのディレクトリが消えた worktree(git では prunable)は作業フォルダとして数えず、そこで開かれていたブランチは `branch_only` に出るが、git はそのブランチを開いたままとみなすので `git switch` が「already checked out」で失敗する。この食い違いは 2.4 の `prune` が手当てし、2.5 の `takeover --branch` では手当てしない
 - 2.2 の確認役の申し送り: `ui.sh` は `run-check.sh` の内部の関数(`_kp_rc_print_holders` `_kp_rc_seconds`)を使うので、名前を変えるときは両方を直す。frontend の TCP の確かめ(1秒ごとに60回)は、node_modules のボリュームが空で `pnpm install` が長いと足りないおそれがあり、db を起こした直後の `psql` の確かめも失敗しうる。この2つの確かめで足りるかどうかは、3.2 と 5.1 の本物の docker での確かめで見る。
+- 2.6 の申し送り: Claude は、2.6 で作ったフックとテストを、scratchpad の `hooks-2-6/` に置いている(3.5 で所有者に置いてもらう)。Claude Code の SessionEnd のフックは、`timeout` を書かないと全体で1.5秒しか使えない(https://code.claude.com/docs/en/hooks)。そのため、Claude は、3.5 で用意する `settings.json` の SessionEnd の登録にも `"timeout": 10` を書く
 
 - 設計への書き足しの貯め方(所有者が 2026-10-05 に決めた): 実装で見つかった、design.md に書き足しが要る細部は、見つかるたびに design を直さず、この下の一覧に貯める。全タスクが終わったあと、出荷の前に、まとめて1回で design.md に書き足し、design と tasks の承認を1回でやり直す
 - 設計への書き足しの一覧:
@@ -171,6 +172,8 @@
   - (2.5 の確認役)Claude は、Issueの記録が無いときに `takeover` が作る記録の形(`branch` は空)と、`takeover` が `branch` を書き換えるのは `--branch` のときと前の作業フォルダからブランチを移したときだけであることを、design の `takeover` の手順7と「データの形」に書く。あわせて、start スキルの「いまのブランチが記録の `branch` と同じなら新しいブランチを作らない」の判定で、`branch` が空のときは新しいブランチを作ることを、design の「start スキルの変更」に書く
   - (2.5 の確認役)Claude は、`takeover --branch` でローカルにブランチが無いときに `git fetch origin +refs/heads/<ブランチ>:refs/remotes/origin/<ブランチ>` で取得し、取得に失敗しても手元のリモート追跡ブランチがあれば注意を出して使うことを、design の `takeover` の手順6に書く
   - (2.5 の確認役)Claude は、`takeover` が終了コード1の文を標準エラーに出すことと、`--from` がこのリポジトリの作業フォルダでないときに終了コード64で終わることを、design の `takeover` の手順8に書く
+  - (2.6 の確認役)Claude は、`session-registry.sh` が、記録が壊れていれば作り直すこと、空のIDや `.` `..` `/` `\` を含むIDでは何もしないこと、失敗したときは additionalContext も出さないことを、design の session-registry.sh の「失敗したとき」に書く
+  - (2.6 の確認役)Claude は、セッションの途中で cwd が別の worktree に移っても記録の `folder` は最初の作業フォルダのままであることを、design の session-registry.sh の節に書く。あわせて、SessionEnd の登録には `timeout` を書くこと(書かないと1.5秒で打ち切られる)を、design の「いつ動くか」に書く
 
 ## 完了条件(全タスク共通)
 
