@@ -45,9 +45,9 @@
 
 - [ ] 2.4 記録と残ったものの片付けを作る
 
-  Claude は、部品「session.sh」の `prune` のサブコマンドと、そのテストを `test-session.sh` に足す。`prune` は、作業フォルダが無くなった記録とボリュームと DB を片付け、ブランチが残っているIssueの記録は `folder` を空にして残し、取り戻せる枠を取り戻す。この小タスクで Claude が変えるファイルは 2.3 と同じなので、Claude は、この小タスクを 2.3 のあとに行う。
+  Claude は、部品「session.sh」の `prune` のサブコマンドと、そのテストを `test-session.sh` に足す。`prune` は、最初に `git worktree prune` を打ってディレクトリが消えた worktree を git の記録から外し、作業フォルダが無くなった記録とボリュームと DB を片付け、ブランチが残っているIssueの記録は `folder` を空にして残し、取り戻せる枠を取り戻す。この小タスクで Claude が変えるファイルは 2.3 と同じなので、Claude は、この小タスクを 2.3 のあとに行う。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の prune の場合がすべて通る
-  - 受入基準とテストの対応: 要件4の受入基準5(ブランチだけでも止まる)は、テストの「worktree を git worktree remove で消したあとも、ブランチが残っていれば issues の記録が folder を空にして残り、check-start の branch_only に出る」「ブランチも消したあとは記録が消える」で確かめる
+  - 受入基準とテストの対応: 要件4の受入基準5(ブランチだけでも止まる)は、テストの「worktree を git worktree remove で消したあとも、ブランチが残っていれば issues の記録が folder を空にして残り、check-start の branch_only に出る」「ブランチも消したあとは記録が消える」で確かめる。ディレクトリだけが消えた worktree のブランチに切り替えられることは、テストの「ディレクトリだけを消した worktree は git worktree prune で外れ、そのブランチに git switch できる」で確かめる
   - _要件: 4.5_
   - _対象の部品: session.sh_
   - _依存: 2.3_
@@ -80,7 +80,7 @@
 - [ ] 3. スキルと設定をつなぐ
 - [ ] 3.1 品質チェックのスキルを新しいスクリプトにつなぐ
 
-  Claude は、部品「品質チェックと画面確認のスキルの変更」のとおり、`/verify-frontend` `/verify-backend` `/verify-terraform` と `.claude/commands/goal-fix-tests.md` の品質チェックと自動の直しのコマンドを `run-check.sh` 経由に変え、`/verify-all` の説明を合わせる。単発のテストや検査(`npx vitest run` や `./gradlew test` など)も `run-check.sh` で打つと書く。`--wait` を `run_in_background` で呼ぶときは、Bash の時間の上限を、待ちの上限(1800秒)とそのコマンドの実行時間の和より長くすると書く。`--wait` は、待ったあとに同じ呼び出しの中でコマンドを動かすためである(backend の `./gradlew check` では最悪で約40分になり、`run_in_background` の既定の30分では足りない)。
+  Claude は、部品「品質チェックと画面確認のスキルの変更」のとおり、`/verify-frontend` `/verify-backend` `/verify-terraform` と `.claude/commands/goal-fix-tests.md` の品質チェックと自動の直しのコマンドを `run-check.sh` 経由に変え、`/verify-all` の説明を合わせる。単発のテストや検査(`npx vitest run` や `./gradlew test` など)も `run-check.sh` で打つと書く。`--wait` を `run_in_background` で呼ぶときは、Bash の時間の上限を、待ちの上限(1800秒)とそのコマンドの実行時間の和より長くすると書く。Bash の時間の上限を長くするのは、`--wait` が、待ったあとに同じ呼び出しの中でコマンドを動かすためである(backend の `./gradlew check` では最悪で約40分になり、`run_in_background` の既定の30分では足りない)。
   - 完了の確かめ方: 3つのスキルと goal-fix-tests に、常駐コンテナへの `docker compose exec` が残っていない(`grep` で0件)。本体フォルダで `/verify-terraform` の手順を `run-check.sh` 経由で流すと、4つのコマンドがすべて合格する
   - 受入基準とテストの対応: 要件2の受入基準1(品質チェックはそのセッションの作業フォルダを検査する)、4(検査できないときは合格にしない)と、要件3の受入基準3(待っていることを示す)、5(待ちの上限で合格にしない)のスキルの側の扱いは、この完了の確かめ方と、5.1 の結合テストで確かめる
   - _要件: 2.1, 2.4, 3.3, 3.5_
@@ -156,9 +156,14 @@
 - design.md の「設計を見直すきっかけ」には、`VITEST_MAX_WORKERS` の基準の8が `compose.yaml` の `frontend` の環境変数に由来することが書かれていない(design の審査の D2-1-4)。`compose.yaml` の値を変えるときは、`run-check.sh` の割り算の基準も合わせて変える
 - 1.1 で作った `lib.sh` の使い方の決まり: 枠を取る関数は、セッションのIDを環境変数 `KP_SESSION_ID`(`--session` の値)から受け取る。`kp_slot_holders` は1行ずつタブ区切りで「枠の番号、作業フォルダ、Issueの番号、種類、始めた時刻」を出す。取り戻しを単独で呼べる `kp_slot_reclaim` がある(2.4 の `prune` で使う)。`kp_json_write` は `キー=値` で文字列を、`キー:=JSON` で数や配列を書き、ファイルが既にあれば中身を残して書き足す。終了コード69の関数は `exit` で終わるので、呼ぶ側を止めたくないときはサブシェルで呼ぶ
 - 2.1 で作った `run-check.sh` の決まり: frontend の準備は `kp_frontend_prepare <k>` で、結果を `KP_FRONTEND_ARGS` `KP_FRONTEND_PRE` `KP_FRONTEND_ERROR` に返す。コンテナの中の準備(`pnpm install`、`terraform init`)の失敗は終了コード197で見分け、外で69に読み替える。Docker のデーモンにつながるかは、枠を取ったあとに `docker version` で確かめる
-- design.md の lib.sh の節の `kp_main_folder` の書き方の誤り(「`kp_state_dir` の親」は `.git` になる)は、design のサイクル3で「git の共通ディレクトリの親、つまり本体フォルダ」に直した。Claude は、`kp_main_folder` の実装を 1.1 で作ったとおりのままにし、変えない
-- 2.3 の確認役の申し送り: `check-start` は、セッションのIDが空のときは、Issueの記録の `session_id` との照合で自分の作りかけを除かない(空どうしを同じとみなすと、閉じた前のセッションの作りかけを見落とすため)。作業フォルダのディレクトリが消えた worktree(git では prunable)は作業フォルダとして数えず、そこで開かれていたブランチは `branch_only` に出るが、git はそのブランチを開いたままとみなすので `git switch` が「already checked out」で失敗する。2.4 の `prune` で `git worktree prune` を打つか、2.5 の `takeover --branch` で手当てする
+- design.md の lib.sh の節の `kp_main_folder` の書き方は、design のサイクル3で、誤り(「`kp_state_dir` の親」は `.git` になる)から「git の共通ディレクトリの親、つまり本体フォルダ」に直っている。Claude は、`kp_main_folder` の実装を 1.1 で作ったとおりのままにし、変えない
+- 2.3 の確認役の申し送り: `check-start` は、セッションのIDが空のときは、Issueの記録の `session_id` との照合で自分の作りかけを除かない(空どうしを同じとみなすと、閉じた前のセッションの作りかけを見落とすため)。作業フォルダのディレクトリが消えた worktree(git では prunable)は作業フォルダとして数えず、そこで開かれていたブランチは `branch_only` に出るが、git はそのブランチを開いたままとみなすので `git switch` が「already checked out」で失敗する。この食い違いは 2.4 の `prune` が手当てし、2.5 の `takeover --branch` では手当てしない
 - 2.2 の確認役の申し送り: `ui.sh` は `run-check.sh` の内部の関数(`_kp_rc_print_holders` `_kp_rc_seconds`)を使うので、名前を変えるときは両方を直す。frontend の TCP の確かめ(1秒ごとに60回)は、node_modules のボリュームが空で `pnpm install` が長いと足りないおそれがあり、db を起こした直後の `psql` の確かめも失敗しうる。この2つの確かめで足りるかどうかは、3.2 と 5.1 の本物の docker での確かめで見る。
+
+- 設計への書き足しの貯め方(所有者が 2026-10-05 に決めた): 実装で見つかった、design.md に書き足しが要る細部は、見つかるたびに design を直さず、この下の一覧に貯める。全タスクが終わったあと、出荷の前に、まとめて1回で design.md に書き足し、design と tasks の承認を1回でやり直す
+- 設計への書き足しの一覧:
+  - (2.3・2.4、tasks の審査の T3-1-2)作業フォルダのディレクトリだけが消えた worktree は、作りかけの見つけ方で作業フォルダとして数えない。`prune` は最初に `git worktree prune` を打つ。design の「作りかけの見つけ方」と、`prune` の箇条書きと「使う部品」に足す
+  - (2.4 の確認役)`prune` が消すボリュームと DB の鍵は、記録(sessions の `folder_key`、issues の `folder`)からしか求めない。記録が先に消えた作業フォルダ(引き継いだ元、`/start` をしなかった worktree)の分は片付けから漏れる。Docker のボリュームの一覧から求めると、同じプロジェクト名の別の clone のボリュームを消すおそれがあるため、記録から求める形を design に書き、漏れることを「失敗したときの扱い」か `prune` の節に書く
 
 ## 完了条件(全タスク共通)
 
