@@ -20,7 +20,9 @@
     },
     "tasks": {
       "generated": true,
-      "approved": false
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-05T18:37:49+09:00"
     }
   },
   "approval_history": [
