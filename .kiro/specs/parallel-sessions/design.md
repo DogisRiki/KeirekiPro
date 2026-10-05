@@ -2,7 +2,7 @@
 
 ## 概要
 
-今は、品質チェックと画面確認のコマンドが、本体フォルダを読み込んだ常駐コンテナ(`spring` `react` `terraform`)の中で動く。この設計では、新しく作るスクリプト `run-check.sh` と `ui.sh` が、品質チェックと画面確認を、コマンドを動かすたびにそのセッションの作業フォルダを読み込んだ1回きりのコンテナで動かす。Claude は、品質チェックのスキルと画面確認のスキルから、新しく作るスクリプト `run-check.sh` と `ui.sh` を呼ぶ。この2つのスクリプトは、セッションの作業フォルダの最上位で `docker compose -p keirekipro run` を打つ。`run-check.sh` と `ui.sh` は、同時に走るコンテナの数を、作業PCごとの設定 `git config keirekipro.parallelSlots` の数の枠で抑える。
+今は、品質チェックと画面確認のコマンドが、本体フォルダを読み込んだ常駐コンテナ(`spring` `react` `terraform`)の中で動く。この設計では、新しく作るスクリプト `run-check.sh` と `ui.sh` が、品質チェックと画面確認を、コマンドを動かすたびにそのセッションの作業フォルダを読み込んだ1回きりのコンテナで動かす。Claude は、品質チェックのスキルと画面確認のスキルから、新しく作るスクリプト `run-check.sh` と `ui.sh` を呼ぶ。`run-check.sh` と `ui.sh` は、同時に走るコンテナの数を、作業PCごとの設定 `git config keirekipro.parallelSlots` の数の枠で抑える。
 
 新しく作るフック `session-registry.sh` は、セッションが始まったときと終わったときに、セッションの記録を付けたり消したりする。新しく作るスクリプト `session.sh` は、`/start` のときに、同じ作業フォルダの別のセッション、同じIssueの作りかけ、作業中のセッションの数を調べ、Claude が所有者に知らせることをまとめて返す。所有者が引き継ぐと答えたら、`session.sh` が前の作業フォルダの作りかけをこのセッションの作業フォルダに写す。
 
@@ -209,7 +209,7 @@ flowchart TD
 
 **役割**: `run-check.sh` は、品質チェックのコマンドを1つ受け取り、枠を取ってから、そのセッションの作業フォルダを読み込んだ1回きりのコンテナで動かし、終わったら枠を返す。`run-check.sh` は、コマンドの中身を書き換えず、ほかのセッションのコンテナを止めない。
 
-**いつ動くか**: 品質チェックのスキル(`/verify-frontend` `/verify-backend` `/verify-terraform`)と `.claude/commands/goal-fix-tests.md` が、コマンドごとに `run-check.sh` を呼ぶ。
+**いつ動くか**: 「品質チェックと画面確認のスキルの変更」の節のスキルが呼ぶ。
 
 **使う部品**: `run-check.sh` は、枠の取り方と記録の場所に `lib.sh` を使う。コンテナを作るのに `docker compose` を使う。共有のサービスが止まっているときに起こすのに、本体フォルダの `compose.yaml` を使う。
 
@@ -222,7 +222,7 @@ flowchart TD
   3. `run-check.sh` は、枠を取る。取れなければ、`--wait` が無いときは、枠を持つセッションの一覧を出して終了コード10で終わる。`--wait` があるときは、最初に一覧を出し、5秒ごとに取り直す。待ち始めてから1800秒たっても取れなければ、待っていた枠の持ち主の一覧を出して終了コード75で終わる
   4. 枠 k を取ったら、`run-check.sh` は、作業フォルダの最上位で次を打つ。`docker compose -p keirekipro -f compose.yaml run --rm --no-deps -T --label keirekipro.slot=<k> --label keirekipro.folder=<鍵> <領域ごとの引数> --entrypoint sh <サービス> -c '<コマンドの前にすること>; exec "$@"' -- <コマンド>`。下の表の「コマンドの前にすること」は、この同じコンテナの中で、枠を持ったまま動く。ただし、`chown` は root で動かす必要があるので、`run-check.sh` は、枠を取った直後に、`chown` を、同じ枠のラベル(`--label keirekipro.slot=<k>`)を付けた別の1回きりのコンテナで動かす。どちらも枠を取ってから動くので、設定の数を超えて同時に走ることは無い
   5. コマンドが終わったら、`run-check.sh` は枠を返し、コマンドの終了コードをそのまま自分の終了コードとして返す
-  6. コマンドが「最後の品質チェック」(frontend の `pnpm run coverage`、backend の `./gradlew check`、terraform の `checkov` で始まるコマンド)で、終了コードが0のときだけ、`run-check.sh` は、作業フォルダの `.claude/.state/gate-run-<領域>.txt` に、その時刻(UNIX 秒)を書く。コマンドが動かなかったとき(終了コード10、69、75)は書かないので、作業の終わりのフックも合格とみなさない
+  6. コマンドが「最後の品質チェック」(frontend の `pnpm run coverage`、backend の `./gradlew check`、terraform の `checkov` で始まるコマンド)で、終了コードが0のときだけ、`run-check.sh` は、作業フォルダの `.claude/.state/gate-run-<領域>.txt` に、その時刻(UNIX 秒)を書く
 - 領域ごとの引数:
 
   | 領域 | ボリューム | 環境変数 | コマンドの前にすること |
@@ -231,7 +231,7 @@ flowchart TD
   | backend | `kp-gradle-home-<k>:/root/.gradle`(枠ごと)、`kp-gradle-project-<鍵>:/home/spring/app/.gradle`(作業フォルダごと) | なし(サービスに書かれた `DOCKER_HOST=tcp://dind:2375` と `TESTCONTAINERS_HOST_OVERRIDE=dind` をそのまま使う) | なし |
   | terraform | `kp-tf-plugins-<k>:/tf-plugin-cache`(枠ごと) | `TF_PLUGIN_CACHE_DIR=/tf-plugin-cache` | 作業フォルダの `terraform/.terraform` が無ければ、`terraform init -backend=false -input=false` を動かす |
 
-- 終了コード: コマンドの終了コード、10(枠が埋まっていて待たなかった)、69(検査の環境を用意できなかった)、75(待ちの上限に達した)。10・69・75 のときは、コマンドを動かしていない
+- 終了コード: コマンドの終了コード、10(枠が埋まっていて待たなかった)、69(検査の環境を用意できなかった。Docker が動いていない、compose の読み込みに失敗した、共有のサービスを起こせなかったなど)、75(待ちの上限に達した)。10・69・75 のときは、コマンドを動かしていない
 - 出す文(標準出力): 枠が埋まっているときは `[parallel] 順番待ち: 設定の数 <N> の枠を、#<Issue>(<作業フォルダ>、<種類>、<分>分前から)が使っている` を枠ごとに1行出す。69 のときは `[parallel] 検査できない: <理由>` を出す
 
 **状態の持ち方**: `run-check.sh` は、枠のほかに状態を持たない。
@@ -247,14 +247,14 @@ flowchart TD
 
 **役割**: `ui.sh` は、画面確認のために、そのセッションの作業フォルダを読み込んだ backend と frontend の開発サーバを、枠ごとのポートで起動し、画面確認が終わったら止める。`ui.sh` は、ほかのセッションの開発サーバと常駐コンテナの開発サーバを止めない。
 
-**いつ動くか**: `/verify-ui` は、手順の始めに `ui.sh start` を、終わりに `ui.sh stop` を呼ぶ。
+**いつ動くか**: 「品質チェックと画面確認のスキルの変更」の節の `/verify-ui` が呼ぶ。
 
 **使う部品**: `ui.sh` は、`lib.sh`、`docker compose`、本体のプロジェクトの `db`(作業フォルダごとの DB を作る)と `redis` `localstack` を使う。
 
 **呼び出し方**: `bash .claude/scripts/parallel/ui.sh start [--wait] [--session <ID>]`、`bash .claude/scripts/parallel/ui.sh stop`
 
 - `start` の手順:
-  1. `ui.sh` は、本体のプロジェクトの `db` `redis` `localstack` `dind` が動いているかを確かめ、止まっていれば本体フォルダで `docker compose -p keirekipro --project-directory <本体> -f <本体>/compose.yaml up -d <止まっているサービス>` を打って起こす
+  1. `ui.sh` は、`kp_folder` でいまの作業フォルダの最上位を決めてそこへ移り、本体のプロジェクトの `db` `redis` `localstack` `dind` が動いているかを確かめ、止まっていれば本体フォルダで `docker compose -p keirekipro --project-directory <本体> -f <本体>/compose.yaml up -d <止まっているサービス>` を打って起こす
   2. `ui.sh` は、種類 `ui` で枠を取る。取れないときの扱いと終了コード(10、75)は `run-check.sh` と同じにする
   3. いまの作業フォルダで前の画面確認のコンテナ(ラベル `keirekipro.folder=<鍵>` と `keirekipro.kind=ui`)が残っていれば、`ui.sh` はそのコンテナを消す
   4. `db` に作業フォルダごとの DB `kp_<鍵>` が無ければ、`ui.sh` は `docker compose -p keirekipro exec -T db psql -U postgres -c "CREATE DATABASE kp_<鍵>"` でその DB を作る
@@ -287,7 +287,7 @@ flowchart TD
 - UserPromptSubmit: `sessions/<session_id>.json` の `last_seen` を書き直す。無ければ SessionStart と同じく作る(フックを入れる前から開いていたセッションのため)
 - SessionEnd: `sessions/<session_id>.json` を消す
 
-**状態の持ち方**: `sessions/<session_id>.json` が1つあれば、そのセッションは作業中の候補である。SessionEnd が届かずに残った記録は、Claude が `/start` のときに所有者に尋ね、所有者が「やめた」と答えたら `session.sh end` が消す。
+**状態の持ち方**: `sessions/<session_id>.json` が1つあれば、そのセッションは作業中の候補である。SessionEnd が届かずに残った作業中の記録については、Claude が `/start` のときに、その記録のセッションをやめたかを所有者に尋ねる。所有者が「やめた」と答えたら、`session.sh end` がその記録を消す。
 
 **失敗したとき**: git のリポジトリの外で呼ばれたときと、記録を書けなかったときは、`session-registry.sh` は何もせずに終了コード0で終わる。
 
@@ -302,7 +302,7 @@ flowchart TD
 **呼び出し方**: `bash .claude/scripts/parallel/session.sh <サブコマンド> ...`
 
 - `check-start <N> [--session <ID>]`: 標準出力に次の形の JSON を1行出す。終了コードは0
-  - `folder_conflict`: いまの作業フォルダの、ほかのセッションの記録の一覧(`session_id` `started_at` `last_seen`)。`kp_session_id` が返すIDの記録を除く
+  - `folder_conflict`: いまの作業フォルダの、ほかの作業中のセッションの記録の一覧(`session_id` `started_at` `last_seen`)。作業中かどうかは「データの形」の定義で判定する。`kp_session_id` が返すIDの記録を除く
   - `leftovers`: Issue #N の作りかけの一覧。要素は `folder` `is_self` `kinds`(`spec` `changes` `branch` の組み合わせ)`branch` `active_session`(その作業フォルダの作業中のセッションの記録。無ければ `null`)
   - `branch_only`: Issue #N のブランチのうち、どの作業フォルダでも開かれていないもの(`branch` `where`: `local` か `remote`)
   - `capacity`: `limit`(設定の数)と `active`(ほかに作業中のセッションの一覧。要素は `issue` `folder` `last_seen`)。`kp_session_id` が返すIDのセッションを `active` から除く
@@ -312,7 +312,7 @@ flowchart TD
 - `claim <N> --branch <ブランチ> [--session <ID>]`: `issues/<N>.json` を書く。すでにあれば `folder` `branch` `session_id` `updated_at` を書き直す
 - `end <session_id>`: 所有者が「やめた」と答えたセッションの記録 `sessions/<session_id>.json` を消す
 - `takeover <N> (--from <作業フォルダ> | --branch <ブランチ>) [--session <ID>]`: 作りかけを、いまの作業フォルダに引き継ぐ
-  1. `--from` がいまの作業フォルダのとき(同じ作業フォルダでセッションを開き直したとき): `session.sh` は、写しもブランチの手放しもしない。Issueの記録のブランチ B があり、いまのブランチが B でなければ、`git switch B` を打つ(コミットしていない変更は git がそのまま持ち越す。持ち越せずに `git switch` が失敗したら、終了コード1で終わる)。続けて、Issueの記録を書き直す手順7と、結果を標準出力に出す手順8へ進む
+  1. `--from` がいまの作業フォルダのとき(同じ作業フォルダでセッションを開き直したとき): `session.sh` は、写しもブランチの手放しもしない。Issueの記録のブランチ B があり、いまのブランチが B でなければ、`git switch B` を打つ(コミットしていない変更は git がそのまま持ち越す。持ち越せずに `git switch` が失敗したら、`session.sh` は終了コード1で終わる)。続けて、Issueの記録を書き直す手順7と、結果を標準出力に出す手順8へ進む
   2. `--from` がほかの作業フォルダのとき: いまの作業フォルダに、git の管理下の変更か、無視されていない git の管理外のファイルがあれば、`session.sh` は何もせずに終了コード1で終わる
   3. `session.sh` は、一時的な索引(`GIT_INDEX_FILE=<一時ファイル>`)で `git -C <前> add -A` と `git -C <前> write-tree` を行い、`git commit-tree -p <前の HEAD>` で前の作業フォルダの中身を1つのコミット S にまとめる。HEAD とは、作業フォルダがいま開いているコミットを指す。索引とは、git が次のコミットに含める中身を記録しておくファイル(index)を指す。前の作業フォルダの索引と中身は変えない
   4. 前の作業フォルダが Issueの記録のブランチ B を開いていれば、`session.sh` は `git -C <前> switch --detach` で前の作業フォルダに B を手放させる。続けて、いまの作業フォルダで `git switch B` を打つ。前の作業フォルダにブランチが無ければ、いまのブランチのまま進む。このとき、前の HEAD がいまの HEAD の先祖でなければ(`git merge-base --is-ancestor <前の HEAD> HEAD` が偽)、`session.sh` は「前の作業フォルダの土台が、いまのブランチに含まれていない」と出して終了コード1で終わる。先祖とは、いまの HEAD から親のコミットをたどって行き着けるコミットを指す
@@ -358,7 +358,7 @@ flowchart TD
 
 - `/verify-frontend` `/verify-backend` `/verify-terraform` は、各コマンドを `bash .claude/scripts/parallel/run-check.sh <領域> <コマンド>` で呼ぶ。終了コード10のときは、Claude は出された順番待ちの知らせを所有者に伝え、`--wait` を付けて `run_in_background` で呼び直す。`run_in_background` は、Claude Code がコマンドを裏で動かし、終わるのを待たずに Claude が次の操作に進めるようにする設定である。終了コード69と75のときは、Claude はそのコマンドを不合格として扱い、出された理由を所有者に報告して、修正の繰り返しに入らない
 - これらのスキルは、自動の直し(`pnpm run format:fix` `pnpm run lint:fix` `./gradlew spotlessApply`)も同じく `run-check.sh` で呼ぶ
-- `/verify-ui` は、`ui.sh start --session <ID>` で開発サーバを起動し、出された URL を Playwright で開く。確認を終えたら `ui.sh stop` を呼ぶ。Claude は、`/verify-ui` から今の「検証後、自分が起動したdevサーバのプロセスを放置してよい」の決まりを消す
+- `/verify-ui` は、手順の始めに `ui.sh start --session <ID>` で開発サーバを起動し、出された URL を Playwright で開く。確認を終えたら、手順の終わりに `ui.sh stop` を呼ぶ。`ui.sh` の終了コード10・69・75の扱いは、品質チェックのスキルと同じにする。Claude は、`/verify-ui` から今の「検証後、自分が起動したdevサーバのプロセスを放置してよい」の決まりを消す
 - Claude は、CI での実行の書き方(`docker compose exec ...` を外してネイティブに動かす)を、`run-check.sh` を外してネイティブに動かす、に直す
 - Claude は、`.claude/commands/goal-fix-tests.md` の品質チェックのコマンドも、`run-check.sh` 経由に変える
 
@@ -410,7 +410,7 @@ flowchart TD
 
 ## 失敗したときの扱い
 
-- 検査の環境を用意できなかったとき(Docker が動いていない、compose の読み込みに失敗した、共有のサービスを起こせなかった)と、待ちの上限に達したとき: `run-check.sh` と `ui.sh` が終了コード(69 と 75)と理由を返し、スキルがその結果を不合格として扱う。部品をまたいで、品質チェックが通った記録が書かれないことと、作業の終わりのフックが止めることがつながる
+- 検査の環境を用意できなかったときと、待ちの上限に達したとき: 部品「run-check.sh」は手順6のとおり品質チェックが通った記録を書かないので、部品「check-verify-before-stop.sh の変更」のフックが、作業の終わりに Claude を止める
 
 ## テストの方針
 
@@ -418,7 +418,7 @@ flowchart TD
   - `lib.sh`: 設定が無いときに1、`3` のときに3、`0` や `abc` のときに終了コード69になる。worktree と本体のどちらから呼んでも `kp_state_dir` が同じパスを返す
   - `lib.sh`: 2つのプロセスが同時に枠を取っても、同じ枠を取らない。設定の数の枠が埋まっていれば取れない。動いているコンテナの無い古い枠を取り戻す。持ち主のセッションの記録が残っている `ui` の枠は取り戻さない
   - `run-check.sh`: worktree で呼ぶと、偽物の `docker` に、その worktree の最上位で `-p keirekipro run --rm --no-deps` と枠のラベルとボリュームが渡る。枠が埋まっていて `--wait` が無ければ終了コード10と持ち主の一覧を出し、コマンドを動かさない。待ちの上限(テストでは環境変数で短くする)で終了コード75になる。`pnpm run coverage` が0で終わったときだけ、その worktree の `.claude/.state/gate-run-frontend.txt` を書き、本体フォルダには書かない。compose の読み込みに失敗したら終了コード69になる
-  - `session.sh check-start`: 同じ作業フォルダに別のセッションの記録があれば `folder_conflict` に出る。別の worktree のコミットしていない spec(`issue` が N)が `leftovers` に出て、そのセッションの記録の有無が `active_session` に出る。どこでも開かれていない Issueのブランチが `branch_only` に出る。いまの作業フォルダの作りかけは `is_self` が真で出る。作業中のセッションの数が `capacity` に出る
+  - `session.sh check-start`: 同じ作業フォルダに別の作業中のセッションの記録があれば `folder_conflict` に出て、Issueの記録の無いセッションの記録は出ない。別の worktree のコミットしていない spec(`issue` が N)が `leftovers` に出て、そのセッションの記録の有無が `active_session` に出る。どこでも開かれていない Issueのブランチが `branch_only` に出る。いまの作業フォルダの作りかけは `is_self` が真で出る。作業中のセッションの数が `capacity` に出る
   - `session.sh takeover`: 別の worktree のコミットしていない spec とブランチがいまの作業フォルダに写り、前の worktree の中身は消えない。引き継いだあとの `check-start` は、前の worktree を作りかけとして出さない
   - `session.sh prune`: worktree を `git worktree remove` で消したあと、Issueのブランチがローカルに残っていれば、`issues/<N>.json` が `folder` を空にして残り、続く `check-start` の `branch_only` にそのブランチが出る。ブランチも消したあとは記録が消える
   - `session.sh takeover --from <いまの作業フォルダ>`: いまの作業フォルダのコミットしていない spec と変更が残ったまま、`issues/<N>.json` の `session_id` だけが書き換わり、続く `check-start` がその作りかけを `leftovers` に出さない

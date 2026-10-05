@@ -2,7 +2,7 @@
   "feature_name": "parallel-sessions",
   "issue": 481,
   "created_at": "2026-10-04T14:24:32+09:00",
-  "updated_at": "2026-10-05T08:37:35+09:00",
+  "updated_at": "2026-10-05T09:14:15+09:00",
   "language": "ja",
   "phase": "tasks-generated",
   "approvals": {
@@ -14,15 +14,11 @@
     },
     "design": {
       "generated": true,
-      "approved": true,
-      "approved_by": "DogisRiki",
-      "approved_at": "2026-10-05T08:15:58+09:00"
+      "approved": false
     },
     "tasks": {
       "generated": true,
-      "approved": true,
-      "approved_by": "DogisRiki",
-      "approved_at": "2026-10-05T08:37:35+09:00"
+      "approved": false
     }
   },
   "approval_history": [
@@ -57,6 +53,22 @@
       "issues": [481],
       "revoked_at": "2026-10-05T07:32:08+09:00",
       "revoked_for": "requirements の承認の取り消しに伴う後続の段階の取り消し(Issue #481 本文の2行の言い回しの直し)"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-05T08:15:58+09:00",
+      "issues": [481],
+      "revoked_at": "2026-10-05T09:14:15+09:00",
+      "revoked_for": "タスク2.3 の確認役の指摘による design への差し戻し: session.sh の folder_conflict の文に「作業中の」が抜けていて、要件3.6・5.1 と食い違う"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-05T08:37:35+09:00",
+      "issues": [481],
+      "revoked_at": "2026-10-05T09:14:15+09:00",
+      "revoked_for": "design の承認の取り消しに伴う後続の段階の取り消し(tasks.md 2.3 のテストの対応の言い回しもそろえる)"
     }
   ]
 }
