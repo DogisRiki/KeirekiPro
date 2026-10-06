@@ -3,6 +3,8 @@ package com.example.keirekipro.unit.usecase.resume;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,7 +18,10 @@ import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
+import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
+import com.example.keirekipro.domain.shared.exception.DomainException;
 import com.example.keirekipro.helper.ResumeObjectBuilder;
+import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.command.UpdateResumeBasicCommand;
 import com.example.keirekipro.usecase.resume.UpdateResumeBasicUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -35,6 +40,9 @@ class UpdateResumeBasicUseCaseTest {
 
     @Mock
     private ResumeRepository repository;
+
+    @Mock
+    private ResumeNameDuplicationCheckService service;
 
     @InjectMocks
     private UpdateResumeBasicUseCase useCase;
@@ -82,6 +90,9 @@ class UpdateResumeBasicUseCaseTest {
         verify(repository).find(findCaptor.capture());
         assertThat(findCaptor.getValue()).isEqualTo(RESUME_ID);
 
+        // 職務経歴書名を変えるため、変更後の名前で重複チェックが呼び出される
+        verify(service).execute(USER_ID, ResumeName.create(new ErrorCollector(), NEW_RESUME_NAME));
+
         // save() に渡された Resume をキャプチャ
         ArgumentCaptor<Resume> saveCaptor = ArgumentCaptor.forClass(Resume.class);
         verify(repository).save(saveCaptor.capture());
@@ -126,6 +137,7 @@ class UpdateResumeBasicUseCaseTest {
 
         verify(repository).find(RESUME_ID);
         verify(repository, never()).save(any());
+        verify(service, never()).execute(any(), any());
     }
 
     @Test
@@ -154,6 +166,72 @@ class UpdateResumeBasicUseCaseTest {
                 .hasMessage("対象の職務経歴書データが存在しません。");
 
         verify(repository).find(RESUME_ID);
+        verify(repository, never()).save(any());
+        verify(service, never()).execute(any(), any());
+    }
+
+    @Test
+    @DisplayName("職務経歴書名を変えずに更新した場合、重複チェックを行わずに保存できる")
+    void test4() {
+        // リクエスト準備（職務経歴書名は変えない）
+        UpdateResumeBasicCommand request = new UpdateResumeBasicCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                ORIGINAL_RESUME_NAME,
+                NEW_DATE,
+                NEW_LAST_NAME,
+                NEW_FIRST_NAME);
+
+        Resume resume = ResumeObjectBuilder.buildResume(
+                RESUME_ID, USER_ID, ORIGINAL_RESUME_NAME, ORIGINAL_DATE,
+                ORIGINAL_LAST_NAME, ORIGINAL_FIRST_NAME, CREATED_AT, UPDATED_AT);
+
+        // モック準備
+        when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
+
+        // 実行
+        useCase.execute(request);
+
+        // 重複チェックは呼び出されない
+        verify(service, never()).execute(any(), any());
+
+        // 職務経歴書名はそのままで、ほかの基本情報が更新されて保存される
+        ArgumentCaptor<Resume> saveCaptor = ArgumentCaptor.forClass(Resume.class);
+        verify(repository).save(saveCaptor.capture());
+        Resume saved = saveCaptor.getValue();
+        assertThat(saved.getName().getValue()).isEqualTo(ORIGINAL_RESUME_NAME);
+        assertThat(saved.getDate()).isEqualTo(NEW_DATE);
+        assertThat(saved.getFullName().getLastName()).isEqualTo(NEW_LAST_NAME);
+        assertThat(saved.getFullName().getFirstName()).isEqualTo(NEW_FIRST_NAME);
+    }
+
+    @Test
+    @DisplayName("職務経歴書名をほかの職務経歴書と同じ名前に変えようとした場合、DomainExceptionがスローされ保存されない")
+    void test5() {
+        // リクエスト準備
+        UpdateResumeBasicCommand request = new UpdateResumeBasicCommand(
+                USER_ID,
+                RESUME_ID.toString(),
+                NEW_RESUME_NAME,
+                NEW_DATE,
+                NEW_LAST_NAME,
+                NEW_FIRST_NAME);
+
+        Resume resume = ResumeObjectBuilder.buildResume(
+                RESUME_ID, USER_ID, ORIGINAL_RESUME_NAME, ORIGINAL_DATE,
+                ORIGINAL_LAST_NAME, ORIGINAL_FIRST_NAME, CREATED_AT, UPDATED_AT);
+
+        // モック準備（変更後の名前が重複している）
+        when(repository.find(RESUME_ID)).thenReturn(Optional.of(resume));
+        doThrow(new DomainException("この職務経歴書名は既に登録されています。"))
+                .when(service).execute(eq(USER_ID), any(ResumeName.class));
+
+        // 実行＆検証
+        assertThatThrownBy(() -> useCase.execute(request))
+                .isInstanceOf(DomainException.class)
+                .hasMessage("この職務経歴書名は既に登録されています。");
+
+        verify(service).execute(USER_ID, ResumeName.create(new ErrorCollector(), NEW_RESUME_NAME));
         verify(repository, never()).save(any());
     }
 }
