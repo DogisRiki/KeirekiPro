@@ -257,4 +257,15 @@ class FullNameTest {
                 eq("firstName"),
                 eq("名には英字、ひらがな、カタカナ、漢字のみ使用できます。"));
     }
+
+    @Test
+    @DisplayName("姓または名に「々」や「ー」が含まれる場合、エラーが収集されない")
+    void test11() {
+        FullName fullName = FullName.create(errorCollector, "佐々木", "ルーカス");
+
+        assertThat(fullName).isNotNull();
+        assertThat(fullName.getLastName()).isEqualTo("佐々木");
+        assertThat(fullName.getFirstName()).isEqualTo("ルーカス");
+        verify(errorCollector, never()).addError(anyString(), anyString());
+    }
 }
