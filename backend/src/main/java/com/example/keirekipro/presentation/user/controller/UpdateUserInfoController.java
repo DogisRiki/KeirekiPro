@@ -48,7 +48,7 @@ public class UpdateUserInfoController {
     public UserInfoResponse handle(
             @RequestParam(name = "username", required = false) String username,
             @RequestParam(name = "profileImage", required = false) MultipartFile profileImage,
-            @RequestParam(name = "twoFactorAuthEnabled", required = false) boolean twoFactorAuthEnabled)
+            @RequestParam(name = "twoFactorAuthEnabled", required = false) Boolean twoFactorAuthEnabled)
             throws IOException {
 
         UUID userId = UUID.fromString(currentUserFacade.getUserId());

@@ -24,7 +24,7 @@ public class UpdateUserInfoRequest {
 
     private MultipartFile profileImage;
 
-    private boolean twoFactorAuthEnabled;
+    private Boolean twoFactorAuthEnabled;
 
     /**
      * ユースケースコマンドへ変換する

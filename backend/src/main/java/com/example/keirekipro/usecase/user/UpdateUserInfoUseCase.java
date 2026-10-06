@@ -89,8 +89,10 @@ public class UpdateUserInfoUseCase {
             user = user.changeProfileImage(imageKey);
         }
 
-        // 二段階認証設定更新
-        user = user.changeTwoFactorAuthEnabled(errorCollector, command.isTwoFactorAuthEnabled());
+        // 二段階認証設定更新(指定がない場合は現在の設定を維持する)
+        if (command.getTwoFactorAuthEnabled() != null) {
+            user = user.changeTwoFactorAuthEnabled(errorCollector, command.getTwoFactorAuthEnabled());
+        }
 
         if (errorCollector.hasErrors()) {
             throw new UseCaseException(errorCollector.getErrors());
