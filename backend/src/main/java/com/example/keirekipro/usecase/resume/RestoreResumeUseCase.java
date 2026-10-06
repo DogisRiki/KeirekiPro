@@ -98,7 +98,7 @@ public class RestoreResumeUseCase {
             RestoreResumeCommand.ResumeCommand resumeCommand, ResumeName resumeName) {
         try {
             // 氏名
-            FullName fullName = FullName.create(errorCollector, resumeCommand.getLastName(),
+            FullName fullName = buildFullName(errorCollector, resumeCommand.getLastName(),
                     resumeCommand.getFirstName());
 
             // 職歴
@@ -136,6 +136,23 @@ public class RestoreResumeUseCase {
         } catch (DomainException e) {
             throw new UseCaseException("バックアップファイルが不正なためリストアできません。\n別のバックアップファイルでお試しください。");
         }
+    }
+
+    /**
+     * 氏名を構築する
+     * <p>
+     * 姓と名がどちらも未入力の場合は、新規作成直後の職務経歴書と同じく氏名なしとして扱う
+     * </p>
+     */
+    private FullName buildFullName(ErrorCollector errorCollector, String lastName, String firstName) {
+        if (isBlank(lastName) && isBlank(firstName)) {
+            return null;
+        }
+        return FullName.create(errorCollector, lastName, firstName);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     /**

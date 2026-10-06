@@ -202,7 +202,8 @@
 **[[${p['name']}]]**
 [[${p['overview']}]]
 URL: [[${p['url']}]]
-技術スタック：[[${p['techStack']}]]
+[# th:if="${p['techStack'] != null and !#strings.isEmpty(p['techStack'])}"]技術スタック：[[${p['techStack']}]]
+[/]
 
 
 [/]
