@@ -11,6 +11,10 @@
 # ままになってマージできない。
 # https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/trigger-a-workflow#triggering-a-workflow-from-a-workflow
 #
+# カナリアPR(ブランチ名 canary/、ラベル canary)は最新化しない。マージしてはならない
+# PRのため最新化する必要が無く、最新化するとmainが進むたびに検査が動き直す。
+# 判定の条件は auto-merge.yaml(reserve-auto-merge.sh)と揃える。
+#
 # 更新に失敗したPRは out-of-date のまま残り、必須チェックの設定によりマージされない。
 # 失敗は実行ログに残す。
 # =====================================================================
@@ -42,8 +46,9 @@ jobs:
 
           # forkのブランチには書き込めないため同一リポジトリのPRに限る。
           # draft は検査を回す段階に無いため除く。
+          # カナリアPRはマージしないため除く(ブランチ名かラベルのどちらかで判定する)。
           # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
-          numbers=$(gh api "repos/${REPO}/pulls?state=open&base=main&per_page=100"             --paginate --slurp             | jq -r --arg repo "$REPO"               '[.[][] | select(.draft == false) | select(.head.repo.full_name == $repo) | .number] | .[]')
+          numbers=$(gh api "repos/${REPO}/pulls?state=open&base=main&per_page=100"             --paginate --slurp             | jq -r --arg repo "$REPO"               '[.[][] | select(.draft == false) | select(.head.repo.full_name == $repo) | select((.head.ref | startswith("canary/")) | not) | select(any(.labels[]?; .name == "canary") | not) | .number] | .[]')
 
           if [ -z "$numbers" ]; then
             echo "対象のPRはありません。"

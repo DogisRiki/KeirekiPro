@@ -91,6 +91,26 @@ describe("useDeleteCareer", () => {
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("職歴を削除しました。", "success");
     });
 
+    it("選択中でないエントリーを削除した場合、選択中のエントリーは選ばれたままであること", async () => {
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("career");
+        useResumeStore.getState().setActiveEntryId("career-2");
+
+        const mockResponse = { status: 200, data: undefined } as AxiosResponse<void>;
+        vi.mocked(protectedApiClient.delete).mockResolvedValueOnce(mockResponse);
+
+        const { result } = renderHook(() => useDeleteCareer("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate("career-1");
+        });
+
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        expect(useResumeStore.getState().activeEntryId).toBe("career-2");
+        expect(useResumeStore.getState().activeEntryIdsBySection.career).toBe("career-2");
+    });
+
     it("職歴不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
         const careerId = "career-1";
         useResumeStore.getState().setResume({ ...localResume, careers: [localResume.careers[0]] });

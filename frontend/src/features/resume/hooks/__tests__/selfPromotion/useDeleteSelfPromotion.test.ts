@@ -90,6 +90,26 @@ describe("useDeleteSelfPromotion", () => {
         );
     });
 
+    it("選択中でないエントリーを削除した場合、選択中のエントリーは選ばれたままであること", async () => {
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("selfPromotion");
+        useResumeStore.getState().setActiveEntryId("self-promotion-2");
+
+        const mockResponse = { status: 200, data: undefined } as AxiosResponse<void>;
+        vi.mocked(protectedApiClient.delete).mockResolvedValueOnce(mockResponse);
+
+        const { result } = renderHook(() => useDeleteSelfPromotion("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate("self-promotion-1");
+        });
+
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        expect(useResumeStore.getState().activeEntryId).toBe("self-promotion-2");
+        expect(useResumeStore.getState().activeEntryIdsBySection.selfPromotion).toBe("self-promotion-2");
+    });
+
     it("自己PR不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
         const selfPromotionId = "self-promotion-1";
         useResumeStore.getState().setResume({ ...localResume, selfPromotions: [localResume.selfPromotions[0]] });
