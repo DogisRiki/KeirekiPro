@@ -87,6 +87,26 @@ describe("useDeleteSnsPlatform", () => {
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("SNSを削除しました。", "success");
     });
 
+    it("選択中でないエントリーを削除した場合、選択中のエントリーは選ばれたままであること", async () => {
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("snsPlatform");
+        useResumeStore.getState().setActiveEntryId("sns-platform-2");
+
+        const mockResponse = { status: 200, data: undefined } as AxiosResponse<void>;
+        vi.mocked(protectedApiClient.delete).mockResolvedValueOnce(mockResponse);
+
+        const { result } = renderHook(() => useDeleteSnsPlatform("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate("sns-platform-1");
+        });
+
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        expect(useResumeStore.getState().activeEntryId).toBe("sns-platform-2");
+        expect(useResumeStore.getState().activeEntryIdsBySection.snsPlatform).toBe("sns-platform-2");
+    });
+
     it("SNSプラットフォーム不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
         const snsPlatformId = "sns-platform-1";
         useResumeStore.getState().setResume({ ...localResume, snsPlatforms: [localResume.snsPlatforms[0]] });

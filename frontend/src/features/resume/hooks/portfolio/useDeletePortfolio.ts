@@ -37,7 +37,10 @@ export const useDeletePortfolio = (resumeId: string, options?: { onResumeNotFoun
             }
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(portfolioId);
-            setActiveEntryId(null);
+            // 削除したエントリーを選択中だったときだけ選択を解除する
+            if (useResumeStore.getState().activeEntryId === portfolioId) {
+                setActiveEntryId(null);
+            }
             setDirty(false);
             setNotification("ポートフォリオを削除しました。", "success");
         },

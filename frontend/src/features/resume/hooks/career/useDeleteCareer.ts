@@ -37,7 +37,10 @@ export const useDeleteCareer = (resumeId: string, options?: { onResumeNotFound?:
             }
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(careerId);
-            setActiveEntryId(null);
+            // 削除したエントリーを選択中だったときだけ選択を解除する
+            if (useResumeStore.getState().activeEntryId === careerId) {
+                setActiveEntryId(null);
+            }
             setDirty(false);
             setNotification("職歴を削除しました。", "success");
         },
