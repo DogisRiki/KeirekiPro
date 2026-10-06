@@ -56,6 +56,26 @@ describe("resume list", () => {
         expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes");
     });
 
+    it("並び替えメニューを選ばずに閉じたときは閉じる前の並び順のままであること", async () => {
+        const { user } = renderWithProviders(<ResumeListContainer />, { route: "/resume/list" });
+        const resumeNames = () => screen.getAllByText(/^(Alpha|Beta) Resume$/).map((element) => element.textContent);
+
+        await screen.findByText("Alpha Resume");
+        expect(resumeNames()).toEqual(["Beta Resume", "Alpha Resume"]);
+
+        await user.click(screen.getByRole("button", { name: "作成日順" }));
+        await user.click(screen.getByRole("menuitem", { name: "名前順" }));
+        expect(resumeNames()).toEqual(["Alpha Resume", "Beta Resume"]);
+
+        await user.click(screen.getByRole("button", { name: "名前順" }));
+        expect(screen.getByRole("menu")).toBeInTheDocument();
+        await user.keyboard("{Escape}");
+
+        await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+        expect(screen.getByRole("button", { name: "名前順" })).toBeInTheDocument();
+        expect(resumeNames()).toEqual(["Alpha Resume", "Beta Resume"]);
+    });
+
     it("ResumeListContainerはempty時にNoData表示に切り替わること", async () => {
         vi.mocked(protectedApiClient.get).mockResolvedValueOnce(createAxiosResponse({ resumes: [] }));
 
