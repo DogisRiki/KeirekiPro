@@ -2,7 +2,13 @@ import { Button } from "@/components/ui";
 import { useErrorMessageStore } from "@/stores";
 import { stringListToBulletList } from "@/utils";
 import { Box, useTheme } from "@mui/material";
-import VerificationInput from "react-verification-input";
+import VerificationInputModule from "react-verification-input";
+
+// react-verification-input はCommonJSのみで配布されており、開発サーバと本番ビルドでは
+// 既定の書き出しが { default: 部品 } の形で届くため、その形のときは中身を取り出す
+const VerificationInput = (
+    "default" in VerificationInputModule ? VerificationInputModule.default : VerificationInputModule
+) as typeof VerificationInputModule;
 
 export interface TwoFactorFormProps {
     code: string;
