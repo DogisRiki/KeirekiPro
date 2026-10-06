@@ -6,6 +6,7 @@ import com.example.keirekipro.domain.model.resume.FullName;
 import com.example.keirekipro.domain.model.resume.Resume;
 import com.example.keirekipro.domain.model.resume.ResumeName;
 import com.example.keirekipro.domain.repository.resume.ResumeRepository;
+import com.example.keirekipro.domain.service.resume.ResumeNameDuplicationCheckService;
 import com.example.keirekipro.usecase.resume.command.UpdateResumeBasicCommand;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
@@ -24,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 public class UpdateResumeBasicUseCase {
 
     private final ResumeRepository resumeRepository;
+
+    private final ResumeNameDuplicationCheckService resumeNameDuplicationCheckService;
 
     /**
      * 基本情報更新ユースケースを実行する
@@ -49,6 +52,12 @@ public class UpdateResumeBasicUseCase {
         ErrorCollector errorCollector = new ErrorCollector();
 
         ResumeName resumeName = ResumeName.create(errorCollector, command.getResumeName());
+
+        // 職務経歴書名を変える場合のみ重複チェック（変えない場合は自分自身と一致するため対象外）
+        if (!resumeName.equals(resume.getName())) {
+            resumeNameDuplicationCheckService.execute(userId, resumeName);
+        }
+
         FullName fullName = FullName.create(errorCollector, command.getLastName(), command.getFirstName());
 
         // オブジェクト更新
