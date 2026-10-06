@@ -17,7 +17,7 @@
   - _対象の部品: ResumeMapperTest_
   - _依存: 1_
 
-- [ ] 2.2 バックアップの JSON に1000文字の文章が入るテストを足す (並行可)
+- [x] 2.2 バックアップの JSON に1000文字の文章が入るテストを足す (並行可)
 
   Claude は、`ResumeQueryMapperTest` の `spring.flyway.target` を1から6に上げ、3つの欄に1000文字の多バイトの文章を入れた職務経歴書について、`selectResumeForBackup` の JSON の `projects[0].overview` `projects[0].role` `portfolios[0].overview` が同じ文章になるテストを足す。Claude は、既存のテストと既存のデータを入れる関数(`insertProject` と `insertPortfolio`)を、target を上げる以外に変えない。Claude は、1000文字の文章を入れるために、文章を引数で受け取るデータを入れる関数を新しく足す。既存のテストが target を上げて失敗したときは、Claude はアサーションを直さず、原因を所有者に報告する。
   - 完了の確かめ方: `ResumeQueryMapperTest` の既存のテストと足したテストがすべて通る。target を1に戻すと、足したテストが失敗する
