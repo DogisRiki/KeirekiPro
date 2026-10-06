@@ -2,7 +2,7 @@
 
 ## 概要
 
-Claude は、Claude Code の設定ファイル `.claude/settings.json` の `env` に、Git Bash の引数の書き換えを止める変数 `MSYS2_ARG_CONV_EXCL` を値 `*` で置く。設定はリポジトリの中にあるので、所有者と参加者は作業PCで何も設定しなくてよい。
+Claude は、Claude Code の設定ファイル `.claude/settings.json` の `env` に、Git Bash の引数の書き換えを止める変数 `MSYS2_ARG_CONV_EXCL` を値 `*` で置く。
 
 Claude は、テスト `test-protect-main.sh` を、書き換えを止めた状態でも通るように直す。あわせて、Claude がパスのつもりで `/c/…` や `/tmp/…` を Windows 向けのプログラムに渡さないよう、CLAUDE.md の Git規約に書き方を1項目足す。
 
@@ -19,11 +19,11 @@ Claude は、テスト `test-protect-main.sh` を、書き換えを止めた状�
 
 ### 作らないもの
 
-- Claude のコマンドを実行の前に止めるフック。この設計では書き換えが起きないので、止める理由が無い
+- Claude のコマンドを実行の前に止めるフック。この設計では書き換えが起きないので、Claude のコマンドを実行の前に止める理由が無い
 - 引数でない環境変数の書き換えを止めること
 - 所有者が自分の端末で打つコマンドと、所有者が打つスクリプト `start-dev.sh` の扱い。`start-dev.sh` はもとから自分で `MSYS_NO_PATHCONV=1` を設定している
 - `.claude/scripts/parallel/lib.sh` の `MSYS_NO_PATHCONV=1` の取り外しと置き換え。`lib.sh` を読み込むスクリプトは所有者の端末からも呼ばれるので、Claude は `lib.sh` の `MSYS_NO_PATHCONV=1` を今のまま残す
-- `/verify-all` や CI に、`.claude/` の下のテストを自動で流す仕組みを足すこと。ほかのフックのテストにも関わる別の変更になる
+- `/verify-all` や CI に、`.claude/` の下のテストを自動で流す仕組みを足すこと。この仕組みを足すことは、ほかのフックのテストにも関わる別の変更になる
 - メモリの記述の直し
 
 ## 使う既存の仕組み
@@ -65,8 +65,8 @@ Claude は、書き換えを止める変数を、コマンドの文字ではな�
 Claude は、引数だけを止める `MSYS2_ARG_CONV_EXCL` を選び、引数と環境変数の両方を止める `MSYS_NO_PATHCONV` を選ばない。要件の対象は引数だけであり、環境変数の書き換えまで止めると、Claude が設定した環境変数の受け取り方まで変わるからである。
 
 **使う技術**:
-- 実行環境: Claude Code の `settings.json` の `env`。書き換えを止める変数を、Bash ツールとフックに届ける
-- 実行環境: Git for Windows の MSYS の実行環境(調査は 2.39.1 で行った)。`MSYS2_ARG_CONV_EXCL=*` を読み、引数を書き換えない
+- 実行環境: Claude Code の `settings.json` の `env`
+- 実行環境: Git for Windows の MSYS の実行環境(調査は 2.39.1 で行った)
 - テスト: `bash` と `perl` の `JSON::PP`。既存のフックのテストと同じく、jq に依存しない
 
 ## ファイルの構成
@@ -95,9 +95,9 @@ Claude が変えるファイル:
 }
 ```
 
-Claude Code は、この値を、Bash ツールのコマンド、フックのコマンド、サブエージェントの Bash ツールのコマンドの環境に入れる。Git Bash は、この値があると、Windows 向けのプログラムに渡す引数を1つも書き換えない。引数の先頭が `/` のもの、`=` の後ろが `/` のもの、`:` で区切った並びのどれも、書いたとおりに届く。macOS と Linux の bash はこの変数を読まないので、macOS と Linux の作業PCで Claude が実行するコマンドの動きは変わらない。この部品は、環境変数の書き換え(`PATH` などの扱い)を変えない。
+Claude Code は、この値を、Bash ツールのコマンド、フックのコマンド、サブエージェントの Bash ツールのコマンドの環境に入れる。引数の先頭が `/` のもの、`=` の後ろが `/` のもの、`:` で区切った並びのどれも、書いたとおりに届く。macOS と Linux の bash は、この変数を読まない。この部品は、環境変数の書き換え(`PATH` などの扱い)を変えない。
 
-**いつ動くか**: Claude Code は、所有者が作業フォルダを信頼したあと、セッションの始めにこの値を当てる。所有者が `settings.json` を保存し直したときは、動いているセッションにも当て直す。worktree は `settings.json` を含むリポジトリの写しなので、所有者が worktree を選んで開いたセッションにも同じ値が当たる。
+**いつ動くか**: Claude Code は、所有者が作業フォルダを信頼したあと、セッションの始めにこの値を当てる。所有者が `settings.json` を保存し直しても、この値は、Claude Desktop アプリで動いているセッションには当たらず、そのあとに新しく始めたセッションから当たる(2026-10-06 に実測)。そのため、所有者がこの値を置いたあと、Claude は新しく始めたセッションで作業を続ける。worktree は `settings.json` を含むリポジトリの写しなので、所有者が worktree を選んで開いたセッションにも同じ値が当たる。
 
 **失敗したとき**: Claude Desktop アプリの起動の環境がすでに `MSYS2_ARG_CONV_EXCL` を設定していると、Claude Code はこの値を無視する。このときは、部品「test-path-conversion.sh」の場合4が失敗し、いまのシェルに `MSYS2_ARG_CONV_EXCL` の値 `*` が届いていないことを示す。
 
@@ -142,4 +142,4 @@ Claude Code は、この値を、Bash ツールのコマンド、フックのコ
   - Claude は、変数が届いた Bash ツールで、`.claude/hooks/tests/` と `.claude/scripts/parallel/tests/` のテストをすべて流し、通ることを確かめる(要件2の1の、リポジトリに書かれたコマンドが変更の前と同じ結果で終わること。要件2の2の、フックが変更の前と同じ判定をすること)
   - Claude は、このPRの出荷で、`/ship` の手順のコマンド(`git commit -F`、`git push -u origin`、`gh pr create`)が変数のある環境で通ることを確かめる(要件2の1の、リポジトリに書かれたコマンドが変更の前と同じ結果で終わること)
 - 要件1の6の後半(Claude がエラーを見てパスを書き直すこと)は Claude の振る舞いなので、Claude はこれを自動のテストでは確かめない
-- 要件2の3(macOS と Linux で動きが変わらないこと)は、`MSYS2_ARG_CONV_EXCL` を読むのが MSYS の実行環境だけであることで成り立つ。手元に macOS と Linux の作業PCが無いので、Claude はこれを実機では確かめない
+- 手元に macOS と Linux の作業PCが無いので、Claude は、要件2の3(macOS と Linux で動きが変わらないこと)を実機では確かめない
