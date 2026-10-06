@@ -37,7 +37,10 @@ export const useDeleteSelfPromotion = (resumeId: string, options?: { onResumeNot
             }
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(selfPromotionId);
-            setActiveEntryId(null);
+            // 削除したエントリーを選択中だったときだけ選択を解除する
+            if (useResumeStore.getState().activeEntryId === selfPromotionId) {
+                setActiveEntryId(null);
+            }
             setDirty(false);
             setNotification("自己PRを削除しました。", "success");
         },
