@@ -23,7 +23,7 @@
   - _要件: 4.1, 4.2, 1.1_
   - _対象の部品: test-path-conversion.sh_
 
-- [ ] 4. CLAUDE.md の Git規約に、Windows 向けのプログラムに渡すパスの書き方を足す
+- [x] 4. CLAUDE.md の Git規約に、Windows 向けのプログラムに渡すパスの書き方を足す
 
   Claude は、部品「CLAUDE.md の Git規約の項目」のとおり、CLAUDE.md の「Git規約」の節の、Git操作をホストOSで行う項目のあとに1項目を足す。Claude は、項目に、対象は Windows 向けのプログラムに渡す引数だけで、`>/dev/null` のようなリダイレクトは今までどおり書くことを添える。
   - 完了の確かめ方: CLAUDE.md の「Git規約」の節に項目が1つ増え、`git diff CLAUDE.md` の変更がその項目の追加の行だけである
