@@ -23,13 +23,16 @@ export const SearchForm = ({ searchWord, setSearchWord, sortType, setSortType }:
     const handleSortClick = (event: React.MouseEvent<HTMLElement>) => setSortAnchorEl(event.currentTarget);
 
     /**
+     * ソートメニューを閉じるハンドラー(選択せずに閉じたときは並び順を変えない)
+     */
+    const handleSortClose = () => setSortAnchorEl(null);
+
+    /**
      * ソートメニュー選択時のハンドラー
      */
-    const handleSortClose = (type: "name" | "date") => {
+    const handleSortSelect = (type: "name" | "date") => {
         setSortAnchorEl(null);
-        if (type) {
-            setSortType(type);
-        }
+        setSortType(type);
     };
 
     /**
@@ -70,8 +73,8 @@ export const SearchForm = ({ searchWord, setSearchWord, sortType, setSortType }:
             </Button>
             {/* ソートメニュー */}
             <Menu anchorEl={sortAnchorEl} open={Boolean(sortAnchorEl)} onClose={handleSortClose}>
-                <MenuItem onClick={() => handleSortClose("name")}>名前順</MenuItem>
-                <MenuItem onClick={() => handleSortClose("date")}>作成日順</MenuItem>
+                <MenuItem onClick={() => handleSortSelect("name")}>名前順</MenuItem>
+                <MenuItem onClick={() => handleSortSelect("date")}>作成日順</MenuItem>
             </Menu>
         </Box>
     );
