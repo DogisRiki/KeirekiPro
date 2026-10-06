@@ -117,10 +117,40 @@ class UpdateUserInfoControllerTest {
         UpdateUserInfoCommand command = commandCaptor.getValue();
         assertThat(command.getUserId()).isEqualTo(USER_ID);
         assertThat(command.getUsername()).isEqualTo(USERNAME);
-        assertThat(command.isTwoFactorAuthEnabled()).isTrue();
+        assertThat(command.getTwoFactorAuthEnabled()).isTrue();
         assertThat(command.getProfileImage()).isNotNull();
         assertThat(command.getProfileImage().getContent()).containsExactly(PROFILE_IMAGE.getBytes());
         assertThat(command.getProfileImage().getContentType()).isEqualTo(PROFILE_IMAGE.getContentType());
         assertThat(command.getProfileImage().getOriginalFilename()).isEqualTo(PROFILE_IMAGE.getOriginalFilename());
+    }
+
+    @Test
+    @DisplayName("二段階認証の指定がないリクエストの場合、コマンドの二段階認証はnullになる")
+    void test2() throws Exception {
+        UserInfoUseCaseDto dto = UserInfoUseCaseDto.builder()
+                .id(USER_ID)
+                .email(EMAIL)
+                .username(USERNAME)
+                .hasPassword(true)
+                .twoFactorAuthEnabled(true)
+                .authProviders(List.of())
+                .build();
+
+        when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
+        when(getUserInfoUseCase.execute(USER_ID)).thenReturn(dto);
+
+        mockMvc.perform(
+                multipart(ENDPOINT)
+                        .param("username", USERNAME)
+                        .with(req -> {
+                            req.setMethod("PUT");
+                            return req;
+                        }))
+                .andExpect(status().isOk());
+
+        verify(updateUserInfoUseCase).execute(commandCaptor.capture());
+        UpdateUserInfoCommand command = commandCaptor.getValue();
+        assertThat(command.getUsername()).isEqualTo(USERNAME);
+        assertThat(command.getTwoFactorAuthEnabled()).isNull();
     }
 }

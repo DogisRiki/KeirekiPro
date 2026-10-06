@@ -299,6 +299,62 @@ class UpdateUserInfoUseCaseTest {
         }
     }
 
+    @Test
+    @DisplayName("二段階認証の指定がない場合、二段階認証の設定は変わらない")
+    void test8() {
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, USERNAME, null, null);
+
+        ErrorCollector errorCollector = new ErrorCollector();
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
+                User.reconstruct(
+                        USER_ID,
+                        Email.create(errorCollector, EMAIL),
+                        PASSWORD_HASH,
+                        true,
+                        Map.of(),
+                        EnumSet.of(RoleName.USER),
+                        null,
+                        "old-name",
+                        LocalDateTime.now(),
+                        LocalDateTime.now())));
+
+        updateUserInfoUseCase.execute(req);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        User saved = captor.getValue();
+        assertThat(saved.getUsername()).isEqualTo(USERNAME);
+        assertThat(saved.isTwoFactorAuthEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("管理者でも、二段階認証の指定がなければユーザー名を更新できる")
+    void test9() {
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, USERNAME, null, null);
+
+        ErrorCollector errorCollector = new ErrorCollector();
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
+                User.reconstruct(
+                        USER_ID,
+                        Email.create(errorCollector, EMAIL),
+                        PASSWORD_HASH,
+                        true,
+                        Map.of(),
+                        EnumSet.of(RoleName.USER, RoleName.ADMIN),
+                        null,
+                        "old-name",
+                        LocalDateTime.now(),
+                        LocalDateTime.now())));
+
+        updateUserInfoUseCase.execute(req);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        User saved = captor.getValue();
+        assertThat(saved.getUsername()).isEqualTo(USERNAME);
+        assertThat(saved.isTwoFactorAuthEnabled()).isTrue();
+    }
+
     private ProfileImageCommand toProfileImage(MultipartFile file) {
         try {
             return new ProfileImageCommand(file.getBytes(), file.getContentType(), file.getOriginalFilename());

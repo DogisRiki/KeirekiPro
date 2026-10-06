@@ -18,7 +18,7 @@ public class UpdateUserInfoCommand {
 
     private ProfileImageCommand profileImage;
 
-    private boolean twoFactorAuthEnabled;
+    private Boolean twoFactorAuthEnabled;
 
     /**
      * Multipart型から切り離したプロフィール画像データ
