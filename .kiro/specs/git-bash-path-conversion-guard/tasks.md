@@ -31,7 +31,7 @@
   - _要件: 1.6_
   - _対象の部品: CLAUDE.md の Git規約の項目_
 
-- [ ] 5. 変数が届いた環境で、今の作業が壊れていないことを確かめる
+- [x] 5. 変数が届いた環境で、今の作業が壊れていないことを確かめる
 
   親のセッションは、変数が届いた自分の Bash ツールで、`.claude/hooks/tests/` のテスト5本(今ある4本と、3で足した `test-path-conversion.sh`)と、`.claude/scripts/parallel/tests/` のテスト4本をすべて流す。続けて親のセッションは、サブエージェントを1つ起動し、`bash .claude/hooks/tests/test-path-conversion.sh` を流させて結果を返させる。
   - 完了の確かめ方: 9本のテストがすべて失敗0件で終わる。流す前と流したあとで `C:\tmp` の下の項目の一覧が変わらない。サブエージェントが流した `test-path-conversion.sh` が場合4まで通る
@@ -49,6 +49,7 @@
 - 設計への書き足し(出荷の前にまとめて design.md と research.md に書く): `settings.json` の `env` は、Claude Desktop アプリでは保存しても動いているセッションに当たらず、新しく始めたセッションから当たる。所有者が `settings.json` を置いたあとは、新しいセッションで作業を続ける
 - 2 の完了の記録(2026-10-06): 置いたあとに新しく始めたセッションで、親のセッションの Bash ツールとサブエージェントの Bash ツールの両方で、`printenv MSYS2_ARG_CONV_EXCL` が `*` を出し、`git rev-parse --sq-quote /kiro-spec-quick --title=/kiro-spec-quick` が ` '/kiro-spec-quick' '--title=/kiro-spec-quick'` を出した。置く前の記録(`place-1/before.txt`)では変数が無く、`git` は書き換わった文字列を受け取っていた
 - 3 の申し送り: `.claude/` の下のファイルは、`cp` で読むときも `settings.json` の `deny` に止められる。scratchpad の写しの中で `.claude/...` を相対パスで書き換えるコマンドも、本来のファイルとみなされて止まる。写しを作るときは Read と Write を使い、写しを壊して確かめるときは `.claude` を含まない別の写しか絶対パスを使う。場合2は、いまのシェルの `MSYS_NO_PATHCONV` で通ってしまわないよう、`MSYS_NO_PATHCONV` を外して `git` を起動する
+- 5 の完了の記録(2026-10-06): 変数が届いた親のセッションの Bash ツールで、`.claude/hooks/tests/` の5本と `.claude/scripts/parallel/tests/` の4本がすべて失敗0件で終わった(成功 13・4・52・11・9・27・24・48・12 件)。`C:\tmp` は流す前もあとも無かった。サブエージェントの Bash ツールで流した `test-path-conversion.sh` も場合4まで通った
 - 要件1の受入基準5(実行の前に止められたら理由と書き方が伝わる)は、design が止める手段を作らないと決めたので、この spec のタスクでは扱わない
 - 要件2の受入基準1(リポジトリに書かれたコマンドが変更の前と同じ結果で終わる)のうち `/start` と `/ship` の手順のコマンドは、タスクでは確かめない。全タスクが終わったあと、Claude がこの spec を `/ship` で出荷するときに、`git commit -F`、`git push -u origin`、`gh pr create` が変数のある環境で通り、`gh pr view --json title,body` でPRの題名と本文に `C:/Program Files/Git` が含まれないことを確かめる
 - 共通の完了条件の1(確かめるテストの無い受入基準を残さない)の例外は、要件1の受入基準6の後半(Windows 向けのプログラムがエラーで終わったら、Claude がパスを書き直して実行する)、要件2の受入基準3(macOS と Linux の作業PCでは動きが変わらない)、要件3の受入基準2(新しく worktree を選んで開いたセッションでも届く)の3つである。理由は、それぞれのタスクの「受入基準とテストの対応」に書いた
