@@ -1,0 +1,46 @@
+{
+  "feature_name": "git-bash-path-conversion-guard",
+  "issue": 480,
+  "created_at": "2026-10-05T23:48:32Z",
+  "updated_at": "2026-10-06T02:42:30Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-06T00:25:30Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-06T02:42:30Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-06T02:42:30Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-06T00:53:58Z",
+      "issues": [480],
+      "revoked_at": "2026-10-06T02:27:09Z",
+      "revoked_for": "実装の結果による design への差し戻し: settings.json の env は、Claude Desktop アプリでは保存しても動いているセッションに当たらず、新しく始めたセッションから当たると実測で分かったため、部品「settings.json の env」の「いつ動くか」を直す"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-06T01:06:31Z",
+      "issues": [480],
+      "revoked_at": "2026-10-06T02:27:09Z",
+      "revoked_for": "design の承認の取り消しに伴う取り消し(design の後続の段階のため)"
+    }
+  ]
+}

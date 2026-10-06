@@ -10,8 +10,9 @@
 set -u
 
 HOOK="$(cd "$(dirname "$0")/.." && pwd)/protect-main.sh"
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
+TMP_ROOT=$(mktemp -d)
+trap 'rm -rf "$TMP_ROOT"' EXIT
+WORK=$(cd "$TMP_ROOT" && { pwd -W 2>/dev/null || pwd; })
 
 git init -q "$WORK/feature" && git -C "$WORK/feature" switch -q -c fix/sample
 git init -q "$WORK/main" && git -C "$WORK/main" checkout -q -B main
