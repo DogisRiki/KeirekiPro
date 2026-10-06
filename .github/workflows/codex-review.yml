@@ -93,6 +93,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      # 抜き出しが壊れていると「決めた方式」の観点が黙って足されなくなるので、
+      # 抜き出しを使う Prepare review context より前に、抜き出しのテストを流す
+      - name: Test decided-method extraction
+        run: bash .github/scripts/tests/test-extract-decided-method.sh
+
       - name: Use Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -157,6 +162,9 @@ jobs:
 
           # spec適合の判定基準: PR本文の Spec: パス -> 無ければ Refs: #N のIssue本文 -> 無ければPR本文
           basis="PR本文(pr-body.txt)"
+          # 「決めた方式」の観点を足すかどうか。Issue本文を判定の基準にし、その本文に
+          # 「## 決めた方式」の節があるときだけ「あり」にする(Spec: のPRとRefs: の無いPRは「なし」のまま)
+          decided="なし"
           spec_path=$(echo "$PR_BODY" | grep -oE 'Spec: *\.kiro/specs/[A-Za-z0-9._/-]+' | head -1 | sed 's/Spec: *//' || true)
           if [ -n "$spec_path" ] && [ -d "$spec_path" ]; then
             cat "$spec_path"/*.md > "$RUNNER_TEMP/review/spec.md" 2>/dev/null || true
@@ -167,12 +175,29 @@ jobs:
           else
             issue_num=$(echo "$PR_BODY" | grep -oE 'Refs: *#[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
             if [ -n "$issue_num" ]; then
-              gh issue view "$issue_num" --json title,body --jq '"# " + .title + "\n\n" + .body' \
-                > "$RUNNER_TEMP/review/spec.md" 2>/dev/null || true
+              # Issue本文を取れないまま判定の基準をPR本文に落として続けると、「決めた方式」の節が
+              # あっても観点が足されず、方式から外れたPRが通る。取れなかったときは手順を失敗にする
+              if ! gh issue view "$issue_num" --json title,body --jq '"# " + .title + "\n\n" + .body' \
+                > "$RUNNER_TEMP/review/spec.md"; then
+                echo "::error::Issue #${issue_num} の本文を取れなかった。PR本文の Refs: の番号が正しいかを確かめてから、このジョブを再実行すること。"
+                exit 1
+              fi
               [ -s "$RUNNER_TEMP/review/spec.md" ] && basis="Issue #${issue_num}(spec.md)"
+              if [ -s "$RUNNER_TEMP/review/spec.md" ]; then
+                # 抜き出しが0以外で終わったときは、既定のシェル(bash -e)により手順が失敗する
+                bash .github/scripts/extract-decided-method.sh "$RUNNER_TEMP/review/spec.md" \
+                  > "$RUNNER_TEMP/review/decided-method.md"
+                if [ -s "$RUNNER_TEMP/review/decided-method.md" ]; then
+                  decided="あり"
+                else
+                  # 空のファイルを残すと、後の手順が「節がある」と取り違えるおそれがあるので消す
+                  rm -f "$RUNNER_TEMP/review/decided-method.md"
+                fi
+              fi
             fi
           fi
           echo "SPEC_BASIS=$basis" >> "$GITHUB_ENV"
+          echo "DECIDED_METHOD=$decided" >> "$GITHUB_ENV"
 
       - name: Write review prompt
         run: |
@@ -236,6 +261,37 @@ jobs:
             CHANGES_REQUESTED にする
           PROMPT_EOF
 
+          # 判定の基準のIssue本文に「## 決めた方式」の節があるときだけ、今のプロンプトのあと、
+          # 実パスの一覧の前に観点の節を足す(DECIDED_METHOD は Prepare review context が書く)
+          if [ "${DECIDED_METHOD:-なし}" = "あり" ]; then
+            cat >> "$RUNNER_TEMP/review/prompt.md" <<'DECIDED_EOF'
+
+          ## 決めた方式の観点(decided-method.md がある場合に限る)
+          decided-method.md は、判定の基準のIssue本文の「## 決めた方式」の節を抜き出したものである。
+          ここに書かれた項目は、所有者が決めて変えてはいけない作り方である。
+
+          - 項目ごとに、PRの変更がその項目に沿っているかを、「沿っている」「沿っていない」
+            「このPRの変更からは判定できない」のどれかで判定する
+          - 項目が作るものや作り方を書いているのに、PRがそれを作っていないときは「沿っていない」とする
+          - 作業の順番や所有者の操作のように、PRの変更からは確かめられないことを書いた項目は
+            「このPRの変更からは判定できない」とする
+          - 項目の末尾の「(AIの提案を了承)」の印は、判定に影響させない。印の無い項目と同じく判定する
+          - 「沿っていない」項目ごとに、指摘一覧に severity High の指摘を1件書く。指摘には、
+            外れた項目の文面をそのまま引用し、外れている変更のファイル:行(作っていないときは
+            作っていないものの名前)と、項目に沿わせる修正案を書く
+          - 「沿っていない」項目は、pr-body.txt に理由が書かれていても High のままにする。
+            上の「設計判断や検証方法がIssueの記述と異なる場合でも、pr-body.txt に理由が記載されていれば
+            適合とする」と、「spec適合は『要求が未実装』または『受け入れ基準に対応するテストが無い』
+            場合のみ CHANGES_REQUESTED にする」の2つの規則は、決めた方式の項目には当てはめない
+          - 「このPRの変更からは判定できない」項目だけを理由に、High の指摘を書かない
+          - spec適合の評価の中に、次の形の表を必ず出す
+
+            | 決めた方式の項目 | 判定 | 根拠 |
+            |---|---|---|
+            | <項目の文面> | 沿っている / 沿っていない / このPRの変更からは判定できない | <ファイル:行、または理由> |
+          DECIDED_EOF
+          fi
+
           {
             printf '\n## 入力ファイルの実パス\n'
             printf -- '- diff.patch: %s/review/diff.patch\n' "$RUNNER_TEMP"
@@ -244,6 +300,9 @@ jobs:
               printf -- '- spec.md: %s/review/spec.md\n' "$RUNNER_TEMP"
             else
               printf -- '- spec.md: なし(pr-body.txt を判定基準とする)\n'
+            fi
+            if [ "${DECIDED_METHOD:-なし}" = "あり" ]; then
+              printf -- '- decided-method.md: %s/review/decided-method.md\n' "$RUNNER_TEMP"
             fi
             printf '\nspec適合の判定基準: %s\n' "$SPEC_BASIS"
           } >> "$RUNNER_TEMP/review/prompt.md"
@@ -299,6 +358,7 @@ jobs:
             echo "|---|---|"
             echo "| コード品質 | ${code_verdict:-未出力} |"
             echo "| spec適合(基準: ${SPEC_BASIS}) | ${spec_verdict:-未出力} |"
+            echo "| 決めた方式 | ${DECIDED_METHOD:-なし} |"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$code_verdict" = "LGTM" ] && [ "$spec_verdict" = "LGTM" ]; then
             echo "両軸LGTM。"
