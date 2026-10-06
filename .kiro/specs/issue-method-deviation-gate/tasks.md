@@ -16,7 +16,7 @@
   - _要件: 1.1, 2.1_
 
 - [ ] 2. 自動レビューのワークフローに組み込む
-- [ ] 2.1 抜き出しのテストと抜き出しを、判定の基準を決める処理に足す
+- [x] 2.1 抜き出しのテストと抜き出しを、判定の基準を決める処理に足す
 
   Claude は、`codex-review.yml` に、`Checkout PR head` のあとで抜き出しのテストを流す手順 `Test decided-method extraction` を足す。Claude は、`Prepare review context` の、Issue本文を `spec.md` に書き出す分岐の中で抜き出しを呼び、`DECIDED_METHOD` を `$GITHUB_ENV` に書く処理を足す。`Spec:` のパスが実在する分岐と `Refs:` が無い分岐では、ワークフローは抜き出しを呼ばずに `DECIDED_METHOD=なし` を書く。Claude は、`Refs: #N` があるのに `gh issue view` が失敗したときに、ワークフローが `::error::` で「Issue #N の本文を取れなかった」と、`Refs:` の番号を確かめてジョブを再実行すればよいことを出して、手順を失敗にする処理を足す。
   - 完了の確かめ方: `codex-review.yml` で、`Test decided-method extraction` の手順が `Checkout PR head` のあと、`Prepare review context` の前にある。Claude は、手順の中身を手元で動かすときに、`${{ github.event.pull_request.base.sha }}` を手元のコミットに置き換え、`gh` を PATH の先頭に置いた偽物に替え、`GITHUB_ENV` と `RUNNER_TEMP` を一時ディレクトリのファイルにする。そのうえで `Prepare review context` の手順の中身を手元で、見出しのあるIssue本文、見出しの無いIssue本文、`Spec:` のパスが実在するPR本文、`Refs:` の無いPR本文、`gh issue view` が失敗する場合の5つの入力で動かすと、それぞれ `DECIDED_METHOD=あり`(`decided-method.md` に項目が入る)、`DECIDED_METHOD=なし`(`decided-method.md` が無い)、`DECIDED_METHOD=なし`(抜き出しを呼ばない)、`DECIDED_METHOD=なし`(抜き出しを呼ばない)、0以外の終了になる
@@ -62,6 +62,7 @@
 - Issue本文の取得に失敗して赤になったPRの扱いは、`/review-loop` に手順が無い(design の審査の低の指摘 D1-1-1)。Claude は、`/review-loop` を変えない。再実行の案内は、抜き出しを判定の基準を決める処理に足すタスク(2.1)で足すエラーの文面に任せる
 
 - 1.2: スクリプトは、見出しの末尾の空白として半角の空白とタブだけを認める。全角の空白や `## 決めた方式 ##` の見出しは節にならず、観点が足されない側に倒れる。起票の決まりの書式が `## 決めた方式` のあいだは問題ない。awk は `LC_ALL=C` で呼び、文書は標準入力から渡す(パスに `=` があると awk が代入として読むため)
+- 2.1: 手元での確かめは scratchpad の `harness21/` で行った。手順の `run:` の中身を取り出し、偽の `gh` と一時ファイルの `GITHUB_ENV` `RUNNER_TEMP` で、ubuntu:24.04 のコンテナで動かす。`gh issue view` の `2>/dev/null` は、取得に失敗した理由をログに出すために外した
 ## 完了条件(全タスク共通)
 
 Claude は、どのタスクでも、タスクの箇条書きの欄を書いたうえで、次の4つを満たしたときにタスクを完了とする。
