@@ -35,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 
 @MybatisTest
 @ActiveProfiles("test")
-@TestPropertySource(properties = "spring.flyway.target=5")
+@TestPropertySource(properties = "spring.flyway.target=6")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -1467,6 +1467,89 @@ class ResumeMapperTest {
         assertThat(loaded.getActive()).isTrue();
         assertThat(loaded.getName()).isEqualTo("継続中プロジェクト");
         assertThat(loaded.getOverview()).isEqualTo("継続中プロジェクト概要");
+    }
+
+    @Test
+    @DisplayName("insertProject_概要と役割に1000文字の文章を挿入後、selectProjectsByResumeIdで同じ文章が取得できる")
+    void test40() {
+        userMapper.upsertUser(createUserDto());
+        ResumeDto resume = createResumeDto(
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                CREATED,
+                UPDATED);
+        resumeMapper.upsert(resume);
+
+        // 概要と役割で異なる1000文字の多バイト文字列を使い、取り違えも検出する
+        String overview = "あ".repeat(1000);
+        String role = "い".repeat(1000);
+
+        UUID projectId = UUID.fromString("44444444-aaaa-bbbb-cccc-444444444444");
+        ProjectDto project = createProjectDto(
+                projectId,
+                RESUME_ID_1,
+                "LongTextCompany",
+                YearMonth.of(2024, 3),
+                YearMonth.of(2024, 9),
+                false,
+                "LongTextProj",
+                overview,
+                "Team",
+                role,
+                "Achievement",
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
+        resumeMapper.insertProject(project);
+
+        List<ProjectDto> list = resumeMapper.selectProjectsByResumeId(RESUME_ID_1);
+        assertThat(list).hasSize(1);
+        ProjectDto loaded = list.get(0);
+        assertThat(loaded.getId()).isEqualTo(projectId);
+        assertThat(loaded.getOverview()).isEqualTo(overview);
+        assertThat(loaded.getRole()).isEqualTo(role);
+    }
+
+    @Test
+    @DisplayName("insertPortfolio_概要に1000文字の文章を挿入後、selectPortfoliosByResumeIdで同じ文章が取得できる")
+    void test41() {
+        userMapper.upsertUser(createUserDto());
+        ResumeDto resume = createResumeDto(
+                RESUME_ID_1,
+                USER_ID,
+                NAME_1,
+                DATE_1,
+                LAST_NAME_1,
+                FIRST_NAME_1,
+                CREATED,
+                UPDATED);
+        resumeMapper.upsert(resume);
+
+        String overview = "う".repeat(1000);
+
+        UUID portId = UUID.fromString("55555555-aaaa-bbbb-cccc-555555555555");
+        PortfolioDto port = createPortfolioDto(
+                portId,
+                RESUME_ID_1,
+                "LongTextPort",
+                overview,
+                "TechStack",
+                "http://link");
+        resumeMapper.insertPortfolio(port);
+
+        List<PortfolioDto> list = resumeMapper.selectPortfoliosByResumeId(RESUME_ID_1);
+        assertThat(list).hasSize(1);
+        PortfolioDto loaded = list.get(0);
+        assertThat(loaded.getId()).isEqualTo(portId);
+        assertThat(loaded.getOverview()).isEqualTo(overview);
     }
 
     private ResumeDto createResumeDto(
