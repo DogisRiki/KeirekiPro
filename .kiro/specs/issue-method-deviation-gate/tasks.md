@@ -39,7 +39,7 @@
   - _対象の部品: README.md と ワークフロー設計.md_
 
 - [ ] 4. 出荷の前に確かめる
-- [ ] 4.1 静的検証とテストを手元で流す
+- [x] 4.1 静的検証とテストを手元で流す
 
   Claude は、所有者にファイルを置いてもらう前に、scratchpad のファイルに対して、CI の guardrails と同じイメージで、変えたワークフローとスクリプトの静的検証を手元で流し、抜き出しのテストを流す。
   - 完了の確かめ方: 手元のコンテナで `test-extract-decided-method.sh` が通る。`rhysd/actionlint:1.7.12` を手元の docker で流すと `codex-review.yml` に指摘が出ない。`koalaman/shellcheck:v0.11.0` を手元の docker で流すと、新しく作った2本のスクリプトに指摘が出ない(info と style の指摘も出ない)
