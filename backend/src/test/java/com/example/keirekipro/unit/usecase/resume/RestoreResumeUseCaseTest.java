@@ -29,6 +29,8 @@ import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -188,7 +190,48 @@ class RestoreResumeUseCaseTest {
         verify(resumeRepository, never()).save(any());
     }
 
+    @ParameterizedTest
+    @CsvSource(value = { "NULL,NULL", "'',''", "' ',' '" }, nullValues = "NULL")
+    @DisplayName("姓と名がどちらも空のバックアップは、氏名なしのままリストアできる")
+    void test6(String lastName, String firstName) {
+        RestoreResumeCommand request = buildValidRequest(lastName, firstName);
+
+        doNothing().when(resumeLimitChecker).checkResumeCreateAllowed(USER_ID);
+        doNothing().when(resumeNameDuplicationCheckService).execute(eq(USER_ID), any(ResumeName.class));
+
+        ArgumentCaptor<Resume> captor = ArgumentCaptor.forClass(Resume.class);
+        ResumeInfoUseCaseDto actual = useCase.execute(request);
+
+        verify(resumeRepository).save(captor.capture());
+        Resume saved = captor.getValue();
+        assertThat(saved.getFullName()).isNull();
+        assertThat(saved.getName().getValue()).isEqualTo(RESUME_NAME);
+        assertThat(saved.getCareers()).hasSize(1);
+        assertThat(actual.getLastName()).isNull();
+        assertThat(actual.getFirstName()).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = { "NULL,太郎", "山田,NULL", "'',太郎", "山田,''" }, nullValues = "NULL")
+    @DisplayName("姓と名の片方だけが空のバックアップは、不正とみなしUseCaseExceptionがスローされる")
+    void test7(String lastName, String firstName) {
+        RestoreResumeCommand request = buildValidRequest(lastName, firstName);
+
+        doNothing().when(resumeLimitChecker).checkResumeCreateAllowed(USER_ID);
+        doNothing().when(resumeNameDuplicationCheckService).execute(eq(USER_ID), any(ResumeName.class));
+
+        assertThatThrownBy(() -> useCase.execute(request))
+                .isInstanceOf(UseCaseException.class)
+                .hasMessage("バックアップファイルが不正なためリストアできません。\n別のバックアップファイルでお試しください。");
+
+        verify(resumeRepository, never()).save(any());
+    }
+
     private static RestoreResumeCommand buildValidRequest() {
+        return buildValidRequest(LAST_NAME, FIRST_NAME);
+    }
+
+    private static RestoreResumeCommand buildValidRequest(String lastName, String firstName) {
         RestoreResumeCommand.CareerCommand career = new RestoreResumeCommand.CareerCommand(
                 "Company",
                 YearMonth.of(2020, 1),
@@ -273,8 +316,8 @@ class RestoreResumeUseCaseTest {
         RestoreResumeCommand.ResumeCommand resume = new RestoreResumeCommand.ResumeCommand(
                 RESUME_NAME,
                 DATE,
-                LAST_NAME,
-                FIRST_NAME,
+                lastName,
+                firstName,
                 List.of(career),
                 List.of(project),
                 List.of(cert),
