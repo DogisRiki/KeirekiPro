@@ -26,7 +26,7 @@
   - _対象の部品: ResumeQueryMapperTest_
   - _依存: 1_
 
-- [ ] 2.3 出力の元になるデータに1000文字の文章が入るテストを足す (並行可)
+- [x] 2.3 出力の元になるデータに1000文字の文章が入るテストを足す (並行可)
 
   Claude は、`ResumeExportModelBuilderTest` に、3つの欄に1000文字の多バイトの文章を持つ `Resume` を `ResumeExportModelBuilder.build` に渡すと、返るデータのプロジェクトの `overview` `role` とポートフォリオの `overview` が渡した文章と1文字も違わないことを確かめるテストを足す。Claude は、足すテストを、既存のテストの作り方(モックの形)に合わせる。
   - 完了の確かめ方: `ResumeExportModelBuilderTest` の既存のテストと足したテストがすべて通る。`ResumeExportModelBuilder` で、プロジェクトの `overview`、プロジェクトの `role`、ポートフォリオの `overview` を1つずつ一時的に先頭の255文字に切ると、そのたびに足したテストが失敗し、戻すと通る

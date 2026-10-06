@@ -682,4 +682,61 @@ class ResumeExportModelBuilderTest {
         assertThat(companySections.get(0).get("companyLabel")).isEqualTo("株式会社XYZ");
         assertThat(companySections.get(0).get("companyPeriodLabel")).isEqualTo("");
     }
+
+    @Test
+    @DisplayName("3つの欄に1000文字の文章を持つ職務経歴書から、出力の元になるデータに同じ文章が入る")
+    void test7() {
+        String projectOverview = "あ".repeat(1000);
+        String projectRole = "い".repeat(1000);
+        String portfolioOverview = "う".repeat(1000);
+
+        // Resume
+        Resume resume = mock(Resume.class);
+        when(resume.getDate()).thenReturn(null);
+        when(resume.getFullName()).thenReturn(null);
+        when(resume.getCareers()).thenReturn(List.of());
+
+        // Projects
+        Project project = mock(Project.class);
+        when(project.getName()).thenReturn("長文プロジェクト");
+        when(project.getOverview()).thenReturn(projectOverview);
+        when(project.getRole()).thenReturn(projectRole);
+
+        when(resume.getProjects()).thenReturn(List.of(project));
+
+        // Certifications
+        when(resume.getCertifications()).thenReturn(List.of());
+
+        // Portfolios
+        Portfolio portfolio = mock(Portfolio.class);
+        when(portfolio.getName()).thenReturn("長文ポートフォリオ");
+        when(portfolio.getOverview()).thenReturn(portfolioOverview);
+        when(resume.getPortfolios()).thenReturn(List.of(portfolio));
+
+        // SNS
+        when(resume.getSnsPlatforms()).thenReturn(List.of());
+
+        // Self promotions
+        when(resume.getSelfPromotions()).thenReturn(List.of());
+
+        // 実行
+        Map<String, Object> export = builder.build(resume);
+
+        // 検証（companySections / projects）
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> companySections = (List<Map<String, Object>>) export.get("companySections");
+        assertThat(companySections).hasSize(1);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> projects = (List<Map<String, Object>>) companySections.get(0).get("projects");
+        assertThat(projects).hasSize(1);
+        assertThat(projects.get(0).get("overview")).isEqualTo(projectOverview);
+        assertThat(projects.get(0).get("role")).isEqualTo(projectRole);
+
+        // 検証（portfolios）
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> portfolios = (List<Map<String, Object>>) export.get("portfolios");
+        assertThat(portfolios).hasSize(1);
+        assertThat(portfolios.get(0).get("overview")).isEqualTo(portfolioOverview);
+    }
 }
