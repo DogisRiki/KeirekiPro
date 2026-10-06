@@ -28,7 +28,7 @@ import lombok.RequiredArgsConstructor;
 
 @MybatisTest
 @ActiveProfiles("test")
-@TestPropertySource(properties = "spring.flyway.target=1")
+@TestPropertySource(properties = "spring.flyway.target=6")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -411,6 +411,38 @@ class ResumeQueryMapperTest {
         assertThat(selfPromotions.get(0).get("content").asText()).isEqualTo("content");
     }
 
+    @Test
+    @DisplayName("selectResumeForBackup_3つの欄に1000文字の文章がある場合、JSONに同じ文章が入る")
+    void test16() throws Exception {
+        final UUID userId = UUID.randomUUID();
+        final UUID resumeId = UUID.randomUUID();
+
+        insertUser(userId);
+        insertResume(resumeId, userId);
+
+        // 3つの欄で異なる1000文字の多バイト文字列を使い、取り違えも検出する
+        final String projectOverview = "あ".repeat(1000);
+        final String projectRole = "い".repeat(1000);
+        final String portfolioOverview = "う".repeat(1000);
+
+        insertProject(UUID.randomUUID(), resumeId, projectOverview, projectRole);
+        insertPortfolio(UUID.randomUUID(), resumeId, "PF1", portfolioOverview);
+
+        String json = resumeQueryMapper.selectResumeForBackup(resumeId, userId);
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode root = objectMapper.readTree(json);
+
+        JsonNode projects = root.get("projects");
+        assertThat(projects).hasSize(1);
+        assertThat(projects.get(0).get("overview").asText()).isEqualTo(projectOverview);
+        assertThat(projects.get(0).get("role").asText()).isEqualTo(projectRole);
+
+        JsonNode portfolios = root.get("portfolios");
+        assertThat(portfolios).hasSize(1);
+        assertThat(portfolios.get(0).get("overview").asText()).isEqualTo(portfolioOverview);
+    }
+
     private void insertUser(UUID userId) {
         Timestamp now = Timestamp.from(Instant.now());
 
@@ -515,6 +547,43 @@ class ResumeQueryMapperTest {
                 true);
     }
 
+    private void insertProject(UUID projectId, UUID resumeId, String overview, String role) {
+        String sql = """
+                INSERT INTO projects (
+                    id, resume_id, company_name, start_date, end_date, is_active,
+                    name, overview, team_comp, role, achievement,
+                    requirements, basic_design, detailed_design,
+                    implementation, integration_test, system_test, maintenance
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?
+                )
+                """;
+
+        jdbcTemplate.update(
+                sql,
+                projectId,
+                resumeId,
+                "Company",
+                Date.valueOf("2021-01-01"),
+                null,
+                true,
+                "Project",
+                overview,
+                "Team",
+                role,
+                "Achievement",
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
+    }
+
     private void insertCertification(UUID certificationId, UUID resumeId, String name) {
         jdbcTemplate.update(
                 "INSERT INTO certifications (id, resume_id, name, date) VALUES (?, ?, ?, ?)",
@@ -540,6 +609,17 @@ class ResumeQueryMapperTest {
                 resumeId,
                 name,
                 "overview",
+                "tech",
+                "https://portfolio.example");
+    }
+
+    private void insertPortfolio(UUID portfolioId, UUID resumeId, String name, String overview) {
+        jdbcTemplate.update(
+                "INSERT INTO portfolios (id, resume_id, name, overview, tech_stack, link) VALUES (?, ?, ?, ?, ?, ?)",
+                portfolioId,
+                resumeId,
+                name,
+                overview,
                 "tech",
                 "https://portfolio.example");
     }
