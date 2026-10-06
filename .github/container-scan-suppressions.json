@@ -1,3 +1,9 @@
 {
-  "suppressions": []
+  "suppressions": [
+    {
+      "id": "CVE-2026-47884",
+      "reason": "spring-webmvc 6.2.19 の XsltView の脆弱性。6.2 系の修正版(6.2.20)は有償サポート限定で、無料の修正版は Spring Framework 7.0.9 以降(Spring Boot 4 系)にしか無く、Spring Boot 4 系へは上げないと所有者が決めた(#516)。成立には Spring MVC で XsltView を使っていることが要るが、このアプリは XsltView を使っていない。https://spring.io/security/cve-2026-47884",
+      "expires": "2027-01-04"
+    }
+  ]
 }
