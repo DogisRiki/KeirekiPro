@@ -37,7 +37,10 @@ export const useDeleteCertification = (resumeId: string, options?: { onResumeNot
             }
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(certificationId);
-            setActiveEntryId(null);
+            // 削除したエントリーを選択中だったときだけ選択を解除する
+            if (useResumeStore.getState().activeEntryId === certificationId) {
+                setActiveEntryId(null);
+            }
             setDirty(false);
             setNotification("資格を削除しました。", "success");
         },

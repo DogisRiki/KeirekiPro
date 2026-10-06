@@ -37,7 +37,10 @@ export const useDeleteProject = (resumeId: string, options?: { onResumeNotFound?
             }
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(projectId);
-            setActiveEntryId(null);
+            // 削除したエントリーを選択中だったときだけ選択を解除する
+            if (useResumeStore.getState().activeEntryId === projectId) {
+                setActiveEntryId(null);
+            }
             setDirty(false);
             setNotification("プロジェクトを削除しました。", "success");
         },

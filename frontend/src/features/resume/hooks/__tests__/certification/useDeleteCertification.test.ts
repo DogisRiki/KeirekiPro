@@ -87,6 +87,26 @@ describe("useDeleteCertification", () => {
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("資格を削除しました。", "success");
     });
 
+    it("選択中でないエントリーを削除した場合、選択中のエントリーは選ばれたままであること", async () => {
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("certification");
+        useResumeStore.getState().setActiveEntryId("cert-2");
+
+        const mockResponse = { status: 200, data: undefined } as AxiosResponse<void>;
+        vi.mocked(protectedApiClient.delete).mockResolvedValueOnce(mockResponse);
+
+        const { result } = renderHook(() => useDeleteCertification("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate("cert-1");
+        });
+
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        expect(useResumeStore.getState().activeEntryId).toBe("cert-2");
+        expect(useResumeStore.getState().activeEntryIdsBySection.certification).toBe("cert-2");
+    });
+
     it("資格不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
         const certificationId = "cert-1";
         const staleResume: Resume = {

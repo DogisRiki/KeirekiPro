@@ -148,6 +148,26 @@ describe("useDeleteProject", () => {
         );
     });
 
+    it("選択中でないエントリーを削除した場合、選択中のエントリーは選ばれたままであること", async () => {
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("project");
+        useResumeStore.getState().setActiveEntryId("project-2");
+
+        const mockResponse = { status: 200, data: undefined } as AxiosResponse<void>;
+        vi.mocked(protectedApiClient.delete).mockResolvedValueOnce(mockResponse);
+
+        const { result } = renderHook(() => useDeleteProject("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate("project-1");
+        });
+
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        expect(useResumeStore.getState().activeEntryId).toBe("project-2");
+        expect(useResumeStore.getState().activeEntryIdsBySection.project).toBe("project-2");
+    });
+
     it("プロジェクト不存在404の場合、空セクションが省略された詳細レスポンスでストアを同期すること", async () => {
         const projectId = "project-1";
         useResumeStore.getState().setResume({ ...localResume, projects: [localResume.projects[0]] });
