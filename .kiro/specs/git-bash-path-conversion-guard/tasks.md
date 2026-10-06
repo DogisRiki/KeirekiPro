@@ -15,7 +15,7 @@
   - 受入基準とテストの対応: 要件1の受入基準1・2・4(Claude が書いた引数が書いたとおりの文字で届く、その決まりが Issue やPRを扱うコマンドに限らずすべてのコマンドに当てはまる、その決まりがメモリの記述を読んだかどうかに依らずに成り立つ)と要件3の受入基準1(作業PCごとに設定を足さずに、書き換えられずに届く)は、親のセッションの Bash ツールでの実測と、1で記録した置く前の状態との比べで確かめる。要件1の受入基準3(サブエージェントが実行するコマンドにも当てはまる)は、サブエージェントの Bash ツールでの実測で確かめる。要件3の受入基準2(新しく worktree を選んで開いたセッションでも届く)は、新しいセッションでは実測しない。このセッションが worktree で開いたセッションであり、プロジェクトの設定(SessionStart のフック)が当たっていることと、design が確かめた文書(`settings.json` の `env` は、プロジェクトの設定としてセッションの始めに当たる)を根拠にする
   - _要件: 1.1, 1.2, 1.3, 1.4, 3.1, 3.2_
 
-- [ ] 3. 書き換えを止める変数が働いているかを確かめるテストを作る
+- [x] 3. 書き換えを止める変数が働いているかを確かめるテストを作る
 
   Claude は、部品「test-path-conversion.sh」のテストを、scratchpad の `place-2/.claude/hooks/tests/test-path-conversion.sh` に作る。`place-2/.claude/settings.json` には、所有者が2で置いた `settings.json` の写しを置く。Claude は、テストの場合2が `git rev-parse --sq-quote` の出力を、`git` が付ける単一引用符と先頭の空白を含めた文字列(` '/kiro-spec-quick' '--title=/kiro-spec-quick' '/a:/b' '/foo:/bar'`)と比べるように作る。テストができたら、親のセッションは、所有者に、`place-2/` のテストを本来の場所に写すコマンドを示して置くよう頼む。
   - 完了の確かめ方: scratchpad の `place-2/` の中で `bash .claude/hooks/tests/test-path-conversion.sh` が4つの場合をすべて通し、終了コード0で終わる。`place-2/.claude/settings.json` から `MSYS2_ARG_CONV_EXCL` の行を消すと場合1が失敗し、終了コード1で終わる。場合2の比べる文字列を書き換わった形(` 'C:/Program Files/Git/kiro-spec-quick'`)に変えて流すと場合2が失敗する。確かめたあと、Claude は消した行と変えた文字列を元に戻す。所有者が置いたあと、本来の場所で同じテストが終了コード0で終わる
@@ -48,6 +48,7 @@
 - 2 の途中の記録(2026-10-06): 所有者は2つのファイルを置いた。置いたあと、それより前に始めていたセッションの Bash ツールでは、`printenv MSYS2_ARG_CONV_EXCL` は何も出さず、`git` は `C:/Program Files/Git/kiro-spec-quick` を受け取った。Claude Desktop アプリで所有者がこの worktree のフォルダを選んで新しく始めたセッション(「Bash ツール出力確認」、02:03)の Bash ツールでは、`printenv` が `*` を出し、`git` は `'/kiro-spec-quick'` を受け取った。したがって、`settings.json` の `env` は、保存しても動いているセッションには当たらず、新しく始めたセッションから当たる(design と research.md の「保存すると動いているセッションにも反映される」は、Desktop アプリでは成り立たなかった)。2の残り(サブエージェントの Bash ツールでの実測)と3から5は、置いたあとに新しく始めたセッションで進める
 - 設計への書き足し(出荷の前にまとめて design.md と research.md に書く): `settings.json` の `env` は、Claude Desktop アプリでは保存しても動いているセッションに当たらず、新しく始めたセッションから当たる。所有者が `settings.json` を置いたあとは、新しいセッションで作業を続ける
 - 2 の完了の記録(2026-10-06): 置いたあとに新しく始めたセッションで、親のセッションの Bash ツールとサブエージェントの Bash ツールの両方で、`printenv MSYS2_ARG_CONV_EXCL` が `*` を出し、`git rev-parse --sq-quote /kiro-spec-quick --title=/kiro-spec-quick` が ` '/kiro-spec-quick' '--title=/kiro-spec-quick'` を出した。置く前の記録(`place-1/before.txt`)では変数が無く、`git` は書き換わった文字列を受け取っていた
+- 3 の申し送り: `.claude/` の下のファイルは、`cp` で読むときも `settings.json` の `deny` に止められる。scratchpad の写しの中で `.claude/...` を相対パスで書き換えるコマンドも、本来のファイルとみなされて止まる。写しを作るときは Read と Write を使い、写しを壊して確かめるときは `.claude` を含まない別の写しか絶対パスを使う。場合2は、いまのシェルの `MSYS_NO_PATHCONV` で通ってしまわないよう、`MSYS_NO_PATHCONV` を外して `git` を起動する
 - 要件1の受入基準5(実行の前に止められたら理由と書き方が伝わる)は、design が止める手段を作らないと決めたので、この spec のタスクでは扱わない
 - 要件2の受入基準1(リポジトリに書かれたコマンドが変更の前と同じ結果で終わる)のうち `/start` と `/ship` の手順のコマンドは、タスクでは確かめない。全タスクが終わったあと、Claude がこの spec を `/ship` で出荷するときに、`git commit -F`、`git push -u origin`、`gh pr create` が変数のある環境で通り、`gh pr view --json title,body` でPRの題名と本文に `C:/Program Files/Git` が含まれないことを確かめる
 - 共通の完了条件の1(確かめるテストの無い受入基準を残さない)の例外は、要件1の受入基準6の後半(Windows 向けのプログラムがエラーで終わったら、Claude がパスを書き直して実行する)、要件2の受入基準3(macOS と Linux の作業PCでは動きが変わらない)、要件3の受入基準2(新しく worktree を選んで開いたセッションでも届く)の3つである。理由は、それぞれのタスクの「受入基準とテストの対応」に書いた
