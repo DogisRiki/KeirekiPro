@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 所有者が最初に置く2つのファイルを用意し、置く前の状態を記録する
+- [x] 1. 所有者が最初に置く2つのファイルを用意し、置く前の状態を記録する
 
   Claude は、部品「settings.json の env」と部品「test-protect-main.sh の直し」の変更を、scratchpad の `place-1/` に、リポジトリと同じ並び(`place-1/.claude/settings.json`、`place-1/.claude/hooks/protect-main.sh` の写し、`place-1/.claude/hooks/tests/test-protect-main.sh`)で用意する。`settings.json` は、いまのファイルの写しの最上位に `env` を足しただけのものにし、`permissions` と `hooks` は1文字も変えない。`test-protect-main.sh` は、13行目と14行目だけを、`mktemp -d` の結果を `TMP_ROOT` に置き、`pwd -W` でドライブ文字の形に直したパスを `WORK` にする書き方に直す。Claude は、直す前の `test-protect-main.sh` を、`MSYS2_ARG_CONV_EXCL` か `MSYS_NO_PATHCONV` のある環境で流さない。流すと `C:\tmp` の下にリポジトリが残るからである。あわせて、/kiro-impl を動かしているセッション(以下、親のセッション)は、自分の Bash ツールと、起動したサブエージェントの Bash ツールの両方で、置く前の状態として `printenv MSYS2_ARG_CONV_EXCL` と `git rev-parse --sq-quote /kiro-spec-quick` の出力を、scratchpad のファイル `place-1/before.txt` に記録する。
   - 完了の確かめ方: scratchpad の `place-1/` の中で、直した `test-protect-main.sh` が、`MSYS2_ARG_CONV_EXCL='*'` を付けて流したときも付けずに流したときも「成功 52 件 / 失敗 0 件」で終わり、流す前と流したあとで `C:\tmp` の下の項目の一覧が変わらない。`git diff --no-index` で本来の `settings.json` と `place-1/.claude/settings.json` を比べたとき、違いが `env` の4行だけである。親のセッションの記録では、置く前の2か所とも `printenv` が何も出さず、`git` が `C:/Program Files/Git/kiro-spec-quick` の形を返している
@@ -44,6 +44,7 @@
 - 所有者への依頼、親のセッションの Bash ツールでの実測、サブエージェントの起動は、/kiro-impl を動かしている親のセッションが行う。実装役のサブエージェントは、所有者に依頼する手前で止まり、用意したもの(scratchpad の `place-1/` `place-2/` のパス)を親のセッションに返す。1と3の成果は scratchpad にあり、リポジトリには所有者が置いたあとに入る。そのため、確認役は、1と3の成果を scratchpad のパスで確かめる
 - 所有者が `settings.json` を置くと、動いているセッションにも変数が当たる。そのあと、Claude は `/tmp/…` や `/c/…` の形のパスを Windows 向けのプログラム(`git` `gh` `docker`)に渡さない
 - design は、変数が届くことを実測するまでほかの部品を作らないと決めている。1で `test-protect-main.sh` の直しだけを先に作るのは、この直しが変数があってもなくても通るものであり、直す前のテストを変数のある環境で流させないために `settings.json` と同時に置く必要があるからである。`test-path-conversion.sh` と CLAUDE.md の項目は、2の実測のあとに作る。そのため、所有者への依頼は2と3の2回になる
+- 1 の申し送り: `settings.json` の `env` は最上位の先頭(`{` の直後)に足したので、差分は3行の追加になった。末尾に足すと `hooks` を閉じる `}` を `},` に変えることになるためである。1の完了の確かめ方の「`env` の4行」は「`env` の追加だけ」と読む。置く前の状態は、親のセッションとサブエージェントの両方で、変数が無く、`git` が `C:/Program Files/Git/kiro-spec-quick` を受け取った(scratchpad の `place-1/before.txt`)
 - 要件1の受入基準5(実行の前に止められたら理由と書き方が伝わる)は、design が止める手段を作らないと決めたので、この spec のタスクでは扱わない
 - 要件2の受入基準1(リポジトリに書かれたコマンドが変更の前と同じ結果で終わる)のうち `/start` と `/ship` の手順のコマンドは、タスクでは確かめない。全タスクが終わったあと、Claude がこの spec を `/ship` で出荷するときに、`git commit -F`、`git push -u origin`、`gh pr create` が変数のある環境で通り、`gh pr view --json title,body` でPRの題名と本文に `C:/Program Files/Git` が含まれないことを確かめる
 - 共通の完了条件の1(確かめるテストの無い受入基準を残さない)の例外は、要件1の受入基準6の後半(Windows 向けのプログラムがエラーで終わったら、Claude がパスを書き直して実行する)、要件2の受入基準3(macOS と Linux の作業PCでは動きが変わらない)、要件3の受入基準2(新しく worktree を選んで開いたセッションでも届く)の3つである。理由は、それぞれのタスクの「受入基準とテストの対応」に書いた
