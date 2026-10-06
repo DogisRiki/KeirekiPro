@@ -260,7 +260,7 @@ package "職務経歴書集約(ResumeAggregation)" as ResumeAggregation {
     note bottom of FullName
         ・姓・名ともに必須。
         ・姓・名ともに10文字以内。
-        ・英字、ひらがな、カタカナ、漢字のみ許可する。
+        ・英字、ひらがな、カタカナ、漢字(「々」「ー」を含む)のみ許可する。
     end note
 
     note bottom of Period

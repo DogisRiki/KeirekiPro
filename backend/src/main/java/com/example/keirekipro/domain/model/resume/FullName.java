@@ -15,7 +15,7 @@ public class FullName {
     /**
      * 許可する文字列
      */
-    public static final String ARROW_PATTERN = "^[a-zA-Zぁ-んァ-ン一-龯]+$";
+    public static final String ARROW_PATTERN = "^[a-zA-Zぁ-んァ-ン一-龯々ー]+$";
 
     /**
      * 姓
