@@ -1,4 +1,7 @@
 {
+    "env": {
+        "MSYS2_ARG_CONV_EXCL": "*"
+    },
     "permissions": {
         "allow": [
             "Bash(bash .claude/scripts/parallel/run-check.sh *)",
