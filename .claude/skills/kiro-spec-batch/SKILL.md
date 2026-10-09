@@ -169,7 +169,7 @@ Next: Review generated specs, then start implementation with /kiro-impl <feature
 - Log the error, skip the failed feature
 - Continue with remaining features in the wave
 - Report failed features in the summary
-- Suggest: "Run `/kiro-spec-quick <feature> --auto` manually for failed features."
+- Suggest: "Run `/kiro-spec-init <feature>` manually for failed features."
 
 **Circular dependencies**:
 - If dependency graph has cycles, report the cycle and stop
