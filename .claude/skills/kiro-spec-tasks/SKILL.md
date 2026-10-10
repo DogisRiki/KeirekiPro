@@ -66,6 +66,7 @@ After all parallel research completes, synthesize findings before generating tas
 - Explicitly note dependencies preventing `(並行可)` when tasks appear parallel but are not safe
 - If sequential mode is true, omit `(並行可)` entirely
 - If existing tasks.md found, merge with new content
+- Do not create tasks from requirement or design items marked `(PR #… で変更済み)`: their behavior was already implemented in the PR named by the mark
 
 ### Step 3: Review Task Plan
 

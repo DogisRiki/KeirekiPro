@@ -243,7 +243,7 @@
   - _対象の部品: ship の変更_
   - _依存: 7.1_
 
-- [ ] 7.5 spec の生成と審査のスキルに、spec 無しで変えた動きの扱いを足す (並行可) (#524)
+- [x] 7.5 spec の生成と審査のスキルに、spec 無しで変えた動きの扱いを足す (並行可) (#524)
 
   Claude は、kiro-spec-requirements の Step 3 と kiro-spec-design の Step 4 に、マージ済みのPRから食い違いの行を探して本文に反映する1行を足し、kiro-spec-tasks の Step 2 に、`(PR #… で変更済み)` の印の項目からタスクを作らない1行を足し、spec-review の `rules/requirements.md` の観点9に、その印の行と、その印の項目を取りこぼしと勝手な追加の判定から外す決まりを足す。
   - Claude は、探すコマンドを design の「spec の生成のスキルの変更」の節の `gh pr list --state merged --limit 1000 --json number,body --jq '{total: length, hits: [...]}'` の形にし、`total` が1000のときはそれより古いPRを見ていないことを生成の報告に書くと書く。Claude は、SKILL.md でコマンドをコードブロックに入れる(design の審査の記録 D2-3-2)

@@ -58,6 +58,15 @@ After all research completes, synthesize findings in main context before generat
 - Keep this as a draft until the review gate passes; do not write `requirements.md` yet
 - If spec.json has `additional_issues`, keep every existing requirement and its numbered items with their numbers unchanged, and add new requirements numbered after the last existing one
 - Mark new, changed, and withdrawn items following the 「Issueの印」 rules in CLAUDE.md
+- If spec.json has `additional_issues`, run the command below (replace `<feature>` with the feature name) to get only the total number of merged PRs returned (`total`) and the PRs whose body has a mismatched-spec line, with their numbers and those lines (`hits`). Do not use `--search`, so the result does not depend on how GitHub splits search terms. `--jq` is built into gh and does not depend on jq on the host
+
+  ```bash
+  gh pr list --state merged --limit 1000 --json number,body --jq '{total: length, hits: [.[] | select(.body | contains("- 食い違う spec: `.kiro/specs/<feature>/")) | {number, lines: [.body | split("\n")[] | select(startswith("- 食い違う spec: `.kiro/specs/<feature>/"))]}]}'
+  ```
+
+  - If `total` is 1000 (the limit), state in the generation report that older PRs were not checked
+  - If `gh pr list` fails, do not stop the generation. State in the generation report that the search failed, and at the end of requirements.md leave one empty line followed by the line 「spec 無しのPRの検索に失敗したため、食い違いを拾えていない」
+  - Among the places those lines point to, fix the ones in requirements.md to match the behavior the PR changed, and append `(PR #<そのPRの番号> で変更済み)` to the end of each fixed item. Do not use `(#N で変更)` for them: that behavior is not written in the body of the additional Issue #N and has already shipped. Do not fix places whose text already matches the PR's behavior
 
 ### Step 4: Review Requirements Draft
 - Run the `Requirements Review Gate` from `rules/requirements-review-gate.md`

@@ -112,6 +112,15 @@ After all findings return, synthesize in main context before proceeding.
    - **`## ファイルの構成`** (required): Populate `## ファイルの構成` with concrete file paths and responsibilities. Analyze the codebase to determine which files need to be created vs. modified. Each file must have one clear responsibility. This section directly drives task `_対象の部品:_` annotations and implementation Task Briefs — vague file structures produce vague implementations.
    - **`## テストの方針`**: Derive test items from the numbered items of the requirements, not generic patterns. Each test item should reference specific components and behaviors from this design. E2E paths must map to the critical user flows identified in requirements. Avoid vague entries like "test login works" -- instead specify what is being verified and why it matters.
    - If existing design.md found in Step 1, use it as reference context (merge mode)
+   - If spec.json has `additional_issues`, run the command below (replace `<feature>` with the feature name) to get only the total number of merged PRs returned (`total`) and the PRs whose body has a mismatched-spec line, with their numbers and those lines (`hits`). Do not use `--search`, so the result does not depend on how GitHub splits search terms. `--jq` is built into gh and does not depend on jq on the host
+
+     ```bash
+     gh pr list --state merged --limit 1000 --json number,body --jq '{total: length, hits: [.[] | select(.body | contains("- 食い違う spec: `.kiro/specs/<feature>/")) | {number, lines: [.body | split("\n")[] | select(startswith("- 食い違う spec: `.kiro/specs/<feature>/"))]}]}'
+     ```
+
+     - If `total` is 1000 (the limit), state in the generation report that older PRs were not checked
+     - If `gh pr list` fails, do not stop the generation. State in the generation report that the search failed, and at the end of design.md leave one empty line followed by the line 「spec 無しのPRの検索に失敗したため、食い違いを拾えていない」
+     - Among the places those lines point to, fix the ones in design.md to match the behavior the PR changed, and append `(PR #<そのPRの番号> で変更済み)` to the end of each fixed item. Do not use `(#N で変更)` for them: that behavior is not written in the body of the additional Issue #N and has already shipped. Do not fix places whose text already matches the PR's behavior
    - Apply design rules: Type Safety, Visual Communication. 文の調子は `.kiro/settings/rules/spec-writing.md` の文の書き方の節に従う
    - Use language specified in spec.json
    - Keep this as a draft until the review gate passes; do not write `design.md` yet
