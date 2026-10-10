@@ -18,7 +18,7 @@
 # KP_WAIT_INTERVAL_SECONDS(既定5)で変えられる。
 #
 # 読み込んだ(source した)だけのときは本体の処理を動かさず、frontend の準備の関数
-# kp_frontend_prepare だけを使えるようにする(ui.sh が使う)。
+# kp_frontend_prepare と、枠のボリュームを用意する関数 kp_node_volume だけを使えるようにする(ui.sh が使う)。
 # 前提: bash・perl(JSON::PP)・git・docker(Compose 2.24.0 以上)。jq には依存しない。
 # =====================================================================
 
@@ -30,35 +30,43 @@ KP_RUN_CHECK_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # コマンド自身の終了コード(69 を含む)と見分けるための値で、外に返すときは69に読み替える。
 KP_PRE_FAIL_CODE=197
 
+# 枠のボリュームを node の持ち物で用意する: kp_node_volume <ボリューム> <枠の番号> <作業フォルダ> <コンテナの中の場所>
+# ボリュームが無ければ作り、同じ枠のラベルを付けた root の1回きりのコンテナで持ち主を node にする
+# (イメージに無い場所のボリュームは root の持ち物になるため)。
+# 失敗したら理由を KP_FRONTEND_ERROR に入れて終了コード1。
+kp_node_volume() {
+    local vol="$1" k="$2" folder="$3" dest="$4" err
+    docker volume inspect "$vol" >/dev/null 2>&1 && return 0
+    if ! err=$(docker volume create "$vol" 2>&1); then
+        KP_FRONTEND_ERROR="ボリューム $vol を作れない: $err"
+        return 1
+    fi
+    if ! (cd "$folder" && docker compose -p keirekipro -f compose.yaml run --rm --no-deps -T -u root \
+        --label "keirekipro.slot=$k" -v "$vol:$dest" --entrypoint chown frontend node:node "$dest"); then
+        # 持ち主を変えられなかったボリュームを残すと、次から作り直されないので消す
+        docker volume rm "$vol" >/dev/null 2>&1
+        KP_FRONTEND_ERROR="ボリューム $vol の持ち主を node にできない"
+        return 1
+    fi
+    return 0
+}
+
 # frontend の準備: kp_frontend_prepare <枠の番号>
 # いまの作業フォルダの最上位で呼ぶ。
-# 1. 枠のボリューム kp-pnpm-store-<k> が無ければ作り、同じ枠のラベルを付けた root の
-#    1回きりのコンテナで持ち主を node にする(イメージに無い場所のボリュームは root の持ち物になるため)
+# 1. 枠のボリューム kp-pnpm-store-<k> を kp_node_volume で用意する
 # 2. コンテナに渡す引数を KP_FRONTEND_ARGS(配列)に、コンテナの中でコマンドの前にすること
 #    (node_modules の印 .kp-lock-hash が lock と違えば pnpm install して印を書き直す。
 #    install に失敗したら終了コード KP_PRE_FAIL_CODE)を KP_FRONTEND_PRE に入れる
 # 失敗したら理由を KP_FRONTEND_ERROR に入れて終了コード1。
 kp_frontend_prepare() {
-    local k="$1" folder key vol hash err
+    local k="$1" folder key vol hash
     KP_FRONTEND_ARGS=()
     KP_FRONTEND_PRE=
     KP_FRONTEND_ERROR=
     folder=$(kp_folder 2>&1) || { KP_FRONTEND_ERROR=$folder; return 1; }
     key=$(kp_folder_key 2>&1) || { KP_FRONTEND_ERROR=$key; return 1; }
     vol="kp-pnpm-store-$k"
-    if ! docker volume inspect "$vol" >/dev/null 2>&1; then
-        if ! err=$(docker volume create "$vol" 2>&1); then
-            KP_FRONTEND_ERROR="ボリューム $vol を作れない: $err"
-            return 1
-        fi
-        if ! (cd "$folder" && docker compose -p keirekipro -f compose.yaml run --rm --no-deps -T -u root \
-            --label "keirekipro.slot=$k" -v "$vol:/pnpm-store" --entrypoint chown frontend node:node /pnpm-store); then
-            # 持ち主を変えられなかったボリュームを残すと、次から作り直されないので消す
-            docker volume rm "$vol" >/dev/null 2>&1
-            KP_FRONTEND_ERROR="ボリューム $vol の持ち主を node にできない"
-            return 1
-        fi
-    fi
+    kp_node_volume "$vol" "$k" "$folder" /pnpm-store || return 1
     if [ ! -f "$folder/frontend/pnpm-lock.yaml" ] || [ ! -f "$folder/frontend/package.json" ]; then
         KP_FRONTEND_ERROR="frontend/pnpm-lock.yaml か frontend/package.json が無い"
         return 1

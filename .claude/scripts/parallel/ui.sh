@@ -7,7 +7,10 @@
 # start は、種類 ui の枠 k を取り、いまの作業フォルダを読み込んだ backend と frontend の
 # 開発サーバを1回きりのコンテナ(docker compose -p keirekipro run -d)で、枠ごとのポート
 # (backend 18080+k、frontend 15173+k)で起動する。DB は作業フォルダごとの kp_<鍵> を使う。
-# 起動したら、画面確認の URL(http://host.docker.internal:<15173+k>)と backend の URL を出す。
+# あわせて、所有者が作業PCのブラウザで開く frontend を、ポート 25173+k で起動する。この frontend は
+# backend を localhost で呼ぶので、hosts ファイルの host.docker.internal の向き先に左右されない。
+# 起動したら、画面確認の URL(http://host.docker.internal:<15173+k>)と backend の URL と、
+# 所有者が開く URL(http://localhost:<25173+k>)を出す。
 # 枠は stop まで持ち続ける。stop は、いまの作業フォルダの画面確認のコンテナだけを消し、枠を返す。
 # --session の値は、セッションのID(KP_SESSION_ID)として lib.sh に渡す。
 #
@@ -107,7 +110,7 @@ _kp_ui_fail69() {
 # 健康の確かめが上限に達したとき: ログの末尾を出し、片付けて69で終わる
 _kp_ui_health_fail() { # <理由>
     local name
-    for name in "kp-ui-$KP_UI_SLOT-backend" "kp-ui-$KP_UI_SLOT-frontend"; do
+    for name in "kp-ui-$KP_UI_SLOT-backend" "kp-ui-$KP_UI_SLOT-frontend" "kp-ui-$KP_UI_SLOT-frontend-owner"; do
         printf '[parallel] %s のログの末尾:\n' "$name"
         docker logs --tail 50 "$name" 2>&1
     done
@@ -116,7 +119,7 @@ _kp_ui_health_fail() { # <理由>
 
 kp_ui_start() {
     local wait=0 folder key n main out rc s stopped limit interval waited_from told k
-    local be_port fe_port db exists json tries pause i
+    local be_port fe_port own_port db exists json tries pause i
     while [ $# -gt 0 ]; do
         case "$1" in
             --wait) wait=1; shift ;;
@@ -185,6 +188,7 @@ kp_ui_start() {
     trap 'exit 129' HUP
     be_port=$((18080 + k))
     fe_port=$((15173 + k))
+    own_port=$((25173 + k))
 
     # 3. 前の画面確認のコンテナが残っていれば消す
     out=$(_kp_ui_remove_containers "$key" 2>&1) || _kp_ui_fail69 "前の画面確認のコンテナを消せない: $out"
@@ -199,8 +203,9 @@ kp_ui_start() {
             || _kp_ui_fail69 "DB $db を作れない: $out"
     fi
 
-    # 5. backend を起動する(DB の接続先と、画面の URL と CORS の許可だけを上書きする)
-    json='{"spring":{"datasource":{"url":"jdbc:postgresql://db:5432/'"$db"'"}},"frontend-base-url":"http://host.docker.internal:'"$fe_port"'","cors":{"allowed-origins":"http://host.docker.internal:'"$fe_port"'"}}'
+    # 5. backend を起動する(DB の接続先と、画面の URL と CORS の許可だけを上書きする)。
+    #    CORS は、画面確認の frontend と所有者が開く frontend の両方を許す
+    json='{"spring":{"datasource":{"url":"jdbc:postgresql://db:5432/'"$db"'"}},"frontend-base-url":"http://host.docker.internal:'"$fe_port"'","cors":{"allowed-origins":"http://host.docker.internal:'"$fe_port"',http://localhost:'"$own_port"'"}}'
     out=$(docker compose -p keirekipro -f compose.yaml run -d --no-deps --name "kp-ui-$k-backend" -p "$be_port:8080" \
         --label "keirekipro.slot=$k" --label "keirekipro.folder=$key" --label keirekipro.kind=ui \
         -v "kp-gradle-home-$k:/root/.gradle" -v "kp-gradle-project-$key:/home/spring/app/.gradle" \
@@ -208,12 +213,14 @@ kp_ui_start() {
         backend ./gradlew bootRun --args=--spring.profiles.active=dev 2>&1) \
         || _kp_ui_fail69 "backend の開発サーバを起動できない: $out"
 
-    # 6. frontend を起動する(pnpm のストアと node_modules の準備は run-check.sh と同じ)
+    # 6. frontend を起動する(pnpm のストアと node_modules の準備は run-check.sh と同じ)。
+    #    所有者が開く frontend が node_modules/.vite に別のボリュームを重ねるので、その場所を
+    #    先に node の持ち物で作っておく(無いと docker が root の持ち物で作り、この frontend が書けなくなる)
     kp_frontend_prepare "$k" || _kp_ui_fail69 "$KP_FRONTEND_ERROR"
     out=$(docker compose -p keirekipro -f compose.yaml run -d --no-deps --name "kp-ui-$k-frontend" -p "$fe_port:5173" \
         --label "keirekipro.slot=$k" --label "keirekipro.folder=$key" --label keirekipro.kind=ui \
         "${KP_FRONTEND_ARGS[@]}" -e "VITE_API_URL=http://host.docker.internal:$be_port/api/" \
-        frontend sh -c "$KP_FRONTEND_PRE; exec pnpm run dev" 2>&1) \
+        frontend sh -c "$KP_FRONTEND_PRE; mkdir -p node_modules/.vite; exec pnpm run dev" 2>&1) \
         || _kp_ui_fail69 "frontend の開発サーバを起動できない: $out"
 
     # 7. 健康の確かめ: backend は actuator/health が200を返すまで、frontend は TCP でつながるまで待つ
@@ -232,11 +239,29 @@ kp_ui_start() {
         sleep "$pause"
     done
 
-    # 8. 起動を終えたので、枠は stop まで持ち続ける
+    # 8. 所有者が開く frontend を起動する。画面確認の frontend が node_modules の準備を終えてから
+    #    起動するので、pnpm install は重ならない。Vite の作業用の置き場(node_modules/.vite)は、
+    #    2つの開発サーバが取り合わないよう、枠のボリューム kp-vite-owner-<k> を重ねて分ける。
+    #    backend を localhost で呼ぶので、作業PCのブラウザから開ける
+    kp_node_volume "kp-vite-owner-$k" "$k" "$folder" /vite-owner || _kp_ui_fail69 "$KP_FRONTEND_ERROR"
+    out=$(docker compose -p keirekipro -f compose.yaml run -d --no-deps --name "kp-ui-$k-frontend-owner" -p "$own_port:5173" \
+        --label "keirekipro.slot=$k" --label "keirekipro.folder=$key" --label keirekipro.kind=ui \
+        "${KP_FRONTEND_ARGS[@]}" -v "kp-vite-owner-$k:/home/node/app/node_modules/.vite" \
+        -e "VITE_API_URL=http://localhost:$be_port/api/" \
+        frontend sh -c "$KP_FRONTEND_PRE; exec pnpm run dev" 2>&1) \
+        || _kp_ui_fail69 "所有者が開く frontend の開発サーバを起動できない: $out"
+    for ((i = 1; ; i++)); do
+        _kp_ui_tcp_open "$own_port" && break
+        [ "$i" -lt "$tries" ] || _kp_ui_health_fail "所有者が開く frontend に TCP でつながるかの確かめが上限($tries回)に達した"
+        sleep "$pause"
+    done
+
+    # 9. 起動を終えたので、枠は stop まで持ち続ける
     KP_UI_SLOT=
     trap - EXIT INT TERM HUP
     printf '[parallel] 画面確認の URL: http://host.docker.internal:%s\n' "$fe_port"
     printf '[parallel] backend の URL: http://host.docker.internal:%s\n' "$be_port"
+    printf '[parallel] 所有者が開く URL: http://localhost:%s\n' "$own_port"
     exit 0
 }
 
