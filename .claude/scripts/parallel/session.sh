@@ -20,7 +20,13 @@
 #         それ以外(閉じたセッションの予約や、片付けを待つ記録)は、folder session_id updated_at を書き直し、
 #           branch を空にする(handed_over_from は残す)
 #   claim <N> --branch <ブランチ> [--session <ID>]
-#       Issueの記録 issues/<N>.json を書く。すでにあれば folder branch session_id updated_at を書き直す。
+#       Issueの記録 issues/<N>.json を、記録の錠の中で読んでから書く。
+#       記録がほかのセッションのもの(folder が空でなくいまの作業フォルダと違う(core.ignorecase に従って比べる)、
+#       または session_id が空でなくこのセッションのIDも空でなく2つが違う)なら、書き直さずに
+#       「[parallel] 着手できない: Issue #<N> は、別のセッション(作業フォルダ <folder>、セッション <session_id>)が
+#       着手したものとして記録されている。」を標準エラーに出し、終了コード1で終わる。
+#       記録が無ければ作る。記録の folder と session_id が空(prune が残した記録)か、記録がこのセッションのものなら、
+#       folder branch session_id updated_at を書き直す(handed_over_from は残す)。
 #   end <session_id>
 #       所有者が「やめた」と答えたセッションの記録 sessions/<session_id>.json を消す。
 #   takeover <N> (--from <作業フォルダ> | --branch <ブランチ>) [--session <ID>]
@@ -36,7 +42,8 @@
 #         --branch: いまの作業フォルダがきれいでなければ何もせずに終了コード1。B がローカルにあれば git switch B、
 #           無ければリモート(origin)から取得して git switch -c B --track origin/B
 #       どれも、Issueの記録の folder と session_id をいまのものに書き直す(無ければ作る。branch は空)。
-#       前の作業フォルダがほかの作業フォルダなら handed_over_from に足す。
+#       前の作業フォルダがほかの作業フォルダなら handed_over_from に足す。この書き直しは記録の錠の中で行い、
+#       記録の持ち主は確かめない(所有者が引き継ぐと答えたあとに呼ばれるため)。
 #       標準出力に、写したファイル(--from がいまの作業フォルダのときは作りかけ)の一覧と、いまのブランチを出す。
 #   spec-names
 #       すべての作業フォルダの .kiro/specs/ のディレクトリ名を、重ならないように1行ずつ出す。
@@ -67,8 +74,9 @@
 # このスクリプトは所有者とやり取りしない。docker を呼ぶのは prune(片付けるものがあるとき)だけ。
 # check-start は、記録の錠(記録の置き場所の records.lock。lib.sh の _kp_lock で取る)の中で調べと予約を行い、
 # 錠を返してから JSON を出す。15秒待っても錠を取れないときと、予約を書けないときは、JSON を出さずに終了コード69で終わる。
+# claim と takeover も、Issueの記録を同じ錠の中で読み書きし、15秒待っても錠を取れなければ記録を書かずに終了コード69で終わる。
 #
-# 終了コード: 0(成功)、1(takeover が引き継げなかった)、64(呼び方の誤り)、
+# 終了コード: 0(成功)、1(claim がほかのセッションの記録を断った、takeover が引き継げなかった)、64(呼び方の誤り)、
 #             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない)。
 # 前提: bash・perl(JSON::PP)・git。jq には依存しない。
 # =====================================================================
@@ -698,7 +706,7 @@ kp_session_check_start() {
 }
 
 kp_session_claim() {
-    local n="" branch="" session="" have_branch=0 state folder sid f now
+    local n="" branch="" session="" have_branch=0 state folder sid f now rec_folder rec_sid
     while [ $# -gt 0 ]; do
         case "$1" in
             --branch)
@@ -726,17 +734,34 @@ kp_session_claim() {
     state=$(kp_state_dir) || exit $?
     folder=$(kp_folder) || exit $?
     sid=$(kp_session_id "${session:-${KP_SESSION_ID:-}}") || exit $?
-    mkdir -p "$state/issues" 2>/dev/null || _kp_die69 "記録の置き場所 $state/issues を作れない"
     f="$state/issues/$n.json"
+
+    # 記録を読んでから書き終えるまで、記録の錠の中で行う
+    _kp_ss_lock "$state"
+    mkdir -p "$state/issues" 2>/dev/null || _kp_ss_die69 "記録の置き場所 $state/issues を作れない"
+    if [ -f "$f" ]; then
+        # ほかのセッションの記録(folder が空でなくいまの作業フォルダと違う、または session_id が空でなく
+        # このセッションのIDも空でなく2つが違う)なら、書き直さずに断る
+        rec_folder=$(kp_json_get "$f" folder) || _kp_ss_die69 "Issueの記録 $f を読めない"
+        rec_sid=$(kp_json_get "$f" session_id) || _kp_ss_die69 "Issueの記録 $f を読めない"
+        if { [ -n "$rec_folder" ] && [ "$(_kp_norm_path "$rec_folder")" != "$(_kp_norm_path "$folder")" ]; } \
+            || { [ -n "$rec_sid" ] && [ -n "$sid" ] && [ "$rec_sid" != "$sid" ]; }; then
+            _kp_ss_unlock
+            printf '[parallel] 着手できない: Issue #%s は、別のセッション(作業フォルダ %s、セッション %s)が着手したものとして記録されている。\n' \
+                "$n" "$rec_folder" "$rec_sid" >&2
+            exit 1
+        fi
+    fi
     now=$(date +%s)
     if [ -f "$f" ]; then
         kp_json_write "$f" folder="$folder" branch="$branch" session_id="$sid" updated_at:="$now" \
-            || _kp_die69 "Issueの記録 $f を書けない"
+            || _kp_ss_die69 "Issueの記録 $f を書けない"
     else
         kp_json_write "$f" issue:="$n" folder="$folder" branch="$branch" session_id="$sid" \
             updated_at:="$now" 'handed_over_from:=[]' \
-            || _kp_die69 "Issueの記録 $f を書けない"
+            || _kp_ss_die69 "Issueの記録 $f を書けない"
     fi
+    _kp_ss_unlock
 }
 
 kp_session_end() {
@@ -784,24 +809,29 @@ _kp_ss_handed_json() { # <Issueの記録> <いまの作業フォルダ> <前の�
 }
 
 # Issueの記録の folder と session_id をいまのものに書き直す(無ければ作る。branch は空)。
-# <ブランチ> が空でなければ branch も書き直す。<前の作業フォルダ> が空でなければ handed_over_from に足す
+# <ブランチ> が空でなければ branch も書き直す。<前の作業フォルダ> が空でなければ handed_over_from に足す。
+# 記録を読んでから書き終えるまで、記録の錠の中で行う(記録の持ち主は確かめない)。
+# 錠を取れないときと、読み書きできないときは、錠を返してから終了コード69で終わる
 _kp_ss_write_takeover() { # <Issueの記録> <N> <いまの作業フォルダ> <セッションのID> <ブランチ> <前の作業フォルダ>
     local f="$1" n="$2" me="$3" sid="$4" branch="$5" prev="$6" handed now
-    handed=$(_kp_ss_handed_json "$f" "$me" "$prev") || _kp_die69 "[parallel] Issueの記録 $f を読めない"
+    # Issueの記録は <記録の置き場所>/issues/<N>.json
+    _kp_ss_lock "${f%/issues/*}"
+    handed=$(_kp_ss_handed_json "$f" "$me" "$prev") || _kp_ss_die69 "[parallel] Issueの記録 $f を読めない"
     now=$(date +%s)
     if [ -f "$f" ]; then
         if [ -n "$branch" ]; then
             kp_json_write "$f" folder="$me" branch="$branch" session_id="$sid" updated_at:="$now" \
-                "handed_over_from:=$handed" || _kp_die69 "[parallel] Issueの記録 $f を書けない"
+                "handed_over_from:=$handed" || _kp_ss_die69 "[parallel] Issueの記録 $f を書けない"
         else
             kp_json_write "$f" folder="$me" session_id="$sid" updated_at:="$now" \
-                "handed_over_from:=$handed" || _kp_die69 "[parallel] Issueの記録 $f を書けない"
+                "handed_over_from:=$handed" || _kp_ss_die69 "[parallel] Issueの記録 $f を書けない"
         fi
     else
-        mkdir -p "${f%/*}" 2>/dev/null || _kp_die69 "[parallel] 記録の置き場所 ${f%/*} を作れない"
+        mkdir -p "${f%/*}" 2>/dev/null || _kp_ss_die69 "[parallel] 記録の置き場所 ${f%/*} を作れない"
         kp_json_write "$f" issue:="$n" folder="$me" branch="$branch" session_id="$sid" updated_at:="$now" \
-            "handed_over_from:=$handed" || _kp_die69 "[parallel] Issueの記録 $f を書けない"
+            "handed_over_from:=$handed" || _kp_ss_die69 "[parallel] Issueの記録 $f を書けない"
     fi
+    _kp_ss_unlock
 }
 
 # 引き継ぎの結果を標準出力に出す

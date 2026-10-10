@@ -486,7 +486,7 @@ t_conflict_and_leftover_ignore_responding() {
 # =====================================================================
 # shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 t_claim() {
-    local f got
+    local f got before rc
     put_session s-me "$WT" "$(fkey "$WT_DIR")" 100
     ss "$WT_DIR" claim 42 --branch feat/wt --session s-me || die "claim の終了コード $?"
     f="$STATE/issues/42.json"
@@ -494,12 +494,20 @@ t_claim() {
     got=$(pj "$(cat "$f")" 'join "|", $d->{issue}, $d->{folder}, $d->{branch}, $d->{session_id}, scalar @{$d->{handed_over_from}}')
     [ "$got" = "42|$WT|feat/wt|s-me|0" ] || die "記録の中身が違う: $(cat "$f")"
     case "$(pj "$(cat "$f")" '$d->{updated_at}')" in '' | *[!0-9]*) die "updated_at が UNIX 秒でない: $(cat "$f")" ;; esac
-    # すでにあれば folder branch session_id updated_at を書き直し、handed_over_from は残す
-    put_issue 42 "$WT2" feat/old s-old "[\"$WT2\"]"
+    # folder と session_id が空の記録(prune が残した記録)なら、folder branch session_id updated_at を書き直し、
+    # handed_over_from は残す
+    put_issue 42 "" feat/old "" "[\"$WT2\"]"
     ss "$MAIN_DIR" claim 42 --branch main --session s-new || die "2回目の claim の終了コード $?"
     got=$(pj "$(cat "$f")" 'join "|", $d->{issue}, $d->{folder}, $d->{branch}, $d->{session_id}, @{$d->{handed_over_from}}')
     [ "$got" = "42|$MAIN|main|s-new|$WT2" ] || die "書き直した記録が違う: $(cat "$f")"
     [ "$(pj "$(cat "$f")" '$d->{updated_at}')" != 1 ] || die "updated_at が書き直されていない"
+    # ほかの作業フォルダとセッションの記録なら、書き直さずに終了コード1で断る
+    put_issue 42 "$WT2" feat/old s-old "[\"$WT2\"]"
+    before=$(cat "$f")
+    ss "$MAIN_DIR" claim 42 --branch main --session s-new >/dev/null 2>&1
+    rc=$?
+    [ "$rc" = 1 ] || die "ほかの作業フォルダとセッションの記録への claim の終了コードが1でない: $rc"
+    [ "$(cat "$f")" = "$before" ] || die "ほかの作業フォルダとセッションの記録を書き直した: $(cat "$f")"
     # --session が無いときは、いまの作業フォルダのいちばん古い記録のID
     ss "$WT_DIR" claim 43 --branch feat/wt || die "--session の無い claim の終了コード $?"
     [ "$(pj "$(cat "$STATE/issues/43.json")" '$d->{session_id}')" = s-me ] || die "--session が無いときのIDが違う"
@@ -1383,6 +1391,159 @@ t_takeover_usage() {
     [ "$(issue_fields 42)" = "42|$WT|feat/wt|s-wt|" ] || die "誤った呼び方でIssueの記録を書き直した"
 }
 
+# =====================================================================
+# claim の断りと、claim と takeover の錠(session-overlap-guard 要件1.3・1.4)
+# =====================================================================
+# claim を呼び、終了コードを CLAIM_RC に、標準エラーを CLAIM_ERR に入れる
+claim_rc() { # <フォルダ> <引数>...
+    ss "$1" claim "${@:2}" >/dev/null 2>"$WORK/claim-err.txt"
+    CLAIM_RC=$?
+    CLAIM_ERR=$(cat "$WORK/claim-err.txt")
+}
+
+t_claim_refuses_other_reservation() {
+    local before want
+    # WT のセッション s-wt が check-start で予約した(branch が空)
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 100
+    put_session s-me "$WT2" "$(fkey "$WT2_DIR")" 200
+    put_issue 42 "$WT" "" s-wt
+    before=$(cat "$STATE/issues/42.json")
+    claim_rc "$WT2_DIR" 42 --branch feat/wt2 --session s-me
+    [ "$CLAIM_RC" = 1 ] || die "ほかの作業フォルダの予約への claim の終了コードが1でない: $CLAIM_RC: $CLAIM_ERR"
+    want="[parallel] 着手できない: Issue #42 は、別のセッション(作業フォルダ $WT、セッション s-wt)が着手したものとして記録されている。"
+    case "$CLAIM_ERR" in "$want"*) ;; *) die "標準エラーの文が違う: $CLAIM_ERR" ;; esac
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "ほかのセッションの予約を書き換えた: $(cat "$STATE/issues/42.json")"
+    [ ! -e "$LOCK" ] || die "断ったあとに錠を残した"
+    # 記録の session_id が空でも、folder がほかの作業フォルダなら断る
+    put_issue 42 "$WT" feat/wt ""
+    before=$(cat "$STATE/issues/42.json")
+    claim_rc "$WT2_DIR" 42 --branch feat/wt2 --session s-me
+    [ "$CLAIM_RC" = 1 ] || die "session_id が空でほかの作業フォルダの記録への claim の終了コードが1でない: $CLAIM_RC"
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "session_id が空の、ほかの作業フォルダの記録を書き換えた"
+    # 同じ作業フォルダでも、記録の session_id が空でなくこのセッションのIDと違えば断る
+    put_issue 42 "$WT2" "" s-wt
+    before=$(cat "$STATE/issues/42.json")
+    claim_rc "$WT2_DIR" 42 --branch feat/wt2 --session s-me
+    [ "$CLAIM_RC" = 1 ] || die "同じ作業フォルダのほかのセッションの記録への claim の終了コードが1でない: $CLAIM_RC"
+    case "$CLAIM_ERR" in *"作業フォルダ $WT2、セッション s-wt)"*) ;; *) die "標準エラーに記録の作業フォルダとセッションが出ない: $CLAIM_ERR" ;; esac
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "同じ作業フォルダのほかのセッションの記録を書き換えた"
+}
+
+t_claim_writes_own_or_free_record() {
+    local upper
+    put_session s-me "$WT" "$(fkey "$WT_DIR")" 100
+    # 自分の予約があれば branch を書く
+    check_start "$WT_DIR" check-start 42 --session s-me >/dev/null || die "check-start が成り立たない"
+    [ "$(issue_fields 42)" = "42|$WT||s-me|" ] || die "前提: 自分の予約が無い: $(cat "$STATE/issues/42.json")"
+    claim_rc "$WT_DIR" 42 --branch feat/wt --session s-me
+    [ "$CLAIM_RC" = 0 ] || die "自分の予約への claim の終了コードが0でない: $CLAIM_RC: $CLAIM_ERR"
+    [ "$(issue_fields 42)" = "42|$WT|feat/wt|s-me|" ] || die "自分の予約に branch を書いていない: $(cat "$STATE/issues/42.json")"
+    [ ! -e "$LOCK" ] || die "claim のあとに錠を残した"
+    # 記録が無ければ作る
+    claim_rc "$WT_DIR" 43 --branch feat/wt --session s-me
+    [ "$CLAIM_RC" = 0 ] || die "記録の無い claim の終了コードが0でない: $CLAIM_RC: $CLAIM_ERR"
+    [ "$(issue_fields 43)" = "43|$WT|feat/wt|s-me|" ] || die "記録の無い claim の記録が違う: $(cat "$STATE/issues/43.json")"
+    # folder と session_id が空の記録(prune が残した記録)は書き直す
+    put_issue 44 "" feat/old ""
+    claim_rc "$WT_DIR" 44 --branch feat/wt --session s-me
+    [ "$CLAIM_RC" = 0 ] || die "prune が残した記録への claim の終了コードが0でない: $CLAIM_RC: $CLAIM_ERR"
+    [ "$(issue_fields 44)" = "44|$WT|feat/wt|s-me|" ] || die "prune が残した記録を書き直していない: $(cat "$STATE/issues/44.json")"
+    # 作業フォルダを比べるときは core.ignorecase に従う
+    if [ "$(git -C "$MAIN_DIR" config --get core.ignorecase)" = true ]; then
+        upper=$(printf '%s' "$WT" | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+        put_issue 45 "$upper" "" s-me
+        claim_rc "$WT_DIR" 45 --branch feat/wt --session s-me
+        [ "$CLAIM_RC" = 0 ] || die "大文字と小文字だけが違う作業フォルダの自分の予約を断った: $CLAIM_RC: $CLAIM_ERR"
+        [ "$(issue_fields 45)" = "45|$WT|feat/wt|s-me|" ] || die "大文字と小文字だけが違う自分の予約に書いていない: $(cat "$STATE/issues/45.json")"
+    fi
+}
+
+t_claim_without_session_id_writes() {
+    # このセッションのIDが空(--session も KP_SESSION_ID も無く、いまの作業フォルダにセッションの記録も無い)なら、
+    # いまの作業フォルダの記録は、session_id が空でなくても断らずに書き直す
+    unset KP_SESSION_ID
+    [ ! -d "$STATE/sessions" ] || [ -z "$(ls "$STATE/sessions")" ] || die "前提: セッションの記録がある"
+    put_issue 42 "$MAIN" "" s-other
+    claim_rc "$MAIN_DIR" 42 --branch main
+    [ "$CLAIM_RC" = 0 ] || die "IDが空のセッションの claim を断った: $CLAIM_RC: $CLAIM_ERR"
+    [ "$(issue_fields 42)" = "42|$MAIN|main||" ] || die "IDが空のセッションの claim が記録を書き直していない: $(cat "$STATE/issues/42.json")"
+    [ ! -e "$LOCK" ] || die "claim のあとに錠を残した"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_end_then_check_start_takes_reservation() {
+    local out before
+    # WT のセッション s-wt が先に予約し、WT2 のセッション s-me には started で出る
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 100
+    put_session s-me "$WT2" "$(fkey "$WT2_DIR")" 200
+    check_start "$WT_DIR" check-start 42 --session s-wt >/dev/null || die "先の check-start が成り立たない"
+    out=$(check_start "$WT2_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}[0]{kinds}')" = '["started"]' ] || die "前提: 先の予約が started で出ない: $out"
+    # 所有者が「やめた」と答えたので、s-wt の記録を消してから調べ直す
+    ss "$WT2_DIR" end s-wt || die "end の終了コード $?"
+    out=$(check_start "$WT2_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "end のあとも leftovers が空でない: $out"
+    [ "$(issue_fields 42)" = "42|$WT2||s-me|" ] || die "予約がこのセッションのものに書き換わっていない: $(cat "$STATE/issues/42.json")"
+    # そのあとで先のセッションが claim しても、記録を奪わない
+    before=$(cat "$STATE/issues/42.json")
+    claim_rc "$WT_DIR" 42 --branch feat/wt --session s-wt
+    [ "$CLAIM_RC" = 1 ] || die "やめたセッションの claim の終了コードが1でない: $CLAIM_RC: $CLAIM_ERR"
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "やめたセッションの claim が記録を書き換えた: $(cat "$STATE/issues/42.json")"
+}
+
+t_claim_lock_held_refused() {
+    local before
+    mkdir -p "$LOCK"
+    # 記録が無いときも、錠を取れなければ作らない
+    PATH="$TMP_ROOT/fastsleep:$PATH" claim_rc "$WT_DIR" 42 --branch feat/wt --session s-me
+    [ "$CLAIM_RC" = 69 ] || die "錠がほかに持たれたままなのに claim の終了コードが69でない: $CLAIM_RC: $CLAIM_ERR"
+    case "$CLAIM_ERR" in *'[parallel]'*records.lock*) ;; *) die "標準エラーに [parallel] で始まる錠の理由が無い: $CLAIM_ERR" ;; esac
+    [ ! -f "$STATE/issues/42.json" ] || die "錠を取れないのに記録を書いた: $(cat "$STATE/issues/42.json")"
+    [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
+    # 自分の予約があっても、錠を取れなければ書き換えない
+    put_issue 42 "$WT" "" s-me
+    before=$(cat "$STATE/issues/42.json")
+    PATH="$TMP_ROOT/fastsleep:$PATH" claim_rc "$WT_DIR" 42 --branch feat/wt --session s-me
+    [ "$CLAIM_RC" = 69 ] || die "錠がほかに持たれたままなのに claim の終了コードが69でない(予約があるとき): $CLAIM_RC"
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "錠を取れないのに記録を書き換えた: $(cat "$STATE/issues/42.json")"
+    [ -d "$LOCK" ] || die "ほかのセッションの錠を消した(予約があるとき)"
+}
+
+t_takeover_lock() {
+    local before out rc real_perl
+    put_session s-old "$WT" "$(fkey "$WT_DIR")" 100
+    put_issue 42 "$WT" feat/wt s-old
+    before=$(cat "$STATE/issues/42.json")
+    # 錠がほかに持たれたままなら、記録を書かずに終了コード69で終わり、その錠を消さない
+    mkdir -p "$LOCK"
+    out=$(PATH="$TMP_ROOT/fastsleep:$PATH" ss "$WT_DIR" takeover 42 --from "$WT" --session s-new 2>"$WORK/err.txt")
+    rc=$?
+    [ "$rc" = 69 ] || die "錠がほかに持たれたままなのに takeover の終了コードが69でない: $rc: $out $(cat "$WORK/err.txt")"
+    grep -q 'records.lock' "$WORK/err.txt" || die "標準エラーに錠の理由が無い: $(cat "$WORK/err.txt")"
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "錠を取れないのに記録を書き換えた: $(cat "$STATE/issues/42.json")"
+    [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
+    rmdir "$LOCK"
+    # 錠の中で記録を読めなければ、終了コード69で終わり、錠を残さない
+    real_perl=$(command -v perl)
+    mkdir -p "$TMP_ROOT/handedfail"
+    # handed_over_from を求める perl(_kp_ss_handed_json)だけが失敗する perl
+    cat >"$TMP_ROOT/handedfail/perl" <<EOF
+#!/bin/bash
+case "\$*" in *'push @out, \$prev'*) echo "fake perl failure" >&2; exit 1 ;; esac
+exec "$real_perl" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/handedfail/perl"
+    PATH="$TMP_ROOT/handedfail:$PATH" ss "$WT_DIR" takeover 42 --from "$WT" --session s-new >/dev/null 2>&1
+    rc=$?
+    [ "$rc" = 69 ] || die "記録を読めないのに takeover の終了コードが69でない: $rc"
+    [ ! -e "$LOCK" ] || die "記録を読めなかったときに錠を残した"
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "記録を読めないのに書き換えた"
+    # 引き継げたあとは錠を残さない。takeover は記録の持ち主を確かめずに書き直す
+    ss "$WT_DIR" takeover 42 --from "$WT" --session s-new >/dev/null || die "takeover の終了コード $?"
+    [ "$(issue_fields 42)" = "42|$WT|feat/wt|s-new|" ] || die "Issueの記録が書き直されていない: $(cat "$STATE/issues/42.json")"
+    [ ! -e "$LOCK" ] || die "引き継いだあとに錠を残した"
+}
+
 echo "--- check-start: 同じ作業フォルダの別のセッション(要件5.1・5.2)"
 run_test "同じ作業フォルダに別の作業中のセッションの記録があると folder_conflict に出る" t_folder_conflict
 run_test "同じ作業フォルダの、Issueの記録の無いセッション(着手していない記録)は folder_conflict に出ない" t_folder_conflict_idle_ignored
@@ -1406,7 +1567,7 @@ run_test "capacity は返答している途中のセッションだけを数え�
 run_test "folder_conflict と leftovers は返答しているかによらない(#520)" t_conflict_and_leftover_ignore_responding
 
 echo "--- claim・spec-names"
-run_test "claim がIssueの記録を書き、すでにあれば書き直す" t_claim
+run_test "claim がIssueの記録を書き、prune が残した記録は書き直し、ほかの作業フォルダとセッションの記録は終了コード1で断る" t_claim
 run_test "claim は誤った呼び方で記録を書かない" t_claim_usage
 run_test "spec-names がほかの worktree の spec の名前も出す" t_spec_names
 run_test "check-start・claim・spec-names は docker を呼ばない" t_no_docker_in_check_start
@@ -1458,6 +1619,14 @@ run_test "写しが食い違って git apply が失敗したら、いまの作�
 run_test "git apply が失敗したら、前の作業フォルダにブランチを開き直させる" t_takeover_apply_failure_reopens_branch
 run_test "いまの作業フォルダに無視されていない git の管理外のファイルがあれば、何もせずに終了コード1で終わる" t_takeover_dirty_refused
 run_test "takeover は誤った呼び方で何も変えない" t_takeover_usage
+
+echo "--- claim の断りと、claim と takeover の錠(session-overlap-guard 要件1.3・1.4)"
+run_test "ほかの作業フォルダの予約があると claim は終了コード1で断り、記録を書き換えない" t_claim_refuses_other_reservation
+run_test "自分の予約・記録が無いとき・prune が残した記録には claim が書く" t_claim_writes_own_or_free_record
+run_test "このセッションのIDが空なら、いまの作業フォルダの記録は session_id が空でなくても claim が書く" t_claim_without_session_id_writes
+run_test "end で予約したセッションの記録を消したあとの check-start は、予約をこのセッションに書き換え、先のセッションの claim は断られる" t_end_then_check_start_takes_reservation
+run_test "錠がほかに持たれたままなら claim は終了コード69で終わり、記録を書かず、その錠を消さない" t_claim_lock_held_refused
+run_test "takeover は錠の中で記録を書き直し、錠を取れなければ終了コード69で終わり、どの経路でも自分の錠を残さない" t_takeover_lock
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"
