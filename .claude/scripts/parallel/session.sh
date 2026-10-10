@@ -8,7 +8,7 @@
 #         folder_conflict  いまの作業フォルダの、ほかの作業中のセッションの記録(session_id started_at last_seen)
 #         leftovers        Issue #N の作りかけ(folder is_self kinds branch active_session)
 #         branch_only      Issue #N のブランチのうち、どの作業フォルダでも開かれていないもの(branch where)
-#         capacity         limit(設定の数)と active(ほかに作業中のセッション。issue folder last_seen)
+#         capacity         limit(設定の数)と active(ほかに作業中のセッションのうち、返答している途中のもの。issue folder last_seen)
 #       最初に prune を行う(prune の標準出力は捨て、消せなかった名前などの標準エラーはそのまま出す)。
 #   claim <N> --branch <ブランチ> [--session <ID>]
 #       Issueの記録 issues/<N>.json を書く。すでにあれば folder branch session_id updated_at を書き直す。
@@ -52,6 +52,9 @@
 # いまの作業フォルダのセッションの記録のうち started_at がいちばん古いもの(lib.sh の kp_session_id)。
 # 作業中のセッションは、sessions/ の記録のうち、issues/ に同じ session_id か同じ folder の記録があるもの。
 # ただし、folder の作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は数えない。
+# capacity は、作業中のセッションのうち、記録の responding が真のもの(session-registry.sh が、返答を始めたときに
+# 真にし、返答を終えたときと返答を終えて入力を待っているときに偽にする)だけを数える。欄が無い記録は数えない。
+# folder_conflict と leftovers の active_session は、responding によらず作業中のセッションを出す。
 # このスクリプトは所有者とやり取りしない。docker を呼ぶのは prune(片付けるものがあるとき)だけ。
 #
 # 終了コード: 0(成功)、1(takeover が引き継げなかった)、64(呼び方の誤り)、
@@ -497,6 +500,8 @@ kp_session_check_start() {
             return 1 if norm(str($s->{folder})) eq $fid;
             return $fid eq $me_id && str($s->{folder_key}) eq $me_key;
         }
+        # 返答している途中か(記録の responding が真。欄が無い記録は返答していないとみなす)
+        sub responding { my $v = $_[0]->{responding}; JSON::PP::is_bool($v) && $v }
         sub by_start { (str($a->{started_at}) || 0) <=> (str($b->{started_at}) || 0) or str($a->{session_id}) cmp str($b->{session_id}) }
         sub brief { my $s = shift; +{ map { $_ => $s->{$_} } qw(session_id started_at last_seen) } }
 
@@ -557,9 +562,9 @@ kp_session_check_start() {
             }
         }
 
-        # capacity
+        # capacity(作業中のセッションのうち、返答している途中のものだけ)
         my @active;
-        for my $s (sort by_start grep { str($_->{session_id}) ne $sid && is_active($_, \%issue_by_sid, \%issue_by_folder) } @sessions) {
+        for my $s (sort by_start grep { str($_->{session_id}) ne $sid && is_active($_, \%issue_by_sid, \%issue_by_folder) && responding($_) } @sessions) {
             my $id = str($s->{session_id});
             my $issue = length $id && exists $issue_by_sid{$id} ? $issue_by_sid{$id} : $issue_by_folder{ norm(str($s->{folder})) };
             push @active, { issue => $issue, folder => $s->{folder}, last_seen => $s->{last_seen} };
