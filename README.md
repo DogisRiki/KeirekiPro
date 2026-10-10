@@ -64,7 +64,7 @@ flowchart LR
         H[ビルド設定・ライブラリの入手先・<br>pre-merge-checkラベル・保護パスの変更は<br>所有者がApproveするまで赤]
     end
     subgraph s4[系統4: AIレビュー]
-        A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回<br>Dependabotのプルリクエストは対象外]
+        A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回<br>Dependabotのプルリクエストは対象外<br>Issueの決めた方式からの外れも止める]
     end
 
     PR --> Q
@@ -102,7 +102,7 @@ flowchart LR
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
-| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック |
+| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック。Issue本文の『決めた方式』の見出しがあるときは、その方式から外れたPRも、理由の有無に関わらずブロック |
 | マージ | auto-merge.yaml | pull_request (opened / reopened / ready_for_review / synchronize / auto_merge_disabled) / 30分ごと (schedule) / 手動 | main向けのプルリクエストにauto-mergeを予約する。作成者がAIか所有者かに依らず予約し、下書きの間は予約しない。予約が外れたときは、所有者が手で外した場合も含めて理由を問わず付け直し、30分ごとの見直しで予約の無いプルリクエストにも予約する。マージを保留するときはpre-merge-checkラベルを付けるか下書きにする。DependabotのPR・カナリアPR・forkのPRは対象外で、DependabotのPRはdependabot-auto-merge.yamlが予約する。予約に失敗したときと、同じコミットで3回を超えて外れて付け直しを止めたときは、プルリクエストへのコメントで所有者に知らせる |
 | マージ | close-linked-issues.yaml | pull_request (closed) / 毎時 (schedule) / 手動 | mainへマージされたプルリクエストの本文に`Closes #番号`で書かれたIssueが開いたままなら閉じ、どのプルリクエストのマージで閉じたかをIssueにコメントで記録する。マージされずに閉じたプルリクエストでは動かない。閉じられなかったときと、`Refs: #番号`にだけ書かれたIssueが開いたままのときは、Issueへのコメントで所有者に知らせる。閉じたIssueが、あるIssueから分けた部分のIssue(サブIssue)で、分けた部分がすべて閉じたときは、元のIssueも閉じて記録をコメントする。元のIssueが別のリポジトリにあるときは扱わない。分けた部分がすべて閉じたかを確かめられなかったときと、元のIssueを閉じられなかったときは、元のIssueへのコメントで所有者に知らせる。毎時の見直しで、マージから7日以内のプルリクエストの閉じ漏れを拾う |
 | 依存の更新 | dependabot-auto-merge.yaml | pull_request / 日次 (schedule) / 手動 | Dependabotが作成したプルリクエストにauto-mergeを予約する。tflintの更新は、GitHubのリリースの公開から72時間経つまで予約を保留し、毎日の見直しで予約する。公開日時を取れない更新と、版が同じで中身だけが変わった更新は予約せず、プルリクエストへのコメントで所有者に知らせる |

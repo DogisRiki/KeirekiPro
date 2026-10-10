@@ -238,7 +238,6 @@ Suggest the next command and stop. Do NOT automatically run downstream spec gene
 - Path A: `/kiro-spec-requirements {feature}` to update the existing spec
 - Path B: Recommend direct implementation without creating a spec
 - Path C: Default to `/kiro-spec-init <feature-name>`
-  - Optional fast path: `/kiro-spec-quick <feature-name>` when the user explicitly wants to continue immediately
 - Path D: Default to `/kiro-spec-batch` (creates all specs in parallel based on roadmap.md dependency order)
   - Optional cautious path: `/kiro-spec-init <first-feature-name>` when the user wants to validate the first slice before batching the rest
 - Path E: Choose the next command based on the new-spec portion of the decomposition
