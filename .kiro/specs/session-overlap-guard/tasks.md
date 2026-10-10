@@ -1,0 +1,95 @@
+# タスク
+
+- [ ] 1. 同じIssueの着手を `session.sh` で予約する
+- [ ] 1.1 記録の錠と、作業中のセッションの見分けの共通の処理を作る
+
+  Claude は、`session.sh` に記録の錠 `records.lock` の取り方と返し方を足す。`session.sh` は、錠を lib.sh の `_kp_lock` で取り、15秒待っても取れなければ終了コード69で終わる。`_kp_die69` は錠を消さないので、Claude は、錠を持ったまま終わる経路を、錠のディレクトリを消してから `_kp_die69` を呼ぶ形にそろえる。あわせて、Claude は、`check-start` の perl の中にある作業中のセッションの見分け(`is_active` と、`session_id` か `folder` からIssueの番号を引く処理)を、`check-start` と、2.1 で作る `check-spec` の両方から使える共通の処理にくくり出す。この小タスクでは、`check-start` は、今の調べを錠の中で行う。この小タスクでは、Claude は、`check-start` にまだ予約を書かせず、`check-start` の出す JSON を変えない。Claude は、`test-session.sh` に、錠の場合を足す。
+  - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る(既存の `check-start` の場合が、くくり出したあとも変わらず通る)
+  - 受入基準とテストの対応: 要件3の受入基準1(調べを終えられなければ進まない)は、テストの「錠がほかに持たれたままなら check-start は終了コード69で終わる」で確かめる
+  - _要件: 3.1_
+
+- [ ] 1.2 `check-start` の予約と `started` を作る
+
+  Claude は、部品「session.sh check-start の変更」のとおりに、`check-start` が錠の中で調べと予約を行い、ほかのセッションの予約を作りかけの種類 `started` として返すようにする。Claude は、`session.sh` の冒頭の使い方の注記に、`check-start` が予約を書くことと `started` を書き足す。Claude は、`test-session.sh` に、design.md の「テストの方針」の `check-start` の予約の場合と、同時の `check-start` の場合を足す。既存の `t_prune_branch_gone` は、ブランチを消したあとの `check-start` のあとで `issues/42.json` が無いことを確かめているが、予約を書く `check-start` のあとでは、この記録はこのセッションの予約として残る。Claude は、この確かめを、`prune` のあとで `issues/42.json` が無いことを確かめる形に書き換え、`check-start` のあとは、記録がこのセッションの予約(`branch` が空)になっていることを確かめる形に書き換える。既存の `t_leftover_own_claim_excluded` は、ほかのセッション s-me の記録がある作業フォルダで s-other が `check-start` を呼んだときの `kinds` を `spec,changes,branch` と確かめているが、この場合は、部品「session.sh check-start の変更」の `started` の判定の4つの条件にすべて当たる。Claude は、この期待を `started,spec,changes,branch` に書き換える。
+  - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る。同時の `check-start` の場合を10回くり返して、毎回通る
+  - 受入基準とテストの対応: 要件1の受入基準1(最初の調べを終えた時点から着手したセッションとして扱う)は、テストの「何も見つからなければ予約を書く」で確かめる。受入基準2(ほかに着手した作業中のセッションがあれば止まる)は、テストの「ほかの worktree の作業中のセッションの予約は started で出て、予約は書き換わらない」で確かめる。受入基準3(同じ時に重なっても片方だけ)は、テストの「2つの worktree から同時に check-start を呼ぶと、片方だけが空を返し、予約はそのセッションのもの」で確かめる。受入基準5(閉じたセッションの予約では尋ねない)は、テストの「予約したセッションの記録が無ければ leftovers は空で、予約がこのセッションに書き換わる」で確かめる。受入基準6(同じセッションの打ち直しでは止まらない)は、テストの「同じセッションの打ち直しでは leftovers が空で、updated_at だけが変わる」で確かめる。要件3の受入基準1(調べを終えられなければ進まない)は、テストの「予約を書けなければ終了コード69で、錠が残らない」で確かめる
+  - _要件: 1.1, 1.2, 1.3, 1.5, 1.6, 3.1_
+
+- [ ] 1.3 `claim` と `takeover` に錠を足し、`claim` がほかのセッションの記録を断るようにする
+
+  Claude は、部品「session.sh claim と takeover の変更」のとおりに、`claim` が錠の中で記録を読んでから書き、ほかのセッションの記録なら終了コード1で断るようにする。Claude は、`takeover` の手順7(Issueの記録の書き直し)を錠の中で行うようにする。Claude は、`session.sh` の冒頭の注記の `claim` の説明に、断ることを書き足す。Claude は、`test-session.sh` に、design.md の「テストの方針」の `claim` の場合と、`end` のあとの `check-start` の場合を足す。既存の `t_claim` は、2回目の `claim` が、ほかの作業フォルダとセッションの記録を書き直して成功することを確かめているが、この動きは design の `claim` の断りと逆である。Claude は、この確かめを、書き直しの成功を `folder` と `session_id` が空の記録(`prune` が残した記録)で確かめる形と、ほかの作業フォルダとセッションの記録では終了コード1で断る形に分けて書き換える。
+  - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る(書き換えた `t_claim` と、既存の `takeover` の場合を含む)
+  - 受入基準とテストの対応: 要件1の受入基準4(「やめた」と答えたら、あとのセッションが着手したセッションになる)は、テストの「end で予約したセッションの記録を消したあとの check-start は、予約をこのセッションに書き換える」と「ほかの作業フォルダの予約があると claim は終了コード1で断り、記録を書き換えない」で確かめる。受入基準3(片方だけ)の、あとから `claim` したセッションが記録を奪わないことは、テストの「ほかの作業フォルダの予約があると claim は終了コード1で断る」で確かめる
+  - _要件: 1.3, 1.4_
+
+- [ ] 2. 同じ spec を直しているセッションを `session.sh` で調べる
+- [ ] 2.1 `check-spec` の、中身の差分による判定を作る
+
+  Claude は、部品「session.sh check-spec」の手順1から4と手順6と8のとおりに、`session.sh` に `check-spec` のサブコマンドを足す。この小タスクの `check-spec` は、`reason` が `changes` の要素だけを返し、spec の予約を読み書きしない。作業中のセッションの見分けと、要素の `issue` の引き方には、1.1 でくくり出した共通の処理を使う。Claude は、`session.sh` の冒頭の注記に `check-spec` の使い方を書き足し、サブコマンドの振り分けと呼び方の誤りの文に `check-spec` を足す。Claude は、`test-session.sh` に、design.md の「テストの方針」の `check-spec` の場合のうち、spec の予約に関わらないものを足す。テストは、`refs/remotes/origin/main` を手で動かして `origin/main` を作る。
+  - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る
+  - 受入基準とテストの対応: 要件2の受入基準1(main にまだ入っていない変更を中身で調べる)は、テストの「コミットしていない spec の変更があると changes の要素が出る」「コミットしてもマージしていなければ要素が出る」「squash を真似て同じ中身を origin/main に入れたあとは空で、隣の行がさらに変わっても空」「古い main から作ったブランチで spec を変えていなければ空」で確かめる。受入基準2(直しているセッションがあれば止まって尋ねる)は、テストの「作業中のセッションが2つある worktree では要素が2つ出る」と、要素に folder session_id started_at last_seen issue が入ることで確かめる。受入基準3(「やめた」と答えたら調べ直す)は、テストの「end のあとの check-spec はそのセッションの要素を出さない」で確かめる。受入基準6(作業中のセッションの無い作業フォルダでは止まらない)は、テストの「変更を持つ worktree に作業中のセッションが無ければ空」で確かめる。要件3の受入基準1(調べを終えられなければ進まない)は、テストの「origin/main が無いと終了コード69」「名前に大文字か / を含むと終了コード64」で確かめる。調べがほかの作業フォルダを変えないことは、テストの「調べのあと、ほかの worktree の git status --porcelain の出力と中身が変わっていない」で確かめる
+  - _要件: 2.1, 2.2, 2.3, 2.6, 3.1_
+
+- [ ] 2.2 `check-spec` に spec の予約を足す
+
+  Claude は、部品「session.sh check-spec」の手順5と7のとおりに、`check-spec` が spec の予約 `specs/<feature>.json` を読み、600秒以内のほかの作業中のセッションの予約を `reason` が `starting` の要素として返し、要素が無いときだけ予約を書くようにする。Claude は、`test-session.sh` に、design.md の「テストの方針」の `check-spec` の場合のうち、spec の予約に関わるものを足す。
+  - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る
+  - 受入基準とテストの対応: 要件2の受入基準5(同じ時に重なっても片方だけ)は、テストの「600秒以内のほかのセッションの spec の予約があると starting の要素が出て、古い予約は無視する」と「conflicts が空のときだけ spec の予約が書かれる」で確かめる
+  - _要件: 2.5_
+
+- [ ] 2.3 `prune` が古い spec の予約を片付けるようにする
+
+  Claude は、部品「session.sh prune の変更」のとおりに、`prune` が `specs/` の下の古い予約と壊れた予約を消すようにする。Claude は、`session.sh` の冒頭の注記の `prune` の説明に、spec の予約の片付けを書き足す。Claude は、`test-session.sh` に、design.md の「テストの方針」の `prune` の場合を足す。
+  - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る
+  - 受入基準とテストの対応: 要件2の受入基準5(同じ時に重なっても片方だけ)の、古い予約が残り続けて次の調べを止めないことは、テストの「prune は600秒より古い spec の予約と updated_at が数でない予約を消し、新しい予約を残す」で確かめる
+  - _要件: 2.5_
+
+- [ ] 3. スキルと README を直す
+- [ ] 3.1 `/start` に予約と `started` の扱いを書き足す (並行可)
+
+  Claude は、部品「start スキルの変更」のとおりに、`.claude/skills/start/SKILL.md` の Step 1.5 の説明と表、問いに添えること、Step 7 の手順1の `claim` の失敗の扱いを直す。
+  - 完了の確かめ方: SKILL.md の Step 1.5 の表で、`started` だけの行が `folder_conflict` の行の次、既存の `leftovers` の行の前にあり、「やめた」の答えで `session.sh end <active_session の session_id>` を呼ぶと書かれている。Step 7 の手順1に、`claim` が終了コード1で終わったら止まって伝えることが書かれている
+  - 受入基準とテストの対応: 要件1の受入基準2(ほかに着手した作業中のセッションがあれば止まる)・受入基準4(「やめた」と答えたら、あとのセッションが着手したセッションになる)・受入基準5(閉じたセッションの予約では尋ねない)・受入基準6(同じセッションの打ち直しでは止まらない)と、要件3の受入基準1(調べを終えられなければ進まない)の Claude の動きは、マージのあとに所有者が行う実地の確かめ(Issueの「確かめ方」の1つ目)で確かめる。スクリプトの側の動きは、1.1 から 1.3 のテストで確かめてある
+  - _要件: 1.2, 1.4, 1.5, 1.6, 3.1_
+  - _対象の部品: start スキルの変更_
+  - _依存: 1.3_
+
+- [ ] 3.2 `/kiro-spec-init` の更新の形に、spec を書き換える前の手順を足す (並行可)
+
+  Claude は、部品「kiro-spec-init スキルの変更」のとおりに、`.claude/skills/kiro-spec-init/SKILL.md` の Update Mode Steps の手順2と手順3の間に手順を足す。Claude は、足す手順に、既存の手順と区別できる番号(2a、2b、2c、2d)を振る。Claude は、design.md の処理の流れの図のとおりに、`git merge origin/main` を打ったあとは手順2からやり直し、2a から 2d ももう一度通ることを書く。2回目に 2d を通るときは、`origin/main` を取り込み済みなので、Claude は何もしない。
+  - 完了の確かめ方: SKILL.md の Update Mode Steps に、手順2の「何も書かずに終える」経路では 2a から 2d を行わないこと、requirements.md の書き足しだけをやり直す経路では手順4の前に行うこと、2a(`git fetch origin`)、2b(`check-spec` と、0でない終了コードでの停止)、2c(`conflicts` の示し方、要素ごとの問い、「やめた」なら `end` と 2b のやり直し、それ以外なら止まってマージのあとの打ち直しを知らせること)、2d(`origin/main` を含まなければ `git merge origin/main`、失敗したら `git merge --abort` と停止)が書かれている
+  - 受入基準とテストの対応: 要件2の受入基準2(直しているセッションがあれば止まって尋ねる)・受入基準3(「やめた」と答えたら調べ直す)・受入基準4(「やめた」以外で答えたら書き換えずに止まり、マージのあとの打ち直しを知らせる)・受入基準7(手順を続けるときは main の最新の直しを取り込み、取り込めなければ止まる)と、要件3の受入基準1(調べを終えられなければ進まない)の Claude の動きは、マージのあとに所有者が行う実地の確かめ(Issueの「確かめ方」の2つ目)で確かめる。要件2の受入基準1(main にまだ入っていない変更を中身で調べる)の判定と、受入基準4のうち、ほかのセッションの直しがマージされたあとに打ち直せば止まらないことは、2.1 のテストで確かめてある
+  - _要件: 2.1, 2.2, 2.3, 2.4, 2.7, 3.1_
+  - _対象の部品: kiro-spec-init スキルの変更_
+  - _依存: 2.2_
+
+- [ ] 3.3 README の `/kiro-spec-init` の行を書き足す (並行可)
+
+  Claude は、部品「README の変更」のとおりに、`README.md` のコマンドの一覧の `/kiro-spec-init` の行に、ほかのセッションが同じ仕様書を直しているときは書き換えずに止まり、そのセッションをやめたかを尋ねることを書き足す。
+  - 完了の確かめ方: README のコマンドの一覧の `/kiro-spec-init` の行に、書き足した文がある
+  - 受入基準とテストの対応: 要件2の受入基準2(ほかの作業中のセッションがその spec を直していたら、spec を書き換えずに止まり、そのセッションをやめたかを尋ねる)と受入基準4(「やめた」以外で答えたら、spec を書き換えずに止まり、マージのあとの打ち直しを知らせる)の所有者向けの説明である。動きは 2.1 のテストと、3.2 の実地の確かめで確かめる
+  - _要件: 2.2, 2.4_
+  - _対象の部品: README の変更_
+
+- [ ] 4. 全体を確かめる
+
+  Claude は、変えたシェルスクリプトを、CI と同じ形で検査し、並行作業のテストをすべて流す。
+  - 完了の確かめ方: `git ls-files -z '*.sh' | xargs -0 docker run --rm -v "$(pwd -W):/mnt" koalaman/shellcheck:v0.11.0` が指摘を出さずに終わる。`bash .claude/scripts/parallel/tests/test-lib.sh` と `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る
+  - 受入基準とテストの対応: どの受入基準も、1.1 から 3.3 の対応のとおりに確かめる。このタスクでは、ほかの場合を壊していないことを確かめる
+  - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1_
+
+## 完了条件(全タスク共通)
+
+Claude は、どのタスクでも、タスクの箇条書きの欄を書いたうえで、次の4つを満たしたときにタスクを完了とする。
+
+1. Claude は、タスクが満たす requirements.md の受入基準(要件の番号付きの項目)ごとに、それを確かめるテストのファイル名とテスト名を「受入基準とテストの対応」の行に書く。Claude は、確かめるテストの無い受入基準を残さない。
+2. タスクで変えた領域の verify のスキル(`/verify-frontend` `/verify-backend` `/verify-terraform`)が、すべて成功している。
+3. Claude は、テストを飛ばす設定、アサーションの削除、カバレッジや lint の対象からの除外を足して、完了条件を満たしたように見せない。CI の escape-hatch の検査が、これらの追加を機械で見つける。
+4. Claude は、新しく書いたテストについて、テストの対象のコードを一時的に壊してテストが失敗することを確かめてから、コードを元に戻す。
+
+## 実装のメモ
+
+- この spec は `frontend/` `backend/` `terraform/` を変えないので、完了条件の2で動く verify のスキルは無い。シェルスクリプトの検査は、タスク4の shellcheck と、CI の `guardrails` が行う
+- スキルの変更(3.1 と 3.2)には自動のテストが無い(design.md の「テストの方針」)。Claude は、完了条件の1と4のテストの代わりに、各タスクの「受入基準とテストの対応」に書いた確かめを使う
+- 出荷のとき、Claude は、PRの本文に、design.md の「ほかの spec との食い違い」の3つの「食い違う spec:」の行と、マージのあとに所有者が行う実地の確かめ(Issueの「確かめ方」の2つ)を書く
+- 出荷のとき、Claude は、PRの本文に `Test-Change-Justification:` の行を置き、1.2 と 1.3 で既存のテスト `t_claim` と `t_prune_branch_gone` と `t_leftover_own_claim_excluded` の確かめを書き換えた理由(`check-start` が予約を書き、ほかのセッションの記録を `started` として返すようになったことと、`claim` がほかのセッションの記録を断るようになったこと)を書く
