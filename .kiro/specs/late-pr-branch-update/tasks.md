@@ -1,7 +1,7 @@
 # タスク
 
-- [ ] 1. PRを出したときにワークフローがブランチを合わせる
-- [ ] 1.1 ワークフローに PRの起点を足す (並行可)
+- [x] 1. PRを出したときにワークフローがブランチを合わせる
+- [x] 1.1 ワークフローに PRの起点を足す (並行可)
 
   Claude は、design.md の部品「update-pr-branches.yaml」のとおりに変えた `.github/workflows/update-pr-branches.yaml` を scratchpad に作る。Claude は、`pull_request` の起点(`opened` `reopened` `ready_for_review`)、起点ごとの同時実行の組、fork を外すジョブの条件、対象の判定の式を変数 `TARGET_FILTER` に1つだけ置く形、PRの起点での PR1件の取り直しと compare の API による最新かどうかの確かめ、冒頭の注記の追記を入れる。main への push の起点の処理の動き(一覧の取り方、update-branch の呼び方、応答の扱い、失敗したときにジョブを赤にする扱い)は変えない。update-branch の呼び出しと応答の振り分けを、push の起点とPRの起点で共有するシェルの関数にまとめてもよい。`.github/` は Claude が書けないので、Claude は所有者に、scratchpad のファイルを `.github/workflows/update-pr-branches.yaml` に写すコマンドを示し、写してもらう
   - 完了の確かめ方: 所有者が写したあとの `.github/workflows/update-pr-branches.yaml` に、Claude が `docker run --rm -v "C:/<作業フォルダ>:/repo" -w /repo rhysd/actionlint:1.7.12 -color` をかけ、エラーが0件である(このコマンドは許可の一覧に無いので、実行のたびに確認が出る)。`git diff` を読み、push の起点の `run` の中の処理の動きが、対象の判定を変数 `TARGET_FILTER` で行うことと、共有の関数に移したことのほかに変わっていない
@@ -17,7 +17,7 @@
   - _要件: 1.1_
   - _対象の部品: README.md, 監査手順.md, 基盤構築手順.md_
 
-- [ ] 2. Claude がPRをマージまで見届ける
+- [x] 2. Claude がPRをマージまで見届ける
 - [x] 2.1 ship スキルの手順6と手順7を書き換える (並行可)
 
   Claude は、design.md の部品「ship スキルの手順7」のとおりに `.claude/skills/ship/SKILL.md` を書き換える。Claude は、手順6に、PRが main と衝突しているときに予約の確認を飛ばすことを、手順7に衝突の確かめ・検査の見届け・状態の読み取り・判定・取り込みの流れと、60秒の読み直しが3回続いたときに見届けを終えることを書く。Claude は、Rules の「verify全PASSまでpushしない」に、PRが main と衝突していないときは `gh pr update-branch` で main を取り込み、手元で push しないことを添え、Report に `merge` の行を足す。あわせて、Claude は、design のレビューで記録のみにした次の4つの決めごとを手順の文に入れる。どれも design.md の手順7の記述を置き換えるもので、タスクの文が design.md より優先する。
@@ -58,3 +58,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - この spec は `frontend/` `backend/` `terraform/` を変えないので、完了条件の2で動く verify のスキルは無い。ワークフローの検査は、タスク1.1の actionlint と、CI の `guardrails` が行う
 - このワークフローには自動のテストが無い(design.md の「テストの方針」)。Claude は、完了条件の1(受入基準ごとに確かめるテストを書くこと)と4(テストの対象のコードを一時的に壊してテストが失敗することを確かめること)のテストの代わりに、各タスクの「受入基準とテストの対応」に書いた確かめを使う
 - タスク2.1: 手元での push が拒まれたとき(サーバーでの取り込みやワークフローでリモートのPRブランチが進んだとき)に使う `git merge origin/<ブランチ名>` は、`.claude/settings.json` の許可の規則に無い。手順7の本文に、確認が出ることがあると書いた。許可の規則に足すかは、所有者への提案としてPR本文に書く
+- タスク1.1: 対象の判定の式は、design.md の `$repo`(`--arg repo`)ではなく `env.REPO` で書いた。単一引用符の中の `$repo` が shellcheck の SC2016 に当たり、無効化の記述を足さないためである。比べる値は同じ `github.repository` である

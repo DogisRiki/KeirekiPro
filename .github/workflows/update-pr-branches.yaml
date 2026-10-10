@@ -6,6 +6,18 @@
 # ブランチを自動で最新化せず、Dependabot も衝突が無い限り rebase しない。
 # 人間が Update branch を押す運用を避けるため、mainへのpushを起点にここで更新する。
 #
+# PRを出したとき(opened / reopened / ready_for_review)にも、そのPRだけを更新する。
+# mainへのpushだけを起点にすると、最後のpushのあとに古いmainから作ったブランチで
+# 出したPRは、次にmainへpushされるまで out-of-date のまま止まるため。
+# mainと衝突しているPRでは GitHub が pull_request のワークフローを起動しないので、
+# PRの起点では動かない。衝突の解消は、PRを出した側(/ship の見届け)が受け持つ。
+# https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
+#
+# 同時実行の組は、pushの実行とPRの起点の実行で分ける。同じ組では待てる実行が1つだけで、
+# 新しい実行が待ちに入るとそれまで待っていた実行が取り消されるため、PRの起点の実行が
+# 待っているpushの実行を取り消し、ほかのPRが更新されないまま残る。
+# https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
+#
 # GITHUB_TOKEN ではなくPATを使う。GITHUB_TOKEN によるpushは後続のワークフローを
 # 起動しないため、ブランチを最新化しても検査が再実行されず、必須チェックが古いSHAの
 # ままになってマージできない。
@@ -23,17 +35,24 @@ name: Update PR Branches
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, ready_for_review]
 
 # GITHUB_TOKEN には何も与えない。更新は BOT_GITHUB_TOKEN で行う
 permissions: {}
 
+# pushの実行は1つの組で順に動かす。PRの起点の実行はPRごとの組に入れ、
+# 待っているpushの実行を取り消さない
 concurrency:
-  group: update-pr-branches
+  group: ${{ github.event_name == 'push' && 'update-pr-branches' || format('update-pr-branches-pr-{0}', github.event.pull_request.number) }}
   cancel-in-progress: false
 
 jobs:
   update:
     name: update-pr-branches
+    # forkのPRにはシークレットが渡らず、forkのブランチには書き込めないため外す
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       # checkout しない。APIを呼ぶだけで、PRのコードを一切実行しない
@@ -41,26 +60,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
+          # 対象の判定の式。pushの起点とPRの起点の両方がこの式だけを使う。
           # forkのブランチには書き込めないため同一リポジトリのPRに限る。
           # draft は検査を回す段階に無いため除く。
           # カナリアPRはマージしないため除く(ブランチ名かラベルのどちらかで判定する)。
-          # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
-          numbers=$(gh api "repos/${REPO}/pulls?state=open&base=main&per_page=100"             --paginate --slurp             | jq -r --arg repo "$REPO"               '[.[][] | select(.draft == false) | select(.head.repo.full_name == $repo) | select((.head.ref | startswith("canary/")) | not) | select(any(.labels[]?; .name == "canary") | not) | .number] | .[]')
-
-          if [ -z "$numbers" ]; then
-            echo "対象のPRはありません。"
-            exit 0
-          fi
+          # env.REPO は jq が環境変数から読む(ステップの env の REPO)。
+          TARGET_FILTER='select(.draft == false) | select(.head.repo.full_name == env.REPO) | select((.head.ref | startswith("canary/")) | not) | select(any(.labels[]?; .name == "canary") | not)'
 
           failed=0
 
-          for n in $numbers; do
+          # update-branch を呼び、応答の文面で、最新化した・すでに最新・衝突・想定外の失敗を分ける。
+          # 想定外の失敗は数えておき、最後にジョブを赤にする。
+          update_branch() {
+            local n="$1"
+            local out
+
             if out=$(gh api -X PUT "repos/${REPO}/pulls/${n}/update-branch" 2>&1); then
               echo "最新化しました: #${n}"
-              continue
+              return 0
             fi
 
             case "$out" in
@@ -75,7 +97,41 @@ jobs:
                 failed=$((failed + 1))
                 ;;
             esac
-          done
+          }
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
+            numbers=$(gh api "repos/${REPO}/pulls?state=open&base=main&per_page=100" --paginate --slurp | jq -r "[.[][] | ${TARGET_FILTER} | .number] | .[]")
+
+            if [ -z "$numbers" ]; then
+              echo "対象のPRはありません。"
+              exit 0
+            fi
+
+            for n in $numbers; do
+              update_branch "$n"
+            done
+          else
+            # イベントの中身ではなく、実行の時点のラベルと下書きの状態で判定するため、PRを取り直す。
+            pr=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")
+            n=$(jq -r "${TARGET_FILTER} | .number" <<<"$pr")
+
+            if [ -z "$n" ]; then
+              echo "#${PR_NUMBER} は最新化の対象外です(下書き・カナリアPR・forkのいずれか)。"
+              exit 0
+            fi
+
+            # 出した直後のブランチは最新であることが多い。update-branch の応答の文面に頼らず、
+            # 比較の API で main より古いかを先に確かめる。
+            head_sha=$(jq -r '.head.sha' <<<"$pr")
+            behind_by=$(gh api "repos/${REPO}/compare/main...${head_sha}" --jq '.behind_by')
+
+            if [ "$behind_by" -eq 0 ]; then
+              echo "すでに最新です: #${n}"
+            else
+              update_branch "$n"
+            fi
+          fi
 
           # 想定外の失敗はジョブを赤にする。更新されなかったPRは out-of-date のまま
           # 残りマージされないため、見落としても取り込まれることはない。
