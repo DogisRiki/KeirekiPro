@@ -86,12 +86,12 @@ call_hook_raw() { # <標準入力にそのまま渡す文字列>
     RC=$?
 }
 
-get() { # <ファイル> <キー>
+get() { # <ファイル> <キー>(真偽は true/false で出す)
     perl -MJSON::PP -e '
         open my $fh, "<:raw", $ARGV[0] or exit 1;
         local $/; my $d = JSON::PP->new->utf8->decode(<$fh>);
         my $v = $d->{$ARGV[1]};
-        print defined $v ? $v : "";
+        print !defined $v ? "" : JSON::PP::is_bool($v) ? ($v ? "true" : "false") : $v;
     ' -- "$1" "$2"
 }
 
@@ -114,6 +114,10 @@ expect_rc0() {
     [ "$RC" = 0 ] || die "終了コードが0でない: $RC($(cat "$WORK/stderr.txt"))"
 }
 
+expect_responding() { # <ファイル> <true|false> <場面>
+    [ "$(get "$1" responding)" = "$2" ] || die "$3 で responding が $2 でない: $(cat "$1")"
+}
+
 # ---------------------------------------------------------------------
 
 t_session_start_creates_record() {
@@ -129,6 +133,7 @@ t_session_start_creates_record() {
     case "$(get "$f" last_seen)" in '' | *[!0-9]*) die "last_seen が UNIX 秒でない: $(cat "$f")" ;; esac
     [ "$(get "$f" started_at)" -ge "$now" ] || die "started_at がいまの時刻でない: $(cat "$f")"
     [ "$(get "$f" last_seen)" = "$(get "$f" started_at)" ] || die "作ったときの last_seen が started_at と違う: $(cat "$f")"
+    expect_responding "$f" false "SessionStart で作った記録"
     # 標準出力は SessionStart の hookSpecificOutput の JSON で、additionalContext にIDが出る
     ev=$(printf '%s' "$OUT" | perl -MJSON::PP -e 'local $/; my $d = JSON::PP->new->utf8->decode(<STDIN>); print $d->{hookSpecificOutput}{hookEventName}') \
         || die "標準出力が JSON でない: $OUT"
@@ -168,6 +173,7 @@ t_user_prompt_creates_record() {
     [ "$(get "$f" folder)" = "$MAIN" ] || die "folder が違う: $(cat "$f")"
     [ "$(get "$f" folder_key)" = "$(key_of "$MAIN")" ] || die "folder_key が違う: $(cat "$f")"
     case "$(get "$f" started_at)" in '' | *[!0-9]*) die "started_at が UNIX 秒でない: $(cat "$f")" ;; esac
+    expect_responding "$f" true "UserPromptSubmit で作った記録"
     # UserPromptSubmit の標準出力は Claude の文脈に足されるので、何も出さない
     [ -z "$OUT" ] || die "UserPromptSubmit で標準出力に何か出た: $OUT"
 }
@@ -180,6 +186,7 @@ t_user_prompt_updates_last_seen() {
     expect_rc0
     [ "$(get "$f" started_at)" = 200 ] || die "UserPromptSubmit が started_at を書き換えた: $(cat "$f")"
     [ "$(get "$f" last_seen)" -gt 200 ] || die "UserPromptSubmit が last_seen を書き直していない: $(cat "$f")"
+    expect_responding "$f" true "すでにある記録への UserPromptSubmit"
     [ -z "$OUT" ] || die "UserPromptSubmit で標準出力に何か出た: $OUT"
 }
 
@@ -197,6 +204,66 @@ t_session_end_removes_record() {
     expect_rc0
 }
 
+t_stop_clears_responding() {
+    local f="$STATE/sessions/s-5.json" seen
+    call_hook SessionStart s-5 "$MAIN" source startup
+    call_hook UserPromptSubmit s-5 "$MAIN" prompt hello
+    expect_responding "$f" true "前提の UserPromptSubmit"
+    AGE_TO=300 age_record "$f"
+    call_hook Stop s-5 "$MAIN" stop_hook_active 0
+    expect_rc0
+    expect_responding "$f" false "Stop"
+    seen=$(get "$f" last_seen)
+    [ "$seen" = 300 ] || die "Stop が last_seen を書き換えた: $(cat "$f")"
+    [ -z "$OUT" ] || die "Stop で標準出力に何か出た: $OUT"
+    # 次の返答で真に戻り、API の失敗で返答を終えたときも偽になる
+    call_hook UserPromptSubmit s-5 "$MAIN" prompt again
+    expect_responding "$f" true "Stop のあとの UserPromptSubmit"
+    call_hook StopFailure s-5 "$MAIN" error rate_limit
+    expect_rc0
+    expect_responding "$f" false "StopFailure"
+    [ -z "$OUT" ] || die "StopFailure で標準出力に何か出た: $OUT"
+}
+
+t_idle_prompt_clears_responding() {
+    local f="$STATE/sessions/s-6.json"
+    call_hook UserPromptSubmit s-6 "$MAIN" prompt hello
+    expect_responding "$f" true "前提の UserPromptSubmit"
+    # 返答の途中の確認の知らせでは変えない
+    call_hook Notification s-6 "$MAIN" notification_type permission_prompt message "needs permission"
+    expect_rc0
+    expect_responding "$f" true "permission_prompt の Notification"
+    # 返答を止めたあとに入力を待っている知らせで偽になる(所有者が止めたときは Stop が動かない)
+    call_hook Notification s-6 "$MAIN" notification_type idle_prompt message "waiting for your input"
+    expect_rc0
+    expect_responding "$f" false "idle_prompt の Notification"
+    [ -z "$OUT" ] || die "Notification で標準出力に何か出た: $OUT"
+}
+
+t_session_start_resets_responding() {
+    local f="$STATE/sessions/s-7.json"
+    call_hook UserPromptSubmit s-7 "$MAIN" prompt hello
+    # 返答の途中の要約(compact)では変えない
+    call_hook SessionStart s-7 "$MAIN" source compact
+    expect_rc0
+    expect_responding "$f" true "compact の SessionStart"
+    # 開き直したセッションは入力を待っている
+    call_hook SessionStart s-7 "$MAIN" source resume
+    expect_rc0
+    expect_responding "$f" false "resume の SessionStart"
+}
+
+t_end_of_reply_without_record() {
+    call_hook Stop s-8 "$MAIN"
+    expect_rc0
+    call_hook StopFailure s-8 "$MAIN" error unknown
+    expect_rc0
+    call_hook Notification s-8 "$MAIN" notification_type idle_prompt
+    expect_rc0
+    [ ! -e "$STATE/sessions/s-8.json" ] || die "返答を終えたときに、無い記録を作った: $(cat "$STATE/sessions/s-8.json")"
+    [ -z "$OUT" ] || die "記録が無いときの Notification で標準出力に何か出た: $OUT"
+}
+
 t_worktree_folder() {
     local f="$STATE/sessions/s-wt.json"
     call_hook SessionStart s-wt "$WT" source startup
@@ -206,6 +273,11 @@ t_worktree_folder() {
     [ "$(get "$f" folder)" = "$WT" ] || die "folder が worktree でない: $(get "$f" folder)"
     [ "$(get "$f" folder_key)" = "$(key_of "$WT")" ] || die "folder_key が worktree の鍵でない: $(cat "$f")"
     [ "$(get "$f" folder_key)" != "$(key_of "$MAIN")" ] || die "worktree と本体フォルダの鍵が同じになった"
+    # 返答を終えたときも、worktree の記録を書き直す
+    call_hook UserPromptSubmit s-wt "$WT/sub/dir" prompt hi
+    call_hook Stop s-wt "$WT/sub/dir"
+    expect_rc0
+    expect_responding "$f" false "worktree の下のディレクトリからの Stop"
     # lib.sh の kp_session_id が、worktree ではこの記録のIDを返し、本体フォルダでは返さない
     # shellcheck source=.claude/scripts/parallel/lib.sh
     [ "$(cd "$WT" && . "$LIB" && kp_session_id)" = s-wt ] || die "worktree の kp_session_id がこの記録のIDでない"
@@ -242,6 +314,9 @@ t_outside_git_does_nothing() {
     call_hook SessionStart s-out "$WORK/no-such-dir" source startup
     expect_rc0
     [ -z "$OUT" ] || die "無い cwd で標準出力に何か出た: $OUT"
+    call_hook Stop s-out "$OUTSIDE_DIR"
+    expect_rc0
+    [ -z "$OUT" ] || die "git のリポジトリの外の Stop で標準出力に何か出た: $OUT"
 }
 
 t_bad_input_does_nothing() {
@@ -256,14 +331,21 @@ t_bad_input_does_nothing() {
     [ -z "$OUT" ] || die "パスを含む session_id で標準出力に何か出た: $OUT"
     call_hook UserPromptSubmit 'a\b' "$MAIN" prompt hi
     expect_rc0
+    call_hook Stop "../evil" "$MAIN"
+    expect_rc0
     call_hook SessionEnd ".." "$MAIN" reason other
     expect_rc0
     [ ! -e "$STATE/evil.json" ] || die "パスを含む session_id で記録の置き場所の外に書いた"
     [ -z "$(ls -A "$STATE/sessions" 2>/dev/null)" ] || die "誤った session_id で記録を書いた: $(ls -A "$STATE/sessions")"
     # 知らないイベントでは何もしない
-    call_hook Stop s-x "$MAIN"
+    call_hook PreToolUse s-x "$MAIN" tool_name Bash
     expect_rc0
     [ ! -e "$STATE/sessions/s-x.json" ] || die "登録していないイベントで記録を作った"
+    # 知らないイベントは、記録があっても書き換えない
+    call_hook UserPromptSubmit s-x "$MAIN" prompt hi
+    call_hook PostToolUse s-x "$MAIN" tool_name Bash
+    expect_rc0
+    expect_responding "$STATE/sessions/s-x.json" true "登録していないイベント"
 }
 
 t_write_failure_does_nothing() {
@@ -274,6 +356,10 @@ t_write_failure_does_nothing() {
     expect_rc0
     [ -z "$OUT" ] || die "記録を書けなかったのに標準出力に何か出た: $OUT"
     call_hook UserPromptSubmit s-f "$MAIN" prompt hi
+    expect_rc0
+    call_hook Stop s-f "$MAIN"
+    expect_rc0
+    call_hook Notification s-f "$MAIN" notification_type idle_prompt
     expect_rc0
     call_hook SessionEnd s-f "$MAIN" reason other
     expect_rc0
@@ -287,6 +373,12 @@ run_test "SessionStart で記録がすでにあれば last_seen だけを書き�
 run_test "UserPromptSubmit で記録が無ければ作る" t_user_prompt_creates_record
 run_test "UserPromptSubmit で記録があれば last_seen だけを書き直す" t_user_prompt_updates_last_seen
 run_test "SessionEnd で記録が消える" t_session_end_removes_record
+
+echo "--- 返答している途中かの印(#520)"
+run_test "Stop と StopFailure で responding が偽になり、UserPromptSubmit で真に戻る" t_stop_clears_responding
+run_test "Notification は idle_prompt のときだけ responding を偽にする" t_idle_prompt_clears_responding
+run_test "SessionStart は compact では responding を変えず、それ以外では偽にする" t_session_start_resets_responding
+run_test "記録が無いときに返答を終えても記録を作らない" t_end_of_reply_without_record
 
 echo "--- 作業フォルダの決め方"
 run_test "cwd が worktree なら記録の folder が worktree になる" t_worktree_folder

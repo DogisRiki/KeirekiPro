@@ -158,12 +158,15 @@ jobs:
           # テストを厚く書くほど上限に近づく構造にしない。
           # frontendはディレクトリではなくファイル名で判定する。__tests__ を丸ごと外すと、
           # そこへ実装を置いて上限を回避できてしまうため
+          # .claude の下のテストも、ワイルドカードにせずディレクトリを1件ずつ足す(同じ理由)
           test_excludes=(
             ':(exclude)backend/src/test/**'
             ':(exclude)frontend/e2e/**'
             ':(exclude)frontend/**/*.test.ts'
             ':(exclude)frontend/**/*.test.tsx'
             ':(exclude).github/scripts/tests/**'
+            ':(exclude).claude/hooks/tests/**'
+            ':(exclude).claude/scripts/parallel/tests/**'
           )
 
           count() {

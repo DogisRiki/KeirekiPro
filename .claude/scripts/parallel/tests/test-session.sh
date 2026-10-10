@@ -133,10 +133,12 @@ pj() {
 }
 
 # 記録の下書き(session.sh の書き込みに頼らずに置く)
-put_session() { # <session_id> <folder> <folder_key> <started_at>
+put_session() { # <session_id> <folder> <folder_key> <started_at> [<responding: true(既定)|false|none(欄が無い)>]
+    local responding="${5:-true}" field=""
+    [ "$responding" = none ] || field=",\"responding\":$responding"
     mkdir -p "$STATE/sessions"
-    printf '{"folder":"%s","folder_key":"%s","last_seen":%s,"session_id":"%s","started_at":%s}\n' \
-        "$2" "$3" "$(($4 + 5))" "$1" "$4" >"$STATE/sessions/$1.json"
+    printf '{"folder":"%s","folder_key":"%s","last_seen":%s%s,"session_id":"%s","started_at":%s}\n' \
+        "$2" "$3" "$(($4 + 5))" "$field" "$1" "$4" >"$STATE/sessions/$1.json"
 }
 put_issue() { # <N> <folder> <branch> <session_id> [<handed_over_from の JSON>]
     mkdir -p "$STATE/issues"
@@ -441,6 +443,42 @@ t_capacity() {
     out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
     [ "$(pj "$out" 'join ",", map { $_->{issue} } @{$d->{capacity}{active}}')" = 50,52 ] \
         || die "同じ folder のIssueの記録があるセッションが active に出ない: $out"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_capacity_only_responding() {
+    local out
+    put_session s-me "$MAIN" "$(fkey "$MAIN_DIR")" 100
+    # 返答を終えて入力を待っているセッションと、印の欄が無い記録(印を付ける前からのセッション)
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 200 false
+    put_issue 50 "$WT" feat/wt s-wt
+    put_session s-wt2 "$WT2" "$(fkey "$WT2_DIR")" 300 none
+    put_issue 52 "$WT2" feat/wt2 s-wt2
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{capacity}{active}')" = '[]' ] || die "返答していないセッションが active に出た: $out"
+    # 返答を始めたセッションだけが出る
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 200 true
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" 'join ",", map { $_->{issue} } @{$d->{capacity}{active}}')" = 50 ] \
+        || die "返答しているセッションだけが active に出ない: $out"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_conflict_and_leftover_ignore_responding() {
+    local out
+    # 返答を終えたセッションも、同じ作業フォルダの確認と作りかけの確認では作業中に数える(#520 のやらないこと)
+    put_session s-old "$MAIN" "$(fkey "$MAIN_DIR")" 100 false
+    put_issue 77 "$MAIN" main s-old
+    put_session s-me "$MAIN" "$(fkey "$MAIN_DIR")" 200
+    put_spec "$WT_DIR" beta 42
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 50 none
+    put_issue 78 "$WT" feat/wt s-wt
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" 'join ",", map { $_->{session_id} } @{$d->{folder_conflict}}')" = s-old ] \
+        || die "返答を終えたセッションが folder_conflict に出ない: $out"
+    [ "$(pj "$out" '$d->{leftovers}[0]{active_session}{session_id}')" = s-wt ] \
+        || die "印の欄が無いセッションが leftovers の active_session に出ない: $out"
+    [ "$(pj "$out" '$d->{capacity}{active}')" = '[]' ] || die "返答していないセッションが active に出た: $out"
 }
 
 # =====================================================================
@@ -996,9 +1034,10 @@ t_takeover_branch_remote() {
     local remote_sha rc
     # リモートにだけ feat/extra がある(リモートのブランチの記録もまだ無い)
     git init -q --bare "$ORIGIN_DIR"
-    git -C "$MAIN_DIR" remote add origin "$ORIGIN_DIR"
     remote_sha=$(git -C "$MAIN_DIR" "${GITC[@]}" commit-tree -p "$SEED_SHA" -m remote "$SEED_SHA^{tree}")
+    # origin を足す前に送る(Git 2.56 から、送り先の URL が足したリモートと同じだとリモートのブランチの記録ができるため)
     git -C "$MAIN_DIR" push -q "$ORIGIN_DIR" "$remote_sha:refs/heads/feat/extra" || die "リモートに push できない"
+    git -C "$MAIN_DIR" remote add origin "$ORIGIN_DIR"
     ! git -C "$MAIN_DIR" show-ref --quiet feat/extra || die "前提: ローカルに feat/extra の記録がある"
     put_issue 42 "" feat/extra ""
     # いまの作業フォルダがきれいでなければ、何もせずに終了コード1
@@ -1144,6 +1183,8 @@ run_test "どこでも開かれていないIssueのブランチが branch_only �
 
 echo "--- check-start: 作業中のセッションの数(要件3.6)"
 run_test "capacity に自分以外の作業中のセッションが出る" t_capacity
+run_test "capacity は返答している途中のセッションだけを数える(#520)" t_capacity_only_responding
+run_test "folder_conflict と leftovers は返答しているかによらない(#520)" t_conflict_and_leftover_ignore_responding
 
 echo "--- claim・spec-names"
 run_test "claim がIssueの記録を書き、すでにあれば書き直す" t_claim
