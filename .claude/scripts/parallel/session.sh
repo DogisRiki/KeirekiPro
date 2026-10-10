@@ -6,10 +6,19 @@
 #   check-start <N> [--session <ID>]
 #       Issue #N に着手してよいかを調べ、標準出力に JSON を1行出す(終了コード0)。
 #         folder_conflict  いまの作業フォルダの、ほかの作業中のセッションの記録(session_id started_at last_seen)
-#         leftovers        Issue #N の作りかけ(folder is_self kinds branch active_session)
+#         leftovers        Issue #N の作りかけ(folder is_self kinds branch active_session)。
+#                          kinds は started spec changes branch の順。started は、ほかの作業中のセッションの着手の記録
+#                          (予約か claim)。session_id が空でなく自分と違い、sessions/ にその記録があって作業フォルダが
+#                          無くなっておらず、folder が開かれている作業フォルダで handed_over_from に無いもの。
+#                          started の要素の active_session は、その記録のセッション
 #         branch_only      Issue #N のブランチのうち、どの作業フォルダでも開かれていないもの(branch where)
 #         capacity         limit(設定の数)と active(ほかに作業中のセッションのうち、返答している途中のもの。issue folder last_seen)
 #       最初に prune を行う(prune の標準出力は捨て、消せなかった名前などの標準エラーはそのまま出す)。
+#       folder_conflict leftovers branch_only がすべて空なら、Issue #N の着手の予約を issues/<N>.json に書く。
+#         記録が無ければ、いまの作業フォルダとこのセッションのIDと空の branch で作る
+#         記録がいまの作業フォルダとこのセッションのものなら(同じセッションの打ち直し)、updated_at だけを書き直す
+#         それ以外(閉じたセッションの予約や、片付けを待つ記録)は、folder session_id updated_at を書き直し、
+#           branch を空にする(handed_over_from は残す)
 #   claim <N> --branch <ブランチ> [--session <ID>]
 #       Issueの記録 issues/<N>.json を書く。すでにあれば folder branch session_id updated_at を書き直す。
 #   end <session_id>
@@ -56,8 +65,8 @@
 # 真にし、返答を終えたときと返答を終えて入力を待っているときに偽にする)だけを数える。欄が無い記録は数えない。
 # folder_conflict と leftovers の active_session は、responding によらず作業中のセッションを出す。
 # このスクリプトは所有者とやり取りしない。docker を呼ぶのは prune(片付けるものがあるとき)だけ。
-# check-start は、記録の錠(記録の置き場所の records.lock。lib.sh の _kp_lock で取る)の中で調べ、
-# 錠を返してから JSON を出す。15秒待っても錠を取れなければ、JSON を出さずに終了コード69で終わる。
+# check-start は、記録の錠(記録の置き場所の records.lock。lib.sh の _kp_lock で取る)の中で調べと予約を行い、
+# 錠を返してから JSON を出す。15秒待っても錠を取れないときと、予約を書けないときは、JSON を出さずに終了コード69で終わる。
 #
 # 終了コード: 0(成功)、1(takeover が引き継げなかった)、64(呼び方の誤り)、
 #             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない)。
@@ -484,7 +493,7 @@ kp_session_prune() {
 }
 
 kp_session_check_start() {
-    local n="" session="" state sid limit me key ic gone_sessions out
+    local n="" session="" state sid limit me key ic gone_sessions out mode f now
     while [ $# -gt 0 ]; do
         case "$1" in
             --session)
@@ -510,7 +519,7 @@ kp_session_check_start() {
     key=$(kp_folder_key) || exit $?
     ic=$(git config --get core.ignorecase 2>/dev/null)
 
-    # ここから JSON を作り終えるまで、記録の錠の中で調べる
+    # ここから予約を書き終えるまで、記録の錠の中で調べる
     _kp_ss_lock "$state"
 
     # 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は作業中に数えない
@@ -583,12 +592,24 @@ kp_session_check_start() {
         my %handed = map { (norm(str($_)) => 1) } (ref $iss && ref $iss->{handed_over_from} eq "ARRAY" ? @{ $iss->{handed_over_from} } : ());
         my $iss_branch = $iss ? str($iss->{branch}) : "";
         my $own = $iss && length $sid && norm(str($iss->{folder})) eq $me_id && str($iss->{session_id}) eq $sid;
+        # started: ほかの作業中のセッションの着手の記録(予約か claim)。記録の session_id が空でなく自分と違い、
+        # sessions/<session_id>.json があって作業フォルダが無くなっていないもの(記録の folder と handed_over_from は下で比べる)
+        my ($started_fid, $started_s);
+        if ($iss) {
+            my $isid = str($iss->{session_id});
+            my %gone = map { ($_ => 1) } grep { length } split /\n/, $gone_list;
+            if (length $isid && $isid ne $sid && $isid !~ m{[/\\]} && !$gone{"$isid.json"}) {
+                $started_s = load("$state/sessions/$isid.json");
+                $started_fid = norm(str($iss->{folder})) if $started_s;
+            }
+        }
         my @leftovers;
         for my $w (@worktrees) {
             my $fid = norm($w->{path});
             next if $handed{$fid};
             next if $own && $fid eq $me_id;
             my (%kind);
+            $kind{started} = 1 if defined $started_fid && length $started_fid && $fid eq $started_fid;
             my @names;
             if (opendir my $sd, "$w->{path}/.kiro/specs") {
                 @names = sort grep { !/\A\.\.?\z/ && -d "$w->{path}/.kiro/specs/$_" } readdir $sd;
@@ -610,12 +631,12 @@ kp_session_check_start() {
                 $kind{changes} = 1 if defined $st && length $st;
             }
             next unless %kind;
-            my ($active) = sort by_start
+            my ($active) = $kind{started} ? ($started_s) : sort by_start
                 grep { in_folder($_, $fid) && str($_->{session_id}) ne $sid && is_active($_, $ix) } @sessions;
             push @leftovers, {
                 folder => $w->{path},
                 is_self => ($fid eq $me_id ? JSON::PP::true : JSON::PP::false),
-                kinds => [ grep { $kind{$_} } qw(spec changes branch) ],
+                kinds => [ grep { $kind{$_} } qw(started spec changes branch) ],
                 branch => $w->{branch},
                 active_session => ($active ? brief($active) : undef),
             };
@@ -637,6 +658,14 @@ kp_session_check_start() {
             push @active, { issue => issue_of($s, $ix), folder => $s->{folder}, last_seen => $s->{last_seen} };
         }
 
+        # 着手の予約の書き方(1行目に出す): none(書かない)、new(作る)、touch(updated_at だけ)、rewrite(書き直す)
+        my $mode = "none";
+        if (!@conflict && !@leftovers && !@branch_only) {
+            if (!$iss) { $mode = "new" }
+            elsif (norm(str($iss->{folder})) eq $me_id && str($iss->{session_id}) eq $sid) { $mode = "touch" }
+            else { $mode = "rewrite" }
+        }
+        print "$mode\n";
         print JSON::PP->new->utf8->canonical->encode({
             folder_conflict => \@conflict,
             leftovers => \@leftovers,
@@ -645,6 +674,24 @@ kp_session_check_start() {
         }), "\n";
     ' -- "$state" "$n" "$sid" "$limit" "$me" "$key" "$ic" "$gone_sessions") \
         || _kp_ss_die69 "[parallel] 調べられない: Issue #$n の記録と作業フォルダを読めない"
+    mode=${out%%$'\n'*}
+    out=${out#*$'\n'}
+
+    # 何も見つからなければ、錠の中で着手の予約を書く
+    f="$state/issues/$n.json"
+    now=$(date +%s)
+    case "$mode" in
+        new)
+            mkdir -p "$state/issues" 2>/dev/null \
+                && kp_json_write "$f" issue:="$n" folder="$me" branch="" session_id="$sid" \
+                    updated_at:="$now" 'handed_over_from:=[]'
+            ;;
+        touch) kp_json_write "$f" updated_at:="$now" ;;
+        rewrite) kp_json_write "$f" folder="$me" branch="" session_id="$sid" updated_at:="$now" ;;
+        none) true ;;
+        *) false ;;
+    esac || _kp_ss_die69 "[parallel] 調べられない: Issue #$n の着手の予約を $f に書けない"
+
     # 錠を返してから JSON を出す
     _kp_ss_unlock
     printf '%s\n' "$out"

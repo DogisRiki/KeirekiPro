@@ -368,8 +368,8 @@ t_leftover_own_claim_excluded() {
     # 別のセッションから見ると、作りかけとして出る
     out=$(check_start "$MAIN_DIR" check-start 42 --session s-other) || die "$out"
     [ "$(pj "$out" '$d->{leftovers}[0]{is_self}')" = true ] || die "別のセッションから見て is_self の作りかけが出ない: $out"
-    # コミットしていない spec は、コミットしていない変更でもある
-    [ "$(pj "$out" 'join ",", @{$d->{leftovers}[0]{kinds}}')" = spec,changes,branch ] || die "kinds が spec,changes,branch でない: $out"
+    # コミットしていない spec は、コミットしていない変更でもある。s-me の記録は着手の記録なので started も付く
+    [ "$(pj "$out" 'join ",", @{$d->{leftovers}[0]{kinds}}')" = started,spec,changes,branch ] || die "kinds が started,spec,changes,branch でない: $out"
 }
 
 # shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
@@ -589,9 +589,13 @@ t_prune_branch_gone() {
     ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
     [ -f "$STATE/issues/42.json" ] || die "ブランチが残っているのに issues/42.json が消えた"
     git -C "$MAIN_DIR" branch -q -D feat/extra
-    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
     [ ! -f "$STATE/issues/42.json" ] || die "ブランチも消したのに issues/42.json が残っている: $(cat "$STATE/issues/42.json")"
+    # check-start は、何も見つからなければこのセッションの予約(branch が空)を書く
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
     [ "$(pj "$out" '$d->{branch_only}')" = '[]' ] || die "消したブランチが branch_only に出た: $out"
+    [ "$(pj "$(cat "$STATE/issues/42.json")" 'join "|", $d->{issue}, $d->{folder}, $d->{branch}, $d->{session_id}')" = "42|$MAIN||s-me" ] \
+        || die "check-start のあとの記録がこのセッションの予約でない: $(cat "$STATE/issues/42.json")"
     # 作業フォルダとブランチが一度に無くなったときも消す
     put_issue 43 "$WORK/RepoGone" feat/none s-gone
     ss "$MAIN_DIR" prune >/dev/null || die "prune の終了コード $?"
@@ -913,6 +917,7 @@ t_lock_held_refused() {
     [ -z "$out" ] || die "錠を取れないのに JSON を出した: $out"
     case "$err" in *'[parallel]'*records.lock*) ;; *) die "標準エラーに [parallel] で始まる錠の理由が無い: $err" ;; esac
     [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
+    [ ! -f "$STATE/issues/42.json" ] || die "錠を取れないのに着手の予約を書いた: $(cat "$STATE/issues/42.json")"
     [ $((SECONDS - start)) -le 20 ] || die "錠を待つのに20秒より長くかかった: $((SECONDS - start))秒"
 }
 
@@ -944,6 +949,164 @@ EOF
     [ "$rc" = 69 ] || die "調べが失敗したのに終了コードが69でない: $rc: $out"
     [ -z "$out" ] || die "調べが失敗したのに JSON を出した: $out"
     [ ! -e "$LOCK" ] || die "調べが失敗したときに錠を残した"
+}
+
+# =====================================================================
+# check-start の着手の予約(session-overlap-guard 要件1・要件3.1)
+# =====================================================================
+# Issueの記録の updated_at を書き換える(打ち直しで updated_at が変わることを確かめるため)
+# shellcheck disable=SC2016 # perl のコードなので、$ を展開しない
+set_updated_at() { # <N> <UNIX 秒>
+    perl -MJSON::PP -e '
+        my ($file, $at) = @ARGV;
+        my $j = JSON::PP->new->utf8->canonical;
+        open my $in, "<:raw", $file or die "$file: $!\n";
+        my $d = do { local $/; $j->decode(<$in>) };
+        close $in;
+        $d->{updated_at} = 0 + $at;
+        open my $out, ">:raw", $file or die "$file: $!\n";
+        print $out $j->encode($d), "\n";
+        close $out or die "$file: $!\n";
+    ' -- "$STATE/issues/$1.json" "$2" || die "updated_at を書き換えられない"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_reserve_when_nothing_found() {
+    local out f
+    put_session s-me "$WT" "$(fkey "$WT_DIR")" 100
+    out=$(check_start "$WT_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "前提: leftovers が空でない: $out"
+    f="$STATE/issues/42.json"
+    [ -f "$f" ] || die "何も見つからないのに着手の予約を書いていない"
+    [ "$(issue_fields 42)" = "42|$WT||s-me|" ] || die "予約の中身が違う: $(cat "$f")"
+    [ "$(pj "$(cat "$f")" 'ref $d->{handed_over_from}')" = ARRAY ] || die "handed_over_from が配列でない: $(cat "$f")"
+    case "$(pj "$(cat "$f")" '$d->{updated_at}')" in '' | *[!0-9]*) die "updated_at が UNIX 秒でない: $(cat "$f")" ;; esac
+    [ ! -e "$LOCK" ] || die "予約を書いたあとに錠を残した"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_reserve_other_session_started() {
+    local out before
+    # WT のセッション s-wt が、ブランチを作る前に予約を書いた(branch が空)
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    put_issue 42 "$WT" "" s-wt
+    before=$(cat "$STATE/issues/42.json")
+    out=$(check_start "$WT2_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" 'scalar @{$d->{leftovers}}')" = 1 ] || die "leftovers の数が1でない: $out"
+    [ "$(pj "$out" '$d->{leftovers}[0]{folder}')" = "$WT" ] || die "folder が予約した作業フォルダでない: $out"
+    [ "$(pj "$out" '$d->{leftovers}[0]{kinds}')" = '["started"]' ] || die "kinds が started だけでない: $out"
+    [ "$(pj "$out" '$d->{leftovers}[0]{is_self}')" = false ] || die "is_self が偽でない: $out"
+    [ "$(pj "$out" '$d->{leftovers}[0]{active_session}')" = '{"last_seen":305,"session_id":"s-wt","started_at":300}' ] \
+        || die "active_session が予約したセッションでない: $out"
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "ほかのセッションの予約を書き換えた: $(cat "$STATE/issues/42.json")"
+    # ほかの種類もある作業フォルダでは、started が先頭に並ぶ
+    put_spec "$WT_DIR" beta 42
+    out=$(check_start "$WT2_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" 'join ",", @{$d->{leftovers}[0]{kinds}}')" = started,spec ] || die "kinds が started,spec でない: $out"
+    [ "$(cat "$STATE/issues/42.json")" = "$before" ] || die "ほかのセッションの予約を書き換えた: $(cat "$STATE/issues/42.json")"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_reserve_closed_session_rewritten() {
+    local out
+    # 予約したセッション s-closed の記録が無い(所有者が閉じた)。handed_over_from は残す
+    put_issue 42 "$WT" "" s-closed "[\"$WORK/RepoOld\"]"
+    out=$(check_start "$WT2_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "閉じたセッションの予約が leftovers に出た: $out"
+    [ "$(issue_fields 42)" = "42|$WT2||s-me|$WORK/RepoOld" ] || die "予約がこのセッションのものに書き換わっていない: $(cat "$STATE/issues/42.json")"
+    [ "$(pj "$(cat "$STATE/issues/42.json")" '$d->{updated_at}')" != 1 ] || die "updated_at が書き直されていない"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_reserve_same_session_rerun() {
+    local out before
+    put_session s-me "$WT" "$(fkey "$WT_DIR")" 100
+    out=$(check_start "$WT_DIR" check-start 42 --session s-me) || die "$out"
+    set_updated_at 42 7
+    before=$(issue_fields 42)
+    out=$(check_start "$WT_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "同じセッションの打ち直しで leftovers が出た: $out"
+    [ "$(issue_fields 42)" = "$before" ] || die "打ち直しで updated_at のほかの欄が変わった: $(cat "$STATE/issues/42.json")"
+    [ "$(pj "$(cat "$STATE/issues/42.json")" '$d->{updated_at}')" != 7 ] || die "打ち直しで updated_at が書き直されていない"
+    # claim でブランチを書いたあとの打ち直しでも、ブランチを空にしない
+    ss "$WT_DIR" claim 42 --branch feat/wt --session s-me || die "claim の終了コード $?"
+    before=$(issue_fields 42)
+    out=$(check_start "$WT_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "claim のあとの打ち直しで leftovers が出た: $out"
+    [ "$(issue_fields 42)" = "$before" ] || die "claim のあとの打ち直しで記録が変わった: $(cat "$STATE/issues/42.json")"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_reserve_empty_session_id_not_started() {
+    local out
+    # 予約の session_id が空(セッションのIDが分からなかったセッションの予約)は started に数えない。
+    # session_id が空のセッションの記録(sessions/.json)があっても、空のIDでは引かない
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    put_session "" "$WT" "$(fkey "$WT_DIR")" 310
+    put_issue 42 "$WT" "" ""
+    out=$(check_start "$WT2_DIR" check-start 42 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{leftovers}')" = '[]' ] || die "session_id が空の予約が leftovers に出た: $out"
+}
+
+t_reserve_write_failure() {
+    local real_perl out rc err
+    real_perl=$(command -v perl)
+    mkdir -p "$TMP_ROOT/writefail"
+    # 記録を書く perl(lib.sh の kp_json_write)だけが失敗する perl
+    cat >"$TMP_ROOT/writefail/perl" <<EOF
+#!/bin/bash
+case "\$*" in *kp_json_write*) echo "fake write failure" >&2; exit 1 ;; esac
+exec "$real_perl" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/writefail/perl"
+    out=$(PATH="$TMP_ROOT/writefail:$PATH" ss "$WT_DIR" check-start 42 --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    err=$(cat "$WORK/err.txt")
+    [ "$rc" = 69 ] || die "予約を書けないのに終了コードが69でない: $rc: $out $err"
+    [ -z "$out" ] || die "予約を書けないのに JSON を出した: $out"
+    case "$err" in *'[parallel]'*) ;; *) die "標準エラーに [parallel] で始まる理由が無い: $err" ;; esac
+    [ ! -e "$LOCK" ] || die "予約を書けなかったときに錠を残した"
+    [ ! -f "$STATE/issues/42.json" ] || die "予約を書けなかったのに記録がある: $(cat "$STATE/issues/42.json")"
+}
+
+# 2つの worktree から別々のセッションで同時に check-start を呼び、片方だけが着手したことになるかを確かめる
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+concurrent_check_start_once() { # <回>
+    local pa pb rca rcb outa outb win lose win_dir
+    rm -f "$STATE/issues/42.json"
+    ss "$WT_DIR" check-start 42 --session s-a >"$WORK/outa.txt" 2>"$WORK/erra.txt" &
+    pa=$!
+    ss "$WT2_DIR" check-start 42 --session s-b >"$WORK/outb.txt" 2>"$WORK/errb.txt" &
+    pb=$!
+    wait "$pa"
+    rca=$?
+    wait "$pb"
+    rcb=$?
+    outa=$(cat "$WORK/outa.txt")
+    outb=$(cat "$WORK/outb.txt")
+    [ "$rca" = 0 ] && [ "$rcb" = 0 ] || die "$1 回目: 終了コードが0でない: a=$rca b=$rcb $(cat "$WORK/erra.txt" "$WORK/errb.txt")"
+    if [ "$(pj "$outa" '$d->{leftovers}')" = '[]' ]; then
+        win=s-a lose=$outb win_dir=$WT
+        [ "$(pj "$outb" '$d->{leftovers}')" != '[]' ] || die "$1 回目: 両方の leftovers が空: $outa / $outb"
+    else
+        win=s-b lose=$outa win_dir=$WT2
+        [ "$(pj "$outb" '$d->{leftovers}')" = '[]' ] || die "$1 回目: どちらの leftovers も空でない: $outa / $outb"
+    fi
+    [ "$(pj "$lose" 'scalar @{$d->{leftovers}}')" = 1 ] || die "$1 回目: あとのほうの leftovers の数が1でない: $lose"
+    [ "$(pj "$lose" '$d->{leftovers}[0]{kinds}')" = '["started"]' ] || die "$1 回目: あとのほうに started が出ない: $lose"
+    [ "$(pj "$lose" '$d->{leftovers}[0]{folder}')" = "$win_dir" ] || die "$1 回目: started の folder が先のほうの作業フォルダでない: $lose"
+    [ "$(pj "$lose" '$d->{leftovers}[0]{active_session}{session_id}')" = "$win" ] || die "$1 回目: started の active_session が先のほうでない: $lose"
+    [ "$(issue_fields 42)" = "42|$win_dir||$win|" ] || die "$1 回目: 予約が空を返したほうのものでない: $(cat "$STATE/issues/42.json")"
+    [ ! -e "$LOCK" ] || die "$1 回目: 錠が残った"
+}
+
+t_reserve_concurrent() {
+    local i
+    put_session s-a "$WT" "$(fkey "$WT_DIR")" 100
+    put_session s-b "$WT2" "$(fkey "$WT2_DIR")" 200
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        concurrent_check_start_once "$i"
+    done
 }
 
 # =====================================================================
@@ -1252,6 +1415,15 @@ echo "--- 記録の錠(session-overlap-guard 要件3.1)"
 run_test "錠がほかに持たれたままなら check-start は終了コード69で終わり、その錠を消さない" t_lock_held_refused
 run_test "60秒より古い錠は壊して取り直し、check-start は錠を返して終わる" t_lock_stale_broken
 run_test "錠の中の調べが失敗したら、check-start は終了コード69で終わり、錠を残さない" t_lock_released_on_failure
+
+echo "--- check-start の着手の予約(session-overlap-guard 要件1・要件3.1)"
+run_test "何も見つからなければ、check-start はいまの作業フォルダとこのセッションの予約を書く" t_reserve_when_nothing_found
+run_test "ほかの worktree の作業中のセッションの予約は started で出て、予約は書き換わらない" t_reserve_other_session_started
+run_test "予約したセッションの記録が無ければ leftovers は空で、予約がこのセッションに書き換わる" t_reserve_closed_session_rewritten
+run_test "同じセッションの打ち直しでは leftovers が空で、updated_at だけが変わる" t_reserve_same_session_rerun
+run_test "予約の session_id が空なら started を出さない" t_reserve_empty_session_id_not_started
+run_test "予約を書けなければ終了コード69で、錠が残らない" t_reserve_write_failure
+run_test "2つの worktree から同時に check-start を呼ぶと、片方だけが空を返し、予約はそのセッションのもの(10回)" t_reserve_concurrent
 
 echo "--- prune(要件4.5)"
 run_test "prune は、作業フォルダが残っている記録を変えず、片付けるものが無ければ docker を呼ばない" t_prune_callable

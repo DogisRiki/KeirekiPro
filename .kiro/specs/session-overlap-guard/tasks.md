@@ -8,7 +8,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(調べを終えられなければ進まない)は、テストの「錠がほかに持たれたままなら check-start は終了コード69で終わる」で確かめる
   - _要件: 3.1_
 
-- [ ] 1.2 `check-start` の予約と `started` を作る
+- [x] 1.2 `check-start` の予約と `started` を作る
 
   Claude は、部品「session.sh check-start の変更」のとおりに、`check-start` が錠の中で調べと予約を行い、ほかのセッションの予約を作りかけの種類 `started` として返すようにする。Claude は、`session.sh` の冒頭の使い方の注記に、`check-start` が予約を書くことと `started` を書き足す。Claude は、`test-session.sh` に、design.md の「テストの方針」の `check-start` の予約の場合と、同時の `check-start` の場合を足す。既存の `t_prune_branch_gone` は、ブランチを消したあとの `check-start` のあとで `issues/42.json` が無いことを確かめているが、予約を書く `check-start` のあとでは、この記録はこのセッションの予約として残る。Claude は、この確かめを、`prune` のあとで `issues/42.json` が無いことを確かめる形に書き換え、`check-start` のあとは、記録がこのセッションの予約(`branch` が空)になっていることを確かめる形に書き換える。既存の `t_leftover_own_claim_excluded` は、ほかのセッション s-me の記録がある作業フォルダで s-other が `check-start` を呼んだときの `kinds` を `spec,changes,branch` と確かめているが、この場合は、部品「session.sh check-start の変更」の `started` の判定の4つの条件にすべて当たる。Claude は、この期待を `started,spec,changes,branch` に書き換える。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る。同時の `check-start` の場合を10回くり返して、毎回通る
