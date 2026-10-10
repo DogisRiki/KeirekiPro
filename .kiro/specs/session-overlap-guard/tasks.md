@@ -1,7 +1,7 @@
 # タスク
 
 - [ ] 1. 同じIssueの着手を `session.sh` で予約する
-- [ ] 1.1 記録の錠と、作業中のセッションの見分けの共通の処理を作る
+- [x] 1.1 記録の錠と、作業中のセッションの見分けの共通の処理を作る
 
   Claude は、`session.sh` に記録の錠 `records.lock` の取り方と返し方を足す。`session.sh` は、錠を lib.sh の `_kp_lock` で取り、15秒待っても取れなければ終了コード69で終わる。`_kp_die69` は錠を消さないので、Claude は、錠を持ったまま終わる経路を、錠のディレクトリを消してから `_kp_die69` を呼ぶ形にそろえる。あわせて、Claude は、`check-start` の perl の中にある作業中のセッションの見分け(`is_active` と、`session_id` か `folder` からIssueの番号を引く処理)を、`check-start` と、2.1 で作る `check-spec` の両方から使える共通の処理にくくり出す。この小タスクでは、`check-start` は、今の調べを錠の中で行う。この小タスクでは、Claude は、`check-start` にまだ予約を書かせず、`check-start` の出す JSON を変えない。Claude は、`test-session.sh` に、錠の場合を足す。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る(既存の `check-start` の場合が、くくり出したあとも変わらず通る)
@@ -93,3 +93,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - スキルの変更(3.1 と 3.2)には自動のテストが無い(design.md の「テストの方針」)。Claude は、完了条件の1と4のテストの代わりに、各タスクの「受入基準とテストの対応」に書いた確かめを使う
 - 出荷のとき、Claude は、PRの本文に、design.md の「ほかの spec との食い違い」の3つの「食い違う spec:」の行と、マージのあとに所有者が行う実地の確かめ(Issueの「確かめ方」の2つ)を書く
 - 出荷のとき、Claude は、PRの本文に `Test-Change-Justification:` の行を置き、1.2 と 1.3 で既存のテスト `t_claim` と `t_prune_branch_gone` と `t_leftover_own_claim_excluded` の確かめを書き換えた理由(`check-start` が予約を書き、ほかのセッションの記録を `started` として返すようになったことと、`claim` がほかのセッションの記録を断るようになったこと)を書く
+- タスク1.1: lib.sh の `_kp_lock` は「150回 × 0.1秒」で待つが、Windows の作業PCでは、試すたびに `date` と perl を起動するため、持たれたままの錠を約25秒待ってから終わる(実測)。`t_lock_held_refused` は、待たずに終わる偽物の `sleep` を PATH の先頭に置いて流す。作業中のセッションの見分けは、perl の共通の処理 `_KP_SS_PL_ACTIVE` を `perl -e "$_KP_SS_PL_ACTIVE" -e '<本体>'` の形で本体の前に置いて使う。本体は `our` の `$KP_IC` `$KP_ME_ID` `$KP_ME_KEY` を決めてから共通の処理を呼ぶ

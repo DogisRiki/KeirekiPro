@@ -56,9 +56,11 @@
 # 真にし、返答を終えたときと返答を終えて入力を待っているときに偽にする)だけを数える。欄が無い記録は数えない。
 # folder_conflict と leftovers の active_session は、responding によらず作業中のセッションを出す。
 # このスクリプトは所有者とやり取りしない。docker を呼ぶのは prune(片付けるものがあるとき)だけ。
+# check-start は、記録の錠(記録の置き場所の records.lock。lib.sh の _kp_lock で取る)の中で調べ、
+# 錠を返してから JSON を出す。15秒待っても錠を取れなければ、JSON を出さずに終了コード69で終わる。
 #
 # 終了コード: 0(成功)、1(takeover が引き継げなかった)、64(呼び方の誤り)、
-#             69(git のリポジトリの外、設定の値の誤り、記録を書けない)。
+#             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない)。
 # 前提: bash・perl(JSON::PP)・git。jq には依存しない。
 # =====================================================================
 
@@ -78,6 +80,120 @@ _kp_ss_issue_number() {
     esac
     printf '%s\n' "$((10#$1))"
 }
+
+# 記録の錠(記録の置き場所の records.lock)を取る。持っている錠は _KP_SS_LOCK に入れる。
+# 15秒待っても取れなければ、理由を標準エラーに出して終了コード69で終わる
+_kp_ss_lock() { # <記録の置き場所>
+    mkdir -p "$1" 2>/dev/null || _kp_die69 "[parallel] 調べられない: 記録の置き場所 $1 を作れない"
+    _kp_lock "$1/records.lock" \
+        || _kp_die69 "[parallel] 調べられない: 記録の錠 $1/records.lock を15秒待っても取れない(ほかのセッションが記録を読み書きしている)。少し待ってから、もう一度打つ"
+    _KP_SS_LOCK="$1/records.lock"
+}
+
+# 持っている記録の錠を返す(持っていなければ何もしない)
+_kp_ss_unlock() {
+    [ -n "${_KP_SS_LOCK:-}" ] || return 0
+    rmdir "$_KP_SS_LOCK" 2>/dev/null
+    _KP_SS_LOCK=
+    return 0
+}
+
+# 記録の錠を返してから、理由を標準エラーに出して終了コード69で終わる(_kp_die69 は錠を消さないため)
+_kp_ss_die69() {
+    _kp_ss_unlock
+    _kp_die69 "$@"
+}
+
+# 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)のファイル名を1行ずつ出す。
+# これらは作業中に数えない。作業フォルダの一覧を取れないときは、どの記録も無くなったとはみなさない
+# (作業中のセッションを見落とさないため)。git のリポジトリの外などで鍵を求められなければ終了コード69
+_kp_ss_gone_sessions() { # <記録の置き場所>
+    local alive rc file
+    alive=$(kp_live_folders)
+    rc=$?
+    [ "$rc" = 69 ] && return 69
+    [ "$rc" = 0 ] || return 0
+    for file in "$1"/sessions/*.json; do
+        [ -f "$file" ] || continue
+        kp_folder_gone "$(kp_json_get "$file" folder)" "$(kp_json_get "$file" folder_key)" "$alive" \
+            && printf '%s\n' "${file##*/}"
+    done
+    return 0
+}
+
+# 記録の読み方と、作業中のセッションの見分け(check-start と check-spec の perl が使う共通の処理)。
+# perl -MJSON::PP -e "$_KP_SS_PL_ACTIVE" -e '<本体>' の形で、本体の前に置く。
+# 本体は、our の $KP_IC(core.ignorecase の値)・$KP_ME_ID(norm したいまの作業フォルダ)・
+# $KP_ME_KEY(いまの作業フォルダの鍵)を決めてから使う。
+#   load_sessions(<記録の置き場所>, <作業フォルダが無くなったセッションの記録のファイル名(改行区切り)>)
+#       sessions/ の記録のうち、作業フォルダが無くなったものを除いたもの
+#   active_index(<issues/ の記録>...)
+#       session_id と folder から、そのセッションが着手しているIssueの番号を引く表(updated_at の新しいものが勝つ)
+#   is_active(<セッションの記録>, <表>)  作業中のセッションか(issues/ に同じ session_id か同じ folder の記録がある)
+#   issue_of(<セッションの記録>, <表>)   着手しているIssueの番号(session_id で引き、無ければ folder で引く。無ければ undef)
+#   in_folder(<セッションの記録>, <norm した作業フォルダ>)
+#       その作業フォルダの記録か(いまの作業フォルダは鍵でも比べる。kp_session_id と同じ規則)
+# shellcheck disable=SC2016 # perl のコードなので、$ を展開しない
+_KP_SS_PL_ACTIVE='
+    use strict; use warnings;
+    our ($KP_IC, $KP_ME_ID, $KP_ME_KEY) = ("", "", "");
+    my $kp_json = JSON::PP->new->utf8;
+
+    sub norm { my $p = $_[0] // ""; $p =~ tr/A-Z/a-z/ if $KP_IC eq "true"; $p }
+    sub str { my $v = $_[0]; defined $v && !ref $v ? $v : "" }
+    sub load {
+        open my $fh, "<:raw", $_[0] or return undef;
+        local $/; my $text = <$fh>; close $fh;
+        my $d = eval { $kp_json->decode($text) };
+        return ref $d eq "HASH" ? $d : undef;
+    }
+    sub load_dir {
+        my ($dir, $skip) = @_;
+        opendir my $dh, $dir or return ();
+        my @out;
+        for my $name (sort readdir $dh) {
+            next unless $name =~ /\.json\z/;
+            next if $skip && $skip->{$name};
+            my $d = load("$dir/$name") or next;
+            push @out, $d;
+        }
+        return @out;
+    }
+    sub load_sessions {
+        my ($state, $gone_list) = @_;
+        my %gone = map { ($_ => 1) } grep { length } split /\n/, $gone_list // "";
+        return load_dir("$state/sessions", \%gone);
+    }
+    sub active_index {
+        my (%by_sid, %by_folder);
+        for my $d (sort { (str($a->{updated_at}) || 0) <=> (str($b->{updated_at}) || 0) } @_) {
+            my $s = str($d->{session_id});
+            my $f = norm(str($d->{folder}));
+            $by_sid{$s} = $d->{issue} if length $s;
+            $by_folder{$f} = $d->{issue} if length $f;
+        }
+        return { sid => \%by_sid, folder => \%by_folder };
+    }
+    sub is_active {
+        my ($s, $ix) = @_;
+        my $id = str($s->{session_id});
+        my $f = norm(str($s->{folder}));
+        return (length $id && exists $ix->{sid}{$id}) || (length $f && exists $ix->{folder}{$f});
+    }
+    sub issue_of {
+        my ($s, $ix) = @_;
+        my $id = str($s->{session_id});
+        return $ix->{sid}{$id} if length $id && exists $ix->{sid}{$id};
+        return $ix->{folder}{ norm(str($s->{folder})) };
+    }
+    sub in_folder {
+        my ($s, $fid) = @_;
+        return 1 if norm(str($s->{folder})) eq $fid;
+        return $fid eq $KP_ME_ID && str($s->{folder_key}) eq $KP_ME_KEY;
+    }
+    # started_at の古い順(同じなら session_id の順)
+    sub by_start { (str($a->{started_at}) || 0) <=> (str($b->{started_at}) || 0) or str($a->{session_id}) cmp str($b->{session_id}) }
+'
 
 # 開かれている作業フォルダ(フォルダがあるもの)の最上位を1行ずつ出す
 _kp_ss_worktree_paths() {
@@ -368,7 +484,7 @@ kp_session_prune() {
 }
 
 kp_session_check_start() {
-    local n="" session="" state sid limit me key ic alive rc file gone_sessions=""
+    local n="" session="" state sid limit me key ic gone_sessions out
     while [ $# -gt 0 ]; do
         case "$1" in
             --session)
@@ -394,46 +510,20 @@ kp_session_check_start() {
     key=$(kp_folder_key) || exit $?
     ic=$(git config --get core.ignorecase 2>/dev/null)
 
-    # 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は作業中に数えない。
-    # 作業フォルダの一覧を取れないときは、どの記録も無くなったとはみなさない(作業中のセッションを見落とさないため)
-    alive=$(kp_live_folders)
-    rc=$?
-    [ "$rc" = 69 ] && exit 69
-    if [ "$rc" = 0 ]; then
-        for file in "$state"/sessions/*.json; do
-            [ -f "$file" ] || continue
-            kp_folder_gone "$(kp_json_get "$file" folder)" "$(kp_json_get "$file" folder_key)" "$alive" \
-                && gone_sessions+="${file##*/}"$'\n'
-        done
-    fi
+    # ここから JSON を作り終えるまで、記録の錠の中で調べる
+    _kp_ss_lock "$state"
 
-    perl -MJSON::PP -e '
+    # 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は作業中に数えない
+    gone_sessions=$(_kp_ss_gone_sessions "$state") \
+        || _kp_ss_die69 "[parallel] 調べられない: 作業フォルダの一覧から、無くなったセッションの記録を見分けられない"
+
+    out=$(perl -MJSON::PP -e "$_KP_SS_PL_ACTIVE" -e '
         use strict; use warnings;
         my ($state, $n, $sid, $limit, $me, $me_key, $ic, $gone_list) = @ARGV;
         utf8::decode($_) for ($state, $sid, $me);
-        my $json = JSON::PP->new->utf8;
+        ($KP_IC, $KP_ME_KEY) = ($ic, $me_key);
+        $KP_ME_ID = norm($me);
 
-        sub norm { my $p = $_[0] // ""; $p =~ tr/A-Z/a-z/ if $ic eq "true"; $p }
-        sub load {
-            open my $fh, "<:raw", $_[0] or return undef;
-            local $/; my $text = <$fh>; close $fh;
-            my $d = eval { $json->decode($text) };
-            return ref $d eq "HASH" ? $d : undef;
-        }
-        # 作業フォルダが無くなったセッションの記録のファイル名
-        my %gone_session = map { ($_ => 1) } grep { length } split /\n/, $gone_list;
-        sub load_dir {
-            my ($dir, $skip) = @_;
-            opendir my $dh, $dir or return ();
-            my @out;
-            for my $name (sort readdir $dh) {
-                next unless $name =~ /\.json\z/;
-                next if $skip && $skip->{$name};
-                my $d = load("$dir/$name") or next;
-                push @out, $d;
-            }
-            return @out;
-        }
         # git を呼んで標準出力を返す(標準エラーは捨てる)。失敗したら undef
         sub git_out {
             my @args = @_;
@@ -455,9 +545,8 @@ kp_session_check_start() {
             (my $s = $v) =~ s/\A#//;
             return $s =~ /\A0*([0-9]+)\z/ && $1 == $n;
         }
-        sub str { my $v = $_[0]; defined $v && !ref $v ? $v : "" }
 
-        my $me_id = norm($me);
+        my $me_id = $KP_ME_ID;
 
         # 開かれている作業フォルダ(フォルダがあるもの)と、そこで開かれているブランチ
         my @worktrees;
@@ -476,39 +565,19 @@ kp_session_check_start() {
         }
         @worktrees = grep { !$_->{bare} && -d $_->{path} } @worktrees;
 
-        my @sessions = load_dir("$state/sessions", \%gone_session);
-        my @issues = load_dir("$state/issues");
+        my @sessions = load_sessions($state, $gone_list);
         my $iss = load("$state/issues/$n.json");
 
         # 作業中のセッション: issues/ に同じ session_id か同じ folder の記録があるもの
-        my (%issue_by_sid, %issue_by_folder);
-        for my $d (sort { (str($a->{updated_at}) || 0) <=> (str($b->{updated_at}) || 0) } @issues) {
-            my $s = str($d->{session_id});
-            my $f = norm(str($d->{folder}));
-            $issue_by_sid{$s} = $d->{issue} if length $s;
-            $issue_by_folder{$f} = $d->{issue} if length $f;
-        }
-        sub is_active {
-            my ($s, $by_sid, $by_folder) = @_;
-            my $id = str($s->{session_id});
-            my $f = norm(str($s->{folder}));
-            return (length $id && exists $by_sid->{$id}) || (length $f && exists $by_folder->{$f});
-        }
-        # セッションの記録がその作業フォルダのものか(いまの作業フォルダは鍵でも比べる。kp_session_id と同じ規則)
-        sub in_folder {
-            my ($s, $fid) = @_;
-            return 1 if norm(str($s->{folder})) eq $fid;
-            return $fid eq $me_id && str($s->{folder_key}) eq $me_key;
-        }
+        my $ix = active_index(load_dir("$state/issues"));
         # 返答している途中か(記録の responding が真。欄が無い記録は返答していないとみなす)
         sub responding { my $v = $_[0]->{responding}; JSON::PP::is_bool($v) && $v }
-        sub by_start { (str($a->{started_at}) || 0) <=> (str($b->{started_at}) || 0) or str($a->{session_id}) cmp str($b->{session_id}) }
         sub brief { my $s = shift; +{ map { $_ => $s->{$_} } qw(session_id started_at last_seen) } }
 
         # folder_conflict(作業中のセッションだけ。要件3.6・5.1)
         my @conflict = map { brief($_) }
             sort by_start grep { in_folder($_, $me_id) && str($_->{session_id}) ne $sid
-                && is_active($_, \%issue_by_sid, \%issue_by_folder) } @sessions;
+                && is_active($_, $ix) } @sessions;
 
         # leftovers
         my %handed = map { (norm(str($_)) => 1) } (ref $iss && ref $iss->{handed_over_from} eq "ARRAY" ? @{ $iss->{handed_over_from} } : ());
@@ -542,7 +611,7 @@ kp_session_check_start() {
             }
             next unless %kind;
             my ($active) = sort by_start
-                grep { in_folder($_, $fid) && str($_->{session_id}) ne $sid && is_active($_, \%issue_by_sid, \%issue_by_folder) } @sessions;
+                grep { in_folder($_, $fid) && str($_->{session_id}) ne $sid && is_active($_, $ix) } @sessions;
             push @leftovers, {
                 folder => $w->{path},
                 is_self => ($fid eq $me_id ? JSON::PP::true : JSON::PP::false),
@@ -564,10 +633,8 @@ kp_session_check_start() {
 
         # capacity(作業中のセッションのうち、返答している途中のものだけ)
         my @active;
-        for my $s (sort by_start grep { str($_->{session_id}) ne $sid && is_active($_, \%issue_by_sid, \%issue_by_folder) && responding($_) } @sessions) {
-            my $id = str($s->{session_id});
-            my $issue = length $id && exists $issue_by_sid{$id} ? $issue_by_sid{$id} : $issue_by_folder{ norm(str($s->{folder})) };
-            push @active, { issue => $issue, folder => $s->{folder}, last_seen => $s->{last_seen} };
+        for my $s (sort by_start grep { str($_->{session_id}) ne $sid && is_active($_, $ix) && responding($_) } @sessions) {
+            push @active, { issue => issue_of($s, $ix), folder => $s->{folder}, last_seen => $s->{last_seen} };
         }
 
         print JSON::PP->new->utf8->canonical->encode({
@@ -576,7 +643,11 @@ kp_session_check_start() {
             branch_only => \@branch_only,
             capacity => { limit => $limit + 0, active => \@active },
         }), "\n";
-    ' -- "$state" "$n" "$sid" "$limit" "$me" "$key" "$ic" "$gone_sessions" || exit 69
+    ' -- "$state" "$n" "$sid" "$limit" "$me" "$key" "$ic" "$gone_sessions") \
+        || _kp_ss_die69 "[parallel] 調べられない: Issue #$n の記録と作業フォルダを読めない"
+    # 錠を返してから JSON を出す
+    _kp_ss_unlock
+    printf '%s\n' "$out"
 }
 
 kp_session_claim() {

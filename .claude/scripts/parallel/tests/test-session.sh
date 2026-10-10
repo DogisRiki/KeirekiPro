@@ -891,6 +891,62 @@ t_no_docker_in_check_start() {
 }
 
 # =====================================================================
+# 記録の錠(session-overlap-guard 要件3.1)
+# =====================================================================
+LOCK="$STATE/records.lock"
+
+# sleep を待たずに終える偽物(錠を待つ150回の試しを、待ち時間なしで流す)
+mkdir -p "$TMP_ROOT/fastsleep"
+printf '#!/bin/bash\nexit 0\n' >"$TMP_ROOT/fastsleep/sleep"
+chmod +x "$TMP_ROOT/fastsleep/sleep"
+
+t_lock_held_refused() {
+    local out err rc start
+    put_spec "$WT_DIR" beta 42
+    # ほかのセッションが持っている錠(60秒より新しい)
+    mkdir -p "$LOCK"
+    start=$SECONDS
+    out=$(PATH="$TMP_ROOT/fastsleep:$PATH" ss "$MAIN_DIR" check-start 42 --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    err=$(cat "$WORK/err.txt")
+    [ "$rc" = 69 ] || die "錠がほかに持たれたままなのに終了コードが69でない: $rc: $out $err"
+    [ -z "$out" ] || die "錠を取れないのに JSON を出した: $out"
+    case "$err" in *'[parallel]'*records.lock*) ;; *) die "標準エラーに [parallel] で始まる錠の理由が無い: $err" ;; esac
+    [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
+    [ $((SECONDS - start)) -le 20 ] || die "錠を待つのに20秒より長くかかった: $((SECONDS - start))秒"
+}
+
+t_lock_stale_broken() {
+    local out
+    # 60秒より古い錠は、持ち主が落ちて残ったものとみなして壊し、取り直す
+    mkdir -p "$LOCK"
+    perl -e 'my $t = time - 120; utime $t, $t, $ARGV[0] or die "utime: $!\n"' "$LOCK" || die "錠の時刻を古くできない"
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "古い錠があると check-start が成り立たない: $out"
+    [ ! -e "$LOCK" ] || die "check-start が錠を返していない"
+    # 錠が無いときも、終わったあとに錠を残さない
+    out=$(check_start "$WT_DIR" check-start 42 --session s-me) || die "$out"
+    [ ! -e "$LOCK" ] || die "check-start が錠を返していない(錠が無かったとき)"
+}
+
+t_lock_released_on_failure() {
+    local real_perl out rc
+    real_perl=$(command -v perl)
+    mkdir -p "$TMP_ROOT/perlfail"
+    # check-start の調べの perl(folder_conflict を出すもの)だけが失敗する perl
+    cat >"$TMP_ROOT/perlfail/perl" <<EOF
+#!/bin/bash
+case "\$*" in *folder_conflict*) echo "fake perl failure" >&2; exit 1 ;; esac
+exec "$real_perl" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/perlfail/perl"
+    out=$(PATH="$TMP_ROOT/perlfail:$PATH" ss "$MAIN_DIR" check-start 42 --session s-me 2>/dev/null)
+    rc=$?
+    [ "$rc" = 69 ] || die "調べが失敗したのに終了コードが69でない: $rc: $out"
+    [ -z "$out" ] || die "調べが失敗したのに JSON を出した: $out"
+    [ ! -e "$LOCK" ] || die "調べが失敗したときに錠を残した"
+}
+
+# =====================================================================
 # takeover(要件1.1・1.2・4.3〜4.6)
 # =====================================================================
 # 作業フォルダのいまのブランチ(detached なら空)
@@ -1191,6 +1247,11 @@ run_test "claim がIssueの記録を書き、すでにあれば書き直す" t_c
 run_test "claim は誤った呼び方で記録を書かない" t_claim_usage
 run_test "spec-names がほかの worktree の spec の名前も出す" t_spec_names
 run_test "check-start・claim・spec-names は docker を呼ばない" t_no_docker_in_check_start
+
+echo "--- 記録の錠(session-overlap-guard 要件3.1)"
+run_test "錠がほかに持たれたままなら check-start は終了コード69で終わり、その錠を消さない" t_lock_held_refused
+run_test "60秒より古い錠は壊して取り直し、check-start は錠を返して終わる" t_lock_stale_broken
+run_test "錠の中の調べが失敗したら、check-start は終了コード69で終わり、錠を残さない" t_lock_released_on_failure
 
 echo "--- prune(要件4.5)"
 run_test "prune は、作業フォルダが残っている記録を変えず、片付けるものが無ければ docker を呼ばない" t_prune_callable
