@@ -12,11 +12,13 @@
 #   FAKE_DB_EXISTS     指定すると、鍵の DB があることにする
 #   FAKE_PSQL_RC       DB があるかの確かめ(psql)の終了コード(既定0)
 #   FAKE_RUN_RC_<サービス>  そのサービスの compose run -d の終了コード(既定0)
+#   FAKE_RUN_FAIL_NAME その名前のコンテナの compose run -d を終了コード1で失敗させる
 #   FAKE_CHOWN_RC      chown のコンテナの終了コード(既定0)
 #   FAKE_VOLUMES       ボリュームの有無を表すフォルダ(volume inspect/create/rm)
 # 偽物の curl は、$FAKE_CURL_OK のファイルがあるときだけ成功する。
 # frontend の TCP の確かめ(_kp_ui_tcp_open)は、start の流れのテストでは、ui.sh を読み込んで
-# $FAKE_TCP_OK のファイルを見る関数に差し替える。関数そのものは、本物の perl の待ち受けで確かめる。
+# $FAKE_TCP_OK のファイルを見る関数に差し替える。$FAKE_TCP_NG のファイルに書いたポートは、
+# $FAKE_TCP_OK があってもつながらないことにする。関数そのものは、本物の perl の待ち受けで確かめる。
 # 前提: bash・perl(JSON::PP)・git。ホストの Git Bash から流す。本物の docker には触れない。
 # =====================================================================
 set -u
@@ -137,10 +139,15 @@ while [ $# -gt 0 ]; do
     esac
 done
 printf '%s\n' "${all[@]}" >"$FAKE_RUNS/$svc.args"
+printf '%s\n' "${all[@]}" >"$FAKE_RUNS/$name.args"
 rcvar="FAKE_RUN_RC_$svc"
 if [ "${!rcvar:-0}" != 0 ]; then
     echo "fake: $svc のコンテナを作れない" >&2
     exit "${!rcvar}"
+fi
+if [ "$name" = "${FAKE_RUN_FAIL_NAME:-}" ]; then
+    echo "fake: $name のコンテナを作れない" >&2
+    exit 1
 fi
 printf '%s\n' "${labels[@]}" >"$FAKE_CONTAINERS/$name"
 printf '%s\n' "$name"
@@ -165,6 +172,7 @@ export FAKE_CURL_LOG="$WORK/curl.log"
 export FAKE_CURL_OK="$WORK/curl.ok"
 export FAKE_TCP_LOG="$WORK/tcp.log"
 export FAKE_TCP_OK="$WORK/tcp.ok"
+export FAKE_TCP_NG="$WORK/tcp.ng"
 
 # --- 一時的なリポジトリと worktree
 MAIN_DIR="$WORK/RepoMain"
@@ -233,7 +241,7 @@ ui() {
     OUT=$(cd "$dir" && bash -c '
         . "$1" || exit 97
         shift
-        _kp_ui_tcp_open() { printf "%s\n" "$1" >>"$FAKE_TCP_LOG"; [ -f "$FAKE_TCP_OK" ]; }
+        _kp_ui_tcp_open() { printf "%s\n" "$1" >>"$FAKE_TCP_LOG"; [ -f "$FAKE_TCP_OK" ] && ! grep -qx "$1" "$FAKE_TCP_NG" 2>/dev/null; }
         kp_ui_main "$@"
     ' _ "$UI" "$@" 2>&1)
     RC=$?
@@ -258,9 +266,10 @@ reset_state() {
     mkdir -p "$FAKE_RUNS"
     : >"$FAKE_CURL_OK"
     : >"$FAKE_TCP_OK"
+    rm -f "$FAKE_TCP_NG"
     for s in db redis localstack dind; do : >"$FAKE_SERVICES/$s"; done
     git -C "$MAIN_DIR" config --unset keirekipro.parallelSlots 2>/dev/null
-    unset FAKE_UP_RC FAKE_DB_EXISTS FAKE_PSQL_RC FAKE_RUN_RC_backend FAKE_RUN_RC_frontend FAKE_CHOWN_RC
+    unset FAKE_UP_RC FAKE_DB_EXISTS FAKE_PSQL_RC FAKE_RUN_RC_backend FAKE_RUN_RC_frontend FAKE_RUN_FAIL_NAME FAKE_CHOWN_RC
     unset KP_WAIT_LIMIT_SECONDS KP_WAIT_INTERVAL_SECONDS KP_SESSION_ID
     unset KP_UI_BACKEND_TRIES KP_UI_BACKEND_INTERVAL_SECONDS KP_UI_FRONTEND_TRIES KP_UI_FRONTEND_INTERVAL_SECONDS
 }
@@ -303,32 +312,51 @@ t_start_args() {
         || die "鍵の DB があるかを確かめていない: $(cat "$FAKE_DOCKER_LOG")"
     grep -qxF "$WT|compose -p keirekipro exec -T db psql -U postgres -c CREATE DATABASE kp_$KW" "$FAKE_DOCKER_LOG" \
         || die "鍵の DB を作っていない: $(cat "$FAKE_DOCKER_LOG")"
-    json='{"spring":{"datasource":{"url":"jdbc:postgresql://db:5432/kp_'"$KW"'"}},"frontend-base-url":"http://host.docker.internal:15175","cors":{"allowed-origins":"http://host.docker.internal:15175"}}'
+    json='{"spring":{"datasource":{"url":"jdbc:postgresql://db:5432/kp_'"$KW"'"}},"frontend-base-url":"http://host.docker.internal:15175","cors":{"allowed-origins":"http://host.docker.internal:15175,http://localhost:25175"}}'
     be="$WT|compose -p keirekipro -f compose.yaml run -d --no-deps --name kp-ui-2-backend -p 18082:8080 --label keirekipro.slot=2 --label keirekipro.folder=$KW --label keirekipro.kind=ui -v kp-gradle-home-2:/root/.gradle -v kp-gradle-project-$KW:/home/spring/app/.gradle -e SPRING_APPLICATION_JSON=$json backend ./gradlew bootRun --args=--spring.profiles.active=dev"
     grep -qxF "$be" "$FAKE_DOCKER_LOG" || die "backend の起動の形が違う: $(run_lines)"
     grep -qxF -- "SPRING_APPLICATION_JSON=$json" "$FAKE_RUNS/backend.args" \
         || die "SPRING_APPLICATION_JSON が1つの引数で渡っていない: $(cat "$FAKE_RUNS/backend.args")"
     fe="$WT|compose -p keirekipro -f compose.yaml run -d --no-deps --name kp-ui-2-frontend -p 15175:5173 --label keirekipro.slot=2 --label keirekipro.folder=$KW --label keirekipro.kind=ui -v kp-nm-$KW:/home/node/app/node_modules -v kp-pnpm-store-2:/pnpm-store -e KP_LOCK_HASH=$(lock_hash "$WT_DIR") -e VITE_API_URL=http://host.docker.internal:18082/api/ frontend sh -c "
-    case "$(grep -F -- '--name kp-ui-2-frontend' "$FAKE_DOCKER_LOG")" in
+    case "$(grep -F -- '--name kp-ui-2-frontend -p' "$FAKE_DOCKER_LOG")" in
         "$fe"*) ;;
         *) die "frontend の起動の形が違う: $(run_lines)" ;;
     esac
-    script=$(arg_after frontend -c)
+    script=$(arg_after kp-ui-2-frontend -c)
     case "$script" in
-        *"pnpm install --frozen-lockfile --store-dir /pnpm-store"*"pnpm run dev") ;;
-        *) die "frontend のコンテナの中で node_modules を確かめてから pnpm run dev を動かしていない: '$script'" ;;
+        *"pnpm install --frozen-lockfile --store-dir /pnpm-store"*"mkdir -p node_modules/.vite; exec pnpm run dev") ;;
+        *) die "frontend のコンテナの中で node_modules を確かめ、.vite を作ってから pnpm run dev を動かしていない: '$script'" ;;
     esac
     grep -qF -- "-fsS http://localhost:18082/actuator/health" "$FAKE_CURL_LOG" || die "backend の健康を確かめていない: $(cat "$FAKE_CURL_LOG")"
     grep -qx 15175 "$FAKE_TCP_LOG" || die "frontend に TCP でつながるかを確かめていない: $(cat "$FAKE_TCP_LOG")"
     printf '%s\n' "$OUT" | grep -qxF '[parallel] 画面確認の URL: http://host.docker.internal:15175' || die "画面確認の URL が無い: $OUT"
     printf '%s\n' "$OUT" | grep -qF 'http://host.docker.internal:18082' || die "backend の URL が無い: $OUT"
-    awk '/CREATE DATABASE/ { d = 1 } /kp-ui-2-backend/ && d { b = 1 } /kp-ui-2-frontend/ && b { ok = 1 } END { exit !ok }' "$FAKE_DOCKER_LOG" \
+    awk '/CREATE DATABASE/ { d = 1 } /kp-ui-2-backend/ && d { b = 1 } /kp-ui-2-frontend -p/ && b { ok = 1 } END { exit !ok }' "$FAKE_DOCKER_LOG" \
         || die "DB を作る・backend・frontend の順でない: $(cat "$FAKE_DOCKER_LOG")"
+    # 所有者が開く frontend: 枠の .vite のボリュームを重ね、backend を localhost で呼ぶ
+    grep -qxF "$WT|compose -p keirekipro -f compose.yaml run --rm --no-deps -T -u root --label keirekipro.slot=2 -v kp-vite-owner-2:/vite-owner --entrypoint chown frontend node:node /vite-owner" "$FAKE_DOCKER_LOG" \
+        || die "所有者が開く frontend の .vite のボリュームの持ち主を変えていない: $(cat "$FAKE_DOCKER_LOG")"
+    fe="$WT|compose -p keirekipro -f compose.yaml run -d --no-deps --name kp-ui-2-frontend-owner -p 25175:5173 --label keirekipro.slot=2 --label keirekipro.folder=$KW --label keirekipro.kind=ui -v kp-nm-$KW:/home/node/app/node_modules -v kp-pnpm-store-2:/pnpm-store -e KP_LOCK_HASH=$(lock_hash "$WT_DIR") -v kp-vite-owner-2:/home/node/app/node_modules/.vite -e VITE_API_URL=http://localhost:18082/api/ frontend sh -c "
+    case "$(grep -F -- '--name kp-ui-2-frontend-owner' "$FAKE_DOCKER_LOG")" in
+        "$fe"*) ;;
+        *) die "所有者が開く frontend の起動の形が違う: $(run_lines)" ;;
+    esac
+    script=$(arg_after kp-ui-2-frontend-owner -c)
+    case "$script" in
+        *"pnpm install --frozen-lockfile --store-dir /pnpm-store"*"; exec pnpm run dev") ;;
+        *) die "所有者が開く frontend のコンテナの中で pnpm run dev を動かしていない: '$script'" ;;
+    esac
+    # 画面確認の frontend に TCP でつながってから、所有者が開く frontend を起動して確かめる
+    [ "$(tr '\n' ' ' <"$FAKE_TCP_LOG")" = "15175 25175 " ] || die "TCP の確かめの順が違う: $(cat "$FAKE_TCP_LOG")"
+    awk '/--name kp-ui-2-frontend -p/ { f = 1 } /--name kp-ui-2-frontend-owner/ && f { ok = 1 } END { exit !ok }' "$FAKE_DOCKER_LOG" \
+        || die "画面確認の frontend より先に所有者が開く frontend を起動した: $(cat "$FAKE_DOCKER_LOG")"
+    printf '%s\n' "$OUT" | grep -qxF '[parallel] 所有者が開く URL: http://localhost:25175' || die "所有者が開く URL が無い: $OUT"
     # 起動したあとも枠を持ち続け、持ち主は --session のセッションになる
     [ "$(owner_get 2 kind)" = ui ] || die "枠2の種類が ui でない: $(cat "$STATE/slots/2/owner.json")"
     [ "$(owner_get 2 folder_key)" = "$KW" ] || die "枠2の持ち主が worktree でない"
     [ "$(owner_get 2 session_id)" = s-wt ] || die "--session の値が枠の持ち主に渡っていない: $(cat "$STATE/slots/2/owner.json")"
-    [ -f "$FAKE_CONTAINERS/kp-ui-2-backend" ] && [ -f "$FAKE_CONTAINERS/kp-ui-2-frontend" ] || die "コンテナを残していない"
+    [ -f "$FAKE_CONTAINERS/kp-ui-2-backend" ] && [ -f "$FAKE_CONTAINERS/kp-ui-2-frontend" ] \
+        && [ -f "$FAKE_CONTAINERS/kp-ui-2-frontend-owner" ] || die "コンテナを残していない"
     if grep -q "^$MAIN|" "$FAKE_DOCKER_LOG"; then
         die "本体フォルダで docker を呼んだ: $(cat "$FAKE_DOCKER_LOG")"
     fi
@@ -399,6 +427,7 @@ t_stop_own_only() {
     put_owner 3 "$WT" "$KW" check "$(now)" s-wt
     put_container kp-ui-1-backend keirekipro.slot=1 "keirekipro.folder=$KW" keirekipro.kind=ui
     put_container kp-ui-1-frontend keirekipro.slot=1 "keirekipro.folder=$KW" keirekipro.kind=ui
+    put_container kp-ui-1-frontend-owner keirekipro.slot=1 "keirekipro.folder=$KW" keirekipro.kind=ui
     put_container kp-ui-2-backend keirekipro.slot=2 "keirekipro.folder=$KM" keirekipro.kind=ui
     put_container kp-ui-2-frontend keirekipro.slot=2 "keirekipro.folder=$KM" keirekipro.kind=ui
     # 同じ作業フォルダの品質チェックのコンテナ(kind のラベルが無い)
@@ -406,6 +435,7 @@ t_stop_own_only() {
     ui_direct "$WT_DIR/backend" stop
     [ "$RC" = 0 ] || die "終了コード $RC: $OUT"
     [ ! -f "$FAKE_CONTAINERS/kp-ui-1-backend" ] && [ ! -f "$FAKE_CONTAINERS/kp-ui-1-frontend" ] \
+        && [ ! -f "$FAKE_CONTAINERS/kp-ui-1-frontend-owner" ] \
         || die "いまの作業フォルダの画面確認のコンテナを消していない: $(ls "$FAKE_CONTAINERS")"
     [ -f "$FAKE_CONTAINERS/kp-ui-2-backend" ] && [ -f "$FAKE_CONTAINERS/kp-ui-2-frontend" ] \
         || die "ほかの作業フォルダの開発サーバを消した"
@@ -454,6 +484,18 @@ t_health_limit() {
     grep -qxF "$WT|logs --tail 50 kp-ui-1-frontend" "$FAKE_DOCKER_LOG" || die "frontend: ログの末尾を出していない"
     [ -z "$(ls "$FAKE_CONTAINERS")" ] || die "frontend: 自分のコンテナを消していない: $(ls "$FAKE_CONTAINERS")"
     [ ! -d "$STATE/slots/1" ] || die "frontend: 枠を返していない"
+    # 所有者が開く frontend に TCP でつながらないときも同じ
+    reset_state
+    echo 25174 >"$FAKE_TCP_NG"
+    export KP_UI_FRONTEND_TRIES=2 KP_UI_FRONTEND_INTERVAL_SECONDS=0
+    ui "$WT_DIR" start
+    [ "$RC" = 69 ] || die "所有者: 期待 69 / 実際 $RC: $OUT"
+    [ "$(grep -cx 25174 "$FAKE_TCP_LOG")" = 2 ] || die "所有者: TCP の確かめの回数が上限どおりでない: $(cat "$FAKE_TCP_LOG")"
+    grep -qxF "$WT|logs --tail 50 kp-ui-1-frontend-owner" "$FAKE_DOCKER_LOG" || die "所有者: ログの末尾を出していない"
+    case "$OUT" in *"[parallel] 検査できない: 所有者が開く frontend"*) ;; *) die "所有者: 理由の文が無い: $OUT" ;; esac
+    case "$OUT" in *"URL: "*) die "所有者: 起動しなかったのに URL を出した: $OUT" ;; esac
+    [ -z "$(ls "$FAKE_CONTAINERS")" ] || die "所有者: 自分のコンテナを消していない: $(ls "$FAKE_CONTAINERS")"
+    [ ! -d "$STATE/slots/1" ] || die "所有者: 枠を返していない"
 }
 
 t_run_fail() {
@@ -464,6 +506,24 @@ t_run_fail() {
     [ ! -f "$FAKE_CONTAINERS/kp-ui-1-backend" ] || die "起動した backend を消していない"
     [ ! -d "$STATE/slots/1" ] || die "枠を返していない"
     [ ! -s "$FAKE_CURL_LOG" ] || die "起動しなかったのに健康を確かめた"
+    # 所有者が開く frontend を起動できないときも69で、起動したコンテナを消す
+    reset_state
+    export FAKE_RUN_FAIL_NAME=kp-ui-1-frontend-owner
+    ui "$WT_DIR" start
+    [ "$RC" = 69 ] || die "所有者: 期待 69 / 実際 $RC: $OUT"
+    case "$OUT" in *"[parallel] 検査できない: 所有者が開く frontend の開発サーバを起動できない"*) ;; *) die "所有者: 理由の文が無い: $OUT" ;; esac
+    [ -z "$(ls "$FAKE_CONTAINERS")" ] || die "所有者: 起動したコンテナを消していない: $(ls "$FAKE_CONTAINERS")"
+    [ ! -d "$STATE/slots/1" ] || die "所有者: 枠を返していない"
+    # .vite のボリュームの持ち主を変えられないときも69
+    reset_state
+    : >"$FAKE_VOLUMES/kp-pnpm-store-1"
+    export FAKE_CHOWN_RC=1
+    ui "$WT_DIR" start
+    [ "$RC" = 69 ] || die ".vite: 期待 69 / 実際 $RC: $OUT"
+    case "$OUT" in *"[parallel] 検査できない: "*kp-vite-owner-1*) ;; *) die ".vite: 理由の文が無い: $OUT" ;; esac
+    [ ! -e "$FAKE_VOLUMES/kp-vite-owner-1" ] || die ".vite: 持ち主を変えられなかったボリュームを残した"
+    [ -z "$(ls "$FAKE_CONTAINERS")" ] || die ".vite: 起動したコンテナを消していない: $(ls "$FAKE_CONTAINERS")"
+    [ ! -d "$STATE/slots/1" ] || die ".vite: 枠を返していない"
     # DB を確かめられないときも、コンテナを作らずに69
     reset_state
     export FAKE_PSQL_RC=1
@@ -550,7 +610,7 @@ t_usage() {
 }
 
 echo "--- 画面にそのセッションの変更が出る(要件2.2)"
-run_test "start で、枠 k のポートと鍵の DB と host.docker.internal の VITE_API_URL と SPRING_APPLICATION_JSON が docker に渡る" t_start_args
+run_test "start で、枠 k のポートと鍵の DB と host.docker.internal の VITE_API_URL と SPRING_APPLICATION_JSON が docker に渡り、所有者が開く frontend は localhost の VITE_API_URL で起動する" t_start_args
 run_test "frontend の準備は run-check.sh の関数で、枠のラベルを付けた root のコンテナでストアのボリュームの持ち主を変える" t_store_volume_chown
 run_test "鍵の DB があれば作らない" t_db_exists
 run_test "止まっている共有のサービスだけを本体フォルダで起こし、起こせなければ終了コード69で枠を取らない" t_shared_services_up
