@@ -20,7 +20,8 @@ bash .claude/scripts/parallel/ui.sh start --session <ID>
    - `ui.sh` は、いまの作業フォルダ(worktree のセッションでは worktree の最上位)を読み込んだ backend と frontend のdevサーバを、1回きりのコンテナで起動する。Claude は、起動したままの常駐コンテナの中でdevサーバを起動しない
    - Claude は、セッションのIDを、SessionStart のフックが渡した `[parallel] このセッションのID` の文から取る。文が見つからなければ、`--session` を付けずに呼ぶ
    - `ui.sh` は、backend の `actuator/health` が200を返し、frontend に TCP でつながるまで待ってから、終了コード0で終わる。最初の1回は、Gradle のライブラリの取得と `pnpm install` が走るので数分かかる(2026-10-05 の本体フォルダでの最初の1回は約3分)。健康の確かめが上限まで続くと、Bash を前面で動かすときの上限600秒を超えるおそれがあるので、Claude は、`--wait` を付けないときも Bash の `run_in_background` で呼び、`timeout` を2400000ミリ秒にする(健康の確かめだけで最大約1230秒かかり、その前の DB の確かめとコンテナの起動の時間も加わるため)
-   - 終了コード0のとき、`ui.sh` は `[parallel] 画面確認の URL: http://host.docker.internal:<ポート>` と `[parallel] backend の URL: ...` を出す。ポートは枠ごとに変わるので、Claude は URL を決め打ちせず、この出力から取る
+   - 終了コード0のとき、`ui.sh` は `[parallel] 画面確認の URL: http://host.docker.internal:<ポート>` と `[parallel] backend の URL: ...` と `[parallel] 所有者が開く URL: http://localhost:<ポート>` を出す。ポートは枠ごとに変わるので、Claude は URL を決め打ちせず、この出力から取る
+   - 所有者が画面を自分のブラウザで開くときは、Claude は「所有者が開く URL」(`localhost`)を伝える。`host.docker.internal` の URL は伝えない。作業PCの `host.docker.internal` は、Docker Desktop が hosts ファイルに書いたアドレス(Windows では Wi-Fi などのアドレス)を指し、ネットワークの状態に左右されるためである。所有者が開く画面は、`ui.sh stop` を呼ぶまで開ける
    - 終了コードが0でないときは、下の「順番待ちと検査できないとき」に従う
 
 2. Playwright MCPで、手順1で出された画面確認の URL を開き、**変更した画面**へ遷移する。Playwright のブラウザは別のコンテナで動くので、`localhost` ではなく出された `host.docker.internal` の URL をそのまま使う。
