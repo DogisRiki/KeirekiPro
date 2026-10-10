@@ -273,16 +273,16 @@ t_worktree_folder() {
     [ "$(get "$f" folder)" = "$WT" ] || die "folder が worktree でない: $(get "$f" folder)"
     [ "$(get "$f" folder_key)" = "$(key_of "$WT")" ] || die "folder_key が worktree の鍵でない: $(cat "$f")"
     [ "$(get "$f" folder_key)" != "$(key_of "$MAIN")" ] || die "worktree と本体フォルダの鍵が同じになった"
-    # lib.sh の kp_session_id が、worktree ではこの記録のIDを返し、本体フォルダでは返さない
-    # shellcheck source=.claude/scripts/parallel/lib.sh
-    [ "$(cd "$WT" && . "$LIB" && kp_session_id)" = s-wt ] || die "worktree の kp_session_id がこの記録のIDでない"
-    # shellcheck source=.claude/scripts/parallel/lib.sh
-    [ -z "$(cd "$MAIN" && . "$LIB" && kp_session_id)" ] || die "本体フォルダの kp_session_id が worktree の記録のIDを返した"
     # 返答を終えたときも、worktree の記録を書き直す
     call_hook UserPromptSubmit s-wt "$WT/sub/dir" prompt hi
     call_hook Stop s-wt "$WT/sub/dir"
     expect_rc0
     expect_responding "$f" false "worktree の下のディレクトリからの Stop"
+    # lib.sh の kp_session_id が、worktree ではこの記録のIDを返し、本体フォルダでは返さない
+    # shellcheck source=.claude/scripts/parallel/lib.sh
+    [ "$(cd "$WT" && . "$LIB" && kp_session_id)" = s-wt ] || die "worktree の kp_session_id がこの記録のIDでない"
+    # shellcheck source=.claude/scripts/parallel/lib.sh
+    [ -z "$(cd "$MAIN" && . "$LIB" && kp_session_id)" ] || die "本体フォルダの kp_session_id が worktree の記録のIDを返した"
 }
 
 t_subdir_and_backslash_cwd() {
