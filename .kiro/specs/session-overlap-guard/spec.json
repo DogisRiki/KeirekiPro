@@ -1,0 +1,46 @@
+{
+  "feature_name": "session-overlap-guard",
+  "issue": 507,
+  "created_at": "2026-10-11T00:26:17+09:00",
+  "updated_at": "2026-10-11T12:38:49+09:00",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-11T00:56:37+09:00"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-11T12:18:58+09:00"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-11T12:38:49+09:00"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-11T01:24:27+09:00",
+      "issues": [507],
+      "revoked_at": "2026-10-11T11:12:35+09:00",
+      "revoked_for": "タスク2.1のレビューで見つかった design への差し戻し: check-spec の判定(-U0 の差分を逆向きに当てる)が、行を消しただけの変更と、ずれた位置で一致する書き換えを main に入っていると取り違える"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-11T01:49:20+09:00",
+      "issues": [507],
+      "revoked_at": "2026-10-11T11:12:35+09:00",
+      "revoked_for": "design の承認の取り消しに伴う後続の段階の取り消し"
+    }
+  ]
+}
