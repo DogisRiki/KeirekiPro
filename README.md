@@ -339,7 +339,7 @@ flowchart LR
 |---|---|---|
 | 0 | `/request` | 要望の壁打ちを始める。AIが調べたうえで、決めることが尽きるまで推奨を添えて聞き、決まったことを記録する。最後に要望のIssue案を見せ、了承すると起票する |
 | 1 | `/start #Issue番号` | Issueに着手させる。AIがIssueの本文とその時点のコードを調べて進め方を決め、判断と理由を知らせる。仕様書が要らなければ、AIは返事を待たずに実装し、プルリクエストを出す。AIが決められないことがあれば、推奨を付けた問いを1回出し、答えを待つ。答えはAIがIssueの本文の「決めた方式」に書き足し、そのあと実装する |
-| 2 | `/kiro-spec-init #Issue番号` | AIに頼まれたときに打つ。AIがIssueを読んで説明文を組み立て、`.kiro/specs/{feature名}/` を用意してfeature名を知らせる。すでにある仕様書を新しいIssueのために直すときは、AIに頼まれた `/kiro-spec-init #Issue番号 {既存のfeature名}` を打つ。その仕様書の承認は取り消され、要件から作り直す |
+| 2 | `/kiro-spec-init #Issue番号` | AIに頼まれたときに打つ。AIがIssueを読んで説明文を組み立て、`.kiro/specs/{feature名}/` を用意してfeature名を知らせる。すでにある仕様書を新しいIssueのために直すときは、AIに頼まれた `/kiro-spec-init #Issue番号 {既存のfeature名}` を打つ。その仕様書の承認は取り消され、要件から作り直す。ほかのセッションが同じ仕様書を直しているときは、AIは仕様書を書き換えずに止まり、そのセッションをやめたかを尋ねる |
 | 3 | `/kiro-spec-requirements {feature名}` | AIが要件(requirements.md)を書き、別のAIがレビューする → 要件とレビュー結果を確認する |
 | 4 | `/kiro-spec-design {feature名}` | 要件を承認したことになり、AIが設計(design.md)を書き、別のAIがレビューする → 設計とレビュー結果を確認する |
 | 5 | `/kiro-spec-tasks {feature名}` | 設計を承認したことになり、AIがタスク(tasks.md)を書き、別のAIがレビューする → タスクとレビュー結果を確認する |

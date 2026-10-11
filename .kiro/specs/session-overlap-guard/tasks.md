@@ -70,7 +70,7 @@
   - _対象の部品: kiro-spec-init スキルの変更_
   - _依存: 2.3_
 
-- [ ] 3.3 README の `/kiro-spec-init` の行を書き足す (並行可)
+- [x] 3.3 README の `/kiro-spec-init` の行を書き足す (並行可)
 
   Claude は、部品「README の変更」のとおりに、`README.md` のコマンドの一覧の `/kiro-spec-init` の行に、ほかのセッションが同じ仕様書を直しているときは書き換えずに止まり、そのセッションをやめたかを尋ねることを書き足す。
   - 完了の確かめ方: README のコマンドの一覧の `/kiro-spec-init` の行に、書き足した文がある
