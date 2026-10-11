@@ -37,7 +37,7 @@ Claude は、`check-start` に着手の予約の書き込みを足し、`claim` 
 - `lib.sh` の `_kp_lock`(`mkdir` で取る錠。取れるまで0.1秒ごとに最大150回試し、60秒より古い錠は壊して取り直す)、`kp_state_dir` `kp_folder` `kp_session_id` `kp_json_get` `kp_json_write` `kp_live_folders` `kp_folder_gone`
 - `session.sh` の `end`(所有者が「やめた」と答えたセッションの記録を消す)と `takeover`
 - `/start` の Step 1.5 の表(JSON の欄ごとの問いと、答えに応じて呼ぶサブコマンド)
-- git の `apply --cached --check -R --unidiff-zero`、`diff -U0`、`merge-base`、`read-tree`、`add -A`、`write-tree`、`commit-tree`、`merge`
+- git の `diff -U0`、`diff --name-only`、`cat-file`、`merge-base`、`read-tree`、`add -A`、`write-tree`、`commit-tree`、`merge`
 - 依存の向き: スキルは `session.sh` を呼ぶ。`session.sh` は `lib.sh` を読み込む。`session.sh` はスキルとフックを呼ばない
 
 ## 設計を見直すきっかけ
@@ -77,11 +77,11 @@ flowchart LR
     CheckSpec --> Sessions
 ```
 
-選んだ構成: 同じIssueの調べと同じ spec の調べを、どちらも `session.sh` のサブコマンドに置く。どちらの調べも、ほかの作業フォルダの記録と git の状態を読み、所有者とはやり取りしない。所有者への問いと答えの扱いは、今と同じくスキル(`/start` と `/kiro-spec-init`)が受け持つ。
+選んだ構成: 同じIssueの調べと同じ spec の調べを、どちらも `session.sh` のサブコマンドに置く。`check-start` と `check-spec` は、どちらも、ほかの作業フォルダの記録と git の状態を読み、所有者とはやり取りしない。所有者への問いと答えの扱いは、今と同じくスキル(`/start` と `/kiro-spec-init`)が受け持つ。
 
 錠を1つにした理由: `check-start` `claim` `takeover` `check-spec` は、どれも本体の `.git/keirekipro-parallel/` の記録を読んでから書く。読んでから書くまでの間に、ほかのセッションが同じ記録を書くと、片方の書き込みが消える。錠を1つにすれば、記録を読み書きするサブコマンドが同時に1つしか動かない。どのサブコマンドも錠を持つ時間は数秒なので、錠を分けても待ちはほとんど減らない。錠のディレクトリは `.git/keirekipro-parallel/records.lock` に置く。
 
-Claude は、予約を `check-start` に置いた理由と、spec の判定に差分を逆向きに当てる方法を選んだ理由を、research.md の「設計の判断」と「比べた案」に書いた。
+Claude は、予約を `check-start` に置いた理由と、spec の判定に、変更のかたまりを位置で重ねて比べる方法を選んだ理由を、research.md の「設計の判断」と「比べた案」に書いた。
 
 **使う技術**:
 - 実行環境: 作業PCの Git Bash(Windows)か bash(macOS / Linux)、perl の `JSON::PP`、git 2.31 以上。今の `session.sh` と同じである
@@ -94,7 +94,7 @@ Claude が変えるファイル:
 - `.claude/scripts/parallel/tests/test-session.sh`: 「テストの方針」の場合を足す。偽物のリモート(裸のリポジトリ)は、既存の `takeover --branch` のテストと同じ作り方で用意する。裸のリポジトリとは、作業フォルダを持たない git のリポジトリを指す
 - `.claude/skills/start/SKILL.md`: 部品「start スキルの変更」
 - `.claude/skills/kiro-spec-init/SKILL.md`: 部品「kiro-spec-init スキルの変更」
-- `README.md`: `/kiro-spec-init` の行(コマンドの一覧の表の2行目)に、ほかのセッションが同じ仕様書を直しているときは書き換えずに止まることを書き足す
+- `README.md`: 部品「README の変更」。書き足す `/kiro-spec-init` の行は、コマンドの一覧の表の2行目である
 
 ## 処理の流れ
 
@@ -149,7 +149,7 @@ flowchart TD
 
 **役割**: `check-start` は、今の調べに、作りかけの種類 `started` を足す。`check-start` は、調べの結果の `folder_conflict` `leftovers` `branch_only` がすべて空のときに、Issue #N の予約を書く。`check-start` は、所有者とやり取りしない。
 
-**呼び出し方**: `check-start <N> [--session <ID>]`(今と同じ)。標準出力の JSON の形は今と同じで、`leftovers` の要素の `kinds` に `started` が入ることがある。`kinds` の並びは `started` `spec` `changes` `branch` の順にする。
+**呼び出し方**: `check-start <N> [--session <ID>]`(今と同じ)。標準出力の JSON の形は今と同じで、`leftovers` の要素の `kinds` に `started` が入ることがある。`check-start` は、`kinds` の並びを `started` `spec` `changes` `branch` の順にする。
 
 **`started` の判定**: Issueの記録 `issues/<N>.json` があり、次のすべてに当たるとき、`check-start` は、記録の `folder` の作業フォルダの `leftovers` の要素の `kinds` に `started` を入れる。
 
@@ -160,13 +160,13 @@ flowchart TD
 
 `started` を入れた要素の `active_session` には、`check-start` は、`sessions/<記録の session_id>.json` の `session_id` `started_at` `last_seen` を入れる。`started` 以外の種類が無い作業フォルダでも、`check-start` は要素を作る。
 
-**予約の書き込み**: `check-start` は、`prune` を終えたあとに `records.lock` を取り、錠の中で調べと予約を行い、錠を返してから JSON を出す。予約は次のとおりに書く。時刻 `updated_at` は UNIX 秒である。
+**予約の書き込み**: `check-start` は、`prune` を終えたあとに `records.lock` を取り、錠の中で調べと予約を行い、錠を返してから JSON を出す。予約は次のとおりに書く。
 
 - Issueの記録が無いとき: `issue` `folder`(いまの作業フォルダ)`branch`(空)`session_id`(このセッションのID。無ければ空)`updated_at` `handed_over_from`(空の配列)を持つ記録を作る
 - Issueの記録の `folder` がいまの作業フォルダで、`session_id` がこのセッションのIDと同じとき(同じセッションの打ち直し): `updated_at` だけを書き直す
 - それ以外のとき(閉じたセッションの予約や、片付けを待つ記録): `folder` `session_id` `updated_at` を書き直し、`branch` を空にする。`handed_over_from` は残す。この場合に当たるのは、記録のブランチがどの作業フォルダでも開かれておらず、ローカルにもリモートにも無いときだけである。ブランチがあれば、`leftovers` か `branch_only` が空にならないので、`check-start` は予約を書かない
 
-**失敗したとき**: `records.lock` を取れなかったとき(15秒待っても取れないとき)と、予約を書けなかったときは、`check-start` は JSON を出さずに、理由を `[parallel]` で始まる文で標準エラーに出し、終了コード69で終わる。`/start` は、今の決まりのとおり、0でない終了コードで止まって所有者に伝える。
+**失敗したとき**: `records.lock` を取れなかったとき(15秒待っても取れないとき)と、予約を書けなかったときは、`check-start` は JSON を出さずに、理由を `[parallel]` で始まる文で標準エラーに出し、終了コード69で終わる。`/start` は、今の決まりのとおり、0でない終了コードを受けたら止まり、終了コードと標準エラーの文を所有者に伝える。
 
 ### session.sh claim と takeover の変更(着手の記録の書き直しを断る)
 
@@ -179,7 +179,7 @@ flowchart TD
 - 記録の `folder` が空でなく、いまの作業フォルダと違う(比べるときは `core.ignorecase` に従う)
 - 記録の `session_id` が空でなく、このセッションのIDも空でなく、2つが違う
 
-ほかのセッションの記録のとき、`claim` は、`[parallel] 着手できない: Issue #<N> は、別のセッション(作業フォルダ <folder>、セッション <session_id>)が着手したものとして記録されている。` で始まる文を標準エラーに出し、終了コード1で終わる。記録が無いとき、記録の `folder` と `session_id` が空のとき(`prune` が残した記録)、記録がこのセッションのものとき、`claim` は今と同じく書く。
+ほかのセッションの記録のとき、`claim` は、`[parallel] 着手できない: Issue #<N> は、別のセッション(作業フォルダ <folder>、セッション <session_id>)が着手したものとして記録されている。` で始まる文を標準エラーに出し、終了コード1で終わる。記録が無いとき、記録の `folder` と `session_id` が空のとき(`prune` が残した記録)、記録がこのセッションのものであるときは、`claim` は今と同じく記録を書く。
 
 **失敗したとき**: `records.lock` を取れなかったときは、`claim` と `takeover` は、記録を書かずに終了コード69で終わる。
 
@@ -189,32 +189,40 @@ flowchart TD
 
 **役割**: `check-spec` は、ほかの作業中のセッションが spec `<feature>` を直しているかを調べ、結果を JSON で返す。ほかのセッションが直していなければ、`check-spec` は spec の予約を書く。`check-spec` は、所有者とやり取りせず、spec のファイルと作業フォルダの中身を変えない。
 
-**いつ動くか**: `/kiro-spec-init` の更新の形から、`git fetch origin` のあとに呼ばれる。
+**いつ動くか**: Claude は、`/kiro-spec-init` の更新の形で、`git fetch origin` のあとに `check-spec` を呼ぶ。
 
 **呼び出し方**: `check-spec <feature> --issue <N> [--session <ID>]`
 
 - `<feature>` は、英小文字・数字・ハイフンだけの名前でなければならない。名前が違えば、`check-spec` は終了コード64で終わる。`--issue` が無いか数でないときも、`check-spec` は終了コード64で終わる
-- `check-spec` は、標準出力に、`{"conflicts":[...]}` の形の JSON を1行出し、終了コード0で終わる。要素は、直しているほかの作業中のセッションごとに1つで、`folder`(作業フォルダ)`session_id` `started_at` `last_seen` `issue`(そのセッションが着手しているIssueの番号。`issues/` の記録の `session_id` が同じものを先に、無ければ `folder` が同じものを引く。どちらも無ければ `null`)`reason`(`changes` か `starting`)を持つ。`check-spec` は、要素を `started_at` の古い順に並べる
+- `check-spec` は、標準出力に、`{"conflicts":[...]}` の形の JSON を1行出し、終了コード0で終わる。要素は、直しているほかの作業中のセッションごとに1つで、`folder`(作業フォルダ)`session_id` `started_at` `last_seen` `issue` `reason`(`changes` か `starting`)を持つ。`issue` は、そのセッションが着手しているIssueの番号である。`check-spec` は、`issue` に、`issues/` の記録のうち `session_id` が同じ記録の番号を入れる。その記録が無ければ、`check-spec` は、`folder` が同じ記録の番号を入れる。どちらの記録も無ければ、`check-spec` は `issue` を `null` にする。`check-spec` は、要素を `started_at` の古い順に並べる
 
 **手順**:
 
 1. `check-spec` は、`refs/remotes/origin/main` を読む。無ければ、`[parallel] 調べられない: origin/main が手元に無い` を標準エラーに出し、終了コード69で終わる
 2. `check-spec` は `records.lock` を取る
-3. `check-spec` は、`git worktree list --porcelain` の作業フォルダのうち、ディレクトリがあり bare でなく、いまの作業フォルダでないものを1つずつ調べる。その作業フォルダの作業中のセッション(spec `parallel-sessions` の見分け方で作業中のもの。このセッションのIDの記録は除く)が無ければ、`check-spec` はその作業フォルダを飛ばす。要件2の受入基準6(作業中のセッションの無い作業フォルダでは止まらない)は、この飛ばし方で満たす
+3. `check-spec` は、`git worktree list --porcelain` の作業フォルダのうち、ディレクトリがあり bare でなく、いまの作業フォルダでないものを1つずつ調べる。その作業フォルダに作業中のセッションが無ければ、`check-spec` はその作業フォルダを飛ばす。作業中のセッションとは、spec `parallel-sessions` の見分け方で作業中とされるセッションを指す。ただし、`check-spec` は、このセッションのIDの記録を、作業中のセッションに数えない。要件2の受入基準6(作業中のセッションの無い作業フォルダでは止まらない)は、この飛ばし方で満たす
 4. 作業中のセッションがある作業フォルダ W について、`check-spec` は、W が spec `<feature>` を直しているかを次のとおりに判定する
-   1. W の `.kiro/specs/<feature>` が、W の作業フォルダにも W の HEAD の木にも無ければ、W は直していない。HEAD の木とは、W の HEAD のコミットが持つディレクトリとファイルの一覧を指す
-   2. `check-spec` は、W の git のディレクトリに置いた一時的な索引(`GIT_INDEX_FILE`)に W の HEAD を読み込み(`read-tree`)、`add -A -- .kiro/specs/<feature>` で spec のディレクトリだけを載せ、`write-tree` と `commit-tree -p <W の HEAD>` で一時的なコミット S を作る。索引とは、git が次のコミットに載せる中身を置く場所を指す。W の索引と中身は変えない。S はどのブランチにも載せない
-   3. `check-spec` は、S と `origin/main` の分かれ目 M(`git merge-base origin/main S`)を求め、`git diff -U0 --binary --no-renames M S -- .kiro/specs/<feature>` で差分 P を取る。P が空なら、W は直していない
-   4. `check-spec` は、いまの作業フォルダの git のディレクトリに置いた一時的な索引に `origin/main` を読み込み、`git apply --cached --check -R --unidiff-zero` で P を逆向きに当てる。当てられれば、W の変更はすべて main に中身として入っているので、W は直していない。当てられなければ、W は直している(`reason` は `changes`)
-   5. `check-spec` は、一時的な索引と P のファイルを消す
+   1. W の `.kiro/specs/<feature>` が、W の作業フォルダにも W の HEAD の木にも無いときは、`check-spec` は2を行わず、W の HEAD を S とする。HEAD の木とは、W の HEAD のコミットが持つディレクトリとファイルの一覧を指す。W が spec のディレクトリを消してコミットしていても、`check-spec` は、3と4で、その削除が main に入っているかを判定する
+   2. `check-spec` は、W の git のディレクトリに置いた一時的な索引(`GIT_INDEX_FILE`)に W の HEAD を読み込み(`read-tree`)、`add -A -- .kiro/specs/<feature>` で spec のディレクトリだけを載せ、`write-tree` と `commit-tree -p <W の HEAD>` で一時的なコミット S を作る。索引とは、git が次のコミットに載せる中身を置く場所を指す。`check-spec` は、W の索引と中身を変えない。S はどのブランチにも載せない
+   3. `check-spec` は、S と `origin/main` の分かれ目のコミット M(`git merge-base origin/main S`)を求める。`git diff --name-only --no-renames M S -- .kiro/specs/<feature>` の出力が空なら、W は直していない
+   4. `check-spec` は、3で出たファイルごとに、W の変更が `origin/main` に中身として入っているかを、次のとおりに判定する。1つでも入っていないファイルがあれば、W は直している(`reason` は `changes`)。すべて入っていれば、W は直していない
+      - `check-spec` は、`git diff -U0 --diff-algorithm=myers --indent-heuristic --inter-hunk-context=0 --no-renames --no-color --no-ext-diff --no-textconv M S -- <ファイル>` と、同じオプションの `git diff ... M origin/main -- <ファイル>` の `@@` の行から、W の変更のかたまりと main の変更のかたまりを読む。かたまりとは、M のファイルの何行目から何行目までを、どの行に置き換えたかの1組を指す。行を足しただけのかたまりは、M のファイルの行と行の間の位置を持ち、範囲の始まりと終わりが同じ位置になる。`check-spec` は、差分の作り方のオプションを固定し、利用者の git の設定(`diff.algorithm` `diff.indentHeuristic` `diff.interHunkContext` など)でかたまりの区切りが変わらないようにする。`diff.interHunkContext` が置かれていると、`-U0` でも近くのかたまりが1つにまとめられ、判定が「入っている」の側に倒れる(2026-10-11 に手元で確かめた)。`check-spec` は、2つの `git diff` を、環境変数 `GIT_DIFF_OPTS` を外して打つ。`GIT_DIFF_OPTS` はコマンドラインの `-U0` より優先され、置かれていると差分に前後の行が入り、判定が同じ向きに倒れる(2026-10-11 に手元で確かめた)。差分のかたまりの本文に前後の行(空白で始まる行)があれば、`check-spec` は判定できないものとして、終了コード69で終わる
+      - `check-spec` は、W のかたまりごとに、M の行の位置で重なるか接する main のかたまりを集める。重なるとは、2つのかたまりの M の範囲が1行以上共通することを指し、接するとは、一方の範囲の終わりが他方の範囲の始まりと同じ位置にあることを指す。行を足しただけのかたまりどうしが同じ位置にあるときと、行を足しただけのかたまりの位置が他方の範囲の始まりから終わりまで(始まりと終わりの位置を含む)にあるときも、接するとみなす。そのため、行を足しただけのかたまりは、その直前の行を置き換えた main のかたまりにも、直後の行を置き換えた main のかたまりにも接する
+      - 集めた main のかたまりが1つも無ければ、main は W が変えた位置を変えていないので、W の変更は入っていない
+      - W のかたまりが置き換えた M の行(消した行と書き換えた行)のうち、1行でも、集めた main のかたまりの M の範囲に入っていない行があれば、W の変更は入っていない。`check-spec` は、この判定を行の中身で行わず、M の行の位置だけで行う。同じ中身の行(空行など)が近くにあっても、取り違えないためである。行を足しただけの main のかたまりは、M の行を1行も置き換えないので、W の置き換えた行を範囲に入れない
+      - W のかたまりが足した行が、集めた main のかたまりが足した行の中に、同じ順で現れなければ、W の変更は入っていない。現れる行は、続いていなくてもよい
+      - W のかたまりのうち、上の3つのどれかに当たるものが1つも無ければ、W の変更は入っている
+      - ファイルの中身に NUL の文字があるとき(バイナリのファイル)は、`check-spec` は、S と `origin/main` のそのファイルの中身(blob)が同じときだけ、W の変更は入っているとみなす。S と `origin/main` のどちらにもそのファイルが無いときも、`check-spec` は、W の変更は入っているとみなす
+      - M・S・`origin/main` のどれかにファイルが無いときは、`check-spec` はそのファイルを0行の中身として扱う
+   5. `check-spec` は、一時的な索引を消す
 5. `check-spec` は、`specs/<feature>.json`(spec の予約)を読む。予約の `folder` が W で、予約の `session_id` が W の作業中のセッションのIDで、`updated_at` から600秒たっていなければ、W は直している(`reason` は `starting`)。4と5の両方に当たるときは、`check-spec` は `reason` を `changes` にする
 6. 直している作業フォルダ W ごとに、`check-spec` は、W の作業中のセッションをすべて要素にする
 7. 要素が1つも無ければ、`check-spec` は、`specs/<feature>.json` に `feature` `folder`(いまの作業フォルダ)`session_id`(このセッションのID)`issue` `updated_at` を書く。要素があれば、`check-spec` は予約を書かない
 8. `check-spec` は錠を返し、JSON を出す
 
-**状態の持ち方**: spec の予約 `specs/<feature>.json` は、spec ごとに1つで、最後に調べを通ったセッションのものである。予約が意味を持つのは、書いてから600秒の間だけである。600秒は、`/kiro-spec-init` が spec.json と requirements.md を書き終えるまでの時間に余裕を見た長さである。書き終えたあとは、手順4の差分の判定が止める。
+**状態の持ち方**: spec の予約 `specs/<feature>.json` は、spec ごとに1つで、最後に調べを通ったセッションのものである。予約が意味を持つのは、書いてから600秒の間だけである。600秒は、`/kiro-spec-init` が spec.json と requirements.md を書き終えるまでの時間に余裕を見た長さである。spec.json と requirements.md を書き終えたあとは、`check-spec` が、手順4の差分の判定で、予約したセッションの spec の変更を見つける。
 
-**失敗したとき**: 手順4のどこかで git のコマンドが失敗したときと、錠を取れなかったときと、予約を書けなかったときは、`check-spec` は、JSON を出さずに、どの作業フォルダで何が失敗したかを `[parallel] 調べられない:` で始まる文で標準エラーに出し、一時的な索引を消して、終了コード69で終わる。ただし、手順4で P を逆向きに当てられないことは、`check-spec` は git のコマンドの失敗に数えない。
+**失敗したとき**: 手順4のどこかで git のコマンドが失敗したときと、錠を取れなかったときと、予約を書けなかったときは、`check-spec` は、JSON を出さずに、どの作業フォルダで何が失敗したかを `[parallel] 調べられない:` で始まる文で標準エラーに出し、一時的な索引を消して、終了コード69で終わる。ただし、M・S・`origin/main` のどれかにファイルが無いために `git cat-file` が失敗することは、`check-spec` は git のコマンドの失敗に数えない。
 
 ### session.sh prune の変更(古くなった spec の予約の片付け)
 
@@ -232,7 +240,7 @@ flowchart TD
 - 表の `folder_conflict` の行の次に、`leftovers` の要素の `kinds` が `started` だけのときの行を足す。問いは「やめたか」、答えが「やめた」なら呼ぶのは `session.sh end <active_session の session_id>` である。`kinds` に `started` のほかの種類もある要素は、今の表の行(`active_session` が `null` でないので「やめたか」、「やめた」なら `takeover --from <folder>`)で扱う。どちらの行も、問いは1つの要素につき1回である
 - 問いに添えることに、`started` だけの要素では、作業フォルダの場所(`folder`)と、そのセッションを始めた時刻と最後に操作された時刻(`active_session` の `started_at` と `last_seen` を読める日時にしたもの)と、そのセッションがまだブランチを作っていないことを書き足す
 
-Claude は、Step 7 の「spec を作らずに実装する」の手順1に、`claim` が終了コード1で終わったときは、ほかのセッションが同じIssueに着手したことを表すので、ブランチを使わずに止まり、標準エラーの文を所有者に伝えることを書き足す。
+Claude は、Step 7 の「spec を作らずに実装する」の手順1に、`claim` が終了コード1で終わったときは、ほかのセッションが同じIssueに着手したことを表すので、Claude がブランチを使わずに止まり、標準エラーの文を所有者に伝えることを書き足す。
 
 ### kiro-spec-init スキルの変更(spec を書き換える前の調べと取り込み)
 
@@ -261,7 +269,7 @@ Claude は、Step 7 の「spec を作らずに実装する」の手順1に、`cl
 
 ### 論理的なデータの形
 
-記録は、今と同じく本体の `.git/keirekipro-parallel/` の下に置き、時刻を UNIX 秒で持つ。この設計で変わる記録は次のとおりである。
+記録は、今と同じく本体の `.git/keirekipro-parallel/` の下に置き、時刻を UNIX 秒で持つ。UNIX 秒とは、1970年1月1日0時(協定世界時)からたった秒数を指す。この設計で変わる記録は次のとおりである。
 
 | 記録 | パス | 書く部品 | 中身 |
 |---|---|---|---|
@@ -269,7 +277,7 @@ Claude は、Step 7 の「spec を作らずに実装する」の手順1に、`cl
 | spec の予約 | `specs/<feature>.json` | `check-spec`(書く)、`prune`(消す) | `feature` `folder` `session_id` `issue` `updated_at` |
 | 記録の錠 | `records.lock`(ディレクトリ) | `check-start` `claim` `takeover` `check-spec` | 中身は無い。ディレクトリがあるあいだ、ほかのサブコマンドは待つ |
 
-`/start` と `prune` は、`branch` が空の予約を、今の決まりのままでも扱える。`/start` の Step 7 の手順1は、記録の `branch` が空なら新しいブランチを作るので、予約のあとに `claim` が `branch` を書く。`prune` は、`folder` の作業フォルダが無くなった予約を、`branch` が空なので消す。
+`/start` と `prune` は、`branch` が空の予約を、今の決まりのままでも扱える。Claude は、`/start` の Step 7 の手順1で、記録の `branch` が空なら新しいブランチを作る。そのため、予約のあとに `claim` が `branch` を書く。`prune` は、`folder` の作業フォルダが無くなった予約を、`branch` が空なので消す。
 
 ## 失敗したときの扱い
 
@@ -287,17 +295,26 @@ Claude は、`test-session.sh` に次の場合を足す。どれも、一時的�
   - 予約したセッションの記録が無いとき(閉じたとき)、`leftovers` は空で、予約がこのセッションのものに書き換わる(要件1の受入基準5: 先のセッションが閉じていて作りかけも無ければ、所有者に尋ねずに続ける)
   - 同じセッションで `check-start` を打ち直すと、`leftovers` は空で、予約の `updated_at` だけが変わる(要件1の受入基準6: 同じセッションでの打ち直しでは、そのセッション自身を理由に止まらない)
   - `end` で予約したセッションの記録を消したあとの `check-start` は、`leftovers` が空になり、予約がこのセッションのものに書き換わる(要件1の受入基準4: 所有者が「やめた」と答えたら、あとのセッションが着手したセッションになる)
-  - 予約の `session_id` が空のときは、`started` を出さない
+  - 予約の `session_id` が空のときは、`check-start` は `started` を出さない
   - `records.lock` がほかに持たれたままのとき(60秒より新しい錠のディレクトリを置いたとき)、`check-start` は終了コード69で終わり、予約を書かない(要件3の受入基準1: 調べを終えられなければ進まない)
 - 結合テスト(同時の `check-start`): 2つの worktree から、別々のセッションのIDで `check-start` を同時に(バックグラウンドで)呼ぶと、片方の `leftovers` だけが空で、もう片方は `started` の要素を返し、予約は空を返したほうのセッションのものである(要件1の受入基準3: 最初の調べが同じ時に重なっても、片方だけを着手したセッションとして扱う)。Claude は、この場合を10回くり返して、毎回成り立つことを確かめる
 - 単体テスト(`claim`):
   - ほかの作業フォルダの予約があると、`claim` は終了コード1で `[parallel] 着手できない:` の文を出し、記録を書き換えない(要件1の受入基準4: 所有者が「やめた」と答えたら、あとのセッションが着手したセッションになる)
   - 自分の予約があると、`claim` は `branch` を書く。記録が無いとき、`folder` と `session_id` が空の記録のときも、`claim` は書く
-- 単体テスト(`check-spec`)。偽物のリモートの `main` を用意し、`refs/remotes/origin/main` を手で動かして main の進み具合を作る:
+- 単体テスト(`check-spec`)。テストは、偽物のリモートの `main` を用意し、`refs/remotes/origin/main` を手で動かして main の進み具合を作る:
   - ほかの worktree に作業中のセッションがあり、その worktree が spec にコミットしていない変更を持つと、`conflicts` に `reason` が `changes` の要素が出る(要件2の受入基準1と2: main にまだ入っていない spec の変更を持つほかの作業中のセッションがあれば、spec を書き換えずに止まって尋ねる)
   - その変更をコミットしても(マージしていなければ)、要素が出る(要件2の受入基準1: main にまだ入っていない変更は、コミットしたがマージされていない変更も含む)
   - 同じ中身を別のコミットとして `origin/main` に入れたあと(squash でのマージを真似たもの)は、`conflicts` が空になる。そのあと `origin/main` で隣の行がさらに変わっても空のままである(要件2の受入基準1と4: 変更が main に中身として入っていれば止まらず、マージのあとに打ち直せば続けられる)
   - ほかの worktree が spec を変えておらず、ブランチが古い main から作られていて、`origin/main` が spec を変えているときは、`conflicts` が空である(要件2の受入基準1: そのセッションが加えた変更だけを数える)
+  - 次の場合は、マージしていなければ要素が出て、同じ中身を別のコミットとして `origin/main` に入れたあとは空になる(要件2の受入基準1: 行を消しただけの変更や、同じ中身の行がファイルの別の場所にある変更も、中身で正しく見分ける): ほかの worktree が行を1行消しただけのとき、先頭の行を消したとき、ファイルを空にしたとき、行を1行足しただけのとき、コミットしていない新しいファイル(例: `reviews/` の下の新しいファイル)だけを足したとき、コミット済みの spec のディレクトリを作業フォルダで消したとき
+  - ほかの worktree が1行目の `a` を `c` に書き換え、`origin/main` が同じファイルの別の行に `c` を持つだけのときは、要素が出る(要件2の受入基準1: 同じ中身の行が別の場所にあっても取り違えない)
+  - ほかの worktree が2行目の空行を消し、`origin/main` が同じファイルの4行目の空行を消しているときは、要素が出る(要件2の受入基準1: 同じ中身の行が別の場所で消されていても取り違えない)
+  - ファイルの2行目と4行目が空行で、ほかの worktree が2行目を消し、`origin/main` が3行目を書き換えて4行目を消しているとき(マージしていない)は、要素が出る。左右を入れ替えた場面(ほかの worktree が4行目を消し、`origin/main` が2行目を消して3行目を書き換えた)も要素が出る。ほかの worktree が4行目を消した変更を squash でマージし、`origin/main` で3行目も書き換えたあとは、空になる(要件2の受入基準1: 隣り合う同じ中身の行を取り違えない)
+  - ほかの worktree が行を1行足し、`origin/main` が同じ中身の行を別の場所に足しているだけのときは、要素が出る。ほかの worktree が行を足した変更を squash でマージし、`origin/main` で足した行の直前の行を書き換えたあとと、直後の行を書き換えたあとは、どちらも空になる(要件2の受入基準1: 足した行も位置で比べる)
+  - ほかの worktree が続く2行(3行目と4行目)を消し、`origin/main` がそのうち4行目だけを書き換えているとき(マージしていない)は、要素が出る。2行を消した変更を squash でマージしたあとは、空になる(要件2の受入基準1: 置き換えた行の一部だけを main が変えていても取り違えない)
+  - ほかの worktree が4行目を消しただけで、`origin/main` が3行目と5行目を書き換えているとき(マージしていない)は、要素が出る。テストの中で `git config diff.interHunkContext 3` を置いても、環境変数 `GIT_DIFF_OPTS=-u3` を置いても要素が出る。ほかの worktree が4行目を消しただけで、`origin/main` が4行目と5行目の間に行を足しただけのときも、要素が出る(要件2の受入基準1: 利用者の git の設定や、行を足しただけの main のかたまりで判定が変わらない)
+  - ほかの worktree が spec のディレクトリを消してコミットしたとき(作業フォルダにも HEAD の木にも spec が無いとき)も、マージしていなければ要素が出る(要件2の受入基準1: コミットした削除も見逃さない)
+  - `origin/main` が、ほかの worktree の書き換えた行と同じ行を別の中身に変えているとき、またはマージのあとにさらに書き換えているときは、要素が出る(要件2の受入基準1: main に中身として入っていなければ、直しているとみなす)
   - 変更を持つ worktree に作業中のセッションが無いときは、`conflicts` が空である(要件2の受入基準6: 作業中のセッションの無い作業フォルダにだけ変更があるときは止まらない)
   - ほかのセッションの600秒以内の spec の予約があると、`reason` が `starting` の要素が出る。600秒より古い予約は、`check-spec` が無視する(要件2の受入基準5: 2つの調べが同じ時に重なっても、片方だけに spec を書き換えさせる)
   - `conflicts` が空のときだけ、`specs/<feature>.json` にこのセッションの予約が書かれる(要件2の受入基準5: 2つの調べが同じ時に重なっても、片方だけに spec を書き換えさせる)
@@ -310,11 +327,11 @@ Claude は、`test-session.sh` に次の場合を足す。どれも、一時的�
 
 ## 性能
 
-`check-spec` は、作業中のセッションがある worktree ごとに、一時的な索引への読み込み、spec のディレクトリの載せ直し、差分、逆向きの当てはめを行う。`check-spec` は spec のディレクトリだけを載せ直すので、`check-spec` の調べにかかる時間は、worktree 1つにつき数秒の範囲である。錠を持つのはこの調べの間だけで、ほかのセッションの `check-start` はその間待つ。
+`check-spec` は、作業中のセッションがある worktree ごとに、一時的な索引への読み込み、spec のディレクトリの載せ直し、ファイルごとの差分の読み取りと、変更のかたまりどうしの位置の比べを行う。比べる量は、spec のファイル全体の行数ではなく、変更のかたまりの数で決まる。`check-spec` は spec のディレクトリだけを載せ直すので、`check-spec` の調べにかかる時間は、worktree 1つにつき数秒の範囲である。`check-spec` が錠を持つのはこの調べの間だけで、ほかのセッションの `check-start` はその間待つ。
 
 ## ほかの spec との食い違い
 
-この設計は、spec `parallel-sessions` の design.md の部品「session.sh」と「start スキルの変更」に書かれた動き(`check-start` は記録を書かない、`claim` は記録があれば書き直す、Step 1.5 の表の行)を変える。Claude は、spec `parallel-sessions` の本文を直さず、このPRの本文に、`/ship` の「食い違う spec:」の行の形で、変えた動きを書く。spec `parallel-sessions` をあとで開き直すとき、`/kiro-spec-requirements` と `/kiro-spec-design` は、この形の行をマージ済みのPRの本文から拾う。
+この設計は、spec `parallel-sessions` の design.md の部品「session.sh」と「start スキルの変更」に書かれた動き(`check-start` は記録を書かない、`claim` は記録があれば書き直す、Step 1.5 の表の行)を変える。Claude は、このPRの本文に、`/ship` の「食い違う spec:」の行の形で、変えた動きを書く。spec `parallel-sessions` をあとで開き直すとき、`/kiro-spec-requirements` と `/kiro-spec-design` は、この形の行をマージ済みのPRの本文から拾う。
 
 - 食い違う spec: `.kiro/specs/parallel-sessions/design.md` 部品「session.sh」。`check-start` は調べるだけで記録を書かない を、`check-start` は調べの結果が空のときに着手の予約を書き、ほかのセッションの予約を作りかけの種類 `started` として返す に変えた
 - 食い違う spec: `.kiro/specs/parallel-sessions/design.md` 部品「session.sh」。`claim` は記録があれば書き直す を、`claim` は記録がほかのセッションのものなら書き直さずに終了コード1で断る に変えた
