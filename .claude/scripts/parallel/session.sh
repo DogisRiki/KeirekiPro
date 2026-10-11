@@ -49,7 +49,7 @@
 #       ほかの作業中のセッションが spec <feature>(英小文字・数字・ハイフンだけの名前。違えば終了コード64)を
 #       直しているかを調べ、標準出力に {"conflicts":[...]} の JSON を1行出す(終了コード0)。--issue が無いか数でなければ
 #       終了コード64。要素は、直しているほかの作業中のセッションごとに1つで、folder session_id started_at last_seen
-#       issue(issues/ の記録を session_id で引き、無ければ folder で引く。どちらも無ければ null)reason(changes)を持ち、
+#       issue(issues/ の記録を session_id で引き、無ければ folder で引く。どちらも無ければ null)reason(changes か starting)を持ち、
 #       started_at の古い順に並ぶ。refs/remotes/origin/main が無ければ、
 #       「[parallel] 調べられない: origin/main が手元に無い」を標準エラーに出して終了コード69で終わる。
 #       記録の錠の中で、いまの作業フォルダでない作業フォルダ(ディレクトリがあり bare でないもの)のうち、
@@ -64,10 +64,17 @@
 #           集めた main のかたまりの範囲に無い、W が足した行が集めた main のかたまりの足した行の中に同じ順で現れない、
 #           のどれかに当たれば入っていない。バイナリのファイル(NUL を含む)は S と origin/main の blob が同じときだけ
 #           入っている。無いファイルは0行の中身として扱う。入っていないファイルが1つでもあれば、直している
-#       直している W の作業中のセッションを、すべて要素にする。調べの git のコマンドが失敗したときと、
-#       差分のかたまりの本文に前後の行(空白で始まる行)があるときは、JSON を出さずに、どの作業フォルダで何が
-#       起きたか(前後の行のときはファイルの名前)を「[parallel] 調べられない:」で始まる文で標準エラーに出し、
-#       一時的な索引を消して、終了コード69で終わる。
+#         spec の予約 specs/<feature>.json(feature folder session_id issue updated_at)の folder が W で、session_id が
+#           W の作業中のセッションのIDで、updated_at から600秒たっていなければ、予約で直している(reason は starting)。
+#           updated_at が負でない整数でない予約は無視する。変更でも予約でも直しているときは、reason は changes
+#       直している W の作業中のセッションを、すべて要素にする。要素が1つも無ければ、錠の中で
+#       specs/<feature>.json に feature folder(いまの作業フォルダ)session_id(このセッションのID)
+#       issue(--issue の値)updated_at(いまの UNIX 秒)を書く(要素があれば書かない)。
+#       調べの git のコマンドが失敗したときと、差分のかたまりの本文に前後の行(空白で始まる行)があるときは、
+#       JSON を出さずに、どの作業フォルダで何が起きたか(前後の行のときはファイルの名前)を
+#       「[parallel] 調べられない:」で始まる文で標準エラーに出し、一時的な索引を消して、終了コード69で終わる。
+#       予約を書けないときも、JSON を出さずに、予約のファイルの名前を「[parallel] 調べられない:」で始まる文で
+#       標準エラーに出し、終了コード69で終わる。
 #   spec-names
 #       すべての作業フォルダの .kiro/specs/ のディレクトリ名を、重ならないように1行ずつ出す。
 #   prune
@@ -98,7 +105,8 @@
 # check-start は、記録の錠(記録の置き場所の records.lock。lib.sh の _kp_lock で取る)の中で調べと予約を行い、
 # 錠を返してから JSON を出す。15秒待っても錠を取れないときと、予約を書けないときは、JSON を出さずに終了コード69で終わる。
 # claim と takeover も、Issueの記録を同じ錠の中で読み書きし、15秒待っても錠を取れなければ記録を書かずに終了コード69で終わる。
-# check-spec も、同じ錠の中で調べ、錠を返してから JSON を出す。15秒待っても錠を取れなければ終了コード69で終わる。
+# check-spec も、同じ錠の中で調べと spec の予約を行い、錠を返してから JSON を出す。15秒待っても錠を取れないときと、
+# 予約を書けないときは、JSON を出さずに終了コード69で終わる。
 #
 # 終了コード: 0(成功)、1(claim がほかのセッションの記録を断った、takeover が引き継げなかった)、64(呼び方の誤り)、
 #             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない、
@@ -1310,7 +1318,7 @@ _kp_ss_spec_changed() { # <作業フォルダ W> <feature> <origin/main のコ�
 }
 
 kp_session_check_spec() {
-    local feature="" have_feature=0 n="" session="" state sid me key ic main gone_sessions wl cand w els out
+    local feature="" have_feature=0 n="" session="" state sid me key ic main gone_sessions wl cand w by_rsv els out rsv
     local -a found=()
     while [ $# -gt 0 ]; do
         case "$1" in
@@ -1361,11 +1369,14 @@ kp_session_check_spec() {
         || _kp_ss_die69 "[parallel] 調べられない: 作業フォルダの一覧(git worktree list)を取れない: $(_kp_ss_one_line "$wl")"
 
     # 3. いまの作業フォルダでない作業フォルダ(ディレクトリがあり bare でないもの)のうち、作業中のセッション
-    #    (このセッションのIDの記録を除く)があるものを、「作業フォルダ \x1f 要素の JSON の配列」の行で出す。
-    #    要素は、その作業フォルダの作業中のセッションごとに1つ
+    #    (このセッションのIDの記録を除く)があるものを、
+    #    「作業フォルダ \x1f 予約で直しているときの要素の JSON の配列(予約に当たらなければ -) \x1f 要素の JSON の配列」
+    #    の行で出す。要素は、その作業フォルダの作業中のセッションごとに1つ。
+    # 5. spec の予約 specs/<feature>.json の folder がその作業フォルダで、session_id がその作業フォルダの作業中の
+    #    セッションのIDで、updated_at から600秒たっていなければ、予約で直している(reason は starting)
     cand=$(perl -MJSON::PP -e "$_KP_SS_PL_ACTIVE" -e '
         use strict; use warnings;
-        my ($state, $sid, $me, $me_key, $ic, $gone_list, $wl) = @ARGV;
+        my ($state, $sid, $me, $me_key, $ic, $gone_list, $wl, $feature) = @ARGV;
         utf8::decode($_) for ($state, $sid, $me, $wl);
         ($KP_IC, $KP_ME_KEY) = ($ic, $me_key);
         $KP_ME_ID = norm($me);
@@ -1382,12 +1393,24 @@ kp_session_check_spec() {
         my @sessions = load_sessions($state, $gone_list);
         my $ix = active_index(load_dir("$state/issues"));
         my $enc = JSON::PP->new->utf8->canonical;
+
+        # 600秒以内の spec の予約(無いとき、壊れているとき、session_id が空のとき、updated_at が負でない整数でないとき、
+        # 古いときは undef)
+        my $rsv = load("$state/specs/$feature.json");
+        if ($rsv) {
+            my $at = $rsv->{updated_at};
+            $rsv = undef unless length str($rsv->{session_id})
+                && defined $at && $at =~ /\A[0-9]+\z/ && time() - $at < 600;
+        }
+
         for my $w (grep { !$_->{bare} && -d $_->{path} } @worktrees) {
             my $fid = norm($w->{path});
             next if $fid eq $KP_ME_ID;
             my @active = sort by_start
                 grep { in_folder($_, $fid) && str($_->{session_id}) ne $sid && is_active($_, $ix) } @sessions;
             next unless @active;
+            my $starting = $rsv && norm(str($rsv->{folder})) eq $fid
+                && grep { str($_->{session_id}) eq str($rsv->{session_id}) } @active;
             my @els = map { +{
                 folder => $w->{path},
                 session_id => $_->{session_id},
@@ -1396,18 +1419,24 @@ kp_session_check_spec() {
                 issue => issue_of($_, $ix),
                 reason => "changes",
             } } @active;
+            my $by_rsv = $starting ? $enc->encode([ map { +{ %$_, reason => "starting" } } @els ]) : "-";
             my $path = $w->{path};
             utf8::encode($path);
-            print $path, "\x1f", $enc->encode(\@els), "\n";
+            print $path, "\x1f", $by_rsv, "\x1f", $enc->encode(\@els), "\n";
         }
-    ' -- "$state" "$sid" "$me" "$key" "$ic" "$gone_sessions" "$wl") \
+    ' -- "$state" "$sid" "$me" "$key" "$ic" "$gone_sessions" "$wl" "$feature") \
         || _kp_ss_die69 "[parallel] 調べられない: セッションの記録と作業フォルダの一覧を読めない"
 
     # 4. 作業中のセッションがある作業フォルダ W ごとに、W が spec を直しているかを判定する。
+    #    4(変更)と5(予約)の両方に当たるときは、reason を changes にする。
     # 6. 直している W の作業中のセッションを、すべて要素にする
-    while IFS=$'\x1f' read -r -u 3 w els; do
+    while IFS=$'\x1f' read -r -u 3 w by_rsv els; do
         [ -n "$w" ] || continue
-        _kp_ss_spec_changed "$w" "$feature" "$main" "$me" && found+=("$els")
+        if _kp_ss_spec_changed "$w" "$feature" "$main" "$me"; then
+            found+=("$els")
+        elif [ "$by_rsv" != - ]; then
+            found+=("$by_rsv")
+        fi
     done 3<<<"$cand"
 
     # 要素を started_at の古い順に並べる
@@ -1417,6 +1446,15 @@ kp_session_check_spec() {
         my @all = map { @{ $json->decode($_) } } @ARGV;
         print $json->encode({ conflicts => [ sort by_start @all ] }), "\n";
     ' -- "${found[@]}") || _kp_ss_die69 "[parallel] 調べられない: 調べの結果を JSON にできない"
+
+    # 7. 要素が1つも無ければ、錠の中で spec の予約を書く(要素があれば書かない)
+    if [ "${#found[@]}" = 0 ]; then
+        rsv="$state/specs/$feature.json"
+        { mkdir -p "$state/specs" 2>/dev/null \
+            && kp_json_write "$rsv" feature="$feature" folder="$me" session_id="$sid" issue:="$n" \
+                updated_at:="$(date +%s)"; } \
+            || _kp_ss_die69 "[parallel] 調べられない: spec $feature の予約を $rsv に書けない"
+    fi
 
     # 8. 錠を返してから JSON を出す
     _kp_ss_unlock

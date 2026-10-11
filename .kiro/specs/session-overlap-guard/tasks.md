@@ -37,7 +37,7 @@
   - 受入基準とテストの対応: 要件2の受入基準1(main にまだ入っていない変更を中身で調べる)は、design.md の「テストの方針」の次の場面のテストで確かめる。squash を真似て同じ中身を origin/main に入れたあとは `conflicts` が空になり、隣の行がさらに変わっても `conflicts` は空のままである。行を消しただけ、先頭の行を消した、ファイルを空にした、行を足しただけ、コミットしていない新しいファイルだけ、spec のディレクトリを消した、spec のディレクトリを消してコミットした、の各場面で、マージしていなければ要素が出て、squash のあとは `conflicts` が空になる。書き換えた先の中身が main の別の行にあるときは要素が出る。別の場所の空行が消されたときは要素が出る。隣り合う空行の2つの場面は要素が出て、squash のあとの場面は空。続く2行の一部だけを main が書き換えたときは要素が出て、squash のあとは `conflicts` が空になる。行を足し、main が同じ中身の行を別の場所に足しているだけのときは要素が出る。行を足した変更を squash でマージし、直前の行か直後の行を書き換えたあとは、`conflicts` が空になる。4行目を消し main が3行目と5行目を書き換えたときは要素が出て、`diff.interHunkContext` を置いても、`GIT_DIFF_OPTS` を置いても要素が出る。4行目を消し main が4行目と5行目の間に行を足しただけのときは要素が出る。main が同じ行を別の中身に変えたとき、マージのあとに同じ行をさらに書き換えたときは要素が出る。受入基準4(マージのあとに打ち直せば続けられる)は、上の場面のうち squash のあとは空になる場面のテストで確かめる。要件3の受入基準1(調べを終えられなければ進まない)は、差分に前後の行が入ったときに終了コード69で終わる場合のテストで確かめる。テストは、`git diff` の出力のかたまりの本文に空白で始まる行を混ぜる偽物の `git` を PATH の先頭に置いて、この場合を起こす
   - _要件: 2.1, 2.4, 3.1_
 
-- [ ] 2.3 `check-spec` に spec の予約を足す
+- [x] 2.3 `check-spec` に spec の予約を足す
 
   Claude は、部品「session.sh check-spec」の手順5と7のとおりに、`check-spec` が spec の予約 `specs/<feature>.json` を読み、600秒以内のほかの作業中のセッションの予約を `reason` が `starting` の要素として返し、要素が無いときだけ予約を書くようにする。Claude は、`test-session.sh` に、design.md の「テストの方針」の `check-spec` の場合のうち、spec の予約に関わるものを足す。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る
@@ -102,3 +102,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 出荷のとき、Claude は、PRの本文に `Test-Change-Justification:` の行を置き、1.2 と 1.3 で既存のテスト `t_claim` と `t_prune_branch_gone` と `t_leftover_own_claim_excluded` の確かめを書き換えた理由(`check-start` が予約を書き、ほかのセッションの記録を `started` として返すようになったことと、`claim` がほかのセッションの記録を断るようになったこと)を書く
 - タスク1.1: lib.sh の `_kp_lock` は「150回 × 0.1秒」で待つが、Windows の作業PCでは、試すたびに `date` と perl を起動するため、持たれたままの錠を約25秒待ってから終わる(実測)。`t_lock_held_refused` は、待たずに終わる偽物の `sleep` を PATH の先頭に置いて流す。作業中のセッションの見分けは、perl の共通の処理 `_KP_SS_PL_ACTIVE` を `perl -e "$_KP_SS_PL_ACTIVE" -e '<本体>'` の形で本体の前に置いて使う。本体は `our` の `$KP_IC` `$KP_ME_ID` `$KP_ME_KEY` を決めてから共通の処理を呼ぶ
 - タスク2.2: テストの効き目を確かめるために session.sh を壊すときは、作業フォルダのファイルを直接書き換えない。書き換えたまま途中で止まると、作業フォルダに壊れた session.sh が残る。scratchpad に session.sh と lib.sh を写し、テストの `SESSION` をその写しに向けて流す
+- タスク2.3: spec の予約の `updated_at` は、負でない整数だけを受け付ける(`looks_like_number` は "Inf" や "1e9" も数とみなすため使わない)。2.4 の `prune` も同じ決まりで、数でない予約を消す

@@ -1841,6 +1841,160 @@ t_check_spec_lock_held() {
     [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
 }
 
+# --- check-spec の spec の予約(session-overlap-guard 要件2.5)
+SPEC_RSV="$STATE/specs/beta.json"
+
+# spec beta の予約を、session.sh の書き込みに頼らずに置く。<何秒前> は、いまの時刻から引いて updated_at にする
+put_spec_reserve() { # <作業フォルダ> <session_id> <issue> <何秒前>
+    mkdir -p "$STATE/specs"
+    printf '{"feature":"beta","folder":"%s","issue":%s,"session_id":"%s","updated_at":%s}\n' \
+        "$1" "$3" "$2" "$(($(date +%s) - $4))" >"$SPEC_RSV"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_check_spec_reserve_starting() {
+    local out before
+    spec_base
+    # WT の作業中のセッション s-wt が、580秒前に spec beta を予約した(spec のファイルはまだ変えていない)
+    put_spec_reserve "$WT" s-wt 42 580
+    before=$(cat "$SPEC_RSV")
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" 'scalar @{$d->{conflicts}}')" = 1 ] || die "600秒以内の予約で要素が1つでない: $out"
+    [ "$(pj "$out" '$d->{conflicts}[0]')" = "{\"folder\":\"$WT\",\"issue\":42,\"last_seen\":305,\"reason\":\"starting\",\"session_id\":\"s-wt\",\"started_at\":300}" ] \
+        || die "予約の要素の中身が違う: $out"
+    [ "$(cat "$SPEC_RSV")" = "$before" ] || die "要素があるのに予約が書き換わった: $(cat "$SPEC_RSV")"
+    spec_clean_after "予約があるとき"
+    # 予約の folder と作業フォルダを比べるときは core.ignorecase に従う
+    if [ "$(git -C "$MAIN_DIR" config --get core.ignorecase)" = true ]; then
+        put_spec_reserve "$(printf '%s' "$WT" | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')" s-wt 42 10
+        out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+        [ "$(pj "$out" 'join ",", map { "$_->{session_id}|$_->{reason}" } @{$d->{conflicts}}')" = "s-wt|starting" ] \
+            || die "大文字と小文字だけが違う作業フォルダの予約で starting の要素が出ない: $out"
+        put_spec_reserve "$WT" s-wt 42 580
+        before=$(cat "$SPEC_RSV")
+    fi
+    # 作業中のセッションが2つある作業フォルダの予約では、どちらのセッションも starting の要素になる
+    put_session s-wt0 "$WT" "$(fkey "$WT_DIR")" 200
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" 'join ",", map { "$_->{session_id}|$_->{reason}" } @{$d->{conflicts}}')" = "s-wt0|starting,s-wt|starting" ] \
+        || die "2つのセッションの要素が starting で出ない: $out"
+    rm -f "$STATE/sessions/s-wt0.json"
+    # 予約と spec の変更の両方があるときは、reason は changes
+    printf 'A\nb\nc\n' >"$WT_DIR/$REQ"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" 'join ",", map { "$_->{session_id}|$_->{reason}" } @{$d->{conflicts}}')" = "s-wt|changes" ] \
+        || die "予約と変更の両方があるのに reason が changes の1つでない: $out"
+    [ "$(cat "$SPEC_RSV")" = "$before" ] || die "要素があるのに予約が書き換わった: $(cat "$SPEC_RSV")"
+    spec_clean_after "調べのあと"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_check_spec_reserve_ignored() {
+    local out at
+    spec_base
+    # 600秒より古い予約は無視する
+    put_spec_reserve "$WT" s-wt 42 620
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "600秒より古い予約で要素が出た: $out"
+    # 予約のセッションが作業中でない(Issueの記録が無い)ときは無視する
+    put_spec_reserve "$WT" s-wt 42 10
+    mv "$STATE/issues/42.json" "$WORK/issue42.json"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "作業中でないセッションの予約で要素が出た: $out"
+    mv "$WORK/issue42.json" "$STATE/issues/42.json"
+    # 予約のセッションの記録が無い(閉じた)ときは、その作業フォルダにほかの作業中のセッションがあっても無視する
+    put_spec_reserve "$WT" s-closed 42 10
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "閉じたセッションの予約で要素が出た: $out"
+    # 予約の folder が、予約のセッションの作業フォルダと違うときは無視する
+    put_spec_reserve "$MAIN" s-wt 42 10
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "ほかの作業フォルダの予約で要素が出た: $out"
+    # 予約の updated_at が負でない整数でないときは、警告を出さずに無視する
+    for at in '"x"' '[1]' '"Inf"' '"1e9"' '-1' '1.5' 'true' 'null'; do
+        printf '{"feature":"beta","folder":"%s","issue":42,"session_id":"s-wt","updated_at":%s}\n' "$WT" "$at" >"$SPEC_RSV"
+        out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+        [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "updated_at が $at の予約で要素が出た: $out"
+        [ ! -s "$WORK/spec-err.txt" ] || die "updated_at が $at の予約で標準エラーに出た: $(cat "$WORK/spec-err.txt")"
+    done
+    # 予約の session_id が空のときは、session_id が空の作業中のセッションの記録があっても無視する
+    printf '{"folder":"%s","folder_key":"%s","last_seen":255,"session_id":"","started_at":250}\n' \
+        "$WT" "$(fkey "$WT_DIR")" >"$STATE/sessions/blank.json"
+    put_spec_reserve "$WT" "" 42 10
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "session_id が空の予約で要素が出た: $out"
+    rm -f "$STATE/sessions/blank.json"
+    # このセッション自身の予約は、ほかの作業フォルダに書かれていても数えない
+    put_session s-me2 "$WT" "$(fkey "$WT_DIR")" 500
+    put_spec_reserve "$WT" s-me2 42 10
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me2) || die "$out"
+    [ "$(spec_sids "$out")" = "" ] || die "このセッション自身の予約で要素が出た: $out"
+    spec_clean_after "調べのあと"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_check_spec_reserve_written() {
+    local out t0 t1 at
+    spec_base
+    [ ! -e "$SPEC_RSV" ] || die "前提: 予約がある"
+    t0=$(date +%s)
+    out=$(check_spec "$WT2_DIR" beta --issue 050 --session s-me) || die "$out"
+    t1=$(date +%s)
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "前提: conflicts が空でない: $out"
+    [ -f "$SPEC_RSV" ] || die "conflicts が空なのに予約を書いていない"
+    [ "$(pj "$(cat "$SPEC_RSV")" 'join "|", sort keys %$d')" = "feature|folder|issue|session_id|updated_at" ] \
+        || die "予約の欄が違う: $(cat "$SPEC_RSV")"
+    [ "$(pj "$(cat "$SPEC_RSV")" 'join "|", $d->{feature}, $d->{folder}, $d->{session_id}, $d->{issue}')" = "beta|$WT2|s-me|50" ] \
+        || die "予約の中身が違う: $(cat "$SPEC_RSV")"
+    [ "$(pj "$(cat "$SPEC_RSV")" 'JSON::PP->new->allow_nonref->encode($d->{issue})')" = 50 ] || die "予約の issue が数でない: $(cat "$SPEC_RSV")"
+    at=$(pj "$(cat "$SPEC_RSV")" '$d->{updated_at}')
+    case "$at" in '' | *[!0-9]*) die "updated_at が UNIX 秒でない: $(cat "$SPEC_RSV")" ;; esac
+    [ "$at" -ge "$t0" ] && [ "$at" -le "$t1" ] || die "updated_at が調べの時刻でない: $at($t0..$t1)"
+    spec_clean_after "予約を書いたあと"
+    # 書いた予約は、ほかの作業フォルダの作業中のセッションの check-spec に starting で見える
+    put_issue 50 "$WT2" "" s-me
+    out=$(check_spec "$WT_DIR" beta --issue 42 --session s-wt) || die "$out"
+    [ "$(pj "$out" 'join ",", map { "$_->{session_id}|$_->{folder}|$_->{issue}|$_->{reason}" } @{$d->{conflicts}}')" = "s-me|$WT2|50|starting" ] \
+        || die "書いた予約がほかのセッションに starting で見えない: $out"
+    [ "$(pj "$(cat "$SPEC_RSV")" '$d->{session_id}')" = s-me ] || die "要素があるのに予約が書き換わった: $(cat "$SPEC_RSV")"
+    # conflicts が空でないときは、予約が無ければ書かない
+    rm -f "$SPEC_RSV" "$STATE/issues/50.json"
+    printf 'A\nb\nc\n' >"$WT_DIR/$REQ"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(spec_sids "$out")" = s-wt ] || die "前提: s-wt が出ない: $out"
+    [ ! -e "$SPEC_RSV" ] || die "conflicts が空でないのに予約を書いた: $(cat "$SPEC_RSV")"
+    # 古い予約があって conflicts が空のときは、このセッションの予約に書き直す
+    git -C "$WT_DIR" checkout -q -- "$REQ"
+    put_spec_reserve "$WT" s-wt 42 700
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "前提: conflicts が空でない: $out"
+    [ "$(pj "$(cat "$SPEC_RSV")" 'join "|", $d->{folder}, $d->{session_id}, $d->{issue}')" = "$WT2|s-me|50" ] \
+        || die "古い予約がこのセッションの予約に書き直されていない: $(cat "$SPEC_RSV")"
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_reserve_write_failure() {
+    local real_perl out rc err
+    spec_base
+    real_perl=$(command -v perl)
+    mkdir -p "$TMP_ROOT/writefail"
+    # 記録を書く perl(lib.sh の kp_json_write)だけが失敗する perl
+    cat >"$TMP_ROOT/writefail/perl" <<EOF
+#!/bin/bash
+case "\$*" in *kp_json_write*) echo "fake write failure" >&2; exit 1 ;; esac
+exec "$real_perl" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/writefail/perl"
+    out=$(PATH="$TMP_ROOT/writefail:$PATH" ss "$WT2_DIR" check-spec beta --issue 50 --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    err=$(cat "$WORK/err.txt")
+    [ "$rc" = 69 ] || die "予約を書けないのに終了コードが69でない: $rc: $out $err"
+    [ -z "$out" ] || die "予約を書けないのに JSON を出した: $out"
+    case "$err" in *'[parallel] 調べられない:'*beta*) ;; *) die "標準エラーに [parallel] で始まる理由が無い: $err" ;; esac
+    [ ! -e "$SPEC_RSV" ] || die "予約を書けなかったのに予約がある: $(cat "$SPEC_RSV")"
+    spec_clean_after "予約を書けなかったとき"
+}
+
 # --- check-spec の判定の細かい場面(変更のかたまりを M の行の位置で比べる。session-overlap-guard 要件2.1・2.4)
 # 場面ごとに、spec_base のあとで spec_case で WT と origin/main を作り、expect_spec で WT2 から調べた結果を確かめる。
 # 「squash でのマージ」は、W と同じ中身を、古い main(土台)の上の別のコミットとして origin/main に入れて真似る
@@ -2156,6 +2310,12 @@ run_test "origin/main が無いと終了コード69" t_check_spec_no_origin_main
 run_test "名前に大文字か / を含むときと、--issue が無いか数でないときは終了コード64" t_check_spec_usage
 run_test "調べの git が失敗したら終了コード69で、作業フォルダと理由を出し、錠と一時的な索引を残さない" t_check_spec_git_failure
 run_test "錠がほかに持たれたままなら check-spec は終了コード69で終わり、その錠を消さない" t_check_spec_lock_held
+
+echo "--- check-spec の spec の予約(session-overlap-guard 要件2.5)"
+run_test "ほかの作業中のセッションの600秒以内の予約は starting の要素になり、予約と変更の両方があれば changes" t_check_spec_reserve_starting
+run_test "600秒より古い予約、作業中でないセッションや閉じたセッションの予約、作業フォルダの違う予約、壊れた予約、このセッション自身の予約は無視する" t_check_spec_reserve_ignored
+run_test "conflicts が空のときだけ、このセッションの予約が書かれる" t_check_spec_reserve_written
+run_test "予約を書けなければ終了コード69で、JSON を出さず、錠と一時的な索引を残さない" t_check_spec_reserve_write_failure
 
 echo "--- check-spec の判定: 変更のかたまりを M の行の位置で比べる(session-overlap-guard 要件2.1・2.4・3.1)"
 run_test "マージしていない書き換えは要素が出て、squash でマージしたあとは隣の行が変わっても空。main が同じ行を別の中身に変えたときと、マージのあとにさらに書き換えたときは要素が出る" t_check_spec_squash_merged
