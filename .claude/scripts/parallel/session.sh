@@ -57,9 +57,16 @@
 #         W の .kiro/specs/<feature> が W の中身にも HEAD の木にも無ければ、W の HEAD を S とする
 #         それ以外は、W の git のディレクトリに置いた一時的な索引で、W の HEAD に spec のディレクトリだけを載せた
 #           一時的なコミット S を作る(W の索引と中身は変えない。S はどのブランチにも載せない)
-#         origin/main と S の分かれ目 M から S までに spec のディレクトリのファイルの変更があれば、直している
-#       直している W の作業中のセッションを、すべて要素にする。調べの git のコマンドが失敗したら、JSON を出さずに、
-#       どの作業フォルダで何が失敗したかを「[parallel] 調べられない:」で始まる文で標準エラーに出し、
+#         origin/main と S の分かれ目 M から S までに変わった spec のファイルごとに、W の変更が origin/main に
+#           中身として入っているかを、変更のかたまり(git diff -U0 の、M のファイルの行の範囲と足した行)を M の行の位置で
+#           比べて判定する。差分は M→S と M→origin/main を、作り方のオプションを固定し GIT_DIFF_OPTS を外して取る。
+#           W のかたまりごとに、重なるか接する main のかたまりを集め、集めたものが無い、W が置き換えた M の行が
+#           集めた main のかたまりの範囲に無い、W が足した行が集めた main のかたまりの足した行の中に同じ順で現れない、
+#           のどれかに当たれば入っていない。バイナリのファイル(NUL を含む)は S と origin/main の blob が同じときだけ
+#           入っている。無いファイルは0行の中身として扱う。入っていないファイルが1つでもあれば、直している
+#       直している W の作業中のセッションを、すべて要素にする。調べの git のコマンドが失敗したときと、
+#       差分のかたまりの本文に前後の行(空白で始まる行)があるときは、JSON を出さずに、どの作業フォルダで何が
+#       起きたか(前後の行のときはファイルの名前)を「[parallel] 調べられない:」で始まる文で標準エラーに出し、
 #       一時的な索引を消して、終了コード69で終わる。
 #   spec-names
 #       すべての作業フォルダの .kiro/specs/ のディレクトリ名を、重ならないように1行ずつ出す。
@@ -95,7 +102,8 @@
 #
 # 終了コード: 0(成功)、1(claim がほかのセッションの記録を断った、takeover が引き継げなかった)、64(呼び方の誤り)、
 #             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない、
-#             check-spec の origin/main が手元に無い、check-spec の調べの git のコマンドが失敗した)。
+#             check-spec の origin/main が手元に無い、check-spec の調べの git のコマンドが失敗した、
+#             check-spec の差分のかたまりに前後の行が入った)。
 # 前提: bash・perl(JSON::PP)・git。jq には依存しない。
 # =====================================================================
 
@@ -1076,12 +1084,183 @@ _kp_ss_spec_fail() { # <作業フォルダ> <何が失敗したか> <git の文>
     _kp_ss_die69 "[parallel] 調べられない: 作業フォルダ $1 で、$2 に失敗した: $(_kp_ss_one_line "$3")"
 }
 
+# check-spec の判定(手順4の3と4)。perl -e "$_KP_SS_PL_SPEC_JUDGE" -- <いまの作業フォルダ> <M> <S> <origin/main> <spec のディレクトリ>
+# の形で呼ぶ。M から S までに変わった spec のファイルごとに、W の変更が origin/main に中身として入っているかを、
+# 変更のかたまりを M の行の位置で比べて判定する。
+#   かたまり: M のファイルの行の間の位置で [始まり, 終わり) と、足した行の並び。行を足しただけのかたまりは始まりと終わりが同じ
+#   W のかたまりごとに、重なるか接する(始まりと終わりの位置を含む)main のかたまりを集める。集めたものが無い、
+#   W が置き換えた M の行のどれかが集めた main のかたまりの範囲に無い、W が足した行が集めた main のかたまりの足した行の中に
+#   同じ順で現れない(続いていなくてよい)、のどれかに当たれば、W の変更は入っていない
+#   ファイルの中身(M・S・origin/main のどれか)に NUL があるか、git がバイナリとみなしたときは、S と origin/main の
+#   blob が同じ(どちらにも無いときを含む)ときだけ入っている。無いファイルは0行の中身として扱う
+# 終了コード: 0(どのファイルも入っている。直していない)、1(入っていないファイルがある。直している)、
+#   2(git のコマンドが失敗した。標準出力に「何が失敗したか \x1f git の文」)、
+#   3(差分のかたまりの本文に前後の行(空白で始まる行)か読めない行がある。標準出力にファイルの名前)、
+#   4(perl の処理が止まった。標準出力に理由)
+# 差分の作り方のオプションは固定し、GIT_DIFF_OPTS は外す(-U0 より優先され、差分に前後の行が入るため)
+# shellcheck disable=SC2016 # perl のコードなので、$ を展開しない
+_KP_SS_PL_SPEC_JUDGE='
+    use strict; use warnings;
+    use File::Temp ();
+    use POSIX ();
+    my ($top, $m, $s, $mn, $dir) = @ARGV;
+    delete $ENV{GIT_DIFF_OPTS};
+    $SIG{__DIE__} = sub { print "perl: @_"; exit 4 };
+
+    sub git_fail { my ($what, $msg) = @_; print $what, "\x1f", $msg; exit 2 }
+
+    # git を打ち、標準出力を返す(<標準入力> が undef でなければ、それを標準入力に渡す)。失敗したら git_fail
+    sub git_out {
+        my ($what, $in, @args) = @_;
+        my $err = File::Temp->new;
+        my $inf;
+        if (defined $in) {
+            $inf = File::Temp->new;
+            binmode $inf;
+            print {$inf} $in;
+            $inf->flush;
+        }
+        my $pid = open(my $fh, "-|");
+        git_fail($what, "git を起動できない: $!") unless defined $pid;
+        if (!$pid) {
+            open(STDERR, ">&", $err) or POSIX::_exit(127);
+            if (defined $inf) { open(STDIN, "<", $inf->filename) or POSIX::_exit(127) }
+            exec("git", "--literal-pathspecs", "-C", $top, @args) or POSIX::_exit(127);
+        }
+        binmode $fh;
+        my $out = do { local $/; <$fh> } // "";
+        close $fh;
+        if ($?) {
+            my $code = $? >> 8;
+            seek($err, 0, 0);
+            my $msg = do { local $/; <$err> } // "";
+            git_fail($what, length $msg ? $msg : "git の終了コード $code");
+        }
+        return $out;
+    }
+
+    # <コミット> の spec のディレクトリの blob の表(パス => オブジェクト)。無いファイルは表に入らない
+    sub tree_blobs {
+        my ($rev) = @_;
+        my %b;
+        for my $e (split /\0/, git_out("spec のファイルの一覧を読むこと", undef,
+                "ls-tree", "-r", "-z", "--full-tree", $rev, "--", $dir)) {
+            $b{$2} = $1 if $e =~ /\A\d+ blob ([0-9a-f]+)\t(.*)\z/s;
+        }
+        return \%b;
+    }
+
+    # 中身に NUL の文字がある blob の表
+    sub nul_blobs {
+        my @oids = @_;
+        my %nul;
+        return \%nul unless @oids;
+        my $what = "spec のファイルの中身を読むこと";
+        my $out = git_out($what, join("", map { "$_\n" } @oids), "cat-file", "--batch");
+        my $pos = 0;
+        for my $oid (@oids) {
+            my $nl = index($out, "\n", $pos);
+            my $head = $nl < 0 ? substr($out, $pos) : substr($out, $pos, $nl - $pos);
+            git_fail($what, "cat-file の出力を読めない: $head") unless $nl >= 0 && $head =~ /\A\Q$oid\E \S+ (\d+)\z/;
+            $nul{$oid} = 1 if index(substr($out, $nl + 1, $1), "\0") >= 0;
+            $pos = $nl + 1 + $1 + 1;
+        }
+        return \%nul;
+    }
+
+    # M から <コミット> までの <パス> の変更のかたまり: [始まり, 終わり, [足した行...]]。
+    # git がバイナリとみなしたら undef。かたまりの本文に前後の行か読めない行があれば、ファイルの名前を出して終了コード3
+    sub hunks {
+        my ($rev, $path) = @_;
+        my $out = git_out("spec のファイルの差分を取ること", undef, "diff", "-U0", "--diff-algorithm=myers",
+            "--indent-heuristic", "--inter-hunk-context=0", "--no-renames", "--no-color", "--no-ext-diff",
+            "--no-textconv", $m, $rev, "--", $path);
+        my $bad = sub { print $path; exit 3 };
+        my (@h, $cur, $del, $add, $prev);
+        for my $line (split /\n/, $out) {
+            if ($line =~ /\A\@\@ -(\d+)(?:,(\d+))? \+\d+(?:,(\d+))? \@\@/) {
+                $bad->() if $cur && ($del || $add);
+                my $len = $2 // 1;
+                my $start = $len ? $1 - 1 : $1;
+                $cur = [ $start, $start + $len, [] ];
+                ($del, $add, $prev) = ($len, $3 // 1, "");
+                push @h, $cur;
+            } elsif (!$cur) {
+                return undef if $line =~ /\ABinary files /;
+            } elsif ($line =~ /\A-/) {
+                ($del, $prev) = ($del - 1, "-");
+            } elsif ($line =~ /\A\+(.*)\z/s) {
+                push @{ $cur->[2] }, $1;
+                ($add, $prev) = ($add - 1, "+");
+            } elsif ($line =~ /\A\\/) {
+                # 終わりに改行の無い行は、改行のある行と別の中身として比べる
+                $cur->[2][-1] .= "\n" if $prev eq "+";
+            } else {
+                # 前後の行(空白で始まる行)と読めない行
+                $bad->();
+            }
+        }
+        $bad->() if $cur && ($del || $add);
+        return \@h;
+    }
+
+    # W のかたまりが、どれも main のかたまりに入っているか
+    sub contained {
+        my ($wh, $mh) = @_;
+        for my $h (@$wh) {
+            # M の行の位置で重なるか接する main のかたまり
+            my @near = grep { $h->[0] <= $_->[1] && $_->[0] <= $h->[1] } @$mh;
+            return 0 unless @near;
+            # W が置き換えた M の行は、どれも集めた main のかたまりの範囲に入っていなければならない(位置だけで比べる)
+            for my $i ($h->[0] .. $h->[1] - 1) {
+                return 0 unless grep { $_->[0] <= $i && $i < $_->[1] } @near;
+            }
+            # W が足した行は、集めた main のかたまりが足した行の中に、同じ順で現れなければならない
+            my @plus = map { @{ $_->[2] } } @near;
+            my $k = 0;
+            for my $line (@{ $h->[2] }) {
+                $k++ while $k < @plus && $plus[$k] ne $line;
+                return 0 if $k >= @plus;
+                $k++;
+            }
+        }
+        return 1;
+    }
+
+    my @files = grep { length } split /\0/, git_out("spec の差分を取ること", undef,
+        "diff", "--name-only", "-z", "--no-renames", "--no-color", $m, $s, "--", $dir);
+    exit 0 unless @files;
+    my @trees = map { tree_blobs($_) } ($m, $s, $mn);
+    my %want;
+    for my $p (@files) {
+        defined $_->{$p} and $want{ $_->{$p} } = 1 for @trees;
+    }
+    my $nul = nul_blobs(sort keys %want);
+    for my $path (@files) {
+        my ($om, $os, $on) = map { $_->{$path} } @trees;
+        my $binary = grep { defined $_ && $nul->{$_} } ($om, $os, $on);
+        my ($wh, $mh);
+        if (!$binary) {
+            $wh = hunks($s, $path);
+            $mh = hunks($mn, $path);
+            $binary = !($wh && $mh);
+        }
+        if ($binary) {
+            exit 1 if ($os // "") ne ($on // "");
+            next;
+        }
+        exit 1 unless contained($wh, $mh);
+    }
+    exit 0;
+'
+
 # 作業フォルダ W が spec <feature> を直しているか(main にまだ入っていない変更を持つか)を判定する。
 # 直していれば終了コード0、直していなければ1。W の索引と中身は変えず、一時的なコミット S はどのブランチにも載せない。
-# git のコマンドが失敗したら、一時的な索引を消し、錠を返して終了コード69で終わる
+# git のコマンドが失敗したときと、差分のかたまりの本文に前後の行があるときは、一時的な索引を消し、
+# 錠を返して終了コード69で終わる
 _kp_ss_spec_changed() { # <作業フォルダ W> <feature> <origin/main のコミット> <いまの作業フォルダ>
     local w="$1" main="$3" me="$4" dir=".kiro/specs/$2"
-    local head out tree snap base wgit names
+    local head out tree snap base wgit judged rc
     head=$(git -C "$w" rev-parse --verify HEAD 2>&1) || _kp_ss_spec_fail "$w" "HEAD を読むこと" "$head"
 
     if [ ! -e "$w/$dir" ] && ! git -C "$w" cat-file -e "$head:$dir" 2>/dev/null; then
@@ -1111,13 +1290,23 @@ _kp_ss_spec_changed() { # <作業フォルダ W> <feature> <origin/main のコ�
     # 3. S と origin/main の分かれ目のコミット M を求める
     base=$(git -C "$me" merge-base "$main" "$snap" 2>&1) \
         || _kp_ss_spec_fail "$w" "origin/main との分かれ目を求めること" "$base"
-    # 4. M から S までに spec のディレクトリのファイルの変更があれば、直しているとみなす
-    names=$(git -C "$me" diff --name-only --no-renames --no-color "$base" "$snap" -- "$dir" 2>&1) \
-        || _kp_ss_spec_fail "$w" "spec の差分を取ること" "$names"
+    # 3 と 4. M から S までに変わった spec のファイルごとに、W の変更が origin/main に中身として入っているかを、
+    #    変更のかたまりを M の行の位置で比べて判定する(_KP_SS_PL_SPEC_JUDGE)
+    judged=$(perl -e "$_KP_SS_PL_SPEC_JUDGE" -- "$me" "$base" "$snap" "$main" "$dir" 2>&1)
+    rc=$?
+    case "$rc" in
+        0 | 1) ;;
+        2) _kp_ss_spec_fail "$w" "${judged%%$'\x1f'*}" "${judged#*$'\x1f'}" ;;
+        3)
+            _kp_ss_spec_rm_index
+            _kp_ss_die69 "[parallel] 調べられない: 作業フォルダ $w の spec のファイル $judged の差分のかたまりに、前後の行(空白で始まる行)か読めない行が入っていて、変更のかたまりを比べられない"
+            ;;
+        *) _kp_ss_spec_fail "$w" "spec の変更のかたまりを比べること" "$judged" ;;
+    esac
 
     # 5. 一時的な索引を消す
     _kp_ss_spec_rm_index
-    [ -n "$names" ]
+    [ "$rc" = 1 ]
 }
 
 kp_session_check_spec() {

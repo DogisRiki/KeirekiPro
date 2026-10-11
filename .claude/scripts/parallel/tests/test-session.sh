@@ -155,6 +155,8 @@ reset_state() {
     local d b
     rm -rf "$STATE"
     git -C "$MAIN_DIR" config --unset keirekipro.parallelSlots 2>/dev/null
+    # check-spec のテストで置いた差分の設定を外す
+    git -C "$MAIN_DIR" config --unset diff.interHunkContext 2>/dev/null
     # takeover のテストで足したリモートを外す
     git -C "$MAIN_DIR" remote remove origin 2>/dev/null
     rm -rf "$ORIGIN_DIR"
@@ -1839,6 +1841,225 @@ t_check_spec_lock_held() {
     [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
 }
 
+# --- check-spec の判定の細かい場面(変更のかたまりを M の行の位置で比べる。session-overlap-guard 要件2.1・2.4)
+# 場面ごとに、spec_base のあとで spec_case で WT と origin/main を作り、expect_spec で WT2 から調べた結果を確かめる。
+# 「squash でのマージ」は、W と同じ中身を、古い main(土台)の上の別のコミットとして origin/main に入れて真似る
+
+# <親のコミット> から <パス> を除いたコミットを作り、その ID を出す(作業フォルダに触れない)
+main_rm_commit() { # <親のコミット> <パス>
+    local idx="$WORK/main-commit.index" tree
+    rm -f "$idx"
+    GIT_INDEX_FILE="$idx" git -C "$MAIN_DIR" read-tree "$1" || return 1
+    GIT_INDEX_FILE="$idx" git -C "$MAIN_DIR" rm -q -r --cached -- "$2" || return 1
+    tree=$(GIT_INDEX_FILE="$idx" git -C "$MAIN_DIR" write-tree) || return 1
+    rm -f "$idx"
+    git -C "$MAIN_DIR" "${GITC[@]}" commit-tree -p "$1" -m "main" "$tree"
+}
+
+# 場面を作る。REQ が <土台> のコミット CASE_BASE に WT を戻し(コミットしていない変更と新しいファイルも消す)、
+# WT の REQ を <W の中身> にする(コミットしない)。origin/main は、CASE_BASE から REQ を <main の中身> に順に
+# 変えたコミットの列の先にする(<main の中身> が無ければ CASE_BASE のまま。マージしていない場面)。中身は printf の %b で読む
+spec_case() { # <土台> <W の中身> [<main の中身>...]
+    local tip c
+    CASE_BASE=$(main_commit "$SEED_SHA" "$REQ" "$1") || die "土台のコミットを作れない"
+    git -C "$WT_DIR" reset -q --hard "$CASE_BASE" || die "WT を土台に戻せない"
+    git -C "$WT_DIR" clean -fdq
+    printf '%b' "$2" >"$WT_DIR/$REQ"
+    tip=$CASE_BASE
+    shift 2
+    for c in "$@"; do
+        tip=$(main_commit "$tip" "$REQ" "$c") || die "origin/main のコミットを作れない"
+    done
+    set_origin_main "$tip"
+}
+
+# WT2 のセッション s-me から check-spec を呼び、WT のセッション s-wt の要素が出るか(changes)、
+# conflicts が空か(empty)を確かめる
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+expect_spec() { # <場面> <changes|empty>
+    local out
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$1: $out"
+    if [ "$2" = changes ]; then
+        [ "$(spec_sids "$out")" = s-wt ] || die "$1: s-wt の要素が出ない: $out"
+        [ "$(pj "$out" '$d->{conflicts}[0]{reason}')" = changes ] || die "$1: reason が changes でない: $out"
+    else
+        [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "$1: conflicts が空でない: $out"
+    fi
+}
+
+t_check_spec_squash_merged() {
+    spec_base
+    spec_case 'a\nb\nc\n' 'A\nb\nc\n'
+    expect_spec "1行目を書き換え、マージしていない" changes
+    spec_case 'a\nb\nc\n' 'A\nb\nc\n' 'a\nB\nc\n'
+    expect_spec "1行目を書き換え、マージしていない(main は隣の2行目を書き換えた)" changes
+    spec_case 'a\nb\nc\n' 'A\nb\nc\n' 'A\nb\nc\n'
+    expect_spec "1行目の書き換えを squash でマージした" empty
+    spec_case 'a\nb\nc\n' 'A\nb\nc\n' 'A\nb\nc\n' 'A\nB\nc\n'
+    expect_spec "1行目の書き換えを squash でマージし、隣の2行目がさらに変わった" empty
+    spec_case 'a\nb\nc\n' 'A\nb\nc\n' 'Z\nb\nc\n'
+    expect_spec "main が同じ1行目を別の中身に変えた" changes
+    spec_case 'a\nb\nc\n' 'A\nb\nc\n' 'A\nb\nc\n' 'A2\nb\nc\n'
+    expect_spec "1行目の書き換えをマージしたあと、main が同じ行をさらに書き換えた" changes
+    # 終わりに改行の無い行は、改行のある行と別の中身として比べる
+    spec_case 'a\nb\nc\n' 'a\nb\nC' 'a\nb\nC\n'
+    expect_spec "最後の行を改行無しで書き換え、main は同じ行を改行ありで書き換えた" changes
+    spec_case 'a\nb\nc\n' 'a\nb\nC' 'a\nb\nC'
+    expect_spec "最後の行を改行無しで書き換えた変更を squash でマージした" empty
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_delete_and_add_lines() {
+    spec_base
+    spec_case 'a\nb\nc\n' 'a\nc\n'
+    expect_spec "2行目を消しただけで、マージしていない" changes
+    spec_case 'a\nb\nc\n' 'a\nc\n' 'a\nc\n'
+    expect_spec "2行目を消した変更を squash でマージした" empty
+    spec_case 'a\nb\nc\n' 'b\nc\n'
+    expect_spec "先頭の行を消し、マージしていない" changes
+    spec_case 'a\nb\nc\n' 'b\nc\n' 'b\nc\n'
+    expect_spec "先頭の行を消した変更を squash でマージした" empty
+    spec_case 'a\nb\nc\n' ''
+    expect_spec "ファイルを空にし、マージしていない" changes
+    spec_case 'a\nb\nc\n' '' ''
+    expect_spec "ファイルを空にした変更を squash でマージした" empty
+    spec_case 'a\nb\nc\n' 'a\nN\nb\nc\n'
+    expect_spec "行を1行足しただけで、マージしていない" changes
+    spec_case 'a\nb\nc\n' 'a\nN\nb\nc\n' 'a\nN\nb\nc\n'
+    expect_spec "行を足した変更を squash でマージした" empty
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_files_and_dir() {
+    local tip pad
+    spec_base
+    # コミットしていない新しいファイルだけを足した
+    spec_case 'a\nb\nc\n' 'a\nb\nc\n'
+    mkdir -p "$WT_DIR/.kiro/specs/beta/reviews"
+    printf 'note\n' >"$WT_DIR/.kiro/specs/beta/reviews/r.md"
+    expect_spec "コミットしていない新しいファイルだけを足し、マージしていない" changes
+    tip=$(main_commit "$CASE_BASE" .kiro/specs/beta/reviews/r.md 'note\n') || die "origin/main のコミットを作れない"
+    set_origin_main "$tip"
+    expect_spec "新しいファイルを squash でマージした" empty
+    # spec のディレクトリを作業フォルダで消した(コミットしていない)
+    spec_case 'a\nb\nc\n' 'a\nb\nc\n'
+    rm -rf "$WT_DIR/.kiro/specs/beta"
+    expect_spec "spec のディレクトリを作業フォルダで消し、マージしていない" changes
+    tip=$(main_rm_commit "$CASE_BASE" .kiro/specs/beta) || die "origin/main のコミットを作れない"
+    set_origin_main "$tip"
+    expect_spec "spec のディレクトリを消した変更を squash でマージした" empty
+    # spec のディレクトリを消してコミットした(作業フォルダにも HEAD の木にも spec が無い)
+    spec_case 'a\nb\nc\n' 'a\nb\nc\n'
+    git -C "$WT_DIR" rm -q -r -- .kiro/specs/beta || die "spec のディレクトリを消せない"
+    git -C "$WT_DIR" "${GITC[@]}" commit -q -m remove-spec || die "消したことをコミットできない"
+    expect_spec "spec のディレクトリを消してコミットし、マージしていない" changes
+    set_origin_main "$tip"
+    expect_spec "spec のディレクトリを消してコミットした変更を squash でマージした" empty
+    # バイナリのファイル(NUL を含む)は、S と origin/main の中身が同じときだけ入っているとみなす
+    spec_case 'a\nb\nc\n' 'a\nb\nc\n'
+    printf 'x\000y\n' >"$WT_DIR/.kiro/specs/beta/b.bin"
+    expect_spec "バイナリのファイルを足し、マージしていない" changes
+    tip=$(main_commit "$CASE_BASE" .kiro/specs/beta/b.bin 'x\0000z\n') || die "origin/main のコミットを作れない"
+    set_origin_main "$tip"
+    expect_spec "main が同じバイナリのファイルを別の中身で足した" changes
+    tip=$(main_commit "$CASE_BASE" .kiro/specs/beta/b.bin 'x\0000y\n') || die "origin/main のコミットを作れない"
+    set_origin_main "$tip"
+    expect_spec "バイナリのファイルを squash でマージした" empty
+    # NUL が先頭の8000バイトより後ろにあり、git が文字のファイルとみなすときも、中身(blob)で比べる。
+    # main は W の足した行に1行を足した中身なので、変更のかたまりで比べると入っているように見える
+    spec_case 'a\nb\nc\n' 'a\nb\nc\n'
+    pad=$(printf '%9000s' '' | tr ' ' a)
+    printf '%s\n\000\n' "$pad" >"$WT_DIR/.kiro/specs/beta/late.bin"
+    tip=$(main_commit "$CASE_BASE" .kiro/specs/beta/late.bin "$pad\n\0000\nZ\n") || die "origin/main のコミットを作れない"
+    set_origin_main "$tip"
+    git -C "$MAIN_DIR" diff "$CASE_BASE" "$tip" | grep -q '^@@' || die "前提: git が NUL の遅いファイルをバイナリとみなした"
+    expect_spec "NUL が後ろにあるファイルを足し、main は1行多い中身で足した" changes
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_same_content_elsewhere() {
+    spec_base
+    spec_case 'a\nb\nc\n' 'c\nb\nc\n'
+    expect_spec "1行目の a を c に書き換え、main は別の行に c を持つだけ" changes
+    spec_case 'a\nb\nc\n' 'a\nN\nb\nc\n' 'a\nb\nc\nN\n'
+    expect_spec "行を足し、main は同じ中身の行を別の場所に足しただけ" changes
+    # 2行目と4行目が空行のファイル
+    spec_case 'x\n\ny\n\nz\n' 'x\ny\n\nz\n' 'x\n\ny\nz\n'
+    expect_spec "2行目の空行を消し、main は4行目の空行を消した" changes
+    spec_case 'x\n\ny\n\nz\n' 'x\ny\n\nz\n' 'x\n\nY\nz\n'
+    expect_spec "2行目の空行を消し、main は3行目を書き換えて4行目の空行を消した" changes
+    spec_case 'x\n\ny\n\nz\n' 'x\n\ny\nz\n' 'x\nY\n\nz\n'
+    expect_spec "4行目の空行を消し、main は2行目の空行を消して3行目を書き換えた" changes
+    spec_case 'x\n\ny\n\nz\n' 'x\n\ny\nz\n' 'x\n\ny\nz\n' 'x\n\nY\nz\n'
+    expect_spec "4行目の空行を消した変更を squash でマージし、3行目も書き換えた" empty
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_hunk_positions() {
+    spec_base
+    spec_case '1\n2\n3\n4\n5\n' '1\n2\n5\n' '1\n2\n3\nFOUR\n5\n'
+    expect_spec "3行目と4行目を消し、main は4行目だけを書き換えた" changes
+    spec_case '1\n2\n3\n4\n5\n' '1\n2\n5\n' '1\n2\n5\n'
+    expect_spec "3行目と4行目を消した変更を squash でマージした" empty
+    spec_case 'a\nb\nc\n' 'a\nN\nb\nc\n' 'a\nN\nb\nc\n' 'A\nN\nb\nc\n'
+    expect_spec "行を足した変更を squash でマージし、直前の行を書き換えた" empty
+    spec_case 'a\nb\nc\n' 'a\nN\nb\nc\n' 'a\nN\nb\nc\n' 'a\nN\nB\nc\n'
+    expect_spec "行を足した変更を squash でマージし、直後の行を書き換えた" empty
+    spec_case 'a\nb\nc\n' 'a\nb\nN\nc\n' 'A\nN\nb\nc\n'
+    expect_spec "2行目のあとに行を足し、main は同じ中身の行を1行目のあとに足して1行目を書き換えた" changes
+    # 足した行は、main の足した行の中に同じ順で現れなければならない
+    spec_case 'a\nb\nc\n' 'a\nX\nY\nb\nc\n' 'a\nY\nX\nb\nc\n'
+    expect_spec "1行目のあとに X と Y を足し、main は同じ位置に Y と X の順で足した" changes
+    spec_case 'a\nb\nc\n' 'a\nX\nY\nb\nc\n' 'a\nX\nY\nb\nc\n'
+    expect_spec "1行目のあとに X と Y を足した変更を squash でマージした" empty
+    spec_case '1\n2\n3\n4\n5\n' '1\n2\n3\n5\n' '1\n2\n3\n4\nNEW\n5\n'
+    expect_spec "4行目を消し、main は4行目と5行目の間に行を足しただけ" changes
+    spec_case '1\n2\n3\n4\n5\n' '1\n2\n3\n5\n' '1\n2\nTHREE\n4\nFIVE\n'
+    expect_spec "4行目を消し、main は3行目と5行目を書き換えた" changes
+    # 利用者の git の設定と環境変数で、かたまりの区切りと前後の行が変わらない
+    git -C "$MAIN_DIR" config diff.interHunkContext 3
+    [ "$(git -C "$MAIN_DIR" diff -U0 "$CASE_BASE" origin/main -- "$REQ" | grep -c '^@@')" = 1 ] \
+        || die "前提: diff.interHunkContext で main の2つのかたまりが1つにまとまらない"
+    expect_spec "diff.interHunkContext を置いても、4行目を消し main が3行目と5行目を書き換えた" changes
+    git -C "$MAIN_DIR" config --unset diff.interHunkContext
+    GIT_DIFF_OPTS=-u3 git -C "$MAIN_DIR" diff -U0 "$CASE_BASE" origin/main -- "$REQ" | grep -q '^ ' \
+        || die "前提: GIT_DIFF_OPTS で差分に前後の行が入らない"
+    export GIT_DIFF_OPTS=-u3
+    expect_spec "GIT_DIFF_OPTS を置いても、4行目を消し main が3行目と5行目を書き換えた" changes
+    unset GIT_DIFF_OPTS
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_context_line_refused() {
+    local real_git out rc err
+    spec_base
+    spec_case 'a\nb\nc\n' 'A\nb\nc\n' 'A\nb\nc\n'
+    real_git=$(command -v git)
+    mkdir -p "$TMP_ROOT/gitctx"
+    # -U0 の git diff の出力の、最初のかたまりの本文に、空白で始まる行(前後の行)を混ぜる偽物の git
+    cat >"$TMP_ROOT/gitctx/git" <<EOF
+#!/bin/bash
+set -o pipefail
+case " \$* " in
+    *" diff "*"-U0 "*)
+        "$real_git" "\$@" | perl -pe 'if (!\$done && /^@@ /) { \$_ .= " injected\\n"; \$done = 1 }'
+        exit
+        ;;
+esac
+exec "$real_git" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/gitctx/git"
+    "$TMP_ROOT/gitctx/git" -C "$MAIN_DIR" diff -U0 "$CASE_BASE" origin/main -- "$REQ" | grep -q '^ injected$' \
+        || die "前提: 偽物の git が前後の行を混ぜない"
+    out=$(PATH="$TMP_ROOT/gitctx:$PATH" ss "$WT2_DIR" check-spec beta --issue 50 --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    err=$(cat "$WORK/err.txt")
+    [ "$rc" = 69 ] || die "差分に前後の行があるのに終了コードが69でない: $rc: $out $err"
+    [ -z "$out" ] || die "差分に前後の行があるのに JSON を出した: $out"
+    case "$err" in *'[parallel] 調べられない:'*"$WT"*"$REQ"*) ;; *) die "標準エラーに作業フォルダとファイルの名前が無い: $err" ;; esac
+    spec_clean_after "差分に前後の行があったとき"
+}
+
 echo "--- check-start: 同じ作業フォルダの別のセッション(要件5.1・5.2)"
 run_test "同じ作業フォルダに別の作業中のセッションの記録があると folder_conflict に出る" t_folder_conflict
 run_test "同じ作業フォルダの、Issueの記録の無いセッション(着手していない記録)は folder_conflict に出ない" t_folder_conflict_idle_ignored
@@ -1935,6 +2156,14 @@ run_test "origin/main が無いと終了コード69" t_check_spec_no_origin_main
 run_test "名前に大文字か / を含むときと、--issue が無いか数でないときは終了コード64" t_check_spec_usage
 run_test "調べの git が失敗したら終了コード69で、作業フォルダと理由を出し、錠と一時的な索引を残さない" t_check_spec_git_failure
 run_test "錠がほかに持たれたままなら check-spec は終了コード69で終わり、その錠を消さない" t_check_spec_lock_held
+
+echo "--- check-spec の判定: 変更のかたまりを M の行の位置で比べる(session-overlap-guard 要件2.1・2.4・3.1)"
+run_test "マージしていない書き換えは要素が出て、squash でマージしたあとは隣の行が変わっても空。main が同じ行を別の中身に変えたときと、マージのあとにさらに書き換えたときは要素が出る" t_check_spec_squash_merged
+run_test "行を消しただけ・先頭の行を消した・ファイルを空にした・行を足しただけは、マージしていなければ要素が出て、squash のあとは空" t_check_spec_delete_and_add_lines
+run_test "コミットしていない新しいファイル・spec のディレクトリの削除(コミットしたものも)・バイナリのファイルは、マージしていなければ要素が出て、squash のあとは空" t_check_spec_files_and_dir
+run_test "同じ中身の行が別の場所にあるか、別の場所で消されていても要素が出て、隣り合う空行の squash のあとは空" t_check_spec_same_content_elsewhere
+run_test "置き換えた行の一部だけを main が変えたとき、行を足しただけの main のかたまり、diff.interHunkContext と GIT_DIFF_OPTS で判定が変わらず、足した行の squash のあとは前後の行が変わっても空" t_check_spec_hunk_positions
+run_test "差分のかたまりの本文に前後の行があれば終了コード69で、作業フォルダとファイルの名前を出し、錠と一時的な索引を残さない" t_check_spec_context_line_refused
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"
