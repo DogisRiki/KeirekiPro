@@ -38,7 +38,7 @@ Decide the mode from $ARGUMENTS before doing anything else:
    - Write `spec.json` and `requirements.md` to spec directory
 
 ## Update Mode Steps(更新の形)
-Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-2 only read; nothing is written until step 3.
+Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-2 only read, and steps 2a-2d only check for other sessions and bring in the latest main; do not write any file of the spec until step 3 (or step 4 on the repair path). The only change to the working folder before then is the `git merge origin/main` of step 2d.
 
 1. **Read the new Issue**: Run `gh issue view <N> --json number,title,body,state`. The body is the owner's request. Do NOT read the comments (no `comments` field, no `--comments`), for the same reason as step 0 of the Execution Steps. If the command fails or the Issue does not exist, report it and write nothing.
 2. **Check the existing files** (read only):
@@ -46,7 +46,31 @@ Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-
    - Read `requirements.md`. If it has no anchor line, report it as an error (name the expected anchor) and write nothing (there is no place to append the new request).
    - Read `spec.json`: if N equals `issue` or is already in `additional_issues`:
      - If `requirements.md` already has the heading `### 追加の要望(Issue #<N>)` (or N equals `issue`), write nothing. Report that the spec already covers #N, its current progress (`phase` and each stage's `generated` / `approved`), and the next command the owner should type.
-     - If N is in `additional_issues` but `requirements.md` has no `### 追加の要望(Issue #<N>)` heading, the previous run wrote `spec.json` but failed to write `requirements.md`. Do NOT redo step 3 (the approvals are already revoked and recorded). Redo only step 4, then step 5, and say that this run repaired the missing request in requirements.md.
+     - If N is in `additional_issues` but `requirements.md` has no `### 追加の要望(Issue #<N>)` heading, the previous run wrote `spec.json` but failed to write `requirements.md`. Do NOT redo step 3 (the approvals are already revoked and recorded). Run steps 2a-2d, then redo only step 4, then step 5, and say that this run repaired the missing request in requirements.md.
+   - Otherwise, run steps 2a-2d, then continue with step 3.
+
+**Steps 2a-2d (before writing the spec)**: These steps check that no other working session is editing the same spec, and bring the latest main into this branch. Do NOT run them when step 2 decided to write nothing (the spec already covers #N). Run them before step 3 on the normal path, and before step 4 on the repair path. Until they finish, do not write any file of the spec.
+
+2a. **Fetch**: Run `git fetch origin` as a standalone command. If it fails, tell the owner that it failed and show git's message, write nothing, and stop.
+2b. **Check other sessions**: Run `bash .claude/scripts/parallel/session.sh check-spec <feature> --issue <N> --session <ID>` as a standalone command.
+   - Take the session ID from the line `[parallel] このセッションのID: <ID>` that the SessionStart hook gave at the start of the conversation (the same way as `/start`). If that line is not found, omit `--session <ID>`.
+   - If the exit code is not 0 (64: wrong arguments, 69: the check could not finish), tell the owner the exit code and its stderr, write nothing, and stop. Do not treat a failed check as "no conflicts".
+   - On exit code 0, stdout is one line of JSON: `{"conflicts":[{"folder","session_id","started_at","last_seen","issue","reason"}, ...]}`. Each element is another working session that is editing this spec, oldest `started_at` first.
+2c. **If `conflicts` is not empty, ask and stop**: Show the spec name (`<feature>`) and, for each element:
+   - the working folder (`folder`)
+   - the Issue number that session is working on (`issue`; say "unknown" when it is `null`)
+   - when that session started (`started_at`) and when it was last used (`last_seen`), as readable local dates and times
+   - what the session is doing, from `reason`: `changes` means that session has changes to this spec that are not in main yet; `starting` means that session has just started reopening this spec and has not written its changes yet
+
+   For each element, ask the owner whether that session was abandoned (quit and will not be continued). Write the questions in the chat text, not with AskUserQuestion (its preamble and preview are not shown to the owner). Then stop and wait for the answers.
+   - If the owner answers "abandoned" for every element, call `bash .claude/scripts/parallel/session.sh end <session_id>` once for each element, then redo step 2b. If `end` exits with a non-zero code, tell the owner the exit code and its stderr, write nothing, and stop.
+   - If any answer is not "abandoned", write nothing and stop. Tell the owner to type the same command again after that session's PR is merged.
+2d. **Bring in the latest main** (only when `conflicts` is empty): Run `git merge-base --is-ancestor origin/main HEAD`.
+   - Exit code 0: this branch already contains `origin/main`. Go on to step 3 (or step 4 on the repair path).
+   - Otherwise, run `git merge origin/main` as a standalone command (exactly this form, with no other options).
+     - If the merge fails, check whether a merge is still in progress with `git rev-parse -q --verify MERGE_HEAD`. Only if that succeeds, run `git merge --abort`. Then tell the owner that main could not be brought in and why (git's message), write nothing, and stop.
+     - If the merge succeeds, the spec files may have changed. Redo step 2 from the start and follow the path it decides. If it decides to write nothing, stop as step 2 says. Otherwise run steps 2a-2d again; this time step 2d finds that the branch already contains `origin/main` and does nothing more.
+
 3. **Update `spec.json` (write this file first)**:
    - **Record the approvals being revoked**: For each stage in `approvals` (`requirements`, `design`, `tasks`) whose `approved` is `true`, append one element to `approval_history` (create the array if missing):
      ```json
@@ -81,6 +105,7 @@ Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-
 ## Important Constraints
 - Do NOT generate requirements, design, or tasks. This skill only creates spec.json and requirements.md (or, in update mode, updates them).
 - In update mode, do NOT create a new directory or a new feature name.
+- In update mode, do NOT write any file of the spec until steps 2a-2d have finished. If another working session is editing the spec, or the check or the merge of main fails, stop without writing.
 </instructions>
 
 ## Output Description
@@ -99,6 +124,8 @@ In update mode, use this structure instead:
 4. **Next Step**: Command block showing `/kiro-spec-requirements <feature-name>`
 
 If #N was already in the spec (Update Mode Step 2), report only that fact, the current progress, and the next command; say that nothing was written. If Step 2 found the requirements.md block missing and only Step 4 was redone, say so and list only `requirements.md` as updated.
+
+If update mode stopped in steps 2a-2d (the fetch, the check, or the merge of main failed, or another working session is editing the spec), use none of the structures above. Report why it stopped, as those steps say, and that nothing was written. When it stopped to ask about other sessions, end with the questions.
 
 **Format Requirements**:
 - Use Markdown headings (##, ###)

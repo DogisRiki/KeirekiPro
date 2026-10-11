@@ -61,7 +61,7 @@
   - _対象の部品: start スキルの変更_
   - _依存: 1.3_
 
-- [ ] 3.2 `/kiro-spec-init` の更新の形に、spec を書き換える前の手順を足す (並行可)
+- [x] 3.2 `/kiro-spec-init` の更新の形に、spec を書き換える前の手順を足す (並行可)
 
   Claude は、部品「kiro-spec-init スキルの変更」のとおりに、`.claude/skills/kiro-spec-init/SKILL.md` の Update Mode Steps の手順2と手順3の間に手順を足す。Claude は、足す手順に、既存の手順と区別できる番号(2a、2b、2c、2d)を振る。Claude は、design.md の処理の流れの図のとおりに、`git merge origin/main` を打ったあとは手順2からやり直し、2a から 2d ももう一度通ることを書く。2回目に 2d を通るときは、`origin/main` を取り込み済みなので、Claude は何もしない。
   - 完了の確かめ方: SKILL.md の Update Mode Steps に、手順2の「何も書かずに終える」経路では 2a から 2d を行わないこと、requirements.md の書き足しだけをやり直す経路では手順4の前に行うこと、2a(`git fetch origin`)、2b(`check-spec` と、0でない終了コードでの停止)、2c(`conflicts` の示し方、要素ごとの問い、「やめた」なら `end` と 2b のやり直し、それ以外なら止まってマージのあとの打ち直しを知らせること)、2d(`origin/main` を含まなければ `git merge origin/main`、失敗したら `git merge --abort` と停止)が書かれている
