@@ -52,7 +52,7 @@
   - _要件: 2.5_
 
 - [ ] 3. スキルと README を直す
-- [ ] 3.1 `/start` に予約と `started` の扱いを書き足す (並行可)
+- [x] 3.1 `/start` に予約と `started` の扱いを書き足す (並行可)
 
   Claude は、部品「start スキルの変更」のとおりに、`.claude/skills/start/SKILL.md` の Step 1.5 の説明と表、問いに添えること、Step 7 の手順1の `claim` の失敗の扱いを直す。
   - 完了の確かめ方: SKILL.md の Step 1.5 の表で、`started` だけの行が `folder_conflict` の行の次、既存の `leftovers` の行の前にあり、「やめた」の答えで `session.sh end <active_session の session_id>` を呼ぶと書かれている。Step 7 の手順1に、`claim` が終了コード1で終わったら止まって伝えることが書かれている

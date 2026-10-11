@@ -69,12 +69,15 @@ AIは、同じ作業フォルダで作業中のほかのセッションと、Iss
    bash .claude/scripts/parallel/session.sh check-start <N> --session <ID>
    ```
 
+   `check-start` は、`folder_conflict` `leftovers` `branch_only` がすべて空のときに、Issue #N の着手の予約を書く。この予約は、ほかのセッションが呼ぶ `check-start` には、`leftovers` の要素の種類(`kinds`)が `started` の作りかけとして見える
+
    終了コードが0でないとき(64 は呼び方の誤り、69 は git のリポジトリの外・設定の値の誤り・記録を書けない)は、AIは着手せず、終了コードと標準エラーの文を所有者に伝えて止まる。推測で進めない
 3. AIは、JSON の欄ごとに、次の表で所有者に出す問いと、答えに応じて呼ぶサブコマンドを決める。表の `session.sh` は `bash .claude/scripts/parallel/session.sh` を指し、どのサブコマンドにも1で取ったIDを `--session <ID>` で付ける(`end` は除く)
 
 | JSON の欄 | AIが所有者に出す問い | 答えに応じて呼ぶサブコマンド |
 |---|---|---|
 | `folder_conflict` が空でない | やめたか | 「やめた」なら `session.sh end <ID>`(`<ID>` は要素の `session_id`) |
+| `leftovers` の要素で `kinds` が `started` だけ | やめたか | 「やめた」なら `session.sh end <ID>`(`<ID>` は要素の `active_session` の `session_id`) |
 | `leftovers` の要素で `is_self` が真 | 続きから進めるか | 「進める」なら `session.sh takeover <N> --from <いまの作業フォルダ>`(要素の `folder` と同じ) |
 | `leftovers` の要素で `is_self` が偽、`active_session` が `null` でない | やめたか | 「やめた」なら `session.sh takeover <N> --from <folder>` |
 | `leftovers` の要素で `is_self` が偽、`active_session` が `null` | 続きから進めるか | 「進める」なら `session.sh takeover <N> --from <folder>` |
@@ -82,8 +85,9 @@ AIは、同じ作業フォルダで作業中のほかのセッションと、Iss
 | `capacity.active` の数が `capacity.limit` 以上 | 問いは出さない | なし |
 
 - AIは、表の上の行から順に扱う。`folder_conflict` を、Issueの作りかけ(`leftovers` と `branch_only`)より先に扱う
-- 問いを出すときは、AIは止まって所有者の答えを待つ。問いには、相手のセッションか作りかけを特定できることを添える。`folder_conflict` では、要素の `session_id` と、`started_at`(始めた時刻)と `last_seen`(最後に操作された時刻)を読める日時にしたもの。`leftovers` では、作りかけが残っている作業フォルダの場所(`folder`)、作りかけの種類(`kinds`)、ブランチ(`branch`)、その作業フォルダで作業中のセッションがあるかどうか(`active_session`)。`branch_only` では、残っているブランチの名前(`branch`)
+- 問いを出すときは、AIは止まって所有者の答えを待つ。問いには、相手のセッションか作りかけを特定できることを添える。`folder_conflict` では、要素の `session_id` と、`started_at`(始めた時刻)と `last_seen`(最後に操作された時刻)を読める日時にしたもの。`leftovers` の要素で `kinds` が `started` だけのものでは、作業フォルダの場所(`folder`)と、そのセッションを始めた時刻と最後に操作された時刻(`active_session` の `started_at` と `last_seen` を読める日時にしたもの)と、そのセッションがまだブランチを作っていないこと。そのほかの `leftovers` の要素では、作りかけが残っている作業フォルダの場所(`folder`)、作りかけの種類(`kinds`)、ブランチ(`branch`)、その作業フォルダで作業中のセッションがあるかどうか(`active_session`)。`branch_only` では、残っているブランチの名前(`branch`)
 - `folder_conflict` の問いには、同じ作業フォルダで別のセッションが作業中であることと、そのセッションをやめていないなら worktree を選んでセッションを開き直してほしいことを添える。要素が複数あるときは、要素ごとに尋ねる
+- `kinds` に `started` のほかの種類もある `leftovers` の要素は、AIは `kinds` が `started` だけの行ではなく、その下の `leftovers` の行で扱う。この要素の `active_session` は `null` でないので、AIは「やめたか」を尋ね、「やめた」なら `session.sh takeover <N> --from <folder>` を呼ぶ。どちらの行でも、AIは1つの要素につき1回だけ尋ねる
 - `leftovers` の要素が複数あるときは、AIはすべての場所を示したうえで、要素ごとに1つずつ尋ねる
 - 所有者が問いに「やめた」「進める」以外で答えたら(「まだ進めている」「進めない」など)、AIはこのセッションではIssue #N の作業をせず、spec もブランチも作らずに止まる。止まるときは、`folder_conflict` では worktree を選んでセッションを開き直すよう、`leftovers` では作りかけが残っている作業フォルダの場所を、`branch_only` では残っているブランチの名前を、所有者に示す
 - `end` か `takeover` を呼んだら、AIは結果を示してから `check-start` を呼び直し、残りの欄を同じ表で扱う。`takeover` が終了コード0で終わったときは、標準出力の、写したファイル(いまの作業フォルダのまま引き継いだときは作りかけ)の一覧と、いまのブランチを示す。標準エラーに注意の文が出ていれば、それも示す
@@ -222,7 +226,7 @@ AIは、Step 5 で決めた、所有者に尋ねる問いがあるかどうか�
 - 問いがあるとき: 問いの候補(Issueの本文と3つの材料から決められない、作り方ごとに違う見える結果と、3つの材料で決められない見える動き)が残り、候補が「1回尋ねれば決まる」の条件を満たしたときである。AIは、判断を示す前に、下の手順1でブランチを作り、`session.sh claim` で記録する。続けて、AIは、Step 6 の書式で判断と「## 問い」の節を示し、止まって所有者の答えを待つ。所有者が答えるまで、AIは実装を始めない。答えを受けたら、AIは、下の「問いの出し方と答えの書き足し」の手順で進め、すべての問いが答えで決まったときだけ、手順2から実装を始める
 - 問いの候補が「1回尋ねれば決まる」の条件を満たさないとき(1回の問いにできないとき)は、判断は「spec を作らずに実装する」にならない。Step 5 の「観点2と観点3の当てはめ方」の5のとおり、候補の出どころの観点に当たるので、AIは spec が要るときの判断で進む
 
-1. AIは `.branch_name_template` に従って、最新の main からブランチを作る。`git fetch origin` を実行してから、`git switch --no-track -c <type>/<short-description> origin/main` で作る。いまいるブランチから作らない(別の feature ブランチにいるときに `/start` を打たれると、そのブランチのコミットを引き継いでしまうため)。git が管理しているファイルにコミットしていない変更があるとき(`git status --porcelain --untracked-files=no` の出力があるとき)は、AIはブランチを作らず、そのことを所有者に伝えて止まる(`origin/main` から作っても、コミットしていない変更は新しいブランチへ持ち越され、持ち越せないときは `git switch` が失敗するため)。git が管理していないファイルは、この判定に含めない。ブランチを作ったら、AIはすぐに `bash .claude/scripts/parallel/session.sh claim <N> --branch <作ったブランチ> --session <ID>` を呼び、Issue #N のブランチとして記録する(`--session` は Step 1.5 の1のとおりに付ける)。`claim` が0でない終了コードで終わったら、AIは先へ進まず、終了コードと標準エラーの文を所有者に伝えて止まる
+1. AIは `.branch_name_template` に従って、最新の main からブランチを作る。`git fetch origin` を実行してから、`git switch --no-track -c <type>/<short-description> origin/main` で作る。いまいるブランチから作らない(別の feature ブランチにいるときに `/start` を打たれると、そのブランチのコミットを引き継いでしまうため)。git が管理しているファイルにコミットしていない変更があるとき(`git status --porcelain --untracked-files=no` の出力があるとき)は、AIはブランチを作らず、そのことを所有者に伝えて止まる(`origin/main` から作っても、コミットしていない変更は新しいブランチへ持ち越され、持ち越せないときは `git switch` が失敗するため)。git が管理していないファイルは、この判定に含めない。ブランチを作ったら、AIはすぐに `bash .claude/scripts/parallel/session.sh claim <N> --branch <作ったブランチ> --session <ID>` を呼び、Issue #N のブランチとして記録する(`--session` は Step 1.5 の1のとおりに付ける)。`claim` が0でない終了コードで終わったら、AIは先へ進まず、終了コードと標準エラーの文を所有者に伝えて止まる。`claim` の終了コード1は、ほかのセッションが同じIssueに着手したことを表す。このとき、AIは作ったブランチを使わずに止まり、標準エラーの `[parallel] 着手できない:` で始まる文を所有者に伝える
    - Step 1.5 で引き継いだ(`session.sh takeover` を呼んだ)あとで、いまのブランチ(`git branch --show-current` の出力)が、Issueの記録 `issues/<N>.json` の `branch` と同じときは、AIはこの手順1を丸ごと飛ばす。新しいブランチを作らず、`session.sh claim` も呼ばずに、いまのブランチで進む。引き継いだブランチのコミットを置き去りにしないためである。Issueの記録は、`git rev-parse --path-format=absolute --git-common-dir` の出力のディレクトリの下の `keirekipro-parallel/issues/<N>.json` にある。記録が無いとき、または記録の `branch` が空のときは、同じとはみなさず、この手順1のとおり新しいブランチを作る
 2. AIはIssueの本文のとおりに実装する。問いに答えてもらったときは、AIは、本文の「決めた方式」に書き足した答えのとおりに実装する。実装の途中は、「途中で見立てが外れたとき」の見直しの時点で、4つの観点を当て直す
 3. AIは `/verify-all` の手順で、変更した領域の verify を通す
