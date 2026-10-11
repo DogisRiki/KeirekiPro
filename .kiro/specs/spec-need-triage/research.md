@@ -95,6 +95,30 @@
 - **Findings**(採らなかったもの): 直すPRに再現テストを必ず入れる決まり、自動レビューに「AIが決めたこと」の確かめを足すこと。どちらも Issue #524 の本文に無いため(所有者に了承済み)
 - **Implications**: requirements の要件2・4・7・10 の #524 の項目は、この壁打ちの結論をもとにしている
 
+### ほかのIssueとまとめた前例(#531)
+- **Context**: 要件11の、まとめ方と残すIssueの決め方
+- **Sources Consulted**: `gh issue view 507`、`gh issue view 530`(2026-10-09 に #530 を #507 へ統合)、`gh api repos/DogisRiki/KeirekiPro/issues/530/comments`(閉じたときのコメント「#507 に統合した。」)、2026-10-11 に #538 を #531 へ統合した操作
+- **Findings**:
+  - 統合では、残すIssueの本文の同じ見出しの節に、閉じるIssueの項目を足し、「(#530 から統合)」と書き込んだ。閉じるIssueは、コメント「#<残すIssue> に統合した。」を付けて `not planned` で閉じた
+  - `gh issue close <N> --reason "not planned" --comment <文>` は gh 2.102.0 で動いた(#538)
+  - #507 の spec(session-overlap-guard)の `created_at` は 2026-10-11 で、統合(2026-10-09)のときには #507 に spec は無かった
+- **Implications**: まとめ方は前例の形にする。spec があるIssueは相手から外すので(要件11.4)、前例のように、spec の無い2つのIssueをまとめる場面が対象になる
+
+### ほかのセッションが作業中のIssueの見分け方(#531)
+- **Context**: 要件11.4 の「ほかのセッションが作業中のIssue」
+- **Sources Consulted**: `.claude/scripts/parallel/session.sh` の使い方の注記(L1-L110)と perl の共通の処理(L186-L250)、`.kiro/specs/session-overlap-guard/design.md` の「作るもの」、2026-10-11 の着手の作業
+- **Findings**:
+  - `check-start <N>` は、作りかけが無ければ #N の着手の予約を書く。2026-10-11 に、Claude が #538 を調べるために `check-start 538` を呼び、#538 の予約を書いてしまった。予約を消すサブコマンドは無く、所有者が記録のファイルを手で消した
+  - 作業中のセッションの見分け(`is_active`)は、session-overlap-guard が `check-start` と `check-spec` のために共通の処理にくくり出してある
+  - 読み取りだけのサブコマンドは無い
+- **Implications**: `session.sh` に、記録を書かない `busy-issues` を足す。`busy-issues` は、spec があるIssueの番号も返す。セッションを閉じると `session-registry.sh` がセッションの記録を消すので(`test-session-registry.sh`)、作業中のセッションの記録だけでは、閉じたセッションが残した作りかけの spec のIssueを外せないためである(design の審査の指摘 D3-1-1)。spec は、すべての作業フォルダの中身、`origin/main` の木、記録に残ったブランチの木から読む。session-overlap-guard が `check-spec` を足した前例と同じく、別の spec のサブコマンドとして足す。Claude が記録のファイル(`issues/<N>.json`)を直接読む案は、記録の形を `/start` の手順が知ることになるため採らない
+
+### 開いているIssueの数と、まとめる相手の探し方の費用(#531)
+- **Context**: requirements の申告(相手ごとに着手と同じ判断を繰り返すと、着手の時間と費用が増える)
+- **Sources Consulted**: `gh issue list --state open`(2026-10-11 時点で20件。うちラベル `audit` 2件、`container-vuln` 1件、`blocked` 2件)
+- **Findings**: 外す条件を当てると、本文を読む候補は十数件になる。条件Bの判断(コードを調べる)を全件に当てる必要は無く、本文が spec の「作るもの」にある名前に触れるかで先に絞れる
+- **Implications**: Step 5.5 は、条件Bを当てる前に、本文の名前で候補を絞る。コードを調べるのは、絞ったあとの候補だけにする
+
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
@@ -178,7 +202,27 @@
 - **Rationale**: 承認の手順を経て spec の本文を直せる。行の形を決めておけば検索で拾える
 - **Trade-offs**: 次の更新が来るまで、spec の本文はコードと食い違ったままになる
 
+### Decision: まとめる提案を出すときは、ブランチを答えのあとに作る(#531)
+- **Context**: 要件11.9、11.14、11.15、requirements の指摘 R4-1-6
+- **Alternatives Considered**:
+  1. 今の Step 6 のとおり、報告の前に #N のブランチを作る — 残すIssueが #N でなくなると、#N のブランチと記録が閉じたIssueのものとして残る
+  2. まとめる提案を出すときだけ、所有者の答えを受けて残すIssueが決まってからブランチを作る — 採用
+- **Selected Approach**: まとめる提案がある報告ではブランチを作らず、コマンドも依頼しない。答えのあとに、残すIssueでブランチを作り、`session.sh claim` で記録する
+- **Rationale**: 答えを待つ間も、Step 1.5 の `check-start` が書いた予約が、ほかのセッションに #N が作業中であることを示す
+- **Trade-offs**: 残すIssueが #N でないとき、#N の予約がこのセッションの記録として残る。#N は閉じているので、`/start #N` は Step 1 で止まり、予約はほかのセッションの着手を止めない
+
+### Decision: 承認済みの spec 2本以上にまたがる直しは、spec ごとの部分に分けて範囲を見る(#531)
+- **Context**: 要件2.8、Issue #531 に統合した #538
+- **Alternatives Considered**:
+  1. 2本以上にまたがれば、範囲の外として扱う — 今の「安全側に寄る」判断と同じで、#538 の困りごとが残る
+  2. 部分ごとに、その部分が変える動きを「作るもの」に持つ spec の範囲で見る — 採用
+- **Selected Approach**: `/start` の「観点2と観点3の当てはめ方」の3の (b) に、部分に分けて見る手順を足す
+- **Rationale**: 各 spec の「作るもの」は、その spec が持つ動きを書いている。部分ごとに持ち主の spec で見れば、どの部分も承認済みの範囲の中にあるかを判定できる
+- **Trade-offs**: spec が要ると判断したあとの「どの spec を直すか」は今のまま(1つの spec に収まらなければ新しい spec)残る
+
 ## Risks & Mitigations
+- (#531) 条件Bの判定がぶれ、関係の薄いIssueをまとめる提案が出る — 所有者が相手ごとに断れる。断った答えは残さないが、同じ組み合わせが出ても所有者がそのつど答えればよい(要件11.16)
+- (#531) まとめる相手探しで `/start` の時間と費用が増える — spec で進めるときだけ探し、外す条件と名前で候補を絞ってから、コードを調べる
 - (#524) AIが「今の動きのまま」を広く使い、所有者が決めるべき動きを問わずに決める — PR本文の「AIが決めたこと」に材料ごとに残す。所有者が読んで違えば、新しいIssueで直す
 - (#524) 所有者の答えが問いに答えていない — `/start` は、答えで決まらない動きが残ったら spec に改める(要件4.4)
 - AIが4つの観点を甘く判断し、spec の要る変更を spec 無しで進める — 判断の根拠を所有者に示す(要件3)。途中で気づいたら止まる(要件7)。200行の検査が最後に止める
