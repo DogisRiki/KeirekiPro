@@ -1995,6 +1995,74 @@ EOF
     spec_clean_after "予約を書けなかったとき"
 }
 
+# --- prune の spec の予約の片付け(session-overlap-guard 要件2.5)
+# 予約 specs/<名前>.json を、updated_at の JSON の値をそのまま書いて置く
+put_spec_reserve_raw() { # <名前> <updated_at の JSON>
+    mkdir -p "$STATE/specs"
+    printf '{"feature":"%s","folder":"%s","issue":42,"session_id":"s-wt","updated_at":%s}\n' \
+        "$1" "$WT" "$2" >"$STATE/specs/$1.json"
+}
+
+t_prune_spec_reservations() {
+    local out err rc name kept fresh at i
+    local -a bad=()
+    # specs/ が無くても prune は成り立ち、specs/ を作らない
+    ss "$MAIN_DIR" prune >"$WORK/out.txt" 2>"$WORK/err.txt" || die "specs/ が無いときの prune の終了コード $?: $(cat "$WORK/err.txt")"
+    [ ! -e "$STATE/specs" ] || die "specs/ が無いときに prune が specs/ を作った"
+    # 600秒たった予約(old)と、600秒たっていない予約(fresh)と、updated_at が負でない整数でない予約と、読めない JSON
+    put_spec_reserve_raw old "$(($(date +%s) - 600))"
+    put_spec_reserve_raw older "$(($(date +%s) - 86400))"
+    fresh=$(($(date +%s) - 580))
+    put_spec_reserve_raw fresh "$fresh"
+    kept=$(cat "$STATE/specs/fresh.json")
+    i=0
+    for at in '"Inf"' '"x"' 'null' '1.5' '-1' '"1e9"' 'true' '[1]' '{}'; do
+        i=$((i + 1))
+        put_spec_reserve_raw "bad$i" "$at"
+        bad+=("bad$i")
+    done
+    printf '{"feature":"noat","folder":"%s","session_id":"s-wt"}\n' "$WT" >"$STATE/specs/noat.json"
+    printf '{"feature":"broken",' >"$STATE/specs/broken.json"
+    printf '[1,2]\n' >"$STATE/specs/array.json"
+    out=$(ss "$MAIN_DIR" prune 2>"$WORK/err.txt")
+    rc=$?
+    err=$(cat "$WORK/err.txt")
+    [ "$rc" = 0 ] || die "prune の終了コード $rc: $out $err"
+    for name in old older "${bad[@]}" noat broken array; do
+        [ ! -e "$STATE/specs/$name.json" ] || die "spec の予約 $name.json が消えていない: $(cat "$STATE/specs/$name.json")"
+        printf '%s\n' "$out" | grep -qxF "[parallel] 片付け: spec の予約 $name.json を消した" \
+            || die "spec の予約 $name.json を消したことが標準出力に無い: $out"
+    done
+    [ "$(cat "$STATE/specs/fresh.json" 2>/dev/null)" = "$kept" ] || die "600秒たっていない予約が消えたか変わった"
+    case "$out" in *fresh.json*) die "残した予約を消したと出した: $out" ;; esac
+    [ -z "$err" ] || die "片付けで標準エラーに出た: $err"
+    [ ! -e "$LOCK" ] || die "prune が記録の錠を残した"
+    # check-start も、最初の prune で古い予約を消す(標準出力には出さない)
+    put_spec_reserve_raw old "$(($(date +%s) - 700))"
+    out=$(check_start "$MAIN_DIR" check-start 42 --session s-me) || die "$out"
+    [ ! -e "$STATE/specs/old.json" ] || die "check-start の prune が古い予約を消していない"
+    [ -f "$STATE/specs/fresh.json" ] || die "check-start の prune が600秒たっていない予約を消した"
+}
+
+t_prune_spec_reservations_lock_held() {
+    local out err rc
+    put_spec_reserve_raw old "$(($(date +%s) - 700))"
+    # ほかのセッションが記録の錠を持っている(60秒より新しい)あいだは、予約を消さずに理由を標準エラーに出す
+    mkdir -p "$LOCK"
+    out=$(PATH="$TMP_ROOT/fastsleep:$PATH" ss "$MAIN_DIR" prune 2>"$WORK/err.txt")
+    rc=$?
+    err=$(cat "$WORK/err.txt")
+    [ "$rc" = 0 ] || die "錠を取れないときの prune の終了コード $rc: $out $err"
+    [ -f "$STATE/specs/old.json" ] || die "錠を取れないのに予約を消した"
+    case "$err" in *'[parallel]'*'spec の予約'*records.lock*) ;; *) die "標準エラーに spec の予約と錠の理由が無い: $err" ;; esac
+    [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
+    # 錠が返されたあとの prune は消す
+    rmdir "$LOCK"
+    out=$(ss "$MAIN_DIR" prune 2>/dev/null) || die "prune の終了コード $?"
+    [ ! -e "$STATE/specs/old.json" ] || die "錠が返されたあとの prune が古い予約を消していない"
+    [ ! -e "$LOCK" ] || die "prune が記録の錠を残した"
+}
+
 # --- check-spec の判定の細かい場面(変更のかたまりを M の行の位置で比べる。session-overlap-guard 要件2.1・2.4)
 # 場面ごとに、spec_base のあとで spec_case で WT と origin/main を作り、expect_spec で WT2 から調べた結果を確かめる。
 # 「squash でのマージ」は、W と同じ中身を、古い main(土台)の上の別のコミットとして origin/main に入れて真似る
@@ -2316,6 +2384,8 @@ run_test "ほかの作業中のセッションの600秒以内の予約は starti
 run_test "600秒より古い予約、作業中でないセッションや閉じたセッションの予約、作業フォルダの違う予約、壊れた予約、このセッション自身の予約は無視する" t_check_spec_reserve_ignored
 run_test "conflicts が空のときだけ、このセッションの予約が書かれる" t_check_spec_reserve_written
 run_test "予約を書けなければ終了コード69で、JSON を出さず、錠と一時的な索引を残さない" t_check_spec_reserve_write_failure
+run_test "prune は600秒たった spec の予約と updated_at が負でない整数でない予約と読めない予約を消したと出し、新しい予約を残し、specs/ が無くても成り立つ" t_prune_spec_reservations
+run_test "記録の錠がほかに持たれたままなら、prune は spec の予約を消さずに理由を標準エラーに出し、錠が返されたあとに消す" t_prune_spec_reservations_lock_held
 
 echo "--- check-spec の判定: 変更のかたまりを M の行の位置で比べる(session-overlap-guard 要件2.1・2.4・3.1)"
 run_test "マージしていない書き換えは要素が出て、squash でマージしたあとは隣の行が変わっても空。main が同じ行を別の中身に変えたときと、マージのあとにさらに書き換えたときは要素が出る" t_check_spec_squash_merged

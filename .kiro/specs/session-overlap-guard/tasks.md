@@ -44,7 +44,7 @@
   - 受入基準とテストの対応: 要件2の受入基準5(同じ時に重なっても片方だけ)は、テストの「600秒以内のほかのセッションの spec の予約があると starting の要素が出て、古い予約は無視する」と「conflicts が空のときだけ spec の予約が書かれる」で確かめる
   - _要件: 2.5_
 
-- [ ] 2.4 `prune` が古い spec の予約を片付けるようにする
+- [x] 2.4 `prune` が古い spec の予約を片付けるようにする
 
   Claude は、部品「session.sh prune の変更」のとおりに、`prune` が `specs/` の下の古い予約と壊れた予約を消すようにする。Claude は、`session.sh` の冒頭の注記の `prune` の説明に、spec の予約の片付けを書き足す。Claude は、`test-session.sh` に、design.md の「テストの方針」の `prune` の場合を足す。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-session.sh` の場合がすべて通る
@@ -103,3 +103,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - タスク1.1: lib.sh の `_kp_lock` は「150回 × 0.1秒」で待つが、Windows の作業PCでは、試すたびに `date` と perl を起動するため、持たれたままの錠を約25秒待ってから終わる(実測)。`t_lock_held_refused` は、待たずに終わる偽物の `sleep` を PATH の先頭に置いて流す。作業中のセッションの見分けは、perl の共通の処理 `_KP_SS_PL_ACTIVE` を `perl -e "$_KP_SS_PL_ACTIVE" -e '<本体>'` の形で本体の前に置いて使う。本体は `our` の `$KP_IC` `$KP_ME_ID` `$KP_ME_KEY` を決めてから共通の処理を呼ぶ
 - タスク2.2: テストの効き目を確かめるために session.sh を壊すときは、作業フォルダのファイルを直接書き換えない。書き換えたまま途中で止まると、作業フォルダに壊れた session.sh が残る。scratchpad に session.sh と lib.sh を写し、テストの `SESSION` をその写しに向けて流す
 - タスク2.3: spec の予約の `updated_at` は、負でない整数だけを受け付ける(`looks_like_number` は "Inf" や "1e9" も数とみなすため使わない)。2.4 の `prune` も同じ決まりで、数でない予約を消す
+- タスク2.4: `prune` は、spec の予約を消すときに記録の錠を取る(design に無い判断)。古い予約を読んだあとに `check-spec` が新しい予約を書き、それを `prune` が消す競合を防ぐためである。錠を取れないときは、片付けを飛ばして終了コード0で続ける。`specs/` があって錠がほかに持たれたままのとき、`check-start` は最大で約30秒待ってから終了コード69で終わる(今までは約15秒)

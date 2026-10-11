@@ -78,9 +78,12 @@
 #   spec-names
 #       すべての作業フォルダの .kiro/specs/ のディレクトリ名を、重ならないように1行ずつ出す。
 #   prune
-#       作業フォルダが無くなった記録と、残った枠と、作業フォルダごとのボリュームと DB を片付け、
+#       作業フォルダが無くなった記録と、古くなった spec の予約と、残った枠と、作業フォルダごとのボリュームと DB を片付け、
 #       片付けたことを標準出力に出す。所有者が手で打っても使える。
 #         最初に git worktree prune を打ち、ディレクトリが消えた worktree を git の記録から外す
+#         spec の予約 specs/<feature>.json のうち、updated_at から600秒たったものと、updated_at が負でない整数でないもの
+#           (欄が無いもの、読めない JSON も含む壊れた記録)を、記録の錠の中で消す(600秒たっていない予約は残す)。
+#           15秒待っても錠を取れなければ、消さずに理由を標準エラーに出す(次の片付けがもう一度消しにいく)
 #         枠は、lib.sh の取り戻しの条件に当たるものを取り戻す(kp_slot_reclaim)
 #         sessions/ と issues/ の記録から、folder が無くなったもの(lib.sh の kp_folder_gone)を探し、
 #           無くなった作業フォルダの鍵(セッションの記録の folder_key か、folder から求めた鍵)ごとに、
@@ -426,7 +429,46 @@ _kp_ss_tidy_record() { # <S|I> <ファイル> <folder> <branch> <session_id>
     return 0
 }
 
-# 作業フォルダが無くなった記録と、残った枠と、作業フォルダごとのボリュームと DB を片付ける。
+# spec の予約 specs/<feature>.json のうち、updated_at から600秒たったものと、updated_at が負でない整数でないもの
+# (欄が無いもの、読めない JSON も含む壊れた記録)を消し、消したことを標準出力に出す。
+# 負でない整数の決まりは check-spec と同じ(check-spec は600秒たっていない予約だけを数える)。
+# check-spec が予約を書き直すのと重ならないよう、記録の錠の中で読んで消す。15秒待っても錠を取れなければ、
+# 消さずに理由を標準エラーに出す(次の片付けがもう一度消しにいく)
+_kp_ss_prune_spec_reservations() { # <記録の置き場所>
+    local state="$1"
+    [ -d "$state/specs" ] || return 0
+    if ! _kp_lock "$state/records.lock"; then
+        printf '[parallel] 片付けを飛ばした: spec の予約(記録の錠 %s を15秒待っても取れない。次の片付けがもう一度消しにいく)\n' \
+            "$state/records.lock" >&2
+        return 0
+    fi
+    _KP_SS_LOCK="$state/records.lock"
+    perl -MJSON::PP -e '
+        use strict; use warnings;
+        my ($dir) = @ARGV;
+        my $json = JSON::PP->new->utf8;
+        opendir my $dh, $dir or exit 0;
+        for my $name (sort grep { /\.json\z/ && -f "$dir/$_" } readdir $dh) {
+            my $file = "$dir/$name";
+            my $at;
+            if (open my $fh, "<:raw", $file) {
+                local $/; my $text = <$fh>; close $fh;
+                my $d = eval { $json->decode($text) };
+                $at = $d->{updated_at} if ref $d eq "HASH";
+            }
+            next if defined $at && !ref $at && $at =~ /\A[0-9]+\z/ && time() - $at < 600;
+            if (unlink $file) {
+                print "[parallel] 片付け: spec の予約 $name を消した\n";
+            } else {
+                print STDERR "[parallel] 消せなかった名前: spec の予約 $name($!)。次の片付けがもう一度消しにいく\n";
+            }
+        }
+    ' -- "$state/specs"
+    _kp_ss_unlock
+    return 0
+}
+
+# 作業フォルダが無くなった記録と、古くなった spec の予約と、残った枠と、作業フォルダごとのボリュームと DB を片付ける。
 # 片付けたことを標準出力に出す(check-start から呼ぶときは捨てる)。
 kp_session_prune() {
     [ $# -eq 0 ] || _kp_ss_usage "prune は引数を取らない"
@@ -438,6 +480,9 @@ kp_session_prune() {
 
     # ディレクトリが消えた worktree を git の記録から外す(そのブランチを開けるようにする)
     git worktree prune 2>/dev/null
+
+    # 古くなった spec の予約と壊れた spec の予約を消す(作業フォルダの一覧によらない)
+    _kp_ss_prune_spec_reservations "$state"
 
     # 残っている作業フォルダと鍵。一覧を取れなかったとき(いまの作業フォルダが一覧に無いときも)は、
     # 残っている作業フォルダの記録まで消さないよう、何もせずに終わる
