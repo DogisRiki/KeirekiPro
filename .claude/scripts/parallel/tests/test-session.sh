@@ -1544,6 +1544,301 @@ EOF
     [ ! -e "$LOCK" ] || die "引き継いだあとに錠を残した"
 }
 
+# =====================================================================
+# check-spec: 同じ spec を直しているほかのセッションの調べ(session-overlap-guard 要件2・要件3.1)
+# =====================================================================
+# 作業フォルダに触れずに、<親のコミット> にファイルを置いたコミットを作り、その ID を出す(origin/main を作るため)。
+# 中身は printf の %b で読む(\n で改行)
+main_commit() { # <親のコミット> <ファイル> <中身> [<ファイル> <中身>]...
+    local parent="$1" idx="$WORK/main-commit.index" blob tree
+    shift
+    rm -f "$idx"
+    GIT_INDEX_FILE="$idx" git -C "$MAIN_DIR" read-tree "$parent" || return 1
+    while [ $# -ge 2 ]; do
+        blob=$(printf '%b' "$2" | git -C "$MAIN_DIR" hash-object -w --stdin) || return 1
+        GIT_INDEX_FILE="$idx" git -C "$MAIN_DIR" update-index --add --cacheinfo "100644,$blob,$1" || return 1
+        shift 2
+    done
+    tree=$(GIT_INDEX_FILE="$idx" git -C "$MAIN_DIR" write-tree) || return 1
+    rm -f "$idx"
+    git -C "$MAIN_DIR" "${GITC[@]}" commit-tree -p "$parent" -m "main" "$tree"
+}
+
+# origin/main を <コミット> に動かす(偽物のリモートの main の進み具合)
+set_origin_main() { git -C "$MAIN_DIR" update-ref refs/remotes/origin/main "$1" || die "origin/main を動かせない"; }
+
+REQ=.kiro/specs/beta/requirements.md
+
+# origin/main と WT・WT2 のブランチを、spec beta の requirements.md(a b c の3行)を持つコミット SPEC_BASE にする。
+# WT のセッション s-wt は作業中(Issue 42 の記録がある)。WT2 のセッション s-me が調べる
+spec_base() {
+    SPEC_BASE=$(main_commit "$SEED_SHA" "$REQ" 'a\nb\nc\n') || die "SPEC_BASE を作れない"
+    set_origin_main "$SPEC_BASE"
+    git -C "$WT_DIR" reset -q --hard "$SPEC_BASE"
+    git -C "$WT2_DIR" reset -q --hard "$SPEC_BASE"
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    put_issue 42 "$WT" feat/wt s-wt
+    put_session s-me "$WT2" "$(fkey "$WT2_DIR")" 400
+}
+
+# check-spec を呼び、終了コード0と1行の JSON であることを確かめて JSON を出す
+check_spec() { # <フォルダ> <引数>...
+    local out rc lines
+    out=$(ss "$1" check-spec "${@:2}" 2>"$WORK/spec-err.txt")
+    rc=$?
+    [ "$rc" = 0 ] || die "check-spec の終了コード $rc: $(cat "$WORK/spec-err.txt")"
+    lines=$(printf '%s\n' "$out" | wc -l)
+    [ "$lines" -eq 1 ] || die "check-spec の出力が1行でない: $out"
+    pj "$out" '1' >/dev/null 2>&1 || die "check-spec の出力が JSON でない: $out"
+    printf '%s' "$out"
+}
+
+# check-spec の要素のセッションのIDを , でつないで出す
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+spec_sids() { pj "$1" 'join ",", map { $_->{session_id} } @{$d->{conflicts}}'; }
+
+# 調べが残した一時的な索引(どの作業フォルダの git のディレクトリにも残してはならない)
+spec_tmp_left() { find "$MAIN_DIR/.git" -name 'kp-check-spec*' 2>/dev/null; }
+
+# 調べのあとに、錠と一時的な索引が残っていないことを確かめる
+spec_clean_after() { # <場面>
+    [ ! -e "$LOCK" ] || die "$1: 錠が残った"
+    [ -z "$(spec_tmp_left)" ] || die "$1: 一時的な索引が残った: $(spec_tmp_left)"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_check_spec_uncommitted() {
+    local out
+    spec_base
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "前提: 変更が無いのに conflicts が空でない: $out"
+    # WT がコミットしていない spec の変更を持つ
+    printf 'A\nb\nc\n' >"$WT_DIR/$REQ"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" 'scalar @{$d->{conflicts}}')" = 1 ] || die "conflicts の数が1でない: $out"
+    [ "$(pj "$out" '$d->{conflicts}[0]')" = "{\"folder\":\"$WT\",\"issue\":42,\"last_seen\":305,\"reason\":\"changes\",\"session_id\":\"s-wt\",\"started_at\":300}" ] \
+        || die "要素の中身が違う: $out"
+    spec_clean_after "変更があるとき"
+    # ほかの spec の名前では出ない
+    out=$(check_spec "$WT2_DIR" gamma --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "ほかの spec の名前で conflicts が出た: $out"
+    # このセッションのIDの記録は除く
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-wt) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "このセッション自身が conflicts に出た: $out"
+    # いまの作業フォルダの変更は数えない
+    out=$(check_spec "$WT_DIR" beta --issue 50 --session s-other) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "いまの作業フォルダの変更が conflicts に出た: $out"
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_committed() {
+    local out
+    spec_base
+    # spec の変更と spec の新しいファイルをコミットしたが、main にはマージしていない
+    printf 'A\nb\nc\n' >"$WT_DIR/$REQ"
+    echo design >"$WT_DIR/.kiro/specs/beta/design.md"
+    git -C "$WT_DIR" add -A
+    git -C "$WT_DIR" "${GITC[@]}" commit -q -m spec
+    [ -z "$(wt_status "$WT_DIR")" ] || die "前提: WT がきれいでない"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(spec_sids "$out")" = s-wt ] || die "コミットしてマージしていない変更で s-wt が出ない: $out"
+    # 新しいファイルだけをコミットしたときも出る
+    git -C "$WT_DIR" reset -q --hard "$SPEC_BASE"
+    echo design >"$WT_DIR/.kiro/specs/beta/design.md"
+    git -C "$WT_DIR" add -A
+    git -C "$WT_DIR" "${GITC[@]}" commit -q -m spec-new-file
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(spec_sids "$out")" = s-wt ] || die "新しいファイルだけのコミットで s-wt が出ない: $out"
+    spec_clean_after "調べのあと"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_check_spec_old_base() {
+    local out newer
+    spec_base
+    # WT のブランチは古い main(SPEC_BASE)から作られ、spec のほかのファイルだけをコミットした
+    echo other >"$WT_DIR/other.txt"
+    git -C "$WT_DIR" add -A
+    git -C "$WT_DIR" "${GITC[@]}" commit -q -m other
+    # origin/main が spec を変えた
+    newer=$(main_commit "$SPEC_BASE" "$REQ" 'a\nB\nc\n') || die "origin/main の変更を作れない"
+    set_origin_main "$newer"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "古い main から作ったブランチで conflicts が出た: $out"
+    # WT に spec のディレクトリが無い(spec ができる前の main から作った)ときも空
+    git -C "$WT_DIR" reset -q --hard "$SEED_SHA"
+    [ ! -e "$WT_DIR/.kiro/specs/beta" ] || die "前提: WT に spec beta がある"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "spec の無い作業フォルダで conflicts が出た: $out"
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_deleted_dir() {
+    local out
+    spec_base
+    # WT が spec のディレクトリを作業フォルダで消した(コミットしていない)
+    rm -rf "$WT_DIR/.kiro/specs/beta"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(spec_sids "$out")" = s-wt ] || die "作業フォルダで spec のディレクトリを消したときに s-wt が出ない: $out"
+    # 消したことをコミットした(作業フォルダにも HEAD の木にも spec が無い)が、main にはマージしていない
+    git -C "$WT_DIR" add -A
+    git -C "$WT_DIR" "${GITC[@]}" commit -q -m remove-spec
+    if [ -e "$WT_DIR/.kiro/specs/beta" ] || git -C "$WT_DIR" cat-file -e HEAD:.kiro/specs/beta 2>/dev/null; then
+        die "前提: WT の作業フォルダか HEAD の木に spec beta がある"
+    fi
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(spec_sids "$out")" = s-wt ] || die "spec のディレクトリを消してコミットしたときに s-wt が出ない: $out"
+    spec_clean_after "調べのあと"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_check_spec_inactive_skipped() {
+    local out
+    spec_base
+    printf 'A\nb\nc\n' >"$WT_DIR/$REQ"
+    # WT のセッションの記録はあるが、Issueの記録が無い(着手していない)
+    rm -f "$STATE/issues/42.json"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "作業中でないセッションの作業フォルダで conflicts が出た: $out"
+    # セッションの記録も無い(閉じた)
+    put_issue 42 "$WT" feat/wt s-wt
+    rm -f "$STATE/sessions/s-wt.json"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "セッションの無い作業フォルダで conflicts が出た: $out"
+    spec_clean_after "調べのあと"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_check_spec_two_sessions_and_end() {
+    local out
+    spec_base
+    # WT にもう1つ作業中のセッション s-wt0(先に始めた)がある
+    put_session s-wt0 "$WT" "$(fkey "$WT_DIR")" 200
+    printf 'A\nb\nc\n' >"$WT_DIR/$REQ"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(spec_sids "$out")" = s-wt0,s-wt ] || die "要素が started_at の古い順の2つでない: $out"
+    [ "$(pj "$out" 'join ",", map { "$_->{issue}|$_->{folder}|$_->{started_at}|$_->{last_seen}|$_->{reason}" } @{$d->{conflicts}}')" \
+        = "42|$WT|200|205|changes,42|$WT|300|305|changes" ] || die "要素の欄が違う: $out"
+    # 所有者が「やめた」と答えたので、s-wt0 の記録を消してから調べ直す
+    ss "$WT2_DIR" end s-wt0 || die "end の終了コード $?"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(spec_sids "$out")" = s-wt ] || die "end のあとも s-wt0 が出る: $out"
+    ss "$WT2_DIR" end s-wt || die "end の終了コード $?"
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{conflicts}')" = '[]' ] || die "両方を end したあとも conflicts が空でない: $out"
+}
+
+t_check_spec_leaves_worktree() {
+    local out status index content refs head
+    spec_base
+    # WT は、索引に載せた変更と、載せていない変更と、git の管理外のファイルを持つ
+    printf 'A\nb\nc\n' >"$WT_DIR/$REQ"
+    git -C "$WT_DIR" add "$REQ"
+    printf 'A\nb\nC\n' >"$WT_DIR/$REQ"
+    echo draft >"$WT_DIR/.kiro/specs/beta/design.md"
+    status=$(wt_status "$WT_DIR")
+    index=$(git -C "$WT_DIR" ls-files -s)
+    content=$(cat "$WT_DIR/$REQ" "$WT_DIR/.kiro/specs/beta/design.md")
+    refs=$(git -C "$MAIN_DIR" for-each-ref)
+    head=$(git -C "$WT_DIR" rev-parse HEAD)
+    out=$(check_spec "$WT2_DIR" beta --issue 50 --session s-me) || die "$out"
+    [ "$(spec_sids "$out")" = s-wt ] || die "前提: s-wt が出ない: $out"
+    [ "$(wt_status "$WT_DIR")" = "$status" ] || die "WT の git status が変わった: $(wt_status "$WT_DIR")"
+    [ "$(git -C "$WT_DIR" ls-files -s)" = "$index" ] || die "WT の索引が変わった"
+    [ "$(cat "$WT_DIR/$REQ" "$WT_DIR/.kiro/specs/beta/design.md")" = "$content" ] || die "WT の中身が変わった"
+    [ "$(git -C "$WT_DIR" rev-parse HEAD)" = "$head" ] || die "WT の HEAD が変わった"
+    # 一時的なコミット S はどのブランチにも載らない
+    [ "$(git -C "$MAIN_DIR" for-each-ref)" = "$refs" ] || die "ブランチなどの参照が変わった: $(git -C "$MAIN_DIR" for-each-ref)"
+    spec_clean_after "調べのあと"
+}
+
+t_check_spec_no_origin_main() {
+    local out rc err
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    put_issue 42 "$WT" feat/wt s-wt
+    out=$(ss "$WT2_DIR" check-spec beta --issue 50 --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    err=$(cat "$WORK/err.txt")
+    [ "$rc" = 69 ] || die "origin/main が無いのに終了コードが69でない: $rc: $out $err"
+    [ -z "$out" ] || die "origin/main が無いのに JSON を出した: $out"
+    case "$err" in *'[parallel] 調べられない: origin/main が手元に無い'*) ;; *) die "標準エラーの文が違う: $err" ;; esac
+    spec_clean_after "origin/main が無いとき"
+}
+
+t_check_spec_usage() {
+    local rc args
+    set_origin_main "$SEED_SHA"
+    for args in "Beta --issue 50" "be/ta --issue 50" "beta_x --issue 50" " --issue 50" "beta" "beta --issue" \
+        "beta --issue x" "beta --issue 50 extra" "beta --issue 50 --bogus"; do
+        # shellcheck disable=SC2086 # 引数を空白で分けて渡す
+        ss "$WT2_DIR" check-spec $args >/dev/null 2>&1
+        rc=$?
+        [ "$rc" = 64 ] || die "check-spec $args の終了コードが64でない: $rc"
+    done
+    ss "$WT2_DIR" check-spec "" --issue 50 >/dev/null 2>&1
+    rc=$?
+    [ "$rc" = 64 ] || die "空の名前の終了コードが64でない: $rc"
+    spec_clean_after "誤った呼び方のあと"
+}
+
+t_check_spec_git_failure() {
+    local real_git out rc err at
+    spec_base
+    printf 'A\nb\nc\n' >"$WT_DIR/$REQ"
+    real_git=$(command -v git)
+    mkdir -p "$TMP_ROOT/gitfail"
+    # FAKE_GIT_FAIL に挙げた段の git が失敗する。失敗するときに、一時的な索引が git のディレクトリにあれば
+    # FAKE_GIT_MARK のファイルを作る(失敗したあとに、その索引が消されたことを確かめるため)。
+    #   read-tree    一時的な索引に W の HEAD を読み込む git(本物の read-tree で索引を作ってから失敗する)
+    #   add          一時的な索引に spec のディレクトリを載せる git
+    #   commit-tree  一時的なコミット S を作る git
+    #   merge-base   origin/main と S の分かれ目を求める git
+    #   diff         分かれ目から S までの spec の差分を取る git
+    cat >"$TMP_ROOT/gitfail/git" <<EOF
+#!/bin/bash
+fail() {
+    if find "$MAIN_DIR/.git" -name 'kp-check-spec-index*' 2>/dev/null | grep -q .; then : >"\$FAKE_GIT_MARK"; fi
+    echo "fake \$FAKE_GIT_FAIL failure" >&2
+    exit 1
+}
+case "\$FAKE_GIT_FAIL: \$* " in
+    "read-tree: "*" read-tree "*)
+        case "\${GIT_INDEX_FILE:-}" in *kp-check-spec-index*) "$real_git" "\$@" >/dev/null 2>&1; fail ;; esac
+        ;;
+    "add: "*" add "*)
+        case "\${GIT_INDEX_FILE:-}" in *kp-check-spec-index*) fail ;; esac
+        ;;
+    "commit-tree: "*" commit-tree "* | "merge-base: "*" merge-base "* | "diff: "*" diff "*) fail ;;
+esac
+exec "$real_git" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/gitfail/git"
+    for at in read-tree add commit-tree merge-base diff; do
+        rm -f "$WORK/gitfail-mark"
+        out=$(FAKE_GIT_FAIL=$at FAKE_GIT_MARK="$WORK/gitfail-mark" PATH="$TMP_ROOT/gitfail:$PATH" \
+            ss "$WT2_DIR" check-spec beta --issue 50 --session s-me 2>"$WORK/err.txt")
+        rc=$?
+        err=$(cat "$WORK/err.txt")
+        [ "$rc" = 69 ] || die "$at: git が失敗したのに終了コードが69でない: $rc: $out $err"
+        [ -z "$out" ] || die "$at: git が失敗したのに JSON を出した: $out"
+        case "$err" in *'[parallel] 調べられない:'*"$WT"*"fake $at failure"*) ;; *) die "$at: 標準エラーに作業フォルダと失敗の理由が無い: $err" ;; esac
+        [ -e "$WORK/gitfail-mark" ] || die "$at: 前提: 失敗したときに一時的な索引が無かった"
+        spec_clean_after "$at の git が失敗したとき"
+    done
+}
+
+t_check_spec_lock_held() {
+    local out rc
+    spec_base
+    mkdir -p "$LOCK"
+    out=$(PATH="$TMP_ROOT/fastsleep:$PATH" ss "$WT2_DIR" check-spec beta --issue 50 --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    [ "$rc" = 69 ] || die "錠がほかに持たれたままなのに終了コードが69でない: $rc: $out $(cat "$WORK/err.txt")"
+    [ -z "$out" ] || die "錠を取れないのに JSON を出した: $out"
+    grep -q 'records.lock' "$WORK/err.txt" || die "標準エラーに錠の理由が無い: $(cat "$WORK/err.txt")"
+    [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
+}
+
 echo "--- check-start: 同じ作業フォルダの別のセッション(要件5.1・5.2)"
 run_test "同じ作業フォルダに別の作業中のセッションの記録があると folder_conflict に出る" t_folder_conflict
 run_test "同じ作業フォルダの、Issueの記録の無いセッション(着手していない記録)は folder_conflict に出ない" t_folder_conflict_idle_ignored
@@ -1627,6 +1922,19 @@ run_test "このセッションのIDが空なら、いまの作業フォルダ�
 run_test "end で予約したセッションの記録を消したあとの check-start は、予約をこのセッションに書き換え、先のセッションの claim は断られる" t_end_then_check_start_takes_reservation
 run_test "錠がほかに持たれたままなら claim は終了コード69で終わり、記録を書かず、その錠を消さない" t_claim_lock_held_refused
 run_test "takeover は錠の中で記録を書き直し、錠を取れなければ終了コード69で終わり、どの経路でも自分の錠を残さない" t_takeover_lock
+
+echo "--- check-spec: 同じ spec を直しているほかのセッションの調べ(session-overlap-guard 要件2・要件3.1)"
+run_test "ほかの worktree の作業中のセッションがコミットしていない spec の変更を持つと changes の要素が出る" t_check_spec_uncommitted
+run_test "spec の変更をコミットしても、マージしていなければ要素が出る" t_check_spec_committed
+run_test "古い main から作ったブランチで spec を変えていなければ、origin/main が spec を変えていても空" t_check_spec_old_base
+run_test "spec のディレクトリを作業フォルダで消したときと、消してコミットしたとき(マージしていない)は要素が出る" t_check_spec_deleted_dir
+run_test "変更を持つ worktree に作業中のセッションが無ければ空" t_check_spec_inactive_skipped
+run_test "作業中のセッションが2つある worktree では要素が2つ出て、end のあとの check-spec はそのセッションの要素を出さない" t_check_spec_two_sessions_and_end
+run_test "調べのあと、ほかの worktree の git status --porcelain の出力と索引と中身とブランチが変わっていない" t_check_spec_leaves_worktree
+run_test "origin/main が無いと終了コード69" t_check_spec_no_origin_main
+run_test "名前に大文字か / を含むときと、--issue が無いか数でないときは終了コード64" t_check_spec_usage
+run_test "調べの git が失敗したら終了コード69で、作業フォルダと理由を出し、錠と一時的な索引を残さない" t_check_spec_git_failure
+run_test "錠がほかに持たれたままなら check-spec は終了コード69で終わり、その錠を消さない" t_check_spec_lock_held
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"

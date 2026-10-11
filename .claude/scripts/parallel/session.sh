@@ -45,6 +45,22 @@
 #       前の作業フォルダがほかの作業フォルダなら handed_over_from に足す。この書き直しは記録の錠の中で行い、
 #       記録の持ち主は確かめない(所有者が引き継ぐと答えたあとに呼ばれるため)。
 #       標準出力に、写したファイル(--from がいまの作業フォルダのときは作りかけ)の一覧と、いまのブランチを出す。
+#   check-spec <feature> --issue <N> [--session <ID>]
+#       ほかの作業中のセッションが spec <feature>(英小文字・数字・ハイフンだけの名前。違えば終了コード64)を
+#       直しているかを調べ、標準出力に {"conflicts":[...]} の JSON を1行出す(終了コード0)。--issue が無いか数でなければ
+#       終了コード64。要素は、直しているほかの作業中のセッションごとに1つで、folder session_id started_at last_seen
+#       issue(issues/ の記録を session_id で引き、無ければ folder で引く。どちらも無ければ null)reason(changes)を持ち、
+#       started_at の古い順に並ぶ。refs/remotes/origin/main が無ければ、
+#       「[parallel] 調べられない: origin/main が手元に無い」を標準エラーに出して終了コード69で終わる。
+#       記録の錠の中で、いまの作業フォルダでない作業フォルダ(ディレクトリがあり bare でないもの)のうち、
+#       作業中のセッション(このセッションのIDの記録を除く)があるもの W を1つずつ調べる。
+#         W の .kiro/specs/<feature> が W の中身にも HEAD の木にも無ければ、W の HEAD を S とする
+#         それ以外は、W の git のディレクトリに置いた一時的な索引で、W の HEAD に spec のディレクトリだけを載せた
+#           一時的なコミット S を作る(W の索引と中身は変えない。S はどのブランチにも載せない)
+#         origin/main と S の分かれ目 M から S までに spec のディレクトリのファイルの変更があれば、直している
+#       直している W の作業中のセッションを、すべて要素にする。調べの git のコマンドが失敗したら、JSON を出さずに、
+#       どの作業フォルダで何が失敗したかを「[parallel] 調べられない:」で始まる文で標準エラーに出し、
+#       一時的な索引を消して、終了コード69で終わる。
 #   spec-names
 #       すべての作業フォルダの .kiro/specs/ のディレクトリ名を、重ならないように1行ずつ出す。
 #   prune
@@ -75,9 +91,11 @@
 # check-start は、記録の錠(記録の置き場所の records.lock。lib.sh の _kp_lock で取る)の中で調べと予約を行い、
 # 錠を返してから JSON を出す。15秒待っても錠を取れないときと、予約を書けないときは、JSON を出さずに終了コード69で終わる。
 # claim と takeover も、Issueの記録を同じ錠の中で読み書きし、15秒待っても錠を取れなければ記録を書かずに終了コード69で終わる。
+# check-spec も、同じ錠の中で調べ、錠を返してから JSON を出す。15秒待っても錠を取れなければ終了コード69で終わる。
 #
 # 終了コード: 0(成功)、1(claim がほかのセッションの記録を断った、takeover が引き継げなかった)、64(呼び方の誤り)、
-#             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない)。
+#             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない、
+#             check-spec の origin/main が手元に無い、check-spec の調べの git のコマンドが失敗した)。
 # 前提: bash・perl(JSON::PP)・git。jq には依存しない。
 # =====================================================================
 
@@ -1043,6 +1061,179 @@ kp_session_takeover() {
     fi
 }
 
+# check-spec の一時的な索引のパス(作っている間だけ入れる)。失敗したときに消す
+_KP_SS_SPEC_IDX=
+
+# check-spec の一時的な索引を消す(作っていなければ何もしない)
+_kp_ss_spec_rm_index() {
+    [ -z "$_KP_SS_SPEC_IDX" ] || rm -f "$_KP_SS_SPEC_IDX"
+    _KP_SS_SPEC_IDX=
+}
+
+# check-spec の調べの git が失敗したときに、一時的な索引を消し、錠を返して終了コード69で終わる
+_kp_ss_spec_fail() { # <作業フォルダ> <何が失敗したか> <git の文>
+    _kp_ss_spec_rm_index
+    _kp_ss_die69 "[parallel] 調べられない: 作業フォルダ $1 で、$2 に失敗した: $(_kp_ss_one_line "$3")"
+}
+
+# 作業フォルダ W が spec <feature> を直しているか(main にまだ入っていない変更を持つか)を判定する。
+# 直していれば終了コード0、直していなければ1。W の索引と中身は変えず、一時的なコミット S はどのブランチにも載せない。
+# git のコマンドが失敗したら、一時的な索引を消し、錠を返して終了コード69で終わる
+_kp_ss_spec_changed() { # <作業フォルダ W> <feature> <origin/main のコミット> <いまの作業フォルダ>
+    local w="$1" main="$3" me="$4" dir=".kiro/specs/$2"
+    local head out tree snap base wgit names
+    head=$(git -C "$w" rev-parse --verify HEAD 2>&1) || _kp_ss_spec_fail "$w" "HEAD を読むこと" "$head"
+
+    if [ ! -e "$w/$dir" ] && ! git -C "$w" cat-file -e "$head:$dir" 2>/dev/null; then
+        # 1. spec のディレクトリが、W の中身にも HEAD の木にも無ければ、W の HEAD を S とする
+        #    (W が spec のディレクトリを消してコミットしていれば、分かれ目から S までの差分に出る)
+        snap=$head
+    else
+        # 2. W の git のディレクトリに置いた一時的な索引に W の HEAD を読み込み、spec のディレクトリだけを載せて、
+        #    一時的なコミット S を作る
+        wgit=$(git -C "$w" rev-parse --path-format=absolute --git-dir 2>&1) \
+            || _kp_ss_spec_fail "$w" "git のディレクトリを読むこと" "$wgit"
+        _KP_SS_SPEC_IDX="${wgit//\\//}/kp-check-spec-index.$$"
+        rm -f "$_KP_SS_SPEC_IDX"
+        out=$(GIT_INDEX_FILE="$_KP_SS_SPEC_IDX" git -C "$w" read-tree "$head" 2>&1) \
+            || _kp_ss_spec_fail "$w" "一時的な索引に HEAD を読み込むこと" "$out"
+        out=$(GIT_INDEX_FILE="$_KP_SS_SPEC_IDX" git -C "$w" add -A -- "$dir" 2>&1) \
+            || _kp_ss_spec_fail "$w" "一時的な索引に spec のディレクトリを載せること" "$out"
+        tree=$(GIT_INDEX_FILE="$_KP_SS_SPEC_IDX" git -C "$w" write-tree 2>&1) \
+            || _kp_ss_spec_fail "$w" "一時的な索引の木を作ること" "$tree"
+        # S はどのブランチにも載せない一時的なコミットなので、作者は固定の名前にする
+        snap=$(GIT_AUTHOR_NAME=keirekipro-parallel GIT_AUTHOR_EMAIL=keirekipro-parallel@localhost \
+            GIT_COMMITTER_NAME=keirekipro-parallel GIT_COMMITTER_EMAIL=keirekipro-parallel@localhost \
+            git -C "$w" commit-tree --no-gpg-sign -p "$head" -m "keirekipro-parallel check-spec $2" "$tree" 2>&1) \
+            || _kp_ss_spec_fail "$w" "spec の中身を一時的なコミットにまとめること" "$snap"
+    fi
+
+    # 3. S と origin/main の分かれ目のコミット M を求める
+    base=$(git -C "$me" merge-base "$main" "$snap" 2>&1) \
+        || _kp_ss_spec_fail "$w" "origin/main との分かれ目を求めること" "$base"
+    # 4. M から S までに spec のディレクトリのファイルの変更があれば、直しているとみなす
+    names=$(git -C "$me" diff --name-only --no-renames --no-color "$base" "$snap" -- "$dir" 2>&1) \
+        || _kp_ss_spec_fail "$w" "spec の差分を取ること" "$names"
+
+    # 5. 一時的な索引を消す
+    _kp_ss_spec_rm_index
+    [ -n "$names" ]
+}
+
+kp_session_check_spec() {
+    local feature="" have_feature=0 n="" session="" state sid me key ic main gone_sessions wl cand w els out
+    local -a found=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --issue)
+                [ $# -ge 2 ] || _kp_ss_usage "--issue の値が無い"
+                n=$(_kp_ss_issue_number "$2") || exit $?
+                shift 2
+                ;;
+            --session)
+                [ $# -ge 2 ] || _kp_ss_usage "--session の値が無い"
+                session=$2
+                shift 2
+                ;;
+            -*) _kp_ss_usage "知らないオプション $1" ;;
+            *)
+                [ "$have_feature" = 0 ] || _kp_ss_usage "引数が多い: $1"
+                feature=$1
+                have_feature=1
+                shift
+                ;;
+        esac
+    done
+    [ -n "$feature" ] && [ -n "$n" ] || _kp_ss_usage "check-spec <feature> --issue <N> [--session <ID>]"
+    # 名前は英小文字・数字・ハイフンだけ(ロケールによらないよう、文字を並べて比べる)
+    case "$feature" in
+        *[!abcdefghijklmnopqrstuvwxyz0123456789-]*)
+            _kp_ss_usage "spec の名前 '$feature' に、英小文字・数字・ハイフンのほかの文字が含まれる"
+            ;;
+    esac
+
+    state=$(kp_state_dir) || exit $?
+    sid=$(kp_session_id "${session:-${KP_SESSION_ID:-}}") || exit $?
+    me=$(kp_folder) || exit $?
+    key=$(kp_folder_key) || exit $?
+    ic=$(git config --get core.ignorecase 2>/dev/null)
+
+    # 1. origin/main を読む
+    main=$(git rev-parse --verify -q 'refs/remotes/origin/main^{commit}') \
+        || _kp_die69 "[parallel] 調べられない: origin/main が手元に無い"
+
+    # 2. ここから JSON を作り終えるまで、記録の錠の中で調べる
+    _kp_ss_lock "$state"
+
+    # 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は作業中に数えない
+    gone_sessions=$(_kp_ss_gone_sessions "$state") \
+        || _kp_ss_die69 "[parallel] 調べられない: 作業フォルダの一覧から、無くなったセッションの記録を見分けられない"
+    wl=$(git worktree list --porcelain 2>&1) \
+        || _kp_ss_die69 "[parallel] 調べられない: 作業フォルダの一覧(git worktree list)を取れない: $(_kp_ss_one_line "$wl")"
+
+    # 3. いまの作業フォルダでない作業フォルダ(ディレクトリがあり bare でないもの)のうち、作業中のセッション
+    #    (このセッションのIDの記録を除く)があるものを、「作業フォルダ \x1f 要素の JSON の配列」の行で出す。
+    #    要素は、その作業フォルダの作業中のセッションごとに1つ
+    cand=$(perl -MJSON::PP -e "$_KP_SS_PL_ACTIVE" -e '
+        use strict; use warnings;
+        my ($state, $sid, $me, $me_key, $ic, $gone_list, $wl) = @ARGV;
+        utf8::decode($_) for ($state, $sid, $me, $wl);
+        ($KP_IC, $KP_ME_KEY) = ($ic, $me_key);
+        $KP_ME_ID = norm($me);
+
+        my (@worktrees, $cur);
+        for my $line (split /\r?\n/, $wl) {
+            if ($line =~ /\Aworktree (.+)\z/) {
+                $cur = { path => $1 };
+                push @worktrees, $cur;
+            } elsif ($cur && $line eq "bare") {
+                $cur->{bare} = 1;
+            }
+        }
+        my @sessions = load_sessions($state, $gone_list);
+        my $ix = active_index(load_dir("$state/issues"));
+        my $enc = JSON::PP->new->utf8->canonical;
+        for my $w (grep { !$_->{bare} && -d $_->{path} } @worktrees) {
+            my $fid = norm($w->{path});
+            next if $fid eq $KP_ME_ID;
+            my @active = sort by_start
+                grep { in_folder($_, $fid) && str($_->{session_id}) ne $sid && is_active($_, $ix) } @sessions;
+            next unless @active;
+            my @els = map { +{
+                folder => $w->{path},
+                session_id => $_->{session_id},
+                started_at => $_->{started_at},
+                last_seen => $_->{last_seen},
+                issue => issue_of($_, $ix),
+                reason => "changes",
+            } } @active;
+            my $path = $w->{path};
+            utf8::encode($path);
+            print $path, "\x1f", $enc->encode(\@els), "\n";
+        }
+    ' -- "$state" "$sid" "$me" "$key" "$ic" "$gone_sessions" "$wl") \
+        || _kp_ss_die69 "[parallel] 調べられない: セッションの記録と作業フォルダの一覧を読めない"
+
+    # 4. 作業中のセッションがある作業フォルダ W ごとに、W が spec を直しているかを判定する。
+    # 6. 直している W の作業中のセッションを、すべて要素にする
+    while IFS=$'\x1f' read -r -u 3 w els; do
+        [ -n "$w" ] || continue
+        _kp_ss_spec_changed "$w" "$feature" "$main" "$me" && found+=("$els")
+    done 3<<<"$cand"
+
+    # 要素を started_at の古い順に並べる
+    out=$(perl -MJSON::PP -e "$_KP_SS_PL_ACTIVE" -e '
+        use strict; use warnings;
+        my $json = JSON::PP->new->utf8->canonical;
+        my @all = map { @{ $json->decode($_) } } @ARGV;
+        print $json->encode({ conflicts => [ sort by_start @all ] }), "\n";
+    ' -- "${found[@]}") || _kp_ss_die69 "[parallel] 調べられない: 調べの結果を JSON にできない"
+
+    # 8. 錠を返してから JSON を出す
+    _kp_ss_unlock
+    printf '%s\n' "$out"
+}
+
 kp_session_spec_names() {
     [ $# -eq 0 ] || _kp_ss_usage "spec-names は引数を取らない"
     kp_state_dir >/dev/null || exit $?
@@ -1065,7 +1256,8 @@ kp_session_main() {
         spec-names) kp_session_spec_names "$@" ;;
         prune) kp_session_prune "$@" ;;
         takeover) kp_session_takeover "$@" ;;
-        *) _kp_ss_usage "サブコマンドは check-start / claim / end / takeover / spec-names / prune のどれか" ;;
+        check-spec) kp_session_check_spec "$@" ;;
+        *) _kp_ss_usage "サブコマンドは check-start / claim / end / takeover / check-spec / spec-names / prune のどれか" ;;
     esac
 }
 
