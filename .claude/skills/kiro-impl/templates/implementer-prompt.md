@@ -41,10 +41,12 @@ If any of these cannot be determined from the spec — the requirements are too 
 - Use the acceptance criteria from the Task Brief to drive test design
 - Follow the design constraints exactly
 - Keep changes tightly scoped to the assigned task
+- Run only the tests you added and the tests that cover the code you changed, by naming them (e.g. `./gradlew test --tests <class>`, `pnpm test <test file>`). Do NOT run the full suite at any point (see Critical Constraints)
 
 ### Step 4: Validate
-- Run the parent-provided validation commands needed to establish confidence for this task
+- Run the parent-provided validation commands needed to establish confidence for this task, narrowed to the tests you added and the tests that cover the changed code
 - Prefer the parent-discovered canonical commands over inventing new ones; only add a task-local verification command when the parent set does not cover the task, and explain why
+- The reviewer runs the full suite and the quality gates for this task after you report, so you do not need to run them
 - Re-read the referenced requirement and design sections and compare them against the changed code and tests
 - Confirm the verification method from the Task Brief passes
 - If a validation command fails because of a pre-existing unrelated issue, report that precisely instead of masking it
@@ -63,6 +65,7 @@ If any of these cannot be determined from the spec — the requirements are too 
 ## Critical Constraints
 - Do NOT update `tasks.md`
 - Do NOT create commits
+- Do NOT run the full test suite or the quality gates: `./gradlew check` / `build`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`, mutation tests, or the `/verify-frontend` `/verify-backend` skills. `.claude/hooks/block-full-test-in-implementer.sh` blocks these commands for this subagent and returns the reason
 - Do NOT expand scope beyond the assigned task and boundary
 - Do NOT silently work around requirement or design mismatches
 - Use the exact section numbers from `requirements.md` and `design.md` in all notes and reports; do NOT invent `REQ-*` aliases

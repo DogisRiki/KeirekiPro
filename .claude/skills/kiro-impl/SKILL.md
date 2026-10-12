@@ -51,6 +51,7 @@ After all parallel research completes, synthesize implementation brief before st
 - Prefer commands already used by repo automation over ad hoc shell pipelines
 - For `SMOKE_COMMANDS`, choose the lightest trustworthy runtime-liveness check for the app shape (for example: root URL load, Electron launch, CLI `--help`, service health endpoint, mobile simulator/e2e harness if one already exists)
 - Keep the full command set in the parent context, and pass only the task-relevant subset to implementer and reviewer subagents
+- For the implementer, pass commands that run only specific tests (e.g. `bash .claude/scripts/parallel/run-check.sh backend ./gradlew test --tests <class>`, `bash .claude/scripts/parallel/run-check.sh frontend pnpm test <test file>`), not the full-suite or quality-gate commands. `.claude/hooks/block-full-test-in-implementer.sh` blocks full-suite commands (`./gradlew check`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`) inside the `kiro-implementer` subagent. The reviewer runs the full suite and the quality gates for each task (see Step 3 c)
 
 **Establish repo baseline**:
 - Run `git status --porcelain` and note any pre-existing uncommitted changes
@@ -91,7 +92,7 @@ For each task (one at a time):
   - Whether the task is behavioral (Feature Flag Protocol) or non-behavioral
   - **Previous learnings**: Include any `## 実装のメモ` entries from tasks.md that are relevant to this task's boundary or dependencies (e.g., "better-sqlite3 requires separate rebuild for Electron"). This prevents the same mistakes from recurring.
 - The implementer subagent will read the spec files and build its own Task Brief (acceptance criteria, completion definition, design constraints, verification method) before implementation
-- Dispatch via **Agent tool** as a fresh subagent
+- Dispatch via **Agent tool** as a fresh subagent with `subagent_type: kiro-implementer` (`.claude/agents/kiro-implementer.md`). Do not use another subagent type for the implementer: the hook that blocks full-suite test commands applies only to `kiro-implementer`
 
 **b) Handle implementer status**:
 - Parse implementer status only from the exact `## Status Report` block and `- STATUS:` field.
@@ -108,6 +109,8 @@ For each task (one at a time):
   - The implementer's status report (for reference only — reviewer must verify independently)
 - The reviewer must apply the `kiro-review` protocol to this task-local review.
 - Preserve the existing task-specific context: task text, spec refs, `_対象の部品:_` scope, validation commands, implementer report, and the actual `git diff` as the primary source of truth.
+- Pass the quality-gate commands of every area this task changed (the commands of `/verify-frontend` `/verify-backend` `/verify-terraform` listed in CLAUDE.md) as the validation commands for Regression Safety. The implementer does not run them, so the reviewer's run is the task's verify run required by the completion conditions in tasks.md, and its output is the fresh evidence for `kiro-verify-completion`
+- Dispatch the reviewer with a subagent type other than `kiro-implementer` (e.g. `general-purpose`), so that the full-suite commands are not blocked
 - The reviewer subagent will run `git diff` itself to read the actual code changes and verify against the spec
 - Dispatch via **Agent tool** as a fresh subagent
 
@@ -147,7 +150,7 @@ The debug subagent runs in a **fresh context** — it receives only the error in
 - Parse `NEXT_ACTION` from the debug report's exact structured field.
 - If `NEXT_ACTION: STOP_FOR_HUMAN` → append `_保留: <ROOT_CAUSE>_` to tasks.md, stop the feature run, and report that human review is required before continuing
 - If `NEXT_ACTION: BLOCK_TASK` → append `_保留: <ROOT_CAUSE>_` to tasks.md, skip to next task
-- If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Spawn a **new** implementer subagent with the debug report's `FIX_PLAN`, `NOTES`, and the current `git diff`, and require it to repair the task with explicit edits only
+- If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Spawn a **new** implementer subagent (`subagent_type: kiro-implementer`) with the debug report's `FIX_PLAN`, `NOTES`, and the current `git diff`, and require it to repair the task with explicit edits only
   - If the new implementer succeeds (READY_FOR_REVIEW → reviewer APPROVED) → normal flow
   - If the new implementer also fails → repeat debug cycle (max 2 debug rounds total). After 2 failed debug rounds → append `_保留: debug attempted twice, still failing — <ROOT_CAUSE>_` to tasks.md, skip
 - **Max 2 debug rounds per task**. Each round: fresh debug subagent → fresh implementer. If still failing after 2 rounds, the task is blocked.
