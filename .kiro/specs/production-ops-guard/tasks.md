@@ -85,7 +85,7 @@
   - _対象の部品: 障害時の本番操作手順.md_
   - _依存: 2_
 
-- [ ] 6. 準備のあとの確かめ方を PR の本文の下書きに用意する
+- [x] 6. 準備のあとの確かめ方を PR の本文の下書きに用意する
 
   Claude は、design.md の「テストの方針」の結合テストの項目に、下の追加の項目を足して、所有者の準備のあとに一度だけ行う確かめ方を、このセッションの scratchpad の下の `production-ops-guard/pr-body-check.md` に書く。Claude は、`/ship` で PR を作るときに、この下書きを本文の節「マージのあとにすること」として載せる。変更用ロールの権限の確かめは、普段の `keirekipro` の鍵から、`aws iam simulate-principal-policy` の `--policy-source-arn` に変更用ロールの ARN を渡して行う。
   - 下書きの見出し: 「A. Claude の普段の鍵で読めるもの・拒まれるもの」「B. 切り替え」「C. 変更用ロールで拒まれるもの」「D. GitHub の App の鍵」「E. 所有者の PAT」「F. ワークフローのファイルを変えた PR」「G. Claude の振る舞いの決まり」
