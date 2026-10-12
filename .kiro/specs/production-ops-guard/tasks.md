@@ -42,7 +42,7 @@
   - _要件: 6.1, 6.4_
   - _対象の部品: refresh-github-app-token.sh_
 
-- [ ] 4. Claude の振る舞いの決まりを CLAUDE.md に書く (並行可)
+- [x] 4. Claude の振る舞いの決まりを CLAUDE.md に書く (並行可)
 
   Claude は、CLAUDE.md の「自律動作の境界」の節に、design.md の「CLAUDE.md の決まり」の節の4つの決まりを足す。
   - 完了の確かめ方: CLAUDE.md の「自律動作の境界」の節に、拒まれたときの振る舞い、AWS を変える操作とワークフローの手での起動を試さないこと、所有者の GitHub の鍵を使わないこと、ブラウザで github.com と AWS のコンソールを操作する前に伝えることの4つが書かれていること
@@ -96,6 +96,7 @@
 
 ## 実装のメモ
 
+- タスク4のレビューで、`.github/workflows/codex-review.yml` の誤りの文と、承認済みの spec `issue-method-deviation-gate` の design が、Claude に codex-review の再実行をさせていると分かった。App に替えたあとは Claude は再実行できないので、PR の本文の `Refs:` を直したときは、Claude がコミットを push して動き直させるか、所有者が再実行する。範囲の外なので所有者に報告する
 - タスク3.2のレビューで、`.claude/settings.local.json` の `env` の `GH_CONFIG_DIR` がフックの処理に届くかを公式文書で確かめられなかった。そこでフックは、環境に `GH_CONFIG_DIR` が無ければ `settings.local.json` の `env.GH_CONFIG_DIR` を読んで渡す(テスト3件を足した)
 - タスク3.1で、`hosts.yml` の `user` は `x-access-token` にした(design-response.md の D2-1-3 の対応のとおり、公式文書と gh の資格情報ヘルパーで確かめた)。design.md の「refresh-token.sh」の節の `<App の名前>[bot]` は古い記述で、手順書と PR の本文では `x-access-token` で書く
 - タスク2のレビューで、ユーザーのモジュールの置き場(`DocumentsWindowsPowerShellModules`)に置いた偽の PSReadLine が、`-NoProfile -File` でもスクリプトより先に読み込まれると分かった。Claude が意図してファイルを置く道なので、要件3の3の例外に当たる。PR の本文の確かめ方と所有者への報告に、この道を例外に含むと明記する。`ops-renew` は aws.exe をその時点の作業の場所で起動するので、手順書に、`ops-renew` は `cd` で移らずに打つことを書く

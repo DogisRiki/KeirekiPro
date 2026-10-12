@@ -72,6 +72,11 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - 200行(実装のコード差分。テストとドキュメントは計上しない)を超えるPRは、spec駆動(Lane A)のPRとしてPR本文に `Spec: .kiro/specs/<feature>` を記載したものしか通らない(size-checkが機械判定する)。
   この200行の検査は、着手時の判断(`/start`)をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
+- 上の箇条に加えて、Claude は、AWS を変える操作、変更用ロール `keirekipro-ops` への切り替え、GitHub のワークフローの手での起動・再実行・取り消し・承認を試さない。本番のワークフローに限らず、どのワークフローも手で動かさない。
+  AWS と GitHub の鍵の権限が止めるのは、この手での操作である。Claude がワークフローのファイルを足すか変えて push し、そのワークフローに本番のワークフローを起動させる道は、鍵の権限では止まらない(#557 で扱う)。この道でも、Claude は上の箇条のとおり本番デプロイと `terraform apply` を起動しない
+- **AWS か GitHub に操作を拒まれたら、Claude は、別の書き方、別の鍵、別のプログラムで同じ操作を試さない。** Claude は、何をしようとして拒まれたかを所有者に伝える
+- Claude は、所有者の GitHub の鍵(gh の既定の設定、Windows の資格情報マネージャー、環境変数にある鍵)を使わない。Claude の gh は、Claude Code の設定の `GH_CONFIG_DIR` が指す置き場の鍵を使う。Claude は `GH_CONFIG_DIR` を外して gh を打たない
+- Claude は、Claude in Chrome で github.com か AWS のコンソールを操作する前に、どのページで何をするかを所有者に伝え、許可を求める。Claude は、許可を1回の操作ごとに求め、所有者が許可しなければその操作をしない
 - DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う
 - 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)
 - 依頼範囲外の問題を見つけたら報告のみ行う(勝手に直さない)
