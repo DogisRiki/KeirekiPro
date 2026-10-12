@@ -77,6 +77,19 @@
 #       標準エラーに出し、終了コード69で終わる。
 #   spec-names
 #       すべての作業フォルダの .kiro/specs/ のディレクトリ名を、重ならないように1行ずつ出す。
+#   busy-issues [--session <ID>]
+#       spec があるIssueの番号と、ほかの作業中のセッションが着手の記録(予約か claim)を持つIssueの番号を、
+#       記録を書かずに調べ、標準出力に {"active":[...],"spec":[...]} の JSON を1行出す(終了コード0)。
+#       どちらの配列も番号の小さい順で重なりが無く、該当が無ければ空の配列。
+#         active  issues/<N>.json のうち、check-start の started と同じ4つの条件(session_id が空でなく自分と違う、
+#                 sessions/ にその記録がある、その作業フォルダが無くなっていない、folder が開かれている作業フォルダで
+#                 handed_over_from に無い)を満たす記録の番号。folder だけが一致する記録は数えない
+#         spec    .kiro/specs/*/spec.json の issue と additional_issues の番号。読む場所は、すべての作業フォルダ
+#                 (spec-names と同じ一覧)の中身と、refs/remotes/origin/main の木(無ければ飛ばす)と、
+#                 issues/ の記録の branch(空でないもの)のブランチの木(refs/heads/<branch>、無ければ
+#                 refs/remotes/origin/<branch>。どちらも無ければ飛ばす)
+#       読めない spec.json は飛ばし、「[parallel] 読めない spec.json: <場所>」を標準エラーに出す(終了コードは0のまま)。
+#       記録を書かず、prune も docker も呼ばない。呼ぶ git のコマンドは読むだけのもの。
 #   prune
 #       作業フォルダが無くなった記録と、古くなった spec の予約と、残った枠と、作業フォルダごとのボリュームと DB を片付け、
 #       片付けたことを標準出力に出す。所有者が手で打っても使える。
@@ -110,6 +123,8 @@
 # claim と takeover も、Issueの記録を同じ錠の中で読み書きし、15秒待っても錠を取れなければ記録を書かずに終了コード69で終わる。
 # check-spec も、同じ錠の中で調べと spec の予約を行い、錠を返してから JSON を出す。15秒待っても錠を取れないときと、
 # 予約を書けないときは、JSON を出さずに終了コード69で終わる。
+# busy-issues も、同じ錠の中で記録を読み、錠を返してから JSON を出す。15秒待っても錠を取れないときは、
+# JSON を出さずに終了コード69で終わる。
 #
 # 終了コード: 0(成功)、1(claim がほかのセッションの記録を断った、takeover が引き継げなかった)、64(呼び方の誤り)、
 #             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない、
@@ -1518,6 +1533,166 @@ kp_session_spec_names() {
     done | LC_ALL=C sort -u
 }
 
+# spec があるIssueの番号と、ほかの作業中のセッションが着手の記録(予約か claim)を持つIssueの番号を、
+# 記録を書かずに JSON で出す。記録の錠の中で記録を読み、錠を返してから JSON を出す
+kp_session_busy_issues() {
+    local session="" state sid ic paths gone_sessions out
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --session)
+                [ $# -ge 2 ] || _kp_ss_usage "--session の値が無い"
+                session=$2
+                shift 2
+                ;;
+            -*) _kp_ss_usage "知らないオプション $1" ;;
+            *) _kp_ss_usage "引数が多い: $1" ;;
+        esac
+    done
+
+    state=$(kp_state_dir) || exit $?
+    sid=$(kp_session_id "${session:-${KP_SESSION_ID:-}}") || exit $?
+    ic=$(git config --get core.ignorecase 2>/dev/null)
+    # spec-names と同じ作業フォルダの一覧
+    paths=$(_kp_ss_worktree_paths)
+
+    # ここから JSON を作り終えるまで、記録の錠の中で読む(記録は書かない)
+    _kp_ss_lock "$state"
+
+    # 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は作業中に数えない
+    gone_sessions=$(_kp_ss_gone_sessions "$state") \
+        || _kp_ss_die69 "[parallel] 調べられない: 作業フォルダの一覧から、無くなったセッションの記録を見分けられない"
+
+    out=$(perl -MJSON::PP -e "$_KP_SS_PL_ACTIVE" -e '
+        use strict; use warnings;
+        my ($state, $sid, $ic, $gone_list, $paths) = @ARGV;
+        utf8::decode($_) for ($state, $sid, $paths);
+        $KP_IC = $ic;
+
+        # git を呼んで標準出力を返す(標準エラーは捨てる)。失敗したら undef
+        sub git_out {
+            my @args = @_;
+            my $pid = open(my $fh, "-|");
+            return undef unless defined $pid;
+            if (!$pid) {
+                open STDERR, ">", "/dev/null";
+                exec "git", @args;
+                exit 127;
+            }
+            local $/; my $out = <$fh>;
+            close $fh;
+            return undef if $?;
+            return $out // "";
+        }
+        # Issueの番号(数か "#<数>" の文字列)。番号でなければ undef
+        sub num {
+            my ($v) = @_;
+            return undef unless defined $v && !ref $v;
+            (my $s = $v) =~ s/\A#//;
+            return $s =~ /\A0*([0-9]+)\z/ ? $1 + 0 : undef;
+        }
+
+        # active: check-start の leftovers の started と同じ4つの条件を満たす記録の番号
+        # (session_id が空でなく自分と違い、sessions/<session_id>.json があって作業フォルダが無くなっておらず、
+        # folder が開かれている作業フォルダで handed_over_from に無いもの)
+        my %gone = map { ($_ => 1) } grep { length } split /\n/, $gone_list;
+        my (@worktrees, $cur);
+        my $list = git_out("worktree", "list", "--porcelain") // "";
+        utf8::decode($list);
+        for my $line (split /\r?\n/, $list) {
+            if ($line =~ /\Aworktree (.+)\z/) {
+                $cur = { path => $1 };
+                push @worktrees, $cur;
+            } elsif ($cur && $line eq "bare") {
+                $cur->{bare} = 1;
+            }
+        }
+        my %open = map { (norm($_->{path}) => 1) } grep { !$_->{bare} && -d $_->{path} } @worktrees;
+
+        my (%active, %branches);
+        for my $d (load_dir("$state/issues")) {
+            my $br = str($d->{branch});
+            $branches{$br} = 1 if length $br;
+            my $n = num($d->{issue});
+            next unless defined $n;
+            my $isid = str($d->{session_id});
+            next unless length $isid && $isid ne $sid && $isid !~ m{[/\\]} && !$gone{"$isid.json"};
+            next unless load("$state/sessions/$isid.json");
+            my $fid = norm(str($d->{folder}));
+            next unless length $fid && $open{$fid};
+            my %handed = map { (norm(str($_)) => 1) }
+                (ref $d->{handed_over_from} eq "ARRAY" ? @{ $d->{handed_over_from} } : ());
+            next if $handed{$fid};
+            $active{$n} = 1;
+        }
+
+        # spec: spec.json の issue と additional_issues の番号
+        my %spec;
+        sub bad {
+            my ($where) = @_;
+            utf8::encode($where) if utf8::is_utf8($where);
+            print STDERR "[parallel] 読めない spec.json: $where\n";
+        }
+        sub add_spec { # <中身> <場所>
+            my ($text, $where) = @_;
+            my $d = defined $text ? eval { JSON::PP->new->utf8->decode($text) } : undef;
+            return bad($where) unless ref $d eq "HASH";
+            for my $v ($d->{issue}, (ref $d->{additional_issues} eq "ARRAY" ? @{ $d->{additional_issues} } : ())) {
+                my $n = num($v);
+                $spec{$n} = 1 if defined $n;
+            }
+        }
+
+        # 1. すべての作業フォルダの中身
+        for my $w (grep { length } split /\n/, $paths) {
+            opendir my $dh, "$w/.kiro/specs" or next;
+            my @names = sort grep { !/\A\./ } readdir $dh;
+            closedir $dh;
+            for my $name (@names) {
+                my $file = "$w/.kiro/specs/$name/spec.json";
+                next unless -f $file;
+                my $text;
+                if (open my $fh, "<:raw", $file) {
+                    local $/; $text = <$fh>; close $fh;
+                }
+                add_spec($text, $file);
+            }
+        }
+
+        # 2. refs/remotes/origin/main の木と、3. 記録の branch のブランチの木(refs/heads/<branch>、
+        #    無ければ refs/remotes/origin/<branch>)。無い参照は飛ばす。同じコミットは1回だけ読む
+        my %read;
+        sub read_tree {
+            my ($ref) = @_;
+            my $c = git_out("rev-parse", "--verify", "-q", "$ref^{commit}");
+            return 0 unless defined $c;
+            $c =~ s/\s+\z//;
+            return 1 if $read{$c}++;
+            my $ls = git_out("ls-tree", "-r", "-z", "--name-only", "$c:.kiro/specs");
+            return 1 unless defined $ls;
+            for my $rel (sort split /\0/, $ls) {
+                next unless $rel =~ m{\A([^/]+)/spec\.json\z} && $1 !~ /\A\./;
+                my $path = ".kiro/specs/$rel";
+                add_spec(git_out("show", "--no-textconv", "$c:$path"), "$ref:$path");
+            }
+            return 1;
+        }
+        read_tree("refs/remotes/origin/main");
+        for my $br (sort keys %branches) {
+            read_tree("refs/heads/$br") or read_tree("refs/remotes/origin/$br");
+        }
+
+        print JSON::PP->new->canonical->encode({
+            active => [ map { $_ + 0 } sort { $a <=> $b } keys %active ],
+            spec => [ map { $_ + 0 } sort { $a <=> $b } keys %spec ],
+        }), "\n";
+    ' -- "$state" "$sid" "$ic" "$gone_sessions" "$paths") \
+        || _kp_ss_die69 "[parallel] 調べられない: 記録と spec.json を読めない"
+
+    # 錠を返してから JSON を出す
+    _kp_ss_unlock
+    printf '%s\n' "$out"
+}
+
 kp_session_main() {
     local cmd="${1:-}"
     [ $# -gt 0 ] && shift
@@ -1529,7 +1704,8 @@ kp_session_main() {
         prune) kp_session_prune "$@" ;;
         takeover) kp_session_takeover "$@" ;;
         check-spec) kp_session_check_spec "$@" ;;
-        *) _kp_ss_usage "サブコマンドは check-start / claim / end / takeover / check-spec / spec-names / prune のどれか" ;;
+        busy-issues) kp_session_busy_issues "$@" ;;
+        *) _kp_ss_usage "サブコマンドは check-start / claim / end / takeover / check-spec / spec-names / busy-issues / prune のどれか" ;;
     esac
 }
 

@@ -2282,6 +2282,187 @@ EOF
     spec_clean_after "差分に前後の行があったとき"
 }
 
+# =====================================================================
+# busy-issues: spec があるIssueと、ほかのセッションが作業中のIssue(spec-need-triage 要件11.4)
+# =====================================================================
+# busy-issues を呼び、終了コード0と1行の JSON であることを確かめて JSON を出す(標準エラーは $WORK/busy-err.txt に残す)
+busy() { # <フォルダ> <引数>...
+    local out rc lines
+    out=$(ss "$1" busy-issues "${@:2}" 2>"$WORK/busy-err.txt")
+    rc=$?
+    [ "$rc" = 0 ] || die "busy-issues の終了コード $rc: $(cat "$WORK/busy-err.txt")"
+    lines=$(printf '%s\n' "$out" | wc -l)
+    [ "$lines" -eq 1 ] || die "busy-issues の出力が1行でない: $out"
+    pj "$out" '1' >/dev/null 2>&1 || die "busy-issues の出力が JSON でない: $out"
+    printf '%s' "$out"
+}
+
+# 記録の置き場所のファイルとディレクトリの一覧と、ファイルの中身を出す(busy-issues が記録を書かないことを比べるため)
+state_snapshot() {
+    local p
+    (cd "$STATE" && find . | LC_ALL=C sort) || return 1
+    while IFS= read -r p; do
+        printf '== %s\n' "$p"
+        cat "$p"
+    done < <(find "$STATE" -type f | LC_ALL=C sort)
+}
+
+t_busy_empty() {
+    local out d
+    # 種のコミットの spec alpha を、どの作業フォルダの中身からも消す(reset_state が戻す)
+    for d in "$MAIN_DIR" "$WT_DIR" "$WT2_DIR"; do
+        rm -rf "$d/.kiro"
+    done
+    out=$(busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$out" = '{"active":[],"spec":[]}' ] || die "記録も spec も無いのに空の配列でない: $out"
+    [ ! -e "$LOCK" ] || die "錠を残した"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_busy_active_started() {
+    local out
+    # WT のセッション s-wt は claim した(branch がある)。WT2 のセッション s-wt2 はブランチを作る前に予約した(branch が空)
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    put_issue 42 "$WT" feat/wt s-wt
+    put_session s-wt2 "$WT2" "$(fkey "$WT2_DIR")" 310
+    put_issue 43 "$WT2" "" s-wt2
+    out=$(busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{active}')" = '[42,43]' ] || die "claim した記録と予約の記録が active に出ない: $out"
+    # このセッションの記録は出ない(--session でも、KP_SESSION_ID でも、いまの作業フォルダのセッションの記録からでも)
+    out=$(busy "$WT_DIR" --session s-wt) || die "$out"
+    [ "$(pj "$out" '$d->{active}')" = '[43]' ] || die "--session s-wt で自分の記録が active に出た: $out"
+    out=$(KP_SESSION_ID=s-wt2 busy "$WT2_DIR") || die "$out"
+    [ "$(pj "$out" '$d->{active}')" = '[42]' ] || die "KP_SESSION_ID=s-wt2 で自分の記録が active に出た: $out"
+    out=$(busy "$WT_DIR") || die "$out"
+    [ "$(pj "$out" '$d->{active}')" = '[43]' ] || die "作業フォルダのセッションの記録から決めた自分の記録が active に出た: $out"
+    [ ! -e "$LOCK" ] || die "錠を残した"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_busy_active_excluded() {
+    local out gone="$WORK/RepoGone"
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    # 数える記録(下の記録がすべて外れたことを、何も出ないことと見分けるため)
+    put_issue 56 "$WT" feat/wt s-wt
+    # prune が残したブランチだけの記録(folder と session_id が空)
+    git -C "$MAIN_DIR" branch -q feat/extra "$SEED_SHA"
+    put_issue 50 "" feat/extra ""
+    # セッションの記録が無い(セッションを終えた)記録
+    put_issue 51 "$WT" "" s-closed
+    # 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)。Issueの記録の folder は開かれている
+    put_session s-gone "$gone" "$(fkey_path "$gone")" 200
+    put_issue 52 "$WT" "" s-gone
+    # 同じ作業フォルダで開き直したセッション s-new がいるときの、前のセッション s-prev の記録(folder だけが一致する)
+    put_session s-new "$WT2" "$(fkey "$WT2_DIR")" 320
+    put_issue 53 "$WT2" "" s-prev
+    # 記録の folder が handed_over_from にある記録
+    put_issue 54 "$WT" "" s-wt "[\"$WT\"]"
+    # 記録の folder が開かれている作業フォルダでない記録
+    put_issue 55 "$WORK/RepoElsewhere" "" s-wt
+    out=$(busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{active}')" = '[56]' ] || die "数えない記録が active に出たか、数える記録が出ない: $out"
+}
+
+t_busy_spec_sources() {
+    local c out
+    # 本体の中身(コミットしていない spec)と、worktree の中身。種のコミットの alpha(10)も本体と worktree の中身にある
+    put_spec "$MAIN_DIR" beta 20 '[21]'
+    put_spec "$WT_DIR" gamma 22 '[23]'
+    # origin/main にだけある spec
+    c=$(main_commit "$SEED_SHA" .kiro/specs/delta/spec.json '{"issue":30,"additional_issues":[31]}\n') \
+        || die "origin/main を作れない"
+    set_origin_main "$c"
+    # 記録の branch のブランチにだけある spec(ローカルのブランチ)
+    c=$(main_commit "$SEED_SHA" .kiro/specs/epsilon/spec.json '{"issue":40,"additional_issues":[41]}\n') \
+        || die "ブランチのコミットを作れない"
+    git -C "$MAIN_DIR" update-ref refs/heads/feat/extra-local "$c" || die "ローカルのブランチを作れない"
+    put_issue 60 "" feat/extra-local ""
+    # 記録の branch のブランチにだけある spec(リモートにだけあるブランチ)
+    c=$(main_commit "$SEED_SHA" .kiro/specs/zeta/spec.json '{"issue":44}\n') || die "ブランチのコミットを作れない"
+    git -C "$MAIN_DIR" update-ref refs/remotes/origin/feat/extra-remote "$c" || die "リモートのブランチを作れない"
+    put_issue 61 "" feat/extra-remote ""
+    # ローカルにもリモートにもあるブランチは、ローカルのブランチを読む
+    c=$(main_commit "$SEED_SHA" .kiro/specs/eta/spec.json '{"issue":45}\n') || die "ブランチのコミットを作れない"
+    git -C "$MAIN_DIR" update-ref refs/heads/feat/extra-both "$c" || die "ローカルのブランチを作れない"
+    c=$(main_commit "$SEED_SHA" .kiro/specs/theta/spec.json '{"issue":46}\n') || die "ブランチのコミットを作れない"
+    git -C "$MAIN_DIR" update-ref refs/remotes/origin/feat/extra-both "$c" || die "リモートのブランチを作れない"
+    put_issue 62 "" feat/extra-both ""
+    out=$(busy "$WT2_DIR" --session s-me) || die "$out"
+    [ "$out" = '{"active":[],"spec":[10,20,21,22,23,30,31,40,41,44,45]}' ] \
+        || die "spec の番号が違う(期待は 10,20,21,22,23,30,31,40,41,44,45): $out"
+}
+
+t_busy_branch_missing() {
+    local out
+    put_issue 63 "" feat/extra-none ""
+    out=$(busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$out" = '{"active":[],"spec":[10]}' ] || die "どこにも無いブランチの記録で spec が変わった: $out"
+    [ ! -s "$WORK/busy-err.txt" ] || die "どこにも無いブランチで標準エラーに文が出た: $(cat "$WORK/busy-err.txt")"
+}
+
+t_busy_broken_spec() {
+    local c out err
+    mkdir -p "$WT_DIR/.kiro/specs/broken"
+    printf '{"issue":' >"$WT_DIR/.kiro/specs/broken/spec.json"
+    c=$(main_commit "$SEED_SHA" .kiro/specs/bad/spec.json 'not json\n') || die "origin/main を作れない"
+    set_origin_main "$c"
+    put_spec "$WT2_DIR" beta 20
+    out=$(busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$out" = '{"active":[],"spec":[10,20]}' ] || die "壊れた spec.json があると読める spec の番号が出ない: $out"
+    err=$(cat "$WORK/busy-err.txt")
+    grep -F "$WT/.kiro/specs/broken/spec.json" "$WORK/busy-err.txt" | grep -q '^\[parallel\] 読めない spec\.json:' \
+        || die "作業フォルダの壊れた spec.json の文が標準エラーに無い: $err"
+    grep -F 'origin/main' "$WORK/busy-err.txt" | grep -F '.kiro/specs/bad/spec.json' \
+        | grep -q '^\[parallel\] 読めない spec\.json:' \
+        || die "origin/main の壊れた spec.json の文が標準エラーに無い: $err"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_busy_no_write() {
+    local out before after gone="$WORK/RepoGone"
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    put_issue 42 "$WT" feat/wt s-wt
+    # prune なら片付ける記録(作業フォルダが無くなったセッションとIssueの記録、ブランチがどこにも無い記録、
+    # 600秒たった spec の予約)
+    put_session s-gone "$gone" "$(fkey_path "$gone")" 200
+    put_issue 52 "$gone" "" s-gone
+    put_issue 63 "" feat/extra-none ""
+    put_spec_reserve_raw old 1
+    before=$(state_snapshot) || die "記録の置き場所を読めない"
+    out=$(busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$(pj "$out" '$d->{active}')" = '[42]' ] || die "前提: active が 42 でない: $out"
+    after=$(state_snapshot) || die "記録の置き場所を読めない"
+    [ "$after" = "$before" ] || die "記録の置き場所のファイルの一覧か中身が変わった:
+$(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
+    [ ! -s "$FAKE_DOCKER_LOG" ] || die "docker が呼ばれた: $(cat "$FAKE_DOCKER_LOG")"
+}
+
+t_busy_usage() {
+    local out rc a
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    put_issue 42 "$WT" feat/wt s-wt
+    for a in 'extra' '--session' '--bogus' '--session s-me extra'; do
+        # shellcheck disable=SC2086 # 空白で引数に分けて渡す
+        out=$(ss "$MAIN_DIR" busy-issues $a 2>"$WORK/err.txt")
+        rc=$?
+        [ "$rc" = 64 ] || die "busy-issues $a の終了コードが64でない: $rc: $out $(cat "$WORK/err.txt")"
+        [ -z "$out" ] || die "busy-issues $a が JSON を出した: $out"
+    done
+}
+
+t_busy_lock_held() {
+    local out rc
+    put_session s-wt "$WT" "$(fkey "$WT_DIR")" 300
+    put_issue 42 "$WT" feat/wt s-wt
+    mkdir -p "$LOCK"
+    out=$(PATH="$TMP_ROOT/fastsleep:$PATH" ss "$MAIN_DIR" busy-issues --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    [ "$rc" = 69 ] || die "錠がほかに持たれたままなのに終了コードが69でない: $rc: $out $(cat "$WORK/err.txt")"
+    [ -z "$out" ] || die "錠を取れないのに JSON を出した: $out"
+    grep -q 'records.lock' "$WORK/err.txt" || die "標準エラーに錠の理由が無い: $(cat "$WORK/err.txt")"
+    [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
+}
+
 echo "--- check-start: 同じ作業フォルダの別のセッション(要件5.1・5.2)"
 run_test "同じ作業フォルダに別の作業中のセッションの記録があると folder_conflict に出る" t_folder_conflict
 run_test "同じ作業フォルダの、Issueの記録の無いセッション(着手していない記録)は folder_conflict に出ない" t_folder_conflict_idle_ignored
@@ -2394,6 +2575,17 @@ run_test "コミットしていない新しいファイル・spec のディレ�
 run_test "同じ中身の行が別の場所にあるか、別の場所で消されていても要素が出て、隣り合う空行の squash のあとは空" t_check_spec_same_content_elsewhere
 run_test "置き換えた行の一部だけを main が変えたとき、行を足しただけの main のかたまり、diff.interHunkContext と GIT_DIFF_OPTS で判定が変わらず、足した行の squash のあとは前後の行が変わっても空" t_check_spec_hunk_positions
 run_test "差分のかたまりの本文に前後の行があれば終了コード69で、作業フォルダとファイルの名前を出し、錠と一時的な索引を残さない" t_check_spec_context_line_refused
+
+echo "--- busy-issues: spec があるIssueと、ほかのセッションが作業中のIssue(spec-need-triage 要件11.4)"
+run_test "記録も spec も無いときは空の配列を出し、終了コード0で終わる" t_busy_empty
+run_test "ほかの作業中のセッションが claim した記録と予約の記録は active に出て、このセッションの記録は出ない" t_busy_active_started
+run_test "ブランチだけの記録、セッションを終えた記録、作業フォルダが無くなったセッションの記録、folder だけが一致する前のセッションの記録、handed_over_from の記録、開かれていない作業フォルダの記録は active に出ない" t_busy_active_excluded
+run_test "本体と worktree の中身、origin/main にだけある、記録の branch のブランチ(ローカルを先に、無ければリモート)にだけある spec.json の issue と additional_issues が spec に出る" t_busy_spec_sources
+run_test "記録の branch のブランチがローカルにもリモートにも無ければ飛ばし、終了コード0で終わる" t_busy_branch_missing
+run_test "壊れた spec.json は飛ばして標準エラーに場所を出し、終了コード0で終わる" t_busy_broken_spec
+run_test "busy-issues は記録の置き場所のファイルの一覧と中身を変えず、prune も docker も呼ばない" t_busy_no_write
+run_test "余計な引数、--session の値が無い、知らないオプションは終了コード64で、JSON を出さない" t_busy_usage
+run_test "錠がほかに持たれたままなら busy-issues は終了コード69で終わり、JSON を出さず、その錠を消さない" t_busy_lock_held
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"
