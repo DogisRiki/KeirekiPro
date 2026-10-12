@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. AWS の運用者の権限を定める
+- [x] 1. AWS の運用者の権限を定める
 - [x] 1.1 普段のログインの権限の制限のポリシーを書く (並行可)
 
   Claude は、IAM ユーザー `keirekipro` に付けるインラインポリシー `keirekipro-readonly-guard.json` を、design.md の「keirekipro-readonly-guard」の節のとおりに書く。Claude は、アカウントの番号を `<ACCOUNT_ID>` と書く。
@@ -25,7 +25,7 @@
   - _要件: 3.1, 3.2, 3.3_
   - _対象の部品: ops-shell.ps1_
 
-- [ ] 3. Claude の手元の gh を GitHub App のトークンで動かす
+- [x] 3. Claude の手元の gh を GitHub App のトークンで動かす
 - [x] 3.1 トークンを入れ替えるスクリプトをテストから作る (並行可)
 
   Claude は、`refresh-token.sh` を、design.md の「refresh-token.sh」の節の呼び出し方のとおりに、テスト `test-refresh-token.sh` を先に書いてから作る。テストは、テストの中で作った鍵と偽の `curl` を使い、ネットワークにつながない。Claude は、ホストの Git Bash で `bash .claude/scripts/github-app/tests/test-refresh-token.sh` を打って、テストを流す。
@@ -50,7 +50,7 @@
   - _要件: 1.5, 4.6, 5.1, 5.2_
   - _対象の部品: CLAUDE.md の決まり_
 
-- [ ] 5. 所有者の準備と障害のときの手順を書く
+- [x] 5. 所有者の準備と障害のときの手順を書く
 - [x] 5.1 Claude の手元の準備と ops-shell を置く手順を書く (並行可)
 
   Claude は、`参加者セットアップ手順.md` に、`github-app.env` と App の秘密鍵の置き場とその確かめ方を書き、「2-2. PR作成名義の固定(bot専用のgh設定ディレクトリ)」の節を、ボットの classic PAT で `gh auth login` する手順から、App のトークンを `refresh-token.sh` で入れる手順に置き換え、確かめ方も置き換える。あわせて、`ops-shell.ps1` と `aws-config` の `<ACCOUNT_ID>` をアカウントの番号に置き換えて `C:\Program Files\KeirekiPro\` に置き、空の `empty-credentials` を同じ場所に作り、全利用者のスタートメニューに「KeirekiPro ops」を作る手順を書く。
