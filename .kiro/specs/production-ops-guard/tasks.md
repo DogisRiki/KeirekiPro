@@ -26,7 +26,7 @@
   - _対象の部品: ops-shell.ps1_
 
 - [ ] 3. Claude の手元の gh を GitHub App のトークンで動かす
-- [ ] 3.1 トークンを入れ替えるスクリプトをテストから作る (並行可)
+- [x] 3.1 トークンを入れ替えるスクリプトをテストから作る (並行可)
 
   Claude は、`refresh-token.sh` を、design.md の「refresh-token.sh」の節の呼び出し方のとおりに、テスト `test-refresh-token.sh` を先に書いてから作る。テストは、テストの中で作った鍵と偽の `curl` を使い、ネットワークにつながない。Claude は、ホストの Git Bash で `bash .claude/scripts/github-app/tests/test-refresh-token.sh` を打って、テストを流す。
   - 完了の確かめ方: `test-refresh-token.sh` の場合がすべて通ること。新しい `*.sh` を `git add` したあと、CI と同じ形で、追跡しているすべての `*.sh` をまとめて渡した shellcheck の指摘が0件であること。`hosts.yml` の `user` の値を GitHub の公式文書で確かめ、根拠の URL をテストの冒頭の注記に書くこと
@@ -96,6 +96,7 @@
 
 ## 実装のメモ
 
+- タスク3.1で、`hosts.yml` の `user` は `x-access-token` にした(design-response.md の D2-1-3 の対応のとおり、公式文書と gh の資格情報ヘルパーで確かめた)。design.md の「refresh-token.sh」の節の `<App の名前>[bot]` は古い記述で、手順書と PR の本文では `x-access-token` で書く
 - タスク2のレビューで、ユーザーのモジュールの置き場(`DocumentsWindowsPowerShellModules`)に置いた偽の PSReadLine が、`-NoProfile -File` でもスクリプトより先に読み込まれると分かった。Claude が意図してファイルを置く道なので、要件3の3の例外に当たる。PR の本文の確かめ方と所有者への報告に、この道を例外に含むと明記する。`ops-renew` は aws.exe をその時点の作業の場所で起動するので、手順書に、`ops-renew` は `cd` で移らずに打つことを書く
 - タスク1.1のレビューで、`ReadOnlyAccess` の `s3:Get*` は `s3:GetObjectTorrent` と `s3:GetObjectVersionTorrent` も許すと分かった。design の Deny の一覧には無い。PR の本文の確かめ方「A」で、`aws s3api get-object-torrent` で state の中身を取り出せないことも見る
 - `.claude/hooks/` と `.claude/settings.json` は、Claude の Edit と Write が禁止されている。Claude はタスク3.2の成果物を scratchpad に用意し、`/ship` の前に、所有者が置くためのコマンドをまとめて示す。所有者が置いたあと、Claude は `/ship` のコミットの前に、置いた場所(`.claude/hooks/tests/`)でフックのテストを流し直し、通ることを確かめる
