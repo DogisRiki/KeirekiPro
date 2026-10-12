@@ -17,7 +17,7 @@
   - _要件: 1.6, 1.7, 3.5, 3.6_
   - _対象の部品: keirekipro-ops_
 
-- [ ] 2. 所有者が管理者のターミナルで切り替えるスクリプトを作る (並行可)
+- [x] 2. 所有者が管理者のターミナルで切り替えるスクリプトを作る (並行可)
 
   Claude は、`ops-shell.ps1` と `aws-config` を、design.md の「ops-shell.ps1」の節の手順のとおりに書く。Claude は、スクリプトを ASCII の文字だけで書く。スクリプトは、鍵をファイルに書かない。Claude は、アカウントの番号を `<ACCOUNT_ID>` と書く。
   - 完了の確かめ方: `powershell.exe -NoProfile -Command` から `[System.Management.Automation.Language.Parser]::ParseFile` でスクリプトを読み、構文の誤りが0件であること。`grep -P '[^\x00-\x7F]'` で ASCII 以外の文字が0件であること。スクリプトの中に、`Out-File`、`Set-Content`、`Add-Content`、`>` によるファイルへの書き出しが無いこと。12桁の数字を含まないこと。スクリプトが、design.md の「ops-shell.ps1」の節の9つの手順(管理者でなければ終える、`AWS_` などの環境変数を消す、`PATH` を4つにする、`AWS_CONFIG_FILE` と `AWS_SHARED_CREDENTIALS_FILE` を `C:\Program Files\KeirekiPro\` に向ける、作業の場所を変える、`Read-Host -AsSecureString` で受ける、`aws.exe` を絶対のパスで `--duration-seconds 900` を付けて呼ぶ、鍵を環境変数に置く、`ops-renew` を定める)をすべて持つことを、所有者が置く前に Claude が読んで見ること。`aws-config` が、`source` のプロファイルに `login_session` と `region = ap-northeast-1` だけを持つこと
@@ -96,6 +96,7 @@
 
 ## 実装のメモ
 
+- タスク2のレビューで、ユーザーのモジュールの置き場(`DocumentsWindowsPowerShellModules`)に置いた偽の PSReadLine が、`-NoProfile -File` でもスクリプトより先に読み込まれると分かった。Claude が意図してファイルを置く道なので、要件3の3の例外に当たる。PR の本文の確かめ方と所有者への報告に、この道を例外に含むと明記する。`ops-renew` は aws.exe をその時点の作業の場所で起動するので、手順書に、`ops-renew` は `cd` で移らずに打つことを書く
 - タスク1.1のレビューで、`ReadOnlyAccess` の `s3:Get*` は `s3:GetObjectTorrent` と `s3:GetObjectVersionTorrent` も許すと分かった。design の Deny の一覧には無い。PR の本文の確かめ方「A」で、`aws s3api get-object-torrent` で state の中身を取り出せないことも見る
 - `.claude/hooks/` と `.claude/settings.json` は、Claude の Edit と Write が禁止されている。Claude はタスク3.2の成果物を scratchpad に用意し、`/ship` の前に、所有者が置くためのコマンドをまとめて示す。所有者が置いたあと、Claude は `/ship` のコミットの前に、置いた場所(`.claude/hooks/tests/`)でフックのテストを流し直し、通ることを確かめる
 - `/kiro-impl` の実装役とレビュー役と `/ship` は、タスク3.2とタスク6の成果物を、それぞれのタスクに書いた scratchpad の置き場から読む。セッションが替わったときは、Claude はタスク3.2とタスク6の成果物を新しいセッションの scratchpad に作り直す

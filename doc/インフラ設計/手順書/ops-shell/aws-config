@@ -1,0 +1,3 @@
+[profile source]
+login_session = arn:aws:iam::<ACCOUNT_ID>:user/keirekipro
+region = ap-northeast-1
