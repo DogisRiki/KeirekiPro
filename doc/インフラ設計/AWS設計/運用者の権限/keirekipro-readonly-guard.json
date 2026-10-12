@@ -1,0 +1,42 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyTerraformStateObjectRead",
+      "Effect": "Deny",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:GetObjectAttributes"
+      ],
+      "Resource": "arn:aws:s3:::keirekipro-terraform-state/*"
+    },
+    {
+      "Sid": "DenySecretValueRead",
+      "Effect": "Deny",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:BatchGetSecretValue"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyKmsDecrypt",
+      "Effect": "Deny",
+      "Action": "kms:Decrypt",
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowAssumeOpsRole",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/keirekipro-ops"
+    },
+    {
+      "Sid": "AllowChangeOwnPassword",
+      "Effect": "Allow",
+      "Action": "iam:ChangePassword",
+      "Resource": "arn:aws:iam::<ACCOUNT_ID>:user/keirekipro"
+    }
+  ]
+}

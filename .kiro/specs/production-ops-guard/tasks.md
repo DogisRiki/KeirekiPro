@@ -1,7 +1,7 @@
 # タスク
 
 - [ ] 1. AWS の運用者の権限を定める
-- [ ] 1.1 普段のログインの権限の制限のポリシーを書く (並行可)
+- [x] 1.1 普段のログインの権限の制限のポリシーを書く (並行可)
 
   Claude は、IAM ユーザー `keirekipro` に付けるインラインポリシー `keirekipro-readonly-guard.json` を、design.md の「keirekipro-readonly-guard」の節のとおりに書く。Claude は、アカウントの番号を `<ACCOUNT_ID>` と書く。
   - 完了の確かめ方: `perl -MJSON::PP` で読み込めること。state バケットのオブジェクトの読み取り、`secretsmanager:GetSecretValue`、`secretsmanager:BatchGetSecretValue`、`kms:Decrypt` の Deny と、変更用ロールへの `sts:AssumeRole` と自分の `iam:ChangePassword` の Allow だけを持つこと。12桁の数字(アカウントの番号)を含まないこと
@@ -96,6 +96,7 @@
 
 ## 実装のメモ
 
+- タスク1.1のレビューで、`ReadOnlyAccess` の `s3:Get*` は `s3:GetObjectTorrent` と `s3:GetObjectVersionTorrent` も許すと分かった。design の Deny の一覧には無い。PR の本文の確かめ方「A」で、`aws s3api get-object-torrent` で state の中身を取り出せないことも見る
 - `.claude/hooks/` と `.claude/settings.json` は、Claude の Edit と Write が禁止されている。Claude はタスク3.2の成果物を scratchpad に用意し、`/ship` の前に、所有者が置くためのコマンドをまとめて示す。所有者が置いたあと、Claude は `/ship` のコミットの前に、置いた場所(`.claude/hooks/tests/`)でフックのテストを流し直し、通ることを確かめる
 - `/kiro-impl` の実装役とレビュー役と `/ship` は、タスク3.2とタスク6の成果物を、それぞれのタスクに書いた scratchpad の置き場から読む。セッションが替わったときは、Claude はタスク3.2とタスク6の成果物を新しいセッションの scratchpad に作り直す
 - このリポジトリは公開されているので、Claude は、ポリシーの JSON とスクリプトと手順書に、AWS のアカウントの番号を書かない
