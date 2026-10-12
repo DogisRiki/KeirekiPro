@@ -34,7 +34,7 @@
   - _要件: 6.1, 6.4_
   - _対象の部品: refresh-token.sh_
 
-- [ ] 3.2 トークンを入れ替えるフックとそのテストを用意する
+- [x] 3.2 トークンを入れ替えるフックとそのテストを用意する
 
   Claude は、フック `refresh-github-app-token.sh` と、そのテスト `test-refresh-github-app-token.sh` と、`.claude/settings.json` の SessionStart、UserPromptSubmit、PreToolUse(matcher は `Bash`)への登録を、design.md の「refresh-github-app-token.sh」の節のとおりに、このセッションの scratchpad の下の `production-ops-guard/` に用意する。テストは、scratchpad に置いたフックを、`refresh-token.sh` を偽物に置き換えたうえで、3つのイベントの入力で直接呼んで確かめる。
   - 完了の確かめ方: scratchpad のテストが通ること。テストは、偽物の `refresh-token.sh` が成功したときに3つのイベントのどれでも終了コード0で終えること、`refresh-token.sh` が失敗したときに SessionStart と UserPromptSubmit では理由を標準出力に出し、どのイベントでも終了コード0で終えること、フックが `refresh-token.sh` に `--force` を渡さないことを確かめる。scratchpad のフックとテストを、追跡しているすべての `*.sh` とまとめて shellcheck に渡し、指摘が0件であること。登録を足した `settings.json` の下書きが `perl -MJSON::PP` で読み込めること
@@ -96,6 +96,7 @@
 
 ## 実装のメモ
 
+- タスク3.2のレビューで、`.claude/settings.local.json` の `env` の `GH_CONFIG_DIR` がフックの処理に届くかを公式文書で確かめられなかった。そこでフックは、環境に `GH_CONFIG_DIR` が無ければ `settings.local.json` の `env.GH_CONFIG_DIR` を読んで渡す(テスト3件を足した)
 - タスク3.1で、`hosts.yml` の `user` は `x-access-token` にした(design-response.md の D2-1-3 の対応のとおり、公式文書と gh の資格情報ヘルパーで確かめた)。design.md の「refresh-token.sh」の節の `<App の名前>[bot]` は古い記述で、手順書と PR の本文では `x-access-token` で書く
 - タスク2のレビューで、ユーザーのモジュールの置き場(`DocumentsWindowsPowerShellModules`)に置いた偽の PSReadLine が、`-NoProfile -File` でもスクリプトより先に読み込まれると分かった。Claude が意図してファイルを置く道なので、要件3の3の例外に当たる。PR の本文の確かめ方と所有者への報告に、この道を例外に含むと明記する。`ops-renew` は aws.exe をその時点の作業の場所で起動するので、手順書に、`ops-renew` は `cd` で移らずに打つことを書く
 - タスク1.1のレビューで、`ReadOnlyAccess` の `s3:Get*` は `s3:GetObjectTorrent` と `s3:GetObjectVersionTorrent` も許すと分かった。design の Deny の一覧には無い。PR の本文の確かめ方「A」で、`aws s3api get-object-torrent` で state の中身を取り出せないことも見る
