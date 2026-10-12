@@ -37,6 +37,10 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
+# ベースイメージ(Ubuntu 26.04)には、OSパッケージの外で /usr/bin/pebble(Go製)が入っている。
+# アプリは java で直接起動し pebble を使わないため、Go の脆弱性を持ち込まないよう消す(#554)。
+RUN rm -f /usr/bin/pebble
+
 # セキュリティ: 非rootユーザーを作成
 RUN groupadd -r spring && useradd -r -g spring spring
 
