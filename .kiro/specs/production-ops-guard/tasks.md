@@ -68,7 +68,7 @@
   - _要件: 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 4.8, 4.9, 5.1, 7.1_
   - _対象の部品: 基盤構築手順.md_
 
-- [ ] 5.3 AWS の準備の手順と、準備の全体の順番を書く
+- [x] 5.3 AWS の準備の手順と、準備の全体の順番を書く
 
   Claude は、`手動作業手順.md` に、変更用ロールと制限のポリシーを作り、切り替えを確かめてから `AdministratorAccess` を外す手順を足し、既存の AWS を変える手順を design.md の「手順書と PR の本文」の節のとおりに直す。あわせて、`IAMロール・ポリシー設計.md` に、IAM ユーザー `keirekipro` と変更用ロール `keirekipro-ops` を足す。準備の全体の順番は、design.md の「移行」の順(AWS の権限を作る、ops-shell を置く、切り替えを確かめる、`AdministratorAccess` を外す、GitHub の準備)とし、ほかの手順書の該当する節へのつながりを書く。
   - 完了の確かめ方: 手順が、`<ACCOUNT_ID>` を置き換えるコマンドを含み、`AdministratorAccess` を外す前に切り替えを確かめる順になっていること。ops-shell を置く手順は `参加者セットアップ手順.md` の節を、GitHub の準備は `基盤構築手順.md` の節を指していること。「3. Terraformバックエンド用リソース作成」の章に `ops-shell` で行うことが、「4. GitHub Actions用OIDC設定」の章にルートユーザーで行うことが書かれていること。`IAMロール・ポリシー設計.md` に `keirekipro` と `keirekipro-ops` の項目があること。手順が、`keirekipro` に `ReadOnlyAccess` と `SignInLocalDevelopmentAccess` と `keirekipro-readonly-guard` を付けてから `AdministratorAccess` を外す順であること。手順が、`keirekipro-ops` に `PowerUserAccess` と `keirekipro-ops-guard` を付け、最大のセッションの長さを3600秒にすること。「1.2 AWS CLIの認証設定」の節に、普段のログインは読み取り専用であることが書き足されていること

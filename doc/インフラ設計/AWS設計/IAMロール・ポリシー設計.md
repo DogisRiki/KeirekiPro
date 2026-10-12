@@ -403,3 +403,56 @@ OIDCプロバイダーはAWSコンソールから手動で作成・管理する�
   ]
 }
 ```
+
+## 6. 運用者のIAMユーザー(keirekipro)
+
+所有者の普段のログインに使うIAMユーザー。AWSのルートユーザーが手動で作成・管理する(手順は `doc/インフラ設計/手順書/手動作業手順.md` の 1.2.1)。Terraformでは管理しない。
+
+### 6.1 ユーザー設計
+
+| 項目 | 設定値 |
+|------|--------|
+| ユーザー名 | keirekipro |
+| 用途 | 所有者の普段のログイン(`aws login` とマネジメントコンソール)。読み取り専用 |
+| アクセスキー | 作らない |
+| MFA | 認証アプリ(デバイス名 `authenticator-app`) |
+
+### 6.2 アタッチポリシー
+
+| ポリシー名 | 種別 | 用途 |
+|-----------|------|------|
+| ReadOnlyAccess | AWS管理 | AWSの状態の読み取り |
+| SignInLocalDevelopmentAccess | AWS管理 | `aws login` |
+| keirekipro-readonly-guard | インライン | Terraformの状態ファイルの中身、秘密の値、KMSの復号の読み取りを拒む。`keirekipro-ops` への切り替えと自分のパスワードの変更を許す |
+
+### 6.3 インラインポリシー: keirekipro-readonly-guard
+
+中身は `doc/インフラ設計/AWS設計/運用者の権限/keirekipro-readonly-guard.json` にある。`<ACCOUNT_ID>` はアカウントの番号にして付ける。
+
+## 7. 変更用ロール(keirekipro-ops)
+
+所有者がAWSを変えるときに切り替えるロール。AWSのルートユーザーが手動で作成・管理する(手順は `doc/インフラ設計/手順書/手動作業手順.md` の 1.2.1)。Terraformでは管理しない。
+
+### 7.1 ロール設計
+
+| 項目 | 設定値 |
+|------|--------|
+| ロール名 | keirekipro-ops |
+| 信頼されたエンティティ | IAMユーザー keirekipro(認証アプリの6桁を入れてから60秒未満のときだけ) |
+| 最大セッション時間 | 3600秒 |
+| 用途 | ops-shell とマネジメントコンソールのスイッチロールで、所有者がAWSを変える |
+
+### 7.2 アタッチポリシー
+
+| ポリシー名 | 種別 | 用途 |
+|-----------|------|------|
+| PowerUserAccess | AWS管理 | IAM、Organizations、アカウントの設定を除くAWSの変更 |
+| keirekipro-ops-guard | インライン | ほかのロールへの切り替えと、サービスにひもづくロールの作成・削除を拒む |
+
+### 7.3 信頼ポリシー
+
+中身は `doc/インフラ設計/AWS設計/運用者の権限/keirekipro-ops-trust.json` にある。`<ACCOUNT_ID>` はアカウントの番号にして付ける。
+
+### 7.4 インラインポリシー: keirekipro-ops-guard
+
+中身は `doc/インフラ設計/AWS設計/運用者の権限/keirekipro-ops-guard.json` にある。
