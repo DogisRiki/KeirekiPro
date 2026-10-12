@@ -60,7 +60,7 @@
   - _対象の部品: 参加者セットアップ手順.md_
   - _依存: 2, 3.1_
 
-- [ ] 5.2 GitHub の準備の手順を書く (並行可)
+- [x] 5.2 GitHub の準備の手順を書く (並行可)
 
   Claude は、`基盤構築手順.md` に、GitHub App を作ってインストールする手順、ボットの classic PAT を作り直して `BOT_GITHUB_TOKEN` を GitHub の画面で Actions と Dependabot の両方の秘密に置き換える手順、所有者の gh の鍵を fine-grained PAT(Pull requests は Read-only)に作り直して `gh auth login --with-token` でログインし直し、前の OAuth の鍵を取り消す手順、資格情報マネージャーの github.com の資格情報を消して git の資格情報ヘルパーを設定する手順、ユーザーの環境変数の GitHub の鍵を消す手順、所有者の前提の3つ(「常に許可」を出さない、内蔵ブラウザでサインインしない、Claude Desktop を管理者として起動しない)を書く。あわせて、Claude がワークフローのファイルを足して本番のワークフローを起動させる道と、ワークフローの中でリポジトリの秘密に触れる道は、この準備では塞がず #557 で扱うことを書く。「botのPATが期限切れになったときの復旧」の節を直し、「App の秘密鍵を作り直すとき」の節を足す。「1」と「3-1」の、ボットの PAT を参加者セットアップで使うという記述を、ボットの PAT は `BOT_GITHUB_TOKEN` にだけ使う記述に直す。
   - 完了の確かめ方: App の権限の一覧と、所有者の PAT の権限の一覧が、design.md の「refresh-token.sh」と「所有者の GitHub の鍵(fine-grained PAT)」の節と一致すること。上に挙げた手順と、#557 で扱う道の記述がすべてあること。`基盤構築手順.md` に、ボットの PAT を Claude の手元に入れる記述が残っていないこと。所有者の前提の3つ(「常に許可」を出さない、内蔵ブラウザでサインインしない、Claude Desktop を管理者として起動しない)が書かれていること
@@ -96,6 +96,7 @@
 
 ## 実装のメモ
 
+- 所有者の指示(2026-10-12、タスク5.2の途中): 手順書(基盤構築手順・参加者セットアップ手順・手動作業手順)は「リポジトリを壊して1から作るときに見る手順」なので、今の環境の置き換え・取り消し・作り直し・外すといった切り替えの記述は書かない。切り替えは scratchpad の `production-ops-guard/pr-body-migration.md` にまとめ、PR の本文の「マージのあとにすること」に載せる。design.md の「手順書と PR の本文」の節と tasks.md の5.x の文面(作り直す・取り消す・外す手順を手順書に書く)より、この指示を優先する
 - タスク4のレビューで、`.github/workflows/codex-review.yml` の誤りの文と、承認済みの spec `issue-method-deviation-gate` の design が、Claude に codex-review の再実行をさせていると分かった。App に替えたあとは Claude は再実行できないので、PR の本文の `Refs:` を直したときは、Claude がコミットを push して動き直させるか、所有者が再実行する。範囲の外なので所有者に報告する
 - タスク3.2のレビューで、`.claude/settings.local.json` の `env` の `GH_CONFIG_DIR` がフックの処理に届くかを公式文書で確かめられなかった。そこでフックは、環境に `GH_CONFIG_DIR` が無ければ `settings.local.json` の `env.GH_CONFIG_DIR` を読んで渡す(テスト3件を足した)
 - タスク3.1で、`hosts.yml` の `user` は `x-access-token` にした(design-response.md の D2-1-3 の対応のとおり、公式文書と gh の資格情報ヘルパーで確かめた)。design.md の「refresh-token.sh」の節の `<App の名前>[bot]` は古い記述で、手順書と PR の本文では `x-access-token` で書く
