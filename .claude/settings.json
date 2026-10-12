@@ -90,6 +90,15 @@
                         "timeout": 10
                     }
                 ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/refresh-github-app-token.sh\"",
+                        "timeout": 30
+                    }
+                ]
             }
         ],
         "SessionEnd": [
@@ -116,6 +125,11 @@
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/block-full-test-in-implementer.sh\"",
                         "timeout": 15
+                    },
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/refresh-github-app-token.sh\"",
+                        "timeout": 30
                     }
                 ]
             }
@@ -222,6 +236,15 @@
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-registry.sh\"",
                         "timeout": 10
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/refresh-github-app-token.sh\"",
+                        "timeout": 30
                     }
                 ]
             }
