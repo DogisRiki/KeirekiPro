@@ -2,7 +2,7 @@
   "feature_name": "spec-need-triage",
   "issue": 472,
   "created_at": "2026-10-02T00:07:57Z",
-  "updated_at": "2026-10-10T06:29:04Z",
+  "updated_at": "2026-10-12T03:13:50Z",
   "language": "ja",
   "phase": "tasks-generated",
   "approvals": {
@@ -10,19 +10,19 @@
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-10T03:14:37Z"
+      "approved_at": "2026-10-12T02:12:30Z"
     },
     "design": {
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-10T05:30:48Z"
+      "approved_at": "2026-10-12T02:56:33Z"
     },
     "tasks": {
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-10T06:29:04Z"
+      "approved_at": "2026-10-12T03:13:50Z"
     }
   },
   "approval_history": [
@@ -73,7 +73,55 @@
       "issues": [472],
       "revoked_at": "2026-10-10T01:59:25Z",
       "revoked_for": "Issue #524 のための更新"
+    },
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-10T03:14:37Z",
+      "issues": [472, 524],
+      "revoked_at": "2026-10-11T07:44:31Z",
+      "revoked_for": "Issue #531 のための更新"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-10T05:30:48Z",
+      "issues": [472, 524],
+      "revoked_at": "2026-10-11T07:44:31Z",
+      "revoked_for": "Issue #531 のための更新"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-10T06:29:04Z",
+      "issues": [472, 524],
+      "revoked_at": "2026-10-11T07:44:31Z",
+      "revoked_for": "Issue #531 のための更新"
+    },
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-11T12:07:21Z",
+      "issues": [472, 524, 531],
+      "revoked_at": "2026-10-12T01:32:01Z",
+      "revoked_for": "8.7 の突き合わせによる requirements への差し戻し: 新しい spec を作るIssueのときに、同じ spec の範囲に関わる spec の要るIssueを、まとめる相手にできない"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-11T13:18:04Z",
+      "issues": [472, 524, 531],
+      "revoked_at": "2026-10-12T01:32:01Z",
+      "revoked_for": "8.7 の突き合わせによる requirements への差し戻し: 新しい spec を作るIssueのときに、同じ spec の範囲に関わる spec の要るIssueを、まとめる相手にできない"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-11T13:34:40Z",
+      "issues": [472, 524, 531],
+      "revoked_at": "2026-10-12T01:32:01Z",
+      "revoked_for": "8.7 の突き合わせによる requirements への差し戻し: 新しい spec を作るIssueのときに、同じ spec の範囲に関わる spec の要るIssueを、まとめる相手にできない"
     }
   ],
-  "additional_issues": [524]
+  "additional_issues": [524, 531]
 }
