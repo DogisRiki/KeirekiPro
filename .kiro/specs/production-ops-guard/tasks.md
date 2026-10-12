@@ -51,7 +51,7 @@
   - _対象の部品: CLAUDE.md の決まり_
 
 - [ ] 5. 所有者の準備と障害のときの手順を書く
-- [ ] 5.1 Claude の手元の準備と ops-shell を置く手順を書く (並行可)
+- [x] 5.1 Claude の手元の準備と ops-shell を置く手順を書く (並行可)
 
   Claude は、`参加者セットアップ手順.md` に、`github-app.env` と App の秘密鍵の置き場とその確かめ方を書き、「2-2. PR作成名義の固定(bot専用のgh設定ディレクトリ)」の節を、ボットの classic PAT で `gh auth login` する手順から、App のトークンを `refresh-token.sh` で入れる手順に置き換え、確かめ方も置き換える。あわせて、`ops-shell.ps1` と `aws-config` の `<ACCOUNT_ID>` をアカウントの番号に置き換えて `C:\Program Files\KeirekiPro\` に置き、空の `empty-credentials` を同じ場所に作り、全利用者のスタートメニューに「KeirekiPro ops」を作る手順を書く。
   - 完了の確かめ方: 手順が、`refresh-token.sh --force` のあとに `gh auth status` と `gh repo view DogisRiki/KeirekiPro` で確かめる形になっていること。`参加者セットアップ手順.md` に、ボットの classic PAT を Claude の手元(`.gh-bot`)に入れる手順が残っていないこと。`<ACCOUNT_ID>` を置き換えるコマンドと、`empty-credentials` を作るコマンドがあること。スタートメニューの項目の起動の内容が design.md の「ops-shell.ps1」の節と一致すること
