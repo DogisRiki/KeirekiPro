@@ -9,7 +9,7 @@
   - _要件: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 3.4_
   - _対象の部品: keirekipro-readonly-guard_
 
-- [ ] 1.2 変更用ロールの信頼ポリシーとインラインポリシーを書く (並行可)
+- [x] 1.2 変更用ロールの信頼ポリシーとインラインポリシーを書く (並行可)
 
   Claude は、変更用ロール `keirekipro-ops` の信頼ポリシー `keirekipro-ops-trust.json` とインラインポリシー `keirekipro-ops-guard.json` を、design.md の「keirekipro-ops」の節のとおりに書く。
   - 完了の確かめ方: 2つのファイルが `perl -MJSON::PP` で読み込めること。信頼ポリシーが、主体を `keirekipro` に限り、`aws:MultiFactorAuthPresent` と、`aws:MultiFactorAuthAge` が60未満であることの両方の条件を持つこと。インラインポリシーが、`sts:AssumeRole`、`iam:CreateServiceLinkedRole`、`iam:DeleteServiceLinkedRole` の Deny だけを持つこと。12桁の数字を含まないこと
