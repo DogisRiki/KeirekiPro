@@ -82,12 +82,13 @@ printf '%s' "$marker" | grep -qE '^-[[:space:]]*往復:.*未解決:[[:space:]]*[
 
 # レビュー役のモデルの確認。
 # agent_transcript_path が渡る経路(SubagentStop)では、記録にモデル名が残るため
-# Fable 5.1 以外で動いたレビューの証跡は書かない(実測でモデル名が残ることを確認済み)。
+# Fable 5.1 と Opus 5.5 のどちらかで動いたレビューの証跡だけを書き、
+# ほかのモデルで動いたレビューの証跡は書かない(実測でモデル名が残ることを確認済み)。
 # PostToolUse(SubagentHandback)経路では渡らないため、その場合は確認を省く。
 agent_transcript=$(extract agent_transcript_path)
 if [ -n "$agent_transcript" ] && [ -f "$agent_transcript" ]; then
     if grep -q '"model":' "$agent_transcript" 2>/dev/null; then
-        grep -q '"model":"claude-fable-5-1"' "$agent_transcript" 2>/dev/null || exit 0
+        grep -qE '"model":"claude-(fable-5-1|opus-5-5)"' "$agent_transcript" 2>/dev/null || exit 0
     fi
 fi
 
