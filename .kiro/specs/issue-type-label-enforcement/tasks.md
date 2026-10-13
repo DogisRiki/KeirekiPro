@@ -24,7 +24,7 @@
   - _要件: 1.1, 2.5_
   - _対象の部品: sync-labels.sh_
 
-- [ ] 3.2 GitHub のラベルの合わせ込みを作る
+- [x] 3.2 GitHub のラベルの合わせ込みを作る
 
   Claude は、部品「sync-labels.sh」の合わせ込みの決まり(名前の変更、前の名前と新しい名前の食い違い、作成と直し、削除)と、失敗したときの扱いを作り、テストに場合を足す。偽物の gh は、`GET` に決めたラベルの一覧を返し、`POST`・`PATCH`・`DELETE` の呼び出しを経路と引数ごとに記録する。
   - 完了の確かめ方: alpine のコンテナに `place-1/.github` を写し、`chmod -R a-x` したうえで `bash .github/scripts/tests/test-sync-labels.sh` が失敗0件で終わる。shellcheck を、CI と同じく `git ls-files -z '*.sh'` の全ファイルに、scratchpad の `sync-labels.sh` とテストを `-v` で本来のパスに重ね、その2つのパスも引数に足して渡し、指摘が0件である(まだリポジトリに無いファイルは `git ls-files` に出ないため)
@@ -121,6 +121,8 @@
 - 1 の完了の記録(2026-10-13): 所有者が自分のアカウントで非公開のリポジトリ `DogisRiki/label-rename-check` を作り、確かめた(bot のアカウントでの作成は、安全装置に止められるおそれがあるため、所有者が作った)。`bug` を付けた Issue を作り、`gh api -X PATCH repos/DogisRiki/label-rename-check/labels/bug -f new_name=kind/bug` で名前を変えたあと、`gh issue view 1 --json labels` は `kind/bug`(説明と色は `bug` のまま)だけを返した。`gh api "repos/DogisRiki/label-rename-check/labels/kind%2Fbug"` は `kind/bug` を返し、`gh api -X DELETE "repos/DogisRiki/label-rename-check/labels/good%20first%20issue"` で消せた。新しいリポジトリの初めのラベルには `accessibility` もあった(このリポジトリの今のラベルには無い)
 - 2 の申し送り: 成果物は scratchpad の `place-1/.github/labels.json`(23個)。今の GitHub の色のうち7個(blocked・audit・container-vuln・canary・pre-merge-check・migration・codex-overruled)は大文字で、ファイルは小文字で書いた。タスク3.2のスクリプトは、色を大文字と小文字を区別せずに比べる(区別すると、初めての実行で色の変わらない直しを7個送り、2回目の実行が何も書き込まないことの確かめが GitHub の返す形に左右されるため)。requirements の表の文のバッククォートは、`description` と `selection_rule` にそのまま入れた。GitHub の画面の説明では、バッククォートが文字のまま出る
 - 3.1 の申し送り: `--check` を付けずに呼ぶと、今は検証のあとに終了コード1で止まる(合わせ込みは3.2で作る)。3.2では、スクリプトの末尾のこの扱いと、先頭の説明の「guardrails から実行」と終了コード1の説明を、合わせ込みの説明に書き直す。`GITHUB_REPOSITORY` と `GH_TOKEN` の確かめも3.2で入れる。名前が空の文字列のラベルは、design の検証の決まりに無いので検証に通る(GitHub が受け付けないので、合わせ込みの書き込みが失敗して終了コード1で終わる)
+- 3.2 の申し送り: `GITHUB_REPOSITORY` が無いか形が誤っているとき、`GH_TOKEN` が無いときは、gh を呼ばずに終了コード64で終わる。前の名前のラベルが GitHub に2つ以上あるときは、`previous_names` の先のものの名前を変え、残りを食い違いとして1で終わる。gh の呼び出しは `timeout -k 10 60` で打ち切る(alpine と ubuntu:24.04 の両方にある)。書き込みの失敗の文は、標準エラーに加えて実行の要約にも出す
+- 3.2 で起きたこと: 実装役が、読み取り専用で写したリポジトリにファイルを重ねようとして、Docker が作業フォルダに0バイトの `.github/scripts/sync-labels.sh` と `.github/scripts/tests/test-sync-labels.sh` を作った。Claude は `.github/` の下を消せないので、タスク8.1で所有者が置くときに上書きされる。4.1 と 5.1 で shellcheck や actionlint を流すときは、作業フォルダに無いファイルを `-v` で重ねない。リポジトリを scratchpad の一時フォルダに写してそこで重ねるか、scratchpad のファイルを直接渡す
 - 共通の完了条件の2(verify のスキル)は、この spec が frontend・backend・terraform を変えないので、当てはまらない。代わりに、Claude は、各タスクの完了の確かめ方に書いたテスト・shellcheck・actionlint を流す
 
 ## 完了条件(全タスク共通)
