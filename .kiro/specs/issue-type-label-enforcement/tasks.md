@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 名前を変えたラベルが Issue に付いたまま残ることを確かめる
+- [x] 1. 名前を変えたラベルが Issue に付いたまま残ることを確かめる
 
   /kiro-impl を動かしているセッション(以下、親のセッション)は、所有者の了承を得てから、使い捨ての非公開のリポジトリを1つ作り、ラベル `bug` を付けた Issue を1つ作る。親のセッションは、`gh api -X PATCH "repos/<owner>/<repo>/labels/bug" -f new_name=kind/bug` でラベルの名前を変え、`gh issue view <番号> --json labels` でその Issue のラベルを読む。続けて、`gh api "repos/<owner>/<repo>/labels/kind%2Fbug"` が名前を変えたラベルを返すことと、`DELETE` で `good%20first%20issue` の形の符号化した名前のラベルを消せることも確かめる。確かめたあと、親のセッションは、所有者に使い捨てのリポジトリを消すよう頼む。
   - 完了の確かめ方: 名前を変えたあとの `gh issue view` の `labels` に `kind/bug` があり、`bug` が無い。結果を「実装のメモ」に記録してある。`kind/bug` が Issue から外れていたら、親のセッションはこのあとのタスクに進まずに止まり、design の「名前の変更の確かめ」のとおり、所有者に設計の見直しを伝える
@@ -118,6 +118,7 @@
 - 共通の完了条件の1(確かめるテストの無い受入基準を残さない)の例外は、要件2の受入基準3のうち Issue にラベルが残ること・受入基準4のうち Issue と PR から外れること(GitHub の動き。タスク1と公式の説明書で確かめる)、要件2の受入基準1と7(ワークフローの起動。マージのあとの初めての実行で確かめる)、要件3の受入基準1から7(Claude が起票する Issue に、ラベルの一覧のファイルから選んだ種類のラベルを1つと、要るときは場所のラベルを付け、付けるラベルを所有者に見せること。手順の文書なので、照合と grep で確かめる)、要件4の受入基準6のうち定期実行と所有者の端末の起票(Claude のフックを通らない)である
 - マージのあとのフックの確かめ: Claude は、出荷の PR の本文に、この確かめの手順を書く。マージのあと、所有者がこの確かめを始める。Claude Desktop の worktree のセッションは、本体の作業フォルダの設定とフックを読む。そのため、マージの前にこの worktree で新しいセッションを開いても、登録したフックは働かない。マージのあと、所有者が本体の作業フォルダを最新の main にしてから新しいセッションを開き、Claude は `GH_TOKEN=invalid gh issue create --title t --body b` を打って、フックがその起票を止めること(要件4の受入基準1)を確かめる。`GH_TOKEN` を無効な値にするのは、フックが働かなかったときにも Issue が作られないようにするためである
 - マージのあとの確かめ: 所有者は、初めての `sync-labels.yaml` の実行が成功していることと、`bug`・`enhancement`・`documentation` の名前が変わり、今それらが付いている Issue に新しい名前のラベルが付いていること、`duplicate` など6つが消えていることを、Actions の画面と Issue の一覧で確かめる。Claude は、出荷の PR の本文にこの確かめを書く
+- 1 の完了の記録(2026-10-13): 所有者が自分のアカウントで非公開のリポジトリ `DogisRiki/label-rename-check` を作り、確かめた(bot のアカウントでの作成は、安全装置に止められるおそれがあるため、所有者が作った)。`bug` を付けた Issue を作り、`gh api -X PATCH repos/DogisRiki/label-rename-check/labels/bug -f new_name=kind/bug` で名前を変えたあと、`gh issue view 1 --json labels` は `kind/bug`(説明と色は `bug` のまま)だけを返した。`gh api "repos/DogisRiki/label-rename-check/labels/kind%2Fbug"` は `kind/bug` を返し、`gh api -X DELETE "repos/DogisRiki/label-rename-check/labels/good%20first%20issue"` で消せた。新しいリポジトリの初めのラベルには `accessibility` もあった(このリポジトリの今のラベルには無い)
 - 共通の完了条件の2(verify のスキル)は、この spec が frontend・backend・terraform を変えないので、当てはまらない。代わりに、Claude は、各タスクの完了の確かめ方に書いたテスト・shellcheck・actionlint を流す
 
 ## 完了条件(全タスク共通)
