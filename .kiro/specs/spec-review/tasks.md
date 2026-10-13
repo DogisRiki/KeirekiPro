@@ -233,7 +233,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - _対象の部品: spec-reviewer(レビュー役の定義), rules/ 配下_
   - _依存: 9.1_
 
-- [ ] 10. 証跡のフックが Opus 5.5 の審査も受け入れるようにする (#559)
+- [x] 10. 証跡のフックが Opus 5.5 の審査も受け入れるようにする (#559)
 
   Claude は、`.claude/hooks/record-spec-review.sh` の受け入れるモデルに `claude-opus-5-5` を足した版と、新しいテスト `.claude/hooks/tests/test-record-spec-review.sh` を scratchpad に作る。`.claude/hooks/**` は書き込みが禁止されているので、Claude は、所有者に、2つのファイルを置くコピーのコマンドを示し、置いてもらう。
   - テストは、模擬の入力(JSON)と模擬のサブエージェントの記録をファイルで渡し、モデル名が `claude-fable-5-1` と `claude-opus-5-5` のときに証跡を書き、`claude-sonnet-5-5` のときに書かず、記録にモデル名が無い経路では書くことを確かめる
