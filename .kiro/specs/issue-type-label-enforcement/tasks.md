@@ -59,7 +59,7 @@
   - _対象の部品: check-issue-labels.sh_
   - _依存: 2_
 
-- [ ] 5.2 フックを Claude の設定に登録する
+- [x] 5.2 フックを Claude の設定に登録する
 
   Claude は、`.claude/settings.json` の写しを scratchpad の `place-2/.claude/settings.json` に作り、`PreToolUse` の `matcher: "Bash"` のフックの一覧の最後に、`check-issue-labels.sh` を時間の上限15秒で足す。
   - 完了の確かめ方: `git diff --no-index` で今の `settings.json` と写しを比べたとき、違いがフックの1件の追加だけである。写しが `perl -MJSON::PP` で読める
