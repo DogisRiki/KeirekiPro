@@ -50,7 +50,7 @@
   - _対象の部品: guardrails.yaml の手順_
 
 - [ ] 5. ラベルが足りない起票を止める
-- [ ] 5.1 起票を止めるフックを作る (並行可)
+- [x] 5.1 起票を止めるフックを作る (並行可)
 
   Claude は、部品「check-issue-labels.sh」を、scratchpad の `place-2/.claude/hooks/check-issue-labels.sh` に、design の「コマンドの読み方」「止める決まり」「ラベルの一覧のファイルを読む場所」「止めたときに出す文」のとおりに作る。あわせて、テスト `place-2/.claude/hooks/tests/test-check-issue-labels.sh` を作る。テストは、一時フォルダに git のリポジトリを作って `origin` を設定し、`.github/labels.json` を置き、フックの入力の `cwd` にそのフォルダを渡す。
   - 完了の確かめ方: Git Bash で `bash <place-2>/.claude/hooks/tests/test-check-issue-labels.sh` が失敗0件で終わる。テストの後片付けで一時フォルダが消えている。shellcheck を、3.2 と同じく全 `.sh` に、scratchpad のフックとテストを `-v` で本来のパスに重ね、その2つのパスも引数に足して渡し、指摘が0件である
@@ -123,6 +123,7 @@
 - 3.1 の申し送り: `--check` を付けずに呼ぶと、今は検証のあとに終了コード1で止まる(合わせ込みは3.2で作る)。3.2では、スクリプトの末尾のこの扱いと、先頭の説明の「guardrails から実行」と終了コード1の説明を、合わせ込みの説明に書き直す。`GITHUB_REPOSITORY` と `GH_TOKEN` の確かめも3.2で入れる。名前が空の文字列のラベルは、design の検証の決まりに無いので検証に通る(GitHub が受け付けないので、合わせ込みの書き込みが失敗して終了コード1で終わる)
 - 3.2 の申し送り: `GITHUB_REPOSITORY` が無いか形が誤っているとき、`GH_TOKEN` が無いときは、gh を呼ばずに終了コード64で終わる。前の名前のラベルが GitHub に2つ以上あるときは、`previous_names` の先のものの名前を変え、残りを食い違いとして1で終わる。gh の呼び出しは `timeout -k 10 60` で打ち切る(alpine と ubuntu:24.04 の両方にある)。書き込みの失敗の文は、標準エラーに加えて実行の要約にも出す
 - 3.2 で起きたこと: 実装役が、読み取り専用で写したリポジトリにファイルを重ねようとして、Docker が作業フォルダに0バイトの `.github/scripts/sync-labels.sh` と `.github/scripts/tests/test-sync-labels.sh` を作った。Claude は `.github/` の下を消せないので、タスク8.1で所有者が置くときに上書きされる。4.1 と 5.1 で shellcheck や actionlint を流すときは、作業フォルダに無いファイルを `-v` で重ねない。リポジトリを scratchpad の一時フォルダに写してそこで重ねるか、scratchpad のファイルを直接渡す
+- 5.1 の申し送り: フックは、design の読み方に加えて、次の形も読む。`gh` と `issue` の間の `-R` / `--repo`。`env`・`command`・`exec`・`time`・`nohup`・`if` などの前置きの語。`"$(...)"` の中。`sh` か `bash` が受けるヒアドキュメントの本文(それ以外のヒアドキュメントの本文は読まない)。`--help` / `-h` の起票は通す。このリポジトリが分からないとき(origin が無いなど)は、`-R` をほかのリポジトリとみなさず、ラベルの判定を続ける。`GH_REPO` は見ない。止まりすぎの形として、`bash -c '...' <<EOF` と `bash script.sh <<EOF` の本文にラベル無しの `gh issue create` の行があると止まる。通り抜ける形として、`tee f <<EOF | bash`・`eval`・`timeout 30 gh ...`・`gh api` に URL を全部書く形・curl がある。どれも手順では使わない形なので、このままにする
 - 共通の完了条件の2(verify のスキル)は、この spec が frontend・backend・terraform を変えないので、当てはまらない。代わりに、Claude は、各タスクの完了の確かめ方に書いたテスト・shellcheck・actionlint を流す
 
 ## 完了条件(全タスク共通)
