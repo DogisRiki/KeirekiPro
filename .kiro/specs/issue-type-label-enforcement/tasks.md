@@ -33,7 +33,7 @@
   - _対象の部品: sync-labels.sh_
 
 - [ ] 4. ワークフローと PR の検査にスクリプトをつなぐ
-- [ ] 4.1 ラベルを合わせるワークフローを作る
+- [x] 4.1 ラベルを合わせるワークフローを作る
 
   Claude は、部品「sync-labels.yaml」を、scratchpad の `place-1/.github/workflows/sync-labels.yaml` に、design の節のとおりの起動するイベント・動かす条件・権限・同時実行・時間の上限・手順で作る。`actions/checkout` は、`guardrails.yaml` と同じコミットの SHA で固定する。
   - 完了の確かめ方: actionlint(`rhysd/actionlint:1.7.12`)を、scratchpad の `place-1/.github/workflows/` を重ねたリポジトリに対して流し、指摘が0件である。`sync-labels.yaml` の `uses:` の行が、`guardrails.yaml` の `actions/checkout` の行と同じ文字列(`@` のあとの40桁のコミットの SHA と、そのあとの `# <版>` のコメント)であることを、`grep -nE 'uses:'` の出力を2つのファイルで比べて確かめる(`check-action-pinning.sh` は `git ls-files` で対象を集めるので、まだリポジトリに無いファイルを見ない)。`permissions` が `contents: read` と `issues: write` の2つだけである
