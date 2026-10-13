@@ -148,7 +148,11 @@ AIがIssueの本文とその時点のコードを調べ、下の4つの観点で
 - Phase 1(仕様化):
   - `/kiro-spec-init #N`(既存の spec を新しいIssueのために直すときは `/kiro-spec-init #N <feature>`)→ `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
   - 各段階の生成直後に `/spec-review {feature} {段階}` を実行する(requirements / design / tasks)。
-    別モデル(Fable 5.1)のサブエージェントが審査し、記録が `.kiro/specs/{feature}/reviews/` に残る。人間が承認するときは本文と記録の両方を読む
+    審査役のサブエージェントが審査し、記録が `.kiro/specs/{feature}/reviews/` に残る。人間が承認するときは本文と記録の両方を読む
+  - 審査役のモデルは、既定では Fable 5.1 で、所有者が spec ごとに Opus 5.5 を選べる。所有者は、spec を始めるときに、選んだモデルを会話で伝える。
+    所有者が会話で審査役のモデルを伝えたら、実装セッションは、その spec の spec.json の `review_model` に `fable` か `opus` を書き、書いた値を所有者に1行で示す。
+    spec.json がまだ無いとき(`/kiro-spec-init` の前)は、`/kiro-spec-init` が spec.json を作った直後に書く。
+    所有者が spec の途中で選び直したときも、同じく `review_model` を書き換える。所有者が選んでいない spec では `review_model` を書かない
   - `/spec-review` は審査役(spec-reviewer)の前に毎回、
     点検役(spec-style-checker)に本文の書き方を点検させ、点検の記録を `reviews/{段階}-style.md` に残す
   - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
