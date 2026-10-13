@@ -41,7 +41,7 @@
   - _要件: 2.1, 2.6, 2.7_
   - _対象の部品: sync-labels.yaml_
 
-- [ ] 4.2 PR の検査にファイルの検証を足す
+- [x] 4.2 PR の検査にファイルの検証を足す
 
   Claude は、部品「guardrails.yaml の手順」を、scratchpad の `place-1/.github/workflows/guardrails.yaml`(今のファイルの写し)に作る。ジョブ `escape-hatch` の `Test close linked issues` のあと、`Check owner approval` の前に、`test-sync-labels.sh` を流す手順と `sync-labels.sh --check` を流す手順の2つを足す。
   - 完了の確かめ方: `git diff --no-index` で今の `guardrails.yaml` と写しを比べたとき、違いが足した2つの手順だけである。actionlint の指摘が0件である
