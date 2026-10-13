@@ -67,7 +67,7 @@
   - _要件: 4.1_
 
 - [ ] 6. 起票の手順にラベルの選び方を入れる
-- [ ] 6.1 起票の決まりにラベルの選び方を入れる (並行可)
+- [x] 6.1 起票の決まりにラベルの選び方を入れる (並行可)
 
   Claude は、部品「file-issue の直し」のとおり、`.claude/skills/file-issue/SKILL.md` に「## ラベルの選び方」の節を足し、Step 3・Step 4・Step 5、「分けた部分のIssue」のコマンド、「実装の途中で小さく分けるとき」の箇条を直す。
   - 完了の確かめ方: 「## ラベルの選び方」の節が、ファイルを起票のたびに読むこと、`description` と `selection_rule` で種類を1つ選ぶこと、迷ったときの手がかりの順(「どうなれば解決か」「やりたいこと」「困っていること」)、`area_required` で場所のラベルを選ぶかを決めること、所有者がラベルを直すよう言ったら Claude がラベルを直すことを含む。`gh issue create` のコマンドの例のすべてに `--label` がある。`grep -nE 'kind/|area/|retrospective'` の当たりが、もとからある「監査の通知と振り返りのIssueは対象外」の行だけである
@@ -124,6 +124,7 @@
 - 3.2 の申し送り: `GITHUB_REPOSITORY` が無いか形が誤っているとき、`GH_TOKEN` が無いときは、gh を呼ばずに終了コード64で終わる。前の名前のラベルが GitHub に2つ以上あるときは、`previous_names` の先のものの名前を変え、残りを食い違いとして1で終わる。gh の呼び出しは `timeout -k 10 60` で打ち切る(alpine と ubuntu:24.04 の両方にある)。書き込みの失敗の文は、標準エラーに加えて実行の要約にも出す
 - 3.2 で起きたこと: 実装役が、読み取り専用で写したリポジトリにファイルを重ねようとして、Docker が作業フォルダに0バイトの `.github/scripts/sync-labels.sh` と `.github/scripts/tests/test-sync-labels.sh` を作った。Claude は `.github/` の下を消せないので、タスク8.1で所有者が置くときに上書きされる。4.1 と 5.1 で shellcheck や actionlint を流すときは、作業フォルダに無いファイルを `-v` で重ねない。リポジトリを scratchpad の一時フォルダに写してそこで重ねるか、scratchpad のファイルを直接渡す
 - 5.1 の申し送り: フックは、design の読み方に加えて、次の形も読む。`gh` と `issue` の間の `-R` / `--repo`。`env`・`command`・`exec`・`time`・`nohup`・`if` などの前置きの語。`"$(...)"` の中。`sh` か `bash` が受けるヒアドキュメントの本文(それ以外のヒアドキュメントの本文は読まない)。`--help` / `-h` の起票は通す。このリポジトリが分からないとき(origin が無いなど)は、`-R` をほかのリポジトリとみなさず、ラベルの判定を続ける。`GH_REPO` は見ない。止まりすぎの形として、`bash -c '...' <<EOF` と `bash script.sh <<EOF` の本文にラベル無しの `gh issue create` の行があると止まる。通り抜ける形として、`tee f <<EOF | bash`・`eval`・`timeout 30 gh ...`・`gh api` に URL を全部書く形・curl がある。どれも手順では使わない形なので、このままにする
+- 6.1 で見つかったこと: 文書だけを変える Issue(`kind/documentation`)は `area_required` が `true` だが、3つの場所のラベルの説明はどれも文書そのものを指していない。文書が扱う対象(インフラの設計の文書なら `area/infra` など)で選べば1つに決まるが、spec はこの読み方を決めていない。所有者に伝える
 - 共通の完了条件の2(verify のスキル)は、この spec が frontend・backend・terraform を変えないので、当てはまらない。代わりに、Claude は、各タスクの完了の確かめ方に書いたテスト・shellcheck・actionlint を流す
 
 ## 完了条件(全タスク共通)
