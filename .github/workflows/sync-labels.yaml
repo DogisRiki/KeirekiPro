@@ -1,0 +1,95 @@
+name: Sync Labels
+
+# GitHub のラベルを、ラベルの一覧のファイル(.github/labels.json)のとおりにする。
+#
+# 何をするか:
+#   main の .github/labels.json を読み、GitHub のラベルを作り、直し、名前を変え、消す。
+#   ファイルに無いラベル(所有者が GitHub の画面で手で足したものも含む)は消す。
+#   消したラベルは、付いていた Issue と PR からも外れる(GitHub の動き)。
+#   名前を変えるラベル(ファイルの previous_names)は、消して作り直さずに名前だけを変える。
+#
+# なぜ要るか:
+#   所有者がラベルを変えたいときにすることを、ファイルを書き換えることだけにする。
+#   GitHub の画面でラベルを1つずつ作ったり消したりする手間を無くす。
+#
+# いつ動くか:
+#   push               ファイル・スクリプト・このワークフローの変更が main に入ったとき
+#   workflow_dispatch  手で動かしたとき。ファイルを書き換えずに、ラベルをファイルのとおりにし直す
+#                      (前の実行が失敗したあとのやり直しにも使う)
+#
+# 失敗したとき:
+#   スクリプトが0以外で終わったら、ジョブは失敗として終わる。所有者は失敗を Actions の画面で見る。
+#   スクリプトは何度動いても同じ結果になるので、原因を直したあと手で動かし直せばよい。
+#
+# なぜシークレットを使わないか:
+#   ラベルの作成・変更・削除は github.token(issues: write)でできる。
+#   github.token によるラベルの変更は、ほかのワークフローを起動しない。
+#
+# 検証の決まりと、どのラベルを作り・直し・名前を変え・消すかの判定は sync-labels.sh 側が持つ。
+# ここは起動の条件と権限のみ。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/labels.json
+      - .github/scripts/sync-labels.sh
+      - .github/workflows/sync-labels.yaml
+  # 手での起動。ファイルを書き換えずにラベルを合わせ直す
+  workflow_dispatch:
+
+# 書き込みはラベルの作成・変更・削除のための issues: write だけ。
+# contents は checkout に使う。リポジトリの内容には書き込まない。secrets は使わない。
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    name: sync
+    # 手での起動で main 以外のブランチを選んだときは動かさない
+    if: github.ref == 'refs/heads/main'
+    concurrency:
+      # 同時に走ると同じラベルへの書き込みが重なる。走行中のものは取り消さず、後発を待たせる
+      # (取り消すと、名前の変更などの書き込みの途中で止まりうる)
+      group: sync-labels
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    # 自己テストと、ラベルの数だけの API の呼び出しを含む(1回ごとの時間の上限はスクリプトが付ける)。
+    # gh の応答が返らないときに既定の360分を握らせない
+    timeout-minutes: 10
+    steps:
+      # ファイルとスクリプトは main のものを使う。
+      # 認証情報は .git に残さない(後続のステップは gh だけで API を呼ぶ)。
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      # 実行の前にスクリプトのテストを行う。壊れた判定でラベルを消さない
+      # (テストは gh を偽物に置き換えるため、ネットワークを使わない。jq と timeout を使う)。
+      # スクリプトには実行ビットが無いため bash 経由で起動する。
+      - name: Test sync-labels script
+        id: selftest
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/tests/test-sync-labels.sh; then
+            echo "::error::test-sync-labels.sh が失敗しました。ラベルは変えません。"
+            exit 1
+          fi
+
+      # GITHUB_REPOSITORY はランナーが既定で入れる。
+      # スクリプトの終了コードは握りつぶさない。0以外ならジョブを失敗にする
+      # (終了コード 2 はファイルの誤りで、ラベルを1つも変えていない。1 は読み取りか書き込みの
+      # 失敗か、前の名前と新しい名前のラベルが両方あるとき。どちらも理由はスクリプトがログに出す)。
+      - name: Sync labels
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          if ! bash .github/scripts/sync-labels.sh; then
+            echo "::error::GitHub のラベルをファイルのとおりにできませんでした。上のログと実行の要約を確かめてください。"
+            exit 1
+          fi

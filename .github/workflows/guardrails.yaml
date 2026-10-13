@@ -74,6 +74,16 @@ jobs:
       - name: Test close linked issues
         run: bash .github/scripts/tests/test-close-linked-issues.sh
 
+      # ラベルの一覧のファイル(.github/labels.json)の検証と、その合わせ込みのスクリプトのテスト。
+      # 誤ったファイルを main に入れないために、PRの時点で流す。.github/ を変えるPRでも
+      # 承認を待たずに動くよう、承認待ちで失敗するステップより前に置く。
+      # どちらも GitHub の API を呼ばないため、権限もネットワークも使わない
+      - name: Test sync labels
+        run: bash .github/scripts/tests/test-sync-labels.sh
+
+      - name: Check labels file
+        run: bash .github/scripts/sync-labels.sh --check
+
       - name: Check owner approval
         id: approval
         env:

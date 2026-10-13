@@ -1,0 +1,39 @@
+{
+  "feature_name": "issue-type-label-enforcement",
+  "issue": 500,
+  "created_at": "2026-10-13T04:43:45Z",
+  "updated_at": "2026-10-13T07:02:12Z",
+  "language": "ja",
+  "review_model": "opus",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-13T06:22:27Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-13T06:36:59Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-13T07:02:12Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-13T05:47:05Z",
+      "issues": [500],
+      "revoked_at": "2026-10-13T06:08:15Z",
+      "revoked_for": "D1-1-6 による requirements への差し戻し: 要件3の受入基準2が、「どうなれば解決か」の節の無い Issue(振り返りの Issue など)で種類のラベルを選ぶ基準を決めていない。所有者の指示で、振り返りを種類のラベルにし、種類のラベルごとに場所のラベルが要るかと選ぶときの決まりをファイルに書ける形に改める"
+    }
+  ]
+}

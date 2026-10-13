@@ -29,16 +29,16 @@ disable-model-invocation: true
 
 3. **記録**: GitHub Issueとして起票する。状態管理はIssueのopen/closedで行う。
 
-   ラベルが無ければ作成する:
+   ラベルは `.github/labels.json` が持ち、ワークフローがGitHubに作るので、この手順では作らない。
 
-```
-gh label create retrospective --description "ゲートすり抜けの振り返り(月次監査の棚卸し対象)" --color 0E8A16
-```
+   ラベルは、起票の決まり(`.claude/skills/file-issue/SKILL.md`)の「ラベルの選び方」の節に従って選ぶ。
+   種類のラベルは、ラベルの一覧のファイルの選ぶときの決まり(`selection_rule`)が振り返りの手順を名指ししているラベルがあれば、それを選ぶ。
+   場所のラベルは、選んだ種類のラベルの `area_required` が `true` のときだけ付ける。
 
    起票コマンド(タイトルは事象の短い題名、本文は次の様式):
 
 ```
-gh issue create --label retrospective --title "<事象の短い題名>" --body "..."
+gh issue create --label <種類のラベル> [--label <場所のラベル>] --title "<事象の短い題名>" --body "..."
 ```
 
 ```markdown
@@ -51,6 +51,8 @@ gh issue create --label retrospective --title "<事象の短い題名>" --body "
 ## 強化案
 <上記1〜5のどれで何を追加するか>
 ```
+
+   起票したら、Issueの番号と付けたラベルを所有者に示す。
 
 4. **実行**: 強化案のうち自分で実施できるもの(テスト追加等)は実施し、完了したらIssueをcloseする。
    ゲート設定ファイル(CODEOWNERS保護対象)の変更が必要なものは、Issue本文に人間の承認が必要な旨を

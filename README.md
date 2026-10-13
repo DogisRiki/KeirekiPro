@@ -76,6 +76,7 @@ flowchart LR
 
     M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
     M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
+    M -->|ラベルの一覧のファイルが変わったとき| Labels[sync-labels<br>GitHubのラベルを<br>ラベルの一覧のファイルのとおりに合わせる]
 
     subgraph s5[定期の監査]
         AW[audit-weekly<br>週次で定期スキャンと棚卸しの鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜けを判定し<br>結果をIssueで通知]
@@ -107,6 +108,7 @@ flowchart LR
 | マージ | close-linked-issues.yaml | pull_request (closed) / 毎時 (schedule) / 手動 | mainへマージされたプルリクエストの本文に`Closes #番号`で書かれたIssueが開いたままなら閉じ、どのプルリクエストのマージで閉じたかをIssueにコメントで記録する。マージされずに閉じたプルリクエストでは動かない。閉じられなかったときと、`Refs: #番号`にだけ書かれたIssueが開いたままのときは、Issueへのコメントで所有者に知らせる。閉じたIssueが、あるIssueから分けた部分のIssue(サブIssue)で、分けた部分がすべて閉じたときは、元のIssueも閉じて記録をコメントする。元のIssueが別のリポジトリにあるときは扱わない。分けた部分がすべて閉じたかを確かめられなかったときと、元のIssueを閉じられなかったときは、元のIssueへのコメントで所有者に知らせる。毎時の見直しで、マージから7日以内のプルリクエストの閉じ漏れを拾う |
 | 依存の更新 | dependabot-auto-merge.yaml | pull_request / 日次 (schedule) / 手動 | Dependabotが作成したプルリクエストにauto-mergeを予約する。tflintの更新は、GitHubのリリースの公開から72時間経つまで予約を保留し、毎日の見直しで予約する。公開日時を取れない更新と、版が同じで中身だけが変わった更新は予約せず、プルリクエストへのコメントで所有者に知らせる |
 | 依存の更新 | update-pr-branches.yaml | push (main) / pull_request (opened / reopened / ready_for_review) | 開いているプルリクエストのブランチをmainの最新に合わせる。マージしないカナリアPRは対象外 |
+| ラベル | sync-labels.yaml | push (main、`.github/labels.json` などの変更) / 手動 | ラベルの一覧のファイル`.github/labels.json`のとおりに、GitHubのラベルを作り・直し・名前を変え・消す。ファイルに前の名前が書かれたラベルは、消さずに名前だけを変える。先に合わせ込みのスクリプトのテストを流し、ファイルが検証に通らなければラベルを1つも変えずに失敗で終わる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
 | リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
