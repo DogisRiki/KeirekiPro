@@ -7,7 +7,7 @@
   - 受入基準とテストの対応: 要件2の受入基準3のうち、名前を変えたラベルが付いていた Issue に付いたまま残ることは、この確かめで確かめる。GitHub の動きなので、スクリプトのテストでは確かめられない
   - _要件: 2.3_
 
-- [ ] 2. ラベルの一覧のファイルを作る
+- [x] 2. ラベルの一覧のファイルを作る
 
   Claude は、部品「labels.json」を、scratchpad の `place-1/.github/labels.json` に作る。中身は design の labels.json の節と「データの形」の節のとおりにする。そのほかのラベルの説明と色は、作るときに `gh label list --limit 100 --json name,description,color` で読んだ今の GitHub の値を写す。種類のラベルと場所のラベルの説明・場所のラベルが要るかどうか・選ぶときの決まりは、requirements の要件1(ラベルの一覧を1つのファイルに書く)の表の文と値を文字を変えずに写す。
   - 完了の確かめ方: `perl -MJSON::PP` で読める。`kind` の組が7つ、`area` の組が3つ、`other` の組が13個で、名前が design の labels.json の節と一致する。`duplicate` など6つの名前が、名前の欄にも `previous_names` にも無い。`kind/bug`・`kind/enhancement`・`kind/documentation` の `previous_names` が、それぞれ `bug`・`enhancement`・`documentation` である。Claude は、requirements の要件1の種類のラベルの表と場所のラベルの表から、ラベルごとの意味の文・場所のラベルが要るかどうか・選ぶときの決まりを取り出し、ファイルの `description`・`area_required`・`selection_rule` と1字ずつ比べる小さな perl の照合を scratchpad で流し、食い違いが0件である。そのほかのラベルの `description` と `color` は、`gh label list` の値と比べて食い違いが0件である
@@ -119,6 +119,7 @@
 - マージのあとのフックの確かめ: Claude は、出荷の PR の本文に、この確かめの手順を書く。マージのあと、所有者がこの確かめを始める。Claude Desktop の worktree のセッションは、本体の作業フォルダの設定とフックを読む。そのため、マージの前にこの worktree で新しいセッションを開いても、登録したフックは働かない。マージのあと、所有者が本体の作業フォルダを最新の main にしてから新しいセッションを開き、Claude は `GH_TOKEN=invalid gh issue create --title t --body b` を打って、フックがその起票を止めること(要件4の受入基準1)を確かめる。`GH_TOKEN` を無効な値にするのは、フックが働かなかったときにも Issue が作られないようにするためである
 - マージのあとの確かめ: 所有者は、初めての `sync-labels.yaml` の実行が成功していることと、`bug`・`enhancement`・`documentation` の名前が変わり、今それらが付いている Issue に新しい名前のラベルが付いていること、`duplicate` など6つが消えていることを、Actions の画面と Issue の一覧で確かめる。Claude は、出荷の PR の本文にこの確かめを書く
 - 1 の完了の記録(2026-10-13): 所有者が自分のアカウントで非公開のリポジトリ `DogisRiki/label-rename-check` を作り、確かめた(bot のアカウントでの作成は、安全装置に止められるおそれがあるため、所有者が作った)。`bug` を付けた Issue を作り、`gh api -X PATCH repos/DogisRiki/label-rename-check/labels/bug -f new_name=kind/bug` で名前を変えたあと、`gh issue view 1 --json labels` は `kind/bug`(説明と色は `bug` のまま)だけを返した。`gh api "repos/DogisRiki/label-rename-check/labels/kind%2Fbug"` は `kind/bug` を返し、`gh api -X DELETE "repos/DogisRiki/label-rename-check/labels/good%20first%20issue"` で消せた。新しいリポジトリの初めのラベルには `accessibility` もあった(このリポジトリの今のラベルには無い)
+- 2 の申し送り: 成果物は scratchpad の `place-1/.github/labels.json`(23個)。今の GitHub の色のうち7個(blocked・audit・container-vuln・canary・pre-merge-check・migration・codex-overruled)は大文字で、ファイルは小文字で書いた。タスク3.2のスクリプトは、色を大文字と小文字を区別せずに比べる(区別すると、初めての実行で色の変わらない直しを7個送り、2回目の実行が何も書き込まないことの確かめが GitHub の返す形に左右されるため)。requirements の表の文のバッククォートは、`description` と `selection_rule` にそのまま入れた。GitHub の画面の説明では、バッククォートが文字のまま出る
 - 共通の完了条件の2(verify のスキル)は、この spec が frontend・backend・terraform を変えないので、当てはまらない。代わりに、Claude は、各タスクの完了の確かめ方に書いたテスト・shellcheck・actionlint を流す
 
 ## 完了条件(全タスク共通)
