@@ -16,7 +16,7 @@
   - _対象の部品: labels.json_
 
 - [ ] 3. ラベルを合わせるスクリプトを作る
-- [ ] 3.1 ファイルの検証を作る
+- [x] 3.1 ファイルの検証を作る
 
   Claude は、部品「sync-labels.sh」のうち、引数の読み取りと `--check` の検証を、scratchpad の `place-1/.github/scripts/sync-labels.sh` に作る。あわせて、テスト `place-1/.github/scripts/tests/test-sync-labels.sh` に、design の「検証の決まり」の場合ごとのテストと、タスク2のファイルを検証に通すテストを作る。テストは gh を偽物に置き換え、偽物が呼ばれた回数を記録する。
   - 完了の確かめ方: alpine のコンテナに `place-1/.github` を写し(ホストに jq が無いため)、`chmod -R a-x` したうえで `bash .github/scripts/tests/test-sync-labels.sh` が失敗0件で終わる。`bash .github/scripts/sync-labels.sh --check` が、タスク2のファイルで終了コード0を返す
@@ -120,6 +120,7 @@
 - マージのあとの確かめ: 所有者は、初めての `sync-labels.yaml` の実行が成功していることと、`bug`・`enhancement`・`documentation` の名前が変わり、今それらが付いている Issue に新しい名前のラベルが付いていること、`duplicate` など6つが消えていることを、Actions の画面と Issue の一覧で確かめる。Claude は、出荷の PR の本文にこの確かめを書く
 - 1 の完了の記録(2026-10-13): 所有者が自分のアカウントで非公開のリポジトリ `DogisRiki/label-rename-check` を作り、確かめた(bot のアカウントでの作成は、安全装置に止められるおそれがあるため、所有者が作った)。`bug` を付けた Issue を作り、`gh api -X PATCH repos/DogisRiki/label-rename-check/labels/bug -f new_name=kind/bug` で名前を変えたあと、`gh issue view 1 --json labels` は `kind/bug`(説明と色は `bug` のまま)だけを返した。`gh api "repos/DogisRiki/label-rename-check/labels/kind%2Fbug"` は `kind/bug` を返し、`gh api -X DELETE "repos/DogisRiki/label-rename-check/labels/good%20first%20issue"` で消せた。新しいリポジトリの初めのラベルには `accessibility` もあった(このリポジトリの今のラベルには無い)
 - 2 の申し送り: 成果物は scratchpad の `place-1/.github/labels.json`(23個)。今の GitHub の色のうち7個(blocked・audit・container-vuln・canary・pre-merge-check・migration・codex-overruled)は大文字で、ファイルは小文字で書いた。タスク3.2のスクリプトは、色を大文字と小文字を区別せずに比べる(区別すると、初めての実行で色の変わらない直しを7個送り、2回目の実行が何も書き込まないことの確かめが GitHub の返す形に左右されるため)。requirements の表の文のバッククォートは、`description` と `selection_rule` にそのまま入れた。GitHub の画面の説明では、バッククォートが文字のまま出る
+- 3.1 の申し送り: `--check` を付けずに呼ぶと、今は検証のあとに終了コード1で止まる(合わせ込みは3.2で作る)。3.2では、スクリプトの末尾のこの扱いと、先頭の説明の「guardrails から実行」と終了コード1の説明を、合わせ込みの説明に書き直す。`GITHUB_REPOSITORY` と `GH_TOKEN` の確かめも3.2で入れる。名前が空の文字列のラベルは、design の検証の決まりに無いので検証に通る(GitHub が受け付けないので、合わせ込みの書き込みが失敗して終了コード1で終わる)
 - 共通の完了条件の2(verify のスキル)は、この spec が frontend・backend・terraform を変えないので、当てはまらない。代わりに、Claude は、各タスクの完了の確かめ方に書いたテスト・shellcheck・actionlint を流す
 
 ## 完了条件(全タスク共通)
