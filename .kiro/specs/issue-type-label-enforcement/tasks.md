@@ -15,7 +15,7 @@
   - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
   - _対象の部品: labels.json_
 
-- [ ] 3. ラベルを合わせるスクリプトを作る
+- [x] 3. ラベルを合わせるスクリプトを作る
 - [x] 3.1 ファイルの検証を作る
 
   Claude は、部品「sync-labels.sh」のうち、引数の読み取りと `--check` の検証を、scratchpad の `place-1/.github/scripts/sync-labels.sh` に作る。あわせて、テスト `place-1/.github/scripts/tests/test-sync-labels.sh` に、design の「検証の決まり」の場合ごとのテストと、タスク2のファイルを検証に通すテストを作る。テストは gh を偽物に置き換え、偽物が呼ばれた回数を記録する。
@@ -32,7 +32,7 @@
   - _要件: 2.1, 2.2, 2.3, 2.4, 2.6_
   - _対象の部品: sync-labels.sh_
 
-- [ ] 4. ワークフローと PR の検査にスクリプトをつなぐ
+- [x] 4. ワークフローと PR の検査にスクリプトをつなぐ
 - [x] 4.1 ラベルを合わせるワークフローを作る
 
   Claude は、部品「sync-labels.yaml」を、scratchpad の `place-1/.github/workflows/sync-labels.yaml` に、design の節のとおりの起動するイベント・動かす条件・権限・同時実行・時間の上限・手順で作る。`actions/checkout` は、`guardrails.yaml` と同じコミットの SHA で固定する。
@@ -49,7 +49,7 @@
   - _要件: 2.5_
   - _対象の部品: guardrails.yaml の手順_
 
-- [ ] 5. ラベルが足りない起票を止める
+- [x] 5. ラベルが足りない起票を止める
 - [x] 5.1 起票を止めるフックを作る (並行可)
 
   Claude は、部品「check-issue-labels.sh」を、scratchpad の `place-2/.claude/hooks/check-issue-labels.sh` に、design の「コマンドの読み方」「止める決まり」「ラベルの一覧のファイルを読む場所」「止めたときに出す文」のとおりに作る。あわせて、テスト `place-2/.claude/hooks/tests/test-check-issue-labels.sh` を作る。テストは、一時フォルダに git のリポジトリを作って `origin` を設定し、`.github/labels.json` を置き、フックの入力の `cwd` にそのフォルダを渡す。
@@ -66,7 +66,7 @@
   - 受入基準とテストの対応: 要件4の受入基準1から3(種類のラベルが無いか2つ以上ある起票と、場所のラベルが要るのに無い起票が止まる)が、Claude のセッションで実際に働くことは、「実装のメモ」の、マージのあとのフックの確かめで確かめる。フックの判定そのものは、タスク5.1のテストで確かめる
   - _要件: 4.1_
 
-- [ ] 6. 起票の手順にラベルの選び方を入れる
+- [x] 6. 起票の手順にラベルの選び方を入れる
 - [x] 6.1 起票の決まりにラベルの選び方を入れる (並行可)
 
   Claude は、部品「file-issue の直し」のとおり、`.claude/skills/file-issue/SKILL.md` に「## ラベルの選び方」の節を足し、Step 3・Step 4・Step 5、「分けた部分のIssue」のコマンド、「実装の途中で小さく分けるとき」の箇条を直す。
@@ -99,8 +99,8 @@
   - _要件: 2.1_
   - _依存: 4.1_
 
-- [ ] 8. 所有者が置いたファイルで全体を確かめる
-- [ ] 8.1 所有者にファイルを置いてもらい、置いた場所でテストを流す
+- [x] 8. 所有者が置いたファイルで全体を確かめる
+- [x] 8.1 所有者にファイルを置いてもらい、置いた場所でテストを流す
 
   親のセッションは、scratchpad の `place-1/` と `place-2/` のファイルを本来の場所に写すコマンドを、所有者に示して置くよう頼む。依頼には、Claude が `.github/` と `.claude/settings.json` と `.claude/hooks/` に書き込めないこと(`settings.json` の `deny`)を添える。所有者が置いたら、親のセッションは、本来の場所で、コンテナの中の `test-sync-labels.sh`、Git Bash の `test-check-issue-labels.sh`、shellcheck(対象は `git ls-files -z --cached --others --exclude-standard '*.sh'` で、まだコミットしていない新しいファイルを含める)、actionlint、`sync-labels.sh --check` を流す。
   - 完了の確かめ方: `git status` に、置いた7つのファイル(`labels.json`、`sync-labels.sh`、`test-sync-labels.sh`、`sync-labels.yaml`、`guardrails.yaml`、`check-issue-labels.sh`、`test-check-issue-labels.sh`)と `settings.json` が出る。上のすべてが失敗0件か指摘0件で終わる
@@ -125,6 +125,8 @@
 - 3.2 で起きたこと: 実装役が、読み取り専用で写したリポジトリにファイルを重ねようとして、Docker が作業フォルダに0バイトの `.github/scripts/sync-labels.sh` と `.github/scripts/tests/test-sync-labels.sh` を作った。Claude は `.github/` の下を消せないので、タスク8.1で所有者が置くときに上書きされる。4.1 と 5.1 で shellcheck や actionlint を流すときは、作業フォルダに無いファイルを `-v` で重ねない。リポジトリを scratchpad の一時フォルダに写してそこで重ねるか、scratchpad のファイルを直接渡す
 - 5.1 の申し送り: フックは、design の読み方に加えて、次の形も読む。`gh` と `issue` の間の `-R` / `--repo`。`env`・`command`・`exec`・`time`・`nohup`・`if` などの前置きの語。`"$(...)"` の中。`sh` か `bash` が受けるヒアドキュメントの本文(それ以外のヒアドキュメントの本文は読まない)。`--help` / `-h` の起票は通す。このリポジトリが分からないとき(origin が無いなど)は、`-R` をほかのリポジトリとみなさず、ラベルの判定を続ける。`GH_REPO` は見ない。止まりすぎの形として、`bash -c '...' <<EOF` と `bash script.sh <<EOF` の本文にラベル無しの `gh issue create` の行があると止まる。通り抜ける形として、`tee f <<EOF | bash`・`eval`・`timeout 30 gh ...`・`gh api` に URL を全部書く形・curl がある。どれも手順では使わない形なので、このままにする
 - 6.1 で見つかったこと: 文書だけを変える Issue(`kind/documentation`)は `area_required` が `true` だが、3つの場所のラベルの説明はどれも文書そのものを指していない。文書が扱う対象(インフラの設計の文書なら `area/infra` など)で選べば1つに決まるが、spec はこの読み方を決めていない。所有者に伝える
+- 6.1 で見つかったことへの所有者の答え(2026-10-13): 文書だけを変える Issue の場所のラベルは、その文書が扱う対象で選ぶ読み方でよい
+- 8.1 の完了の記録(2026-10-13): 所有者が scratchpad の8つのファイルを本来の場所に置いた。置いた場所で、alpine のコンテナの `test-sync-labels.sh` は PASS 110・FAIL 0、Git Bash の `test-check-issue-labels.sh` は126件成功・0件失敗、`sync-labels.sh --check` は終了コード0、shellcheck(`git ls-files --cached --others --exclude-standard '*.sh'` の全ファイル)と actionlint はどちらも指摘0件だった
 - 共通の完了条件の2(verify のスキル)は、この spec が frontend・backend・terraform を変えないので、当てはまらない。代わりに、Claude は、各タスクの完了の確かめ方に書いたテスト・shellcheck・actionlint を流す
 
 ## 完了条件(全タスク共通)

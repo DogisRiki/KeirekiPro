@@ -116,6 +116,11 @@
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/block-full-test-in-implementer.sh\"",
                         "timeout": 15
+                    },
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-issue-labels.sh\"",
+                        "timeout": 15
                     }
                 ]
             }

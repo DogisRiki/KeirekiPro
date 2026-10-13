@@ -1,0 +1,154 @@
+{
+  "labels": [
+    {
+      "name": "kind/bug",
+      "group": "kind",
+      "description": "今ある機能が本来の動きをしていないので、本来の動きに直す",
+      "color": "d73a4a",
+      "area_required": true,
+      "previous_names": ["bug"]
+    },
+    {
+      "name": "kind/feature",
+      "group": "kind",
+      "description": "利用者や所有者が、今はできないことをできるようになる",
+      "color": "0e8a16",
+      "area_required": true
+    },
+    {
+      "name": "kind/enhancement",
+      "group": "kind",
+      "description": "今ある機能の動きや見た目を、意図して変えてよくする",
+      "color": "a2eeef",
+      "area_required": true,
+      "previous_names": ["enhancement"]
+    },
+    {
+      "name": "kind/cleanup",
+      "group": "kind",
+      "description": "見える動きを変えずに、作りを整理する、または使っていないものを消す",
+      "color": "c5def5",
+      "area_required": true
+    },
+    {
+      "name": "kind/dependency",
+      "group": "kind",
+      "description": "依存やツールの版を上げる",
+      "color": "bfd4f2",
+      "area_required": true
+    },
+    {
+      "name": "kind/documentation",
+      "group": "kind",
+      "description": "人が読む文書(README と `doc/` の下の文書)だけを変える",
+      "color": "0075ca",
+      "area_required": true,
+      "selection_rule": "README と `doc/` の下の文書だけを変える Issue に付ける。コードや仕組みの変更に合わせて文書も直す Issue と、CLAUDE.md・スキル・steering・spec のように Claude が読んで動きを決める文書を変える Issue には付けない",
+      "previous_names": ["documentation"]
+    },
+    {
+      "name": "retrospective",
+      "group": "kind",
+      "description": "ゲートすり抜けの振り返り(月次監査の棚卸し対象)",
+      "color": "0e8a16",
+      "area_required": false,
+      "selection_rule": "振り返りの手順(`/retrospective`)で起票する Issue にだけ付ける"
+    },
+    {
+      "name": "area/app",
+      "group": "area",
+      "description": "利用者が使う画面・API・データベースの中身",
+      "color": "f9d0c4"
+    },
+    {
+      "name": "area/infra",
+      "group": "area",
+      "description": "アプリを動かす本番の AWS の環境",
+      "color": "fef2c0"
+    },
+    {
+      "name": "area/dev-platform",
+      "group": "area",
+      "description": "Claude が開発を進めるための手順・品質チェック・CI・監査と、開発環境",
+      "color": "d4c5f9"
+    },
+    {
+      "name": "blocked",
+      "group": "other",
+      "description": "上流や外部要因で着手できない",
+      "color": "b60205"
+    },
+    {
+      "name": "audit",
+      "group": "other",
+      "description": "監査の通知",
+      "color": "d93f0b"
+    },
+    {
+      "name": "container-vuln",
+      "group": "other",
+      "description": "コンテナイメージの脆弱性",
+      "color": "b60205"
+    },
+    {
+      "name": "canary",
+      "group": "other",
+      "description": "ゲート健康診断用カナリアPR(マージ禁止)",
+      "color": "5319e7"
+    },
+    {
+      "name": "pre-merge-check",
+      "group": "other",
+      "description": "マージ前に人間がローカルで確認するPR",
+      "color": "1d76db"
+    },
+    {
+      "name": "migration",
+      "group": "other",
+      "description": "DBマイグレーション変更あり。承認前にローカルDBで適用・巻き戻しを確認すること",
+      "color": "d93f0b"
+    },
+    {
+      "name": "codex-overruled",
+      "group": "other",
+      "description": "Codex指摘をClaudeが誤検知と判定したPR(週次監査の優先サンプリング対象)",
+      "color": "fbca04"
+    },
+    {
+      "name": "dependencies",
+      "group": "other",
+      "description": "Pull requests that update a dependency file",
+      "color": "0366d6"
+    },
+    {
+      "name": "java",
+      "group": "other",
+      "description": "Pull requests that update java code",
+      "color": "ffa221"
+    },
+    {
+      "name": "javascript",
+      "group": "other",
+      "description": "Pull requests that update javascript code",
+      "color": "168700"
+    },
+    {
+      "name": "python",
+      "group": "other",
+      "description": "Pull requests that update python code",
+      "color": "2b67c6"
+    },
+    {
+      "name": "docker",
+      "group": "other",
+      "description": "Pull requests that update docker code",
+      "color": "21ceff"
+    },
+    {
+      "name": "github_actions",
+      "group": "other",
+      "description": "Pull requests that update GitHub Actions code",
+      "color": "000000"
+    }
+  ]
+}
