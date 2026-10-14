@@ -133,6 +133,19 @@ describe("createErrorInterceptor", () => {
         expect(useUserAuthStore.getState().isAuthenticated).toBe(true);
     });
 
+    it.each([502, 504])("%iのときは、メンテナンス画面へ移り、エラーを返すこと", async (status) => {
+        const error = createAxiosError(status, "");
+
+        await expect(createErrorInterceptor()(error)).rejects.toBe(error);
+
+        expect(assign).toHaveBeenCalledWith(paths.maintenance);
+        expect(assign).toHaveBeenCalledTimes(1);
+        expect(replace).not.toHaveBeenCalled();
+        expect(useNotificationStore.getState().isShow).toBe(false);
+        expect(useErrorMessageStore.getState().message).toBeNull();
+        expect(useUserAuthStore.getState().isAuthenticated).toBe(true);
+    });
+
     it("それ以外のステータスのときは、何もせずエラーを返すこと", async () => {
         const error = createAxiosError(409, errorResponse);
 
