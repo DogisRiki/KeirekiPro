@@ -42,7 +42,7 @@
   - _要件: 1.1, 1.3, 1.4, 1.5, 1.6, 1.8, 4.3_
   - _対象の部品: アラーム db_start_failed_
 
-- [ ] 2.3 DBの異常のイベントで鳴るアラームを足す
+- [x] 2.3 DBの異常のイベントで鳴るアラームを足す
 
   Claude は、cloudwatch モジュールに、対象のDBのカテゴリ `failure` の RDS のイベントに当たる EventBridge のルールと、イベントを置いておく SQS のキュー(キューのポリシーを含む)と、ルールの `Invocations` を見て直前60分のうち1分でも呼び出しがあれば鳴るアラーム `keirekipro-db-instance-failure` を足す。Claude は、`CloudWatch設計.md` と `バックエンド・モジュール設計.md` に、ルールとキューとアラームを書き足し、`doc/インフラ設計/手順書/手動作業手順.md` の `TerraformFullAccess` の Action に `events:*` と `sqs:*` を足す。
   - 完了の確かめ方: `/verify-terraform` が成功し、checkov の新しい指摘が0件である。SNS のトピックとトピックのポリシーに差分が無い
@@ -62,6 +62,7 @@
 
 - `Invocations` の数え方: キューへの送信が再試行されるときの数え方を、実装のときに公式の文書(https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-monitoring.html)で確かめる。SQS への送信は、ふつう最初の試みで成功する
 - SQS のキューの暗号化: checkov の CKV_AWS_27 が、`sqs_managed_sse_enabled = true` を暗号化として認めるかを、`/verify-terraform` の結果で確かめる。認めないときは、Claude は、抑制を足さずに、CKV_AWS_27 が `sqs_managed_sse_enabled = true` を暗号化として認めないことを所有者に報告する
+- タスク 2.3 で確かめた結果: checkov は `sqs_managed_sse_enabled = true` のキューを CKV_AWS_27 で PASSED にした。`Invocations` は、再試行中の試みを最終的に失敗するまで数えないので、1つのイベントは1回と数えられる(https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-monitoring.html)
 
 ## 完了条件(全タスク共通)
 

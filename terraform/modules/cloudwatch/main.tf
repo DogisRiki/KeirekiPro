@@ -238,6 +238,98 @@ resource "aws_cloudwatch_metric_alarm" "db_start_failed" {
   }
 }
 
+# DB Instance Failure Event Rule
+# Matches RDS events in the "failure" category for the DB instance, at any time.
+# RDS-EVENT-0087 (DB instance stopped) is in the "notification" category and does not match.
+resource "aws_cloudwatch_event_rule" "db_instance_failure" {
+  name        = "${var.project_name}-db-instance-failure"
+  description = "RDS failure category events of the DB instance"
+
+  event_pattern = jsonencode({
+    source        = ["aws.rds"]
+    "detail-type" = ["RDS DB Instance Event"]
+    detail = {
+      SourceIdentifier = [var.rds_instance_identifier]
+      EventCategories  = ["failure"]
+    }
+  })
+
+  tags = {
+    Name = "${var.project_name}-db-instance-failure"
+  }
+}
+
+# SQS Queue that keeps the DB instance failure events for the owner to read later.
+# No component reads this queue.
+resource "aws_sqs_queue" "db_instance_failure_events" {
+  name                      = "${var.project_name}-db-instance-failure-events"
+  sqs_managed_sse_enabled   = true
+  message_retention_seconds = 1209600 # 14 days
+
+  tags = {
+    Name = "${var.project_name}-db-instance-failure-events"
+  }
+}
+
+# SQS Queue Policy: allow only the DB instance failure rule to send messages
+resource "aws_sqs_queue_policy" "db_instance_failure_events" {
+  queue_url = aws_sqs_queue.db_instance_failure_events.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowEventBridgeDbInstanceFailureRule"
+        Effect = "Allow"
+        Principal = {
+          Service = "events.amazonaws.com"
+        }
+        Action   = "sqs:SendMessage"
+        Resource = aws_sqs_queue.db_instance_failure_events.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_cloudwatch_event_rule.db_instance_failure.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+# DB Instance Failure Event Target
+resource "aws_cloudwatch_event_target" "db_instance_failure_events" {
+  rule      = aws_cloudwatch_event_rule.db_instance_failure.name
+  target_id = "${var.project_name}-db-instance-failure-events"
+  arn       = aws_sqs_queue.db_instance_failure_events.arn
+}
+
+# DB Instance Failure Alarm
+# Fires when the DB instance failure rule invokes its target at least once
+# (EventBridge Invocations of the rule).
+resource "aws_cloudwatch_metric_alarm" "db_instance_failure" {
+  alarm_name          = "${var.project_name}-db-instance-failure"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 60
+  datapoints_to_alarm = 1
+  metric_name         = "Invocations"
+  namespace           = "AWS/Events"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "The DB instance went into an abnormal state (RDS failure event). If this is in the morning, the scheduled start of the DB failed. See the SQS queue ${aws_sqs_queue.db_instance_failure_events.name} for the event."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    RuleName = aws_cloudwatch_event_rule.db_instance_failure.name
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "${var.project_name}-db-instance-failure"
+  }
+}
+
 # CloudWatch Dashboard
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = "${var.project_name}-dashboard"
