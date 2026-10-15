@@ -86,6 +86,7 @@
 | keirekipro-rds-cpu-high | RDS | CPUUtilization | >= 80% | 5分 x 2回 | Warning |
 | keirekipro-rds-storage-low | RDS | FreeStorageSpace | <= 2GB | 5分 x 1回 | Critical |
 | keirekipro-redis-memory-high | Redis | DatabaseMemoryUsagePercentage | >= 80% | 5分 x 2回 | Warning |
+| keirekipro-db-start-failed | EventBridge Scheduler | TargetErrorCount | >= 1 | 1分 x 60回のうち1回 | Critical |
 
 ### 4.2 ECSアラーム詳細
 
@@ -212,6 +213,26 @@
 | 比較演算子 | GreaterThanOrEqualToThreshold |
 | しきい値 | 80 |
 | 欠落データの処理 | missing |
+| アクション | SNSトピックへ通知 |
+
+### 4.6 EventBridge Schedulerアラーム詳細
+
+#### 4.6.1 keirekipro-db-start-failed
+
+| 項目 | 設定値 |
+|------|--------|
+| アラーム名 | keirekipro-db-start-failed |
+| 説明 | 平日 7:50（JST）のDBの定時の起動の指令が断られた状態 |
+| 名前空間 | AWS/Scheduler |
+| メトリクス名 | TargetErrorCount |
+| ディメンション | ScheduleGroup=keirekipro-db-start |
+| 統計 | Sum |
+| 期間 | 60秒（1分） |
+| 評価期間 | 60 |
+| アラームに必要なデータポイント | 1 |
+| 比較演算子 | GreaterThanOrEqualToThreshold |
+| しきい値 | 1 |
+| 欠落データの処理 | notBreaching |
 | アクション | SNSトピックへ通知 |
 
 ## 5. SNS通知設計

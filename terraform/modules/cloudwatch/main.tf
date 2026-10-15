@@ -211,6 +211,33 @@ resource "aws_cloudwatch_metric_alarm" "redis_memory_high" {
   }
 }
 
+# DB Start Failed Alarm
+# Fires when the scheduled start of the DB instance is rejected by the RDS API
+# (EventBridge Scheduler TargetErrorCount of the DB start schedule group).
+resource "aws_cloudwatch_metric_alarm" "db_start_failed" {
+  alarm_name          = "${var.project_name}-db-start-failed"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 60
+  datapoints_to_alarm = 1
+  metric_name         = "TargetErrorCount"
+  namespace           = "AWS/Scheduler"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "The scheduled start of the DB instance (weekdays 7:50 JST) failed."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    ScheduleGroup = var.db_start_schedule_group_name
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "${var.project_name}-db-start-failed"
+  }
+}
+
 # CloudWatch Dashboard
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = "${var.project_name}-dashboard"
