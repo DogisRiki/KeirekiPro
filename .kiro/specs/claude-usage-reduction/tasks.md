@@ -33,8 +33,8 @@
   - _要件: 2.3, 3.2, 4.3_
   - _対象の部品: spec-reviewer.md の「会話が要約されたとき」の決まり_
 
-- [ ] 3. 全員に効く設定を作り、部品をつなぐ
-- [ ] 3.1 設定を変え、設定と文書をまとめて確かめるテストを足す
+- [x] 3. 全員に効く設定を作り、部品をつなぐ
+- [x] 3.1 設定を変え、設定と文書をまとめて確かめるテストを足す
 
   Claude は、部品「`.claude/settings.json` の上限とフックの登録」を、置き場所の `place-1/.claude/settings.json` に作る。Claude は、今の `.claude/settings.json` を Read で読んで写しを作り(実装のメモ)、`env` に `"CLAUDE_CODE_AUTO_COMPACT_WINDOW": "250000"` を足し、`hooks.SessionStart` に、`bash "${CLAUDE_PROJECT_DIR}/.claude/hooks/restore-after-compact.sh"` を `timeout` 10秒で呼ぶ `"matcher": "compact"` の項目を足す。今ある項目は変えない。このタスクは、設定(`settings.json`)とフックとタスク2の文書をつなぐ統合のタスクである。Claude は、タスク1.1のテストに、設定とタスク2の文書を確かめるテストを足す。
   - 完了の確かめ方: `place-1/.claude/settings.json` が JSON として読め、今のファイルとの違いが `env` の1行と SessionStart の1項目だけである。検査用の写しで、Git Bash と Linux のコンテナの `test-restore-after-compact.sh` が、設定と文書のテストを含めて失敗0件で終わる。shellcheck をタスク1.1と同じ形で流し、指摘が0件である。`git diff --stat $(git merge-base origin/main HEAD) -- .claude/skills .claude/agents` に出るファイルが、`.claude/skills/spec-review/SKILL.md` と `.claude/agents/spec-reviewer.md` だけである。`.claude/agents/*.md` のどの frontmatter の `model` の行にも違いが無い
