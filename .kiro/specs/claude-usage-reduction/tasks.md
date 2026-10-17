@@ -9,7 +9,7 @@
   - _要件: 3.1, 3.2, 3.3, 5.4_
 
 - [ ] 2. 要約のあとに作業を続けるための指示と決まりを書く
-- [ ] 2.1 CLAUDE.md に要約に残すことの指示を書く (並行可)
+- [x] 2.1 CLAUDE.md に要約に残すことの指示を書く (並行可)
 
   Claude は、部品「CLAUDE.md の `# Compact instructions` の節」を、CLAUDE.md の末尾に `# Compact instructions` の見出しで足す。Claude は、design の部品の節に並ぶ8つの項目を、1項目1行の箇条書きで書き、そのあとに、要約のそれ以外の部分を短くすることと、審査役・点検役・確認役に渡す材料を要約で置き換えないことを書く。Claude は、項目を並べるだけにとどめ、理由の説明を足さない。
   - 完了の確かめ方: CLAUDE.md の末尾に `# Compact instructions` の節があり、実行中のスキルと手順の位置、Issue の番号・spec の名前と段階・ブランチ・PR の番号、`/spec-review` の CYCLE・ROUND・CHANGED と受け入れた指摘と却下した指摘、`/kiro-impl` の検査のコマンドと回数、`/ship` の失敗の回数、答えを待っている問いの全文、所有者が伝えてまだ使っていないこと、補助役の依頼文の識別の欄と判定、の8項目が並んでいる。`git diff $(git merge-base origin/main HEAD) -- CLAUDE.md` の違いが、末尾に足した節だけである
