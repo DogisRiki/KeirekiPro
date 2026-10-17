@@ -1,0 +1,38 @@
+{
+  "feature_name": "claude-usage-reduction",
+  "issue": 566,
+  "created_at": "2026-10-17T09:55:28Z",
+  "updated_at": "2026-10-17T13:50:41Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-17T11:56:39Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-17T13:09:17Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-17T13:50:41Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-17T10:54:09Z",
+      "issues": [566],
+      "revoked_at": "2026-10-17T11:32:25Z",
+      "revoked_for": "要件1(週の7日目まで達しない)が、質を落とさない直し方では満たせない見込みと design の調べで分かり、所有者が要件1を直すと決めたため"
+    }
+  ]
+}
