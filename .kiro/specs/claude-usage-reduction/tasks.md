@@ -1,7 +1,7 @@
 # タスク
 
-- [ ] 1. 圧縮の直後に作業の状態を差し込むフックを作る
-- [ ] 1.1 フックとその単体テストを作る
+- [x] 1. 圧縮の直後に作業の状態を差し込むフックを作る
+- [x] 1.1 フックとその単体テストを作る
 
   Claude は、部品「restore-after-compact.sh」を、置き場所の `place-1/.claude/hooks/restore-after-compact.sh` に、design の「役割」「いつ動くか」「呼び出し方」「失敗したとき」のとおりに作る。あわせて、Claude は、テスト `place-1/.claude/hooks/tests/test-restore-after-compact.sh` を作る。テストは、一時フォルダに git のリポジトリを作り、spec.json・`reviews/` の記録・tasks.md・並行作業の Issue の記録を置き、フックの入力の `cwd` にそのフォルダを渡す。Claude は、テストが置く `reviews/{段階}-response.md` の見出しを、実際の記録と同じく `## サイクル<N> 往復<M> への対応(<日付>)` の形にする。
   - 完了の確かめ方: 検査用の写し(実装のメモ)で、Git Bash の `bash .claude/hooks/tests/test-restore-after-compact.sh` と、Linux のコンテナ(alpine に bash・perl・git を入れたもの)の中の同じテストが、どちらも失敗0件で終わる。テストの後片付けで一時フォルダが消えている。検査用の写しの全 `.sh` を CI と同じ shellcheck(`koalaman/shellcheck:v0.11.0`)にまとめて渡し、指摘が0件である
