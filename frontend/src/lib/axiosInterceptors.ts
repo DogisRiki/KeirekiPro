@@ -6,6 +6,12 @@ import type { ErrorResponse } from "@/types";
 import axios from "axios";
 
 /**
+ * メンテナンス画面へ切り替える応答のステータス
+ * 503: ALBにターゲットが無い、502/504: ALBやCloudFrontがバックエンドにつながらない
+ */
+const MAINTENANCE_STATUSES: readonly number[] = [502, 503, 504];
+
+/**
  * 共通エラーインターセプタ
  */
 export const createErrorInterceptor =
@@ -57,8 +63,8 @@ export const createErrorInterceptor =
                 useNotificationStore.getState().setNotification(toastMessage.serverError, "error");
             }
 
-            // 503(メンテナンス)
-            if (response?.status === 503) {
+            // 502 / 503 / 504(バックエンドにつながらない)
+            if (MAINTENANCE_STATUSES.includes(response.status)) {
                 window.location.assign(paths.maintenance);
                 return Promise.reject(error);
             }

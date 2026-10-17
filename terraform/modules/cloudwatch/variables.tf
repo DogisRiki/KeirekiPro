@@ -43,3 +43,8 @@ variable "aws_account_id" {
   description = "AWS account ID"
   type        = string
 }
+
+variable "db_start_schedule_group_name" {
+  description = "Name of the EventBridge Scheduler schedule group that contains only the scheduled DB start"
+  type        = string
+}

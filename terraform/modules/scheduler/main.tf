@@ -56,11 +56,26 @@ resource "aws_iam_role_policy_attachment" "scheduler" {
 }
 
 # ============================================================
+# DB起動専用のスケジュールグループ
+# TargetErrorCount の次元は ScheduleGroup だけなので、
+# DB起動の失敗だけを数えられるよう rds_start をこのグループに分ける
+# ============================================================
+
+resource "aws_scheduler_schedule_group" "db_start" {
+  name = "${var.project_name}-db-start"
+
+  tags = {
+    Name = "${var.project_name}-db-start"
+  }
+}
+
+# ============================================================
 # 平日朝 7:50 (JST) - RDS起動 + ECS起動
 # ============================================================
 
 resource "aws_scheduler_schedule" "rds_start" {
   name        = "${var.project_name}-rds-start"
+  group_name  = aws_scheduler_schedule_group.db_start.name
   description = "Start RDS on weekday mornings"
 
   flexible_time_window {

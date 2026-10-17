@@ -205,15 +205,16 @@ module "ecs" {
 module "cloudwatch" {
   source = "./modules/cloudwatch"
 
-  project_name            = var.project_name
-  ecs_cluster_name        = module.ecs.cluster_name
-  ecs_service_name        = module.ecs.service_name
-  alb_arn_suffix          = module.alb.alb_arn_suffix
-  target_group_arn_suffix = module.alb.target_group_arn_suffix
-  rds_instance_identifier = module.rds.instance_identifier
-  redis_cluster_id        = module.elasticache.cluster_id
-  alert_email_address     = var.alert_email_address
-  aws_account_id          = data.aws_caller_identity.current.account_id
+  project_name                 = var.project_name
+  ecs_cluster_name             = module.ecs.cluster_name
+  ecs_service_name             = module.ecs.service_name
+  alb_arn_suffix               = module.alb.alb_arn_suffix
+  target_group_arn_suffix      = module.alb.target_group_arn_suffix
+  rds_instance_identifier      = module.rds.instance_identifier
+  redis_cluster_id             = module.elasticache.cluster_id
+  alert_email_address          = var.alert_email_address
+  aws_account_id               = data.aws_caller_identity.current.account_id
+  db_start_schedule_group_name = module.scheduler.db_start_schedule_group_name
 }
 
 # WAF Module (must be created before CloudFront)

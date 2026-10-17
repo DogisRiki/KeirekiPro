@@ -86,6 +86,8 @@
 | keirekipro-rds-cpu-high | RDS | CPUUtilization | >= 80% | 5分 x 2回 | Warning |
 | keirekipro-rds-storage-low | RDS | FreeStorageSpace | <= 2GB | 5分 x 1回 | Critical |
 | keirekipro-redis-memory-high | Redis | DatabaseMemoryUsagePercentage | >= 80% | 5分 x 2回 | Warning |
+| keirekipro-db-start-failed | EventBridge Scheduler | TargetErrorCount | >= 1 | 1分 x 60回のうち1回 | Critical |
+| keirekipro-db-instance-failure | EventBridge ルール | Invocations | >= 1 | 1分 x 60回のうち1回 | Critical |
 
 ### 4.2 ECSアラーム詳細
 
@@ -213,6 +215,104 @@
 | しきい値 | 80 |
 | 欠落データの処理 | missing |
 | アクション | SNSトピックへ通知 |
+
+### 4.6 EventBridge Schedulerアラーム詳細
+
+#### 4.6.1 keirekipro-db-start-failed
+
+| 項目 | 設定値 |
+|------|--------|
+| アラーム名 | keirekipro-db-start-failed |
+| 説明 | 平日 7:50（JST）のDBの定時の起動の指令が断られた状態 |
+| 名前空間 | AWS/Scheduler |
+| メトリクス名 | TargetErrorCount |
+| ディメンション | ScheduleGroup=keirekipro-db-start |
+| 統計 | Sum |
+| 期間 | 60秒（1分） |
+| 評価期間 | 60 |
+| アラームに必要なデータポイント | 1 |
+| 比較演算子 | GreaterThanOrEqualToThreshold |
+| しきい値 | 1 |
+| 欠落データの処理 | notBreaching |
+| アクション | SNSトピックへ通知 |
+
+### 4.7 DBの異常のイベントのアラーム詳細
+
+DBが異常の状態に入ったときに AWS が出す RDS のイベント（カテゴリ `failure`）を、EventBridge のルールが拾って SQS のキューに送る。ルールがキューに送った数（`Invocations`）を、アラームが見る。キューは、所有者があとでイベントの中身を見るための置き場で、どの仕組みもキューを読まない。
+
+#### 4.7.1 keirekipro-db-instance-failure
+
+| 項目 | 設定値 |
+|------|--------|
+| アラーム名 | keirekipro-db-instance-failure |
+| 説明 | DBが異常の状態に入った（RDS の failure のイベントが出た）状態。朝なら、DBの定時の起動に失敗している |
+| 名前空間 | AWS/Events |
+| メトリクス名 | Invocations |
+| ディメンション | RuleName=keirekipro-db-instance-failure |
+| 統計 | Sum |
+| 期間 | 60秒（1分） |
+| 評価期間 | 60 |
+| アラームに必要なデータポイント | 1 |
+| 比較演算子 | GreaterThanOrEqualToThreshold |
+| しきい値 | 1 |
+| 欠落データの処理 | notBreaching |
+| アクション | SNSトピックへ通知 |
+
+#### 4.7.2 EventBridge ルール keirekipro-db-instance-failure
+
+| 項目 | 設定値 |
+|------|--------|
+| ルール名 | keirekipro-db-instance-failure |
+| イベントバス | default |
+| 送り先 | SQS キュー keirekipro-db-instance-failure-events |
+
+イベントパターン:
+
+```json
+{
+  "source": ["aws.rds"],
+  "detail-type": ["RDS DB Instance Event"],
+  "detail": {
+    "SourceIdentifier": ["keirekipro-db"],
+    "EventCategories": ["failure"]
+  }
+}
+```
+
+毎晩の定時の停止で出る RDS-EVENT-0087（DB instance stopped）は、カテゴリが `notification` なので、このルールに当たらない。
+
+#### 4.7.3 SQS キュー keirekipro-db-instance-failure-events
+
+| 項目 | 設定値 |
+|------|--------|
+| キュー名 | keirekipro-db-instance-failure-events |
+| タイプ | スタンダード |
+| 暗号化 | SQS 管理の鍵（SSE-SQS） |
+| メッセージの保持期間 | 1209600秒（14日） |
+
+アクセスポリシー:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowEventBridgeDbInstanceFailureRule",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "events.amazonaws.com"
+      },
+      "Action": "sqs:SendMessage",
+      "Resource": "arn:aws:sqs:ap-northeast-1:${AWS_ACCOUNT_ID}:keirekipro-db-instance-failure-events",
+      "Condition": {
+        "ArnEquals": {
+          "aws:SourceArn": "arn:aws:events:ap-northeast-1:${AWS_ACCOUNT_ID}:rule/keirekipro-db-instance-failure"
+        }
+      }
+    }
+  ]
+}
+```
 
 ## 5. SNS通知設計
 
