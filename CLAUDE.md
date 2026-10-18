@@ -76,7 +76,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 ## spec駆動開発(cc-sdd / Kiro-style)
 
 spec で進めるか(Lane A)、spec 無しで進めるか(Lane B)は、着手時に `/start` が決める。
-AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(`.claude/skills/start/SKILL.md`)の「観点の定義」の4つの観点で判断し、判断と観点ごとの理由を所有者に示す。
+AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(`.claude/skills/start/SKILL.md`)の「観点の定義」の4つの観点で判断し、判断と観点ごとの理由を所有者に示す。spec が要らないと判断して返事を待たずに実装するときも、実装を始める前に示す。
 
 - 変更の行数の見込みは、着手時の判断に使わない。200行の検査は、着手時の判断をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない(全文は `.claude/skills/start/SKILL.md` の「Step 5: 判断する」)
 - 観点ごとの定義(「当たる」「当たらない」、3つの材料、1回尋ねれば決まる)は、`.claude/skills/start/SKILL.md` の「Step 5: 判断する」の「観点の定義」の表と表の下の箇条のとおりとする
