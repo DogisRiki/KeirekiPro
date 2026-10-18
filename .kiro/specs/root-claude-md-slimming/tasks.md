@@ -17,7 +17,7 @@
   - _要件: 1.2, 1.5, 1.6_
   - _対象の部品: spec-writing.md の「Issueの印」の節_
 
-- [ ] 1.3 ほかの文書から写しを消す (並行可)
+- [x] 1.3 ほかの文書から写しを消す (並行可)
 
   Claude は、部品「写しを消す文書」のとおりに、対応表の「写しを消す箇所」に挙げた写しを、`.claude/loop.md`、`.kiro/steering/tech.md`、`.claude/skills/verify-frontend/SKILL.md`、`.claude/skills/verify-backend/SKILL.md`、`.claude/skills/start/SKILL.md`、`.claude/skills/spec-review/SKILL.md` から消す。あわせて、Claude は、`.kiro/steering/tech.md` の「開発環境」の節の品質ゲートの参照を、対応表の「参照の直し」のとおりに、各 verify のスキルの「Steps」に向ける。`tech.md` では、消す写しと直す参照が同じ節にあるので、Claude はこの2つを同じタスクで直す。
   - 完了の確かめ方: 6つの文書の `git diff` で消えた行が、対応表の「写しを消す箇所」に挙げた文と、`tech.md` の直した参照の文だけである。`.claude/skills/verify-terraform/SKILL.md` に違いが無い。`.claude/skills/start/SKILL.md` の「Step 5: 判断する」「Step 5.5」「Step 6」に違いが無く、「Step 7: 判断ごとに進む」の違いが冒頭の文だけである

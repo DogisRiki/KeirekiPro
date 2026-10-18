@@ -245,7 +245,7 @@ response の書式:
    - 戻る段階とその後続の段階について、spec.json の `approved` を `false` にし、`approved_by` と `approved_at` を削除する
    - 本文を直す
    - その段階について、`CYCLE` を 1 増やし、`ROUND` を 1 にし、`CHANGED` を「あり」にして Step 1.5 からやり直す(往復は新たに最大3回)。本文を直したあとなので、往復1から、Step 2 の手順2で審査の範囲は差分になる(控えと本文を比べられないときは全体)
-   - 後続の段階は自分で作り直さない。所有者に、後続の段階のコマンドを順に打つよう依頼する(requirements に戻るときは `/kiro-spec-design <feature>` と `/kiro-spec-tasks <feature>`、design に戻るときは `/kiro-spec-tasks <feature>`)。各段階のコマンドには `disable-model-invocation` が付いており、AIからは起動できない。所有者が打って生成された段階は、それぞれこのスキルでレビューする
+   - 後続の段階は自分で作り直さない。所有者に、後続の段階のコマンドを順に打つよう依頼する(requirements に戻るときは `/kiro-spec-design <feature>` と `/kiro-spec-tasks <feature>`、design に戻るときは `/kiro-spec-tasks <feature>`)。所有者が打って生成された段階は、それぞれこのスキルでレビューする
 
 ### Step 7: 所有者への報告
 

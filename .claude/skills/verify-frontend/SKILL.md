@@ -25,7 +25,6 @@ bash .claude/scripts/parallel/run-check.sh frontend pnpm run coverage
 - 単発のテストや検査(`npx vitest run <ファイル>` など)も、`bash .claude/scripts/parallel/run-check.sh frontend npx vitest run <ファイル>` のように `run-check.sh` で打つ
 - vitestはテスト実行時に型を検査しない。型の誤りは `pnpm run typecheck`(`tsc -b`。CIの `pnpm run build` と同じ型検査)で検出する
 - `pnpm run coverage` が終了コード0で終わったときだけ、`run-check.sh` が作業フォルダの `.claude/.state/gate-run-frontend.txt` に品質チェックが通った時刻を書く
-- CI環境(Docker Compose無し)では `bash .claude/scripts/parallel/run-check.sh frontend` を外し `frontend/` でネイティブ実行する
 
 ## 順番待ちと検査できないとき
 
