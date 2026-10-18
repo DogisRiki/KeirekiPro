@@ -2,10 +2,10 @@
   "feature_name": "root-claude-md-slimming",
   "issue": 568,
   "created_at": "2026-10-18T00:55:08Z",
-  "updated_at": "2026-10-18T14:07:35Z",
+  "updated_at": "2026-10-18T14:14:47Z",
   "language": "ja",
   "review_model": "opus",
-  "phase": "design-generated",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
