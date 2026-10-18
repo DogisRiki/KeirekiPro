@@ -59,7 +59,7 @@
   - _依存: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2_
 
 - [ ] 4. 場面を動かす仕組みを作る
-- [ ] 4.1 使い捨ての写しと身代わりを作る
+- [x] 4.1 使い捨ての写しと身代わりを作る
 
   Claude は、部品「場面を動かす仕組み」の「権限」の送り先を無くす制限と GitHub に届かなくする制限、「呼び出し方」の手順1(写しと `origin.git` を作る)・手順3(身代わりの `gh` と `docker` が答えを返し、呼び出しを記録する)・手順7(写しを残して記録を集める)、「状態の持ち方」の所有者の作業フォルダとほかのセッションの記録の確かめのとおりに、`<scratchpad>/scenes/run-scene.sh` の写しを作る部分と記録を集める部分を作る。あわせて、Claude は、`bin/gh`、`bin/docker`、`git-hooks/pre-push`、`run-check.sh` の身代わりを作る。Claude は、ほかのセッションの記録の確かめが読む記録の場所を、環境の変数で差し替えられるように作る。
   - 完了の確かめ方: Claude が試しの場面の用意を動かすと、`<scratchpad>/scenes/work/<場面>/repo` に写しができる。写しの `origin` が `origin.git` を指し、写しの `main` が、作業のブランチの先頭に身代わりのコミットを1つ足したコミットである。写しの中の `git push` は、`pre-push` の記録に残って終了コード1で終わり、`origin.git` の参照が変わらない。写しの中の `gh issue create` と `gh api -X POST` は、記録に残って終了コード1で終わる。答えのファイルのある `gh issue view` は答えを返す。写しの中の `docker volume rm` は、記録に残って終了コード0で終わり、ホストの Docker のボリュームの一覧が変わらない。写しの中の `docker info` は、用意した答えを返す。写しの中の `bash .claude/scripts/parallel/run-check.sh frontend pnpm run lint` は、引数と始めと終わりの時刻を記録する。用意の前と後で、所有者の作業フォルダの `git status --porcelain=v1 -uall` と `git rev-parse HEAD` の出力が同じである。Claude が手で作ったセッションの ID と写しの道を確かめに渡すと、所有者の作業フォルダの `git rev-parse --git-common-dir` の下の並行作業の記録にそれらが無いときは確かめが通る。Claude が記録の場所を scratchpad の中の試し用のフォルダに差し替え、そこにそれらを含む記録を置いたときは、`run-scene.sh` がその場面を不合格にして止まる。Claude は、この試しで、所有者の作業フォルダの並行作業の記録に何も書かない
