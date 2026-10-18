@@ -34,7 +34,7 @@
   - _依存: 1.2_
 
 - [ ] 2. 読み込まれる文書の量を PR で検査する
-- [ ] 2.1 量を測るスクリプトとそのテストを作る (並行可)
+- [x] 2.1 量を測るスクリプトとそのテストを作る (並行可)
 
   Claude は、部品「check-claude-md-size.sh」と部品「test-check-claude-md-size.sh」を、置き場所(実装のメモ)の `.github/scripts/check-claude-md-size.sh` と `.github/scripts/tests/test-check-claude-md-size.sh` に作る。Claude は、スクリプトを design の「呼び出し方」と終了コードの表と「失敗したとき」のとおりに作り、テストの場合を design の「テストの方針」の単体テストのとおりにする。
   - 完了の確かめ方: 検査用の写し(実装のメモ)で、Git Bash の `bash .github/scripts/tests/test-check-claude-md-size.sh` と、Linux のコンテナの中の同じテストが、どちらも失敗0件で終わる。検査用の写しの全 `.sh` を CI と同じ形の shellcheck にまとめて渡すと、指摘が0件である。Claude がスクリプトの合計と上限の比べ方を一時的に壊すと、テストが失敗する
