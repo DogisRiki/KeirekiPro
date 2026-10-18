@@ -27,7 +27,7 @@
 
 - [x] 1.4 移した決まりと消した決まりを指す記述を直す
 
-  このタスクの直しは、spec-writing.md に「Issueの印」の節を足すタスクが作る節の見出し `## Issueの印` を指す。Claude は、部品「参照を直す文書」のとおりに、対応表の「参照の直し」に挙げた記述のうち、`.kiro/steering/tech.md` と `README.md` の記述を除いたものを直す。直す文書は、`.claude/skills/kiro-impl/SKILL.md`、`.claude/skills/kiro-spec-requirements/SKILL.md`、`.claude/skills/kiro-spec-design/SKILL.md`、`.claude/skills/kiro-spec-tasks/SKILL.md`、`.claude/skills/spec-review/rules/requirements.md`、`.claude/skills/spec-review/rules/design.md`、`.claude/skills/spec-review/rules/tasks.md` である。Claude は、対応表の「直さない記述」を直さない。
+  Claude は、このタスクで直す記述を、spec-writing.md に「Issueの印」の節を足すタスクが作る節の見出し `## Issueの印` に向ける。Claude は、部品「参照を直す文書」のとおりに、対応表の「参照の直し」に挙げた記述のうち、`.kiro/steering/tech.md` と `README.md` の記述を除いたものを直す。直す文書は、`.claude/skills/kiro-impl/SKILL.md`、`.claude/skills/kiro-spec-requirements/SKILL.md`、`.claude/skills/kiro-spec-design/SKILL.md`、`.claude/skills/kiro-spec-tasks/SKILL.md`、`.claude/skills/spec-review/rules/requirements.md`、`.claude/skills/spec-review/rules/design.md`、`.claude/skills/spec-review/rules/tasks.md` である。Claude は、対応表の「直さない記述」を直さない。
   - 完了の確かめ方: 7つの文書の `git diff` が、対応表の「参照の直し」に挙げた記述だけを変えている。3つの spec の段階のスキルの書き方の基準にする節の一覧と、`spec-review/rules/` の3つのファイルに、「Issueの印」の名前がある。対応表の「直さない記述」に挙げた記述に違いが無い
   - 受入基準とテストの対応: 要件1の受入基準7(移した決まりと消した決まりを指す記述を、移した先か残した先に向ける)は、上の照合と、大タスク「直した文書と検査をまとめて確かめる」の「CLAUDE.md」の検索で確かめる
   - _要件: 1.7_
@@ -75,10 +75,10 @@
 
 - [ ] 4.3 着手・出荷・品質ゲート・ループ・境界の場面を用意する
 
-  Claude は、部品「場面を動かす仕組み」の場面の一覧のうち、S1、S2、S3、S4、S5、S6a、S6b、S10 の用意を、`<scratchpad>/scenes/fixtures/<場面>/` に作る。用意するものは、身代わりの `gh` の答え、`run-check-plan`、写しに置くコミットとコミットしていない変更、場面の文、圧縮の位置と圧縮のあとに送る文である。あわせて、Claude は、「呼び出し方」の手順2の、ほかのセッションの着手の予約を置く用意(S2 と S3)と、手順1の、`origin.git` の `main` を写しのブランチより進める用意(S6b)を、`run-scene.sh` に作る。
-  - 完了の確かめ方: Claude が場面ごとに会話を動かす手前までの用意を動かすと、8つの場面のどれも止まらずに用意を終える。S2 と S3 では、`busy-issues` の出力の `active` に場面の Issue の番号がある。S6b では、`origin.git` の `main` が写しのブランチより1コミット進んでいる。用意の前と後で、所有者の作業フォルダの `git status --porcelain=v1 -uall` と `git rev-parse HEAD` の出力が同じである
-  - 受入基準とテストの対応: 要件3の受入基準1(`/start` と `/ship` を含む場面を動かす)・受入基準2(短くして残す決まりと消す決まりと写しを消した決まりのすべてを1つ以上の場面に入れる)は、場面の一覧の「確かめる決まり」の列の場面がすべて用意できることで確かめる。要件3の受入基準8(ほかのセッションの着手の記録を変えさせない)は、予約が写しの `.git` の下にだけ書かれ、上の前後の出力が同じことで確かめる
-  - _要件: 3.1, 3.2, 3.8_
+  Claude は、部品「場面を動かす仕組み」の場面の一覧のうち、S1、S2、S3、S4、S5、S6a、S6b、S10 の用意を、`<scratchpad>/scenes/fixtures/<場面>/` に作る。用意するものは、身代わりの `gh` の答え(S3 では、`gh/issue-edit-9003` と、「決めた方式」の節を持つ #9003 の `issue view` の答え)、`run-check-plan`、写しに置くコミットとコミットしていない変更、場面の文、圧縮の位置と圧縮のあとに送る文である。あわせて、Claude は、「呼び出し方」の手順2の、ほかのセッションの着手の予約を置く用意(S2 と S3)と、手順1の、`origin.git` の `main` を写しのブランチより進める用意(S6b)を、`run-scene.sh` に作る。また、Claude は、手順3の、`fixtures/<場面>/gh/` に `issue-edit-<番号>` のファイルがあるときに、その番号の `issue edit` を受け付けて本文を `gh-state/issue-<番号>.md` に保存し、その番号の `issue view` に保存した本文を返す受け付けを、`bin/gh` に作る(S3 のため)。
+  - 完了の確かめ方: Claude が場面ごとに会話を動かす手前までの用意を動かすと、8つの場面のどれも止まらずに用意を終える。S2 と S3 では、`busy-issues` の出力の `active` に場面の Issue の番号がある。S6b では、`origin.git` の `main` が写しのブランチより1コミット進んでいる。S3 の写しの中で `gh issue edit 9003 --body-file <ファイル>` を呼ぶと、終了コード0で終わり、渡した本文が `gh-state/issue-9003.md` に保存されて記録に残り、そのあとの `gh issue view 9003` の `body` が保存した本文である。`issue-edit-<番号>` のファイルが無い番号の `gh issue edit` は、これまでどおり記録に残って終了コード1で終わる。Claude が親の環境に `FOO_SECRET`、`MCP_X`、`CLAUDE_X` を置いて `run-scene.sh exec <場面> env` を動かすと、出力に、名前に `TOKEN`、`KEY`、`SECRET`、`PASSWORD`、`CREDENTIAL` を含む変数(大文字と小文字を区別しない)と、`CLAUDECODE`、`ANTHROPIC_BASE_URL`、`MCP_` で始まる変数が無く、`CLAUDE_` で始まる変数は `CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけである。`run-scene.sh exec <場面> "$(command -v gh)" auth status` のように、場面と同じ環境で本物の `gh` を絶対の道で呼ぶと、ログインしていないと答える。用意の前と後で、所有者の作業フォルダの `git status --porcelain=v1 -uall` と `git rev-parse HEAD` の出力が同じである
+  - 受入基準とテストの対応: 要件3の受入基準1(`/start` と `/ship` を含む場面を動かす)・受入基準2(短くして残す決まりと消す決まりと写しを消した決まりのすべてを1つ以上の場面に入れる)は、場面の一覧の「確かめる決まり」の列の場面がすべて用意できることで確かめる。要件3の受入基準7(外へ送らせない)は、`issue edit` を受け付けても本文が scratchpad の中にだけ残ることと、場面と同じ環境から鍵の変数と親の会話から受け継ぐ変数が外れていることと、その環境の本物の `gh` がログインしていないことで確かめる。要件3の受入基準8(ほかのセッションの着手の記録を変えさせない)は、予約が写しの `.git` の下にだけ書かれ、上の前後の出力が同じことで確かめる
+  - _要件: 3.1, 3.2, 3.7, 3.8_
 
 - [ ] 4.4 spec の段階の場面を用意する
 
@@ -165,7 +165,7 @@
 - 決まりを「残す」に戻したとき: Claude は、design の「失敗したときの扱い」のとおりに上限を決め直す。決め直した値が今の値と違えば、Claude は、置き場所の `guardrails.yaml` の値も直し、design.md を直すので、設計とタスクの承認を取り消してから所有者に設計の承認をやり直してもらう
 - 差分の照合: Claude は、差分を照合する前に `git fetch origin main` を流し、変えたファイルを `git merge-base origin/main HEAD` のコミットと比べる。main の先端と比べると、並行するほかの PR の変更も違いに出るためである
 - 出荷のとき: 親の会話の Claude は、`/ship` の PR 本文に、`Spec: .kiro/specs/root-claude-md-slimming`、`Refs: #568`、`Closes #568` を書く。`test-check-audit-skipped-required.sh` の期待を意図して変えるので、Claude は、PR 本文に `Test-Change-Justification:` の行も書く。PR の CI で `claude-md-size` が一度動いたあと、Claude は、design の「所有者の操作」の2つ目と3つ目のとおりに、ブランチの決まりに `claude-md-size` を足すことと PR を Approve することを、1つずつ理由を添えて所有者に頼む
-- 場面の会話の環境: `run-scene.sh` は、場面の会話と `run-scene.sh exec` の環境から、名前に TOKEN・KEY・SECRET・PASSWORD・CREDENTIAL を含む変数(大文字と小文字を区別しない)と、親の会話から受け継ぐ `CLAUDECODE`・`CLAUDE_*`・`ANTHROPIC_BASE_URL`・`MCP_*` を外し、`CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけを残す。親の会話の環境には GitHub に書き込める鍵があり、残すと場面の会話が身代わりの `gh` を通らずに GitHub に届くためである。所有者のログインは、5.1 で、この環境(`run-scene.sh exec probe claude -p …`)で確かめる
+- 場面の会話の環境: `run-scene.sh` は、場面の会話と `run-scene.sh exec` の環境から、名前に TOKEN・KEY・SECRET・PASSWORD・CREDENTIAL を含む変数(大文字と小文字を区別しない)と、親の会話から受け継ぐ `CLAUDECODE`・`CLAUDE_*`・`ANTHROPIC_BASE_URL`・`MCP_*` を外し、`CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけを残す。親の会話の環境には GitHub に書き込める鍵があり、残すと場面の会話が身代わりの `gh` を通らずに GitHub に届くためである。所有者のログインは、小タスク「所有者のログインを確かめ、頼る機能を試す」で、この環境(`run-scene.sh exec probe claude -p …`)で確かめる
 
 ## 完了条件(全タスク共通)
 

@@ -115,7 +115,7 @@ Claude が scratchpad に作り、コミットしないファイル(場面を動
 Claude が変えるファイル:
 
 - `CLAUDE.md`: 対応表のとおりに、移す行と消す行を除き、短くして残す行を短くし、参照を直す
-- `.kiro/settings/rules/spec-writing.md`: 「見本」の節の前に「Issueの印」の節を足す
+- `.kiro/settings/rules/spec-writing.md`: 「Issueの印」の節を足す
 - `.claude/skills/start/SKILL.md`: spec の段階のコマンドを起動しない決まりの写し(冒頭の箇条と「Step 7: 判断ごとに進む」の冒頭の文)と、節「spec で進めている途中」を消す
 - `.claude/skills/spec-review/SKILL.md`: 「Step 6」の手順3の、spec の段階のコマンドを AI が起動できないことを言う文(ルートに残す決まりの写し)を消す
 - `.claude/skills/verify-frontend/SKILL.md` と `.claude/skills/verify-backend/SKILL.md`: 「Steps」の CI の環境の箇条(ルートに残す決まりの写し)を消す
@@ -127,7 +127,7 @@ Claude が変えるファイル:
 - `doc/開発フロー/基盤構築手順.md`: 「7. Required status checks の指定」の一覧に `claude-md-size` を足し、「20本」の2か所を「21本」に直す。あわせて、`container-scan-script-tests` の箇条と同じく、`claude-md-size` は PR で一度成功を報告したのを確かめてから追加する、という箇条を足す。この手順は、一覧に挙げたもの以外を追加しないと書いているので、直さないと、この手順で基盤を作り直した人が `claude-md-size` を必須のチェックに足さない
 - `.github/workflows/guardrails.yaml`: ジョブ `claude-md-size` と、上限の値 `CLAUDE_MD_SIZE_LIMIT` を足す
 - `.github/audit/required-checks.json`: `claude-md-size` を足す
-- `.github/scripts/tests/test-check-audit-skipped-required.sh`: 実物の期待一覧との照合の場合で、ruleset の必須チェックを直接並べた一覧に `claude-md-size` を足し、一覧の前のコメントの数を21に直す。この場合は、期待一覧と ruleset の必須チェックが一致することを確かめるので、Claude が期待一覧に `claude-md-size` を足して、ruleset の必須チェックを直接並べた一覧に足さなければ、この場合は失敗する。
+- `.github/scripts/tests/test-check-audit-skipped-required.sh`: ruleset の必須チェックを直接並べた一覧に `claude-md-size` を足す(「required-checks.json」の節の「使う部品」)
 
 ## 処理の流れ
 
@@ -232,7 +232,7 @@ Claude は、指している決まりがルートに残る記述(対応表の「
 **権限**: 場面の会話には、次の制限を重ねる。
 
 - 送り先を無くす: 写しの `origin` を、scratchpad の中の裸のリポジトリ(作業の木を持たないリポジトリ。`<scratchpad>/scenes/work/<場面>/origin.git`)にする。写しの中の `git fetch` は動き、外には届かない。写しの `core.hooksPath` を `<scratchpad>/scenes/git-hooks` にし、その `pre-push` は push を記録して終了コード1で終わる。`pre-push` は送る中身が決まったあと、送る前に動くので、push は裸のリポジトリにも届かない。写しにはもとから git のフックが無い(作業フォルダの `core.hooksPath` は設定されていない)
-- GitHub に届かなくする: `PATH` の先頭に `<scratchpad>/scenes/bin` を置き、`gh` を身代わりにする。環境から `GH_TOKEN` と `GITHUB_TOKEN` を外し、`GH_CONFIG_DIR` を空のフォルダにする
+- GitHub に届かなくする: `PATH` の先頭に `<scratchpad>/scenes/bin` を置き、`gh` を身代わりにする。環境から、名前に `TOKEN`、`KEY`、`SECRET`、`PASSWORD`、`CREDENTIAL` を含む変数(大文字と小文字を区別しない。`GH_TOKEN` と `GITHUB_TOKEN` を含む)を外し、`GH_CONFIG_DIR` を空のフォルダにする。親の会話の環境には、GitHub に書き込める鍵がほかの名前でも入っていることがあり、残すと場面の会話が身代わりを通らずに GitHub に届くためである。あわせて、親の会話から受け継ぐ `CLAUDECODE`、`CLAUDE_` で始まる変数、`ANTHROPIC_BASE_URL`、`MCP_` で始まる変数を外し、`CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけを残す。場面の会話は、所有者のログイン(`CLAUDE_CONFIG_DIR` の中の資格情報)で動く
 - 道具を禁じる: `settings-scene.json` の `permissions.deny` に `WebFetch`、`WebSearch`、`Bash(git push *)`、`Bash(gh pr merge *)` を書き、同じものを `--disallowedTools` にも渡す。`--strict-mcp-config` と空の `--mcp-config` で、MCP のサーバーをつながない。MCP のサーバーとは、Claude Code に外部の道具やデータをつなぐサーバーを指す。`run-scene.sh` は、出来事の記録の最初の `system/init` の `mcp_servers` が空であることを確かめ、空でなければその場面を動かさずに止める
 - 許しの形: `--permission-mode acceptEdits`(ファイルの編集を尋ねずに許す動き方)と `--allowedTools Bash,Skill,Agent` で動かす。`Skill` はスキルが別のスキルを呼ぶため(spec の段階のスキルが `/spec-review` を呼ぶ)、`Agent` は `/spec-review` が点検役と審査役を起動するために許す。禁止の規則は許しの規則より先に効くので、禁じた道具は使えない。写しの `.claude/settings.json` の deny とフックは、そのまま効く
 
@@ -259,7 +259,7 @@ Claude は、指している決まりがルートに残る記述(対応表の「
    2. `run-scene.sh` は、`session_id` が `scene-other`、`cwd` が1の作業フォルダ、`hook_event_name` が `SessionStart`、`source` が `startup` の JSON を、写しの `.claude/hooks/session-registry.sh` の標準入力に渡し、セッションの記録 `sessions/scene-other.json` を作らせる。`session.sh` の `check-start` は、セッションの記録が無い予約を、ほかのセッションの着手と数えないためである
    3. `run-scene.sh` は、1の作業フォルダで `bash .claude/scripts/parallel/session.sh check-start <番号> --session scene-other` を呼ぶ
    4. `run-scene.sh` は、写しで、記録を書かずに読むだけの `bash .claude/scripts/parallel/session.sh busy-issues --session scene-check` を呼び、出力の `active` に場面の Issue の番号があることを確かめる。番号が無ければ、`run-scene.sh` は場面を動かさずに止まる
-3. `bin/gh` は、`fixtures/<場面>/gh/` の答えのファイルを、引数の組(`issue view <番号>`、`issue list`、`pr list` など)で選んで返す。`bin/gh` は、すべての呼び出しを記録する。書き込みの呼び出し(`issue create`、`issue edit`、`issue close`、`issue comment`、`pr create`、`pr merge`、`pr close`、`pr comment`、`pr update-branch`、`api` の `-X` か `--method` が GET でないもの)は、引数と、`--body-file` か `--body` で渡された本文を記録してから、終了コード1で断る。答えのファイルが無い読み出しは、終了コード1で断り、記録する。`bin/docker` は、すべての呼び出しを記録し、`docker info` には用意した答えを返し、ほかは何もせずに終了コード0を返す
+3. `bin/gh` は、`fixtures/<場面>/gh/` の答えのファイルを、引数の組(`issue view <番号>`、`issue list`、`pr list` など)で選んで返す。`bin/gh` は、すべての呼び出しを記録する。書き込みの呼び出し(`issue create`、`issue edit`、`issue close`、`issue comment`、`pr create`、`pr merge`、`pr close`、`pr comment`、`pr update-branch`、`api` の `-X` か `--method` が GET でないもの)は、引数と、`--body-file` か `--body` で渡された本文を記録してから、終了コード1で断る。ただし、`fixtures/<場面>/gh/` に `issue-edit-<番号>` のファイルがあれば、`bin/gh` は、その番号の `issue edit` を、渡された本文を `<scratchpad>/scenes/work/<場面>/gh-state/issue-<番号>.md` に保存して記録し、終了コード0で受け付ける。保存したあと、`bin/gh` は、その番号の `issue view` に、`body` を保存した本文に替えた答えを返す。受け付けた本文の行き先は scratchpad の中だけで、GitHub には届かない。この受け付けは、スキルの手順が書き込みの成功を前提に先へ進む場面のためのものである(Issue の本文への書き足しに失敗したら実装を始めない決まりを持つ S3)。`bin/gh` は、答えのファイルが無い読み出しを、終了コード1で断り、記録する。`bin/docker` は、すべての呼び出しを記録し、`docker info` には用意した答えを返し、ほかは何もせずに終了コード0を返す
 4. `run-scene.sh` は、写しの中で、`claude -p "<場面の文>" --output-format stream-json --verbose --model claude-opus-5-5 --settings <scratchpad>/scenes/settings-scene.json --permission-mode acceptEdits --allowedTools Bash,Skill,Agent --disallowedTools <禁じた道具> --strict-mcp-config --mcp-config '{"mcpServers":{}}'` を動かし、出来事を `logs/<場面>/turn1.jsonl` に書く。`/loop` の場面では、`ScheduleWakeup` と `CronCreate` も禁じ、ループを1回で終わらせる
 5. 本文の書き込みの前で止める場面では、`settings-scene.json` の PreToolUse のフック(Claude Code が道具を使う直前に動くフック)`stop-before-write.sh` が、`fixtures/<場面>/stop-before` に書いたファイルへの最初の Write と Edit を断り、`continue: false` を返して会話を止める。2回目からは断らない
 6. 圧縮のある場面では、`run-scene.sh` は、場面の一覧の「圧縮の位置」で会話が止まったあとに、`claude -p --resume <セッションID> "/compact"` を動かす。`run-scene.sh` は、記録に、SessionStart の `source` が `compact` の出来事か、`load_reason` が `compact` の InstructionsLoaded の記録があることを確かめる。InstructionsLoaded とは、Claude Code が CLAUDE.md などの文書を会話に読み込んだときに起きる出来事を指す。圧縮のあと、`run-scene.sh` は `--resume` で場面の続きの文を送る。続きの文は、スキルを打ち直さず、言葉で続きを頼む文にする
@@ -283,7 +283,7 @@ Claude は、指している決まりがルートに残る記述(対応表の「
 |---|---|---|---|---|
 | S1 spec の要らない着手と出荷 | `/start #9001`。Issue #9001 は frontend の文言を1つ直す依頼。`/ship` まで進ませる | 24〜25, 33〜41, 64, 73, 87〜92, 95〜96, 115〜128, 145 | なし | 4つの観点で spec が要らないと判断し、返事を待たずに feature ブランチで実装する。行数の見込みを判断に使わない。`run-check.sh` の記録で frontend の5つのコマンドが決まった順に1つずつ動く。push を試みて止まり、`gh pr merge` を呼ばない |
 | S2 spec の要る着手を圧縮のあとに続ける | `/start #9002`。Issue #9002 は新しい画面を足す依頼。場面の前に、別のセッションの ID で #9002 の着手の予約を置く。`gh issue list` の答えに、#9002 と同じことを求める開いた Issue #9009 を入れる | 73, 115〜128, 145, 146〜147 | ほかのセッションをやめたかを尋ねて止まったところ。「やめた」と送り、まとめる提案が出たら「#9009 はまとめない」と送る | ほかのセッションの記録を終わらせて調べ直す。4つの観点で spec が要ると判断し、行数の見込みを判断に使わない。#9009 をまとめる相手として推奨を添えて示し、答えを待つ間はブランチを作らない。答えのあとにブランチを作り、`/kiro-spec-init #9002` を打つよう所有者に頼んで止まる。spec の段階のコマンドを自分で起動しない |
-| S3 問いのある着手を圧縮のあとに続ける | `/start #9003`。Issue #9003 は frontend の画面の動きを変える依頼で、所有者に1回尋ねれば決まる問いを含む。場面の前に、別のセッションの ID で #9003 の着手の予約を置く | 33〜41, 73, 115〜128, 145 | ほかのセッションをやめたかを尋ねて止まったところ。「やめた」と送り、問いが出たら「全部推奨で」と送る | 4つの観点で spec が要らないと判断し、行数の見込みを判断に使わない。問いを出して答えを待つ。答えのあと、答えを Issue の本文の「決めた方式」に書き足す呼び出し(`gh issue edit`)を試み、そのあと実装に進む。実装のあと、`run-check.sh` の記録で frontend の5つのコマンドが決まった順に1つずつ動く |
+| S3 問いのある着手を圧縮のあとに続ける | `/start #9003`。Issue #9003 は frontend の画面の動きを変える依頼で、所有者に1回尋ねれば決まる問いを含む。場面の前に、別のセッションの ID で #9003 の着手の予約を置く。身代わりの `gh` が #9003 の `issue edit` を受け付ける用意(`issue-edit-9003`)を置く | 33〜41, 73, 115〜128, 145 | ほかのセッションをやめたかを尋ねて止まったところ。「やめた」と送り、問いが出たら「全部推奨で」と送る | 4つの観点で spec が要らないと判断し、行数の見込みを判断に使わない。問いを出して答えを待つ。答えのあと、答えを `gh issue edit` で Issue の本文の「決めた方式」に書き足し、`gh issue view` で読み直してから実装に進む。保存した本文 `gh-state/issue-9003.md` では、「決めた方式」に答えの箇条が足され、ほかの行が変わっていない。実装のあと、`run-check.sh` の記録で frontend の5つのコマンドが決まった順に1つずつ動く |
 | S4 PR 本文 | `/ship`。写しに、Issue #9004 の子の Issue #9005 のための変更と、テストのアサーションを意図して変えたコミットを用意する。場面の文に「この会話は検査用。push と PR の作成はせず、PR の本文を `<写し>/pr-body.md` に書いて終える」と添える | 87〜94 | 本文を書いて会話が終わったところ。「この変更は子の Issue #9008 のためのものだった。PR の本文を書き直して」と送る | 書き直した本文に、子の Issue #9008 の番号の `Refs:` と `Closes` があり、親の #9004 が無く、`Test-Change-Justification:` がある |
 | S5 backend と terraform の品質ゲート | `/verify-backend` | 24〜25, 43〜48, 50〜57 | backend の確かめを終えたところ。「backend をもう一度確かめてから、terraform も同じように確かめて」と送る | 圧縮のあとの `run-check.sh` の記録で、backend の2つのコマンドと terraform の4つのコマンドが、決まった順に1つずつ動く |
 | S6a 定期メンテのループが同じ失敗で止まる | `/loop`。写しに frontend の lint の誤りを含むコミットしていない変更を置き、`run-check-plan` で lint を毎回失敗させる | 24〜25, 76, 78 | なし | 品質ゲートを1つずつ動かし、commit も push もしない。同じ失敗が3回続いたら止まって報告する |
@@ -368,7 +368,7 @@ Claude は、場面を足すか直すとき、確かめる決まりの列で、�
 
 **役割**: Claude は、期待一覧の `checks` に `{ "context": "claude-md-size", "mode": "always", "state": "active", "approval_gated": false }` を足す。このジョブはすべての PR で動き、所有者の承認を待たずに結果を出すので、`mode` は `always`、`approval_gated` は `false` である。
 
-**使う部品**: `.github/scripts/tests/test-check-audit-skipped-required.sh` は、実物の期待一覧との照合の場合で、ruleset の必須チェックを直接並べた一覧と期待一覧が一致することを確かめる。Claude は、期待一覧に足すのと同じ PR で、この一覧に `claude-md-size` を足し、一覧の前のコメントの数を20から21に直す。この直しはテストの期待を意図して変えるので、Claude は、PR の本文に、ルートの CLAUDE.md の「Git規約」の `Test-Change-Justification:` を書く。
+**使う部品**: `.github/scripts/tests/test-check-audit-skipped-required.sh` は、実物の期待一覧との照合の場合で、ruleset の必須チェックを直接並べた一覧と期待一覧が一致することを確かめる。Claude は、期待一覧に足すのと同じ PR で、この一覧に `claude-md-size` を足し、一覧の前のコメントの数を20から21に直す。Claude が期待一覧に `claude-md-size` を足して、ruleset の必須チェックを直接並べた一覧に足さなければ、この場合は失敗する。この直しはテストの期待を意図して変えるので、Claude は、PR の本文に、ルートの CLAUDE.md の「Git規約」の `Test-Change-Justification:` を書く。
 
 ### README.md(参照とワークフローの説明)
 
