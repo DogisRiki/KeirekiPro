@@ -11,7 +11,7 @@ tasks は実装の順序と粒度を決める。requirements と design の両�
 
 **Step 3.5 と重なる観点も出してよい。** Step 3.5 は書いたのと同じモデルで走り、書く前に1回だけで、結果が残らない。ただし、Step 3.5 が既に潰しているだけの指摘を機械的に並べない。実際の本文を見て判断する。
 
-見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む。
+見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む。Issueの印の決まりは、`.kiro/settings/rules/spec-writing.md` の「Issueの印」の節で読み、印の付け方の誤りも指摘する。
 
 ## 観点
 

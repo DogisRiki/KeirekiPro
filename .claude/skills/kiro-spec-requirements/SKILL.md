@@ -31,7 +31,7 @@ Otherwise, load all necessary context:
 - Relevant local agent skills or playbooks only when they clearly match the feature's host environment or use case and contain domain terminology or workflow rules that shape user-observable requirements
 
 ### Step 2: Read Guidelines
-- Read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方 and 文書の組み立て, the sample 見本1, and the 見出しと目印の一覧 are the writing standard for this spec
+- Read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, and Issueの印, the sample 見本1, and the 見出しと目印の一覧 are the writing standard for this spec
 - Read `rules/requirements-review-gate.md` from this skill's directory for pre-write review criteria
 - Read `.kiro/settings/templates/specs/requirements.md` for document structure
 
@@ -57,7 +57,7 @@ After all research completes, synthesize findings in main context before generat
 - If scope could be misread, add lightweight boundary context without introducing implementation or architecture ownership detail
 - Keep this as a draft until the review gate passes; do not write `requirements.md` yet
 - If spec.json has `additional_issues`, keep every existing requirement and its numbered items with their numbers unchanged, and add new requirements numbered after the last existing one
-- Mark new, changed, and withdrawn items following the 「Issueの印」 rules in CLAUDE.md
+- Mark new, changed, and withdrawn items following the 「Issueの印」 section of `.kiro/settings/rules/spec-writing.md`
 - If spec.json has `additional_issues`, run the command below (replace `<feature>` with the feature name) to get only the total number of merged PRs returned (`total`) and the PRs whose body has a mismatched-spec line, with their numbers and those lines (`hits`). Do not use `--search`, so the result does not depend on how GitHub splits search terms. `--jq` is built into gh and does not depend on jq on the host
 
   ```bash
@@ -113,7 +113,7 @@ Provide output in the language specified in spec.json with:
 1. **Generated Requirements Summary**: Brief overview of major requirement areas (3-5 bullets)
 2. **Document Status**: Confirm requirements.md updated and spec.json metadata updated
 3. **Review Gate**: Confirm the requirements review gate passed
-4. **Next Steps**: State that `/spec-review {feature} requirements` runs next, right after generation and before approval (CLAUDE.md requires running it immediately and not asking for approval until the review is complete). Then guide user on how to proceed after the review (approve and continue, or modify)
+4. **Next Steps**: State that `/spec-review {feature} requirements` runs next, right after generation and before approval (this skill's **Right After Generation (before approval)** item under Next Phase requires running it immediately and not asking for approval until the review is complete). Then guide user on how to proceed after the review (approve and continue, or modify)
 
 **Format Requirements**:
 - Use Markdown headings for clarity

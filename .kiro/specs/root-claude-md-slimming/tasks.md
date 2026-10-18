@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 対応表のとおりに文書を直す
+- [x] 1. 対応表のとおりに文書を直す
 - [x] 1.1 ルートの CLAUDE.md を軽くした本文に置き換える (並行可)
 
   Claude は、部品「ルートの CLAUDE.md(軽くした本文)」のとおりに、作業フォルダのルートの CLAUDE.md を、scratchpad の下書き `draft/CLAUDE.md` と同じ中身に置き換える。置き換える前に、Claude は、部品「mapping.md」の「呼び出し方」のとおりに生成のスクリプトを動かし直し、スクリプトが止まらないことと、生成した対応表が `.kiro/specs/root-claude-md-slimming/mapping.md` と同じことを確かめる。生成のスクリプトの呼び方は、実装のメモにある。
@@ -25,7 +25,7 @@
   - _要件: 1.7, 1.8_
   - _対象の部品: 写しを消す文書_
 
-- [ ] 1.4 移した決まりと消した決まりを指す記述を直す
+- [x] 1.4 移した決まりと消した決まりを指す記述を直す
 
   このタスクの直しは、spec-writing.md に「Issueの印」の節を足すタスクが作る節の見出し `## Issueの印` を指す。Claude は、部品「参照を直す文書」のとおりに、対応表の「参照の直し」に挙げた記述のうち、`.kiro/steering/tech.md` と `README.md` の記述を除いたものを直す。直す文書は、`.claude/skills/kiro-impl/SKILL.md`、`.claude/skills/kiro-spec-requirements/SKILL.md`、`.claude/skills/kiro-spec-design/SKILL.md`、`.claude/skills/kiro-spec-tasks/SKILL.md`、`.claude/skills/spec-review/rules/requirements.md`、`.claude/skills/spec-review/rules/design.md`、`.claude/skills/spec-review/rules/tasks.md` である。Claude は、対応表の「直さない記述」を直さない。
   - 完了の確かめ方: 7つの文書の `git diff` が、対応表の「参照の直し」に挙げた記述だけを変えている。3つの spec の段階のスキルの書き方の基準にする節の一覧と、`spec-review/rules/` の3つのファイルに、「Issueの印」の名前がある。対応表の「直さない記述」に挙げた記述に違いが無い
