@@ -59,7 +59,7 @@
   - _要件: 1.7, 5.1, 5.4_
   - _依存: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2_
 
-- [ ] 4. 場面を動かす仕組みを作る
+- [x] 4. 場面を動かす仕組みを作る
 - [x] 4.1 使い捨ての写しと身代わりを作る
 
   Claude は、部品「場面を動かす仕組み」の「権限」の送り先を無くす制限と GitHub に届かなくする制限、「呼び出し方」の手順1(写しと `origin.git` を作る)・手順3(身代わりの `gh` と `docker` が答えを返し、呼び出しを記録する)・手順7(写しを残して記録を集める)、「状態の持ち方」の所有者の作業フォルダとほかのセッションの記録の確かめのとおりに、`<scratchpad>/scenes/run-scene.sh` の写しを作る部分と記録を集める部分を作る。あわせて、Claude は、`bin/gh`、`bin/docker`、`git-hooks/pre-push`、`run-check.sh` の身代わりを作る。Claude は、ほかのセッションの記録の確かめが読む記録の場所を、環境の変数で差し替えられるように作る。
@@ -91,7 +91,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(spec の各段階の流れを含める)・受入基準2(移す決まりのすべてを1つ以上の場面に入れる)は、場面の一覧の S7、S8、S9、S11、S12 の「確かめる決まり」の列の場面がすべて用意できることで確かめる
   - _要件: 3.1, 3.2_
 
-- [ ] 4.5 場面の会話を保存した記録を集め、スキルの読み込みをその記録で確かめる
+- [x] 4.5 場面の会話を保存した記録を集め、スキルの読み込みをその記録で確かめる
 
   Claude は、部品「場面を動かす仕組み」の「呼び出し方」の手順7と「状態の持ち方」のとおりに、小タスク「使い捨ての写しと身代わりを作る」が作った `run-scene.sh` の記録を集める部分に、出来事の記録(`turn*.jsonl` と、圧縮と続きの文の記録)の `system/init` に出たセッションの ID ごとに、`CLAUDE_CONFIG_DIR`(無ければ `~/.claude`)の `projects/` の下のフォルダにある `<セッションの ID>.jsonl` を `logs/<場面>/sessions/` に写す処理を足す。あわせて、Claude は、小タスク「場面の会話を動かして記録する部分を作る」が作った `run-scene.sh probe` の「頼る機能と試し方」の表の1つ目の試しを、`/verify-frontend` の会話を保存した記録を `logs/probe/sessions/` に写し、その記録を `perl lib/stream.pl skill-bases` に渡して、出た道に写しの中の道があるかで決める形に直す。親の会話の Claude が場面の合否を決めるときも、同じく `logs/<場面>/sessions/` の記録を `skill-bases` に渡して、スキルの読み込みの道を拾う。
   - 完了の確かめ方: Claude が、手で作ったセッションの ID を `system/init` に持つ出来事の記録と、scratchpad の中の試し用の `CLAUDE_CONFIG_DIR` の `projects/<フォルダ>/<その ID>.jsonl` を用意して記録を集める部分を動かすと、そのファイルが `logs/<場面>/sessions/<その ID>.jsonl` に写る。身代わりの `claude` と試し用の `CLAUDE_CONFIG_DIR` で `run-scene.sh probe` を動かすと、会話を保存した記録に写しの中の道を持つ「Base directory for this skill:」の行があるときは、`probe.txt` の1つ目の機能が「動いた」になり、写しの外の道しか無いときと、その行が無いときと、会話を保存した記録が無いときは「動かなかった」になる。小タスク「使い捨ての写しと身代わりを作る」と「場面の会話を動かして記録する部分を作る」の確かめを含む `<scratchpad>/scenes/tests/` のテスト3本が失敗0件で終わる。`scenes/` の全 `.sh` と `bin/gh`、`bin/docker`、`git-hooks/pre-push` をまとめて渡した shellcheck の指摘が0件である
@@ -179,6 +179,8 @@
 - 出荷のとき: 親の会話の Claude は、`/ship` の PR 本文に、`Spec: .kiro/specs/root-claude-md-slimming`、`Refs: #568`、`Closes #568` を書く。`test-check-audit-skipped-required.sh` の期待を意図して変えるので、Claude は、PR 本文に `Test-Change-Justification:` の行も書く。PR の CI で `claude-md-size` が一度動いたあと、Claude は、design の「所有者の操作」の2つ目と3つ目のとおりに、ブランチの決まりに `claude-md-size` を足すことと PR を Approve することを、1つずつ理由を添えて所有者に頼む
 - 場面の会話の環境: `run-scene.sh` は、場面の会話と `run-scene.sh exec` の環境から、名前に TOKEN・KEY・SECRET・PASSWORD・CREDENTIAL を含む変数(大文字と小文字を区別しない)と、親の会話から受け継ぐ `CLAUDECODE`・`CLAUDE_*`・`ANTHROPIC_BASE_URL`・`MCP_*` を外し、`CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけを残す。親の会話の環境には GitHub に書き込める鍵があり、残すと場面の会話が身代わりの `gh` を通らずに GitHub に届くためである。所有者のログインは、小タスク「所有者のログインを確かめ、頼る機能を試す」で、この環境(`run-scene.sh exec probe claude -p …`)で確かめる
 - 場面ごとの答え: 身代わりの `gh` の答えは場面のフォルダに1組しか置けないので、同じ用意で別の文を送る場面(S10 の11の問いなど)は、文ごとに `fixtures/S10-01/` のように別の場面のフォルダを作る。S12 も同じ形にする
+- 場面のテストと probe: `<scratchpad>/scenes/tests/` のテストは、`logs/probe` と `work/probe` を身代わりの結果で作り直す。親の会話の Claude は、テストを流したあとに本物の `run-scene.sh probe` を動かし直してから、`probe.txt` を読む
+- 会話を保存した記録の無い場面: `run-scene.sh` の記録を集める部分は、会話を保存した記録が見つからないセッションを出力に書くだけで、場面を不合格にしない。親の会話の Claude は、場面の合否を決めるときに `logs/<場面>/sessions/` にその場面の記録が無ければ、スキルの読み込みを確かめられないので、その場面を不合格にする
 
 ## 完了条件(全タスク共通)
 
