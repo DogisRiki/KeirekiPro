@@ -73,7 +73,7 @@
   - 受入基準とテストの対応: 要件3の受入基準3(場面の会話が変更後の文書を読み込んだことを記録から確かめる)は、上の `record-load.sh` の確かめで確かめる。要件3の受入基準7(外へ送らせない)は、上の禁止の規則と環境と `mcp_servers` の確かめで確かめる。要件3の受入基準9(所有者は場面を動かす作業をしない)と要件4の受入基準3(圧縮のあとの場面にも同じことを当てはめる)は、`run-scene.sh` が場面の会話を始め、圧縮し、記録を集めることを、大タスク「場面を動かして確かめる」で確かめる
   - _要件: 3.3, 3.7, 3.9, 4.3_
 
-- [ ] 4.3 着手・出荷・品質ゲート・ループ・境界の場面を用意する
+- [x] 4.3 着手・出荷・品質ゲート・ループ・境界の場面を用意する
 
   Claude は、部品「場面を動かす仕組み」の場面の一覧のうち、S1、S2、S3、S4、S5、S6a、S6b、S10 の用意を、`<scratchpad>/scenes/fixtures/<場面>/` に作る。用意するものは、身代わりの `gh` の答え(S3 では、`gh/issue-edit-9003` と、「決めた方式」の節を持つ #9003 の `issue view` の答え)、`run-check-plan`、写しに置くコミットとコミットしていない変更、場面の文、圧縮の位置と圧縮のあとに送る文である。あわせて、Claude は、「呼び出し方」の手順2の、ほかのセッションの着手の予約を置く用意(S2 と S3)と、手順1の、`origin.git` の `main` を写しのブランチより進める用意(S6b)を、`run-scene.sh` に作る。また、Claude は、手順3の、`fixtures/<場面>/gh/` に `issue-edit-<番号>` のファイルがあるときに、その番号の `issue edit` を受け付けて本文を `gh-state/issue-<番号>.md` に保存し、その番号の `issue view` に保存した本文を返す受け付けを、`bin/gh` に作る(S3 のため)。
   - 完了の確かめ方: Claude が場面ごとに会話を動かす手前までの用意を動かすと、8つの場面のどれも止まらずに用意を終える。S2 と S3 では、`busy-issues` の出力の `active` に場面の Issue の番号がある。S6b では、`origin.git` の `main` が写しのブランチより1コミット進んでいる。S3 の写しの中で `gh issue edit 9003 --body-file <ファイル>` を呼ぶと、終了コード0で終わり、渡した本文が `gh-state/issue-9003.md` に保存されて記録に残り、そのあとの `gh issue view 9003` の `body` が保存した本文である。`issue-edit-<番号>` のファイルが無い番号の `gh issue edit` は、これまでどおり記録に残って終了コード1で終わる。Claude が親の環境に `FOO_SECRET`、`MCP_X`、`CLAUDE_X` を置いて `run-scene.sh exec <場面> env` を動かすと、出力に、名前に `TOKEN`、`KEY`、`SECRET`、`PASSWORD`、`CREDENTIAL` を含む変数(大文字と小文字を区別しない)と、`CLAUDECODE`、`ANTHROPIC_BASE_URL`、`MCP_` で始まる変数が無く、`CLAUDE_` で始まる変数は `CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけである。`run-scene.sh exec <場面> "$(command -v gh)" auth status` のように、場面と同じ環境で本物の `gh` を絶対の道で呼ぶと、ログインしていないと答える。用意の前と後で、所有者の作業フォルダの `git status --porcelain=v1 -uall` と `git rev-parse HEAD` の出力が同じである
@@ -166,6 +166,7 @@
 - 差分の照合: Claude は、差分を照合する前に `git fetch origin main` を流し、変えたファイルを `git merge-base origin/main HEAD` のコミットと比べる。main の先端と比べると、並行するほかの PR の変更も違いに出るためである
 - 出荷のとき: 親の会話の Claude は、`/ship` の PR 本文に、`Spec: .kiro/specs/root-claude-md-slimming`、`Refs: #568`、`Closes #568` を書く。`test-check-audit-skipped-required.sh` の期待を意図して変えるので、Claude は、PR 本文に `Test-Change-Justification:` の行も書く。PR の CI で `claude-md-size` が一度動いたあと、Claude は、design の「所有者の操作」の2つ目と3つ目のとおりに、ブランチの決まりに `claude-md-size` を足すことと PR を Approve することを、1つずつ理由を添えて所有者に頼む
 - 場面の会話の環境: `run-scene.sh` は、場面の会話と `run-scene.sh exec` の環境から、名前に TOKEN・KEY・SECRET・PASSWORD・CREDENTIAL を含む変数(大文字と小文字を区別しない)と、親の会話から受け継ぐ `CLAUDECODE`・`CLAUDE_*`・`ANTHROPIC_BASE_URL`・`MCP_*` を外し、`CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけを残す。親の会話の環境には GitHub に書き込める鍵があり、残すと場面の会話が身代わりの `gh` を通らずに GitHub に届くためである。所有者のログインは、小タスク「所有者のログインを確かめ、頼る機能を試す」で、この環境(`run-scene.sh exec probe claude -p …`)で確かめる
+- 場面ごとの答え: 身代わりの `gh` の答えは場面のフォルダに1組しか置けないので、同じ用意で別の文を送る場面(S10 の11の問いなど)は、文ごとに `fixtures/S10-01/` のように別の場面のフォルダを作る。S12 も同じ形にする
 
 ## 完了条件(全タスク共通)
 
