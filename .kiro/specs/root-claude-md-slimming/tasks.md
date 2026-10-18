@@ -1,7 +1,7 @@
 # タスク
 
 - [ ] 1. 対応表のとおりに文書を直す
-- [ ] 1.1 ルートの CLAUDE.md を軽くした本文に置き換える (並行可)
+- [x] 1.1 ルートの CLAUDE.md を軽くした本文に置き換える (並行可)
 
   Claude は、部品「ルートの CLAUDE.md(軽くした本文)」のとおりに、作業フォルダのルートの CLAUDE.md を、scratchpad の下書き `draft/CLAUDE.md` と同じ中身に置き換える。置き換える前に、Claude は、部品「mapping.md」の「呼び出し方」のとおりに生成のスクリプトを動かし直し、スクリプトが止まらないことと、生成した対応表が `.kiro/specs/root-claude-md-slimming/mapping.md` と同じことを確かめる。生成のスクリプトの呼び方は、実装のメモにある。
   - 完了の確かめ方: 作業フォルダのルートの CLAUDE.md と下書きを `cmp` で比べると、違いが出ない。生成のスクリプトが終了コード0で終わり、生成した対応表と `mapping.md` に違いが無い。ルートの CLAUDE.md の「Compact instructions」の節の文が、変える前のルートの CLAUDE.md の同じ節の文と同じである
