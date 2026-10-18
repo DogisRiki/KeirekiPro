@@ -2,10 +2,10 @@
   "feature_name": "root-claude-md-slimming",
   "issue": 568,
   "created_at": "2026-10-18T00:55:08Z",
-  "updated_at": "2026-10-18T12:18:29Z",
+  "updated_at": "2026-10-18T13:57:38Z",
   "language": "ja",
   "review_model": "opus",
-  "phase": "tasks-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -15,15 +15,11 @@
     },
     "design": {
       "generated": true,
-      "approved": true,
-      "approved_by": "DogisRiki",
-      "approved_at": "2026-10-18T12:01:25Z"
+      "approved": false
     },
     "tasks": {
       "generated": true,
-      "approved": true,
-      "approved_by": "DogisRiki",
-      "approved_at": "2026-10-18T12:18:29Z"
+      "approved": false
     }
   },
   "approval_history": [
@@ -58,6 +54,22 @@
       "issues": [568],
       "revoked_at": "2026-10-18T11:14:36Z",
       "revoked_for": "タスク 4.3 の審査による design への差し戻しに伴う取り消し: 場面 S3 の合格の条件が、身代わりの gh と file-issue の決まりの下で満たせない"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T12:01:25Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T13:57:38Z",
+      "revoked_for": "タスク 5.1 の頼る機能の試しによる design への差し戻し: -p の出来事の記録(turn*.jsonl)にはスキルの本文の「Base directory for this skill:」の行が出ず、保存された会話の記録にだけ出るため、スキルの読み込みの確かめ方を直す"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T12:18:29Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T13:57:38Z",
+      "revoked_for": "タスク 5.1 の頼る機能の試しによる design への差し戻しに伴う取り消し: スキルの読み込みの確かめ方を直す"
     }
   ]
 }

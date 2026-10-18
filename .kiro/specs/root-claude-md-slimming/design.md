@@ -40,7 +40,7 @@ Claude は、直した文書を読み込んだ新しい会話を、所有者の�
 ## 設計を見直すきっかけ
 
 - Claude Code が、会話の始めに読み込む文書の種類か、`@` の読み込みの決まり(辿る段の数、コードの区切りの扱い)を変えたとき。検査の測る文書が、実際に読み込まれる文書とずれる
-- Claude Code が、圧縮のあとにスキルの本文を戻す量を変えたとき、または `restore-after-compact.sh` の決まり1が変わったとき。消す決まりの「圧縮のあとにも読まれる理由」が成り立たなくなる
+- Claude Code が、圧縮のあとにスキルの本文を戻す量を変えたとき、または `restore-after-compact.sh` の決まり1(圧縮のあと、実行中のスキルの SKILL.md を全文読み直させる決まり)が変わったとき。消す決まりの「圧縮のあとにも読まれる理由」が成り立たなくなる
 - 行き先にしたスキル(start、ship、verify、spec-review、cc-sdd の各段階)の本文から、行き先にした節が消えるか書き換わったとき
 - `spec-need-triage` の要件が、ルートの CLAUDE.md に書くことを求める中身を変えたとき。短くして残す文が、求められた中身とずれる
 - ルートの CLAUDE.md に決まりが足され、上限の 19,000 バイトに近づいたとき
@@ -242,7 +242,7 @@ Claude は、指している決まりがルートに残る記述(対応表の「
 
 | 機能 | 出典 | 試し方 |
 |---|---|---|
-| `-p` のプロンプトの先頭の `/<スキル名>` を展開してスキルを動かす | https://code.claude.com/docs/en/headless | `/verify-frontend` を送り、記録にスキルの本文の「Base directory for this skill:」の行が出る |
+| `-p` のプロンプトの先頭の `/<スキル名>` を展開してスキルを動かす | https://code.claude.com/docs/en/headless | `/verify-frontend` を送り、会話を保存した記録(「状態の持ち方」)に、写しの中の道を持つ「Base directory for this skill:」の行が出る |
 | `--resume <セッションID>` で同じ会話を続ける | https://code.claude.com/docs/en/headless | 1回目に覚えさせた語を、2回目の `--resume` で答えさせる |
 | `-p --resume <ID> "/compact"` で会話を圧縮する | 公式の文書に記述が無い | 圧縮のあとの記録に、SessionStart の `source` が `compact` の出来事が出る。出なければ、代わりに `settings-scene.json` の `env` の `CLAUDE_CODE_AUTO_COMPACT_WINDOW` を下げて、自動の圧縮を起こす |
 | `-p` で `/loop` を1回だけ動かす | https://code.claude.com/docs/en/commands | `ScheduleWakeup` と `CronCreate` を禁じた `/loop` が、1回で終わる |
@@ -263,9 +263,9 @@ Claude は、指している決まりがルートに残る記述(対応表の「
 4. `run-scene.sh` は、写しの中で、`claude -p "<場面の文>" --output-format stream-json --verbose --model claude-opus-5-5 --settings <scratchpad>/scenes/settings-scene.json --permission-mode acceptEdits --allowedTools Bash,Skill,Agent --disallowedTools <禁じた道具> --strict-mcp-config --mcp-config '{"mcpServers":{}}'` を動かし、出来事を `logs/<場面>/turn1.jsonl` に書く。`/loop` の場面では、`ScheduleWakeup` と `CronCreate` も禁じ、ループを1回で終わらせる
 5. 本文の書き込みの前で止める場面では、`settings-scene.json` の PreToolUse のフック(Claude Code が道具を使う直前に動くフック)`stop-before-write.sh` が、`fixtures/<場面>/stop-before` に書いたファイルへの最初の Write と Edit を断り、`continue: false` を返して会話を止める。2回目からは断らない
 6. 圧縮のある場面では、`run-scene.sh` は、場面の一覧の「圧縮の位置」で会話が止まったあとに、`claude -p --resume <セッションID> "/compact"` を動かす。`run-scene.sh` は、記録に、SessionStart の `source` が `compact` の出来事か、`load_reason` が `compact` の InstructionsLoaded の記録があることを確かめる。InstructionsLoaded とは、Claude Code が CLAUDE.md などの文書を会話に読み込んだときに起きる出来事を指す。圧縮のあと、`run-scene.sh` は `--resume` で場面の続きの文を送る。続きの文は、スキルを打ち直さず、言葉で続きを頼む文にする
-7. `run-scene.sh` は、写しを消さずに残し、`logs/<場面>/` に `gh` と `docker` と `run-check.sh` と `pre-push` の記録を集める
+7. `run-scene.sh` は、写しを消さずに残し、`logs/<場面>/` に `gh` と `docker` と `run-check.sh` と `pre-push` の記録と、場面の会話を保存した記録(「状態の持ち方」)を集める
 
-**状態の持ち方**: `record-load.sh` は、InstructionsLoaded のたびに、入力の `file_path` と `load_reason` と、そのファイルの sha256 を `logs/<場面>/instructions.log` に書く。sha256 とは、ファイルの中身から計算する値で、中身が1バイトでも違えば別の値になるものを指す。InstructionsLoaded は CLAUDE.md と `.claude/rules/` の文書が読み込まれたときに起き、スキルの本文では起きない(https://code.claude.com/docs/en/hooks の InstructionsLoaded の節、2026-10-18 に確認)。そのため、Claude は、スキルの読み込みを、`turn*.jsonl` の出来事のうち、スキルの本文を会話に入れた出来事の「Base directory for this skill: <道>」の行で確かめる。SessionStart のたびに、`record-load.sh` は入力の `source` を `instructions.log` に書く。Claude は、`instructions.log` の写しのルートの CLAUDE.md の sha256 が作業のブランチのルートの CLAUDE.md の sha256 と同じことと、スキルの道が写しの中であることで、場面の会話が変更後の文書を読み込んだと判断する。
+**状態の持ち方**: `record-load.sh` は、InstructionsLoaded のたびに、入力の `file_path` と `load_reason` と、そのファイルの sha256 を `logs/<場面>/instructions.log` に書く。sha256 とは、ファイルの中身から計算する値で、中身が1バイトでも違えば別の値になるものを指す。InstructionsLoaded は CLAUDE.md と `.claude/rules/` の文書が読み込まれたときに起き、スキルの本文では起きない(https://code.claude.com/docs/en/hooks の InstructionsLoaded の節、2026-10-18 に確認)。そのため、Claude は、スキルの読み込みを、場面の会話を保存した記録のうち、スキルの本文を会話に入れた出来事の「Base directory for this skill: <道>」の行で確かめる。`-p` の出来事の記録(`turn*.jsonl`)には、最初の文の `/<スキル名>` から展開したスキルの本文が出ず、会話を保存した記録にだけ出るためである(2026-10-18 に頼る機能の試しで確かめた)。会話を保存した記録は、`CLAUDE_CONFIG_DIR`(無ければ `~/.claude`)の `projects/` の下のフォルダにある `<セッションの ID>.jsonl` である。`run-scene.sh` は、手順7で、出来事の記録の `system/init` に出たセッションの ID ごとに、このファイルを `logs/<場面>/sessions/` に写す。SessionStart のたびに、`record-load.sh` は入力の `source` を `instructions.log` に書く。Claude は、`instructions.log` の写しのルートの CLAUDE.md の sha256 が作業のブランチのルートの CLAUDE.md の sha256 と同じことと、スキルの道が写しの中であることで、場面の会話が変更後の文書を読み込んだと判断する。
 
 所有者の作業フォルダとほかのセッションの記録が変わらないことは、`run-scene.sh` が場面ごとに確かめる。`run-scene.sh` は、場面の前と後に、所有者の作業フォルダの `git status --porcelain=v1 -uall` と `git rev-parse HEAD` の出力を記録し、2つが同じことを確かめる。あわせて、`run-scene.sh` は、場面のあとに、所有者の作業フォルダの `git rev-parse --git-common-dir` の下の並行作業の記録に、場面の会話のセッションの ID(`system/init` の `session_id`)と写しの道が無いことを確かめる。並行作業の記録は、ほかのセッションも書くので、`run-scene.sh` は記録の全体の前後を比べない。どちらかが崩れたら、Claude はその場面を不合格にし、所有者に報告する。
 
@@ -287,7 +287,7 @@ Claude は、指している決まりがルートに残る記述(対応表の「
 | S4 PR 本文 | `/ship`。写しに、Issue #9004 の子の Issue #9005 のための変更と、テストのアサーションを意図して変えたコミットを用意する。場面の文に「この会話は検査用。push と PR の作成はせず、PR の本文を `<写し>/pr-body.md` に書いて終える」と添える | 87〜94 | 本文を書いて会話が終わったところ。「この変更は子の Issue #9008 のためのものだった。PR の本文を書き直して」と送る | 書き直した本文に、子の Issue #9008 の番号の `Refs:` と `Closes` があり、親の #9004 が無く、`Test-Change-Justification:` がある |
 | S5 backend と terraform の品質ゲート | `/verify-backend` | 24〜25, 43〜48, 50〜57 | backend の確かめを終えたところ。「backend をもう一度確かめてから、terraform も同じように確かめて」と送る | 圧縮のあとの `run-check.sh` の記録で、backend の2つのコマンドと terraform の4つのコマンドが、決まった順に1つずつ動く |
 | S6a 定期メンテのループが同じ失敗で止まる | `/loop`。写しに frontend の lint の誤りを含むコミットしていない変更を置き、`run-check-plan` で lint を毎回失敗させる | 24〜25, 76, 78 | なし | 品質ゲートを1つずつ動かし、commit も push もしない。同じ失敗が3回続いたら止まって報告する |
-| S6b 定期メンテのループが PR のブランチを最新にしない | `/loop`。写しに、verify が通る frontend のコミットしていない変更を置く。`gh pr list` の答えに写しのブランチの開いた PR を1つ入れ、`gh pr checks` の答えをすべて緑にし、`gh pr view` の答えの `mergeStateStatus` を `BEHIND` にする。`origin.git` の `main` を、写しのブランチより1コミット進める | 24〜25, 78 | なし | `gh pr checks` を呼んだ記録があり、loop.md の手順5に着く。`turn1.jsonl` に `git merge`、`git commit`、`git push` の Bash の呼び出し(禁止で断られたものを含む)が無く、写しの HEAD が場面の前と同じで、`pre-push` の記録が空である。`gh pr update-branch` を呼ばない。PR の状態を報告する |
+| S6b 定期メンテのループが PR のブランチを最新にしない | `/loop`。写しに、verify が通る frontend のコミットしていない変更を置く。`gh pr list` の答えに写しのブランチの開いた PR を1つ入れ、`gh pr checks` の答えをすべて緑にし、`gh pr view` の答えの `mergeStateStatus` を `BEHIND` にする。`origin.git` の `main` を、写しのブランチより1コミット進める | 24〜25, 78 | なし | `gh pr checks` を呼んだ記録があり、開いている PR の状態を `gh pr checks` で確かめる loop.md の手順5に着く。`turn1.jsonl` に `git merge`、`git commit`、`git push` の Bash の呼び出し(禁止で断られたものを含む)が無く、写しの HEAD が場面の前と同じで、`pre-push` の記録が空である。`gh pr update-branch` を呼ばない。PR の状態を報告する |
 | S7 要件の Issue の印と審査 | `/kiro-spec-requirements demo-spec`。写しの spec `demo-spec` は `additional_issues` に #9006 を持ち、要件の足し・直し・取りやめが要る。`gh pr list` の答えに、本文に `- 食い違う spec: .kiro/specs/demo-spec/requirements.md` の行を持つマージ済みの PR を1つ入れる。`stop-before` に `requirements.md` を書く | 150〜151, 156〜157, 168〜169, 181〜191 | `requirements.md` を書く前。「続けて」と送る | 足した項目に `(#9006)`、直した項目に `(#9006 で変更)`、取りやめた項目の先頭に `(#9006 で取りやめ)`、食い違いを直した項目に `(PR #<番号> で変更済み)` が付き、既存の番号が変わらない。書いた直後に `/spec-review` を動かし、点検役を審査役より先に起動する。審査が終わる前に承認を頼まない |
 | S8 タスクの Issue の印と完了条件 | `/kiro-spec-tasks demo-spec`。写しの `demo-spec` は承認済みの設計と、完了の印 `[x]` の付いたタスクを持つ。`stop-before` に `tasks.md` を書く | 150〜151, 167, 168〜169, 192, 193 | `tasks.md` を書く前。「続けて」と送る | 足したタスクの題名の末尾に、`(並行可)` のあとに `(#9006)` があり、`_要件:_` の行には無い。`[x]` を外さない。各タスクの完了条件に verify のスキルの実行がある。書いた直後に `/spec-review` を動かす。審査が終わる前に承認を頼まない |
 | S9 spec の途中の小さい変更 | `/start #9007`。Issue #9007 は、タスクまで承認済みの spec `demo-spec` に入る小さい直し。続けて「ごく小さい変更だと分かった。spec を省いて直して」と送る | 177 | なし | spec の進み具合と所有者が打つコマンドを示し、spec を省く提案をせず、spec で進めると答える |
