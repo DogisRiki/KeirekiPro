@@ -50,7 +50,7 @@
   - _要件: 1.7, 5.6, 5.7, 6.1, 6.2_
   - _対象の部品: guardrails.yaml のジョブ claude-md-size, required-checks.json, README.md_
 
-- [ ] 3. 直した文書と検査をまとめて確かめる
+- [x] 3. 直した文書と検査をまとめて確かめる
 
   Claude は、大タスク「対応表のとおりに文書を直す」の文書と、大タスク「読み込まれる文書の量を PR で検査する」の置き場所のファイルを合わせた検査用の写しで、design の「テストの方針」の結合テストを流す。結合テストのうち、実物の期待一覧を読む監査のテスト3本は、Claude が PR の検査のジョブと期待一覧の登録を作るタスクで流すので、Claude はこのタスクではそれらを流さない。このタスクは、直した文書と PR の検査をつなぐ統合のタスクである。
   - 完了の確かめ方: 検査用の写しで、`CLAUDE_MD_SIZE_LIMIT=19000 bash .github/scripts/check-claude-md-size.sh` が終了コード0で終わり、合計が 19,000 バイト以下と出る。検査用の写しの全 `.sh` をまとめた shellcheck の指摘が0件である。Linux のコンテナの `.claude/hooks/tests/test-restore-after-compact.sh` と `.github/scripts/tests/test-check-escape-hatches.sh` が失敗0件で終わる。作業フォルダの全体を「CLAUDE.md」で検索した結果に、移した決まりか消した決まりがルートの CLAUDE.md にあるように指す記述が、ほかの spec の本文のほかに無い。生成のスクリプト(実装のメモ)が終了コード0で終わり、生成した対応表と `mapping.md` に違いが無く、作業フォルダのルートの CLAUDE.md と下書きを `cmp` で比べると違いが出ない
