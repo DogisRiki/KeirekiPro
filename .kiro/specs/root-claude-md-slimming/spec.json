@@ -1,0 +1,47 @@
+{
+  "feature_name": "root-claude-md-slimming",
+  "issue": 568,
+  "created_at": "2026-10-18T00:55:08Z",
+  "updated_at": "2026-10-18T06:54:44Z",
+  "language": "ja",
+  "review_model": "opus",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T04:23:53Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T06:19:21Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T06:54:44Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T01:20:23Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T02:52:41Z",
+      "revoked_for": "D1-1-10 による requirements への差し戻し: ほかの承認済みの spec の要件が CLAUDE.md に書くことを求める決まりの扱いを決めていない"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T05:30:17Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T05:53:08Z",
+      "revoked_for": "T1-1-6 による design への差し戻し: required-checks.json に claude-md-size を足すと失敗する test-check-audit-skipped-required.sh を、変えるファイルと所有者に写してもらうファイルに挙げていない"
+    }
+  ]
+}
