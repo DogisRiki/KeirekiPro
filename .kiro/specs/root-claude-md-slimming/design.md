@@ -138,8 +138,11 @@ flowchart TD
     P --> Q[頼る機能を試す]
     Q --> C[場面を動かす]
     C --> D{不合格の場面があるか}
-    D -->|ある| E[行き先か書き方を直す]
+    D -->|ある| K{原因はどこか}
+    K -->|文書| E[行き先か書き方を直す]
     E --> B
+    K -->|場面を動かす環境| L[環境を直す]
+    L --> C
     D -->|無い| F[main のルートの CLAUDE.md と対応表を比べ直す]
     F --> G{main で足されたか直された決まりがあるか}
     G -->|ある| A
@@ -235,6 +238,7 @@ Claude は、指している決まりがルートに残る記述(対応表の「
 - GitHub に届かなくする: `PATH` の先頭に `<scratchpad>/scenes/bin` を置き、`gh` を身代わりにする。環境から、名前に `TOKEN`、`KEY`、`SECRET`、`PASSWORD`、`CREDENTIAL` を含む変数(大文字と小文字を区別しない。`GH_TOKEN` と `GITHUB_TOKEN` を含む)を外し、`GH_CONFIG_DIR` を空のフォルダにする。親の会話の環境には、GitHub に書き込める鍵がほかの名前でも入っていることがあり、残すと場面の会話が身代わりを通らずに GitHub に届くためである。あわせて、親の会話から受け継ぐ `CLAUDECODE`、`CLAUDE_` で始まる変数、`ANTHROPIC_BASE_URL`、`MCP_` で始まる変数を外し、`CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけを残す。場面の会話は、所有者のログイン(`CLAUDE_CONFIG_DIR` の中の資格情報)で動く
 - 道具を禁じる: `settings-scene.json` の `permissions.deny` に `WebFetch`、`WebSearch`、`Bash(git push *)`、`Bash(gh pr merge *)` を書き、同じものを `--disallowedTools` にも渡す。`--strict-mcp-config` と空の `--mcp-config` で、MCP のサーバーをつながない。MCP のサーバーとは、Claude Code に外部の道具やデータをつなぐサーバーを指す。`run-scene.sh` は、出来事の記録の最初の `system/init` の `mcp_servers` が空であることを確かめ、空でなければその場面を動かさずに止める
 - 許しの形: `--permission-mode acceptEdits`(ファイルの編集を尋ねずに許す動き方)と `--allowedTools Bash,Skill,Agent` で動かす。`Skill` はスキルが別のスキルを呼ぶため(spec の段階のスキルが `/spec-review` を呼ぶ)、`Agent` は `/spec-review` が点検役と審査役を起動するために許す。禁止の規則は許しの規則より先に効くので、禁じた道具は使えない。写しの `.claude/settings.json` の deny とフックは、そのまま効く
+- 一時フォルダを渡す: `run-scene.sh` は、場面ごとに `<scratchpad>/scenes/work/<場面>/scratchpad` を作り、`--add-dir` でそのフォルダへの道具の使用を許し、`--append-system-prompt` でそのフォルダが一時フォルダであることを会話に伝える。足す文は「一時フォルダ(Scratchpad directory): <そのフォルダの道>。一時ファイル(コミットのメッセージや Issue の本文など)は、/tmp やリポジトリの中ではなく、このフォルダに書く」の1文だけである。ふだんのセッションは、コミットのメッセージや Issue の本文を書く一時フォルダを持つが、`claude -p` の会話は持たないためである(2026-10-19 に場面 S1 で確かめた)。`--append-system-prompt` で足した文は、`--resume` で続けた会話にも送られる(`claude --help`、2.1.292)
 
 **いつ動くか**: Claude は、PR を出す前に、「処理の流れ」の順のとおりに、場面ごとに `run-scene.sh <場面>` を呼ぶ。場面は1つずつ順に動かす。
 
@@ -260,9 +264,9 @@ Claude は、指している決まりがルートに残る記述(対応表の「
    3. `run-scene.sh` は、1の作業フォルダで `bash .claude/scripts/parallel/session.sh check-start <番号> --session scene-other` を呼ぶ
    4. `run-scene.sh` は、写しで、記録を書かずに読むだけの `bash .claude/scripts/parallel/session.sh busy-issues --session scene-check` を呼び、出力の `active` に場面の Issue の番号があることを確かめる。番号が無ければ、`run-scene.sh` は場面を動かさずに止まる
 3. `bin/gh` は、`fixtures/<場面>/gh/` の答えのファイルを、引数の組(`issue view <番号>`、`issue list`、`pr list` など)で選んで返す。`bin/gh` は、すべての呼び出しを記録する。書き込みの呼び出し(`issue create`、`issue edit`、`issue close`、`issue comment`、`pr create`、`pr merge`、`pr close`、`pr comment`、`pr update-branch`、`api` の `-X` か `--method` が GET でないもの)は、引数と、`--body-file` か `--body` で渡された本文を記録してから、終了コード1で断る。ただし、`fixtures/<場面>/gh/` に `issue-edit-<番号>` のファイルがあれば、`bin/gh` は、その番号の `issue edit` を、渡された本文を `<scratchpad>/scenes/work/<場面>/gh-state/issue-<番号>.md` に保存して記録し、終了コード0で受け付ける。保存したあと、`bin/gh` は、その番号の `issue view` に、`body` を保存した本文に替えた答えを返す。受け付けた本文の行き先は scratchpad の中だけで、GitHub には届かない。この受け付けは、スキルの手順が書き込みの成功を前提に先へ進む場面のためのものである(Issue の本文への書き足しに失敗したら実装を始めない決まりを持つ S3)。`bin/gh` は、答えのファイルが無い読み出しを、終了コード1で断り、記録する。`bin/docker` は、すべての呼び出しを記録し、`docker info` には用意した答えを返し、ほかは何もせずに終了コード0を返す
-4. `run-scene.sh` は、写しの中で、`claude -p "<場面の文>" --output-format stream-json --verbose --model claude-opus-5-5 --settings <scratchpad>/scenes/settings-scene.json --permission-mode acceptEdits --allowedTools Bash,Skill,Agent --disallowedTools <禁じた道具> --strict-mcp-config --mcp-config '{"mcpServers":{}}'` を動かし、出来事を `logs/<場面>/turn1.jsonl` に書く。`/loop` の場面では、`ScheduleWakeup` と `CronCreate` も禁じ、ループを1回で終わらせる
+4. `run-scene.sh` は、写しの中で、`claude -p "<場面の文>" --output-format stream-json --verbose --model claude-opus-5-5 --settings <scratchpad>/scenes/settings-scene.json --permission-mode acceptEdits --allowedTools Bash,Skill,Agent --disallowedTools <禁じた道具> --strict-mcp-config --mcp-config '{"mcpServers":{}}' --add-dir <scratchpad>/scenes/work/<場面>/scratchpad --append-system-prompt "<一時フォルダを伝える文>"` を動かし、出来事を `logs/<場面>/turn1.jsonl` に書く。`/loop` の場面では、`ScheduleWakeup` と `CronCreate` も禁じ、ループを1回で終わらせる
 5. 本文の書き込みの前で止める場面では、`settings-scene.json` の PreToolUse のフック(Claude Code が道具を使う直前に動くフック)`stop-before-write.sh` が、`fixtures/<場面>/stop-before` に書いたファイルへの最初の Write と Edit を断り、`continue: false` を返して会話を止める。2回目からは断らない
-6. 圧縮のある場面では、`run-scene.sh` は、場面の一覧の「圧縮の位置」で会話が止まったあとに、`claude -p --resume <セッションID> "/compact"` を動かす。`run-scene.sh` は、記録に、SessionStart の `source` が `compact` の出来事か、`load_reason` が `compact` の InstructionsLoaded の記録があることを確かめる。InstructionsLoaded とは、Claude Code が CLAUDE.md などの文書を会話に読み込んだときに起きる出来事を指す。圧縮のあと、`run-scene.sh` は `--resume` で場面の続きの文を送る。続きの文は、スキルを打ち直さず、言葉で続きを頼む文にする
+6. 圧縮のある場面では、`run-scene.sh` は、場面の一覧の「圧縮の位置」で会話が止まったあとに、`claude -p --resume <セッションID> "/compact"` を動かす。`run-scene.sh` は、記録に、SessionStart の `source` が `compact` の出来事か、`load_reason` が `compact` の InstructionsLoaded の記録があることを確かめる。InstructionsLoaded とは、Claude Code が CLAUDE.md などの文書を会話に読み込んだときに起きる出来事を指す。圧縮のあと、`run-scene.sh` は `--resume` で場面の続きの文を送る。続きの文は、スキルを打ち直さず、言葉で続きを頼む文にする。`run-scene.sh` は、`--resume` で続ける呼び出しのすべて(圧縮と続きの文)に、手順4と同じ `--settings`、`--permission-mode`、`--allowedTools`、`--disallowedTools`、`--strict-mcp-config`、`--mcp-config`、`--add-dir`、`--append-system-prompt` を渡す
 7. `run-scene.sh` は、写しを消さずに残し、`logs/<場面>/` に `gh` と `docker` と `run-check.sh` と `pre-push` の記録と、場面の会話を保存した記録(「状態の持ち方」)を集める
 
 **状態の持ち方**: `record-load.sh` は、InstructionsLoaded のたびに、入力の `file_path` と `load_reason` と、そのファイルの sha256 を `logs/<場面>/instructions.log` に書く。sha256 とは、ファイルの中身から計算する値で、中身が1バイトでも違えば別の値になるものを指す。InstructionsLoaded は CLAUDE.md と `.claude/rules/` の文書が読み込まれたときに起き、スキルの本文では起きない(https://code.claude.com/docs/en/hooks の InstructionsLoaded の節、2026-10-18 に確認)。そのため、Claude は、スキルの読み込みを、場面の会話を保存した記録のうち、スキルの本文を会話に入れた出来事の「Base directory for this skill: <道>」の行で確かめる。`-p` の出来事の記録(`turn*.jsonl`)には、最初の文の `/<スキル名>` から展開したスキルの本文が出ず、会話を保存した記録にだけ出るためである(2026-10-18 に頼る機能の試しで確かめた)。会話を保存した記録は、`CLAUDE_CONFIG_DIR`(無ければ `~/.claude`)の `projects/` の下のフォルダにある `<セッションの ID>.jsonl` である。`run-scene.sh` は、手順7で、出来事の記録の `system/init` に出たセッションの ID ごとに、このファイルを `logs/<場面>/sessions/` に写す。SessionStart のたびに、`record-load.sh` は入力の `source` を `instructions.log` に書く。Claude は、`instructions.log` の写しのルートの CLAUDE.md の sha256 が作業のブランチのルートの CLAUDE.md の sha256 と同じことと、スキルの道が写しの中であることで、場面の会話が変更後の文書を読み込んだと判断する。
@@ -301,7 +305,7 @@ Claude は、場面を足すか直すとき、確かめる決まりの列で、�
 
 対応する要件: 3.5, 4.3
 
-**役割**: この文書は、はじめに「頼る機能の試し」の節を持ち、機能ごとに、試した日時と、動いたか動かなかったかを持つ。続けて、この文書は、場面ごとに1つの節を持つ。Claude は、各節に、場面の名前、動かした文、確かめた決まり(対応表の元の行)、会話がしたこと、変更後の文書を読み込んだことの確かめ(ルートの CLAUDE.md の sha256 とスキルの読み込みの道)、圧縮を起こした方法と位置、所有者の作業フォルダとほかのセッションの記録が変わらなかったことの確かめ、合格か不合格かを書く。不合格のあとに直して動かし直した場面は、Claude は前の節を消さずに、動かし直した節を足す。会話の出来事の記録そのものは、scratchpad の `logs/` に残し、この文書にはコミットしない。
+**役割**: この文書は、はじめに「頼る機能の試し」の節を持ち、機能ごとに、試した日時と、動いたか動かなかったかを持つ。続けて、この文書は、場面ごとに1つの節を持つ。Claude は、各節に、場面の名前、動かした文、確かめた決まり(対応表の元の行)、会話がしたこと、変更後の文書を読み込んだことの確かめ(ルートの CLAUDE.md の sha256 とスキルの読み込みの道)、圧縮を起こした方法と位置、所有者の作業フォルダとほかのセッションの記録が変わらなかったことの確かめ、合格か不合格かを書く。不合格のあとに直して動かし直した場面は、Claude は前の節を消さずに、動かし直した節を足す。場面を動かす環境を直して動かし直したときは、Claude は、動かし直した節に、直した内容と理由を書く。会話の出来事の記録そのものは、scratchpad の `logs/` に残し、この文書にはコミットしない。
 
 ### check-claude-md-size.sh(読み込まれる文書の量を測るスクリプト)
 
@@ -379,6 +383,7 @@ Claude は、場面を足すか直すとき、確かめる決まりの列で、�
 ## 失敗したときの扱い
 
 - 不合格の原因が場面を動かす仕組みにあるとき: 原因が、身代わり、`fixtures/`、`run-scene.sh` の用意の誤りにあるとき(例: 会話が決めた「圧縮の位置」に着かなかった原因が、用意した予約の誤りだったとき)は、Claude は仕組みを直して場面を動かし直し、文書と対応表と下書きを変えない。Claude は、この動かし直しを、次の箇条の文書の不合格に数えない。同じ理由で3回続けて動かし直しても直らなければ、Claude は直すのをやめ、所有者に報告する
+- 不合格の原因が場面を動かす環境の不足にあるとき: 原因が、ふだんのセッションが持つ作業の場所か道具の許しを場面の会話が持たないことにあるとき(例: 一時フォルダが無いとき)も、Claude は、`run-scene.sh`、身代わり、`settings-scene.json` を、設計に戻さずに直して場面を動かし直す。ただし、このとき、Claude は、場面の一覧の「確かめる決まり」と「合格の条件」の列を変えず、決まりの中身か場面ですることを指す文を、足す文か身代わりの答えで場面の会話に渡さず、「権限」の制限と「安全」の各項を外すことも弱めることもしない。会話の判断や振る舞いが原因のときは、Claude は、その不合格を環境の不足として扱わず、次の「場面が不合格のとき」の箇条のとおりに扱う。Claude は、直した内容と理由を `verification.md` のその場面の節に書く。Claude は、この動かし直しを、文書の不合格に数えない。「確かめる決まり」か「合格の条件」を変える必要があるときと、「権限」の制限か「安全」の各項のせいで合格の条件に届かないときだけ、Claude は設計に戻し、所有者に報告する。同じ理由で3回続けて動かし直しても直らなければ、Claude は直すのをやめ、所有者に報告する
 - 場面が不合格のとき: 原因が仕組みに無いとき、Claude は、不合格の理由が、決まりの行き先(要る場面で読まれていない)か、書き方(読まれたが従われない)かを、記録の InstructionsLoaded とスキルの読み込みで分ける。行き先なら Claude はその決まりを「残す」に戻し、書き方なら行き先の文を直す。どちらでも、Claude は対応表と下書きを作り直す。どちらにしたかは、Claude が対応表と場面の記録の両方に書く
 - 決まりを「残す」に戻したとき: Claude は、作り直した下書きの量を測り、「guardrails.yaml のジョブ claude-md-size」の節の「上限の値」に書いた決め方で上限を決め直す。決め直した値が今の値と違えば、Claude は、design.md の上限の値と理由を直し、直した値と理由を所有者に示す。design.md を直すので、Claude は、ルートの CLAUDE.md の「ルール」の承認を取り消す決まりのとおり、設計とタスクの承認を取り消し、所有者に設計の承認をやり直してもらう
 - 場面の会話が外へ送ろうとしたとき: 身代わりと `pre-push` が断り、記録に残る。Claude は、送ろうとした操作が、場面に効く決まりのとおりの順番で起きたかを確かめる。決まりより早く送ろうとしたときは、その場面を不合格にする

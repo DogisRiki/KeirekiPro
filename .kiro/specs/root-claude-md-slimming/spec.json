@@ -2,7 +2,7 @@
   "feature_name": "root-claude-md-slimming",
   "issue": 568,
   "created_at": "2026-10-18T00:55:08Z",
-  "updated_at": "2026-10-18T14:27:01Z",
+  "updated_at": "2026-10-18T15:44:07Z",
   "language": "ja",
   "review_model": "opus",
   "phase": "tasks-generated",
@@ -17,13 +17,13 @@
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-18T14:07:35Z"
+      "approved_at": "2026-10-18T15:44:07Z"
     },
     "tasks": {
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-10-18T14:27:01Z"
+      "approved_at": "2026-10-18T15:44:07Z"
     }
   },
   "approval_history": [
@@ -74,6 +74,22 @@
       "issues": [568],
       "revoked_at": "2026-10-18T13:57:38Z",
       "revoked_for": "タスク 5.1 の頼る機能の試しによる design への差し戻しに伴う取り消し: スキルの読み込みの確かめ方を直す"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T14:07:35Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T15:22:16Z",
+      "revoked_for": "タスク 5.2 の場面 S1 による design への差し戻し: 場面の会話に一時フォルダが無く、コミットのメッセージを書けずに止まったため、一時フォルダを渡し、合格の条件を変えない環境の直しを設計に戻さずに行えるようにする"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T14:27:01Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T15:22:16Z",
+      "revoked_for": "タスク 5.2 の場面 S1 による design への差し戻しに伴う取り消し: 場面の会話に一時フォルダを渡す"
     }
   ]
 }
