@@ -9,7 +9,7 @@
   - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.9, 2.1, 2.2, 2.3, 2.4, 2.5, 2.7, 2.8_
   - _対象の部品: ルートの CLAUDE.md(軽くした本文), mapping.md_
 
-- [ ] 1.2 spec-writing.md に「Issueの印」の節を足す (並行可)
+- [x] 1.2 spec-writing.md に「Issueの印」の節を足す (並行可)
 
   Claude は、部品「spec-writing.md の「Issueの印」の節」のとおりに、`.kiro/settings/rules/spec-writing.md` の「見本」の節の前に、`## Issueの印` の節を足す。Claude は、節の本文に、変える前のルートの CLAUDE.md の「Issueの印」の節の見出しのあとの文を、文を変えずに写す。作業フォルダのルートの CLAUDE.md は、軽くした本文に置き換わっていることがあるので、Claude は、写す元を `git show $(git merge-base origin/main HEAD):CLAUDE.md` の出力から読む。Claude は、`spec-writing.md` の見出しと目印の一覧に、この節を足さない。
   - 完了の確かめ方: `spec-writing.md` の「見本」の節のすぐ前に `## Issueの印` の節がある。節の見出しのあとの行が、`git show $(git merge-base origin/main HEAD):CLAUDE.md` の出力の「Issueの印」の見出しのあとの行(183〜193 行)と同じ文である。`git diff` の `spec-writing.md` の違いが、足した節だけである
