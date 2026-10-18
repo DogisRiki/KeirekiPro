@@ -35,6 +35,18 @@ spec 文書を `spec-reviewer` にレビューさせ、指摘に対応して記�
 
 ## 手順
 
+### 会話が要約されたあとに続けるとき
+
+`/spec-review` の途中で会話が要約されたあと、Claude は、続きを始める前に、次の手順で往復の位置をファイルから決め直す。`reviews/{STAGE}-review.md` が無いときは、往復が始まっていないので、Claude は Step 1 から始める。
+
+1. Claude は、`reviews/{STAGE}-review.md` の最後の `## サイクル<N> 往復<M>` の見出しから、`CYCLE` を N に、`ROUND` を M にする。最後の `## サイクル<N> 往復<M>` の節が `- 往復:` の行で終わっていなければ、審査役が途中で止まった節なので、Claude は Step 3 の「上限のときの切り替え」のとおり、`CYCLE` を 1 増やし、`ROUND` を 1 にして審査役を起動し直す
+2. `reviews/{STAGE}-response.md` に `## サイクル<CYCLE> 往復<ROUND> への対応` の見出しが無ければ、Claude は、その往復の Step 4(指摘への対応)から続ける
+3. 見出しがあり、`reviews/{STAGE}-review.md` の最終行が収束か未解決の終わり(`- 往復: <n>回で収束 / 未解決: 0件` か `- 往復: 3回 / 未解決: <n>件`)のとき、本文(`.kiro/specs/{FEATURE}/{STAGE}.md`)が `reviews/{STAGE}-review.md` より新しくなければ、Claude は Step 7(所有者への報告)から続ける。本文のほうが新しければ、前の回のあとに新しい回(`changed` 付きの回、差し戻しの回、作り直した段階の回)を始め、その往復1の審査がまだ書かれていない。そのため Claude は、`CYCLE` を N+1 に、`ROUND` を 1 にし、Step 1.5 から続ける。前の回が終わったあとに本文が書き換わるのは新しい回を始めたときだけで、判定のスクリプト `spec-review-scan.sh` の「本文がレビューより新しい」と同じ比べ方(ファイルの変更日時)である
+4. それ以外なら、Claude は `ROUND` を 1 増やし、Step 1.5(書き方の点検)から続ける
+5. 却下した指摘の一覧は、Claude が `reviews/{STAGE}-response.md` の、そのサイクルの処置が「却下」の行から作り直す
+6. Claude は、審査の範囲(`SCOPE`)を、Step 2 の手順2のとおり、控え(`.reviewed.md`)があれば差分にし、無ければ全体にする。`CHANGED` の有無が要約から分からないまま往復1の審査役を起動するときは、Claude は `SCOPE` を全体にする。全体を審査すれば、見落としは増えないためである
+7. その往復の点検の記録(`reviews/{STAGE}-style.md` の節)を書いたかどうかが分からないときは、Claude は Step 1.5 をやり直す
+
 ### Step 1: 準備
 
 1. 引数から `FEATURE` と `STAGE` を取る。`STAGE` は `requirements` / `design` / `tasks` のいずれか。3つ目の引数が `changed` なら `CHANGED` を「あり」にし、無ければ「なし」にする

@@ -1,6 +1,7 @@
 {
     "env": {
-        "MSYS2_ARG_CONV_EXCL": "*"
+        "MSYS2_ARG_CONV_EXCL": "*",
+        "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "250000"
     },
     "permissions": {
         "allow": [
@@ -87,6 +88,16 @@
                     {
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-registry.sh\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
+                "matcher": "compact",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/restore-after-compact.sh\"",
                         "timeout": 10
                     }
                 ]
