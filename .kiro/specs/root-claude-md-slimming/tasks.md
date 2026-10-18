@@ -66,7 +66,7 @@
   - 受入基準とテストの対応: 要件3の受入基準7(場面の会話に、push・PR の作成・Issue の起票・コメント・マージをさせない)は、上の `git push` と `gh` の書き込みの呼び出しの確かめで確かめる。要件3の受入基準8(場面の会話に、所有者の作業フォルダとほかのセッションの着手の記録を変えさせない)は、上の前後の出力の比べ合わせと、ほかのセッションの記録の確かめの試しで確かめる
   - _要件: 3.7, 3.8_
 
-- [ ] 4.2 場面の会話を動かして記録する部分を作る
+- [x] 4.2 場面の会話を動かして記録する部分を作る
 
   Claude は、部品「場面を動かす仕組み」の「権限」の道具を禁じる制限と許しの形、「呼び出し方」の手順4〜6(写しの中で `claude -p` を動かして出来事を記録する、本文の書き込みの前で会話を止める、圧縮して続きの文を送る)、「状態の持ち方」の読み込みの記録、「失敗したとき」の30分の打ち切りのとおりに、`run-scene.sh` の会話を動かす部分を作る。あわせて、Claude は、`settings-scene.json`、`hooks/record-load.sh`、`hooks/stop-before-write.sh` を作り、「頼る機能と試し方」の表の試しを1つずつ動かす `run-scene.sh probe` を作る。
   - 完了の確かめ方: `settings-scene.json` が JSON として読め、`permissions.deny` に `WebFetch`、`WebSearch`、`Bash(git push *)`、`Bash(gh pr merge *)` があり、InstructionsLoaded と SessionStart に `record-load.sh` が、PreToolUse に `stop-before-write.sh` が登録されている。Claude が手で作った InstructionsLoaded の入力を `record-load.sh` に渡すと、`instructions.log` に、道と `load_reason` と sha256 の行が出る。Claude が手で作った PreToolUse の入力を `stop-before-write.sh` に渡すと、1回目は `continue: false` と `permissionDecision` の `deny` が返り、2回目は何も返らない。`mcp_servers` が空でない `system/init` の記録を Claude が手で作って `run-scene.sh` の確かめに渡すと、`run-scene.sh` が場面を動かさずに止まる。`run-scene.sh` が会話に渡す環境に `GH_TOKEN` と `GITHUB_TOKEN` が無く、`PATH` の先頭が `<scratchpad>/scenes/bin` である。Claude が打ち切りまでの時間を数秒に上書きして、終わらない身代わりの会話で `run-scene.sh` を動かすと、`run-scene.sh` が会話を打ち切り、その場面を不合格として理由を記録に書く。`scenes/` の全 `.sh` の shellcheck の指摘が0件である
@@ -165,6 +165,7 @@
 - 決まりを「残す」に戻したとき: Claude は、design の「失敗したときの扱い」のとおりに上限を決め直す。決め直した値が今の値と違えば、Claude は、置き場所の `guardrails.yaml` の値も直し、design.md を直すので、設計とタスクの承認を取り消してから所有者に設計の承認をやり直してもらう
 - 差分の照合: Claude は、差分を照合する前に `git fetch origin main` を流し、変えたファイルを `git merge-base origin/main HEAD` のコミットと比べる。main の先端と比べると、並行するほかの PR の変更も違いに出るためである
 - 出荷のとき: 親の会話の Claude は、`/ship` の PR 本文に、`Spec: .kiro/specs/root-claude-md-slimming`、`Refs: #568`、`Closes #568` を書く。`test-check-audit-skipped-required.sh` の期待を意図して変えるので、Claude は、PR 本文に `Test-Change-Justification:` の行も書く。PR の CI で `claude-md-size` が一度動いたあと、Claude は、design の「所有者の操作」の2つ目と3つ目のとおりに、ブランチの決まりに `claude-md-size` を足すことと PR を Approve することを、1つずつ理由を添えて所有者に頼む
+- 場面の会話の環境: `run-scene.sh` は、場面の会話と `run-scene.sh exec` の環境から、名前に TOKEN・KEY・SECRET・PASSWORD・CREDENTIAL を含む変数(大文字と小文字を区別しない)と、親の会話から受け継ぐ `CLAUDECODE`・`CLAUDE_*`・`ANTHROPIC_BASE_URL`・`MCP_*` を外し、`CLAUDE_CONFIG_DIR` と `CLAUDE_CODE_GIT_BASH_PATH` だけを残す。親の会話の環境には GitHub に書き込める鍵があり、残すと場面の会話が身代わりの `gh` を通らずに GitHub に届くためである。所有者のログインは、5.1 で、この環境(`run-scene.sh exec probe claude -p …`)で確かめる
 
 ## 完了条件(全タスク共通)
 
