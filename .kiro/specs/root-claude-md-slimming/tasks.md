@@ -33,7 +33,7 @@
   - _要件: 1.7_
   - _依存: 1.2_
 
-- [ ] 2. 読み込まれる文書の量を PR で検査する
+- [x] 2. 読み込まれる文書の量を PR で検査する
 - [x] 2.1 量を測るスクリプトとそのテストを作る (並行可)
 
   Claude は、部品「check-claude-md-size.sh」と部品「test-check-claude-md-size.sh」を、置き場所(実装のメモ)の `.github/scripts/check-claude-md-size.sh` と `.github/scripts/tests/test-check-claude-md-size.sh` に作る。Claude は、スクリプトを design の「呼び出し方」と終了コードの表と「失敗したとき」のとおりに作り、テストの場合を design の「テストの方針」の単体テストのとおりにする。
@@ -42,7 +42,7 @@
   - _要件: 5.1, 5.2, 5.3, 5.4, 5.5, 6.3_
   - _対象の部品: check-claude-md-size.sh, test-check-claude-md-size.sh_
 
-- [ ] 2.2 PR の検査のジョブと期待一覧の登録と、README と手順書の説明を作る (並行可)
+- [x] 2.2 PR の検査のジョブと期待一覧の登録と、README と手順書の説明を作る (並行可)
 
   Claude は、部品「guardrails.yaml のジョブ claude-md-size」のとおりに、今の `.github/workflows/guardrails.yaml` を Read で読んで置き場所に写し、写しのワークフローの `env` に `CLAUDE_MD_SIZE_LIMIT: '19000'` を、ジョブに `claude-md-size` を足す。続けて、Claude は、部品「required-checks.json(期待一覧への登録)」のとおりに、今の `.github/audit/required-checks.json` を置き場所に写し、写しの `checks` に `claude-md-size` の項目を足す。同じ部品の「使う部品」のとおりに、Claude は、今の `.github/scripts/tests/test-check-audit-skipped-required.sh` を置き場所に写し、写しの、実物の期待一覧との照合の場合の ruleset の必須チェックを直接並べた一覧に `claude-md-size` を足し、一覧の前のコメントの数を20から21に直す。あわせて、Claude は、部品「README.md(参照とワークフローの説明)」のとおりに、作業フォルダの `README.md` の観点の定義の参照の文と、ワークフローの一覧の表の行と、Mermaid の図の箱を直す。さらに、Claude は、design の「ファイルの構成」のとおりに、作業フォルダの `doc/開発フロー/基盤構築手順.md` の「7. Required status checks の指定」の一覧に `claude-md-size` を足し、「20本」の2か所を「21本」に直し、「`claude-md-size` が PR で一度成功を報告したのを確かめてから、Required status checks に `claude-md-size` を追加する」という箇条を足す。
   - 完了の確かめ方: 置き場所の `guardrails.yaml` と今のファイルの違いが、`env` の1行とジョブ `claude-md-size` だけである。ジョブの権限、checkout の指定、3つの手順が、design の「権限」と「呼び出し方」と同じである。置き場所の `required-checks.json` が JSON として読め、今のファイルとの違いが `claude-md-size` の1項目だけである。置き場所の `test-check-audit-skipped-required.sh` と今のファイルの違いが、一覧の `claude-md-size` とコメントの数だけである。検査用の写しで、Linux のコンテナの、実物の期待一覧を読む3つのテスト `test-check-audit-skipped-required.sh`、`test-check-audit-dependabot-stuck.sh`、`test-check-canary-results.sh` が失敗0件で終わる。Claude が置き場所の `test-check-audit-skipped-required.sh` の一覧から `claude-md-size` を一時的に外すと、そのテストが失敗する。検査用の写しの全 `.sh` を CI と同じ形の shellcheck にまとめて渡すと、指摘が0件である。`README.md` の違いが、観点の定義の参照の文と、表の「ずるの検査 | guardrails.yaml」の行と、図の「系統2: ずるの検査」の箱だけである。`doc/開発フロー/基盤構築手順.md` の違いが、手順7の一覧の1行と「21本」の2か所と足した箇条だけであり、手順7の一覧の本数が21である
