@@ -43,13 +43,12 @@
   - _依存: 1.1, 2.1, 2.2, 2.3_
 
 - [ ] 4. 本来の場所に置いて確かめ、出荷のあとに効き目を確かめる
-- [ ] 4.1 所有者に置いてもらい、本来の場所でテストを流す
+- [x] 4.1 所有者に置いてもらい、本来の場所でテストを流す
 
   親の会話の Claude は、置き場所の `place-1/` の3つのファイル(`.claude/hooks/restore-after-compact.sh`、`.claude/hooks/tests/test-restore-after-compact.sh`、`.claude/settings.json`)を本来の場所に写すコマンドを、所有者に示して置くよう頼む。依頼には、Claude が `.claude/settings.json` と `.claude/hooks/` に書き込めないこと(`settings.json` の `deny`)を添える。所有者が置いたら、親の会話の Claude は、置いたファイルが置き場所の完成版と一致することを確かめ(実装のメモ)、本来の場所で、Git Bash と Linux のコンテナのテストと、shellcheck(対象は `git ls-files -z --cached --others --exclude-standard '*.sh'` で、まだコミットしていない新しいファイルを含める)を流す。
   - 完了の確かめ方: `git status` に、置いた3つのファイルが出る。3つとも置き場所の完成版と一致する。本来の場所のテストが Git Bash と Linux のコンテナの両方で失敗0件で、shellcheck の指摘が0件である
   - 受入基準とテストの対応: 要件5の受入基準2・3(リポジトリの最新を取り込むだけで、どの OS でも効く)は、本来の場所で Git Bash と Linux のコンテナの両方で流した `test-restore-after-compact.sh` の設定のテストで確かめる
   - _要件: 5.2, 5.3_
-  - _保留: 所有者が置き場所のファイルを置くのを待つ。親の会話の Claude が、実装役を起動せずにタスク4.1を行う(実装のメモ)_
 
 - [x] 4.2 出荷のときの頼みの文を用意する
 
