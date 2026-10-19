@@ -58,14 +58,13 @@
   - _要件: 1.1, 2.1_
   - _依存: 2.1_
 
-- [ ] 2.3 所有者に3つのファイルを写してもらい、本来の場所でテストを流す
+- [x] 2.3 所有者に3つのファイルを写してもらい、本来の場所でテストを流す
 
   親の会話の Claude は、置き場所の `place-1/` の3つのファイル(`.claude/hooks/inject-writing-rules.sh`、`.claude/hooks/tests/test-inject-writing-rules.sh`、`.claude/settings.json`)を本来の場所に写すコマンドを、所有者に示して写すよう頼む。依頼には、Claude が `.claude/settings.json` と `.claude/hooks/` に書き込めないこと(`settings.json` の permissions の deny)を添える。所有者が写したら、親の会話の Claude は、写したファイルが置き場所の完成版と一致することを確かめる。続けて、親の会話の Claude は、本来の場所で、Git Bash と Linux のコンテナのテストと、`.claude/hooks/tests/` の今あるテストと、shellcheck を流す。shellcheck の対象は `git ls-files -z --cached --others --exclude-standard '*.sh'` で、まだコミットしていない新しいファイルを含める。
   - 完了の確かめ方: `git status` に、写した3つのファイルが出る。3つとも置き場所の完成版と一致する。本来の場所の `test-inject-writing-rules.sh` が Git Bash と Linux のコンテナの両方で失敗0件で、`.claude/hooks/tests/` の今あるテストも失敗0件で、shellcheck の指摘が0件である
   - 受入基準とテストの対応: 要件1の受入基準1(所有者に送る文の決まりを1つのファイルに書き、書く前にそのファイルを読む)と要件2の受入基準1(チャットの報告と問い、Issue の本文、PR の本文を送る前に、決まりと照らして自分で読み直す)は、タスク2.1 と 2.2 で作ったテスト `test-inject-writing-rules.sh` を本来の場所で流し直して確かめる
   - _要件: 1.1, 2.1_
   - _依存: 2.2_
-  - _保留: 所有者がファイルを写したあとに、親の会話の Claude がタスク2.3を行う(実装のメモ)_
 
 - [ ] 3. 決まりのファイルを読む先を、CLAUDE.md と点検役とスキルの手順につなぐ
 - [x] 3.1 CLAUDE.md の作業規約に、決まりのファイルを指す1行を足す (並行可)
