@@ -25,7 +25,7 @@
   - _要件: 5.1_
   - _対象の部品: メモリの移し替え_
 
-- [ ] 1.4 spec-writing.md から7つの決まりを消し、書き方の決まりのファイルを指す文を足す
+- [x] 1.4 spec-writing.md から7つの決まりを消し、書き方の決まりのファイルを指す文を足す
 
   Claude は、部品「spec-writing.md の直し」のとおり、`.kiro/settings/rules/spec-writing.md` から7つの見出しとその本文と例を消す。Claude は、「対応の行だけは要件の番号で書く」を残し、`owner-writing.md` の「番号だけで別の箇所を指さない」の例外であることを書き添える。Claude は、`spec-writing.md` の冒頭に、spec の本文には `owner-writing.md` の決まりも当てはまることと、`owner-writing.md` を先に読むことを書く。
   - 完了の確かめ方: `grep '^### '` で `spec-writing.md` の見出しの行を並べると、部品の節に挙げた7つの見出しが無い。`spec-writing.md` の冒頭に `owner-writing.md` を指す文があり、「対応の行だけは要件の番号で書く」の見出しが残っている
