@@ -7,7 +7,7 @@
   - 受入基準とテストの対応: 要件2の受入基準6(3回とも、着手した Claude がファイルを書き換える前に表を返答の本文に書き、返事を待つところで返答を終える)と、要件5の受入基準1(仕組みを外した状態で3回の試しを行う)を判定する分け方は、上の前の試しの記録での照合で確かめる
   - _要件: 2.6, 5.1_
 
-- [ ] 2. 着手の進み方を説明する文書を書き換える
+- [x] 2. 着手の進み方を説明する文書を書き換える
 - [x] 2.1 着手の手順書を書き換える (並行可)
 
   Claude は、部品「start の SKILL.md」のとおりに、`.claude/skills/start/SKILL.md` の冒頭の文、Step 6 の「してほしいこと」の1つ目、Step 7 の「問いが無いとき」の文、Step 7 の「すでに spec がある機能を spec 無しで直す」の文を書き換え、Step 6 に箇条を1つ足す。あわせて、Claude は、Step 7 の「問いの出し方と答えの書き足し」の節の前に、節「判断への返事を受けたとき」を足す。Claude は、足す節に、所有者の返事を部品の「呼び出し方」の4つに分けることと、分けた先ごとの進み方を書く。
@@ -33,14 +33,13 @@
   - _対象の部品: README.md_
 
 - [ ] 3. フックを外して試す
-- [ ] 3.1 フックを取り除き、所有者に写してもらってコミットする
+- [x] 3.1 フックを取り除き、所有者に写してもらってコミットする
 
   Claude は、部品「require-start-report.sh と、そのテストと登録」の「権限」と「取り除くとき」のとおりに、今の `.claude/settings.json` から `PreToolUse` の `"matcher": "Edit|Write|NotebookEdit"` の要素を外した写しを、`<scratchpad>/hookdraft/settings.json` に作る。Claude は、所有者に、`.claude/hooks/require-start-report.sh` と `.claude/hooks/tests/test-require-start-report.sh` を `git rm` で消すコマンドと、写しを `cp` で `.claude/settings.json` に写すコマンドを、1つのまとまりで示す。所有者が写したあと、Claude は `git status --porcelain --untracked-files=no` を確かめてコミットする。
   - 完了の確かめ方: 写しの `settings.json` が JSON として読め、今のファイルとの違いが外した1つの要素だけである。所有者が写したあとの `git status --porcelain --untracked-files=no` に、消した2つのファイルと `.claude/settings.json` のほかの変更が無い。Claude は、まだコミットしていない新しいファイル(この spec のフォルダのファイルなど)を、ほかの変更に数えない。コミットしたあとに、`git ls-files .claude/hooks/require-start-report.sh .claude/hooks/tests/test-require-start-report.sh` の出力が空で、`.claude/settings.json` に `require-start-report.sh` の文字が無い。作業のブランチの、main との分かれ目からの違いに、この2つのファイルが出ない
   - 受入基準とテストの対応: 要件5の受入基準1(仕組みを外した状態で試しを行う)の、仕組みを外した状態は、上のコミットのあとの照合で確かめる
   - _要件: 5.1_
   - _依存: 2.1, 2.2, 2.3_
-  - _保留: 所有者がコマンドでファイルを変えるので、親の会話の Claude が進める_
 
 - [ ] 3.2 フックを外した状態で3回試し、結果を記録する
 

@@ -117,16 +117,6 @@
         ],
         "PreToolUse": [
             {
-                "matcher": "Edit|Write|NotebookEdit",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/require-start-report.sh\"",
-                        "timeout": 15
-                    }
-                ]
-            },
-            {
                 "matcher": "Bash",
                 "hooks": [
                     {
