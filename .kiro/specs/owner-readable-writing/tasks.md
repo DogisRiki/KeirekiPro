@@ -42,7 +42,7 @@
   - _対象の部品: owner-writing-examples.md_
 
 - [ ] 2. 決まりの要点を渡すフックを作る
-- [ ] 2.1 フックとそのテストを置き場所に作る (並行可)
+- [x] 2.1 フックとそのテストを置き場所に作る (並行可)
 
   Claude は、部品「inject-writing-rules.sh」の呼び出し方と失敗したときの扱いのとおりに、フックとテストを、置き場所の `place-1/` に、リポジトリと同じ並び(`place-1/.claude/hooks/inject-writing-rules.sh`、`place-1/.claude/hooks/tests/test-inject-writing-rules.sh`)で作る(置き場所は実装のメモ)。テストは、design の「テストの方針」の単体テストの場合のうち、`settings.json` の登録を確かめる場合を除いた3つの場合を持つ。テストは、`CLAUDE_PROJECT_DIR` を一時のフォルダに向け、そこに決まりのファイルを置いてフックを動かす。フックは、bash と perl(JSON::PP)で書き、jq を使わない。
   - 完了の確かめ方: 検査用の写し(実装のメモ)で、Git Bash の `bash .claude/hooks/tests/test-inject-writing-rules.sh` と、Linux のコンテナ(alpine に bash・perl・git を入れたもの)の中の同じテストが、どちらもすべての場合を通し、終了コード0で終わる。検査用の写しの全 `.sh` を CI と同じ shellcheck(`koalaman/shellcheck:v0.11.0`)にまとめて渡し、指摘が0件である。フックの、`### ` の見出しの直後の1文目を抜き出す処理を一時的に壊すと、決まりが3つある場合が失敗する。9千字で打ち切る処理を一時的に外すと、9千字を超える場合が失敗する。確かめたあと、Claude は壊した処理を元に戻す
