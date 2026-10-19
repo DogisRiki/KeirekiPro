@@ -5,6 +5,7 @@
     { "context": "e2e-smoke", "mode": "conditional", "state": "active", "approval_gated": false },
     { "context": "escape-hatch", "mode": "always", "state": "active", "approval_gated": true },
     { "context": "size-check", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "claude-md-size", "mode": "always", "state": "active", "approval_gated": false },
     { "context": "gitleaks", "mode": "always", "state": "active", "approval_gated": false },
     {
       "context": "codex-review",
