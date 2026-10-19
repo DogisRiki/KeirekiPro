@@ -10,6 +10,8 @@
 #      この照合には使わない(照合は名前の集合のみで行う)。
 #   2. スキップ検知: 対象期間内にmainへマージされたPRごとに、PRの
 #      headコミット(pulls APIの head.sha)の check-runs を走査する。
+#      どのチェックを見るかは、そのPRをマージした時点の期待一覧
+#      (マージコミットの版。contents API で読む)で決める。
 #        mode: always かつ state: active の context に「実行の証拠」が
 #          無い(全check-runがskipped、または1件も無い)→ 違反。
 #          1件以上で exit 1(逸脱あり。PR番号+チェック名を列挙)
@@ -43,6 +45,17 @@
 #   チェックのcheck-runsが存在しない。merge_commit_sha を走査すると
 #   全PRが「実行なし=違反」の偽赤になる(必須チェックはすべて
 #   GitHub Actionsのcheck-runsで報告されることを実測済み)。
+#
+# なぜマージした時点の期待一覧で判定するのか:
+#   今の期待一覧で判定すると、常に動く必須チェックを新しく足した週に、
+#   そのチェックを足す前にマージしたPRまで「実行の証拠が無い」違反として
+#   挙がる(#587 の claude-md-size)。必須チェックを足すときは期待一覧への
+#   登録を同じ変更に含める決まりのため、マージコミットの版の期待一覧には、
+#   そのPRのときに必須だったチェックだけが載っている。マージコミットは
+#   check-runs の走査には使わず(上記)、期待一覧の版を読むためだけに使う。
+#   過去の版は、判定に使う欄(context/mode/state/issue)だけを確かめる。
+#   今のスキーマで縛ると、スキーマを変えた週に、それより前にマージした
+#   PRがすべて判定不能になるため。
 #
 # なぜ「最新の結論」ではなく「実行の証拠の有無」で判定するのか:
 #   guardrails.yaml は pull_request_review イベントでも発火し、承認操作の
@@ -251,19 +264,20 @@ if ! pulls_list=$(printf '%s' "$pulls_json" | jq -ces --arg boundary "$boundary"
         (add // [])
         | if all(((.number? | type) == "number") and ((.head.sha? | type) == "string")) then
               map(select(((.merged_at? | type) == "string") and (.merged_at >= $boundary)))
-              | map({number: .number, sha: .head.sha})
+              | if all((.merge_commit_sha? | type) == "string") then
+                    map({number: .number, sha: .head.sha, merge_sha: .merge_commit_sha})
+                else empty end
           else empty end
     else empty end' 2>/dev/null); then
     report_undecidable "PR一覧APIの応答を解釈できませんでした。"
 fi
 
 # --- PRごとのスキップ走査(3.6-3.8) ----------------------------------------------
-# 判定に使うcontextは mode: always のみ(conditional のスキップは変更検知に
-# よる正当なもの=3.8)。always は state で違反(active)と停止中報告
-# (paused)に分ける。
-always_active=$(jq -c '[.checks[] | select(.mode == "always" and .state == "active") | .context]' "$CHECKS_FILE")
-paused_map=$(jq -c '[.checks[] | select(.mode == "always" and .state == "paused")
-    | {key: .context, value: .issue}] | from_entries' "$CHECKS_FILE")
+# 判定に使うcontextは、そのPRをマージした時点の期待一覧の mode: always のみ
+# (conditional のスキップは変更検知による正当なもの=3.8)。always は state で
+# 違反(active)と停止中報告(paused)に分ける。
+# 期待一覧のリポジトリ内のパス。マージした時点の版を contents API で読む。
+EXPECTED_LIST_PATH=".github/audit/required-checks.json"
 
 violation_report=""
 paused_report=""
@@ -273,6 +287,37 @@ i=0
 while [ "$i" -lt "$pr_count" ]; do
     number=$(jq -r ".[$i].number" <<<"$pulls_list")
     sha=$(jq -r ".[$i].sha" <<<"$pulls_list")
+    merge_sha=$(jq -r ".[$i].merge_sha" <<<"$pulls_list")
+
+    # マージした時点の期待一覧を読む。読めない(その版にファイルが無い場合を
+    # 含む)・判定に使う欄が壊れているときは、今の期待一覧で代用せず判定不能に
+    # する。代用すると、#587 と同じ誤った違反を黙って出しうるため。
+    list_json=""
+    if ! list_json=$(gh api -H "Accept: application/vnd.github.raw+json" \
+        "repos/${REPO}/contents/${EXPECTED_LIST_PATH}?ref=${merge_sha}" 2>/dev/null); then
+        report_undecidable "PR #${number} をマージした時点の期待一覧(${EXPECTED_LIST_PATH}@${merge_sha})を読めませんでした。"
+    fi
+
+    expected_at_merge=""
+    if ! expected_at_merge=$(printf '%s' "$list_json" | jq -ce '
+        if ((.checks? | type) == "array")
+           and ([.checks[]
+               | (type == "object")
+                 and ((.context? | type) == "string")
+                 and (.mode == "always" or .mode == "conditional")
+                 and (.state == "active" or .state == "paused")
+                 and (if .state == "paused" then has("issue") else true end)
+           ] | all)
+        then {
+            active: [.checks[] | select(.mode == "always" and .state == "active") | .context],
+            paused: ([.checks[] | select(.mode == "always" and .state == "paused")
+                      | {key: .context, value: .issue}] | from_entries)
+        }
+        else empty end' 2>/dev/null); then
+        report_undecidable "PR #${number} をマージした時点の期待一覧(${EXPECTED_LIST_PATH}@${merge_sha})を解釈できませんでした。"
+    fi
+    always_active=$(jq -c '.active' <<<"$expected_at_merge")
+    paused_map=$(jq -c '.paused' <<<"$expected_at_merge")
 
     # headコミットのcheck-runsを取得する。per_page=100 は必須チェック数+
     # イベント多重発火分に対して十分な余裕がある(APIの既定 filter=latest が
@@ -324,6 +369,7 @@ emit_scope_and_paused_sections() {
         echo "#### スキップ検知の対象期間"
         echo ""
         echo "- ${window_desc}(対象のマージ済みPR: ${pr_count}件)"
+        echo "- 各PRは、そのPRをマージした時点の期待一覧に載っていた必須チェックで判定しています"
         echo ""
         echo "#### 停止中と記録されている必須チェックのスキップ"
         echo ""

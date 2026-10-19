@@ -33,11 +33,30 @@ mkdir -p "$WORK/bin"
 # 呼び出しの引数を $STUB_CALLS に記録し、URLに応じてcannedな応答を返す。
 # ruleset は $STUB_RULES、自ワークフローの実行一覧は $STUB_WFRUNS、
 # PR一覧は $STUB_PULLS、check-runs はURL中のSHAごとに $STUB_DIR/checkruns_<sha>.json。
+# マージした時点の期待一覧は、URLの ref ごとに $STUB_DIR/list_<ref>.json があれば
+# それを、無ければ $STUB_LIST_DEFAULT(引数に渡した今の期待一覧)を返す。
+# $STUB_DIR/list_<ref>.missing があれば、その版にファイルが無いときの404を返す。
 # STUB_FAIL_* で各APIの失敗を再現する。
 cat >"$WORK/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"${STUB_CALLS:?}"
 case "$*" in
+*/contents/*)
+    if [ -n "${STUB_FAIL_CONTENTS:-}" ]; then
+        echo "stub: API failure" >&2
+        exit 1
+    fi
+    ref=$(printf '%s' "$*" | sed -n 's|.*[?&]ref=\([^& ]*\).*|\1|p')
+    if [ -f "${STUB_DIR:?}/list_${ref}.missing" ]; then
+        echo '{"message":"Not Found","status":"404"}'
+        exit 1
+    fi
+    if [ -f "${STUB_DIR:?}/list_${ref}.json" ]; then
+        cat "${STUB_DIR:?}/list_${ref}.json"
+    else
+        cat "${STUB_LIST_DEFAULT:?}"
+    fi
+    ;;
 *rules/branches/*)
     if [ -n "${STUB_FAIL_RULES:-}" ]; then
         echo "stub: API failure" >&2
@@ -106,6 +125,7 @@ run() {
     PATH="$WORK/bin:$PATH" \
         STUB_CALLS="$WORK/calls.log" STUB_RULES="$WORK/rules.json" \
         STUB_WFRUNS="$WORK/wfruns.json" STUB_PULLS="$WORK/pulls.json" STUB_DIR="$WORK" \
+        STUB_LIST_DEFAULT="$1" STUB_FAIL_CONTENTS="${STUB_FAIL_CONTENTS:-}" \
         STUB_FAIL_RULES="${2:-}" STUB_FAIL_WFRUNS="${3:-}" \
         STUB_FAIL_PULLS="${4:-}" STUB_FAIL_CHECKRUNS="${5:-}" STUB_JQ_FAIL="${6:-}" \
         GITHUB_REPOSITORY="owner/repo" GH_TOKEN="dummy" \
@@ -144,6 +164,7 @@ check_invocation() {
         PATH="$WORK/bin:$PATH" \
         STUB_CALLS="$WORK/calls.log" STUB_RULES="$WORK/rules.json" \
         STUB_WFRUNS="$WORK/wfruns.json" STUB_PULLS="$WORK/pulls.json" STUB_DIR="$WORK" \
+        STUB_LIST_DEFAULT="$WORK/checks.json" STUB_FAIL_CONTENTS="" \
         STUB_FAIL_RULES="" STUB_FAIL_WFRUNS="" STUB_FAIL_PULLS="" STUB_FAIL_CHECKRUNS="" \
         STUB_JQ_FAIL="" NOW_EPOCH="${INVOKE_NOW-$NOW}" \
         GITHUB_STEP_SUMMARY="$WORK/summary.md" \
@@ -237,6 +258,7 @@ reset_defaults() {
     set_rules "$(rules_with backend-test codex-review dependency-gate gitleaks)"
     set_wfruns "$(wfruns "$(wfrun 9999 "2026-01-10T00:00:00Z"),$(wfrun 100 "2026-01-08T00:00:00Z")")"
     set_pulls "[]"
+    rm -f "$WORK"/list_*
 }
 reset_defaults
 
@@ -332,7 +354,102 @@ set_pulls "[$(pull 303 '"2026-01-09T00:00:00Z"' sha303h sha303m)]"
 set_checkruns sha303h "$(runs "$(crun 1 gitleaks completed '"success"' "2026-01-09T00:00:00Z"),$(crun 2 dependency-gate completed '"success"' "2026-01-09T00:00:00Z")")"
 check 0 "PRのheadコミット(head.sha)のcheck-runsで判定する"
 check_calls "commits/sha303h/check-runs" "head.shaのcheck-runsを取得している"
-check_no_calls "sha303m" "merge_commit_shaは使わない(squashマージでは全PRが偽赤になる)"
+check_no_calls "commits/sha303m" "check-runsの走査にmerge_commit_shaは使わない(squashマージでは全PRが偽赤になる)"
+
+reset_defaults
+
+echo "--- マージした時点の期待一覧で判定する(#588) ---"
+# 今の期待一覧には常時の必須チェック claude-md-size があるが、PR 601 を
+# マージした時点の版(mrg601)には無い。PR 602 をマージした時点の版には
+# 今の期待一覧と同じく載っている(既定の応答=今の期待一覧)。
+CHECKS_WITH_NEW='{
+  "checks": [
+    { "context": "gitleaks", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "claude-md-size", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "codex-review", "mode": "always", "state": "paused", "approval_gated": false,
+      "reason": "整備期間中はCIでのレビューを行わない", "issue": 166 }
+  ]
+}'
+CHECKS_BEFORE_NEW='{
+  "checks": [
+    { "context": "gitleaks", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "codex-review", "mode": "always", "state": "paused", "approval_gated": false,
+      "reason": "整備期間中はCIでのレビューを行わない", "issue": 166 }
+  ]
+}'
+set_checks "$CHECKS_WITH_NEW"
+set_rules "$(rules_with claude-md-size codex-review gitleaks)"
+printf '%s' "$CHECKS_BEFORE_NEW" >"$WORK/list_mrg601.json"
+set_checkruns sha601 "$(runs "$(crun 1 gitleaks completed '"success"' "2026-01-08T12:00:00Z")")"
+set_checkruns sha602 "$(runs "$(crun 1 gitleaks completed '"success"' "2026-01-09T00:00:00Z"),$(crun 2 claude-md-size completed '"success"' "2026-01-09T00:00:00Z")")"
+
+set_pulls "[$(pull 601 '"2026-01-08T12:00:00Z"' sha601 mrg601)]"
+check 0 "必須チェックを足す前にマージしたPRは、そのチェックが無くても違反にしない"
+check_calls "contents/.github/audit/required-checks.json?ref=mrg601" "マージコミットの版の期待一覧を読んでいる"
+check_calls "application/vnd.github.raw+json" "期待一覧はファイルの中身のまま(raw)で読んでいる"
+check_summary "マージした時点の期待一覧" "マージした時点の期待一覧で判定したことが報告に出る"
+
+set_pulls "[$(pull 602 '"2026-01-09T00:00:00Z"' sha602 mrg602),$(pull 601 '"2026-01-08T12:00:00Z"' sha601 mrg601)]"
+set_checkruns sha602 "$(runs "$(crun 1 gitleaks completed '"success"' "2026-01-09T00:00:00Z")")"
+check 1 "必須チェックを足したあとにマージしたPRは、そのチェックが無ければ違反にする"
+check_summary "#602: claude-md-size" "足したあとのPRの違反が報告に出る"
+if grep -qF -- "#601: claude-md-size" "$WORK/summary.md"; then
+    echo "FAIL: 足す前のPRは違反として報告しない (#601 が違反に出ている)"
+    FAILED=1
+else
+    echo "PASS: 足す前のPRは違反として報告しない"
+fi
+
+# 対照: 版を分けなければ(=今の期待一覧で判定すると)PR 601 も違反になる。
+# 上の緑が、マージした時点の版を読んだことによることを確かめる。
+rm -f "$WORK/list_mrg601.json"
+set_pulls "[$(pull 601 '"2026-01-08T12:00:00Z"' sha601 mrg601)]"
+check 1 "同じPRでも、マージした時点の版にチェックが載っていれば違反にする(対照)"
+check_summary "#601: claude-md-size" "対照では違反のPR番号とチェック名が報告に出る"
+
+# 停止中かどうかも、マージした時点の版に従う。今は active の gitleaks が、
+# PR 603 をマージした時点では paused だった。
+printf '%s' '{"checks":[
+  { "context": "gitleaks", "mode": "always", "state": "paused", "approval_gated": false,
+    "reason": "一時停止", "issue": 700 },
+  { "context": "claude-md-size", "mode": "always", "state": "active", "approval_gated": false }
+]}' >"$WORK/list_mrg603.json"
+set_pulls "[$(pull 603 '"2026-01-09T00:00:00Z"' sha603 mrg603)]"
+set_checkruns sha603 "$(runs "$(crun 1 gitleaks completed '"skipped"' "2026-01-09T00:00:00Z"),$(crun 2 claude-md-size completed '"success"' "2026-01-09T00:00:00Z")")"
+check 0 "マージした時点で停止中だったチェックのスキップは違反にしない"
+check_summary "#603: gitleaks(停止中: #700)" "マージした時点の版の参照Issueで停止中と報告する"
+
+# 過去の版は判定に使う欄だけを確かめる。今のスキーマに無い欄があっても、
+# 今のスキーマで必須の欄(approval_gated)が無くても判定する。
+printf '%s' '{"checks":[
+  { "context": "gitleaks", "mode": "always", "state": "active", "note": "old" }
+]}' >"$WORK/list_mrg604.json"
+set_pulls "[$(pull 604 '"2026-01-09T00:00:00Z"' sha604 mrg604)]"
+set_checkruns sha604 "$(runs "$(crun 1 gitleaks completed '"success"' "2026-01-09T00:00:00Z")")"
+check 0 "過去の版の、判定に使わない欄の違いでは判定不能にしない"
+
+printf '%s' '{"checks":[{ "context": "gitleaks", "mode": "always", "state": "paused" }]}' >"$WORK/list_mrg604.json"
+check 2 "過去の版で停止中なのに参照Issueが無ければ判定不能として2を返す"
+check_summary "解釈できませんでした" "過去の版を解釈できないことが報告に出る"
+
+printf '%s' '{"checks":{"context":"gitleaks"}}' >"$WORK/list_mrg604.json"
+check 2 "過去の版のchecksが配列でなければ判定不能として2を返す"
+
+printf '%s' 'not-json' >"$WORK/list_mrg604.json"
+check 2 "過去の版をJSONとして解釈できなければ判定不能として2を返す"
+
+rm -f "$WORK/list_mrg604.json"
+: >"$WORK/list_mrg604.missing"
+check 2 "マージした時点の版に期待一覧が無ければ、今の期待一覧で代用せず判定不能として2を返す"
+check_summary "読めませんでした" "マージした時点の期待一覧を読めないことが報告に出る"
+rm -f "$WORK/list_mrg604.missing"
+
+STUB_FAIL_CONTENTS=yes check 2 "期待一覧の版を読むAPIが失敗したら判定不能として2を返す"
+check_summary "判定不能" "判定不能の見出しが出る"
+
+set_pulls '[{"number":605,"state":"closed","merged_at":"2026-01-09T00:00:00Z","head":{"sha":"sha605"},"merge_commit_sha":null,"base":{"ref":"main"}}]'
+check 2 "マージ済みのPRにmerge_commit_shaが無ければ判定不能として2を返す"
+check_no_calls "commits/sha605" "merge_commit_shaが無ければcheck-runsへ進まない"
 
 reset_defaults
 
