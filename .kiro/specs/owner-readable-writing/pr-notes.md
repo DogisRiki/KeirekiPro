@@ -113,8 +113,12 @@ Claude は、組ごとに、差し戻された文にまだ直していないセ�
 | 返事の形は、場面ごとに決める | request-grilling-style.md | 一部 |
 | 選択肢を減らすときは、減らした理由を1つずつ書く | request-honor-owner-constraints.md | 一部 |
 | 所有者に頼む手順には、押す場所、打つコマンド、うまくいったかの見分け方を書く | user-runs-github-write-commands.md | 一部 |
+| 所有者に頼む手順には、押す場所、打つコマンド、うまくいったかの見分け方を書く | no-app-run-button.md | 全部 |
+| 決まりと普通の判断で答えが決まることを、所有者に尋ねない | recheck-without-asking.md | 一部 |
 
 no-unintelligible-reports.md の「送る前にすること」は、見出しではなく、`owner-writing.md` の冒頭の「送る前の読み直し」の節に当たる。writing-style-feedback.md の「図の中の矢印は使ってよい」は、見出しではなく、`owner-writing.md` の「決まりの例外」の節に当たる。
+
+no-app-run-button.md と recheck-without-asking.md は、タスク1.3 を終えたあとに、所有者の指摘を受けて Claude が作ったメモリのファイルである。Claude は、出荷の前の確かめでこの2つが表に無いことに気づき、表に足した。no-app-run-button.md の中身は、例の一覧の組70 と、決まり「所有者に頼む手順には、押す場所、打つコマンド、うまくいったかの見分け方を書く」の本文に移した。
 
 ### 一部を移したファイルに残すこと
 
@@ -133,6 +137,7 @@ no-unintelligible-reports.md の「送る前にすること」は、見出しで
 - request-grilling-style.md: `/request` で何を問いにしてよいか、いつ終えるかという、壁打ちの進め方を残す
 - request-honor-owner-constraints.md: 問いを出す前に、所有者が決めたことを打ち消していないかを読むという、作業の進め方を残す
 - user-runs-github-write-commands.md: `.github/` への書き込みを scratchpad で作り、写すコマンドを所有者に渡し、写したあとに一致を確かめるという手順を残す
+- recheck-without-asking.md: 同じ失敗が3回続いて止まったあと、所有者が続けると答えたら、そのあとの確認には尋ねずに出すという、作業の進め方を残す
 
 ### 移さなかったメモリのファイル
 
