@@ -1,9 +1,10 @@
 name: Terraform Apply
 
 # インフラの本番反映は人間の手動実行でのみ行う(アプリのrelease.yamlと同じ方針)。
-# mainへのマージだけではapplyされない。terraform/** のPRは terraform-plan.yaml が
-# plan結果をコメントするので、それを確認してマージし、反映したいタイミングで
-# このワークフローを実行する。
+# mainへのマージだけではapplyされない。反映したいタイミングでこのワークフローを実行する。
+# PRで動く terraform-plan.yaml は本番の状態を読まない検査だけを行う。本番の状態との
+# 差分は、承認のあと、適用の直前にこのワークフローのログへ出す。
+# 本番の秘密は production environment の secrets に置き、承認が通ったジョブにだけ渡る。
 
 on:
   workflow_dispatch:
@@ -28,8 +29,7 @@ jobs:
     # まだ発行されていない。
     #
     # 手元の禁止設定(.claude/settings.json の deny)は Claude Code 側の仕組みで、
-    # 打ち方によっては素通りしうる。こちらは GitHub 側で強制されるため、
-    # 誰がどう起動しても承認を挟む。
+    # こちらは GitHub 側で強制され、誰がどう起動しても承認を挟む。
     #
     # environment を指定すると OIDC の sub が
     # repo:OWNER/REPO:environment:production になり、ref は refs/heads/main の
@@ -59,8 +59,7 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      # マージからapply実行までの間にmainが進んでいた場合の確認用に、
-      # apply直前の差分をログへ表示する。-out で保存したplanをそのまま適用することで、
+      # 本番の状態との差分を、apply直前にログへ表示する。-out で保存したplanをそのまま適用することで、
       # 表示した差分と適用内容の厳密一致を保証する
       - name: Terraform Plan (差分の事前表示)
         run: |

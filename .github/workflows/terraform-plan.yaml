@@ -5,13 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  id-token: write
   contents: read
-  pull-requests: write
-
-env:
-  AWS_REGION: ap-northeast-1
-  TF_VERSION: '1.9.0'
 
 jobs:
   # ワークフロー単位の paths フィルタは使わない。フィルタでワークフロー自体が
@@ -20,7 +14,6 @@ jobs:
   # ジョブ単位のスキップは成功として報告されるため、ci.yaml と同じ方式にする。
   detect-terraform-changes:
     runs-on: ubuntu-latest
-    # ワークフローレベルの id-token: write / pull-requests: write を継承させない
     permissions:
       contents: read
     outputs:
@@ -41,8 +34,10 @@ jobs:
               - 'docker/terraform/**'
               - '.github/workflows/terraform-plan.yaml'
 
-  # AWS認証を必要としない検査。plan と分けているのは、認証やsecretsが無い状況でも
-  # 動かせるようにするため。ローカルの /verify-terraform と同じイメージを使い、
+  # AWS認証を必要としない検査。PRで動くジョブは、まだ承認されていないコードを動かすため、
+  # 本番のAWSの権限も本番の秘密も渡さない。本番の状態との差分(plan)は、
+  # 本番の承認が通ったあとに terraform-apply.yaml の中で出す。
+  # ローカルの /verify-terraform と同じイメージを使い、
   # tflint と checkov のバージョンをCIとローカルで一致させる。
   terraform-static:
     name: terraform-static
@@ -83,126 +78,3 @@ jobs:
           docker run --rm -v "$PWD/terraform:/workspace" -w /workspace \
             --entrypoint checkov keirekipro-terraform -d .
 
-  terraform-plan:
-    needs: detect-terraform-changes
-    if: needs.detect-terraform-changes.outputs.terraform_changed == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          # plan は状態と現状を読むだけで、書き換えを行わない。PRから引き受ける経路は
-          # ブランチで絞れない(pull_request の sub にブランチ名が入らない)ため、
-          # ここが広い権限を持つと、PRを出せる者が構築・削除まで行えることになる。
-          # 参照専用のロールに分けている(#222)。
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-plan-role
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-
-      - name: Terraform Init
-        id: init
-        run: terraform init
-
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate -no-color
-
-      - name: Terraform Plan
-        id: plan
-        run: |
-          terraform plan -var-file=environments/prod/terraform.tfvars -no-color -out=tfplan \
-            -var="jwt_secret=${{ secrets.TF_VAR_jwt_secret }}" \
-            -var="google_oauth_client_id=${{ secrets.TF_VAR_google_oauth_client_id }}" \
-            -var="google_oauth_client_secret=${{ secrets.TF_VAR_google_oauth_client_secret }}" \
-            -var="github_oauth_client_id=${{ secrets.TF_VAR_github_oauth_client_id }}" \
-            -var="github_oauth_client_secret=${{ secrets.TF_VAR_github_oauth_client_secret }}" \
-            -var="alert_email_address=${{ secrets.TF_VAR_alert_email_address }}"
-        continue-on-error: true
-
-      - name: Generate Plan Output
-        id: show
-        run: terraform show -no-color tfplan
-        continue-on-error: true
-
-      - name: Comment on PR
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const initOutcome = '${{ steps.init.outcome }}';
-            const validateOutcome = '${{ steps.validate.outcome }}';
-            const planOutcome = '${{ steps.plan.outcome }}';
-
-            let planOutput = `${{ steps.show.outputs.stdout }}`;
-
-            const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
-            const failureNote = planOutcome === 'success'
-              ? ''
-              : `\n> :x: Planが失敗しました。詳細は [Actionsの実行ログ](${runUrl}) を参照してください。\n`;
-
-            // 出力が長すぎる場合は切り詰める
-            const maxLength = 60000;
-            if (planOutput.length > maxLength) {
-              planOutput = planOutput.substring(0, maxLength) + '\n\n... (truncated)';
-            }
-
-            const output = `## Terraform Plan Results
-
-            | Step | Status |
-            |------|--------|
-            | ⚙️ Init | ${initOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
-            | ✅ Validate | ${validateOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
-            | 📖 Plan | ${planOutcome === 'success' ? '✅ Success' : '❌ Failed'} |
-            ${failureNote}
-            <details><summary>📋 Show Plan Output</summary>
-
-            \`\`\`hcl
-            ${planOutput}
-            \`\`\`
-
-            </details>
-
-            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-            // 既存のコメントを探して更新、なければ新規作成
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('## Terraform Plan Results')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: output
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: output
-              });
-            }
-
-      - name: Exit on Plan Failure
-        if: steps.plan.outcome == 'failure'
-        run: exit 1
