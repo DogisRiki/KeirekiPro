@@ -135,7 +135,7 @@
           "pattern": "(?m)^FROM hashicorp/terraform:(?<version>[0-9]+(?:\\.[0-9]+)*)"
         },
         {
-          "files": [".github/workflows/terraform-plan.yaml", ".github/workflows/terraform-apply.yaml"],
+          "files": [".github/workflows/terraform-apply.yaml"],
           "pattern": "(?m)^[ \\t]*TF_VERSION:[ \\t]*['\"]?(?<version>[0-9][0-9.]*)"
         }
       ],

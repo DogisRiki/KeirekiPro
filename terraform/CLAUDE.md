@@ -13,10 +13,9 @@ terraform配下・CI/CD(`.github/workflows/`)に関わる変更のとき常に�
 ## 安全不変条件(絶対に守る)
 
 - **`terraform apply` をローカルで実行しない**。applyは人間が手動実行するワークフロー(terraform-apply.yaml)でのみ行う
-- **planとapplyはAWSの権限が異なる**。PRで動く `terraform-plan.yaml` は参照専用の
-  `keirekipro-github-actions-plan-role` を使い、状態ファイルのロック以外の書き込みができない。
-  applyだけが構築用の `keirekipro-github-actions-role` を使う(#222)。
-  planで書き込みを伴う操作が要るコードを書くと、planの段階で権限不足になる
+- **PRで動くワークフローはAWSに接続しない**。PRで動く `terraform-plan.yaml` は静的検査だけを行い、
+  AWSの権限も本番の秘密も持たない。本番の状態との差分(plan)は、承認が通ったあとに
+  `terraform-apply.yaml` が適用の直前に出す。PRのジョブにAWSの認証や本番の秘密を足さない
 - デプロイゲートを弱めない: release.yaml の手動トリガー構造、ブランチ保護のrequired checks、
   CI内の検証ステップを削除・緩和しない
 - CIのbypass(`--no-verify`、requiredチェックのskip条件追加等)を仕込まない

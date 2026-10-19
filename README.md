@@ -95,7 +95,7 @@ flowchart LR
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
 |---|---|---|---|
 | 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存。テスト結果とカバレッジの成果物は、mainへのpushでは90日、プルリクエストでは7日保持する |
-| 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査(AWS認証不要)と、Terraform Planの実行および結果のPRコメント。terraform関連の変更が無いPRでは各ジョブをスキップする |
+| 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査。本番のAWSには接続しない(本番との差分は terraform-apply.yaml が適用の直前に出す)。terraform関連の変更が無いPRでは各ジョブをスキップする |
 | 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする |
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。本番用のイメージをarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
