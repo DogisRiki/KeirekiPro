@@ -50,7 +50,7 @@
   - _要件: 1.1, 2.1_
   - _対象の部品: inject-writing-rules.sh_
 
-- [ ] 2.2 settings.json にフックを登録した写しを置き場所に作る
+- [x] 2.2 settings.json にフックを登録した写しを置き場所に作る
 
   Claude は、今の `.claude/settings.json` を Read で読んで写しを作り、その `UserPromptSubmit` に `inject-writing-rules.sh` を足したものを、置き場所の `place-1/.claude/settings.json` に作る。打ち切りの時間は10秒にする。今ある項目は変えない。Claude は、タスク2.1 で作ったテスト `test-inject-writing-rules.sh` に、`settings.json` の `UserPromptSubmit` に `inject-writing-rules.sh` が登録されていることを確かめる場合を足す。
   - 完了の確かめ方: `place-1/.claude/settings.json` が JSON として読め、`git diff --no-index` で今の `settings.json` と比べたとき、違いが `UserPromptSubmit` への1つのフックの追加だけである。検査用の写しで、Git Bash と Linux のコンテナの `test-inject-writing-rules.sh` が、登録を確かめる場合を含めて失敗0件で終わる。shellcheck を、タスク2.1 と同じく、検査用の写しの全 `.sh` を `koalaman/shellcheck:v0.11.0` にまとめて渡す形で流し、指摘が0件である。`settings.json` の登録の行を一時的に消すと、登録を確かめる場合が失敗する
