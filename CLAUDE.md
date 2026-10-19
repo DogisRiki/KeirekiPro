@@ -3,7 +3,7 @@
 エンジニア向け職務経歴書の作成・管理を行うフルスタックWebアプリケーション。
 開発は、人間がコードをレビューしないことを前提とした自律パイプラインで行う。
 実装からマージまでを自律的に進め、品質は自動チェック(テスト・静的解析・カバレッジ閾値・
-Codexによるクロスレビュー)で担保する。人間が関与するのは、作るものの決定(`/request` で始める壁打ちを経てAIが要望を起票)・specの承認・
+Codexによるクロスレビュー)で担保する。人間が関与するのは、作るものの決定(`/request` で始める壁打ちを経てAIが要望を起票)・着手の判断の確認・specの承認・
 影響の大きい変更の承認・デプロイ前確認・デプロイ実行のみ。
 
 ## リポジトリ構成
@@ -79,7 +79,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 ## spec駆動開発(cc-sdd / Kiro-style)
 
 spec で進めるか(Lane A)、spec 無しで進めるか(Lane B)は、着手時に `/start` が決める。
-AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(`.claude/skills/start/SKILL.md`)の「観点の定義」の4つの観点で判断し、判断と観点ごとの理由を所有者に示す。spec が要らないと判断して返事を待たずに実装するときも、実装を始める前に示す。
+AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(`.claude/skills/start/SKILL.md`)の「観点の定義」の4つの観点で判断し、判断と観点ごとの理由を所有者に示す。spec が要らないと判断したときも、AIは示したところで止まり、所有者の返事を受けてから実装する。
 
 - 変更の行数の見込みは、着手時の判断に使わない。200行の検査は、着手時の判断をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない(全文は `.claude/skills/start/SKILL.md` の「Step 5: 判断する」)
 - 観点ごとの定義(「当たる」「当たらない」、3つの材料、1回尋ねれば決まる)は、`.claude/skills/start/SKILL.md` の「Step 5: 判断する」の「観点の定義」の表と表の下の箇条のとおりとする
@@ -99,7 +99,7 @@ AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(
   spec-reviewer と codex-review は本文だけを判定の基準にする。Issueのコメントは要望として読まない。
   `/kiro-discovery` は使わない
 - 着手: Issueへの着手は、所有者が `/start #N` を打って始める。所有者が「#N をやって」のように言葉で着手を頼んだときも、AIは `/start` に従う。
-  spec が要らないと判断しても、所有者に尋ねる問いがあれば、AIは答えを待ち、答えをIssueの本文の「決めた方式」に書き足してから実装する。AIは、着手のときに、まとめたほうがよいほかのIssueを探し、あれば所有者に提案する(進め方ごとの手順の全文は `.claude/skills/start/SKILL.md` の「Step 5.5」「Step 6」「Step 7」)
+  所有者に尋ねる問いがあれば、AIは答えをIssueの本文の「決めた方式」に書き足してから実装する。AIは、着手のときに、まとめたほうがよいほかのIssueを探し、あれば所有者に提案する(進め方ごとの手順の全文は `.claude/skills/start/SKILL.md` の「Step 5.5」「Step 6」「Step 7」)
 - spec の各段階のコマンド(`/kiro-spec-init` `/kiro-spec-requirements` `/kiro-spec-design` `/kiro-spec-tasks` `/kiro-impl`)は所有者が打つ。
   AIは起動しない(`disable-model-invocation` により、AIからは起動できない)。必要なときは所有者に打つよう依頼する
 - Phase 1(仕様化):

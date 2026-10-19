@@ -64,6 +64,7 @@ payload() { # <hook_event_name> <last_assistant_message> [<追加のキー> <値
 #   notify <文>        知らせ(task-notification)
 #   notifyarr <文>     知らせ(本文が文の塊の配列の形)
 #   meta <文>          補足(isMeta)
+#   limitnote <種類>   Claude Code の使う量の上限の知らせ(isMeta と usageLimitNote。wrap_up は猶予、release は戻った)
 add_row() { # <種類> <文>
     TRANSCRIPT="$TRANSCRIPT" perl -MJSON::PP -e '
         my ($kind, $text) = @ARGV;
@@ -76,6 +77,7 @@ add_row() { # <種類> <文>
         elsif ($kind eq "notify") { $d = {type => "user", message => {role => "user", content => "<task-notification>\n$text"}} }
         elsif ($kind eq "notifyarr") { $d = {type => "user", message => {role => "user", content => [{type => "text", text => "<task-notification>\n$text"}]}} }
         elsif ($kind eq "meta") { $d = {type => "user", isMeta => JSON::PP::true, message => {role => "user", content => $text}} }
+        elsif ($kind eq "limitnote") { $d = {type => "user", isMeta => JSON::PP::true, usageLimitNote => $text, message => {role => "user", content => $text eq "wrap_up" ? "[Usage limit reached; a short grace allowance remains, then this turn is cut off without warning.]" : "[Earlier usage-limit notes no longer apply. Continue working normally.]"}} }
         else { die "unknown kind $kind" }
         open my $fh, ">>", $ENV{TRANSCRIPT} or die;
         print $fh JSON::PP->new->utf8->canonical->encode($d), "\n";
@@ -199,6 +201,45 @@ t_stop_backslash_path() {
     expect_delay "$(payload Stop "上限で止まりました" transcript_path "${TRANSCRIPT//\//\\}")" $((4 * 3600 + 20 * 60 + MARGIN))
 }
 
+# --- Stop: 猶予の知らせのまま返答を終えた(戻る時刻が分からない)
+t_grace_note_probes() {
+    add_row prompt "テストを流して"
+    add_row tool "ok"
+    add_row limitnote wrap_up
+    add_row tool "ok"
+    expect_delay "$(payload Stop "使う量の上限に達したので、ここで止めます")" 300
+}
+t_grace_note_time_wins() {
+    add_row prompt "テストを流して"
+    add_row limitnote wrap_up
+    add_row tool "$(limit_line session '5:20pm')"
+    expect_delay "$(payload Stop "上限で止まりました")" $((4 * 3600 + 20 * 60 + MARGIN))
+}
+t_grace_note_released_ignored() {
+    add_row prompt "テストを流して"
+    add_row limitnote wrap_up
+    add_row limitnote release
+    expect_delay "$(payload Stop "上限の知らせは取り消されました")" ""
+}
+t_grace_note_earlier_turn_ignored() {
+    add_row prompt "テストを流して"
+    add_row limitnote wrap_up
+    add_row assistant "上限で止まります"
+    add_row prompt "続けて"
+    add_row tool "ok"
+    expect_delay "$(payload Stop "上限の話はもう済みました")" ""
+}
+t_grace_note_needs_limit_word() {
+    add_row prompt "テストを流して"
+    add_row limitnote wrap_up
+    expect_delay "$(payload Stop "終わりました")" ""
+}
+t_grace_note_stopfailure_ignored() {
+    add_row prompt "テストを流して"
+    add_row limitnote wrap_up
+    expect_delay "$(payload StopFailure "API Error: 429 rate limited")" ""
+}
+
 # --- 待ってから起こすか(待つ時間を数秒に縮めて流す)
 # いまより少し前に戻った上限の文(待つ秒は余白の秒になる)
 recent_limit() {
@@ -209,7 +250,7 @@ recent_limit() {
 
 # 起こすまで待って、終了コードと標準エラーを控える(背景で流し、途中で記録に行を足せるようにする)
 start_hook() { # <入力の JSON>
-    printf '%s' "$1" | RESUME_AFTER_LIMIT_MARGIN=3 RESUME_AFTER_LIMIT_SETTLE=1 RESUME_AFTER_LIMIT_POLL=1 \
+    printf '%s' "$1" | RESUME_AFTER_LIMIT_MARGIN=3 RESUME_AFTER_LIMIT_SETTLE=1 RESUME_AFTER_LIMIT_POLL=1 RESUME_AFTER_LIMIT_PROBE=3 \
         bash "$HOOK" 2>"$WORK/stderr.txt" &
     HOOK_PID=$!
 }
@@ -302,6 +343,14 @@ t_stop_path_wakes() {
     start_hook "$(payload Stop "子の Claude が上限で止まりました")"
     finish_hook 2
 }
+t_grace_probe_wakes() {
+    add_row prompt "テストを流して"
+    add_row limitnote wrap_up
+    add_row assistant "上限に達したので止めます"
+    start_hook "$(payload Stop "上限に達したので止めます")"
+    finish_hook 2 || return 1
+    grep -qF "時間がたったので" "$WORK/stderr.txt" || die "猶予の知らせのときの文でない: $(cat "$WORK/stderr.txt")"
+}
 
 export TRANSCRIPT
 
@@ -330,6 +379,14 @@ run_test "Claude の返答の中の上限の文は扱わない" t_stop_assistant
 run_test "会話の記録が無ければ扱わない" t_stop_no_transcript
 run_test "会話の記録のパスが \\ 区切りでも読む" t_stop_backslash_path
 
+echo "--- Stop: 猶予の知らせのまま返答を終えた"
+run_test "猶予の知らせだけなら少し待って起こす" t_grace_note_probes
+run_test "上限の文の時刻があればそちらで待つ" t_grace_note_time_wins
+run_test "戻った知らせのあとなら扱わない" t_grace_note_released_ignored
+run_test "前の返答の猶予の知らせは扱わない" t_grace_note_earlier_turn_ignored
+run_test "最後の返答の文が上限に触れなければ扱わない" t_grace_note_needs_limit_word
+run_test "StopFailure では猶予の知らせを使わない" t_grace_note_stopfailure_ignored
+
 echo "--- 待ってから起こすか"
 run_test "会話が進んでいなければ起こす" t_wakes_when_no_progress
 run_test "上限で断られた返答は進んだとみなさない" t_api_error_is_not_progress
@@ -340,6 +397,7 @@ run_test "配列の形の知らせも起こした回数に数える" t_wake_limi
 run_test "所有者の新しい指示で起こした回数を数え直す" t_owner_prompt_resets_wake_count
 run_test "StopFailure で会話の記録が無くても起こす" t_wakes_without_transcript
 run_test "Stop の道具の結果の上限でも起こす" t_stop_path_wakes
+run_test "猶予の知らせで止まったら確かめのために起こす" t_grace_probe_wakes
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"
