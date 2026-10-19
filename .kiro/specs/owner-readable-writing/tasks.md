@@ -86,7 +86,7 @@
   - _対象の部品: spec-style-checker.md の直し_
   - _依存: 1.2_
 
-- [ ] 3.3 /start と /spec-review の報告の書式を、決まりのファイルに合わせて直す (並行可)
+- [x] 3.3 /start と /spec-review の報告の書式を、決まりのファイルに合わせて直す (並行可)
 
   Claude は、部品「報告の書式の直し」のとおり、`.claude/skills/start/SKILL.md` の Step 6 の「理由」の表と、`.claude/skills/spec-review/SKILL.md` の Step 7 の報告の見本を直す。続けて、Claude は、ほかのスキルの手順の報告の書式を `owner-writing.md` の決まりと照らす。外れる書式を見つけたら、Claude は同じタスクで直し、直した書式の一覧を、PR の本文に貼るために、`pr-notes.md` に書く。
   - 完了の確かめ方: `/start` の Step 6 の「理由」の表の列が「観点」と「当たるか」の2つで、観点ごとの根拠を表の下の段落に書く書式になっている。`/spec-review` の Step 7 の報告の見本に、斜線でつないだ件数と、「往復」「レビュー役」「審査の範囲」の呼び名が無い。`pr-notes.md` に、ほかのスキルの手順で直した書式の一覧か、直す書式が無かったことが書かれている

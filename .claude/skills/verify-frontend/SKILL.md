@@ -52,12 +52,18 @@ bash .claude/scripts/parallel/run-check.sh frontend pnpm run coverage
 ## Report
 
 ```
-verify-frontend:
-- format   -> PASS/FAIL
-- lint     -> PASS/FAIL
-- typecheck -> PASS/FAIL
-- test     -> PASS/FAIL (件数)
-- coverage -> PASS/FAIL (Stmts/Branch/Funcs/Lines の各%)
+frontend の品質チェックの結果:
+- format による書式の整え: <通った、または通らなかった>
+- lint による書き方の検査: <通った、または通らなかった>
+- typecheck による型の検査: <通った、または通らなかった>
+- test によるテストの実行: <通った、または通らなかった>。テストの数は<数>件
+- coverage によるカバレッジの検査: <通った、または通らなかった>。カバレッジは、テストで動いたコードの割合です
+  - 文の割合: <数>%
+  - 分岐の割合: <数>%
+  - 関数の割合: <数>%
+  - 行の割合: <数>%
 ```
 
-FAILがある場合は、失敗ログの要点(ファイル・テスト名・エラー概要)と修正方針を添える。
+Claude は、文の割合に Stmts の列の値を、分岐の割合に Branch の列の値を、関数の割合に Funcs の列の値を、行の割合に Lines の列の値を書く。
+
+通らなかったチェックがあるときは、Claude は、失敗したファイルとテストの名前と、エラーの要点と、どう直すかを添える。

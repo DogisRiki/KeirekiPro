@@ -213,10 +213,10 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 
 ## Output Description
 
-**Autonomous mode**: For each task, report:
-1. Task ID, implementer status, reviewer verdict
-2. Files changed, commit hash
-3. After all tasks: final validation result (GO/NO-GO)
+**Autonomous mode**: For each task, report the following in Japanese. Do not show the structured values (`READY_FOR_REVIEW`, `BLOCKED`, `NEEDS_CONTEXT`, `APPROVED`, `REJECTED`, `GO`, `NO-GO`, `MANUAL_VERIFY_REQUIRED`) as they are; write them as the Japanese words below
+1. タスクの番号と、実装のチェックの判定。`APPROVED` は「合格」、`REJECTED` は「差し戻し」と書く。実装が止まったときは、止まった理由を書く
+2. 変えたファイルと、コミットのハッシュ
+3. すべてのタスクのあと: `/kiro-validate-impl` の判定。`GO` は「出荷してよい」、`NO-GO` は「直すところがある」、`MANUAL_VERIFY_REQUIRED` は「所有者が手で確かめることがある」と書く
 
 **Manual mode**:
 1. Tasks executed: task numbers and test results
@@ -230,7 +230,7 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 
 **Tasks Not Approved or Missing Spec Files**:
 - **Stop Execution**: All spec files must exist and tasks must be approved
-- **Suggested Action**: "Complete previous phases: `/kiro-spec-requirements`, `/kiro-spec-design`, `/kiro-spec-tasks`"
+- **Suggested Action**: 「spec のファイルがそろっていないか、タスクがまだ承認されていません。`/kiro-spec-requirements`、`/kiro-spec-design`、`/kiro-spec-tasks` のうち、終わっていない段階のコマンドを打ち、その段階を承認してください。」
 
 **Test Failures**:
 - **Stop Implementation**: Fix failing tests before continuing

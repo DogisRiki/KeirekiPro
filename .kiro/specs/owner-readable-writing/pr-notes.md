@@ -142,3 +142,70 @@ MEMORY.md の行のうち、上の表に無いファイルは次のとおりで�
 - `doc/` の文書の書き方を書いたファイル: procedure-doc-only-steps.md、no-one-time-work-in-ops-docs.md。`doc/` の文書は、`owner-writing.md` が決まりの対象にする4つの種類の文に入らない
 - 道具や仕組みの知識を書いたファイル: windows-powershell-hooks-bom.md、gradle-apply-from-classloader.md、shell-tests-need-container.md、github-token-automerge-pitfall.md、audit-notification-via-issues.md、audit-expected-list-change-pitfalls.md、frontend-test-writing-pitfalls.md、frontend-local-check-gaps.md、git-bash-slash-arg-conversion.md、settings-env-needs-new-session.md、desktop-worktree-loads-main-checkout-config.md、shellcheck-run-like-ci.md、docker-overlay-creates-empty-files.md、desktop-appdata-virtualized.md
 - プロジェクトや作業の記録を書いたファイル: autonomous-pipeline-overview.md、pending-human-setup-steps.md、audit-automation-shipped.md、parallel-sessions-field-test.md、test-suite-durations.md、issue-566-session-switch-idea.md
+
+## タスク3.3 報告の書式の直し
+
+Claude は、`.claude/skills/` の下のすべてのスキルの手順にある、所有者に見せる報告の書式を、`owner-writing.md` の決まりと照らした。
+
+### 直した書式
+
+| スキルのファイル | 直した書式 |
+|---|---|
+| `.claude/skills/start/SKILL.md` | Step 3 と「分けたあとの進め方」の、分けた部分のIssueの一覧<br>Step 6 の「理由」の表と問いの書式<br>「まとめる提案」の表<br>「Issueを分ける」の分け方の表<br>失敗したときに所有者に見せる文 |
+| `.claude/skills/spec-review/SKILL.md` | Step 7 の報告の見本 |
+| `.claude/skills/verify-backend/SKILL.md` | 「Report」の節の書式 |
+| `.claude/skills/verify-frontend/SKILL.md` | 「Report」の節の書式 |
+| `.claude/skills/verify-terraform/SKILL.md` | 「Report」の節の書式 |
+| `.claude/skills/verify-all/SKILL.md` | 「Report」の節の書式 |
+| `.claude/skills/verify-ui/SKILL.md` | 「Report」の節の書式<br>途中で止められたときに所有者に見せる文 |
+| `.claude/skills/ship/SKILL.md` | 「Report」の節の書式<br>PR 本文の「AIが決めたこと」の節の書式 |
+| `.claude/skills/review-loop/SKILL.md` | 「Report」の節の書式<br>「エスカレーション」の節の、所有者が選ぶ判断の名前と報告の指示 |
+| `.claude/skills/file-issue/SKILL.md` | Step 4 で所有者に見せる、本文の項目の出どころの書式<br>本文の「きっかけ」の項目の、所有者の言葉の引き方と例<br>Issue をまとめるときの本文の見本 |
+| `.claude/skills/retrospective/SKILL.md` | Issue の本文の様式の、見出しと書き方の案内 |
+| `.claude/skills/kiro-steering/SKILL.md` | 「Output Description」の節の2つの見本 |
+| `.claude/skills/kiro-steering-custom/SKILL.md` | 「Output Description」の節の見本 |
+| `.claude/skills/request/SKILL.md` | 決定の記録の「調べた事実」の書式<br>質問の出し方の書式 |
+| `.claude/skills/kiro-impl/SKILL.md` | 「Output Description」の節の、所有者への報告の書式<br>「Safety & Fallback」の節の、所有者に見せる英語の文 |
+| `.claude/skills/kiro-spec-design/SKILL.md` | 「Safety & Fallback」の節の、所有者に見せる英語の文 |
+| `.claude/skills/kiro-spec-tasks/SKILL.md` | 「Approval」の手順と「Safety & Fallback」の節の、所有者に見せる英語の文<br>「Output Description」の節のタスクの数の書式 |
+| `.claude/skills/kiro-spec-init/SKILL.md` | 失敗したときに所有者に見せる文 |
+| `.claude/skills/kiro-spec-batch/SKILL.md` | roadmap.md が見つからないときに所有者に見せる英語の文 |
+| `.claude/skills/kiro-spec-status/SKILL.md` | Step 3 のタスクの数と状態の書式<br>「Safety & Fallback」の節の、所有者に見せる英語の文 |
+| `.claude/skills/kiro-validate-gap/SKILL.md` | 「Safety & Fallback」の節の、所有者に見せる英語の文 |
+| `.claude/skills/kiro-validate-impl/SKILL.md` | 「Safety & Fallback」の節の、所有者に見せる英語の文 |
+
+直し方は次のとおりである。
+
+- `/start` の「理由」の表: Claude は、表の列を「観点」と「当たるか」の2つにし、観点ごとの根拠を表の下に観点ごとの段落で書く書式にした。Step 5 の手順6と手順7の、根拠を書く場所を指す文も、段落を指すように直した
+- `/start` のほかの書式: Claude は、分けた部分のIssueの見出しから括弧の件数を外し、件数を見出しの下の文で書く書式にした。問いの推奨の理由と、まとめない理由と、分け方の理由は、括弧や表のマスに入れず、別の行か表の下の文で書く書式にした
+- `/start` の手順の文: Claude は、「## 理由」を表と根拠の段落に分けたので、まとめる相手を探した結果の1行を置く場所と、まとめる提案があるときに出す部分を指す文も、根拠の段落を含めるように直した
+- `/start`、`/verify-ui`、`/kiro-spec-init` の、失敗したときに所有者に見せる文: Claude は、終了コードの番号を所有者に見せず、どのコマンドが失敗したかと、標準エラーに出た文を見せるようにした
+- `/spec-review` の報告の見本: Claude は、斜線でつないでいた件数を1行に1つずつ書き、「往復」「レビュー役」「審査の範囲」「申告」の呼び名を、「1回目の審査」「審査したエージェント」「審査した部分」「審査したエージェントが、あなたに承認の前に確かめてほしいとして挙げたこと」に替えた
+- verify の5つのスキルの書式: Claude は、矢印と「PASS/FAIL」「OK/NG」を使わず、チェックごとに日本語の名前と「通った、または通らなかった」を書く書式にした。数も1行に1つずつ書く書式にした。チェックのコマンドの名前は、括弧で添えず、「lint による書き方の検査」のように欄の名前の中に入れた
+- `/ship` と `/review-loop` の書式: Claude は、矢印と斜線を使わず、項目ごとに日本語の名前を書く書式にした。1行に括弧で並べていた場合分けは、どのときに書くかを決めた別の行に分けた。`/ship` では、GitHub が返す PR の状態の値 `mergeStateStatus` をそのまま書かず、日本語の文に言い換える書式にした。言い換えは、GitHub の GraphQL API が返す `MergeStateStatus` の説明に合わせた。`/review-loop` では、報告の1行目に括弧で添えていた PR の番号を、別の欄にした。正しいが軽い指摘の数は、コードを直したものと、理由を記録して直さなかったものの2行に分けた。5回で打ち切られたときに所有者が選ぶ3つの判断は、元の意味を変えずに、何をするかが分かる名前にした。1つ目の判断の括弧の補足は、spec で進めた PR と spec 無しの PR のそれぞれで何を見直すかを書く文にした。3つの判断のそれぞれに、打ち切りのコメントでの呼び名を添えた
+- verify-backend と verify-frontend: Claude は、カバレッジの意味を、スキルの地の文ではなく報告の書式の中に書いた
+- verify-ui: Claude は、手順が確かめるとおりに、コンソールのエラーと警告の両方を報告の欄にした。スクリーンショットの枚数は決めず、操作ごとに前と後を添える書式にした
+- `/request` の「調べた事実」と、`/ship` の「AIが決めたこと」の書式: Claude は、括弧に入れていた根拠と理由を、別の欄に分けた
+- `/request` の質問の出し方: Claude は、質問の本文の末尾に括弧で書いていた、答えで変わるIssueの本文の見出しを、質問の最後の文で書くようにした。選択肢の名前に括弧で添えていた自由入力の案内は、選択肢の説明に移した
+- `/file-issue` の Step 4: Claude は、本文の項目の末尾に付けていた出どころを、項目の下の「出どころ:」の行で書くようにした。出どころの名前の「会話から拾った(記録なし)」は、括弧を使わない「記録の無い会話から拾った」に替えた。本文の「きっかけ」の項目は、所有者の言葉が書き言葉で短いときだけ引用し、それ以外のときは書き言葉の文で書くようにした。「きっかけ」の項目の例の文と、Issue をまとめるときの本文の見本の文は、括弧に補足を入れない文にした
+- `/retrospective` の Issue の本文の様式: Claude は、たとえの言葉の見出し「すり抜けたゲート」を「見逃した検査」に替えた。強化案の書き方の案内は、手順の番号だけで層を指さず、層の名前で書くようにした
+- `/kiro-impl` の所有者への報告: Claude は、判定の英語の値をそのまま出さず、「合格」「差し戻し」「出荷してよい」「直すところがある」のような日本語で書くようにした
+- `/kiro-impl`、`/kiro-spec-design`、`/kiro-spec-tasks`、`/kiro-spec-status`、`/kiro-validate-gap`、`/kiro-validate-impl` の英語の文: Claude は、所有者に見せる英語の決まった文を、日本語の文に替えた。`/kiro-spec-status` では、終わったタスクの数と残りのタスクの数を斜線でつながずに1行に1つずつ書き、状態を絵文字だけで示さずに日本語の言葉で書くようにした。`/kiro-spec-tasks` では、大きなタスクの数と小さなタスクの数を別の行で書くようにした。日本語に替えた文のうち、誰かが動く必要がある文には、動く人を書いた。所有者に頼む文には、打つコマンドか、この会話で何を答えればよいかを書いた。要件か設計に足りない点が見つかったときの文は、Claude が足りない点を並べる文にした。`/kiro-spec-batch` では、roadmap.md が見つからないときの文を日本語にし、CLAUDE.md が使わないと決めた `/kiro-discovery` を勧めずに、`/kiro-spec-init` で spec を1つずつ作るよう書いた
+- steering の2つのスキルの見本: Claude は、英語の定型文の見本を、日本語の見出しと文の見本に替えた。直したいところがあるときに所有者がすることは、「この会話に書いてください」と書いた
+
+### 照らしたが直さなかった書式
+
+- `.claude/skills/kiro-validate-impl/SKILL.md` の `## Validation Report` の書式: 所有者が `/kiro-validate-impl` を打ったときは、この書式が所有者にも見える。しかし、`/kiro-impl` がこの書式の決まった欄を読み取って次の動きを決めるので、書式を変えると読み取れなくなる。`/kiro-impl` から所有者への報告では、上のとおり、判定を日本語で書く
+- `.claude/skills/kiro-review/SKILL.md` と `.claude/skills/kiro-debug/SKILL.md` と `.claude/skills/kiro-verify-completion/SKILL.md` の判定の書式と、`.claude/skills/kiro-impl/templates/` の実装役・確認役・調べ役が返す書式: `/kiro-impl` を動かしている Claude が決まった欄を読み取って次の動きを決めるので、書式を変えると読み取れなくなる。この書式は、エージェントや手順が Claude に返す書式で、所有者に送る文ではない
+- `/start` の表のマスにある「開いている / 閉じている」のような斜線: Claude がどれか1つの値に置き換えて書くための書式の中の印で、所有者に見せる報告には斜線が残らない
+- `/ship` の「AIが決めたこと」の節の「食い違う spec:」の行: spec を作るスキルが、この行の書き出しの文字でPRの本文を探すので、書式を変えると探せなくなる
+- `.claude/skills/kiro-discovery/SKILL.md` と `.claude/skills/kiro-validate-design/SKILL.md` の見本と決まった文: CLAUDE.md がこの2つのスキルを使わないと決めているので、所有者に見せる文にならない
+- `.claude/skills/kiro-spec-batch/SKILL.md` の、roadmap.md が見つからないときの文のほかの見本と決まった文: このスキルは、`/kiro-discovery` が作る `.kiro/steering/roadmap.md` が無いと、最初の手順で止まる。CLAUDE.md が `/kiro-discovery` を使わないと決めており、リポジトリにも `roadmap.md` が無いので、止まったときの文のほかは、所有者に見せる文にならない。止まったときの文は、上のとおり直した
+- `/request` の質問の出し方の「(推奨)」の印: AskUserQuestion の説明が、推奨する選択肢の名前の末尾に、推奨を示す印を付けるよう決めている。所有者は、この印で推奨する選択肢を見分ける
+- `/file-issue` の「(AIの提案を了承)」の印: Issue の本文に残す印である。spec-reviewer は、`.claude/skills/spec-review/rules/requirements.md` の決まりに従い、この印で、項目が所有者の発言か AI の提案かを見分ける。印を変えると見分けられなくなる
+- `/file-issue` の「(#<番号> から統合)」の印: Issue をまとめたときに、書き足した項目の末尾に残す印で、「(AIの提案を了承)」の印と並べて書く。すでにまとめた Issue の本文にこの印が残っているので、印の形を変えると、新しい形と古い形が Issue の本文に混ざる
+- `.github/workflows/codex-review.yml` が PR に付ける打ち切りのコメントの、「仕様の差し戻し」「タスクの分割」「PR破棄」の3つの名前: `/review-loop` では、選んだときに何が起きるかを書いた名前に直し、コメントでの呼び名を添えた。コメントの文面は、CLAUDE.md が Claude に変更を禁じている `.github/` の下にあるので、Claude は直していない
+- `.claude/skills/spec-review/SKILL.md` の、審査の対応の記録の書式: 所有者への報告ではなく、`reviews/{段階}-response.md` のファイルに残す記録の書式である。報告は Step 7 の見本で直した
+- ここに挙げていないスキル: Claude は、`.claude/skills/` の下の28のスキルのすべてで、所有者に見せる報告の書式と決まった文を探した。ここに挙げていないスキルには、所有者に見せる決まった書式と決まった文が無いか、あっても `owner-writing.md` の決まりから外れていなかった
+- 所有者に終了コードの番号を見せる指示: Claude は、28のスキルのすべてで探した。指示があったのは `/start`、`/verify-ui`、`/kiro-spec-init` の3つのスキルだけで、3つとも直した
+- 4つのスキルの「Output Description」の節: `/kiro-spec-init`、`/kiro-spec-requirements`、`/kiro-spec-design`、`/kiro-validate-gap` の「Output Description」の節は、報告に入れる項目を英語で並べているが、1行に1つの項目を並べており、報告を `spec.json` の言語で書くよう決めている。そのため、Claude は、項目の名前も日本語で書く

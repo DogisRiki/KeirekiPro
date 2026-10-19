@@ -183,21 +183,21 @@ Provide brief summary in the language specified in spec.json:
 
 **Requirements Not Approved**:
 - **Stop Execution**: Cannot proceed without approved requirements
-- **User Message**: "Requirements not yet approved. Approval required before design generation."
-- **Suggested Action**: "Ask the user to review `requirements.md` and approve it, then re-run this skill. Do not use `-y`: auto-approval is prohibited by CLAUDE.md"
+- **User Message**: 「要件がまだ承認されていません。設計を作る前に、要件の承認が要ります。」
+- **Suggested Action**: 「`requirements.md` を読んで承認してから、もう一度 `/kiro-spec-design {feature}` を打ってください。CLAUDE.md が自動の承認を禁じているので、`-y` は付けないでください。」
 
 **Missing Requirements**:
 - **Stop Execution**: Requirements document must exist
-- **User Message**: "No requirements.md found at `.kiro/specs/{feature}/requirements.md`"
-- **Suggested Action**: "Run `/kiro-spec-requirements {feature}` to generate requirements first"
+- **User Message**: 「`.kiro/specs/{feature}/requirements.md` が見つかりません。」
+- **Suggested Action**: 「先に `/kiro-spec-requirements {feature}` を打って、要件を作ってください。」
 
 **Template Missing**:
-- **User Message**: "Template file missing at `.kiro/settings/templates/specs/design.md`"
-- **Suggested Action**: "Check repository setup or restore template file"
+- **User Message**: 「設計の雛形のファイル `.kiro/settings/templates/specs/design.md` が見つかりません。」
+- **Suggested Action**: 「Claude は、雛形が無いので、雛形を使わずに設計を作りました。雛形どおりの見出しで作り直すときは、Claude が main から雛形のファイルを戻すので、この会話でそう書いてください。」
 - **Fallback**: Use inline basic structure with warning
 
 **Steering Context Missing**:
-- **Warning**: "Steering directory empty or missing - design may not align with project standards"
+- **Warning**: 「`.kiro/steering/` が無いか空なので、設計がこのプロジェクトの決まりに合わないおそれがあります。」
 - **Proceed**: Continue with generation but note limitation in output
 
 **Invalid Requirement IDs**:
@@ -205,8 +205,8 @@ Provide brief summary in the language specified in spec.json:
 
 **Spec Gap Found During Design Review**:
 - **Stop Execution**: Do not write a patched-over `design.md`
-- **User Message**: "Design review found a real spec gap or ambiguity that must be resolved before design can be finalized."
-- **Suggested Action**: Clarify or fix `requirements.md`, then re-run `/kiro-spec-design {feature}`
+- **User Message**: 「設計の見直しで、要件に足りない点か、2通りに読める点が見つかりました。Claude は、足りない点と2通りに読める点を、下に並べます。要件をどう直すかを、この会話で答えてください。」
+- **Suggested Action**: Refine `requirements.md` following the owner's answer, then re-run `/kiro-spec-design {feature}`
 
 ### Next Phase: Task Generation
 

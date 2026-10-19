@@ -52,9 +52,12 @@ bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 ## Report
 
 ```
-verify-backend:
-- spotlessApply -> PASS/FAIL
-- check         -> PASS/FAIL (test件数 / カバレッジ% / spotbugs指摘数)
+backend の品質チェックの結果:
+- spotlessApply による書式の整え: <通った、または通らなかった>
+- check による品質チェックの全体: <通った、または通らなかった>
+  - テストの数: <数>件
+  - カバレッジ: <数>%。カバレッジは、テストで動いたコードの割合です
+  - SpotBugs の指摘: <数>件
 ```
 
-FAILがある場合は、失敗ログの要点(クラス・テスト名・エラー概要)と修正方針を添える。
+通らなかったチェックがあるときは、Claude は、失敗したクラスとテストの名前と、エラーの要点と、どう直すかを添える。
