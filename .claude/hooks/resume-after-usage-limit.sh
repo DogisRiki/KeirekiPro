@@ -6,6 +6,9 @@
 # - StopFailure(error が rate_limit): Claude 自身が上限で断られた。上限の文は last_assistant_message にある
 # - Stop: 子の Claude や補助役が上限に当たり、Claude が返答を終えた。上限の文は最後の返答の
 #   道具の結果と知らせにある。最後の返答の文が「上限」か limit を含むときだけ扱う
+# - Stop で上限の文が無く、最後の返答に Claude Code の猶予の知らせ(usageLimitNote が wrap_up の補足)が
+#   あるとき: Claude が猶予の中で返答を終えたので、戻る時刻が分からない。少し待って一度起こす。まだ上限の
+#   中なら起こした返答が断られ、戻る時刻の入った上限の文で StopFailure の扱いになる
 # 上限の文の形(https://code.claude.com/docs/en/errors)は「You've hit your session limit · resets 3:45pm」
 # 「You've hit your weekly limit · resets Mon 12:00am」。時刻はフックが動く PC の時刻の帯で読む。
 # 起こす前に、会話が進んだ(所有者が話しかけた、Claude Code や Desktop が自分で続けた)かを会話の記録で
@@ -18,11 +21,13 @@ set -u
 
 MARKER='[resume-after-usage-limit]'
 MAX_WAKES=3
-# 試験のための環境変数: 上限が戻ってから起こすまでの秒、記録の行数を数える前に待つ秒、時刻を見直す間隔の秒。
+# 試験のための環境変数: 上限が戻ってから起こすまでの秒、記録の行数を数える前に待つ秒、時刻を見直す間隔の秒、
+# 猶予の知らせで止まったときに起こすまでの秒。
 # ほかに RESUME_AFTER_LIMIT_NOW(時刻を読むときの「いま」の UNIX 秒)と RESUME_AFTER_LIMIT_DRY_RUN=1(待つ秒を出して終える)
 margin=${RESUME_AFTER_LIMIT_MARGIN:-180}
 settle=${RESUME_AFTER_LIMIT_SETTLE:-10}
 poll=${RESUME_AFTER_LIMIT_POLL:-30}
+probe=${RESUME_AFTER_LIMIT_PROBE:-300}
 
 payload=$(cat)
 
@@ -40,6 +45,7 @@ event=$(extract hook_event_name)
 transcript=$(extract transcript_path)
 transcript=${transcript//\\//}
 last_message=$(extract last_assistant_message)
+note=
 
 # 上限の文を探す。StopFailure は入力の文、Stop は最後の返答の道具の結果と知らせ
 case "$event" in
@@ -50,6 +56,7 @@ case "$event" in
     Stop)
         printf '%s' "$last_message" | grep -qiE '上限|limit' || exit 0
         [ -f "$transcript" ] || exit 0
+        # 1行目は最後の返答の中で最後の猶予の知らせの種類(wrap_up、release など。無ければ空)、2行目からは上限の文を探す文
         limit_text=$(perl -MJSON::PP -e '
             binmode STDOUT, ":utf8";
             my @rows;
@@ -72,11 +79,14 @@ case "$event" in
                 return (texts($c->{content} // ""), ($c->{text} // ()));
             }
             exit 0 unless @rows;
+            my ($note) = reverse grep { defined && !ref } map { $_->{usageLimitNote} } @rows[$start .. $#rows];
             # 返答の始まりの行は、知らせ(補助役の終わりなど)のときだけ読む。所有者の指示の文は読まない
             my $first = $rows[$start]{message}{content};
             $start++ unless !ref $first && $first =~ /^\s*<task-notification>/;
-            print join("\n", map { texts($_->{message}{content}) } @rows[$start .. $#rows]);
+            print $note // "", "\n", join("\n", map { texts($_->{message}{content}) } @rows[$start .. $#rows]);
         ' <"$transcript" 2>/dev/null)
+        note=${limit_text%%$'\n'*}
+        limit_text=${limit_text#*$'\n'}
         ;;
     *) exit 0 ;;
 esac
@@ -120,6 +130,13 @@ delay=$(LIMIT_TEXT="$limit_text" perl -MTime::Local -e '
     my $wake = $reset + $margin;
     print $wake > $now ? $wake - $now : $margin;
 ' -- "$margin" 2>/dev/null)
+
+# 戻る時刻が読めず、猶予の知らせのまま返答を終えたときは、戻ったかを確かめるために起こす
+probing=
+if [ -z "$delay" ] && [ "$note" = wrap_up ]; then
+    delay=$probe
+    probing=1
+fi
 
 case "$delay" in
     '' | *[!0-9]*) exit 0 ;;
@@ -171,7 +188,11 @@ if [ -f "$transcript" ]; then
 fi
 
 {
-    echo "$MARKER 使う量の上限が戻る時刻を過ぎました。上限で止まったところから作業を続けてください。"
+    if [ -n "$probing" ]; then
+        echo "$MARKER 使う量の上限で止まってから時間がたったので、会話を起こしました。上限で止まったところから作業を続けてください。"
+    else
+        echo "$MARKER 使う量の上限が戻る時刻を過ぎました。上限で止まったところから作業を続けてください。"
+    fi
     echo "上限で止まっていなかったとき、または続ける作業が無いときは、何もせずに返答を終えてください。"
 } >&2
 exit 2
