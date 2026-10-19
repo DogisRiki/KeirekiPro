@@ -8,7 +8,7 @@ requirements と違い、**照合できる相手がある**(requirements.md)。�
 
 生成側には書く前の自己点検(`.claude/skills/kiro-spec-design/rules/design-review-gate.md`)がある。**その点検は `## プロジェクトの決まりを守っているか` の節に一切言及していない。** ここが最も空いている。
 
-見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む。
+見出しと目印は、`.kiro/settings/rules/spec-writing.md` の「見出しと目印の一覧」の名前で読む。Issueの印の決まりは、`.kiro/settings/rules/spec-writing.md` の「Issueの印」の節で読み、印の付け方の誤りも指摘する。
 
 ## 観点
 

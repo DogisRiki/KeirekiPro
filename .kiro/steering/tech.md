@@ -65,7 +65,6 @@ steeringには転記しない(更新のたびに乖離するため)。
   `backend/gradle/quality.gradle`(JaCoCo)と `frontend/vite.config.ts`(v8)が正
 - backend: Spotless(フォーマット)・Checkstyle・SpotBugs・PMDを `check` で一括実行
 - frontend: ESLint(flat config)+ Prettier。アサーションの無いテストはlintで拒否される
-- これらのゲート設定ファイルはCODEOWNERS保護されており、エージェントは変更しない
 
 ## 開発環境
 
@@ -73,9 +72,8 @@ steeringには転記しない(更新のたびに乖離するため)。
 サービス: `backend` / `frontend` / `terraform` / `db`(PostgreSQL)/ `redis` /
 `localstack` / `dind`(Testcontainers用のDockerデーモン)。起動は `./start-dev.sh`。
 
-品質ゲートのコマンドはルートCLAUDE.mdの `/verify-frontend` `/verify-backend`
-`/verify-terraform` が正。Claude は、1つのセッションの中では品質チェックを順に1つずつ動かす。
-セッションをまたぐ同時実行は `run-check.sh` が設定の数までに抑える。
+品質ゲートのコマンドは `/verify-frontend` `/verify-backend` `/verify-terraform` の
+各スキルの「Steps」が正。
 
 ## 主要な技術的意思決定
 

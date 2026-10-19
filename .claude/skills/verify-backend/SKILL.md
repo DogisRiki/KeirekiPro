@@ -25,7 +25,6 @@ bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 - 失敗したら修正して `check` を再実行する
 - 単発のテストや検査(`./gradlew test --tests <テストクラス>` など)も、`bash .claude/scripts/parallel/run-check.sh backend ./gradlew test --tests <テストクラス>` のように `run-check.sh` で打つ
 - `./gradlew check` が終了コード0で終わったときだけ、`run-check.sh` が作業フォルダの `.claude/.state/gate-run-backend.txt` に品質チェックが通った時刻を書く
-- CI環境では `bash .claude/scripts/parallel/run-check.sh backend` を外し、`backend/` で `./gradlew check` をネイティブ実行する
 - Testcontainers が使う `dind` が止まっていれば、`run-check.sh` が本体フォルダのプロジェクトの `dind` を起こしてからコマンドを動かす。起こせなければ、`run-check.sh` は終了コード69で終わる
 
 ## 順番待ちと検査できないとき

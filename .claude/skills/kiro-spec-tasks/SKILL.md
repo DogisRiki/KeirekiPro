@@ -44,7 +44,7 @@ Otherwise, load all necessary context:
 - Read `rules/tasks-generation.md` from this skill's directory for principles
 - Read `rules/tasks-parallel-analysis.md` from this skill's directory for parallel judgement criteria
 - Template for format: Read `.kiro/settings/templates/specs/tasks.md` (supports `(並行可)` markers)
-- Writing rules: read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, 繰り返しの扱い, the sample tasks.md の見本, and the 見出しと目印の一覧 are the writing standard for this spec's `tasks.md`
+- Writing rules: read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, 繰り返しの扱い, Issueの印, the sample tasks.md の見本, and the 見出しと目印の一覧 are the writing standard for this spec's `tasks.md`
 
 #### Parallel Research
 
@@ -125,7 +125,7 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
 
 **Approval**:
 
-CLAUDE.md requires running `/spec-review` right after generation and not asking for approval until the review is complete, so this skill does NOT ask for approval right after writing `tasks.md`.
+This skill's **Right After Generation (before approval)** item under Next Phase requires running `/spec-review` right after generation and not asking for approval until the review is complete, so this skill does NOT ask for approval right after writing `tasks.md`.
 
 - If auto-approve flag (`-y`) is true:
   - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "auto:-y"`
@@ -169,7 +169,7 @@ Provide brief summary in the language specified in spec.json:
    - Task plan review gate passed
    - Independent task-graph sanity review passed
    - Testing tasks included
-4. **Next Action**: State that `/spec-review {feature} tasks` runs next, right after generation and before approval (CLAUDE.md requires running it immediately and not asking for approval until the review is complete). Then ask for approval after the review (see Step 4)
+4. **Next Action**: State that `/spec-review {feature} tasks` runs next, right after generation and before approval (this skill's **Right After Generation (before approval)** item under Next Phase requires running it immediately and not asking for approval until the review is complete). Then ask for approval after the review (see Step 4)
 
 **Format**: Concise (under 200 words)
 

@@ -109,7 +109,7 @@ For each task (one at a time):
   - The implementer's status report (for reference only — reviewer must verify independently)
 - The reviewer must apply the `kiro-review` protocol to this task-local review.
 - Preserve the existing task-specific context: task text, spec refs, `_対象の部品:_` scope, validation commands, implementer report, and the actual `git diff` as the primary source of truth.
-- Pass the quality-gate commands of every area this task changed (the commands of `/verify-frontend` `/verify-backend` `/verify-terraform` listed in CLAUDE.md) as the validation commands for Regression Safety. The implementer does not run them, so the reviewer's run is the task's verify run required by the completion conditions in tasks.md, and its output is the fresh evidence for `kiro-verify-completion`
+- Pass the quality-gate commands of every area this task changed (the commands listed in the Steps of the `/verify-frontend` `/verify-backend` `/verify-terraform` skills) as the validation commands for Regression Safety. The implementer does not run them, so the reviewer's run is the task's verify run required by the completion conditions in tasks.md, and its output is the fresh evidence for `kiro-verify-completion`
 - Dispatch the reviewer with a subagent type other than `kiro-implementer` (e.g. `general-purpose`), so that the full-suite commands are not blocked
 - The reviewer subagent will run `git diff` itself to read the actual code changes and verify against the spec
 - Dispatch via **Agent tool** as a fresh subagent

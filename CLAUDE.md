@@ -19,7 +19,7 @@ Codexによるクロスレビュー)で担保する。人間が関与するの�
 | `.kiro/steering/` | steering(プロジェクト知識) | - |
 | `doc/` | 設計図(クラス図・ER図・インフラ設計等)と人間向けの運用文書 | - |
 
-## 品質ゲート(すべて `run-check.sh` 経由・この順で実行)
+## 品質ゲート(すべて `run-check.sh` 経由。コマンドと順番は `/verify-frontend` `/verify-backend` `/verify-terraform` の各スキルに従う)
 
 Claude は、1つのセッションの中では品質チェックを順に1つずつ動かす。セッションをまたぐ同時実行は `run-check.sh` が設定の数までに抑える。
 `run-check.sh` は、そのセッションの作業フォルダを読み込んだ1回きりのコンテナでコマンドを動かす。
@@ -29,32 +29,6 @@ Claude は、1つのセッションの中では品質チェックを順に1つ�
 1. `docker info --format '{{.MemTotal}}'` で Docker に割り当てたメモリ(バイト)を読む
 2. 目安の数を求める。目安は、(割り当てたメモリ − 約1GB)÷ 約4.2GB の小数点以下を切り捨てた数(最小1)。約1GBは共有のサービスの分、約4.2GBは backend の品質チェック1回分
 3. 数と求め方を所有者に示してから、`git config keirekipro.parallelSlots <数>` で設定する
-
-frontend(`/verify-frontend`):
-
-```
-bash .claude/scripts/parallel/run-check.sh frontend pnpm run format
-bash .claude/scripts/parallel/run-check.sh frontend pnpm run lint
-bash .claude/scripts/parallel/run-check.sh frontend pnpm run typecheck
-bash .claude/scripts/parallel/run-check.sh frontend pnpm test
-bash .claude/scripts/parallel/run-check.sh frontend pnpm run coverage
-```
-
-backend(`/verify-backend`):
-
-```
-bash .claude/scripts/parallel/run-check.sh backend ./gradlew spotlessApply
-bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
-```
-
-terraform(`/verify-terraform`):
-
-```
-bash .claude/scripts/parallel/run-check.sh terraform terraform fmt -check -recursive
-bash .claude/scripts/parallel/run-check.sh terraform terraform validate
-bash .claude/scripts/parallel/run-check.sh terraform tflint --recursive
-bash .claude/scripts/parallel/run-check.sh terraform checkov -d .
-```
 
 CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/parallel/run-check.sh <領域>` を外し、
 `frontend/` `backend/` 各ディレクトリでネイティブにコマンドを実行する。
@@ -70,7 +44,6 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - **コンテナイメージの脆弱性の抑制(`.github/container-scan-suppressions.json`)を自分の判断で足さない。** これは `container-scan` を緑にする唯一の手段であり、「見かけの合格」を作る経路にあたる。追加が要ると判断したときは、脆弱性ごとに理由と期限を添えて人間に提案する。`.github/` 配下のためCODEOWNERSとescape-hatchが承認を機械強制する
 - **`container-scan` の実行を自律側からキャンセルしない。** キャンセルされたジョブは `cancelled` として報告され、必須ステータスチェックは成功にならない(2026-08-20 実測。緑は残らない)。ただしその後に再検査を発火させるイベントが無いため、**再実行するまでPRは赤のまま進まなくなる。** 実行が長い(本番イメージの組み立てを含む)ことを理由に止めない
 - 200行(実装のコード差分。テストとドキュメントは計上しない)を超えるPRは、spec駆動(Lane A)のPRとしてPR本文に `Spec: .kiro/specs/<feature>` を記載したものしか通らない(size-checkが機械判定する)。
-  この200行の検査は、着手時の判断(`/start`)をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
 - DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う
 - 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)
@@ -84,14 +57,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - Git操作は、ホストOSで、そのセッションの作業フォルダの最上位で実行する(devcontainer内Gitは無効)
 - Windows では、Claude の Bash は Git Bash の引数の書き換えを止めてある(`.claude/settings.json` の `env` の `MSYS2_ARG_CONV_EXCL`)。`git` `gh` `docker` などにパスを渡すときは、`C:/Users/…` のドライブ文字の形か、作業フォルダからの相対の形で書く。`/c/…` や、`mktemp` が返す `/tmp/…` の形は渡さない。`mktemp` の結果は `cd "$d" && pwd -W` でドライブ文字の形に直す。対象は Windows 向けのプログラムに渡す引数だけで、`>/dev/null` のようなリダイレクトは今までどおり書く
 - ブランチ名は `.branch_name_template`、コミットメッセージは `.commit_template` に従う
-- PR本文には必ず `Refs: #<Issue番号>` を含める。テストのアサーションを意図的に変更した場合は
-  `Test-Change-Justification: <理由>` を記載する
-- PR本文には `Closes #<Issue番号>` も併記し、マージ時にIssueが自動で閉じるようにする
-  (GitHubが閉じなかったときは仕組みが閉じる)。人間はIssueを閉じない
-- `Refs: #<Issue番号>` は `Closes` と併記しても消さない。codex-reviewがこの行からIssue本文を
-  取得してspec適合の判定基準にしている
-- 分けた部分のIssue(サブIssue)のPRでは、`Refs:` と `Closes` にサブIssueの番号を書き、元のIssue(親)の番号は書かない。
-  親は、サブIssueがすべて閉じたときに仕組み(close-linked-issues)が閉じる
+- 人間はIssueを閉じない
 - push先はfeatureブランチのみ。マージはauto-merge(ゲート全通過で自動)に任せる。auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する。
   AIは予約の操作(`gh pr merge`)をせず、予約されたことを確かめる。予約が付かないときは自分で予約せず報告する
 - 出荷手順(verify→commit→push→PR→auto-mergeの予約の確認)は `/ship` に従う
@@ -110,29 +76,17 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 ## spec駆動開発(cc-sdd / Kiro-style)
 
 spec で進めるか(Lane A)、spec 無しで進めるか(Lane B)は、着手時に `/start` が決める。
-AIがIssueの本文とその時点のコードを調べ、下の4つの観点で判断し、判断と観点ごとの理由を所有者に示す。
+AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(`.claude/skills/start/SKILL.md`)の「観点の定義」の4つの観点で判断し、判断と観点ごとの理由を所有者に示す。spec が要らないと判断して返事を待たずに実装するときも、実装を始める前に示す。
 
-- 4つの観点のうち1つでも当たれば spec が要る(Lane A)。どれにも当たらなければ spec は要らない(Lane B)
-- 変更の行数の見込みは、着手時の判断に使わない(200行の検査は最後の網。「自律動作の境界」を参照)
-
-**観点の定義**
-
-| 観点 | 当たる | 当たらない |
-|---|---|---|
-| 1. 新しい機能か | 今は無い機能を足し、所有者や利用者が新しく使えるもの(画面・API・コマンド・手順・通知)ができる | 今ある機能を本来の動きに直す。直すために中の仕組みを足しても、所有者や利用者が新しく使うものが増えなければ当たらない。今ある動きを意図して変えるだけの変更は、この観点では当たらないとし、観点2と3で判断する |
-| 2. 作り方を選ぶ必要があるか | 作り方によって、マージしたあとに所有者や利用者が見るもの・すること・受け取るものが変わり、どの結果にするかを、Issueの本文からも3つの材料からも決められず、所有者に1回尋ねても決まらない。または、Issueの本文の「決めた方式」に沿ったまま作れる作り方が1つも無い。または、承認済みの spec の設計の「作るもの」の範囲の中で作れる作り方が1つも無い | どの作り方でも所有者や利用者から見える結果が同じで、違うのは中の作りと後からの直しやすさだけ。かかる時間の違いは、Issueの本文が時間について要望しているときだけ見える結果に数える |
-| 3. Issueの本文だけで完成の形が決まらないか | Issueの本文で決まっていない、所有者や利用者から見える動きがあり、3つの材料のどれからも決められず、所有者に1回尋ねても決まらない | 決まっていない見える動きを、すべて3つの材料から決められる。または、所有者に1回尋ねれば決まる |
-| 4. マージを取り消しても元に戻らないか | 保存されているデータの形を変える・消す(DBのマイグレーションなど)、外部に何かを送る、本番の設定を変える | PRを取り消せば元の状態に戻る |
-
-- 3つの材料: 1つ目は今の動きのまま変えないこと。2つ目はIssueの本文の「やりたいこと」と「どうなれば解決か」に書かれた目的。3つ目は既存の文書(承認済みの spec、README、CLAUDE.md、スキルの手順)に書かれた本来の動き。2つ目に「やりたいこと」を含めるのは、「どうなれば解決か」の節が無いIssueでも、AIが「やりたいこと」の節から目的を読めるようにするためである
-- 1回尋ねれば決まる: AIが問いをすべて1回にまとめて出せ、どの問いの答えもほかの問いの答えで変わらず、AIが問いごとに推奨する答えを付けられ、所有者がコードを読まずに答えられること
+- 変更の行数の見込みは、着手時の判断に使わない。200行の検査は、着手時の判断をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない(全文は `.claude/skills/start/SKILL.md` の「Step 5: 判断する」)
+- 観点ごとの定義(「当たる」「当たらない」、3つの材料、1回尋ねれば決まる)は、`.claude/skills/start/SKILL.md` の「Step 5: 判断する」の「観点の定義」の表と表の下の箇条のとおりとする
 
 ### パスと役割分担
 
 - Steering: `.kiro/steering/`(プロジェクト全体の知識。`product.md` `tech.md` `structure.md`。
   作業規約はこのCLAUDE.mdとスコープ別CLAUDE.mdに書き、steeringと二重記述しない)
 - Specs: `.kiro/specs/`(機能単位の要件・設計・タスク。進捗は `/kiro-spec-status {feature}`)
-- spec の書き方の基準: `.kiro/settings/rules/spec-writing.md`(書き方の決まり・見本・見出しと目印の一覧)
+- spec の書き方の基準: `.kiro/settings/rules/spec-writing.md`(書き方の決まり・見本・見出しと目印の一覧・Issueの印)
 
 ### ワークフロー
 
@@ -142,19 +96,15 @@ AIがIssueの本文とその時点のコードを調べ、下の4つの観点で
   spec-reviewer と codex-review は本文だけを判定の基準にする。Issueのコメントは要望として読まない。
   `/kiro-discovery` は使わない
 - 着手: Issueへの着手は、所有者が `/start #N` を打って始める。所有者が「#N をやって」のように言葉で着手を頼んだときも、AIは `/start` に従う。
-  spec が要らないときは、AIは判断を示したあと返事を待たずに実装する。ただし、所有者に尋ねる問いがあるときは、答えを待ち、答えをIssueの本文の「決めた方式」に書き足してから実装する。どちらも `/ship` で出荷する。spec が要るときは、AIは、同じことを求めるIssue、同じ spec を直すIssue、同じ既存の spec の範囲に関わる spec の要るIssueが開いていないかを調べ、あれば、まとめるかどうかを推奨を添えて提案する。提案したときは、所有者が答えてから、所有者が打つコマンドを示して止まる。提案が無いときは、そのまま所有者が打つコマンドを示して止まる。Issueを分けるときは、分け方を示して所有者の了承を待つ
+  spec が要らないと判断しても、所有者に尋ねる問いがあれば、AIは答えを待ち、答えをIssueの本文の「決めた方式」に書き足してから実装する。AIは、着手のときに、まとめたほうがよいほかのIssueを探し、あれば所有者に提案する(進め方ごとの手順の全文は `.claude/skills/start/SKILL.md` の「Step 5.5」「Step 6」「Step 7」)
 - spec の各段階のコマンド(`/kiro-spec-init` `/kiro-spec-requirements` `/kiro-spec-design` `/kiro-spec-tasks` `/kiro-impl`)は所有者が打つ。
   AIは起動しない(`disable-model-invocation` により、AIからは起動できない)。必要なときは所有者に打つよう依頼する
 - Phase 1(仕様化):
   - `/kiro-spec-init #N`(既存の spec を新しいIssueのために直すときは `/kiro-spec-init #N <feature>`)→ `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
-  - 各段階の生成直後に `/spec-review {feature} {段階}` を実行する(requirements / design / tasks)。
-    審査役のサブエージェントが審査し、記録が `.kiro/specs/{feature}/reviews/` に残る。人間が承認するときは本文と記録の両方を読む
   - 審査役のモデルは、既定では Fable 5.1 で、所有者が spec ごとに Opus 5.5 を選べる。所有者は、spec を始めるときに、選んだモデルを会話で伝える。
     所有者が会話で審査役のモデルを伝えたら、実装セッションは、その spec の spec.json の `review_model` に `fable` か `opus` を書き、書いた値を所有者に1行で示す。
     spec.json がまだ無いとき(`/kiro-spec-init` の前)は、`/kiro-spec-init` が spec.json を作った直後に書く。
     所有者が spec の途中で選び直したときも、同じく `review_model` を書き換える。所有者が選んでいない spec では `review_model` を書かない
-  - `/spec-review` は審査役(spec-reviewer)の前に毎回、
-    点検役(spec-style-checker)に本文の書き方を点検させ、点検の記録を `reviews/{段階}-style.md` に残す
   - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
   - `/kiro-validate-design` は使わない(`/spec-review` が置き換えた)。cc-sdd のスキルの出力で案内されても起動しない
 - Phase 2(実装): `/kiro-impl {feature}`(タスクごとにsubagent実装+独立レビュー+最終検証)
@@ -164,9 +114,6 @@ AIがIssueの本文とその時点のコードを調べ、下の4つの観点で
 ### ルール
 
 - 3段階承認: Requirements → Design → Tasks の各段階で人間の承認を得る。`-y` による自動承認は使用しない(/kiro-spec-batch 等による同等の自動承認も同様)。承認を記録するときは spec.json に承認者名と日時(`approved_by` / `approved_at`)を残す
-- 各タスクの完了条件に該当verify Skillの実行を含める(タスクテンプレートに定義済み)
-- **各段階の spec を生成したら、続けて `/spec-review {feature} {段階}` を実行する。** レビューが終わる前に承認を求めない。
-  `/kiro-spec-tasks` は、tasks.md を生成したあと承認を尋ねずに `/spec-review {feature} tasks` を実行し、審査が終わってから承認を尋ねる
 - **次の段階へ進む前に、前の段階の記録の未解決を一覧で提示し、人間の了承を得る。** 未解決があっても機械的には止めない(判断は人間)
 - **承認済みの段階の本文を再生成または修正する前に、その段階と後続の段階の承認を取り消す**(`approved: false` にし `approved_by` / `approved_at` を削除)。
   cc-sdd は既存の `approved_by` を上書きしないため、取り消さないと再生成した本文が承認済みのまま扱われる
@@ -177,20 +124,6 @@ AIがIssueの本文とその時点のコードを調べ、下の4つの観点で
 - spec で進めている途中で、ごく小さい変更だと分かっても、spec の段階を省かず spec で最後まで進める。spec 無しへの切り替えを所有者に提案しない
 - Skills は `.claude/skills/kiro-*/SKILL.md` と `.claude/skills/spec-review/SKILL.md`。適用可能性が1%でもあればスキルを起動する(spec の各段階のコマンドは除く。上のワークフローのとおり所有者が打つ)
 - steeringは常に最新に保つ(`/kiro-steering` で更新)
-
-#### Issueの印
-
-既存の spec を新しいIssueのために直したとき(`/kiro-spec-init #N <feature>` で開き直し、spec.json に `additional_issues` があるとき)は、
-要件・受入基準・設計の節・タスクがどのIssueに対するものかを、次の印で本文の中に示す。
-
-- 追加のIssue #N のために足した項目は、末尾に `(#N)` を付ける
-- 既存の項目を直したときは、直した項目の末尾に `(#N で変更)` を付ける
-- 既存の項目を取りやめるときは、本文を消さず、先頭に `(#N で取りやめ)` を付ける
-- 印の無い項目は、spec.json の `issue`(元のIssue)に対するものとする
-- spec 無しのPRで変わった動きを、spec を更新するときに反映した項目は、末尾に `(PR #<番号> で変更済み)` を付ける。この項目の動きは、そのPRで実装済みである
-- 既存の要件・受入基準・タスクの番号は変えない。新しい要件は既存の最後の番号の次から足す(実装済みのタスクの `_要件:_` が指す番号をずらさないため)
-- tasks.md では、`(#N)` をタスクの題名の末尾に置き、題名に `(並行可)` があるときはそのあとに置く。`_要件:_` の行には付けない
-- 実装済みのタスクの完了の印(`[x]`)は外さない
 
 # Compact instructions
 

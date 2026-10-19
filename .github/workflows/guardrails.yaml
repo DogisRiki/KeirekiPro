@@ -21,6 +21,7 @@ concurrency:
 
 env:
   PR_SIZE_LIMIT: '200'
+  CLAUDE_MD_SIZE_LIMIT: '19000'
 
 jobs:
   escape-hatch:
@@ -201,6 +202,30 @@ jobs:
           # 証明にはならない。#177 で受容済み)
           echo "実装差分 ${lines} 行 > 上限 ${PR_SIZE_LIMIT} 行のため、spec の裏付けを検証します(テスト ${test_lines} 行は計上対象外)。"
           bash .github/scripts/check-spec-backing.sh
+
+  # どの会話の始めにも読み込まれる文書(ルートの CLAUDE.md など)の量の検査。
+  # 上限は env の CLAUDE_MD_SIZE_LIMIT。合否はスクリプトが決める。required check に指定する
+  claude-md-size:
+    name: claude-md-size
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # PR head から取得したスクリプトを実行するため、書き込み権限を継承させない。
+    # ジョブ単位の宣言はワークフローレベルの設定を丸ごと置き換える
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      # 判定スクリプト自身のテスト。落ちた場合は検査も失敗させる(fail-closed)
+      - name: Test claude md size check
+        run: bash .github/scripts/tests/test-check-claude-md-size.sh
+
+      - name: Check claude md size
+        run: bash .github/scripts/check-claude-md-size.sh
 
   migration-label:
     name: migration-label

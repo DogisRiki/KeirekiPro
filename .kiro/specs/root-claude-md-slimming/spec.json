@@ -1,0 +1,95 @@
+{
+  "feature_name": "root-claude-md-slimming",
+  "issue": 568,
+  "created_at": "2026-10-18T00:55:08Z",
+  "updated_at": "2026-10-18T15:44:07Z",
+  "language": "ja",
+  "review_model": "opus",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T04:23:53Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T15:44:07Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T15:44:07Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T01:20:23Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T02:52:41Z",
+      "revoked_for": "D1-1-10 による requirements への差し戻し: ほかの承認済みの spec の要件が CLAUDE.md に書くことを求める決まりの扱いを決めていない"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T05:30:17Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T05:53:08Z",
+      "revoked_for": "T1-1-6 による design への差し戻し: required-checks.json に claude-md-size を足すと失敗する test-check-audit-skipped-required.sh を、変えるファイルと所有者に写してもらうファイルに挙げていない"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T06:19:21Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T11:14:36Z",
+      "revoked_for": "タスク 4.3 の審査による design への差し戻し: 場面 S3 の合格の条件(gh issue edit を試みたあと実装に進む)が、身代わりの gh が書き込みを必ず断る決まりと、file-issue の「書き足しに失敗したら実装を始めずに止まる」決まりの下で満たせない"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T06:54:44Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T11:14:36Z",
+      "revoked_for": "タスク 4.3 の審査による design への差し戻しに伴う取り消し: 場面 S3 の合格の条件が、身代わりの gh と file-issue の決まりの下で満たせない"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T12:01:25Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T13:57:38Z",
+      "revoked_for": "タスク 5.1 の頼る機能の試しによる design への差し戻し: -p の出来事の記録(turn*.jsonl)にはスキルの本文の「Base directory for this skill:」の行が出ず、保存された会話の記録にだけ出るため、スキルの読み込みの確かめ方を直す"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T12:18:29Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T13:57:38Z",
+      "revoked_for": "タスク 5.1 の頼る機能の試しによる design への差し戻しに伴う取り消し: スキルの読み込みの確かめ方を直す"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T14:07:35Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T15:22:16Z",
+      "revoked_for": "タスク 5.2 の場面 S1 による design への差し戻し: 場面の会話に一時フォルダが無く、コミットのメッセージを書けずに止まったため、一時フォルダを渡し、合格の条件を変えない環境の直しを設計に戻さずに行えるようにする"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-18T14:27:01Z",
+      "issues": [568],
+      "revoked_at": "2026-10-18T15:22:16Z",
+      "revoked_for": "タスク 5.2 の場面 S1 による design への差し戻しに伴う取り消し: 場面の会話に一時フォルダを渡す"
+    }
+  ]
+}
