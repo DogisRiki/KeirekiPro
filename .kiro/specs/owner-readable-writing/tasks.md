@@ -77,7 +77,7 @@
   - _対象の部品: CLAUDE.md の作業規約の1行_
   - _依存: 1.2_
 
-- [ ] 3.2 点検役 spec-style-checker が、決まりのファイルでも spec の本文を点検するようにする (並行可)
+- [x] 3.2 点検役 spec-style-checker が、決まりのファイルでも spec の本文を点検するようにする (並行可)
 
   Claude は、部品「spec-style-checker.md の直し」のとおり、`.claude/agents/spec-style-checker.md` を直す。
   - 完了の確かめ方: `spec-style-checker.md` の手順に、`owner-writing.md` を最初から最後まで読むことと、`## 決まり` の節の決まりを requirements.md・design.md・tasks.md のすべてに当てはめることと、外れを返すときの決まりの名前に `owner-writing.md` の見出しの文字を使うことと、「決まりに入れない書き方」を外れとして挙げないことがある。点検役がいつ動くかを書いた文は、`git diff` で変わっていない
