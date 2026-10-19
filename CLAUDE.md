@@ -70,7 +70,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - 外部ツールの仕様やエラーは、記憶で判断せず公式ドキュメントとissueを調査してから実装・提案する(根拠URLを添える)
 - ユーザーへの報告・PR本文・コミットメッセージは日本語(コミットprefix等の規約語は除く)
 - テキストファイルはUTF-8。文字化けを検知したら保存せず停止して報告する(hookでもブロックされる)
-- Think in English, generate responses in Japanese. `.kiro/` 配下に生成するMarkdown(requirements.md,
+- Think in English, generate responses in Japanese. 所有者に見える文は、作業の途中に書く一言や所有者への問いも含めて日本語で書く。`.kiro/` 配下に生成するMarkdown(requirements.md,
   design.md, tasks.md, research.md 等)は spec.json.language の設定言語(日本語)で書く
 
 ## spec駆動開発(cc-sdd / Kiro-style)
