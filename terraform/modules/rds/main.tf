@@ -44,8 +44,9 @@ resource "aws_db_instance" "main" {
   identifier = "${var.project_name}-db"
 
   # Engine
+  # Major version only: auto_minor_version_upgrade moves the minor version, and a full version would make plan try to downgrade it
   engine         = "postgres"
-  engine_version = "17.4"
+  engine_version = "17"
 
   # Instance
   instance_class         = "db.t4g.micro"
@@ -77,8 +78,9 @@ resource "aws_db_instance" "main" {
   final_snapshot_identifier = "${var.project_name}-db-final-snapshot"
 
   # Maintenance
+  # Must fall while the scheduler keeps the instance running (stopping it cancels pending maintenance). Wed 08:30-09:00 JST
   auto_minor_version_upgrade = true
-  maintenance_window         = "Sun:19:00-Sun:20:00"
+  maintenance_window         = "Tue:23:30-Wed:00:00"
 
   # Monitoring
   enabled_cloudwatch_logs_exports = []

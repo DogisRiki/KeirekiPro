@@ -186,6 +186,16 @@
                         "timeout": 30
                     }
                 ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/resume-after-usage-limit.sh\"",
+                        "asyncRewake": true,
+                        "timeout": 691200
+                    }
+                ]
             }
         ],
         "StopFailure": [
@@ -195,6 +205,17 @@
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-registry.sh\"",
                         "timeout": 10
+                    }
+                ]
+            },
+            {
+                "matcher": "rate_limit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/resume-after-usage-limit.sh\"",
+                        "asyncRewake": true,
+                        "timeout": 691200
                     }
                 ]
             }
