@@ -262,6 +262,15 @@
                         "timeout": 10
                     }
                 ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/inject-writing-rules.sh\"",
+                        "timeout": 10
+                    }
+                ]
             }
         ],
         "SubagentStop": [

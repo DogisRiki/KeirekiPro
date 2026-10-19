@@ -49,11 +49,11 @@ bash .claude/scripts/parallel/run-check.sh terraform checkov -d .
 ## Report
 
 ```
-verify-terraform:
-- fmt      -> PASS/FAIL
-- validate -> PASS/FAIL
-- tflint   -> PASS/FAIL (指摘数)
-- checkov  -> PASS/FAIL (failed数)
+terraform の品質チェックの結果:
+- fmt による書式の検査: <通った、または通らなかった>
+- validate による設定の検査: <通った、または通らなかった>
+- tflint による書き方の検査: <通った、または通らなかった>。指摘は<数>件
+- checkov によるセキュリティの検査: <通った、または通らなかった>。通らなかった項目は<数>件
 ```
 
-FAILがある場合は、失敗ログの要点と修正方針を添える。
+通らなかったチェックがあるときは、Claude は、エラーの要点と、どう直すかを添える。

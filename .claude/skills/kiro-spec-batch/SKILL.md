@@ -176,4 +176,4 @@ Next: Review generated specs, then start implementation with /kiro-impl <feature
 - Suggest: "Fix dependency ordering in roadmap.md"
 
 **Roadmap not found**:
-- Stop and report: "No roadmap.md found. Run `/kiro-discovery` first."
+- Stop and report: 「`.kiro/steering/roadmap.md` が見つかりません。このスキルは、roadmap.md に並べた spec をまとめて作るので、roadmap.md が無いと spec を作れません。spec は、`/kiro-spec-init #<Issue番号>` を打って、1つずつ作ってください。」

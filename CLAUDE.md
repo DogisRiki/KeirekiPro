@@ -70,6 +70,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - 外部技術の仕様は Context7 MCP または公式ドキュメントで現行版を確認してから使う
 - 外部ツールの仕様やエラーは、記憶で判断せず公式ドキュメントとissueを調査してから実装・提案する(根拠URLを添える)
 - ユーザーへの報告・PR本文・コミットメッセージは日本語(コミットprefix等の規約語は除く)
+- 所有者に送る文は `.kiro/settings/rules/owner-writing.md` を読んで書き、送る前に自分で読み直す。わかりにくいと言われたら同ファイルの手順で決まりと例を足す
 - 選択肢の中身・手順・コマンドを読まないと答えられない問いは、返事の最後のボタン付きの問い(`wrap_up` の `ask`)で尋ねない。`wrap_up` は `recap` だけで呼び、締めの本文に中身の全文と問いを書く(ボタン付きの問いを出すと、前に書いた本文も所有者の画面に出ない)
 - テキストファイルはUTF-8。文字化けを検知したら保存せず停止して報告する(hookでもブロックされる)
 - Think in English, generate responses in Japanese. 所有者に見える文は、作業の途中に書く一言や所有者への問いも含めて日本語で書く。`.kiro/` 配下に生成するMarkdown(requirements.md,

@@ -1,0 +1,28 @@
+{
+  "feature_name": "owner-readable-writing",
+  "issue": 590,
+  "created_at": "2026-10-19T06:07:49Z",
+  "updated_at": "2026-10-19T10:42:25Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-19T09:35:49Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-19T10:10:08Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-19T10:42:25Z"
+    }
+  }
+}

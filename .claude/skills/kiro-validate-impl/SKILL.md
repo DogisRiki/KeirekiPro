@@ -186,7 +186,7 @@ If NO-GO, REMEDIATION is mandatory — identify the exact issue and what needs t
 ## Safety & Fallback
 
 ### Error Scenarios
-- **No Implementation Found**: If no `[x]` tasks found, report "No implementations detected"
+- **No Implementation Found**: If no `[x]` tasks found, report 「終わったタスクが1つも無いので、確かめる実装がありません。」
 - **Test Command Unknown**: Return `MANUAL_VERIFY_REQUIRED` and explain which validation command is missing; do not return `GO`
 - **Missing Spec Files**: Stop with error if spec.json/requirements.md/design.md missing
 

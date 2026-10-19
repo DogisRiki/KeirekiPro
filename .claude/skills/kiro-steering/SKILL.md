@@ -110,29 +110,29 @@ Chat summary only (files updated directly).
 
 ### Bootstrap:
 ```
-Steering Created
+steering のファイルを作りました。
 
-## Generated:
-- product.md: [Brief description]
-- tech.md: [Key stack]
-- structure.md: [Organization]
+## 作ったファイル
+- product.md: <このアプリが何をするかの短い説明>
+- tech.md: <主に使っている言語とライブラリ>
+- structure.md: <フォルダの分け方>
 
-Review and approve as Source of Truth.
+中身を読んで、プロジェクトの知識として正しいかを確かめてください。違うところがあれば、この会話に書いてください。
 ```
 
 ### Sync:
 ```
-Steering Updated
+steering のファイルを直しました。
 
-## Changes:
-- tech.md: React 18 → 19
-- structure.md: Added API pattern
+## 直したこと
+- tech.md: React の版を 18 から 19 に直した
+- structure.md: API の置き場所の決まりを足した
 
-## Code Drift:
-- Components not following import conventions
+## steering とコードの食い違い
+- 一部の部品が、steering に書いた import の書き方に従っていない
 
-## Recommendations:
-- Consider api-standards.md
+## 提案
+- API の書き方の決まりを api-standards.md として足すことを勧める
 ```
 
 ## Examples
