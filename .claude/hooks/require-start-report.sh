@@ -107,8 +107,9 @@ printf '%s' "$payload" | perl -MJSON::PP -e '
     close $fh;
     exit 0 unless $watch && !($judged && $reasoned);
     binmode STDERR, ":encoding(UTF-8)";
-    print STDERR "/start の判断の報告を、まだチャットに書いていません。\n";
-    print STDERR "ファイルを書き換える前に、.claude/skills/start/SKILL.md の Step 6 の書式の報告(「## してほしいこと」「## 判断」「## 理由」の表)を、省かずにチャットの本文に書いてください。\n";
+    print STDERR "/start の判断の報告が、所有者に見える返答の本文にまだありません。\n";
+    print STDERR "ファイルを書き換える前に、.claude/skills/start/SKILL.md の Step 6 の書式の報告(「## してほしいこと」「## 判断」「## 理由」の表)を、省かずに返答の本文に書いてください。\n";
+    print STDERR "考え(thinking)の中に書いた報告は、所有者に見えず、会話の記録にも残らないので、書いたことになりません。ツールを呼ぶ前に、所有者に見える文として出してください。\n";
     print STDERR "所有者は、この報告を読んで判断の誤りに気づき、実装を止めます。1文の知らせや、実装を終えたあとの報告は、この報告の代わりになりません。\n";
     exit 2;
 '
