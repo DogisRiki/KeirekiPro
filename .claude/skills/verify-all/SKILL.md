@@ -44,10 +44,11 @@ git diff --name-only origin/main...HEAD
 ## Report
 
 ```
-verify-all(変更領域: frontend, backend):
-- verify-frontend -> PASS/FAIL
-- verify-backend  -> PASS/FAIL
-- verify-terraform -> SKIP(変更なし)
+品質チェックの結果:
+- 変更があった領域: frontend、backend
+- /verify-frontend による frontend の品質チェック: <通った、または通らなかった>
+- /verify-backend による backend の品質チェック: <通った、または通らなかった>
+- /verify-terraform による terraform の品質チェック: 変更が無いので動かしていない
 ```
 
-各領域の詳細は該当verifyのReport形式に従って添える。
+Claude は、領域ごとの詳しい結果を、その領域の verify のスキルの「Report」の節の形で添える。

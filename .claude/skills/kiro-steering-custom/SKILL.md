@@ -96,23 +96,23 @@ From `rules/steering-principles.md` (in this skill's directory):
 Chat summary with file location (file created directly).
 
 ```
-Custom Steering Created
+steering のファイルを1つ足しました。
 
-## Created:
+## 作ったファイル
 - .kiro/steering/api-standards.md
 
-## Based On:
-- Template: api-standards.md
-- Analyzed: src/api/ directory patterns
-- Extracted: REST conventions, error format
+## 作るときに使ったもの
+- ひな形: api-standards.md
+- 調べたコード: src/api/ の下のファイル
+- コードから取り出した決まり: REST の API の書き方と、エラーの返し方
 
-## Content:
-- Endpoint naming patterns
-- Request/response format
-- Error handling conventions
-- Authentication approach
+## ファイルに書いたこと
+- API の URL の名前の付け方
+- リクエストとレスポンスの形
+- エラーの扱い方
+- ログインの確かめ方
 
-Review and customize as needed.
+中身を読んで、直したいところがあれば、この会話に書いてください。
 ```
 
 ## Examples

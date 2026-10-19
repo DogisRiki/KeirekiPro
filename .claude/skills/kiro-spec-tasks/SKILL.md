@@ -131,16 +131,16 @@ This skill's **Right After Generation (before approval)** item under Next Phase 
   - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "auto:-y"`
     and `approved_at` (ISO 8601)
   - Display task summary (task count, major groups, parallel markers)
-  - Respond: "Tasks generated and auto-approved. Start implementation with `/kiro-impl {feature}`"
+  - Respond: 「タスクを作り、自動で承認しました。`/kiro-impl {feature}` を打つと、実装が始まります。」
   - Note: CLAUDE.md prohibits `-y`; this branch is kept only as the upstream behavior. Do not add any other automatic approval path
 - Otherwise (interactive):
   1. Display a summary of the generated tasks (task count, major groups, parallel markers)
   2. Do NOT ask for approval yet. Run `/spec-review {feature} tasks` next
-  3. Only after `/spec-review {feature} tasks` has finished, ask the user: "Tasks generated and reviewed. Approve and proceed to implementation?"
+  3. Only after `/spec-review {feature} tasks` has finished, ask the user: 「タスクを作り、審査も終わりました。タスクを承認して、実装に進みますか。」
   - If the user approves:
     - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "DogisRiki"`
       and `approved_at` (ISO 8601)
-    - Respond: "Tasks approved. Start implementation with `/kiro-impl {feature}`"
+    - Respond: 「タスクの承認を記録しました。`/kiro-impl {feature}` を打つと、実装が始まります。」
   - If the user wants changes:
     - Keep `approvals.tasks.approved: false`
     - Respond with guidance on what to adjust and re-run
@@ -159,7 +159,9 @@ Provide brief summary in the language specified in spec.json:
 
 1. **Status**: Confirm tasks generated at `.kiro/specs/{feature}/tasks.md`
 2. **Task Summary**:
-   - Total: X major tasks, Y sub-tasks
+   - Number of major tasks: X
+   - Number of sub-tasks: Y
+   - Write these two numbers on separate lines, not joined in one line
    - All Z requirements covered
    - Average task size: 1-3 hours per sub-task
 3. **Quality Validation**:
@@ -181,27 +183,27 @@ Provide brief summary in the language specified in spec.json:
 
 **Requirements or Design Not Approved**:
 - **Stop Execution**: Cannot proceed without approved requirements and design
-- **User Message**: "Requirements and design must be approved before task generation"
-- **Suggested Action**: "Ask the user to review and approve the outstanding documents, then re-run this skill. Do not use `-y`: auto-approval is prohibited by CLAUDE.md"
+- **User Message**: 「タスクを作る前に、要件と設計の承認が要ります。」
+- **Suggested Action**: 「まだ承認されていない要件か設計を読んで承認してから、もう一度 `/kiro-spec-tasks {feature}` を打ってください。CLAUDE.md が自動の承認を禁じているので、`-y` は付けないでください。」
 
 **Missing Requirements or Design**:
 - **Stop Execution**: Both documents must exist
-- **User Message**: "Missing requirements.md or design.md at `.kiro/specs/{feature}/`"
-- **Suggested Action**: "Complete requirements and design phases first"
+- **User Message**: 「`.kiro/specs/{feature}/` に、`requirements.md` か `design.md` がありません。」
+- **Suggested Action**: 「先に、`/kiro-spec-requirements {feature}` と `/kiro-spec-design {feature}` のうち、まだ打っていないコマンドを打ち、要件と設計を作って承認してください。そのあと、もう一度 `/kiro-spec-tasks {feature}` を打ってください。」
 
 **Incomplete Requirements Coverage**:
-- **Warning**: "Not all requirements mapped to tasks. Review coverage."
+- **Warning**: 「どのタスクにも割り当てられていない要件があります。Claude は、その要件の番号を下に並べます。わざとタスクにしていない要件か、Claude がタスクを作り直す要件かを、この会話で答えてください。」
 - **User Action Required**: Confirm intentional gaps or regenerate tasks
 
 **Spec Gap Found During Task Review**:
 - **Stop Execution**: Do not write a patched-over `tasks.md`
-- **User Message**: "Requirements/design do not provide enough clear coverage to generate an executable task plan"
-- **Suggested Action**: "Refine requirements.md or design.md, then re-run `/kiro-spec-tasks {feature}`"
+- **User Message**: 「タスクを作る途中で、要件か設計に足りない点か、2通りに読める点が見つかりました。Claude は、足りない点と2通りに読める点を、下に並べます。要件か設計をどう直すかを、この会話で答えてください。」
+- **Suggested Action**: Refine requirements.md or design.md following the owner's answer, then re-run `/kiro-spec-tasks {feature}`
 
 **Template/Rules Missing**:
-- **User Message**: "Template or rules files missing in `.kiro/settings/`" (the template is `.kiro/settings/templates/specs/tasks.md`)
+- **User Message**: 「`.kiro/settings/` に、タスクの雛形か決まりのファイルがありません。」 (the template is `.kiro/settings/templates/specs/tasks.md`)
 - **Fallback**: Use inline basic structure with warning
-- **Suggested Action**: "Check repository setup or restore template files"
+- **Suggested Action**: 「Claude は、雛形か決まりのファイルが無いので、それを使わずにタスクを作りました。雛形と決まりのとおりに作り直すときは、Claude が main から雛形と決まりのファイルを戻すので、この会話でそう書いてください。」
 - **Missing Numeric Requirement IDs**:
   - **Stop Execution**: All requirements in requirements.md MUST have numeric IDs. If any requirement lacks a numeric ID, stop and request that requirements.md be fixed before generating tasks.
 

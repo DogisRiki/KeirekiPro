@@ -44,20 +44,20 @@ argument-hint: <feature-name>
 Create report in the language specified in spec.json covering:
 1. **Current Phase & Progress**: Where the spec is in the workflow
 2. **Completion Status**: Percentage complete for each phase
-3. **Task Breakdown**: If tasks exist, show completed/remaining counts
+3. **Task Breakdown**: If tasks exist, show the number of completed tasks and the number of remaining tasks on separate lines, without joining them with a slash
 4. **Boundary Context**: Upstream/downstream, out-of-boundary, and allowed dependency notes when available
 5. **Revalidation Watchlist**: Downstream or adjacent work likely affected by changes to this spec
 6. **Next Actions**: What needs to be done next
 7. **Blockers**: Any issues preventing progress
 
-**Format**: Clear, scannable format with emojis for status
+**Format**: Clear, scannable format. Write each status in Japanese words; an emoji may be added beside the words, but must not replace them
 
 ## Safety & Fallback
 
 ### Error Scenarios
 
 **Spec Not Found**:
-- **Message**: "No spec found for `$ARGUMENTS`. Check available specs in `.kiro/specs/`"
+- **Message**: 「`$ARGUMENTS` という spec は見つかりませんでした。`.kiro/specs/` にある spec を下に並べます。」
 - **Action**: List available spec directories
 
 **Incomplete Spec**:
