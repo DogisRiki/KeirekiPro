@@ -103,6 +103,13 @@ public class JwtProvider {
         // ユーザーIDを取得
         String userId = jwt.getSubject();
 
+        // トークンバージョンが現在の値と一致しないトークンは受け付けない
+        Long tokenVersion = jwt.getClaim(TOKEN_VERSION_CLAIM).asLong();
+        if (userId == null || tokenVersion == null
+                || tokenVersion != userTokenVersionStore.get(parseUserId(userId))) {
+            throw new JWTVerificationException("トークンバージョンが一致しません。");
+        }
+
         // JWTからロール情報を取得
         List<String> roles = jwt.getClaim(ROLES_CLAIM).asList(String.class);
         if (roles == null) {
@@ -117,6 +124,25 @@ public class JwtProvider {
 
         // Spring Securityの認証オブジェクトを作成
         return new UsernamePasswordAuthenticationToken(userId, null, authorities);
+    }
+
+    /**
+     * トークンを検証し、ユーザーIDを取得する
+     *
+     * @param token JWTトークン
+     * @return ユーザーID
+     * @throws JWTVerificationException トークンが無効な場合
+     */
+    public UUID getUserId(String token) throws JWTVerificationException {
+        return parseUserId(getAuthentication(token).getName());
+    }
+
+    private UUID parseUserId(String userId) {
+        try {
+            return UUID.fromString(userId);
+        } catch (IllegalArgumentException e) {
+            throw new JWTVerificationException("ユーザーIDの形式が無効です。", e);
+        }
     }
 
     /**

@@ -2,6 +2,7 @@ package com.example.keirekipro.presentation.user.dto;
 
 import java.util.UUID;
 
+import com.example.keirekipro.presentation.shared.validator.MaxUtf8Bytes;
 import com.example.keirekipro.presentation.shared.validator.PasswordMatches;
 import com.example.keirekipro.usecase.user.command.SetEmailAndPasswordCommand;
 
@@ -28,7 +29,8 @@ public class SetEmailAndPasswordRequest {
     private String email;
 
     @NotBlank(message = "パスワードは入力必須です。")
-    @Size(min = 8, max = 20, message = "パスワードは8文字以上20文字以内で入力してください。")
+    @Size(min = 8, message = "パスワードは8文字以上で、半角72文字以内で入力してください。全角の文字は1文字を半角3文字分として数えます。")
+    @MaxUtf8Bytes(value = 72, message = "パスワードは8文字以上で、半角72文字以内で入力してください。全角の文字は1文字を半角3文字分として数えます。")
     @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$", message = "パスワードには英小文字、英大文字、数字をそれぞれ1文字以上含める必要があります。")
     private String password;
 

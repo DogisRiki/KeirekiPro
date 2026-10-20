@@ -98,7 +98,8 @@ class ResetPasswordControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.password").isArray())
-                .andExpect(jsonPath("$.errors.password", hasItem("新しいパスワードは8文字以上20文字以内で入力してください。")))
+                .andExpect(jsonPath("$.errors.password",
+                        hasItem("新しいパスワードは8文字以上で、半角72文字以内で入力してください。全角の文字は1文字を半角3文字分として数えます。")))
                 .andExpect(jsonPath("$.errors.password", hasItem("新しいパスワードには英小文字、英大文字、数字をそれぞれ1文字以上含める必要があります。")));
     }
 
