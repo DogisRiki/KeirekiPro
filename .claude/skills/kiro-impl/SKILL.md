@@ -1,6 +1,6 @@
 ---
 name: kiro-impl
-description: Implement approved tasks using TDD with native subagent dispatch. Runs all pending tasks autonomously or selected tasks manually.
+description: Implement approved tasks using TDD in the main context, with an independent reviewer subagent per task. Runs all pending tasks autonomously or selected tasks manually.
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, MultiEdit, Bash, Glob, Grep, Agent, WebSearch, WebFetch
 argument-hint: <feature-name> [task-numbers]
@@ -10,7 +10,7 @@ argument-hint: <feature-name> [task-numbers]
 
 ## Role
 You operate in two modes:
-- **Autonomous mode** (no task numbers): Dispatch a fresh subagent per task, with independent review after each
+- **Autonomous mode** (no task numbers): Implement each task yourself in the main context, then dispatch a fresh reviewer subagent for independent review after each
 - **Manual mode** (task numbers provided): Execute selected tasks directly in the main context
 
 ## Core Mission
@@ -50,8 +50,8 @@ After all parallel research completes, synthesize implementation brief before st
 - Derive a canonical validation set for this repo: `TEST_COMMANDS`, `BUILD_COMMANDS`, and `SMOKE_COMMANDS`
 - Prefer commands already used by repo automation over ad hoc shell pipelines
 - For `SMOKE_COMMANDS`, choose the lightest trustworthy runtime-liveness check for the app shape (for example: root URL load, Electron launch, CLI `--help`, service health endpoint, mobile simulator/e2e harness if one already exists)
-- Keep the full command set in the parent context, and pass only the task-relevant subset to implementer and reviewer subagents
-- For the implementer, pass commands that run only specific tests (e.g. `bash .claude/scripts/parallel/run-check.sh backend ./gradlew test --tests <class>`, `bash .claude/scripts/parallel/run-check.sh frontend pnpm test <test file>`), not the full-suite or quality-gate commands. `.claude/hooks/block-full-test-in-implementer.sh` blocks full-suite commands (`./gradlew check`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`) inside the `kiro-implementer` subagent. The reviewer runs the full suite and the quality gates for each task (see Step 3 c)
+- Keep the full command set in the main context, and pass only the task-relevant subset to reviewer subagents
+- While implementing a task, run only commands that run specific tests (e.g. `bash .claude/scripts/parallel/run-check.sh backend ./gradlew test --tests <class>`, `bash .claude/scripts/parallel/run-check.sh frontend pnpm test <test file>`), not the full-suite or quality-gate commands (`./gradlew check`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`). The reviewer runs the full suite and the quality gates for each task (see Step 3 c)
 
 **Establish repo baseline**:
 - Run `git status --porcelain` and note any pre-existing uncommitted changes
@@ -74,54 +74,51 @@ After all parallel research completes, synthesize implementation brief before st
 
 ### Step 3: Execute Implementation
 
-#### Autonomous Mode (subagent dispatch)
+#### Autonomous Mode (implement in the main context, review by subagent)
 
-**Iteration discipline**: Process exactly ONE sub-task (e.g., 1.1) per iteration. Do NOT batch multiple sub-tasks into a single subagent dispatch. Each iteration follows the full cycle: dispatch implementer → review → commit → re-read tasks.md → next.
+**Iteration discipline**: Process exactly ONE sub-task (e.g., 1.1) per iteration. Do NOT batch multiple sub-tasks into a single implementation or review. Each iteration follows the full cycle: implement → review → commit → re-read tasks.md → next.
 
-**Context management**: At the start of each iteration, re-read `tasks.md` to determine the next actionable sub-task. Do NOT rely on accumulated memory of previous iterations. After completing each iteration, retain only a one-line summary (e.g., "1.1: READY_FOR_REVIEW, 3 files changed") and discard the full status report and reviewer details.
+**Context management**: At the start of each iteration, re-read `tasks.md` to determine the next actionable sub-task. Do NOT rely on accumulated memory of previous iterations. After completing each iteration, retain only a one-line summary (e.g., "1.1: APPROVED, 3 files changed") and discard the full status report and reviewer details.
 
 For each task (one at a time):
 
-**a) Dispatch implementer**:
-- Read `templates/implementer-prompt.md` from this skill's directory
-- Construct a prompt by combining the template with task-specific context:
+**a) Implement the task yourself**:
+- Do NOT dispatch an implementer subagent. The owner decided that the conversation's Claude implements each task, because an implementer subagent adds cost and time; only the review goes to a separate subagent
+- Read `templates/implementation-protocol.md` from this skill's directory and follow it for this task, using this task-specific context:
   - Task description and boundary scope
   - Paths to spec files: requirements.md, design.md, tasks.md
   - Exact requirement and design section numbers this task must satisfy (using source numbering, NOT invented `REQ-*` aliases)
-  - Task-relevant steering context and parent-discovered validation commands (tests/build/smoke as relevant)
+  - Task-relevant steering context and the validation commands from the Preflight (tests/build/smoke as relevant)
   - Whether the task is behavioral (Feature Flag Protocol) or non-behavioral
-  - **Previous learnings**: Include any `## 実装のメモ` entries from tasks.md that are relevant to this task's boundary or dependencies (e.g., "better-sqlite3 requires separate rebuild for Electron"). This prevents the same mistakes from recurring.
-- The implementer subagent will read the spec files and build its own Task Brief (acceptance criteria, completion definition, design constraints, verification method) before implementation
-- Dispatch via **Agent tool** as a fresh subagent with `subagent_type: kiro-implementer` (`.claude/agents/kiro-implementer.md`). Do not use another subagent type for the implementer: the hook that blocks full-suite test commands applies only to `kiro-implementer`
+  - **Previous learnings**: Use any `## 実装のメモ` entries from tasks.md that are relevant to this task's boundary or dependencies (e.g., "better-sqlite3 requires separate rebuild for Electron"). This prevents the same mistakes from recurring.
+- Build the Task Brief (acceptance criteria, completion definition, design constraints, verification method) from the spec files before writing code, and end with the Status Report block defined in the protocol
 
-**b) Handle implementer status**:
-- Parse implementer status only from the exact `## Status Report` block and `- STATUS:` field.
-- If `STATUS` is missing, ambiguous, or replaced with prose, re-dispatch the implementer once requesting the exact structured status block only. Do NOT proceed to review without a parseable `READY_FOR_REVIEW | BLOCKED | NEEDS_CONTEXT` value.
+**b) Handle your status**:
+- Decide the next step only from the `- STATUS:` field of your Status Report block. Do NOT proceed to review without a `READY_FOR_REVIEW | BLOCKED | NEEDS_CONTEXT` value in that field.
 - **READY_FOR_REVIEW** → proceed to review
 - **BLOCKED** → dispatch debug subagent (see section below); do NOT immediately skip
-- **NEEDS_CONTEXT** → re-dispatch once with the requested additional context; if still unresolved → dispatch debug subagent
+- **NEEDS_CONTEXT** → look once for the missing context in the spec files, steering, and existing code, then retry the task; if still unresolved → dispatch debug subagent
 
 **c) Dispatch reviewer**:
 - Read `templates/reviewer-prompt.md` from this skill's directory
 - Construct a review prompt with:
   - The task description and relevant spec section numbers
   - Paths to spec files (requirements.md, design.md) so the reviewer can read them directly
-  - The implementer's status report (for reference only — reviewer must verify independently)
+  - Your Status Report from a) (for reference only — reviewer must verify independently)
 - The reviewer must apply the `kiro-review` protocol to this task-local review.
-- Preserve the existing task-specific context: task text, spec refs, `_対象の部品:_` scope, validation commands, implementer report, and the actual `git diff` as the primary source of truth.
-- Pass the quality-gate commands of every area this task changed (the commands listed in the Steps of the `/verify-frontend` `/verify-backend` `/verify-terraform` skills) as the validation commands for Regression Safety. The implementer does not run them, so the reviewer's run is the task's verify run required by the completion conditions in tasks.md, and its output is the fresh evidence for `kiro-verify-completion`
-- Dispatch the reviewer with a subagent type other than `kiro-implementer` (e.g. `general-purpose`), so that the full-suite commands are not blocked
+- Preserve the existing task-specific context: task text, spec refs, `_対象の部品:_` scope, validation commands, your Status Report, and the actual `git diff` as the primary source of truth.
+- Pass the quality-gate commands of every area this task changed (the commands listed in the Steps of the `/verify-frontend` `/verify-backend` `/verify-terraform` skills) as the validation commands for Regression Safety. You do not run them in a), so the reviewer's run is the task's verify run required by the completion conditions in tasks.md, and its output is the fresh evidence for `kiro-verify-completion`
 - The reviewer subagent will run `git diff` itself to read the actual code changes and verify against the spec
-- Dispatch via **Agent tool** as a fresh subagent
+- Dispatch via **Agent tool** as a fresh subagent with `subagent_type: general-purpose`
 
 **d) Handle reviewer verdict**:
 - Parse reviewer verdict only from the exact `## Review Verdict` block and `- VERDICT:` field.
 - If `VERDICT` is missing, ambiguous, or replaced with prose, re-dispatch the reviewer once requesting the exact structured verdict only. Do NOT mark the task complete, commit, or continue to the next task without a parseable `APPROVED | REJECTED` value.
 - **APPROVED** → before marking the task `[x]` or making any success claim, apply `kiro-verify-completion` using fresh evidence from the current code state; then mark task `[x]` in tasks.md and perform selective git commit
-- **REJECTED (round 1-2)** → re-dispatch implementer with review feedback
+- **REJECTED (round 1-2)** → fix the findings yourself following the protocol, write a new Status Report, and dispatch a fresh reviewer
 - **REJECTED (round 3)** → dispatch debug subagent (see section below)
 
-**e) Commit** (parent-only, selective staging):
+**e) Commit** (main context only, selective staging):
 - Stage only the files actually changed for this task, plus tasks.md
 - **NEVER** use `git add -A` or `git add .`
 - Use `git add <file1> <file2> ...` with explicit file paths
@@ -150,10 +147,10 @@ The debug subagent runs in a **fresh context** — it receives only the error in
 - Parse `NEXT_ACTION` from the debug report's exact structured field.
 - If `NEXT_ACTION: STOP_FOR_HUMAN` → append `_保留: <ROOT_CAUSE>_` to tasks.md, stop the feature run, and report that human review is required before continuing
 - If `NEXT_ACTION: BLOCK_TASK` → append `_保留: <ROOT_CAUSE>_` to tasks.md, skip to next task
-- If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Spawn a **new** implementer subagent (`subagent_type: kiro-implementer`) with the debug report's `FIX_PLAN`, `NOTES`, and the current `git diff`, and require it to repair the task with explicit edits only
-  - If the new implementer succeeds (READY_FOR_REVIEW → reviewer APPROVED) → normal flow
-  - If the new implementer also fails → repeat debug cycle (max 2 debug rounds total). After 2 failed debug rounds → append `_保留: debug attempted twice, still failing — <ROOT_CAUSE>_` to tasks.md, skip
-- **Max 2 debug rounds per task**. Each round: fresh debug subagent → fresh implementer. If still failing after 2 rounds, the task is blocked.
+- If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Repair the task yourself with explicit edits only, following the debug report's `FIX_PLAN` and `NOTES` and the current `git diff`
+  - If the repair succeeds (READY_FOR_REVIEW → reviewer APPROVED) → normal flow
+  - If the repair also fails → repeat debug cycle (max 2 debug rounds total). After 2 failed debug rounds → append `_保留: debug attempted twice, still failing — <ROOT_CAUSE>_` to tasks.md, skip
+- **Max 2 debug rounds per task**. Each round: fresh debug subagent → your repair. If still failing after 2 rounds, the task is blocked.
 - Record debug findings in `## 実装のメモ` (this helps subsequent tasks avoid the same issue)
 
 **`(並行可)` markers**: Tasks marked `(並行可)` in tasks.md indicate they have no inter-dependencies and could theoretically run in parallel. However, kiro-impl processes them sequentially (one at a time) to avoid git conflicts and simplify review. The `(並行可)` marker is informational for task planning, not an execution directive.
@@ -204,10 +201,10 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 **Skip this protocol for**: refactoring, configuration, documentation, or tasks with no behavioral change.
 
 ## Critical Constraints
-- **Strict Handoff Parsing**: Never infer implementer `STATUS` or reviewer `VERDICT` from surrounding prose; only the exact structured fields count
+- **Strict Handoff Parsing**: Never infer your `STATUS` or the reviewer's `VERDICT` from surrounding prose; only the exact structured fields count
 - **No Destructive Reset**: Never use `git checkout .`, `git reset --hard`, or similar destructive rollback inside the implementation loop
 - **Selective Staging**: NEVER use `git add -A` or `git add .`; always stage explicit file paths
-- **Bounded Review Rounds**: Max 2 implementer re-dispatch rounds per reviewer rejection, then debug
+- **Bounded Review Rounds**: Max 2 rounds of fixing the reviewer's findings yourself, then debug
 - **Bounded Debug**: Max 2 debug rounds per task (debug + re-implementation per round); if still failing → BLOCKED
 - **Bounded Remediation**: Cap final-validation remediation at 3 rounds
 
