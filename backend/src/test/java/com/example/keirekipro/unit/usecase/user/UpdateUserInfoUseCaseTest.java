@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -19,6 +21,8 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+
+import javax.imageio.ImageIO;
 
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
@@ -353,6 +357,69 @@ class UpdateUserInfoUseCaseTest {
         User saved = captor.getValue();
         assertThat(saved.getUsername()).isEqualTo(USERNAME);
         assertThat(saved.isTwoFactorAuthEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("画像の幅が4096ピクセルを超える場合はUseCaseExceptionがスローされる")
+    void test_imageWidthOverLimit() throws Exception {
+        assertImageSizeRejected(4097, 1);
+    }
+
+    @Test
+    @DisplayName("画像の高さが4096ピクセルを超える場合はUseCaseExceptionがスローされる")
+    void test_imageHeightOverLimit() throws Exception {
+        assertImageSizeRejected(1, 4097);
+    }
+
+    @Test
+    @DisplayName("画像の幅と高さが4096ピクセルの場合は更新できる")
+    void test_imageSizeAtLimit() throws Exception {
+        MockMultipartFile image = new MockMultipartFile(
+                "profileImage", "test.png", "image/png", createPng(4096, 4096));
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, USERNAME, toProfileImage(image), null);
+
+        ErrorCollector errorCollector = new ErrorCollector();
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
+                User.reconstruct(
+                        USER_ID,
+                        Email.create(errorCollector, EMAIL),
+                        PASSWORD_HASH,
+                        false,
+                        Map.of(),
+                        EnumSet.of(RoleName.USER),
+                        null,
+                        "old-name",
+                        LocalDateTime.now(),
+                        LocalDateTime.now())));
+        when(objectStore.putAs(any(StoredObject.class), eq("/profile/image/"), eq(USER_ID + ".png")))
+                .thenReturn(S3_KEY);
+
+        updateUserInfoUseCase.execute(req);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getProfileImage()).isEqualTo(S3_KEY);
+    }
+
+    private void assertImageSizeRejected(int width, int height) throws IOException {
+        MockMultipartFile image = new MockMultipartFile(
+                "profileImage", "test.png", "image/png", createPng(width, height));
+        UpdateUserInfoCommand req = new UpdateUserInfoCommand(USER_ID, USERNAME, toProfileImage(image), null);
+
+        assertThatThrownBy(() -> updateUserInfoUseCase.execute(req))
+                .isInstanceOf(UseCaseException.class)
+                .satisfies(e -> assertThat(((UseCaseException) e).getErrors().get("profileImage"))
+                        .containsExactly("プロフィール画像の幅と高さは4096ピクセル以下である必要があります。"));
+
+        verify(objectStore, never()).putAs(any(), any(), any());
+        verify(userRepository, never()).save(any());
+    }
+
+    private byte[] createPng(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_BINARY);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
     }
 
     private ProfileImageCommand toProfileImage(MultipartFile file) {

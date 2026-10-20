@@ -252,37 +252,42 @@ class RequestContextLoggingFilterTest {
     }
 
     @Test
-    @DisplayName("X-Forwarded-Forヘッダがある場合、先頭のIPを使用する")
+    @DisplayName("X-Forwarded-Forヘッダに複数のIPがある場合、末尾から2つ目のIPを使用する")
     void test11() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/test");
         request.addHeader("X-Forwarded-For", "192.168.1.100, 10.0.0.1, 172.16.0.1");
+        request.setRemoteAddr("127.0.0.1");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, filterChain);
 
-        ILoggingEvent logEvent = listAppender.list.get(0);
-        assertThat(logEvent.getKeyValuePairs()).anySatisfy(kv -> {
-            if ("client.address".equals(kv.key)) {
-                assertThat(kv.value).isEqualTo("192.168.1.100");
-            }
-        });
+        assertThat(clientAddress(listAppender.list.get(0))).isEqualTo("10.0.0.1");
     }
 
     @Test
-    @DisplayName("X-Forwarded-Forヘッダに単一IPの場合、そのIPを使用する")
+    @DisplayName("X-Forwarded-Forヘッダに単一IPの場合、remoteAddrを使用する")
     void test12() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/test");
         request.addHeader("X-Forwarded-For", "192.168.1.100");
+        request.setRemoteAddr("127.0.0.1");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, filterChain);
 
-        ILoggingEvent logEvent = listAppender.list.get(0);
-        assertThat(logEvent.getKeyValuePairs()).anySatisfy(kv -> {
-            if ("client.address".equals(kv.key)) {
-                assertThat(kv.value).isEqualTo("192.168.1.100");
-            }
-        });
+        assertThat(clientAddress(listAppender.list.get(0))).isEqualTo("127.0.0.1");
+    }
+
+    @Test
+    @DisplayName("X-Forwarded-Forヘッダの末尾から2つ目が空の場合、remoteAddrを使用する")
+    void test12_2() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/test");
+        request.addHeader("X-Forwarded-For", " , 172.16.0.1");
+        request.setRemoteAddr("127.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(clientAddress(listAppender.list.get(0))).isEqualTo("127.0.0.1");
     }
 
     @Test
@@ -390,5 +395,12 @@ class RequestContextLoggingFilterTest {
                 assertThat(kv.value).isEqualTo(404);
             }
         });
+    }
+
+    private static Object clientAddress(ILoggingEvent logEvent) {
+        return logEvent.getKeyValuePairs().stream()
+                .filter(kv -> "client.address".equals(kv.key))
+                .findFirst()
+                .orElseThrow().value;
     }
 }

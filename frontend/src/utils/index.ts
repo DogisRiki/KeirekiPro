@@ -1,3 +1,4 @@
+export * from "@/utils/analyticsUtils";
 export * from "@/utils/businessHours";
 export * from "@/utils/dateUtils";
 export * from "@/utils/httpUtils";
