@@ -57,6 +57,22 @@ describe("ui controls", () => {
         expect(screen.getByRole("button", { name: "パスワードを隠す" })).toBeInTheDocument();
     });
 
+    it("PasswordTextFieldは既定では73文字以上も入力を止めないこと", async () => {
+        const Wrapper = () => {
+            const [value, setValue] = useState("");
+            return <PasswordTextField label="パスワード" value={value} onChange={(e) => setValue(e.target.value)} />;
+        };
+
+        const { user } = renderWithProviders(<Wrapper />);
+        const input = screen.getByLabelText("パスワード");
+        const longPassword = "a".repeat(73);
+
+        await user.type(input, longPassword);
+
+        expect(input).not.toHaveAttribute("maxlength");
+        expect(input).toHaveValue(longPassword);
+    });
+
     it("DatePickerは入力欄操作で開き直接入力では値を変えないこと", async () => {
         const onOpen = vi.fn();
         const onChange = vi.fn();

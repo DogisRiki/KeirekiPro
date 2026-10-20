@@ -40,8 +40,8 @@ export const PasswordTextField = (props: TextFieldProps) => {
             shrink: true,
             ...slotProps?.inputLabel,
         },
+        // 長さの上限は画面で止めず、サーバーの入力検査の文言で知らせる
         htmlInput: {
-            maxLength: 72,
             minLength: 8,
             ...slotProps?.htmlInput,
         },
