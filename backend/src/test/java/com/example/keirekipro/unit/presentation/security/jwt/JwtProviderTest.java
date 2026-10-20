@@ -147,8 +147,10 @@ class JwtProviderTest {
     @Test
     @DisplayName("roles claimが無いトークンは権限が空で認証できる")
     void test7() {
+        when(userTokenVersionStore.get(USER_UUID)).thenReturn(0L);
         String tokenWithoutRoles = JWT.create()
                 .withSubject(USER_ID)
+                .withClaim("tokenVersion", 0L)
                 .withIssuedAt(new Date())
                 .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
                 .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
@@ -160,5 +162,67 @@ class JwtProviderTest {
 
         // ロールが空である
         assertThat(auth.getAuthorities()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("トークンバージョンが現在の値と一致しないトークンは受け付けない")
+    void test8() {
+        when(userTokenVersionStore.get(USER_UUID)).thenReturn(0L);
+        String token = jwtProvider.createAccessToken(USER_ID, Set.of("USER"));
+
+        // ログアウトなどでトークンバージョンが上がった
+        when(userTokenVersionStore.get(USER_UUID)).thenReturn(1L);
+
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(token))
+                .isInstanceOf(JWTVerificationException.class);
+    }
+
+    @Test
+    @DisplayName("tokenVersion claimが無いトークンは受け付けない")
+    void test9() {
+        String tokenWithoutVersion = JWT.create()
+                .withSubject(USER_ID)
+                .withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
+                .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
+
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(tokenWithoutVersion))
+                .isInstanceOf(JWTVerificationException.class);
+    }
+
+    @Test
+    @DisplayName("subjectがUUIDの形式でないトークンは受け付けない")
+    void test10() {
+        String tokenWithInvalidSubject = JWT.create()
+                .withSubject("not-a-uuid")
+                .withClaim("tokenVersion", 0L)
+                .withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
+                .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
+
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(tokenWithInvalidSubject))
+                .isInstanceOf(JWTVerificationException.class);
+    }
+
+    @Test
+    @DisplayName("subjectが無いトークンは受け付けない")
+    void test11() {
+        String tokenWithoutSubject = JWT.create()
+                .withClaim("tokenVersion", 0L)
+                .withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
+                .sign(Algorithm.HMAC256(jwtProperties.getSecret()));
+
+        assertThatThrownBy(() -> jwtProvider.getAuthentication(tokenWithoutSubject))
+                .isInstanceOf(JWTVerificationException.class);
+    }
+
+    @Test
+    @DisplayName("有効なアクセストークンからユーザーIDを取得する")
+    void test12() {
+        when(userTokenVersionStore.get(USER_UUID)).thenReturn(3L);
+        String token = jwtProvider.createAccessToken(USER_ID, Set.of("USER"));
+
+        assertThat(jwtProvider.getUserId(token)).isEqualTo(USER_UUID);
     }
 }

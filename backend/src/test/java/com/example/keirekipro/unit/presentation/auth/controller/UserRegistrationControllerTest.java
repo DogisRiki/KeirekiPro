@@ -195,14 +195,15 @@ class UserRegistrationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.password").isArray())
-                .andExpect(jsonPath("$.errors.password", hasItem("パスワードは8文字以上20文字以内で入力してください。")));
+                .andExpect(jsonPath("$.errors.password",
+                        hasItem("パスワードは8文字以上で、半角72文字以内で入力してください。全角の文字は1文字を半角3文字分として数えます。")));
     }
 
     @Test
-    @DisplayName("パスワードが20文字を超える場合、バリデーションエラーとなる")
+    @DisplayName("パスワードが72バイトを超える場合、バリデーションエラーとなる")
     void test9() throws Exception {
-        // 21文字のパスワード
-        String longPassword = "Password123Password12";
+        // 73バイトのパスワード
+        String longPassword = "Password123" + "a".repeat(62);
 
         // リクエストを準備
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, longPassword, longPassword);
@@ -216,7 +217,8 @@ class UserRegistrationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.password").isArray())
-                .andExpect(jsonPath("$.errors.password", hasItem("パスワードは8文字以上20文字以内で入力してください。")));
+                .andExpect(jsonPath("$.errors.password",
+                        hasItem("パスワードは8文字以上で、半角72文字以内で入力してください。全角の文字は1文字を半角3文字分として数えます。")));
     }
 
     @Test
@@ -357,7 +359,8 @@ class UserRegistrationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("入力エラーがあります。"))
                 .andExpect(jsonPath("$.errors.password", hasSize(2)))
-                .andExpect(jsonPath("$.errors.password", hasItem("パスワードは8文字以上20文字以内で入力してください。")))
+                .andExpect(jsonPath("$.errors.password",
+                        hasItem("パスワードは8文字以上で、半角72文字以内で入力してください。全角の文字は1文字を半角3文字分として数えます。")))
                 .andExpect(jsonPath("$.errors.password", hasItem("パスワードには英小文字、英大文字、数字をそれぞれ1文字以上含める必要があります。")));
     }
 

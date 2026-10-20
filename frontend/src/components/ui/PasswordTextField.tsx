@@ -41,7 +41,7 @@ export const PasswordTextField = (props: TextFieldProps) => {
             ...slotProps?.inputLabel,
         },
         htmlInput: {
-            maxLength: 20,
+            maxLength: 72,
             minLength: 8,
             ...slotProps?.htmlInput,
         },
