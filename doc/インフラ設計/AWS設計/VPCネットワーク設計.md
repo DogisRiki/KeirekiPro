@@ -72,7 +72,7 @@
 
 | プロトコル | ポート | ソース | 説明 |
 |-----------|--------|--------|------|
-| HTTPS | 443 | 0.0.0.0/0 | CloudFrontからのアクセス |
+| HTTPS | 443 | CloudFrontのオリジン向けのマネージドプレフィックスリスト(com.amazonaws.global.cloudfront.origin-facing) | CloudFrontからのアクセス |
 
 アウトバウンドルール:
 

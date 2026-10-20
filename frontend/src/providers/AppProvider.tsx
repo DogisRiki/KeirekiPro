@@ -4,6 +4,7 @@ import { darkTheme, lightTheme } from "@/config/theme";
 import { queryConfig } from "@/lib";
 import { NotificationProvider } from "@/providers/NotificationProvider";
 import { useThemeStore, useUserAuthStore } from "@/stores";
+import { toAnalyticsLocation } from "@/utils";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -22,9 +23,15 @@ dayjs.locale("ja");
 
 /**
  * Google Analytics初期化
+ * ページの表示は useGoogleAnalytics が送るので、初期化のときには送らない
  */
 if (env.GA_MEASUREMENT_ID) {
-    ReactGA.initialize(env.GA_MEASUREMENT_ID);
+    ReactGA.initialize(env.GA_MEASUREMENT_ID, {
+        gtagOptions: {
+            send_page_view: false,
+            page_location: toAnalyticsLocation(window.location.origin, window.location.pathname),
+        },
+    });
 }
 
 /**

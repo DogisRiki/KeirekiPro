@@ -102,7 +102,32 @@ describe("AppProvider の Google Analytics", () => {
 
         await import("@/providers/AppProvider");
 
-        expect(initialize).toHaveBeenCalledWith("G-dummyId");
+        expect(initialize).toHaveBeenCalledWith("G-dummyId", {
+            gtagOptions: {
+                send_page_view: false,
+                page_location: `${window.location.origin}${window.location.pathname}`,
+            },
+        });
+    });
+
+    it("パスワード再設定ページで初期化するときは、トークンを固定の文字列に置き換えたURLを渡すこと", async () => {
+        vi.resetModules();
+        const initialize = vi.fn();
+        vi.doMock("react-ga4", () => ({ default: { initialize } }));
+        window.history.pushState({}, "", "/password/reset/secret-token?a=1#b");
+
+        try {
+            await import("@/providers/AppProvider");
+        } finally {
+            window.history.pushState({}, "", "/");
+        }
+
+        expect(initialize).toHaveBeenCalledWith("G-dummyId", {
+            gtagOptions: {
+                send_page_view: false,
+                page_location: `${window.location.origin}/password/reset/:token`,
+            },
+        });
     });
 
     it("計測IDが無いときは、計測を初期化しないこと", async () => {

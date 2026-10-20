@@ -123,12 +123,17 @@ public class RequestContextLoggingFilter extends OncePerRequestFilter {
     }
 
     private static String resolveClientIp(HttpServletRequest request) {
-        // 実行基盤（ALB等）を想定し、X-Forwarded-Forを優先
+        // CloudFront は受け取った接続の送り元をX-Forwarded-Forの末尾に足し、ALB はそのあとに CloudFront の送り元を足す。
+        // そのため、末尾から2つ目が CloudFront が受け取った接続の送り元になる。それより前の値は利用者が書き換えられる
         String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            // 先頭がクライアントIP
-            int comma = xff.indexOf(',');
-            return (comma >= 0 ? xff.substring(0, comma) : xff).trim();
+        if (xff != null) {
+            String[] entries = xff.split(",");
+            if (entries.length >= 2) {
+                String viewerAddress = entries[entries.length - 2].trim();
+                if (!viewerAddress.isEmpty()) {
+                    return viewerAddress;
+                }
+            }
         }
         return request.getRemoteAddr();
     }

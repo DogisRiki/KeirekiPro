@@ -95,12 +95,17 @@ resource "aws_security_group" "alb" {
   }
 }
 
+# CloudFront がオリジンへの接続に使うアドレスの一覧(AWS が管理する)
+data "aws_ec2_managed_prefix_list" "cloudfront" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 resource "aws_security_group_rule" "alb_ingress_https" {
   type              = "ingress"
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
+  prefix_list_ids   = [data.aws_ec2_managed_prefix_list.cloudfront.id]
   security_group_id = aws_security_group.alb.id
   description       = "HTTPS from CloudFront"
 }
