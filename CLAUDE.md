@@ -110,7 +110,7 @@ AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(
     所有者が spec の途中で選び直したときも、同じく `review_model` を書き換える。所有者が選んでいない spec では `review_model` を書かない
   - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
   - `/kiro-validate-design` は使わない(`/spec-review` が置き換えた)。cc-sdd のスキルの出力で案内されても起動しない
-- Phase 2(実装): `/kiro-impl {feature}`(タスクごとにsubagent実装+独立レビュー+最終検証)
+- Phase 2(実装): `/kiro-impl {feature}`(タスクごとに実装+確認役の独立レビュー+最終検証)
   - 再検証のみ: `/kiro-validate-impl {feature}`
 - 実装完了後の出荷は `/ship`(PR本文に `Spec: .kiro/specs/{feature}` と `Refs: #<Issue番号>` を記載)
 

@@ -41,7 +41,10 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
    - `Refs: #<Issue番号>`
    - `Closes #<Issue番号>`(例外なく必須。マージ時にGitHubがIssueを自動で閉じる。GitHubが閉じなかったときは仕組みが閉じる)
    - Lane A(spec駆動)の場合: `Spec: .kiro/specs/<feature>`(size-checkがこの行で判定する)
-   - テストのアサーションを意図的に変更した場合: `Test-Change-Justification: <理由>`
+   - テストのアサーションを意図的に変更した場合: `Test-Change-Justification: <理由>`。
+     本文を書く前に、変えた・消したアサーションの行(テストのファイルを消した場合も含む)があるかを差分で確かめ、あれば `gh pr create` の時点の本文に書く。
+     あとから `gh pr edit` で足すと、所有者の承認のあとに pull_request の検査をやり直しても、やり直しは PR を作ったときの本文を読むので、escape-hatch がまた落ちる。
+     あとから足すしかないときは、承認の前に、PR を閉じて開き直すよう所有者に頼む
    - 変更概要・検証結果(verifyのReport)
 
    分けた部分のIssue(サブIssue)のPRでは、`Refs:` と `Closes` にサブIssueの番号を書き、元のIssue(親)の番号は書かない。
