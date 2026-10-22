@@ -7,7 +7,9 @@
 | 項目 | 設定値 |
 |------|--------|
 | エンジン | PostgreSQL |
-| エンジンバージョン | 17（マイナーバージョンは自動マイナーバージョンアップグレードで上がる） |
+| エンジンバージョン | 17 |
+
+※ Terraform の `engine_version` には、メジャーバージョンの `17` だけを書く。マイナーバージョンまで書くと、AWS が版を上げたあとに、Terraform が元の版に戻そうとして適用に失敗するためである。マイナーバージョンの上げ方は「6. メンテナンス設定」に書く。
 | インスタンス識別子 | keirekipro-db |
 | インスタンスクラス | db.t4g.micro |
 | マルチAZ配置 | 無効 |
@@ -83,6 +85,28 @@
 | メンテナンスウィンドウ | Tue:23:30-Wed:00:00 UTC（JST 水08:30-09:00） |
 
 ※ RDSは平日の定時の起動から停止までの間（JST 07:50-20:05）しか動かず、停止中は予定されていた保守が取り消される。そのため、メンテナンスウィンドウはRDSが動いている時間に置く。
+
+### 6.1 マイナーバージョンの上がり方
+
+AWS は、メジャーバージョンごとに、自動で上げる先のマイナーバージョンを1つ決める。自動マイナーバージョンアップグレードは、今の版より新しい版を AWS が上げる先に決めているときだけ、メンテナンスウィンドウの中で版を上げる。AWS が上げる先を決めていない版では、自動の版上げは起きない。2026年10月には、サポートの切れた 17.4 から上げる先が無く、本番の RDS が 17.4 のまま残った。
+
+今の版から自動で上げる先の版は、次のコマンドで確かめる。`AutoUpgrade` が `True` の行の版が、自動で上げる先の版である。`True` の行が無いときは、手で版を上げる。
+
+```bash
+aws rds describe-db-engine-versions --engine postgres --engine-version <今の版> --include-all --region ap-northeast-1 --query "DBEngineVersions[*].ValidUpgradeTarget[*].{AutoUpgrade:AutoUpgrade,EngineVersion:EngineVersion}" --output table
+```
+
+手で版を上げるときは、RDS が動いている時間に、次のコマンドを打つ。`<上げる先の版>` には、上のコマンドの表にある 17 系の版を入れる。コマンドを打つとすぐに版上げが始まり、版上げの間、RDS はおよそ10分止まる。Terraform の `engine_version` はメジャーバージョンだけを書いているので、手で版を上げても Terraform に差分は出ない。
+
+```bash
+aws rds modify-db-instance --db-instance-identifier keirekipro-db --engine-version <上げる先の版> --apply-immediately --region ap-northeast-1 --profile keirekipro-admin
+```
+
+版上げが終わったかは、次のコマンドで確かめる。出力が `["available", "<上げる先の版>", {}]` になれば、版上げは終わっている。
+
+```bash
+aws rds describe-db-instances --db-instance-identifier keirekipro-db --region ap-northeast-1 --query "DBInstances[0].[DBInstanceStatus,EngineVersion,PendingModifiedValues]" --output json
+```
 
 ## 7. モニタリング設定
 
