@@ -82,7 +82,7 @@
   - _対象の部品: シークレット keirekipro/redis_
 
 - [ ] 4. 2つ目の PR の変更を確かめ、設計書を合わせる
-- [ ] 4.1 Terraform の検査と差分の読み取りで、変えてはいけないものが変わっていないことを確かめる
+- [x] 4.1 Terraform の検査と差分の読み取りで、変えてはいけないものが変わっていないことを確かめる
 
   Claude は、`/verify-terraform` を通す。Claude は、テストの方針の「差分の読み取り」のとおり、2つ目の PR の差分を読む。
   - 完了の確かめ方: `/verify-terraform` の fmt、validate、tflint、checkov が成功し、checkov が `terraform/.checkov.baseline` に無い指摘を出さない。差分で、`aws_lb.main` と `aws_lb_target_group.backend` の資源の名前が変わっておらず、`terraform/modules/ecs/` `terraform/modules/waf/` `terraform/modules/scheduler/` `frontend/` のファイルと `application-prod.yaml` が変わっていない
@@ -169,3 +169,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - ALB と CloudFront と ElastiCache のモジュールを変えるタスク2.1 から 2.3 は、変数を足すか名前を改めたモジュールに、`terraform/main.tf` で値を渡すところまでを受け持つ。そうしないと、タスクを終えた時点で `terraform validate` が通らず、完了条件の2つ目の `/verify-terraform` が失敗するためである。3つのタスクが同じ `terraform/main.tf` を変えるので、Claude は、3つのタスクに並行可の印を付けない
 - Claude は、3つ目の PR の変更を、2つ目の PR のマージのあとの main から作ったブランチで作る
 - Claude は、どの PR でも、PR の本文の Issue の行を `Refs: #614` にする。Issue を閉じる語を使わないのは、3つ目の PR のマージのあとも、判定の月の請求を比べるタスク7が残るためである
+- タスク4.1 の確認では、手元の terraform のイメージ(2026-09-29 に作ったもの)の checkov が 3.3.19 で、`docker/terraform/requirements.txt` で固定した 3.3.29 より古かった。そのため、手元の checkov の合格は 3.3.29 での合格ではない。3.3.29 での合格は、2つ目の PR の CI の terraform-static の結果で確かめる
