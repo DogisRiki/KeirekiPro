@@ -9,7 +9,7 @@
   - _要件: 4.1_
   - _対象の部品: OIDC のログインの途中の情報のストア_
 
-- [ ] 1.2 点を含むシークレットのキーが設定の名前として読まれることを確かめるテストを作る (並行可)
+- [x] 1.2 点を含むシークレットのキーが設定の名前として読まれることを確かめるテストを作る (並行可)
 
   Claude は、`backend/src/test/java/com/example/keirekipro/unit/infrastructure/config/SecretsManagerDottedKeyTest.java` を作る。このテストは、Spring Cloud AWS の Secrets Manager の設定の読み込みに、`spring.data.redis.cluster.nodes` と `spring.data.redis.username` のキーを持つ JSON を、テストの中の偽物の Secrets Manager から渡す。
   - 完了の確かめ方: `SecretsManagerDottedKeyTest` が、2つのキーが同じ名前の設定として読まれ、値が JSON の値と一致することを確かめて通る。偽物が返す JSON から `spring.data.redis.username` のキーを一時的に消すと、テストが失敗する。テストが、偽物を使わずに AWS に問い合わせることは無い
