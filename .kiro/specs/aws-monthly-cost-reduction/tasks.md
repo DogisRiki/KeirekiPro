@@ -46,7 +46,7 @@
   - _対象の部品: VPC オリジン_
   - _依存: 1.3_
 
-- [ ] 2.3 ElastiCache Serverless と RBAC のユーザーを作り、出力を向け直す
+- [x] 2.3 ElastiCache Serverless と RBAC のユーザーを作り、出力を向け直す
 
   Claude は、部品「ElastiCache Serverless」の設定の値のとおり、`terraform/modules/elasticache/main.tf` に `aws_elasticache_user.app` と `aws_elasticache_user_group.app` と `aws_elasticache_serverless_cache.main` を足す。Claude は、`variables.tf` に変数 `app_user_password` を足して、`terraform/main.tf` の ElastiCache のモジュールに `app_user_password = module.secrets_manager.redis_password` を渡し、`outputs.tf` の `endpoint` `port` `cluster_id` を ElastiCache Serverless に向け、出力 `username` を足す。Claude は、古い `aws_elasticache_replication_group.main` とその付属の資源と変数 `auth_token` を残す。
   - 完了の確かめ方: `aws_elasticache_serverless_cache.main` の `engine` が `valkey`、`major_engine_version` が `"8"`、`cache_usage_limits` が保存量 1GB と毎秒 1000 ECPU で、`kms_key_id` と最低の使用量が無い。ECPU とは、ElastiCache Serverless が、リクエストの処理に使った CPU の時間と転送したデータの量を合わせて数える単位である。`aws_elasticache_user.app` の `authentication_mode` が `password` で、ユーザーグループに default のユーザーが無い。変数 `app_user_password` が `sensitive = true` である。古い `aws_elasticache_replication_group.main` が差分で消えていない
