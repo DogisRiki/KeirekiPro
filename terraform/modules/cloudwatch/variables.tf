@@ -29,7 +29,7 @@ variable "rds_instance_identifier" {
 }
 
 variable "redis_cluster_id" {
-  description = "Redis cluster ID"
+  description = "ElastiCache Serverless cache name (clusterId dimension)"
   type        = string
 }
 

@@ -5,15 +5,25 @@
 | 項目 | 設定値 |
 |------|--------|
 | 名前 | keirekipro-alb |
-| スキーム | internet-facing |
+| スキーム | internal（公開の IP アドレスを持たない） |
 | IPアドレスタイプ | IPv4 |
 | VPC | keirekipro-vpc |
-| サブネット | keirekipro-public-1a, keirekipro-public-1c |
+| サブネット | keirekipro-private-1a, keirekipro-private-1c |
 | セキュリティグループ | keirekipro-alb-sg |
 | アイドルタイムアウト | 60秒 |
 | 削除保護 | 有効 |
 | HTTP/2 | 有効 |
 | クロスゾーン負荷分散 | 有効 |
+
+### 1.1 CloudFront からの接続
+
+| 項目 | 設定値 |
+|------|--------|
+| 接続の経路 | CloudFront の VPC オリジン（keirekipro-alb-vpc-origin）。インターネットを通らない |
+| VPC オリジンから ALB へのプロトコル | HTTPS（TLSv1.2） |
+| ALB に届く要求 | CloudFront に付いた WAF を通った要求だけ |
+
+※ ALB は internal なので、インターネットから直接届く経路は無い。VPC オリジンは要求を選ばない。要求を選ぶのは、CloudFront に付いた WAF と、ALB のリスナールール（X-Origin-Verify ヘッダーとパスパターン）である。
 
 ## 2. リスナー設計
 
@@ -108,7 +118,7 @@
 | デフォルト証明書 | api.keirekipro.click | CloudFrontからのAPI通信 | リスナーのcertificate_arn |
 | 追加証明書 | app.keirekipro.click | 直接アクセス時（拒否用） | aws_lb_listener_certificate |
 
-※ CloudFrontはオリジンとしてapi.keirekipro.clickを使用するため、APIサブドメイン用の証明書をデフォルトとして設定する。
+※ CloudFrontはオリジンとしてapi.keirekipro.clickを使用するため、APIサブドメイン用の証明書をデフォルトとして設定する。VPC オリジンを使っても、CloudFront のオリジンドメインは api.keirekipro.click のままで、この証明書の名前と合わせる。
 
 ## 6. アクセスログ設定
 

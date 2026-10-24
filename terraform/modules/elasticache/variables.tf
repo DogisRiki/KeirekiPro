@@ -18,3 +18,9 @@ variable "auth_token" {
   type        = string
   sensitive   = true
 }
+
+variable "app_user_password" {
+  description = "Password of the RBAC user for the application"
+  type        = string
+  sensitive   = true
+}

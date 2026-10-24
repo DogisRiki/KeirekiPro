@@ -75,6 +75,7 @@ module "elasticache" {
   private_subnet_ids = module.vpc.private_subnet_ids
   security_group_id  = module.vpc.redis_security_group_id
   auth_token         = module.secrets_manager.redis_password
+  app_user_password  = module.secrets_manager.redis_password
 }
 
 # RDS Secret Version (created after RDS to avoid circular dependency)
@@ -93,9 +94,11 @@ resource "aws_secretsmanager_secret_version" "rds" {
 resource "aws_secretsmanager_secret_version" "redis" {
   secret_id = module.secrets_manager.redis_secret_id
   secret_string = jsonencode({
-    "redis-host"     = module.elasticache.endpoint
-    "redis-port"     = tostring(module.elasticache.port)
-    "redis-password" = module.secrets_manager.redis_password
+    "redis-host"                      = module.elasticache.endpoint
+    "redis-port"                      = tostring(module.elasticache.port)
+    "redis-password"                  = module.secrets_manager.redis_password
+    "spring.data.redis.cluster.nodes" = "${module.elasticache.endpoint}:${module.elasticache.port}"
+    "spring.data.redis.username"      = module.elasticache.username
   })
 }
 
@@ -119,7 +122,7 @@ module "alb" {
 
   project_name               = var.project_name
   vpc_id                     = module.vpc.vpc_id
-  public_subnet_ids          = module.vpc.public_subnet_ids
+  subnet_ids                 = module.vpc.private_subnet_ids
   security_group_id          = module.vpc.alb_security_group_id
   certificate_arn            = module.acm.alb_certificate_arn
   api_certificate_arn        = module.acm.alb_api_certificate_arn
@@ -240,6 +243,7 @@ module "cloudfront" {
   api_domain_name                      = "api.${var.domain_name}"
   origin_verify_header_value           = module.secrets_manager.alb_origin_verify_header_value
   waf_web_acl_arn                      = module.waf.web_acl_arn
+  alb_arn                              = module.alb.alb_arn
 }
 
 # Route 53 Module

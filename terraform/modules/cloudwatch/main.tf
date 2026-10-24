@@ -192,16 +192,16 @@ resource "aws_cloudwatch_metric_alarm" "redis_memory_high" {
   alarm_name          = "${var.project_name}-redis-memory-high"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 2
-  metric_name         = "DatabaseMemoryUsagePercentage"
+  metric_name         = "BytesUsedForCache"
   namespace           = "AWS/ElastiCache"
   period              = 300
   statistic           = "Average"
-  threshold           = 80
+  threshold           = 300000000
   alarm_description   = "Redis memory usage is high"
   treat_missing_data  = "missing"
 
   dimensions = {
-    CacheClusterId = "${var.redis_cluster_id}-001"
+    clusterId = var.redis_cluster_id
   }
 
   alarm_actions = [aws_sns_topic.alerts.arn]
@@ -493,11 +493,11 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         properties = {
           title   = "Redis Memory Usage"
-          metrics = [["AWS/ElastiCache", "DatabaseMemoryUsagePercentage", "CacheClusterId", "${var.redis_cluster_id}-001"]]
+          metrics = [["AWS/ElastiCache", "BytesUsedForCache", "clusterId", var.redis_cluster_id]]
           period  = 300
           stat    = "Average"
           region  = "ap-northeast-1"
-          yAxis   = { left = { min = 0, max = 100 } }
+          yAxis   = { left = { min = 0 } }
         }
       },
       {
@@ -508,7 +508,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         properties = {
           title   = "Redis Connections"
-          metrics = [["AWS/ElastiCache", "CurrConnections", "CacheClusterId", "${var.redis_cluster_id}-001"]]
+          metrics = [["AWS/ElastiCache", "CurrConnections", "clusterId", var.redis_cluster_id]]
           period  = 60
           stat    = "Average"
           region  = "ap-northeast-1"

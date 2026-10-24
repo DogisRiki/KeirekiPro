@@ -27,7 +27,7 @@
 | keirekipro.click | SOA | シンプル | Route 53 SOA | 900 | 権威情報 |
 | app.keirekipro.click | A | シンプル | CloudFront（エイリアス） | - | アプリケーションアクセス |
 | app.keirekipro.click | AAAA | シンプル | CloudFront（エイリアス） | - | IPv6アクセス |
-| api.keirekipro.click | A | シンプル | ALB（エイリアス） | - | APIアクセス（CloudFrontオリジン用） |
+| api.keirekipro.click | A | シンプル | ALB（エイリアス・プライベートの IP アドレス） | - | APIアクセス（CloudFrontオリジン用） |
 | _xxxxxxxx.app.keirekipro.click | CNAME | シンプル | ACM検証値 | 300 | CloudFront用証明書検証 |
 | _yyyyyyyy.app.keirekipro.click | CNAME | シンプル | ACM検証値 | 300 | ALB用証明書検証（app） |
 | _zzzzzzzz.api.keirekipro.click | CNAME | シンプル | ACM検証値 | 300 | ALB用証明書検証（api） |
@@ -67,6 +67,9 @@
 | ALB | keirekipro-alb |
 | ルーティングポリシー | シンプルルーティング |
 | ターゲットの正常性を評価 | はい |
+| 返す IP アドレス | ALB のプライベートの IP アドレス（ALB が internal のため） |
+
+※ このレコードは、インターネットから ALB に届く経路を作らない。CloudFront のオリジンドメイン（api.keirekipro.click）と ALB の証明書の名前を合わせるために残す。CloudFront は、このレコードではなく VPC オリジンを通って ALB につなぐ。
 
 ## 3. SES用DNSレコード設計
 

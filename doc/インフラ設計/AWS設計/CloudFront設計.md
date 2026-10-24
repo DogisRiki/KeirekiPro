@@ -39,7 +39,7 @@
 | オリジンID | オリジンタイプ | オリジンドメイン | 用途 |
 |-----------|---------------|-----------------|------|
 | S3-frontend | S3 | keirekipro-frontend.s3.ap-northeast-1.amazonaws.com | 静的ファイル配信 |
-| ALB-api | ALB | api.keirekipro.click | APIリクエスト転送 |
+| ALB-api | VPC オリジン（internal の ALB） | api.keirekipro.click | APIリクエスト転送 |
 | S3-storage | S3 | keirekipro-storage.s3.ap-northeast-1.amazonaws.com | 画像配信 |
 
 ### 2.2 S3-frontend オリジン設定
@@ -64,14 +64,26 @@
 | オリジンID | ALB-api |
 | オリジンドメイン | api.keirekipro.click |
 | オリジンパス | （空） |
-| オリジンプロトコルポリシー | HTTPS only |
-| HTTPSポート | 443 |
-| 最小オリジンSSLプロトコル | TLSv1.2 |
+| オリジンの種類 | VPC オリジン（keirekipro-alb-vpc-origin） |
 | オリジンシールド | 無効 |
 | 接続タイムアウト | 10秒 |
 | 接続試行回数 | 3回 |
 | レスポンスタイムアウト | 30秒 |
 | キープアライブタイムアウト | 5秒 |
+
+#### 2.3.1 VPC オリジン設定
+
+| 項目 | 設定値 |
+|------|--------|
+| 名前 | keirekipro-alb-vpc-origin |
+| つなぐ先 | keirekipro-alb（internal の ALB。ARN で指定する） |
+| オリジンプロトコルポリシー | HTTPS only |
+| HTTPポート | 80 |
+| HTTPSポート | 443 |
+| オリジンSSLプロトコル | TLSv1.2 |
+
+※ VPC オリジンは、CloudFront から internal の ALB への、インターネットを通らない経路を作る。WAF はディストリビューションに付いているので、ALB に届く要求はどれも WAF を通っている。
+※ VPC オリジンを作ると、CloudFront はサービスにリンクされたロールと、管理されたセキュリティグループ `CloudFront-VPCOrigins-Service-SG` を作る。ALB のセキュリティグループは、`CloudFront-VPCOrigins-Service-SG` ではなく、CloudFront のオリジン向けのプレフィックスリストからの 443 を許す（VPCネットワーク設計書を参照）。
 
 ### 2.4 S3-storage オリジン設定
 

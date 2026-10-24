@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 1つ目の PR で、backend が OIDC のログインの途中の情報をキャッシュから消すやり方を替え、点を含むシークレットのキーが設定の名前として読まれることを確かめる
+- [x] 1. 1つ目の PR で、backend が OIDC のログインの途中の情報をキャッシュから消すやり方を替え、点を含むシークレットのキーが設定の名前として読まれることを確かめる
 - [x] 1.1 OIDC のログインの途中の情報を、3つのキーごとに消す (並行可)
 
   Claude は、部品「OIDC のログインの途中の情報のストア」の呼び出し方のとおり、`RedisOidcAuthorizationSessionStore.remove` を、`redisTemplate.delete(String)` を3つのキーに1回ずつ呼ぶ形にする。Claude は、`RedisOidcAuthorizationSessionStoreTest` の `test3` に、`remove` のあとに `oidc:state:` `oidc:provider:` `oidc:code_verifier:` に state を付けた3つのキーが、どれもキャッシュに残っていないことの確認を足す。
@@ -17,7 +17,7 @@
   - _要件: 3.7_
   - _対象の部品: シークレット keirekipro/redis_
 
-- [ ] 1.3 1つ目の PR を出す
+- [x] 1.3 1つ目の PR を出す
 
   Claude は、`/verify-backend` を通したあと、`/ship` で1つ目の PR を出す。Claude は、PR の本文の「マージのあとにすること」に、移行の節の「1つ目の PR(準備)のマージのあとにすること」の手順を書く。
   - 完了の確かめ方: `/verify-backend` が成功している。PR の差分が `backend/` と `.kiro/specs/aws-monthly-cost-reduction/` だけにあり、`terraform/` の変更が無い。PR の本文に、所有者が打つ `release.yaml` のコマンドと、ジョブが緑で終わればうまくいったという見分け方と、`Spec: .kiro/specs/aws-monthly-cost-reduction` と `Refs: #614` の行がある。auto-merge の予約が付いている
@@ -25,10 +25,10 @@
   - _要件: 4.4_
   - _依存: 1.1, 1.2_
 
-- [ ] 2. 2つ目の PR の Terraform のモジュールを変える
+- [x] 2. 2つ目の PR の Terraform のモジュールを変える
 
   Claude は、1つ目の PR が main にマージされたあとに、マージのあとの main から作ったブランチで、このタスクを始める。
-- [ ] 2.1 ALB を internal にし、置くサブネットを変数で受け取る
+- [x] 2.1 ALB を internal にし、置くサブネットを変数で受け取る
 
   Claude は、部品「ALB」の設定の値のとおり、`terraform/modules/alb/main.tf` の `aws_lb.main` を `internal = true` にし、`subnets` を変数 `subnet_ids` にする。Claude は、`terraform/modules/alb/variables.tf` の変数 `public_subnet_ids` を `subnet_ids` に改め、`terraform/main.tf` の ALB のモジュールに `subnet_ids = module.vpc.private_subnet_ids` を渡す。
   - 完了の確かめ方: `aws_lb.main` と `aws_lb_target_group.backend` の資源の名前と、`enable_deletion_protection = true` と、リスナーとリスナーのルールとアクセスログの設定が、差分で変わっていない。`enable_deletion_protection` を一時的に `false` にすると、checkov が CKV_AWS_150 の指摘を出す
@@ -37,7 +37,7 @@
   - _対象の部品: ALB_
   - _依存: 1.3_
 
-- [ ] 2.2 CloudFront から ALB への VPC オリジンを作り、API のオリジンを向ける
+- [x] 2.2 CloudFront から ALB への VPC オリジンを作り、API のオリジンを向ける
 
   Claude は、部品「VPC オリジン」の設定の値のとおり、`terraform/modules/cloudfront/main.tf` に `aws_cloudfront_vpc_origin` を足し、オリジン `ALB-api` の `custom_origin_config` を `vpc_origin_config` に替える。Claude は、`terraform/modules/cloudfront/variables.tf` に変数 `alb_arn` を足し、`terraform/main.tf` の CloudFront のモジュールに `alb_arn = module.alb.alb_arn` を渡す。
   - 完了の確かめ方: `aws_cloudfront_vpc_origin` の `origin_protocol_policy` が `https-only`、`origin_ssl_protocols` が `TLSv1.2` だけである。オリジン `ALB-api` の `domain_name` と `custom_header` の `X-Origin-Verify` と、ディストリビューションの `web_acl_id` が、差分で変わっていない
@@ -46,7 +46,7 @@
   - _対象の部品: VPC オリジン_
   - _依存: 1.3_
 
-- [ ] 2.3 ElastiCache Serverless と RBAC のユーザーを作り、出力を向け直す
+- [x] 2.3 ElastiCache Serverless と RBAC のユーザーを作り、出力を向け直す
 
   Claude は、部品「ElastiCache Serverless」の設定の値のとおり、`terraform/modules/elasticache/main.tf` に `aws_elasticache_user.app` と `aws_elasticache_user_group.app` と `aws_elasticache_serverless_cache.main` を足す。Claude は、`variables.tf` に変数 `app_user_password` を足して、`terraform/main.tf` の ElastiCache のモジュールに `app_user_password = module.secrets_manager.redis_password` を渡し、`outputs.tf` の `endpoint` `port` `cluster_id` を ElastiCache Serverless に向け、出力 `username` を足す。Claude は、古い `aws_elasticache_replication_group.main` とその付属の資源と変数 `auth_token` を残す。
   - 完了の確かめ方: `aws_elasticache_serverless_cache.main` の `engine` が `valkey`、`major_engine_version` が `"8"`、`cache_usage_limits` が保存量 1GB と毎秒 1000 ECPU で、`kms_key_id` と最低の使用量が無い。ECPU とは、ElastiCache Serverless が、リクエストの処理に使った CPU の時間と転送したデータの量を合わせて数える単位である。`aws_elasticache_user.app` の `authentication_mode` が `password` で、ユーザーグループに default のユーザーが無い。変数 `app_user_password` が `sensitive = true` である。古い `aws_elasticache_replication_group.main` が差分で消えていない
@@ -55,7 +55,7 @@
   - _対象の部品: ElastiCache Serverless_
   - _依存: 1.3_
 
-- [ ] 2.4 キャッシュのセキュリティグループで許すポートの番号を 6379〜6380 にする (並行可)
+- [x] 2.4 キャッシュのセキュリティグループで許すポートの番号を 6379〜6380 にする (並行可)
 
   Claude は、部品「セキュリティグループ」の設定の値のとおり、`terraform/modules/vpc/main.tf` のルール `redis_ingress_ecs` と `ecs_egress_redis` で許すポートの番号を 6379〜6380 にする。
   - 完了の確かめ方: 2つのルールの `from_port` が 6379、`to_port` が 6380 で、許す相手が今と同じ ECS とキャッシュのセキュリティグループである。ALB と RDS のセキュリティグループのルールが、差分で変わっていない
@@ -64,7 +64,7 @@
   - _対象の部品: セキュリティグループ_
   - _依存: 1.3_
 
-- [ ] 2.5 キャッシュのメモリのアラームとダッシュボードを ElastiCache Serverless の指標にする (並行可)
+- [x] 2.5 キャッシュのメモリのアラームとダッシュボードを ElastiCache Serverless の指標にする (並行可)
 
   Claude は、部品「キャッシュのメモリのアラーム」の設定の値のとおり、`terraform/modules/cloudwatch/main.tf` のアラーム `redis_memory_high` を、指標 `BytesUsedForCache`、次元 `clusterId`、閾値 300000000 にする。Claude は、ダッシュボードのキャッシュの2つの図を、`BytesUsedForCache` と `CurrConnections` を次元 `clusterId` で描く形にし、メモリの図の縦軸の上限を外す。今の `terraform/modules/cloudwatch/main.tf` は、ノードの名前に合わせて `var.redis_cluster_id` の後ろに `-001` を付けている。タスク2.3 が出力 `cluster_id` を ElastiCache Serverless の名前に向けるので、Claude は `-001` を外す。
   - 完了の確かめ方: `terraform/modules/cloudwatch/main.tf` に `${var.redis_cluster_id}-001` が残っていない。アラームの `evaluation_periods` `period` `statistic` `comparison_operator` `treat_missing_data` `alarm_actions` が、差分で変わっていない。アラームの数が9つのままである。ほかの8つのアラームが、差分で変わっていない
@@ -73,7 +73,7 @@
   - _対象の部品: キャッシュのメモリのアラーム_
   - _依存: 1.3_
 
-- [ ] 3. 2つ目の PR で、シークレットのキーを変える
+- [x] 3. 2つ目の PR で、シークレットのキーを変える
 
   Claude は、部品「シークレット keirekipro/redis」の呼び出し方の表のとおり、`aws_secretsmanager_secret_version.redis` の JSON を5つのキーにする。
   - 完了の確かめ方: `terraform validate` が成功する。シークレットの JSON に、表の5つのキーがあり、`spring.data.redis.cluster.nodes` の値が ElastiCache のモジュールの出力 `endpoint` と `port` を `:` でつないだものである。シークレットの数と、シークレットを読める役割が、差分で変わっていない
@@ -81,8 +81,8 @@
   - _要件: 3.7_
   - _対象の部品: シークレット keirekipro/redis_
 
-- [ ] 4. 2つ目の PR の変更を確かめ、設計書を合わせる
-- [ ] 4.1 Terraform の検査と差分の読み取りで、変えてはいけないものが変わっていないことを確かめる
+- [x] 4. 2つ目の PR の変更を確かめ、設計書を合わせる
+- [x] 4.1 Terraform の検査と差分の読み取りで、変えてはいけないものが変わっていないことを確かめる
 
   Claude は、`/verify-terraform` を通す。Claude は、テストの方針の「差分の読み取り」のとおり、2つ目の PR の差分を読む。
   - 完了の確かめ方: `/verify-terraform` の fmt、validate、tflint、checkov が成功し、checkov が `terraform/.checkov.baseline` に無い指摘を出さない。差分で、`aws_lb.main` と `aws_lb_target_group.backend` の資源の名前が変わっておらず、`terraform/modules/ecs/` `terraform/modules/waf/` `terraform/modules/scheduler/` `frontend/` のファイルと `application-prod.yaml` が変わっていない
@@ -94,7 +94,7 @@
   - _要件: 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.5, 3.9, 7.1_
   - _依存: 2.1, 2.2, 2.3, 2.4, 2.5, 3_
 
-- [ ] 4.2 インフラの設計書を、変更のあとの本番環境に合わせる (並行可)
+- [x] 4.2 インフラの設計書を、変更のあとの本番環境に合わせる (並行可)
 
   Claude は、部品「設計書」の直す中身のとおり、`doc/インフラ設計/AWS設計/` の7つの設計書と `doc/インフラ設計/Terraform設計/バックエンド・モジュール設計.md` を、3つ目の PR まで終えたあとの状態に直す。
   - 完了の確かめ方: 8つの設計書で、`grep` が `internet-facing` `cache.t4g.micro` `AUTHトークン` `auth_token` `1ノード構成` `DatabaseMemoryUsagePercentage` を、変更の前の状態を説明する文のほかに見つけない。変更の前の状態を説明する文とは、「変更の前は」「以前は」のように、今は使っていない設定であることを文の中で書いている文である。8つの設計書のどれにも、部品「設計書」の箇条に挙げた中身がある
@@ -102,7 +102,7 @@
   - _要件: 8.1_
   - _対象の部品: 設計書_
 
-- [ ] 4.3 本番環境の構成図を、変更のあとの本番環境に合わせる
+- [x] 4.3 本番環境の構成図を、変更のあとの本番環境に合わせる
 
   Claude は、`doc/インフラ設計/構成図/本番環境構成/本番環境構成図.drawio.svg` の、ALB の置き場所をプライベートのサブネットに、キャッシュを ElastiCache Serverless に直し、CloudFront から ALB への線に VPC オリジンを書き添える。
   - 完了の確かめ方: 直した SVG が XML として読め、ブラウザで開くと、ALB がプライベートのサブネットの枠の中にあり、キャッシュの名前が ElastiCache Serverless である
@@ -169,3 +169,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - ALB と CloudFront と ElastiCache のモジュールを変えるタスク2.1 から 2.3 は、変数を足すか名前を改めたモジュールに、`terraform/main.tf` で値を渡すところまでを受け持つ。そうしないと、タスクを終えた時点で `terraform validate` が通らず、完了条件の2つ目の `/verify-terraform` が失敗するためである。3つのタスクが同じ `terraform/main.tf` を変えるので、Claude は、3つのタスクに並行可の印を付けない
 - Claude は、3つ目の PR の変更を、2つ目の PR のマージのあとの main から作ったブランチで作る
 - Claude は、どの PR でも、PR の本文の Issue の行を `Refs: #614` にする。Issue を閉じる語を使わないのは、3つ目の PR のマージのあとも、判定の月の請求を比べるタスク7が残るためである
+- タスク4.1 の確認では、手元の terraform のイメージ(2026-09-29 に作ったもの)の checkov が 3.3.19 で、`docker/terraform/requirements.txt` で固定した 3.3.29 より古かった。そのため、手元の checkov の合格は 3.3.29 での合格ではない。3.3.29 での合格は、2つ目の PR の CI の terraform-static の結果で確かめる

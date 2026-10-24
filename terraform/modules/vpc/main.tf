@@ -154,7 +154,7 @@ resource "aws_security_group_rule" "ecs_egress_rds" {
 resource "aws_security_group_rule" "ecs_egress_redis" {
   type                     = "egress"
   from_port                = 6379
-  to_port                  = 6379
+  to_port                  = 6380
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.redis.id
   security_group_id        = aws_security_group.ecs.id
@@ -206,7 +206,7 @@ resource "aws_security_group" "redis" {
 resource "aws_security_group_rule" "redis_ingress_ecs" {
   type                     = "ingress"
   from_port                = 6379
-  to_port                  = 6379
+  to_port                  = 6380
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.ecs.id
   security_group_id        = aws_security_group.redis.id
