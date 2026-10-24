@@ -1,7 +1,6 @@
 package com.example.keirekipro.infrastructure.store.auth;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.Optional;
 
 import com.example.keirekipro.usecase.auth.oidc.OidcAuthorizationSession;
@@ -63,9 +62,9 @@ public class RedisOidcAuthorizationSessionStore implements OidcAuthorizationSess
     public void remove(String state) {
 
         // 使用済みのstateとpkce関連のデータを削除
-        redisTemplate.delete(List.of(
-                STATE_KEY_PREFIX + state,
-                PROVIDER_KEY_PREFIX + state,
-                CODE_VERIFIER_KEY_PREFIX + state));
+        // クラスター構成ではキーごとにスロットが異なりうるため、複数キーを1回で削除するとCROSSSLOTエラーになる。1キーずつ削除する
+        redisTemplate.delete(STATE_KEY_PREFIX + state);
+        redisTemplate.delete(PROVIDER_KEY_PREFIX + state);
+        redisTemplate.delete(CODE_VERIFIER_KEY_PREFIX + state);
     }
 }

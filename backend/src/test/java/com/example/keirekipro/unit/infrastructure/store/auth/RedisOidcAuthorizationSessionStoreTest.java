@@ -36,6 +36,8 @@ class RedisOidcAuthorizationSessionStoreTest {
 
     private final OidcAuthorizationSessionStore oidcAuthorizationSessionStore;
 
+    private final RedisTemplate<String, Object> redisTemplate;
+
     @TestConfiguration
     static class RedisTemplateTestConfig {
 
@@ -118,6 +120,9 @@ class RedisOidcAuthorizationSessionStoreTest {
 
         // 検証
         assertThat(oidcAuthorizationSessionStore.find(state)).isEmpty();
+        assertThat(redisTemplate.hasKey("oidc:state:" + state)).isFalse();
+        assertThat(redisTemplate.hasKey("oidc:provider:" + state)).isFalse();
+        assertThat(redisTemplate.hasKey("oidc:code_verifier:" + state)).isFalse();
     }
 
     @Test

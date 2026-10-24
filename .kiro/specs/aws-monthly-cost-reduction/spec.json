@@ -1,0 +1,41 @@
+{
+  "feature_name": "aws-monthly-cost-reduction",
+  "issue": 614,
+  "created_at": "2026-10-24T01:23:01Z",
+  "updated_at": "2026-10-24T05:34:30Z",
+  "language": "ja",
+  "review_model": "opus",
+  "phase": "tasks-approved",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-24T04:14:51Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-24T04:57:15Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-24T05:34:30Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-10-24T03:28:52Z",
+      "issues": [
+        614
+      ],
+      "revoked_at": "2026-10-24T04:06:24Z",
+      "revoked_for": "D1-1-8 による requirements への差し戻し: 元に戻したときの2度目のログインを要件4の2が決めていない"
+    }
+  ]
+}
