@@ -13,12 +13,14 @@
 
 | サブネット名 | CIDR | AZ | 種別 | 用途 |
 |-------------|------|-----|------|------|
-| keirekipro-public-1a | 10.0.1.0/24 | ap-northeast-1a | パブリック | ALB、NAT Gateway |
-| keirekipro-public-1c | 10.0.2.0/24 | ap-northeast-1c | パブリック | ALB（冗長化） |
-| keirekipro-private-1a | 10.0.11.0/24 | ap-northeast-1a | プライベート | ECS、RDS、Redis |
-| keirekipro-private-1c | 10.0.12.0/24 | ap-northeast-1c | プライベート | 将来のマルチAZ拡張用 |
+| keirekipro-public-1a | 10.0.1.0/24 | ap-northeast-1a | パブリック | NAT Gateway |
+| keirekipro-public-1c | 10.0.2.0/24 | ap-northeast-1c | パブリック | - |
+| keirekipro-private-1a | 10.0.11.0/24 | ap-northeast-1a | プライベート | ALB、ECS、RDS、ElastiCache Serverless |
+| keirekipro-private-1c | 10.0.12.0/24 | ap-northeast-1c | プライベート | ALB、ElastiCache Serverless |
 
-※ RDS・Redisのサブネットグループには両AZのサブネットを登録するが、Single-AZ構成・1ノード構成のため、実際のインスタンス/ノードはprivate-1aにのみ配置される
+※ ALB は internal で、プライベートの2つのサブネットに置く。CloudFront からは VPC オリジンでつなぐ
+※ ElastiCache Serverless には、プライベートの2つのサブネットを指定する
+※ RDSのサブネットグループには両AZのサブネットを登録するが、Single-AZ構成のため、実際のインスタンスはprivate-1aにのみ配置される
 
 ## 3. インターネットゲートウェイ設計
 
@@ -96,7 +98,7 @@
 | プロトコル | ポート | 送信先 | 説明 |
 |-----------|--------|--------|------|
 | TCP | 5432 | keirekipro-rds-sg | RDSへの接続 |
-| TCP | 6379 | keirekipro-redis-sg | Redisへの接続 |
+| TCP | 6379-6380 | keirekipro-redis-sg | ElastiCache Serverlessへの接続 |
 | TCP | 443 | 0.0.0.0/0 | AWS API、外部サービス接続 |
 
 ### 6.3 RDS用セキュリティグループ
@@ -125,7 +127,9 @@
 
 | プロトコル | ポート | ソース | 説明 |
 |-----------|--------|--------|------|
-| TCP | 6379 | keirekipro-ecs-sg | ECSからの接続 |
+| TCP | 6379-6380 | keirekipro-ecs-sg | ECSからの接続 |
+
+※ ElastiCache Serverless は、読み書きに 6379、読み取り専用に 6380 を使う。
 
 アウトバウンドルール:
 

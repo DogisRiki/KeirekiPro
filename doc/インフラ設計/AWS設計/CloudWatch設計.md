@@ -9,7 +9,7 @@
 | ECS | CPU使用率、メモリ使用率、タスク数 |
 | ALB | リクエスト数、5xxエラー、レイテンシ、ターゲット健全性 |
 | RDS | CPU使用率、空きストレージ、接続数、読み書きレイテンシ |
-| ElastiCache Redis | CPU使用率、メモリ使用率、接続数、キャッシュヒット率 |
+| ElastiCache Serverless | 使用バイト数、ECPU、接続数、キャッシュヒット率 |
 
 ## 2. ロググループ設計
 
@@ -63,15 +63,17 @@
 | WriteLatency | AWS/RDS | DBInstanceIdentifier | 書き込みレイテンシ（秒） |
 | FreeableMemory | AWS/RDS | DBInstanceIdentifier | 利用可能メモリ（バイト） |
 
-### 3.4 ElastiCache Redisメトリクス
+### 3.4 ElastiCache Serverlessメトリクス
 
 | メトリクス名 | 名前空間 | ディメンション | 説明 |
 |-------------|---------|---------------|------|
-| CPUUtilization | AWS/ElastiCache | CacheClusterId | CPU使用率（%） |
-| DatabaseMemoryUsagePercentage | AWS/ElastiCache | CacheClusterId | メモリ使用率（%） |
-| CurrConnections | AWS/ElastiCache | CacheClusterId | 現在の接続数 |
-| CacheHitRate | AWS/ElastiCache | CacheClusterId | キャッシュヒット率（%） |
-| Evictions | AWS/ElastiCache | CacheClusterId | キー排出数 |
+| BytesUsedForCache | AWS/ElastiCache | clusterId | キャッシュのデータが使っているバイト数 |
+| ElastiCacheProcessingUnits | AWS/ElastiCache | clusterId | 要求が使った ECPU の数 |
+| CurrConnections | AWS/ElastiCache | clusterId | 現在の接続数 |
+| CacheHitRate | AWS/ElastiCache | clusterId | キャッシュヒット率（%） |
+| Evictions | AWS/ElastiCache | clusterId | キー排出数 |
+
+※ ElastiCache Serverless のディメンションは `clusterId` で、値はキャッシュ名（keirekipro-cache）である。ElastiCache Serverless には、CPU使用率とメモリ使用率（%）のメトリクスが無い。
 
 ## 4. アラーム設計
 
@@ -85,7 +87,7 @@
 | keirekipro-alb-unhealthy | ALB | UnHealthyHostCount | >= 1 | 1分 x 3回 | Critical |
 | keirekipro-rds-cpu-high | RDS | CPUUtilization | >= 80% | 5分 x 2回 | Warning |
 | keirekipro-rds-storage-low | RDS | FreeStorageSpace | <= 2GB | 5分 x 1回 | Critical |
-| keirekipro-redis-memory-high | Redis | DatabaseMemoryUsagePercentage | >= 80% | 5分 x 2回 | Warning |
+| keirekipro-redis-memory-high | ElastiCache Serverless | BytesUsedForCache | >= 300MB | 5分 x 2回 | Warning |
 | keirekipro-db-start-failed | EventBridge Scheduler | TargetErrorCount | >= 1 | 1分 x 60回のうち1回 | Critical |
 | keirekipro-db-instance-failure | EventBridge ルール | Invocations | >= 1 | 1分 x 60回のうち1回 | Critical |
 
@@ -197,24 +199,26 @@
 | 欠落データの処理 | missing |
 | アクション | SNSトピックへ通知 |
 
-### 4.5 Redisアラーム詳細
+### 4.5 ElastiCache Serverlessアラーム詳細
 
 #### 4.5.1 keirekipro-redis-memory-high
 
 | 項目 | 設定値 |
 |------|--------|
 | アラーム名 | keirekipro-redis-memory-high |
-| 説明 | Redisのメモリ使用率が高い状態 |
+| 説明 | キャッシュのメモリ使用量が多い状態 |
 | 名前空間 | AWS/ElastiCache |
-| メトリクス名 | DatabaseMemoryUsagePercentage |
-| ディメンション | CacheClusterId=keirekipro-redis-001 |
+| メトリクス名 | BytesUsedForCache |
+| ディメンション | clusterId=keirekipro-cache |
 | 統計 | Average |
 | 期間 | 300秒（5分） |
 | 評価期間 | 2 |
 | 比較演算子 | GreaterThanOrEqualToThreshold |
-| しきい値 | 80 |
+| しきい値 | 300000000（300MB） |
 | 欠落データの処理 | missing |
 | アクション | SNSトピックへ通知 |
+
+※ しきい値の 300MB は、保存量の上限 1GB より十分小さく、上限に近づく前にメールを送れる。ElastiCache Serverless にはメモリ使用率（%）のメトリクスが無いため、使用バイト数で見る。
 
 ### 4.6 EventBridge Schedulerアラーム詳細
 
@@ -379,7 +383,7 @@ DBが異常の状態に入ったときに AWS が出す RDS のイベント（�
 | 4 | RDS Storage | 折れ線グラフ | FreeStorageSpace |
 | 5 | RDS Connections | 折れ線グラフ | DatabaseConnections |
 | 5 | RDS Latency | 折れ線グラフ | ReadLatency, WriteLatency |
-| 6 | Redis Memory | 折れ線グラフ | DatabaseMemoryUsagePercentage |
+| 6 | Redis Memory | 折れ線グラフ | BytesUsedForCache |
 | 6 | Redis Connections | 折れ線グラフ | CurrConnections |
 
 ### 6.3 ダッシュボードJSON定義
@@ -561,12 +565,12 @@ DBが異常の状態に入ったときに AWS が出す RDS のイベント（�
       "properties": {
         "title": "Redis Memory Usage",
         "metrics": [
-          ["AWS/ElastiCache", "DatabaseMemoryUsagePercentage", "CacheClusterId", "keirekipro-redis"]
+          ["AWS/ElastiCache", "BytesUsedForCache", "clusterId", "keirekipro-cache"]
         ],
         "period": 300,
         "stat": "Average",
         "region": "ap-northeast-1",
-        "yAxis": { "left": { "min": 0, "max": 100 } }
+        "yAxis": { "left": { "min": 0 } }
       }
     },
     {
@@ -578,7 +582,7 @@ DBが異常の状態に入ったときに AWS が出す RDS のイベント（�
       "properties": {
         "title": "Redis Connections",
         "metrics": [
-          ["AWS/ElastiCache", "CurrConnections", "CacheClusterId", "keirekipro-redis"]
+          ["AWS/ElastiCache", "CurrConnections", "clusterId", "keirekipro-cache"]
         ],
         "period": 60,
         "stat": "Average",

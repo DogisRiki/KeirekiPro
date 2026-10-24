@@ -5,7 +5,7 @@
 | シークレット名 | 用途 |
 |---------------|------|
 | `keirekipro/rds` | RDSデータベース接続情報 |
-| `keirekipro/redis` | ElastiCache Redis接続情報 |
+| `keirekipro/redis` | ElastiCache Serverless接続情報 |
 | `keirekipro/jwt` | JWTトークン署名鍵 |
 | `keirekipro/oidc/google` | Google OAuth認証情報 |
 | `keirekipro/oidc/github` | GitHub OAuth認証情報 |
@@ -40,9 +40,21 @@
 {
   "redis-host": "string",
   "redis-port": "string",
-  "redis-password": "string"
+  "redis-password": "string",
+  "spring.data.redis.cluster.nodes": "string",
+  "spring.data.redis.username": "string"
 }
 ```
+
+| キー | 値 |
+|------|-----|
+| redis-host | ElastiCache Serverless の接続先の名前 |
+| redis-port | ElastiCache Serverless のポート番号（6379） |
+| redis-password | RBAC のユーザー keirekipro-app のパスワード |
+| spring.data.redis.cluster.nodes | 接続先の名前とポート番号を `:` でつないだ値 |
+| spring.data.redis.username | RBAC のユーザー名（keirekipro-app） |
+
+※ Spring Boot は、`spring.data.redis.cluster.nodes` があると、`redis-host` と `redis-port` より優先してクラスターの形でつなぐ。`spring.data.redis.username` で RBAC のユーザー名を渡す。
 
 ### 3.3 keirekipro/jwt
 ```json
