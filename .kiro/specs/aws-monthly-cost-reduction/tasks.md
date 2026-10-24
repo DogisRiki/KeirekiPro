@@ -73,7 +73,7 @@
   - _対象の部品: キャッシュのメモリのアラーム_
   - _依存: 1.3_
 
-- [ ] 3. 2つ目の PR で、シークレットのキーを変える
+- [x] 3. 2つ目の PR で、シークレットのキーを変える
 
   Claude は、部品「シークレット keirekipro/redis」の呼び出し方の表のとおり、`aws_secretsmanager_secret_version.redis` の JSON を5つのキーにする。
   - 完了の確かめ方: `terraform validate` が成功する。シークレットの JSON に、表の5つのキーがあり、`spring.data.redis.cluster.nodes` の値が ElastiCache のモジュールの出力 `endpoint` と `port` を `:` でつないだものである。シークレットの数と、シークレットを読める役割が、差分で変わっていない

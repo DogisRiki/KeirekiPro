@@ -94,9 +94,11 @@ resource "aws_secretsmanager_secret_version" "rds" {
 resource "aws_secretsmanager_secret_version" "redis" {
   secret_id = module.secrets_manager.redis_secret_id
   secret_string = jsonencode({
-    "redis-host"     = module.elasticache.endpoint
-    "redis-port"     = tostring(module.elasticache.port)
-    "redis-password" = module.secrets_manager.redis_password
+    "redis-host"                      = module.elasticache.endpoint
+    "redis-port"                      = tostring(module.elasticache.port)
+    "redis-password"                  = module.secrets_manager.redis_password
+    "spring.data.redis.cluster.nodes" = "${module.elasticache.endpoint}:${module.elasticache.port}"
+    "spring.data.redis.username"      = module.elasticache.username
   })
 }
 
