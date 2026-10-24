@@ -25,7 +25,7 @@
   - _要件: 4.4_
   - _依存: 1.1, 1.2_
 
-- [ ] 2. 2つ目の PR の Terraform のモジュールを変える
+- [x] 2. 2つ目の PR の Terraform のモジュールを変える
 
   Claude は、1つ目の PR が main にマージされたあとに、マージのあとの main から作ったブランチで、このタスクを始める。
 - [x] 2.1 ALB を internal にし、置くサブネットを変数で受け取る
@@ -64,7 +64,7 @@
   - _対象の部品: セキュリティグループ_
   - _依存: 1.3_
 
-- [ ] 2.5 キャッシュのメモリのアラームとダッシュボードを ElastiCache Serverless の指標にする (並行可)
+- [x] 2.5 キャッシュのメモリのアラームとダッシュボードを ElastiCache Serverless の指標にする (並行可)
 
   Claude は、部品「キャッシュのメモリのアラーム」の設定の値のとおり、`terraform/modules/cloudwatch/main.tf` のアラーム `redis_memory_high` を、指標 `BytesUsedForCache`、次元 `clusterId`、閾値 300000000 にする。Claude は、ダッシュボードのキャッシュの2つの図を、`BytesUsedForCache` と `CurrConnections` を次元 `clusterId` で描く形にし、メモリの図の縦軸の上限を外す。今の `terraform/modules/cloudwatch/main.tf` は、ノードの名前に合わせて `var.redis_cluster_id` の後ろに `-001` を付けている。タスク2.3 が出力 `cluster_id` を ElastiCache Serverless の名前に向けるので、Claude は `-001` を外す。
   - 完了の確かめ方: `terraform/modules/cloudwatch/main.tf` に `${var.redis_cluster_id}-001` が残っていない。アラームの `evaluation_periods` `period` `statistic` `comparison_operator` `treat_missing_data` `alarm_actions` が、差分で変わっていない。アラームの数が9つのままである。ほかの8つのアラームが、差分で変わっていない
