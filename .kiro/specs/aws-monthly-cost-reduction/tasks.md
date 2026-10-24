@@ -37,7 +37,7 @@
   - _対象の部品: ALB_
   - _依存: 1.3_
 
-- [ ] 2.2 CloudFront から ALB への VPC オリジンを作り、API のオリジンを向ける
+- [x] 2.2 CloudFront から ALB への VPC オリジンを作り、API のオリジンを向ける
 
   Claude は、部品「VPC オリジン」の設定の値のとおり、`terraform/modules/cloudfront/main.tf` に `aws_cloudfront_vpc_origin` を足し、オリジン `ALB-api` の `custom_origin_config` を `vpc_origin_config` に替える。Claude は、`terraform/modules/cloudfront/variables.tf` に変数 `alb_arn` を足し、`terraform/main.tf` の CloudFront のモジュールに `alb_arn = module.alb.alb_arn` を渡す。
   - 完了の確かめ方: `aws_cloudfront_vpc_origin` の `origin_protocol_policy` が `https-only`、`origin_ssl_protocols` が `TLSv1.2` だけである。オリジン `ALB-api` の `domain_name` と `custom_header` の `X-Origin-Verify` と、ディストリビューションの `web_acl_id` が、差分で変わっていない

@@ -240,6 +240,7 @@ module "cloudfront" {
   api_domain_name                      = "api.${var.domain_name}"
   origin_verify_header_value           = module.secrets_manager.alb_origin_verify_header_value
   waf_web_acl_arn                      = module.waf.web_acl_arn
+  alb_arn                              = module.alb.alb_arn
 }
 
 # Route 53 Module

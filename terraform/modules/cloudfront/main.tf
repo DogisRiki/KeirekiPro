@@ -16,6 +16,26 @@ resource "aws_cloudfront_origin_access_control" "storage" {
   signing_protocol                  = "sigv4"
 }
 
+# VPC Origin for internal ALB
+resource "aws_cloudfront_vpc_origin" "alb" {
+  vpc_origin_endpoint_config {
+    name                   = "${var.project_name}-alb-vpc-origin"
+    arn                    = var.alb_arn
+    http_port              = 80
+    https_port             = 443
+    origin_protocol_policy = "https-only"
+
+    origin_ssl_protocols {
+      items    = ["TLSv1.2"]
+      quantity = 1
+    }
+  }
+
+  tags = {
+    Name = "${var.project_name}-alb-vpc-origin"
+  }
+}
+
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
@@ -53,11 +73,8 @@ resource "aws_cloudfront_distribution" "main" {
     domain_name = var.api_domain_name
     origin_id   = "ALB-api"
 
-    custom_origin_config {
-      http_port                = 80
-      https_port               = 443
-      origin_protocol_policy   = "https-only"
-      origin_ssl_protocols     = ["TLSv1.2"]
+    vpc_origin_config {
+      vpc_origin_id            = aws_cloudfront_vpc_origin.alb.id
       origin_keepalive_timeout = 5
       origin_read_timeout      = 30
     }

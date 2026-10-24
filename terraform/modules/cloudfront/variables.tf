@@ -38,3 +38,8 @@ variable "waf_web_acl_arn" {
   description = "WAF Web ACL ARN"
   type        = string
 }
+
+variable "alb_arn" {
+  description = "ARN of the internal ALB used as the VPC origin"
+  type        = string
+}
