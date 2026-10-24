@@ -129,7 +129,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(WAF の6つのルール)と受入基準5(WAF を通らない経路が無い)は、plan で `module.waf` に変更が無く、ALB が作り直しになったことで確かめる。これは apply のあとの確認で、自動のテストは無い
   - _要件: 3.1, 3.5_
 
-- [ ] 6. 3つ目の PR で、古いキャッシュを片付ける
+- [x] 6. 3つ目の PR で、古いキャッシュを片付ける
 - [x] 6.1 古いキャッシュの資源と AUTH トークンの変数を消す
 
   Claude は、所有者が2つ目の PR の確認が済んだと伝えたあとに、`terraform/modules/elasticache/main.tf` から `aws_elasticache_replication_group.main` `aws_elasticache_parameter_group.main` `aws_elasticache_subnet_group.main` を消し、`variables.tf` から変数 `auth_token` を消し、`terraform/main.tf` から `auth_token` を渡す行を消す。
@@ -138,7 +138,7 @@
   - _要件: 4.1_
   - _依存: 5.2_
 
-- [ ] 6.2 3つ目の PR を出す
+- [x] 6.2 3つ目の PR を出す
 
   Claude は、`/ship` で3つ目の PR を出す。Claude は、PR の本文の「マージのあとにすること」に、移行の節の「3つ目の PR(片付け)のマージのあとにすること」の手順を書く。
   - 完了の確かめ方: PR の本文に、所有者が打つ `terraform-apply.yaml` のコマンドと、ElastiCache の画面から `keirekipro-redis` が消えればうまくいったという見分け方と、`Spec: .kiro/specs/aws-monthly-cost-reduction` と `Refs: #614` の行がある。auto-merge の予約が付いている
