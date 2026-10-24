@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 1つ目の PR で、backend が OIDC のログインの途中の情報をキャッシュから消すやり方を替え、点を含むシークレットのキーが設定の名前として読まれることを確かめる
+- [x] 1. 1つ目の PR で、backend が OIDC のログインの途中の情報をキャッシュから消すやり方を替え、点を含むシークレットのキーが設定の名前として読まれることを確かめる
 - [x] 1.1 OIDC のログインの途中の情報を、3つのキーごとに消す (並行可)
 
   Claude は、部品「OIDC のログインの途中の情報のストア」の呼び出し方のとおり、`RedisOidcAuthorizationSessionStore.remove` を、`redisTemplate.delete(String)` を3つのキーに1回ずつ呼ぶ形にする。Claude は、`RedisOidcAuthorizationSessionStoreTest` の `test3` に、`remove` のあとに `oidc:state:` `oidc:provider:` `oidc:code_verifier:` に state を付けた3つのキーが、どれもキャッシュに残っていないことの確認を足す。
@@ -17,7 +17,7 @@
   - _要件: 3.7_
   - _対象の部品: シークレット keirekipro/redis_
 
-- [ ] 1.3 1つ目の PR を出す
+- [x] 1.3 1つ目の PR を出す
 
   Claude は、`/verify-backend` を通したあと、`/ship` で1つ目の PR を出す。Claude は、PR の本文の「マージのあとにすること」に、移行の節の「1つ目の PR(準備)のマージのあとにすること」の手順を書く。
   - 完了の確かめ方: `/verify-backend` が成功している。PR の差分が `backend/` と `.kiro/specs/aws-monthly-cost-reduction/` だけにあり、`terraform/` の変更が無い。PR の本文に、所有者が打つ `release.yaml` のコマンドと、ジョブが緑で終わればうまくいったという見分け方と、`Spec: .kiro/specs/aws-monthly-cost-reduction` と `Refs: #614` の行がある。auto-merge の予約が付いている
@@ -28,7 +28,7 @@
 - [ ] 2. 2つ目の PR の Terraform のモジュールを変える
 
   Claude は、1つ目の PR が main にマージされたあとに、マージのあとの main から作ったブランチで、このタスクを始める。
-- [ ] 2.1 ALB を internal にし、置くサブネットを変数で受け取る
+- [x] 2.1 ALB を internal にし、置くサブネットを変数で受け取る
 
   Claude は、部品「ALB」の設定の値のとおり、`terraform/modules/alb/main.tf` の `aws_lb.main` を `internal = true` にし、`subnets` を変数 `subnet_ids` にする。Claude は、`terraform/modules/alb/variables.tf` の変数 `public_subnet_ids` を `subnet_ids` に改め、`terraform/main.tf` の ALB のモジュールに `subnet_ids = module.vpc.private_subnet_ids` を渡す。
   - 完了の確かめ方: `aws_lb.main` と `aws_lb_target_group.backend` の資源の名前と、`enable_deletion_protection = true` と、リスナーとリスナーのルールとアクセスログの設定が、差分で変わっていない。`enable_deletion_protection` を一時的に `false` にすると、checkov が CKV_AWS_150 の指摘を出す

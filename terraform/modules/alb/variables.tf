@@ -8,8 +8,8 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "public_subnet_ids" {
-  description = "List of public subnet IDs"
+variable "subnet_ids" {
+  description = "List of subnet IDs for the internal ALB"
   type        = list(string)
 }
 
