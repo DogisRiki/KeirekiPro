@@ -74,7 +74,6 @@ module "elasticache" {
   project_name       = var.project_name
   private_subnet_ids = module.vpc.private_subnet_ids
   security_group_id  = module.vpc.redis_security_group_id
-  auth_token         = module.secrets_manager.redis_password
   app_user_password  = module.secrets_manager.redis_password
 }
 

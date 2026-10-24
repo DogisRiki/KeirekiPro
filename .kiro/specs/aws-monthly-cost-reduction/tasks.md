@@ -130,7 +130,7 @@
   - _要件: 3.1, 3.5_
 
 - [ ] 6. 3つ目の PR で、古いキャッシュを片付ける
-- [ ] 6.1 古いキャッシュの資源と AUTH トークンの変数を消す
+- [x] 6.1 古いキャッシュの資源と AUTH トークンの変数を消す
 
   Claude は、所有者が2つ目の PR の確認が済んだと伝えたあとに、`terraform/modules/elasticache/main.tf` から `aws_elasticache_replication_group.main` `aws_elasticache_parameter_group.main` `aws_elasticache_subnet_group.main` を消し、`variables.tf` から変数 `auth_token` を消し、`terraform/main.tf` から `auth_token` を渡す行を消す。
   - 完了の確かめ方: `/verify-terraform` が成功する。`grep -rn --include='*.tf' "auth_token\|replication_group" terraform/` が何も見つけない。`terraform/.checkov.baseline` に残る古いキャッシュの行は、design.md が `.checkov.baseline` を変えないと決めているので、消さない。ElastiCache Serverless とシークレット `keirekipro/redis` の資源が、差分で変わっていない
