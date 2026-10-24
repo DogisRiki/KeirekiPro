@@ -13,12 +13,6 @@ variable "security_group_id" {
   type        = string
 }
 
-variable "auth_token" {
-  description = "Redis AUTH token"
-  type        = string
-  sensitive   = true
-}
-
 variable "app_user_password" {
   description = "Password of the RBAC user for the application"
   type        = string

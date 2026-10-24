@@ -109,8 +109,8 @@
   - 受入基準とテストの対応: 要件8の受入基準1(設計書を変更のあとに合わせる)のうち、構成図の部分は、完了の確かめ方に書いた、直した SVG をブラウザで開いて読む確認で確かめる。図には自動のテストが無い
   - _要件: 8.1_
 
-- [ ] 5. 2つ目の PR を出し、切り替えの apply のログで plan を読む
-- [ ] 5.1 2つ目の PR を、所有者が決めた切り替えの日に合わせて出す
+- [x] 5. 2つ目の PR を出し、切り替えの apply のログで plan を読む
+- [x] 5.1 2つ目の PR を、所有者が決めた切り替えの日に合わせて出す
 
   Claude は、所有者が、1つ目の PR の backend のリリースを終えたことと、切り替えの日を書いたあとに、`/ship` で2つ目の PR を出す。Claude は、部品「3つの PR の本文」のとおり、PR の本文の「マージのあとにすること」に、移行の節の「2つ目の PR(切り替え)の作り方とマージのあとにすること」から、次の5つを書く。1つ目は削除保護を外す手順、2つ目は apply を始める時間の幅、3つ目はマージから切り替えの apply までの間はほかの目的で `terraform-apply.yaml` を動かさないという注意、4つ目は5つの確認の手順、5つ目は元に戻す手順である。Claude は、PR の本文に、WAF の6つのルールの設定を変えていないことと、`terraform/modules/waf/` のファイルを変えていないことを書く。
   - 完了の確かめ方: PR の本文に、所有者が打つコマンドが、移行の節のコマンドと1文字も違わずにあり、手順ごとにうまくいったかの見分け方がある。PR の本文に、マージから切り替えの apply までの間はほかの目的で `terraform-apply.yaml` を動かさないという注意と、動かすと ALB が作り直されてアプリの稼働時間の中に API に届かなくなるという理由がある。PR の本文に `Spec: .kiro/specs/aws-monthly-cost-reduction` と `Refs: #614` の行がある。auto-merge の予約が付いている
@@ -122,7 +122,7 @@
   - _対象の部品: 3つの PR の本文_
   - _依存: 1.3, 4.1, 4.2, 4.3_
 
-- [ ] 5.2 切り替えの apply のログで plan を読む
+- [x] 5.2 切り替えの apply のログで plan を読む
 
   Claude は、所有者が切り替えの apply を終えたと伝えたあとに、`gh run view <実行の番号> --log` で `terraform-apply.yaml` のログを読む。食い違いがあれば、Claude は所有者に知らせる。
   - 完了の確かめ方: plan で、`module.alb.aws_lb.main` が作り直しになり、`module.alb.aws_lb_target_group.backend` と `module.ecs.aws_ecs_service.backend` が作り直しにならず、`module.waf` に変更が無かったことを、Claude が所有者に1行ずつ示している
@@ -130,7 +130,7 @@
   - _要件: 3.1, 3.5_
 
 - [ ] 6. 3つ目の PR で、古いキャッシュを片付ける
-- [ ] 6.1 古いキャッシュの資源と AUTH トークンの変数を消す
+- [x] 6.1 古いキャッシュの資源と AUTH トークンの変数を消す
 
   Claude は、所有者が2つ目の PR の確認が済んだと伝えたあとに、`terraform/modules/elasticache/main.tf` から `aws_elasticache_replication_group.main` `aws_elasticache_parameter_group.main` `aws_elasticache_subnet_group.main` を消し、`variables.tf` から変数 `auth_token` を消し、`terraform/main.tf` から `auth_token` を渡す行を消す。
   - 完了の確かめ方: `/verify-terraform` が成功する。`grep -rn --include='*.tf' "auth_token\|replication_group" terraform/` が何も見つけない。`terraform/.checkov.baseline` に残る古いキャッシュの行は、design.md が `.checkov.baseline` を変えないと決めているので、消さない。ElastiCache Serverless とシークレット `keirekipro/redis` の資源が、差分で変わっていない
