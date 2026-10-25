@@ -1,0 +1,82 @@
+{
+  "prices": {
+    "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "checked_on": "2026-10-26",
+    "unit": "USD per 1,000,000 tokens",
+    "geo_us_multiplier": 1.1,
+    "web_search_per_1000": 10,
+    "models": {
+      "claude-fable-5-1": {"in": 10, "cw5": 12.5, "cw1h": 20, "cr": 0.25, "out": 50},
+      "claude-fable-5": {"in": 10, "cw5": 12.5, "cw1h": 20, "cr": 1, "out": 50},
+      "claude-opus-5-5": {
+        "in": 4, "cw5": 5, "cw1h": 8, "cr": 0.2, "out": 20,
+        "fast": {"in": 8, "cw5": 10, "cw1h": 16, "cr": 0.4, "out": 40}
+      },
+      "claude-opus-5": {
+        "in": 5, "cw5": 6.25, "cw1h": 10, "cr": 0.5, "out": 25,
+        "fast": {"in": 10, "cw5": 12.5, "cw1h": 20, "cr": 1, "out": 50}
+      },
+      "claude-opus-4-8": {
+        "in": 5, "cw5": 6.25, "cw1h": 10, "cr": 0.5, "out": 25,
+        "fast": {"in": 10, "cw5": 12.5, "cw1h": 20, "cr": 1, "out": 50}
+      },
+      "claude-opus-4-7": {"in": 5, "cw5": 6.25, "cw1h": 10, "cr": 0.5, "out": 25},
+      "claude-opus-4-6": {"in": 5, "cw5": 6.25, "cw1h": 10, "cr": 0.5, "out": 25},
+      "claude-opus-4-5": {"in": 5, "cw5": 6.25, "cw1h": 10, "cr": 0.5, "out": 25},
+      "claude-opus-4-1": {"in": 15, "cw5": 18.75, "cw1h": 30, "cr": 1.5, "out": 75},
+      "claude-opus-4": {"in": 15, "cw5": 18.75, "cw1h": 30, "cr": 1.5, "out": 75},
+      "claude-sonnet-5-5": {"in": 2, "cw5": 2.5, "cw1h": 4, "cr": 0.1, "out": 10},
+      "claude-sonnet-5": {"in": 2, "cw5": 2.5, "cw1h": 4, "cr": 0.2, "out": 10},
+      "claude-sonnet-4-6": {"in": 3, "cw5": 3.75, "cw1h": 6, "cr": 0.3, "out": 15},
+      "claude-sonnet-4-5": {"in": 3, "cw5": 3.75, "cw1h": 6, "cr": 0.3, "out": 15},
+      "claude-sonnet-4": {"in": 3, "cw5": 3.75, "cw1h": 6, "cr": 0.3, "out": 15},
+      "claude-haiku-5-5": {
+        "in": 0.1, "cw5": 0.125, "cw1h": 0.2, "cr": 0.01, "out": 0.5,
+        "long_input": {"over_tokens": 100000, "in": 0.5, "cw5": 0.625, "cw1h": 1, "cr": 0.05, "out": 2.5}
+      },
+      "claude-haiku-4-5": {"in": 1, "cw5": 1.25, "cw1h": 2, "cr": 0.1, "out": 5},
+      "claude-3-5-haiku": {"in": 0.8, "cw5": 1, "cw1h": 1.6, "cr": 0.08, "out": 4}
+    }
+  },
+  "wait_categories": [
+    {"name": "品質チェック", "kind": "shell", "pattern": "run-check\\.sh"},
+    {"name": "CI の待ち", "kind": "shell", "pattern": "gh (pr checks.*--watch|run watch)"},
+    {"name": "Docker", "kind": "shell", "pattern": "docker"},
+    {"name": "待つだけのコマンド", "kind": "shell", "pattern": "(^|[;&| ])sleep "},
+    {"name": "待つだけの道具", "kind": "wait"}
+  ],
+  "stage_marks": {
+    "start": "着手の判断",
+    "kiro-spec-init": "要件",
+    "kiro-spec-requirements": "要件",
+    "kiro-validate-gap": "設計",
+    "kiro-spec-design": "設計",
+    "kiro-spec-tasks": "タスク",
+    "spec-review": {"requirements": "要件の審査", "design": "設計の審査", "tasks": "タスクの審査"},
+    "kiro-impl": "実装",
+    "kiro-validate-impl": "実装",
+    "kiro-review": "実装",
+    "kiro-debug": "実装",
+    "verify-*": "実装",
+    "goal-*": "実装",
+    "ship": "出荷とレビュー対応",
+    "review-loop": "出荷とレビュー対応",
+    "request": null
+  },
+  "roles": {
+    "agent_types": {
+      "spec-reviewer": "spec の審査役",
+      "spec-style-checker": "書き方の点検役"
+    },
+    "verdict": "タスクごとの確認役",
+    "next_action": "原因を調べる補助役"
+  },
+  "ci_exclude_checks": [
+    "rerun-approval-gated-checks",
+    "rerun",
+    "update-pr-branches",
+    "escape-hatch",
+    "dependency-gate",
+    "pre-merge-check"
+  ]
+}

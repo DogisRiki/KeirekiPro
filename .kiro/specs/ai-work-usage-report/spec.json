@@ -1,0 +1,101 @@
+{
+   "approval_history" : [
+      {
+         "approved_at" : "2026-10-24T11:42:00Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            501
+         ],
+         "revoked_at" : "2026-10-25T02:46:31Z",
+         "revoked_for" : "所有者の判断による修正: さかのぼりの集計を仕組みから外して今回だけの特例の作業にし、一覧の Issue と集計のコメントを読む相手をリポジトリとの関係で決める",
+         "stage" : "requirements"
+      },
+      {
+         "approved_at" : "2026-10-25T06:02:37Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            501
+         ],
+         "revoked_at" : "2026-10-25T07:14:30Z",
+         "revoked_for" : "T1-1-11・T1-1-12・T1-1-13 による design への差し戻し: フックの登録の場所を CLAUDE_PROJECT_DIR の形にし、仕組みが main に入る前の動きと #501 の扱いを決め、extract.pl の版で抜き出し直す",
+         "stage" : "design"
+      },
+      {
+         "approved_at" : "2026-10-25T06:02:37Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            501
+         ],
+         "revoked_at" : "2026-10-25T07:45:50Z",
+         "revoked_for" : "D12-1-8 による requirements への差し戻し: 仕組みを main に入れる PR が本文に書いた Issue(#501)の集計を、この spec で決めないことに足す",
+         "stage" : "requirements"
+      },
+      {
+         "approved_at" : "2026-10-25T08:40:13Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            501
+         ],
+         "revoked_at" : "2026-10-25T09:51:44Z",
+         "revoked_for" : "所有者の指摘による修正: さかのぼりの集計と #501 の集計を、仕組みには入れず、この Issue の作業として一度だけ行うものとして要件に入れる",
+         "stage" : "requirements"
+      },
+      {
+         "approved_at" : "2026-10-25T08:40:13Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            501
+         ],
+         "revoked_at" : "2026-10-25T09:51:44Z",
+         "revoked_for" : "所有者の指摘による修正: さかのぼりの集計と #501 の集計を、仕組みには入れず、この Issue の作業として一度だけ行うものとして要件に入れる",
+         "stage" : "design"
+      },
+      {
+         "approved_at" : "2026-10-25T11:07:11Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            501
+         ],
+         "revoked_at" : "2026-10-25T12:04:42Z",
+         "revoked_for" : "所有者の指摘による修正: さかのぼりの集計で集計を出せなかった Issue を、毎回動く仕組みで出し直さない(要件10の3と7)",
+         "stage" : "requirements"
+      },
+      {
+         "approved_at" : "2026-10-25T11:07:11Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            501
+         ],
+         "revoked_at" : "2026-10-25T12:04:42Z",
+         "revoked_for" : "所有者の指摘による修正: さかのぼりの集計で集計を出せなかった Issue を、毎回動く仕組みで出し直さない(要件10の3と7)",
+         "stage" : "design"
+      }
+   ],
+   "approvals" : {
+      "design" : {
+         "approved" : true,
+         "approved_at" : "2026-10-25T13:11:13Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      },
+      "requirements" : {
+         "approved" : true,
+         "approved_at" : "2026-10-25T12:23:35Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      },
+      "tasks" : {
+         "approved" : true,
+         "approved_at" : "2026-10-25T13:53:42Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      }
+   },
+   "created_at" : "2026-10-24T09:11:07Z",
+   "feature_name" : "ai-work-usage-report",
+   "issue" : 501,
+   "language" : "ja",
+   "phase" : "tasks-approved",
+   "review_model" : "opus",
+   "updated_at" : "2026-10-25T13:53:42Z"
+}
