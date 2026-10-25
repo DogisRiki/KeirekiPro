@@ -9,7 +9,7 @@
   - _要件: 3.4, 4.2, 4.3, 4.4, 5.3, 5.5_
   - _対象の部品: usage-config.json_
 
-- [ ] 1.2 テストに使う偽の gh を作る (並行可)
+- [x] 1.2 テストに使う偽の gh を作る (並行可)
 
   Claude は、偽の gh の本体を、`.claude/scripts/usage/tests/fixtures/fake-gh.sh` に作る。テストは、テストごとの一時フォルダに `gh` の名前で `fake-gh.sh` を写し、その一時フォルダを PATH の先頭に置く。本体の名前を `.sh` にするのは、`.gitattributes` の LF の決まりと、shellcheck の対象の選び方(実装のメモ)に入れるためである。偽の gh は、テストごとの一時フォルダに置いた JSON のファイルを GitHub の代わりにし、design の部品が呼ぶ gh の呼び出しに答える。答える呼び出しは、`gh pr list`、PR のコミットの一覧を含む `gh pr view`、`gh issue view`、`gh issue list`、`gh issue comment --body-file`、`gh issue edit --body-file`、`gh issue create`、`gh issue close`、`gh issue lock`、Issue とコメントの一覧とコメントの作成と編集の `gh api`、`repos/{owner}/{repo}` の `permissions.push` の `gh api`、`commits/<sha>/check-runs` の `gh api` である。偽の gh は、呼ばれた引数を1行ずつ記録し、テストが指定した呼び出しを失敗させる。Claude は、偽の gh を、bash と perl(JSON::PP)だけで動くように書く。
   - 完了の確かめ方: 3つの環境(実装のメモ)のそれぞれで、`gh` の名前で写した偽の gh で Issue を作り、コメントを書き、読み直すと書いた中身が返る。テストが失敗を指定した呼び出しが、0 でない終了コードで終わる。`fake-gh.sh` に対する shellcheck(`koalaman/shellcheck:v0.11.0`)の指摘が0件である
@@ -461,6 +461,8 @@
 - 検査の名前: GitHub の検査の結果の名前は、ワークフローのジョブの `name` である。`rerun-approval-gated-checks.yaml` のジョブの名前は `rerun` なので、`ci_exclude_checks` は、design の5つの名前に加えて `rerun` を持つ。2026-10-26 に PR #620 から #622 の最後のコミットの検査の名前を読み、`update-pr-branches` `escape-hatch` `dependency-gate` `pre-merge-check` の名前が検査の結果の名前と同じことを確かめた
 - 価格の名前の照らし方: report.pl は、モデルの ID が `prices.models` の名前と同じときか、名前のあとに `-` と8桁の日付だけが続くとき(例 `claude-opus-4-20250514` は `claude-opus-4`)に、その名前の価格を使う。どれにも当たらない ID は「価格が分からない」にする。頭が当たる名前のうち最も長いものを使う決まりにすると、`claude-fable-5-2` のような、価格を確かめた日より後に出たモデルに `claude-fable-5` の価格が付き、要件4の受入基準4に反するためである。タスク4.4か4.8のテストは、`claude-fable-5-2` が「価格が分からない」になる場合と、`claude-opus-4-20250514` が `claude-opus-4` の価格になる場合を持つ
 - `stage_marks` の読み方: `request` の値は `null` なので、extract.pl は、印を残すかを、値が真かでなく名前があるか(`exists`)で決める。`verify-*` と `goal-*` の `*` は、名前の頭が同じものに当てる
+- 名前で起動するスクリプトの1行目: テストが PATH の先頭に置いて名前で起動する偽のコマンド(`fake-gh.sh` を写した `gh` など)は、1行目を `#!/usr/bin/env bash` にする。`bash:3.2` のイメージは bash を `/usr/local/bin/bash` に置き、`/bin/bash` を持たないので、`#!/bin/bash` では起動できないためである(2026-10-26 にタスク1.2で確かめた)。`bash <ファイル>` の形で流すテストのスクリプトは、この限りでない
+- 偽の gh の答え方: 偽の gh は、`--json` で知らない欄を頼まれると null を返し、`issues/<番号>/comments` の経路では Issue だけを探す(PR の番号は 404 になる)。タスク3からタスク5の部品が、PR の会話のコメントを `gh api` で読むときや、本物の gh が持たない欄の名前を書き間違えたときに気づくには、そのタスクで偽の gh に答えを足す
 - Mythos 5.1 と Mythos 5: 価格のページにも、モデルの一覧のページにも、API のモデルの ID が無いので、`prices.models` に入れない。使われたときは「価格が分からない」になる
 - 差分の照合: Claude は、差分を照合する前に `git fetch origin main` を流し、変えたファイルを `git merge-base origin/main HEAD` のコミットと比べる
 
