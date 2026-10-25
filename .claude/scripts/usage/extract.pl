@@ -17,6 +17,7 @@ use warnings;
 use Getopt::Long qw(GetOptionsFromArray);
 use JSON::PP ();
 use File::Path ();
+use Time::Local ();
 
 # 抜き出し方を変えたら上げる。.pos の版の番号が違う記録の鍵は、最初から読み直す
 use constant EXTRACT_VERSION => 1;
@@ -95,7 +96,10 @@ sub project_dirs {
 # worktree は本体の下の .claude/worktrees/ に作られるので、消した worktree の会話も本体で見分ける
 sub repo_bases {
     my ($repo) = @_;
-    my @bases = (norm_path($repo));
+    # cwd は JSON から解いた文字の列なので、引数の場所も文字の列にしてから比べる
+    my $r = $repo;
+    utf8::decode($r);
+    my @bases = (norm_path($r));
     if (open(my $git, '-|', 'git', '-C', $repo, 'worktree', 'list', '--porcelain')) {
         while (my $l = <$git>) {
             $l =~ s/\r?\n\z//;
@@ -169,9 +173,11 @@ sub read_record {
         open($out, '>:raw', $exf) or return write_failed($exf);
         print $out $JSON->encode(meta_line($key)), "\n" or return write_failed($exf);
     } else {
+        trim_partial($exf) or return write_failed($exf);
         open($out, '>>:raw', $exf) or return write_failed($exf);
     }
     my ($offset, $skipped) = ($pos->{offset}, $pos->{skipped});
+    my $st = $pos->{offset} ? read_state($exf, $path, $pos->{offset}) : { ids => {}, rows => {}, branch => undef };
     while (my $line = <$in>) {
         # 改行の無い最後の行は書きかけなので、次の呼び出しで読む
         last unless $line =~ /\n\z/;
@@ -180,6 +186,13 @@ sub read_record {
         if (ref $d ne 'HASH') {
             $skipped++;
             next;
+        }
+        my ($rows, $unknown) = extract_line($d, $st);
+        $skipped++ if $unknown;
+        for my $row (@$rows) {
+            my $enc = $JSON->encode($row);
+            next if $st->{rows}{$enc}++;
+            print $out $enc, "\n" or return write_failed($exf);
         }
     }
     close $in;
@@ -192,6 +205,161 @@ sub read_record {
         version => EXTRACT_VERSION,
     };
     return write_pos($posf, $new);
+}
+
+# 書き足しの途中で止まると、抜き出した記録の最後に改行の無い書きかけの行が残る
+# 続きを書き足す前に、最後の改行の直後まで切り詰める(書きかけの行は、読み直しで作り直して書く)
+sub trim_partial {
+    my ($exf) = @_;
+    my $size = -s $exf;
+    return 1 unless $size;
+    open(my $fh, '+<:raw', $exf) or return 0;
+    my $end = $size;
+    my $keep = 0;
+    while ($end > 0) {
+        my $n = $end < 4096 ? $end : 4096;
+        $end -= $n;
+        seek($fh, $end, 0) or return 0;
+        my $buf;
+        return 0 unless defined read($fh, $buf, $n) && length $buf == $n;
+        my $i = rindex($buf, "\n");
+        if ($i >= 0) {
+            $keep = $end + $i + 1;
+            last;
+        }
+    }
+    if ($keep < $size) {
+        truncate($fh, $keep) or return 0;
+    }
+    close $fh or return 0;
+    return 1;
+}
+
+# 続きを読む前に、前に抜き出した記録から、抜き出し済みの行と message.id を読み、
+# 会話の記録の読んだ位置より前から、最後の gitBranch を読む
+# 同じ応答は1つの message.id で2行以上に書かれ、その行が前の呼び出しと今の呼び出しにまたがることがあるため
+# 書き足したあと .pos を書く前に止まると、次の呼び出しは同じ行をもう一度読む。抜き出し済みの行と同じ行は書かない
+# そのときの gitBranch は、抜き出した記録の最後の branch の行ではなく、読み直す位置の直前の値でなければならない
+sub read_state {
+    my ($exf, $path, $offset) = @_;
+    my $st = { ids => {}, rows => {}, branch => branch_before($path, $offset) };
+    open(my $fh, '<:raw', $exf) or return $st;
+    while (my $l = <$fh>) {
+        (my $enc = $l) =~ s/\n\z//;
+        $st->{rows}{$enc} = 1;
+        next unless index($l, '"k":"msg"') >= 0;
+        my $d = eval { $JSON->decode($l) };
+        $st->{ids}{$d->{id}} = 1 if ref $d eq 'HASH' && defined $d->{id};
+    }
+    close $fh;
+    return $st;
+}
+
+# 会話の記録の $offset より前の行のうち、gitBranch を持つ最後の行の gitBranch
+# 最後の数行で見つかることが多いので、ファイルの後ろから 64KB ずつ読む
+sub branch_before {
+    my ($path, $offset) = @_;
+    open(my $fh, '<:raw', $path) or return undef;
+    my ($end, $tail) = ($offset, '');
+    while ($end > 0) {
+        my $n = $end < 65536 ? $end : 65536;
+        $end -= $n;
+        seek($fh, $end, 0) or last;
+        my $buf;
+        last unless defined read($fh, $buf, $n) && length $buf == $n;
+        my @lines = split /\n/, $buf . $tail, -1;
+        # 読んだ塊の先頭は前の行の途中のことがあるので、前の塊と合わせてから見る
+        $tail = $end > 0 ? shift @lines : '';
+        for my $l (reverse @lines) {
+            next unless index($l, '"gitBranch"') >= 0;
+            my $d = eval { $JSON->decode($l) };
+            next unless ref $d eq 'HASH';
+            my $br = $d->{gitBranch};
+            return $br if defined $br && !ref $br && length $br;
+        }
+    }
+    close $fh;
+    return undef;
+}
+
+# 会話の記録の1行から、抜き出す行を作る。会話の文、道具の引数と結果の中身は読まない
+# 返す値: 抜き出す行の配列と、知らない形の行かどうか
+sub extract_line {
+    my ($d, $st) = @_;
+    my @rows;
+    my $ts = iso_ts($d->{timestamp});
+    my $br = $d->{gitBranch};
+    if (defined $br && !ref $br && length $br && (!defined $st->{branch} || $st->{branch} ne $br)) {
+        $st->{branch} = $br;
+        push @rows, { k => 'branch', ts => $ts, name => $br };
+    }
+    my $type = defined $d->{type} && !ref $d->{type} ? $d->{type} : '';
+    if ($type eq 'assistant') {
+        my $m = $d->{message};
+        return (\@rows, 1) unless ref $m eq 'HASH';
+        my $model = defined $m->{model} && !ref $m->{model} ? $m->{model} : undef;
+        if (defined $model && $model eq '<synthetic>') {
+            # Claude Code が自分で作った行。トークン数は数えず、上限で止まった印だけを残す
+            if (($d->{error} // '') eq 'rate_limit') {
+                my $q = ref $d->{quotaLimits} eq 'HASH' ? $d->{quotaLimits} : {};
+                push @rows, { k => 'limit', ts => $ts, resets_at => num_or_undef($q->{resetsAt}) };
+            }
+            return (\@rows, 0);
+        }
+        my $u  = $m->{usage};
+        my $id = $m->{id};
+        return (\@rows, 1) unless ref $u eq 'HASH' && defined $id && !ref $id && length $id;
+        return (\@rows, 0) if $st->{ids}{$id}++;
+        my ($cw5, $cw1h);
+        if (ref $u->{cache_creation} eq 'HASH') {
+            $cw5  = count($u->{cache_creation}{ephemeral_5m_input_tokens});
+            $cw1h = count($u->{cache_creation}{ephemeral_1h_input_tokens});
+        } else {
+            # 内訳の無い記録では、書き込みの全部を既定の5分に数える
+            ($cw5, $cw1h) = (count($u->{cache_creation_input_tokens}), 0);
+        }
+        my $stu = ref $u->{server_tool_use} eq 'HASH' ? $u->{server_tool_use} : {};
+        push @rows, {
+            k    => 'msg', ts => $ts, id => $id, model => $model,
+            in   => count($u->{input_tokens}), cw5 => $cw5, cw1h => $cw1h,
+            cr   => count($u->{cache_read_input_tokens}), out => count($u->{output_tokens}),
+            ws   => count($stu->{web_search_requests}),
+            fast => is_value($u->{speed}, 'fast'),
+            us   => is_value($u->{inference_geo}, 'us'),
+            end  => is_value($m->{stop_reason}, 'end_turn'),
+        };
+    } elsif ($type eq 'system' && ($d->{subtype} // '') eq 'api_error') {
+        my $ms = num_or_undef($d->{retryInMs});
+        push @rows, { k => 'retry', ts => $ts, ms => $ms } if defined $ms;
+    }
+    my $pr = $d->{prNumber};
+    push @rows, { k => 'pr', ts => $ts, number => $pr + 0 } if defined $pr && !ref $pr && $pr =~ /^\d+\z/;
+    return (\@rows, 0);
+}
+
+# 会話の記録の時刻(協定世界時の ISO 8601)を、UNIX 秒(小数3桁まで)にする
+sub iso_ts {
+    my ($s) = @_;
+    return undef unless defined $s && !ref $s
+        && $s =~ /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(\.\d+)?Z\z/;
+    my $t = eval { Time::Local::timegm($6, $5, $4, $3, $2 - 1, $1) };
+    return undef unless defined $t;
+    return sprintf('%.3f', $t + ($7 // 0)) + 0;
+}
+
+sub count {
+    my ($v) = @_;
+    return defined $v && !ref $v && $v =~ /^\d+\z/ ? $v + 0 : 0;
+}
+
+sub num_or_undef {
+    my ($v) = @_;
+    return defined $v && !ref $v && $v =~ /^\d+(?:\.\d+)?\z/ ? $v + 0 : undef;
+}
+
+sub is_value {
+    my ($v, $want) = @_;
+    return defined $v && !ref $v && $v eq $want ? JSON::PP::true : JSON::PP::false;
 }
 
 sub meta_line {

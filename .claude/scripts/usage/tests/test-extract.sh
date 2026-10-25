@@ -40,6 +40,11 @@ kcount() {
     perl -MJSON::PP -ne 'BEGIN { $want = shift; $n = 0 } my $d = eval { decode_json($_) }; $n++ if $d && ($d->{k} // "") eq $want; END { print $n }' "$2" <"$1"
 }
 fsize() { perl -e 'print -s $ARGV[0]' "$1"; }
+# 抜き出した記録の、k が $2 の行のうち $3 番目(1から)の行の、欄 $4 の値。真偽は true か false
+kfield() {
+    [ -f "$1" ] || { printf 'nofile'; return; }
+    perl -MJSON::PP -ne 'BEGIN { ($want, $nth, $field) = splice @ARGV, 0, 3; $i = 0 } my $d = eval { decode_json($_) } or next; next unless ($d->{k} // "") eq $want; next unless ++$i == $nth; my $v = $d->{$field}; print !defined $v ? "undef" : JSON::PP::is_bool($v) ? ($v ? "true" : "false") : $v; END { print "noline" if $i < $nth }' "$2" "$3" "$4" <"$1"
+}
 
 # 作り物の会話の記録を書く: mkrec <ファイル> <cwd> <cwd の無い行の数>
 # 最初に cwd の無い行を置き、cwd を持つ user の行と assistant の行を続ける
@@ -47,6 +52,7 @@ mkrec() {
     mkdir -p "$(dirname "$1")"
     perl -MJSON::PP -e '
         my ($file, $cwd, $n) = @ARGV;
+        utf8::decode($cwd);
         my $j = JSON::PP->new->utf8->canonical;
         (my $sid = $file) =~ s{.*/}{}; $sid =~ s{\.jsonl$}{};
         open my $f, ">", $file or die "$file: $!";
@@ -138,6 +144,25 @@ check "Windows の場所でも、worktree の名前を頭に持つだけのフ�
 check "Windows の場所でも、本体の名前を頭に持つだけのフォルダを抜き出さない" "$(kcount "$WSTATE/extract/w-prefix.jsonl" meta)" "nofile"
 check "Windows の場所の、消した worktree の記録を抜き出す" "$(kcount "$WSTATE/extract/w-gone.jsonl" meta)" "1"
 
+printf '== 本体の場所の文字と、記録の置き場所の候補\n'
+# git worktree list に失敗したときも、日本語を含む本体の作業フォルダで見分ける
+mkdir -p "$TMP_ROOT/failgit"
+printf '#!/usr/bin/env bash\nexit 1\n' >"$TMP_ROOT/failgit/git"
+chmod +x "$TMP_ROOT/failgit/git"
+JREPO="$WORK/リポジトリ"
+mkrec "$WORK/jhome/.claude/projects/j/j-main.jsonl" "$JREPO/src" 0
+HOME="$WORK/jhome" USERPROFILE="$WORK/jhome" PATH="$TMP_ROOT/failgit:$PATH" \
+    perl "$EXTRACT" --state "$WORK/jstate" --all --wait --repo "$JREPO" 2>/dev/null
+check "git worktree list に失敗しても 0 で終わる" "$?" "0"
+check "日本語を含む本体の作業フォルダの下の cwd の記録を抜き出す" "$(kcount "$WORK/jstate/extract/j-main.jsonl" meta)" "1"
+# Windows の Git Bash では、HOME と別の USERPROFILE の下の記録も読む
+if [ "$(perl -e 'print $^O')" = msys ]; then
+    mkrec "$WORK/uprofile/.claude/projects/u/u-main.jsonl" "$REPO" 0
+    mkdir -p "$WORK/uhome"
+    HOME="$WORK/uhome" USERPROFILE="$WORK/uprofile" perl "$EXTRACT" --state "$WORK/ustate" --all --wait --repo "$REPO"
+    check "Windows では USERPROFILE の下の会話の記録も読む" "$(kcount "$WORK/ustate/extract/u-main.jsonl" meta)" "1"
+fi
+
 printf '== 2回続けて呼ぶ・ファイルが短くなる\n'
 addline "$D/s-main.jsonl" '{"type":"user","sessionId":"s-main","message":{"role":"user","content":"more"}}'
 run_all
@@ -205,6 +230,112 @@ rm -f "$D/s-outwt.jsonl"
 run_all
 check "記録のファイルが無い記録の鍵の、抜き出した記録が残る" "$(kcount "$EX/s-outwt.jsonl" marker)/$(kcount "$EX/s-outwt.jsonl" meta)" "1/1"
 check "記録のファイルが無い記録の鍵の、.pos が残る" "$(jfile "$EX/s-outwt.pos" version)" "old-version"
+
+printf '== 応答の行と、上限と再試行の行\n'
+# 作り物の会話の記録: mkmsgrec <ファイル> <entrypoint>
+# 会話の文・コマンドの文字列・ファイルの中身には SECRET を含む文字列を入れ、抜き出した記録に入らないことを確かめる
+mkmsgrec() {
+    mkdir -p "$(dirname "$1")"
+    perl -MJSON::PP -e '
+        my ($file, $cwd, $ep) = @ARGV;
+        my $j = JSON::PP->new->utf8->canonical;
+        (my $sid = $file) =~ s{.*/}{}; $sid =~ s{\.jsonl$}{};
+        my %c = (cwd => $cwd, sessionId => $sid, entrypoint => $ep);
+        my $u1 = {input_tokens => 10, cache_creation_input_tokens => 300, cache_read_input_tokens => 50, output_tokens => 7,
+            cache_creation => {ephemeral_5m_input_tokens => 100, ephemeral_1h_input_tokens => 200},
+            server_tool_use => {web_search_requests => 2, web_fetch_requests => 0}, speed => "fast", inference_geo => "us"};
+        my $u2 = {input_tokens => 1, cache_creation_input_tokens => 0, cache_read_input_tokens => 0, output_tokens => 3,
+            cache_creation => {ephemeral_5m_input_tokens => 0, ephemeral_1h_input_tokens => 0},
+            server_tool_use => {web_search_requests => 0, web_fetch_requests => 0}, speed => "standard", inference_geo => "global"};
+        my $z = {input_tokens => 0, cache_creation_input_tokens => 0, cache_read_input_tokens => 0, output_tokens => 0,
+            cache_creation => {ephemeral_5m_input_tokens => 0, ephemeral_1h_input_tokens => 0}, speed => undef, inference_geo => undef};
+        my @l = (
+            {%c, type => "user", gitBranch => "feat/a", timestamp => "2026-10-26T00:00:00.000Z", message => {role => "user", content => "SECRET-USER-TEXT"}},
+            {%c, type => "assistant", gitBranch => "feat/a", timestamp => "2026-10-26T00:00:01.500Z",
+                message => {id => "msg_1", model => "claude-opus-5-5", role => "assistant", stop_reason => "tool_use", usage => $u1,
+                    content => [{type => "tool_use", id => "toolu_1", name => "Bash", input => {command => "echo SECRET-COMMAND"}}]}},
+            {%c, type => "assistant", gitBranch => "feat/a", timestamp => "2026-10-26T00:00:01.600Z",
+                message => {id => "msg_1", model => "claude-opus-5-5", role => "assistant", stop_reason => "tool_use", usage => $u1,
+                    content => [{type => "text", text => "SECRET-ASSISTANT-TEXT"}]}},
+            {%c, type => "user", gitBranch => "feat/a", timestamp => "2026-10-26T00:00:02.000Z",
+                message => {role => "user", content => [{type => "tool_result", tool_use_id => "toolu_1", content => "SECRET-FILE-CONTENT"}]}},
+            {%c, type => "assistant", gitBranch => "feat/b", timestamp => "2026-10-26T00:00:03.000Z",
+                message => {id => "msg_2", model => "claude-fable-5-1", role => "assistant", stop_reason => "end_turn", usage => $u2,
+                    content => [{type => "text", text => "SECRET-ASSISTANT-TEXT"}]}},
+            {%c, type => "assistant", gitBranch => "feat/b", timestamp => "2026-10-26T00:00:04.000Z", error => "rate_limit", isApiErrorMessage => JSON::PP::true,
+                quotaLimits => {resetsAt => 1792990800, rateLimitType => "five_hour", status => "rejected"},
+                message => {id => "syn_1", model => "<synthetic>", role => "assistant", stop_reason => "stop_sequence", usage => $z,
+                    content => [{type => "text", text => "SECRET-LIMIT-TEXT"}]}},
+            {%c, type => "assistant", gitBranch => "feat/b", timestamp => "2026-10-26T00:00:05.000Z", error => "server_error", isApiErrorMessage => JSON::PP::true,
+                message => {id => "syn_2", model => "<synthetic>", role => "assistant", stop_reason => "stop_sequence", usage => $z,
+                    content => [{type => "text", text => "SECRET-ERROR-TEXT"}]}},
+            {%c, type => "system", subtype => "api_error", gitBranch => "feat/b", timestamp => "2026-10-26T00:00:06.250Z",
+                retryInMs => 603, retryAttempt => 1, maxRetries => 10, level => "error", error => {message => "SECRET-ERROR-TEXT"}},
+            {type => "pr-link", sessionId => $sid, timestamp => "2026-10-26T00:00:07.000Z", prNumber => 626,
+                prRepository => "o/r", prUrl => "https://github.com/o/r/pull/626", message => {}},
+        );
+        open my $f, ">", $file or die "$file: $!";
+        print $f $j->encode($_), "\n" for @l;
+    ' "$1" "$REPO" "$2"
+}
+mkmsgrec "$D/s-msg.jsonl" cli
+mkmsgrec "$D/s-desk.jsonl" claude-desktop
+run_all
+check "応答の行を抜き出して 0 で終わる" "$?" "0"
+M="$EX/s-msg.jsonl"
+check "同じ message.id の2行と synthetic の行から、トークン数を1回だけ抜き出す" "$(kcount "$M" msg)" "2"
+check "msg の時刻は UNIX 秒" "$(kfield "$M" msg 1 ts)" "1792972801.5"
+check "msg の id" "$(kfield "$M" msg 1 id)" "msg_1"
+check "msg のモデル" "$(kfield "$M" msg 1 model)/$(kfield "$M" msg 2 model)" "claude-opus-5-5/claude-fable-5-1"
+check "msg の入力と読み込みと出力のトークン数" "$(kfield "$M" msg 1 in)/$(kfield "$M" msg 1 cr)/$(kfield "$M" msg 1 out)" "10/50/7"
+check "書き込みのトークン数を5分と1時間に分ける" "$(kfield "$M" msg 1 cw5)/$(kfield "$M" msg 1 cw1h)" "100/200"
+check "Web 検索の回数" "$(kfield "$M" msg 1 ws)/$(kfield "$M" msg 2 ws)" "2/0"
+check "speed と inference_geo が fast と us になる" "$(kfield "$M" msg 1 fast)/$(kfield "$M" msg 1 us)" "true/true"
+check "standard と global は fast と us にならない" "$(kfield "$M" msg 2 fast)/$(kfield "$M" msg 2 us)" "false/false"
+check "end_turn が msg.end になる" "$(kfield "$M" msg 1 end)/$(kfield "$M" msg 2 end)" "false/true"
+check "上限の印を抜き出す" "$(kcount "$M" limit)/$(kfield "$M" limit 1 ts)/$(kfield "$M" limit 1 resets_at)" "1/1792972804/1792990800"
+check "API の再試行の時間を抜き出す" "$(kcount "$M" retry)/$(kfield "$M" retry 1 ts)/$(kfield "$M" retry 1 ms)" "1/1792972806.25/603"
+check "gitBranch が変わった時刻と値を抜き出す" "$(kcount "$M" branch)/$(kfield "$M" branch 1 name)/$(kfield "$M" branch 2 name)/$(kfield "$M" branch 2 ts)" "2/feat/a/feat/b/1792972803"
+check "prNumber を抜き出す" "$(kcount "$M" pr)/$(kfield "$M" pr 1 number)/$(kfield "$M" pr 1 ts)" "1/626/1792972807"
+check "抜き出した記録に、会話の文、コマンドの文字列、ファイルの中身が入らない" "$(grep -c SECRET "$M")" "0"
+check "entrypoint が cli の記録と claude-desktop の記録から、同じ形の行を抜き出す" \
+    "$(grep -v '"k":"meta"' "$M" | cksum)" "$(grep -v '"k":"meta"' "$EX/s-desk.jsonl" | cksum)"
+# 続きを読む: 同じ message.id の行と、同じ gitBranch の行を足しても、行は重ならない
+addline "$D/s-msg.jsonl" "$(sed -n '5p' "$D/s-msg.jsonl" | sed 's/00:00:03.000Z/00:00:03.100Z/')"
+run_all
+check "前の呼び出しで抜き出した message.id の行を、続きで重ねて抜き出さない" "$(kcount "$M" msg)" "2"
+check "gitBranch が変わらない続きの行で、branch の行を足さない" "$(kcount "$M" branch)" "2"
+addline "$D/s-msg.jsonl" "$(sed -n '5p' "$D/s-msg.jsonl" | sed 's/msg_2/msg_3/')"
+run_all
+check "新しい message.id の行を続きで抜き出す" "$(kcount "$M" msg)/$(kfield "$M" msg 3 id)" "3/msg_3"
+# 書き足したあと .pos を書く前に止まった状態をまねる: .pos の offset を1行目の直後に戻す
+# 読み直す行には、同じ message.id の行、gitBranch が変わる行、上限と再試行と PR の行が入る
+setoffset() { perl -MJSON::PP -i -pe 'my $d = decode_json($_); $d->{offset} = $ENV{OFF}; $_ = encode_json($d) . "\n"' "$1"; }
+before=$(cksum <"$M")
+OFF=$(head -n 1 "$D/s-msg.jsonl" | wc -c | tr -d ' ') setoffset "$EX/s-msg.pos"
+run_all
+check "止まったあとに読み直しても、抜き出した記録に行が重ならない" "$(cksum <"$M")" "$before"
+check "止まったあとに読み直しても、行の数が変わらない" \
+    "$(kcount "$M" msg)/$(kcount "$M" branch)/$(kcount "$M" limit)/$(kcount "$M" retry)/$(kcount "$M" pr)" "3/2/1/1/1"
+# 書き足しの途中で止まった状態をまねる: 抜き出した記録の最後の15バイトを切り、書きかけの行を残す
+perl -e 'truncate($ARGV[0], (-s $ARGV[0]) - 15) or exit 1' "$M"
+OFF=$(head -n 1 "$D/s-msg.jsonl" | wc -c | tr -d ' ') setoffset "$EX/s-msg.pos"
+run_all
+check "書きかけの行が残っていても、読み直したあとの抜き出した記録は止まる前と同じ" "$(cksum <"$M")" "$before"
+check "書きかけの行が残っていても、抜き出した記録の行はすべて JSON として読める" \
+    "$(perl -MJSON::PP -ne 'eval { decode_json($_); 1 } or $n++; END { print $n // 0 }' "$M")" "0"
+# 読み直す位置の直前の gitBranch が、64KB より長い行にあっても読める
+big=$(perl -e 'print "x" x 100000')
+addline "$D/s-big.jsonl" "{\"type\":\"user\",\"cwd\":\"$REPO\",\"sessionId\":\"s-big\",\"gitBranch\":\"feat/big\",\"timestamp\":\"2026-10-26T00:00:00.000Z\",\"message\":{\"role\":\"user\",\"content\":\"$big\"}}"
+addline "$D/s-big.jsonl" "{\"type\":\"user\",\"cwd\":\"$REPO\",\"sessionId\":\"s-big\",\"gitBranch\":\"feat/big\",\"timestamp\":\"2026-10-26T00:00:01.000Z\",\"message\":{\"role\":\"user\",\"content\":\"y\"}}"
+run_all
+OFF=$(head -n 1 "$D/s-big.jsonl" | wc -c | tr -d ' ') setoffset "$EX/s-big.pos"
+run_all
+check "長い行の gitBranch を読み、読み直しで branch の行を足さない" "$(kcount "$EX/s-big.jsonl" branch)" "1"
+# キャッシュの書き込みの内訳が無い usage では、書き込みの全部を5分に数える
+addline "$D/s-nocc.jsonl" "{\"type\":\"assistant\",\"cwd\":\"$REPO\",\"sessionId\":\"s-nocc\",\"timestamp\":\"2026-10-26T00:00:01.000Z\",\"message\":{\"id\":\"msg_n\",\"model\":\"claude-opus-5-5\",\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":1,\"cache_creation_input_tokens\":40,\"output_tokens\":2}}}"
+run_all
+check "内訳の無い書き込みは5分に数える" "$(kfield "$EX/s-nocc.jsonl" msg 1 cw5)/$(kfield "$EX/s-nocc.jsonl" msg 1 cw1h)" "40/0"
 
 printf '== 終了コード\n'
 printf 'x\n' >"$WORK/afile"
