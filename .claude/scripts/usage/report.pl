@@ -49,6 +49,13 @@ use constant SPEC_STEPS    => [qw(requirements design tasks)];
 use constant REVIEWER_TYPE => 'spec-reviewer';
 # 新しい Issue のための spec の更新で承認を取り消したときの、revoked_for の「Issue #<N>」に続く文字
 use constant UPDATE_FOR    => Encode::decode('UTF-8', ' のための更新');
+# Codex レビューのコメントの見出しと、Issue の決めた方式に沿わない項目の判定と、往復と手戻りで別に数える検査の名前
+use constant CODEX_HEADING => Encode::decode('UTF-8', '## Codex Review(自動クロスレビュー)');
+use constant NOT_FOLLOWED  => Encode::decode('UTF-8', '沿っていない');
+use constant SIZE_CHECK    => 'size-check';
+use constant CODEX_CHECK   => 'codex-review';
+# 検査の結果の conclusion のうち、失敗とするもの
+use constant FAILED_RUN    => { map { ($_ => 1) } qw(failure timed_out) };
 
 my $JSON = JSON::PP->new->utf8->canonical;
 
@@ -1068,12 +1075,14 @@ sub count_rework {
     my %w = (
         spec_review_rounds => {%zero}, owner_fix => {%zero}, spec_back => [], impl_spec_back => {%zero},
         task_rejected => 0, same_failure => 0, switch_to_spec => 0,
+        codex_rounds => 0, ci_fix => 0, size_check_stops => 0, decided_method_stops => 0,
         split => $ctx->{split} ? JSON::PP::true : JSON::PP::false,
     );
     my @marks = grep { mark_in_issue($ctx, $_) } @{ $ctx->{marks} };
     my %kind;
     push @{ $kind{ $_->{kind} // '' } }, $_ for @marks;
     $w{same_failure} = @{ $kind{'same-failure'} || [] };
+    count_pr_rework($ctx, \%w);
     my @subs = sort grep { defined parent_key($_) } keys %{ $ctx->{irec} };
     # 補助役の報告の判定は、最後の verdict の行で決まる
     for my $key (@subs) {
@@ -1149,6 +1158,62 @@ sub revoked_then {
         return 1 if !defined $next || $next > $t;
     }
     return 0;
+}
+# Issue の PR のコメントとコミットと検査の結果から、Codex レビューとの往復、CI の失敗のあとの直し、
+# 200行の検査で PR が止まった回数、決めた方式から外れたとして PR を止めた回数を数える。
+# PR のコミットは、gh pr view が返す古い順に並ぶ
+sub count_pr_rework {
+    my ($ctx, $w) = @_;
+    my $ex = $ctx->{cfg}{ci_exclude_checks};
+    my %skip = map { ($_ => 1) } SIZE_CHECK, CODEX_CHECK, grep { defined && !ref } @{ ref $ex eq 'ARRAY' ? $ex : [] };
+    my %runs;
+    for my $pr (@{ $ctx->{prs} }) {
+        my $out = gh('pr', 'view', $pr->{number}, '--json', 'commits,comments');
+        my $v = eval { $JSON->decode($out) };
+        die "PR #$pr->{number} のコミットとコメントを JSON として読めなかった\n" unless ref $v eq 'HASH';
+        for my $c (@{ ref $v->{comments} eq 'ARRAY' ? $v->{comments} : [] }) {
+            my $b = ref $c eq 'HASH' && defined $c->{body} && !ref $c->{body} ? $c->{body} : '';
+            next unless $b =~ /\A\Q${\ CODEX_HEADING}\E[ \t]*(?:\r?\n|\z)/;
+            $w->{codex_rounds}++;
+            $w->{decided_method_stops}++ if grep { /\A[ \t]*\|/ && /\Q${\ NOT_FOLLOWED}\E/ } split /\r?\n/, $b;
+        }
+        my @shas = map { ref $_ eq 'HASH' ? $_->{oid} : undef } @{ ref $v->{commits} eq 'ARRAY' ? $v->{commits} : [] };
+        my $size_before = 0;
+        for my $i (0 .. $#shas) {
+            my $sha = $shas[$i];
+            die "PR #$pr->{number} のコミットの ID を読めなかった\n" unless defined $sha && !ref $sha && $sha =~ /\A[0-9a-f]{7,64}\z/;
+            my $r = $runs{$sha} //= check_runs($sha);
+            # 200行の検査は、同じ PR の直前のコミットで失敗していなかったときだけ、止まった1回とする
+            my $size = grep { $_->{failed} && $_->{name} eq SIZE_CHECK } @$r;
+            $w->{size_check_stops}++ if $size && !$size_before;
+            $size_before = $size;
+            $w->{ci_fix}++ if $i < $#shas && grep { $_->{failed} && !$skip{ $_->{name} } } @$r;
+        }
+    }
+    return 1;
+}
+
+# コミットの検査の結果を読み、検査ごとの名前と失敗したかを返す。取り消された検査は失敗としない
+sub check_runs {
+    my ($sha) = @_;
+    my $path = "repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100";
+    my $out = gh('api', '--paginate', $path);
+    # --paginate の出力は、ページごとの JSON が区切らずに続く
+    my $json = JSON::PP->new->utf8;
+    my @pages = eval { $json->incr_parse($out) };
+    die "コミット $sha の検査の結果を JSON として読めなかった\n" if $@;
+    my $rest = $json->incr_text;
+    die "コミット $sha の検査の結果を JSON として読めなかった\n" if defined $rest && $rest =~ /\S/;
+    my @r;
+    for my $p (@pages) {
+        die "コミット $sha の検査の結果の形が違った\n" unless ref $p eq 'HASH' && ref $p->{check_runs} eq 'ARRAY';
+        for my $c (@{ $p->{check_runs} }) {
+            next unless ref $c eq 'HASH' && defined $c->{name} && !ref $c->{name};
+            my $k = $c->{conclusion};
+            push @r, { name => $c->{name}, failed => defined $k && !ref $k && FAILED_RUN->{$k} ? 1 : 0 };
+        }
+    }
+    return \@r;
 }
 
 # ---- 時刻と日付 ------------------------------------------------------------

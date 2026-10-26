@@ -206,7 +206,7 @@
   - _要件: 6.1, 6.3_
   - _対象の部品: report.pl_
 
-- [ ] 4.6 PR と CI と Codex レビューから、往復と手戻りを数える
+- [x] 4.6 PR と CI と Codex レビューから、往復と手戻りを数える
 
   Claude は、report.pl の手順「往復と手戻りを数える」のうち、Codex レビューのコメント、CI の検査の結果、200行の検査、Codex の表から数える行を、design の「report.pl」の節のとおりに足す。report.pl は、CI の検査の結果のうち、`ci_exclude_checks` に載った検査と、`size-check` と、`codex-review` と、取り消された検査を除く。report.pl は、PR のコミットの一覧を `gh pr view` で、検査の結果を `gh api` の `check-runs` で読む。Claude は、テスト `test-report.sh` に、このタスクの場合を足す。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `test-report.sh` が、どれも失敗0件で終わる。shellcheck の指摘が0件である
@@ -483,6 +483,7 @@
 - 作業時間の境目: report.pl は、会話ごとに Issue N に決めた行が続く間ごとに区間を作るので、続きの最後の行から次のほかの Issue の行までの時間は、どの Issue にも入らない。上限で止まった区間は、その区間を持つ会話の中だけで除くので、ほかの会話がその間に動いた時間は、作業時間と上限で止まった時間の両方に入る(design のとおり)。補助役の記録の `coordinator` の行は unknown の行として待ちになり、unknown_turns に数える(タスク4.3)
 - report.pl の日本語の名前: report.pl は `use utf8` を持たないので、字句の日本語はバイトの列であり、JSON::PP の `->utf8` で読んだデータのファイルの名前(文字の列)と等しくならない。データのファイルの名前と比べる名前は `Encode::decode('UTF-8', ...)` で文字の列にする。ファイルの頭の `my` の変数は `exit main(@ARGV) unless caller` より後ろで値が入らないので、名前は `use constant` でその行より前に置く(タスク4.4)
 - 印の Issue と時刻: report.pl は、marks.jsonl の印を、`issue` があればその番号で、無ければ印の `session` と `ts` と `branch` を行と同じ決まり(`issue_at`)に通して Issue に決める(`mark_in_issue`)。`ts` は UNIX 秒として読むので、タスク5.1の `usage.sh mark` は `ts` を UNIX 秒で書く(ISO の形で書くと、印がすべて数えられない)。spec の有無を決める `spec_info` の `mark_of_issue` は、番号かブランチで決める古い形のままで、次に report.pl のこの部分を直すときに `mark_in_issue` にそろえる(タスク4.5)
+- テストの偽の GitHub の PR のコミットとコメントと検査の結果: test-report.sh の `mkdb` の `withc` で PR にコミットとコメントを足し、`runs` でコミットごとの検査の結果を置く。report.pl は Issue の PR ごとに `gh pr view` を呼ぶので、コミットの無い PR では検査の結果を読まない。`mkdb` の一重引用符の中に `$_` を書くと shellcheck が SC2016 を出すので、`map` を使わずに値を1つずつ書く(タスク4.6)
 
 ## 完了条件(全タスク共通)
 

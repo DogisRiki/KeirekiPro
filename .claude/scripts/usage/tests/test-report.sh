@@ -82,6 +82,8 @@ newgh() {
 # 偽の GitHub の db.json を書く: mkdb <perl のハッシュの中身>。
 # pr(<番号>, <状態>, <本文>, <ブランチ>, <マージの時刻>, <マージのコミット>) は main に向けた PR である。
 # iss(<番号>, <親の番号>) は Issue である。closes(<マージのコミット>, <番号>...) は、番号ごとの、Issue を閉じるマージ済みの PR である
+# withc(<PR>, [<コミット>...], [<コメントの本文>...]) は、PR にコミットとコメントを足す。
+# runs(<コミット> => [[<検査の名前>, <結論>]...], ...) は、コミットごとの検査の結果である
 mkdb() {
     perl -MJSON::PP -e '
         sub pr { my ($n, $st, $body, $br, $at, $sha) = @_;
@@ -89,6 +91,10 @@ mkdb() {
                 mergedAt => $at, mergeCommit => defined $sha ? { oid => $sha } : undef } }
         sub iss { my ($n, $parent) = @_; return { number => $n, parent => defined $parent ? { number => $parent } : undef } }
         sub closes { my ($sha, @n) = @_; return map { pr($_, "MERGED", "Closes #$_\n", "f$_", "2026-10-30T00:00:00Z", $sha) } @n }
+        sub withc { my ($p, $c, $b) = @_; $p->{commits} = [ map { { oid => $_ } } @$c ];
+            $p->{comments} = [ map { { body => $_ } } @$b ]; return $p }
+        sub runs { my %r = @_; return { map { my $s = $_;
+            ($s => [ map { { name => $_->[0], status => "completed", conclusion => $_->[1] } } @{ $r{$s} } ]) } keys %r } }
         my $db = { '"$1"' };
         open my $fh, ">", "$ENV{FAKE_GH_DIR}/db.json" or die $!;
         print $fh JSON::PP->new->canonical->encode($db);
@@ -573,6 +579,45 @@ check "spec 無しの Issue で、spec に関わる行が無い" \
 rv u4 0 2014; rm1 u4 10 false; rv u4 100 2015; rm1 u4 110 true
 check "分けた Issue で、分けた行が 有 になる" \
     "$(run 2015; printf '%s:' "$RC"; rj 'J(R("rework", "split"))')" '0:true'
+
+echo "== PR と CI と Codex レビューから数える往復と手戻り"
+# #2020 はマージせずに閉じた PR 30 と閉じた PR 31 を持ち、#2021 は除く検査の失敗を持ち、#2022 は Codex レビューのコメントを持つ。
+# コミットの ID は、PR の番号と、PR の中の順番である
+CX='## Codex Review(自動クロスレビュー)\n\n> x\n\n'
+newrepo
+commit 2026-09-01T00:00:00Z "$CFGPATH={}"
+newgh prci
+mkdb 'prs => [
+    withc(pr(30, "CLOSED", "Closes #2020\n", "f30", undef, undef), [qw(a300001 a300002 a300003)],
+        ["'"$CX"'| 項目 | 判定 | 根拠 |\n|---|---|---|\n| 印を残す | 沿っていない | a.pl:1 |\n"]),
+    withc(pr(31, "MERGED", "Closes #2020\n", "f31", "2026-10-30T00:00:00Z", "'"$SHA"'"), [qw(a310001)], []),
+    withc(pr(32, "MERGED", "Closes #2021\n", "f32", "2026-10-30T00:00:00Z", "'"$SHA"'"), [qw(a320001 a320002 a320003)], []),
+    withc(pr(33, "MERGED", "Closes #2022\n", "f33", "2026-10-30T00:00:00Z", "'"$SHA"'"), [qw(a330001)],
+        ["'"$CX"'| 項目 | 判定 | 根拠 |\n|---|---|---|\n| 印を残す | 沿っている | a.pl:1 |\n", "'"$CX"'VERDICT_CODE_QUALITY: PASS\n",
+         "## Codex Review 打ち切り(往復上限に到達)\n", "見出しの前の文\n'"$CX"'", "沿っていない\n"]) ],
+    check_runs => runs(
+        a300001 => [["size-check", "success"], ["test", "failure"]],
+        a300002 => [["size-check", "failure"], ["test", "success"]],
+        a300003 => [["size-check", "failure"], ["test", "failure"]],
+        a310001 => [["size-check", "success"]],
+        a320001 => [["rerun-approval-gated-checks", "failure"], ["rerun", "failure"], ["update-pr-branches", "failure"],
+            ["escape-hatch", "failure"], ["dependency-gate", "failure"], ["pre-merge-check", "failure"], ["codex-review", "failure"]],
+        a320002 => [["test", "cancelled"], ["build", "success"]],
+        a320003 => [["test", "failure"]],
+        a330001 => [["test", "success"]])'
+newstate
+rv p1 0 2020; rm1 p1 10 true
+rv p2 0 2021; rm1 p2 10 true
+rv p3 0 2022; rm1 p3 10 true
+run 2020
+check "マージせずに閉じた PR の size-check の失敗が1と数えられ、閉じた PR の CI の失敗と Codex レビューも数えられる" \
+    "$RC:$(rj 'J(W("size_check_stops", "ci_fix", "codex_rounds", "decided_method_stops"))')" '0:[1,1,1,1]'
+run 2021
+check "ci_exclude_checks の検査と取り消された検査の失敗を数えない" \
+    "$RC:$(rj 'J(W("ci_fix", "size_check_stops"))')" '0:[0,0]'
+run 2022
+check "Codex レビューのコメントが往復の回数にだけ入り、使用料に入らない" \
+    "$RC:$(rj 'J([W("codex_rounds", "decided_method_stops"), M("model", "role")])')" '0:[[2,0],[["claude-opus-5-5","本体の会話"]]]'
 
 echo "== 仕組みが main に入った時刻"
 newrepo
