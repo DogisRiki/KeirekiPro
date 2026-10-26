@@ -6,6 +6,8 @@
 # 一時フォルダに git のリポジトリを作り、origin/main にデータのファイル(usage-config.json)を足したコミットを置く。
 # 偽の gh(fixtures/fake-gh.sh)を一時フォルダに gh の名前で写し、その一時フォルダを PATH の先頭に置く。
 # 偽の gh は、一時フォルダの db.json を GitHub の代わりにする。本物の GitHub は読まず、書かない。
+# 最後の節は、作業フォルダの最上位の .claude/hooks/usage-hook.sh と .claude/settings.json と、
+# 集計の時点と印を書いた手順の文書(スキルと CLAUDE.md)を読む。
 # 前提: bash・perl(JSON::PP)・git。
 # =====================================================================
 set -u
@@ -963,6 +965,99 @@ run pending --session
 check "--session に会話の ID が無いと、1 で終わり、理由を1行で出す" "$RC/$(errline)" "1/one"
 runin "$WORK" pending
 check "git のリポジトリの外で呼ぶと、1 で終わり、理由を1行で出す" "$RC/$(errline)" "1/one"
+
+echo "== フックと設定と手順の文書"
+# 作業フォルダの最上位(このテストは .claude/scripts/usage/tests/ にある)
+ROOT="$(cd "$HERE/../../../.." && pwd)"
+HOOK="$ROOT/.claude/hooks/usage-hook.sh"
+# 偽の extract.pl を置いた作業フォルダ。受けた引数と標準入力をそのまま出し、3 で終わる
+FAKEP="$WORK/fakeproj"
+mkdir -p "$FAKEP/.claude/scripts/usage"
+cat >"$FAKEP/.claude/scripts/usage/extract.pl" <<'EOF'
+binmode STDIN; binmode STDOUT;
+print "args=@ARGV\n";
+local $/;
+print scalar(<STDIN>) // '';
+exit 3;
+EOF
+mkdir -p "$WORK/hookcwd"
+out=$(printf 'line1\n{"a":1}' | (cd "$WORK/hookcwd" && CLAUDE_PROJECT_DIR="$FAKEP" bash "$HOOK"))
+check "usage-hook.sh が入力をそのまま extract.pl hook に渡して出力を返し、extract.pl が失敗しても 0 で終わる" \
+    "$?|$out" "0|args=hook
+line1
+{\"a\":1}"
+newrepo hookrepo
+out=$(printf '{"session_id":"hk1","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Bash","tool_use_id":"toolu_H1","duration_ms":34}' "$REPO" |
+    (cd "$ROOT/.claude" && CLAUDE_PROJECT_DIR="$ROOT" bash "$HOOK"))
+RC=$?
+check "usage-hook.sh を作業フォルダの最上位でないディレクトリから、CLAUDE_PROJECT_DIR に最上位を入れて動かすと、extract.pl が動いて durations/ に行が足される" \
+    "$RC|$out|$(cat "$STATE/durations/hk1.tsv" 2>/dev/null)" "0||toolu_H1	34"
+
+# settings.json の、usage-hook.sh を呼ぶフックを「時点/matcher/async か timeout」で並べ、許可の有無と、
+# usage-hook.sh を呼ぶのに決まったコマンドの形でないフックの数を添える
+hookregs() {
+    perl -MJSON::PP -e '
+        local $/;
+        open my $f, "<", $ARGV[0] or do { print "none"; exit };
+        my $d = JSON::PP->new->decode(<$f>);
+        my $c = q{bash "${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh"};
+        my (@got, $bad);
+        for my $ev (sort keys %{ $d->{hooks} }) {
+            for my $g (@{ $d->{hooks}{$ev} }) {
+                for my $h (@{ $g->{hooks} }) {
+                    next unless ($h->{command} // "") =~ /usage-hook/;
+                    $bad++ if $h->{command} ne $c;
+                    my $how = JSON::PP::is_bool($h->{async}) && $h->{async} ? "async"
+                        : defined $h->{timeout} ? "timeout$h->{timeout}" : "none";
+                    push @got, "$ev/" . ($g->{matcher} // "-") . "/$how";
+                }
+            }
+        }
+        my $allow = grep { $_ eq q{Bash(bash .claude/scripts/usage/usage.sh *)} } @{ $d->{permissions}{allow} };
+        print join(" ", @got), " allow=$allow bad=", $bad // 0;
+    ' "$1"
+}
+check "settings.json に、Stop・SubagentStop・SessionEnd・PostToolUse(matcher *)の async の登録と、SessionStart の timeout 10 の登録と、Bash(bash .claude/scripts/usage/usage.sh *) の許可がある" \
+    "$(hookregs "$ROOT/.claude/settings.json")" \
+    "PostToolUse/*/async SessionEnd/-/async SessionStart/-/timeout10 Stop/-/async SubagentStop/-/async allow=1 bad=0"
+# usage-hook.sh を書いた行の数も数え、フックのコマンドのほかに usage-hook.sh を呼ぶ書き方が無いことを確かめる
+check "settings.json の完成版の、足したフックのコマンドが、どれも bash \"\${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh\" である" \
+    "$(hookregs "$ROOT/.claude/settings.json" | sed 's/.* bad=//')/$(grep -c 'usage-hook' "$ROOT/.claude/settings.json")" "0/5"
+
+# 文書 $1 に、拡張正規表現 $2 に合う行があれば yes を出す
+hasline() { if grep -qE -- "$2" "$1"; then printf yes; else printf no; fi; }
+# 文書 $1 の、$2 に合う行から続く $3 行のどこかに、$4 に合う行があれば yes を出す
+hasnear() { if grep -E -A"$3" -- "$2" "$1" | grep -qE -- "$4"; then printf yes; else printf no; fi; }
+SK="$ROOT/.claude/skills"
+UR="$SK/usage-report/SKILL.md"
+check "usage-report の SKILL.md に、5つの時点の見出しと、usage.sh の draft・publish・proposals・proposal・owner・backfill-list と draft --backfill を呼ぶ行と、所見の決まりの見出しがある" \
+    "$(hasline "$UR" '^### マージを見届けたとき$')$(hasline "$UR" '^### 次の会話で出すとき$')$(hasline "$UR" '^### 案を尋ねるとき$')$(hasline "$UR" '^### 所有者かを尋ねるとき$')$(hasline "$UR" '^### さかのぼりの集計を頼まれたとき$') $(hasline "$UR" 'usage\.sh draft <N>')$(hasline "$UR" 'usage\.sh publish <N>')$(hasline "$UR" 'usage\.sh proposals')$(hasline "$UR" 'usage\.sh proposal <')$(hasline "$UR" 'usage\.sh owner (yes|no)')$(hasline "$UR" 'usage\.sh backfill-list')$(hasline "$UR" 'usage\.sh draft <N> --backfill') $(hasline "$UR" '^## 所見の決まり$')" \
+    "yesyesyesyesyes yesyesyesyesyesyesyes yes"
+check "ship の SKILL.md の MERGED の行が usage-report の手順を指し、同じ失敗の3回目の箇所が mark same-failure を呼ぶ" \
+    "$(hasline "$SK/ship/SKILL.md" 'MERGED.*usage-report のスキル.*マージを見届けたとき')$(hasnear "$SK/ship/SKILL.md" '同じ失敗が3回続いたとき' 2 'usage\.sh mark same-failure')" "yesyes"
+check "spec-review の SKILL.md が changed のときに mark spec-fix を呼ぶ" \
+    "$(hasline "$SK/spec-review/SKILL.md" 'changed.*usage\.sh mark spec-fix --stage')" "yes"
+check "start の SKILL.md の spec に切り替えるときの箇所が mark switch-to-spec を呼ぶ" \
+    "$(hasnear "$SK/start/SKILL.md" 'spec に切り替えるとき' 2 'usage\.sh mark switch-to-spec --issue')" "yes"
+check "CLAUDE.md に mark same-failure の行と usage-report の行がある" \
+    "$(hasline "$ROOT/CLAUDE.md" '同一の失敗が3回.*usage\.sh mark same-failure')$(hasline "$ROOT/CLAUDE.md" 'usage-report.*スキルに従う')" "yesyes"
+
+# Claude Code が決めている欄の名前と値。読むのは extract.pl だけにする
+CCNAMES="stop_reason turnOrigin hook_event_name cliSessionId AskUserQuestion transcript_path agent_transcript_path
+permissionDecision toolUseResult tool_use_id duration_ms cache_read_input_tokens cache_creation_input_tokens
+input_tokens output_tokens quotaLimits SubagentHandback task_notification gitBranch end_turn run_in_background
+mcp__ccd_session__start_session prNumber resetsAt retryInMs agentType server_tool_use web_search_requests tool_result"
+hits=""
+for f in "$SCRIPTS/report.pl" "$SCRIPTS/github.pl" "$SCRIPTS/usage.sh" "$SCRIPTS/usage-config.json" "$HOOK"; do
+    if [ ! -f "$f" ]; then
+        hits="$hits ${f##*/}:missing"
+        continue
+    fi
+    for w in $CCNAMES; do
+        if grep -qF -- "$w" "$f"; then hits="$hits ${f##*/}:$w"; fi
+    done
+done
+check "report.pl、github.pl、usage.sh、usage-config.json、usage-hook.sh に、stop_reason・turnOrigin・hook_event_name・cliSessionId・AskUserQuestion などの欄の名前と値が文字列として現れない" "$hits" ""
 
 echo
 echo "$pass ok, $failn NG"

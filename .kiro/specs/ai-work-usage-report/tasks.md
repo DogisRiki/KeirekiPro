@@ -388,7 +388,7 @@
   - _要件: 1.2, 6.3_
   - _対象の部品: ship・spec-review・start の SKILL.md と CLAUDE.md、`doc/開発フロー/基盤構築手順.md`_
 
-- [ ] 7.2 フックと設定の完成版を作り、部品をつなぐテストを足す
+- [x] 7.2 フックと設定の完成版を作り、部品をつなぐテストを足す
 
   Claude は、部品「usage-hook.sh」を置き場所の `.claude/.state/ai-work-usage-report/place-1/hooks/usage-hook.sh` に、部品「settings.json の変更」を置き場所の `place-1/settings.json` に作る(実装のメモ)。usage-hook.sh は、標準入力をそのまま `perl "${CLAUDE_PROJECT_DIR}/.claude/scripts/usage/extract.pl" hook` に渡す。Claude は、今の `.claude/settings.json` を Read で読んで写しを作り、design の「settings.json の変更」の4つの項目だけを足す。足すフックのコマンドは、どれも `bash "${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh"` である。このタスクは、フックと設定とスキルと部品をつなぐ統合のタスクである。Claude は、テスト `test-usage.sh` に、次の4つを確かめる場合を足す。
   1. usage-hook.sh が標準入力をそのまま `extract.pl hook` に渡して標準出力を返し、extract.pl が失敗しても 0 で終わること。作業フォルダの最上位でないディレクトリから、`CLAUDE_PROJECT_DIR` に作業フォルダの最上位を入れて動かしても、extract.pl が動くこと
