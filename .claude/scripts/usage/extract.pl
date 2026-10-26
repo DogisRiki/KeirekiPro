@@ -86,7 +86,7 @@ sub run_all {
         }
     }
     my @bases = repo_bases($o->{repo});
-    my %seen;
+    my (%seen, %repo_keys);
     for my $projects (project_dirs()) {
         opendir(my $pd, $projects) or next;
         my @dirs = sort grep { !/^\./ && -d "$projects/$_" } readdir $pd;
@@ -101,6 +101,7 @@ sub run_all {
                 my $path = "$projects/$dir/$file";
                 # .pos がある記録の鍵は、前にこのリポジトリの会話と見分けたもの
                 next unless -e "$exdir/$key.pos" || is_repo_record($path, \@bases);
+                $repo_keys{$key} = 1;
                 my $rc = read_record($path, $key, $exdir);
                 return $rc if $rc;
                 # 補助役の記録は、本体の会話の記録と同じフォルダの <sessionId>/subagents/ の下にある
@@ -116,6 +117,76 @@ sub run_all {
                 }
             }
         }
+    }
+    return write_desktop($exdir, \%repo_keys);
+}
+
+# デスクトップアプリの手元の記録の置き場所の候補(claude-code-sessions のフォルダ)
+# 確かめた置き場所は Windows の %LOCALAPPDATA%\Claude-Data\<名前>\claude-code-sessions だけである(2026-10-26)
+sub desktop_dirs {
+    my @locals = ($ENV{LOCALAPPDATA});
+    push @locals, "$ENV{USERPROFILE}/AppData/Local"
+        if $^O =~ /^(?:MSWin32|msys|cygwin)\z/ && defined $ENV{USERPROFILE} && length $ENV{USERPROFILE};
+    my (@dirs, %dup);
+    for my $l (grep { defined && length } @locals) {
+        my $data = "$l/Claude-Data";
+        opendir(my $dh, $data) or next;
+        for my $n (sort grep { !/^\./ } readdir $dh) {
+            my $d = "$data/$n/claude-code-sessions";
+            next if !-d $d || $dup{norm_path($d)}++;
+            push @dirs, $d;
+        }
+        closedir $dh;
+    }
+    return @dirs;
+}
+
+# デスクトップアプリの手元の記録 local_<uuid>.json から、別に起こしたセッションの local_<uuid> と
+# 会話の記録の鍵(cliSessionId)の対応を読み、このリポジトリの会話のものだけを extract/desktop.jsonl に書き直す
+# 置き場所の候補が1つも無い PC(デスクトップアプリを入れていない PC)では、desktop.jsonl を作らない
+sub write_desktop {
+    my ($exdir, $repo_keys) = @_;
+    my @dirs = desktop_dirs();
+    return 0 unless @dirs;
+    my %map;
+    my @todo = @dirs;
+    while (defined(my $d = shift @todo)) {
+        opendir(my $dh, $d) or next;
+        my @names = sort grep { !/^\./ } readdir $dh;
+        closedir $dh;
+        for my $n (@names) {
+            my $p = "$d/$n";
+            if (-d $p) {
+                push @todo, $p;
+                next;
+            }
+            next unless $n =~ /\Alocal_[0-9a-f-]+\.json\z/ && -f $p;
+            open(my $fh, '<:raw', $p) or next;
+            my $text = do { local $/; <$fh> };
+            close $fh;
+            my $j = eval { $JSON->decode($text) };
+            next unless ref $j eq 'HASH';
+            my ($local, $session) = ($j->{sessionId}, $j->{cliSessionId});
+            next unless defined $local && !ref $local && $local =~ /\A$LOCAL_RE\z/;
+            next unless defined $session && !ref $session && $session =~ /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/;
+            # 会話の記録のファイルが消えた鍵も、前にこのリポジトリの会話と見分けた鍵(.pos がある鍵)なら残す
+            next unless $repo_keys->{$session} || -e "$exdir/$session.pos";
+            $map{$local} //= $session;
+        }
+    }
+    my $file = "$exdir/desktop.jsonl";
+    my $tmp = "$file.tmp.$$";
+    my $ok = open(my $out, '>:raw', $tmp);
+    if ($ok) {
+        for my $l (sort keys %map) {
+            $ok = print $out $JSON->encode({ local => $l, session => $map{$l} }), "\n" or last;
+        }
+        $ok = close($out) && $ok;
+    }
+    if (!$ok || !rename($tmp, $file)) {
+        unlink $tmp;
+        print STDERR "extract.pl: 記録の置き場所に書けない: $file\n";
+        return 1;
     }
     return 0;
 }

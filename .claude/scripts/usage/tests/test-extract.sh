@@ -20,7 +20,9 @@ WORK=$(cd "$TMP_ROOT" && { pwd -W 2>/dev/null || pwd; })
 # Windows の Git Bash では USERPROFILE も記録の置き場所の候補になるので、両方を替える
 HOME="$WORK/home"
 USERPROFILE="$HOME"
-export HOME USERPROFILE
+# デスクトップアプリの手元の記録の置き場所の候補も、本物を読まないように替える
+LOCALAPPDATA="$HOME/AppData/Local"
+export HOME USERPROFILE LOCALAPPDATA
 PROJ="$HOME/.claude/projects"
 mkdir -p "$PROJ"
 
@@ -156,7 +158,8 @@ HOME="$WORK/jhome" USERPROFILE="$WORK/jhome" PATH="$TMP_ROOT/failgit:$PATH" \
 check "git worktree list に失敗しても 0 で終わる" "$?" "0"
 check "日本語を含む本体の作業フォルダの下の cwd の記録を抜き出す" "$(kcount "$WORK/jstate/extract/j-main.jsonl" meta)" "1"
 # Windows の Git Bash では、HOME と別の USERPROFILE の下の記録も読む
-if [ "$(perl -e 'print $^O')" = msys ]; then
+case "$(perl -e 'print $^O')" in msys | cygwin) IS_WIN=1 ;; *) IS_WIN=0 ;; esac
+if [ "$IS_WIN" = 1 ]; then
     mkrec "$WORK/uprofile/.claude/projects/u/u-main.jsonl" "$REPO" 0
     mkdir -p "$WORK/uhome"
     HOME="$WORK/uhome" USERPROFILE="$WORK/uprofile" perl "$EXTRACT" --state "$WORK/ustate" --all --wait --repo "$REPO"
@@ -604,6 +607,61 @@ perl -MJSON::PP -e 'local $/; my $d = decode_json(<STDIN>); delete $d->{stage_ma
     <"$(dirname "$EXTRACT")/usage-config.json" >"$WORK/nomarks/usage-config.json"
 perl "$WORK/nomarks/extract.pl" --state "$WORK/nomarksstate" --all --skip-locked --repo "$REPO" 2>/dev/null
 check "データのファイルに stage_marks が無いときは 1 で終わり、抜き出した記録を作らない" "$?/$( [ -e "$WORK/nomarksstate/extract/s-ev.jsonl" ] && echo yes || echo no)" "1/no"
+
+printf '== デスクトップアプリの手元の記録\n'
+# desktop.jsonl の行を local>session の形にしてつなぐ。ファイルが無ければ nofile
+dpairs() {
+    [ -f "$1" ] || { printf 'nofile'; return; }
+    perl -MJSON::PP -ne 'my $d = decode_json($_); push @p, "$d->{local}>$d->{session}"; END { print join ",", @p }' "$1"
+}
+# 作り物の手元の記録を書く: mklocal <ファイル> <sessionId> <cliSessionId>
+mklocal() {
+    mkdir -p "$(dirname "$1")"
+    perl -MJSON::PP -e 'my ($f, $l, $c) = @ARGV; open my $h, ">", $f or die; print $h JSON::PP->new->canonical->encode({sessionId => $l, cliSessionId => $c, title => "SECRET TITLE", cwd => "x"})' "$1" "$2" "$3"
+}
+U1=11111111-1111-4111-8111-111111111111
+U2=22222222-2222-4222-8222-222222222222
+U3=33333333-3333-4333-8333-333333333333
+LA=local_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+LB=local_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+LC=local_cccccccc-cccc-4ccc-8ccc-cccccccccccc
+DHOME="$WORK/dhome"
+mkrec "$DHOME/.claude/projects/p/$U1.jsonl" "$REPO" 0
+mkrec "$DHOME/.claude/projects/p/$U2.jsonl" "$WORK/other" 0
+mkrec "$DHOME/.claude/projects/p/$U3.jsonl" "$REPO" 0
+DS="$DHOME/AppData/Local/Claude-Data/claude_x/claude-code-sessions"
+mklocal "$DS/g1/g2/$LA.json" "$LA" "$U1"
+mklocal "$DS/g1/g2/waiting-input/$LB.json" "$LB" "$U3"
+mklocal "$DS/g1/g2/$LC.json" "$LC" "$U2"
+mklocal "$DS/g1/g2/local_dddddddd-dddd-4ddd-8ddd-dddddddddddd.json" "not-a-local-id" "$U1"
+printf '{broken' >"$DS/g1/g2/local_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.json"
+drun() { HOME="${3:-$DHOME}" USERPROFILE="${3:-$DHOME}" LOCALAPPDATA="$1" perl "$EXTRACT" --state "$2" --all --skip-locked --repo "$REPO"; }
+drun "$DHOME/AppData/Local" "$WORK/dstate"
+check "デスクトップアプリの手元の記録があっても 0 で終わる" "$?" "0"
+check "デスクトップアプリの記録の cliSessionId から desktop.jsonl に local と session の対応が書かれる" \
+    "$(dpairs "$WORK/dstate/extract/desktop.jsonl")" "$LA>$U1,$LB>$U3"
+check "desktop.jsonl に手元の記録の文を書かない" "$(grep -c SECRET "$WORK/dstate/extract/desktop.jsonl")" "0"
+rm "$DS/g1/g2/waiting-input/$LB.json"
+drun "$DHOME/AppData/Local" "$WORK/dstate"
+check "読むたびに desktop.jsonl を書き直す" "$(dpairs "$WORK/dstate/extract/desktop.jsonl")" "$LA>$U1"
+rm "$DHOME/.claude/projects/p/$U1.jsonl"
+drun "$DHOME/AppData/Local" "$WORK/dstate"
+check "会話の記録のファイルが消えた鍵でも、手元の記録に残る対応を desktop.jsonl に書く" "$(dpairs "$WORK/dstate/extract/desktop.jsonl")" "$LA>$U1"
+run_all
+check "デスクトップアプリの手元の記録の置き場所が無い PC で、desktop.jsonl を作らずに 0 で終わる" \
+    "$?/$(dpairs "$EX/desktop.jsonl")" "0/nofile"
+mkdir -p "$WORK/emptylocal/Claude-Data/claude_y"
+mkrec "$WORK/ehome/.claude/projects/p/$U1.jsonl" "$REPO" 0
+drun "$WORK/emptylocal" "$WORK/dstate2" "$WORK/ehome"
+check "Claude-Data に claude-code-sessions が無いときも、desktop.jsonl を作らずに 0 で終わる" \
+    "$?/$(dpairs "$WORK/dstate2/extract/desktop.jsonl")/$(kcount "$WORK/dstate2/extract/$U1.jsonl" meta)" "0/nofile/1"
+# Windows の Git Bash では、LOCALAPPDATA が無くても USERPROFILE の下の AppData/Local を見る
+if [ "$IS_WIN" = 1 ]; then
+    mkrec "$DHOME/.claude/projects/p/$U1.jsonl" "$REPO" 0
+    HOME="$DHOME" USERPROFILE="$DHOME" perl -e 'delete $ENV{LOCALAPPDATA}; exec @ARGV' \
+        perl "$EXTRACT" --state "$WORK/dstate3" --all --skip-locked --repo "$REPO"
+    check "Windows では LOCALAPPDATA が無くても USERPROFILE の下の手元の記録を読む" "$(dpairs "$WORK/dstate3/extract/desktop.jsonl")" "$LA>$U1"
+fi
 
 printf '== 終了コード\n'
 printf 'x\n' >"$WORK/afile"
