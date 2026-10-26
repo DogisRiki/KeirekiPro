@@ -63,7 +63,8 @@ newgh() {
 # 偽の GitHub の db.json を書く: mkdb <perl のハッシュの中身>。
 # cl(<番号>, <閉じた時刻>) は閉じた Issue、op(<番号>) は開いた Issue である。どちらも、<欄> => <値> を続けて欄を替えられる。
 # list(<コメント>...) は一覧の Issue(番号 1)、cm(<id>, <本文>) はコメント、idx(<ID>...) は案の索引のコメントの本文、
-# props(<番号>, <行>...) は直す案を持つ集計のコメントの本文である
+# props(<番号>, <行>...) は直す案を持つ集計のコメントの本文である。
+# pr(<番号>, <state>, <本文>, <mergedAt>, <mergeCommit の oid>) は main に向けた PR である
 mkdb() {
     perl -MJSON::PP -e '
         my ($t, $f) = (JSON::PP::true, JSON::PP::false);
@@ -76,11 +77,62 @@ mkdb() {
         sub cm { my ($id, $body) = @_; return { id => $id, body => $body, author_association => "OWNER", created_at => "2026-10-26T00:00:00Z" } }
         sub idx { return "<!-- keirekipro-usage-proposals:v1 page=1 " . JSON::PP->new->canonical->encode([ map { { id => $_, issue => (split /-/)[0] + 0 } } @_ ]) . " -->\n説明\n" }
         sub props { my ($n, @l) = @_; return "<!-- keirekipro-usage-report:v1 issue=$n -->\n\n## AIの作業の集計\n\n### 所見\n\n- 箇条\n\n### 直す案\n\n" . join("", map { "$_\n" } @l) }
+        sub pr { my ($n, $st, $body, $at, $mc) = @_; return { number => $n, state => $st, baseRefName => "main", headRefName => "feat/pr$n",
+            body => $body, mergedAt => $at, mergeCommit => defined $mc ? { oid => $mc } : undef } }
         my $db = { '"$1"' };
         open my $fh, ">", "$ENV{FAKE_GH_DIR}/db.json" or die $!;
         print $fh JSON::PP->new->canonical->encode($db);
     ' || ng "偽の GitHub を用意できない"
 }
+# 集計の対象かを確かめる一時の git のリポジトリを作り、REPO と STATE にする: draftrepo <名前> [noconfig]
+# main に、base と、仕組みが入る前の PR のマージ(PRE)と、時刻 $SYS にデータのファイルを足したコミット(SYSC)と、
+# 仕組みが入ったあとの PR のマージ(POST)を置く。noconfig を付けると、base だけを置く。
+# origin はこのリポジトリ自身で、origin/main は無い。draft の git fetch origin main が origin/main を作る
+draftrepo() {
+    REPO="$WORK/$1"
+    STATE="$REPO/.git/keirekipro-usage"
+    git init -q "$REPO"
+    gitq symbolic-ref HEAD refs/heads/main
+    printf 'a\n' >"$REPO/README"
+    gitq add README
+    GIT_COMMITTER_DATE="2026-10-01T00:00:00+09:00" gitq commit -q -m base
+    if [ "${2:-}" != noconfig ]; then
+        printf 'p\n' >"$REPO/pre"
+        gitq add pre
+        GIT_COMMITTER_DATE="2026-10-20T00:00:00+09:00" gitq commit -q -m pre
+        PRE=$(gitq rev-parse HEAD)
+        mkdir -p "$REPO/.claude/scripts/usage"
+        printf '{}\n' >"$REPO/.claude/scripts/usage/usage-config.json"
+        gitq add .claude/scripts/usage/usage-config.json
+        GIT_COMMITTER_DATE="$SYS" gitq commit -q -m config
+        SYSC=$(gitq rev-parse HEAD)
+        printf 'q\n' >"$REPO/post"
+        gitq add post
+        GIT_COMMITTER_DATE="2026-10-25T00:00:00+09:00" gitq commit -q -m post
+        POST=$(gitq rev-parse HEAD)
+    fi
+    gitq remote add origin "$REPO"
+    gitq checkout -q -b feat/usage-test
+}
+# git の呼び出しを $TMP_ROOT/git-calls.log に書いてから本物の git を動かす偽の git を、$TMP_ROOT/gitlog-bin に置く
+REALGIT=$(command -v git)
+mkdir -p "$TMP_ROOT/gitlog-bin"
+cat >"$TMP_ROOT/gitlog-bin/git" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$TMP_ROOT/git-calls.log"
+exec "$REALGIT" "\$@"
+EOF
+chmod +x "$TMP_ROOT/gitlog-bin/git"
+# 偽の git を PATH の先頭に置いて usage.sh を呼ぶ: gitlogrun <引数>...
+gitlogrun() {
+    local saved=$PATH
+    : >"$TMP_ROOT/git-calls.log"
+    PATH="$TMP_ROOT/gitlog-bin:$PATH"
+    run "$@"
+    PATH=$saved
+}
+# 偽の git が merge-base の呼び出しを書いた回数(git -C <場所> merge-base の形も数える)
+mergebases() { grep -cE '(^| )merge-base( |$)' "$TMP_ROOT/git-calls.log" | tr -d ' '; }
 # 手元の抜き出した記録に行を足す: xrow <記録の鍵> <行の JSON>
 xrow() {
     mkdir -p "$STATE/extract"
@@ -222,6 +274,111 @@ recv 101
 mkdb "issues => [ cl(101, '2026-10-25T01:00:00Z') ]"
 run pending
 check "記録の置き場所のパスに空白があっても、pending が、受け持ちの出来事がある Issue を出す" "$RC/$OUT" '0/{"issues":[101]}'
+
+echo "== 集計の対象か"
+draftrepo dr
+newgh dr
+# 201: Refs: の PR の mergeCommit がデータのファイルを足したコミット(SYSC)で、閉じる PR はそのあとにマージされた Issue
+# 202: 閉じる PR が SYSC より前にマージされた Issue
+# 203: 閉じる PR が2つあり、遅くマージされたほうが SYSC よりあとにマージされた Issue。Closes #2031 の PR は 203 の PR でない
+# 204: Refs: の PR だけがマージされ、Closes の PR はマージせずに閉じた、閉じた Issue
+# 205: 開いていて、PR の無い Issue
+# 206: まとめて閉じた、PR の無い Issue。207: 分けた元の、PR の無い Issue
+# 208: 閉じる PR の mergeCommit が手元に無い Issue
+drdb() {
+    mkdb "issues => [ cl(201, '2026-10-25T01:00:00Z'), cl(202, '2026-10-25T02:00:00Z'), cl(203, '2026-10-25T03:00:00Z'),
+        cl(204, '2026-10-25T04:00:00Z'), op(205), cl(206, '$1', state_reason => 'not_planned'),
+        cl(207, '2026-10-25T07:00:00Z', state_reason => 'not_planned'), cl(208, '2026-10-25T08:00:00Z') ],
+      prs => [ pr(301, 'MERGED', 'Refs: #201', '2026-10-24T03:00:00Z', '$SYSC'), pr(302, 'MERGED', 'Closes #201', '2026-10-25T00:30:00Z', '$POST'),
+        pr(303, 'MERGED', 'Closes #202', '2026-10-19T15:00:00Z', '$PRE'),
+        pr(304, 'MERGED', 'Closes #203', '2026-10-19T15:00:00Z', '$PRE'), pr(305, 'MERGED', 'Closes #203', '2026-10-24T15:00:00Z', '$POST'),
+        pr(306, 'MERGED', 'Closes #2031', '2026-10-26T00:00:00Z', '$PRE'),
+        pr(307, 'MERGED', 'Refs: #204', '2026-10-24T15:00:00Z', '$POST'), pr(308, 'CLOSED', 'Closes #204', undef, undef),
+        pr(309, 'MERGED', 'Closes #208', '2026-10-25T08:00:00Z', '0123456789abcdef0123456789abcdef01234567') ]"
+}
+drdb "2026-10-25T06:00:00Z"
+for n in 201 206 207; do recv "$n"; done
+run draft 202 --session S1
+check "閉じる PR がデータのファイルを足したコミットより前にマージされた Issue に、draft が before-system の印を書いて 2 で終わり、PR と Issue を report.pl と同じ gh のコマンドで読む" \
+    "$RC/$(statejson issues/202.json)/$(calls)" \
+    '2/{"closed_at":"2026-10-25T02:00:00Z","skip":"before-system"}/pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit|issue view 202 --json state,closedAt|'
+run draft 203
+check "閉じる PR がデータのファイルを足したコミットより後にマージされた Issue には、draft が集計しない印を書かない" \
+    "$RC/$(statejson issues/203.json)" "0/none"
+run draft 201
+check "Refs: の PR の mergeCommit がデータのファイルを足したコミットと同じ Issue に、draft が system-pr の印を書いて 2 で終わる" \
+    "$RC/$(statejson issues/201.json)" '2/{"closed_at":"2026-10-25T01:00:00Z","skip":"system-pr"}'
+gitlogrun draft 204
+check "Refs: の PR だけがあって閉じる PR の無い閉じた Issue で、draft が git merge-base を呼ばずに no-merged-pr の印を書く" \
+    "$RC/$(statejson issues/204.json)/$(mergebases)" '2/{"closed_at":"2026-10-25T04:00:00Z","skip":"no-merged-pr"}/0'
+gitlogrun draft 202
+check "閉じる PR のある Issue では、draft が git merge-base を呼ぶ(偽の git が呼び出しを数えられる)" "$RC/$(mergebases)" "2/1"
+run draft 205
+check "開いていてマージ済みの Closes の PR が無い Issue で、draft が何も書かずに 2 で終わる" "$RC/$(statejson issues/205.json)" "2/none"
+run draft 206
+r206="$RC/$(statejson issues/206.json)"
+run draft 207
+check "まとめて閉じた Issue と分けた元の Issue で、draft が集計しない印を書いて 2 で終わる" "$r206/$RC/$(statejson issues/207.json)" \
+    '2/{"closed_at":"2026-10-25T06:00:00Z","skip":"no-merged-pr"}/2/{"closed_at":"2026-10-25T07:00:00Z","skip":"no-merged-pr"}'
+run pending
+check "draft が集計しない印を書いた Issue を、次の pending が出さない" "$RC/$OUT" '0/{"issues":[]}'
+drdb "2026-10-25T09:00:00Z"
+run pending
+check "まとめて閉じた Issue を開き直して閉じ直すと、また pending に出る" "$RC/$OUT" '0/{"issues":[206]}'
+run draft 208
+check "閉じる PR の mergeCommit が手元に無く、git merge-base --is-ancestor が 0 と 1 のほかの値で終わると、draft が 1 で終わる" \
+    "$RC/$(errline)/$(statejson issues/208.json)" "1/one/none"
+run draft 0
+check "draft が、Issue の番号でない引数を受けない" "$RC/$(errline)" "1/one"
+run draft 202 203
+check "draft が、2つ目の Issue の番号を受けない" "$RC/$(errline)" "1/one"
+check "draft が、終わるたびに Issue の錠を外す" "$([ -e "$STATE/locks/issue-202" ] || [ -e "$STATE/locks/issue-208" ] && printf left || printf none)" "none"
+
+newgh dr-lock
+drdb "2026-10-25T06:00:00Z"
+mkdir -p "$STATE/locks/issue-203"
+perl -e 'my $t = time - 700; utime $t, $t, $ARGV[0] or exit 1' "$STATE/locks/issue-203"
+run draft 203
+check "テストのための上書きが無いとき、draft が、700秒前の Issue の錠を、持ち主が止まった錠とみなして取り直す" \
+    "$RC/$([ -e "$STATE/locks/issue-203" ] && printf left || printf none)" "0/none"
+mkdir "$STATE/locks/issue-203"
+: >"$FAKE_GH_DIR/calls.log"
+(cd "$REPO" && exec bash "$USAGE" draft 203) >"$TMP_ROOT/bg-out" 2>"$TMP_ROOT/bg-err" &
+bg=$!
+sleep 2
+held="$(calls)"
+rmdir "$STATE/locks/issue-203"
+wait "$bg"
+bgrc=$?
+check "テストのための上書きが無いとき、draft が、ほかの呼び出しが持つ新しい Issue の錠が外れるまで gh を呼ばずに待ち、外れたら続ける" \
+    "$held/$bgrc/$(calls | grep -c 'issue view 203' | tr -d ' ')" "/0/1"
+mkdir "$STATE/locks/issue-203"
+: >"$FAKE_GH_DIR/calls.log"
+KP_USAGE_TEST_ISSUE_LOCK_STALE=1
+export KP_USAGE_TEST_ISSUE_LOCK_STALE
+run draft 203
+unset KP_USAGE_TEST_ISSUE_LOCK_STALE
+check "テストのための上書きで錠の古さの上限を短くすると、draft が、外れない Issue の錠を取り直して続ける" \
+    "$RC/$([ -e "$STATE/locks/issue-203" ] && printf left || printf none)" "0/none"
+
+newgh dr-ghfail
+drdb "2026-10-25T06:00:00Z"
+printf '%s\n' '^pr list' >"$FAKE_GH_DIR/fail"
+run draft 202
+check "gh pr list が失敗すると、draft が 1 で終わり、理由を1行で出す" "$RC/$(errline)" "1/one"
+
+newgh dr-fetch
+drdb "2026-10-25T06:00:00Z"
+gitq remote set-url origin "$WORK/no-such-repo"
+run draft 202
+check "git fetch が失敗すると draft が 1 で終わる" "$RC/$(errline)/$(calls)" "1/one/"
+
+draftrepo dr-noconf noconfig
+newgh dr-noconf
+mkdb "issues => [ cl(202, '2026-10-25T02:00:00Z') ]"
+run draft 202
+check "origin/main にデータのファイルを足したコミットが無いとき、draft が issues/<N>.json に書かず、偽の gh を呼ばずに 2 で終わる" \
+    "$RC/$(statejson issues/202.json)/$(calls)" "2/none/"
 
 echo "== 案と所有者"
 newrepo prop config

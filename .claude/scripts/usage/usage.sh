@@ -8,6 +8,9 @@
 #   pending
 #     まだ出していない Issue と、一覧か案の索引への書き込みが残った Issue の番号を
 #     {"issues":[<番号>, ...]} の1行で出す
+#   draft <N>
+#     Issue N の錠の中で、Issue N が集計の対象かを確かめる。対象でなければ、集計しない印を
+#     issues/<N>.json に書いて(書かないこともある)2 で終わる
 #   proposals
 #     まだ答えていない案を、github.pl proposals-open の JSON の1行で出す
 #   proposal <案の ID> filed|declined
@@ -45,7 +48,7 @@ while [ $# -gt 0 ]; do
         ;;
     esac
 done
-[ ${#ARGS[@]} -gt 0 ] || fail "サブコマンドを mark・pending・proposals・proposal・owner のどれかにする。"
+[ ${#ARGS[@]} -gt 0 ] || fail "サブコマンドを mark・pending・draft・proposals・proposal・owner のどれかにする。"
 
 # Claude が Bash で cd したままでも同じ記録の置き場所を使うように、git を作業フォルダの最上位で動かす
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || fail "git のリポジトリの作業フォルダの中で呼ぶ。"
@@ -64,6 +67,68 @@ system_time() {
     git -C "$TOP" rev-parse -q --verify refs/remotes/origin/main >/dev/null || return 0
     git -C "$TOP" log origin/main --first-parent --diff-filter=A --format=%cI -1 -- "$CONFIG_PATH" 2>/dev/null ||
         fail "origin/main の履歴を読めなかった。"
+}
+
+# Issue の錠 locks/issue-<N> を mkdir で取り、終わるときに外す。錠が古いとみなす時間(600秒)より古ければ、
+# 錠の持ち主が止まったとみなして取り直す。テストだけが KP_USAGE_TEST_ISSUE_LOCK_STALE で短くする
+ISSUE_LOCK=
+lock_issue() {
+    local dir="$STATE/locks/issue-$1" stale=600
+    case "${KP_USAGE_TEST_ISSUE_LOCK_STALE-}" in '' | *[!0-9]*) ;; *) stale=$KP_USAGE_TEST_ISSUE_LOCK_STALE ;; esac
+    mkdir -p "$STATE/locks" || fail "錠の置き場所 $STATE/locks を作れなかった。"
+    until mkdir "$dir" 2>/dev/null; do
+        # 錠の持ち主がちょうど外したときは、すぐに取り直す
+        [ -d "$dir" ] || { mkdir "$dir" 2>/dev/null && break; fail "Issue の錠 $dir を作れなかった。"; }
+        # 待っている間に止められても錠を残さないように、待つ繰り返しは bash で回す
+        if perl -e 'my @s = stat $ARGV[0]; exit(@s && time - $s[9] > $ARGV[1] ? 0 : 1)' "$dir" "$stale"; then
+            rmdir "$dir" 2>/dev/null || sleep 1
+        else
+            sleep 1
+        fi
+    done
+    ISSUE_LOCK=$dir
+    trap 'rmdir "$ISSUE_LOCK" 2>/dev/null' EXIT
+}
+
+# 標準エラーを一時ファイルに受けてコマンドを動かし、失敗したら最後の1行を理由に添えて 1 で終わる: checked <失敗の文> <コマンド>...
+# 標準出力はそのまま出す
+checked() {
+    local what=$1 why
+    shift
+    if "$@" 2>"$STATE/.err.$$"; then
+        rm -f "$STATE/.err.$$"
+        return 0
+    fi
+    why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
+    rm -f "$STATE/.err.$$"
+    fail "${what}(${why:-理由の出力なし})。"
+}
+
+# issues/<N>.json に集計しない印を書く: write_skip <N> <印> <closedAt か ->
+# ほかの欄は残す。ファイルがあるのに JSON のオブジェクトとして読めないときは、ほかの欄を失わないように書かない
+write_skip() {
+    perl -MJSON::PP -e '
+        my ($f, $skip, $at) = @ARGV;
+        my $J = JSON::PP->new->utf8->canonical;
+        my $d = {};
+        if (-e $f) {
+            open(my $in, "<:raw", $f) or exit 1;
+            local $/;
+            my $x = eval { $J->decode(<$in> // "") };
+            close $in;
+            exit 1 unless ref $x eq "HASH";
+            $d = $x;
+        }
+        $d->{skip} = $skip;
+        $d->{closed_at} = $at eq "-" ? undef : $at;
+        my $tmp = "$f.tmp.$$";
+        open(my $o, ">:raw", $tmp) or exit 1;
+        my $ok = print $o $J->encode($d), "\n";
+        $ok = close($o) && $ok;
+        exit 0 if $ok && rename($tmp, $f);
+        unlink $tmp;
+        exit 1;
+    ' "$STATE/issues/$1.json" "$2" "$3" || fail "$STATE/issues/$1.json に集計しない印を書けなかった。"
 }
 
 cmd_mark() {
@@ -192,6 +257,99 @@ cmd_pending() {
     rm -f "$STATE/.perl-err.$$"
 }
 
+cmd_draft() {
+    [ $# -eq 1 ] || fail "draft には Issue の番号を1つだけ渡す。"
+    printf '%s' "$1" | grep -Eq '^[1-9][0-9]{0,9}$' && [ "$(printf '%s' "$1" | wc -l | tr -d ' ')" = 0 ] ||
+        fail "draft の Issue の番号を、0で始まらない10桁までの数にする。"
+    local n=$1 sysc decision kind mc at rc why
+    ensure_state
+    lock_issue "$n"
+
+    # 1. データのファイルを足したコミットを origin/main から求める。無ければ仕組みが main に入る前なので何もしない
+    checked "origin の main を取り込めなかった" git -C "$TOP" fetch -q origin main
+    sysc=$(git -C "$TOP" log origin/main --first-parent --diff-filter=A --format=%H -1 -- "$CONFIG_PATH" 2>/dev/null) ||
+        fail "origin/main の履歴を読めなかった。"
+    [ -n "$sysc" ] || exit 2
+
+    # 2〜3. PR と Issue を、report.pl の collect_prs と同じ gh のコマンドで読む
+    # 一時ファイルの名前は、終わるときの trap から見えるように関数の外の変数に置く
+    prs="$STATE/.draft-prs.$$"
+    issue="$STATE/.draft-issue.$$"
+    trap 'rm -f "$prs" "$issue"; rmdir "$ISSUE_LOCK" 2>/dev/null' EXIT
+    checked "gh で PR の一覧を読めなかった" \
+        gh pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit >"$prs"
+    checked "gh で Issue $n を読めなかった" gh issue view "$n" --json state,closedAt >"$issue"
+    # report.pl の collect_prs と同じ決まりで Issue の PR を選び、判定を「種類 タブ 閉じる PR の mergeCommit タブ closedAt」の1行で出す。
+    # 空の欄は - にする(read がタブの続きを1つにまとめるため)
+    decision=$(perl -MJSON::PP -e '
+        my ($n, $sysc, $pf, $if) = @ARGV;
+        my $J = JSON::PP->new->utf8;
+        my $load = sub {
+            open(my $in, "<:raw", $_[0]) or die "gh の出力を受けたファイルを開けなかった\n";
+            local $/;
+            my $x = eval { $J->decode(<$in> // "") };
+            close $in;
+            die "gh の出力を JSON として読めなかった\n" unless ref $x eq $_[1];
+            return $x;
+        };
+        my ($prs, $iss) = ($load->($pf, "ARRAY"), $load->($if, "HASH"));
+        my $at = defined $iss->{closedAt} && !ref $iss->{closedAt} && $iss->{closedAt} ne "" ? $iss->{closedAt} : "-";
+        my ($system, $last) = (0, undef);
+        for my $p (sort { $a->{number} <=> $b->{number} } grep { ref $_ eq "HASH" && defined $_->{number} } @$prs) {
+            my $st = $p->{state} // "";
+            next unless $st eq "MERGED" || $st eq "CLOSED";
+            my $body = defined $p->{body} && !ref $p->{body} ? $p->{body} : "";
+            my $closes = $body =~ /^Closes #$n(?![0-9])/m;
+            next unless $closes || $body =~ /^Refs: #$n(?![0-9])/m;
+            my $mc = ref $p->{mergeCommit} eq "HASH" ? $p->{mergeCommit}{oid} : undef;
+            $system = 1 if defined $mc && !ref $mc && $mc eq $sysc;
+            next unless $closes && $st eq "MERGED";
+            # report.pl と同じく、閉じる PR のマージの時刻を読めなければ先へ進まない。GitHub の時刻は UTC の Z で終わる形なので、
+            # report.pl の iso_epoch より狭い形だけを受けて文字列で比べる。違う形が来たら、選び違えないように 1 で終わる
+            my $m = $p->{mergedAt};
+            die "PR #$p->{number} のマージの時刻を読めなかった\n"
+                unless defined $m && !ref $m && $m =~ /\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\z/;
+            $last = { number => $p->{number}, at => $m, mc => $mc } if !defined $last || $m gt $last->{at};
+        }
+        die "PR #$last->{number} のマージのコミットを読めなかった\n"
+            if defined $last && !(defined $last->{mc} && !ref $last->{mc} && $last->{mc} =~ /\A[0-9a-f]{7,64}\z/);
+        my $closed = ($iss->{state} // "") eq "CLOSED";
+        if ($system) { print "system-pr\t-\t$at\n" }
+        elsif (defined $last) { print "ancestor\t$last->{mc}\t$at\n" }
+        elsif ($closed) { print "no-merged-pr\t-\t$at\n" }
+        else { print "open\t-\t-\n" }
+    ' "$n" "$sysc" "$prs" "$issue" 2>"$STATE/.err.$$") || {
+        why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
+        rm -f "$STATE/.err.$$"
+        fail "Issue $n が集計の対象かを、gh から読んだ PR の一覧と Issue で決められなかった(${why:-理由の出力なし})。"
+    }
+    rm -f "$STATE/.err.$$"
+    IFS="$(printf '\t')" read -r kind mc at <<EOF
+$decision
+EOF
+    case "$kind" in
+    system-pr | no-merged-pr)
+        write_skip "$n" "$kind" "$at"
+        exit 2
+        ;;
+    open) exit 2 ;;
+    ancestor) ;;
+    *) fail "Issue $n が集計の対象かを決められなかった。" ;;
+    esac
+
+    # 4. 閉じる PR のうち最後にマージされた PR が、データのファイルを足したコミットの祖先なら、仕組みが入る前の Issue である
+    rc=0
+    git -C "$TOP" merge-base --is-ancestor "$mc" "$sysc" 2>/dev/null || rc=$?
+    case "$rc" in
+    0)
+        write_skip "$n" before-system "$at"
+        exit 2
+        ;;
+    1) return 0 ;;
+    *) fail "Issue $n の閉じる PR のコミット $mc が手元に無く、仕組みが入る前の PR かを確かめられなかった。" ;;
+    esac
+}
+
 cmd_proposals() {
     [ $# -eq 0 ] || fail "proposals は引数を受けない。"
     github proposals-open
@@ -242,8 +400,9 @@ shift
 case "$cmd" in
 mark) cmd_mark "$@" ;;
 pending) cmd_pending "$@" ;;
+draft) cmd_draft "$@" ;;
 proposals) cmd_proposals "$@" ;;
 proposal) cmd_proposal "$@" ;;
 owner) cmd_owner "$@" ;;
-*) fail "知らないサブコマンド $cmd を受けた。サブコマンドを mark・pending・proposals・proposal・owner のどれかにする。" ;;
+*) fail "知らないサブコマンド $cmd を受けた。サブコマンドを mark・pending・draft・proposals・proposal・owner のどれかにする。" ;;
 esac
