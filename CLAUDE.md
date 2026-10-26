@@ -27,7 +27,7 @@ Claude は、1つのセッションの中では品質チェックを順に1つ�
 同時に走らせる数は、作業PCごとの設定 `keirekipro.parallelSlots`(初期値1)で決まる。所有者に数を変えるよう頼まれたら、Claude は次の順で設定する。
 
 1. `docker info --format '{{.MemTotal}}'` で Docker に割り当てたメモリ(バイト)を読む
-2. 目安の数を求める。目安は、(割り当てたメモリ − 約1GB)÷ 約4.2GB の小数点以下を切り捨てた数(最小1)。約1GBは共有のサービスの分、約4.2GBは backend の品質チェック1回分
+2. 目安の数を、(割り当てたメモリ − 約1GB)÷ 約4.2GB の小数点以下を切り捨てて求める(最小1)。約1GBは共有のサービスの分、約4.2GBは backend の品質チェック1回分
 3. 数と求め方を所有者に示してから、`git config keirekipro.parallelSlots <数>` で設定する
 
 CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/parallel/run-check.sh <領域>` を外し、
@@ -47,7 +47,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - 200行(実装のコード差分。テストとドキュメントは計上しない)を超えるPRは、spec駆動(Lane A)のPRとしてPR本文に `Spec: .kiro/specs/<feature>` を記載したものしか通らない(size-checkが機械判定する)。
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
 - DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う
-- 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)
+- 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)。止まる前に `bash .claude/scripts/usage/usage.sh mark same-failure` を1回呼ぶ(このコマンドが失敗しても、停止と報告を続ける)
 - 依頼範囲外の問題を見つけたら報告のみ行う(勝手に直さない)
 - `/loop` などの定期実行ループの中からはcommit/pushしない(出荷は明示的な `/ship` でのみ行う)
 
@@ -79,9 +79,9 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 ## spec駆動開発(cc-sdd / Kiro-style)
 
 spec で進めるか(Lane A)、spec 無しで進めるか(Lane B)は、着手時に `/start` が決める。
-AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(`.claude/skills/start/SKILL.md`)の「観点の定義」の4つの観点で判断し、判断と観点ごとの理由を所有者に示す。spec が要らないと判断したときも、AIは示したところで止まり、所有者の返事を受けてから実装する。
+AIがIssueの本文とその時点のコードを調べ、4つの観点で判断し、判断と観点ごとの理由を所有者に示す。spec が要らないと判断したときも、AIは示したところで止まり、所有者の返事を受けてから実装する。
 
-- 変更の行数の見込みは、着手時の判断に使わない。200行の検査は、着手時の判断をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない(全文は `.claude/skills/start/SKILL.md` の「Step 5: 判断する」)
+- 変更の行数の見込みは、着手時の判断に使わない。200行の検査は、着手時の判断をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない
 - 観点ごとの定義(「当たる」「当たらない」、3つの材料、1回尋ねれば決まる)は、`.claude/skills/start/SKILL.md` の「Step 5: 判断する」の「観点の定義」の表と表の下の箇条のとおりとする
 
 ### パスと役割分担
@@ -105,14 +105,14 @@ AIがIssueの本文とその時点のコードを調べ、`/start` のスキル(
 - Phase 1(仕様化):
   - `/kiro-spec-init #N`(既存の spec を新しいIssueのために直すときは `/kiro-spec-init #N <feature>`)→ `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
   - 審査役のモデルは、既定では Fable 5.1 で、所有者が spec ごとに Opus 5.5 を選べる。所有者は、spec を始めるときに、選んだモデルを会話で伝える。
-    所有者が会話で審査役のモデルを伝えたら、実装セッションは、その spec の spec.json の `review_model` に `fable` か `opus` を書き、書いた値を所有者に1行で示す。
-    spec.json がまだ無いとき(`/kiro-spec-init` の前)は、`/kiro-spec-init` が spec.json を作った直後に書く。
-    所有者が spec の途中で選び直したときも、同じく `review_model` を書き換える。所有者が選んでいない spec では `review_model` を書かない
+    所有者がモデルを伝えたときと、spec の途中で選び直したときに、実装セッションは、その spec の spec.json の `review_model` に `fable` か `opus` を書き、書いた値を所有者に1行で示す。
+    spec.json がまだ無いときは、`/kiro-spec-init` が spec.json を作った直後に書く。所有者が選んでいない spec では `review_model` を書かない
   - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
   - `/kiro-validate-design` は使わない(`/spec-review` が置き換えた)。cc-sdd のスキルの出力で案内されても起動しない
 - Phase 2(実装): `/kiro-impl {feature}`(タスクごとに実装+確認役の独立レビュー+最終検証)
   - 再検証のみ: `/kiro-validate-impl {feature}`
 - 実装完了後の出荷は `/ship`(PR本文に `Spec: .kiro/specs/{feature}` と `Refs: #<Issue番号>` を記載)
+- Issue を閉じる PR がマージされたあとの集計は `usage-report` のスキルに従う
 
 ### ルール
 

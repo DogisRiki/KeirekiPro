@@ -49,6 +49,8 @@ spec 文書を `spec-reviewer` にレビューさせ、指摘に対応して記�
 
 ### Step 1: 準備
 
+3つ目の引数が `changed` のときは、Claude は、下の1より前に、`bash .claude/scripts/usage/usage.sh mark spec-fix --stage <STAGE>` を1回呼ぶ。`<STAGE>` には、2つ目の引数の段階を書く。このコマンドは、集計に入れる印を残す。このコマンドが失敗しても、Claude は手順を続ける。
+
 1. 引数から `FEATURE` と `STAGE` を取る。`STAGE` は `requirements` / `design` / `tasks` のいずれか。3つ目の引数が `changed` なら `CHANGED` を「あり」にし、無ければ「なし」にする
 2. `.kiro/specs/{FEATURE}/reviews/` が無ければ作る
 3. `CYCLE` を決める: `reviews/{STAGE}-review.md` にある最大のサイクル番号 + 1。ファイルが無ければ 1

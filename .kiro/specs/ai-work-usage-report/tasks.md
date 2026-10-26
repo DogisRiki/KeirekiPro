@@ -380,7 +380,7 @@
   - _対象の部品: usage-report のスキル_
 
 - [ ] 7. 既存の手順と設定に、集計を出す時点と印を残す時点をつなぐ
-- [ ] 7.1 既存のスキルと CLAUDE.md と構築の手順書を直す (並行可)
+- [x] 7.1 既存のスキルと CLAUDE.md と構築の手順書を直す (並行可)
 
   Claude は、部品「ship・spec-review・start の SKILL.md と CLAUDE.md」の4つの変更を、design のその節のとおりに入れる。あわせて、Claude は、`doc/開発フロー/基盤構築手順.md` の「1. botアカウントの作成とPATの発行」の節に、bot のアカウントを替えるときも前のアカウントを共同作業者から外さないことと、外すと集計の一覧と集計のコメントを読まなくなることを足す。Claude は、ほかの文を変えない。
   - 完了の確かめ方: `git diff $(git merge-base origin/main HEAD) -- .claude/skills/ship/SKILL.md .claude/skills/spec-review/SKILL.md .claude/skills/start/SKILL.md CLAUDE.md doc/開発フロー/基盤構築手順.md` の違いが、design の節に書いた変更と手順書の足した文だけである。`bash .github/scripts/check-claude-md-size.sh` が通る
@@ -498,3 +498,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 記録の置き場所の読み方: usage.sh の perl は、記録の置き場所の中のファイルを `glob` でなく `opendir` で探す。perl の `glob` は引数を空白で区切るので、記録の置き場所のパスに空白がある PC では、ファイルを1つも見つけられないためである。テストには、名前に空白があるリポジトリの場合を持たせる(タスク5.1)
 - `draft` の最初の1回の時間: 2026-10-26 に、この PC の記録(2,809 ファイル)を extract.pl で最初から読むと、964秒(約16分)かかった。仕組みが main に入る前は `draft` が抜き出しの前に終わるので、`draft` の最初の1回の重い部分である `extract.pl --all --wait` だけを測った。Bash の道具の前面の呼び出しの上限(10分)を超えるので、タスク6.1のスキルは、`draft` を裏で動かすか、上限を長くして呼ぶ。会話の始めのフックが裏で `extract --all --skip-locked` を動かすので、2回目からは続きだけを読む(タスク5.3)
 - `publish` の下書きの新しさ: 上限(3600秒)は、テストだけが `KP_USAGE_TEST_DRAFT_MAX_AGE` で短くする。`publish` は、所見の確かめを gh を呼ぶ前に行い、出し済みかを下書きの新しさより先に確かめる(ほかの PC で出した Issue で、古い下書きを理由に draft のやり直しを求めないため)。下書きが無いときは、draft を先に呼ぶよう返して 1 で終わる。draft は Issue を閉じる PR が無ければ下書きを書かないので、閉じる PR が無い Issue は draft の 2 で止まる(タスク5.4)
+- CLAUDE.md の読み込みの量の上限: main の CLAUDE.md は 18997 バイトで、`check-claude-md-size.sh` の上限 19000 バイトまで 3 バイトしか残っていなかった。タスク7.1の2つの変更を入れると上限を超えるので、所有者が了承した4か所(spec で進めるかを決める節の段落と変更の行数の箇条、審査役のモデルの箇条、同時に走らせる数の手順の2つ目)を、意味を変えずに短くした。このため、タスク7.1の CLAUDE.md の違いは、design の2つの変更とこの4か所である
