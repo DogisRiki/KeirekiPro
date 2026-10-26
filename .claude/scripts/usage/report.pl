@@ -47,6 +47,8 @@ use constant UNKNOWN_MODEL  => Encode::decode('UTF-8', '不明');
 # spec の3つの段階の名前(spec.json と依頼文の STAGE の名前)と、spec の審査役の agent_type
 use constant SPEC_STEPS    => [qw(requirements design tasks)];
 use constant REVIEWER_TYPE => 'spec-reviewer';
+# 読めない会話があったときに数えられないとする往復と手戻りの5行(uncountable に入れる順)
+use constant NULL_ROWS     => [qw(spec_review_rounds owner_fix task_rejected same_failure switch_to_spec)];
 # 新しい Issue のための spec の更新で承認を取り消したときの、revoked_for の「Issue #<N>」に続く文字
 use constant UPDATE_FOR    => Encode::decode('UTF-8', ' のための更新');
 # Codex レビューのコメントの見出しと、Issue の決めた方式に沿わない項目の判定と、往復と手戻りで別に数える検査の名前
@@ -95,6 +97,8 @@ sub build {
     my $lines = stage_lines($ctx);
     my ($totals, $by_stage) = count_times($ctx, $lines);
     my $models = count_tokens($ctx, $lines, $totals, $by_stage);
+    my $rework = count_rework($ctx);
+    my ($uncountable, $partial) = uncountable_rows($ctx, $rework);
     my $report = {
         v          => 1,
         issue      => $n,
@@ -105,7 +109,9 @@ sub build {
         totals     => $totals,
         stages     => stage_rows($ctx, $by_stage),
         models     => $models,
-        rework     => count_rework($ctx),
+        rework     => $rework,
+        uncountable     => $uncountable,
+        partial_records => $partial ? JSON::PP::true : JSON::PP::false,
         unknown_turns => unknown_turns($ctx),
     };
     write_file("$o->{out}/report.json", $JSON->encode($report) . "\n");
@@ -248,20 +254,26 @@ sub load_records {
     $ctx->{rec} = \%rec;
     $ctx->{marks} = read_jsonl("$ctx->{state}/marks.jsonl");
     $ctx->{desktop} = read_jsonl("$dir/desktop.jsonl");
-    # 道具の呼び出しの識別子ごとの、道具の実行時間(ミリ秒)。同じ識別子が2行あれば後の行を使う
-    my %dur;
+    # 道具の呼び出しの識別子ごとの、道具の実行時間(ミリ秒)。同じ識別子が2行あれば後の行を使う。
+    # あわせて、読める行が1つ以上あるファイルのセッションの ID ごとに、ファイルを最後に書いた時刻を置く
+    my (%dur, %dur_s);
     my $ddir = "$ctx->{state}/durations";
     if (opendir(my $dh, $ddir)) {
         for my $f (sort grep { /\.tsv\z/ } readdir $dh) {
             open(my $fh, '<:raw', "$ddir/$f") or next;
+            my $lines = 0;
             while (my $l = <$fh>) {
-                $dur{$1} = $2 + 0 if $l =~ /\A([A-Za-z0-9_-]{1,128})\t([0-9]+(?:\.[0-9]+)?)\r?\n?\z/;
+                next unless $l =~ /\A([A-Za-z0-9_-]{1,128})\t([0-9]+(?:\.[0-9]+)?)\r?\n?\z/;
+                $dur{$1} = $2 + 0;
+                $lines++;
             }
+            $dur_s{ substr($f, 0, -4) } = (stat $fh)[9] // 0 if $lines;
             close $fh;
         }
         closedir $dh;
     }
     $ctx->{durations} = \%dur;
+    $ctx->{dur_sessions} = \%dur_s;
     return 1;
 }
 
@@ -1214,6 +1226,105 @@ sub check_runs {
         }
     }
     return \@r;
+}
+
+# ---- 数えられない行と、読めなかった記録 --------------------------------------
+
+# 往復と手戻りの行のうち、数えられない行の値を null にし、null にした行の名前を NULL_ROWS の順に返す。
+# あわせて、会話の記録の一部を読めなかったかを返す。
+# 仕組みが main に入る前に受け持った Issue か、印の残らない本体の会話がある Issue では、印から数える3行を数えられない。
+# 読めない会話があれば、その会話から数える5行を数えられない。spec 無しの Issue では、spec に関わる行を 0 のままにする
+sub uncountable_rows {
+    my ($ctx, $w) = @_;
+    my %null;
+    my $sys = $ctx->{system_ts};
+    if (!defined $sys || $ctx->{start_ts} < $sys || unmarked($ctx)) {
+        $null{$_} = 1 for qw(owner_fix same_failure switch_to_spec);
+    }
+    my $partial = partial_records($ctx);
+    if ($partial) {
+        $null{$_} = 1 for @{ +NULL_ROWS };
+    }
+    if (!$ctx->{spec}{has}) {
+        delete @null{qw(spec_review_rounds owner_fix switch_to_spec)};
+    }
+    my @names = grep { $null{$_} } @{ +NULL_ROWS };
+    $w->{$_} = undef for @names;
+    return (\@names, $partial);
+}
+
+# Issue に決めた本体の会話に、道具を使ったのに、durations/ にその会話のセッションの ID の行が1つも無い会話があるか
+sub unmarked {
+    my ($ctx) = @_;
+    for my $key (sort keys %{ $ctx->{irec} }) {
+        next if defined parent_key($key) || $ctx->{spawned}{$key} || $ctx->{dur_sessions}{$key};
+        return 1 if grep { ($_->{k} // '') eq 'tool' } @{ $ctx->{irec}{$key} };
+    }
+    return 0;
+}
+
+# 会話の記録の一部を読めなかったか。design の「読めない会話を見つける」の4つの条件のどれかに当たれば真
+sub partial_records {
+    my ($ctx) = @_;
+    my ($rec, $irec) = @$ctx{qw(rec irec)};
+    # durations/ か marks.jsonl にセッションの ID があるのに、extract/ にその記録が無い。
+    # durations/ のファイルは、Issue の開始の時刻より後に書かれたものだけを見る
+    for my $s (sort keys %{ $ctx->{dur_sessions} }) {
+        return 1 if !$rec->{$s} && $ctx->{dur_sessions}{$s} >= $ctx->{start_ts};
+    }
+    for my $m (@{ $ctx->{marks} }) {
+        my $s = $m->{session};
+        return 1 if defined $s && !ref $s && $s ne '' && !$rec->{$s} && mark_in_issue($ctx, $m);
+    }
+    for my $key (sort keys %$irec) {
+        # .pos の飛ばした行の数が1以上
+        my ($pos) = @{ read_jsonl("$ctx->{state}/extract/$key.pos") };
+        return 1 if $pos && is_num($pos->{skipped}) && $pos->{skipped} > 0;
+        # 補助役の起動があるのに、その補助役の記録が無い。結果の無い呼び出しと、失敗した呼び出しは見ない
+        my %res = map { ($_->{id} => $_) } grep { ($_->{k} // '') eq 'result' && defined $_->{id} && !ref $_->{id} } @{ $rec->{$key} };
+        my $root = parent_key($key) // $key;
+        for my $t (grep { ($_->{k} // '') eq 'tool' && ($_->{kind} // '') eq 'agent' } @{ $irec->{$key} }) {
+            my $r = defined $t->{id} && !ref $t->{id} ? $res{ $t->{id} } : undef;
+            next if !$r || $r->{err};
+            my $job = $r->{job};
+            return 1 unless defined $job && !ref $job && $rec->{"$root.agent-$job"};
+        }
+    }
+    return unlinked_spawn($ctx);
+}
+
+# Issue に決めた行に、別に起こしたセッションの出来事があり、その会話を結び付けられないものがあるか。
+# extract/desktop.jsonl で、記録のあるセッションに結び付けば結び付いたとする。結び付かない出来事は、時刻の順に、
+# 出来事のあとに始まり、Issue のブランチで動いた、まだ結び付けていない本体の会話の記録に、始まりの早い順に結び付ける
+sub unlinked_spawn {
+    my ($ctx) = @_;
+    my ($rec, $irec) = @$ctx{qw(rec irec)};
+    my %session;
+    for my $d (@{ $ctx->{desktop} }) {
+        my ($l, $s) = @$d{qw(local session)};
+        $session{$l} = $s if defined $l && !ref $l && defined $s && !ref $s;
+    }
+    my %mapped = map { ($_ => 1) } values %session;
+    my (@spawns, %first);
+    for my $key (sort keys %$irec) {
+        for my $r (timed_rows($irec->{$key})) {
+            next unless ($r->{k} // '') eq 'spawn' && defined $r->{child} && !ref $r->{child};
+            my $s = $session{ $r->{child} };
+            next if defined $s && $rec->{$s} && @{ $rec->{$s} };
+            push @spawns, [ row_ts($r), $key ];
+        }
+        next if defined parent_key($key) || $mapped{$key};
+        next unless grep { ($_->{k} // '') eq 'branch' && defined $_->{name} && !ref $_->{name} && $ctx->{branches}{ $_->{name} } } @{ $irec->{$key} };
+        my ($f) = timed_rows($rec->{$key});
+        $first{$key} = row_ts($f);
+    }
+    my @cand = sort { $first{$a} <=> $first{$b} || $a cmp $b } keys %first;
+    for my $sp (sort { $a->[0] <=> $b->[0] || $a->[1] cmp $b->[1] } @spawns) {
+        my ($i) = grep { defined $cand[$_] && $cand[$_] ne $sp->[1] && $first{ $cand[$_] } >= $sp->[0] } 0 .. $#cand;
+        return 1 unless defined $i;
+        $cand[$i] = undef;
+    }
+    return 0;
 }
 
 # ---- 時刻と日付 ------------------------------------------------------------

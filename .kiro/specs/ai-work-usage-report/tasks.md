@@ -215,7 +215,7 @@
   - _対象の部品: report.pl_
   - _依存: 1.1_
 
-- [ ] 4.7 数えられない行と、読めなかった記録を決める
+- [x] 4.7 数えられない行と、読めなかった記録を決める
 
   Claude は、report.pl の手順「往復と手戻りを数える」のうち「数えられない」と書く2つのときと、印の残らない会話の行の扱いと、読めない会話から数える5行の扱いと、手順「読めない会話を見つける」の4つの条件を、design の「report.pl」の節のとおりに足す。report.pl は、結果を `report.json` の `uncountable` と `partial_records` に書く。Claude は、テスト `test-report.sh` に、このタスクの場合を足す。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `test-report.sh` が、どれも失敗0件で終わる。shellcheck の指摘が0件である
@@ -484,6 +484,7 @@
 - report.pl の日本語の名前: report.pl は `use utf8` を持たないので、字句の日本語はバイトの列であり、JSON::PP の `->utf8` で読んだデータのファイルの名前(文字の列)と等しくならない。データのファイルの名前と比べる名前は `Encode::decode('UTF-8', ...)` で文字の列にする。ファイルの頭の `my` の変数は `exit main(@ARGV) unless caller` より後ろで値が入らないので、名前は `use constant` でその行より前に置く(タスク4.4)
 - 印の Issue と時刻: report.pl は、marks.jsonl の印を、`issue` があればその番号で、無ければ印の `session` と `ts` と `branch` を行と同じ決まり(`issue_at`)に通して Issue に決める(`mark_in_issue`)。`ts` は UNIX 秒として読むので、タスク5.1の `usage.sh mark` は `ts` を UNIX 秒で書く(ISO の形で書くと、印がすべて数えられない)。spec の有無を決める `spec_info` の `mark_of_issue` は、番号かブランチで決める古い形のままで、次に report.pl のこの部分を直すときに `mark_in_issue` にそろえる(タスク4.5)
 - テストの偽の GitHub の PR のコミットとコメントと検査の結果: test-report.sh の `mkdb` の `withc` で PR にコミットとコメントを足し、`runs` でコミットごとの検査の結果を置く。report.pl は Issue の PR ごとに `gh pr view` を呼ぶので、コミットの無い PR では検査の結果を読まない。`mkdb` の一重引用符の中に `$_` を書くと shellcheck が SC2016 を出すので、`map` を使わずに値を1つずつ書く(タスク4.6)
+- 読めなかった記録の見つけ方の絞り込み: `durations/` のファイルは Issue に結び付かないので、report.pl は、最後に書いた時刻が Issue の開始の時刻以後のファイルだけを、記録の無いセッションの見つけ方に使う。別に起こしたセッションの会話をブランチで結び付けるときは、出来事より後に始まり、Issue のブランチで動いた本体の会話に、1つずつ結び付ける(タスク4.7)
 
 ## 完了条件(全タスク共通)
 

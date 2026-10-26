@@ -619,6 +619,93 @@ run 2022
 check "Codex レビューのコメントが往復の回数にだけ入り、使用料に入らない" \
     "$RC:$(rj 'J([W("codex_rounds", "decided_method_stops"), M("model", "role")])')" '0:[[2,0],[["claude-opus-5-5","本体の会話"]]]'
 
+echo "== 数えられない行と、読めなかった記録"
+# 時刻は T0 からの秒数で書く。#2030 は、仕組みが main に入る前に受け持った spec ありの Issue である
+U3='J([R("uncountable"), W("owner_fix", "same_failure", "switch_to_spec"), R("partial_records")])'
+U5='J([R("uncountable"), W("spec_review_rounds", "owner_fix", "task_rejected", "same_failure", "switch_to_spec"), R("partial_records")])'
+UP='J([R("uncountable"), R("partial_records")])'
+NULL5='[["spec_review_rounds","owner_fix","task_rejected","same_failure","switch_to_spec"],[null,null,null,null,null],true]'
+LOCAL1=local_11111111-1111-1111-1111-111111111111
+# 別に起こしたセッションの出来事: rspawn <記録の鍵> <時刻>
+rspawn() { rec "$1" "{\"k\":\"spawn\",\"ts\":$((T0 + $2)),\"child\":\"$LOCAL1\"}"; }
+newrepo
+commit 2026-09-01T00:00:00Z '.kiro/specs/feat-u/spec.json={"feature_name":"feat-u","issue":2030}'
+commit 2026-10-01T00:00:00Z "$CFGPATH={}"
+newgh uncount
+mkdb 'prs => [ closes("'"$SHA"'", 2030 .. 2039) ]'
+newstate
+rv q0 0 2030; rm1 q0 10 true
+run 2030
+check "仕組みが main に入る前に受け持った Issue で、数えられない行が 数えられない になる" \
+    "$RC:$(rj "$U3")" '0:[["owner_fix","same_failure","switch_to_spec"],[null,null,null],false]'
+# #2031 から #2039 は、仕組みが main に入ったあとに受け持った Issue で、#2036 だけが spec 無しの Issue である
+newrepo
+commit 2026-09-01T00:00:00Z "$CFGPATH={}" \
+    '.kiro/specs/feat-v/spec.json={"feature_name":"feat-v","issue":2031,"additional_issues":[2032,2033,2034,2035,2037,2038,2039]}'
+newgh uncount2
+mkdb 'prs => [ closes("'"$SHA"'", 2030 .. 2039) ]'
+newstate
+mkdir -p "$STATE/durations"
+rv q1 0 2031; rtool q1 5 6 t1 shell "" other; rm1 q1 10 true
+run 2031
+r2031="$RC:$(rj "$U3")"
+newstate
+mkdir -p "$STATE/durations"
+rv q2 0 2032; rtool q2 5 6 t2 shell "" other; rdur q2 t2 5; rm1 q2 10 true
+run 2032
+check "道具を使ったのに durations に行が無い本体の会話があると、印から数える3行が 数えられない になり、すべての本体の会話に durations の行があり印が無いときは 0 になる" \
+    "$r2031/$RC:$(rj "$U3")" \
+    '0:[["owner_fix","same_failure","switch_to_spec"],[null,null,null],false]/0:[[],[{"design":0,"requirements":0,"tasks":0},0,0],false]'
+newstate
+rv q3 0 2033; rm1 q3 10 true
+printf '{"offset":1,"size":1,"skipped":1,"version":1}\n' >"$STATE/extract/q3.pos"
+run 2033
+check ".pos の飛ばした行の数が1以上の会話があると、design が挙げる5行が null になり、uncountable に出る" "$RC:$(rj "$U5")" "0:$NULL5"
+newstate
+mkdir -p "$STATE/durations"
+rv q4 0 2034; rtool q4 5 6 t4 agent "" other abc agent; rtool q4 7 8 t5 agent "" other def agent; rdur q4 t4 1; rm1 q4 10 true
+rsub q4.agent-def general-purpose null null null APPROVED
+run 2034
+check "補助役の起動があるのに補助役の記録が無い会話があると、design が挙げる5行が null になり、uncountable に出る" "$RC:$(rj "$U5")" "0:$NULL5"
+check "補助役の起動があるのに補助役の記録が無いとき、読めなかったことが記録される" "$RC:$(rj 'J(R("partial_records"))')" '0:true'
+newstate
+mkdir -p "$STATE/durations"
+rv q5 0 2035; rtool q5 7 8 t6 agent "" other def agent; rdur q5 t6 1; rm1 q5 10 true
+rsub q5.agent-def general-purpose null null null APPROVED
+printf '{"offset":1,"size":1,"skipped":0,"version":1}\n' >"$STATE/extract/q5.pos"
+run 2035
+check "補助役の記録がそろい、.pos の飛ばした行の数が 0 のとき、読めなかったことが記録されない" "$RC:$(rj "$UP")" '0:[[],false]'
+newstate
+mkdir -p "$STATE/durations"
+rv q6 0 2036; rm1 q6 10 true; rdur lost1 t9 1
+run 2036
+r2036="$RC:$(rj 'J([R("uncountable"), W("task_rejected", "same_failure"), R("partial_records")])')"
+newstate
+rv q6 0 2036; rm1 q6 10 true; rmk same-failure 5 lost2 null 2036
+run 2036
+check "durations にセッションの ID があり、extract にその記録が無いとき、読めなかったことが記録される" \
+    "$r2036/$RC:$(rj 'J(R("partial_records"))')" '0:[["task_rejected","same_failure"],[null,null],true]/0:true'
+newstate
+rv q7 0 2037; rm1 q7 10 true
+run 2037
+check "ターミナルで動かした会話だけで desktop.jsonl が無くても、読めなかったことが記録されない" "$RC:$(rj "$UP")" '0:[[],false]'
+newstate
+rv q8 0 2038; rspawn q8 5; rm1 q8 10 true
+run 2038
+check "別に起こしたセッションの出来事があり、desktop.jsonl が無く、ブランチでも結び付けられないとき、読めなかったことが記録される" \
+    "$RC:$(rj 'J(R("partial_records"))')" '0:true'
+newstate
+rv q9 0 2039; rspawn q9 5; rm1 q9 10 true
+rec q9b "{\"k\":\"branch\",\"ts\":$((T0 + 20)),\"name\":\"f2039\"}"; rm1 q9b 30 true
+run 2039
+r2039="$RC:$(rj "$UP")"
+newstate
+rv q8 0 2038; rspawn q8 5; rm1 q8 10 true; rm1 q8c 30 true
+printf '{"local":"%s","session":"q8c"}\n' "$LOCAL1" >"$STATE/extract/desktop.jsonl"
+run 2038
+check "別に起こしたセッションの会話がブランチか desktop.jsonl で結び付くとき、読めなかったことが記録されない" \
+    "$r2039/$RC:$(rj "$UP")" '0:[[],false]/0:[[],false]'
+
 echo "== 仕組みが main に入った時刻"
 newrepo
 commit 2026-10-01T00:00:00Z a.txt=1
