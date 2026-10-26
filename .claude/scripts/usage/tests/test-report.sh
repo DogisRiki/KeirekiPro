@@ -81,13 +81,14 @@ newgh() {
 }
 # 偽の GitHub の db.json を書く: mkdb <perl のハッシュの中身>。
 # pr(<番号>, <状態>, <本文>, <ブランチ>, <マージの時刻>, <マージのコミット>) は main に向けた PR である。
-# iss(<番号>, <親の番号>) は Issue である
+# iss(<番号>, <親の番号>) は Issue である。closes(<マージのコミット>, <番号>...) は、番号ごとの、Issue を閉じるマージ済みの PR である
 mkdb() {
     perl -MJSON::PP -e '
         sub pr { my ($n, $st, $body, $br, $at, $sha) = @_;
             return { number => $n, state => $st, body => $body, headRefName => $br, baseRefName => "main",
                 mergedAt => $at, mergeCommit => defined $sha ? { oid => $sha } : undef } }
         sub iss { my ($n, $parent) = @_; return { number => $n, parent => defined $parent ? { number => $parent } : undef } }
+        sub closes { my ($sha, @n) = @_; return map { pr($_, "MERGED", "Closes #$_\n", "f$_", "2026-10-30T00:00:00Z", $sha) } @n }
         my $db = { '"$1"' };
         open my $fh, ">", "$ENV{FAKE_GH_DIR}/db.json" or die $!;
         print $fh JSON::PP->new->canonical->encode($db);
@@ -299,6 +300,100 @@ printf '%s\n' '^issue view 601' >"$FAKE_GH_DIR/fail"
 run 601
 check "gh で親を読めないと、集計を作らずに 1 で終わる" "$RC" "1"
 rm -f "$FAKE_GH_DIR/fail"
+
+echo "== 作業時間"
+# 時刻は T0 からの秒数で書く。会話ごとに、受け持ちの出来事で Issue を決める
+T0=1790000000
+newrepo
+commit 2026-09-01T00:00:00Z "$CFGPATH={}"
+newgh time
+mkdb 'prs => [ closes("'"$SHA"'", 1001 .. 1011) ]'
+newstate
+mkdir -p "$STATE/durations"
+# 受け持ち: rv <記録の鍵> <時刻> <Issue>
+rv() { rec "$1" "{\"k\":\"recv\",\"ts\":$((T0 + $2)),\"how\":\"claim\",\"issue\":$3,\"branch\":null}"; }
+# 応答: rmsg <記録の鍵> <時刻> <応答の終わりなら true>
+rmsg() { rec "$1" "{\"k\":\"msg\",\"ts\":$((T0 + $2)),\"id\":\"$1-$2\",\"model\":\"claude-opus-5-5\",\"end\":$3}"; }
+# 次の行を始めた者: rturn <記録の鍵> <時刻> <from> [<知らせの元の仕事>]
+rturn() {
+    local job=null raw=''
+    [ $# -ge 4 ] && job="\"$4\""
+    [ "$3" = unknown ] && raw=',"raw":"x"'
+    rec "$1" "{\"k\":\"turn\",\"ts\":$((T0 + $2)),\"from\":\"$3\",\"job\":$job$raw}"
+}
+# 道具の呼び出しと結果: rtool <記録の鍵> <呼び出しの時刻> <結果の時刻> <識別子> <種類> <待ちの分類> <perm> [<仕事> <仕事の種類>]。
+# extract.pl と同じく、道具の行を結果の行の直前に書く
+rtool() {
+    local job=null jk=null
+    [ $# -ge 9 ] && job="\"$8\"" jk="\"$9\""
+    rec "$1" "{\"k\":\"tool\",\"ts\":$((T0 + $2)),\"id\":\"$4\",\"kind\":\"$5\",\"cat\":\"$6\",\"perm\":\"$7\",\"bg\":false}" \
+        "{\"k\":\"result\",\"ts\":$((T0 + $3)),\"id\":\"$4\",\"err\":false,\"job\":$job,\"job_kind\":$jk}"
+}
+rlim() { rec "$1" "{\"k\":\"limit\",\"ts\":$((T0 + $2)),\"resets_at\":null}"; }
+rretry() { rec "$1" "{\"k\":\"retry\",\"ts\":$((T0 + $2)),\"ms\":$3}"; }
+# 道具の実行時間: rdur <セッションの ID> <識別子> <ミリ秒>
+rdur() { printf '%s\t%s\n' "$2" "$3" >>"$STATE/durations/$1.tsv"; }
+# 「<終了コード>:」に続けて、全体の合計の作業時間、待ち時間、同時に動いた時間、上限で止まった回数、上限で止まった時間と、見分けられなかった再開の数を JSON の配列で出す
+tot() {
+    run "$1"
+    printf '%s:' "$RC"
+    rj 'J([R("totals", "work_sec"), R("totals", "wait_sec"), R("totals", "concurrent_sec"), R("totals", "limit_count"), R("totals", "limit_sec"), R("unknown_turns")])'
+}
+# #1001: 2つの会話が [150,200] で重なる
+rv a1 0 1001; rmsg a1 100 false; rmsg a1 200 true
+rv a2 150 1001; rmsg a2 250 false; rmsg a2 300 true
+check "2つの会話が重なった時間が作業時間に1回だけ入り、同時に動いた時間に入る" "$(tot 1001)" "0:[300,0,50,0,0,0]"
+# #1002: 所有者の返事の待ち(300秒)、ask の道具(200秒)、権限の確認(実行時間10秒を引いた50秒と、実行時間の記録が無い30秒)、
+# ほかのセッションの知らせ(1000秒)を除く
+rv b1 0 1002; rmsg b1 100 true; rturn b1 400 owner; rmsg b1 450 false
+rtool b1 450 650 tb1 ask "" other; rmsg b1 700 false
+rtool b1 700 760 tb2 shell "" user; rdur b1 tb2 10000
+rtool b1 760 790 tb3 shell "" user; rmsg b1 800 true
+rturn b1 1800 peer; rmsg b1 1850 true
+check "応答の終わりのあと owner の行までの時間と、ask の道具の時間と、perm が user の道具の確認の時間(実行時間を引いた残り)が作業時間に入らない" \
+    "$(tot 1002)" "0:[270,0,0,0,0,0]"
+# #1003: 見分けられなかった再開の前の60秒と20秒が待ち
+rv c1 0 1003; rmsg c1 100 true; rturn c1 160 unknown; rmsg c1 200 false; rmsg c1 210 true; rturn c1 230 unknown; rmsg c1 240 true
+check "turn.from が unknown の行までの時間が待ち時間に入り、unknown_turns に回数が出る" "$(tot 1003)" "0:[240,80,0,0,0,2]"
+# #1004: 上限の印から所有者の行までの1000秒
+rv d1 0 1004; rmsg d1 100 false; rlim d1 150; rturn d1 1150 owner; rmsg d1 1200 true
+check "上限の印のあとの時間が作業時間に入らず、上限で止まった回数と時間が全体の合計に別に出る" "$(tot 1004)" "0:[200,0,0,1,1000,0]"
+# #1005: 応答の終わりから、上限が戻ったあとの再開の知らせまでの2000秒
+rv e1 0 1005; rmsg e1 100 true; rturn e1 2100 limit; rmsg e1 2150 true
+check "msg.end が真の応答のあとに turn.from が limit の行が来た記録で、その間の時間が作業時間と待ち時間に入らず、上限で止まった回数と時間に入る" \
+    "$(tot 1005)" "0:[150,0,0,1,2000,0]"
+# #1006: 上限の印のすぐあとに再開の知らせ
+rv f1 0 1006; rmsg f1 100 false; rlim f1 120; rturn f1 3120 limit; rmsg f1 3200 true
+check "上限の印のすぐあとに turn.from が limit の行が来ると、上限で止まった回数が1回になる" "$(tot 1006)" "0:[200,0,0,1,3000,0]"
+# #1007: 裏で動かした補助役が上限の印で終わり、本体の会話は応答を終えたあとに再開の知らせを受ける
+rv g1 0 1007; rtool g1 50 60 tg1 agent "" other gb1 agent; rmsg g1 100 true; rturn g1 3500 limit; rmsg g1 3550 true
+rec g1.agent-gb1 '{"k":"meta","session":"g1","agent_id":"gb1"}'
+rmsg g1.agent-gb1 110 false; rmsg g1.agent-gb1 400 false; rlim g1.agent-gb1 500
+check "補助役の会話が上限の印で終わり、本体の会話に msg.end が真の応答と turn.from が limit の行があると、上限で止まった回数が1回になる" \
+    "$(tot 1007)" "0:[530,0,0,1,3400,0]"
+# #1008: 再開の知らせ、上限の印、再開の知らせの順
+rv h1 0 1008; rmsg h1 100 true; rturn h1 1100 limit; rlim h1 1101; rturn h1 2101 limit; rmsg h1 2150 true
+check "msg.end が真の応答、turn.from が limit の行、上限の印、turn.from が limit の行の順に並ぶと、上限で止まった回数が1回になる" \
+    "$(tot 1008)" "0:[149,0,0,1,2001,0]"
+# #1009: 本体の会話 [200,1200] と別に起こしたセッションの会話 [300,1400] が上限で止まる
+rv i1 0 1009; rec i1 "{\"k\":\"spawn\",\"ts\":$((T0 + 10)),\"child\":\"local_i\"}"
+rmsg i1 100 false; rlim i1 200; rturn i1 1200 owner; rmsg i1 1250 true
+rec desktop '{"local":"local_i","session":"i2"}'
+rmsg i2 20 false; rmsg i2 150 false; rlim i2 300; rturn i2 1400 owner; rmsg i2 1450 true
+check "本体の会話と別に起こしたセッションの会話が同じ時間に上限で止まると、回数が1回で、重なった時間を1回だけ数える" \
+    "$(tot 1009)" "0:[400,0,180,1,1200,0]"
+# #1010: 品質チェックの600秒、裏で動かした Bash の知らせを待った1000秒、API の再試行の30秒が待ち
+rv j1 0 1010; rmsg j1 50 false; rtool j1 50 650 tj1 shell "品質チェック" other; rmsg j1 700 false
+rtool j1 700 701 tj2 shell "" other jb1 other; rmsg j1 710 true; rturn j1 1710 notice jb1
+rretry j1 1720 30000; rmsg j1 1800 true
+check "品質チェックの分類に当たる道具の時間と、裏で動かした Bash の知らせを待った時間と、API の再試行の時間が待ち時間に入る" \
+    "$(tot 1010)" "0:[1800,1630,0,0,0,0]"
+# #1011: 本体の会話が同期の補助役を [50,1050] 待ち、補助役は品質チェックを600秒待つ。補助役の知らせの前の1000秒も本体に入らない
+rv k1 0 1011; rmsg k1 50 false; rtool k1 50 1050 tk1 agent "" other kb1 agent; rmsg k1 1100 true; rturn k1 2100 notice kb1; rmsg k1 2150 true
+rec k1.agent-kb1 '{"k":"meta","session":"k1","agent_id":"kb1"}'
+rmsg k1.agent-kb1 60 false; rtool k1.agent-kb1 100 700 tk2 shell "品質チェック" other; rmsg k1.agent-kb1 800 false; rmsg k1.agent-kb1 1000 true
+check "同期の補助役を待つ本体の時間が、本体にも同時に動いた時間にも入らず、補助役の側に入る。補助役が品質チェックを待った時間は待ち時間に入る" \
+    "$(tot 1011)" "0:[1090,600,0,0,0,0]"
 
 echo "== 仕組みが main に入った時刻"
 newrepo

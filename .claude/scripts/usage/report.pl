@@ -23,6 +23,7 @@ use File::Path ();
 use File::Temp ();
 use Time::Local ();
 use POSIX ();
+use Scalar::Util ();
 
 # 仕組みが main に入ったコミットを見分けるデータのファイルの、リポジトリの最上位からの場所
 use constant CONFIG_PATH => '.claude/scripts/usage/usage-config.json';
@@ -73,6 +74,8 @@ sub build {
         spec       => $ctx->{spec}{has} ? JSON::PP::true : JSON::PP::false,
         start_date => local_date($ctx->{start_ts}),
         end_date   => local_date($ctx->{end_ts}),
+        totals     => count_times($ctx),
+        unknown_turns => unknown_turns($ctx),
     };
     write_file("$o->{out}/report.json", $JSON->encode($report) . "\n");
     return 0;
@@ -214,6 +217,20 @@ sub load_records {
     $ctx->{rec} = \%rec;
     $ctx->{marks} = read_jsonl("$ctx->{state}/marks.jsonl");
     $ctx->{desktop} = read_jsonl("$dir/desktop.jsonl");
+    # 道具の呼び出しの識別子ごとの、道具の実行時間(ミリ秒)。同じ識別子が2行あれば後の行を使う
+    my %dur;
+    my $ddir = "$ctx->{state}/durations";
+    if (opendir(my $dh, $ddir)) {
+        for my $f (sort grep { /\.tsv\z/ } readdir $dh) {
+            open(my $fh, '<:raw', "$ddir/$f") or next;
+            while (my $l = <$fh>) {
+                $dur{$1} = $2 + 0 if $l =~ /\A([A-Za-z0-9_-]{1,128})\t([0-9]+(?:\.[0-9]+)?)\r?\n?\z/;
+            }
+            close $fh;
+        }
+        closedir $dh;
+    }
+    $ctx->{durations} = \%dur;
     return 1;
 }
 
@@ -243,7 +260,7 @@ sub assign_rows {
     relabel_splits($ctx);
     issue_model($ctx);
     link_spawned($ctx);
-    my (%irec, $count, $first, $first_branch);
+    my (%irec, %in, $count, $first, $first_branch);
     for my $key (sort keys %{ $ctx->{rec} }) {
         my ($branch, @rows, @meta);
         for my $r (@{ $ctx->{rec}{$key} }) {
@@ -258,6 +275,7 @@ sub assign_rows {
             my $i = issue_at($ctx, $key, $t, $branch, 0);
             next unless defined $i && $i == $n;
             push @rows, $r;
+            $in{ Scalar::Util::refaddr($r) } = 1;
             $first = $t if !defined $first || $t < $first;
             $first_branch = $t if defined $branch && $ctx->{branches}{$branch} && (!defined $first_branch || $t < $first_branch);
         }
@@ -266,6 +284,7 @@ sub assign_rows {
         $count += @rows;
     }
     $ctx->{irec} = \%irec;
+    $ctx->{in_n} = \%in;
     $ctx->{row_count} = $count // 0;
     # 開始の時刻は、受け持ちの出来事のうち最も早い時刻。受け持ちの出来事が無ければ、Issue のブランチで最初に動いた行の時刻
     $ctx->{start_ts} = $ctx->{starts}{$n} // $first_branch // $first;
@@ -545,6 +564,222 @@ sub mark_of_issue {
     my ($ctx, $m) = @_;
     return 1 if same_issue($m->{issue}, $ctx->{n});
     return defined $m->{branch} && !ref $m->{branch} && $ctx->{branches}{ $m->{branch} } ? 1 : 0;
+}
+
+# ---- 作業時間 --------------------------------------------------------------
+
+# Issue N の作業時間、待ち時間、同時に動いた時間、上限で止まった回数と時間(秒)を数える。
+# 会話ごとの動いていた区間を重ね、1つ以上の会話が動いていた時間を作業時間、2つ以上の会話が動いていた時間を
+# 同時に動いた時間、動いている会話がすべて待ちの区間にあった時間を待ち時間とする。
+# 上限で止まった区間は、すべての会話の区間を重ね、重なる区間と接する区間を1つにまとめて数える
+sub count_times {
+    my ($ctx) = @_;
+    my (@ev, @limits);
+    for my $key (sort keys %{ $ctx->{irec} }) {
+        my @all = timed_rows($ctx->{rec}{$key});
+        # 知らせの元の仕事の種類。道具の結果の行の job と job_kind で決める
+        my %jobs = map { ($_->{job}, $_->{job_kind} // '') }
+            grep { ($_->{k} // '') eq 'result' && defined $_->{job} && !ref $_->{job} } @all;
+        # Issue N に決めた行が続く間ごとに区間を作る。間にほかの Issue の行があれば、そこで切る
+        my @run;
+        for my $r (@all, undef) {
+            if (defined $r && $ctx->{in_n}{ Scalar::Util::refaddr($r) }) {
+                push @run, $r;
+                next;
+            }
+            if (@run) {
+                my ($spans, $lim) = run_spans($ctx, \@run, \%jobs);
+                push @ev, map { [ $_->[0], 1, $_->[2] ], [ $_->[1], -1, $_->[2] ] } @$spans;
+                push @limits, @$lim;
+            }
+            @run = ();
+        }
+    }
+    my %tot = (work_sec => 0, wait_sec => 0, concurrent_sec => 0, limit_count => 0, limit_sec => 0);
+    # 同じ時刻の出入りをすべて済ませてから、次の時刻までの長さを足す
+    my ($active, $waiting, $prev) = (0, 0);
+    for my $e (sort { $a->[0] <=> $b->[0] } @ev) {
+        my ($t, $d, $label) = @$e;
+        if (defined $prev && $t > $prev) {
+            my $len = $t - $prev;
+            $tot{work_sec} += $len if $active >= 1;
+            $tot{concurrent_sec} += $len if $active >= 2;
+            $tot{wait_sec} += $len if $active >= 1 && $waiting == $active;
+        }
+        $active += $d;
+        $waiting += $d if $label eq 'wait';
+        $prev = $t;
+    }
+    my $cur;
+    for my $s (sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @limits) {
+        if ($cur && $s->[0] <= $cur->[1]) {
+            $cur->[1] = $s->[1] if $s->[1] > $cur->[1];
+            next;
+        }
+        push_limit(\%tot, $cur) if $cur;
+        $cur = [@$s];
+    }
+    push_limit(\%tot, $cur) if $cur;
+    $tot{$_} = int($tot{$_} + 0.5) for keys %tot;
+    return \%tot;
+}
+
+sub push_limit {
+    my ($tot, $s) = @_;
+    $tot->{limit_count}++;
+    $tot->{limit_sec} += $s->[1] - $s->[0];
+    return 1;
+}
+
+# Issue N の、turn の from が unknown の行の数
+sub unknown_turns {
+    my ($ctx) = @_;
+    return scalar grep { ($_->{k} // '') eq 'turn' && ($_->{from} // '') eq 'unknown' } map { @$_ } values %{ $ctx->{irec} };
+}
+
+# 時刻のある行を、時刻の順に並べる。同じ時刻の行は、記録の順のままにする
+sub timed_rows {
+    my ($rows) = @_;
+    my $i = 0;
+    my @t = map { my $t = row_ts($_); defined $t ? [ $t, $i++, $_ ] : () } @$rows;
+    return map { $_->[2] } sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @t;
+}
+
+# 1つの会話の、Issue N に決めた行が続く間の行から、動いていた区間と、上限で止まった区間を作る。
+# 動いていた区間は [始まり, 終わり, think か wait] の配列で、上限で止まった区間は [始まり, 終わり] の配列である。
+# 隣り合う時点の間を、「処理の流れ」の図のとおりに、考える(think)、待ち(wait)、除く(skip)に分ける。
+# 上限で止まった区間の中の時間は、除く
+sub run_spans {
+    my ($ctx, $rows, $jobs) = @_;
+    my @t = map { row_ts($_) } @$rows;
+    my $limits = limit_spans($rows, \@t);
+    my %res;
+    for my $i (0 .. $#$rows) {
+        my $r = $rows->[$i];
+        $res{ $r->{id} } = $t[$i] if ($r->{k} // '') eq 'result' && defined $r->{id} && !ref $r->{id};
+    }
+    # 応答の終わりのあとの区間を、次の行を始めた者で分けるために、行ごとに、あとで最初に来る turn か msg か tool の行を求める
+    my @ender;
+    my $next;
+    for (my $i = $#$rows; $i >= 0; $i--) {
+        $ender[$i] = $next;
+        my $k = $rows->[$i]{k} // '';
+        $next = $rows->[$i] if $k eq 'turn' || $k eq 'msg' || $k eq 'tool';
+    }
+    my (@spans, %open, $idle, $retry_until);
+    for my $i (0 .. $#$rows - 1) {
+        my $r = $rows->[$i];
+        my $k = $r->{k} // '';
+        if ($k eq 'msg') {
+            $idle = $r->{end} ? 1 : 0;
+            undef $retry_until;
+        } elsif ($k eq 'turn') {
+            $idle = 0;
+            undef $retry_until;
+        } elsif ($k eq 'tool' && defined $r->{id} && !ref $r->{id}) {
+            $idle = 0;
+            my $end = $res{ $r->{id} } // FAR;
+            my $dur = $ctx->{durations}{ $r->{id} };
+            # 権限の確認の分は、呼び出しから結果までの時間から、道具の実行時間を引いた残りで、呼び出しの直後に置く。
+            # 実行時間の記録が無ければ、呼び出しから結果までの全部とする
+            my $perm_end = ($r->{perm} // '') ne 'user' ? $t[$i] : defined $dur ? $end - $dur / 1000 : $end;
+            $perm_end = $t[$i] if $perm_end < $t[$i];
+            $open{ $r->{id} } = { %$r, perm_end => $perm_end };
+        } elsif ($k eq 'result' && defined $r->{id} && !ref $r->{id}) {
+            delete $open{ $r->{id} };
+        } elsif ($k eq 'retry' && defined $r->{ms} && !ref $r->{ms} && $r->{ms} =~ /\A[0-9]+(?:\.[0-9]+)?\z/) {
+            $retry_until = $t[$i] + $r->{ms} / 1000;
+        }
+        my ($from, $to) = ($t[$i], $t[ $i + 1 ]);
+        next unless $to > $from;
+        # 区間の中で分け方が変わる時刻: 権限の確認の終わり、再試行の終わり、上限で止まった区間の端
+        my %cut = ($from => 1, $to => 1);
+        $cut{$_} = 1 for grep { $_ > $from && $_ < $to }
+            (map { $_->{perm_end} } values %open), (defined $retry_until ? $retry_until : ()), map { @$_ } @$limits;
+        my @c = sort { $a <=> $b } keys %cut;
+        for my $j (0 .. $#c - 1) {
+            my ($p, $q) = ($c[$j], $c[ $j + 1 ]);
+            my $m = ($p + $q) / 2;
+            next if grep { $_->[0] <= $m && $m < $_->[1] } @$limits;
+            my $label = $idle ? idle_label($ender[$i], $jobs)
+                : %open ? call_label(\%open, $m)
+                : defined $retry_until && $m < $retry_until ? 'wait' : 'think';
+            next if $label eq 'skip';
+            if (@spans && $spans[-1][1] == $p && $spans[-1][2] eq $label) {
+                $spans[-1][1] = $q;
+            } else {
+                push @spans, [ $p, $q, $label ];
+            }
+        }
+    }
+    return (\@spans, $limits);
+}
+
+# 応答の終わりのあとの区間の分け方。次の行を始めた者が、所有者、ほかのセッションの知らせ、補助役の知らせ、
+# 上限が戻ったあとの再開の知らせなら除き、それ以外なら待ちにする。あとに行が無ければ除く
+sub idle_label {
+    my ($r, $jobs) = @_;
+    return 'skip' unless $r;
+    return 'wait' unless ($r->{k} // '') eq 'turn';
+    my $from = $r->{from} // '';
+    return 'skip' if $from eq 'owner' || $from eq 'peer' || $from eq 'limit';
+    return 'skip' if $from eq 'notice' && defined $r->{job} && !ref $r->{job} && ($jobs->{ $r->{job} } // '') eq 'agent';
+    return 'wait';
+}
+
+# 道具の呼び出しの途中の分け方。所有者に尋ねる道具、同期の補助役、権限の確認の分は除く。
+# 同時に呼んだ道具のうち、1つでも考える道具があれば考える、待ちの分類に当たる道具だけなら待ちにする
+sub call_label {
+    my ($open, $m) = @_;
+    my ($think, $wait);
+    for my $c (values %$open) {
+        my $kind = $c->{kind} // '';
+        next if $kind eq 'ask' || $kind eq 'agent' || $m < $c->{perm_end};
+        if (defined $c->{cat} && !ref $c->{cat} && length $c->{cat}) {
+            $wait = 1;
+        } else {
+            $think = 1;
+        }
+    }
+    return $think ? 'think' : $wait ? 'wait' : 'skip';
+}
+
+# 1つの会話の上限で止まった区間を、「処理の流れ」の3つの決まりで作る
+# - 上限の印の区間は、印の時刻から次の行の時刻まで。印のあとに行が無ければ作らない。
+#   印の直前の行が turn の from が limit の行なら、区間の始まりをその行の時刻にする
+# - turn の from が limit の行の区間は、その行の直前の時点から、その行の時刻まで
+sub limit_spans {
+    my ($rows, $t) = @_;
+    my @s;
+    for my $i (0 .. $#$rows) {
+        my $k = $rows->[$i]{k} // '';
+        if ($k eq 'limit') {
+            my $j = $i + 1;
+            $j++ while $j <= $#$rows && $t->[$j] <= $t->[$i];
+            next if $j > $#$rows;
+            my $p = prev_point($t, $i);
+            my $start = defined $p && is_limit_turn($rows->[$p]) ? $t->[$p] : $t->[$i];
+            push @s, [ $start, $t->[$j] ];
+        } elsif (is_limit_turn($rows->[$i])) {
+            my $p = prev_point($t, $i);
+            push @s, [ $t->[$p], $t->[$i] ] if defined $p;
+        }
+    }
+    return \@s;
+}
+
+# $i の行より前で、時刻が $i の行より早い行のうち、最も後の行の番号。無ければ undef
+sub prev_point {
+    my ($t, $i) = @_;
+    for (my $p = $i - 1; $p >= 0; $p--) {
+        return $p if $t->[$p] < $t->[$i];
+    }
+    return undef;
+}
+
+sub is_limit_turn {
+    my ($r) = @_;
+    return ($r->{k} // '') eq 'turn' && ($r->{from} // '') eq 'limit' ? 1 : 0;
 }
 
 # ---- 時刻と日付 ------------------------------------------------------------
