@@ -23,6 +23,14 @@ export PATH
 
 # git が返すパス(Windows では C:/...)と同じ形で作る
 WORK=$(cd "$TMP_ROOT" && { pwd -W 2>/dev/null || pwd; })
+SCRIPTS="$(cd "$HERE/.." && pwd)"
+
+# draft が呼ぶ extract.pl が本物の会話の記録を読まないように、会話の記録の置き場所の候補
+# (HOME と、Windows の USERPROFILE と LOCALAPPDATA)を一時フォルダに替える
+HOME="$WORK/home"
+USERPROFILE="$HOME"
+LOCALAPPDATA="$WORK/nolocal"
+export HOME USERPROFILE LOCALAPPDATA
 
 # 仕組みが main に入った時刻(データのファイルを足したコミットの時刻)。協定世界時では 2026-10-24T03:00:00Z である
 SYS="2026-10-24T12:00:00+09:00"
@@ -63,7 +71,7 @@ newgh() {
 # 偽の GitHub の db.json を書く: mkdb <perl のハッシュの中身>。
 # cl(<番号>, <閉じた時刻>) は閉じた Issue、op(<番号>) は開いた Issue である。どちらも、<欄> => <値> を続けて欄を替えられる。
 # list(<コメント>...) は一覧の Issue(番号 1)、cm(<id>, <本文>) はコメント、idx(<ID>...) は案の索引のコメントの本文、
-# props(<番号>, <行>...) は直す案を持つ集計のコメントの本文である。
+# props(<番号>, <行>...) は直す案を持つ集計のコメントの本文、rep(<番号>) は数字の行を1つ持つ集計のコメントの本文である。
 # pr(<番号>, <state>, <本文>, <mergedAt>, <mergeCommit の oid>) は main に向けた PR である
 mkdb() {
     perl -MJSON::PP -e '
@@ -77,6 +85,9 @@ mkdb() {
         sub cm { my ($id, $body) = @_; return { id => $id, body => $body, author_association => "OWNER", created_at => "2026-10-26T00:00:00Z" } }
         sub idx { return "<!-- keirekipro-usage-proposals:v1 page=1 " . JSON::PP->new->canonical->encode([ map { { id => $_, issue => (split /-/)[0] + 0 } } @_ ]) . " -->\n説明\n" }
         sub props { my ($n, @l) = @_; return "<!-- keirekipro-usage-report:v1 issue=$n -->\n\n## AIの作業の集計\n\n### 所見\n\n- 箇条\n\n### 直す案\n\n" . join("", map { "$_\n" } @l) }
+        sub rep { my ($n) = @_; return "<!-- keirekipro-usage-report:v1 issue=$n -->\n\n## AIの作業の集計\n\n本文\n<!-- keirekipro-usage-data:v1 "
+            . q({"v":1,"issue":) . $n . q(,"prs":[305],"spec":false,"end_date":"2026-10-25","totals":{"work_sec":600,"wait_sec":0,"tokens":12,"usd":0.5,"usd_unknown_models":[]},"rework":{"impl_spec_back":{"requirements":0,"design":0,"tasks":0}}})
+            . " -->\n" }
         sub pr { my ($n, $st, $body, $at, $mc) = @_; return { number => $n, state => $st, baseRefName => "main", headRefName => "feat/pr$n",
             body => $body, mergedAt => $at, mergeCommit => defined $mc ? { oid => $mc } : undef } }
         my $db = { '"$1"' };
@@ -114,6 +125,27 @@ draftrepo() {
     gitq remote add origin "$REPO"
     gitq checkout -q -b feat/usage-test
 }
+# 作業フォルダ $REPO で、Issue 203 のブランチ feat/pr305 で動いた会話の記録を置く: mktrans <会話の ID> <assistant の行の数>
+# 2026-10-24T10:00Z(仕組みが入ったあとで、PR 305 のマージより前)に、所有者の行と assistant の行を続け、
+# 最後に、見分けられない再開の値 mystery-x の user の行と、assistant の行を1つ置く。assistant の行は、1行で 3 トークンを使う
+mktrans() {
+    perl -MJSON::PP -e '
+        my ($file, $cwd, $sid, $n) = @ARGV;
+        my $j = JSON::PP->new->utf8->canonical;
+        my $k = 0;
+        my $ts = sub { my $s = $k++; return sprintf("2026-10-24T10:%02d:%02d.000Z", int($s / 60), $s % 60) };
+        my %c = (cwd => $cwd, sessionId => $sid, gitBranch => "feat/pr305");
+        my $user = sub { return { %c, type => "user", turnOrigin => $_[0], timestamp => $ts->(), message => { role => "user", content => "hi" } } };
+        my $ai = sub { return { %c, type => "assistant", timestamp => $ts->(),
+            message => { id => "m$_[0]", model => "claude-opus-5-5", content => [], usage => { input_tokens => 1, output_tokens => 2 } } } };
+        open my $f, ">", $file or die "$file: $!";
+        print $f $j->encode($_), "\n" for $user->("human"), (map { $ai->($_) } 1 .. $n), $user->("mystery-x"), $ai->($n + 1);
+        close $f or die $!;
+    ' "$(mkdir -p "$HOME/.claude/projects/p-$1" && printf '%s' "$HOME/.claude/projects/p-$1")/$1.jsonl" "$REPO" "$1" "$2" ||
+        ng "会話の記録を用意できない"
+}
+# 下書きの report.json の totals の tokens
+drafttokens() { perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; print JSON::PP->new->decode(<$f>)->{totals}{tokens} // "null"' "$STATE/drafts/203/report.json" 2>/dev/null || printf none; }
 # git の呼び出しを $TMP_ROOT/git-calls.log に書いてから本物の git を動かす偽の git を、$TMP_ROOT/gitlog-bin に置く
 REALGIT=$(command -v git)
 mkdir -p "$TMP_ROOT/gitlog-bin"
@@ -278,6 +310,7 @@ check "記録の置き場所のパスに空白があっても、pending が、�
 echo "== 集計の対象か"
 draftrepo dr
 newgh dr
+mktrans dr-a 1
 # 201: Refs: の PR の mergeCommit がデータのファイルを足したコミット(SYSC)で、閉じる PR はそのあとにマージされた Issue
 # 202: 閉じる PR が SYSC より前にマージされた Issue
 # 203: 閉じる PR が2つあり、遅くマージされたほうが SYSC よりあとにマージされた Issue。Closes #2031 の PR は 203 の PR でない
@@ -299,9 +332,9 @@ drdb() {
 drdb "2026-10-25T06:00:00Z"
 for n in 201 206 207; do recv "$n"; done
 run draft 202 --session S1
-check "閉じる PR がデータのファイルを足したコミットより前にマージされた Issue に、draft が before-system の印を書いて 2 で終わり、PR と Issue を report.pl と同じ gh のコマンドで読む" \
+check "閉じる PR がデータのファイルを足したコミットより前にマージされた Issue に、draft が before-system の印を書いて 2 で終わり、集計のコメントを探してから、PR と Issue を report.pl と同じ gh のコマンドで読む" \
     "$RC/$(statejson issues/202.json)/$(calls)" \
-    '2/{"closed_at":"2026-10-25T02:00:00Z","skip":"before-system"}/pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit|issue view 202 --json state,closedAt|'
+    '2/{"closed_at":"2026-10-25T02:00:00Z","skip":"before-system"}/api --paginate repos/{owner}/{repo}/issues/202/comments|pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit|issue view 202 --json state,closedAt|'
 run draft 203
 check "閉じる PR がデータのファイルを足したコミットより後にマージされた Issue には、draft が集計しない印を書かない" \
     "$RC/$(statejson issues/203.json)" "0/none"
@@ -379,6 +412,88 @@ mkdb "issues => [ cl(202, '2026-10-25T02:00:00Z') ]"
 run draft 202
 check "origin/main にデータのファイルを足したコミットが無いとき、draft が issues/<N>.json に書かず、偽の gh を呼ばずに 2 で終わる" \
     "$RC/$(statejson issues/202.json)/$(calls)" "2/none/"
+
+echo "== 集計の下書き"
+# Issue 203 と、それを閉じる、仕組みが入ったあとにマージされた PR 305 だけの偽の GitHub
+dwdb() { mkdb "issues => [ cl(203, '2026-10-25T03:00:00Z'${1-}) ], prs => [ pr(305, 'MERGED', 'Closes #203', '2026-10-24T15:00:00Z', '$POST') ]"; }
+draftrepo dw
+newgh dw
+dwdb
+mktrans dw-a 3
+run draft 203
+r1=$RC
+c1=$(cat "$STATE/drafts/203/created_at" 2>/dev/null)
+sleep 1
+run draft 203
+c2=$(cat "$STATE/drafts/203/created_at" 2>/dev/null)
+check "draft を2回呼ぶと、drafts/<N>/ の created_at が2回目の時刻になる" \
+    "$r1/$RC/$(perl -e 'my ($a1, $a2) = @ARGV; print $a2 =~ /\A[0-9]+\z/ && $a2 > $a1 && abs(time - $a2) <= 5 ? "later" : "c1=$a1 c2=$a2"' "${c1:-0}" "${c2:-x}")/$(ls "$STATE/drafts")" \
+    "0/0/later/203"
+check "draft が、下書きの場所を出し、会話の記録を抜き出して集計を作る" \
+    "$(printf '%s' "$OUT" | perl -MJSON::PP -e 'local $/; print JSON::PP->new->decode(<STDIN>)->{draft}')/$(drafttokens)" "$STATE/drafts/203/12"
+check "unknown.json があるとき、draft が値と回数を標準出力に出す" \
+    "$(printf '%s' "$OUT" | perl -MJSON::PP -e 'local $/; print JSON::PP->new->canonical->encode(JSON::PP->new->decode(<STDIN>)->{unknown})')/$(cat "$STATE/drafts/203/unknown.json")" \
+    '{"mystery-x":1}/{"mystery-x":1}'
+printf '%s\n' '[{"issue":150,"url":"https://github.com/owner/repo/issues/150#issuecomment-5150","spec":false,"end_date":"2026-10-01","work_sec":600,"tokens":24,"usd":1,"usd_partial":false,"impl_spec_back":0}]' >"$TMP_ROOT/rows.json"
+(cd "$REPO" && perl "$SCRIPTS/github.pl" list-add "$TMP_ROOT/rows.json") || ng "一覧に過去の行を足せない"
+run draft 203
+check "draft が、一覧の過去の行と比べた compare.json の要約を出す" \
+    "$RC/$(printf '%s' "$OUT" | perl -MJSON::PP -e 'local $/; my $c = JSON::PP->new->decode(<STDIN>)->{compare}; my $t = $c->{values}[1];
+        print join("/", $c->{past_rows}, scalar @{ $c->{values} }, map { $t->{$_} // "null" } qw(value_text median_text ratio rows))')" \
+    "0/1/4/12/24/0.5/1"
+check "draft が、作業のブランチの名前と会話の文を下書きの要約に出さない" "$(printf '%s' "$OUT" | grep -cE 'feat/pr305|"hi"' | tr -d ' ')" "0"
+
+draftrepo dw-rep
+newgh dw-rep
+dwdb ", comments => [ cm(4001, rep(203)) ]"
+run draft 203
+check "集計のコメントがあって一覧に行が無い Issue で、draft が一覧に行を足して 2 で終わる" \
+    "$RC/$(perl -MJSON::PP -e 'open my $f, "<", "$ENV{FAKE_GH_DIR}/db.json" or exit 1; local $/; my $db = JSON::PP->new->decode(<$f>);
+        my @l = grep { $_->{number} != 203 } @{ $db->{issues} };
+        print scalar(@l), "/", scalar(() = $l[0]{body} =~ m{^\| \[#203\]\(https://github\.com/owner/repo/issues/203#issuecomment-4001\) \|}mg)')" "2/1/1"
+check "出し済みの Issue で、draft が issues/<N>.json に出した時刻と集計のコメントの URL を書き、PR を読まず、下書きを作らない" \
+    "$(perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; my $d = JSON::PP->new->decode(<$f>);
+        print join(",", sort keys %$d), "/", $d->{report_url}, "/", $d->{reported_at} =~ /\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\z/ ? "time" : "bad"' "$STATE/issues/203.json")/$(calls | grep -c 'pr list' | tr -d ' ')/$([ -e "$STATE/drafts/203" ] && printf made || printf none)" \
+    "report_url,reported_at/https://github.com/owner/repo/issues/203#issuecomment-4001/time/0/none"
+run draft 203
+check "出し済みの Issue で draft を呼び直すと、一覧の行を重ねず、出した時刻を書き直さずに 2 で終わる" \
+    "$RC/$(perl -MJSON::PP -e 'open my $f, "<", "$ENV{FAKE_GH_DIR}/db.json" or exit 1; local $/; my $db = JSON::PP->new->decode(<$f>);
+        my @l = grep { $_->{number} != 203 } @{ $db->{issues} }; print scalar(() = $l[0]{body} =~ m{^\| \[#203\]}mg)')" "2/1"
+
+draftrepo dw-conc
+newgh dw-conc
+dwdb
+mktrans dw-conc-a 60
+# 1行読むたびに少し待つ extract.pl を裏で動かし、記録の鍵の錠を持って読んでいる間に draft を呼ぶ
+mkdir -p "$STATE"
+perl -e 'BEGIN { no warnings "once"; *CORE::GLOBAL::readline = sub { select(undef, undef, undef, 0.1); CORE::readline($_[0]) } }
+    $0 = shift; do $0; die $@ if $@; exit 1' "$SCRIPTS/extract.pl" --state "$STATE" --all --skip-locked --repo "$REPO" &
+slow=$!
+i=0
+while [ ! -d "$STATE/locks/extract-dw-conc-a" ] && [ "$i" -lt 100 ]; do
+    sleep 0.1
+    i=$((i + 1))
+done
+held=$([ -d "$STATE/locks/extract-dw-conc-a" ] && printf held || printf free)
+run draft 203
+during="$RC/$(drafttokens)"
+wait "$slow"
+run draft 203
+check "裏の extract.pl --all --skip-locked が記録を読んでいる間に draft を呼んでも、集計の数が、裏の読み込みが終わってから呼んだときと同じになる" \
+    "$held/$during/$RC/$(drafttokens)" "held/0/183/0/183"
+
+draftrepo dw-xfail
+newgh dw-xfail
+dwdb
+mktrans dw-xfail-a 1
+# 記録の鍵の錠を持ったままにし、テストのための上書きで錠を待つ上限を1秒にする
+mkdir -p "$STATE/locks/extract-dw-xfail-a"
+KP_USAGE_TEST_LOCK_WAIT=1
+export KP_USAGE_TEST_LOCK_WAIT
+run draft 203
+unset KP_USAGE_TEST_LOCK_WAIT
+check "extract.pl が 1 で終わると、draft が report.pl を呼ばずに、下書きを作らずに 1 で終わる" \
+    "$RC/$(errline)/$([ -e "$STATE/drafts/203" ] && printf made || printf none)/$(calls | grep -c 'pr list' | tr -d ' ')" "1/one/none/1"
 
 echo "== 案と所有者"
 newrepo prop config

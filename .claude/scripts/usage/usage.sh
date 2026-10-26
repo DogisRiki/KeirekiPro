@@ -10,7 +10,9 @@
 #     {"issues":[<番号>, ...]} の1行で出す
 #   draft <N>
 #     Issue N の錠の中で、Issue N が集計の対象かを確かめる。対象でなければ、集計しない印を
-#     issues/<N>.json に書いて(書かないこともある)2 で終わる
+#     issues/<N>.json に書いて(書かないこともある)2 で終わる。出し済みなら、一覧の行と案の索引を足し直して 2 で終わる。
+#     対象なら、会話の記録を抜き出し、集計の下書きを drafts/<N>/ に作り、下書きの場所と比べの要約と見分けられなかった
+#     再開の回数を {"draft":<場所>,"compare":{...},"unknown":{...}} の1行で出す。この PC に記録が無ければ 2 で終わる
 #   proposals
 #     まだ答えていない案を、github.pl proposals-open の JSON の1行で出す
 #   proposal <案の ID> filed|declined
@@ -104,11 +106,12 @@ checked() {
     fail "${what}(${why:-理由の出力なし})。"
 }
 
-# issues/<N>.json に集計しない印を書く: write_skip <N> <印> <closedAt か ->
+# issues/<N>.json の欄を書く: edit_issue <N> skip <印> <closedAt か -> | edit_issue <N> reported <集計のコメントの URL>
+# skip は集計しない印を書く。reported は、まだ出し済みと書かれていなければ、出した時刻と URL を書いて出し済みにする。
 # ほかの欄は残す。ファイルがあるのに JSON のオブジェクトとして読めないときは、ほかの欄を失わないように書かない
-write_skip() {
-    perl -MJSON::PP -e '
-        my ($f, $skip, $at) = @ARGV;
+edit_issue() {
+    perl -MJSON::PP -MPOSIX -e '
+        my ($f, $mode, @v) = @ARGV;
         my $J = JSON::PP->new->utf8->canonical;
         my $d = {};
         if (-e $f) {
@@ -119,8 +122,14 @@ write_skip() {
             exit 1 unless ref $x eq "HASH";
             $d = $x;
         }
-        $d->{skip} = $skip;
-        $d->{closed_at} = $at eq "-" ? undef : $at;
+        if ($mode eq "skip") {
+            $d->{skip} = $v[0];
+            $d->{closed_at} = $v[1] eq "-" ? undef : $v[1];
+        } else {
+            exit 0 if defined $d->{reported_at};
+            $d->{reported_at} = POSIX::strftime("%Y-%m-%dT%H:%M:%SZ", gmtime);
+            $d->{report_url} = $v[0];
+        }
         my $tmp = "$f.tmp.$$";
         open(my $o, ">:raw", $tmp) or exit 1;
         my $ok = print $o $J->encode($d), "\n";
@@ -128,7 +137,7 @@ write_skip() {
         exit 0 if $ok && rename($tmp, $f);
         unlink $tmp;
         exit 1;
-    ' "$STATE/issues/$1.json" "$2" "$3" || fail "$STATE/issues/$1.json に集計しない印を書けなかった。"
+    ' "$STATE/issues/$1.json" "${@:2}" || fail "$STATE/issues/$1.json に書けなかった。"
 }
 
 cmd_mark() {
@@ -261,7 +270,7 @@ cmd_draft() {
     [ $# -eq 1 ] || fail "draft には Issue の番号を1つだけ渡す。"
     printf '%s' "$1" | grep -Eq '^[1-9][0-9]{0,9}$' && [ "$(printf '%s' "$1" | wc -l | tr -d ' ')" = 0 ] ||
         fail "draft の Issue の番号を、0で始まらない10桁までの数にする。"
-    local n=$1 sysc decision kind mc at rc why
+    local n=$1 sysc url decision kind mc at rc why
     ensure_state
     lock_issue "$n"
 
@@ -271,11 +280,30 @@ cmd_draft() {
         fail "origin/main の履歴を読めなかった。"
     [ -n "$sysc" ] || exit 2
 
-    # 2〜3. PR と Issue を、report.pl の collect_prs と同じ gh のコマンドで読む
     # 一時ファイルの名前は、終わるときの trap から見えるように関数の外の変数に置く
     prs="$STATE/.draft-prs.$$"
     issue="$STATE/.draft-issue.$$"
-    trap 'rm -f "$prs" "$issue"; rmdir "$ISSUE_LOCK" 2>/dev/null' EXIT
+    list="$STATE/.draft-list.$$"
+    trap 'rm -f "$prs" "$issue" "$list"; rmdir "$ISSUE_LOCK" 2>/dev/null' EXIT
+
+    # 出し済みなら、出し済みと書き、一覧の行と案の索引を足し直して終わる。ほかの PC で出した Issue もここで見つかる
+    rc=0
+    url=$(github reported "$n" 2>"$STATE/.err.$$") || rc=$?
+    case "$rc" in
+    0)
+        rm -f "$STATE/.err.$$"
+        already_reported "$n" "$url"
+        exit 2
+        ;;
+    3) rm -f "$STATE/.err.$$" ;;
+    *)
+        why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
+        rm -f "$STATE/.err.$$"
+        fail "Issue $n に集計のコメントがあるかを確かめられなかった(${why:-理由の出力なし})。"
+        ;;
+    esac
+
+    # 2〜3. PR と Issue を、report.pl の collect_prs と同じ gh のコマンドで読む
     checked "gh で PR の一覧を読めなかった" \
         gh pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit >"$prs"
     checked "gh で Issue $n を読めなかった" gh issue view "$n" --json state,closedAt >"$issue"
@@ -329,7 +357,7 @@ $decision
 EOF
     case "$kind" in
     system-pr | no-merged-pr)
-        write_skip "$n" "$kind" "$at"
+        edit_issue "$n" skip "$kind" "$at"
         exit 2
         ;;
     open) exit 2 ;;
@@ -342,12 +370,73 @@ EOF
     git -C "$TOP" merge-base --is-ancestor "$mc" "$sysc" 2>/dev/null || rc=$?
     case "$rc" in
     0)
-        write_skip "$n" before-system "$at"
+        edit_issue "$n" skip before-system "$at"
         exit 2
         ;;
-    1) return 0 ;;
+    1) ;;
     *) fail "Issue $n の閉じる PR のコミット $mc が手元に無く、仕組みが入る前の PR かを確かめられなかった。" ;;
     esac
+
+    # 5. この PC の会話の記録の続きを抜き出す。ほかの呼び出しが読んでいる記録は、読み終わるのを待ってから続きを読む。
+    # 消した worktree の会話も読むように、--repo には worktree でなく本体の作業フォルダ(共通ディレクトリの親)を渡す。
+    # 途中までしか抜き出していない記録で集計を作らないように、抜き出しに失敗したら集計を作らない
+    checked "会話の記録を抜き出せなかった" \
+        perl "$HERE/extract.pl" --state "$STATE" --all --wait --repo "$(dirname "$COMMON")"
+
+    # 6. 一覧の過去の行を読み、集計を作って drafts/<N>/ に書く。report.pl は、記録が無ければ 2 で終わる
+    checked "gh で一覧の行を読めなかった" github list-read >"$list"
+    rc=0
+    (cd "$TOP" && perl "$HERE/report.pl" --state "$STATE" --config "$HERE/usage-config.json" --issue "$n" \
+        --out "$STATE/drafts/$n" --list "$list") 2>"$STATE/.err.$$" || rc=$?
+    why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
+    rm -f "$STATE/.err.$$"
+    case "$rc" in
+    0) ;;
+    2) exit 2 ;;
+    *) fail "Issue $n の集計を作れなかった(${why:-理由の出力なし})。" ;;
+    esac
+
+    # 7. 下書きの場所と、過去の行との比べの要約と、見分けられなかった再開の値ごとの回数を1行の JSON で出す
+    perl -MJSON::PP -e '
+        my ($dir) = @ARGV;
+        my $J = JSON::PP->new->utf8->canonical;
+        my $load = sub {
+            open(my $in, "<:raw", "$dir/$_[0]") or die "下書きの $_[0] を読めなかった\n";
+            local $/;
+            my $x = eval { $J->decode(<$in> // "") };
+            die "下書きの $_[0] を JSON として読めなかった\n" unless ref $x eq "HASH";
+            return $x;
+        };
+        my ($cmp, $unk) = ($load->("compare.json"), $load->("unknown.json"));
+        my @values = map { my $v = $_; +{ map { ($_ => $v->{$_}) } qw(name value_text median_text ratio rows) } }
+            grep { ref $_ eq "HASH" } @{ ref $cmp->{values} eq "ARRAY" ? $cmp->{values} : [] };
+        print $J->encode({ draft => $dir, compare => { past_rows => $cmp->{past_rows}, values => \@values }, unknown => $unk }), "\n";
+    ' "$STATE/drafts/$n" 2>"$STATE/.err.$$" || {
+        why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
+        rm -f "$STATE/.err.$$"
+        fail "Issue $n の下書きの要約を出せなかった(${why:-理由の出力なし})。"
+    }
+    rm -f "$STATE/.err.$$"
+}
+
+# GitHub に集計のコメントがあった Issue を手元でも出し済みにし、一覧の行と、まだ索引に無い案を足し直す:
+# already_reported <N> <集計のコメントの URL>
+# 一覧と案の索引の両方を試してから、どちらかに書けなかったら 1 で終わる。書けなかった印は github.pl が issues/<N>.json に残す
+already_reported() {
+    local n=$1 bad=''
+    edit_issue "$n" reported "$2"
+    github list-ensure "$n" >/dev/null 2>"$STATE/.err.$$" || bad="一覧の行($(tail -n 1 "$STATE/.err.$$" 2>/dev/null))"
+    if perl -MJSON::PP -e '
+        open(my $in, "<:raw", $ARGV[0]) or exit 1;
+        local $/;
+        my $d = eval { JSON::PP->new->utf8->decode(<$in> // "") };
+        exit(ref $d eq "HASH" && ref $d->{proposals_pending} eq "ARRAY" && @{ $d->{proposals_pending} } ? 0 : 1);
+    ' "$STATE/issues/$n.json"; then
+        github proposals-ensure "$n" >/dev/null 2>"$STATE/.err.$$" ||
+            bad="${bad:+$bad、}案の索引($(tail -n 1 "$STATE/.err.$$" 2>/dev/null))"
+    fi
+    rm -f "$STATE/.err.$$"
+    [ -z "$bad" ] || fail "出し済みの Issue $n の、${bad}を GitHub に書けなかった。"
 }
 
 cmd_proposals() {
