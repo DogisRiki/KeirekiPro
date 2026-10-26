@@ -46,7 +46,8 @@
             "Bash(gh run view *)",
             "Bash(gh run list *)",
             "Bash(gh run watch *)",
-            "Bash(gh label create *)"
+            "Bash(gh label create *)",
+            "Bash(bash .claude/scripts/usage/usage.sh *)"
         ],
         "deny": [
             "Bash(git push --force*)",
@@ -102,6 +103,15 @@
                         "timeout": 10
                     }
                 ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh\"",
+                        "timeout": 10
+                    }
+                ]
             }
         ],
         "SessionEnd": [
@@ -111,6 +121,15 @@
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-registry.sh\"",
                         "timeout": 10
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh\"",
+                        "async": true
                     }
                 ]
             }
@@ -152,6 +171,16 @@
                         "timeout": 20
                     }
                 ]
+            },
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh\"",
+                        "async": true
+                    }
+                ]
             }
         ],
         "Stop": [
@@ -189,6 +218,15 @@
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/resume-after-usage-limit.sh\"",
                         "asyncRewake": true,
                         "timeout": 691200
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh\"",
+                        "async": true
                     }
                 ]
             }
@@ -276,6 +314,15 @@
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/record-spec-review.sh\"",
                         "timeout": 20
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh\"",
+                        "async": true
                     }
                 ]
             }
