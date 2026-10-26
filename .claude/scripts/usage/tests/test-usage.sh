@@ -495,6 +495,186 @@ unset KP_USAGE_TEST_LOCK_WAIT
 check "extract.pl が 1 で終わると、draft が report.pl を呼ばずに、下書きを作らずに 1 で終わる" \
     "$RC/$(errline)/$([ -e "$STATE/drafts/203" ] && printf made || printf none)/$(calls | grep -c 'pr list' | tr -d ' ')" "1/one/none/1"
 
+echo "== 集計を出す"
+# 一覧の書き込みのあと、読み直す前の10秒の待ちを外す
+KP_USAGE_TEST_LIST_REREAD=0
+export KP_USAGE_TEST_LIST_REREAD
+# Issue 203 と、それを閉じる、仕組みが入ったあとにマージされた PR 305 と、一覧の Issue(番号 1)の偽の GitHub: pubdb [Issue 203 の欄]
+pubdb() { mkdb "issues => [ list(), cl(203, '2026-10-25T03:00:00Z'${1-}) ], prs => [ pr(305, 'MERGED', 'Closes #203', '2026-10-24T15:00:00Z', '$POST') ]"; }
+# 目立つ点の箇条1つと、直す案1つの所見のファイル
+FINDINGS="$TMP_ROOT/findings.md"
+printf '%s\n' '- 目立つ点の箇条' '' '### 直す案' '' '- [203-1] 案の文その1' >"$FINDINGS"
+# 偽の GitHub の Issue N のコメントのうち、集計のコメントの数: reports <N>
+reports() {
+    perl -MJSON::PP -e 'open my $f, "<", "$ENV{FAKE_GH_DIR}/db.json" or exit 1; local $/; my $db = JSON::PP->new->decode(<$f>);
+        my ($i) = grep { $_->{number} == $ARGV[0] } @{ $db->{issues} };
+        print scalar grep { $_->{body} =~ /\A<!-- keirekipro-usage-report:v1 issue=$ARGV[0] -->/ } @{ $i->{comments} }' "$1"
+}
+# 偽の GitHub の一覧の Issue(番号 1)の本文にある、Issue N の行の数: listrows <N>
+listrows() {
+    perl -MJSON::PP -e 'open my $f, "<", "$ENV{FAKE_GH_DIR}/db.json" or exit 1; local $/; my $db = JSON::PP->new->decode(<$f>);
+        my ($l) = grep { $_->{number} == 1 } @{ $db->{issues} };
+        print scalar(() = $l->{body} =~ /^\| \[#$ARGV[0]\]\(/mg)' "$1"
+}
+# 偽の GitHub の案の索引にある案の ID を , でつなぐ
+indexids() {
+    perl -MJSON::PP -e 'open my $f, "<", "$ENV{FAKE_GH_DIR}/db.json" or exit 1; local $/; my $J = JSON::PP->new; my $db = $J->decode(<$f>);
+        my ($l) = grep { $_->{number} == 1 } @{ $db->{issues} };
+        my @ids = map { $_->{body} =~ /\A<!-- keirekipro-usage-proposals:v1 page=[0-9]+ (\[[^\n]*\]) -->/ ? map { $_->{id} } @{ $J->decode($1) } : () } @{ $l->{comments} };
+        print join(",", sort @ids)'
+}
+# publish の出力の、url が Issue N の集計のコメントの URL か(url)と、proposals と、owner と、failed(並べ替えて , でつなぐ): pubout <N>
+pubout() {
+    printf '%s' "$OUT" | perl -MJSON::PP -e 'local $/; my $o = eval { JSON::PP->new->decode(<STDIN>) }; if (ref $o ne "HASH") { print "bad"; exit }
+        print join("/", (($o->{url} // "") =~ m{\Ahttps://github\.com/owner/repo/issues/$ARGV[0]#issuecomment-[0-9]+\z} ? "url" : "nourl"),
+            join(",", @{ $o->{proposals} || [] }), $o->{owner} // "null", join(",", sort @{ $o->{failed} || [] }))' "$1"
+}
+# 一覧の書き込みを失敗させる偽の gh の決まり(一覧の Issue の本文の書き直し)と、案の索引の書き込みを失敗させる決まり(一覧の Issue への新しいコメント)
+FAIL_LIST='^issue edit 1 '
+FAIL_INDEX='^issue comment 1 '
+
+draftrepo pub
+newgh pub
+pubdb
+mktrans pub-a 400
+run draft 203
+dr=$RC
+run publish 203 --findings "$FINDINGS" --session S1
+check "state.json に owner が無いと、publish が、集計のコメントの URL と案の ID と、owner に unknown を出し、両方に書けたときは書けなかった書き込みを空にして出す" \
+    "$dr/$RC/$(pubout 203)" "0/0/url/203-1/unknown/"
+url=$(printf '%s' "$OUT" | perl -MJSON::PP -e 'local $/; print JSON::PP->new->decode(<STDIN>)->{url} // ""' 2>/dev/null)
+check "publish が、issues/<N>.json に reported_at と、その7日後の list_checked_until を書く" \
+    "$(perl -MJSON::PP -MTime::Local=timegm -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; my $d = JSON::PP->new->decode(<$f>);
+        my @t = map { /\A([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})Z\z/ ? timegm($6, $5, $4, $3, $2 - 1, $1) : undef } map { $d->{$_} // "" } qw(reported_at list_checked_until);
+        print join("/", (grep { !defined } @t) ? "bad" : ($t[1] - $t[0] == 7 * 86400 ? "7d" : "bad"), defined $t[0] && abs(time - $t[0]) <= 120 ? "now" : "old", $d->{report_url} // "null")' "$STATE/issues/203.json")" \
+    "7d/now/$url"
+check "publish が、Issue に集計のコメントを1つ書き、案を案の索引に足す" "$(reports 203)/$(indexids)" "1/203-1"
+check "publish が一覧に1行を足し、その行の値が、同じ Issue の report.md の値と同じ形で書かれる" \
+    "$(listrows 203)/$(perl -MJSON::PP -e 'open my $f, "<", "$ENV{FAKE_GH_DIR}/db.json" or exit 1; local $/; my $db = JSON::PP->new->decode(<$f>);
+        my ($l) = grep { $_->{number} == 1 } @{ $db->{issues} };
+        my ($row) = grep { /\A\| \[#203\]\(/ } split /\n/, $l->{body};
+        my @c = map { s/\A\s+|\s+\z//gr } split /\|/, $row // "";
+        open my $m, "<", $ARGV[0] or exit 1; my $md = <$m>;
+        my %v = map { /\A\| (.+?) \| (.+?) \|\z/ ? ($1 => $2) : () } split /\n/, $md;
+        my ($end, $spec) = $md =~ /^\| [0-9]{4}-[0-9]{2}-[0-9]{2} \| ([0-9]{4}-[0-9]{2}-[0-9]{2}) \| (\S+) \| #/m;
+        my @want = ($spec, $end, map { $v{$_} } "AIの作業時間", "トークン数", "使用料");
+        my $same = !grep { !defined $want[$_] || !defined $c[$_ + 2] || $want[$_] ne $c[$_ + 2] } 0 .. $#want;
+        print $same ? "same/$c[5]" : "row=[" . join("|", map { $_ // "" } @c) . "] md=[" . join("|", map { $_ // "" } @want) . "]"' "$STATE/drafts/203/report.md")" \
+    "1/same/1,203"
+run publish 203 --findings "$FINDINGS"
+check "出し済みの Issue で publish を呼ぶと、集計のコメントと一覧の行を重ねずに 2 で終わる" "$RC/$(reports 203)/$(listrows 203)" "2/1/1"
+
+draftrepo pub-old
+newgh pub-old
+pubdb
+mktrans pub-old-a 1
+run publish 203 --findings "$FINDINGS"
+check "下書きが無いと、publish が GitHub に書かずに 1 で終わり、理由を1行で出す" "$RC/$(errline)/$(calls | grep -c 'issue comment' | tr -d ' ')" "1/one/0"
+run draft 203
+KP_USAGE_TEST_DRAFT_MAX_AGE=1
+export KP_USAGE_TEST_DRAFT_MAX_AGE
+sleep 2
+run publish 203 --findings "$FINDINGS"
+unset KP_USAGE_TEST_DRAFT_MAX_AGE
+check "下書きを作ってから上限の時間を過ぎると、publish が GitHub に書かずに、draft からやり直すよう返す" \
+    "$RC/$(errline)/$(printf '%s' "$ERR" | grep -c 'draft' | tr -d ' ')/$(calls | grep -c 'issue comment' | tr -d ' ')/$(statejson issues/203.json)" "1/one/1/0/none"
+perl -e 'print time - 3660, "\n"' >"$STATE/drafts/203/created_at"
+run publish 203 --findings "$FINDINGS"
+old="$RC/$(reports 203)"
+perl -e 'print time - 3540, "\n"' >"$STATE/drafts/203/created_at"
+run publish 203 --findings "$FINDINGS"
+check "テストのための上書きが無いと、publish が、作ってから61分の下書きを出さず、59分の下書きを出す" "$old/$RC/$(reports 203)" "1/0/0/1"
+
+draftrepo pub-priv
+newgh pub-priv
+pubdb
+mktrans pub-priv-a 1
+run draft 203
+gitq config user.email owner-secret@example.com
+for p in 'C:/Users/someone/a.txt' 'C:\Users\someone\a.txt' '/Users/someone/a.txt' '/home/someone/a.txt' "$HOME/a.txt" "$(id -un)" owner-secret@example.com; do
+    printf -- '- 見た場所は %s である\n' "$p" >"$TMP_ROOT/findings-priv.md"
+    : >"$FAKE_GH_DIR/calls.log"
+    run publish 203 --findings "$TMP_ROOT/findings-priv.md"
+    check "所見に $p を含むと、publish が書かずに 1 で終わる" "$RC/$(errline)/$(calls)/$(reports 203)" "1/one//0"
+done
+
+draftrepo pub-cfail
+newgh pub-cfail
+pubdb
+mktrans pub-cfail-a 1
+run draft 203
+recv 203
+printf '%s\n' '^issue comment 203 ' >"$FAKE_GH_DIR/fail"
+run publish 203 --findings "$FINDINGS"
+pub="$RC/$(errline)"
+run pending
+check "集計のコメントの書き込みが失敗すると publish が 1 で終わり、pending がその Issue を出し続ける" "$pub/$RC/$OUT/$(reports 203)" '1/one/0/{"issues":[203]}/0'
+
+draftrepo pub-ifail
+newgh pub-ifail
+pubdb
+mktrans pub-ifail-a 1
+run owner yes
+run draft 203
+printf '%s\n' "$FAIL_INDEX" >"$FAKE_GH_DIR/fail"
+run publish 203 --findings "$FINDINGS"
+check "案の索引の書き込みが失敗すると、publish が 0 で終わって案の ID と owner を出し、書けなかった書き込みに proposals を出す" \
+    "$RC/$(pubout 203)/$(reports 203)/$(listrows 203)/$(indexids)" "0/url/203-1/yes/proposals/1/1/"
+rm -f "$FAKE_GH_DIR/fail"
+run draft 203
+check "案の索引に書けなかったあと、次の draft が案を索引に足して 2 で終わる" "$RC/$(indexids)/$(statejson issues/203.json | grep -c proposals_pending | tr -d ' ')" "2/203-1/0"
+run proposal 203-1 declined
+run draft 203
+check "proposal で答えた案を、次の draft が案の索引に戻さない" "$RC/$(indexids)/$(listrows 203)" "2//1"
+
+draftrepo pub-lfail
+newgh pub-lfail
+pubdb
+mktrans pub-lfail-a 1
+run owner no
+run draft 203
+printf '%s\n' "$FAIL_LIST" >"$FAKE_GH_DIR/fail"
+run publish 203 --findings "$FINDINGS"
+pub="$RC/$(pubout 203)/$(reports 203)/$(listrows 203)/$(indexids)"
+run pending
+check "一覧の書き込みが失敗すると、publish が 0 で終わり、書けなかった書き込みに list を出し、pending がその Issue を出す" \
+    "$pub/$OUT" '0/url/203-1/no/list/1/0/203-1/{"issues":[203]}'
+rm -f "$FAKE_GH_DIR/fail"
+run draft 203
+check "一覧に書けなかったあと、次の draft が行を一覧に足して 2 で終わる" "$RC/$(listrows 203)/$(statejson issues/203.json | grep -c list_pending | tr -d ' ')" "2/1/0"
+
+draftrepo pub-bfail
+newgh pub-bfail
+pubdb
+mktrans pub-bfail-a 1
+run draft 203
+printf '%s\n' "$FAIL_LIST" "$FAIL_INDEX" >"$FAKE_GH_DIR/fail"
+run publish 203 --findings "$FINDINGS"
+check "一覧と案の索引の両方に書けないと、publish が 0 で終わり、書けなかった書き込みに両方を出す" "$RC/$(pubout 203)/$(reports 203)" "0/url/203-1/unknown/list,proposals/1"
+
+draftrepo pub-none
+newgh pub-none
+pubdb ", author_association => 'NONE'"
+mktrans pub-none-a 1
+run draft 203
+dr=$RC
+run publish 203 --findings "$FINDINGS"
+check "関係の欄が NONE のアカウントが起票した Issue で、draft と publish が集計のコメントを書き、一覧に行を足す" "$dr/$RC/$(reports 203)/$(listrows 203)" "0/0/1/1"
+
+draftrepo pub-conc
+newgh pub-conc
+pubdb
+mktrans pub-conc-a 30
+# draft のあとに publish を呼ぶ組を、裏で2つ同時に動かす
+pubpair() { (cd "$REPO" && bash "$USAGE" draft 203 >/dev/null 2>&1 && bash "$USAGE" publish 203 --findings "$FINDINGS" >/dev/null 2>&1); }
+pubpair &
+p1=$!
+pubpair &
+p2=$!
+wait "$p1"
+wait "$p2"
+check "draft と publish の組を2つ同時に動かしても、集計のコメントは1つだけ書かれる" "$(reports 203)/$(listrows 203)" "1/1"
+
 echo "== 案と所有者"
 newrepo prop config
 newgh prop

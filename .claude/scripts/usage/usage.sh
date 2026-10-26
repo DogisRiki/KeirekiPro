@@ -13,6 +13,11 @@
 #     issues/<N>.json に書いて(書かないこともある)2 で終わる。出し済みなら、一覧の行と案の索引を足し直して 2 で終わる。
 #     対象なら、会話の記録を抜き出し、集計の下書きを drafts/<N>/ に作り、下書きの場所と比べの要約と見分けられなかった
 #     再開の回数を {"draft":<場所>,"compare":{...},"unknown":{...}} の1行で出す。この PC に記録が無ければ 2 で終わる
+#   publish <N> --findings <所見のファイル>
+#     Issue N の錠の中で、所見のファイルに手元の場所・PC のユーザー名・git の user.email の値が無いことと、出し済みでないことと、
+#     drafts/<N>/ の下書きを作ってから60分以内であることを確かめ、Issue N に集計のコメントを書く。出し済みなら、draft と同じく
+#     一覧の行と案の索引を足し直して 2 で終わる。集計のコメントを書けたら、一覧か案の索引に書けなくても 0 で終わり、
+#     {"failed":[書けなかった書き込み],"owner":"yes|no|unknown","proposals":[案の ID],"url":<集計のコメントの URL>} の1行を出す
 #   proposals
 #     まだ答えていない案を、github.pl proposals-open の JSON の1行で出す
 #   proposal <案の ID> filed|declined
@@ -50,7 +55,7 @@ while [ $# -gt 0 ]; do
         ;;
     esac
 done
-[ ${#ARGS[@]} -gt 0 ] || fail "サブコマンドを mark・pending・draft・proposals・proposal・owner のどれかにする。"
+[ ${#ARGS[@]} -gt 0 ] || fail "サブコマンドを mark・pending・draft・publish・proposals・proposal・owner のどれかにする。"
 
 # Claude が Bash で cd したままでも同じ記録の置き場所を使うように、git を作業フォルダの最上位で動かす
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || fail "git のリポジトリの作業フォルダの中で呼ぶ。"
@@ -106,8 +111,9 @@ checked() {
     fail "${what}(${why:-理由の出力なし})。"
 }
 
-# issues/<N>.json の欄を書く: edit_issue <N> skip <印> <closedAt か -> | edit_issue <N> reported <集計のコメントの URL>
+# issues/<N>.json の欄を書く: edit_issue <N> skip <印> <closedAt か -> | edit_issue <N> reported|published <集計のコメントの URL>
 # skip は集計しない印を書く。reported は、まだ出し済みと書かれていなければ、出した時刻と URL を書いて出し済みにする。
+# published は、publish が集計のコメントを書いたときに、出した時刻と URL と、出した時刻の7日後の list_checked_until を書く。
 # ほかの欄は残す。ファイルがあるのに JSON のオブジェクトとして読めないときは、ほかの欄を失わないように書かない
 edit_issue() {
     perl -MJSON::PP -MPOSIX -e '
@@ -125,6 +131,11 @@ edit_issue() {
         if ($mode eq "skip") {
             $d->{skip} = $v[0];
             $d->{closed_at} = $v[1] eq "-" ? undef : $v[1];
+        } elsif ($mode eq "published") {
+            my $t = time;
+            $d->{reported_at} = POSIX::strftime("%Y-%m-%dT%H:%M:%SZ", gmtime $t);
+            $d->{list_checked_until} = POSIX::strftime("%Y-%m-%dT%H:%M:%SZ", gmtime($t + 7 * 86400));
+            $d->{report_url} = $v[0];
         } else {
             exit 0 if defined $d->{reported_at};
             $d->{reported_at} = POSIX::strftime("%Y-%m-%dT%H:%M:%SZ", gmtime);
@@ -270,7 +281,7 @@ cmd_draft() {
     [ $# -eq 1 ] || fail "draft には Issue の番号を1つだけ渡す。"
     printf '%s' "$1" | grep -Eq '^[1-9][0-9]{0,9}$' && [ "$(printf '%s' "$1" | wc -l | tr -d ' ')" = 0 ] ||
         fail "draft の Issue の番号を、0で始まらない10桁までの数にする。"
-    local n=$1 sysc url decision kind mc at rc why
+    local n=$1 sysc decision kind mc at rc why
     ensure_state
     lock_issue "$n"
 
@@ -287,21 +298,10 @@ cmd_draft() {
     trap 'rm -f "$prs" "$issue" "$list"; rmdir "$ISSUE_LOCK" 2>/dev/null' EXIT
 
     # 出し済みなら、出し済みと書き、一覧の行と案の索引を足し直して終わる。ほかの PC で出した Issue もここで見つかる
-    rc=0
-    url=$(github reported "$n" 2>"$STATE/.err.$$") || rc=$?
-    case "$rc" in
-    0)
-        rm -f "$STATE/.err.$$"
-        already_reported "$n" "$url"
+    if find_report "$n"; then
+        already_reported "$n" "$REPORTED_URL"
         exit 2
-        ;;
-    3) rm -f "$STATE/.err.$$" ;;
-    *)
-        why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
-        rm -f "$STATE/.err.$$"
-        fail "Issue $n に集計のコメントがあるかを確かめられなかった(${why:-理由の出力なし})。"
-        ;;
-    esac
+    fi
 
     # 2〜3. PR と Issue を、report.pl の collect_prs と同じ gh のコマンドで読む
     checked "gh で PR の一覧を読めなかった" \
@@ -439,6 +439,108 @@ already_reported() {
     [ -z "$bad" ] || fail "出し済みの Issue $n の、${bad}を GitHub に書けなかった。"
 }
 
+# Issue N に集計のコメントがあれば、その URL を REPORTED_URL に置いて 0 を返し、無ければ 1 を返す。確かめられなければ 1 で終わる
+REPORTED_URL=
+find_report() {
+    local rc=0 why
+    REPORTED_URL=$(github reported "$1" 2>"$STATE/.err.$$") || rc=$?
+    why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
+    rm -f "$STATE/.err.$$"
+    case "$rc" in
+    0) return 0 ;;
+    3) return 1 ;;
+    *) fail "Issue $1 に集計のコメントがあるかを確かめられなかった(${why:-理由の出力なし})。" ;;
+    esac
+}
+
+# 所見のファイルに、手元の場所(ホームディレクトリと、C:/Users/ C:\Users\ /Users/ /home/ を含む場所)と、PC のユーザー名と、
+# git の user.email の値のどれかがあれば 1 を返す: private_in <所見のファイル>
+# \ と / を同じとみなし、大文字と小文字を区別せずに比べる。1文字の値はどの文にも当たるので比べない
+private_in() {
+    local email
+    email=$(git -C "$TOP" config user.email 2>/dev/null) || email=
+    perl -e '
+        my ($f, @needles) = @ARGV;
+        open(my $in, "<:raw", $f) or exit 1;
+        local $/;
+        (my $t = lc(<$in> // "")) =~ tr{\\}{/};
+        exit 1 if $t =~ m{/users/|/home/};
+        for my $s (@needles) {
+            (my $x = lc $s) =~ tr{\\}{/};
+            exit 1 if length $x > 1 && index($t, $x) >= 0;
+        }
+        exit 0;
+    ' "$1" "${HOME-}" "${USERPROFILE-}" "${USER-}" "${USERNAME-}" "${LOGNAME-}" "$(id -un 2>/dev/null)" "$email"
+}
+
+cmd_publish() {
+    [ $# -eq 3 ] && [ "$2" = --findings ] && [ -n "$3" ] || fail "publish には Issue の番号と、--findings <所見のファイル> を渡す。"
+    printf '%s' "$1" | grep -Eq '^[1-9][0-9]{0,9}$' && [ "$(printf '%s' "$1" | wc -l | tr -d ' ')" = 0 ] ||
+        fail "publish の Issue の番号を、0で始まらない10桁までの数にする。"
+    local n=$1 findings=$3 dir max=3600 limit rc out why result url
+    [ -f "$findings" ] && [ -r "$findings" ] || fail "所見のファイル $findings を読めなかった。"
+    # github.pl は作業フォルダの最上位で動くので、相対の場所を、呼ばれた場所からの場所にする
+    case "$findings" in /* | [A-Za-z]:[\\/]*) ;; *) findings="$PWD/$findings" ;; esac
+    private_in "$findings" ||
+        fail "所見のファイルに、手元の場所か、PC のユーザー名か、git の user.email の値があるので、GitHub に書かなかった。"
+    ensure_state
+    lock_issue "$n"
+
+    if find_report "$n"; then
+        already_reported "$n" "$REPORTED_URL"
+        exit 2
+    fi
+
+    # draft は Issue ごとに drafts/<N>/ の1つだけに下書きを書き、Issue を閉じる PR が無ければ書かない。
+    # 作ってから上限の時間(60分)を過ぎた下書きは、そのあとの作業を数えていないので出さない。テストだけが KP_USAGE_TEST_DRAFT_MAX_AGE で短くする
+    case "${KP_USAGE_TEST_DRAFT_MAX_AGE-}" in '' | *[!0-9]*) ;; *) max=$KP_USAGE_TEST_DRAFT_MAX_AGE ;; esac
+    dir="$STATE/drafts/$n"
+    rc=0
+    perl -e '
+        open(my $in, "<", $ARGV[0]) or exit 3;
+        my $t = <$in>;
+        exit 3 unless defined $t && $t =~ /\A([0-9]{1,12})\n?\z/;
+        my $age = time - $1;
+        exit($age >= 0 && $age <= $ARGV[1] ? 0 : 4);
+    ' "$dir/created_at" "$max" || rc=$?
+    if [ $((max % 60)) -eq 0 ]; then limit="$((max / 60))分"; else limit="${max}秒"; fi
+    case "$rc" in
+    0) ;;
+    3) fail "Issue $n の下書きが無い。draft を先に呼ぶ。" ;;
+    *) fail "Issue $n の下書きは、作ってから${limit}を過ぎている。draft からやり直す。" ;;
+    esac
+
+    rc=0
+    out=$(github publish "$n" --draft "$dir" --findings "$findings" 2>"$STATE/.err.$$") || rc=$?
+    why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
+    rm -f "$STATE/.err.$$"
+    [ "$rc" -eq 0 ] || fail "Issue $n に集計のコメントを書けなかった(${why:-理由の出力なし})。"
+
+    # github.pl の出力に、state.json の owner(真なら yes、偽なら no、無ければ unknown)を足す
+    result=$(perl -MJSON::PP -e '
+        my ($out, $sf) = @ARGV;
+        my $J = JSON::PP->new->utf8->canonical;
+        my $o = eval { $J->decode($out) };
+        die "github.pl の出力を JSON のオブジェクトとして読めなかった\n" unless ref $o eq "HASH";
+        my $owner = "unknown";
+        if (open(my $in, "<:raw", $sf)) {
+            local $/;
+            my $s = eval { $J->decode(<$in> // "") };
+            $owner = $s->{owner} ? "yes" : "no" if ref $s eq "HASH" && ref $s->{owner} eq "JSON::PP::Boolean";
+        }
+        print $J->encode({ url => $o->{url}, proposals => $o->{proposals}, owner => $owner, failed => $o->{failed} }), "\n";
+    ' "$out" "$STATE/state.json" 2>"$STATE/.err.$$") || {
+        why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
+        rm -f "$STATE/.err.$$"
+        fail "Issue $n に集計のコメントを書いたが、結果を読めなかった(${why:-理由の出力なし})。次の draft が出し済みと書き直す。"
+    }
+    rm -f "$STATE/.err.$$"
+    # 集計のコメントの URL を読めなかったときは出し済みと書かない。次の draft が、GitHub の集計のコメントから URL を書く
+    url=$(printf '%s' "$result" | perl -MJSON::PP -e 'local $/; my $u = JSON::PP->new->utf8->decode(<STDIN>)->{url}; print $u if defined $u && !ref $u')
+    [ -z "$url" ] || edit_issue "$n" published "$url"
+    printf '%s\n' "$result"
+}
+
 cmd_proposals() {
     [ $# -eq 0 ] || fail "proposals は引数を受けない。"
     github proposals-open
@@ -490,8 +592,9 @@ case "$cmd" in
 mark) cmd_mark "$@" ;;
 pending) cmd_pending "$@" ;;
 draft) cmd_draft "$@" ;;
+publish) cmd_publish "$@" ;;
 proposals) cmd_proposals "$@" ;;
 proposal) cmd_proposal "$@" ;;
 owner) cmd_owner "$@" ;;
-*) fail "知らないサブコマンド $cmd を受けた。サブコマンドを mark・pending・draft・proposals・proposal・owner のどれかにする。" ;;
+*) fail "知らないサブコマンド $cmd を受けた。サブコマンドを mark・pending・draft・publish・proposals・proposal・owner のどれかにする。" ;;
 esac
