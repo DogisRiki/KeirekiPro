@@ -11,11 +11,25 @@
 #     ファイルの行(list-read の出力と同じ形の配列)を一覧に足す。同じ Issue の行があれば置き換える
 #   perl github.pl list-ensure <N>
 #     一覧に Issue N の行が無ければ、Issue N の集計のコメントの最後の数字の行の JSON から行を作って足す
+#   perl github.pl publish <N> --draft <下書きのディレクトリ> --findings <所見のファイル>
+#     下書きの report.json と report.md と所見のファイルが集計のコメントの形だけからなることを確かめ、
+#     所見の直す案の ID を issues/<N>.json の proposals_pending に書いてから、Issue N に集計のコメントを書く。
+#     そのあと、案を案の索引に足し、一覧に行を足す。集計のコメントを書けたら、索引か一覧に書けなくても 0 で終わり、
+#     {"failed":[書けなかった書き込み],"proposals":[案の ID],"url":<集計のコメントの URL>} の1行を出す
+#   perl github.pl proposals-ensure <N>
+#     issues/<N>.json の proposals_pending の案を案の索引に足す。足せたら proposals_pending を消す
+#   perl github.pl proposals-open
+#     案の索引の案を、[{"id","issue","text"}] の JSON の1行で出す。text は集計のコメントの所見の案の文である
+#   perl github.pl proposal-remove <案の ID>
+#     案を、案の索引と、その Issue の issues/<N>.json の proposals_pending から外す
 #
 # 一覧の行は、終了日の古い順に、終了日が同じなら Issue の番号の順に並べ、300行ごとのページに分ける。
 # 1ページ目は一覧の Issue の本文に、2ページ目からは行頭が <!-- keirekipro-usage-list:v1 page=<k> --> の
 # コメントに置く。行を足したら、待ってから一覧を読み直し、足した行が無ければ3回まで書き直す。
 # 足せなかったときは、その Issue の issues/<N>.json に list_pending を残して 1 で終わる。
+#
+# 案の索引は、一覧の Issue の、行頭が <!-- keirekipro-usage-proposals:v1 page=<k> <JSON> --> のコメントに、
+# 案を1,000件ずつ置く。案が無くなったページは [] にして残す。書いたら、一覧と同じく読み直して確かめる。
 #
 # gh は、開発者の PC の gh のトークンで、いまの作業フォルダのリポジトリ({owner}/{repo})を読み書きする。
 # 印で見つけるコメントと、題名で見つける一覧の Issue は、リポジトリとの関係の欄(author_association)が
@@ -36,6 +50,7 @@ use JSON::PP ();
 use File::Temp ();
 use Encode ();
 use Scalar::Util ();
+use File::Basename ();
 
 # 集計のコメントの1行目の印。あとに issue=<N> と空白が続く
 use constant REPORT_MARK => '<!-- keirekipro-usage-report:v1';
@@ -67,6 +82,14 @@ use constant LIST_TRIES => 3;
 use constant UNCOUNTABLE => '数えられない';
 use constant USD_PARTIAL => '(価格が分からないモデルを除く)';
 
+# 案の索引のコメントの1行目の印。あとに page=<k> と空白と案の JSON が続く。2行目は、コメントの用途を示す文である
+use constant PROPOSALS_MARK => '<!-- keirekipro-usage-proposals:v1';
+use constant PROPOSALS_NOTE => "このコメントは、所有者がまだ起票するかを答えていない直す案の番号を、AI が覚えておくためのものである。案の文は、番号の頭の Issue の集計のコメントの所見にある。\n";
+
+# 案の索引の1つのコメントに置く案の数と、コメントの文字の数の上限
+use constant PROPOSALS_PER_PAGE => 1000;
+use constant COMMENT_MAX => 65536;
+
 # 書き手として認めるリポジトリとの関係の欄の値
 my %TRUSTED = map { $_ => 1 } qw(OWNER COLLABORATOR);
 
@@ -75,6 +98,10 @@ my %COMMANDS = (
     'list-read'   => \&cmd_list_read,
     'list-add'    => \&cmd_list_add,
     'list-ensure' => \&cmd_list_ensure,
+    publish            => \&cmd_publish,
+    'proposals-ensure' => \&cmd_proposals_ensure,
+    'proposals-open'   => \&cmd_proposals_open,
+    'proposal-remove'  => \&cmd_proposal_remove,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
@@ -104,7 +131,11 @@ sub usage {
     print STDERR "usage: perl github.pl reported <N>\n",
         "       perl github.pl list-read\n",
         "       perl github.pl list-add <行の JSON のファイル>\n",
-        "       perl github.pl list-ensure <N>\n";
+        "       perl github.pl list-ensure <N>\n",
+        "       perl github.pl publish <N> --draft <下書きのディレクトリ> --findings <所見のファイル>\n",
+        "       perl github.pl proposals-ensure <N>\n",
+        "       perl github.pl proposals-open\n",
+        "       perl github.pl proposal-remove <案の ID>\n";
     return 64;
 }
 
@@ -690,5 +721,431 @@ sub cmd_list_ensure {
         die $why;
     }
     clear_pending($n, 'list_pending');
+    return 0;
+}
+
+# ---- 集計のコメントの形の確かめ -------------------------------------------
+# github.pl は、集計のコメントに、design の「データの形」の節の形の値だけを置く。形に無い値があれば、何も書かずに die する
+
+# 段階ごとの表の段階の名前
+sub stage_names {
+    return ('着手の判断', '要件', '要件の審査', '設計', '設計の審査', 'タスク', 'タスクの審査', '実装',
+        '実装中の spec の直し', '出荷とレビュー対応', 'その他', '合計');
+}
+
+# 全体の合計の表の5行の項目の名前と、値の形の名前
+sub total_items {
+    return (['AIの作業時間', 'time'], ['トークン数', 'num'], ['使用料', 'usd'],
+        ['使う量の上限で止まった回数', 'count'], ['使う量の上限で止まっていた時間', 'time']);
+}
+
+# 往復と手戻りの表の項目の名前
+sub rework_items {
+    return ('spec の審査役との往復', '承認の前に、所有者が spec の直しを求めた', 'spec を作る途中で、前の段階に戻って直した',
+        '実装の途中で、spec に戻って直した', '実装したコードに、タスクごとの確認役が問題を見つけ、コードを直した',
+        'PR の Codex レビューとの往復', 'PR を出したあと、CI の自動チェックが失敗し、コードを直した',
+        '同じ失敗を3回続けて直せず、AI が作業を止めて所有者に報告した', '実装の途中で、Issue を分けた',
+        'spec 無しで始め、実装の途中で spec に切り替えた', '200行の検査で PR が止まった',
+        '自動レビューが、Issue の決めた方式から外れたとして PR を止めた');
+}
+
+# 注記の文。<MODELS> はモデルの ID を「、」で区切ったもの、<N> は回数に替わる
+sub note_texts {
+    return (
+        'この集計は、この Issue が終わったあとに、さかのぼって作った。Claude Code は、最後に動いてから30日たった会話の記録を消すので、この集計には、消えた会話の分が入っていないことがある。',
+        'この Issue は、仕組みが入る前に着手した。「数えられない」と書いた項目は、数えるための印を作業の途中で残す仕組みが、着手のときにまだ無かった項目である。',
+        '会話の記録の一部を読めなかった。Claude は、この Issue の作業の一部を、仕組みが入る前の設定で始めた会話で行った。「数えられない」と書いた項目は、その会話では、数えるための印が残らなかった項目である。',
+        '会話の記録の一部を読めなかった。仕組みは、この集計を、読めた分だけで数えた。そのため、作業時間とトークン数と使用料は、実際より少ないことがある。往復と手戻りの表の「数えられない」の項目は、読めなかった会話から数える項目である。',
+        '<MODELS>の公表価格が分からないため、仕組みは、このモデルの使用料を数えていない。全体の合計と段階ごとの表の使用料は、このモデルの分を除いた額である。',
+        '会話が再開したきっかけのうち、仕組みが種類を見分けられなかったものが <N>回あった。仕組みは、見分けられなかったきっかけの前の時間を、外の仕組みを待っていた時間として、作業時間と待ち時間に数えた。そのため、作業時間と待ち時間は、実際より長いことがある。',
+    );
+}
+
+# データのファイルの roles の役割の名前
+sub config_roles {
+    my $f = File::Basename::dirname(__FILE__) . '/usage-config.json';
+    my $roles = read_json_file($f)->{roles};
+    die "$f の roles を読めなかった\n" unless ref $roles eq 'HASH';
+    my @v = map { ref $_ eq 'HASH' ? values %$_ : $_ } values %$roles;
+    return map { bytes_of($_) } grep { defined && !ref } @v;
+}
+
+sub is_model_id {
+    my ($s) = @_;
+    return defined $s && !ref $s && $s =~ /\A[A-Za-z0-9][A-Za-z0-9._\[\]-]{0,99}\z/ ? 1 : 0;
+}
+
+# モデルごとの表の役割の名前。本体の会話、別に起こしたセッション、データのファイルの役割の名前、補助役の種類の名前のどれかである
+sub is_role {
+    my ($s) = @_;
+    return 0 unless defined $s && !ref $s;
+    return 1 if $s =~ /\A[A-Za-z0-9_-]{1,64}\z/;
+    return scalar grep { $_ eq $s } ('本体の会話', '別に起こしたセッション', config_roles());
+}
+
+sub in_set {
+    my ($s, @set) = @_;
+    return 0 unless defined $s && !ref $s;
+    return scalar grep { $_ eq $s } @set;
+}
+
+# 値 $v が形 $s に合うかを返す。形は、値を確かめる関数か、要素の形を1つ持つ配列か、欄ごとの形を持つハッシュである。
+# ハッシュの形は、欄の過不足を許さない
+sub fits {
+    my ($v, $s) = @_;
+    return $s->($v) ? 1 : 0 if ref $s eq 'CODE';
+    if (ref $s eq 'ARRAY') {
+        return 0 unless ref $v eq 'ARRAY';
+        return (grep { !fits($_, $s->[0]) } @$v) ? 0 : 1;
+    }
+    return 0 unless ref $v eq 'HASH' && keys %$v == keys %$s;
+    for my $k (keys %$s) {
+        return 0 unless exists $v->{$k} && fits($v->{$k}, $s->{$k});
+    }
+    return 1;
+}
+
+# report.json の形。数えられない値は null を取る
+sub report_schema {
+    my ($n) = @_;
+    my $int = sub { nonneg($_[0], 1) };
+    my $num = sub { nonneg($_[0], 0) };
+    my $int0 = sub { !defined $_[0] || nonneg($_[0], 1) };
+    my $num0 = sub { !defined $_[0] || nonneg($_[0], 0) };
+    my $bool = sub { JSON::PP::is_bool($_[0]) };
+    my $bool0 = sub { !defined $_[0] || JSON::PP::is_bool($_[0]) };
+    my $date = sub { defined $_[0] && !ref $_[0] && $_[0] =~ /\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z/ };
+    my $spec_stage = sub { in_set(bytes_of($_[0]), qw(requirements design tasks)) };
+    my $tri = { requirements => $int, design => $int, tasks => $int };
+    my $tri0 = sub { !defined $_[0] || fits($_[0], $tri) };
+    my $back = [ { from => $spec_stage, to => $spec_stage } ];
+    my @names = (stage_names(), (map { $_->[0] } total_items()), rework_items());
+    return {
+        v => sub { nonneg($_[0], 1) && $_[0] == 1 },
+        issue => sub { nonneg($_[0], 1) && $_[0] == $n },
+        prs => [ sub { defined issue_number($_[0]) } ],
+        spec => $bool,
+        start_date => $date,
+        end_date => $date,
+        totals => { work_sec => $num0, wait_sec => $num0, concurrent_sec => $num0, tokens => $int0, usd => $num0,
+            usd_unknown_models => [ \&is_model_id ], limit_count => $int0, limit_sec => $num0 },
+        stages => [ { name => sub { in_set(bytes_of($_[0]), stage_names()) }, work_sec => $num0, wait_sec => $num0,
+            concurrent_sec => $num0, tokens => $int0, usd => $num0 } ],
+        models => [ { model => \&is_model_id, role => sub { is_role(bytes_of($_[0])) }, in => $int0, cw => $int0, cr => $int0, out => $int0, usd => $num0 } ],
+        rework => { spec_review_rounds => $tri0, owner_fix => $tri0, spec_back => sub { !defined $_[0] || fits($_[0], $back) },
+            impl_spec_back => $tri0, task_rejected => $int0, codex_rounds => $int0, ci_fix => $int0, same_failure => $int0,
+            split => $bool0, switch_to_spec => $int0, size_check_stops => $int0, decided_method_stops => $int0 },
+        uncountable => [ sub { in_set(bytes_of($_[0]), @names) } ],
+        partial_records => $bool,
+        unknown_turns => $int,
+        backfill => $bool,
+        prices => { source => sub { defined $_[0] && !ref $_[0] && $_[0] =~ m{\Ahttps://[A-Za-z0-9.-]+(?:/[A-Za-z0-9._~/-]*)?\z} },
+            checked_on => $date },
+    };
+}
+
+# ファイルをバイトのまま読み、行の終わりを \n にそろえ、最後の改行を除いて返す
+sub read_text {
+    my ($f) = @_;
+    open(my $fh, '<:raw', $f) or die "$f を読めなかった($!)\n";
+    my $s = do { local $/; <$fh> } // '';
+    close $fh;
+    $s =~ s/\r\n/\n/g;
+    $s =~ s/\n+\z//;
+    return $s;
+}
+
+sub read_report_json {
+    my ($f, $n) = @_;
+    my $d = eval { $JSON->decode(read_text($f)) };
+    die "$f を JSON として読めなかった\n" unless defined $d;
+    die "$f に、集計の JSON の形に無い値がある\n" unless fits($d, report_schema($n));
+    return $d;
+}
+
+# 表の1行のマスを返す。表の行の形でなければ空の並びを返す
+sub cells {
+    my ($line) = @_;
+    return () unless $line =~ /\A\| (.*) \|\z/;
+    return split / \| /, $1, -1;
+}
+
+# report.md の形を確かめる。形に無い行があれば die する
+sub check_report_md {
+    my ($md, $n) = @_;
+    my $u = UNCOUNTABLE;
+    my $p = USD_PARTIAL;
+    my $date = qr/[0-9]{4}-[0-9]{2}-[0-9]{2}/;
+    my $count = qr/(?:0|[1-9][0-9]*)/;
+    my %v = (
+        time => qr/\A(?:(?:[1-9][0-9]*時間)?(?:[0-9]|[1-5][0-9])分|\Q$u\E)\z/,
+        num => qr/\A(?:(?:0|[1-9][0-9]{0,2}(?:,[0-9]{3})*)|\Q$u\E)\z/,
+        usd => qr/\A(?:\$(?:0|[1-9][0-9]{0,2}(?:,[0-9]{3})*)\.[0-9]{2}(?:\Q$p\E)?|\Q$u\E)\z/,
+        count => qr/\A(?:$count|\Q$u\E)\z/,
+    );
+    my $stg = qr/(?:要件|設計|タスク)/;
+    my $rework = qr/\A(?:$count|要件 $count、設計 $count、タスク $count|[1-9][0-9]*\(${stg}から${stg}へ [1-9][0-9]*(?:、${stg}から${stg}へ [1-9][0-9]*)*\)|有|無し|\Q$u\E)\z/;
+    my @b = split /\n\n/, $md, -1;
+    my $bad = sub { die "report.md の$_[0]が、集計のコメントの形でない\n" };
+    my $table = sub {
+        my ($block, $head, $what) = @_;
+        my @l = split /\n/, $block, -1;
+        $bad->($what) unless @l >= 2 && $l[0] eq $head && $l[1] eq '|' . ('---|' x (() = $head =~ / \|/g));
+        return @l[ 2 .. $#l ];
+    };
+    $bad->('見出し') unless @b >= 12 && $b[0] eq '## AIの作業の集計';
+    my @r = $table->($b[1], '| 開始日 | 終了日 | spec | PR |', '最初の表');
+    $bad->('最初の表') unless @r == 1 && $r[0] =~ /\A\| $date \| $date \| (?:あり|無し) \| #[1-9][0-9]*(?:、#[1-9][0-9]*)* \|\z/;
+    $bad->('全体の合計の見出し') unless $b[2] eq '### 全体の合計';
+    @r = $table->($b[3], '| 項目 | 値 |', '全体の合計の表');
+    my @t = total_items();
+    $bad->('全体の合計の表') unless @r == @t;
+    for my $i (0 .. $#t) {
+        my @c = cells($r[$i]);
+        $bad->('全体の合計の表') unless @c == 2 && $c[0] eq $t[$i][0] && $c[1] =~ $v{ $t[$i][1] };
+    }
+    $bad->('段階ごとの見出し') unless $b[4] eq '### 段階ごと';
+    for my $line ($table->($b[5], '| 段階 | AIの作業時間 | そのうち待ち時間 | 審査役などが同時に動いた時間 | トークン数 | 使用料 |', '段階ごとの表')) {
+        my @c = cells($line);
+        $bad->('段階ごとの表') unless @c == 6 && in_set($c[0], stage_names()) && $c[1] =~ $v{time} && $c[2] =~ $v{time}
+            && $c[3] =~ $v{time} && $c[4] =~ $v{num} && $c[5] =~ $v{usd};
+    }
+    $bad->('モデルごとの見出し') unless $b[6] eq '### モデルごと';
+    for my $line ($table->($b[7], '| モデル | 役割 | 入力 | キャッシュの書き込み | キャッシュの読み込み | 出力 | 使用料 |', 'モデルごとの表')) {
+        my @c = cells($line);
+        $bad->('モデルごとの表') unless @c == 7 && is_model_id($c[0]) && is_role($c[1])
+            && !grep({ $_ !~ $v{num} } @c[ 2 .. 5 ]) && ($c[6] =~ $v{usd} || $c[6] eq '価格が分からない');
+    }
+    $bad->('往復と手戻りの見出し') unless $b[8] eq '### 往復と手戻り';
+    for my $line ($table->($b[9], '| 項目 | 回数 |', '往復と手戻りの表')) {
+        my @c = cells($line);
+        $bad->('往復と手戻りの表') unless @c == 2 && in_set($c[0], rework_items()) && $c[1] =~ $rework;
+    }
+    $bad->('価格の見出し') unless $b[10] eq '### 価格';
+    $bad->('価格の文') unless $b[11] =~ m{\A使用料は、https://[A-Za-z0-9.-]+(?:/[A-Za-z0-9._~/-]*)? の公表価格で換算した。価格を確かめた日は $date である。\z};
+    return 1 if @b == 12;
+    $bad->('注記') unless @b == 14 && $b[12] eq '### 注記';
+    my @notes = map {
+        my $re = quotemeta $_;
+        $re =~ s/\\<MODELS\\>/[A-Za-z0-9][A-Za-z0-9._\\[\\]-]{0,99}(?:、[A-Za-z0-9][A-Za-z0-9._\\[\\]-]{0,99})*/;
+        $re =~ s/\\<N\\>/[1-9][0-9]*/;
+        qr/\A- $re\z/;
+    } note_texts();
+    for my $line (split /\n/, $b[13], -1) {
+        $bad->('注記') unless grep { $line =~ $_ } @notes;
+    }
+    return 1;
+}
+
+# 所見のファイルの形を確かめ、直す案の ID を返す。所見は、箇条の行と、1つの「### 直す案」の見出しと、
+# その下の「- [<N>-<連番>] <案の文>」の行と、空の行だけからなる。HTML のコメントの印を含む行は書かない
+sub check_findings {
+    my ($text, $n) = @_;
+    my ($props, $bullets, @ids) = (0, 0);
+    for my $line (split /\n/, $text) {
+        next if $line eq '';
+        die "所見のファイルに、HTML のコメントの印がある\n" if $line =~ /<!--|-->/;
+        if ($line eq '### 直す案') {
+            die "所見のファイルに、直す案の見出しが2つある\n" if $props++;
+            next;
+        }
+        if ($props) {
+            my ($i, $k) = $line =~ /\A- \[([1-9][0-9]*)-([1-9][0-9]*)\] \S/
+                or die "所見のファイルの直す案の行が、「- [<Issue の番号>-<連番>] <案の文>」の形でない\n";
+            die "所見のファイルの直す案の ID が、$n-1 から順に振られていない\n" unless $i == $n && $k == @ids + 1;
+            push @ids, "$n-$k";
+        } else {
+            die "所見のファイルに、箇条でない行がある\n" unless $line =~ /\A- \S/;
+            $bullets++;
+        }
+    }
+    die "所見のファイルに、目立つ点の箇条が無い\n" unless $bullets;
+    die "所見のファイルの直す案の見出しの下に、案が無い\n" if $props && !@ids;
+    return @ids;
+}
+
+# ---- 案の索引 ------------------------------------------------------------
+
+# 案の ID を Issue の番号と連番に分ける。ID の形でなければ空の並びを返す
+sub proposal_id {
+    my ($s) = @_;
+    return defined $s && !ref $s && $s =~ /\A([1-9][0-9]{0,9})-([1-9][0-9]{0,5})\z/ ? ($1, $2) : ();
+}
+
+sub sort_ids {
+    my %seen;
+    return map { $_->[2] } sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] }
+        map { [ proposal_id($_), $_ ] } grep { !$seen{$_}++ } @_;
+}
+
+sub proposals_text {
+    my ($k, @ids) = @_;
+    my $json = $JSON->encode([ map { { id => $_, issue => (proposal_id($_))[0] + 0 } } @ids ]);
+    return PROPOSALS_MARK . " page=$k $json -->\n" . PROPOSALS_NOTE;
+}
+
+# 一覧の Issue の、書き手の確認を通る案の索引のコメントを読む。案は、ページの番号の順、同じ番号ならコメントの古い順に読む。
+# ID の形でない案と、ID の頭と issue が合わない案は読まない
+sub read_index {
+    my ($list) = @_;
+    my @pages;
+    for my $c (@{ trusted_comments($list) }) {
+        my $body = bytes_of($c->{body});
+        my ($k, $json) = $body =~ /\A\Q${\PROPOSALS_MARK}\E page=([1-9][0-9]*) (\[[^\n]*\]) -->(?:\n|\z)/ or next;
+        next unless defined issue_number($c->{id});
+        my $arr = eval { $JSON->decode($json) };
+        push @pages, { k => $k, id => $c->{id}, body => $body, entries => ref $arr eq 'ARRAY' ? $arr : [] };
+    }
+    @pages = sort { $a->{k} <=> $b->{k} || $a->{id} <=> $b->{id} } @pages;
+    my @ids;
+    for my $e (map { @{ $_->{entries} } } @pages) {
+        next unless ref $e eq 'HASH';
+        my ($i) = proposal_id($e->{id});
+        push @ids, $e->{id} if defined $i && nonneg($e->{issue}, 1) && $e->{issue} == $i;
+    }
+    return { pages => \@pages, ids => [ sort_ids(@ids) ] };
+}
+
+# 案を Issue の番号と連番の順に並べ、1,000件ごとのページに分け、変わったページのコメントだけを書き直し、
+# 足りないページのコメントを書く。案が無くなったページと、同じ番号の2つ目のページは、[] にして残す。何かを書いたら真を返す
+sub write_index {
+    my ($list, $cur, $ids) = @_;
+    my @rest = sort_ids(@$ids);
+    my @pages;
+    push @pages, [ splice @rest, 0, PROPOSALS_PER_PAGE ] while @rest;
+    my ($wrote, %used) = (0);
+    for my $c (@{ $cur->{pages} }) {
+        my $want = $used{ $c->{k} }++ || $c->{k} - 1 > $#pages ? proposals_text($c->{k}) : proposals_text($c->{k}, @{ $pages[ $c->{k} - 1 ] });
+        next if $want eq $c->{body};
+        my $f = body_file($want);
+        gh('api', '-X', 'PATCH', "repos/{owner}/{repo}/issues/comments/$c->{id}", '-F', 'body=@' . $f->filename);
+        $wrote = 1;
+    }
+    for my $i (0 .. $#pages) {
+        next if $used{ $i + 1 };
+        my $f = body_file(proposals_text($i + 1, @{ $pages[$i] }));
+        gh('issue', 'comment', $list, '--body-file', $f->filename);
+        $wrote = 1;
+    }
+    return $wrote;
+}
+
+# 案の索引に案を足し、案を外す。書いたら待ってから読み直し、足した案がすべてあり、外した案が無ければ 1 を返す。
+# そうでなければ、読み直した索引に足し直す。LIST_TRIES 回やってもそうならなければ die する
+sub write_proposals {
+    my ($list, $add, $remove) = @_;
+    my %rm = map { $_ => 1 } @$remove;
+    my $cur;
+    for (1 .. LIST_TRIES) {
+        $cur ||= read_index($list);
+        return 1 unless write_index($list, $cur, [ grep { !$rm{$_} } @{ $cur->{ids} }, @$add ]);
+        list_reread_wait();
+        $cur = read_index($list);
+        my %have = map { $_ => 1 } @{ $cur->{ids} };
+        return 1 unless (grep { !$have{$_} } @$add) || (grep { $have{$_} } @$remove);
+    }
+    die LIST_TRIES . "回書き直しても、案の索引が書いたとおりにならなかった\n";
+}
+
+# 案を索引に足す。足せたら proposals_pending を消し、足せなければ proposals_pending を残して die する
+sub add_proposals {
+    my ($n, @ids) = @_;
+    write_proposals(list_issue_for_write(), \@ids, []);
+    clear_pending($n, 'proposals_pending');
+    return 1;
+}
+
+# Issue N の集計のコメントの所見の直す案の文を、ID ごとに返す
+sub proposal_texts {
+    my ($n) = @_;
+    my $c = report_comment($n) or return {};
+    my ($in, %t) = (0);
+    for my $line (split /\n/, bytes_of($c->{body})) {
+        if ($line =~ /\A### /) { $in = $line eq '### 直す案'; next }
+        next unless $in;
+        my ($id, $text) = $line =~ /\A- \[([1-9][0-9]*-[1-9][0-9]*)\] (\S.*)\z/ or next;
+        $t{$id} //= Encode::decode('UTF-8', $text);
+    }
+    return \%t;
+}
+
+sub cmd_publish {
+    my (@args) = @_;
+    my $n = issue_number(shift @args);
+    my %o;
+    while (@args >= 2 && $args[0] =~ /\A--(draft|findings)\z/ && !exists $o{$1}) {
+        shift @args;
+        $o{$1} = shift @args;
+    }
+    return usage() unless defined $n && !@args && exists $o{draft} && exists $o{findings};
+    my $d = read_report_json("$o{draft}/report.json", $n);
+    my $md = read_text("$o{draft}/report.md");
+    my $findings = read_text($o{findings});
+    check_report_md($md, $n);
+    my @ids = check_findings($findings, $n);
+    my $body = REPORT_MARK . " issue=$n -->\n\n$md\n\n### 所見\n\n$findings\n\n" . DATA_MARK . ' ' . $JSON->encode($d) . " -->\n";
+    die "集計のコメントが " . COMMENT_MAX . " 文字を超える\n" if length(Encode::decode('UTF-8', $body)) > COMMENT_MAX;
+    require_push();
+    # 前に書けなかった集計の案が残っていても、いまの所見の案だけにする
+    if (@ids) { update_json_file(state_dir() . "/issues/$n.json", sub { $_[0]{proposals_pending} = [@ids] }) }
+    else { clear_pending($n, 'proposals_pending') }
+    my $f = body_file($body);
+    my $out = gh('issue', 'comment', $n, '--body-file', $f->filename);
+    my ($url) = $out =~ m{(https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\Q$n\E#issuecomment-[1-9][0-9]*)};
+    $url //= eval { comment_url(report_comment($n) // die "\n") };
+    my @failed;
+    push @failed, 'proposals' if @ids && !eval { add_proposals($n, @ids) };
+    if (!defined $url || !eval { add_rows([ row_from_report($d, $url, $n) ]); 1 }) {
+        mark_pending($n, 'list_pending');
+        push @failed, 'list';
+    }
+    print $JSON->encode({ url => $url, proposals => \@ids, failed => \@failed }), "\n";
+    return 0;
+}
+
+sub cmd_proposals_ensure {
+    my (@args) = @_;
+    my $n = @args == 1 ? issue_number($args[0]) : undef;
+    return usage() unless defined $n;
+    require_push();
+    my $p = read_json_file(state_dir() . "/issues/$n.json")->{proposals_pending};
+    my @ids = grep { my ($i) = proposal_id($_); defined $i && $i == $n } ref $p eq 'ARRAY' ? @$p : ();
+    if (!@ids) {
+        clear_pending($n, 'proposals_pending');
+        return 0;
+    }
+    add_proposals($n, @ids);
+    return 0;
+}
+
+sub cmd_proposals_open {
+    my (@args) = @_;
+    return usage() if @args;
+    my $list = list_issue_for_read();
+    my (@out, %texts);
+    for my $id (defined $list ? @{ read_index($list)->{ids} } : ()) {
+        my ($i) = proposal_id($id);
+        $texts{$i} //= proposal_texts($i);
+        push @out, { id => $id, issue => $i + 0, text => $texts{$i}{$id} };
+    }
+    print $JSON->encode(\@out), "\n";
+    return 0;
+}
+
+sub cmd_proposal_remove {
+    my (@args) = @_;
+    my ($n) = @args == 1 ? proposal_id($args[0]) : ();
+    return usage() unless defined $n;
+    my $id = $args[0];
+    require_push();
+    my $f = state_dir() . "/issues/$n.json";
+    if (-e $f && ref read_json_file($f)->{proposals_pending} eq 'ARRAY') {
+        update_json_file($f, sub {
+            my @rest = grep { $_ ne $id } @{ $_[0]{proposals_pending} };
+            if (@rest) { $_[0]{proposals_pending} = \@rest } else { delete $_[0]{proposals_pending} }
+        });
+    }
+    my $list = list_issue_for_read();
+    write_proposals($list, [], [$id]) if defined $list;
     return 0;
 }

@@ -93,6 +93,16 @@ sub read_after_add {
     );
     return join " ", map { $_->[0] eq $_->[1] ? "same" : "diff" } @want;
 }
+# many(<番号>, <件数>) はその Issue の連番の案の ID、worst_ids() は桁の最も多い1,000件の案の ID である。
+# idx_body(<k>, <ID>...) は案の索引のコメントの本文、rep_props(<番号>, <行>...) は直す案を持つ集計のコメントの本文である。
+# dbq だけで使うもの: idx_desc(<番号>) は Issue の索引のコメントごとの「ページ:件数」、idx_ids(<番号>) は索引の案の ID である
+sub many { my ($n, $k) = @_; return map { "$n-$_" } 1 .. $k }
+sub worst_ids { return map { "9999999999-" . (998999 + $_) } 1 .. 1000 }
+sub idx_body { my ($k, @ids) = @_; return "<!-- keirekipro-usage-proposals:v1 page=$k " . JSON::PP->new->canonical->encode([ map { { id => $_, issue => (split /-/)[0] + 0 } } @ids ]) . " -->\n説明\n" }
+sub rep_props { my ($n, @l) = @_; return "<!-- keirekipro-usage-report:v1 issue=$n -->\n\n## AIの作業の集計\n\n### 所見\n\n- 箇条\n\n### 直す案\n\n" . join("", map { "$_\n" } @l) }
+sub idx_parse { my ($b) = @_; my ($k, $j) = $b =~ /\A<!-- keirekipro-usage-proposals:v1 page=([0-9]+) (\[[^\n]*\]) -->/ or return; return [ $k, JSON::PP->new->decode($j) ] }
+sub idx_desc { return join " ", map { "$_->[0]:" . scalar @{ $_->[1] } } grep { defined } map { idx_parse($_->{body}) } @{ I(shift)->{comments} } }
+sub idx_ids { return join " ", map { $_->{id} } map { @{ $_->[1] } } grep { defined } map { idx_parse($_->{body}) } @{ I(shift)->{comments} } }
 1;
 __H__
 
@@ -561,6 +571,227 @@ check "COLLABORATOR のアカウントが、OWNER の一覧に行を足し、一
 run list-read
 check "COLLABORATOR のアカウントが書いた2ページ目の行を、list-read が読む" "$RC/$(printf '%s' "$OUT" | grep -o '"issue":1301')" '0/"issue":1301'
 
+echo "== 集計のコメントと案の索引"
+DRAFT="$TMP_ROOT/draft"
+FIND="$TMP_ROOT/findings.md"
+mkdir -p "$DRAFT"
+# report.json は、github.pl が数字の行に書く形(キーの順、空白無し、最後の改行無し)で書く
+perl -MJSON::PP -e '
+    my ($t, $f) = (JSON::PP::true, JSON::PP::false);
+    my @st = ("着手の判断", "要件", "要件の審査", "設計", "設計の審査", "タスク", "タスクの審査", "実装", "実装中の spec の直し", "出荷とレビュー対応", "その他", "合計");
+    my $m = sub { { model => $_[0], role => $_[1], in => 100456, cw => 2856789, cr => 61123456, out => 376789, usd => 155.2 } };
+    my $tri = sub { { requirements => $_[0], design => $_[1], tasks => $_[2] } };
+    my $d = { v => 1, issue => 501, prs => [ 612, 618 ], spec => $t, start_date => "2026-10-20", end_date => "2026-11-02",
+        totals => { work_sec => 50700, wait_sec => 7800, concurrent_sec => 23280, tokens => 123456789, usd => 312.45,
+            usd_unknown_models => [], limit_count => 1, limit_sec => 9000 },
+        stages => [ map { { name => $_, work_sec => 720, wait_sec => 0, concurrent_sec => 180, tokens => 1234567, usd => 3.1 } } @st ],
+        models => [ $m->("claude-opus-5-5", "本体の会話"), $m->("claude-opus-5-5", "spec の審査役"), $m->("claude-opus-5-5", "タスクごとの確認役"),
+            $m->("claude-haiku-5-5", "Explore") ],
+        rework => { spec_review_rounds => $tri->(3, 5, 2), owner_fix => $tri->(0, 1, 0), spec_back => [ { from => "design", to => "requirements" } ],
+            impl_spec_back => $tri->(0, 1, 0), task_rejected => 2, codex_rounds => 3, ci_fix => 1, same_failure => 0, split => $f,
+            switch_to_spec => 0, size_check_stops => 0, decided_method_stops => 0 },
+        uncountable => [], partial_records => $f, unknown_turns => 3, backfill => $f,
+        prices => { source => "https://platform.claude.com/docs/en/about-claude/pricing", checked_on => "2026-10-24" } };
+    print JSON::PP->new->canonical->encode($d);
+' >"$DRAFT/report.json" || ng "report.json を用意できない"
+# report.md は design の「集計のコメント」の見本の形である
+cat >"$DRAFT/report.md" <<'__MD__'
+## AIの作業の集計
+
+| 開始日 | 終了日 | spec | PR |
+|---|---|---|---|
+| 2026-10-20 | 2026-11-02 | あり | #612、#618 |
+
+### 全体の合計
+
+| 項目 | 値 |
+|---|---|
+| AIの作業時間 | 14時間5分 |
+| トークン数 | 123,456,789 |
+| 使用料 | $312.45 |
+| 使う量の上限で止まった回数 | 1 |
+| 使う量の上限で止まっていた時間 | 2時間30分 |
+
+### 段階ごと
+
+| 段階 | AIの作業時間 | そのうち待ち時間 | 審査役などが同時に動いた時間 | トークン数 | 使用料 |
+|---|---|---|---|---|---|
+| 着手の判断 | 12分 | 0分 | 3分 | 1,234,567 | $3.10 |
+| 要件 | 1時間2分 | 0分 | 10分 | 8,765,432 | $20.12 |
+| 要件の審査 | 1時間40分 | 0分 | 1時間20分 | 15,432,109 | $38.40 |
+| 設計 | 2時間5分 | 0分 | 15分 | 16,543,210 | $41.25 |
+| 設計の審査 | 3時間10分 | 0分 | 2時間40分 | 30,123,456 | $76.80 |
+| タスク | 40分 | 0分 | 5分 | 5,432,100 | $13.55 |
+| タスクの審査 | 50分 | 0分 | 40分 | 6,123,456 | $15.30 |
+| 実装 | 2時間30分 | 50分 | 1時間10分 | 25,678,901 | $66.20 |
+| 実装中の spec の直し | 20分 | 0分 | 5分 | 3,456,789 | $8.63 |
+| 出荷とレビュー対応 | 1時間20分 | 1時間10分 | 0分 | 9,876,543 | $24.70 |
+| その他 | 16分 | 10分 | 0分 | 790,226 | $4.40 |
+| 合計 | 14時間5分 | 2時間10分 | 6時間28分 | 123,456,789 | $312.45 |
+
+### モデルごと
+
+| モデル | 役割 | 入力 | キャッシュの書き込み | キャッシュの読み込み | 出力 | 使用料 |
+|---|---|---|---|---|---|---|
+| claude-opus-5-5 | 本体の会話 | 100,456 | 2,856,789 | 61,123,456 | 376,789 | $155.20 |
+| claude-opus-5-5 | spec の審査役 | 30,123 | 1,234,567 | 30,456,789 | 123,456 | $95.15 |
+| claude-opus-5-5 | タスクごとの確認役 | 20,000 | 600,000 | 9,000,000 | 80,000 | $25.00 |
+| claude-opus-5-5 | 書き方の点検役 | 10,234 | 456,789 | 8,765,432 | 45,678 | $20.60 |
+| claude-haiku-5-5 | Explore | 5,678 | 345,678 | 7,801,419 | 23,456 | $16.50 |
+
+### 往復と手戻り
+
+| 項目 | 回数 |
+|---|---|
+| spec の審査役との往復 | 要件 3、設計 5、タスク 2 |
+| 承認の前に、所有者が spec の直しを求めた | 要件 0、設計 1、タスク 0 |
+| spec を作る途中で、前の段階に戻って直した | 1(設計から要件へ 1) |
+| 実装の途中で、spec に戻って直した | 要件 0、設計 1、タスク 0 |
+| 実装したコードに、タスクごとの確認役が問題を見つけ、コードを直した | 2 |
+| PR の Codex レビューとの往復 | 3 |
+| PR を出したあと、CI の自動チェックが失敗し、コードを直した | 1 |
+| 同じ失敗を3回続けて直せず、AI が作業を止めて所有者に報告した | 0 |
+| 実装の途中で、Issue を分けた | 無し |
+| spec 無しで始め、実装の途中で spec に切り替えた | 0 |
+| 200行の検査で PR が止まった | 0 |
+| 自動レビューが、Issue の決めた方式から外れたとして PR を止めた | 0 |
+
+### 価格
+
+使用料は、https://platform.claude.com/docs/en/about-claude/pricing の公表価格で換算した。価格を確かめた日は 2026-10-24 である。
+
+### 注記
+
+- 会話が再開したきっかけのうち、仕組みが種類を見分けられなかったものが 3回あった。仕組みは、見分けられなかったきっかけの前の時間を、外の仕組みを待っていた時間として、作業時間と待ち時間に数えた。そのため、作業時間と待ち時間は、実際より長いことがある。
+__MD__
+cat >"$FIND" <<'__FIND__'
+- AIの作業時間は 14時間5分で、過去 12件の中央値 5時間40分の 2.5倍だった。設計の審査の段階が 3時間10分だった。
+- 実装中に spec へ戻った回数は 1 で、過去 10件の中央値は 0 だった。
+
+### 直す案
+
+- [501-1] 設計の審査の往復を減らすため、審査役に渡す差分を短くする。
+- [501-2] extract.pl の、会話の再開のきっかけの値の一覧に、値 `example_value` を足す。
+__FIND__
+ROW501="| [#501]($URL/501#issuecomment-1000) | あり | 2026-11-02 | 14時間5分 | 123,456,789 | \$312.45 | 1 |"
+IDX_NOTE="このコメントは、所有者がまだ起票するかを答えていない直す案の番号を、AI が覚えておくためのものである。案の文は、番号の頭の Issue の集計のコメントの所見にある。"
+PUBDB='issues => [ iss(1, body => intro()), iss(501, title => "ふつうの Issue", locked => F, state => "open") ]'
+# publish の出力の見込み: pubout <書けなかった書き込みの JSON の中身>
+pubout() { printf '{"failed":[%s],"proposals":["501-1","501-2"],"url":"%s/501#issuecomment-1000"}' "$1" "$URL"; }
+
+newgh publish
+mkdb "$PUBDB"
+rm -rf "$STATE"
+run publish 501 --draft "$DRAFT" --findings "$FIND"
+check "publish が 0 で終わり、集計のコメントの URL と案の ID と、空の書けなかった書き込みを出す" "$RC/$OUT/$ERR" "0/$(pubout '')/"
+check "publish は、集計のコメント、案の索引、一覧の順に書く" "$(writes)" "issue comment 501 --body-file F|issue comment 1 --body-file F|issue edit 1 --body-file F|"
+check "集計のコメントが、1行目の印、report.md、### 所見 と所見のファイル、最後の数字の行の順に組み立てられる" \
+    "$(dbq 'I(501)->{comments}[0]{body}')" \
+    "$(printf '<!-- keirekipro-usage-report:v1 issue=501 -->\n\n%s\n\n### 所見\n\n%s\n\n<!-- keirekipro-usage-data:v1 %s -->' "$(cat "$DRAFT/report.md")" "$(cat "$FIND")" "$(cat "$DRAFT/report.json")")"
+check "案の索引のコメントが、一覧の Issue の見本の形で書かれる" "$(dbq 'I(1)->{comments}[0]{body}')" \
+    "$(printf '<!-- keirekipro-usage-proposals:v1 page=1 [{"id":"501-1","issue":501},{"id":"501-2","issue":501}] -->\n%s' "$IDX_NOTE")"
+check "publish が一覧に足した行が、集計の値から作った行である" "$(dbq '"" . (lines(1))[-1]')" "$ROW501"
+check "案の索引が一覧の本文に入らない" "$(dbq 'index(I(1)->{body}, "keirekipro-usage-proposals") < 0 ? "none" : "found"')" "none"
+check "案の索引に書けたら proposals_pending を消す" "$(statejson issues/501.json)" "{}"
+perl -MJSON::PP -e '
+    do $ENV{KP_TEST_H} or die "h.pl: $@ $!";
+    my $f = "$ENV{FAKE_GH_DIR}/db.json";
+    open my $i, "<", $f or die $!;
+    my $db = JSON::PP->new->decode(do { local $/; <$i> });
+    close $i;
+    $_->{body} = intro() for grep { $_->{number} == 1 } @{ $db->{issues} };
+    open my $o, ">", $f or die $!;
+    print $o JSON::PP->new->canonical->encode($db);
+' || ng "一覧の本文を戻せない"
+printf '%s\n' '{"list_pending":true}' >"$STATE/issues/501.json"
+run list-ensure 501
+check "list-ensure が、publish の書いた集計のコメントの最後の数字の行の JSON から作った行が、publish が一覧に足した行と同じになる" "$RC/$(dbq '"" . (lines(1))[-1]')" "0/$ROW501"
+
+echo "== 集計のコメントの形に無い値"
+mkdir -p "$TMP_ROOT/bad-json" "$TMP_ROOT/bad-md"
+sed 's/^{/{"branch":"feat\/x",/' "$DRAFT/report.json" >"$TMP_ROOT/bad-json/report.json"
+cp "$DRAFT/report.md" "$TMP_ROOT/bad-json/report.md"
+cp "$DRAFT/report.json" "$TMP_ROOT/bad-md/report.json"
+perl -pe 's/^(### 価格)$/余計な段落\n\n$1/' "$DRAFT/report.md" >"$TMP_ROOT/bad-md/report.md"
+{ cat "$FIND"; printf '%s\n' '- <!-- 隠した行 -->'; } >"$TMP_ROOT/bad-findings.md"
+newgh publish-bad
+mkdb "$PUBDB"
+rm -rf "$STATE"
+run publish 501 --draft "$TMP_ROOT/bad-json" --findings "$FIND"
+check "report.json に形に無い欄があると、publish は書かずに 1 で終わり、手元に何も残さない" "$RC/$(calls)/$(nlines "$ERR")/$(statejson issues/501.json)" "1//1/none"
+run publish 501 --draft "$TMP_ROOT/bad-md" --findings "$FIND"
+check "report.md に形に無い段落があると、publish は書かずに 1 で終わる" "$RC/$(calls)/$(nlines "$ERR")/$(statejson issues/501.json)" "1//1/none"
+run publish 501 --draft "$DRAFT" --findings "$TMP_ROOT/bad-findings.md"
+check "所見に HTML のコメントの印があると、publish は書かずに 1 で終わる" "$RC/$(calls)/$(nlines "$ERR")/$(statejson issues/501.json)" "1//1/none"
+
+echo "== 集計のコメントを書くときの失敗"
+newgh publish-nopush
+mkdb "repo => { owner => \"owner\", name => \"repo\", push => F }, $PUBDB"
+rm -rf "$STATE"
+run publish 501 --draft "$DRAFT" --findings "$FIND"
+check "permissions.push が偽のときは、publish は書かずに 1 で終わり、手元に何も残さない" "$RC/$(writes)/$(nlines "$ERR")/$(statejson issues/501.json)" "1//1/none"
+newgh publish-comment-fail
+mkdb "$PUBDB"
+rm -rf "$STATE"
+printf '%s\n' '^issue comment 501 ' >"$FAKE_GH_DIR/fail"
+run publish 501 --draft "$DRAFT" --findings "$FIND"
+check "publish は、集計のコメントを書く前に proposals_pending を書く" "$RC/$(statejson issues/501.json)" '1/{"proposals_pending":["501-1","501-2"]}'
+rm -f "$FAKE_GH_DIR/fail"
+grep -v -e '^### 直す案$' -e '^- \[501-' "$FIND" >"$TMP_ROOT/no-proposals.md"
+run publish 501 --draft "$DRAFT" --findings "$TMP_ROOT/no-proposals.md"
+check "案の無い所見で書き直すと、前に書けなかった集計の proposals_pending を消し、案の索引を書かない" "$RC/$(statejson issues/501.json)/$(dbq 'idx_ids(1)')" "0/{}/"
+newgh publish-index-fail
+mkdb "$PUBDB"
+rm -rf "$STATE"
+printf '%s\n' '^issue comment 1 ' >"$FAKE_GH_DIR/fail"
+run publish 501 --draft "$DRAFT" --findings "$FIND"
+check "案の索引に書けなくても、publish は 0 で終わり、proposals を書けなかった書き込みとして出し、一覧に行を足す" "$RC/$OUT/$(dbq '"" . (lines(1))[-1]')" "0/$(pubout '"proposals"')/$ROW501"
+check "案の索引に書けなかったときは、proposals_pending を残す" "$(statejson issues/501.json)" '{"proposals_pending":["501-1","501-2"]}'
+rm -f "$FAKE_GH_DIR/fail"
+run proposals-ensure 501
+check "proposals-ensure が、proposals_pending の案を案の索引に足し、proposals_pending を消す" "$RC/$(dbq 'idx_ids(1)')/$(statejson issues/501.json)" "0/501-1 501-2/{}"
+newgh publish-list-fail
+mkdb "$PUBDB"
+rm -rf "$STATE"
+printf '%s\n' '^issue edit 1 ' >"$FAKE_GH_DIR/fail"
+run publish 501 --draft "$DRAFT" --findings "$FIND"
+check "一覧に書けなくても、publish は 0 で終わり、list を書けなかった書き込みとして出し、list_pending を残す" "$RC/$OUT/$(statejson issues/501.json)" "0/$(pubout '"list"')/{\"list_pending\":true}"
+
+echo "== 案の索引のページ"
+newgh index-pages
+mkdb 'issues => [ iss(1, body => intro()) ]'
+rm -rf "$STATE"
+drive 'write_proposals(1, [ many(7, 1001) ], []); 0'
+check "1,001件の案は、1,000件と1件の2つの索引のコメントに分かれ、一覧の本文は変わらない" "$RC/$(dbq 'idx_desc(1)')/$(dbq 'I(1)->{body} eq intro() ? "same" : "diff"')" "0/1:1000 2:1/same"
+drive 'print length(Encode::decode("UTF-8", proposals_text(1, worst_ids()))) < 65536 ? "under" : "over"; 0'
+check "ID の桁が最も多い1,000件の索引のコメントが、65,536文字に届かない" "$RC/$OUT" "0/under"
+run proposal-remove 7-1001
+check "案が無くなったページの索引のコメントを、JSON を [] にして残す" "$RC/$(dbq 'idx_desc(1)')" "0/1:1000 2:0"
+newgh index-reread
+mkdb 'issues => [ iss(1, body => intro()) ]'
+rm -rf "$STATE"
+drive 'clobber(1); write_proposals(1, ["7-1"], []); 0'
+check "書いたあとに読み直して案が無ければ、索引のコメントを書き直す" "$RC/$(writes)/$(dbq 'idx_ids(1)')" "0/issue comment 1 --body-file F|issue comment 1 --body-file F|/7-1"
+
+echo "== 案を外す"
+newgh proposal-remove
+mkdb 'issues => [ iss(1, body => intro(), comments => [ cm(2001, idx_body(1, "7-1")) ]) ]'
+rm -rf "$STATE"
+mkdir -p "$STATE/issues"
+printf '%s\n' '{"proposals_pending":["7-1","7-2"]}' >"$STATE/issues/7.json"
+run proposal-remove 7-1
+check "proposal-remove が、案を proposals_pending と案の索引から外す" "$RC/$(statejson issues/7.json)/$(dbq 'idx_ids(1)')" '0/{"proposals_pending":["7-2"]}/'
+run proposals-ensure 7
+check "proposal-remove で外した案は、proposals-ensure で索引に戻らない" "$RC/$(dbq 'idx_ids(1)')/$(statejson issues/7.json)" "0/7-2/{}"
+
+echo "== 答えていない案を読む"
+newgh proposals-open
+mkdb 'issues => [ iss(1, body => intro(), comments => [ cm(2001, idx_body(1, "501-1")), cm(2002, idx_body(1, "502-1"), "NONE") ]),
+    iss(501, title => "t", locked => F, comments => [ cm(3001, rep_props(501, "- [501-1] 案の文その1")) ]),
+    iss(502, title => "t", locked => F, comments => [ cm(3002, rep_props(502, "- [502-1] 案の文その2")) ]) ]'
+rm -rf "$STATE"
+run proposals-open
+check "proposals-open が、案の ID と Issue の番号と案の文を出し、関係の欄の違う索引のコメントの案を出さない" "$RC/$OUT" '0/[{"id":"501-1","issue":501,"text":"案の文その1"}]'
 
 echo
 echo "$pass ok, $failn NG"
