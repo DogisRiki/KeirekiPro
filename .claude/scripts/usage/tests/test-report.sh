@@ -863,6 +863,76 @@ drive 'binmode STDOUT, ":encoding(UTF-8)"; print join "/", hm(0), hm(29), hm(30)
     commas(0), commas(999), commas(1000), commas(123456789), usd_text(0), usd_text(0.004), usd_text(1234.56), usd_text(312.449), usd_text(0.125), usd_text(1.005), usd_text(0.015), usd_text(2.675)'
 check "時間とトークン数と使用料が、数の書き方の形になる" "$RC:$OUT" "0:0分/0分/1分/59分/1時間0分/14時間5分/0/999/1,000/123,456,789/\$0.00/\$0.00/\$1,234.56/\$312.45/\$0.13/\$1.01/\$0.02/\$2.68"
 
+echo "== 過去との比べと、見分けられなかった値の一覧"
+# 一覧の行(github.pl list-read の出力の形)を書く: lrow <番号> <終了日> <作業時間の秒> <トークン数> <使用料> <実装中に spec へ戻った回数>
+lrow() {
+    printf '{"issue":%s,"url":"https://example.com/c%s","spec":true,"end_date":"%s","work_sec":%s,"tokens":%s,"usd":%s,"impl_spec_back":%s,"usd_partial":false}' \
+        "$1" "$1" "$2" "$3" "$4" "$5" "$6"
+}
+# compare.json の値を読む: cj <perl の式>。P は past_rows、C(<欄>) は values の行ごとの欄の値の配列、J(<値>) は値の JSON である
+cj() {
+    if [ ! -f "$OUTD/compare.json" ]; then
+        printf 'none'
+        return
+    fi
+    perl -MJSON::PP -e '
+        open my $fh, "<", $ARGV[0] or die $!;
+        local $/;
+        my $c = JSON::PP->new->decode(<$fh>);
+        sub P { return $c->{past_rows} }
+        sub C { my ($k) = @_; return [ map { $_->{$k} } @{ $c->{values} || [] } ] }
+        sub J { return JSON::PP->new->canonical->allow_nonref->encode($_[0]) }
+        print '"$1"';
+    ' "$OUTD/compare.json"
+}
+LIST="$WORK/list.json"
+newrepo
+commit 2026-09-01T00:00:00Z "$CFGPATH={}" '.kiro/specs/feat-c/spec.json={"feature_name":"feat-c","issue":2050}'
+newgh cmp
+mkdb 'prs => [ closes("'"$SHA"'", 2050) ]'
+newstate
+rv s50 0 2050
+rtk s50 1800 m1 claude-opus-5-5 1000000 0 0 0 0
+rm1 s50 2400 true
+# 前に終わった行は #2047(終了日が同じで番号が小さい)と #2048 と #2049。#2048 の回数は数えられない。
+# #2051(終了日が同じで番号が大きい)と #2060(終了日が新しい)は、比べる相手に入らない
+printf '[%s,%s,%s,%s,%s]\n' "$(lrow 2049 2026-10-29 600 100 1.00 3)" "$(lrow 2048 2026-10-28 1800 300 3.00 null)" \
+    "$(lrow 2047 2026-10-30 1200 200 2.00 1)" "$(lrow 2051 2026-10-30 99999 99999 999.00 9)" \
+    "$(lrow 2060 2026-10-31 99999 99999 999.00 9)" >"$LIST"
+run 2050 --list "$LIST"
+c_old="$RC:$(cj 'J([P(), C("rows"), C("median"), C("median_text")])')"
+check "一覧に、この Issue より終了日の新しい行と、終了日が同じで番号の大きい行があっても、その行は past_rows にも中央値にも入らない" \
+    "$c_old" "0:[3,[3,3,3,2],[1200,200,2,2],[\"20分\",\"200\",\"\$2.00\",\"2\"]]"
+check "compare.json の値が、集計の値と数の書き方の形の文字になり、ratio が値を中央値で割った値になる" \
+    "$(cj 'J([C("name"), C("value"), C("value_text"), C("ratio")])')" \
+    "[[\"AIの作業時間\",\"トークン数\",\"使用料\",\"実装中に spec へ戻った回数\"],[2400,1000001,4.000004,0],[\"40分\",\"1,000,001\",\"\$4.00\",\"0\"],[2,5000.005,2,0]]"
+u_none=$(cat "$OUTD/unknown.json" 2>/dev/null)
+printf '[]\n' >"$LIST"
+run 2050 --list "$LIST"
+c_empty="$RC:$(cj 'J([P(), C("rows"), C("median"), C("median_text"), C("ratio")])')"
+run 2050
+c_nolist="$RC:$(cj 'J([P(), C("ratio")])')"
+printf '[%s]\n' "$(lrow 2001 2026-10-01 0 0 0 0)" >"$LIST"
+run 2050 --list "$LIST"
+check "compare.json で、過去の行が無いと past_rows が 0 になり、中央値が 0 の値の ratio が null になり、数えられない過去の行が中央値から除かれる" \
+    "$c_empty/$c_nolist/$RC:$(cj 'J([P(), C("median"), C("ratio")])')/${c_old##*,}" \
+    '0:[0,[0,0,0,0],[null,null,null,null],[null,null,null,null],[null,null,null,null]]/0:[0,[null,null,null,null]]/0:[1,[0,0,0,0],[null,null,null,null]]/"2"]]'
+printf 'x\n' >"$LIST"
+rm -rf "$OUTD"
+run 2050 --list "$LIST"
+check "一覧の行のファイルが行の JSON の配列でないと、下書きを書かずに 1 で終わる" "$RC:$(find "$OUTD" -type f 2>/dev/null | wc -l | tr -d ' ')" "1:0"
+newstate
+rv s50 0 2050
+rec s50 "{\"k\":\"turn\",\"ts\":$((T0 + 5)),\"from\":\"unknown\",\"job\":null,\"raw\":\"qq-raw-1\"}" \
+    "{\"k\":\"turn\",\"ts\":$((T0 + 6)),\"from\":\"unknown\",\"job\":null,\"raw\":\"qq-raw-1\"}" \
+    "{\"k\":\"turn\",\"ts\":$((T0 + 7)),\"from\":\"unknown\",\"job\":null,\"raw\":\"qq-raw-2\"}" \
+    "{\"k\":\"turn\",\"ts\":$((T0 + 8)),\"from\":\"unknown\",\"job\":null}"
+rm1 s50 10 true
+run 2050
+check "unknown.json に raw の値ごとの回数が出て、report.json と report.md には raw の値が出ず、注記に回数と作業時間が長く数えられたことがあることが出る" \
+    "$RC:$(cat "$OUTD/unknown.json" 2>/dev/null)/$u_none/$(cat "$OUTD/report.json" "$OUTD/report.md" 2>/dev/null | grep -c qq-raw)/$(rj 'R("unknown_turns")')/$(grep -c '見分けられなかったものが 4回あった。.*実際より長いことがある。' "$OUTD/report.md")" \
+    '0:{"":1,"qq-raw-1":2,"qq-raw-2":1}/{}/0/4/1'
+
 echo "== 仕組みが main に入った時刻"
 newrepo
 commit 2026-10-01T00:00:00Z a.txt=1

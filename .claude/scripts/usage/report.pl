@@ -6,7 +6,8 @@
 #   perl report.pl --state <記録の置き場所> --config <データのファイル> --issue <N> --out <下書きのディレクトリ>
 #                  [--list <一覧の行のファイル>] [--backfill]
 #     手元の記録(extract/ marks.jsonl durations/)と、gh で読む PR と、git で読む main の spec.json から
-#     Issue N の集計を作り、<下書きのディレクトリ> に report.json と report.md と created_at を書く。
+#     Issue N の集計を作り、<下書きのディレクトリ> に report.json と report.md と compare.json と unknown.json と
+#     created_at を書く。
 #     --list は、github.pl list-read の出力を過去の行として受ける。--backfill は、さかのぼりの集計の印である
 #
 # report.pl は、gh を読み取りだけに使い、GitHub に書かない。所見を書かない。
@@ -99,6 +100,7 @@ sub build {
     my $models = count_tokens($ctx, $lines, $totals, $by_stage);
     my $rework = count_rework($ctx);
     my ($uncountable, $partial) = uncountable_rows($ctx, $rework);
+    my $list = read_list($o->{list});
     my $report = {
         v          => 1,
         issue      => $n,
@@ -118,6 +120,8 @@ sub build {
     };
     write_file("$o->{out}/report.json", $JSON->encode($report) . "\n");
     write_file("$o->{out}/report.md", Encode::encode('UTF-8', report_md($report, $ctx)));
+    write_file("$o->{out}/compare.json", $JSON->encode(compare($report, $list)) . "\n");
+    write_file("$o->{out}/unknown.json", $JSON->encode(unknown_raws($ctx)) . "\n");
     # usage.sh の publish が下書きの新しさを確かめるための、下書きを作った時刻(秒)
     write_file("$o->{out}/created_at", time() . "\n");
     return 0;
@@ -1333,6 +1337,74 @@ sub unlinked_spawn {
         $cand[$i] = undef;
     }
     return 0;
+}
+
+# ---- 過去との比べと、見分けられなかった値 ------------------------------------
+
+# --list のファイル(github.pl list-read の出力の形)を読み、一覧の行の配列を返す。--list が無ければ空の配列を返す
+sub read_list {
+    my ($f) = @_;
+    return [] unless defined $f;
+    open(my $fh, '<:raw', $f) or die "一覧の行のファイル $f を読めなかった($!)\n";
+    local $/;
+    my $s = <$fh>;
+    close $fh;
+    my $rows = eval { $JSON->decode($s // '') };
+    die "一覧の行のファイル $f が、行の JSON の配列でない\n" unless ref $rows eq 'ARRAY';
+    for my $r (@$rows) {
+        die "一覧の行のファイル $f に、番号と終了日を持たない行がある\n"
+            unless ref $r eq 'HASH' && defined $r->{issue} && !ref $r->{issue} && $r->{issue} =~ /\A[1-9][0-9]*\z/
+            && defined $r->{end_date} && !ref $r->{end_date} && $r->{end_date} =~ /\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z/;
+        for my $k (qw(work_sec tokens usd impl_spec_back)) {
+            my $v = $r->{$k};
+            die "一覧の行のファイル $f の Issue $r->{issue} の行の $k が数でない\n"
+                if defined $v && (ref $v || !Scalar::Util::looks_like_number($v) || $v < 0);
+        }
+    }
+    return $rows;
+}
+
+# 一覧の行のうち、この Issue より前に終わった行と比べた compare.json の中身を作る。
+# 前に終わった行は、終了日がこの Issue より前の行と、終了日が同じで番号がこの Issue より小さい行である
+sub compare {
+    my ($r, $list) = @_;
+    my ($n, $end) = ($r->{issue}, $r->{end_date});
+    my @past = grep { $_->{end_date} lt $end || ($_->{end_date} eq $end && $_->{issue} < $n) } @$list;
+    my $t = $r->{totals};
+    my $isb = $r->{rework}{impl_spec_back};
+    my $back;
+    if (ref $isb eq 'HASH') { $back = 0; $back += $isb->{$_} // 0 for @{ +SPEC_STEPS } }
+    my @values = (
+        [ 'AIの作業時間',               'work_sec',       $t->{work_sec}, \&hm ],
+        [ 'トークン数',                 'tokens',         $t->{tokens},   sub { commas(int($_[0] + 0.5)) } ],
+        [ '使用料',                     'usd',            $t->{usd},      \&usd_text ],
+        [ '実装中に spec へ戻った回数', 'impl_spec_back', $back,          sub { $_[0] == int($_[0]) ? "$_[0]" : sprintf('%.1f', $_[0]) } ],
+    );
+    my $none = ja('数えられない');
+    return {
+        past_rows => scalar @past,
+        values    => [ map {
+            my ($name, $key, $value, $fmt) = @$_;
+            my @v = sort { $a <=> $b } map { $_->{$key} + 0 } grep { defined $_->{$key} } @past;
+            my $median = !@v ? undef : @v % 2 ? $v[$#v / 2] : ($v[@v / 2 - 1] + $v[@v / 2]) / 2;
+            +{  name        => ja($name),
+                value       => $value,
+                value_text  => defined $value ? $fmt->($value) : $none,
+                median      => $median,
+                median_text => defined $median ? $fmt->($median) : undef,
+                ratio       => defined $value && defined $median && $median != 0 ? 0 + sprintf('%.4f', $value / $median) : undef,
+                rows        => scalar @v }
+        } @values ],
+    };
+}
+
+# Issue N の、turn の from が unknown の行の、raw の値ごとの回数。raw が無い行は空の値として数える
+sub unknown_raws {
+    my ($ctx) = @_;
+    my %c;
+    $c{ $_->{raw} // '' }++
+        for grep { ($_->{k} // '') eq 'turn' && ($_->{from} // '') eq 'unknown' } map { @$_ } values %{ $ctx->{irec} };
+    return \%c;
 }
 
 # ---- 集計のコメントの本文 ----------------------------------------------------
