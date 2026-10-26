@@ -5,6 +5,17 @@
 # 呼び出し方:
 #   perl github.pl reported <N>
 #     Issue N に集計のコメントがあれば、そのコメントの URL を出して 0、無ければ 3 で終わる
+#   perl github.pl list-read
+#     一覧のすべての行を、数に戻して JSON の配列の1行で出す。一覧の Issue が無ければ [] を出す
+#   perl github.pl list-add <行の JSON のファイル>
+#     ファイルの行(list-read の出力と同じ形の配列)を一覧に足す。同じ Issue の行があれば置き換える
+#   perl github.pl list-ensure <N>
+#     一覧に Issue N の行が無ければ、Issue N の集計のコメントの最後の数字の行の JSON から行を作って足す
+#
+# 一覧の行は、終了日の古い順に、終了日が同じなら Issue の番号の順に並べ、300行ごとのページに分ける。
+# 1ページ目は一覧の Issue の本文に、2ページ目からは行頭が <!-- keirekipro-usage-list:v1 page=<k> --> の
+# コメントに置く。行を足したら、待ってから一覧を読み直し、足した行が無ければ3回まで書き直す。
+# 足せなかったときは、その Issue の issues/<N>.json に list_pending を残して 1 で終わる。
 #
 # gh は、開発者の PC の gh のトークンで、いまの作業フォルダのリポジトリ({owner}/{repo})を読み書きする。
 # 印で見つけるコメントと、題名で見つける一覧の Issue は、リポジトリとの関係の欄(author_association)が
@@ -24,26 +35,46 @@ use warnings;
 use JSON::PP ();
 use File::Temp ();
 use Encode ();
+use Scalar::Util ();
 
 # 集計のコメントの1行目の印。あとに issue=<N> と空白が続く
 use constant REPORT_MARK => '<!-- keirekipro-usage-report:v1';
 
+# 集計のコメントの最後の数字の行の印。あとに空白と report.json を1行にしたものが続く
+use constant DATA_MARK => '<!-- keirekipro-usage-data:v1';
+
+# 一覧の続きのコメントの1行目の印。あとに page=<k> が続く
+use constant LIST_PAGE_MARK => '<!-- keirekipro-usage-list:v1';
+
 # 一覧の Issue の題名と、作るときの本文(行の無い一覧)
 use constant LIST_TITLE => 'AIの作業の集計の一覧';
-use constant LIST_INTRO => <<'END';
+use constant LIST_HEAD => <<'END';
+| Issue | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |
+|---|---|---|---|---|---|---|
+END
+use constant LIST_INTRO => <<'END' . LIST_HEAD;
 ## AIの作業の集計の一覧
 
 この一覧は、Issue ごとの AI の作業の集計を、終了日の古い順に1行ずつ並べたものである。Issue の列の番号から、その Issue の集計のコメントを開ける。「AIの作業時間」は、AI の会話のどれかが動いていた時間で、所有者の返事を待っていた時間と、使う量の上限で止まっていた時間を含まない。「トークン数」は、入力、キャッシュの書き込み、キャッシュの読み込み、出力の合計である。「使用料」は、トークン数を公表価格で換算した米ドルの額である。「実装中に spec へ戻った回数」は、実装の途中で要件、設計、タスクに戻って直した回数の合計である。300行を超えた行は、この Issue のコメントに続く。
 
-| Issue | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |
-|---|---|---|---|---|---|---|
 END
+
+# 1ページの行の数と、一覧に行を足すときに書き直す回数
+use constant ROWS_PER_PAGE => 300;
+use constant LIST_TRIES => 3;
+
+# 一覧の行の、数えられない値と、価格が分からないモデルがあるときの使用料のあとに付ける文
+use constant UNCOUNTABLE => '数えられない';
+use constant USD_PARTIAL => '(価格が分からないモデルを除く)';
 
 # 書き手として認めるリポジトリとの関係の欄の値
 my %TRUSTED = map { $_ => 1 } qw(OWNER COLLABORATOR);
 
 my %COMMANDS = (
-    reported => \&cmd_reported,
+    reported      => \&cmd_reported,
+    'list-read'   => \&cmd_list_read,
+    'list-add'    => \&cmd_list_add,
+    'list-ensure' => \&cmd_list_ensure,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
@@ -70,7 +101,10 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "usage: perl github.pl reported <N>\n";
+    print STDERR "usage: perl github.pl reported <N>\n",
+        "       perl github.pl list-read\n",
+        "       perl github.pl list-add <行の JSON のファイル>\n",
+        "       perl github.pl list-ensure <N>\n";
     return 64;
 }
 
@@ -310,28 +344,351 @@ sub create_list_issue {
     return $n;
 }
 
-# 一覧に行を足す呼び出しが使う。一覧の Issue を用意できなければ、Issue N に list_pending を残して die する
+# 一覧に行を足す呼び出しが使う。一覧の Issue を用意できなければ、行を足す Issue ごとに list_pending を残して die する
 sub list_issue_for_rows {
-    my ($n) = @_;
+    my (@ns) = @_;
     my $list = eval { list_issue_for_write() };
     return $list if defined $list;
     my $why = $@;
-    mark_pending($n, 'list_pending');
+    mark_pending($_, 'list_pending') for @ns;
     die $why;
+}
+
+# issues/<N>.json に印があれば消す。ファイルが無いときは作らない
+sub clear_pending {
+    my ($n, $key) = @_;
+    my $f = state_dir() . "/issues/$n.json";
+    return unless -e $f && exists read_json_file($f)->{$key};
+    update_json_file($f, sub { delete $_[0]{$key} });
+}
+
+# ---- 一覧の行 ------------------------------------------------------------
+# 一覧の行は、次の欄のハッシュで持つ。list-read はこの形を出し、list-add はこの形を読む。
+# issue / url(集計のコメント)/ spec(真偽)/ end_date / work_sec / tokens / usd / impl_spec_back /
+# usd_partial(真偽。価格が分からないモデルがあるとき真)。work_sec から impl_spec_back は null(数えられない)を取る
+
+sub group3 {
+    my ($s) = @_;
+    1 while $s =~ s/\A(\d+)(\d{3})/$1,$2/;
+    return $s;
+}
+
+sub fmt_time {
+    my ($sec) = @_;
+    return UNCOUNTABLE unless defined $sec;
+    my $m = int($sec / 60 + 0.5);
+    my ($h, $mm) = (int($m / 60), $m % 60);
+    return $h ? "${h}時間${mm}分" : "${mm}分";
+}
+
+sub fmt_tokens {
+    my ($n) = @_;
+    return defined $n ? group3(sprintf '%d', $n) : UNCOUNTABLE;
+}
+
+# 小数2桁に四捨五入する。2進数の小数の誤差で 0.5 セントを切り捨てないよう、わずかに足す
+sub fmt_usd {
+    my ($usd, $partial) = @_;
+    return UNCOUNTABLE unless defined $usd;
+    my $cents = int($usd * 100 + 0.5 + 1e-6);
+    return sprintf('$%s.%02d', group3(int($cents / 100)), $cents % 100) . ($partial ? USD_PARTIAL : '');
+}
+
+sub fmt_count {
+    my ($n) = @_;
+    return defined $n ? "$n" : UNCOUNTABLE;
+}
+
+sub format_row {
+    my ($r) = @_;
+    return '| ' . join(' | ', "[#$r->{issue}]($r->{url})", ($r->{spec} ? 'あり' : '無し'), $r->{end_date},
+        fmt_time($r->{work_sec}), fmt_tokens($r->{tokens}), fmt_usd($r->{usd}, $r->{usd_partial}),
+        fmt_count($r->{impl_spec_back})) . ' |';
+}
+
+# 一覧の1行(バイトの文字列)を、行のハッシュに戻す。一覧の行の形でなければ undef を返す
+sub parse_row {
+    my ($line) = @_;
+    my $u = UNCOUNTABLE;
+    my ($n, $url, $spec, $date, $time, $tok, $usd, $back) = $line =~ m{\A\| \[#([1-9][0-9]*)\]\((\S+)\) \| (あり|無し) \| ([0-9]{4}-[0-9]{2}-[0-9]{2}) \| ([^|]+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|\s*\z}
+        or return undef;
+    my %r = (issue => $n + 0, url => $url, spec => $spec eq 'あり' ? JSON::PP::true : JSON::PP::false, end_date => $date,
+        usd_partial => JSON::PP::false);
+    if ($time eq $u) { $r{work_sec} = undef }
+    elsif ($time =~ /\A(?:([1-9][0-9]*)時間)?([0-9]+)分\z/) { $r{work_sec} = (($1 // 0) * 60 + $2) * 60 }
+    else { return undef }
+    if ($tok eq $u) { $r{tokens} = undef }
+    elsif ($tok =~ /\A[0-9]{1,3}(?:,[0-9]{3})*\z/) { ($r{tokens} = $tok) =~ s/,//g; $r{tokens} += 0 }
+    else { return undef }
+    if ($usd eq $u) { $r{usd} = undef }
+    elsif ($usd =~ /\A\$([0-9]{1,3}(?:,[0-9]{3})*)\.([0-9]{2})(\Q${\USD_PARTIAL}\E)?\z/) {
+        my ($int, $cent, $partial) = ($1, $2, $3);
+        $int =~ s/,//g;
+        $r{usd} = "$int.$cent" + 0;
+        $r{usd_partial} = JSON::PP::true if $partial;
+    } else { return undef }
+    if ($back eq $u) { $r{impl_spec_back} = undef }
+    elsif ($back =~ /\A(?:0|[1-9][0-9]*)\z/) { $r{impl_spec_back} = $back + 0 }
+    else { return undef }
+    return eval { check_row(\%r) };
+}
+
+sub nonneg {
+    my ($v, $int) = @_;
+    return 0 unless defined $v && !ref $v && Scalar::Util::looks_like_number($v) && $v >= 0 && $v < 1e15;
+    return !$int || $v == int($v) ? 1 : 0;
+}
+
+# 行のハッシュを確かめ、欄をそろえた写しを返す。一覧に書くのは、この形の値だけである
+sub check_row {
+    my ($r) = @_;
+    die "一覧の行がオブジェクトでない\n" unless ref $r eq 'HASH';
+    my $n = issue_number($r->{issue});
+    die "一覧の行の issue が正しくない\n" unless defined $n;
+    my $url = $r->{url};
+    die "Issue $n の行の url が、その Issue の集計のコメントの URL でない\n"
+        unless defined $url && !ref $url && $url =~ m{\Ahttps://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\Q$n\E#issuecomment-[1-9][0-9]*\z};
+    die "Issue $n の行の spec が真偽でない\n" unless JSON::PP::is_bool($r->{spec});
+    die "Issue $n の行の end_date が年-月-日でない\n" unless defined $r->{end_date} && !ref $r->{end_date} && $r->{end_date} =~ /\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z/;
+    my %c = (issue => $n + 0, url => $url, spec => $r->{spec} ? JSON::PP::true : JSON::PP::false, end_date => $r->{end_date});
+    for my $k (qw(work_sec tokens usd impl_spec_back)) {
+        my $v = $r->{$k};
+        die "Issue $n の行の $k が正しくない\n" if defined $v && !nonneg($v, $k eq 'tokens' || $k eq 'impl_spec_back');
+        $c{$k} = defined $v ? $v + 0 : undef;
+    }
+    my $p = $r->{usd_partial};
+    die "Issue $n の行の usd_partial が真偽でない\n" if defined $p && !JSON::PP::is_bool($p);
+    $c{usd_partial} = $p ? JSON::PP::true : JSON::PP::false;
+    return \%c;
+}
+
+# 集計の JSON(report.json の形)と集計のコメントの URL から、行のハッシュを作る
+sub row_from_report {
+    my ($d, $url, $n) = @_;
+    die "Issue $n の集計の JSON がオブジェクトでない\n" unless ref $d eq 'HASH' && ref $d->{totals} eq 'HASH';
+    my $issue = issue_number($d->{issue});
+    die "Issue $n の集計の JSON の issue が $n でない\n" unless defined $issue && $issue == $n;
+    my $t = $d->{totals};
+    my $b = ref $d->{rework} eq 'HASH' ? $d->{rework}{impl_spec_back} : undef;
+    my $back;
+    if (ref $b eq 'HASH') {
+        my @v = map { $b->{$_} } qw(requirements design tasks);
+        if (!grep { !nonneg($_, 1) } @v) { $back = 0; $back += $_ for @v }
+    }
+    my $unknown = $t->{usd_unknown_models};
+    return check_row({ issue => $n, url => $url, spec => $d->{spec}, end_date => $d->{end_date},
+        work_sec => $t->{work_sec}, tokens => $t->{tokens}, usd => $t->{usd}, impl_spec_back => $back,
+        usd_partial => ref $unknown eq 'ARRAY' && @$unknown ? JSON::PP::true : JSON::PP::false });
+}
+
+# ---- 一覧の読み書き ------------------------------------------------------
+
+sub bytes_of {
+    my ($s) = @_;
+    return '' unless defined $s && !ref $s;
+    $s = Encode::encode('UTF-8', $s);
+    $s =~ s/\r\n/\n/g;
+    return $s;
+}
+
+# 一覧の Issue の本文と、書き手の確認を通るページのコメントを読む。行は、本文、ページの番号の順、
+# 同じ番号ならコメントの古い順に読み、同じ Issue の行が2つあれば先の行を使う
+sub read_list {
+    my ($list) = @_;
+    my $issue = gh_api_one("repos/{owner}/{repo}/issues/$list");
+    my %cur = (body => bytes_of(ref $issue eq 'HASH' ? $issue->{body} : undef), pages => []);
+    for my $c (@{ trusted_comments($list) }) {
+        my $body = bytes_of($c->{body});
+        my ($k) = $body =~ /\A\Q${\LIST_PAGE_MARK}\E page=([1-9][0-9]*) -->/ or next;
+        next unless $k >= 2 && defined issue_number($c->{id});
+        push @{ $cur{pages} }, { k => $k, id => $c->{id}, body => $body };
+    }
+    @{ $cur{pages} } = sort { $a->{k} <=> $b->{k} || $a->{id} <=> $b->{id} } @{ $cur{pages} };
+    my (%seen, @rows);
+    for my $text ($cur{body}, map { $_->{body} } @{ $cur{pages} }) {
+        for my $line (split /\n/, $text) {
+            my $r = parse_row($line) or next;
+            push @rows, $r unless $seen{ $r->{issue} }++;
+        }
+    }
+    $cur{rows} = \@rows;
+    return \%cur;
+}
+
+sub sort_rows {
+    return sort { $a->{end_date} cmp $b->{end_date} || $a->{issue} <=> $b->{issue} } @_;
+}
+
+sub page_text {
+    my ($k, @lines) = @_;
+    return LIST_PAGE_MARK . " page=$k -->\n\n### 一覧の続き(${k}ページ目)\n\n" . LIST_HEAD . join('', map { "$_\n" } @lines);
+}
+
+sub body_file {
+    my ($text) = @_;
+    my $f = File::Temp->new;
+    binmode $f;
+    print $f $text;
+    close $f or die "一覧の本文を一時ファイルに書けなかった($!)\n";
+    return $f;
+}
+
+# 行を並べ、ページに分け、変わった本文とページのコメントだけを書き直し、足りないページのコメントを書く。
+# 同じ番号のページのコメントがいくつもあるときは、古いものを使い、ほかのものを行の無いページにする。
+# 何かを書いたら真を返す
+sub write_list {
+    my ($list, $cur, $rows) = @_;
+    my @lines = map { format_row($_) } sort_rows(@$rows);
+    my @pages;
+    push @pages, [ splice @lines, 0, ROWS_PER_PAGE ] while @lines;
+    my $wrote = 0;
+    my $body = LIST_INTRO . join('', map { "$_\n" } @{ shift(@pages) || [] });
+    if ($body ne $cur->{body}) {
+        my $f = body_file($body);
+        gh('issue', 'edit', $list, '--body-file', $f->filename);
+        $wrote = 1;
+    }
+    my %used;
+    for my $c (@{ $cur->{pages} }) {
+        my $want = $used{ $c->{k} }++ || $c->{k} - 2 > $#pages ? page_text($c->{k}) : page_text($c->{k}, @{ $pages[ $c->{k} - 2 ] });
+        next if $want eq $c->{body};
+        my $f = body_file($want);
+        gh('api', '-X', 'PATCH', "repos/{owner}/{repo}/issues/comments/$c->{id}", '-F', 'body=@' . $f->filename);
+        $wrote = 1;
+    }
+    for my $i (0 .. $#pages) {
+        my $k = $i + 2;
+        next if $used{$k};
+        my $f = body_file(page_text($k, @{ $pages[$i] }));
+        gh('issue', 'comment', $list, '--body-file', $f->filename);
+        $wrote = 1;
+    }
+    return $wrote;
+}
+
+# 一覧を読み直す前に待つ秒数。テストだけが環境変数で短くする
+sub test_secs {
+    my ($name, $default) = @_;
+    my $v = $ENV{$name};
+    return defined $v && $v =~ /\A[0-9]+(?:\.[0-9]+)?\z/ ? $v : $default;
+}
+
+sub list_reread_secs { return test_secs(q(KP_USAGE_TEST_LIST_REREAD), 10) }
+
+sub list_reread_wait {
+    my $s = list_reread_secs();
+    select(undef, undef, undef, $s) if $s > 0;
+}
+
+# 一覧に行を足す。同じ Issue の行は置き換える。書いたら待ってから読み直し、足した行がすべてあれば 1 を返す。
+# 無ければ、読み直した一覧に足し直す。LIST_TRIES 回やっても無ければ die する
+sub write_rows {
+    my ($list, $rows, $cur) = @_;
+    my %want = map { format_row($_) => 1 } @$rows;
+    for (1 .. LIST_TRIES) {
+        $cur ||= read_list($list);
+        my %add = map { $_->{issue} => $_ } @$rows;
+        my @all = ((grep { !$add{ $_->{issue} } } @{ $cur->{rows} }), values %add);
+        return 1 unless write_list($list, $cur, \@all);
+        list_reread_wait();
+        $cur = read_list($list);
+        my %have = map { format_row($_) => 1 } @{ $cur->{rows} };
+        return 1 unless grep { !$have{$_} } keys %want;
+    }
+    die LIST_TRIES . "回書き直しても、一覧に足した行が残らなかった\n";
+}
+
+# 行を足す。足せたら行の Issue ごとの list_pending を消し、足せなければ list_pending を残して die する
+sub add_rows {
+    my ($rows) = @_;
+    my %seen;
+    my @ns = grep { !$seen{$_}++ } map { $_->{issue} } @$rows;
+    my $list = list_issue_for_rows(@ns);
+    my $ok = eval { write_rows($list, $rows) };
+    if (!$ok) {
+        my $why = $@;
+        mark_pending($_, 'list_pending') for @ns;
+        die $why;
+    }
+    clear_pending($_, 'list_pending') for @ns;
+    return 0;
+}
+
+# Issue N の集計のコメント(書き手の確認を通り、1行目がその Issue の印のもの)のうち、最初のものを返す
+sub report_comment {
+    my ($n) = @_;
+    my $head = REPORT_MARK . " issue=$n ";
+    for my $c (@{ trusted_comments($n) }) {
+        my $body = $c->{body};
+        return $c if defined $body && !ref $body && index($body, $head) == 0;
+    }
+    return undef;
+}
+
+sub comment_url {
+    my ($c) = @_;
+    my $url = $c->{html_url};
+    die "集計のコメントの URL が応答に無かった\n" unless defined $url && !ref $url;
+    return $url;
+}
+
+# Issue N の集計のコメントの最後の数字の行の JSON から、一覧の行を作る
+sub report_row {
+    my ($n) = @_;
+    my $c = report_comment($n) or die "Issue $n に集計のコメントが無いので、一覧の行を作れなかった\n";
+    my $mark = DATA_MARK;
+    my @data = bytes_of($c->{body}) =~ /^\Q$mark\E (\{.*\}) -->[ \t]*$/mg;
+    die "Issue $n の集計のコメントに数字の行が無い\n" unless @data;
+    my $d = eval { $JSON->decode($data[-1]) };
+    die "Issue $n の集計のコメントの数字の行を JSON として読めなかった\n" unless defined $d;
+    return row_from_report($d, comment_url($c), $n);
 }
 
 sub cmd_reported {
     my (@args) = @_;
     my $n = @args == 1 ? issue_number($args[0]) : undef;
     return usage() unless defined $n;
-    my $head = REPORT_MARK . " issue=$n ";
-    for my $c (@{ trusted_comments($n) }) {
-        my $body = $c->{body};
-        next unless defined $body && !ref $body && index($body, $head) == 0;
-        my $url = $c->{html_url};
-        die "集計のコメントの URL が応答に無かった\n" unless defined $url && !ref $url;
-        print "$url\n";
-        return 0;
+    my $c = report_comment($n) or return 3;
+    print comment_url($c), "\n";
+    return 0;
+}
+
+sub cmd_list_read {
+    my (@args) = @_;
+    return usage() if @args;
+    my $list = list_issue_for_read();
+    print $JSON->encode(defined $list ? [ sort_rows(@{ read_list($list)->{rows} }) ] : []), "\n";
+    return 0;
+}
+
+sub cmd_list_add {
+    my (@args) = @_;
+    return usage() unless @args == 1;
+    open(my $fh, '<:raw', $args[0]) or die "$args[0] を読めなかった($!)\n";
+    my $text = do { local $/; <$fh> };
+    close $fh;
+    my $in = eval { $JSON->decode($text // '') };
+    die "$args[0] が、行の JSON の配列でない\n" unless ref $in eq 'ARRAY' && @$in;
+    my $rows = [ map { check_row($_) } @$in ];
+    require_push();
+    return add_rows($rows);
+}
+
+sub cmd_list_ensure {
+    my (@args) = @_;
+    my $n = @args == 1 ? issue_number($args[0]) : undef;
+    return usage() unless defined $n;
+    require_push();
+    my $list = list_issue_for_rows($n);
+    my $ok = eval {
+        my $cur = read_list($list);
+        (grep { $_->{issue} == $n } @{ $cur->{rows} }) ? 1 : write_rows($list, [ report_row($n) ], $cur);
+    };
+    if (!$ok) {
+        my $why = $@;
+        mark_pending($n, 'list_pending');
+        die $why;
     }
-    return 3;
+    clear_pending($n, 'list_pending');
+    return 0;
 }

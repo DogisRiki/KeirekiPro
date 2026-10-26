@@ -20,6 +20,82 @@ chmod +x "$TMP_ROOT/bin/gh"
 PATH="$TMP_ROOT/bin:$PATH"
 export PATH
 
+# 一覧を読み直す前に待つ秒数を 0 にする(既定の10秒は「一覧を読み直す前に待つ」で確かめる)
+KP_USAGE_TEST_LIST_REREAD=0
+export KP_USAGE_TEST_LIST_REREAD
+# list-add に渡す行の JSON のファイル
+ROWS="$TMP_ROOT/rows.json"
+export ROWS
+
+# mkdb・dbq・drive の perl が読み込む、テストの関数。本文の文字は UTF-8 のバイトのまま扱う。
+# intro() は一覧の本文の見出しと説明と表の頭、R(<番号>, <終了日>[, <spec>]) は決まった値の一覧の行、
+# Rs(<始め>, <終わり>, <終了日>) はその範囲の番号の R の行、body_with(<行>...) は行を持つ一覧の本文、
+# page(<k>, <行>...) は k ページ目のコメントの本文、cm(<id>, <本文>[, <関係の欄>]) はコメントである。
+# report_body(<番号>, <数字の行の JSON>...) は集計のコメントの本文、D_OLD と D_NEW は数字の行の JSON、
+# L501(<コメントの id>) は D_NEW から作った一覧の行、worst_rows() は値の桁が最も多い300行の JSON である。
+# not_row() は URL が一覧の行の形でない行、worst_last(<行>) は worst_rows() の最後の行かどうかを返す。
+# dbq だけで使うもの: read_after_add() は「一覧を読む」の一覧に行を足したあとの本文とコメントを、見込みと比べる
+# drive だけで使うもの: add_file() は $ROWS で list-add を呼ぶ。rr(<JSON>, <番号>) は集計の JSON から作った行を出す。
+# clobber(<回数>, <行>...) は、いまの一覧の本文に行を足した写しを控え、書いたあとの読み直しの前の待ちを、
+# 最初の <回数> 回だけ、控えを書き戻すものに替える。ほかの人が同時に一覧を書き、こちらの行を消した形になる
+export KP_TEST_H="$TMP_ROOT/h.pl"
+cat >"$KP_TEST_H" <<'__H__'
+require JSON::PP;
+my $URLB = "https://github.com/owner/repo/issues";
+sub head { return "| Issue | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |\n|---|---|---|---|---|---|---|\n" }
+sub intro {
+    return "## AIの作業の集計の一覧\n\nこの一覧は、Issue ごとの AI の作業の集計を、終了日の古い順に1行ずつ並べたものである。Issue の列の番号から、その Issue の集計のコメントを開ける。「AIの作業時間」は、AI の会話のどれかが動いていた時間で、所有者の返事を待っていた時間と、使う量の上限で止まっていた時間を含まない。「トークン数」は、入力、キャッシュの書き込み、キャッシュの読み込み、出力の合計である。「使用料」は、トークン数を公表価格で換算した米ドルの額である。「実装中に spec へ戻った回数」は、実装の途中で要件、設計、タスクに戻って直した回数の合計である。300行を超えた行は、この Issue のコメントに続く。\n\n" . head();
+}
+sub R { my ($n, $date, $spec) = @_; return "| [#$n]($URLB/$n#issuecomment-" . (5000 + $n) . ") | " . ($spec // "無し") . " | $date | 1時間20分 | 3,456,789 | \$8.90 | 0 |" }
+sub Rs { my ($from, $to, $date) = @_; return map { R($_, $date) } $from .. $to }
+sub body_with { return intro() . join("", map { "$_\n" } @_) }
+sub page { my ($k, @l) = @_; return "<!-- keirekipro-usage-list:v1 page=$k -->\n\n### 一覧の続き(${k}ページ目)\n\n" . head() . join("", map { "$_\n" } @l) }
+sub cm { my ($id, $body, $a) = @_; return { id => $id, body => $body, author_association => $a // "OWNER", created_at => "2026-10-26T00:00:00Z" } }
+sub report_body {
+    my ($n, @data) = @_;
+    return "<!-- keirekipro-usage-report:v1 issue=$n -->\n\n## AIの作業の集計\n\n本文\n"
+        . join("本文の途中\n", map { "<!-- keirekipro-usage-data:v1 $_ -->\n" } @data);
+}
+sub D_OLD { return '{"v":1,"issue":501,"spec":false,"end_date":"2026-01-01","totals":{"work_sec":60,"tokens":1,"usd":1,"usd_unknown_models":[]},"rework":{"impl_spec_back":{"requirements":0,"design":0,"tasks":0}}}' }
+sub D_NEW { return '{"v":1,"issue":501,"prs":[612,618],"spec":true,"end_date":"2026-11-02","totals":{"work_sec":50700,"wait_sec":0,"tokens":123456789,"usd":312.45,"usd_unknown_models":["claude-x"]},"rework":{"impl_spec_back":{"requirements":1,"design":0,"tasks":0}}}' }
+sub L501 { my ($id) = @_; return "| [#501]($URLB/501#issuecomment-$id) | あり | 2026-11-02 | 14時間5分 | 123,456,789 | \$312.45(価格が分からないモデルを除く) | 1 |" }
+sub worst_rows {
+    return JSON::PP->new->canonical->encode([ map { { issue => $_, url => "https://github.com/DogisRiki/KeirekiPro/issues/$_#issuecomment-99999999999",
+        spec => JSON::PP::true, end_date => "2026-11-02", work_sec => 3599940, tokens => 999999999999, usd => 99999.99,
+        usd_partial => JSON::PP::true, impl_spec_back => undef } } 99000 .. 99299 ]);
+}
+sub add_file { return cmd_list_add($ENV{ROWS}) }
+sub rr { my ($json, $n) = @_; print format_row(row_from_report(JSON::PP->new->decode($json), "$URLB/$n#issuecomment-9", $n)), "\n"; return 0 }
+sub clobber {
+    my ($k, @extra) = @_;
+    my $f = "$ENV{FAKE_GH_DIR}/db.json";
+    my $j = JSON::PP->new->canonical;
+    open my $fh, "<", $f or die $!;
+    my $db = $j->decode(do { local $/; <$fh> });
+    close $fh;
+    for my $i (@{ $db->{issues} }) { $i->{body} .= join "", map { "$_\n" } @extra if $i->{title} eq "AIの作業の集計の一覧" }
+    my $snap = $j->encode($db);
+    my $n = 0;
+    no warnings "redefine";
+    *main::list_reread_wait = sub { return if $n++ >= $k; open my $o, ">", $f or die $!; print $o $snap; close $o };
+    return 1;
+}
+sub not_row { return "| [#9](https://example.com/x/issues/9#issuecomment-1) | 無し | 2026-10-01 | 1分 | 1 | \$1.00 | 0 |" }
+sub worst_last {
+    return $_[0] eq "| [#99299](https://github.com/DogisRiki/KeirekiPro/issues/99299#issuecomment-99999999999) | あり | 2026-11-02 | 999時間59分 | 999,999,999,999 | \$99,999.99(価格が分からないモデルを除く) | 数えられない |";
+}
+sub read_after_add {
+    my %c = map { $_->{id} => $_->{body} } @{ I(1)->{comments} };
+    my @want = (
+        [ I(1)->{body}, body_with(R(480, "2026-09-30"), R(700, "2026-10-15"), R(501, "2026-11-02", "あり"), R(812, "2027-05-10"), R(813, "2027-05-12")) ],
+        [ $c{1001}, page(2) ], [ $c{1002}, page(3, R(900, "2027-06-01")) ], [ $c{1003}, page(2, R(901, "2027-06-02")) ],
+        [ $c{1004}, page(2) ], [ $c{1005}, "ふつうのコメント\n" . R(902, "2027-06-03") ], [ $c{1006}, page(1, R(903, "2027-06-04")) ],
+    );
+    return join " ", map { $_->[0] eq $_->[1] ? "same" : "diff" } @want;
+}
+1;
+__H__
+
 # github.pl は、手元の記録を <git の共通ディレクトリ>/keirekipro-usage に置くので、一時の git のリポジトリの中で動かす。
 # git が返すパス(Windows では C:/...)と同じ形で作る
 WORK=$(cd "$TMP_ROOT" && { pwd -W 2>/dev/null || pwd; })
@@ -49,7 +125,7 @@ run() {
 # github.pl を読み込み、github.pl の中の関数を呼ぶ perl の文を、呼び出しと同じ失敗の扱い(guarded)で動かす。
 # 一覧の Issue を用意する部分は、一覧に行を足す呼び出し(タスク3.3・3.4)の中から呼ばれるので、ここで直に確かめる
 drive() {
-    (cd "$REPO" && perl -e 'do $ARGV[0]; die $@ if $@; exit guarded(sub { '"$1"' })' "$GITHUB") >"$TMP_ROOT/out" 2>"$TMP_ROOT/err"
+    (cd "$REPO" && perl -e 'do $ARGV[0]; die $@ if $@; do $ENV{KP_TEST_H} or die "h.pl: $@ $!"; exit guarded(sub { '"$1"' })' "$GITHUB") >"$TMP_ROOT/out" 2>"$TMP_ROOT/err"
     RC=$?
     OUT=$(cat "$TMP_ROOT/out")
     ERR=$(cat "$TMP_ROOT/err")
@@ -59,6 +135,7 @@ drive() {
 # fill(<始め>, <終わり>) は、その範囲の番号の、ロックしていない開いたふつうの Issue を作る
 mkdb() {
     perl -MJSON::PP -e '
+        do $ENV{KP_TEST_H} or die "h.pl: $@ $!";
         my $T = "AIの作業の集計の一覧";
         my ($t, $f) = (JSON::PP::true, JSON::PP::false);
         sub F () { return $f }
@@ -74,7 +151,8 @@ mkdb() {
 # 偽の GitHub の db.json から値を読む: dbq <perl の式>。I(<番号>) は Issue、st(<番号>) は Issue の状態、
 # nlist は題名が一覧の題名の Issue の数、lines(<番号>) は Issue の本文の行である
 dbq() {
-    perl -MJSON::PP -e '
+    perl -MJSON::PP -MEncode -e '
+        do $ENV{KP_TEST_H} or die "h.pl: $@ $!";
         open my $fh, "<", "$ENV{FAKE_GH_DIR}/db.json" or die $!;
         local $/;
         my $db = JSON::PP->new->decode(<$fh>);
@@ -87,7 +165,9 @@ dbq() {
     '
 }
 # 偽の gh が呼ばれた引数を | でつなぐ。一時ファイルの名前は F にそろえる
-calls() { if [ -f "$FAKE_GH_DIR/calls.log" ]; then sed 's/--body-file [^ ]*/--body-file F/' "$FAKE_GH_DIR/calls.log" | tr '\n' '|'; fi; }
+calls() { if [ -f "$FAKE_GH_DIR/calls.log" ]; then sed -e 's/--body-file [^ ]*/--body-file F/' -e 's/body=@[^ ]*/body=@F/' "$FAKE_GH_DIR/calls.log" | tr '\n' '|'; fi; }
+# 偽の gh の呼び出しのうち、GitHub に書いたものだけを | でつなぐ
+writes() { calls | tr '|' '\n' | grep -E '^(issue (edit|comment|create|close|lock)|api -X)' | tr '\n' '|'; }
 statejson() { if [ -f "$STATE/$1" ]; then cat "$STATE/$1"; else printf 'none'; fi; }
 # 偽の gh が呼ばれた回数
 ncalls() { if [ -f "$FAKE_GH_DIR/calls.log" ]; then wc -l <"$FAKE_GH_DIR/calls.log" | tr -d ' '; else printf 0; fi; }
@@ -155,7 +235,7 @@ check "本文や関係の欄が文字でないコメントを、集計のコメ�
 
 echo "== 引数が違うとき"
 newgh usage
-for a in "" "reported" "reported abc" "reported 0" "reported 1 2" "nosuch 1"; do
+for a in "" "reported" "reported abc" "reported 0" "reported 1 2" "nosuch 1" "list-read x" "list-add" "list-add a b" "list-ensure" "list-ensure abc" "list-ensure 1 2"; do
     # 空白で分けた引数として渡す。bash 3.2 の set -u は空の配列の展開を止めるので、+ の形で展開する
     read -r -a argv <<<"$a"
     rm -f "$FAKE_GH_DIR/calls.log"
@@ -278,6 +358,209 @@ check "読むだけの呼び出しは、ロックしてある一覧の Issue を
 rm -f "$FAKE_GH_DIR/calls.log"
 drive 'print list_issue_for_read(), "\n"; 0'
 check "読むだけの呼び出しは、state.json の list_issue の Issue を確かめて使う" "$RC/$OUT/$(calls)" "0/4/api repos/{owner}/{repo}/issues/4|"
+
+echo "== 一覧の行の書き方"
+# 一覧の行の JSON(list-read の出力と同じ形)を $ROWS に書く: row_json <番号> <終了日>。値は R(<番号>, <終了日>) と同じ
+row_json() {
+    printf '[{"issue":%s,"url":"%s/%s#issuecomment-%s","spec":false,"end_date":"%s","work_sec":4800,"tokens":3456789,"usd":8.9,"impl_spec_back":0}]\n' \
+        "$1" "$URL" "$1" "$(($1 + 5000))" "$2" >"$ROWS"
+}
+# R(<番号>, <終了日>[, <spec>]) の行を list-read が戻した JSON: J <番号> <終了日> [true]
+J() {
+    printf '{"end_date":"%s","impl_spec_back":0,"issue":%s,"spec":%s,"tokens":3456789,"url":"%s/%s#issuecomment-%s","usd":8.9,"usd_partial":false,"work_sec":4800}' \
+        "$2" "$1" "${3:-false}" "$URL" "$1" "$(($1 + 5000))"
+}
+newgh format
+mkdb 'issues => [ iss(1, body => intro()) ]'
+rm -rf "$STATE"
+cat >"$ROWS" <<'__ROWS__'
+[{"issue":493,"url":"https://github.com/owner/repo/issues/493#issuecomment-1234567894","spec":false,"end_date":"2026-10-01","work_sec":3599,"tokens":1000000,"usd":0.005,"impl_spec_back":0},
+ {"issue":501,"url":"https://github.com/owner/repo/issues/501#issuecomment-1234567891","spec":true,"end_date":"2026-11-02","work_sec":50700,"tokens":123456789,"usd":312.45,"usd_partial":true,"impl_spec_back":1},
+ {"issue":490,"url":"https://github.com/owner/repo/issues/490#issuecomment-1234567892","spec":false,"end_date":"2026-10-01","work_sec":2670,"tokens":0,"usd":1234.5,"impl_spec_back":null},
+ {"issue":480,"url":"https://github.com/owner/repo/issues/480#issuecomment-1234567890","spec":false,"end_date":"2026-09-30","work_sec":4800,"tokens":3456789,"usd":8.9,"impl_spec_back":0},
+ {"issue":492,"url":"https://github.com/owner/repo/issues/492#issuecomment-1234567895","spec":false,"end_date":"2026-10-01","work_sec":null,"tokens":999,"usd":1.005,"impl_spec_back":0},
+ {"issue":491,"url":"https://github.com/owner/repo/issues/491#issuecomment-1234567893","spec":true,"end_date":"2026-10-01","work_sec":29,"tokens":null,"usd":0,"impl_spec_back":2}]
+__ROWS__
+cat >"$TMP_ROOT/want" <<'__WANT__'
+| [#480](https://github.com/owner/repo/issues/480#issuecomment-1234567890) | 無し | 2026-09-30 | 1時間20分 | 3,456,789 | $8.90 | 0 |
+| [#490](https://github.com/owner/repo/issues/490#issuecomment-1234567892) | 無し | 2026-10-01 | 45分 | 0 | $1,234.50 | 数えられない |
+| [#491](https://github.com/owner/repo/issues/491#issuecomment-1234567893) | あり | 2026-10-01 | 0分 | 数えられない | $0.00 | 2 |
+| [#492](https://github.com/owner/repo/issues/492#issuecomment-1234567895) | 無し | 2026-10-01 | 数えられない | 999 | $1.01 | 0 |
+| [#493](https://github.com/owner/repo/issues/493#issuecomment-1234567894) | 無し | 2026-10-01 | 1時間0分 | 1,000,000 | $0.01 | 0 |
+| [#501](https://github.com/owner/repo/issues/501#issuecomment-1234567891) | あり | 2026-11-02 | 14時間5分 | 123,456,789 | $312.45(価格が分からないモデルを除く) | 1 |
+__WANT__
+cat >"$TMP_ROOT/want.json" <<'__J__'
+[{"end_date":"2026-09-30","impl_spec_back":0,"issue":480,"spec":false,"tokens":3456789,"url":"https://github.com/owner/repo/issues/480#issuecomment-1234567890","usd":8.9,"usd_partial":false,"work_sec":4800},{"end_date":"2026-10-01","impl_spec_back":null,"issue":490,"spec":false,"tokens":0,"url":"https://github.com/owner/repo/issues/490#issuecomment-1234567892","usd":1234.5,"usd_partial":false,"work_sec":2700},{"end_date":"2026-10-01","impl_spec_back":2,"issue":491,"spec":true,"tokens":null,"url":"https://github.com/owner/repo/issues/491#issuecomment-1234567893","usd":0,"usd_partial":false,"work_sec":0},{"end_date":"2026-10-01","impl_spec_back":0,"issue":492,"spec":false,"tokens":999,"url":"https://github.com/owner/repo/issues/492#issuecomment-1234567895","usd":1.01,"usd_partial":false,"work_sec":null},{"end_date":"2026-10-01","impl_spec_back":0,"issue":493,"spec":false,"tokens":1000000,"url":"https://github.com/owner/repo/issues/493#issuecomment-1234567894","usd":0.01,"usd_partial":false,"work_sec":3600},{"end_date":"2026-11-02","impl_spec_back":1,"issue":501,"spec":true,"tokens":123456789,"url":"https://github.com/owner/repo/issues/501#issuecomment-1234567891","usd":312.45,"usd_partial":true,"work_sec":50700}]
+__J__
+run list-add "$ROWS"
+check "list-add が、行を足して 0 で終わる" "$RC/$OUT/$ERR" "0//"
+check "一覧の本文が、見本の形で、終了日の古い順に、終了日が同じなら Issue の番号の順に、数の書き方の決まりで行を並べる" "$(dbq 'I(1)->{body}')" "$(dbq 'intro()'; cat "$TMP_ROOT/want")"
+check "list-add は、本文を1回書き直し、ページのコメントを書かない" "$(writes)" "issue edit 1 --body-file F|"
+check "D_NEW の集計の値の行が、L501 の形である" "$(dbq '[lines(1)]->[-1] eq L501(1234567891) ? "same" : "diff"')" "same"
+run list-read
+check "list-read が、一覧の行を数に戻し、数えられない値を null にして、JSON の配列の1行で出す" "$RC/$(nlines "$OUT")/$OUT" "0/1/$(cat "$TMP_ROOT/want.json")"
+printf '%s\n' "$OUT" >"$ROWS"
+rm -f "$FAKE_GH_DIR/calls.log"
+run list-add "$ROWS"
+check "list-read の出力を list-add に渡すと、同じ行を置き換えるだけで、一覧に何も書かない" "$RC/$(writes)/$(dbq 'scalar(grep { /\A\| \[#/ } lines(1))')" "0//6"
+drive 'rr(q{{"issue":7,"spec":false,"end_date":"2026-10-01","totals":{"work_sec":0,"tokens":0,"usd":0,"usd_unknown_models":[]},"rework":{"impl_spec_back":{"requirements":null,"design":0,"tasks":0}}}}, 7)'
+check "集計の JSON の impl_spec_back の3つのどれかが null のときは、回数を「数えられない」と書く" "$RC/$OUT" "0/| [#7]($URL/7#issuecomment-9) | 無し | 2026-10-01 | 0分 | 0 | \$0.00 | 数えられない |"
+drive 'rr(q{{"issue":8,"spec":false,"end_date":"2026-10-01","totals":{"work_sec":0,"tokens":0,"usd":0,"usd_unknown_models":[]},"rework":{"impl_spec_back":{"requirements":0,"design":0,"tasks":0}}}}, 7)'
+check "集計の JSON の issue が行の Issue と違えば、行を作らない" "$RC/$OUT/$(nlines "$ERR")" "1//1"
+
+echo "== list-add に渡す行が正しくないとき"
+newgh badrows
+mkdb 'issues => [ iss(1, body => intro()) ]'
+cat >"$TMP_ROOT/bad" <<'__BAD__'
+{}
+[]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/6#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":0,"tokens":0,"usd":0,"impl_spec_back":0}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":0,"tokens":1.5,"usd":0,"impl_spec_back":0}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":"no","end_date":"2026-10-01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":-1,"tokens":1,"usd":0,"impl_spec_back":0}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026/10/01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0}]
+__BAD__
+while IFS= read -r bad; do
+    printf '%s\n' "$bad" >"$ROWS"
+    rm -f "$FAKE_GH_DIR/calls.log"
+    run list-add "$ROWS"
+    check "行の JSON が正しくないとき($(printf '%s' "$bad" | cut -c1-30)…)は、gh を呼ばずに 1 で終わる" "$RC/$(ncalls)/$(nlines "$ERR")" "1/0/1"
+done <"$TMP_ROOT/bad"
+run list-add "$TMP_ROOT/nosuch.json"
+check "行の JSON のファイルが無いときは、1 で終わる" "$RC/$(nlines "$ERR")" "1/1"
+
+echo "== 一覧のページ"
+newgh pages
+mkdb 'issues => [ iss(1, body => body_with(Rs(1001, 1300, "2026-10-01"))) ]'
+rm -rf "$STATE"
+mkdir -p "$STATE"
+printf '%s\n' '{"list_issue":1}' >"$STATE/state.json"
+row_json 1301 2026-10-02
+run list-add "$ROWS"
+check "一覧が301行になると、本文を書き直さずに2ページ目のコメントを書き、読み直して確かめる" "$RC/$(calls)" "0/api repos/{owner}/{repo}|api repos/{owner}/{repo}/issues/1|api repos/{owner}/{repo}/issues/1|api --paginate repos/{owner}/{repo}/issues/1/comments|issue comment 1 --body-file F|api repos/{owner}/{repo}/issues/1|api --paginate repos/{owner}/{repo}/issues/1/comments|"
+check "2ページ目のコメントが、見本の形で301行目を持ち、本文が300行のまま" "$(dbq 'join " ", scalar @{ I(1)->{comments} }, I(1)->{comments}[0]{body} eq page(2, R(1301, "2026-10-02")) ? "same" : "diff", I(1)->{body} eq body_with(Rs(1001, 1300, "2026-10-01")) ? "same" : "diff"')" "1 same same"
+row_json 999 2026-09-01
+rm -f "$FAKE_GH_DIR/calls.log"
+run list-add "$ROWS"
+check "終了日が古い行を足すと、本文と2ページ目のコメントを書き直す" "$RC/$(writes)" "0/issue edit 1 --body-file F|api -X PATCH repos/{owner}/{repo}/issues/comments/1000 -F body=@F|"
+check "終了日が古い行を足すと、ページの境目の行がずれて並ぶ" "$(dbq 'join " ", scalar @{ I(1)->{comments} }, I(1)->{body} eq body_with(R(999, "2026-09-01"), Rs(1001, 1299, "2026-10-01")) ? "same" : "diff", I(1)->{comments}[0]{body} eq page(2, R(1300, "2026-10-01"), R(1301, "2026-10-02")) ? "same" : "diff"')" "1 same same"
+
+printf '[{"issue":1001,"url":"%s/1001#issuecomment-6001","spec":false,"end_date":"2026-10-01","work_sec":60,"tokens":3456789,"usd":8.9,"impl_spec_back":0}]\n' "$URL" >"$ROWS"
+rm -f "$FAKE_GH_DIR/calls.log"
+run list-add "$ROWS"
+check "1ページ目の行だけが変わるときは、本文だけを書き直し、変わらない2ページ目のコメントを書き直さない" "$RC/$(writes)/$(dbq 'I(1)->{comments}[0]{body} eq page(2, R(1300, "2026-10-01"), R(1301, "2026-10-02")) ? "same" : "diff"')" "0/issue edit 1 --body-file F|/same"
+
+newgh worst
+mkdb 'issues => [ iss(1, body => intro()) ]'
+rm -rf "$STATE"
+dbq 'worst_rows()' >"$ROWS"
+run list-add "$ROWS"
+check "値の桁が最も多い300行を足すと、すべての行が本文に入り、ページのコメントを書かない" "$RC/$(dbq 'scalar(grep { /\A\| \[#99[0-9]{3}\]/ } lines(1)) . " " . scalar @{ I(1)->{comments} } . " " . (worst_last((lines(1))[-1]) ? "worst" : "diff")')" "0/300 0 worst"
+blen=$(dbq 'length(Encode::decode("UTF-8", I(1)->{body}))')
+if [ "$blen" -lt 65536 ]; then ok "300行の一覧の本文が65,536文字に届かない($blen 文字)"; else ng "300行の一覧の本文が65,536文字に届かない($blen 文字)"; fi
+
+echo "== 一覧を読む"
+newgh read
+mkdb 'issues => [ iss(1, body => body_with(R(501, "2026-11-02", "あり"), R(480, "2026-09-30"), not_row()), comments => [ cm(1001, page(2, R(812, "2027-05-10"))), cm(1002, page(3, R(900, "2027-06-01")), "NONE"), cm(1003, page(2, R(901, "2027-06-02")), "CONTRIBUTOR"), cm(1004, page(2, R(812, "2027-05-11"), R(813, "2027-05-12")), "COLLABORATOR"), cm(1005, "ふつうのコメント\n" . R(902, "2027-06-03")), cm(1006, page(1, R(903, "2027-06-04"))) ]) ]'
+rm -rf "$STATE"
+run list-read
+check "list-read が、本文と、関係の欄が OWNER か COLLABORATOR の2ページ目からのコメントの行を並べて出す。同じ Issue の行は先の行を使う" "$RC/$OUT" "0/[$(J 480 2026-09-30),$(J 501 2026-11-02 true),$(J 812 2027-05-10),$(J 813 2027-05-12)]"
+check "list-read は、一覧の本文とコメントを読むだけで、書かない" "$(calls)" "$SCAN|api repos/{owner}/{repo}/issues/1|api --paginate repos/{owner}/{repo}/issues/1/comments|"
+row_json 700 2026-10-15
+rm -f "$FAKE_GH_DIR/calls.log"
+run list-add "$ROWS"
+check "行が1ページに収まると、本文に行を集め、ページのコメントを行の無いページにする" "$RC/$(writes)" "0/issue edit 1 --body-file F|api -X PATCH repos/{owner}/{repo}/issues/comments/1001 -F body=@F|api -X PATCH repos/{owner}/{repo}/issues/comments/1004 -F body=@F|"
+check "関係の欄が OWNER でも COLLABORATOR でもないページのコメントと、1ページ目の印のコメントの行を一覧に入れず、そのコメントを編集しない" "$(dbq 'read_after_add()')" "same same same same same same same"
+
+newgh stale-page
+mkdb 'issues => [ iss(1, body => body_with(R(480, "2026-09-30")), comments => [ cm(1001, page(3, R(812, "2027-05-10"))) ]) ]'
+rm -rf "$STATE"
+row_json 700 2026-10-15
+run list-add "$ROWS"
+check "2ページ目が無く、行が1ページに収まるときは、3ページ目のコメントを行の無いページにし、ページのコメントを新しく書かない" "$RC/$(writes)/$(dbq 'scalar(@{ I(1)->{comments} }) == 1 && I(1)->{comments}[0]{body} eq page(3) && I(1)->{body} eq body_with(R(480, "2026-09-30"), R(700, "2026-10-15"), R(812, "2027-05-10")) ? "same" : "diff"')" "0/issue edit 1 --body-file F|api -X PATCH repos/{owner}/{repo}/issues/comments/1001 -F body=@F|/same"
+
+newgh read-none
+mkdb 'issues => [ iss(1, locked => F, state => "open") ]'
+rm -rf "$STATE"
+run list-read
+check "一覧の Issue が無いとき、list-read は [] を出し、一覧の Issue を作らない" "$RC/$OUT/$(calls)/$(dbq 'st(1)')/$(statejson state.json)" "0/[]/$SCAN|/open/not_planned/unlocked/none"
+
+echo "== 一覧を読み直す前に待つ"
+drive 'print list_reread_secs(), "\n"; 0'
+check "テストでは、読み直す前に待つ秒数を環境変数で 0 にする" "$OUT" "0"
+OUT=$(unset KP_USAGE_TEST_LIST_REREAD; drive 'print list_reread_secs(), "\n"; 0'; printf '%s' "$OUT")
+check "環境変数が無いときは、書いたあと10秒待ってから一覧を読み直す" "$OUT" "10"
+OUT=$(KP_USAGE_TEST_LIST_REREAD=abc; export KP_USAGE_TEST_LIST_REREAD; drive 'print list_reread_secs(), "\n"; 0'; printf '%s' "$OUT")
+check "環境変数が数でないときも、10秒待つ" "$OUT" "10"
+
+echo "== 同時に行を足したとき"
+newgh race
+mkdb 'issues => [ iss(1, body => body_with(R(480, "2026-09-30"))) ]'
+rm -rf "$STATE"
+mkdir -p "$STATE/issues"
+printf '%s\n' '{"list_issue":1}' >"$STATE/state.json"
+printf '%s\n' '{"list_pending":true,"reported_at":"2026-10-26T00:00:00Z"}' >"$STATE/issues/501.json"
+row_json 501 2026-11-02
+drive 'clobber(1, R(700, "2026-10-15")); add_file()'
+check "書いたあとの読み直しで足した行が無いときは、読み直した一覧に行を足し直し、0 で終わる" "$RC/$ERR/$(writes)" "0//issue edit 1 --body-file F|issue edit 1 --body-file F|"
+check "足し直した一覧が、ほかの人が足した行とこちらの行を、重ならずに持つ" "$(dbq 'I(1)->{body} eq body_with(R(480, "2026-09-30"), R(700, "2026-10-15"), R(501, "2026-11-02")) ? "same" : I(1)->{body}')" "same"
+check "行を足せたら list_pending を消し、ほかの欄は残る" "$(statejson issues/501.json)" '{"reported_at":"2026-10-26T00:00:00Z"}'
+newgh race3
+mkdb 'issues => [ iss(1, body => body_with(R(480, "2026-09-30"))) ]'
+rm -f "$STATE/issues/501.json"
+printf '%s\n' '{"list_issue":1}' >"$STATE/state.json"
+drive 'clobber(3, R(700, "2026-10-15")); add_file()'
+check "3回書き直しても足した行が無ければ、1 で終わり、標準エラーに理由を1行で残す" "$RC/$OUT/$ERR/$(writes)" "1//github.pl: 3回書き直しても、一覧に足した行が残らなかった/issue edit 1 --body-file F|issue edit 1 --body-file F|issue edit 1 --body-file F|"
+check "3回書き直しても足した行が無ければ、list_pending を残す" "$(statejson issues/501.json)" '{"list_pending":true}'
+newgh editfail
+mkdb 'issues => [ iss(1, body => intro()) ]'
+rm -rf "$STATE"
+printf '%s\n' '^issue edit' >"$FAKE_GH_DIR/fail"
+printf '[%s,%s]\n' "$(J 480 2026-09-30)" "$(J 501 2026-11-02 true)" >"$ROWS"
+run list-add "$ROWS"
+check "一覧を書けなかったときは、1 で終わり、足す行の Issue ごとに list_pending を残す" "$RC/$(nlines "$ERR")/$(statejson issues/480.json)/$(statejson issues/501.json)" '1/1/{"list_pending":true}/{"list_pending":true}'
+
+echo "== list-ensure"
+newgh ensure
+# 「list-ensure」の偽の GitHub の、一覧の Issue 1 のほかの Issue
+ENSURE='iss(501, title => "ふつうの Issue", locked => F, comments => [ cm(2001, report_body(501, D_NEW()), "NONE"), cm(2002, report_body(501, D_NEW(), D_OLD()), "CONTRIBUTOR"), cm(2003, "ふつうのコメント"), cm(2004, report_body(501, D_OLD(), D_NEW())) ]), iss(502, title => "ふつうの Issue", locked => F)'
+mkdb "issues => [ iss(1, body => intro()), $ENSURE ]"
+rm -rf "$STATE"
+mkdir -p "$STATE/issues"
+printf '%s\n' '{"list_issue":1}' >"$STATE/state.json"
+printf '%s\n' '{"list_pending":true}' >"$STATE/issues/501.json"
+run list-ensure 501
+check "list-ensure が、書き手の確認を通る集計のコメントの最後の数字の行の JSON から行を作って足し、0 で終わる" "$RC/$OUT/$ERR/$(dbq 'I(1)->{body} eq intro() . L501(2004) . "\n" ? "same" : I(1)->{body}')" "0///same"
+check "list-ensure が行を足せたら list_pending を消す" "$(statejson issues/501.json)" "{}"
+mkdb "issues => [ iss(1, body => body_with(R(501, \"2026-11-02\", \"あり\"))), $ENSURE ]"
+printf '%s\n' '{"list_pending":true}' >"$STATE/issues/501.json"
+rm -f "$FAKE_GH_DIR/calls.log"
+run list-ensure 501
+check "一覧に Issue の行があれば、行の値が集計のコメントと違っても、list-ensure は書かずに 0 で終わり、list_pending を消す" "$RC/$(writes)/$(statejson issues/501.json)/$(dbq 'I(1)->{body} eq body_with(R(501, "2026-11-02", "あり")) ? "same" : "diff"')" "0//{}/same"
+run list-ensure 502
+check "集計のコメントが無ければ、list-ensure は 1 で終わり、list_pending を残す" "$RC/$ERR/$(statejson issues/502.json)" '1/github.pl: Issue 502 に集計のコメントが無いので、一覧の行を作れなかった/{"list_pending":true}'
+
+echo "== 書き込む権限が無いとき"
+newgh nopush-cli
+mkdb 'repo => { owner => "owner", name => "repo", push => F }, issues => [ iss(1, body => intro()), iss(501, title => "ふつうの Issue", locked => F, comments => [ cm(2004, report_body(501, D_NEW())) ]) ]'
+rm -rf "$STATE"
+row_json 501 2026-11-02
+run list-add "$ROWS"
+check "permissions.push が偽のときは、list-add は書かずに 1 で終わり、手元に何も残さない" "$RC/$(calls)/$(nlines "$ERR")/$(statejson issues/501.json)" "1/api repos/{owner}/{repo}|/1/none"
+rm -f "$FAKE_GH_DIR/calls.log"
+run list-ensure 501
+check "permissions.push が偽のときは、list-ensure は書かずに 1 で終わり、手元に何も残さない" "$RC/$(calls)/$(nlines "$ERR")/$(statejson issues/501.json)/$(dbq 'I(1)->{body} eq intro() ? "same" : "diff"')" "1/api repos/{owner}/{repo}|/1/none/same"
+
+echo "== 関係の欄が COLLABORATOR のアカウント"
+newgh collaborator-rows
+mkdb 'viewer_association => "COLLABORATOR", issues => [ iss(1, body => body_with(Rs(1001, 1300, "2026-10-01"))) ]'
+rm -rf "$STATE"
+row_json 1301 2026-10-02
+run list-add "$ROWS"
+check "COLLABORATOR のアカウントが、OWNER の一覧に行を足し、一覧の Issue が1つのまま、2ページ目のコメントを書く" "$RC/$(dbq 'nlist . " " . scalar @{ I(1)->{comments} } . " " . I(1)->{comments}[0]{author_association}')" "0/1 1 COLLABORATOR"
+run list-read
+check "COLLABORATOR のアカウントが書いた2ページ目の行を、list-read が読む" "$RC/$(printf '%s' "$OUT" | grep -o '"issue":1301')" '0/"issue":1301'
+
 
 echo
 echo "$pass ok, $failn NG"
