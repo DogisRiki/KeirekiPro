@@ -28,6 +28,8 @@ use POSIX ();
 use constant CONFIG_PATH => '.claude/scripts/usage/usage-config.json';
 # spec のフォルダの、リポジトリの最上位からの場所
 use constant SPECS_DIR => '.kiro/specs';
+# 開始と終了の時刻が無いときの、果ての時刻
+use constant FAR => 9e18;
 
 my $JSON = JSON::PP->new->utf8->canonical;
 
@@ -55,25 +57,37 @@ sub usage {
     return 1;
 }
 
-# 集計を作り、下書きを書く
+# 集計を作り、下書きを書く。Issue に決めた行が1行も無ければ、下書きを書かずに 2 で終わる
 sub build {
     my ($o) = @_;
-    my $n = $o->{issue} + 0;
-    my $ctx = { n => $n, state => $o->{state}, cfg => read_config($o->{config}) };
-    collect_prs($ctx);
-    $ctx->{system_ts} = system_time();
-    load_records($ctx);
-    $ctx->{branches} = issue_branches($ctx);
-    $ctx->{spec} = spec_info($ctx);
+    my $ctx = prepare($o);
+    my $n = $ctx->{n};
+    if (!$ctx->{row_count}) {
+        print STDERR "report.pl: この PC に Issue #$n の記録が無い\n";
+        return 2;
+    }
     my $report = {
-        v        => 1,
-        issue    => $n,
-        prs      => [ map { $_->{number} } @{ $ctx->{prs} } ],
-        spec     => $ctx->{spec}{has} ? JSON::PP::true : JSON::PP::false,
-        end_date => local_date($ctx->{end_ts}),
+        v          => 1,
+        issue      => $n,
+        prs        => [ map { $_->{number} } @{ $ctx->{prs} } ],
+        spec       => $ctx->{spec}{has} ? JSON::PP::true : JSON::PP::false,
+        start_date => local_date($ctx->{start_ts}),
+        end_date   => local_date($ctx->{end_ts}),
     };
     write_file("$o->{out}/report.json", $JSON->encode($report) . "\n");
     return 0;
+}
+
+# PR と手元の記録を読み、Issue に決めた行を $ctx->{irec} に集める
+sub prepare {
+    my ($o) = @_;
+    my $ctx = { n => $o->{issue} + 0, state => $o->{state}, cfg => read_config($o->{config}) };
+    collect_prs($ctx);
+    $ctx->{system_ts} = system_time();
+    load_records($ctx);
+    assign_rows($ctx);
+    $ctx->{spec} = spec_info($ctx);
+    return $ctx;
 }
 
 # ---- 外のコマンド ----------------------------------------------------------
@@ -147,6 +161,8 @@ sub collect_prs {
         '--json', 'number,state,body,headRefName,mergedAt,mergeCommit');
     my $list = eval { $JSON->decode($out) };
     die "gh pr list の出力を JSON として読めなかった\n" unless ref $list eq 'ARRAY';
+    # ほかの Issue のブランチと終了の時刻を決めるために、PR の一覧の全部を残す
+    $ctx->{pr_list} = $list;
     my (@prs, $last);
     for my $p (sort { $a->{number} <=> $b->{number} } grep { ref $_ eq 'HASH' && defined $_->{number} } @$list) {
         my $st = $p->{state} // '';
@@ -184,7 +200,8 @@ sub system_time {
 
 # ---- 手元の記録 ------------------------------------------------------------
 
-# extract/<記録の鍵>.jsonl の行を記録の鍵ごとに、marks.jsonl の行を1つの並びに読む。読めない行は飛ばす
+# extract/<記録の鍵>.jsonl の行を記録の鍵ごとに、marks.jsonl と extract/desktop.jsonl の行を1つの並びに読む。
+# 読めない行は飛ばす
 sub load_records {
     my ($ctx) = @_;
     my $dir = "$ctx->{state}/extract";
@@ -196,6 +213,7 @@ sub load_records {
     }
     $ctx->{rec} = \%rec;
     $ctx->{marks} = read_jsonl("$ctx->{state}/marks.jsonl");
+    $ctx->{desktop} = read_jsonl("$dir/desktop.jsonl");
     return 1;
 }
 
@@ -211,17 +229,278 @@ sub read_jsonl {
     return \@rows;
 }
 
-# Issue のブランチ: Issue の PR のブランチと、Issue N の受け持ちの出来事の --branch の値
-sub issue_branches {
+# ---- 受け持ちの区切りと、行の Issue -----------------------------------------
+
+# 1行ごとに Issue を決め、Issue N に決めた行を記録の鍵ごとに $ctx->{irec} に置く。meta の行は、
+# Issue N に決めた行がある記録の鍵にだけ添える。あわせて、Issue N のブランチ($ctx->{branches})、
+# 開始の時刻($ctx->{start_ts})、Issue に決めた時刻のある行の数($ctx->{row_count})、
+# 分けた Issue かどうか($ctx->{split})を決める
+sub assign_rows {
     my ($ctx) = @_;
-    my %b = map { $_ => 1 } grep { defined && !ref && length } map { $_->{branch} } @{ $ctx->{prs} };
-    for my $rows (values %{ $ctx->{rec} }) {
-        for my $r (@$rows) {
-            next unless ($r->{k} // '') eq 'recv' && same_issue($r->{issue}, $ctx->{n});
-            $b{ $r->{branch} } = 1 if defined $r->{branch} && !ref $r->{branch} && length $r->{branch};
+    my $n = $ctx->{n};
+    build_segments($ctx);
+    relabel_merges($ctx);
+    relabel_splits($ctx);
+    issue_model($ctx);
+    link_spawned($ctx);
+    my (%irec, $count, $first, $first_branch);
+    for my $key (sort keys %{ $ctx->{rec} }) {
+        my ($branch, @rows, @meta);
+        for my $r (@{ $ctx->{rec}{$key} }) {
+            my $k = $r->{k} // '';
+            $branch = $r->{name} if $k eq 'branch' && defined $r->{name} && !ref $r->{name};
+            if ($k eq 'meta') {
+                push @meta, $r;
+                next;
+            }
+            my $t = row_ts($r);
+            next unless defined $t;
+            my $i = issue_at($ctx, $key, $t, $branch, 0);
+            next unless defined $i && $i == $n;
+            push @rows, $r;
+            $first = $t if !defined $first || $t < $first;
+            $first_branch = $t if defined $branch && $ctx->{branches}{$branch} && (!defined $first_branch || $t < $first_branch);
+        }
+        next unless @rows;
+        $irec{$key} = [ @meta, @rows ];
+        $count += @rows;
+    }
+    $ctx->{irec} = \%irec;
+    $ctx->{row_count} = $count // 0;
+    # 開始の時刻は、受け持ちの出来事のうち最も早い時刻。受け持ちの出来事が無ければ、Issue のブランチで最初に動いた行の時刻
+    $ctx->{start_ts} = $ctx->{starts}{$n} // $first_branch // $first;
+    return 1;
+}
+
+# 会話ごとに、受け持ちの出来事を時刻の順に並べ、次の受け持ちまでを、その Issue の区切りとする。
+# /request の段階の印は、次の受け持ちまでを、どの Issue にも入れない区切り(issue が undef)にする。
+# 補助役の会話は、親の会話の区切りを使うので、区切りを作らない
+sub build_segments {
+    my ($ctx) = @_;
+    my %segs;
+    for my $key (keys %{ $ctx->{rec} }) {
+        next if defined parent_key($key);
+        my (@ev, $i);
+        for my $r (@{ $ctx->{rec}{$key} }) {
+            $i++;
+            my $t = row_ts($r);
+            next unless defined $t;
+            my $n = recv_issue($r);
+            push @ev, [ $t, $i, $n, $r ] if defined $n || is_request($r);
+        }
+        my @s;
+        for my $e (sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @ev) {
+            my ($t, undef, $n, $r) = @$e;
+            my $prev = @s ? $s[-1]{issue} : -1;
+            if (@s && (defined $n ? defined $prev && $prev == $n : !defined $prev)) {
+                push @{ $s[-1]{events} }, $r;
+                next;
+            }
+            my $claim = ($r->{k} // '') eq 'recv' && ($r->{how} // '') eq 'claim' ? 1 : 0;
+            push @s, { start => $t, issue => $n, orig => $n, events => [$r], claim => $claim };
+        }
+        $segs{$key} = \@s if @s;
+    }
+    $ctx->{segs} = \%segs;
+    return 1;
+}
+
+# まとめた: 会話に M から K へのまとめの出来事があり、その会話が M を受け持ったあとに K を受け持ったとき、
+# その会話の M の区切りを K の区切りにする
+sub relabel_merges {
+    my ($ctx) = @_;
+    for my $key (keys %{ $ctx->{segs} }) {
+        my %to;
+        for my $r (@{ $ctx->{rec}{$key} }) {
+            next unless ($r->{k} // '') eq 'merge';
+            my ($m, $k) = (issue_no($r->{from}), issue_no($r->{to}));
+            $to{$m} = $k if defined $m && defined $k && $m != $k;
+        }
+        next unless %to;
+        my $s = $ctx->{segs}{$key};
+        for my $i (0 .. $#$s) {
+            my $m = $s->[$i]{issue};
+            next unless defined $m && defined $to{$m};
+            my $k = $to{$m};
+            $s->[$i]{issue} = $k if grep { defined $_->{orig} && $_->{orig} == $k } @$s[ $i + 1 .. $#$s ];
         }
     }
-    return \%b;
+    return 1;
+}
+
+# 分けた: Issue O の区切りのすぐあとに、O と違う Issue P の claim で始まる区切りがあり、GitHub の P の親が O で、
+# P が O の子のうち最初に claim された Issue のとき、O の区切りを P の区切りにする。
+# gh で親を読むのは、Issue N に関わる O の候補だけである
+sub relabel_splits {
+    my ($ctx) = @_;
+    my $n = $ctx->{n};
+    my @cand;
+    for my $key (sort keys %{ $ctx->{segs} }) {
+        my $s = $ctx->{segs}{$key};
+        for my $i (1 .. $#$s) {
+            my ($o, $p) = ($s->[ $i - 1 ]{issue}, $s->[$i]{issue});
+            next unless $s->[$i]{claim} && defined $o && defined $p && $o != $p;
+            push @cand, { key => $key, at => $i - 1, o => $o, p => $p, ts => $s->[$i]{start} };
+        }
+    }
+    my %os = ($n => 1);
+    $os{ $_->{o} } = 1 for grep { $_->{p} == $n } @cand;
+    my %first;
+    for my $c (sort { $a->{ts} <=> $b->{ts} || $a->{key} cmp $b->{key} } grep { $os{ $_->{o} } } @cand) {
+        next if $first{ $c->{o} };
+        my $parent = parent_of($ctx, $c->{p});
+        $first{ $c->{o} } = $c if defined $parent && $parent == $c->{o};
+    }
+    for my $c (values %first) {
+        $ctx->{segs}{ $c->{key} }[ $c->{at} ]{issue} = $c->{p};
+        $ctx->{split} = 1 if $c->{p} == $n;
+    }
+    return 1;
+}
+
+# GitHub の Issue の親の番号。親が無ければ undef
+sub parent_of {
+    my ($ctx, $p) = @_;
+    return $ctx->{parent}{$p} if exists $ctx->{parent}{$p};
+    my $d = eval { $JSON->decode(gh('issue', 'view', $p, '--json', 'parent')) };
+    die "gh issue view $p の出力を JSON として読めなかった\n" unless ref $d eq 'HASH';
+    my $parent = ref $d->{parent} eq 'HASH' ? issue_no($d->{parent}{number}) : undef;
+    return $ctx->{parent}{$p} = $parent;
+}
+
+# Issue ごとのブランチと、開始と終了の時刻。ブランチは、Issue の PR(本文の行頭に Closes #X か Refs: #X がある、
+# マージ済みかマージせずに閉じた PR)のブランチと、Issue の区切りの受け持ちの出来事の --branch の値である
+sub issue_model {
+    my ($ctx) = @_;
+    my (%br, %start, %end);
+    for my $p (@{ $ctx->{pr_list} }) {
+        next unless ref $p eq 'HASH';
+        my $st = $p->{state} // '';
+        next unless $st eq 'MERGED' || $st eq 'CLOSED';
+        my $body = defined $p->{body} && !ref $p->{body} ? $p->{body} : '';
+        my $head = defined $p->{headRefName} && !ref $p->{headRefName} ? $p->{headRefName} : '';
+        my $merged = $st eq 'MERGED' ? iso_epoch($p->{mergedAt}) : undef;
+        while ($body =~ /^(Closes|Refs:) #([1-9][0-9]{0,9})(?![0-9])/mg) {
+            my ($how, $x) = ($1, $2 + 0);
+            $br{$x}{$head} = 1 if length $head;
+            $end{$x} = $merged if $how eq 'Closes' && defined $merged && (!defined $end{$x} || $merged > $end{$x});
+        }
+    }
+    $end{ $ctx->{n} } = $ctx->{end_ts};
+    for my $s (map { @$_ } values %{ $ctx->{segs} }) {
+        my $x = $s->{issue};
+        next unless defined $x;
+        $start{$x} = $s->{start} if !defined $start{$x} || $s->{start} < $start{$x};
+        for my $e (@{ $s->{events} }) {
+            my $b = $e->{branch};
+            $br{$x}{$b} = 1 if ($e->{k} // '') eq 'recv' && defined $b && !ref $b && length $b;
+        }
+    }
+    my %by;
+    for my $x (sort { $a <=> $b } keys %br) {
+        push @{ $by{$_} }, [ $x, $start{$x} // -FAR, $end{$x} // FAR ] for sort keys %{ $br{$x} };
+    }
+    @$ctx{qw(by_branch starts ends)} = (\%by, \%start, \%end);
+    $ctx->{branches} = $br{ $ctx->{n} } || {};
+    return 1;
+}
+
+# 別に起こしたセッションの会話の記録の鍵ごとに、そのセッションを起こした親の会話の出来事
+# (親の記録の鍵、時刻、そのときのブランチ)を、extract/desktop.jsonl の対応で決める。最も早い出来事を使う
+sub link_spawned {
+    my ($ctx) = @_;
+    my %session;
+    for my $d (@{ $ctx->{desktop} }) {
+        my ($l, $s) = @$d{qw(local session)};
+        $session{$l} = $s if defined $l && !ref $l && defined $s && !ref $s;
+    }
+    my %spawned;
+    for my $key (sort keys %{ $ctx->{rec} }) {
+        my $branch;
+        for my $r (@{ $ctx->{rec}{$key} }) {
+            my $k = $r->{k} // '';
+            $branch = $r->{name} if $k eq 'branch' && defined $r->{name} && !ref $r->{name};
+            next unless $k eq 'spawn' && defined $r->{child} && !ref $r->{child};
+            my ($s, $t) = ($session{ $r->{child} }, row_ts($r));
+            next unless defined $s && defined $t && $s ne $key;
+            $spawned{$s} = { key => $key, ts => $t, branch => $branch } if !$spawned{$s} || $t < $spawned{$s}{ts};
+        }
+    }
+    $ctx->{spawned} = \%spawned;
+    return 1;
+}
+
+# 会話 $key の時刻 $t の行(そのときのブランチ $b)の Issue。どの Issue にも入れない行は undef。
+# 次の順で決める。補助役の会話は、親の会話の区切りと、別に起こしたセッションの出来事を使う
+# - /request の段階の印のあとから次の受け持ちまでの行は、Issue に入れない
+# - 行のブランチが Issue のブランチで、行の時刻が開始の時刻から終了の時刻までにあるとき、その Issue。
+#   2つ以上の Issue に当たれば、開始の時刻が最も遅い Issue
+# - 行の会話が、その時刻にある Issue の区切りの中にあり、行の時刻が終了の時刻より前のとき、その Issue
+# - 別に起こしたセッションの会話は、親の会話の、セッションを起こした出来事と同じ Issue
+sub issue_at {
+    my ($ctx, $key, $t, $b, $depth) = @_;
+    my $host = parent_key($key) // $key;
+    my $seg = seg_at($ctx, $host, $t);
+    return undef if $seg && !defined $seg->{issue};
+    if (defined $b) {
+        my $best;
+        for my $c (@{ $ctx->{by_branch}{$b} || [] }) {
+            next unless $c->[1] <= $t && $t <= $c->[2];
+            $best = $c if !$best || $c->[1] > $best->[1];
+        }
+        return $best->[0] if $best;
+    }
+    return $t < end_of($ctx, $seg->{issue}) ? $seg->{issue} : undef if $seg;
+    my $sp = $ctx->{spawned}{$host};
+    return undef unless $sp && $depth < 3;
+    my $i = issue_at($ctx, $sp->{key}, $sp->{ts}, $sp->{branch}, $depth + 1);
+    return defined $i && $t < end_of($ctx, $i) ? $i : undef;
+}
+
+# 会話 $key の、時刻 $t を含む区切り。無ければ undef
+sub seg_at {
+    my ($ctx, $key, $t) = @_;
+    my $found;
+    for my $s (@{ $ctx->{segs}{$key} || [] }) {
+        last if $s->{start} > $t;
+        $found = $s;
+    }
+    return $found;
+}
+
+sub end_of {
+    my ($ctx, $x) = @_;
+    return $ctx->{ends}{$x} // FAR;
+}
+
+# 受け持ちの出来事(Issue の番号がある start の段階の印と、recv の行)の Issue の番号。受け持ちの出来事でなければ undef
+sub recv_issue {
+    my ($r) = @_;
+    my $k = $r->{k} // '';
+    return undef unless $k eq 'recv' || ($k eq 'stage' && ($r->{name} // '') eq 'start');
+    return issue_no($r->{issue});
+}
+
+sub is_request {
+    my ($r) = @_;
+    return ($r->{k} // '') eq 'stage' && ($r->{name} // '') eq 'request' ? 1 : 0;
+}
+
+# 補助役の会話の記録の鍵(<親の記録の鍵>.agent-<id>)の、親の記録の鍵。補助役の会話でなければ undef
+sub parent_key {
+    my ($key) = @_;
+    return $key =~ /\A(.+?)\.agent-[A-Za-z0-9_-]+\z/ ? $1 : undef;
+}
+
+sub row_ts {
+    my ($r) = @_;
+    my $t = $r->{ts};
+    return defined $t && !ref $t && $t =~ /\A[0-9]+(?:\.[0-9]+)?\z/ ? $t + 0 : undef;
+}
+
+sub issue_no {
+    my ($v) = @_;
+    return defined $v && !ref $v && $v =~ /\A[1-9][0-9]{0,9}\z/ ? $v + 0 : undef;
 }
 
 sub same_issue {
