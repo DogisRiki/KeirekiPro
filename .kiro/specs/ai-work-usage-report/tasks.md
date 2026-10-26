@@ -142,7 +142,7 @@
   - _対象の部品: github.pl_
 
 - [ ] 4. Issue ごとの集計を作る部品を作る
-- [ ] 4.1 呼び出し方と、PR と、spec の有無と、仕組みが入った時刻を決める (並行可)
+- [x] 4.1 呼び出し方と、PR と、spec の有無と、仕組みが入った時刻を決める (並行可)
 
   Claude は、部品「report.pl」の呼び出し方(`--state --config --issue --out --list --backfill`、終了コード 0・2・1)と、手順「Issue の PR を集める」「Issue のブランチを集める」と、手順「開始日と終了日」のうち終了日の決め方を、`.claude/scripts/usage/report.pl` に、design の「report.pl」の節のとおりに作る。あわせて、Claude は、spec 無しの Issue の決め方(終了の時刻の main の spec.json と `switch-to-spec` の印)と、仕組みが main に入った時刻の決め方(design の「移行」の節の `git log` のコマンド)を、report.pl に作る。report.pl は、この時点で `report.json` に、Issue の番号、PR、終了日、spec の有無を書く。`--backfill` を受けたときの出力は、タスク4.8で足す。Claude は、テスト `.claude/scripts/usage/tests/test-report.sh` と、その作り物の手元の記録(extract.pl が書く形の行)を作る。テストは、一時フォルダに git のリポジトリを作り、`origin/main` に spec.json とデータのファイルを足したコミットを置き、偽の gh で PR と Issue の親子を返す。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `bash .claude/scripts/usage/tests/test-report.sh` が、どれも失敗0件で終わる。`perl -c .claude/scripts/usage/report.pl` が通る。shellcheck の指摘が0件である
