@@ -747,6 +747,102 @@ check "元の会話の記録のファイルが無い記録の鍵でも、unknown
     "$(kfield "$LSTATE/extract/lk3.jsonl" turn 2 from)/$(kfield "$LSTATE/extract/lk3.jsonl" turn 2 raw)" "owner/undef"
 check "書き直した行と同じ行がファイルの後ろにあるときは、同じ行を2つ残さない" "$(kcount "$LSTATE/extract/lk3.jsonl" turn)" "2"
 
+printf '== フックから呼ばれたとき\n'
+HHOME="$WORK/hhome"
+HP="$HHOME/.claude/projects/p"
+# フックから呼ばれた extract.pl は、記録の置き場所を、入力の cwd の git の共通ディレクトリの下に決める
+HS="$REPO/.git/keirekipro-usage"
+HX="$HS/extract"
+hook() { HOME="$HHOME" USERPROFILE="$HHOME" LOCALAPPDATA="$WORK/nolocal" perl "${1:-$EXTRACT}" hook; }
+mkrec "$HP/hs2.jsonl" "$REPO" 0
+mkrec "$HP/hs3.jsonl" "$REPO" 0
+mkrec "$HP/hs2/subagents/agent-a1.jsonl" "$REPO" 0
+# 道具の結果の中にも同じ名前の欄があり、上の層の欄は最後に来る(Claude Code の入力の並び)
+out=$(printf '{"session_id":"hs1","transcript_path":"%s","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"echo"},"tool_response":{"tool_use_id":"inner","duration_ms":5},"tool_use_id":"toolu_A1","duration_ms":12}' "$HP/hs1.jsonl" "$REPO" | hook)
+check "PostToolUse で、durations/<session_id>.tsv に道具の呼び出しの識別子と実行時間の1行を足し、何も出さずに 0 で終わる" \
+    "$?/$out/$(cat "$HS/durations/hs1.tsv" 2>/dev/null | tr '\t' ' ')" "0//toolu_A1 12"
+# JSON として解けない入力でも、3つの欄を取り出す
+out=$(printf '{"session_id":"hs1","cwd":"%s","hook_event_name":"PostToolUse","tool_input":{"command":"\x01 broken' "$REPO"; printf '","tool_use_id":"toolu_A2","duration_ms":7}')
+printf '%s' "$out" | hook
+check "PostToolUse で、入力を JSON として解かずに3つの欄を取り出す" "$(sed -n 2p "$HS/durations/hs1.tsv" | tr '\t' ' ')" "toolu_A2 7"
+printf '{"session_id":"hs1","cwd":"%s","hook_event_name":"PostToolUse","tool_use_id":"toolu_A3"}' "$REPO" | hook
+check "PostToolUse で、duration_ms が無い入力では何も書かずに 0 で終わる" "$?/$(wc -l <"$HS/durations/hs1.tsv" | tr -d ' ')" "0/2"
+out=$(printf '{"session_id":"hs2","transcript_path":"%s","cwd":"%s","hook_event_name":"Notification"}' "$HP/hs2.jsonl" "$REPO" | hook)
+check "知らない hook_event_name では何もせずに 0 で終わる" "$?/$out/$(exists "$HX/hs2.pos")" "0//no"
+out=$(printf '{"session_id":"hs2","transcript_path":"%s","cwd":"%s","hook_event_name":"Stop"}' "$HP/hs2.jsonl" "$REPO" | hook)
+check "Stop で、その会話の記録の鍵だけを読み、何も出さずに 0 で終わる" \
+    "$?/$out/$(exists "$HX/hs2.pos")/$(exists "$HX/hs3.pos")/$(kcount "$HX/hs2.jsonl" msg)" "0//yes/no/1"
+printf '{"session_id":"hs3","transcript_path":"%s","cwd":"%s","hook_event_name":"SessionEnd"}' "$HP/hs3.jsonl" "$REPO" | hook
+check "SessionEnd で、その会話の記録の鍵を読む" "$?/$(exists "$HX/hs3.pos")" "0/yes"
+printf '{"session_id":"hs2","transcript_path":"%s","cwd":"%s","hook_event_name":"SubagentStop","agent_id":"a1","agent_transcript_path":"%s"}' \
+    "$HP/hs2.jsonl" "$REPO" "$HP/hs2/subagents/agent-a1.jsonl" | hook
+check "SubagentStop で、補助役の会話の記録の鍵を読む" "$?/$(exists "$HX/hs2.agent-a1.pos")" "0/yes"
+addline "$HP/hs2.jsonl" '{"type":"user","sessionId":"hs2","timestamp":"2026-10-26T00:02:00.000Z","turnOrigin":"human","message":{"role":"user","content":"x"}}'
+mkdir -p "$HS/locks/extract-hs2"
+printf '{"session_id":"hs2","transcript_path":"%s","cwd":"%s","hook_event_name":"Stop"}' "$HP/hs2.jsonl" "$REPO" | hook
+check "Stop で、錠を持つ呼び出しがあればその記録の鍵を飛ばして 0 で終わる" "$?/$(kcount "$HX/hs2.jsonl" turn)" "0/0"
+rmdir "$HS/locks/extract-hs2"
+printf '{"session_id":"hs9","transcript_path":"%s","cwd":"%s","hook_event_name":"Stop"}' "$HP/hs9.jsonl" "$REPO" | hook 2>"$WORK/hook-stderr"
+check "フックから呼ばれて失敗したときは、0 で終わり、理由を extract/errors.log に1行で残し、標準エラーに出さない" \
+    "$?/$(grep -c 'hs9' "$HX/errors.log" 2>/dev/null)/$(wc -c <"$WORK/hook-stderr" | tr -d ' ')" "0/1/0"
+
+# SessionStart: extract.pl とデータのファイルを一時フォルダに写し、隣に決まった行を出す作り物の usage.sh を置く
+HK="$WORK/hk"
+mkdir -p "$HK"
+cp "$EXTRACT" "$(dirname "$EXTRACT")/usage-config.json" "$HK/"
+cat >"$HK/usage.sh" <<'EOF'
+#!/bin/bash
+[ "$*" = "session-context" ] || exit 9
+cat "$KP_FAKE_CONTEXT"
+EOF
+# 裏の --all の呼び出しが読む、消した worktree の会話の記録
+mkrec "$HP/hs4.jsonl" "$REPO/.claude/worktrees/gone" 0
+i=0
+while [ "$i" -lt 40 ]; do
+    addline "$HP/hs4.jsonl" '{"type":"user","sessionId":"hs4","timestamp":"2026-10-26T00:03:00.000Z","message":{"role":"user","content":"x"}}'
+    i=$((i + 1))
+done
+# 裏の呼び出しを遅くする(1行読むたびに待つ)。フックの終わりが裏の起動の終わりより先かを確かめるため
+# PERL5LIB は : で区切るので、Windows でもドライブ文字の無い場所を渡す
+mkdir -p "$WORK/slowlib"
+cat >"$WORK/slowlib/SlowRead.pm" <<'EOF'
+package SlowRead;
+BEGIN { no warnings "once"; *CORE::GLOBAL::readline = sub { select(undef, undef, undef, 0.05); CORE::readline($_[0]) } }
+1;
+EOF
+printf '[usage] 一つ目\n[usage] 二つ目\n' >"$WORK/ctx1"
+out=$(printf '{"session_id":"hs5","transcript_path":"%s","cwd":"%s","hook_event_name":"SessionStart","source":"startup"}' "$HP/hs5.jsonl" "$OUTWT" \
+    | KP_FAKE_CONTEXT="$WORK/ctx1" PERL5LIB="$TMP_ROOT/slowlib" PERL5OPT=-MSlowRead hook "$HK/extract.pl")
+rc=$?
+check "SessionStart で、フックが裏の --all の呼び出しの終わりを待たずに 0 で終わる" "$rc/$(exists "$HX/hs4.pos")" "0/no"
+check "SessionStart で、session-context の行が additionalContext に入った1つの JSON として出る" \
+    "$(printf '%s' "$out" | perl -MJSON::PP -e 'local $/; my $d = JSON::PP->new->utf8->decode(<STDIN>); my $h = $d->{hookSpecificOutput}; binmode STDOUT, ":utf8"; print join "|", scalar(keys %$d), $h->{hookEventName}, split /\n/, $h->{additionalContext}')" \
+    "1|SessionStart|[usage] 一つ目|[usage] 二つ目"
+i=0
+while [ ! -e "$HX/hs4.pos" ] && [ "$i" -lt 300 ]; do
+    sleep 0.1
+    i=$((i + 1))
+done
+check "SessionStart で、worktree の cwd から呼んでも、裏の --all の呼び出しが、git の共通ディレクトリの下の記録の置き場所に、このリポジトリの会話の記録を読む" \
+    "$(exists "$HX/hs4.pos")/$(kcount "$HX/hs4.jsonl" msg)" "yes/1"
+# 残りの場合は、会話の記録の無い別のリポジトリで呼ぶ(裏の呼び出しがすぐ終わるように)
+OREPO="$WORK/orepo"
+git init -q "$OREPO"
+: >"$WORK/ctx0"
+out=$(printf '{"session_id":"hs6","cwd":"%s","hook_event_name":"SessionStart"}' "$OREPO" | KP_FAKE_CONTEXT="$WORK/ctx0" hook "$HK/extract.pl")
+check "SessionStart で、session-context の行が無いときは何も出さない" "$?/$out" "0/"
+perl -e 'binmode STDOUT, ":utf8"; print "[usage] ", "\x{3042}" x 3000, "\n" for 1 .. 4' >"$WORK/ctx4"
+out=$(printf '{"session_id":"hs7","cwd":"%s","hook_event_name":"SessionStart"}' "$OREPO" | KP_FAKE_CONTEXT="$WORK/ctx4" hook "$HK/extract.pl")
+check "SessionStart で、10,000文字を超えると超える行が省かれ、省いたことを知らせる1行が最後に付く" \
+    "$(printf '%s' "$out" | perl -MJSON::PP -e 'local $/; my $c = JSON::PP->new->utf8->decode(<STDIN>)->{hookSpecificOutput}{additionalContext}; my @l = split /\n/, $c; binmode STDOUT, ":utf8"; print scalar(@l), "|", (length($c) <= 10000 ? "le" : "gt"), "|", substr($l[-1], 0, 60)')" \
+    "4|le|[usage] 知らせが多いので一部を省いた。\`usage.sh pending\` で残りを見る"
+# 裏の呼び出しが終わるのを待つ(一時フォルダを消す前に)
+i=0
+while [ -n "$(ls "$OREPO/.git/keirekipro-usage/locks" 2>/dev/null)" ] && [ "$i" -lt 100 ]; do
+    sleep 0.1
+    i=$((i + 1))
+done
+
 printf '== 終了コード\n'
 printf 'x\n' >"$WORK/afile"
 perl "$EXTRACT" --state "$WORK/afile/state" --all --skip-locked --repo "$REPO" 2>/dev/null

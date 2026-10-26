@@ -5,6 +5,9 @@
 # 呼び出し方:
 #   perl extract.pl --state <記録の置き場所> --all --skip-locked|--wait --repo <本体の作業フォルダ>
 #     このリポジトリの全部の会話の記録の続きを読み、<記録の置き場所>/extract/ に書く
+#   perl extract.pl hook
+#     フックの入力を標準入力で受け、hook_event_name ごとの仕事をする(run_hook)。失敗しても 0 で終わり、
+#     理由を <記録の置き場所>/extract/errors.log に残す
 #
 # Claude Code が形を決めているもの(会話の記録の欄の名前と値)を読むのは、この部品だけである。
 # 抜き出した行は「この仕組みの中の値」で書き、会話の文・道具の引数・結果の中身は書かない。
@@ -24,6 +27,7 @@ use Time::Local ();
 use File::Basename ();
 use File::Spec ();
 use Time::HiRes ();
+use POSIX ();
 
 # 抜き出し方を変えたら上げる。.pos の版の番号が違う記録の鍵は、最初から読み直す
 use constant EXTRACT_VERSION => 1;
@@ -59,10 +63,17 @@ my $LOCK_TOUCH = test_secs(q(KP_USAGE_TEST_LOCK_TOUCH), 10);
 # 今持っている錠のディレクトリと、その時刻を最後に直した時刻
 my ($LOCK_DIR, $LOCK_TOUCHED);
 
+# この部品の場所。SessionStart で、裏の呼び出しを起動するときと、隣の usage.sh を呼ぶときに使う
+my $SELF = File::Spec->rel2abs(__FILE__);
+# Claude Code が SessionStart のフックの additionalContext に受ける文字の数の上限と、超えたときに最後に置く1行
+use constant CONTEXT_MAX => 10000;
+my $CONTEXT_CUT = do { my $s = '[usage] 知らせが多いので一部を省いた。`usage.sh pending` で残りを見る'; utf8::decode($s); $s };
+
 exit main(@ARGV);
 
 sub main {
     my @args = @_;
+    return run_hook() if @args == 1 && $args[0] eq 'hook';
     my %o;
     my $ok = GetOptionsFromArray(\@args,
         'state=s'     => \$o{state},
@@ -77,6 +88,163 @@ sub main {
         return 64;
     }
     return run_all(\%o);
+}
+
+# フックから呼ばれたとき: 標準入力のフックの入力の hook_event_name で、することを分ける
+# 会話を止めないため、どの失敗でも 0 で終わる。記録の置き場所が決まるまでの失敗は、残す場所が無いので捨てる
+sub run_hook {
+    open(STDERR, '>', File::Spec->devnull);
+    binmode STDIN;
+    my $in = do { local $/; <STDIN> };
+    $in = '' unless defined $in;
+    eval { hook_event($in); 1 } or do {
+        (my $e = $@ // '') =~ s/\s+/ /g;
+        print STDERR "extract.pl: フックの仕事が途中で止まった: $e\n";
+    };
+    return 0;
+}
+
+sub hook_event {
+    my ($in) = @_;
+    my ($ev) = $in =~ /"hook_event_name"\s*:\s*"([A-Za-z]+)"/;
+    return unless defined $ev && $ev =~ /\A(?:PostToolUse|Stop|SessionEnd|SubagentStop|SessionStart)\z/;
+    # 記録の置き場所は、入力の cwd の git の共通ディレクトリの下に決める(worktree を消しても残るように)
+    my $cwd = hook_str($in, 'cwd');
+    return unless defined $cwd && length $cwd;
+    my $common = git_common_dir($cwd);
+    return unless defined $common;
+    my $state = "$common/keirekipro-usage";
+    my $exdir = "$state/extract";
+    eval { File::Path::mkpath($exdir) } unless -d $exdir;
+    return unless -d $exdir;
+    open(STDERR, '>>', "$exdir/errors.log") or return;
+    # PostToolUse は道具を使うたびに動くので、道具の結果の中身が大きい入力でも速く終えるよう、JSON として解かない
+    return hook_duration($in, $state) if $ev eq 'PostToolUse';
+    my $d = eval { $JSON->decode($in) };
+    if (ref $d ne 'HASH') {
+        print STDERR "extract.pl: $ev のフックの入力を JSON として読めない\n";
+        return;
+    }
+    return hook_session_start($state, $common) if $ev eq 'SessionStart';
+    # Stop と SessionEnd は本体の会話の記録、SubagentStop は補助役の会話の記録の続きを読む
+    my ($path, $key);
+    if ($ev eq 'SubagentStop') {
+        $path = hook_path($d->{agent_transcript_path});
+        $key = "$1.$2" if defined $path && $path =~ m{([A-Za-z0-9_-]+)/subagents/(agent-[A-Za-z0-9_-]+)\.jsonl\z};
+    } else {
+        $path = hook_path($d->{transcript_path});
+        $key = $1 if defined $path && $path =~ m{(?:\A|/)([A-Za-z0-9_-]+)\.jsonl\z};
+    }
+    if (!defined $key) {
+        print STDERR "extract.pl: $ev のフックの入力に、読める形の会話の記録の場所が無い\n";
+        return;
+    }
+    ($WAIT_CATS, $STAGE_MARKS) = load_config();
+    if (!$WAIT_CATS) {
+        print STDERR "extract.pl: データのファイル usage-config.json の wait_categories か stage_marks を読めない\n";
+        return;
+    }
+    # ほかの呼び出しが同じ記録を読んでいれば、その呼び出しが続きを読むので飛ばす
+    return with_lock({ state => $state, skip_locked => 1 }, $key, sub { read_record($path, $key, $exdir) });
+}
+
+# PostToolUse: 道具の呼び出しの識別子と実行時間を durations/<session_id>.tsv に1行で追記する
+# 道具の結果の中にも同じ名前の欄がありうる。Claude Code は上の層の tool_use_id と duration_ms を最後に置くので、
+# 最後に出てくる値を使う。session_id は最初に置くので、最初に出てくる値を使う
+sub hook_duration {
+    my ($in, $state) = @_;
+    my ($sid) = $in =~ /"session_id"\s*:\s*"([A-Za-z0-9_-]{1,128})"/;
+    my @ids = $in =~ /"tool_use_id"\s*:\s*"([A-Za-z0-9_-]{1,128})"/g;
+    my @ms  = $in =~ /"duration_ms"\s*:\s*([0-9]+(?:\.[0-9]+)?)/g;
+    return unless defined $sid && @ids && @ms;
+    my $dir = "$state/durations";
+    eval { File::Path::mkpath($dir) } unless -d $dir;
+    my $f = "$dir/$sid.tsv";
+    open(my $fh, '>>:raw', $f) or return write_failed($f);
+    print $fh "$ids[-1]\t$ms[-1]\n" or return write_failed($f);
+    close $fh or return write_failed($f);
+    return 0;
+}
+
+# SessionStart: 裏で --all --skip-locked を起動し、隣の usage.sh session-context の行を additionalContext に入れて出す
+sub hook_session_start {
+    my ($state, $common) = @_;
+    # 本体の作業フォルダは、git の共通ディレクトリの親とする(worktree の場所を渡すと、消した worktree の会話を読まない)
+    my $repo = File::Basename::dirname($common);
+    my $pid = fork;
+    if (!defined $pid) {
+        print STDERR "extract.pl: 裏の --all の呼び出しを起動できない: $!\n";
+    } elsif ($pid == 0) {
+        # 標準入力と標準出力を閉じないと、Claude Code がフックの終わりを待ち続ける。標準エラーは errors.log のまま
+        open(STDIN, '<', File::Spec->devnull);
+        open(STDOUT, '>', File::Spec->devnull);
+        POSIX::setsid();
+        { exec($^X, $SELF, '--state', $state, '--all', '--skip-locked', '--repo', $repo) };
+        print STDERR "extract.pl: 裏の --all の呼び出しを起動できない: $!\n";
+        POSIX::_exit(1);
+    }
+    my $usage = File::Spec->catfile(File::Basename::dirname($SELF), 'usage.sh');
+    my $ph;
+    if (!open($ph, '-|', 'bash', $usage, 'session-context')) {
+        print STDERR "extract.pl: usage.sh session-context を呼べない: $!\n";
+        return;
+    }
+    binmode $ph;
+    my @lines;
+    while (my $l = <$ph>) {
+        $l =~ s/\r?\n\z//;
+        next unless length $l;
+        utf8::decode($l);
+        push @lines, $l;
+    }
+    if (!close $ph) {
+        print STDERR "extract.pl: usage.sh session-context が失敗した\n";
+        return;
+    }
+    return unless @lines;
+    my $ctx = join "\n", @lines;
+    if (length $ctx > CONTEXT_MAX) {
+        my (@keep, $len);
+        $len = length $CONTEXT_CUT;
+        for my $l (@lines) {
+            last if $len + length($l) + 1 > CONTEXT_MAX;
+            push @keep, $l;
+            $len += length($l) + 1;
+        }
+        $ctx = join "\n", @keep, $CONTEXT_CUT;
+    }
+    print STDOUT $JSON->encode({ hookSpecificOutput => { hookEventName => 'SessionStart', additionalContext => $ctx } }), "\n";
+    return;
+}
+
+# フックの入力から、文字の列の欄の値を、JSON として解かずに取り出す(最初に出てくる欄。上の層の欄は道具の欄より先に来る)
+# 返す値は、ファイルの場所に使えるバイトの列
+sub hook_str {
+    my ($in, $name) = @_;
+    return undef unless $in =~ /"\Q$name\E"\s*:\s*("(?:[^"\\]|\\.)*")/s;
+    my $v = eval { JSON::PP->new->utf8->allow_nonref->decode($1) };
+    return undef if !defined $v || ref $v;
+    utf8::encode($v);
+    return $v;
+}
+
+# フックの入力の会話の記録の場所を、ファイルを開ける形にする(Windows の C:\... は C:/... にそろえる)
+sub hook_path {
+    my ($p) = @_;
+    return undef if !defined $p || ref $p || !length $p;
+    utf8::encode($p);
+    $p =~ tr{\\}{/} if $p =~ m{\A[A-Za-z]:[\\/]} || $p =~ m{\A\\\\};
+    return $p;
+}
+
+sub git_common_dir {
+    my ($cwd) = @_;
+    open(my $g, '-|', 'git', '-C', $cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir') or return undef;
+    my $dir = <$g>;
+    close $g or return undef;
+    return undef unless defined $dir;
+    $dir =~ s/\r?\n\z//;
+    return length $dir ? $dir : undef;
 }
 
 # このリポジトリの全部の会話の記録の続きを読む
