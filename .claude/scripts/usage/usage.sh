@@ -8,11 +8,14 @@
 #   pending
 #     まだ出していない Issue と、一覧か案の索引への書き込みが残った Issue の番号を
 #     {"issues":[<番号>, ...]} の1行で出す
-#   draft <N>
+#   draft <N> [--backfill]
 #     Issue N の錠の中で、Issue N が集計の対象かを確かめる。対象でなければ、集計しない印を
 #     issues/<N>.json に書いて(書かないこともある)2 で終わる。出し済みなら、一覧の行と案の索引を足し直して 2 で終わる。
 #     対象なら、会話の記録を抜き出し、集計の下書きを drafts/<N>/ に作り、下書きの場所と比べの要約と見分けられなかった
-#     再開の回数を {"draft":<場所>,"compare":{...},"unknown":{...}} の1行で出す。この PC に記録が無ければ 2 で終わる
+#     再開の回数を {"draft":<場所>,"compare":{...},"unknown":{...}} の1行で出す。この PC に記録が無ければ 2 で終わる。
+#     --backfill を付けると、さかのぼりの集計として、仕組みを main に入れた Issue と、仕組みが入る前にマージされた Issue だけを
+#     集計する。その2つでは、集計しない印を書いてから集計を続ける。閉じる PR が仕組みの入ったあとにマージされた Issue では、
+#     issues/<N>.json に書かずに 2 で終わる
 #   backfill-list
 #     さかのぼりの集計の対象の Issue を、終了日の古い順(同じ日なら番号の小さい順)に、仕組みを main に入れた Issue のうち
 #     閉じる PR をまだ待つ Issue と合わせて {"issues":[<番号>, ...],"waiting":[<番号>, ...]} の1行で出す。
@@ -299,10 +302,11 @@ pending_select() {
 }
 
 cmd_draft() {
-    [ $# -eq 1 ] || fail "draft には Issue の番号を1つだけ渡す。"
+    [ $# -eq 1 ] || { [ $# -eq 2 ] && [ "$2" = --backfill ]; } ||
+        fail "draft には Issue の番号を1つと、さかのぼりの集計のときだけ --backfill を渡す。"
     printf '%s' "$1" | grep -Eq '^[1-9][0-9]{0,9}$' && [ "$(printf '%s' "$1" | wc -l | tr -d ' ')" = 0 ] ||
         fail "draft の Issue の番号を、0で始まらない10桁までの数にする。"
-    local n=$1 sysc decision kind mc at rc why
+    local n=$1 backfill=${2-} sysc decision kind mc at rc why
     ensure_state
     lock_issue "$n"
 
@@ -363,7 +367,7 @@ cmd_draft() {
         die "PR #$last->{number} のマージのコミットを読めなかった\n"
             if defined $last && !(defined $last->{mc} && !ref $last->{mc} && $last->{mc} =~ /\A[0-9a-f]{7,64}\z/);
         my $closed = ($iss->{state} // "") eq "CLOSED";
-        if ($system) { print "system-pr\t-\t$at\n" }
+        if ($system) { print "system-pr\t", (defined $last ? $last->{mc} : "-"), "\t$at\n" }
         elsif (defined $last) { print "ancestor\t$last->{mc}\t$at\n" }
         elsif ($closed) { print "no-merged-pr\t-\t$at\n" }
         else { print "open\t-\t-\n" }
@@ -376,26 +380,36 @@ cmd_draft() {
     IFS="$(printf '\t')" read -r kind mc at <<EOF
 $decision
 EOF
+    # さかのぼりの集計では、仕組みを入れた Issue と仕組みが入る前の Issue に、集計しない印を書いてから集計を続ける。
+    # 印があれば pending がその Issue を出さないので、出せなかった集計を次の会話で出し直さない
     case "$kind" in
-    system-pr | no-merged-pr)
-        edit_issue "$n" skip "$kind" "$at"
+    system-pr)
+        edit_issue "$n" skip system-pr "$at"
+        # 閉じる PR がまだ無ければ、集計の終わりを決められないので集計しない
+        [ -n "$backfill" ] && [ "$mc" != - ] || exit 2
+        ;;
+    no-merged-pr)
+        edit_issue "$n" skip no-merged-pr "$at"
         exit 2
         ;;
     open) exit 2 ;;
-    ancestor) ;;
-    *) fail "Issue $n が集計の対象かを決められなかった。" ;;
-    esac
-
-    # 4. 閉じる PR のうち最後にマージされた PR が、データのファイルを足したコミットの祖先なら、仕組みが入る前の Issue である
-    rc=0
-    git -C "$TOP" merge-base --is-ancestor "$mc" "$sysc" 2>/dev/null || rc=$?
-    case "$rc" in
-    0)
-        edit_issue "$n" skip before-system "$at"
-        exit 2
+    ancestor)
+        # 4. 閉じる PR のうち最後にマージされた PR が、データのファイルを足したコミットの祖先なら、仕組みが入る前の Issue である
+        rc=0
+        git -C "$TOP" merge-base --is-ancestor "$mc" "$sysc" 2>/dev/null || rc=$?
+        case "$rc" in
+        0)
+            edit_issue "$n" skip before-system "$at"
+            [ -n "$backfill" ] || exit 2
+            ;;
+        1)
+            # さかのぼりの集計は、仕組みが入ったあとにマージされた Issue を集計しない。その Issue は、マージを見届けた会話で出す
+            [ -z "$backfill" ] || exit 2
+            ;;
+        *) fail "Issue $n の閉じる PR のコミット $mc が手元に無く、仕組みが入る前の PR かを確かめられなかった。" ;;
+        esac
         ;;
-    1) ;;
-    *) fail "Issue $n の閉じる PR のコミット $mc が手元に無く、仕組みが入る前の PR かを確かめられなかった。" ;;
+    *) fail "Issue $n が集計の対象かを決められなかった。" ;;
     esac
 
     # 5. この PC の会話の記録の続きを抜き出す。ほかの呼び出しが読んでいる記録は、読み終わるのを待ってから続きを読む。
@@ -408,7 +422,7 @@ EOF
     checked "gh で一覧の行を読めなかった" github list-read >"$list"
     rc=0
     (cd "$TOP" && perl "$HERE/report.pl" --state "$STATE" --config "$HERE/usage-config.json" --issue "$n" \
-        --out "$STATE/drafts/$n" --list "$list") 2>"$STATE/.err.$$" || rc=$?
+        --out "$STATE/drafts/$n" --list "$list" ${backfill:+"--backfill"}) 2>"$STATE/.err.$$" || rc=$?
     why=$(tail -n 1 "$STATE/.err.$$" 2>/dev/null)
     rm -f "$STATE/.err.$$"
     case "$rc" in

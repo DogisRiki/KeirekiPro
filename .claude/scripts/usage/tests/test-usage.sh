@@ -842,6 +842,77 @@ run backfill-list
 check "閉じる PR のコミットが手元に無く、祖先かを確かめられないとき、backfill-list が 1 で終わり、標準出力に何も出さない" "$RC/$OUT/$(errline)" "1//one"
 if [ "$SAVED_TZ" = unset ]; then unset TZ; else TZ=$SAVED_TZ; fi
 
+echo "== さかのぼりの集計の下書き"
+# 下書きの report.json の backfill: bfflag <N>
+bfflag() { perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or do { print "none"; exit }; local $/; my $d = JSON::PP->new->decode(<$f>); print $d->{backfill} ? "true" : "false"' "$STATE/drafts/$1/report.json"; }
+# 目立つ点の箇条だけの所見のファイル
+FINDINGS_PLAIN="$TMP_ROOT/findings-plain.md"
+printf '%s\n' '- 目立つ点の箇条' >"$FINDINGS_PLAIN"
+draftrepo bfd
+newgh bfd
+# 501: 仕組みが入る前に閉じた、印の無い Issue。閉じる PR 511 は仕組みが入る前のコミットである
+# 502: 仕組みが入る前に閉じた、before-system の印がすでにある Issue
+# 503: 仕組みを main に入れた Issue。PR 513 が Refs: を書き、閉じる PR 514 は仕組みが入ったあとにマージされた
+# 504: 閉じる PR 515 が仕組みが入ったあとにマージされた Issue
+# 505: 仕組みを main に入れた Issue。PR 516 が Refs: だけを書き、閉じる PR がまだ無い
+# 506: 仕組みが入る前に閉じた、印の無い Issue(--backfill を付けない draft で確かめる)
+# 507: 仕組みが入ったあとに閉じた、受け持ちの出来事がある、まだ出していない Issue
+mkdb "issues => [ list(), cl(501, '2026-10-23T20:00:00Z'), cl(502, '2026-10-23T21:00:00Z'), cl(503, '2026-10-25T01:00:00Z'),
+    cl(504, '2026-10-25T02:00:00Z'), cl(505, '2026-10-25T03:00:00Z'), cl(506, '2026-10-23T22:00:00Z'), cl(507, '2026-10-25T04:00:00Z') ],
+  prs => [ pr(511, 'MERGED', 'Closes #501', '2026-10-24T15:00:00Z', '$PRE'), pr(512, 'MERGED', 'Closes #502', '2026-10-24T15:00:00Z', '$PRE'),
+    pr(513, 'MERGED', 'Refs: #503', '2026-10-24T03:00:00Z', '$SYSC'), pr(514, 'MERGED', 'Closes #503', '2026-10-24T15:00:00Z', '$POST'),
+    pr(515, 'MERGED', 'Closes #504', '2026-10-24T15:00:00Z', '$POST'), pr(516, 'MERGED', 'Refs: #505', '2026-10-24T03:00:00Z', '$SYSC'),
+    pr(517, 'MERGED', 'Closes #506', '2026-10-24T15:00:00Z', '$PRE') ]"
+mktrans bfd-a 1 "$REPO" feat/pr511
+mktrans bfd-b 1 "$REPO" feat/pr512
+mktrans bfd-c 1 "$REPO" feat/pr514
+mktrans bfd-d 1 "$REPO" feat/pr515
+mktrans bfd-e 1 "$REPO" feat/pr517
+issuejson 502 '{"closed_at":"2026-10-23T21:00:00Z","skip":"before-system"}'
+run draft 502 --backfill
+d502="$RC/$(bfflag 502)/$(statejson issues/502.json)"
+run draft 501 --backfill
+d501="$RC/$(bfflag 501)/$(statejson issues/501.json)"
+run draft 503 --backfill
+d503="$RC/$(bfflag 503)/$(statejson issues/503.json)"
+run draft 504 --backfill
+d504="$RC/$(bfflag 504)/$(statejson issues/504.json)"
+run draft 506
+d506="$RC/$(bfflag 506)/$(statejson issues/506.json)"
+check "draft <N> --backfill が、before-system の印がある Issue と、印を書いた仕組みが入る前の Issue と、system-pr の印を書いた仕組みを入れた Issue で backfill が真の下書きを作り、閉じる PR が仕組みのあとの Issue では書かずに 2 で終わる。--backfill の無い draft は before-system の印を書いて 2 で終わる" \
+    "$d502|$d501|$d503|$d504|$d506" \
+    '0/true/{"closed_at":"2026-10-23T21:00:00Z","skip":"before-system"}|0/true/{"closed_at":"2026-10-23T20:00:00Z","skip":"before-system"}|0/true/{"closed_at":"2026-10-25T01:00:00Z","skip":"system-pr"}|2/none/none|2/none/{"closed_at":"2026-10-23T22:00:00Z","skip":"before-system"}'
+run draft 505 --backfill
+check "そのコミットの PR が本文に Refs: だけを書き、その Issue を閉じる PR がまだ無いとき、draft <N> --backfill が system-pr の印を書いて 2 で終わる" \
+    "$RC/$(bfflag 505)/$(statejson issues/505.json)" '2/none/{"closed_at":"2026-10-25T03:00:00Z","skip":"system-pr"}'
+run draft 501 --frobnicate
+check "draft が、--backfill のほかの2つ目の引数を受けない" "$RC/$(errline)" "1/one"
+
+run owner no
+printf '%s\n' '^issue comment 501 ' '^issue comment 503 ' >"$FAKE_GH_DIR/fail"
+run publish 501 --findings "$FINDINGS_PLAIN"
+p501=$RC
+run publish 503 --findings "$FINDINGS_PLAIN"
+p503=$RC
+for n in 501 503 507; do recv "$n"; done
+run pending
+pend="$RC/$OUT"
+run session-context
+check "draft <N> --backfill のあとに publish が失敗した、仕組みが入る前に閉じた Issue と仕組みを入れた Issue を、次の pending が出さず、session-context もその Issue の文を作らない" \
+    "$p501/$p503/$pend/$RC/$(ctxlines)" '1/1/0/{"issues":[507]}/0/issue507'
+printf '%s\n' "$FAIL_LIST" >"$FAKE_GH_DIR/fail"
+run publish 502 --findings "$FINDINGS_PLAIN"
+pub="$RC/$(pubout 502)/$(reports 502)/$(listrows 502)"
+run pending
+check "draft <N> --backfill のあとに集計のコメントを書き、一覧の書き込みが失敗した Issue で、publish が 0 で終わって書けなかった書き込みに list を出し、次の pending はその Issue を出さない" \
+    "$pub/$RC/$OUT" '0/url//no/list/1/0/0/{"issues":[507]}'
+rm -f "$FAKE_GH_DIR/fail"
+run backfill-list
+bl="$RC/$OUT"
+run draft 502 --backfill
+check "一覧に書けなかったあと、backfill-list がその Issue を出し、draft <N> --backfill が一覧にその行を足して 2 で終わる" \
+    "$bl/$RC/$(listrows 502)" '0/{"issues":[501,502,503,506],"waiting":[505]}/2/1'
+
 echo "== 案と所有者"
 newrepo prop config
 newgh prop

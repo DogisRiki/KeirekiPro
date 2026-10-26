@@ -352,7 +352,7 @@
   - _要件: 10.1, 10.2, 10.4, 10.6_
   - _対象の部品: usage.sh_
 
-- [ ] 5.7 下書きを作るサブコマンドに、さかのぼりの集計の形を足す
+- [x] 5.7 下書きを作るサブコマンドに、さかのぼりの集計の形を足す
 
   Claude は、usage.sh の `draft` に、`--backfill` を、design の「usage.sh」の節の `draft <N> --backfill` の2つの違いのとおりに足す。`draft <N> --backfill` は、仕組みを main に入れた Issue と、Issue を閉じる PR のうち最も遅くマージされたものが仕組みが main に入る前にマージされた Issue だけを集計する。`draft <N> --backfill` は、タスク5.2の `draft` の4つの動きを、次のとおりに替える。
   1. 1つ目の動き(仕組みが main に入ったコミットを取る)は、`draft <N>` と同じである
