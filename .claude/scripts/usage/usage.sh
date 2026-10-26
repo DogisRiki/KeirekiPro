@@ -24,6 +24,9 @@
 #     案を、案の索引と issues/<N>.json の proposals_pending から外す
 #   owner yes|no
 #     state.json の owner を真か偽にする
+#   session-context
+#     会話の始めのフックが Claude の文脈に入れる、まだ出していない集計と、まだ答えていない案を知らせる文を、1行ずつ出す。
+#     gh は読むだけに使う。gh が失敗するか10秒を超えたときと、仕組みが main に入った時刻を取れないときは、何も出さずに 0 で終わる
 # --session <ID> は、並行作業の仕組みが会話の始めに渡す、その会話の ID である。どのサブコマンドも受ける。
 # 手元の記録の置き場所は <git の共通ディレクトリ>/keirekipro-usage/ である。
 # 終了コード: 成功は 0、何もしなかったときは 2、失敗は 1(標準エラーに理由を日本語の1文で出す)
@@ -55,7 +58,7 @@ while [ $# -gt 0 ]; do
         ;;
     esac
 done
-[ ${#ARGS[@]} -gt 0 ] || fail "サブコマンドを mark・pending・draft・publish・proposals・proposal・owner のどれかにする。"
+[ ${#ARGS[@]} -gt 0 ] || fail "サブコマンドを mark・pending・draft・publish・proposals・proposal・owner・session-context のどれかにする。"
 
 # Claude が Bash で cd したままでも同じ記録の置き場所を使うように、git を作業フォルダの最上位で動かす
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || fail "git のリポジトリの作業フォルダの中で呼ぶ。"
@@ -189,12 +192,19 @@ cmd_mark() {
 
 cmd_pending() {
     [ $# -eq 0 ] || fail "pending は引数を受けない。"
-    local sys since list
+    local sys
     sys=$(system_time) || exit 1
     if [ -z "$sys" ]; then
         printf '{"issues":[]}\n'
         return 0
     fi
+    pending_select "$sys" pending
+}
+
+# まだ出していない Issue と、一覧か案の索引への書き込みが残った Issue を、{"issues":[...]} の1行で出す: pending_select <仕組みが main に入った時刻> pending|context
+# context のときは、ほかの Issue のうち、出してから7日の間(list_checked_until がいまより後)の Issue を recent に足す
+pending_select() {
+    local sys=$1 mode=$2 since list
     # GitHub の検索がどの時間帯で日付を読んでも落とさないように、協定世界時の日付の前の日から探す
     since=$(perl -MTime::Local=timegm -MPOSIX=strftime -e '
         my ($y, $mo, $d, $h, $mi, $s, $z, $sg, $oh, $om) = $ARGV[0] =~ /\A(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(Z|([+-])(\d\d):(\d\d))\z/ or exit 1;
@@ -211,7 +221,7 @@ cmd_pending() {
     }
     rm -f "$STATE/.gh-err.$$"
     printf '%s' "$list" | perl -MJSON::PP -MTime::Local=timegm -e '
-        my ($state, $sys) = @ARGV;
+        my ($state, $sys, $mode) = @ARGV;
         my $J = JSON::PP->new->utf8->canonical;
         sub epoch {
             my ($v) = @_;
@@ -253,7 +263,7 @@ cmd_pending() {
             }
             close $fh;
         }
-        my %out;
+        my (%out, %recent);
         for my $i (@$issues) {
             next unless ref $i eq "HASH" && defined $i->{number} && !ref $i->{number} && $i->{number} =~ /\A[1-9][0-9]{0,9}\z/;
             my $n = $i->{number} + 0;
@@ -262,13 +272,20 @@ cmd_pending() {
             my $st = read_json("$state/issues/$n.json");
             next if defined $st->{skip} && defined $st->{closed_at} && !ref $st->{closed_at} && $st->{closed_at} eq $i->{closedAt};
             if (defined $st->{reported_at}) {
-                $out{$n} = 1 if has($st->{list_pending}) || has($st->{proposals_pending});
+                if (has($st->{list_pending}) || has($st->{proposals_pending})) {
+                    $out{$n} = 1;
+                } else {
+                    my $until = epoch($st->{list_checked_until});
+                    $recent{$n} = 1 if defined $until && $until > time;
+                }
             } elsif ($recv{$n}) {
                 $out{$n} = 1;
             }
         }
-        print $J->encode({ issues => [ map { $_ + 0 } sort { $a <=> $b } keys %out ] }), "\n";
-    ' "$STATE" "$sys" 2>"$STATE/.perl-err.$$" || {
+        my $o = { issues => [ map { $_ + 0 } sort { $a <=> $b } keys %out ] };
+        $o->{recent} = [ map { $_ + 0 } sort { $a <=> $b } keys %recent ] if $mode eq "context";
+        print $J->encode($o), "\n";
+    ' "$STATE" "$sys" "$mode" 2>"$STATE/.perl-err.$$" || {
         local why
         why=$(tail -n 1 "$STATE/.perl-err.$$" 2>/dev/null)
         rm -f "$STATE/.perl-err.$$"
@@ -541,6 +558,116 @@ cmd_publish() {
     printf '%s\n' "$result"
 }
 
+# 会話の始めのフックが文脈に入れる文の行を出す。gh が失敗するか待つ上限(10秒)を超えたら、何も出さずに 0 で終わる。
+# 本体を別のプロセスのグループで動かし、上限を超えたら、本体が呼んだ gh ごと止める。テストだけが KP_USAGE_TEST_CONTEXT_TIMEOUT で上限を短くする
+cmd_session_context() {
+    [ $# -eq 0 ] || fail "session-context は引数を受けない。"
+    local sys limit=10
+    # 仕組みが main に入った時刻を取れないときは、gh を呼ばずに終わる
+    sys=$(system_time 2>/dev/null) || return 0
+    [ -n "$sys" ] || return 0
+    case "${KP_USAGE_TEST_CONTEXT_TIMEOUT-}" in '' | *[!0-9]*) ;; *) limit=$KP_USAGE_TEST_CONTEXT_TIMEOUT ;; esac
+    perl -e '
+        my ($limit, @cmd) = @ARGV;
+        my $pid = open(my $ph, "-|") // exit 0;
+        if (!$pid) {
+            setpgrp(0, 0);
+            open(STDERR, ">", "/dev/null");
+            exec @cmd or exit 1;
+        }
+        my $out = eval {
+            local $SIG{ALRM} = sub { die "timeout\n" };
+            alarm $limit;
+            my $o = do { local $/; <$ph> };
+            my $ok = close $ph;
+            alarm 0;
+            $ok ? $o : undef;
+        };
+        if (!defined $out) {
+            kill "KILL", -$pid, $pid;
+            exit 0;
+        }
+        print $out;
+    ' "$limit" env KP_USAGE_CONTEXT_BODY=1 bash "$HERE/usage.sh" session-context
+}
+
+# state.json の owner を、真なら yes、偽なら no、無ければ unknown で出す
+owner_state() {
+    perl -MJSON::PP -e '
+        my $s;
+        if (open(my $fh, "<:raw", $ARGV[0])) {
+            local $/;
+            $s = eval { JSON::PP->new->decode(<$fh> // "") };
+        }
+        print ref $s eq "HASH" && ref $s->{owner} eq "JSON::PP::Boolean" ? ($s->{owner} ? "yes" : "no") : "unknown";
+    ' "$STATE/state.json"
+}
+
+# session-context の本体。失敗したら 1 で終わり、cmd_session_context が何も出さない
+context_body() {
+    local sys owner
+    sys=$(system_time) || exit 1
+    [ -n "$sys" ] || exit 0
+    ensure_state
+    # 上限を超えて止められた本体が残した一時ファイルを、ほかの会話の本体が使い終えたころに消す
+    find "$STATE" -maxdepth 1 -name '.ctx-*' -mmin +10 -exec rm -f {} + 2>/dev/null
+    trap 'rm -f "$STATE/.ctx-sel.$$" "$STATE/.ctx-rows.$$" "$STATE/.ctx-props.$$"' EXIT
+    pending_select "$sys" context >"$STATE/.ctx-sel.$$" || exit 1
+    printf '[]\n' >"$STATE/.ctx-rows.$$"
+    printf '[]\n' >"$STATE/.ctx-props.$$"
+    # 出してから7日の間の Issue があるときだけ、一覧の行を読む
+    if ! grep -q '"recent":\[\]' "$STATE/.ctx-sel.$$"; then
+        github list-read >"$STATE/.ctx-rows.$$" || exit 1
+    fi
+    owner=$(owner_state)
+    if [ "$owner" != no ]; then
+        github proposals-open >"$STATE/.ctx-props.$$" || exit 1
+    fi
+    perl -MJSON::PP -e '
+        my ($state, $self, $rowsf, $owner, $propsf) = @ARGV;
+        my $J = JSON::PP->new->utf8->canonical;
+        sub read_json {
+            open(my $fh, "<:raw", $_[0]) or return undef;
+            local $/;
+            return eval { $J->decode(<$fh> // "") };
+        }
+        my ($sel, $rows, $props) = map { read_json($_) } $self, $rowsf, $propsf;
+        exit 1 unless ref $sel eq "HASH" && ref $rows eq "ARRAY" && ref $props eq "ARRAY";
+        my %listed = map { ref $_ eq "HASH" && defined $_->{issue} ? ($_->{issue} => 1) : () } @$rows;
+        my %issues = map { $_ => 1 } @{ $sel->{issues} };
+        # 一覧に行が無い、出してから7日の間の Issue に、list_pending を書き直す
+        for my $n (@{ $sel->{recent} }) {
+            next if $listed{$n};
+            my $f = "$state/issues/$n.json";
+            my $d = read_json($f);
+            exit 1 unless ref $d eq "HASH";
+            $d->{list_pending} = JSON::PP::true;
+            my $tmp = "$f.tmp.$$";
+            open(my $o, ">:raw", $tmp) or exit 1;
+            my $ok = print $o $J->encode($d), "\n";
+            $ok = close($o) && $ok;
+            if (!($ok && rename($tmp, $f))) { unlink $tmp; exit 1 }
+            $issues{$n} = 1;
+        }
+        for my $n (sort { $a <=> $b } keys %issues) {
+            my $st = read_json("$state/issues/$n.json");
+            if (ref $st eq "HASH" && defined $st->{reported_at}) {
+                print "[usage] Issue #$n の集計は GitHub に出したが、一覧か案の索引への書き込みが残っている。usage-report のスキルの『次の会話で出すとき』の手順で書き足す。\n";
+            } else {
+                print "[usage] Issue #$n を閉じる PR がマージされ、集計がまだ GitHub に出ていない。usage-report のスキルの『次の会話で出すとき』の手順で出す。\n";
+            }
+        }
+        my @open = grep { ref $_ eq "HASH" && defined $_->{id} && defined $_->{issue} } @$props;
+        if ($owner eq "yes") {
+            print "[usage] 会話の相手: 所有者\n";
+            print "[usage] まだ答えていない直す案がある: ", join("、", map { "$_->{id}（Issue #$_->{issue}）" } @open),
+                "。usage-report のスキルの『案を尋ねるとき』の手順で、案ごとに起票するかを尋ねる。\n" if @open;
+        } elsif ($owner eq "unknown" && @open) {
+            print "[usage] この PC で Claude と話す人が所有者かどうかが、まだ決まっていない。usage-report のスキルの『所有者かを尋ねるとき』の手順で尋ねる。\n";
+        }
+    ' "$STATE" "$STATE/.ctx-sel.$$" "$STATE/.ctx-rows.$$" "$owner" "$STATE/.ctx-props.$$" || exit 1
+}
+
 cmd_proposals() {
     [ $# -eq 0 ] || fail "proposals は引数を受けない。"
     github proposals-open
@@ -596,5 +723,6 @@ publish) cmd_publish "$@" ;;
 proposals) cmd_proposals "$@" ;;
 proposal) cmd_proposal "$@" ;;
 owner) cmd_owner "$@" ;;
-*) fail "知らないサブコマンド $cmd を受けた。サブコマンドを mark・pending・draft・publish・proposals・proposal・owner のどれかにする。" ;;
+session-context) if [ -n "${KP_USAGE_CONTEXT_BODY-}" ]; then context_body "$@"; else cmd_session_context "$@"; fi ;;
+*) fail "知らないサブコマンド $cmd を受けた。サブコマンドを mark・pending・draft・publish・proposals・proposal・owner・session-context のどれかにする。" ;;
 esac

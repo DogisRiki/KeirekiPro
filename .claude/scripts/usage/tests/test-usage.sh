@@ -675,6 +675,107 @@ wait "$p1"
 wait "$p2"
 check "draft と publish の組を2つ同時に動かしても、集計のコメントは1つだけ書かれる" "$(reports 203)/$(listrows 203)" "1/1"
 
+echo "== 会話の始めに知らせる文"
+# 7日の間を過ぎた時刻と、まだ過ぎない時刻
+PAST="2026-01-01T00:00:00Z"
+FUTURE="2099-01-01T00:00:00Z"
+# 知らせる文の行の、Issue の番号(issue)と、出し直す書き込み(write)と、所有者の行(owner)と、案(案の ID)と、
+# 所有者かどうか(undecided)を , でつなぐ
+ctxlines() {
+    printf '%s\n' "$OUT" | perl -ne '
+        chomp; next unless length;
+        if (/\A\[usage\] Issue #([0-9]+) を閉じる PR がマージされ、/) { push @o, "issue$1" }
+        elsif (/\A\[usage\] Issue #([0-9]+) の集計は GitHub に出したが、/) { push @o, "write$1" }
+        elsif ($_ eq "[usage] 会話の相手: 所有者") { push @o, "owner" }
+        elsif (/\A\[usage\] まだ答えていない直す案がある: (.*?)。/) { push @o, map { /\A([0-9]+-[0-9]+)（Issue #[0-9]+）\z/ ? $1 : "bad" } split /、/, $1 }
+        elsif (/\A\[usage\] この PC で Claude と話す人が所有者かどうかが、まだ決まっていない/) { push @o, "undecided" }
+        else { push @o, "unknown-line" }
+        END { print join(",", @o) }'
+}
+# 一覧に Issue N の行を足す: ctxrow <N>
+ctxrow() {
+    printf '[{"end_date":"2026-10-25","impl_spec_back":0,"issue":%s,"spec":false,"tokens":12,"url":"https://github.com/owner/repo/issues/%s#issuecomment-9","usd":0.5,"usd_partial":false,"work_sec":600}]\n' "$1" "$1" >"$TMP_ROOT/row.json"
+    (cd "$REPO" && perl "$SCRIPTS/github.pl" list-add "$TMP_ROOT/row.json") >/dev/null 2>&1 || ng "一覧に行を足せない"
+}
+newrepo ctx config
+newgh ctx
+# 101: 出していない、閉じた Issue / 105: 開いた Issue / 107: 出し済みで list_pending がある Issue
+# 120: 出してから7日の間で、一覧に行が無い Issue / 121: 出してから7日の間で、一覧に行がある Issue
+# 122: 出してから7日を過ぎ、一覧に行が無い Issue / 123: 出してから7日の間で、一覧に行が無く、集計しない印がある Issue
+mkdb "issues => [ list(), cl(101, '2026-10-25T01:00:00Z'), op(105), cl(107, '2026-10-25T02:00:00Z'), cl(120, '2026-10-25T03:00:00Z'),
+    cl(121, '2026-10-25T04:00:00Z'), cl(122, '2026-10-25T05:00:00Z'), cl(123, '2026-10-25T06:00:00Z') ]"
+for n in 101 105; do recv "$n"; done
+ctxrow 121
+issuejson 107 '{"list_pending":true,"report_url":"https://github.com/owner/repo/issues/107#issuecomment-1","reported_at":"2026-10-25T02:10:00Z"}'
+for n in 120 121 123; do
+    issuejson "$n" "{\"list_checked_until\":\"$FUTURE\",\"report_url\":\"https://github.com/owner/repo/issues/$n#issuecomment-2\",\"reported_at\":\"2026-10-25T03:10:00Z\"}"
+done
+issuejson 122 "{\"list_checked_until\":\"$PAST\",\"report_url\":\"https://github.com/owner/repo/issues/122#issuecomment-3\",\"reported_at\":\"2026-10-25T05:10:00Z\"}"
+issuejson 123 "{\"closed_at\":\"2026-10-25T06:00:00Z\",\"list_checked_until\":\"$FUTURE\",\"reported_at\":\"2026-10-25T06:10:00Z\",\"skip\":\"system-pr\"}"
+: >"$FAKE_GH_DIR/calls.log"
+run session-context --session S1
+check "session-context が、閉じた Issue だけを知らせ、gh が失敗したら何も知らせずに 0 で終わる(閉じた Issue だけを知らせる)" \
+    "$RC/$(ctxlines)/$ERR" "0/issue101,write107,write120/"
+check "出してから7日の間の Issue の行が一覧に無いと、list_pending を書き直してその Issue を知らせる" \
+    "$(statejson issues/120.json | grep -c '"list_pending":true')/$(statejson issues/121.json | grep -c list_pending)/$(statejson issues/122.json | grep -c list_pending)/$(statejson issues/123.json | grep -c list_pending)" "1/0/0/0"
+# gh の呼び出しが、閉じた Issue の一覧を読む呼び出しと、本文や欄を付けない gh api の読み取りだけか
+check "session-context が gh で GitHub に書かない" \
+    "$([ -n "$(calls)" ] && printf called)/$(calls | tr '|' '\n' | grep -v '^$' | grep -vcE '^(issue list |api )')/$(calls | tr '|' '\n' | grep -cE '^api .*(^| )(-X|--method|-f|-F|--field|--raw-field|--input)( |=|$)')" "called/0/0"
+check "知らせる文が、usage-report のスキルの手順を指し、所有者に打たせるコマンドを含まない" \
+    "$(nlines "$OUT")/$(printf '%s\n' "$OUT" | grep -v "usage-report のスキルの『" | grep -vc '^\[usage\] 会話の相手: 所有者$')/$(printf '%s\n' "$OUT" | grep -cE 'usage\.sh|`|/[a-z]|gh |打')" "3/0/0"
+run session-context
+check "session-context が、出し直した list_pending の Issue を、次の会話でも知らせる" "$RC/$(ctxlines)" "0/issue101,write107,write120"
+for re in '^issue list' '^api '; do
+    printf '%s\n' "$re" >"$FAKE_GH_DIR/fail"
+    run session-context
+    check "session-context が、閉じた Issue だけを知らせ、gh が失敗したら何も知らせずに 0 で終わる(失敗させた gh の呼び出し: $re)" "$RC/$OUT/$ERR" "0//"
+done
+rm -f "$FAKE_GH_DIR/fail"
+# gh が10秒を超える場合。テストだけ、待つ上限を KP_USAGE_TEST_CONTEXT_TIMEOUT で2秒にする。
+# 遅い gh は、動き出したことを slow-started に残してから待つ。gh が動き出せずに失敗した場合と見分けるためである
+mkdir -p "$TMP_ROOT/slowbin"
+printf '#!/usr/bin/env bash\n: >"%s/slow-started"\nsleep 30\nexec "%s/bin/gh" "$@"\n' "$TMP_ROOT" "$TMP_ROOT" >"$TMP_ROOT/slowbin/gh"
+chmod +x "$TMP_ROOT/slowbin/gh"
+t0=$(date +%s)
+PATH="$TMP_ROOT/slowbin:$PATH" KP_USAGE_TEST_CONTEXT_TIMEOUT=2 run session-context
+t1=$(date +%s)
+check "gh が待つ上限を超えると、session-context が何も出さずに 0 で終わる" \
+    "$RC/$OUT/$ERR/$([ -e "$TMP_ROOT/slow-started" ] && printf started)/$([ $((t1 - t0)) -lt 15 ] && printf fast || printf slow)" "0///started/fast"
+
+newrepo ctx-noconf
+newgh ctx-noconf
+recv 101
+mkdb "issues => [ cl(101, '2026-10-25T01:00:00Z') ]"
+run session-context
+check "origin/main にデータのファイルを足したコミットが無いとき、session-context が何も出さずに 0 で終わり、偽の gh を呼ばない" \
+    "$RC/$OUT/$ERR/$(calls)" "0///"
+
+newrepo ctx-owner config
+newgh ctx-owner
+# 案の索引に、関係の欄が OWNER のコメントの案 501-1 と、NONE のコメントの案 502-1 がある
+mkdb 'issues => [ list(cm(2001, idx("501-1")), { %{ cm(2002, idx("502-1")) }, author_association => "NONE" }),
+    cl(501, "2026-10-20T01:00:00Z", comments => [ cm(3001, props(501, "- [501-1] 案の文その1")) ]),
+    cl(502, "2026-10-20T02:00:00Z", comments => [ cm(3002, props(502, "- [502-1] 案の文その2")) ]) ]'
+run session-context
+check "owner が無く案があると、所有者かどうかがまだ決まっていないと知らせ、owner が偽の PC では案を知らせない(owner が無い)" "$RC/$(ctxlines)" "0/undecided"
+check "所有者かどうかがまだ決まっていないと知らせる行が、usage-report のスキルの手順を指し、所有者に打たせるコマンドを含まない" \
+    "$(printf '%s\n' "$OUT" | grep -c "usage-report のスキルの『所有者かを尋ねるとき』")/$(printf '%s\n' "$OUT" | grep -cE 'usage\.sh|`|/[a-z]|gh |打')" "1/0"
+run owner yes
+run session-context
+check "関係の欄の違う案の索引のコメントの案を知らせない" "$RC/$(ctxlines)" "0/owner,501-1"
+check "owner が真の PC で、案の行が、usage-report のスキルの手順を指す" \
+    "$(printf '%s\n' "$OUT" | grep '^\[usage\] まだ答えていない直す案がある: ' | grep -c "usage-report のスキルの『案を尋ねるとき』")" "1"
+run owner no
+: >"$FAKE_GH_DIR/calls.log"
+run session-context
+check "owner が無く案があると、所有者かどうかがまだ決まっていないと知らせ、owner が偽の PC では案を知らせない(owner が偽)" "$RC/$OUT/$(calls | tr '|' '\n' | grep -c '^api ')" "0//0"
+
+newrepo ctx-noprop config
+newgh ctx-noprop
+mkdb 'issues => [ list(cm(2002, idx())) ]'
+run session-context
+check "owner が無く、まだ答えていない案が無いと、session-context が所有者の行を出さない" "$RC/$OUT" "0/"
+
 echo "== 案と所有者"
 newrepo prop config
 newgh prop

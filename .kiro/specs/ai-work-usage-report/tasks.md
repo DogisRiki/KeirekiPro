@@ -327,7 +327,7 @@
   - _要件: 1.5, 1.6, 7.1, 7.2, 8.3, 9.2, 9.5, 10.7_
   - _対象の部品: usage.sh_
 
-- [ ] 5.5 会話の始めに知らせる文を作る
+- [x] 5.5 会話の始めに知らせる文を作る
 
   Claude は、部品「usage.sh session-context」を、usage.sh に、design の「usage.sh session-context」の節のとおりに足す。出してから7日の間の Issue とは、タスク5.4の `publish` が書いた `issues/<N>.json` の `list_checked_until` が、いまより後の Issue である。`session-context` は、`pending` と同じ手順で知らせる Issue を取り、出してから7日の間の Issue の一覧の行を `github.pl list-read` で確かめ、`state.json` の `owner` で所有者の行と案を足す。`session-context` は、gh で GitHub を読むだけにする。gh が失敗するか10秒を超えたら、`session-context` は何も出さずに 0 で終わる。仕組みが main に入った時刻を取れないときは、`session-context` は、gh を呼ぶ前に、出力を空のまま 0 で終わる。Claude は、テスト `test-usage.sh` に、このタスクの場合を足す。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `test-usage.sh` が、どれも失敗0件で終わる。shellcheck の指摘が0件である
