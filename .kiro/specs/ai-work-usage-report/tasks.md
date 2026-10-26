@@ -109,7 +109,7 @@
   - _対象の部品: github.pl_
   - _依存: 1.2_
 
-- [ ] 3.2 一覧の Issue を見つけ、作り、ロックする部分を作る
+- [x] 3.2 一覧の Issue を見つけ、作り、ロックする部分を作る
 
   Claude は、github.pl に、書き込む前の `permissions.push` の確認と、一覧の Issue を見つける・作る・閉じる・ロックする・使い直す部分を、design の「github.pl」の節のとおりに足す。一覧の Issue を探すときは、github.pl は、タスク3.1の書き手の確認と、`locked` と、`state.json` の `list_issue` を確かめる。一覧の Issue を作る・閉じる・ロックするのは、書き込む呼び出しだけである。読むだけの呼び出し(`reported` `list-read` `proposals-open`)は、一覧の Issue を作らない。閉じることも、ロックすることもしない。`list-read` と `proposals-open` は、ロックしてある一覧の Issue が無ければ、一覧の行も案も無いものとして出す。github.pl は、`state.json` に書くときに、ファイルを読み直して `list_issue` の欄だけを替え、一時ファイルに書いてから名前を替えて置き換える。github.pl と `usage.sh owner` が `state.json` に同時に書いて片方の欄が消えても、集計は正しく出る。`list_issue` が消えたときは、github.pl が次の呼び出しで一覧の Issue を探し直す。`owner` が消えたときは、Claude が次の会話で、会話の相手が所有者かをまた尋ねる。Claude は、テスト `test-github.sh` に、このタスクの場合を足す。テストは、偽の gh で、Issue の書き手の関係とロックを返す。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `test-github.sh` が、どれも失敗0件で終わる。shellcheck の指摘が0件である
@@ -477,6 +477,7 @@
 - 錠と書き直し: 錠を待つ上限・古いとみなす時間・時刻を直す間隔(600秒・60秒・10秒)は、テストだけが環境変数 `KP_USAGE_TEST_LOCK_WAIT` `KP_USAGE_TEST_LOCK_STALE` `KP_USAGE_TEST_LOCK_TOUCH` で短くする。読むのに時間のかかる呼び出しは、テストで `CORE::GLOBAL::readline` を1行ごとに待つ関数に替えて作る。unknown の行の書き直しは、書き直した行と同じ行がファイルのどこかにあれば、書き直した行を残さない(確認役が合格のときに挙げた直しを、合格のあとに入れた)。本物の `turn` の行の `ts` は UNIX 秒の数なので、テストで手で作る行も数で書く。古い錠を2つの呼び出しが同時に取り直す競り合いは、lib.sh の錠と同じく残る
 - フックの呼び出し: PostToolUse は、入力の上の層の欄が最後に来る並びを前提に、session_id は最初の一致、tool_use_id と duration_ms は最後の一致を使う(道具の入力と応答の中に同じ名前の欄があるため)。フックの extract.pl は、標準エラーを先に捨て先へ向け、記録の置き場所が決まってから `extract/errors.log` へ向け直す。`exec` のあとに文を置くと Perl の警告が標準エラーに出るので、`{ exec(...) };` の形で囲む。Git Bash の perl では PERL5LIB の区切りが `:` なので、テストは `C:/` の形ではなく `/tmp` の形のパスを渡す。テストは、`PERL5OPT=-M<遅く読む部品>` で裏の呼び出しを遅らせ、フックの終わりが先に来ることを確かめる。usage.sh ができるまでは、会話の始めのフックは何も出さず、失敗を errors.log に残す
 - github.pl の gh の呼び出し: github.pl は、gh の標準エラーを一時ファイルに受け、失敗したときだけ最後の行を理由に添える(gh の文をそのまま流すと、理由が1行にならないため)。`gh api --paginate` はページの配列を区切らずに続けて出すので、github.pl は JSON::PP の `incr_parse` で読む。偽の gh はコメントの id を作った順に付けるので、テストの db は作る順で id が決まる。bash 3.2 の `set -u` は空の配列の展開を止めるので、テストは `${argv[@]+"${argv[@]}"}` の形で展開する(タスク3.1)
+- github.pl のテスト: github.pl は、読み込まれたときは動かない形(`exit main(@ARGV) unless caller`)なので、テストは `drive` で関数を直に呼べる。まだサブコマンドの無い部分は、この形で確かめる。テストの db の日本語は、`JSON::PP->new`(`->utf8` を付けない)で、バイトの文字列のまま書き、読むときも同じ形で読む。shellcheck は、自前の関数に単一引用符で渡す perl の式の `$` を指摘する(perl と sed に渡すときは指摘しない)ので、テストは、`F` や `LT` や `fill` のような、`$` を含まない補助の関数を db を作る側に置く(タスク3.2)
 
 ## 完了条件(全タスク共通)
 
