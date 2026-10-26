@@ -48,7 +48,7 @@
   - _要件: 1.8, 3.2, 3.3, 3.4, 4.1, 4.2, 9.2_
   - _対象の部品: extract.pl_
 
-- [ ] 2.3 会話の相手と道具の行を抜き出す
+- [x] 2.3 会話の相手と道具の行を抜き出す
 
   Claude は、extract.pl に、`turn` `tool` `result` の行を抜き出す部分を、design の「extract.pl」の節と「データの形」の節のとおりに足す。足す部分は、`turnOrigin` の置き換え(一覧に無い値の `unknown` と `raw`)、resume-after-usage-limit.sh の知らせの印 `[resume-after-usage-limit]` を含む `task_notification` の行の `limit` への置き換え、道具の種類、`perm`、`wait_categories` による待ちの分類、裏で動かした仕事の識別子である。extract.pl は、データのファイルを、自分と同じディレクトリの `usage-config.json` から読む。design の「ファイルの構成」が、2つのファイルを同じ `.claude/scripts/usage/` に置くためである。Claude は、テスト `test-extract.sh` に、このタスクの場合を足す。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `test-extract.sh` が、どれも失敗0件で終わる。shellcheck の指摘が0件である
@@ -477,3 +477,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 3. Claude は、テストを飛ばす設定、アサーションの削除、カバレッジや lint の対象からの除外を足して、完了条件を満たしたように見せない。CI の escape-hatch の検査が、これらの追加を機械で見つける。
 4. Claude は、新しく書いたテストについて、テストの対象のコードを一時的に壊してテストが失敗することを確かめてから、コードを元に戻す。
 - 続きを読むときの途中の停止: extract.pl は、続きを読む前に、抜き出した記録の改行の無い最後の行を切り捨て、すでに書いた行と同じ行を書かない。ブランチは会話の記録の読み始めの位置より前から求める。止まったあとに読み直しても、抜き出した記録は一度に読んだときと同じになる。あとのタスクで抜き出す行の種類を足すときも、Claude は、同じ入力から同じ文字の列の行ができるように書く(同じ行かどうかを文字の列で見分けるため)
+- 道具の行と古い版の記録: Claude Code は、`permissionDecision` を道具の呼び出しの行ではなく結果の行(`tool_result` を持つ `user` の行)に書く(research.md の書き方と違う。2026-10-26 にこの PC の記録 570 ファイルで確かめた)。そのため extract.pl は、`tool` の行を結果の行を読んだときに書き、読み始めの位置より前の呼び出しは記録を後ろから読んで探す。`turnOrigin` を持たない `user` の行(v2.1.275 までの所有者の行、今の版にもある `task-notification` の行、補助役の記録の `coordinator` の行)は、同じ値を `origin.kind` に `-` でつないで書くので、extract.pl は `turnOrigin` が無いときに `origin.kind` を読む。`coordinator` は値の一覧に無いので `unknown` の行になる。report.pl を作るタスクは、補助役の記録のこの行で `unknown` の数が増えることに気を付ける。extract.pl は、データのファイル `usage-config.json` を読めないときは、抜き出した記録を作らずに 1 で終わる

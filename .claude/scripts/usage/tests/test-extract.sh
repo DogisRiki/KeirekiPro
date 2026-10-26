@@ -43,7 +43,7 @@ fsize() { perl -e 'print -s $ARGV[0]' "$1"; }
 # 抜き出した記録の、k が $2 の行のうち $3 番目(1から)の行の、欄 $4 の値。真偽は true か false
 kfield() {
     [ -f "$1" ] || { printf 'nofile'; return; }
-    perl -MJSON::PP -ne 'BEGIN { ($want, $nth, $field) = splice @ARGV, 0, 3; $i = 0 } my $d = eval { decode_json($_) } or next; next unless ($d->{k} // "") eq $want; next unless ++$i == $nth; my $v = $d->{$field}; print !defined $v ? "undef" : JSON::PP::is_bool($v) ? ($v ? "true" : "false") : $v; END { print "noline" if $i < $nth }' "$2" "$3" "$4" <"$1"
+    perl -MJSON::PP -ne 'BEGIN { ($want, $nth, $field) = splice @ARGV, 0, 3; $i = 0; binmode STDOUT, ":utf8" } my $d = eval { decode_json($_) } or next; next unless ($d->{k} // "") eq $want; next unless ++$i == $nth; my $v = $d->{$field}; print !defined $v ? "undef" : JSON::PP::is_bool($v) ? ($v ? "true" : "false") : $v; END { print "noline" if $i < $nth }' "$2" "$3" "$4" <"$1"
 }
 
 # 作り物の会話の記録を書く: mkrec <ファイル> <cwd> <cwd の無い行の数>
@@ -336,6 +336,142 @@ check "長い行の gitBranch を読み、読み直しで branch の行を足さ
 addline "$D/s-nocc.jsonl" "{\"type\":\"assistant\",\"cwd\":\"$REPO\",\"sessionId\":\"s-nocc\",\"timestamp\":\"2026-10-26T00:00:01.000Z\",\"message\":{\"id\":\"msg_n\",\"model\":\"claude-opus-5-5\",\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":1,\"cache_creation_input_tokens\":40,\"output_tokens\":2}}}"
 run_all
 check "内訳の無い書き込みは5分に数える" "$(kfield "$EX/s-nocc.jsonl" msg 1 cw5)/$(kfield "$EX/s-nocc.jsonl" msg 1 cw1h)" "40/0"
+
+printf '== 会話の相手と道具の行\n'
+# 抜き出した記録の、k が $2 の行の欄 $3 の値を、行の順に , でつなぐ。欄の無い行は undef
+kall() {
+    [ -f "$1" ] || { printf 'nofile'; return; }
+    perl -MJSON::PP -ne 'BEGIN { ($want, $field) = splice @ARGV, 0, 2; binmode STDOUT, ":utf8" } my $d = eval { decode_json($_) } or next; next unless ($d->{k} // "") eq $want; my $v = $d->{$field}; push @v, !exists $d->{$field} ? "undef" : !defined $v ? "null" : JSON::PP::is_bool($v) ? ($v ? "true" : "false") : $v; END { print join ",", @v }' "$2" "$3" <"$1"
+}
+# 作り物の会話の記録: mktoolrec <ファイル>
+# 会話の文・コマンドの文字列・道具の引数と結果の中身には SECRET を含む文字列を入れる
+mktoolrec() {
+    mkdir -p "$(dirname "$1")"
+    perl -MJSON::PP -e '
+        my ($file, $cwd) = @ARGV;
+        my $j = JSON::PP->new->utf8->canonical;
+        (my $sid = $file) =~ s{.*/}{}; $sid =~ s{\.jsonl$}{};
+        my $n = 0;
+        my $c = sub { $n++; return (cwd => $cwd, sessionId => $sid, timestamp => sprintf("2026-10-26T00:01:%02d.000Z", $n)) };
+        my $u = sub { my ($origin, $content) = @_; return {$c->(), type => "user", (defined $origin ? (turnOrigin => $origin) : ()), message => {role => "user", content => $content}} };
+        my $call = sub { my ($mid, $id, $name, $input) = @_; return {$c->(), type => "assistant",
+            message => {id => $mid, model => "claude-opus-5-5", role => "assistant", stop_reason => "tool_use", usage => {input_tokens => 1, output_tokens => 1},
+                content => [{type => "tool_use", id => $id, name => $name, input => $input}]}} };
+        my $res = sub { my ($id, %o) = @_; return {$c->(), type => "user",
+            ($o{perm} ? (permissionDecision => {decision => "allow", source => $o{perm}}) : ()),
+            ($o{tur} ? (toolUseResult => $o{tur}) : ()),
+            message => {role => "user", content => [{type => "tool_result", tool_use_id => $id, content => "SECRET-FILE-CONTENT", ($o{err} ? (is_error => JSON::PP::true) : ())}]}} };
+        my @l = (
+            $u->("human", "SECRET-USER-TEXT"),
+            $u->("peer", "SECRET-PEER-TEXT"),
+            $u->("scheduled", "SECRET-SCHEDULED-TEXT"),
+            $u->("sdk", "SECRET-SDK-TEXT"),
+            $u->("task_notification", "<task-notification>\n<task-id>a0123456789abcdef</task-id>\nSECRET-NOTICE-TEXT</task-notification>"),
+            $u->("task_notification", [{type => "text", text => "[resume-after-usage-limit] SECRET-RESUME-TEXT"}]),
+            $u->("brand_new-1", "SECRET-NEW-TEXT"),
+            $u->("y" x 40, "SECRET-40-TEXT"),
+            $u->("z" x 41, "SECRET-41-TEXT"),
+            $u->("has space!", "SECRET-SPACE-TEXT"),
+            $u->(undef, "<command-name>/model</command-name>"),
+            $call->("msg_t1", "toolu_a", "Bash", {command => "bash .claude/scripts/parallel/run-check.sh frontend pnpm test SECRET-COMMAND"}),
+            $res->("toolu_a", perm => "user_temporary"),
+            $call->("msg_t2", "toolu_b", "Bash", {command => "sleep 30 # SECRET-COMMAND", run_in_background => JSON::PP::true}),
+            $res->("toolu_b", perm => "config", tur => {backgroundTaskId => "b12345678", stdout => "SECRET-FILE-CONTENT"}),
+            $call->("msg_t3", "toolu_c", "Agent", {prompt => "SECRET-PROMPT", run_in_background => "true", subagent_type => "general-purpose"}),
+            $res->("toolu_c", tur => {agentId => "a0123456789abcdef", status => "async_launched"}),
+            $call->("msg_t4", "toolu_d", "AskUserQuestion", {questions => "SECRET-QUESTION"}),
+            $call->("msg_t4", "toolu_e", "Monitor", {command => "SECRET-COMMAND"}),
+            $call->("msg_t4", "toolu_f", "SomeNewTool", {}),
+            $res->("toolu_d", err => 1),
+            $res->("toolu_e", perm => "hook"),
+            $res->("toolu_f"),
+            $call->("msg_t5", "toolu_g", "ExitPlanMode", {plan => "SECRET-PLAN"}),
+            $call->("msg_t5", "toolu_h", "PowerShell", {command => "docker compose ps # SECRET-COMMAND"}),
+            $res->("toolu_h"),
+            $res->("toolu_g", perm => "user_permanent"),
+            {$c->(), type => "assistant", message => {id => "msg_t6", model => "claude-opus-5-5", role => "assistant", stop_reason => "end_turn",
+                usage => {input_tokens => 1, output_tokens => 1}, content => [{type => "text", text => "SECRET-ASSISTANT-TEXT"}]}},
+        );
+        open my $f, ">", $file or die "$file: $!";
+        print $f $j->encode($_), "\n" for @l;
+    ' "$1" "$REPO"
+}
+mktoolrec "$D/s-tool.jsonl"
+run_all
+check "会話の相手と道具の行を抜き出して 0 で終わる" "$?" "0"
+T="$EX/s-tool.jsonl"
+check "turnOrigin の3つの値が owner・peer・notice になり、一覧に無い値が unknown と raw になり、41文字以上と記号を含む値の raw が空になる" \
+    "$(kall "$T" turn from)|$(kall "$T" turn raw)" \
+    "owner,peer,notice,notice,notice,limit,unknown,unknown,unknown,unknown|undef,undef,undef,undef,undef,undef,brand_new-1,$(perl -e 'print "y" x 40'),,"
+check "turn の時刻は UNIX 秒" "$(kfield "$T" turn 1 ts)" "1792972861"
+check "task_notification の知らせの元の仕事の識別子が turn.job になる" "$(kall "$T" turn job)" "null,null,null,null,a0123456789abcdef,null,null,null,null,null"
+check "turnOrigin が task_notification で文が [resume-after-usage-limit] を含む行が、turn.from が limit の行になり、文が手元の記録に残らない" \
+    "$(kfield "$T" turn 6 from)/$(grep -c -e SECRET-RESUME-TEXT -e 'resume-after-usage-limit' "$T")" "limit/0"
+check "permissionDecision.source が user_ で始まる道具の perm が user になる" "$(kall "$T" tool perm)" "user,other,other,other,other,other,other,user"
+check "品質チェックのコマンドの道具が、その分類の名前で抜き出され、コマンドの文字列が残らない" \
+    "$(kfield "$T" tool 1 cat)/$(grep -c -e SECRET-COMMAND -e 'run-check' "$T")" "品質チェック/0"
+check "待ちの分類の名前が、道具の種類とコマンドで決まる" "$(kall "$T" tool cat)" "品質チェック,待つだけのコマンド,,,待つだけの道具,,Docker,"
+check "道具の名前が tool.kind になり、知らない名前が other になり、裏で動かした仕事の識別子が抜き出される" \
+    "$(kall "$T" tool kind)|$(kall "$T" result job)|$(kall "$T" result job_kind)" \
+    "shell,shell,agent,ask,wait,other,shell,ask|null,b12345678,a0123456789abcdef,null,null,null,null,null|null,other,agent,null,null,null,null,null"
+check "道具の行は結果が届いた順に並び、tool_use_id を持つ" "$(kall "$T" tool id)" "toolu_a,toolu_b,toolu_c,toolu_d,toolu_e,toolu_f,toolu_h,toolu_g"
+check "裏で動かしたかどうかが tool.bg になる" "$(kall "$T" tool bg)" "false,true,true,false,false,false,false,false"
+check "tool の時刻は呼び出しの時刻、result の時刻は結果の時刻" "$(kfield "$T" tool 1 ts)/$(kfield "$T" result 1 ts)" "1792972872/1792972873"
+check "失敗した道具の結果が result.err になる" "$(kall "$T" result err)" "false,false,false,true,false,false,false,false"
+check "抜き出した行に、元の欄の名前が残らない" \
+    "$(grep -c -e SECRET -e turnOrigin -e permissionDecision -e tool_use -e tool_result -e toolUseResult -e run_in_background -e agentId -e backgroundTaskId -e is_error -e task_notification -e human -e '"Bash"' -e '"Agent"' -e AskUserQuestion -e Monitor -e ExitPlanMode -e PowerShell -e SomeNewTool -e user_temporary -e '"source"' "$T")" "0"
+# 1行ずつ書き足しながら呼ぶ: 呼び出しと結果が別の呼び出しで読まれても、一度に読んだときと同じ行になる
+FULL="$D/s-tool.jsonl"
+lines=$(wc -l <"$FULL" | tr -d ' ')
+i=1
+while [ "$i" -le "$lines" ]; do
+    head -n "$i" "$FULL" | sed 's/"s-tool"/"s-inc"/g' >"$D/s-inc.jsonl"
+    run_all
+    i=$((i + 1))
+done
+check "1行ずつ書き足しながら読んでも、一度に読んだときと同じ行になる" \
+    "$(grep -v '"k":"meta"' "$EX/s-inc.jsonl" | cksum)" "$(grep -v '"k":"meta"' "$T" | cksum)"
+before=$(cksum <"$T")
+OFF=$(head -n 13 "$FULL" | wc -c | tr -d ' ') setoffset "$EX/s-tool.pos"
+run_all
+check "止まったあとに道具の結果の行から読み直しても、抜き出した記録が変わらない" "$(cksum <"$T")" "$before"
+# v2.1.275 までの記録: turnOrigin が無く、同じ値を origin.kind に - でつないで書く
+perl -MJSON::PP -e '
+    my ($file, $cwd) = @ARGV;
+    my $j = JSON::PP->new->utf8->canonical;
+    my $n = 0;
+    my $c = sub { $n++; return (cwd => $cwd, sessionId => "s-old", timestamp => sprintf("2026-10-26T00:02:%02d.000Z", $n)) };
+    my $u = sub { my ($origin, $content, %o) = @_; return {$c->(), type => "user", origin => $origin, %o, message => {role => "user", content => $content}} };
+    my @l = (
+        $u->({kind => "human"}, "SECRET-OLD-USER-TEXT"),
+        $u->({kind => "task-notification"}, "<task-notification>\n<task-id>b87654321</task-id>\nSECRET-OLD-NOTICE-TEXT</task-notification>"),
+        $u->({kind => "task-notification"}, "[resume-after-usage-limit] SECRET-OLD-RESUME-TEXT"),
+        $u->({kind => "coordinator", body => "SECRET-OLD-BODY", from => "SECRET-OLD-FROM"}, "SECRET-OLD-COORDINATOR-TEXT"),
+        $u->({kind => "human"}, "SECRET-OLD-PEER-TEXT", turnOrigin => "peer"),
+        $u->({kind => {nested => "human"}}, "SECRET-OLD-NESTED-TEXT"),
+        $u->({kind => "task-notification"}, "<task-notification>\n<task-id>not an id!</task-id>\nSECRET-OLD-BADID-TEXT</task-notification>"),
+        {$c->(), type => "assistant", message => {id => "msg_o1", model => "claude-opus-5-5", role => "assistant", stop_reason => "tool_use", usage => {input_tokens => 1, output_tokens => 1},
+            content => [{type => "tool_use", id => "toolu_o", name => "Bash", input => {command => "ls # SECRET-COMMAND"}}]}},
+        {$c->(), type => "user", permissionDecision => {decision => "allow", source => "auto_user"},
+            message => {role => "user", content => [{type => "tool_result", tool_use_id => "toolu_o", content => "SECRET-FILE-CONTENT"}]}},
+    );
+    open my $f, ">", $file or die "$file: $!";
+    print $f $j->encode($_), "\n" for @l;
+' "$D/s-old.jsonl" "$REPO"
+run_all
+O="$EX/s-old.jsonl"
+check "turnOrigin の無い古い版の行は、origin.kind の値を - を _ に替えて turnOrigin の値として読み、turnOrigin があればそちらを読む" \
+    "$(kall "$O" turn from)|$(kall "$O" turn raw)|$(kall "$O" turn job)" \
+    "owner,notice,limit,unknown,peer,notice|undef,undef,undef,coordinator,undef,undef|null,b87654321,null,null,null,null"
+check "知らせの元の仕事の識別子が英字と数字と _ と - だけの形でなければ、turn.job が null になる" "$(kall "$O" turn job | cut -d, -f6)/$(grep -c 'not an id' "$O")" "null/0"
+check "古い版の行の origin の欄と会話の文が、抜き出した記録に残らない" \
+    "$(grep -c -e SECRET -e '"origin"' -e task-notification -e '"human"' -e '"body"' "$O")" "0"
+check "permissionDecision.source が user_ で始まらない値は、user を含んでも perm が other になる" "$(kall "$O" tool perm)" "other"
+# データのファイルは extract.pl と同じフォルダから読む。読めないときは何も書かずに 1 で終わる
+mkdir -p "$WORK/nocfg"
+cp "$EXTRACT" "$WORK/nocfg/extract.pl"
+perl "$WORK/nocfg/extract.pl" --state "$WORK/nocfgstate" --all --skip-locked --repo "$REPO" 2>/dev/null
+check "データのファイルが読めないときは 1 で終わり、抜き出した記録を作らない" "$?/$( [ -e "$WORK/nocfgstate/extract/s-tool.jsonl" ] && echo yes || echo no)" "1/no"
 
 printf '== 終了コード\n'
 printf 'x\n' >"$WORK/afile"

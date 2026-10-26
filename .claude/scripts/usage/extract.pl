@@ -9,7 +9,7 @@
 # Claude Code が形を決めているもの(会話の記録の欄の名前と値)を読むのは、この部品だけである。
 # 抜き出した行は「この仕組みの中の値」で書き、会話の文・道具の引数・結果の中身は書かない。
 #
-# 終了コード: 0 読み終えた / 1 記録の置き場所に書けなかった / 64 引数が違う
+# 終了コード: 0 読み終えた / 1 記録の置き場所に書けなかったか、データのファイル usage-config.json を読めなかった / 64 引数が違う
 # 知らない形の行と壊れた行は飛ばし、飛ばした数を extract/<記録の鍵>.pos に残して 0 で終わる。
 # =====================================================================
 use strict;
@@ -18,11 +18,31 @@ use Getopt::Long qw(GetOptionsFromArray);
 use JSON::PP ();
 use File::Path ();
 use Time::Local ();
+use File::Basename ();
+use File::Spec ();
 
 # 抜き出し方を変えたら上げる。.pos の版の番号が違う記録の鍵は、最初から読み直す
 use constant EXTRACT_VERSION => 1;
 
 my $JSON = JSON::PP->new->utf8->canonical;
+
+# 道具の名前と、この仕組みの中の道具の種類の対応。表に無い名前は other にする
+my %TOOL_KIND = (
+    Agent => 'agent', AskUserQuestion => 'ask', ExitPlanMode => 'ask',
+    Bash => 'shell', PowerShell => 'shell', Monitor => 'wait',
+);
+# turnOrigin の値のうち、意味が分かっている値と、その行を始めた者の対応。表に無い値は unknown にする
+my %TURN_FROM = (
+    human => 'owner', peer => 'peer',
+    task_notification => 'notice', scheduled => 'notice', sdk => 'notice',
+);
+# resume-after-usage-limit.sh が会話を再開させるときの知らせの印
+use constant RESUME_MARK => '[resume-after-usage-limit]';
+# 仕事の識別子として書き残してよい値の形(会話の文を書き残さないため、形を限る)
+my $ID_RE = qr/\A[A-Za-z0-9_-]{1,64}\z/;
+
+# データのファイルの wait_categories(待ちの分類)。run_all が読む
+my $WAIT_CATS;
 
 exit main(@ARGV);
 
@@ -47,6 +67,12 @@ sub main {
 # このリポジトリの全部の会話の記録の続きを読む
 sub run_all {
     my ($o) = @_;
+    # 待ちの分類が分からないまま抜き出すと、分類の無い行が残るので、何も書かずに終わる
+    $WAIT_CATS = load_wait_categories();
+    if (!$WAIT_CATS) {
+        print STDERR "extract.pl: データのファイル usage-config.json の wait_categories を読めない\n";
+        return 1;
+    }
     my $exdir = "$o->{state}/extract";
     if (!-d $exdir) {
         eval { File::Path::mkpath($exdir) };
@@ -178,6 +204,9 @@ sub read_record {
     }
     my ($offset, $skipped) = ($pos->{offset}, $pos->{skipped});
     my $st = $pos->{offset} ? read_state($exf, $path, $pos->{offset}) : { ids => {}, rows => {}, branch => undef };
+    # calls は、この呼び出しで読んだ道具の呼び出しのうち、結果をまだ読んでいないもの
+    # 結果が届いたときに呼び出しが calls に無ければ、読み始めた位置より前の行から探す
+    @$st{qw(calls path start)} = ({}, $path, $pos->{offset});
     while (my $line = <$in>) {
         # 改行の無い最後の行は書きかけなので、次の呼び出しで読む
         last unless $line =~ /\n\z/;
@@ -256,9 +285,35 @@ sub read_state {
 }
 
 # 会話の記録の $offset より前の行のうち、gitBranch を持つ最後の行の gitBranch
-# 最後の数行で見つかることが多いので、ファイルの後ろから 64KB ずつ読む
 sub branch_before {
     my ($path, $offset) = @_;
+    return scan_back($path, $offset, '"gitBranch"', sub {
+        my $br = $_[0]{gitBranch};
+        return defined $br && !ref $br && length $br ? $br : undef;
+    });
+}
+
+# 結果が届いた道具の呼び出しを、会話の記録の読み始めた位置より前の行から探す
+# 呼び出しを読んだあと、結果を読む前に、前の呼び出しが読み終えたとき(道具が動いている間に読んだとき)に当たる
+sub call_before {
+    my ($st, $id) = @_;
+    return undef unless $st->{start};
+    return scan_back($st->{path}, $st->{start}, $id, sub {
+        my ($d) = @_;
+        return undef unless ($d->{type} // '') eq 'assistant' && ref $d->{message} eq 'HASH'
+            && ref $d->{message}{content} eq 'ARRAY';
+        for my $b (@{ $d->{message}{content} }) {
+            next unless ref $b eq 'HASH' && ($b->{type} // '') eq 'tool_use' && ($b->{id} // '') eq $id;
+            return tool_call($b, iso_ts($d->{timestamp}));
+        }
+        return undef;
+    });
+}
+
+# 会話の記録の $offset より前の行を後ろから見て、$needle を含む行を解き、$pick が値を返した最初の値を返す
+# 最後の数行で見つかることが多いので、ファイルの後ろから 64KB ずつ読む
+sub scan_back {
+    my ($path, $offset, $needle, $pick) = @_;
     open(my $fh, '<:raw', $path) or return undef;
     my ($end, $tail) = ($offset, '');
     while ($end > 0) {
@@ -271,11 +326,11 @@ sub branch_before {
         # 読んだ塊の先頭は前の行の途中のことがあるので、前の塊と合わせてから見る
         $tail = $end > 0 ? shift @lines : '';
         for my $l (reverse @lines) {
-            next unless index($l, '"gitBranch"') >= 0;
+            next unless index($l, $needle) >= 0;
             my $d = eval { $JSON->decode($l) };
             next unless ref $d eq 'HASH';
-            my $br = $d->{gitBranch};
-            return $br if defined $br && !ref $br && length $br;
+            my $v = $pick->($d);
+            return $v if defined $v;
         }
     }
     close $fh;
@@ -306,6 +361,14 @@ sub extract_line {
             }
             return (\@rows, 0);
         }
+        # 道具の行は、結果の行を読んだときに書く。所有者が権限の確認に答えたかは、結果の行にあるため
+        if (ref $m->{content} eq 'ARRAY') {
+            for my $b (@{ $m->{content} }) {
+                next unless ref $b eq 'HASH' && ($b->{type} // '') eq 'tool_use';
+                my $call = tool_call($b, $ts);
+                $st->{calls}{$call->{id}} = $call if $call;
+            }
+        }
         my $u  = $m->{usage};
         my $id = $m->{id};
         return (\@rows, 1) unless ref $u eq 'HASH' && defined $id && !ref $id && length $id;
@@ -328,6 +391,9 @@ sub extract_line {
             us   => is_value($u->{inference_geo}, 'us'),
             end  => is_value($m->{stop_reason}, 'end_turn'),
         };
+    } elsif ($type eq 'user') {
+        push @rows, turn_row($d, $ts);
+        push @rows, result_rows($d, $ts, $st);
     } elsif ($type eq 'system' && ($d->{subtype} // '') eq 'api_error') {
         my $ms = num_or_undef($d->{retryInMs});
         push @rows, { k => 'retry', ts => $ts, ms => $ms } if defined $ms;
@@ -335,6 +401,129 @@ sub extract_line {
     my $pr = $d->{prNumber};
     push @rows, { k => 'pr', ts => $ts, number => $pr + 0 } if defined $pr && !ref $pr && $pr =~ /^\d+\z/;
     return (\@rows, 0);
+}
+
+# user の行を始めた者。turnOrigin の無い行(道具の結果と、ローカルのコマンドの行)は返さない
+sub turn_row {
+    my ($d, $ts) = @_;
+    my $o = $d->{turnOrigin};
+    # turnOrigin を持たない行(v2.1.275 までの所有者の行、今の版にもある task-notification の行、
+    # 補助役の記録の coordinator の行)は、同じ値を origin.kind に - でつないで書く
+    if (!defined $o && ref $d->{origin} eq 'HASH') {
+        $o = $d->{origin}{kind};
+        $o =~ tr/-/_/ if defined $o && !ref $o;
+    }
+    return () unless defined $o && !ref $o;
+    my $row = { k => 'turn', ts => $ts, from => $TURN_FROM{$o}, job => undef };
+    if ($o eq 'task_notification') {
+        # 文は、印を含むかと、知らせの元の仕事の識別子を見るためだけに読み、書かない
+        my $text = message_text($d->{message});
+        if (index($text, RESUME_MARK) >= 0) {
+            $row->{from} = 'limit';
+        } elsif ($text =~ m{<task-id>([^<]*)</task-id>}) {
+            my $job = $1;
+            $row->{job} = $job if $job =~ $ID_RE;
+        }
+    }
+    if (!defined $row->{from}) {
+        # 会話の文が入らないように、英字と数字と _ と - だけの40文字以内の値だけを残す
+        $row->{from} = 'unknown';
+        $row->{raw} = $o =~ /\A[A-Za-z0-9_-]{1,40}\z/ ? $o : '';
+    }
+    return $row;
+}
+
+# 道具の結果の行から、道具の行と結果の行を作る
+sub result_rows {
+    my ($d, $ts, $st) = @_;
+    my $c = ref $d->{message} eq 'HASH' ? $d->{message}{content} : undef;
+    return () unless ref $c eq 'ARRAY';
+    my $pd = $d->{permissionDecision};
+    my $src = ref $pd eq 'HASH' ? $pd->{source} : undef;
+    my $perm = defined $src && !ref $src && $src =~ /^user_/ ? 'user' : 'other';
+    my ($job, $job_kind) = job_of($d->{toolUseResult});
+    my @rows;
+    for my $b (@$c) {
+        next unless ref $b eq 'HASH' && ($b->{type} // '') eq 'tool_result';
+        my $id = $b->{tool_use_id};
+        next unless defined $id && !ref $id && length $id;
+        my $call = delete $st->{calls}{$id};
+        $call = call_before($st, $id) unless $call;
+        push @rows, { k => 'tool', ts => $call->{ts}, id => $id, kind => $call->{kind}, cat => $call->{cat},
+            perm => $perm, bg => $call->{bg} } if $call;
+        push @rows, { k => 'result', ts => $ts, id => $id, err => $b->{is_error} ? JSON::PP::true : JSON::PP::false,
+            job => $job, job_kind => $job_kind };
+    }
+    return @rows;
+}
+
+# 道具の呼び出しの、時刻と、道具の種類と、待ちの分類の名前と、裏で動かしたかどうか
+# コマンドの文字列は、待ちの分類を決めるためだけに読み、書かない
+sub tool_call {
+    my ($b, $ts) = @_;
+    my $id = $b->{id};
+    return undef unless defined $id && !ref $id && length $id;
+    my $name = defined $b->{name} && !ref $b->{name} ? $b->{name} : '';
+    my $in = ref $b->{input} eq 'HASH' ? $b->{input} : {};
+    my $kind = $TOOL_KIND{$name} // 'other';
+    my $cmd = $kind eq 'shell' && defined $in->{command} && !ref $in->{command} ? $in->{command} : undef;
+    my $bg = $in->{run_in_background};
+    $bg = JSON::PP::is_bool($bg) ? ($bg ? 1 : 0) : (defined $bg && !ref $bg && $bg eq 'true');
+    return { ts => $ts, id => $id, kind => $kind, cat => wait_category($kind, $cmd),
+        bg => $bg ? JSON::PP::true : JSON::PP::false };
+}
+
+# データのファイルの wait_categories の表で、道具の種類と、コマンドの文字列を照らす。当たらなければ空
+sub wait_category {
+    my ($kind, $cmd) = @_;
+    for my $c (@$WAIT_CATS) {
+        next unless $c->{kind} eq $kind;
+        next if $c->{re} && !(defined $cmd && $cmd =~ $c->{re});
+        return $c->{name};
+    }
+    return '';
+}
+
+# 裏で動かした仕事の識別子と仕事の種類。補助役は agentId、裏で動かしたコマンドは backgroundTaskId
+sub job_of {
+    my ($r) = @_;
+    return (undef, undef) unless ref $r eq 'HASH';
+    for ([agentId => 'agent'], [backgroundTaskId => 'other']) {
+        my $v = $r->{ $_->[0] };
+        return ($v, $_->[1]) if defined $v && !ref $v && $v =~ $ID_RE;
+    }
+    return (undef, undef);
+}
+
+# user の行の文。印と識別子を探すためだけに使う
+sub message_text {
+    my ($m) = @_;
+    return '' unless ref $m eq 'HASH';
+    my $c = $m->{content};
+    return $c if defined $c && !ref $c;
+    return '' unless ref $c eq 'ARRAY';
+    return join "\n", map { $_->{text} } grep { ref $_ eq 'HASH' && defined $_->{text} && !ref $_->{text} } @$c;
+}
+
+# データのファイルは、この部品と同じディレクトリに置く(design の「ファイルの構成」)
+sub load_wait_categories {
+    my $f = File::Spec->catfile(File::Basename::dirname(File::Spec->rel2abs(__FILE__)), 'usage-config.json');
+    open(my $fh, '<:raw', $f) or return undef;
+    local $/;
+    my $s = <$fh>;
+    close $fh;
+    my $d = eval { $JSON->decode($s) };
+    return undef unless ref $d eq 'HASH' && ref $d->{wait_categories} eq 'ARRAY';
+    my @cats;
+    for my $c (@{ $d->{wait_categories} }) {
+        return undef unless ref $c eq 'HASH' && defined $c->{name} && defined $c->{kind};
+        my $re;
+        if (defined $c->{pattern}) {
+            $re = eval { qr/$c->{pattern}/ } or return undef;
+        }
+        push @cats, { name => $c->{name}, kind => $c->{kind}, re => $re };
+    }
+    return \@cats;
 }
 
 # 会話の記録の時刻(協定世界時の ISO 8601)を、UNIX 秒(小数3桁まで)にする
