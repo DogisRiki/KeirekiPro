@@ -40,9 +40,13 @@ my %TURN_FROM = (
 use constant RESUME_MARK => '[resume-after-usage-limit]';
 # 仕事の識別子として書き残してよい値の形(会話の文を書き残さないため、形を限る)
 my $ID_RE = qr/\A[A-Za-z0-9_-]{1,64}\z/;
+# まとめの出来事のコメントの、Issue の番号のあとの文(gh issue close --comment "#<K> に統合した。")
+my $MERGED_COMMENT = do { my $s = ' に統合した。'; utf8::decode($s); $s };
+# 別に起こしたセッションの識別子の形
+my $LOCAL_RE = qr/(?<![A-Za-z0-9_])(local_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f])/;
 
-# データのファイルの wait_categories(待ちの分類)。run_all が読む
-my $WAIT_CATS;
+# データのファイルの wait_categories(待ちの分類)と stage_marks(段階の印の名前)。run_all が読む
+my ($WAIT_CATS, $STAGE_MARKS);
 
 exit main(@ARGV);
 
@@ -67,10 +71,10 @@ sub main {
 # このリポジトリの全部の会話の記録の続きを読む
 sub run_all {
     my ($o) = @_;
-    # 待ちの分類が分からないまま抜き出すと、分類の無い行が残るので、何も書かずに終わる
-    $WAIT_CATS = load_wait_categories();
+    # 待ちの分類と段階の印の名前が分からないまま抜き出すと、分類と印の無い行が残るので、何も書かずに終わる
+    ($WAIT_CATS, $STAGE_MARKS) = load_config();
     if (!$WAIT_CATS) {
-        print STDERR "extract.pl: データのファイル usage-config.json の wait_categories を読めない\n";
+        print STDERR "extract.pl: データのファイル usage-config.json の wait_categories か stage_marks を読めない\n";
         return 1;
     }
     my $exdir = "$o->{state}/extract";
@@ -99,6 +103,17 @@ sub run_all {
                 next unless -e "$exdir/$key.pos" || is_repo_record($path, \@bases);
                 my $rc = read_record($path, $key, $exdir);
                 return $rc if $rc;
+                # 補助役の記録は、本体の会話の記録と同じフォルダの <sessionId>/subagents/ の下にある
+                my $sub = "$projects/$dir/$key/subagents";
+                opendir(my $sd, $sub) or next;
+                my @agents = sort grep { /^agent-[A-Za-z0-9_-]+\.jsonl\z/ && -f "$sub/$_" } readdir $sd;
+                closedir $sd;
+                for my $af (@agents) {
+                    (my $akey = "$key.$af") =~ s/\.jsonl\z//;
+                    next if $seen{$akey}++;
+                    $rc = read_record("$sub/$af", $akey, $exdir);
+                    return $rc if $rc;
+                }
             }
         }
     }
@@ -197,7 +212,7 @@ sub read_record {
     my $out;
     if ($pos->{offset} == 0) {
         open($out, '>:raw', $exf) or return write_failed($exf);
-        print $out $JSON->encode(meta_line($key)), "\n" or return write_failed($exf);
+        print $out $JSON->encode(meta_line($key, $path)), "\n" or return write_failed($exf);
     } else {
         trim_partial($exf) or return write_failed($exf);
         open($out, '>>:raw', $exf) or return write_failed($exf);
@@ -207,6 +222,8 @@ sub read_record {
     # calls は、この呼び出しで読んだ道具の呼び出しのうち、結果をまだ読んでいないもの
     # 結果が届いたときに呼び出しが calls に無ければ、読み始めた位置より前の行から探す
     @$st{qw(calls path start)} = ({}, $path, $pos->{offset});
+    # 補助役の記録では、報告の候補(最後の assistant の行の文か SubagentHandback の input.message)を覚える
+    @$st{qw(sub report)} = ($key =~ /\.agent-/ ? 1 : 0, undef);
     while (my $line = <$in>) {
         # 改行の無い最後の行は書きかけなので、次の呼び出しで読む
         last unless $line =~ /\n\z/;
@@ -222,6 +239,23 @@ sub read_record {
             my $enc = $JSON->encode($row);
             next if $st->{rows}{$enc}++;
             print $out $enc, "\n" or return write_failed($exf);
+        }
+    }
+    # 報告は、この呼び出しで読んだ行のうち、会話の記録で後にあるほうの候補とする
+    # 補助役が動いている間に読むと、途中の文を報告として読む。そのため、読むたびに、その時点の報告の判定を
+    # verdict の行として書き足し、集計は最後の verdict の行を使う。前に判定を書いた記録で、
+    # 今の候補に判定の行が無ければ、value が null の行を書いて前の判定を打ち消す
+    # 文は、判定の行を探すためだけに読み、書かない
+    if (defined $st->{report}) {
+        my ($text, $rts) = @{ $st->{report} };
+        my $row = verdict_row($text, $rts);
+        $row ||= { k => 'verdict', ts => $rts, value => undef, next_action => JSON::PP::false }
+            if grep { index($_, '"k":"verdict"') >= 0 } keys %{ $st->{rows} };
+        if ($row) {
+            my $enc = $JSON->encode($row);
+            if (!$st->{rows}{$enc}++) {
+                print $out $enc, "\n" or return write_failed($exf);
+            }
         }
     }
     close $in;
@@ -364,9 +398,23 @@ sub extract_line {
         # 道具の行は、結果の行を読んだときに書く。所有者が権限の確認に答えたかは、結果の行にあるため
         if (ref $m->{content} eq 'ARRAY') {
             for my $b (@{ $m->{content} }) {
-                next unless ref $b eq 'HASH' && ($b->{type} // '') eq 'tool_use';
+                next unless ref $b eq 'HASH';
+                my $bt = $b->{type} // '';
+                if ($bt eq 'text' && defined $b->{text} && !ref $b->{text}) {
+                    # 補助役の報告の候補。会話の記録で後にあるほうを報告とする
+                    $st->{report} = [$b->{text}, $ts] if $st->{sub};
+                    next;
+                }
+                next unless $bt eq 'tool_use';
                 my $call = tool_call($b, $ts);
                 $st->{calls}{$call->{id}} = $call if $call;
+                my $name = $b->{name} // '';
+                my $in = ref $b->{input} eq 'HASH' ? $b->{input} : {};
+                if ($name eq 'Skill') {
+                    push @rows, stage_row($ts, $in->{skill}, $in->{args});
+                } elsif ($name eq 'SubagentHandback' && $st->{sub} && defined $in->{message} && !ref $in->{message}) {
+                    $st->{report} = [$in->{message}, $ts];
+                }
             }
         }
         my $u  = $m->{usage};
@@ -393,6 +441,14 @@ sub extract_line {
         };
     } elsif ($type eq 'user') {
         push @rows, turn_row($d, $ts);
+        # 所有者か開発者が打ったコマンド。文は、コマンドの名前と引数を探すためだけに読む
+        # コマンドの行は <command-message> か <command-name> で始まる。文の途中の <command-name> は、依頼文などに書かれた例である
+        my $text = message_text($d->{message});
+        if ($text =~ m{\A\s*(?:<command-message>[^<]*</command-message>\s*)?<command-name>/?([^<\s]+)</command-name>}) {
+            my $name = $1;
+            my $args = $text =~ m{<command-args>(.*?)</command-args>}s ? $1 : '';
+            push @rows, stage_row($ts, $name, $args);
+        }
         push @rows, result_rows($d, $ts, $st);
     } elsif ($type eq 'system' && ($d->{subtype} // '') eq 'api_error') {
         my $ms = num_or_undef($d->{retryInMs});
@@ -433,6 +489,40 @@ sub turn_row {
     return $row;
 }
 
+# 段階の印の行。stage_marks に載った名前だけを残し、引数からは Issue の番号と spec-review の段階の名前だけを取り出す
+sub stage_row {
+    my ($ts, $name, $args) = @_;
+    return () unless defined $name && !ref $name;
+    $name =~ s{\A/}{};
+    return () unless length $name && is_stage_mark($name);
+    $args = '' unless defined $args && !ref $args;
+    my $issue = $args =~ /#(\d{1,9})(?!\d)/ ? $1 + 0 : undef;
+    my $spec_stage = $name eq 'spec-review' && $args =~ /(?<![A-Za-z0-9_-])(requirements|design|tasks)(?![A-Za-z0-9_-])/ ? $1 : undef;
+    return { k => 'stage', ts => $ts, name => $name, issue => $issue, spec_stage => $spec_stage };
+}
+
+# 受け持ちとまとめの出来事。結果が失敗でないときだけ、結果を読んだときに書く
+# コマンドの文字列は、出来事の形を見るためだけに読み、書かない
+sub shell_event {
+    my ($cmd) = @_;
+    return undef unless defined $cmd;
+    if ($cmd =~ /session\.sh[ \t]+(check-start|claim|takeover)[ \t]+#?(\d{1,9})(?![\w-])([^\n;&|]*)/) {
+        my ($how, $n, $rest) = ($1, $2, $3);
+        my $branch;
+        if ($rest =~ /--branch(?:[ \t]+|=)(["']?)([A-Za-z0-9._\/-]{1,200})\1(?![^ \t])/) {
+            $branch = $2;
+        }
+        return { k => 'recv', how => $how, issue => $n + 0, branch => $branch };
+    }
+    if ($cmd =~ /gh[ \t]+issue[ \t]+close[ \t]+#?(\d{1,9})(?![\w-])([^\n;&|]*)/) {
+        my ($m, $rest) = ($1, $2);
+        return undef unless $rest =~ /--reason(?:[ \t]+|=)(["'])not planned\1/;
+        return undef unless $rest =~ /--comment(?:[ \t]+|=)(["'])#(\d{1,9})\Q$MERGED_COMMENT\E\1/;
+        return { k => 'merge', from => $m + 0, to => $2 + 0 };
+    }
+    return undef;
+}
+
 # 道具の結果の行から、道具の行と結果の行を作る
 sub result_rows {
     my ($d, $ts, $st) = @_;
@@ -453,6 +543,14 @@ sub result_rows {
             perm => $perm, bg => $call->{bg} } if $call;
         push @rows, { k => 'result', ts => $ts, id => $id, err => $b->{is_error} ? JSON::PP::true : JSON::PP::false,
             job => $job, job_kind => $job_kind };
+        next if !$call || $b->{is_error};
+        push @rows, { %{ $call->{ev} }, ts => $call->{ts} } if $call->{ev};
+        # 別に起こしたセッションの識別子は、結果の文から探すためだけに読み、ほかは書かない
+        if ($call->{spawn}) {
+            my %child;
+            my $text = tool_result_text($b->{content});
+            push @rows, map { { k => 'spawn', ts => $ts, child => $_ } } grep { !$child{$_}++ } $text =~ /$LOCAL_RE/g;
+        }
     }
     return @rows;
 }
@@ -470,7 +568,8 @@ sub tool_call {
     my $bg = $in->{run_in_background};
     $bg = JSON::PP::is_bool($bg) ? ($bg ? 1 : 0) : (defined $bg && !ref $bg && $bg eq 'true');
     return { ts => $ts, id => $id, kind => $kind, cat => wait_category($kind, $cmd),
-        bg => $bg ? JSON::PP::true : JSON::PP::false };
+        bg => $bg ? JSON::PP::true : JSON::PP::false, ev => shell_event($cmd),
+        spawn => $name eq 'mcp__ccd_session__start_session' };
 }
 
 # データのファイルの wait_categories の表で、道具の種類と、コマンドの文字列を照らす。当たらなければ空
@@ -505,25 +604,59 @@ sub message_text {
     return join "\n", map { $_->{text} } grep { ref $_ eq 'HASH' && defined $_->{text} && !ref $_->{text} } @$c;
 }
 
+# 道具の結果の文。文字列か、text を持つ塊の配列で書かれる
+sub tool_result_text {
+    my ($c) = @_;
+    return $c if defined $c && !ref $c;
+    return '' unless ref $c eq 'ARRAY';
+    return join "\n", map { $_->{text} } grep { ref $_ eq 'HASH' && defined $_->{text} && !ref $_->{text} } @$c;
+}
+
+# 補助役の報告から、確認役の判定の行の値と、原因を調べる補助役の NEXT_ACTION の行があるかを読む
+# 判定の行も NEXT_ACTION の行も無ければ undef
+sub verdict_row {
+    my ($report, $ts) = @_;
+    my $value = $report =~ /^[ \t]*-[ \t]*VERDICT:[ \t]*(APPROVED|REJECTED)(?![A-Za-z_])/m ? $1 : undef;
+    my $next = $report =~ /^[ \t]*(?:-[ \t]*)?NEXT_ACTION:/m;
+    return undef unless defined $value || $next;
+    return { k => 'verdict', ts => $ts, value => $value, next_action => $next ? JSON::PP::true : JSON::PP::false };
+}
+
 # データのファイルは、この部品と同じディレクトリに置く(design の「ファイルの構成」)
-sub load_wait_categories {
+# 返す値: 待ちの分類の配列と、段階の印の名前の表(名前の最後の * は、その前までが同じ名前のどれにも当たる)
+sub load_config {
     my $f = File::Spec->catfile(File::Basename::dirname(File::Spec->rel2abs(__FILE__)), 'usage-config.json');
-    open(my $fh, '<:raw', $f) or return undef;
+    open(my $fh, '<:raw', $f) or return;
     local $/;
     my $s = <$fh>;
     close $fh;
     my $d = eval { $JSON->decode($s) };
-    return undef unless ref $d eq 'HASH' && ref $d->{wait_categories} eq 'ARRAY';
+    return unless ref $d eq 'HASH' && ref $d->{wait_categories} eq 'ARRAY' && ref $d->{stage_marks} eq 'HASH';
     my @cats;
     for my $c (@{ $d->{wait_categories} }) {
-        return undef unless ref $c eq 'HASH' && defined $c->{name} && defined $c->{kind};
+        return unless ref $c eq 'HASH' && defined $c->{name} && defined $c->{kind};
         my $re;
         if (defined $c->{pattern}) {
-            $re = eval { qr/$c->{pattern}/ } or return undef;
+            $re = eval { qr/$c->{pattern}/ } or return;
         }
         push @cats, { name => $c->{name}, kind => $c->{kind}, re => $re };
     }
-    return \@cats;
+    my %marks = (exact => {}, prefix => []);
+    for my $k (keys %{ $d->{stage_marks} }) {
+        if ($k =~ /\A(.+)\*\z/) {
+            push @{ $marks{prefix} }, $1;
+        } else {
+            $marks{exact}{$k} = 1;
+        }
+    }
+    return (\@cats, \%marks);
+}
+
+# 名前が stage_marks に載っているか
+sub is_stage_mark {
+    my ($name) = @_;
+    return 1 if $STAGE_MARKS->{exact}{$name};
+    return scalar grep { index($name, $_) == 0 && length $name > length $_ } @{ $STAGE_MARKS->{prefix} };
 }
 
 # 会話の記録の時刻(協定世界時の ISO 8601)を、UNIX 秒(小数3桁まで)にする
@@ -552,11 +685,54 @@ sub is_value {
 }
 
 sub meta_line {
-    my ($key) = @_;
-    return {
+    my ($key, $path) = @_;
+    my $meta = {
         k => 'meta', session => $key, agent_id => undef, agent_type => undef, model => undef,
         stage => undef, cycle => undef, round => undef, cwd_is_repo => JSON::PP::true,
     };
+    return $meta unless $key =~ /\.agent-([A-Za-z0-9_-]+)\z/;
+    # 補助役の記録: agent-<id>.meta.json の agentType とモデルと、最初の user の行である依頼文の欄の値
+    $meta->{agent_id} = $1;
+    (my $mf = $path) =~ s/\.jsonl\z/.meta.json/;
+    if (open(my $fh, '<:raw', $mf)) {
+        local $/;
+        my $d = eval { $JSON->decode(scalar <$fh>) };
+        close $fh;
+        if (ref $d eq 'HASH') {
+            $meta->{agent_type} = name_or_undef($d->{agentType});
+            $meta->{model} = name_or_undef($d->{model});
+        }
+    }
+    my $prompt = first_prompt($path);
+    if ($prompt =~ /^[ \t]*(?:[-*][ \t]*)?STAGE:[ \t]*([A-Za-z_-]{1,40})[ \t]*\r?$/m) {
+        $meta->{stage} = $1;
+    }
+    for my $f (qw(CYCLE ROUND)) {
+        $meta->{ lc $f } = $1 + 0 if $prompt =~ /^[ \t]*(?:[-*][ \t]*)?$f:[ \t]*(\d{1,6})[ \t]*\r?$/m;
+    }
+    return $meta;
+}
+
+# 補助役の会話の記録の最初の user の行の文。依頼文の欄を探すためだけに使う
+sub first_prompt {
+    my ($path) = @_;
+    open(my $fh, '<:raw', $path) or return '';
+    while (my $line = <$fh>) {
+        last unless $line =~ /\n\z/;
+        next unless index($line, '"user"') >= 0;
+        my $d = eval { $JSON->decode($line) };
+        next unless ref $d eq 'HASH' && ($d->{type} // '') eq 'user';
+        close $fh;
+        return message_text($d->{message});
+    }
+    close $fh;
+    return '';
+}
+
+# 補助役の種類とモデルの名前。会話の文が入らないように、名前の形の値だけを残す
+sub name_or_undef {
+    my ($v) = @_;
+    return defined $v && !ref $v && $v =~ /\A[A-Za-z0-9_.:\[\]-]{1,64}\z/ ? $v : undef;
 }
 
 sub read_pos {

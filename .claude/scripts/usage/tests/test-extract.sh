@@ -89,7 +89,7 @@ addline "$PROJ/proj-b/s-later.jsonl" "{\"type\":\"user\",\"cwd\":\"$REPO\",\"ses
 # cwd の行が1つも無い記録は、まだ見分けられないので抜き出さない
 mkdir -p "$PROJ/proj-c"
 addline "$PROJ/proj-c/s-nocwd.jsonl" '{"type":"permission-mode","permissionMode":"default"}'
-# 補助役の記録の置き場所は、本体の会話として読まない(補助役はタスク2.4で読む)
+# 補助役の記録は、本体の会話として読まず、本体の会話の記録の鍵の下で読む
 mkrec "$D/s-main/subagents/agent-a1.jsonl" "$REPO" 0
 
 printf '== このリポジトリの会話の見分け方\n'
@@ -105,7 +105,7 @@ check "本体の名前を頭に持つだけの別のフォルダの記録を抜�
 check "あとの行だけ cwd が本体の記録を抜き出さない" "$(kcount "$EX/s-later.jsonl" meta)" "nofile"
 check "cwd の行が無い記録を抜き出さない" "$(kcount "$EX/s-nocwd.jsonl" meta)" "nofile"
 check "見分けなかった記録に .pos を作らない" "$( [ -e "$EX/s-other.pos" ] && echo yes || echo no)" "no"
-check "補助役の記録を本体の会話として読まない" "$( [ -e "$EX/agent-a1.pos" ] && echo yes || echo no)" "no"
+check "補助役の記録を本体の会話として読まず、本体の会話の記録の鍵の下で読む" "$( [ -e "$EX/agent-a1.pos" ] && echo yes || echo no)/$(kcount "$EX/s-main.agent-a1.jsonl" meta)" "no/1"
 check ".pos の offset が記録の大きさ" "$(jfile "$EX/s-main.pos" offset)" "$(fsize "$D/s-main.jsonl")"
 check ".pos の size が記録の大きさ" "$(jfile "$EX/s-main.pos" size)" "$(fsize "$D/s-main.jsonl")"
 check ".pos の skipped が 0" "$(jfile "$EX/s-main.pos" skipped)" "0"
@@ -472,6 +472,138 @@ mkdir -p "$WORK/nocfg"
 cp "$EXTRACT" "$WORK/nocfg/extract.pl"
 perl "$WORK/nocfg/extract.pl" --state "$WORK/nocfgstate" --all --skip-locked --repo "$REPO" 2>/dev/null
 check "データのファイルが読めないときは 1 で終わり、抜き出した記録を作らない" "$?/$( [ -e "$WORK/nocfgstate/extract/s-tool.jsonl" ] && echo yes || echo no)" "1/no"
+
+printf '== 出来事と補助役の情報\n'
+# 作り物の会話の記録: 段階の印、受け持ちとまとめの出来事、別に起こしたセッションの出来事
+perl -MJSON::PP -e '
+    my ($file, $cwd) = @ARGV;
+    my $j = JSON::PP->new->utf8->canonical;
+    my $n = 0;
+    my $c = sub { $n++; return (cwd => $cwd, sessionId => "s-ev", timestamp => sprintf("2026-10-26T00:03:%02d.000Z", $n)) };
+    my $u = sub { return {$c->(), type => "user", message => {role => "user", content => $_[0]}} };
+    my $call = sub { my ($id, $name, $input) = @_; return {$c->(), type => "assistant",
+        message => {id => "msg_$id", model => "claude-opus-5-5", role => "assistant", stop_reason => "tool_use", usage => {input_tokens => 1, output_tokens => 1},
+            content => [{type => "tool_use", id => $id, name => $name, input => $input}]}} };
+    my $res = sub { my ($id, $content, $err) = @_; return {$c->(), type => "user",
+        message => {role => "user", content => [{type => "tool_result", tool_use_id => $id, content => $content, ($err ? (is_error => JSON::PP::true) : ())}]}} };
+    my $bash = sub { my ($id, $cmd, $err) = @_; return ($call->($id, "Bash", {command => $cmd}), $res->($id, "SECRET-OUTPUT", $err)) };
+    my $closed = " に統合した。"; utf8::decode($closed);
+    my @l = (
+        $u->("<command-message>start</command-message>\n<command-name>/start</command-name>\n<command-args>#42 SECRET-ARGS</command-args>"),
+        $u->("<command-message>model</command-message>\n<command-name>/model</command-name>\n<command-args>opus</command-args>"),
+        $u->([{type => "text", text => "<command-name>/kiro-spec-design</command-name>\n            <command-message>kiro-spec-design</command-message>\n            <command-args>feat-x SECRET-ARGS</command-args>"}]),
+        $u->("SECRET-USER-TEXT <command-name>/ship</command-name>"),
+        $call->("toolu_s1", "Skill", {skill => "spec-review", args => "feat-x design changed SECRET-ARGS"}),
+        $res->("toolu_s1", "Launching skill: spec-review"),
+        $call->("toolu_s2", "Skill", {skill => "verify-backend"}),
+        $res->("toolu_s2", "Launching skill: verify-backend"),
+        $call->("toolu_s3", "Skill", {skill => "verify-"}),
+        $res->("toolu_s3", "Launching skill: verify-"),
+        $call->("toolu_s4", "Skill", {skill => "simplify", args => "#77"}),
+        $res->("toolu_s4", "Launching skill: simplify"),
+        $bash->("toolu_b1", "bash .claude/scripts/parallel/session.sh claim 42 --branch feat/x --session SECRET-SESSION"),
+        $bash->("toolu_b2", "bash .claude/scripts/parallel/session.sh check-start 43", 1),
+        $bash->("toolu_b3", "bash .claude/scripts/parallel/session.sh takeover #44 --branch=feat/y"),
+        $bash->("toolu_b4", "gh issue close 7 --reason \"not planned\" --comment \"#9$closed\""),
+        $bash->("toolu_b5", "gh issue close 8 --reason \"not planned\" --comment \"#9$closed\"", 1),
+        $bash->("toolu_b6", "gh issue close 10 --reason completed --comment \"#9$closed\""),
+        $call->("toolu_p1", "mcp__ccd_session__start_session", {title => "SECRET-TITLE", prompt => "SECRET-PROMPT"}),
+        $res->("toolu_p1", [{type => "text", text => "Started session \"SECRET-TITLE\" (session_id: local_f6786648-d7d9-44d1-841b-cf76b75c4a8f, name: x). SECRET-RESULT"}]),
+        $call->("toolu_p2", "mcp__ccd_session__start_session", {title => "SECRET-TITLE"}),
+        $res->("toolu_p2", "local_00000000-0000-4000-8000-000000000000 SECRET-RESULT", 1),
+    );
+    open my $f, ">", $file or die "$file: $!";
+    print $f $j->encode($_), "\n" for @l;
+' "$D/s-ev.jsonl" "$REPO"
+# 作り物の補助役の記録: mkagent <ファイル> <報告の返し方> <meta.json の中身か none>
+# 返し方は text(最後の assistant の行の文)か handback(SubagentHandback)か handback-then-text(報告のあとに文が続く)
+mkagent() {
+    mkdir -p "$(dirname "$1")"
+    [ "$3" = none ] || printf '%s\n' "$3" >"${1%.jsonl}.meta.json"
+    perl -MJSON::PP -e '
+        my ($file, $cwd, $how) = @ARGV;
+        my $j = JSON::PP->new->utf8->canonical;
+        my $n = 0;
+        my $c = sub { $n++; return (cwd => $cwd, sessionId => "s-ev", isSidechain => JSON::PP::true, timestamp => sprintf("2026-10-26T00:04:%02d.000Z", $n)) };
+        my $say = sub { my ($id, @b) = @_; return {$c->(), type => "assistant", message => {id => $id, model => "claude-opus-5-5", role => "assistant",
+            stop_reason => "end_turn", usage => {input_tokens => 1, output_tokens => 1}, content => [@b]}} };
+        my $report = "SECRET-REPORT-TEXT\n## Review Verdict\n- VERDICT: REJECTED\n- NEXT_ACTION: RETRY_TASK\n";
+        my @l = (
+            {$c->(), type => "user", message => {role => "user", content => "- FEATURE: feat-x\n- STAGE: design\n- CYCLE: 1\n- ROUND: 2\n- REVIEW_FILE: SECRET-FILE\nSECRET-PROMPT"}},
+            $say->("msg_a1", {type => "text", text => "SECRET-DRAFT\n- VERDICT: APPROVED\n"}),
+        );
+        if ($how eq "text") {
+            push @l, $say->("msg_a2", {type => "text", text => $report});
+        } else {
+            push @l, $say->("msg_a2", {type => "tool_use", id => "toolu_h1", name => "SubagentHandback", input => {message => $how eq "handback" ? $report : "- VERDICT: APPROVED\n"}}),
+                {$c->(), type => "user", message => {role => "user", content => [{type => "tool_result", tool_use_id => "toolu_h1", content => "SECRET-RESULT"}]}};
+            push @l, $say->("msg_a3", {type => "text", text => "SECRET-AFTER-TEXT"}) if $how eq "handback-then-text";
+        }
+        open my $f, ">", $file or die "$file: $!";
+        print $f $j->encode($_), "\n" for @l;
+    ' "$1" "$REPO" "$2"
+}
+AG="$D/s-ev/subagents"
+mkagent "$AG/agent-atext1.jsonl" text '{"agentType":"spec-reviewer","description":"SECRET-DESC","model":"opus","toolUseId":"toolu_x"}'
+mkagent "$AG/agent-ahand1.jsonl" handback '{"agentType":"general-purpose","description":"SECRET-DESC"}'
+mkagent "$AG/agent-alate1.jsonl" handback-then-text '{"agentType":"SECRET TYPE","model":"SECRET MODEL"}'
+mkagent "$AG/agent-anometa.jsonl" text none
+# このリポジトリでない会話の補助役の記録は読まない
+mkagent "$PROJ/proj-b/s-other/subagents/agent-aother.jsonl" text none
+run_all
+check "補助役の記録を読んでも 0 で終わる" "$?" "0"
+E="$EX/s-ev.jsonl"
+check "stage_marks に載ったスキルの名前だけが段階の印になる" "$(kall "$E" stage name)" "start,kiro-spec-design,spec-review,verify-backend"
+check "段階の印の引数からは Issue の番号と spec-review の段階の名前だけを取り出す" \
+    "$(kall "$E" stage issue)|$(kall "$E" stage spec_stage)" "42,null,null,null|null,null,design,null"
+check "session.sh claim 42 --branch feat/x と /start #42 と gh issue close 7 --reason \"not planned\" --comment \"#9 に統合した。\" から、受け持ちとまとめの出来事が抜き出される" \
+    "$(kall "$E" recv how)|$(kall "$E" recv issue)|$(kall "$E" recv branch)|$(kall "$E" merge from)|$(kall "$E" merge to)" \
+    "claim,takeover|42,44|feat/x,feat/y|7|9"
+check "失敗した結果の呼び出しからは出来事が抜き出されない" "$(kcount "$E" recv)/$(kcount "$E" merge)/$(kcount "$E" spawn)" "2/1/1"
+check "start_session の結果から local_<uuid> が抜き出される" "$(kall "$E" spawn child)" "local_f6786648-d7d9-44d1-841b-cf76b75c4a8f"
+check "出来事の行の時刻は呼び出しの時刻" "$(kall "$E" recv ts | cut -d, -f1)" "$(kall "$E" tool ts | cut -d, -f5)"
+check "本体の会話の meta の行は補助役の欄を持たない" "$(kall "$E" meta agent_id)|$(kall "$E" meta agent_type)|$(kall "$E" meta stage)" "null|null|null"
+AT="$EX/s-ev.agent-atext1.jsonl"
+AH="$EX/s-ev.agent-ahand1.jsonl"
+check "補助役の記録の鍵は、本体の会話の記録の鍵と補助役の記録の名前" "$(kall "$AT" meta session)|$(kall "$AT" meta agent_id)" "s-ev.agent-atext1|atext1"
+check "補助役の meta の行に agentType とモデルが入る" "$(kall "$AT" meta agent_type)|$(kall "$AT" meta model)|$(kall "$AH" meta agent_type)|$(kall "$AH" meta model)" \
+    "spec-reviewer|opus|general-purpose|null"
+check "確認役の - VERDICT: REJECTED と NEXT_ACTION: の行と、審査役の STAGE: design CYCLE: 1 ROUND: 2 が、最後の assistant の行の文で返した記録と SubagentHandback で返した記録の両方から抜き出される" \
+    "$(kall "$AT" verdict value)|$(kall "$AT" verdict next_action)|$(kall "$AT" meta stage)|$(kall "$AT" meta cycle)|$(kall "$AT" meta round)/$(kall "$AH" verdict value)|$(kall "$AH" verdict next_action)|$(kall "$AH" meta stage)|$(kall "$AH" meta cycle)|$(kall "$AH" meta round)" \
+    "REJECTED|true|design|1|2/REJECTED|true|design|1|2"
+check "報告のあとに判定の行の無い文が続けば、判定の行を書かない" "$(kcount "$EX/s-ev.agent-alate1.jsonl" verdict)" "0"
+check "名前の形でない agentType とモデルは null になる" "$(kall "$EX/s-ev.agent-alate1.jsonl" meta agent_type)|$(kall "$EX/s-ev.agent-alate1.jsonl" meta model)" "null|null"
+check "meta.json の無い補助役の記録も読み、agentType とモデルを null にする" \
+    "$(kall "$EX/s-ev.agent-anometa.jsonl" meta agent_type)|$(kall "$EX/s-ev.agent-anometa.jsonl" verdict value)" "null|REJECTED"
+check "このリポジトリでない会話の補助役の記録を読まない" "$(find "$EX" -name '*aother*' | wc -l | tr -d ' ')" "0"
+check "会話の文とコマンドと依頼文と報告の文が、抜き出した記録に残らない" "$(cat "$E" "$EX"/s-ev.agent-*.jsonl | grep -c -e SECRET -e Launching -e session_id)" "0"
+# 補助役が動いている間に読むと、途中の文を報告として読む。集計は最後の verdict の行を使う
+# splitread <ファイル> <1回目に読む行の数>: 先頭の行だけを読ませてから、全部を読ませる
+splitread() {
+    cp "$1" "$WORK/split.full"
+    head -n "$2" "$WORK/split.full" >"$1"
+    run_all
+    cp "$WORK/split.full" "$1"
+    run_all
+}
+mkagent "$AG/agent-asplit.jsonl" text none
+splitread "$AG/agent-asplit.jsonl" 2
+check "途中の文の判定のあとに報告を読むと、報告の判定の行を最後に書く" \
+    "$(kall "$EX/s-ev.agent-asplit.jsonl" verdict value)|$(kall "$EX/s-ev.agent-asplit.jsonl" verdict ts)" \
+    "APPROVED,REJECTED|$(kall "$EX/s-ev.agent-asplit.jsonl" msg ts)"
+mkagent "$AG/agent-alsplit.jsonl" handback-then-text none
+splitread "$AG/agent-alsplit.jsonl" 4
+check "途中の判定のあとに判定の行の無い報告を読むと、value が null の行で前の判定を打ち消す" \
+    "$(kall "$EX/s-ev.agent-alsplit.jsonl" verdict value)|$(kall "$EX/s-ev.agent-alsplit.jsonl" verdict next_action)" "APPROVED,null|false,false"
+run_all
+check "続きの無い記録をもう一度読んでも、判定の行を書き足さない" "$(kcount "$EX/s-ev.agent-alsplit.jsonl" verdict)" "2"
+# データのファイルに stage_marks が無いときも、データのファイルを読めないときと同じに扱う
+mkdir -p "$WORK/nomarks"
+cp "$EXTRACT" "$WORK/nomarks/extract.pl"
+perl -MJSON::PP -e 'local $/; my $d = decode_json(<STDIN>); delete $d->{stage_marks}; print JSON::PP->new->utf8->canonical->encode($d)' \
+    <"$(dirname "$EXTRACT")/usage-config.json" >"$WORK/nomarks/usage-config.json"
+perl "$WORK/nomarks/extract.pl" --state "$WORK/nomarksstate" --all --skip-locked --repo "$REPO" 2>/dev/null
+check "データのファイルに stage_marks が無いときは 1 で終わり、抜き出した記録を作らない" "$?/$( [ -e "$WORK/nomarksstate/extract/s-ev.jsonl" ] && echo yes || echo no)" "1/no"
 
 printf '== 終了コード\n'
 printf 'x\n' >"$WORK/afile"
