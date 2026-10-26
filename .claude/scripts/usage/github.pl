@@ -770,17 +770,23 @@ sub config_roles {
     return map { bytes_of($_) } grep { defined && !ref } @v;
 }
 
+# モデルの ID の形。report.pl が、モデルの分からない応答に付ける「不明」も受ける。
+# 会話の記録のモデルの ID には、`:` を含むもの(Bedrock の ID の末尾の版など)がある
+sub model_id_re { return '(?:不明|[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,99})' }
+
 sub is_model_id {
     my ($s) = @_;
-    return defined $s && !ref $s && $s =~ /\A[A-Za-z0-9][A-Za-z0-9._\[\]-]{0,99}\z/ ? 1 : 0;
+    my $re = model_id_re();
+    return defined $s && !ref $s && $s =~ /\A$re\z/ ? 1 : 0;
 }
 
-# モデルごとの表の役割の名前。本体の会話、別に起こしたセッション、データのファイルの役割の名前、補助役の種類の名前のどれかである
+# モデルごとの表の役割の名前。本体の会話、別に起こしたセッション、データのファイルの役割の名前、補助役の種類の名前(agent_type)、
+# report.pl が agent_type の無い補助役に付ける「補助役」のどれかである。agent_type の字は extract.pl が残す字と同じにする
 sub is_role {
     my ($s) = @_;
     return 0 unless defined $s && !ref $s;
-    return 1 if $s =~ /\A[A-Za-z0-9_-]{1,64}\z/;
-    return scalar grep { $_ eq $s } ('本体の会話', '別に起こしたセッション', config_roles());
+    return 1 if $s =~ /\A[A-Za-z0-9_.:\[\]-]{1,64}\z/;
+    return scalar grep { $_ eq $s } ('本体の会話', '別に起こしたセッション', '補助役', config_roles());
 }
 
 sub in_set {
@@ -828,10 +834,10 @@ sub report_schema {
         start_date => $date,
         end_date => $date,
         totals => { work_sec => $num0, wait_sec => $num0, concurrent_sec => $num0, tokens => $int0, usd => $num0,
-            usd_unknown_models => [ \&is_model_id ], limit_count => $int0, limit_sec => $num0 },
+            usd_unknown_models => [ sub { is_model_id(bytes_of($_[0])) } ], limit_count => $int0, limit_sec => $num0 },
         stages => [ { name => sub { in_set(bytes_of($_[0]), stage_names()) }, work_sec => $num0, wait_sec => $num0,
             concurrent_sec => $num0, tokens => $int0, usd => $num0 } ],
-        models => [ { model => \&is_model_id, role => sub { is_role(bytes_of($_[0])) }, in => $int0, cw => $int0, cr => $int0, out => $int0, usd => $num0 } ],
+        models => [ { model => sub { is_model_id(bytes_of($_[0])) }, role => sub { is_role(bytes_of($_[0])) }, in => $int0, cw => $int0, cr => $int0, out => $int0, usd => $num0 } ],
         rework => { spec_review_rounds => $tri0, owner_fix => $tri0, spec_back => sub { !defined $_[0] || fits($_[0], $back) },
             impl_spec_back => $tri0, task_rejected => $int0, codex_rounds => $int0, ci_fix => $int0, same_failure => $int0,
             split => $bool0, switch_to_spec => $int0, size_check_stops => $int0, decided_method_stops => $int0 },
@@ -927,7 +933,8 @@ sub check_report_md {
     $bad->('注記') unless @b == 14 && $b[12] eq '### 注記';
     my @notes = map {
         my $re = quotemeta $_;
-        $re =~ s/\\<MODELS\\>/[A-Za-z0-9][A-Za-z0-9._\\[\\]-]{0,99}(?:、[A-Za-z0-9][A-Za-z0-9._\\[\\]-]{0,99})*/;
+        my $id = model_id_re();
+        $re =~ s/\\<MODELS\\>/$id(?:、$id)*/;
         $re =~ s/\\<N\\>/[1-9][0-9]*/;
         qr/\A- $re\z/;
     } note_texts();

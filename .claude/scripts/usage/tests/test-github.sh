@@ -724,6 +724,33 @@ check "report.md に形に無い段落があると、publish は書かずに 1 �
 run publish 501 --draft "$DRAFT" --findings "$TMP_ROOT/bad-findings.md"
 check "所見に HTML のコメントの印があると、publish は書かずに 1 で終わる" "$RC/$(calls)/$(nlines "$ERR")/$(statejson issues/501.json)" "1//1/none"
 
+echo "== report.pl が決める役割とモデルの名前"
+# report.pl は、agent_type の無い補助役を「補助役」に、モデルの分からない応答を「不明」にし、
+# 表に無い agent_type(プラグインの補助役の「plugin:helper」など)をそのまま役割の名前にする
+mkdir -p "$TMP_ROOT/names"
+perl -MJSON::PP -e '
+    my $j = JSON::PP->new->canonical;
+    my $d = $j->decode(do { local $/; <STDIN> });
+    my $m = $d->{models}[-1];
+    $d->{models}[-1] = { %$m, role => "補助役" };
+    push @{ $d->{models} }, { %$m, role => "plugin:helper" }, { %$m, model => "不明", usd => 0 };
+    $d->{totals}{usd_unknown_models} = ["us.anthropic.claude-x-v1:0", "不明"];
+    print $j->encode($d);
+' <"$DRAFT/report.json" >"$TMP_ROOT/names/report.json" || ng "役割とモデルの名前の report.json を用意できない"
+# report.md は、report.pl が価格の分からないモデルがあるときに書くとおり、使用料に「(価格が分からないモデルを除く)」を付け、注記に1行を足す
+perl -pe 's/^\| claude-haiku-5-5 \| Explore \|(.*)$/| claude-haiku-5-5 | 補助役 |$1\n| claude-haiku-5-5 | plugin:helper |$1\n| 不明 | 本体の会話 | 1 | 1 | 1 | 1 | 価格が分からない |/;
+    s/^(\| (?:使用料|合計) \|.*\$312\.45)( \|)$/$1(価格が分からないモデルを除く)$2/;
+    s/^(### 注記)$/$1\n\n- 不明、us.anthropic.claude-x-v1:0の公表価格が分からないため、仕組みは、このモデルの使用料を数えていない。全体の合計と段階ごとの表の使用料は、このモデルの分を除いた額である。/' \
+    "$DRAFT/report.md" | perl -0pe 's/(この.*額である。)\n\n(- )/$1\n$2/' >"$TMP_ROOT/names/report.md"
+check "名前の見本の report.md に、価格の分からないモデルの注記が1行と、モデルを除いた使用料が2つある" \
+    "$(grep -c '^- 不明、us\.anthropic\.claude-x-v1:0の公表価格' "$TMP_ROOT/names/report.md")/$(grep -c '[$]312[.]45(価格が分からないモデルを除く) |' "$TMP_ROOT/names/report.md")/$(grep -c '^$' "$TMP_ROOT/names/report.md")" \
+    "1/2/$(grep -c '^$' "$DRAFT/report.md")"
+newgh publish-names
+mkdb "$PUBDB"
+rm -rf "$STATE"
+run publish 501 --draft "$TMP_ROOT/names" --findings "$FIND"
+check "役割が 補助役 と plugin:helper で、モデルが 不明 の集計を、publish が書いて 0 で終わる" "$RC/$ERR/$(dbq 'scalar @{ I(501)->{comments} }')" "0//1"
+
 echo "== 集計のコメントを書くときの失敗"
 newgh publish-nopush
 mkdb "repo => { owner => \"owner\", name => \"repo\", push => F }, $PUBDB"
