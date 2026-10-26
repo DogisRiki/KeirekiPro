@@ -101,7 +101,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24.16.0'
+          node-version: '24.22.1'
 
       - name: Install Codex CLI
         # バージョンは固定する(未固定だと実行のたびに最新版が入り、
