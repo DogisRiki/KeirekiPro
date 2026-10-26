@@ -121,7 +121,8 @@ run() {
     ERR=$(cat "$TMP_ROOT/err")
 }
 # report.json の値を読む: rj <perl の式>。R(<欄>, ...) は report.json の欄の値(欄を順にたどる)、J(<値>) は値の JSON である。
-# S(<欄>, ...) と M(<欄>, ...) は、段階ごとの行とモデルごとの行の、欄の値の配列の配列である。SUM(<欄>) は段階ごとの行の欄の値の合計である
+# S(<欄>, ...) と M(<欄>, ...) は、段階ごとの行とモデルごとの行の、欄の値の配列の配列である。SUM(<欄>) は段階ごとの行の欄の値の合計である。
+# W(<欄>, ...) は、往復と手戻りの欄の値の配列である
 rj() {
     if [ ! -f "$OUTD/report.json" ]; then
         printf 'none'
@@ -137,6 +138,7 @@ rj() {
         sub S { return rows("stages", @_) }
         sub M { return rows("models", @_) }
         sub SUM { my $s = 0; $s += $_->{ $_[0] } for @{ R("stages") || [] }; return $s }
+        sub W { my $w = R("rework") || {}; return [ map { $w->{$_} } @_ ] }
         print '"$1"';
     ' "$OUTD/report.json"
 }
@@ -495,6 +497,82 @@ run 2005
 check "本体の会話と、agent_type と verdict から決めた役割と、別に起こしたセッションが、モデルと役割の組ごとに分かれる" \
     "$RC:$(rj 'J(M("model", "role", "in"))')" \
     '0:[["claude-sonnet-5-5","本体の会話",64],["claude-opus-5-5","別に起こしたセッション",16],["claude-sonnet-5-5","spec の審査役",16],["claude-opus-5-5","原因を調べる補助役",4],["claude-opus-5-5","タスクごとの確認役",2],["claude-opus-5-5","本体の会話",1],["claude-haiku-5-5","Explore",8]]'
+
+echo "== 印と spec の記録と補助役の報告から数える往復と手戻り"
+# 時刻は T0 からの秒数で書く。#2010 は spec ありの Issue で、#2013 は spec 無しの Issue、#2015 は #2014 を分けた Issue である
+# T0 からの秒数の時刻を ISO 8601 で出す: iso <秒数>
+iso() { perl -MPOSIX -e 'print POSIX::strftime("%Y-%m-%dT%H:%M:%SZ", gmtime($ARGV[0]))' $((T0 + $1)); }
+# 承認の記録の要素: ah <段階> <承認した時刻> <取り消した時刻> <取り消した理由>
+ah() { printf '{"stage":"%s","approved_by":"o","approved_at":"%s","issues":[2010],"revoked_at":"%s","revoked_for":"%s"}' "$1" "$(iso "$2")" "$(iso "$3")" "$4"; }
+# 取り消しの記録: design だけを戻す(100)、requirements と design を戻す(200)、実装中に design と tasks を戻す(300)、
+# Issue #2012 のための更新で3つの段階を戻す(400)、開始より前に戻す(-1000)
+HIST="$(ah design 90 100 "D1 による design への差し戻し"),$(ah requirements 20 200 "R1"),$(ah design 180 200 "R1"),\
+$(ah design 280 300 "T1"),$(ah tasks 290 300 "T1"),$(ah requirements 350 400 "Issue #2012 のための更新"),\
+$(ah design 360 400 "Issue #2012 のための更新"),$(ah tasks 370 400 "Issue #2012 のための更新"),$(ah requirements -2000 -1000 "X")"
+APPR="{\"requirements\":{\"approved\":true,\"approved_at\":\"$(iso 500)\"},\"design\":{\"approved\":true,\"approved_at\":\"$(iso 600)\"},\"tasks\":{\"approved\":true,\"approved_at\":\"$(iso 700)\"}}"
+newrepo
+commit 2026-09-01T00:00:00Z "$CFGPATH={}" \
+    ".kiro/specs/feat-r/spec.json={\"feature_name\":\"feat-r\",\"issue\":2010,\"additional_issues\":[2012],\"approvals\":$APPR,\"approval_history\":[$HIST]}"
+newgh rework
+mkdb 'prs => [ closes("'"$SHA"'", 2010 .. 2015) ], issues => [ iss(2010), iss(2013), iss(2014), iss(2015, 2014) ]'
+newstate
+# 審査役か点検役か確認役の会話: rsub <記録の鍵> <agent_type> <STAGE か null> <CYCLE か null> <ROUND か null> [<verdict の値>...]
+rsub() {
+    local key=$1 type=$2 st=$3 cy=$4 ro=$5 v i=0
+    [ "$st" != null ] && st="\"$st\""
+    shift 5
+    rec "$key" "{\"k\":\"meta\",\"session\":\"x\",\"agent_id\":\"x\",\"agent_type\":\"$type\",\"stage\":$st,\"cycle\":$cy,\"round\":$ro}"
+    rm1 "$key" 1000 false
+    for v in "$@"; do
+        i=$((i + 1))
+        [ "$v" != null ] && v="\"$v\""
+        rec "$key" "{\"k\":\"verdict\",\"ts\":$((T0 + 1000 + i)),\"value\":$v,\"next_action\":false}"
+    done
+}
+# 印: rmk <種類> <時刻> <会話> <段階か null> <Issue か null>
+rmk() {
+    local st=$4
+    [ "$st" != null ] && st="\"$st\""
+    mark "{\"ts\":$((T0 + $2)),\"session\":\"$3\",\"kind\":\"$1\",\"stage\":$st,\"issue\":$5,\"branch\":null}"
+}
+rv u1 0 2010; rm1 u1 2000 true
+rsub u1.agent-a spec-reviewer requirements 1 1
+rsub u1.agent-b spec-reviewer requirements 1 2
+rsub u1.agent-c spec-reviewer requirements 1 2
+rsub u1.agent-d spec-reviewer design 2 1
+rsub u1.agent-e spec-style-checker requirements 1 3
+rsub u1.agent-f general-purpose null null null REJECTED
+rsub u1.agent-g general-purpose null null null REJECTED null
+rsub u1.agent-h general-purpose null null null APPROVED
+rsub u1.agent-i general-purpose null null null APPROVED REJECTED
+# 取り消された design(150)と tasks(450)の spec-fix は数えない。ほかの Issue の会話と、ほかの Issue の番号の印も数えない
+rv u2 0 2011; rm1 u2 10 true
+rmk spec-fix 150 u1 design null; rmk spec-fix 190 u1 design null; rmk spec-fix 30 u1 requirements null
+rmk spec-fix 450 u1 tasks null; rmk spec-fix 200 u2 design null
+rmk same-failure 800 u1 null null; rmk same-failure 900 u1 null 2010; rmk same-failure 910 u1 null 2099
+rmk switch-to-spec 50 u1 null 2010
+run 2010
+check "approval_history の、Issue #N のための更新でない要素から、前の段階に戻った回数と実装中に戻った回数が分かれて数えられる" \
+    "$RC:$(rj 'J([R("rework", "spec_back"), R("rework", "impl_spec_back")])')" \
+    '0:[[{"from":"tasks","to":"design"},{"from":"tasks","to":"requirements"}],{"design":1,"requirements":0,"tasks":0}]'
+check "spec-fix と same-failure と switch-to-spec の印が、それぞれの行に数えられ、承認を取り消された段階の spec-fix の印は数えない" \
+    "$RC:$(rj 'J([R("rework", "owner_fix"), R("rework", "same_failure"), R("rework", "switch_to_spec")])')" \
+    '0:[{"design":1,"requirements":1,"tasks":0},2,1]'
+check "spec の審査役との往復が STAGE ごとの CYCLE と ROUND の組で数えられ、最後の判定が REJECTED の確認役の会話が数えられる" \
+    "$RC:$(rj 'J([R("rework", "spec_review_rounds"), R("rework", "task_rejected"), R("rework", "split")])')" \
+    '0:[{"design":1,"requirements":2,"tasks":0},2,false]'
+# #2013: spec 無しの Issue に、審査役の会話と、spec-fix と same-failure の印がある
+rv u3 0 2013; rm1 u3 2000 true
+rsub u3.agent-a spec-reviewer requirements 1 1
+rmk spec-fix 100 u3 requirements 2013; rmk same-failure 120 u3 null 2013
+run 2013
+check "spec 無しの Issue で、spec に関わる行が無い" \
+    "$RC:$(rj 'J(W("spec_review_rounds", "owner_fix", "spec_back", "impl_spec_back", "switch_to_spec", "same_failure"))')" \
+    '0:[{"design":0,"requirements":0,"tasks":0},{"design":0,"requirements":0,"tasks":0},[],{"design":0,"requirements":0,"tasks":0},0,1]'
+# #2015: 会話 u4 が #2014 を受け持ち、#2014 を分けた #2015 を受け持つ
+rv u4 0 2014; rm1 u4 10 false; rv u4 100 2015; rm1 u4 110 true
+check "分けた Issue で、分けた行が 有 になる" \
+    "$(run 2015; printf '%s:' "$RC"; rj 'J(R("rework", "split"))')" '0:true'
 
 echo "== 仕組みが main に入った時刻"
 newrepo

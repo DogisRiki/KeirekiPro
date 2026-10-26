@@ -44,6 +44,11 @@ use constant ROLE_MAIN      => Encode::decode('UTF-8', '本体の会話');
 use constant ROLE_SPAWNED   => Encode::decode('UTF-8', '別に起こしたセッション');
 use constant ROLE_SUB       => Encode::decode('UTF-8', '補助役');
 use constant UNKNOWN_MODEL  => Encode::decode('UTF-8', '不明');
+# spec の3つの段階の名前(spec.json と依頼文の STAGE の名前)と、spec の審査役の agent_type
+use constant SPEC_STEPS    => [qw(requirements design tasks)];
+use constant REVIEWER_TYPE => 'spec-reviewer';
+# 新しい Issue のための spec の更新で承認を取り消したときの、revoked_for の「Issue #<N>」に続く文字
+use constant UPDATE_FOR    => Encode::decode('UTF-8', ' のための更新');
 
 my $JSON = JSON::PP->new->utf8->canonical;
 
@@ -93,6 +98,7 @@ sub build {
         totals     => $totals,
         stages     => stage_rows($ctx, $by_stage),
         models     => $models,
+        rework     => count_rework($ctx),
         unknown_turns => unknown_turns($ctx),
     };
     write_file("$o->{out}/report.json", $JSON->encode($report) . "\n");
@@ -1050,6 +1056,99 @@ sub num {
 sub is_num {
     my ($v) = @_;
     return defined $v && !ref $v && $v =~ /\A[0-9]+(?:\.[0-9]+)?\z/ ? 1 : 0;
+}
+
+# ---- 往復と手戻り ----------------------------------------------------------
+
+# 印と、main の spec.json の approval_history と、補助役の報告と、Issue の分割から、往復と手戻りの行を数える。
+# spec 無しの Issue では、spec に関わる5行を 0 にする
+sub count_rework {
+    my ($ctx) = @_;
+    my %zero = map { ($_ => 0) } @{ +SPEC_STEPS };
+    my %w = (
+        spec_review_rounds => {%zero}, owner_fix => {%zero}, spec_back => [], impl_spec_back => {%zero},
+        task_rejected => 0, same_failure => 0, switch_to_spec => 0,
+        split => $ctx->{split} ? JSON::PP::true : JSON::PP::false,
+    );
+    my @marks = grep { mark_in_issue($ctx, $_) } @{ $ctx->{marks} };
+    my %kind;
+    push @{ $kind{ $_->{kind} // '' } }, $_ for @marks;
+    $w{same_failure} = @{ $kind{'same-failure'} || [] };
+    my @subs = sort grep { defined parent_key($_) } keys %{ $ctx->{irec} };
+    # 補助役の報告の判定は、最後の verdict の行で決まる
+    for my $key (@subs) {
+        my ($v) = reverse grep { ($_->{k} // '') eq 'verdict' } timed_rows($ctx->{irec}{$key});
+        $w{task_rejected}++ if $v && defined $v->{value} && !ref $v->{value} && $v->{value} eq 'REJECTED';
+    }
+    return \%w unless $ctx->{spec}{has};
+    my %pairs;
+    for my $key (@subs) {
+        my $m = meta_of($ctx, $key);
+        my ($type, $st) = @$m{qw(agent_type stage)};
+        next unless defined $type && !ref $type && $type eq REVIEWER_TYPE && defined $st && !ref $st && exists $zero{$st};
+        # CYCLE と ROUND が無い依頼文の会話は、会話ごとに1回とする
+        $pairs{$st}{ is_num($m->{cycle}) && is_num($m->{round}) ? "$m->{cycle}/$m->{round}" : $key } = 1;
+    }
+    $w{spec_review_rounds}{$_} = scalar keys %{ $pairs{$_} || {} } for keys %zero;
+    my $json = $ctx->{spec}{json} || {};
+    my $hist = [ grep { ref $_ eq 'HASH' && defined $_->{stage} && !ref $_->{stage} && exists $zero{ $_->{stage} } }
+            @{ ref $json->{approval_history} eq 'ARRAY' ? $json->{approval_history} : [] } ];
+    for my $m (@{ $kind{'spec-fix'} || [] }) {
+        my $st = $m->{stage};
+        next unless defined $st && !ref $st && exists $zero{$st};
+        $w{owner_fix}{$st}++ unless revoked_then($json, $hist, $st, row_ts($m));
+    }
+    $w{switch_to_spec} = @{ $kind{'switch-to-spec'} || [] };
+    # Issue #<N> のための更新でない取り消しを、取り消した時刻ごとにまとめる
+    my %rank = map { (SPEC_STEPS->[$_] => $_) } 0 .. $#{ +SPEC_STEPS };
+    my ($from, $to) = ($ctx->{start_ts}, $ctx->{end_ts} // FAR);
+    my %grp;
+    for my $e (@$hist) {
+        my $r = iso_epoch($e->{revoked_at});
+        next unless defined $r && defined $from && $from <= $r && $r <= $to;
+        my $for = $e->{revoked_for};
+        next if defined $for && !ref $for && $for =~ /\AIssue #[0-9]+\Q${\ UPDATE_FOR}\E\z/;
+        $grp{$r}{ $e->{stage} } = 1;
+    }
+    for my $r (sort { $a <=> $b } keys %grp) {
+        my @st = sort { $rank{$a} <=> $rank{$b} } keys %{ $grp{$r} };
+        if ($grp{$r}{tasks}) {
+            $w{impl_spec_back}{ $st[0] }++;
+        } else {
+            push @{ $w{spec_back} }, { from => SPEC_STEPS->[ $rank{ $st[-1] } + 1 ], to => $st[0] };
+        }
+    }
+    return \%w;
+}
+
+# 印が Issue N のものか。印に Issue の番号があればその番号で、無ければ、印の会話と時刻とブランチから行と同じ決まりで決める
+sub mark_in_issue {
+    my ($ctx, $m) = @_;
+    my $t = row_ts($m);
+    return 0 unless defined $t;
+    my $i = issue_no($m->{issue});
+    return $i == $ctx->{n} ? 1 : 0 if defined $i;
+    my $s = defined $m->{session} && !ref $m->{session} ? $m->{session} : '';
+    my $b = defined $m->{branch} && !ref $m->{branch} ? $m->{branch} : undef;
+    my $x = issue_at($ctx, $s, $t, $b, 0);
+    return defined $x && $x == $ctx->{n} ? 1 : 0;
+}
+
+# 段階 $st が、時刻 $t に承認を取り消された状態にあるか。取り消された状態とは、approval_history にその段階の要素があり、
+# revoked_at が $t より前で、その段階の次の承認が $t より後にある(まだ承認されていない)状態である
+sub revoked_then {
+    my ($json, $hist, $st, $t) = @_;
+    my @mine = grep { $_->{stage} eq $st } @$hist;
+    my @approved = grep { defined } map { iso_epoch($_->{approved_at}) } @mine;
+    my $cur = ref $json->{approvals} eq 'HASH' && ref $json->{approvals}{$st} eq 'HASH' ? $json->{approvals}{$st}{approved_at} : undef;
+    push @approved, grep { defined } iso_epoch($cur);
+    for my $e (@mine) {
+        my $r = iso_epoch($e->{revoked_at});
+        next unless defined $r && $r < $t;
+        my ($next) = sort { $a <=> $b } grep { $_ > $r } @approved;
+        return 1 if !defined $next || $next > $t;
+    }
+    return 0;
 }
 
 # ---- 時刻と日付 ------------------------------------------------------------
