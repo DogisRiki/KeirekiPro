@@ -339,7 +339,7 @@
   - _要件: 1.3, 1.6, 1.7, 7.5, 8.3, 8.4_
   - _対象の部品: usage.sh session-context_
 
-- [ ] 5.6 さかのぼりの集計の対象を出すサブコマンドを作る
+- [x] 5.6 さかのぼりの集計の対象を出すサブコマンドを作る
 
   Claude は、usage.sh に、`backfill-list` を、design の「usage.sh」の節の `backfill-list` の7つの手順のとおりに足す。`backfill-list` は、`draft` と同じく、仕組みが main に入ったコミットを取り、コミットが無ければ gh を呼ばずに 2 で終わる。`backfill-list` は、`--repo` に実装のメモの「本体の作業フォルダの求め方」の箇条で求めたフォルダを渡して `extract.pl --all --wait` を呼び、手元の記録の `recv` と `stage` の行の Issue の番号と、`branch` の行の `name` と同じ `headRefName` を持つ PR が本文の行頭に書いた Issue の番号を、候補にする。`backfill-list` は、PR を、report.pl の手順「Issue の PR を集める」と同じ gh の呼び出しを1回だけ呼んで読み、`mergeCommit` が仕組みが main に入ったコミットと同じ PR が本文の行頭に書いた Issue を、候補に足す。`backfill-list` は、候補のうち、Issue を閉じる PR があり、仕組みを main に入れた Issue か、Issue を閉じる PR のうち最も遅くマージされたものが仕組みが main に入る前にマージされた Issue だけを残す。仕組みを main に入れた Issue に Issue を閉じる PR がまだ無いときは、`backfill-list` は、その番号を `waiting` に入れる。`backfill-list` は、手元の `issues/<N>.json` が出し済みで、`list_pending` も `proposals_pending` も無い Issue を除く。`backfill-list` は、残った Issue を、終了日の古い順に、終了日が同じなら番号の小さい順に並べる。終了日は、report.pl の手順「開始日と終了日」と同じく、Issue を閉じる PR のうち最も遅くマージされたものの `mergedAt` を、所有者の PC の時間帯の日付にしたものである。`backfill-list` は、`{"issues":[<番号>, ...],"waiting":[<番号>, ...]}` の1行を出して 0 で終わる。`git fetch` か gh が失敗したときと、`git merge-base --is-ancestor` が 0 と 1 のほかの値で終わったときは、`backfill-list` は 1 で終わる。Claude は、テスト `test-usage.sh` に、このタスクの場合を足す。このテストは、本物の extract.pl を、偽の gh で動かす。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `test-usage.sh` が、どれも失敗0件で終わる。shellcheck の指摘が0件である
