@@ -248,7 +248,7 @@
   - _依存: 3.3_
 
 - [ ] 5. 集計の入口のコマンドを作る
-- [ ] 5.1 記録の置き場所と、印と、案と所有者のサブコマンドを作る
+- [x] 5.1 記録の置き場所と、印と、案と所有者のサブコマンドを作る
 
   Claude は、部品「usage.sh」のうち、記録の置き場所(`<git-common-dir>/keirekipro-usage/`)の決め方、`--session <ID>`、終了コード(0・2・1 と日本語の1文)、`mark <spec-fix|same-failure|switch-to-spec> [--stage] [--issue]`、`pending`、`proposals`、`proposal <ID> filed|declined`、`owner yes|no` を、`.claude/scripts/usage/usage.sh` に、design の「usage.sh」の節のとおりに作る。`owner` は、`state.json` を読み直して `owner` の欄だけを替え、一時ファイルに書いてから名前を替えて置き換える。usage.sh は、JSON を読み書きするときに、bash の中から `perl -MJSON::PP` を呼ぶ。
 
@@ -495,3 +495,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 2. タスクで変えた領域の verify のスキル(`/verify-frontend` `/verify-backend` `/verify-terraform`)が、すべて成功している。
 3. Claude は、テストを飛ばす設定、アサーションの削除、カバレッジや lint の対象からの除外を足して、完了条件を満たしたように見せない。CI の escape-hatch の検査が、これらの追加を機械で見つける。
 4. Claude は、新しく書いたテストについて、テストの対象のコードを一時的に壊してテストが失敗することを確かめてから、コードを元に戻す。
+- 記録の置き場所の読み方: usage.sh の perl は、記録の置き場所の中のファイルを `glob` でなく `opendir` で探す。perl の `glob` は引数を空白で区切るので、記録の置き場所のパスに空白がある PC では、ファイルを1つも見つけられないためである。テストには、名前に空白があるリポジトリの場合を持たせる(タスク5.1)
