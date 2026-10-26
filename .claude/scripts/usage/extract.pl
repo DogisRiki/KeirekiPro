@@ -9,7 +9,10 @@
 # Claude Code が形を決めているもの(会話の記録の欄の名前と値)を読むのは、この部品だけである。
 # 抜き出した行は「この仕組みの中の値」で書き、会話の文・道具の引数・結果の中身は書かない。
 #
-# 終了コード: 0 読み終えた / 1 記録の置き場所に書けなかったか、データのファイル usage-config.json を読めなかった / 64 引数が違う
+# 終了コード: 0 読み終えた / 1 記録の置き場所に書けなかったか、データのファイル usage-config.json を読めなかったか、
+#   --wait で錠を待つ上限を超えた / 64 引数が違う
+# 1つの記録の鍵は、錠 <記録の置き場所>/locks/extract-<記録の鍵> を取ってから読む。錠を取れないときは、
+# --skip-locked ではその鍵を飛ばし、--wait では錠が外れるまで待つ。
 # 知らない形の行と壊れた行は飛ばし、飛ばした数を extract/<記録の鍵>.pos に残して 0 で終わる。
 # =====================================================================
 use strict;
@@ -20,6 +23,7 @@ use File::Path ();
 use Time::Local ();
 use File::Basename ();
 use File::Spec ();
+use Time::HiRes ();
 
 # 抜き出し方を変えたら上げる。.pos の版の番号が違う記録の鍵は、最初から読み直す
 use constant EXTRACT_VERSION => 1;
@@ -47,6 +51,13 @@ my $LOCAL_RE = qr/(?<![A-Za-z0-9_])(local_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 
 # データのファイルの wait_categories(待ちの分類)と stage_marks(段階の印の名前)。run_all が読む
 my ($WAIT_CATS, $STAGE_MARKS);
+
+# 錠を待つ上限、錠を古いとみなす時間、読んでいる間に錠の時刻を直す間隔(秒)。テストだけが環境変数で短くする
+my $LOCK_WAIT  = test_secs(q(KP_USAGE_TEST_LOCK_WAIT),  600);
+my $LOCK_STALE = test_secs(q(KP_USAGE_TEST_LOCK_STALE), 60);
+my $LOCK_TOUCH = test_secs(q(KP_USAGE_TEST_LOCK_TOUCH), 10);
+# 今持っている錠のディレクトリと、その時刻を最後に直した時刻
+my ($LOCK_DIR, $LOCK_TOUCHED);
 
 exit main(@ARGV);
 
@@ -102,7 +113,9 @@ sub run_all {
                 # .pos がある記録の鍵は、前にこのリポジトリの会話と見分けたもの
                 next unless -e "$exdir/$key.pos" || is_repo_record($path, \@bases);
                 $repo_keys{$key} = 1;
-                my $rc = read_record($path, $key, $exdir);
+                my $rc = with_lock($o, $key, sub {
+                    read_record($path, $key, $exdir) || rewrite_unknown("$exdir/$key.jsonl");
+                });
                 return $rc if $rc;
                 # 補助役の記録は、本体の会話の記録と同じフォルダの <sessionId>/subagents/ の下にある
                 my $sub = "$projects/$dir/$key/subagents";
@@ -112,13 +125,108 @@ sub run_all {
                 for my $af (@agents) {
                     (my $akey = "$key.$af") =~ s/\.jsonl\z//;
                     next if $seen{$akey}++;
-                    $rc = read_record("$sub/$af", $akey, $exdir);
+                    $rc = with_lock($o, $akey, sub {
+                        read_record("$sub/$af", $akey, $exdir) || rewrite_unknown("$exdir/$akey.jsonl");
+                    });
                     return $rc if $rc;
                 }
             }
         }
     }
+    # 会話の記録のファイルが消えた記録の鍵(.pos だけが残る鍵)も、unknown の行を書き直す
+    if (opendir(my $ed, $exdir)) {
+        my @gone = sort grep { defined && !$seen{$_} } map { /\A([A-Za-z0-9_.-]+)\.pos\z/ ? $1 : undef } readdir $ed;
+        closedir $ed;
+        for my $key (@gone) {
+            my $rc = with_lock($o, $key, sub { rewrite_unknown("$exdir/$key.jsonl") });
+            return $rc if $rc;
+        }
+    }
     return write_desktop($exdir, \%repo_keys);
+}
+
+# 記録の鍵の錠 locks/extract-<記録の鍵> を mkdir で取ってから $work を動かし、終わったら錠を外す
+# 錠を取れないときは、--skip-locked では飛ばして 0 を返し、--wait では待つ。待つ上限を超えたら 1 を返す
+# 錠の時刻が古いとみなす時間より古ければ、錠の持ち主が止まったとみなして取り直す(lib.sh の _kp_lock と同じ決まり)
+sub with_lock {
+    my ($o, $key, $work) = @_;
+    my $locks = "$o->{state}/locks";
+    if (!-d $locks) {
+        eval { File::Path::mkpath($locks) };
+        return write_failed($locks) unless -d $locks;
+    }
+    my $dir = "$locks/extract-$key";
+    my $start = Time::HiRes::time();
+    until (mkdir $dir) {
+        return write_failed($dir) unless $!{EEXIST};
+        my $mtime = (stat $dir)[9];
+        next if defined $mtime && time - $mtime > $LOCK_STALE && (rmdir($dir) || !-e $dir);
+        # 錠の持ち主が今外したときは、すぐに取り直す
+        next unless defined $mtime;
+        return 0 if $o->{skip_locked};
+        if (Time::HiRes::time() - $start >= $LOCK_WAIT) {
+            print STDERR "extract.pl: 錠が外れるのを待つ上限を超えた: $dir\n";
+            return 1;
+        }
+        Time::HiRes::sleep(0.2);
+    }
+    ($LOCK_DIR, $LOCK_TOUCHED) = ($dir, Time::HiRes::time());
+    # 止められたときも錠を残さない(残った錠は、古いとみなす時間のあとにほかの呼び出しが取り直す)
+    local $SIG{INT}  = sub { rmdir $dir; exit 1 };
+    local $SIG{TERM} = sub { rmdir $dir; exit 1 };
+    my $rc = eval { $work->() };
+    my $err = $@;
+    rmdir $dir;
+    $LOCK_DIR = undef;
+    die $err if $err;
+    return $rc;
+}
+
+# 錠を持って読んでいる間、錠の時刻を直す間隔ごとに、錠のディレクトリの時刻を今の時刻に直す
+# 大きな記録を読むのに古いとみなす時間より長くかかっても、ほかの呼び出しが錠を取り直さないようにするため
+sub keep_lock {
+    return unless defined $LOCK_DIR;
+    my $now = Time::HiRes::time();
+    return if $now - $LOCK_TOUCHED < $LOCK_TOUCH;
+    utime(undef, undef, $LOCK_DIR);
+    $LOCK_TOUCHED = $now;
+}
+
+# 抜き出した記録の unknown の行のうち、raw の値がいまの値の一覧(%TURN_FROM)にある行を、値の一覧のとおりに書き直す
+# 値の一覧に値を足したあと、古い extract.pl が書いた行と、会話の記録のファイルが消えた古い会話の行を数え直すため
+sub rewrite_unknown {
+    my ($exf) = @_;
+    open(my $in, '<:raw', $exf) or return 0;
+    my @all = <$in>;
+    close $in;
+    # 書き直した行が、ファイルのどこかにすでにある行と同じになったら、同じ行を2つ残さない
+    my %have = map { $_ => 1 } grep { /\n\z/ && index($_, '"from":"unknown"') < 0 } @all;
+    my (@lines, $changed);
+    for my $line (@all) {
+        keep_lock();
+        if ($line =~ /\n\z/ && index($line, '"from":"unknown"') >= 0) {
+            my $d = eval { $JSON->decode($line) };
+            if (ref $d eq 'HASH' && ($d->{k} // '') eq 'turn' && ($d->{from} // '') eq 'unknown'
+                && defined $d->{raw} && !ref $d->{raw} && defined $TURN_FROM{ $d->{raw} }) {
+                $d->{from} = $TURN_FROM{ delete $d->{raw} };
+                $line = $JSON->encode($d) . "\n";
+                $changed = 1;
+                next if $have{$line};
+            }
+        }
+        $have{$line} = 1;
+        push @lines, $line;
+    }
+    return 0 unless $changed;
+    my $tmp = "$exf.tmp.$$";
+    my $ok = open(my $out, '>:raw', $tmp);
+    $ok &&= print $out @lines;
+    $ok &&= close $out;
+    if (!$ok || !rename($tmp, $exf)) {
+        unlink $tmp;
+        return write_failed($exf);
+    }
+    return 0;
 }
 
 # デスクトップアプリの手元の記録の置き場所の候補(claude-code-sessions のフォルダ)
@@ -296,6 +404,7 @@ sub read_record {
     # 補助役の記録では、報告の候補(最後の assistant の行の文か SubagentHandback の input.message)を覚える
     @$st{qw(sub report)} = ($key =~ /\.agent-/ ? 1 : 0, undef);
     while (my $line = <$in>) {
+        keep_lock();
         # 改行の無い最後の行は書きかけなので、次の呼び出しで読む
         last unless $line =~ /\n\z/;
         $offset += length $line;
@@ -422,6 +531,7 @@ sub scan_back {
     open(my $fh, '<:raw', $path) or return undef;
     my ($end, $tail) = ($offset, '');
     while ($end > 0) {
+        keep_lock();
         my $n = $end < 65536 ? $end : 65536;
         $end -= $n;
         seek($fh, $end, 0) or last;
@@ -804,6 +914,13 @@ sub first_prompt {
 sub name_or_undef {
     my ($v) = @_;
     return defined $v && !ref $v && $v =~ /\A[A-Za-z0-9_.:\[\]-]{1,64}\z/ ? $v : undef;
+}
+
+# テストのための上書き。環境変数 $name が秒の数なら、その値を使う。無ければ design の値 $default を使う
+sub test_secs {
+    my ($name, $default) = @_;
+    my $v = $ENV{$name};
+    return defined $v && $v =~ /\A[0-9]+(?:\.[0-9]+)?\z/ ? $v : $default;
 }
 
 sub read_pos {

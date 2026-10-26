@@ -663,6 +663,90 @@ if [ "$IS_WIN" = 1 ]; then
     check "Windows では LOCALAPPDATA が無くても USERPROFILE の下の手元の記録を読む" "$(dpairs "$WORK/dstate3/extract/desktop.jsonl")" "$LA>$U1"
 fi
 
+printf '== 錠と、知らない値の行の書き直し\n'
+LHOME="$WORK/lhome"
+LP="$LHOME/.claude/projects/p"
+LSTATE="$WORK/lstate"
+LLOCK="$LSTATE/locks/extract-lk1"
+# lk1 は読むのに時間のかかる長い記録、lk2 と lk3 は短い記録
+mkrec "$LP/lk1.jsonl" "$REPO" 0
+i=0
+while [ "$i" -lt 80 ]; do
+    addline "$LP/lk1.jsonl" "$(printf '{"type":"user","sessionId":"lk1","timestamp":"2026-10-26T01:%02d:%02d.000Z","turnOrigin":"human","message":{"role":"user","content":"x"}}' $((i / 60)) $((i % 60)))"
+    i=$((i + 1))
+done
+mkrec "$LP/lk2.jsonl" "$REPO" 0
+mkrec "$LP/lk3.jsonl" "$REPO" 0
+# テストのための上書きは、呼び出しごとに環境変数で渡す(待つ上限・古いとみなす時間・時刻を直す間隔)
+lrun() { HOME="$LHOME" USERPROFILE="$LHOME" LOCALAPPDATA="$WORK/nolocal" perl "$EXTRACT" --state "$LSTATE" --all "$1" --repo "$REPO"; }
+# 1行読むたびに少し待つ extract.pl(読んでいる間の錠の扱いを確かめるため)
+slowrun() {
+    HOME="$LHOME" USERPROFILE="$LHOME" LOCALAPPDATA="$WORK/nolocal" perl -e '
+        BEGIN { no warnings "once"; *CORE::GLOBAL::readline = sub { select(undef, undef, undef, 0.1); CORE::readline($_[0]) } }
+        $0 = shift; do $0; die $@ if $@; exit 1' "$EXTRACT" --state "$LSTATE" --all --skip-locked --repo "$REPO"
+}
+exists() { if [ -e "$1" ]; then printf yes; else printf no; fi; }
+mkdir -p "$LLOCK"
+lrun --skip-locked
+check "錠を持つ呼び出しがあるとき、--skip-locked はその記録の鍵を飛ばし、ほかの鍵は読む" \
+    "$?/$(exists "$LSTATE/extract/lk1.pos")/$(exists "$LSTATE/extract/lk2.pos")" "0/no/yes"
+KP_USAGE_TEST_LOCK_WAIT=30 lrun --wait &
+wpid=$!
+sleep 2
+check "--wait は錠が外れるまで読まずに待つ" "$(exists "$LSTATE/extract/lk1.pos")" "no"
+rmdir "$LLOCK"
+wait "$wpid"
+check "--wait は錠が外れてから最後まで読む" \
+    "$?/$(jfile "$LSTATE/extract/lk1.pos" offset)/$(fsize "$LP/lk1.jsonl")/$(exists "$LLOCK")" \
+    "0/$(fsize "$LP/lk1.jsonl")/$(fsize "$LP/lk1.jsonl")/no"
+addline "$LP/lk3.jsonl" '{"type":"user","sessionId":"lk3","timestamp":"2026-10-26T00:02:00.000Z","turnOrigin":"human","message":{"role":"user","content":"x"}}'
+mkdir -p "$LSTATE/locks/extract-lk3"
+KP_USAGE_TEST_LOCK_WAIT=1 lrun --wait 2>/dev/null
+check "--wait は上限を超えると 1 で終わり、その鍵を読まない" "$?/$(kcount "$LSTATE/extract/lk3.jsonl" turn)" "1/0"
+touch -t 202001010000 "$LSTATE/locks/extract-lk3"
+lrun --skip-locked
+check "古いとみなす時間より古い錠は取り直して読み、読み終えたら錠を外す" \
+    "$?/$(kcount "$LSTATE/extract/lk3.jsonl" turn)/$(exists "$LSTATE/locks/extract-lk3")" "0/1/no"
+# 読み直させるために lk1 の抜き出した記録を消し、遅い呼び出しが錠を持って読んでいる間に、ほかの呼び出しを動かす
+rm -f "$LSTATE/extract/lk1.pos" "$LSTATE/extract/lk1.jsonl"
+KP_USAGE_TEST_LOCK_TOUCH=1 KP_USAGE_TEST_LOCK_STALE=3 slowrun &
+spid=$!
+i=0
+while [ ! -d "$LLOCK" ] && [ "$i" -lt 100 ]; do
+    sleep 0.1
+    i=$((i + 1))
+done
+sleep 4
+KP_USAGE_TEST_LOCK_STALE=3 lrun --skip-locked
+check "読んでいる間に錠の時刻が直り、古いとみなす時間を過ぎてもほかの呼び出しが錠を取り直さない" \
+    "$?/$(exists "$LLOCK")/$(exists "$LSTATE/extract/lk1.pos")" "0/yes/no"
+wait "$spid"
+check "錠を持って読んでいた呼び出しは最後まで読む" \
+    "$?/$(jfile "$LSTATE/extract/lk1.pos" offset)/$(kcount "$LSTATE/extract/lk1.jsonl" turn)/$(exists "$LLOCK")" \
+    "0/$(fsize "$LP/lk1.jsonl")/80/no"
+# 古い extract.pl が書いた unknown の行を手で作る。human は今の値の一覧にあり、brand_new は無い
+UH='{"from":"unknown","job":null,"k":"turn","raw":"human","ts":1792972980}'
+UN='{"from":"unknown","job":null,"k":"turn","raw":"brand_new","ts":1792973040}'
+addline "$LSTATE/extract/lk2.jsonl" "$UH"
+addline "$LSTATE/extract/lk2.jsonl" "$UN"
+addline "$LSTATE/extract/lk3.jsonl" "$UH"
+# lk3 には、UH を書き直した行と同じ行を、UH より後ろにも置く
+addline "$LSTATE/extract/lk3.jsonl" '{"from":"owner","job":null,"k":"turn","ts":1792972980}'
+rm "$LP/lk3.jsonl"
+mkdir -p "$LSTATE/locks/extract-lk2"
+lrun --skip-locked
+check "錠を取れない記録の鍵では unknown の行を書き直さない" "$(kfield "$LSTATE/extract/lk2.jsonl" turn 1 from)" "unknown"
+rmdir "$LSTATE/locks/extract-lk2"
+lrun --skip-locked
+check "--all で呼ぶと、raw の値が値の一覧にある unknown の行が値の一覧のとおりに書き直される" \
+    "$(kfield "$LSTATE/extract/lk2.jsonl" turn 1 from)/$(kfield "$LSTATE/extract/lk2.jsonl" turn 1 raw)/$(kfield "$LSTATE/extract/lk2.jsonl" turn 1 ts)" \
+    "owner/undef/1792972980"
+check "raw の値が値の一覧に無い unknown の行は書き直さない" \
+    "$(kfield "$LSTATE/extract/lk2.jsonl" turn 2 from)/$(kfield "$LSTATE/extract/lk2.jsonl" turn 2 raw)" "unknown/brand_new"
+check "元の会話の記録のファイルが無い記録の鍵でも、unknown の行が書き直される" \
+    "$(kfield "$LSTATE/extract/lk3.jsonl" turn 2 from)/$(kfield "$LSTATE/extract/lk3.jsonl" turn 2 raw)" "owner/undef"
+check "書き直した行と同じ行がファイルの後ろにあるときは、同じ行を2つ残さない" "$(kcount "$LSTATE/extract/lk3.jsonl" turn)" "2"
+
 printf '== 終了コード\n'
 printf 'x\n' >"$WORK/afile"
 perl "$EXTRACT" --state "$WORK/afile/state" --all --skip-locked --repo "$REPO" 2>/dev/null

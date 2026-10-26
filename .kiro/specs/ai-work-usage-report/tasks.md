@@ -83,7 +83,7 @@
   - _要件: 1.8, 2.1_
   - _対象の部品: extract.pl_
 
-- [ ] 2.6 錠と、知らない値の行の書き直しを作る
+- [x] 2.6 錠と、知らない値の行の書き直しを作る
 
   Claude は、extract.pl に、記録の鍵ごとの錠と、`--skip-locked` と `--wait` の扱いと、錠の中での `unknown` の行の書き直しを、design の「状態の持ち方」の欄のとおりに足す。extract.pl は、錠を `locks/extract-<記録の鍵>` の mkdir で取り、錠の時刻を10秒ごとに直し、60秒より古い錠を取り直す。`--wait` は、1つの記録の鍵につき600秒まで待つ。Claude は、テストのための上書き(実装のメモ)を足す。Claude は、テスト `test-extract.sh` に、このタスクの場合を足す。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `test-extract.sh` が、どれも失敗0件で終わる。テストのための上書きが無いときの待つ時間と上限が、design の値と同じである。shellcheck の指摘が0件である
@@ -483,3 +483,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 続きを読むときの途中の停止: extract.pl は、続きを読む前に、抜き出した記録の改行の無い最後の行を切り捨て、すでに書いた行と同じ行を書かない。ブランチは会話の記録の読み始めの位置より前から求める。止まったあとに読み直しても、抜き出した記録は一度に読んだときと同じになる。あとのタスクで抜き出す行の種類を足すときも、Claude は、同じ入力から同じ文字の列の行ができるように書く(同じ行かどうかを文字の列で見分けるため)
 - 道具の行と古い版の記録: Claude Code は、`permissionDecision` を道具の呼び出しの行ではなく結果の行(`tool_result` を持つ `user` の行)に書く(research.md の書き方と違う。2026-10-26 にこの PC の記録 570 ファイルで確かめた)。そのため extract.pl は、`tool` の行を結果の行を読んだときに書き、読み始めの位置より前の呼び出しは記録を後ろから読んで探す。`turnOrigin` を持たない `user` の行(v2.1.275 までの所有者の行、今の版にもある `task-notification` の行、補助役の記録の `coordinator` の行)は、同じ値を `origin.kind` に `-` でつないで書くので、extract.pl は `turnOrigin` が無いときに `origin.kind` を読む。`coordinator` は値の一覧に無いので `unknown` の行になる。report.pl を作るタスクは、補助役の記録のこの行で `unknown` の数が増えることに気を付ける。extract.pl は、データのファイル `usage-config.json` を読めないときは、抜き出した記録を作らずに 1 で終わる
 - デスクトップアプリの手元の記録: 確かめた置き場所は Windows の `%LOCALAPPDATA%\Claude-Data\claude_<id>\claude-code-sessions\<uuid>\<uuid>\local_<uuid>.json` だけである(2026-10-26 にこの PC の 119 ファイルで確かめた。`waiting-input/` の下の2つは `cliSessionId` を持たない)。公式の文書は置き場所を書いていないので、extract.pl はほかの OS の候補を持たない。ほかの OS では desktop.jsonl ができず、report.pl は別に起こしたセッションを結び付けられないので、design の決まりどおり「会話の記録の一部を読めなかった」と書く。desktop.jsonl には、今回このリポジトリの会話と見分けた鍵と、`.pos` がある鍵の対応を書く(会話の記録のファイルが消えても対応を残すため)。Git Bash の perl の `$^O` は `cygwin` なので、Windows だけのテストは `msys` と `cygwin` の両方で動かす
+- 錠と書き直し: 錠を待つ上限・古いとみなす時間・時刻を直す間隔(600秒・60秒・10秒)は、テストだけが環境変数 `KP_USAGE_TEST_LOCK_WAIT` `KP_USAGE_TEST_LOCK_STALE` `KP_USAGE_TEST_LOCK_TOUCH` で短くする。読むのに時間のかかる呼び出しは、テストで `CORE::GLOBAL::readline` を1行ごとに待つ関数に替えて作る。unknown の行の書き直しは、書き直した行と同じ行がファイルのどこかにあれば、書き直した行を残さない(確認役が合格のときに挙げた直しを、合格のあとに入れた)。本物の `turn` の行の `ts` は UNIX 秒の数なので、テストで手で作る行も数で書く。古い錠を2つの呼び出しが同時に取り直す競り合いは、lib.sh の錠と同じく残る
