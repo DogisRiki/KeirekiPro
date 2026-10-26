@@ -5,16 +5,17 @@ import { vi } from "vitest";
 
 /** 画面幅の判定(useMediaQuery)を、スマホ幅かどうかで固定する */
 const mockMobile = (isMobile: boolean) => {
-    vi.spyOn(window, "matchMedia").mockImplementation((query: string) => ({
-        matches: isMobile,
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(() => false),
-    }));
+    vi.spyOn(window, "matchMedia").mockImplementation(
+        (query: string) =>
+            ({
+                matches: isMobile,
+                media: query,
+                onchange: null,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(() => false),
+            }) as unknown as MediaQueryList,
+    );
 };
 
 describe("SectionTabs", () => {
