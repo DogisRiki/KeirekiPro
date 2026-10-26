@@ -6,7 +6,7 @@
 #   perl report.pl --state <記録の置き場所> --config <データのファイル> --issue <N> --out <下書きのディレクトリ>
 #                  [--list <一覧の行のファイル>] [--backfill]
 #     手元の記録(extract/ marks.jsonl durations/)と、gh で読む PR と、git で読む main の spec.json から
-#     Issue N の集計を作り、<下書きのディレクトリ> に report.json を書く。
+#     Issue N の集計を作り、<下書きのディレクトリ> に report.json と report.md と created_at を書く。
 #     --list は、github.pl list-read の出力を過去の行として受ける。--backfill は、さかのぼりの集計の印である
 #
 # report.pl は、gh を読み取りだけに使い、GitHub に書かない。所見を書かない。
@@ -113,8 +113,13 @@ sub build {
         uncountable     => $uncountable,
         partial_records => $partial ? JSON::PP::true : JSON::PP::false,
         unknown_turns => unknown_turns($ctx),
+        backfill   => $o->{backfill} ? JSON::PP::true : JSON::PP::false,
+        prices     => { map { ($_ => ref $ctx->{cfg}{prices} eq 'HASH' ? $ctx->{cfg}{prices}{$_} : undef) } qw(source checked_on) },
     };
     write_file("$o->{out}/report.json", $JSON->encode($report) . "\n");
+    write_file("$o->{out}/report.md", Encode::encode('UTF-8', report_md($report, $ctx)));
+    # usage.sh の publish が下書きの新しさを確かめるための、下書きを作った時刻(秒)
+    write_file("$o->{out}/created_at", time() . "\n");
     return 0;
 }
 
@@ -1238,7 +1243,10 @@ sub uncountable_rows {
     my ($ctx, $w) = @_;
     my %null;
     my $sys = $ctx->{system_ts};
-    if (!defined $sys || $ctx->{start_ts} < $sys || unmarked($ctx)) {
+    # 注記に使うので、2つのときのどちらに当たるかを置いておく
+    $ctx->{before_system} = !defined $sys || $ctx->{start_ts} < $sys ? 1 : 0;
+    $ctx->{unmarked} = unmarked($ctx);
+    if ($ctx->{before_system} || $ctx->{unmarked}) {
         $null{$_} = 1 for qw(owner_fix same_failure switch_to_spec);
     }
     my $partial = partial_records($ctx);
@@ -1325,6 +1333,137 @@ sub unlinked_spawn {
         $cand[$i] = undef;
     }
     return 0;
+}
+
+# ---- 集計のコメントの本文 ----------------------------------------------------
+
+# 集計のコメントの本文(見出し「## AIの作業の集計」から「### 注記」まで)を、design の「集計のコメント」の見本の形で作る。
+# 文字の列で返す。注記のうち、仕組みが入る前に受け持ったときと、印の残らない会話があったときは、$ctx の印で決める
+sub report_md {
+    my ($r, $ctx) = @_;
+    my $t = $r->{totals};
+    my @unknown = @{ $t->{usd_unknown_models} || [] };
+    my $sum_usd = usd_text($t->{usd}) . (@unknown ? ja('(価格が分からないモデルを除く)') : '');
+    my $sep = ja('、');
+    my @out = (
+        ja('## AIの作業の集計'), '',
+        table([ ja('開始日'), ja('終了日'), 'spec', 'PR' ],
+            [ $r->{start_date} // '', $r->{end_date} // '', ja($r->{spec} ? 'あり' : '無し'),
+                join($sep, map {"#$_"} sort { $a <=> $b } @{ $r->{prs} }) ]),
+        '', ja('### 全体の合計'), '',
+        table([ ja('項目'), ja('値') ],
+            [ ja('AIの作業時間'), hm($t->{work_sec}) ],
+            [ ja('トークン数'), commas($t->{tokens}) ],
+            [ ja('使用料'), $sum_usd ],
+            [ ja('使う量の上限で止まった回数'), $t->{limit_count} // 0 ],
+            [ ja('使う量の上限で止まっていた時間'), hm($t->{limit_sec}) ]),
+        '', ja('### 段階ごと'), '',
+        table([ map { ja($_) } qw(段階 AIの作業時間 そのうち待ち時間 審査役などが同時に動いた時間 トークン数 使用料) ],
+            (map { [ $_->{name}, hm($_->{work_sec}), hm($_->{wait_sec}), hm($_->{concurrent_sec}), commas($_->{tokens}), usd_text($_->{usd}) ] }
+                @{ $r->{stages} }),
+            [ ja('合計'), hm($t->{work_sec}), hm($t->{wait_sec}), hm($t->{concurrent_sec}), commas($t->{tokens}), $sum_usd ]),
+        '', ja('### モデルごと'), '',
+        table([ map { ja($_) } qw(モデル 役割 入力 キャッシュの書き込み キャッシュの読み込み 出力 使用料) ],
+            map { [ $_->{model}, $_->{role}, (map { commas($_) } @$_{qw(in cw cr out)}),
+                    defined $_->{usd} ? usd_text($_->{usd}) : ja('価格が分からない') ] } @{ $r->{models} }),
+        '', ja('### 往復と手戻り'), '',
+        table([ ja('項目'), ja('回数') ], rework_md($r)),
+        '', ja('### 価格'), '',
+        ja('使用料は、') . ($r->{prices}{source} // '') . ja(' の公表価格で換算した。価格を確かめた日は ')
+            . ($r->{prices}{checked_on} // '') . ja(' である。'),
+    );
+    my @notes;
+    push @notes, ja('この集計は、この Issue が終わったあとに、さかのぼって作った。Claude Code は、最後に動いてから30日たった'
+            . '会話の記録を消すので、この集計には、消えた会話の分が入っていないことがある。') if $r->{backfill};
+    push @notes, ja('この Issue は、仕組みが入る前に着手した。「数えられない」と書いた項目は、数えるための印を作業の途中で残す'
+            . '仕組みが、着手のときにまだ無かった項目である。') if $ctx->{before_system};
+    push @notes, ja('会話の記録の一部を読めなかった。Claude は、この Issue の作業の一部を、仕組みが入る前の設定で始めた会話で行った。'
+            . '「数えられない」と書いた項目は、その会話では、数えるための印が残らなかった項目である。') if $ctx->{unmarked};
+    push @notes, ja('会話の記録の一部を読めなかった。仕組みは、この集計を、読めた分だけで数えた。そのため、作業時間とトークン数と'
+            . '使用料は、実際より少ないことがある。往復と手戻りの表の「数えられない」の項目は、読めなかった会話から数える項目である。')
+        if $r->{partial_records};
+    push @notes, join($sep, @unknown) . ja('の公表価格が分からないため、仕組みは、このモデルの使用料を数えていない。'
+            . '全体の合計と段階ごとの表の使用料は、このモデルの分を除いた額である。') if @unknown;
+    push @notes, ja('会話が再開したきっかけのうち、仕組みが種類を見分けられなかったものが ') . $r->{unknown_turns}
+        . ja('回あった。仕組みは、見分けられなかったきっかけの前の時間を、外の仕組みを待っていた時間として、作業時間と待ち時間に'
+            . '数えた。そのため、作業時間と待ち時間は、実際より長いことがある。') if $r->{unknown_turns};
+    push @out, '', ja('### 注記'), '', map {"- $_"} @notes if @notes;
+    return join("\n", @out) . "\n";
+}
+
+# 往復と手戻りの表の行。spec 無しの Issue では、spec に関わる5行を書かない
+sub rework_md {
+    my ($r) = @_;
+    my $w = $r->{rework};
+    my %step = (requirements => ja('要件'), design => ja('設計'), tasks => ja('タスク'));
+    my $sep = ja('、');
+    my $steps = sub {
+        my ($v) = @_;
+        return join($sep, map {"$step{$_} $v->{$_}"} @{ +SPEC_STEPS });
+    };
+    my $back = sub {
+        my ($v) = @_;
+        return 0 unless @$v;
+        my (@pairs, %n);
+        for my $e (@$v) {
+            my $p = $step{ $e->{from} } . ja('から') . $step{ $e->{to} } . ja('へ');
+            push @pairs, $p unless $n{$p}++;
+        }
+        return scalar(@$v) . ja('(') . join($sep, map {"$_ $n{$_}"} @pairs) . ja(')');
+    };
+    my $count = sub { return $_[0] };
+    my @lines = (
+        [ 1, 'spec の審査役との往復',                                            'spec_review_rounds', $steps ],
+        [ 1, '承認の前に、所有者が spec の直しを求めた',                         'owner_fix',          $steps ],
+        [ 1, 'spec を作る途中で、前の段階に戻って直した',                        'spec_back',          $back ],
+        [ 1, '実装の途中で、spec に戻って直した',                                'impl_spec_back',     $steps ],
+        [ 0, '実装したコードに、タスクごとの確認役が問題を見つけ、コードを直した', 'task_rejected',      $count ],
+        [ 0, 'PR の Codex レビューとの往復',                                     'codex_rounds',       $count ],
+        [ 0, 'PR を出したあと、CI の自動チェックが失敗し、コードを直した',       'ci_fix',             $count ],
+        [ 0, '同じ失敗を3回続けて直せず、AI が作業を止めて所有者に報告した',     'same_failure',       $count ],
+        [ 0, '実装の途中で、Issue を分けた',                                     'split',              sub { ja($_[0] ? '有' : '無し') } ],
+        [ 1, 'spec 無しで始め、実装の途中で spec に切り替えた',                  'switch_to_spec',     $count ],
+        [ 0, '200行の検査で PR が止まった',                                      'size_check_stops',   $count ],
+        [ 0, '自動レビューが、Issue の決めた方式から外れたとして PR を止めた',   'decided_method_stops', $count ],
+    );
+    return map {
+        my ($spec_only, $label, $key, $fmt) = @$_;
+        $spec_only && !$r->{spec} ? () : [ ja($label), defined $w->{$key} ? $fmt->($w->{$key}) : ja('数えられない') ];
+    } @lines;
+}
+
+# Markdown の表の行。見出しの行と、区切りの行と、値の行を返す
+sub table {
+    my ($head, @rows) = @_;
+    return ('| ' . join(' | ', @$head) . ' |', '|' . join('|', map {'---'} @$head) . '|', map { '| ' . join(' | ', @$_) . ' |' } @rows);
+}
+
+# 時間(秒)を、四捨五入した分で「<時>時間<分>分」か「<分>分」と書く
+sub hm {
+    my ($sec) = @_;
+    my $m = int(($sec // 0) / 60 + 0.5);
+    return $m >= 60 ? int($m / 60) . ja('時間') . ($m % 60) . ja('分') : $m . ja('分');
+}
+
+# 数を、整数に四捨五入して3桁ごとに「,」で区切って書く
+sub commas {
+    my ($n) = @_;
+    my $s = sprintf('%.0f', $n // 0);
+    1 while $s =~ s/\A(-?[0-9]+)([0-9]{3})/$1,$2/;
+    return $s;
+}
+
+# 使用料(米ドル)を、小数2桁に四捨五入して「$」に続けて書く
+sub usd_text {
+    my ($u) = @_;
+    # github.pl の fmt_usd と同じ四捨五入にして、一覧の行と1セントも食い違わないようにする
+    my $c = int(($u // 0) * 100 + 0.5 + 1e-6);
+    return '$' . commas(int($c / 100)) . sprintf('.%02d', $c % 100);
+}
+
+sub ja {
+    my ($s) = @_;
+    return Encode::decode('UTF-8', $s);
 }
 
 # ---- 時刻と日付 ------------------------------------------------------------

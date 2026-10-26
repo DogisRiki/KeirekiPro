@@ -223,7 +223,7 @@
   - _要件: 1.8, 2.8, 6.3, 6.4_
   - _対象の部品: report.pl_
 
-- [ ] 4.8 集計のコメントの本文を書き出す
+- [x] 4.8 集計のコメントの本文を書き出す
 
   Claude は、report.pl の出力のうち、`report.md` と、`report.json` の残りの欄(`v` `prices` `backfill`)と、下書きを作った時刻のファイル `created_at` を、design の「データの形」の節のとおりに足す。Claude は、`report.md` の見出しと表の列と行の並びを design の「集計のコメント」の見本に合わせ、数を「数の書き方」の形で書き、注記を注記の箇条の順に並べる。タスク5.4の `publish` は、`created_at` で下書きの新しさを確かめる。report.pl は、`--backfill` を付けて呼ばれたときだけ `backfill` を真にし、注記の最初に、さかのぼりの集計の注記を書く。Claude は、テスト `test-report.sh` に、このタスクの場合を足す。
   - 完了の確かめ方: 3つの環境(実装のメモ)の `test-report.sh` が、どれも失敗0件で終わる。shellcheck の指摘が0件である
@@ -485,6 +485,7 @@
 - 印の Issue と時刻: report.pl は、marks.jsonl の印を、`issue` があればその番号で、無ければ印の `session` と `ts` と `branch` を行と同じ決まり(`issue_at`)に通して Issue に決める(`mark_in_issue`)。`ts` は UNIX 秒として読むので、タスク5.1の `usage.sh mark` は `ts` を UNIX 秒で書く(ISO の形で書くと、印がすべて数えられない)。spec の有無を決める `spec_info` の `mark_of_issue` は、番号かブランチで決める古い形のままで、次に report.pl のこの部分を直すときに `mark_in_issue` にそろえる(タスク4.5)
 - テストの偽の GitHub の PR のコミットとコメントと検査の結果: test-report.sh の `mkdb` の `withc` で PR にコミットとコメントを足し、`runs` でコミットごとの検査の結果を置く。report.pl は Issue の PR ごとに `gh pr view` を呼ぶので、コミットの無い PR では検査の結果を読まない。`mkdb` の一重引用符の中に `$_` を書くと shellcheck が SC2016 を出すので、`map` を使わずに値を1つずつ書く(タスク4.6)
 - 読めなかった記録の見つけ方の絞り込み: `durations/` のファイルは Issue に結び付かないので、report.pl は、最後に書いた時刻が Issue の開始の時刻以後のファイルだけを、記録の無いセッションの見つけ方に使う。別に起こしたセッションの会話をブランチで結び付けるときは、出来事より後に始まり、Issue のブランチで動いた本体の会話に、1つずつ結び付ける(タスク4.7)
+- 使用料の書き方: report.pl の report.md と github.pl の一覧の行は、どちらも、使用料を1セント単位の整数にしてから四捨五入する(`int($usd * 100 + 0.5 + 1e-6)`)。`sprintf('%.2f')` は半セントちょうどの値を切り捨てることがあり、2つの書き方が1セント食い違う(タスク4.8)
 
 ## 完了条件(全タスク共通)
 
