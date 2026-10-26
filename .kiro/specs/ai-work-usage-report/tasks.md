@@ -371,7 +371,7 @@
   - _対象の部品: usage.sh_
 
 - [ ] 6. 集計を出す手順のスキルを書く
-- [ ] 6.1 usage-report のスキルを書く (並行可)
+- [x] 6.1 usage-report のスキルを書く (並行可)
 
   Claude は、部品「usage-report のスキル」を、`.claude/skills/usage-report/SKILL.md` に、design の「usage-report のスキル」の節のとおりに書く。スキルは、5つの時点(マージを見届けたとき、次の会話で出すとき、案を尋ねるとき、所有者かを尋ねるとき、さかのぼりの集計を頼まれたとき)と、design の「usage-report のスキル」の節の、集計を出す「手順」の全部と、「さかのぼりの集計を頼まれたとき」の手順の全部と、design の「データの形」の節の「所見」の決まりと見本を載せる。「さかのぼりの集計を頼まれたとき」の手順では、Claude が、`usage.sh backfill-list` を呼び、出力の番号の順に `usage.sh draft <N> --backfill` と `usage.sh publish` を呼ぶ。この手順では、`draft` か `publish` が 1 で終わったときと、`publish` の出力に書けなかった書き込みがあったときに、Claude が残りの Issue を集計せずに止まる。この手順は、`waiting` の番号を会話の相手に書くことと、案を Issue ごとでなくまとめて、最後の `publish` の出力の `owner` で扱うことを含む。Claude は、スキルの文を `.kiro/settings/rules/owner-writing.md` の決まりで書く。
   - 完了の確かめ方: SKILL.md に、5つの時点の見出しと、`usage.sh draft` `publish` `proposals` `proposal` `owner` `backfill-list` と `draft <N> --backfill` を呼ぶ手順と、所見の決まりと見本がある。frontmatter の `name` が `usage-report` で、`description` が5つの時点を挙げている。frontmatter は、SKILL.md の先頭の `---` で囲んだ、スキルの名前と説明を書く欄である
