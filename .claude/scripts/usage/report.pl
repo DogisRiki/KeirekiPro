@@ -24,6 +24,7 @@ use File::Temp ();
 use Time::Local ();
 use POSIX ();
 use Scalar::Util ();
+use Encode ();
 
 # 仕組みが main に入ったコミットを見分けるデータのファイルの、リポジトリの最上位からの場所
 use constant CONFIG_PATH => '.claude/scripts/usage/usage-config.json';
@@ -31,6 +32,18 @@ use constant CONFIG_PATH => '.claude/scripts/usage/usage-config.json';
 use constant SPECS_DIR => '.kiro/specs';
 # 開始と終了の時刻が無いときの、果ての時刻
 use constant FAR => 9e18;
+# 段階と役割の名前。データのファイルから読んだ名前と比べるので、文字の列にしておく
+use constant SPEC_STAGES => [ map { Encode::decode('UTF-8', $_) }
+        qw(着手の判断 要件 要件の審査 設計 設計の審査 タスク タスクの審査 実装), '実装中の spec の直し', '出荷とレビュー対応' ];
+use constant NOSPEC_STAGES => [ map { Encode::decode('UTF-8', $_) } qw(着手の判断 実装 出荷とレビュー対応) ];
+use constant SPEC_MAKING => { map { (Encode::decode('UTF-8', $_), 1) } qw(要件 要件の審査 設計 設計の審査 タスク タスクの審査) };
+use constant OTHER_STAGE    => Encode::decode('UTF-8', 'その他');
+use constant IMPL_STAGE     => Encode::decode('UTF-8', '実装');
+use constant SPEC_FIX_STAGE => Encode::decode('UTF-8', '実装中の spec の直し');
+use constant ROLE_MAIN      => Encode::decode('UTF-8', '本体の会話');
+use constant ROLE_SPAWNED   => Encode::decode('UTF-8', '別に起こしたセッション');
+use constant ROLE_SUB       => Encode::decode('UTF-8', '補助役');
+use constant UNKNOWN_MODEL  => Encode::decode('UTF-8', '不明');
 
 my $JSON = JSON::PP->new->utf8->canonical;
 
@@ -67,6 +80,9 @@ sub build {
         print STDERR "report.pl: この PC に Issue #$n の記録が無い\n";
         return 2;
     }
+    my $lines = stage_lines($ctx);
+    my ($totals, $by_stage) = count_times($ctx, $lines);
+    my $models = count_tokens($ctx, $lines, $totals, $by_stage);
     my $report = {
         v          => 1,
         issue      => $n,
@@ -74,7 +90,9 @@ sub build {
         spec       => $ctx->{spec}{has} ? JSON::PP::true : JSON::PP::false,
         start_date => local_date($ctx->{start_ts}),
         end_date   => local_date($ctx->{end_ts}),
-        totals     => count_times($ctx),
+        totals     => $totals,
+        stages     => stage_rows($ctx, $by_stage),
+        models     => $models,
         unknown_turns => unknown_turns($ctx),
     };
     write_file("$o->{out}/report.json", $JSON->encode($report) . "\n");
@@ -571,11 +589,17 @@ sub mark_of_issue {
 # Issue N の作業時間、待ち時間、同時に動いた時間、上限で止まった回数と時間(秒)を数える。
 # 会話ごとの動いていた区間を重ね、1つ以上の会話が動いていた時間を作業時間、2つ以上の会話が動いていた時間を
 # 同時に動いた時間、動いている会話がすべて待ちの区間にあった時間を待ち時間とする。
-# 上限で止まった区間は、すべての会話の区間を重ね、重なる区間と接する区間を1つにまとめて数える
+# 上限で止まった区間は、すべての会話の区間を重ね、重なる区間と接する区間を1つにまとめて数える。
+# 段階ごとの時間は、その時刻に動いている会話のうち、本体の会話か、本体の会話が無ければ最も早く始まった会話の段階に入れる。
+# 全体の時間と、段階の名前ごとの時間を返す
 sub count_times {
-    my ($ctx) = @_;
-    my (@ev, @limits);
+    my ($ctx, $lines) = @_;
+    my (@ev, @limits, %main, %start);
     for my $key (sort keys %{ $ctx->{irec} }) {
+        $main{$key} = !defined parent_key($key) && !$ctx->{spawned}{$key} ? 1 : 0;
+        ($start{$key}) = sort { $a <=> $b } grep { defined } map { row_ts($_) } @{ $ctx->{irec}{$key} };
+        # 段階が変わる時刻で、区間を切る
+        push @ev, map { [ $_->[0], 0, '', $key ] } grep { $_->[0] > -FAR } @{ $lines->{$key} || [] };
         my @all = timed_rows($ctx->{rec}{$key});
         # 知らせの元の仕事の種類。道具の結果の行の job と job_kind で決める
         my %jobs = map { ($_->{job}, $_->{job_kind} // '') }
@@ -589,25 +613,33 @@ sub count_times {
             }
             if (@run) {
                 my ($spans, $lim) = run_spans($ctx, \@run, \%jobs);
-                push @ev, map { [ $_->[0], 1, $_->[2] ], [ $_->[1], -1, $_->[2] ] } @$spans;
+                push @ev, map { [ $_->[0], 1, $_->[2], $key ], [ $_->[1], -1, $_->[2], $key ] } @$spans;
                 push @limits, @$lim;
             }
             @run = ();
         }
     }
     my %tot = (work_sec => 0, wait_sec => 0, concurrent_sec => 0, limit_count => 0, limit_sec => 0);
+    my %by;
     # 同じ時刻の出入りをすべて済ませてから、次の時刻までの長さを足す
-    my ($active, $waiting, $prev) = (0, 0);
+    my (%on, $prev);
     for my $e (sort { $a->[0] <=> $b->[0] } @ev) {
-        my ($t, $d, $label) = @$e;
+        my ($t, $d, $label, $key) = @$e;
         if (defined $prev && $t > $prev) {
-            my $len = $t - $prev;
-            $tot{work_sec} += $len if $active >= 1;
-            $tot{concurrent_sec} += $len if $active >= 2;
-            $tot{wait_sec} += $len if $active >= 1 && $waiting == $active;
+            my @act = grep { $on{$_}{think} || $on{$_}{wait} } sort keys %on;
+            if (@act) {
+                my $len = $t - $prev;
+                my ($rep) = sort { $main{$b} <=> $main{$a} || $start{$a} <=> $start{$b} || $a cmp $b } @act;
+                my $stage = stage_at($lines->{$rep}, $prev) // OTHER_STAGE;
+                my $think = grep { $on{$_}{think} } @act;
+                for my $h (\%tot, $by{$stage} //= {}) {
+                    $h->{work_sec} += $len;
+                    $h->{concurrent_sec} += $len if @act >= 2;
+                    $h->{wait_sec} += $len unless $think;
+                }
+            }
         }
-        $active += $d;
-        $waiting += $d if $label eq 'wait';
+        $on{$key}{$label} += $d if $d;
         $prev = $t;
     }
     my $cur;
@@ -621,7 +653,7 @@ sub count_times {
     }
     push_limit(\%tot, $cur) if $cur;
     $tot{$_} = int($tot{$_} + 0.5) for keys %tot;
-    return \%tot;
+    return (\%tot, \%by);
 }
 
 sub push_limit {
@@ -780,6 +812,244 @@ sub prev_point {
 sub is_limit_turn {
     my ($r) = @_;
     return ($r->{k} // '') eq 'turn' && ($r->{from} // '') eq 'limit' ? 1 : 0;
+}
+
+# ---- 段階とトークン数 ------------------------------------------------------
+
+# 会話ごとに、段階が変わる時刻と段階の名前の組 [時刻, 名前] を、時刻の順に並べる。
+# 本体の会話と別に起こしたセッションは、段階の印と、spec 無しの Issue の claim で段階を変える。
+# spec の審査役と書き方の点検役は、依頼文の STAGE の段階、ほかの補助役は、起動した時刻の親の会話の段階を通して使う。
+# Issue に kiro-impl の段階の印が現れたあとの、spec を作る段階は、実装中の spec の直しにする
+sub stage_lines {
+    my ($ctx) = @_;
+    my $irec = $ctx->{irec};
+    my $claim_impl = !$ctx->{spec}{json} || $ctx->{spec}{switched};
+    my $impl;
+    for my $r (map { @$_ } values %$irec) {
+        next unless ($r->{k} // '') eq 'stage' && ($r->{name} // '') eq 'kiro-impl';
+        my $t = row_ts($r);
+        $impl = $t if defined $t && (!defined $impl || $t < $impl);
+    }
+    my $fix = sub {
+        my ($name, $t) = @_;
+        return defined $name && SPEC_MAKING->{$name} && defined $impl && $t > $impl ? SPEC_FIX_STAGE : $name;
+    };
+    my %lines;
+    for my $key (sort grep { !defined parent_key($_) } keys %$irec) {
+        my @l;
+        for my $r (timed_rows($irec->{$key})) {
+            my ($k, $t) = ($r->{k} // '', row_ts($r));
+            if ($k eq 'stage') {
+                push @l, [ $t, $fix->(stage_of_mark($ctx, $r), $t) // OTHER_STAGE ];
+            } elsif ($k eq 'recv' && $claim_impl && ($r->{how} // '') eq 'claim') {
+                push @l, [ $t, IMPL_STAGE ];
+            }
+        }
+        $lines{$key} = \@l;
+    }
+    my $types = $ctx->{cfg}{roles}{agent_types} || {};
+    my $review = $ctx->{cfg}{stage_marks}{'spec-review'};
+    for my $key (sort grep { defined parent_key($_) } keys %$irec) {
+        my ($meta) = grep { ($_->{k} // '') eq 'meta' } @{ $irec->{$key} };
+        my ($first) = sort { $a <=> $b } grep { defined } map { row_ts($_) } @{ $irec->{$key} };
+        next unless defined $first;
+        my ($type, $st) = $meta ? @$meta{qw(agent_type stage)} : ();
+        my $name;
+        if (defined $type && !ref $type && exists $types->{$type} && defined $st && !ref $st && ref $review eq 'HASH') {
+            $name = $fix->($review->{$st}, $first);
+        } else {
+            $name = stage_at($lines{ parent_key($key) }, $first);
+        }
+        $lines{$key} = [ [ -FAR, $name // OTHER_STAGE ] ];
+    }
+    return \%lines;
+}
+
+# 段階の印の段階の名前。stage_marks の名前と同じ名前か、* で終わる名前の頭に当たる名前を使う。
+# spec-review は、引数の段階の名前で決める。どの段階にも当たらなければ undef
+sub stage_of_mark {
+    my ($ctx, $r) = @_;
+    my $marks = $ctx->{cfg}{stage_marks} || {};
+    my $name = $r->{name} // '';
+    my $v;
+    if (exists $marks->{$name}) {
+        $v = $marks->{$name};
+    } else {
+        for my $m (sort keys %$marks) {
+            next unless $m =~ /\A(.+)\*\z/;
+            my $head = $1;
+            if (index($name, $head) == 0 && length $name > length $head) {
+                $v = $marks->{$m};
+                last;
+            }
+        }
+    }
+    $v = defined $r->{spec_stage} && !ref $r->{spec_stage} ? $v->{ $r->{spec_stage} } : undef if ref $v eq 'HASH';
+    return defined $v && !ref $v ? $v : undef;
+}
+
+# 段階が変わる時刻の並び $l のうち、時刻 $t 以前で最も後の段階の名前。無ければ undef
+sub stage_at {
+    my ($l, $t) = @_;
+    return undef unless $l && @$l;
+    my ($lo, $hi) = (0, $#$l);
+    return undef if $l->[0][0] > $t;
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi + 1) / 2);
+        if ($l->[$mid][0] <= $t) {
+            $lo = $mid;
+        } else {
+            $hi = $mid - 1;
+        }
+    }
+    return $l->[$lo][1];
+}
+
+# Issue N の応答のトークン数と使用料を、すべての会話をまたいで message.id で重なりを除いてから足す。
+# 全体の合計($tot)と段階ごとの合計($by)に足し、モデルと役割の組ごとの行を、使用料の大きい順に返す
+sub count_tokens {
+    my ($ctx, $lines, $tot, $by) = @_;
+    my @msgs;
+    for my $key (sort keys %{ $ctx->{irec} }) {
+        push @msgs, map { [ row_ts($_), $key, $_ ] } grep { ($_->{k} // '') eq 'msg' && defined row_ts($_) } @{ $ctx->{irec}{$key} };
+    }
+    my (%seen, %mod, %unknown, $usd);
+    $tot->{tokens} = 0;
+    for my $m (sort { $a->[0] <=> $b->[0] || $a->[1] cmp $b->[1] } @msgs) {
+        my ($t, $key, $r) = @$m;
+        my $id = $r->{id};
+        if (defined $id && !ref $id) {
+            next if $seen{$id}++;
+        }
+        my %c = map { ($_ => num($r->{$_})) } qw(in cw5 cw1h cr out ws);
+        my $model = $r->{model};
+        $model = meta_of($ctx, $key)->{model} unless defined $model && !ref $model && length $model;
+        $model = UNKNOWN_MODEL unless defined $model && !ref $model && length $model;
+        my $u = row_usd($ctx, $model, $r, \%c);
+        my $row = $mod{$model}{ role_of($ctx, $key) } //= { in => 0, cw => 0, cr => 0, out => 0, usd => 0 };
+        $row->{in} += $c{in};
+        $row->{cw} += $c{cw5} + $c{cw1h};
+        $row->{cr} += $c{cr};
+        $row->{out} += $c{out};
+        if (defined $u) {
+            $row->{usd} += $u;
+            $usd += $u;
+        } else {
+            $row->{unknown} = 1;
+            $unknown{$model} = 1;
+        }
+        my $n = $c{in} + $c{cw5} + $c{cw1h} + $c{cr} + $c{out};
+        my $stage = $by->{ stage_at($lines->{$key}, $t) // OTHER_STAGE } //= {};
+        $stage->{tokens} += $n;
+        $stage->{usd} += $u // 0;
+        $tot->{tokens} += $n;
+    }
+    $tot->{usd} = usd_round($usd // 0);
+    $tot->{usd_unknown_models} = [ sort keys %unknown ];
+    my @rows;
+    for my $model (keys %mod) {
+        for my $role (keys %{ $mod{$model} }) {
+            my $x = $mod{$model}{$role};
+            push @rows, { model => $model, role => $role, (map { ($_ => $x->{$_}) } qw(in cw cr out)),
+                usd => $x->{unknown} ? undef : $x->{usd} };
+        }
+    }
+    @rows = sort { ($b->{usd} // -1) <=> ($a->{usd} // -1) || $a->{model} cmp $b->{model} || $a->{role} cmp $b->{role} } @rows;
+    $_->{usd} = usd_round($_->{usd}) for grep { defined $_->{usd} } @rows;
+    return \@rows;
+}
+
+# 1つの応答の使用料(米ドル)。価格がデータのファイルに無いモデルは undef。
+# fast の行は fast の価格、入力・書き込み・読み込みの合計が long_input の over_tokens を超える行は long_input の価格を使い、
+# us の行は geo_us_multiplier を掛け、Web 検索の分を足す
+sub row_usd {
+    my ($ctx, $model, $r, $c) = @_;
+    my $prices = $ctx->{cfg}{prices} || {};
+    my $p = price_of($prices->{models}, $model);
+    return undef unless $p;
+    if ($r->{fast}) {
+        $p = $p->{fast};
+    } elsif (ref $p->{long_input} eq 'HASH' && is_num($p->{long_input}{over_tokens})
+        && $c->{in} + $c->{cw5} + $c->{cw1h} + $c->{cr} > $p->{long_input}{over_tokens}) {
+        $p = $p->{long_input};
+    }
+    return undef unless ref $p eq 'HASH';
+    my $u = 0;
+    for my $f (qw(in cw5 cw1h cr out)) {
+        return undef unless is_num($p->{$f});
+        $u += $c->{$f} * $p->{$f} / 1e6;
+    }
+    if ($r->{us}) {
+        return undef unless is_num($prices->{geo_us_multiplier});
+        $u *= $prices->{geo_us_multiplier};
+    }
+    if ($c->{ws}) {
+        return undef unless is_num($prices->{web_search_per_1000});
+        $u += $c->{ws} * $prices->{web_search_per_1000} / 1000;
+    }
+    return $u;
+}
+
+# モデルの ID の価格。ID と同じ名前か、ID の末尾の -<8桁の日付> を除いた名前の価格を使う。無ければ undef
+sub price_of {
+    my ($models, $id) = @_;
+    return undef unless ref $models eq 'HASH';
+    return $models->{$id} if ref $models->{$id} eq 'HASH';
+    return $id =~ /\A(.+)-[0-9]{8}\z/ && ref $models->{$1} eq 'HASH' ? $models->{$1} : undef;
+}
+
+# 会話の役割の名前。補助役は、roles の agent_types、最後の verdict の行の VERDICT と NEXT_ACTION、
+# agent_type の値の順で決める
+sub role_of {
+    my ($ctx, $key) = @_;
+    return $ctx->{role}{$key} //= do {
+        my $roles = $ctx->{cfg}{roles} || {};
+        my $type = meta_of($ctx, $key)->{agent_type};
+        $type = undef if ref $type;
+        my ($v) = reverse grep { ($_->{k} // '') eq 'verdict' } timed_rows($ctx->{irec}{$key} || []);
+        !defined parent_key($key) ? ($ctx->{spawned}{$key} ? ROLE_SPAWNED : ROLE_MAIN)
+            : defined $type && defined $roles->{agent_types}{$type} ? $roles->{agent_types}{$type}
+            : $v && defined $v->{value} && defined $roles->{verdict} ? $roles->{verdict}
+            : $v && $v->{next_action} && defined $roles->{next_action} ? $roles->{next_action}
+            : $type // ROLE_SUB;
+    };
+}
+
+# 会話の meta の行。無ければ空の HASH
+sub meta_of {
+    my ($ctx, $key) = @_;
+    my ($m) = grep { ($_->{k} // '') eq 'meta' } @{ $ctx->{irec}{$key} || [] };
+    return $m || {};
+}
+
+# 段階ごとの行を、Issue の段階の並びで作る。並びに無い段階の名前の時間とトークン数は、その他に入れる
+sub stage_rows {
+    my ($ctx, $by) = @_;
+    my @names = (@{ $ctx->{spec}{has} ? SPEC_STAGES : NOSPEC_STAGES }, OTHER_STAGE);
+    my %row = map { ($_ => { work_sec => 0, wait_sec => 0, concurrent_sec => 0, tokens => 0, usd => 0 }) } @names;
+    for my $name (sort keys %$by) {
+        my $dst = $row{$name} || $row{ OTHER_STAGE() };
+        $dst->{$_} += $by->{$name}{$_} // 0 for keys %$dst;
+    }
+    return [ map {
+        my $x = $row{$_};
+        { name => $_, (map { ($_ => int($x->{$_} + 0.5)) } qw(work_sec wait_sec concurrent_sec tokens)), usd => usd_round($x->{usd}) }
+    } @names ];
+}
+
+sub usd_round {
+    my ($u) = @_;
+    return 0 + sprintf('%.6f', $u);
+}
+
+sub num {
+    my ($v) = @_;
+    return is_num($v) ? $v + 0 : 0;
+}
+
+sub is_num {
+    my ($v) = @_;
+    return defined $v && !ref $v && $v =~ /\A[0-9]+(?:\.[0-9]+)?\z/ ? 1 : 0;
 }
 
 # ---- 時刻と日付 ------------------------------------------------------------

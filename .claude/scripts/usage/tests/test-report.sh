@@ -120,7 +120,8 @@ run() {
     OUT=$(cat "$TMP_ROOT/out")
     ERR=$(cat "$TMP_ROOT/err")
 }
-# report.json の値を読む: rj <perl の式>。R(<欄>, ...) は report.json の欄の値(欄を順にたどる)、J(<値>) は値の JSON である
+# report.json の値を読む: rj <perl の式>。R(<欄>, ...) は report.json の欄の値(欄を順にたどる)、J(<値>) は値の JSON である。
+# S(<欄>, ...) と M(<欄>, ...) は、段階ごとの行とモデルごとの行の、欄の値の配列の配列である。SUM(<欄>) は段階ごとの行の欄の値の合計である
 rj() {
     if [ ! -f "$OUTD/report.json" ]; then
         printf 'none'
@@ -132,6 +133,10 @@ rj() {
         my $r = JSON::PP->new->decode(<$fh>);
         sub R { my $v = $r; $v = ref $v eq "ARRAY" ? $v->[$_] : $v->{$_} for @_; return $v }
         sub J { return JSON::PP->new->canonical->allow_nonref->encode($_[0]) }
+        sub rows { my ($what, @f) = @_; return [ map { my $s = $_; [ map { $s->{$_} } @f ] } @{ R($what) || [] } ] }
+        sub S { return rows("stages", @_) }
+        sub M { return rows("models", @_) }
+        sub SUM { my $s = 0; $s += $_->{ $_[0] } for @{ R("stages") || [] }; return $s }
         print '"$1"';
     ' "$OUTD/report.json"
 }
@@ -394,6 +399,102 @@ rec k1.agent-kb1 '{"k":"meta","session":"k1","agent_id":"kb1"}'
 rmsg k1.agent-kb1 60 false; rtool k1.agent-kb1 100 700 tk2 shell "品質チェック" other; rmsg k1.agent-kb1 800 false; rmsg k1.agent-kb1 1000 true
 check "同期の補助役を待つ本体の時間が、本体にも同時に動いた時間にも入らず、補助役の側に入る。補助役が品質チェックを待った時間は待ち時間に入る" \
     "$(tot 1011)" "0:[1090,600,0,0,0,0]"
+
+echo "== 段階とモデルと役割ごとのトークン数と使用料"
+# 時刻は T0 からの秒数で書く。#2001 だけが spec ありの Issue である
+newrepo
+commit 2026-09-01T00:00:00Z "$CFGPATH={}" '.kiro/specs/feat-s/spec.json={"feature_name":"feat-s","issue":2001}'
+newgh tokens
+mkdb 'prs => [ closes("'"$SHA"'", 2001 .. 2005) ]'
+newstate
+# 段階の印: rst <記録の鍵> <時刻> <名前> [<spec-review の段階>]
+rst() {
+    local s=null
+    [ $# -ge 4 ] && s="\"$4\""
+    rec "$1" "{\"k\":\"stage\",\"ts\":$((T0 + $2)),\"name\":\"$3\",\"issue\":null,\"spec_stage\":$s}"
+}
+# 入力が1トークンの応答: rm1 <記録の鍵> <時刻> <応答の終わりなら true>
+rm1() {
+    rec "$1" "{\"k\":\"msg\",\"ts\":$((T0 + $2)),\"id\":\"$1-$2\",\"model\":\"claude-opus-5-5\",\"in\":1,\"cw5\":0,\"cw1h\":0,\"cr\":0,\"out\":0,\"ws\":0,\"fast\":false,\"us\":false,\"end\":$3}"
+}
+# トークン数を持つ応答: rtk <記録の鍵> <時刻> <message.id> <モデルか null> <入力> <5分の書き込み> <1時間の書き込み> <読み込み> <出力> [<fast> <us> <Web 検索の回数>]
+rtk() {
+    local m="\"$4\"" f=false u=false w=0
+    [ "$4" = null ] && m=null
+    [ $# -ge 10 ] && f=${10}
+    [ $# -ge 11 ] && u=${11}
+    [ $# -ge 12 ] && w=${12}
+    rec "$1" "{\"k\":\"msg\",\"ts\":$((T0 + $2)),\"id\":\"$3\",\"model\":$m,\"in\":$5,\"cw5\":$6,\"cw1h\":$7,\"cr\":$8,\"out\":$9,\"ws\":$w,\"fast\":$f,\"us\":$u,\"end\":false}"
+}
+# 「<終了コード>:」に続けて、段階ごとの行の名前と作業時間と同時に動いた時間とトークン数と、全体の合計の同じ3つの値を JSON の配列で出す
+stg() {
+    run "$1"
+    printf '%s:' "$RC"
+    rj 'J([S("name", "work_sec", "concurrent_sec", "tokens"), R("totals", "work_sec"), R("totals", "concurrent_sec"), R("totals", "tokens")])'
+}
+# #2001: 着手の判断・要件のあとに書き方の点検役(STAGE は requirements)を同期で待ち、要件の審査のあとに spec の審査役(STAGE は tasks)を
+# 同期で待ち、実装のあとに設計を直す。spec ありの Issue の claim は段階を変えない。印の無い会話 t2 は、本体の会話と [860,900] で重なる
+rec t1 "{\"k\":\"stage\",\"ts\":$T0,\"name\":\"start\",\"issue\":2001,\"spec_stage\":null}"
+rm1 t1 100 false; rst t1 150 kiro-spec-requirements; rv t1 160 2001; rm1 t1 200 false
+rtool t1 200 400 tt1 agent "" other
+rst t1 450 spec-review requirements; rm1 t1 500 false
+rtool t1 500 700 tt2 agent "" other
+rst t1 750 kiro-impl; rm1 t1 800 false; rst t1 850 kiro-spec-design; rm1 t1 900 true
+rec t1.agent-c1 '{"k":"meta","session":"t1","agent_id":"c1","agent_type":"spec-style-checker","stage":"requirements"}'
+rm1 t1.agent-c1 210 false; rm1 t1.agent-c1 390 true
+rec t1.agent-r1 '{"k":"meta","session":"t1","agent_id":"r1","agent_type":"spec-reviewer","stage":"tasks"}'
+rm1 t1.agent-r1 510 false; rm1 t1.agent-r1 690 true
+rec t2 "{\"k\":\"branch\",\"ts\":$((T0 + 860)),\"name\":\"f2001\"}"
+rm1 t2 950 false; rm1 t2 1300 true
+run 2001
+check "段階ごとの表の合計が全体の合計と一致し、印の無い時間が その他 に入る" \
+    "$RC:$(rj 'J([SUM("work_sec"), R("totals", "work_sec"), SUM("wait_sec"), R("totals", "wait_sec"), SUM("concurrent_sec"), R("totals", "concurrent_sec"), SUM("tokens"), R("totals", "tokens"), R("stages", 10, "name"), R("stages", 10, "work_sec")])')" \
+    '0:[1260,1260,0,0,40,40,11,11,"その他",400]'
+# #2002: spec 無しの Issue。着手の判断のあとに claim する
+rec t3 "{\"k\":\"stage\",\"ts\":$T0,\"name\":\"start\",\"issue\":2002,\"spec_stage\":null}"
+rm1 t3 100 false; rv t3 150 2002; rm1 t3 200 true
+check "spec-review の引数と、審査役と点検役の STAGE と、kiro-impl のあとの spec の直しが、それぞれの段階に入り、spec 無しの Issue では claim のあとが 実装 に入る" \
+    "$(stg 2001) $(stg 2002)" \
+    '0:[[["着手の判断",150,0,1],["要件",100,0,1],["要件の審査",280,0,3],["設計",0,0,0],["設計の審査",0,0,0],["タスク",0,0,0],["タスクの審査",180,0,2],["実装",100,0,1],["実装中の spec の直し",50,40,1],["出荷とレビュー対応",0,0,0],["その他",400,0,2]],1260,40,11] 0:[[["着手の判断",150,0,1],["実装",50,0,1],["出荷とレビュー対応",0,0,0],["その他",0,0,0]],200,0,2]'
+# #2003: 1時間の書き込みと Web 検索、fast、us、Haiku 5.5 の10万トークンちょうどの応答と超える応答、価格の無いモデル、日付の付いたモデルの ID
+rv t4 0 2003
+rtk t4 10 a claude-opus-5-5 1000000 0 1000000 0 0 false false 2
+rtk t4 20 b claude-opus-5-5 1000000 1000000 0 0 0 true false 0
+rtk t4 30 c claude-opus-5-5 1000000 0 0 1000000 0 false true 0
+rtk t4 40 d claude-haiku-5-5 100000 0 0 0 0
+rtk t4 50 e claude-haiku-5-5 50000 0 0 60000 0
+rtk t4 60 f claude-fable-5-2 1000 0 0 0 0
+rtk t4 70 g claude-opus-4-20250514 0 0 0 0 1000000
+run 2003
+check "価格がデータのファイルに無いモデルの使用料が 価格が分からない になり、Haiku 5.5 の10万トークンを超える応答と fast と us の価格が当たる" \
+    "$RC:$(rj 'J([M("model", "role", "in", "cw", "cr", "out", "usd"), R("totals", "tokens"), R("totals", "usd"), R("totals", "usd_unknown_models")])')" \
+    '0:[[["claude-opus-4-20250514","本体の会話",0,0,0,1000000,75],["claude-opus-5-5","本体の会話",3000000,2000000,1000000,0,34.64],["claude-haiku-5-5","本体の会話",150000,0,60000,0,0.038],["claude-fable-5-2","本体の会話",1000,0,0,0,null]],7211000,109.678,["claude-fable-5-2"]]'
+# #2004: 2つの会話が同じ message.id の応答を持つ
+rv t5 0 2004; rtk t5 10 dup claude-opus-5-5 100 0 0 0 0
+rv t6 0 2004; rtk t6 10 dup claude-opus-5-5 100 0 0 0 0; rtk t6 20 u claude-opus-5-5 1 0 0 0 0
+run 2004
+check "2つの会話に同じ message.id があっても1回だけ数える" "$RC:$(rj 'J([R("totals", "tokens"), M("model", "role", "in")])')" '0:[101,[["claude-opus-5-5","本体の会話",101]]]'
+# #2005: 本体の会話の2つのモデル、判定を返した確認役、判定を打ち消して NEXT_ACTION を返した補助役、
+# モデルを meta の行にだけ持つ Explore、spec の審査役、別に起こしたセッション
+rv t7 0 2005; rec t7 "{\"k\":\"spawn\",\"ts\":$((T0 + 5)),\"child\":\"local_t8\"}"
+rec desktop '{"local":"local_t8","session":"t8"}'
+rtk t7 10 m7a claude-sonnet-5-5 64 0 0 0 0; rtk t7 20 m7b claude-opus-5-5 1 0 0 0 0
+rec t7.agent-v1 '{"k":"meta","session":"t7","agent_id":"v1","agent_type":"general-purpose"}' \
+    "{\"k\":\"verdict\",\"ts\":$((T0 + 35)),\"value\":\"APPROVED\",\"next_action\":false}"
+rtk t7.agent-v1 30 v1m claude-opus-5-5 2 0 0 0 0
+rec t7.agent-v2 '{"k":"meta","session":"t7","agent_id":"v2","agent_type":"general-purpose"}' \
+    "{\"k\":\"verdict\",\"ts\":$((T0 + 40)),\"value\":\"REJECTED\",\"next_action\":false}" \
+    "{\"k\":\"verdict\",\"ts\":$((T0 + 45)),\"value\":null,\"next_action\":true}"
+rtk t7.agent-v2 42 v2m claude-opus-5-5 4 0 0 0 0
+rec t7.agent-v3 '{"k":"meta","session":"t7","agent_id":"v3","agent_type":"Explore","model":"claude-haiku-5-5"}'
+rtk t7.agent-v3 50 v3m null 8 0 0 0 0
+rec t7.agent-v4 '{"k":"meta","session":"t7","agent_id":"v4","agent_type":"spec-reviewer"}'
+rtk t7.agent-v4 60 v4m claude-sonnet-5-5 16 0 0 0 0
+rtk t8 70 t8m claude-opus-5-5 16 0 0 0 0
+run 2005
+check "本体の会話と、agent_type と verdict から決めた役割と、別に起こしたセッションが、モデルと役割の組ごとに分かれる" \
+    "$RC:$(rj 'J(M("model", "role", "in"))')" \
+    '0:[["claude-sonnet-5-5","本体の会話",64],["claude-opus-5-5","別に起こしたセッション",16],["claude-sonnet-5-5","spec の審査役",16],["claude-opus-5-5","原因を調べる補助役",4],["claude-opus-5-5","タスクごとの確認役",2],["claude-opus-5-5","本体の会話",1],["claude-haiku-5-5","Explore",8]]'
 
 echo "== 仕組みが main に入った時刻"
 newrepo
