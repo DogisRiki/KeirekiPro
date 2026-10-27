@@ -118,7 +118,9 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
     and `approved_at` (ISO 8601) in the same object: `"DogisRiki"` when the
     user approved interactively in this conversation, `"auto:-y"` when via
     auto-approve. Never record auto-approval under a human's name, and never
-    overwrite an existing `approved_by` / `approved_at`. If an approval is
+    overwrite an existing `approved_by` / `approved_at`. The user typing this
+    command without `-y` is the interactive approval of design, also when they
+    typed `/clear` just before it. If an approval is
     already `true` but carries no `approved_by` (approved in an earlier
     conversation), record `"unknown:pre-existing"` rather than a human's name
   - Update `updated_at` timestamp
@@ -140,7 +142,7 @@ This skill's **Right After Generation (before approval)** item under Next Phase 
   - If the user approves:
     - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "DogisRiki"`
       and `approved_at` (ISO 8601)
-    - Respond: 「タスクの承認を記録しました。`/kiro-impl {feature}` を打つと、実装が始まります。」
+    - Respond: 「タスクの承認を記録しました。`/clear` を打ってから `/kiro-impl {feature}` を打つと、実装が始まります。」 `/clear` keeps the spec stages' skill text and review exchange out of the implementation conversation; spec.json, tasks.md and the review records carry everything `/kiro-impl` needs. Do not ask the user to type `/clear` or `/kiro-impl` again in the middle of implementation
   - If the user wants changes:
     - Keep `approvals.tasks.approved: false`
     - Respond with guidance on what to adjust and re-run

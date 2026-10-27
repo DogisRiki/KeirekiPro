@@ -80,6 +80,8 @@ After all parallel research completes, synthesize implementation brief before st
 
 **Context management**: At the start of each iteration, re-read `tasks.md` to determine the next actionable sub-task. Do NOT rely on accumulated memory of previous iterations. After completing each iteration, retain only a one-line summary (e.g., "1.1: APPROVED, 3 files changed") and discard the full status report and reviewer details.
 
+**Reading limits**: Do NOT read large files whole, in this conversation or in the reviewer's. This applies to requirements.md, design.md, tasks.md, and the code and scripts this feature changes. Find the place with `grep -n`, then read only the lines the current task needs. For the per-iteration re-read of `tasks.md`, read the task checkboxes with `grep -n` and then only the current task's lines and the `## 実装のメモ` section. For requirements.md and design.md, read only the sections the current task references. Re-reading the same whole file every iteration fills the context and causes repeated automatic summaries, which makes every later response cost more.
+
 For each task (one at a time):
 
 **a) Implement the task yourself**:
@@ -105,6 +107,7 @@ For each task (one at a time):
   - The task description and relevant spec section numbers
   - Paths to spec files (requirements.md, design.md) so the reviewer can read them directly
   - Your Status Report from a) (for reference only — reviewer must verify independently)
+  - The template's `## Reading and Verification Limits` section, unchanged. The reviewer subagent does not see this skill, so the limits reach it only through the review prompt
 - The reviewer must apply the `kiro-review` protocol to this task-local review.
 - Preserve the existing task-specific context: task text, spec refs, `_対象の部品:_` scope, validation commands, your Status Report, and the actual `git diff` as the primary source of truth.
 - Pass the quality-gate commands of every area this task changed (the commands listed in the Steps of the `/verify-frontend` `/verify-backend` `/verify-terraform` skills) as the validation commands for Regression Safety. You do not run them in a), so the reviewer's run is the task's verify run required by the completion conditions in tasks.md, and its output is the fresh evidence for `kiro-verify-completion`

@@ -17,7 +17,15 @@ You are an independent, adversarial reviewer. Your job is to verify that a task 
 
 ## First Action
 
-Run `git diff` to see the actual code changes. This is your primary input. If the diff is large, also read the full changed files for context.
+Run `git diff` to see the actual code changes. This is your primary input. If the diff needs more context, read only the surrounding lines of the changed files (find them with `grep -n`, then read that range), not the whole files.
+
+## Reading and Verification Limits
+
+These limits keep the review's cost down without dropping any check in the checklist below. The checks that the task's completion conditions in tasks.md require always come first: when a limit would skip such a check, run the check.
+
+- Do not read large files whole. This applies to requirements.md, design.md, tasks.md, and the changed files. Find the place with `grep -n`, then read only the lines you need. For the spec files, read only the sections referenced by this task
+- Run each validation command once per environment that the task's completion conditions or the validation commands name. Do not re-run the same tests in the same environment, and do not run them in environments that neither names
+- Do not edit the code to break it and re-run the tests to see whether they notice. Judge Test Quality by reading the assertions against the changed code
 
 ## Core Principle
 
