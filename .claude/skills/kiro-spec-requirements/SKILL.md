@@ -140,6 +140,7 @@ Provide output in the language specified in spec.json with:
   - Run `/kiro-validate-gap {feature}` to analyze implementation gap
   - Recommended for brownfield projects; skip for greenfield
 - Run `/kiro-spec-design {feature}` to proceed to design phase
+- When guiding the user to approve and continue, always tell them to type `/clear` first: 「承認するなら、`/clear` を打ってから `/kiro-spec-design {feature}` を打ってください。」 If you also suggest the gap analysis, tell them to type `/clear` before `/kiro-validate-gap {feature}` as well. `/clear` keeps this stage's skill text and review exchange out of the next stage's conversation; spec.json and the review records under `reviews/` carry everything the next stage needs
 
 **If Modifications Needed**:
 - Provide feedback and re-run `/kiro-spec-requirements {feature}`

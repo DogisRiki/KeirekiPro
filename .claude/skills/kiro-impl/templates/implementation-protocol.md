@@ -16,6 +16,7 @@ This is the protocol that the conversation's Claude running `/kiro-impl` follows
 
 ### Step 1: Load Task-Relevant Context
 - Read the referenced sections of `requirements.md` and `design.md` for this task
+- Do NOT read large files whole. This applies to the spec files and to the code you change. Find the place with `grep -n`, then read only the lines this task needs
 - Preserve the original section numbering; do NOT invent `REQ-*` aliases
 - Expand any file globs or path patterns before reading files
 - Inspect existing code patterns only in the declared boundary

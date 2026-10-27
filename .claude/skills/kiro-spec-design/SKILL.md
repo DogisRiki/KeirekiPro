@@ -148,7 +148,9 @@ After all findings return, synthesize in main context before proceeding.
      and `approved_at` (ISO 8601) in the same object: `"DogisRiki"` when the
      user approved interactively in this conversation, `"auto:-y"` when via
      auto-approve. Never record auto-approval under a human's name, and never
-     overwrite an existing `approved_by` / `approved_at`
+     overwrite an existing `approved_by` / `approved_at`. The user typing this
+     command without `-y` is the interactive approval of requirements, also
+     when they typed `/clear` just before it
    - Update `updated_at` timestamp
 
 ## Critical Constraints
@@ -216,6 +218,7 @@ Provide brief summary in the language specified in spec.json:
 **If Design Approved**:
 - **Optional**: Run `/kiro-validate-design {feature}` for interactive quality review
 - Run `/kiro-spec-tasks {feature}` to generate implementation tasks
+- When guiding the user to approve and continue, always tell them to type `/clear` first: 「承認するなら、`/clear` を打ってから `/kiro-spec-tasks {feature}` を打ってください。」 `/clear` keeps this stage's skill text and review exchange out of the next stage's conversation; spec.json and the review records under `reviews/` carry everything the next stage needs
 
 **If Modifications Needed**:
 - Provide feedback and re-run `/kiro-spec-design {feature}`

@@ -120,7 +120,7 @@ Run these checks and use the result as primary signal.
 
 ### 11. Test Quality
 - Confirm tests prove the required behavior rather than only scaffolding.
-- Confirm tests would fail if the implementation were removed or broken.
+- Confirm tests would fail if the implementation were removed or broken. Judge this by reading the assertions against the changed code; do not edit the code to break it and re-run the tests to see whether they notice, unless the task's completion conditions in tasks.md require that check.
 
 ### 12. Error Handling
 - Confirm relevant failure paths are handled and not silently swallowed.
