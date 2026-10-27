@@ -247,8 +247,8 @@ newgh pend
 # 107: 出し済みで list_pending がある Issue(受け持ちの出来事は無い)
 # 108: 出し済みで proposals_pending がある Issue
 # 109: 出し済みで、list_pending も proposals_pending も無い Issue
-# 110: 仕組みが入る前の日に閉じた、出し済みで list_pending がある Issue(さかのぼりの集計で出した Issue)
-# 111: 集計しない印の system-pr があり、出し済みで list_pending がある Issue(さかのぼりの集計で出した #501)
+# 110: 仕組みが入る前の日に閉じた、出し済みで list_pending がある Issue
+# 111: 集計しない印の system-pr があり、出し済みで list_pending がある Issue
 # 112: 仕組みが入ったあとに閉じた、受け持ちの出来事が Issue の番号のある start の段階の印だけの Issue
 pendb() {
     mkdb "issues => [ cl(101, '2026-10-25T01:00:00Z'), cl(102, '2026-10-24T03:00:00Z'), cl(103, '2026-10-24T02:59:59Z'),
@@ -344,6 +344,8 @@ check "閉じる PR がデータのファイルを足したコミットより後
 run draft 201
 check "Refs: の PR の mergeCommit がデータのファイルを足したコミットと同じ Issue に、draft が system-pr の印を書いて 2 で終わる" \
     "$RC/$(statejson issues/201.json)" '2/{"closed_at":"2026-10-25T01:00:00Z","skip":"system-pr"}'
+run draft 201 --extra
+check "draft が、Issue の番号のほかの引数を受けない" "$RC/$(errline)" "1/one"
 gitlogrun draft 204
 check "Refs: の PR だけがあって閉じる PR の無い閉じた Issue で、draft が git merge-base を呼ばずに no-merged-pr の印を書く" \
     "$RC/$(statejson issues/204.json)/$(mergebases)" '2/{"closed_at":"2026-10-25T04:00:00Z","skip":"no-merged-pr"}/0'
@@ -779,142 +781,6 @@ mkdb 'issues => [ list(cm(2002, idx())) ]'
 run session-context
 check "owner が無く、まだ答えていない案が無いと、session-context が所有者の行を出さない" "$RC/$OUT" "0/"
 
-echo "== さかのぼりの集計の対象"
-# 終了日は所有者の PC の時間帯の日付なので、日本の時間帯で確かめる。協定世界時と日付が違う時刻を使う
-SAVED_TZ=${TZ-unset}
-TZ=JST-9
-export TZ
-draftrepo bf
-newgh bf
-# 401: 受け持ちの出来事がある。閉じる PR は日本の時間帯の 10-20 01:00 にマージされた
-# 402: ブランチ feat/pr412 の会話の記録がある。閉じる PR 412 は 10-20 00:30 にマージされた(401 より先)
-# 403: start でない段階の印がある。閉じる PR は日本の時間帯の 10-19 00:30(協定世界時では 10-18)にマージされた
-# 404: 受け持ちの出来事がある。閉じる PR は日本の時間帯の 10-18 23:00 にマージされた
-# 405: 仕組みを main に入れた Issue。PR 415 が Refs: を書き、閉じる PR 416 は仕組みが入ったあとにマージされた
-# 406: 受け持ちの出来事がある。閉じる PR は仕組みが入ったあとにマージされた
-# 407: 手元の記録が無い。閉じる PR は仕組みが入る前にマージされた
-# 408: 受け持ちの出来事がある。Refs: の PR だけがあり、閉じる PR が無い
-# 409: 受け持ちの出来事がある。出し済みで、一覧と案の索引への書き込みが残っていない
-# 410: 受け持ちの出来事がある。出し済みで、一覧への書き込みが残っている。閉じる PR は 10-21 にマージされた
-# 412: 仕組みを main に入れた Issue。PR 423 が Refs: だけを書き、閉じる PR がまだ無い
-mkdb "issues => [],
-  prs => [ pr(411, 'MERGED', 'Closes #401', '2026-10-19T16:00:00Z', '$PRE'), pr(412, 'MERGED', \"text\nCloses #402\", '2026-10-19T15:30:00Z', '$PRE'),
-    pr(413, 'MERGED', 'Closes #403', '2026-10-18T15:30:00Z', '$PRE'), pr(414, 'MERGED', 'Closes #404', '2026-10-18T14:00:00Z', '$PRE'),
-    pr(415, 'MERGED', 'Refs: #405', '2026-10-24T03:00:00Z', '$SYSC'), pr(416, 'MERGED', 'Closes #405', '2026-10-25T00:00:00Z', '$POST'),
-    pr(417, 'MERGED', 'Closes #406', '2026-10-24T15:00:00Z', '$POST'), pr(418, 'MERGED', 'Closes #407', '2026-10-19T00:00:00Z', '$PRE'),
-    pr(419, 'MERGED', 'Refs: #408', '2026-10-19T00:00:00Z', '$PRE'), pr(420, 'MERGED', 'Closes #409', '2026-10-19T00:00:00Z', '$PRE'),
-    pr(421, 'MERGED', 'Closes #410', '2026-10-21T00:00:00Z', '$PRE'), pr(423, 'MERGED', 'Refs: #412', '2026-10-24T03:00:00Z', '$SYSC') ]"
-for n in 401 404 406 408 409 410; do recv "$n"; done
-xrow s2 '{"issue":403,"k":"stage","name":"ship","spec_stage":null,"ts":1761300000}'
-mktrans bf-a 1 "$REPO" feat/pr412
-issuejson 409 '{"report_url":"https://github.com/owner/repo/issues/409#issuecomment-1","reported_at":"2026-10-25T00:00:00Z"}'
-issuejson 410 '{"list_pending":true,"report_url":"https://github.com/owner/repo/issues/410#issuecomment-2","reported_at":"2026-10-25T00:00:00Z"}'
-run backfill-list
-check "backfill-list が、仕組みが入る前にマージされた PR が閉じた、手元の記録に受け持ちかブランチの行がある Issue と、仕組みを入れた Issue を、終了日の古い順に、同じ日なら番号の小さい順に出し、PR の一覧を1回だけ読む" \
-    "$RC/$OUT/$(calls)" '0/{"issues":[404,403,401,402,410,405],"waiting":[412]}/pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit|'
-check "そのコミットの PR が本文に Refs: だけを書き、その Issue を閉じる PR がまだ無いとき、backfill-list がその番号を issues に入れず、waiting に入れる" \
-    "$(printf '%s' "$OUT" | grep -o '"waiting":\[412\]')/$(printf '%s' "$OUT" | grep -o '"issues":\[[^]]*\]' | grep -c 412)" '"waiting":[412]/0'
-
-draftrepo bf-noconf noconfig
-newgh bf-noconf
-recv 401
-mkdb "issues => [], prs => [ pr(411, 'MERGED', 'Closes #401', '2026-10-19T16:00:00Z', undef) ]"
-run backfill-list
-check "origin/main にデータのファイルを足したコミットが無いとき、backfill-list が偽の gh を呼ばずに 2 で終わる" "$RC/$OUT/$(calls)" "2//"
-
-draftrepo bf-wt
-newgh bf-wt
-mkdb "issues => [], prs => [ pr(431, 'MERGED', 'Closes #430', '2026-10-19T16:00:00Z', '$PRE') ]"
-mktrans bf-wt-a 1 "$REPO/.claude/worktrees/gone" feat/pr431
-gitq worktree add -q "$WORK/bf-wt-here" -b feat/here
-runin "$WORK/bf-wt-here" backfill-list
-check "worktree の作業フォルダから backfill-list を呼んでも、git worktree list に無い、本体の作業フォルダの下の .claude/worktrees/<名前> を cwd に持つ記録の Issue が候補に入る" \
-    "$RC/$OUT" '0/{"issues":[430],"waiting":[]}'
-
-draftrepo bf-fail
-newgh bf-fail
-recv 401
-mkdb "issues => [], prs => [ pr(411, 'MERGED', 'Closes #401', '2026-10-19T16:00:00Z', '$PRE') ]"
-printf '%s\n' '^pr list' >"$FAKE_GH_DIR/fail"
-run backfill-list
-check "偽の gh が失敗すると、backfill-list が 1 で終わり、標準出力に何も出さない" "$RC/$OUT/$(errline)" "1//one"
-rm -f "$FAKE_GH_DIR/fail"
-mkdb "issues => [], prs => [ pr(411, 'MERGED', 'Closes #401', '2026-10-19T16:00:00Z', '0123456789abcdef0123456789abcdef01234567') ]"
-run backfill-list
-check "閉じる PR のコミットが手元に無く、祖先かを確かめられないとき、backfill-list が 1 で終わり、標準出力に何も出さない" "$RC/$OUT/$(errline)" "1//one"
-if [ "$SAVED_TZ" = unset ]; then unset TZ; else TZ=$SAVED_TZ; fi
-
-echo "== さかのぼりの集計の下書き"
-# 下書きの report.json の backfill: bfflag <N>
-bfflag() { perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or do { print "none"; exit }; local $/; my $d = JSON::PP->new->decode(<$f>); print $d->{backfill} ? "true" : "false"' "$STATE/drafts/$1/report.json"; }
-# 目立つ点の箇条だけの所見のファイル
-FINDINGS_PLAIN="$TMP_ROOT/findings-plain.md"
-printf '%s\n' '- 目立つ点の箇条' >"$FINDINGS_PLAIN"
-draftrepo bfd
-newgh bfd
-# 501: 仕組みが入る前に閉じた、印の無い Issue。閉じる PR 511 は仕組みが入る前のコミットである
-# 502: 仕組みが入る前に閉じた、before-system の印がすでにある Issue
-# 503: 仕組みを main に入れた Issue。PR 513 が Refs: を書き、閉じる PR 514 は仕組みが入ったあとにマージされた
-# 504: 閉じる PR 515 が仕組みが入ったあとにマージされた Issue
-# 505: 仕組みを main に入れた Issue。PR 516 が Refs: だけを書き、閉じる PR がまだ無い
-# 506: 仕組みが入る前に閉じた、印の無い Issue(--backfill を付けない draft で確かめる)
-# 507: 仕組みが入ったあとに閉じた、受け持ちの出来事がある、まだ出していない Issue
-mkdb "issues => [ list(), cl(501, '2026-10-23T20:00:00Z'), cl(502, '2026-10-23T21:00:00Z'), cl(503, '2026-10-25T01:00:00Z'),
-    cl(504, '2026-10-25T02:00:00Z'), cl(505, '2026-10-25T03:00:00Z'), cl(506, '2026-10-23T22:00:00Z'), cl(507, '2026-10-25T04:00:00Z') ],
-  prs => [ pr(511, 'MERGED', 'Closes #501', '2026-10-24T15:00:00Z', '$PRE'), pr(512, 'MERGED', 'Closes #502', '2026-10-24T15:00:00Z', '$PRE'),
-    pr(513, 'MERGED', 'Refs: #503', '2026-10-24T03:00:00Z', '$SYSC'), pr(514, 'MERGED', 'Closes #503', '2026-10-24T15:00:00Z', '$POST'),
-    pr(515, 'MERGED', 'Closes #504', '2026-10-24T15:00:00Z', '$POST'), pr(516, 'MERGED', 'Refs: #505', '2026-10-24T03:00:00Z', '$SYSC'),
-    pr(517, 'MERGED', 'Closes #506', '2026-10-24T15:00:00Z', '$PRE') ]"
-mktrans bfd-a 1 "$REPO" feat/pr511
-mktrans bfd-b 1 "$REPO" feat/pr512
-mktrans bfd-c 1 "$REPO" feat/pr514
-mktrans bfd-d 1 "$REPO" feat/pr515
-mktrans bfd-e 1 "$REPO" feat/pr517
-issuejson 502 '{"closed_at":"2026-10-23T21:00:00Z","skip":"before-system"}'
-run draft 502 --backfill
-d502="$RC/$(bfflag 502)/$(statejson issues/502.json)"
-run draft 501 --backfill
-d501="$RC/$(bfflag 501)/$(statejson issues/501.json)"
-run draft 503 --backfill
-d503="$RC/$(bfflag 503)/$(statejson issues/503.json)"
-run draft 504 --backfill
-d504="$RC/$(bfflag 504)/$(statejson issues/504.json)"
-run draft 506
-d506="$RC/$(bfflag 506)/$(statejson issues/506.json)"
-check "draft <N> --backfill が、before-system の印がある Issue と、印を書いた仕組みが入る前の Issue と、system-pr の印を書いた仕組みを入れた Issue で backfill が真の下書きを作り、閉じる PR が仕組みのあとの Issue では書かずに 2 で終わる。--backfill の無い draft は before-system の印を書いて 2 で終わる" \
-    "$d502|$d501|$d503|$d504|$d506" \
-    '0/true/{"closed_at":"2026-10-23T21:00:00Z","skip":"before-system"}|0/true/{"closed_at":"2026-10-23T20:00:00Z","skip":"before-system"}|0/true/{"closed_at":"2026-10-25T01:00:00Z","skip":"system-pr"}|2/none/none|2/none/{"closed_at":"2026-10-23T22:00:00Z","skip":"before-system"}'
-run draft 505 --backfill
-check "そのコミットの PR が本文に Refs: だけを書き、その Issue を閉じる PR がまだ無いとき、draft <N> --backfill が system-pr の印を書いて 2 で終わる" \
-    "$RC/$(bfflag 505)/$(statejson issues/505.json)" '2/none/{"closed_at":"2026-10-25T03:00:00Z","skip":"system-pr"}'
-run draft 501 --frobnicate
-check "draft が、--backfill のほかの2つ目の引数を受けない" "$RC/$(errline)" "1/one"
-
-run owner no
-printf '%s\n' '^issue comment 501 ' '^issue comment 503 ' >"$FAKE_GH_DIR/fail"
-run publish 501 --findings "$FINDINGS_PLAIN"
-p501=$RC
-run publish 503 --findings "$FINDINGS_PLAIN"
-p503=$RC
-for n in 501 503 507; do recv "$n"; done
-run pending
-pend="$RC/$OUT"
-run session-context
-check "draft <N> --backfill のあとに publish が失敗した、仕組みが入る前に閉じた Issue と仕組みを入れた Issue を、次の pending が出さず、session-context もその Issue の文を作らない" \
-    "$p501/$p503/$pend/$RC/$(ctxlines)" '1/1/0/{"issues":[507]}/0/issue507'
-printf '%s\n' "$FAIL_LIST" >"$FAKE_GH_DIR/fail"
-run publish 502 --findings "$FINDINGS_PLAIN"
-pub="$RC/$(pubout 502)/$(reports 502)/$(listrows 502)"
-run pending
-check "draft <N> --backfill のあとに集計のコメントを書き、一覧の書き込みが失敗した Issue で、publish が 0 で終わって書けなかった書き込みに list を出し、次の pending はその Issue を出さない" \
-    "$pub/$RC/$OUT" '0/url//no/list/1/0/0/{"issues":[507]}'
-rm -f "$FAKE_GH_DIR/fail"
-run backfill-list
-bl="$RC/$OUT"
-run draft 502 --backfill
-check "一覧に書けなかったあと、backfill-list がその Issue を出し、draft <N> --backfill が一覧にその行を足して 2 で終わる" \
-    "$bl/$RC/$(listrows 502)" '0/{"issues":[501,502,503,506],"waiting":[505]}/2/1'
-
 echo "== 案と所有者"
 newrepo prop config
 newgh prop
@@ -1030,9 +896,9 @@ hasline() { if grep -qE -- "$2" "$1"; then printf yes; else printf no; fi; }
 hasnear() { if grep -E -A"$3" -- "$2" "$1" | grep -qE -- "$4"; then printf yes; else printf no; fi; }
 SK="$ROOT/.claude/skills"
 UR="$SK/usage-report/SKILL.md"
-check "usage-report の SKILL.md に、5つの時点の見出しと、usage.sh の draft・publish・proposals・proposal・owner・backfill-list と draft --backfill を呼ぶ行と、所見の決まりの見出しがある" \
-    "$(hasline "$UR" '^### マージを見届けたとき$')$(hasline "$UR" '^### 次の会話で出すとき$')$(hasline "$UR" '^### 案を尋ねるとき$')$(hasline "$UR" '^### 所有者かを尋ねるとき$')$(hasline "$UR" '^### さかのぼりの集計を頼まれたとき$') $(hasline "$UR" 'usage\.sh draft <N>')$(hasline "$UR" 'usage\.sh publish <N>')$(hasline "$UR" 'usage\.sh proposals')$(hasline "$UR" 'usage\.sh proposal <')$(hasline "$UR" 'usage\.sh owner (yes|no)')$(hasline "$UR" 'usage\.sh backfill-list')$(hasline "$UR" 'usage\.sh draft <N> --backfill') $(hasline "$UR" '^## 所見の決まり$')" \
-    "yesyesyesyesyes yesyesyesyesyesyesyes yes"
+check "usage-report の SKILL.md に、4つの時点の見出しと、usage.sh の draft・publish・proposals・proposal・owner を呼ぶ行と、所見の決まりの見出しがある" \
+    "$(hasline "$UR" '^### マージを見届けたとき$')$(hasline "$UR" '^### 次の会話で出すとき$')$(hasline "$UR" '^### 案を尋ねるとき$')$(hasline "$UR" '^### 所有者かを尋ねるとき$') $(hasline "$UR" 'usage\.sh draft <N>')$(hasline "$UR" 'usage\.sh publish <N>')$(hasline "$UR" 'usage\.sh proposals')$(hasline "$UR" 'usage\.sh proposal <')$(hasline "$UR" 'usage\.sh owner (yes|no)') $(hasline "$UR" '^## 所見の決まり$')" \
+    "yesyesyesyes yesyesyesyesyes yes"
 check "ship の SKILL.md の MERGED の行が usage-report の手順を指し、同じ失敗の3回目の箇所が mark same-failure を呼ぶ" \
     "$(hasline "$SK/ship/SKILL.md" 'MERGED.*usage-report のスキル.*マージを見届けたとき')$(hasnear "$SK/ship/SKILL.md" '同じ失敗が3回続いたとき' 2 'usage\.sh mark same-failure')" "yesyes"
 check "spec-review の SKILL.md が changed のときに mark spec-fix を呼ぶ" \

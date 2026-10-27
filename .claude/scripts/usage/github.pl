@@ -752,7 +752,6 @@ sub rework_items {
 # 注記の文。<MODELS> はモデルの ID を「、」で区切ったもの、<N> は回数に替わる
 sub note_texts {
     return (
-        'この集計は、この Issue が終わったあとに、さかのぼって作った。Claude Code は、最後に動いてから30日たった会話の記録を消すので、この集計には、消えた会話の分が入っていないことがある。',
         'この Issue は、仕組みが入る前に着手した。「数えられない」と書いた項目は、数えるための印を作業の途中で残す仕組みが、着手のときにまだ無かった項目である。',
         '会話の記録の一部を読めなかった。Claude は、この Issue の作業の一部を、仕組みが入る前の設定で始めた会話で行った。「数えられない」と書いた項目は、その会話では、数えるための印が残らなかった項目である。',
         '会話の記録の一部を読めなかった。仕組みは、この集計を、読めた分だけで数えた。そのため、作業時間とトークン数と使用料は、実際より少ないことがある。往復と手戻りの表の「数えられない」の項目は、読めなかった会話から数える項目である。',
@@ -825,7 +824,10 @@ sub report_schema {
     my $tri = { requirements => $int, design => $int, tasks => $int };
     my $tri0 = sub { !defined $_[0] || fits($_[0], $tri) };
     my $back = [ { from => $spec_stage, to => $spec_stage } ];
-    my @names = (stage_names(), (map { $_->[0] } total_items()), rework_items());
+    # 往復と手戻りの行。数えられない行の名前は、この行の名前のどれかである
+    my $rework = { spec_review_rounds => $tri0, owner_fix => $tri0, spec_back => sub { !defined $_[0] || fits($_[0], $back) },
+        impl_spec_back => $tri0, task_rejected => $int0, codex_rounds => $int0, ci_fix => $int0, same_failure => $int0,
+        split => $bool0, switch_to_spec => $int0, size_check_stops => $int0, decided_method_stops => $int0 };
     return {
         v => sub { nonneg($_[0], 1) && $_[0] == 1 },
         issue => sub { nonneg($_[0], 1) && $_[0] == $n },
@@ -838,13 +840,10 @@ sub report_schema {
         stages => [ { name => sub { in_set(bytes_of($_[0]), stage_names()) }, work_sec => $num0, wait_sec => $num0,
             concurrent_sec => $num0, tokens => $int0, usd => $num0 } ],
         models => [ { model => sub { is_model_id(bytes_of($_[0])) }, role => sub { is_role(bytes_of($_[0])) }, in => $int0, cw => $int0, cr => $int0, out => $int0, usd => $num0 } ],
-        rework => { spec_review_rounds => $tri0, owner_fix => $tri0, spec_back => sub { !defined $_[0] || fits($_[0], $back) },
-            impl_spec_back => $tri0, task_rejected => $int0, codex_rounds => $int0, ci_fix => $int0, same_failure => $int0,
-            split => $bool0, switch_to_spec => $int0, size_check_stops => $int0, decided_method_stops => $int0 },
-        uncountable => [ sub { in_set(bytes_of($_[0]), @names) } ],
+        rework => $rework,
+        uncountable => [ sub { exists $rework->{ bytes_of($_[0]) } } ],
         partial_records => $bool,
         unknown_turns => $int,
-        backfill => $bool,
         prices => { source => sub { defined $_[0] && !ref $_[0] && $_[0] =~ m{\Ahttps://[A-Za-z0-9.-]+(?:/[A-Za-z0-9._~/-]*)?\z} },
             checked_on => $date },
     };
