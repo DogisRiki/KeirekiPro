@@ -465,7 +465,7 @@ run_all
 O="$EX/s-old.jsonl"
 check "turnOrigin の無い古い版の行は、origin.kind の値を - を _ に替えて turnOrigin の値として読み、turnOrigin があればそちらを読む" \
     "$(kall "$O" turn from)|$(kall "$O" turn raw)|$(kall "$O" turn job)" \
-    "owner,notice,limit,unknown,peer,notice|undef,undef,undef,coordinator,undef,undef|null,b87654321,null,null,null,null"
+    "owner,notice,limit,peer,peer,notice|undef,undef,undef,undef,undef,undef|null,b87654321,null,null,null,null"
 check "知らせの元の仕事の識別子が英字と数字と _ と - だけの形でなければ、turn.job が null になる" "$(kall "$O" turn job | cut -d, -f6)/$(grep -c 'not an id' "$O")" "null/0"
 check "古い版の行の origin の欄と会話の文が、抜き出した記録に残らない" \
     "$(grep -c -e SECRET -e '"origin"' -e task-notification -e '"human"' -e '"body"' "$O")" "0"
