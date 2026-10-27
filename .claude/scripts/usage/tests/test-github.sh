@@ -685,6 +685,8 @@ rm -rf "$STATE"
 run publish 501 --draft "$DRAFT" --findings "$FIND"
 check "publish が 0 で終わり、集計のコメントの URL と案の ID と、空の書けなかった書き込みを出す" "$RC/$OUT/$ERR" "0/$(pubout '')/"
 check "publish は、集計のコメント、案の索引、一覧の順に書く" "$(writes)" "issue comment 501 --body-file F|issue comment 1 --body-file F|issue edit 1 --body-file F|"
+check "publish は、gh に渡す本文の一時ファイルを、手元の記録の置き場所に作る" \
+    "$(grep -o -- '--body-file [^ ]*' "$FAKE_GH_DIR/calls.log" | grep -v -c -- "--body-file $STATE/")" "0"
 check "集計のコメントが、1行目の印、report.md、### 所見 と所見のファイル、最後の数字の行の順に組み立てられる" \
     "$(dbq 'I(501)->{comments}[0]{body}')" \
     "$(printf '<!-- keirekipro-usage-report:v1 issue=501 -->\n\n%s\n\n### 所見\n\n%s\n\n<!-- keirekipro-usage-data:v1 %s -->' "$(cat "$DRAFT/report.md")" "$(cat "$FIND")" "$(cat "$DRAFT/report.json")")"
