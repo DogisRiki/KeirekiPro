@@ -39,9 +39,10 @@ my %TOOL_KIND = (
     Agent => 'agent', AskUserQuestion => 'ask', ExitPlanMode => 'ask',
     Bash => 'shell', PowerShell => 'shell', Monitor => 'wait',
 );
-# turnOrigin の値のうち、意味が分かっている値と、その行を始めた者の対応。表に無い値は unknown にする
+# turnOrigin の値のうち、意味が分かっている値と、その行を始めた者の対応。表に無い値は unknown にする。
+# coordinator は、親の会話が補助役に話しかけて動き直させた行で、その前の時間は親の会話の側で数えるので peer にする
 my %TURN_FROM = (
-    human => 'owner', peer => 'peer',
+    human => 'owner', peer => 'peer', coordinator => 'peer',
     task_notification => 'notice', scheduled => 'notice', sdk => 'notice',
 );
 # resume-after-usage-limit.sh が会話を再開させるときの知らせの印
