@@ -365,10 +365,7 @@ sub list_issue_for_write {
 }
 
 sub create_list_issue {
-    my $body = File::Temp->new;
-    binmode $body;
-    print $body LIST_INTRO;
-    close $body or die "一覧の Issue の本文を一時ファイルに書けなかった($!)\n";
+    my $body = body_file(LIST_INTRO);
     my $out = gh('issue', 'create', '--title', LIST_TITLE, '--body-file', $body->filename);
     my ($n) = $out =~ m{/issues/([1-9][0-9]*)\s*\z};
     die "作った一覧の Issue の番号を gh の出力から読めなかった\n" unless defined $n;
@@ -555,12 +552,14 @@ sub page_text {
     return LIST_PAGE_MARK . " page=$k -->\n\n### 一覧の続き(${k}ページ目)\n\n" . LIST_HEAD . join('', map { "$_\n" } @lines);
 }
 
+# gh に渡す本文を一時ファイルに書く。一時ファイルは手元の記録の置き場所に作る。
+# 既定の置き場所(Git Bash の /tmp)は、Windows の gh が開けないため
 sub body_file {
     my ($text) = @_;
-    my $f = File::Temp->new;
+    my $f = File::Temp->new(DIR => state_dir());
     binmode $f;
     print $f $text;
-    close $f or die "一覧の本文を一時ファイルに書けなかった($!)\n";
+    close $f or die "gh に渡す本文を一時ファイルに書けなかった($!)\n";
     return $f;
 }
 
