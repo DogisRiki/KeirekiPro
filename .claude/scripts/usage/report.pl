@@ -4,11 +4,11 @@
 #
 # 呼び出し方:
 #   perl report.pl --state <記録の置き場所> --config <データのファイル> --issue <N> --out <下書きのディレクトリ>
-#                  [--list <一覧の行のファイル>] [--backfill]
+#                  [--list <一覧の行のファイル>]
 #     手元の記録(extract/ marks.jsonl durations/)と、gh で読む PR と、git で読む main の spec.json から
 #     Issue N の集計を作り、<下書きのディレクトリ> に report.json と report.md と compare.json と unknown.json と
 #     created_at を書く。
-#     --list は、github.pl list-read の出力を過去の行として受ける。--backfill は、さかのぼりの集計の印である
+#     --list は、github.pl list-read の出力を過去の行として受ける。
 #
 # report.pl は、gh を読み取りだけに使い、GitHub に書かない。所見を書かない。
 # gh と git は、いまの作業フォルダのリポジトリを読む。
@@ -68,7 +68,7 @@ exit main(@ARGV) unless caller;
 sub main {
     my @argv = @_;
     my %o;
-    my $parsed = GetOptionsFromArray(\@argv, \%o, 'state=s', 'config=s', 'issue=s', 'out=s', 'list=s', 'backfill')
+    my $parsed = GetOptionsFromArray(\@argv, \%o, 'state=s', 'config=s', 'issue=s', 'out=s', 'list=s')
         && !@argv && defined $o{state} && defined $o{config} && defined $o{out}
         && defined $o{issue} && $o{issue} =~ /\A[1-9][0-9]{0,9}\z/;
     return usage() unless $parsed;
@@ -82,7 +82,7 @@ sub main {
 
 sub usage {
     print STDERR "report.pl: 引数が違う。使い方: perl report.pl --state <記録の置き場所> --config <データのファイル>",
-        " --issue <N> --out <下書きのディレクトリ> [--list <一覧の行のファイル>] [--backfill]\n";
+        " --issue <N> --out <下書きのディレクトリ> [--list <一覧の行のファイル>]\n";
     return 1;
 }
 
@@ -115,7 +115,6 @@ sub build {
         uncountable     => $uncountable,
         partial_records => $partial ? JSON::PP::true : JSON::PP::false,
         unknown_turns => unknown_turns($ctx),
-        backfill   => $o->{backfill} ? JSON::PP::true : JSON::PP::false,
         prices     => { map { ($_ => ref $ctx->{cfg}{prices} eq 'HASH' ? $ctx->{cfg}{prices}{$_} : undef) } qw(source checked_on) },
     };
     write_file("$o->{out}/report.json", $JSON->encode($report) . "\n");
@@ -1445,8 +1444,6 @@ sub report_md {
             . ($r->{prices}{checked_on} // '') . ja(' である。'),
     );
     my @notes;
-    push @notes, ja('この集計は、この Issue が終わったあとに、さかのぼって作った。Claude Code は、最後に動いてから30日たった'
-            . '会話の記録を消すので、この集計には、消えた会話の分が入っていないことがある。') if $r->{backfill};
     push @notes, ja('この Issue は、仕組みが入る前に着手した。「数えられない」と書いた項目は、数えるための印を作業の途中で残す'
             . '仕組みが、着手のときにまだ無かった項目である。') if $ctx->{before_system};
     push @notes, ja('会話の記録の一部を読めなかった。Claude は、この Issue の作業の一部を、仕組みが入る前の設定で始めた会話で行った。'

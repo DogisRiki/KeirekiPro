@@ -590,7 +590,7 @@ perl -MJSON::PP -e '
         rework => { spec_review_rounds => $tri->(3, 5, 2), owner_fix => $tri->(0, 1, 0), spec_back => [ { from => "design", to => "requirements" } ],
             impl_spec_back => $tri->(0, 1, 0), task_rejected => 2, codex_rounds => 3, ci_fix => 1, same_failure => 0, split => $f,
             switch_to_spec => 0, size_check_stops => 0, decided_method_stops => 0 },
-        uncountable => [], partial_records => $f, unknown_turns => 3, backfill => $f,
+        uncountable => [], partial_records => $f, unknown_turns => 3,
         prices => { source => "https://platform.claude.com/docs/en/about-claude/pricing", checked_on => "2026-10-24" } };
     print JSON::PP->new->canonical->encode($d);
 ' >"$DRAFT/report.json" || ng "report.json を用意できない"
@@ -750,6 +750,29 @@ mkdb "$PUBDB"
 rm -rf "$STATE"
 run publish 501 --draft "$TMP_ROOT/names" --findings "$FIND"
 check "役割が 補助役 と plugin:helper で、モデルが 不明 の集計を、publish が書いて 0 で終わる" "$RC/$ERR/$(dbq 'scalar @{ I(501)->{comments} }')" "0//1"
+
+echo "== 数えられない項目がある集計"
+# report.pl は、数えられない行の値を null にし、uncountable に往復と手戻りの行の名前(rework の欄の名前)を入れる
+for d in uncount uncount-bad; do mkdir -p "$TMP_ROOT/$d"; cp "$DRAFT/report.md" "$TMP_ROOT/$d/report.md"; done
+for v in 'same_failure owner_fix' 'branch'; do
+    if [ "$v" = branch ]; then d=uncount-bad; else d=uncount; fi
+    perl -MJSON::PP -e '
+        my $j = JSON::PP->new->canonical;
+        my $d = $j->decode(do { local $/; <STDIN> });
+        my @k = split / /, $ARGV[0];
+        $d->{uncountable} = \@k;
+        exists $d->{rework}{$_} and $d->{rework}{$_} = undef for @k;
+        print $j->encode($d);
+    ' "$v" <"$DRAFT/report.json" >"$TMP_ROOT/$d/report.json" || ng "数えられない項目の report.json を用意できない"
+done
+newgh publish-uncount
+mkdb "$PUBDB"
+rm -rf "$STATE"
+run publish 501 --draft "$TMP_ROOT/uncount-bad" --findings "$FIND"
+bad="$RC/$(calls)/$(nlines "$ERR")"
+run publish 501 --draft "$TMP_ROOT/uncount" --findings "$FIND"
+check "数えられない項目に往復と手戻りの行の名前がある集計を、publish が書いて 0 で終わる。行の名前でない値があると、書かずに 1 で終わる" \
+    "$bad|$RC/$ERR/$(dbq 'scalar @{ I(501)->{comments} }')" "1//1|0//1"
 
 echo "== 集計のコメントを書くときの失敗"
 newgh publish-nopush

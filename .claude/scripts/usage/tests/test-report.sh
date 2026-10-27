@@ -715,7 +715,6 @@ mdcol() {
 }
 PRICE_SRC=$(perl -MJSON::PP -e 'local $/; open my $f, "<", $ARGV[0] or die; print JSON::PP->new->decode(<$f>)->{prices}{source}' "$CONFIG")
 PRICE_DAY=$(perl -MJSON::PP -e 'local $/; open my $f, "<", $ARGV[0] or die; print JSON::PP->new->decode(<$f>)->{prices}{checked_on}' "$CONFIG")
-NOTE_BACKFILL='- この集計は、この Issue が終わったあとに、さかのぼって作った。Claude Code は、最後に動いてから30日たった会話の記録を消すので、この集計には、消えた会話の分が入っていないことがある。'
 NOTE_PRICE='- claude-unknown-9の公表価格が分からないため、仕組みは、このモデルの使用料を数えていない。全体の合計と段階ごとの表の使用料は、このモデルの分を除いた額である。'
 newrepo
 commit 2026-09-01T00:00:00Z "$CFGPATH={}" '.kiro/specs/feat-w/spec.json={"feature_name":"feat-w","issue":2040}'
@@ -812,11 +811,8 @@ case $created in
     *) [ "$created" -ge "$before" ] && [ "$created" -le "$after" ] && cr=ok ;;
 esac
 check "report.pl が、下書きのディレクトリに、作った時刻の created_at を書く" "$cr" "ok"
-r2040="$(rj 'J([R("v"), R("backfill"), R("prices")])'):$(grep -c 'さかのぼって作った' "$OUTD/report.md")"
-run 2040 --backfill
-check "--backfill を付けて作った report.json の backfill が真になり、注記の最初に、さかのぼりの集計の注記が出る。--backfill を付けないと、backfill が偽になり、その注記が出ない" \
-    "$r2040/$RC:$(rj 'J(R("backfill"))'):$(mdsec '### 注記' | sed -n 2p)" \
-    "[1,false,{\"checked_on\":\"$PRICE_DAY\",\"source\":\"$PRICE_SRC\"}]:0/0:true:$NOTE_BACKFILL"
+check "report.json に、形の版と価格の出どころが入る" "$(rj 'J([R("v"), R("prices")])')" \
+    "[1,{\"checked_on\":\"$PRICE_DAY\",\"source\":\"$PRICE_SRC\"}]"
 newstate
 rv s41 0 2041; rm1 s41 10 true
 run 2041
@@ -835,7 +831,7 @@ newstate
 rv sess-2042-zz 0 2042; rtool sess-2042-zz 5 6 t1 shell "" other; rturn sess-2042-zz 8 unknown
 rtk sess-2042-zz 9 m3 claude-unknown-9 1 0 0 0 0; rm1 sess-2042-zz 10 true
 printf '{"offset":1,"size":1,"skipped":1,"version":1}\n' >"$STATE/extract/sess-2042-zz.pos"
-run 2042 --backfill
+run 2042
 EXP="| 項目 | 回数 |
 |---|---|
 | spec の審査役との往復 | 数えられない |
@@ -851,8 +847,7 @@ EXP="| 項目 | 回数 |
 | 200行の検査で PR が止まった | 0 |
 | 自動レビューが、Issue の決めた方式から外れたとして PR を止めた | 0 |"
 check "前の段階に戻った行に戻った組ごとの回数が出て、数えられない行の全部が 数えられない になる" "$RC:$(mdsec '### 往復と手戻り' | sed '/^$/d')" "0:$EXP"
-EXP="$NOTE_BACKFILL
-- この Issue は、仕組みが入る前に着手した。「数えられない」と書いた項目は、数えるための印を作業の途中で残す仕組みが、着手のときにまだ無かった項目である。
+EXP="- この Issue は、仕組みが入る前に着手した。「数えられない」と書いた項目は、数えるための印を作業の途中で残す仕組みが、着手のときにまだ無かった項目である。
 - 会話の記録の一部を読めなかった。Claude は、この Issue の作業の一部を、仕組みが入る前の設定で始めた会話で行った。「数えられない」と書いた項目は、その会話では、数えるための印が残らなかった項目である。
 - 会話の記録の一部を読めなかった。仕組みは、この集計を、読めた分だけで数えた。そのため、作業時間とトークン数と使用料は、実際より少ないことがある。往復と手戻りの表の「数えられない」の項目は、読めなかった会話から数える項目である。
 $NOTE_PRICE
