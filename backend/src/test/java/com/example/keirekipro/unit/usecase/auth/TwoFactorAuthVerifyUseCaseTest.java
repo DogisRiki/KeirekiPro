@@ -75,7 +75,9 @@ class TwoFactorAuthVerifyUseCaseTest {
                 null,
                 "test-user",
                 LocalDateTime.now(),
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                null);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         // ユースケース実行

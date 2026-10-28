@@ -73,7 +73,9 @@ class GetUserInfoUseCaseTest {
                 PROFILE_IMAGE_PATH,
                 USERNAME_VALUE,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                null);
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
@@ -118,7 +120,9 @@ class GetUserInfoUseCaseTest {
                 null,
                 USERNAME_VALUE,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                null);
 
         // モックをセットアップ
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));

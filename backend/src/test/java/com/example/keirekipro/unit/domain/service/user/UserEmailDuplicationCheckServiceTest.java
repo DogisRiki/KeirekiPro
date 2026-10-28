@@ -8,6 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Optional;
@@ -69,6 +70,8 @@ class UserEmailDuplicationCheckServiceTest {
                 null,
                 null,
                 null,
+                null,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
                 null);
 
         // モックをセットアップ

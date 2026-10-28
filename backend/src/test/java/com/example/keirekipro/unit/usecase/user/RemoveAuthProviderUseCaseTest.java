@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
@@ -57,6 +58,8 @@ class RemoveAuthProviderUseCaseTest {
                 null,
                 "test-user",
                 null,
+                null,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
                 null);
 
         // モックをセットアップ

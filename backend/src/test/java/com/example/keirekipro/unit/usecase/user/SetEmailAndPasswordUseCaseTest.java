@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
@@ -65,6 +66,8 @@ class SetEmailAndPasswordUseCaseTest {
                 null,
                 USERNAME,
                 null,
+                null,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
                 null);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
@@ -90,6 +93,8 @@ class SetEmailAndPasswordUseCaseTest {
                 null,
                 USERNAME,
                 null,
+                null,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
                 null);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);

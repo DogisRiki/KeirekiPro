@@ -109,7 +109,9 @@ public class MyBatisUserRepository implements UserRepository {
                 dto.getProfileImage(),
                 dto.getUsername(),
                 dto.getCreatedAt(),
-                dto.getUpdatedAt());
+                dto.getUpdatedAt(),
+                null,
+                null);
     }
 
     /**

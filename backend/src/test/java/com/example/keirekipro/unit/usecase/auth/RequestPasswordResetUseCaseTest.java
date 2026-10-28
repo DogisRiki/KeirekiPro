@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Optional;
 import java.util.UUID;
@@ -72,6 +73,8 @@ class RequestPasswordResetUseCaseTest {
                 null,
                 USERNAME,
                 null,
+                null,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
                 null);
 
         // モックセットアップ

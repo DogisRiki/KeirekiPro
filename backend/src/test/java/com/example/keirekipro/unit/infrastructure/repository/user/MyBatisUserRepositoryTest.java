@@ -125,7 +125,9 @@ class MyBatisUserRepositoryTest {
                 null,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                null);
 
         // UserDtoのキャプチャ用
         ArgumentCaptor<UserDto> captor = ArgumentCaptor.forClass(UserDto.class);

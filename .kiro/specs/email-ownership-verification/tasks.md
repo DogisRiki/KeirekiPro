@@ -8,7 +8,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1(前からあるアカウントのメールアドレスを確認前として扱う)は、`EmailVerificationColumnsMigrationTest` の「V6 の時点で入れたアカウントの email_verified_at が V7 のあとに NULL になる」で確かめる。要件5の受入基準2(アカウントと職務経歴書を消さない)は、同じテストの「V6 の時点で入れたアカウントと職務経歴書の行が V7 のあとも残る」で確かめる
   - _要件: 5.1, 5.2_
 
-- [ ] 1.2 ドメインのモデル User に確認の状態を持たせる
+- [x] 1.2 ドメインのモデル User に確認の状態を持たせる
 
   Claude は、「User」の節のとおりに、ドメインのモデル `User` に欄 `emailVerifiedAt` と `pendingEmail` を足し、`isEmailVerified`、`createWithVerifiedEmail`、`verifyEmail`、`setPendingEmail`、`promotePendingEmail` を足す。Claude は、`changeTwoFactorAuthEnabled` の有効にする条件、`removeAuthProvider` の解除を断る条件、`delete` が `UserDeletedEvent` を積む条件を、「User」の節のとおりに変える。Claude は、`reconstruct` の検査を強めない。
 
@@ -353,6 +353,7 @@
 
 - Claude は、frontend で新しく作る関数、フック、部品を、そのタスクの中で、それぞれの feature の `index.ts` から公開する
 - 既存のテストが、確認前のアカウントを断る条件で失敗するときは、Claude は、テストのアカウントを確認済みのメールアドレスで作るように直す。Claude は、アサーションを消さず、変えない
+- backend のテストで、`assertThatThrownBy` の中で戻り値のあるメソッドを呼ぶときは、Claude は、`User ignored = ...; assertThat(ignored).isNotNull();` のブロックの形で書く。戻り値を捨てる式の形で書くと、`./gradlew check` の spotbugsTest が失敗する
 
 ## 完了条件(全タスク共通)
 

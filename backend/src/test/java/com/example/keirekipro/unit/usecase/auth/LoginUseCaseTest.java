@@ -100,6 +100,8 @@ class LoginUseCaseTest {
                 null,
                 "tester",
                 LocalDateTime.now(),
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                null);
     }
 }
