@@ -71,6 +71,8 @@ class OidcCallbackControllerTest {
     private static final String USER_ERROR_REDIRECT_URL = "/login?error="
             + URLEncoder.encode("ユーザー情報の取得に失敗しました。しばらく時間を置いてから再度お試しください。", StandardCharsets.UTF_8);
 
+    private static final String UNVERIFIED_EMAIL_REDIRECT_URL = "/login?error=unverified_email";
+
     private static final String FRONTEND_BASE_URL = "http://localhost:3000";
     private static final String API_BASE_URL = "http://localhost";
 
@@ -194,6 +196,21 @@ class OidcCallbackControllerTest {
                 .param("state", STATE_VALUE))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(FRONTEND_BASE_URL + AUTH_ERROR_REDIRECT_URL));
+
+        verify(handleOidcCallbackUseCase).execute(eq(CODE_VALUE), eq(STATE_VALUE), eq(null), anyString());
+    }
+
+    @Test
+    @DisplayName("UNVERIFIED_ACCOUNT_EMAIL なら /login?error=unverified_email へ送る")
+    void test7() throws Exception {
+        when(handleOidcCallbackUseCase.execute(eq(CODE_VALUE), eq(STATE_VALUE), eq(null), anyString()))
+                .thenReturn(new OidcCallbackResult.Failure(OidcCallbackError.UNVERIFIED_ACCOUNT_EMAIL));
+
+        mockMvc.perform(get(CALLBACK_PATH)
+                .param("code", CODE_VALUE)
+                .param("state", STATE_VALUE))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL + UNVERIFIED_EMAIL_REDIRECT_URL));
 
         verify(handleOidcCallbackUseCase).execute(eq(CODE_VALUE), eq(STATE_VALUE), eq(null), anyString());
     }

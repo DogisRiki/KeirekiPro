@@ -203,7 +203,7 @@
   - _対象の部品: GetUserInfoUseCase と UserInfoResponse_
   - _依存: 1.2_
 
-- [ ] 5. 外部連携のログインで確認の状態を扱う
+- [x] 5. 外部連携のログインで確認の状態を扱う
 - [x] 5.1 GitHub が確かめたメールアドレスだけを受け取る (並行可)
 
   Claude は、「GithubOidcProvider」の節のとおりに、`GithubOidcProvider` が、いつも `GET /user/emails` の `primary` と `verified` がどちらも true の要素だけを使うように変える。
@@ -226,7 +226,7 @@
     - 要件8の受入基準3(メールアドレスが確認済みになったあとは、今と同じく結び付ける)は、「確認済みのアカウントには今と同じく結び付ける」で確かめる
   - _要件: 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.3_
 
-- [ ] 5.3 結び付けを断ったときの戻り先を作る
+- [x] 5.3 結び付けを断ったときの戻り先を作る
 
   Claude は、`OidcCallbackError` に `UNVERIFIED_ACCOUNT_EMAIL` を足し、`HandleOidcCallbackUseCase` が `UnverifiedEmailAccountUseCaseException` を今の `catch (Exception e)` より先に受けるようにする。Claude は、`OidcCallbackController` が、その失敗のときだけ `/login?error=unverified_email` へ送るようにする。
   - 完了の確かめ方: `HandleOidcCallbackUseCaseTest` と `OidcCallbackControllerTest` が通る。ほかの失敗の送り先は今のままである

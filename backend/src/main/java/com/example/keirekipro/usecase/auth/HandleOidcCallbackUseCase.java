@@ -9,6 +9,7 @@ import com.example.keirekipro.usecase.auth.oidc.OidcCallbackResult;
 import com.example.keirekipro.usecase.auth.oidc.OidcGateway;
 import com.example.keirekipro.usecase.auth.oidc.OidcToken;
 import com.example.keirekipro.usecase.auth.oidc.OidcUserInfo;
+import com.example.keirekipro.usecase.auth.oidc.UnverifiedEmailAccountUseCaseException;
 import com.example.keirekipro.usecase.auth.store.OidcAuthorizationSessionStore;
 
 import org.springframework.stereotype.Service;
@@ -75,6 +76,9 @@ public class HandleOidcCallbackUseCase {
 
             return new OidcCallbackResult.Success(loginResult.getId(), loginResult.getRoles());
 
+        } catch (UnverifiedEmailAccountUseCaseException e) {
+            // 確認がまだのアカウントへは結び付けなかった
+            return new OidcCallbackResult.Failure(OidcCallbackError.UNVERIFIED_ACCOUNT_EMAIL);
         } catch (Exception e) {
             return new OidcCallbackResult.Failure(OidcCallbackError.LOGIN_FAILED);
         } finally {

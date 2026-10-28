@@ -19,6 +19,7 @@ import com.example.keirekipro.usecase.auth.oidc.OidcCallbackResult;
 import com.example.keirekipro.usecase.auth.oidc.OidcGateway;
 import com.example.keirekipro.usecase.auth.oidc.OidcToken;
 import com.example.keirekipro.usecase.auth.oidc.OidcUserInfo;
+import com.example.keirekipro.usecase.auth.oidc.UnverifiedEmailAccountUseCaseException;
 import com.example.keirekipro.usecase.auth.store.OidcAuthorizationSessionStore;
 
 import org.junit.jupiter.api.DisplayName;
@@ -226,5 +227,33 @@ class HandleOidcCallbackUseCaseTest {
                 .isEqualTo(OidcCallbackError.PROVIDER_ERROR_PARAMETER);
 
         verify(oidcAuthorizationSessionStore, never()).remove(any());
+    }
+
+    @Test
+    @DisplayName("UnverifiedEmailAccountUseCaseException なら UNVERIFIED_ACCOUNT_EMAIL の失敗を返す")
+    void test9() {
+        when(oidcAuthorizationSessionStore.find(STATE)).thenReturn(Optional.of(OidcAuthorizationSession.builder()
+                .state(STATE)
+                .provider(PROVIDER)
+                .codeVerifier(CODE_VERIFIER)
+                .build()));
+        when(oidcGateway.exchangeToken(PROVIDER, CODE, REDIRECT_URI, CODE_VERIFIER))
+                .thenReturn(new OidcToken(ACCESS_TOKEN, null, null));
+        when(oidcGateway.fetchUserInfo(PROVIDER, ACCESS_TOKEN)).thenReturn(OidcUserInfo.builder()
+                .providerType(PROVIDER)
+                .providerUserId("provider-user-id")
+                .email("test@keirekipro.click")
+                .username("test-user")
+                .build());
+        when(oidcLoginUseCase.execute(any(OidcUserInfo.class)))
+                .thenThrow(new UnverifiedEmailAccountUseCaseException());
+
+        OidcCallbackResult result = handleOidcCallbackUseCase.execute(CODE, STATE, null, REDIRECT_URI);
+
+        assertThat(result).isInstanceOf(OidcCallbackResult.Failure.class);
+        assertThat(((OidcCallbackResult.Failure) result).getError())
+                .isEqualTo(OidcCallbackError.UNVERIFIED_ACCOUNT_EMAIL);
+
+        verify(oidcAuthorizationSessionStore).remove(STATE);
     }
 }
