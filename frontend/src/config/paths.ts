@@ -10,6 +10,9 @@ export const paths = {
         reset: "/password/reset/:token",
         change: "/password/change",
     },
+    email: {
+        verify: "/email/verify",
+    },
     emailPassword: {
         set: "/email-password/set",
     },

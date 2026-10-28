@@ -258,7 +258,7 @@
   - 完了の確かめ方: frontend の型の検査と既存のテストがすべて通る
   - 受入基準とテストの対応: このタスクは型を揃える作業で、受入基準を満たさない。そのため、`_要件:_` の行を書かない
 
-- [ ] 7.2 確認のリンクの画面を作る
+- [x] 7.2 確認のリンクの画面を作る
 
   Claude は、「VerifyEmail ページと EmailVerificationContainer」の節のとおりに、確認と送り直しの API を呼ぶ関数とフックと、`EmailVerificationContainer` と、ページ `VerifyEmail` を作る。Claude は、経路 `paths.email.verify` と、`AppRouter` のどのレイアウトにも属さない経路を足し、ページを `pages/index` から公開する。画面は、`location.hash` からトークンを取り、URL から `#` 以降を消し、`result` ごとに文とボタンを出す。
   - 完了の確かめ方: `EmailVerificationContainer.test.tsx` と `useVerifyEmail.test.ts` と `AppRouter.test.tsx` が通る。確認のリンクの画面は、出し直しても、確認の API を2回呼ばない

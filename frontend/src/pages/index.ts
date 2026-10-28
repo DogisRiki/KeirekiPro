@@ -14,3 +14,4 @@ export * from "@/pages/ResumeNew";
 export * from "@/pages/SettingUser";
 export * from "@/pages/Terms";
 export * from "@/pages/TwoFactor";
+export * from "@/pages/VerifyEmail";
