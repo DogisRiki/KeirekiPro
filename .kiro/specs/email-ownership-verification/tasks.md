@@ -204,7 +204,7 @@
   - _依存: 1.2_
 
 - [ ] 5. 外部連携のログインで確認の状態を扱う
-- [ ] 5.1 GitHub が確かめたメールアドレスだけを受け取る (並行可)
+- [x] 5.1 GitHub が確かめたメールアドレスだけを受け取る (並行可)
 
   Claude は、「GithubOidcProvider」の節のとおりに、`GithubOidcProvider` が、いつも `GET /user/emails` の `primary` と `verified` がどちらも true の要素だけを使うように変える。
   - 完了の確かめ方: `GithubOidcProviderTest` が通る。`verified` を見ないように一時的に変えると、テストが失敗する
