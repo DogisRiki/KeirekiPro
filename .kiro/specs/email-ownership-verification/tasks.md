@@ -92,7 +92,7 @@
   - 受入基準とテストの対応: 要件2の受入基準4(期限切れか、新しいメールで使えなくなったリンク)は、`EmailVerificationLinkClassifierTest` の「lexp を過ぎたリンクは EXPIRED」「jti が最新でないリンクは EXPIRED」で確かめる。要件2の受入基準4のうち登録が消えたときは、「確認前の登録が無い REGISTRATION のリンクは REGISTRATION_GONE」で確かめる。要件2の受入基準5(確認を済ませたあとのリンクを押すと、確認がすでに済んでいることを出す)は、「sub のアカウントが email を確認済みで持てば ALREADY_VERIFIED」で確かめる。`sub` は、トークンに入れた、確認前の登録かアカウントの ID である
   - _要件: 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 3.2 確認を済ませたときの書き込みを作る
+- [x] 3.2 確認を済ませたときの書き込みを作る
 
   Claude は、「EmailVerificationCompletion」の節のとおりに、`completeRegistration`、`verifyAccountEmail`、`promotePendingEmail` を、それぞれ1つのトランザクションで行う部品を作る。
   - 完了の確かめ方: `EmailVerificationCompletionTest` が通る。`completeRegistration` で `register()` を呼ばないように一時的に変えると、テストが失敗する
