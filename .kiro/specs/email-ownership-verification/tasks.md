@@ -48,7 +48,7 @@
   - _要件: 1.4, 1.6_
   - _対象の部品: PendingRegistrationStore と RedisPendingRegistrationStore_
 
-- [ ] 2.3 最新のリンクの ID の置き場所を作る (並行可)
+- [x] 2.3 最新のリンクの ID の置き場所を作る (並行可)
 
   Claude は、「EmailVerificationCurrentTokenStore と RedisEmailVerificationCurrentTokenStore」の節のとおりに、インタフェースと Redis の実装を作る。`consume` は、置いてある最新の `jti` と渡された `jti` を比べることと、置いてある `jti` を消すことを、Lua スクリプト1つで行う。`jti` は、リンクごとに作る ID である。
   - 完了の確かめ方: `RedisEmailVerificationCurrentTokenStoreTest`(Testcontainers の Redis)が通る。`consume` が値を比べずに消すように一時的に変えると、テストが失敗する
