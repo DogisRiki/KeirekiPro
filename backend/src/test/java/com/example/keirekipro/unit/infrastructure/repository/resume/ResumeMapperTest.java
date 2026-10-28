@@ -35,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 
 @MybatisTest
 @ActiveProfiles("test")
-@TestPropertySource(properties = "spring.flyway.target=6")
+@TestPropertySource(properties = "spring.flyway.target=7")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

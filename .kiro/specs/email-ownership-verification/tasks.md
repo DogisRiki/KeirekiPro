@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 確認の状態を保存する列とドメインのモデルを作る
+- [x] 1. 確認の状態を保存する列とドメインのモデルを作る
 - [x] 1.1 users の表に2つの列を足すマイグレーションを作る
 
   Claude は、先にテスト `EmailVerificationColumnsMigrationTest` を書いて失敗することを確かめ、そのあとでマイグレーション `V7__add_email_verification_columns.sql` を足す。V7 は、users の表に `email_verified_at`(`TIMESTAMP NULL`)と `pending_email`(`VARCHAR(255) NULL`)を足すだけで、既存の列とデータを変えない。テストは、V6 まで進めたデータベースにアカウントの行と職務経歴書の行を入れ、V7 まで進めたあとで、その行が残り、`email_verified_at` と `pending_email` が NULL であることを確かめる。
@@ -24,7 +24,7 @@
     - 要件10の受入基準3(外部連携を解除できるかを判断するときに、確認前と設定待ちのメールアドレスを無いものとして扱う)は、「確認前のアカウントで外部連携が1つのときに解除を断る」で確かめる
   - _要件: 3.4, 4.1, 4.2, 4.3, 7.2, 7.3, 10.1, 10.2, 10.3_
 
-- [ ] 1.3 ユーザーの保存で2つの列を読み書きする
+- [x] 1.3 ユーザーの保存で2つの列を読み書きする
 
   Claude は、「MyBatisUserRepository と UserMapper」の節のとおりに、`UserDto`、`UserMapper`、`UserMapper.xml`、`MyBatisUserRepository` で、`email_verified_at` と `pending_email` を読み書きする。
   - 完了の確かめ方: `MyBatisUserRepositoryTest` で、`emailVerifiedAt` と `pendingEmail` を持つアカウントを保存して読み直すと、同じ値が返る。`UserMapper.xml` の `upsertUser` から `pending_email` を一時的に外すと、テストが失敗する。`upsertUser` は、users の表に行が無ければ行を足し、行があれば行を書き換える SQL の文である
@@ -354,6 +354,8 @@
 - Claude は、frontend で新しく作る関数、フック、部品を、そのタスクの中で、それぞれの feature の `index.ts` から公開する
 - 既存のテストが、確認前のアカウントを断る条件で失敗するときは、Claude は、テストのアカウントを確認済みのメールアドレスで作るように直す。Claude は、アサーションを消さず、変えない
 - backend のテストで、`assertThatThrownBy` の中で戻り値のあるメソッドを呼ぶときは、Claude は、`User ignored = ...; assertThat(ignored).isNotNull();` のブロックの形で書く。戻り値を捨てる式の形で書くと、`./gradlew check` の spotbugsTest が失敗する
+- 所有者が 2026-10-28 に決めたとおり、この spec では、確認役は、タスクごとには変えたファイルを使うテストだけを動かし、`./gradlew check` などの品質チェックの全体は、大きなまとまり(1. から 8. の見出しのタスク)の最後のタスクの確認で1回だけ動かす。Claude は、確認役に送る前に、変えたファイルを使うテストを `grep` で探して全部動かす
+- `UserMapper` の SQL を変えるときは、`spring.flyway.target` で古い版の表を使うテストのうち、`UserMapper` を呼ぶもの(`UserMapperTest`、`ResumeMapperTest`)の版も上げる
 
 ## 完了条件(全タスク共通)
 

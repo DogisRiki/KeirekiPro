@@ -110,8 +110,8 @@ public class MyBatisUserRepository implements UserRepository {
                 dto.getUsername(),
                 dto.getCreatedAt(),
                 dto.getUpdatedAt(),
-                null,
-                null);
+                dto.getEmailVerifiedAt(),
+                dto.getPendingEmail() != null ? Email.create(new ErrorCollector(), dto.getPendingEmail()) : null);
     }
 
     /**
@@ -127,6 +127,8 @@ public class MyBatisUserRepository implements UserRepository {
         dto.setTwoFactorAuthEnabled(user.isTwoFactorAuthEnabled());
         dto.setCreatedAt(user.getCreatedAt());
         dto.setUpdatedAt(user.getUpdatedAt());
+        dto.setEmailVerifiedAt(user.getEmailVerifiedAt());
+        dto.setPendingEmail(user.getPendingEmail() != null ? user.getPendingEmail().getValue() : null);
 
         dto.setAuthProviders(
                 user.getAuthProviders().values().stream()
