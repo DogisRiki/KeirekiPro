@@ -419,11 +419,13 @@ check "origin/main にデータのファイルを足したコミットが無い�
     "$RC/$(statejson issues/202.json)/$(calls)" "2/none/"
 
 echo "== 集計の下書き"
-# Issue 203 と、それを閉じる、仕組みが入ったあとにマージされた PR 305 だけの偽の GitHub
-dwdb() { mkdb "issues => [ cl(203, '2026-10-25T03:00:00Z'${1-}) ], prs => [ pr(305, 'MERGED', 'Closes #203', '2026-10-24T15:00:00Z', '$POST') ]"; }
+# Issue 203 と、それを閉じる、仕組みが入ったあとにマージされた PR 305 だけの偽の GitHub。
+# 2つ目の引数は、ほかの Issue を足す
+dwdb() { mkdb "issues => [ cl(203, '2026-10-25T03:00:00Z'${1-})${2-} ], prs => [ pr(305, 'MERGED', 'Closes #203', '2026-10-24T15:00:00Z', '$POST') ]"; }
 draftrepo dw
 newgh dw
-dwdb
+# 一覧に過去の行を足す確認で使う Issue 150 は、題名を持つ
+dwdb '' ", cl(150, '2026-10-01T00:00:00Z', title => '過去の Issue')"
 mktrans dw-a 3
 run draft 203
 r1=$RC

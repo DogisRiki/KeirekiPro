@@ -690,20 +690,51 @@ sub list_reread_wait {
     select(undef, undef, undef, $s) if $s > 0;
 }
 
+# 1回の呼び出しの中で読んだ Issue の短い題名
+my %TITLES;
+
+# Issue N の今の題名を読み、短い題名を返す。読めなければ die する。同じ Issue の題名は2回読まない
+sub issue_title {
+    my ($n) = @_;
+    return $TITLES{$n} if exists $TITLES{$n};
+    my $i = gh_api_one("repos/{owner}/{repo}/issues/$n");
+    my $t = ref $i eq 'HASH' ? $i->{title} : undef;
+    die "Issue $n の題名を読めなかった\n" unless defined $t && !ref $t && length $t;
+    return $TITLES{$n} = title_short($t);
+}
+
+# 足す行の題名を、一覧の今の行で決めた写しを返す。title が文字列ならそのまま書く。
+# title の欄が無ければ、一覧の同じ Issue の行の題名を残し、その行が無いか題名が無ければ読む。
+# title が null なら、一覧の同じ Issue の行の題名の欄を残し、その行が無ければ読む
+sub with_titles {
+    my ($rows, $cur) = @_;
+    my %old = map { $_->{issue} => $_ } @{ $cur->{rows} };
+    my @out;
+    for my $r (@$rows) {
+        my %c = %$r;
+        my $o = $old{ $r->{issue} };
+        if (!defined $r->{title}) {
+            $c{title} = !exists $r->{title} ? ($o && defined $o->{title} ? $o->{title} : issue_title($r->{issue}))
+                : $o ? $o->{title} : issue_title($r->{issue});
+        }
+        push @out, \%c;
+    }
+    return \@out;
+}
+
 # 一覧に行を足す。同じ Issue の行は置き換える。書いたら待ってから読み直し、足した行がすべてあれば 1 を返す。
-# 無ければ、読み直した一覧に足し直す。LIST_TRIES 回やっても無ければ die する
+# 無ければ、読み直した一覧で足す行の題名を決め直して足し直す。LIST_TRIES 回やっても無ければ die する
 sub write_rows {
     my ($list, $rows, $cur) = @_;
-    my %want = map { format_row($_) => 1 } @$rows;
     for (1 .. LIST_TRIES) {
         $cur ||= read_list($list);
-        my %add = map { $_->{issue} => $_ } @$rows;
+        my %add = map { $_->{issue} => $_ } @{ with_titles($rows, $cur) };
         my @all = ((grep { !$add{ $_->{issue} } } @{ $cur->{rows} }), values %add);
         return 1 unless write_list($list, $cur, \@all);
         list_reread_wait();
         $cur = read_list($list);
         my %have = map { format_row($_) => 1 } @{ $cur->{rows} };
-        return 1 unless grep { !$have{$_} } keys %want;
+        return 1 unless grep { !$have{ format_row($_) } } values %add;
     }
     die LIST_TRIES . "回書き直しても、一覧に足した行が残らなかった\n";
 }
