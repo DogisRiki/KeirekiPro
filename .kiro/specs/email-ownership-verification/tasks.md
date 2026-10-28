@@ -233,7 +233,7 @@
   - 受入基準とテストの対応: 要件8の受入基準1・2(確認前のメールアドレスのアカウントに結び付けずにログインさせず、先に確認を済ませるよう案内する文を出す)は、`HandleOidcCallbackUseCaseTest` の「UnverifiedEmailAccountUseCaseException なら UNVERIFIED_ACCOUNT_EMAIL の失敗を返す」と、`OidcCallbackControllerTest` の「UNVERIFIED_ACCOUNT_EMAIL なら /login?error=unverified_email へ送る」で確かめる
   - _要件: 8.1, 8.2_
 
-- [ ] 6. 確認の API を作る
+- [x] 6. 確認の API を作る
 - [x] 6.1 確認と送り直しの API を作る
 
   Claude は、`VerifyEmailController`、`ResendEmailVerificationController`、`ResendEmailVerificationForLoginController` と、その要求と応答の DTO を作る。Claude は、`EmailVerificationTokenRequest` の `token` に、`@NotBlank` と、長さを2048文字までに限る検査を付ける。`VerifyEmailController` は、どの結果でも 200 を返す。
@@ -242,7 +242,7 @@
   - _要件: 2.4, 2.5, 3.1, 3.2, 9.2_
   - _依存: 3.3, 3.4, 4.4_
 
-- [ ] 6.2 ユーザー設定の画面から送る API を作る (並行可)
+- [x] 6.2 ユーザー設定の画面から送る API を作る (並行可)
 
   Claude は、`SendAccountEmailVerificationController`(`POST /api/users/me/email-verification`)を作る。
   - 完了の確かめ方: `SendAccountEmailVerificationControllerTest` で、ログインした利用者の要求に 204 を返し、ログインしていない要求に 401 を返す
