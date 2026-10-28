@@ -23,7 +23,8 @@
 #   perl github.pl proposal-remove <案の ID>
 #     案を、案の索引と、その Issue の issues/<N>.json の proposals_pending から外す
 #
-# 一覧の行は、終了日の古い順に、終了日が同じなら Issue の番号の順に並べ、300行ごとのページに分ける。
+# 一覧の行は、終了日の古い順に、終了日が同じなら Issue の番号の順に並べ、ページに分ける。1ページは300行までとし、
+# ページの全文が UTF-8 で60,000バイトを超えるときは、超える行の前で分ける。
 # 1ページ目は一覧の Issue の本文に、2ページ目からは行頭が <!-- keirekipro-usage-list:v1 page=<k> --> の
 # コメントに置く。行を足したら、待ってから一覧を読み直し、足した行が無ければ3回まで書き直す。
 # 足せなかったときは、その Issue の issues/<N>.json に list_pending を残して 1 で終わる。
@@ -64,18 +65,19 @@ use constant LIST_PAGE_MARK => '<!-- keirekipro-usage-list:v1';
 # 一覧の Issue の題名と、作るときの本文(行の無い一覧)
 use constant LIST_TITLE => 'AIの作業の集計の一覧';
 use constant LIST_HEAD => <<'END';
-| Issue | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |
-|---|---|---|---|---|---|---|
+| Issue | 題名 | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |
+|---|---|---|---|---|---|---|---|
 END
 use constant LIST_INTRO => <<'END' . LIST_HEAD;
 ## AIの作業の集計の一覧
 
-この一覧は、Issue ごとの AI の作業の集計を、終了日の古い順に1行ずつ並べたものである。Issue の列の番号から、その Issue の集計のコメントを開ける。「AIの作業時間」は、AI の会話のどれかが動いていた時間で、所有者の返事を待っていた時間と、使う量の上限で止まっていた時間を含まない。「トークン数」は、入力、キャッシュの書き込み、キャッシュの読み込み、出力の合計である。「使用料」は、トークン数を公表価格で換算した米ドルの額である。「実装中に spec へ戻った回数」は、実装の途中で要件、設計、タスクに戻って直した回数の合計である。300行を超えた行は、この Issue のコメントに続く。
+この一覧は、Issue ごとの AI の作業の集計を、終了日の古い順に1行ずつ並べたものである。Issue の列の番号から、その Issue の集計のコメントを開ける。Issue の列の番号にマウスを置くと、GitHub が Issue の題名の全文を出す。「題名」は、行を足したときの Issue の題名の初めの20文字で、長い題名は「…」で切ってある。「AIの作業時間」は、AI の会話のどれかが動いていた時間で、所有者の返事を待っていた時間と、使う量の上限で止まっていた時間を含まない。「トークン数」は、入力、キャッシュの書き込み、キャッシュの読み込み、出力の合計である。「使用料」は、トークン数を公表価格で換算した米ドルの額である。「実装中に spec へ戻った回数」は、実装の途中で要件、設計、タスクに戻って直した回数の合計である。1ページに入らない行は、この Issue のコメントに続く。
 
 END
 
-# 1ページの行の数と、一覧に行を足すときに書き直す回数
+# 1ページの行の数と、1ページの全文の UTF-8 のバイトの数の上限と、一覧に行を足すときに書き直す回数
 use constant ROWS_PER_PAGE => 300;
+use constant PAGE_BYTES => 60_000;
 use constant LIST_TRIES => 3;
 
 # 一覧の行の、数えられない値と、価格が分からないモデルがあるときの使用料のあとに付ける文
@@ -393,7 +395,49 @@ sub clear_pending {
 # ---- 一覧の行 ------------------------------------------------------------
 # 一覧の行は、次の欄のハッシュで持つ。list-read はこの形を出し、list-add はこの形を読む。
 # issue / url(集計のコメント)/ spec(真偽)/ end_date / work_sec / tokens / usd / impl_spec_back /
-# usd_partial(真偽。価格が分からないモデルがあるとき真)。work_sec から impl_spec_back は null(数えられない)を取る
+# usd_partial(真偽。価格が分からないモデルがあるとき真)/ title(短い題名の文字の列。題名の無い行は null)。
+# work_sec から impl_spec_back は null(数えられない)を取る。list-add が受けた行に title の欄が無ければ、
+# check_row は確かめたあとの行にも title の欄を作らない
+
+# 題名の欄に置く字の数の上限と、上限より長い題名のあとに付ける字(…)
+use constant TITLE_MAX => 20;
+use constant TITLE_MORE => "\x{2026}";
+
+# Issue の題名(文字の列)から短い題名を作る。制御文字と行の区切りと段落の区切りを空白に替え、
+# 拡張書記素クラスタ(画面で1字に見えるまとまり)で初めの20字を取り、21字以上なら「…」を付ける
+sub title_short {
+    my ($t) = @_;
+    $t =~ s/[\p{Cc}\p{Zl}\p{Zp}]/ /g;
+    my @g = $t =~ /(\X)/g;
+    return $t if @g <= TITLE_MAX;
+    return join('', @g[0 .. TITLE_MAX - 1]) . TITLE_MORE;
+}
+
+# 短い題名から、一覧の行の題名の欄(UTF-8 のバイトの文字列)を作る。題名の無い行の欄は空にする。
+# 「|」を「\|」に替え、題名の中で続く「`」の最も長い数より1つ多い「`」と空白で囲んでコードの形にする。
+# 「\」は替えない。GitHub は表の中で「\|」だけを「|」に戻し、ほかの「\」をそのまま出すためである
+sub title_cell {
+    my ($t) = @_;
+    return '' unless defined $t;
+    (my $e = $t) =~ s/\|/\\|/g;
+    my $run = 0;
+    for my $b ($e =~ /(`+)/g) { $run = length $b if length $b > $run }
+    my $fence = '`' x ($run + 1);
+    return Encode::encode('UTF-8', "$fence $e $fence");
+}
+
+# 一覧の行の題名の欄より後ろ(バイトの文字列)から、題名の欄を読む。題名の欄が「`」で囲んだコードの形なら、
+# 「\|」を「|」に戻した題名(文字の列)と、欄のあとの残りを返す。形が違えば空のリストを返す。
+# 囲む「`」は題名の中のどの「`」の続きよりも長いので、同じ数の「`」の続きで題名の終わりを見分けられる
+sub parse_title_cell {
+    my ($rest) = @_;
+    my ($fence, $e, $after) = $rest =~ /\A(`+) (.*?) \1(?!`) \| (.*)\z/s or return;
+    return if $e =~ /(?<!\\)\|/;
+    for my $b ($e =~ /(`+)/g) { return if length $b >= length $fence }
+    my $t = Encode::decode('UTF-8', $e);
+    $t =~ s/\\\|/|/g;
+    return ($t, $after);
+}
 
 sub group3 {
     my ($s) = @_;
@@ -429,19 +473,28 @@ sub fmt_count {
 
 sub format_row {
     my ($r) = @_;
-    return '| ' . join(' | ', "[#$r->{issue}]($r->{url})", ($r->{spec} ? 'あり' : '無し'), $r->{end_date},
+    return '| ' . join(' | ', "[#$r->{issue}]($r->{url})", title_cell($r->{title}), ($r->{spec} ? 'あり' : '無し'), $r->{end_date},
         fmt_time($r->{work_sec}), fmt_tokens($r->{tokens}), fmt_usd($r->{usd}, $r->{usd_partial}),
         fmt_count($r->{impl_spec_back})) . ' |';
 }
 
-# 一覧の1行(バイトの文字列)を、行のハッシュに戻す。一覧の行の形でなければ undef を返す
+# 一覧の1行(バイトの文字列)を、行のハッシュに戻す。一覧の行の形でなければ undef を返す。
+# 題名の列の無い7列の行と、題名の欄が空の8列の行の title は null にする
 sub parse_row {
     my ($line) = @_;
     my $u = UNCOUNTABLE;
-    my ($n, $url, $spec, $date, $time, $tok, $usd, $back) = $line =~ m{\A\| \[#([1-9][0-9]*)\]\((\S+)\) \| (あり|無し) \| ([0-9]{4}-[0-9]{2}-[0-9]{2}) \| ([^|]+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|\s*\z}
+    my ($n, $url, $rest) = $line =~ m{\A\| \[#([1-9][0-9]*)\]\((\S+)\) \| (.*)\z}s or return undef;
+    my $title;
+    if ($rest =~ /\A`/) {
+        my ($t, $after) = parse_title_cell($rest) or return undef;
+        ($title, $rest) = ($t, $after);
+    } else {
+        $rest =~ s/\A ?\| //;
+    }
+    my ($spec, $date, $time, $tok, $usd, $back) = $rest =~ m{\A(あり|無し) \| ([0-9]{4}-[0-9]{2}-[0-9]{2}) \| ([^|]+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|\s*\z}
         or return undef;
     my %r = (issue => $n + 0, url => $url, spec => $spec eq 'あり' ? JSON::PP::true : JSON::PP::false, end_date => $date,
-        usd_partial => JSON::PP::false);
+        usd_partial => JSON::PP::false, title => $title);
     if ($time eq $u) { $r{work_sec} = undef }
     elsif ($time =~ /\A(?:([1-9][0-9]*)時間)?([0-9]+)分\z/) { $r{work_sec} = (($1 // 0) * 60 + $2) * 60 }
     else { return undef }
@@ -487,6 +540,12 @@ sub check_row {
     my $p = $r->{usd_partial};
     die "Issue $n の行の usd_partial が真偽でない\n" if defined $p && !JSON::PP::is_bool($p);
     $c{usd_partial} = $p ? JSON::PP::true : JSON::PP::false;
+    if (exists $r->{title}) {
+        my $t = $r->{title};
+        die "Issue $n の行の title が、短い題名か null でない\n"
+            if defined $t && (ref $t || !length $t || title_short("$t") ne "$t");
+        $c{title} = defined $t ? "$t" : undef;
+    }
     return \%c;
 }
 
@@ -552,6 +611,28 @@ sub page_text {
     return LIST_PAGE_MARK . " page=$k -->\n\n### 一覧の続き(${k}ページ目)\n\n" . LIST_HEAD . join('', map { "$_\n" } @lines);
 }
 
+# k ページ目の全文。1ページ目は一覧の Issue の本文、2ページ目からはページのコメントの本文である
+sub page_full {
+    my ($k, @lines) = @_;
+    return $k == 1 ? LIST_INTRO . join('', map { "$_\n" } @lines) : page_text($k, @lines);
+}
+
+# 並べた行(バイトの文字列)をページに分ける。行を足すとページが300行を超えるか、全文が60,000バイトを超えるときは、
+# その行から次のページにする
+sub split_pages {
+    my @pages;
+    my $size = 0;
+    for my $line (@_) {
+        if (!@pages || @{ $pages[-1] } >= ROWS_PER_PAGE || $size + length($line) + 1 > PAGE_BYTES) {
+            push @pages, [];
+            $size = length page_full(scalar @pages);
+        }
+        push @{ $pages[-1] }, $line;
+        $size += length($line) + 1;
+    }
+    return @pages;
+}
+
 # gh に渡す本文を一時ファイルに書く。一時ファイルは手元の記録の置き場所に作る。
 # 既定の置き場所(Git Bash の /tmp)は、Windows の gh が開けないため
 sub body_file {
@@ -569,10 +650,9 @@ sub body_file {
 sub write_list {
     my ($list, $cur, $rows) = @_;
     my @lines = map { format_row($_) } sort_rows(@$rows);
-    my @pages;
-    push @pages, [ splice @lines, 0, ROWS_PER_PAGE ] while @lines;
+    my @pages = split_pages(@lines);
     my $wrote = 0;
-    my $body = LIST_INTRO . join('', map { "$_\n" } @{ shift(@pages) || [] });
+    my $body = page_full(1, @{ shift(@pages) || [] });
     if ($body ne $cur->{body}) {
         my $f = body_file($body);
         gh('issue', 'edit', $list, '--body-file', $f->filename);
@@ -610,20 +690,51 @@ sub list_reread_wait {
     select(undef, undef, undef, $s) if $s > 0;
 }
 
+# 1回の呼び出しの中で読んだ Issue の短い題名
+my %TITLES;
+
+# Issue N の今の題名を読み、短い題名を返す。読めなければ die する。同じ Issue の題名は2回読まない
+sub issue_title {
+    my ($n) = @_;
+    return $TITLES{$n} if exists $TITLES{$n};
+    my $i = gh_api_one("repos/{owner}/{repo}/issues/$n");
+    my $t = ref $i eq 'HASH' ? $i->{title} : undef;
+    die "Issue $n の題名を読めなかった\n" unless defined $t && !ref $t && length $t;
+    return $TITLES{$n} = title_short($t);
+}
+
+# 足す行の題名を、一覧の今の行で決めた写しを返す。title が文字列ならそのまま書く。
+# title の欄が無ければ、一覧の同じ Issue の行の題名を残し、その行が無いか題名が無ければ読む。
+# title が null なら、一覧の同じ Issue の行の題名の欄を残し、その行が無ければ読む
+sub with_titles {
+    my ($rows, $cur) = @_;
+    my %old = map { $_->{issue} => $_ } @{ $cur->{rows} };
+    my @out;
+    for my $r (@$rows) {
+        my %c = %$r;
+        my $o = $old{ $r->{issue} };
+        if (!defined $r->{title}) {
+            $c{title} = !exists $r->{title} ? ($o && defined $o->{title} ? $o->{title} : issue_title($r->{issue}))
+                : $o ? $o->{title} : issue_title($r->{issue});
+        }
+        push @out, \%c;
+    }
+    return \@out;
+}
+
 # 一覧に行を足す。同じ Issue の行は置き換える。書いたら待ってから読み直し、足した行がすべてあれば 1 を返す。
-# 無ければ、読み直した一覧に足し直す。LIST_TRIES 回やっても無ければ die する
+# 無ければ、読み直した一覧で足す行の題名を決め直して足し直す。LIST_TRIES 回やっても無ければ die する
 sub write_rows {
     my ($list, $rows, $cur) = @_;
-    my %want = map { format_row($_) => 1 } @$rows;
     for (1 .. LIST_TRIES) {
         $cur ||= read_list($list);
-        my %add = map { $_->{issue} => $_ } @$rows;
+        my %add = map { $_->{issue} => $_ } @{ with_titles($rows, $cur) };
         my @all = ((grep { !$add{ $_->{issue} } } @{ $cur->{rows} }), values %add);
         return 1 unless write_list($list, $cur, \@all);
         list_reread_wait();
         $cur = read_list($list);
         my %have = map { format_row($_) => 1 } @{ $cur->{rows} };
-        return 1 unless grep { !$have{$_} } keys %want;
+        return 1 unless grep { !$have{ format_row($_) } } values %add;
     }
     die LIST_TRIES . "回書き直しても、一覧に足した行が残らなかった\n";
 }

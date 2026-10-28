@@ -419,11 +419,13 @@ check "origin/main にデータのファイルを足したコミットが無い�
     "$RC/$(statejson issues/202.json)/$(calls)" "2/none/"
 
 echo "== 集計の下書き"
-# Issue 203 と、それを閉じる、仕組みが入ったあとにマージされた PR 305 だけの偽の GitHub
-dwdb() { mkdb "issues => [ cl(203, '2026-10-25T03:00:00Z'${1-}) ], prs => [ pr(305, 'MERGED', 'Closes #203', '2026-10-24T15:00:00Z', '$POST') ]"; }
+# Issue 203 と、それを閉じる、仕組みが入ったあとにマージされた PR 305 だけの偽の GitHub。
+# 2つ目の引数は、ほかの Issue を足す
+dwdb() { mkdb "issues => [ cl(203, '2026-10-25T03:00:00Z'${1-})${2-} ], prs => [ pr(305, 'MERGED', 'Closes #203', '2026-10-24T15:00:00Z', '$POST') ]"; }
 draftrepo dw
 newgh dw
-dwdb
+# 一覧に過去の行を足す確認で使う Issue 150 は、題名を持つ
+dwdb '' ", cl(150, '2026-10-01T00:00:00Z', title => '過去の Issue')"
 mktrans dw-a 3
 run draft 203
 r1=$RC
@@ -563,8 +565,8 @@ check "publish が一覧に1行を足し、その行の値が、同じ Issue の
         my %v = map { /\A\| (.+?) \| (.+?) \|\z/ ? ($1 => $2) : () } split /\n/, $md;
         my ($end, $spec) = $md =~ /^\| [0-9]{4}-[0-9]{2}-[0-9]{2} \| ([0-9]{4}-[0-9]{2}-[0-9]{2}) \| (\S+) \| #/m;
         my @want = ($spec, $end, map { $v{$_} } "AIの作業時間", "トークン数", "使用料");
-        my $same = !grep { !defined $want[$_] || !defined $c[$_ + 2] || $want[$_] ne $c[$_ + 2] } 0 .. $#want;
-        print $same ? "same/$c[5]" : "row=[" . join("|", map { $_ // "" } @c) . "] md=[" . join("|", map { $_ // "" } @want) . "]"' "$STATE/drafts/203/report.md")" \
+        my $same = !grep { !defined $want[$_] || !defined $c[$_ + 3] || $want[$_] ne $c[$_ + 3] } 0 .. $#want;
+        print $same ? "same/$c[6]" : "row=[" . join("|", map { $_ // "" } @c) . "] md=[" . join("|", map { $_ // "" } @want) . "]"' "$STATE/drafts/203/report.md")" \
     "1/same/1,203"
 run publish 203 --findings "$FINDINGS"
 check "出し済みの Issue で publish を呼ぶと、集計のコメントと一覧の行を重ねずに 2 で終わる" "$RC/$(reports 203)/$(listrows 203)" "2/1/1"
