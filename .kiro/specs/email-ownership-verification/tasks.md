@@ -32,7 +32,7 @@
   - _要件: 4.1, 4.2, 5.1_
 
 - [ ] 2. 確認のリンクの部品と一時データの置き場所を作る
-- [ ] 2.1 確認のリンクのトークンを作り、読む部品を作る (並行可)
+- [x] 2.1 確認のリンクのトークンを作り、読む部品を作る (並行可)
 
   Claude は、「EmailVerificationTokenCodec と JwtEmailVerificationTokenCodec」の節と「EmailVerificationPurpose」の節のとおりに、トークンの種類の列挙型、トークンの中身の record、トークンを作る部品と読む部品のインタフェースと、java-jwt の実装を作る。
   - 完了の確かめ方: `JwtEmailVerificationTokenCodecTest` が通る。`read` が、トークンをどの用途に使うかを示す値 `aud` を確かめないように一時的に変えると、テストが失敗する
@@ -356,6 +356,7 @@
 - backend のテストで、`assertThatThrownBy` の中で戻り値のあるメソッドを呼ぶときは、Claude は、`User ignored = ...; assertThat(ignored).isNotNull();` のブロックの形で書く。戻り値を捨てる式の形で書くと、`./gradlew check` の spotbugsTest が失敗する
 - 所有者が 2026-10-28 に決めたとおり、この spec では、確認役は、タスクごとには変えたファイルを使うテストだけを動かし、`./gradlew check` などの品質チェックの全体は、大きなまとまり(1. から 8. の見出しのタスク)の最後のタスクの確認で1回だけ動かす。Claude は、確認役に送る前に、変えたファイルを使うテストを `grep` で探して全部動かす
 - `UserMapper` の SQL を変えるときは、`spring.flyway.target` で古い版の表を使うテストのうち、`UserMapper` を呼ぶもの(`UserMapperTest`、`ResumeMapperTest`)の版も上げる
+- backend で、コンストラクタの中で例外を投げうる部品のクラスは、Claude は `final` にする。`final` でないと、`./gradlew check` の spotbugsMain が「作りかけの物が残る」という指摘で失敗する
 
 ## 完了条件(全タスク共通)
 
