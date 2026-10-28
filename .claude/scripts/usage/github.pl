@@ -393,7 +393,49 @@ sub clear_pending {
 # ---- 一覧の行 ------------------------------------------------------------
 # 一覧の行は、次の欄のハッシュで持つ。list-read はこの形を出し、list-add はこの形を読む。
 # issue / url(集計のコメント)/ spec(真偽)/ end_date / work_sec / tokens / usd / impl_spec_back /
-# usd_partial(真偽。価格が分からないモデルがあるとき真)。work_sec から impl_spec_back は null(数えられない)を取る
+# usd_partial(真偽。価格が分からないモデルがあるとき真)/ title(短い題名の文字の列。題名の無い行は null)。
+# work_sec から impl_spec_back は null(数えられない)を取る。list-add が受けた行に title の欄が無ければ、
+# check_row は確かめたあとの行にも title の欄を作らない
+
+# 題名の欄に置く字の数の上限と、上限より長い題名のあとに付ける字(…)
+use constant TITLE_MAX => 20;
+use constant TITLE_MORE => "\x{2026}";
+
+# Issue の題名(文字の列)から短い題名を作る。制御文字と行の区切りと段落の区切りを空白に替え、
+# 拡張書記素クラスタ(画面で1字に見えるまとまり)で初めの20字を取り、21字以上なら「…」を付ける
+sub title_short {
+    my ($t) = @_;
+    $t =~ s/[\p{Cc}\p{Zl}\p{Zp}]/ /g;
+    my @g = $t =~ /(\X)/g;
+    return $t if @g <= TITLE_MAX;
+    return join('', @g[0 .. TITLE_MAX - 1]) . TITLE_MORE;
+}
+
+# 短い題名から、一覧の行の題名の欄(UTF-8 のバイトの文字列)を作る。題名の無い行の欄は空にする。
+# 「|」を「\|」に替え、題名の中で続く「`」の最も長い数より1つ多い「`」と空白で囲んでコードの形にする。
+# 「\」は替えない。GitHub は表の中で「\|」だけを「|」に戻し、ほかの「\」をそのまま出すためである
+sub title_cell {
+    my ($t) = @_;
+    return '' unless defined $t;
+    (my $e = $t) =~ s/\|/\\|/g;
+    my $run = 0;
+    for my $b ($e =~ /(`+)/g) { $run = length $b if length $b > $run }
+    my $fence = '`' x ($run + 1);
+    return Encode::encode('UTF-8', "$fence $e $fence");
+}
+
+# 一覧の行の題名の欄より後ろ(バイトの文字列)から、題名の欄を読む。題名の欄が「`」で囲んだコードの形なら、
+# 「\|」を「|」に戻した題名(文字の列)と、欄のあとの残りを返す。形が違えば空のリストを返す。
+# 囲む「`」は題名の中のどの「`」の続きよりも長いので、同じ数の「`」の続きで題名の終わりを見分けられる
+sub parse_title_cell {
+    my ($rest) = @_;
+    my ($fence, $e, $after) = $rest =~ /\A(`+) (.*?) \1(?!`) \| (.*)\z/s or return;
+    return if $e =~ /(?<!\\)\|/;
+    for my $b ($e =~ /(`+)/g) { return if length $b >= length $fence }
+    my $t = Encode::decode('UTF-8', $e);
+    $t =~ s/\\\|/|/g;
+    return ($t, $after);
+}
 
 sub group3 {
     my ($s) = @_;
@@ -434,14 +476,23 @@ sub format_row {
         fmt_count($r->{impl_spec_back})) . ' |';
 }
 
-# 一覧の1行(バイトの文字列)を、行のハッシュに戻す。一覧の行の形でなければ undef を返す
+# 一覧の1行(バイトの文字列)を、行のハッシュに戻す。一覧の行の形でなければ undef を返す。
+# 題名の列の無い7列の行と、題名の欄が空の8列の行の title は null にする
 sub parse_row {
     my ($line) = @_;
     my $u = UNCOUNTABLE;
-    my ($n, $url, $spec, $date, $time, $tok, $usd, $back) = $line =~ m{\A\| \[#([1-9][0-9]*)\]\((\S+)\) \| (あり|無し) \| ([0-9]{4}-[0-9]{2}-[0-9]{2}) \| ([^|]+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|\s*\z}
+    my ($n, $url, $rest) = $line =~ m{\A\| \[#([1-9][0-9]*)\]\((\S+)\) \| (.*)\z}s or return undef;
+    my $title;
+    if ($rest =~ /\A`/) {
+        my ($t, $after) = parse_title_cell($rest) or return undef;
+        ($title, $rest) = ($t, $after);
+    } else {
+        $rest =~ s/\A ?\| //;
+    }
+    my ($spec, $date, $time, $tok, $usd, $back) = $rest =~ m{\A(あり|無し) \| ([0-9]{4}-[0-9]{2}-[0-9]{2}) \| ([^|]+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|\s*\z}
         or return undef;
     my %r = (issue => $n + 0, url => $url, spec => $spec eq 'あり' ? JSON::PP::true : JSON::PP::false, end_date => $date,
-        usd_partial => JSON::PP::false);
+        usd_partial => JSON::PP::false, title => $title);
     if ($time eq $u) { $r{work_sec} = undef }
     elsif ($time =~ /\A(?:([1-9][0-9]*)時間)?([0-9]+)分\z/) { $r{work_sec} = (($1 // 0) * 60 + $2) * 60 }
     else { return undef }
@@ -487,6 +538,12 @@ sub check_row {
     my $p = $r->{usd_partial};
     die "Issue $n の行の usd_partial が真偽でない\n" if defined $p && !JSON::PP::is_bool($p);
     $c{usd_partial} = $p ? JSON::PP::true : JSON::PP::false;
+    if (exists $r->{title}) {
+        my $t = $r->{title};
+        die "Issue $n の行の title が、短い題名か null でない\n"
+            if defined $t && (ref $t || !length $t || title_short("$t") ne "$t");
+        $c{title} = defined $t ? "$t" : undef;
+    }
     return \%c;
 }
 

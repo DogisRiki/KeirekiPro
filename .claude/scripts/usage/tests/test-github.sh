@@ -103,6 +103,53 @@ sub rep_props { my ($n, @l) = @_; return "<!-- keirekipro-usage-report:v1 issue=
 sub idx_parse { my ($b) = @_; my ($k, $j) = $b =~ /\A<!-- keirekipro-usage-proposals:v1 page=([0-9]+) (\[[^\n]*\]) -->/ or return; return [ $k, JSON::PP->new->decode($j) ] }
 sub idx_desc { return join " ", map { "$_->[0]:" . scalar @{ $_->[1] } } grep { defined } map { idx_parse($_->{body}) } @{ I(shift)->{comments} } }
 sub idx_ids { return join " ", map { $_->{id} } map { @{ $_->[1] } } grep { defined } map { idx_parse($_->{body}) } @{ I(shift)->{comments} } }
+# 題名の欄のテストで使うもの。題名は文字の列で持つ。TA() は「あ」、FAM() は ZWJ で組み合わせた家族の絵文字、
+# FLAG() は日本の国旗の絵文字、ELL() は「…」、MIX20() は半角の字と全角の字と半角のカナと「あ」と2つの絵文字を混ぜた20字である。
+# tt_short(<題名>, <短い題名>) は、題名から作った短い題名が見込みと同じなら same を返す。
+# tt_ctl() は、改行とタブと U+2028 と U+2029 を含む題名の短い題名が見込みと同じかと、題名の欄が1行に収まるか(line)を返す。
+# tt_line(<題名>) は、その題名の欄を持つ8列の一覧の行、tt_special() は、記号を含む題名の一覧である。
+# tt_trip() は、記号を含む題名ごとに、題名の欄の「|」がどれも「\」のすぐあとにあり、行を読み直した title が短い題名と
+# 同じなら ok、違えば題名を出す。tt_at() は「@x」の題名の行の、コードの形の外にある「@」の数を返す。
+# tt_has(<行のハッシュ>) は、check_row が返す行の title の欄が、無い(none)か、null か、文字の列(str)かを返す。
+# tt_has3() は、title の欄の無い行と、title が null の行と、title が短い題名の行の tt_has を並べる。
+# R8(<番号>, <終了日>, <題名の欄>) は、題名の欄を持つ8列の一覧の行(題名の欄が空なら空の欄)である。
+# TC3() は、題名「題名|`ok」の題名の欄(UTF-8 のバイトの文字列)である
+sub TC3 { return "`` 題名\\|`ok ``" }
+sub TA { return "\x{3042}" }
+sub FAM { return "\x{1F468}\x{200D}\x{1F469}\x{200D}\x{1F467}" }
+sub FLAG { return "\x{1F1EF}\x{1F1F5}" }
+sub ELL { return "\x{2026}" }
+sub MIX20 { return ("a" . "\x{FF41}" . "\x{FF71}" . TA() . FAM() . FLAG()) x 3 . FAM() . FLAG() }
+sub tt_short { my ($t, $want) = @_; my $s = title_short($t); return $s eq $want ? "same" : "diff[" . Encode::encode("UTF-8", $s) . "]" }
+sub tt_ctl {
+    my $t = "a\nb\tc\x{2028}d\re\x{2029}f";
+    return tt_short($t, "a b c d e f") . " " . (title_cell(title_short($t)) =~ /[\x00-\x1f]|\xE2\x80[\xA8\xA9]/ ? "break" : "line");
+}
+sub tt_line { return "| [#5]($URLB/5#issuecomment-1) | " . title_cell(title_short($_[0])) . " | 無し | 2026-10-01 | 1分 | 1 | \$1.00 | 0 |" }
+sub tt_special { return ("a|b", "a\\b", "a`b", "a``b", '@x', "#12", "<!--", ":smile:", "*a*", "a\\|b", "a\\", "`a`", "``", "|", "`", "\\|", "x ` y") }
+sub tt_trip {
+    my @bad;
+    for my $t (tt_special()) {
+        my $cell = title_cell(title_short($t));
+        my $r = parse_row(tt_line($t));
+        push @bad, $t if $cell =~ /(?<!\\)\|/ || !$r || !defined $r->{title} || $r->{title} ne title_short($t);
+    }
+    return @bad ? "ng[" . join("][", @bad) . "]" : "ok";
+}
+sub tt_at {
+    my $line = tt_line('@x');
+    my $cell = title_cell('@x');
+    my $i = index($line, $cell);
+    return "nocell" if $i < 0 || $cell !~ /\A(`+) .* \1\z/;
+    substr($line, $i, length $cell) = "";
+    return scalar(() = $line =~ /@/g);
+}
+sub tt_has { my $c = check_row($_[0]); return !exists $c->{title} ? "none" : !defined $c->{title} ? "null" : "str" }
+sub tt_has3 {
+    my %r = (issue => 5, url => "$URLB/5#issuecomment-1", spec => JSON::PP::false, end_date => "2026-10-01");
+    return join " ", tt_has({ %r }), tt_has({ %r, title => undef }), tt_has({ %r, title => TA() x 20 . ELL() });
+}
+sub R8 { my ($n, $date, $cell) = @_; return "| [#$n]($URLB/$n#issuecomment-" . (5000 + $n) . ") | $cell | 無し | $date | 1時間20分 | 3,456,789 | \$8.90 | 0 |" }
 1;
 __H__
 
@@ -377,7 +424,7 @@ row_json() {
 }
 # R(<番号>, <終了日>[, <spec>]) の行を list-read が戻した JSON: J <番号> <終了日> [true]
 J() {
-    printf '{"end_date":"%s","impl_spec_back":0,"issue":%s,"spec":%s,"tokens":3456789,"url":"%s/%s#issuecomment-%s","usd":8.9,"usd_partial":false,"work_sec":4800}' \
+    printf '{"end_date":"%s","impl_spec_back":0,"issue":%s,"spec":%s,"title":null,"tokens":3456789,"url":"%s/%s#issuecomment-%s","usd":8.9,"usd_partial":false,"work_sec":4800}' \
         "$2" "$1" "${3:-false}" "$URL" "$1" "$(($1 + 5000))"
 }
 newgh format
@@ -400,7 +447,7 @@ cat >"$TMP_ROOT/want" <<'__WANT__'
 | [#501](https://github.com/owner/repo/issues/501#issuecomment-1234567891) | あり | 2026-11-02 | 14時間5分 | 123,456,789 | $312.45(価格が分からないモデルを除く) | 1 |
 __WANT__
 cat >"$TMP_ROOT/want.json" <<'__J__'
-[{"end_date":"2026-09-30","impl_spec_back":0,"issue":480,"spec":false,"tokens":3456789,"url":"https://github.com/owner/repo/issues/480#issuecomment-1234567890","usd":8.9,"usd_partial":false,"work_sec":4800},{"end_date":"2026-10-01","impl_spec_back":null,"issue":490,"spec":false,"tokens":0,"url":"https://github.com/owner/repo/issues/490#issuecomment-1234567892","usd":1234.5,"usd_partial":false,"work_sec":2700},{"end_date":"2026-10-01","impl_spec_back":2,"issue":491,"spec":true,"tokens":null,"url":"https://github.com/owner/repo/issues/491#issuecomment-1234567893","usd":0,"usd_partial":false,"work_sec":0},{"end_date":"2026-10-01","impl_spec_back":0,"issue":492,"spec":false,"tokens":999,"url":"https://github.com/owner/repo/issues/492#issuecomment-1234567895","usd":1.01,"usd_partial":false,"work_sec":null},{"end_date":"2026-10-01","impl_spec_back":0,"issue":493,"spec":false,"tokens":1000000,"url":"https://github.com/owner/repo/issues/493#issuecomment-1234567894","usd":0.01,"usd_partial":false,"work_sec":3600},{"end_date":"2026-11-02","impl_spec_back":1,"issue":501,"spec":true,"tokens":123456789,"url":"https://github.com/owner/repo/issues/501#issuecomment-1234567891","usd":312.45,"usd_partial":true,"work_sec":50700}]
+[{"end_date":"2026-09-30","impl_spec_back":0,"issue":480,"spec":false,"title":null,"tokens":3456789,"url":"https://github.com/owner/repo/issues/480#issuecomment-1234567890","usd":8.9,"usd_partial":false,"work_sec":4800},{"end_date":"2026-10-01","impl_spec_back":null,"issue":490,"spec":false,"title":null,"tokens":0,"url":"https://github.com/owner/repo/issues/490#issuecomment-1234567892","usd":1234.5,"usd_partial":false,"work_sec":2700},{"end_date":"2026-10-01","impl_spec_back":2,"issue":491,"spec":true,"title":null,"tokens":null,"url":"https://github.com/owner/repo/issues/491#issuecomment-1234567893","usd":0,"usd_partial":false,"work_sec":0},{"end_date":"2026-10-01","impl_spec_back":0,"issue":492,"spec":false,"title":null,"tokens":999,"url":"https://github.com/owner/repo/issues/492#issuecomment-1234567895","usd":1.01,"usd_partial":false,"work_sec":null},{"end_date":"2026-10-01","impl_spec_back":0,"issue":493,"spec":false,"title":null,"tokens":1000000,"url":"https://github.com/owner/repo/issues/493#issuecomment-1234567894","usd":0.01,"usd_partial":false,"work_sec":3600},{"end_date":"2026-11-02","impl_spec_back":1,"issue":501,"spec":true,"title":null,"tokens":123456789,"url":"https://github.com/owner/repo/issues/501#issuecomment-1234567891","usd":312.45,"usd_partial":true,"work_sec":50700}]
 __J__
 run list-add "$ROWS"
 check "list-add が、行を足して 0 で終わる" "$RC/$OUT/$ERR" "0//"
@@ -429,6 +476,12 @@ cat >"$TMP_ROOT/bad" <<'__BAD__'
 [{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":"no","end_date":"2026-10-01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0}]
 [{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":-1,"tokens":1,"usd":0,"impl_spec_back":0}]
 [{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026/10/01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0,"title":"a\nb"}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0,"title":"a b"}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0,"title":"aaaaaaaaaaaaaaaaaaaaa"}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0,"title":""}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0,"title":true}]
+[{"issue":5,"url":"https://github.com/owner/repo/issues/5#issuecomment-1","spec":false,"end_date":"2026-10-01","work_sec":0,"tokens":1,"usd":0,"impl_spec_back":0,"title":{}}]
 __BAD__
 while IFS= read -r bad; do
     printf '%s\n' "$bad" >"$ROWS"
@@ -494,6 +547,26 @@ mkdb 'issues => [ iss(1, locked => F, state => "open") ]'
 rm -rf "$STATE"
 run list-read
 check "一覧の Issue が無いとき、list-read は [] を出し、一覧の Issue を作らない" "$RC/$OUT/$(calls)/$(dbq 'st(1)')/$(statejson state.json)" "0/[]/$SCAN|/open/not_planned/unlocked/none"
+
+echo "== 題名の欄"
+drive 'print join(" ", tt_short(TA() x 20, TA() x 20), tt_short(TA() x 21, TA() x 20 . ELL()), tt_short("a" x 20, "a" x 20), tt_short("a" x 25, "a" x 20 . ELL())), "\n"; 0'
+check "20字の題名がそのまま入り、21字の題名が20字と「…」になる" "$RC/$OUT" "0/same same same same"
+drive 'print join(" ", tt_short(MIX20(), MIX20()), tt_short(MIX20() . "b", MIX20() . ELL()), tt_short("a" x 19 . FAM() . "b", "a" x 19 . FAM() . ELL()), tt_short(FLAG() x 21, FLAG() x 20 . ELL())), "\n"; 0'
+check "全角の字と半角の字と、ZWJ で組み合わせた絵文字と国旗の絵文字が、どれも1字と数えられる" "$RC/$OUT" "0/same same same same"
+drive 'print tt_ctl(), "\n"; 0'
+check "改行とタブと U+2028 を含む題名が、空白に替わって1行に収まる" "$RC/$OUT" "0/same line"
+drive 'print tt_trip(), "\n"; 0'
+check "「|」「\\」「\`」「\`\`」「@x」「#12」「<!--」「:smile:」「*a*」「a\\|b」「a\\」を含む題名と、「\`」で始まり「\`」で終わる題名で、題名の欄の中の「|」がどれも「\\」のすぐあとにあり、題名の欄を読み直した title が短い題名と同じになる" "$RC/$OUT" "0/ok"
+drive 'print tt_at(), "\n"; 0'
+check "「@x」を含む題名の欄が、コードの形の中にあり、コードの形の外に「@」が無い" "$RC/$OUT" "0/0"
+drive 'print tt_has3(), "\n"; 0'
+check "行に title の欄が無ければ、確かめたあとの行にも title の欄が無く、null と短い題名の title はそのまま残る" "$RC/$OUT" "0/none null str"
+
+newgh title-read
+mkdb 'issues => [ iss(1, body => body_with(R(1, "2026-10-01"), R8(2, "2026-10-02", ""), R8(3, "2026-10-03", TC3()))) ]'
+rm -rf "$STATE"
+run list-read
+check "題名の列の無い7列の行と、題名の欄が空の8列の行と、題名のある8列の行を、list-read が読み、前の2つの title が null になる" "$RC/$OUT" "0/[$(J 1 2026-10-01),$(J 2 2026-10-02),$(J 3 2026-10-03 | sed 's/"title":null/"title":"題名|`ok"/')]"
 
 echo "== 一覧を読み直す前に待つ"
 drive 'print list_reread_secs(), "\n"; 0'
