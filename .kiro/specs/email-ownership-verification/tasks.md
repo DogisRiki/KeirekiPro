@@ -40,7 +40,7 @@
   - _要件: 2.1, 2.4, 2.5_
   - _対象の部品: EmailVerificationTokenCodec と JwtEmailVerificationTokenCodec, EmailVerificationPurpose_
 
-- [ ] 2.2 確認前の登録の置き場所を作る (並行可)
+- [x] 2.2 確認前の登録の置き場所を作る (並行可)
 
   Claude は、「PendingRegistrationStore と RedisPendingRegistrationStore」の節のとおりに、確認前の登録の record、置き場所のインタフェース、Redis の実装を作る。Redis のキーと有効期限は、「データの形」の「Redis のキー」の表のとおりにする。
   - 完了の確かめ方: `RedisPendingRegistrationStoreTest`(Testcontainers の Redis)が通る。`findByEmail` が新しい順に並べないように一時的に変えると、テストが失敗する
