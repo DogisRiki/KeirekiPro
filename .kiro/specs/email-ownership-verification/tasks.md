@@ -99,7 +99,7 @@
   - 受入基準とテストの対応: 要件1の受入基準2(登録と同じ内容でアカウントを作る)と受入基準3(登録完了のお知らせ)は、`EmailVerificationCompletionTest` の「completeRegistration は登録と同じ ID とメールアドレスとパスワードとユーザー名で確認済みのアカウントを保存し、UserRegisteredEvent を発行する」で確かめる。要件3の受入基準4と要件9の受入基準2の確認は、「verifyAccountEmail はトークンの email と同じアカウントの email を確認済みにする」で確かめる。要件4の受入基準2は、「promotePendingEmail は pending_email がトークンの email と同じときだけ移す」で確かめる
   - _要件: 1.2, 1.3, 3.4, 4.2, 9.2_
 
-- [ ] 3.3 確認のリンクを受け付けるユースケースを作る
+- [x] 3.3 確認のリンクを受け付けるユースケースを作る
 
   Claude は、「VerifyEmailUseCase」の節のとおりに、トークンを読み、リンクの状態を決め、最新の `jti` を消せたときに確認を済ませたときの書き込みを `EmailVerificationCompletion` に任せるユースケースと、結果の列挙型と DTO を作る。`PASSWORD_RESET` のリンクでは、このユースケースは、パスワードの再設定のトークンを、リンクの期限までの残りの時間を有効期限にして置く。
   - 完了の確かめ方: `VerifyEmailUseCaseTest` が通る。一意の制約で失敗したときにアカウントを読み直さないように一時的に変えると、テストが失敗する
