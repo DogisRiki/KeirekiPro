@@ -61,6 +61,8 @@ public class GetUserInfoUseCase {
                 .twoFactorAuthEnabled(user.isTwoFactorAuthEnabled())
                 .authProviders(providers)
                 .roles(user.getRoleNames())
+                .emailVerified(user.isEmailVerified())
+                .pendingEmail(user.getPendingEmail() != null ? user.getPendingEmail().getValue() : null)
                 .build();
     }
 }

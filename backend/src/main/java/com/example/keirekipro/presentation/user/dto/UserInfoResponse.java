@@ -35,6 +35,10 @@ public class UserInfoResponse {
 
     private Set<String> roles;
 
+    private boolean emailVerified;
+
+    private String pendingEmail;
+
     /**
      * ユースケースDTOからレスポンスへの変換を行う
      *
@@ -60,6 +64,8 @@ public class UserInfoResponse {
                 .twoFactorAuthEnabled(dto.isTwoFactorAuthEnabled())
                 .authProviders(authProviders)
                 .roles(dto.getRoles())
+                .emailVerified(dto.isEmailVerified())
+                .pendingEmail(dto.getPendingEmail())
                 .build();
     }
 }

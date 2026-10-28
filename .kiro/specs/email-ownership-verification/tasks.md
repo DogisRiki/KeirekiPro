@@ -120,7 +120,7 @@
     - 要件2の受入基準6(同じメールアドレスへの確認のメールは1分に1回まで送る)は、「RATE_LIMITED なら1分の文の UseCaseException を投げる」で確かめる
   - _要件: 1.6, 2.4, 2.6_
 
-- [ ] 4. 確認前の登録と確認前のメールアドレスを扱う既存のユースケースを変える
+- [x] 4. 確認前の登録と確認前のメールアドレスを扱う既存のユースケースを変える
 - [x] 4.1 登録を受け付けるユースケースを変える
 
   Claude は、「UserRegistrationUseCase」の節のとおりに、登録を受け付けて確認前の登録を置き、確認のメールを送るように、`UserRegistrationUseCase` を変える。Claude は、`UserRegistrationController` の応答を本体なしの 202 にする。
@@ -194,7 +194,7 @@
     - 要件4の受入基準6(前の確認のメールから1分たっていなくても、設定待ちのメールアドレスにし、いつもと同じ文を出す)は、「RATE_LIMITED でも例外を投げない」で確かめる
   - _要件: 4.1, 4.3, 4.4, 4.6_
 
-- [ ] 4.8 ユーザーの情報に確認の状態を載せる (並行可)
+- [x] 4.8 ユーザーの情報に確認の状態を載せる (並行可)
 
   Claude は、「GetUserInfoUseCase と UserInfoResponse」の節のとおりに、`UserInfoUseCaseDto` と `UserInfoResponse` に `emailVerified` と `pendingEmail` を足し、`GetUserInfoUseCase` で値を入れる。
   - 完了の確かめ方: `GetUserInfoUseCaseTest` と `GetUserInfoControllerTest` で、`GET /api/users/me` の応答に `emailVerified` と `pendingEmail` が入る

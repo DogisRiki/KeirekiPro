@@ -47,6 +47,7 @@ class GetUserInfoUseCaseTest {
 
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String EMAIL = "test@keirekipro.click";
+    private static final String PENDING_EMAIL = "pending@keirekipro.click";
     private static final String USERNAME_VALUE = "test-user";
     private static final String PROFILE_IMAGE_PATH = "profile/test-user.jpg";
     private static final String SIGNED_URL = "https://signed.example.com/profile/test-user.jpg";
@@ -98,6 +99,8 @@ class GetUserInfoUseCaseTest {
                 .isEqualTo(PROVIDER_TYPE_VALUE);
         assertThat(result.getAuthProviders().get(0).getProviderUserId())
                 .isEqualTo(PROVIDER_USER_ID_VALUE);
+        assertThat(result.isEmailVerified()).isTrue();
+        assertThat(result.getPendingEmail()).isNull();
 
         verify(objectStore).issueGetUrl(PROFILE_IMAGE_PATH, Duration.ofMinutes(10));
     }
@@ -148,5 +151,47 @@ class GetUserInfoUseCaseTest {
 
         // issueGetUrl は呼ばれない
         verify(objectStore, never()).issueGetUrl(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("確認前のアカウントは emailVerified が false で email を返す")
+    void test4() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(buildStoredUser(EMAIL, null, null)));
+
+        UserInfoUseCaseDto result = getUserInfoUseCase.execute(USER_ID);
+
+        assertThat(result.isEmailVerified()).isFalse();
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(result.getPendingEmail()).isNull();
+    }
+
+    @Test
+    @DisplayName("設定待ちのメールアドレスを pendingEmail で返す")
+    void test5() {
+        when(userRepository.findById(USER_ID))
+                .thenReturn(Optional.of(buildStoredUser(null, null, PENDING_EMAIL)));
+
+        UserInfoUseCaseDto result = getUserInfoUseCase.execute(USER_ID);
+
+        assertThat(result.getPendingEmail()).isEqualTo(PENDING_EMAIL);
+        assertThat(result.getEmail()).isNull();
+        assertThat(result.isEmailVerified()).isFalse();
+    }
+
+    private static User buildStoredUser(String email, LocalDateTime emailVerifiedAt, String pendingEmail) {
+        ErrorCollector errorCollector = new ErrorCollector();
+        return User.reconstruct(
+                USER_ID,
+                email == null ? null : Email.create(errorCollector, email),
+                null,
+                false,
+                Map.of(),
+                EnumSet.of(RoleName.USER),
+                null,
+                USERNAME_VALUE,
+                CREATED_AT,
+                UPDATED_AT,
+                emailVerifiedAt,
+                pendingEmail == null ? null : Email.create(errorCollector, pendingEmail));
     }
 }
