@@ -38,6 +38,8 @@ const user: User = {
     hasPassword: true,
     authProviders: [],
     roles: [],
+    emailVerified: true,
+    pendingEmail: null,
 };
 
 describe("auth forms", () => {

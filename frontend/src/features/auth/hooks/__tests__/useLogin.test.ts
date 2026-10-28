@@ -42,6 +42,8 @@ describe("useLogin", () => {
         hasPassword: true,
         authProviders: [],
         roles: [],
+        emailVerified: true,
+        pendingEmail: null,
     };
 
     beforeEach(() => {

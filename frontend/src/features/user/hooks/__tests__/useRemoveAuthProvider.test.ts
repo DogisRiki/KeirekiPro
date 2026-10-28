@@ -27,6 +27,8 @@ describe("useRemoveAuthProvider", () => {
         hasPassword: true,
         authProviders: ["github", "google"],
         roles: ["USER"],
+        emailVerified: true,
+        pendingEmail: null,
     };
 
     beforeEach(() => {

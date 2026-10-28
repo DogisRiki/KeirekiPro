@@ -56,6 +56,8 @@ describe("useSetEmailAndPassword", () => {
             hasPassword: true,
             authProviders: [],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         const mockResponse = { status: 200, data: returnedUser } as AxiosResponse<User>;
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce(mockResponse);
@@ -99,6 +101,8 @@ describe("useSetEmailAndPassword", () => {
             hasPassword: true,
             authProviders: [],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         const mockResponse = { status: 200, data: returnedUser } as AxiosResponse<User>;
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce(mockResponse);

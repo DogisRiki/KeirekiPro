@@ -18,6 +18,8 @@ describe("getUserState", () => {
             hasPassword: true,
             authProviders: [],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_PASSWORD);
     });
@@ -32,6 +34,8 @@ describe("getUserState", () => {
             hasPassword: false,
             authProviders: ["github"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_WITH_PROVIDER);
     });
@@ -46,6 +50,8 @@ describe("getUserState", () => {
             hasPassword: false,
             authProviders: ["google"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.PROVIDER_ONLY);
     });
@@ -60,6 +66,8 @@ describe("getUserState", () => {
             hasPassword: true,
             authProviders: ["github", "google"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_PASSWORD_WITH_PROVIDER);
     });
@@ -74,6 +82,8 @@ describe("getUserState", () => {
             hasPassword: true,
             authProviders: [],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.UNKNOWN);
     });
@@ -100,6 +110,8 @@ describe("useUserState", () => {
             hasPassword: true,
             authProviders: [],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -118,6 +130,8 @@ describe("useUserState", () => {
             hasPassword: false,
             authProviders: ["github"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -136,6 +150,8 @@ describe("useUserState", () => {
             hasPassword: false,
             authProviders: ["google"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -154,6 +170,8 @@ describe("useUserState", () => {
             hasPassword: true,
             authProviders: ["github", "google"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);

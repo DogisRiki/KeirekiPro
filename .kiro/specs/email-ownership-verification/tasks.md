@@ -252,7 +252,7 @@
   - _依存: 4.5_
 
 - [ ] 7. 画面を作る
-- [ ] 7.1 frontend の利用者の型に確認の状態を足す
+- [x] 7.1 frontend の利用者の型に確認の状態を足す
 
   Claude は、frontend の `User` の型に、欄 `emailVerified` と `pendingEmail` を足す。Claude は、テストの中で利用者のデータを作る既存の箇所に、確認済みのアカウントとして `emailVerified: true` と `pendingEmail: null` を足す。
   - 完了の確かめ方: frontend の型の検査と既存のテストがすべて通る

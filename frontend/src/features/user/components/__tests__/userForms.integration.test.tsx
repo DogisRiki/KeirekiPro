@@ -35,6 +35,8 @@ const baseUser: User = {
     hasPassword: true,
     authProviders: ["google"],
     roles: [],
+    emailVerified: true,
+    pendingEmail: null,
 };
 
 const messages = {

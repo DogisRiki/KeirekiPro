@@ -10,6 +10,10 @@ export interface User {
     hasPassword: boolean;
     authProviders: AuthProvider[];
     roles: string[];
+    /** メールアドレスの確認が済んでいるか */
+    emailVerified: boolean;
+    /** 確認を待っている、設定待ちのメールアドレス */
+    pendingEmail: string | null;
 }
 
 /**

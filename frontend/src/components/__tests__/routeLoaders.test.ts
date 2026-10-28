@@ -23,6 +23,8 @@ const user: User = {
     hasPassword: true,
     authProviders: [],
     roles: [],
+    emailVerified: true,
+    pendingEmail: null,
 };
 
 const expectRedirectResponse = async (loaderPromise: Promise<unknown>, location: string) => {

@@ -36,6 +36,8 @@ describe("useVerifyTwoFactor", () => {
         twoFactorAuthEnabled: false,
         hasPassword: true,
         authProviders: [],
+        emailVerified: true,
+        pendingEmail: null,
     };
 
     beforeEach(() => {
