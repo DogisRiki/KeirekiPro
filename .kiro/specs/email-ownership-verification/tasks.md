@@ -64,7 +64,7 @@
   - _要件: 2.6_
   - _対象の部品: EmailVerificationSendLimiter と RedisEmailVerificationSendLimiter_
 
-- [ ] 2.5 確認のメールの通知と文面を作る (並行可)
+- [x] 2.5 確認のメールの通知と文面を作る (並行可)
 
   Claude は、「EmailVerificationNotification と email-verification.ftl」の節のとおりに、通知の record と文面のテンプレートを作り、`SesFreeMarkerNotificationDispatcher` に確認のメールの分岐を足す。
   - 完了の確かめ方: `SesFreeMarkerNotificationDispatcherTest` で、確認のメールの件名が「【{siteName}】メールアドレスの確認」になり、本文に確認のリンクとリンクの期限が入る

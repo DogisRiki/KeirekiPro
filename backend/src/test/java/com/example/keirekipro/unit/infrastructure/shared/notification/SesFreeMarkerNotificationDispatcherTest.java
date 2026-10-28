@@ -14,6 +14,7 @@ import java.io.StringWriter;
 import java.lang.reflect.Field;
 
 import com.example.keirekipro.infrastructure.shared.notification.SesFreeMarkerNotificationDispatcher;
+import com.example.keirekipro.usecase.auth.notification.EmailVerificationNotification;
 import com.example.keirekipro.usecase.auth.notification.PasswordResetNotification;
 import com.example.keirekipro.usecase.auth.notification.TwoFactorCodeNotification;
 import com.example.keirekipro.usecase.shared.notification.NotificationDispatcher;
@@ -180,5 +181,38 @@ class SesFreeMarkerNotificationDispatcherTest {
                 .hasMessageContaining("user-registered.ftl");
 
         verifyNoInteractions(sesClient);
+    }
+
+    @Test
+    @DisplayName("EmailVerificationNotification を渡すと確認のメールの件名と本文で送る")
+    void test6() throws Exception {
+        // 本番と同じく classpath:/mail/ の文面を読み、本文に入る値を確かめる
+        Configuration realConfiguration = new Configuration(Configuration.VERSION_2_3_34);
+        realConfiguration.setClassForTemplateLoading(SesFreeMarkerNotificationDispatcher.class, "/mail/");
+        realConfiguration.setDefaultEncoding("UTF-8");
+        NotificationDispatcher realDispatcher = new SesFreeMarkerNotificationDispatcher(sesClient, realConfiguration);
+        Field fromAddressField = SesFreeMarkerNotificationDispatcher.class.getDeclaredField("fromAddress");
+        fromAddressField.setAccessible(true);
+        fromAddressField.set(realDispatcher, "no-reply@keirekipro.click");
+
+        realDispatcher.dispatch(new EmailVerificationNotification(
+                "to@example.com",
+                "https://site.example/email/verify#token-xxx",
+                "24時間",
+                "Site",
+                "https://top.example"));
+
+        ArgumentCaptor<SendEmailRequest> captor = ArgumentCaptor.forClass(SendEmailRequest.class);
+        verify(sesClient).sendEmail(captor.capture());
+
+        SendEmailRequest req = captor.getValue();
+        assertThat(req.source()).isEqualTo("no-reply@keirekipro.click");
+        assertThat(req.destination().toAddresses()).containsExactly("to@example.com");
+        assertThat(req.message().subject().data()).isEqualTo("【Site】メールアドレスの確認");
+        assertThat(req.message().body().text().data())
+                .contains("https://site.example/email/verify#token-xxx")
+                .contains("24時間")
+                .contains("Site")
+                .contains("https://top.example");
     }
 }

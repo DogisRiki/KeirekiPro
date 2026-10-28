@@ -4,6 +4,7 @@ import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.example.keirekipro.usecase.auth.notification.EmailVerificationNotification;
 import com.example.keirekipro.usecase.auth.notification.PasswordResetNotification;
 import com.example.keirekipro.usecase.auth.notification.TwoFactorCodeNotification;
 import com.example.keirekipro.usecase.shared.notification.Notification;
@@ -81,6 +82,16 @@ public class SesFreeMarkerNotificationDispatcher implements NotificationDispatch
             model.put("siteName", n.siteName());
             model.put("siteUrl", n.siteUrl());
             send(n.to(), "【" + n.siteName() + "】パスワードリセットのご案内", "password-reset.ftl", model);
+            return;
+        }
+
+        if (notification instanceof EmailVerificationNotification n) {
+            Map<String, Object> model = new HashMap<>();
+            model.put("verificationLink", n.verificationLink());
+            model.put("linkLifetime", n.linkLifetime());
+            model.put("siteName", n.siteName());
+            model.put("siteUrl", n.siteUrl());
+            send(n.to(), "【" + n.siteName() + "】メールアドレスの確認", "email-verification.ftl", model);
             return;
         }
 
