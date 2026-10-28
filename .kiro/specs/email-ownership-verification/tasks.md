@@ -140,7 +140,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1・2(確認がまだであることを画面に出す材料)は、`AppExceptionHandlerTest` の「EmailNotVerifiedUseCaseException は 409 と kind を返す」で確かめる
   - _要件: 3.1, 3.2_
 
-- [ ] 4.3 ログインのユースケースを変える
+- [x] 4.3 ログインのユースケースを変える
 
   Claude は、「LoginUseCase」の節のとおりに、確認がまだのアカウントと確認前の登録で、パスワードが合ったときに `EmailNotVerifiedUseCaseException` を投げるように、`LoginUseCase` を変える。Claude は、既存のテストのアカウントを確認済みのメールアドレスで作るように直し、既存のテストのアサーションを変えない。
   - 完了の確かめ方: `LoginUseCaseTest` の足したテストと既存のテストがすべて通る。照らし合わせる確認前の登録の数を6件にすると、テストが失敗する
