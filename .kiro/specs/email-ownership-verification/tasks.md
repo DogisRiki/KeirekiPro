@@ -56,7 +56,7 @@
   - _要件: 2.2, 2.3_
   - _対象の部品: EmailVerificationCurrentTokenStore と RedisEmailVerificationCurrentTokenStore_
 
-- [ ] 2.4 同じメールアドレスへの送信を1分に1回に抑える部品を作る (並行可)
+- [x] 2.4 同じメールアドレスへの送信を1分に1回に抑える部品を作る (並行可)
 
   Claude は、「EmailVerificationSendLimiter と RedisEmailVerificationSendLimiter」の節のとおりに、インタフェースと Redis の実装を作る。
   - 完了の確かめ方: `RedisEmailVerificationSendLimiterTest`(Testcontainers の Redis)が通る。`tryAcquire` を `SET NX` を使わない形に一時的に変えると、テストが失敗する
