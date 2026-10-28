@@ -85,7 +85,7 @@
   - _依存: 2.1, 2.3, 2.4, 2.5_
 
 - [ ] 3. 確認のリンクを受け付ける流れを作る
-- [ ] 3.1 リンクの状態を決める部品を作る
+- [x] 3.1 リンクの状態を決める部品を作る
 
   Claude は、「EmailVerificationLinkClassifier」の節と「確認のリンクの結果の決め方」の図のとおりに、読んだトークンの中身から `USABLE`、`ALREADY_VERIFIED`、`EXPIRED`、`REGISTRATION_GONE`、`INVALID` を決める部品を作る。
   - 完了の確かめ方: `EmailVerificationLinkClassifierTest` で、図の分岐ごとのテストが通る。`PENDING_EMAIL` で対象のメールアドレスを `email` と比べるように一時的に変えると、テストが失敗する
