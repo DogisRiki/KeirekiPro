@@ -234,7 +234,7 @@
   - _要件: 8.1, 8.2_
 
 - [ ] 6. 確認の API を作る
-- [ ] 6.1 確認と送り直しの API を作る
+- [x] 6.1 確認と送り直しの API を作る
 
   Claude は、`VerifyEmailController`、`ResendEmailVerificationController`、`ResendEmailVerificationForLoginController` と、その要求と応答の DTO を作る。Claude は、`EmailVerificationTokenRequest` の `token` に、`@NotBlank` と、長さを2048文字までに限る検査を付ける。`VerifyEmailController` は、どの結果でも 200 を返す。
   - 完了の確かめ方: 3つの controller のテストが通る。ログインしていない要求で、3つの API が 401 にならない
