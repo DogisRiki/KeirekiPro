@@ -23,7 +23,8 @@
 #   perl github.pl proposal-remove <案の ID>
 #     案を、案の索引と、その Issue の issues/<N>.json の proposals_pending から外す
 #
-# 一覧の行は、終了日の古い順に、終了日が同じなら Issue の番号の順に並べ、300行ごとのページに分ける。
+# 一覧の行は、終了日の古い順に、終了日が同じなら Issue の番号の順に並べ、ページに分ける。1ページは300行までとし、
+# ページの全文が UTF-8 で60,000バイトを超えるときは、超える行の前で分ける。
 # 1ページ目は一覧の Issue の本文に、2ページ目からは行頭が <!-- keirekipro-usage-list:v1 page=<k> --> の
 # コメントに置く。行を足したら、待ってから一覧を読み直し、足した行が無ければ3回まで書き直す。
 # 足せなかったときは、その Issue の issues/<N>.json に list_pending を残して 1 で終わる。
@@ -64,18 +65,19 @@ use constant LIST_PAGE_MARK => '<!-- keirekipro-usage-list:v1';
 # 一覧の Issue の題名と、作るときの本文(行の無い一覧)
 use constant LIST_TITLE => 'AIの作業の集計の一覧';
 use constant LIST_HEAD => <<'END';
-| Issue | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |
-|---|---|---|---|---|---|---|
+| Issue | 題名 | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |
+|---|---|---|---|---|---|---|---|
 END
 use constant LIST_INTRO => <<'END' . LIST_HEAD;
 ## AIの作業の集計の一覧
 
-この一覧は、Issue ごとの AI の作業の集計を、終了日の古い順に1行ずつ並べたものである。Issue の列の番号から、その Issue の集計のコメントを開ける。「AIの作業時間」は、AI の会話のどれかが動いていた時間で、所有者の返事を待っていた時間と、使う量の上限で止まっていた時間を含まない。「トークン数」は、入力、キャッシュの書き込み、キャッシュの読み込み、出力の合計である。「使用料」は、トークン数を公表価格で換算した米ドルの額である。「実装中に spec へ戻った回数」は、実装の途中で要件、設計、タスクに戻って直した回数の合計である。300行を超えた行は、この Issue のコメントに続く。
+この一覧は、Issue ごとの AI の作業の集計を、終了日の古い順に1行ずつ並べたものである。Issue の列の番号から、その Issue の集計のコメントを開ける。Issue の列の番号にマウスを置くと、GitHub が Issue の題名の全文を出す。「題名」は、行を足したときの Issue の題名の初めの20文字で、長い題名は「…」で切ってある。「AIの作業時間」は、AI の会話のどれかが動いていた時間で、所有者の返事を待っていた時間と、使う量の上限で止まっていた時間を含まない。「トークン数」は、入力、キャッシュの書き込み、キャッシュの読み込み、出力の合計である。「使用料」は、トークン数を公表価格で換算した米ドルの額である。「実装中に spec へ戻った回数」は、実装の途中で要件、設計、タスクに戻って直した回数の合計である。1ページに入らない行は、この Issue のコメントに続く。
 
 END
 
-# 1ページの行の数と、一覧に行を足すときに書き直す回数
+# 1ページの行の数と、1ページの全文の UTF-8 のバイトの数の上限と、一覧に行を足すときに書き直す回数
 use constant ROWS_PER_PAGE => 300;
+use constant PAGE_BYTES => 60_000;
 use constant LIST_TRIES => 3;
 
 # 一覧の行の、数えられない値と、価格が分からないモデルがあるときの使用料のあとに付ける文
@@ -471,7 +473,7 @@ sub fmt_count {
 
 sub format_row {
     my ($r) = @_;
-    return '| ' . join(' | ', "[#$r->{issue}]($r->{url})", ($r->{spec} ? 'あり' : '無し'), $r->{end_date},
+    return '| ' . join(' | ', "[#$r->{issue}]($r->{url})", title_cell($r->{title}), ($r->{spec} ? 'あり' : '無し'), $r->{end_date},
         fmt_time($r->{work_sec}), fmt_tokens($r->{tokens}), fmt_usd($r->{usd}, $r->{usd_partial}),
         fmt_count($r->{impl_spec_back})) . ' |';
 }
@@ -609,6 +611,28 @@ sub page_text {
     return LIST_PAGE_MARK . " page=$k -->\n\n### 一覧の続き(${k}ページ目)\n\n" . LIST_HEAD . join('', map { "$_\n" } @lines);
 }
 
+# k ページ目の全文。1ページ目は一覧の Issue の本文、2ページ目からはページのコメントの本文である
+sub page_full {
+    my ($k, @lines) = @_;
+    return $k == 1 ? LIST_INTRO . join('', map { "$_\n" } @lines) : page_text($k, @lines);
+}
+
+# 並べた行(バイトの文字列)をページに分ける。行を足すとページが300行を超えるか、全文が60,000バイトを超えるときは、
+# その行から次のページにする
+sub split_pages {
+    my @pages;
+    my $size = 0;
+    for my $line (@_) {
+        if (!@pages || @{ $pages[-1] } >= ROWS_PER_PAGE || $size + length($line) + 1 > PAGE_BYTES) {
+            push @pages, [];
+            $size = length page_full(scalar @pages);
+        }
+        push @{ $pages[-1] }, $line;
+        $size += length($line) + 1;
+    }
+    return @pages;
+}
+
 # gh に渡す本文を一時ファイルに書く。一時ファイルは手元の記録の置き場所に作る。
 # 既定の置き場所(Git Bash の /tmp)は、Windows の gh が開けないため
 sub body_file {
@@ -626,10 +650,9 @@ sub body_file {
 sub write_list {
     my ($list, $cur, $rows) = @_;
     my @lines = map { format_row($_) } sort_rows(@$rows);
-    my @pages;
-    push @pages, [ splice @lines, 0, ROWS_PER_PAGE ] while @lines;
+    my @pages = split_pages(@lines);
     my $wrote = 0;
-    my $body = LIST_INTRO . join('', map { "$_\n" } @{ shift(@pages) || [] });
+    my $body = page_full(1, @{ shift(@pages) || [] });
     if ($body ne $cur->{body}) {
         my $f = body_file($body);
         gh('issue', 'edit', $list, '--body-file', $f->filename);

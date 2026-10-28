@@ -42,11 +42,11 @@ export KP_TEST_H="$TMP_ROOT/h.pl"
 cat >"$KP_TEST_H" <<'__H__'
 require JSON::PP;
 my $URLB = "https://github.com/owner/repo/issues";
-sub head { return "| Issue | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |\n|---|---|---|---|---|---|---|\n" }
+sub head { return "| Issue | 題名 | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |\n|---|---|---|---|---|---|---|---|\n" }
 sub intro {
-    return "## AIの作業の集計の一覧\n\nこの一覧は、Issue ごとの AI の作業の集計を、終了日の古い順に1行ずつ並べたものである。Issue の列の番号から、その Issue の集計のコメントを開ける。「AIの作業時間」は、AI の会話のどれかが動いていた時間で、所有者の返事を待っていた時間と、使う量の上限で止まっていた時間を含まない。「トークン数」は、入力、キャッシュの書き込み、キャッシュの読み込み、出力の合計である。「使用料」は、トークン数を公表価格で換算した米ドルの額である。「実装中に spec へ戻った回数」は、実装の途中で要件、設計、タスクに戻って直した回数の合計である。300行を超えた行は、この Issue のコメントに続く。\n\n" . head();
+    return "## AIの作業の集計の一覧\n\nこの一覧は、Issue ごとの AI の作業の集計を、終了日の古い順に1行ずつ並べたものである。Issue の列の番号から、その Issue の集計のコメントを開ける。Issue の列の番号にマウスを置くと、GitHub が Issue の題名の全文を出す。「題名」は、行を足したときの Issue の題名の初めの20文字で、長い題名は「…」で切ってある。「AIの作業時間」は、AI の会話のどれかが動いていた時間で、所有者の返事を待っていた時間と、使う量の上限で止まっていた時間を含まない。「トークン数」は、入力、キャッシュの書き込み、キャッシュの読み込み、出力の合計である。「使用料」は、トークン数を公表価格で換算した米ドルの額である。「実装中に spec へ戻った回数」は、実装の途中で要件、設計、タスクに戻って直した回数の合計である。1ページに入らない行は、この Issue のコメントに続く。\n\n" . head();
 }
-sub R { my ($n, $date, $spec) = @_; return "| [#$n]($URLB/$n#issuecomment-" . (5000 + $n) . ") | " . ($spec // "無し") . " | $date | 1時間20分 | 3,456,789 | \$8.90 | 0 |" }
+sub R { my ($n, $date, $spec) = @_; return "| [#$n]($URLB/$n#issuecomment-" . (5000 + $n) . ") |  | " . ($spec // "無し") . " | $date | 1時間20分 | 3,456,789 | \$8.90 | 0 |" }
 sub Rs { my ($from, $to, $date) = @_; return map { R($_, $date) } $from .. $to }
 sub body_with { return intro() . join("", map { "$_\n" } @_) }
 sub page { my ($k, @l) = @_; return "<!-- keirekipro-usage-list:v1 page=$k -->\n\n### 一覧の続き(${k}ページ目)\n\n" . head() . join("", map { "$_\n" } @l) }
@@ -58,7 +58,7 @@ sub report_body {
 }
 sub D_OLD { return '{"v":1,"issue":501,"spec":false,"end_date":"2026-01-01","totals":{"work_sec":60,"tokens":1,"usd":1,"usd_unknown_models":[]},"rework":{"impl_spec_back":{"requirements":0,"design":0,"tasks":0}}}' }
 sub D_NEW { return '{"v":1,"issue":501,"prs":[612,618],"spec":true,"end_date":"2026-11-02","totals":{"work_sec":50700,"wait_sec":0,"tokens":123456789,"usd":312.45,"usd_unknown_models":["claude-x"]},"rework":{"impl_spec_back":{"requirements":1,"design":0,"tasks":0}}}' }
-sub L501 { my ($id) = @_; return "| [#501]($URLB/501#issuecomment-$id) | あり | 2026-11-02 | 14時間5分 | 123,456,789 | \$312.45(価格が分からないモデルを除く) | 1 |" }
+sub L501 { my ($id) = @_; return "| [#501]($URLB/501#issuecomment-$id) |  | あり | 2026-11-02 | 14時間5分 | 123,456,789 | \$312.45(価格が分からないモデルを除く) | 1 |" }
 sub worst_rows {
     return JSON::PP->new->canonical->encode([ map { { issue => $_, url => "https://github.com/DogisRiki/KeirekiPro/issues/$_#issuecomment-99999999999",
         spec => JSON::PP::true, end_date => "2026-11-02", work_sec => 3599940, tokens => 999999999999, usd => 99999.99,
@@ -82,7 +82,7 @@ sub clobber {
 }
 sub not_row { return "| [#9](https://example.com/x/issues/9#issuecomment-1) | 無し | 2026-10-01 | 1分 | 1 | \$1.00 | 0 |" }
 sub worst_last {
-    return $_[0] eq "| [#99299](https://github.com/DogisRiki/KeirekiPro/issues/99299#issuecomment-99999999999) | あり | 2026-11-02 | 999時間59分 | 999,999,999,999 | \$99,999.99(価格が分からないモデルを除く) | 数えられない |";
+    return $_[0] eq "| [#99299](https://github.com/DogisRiki/KeirekiPro/issues/99299#issuecomment-99999999999) |  | あり | 2026-11-02 | 999時間59分 | 999,999,999,999 | \$99,999.99(価格が分からないモデルを除く) | 数えられない |";
 }
 sub read_after_add {
     my %c = map { $_->{id} => $_->{body} } @{ I(1)->{comments} };
@@ -150,6 +150,75 @@ sub tt_has3 {
     return join " ", tt_has({ %r }), tt_has({ %r, title => undef }), tt_has({ %r, title => TA() x 20 . ELL() });
 }
 sub R8 { my ($n, $date, $cell) = @_; return "| [#$n]($URLB/$n#issuecomment-" . (5000 + $n) . ") | $cell | 無し | $date | 1時間20分 | 3,456,789 | \$8.90 | 0 |" }
+# 一覧を8列で書くテストで使うもの。R7(<番号>, <終了日>) は、題名の列の無い7列の一覧の行(#659 より前の形)である。
+# LONG256() は、4バイトの字だけでできた256文字の、拡張書記素クラスタで20字の題名である。1字目は親指の絵文字に
+# 肌の色の絵文字を236個重ねたもの、ほかは親指の絵文字1つずつである。
+# long_row() は、値の桁が最も多い行に LONG256() の題名を持たせた一覧の行のバイトの数と、短い題名が題名と同じか(same)を返す。
+# page_split(<行のバイトの数>, <行の数>) は、その大きさの行を並べてページに分けたときの、ページごとの行の数と、
+# 全文が60,000バイトを超えるページの数を返す。
+# special_file() は、tt_special() の題名の短い題名を title に持つ行(番号は 7001 から)の JSON を $ROWS に書く。
+# special_check() は、一覧の本文の 7001 からの行がどれも8つの欄に分かれ、$ROWS.read の list-read の出力の title が
+# 書いた title と同じなら ok を返す。
+# worst_pages() は、一覧の本文とページのコメントのどれもが300行より少なく、60,000バイトを超えず、ページの順に読んだ行が
+# 99000 から 99299 の順に並び、最後の行が worst_last() の行なら「split over=0 order worst」の形で返す。
+# max_chars() は、一覧の本文とページのコメントのうち、最も長いものの文字の数である
+sub R7 { my ($n, $date) = @_; return "| [#$n]($URLB/$n#issuecomment-" . (5000 + $n) . ") | 無し | $date | 1時間20分 | 3,456,789 | \$8.90 | 0 |" }
+sub LONG256 { return "\x{1F44D}" . ("\x{1F3FB}" x 236) . ("\x{1F44D}" x 19) }
+sub long_row {
+    my $r = JSON::PP->new->decode(worst_rows())->[0];
+    $r->{title} = LONG256();
+    return length(format_row($r)) . " " . (title_short(LONG256()) eq LONG256() ? "same" : "diff");
+}
+sub page_split {
+    my ($size, $count) = @_;
+    my @lines = map { my $l = "| [#$_]($URLB/$_#issuecomment-1) | "; $l . ("x" x ($size - length($l) - 2)) . " |" } 1 .. $count;
+    my @pages = split_pages(@lines);
+    my $over = grep { length(page_full($_ + 1, @{ $pages[$_] })) > 60000 } 0 .. $#pages;
+    return join(",", map { scalar @$_ } @pages) . " over=$over";
+}
+sub special_file {
+    my @t = tt_special();
+    open my $o, ">", $ENV{ROWS} or die $!;
+    print $o JSON::PP->new->canonical->encode([ map { { issue => 7001 + $_, url => "$URLB/" . (7001 + $_) . "#issuecomment-1", spec => JSON::PP::false,
+        end_date => "2026-10-01", work_sec => 60, tokens => 1, usd => 1, impl_spec_back => 0, title => title_short($t[$_]) } } 0 .. $#t ]), "\n";
+    close $o;
+    return 0;
+}
+sub special_check {
+    my @t = tt_special();
+    my @bad;
+    my $j = JSON::PP->new;
+    open my $fh, "<", "$ENV{FAKE_GH_DIR}/db.json" or die $!;
+    my $db = $j->decode(do { local $/; <$fh> });
+    my ($list) = grep { $_->{number} == 1 } @{ $db->{issues} };
+    my %line = map { /\A\| \[#(70[0-9]{2})\]/ ? ($1 => $_) : () } split /\n/, $list->{body};
+    open my $rf, "<", "$ENV{ROWS}.read" or die $!;
+    my %read = map { $_->{issue} => $_->{title} } @{ JSON::PP->new->utf8->decode(do { local $/; <$rf> }) };
+    for my $i (0 .. $#t) {
+        my $n = 7001 + $i;
+        my $pipes = () = ($line{$n} // "") =~ /(?<!\\)\|/g;
+        push @bad, $t[$i] if $pipes != 9 || !defined $read{$n} || $read{$n} ne title_short($t[$i]);
+    }
+    return @bad ? "ng[" . join("][", @bad) . "]" : "ok";
+}
+sub list_texts {
+    my @c = sort { ($a->{body} =~ /page=([0-9]+)/)[0] <=> ($b->{body} =~ /page=([0-9]+)/)[0] } @{ I(1)->{comments} };
+    return (I(1)->{body}, map { $_->{body} } @c);
+}
+sub worst_pages {
+    my @texts = list_texts();
+    my @rows = map { [ grep { /\A\| \[#[0-9]+\]/ } split /\n/ ] } @texts;
+    my $split = @texts > 1 && !grep { @$_ >= 300 } @rows;
+    my $over = grep { length($_) > 60000 } @texts;
+    my @n = map { /\A\| \[#([0-9]+)\]/ } map { @$_ } @rows;
+    my $order = join(",", @n) eq join(",", 99000 .. 99299);
+    return join " ", $split ? "split" : "nosplit", "over=$over", $order ? "order" : "disorder", worst_last($rows[-1][-1] // "") ? "worst" : "diff";
+}
+sub max_chars {
+    my $m = 0;
+    for (list_texts()) { my $l = length(Encode::decode("UTF-8", $_)); $m = $l if $l > $m }
+    return $m;
+}
 1;
 __H__
 
@@ -320,7 +389,8 @@ rm -rf "$STATE"
 drive 'print list_issue_for_write(), "\n"; 0'
 check "一覧の Issue が無いときは、書き込む呼び出しが一覧の Issue を作り、閉じ、ロックする" "$RC/$OUT/$(calls)" "0/2/$SCAN|issue create --title AIの作業の集計の一覧 --body-file F|issue close 2 --reason not planned|issue lock 2|"
 check "作った一覧の Issue は、理由が not planned で閉じてあり、ロックしてある" "$(dbq 'st(2)')" "closed/not_planned/locked"
-check "作った一覧の Issue の本文は、見出しと説明と行の無い表である" "$(dbq 'join "|", scalar(@{[lines(2)]}), (lines(2))[0, 4]')" "6|## AIの作業の集計の一覧|| Issue | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |"
+check "作った一覧の Issue の本文は、見出しと説明と行の無い表である" "$(dbq 'join "|", scalar(@{[lines(2)]}), (lines(2))[0, 4]')" "6|## AIの作業の集計の一覧|| Issue | 題名 | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 |"
+check "一覧の本文の見出しが8つの列を持ち、題名の列が Issue の列のすぐ右にある" "$(dbq 'join " / ", (lines(2))[4, 5]')" "| Issue | 題名 | spec | 終了日 | AIの作業時間 | トークン数 | 使用料 | 実装中に spec へ戻った回数 | / |---|---|---|---|---|---|---|---|"
 check "見つけた一覧の Issue の番号を state.json の list_issue に置く" "$(statejson state.json)" '{"list_issue":2}'
 rm -f "$FAKE_GH_DIR/calls.log"
 drive 'print list_issue_for_write(), "\n"; 0'
@@ -439,12 +509,12 @@ cat >"$ROWS" <<'__ROWS__'
  {"issue":491,"url":"https://github.com/owner/repo/issues/491#issuecomment-1234567893","spec":true,"end_date":"2026-10-01","work_sec":29,"tokens":null,"usd":0,"impl_spec_back":2}]
 __ROWS__
 cat >"$TMP_ROOT/want" <<'__WANT__'
-| [#480](https://github.com/owner/repo/issues/480#issuecomment-1234567890) | 無し | 2026-09-30 | 1時間20分 | 3,456,789 | $8.90 | 0 |
-| [#490](https://github.com/owner/repo/issues/490#issuecomment-1234567892) | 無し | 2026-10-01 | 45分 | 0 | $1,234.50 | 数えられない |
-| [#491](https://github.com/owner/repo/issues/491#issuecomment-1234567893) | あり | 2026-10-01 | 0分 | 数えられない | $0.00 | 2 |
-| [#492](https://github.com/owner/repo/issues/492#issuecomment-1234567895) | 無し | 2026-10-01 | 数えられない | 999 | $1.01 | 0 |
-| [#493](https://github.com/owner/repo/issues/493#issuecomment-1234567894) | 無し | 2026-10-01 | 1時間0分 | 1,000,000 | $0.01 | 0 |
-| [#501](https://github.com/owner/repo/issues/501#issuecomment-1234567891) | あり | 2026-11-02 | 14時間5分 | 123,456,789 | $312.45(価格が分からないモデルを除く) | 1 |
+| [#480](https://github.com/owner/repo/issues/480#issuecomment-1234567890) |  | 無し | 2026-09-30 | 1時間20分 | 3,456,789 | $8.90 | 0 |
+| [#490](https://github.com/owner/repo/issues/490#issuecomment-1234567892) |  | 無し | 2026-10-01 | 45分 | 0 | $1,234.50 | 数えられない |
+| [#491](https://github.com/owner/repo/issues/491#issuecomment-1234567893) |  | あり | 2026-10-01 | 0分 | 数えられない | $0.00 | 2 |
+| [#492](https://github.com/owner/repo/issues/492#issuecomment-1234567895) |  | 無し | 2026-10-01 | 数えられない | 999 | $1.01 | 0 |
+| [#493](https://github.com/owner/repo/issues/493#issuecomment-1234567894) |  | 無し | 2026-10-01 | 1時間0分 | 1,000,000 | $0.01 | 0 |
+| [#501](https://github.com/owner/repo/issues/501#issuecomment-1234567891) |  | あり | 2026-11-02 | 14時間5分 | 123,456,789 | $312.45(価格が分からないモデルを除く) | 1 |
 __WANT__
 cat >"$TMP_ROOT/want.json" <<'__J__'
 [{"end_date":"2026-09-30","impl_spec_back":0,"issue":480,"spec":false,"title":null,"tokens":3456789,"url":"https://github.com/owner/repo/issues/480#issuecomment-1234567890","usd":8.9,"usd_partial":false,"work_sec":4800},{"end_date":"2026-10-01","impl_spec_back":null,"issue":490,"spec":false,"title":null,"tokens":0,"url":"https://github.com/owner/repo/issues/490#issuecomment-1234567892","usd":1234.5,"usd_partial":false,"work_sec":2700},{"end_date":"2026-10-01","impl_spec_back":2,"issue":491,"spec":true,"title":null,"tokens":null,"url":"https://github.com/owner/repo/issues/491#issuecomment-1234567893","usd":0,"usd_partial":false,"work_sec":0},{"end_date":"2026-10-01","impl_spec_back":0,"issue":492,"spec":false,"title":null,"tokens":999,"url":"https://github.com/owner/repo/issues/492#issuecomment-1234567895","usd":1.01,"usd_partial":false,"work_sec":null},{"end_date":"2026-10-01","impl_spec_back":0,"issue":493,"spec":false,"title":null,"tokens":1000000,"url":"https://github.com/owner/repo/issues/493#issuecomment-1234567894","usd":0.01,"usd_partial":false,"work_sec":3600},{"end_date":"2026-11-02","impl_spec_back":1,"issue":501,"spec":true,"title":null,"tokens":123456789,"url":"https://github.com/owner/repo/issues/501#issuecomment-1234567891","usd":312.45,"usd_partial":true,"work_sec":50700}]
@@ -461,7 +531,7 @@ rm -f "$FAKE_GH_DIR/calls.log"
 run list-add "$ROWS"
 check "list-read の出力を list-add に渡すと、同じ行を置き換えるだけで、一覧に何も書かない" "$RC/$(writes)/$(dbq 'scalar(grep { /\A\| \[#/ } lines(1))')" "0//6"
 drive 'rr(q{{"issue":7,"spec":false,"end_date":"2026-10-01","totals":{"work_sec":0,"tokens":0,"usd":0,"usd_unknown_models":[]},"rework":{"impl_spec_back":{"requirements":null,"design":0,"tasks":0}}}}, 7)'
-check "集計の JSON の impl_spec_back の3つのどれかが null のときは、回数を「数えられない」と書く" "$RC/$OUT" "0/| [#7]($URL/7#issuecomment-9) | 無し | 2026-10-01 | 0分 | 0 | \$0.00 | 数えられない |"
+check "集計の JSON の impl_spec_back の3つのどれかが null のときは、回数を「数えられない」と書く" "$RC/$OUT" "0/| [#7]($URL/7#issuecomment-9) |  | 無し | 2026-10-01 | 0分 | 0 | \$0.00 | 数えられない |"
 drive 'rr(q{{"issue":8,"spec":false,"end_date":"2026-10-01","totals":{"work_sec":0,"tokens":0,"usd":0,"usd_unknown_models":[]},"rework":{"impl_spec_back":{"requirements":0,"design":0,"tasks":0}}}}, 7)'
 check "集計の JSON の issue が行の Issue と違えば、行を作らない" "$RC/$OUT/$(nlines "$ERR")" "1//1"
 
@@ -518,9 +588,39 @@ mkdb 'issues => [ iss(1, body => intro()) ]'
 rm -rf "$STATE"
 dbq 'worst_rows()' >"$ROWS"
 run list-add "$ROWS"
-check "値の桁が最も多い300行を足すと、すべての行が本文に入り、ページのコメントを書かない" "$RC/$(dbq 'scalar(grep { /\A\| \[#99[0-9]{3}\]/ } lines(1)) . " " . scalar @{ I(1)->{comments} } . " " . (worst_last((lines(1))[-1]) ? "worst" : "diff")')" "0/300 0 worst"
-blen=$(dbq 'length(Encode::decode("UTF-8", I(1)->{body}))')
-if [ "$blen" -lt 65536 ]; then ok "300行の一覧の本文が65,536文字に届かない($blen 文字)"; else ng "300行の一覧の本文が65,536文字に届かない($blen 文字)"; fi
+check "値の桁が最も多い300行を足すと、300行に届く前にページが分かれ、どのページの全文も60,000バイトを超えず、すべての行が終了日の古い順に並ぶ" "$RC/$(dbq 'worst_pages()')" "0/split over=0 order worst"
+blen=$(dbq 'max_chars()')
+if [ "$blen" -lt 65536 ]; then ok "一覧の本文とどのページのコメントも65,536文字に届かない($blen 文字)"; else ng "一覧の本文とどのページのコメントも65,536文字に届かない($blen 文字)"; fi
+
+echo "== 一覧の題名の列"
+drive 'print long_row(), "\n"; 0'
+lrow=${OUT%% *}
+if [ "$RC" = 0 ] && [ "${OUT#* }" = same ] && [ "$lrow" -le 1300 ]; then ok "256文字の題名から作った title を持つ行が、約1,300バイトに収まる($lrow バイト)"; else ng "256文字の題名から作った title を持つ行が、約1,300バイトに収まる($RC/$OUT)"; fi
+drive 'print page_split(1300, 400), "/", page_split(150, 650), "\n"; 0'
+case "$OUT" in
+*/300,300,50\ over=0) psmall=ok ;;
+*) psmall=ng ;;
+esac
+pbig=${OUT%%/*}
+pbig_over=${pbig#* }
+pbig_first=${pbig%%,*}
+if [ "$RC" = 0 ] && [ "$psmall" = ok ] && [ "$pbig_over" = over=0 ] && [ "${pbig%% *}" != 400 ] && [ "$pbig_first" -lt 300 ]; then
+    ok "1行が約1,300バイトの行を並べると、300行に届く前にページが分かれ、どのページの全文も60,000バイトを超えない。1行が約150バイトの行を並べると、ページは300行ごとに分かれる($OUT)"
+else
+    ng "1行が約1,300バイトの行を並べると、300行に届く前にページが分かれ、どのページの全文も60,000バイトを超えない。1行が約150バイトの行を並べると、ページは300行ごとに分かれる($RC/$OUT)"
+fi
+drive 'print title_cell("a\\b"), "\n"; 0'
+check "題名の欄の中の「\\」は、替わらずにそのまま書かれる" "$RC/$OUT" "0/\` a\\b \`"
+newgh special
+mkdb 'issues => [ iss(1, body => intro()) ]'
+rm -rf "$STATE"
+drive 'special_file()'
+run list-add "$ROWS"
+add_rc=$RC
+run list-read
+printf '%s\n' "$OUT" >"$ROWS.read"
+drive 'print special_check(), "\n"; 0'
+check "「|」「\\」「\`」「\`\`」「@x」「#12」「<!--」「:smile:」「*a*」「a\\|b」「a\\」を含む title の行と、「\`」で始まり「\`」で終わる title の行を list-add で足すと、どの行も8つの欄に分かれ、list-read で読み直した title が書いた title と同じになる" "$add_rc/$RC/$OUT" "0/0/ok"
 
 echo "== 一覧を読む"
 newgh read
@@ -563,7 +663,7 @@ drive 'print tt_has3(), "\n"; 0'
 check "行に title の欄が無ければ、確かめたあとの行にも title の欄が無く、null と短い題名の title はそのまま残る" "$RC/$OUT" "0/none null str"
 
 newgh title-read
-mkdb 'issues => [ iss(1, body => body_with(R(1, "2026-10-01"), R8(2, "2026-10-02", ""), R8(3, "2026-10-03", TC3()))) ]'
+mkdb 'issues => [ iss(1, body => body_with(R7(1, "2026-10-01"), R8(2, "2026-10-02", ""), R8(3, "2026-10-03", TC3()))) ]'
 rm -rf "$STATE"
 run list-read
 check "題名の列の無い7列の行と、題名の欄が空の8列の行と、題名のある8列の行を、list-read が読み、前の2つの title が null になる" "$RC/$OUT" "0/[$(J 1 2026-10-01),$(J 2 2026-10-02),$(J 3 2026-10-03 | sed 's/"title":null/"title":"題名|`ok"/')]"
@@ -746,7 +846,7 @@ cat >"$FIND" <<'__FIND__'
 - [501-1] 設計の審査の往復を減らすため、審査役に渡す差分を短くする。
 - [501-2] extract.pl の、会話の再開のきっかけの値の一覧に、値 `example_value` を足す。
 __FIND__
-ROW501="| [#501]($URL/501#issuecomment-1000) | あり | 2026-11-02 | 14時間5分 | 123,456,789 | \$312.45 | 1 |"
+ROW501="| [#501]($URL/501#issuecomment-1000) |  | あり | 2026-11-02 | 14時間5分 | 123,456,789 | \$312.45 | 1 |"
 IDX_NOTE="このコメントは、所有者がまだ起票するかを答えていない直す案の番号を、AI が覚えておくためのものである。案の文は、番号の頭の Issue の集計のコメントの所見にある。"
 PUBDB='issues => [ iss(1, body => intro()), iss(501, title => "ふつうの Issue", locked => F, state => "open") ]'
 # publish の出力の見込み: pubout <書けなかった書き込みの JSON の中身>

@@ -563,8 +563,8 @@ check "publish が一覧に1行を足し、その行の値が、同じ Issue の
         my %v = map { /\A\| (.+?) \| (.+?) \|\z/ ? ($1 => $2) : () } split /\n/, $md;
         my ($end, $spec) = $md =~ /^\| [0-9]{4}-[0-9]{2}-[0-9]{2} \| ([0-9]{4}-[0-9]{2}-[0-9]{2}) \| (\S+) \| #/m;
         my @want = ($spec, $end, map { $v{$_} } "AIの作業時間", "トークン数", "使用料");
-        my $same = !grep { !defined $want[$_] || !defined $c[$_ + 2] || $want[$_] ne $c[$_ + 2] } 0 .. $#want;
-        print $same ? "same/$c[5]" : "row=[" . join("|", map { $_ // "" } @c) . "] md=[" . join("|", map { $_ // "" } @want) . "]"' "$STATE/drafts/203/report.md")" \
+        my $same = !grep { !defined $want[$_] || !defined $c[$_ + 3] || $want[$_] ne $c[$_ + 3] } 0 .. $#want;
+        print $same ? "same/$c[6]" : "row=[" . join("|", map { $_ // "" } @c) . "] md=[" . join("|", map { $_ // "" } @want) . "]"' "$STATE/drafts/203/report.md")" \
     "1/same/1,203"
 run publish 203 --findings "$FINDINGS"
 check "出し済みの Issue で publish を呼ぶと、集計のコメントと一覧の行を重ねずに 2 で終わる" "$RC/$(reports 203)/$(listrows 203)" "2/1/1"
