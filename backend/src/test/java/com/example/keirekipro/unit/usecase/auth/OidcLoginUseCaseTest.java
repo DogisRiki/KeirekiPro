@@ -1,6 +1,7 @@
 package com.example.keirekipro.unit.usecase.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -8,8 +9,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.AuthProvider;
 import com.example.keirekipro.domain.model.user.Email;
@@ -20,11 +23,13 @@ import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.OidcLoginUseCase;
 import com.example.keirekipro.usecase.auth.dto.OidcLoginUseCaseDto;
 import com.example.keirekipro.usecase.auth.oidc.OidcUserInfo;
+import com.example.keirekipro.usecase.auth.oidc.UnverifiedEmailAccountUseCaseException;
 import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -55,13 +60,7 @@ class OidcLoginUseCaseTest {
         ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> providers = Map.of(
                 PROVIDER_TYPE, AuthProvider.create(errorCollector, PROVIDER_TYPE, PROVIDER_USER_ID));
-        User existingUser = User.create(
-                errorCollector,
-                Email.create(errorCollector, EMAIL),
-                null,
-                providers,
-                null,
-                USERNAME);
+        User existingUser = verifiedUser(errorCollector, providers);
 
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.of(existingUser));
@@ -93,13 +92,7 @@ class OidcLoginUseCaseTest {
         ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> existingProviders = Map.of(
                 "github", AuthProvider.create(errorCollector, "github", "github-id"));
-        User existingUser = User.create(
-                errorCollector,
-                Email.create(errorCollector, EMAIL),
-                null,
-                existingProviders,
-                null,
-                USERNAME);
+        User existingUser = verifiedUser(errorCollector, existingProviders);
 
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
@@ -261,13 +254,7 @@ class OidcLoginUseCaseTest {
         ErrorCollector errorCollector = new ErrorCollector();
         Map<String, AuthProvider> providers = Map.of(
                 PROVIDER_TYPE, AuthProvider.create(errorCollector, PROVIDER_TYPE, PROVIDER_USER_ID));
-        User existingUser = User.create(
-                errorCollector,
-                Email.create(errorCollector, EMAIL),
-                null,
-                providers,
-                null,
-                USERNAME);
+        User existingUser = verifiedUser(errorCollector, providers);
 
         when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
                 .thenReturn(Optional.of(existingUser));
@@ -290,5 +277,256 @@ class OidcLoginUseCaseTest {
         verify(userRepository).save(existingUser);
         verify(eventPublisher, never()).publish(any());
         verify(userTokenVersionStore, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("結び付いたアカウントにログインさせ、返したメールアドレスを付けない")
+    void test9() {
+        ErrorCollector errorCollector = new ErrorCollector();
+        User existingUser = User.create(
+                errorCollector,
+                null,
+                null,
+                googleProviders(errorCollector),
+                null,
+                USERNAME);
+
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.of(existingUser));
+        when(userRepository.findById(existingUser.getId()))
+                .thenReturn(Optional.of(existingUser));
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(oidcUserInfo(EMAIL));
+
+        User saved = captureSavedUser();
+        assertThat(result.getId()).isEqualTo(existingUser.getId());
+        assertThat(result.getEmail()).isNull();
+        assertThat(saved.getEmail()).isNull();
+        assertThat(saved.getPendingEmail()).isNull();
+        verify(userRepository, never()).findByEmail(any());
+        verify(userTokenVersionStore, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("email が同じ確認前のアカウントを確認済みにする")
+    void test10() {
+        ErrorCollector errorCollector = new ErrorCollector();
+        User existingUser = User.create(
+                errorCollector,
+                Email.create(errorCollector, EMAIL),
+                null,
+                googleProviders(errorCollector),
+                null,
+                USERNAME);
+
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.of(existingUser));
+        when(userRepository.findById(existingUser.getId()))
+                .thenReturn(Optional.of(existingUser));
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(oidcUserInfo(EMAIL));
+
+        User saved = captureSavedUser();
+        assertThat(result.getId()).isEqualTo(existingUser.getId());
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(saved.getId()).isEqualTo(existingUser.getId());
+        assertThat(saved.isEmailVerified()).isTrue();
+        verify(userTokenVersionStore, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("pendingEmail が同じでほかのアカウントが持たなければ移す")
+    void test11() {
+        ErrorCollector errorCollector = new ErrorCollector();
+        User existingUser = pendingEmailUser(errorCollector);
+
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.of(existingUser));
+        when(userRepository.findById(existingUser.getId()))
+                .thenReturn(Optional.of(existingUser));
+        when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.empty());
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(oidcUserInfo(EMAIL));
+
+        User saved = captureSavedUser();
+        assertThat(result.getId()).isEqualTo(existingUser.getId());
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(saved.getEmail().getValue()).isEqualTo(EMAIL);
+        assertThat(saved.isEmailVerified()).isTrue();
+        assertThat(saved.getPendingEmail()).isNull();
+        verify(userRepository).findByEmail(EMAIL);
+    }
+
+    @Test
+    @DisplayName("ほかのアカウントが持っていれば設定待ちのまま残してログインさせる")
+    void test12() {
+        ErrorCollector errorCollector = new ErrorCollector();
+        User existingUser = pendingEmailUser(errorCollector);
+        User otherUser = verifiedUser(errorCollector, Map.of(
+                "github", AuthProvider.create(errorCollector, "github", "github-id")));
+
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.of(existingUser));
+        when(userRepository.findById(existingUser.getId()))
+                .thenReturn(Optional.of(existingUser));
+        when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.of(otherUser));
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(oidcUserInfo(EMAIL));
+
+        User saved = captureSavedUser();
+        assertThat(result.getId()).isEqualTo(existingUser.getId());
+        assertThat(result.getEmail()).isNull();
+        assertThat(saved.getEmail()).isNull();
+        assertThat(saved.getPendingEmail().getValue()).isEqualTo(EMAIL);
+        verify(userTokenVersionStore, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("新しいアカウントを確認済みのメールアドレスで作る")
+    void test13() {
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.empty());
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(oidcUserInfo(EMAIL));
+
+        User saved = captureSavedUser();
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(saved.getEmail().getValue()).isEqualTo(EMAIL);
+        assertThat(saved.isEmailVerified()).isTrue();
+        assertThat(saved.getAuthProviders()).containsKey(PROVIDER_TYPE);
+        verify(eventPublisher).publish(any());
+        verify(userTokenVersionStore).initialize(result.getId());
+    }
+
+    @Test
+    @DisplayName("email が null ならメールアドレスの無いアカウントを作る")
+    void test14() {
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.empty());
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(oidcUserInfo(null));
+
+        User saved = captureSavedUser();
+        assertThat(result.getEmail()).isNull();
+        assertThat(saved.getEmail()).isNull();
+        assertThat(saved.isEmailVerified()).isFalse();
+        verify(userRepository, never()).findByEmail(any());
+        verify(userTokenVersionStore).initialize(result.getId());
+    }
+
+    @Test
+    @DisplayName("同じメールアドレスの確認前の登録があってもアカウントを作る")
+    void test15() {
+        // 確認前の登録は users に無いため、findByEmail は見つけない
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.empty());
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(oidcUserInfo(EMAIL));
+
+        User saved = captureSavedUser();
+        assertThat(result.getEmail()).isEqualTo(EMAIL);
+        assertThat(saved.getEmail().getValue()).isEqualTo(EMAIL);
+        assertThat(saved.isEmailVerified()).isTrue();
+        verify(userTokenVersionStore).initialize(result.getId());
+    }
+
+    @Test
+    @DisplayName("確認前のアカウントと同じメールアドレスでは UnverifiedEmailAccountUseCaseException を投げて結び付けない")
+    void test16() {
+        ErrorCollector errorCollector = new ErrorCollector();
+        User existingUser = User.create(
+                errorCollector,
+                Email.create(errorCollector, EMAIL),
+                "hashed-password",
+                null,
+                null,
+                USERNAME);
+
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.of(existingUser));
+        when(userRepository.findById(existingUser.getId()))
+                .thenReturn(Optional.of(existingUser));
+
+        assertThatThrownBy(() -> {
+            OidcLoginUseCaseDto ignored = oidcLoginUseCase.execute(oidcUserInfo(EMAIL));
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(UnverifiedEmailAccountUseCaseException.class);
+
+        verify(userRepository, never()).save(any());
+        verify(eventPublisher, never()).publish(any());
+        verify(userTokenVersionStore, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("確認済みのアカウントには今と同じく結び付ける")
+    void test17() {
+        ErrorCollector errorCollector = new ErrorCollector();
+        User existingUser = verifiedUser(errorCollector, Map.of(
+                "github", AuthProvider.create(errorCollector, "github", "github-id")));
+
+        when(userRepository.findByProvider(PROVIDER_TYPE, PROVIDER_USER_ID))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.of(existingUser));
+        when(userRepository.findById(existingUser.getId()))
+                .thenReturn(Optional.of(existingUser));
+
+        OidcLoginUseCaseDto result = oidcLoginUseCase.execute(oidcUserInfo(EMAIL));
+
+        User saved = captureSavedUser();
+        assertThat(result.getId()).isEqualTo(existingUser.getId());
+        assertThat(saved.getAuthProviders()).containsKeys("github", PROVIDER_TYPE);
+        assertThat(saved.isEmailVerified()).isTrue();
+        verify(userTokenVersionStore, never()).initialize(any());
+    }
+
+    private static User verifiedUser(ErrorCollector errorCollector, Map<String, AuthProvider> providers) {
+        return User.createWithVerifiedEmail(
+                errorCollector,
+                UUID.randomUUID(),
+                Email.create(errorCollector, EMAIL),
+                null,
+                providers,
+                null,
+                USERNAME,
+                LocalDateTime.now());
+    }
+
+    private static User pendingEmailUser(ErrorCollector errorCollector) {
+        return User.create(
+                errorCollector,
+                null,
+                null,
+                googleProviders(errorCollector),
+                null,
+                USERNAME)
+                .setPendingEmail(errorCollector, Email.create(errorCollector, EMAIL));
+    }
+
+    private static Map<String, AuthProvider> googleProviders(ErrorCollector errorCollector) {
+        return Map.of(PROVIDER_TYPE, AuthProvider.create(errorCollector, PROVIDER_TYPE, PROVIDER_USER_ID));
+    }
+
+    private static OidcUserInfo oidcUserInfo(String email) {
+        return OidcUserInfo.builder()
+                .providerUserId(PROVIDER_USER_ID)
+                .email(email)
+                .username(USERNAME)
+                .providerType(PROVIDER_TYPE)
+                .build();
+    }
+
+    private User captureSavedUser() {
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        return captor.getValue();
     }
 }

@@ -212,7 +212,7 @@
   - _要件: 7.3, 7.4_
   - _対象の部品: GithubOidcProvider_
 
-- [ ] 5.2 外部連携のログインのユースケースを変える
+- [x] 5.2 外部連携のログインのユースケースを変える
 
   Claude は、「OidcLoginUseCase、HandleOidcCallbackUseCase、OidcCallbackController」の節のとおりに、`OidcLoginUseCase` の分岐を変え、確認がまだのアカウントへ結び付けないときの例外 `UnverifiedEmailAccountUseCaseException` を作る。Claude は、既存のテストのアカウントを確認済みのメールアドレスで作るように直し、既存のテストのアサーションを変えない。
   - 完了の確かめ方: `OidcLoginUseCaseTest` の足したテストと既存のテストがすべて通る。確認前のアカウントにも結び付けるように一時的に戻すと、テストが失敗する
