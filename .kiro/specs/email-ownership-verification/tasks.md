@@ -133,7 +133,7 @@
     - 送信の失敗は、「send が例外を投げたら置いた登録を消す」で確かめる
   - _要件: 1.1, 1.4, 1.6, 1.7, 2.7_
 
-- [ ] 4.2 確認がまだのときの 409 の応答を作る
+- [x] 4.2 確認がまだのときの 409 の応答を作る
 
   Claude は、「EmailNotVerifiedUseCaseException と AppExceptionHandler」の節のとおりに、`kind` を持つ例外と、`AppExceptionHandler` の 409 のハンドラと、`EmailNotVerifiedErrorResponse` を作る。
   - 完了の確かめ方: `AppExceptionHandlerTest` で、`EmailNotVerifiedUseCaseException` が 409 と `{message, errors, kind}` になり、ほかの `UseCaseException` が今と同じ 400 になる

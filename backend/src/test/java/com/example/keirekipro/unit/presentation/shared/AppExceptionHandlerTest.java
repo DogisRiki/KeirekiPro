@@ -18,6 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -241,6 +243,19 @@ class AppExceptionHandlerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("対象の職務経歴書データが存在しません。"))
                 .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "/test/test15, PENDING_REGISTRATION", "/test/test16, UNVERIFIED_ACCOUNT_EMAIL" })
+    @DisplayName("EmailNotVerifiedUseCaseException は 409 と kind を返す")
+    void test15(String path, String kind) throws Exception {
+        mockMvc.perform(get(path)
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("メールアドレスの確認が済んでいません。"))
+                .andExpect(jsonPath("$.errors").isEmpty())
+                .andExpect(jsonPath("$.kind").value(kind));
     }
 
 }

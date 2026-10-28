@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.presentation.shared.utils.CookieUtil;
 import com.example.keirekipro.shared.exception.BaseException;
+import com.example.keirekipro.usecase.shared.exception.EmailNotVerifiedUseCaseException;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -112,6 +113,19 @@ public class AppExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleResourceNotFoundUseCaseException(ResourceNotFoundUseCaseException ex) {
         return new ErrorResponse(ex.getMessage(), ex.getErrors());
+    }
+
+    /**
+     * EmailNotVerifiedUseCaseExceptionをハンドリングする
+     *
+     * @param ex 例外オブジェクト
+     * @return エラーレスポンス
+     */
+    @ExceptionHandler(EmailNotVerifiedUseCaseException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public EmailNotVerifiedErrorResponse handleEmailNotVerifiedUseCaseException(EmailNotVerifiedUseCaseException ex) {
+        return new EmailNotVerifiedErrorResponse(
+                "メールアドレスの確認が済んでいません。", Collections.emptyMap(), ex.getKind());
     }
 
     /**
