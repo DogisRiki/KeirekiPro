@@ -537,39 +537,6 @@ public class User extends Entity {
     }
 
     /**
-     * メールアドレスを後から設定する
-     *
-     * @param errorCollector エラー収集オブジェクト
-     * @param email メールアドレス
-     * @return 変更後のUserエンティティ
-     */
-    public User setEmail(ErrorCollector errorCollector, Email email) {
-
-        // 既にメールアドレスがある場合は設定不可
-        if (this.email != null) {
-            errorCollector.addError("email", "メールアドレスが既に設定されているため設定できません。");
-        }
-
-        if (errorCollector.hasErrors()) {
-            throw new DomainException(errorCollector.getErrors());
-        }
-
-        return new User(
-                this.id,
-                email,
-                this.passwordHash,
-                this.twoFactorAuthEnabled,
-                this.authProviders,
-                this.roles,
-                this.profileImage,
-                this.username,
-                this.createdAt,
-                LocalDateTime.now(),
-                this.emailVerifiedAt,
-                this.pendingEmail);
-    }
-
-    /**
      * メールアドレスの確認を済ませているかを判定する
      *
      * @return メールアドレスがあり、確認を済ませていればtrue

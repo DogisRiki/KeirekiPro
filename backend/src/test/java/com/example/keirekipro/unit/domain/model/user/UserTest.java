@@ -211,59 +211,6 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("メールアドレスを設定する")
-    void test6() {
-        User user = User.reconstruct(
-                ID,
-                null,
-                PASSWORD_HASH,
-                false,
-                AUTH_PROVIDERS,
-                EnumSet.of(RoleName.USER),
-                PROFILE_IMAGE,
-                USERNAME,
-                CREATED_AT,
-                UPDATED_AT,
-                EMAIL_VERIFIED_AT,
-                null);
-
-        User updatedUser = user.setEmail(errorCollector, Email.create(new ErrorCollector(), "new@keirekipro.click"));
-        assertThat(updatedUser.getEmail().getValue()).isEqualTo("new@keirekipro.click");
-        verify(errorCollector, never()).addError(anyString(), anyString());
-    }
-
-    @Test
-    @DisplayName("既にメールアドレスが設定されている状態でメールアドレスを設定するとDomainExceptionをスローする")
-    void test7() {
-        // モックをセットアップ
-        when(errorCollector.hasErrors()).thenReturn(true);
-
-        Email email = Email.create(errorCollector, EMAIL);
-        User user = User.reconstruct(
-                ID,
-                email,
-                PASSWORD_HASH,
-                true,
-                AUTH_PROVIDERS,
-                EnumSet.of(RoleName.USER),
-                PROFILE_IMAGE,
-                USERNAME,
-                CREATED_AT,
-                UPDATED_AT,
-                EMAIL_VERIFIED_AT,
-                null);
-
-        // DomainExceptionがスローされる
-        assertThatThrownBy(() -> {
-            User ignored = user.setEmail(errorCollector, Email.create(errorCollector, "other@keirekipro.click"));
-            assertThat(ignored).isNotNull();
-        }).isInstanceOf(DomainException.class);
-
-        // エラーメッセージが登録される
-        verify(errorCollector, times(1)).addError(eq("email"), eq("メールアドレスが既に設定されているため設定できません。"));
-    }
-
-    @Test
     @DisplayName("パスワードを変更する")
     void test8() {
         Email email = Email.create(errorCollector, EMAIL);

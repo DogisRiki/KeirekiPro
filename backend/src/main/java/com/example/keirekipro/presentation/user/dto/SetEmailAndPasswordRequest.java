@@ -36,6 +36,8 @@ public class SetEmailAndPasswordRequest {
 
     private String confirmPassword;
 
+    private String currentPassword;
+
     /**
      * ユースケースコマンドへ変換する
      *
@@ -43,6 +45,6 @@ public class SetEmailAndPasswordRequest {
      * @return メールアドレス・パスワード設定コマンド
      */
     public SetEmailAndPasswordCommand toCommand(UUID userId) {
-        return new SetEmailAndPasswordCommand(userId, email, password);
+        return new SetEmailAndPasswordCommand(userId, email, password, currentPassword);
     }
 }

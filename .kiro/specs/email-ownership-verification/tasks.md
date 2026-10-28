@@ -183,7 +183,7 @@
   - _対象の部品: RequestPasswordResetUseCase_
   - _依存: 2.6_
 
-- [ ] 4.7 メールアドレスとパスワードを設定するユースケースを変える
+- [x] 4.7 メールアドレスとパスワードを設定するユースケースを変える
 
   Claude は、「SetEmailAndPasswordUseCase」の節のとおりに、入力されたメールアドレスを設定待ちにし、確認のメールを送るように、`SetEmailAndPasswordUseCase` を変える。パスワードを持つアカウントでは、`SetEmailAndPasswordUseCase` は、入力の `currentPassword` を今のパスワードと照らし合わせる。Claude は、`SetEmailAndPasswordRequest` と `SetEmailAndPasswordCommand` に欄 `currentPassword` を足し、使わなくなった `User.setEmail` を消す。
   - 完了の確かめ方: `SetEmailAndPasswordUseCaseTest` が通る。`currentPassword` を照らし合わせないように一時的に変えると、テストが失敗する
