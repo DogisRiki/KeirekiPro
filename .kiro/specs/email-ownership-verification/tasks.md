@@ -165,7 +165,7 @@
   - _対象の部品: ResendEmailVerificationForLoginUseCase_
   - _依存: 2.2, 2.6_
 
-- [ ] 4.5 ユーザー設定の画面から確認のメールを送るユースケースを作る (並行可)
+- [x] 4.5 ユーザー設定の画面から確認のメールを送るユースケースを作る (並行可)
 
   Claude は、「SendAccountEmailVerificationUseCase」の節のとおりに、ログインしている利用者の設定待ちのメールアドレスか確認前のメールアドレスに確認のメールを送るユースケースを作る。
   - 完了の確かめ方: `SendAccountEmailVerificationUseCaseTest` が通る。`pending_email` より `email` を先に見るように一時的に変えると、テストが失敗する
