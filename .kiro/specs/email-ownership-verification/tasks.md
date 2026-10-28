@@ -272,7 +272,7 @@
   - _要件: 1.2, 1.5, 2.4, 2.5, 3.4, 4.2, 4.5, 9.2_
   - _依存: 7.1_
 
-- [ ] 7.3 ログインの画面に確認がまだであることを出す
+- [x] 7.3 ログインの画面に確認がまだであることを出す
 
   Claude は、「LoginContainer と EmailVerificationNotice」の節のとおりに、ログインの画面から確認のメールを送る関数とフックと、`EmailVerificationNotice` を作り、`LoginContainer` が 409 の `kind` と、クエリ `error=unverified_email` を受けて、ログインの画面に出す案内を出し分けるようにする。
   - 完了の確かめ方: `LoginContainer.test.tsx` と `useResendEmailVerificationForLogin.test.ts` が通る。クエリ `error` にほかの値を入れても、画面にその文字列が出ない
