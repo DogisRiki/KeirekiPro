@@ -21,7 +21,7 @@ Run `git diff` to see the actual code changes. This is your primary input. If th
 
 ## Reading and Verification Limits
 
-These limits keep the review's cost down without dropping any check in the checklist below. The checks that the task's completion conditions in tasks.md require always come first: when a limit would skip such a check, run the check.
+These limits keep the review's cost down without dropping any check in the checklist below. The checks that the task's completion conditions in tasks.md require always come first: when a limit would skip such a check, run the check. For completion condition 2, run the quality gates only when the controller passed them to you: they run once per major task, in the review of its last sub-task. In tasks.md approved before Issue #663, condition 2 reads `タスクで変えた領域の verify のスキル(...)が、すべて成功している`; the owner decided in Issue #663 that this text is read the same way.
 
 - Do not read large files whole. This applies to requirements.md, design.md, tasks.md, and the changed files. Find the place with `grep -n`, then read only the lines you need. For the spec files, read only the sections referenced by this task
 - Run each validation command once per environment that the task's completion conditions or the validation commands name. Do not re-run the same tests in the same environment, and do not run them in environments that neither names
@@ -42,8 +42,9 @@ Evaluate each item. If ANY item fails, the verdict is REJECTED.
 ### Mechanical Checks (run commands, use results)
 
 **1. Regression Safety**
-- Run the project's test suite (e.g., `npm test`, `pytest`). Use the exit code.
-- If tests fail → REJECTED. No judgment needed.
+- Run the validation commands the controller passed. For every task, these run, by name, the tests that use the files this task changed; do not replace them with the full suite. Only for the last task of a major task, the controller also passes the quality-gate commands; run those too. Use the exit codes.
+- Check with `git diff --name-only` and `grep -rln` that the passed tests include the tests that use the changed files. If a test that uses a changed file is missing from the passed commands, run it too.
+- If tests or quality gates fail → REJECTED. No judgment needed.
 
 **2. Completeness — No TBD/TODO/FIXME**
 - Run: `grep -rn "TBD\|TODO\|FIXME\|HACK\|XXX" <changed-files>`
@@ -106,6 +107,7 @@ The parent controller parses the exact `- VERDICT:` line. Do NOT rename the head
 - TASK: <task-id>
 - MECHANICAL_RESULTS:
   - Tests: PASS | FAIL (command and exit code)
+  - Quality gates: PASS | FAIL (command and exit code) | N/A (not the last task of its major task)
   - TBD/TODO grep: CLEAN | <count> matches
   - Secrets grep: CLEAN | <count> matches
   - Boundary: WITHIN | <files outside boundary>
