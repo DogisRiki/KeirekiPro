@@ -31,7 +31,7 @@
   - 受入基準とテストの対応: 要件4の受入基準1・2(設定待ちのメールアドレスを保存し、確認で移す)と要件5の受入基準1(確認前のメールアドレスを確認前として読む)は、`MyBatisUserRepositoryTest` の「emailVerifiedAt と pendingEmail を保存して読み直すと同じ値が返る」「email_verified_at が NULL の行は確認前のアカウントとして読まれる」で確かめる
   - _要件: 4.1, 4.2, 5.1_
 
-- [ ] 2. 確認のリンクの部品と一時データの置き場所を作る
+- [x] 2. 確認のリンクの部品と一時データの置き場所を作る
 - [x] 2.1 確認のリンクのトークンを作り、読む部品を作る (並行可)
 
   Claude は、「EmailVerificationTokenCodec と JwtEmailVerificationTokenCodec」の節と「EmailVerificationPurpose」の節のとおりに、トークンの種類の列挙型、トークンの中身の record、トークンを作る部品と読む部品のインタフェースと、java-jwt の実装を作る。
@@ -72,7 +72,7 @@
   - _要件: 1.1, 4.1, 9.1_
   - _対象の部品: EmailVerificationNotification と email-verification.ftl_
 
-- [ ] 2.6 確認のメールを送る部品を作る
+- [x] 2.6 確認のメールを送る部品を作る
 
   Claude は、「EmailVerificationMailer」の節のとおりに、1分の制限を確かめ、トークンを作り、最新の `jti` を置き、確認のメールを送る部品を作る。リンクは、トークンを URL の `#` のあとに置いた形にする。
   - 完了の確かめ方: `EmailVerificationMailerTest` が通る。送信に失敗したときに `release` を呼ばないように一時的に変えると、テストが失敗する
