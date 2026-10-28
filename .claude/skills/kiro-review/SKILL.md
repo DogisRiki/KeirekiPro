@@ -68,7 +68,7 @@ The main review question is not just "does it work?" but "does it stay inside th
 Run these checks and use the result as primary signal.
 
 ### 1. Regression Safety
-- Run the project's canonical test suite using the validation commands discovered by the controller.
+- Run the validation commands passed by the controller for this task. Do not replace them with the full suite.
 - If tests fail, reject.
 
 ### 2. No Residual Placeholder Markers
