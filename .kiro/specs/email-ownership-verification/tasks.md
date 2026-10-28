@@ -121,7 +121,7 @@
   - _要件: 1.6, 2.4, 2.6_
 
 - [ ] 4. 確認前の登録と確認前のメールアドレスを扱う既存のユースケースを変える
-- [ ] 4.1 登録を受け付けるユースケースを変える
+- [x] 4.1 登録を受け付けるユースケースを変える
 
   Claude は、「UserRegistrationUseCase」の節のとおりに、登録を受け付けて確認前の登録を置き、確認のメールを送るように、`UserRegistrationUseCase` を変える。Claude は、`UserRegistrationController` の応答を本体なしの 202 にする。
   - 完了の確かめ方: `UserRegistrationUseCaseTest` と `UserRegistrationControllerTest` が通る。`UserRegistrationUseCase` は、登録を受け付けたときに、アカウントを users の表に保存しない

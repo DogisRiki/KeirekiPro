@@ -1,45 +1,45 @@
 package com.example.keirekipro.usecase.auth;
 
+import java.time.Instant;
 import java.util.Collections;
+import java.util.UUID;
 
 import com.example.keirekipro.domain.model.user.Email;
 import com.example.keirekipro.domain.model.user.User;
-import com.example.keirekipro.domain.repository.user.UserRepository;
 import com.example.keirekipro.domain.service.user.UserEmailDuplicationCheckService;
-import com.example.keirekipro.domain.shared.event.DomainEventPublisher;
 import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.usecase.auth.command.UserRegistrationCommand;
-import com.example.keirekipro.usecase.auth.store.UserTokenVersionStore;
+import com.example.keirekipro.usecase.auth.store.PendingRegistration;
+import com.example.keirekipro.usecase.auth.store.PendingRegistrationStore;
+import com.example.keirekipro.usecase.auth.verification.EmailVerificationMailer;
+import com.example.keirekipro.usecase.auth.verification.EmailVerificationPurpose;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 
 /**
  * ユーザー新規登録ユースケース
+ * アカウントは作らず、確認前の登録を置いて確認のメールを送る。アカウントは確認のリンクを受け付けたときに作る
  */
 @Service
 @RequiredArgsConstructor
 public class UserRegistrationUseCase {
 
-    private final UserRepository userRepository;
-
     private final PasswordEncoder passwordEncoder;
-
-    private final DomainEventPublisher eventPublisher;
 
     private final UserEmailDuplicationCheckService userEmailDuplicationCheckService;
 
-    private final UserTokenVersionStore userTokenVersionStore;
+    private final PendingRegistrationStore pendingRegistrationStore;
+
+    private final EmailVerificationMailer mailer;
 
     /**
      * ユーザー新規登録ユースケースを実行する
      *
      * @param command コマンド
      */
-    @Transactional
     public void execute(UserRegistrationCommand command) {
 
         ErrorCollector errorCollector = new ErrorCollector();
@@ -50,27 +50,21 @@ public class UserRegistrationUseCase {
         // メールアドレス重複チェック
         userEmailDuplicationCheckService.execute(email);
 
-        User user = User.create(
-                errorCollector,
-                Email.create(
-                        errorCollector,
-                        command.getEmail()),
-                passwordEncoder.encode(command.getPassword()),
-                Collections.emptyMap(),
-                null,
-                command.getUsername());
+        String passwordHash = passwordEncoder.encode(command.getPassword());
 
-        // 新規登録イベントを発行する
-        user.register();
+        // 入力の検証だけに使い、作ったユーザーは保存しない
+        User.create(errorCollector, email, passwordHash, Collections.emptyMap(), null, command.getUsername());
 
-        // ユーザー登録
-        userRepository.save(user);
+        PendingRegistration registration = new PendingRegistration(
+                UUID.randomUUID(), command.getEmail(), passwordHash, command.getUsername(), Instant.now());
+        pendingRegistrationStore.save(registration, EmailVerificationPurpose.REGISTRATION.getLinkValidity());
 
-        // トークンバージョンを初期化
-        userTokenVersionStore.initialize(user.getId());
-
-        // 新規登録イベントをパブリッシュ
-        user.getDomainEvents().forEach(eventPublisher::publish);
-        user.clearDomainEvents();
+        // RATE_LIMITED のときも登録は受け付ける
+        try {
+            mailer.send(command.getEmail(), registration.id(), EmailVerificationPurpose.REGISTRATION);
+        } catch (RuntimeException e) {
+            pendingRegistrationStore.delete(registration);
+            throw e;
+        }
     }
 }

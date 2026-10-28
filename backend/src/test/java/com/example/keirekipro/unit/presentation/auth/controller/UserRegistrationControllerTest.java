@@ -45,7 +45,7 @@ class UserRegistrationControllerTest {
     private static final String CONFIRM_PASSWORD = "Password123";
 
     @Test
-    @DisplayName("正常なリクエストの場合、201が返される")
+    @DisplayName("登録すると 202 を返す")
     void test1() throws Exception {
         // リクエストを準備
         UserRegistrationRequest request = new UserRegistrationRequest(EMAIL, USERNAME, PASSWORD, CONFIRM_PASSWORD);
@@ -56,7 +56,7 @@ class UserRegistrationControllerTest {
                 ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         // 呼び出し検証を追加
         verify(userRegistrationUseCase).execute(eq(request.toCommand()));
