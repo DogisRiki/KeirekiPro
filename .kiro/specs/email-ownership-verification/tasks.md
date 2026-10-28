@@ -174,7 +174,7 @@
   - _対象の部品: SendAccountEmailVerificationUseCase_
   - _依存: 2.6_
 
-- [ ] 4.6 パスワードの再設定を求めるユースケースを変える (並行可)
+- [x] 4.6 パスワードの再設定を求めるユースケースを変える (並行可)
 
   Claude は、「RequestPasswordResetUseCase」の節のとおりに、確認前のアカウントには `PASSWORD_RESET` の確認のメールを送るように、`RequestPasswordResetUseCase` を変える。Claude は、既存のテストのアカウントを確認済みのメールアドレスで作るように直し、既存のテストのアサーションを変えない。
   - 完了の確かめ方: `RequestPasswordResetUseCaseTest` の足したテストと既存のテストがすべて通る。確認前のアカウントにパスワードの再設定のメールを送るように一時的に戻すと、テストが失敗する
