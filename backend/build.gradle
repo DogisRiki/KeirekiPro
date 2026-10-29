@@ -10,20 +10,14 @@ buildscript {
     dependencies {
         classpath "org.flywaydb:flyway-database-postgresql:${libs.versions.flyway.get()}"
 
-        // ビルド用プラグイン(Flyway / Spring Boot)が持ち込む依存の版を引き上げる(#361)。
+        // ビルド用プラグインが持ち込む commons-lang3 の版を引き上げる(#361)。
         // buildscript のクラスパスには Spring Boot の BOM が効かないため、ここで指定する。
         // 版は libs.versions.toml の [versions] を参照する。
-        //   jackson-databind 2.21.4 -> CVE-2026-54515 / CVE-2026-59889 / GHSA-mhm7-754m-9p8w
-        //   commons-lang3    3.16.0 -> CVE-2025-48924
-        //   httpclient5      5.5.2  -> CVE-2026-64607
-        //   httpcore5 5.3.6 -> CVE-2026-54399 / httpcore5-h2 5.3.6 -> CVE-2026-54428
-        // 解除の判定: ./gradlew -q buildEnvironment で、制約を外しても各版がここ以上なら削除する。
+        //   commons-lang3 3.16.0 -> CVE-2025-48924(3.18.0 以降で修正)
+        // 解除の判定: この制約を外して ./gradlew -q buildEnvironment を実行し、
+        // commons-lang3 が 3.18.0 以上なら、この制約と libs.versions.toml の commons-lang3 の行を削除する。
         constraints {
-            classpath "com.fasterxml.jackson.core:jackson-databind:${libs.versions.jackson.bom.get()}"
             classpath "org.apache.commons:commons-lang3:${libs.versions.commons.lang3.get()}"
-            classpath "org.apache.httpcomponents.client5:httpclient5:${libs.versions.httpclient5.get()}"
-            classpath "org.apache.httpcomponents.core5:httpcore5:${libs.versions.httpcore5.get()}"
-            classpath "org.apache.httpcomponents.core5:httpcore5-h2:${libs.versions.httpcore5.get()}"
         }
     }
 }
@@ -60,6 +54,14 @@ configurations {
 repositories {
     mavenCentral()
 }
+
+// Spring Boot 4.1.2 の BOM が管理する OpenTelemetry 1.62.0 には、修正版が公開済みの
+// CVE-2026-118259 がある(1.67.0 以降で修正)。opentelemetry-api は
+// micrometer-tracing-bridge-otel と opentelemetry-exporter-otlp 経由で本番イメージに入る。
+// 上流が追いつくまで、ここで管理バージョンを上書きする。修正の入った最小の版を指定している。
+// 解除の判定: Spring Boot を上げたとき、その BOM の opentelemetry.version が
+// libs.versions.toml の opentelemetry の版以上なら、この行と libs.versions.toml の opentelemetry の行を削除する。
+ext['opentelemetry.version'] = libs.versions.opentelemetry.get()
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -118,14 +120,11 @@ dependencies {
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 
-    // BOM の管理外で推移的に入る版を引き上げる(#361)。どちらも本番には入らない。
-    //   commons-compress 1.24.0 -> CVE-2024-26308 / CVE-2024-25710(testcontainers 1.21.4 経由。
-    //                              1.x の最新が 1.21.4 のため、testcontainers 側では解消しない)
-    //   plexus-utils     3.3.0  -> CVE-2025-67030(checkstyle の doxia 1.12.0 経由。11 系でも残り、
-    //                              14 系では外れている。メジャー更新は設定の互換性の確認が要る)
-    // 解除の判定は libs.versions.toml の該当行のコメントを参照する。
+    // checkstyle が doxia 経由で持ち込む plexus-utils の版を引き上げる(#361)。本番には入らない。
+    //   plexus-utils 3.3.0 -> CVE-2025-67030(3.6.1 以降で修正)
+    // 解除の判定: この制約を外して ./gradlew dependencies --configuration checkstyle を実行し、
+    // plexus-utils が 3.6.1 以上なら、この制約と libs.versions.toml の plexus-utils の行を削除する。
     constraints {
-        testImplementation "org.apache.commons:commons-compress:${libs.versions.commons.compress.get()}"
         checkstyle "org.codehaus.plexus:plexus-utils:${libs.versions.plexus.utils.get()}"
     }
 }

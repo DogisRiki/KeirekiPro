@@ -44,7 +44,7 @@
   - _要件: 1.1, 1.3, 1.4, 1.5, 1.6, 1.10, 1.11, 3.3, 4.3_
   - _対象の部品: libs.versions.toml, build.gradle_
 
-- [ ] 2.3 消す制約と上書きごとに、引き込まれる版に既知の脆弱性が無いことを確かめる
+- [x] 2.3 消す制約と上書きごとに、引き込まれる版に既知の脆弱性が無いことを確かめる
 
   Claude は、buildscript の5つの制約と、`commons-compress` と `plexus-utils` の制約を1つずつ外し、外したときに引き込まれる版に既知の脆弱性が無いかを確かめる。buildscript の制約とは、Gradle のプラグインが引き込む部品の版を決める制約である。Claude は、外したときに引き込まれる版を、`buildEnvironment`、`dependencyInsight`、`dependencies --configuration checkstyle` で読む。Claude は、既知の脆弱性がある版を引き込む制約だけを、直した版を指すように残す。Claude は、小タスク2.2が残した6つの版の行のうち、その行を使う制約を全部消した行だけを消す。Claude は、`jackson-bom` の行を残すときは、名前を `jackson2` に改める。
 
@@ -269,3 +269,5 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 2.1: `./gradlew wrapper` は、動いている Gradle が jar を作る。版を上げるときは2回流す(1回目で設定のファイルだけが新しい版になり、2回目で新しい版の Gradle が jar と gradlew を作り直す)
 - 2.2: archunit-junit6 1.5.1 は junit-platform-engine 6.1.3 を求め、junit-bom 6.1.3 を持ち込んで junit-platform-launcher だけを 6.1.3 に上げる。`build.gradle` で archunit-junit6 から junit-platform-engine を外し、JUnit の部品をすべて Spring Boot の 6.0.3 にそろえた(設計に無い変更。PR 本文に書く)。小タスク2.9・2.10で、ArchUnit のテストが JUnit 6.0.3 の上で見つかって実行されることを確かめる
 - 2.2: 完了の確かめ方は「runtimeClasspath が JUnit 6.0.3 を示す」だが、JUnit はテストだけで使う部品で runtimeClasspath に入らない。JUnit 6.0.3 は testRuntimeClasspath で確かめた(食い違いとして PR 本文に書く)。小タスク2.3で constraints を決めるとき、`build.gradle` の constraints の注記に残る「testcontainers 1.21.4 経由」の古い説明も合わせて直すか消す
+- 2.3: 部品の版は `./gradlew buildEnvironment dependencies` を1回流して全 configuration を読み、OSV(api.osv.dev の querybatch)に問い合わせる。台本は作業用のフォルダの `vuln-check/`(`parse_deps.py`、`osv_check.py`)にある。版を書かずに宣言した部品は `group:name -> 版` の形で出るので、名前から ` -> 版` を外して読む
+- 2.3: 残したのは buildscript の commons-lang3 と checkstyle の plexus-utils の制約、戻したのは `ext['opentelemetry.version']`(1.67.0)。OpenTelemetry を上げると okhttp と okio の版も上がる(作業用のフォルダの記録にある。PR の本文の版の前後の表に書く)。大タスク4で checkstyle を上げたあと、同じ台本で checkstyle の configuration を調べ直す
