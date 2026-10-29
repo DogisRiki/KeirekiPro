@@ -62,6 +62,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - push先はfeatureブランチのみ。マージはauto-merge(ゲート全通過で自動)に任せる。auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する。
   AIは予約の操作(`gh pr merge`)をせず、予約されたことを確かめる。予約が付かないときは自分で予約せず報告する
 - 出荷手順(verify→commit→push→PR→auto-mergeの予約の確認)は `/ship` に従う
+- 実装と確かめが終わったら、AIは `/ship` を自分で起動する。spec で進めたときも、所有者に出荷してよいかを尋ねない。
+  ただし、所有者が画面などで手で確かめることが残っているときは、AIは確かめの手順を示して止まり、所有者の結果を受けてから出荷する
 
 ## 作業規約
 
