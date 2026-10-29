@@ -138,7 +138,7 @@
   - _要件: 2.6_
   - _対象の部品: RestClientConfig_
 
-- [ ] 3.3 2つの Redis の store が上げる前の値を読めることを確かめる
+- [x] 3.3 2つの Redis の store が上げる前の値を読めることを確かめる
 
   Claude は、`RedisPendingRegistrationStoreTest` と `RedisTwoFactorAuthChallengeStoreTest` に、小タスク1.1で作った store の値の見本を Redis に置いて読む場合を足す。見本を読めないときは、Claude は、`use-jackson2-defaults` の設定では上げる前に戻らない差を探し、その差を上げる前に戻す処理を `JsonMapperConfig` に足すか、その差を所有者に示す。
   - 完了の確かめ方: 足した場合が通り、読み取った値が見本を書いたときの値と同じである

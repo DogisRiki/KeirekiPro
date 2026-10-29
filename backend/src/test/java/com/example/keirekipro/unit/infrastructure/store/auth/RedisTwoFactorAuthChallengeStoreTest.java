@@ -2,25 +2,38 @@ package com.example.keirekipro.unit.infrastructure.store.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.config.RedisTestContainerConfig;
+import com.example.keirekipro.infrastructure.shared.json.JsonMapperConfig;
+import com.example.keirekipro.infrastructure.shared.redis.RedisConfig;
 import com.example.keirekipro.infrastructure.store.auth.RedisTwoFactorAuthChallengeStore;
 import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthChallenge;
 import com.example.keirekipro.usecase.auth.store.TwoFactorAuthChallengeStore;
 import tools.jackson.databind.json.JsonMapper;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.redis.test.autoconfigure.DataRedisTest;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.test.context.NestedTestConfiguration;
+import org.springframework.test.context.NestedTestConfiguration.EnclosingConfiguration;
 import org.springframework.test.context.TestConstructor;
 
 import lombok.RequiredArgsConstructor;
@@ -164,5 +177,95 @@ class RedisTwoFactorAuthChallengeStoreTest {
 
         // 検証
         assertThat(result).isZero();
+    }
+
+    /**
+     * 上げる前の backend(Spring Boot 3.5.16)が本番の RedisTemplate で書いた値の見本を読む
+     *
+     * 見本は src/test/resources/baseline-samples/redis/ にある。値の書き方を本番と同じにするため、外側のテストの設定を引き継がず、
+     * 本番の RedisConfig と Spring Boot の Jackson の設定を読み込む
+     */
+    @Nested
+    @NestedTestConfiguration(EnclosingConfiguration.OVERRIDE)
+    @DataRedisTest
+    @ImportAutoConfiguration(JacksonAutoConfiguration.class)
+    @Import({
+            RedisTestContainerConfig.class,
+            RedisConfig.class,
+            JsonMapperConfig.class,
+            RedisTwoFactorAuthChallengeStore.class
+    })
+    class BaselineSample {
+
+        private static final UUID SAMPLE_USER_ID = UUID.fromString("66666666-7777-8888-9999-aaaaaaaaaaaa");
+
+        private static final String SAMPLE_TOKEN = "sample-token";
+
+        private static final String SAMPLE_KEY = "2fa:challenge:" + SAMPLE_TOKEN;
+
+        @Autowired
+        private TwoFactorAuthChallengeStore baselineStore;
+
+        @Autowired
+        private RedisConnectionFactory connectionFactory;
+
+        @AfterEach
+        void deleteSample() {
+            try (RedisConnection connection = connectionFactory.getConnection()) {
+                connection.keyCommands().del(bytes(SAMPLE_KEY));
+            }
+        }
+
+        @Test
+        @DisplayName("上げる前の backend が書いたチャレンジの見本を、find で読める")
+        void test1() throws IOException {
+            putSample("store-2fa-challenge.bin");
+
+            Optional<TwoFactorAuthChallenge> result = baselineStore.find(SAMPLE_TOKEN);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().getUserId()).isEqualTo(SAMPLE_USER_ID);
+            assertThat(result.get().getAttempts()).isZero();
+        }
+
+        @Test
+        @DisplayName("上げる前の backend が試行回数を加算したあとの見本を、find で読める")
+        void test2() throws IOException {
+            putSample("store-2fa-challenge-incremented.bin");
+
+            Optional<TwoFactorAuthChallenge> result = baselineStore.find(SAMPLE_TOKEN);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().getUserId()).isEqualTo(SAMPLE_USER_ID);
+            assertThat(result.get().getAttempts()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("上げる前の backend が書いたチャレンジの見本の試行回数を加算でき、加算した値を find で読める")
+        void test3() throws IOException {
+            putSample("store-2fa-challenge.bin");
+
+            int attempts = baselineStore.incrementAttempts(SAMPLE_TOKEN);
+
+            assertThat(attempts).isEqualTo(1);
+            Optional<TwoFactorAuthChallenge> result = baselineStore.find(SAMPLE_TOKEN);
+            assertThat(result).isPresent();
+            assertThat(result.get().getUserId()).isEqualTo(SAMPLE_USER_ID);
+            assertThat(result.get().getAttempts()).isEqualTo(1);
+        }
+
+        private void putSample(String name) throws IOException {
+            try (RedisConnection connection = connectionFactory.getConnection()) {
+                connection.stringCommands().set(bytes(SAMPLE_KEY), sample(name));
+            }
+        }
+
+        private static byte[] bytes(String key) {
+            return key.getBytes(StandardCharsets.UTF_8);
+        }
+
+        private static byte[] sample(String name) throws IOException {
+            return new ClassPathResource("baseline-samples/redis/" + name).getContentAsByteArray();
+        }
     }
 }
