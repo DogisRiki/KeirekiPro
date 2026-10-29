@@ -51,7 +51,7 @@ After all parallel research completes, synthesize implementation brief before st
 - Prefer commands already used by repo automation over ad hoc shell pipelines
 - For `SMOKE_COMMANDS`, choose the lightest trustworthy runtime-liveness check for the app shape (for example: root URL load, Electron launch, CLI `--help`, service health endpoint, mobile simulator/e2e harness if one already exists)
 - Keep the full command set in the main context, and pass only the task-relevant subset to reviewer subagents
-- While implementing a task, run only commands that run specific tests (e.g. `bash .claude/scripts/parallel/run-check.sh backend ./gradlew test --tests <class>`, `bash .claude/scripts/parallel/run-check.sh frontend pnpm test <test file>`), not the full-suite or quality-gate commands (`./gradlew check`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`). The reviewer runs the full suite and the quality gates for each task (see Step 3 c)
+- While implementing a task, run only commands that run specific tests (e.g. `bash .claude/scripts/parallel/run-check.sh backend ./gradlew test --tests <class>`, `bash .claude/scripts/parallel/run-check.sh frontend pnpm test <test file>`), not the full-suite or quality-gate commands (`./gradlew check`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`). The reviewer runs the quality gates once per major task (`1.`, `2.`), in the review of its last sub-task (see Step 3 c)
 
 **Establish repo baseline**:
 - Run `git status --porcelain` and note any pre-existing uncommitted changes
@@ -110,7 +110,11 @@ For each task (one at a time):
   - The template's `## Reading and Verification Limits` section, unchanged. The reviewer subagent does not see this skill, so the limits reach it only through the review prompt
 - The reviewer must apply the `kiro-review` protocol to this task-local review.
 - Preserve the existing task-specific context: task text, spec refs, `_対象の部品:_` scope, validation commands, your Status Report, and the actual `git diff` as the primary source of truth.
-- Pass the quality-gate commands of every area this task changed (the commands listed in the Steps of the `/verify-frontend` `/verify-backend` `/verify-terraform` skills) as the validation commands for Regression Safety. You do not run them in a), so the reviewer's run is the task's verify run required by the completion conditions in tasks.md, and its output is the fresh evidence for `kiro-verify-completion`
+- Pass the validation commands for Regression Safety by the position of this task in its major task (`1.`, `2.`):
+  - **Every task**: the commands that run, by name, the tests that use the files this task changed (the tests you found and ran in a)). The reviewer runs these instead of the full suite
+  - **The last task of its major task**: in addition, the quality-gate commands (the commands listed in the Steps of the `/verify-frontend` `/verify-backend` `/verify-terraform` skills) of every area that the sub-tasks of this major task changed. A task is the last task of its major task when, once it is marked `[x]`, no sub-task of the same major task is left `- [ ]` except those with `_保留:_`. Do not pass the quality gates for the other tasks
+- In tasks.md approved before Issue #663, completion condition 2 reads `タスクで変えた領域の verify のスキル(...)が、すべて成功している`. Read it as the current template's condition 2: it is satisfied for every sub-task of a major task when the quality gates pass in the review of its last task. The owner decided this in Issue #663; do not rewrite the text of those tasks.md files
+- You do not run the tests or the quality gates in the reviewer's place, so the reviewer's output is the fresh evidence for `kiro-verify-completion`
 - The reviewer subagent will run `git diff` itself to read the actual code changes and verify against the spec
 - Dispatch via **Agent tool** as a fresh subagent with `subagent_type: general-purpose`
 
@@ -175,7 +179,7 @@ Before writing any code, read the relevant sections of requirements.md and desig
 - **RED**: Write test for the next small piece of functionality based on the acceptance criteria. Test should fail.
 - **GREEN**: Implement simplest solution to make test pass, following the design constraints.
 - **REFACTOR**: Improve code structure, remove duplication. All tests must still pass.
-- **VERIFY**: All tests pass (new and existing), no regressions. Confirm verification method passes.
+- **VERIFY**: The tests that use the files this task changed pass, by name. Run the quality gates only when this task is the last task of its major task, by the same rule as Step 3 c. Confirm verification method passes.
 - **REVIEW**: Apply `kiro-review` before marking the task complete. If the host supports fresh subagents in manual mode, use a fresh reviewer; otherwise perform the review in the main context using the `kiro-review` protocol. Do NOT continue until the verdict is parseably `APPROVED`.
 - **MARK COMPLETE**: Only after review returns `APPROVED`, apply `kiro-verify-completion`, then update the checkbox from `- [ ]` to `- [x]` in tasks.md.
 

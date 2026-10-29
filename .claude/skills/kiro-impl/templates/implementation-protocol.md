@@ -42,12 +42,12 @@ If any of these cannot be determined from the spec — the requirements are too 
 - Use the acceptance criteria from the Task Brief to drive test design
 - Follow the design constraints exactly
 - Keep changes tightly scoped to the assigned task
-- Run only the tests you added and the tests that cover the code you changed, by naming them (e.g. `./gradlew test --tests <class>`, `pnpm test <test file>`). Do NOT run the full suite at any point (see Critical Constraints)
+- Run only the tests you added and the tests that use the files you changed, by naming them (e.g. `./gradlew test --tests <class>`, `pnpm test <test file>`). Do NOT run the full suite at any point (see Critical Constraints)
 
 ### Step 4: Validate
-- Run the validation commands from the Preflight needed to establish confidence for this task, narrowed to the tests you added and the tests that cover the changed code
+- Before you write the status report, find every test that uses the files this task changed: search the test directories with `grep -rln` for the changed files' module, class, or file names (imports and references). Run all the tests you found, together with the tests you added, by naming them. List them in `TESTS_RUN`; the reviewer runs the same tests
 - Prefer the canonical commands from the Preflight over inventing new ones; only add a task-local verification command when that set does not cover the task, and explain why
-- The reviewer runs the full suite and the quality gates for this task after you write the status report, so you do not need to run them
+- The reviewer runs the quality gates only in the review of the last task of each major task (Step 3 c of `SKILL.md`), so you do not run them
 - Re-read the referenced requirement and design sections and compare them against the changed code and tests
 - Confirm the verification method from the Task Brief passes
 - If a validation command fails because of a pre-existing unrelated issue, report that precisely instead of masking it
@@ -65,7 +65,7 @@ If any of these cannot be determined from the spec — the requirements are too 
 
 ## Critical Constraints
 - Do NOT mark the task `[x]` in `tasks.md` or create commits before the reviewer returns `APPROVED` (Step 3 d and e of `SKILL.md`)
-- Do NOT run the full test suite or the quality gates while implementing: `./gradlew check` / `build`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`, mutation tests, or the `/verify-frontend` `/verify-backend` skills. The reviewer runs them for each task, and running them here too doubles the time and cost
+- Do NOT run the full test suite or the quality gates while implementing: `./gradlew check` / `build`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`, mutation tests, or the `/verify-frontend` `/verify-backend` skills. The reviewer runs them once per major task, and running them here too adds the time and cost that running them once per major task removes
 - Do NOT expand scope beyond the assigned task and boundary
 - Do NOT silently work around requirement or design mismatches
 - Use the exact section numbers from `requirements.md` and `design.md` in all notes and reports; do NOT invent `REQ-*` aliases
@@ -86,7 +86,7 @@ After the self-review, write this structured status block. Step 3 b of `SKILL.md
 - REQUIREMENTS_CHECKED: <exact section numbers from requirements.md>
 - DESIGN_CHECKED: <exact section numbers from design.md>
 - RED_PHASE_OUTPUT: <test command and failing output from before implementation -- proves tests were written first>
-- TESTS_RUN: <test commands and final passing results>
+- TESTS_RUN: <test commands for the tests you added and every test that uses the changed files, and their final passing results>
 - CONCERNS: <optional -- describe any non-blocking concerns the reviewer should pay attention to>
 - BLOCKER: <only for BLOCKED -- describe what prevents completion>
 - BLOCKER_REMEDIATION: <only for BLOCKED -- what would unblock this? e.g., "design.md section 3.2 specifies API X but it doesn't exist; update design or provide alternative">
