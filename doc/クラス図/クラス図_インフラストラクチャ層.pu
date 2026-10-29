@@ -227,13 +227,58 @@ package com.example.keirekipro.infrastructure.store.auth {
         + void incrementByUserId(UUID userId, LocalDateTime updatedAt)
     }
 
+    class RedisPendingRegistrationStore {
+        - RedisTemplate<String, Object> redisTemplate
+        - ObjectMapper objectMapper
+        --
+        + void save(PendingRegistration registration, Duration ttl)
+        + Optional<PendingRegistration> findById(UUID id)
+        + List<PendingRegistration> findByEmail(String email, int limit)
+        + void extend(UUID id, Duration ttl)
+        + void delete(PendingRegistration registration)
+    }
+
+    class RedisEmailVerificationCurrentTokenStore {
+        - RedisTemplate<String, Object> redisTemplate
+        --
+        + void put(UUID subjectId, String jti, Duration ttl)
+        + Optional<String> find(UUID subjectId)
+        + boolean consume(UUID subjectId, String jti)
+        + void clear(UUID subjectId)
+    }
+
+    class RedisEmailVerificationSendLimiter {
+        - RedisTemplate<String, Object> redisTemplate
+        --
+        + boolean tryAcquire(String email)
+        + void release(String email)
+    }
+
     RedisOidcAuthorizationSessionStore ..|> OidcAuthorizationSessionStore
     RedisPasswordResetTokenStore ..|> PasswordResetTokenStore
     RedisRefreshTokenStore ..|> RefreshTokenStore
     RedisTwoFactorAuthCodeStore ..|> TwoFactorAuthCodeStore
     RedisTwoFactorAuthChallengeStore ..|> TwoFactorAuthChallengeStore
     MyBatisUserTokenVersionStore ..|> UserTokenVersionStore
+    RedisPendingRegistrationStore ..|> PendingRegistrationStore
+    RedisEmailVerificationCurrentTokenStore ..|> EmailVerificationCurrentTokenStore
+    RedisEmailVerificationSendLimiter ..|> EmailVerificationSendLimiter
     MyBatisUserTokenVersionStore --> UserTokenVersionMapper
+}
+
+'========================================
+' infrastructure.auth.verification
+'========================================
+package com.example.keirekipro.infrastructure.auth.verification {
+    class JwtEmailVerificationTokenCodec {
+        - Algorithm algorithm
+        - JWTVerifier verifier
+        --
+        + String issue(EmailVerificationClaims claims)
+        + Optional<EmailVerificationClaims> read(String token)
+    }
+
+    JwtEmailVerificationTokenCodec ..|> EmailVerificationTokenCodec
 }
 
 '========================================
@@ -578,6 +623,8 @@ package com.example.keirekipro.infrastructure.repository.user {
         - String profileImage
         - LocalDateTime createdAt
         - LocalDateTime updatedAt
+        - LocalDateTime emailVerifiedAt
+        - String pendingEmail
         - List<AuthProviderDto> authProviders
         - List<String> roles
     }

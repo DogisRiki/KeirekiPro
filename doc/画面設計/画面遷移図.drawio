@@ -182,6 +182,21 @@
                         <mxPoint x="1460" y="220" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
+                <mxCell id="emailVerify-1" value="メールアドレス確認画面" style="rounded=1;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="420" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="emailVerify-2" value="メールアドレス宛に送信された確認のリンクからのみアクセス可能。ログインの有無を問わない。パスワード再設定の確認のときは、この画面で新しいパスワードを設定する" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="320" width="220" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="emailVerify-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;endArrow=none;endFill=0;dashed=1;" parent="1" source="emailVerify-1" target="emailVerify-2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="emailVerify-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="emailVerify-1" target="pVMww3hBHBPk4zqrIiLN-2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="emailVerify-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="emailVerify-1" target="pVMww3hBHBPk4zqrIiLN-3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
             </root>
         </mxGraphModel>
     </diagram>

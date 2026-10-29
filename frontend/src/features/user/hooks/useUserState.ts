@@ -20,7 +20,11 @@ import { useMemo } from "react";
  *   - hasPassword: ✕
  *   - hasProvider: ○
  * - EMAIL_PASSWORD_WITH_PROVIDER
- *   - 上記以外（email, hasPassword, hasProvider すべて ○）
+ *   - email, hasPassword, hasProvider すべて ○
+ * - PASSWORD_WITH_PROVIDER(メールアドレスが設定待ち)
+ *   - email: ✕
+ *   - hasPassword: ○
+ *   - hasProvider: ○
  *
  * @param user ユーザー情報
  * @returns 判定された {@link UserState}
@@ -45,6 +49,9 @@ export const getUserState = (user: User | null): UserState => {
 
         case hasEmail && hasPassword && hasProvider:
             return UserState.EMAIL_PASSWORD_WITH_PROVIDER;
+
+        case !hasEmail && hasPassword && hasProvider:
+            return UserState.PASSWORD_WITH_PROVIDER;
 
         default:
             return UserState.UNKNOWN; // ここには基本来ない

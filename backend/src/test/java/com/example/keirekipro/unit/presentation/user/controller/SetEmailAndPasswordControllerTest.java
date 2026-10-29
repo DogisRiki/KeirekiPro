@@ -60,6 +60,7 @@ class SetEmailAndPasswordControllerTest {
     private static final UUID AUTH_PROVIDER_ID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479");
     private static final String PROVIDER_NAME = "google";
     private static final String PROVIDER_USER_ID = "109876543210987654321";
+    private static final String CURRENT_PASSWORD = "CurrentPass1";
 
     @Test
     @DisplayName("正常にメールアドレスとパスワードを設定できる")
@@ -67,7 +68,8 @@ class SetEmailAndPasswordControllerTest {
         SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(
                 EMAIL,
                 PASSWORD,
-                PASSWORD);
+                PASSWORD,
+                CURRENT_PASSWORD);
         String json = objectMapper.writeValueAsString(request);
 
         UserInfoUseCaseDto.AuthProviderInfo authProvider = new AuthProviderInfo(
@@ -104,7 +106,7 @@ class SetEmailAndPasswordControllerTest {
     @Test
     @DisplayName("メールアドレス形式が不正な場合、バリデーションエラーとなる")
     void test2() throws Exception {
-        SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest("invalid-email", PASSWORD, PASSWORD);
+        SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest("invalid-email", PASSWORD, PASSWORD, null);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -119,7 +121,7 @@ class SetEmailAndPasswordControllerTest {
     @DisplayName("メールアドレスが255文字を超える場合、バリデーションエラーとなる")
     void test3() throws Exception {
         String longEmail = "a".repeat(245) + "@example.com";
-        SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(longEmail, PASSWORD, PASSWORD);
+        SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(longEmail, PASSWORD, PASSWORD, null);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -133,7 +135,7 @@ class SetEmailAndPasswordControllerTest {
     @Test
     @DisplayName("パスワードが空の場合、バリデーションエラーとなる")
     void test4() throws Exception {
-        SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest("test@example.com", "", "");
+        SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest("test@example.com", "", "", null);
 
         mockMvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -150,7 +152,8 @@ class SetEmailAndPasswordControllerTest {
         SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(
                 null,
                 PASSWORD,
-                PASSWORD);
+                PASSWORD,
+                null);
         String json = objectMapper.writeValueAsString(request);
 
         UserInfoUseCaseDto dto = UserInfoUseCaseDto.builder()
@@ -187,6 +190,7 @@ class SetEmailAndPasswordControllerTest {
         SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(
                 EMAIL,
                 null,
+                null,
                 null);
 
         String json = objectMapper.writeValueAsString(request);
@@ -202,6 +206,7 @@ class SetEmailAndPasswordControllerTest {
     @DisplayName("メールアドレスとパスワードの両方がnullの場合、バリデーションエラーとなる")
     void test7() throws Exception {
         SetEmailAndPasswordRequest request = new SetEmailAndPasswordRequest(
+                null,
                 null,
                 null,
                 null);

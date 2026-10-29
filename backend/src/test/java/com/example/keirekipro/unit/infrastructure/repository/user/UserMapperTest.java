@@ -27,7 +27,7 @@ import lombok.RequiredArgsConstructor;
 
 @MybatisTest
 @ActiveProfiles("test")
-@TestPropertySource(properties = "spring.flyway.target=1")
+@TestPropertySource(properties = "spring.flyway.target=7")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -282,6 +282,37 @@ class UserMapperTest {
         assertThat(loaded.isTwoFactorAuthEnabled()).isFalse();
         assertThat(loaded.getCreatedAt()).isEqualTo(dto.getCreatedAt());
         assertThat(loaded.getUpdatedAt()).isNotEqualTo(dto.getUpdatedAt());
+    }
+
+    @Test
+    @DisplayName("upsert_emailVerifiedAt と pendingEmail を保存して読み直すと同じ値が返る")
+    void test14() {
+        // 設定待ちのメールアドレスだけを持つ行を登録
+        UserDto dto = createUserDto();
+        dto.setEmail(null);
+        dto.setEmailVerifiedAt(null);
+        dto.setPendingEmail("pending@keirekipro.click");
+        userMapper.upsertUser(dto);
+
+        UserDto inserted = userMapper.selectById(USER_ID).orElseThrow();
+        assertThat(inserted.getEmail()).isNull();
+        assertThat(inserted.getEmailVerifiedAt()).isNull();
+        assertThat(inserted.getPendingEmail()).isEqualTo("pending@keirekipro.click");
+
+        // 確認で設定待ちのメールアドレスを移した行に書き換える
+        LocalDateTime verifiedAt = LocalDateTime.of(2024, 6, 1, 9, 0);
+        UserDto promoted = createUserDto();
+        promoted.setEmail("pending@keirekipro.click");
+        promoted.setEmailVerifiedAt(verifiedAt);
+        promoted.setPendingEmail(null);
+        userMapper.upsertUser(promoted);
+
+        UserDto updated = userMapper.selectById(USER_ID).orElseThrow();
+        assertThat(updated.getEmail()).isEqualTo("pending@keirekipro.click");
+        assertThat(updated.getEmailVerifiedAt()).isEqualTo(verifiedAt);
+        assertThat(updated.getPendingEmail()).isNull();
+        assertThat(userMapper.selectByEmail("pending@keirekipro.click").orElseThrow().getEmailVerifiedAt())
+                .isEqualTo(verifiedAt);
     }
 
     @Test

@@ -167,9 +167,23 @@ class OidcProviderFactoryTest {
 
     @Test
     @DisplayName("GithubOidcProviderが正しくインスタンス化でき、OidcUserInfoDtoの情報が正しい")
-    void test7() {
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    void test7() throws Exception {
+        // メールアドレスは /user/emails の primary かつ verified の要素から取得する
         RestClient mockRestClient = mock(RestClient.class);
+        RestClient.RequestHeadersUriSpec rawUriSpec = mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.RequestHeadersSpec rawHeadersSpec = mock(RestClient.RequestHeadersSpec.class);
+        RestClient.ResponseSpec responseSpec = mock(RestClient.ResponseSpec.class);
+        when(mockRestClient.get()).thenReturn((RestClient.RequestHeadersUriSpec) rawUriSpec);
+        when(rawUriSpec.uri(anyString())).thenReturn((RestClient.RequestHeadersSpec) rawHeadersSpec);
+        when(rawHeadersSpec.headers(any())).thenReturn(rawHeadersSpec);
+        when(rawHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(String.class)).thenReturn("[]");
+
         ObjectMapper mockObjectMapper = mock(ObjectMapper.class);
+        List<Map<String, Object>> emails = List.of(
+                Map.of("email", "github@example.com", "primary", true, "verified", true));
+        when(mockObjectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(emails);
 
         GithubOidcProvider githubProvider = new GithubOidcProvider(
                 DUMMY_AUTH_ENDPOINT,

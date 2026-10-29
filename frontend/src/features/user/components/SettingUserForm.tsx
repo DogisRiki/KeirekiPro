@@ -3,6 +3,7 @@ import type { SettingMessages } from "@/features/user";
 import {
     AuthProviderField,
     AuthProviderWarningMessage,
+    EmailVerificationStatus,
     PasswordStatusBox,
     ProfileImageField,
     TwoFactorSwitch,
@@ -15,6 +16,8 @@ import { useState } from "react";
 
 export interface SettingUserFormProps {
     email: string | null;
+    emailVerified: boolean;
+    pendingEmail: string | null;
     username: string;
     onUsernameChange: (v: string) => void;
     profileImageUrl: string | null;
@@ -36,6 +39,8 @@ export interface SettingUserFormProps {
  */
 export const SettingUserForm = ({
     email,
+    emailVerified,
+    pendingEmail,
     username,
     onUsernameChange,
     profileImageUrl,
@@ -96,6 +101,8 @@ export const SettingUserForm = ({
                     }}
                     sx={{ mt: 4, mb: 4 }}
                 />
+
+                <EmailVerificationStatus email={email} emailVerified={emailVerified} pendingEmail={pendingEmail} />
 
                 <TextField
                     label="ユーザー名"

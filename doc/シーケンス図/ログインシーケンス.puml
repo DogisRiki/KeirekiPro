@@ -8,6 +8,7 @@ actor ユーザー
 participant クライアント
 participant アプリケーションサーバー as サーバー
 participant DB
+participant Redis
 participant OIDCプロバイダー兼認可サーバー as OIDC
 
 == Email + パスワードログイン ==
@@ -40,6 +41,18 @@ alt 一致
     end note
 
     クライアント -> ユーザー: [8] ログイン成功。職務経歴書一覧画面へ
+else 一致するが、メールアドレスの確認が済んでいない (email_verified_at が NULL)
+    サーバー -> クライアント: [V1] 409 Conflict (kind = UNVERIFIED_ACCOUNT_EMAIL)
+    note left of クライアント
+        - 2段階認証が有効でも、2段階認証に進まない
+        - ボディに { message, errors, kind }
+    end note
+    クライアント -> ユーザー: [V2] 確認が済んでいないことと「確認のメールを送る」ボタンを表示
+else usersテーブルに該当が無く、確認前の登録のパスワードと一致
+    サーバー -> Redis: [P1] pending-registration:email:{email} の ID を読み、pending-registration:{id} から確認前の登録を取得
+    Redis --> サーバー: [P2] 確認前の登録 (パスワードハッシュを含む) を返却
+    サーバー -> クライアント: [P3] 409 Conflict (kind = PENDING_REGISTRATION)
+    クライアント -> ユーザー: [P4] 登録が済んでいないことと「確認のメールを送り直す」ボタンを表示
 else 不一致
     サーバー -> クライアント: [X1] 401 Unauthorized (ログイン失敗)
     クライアント -> ユーザー: [X2] ログイン失敗メッセージ表示

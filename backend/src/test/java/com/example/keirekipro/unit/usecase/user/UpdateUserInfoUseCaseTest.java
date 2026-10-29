@@ -94,7 +94,9 @@ class UpdateUserInfoUseCaseTest {
                 EnumSet.of(RoleName.USER),
                 null,
                 "old-name",
-                LocalDateTime.now(), LocalDateTime.now());
+                LocalDateTime.now(), LocalDateTime.now(),
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                null);
 
         // オブジェクトストアとリポジトリのモック
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existingUser));
@@ -261,7 +263,9 @@ class UpdateUserInfoUseCaseTest {
                         null,
                         "",
                         LocalDateTime.now(),
-                        LocalDateTime.now())));
+                        LocalDateTime.now(),
+                        LocalDateTime.of(2024, 1, 1, 0, 0),
+                        null)));
 
         try (MockedStatic<FileUtil> util = mockStatic(FileUtil.class)) {
             util.when(() -> FileUtil.isMimeTypeValid(any(), anyList())).thenReturn(true);
@@ -320,7 +324,9 @@ class UpdateUserInfoUseCaseTest {
                         null,
                         "old-name",
                         LocalDateTime.now(),
-                        LocalDateTime.now())));
+                        LocalDateTime.now(),
+                        LocalDateTime.of(2024, 1, 1, 0, 0),
+                        null)));
 
         updateUserInfoUseCase.execute(req);
 
@@ -348,7 +354,9 @@ class UpdateUserInfoUseCaseTest {
                         null,
                         "old-name",
                         LocalDateTime.now(),
-                        LocalDateTime.now())));
+                        LocalDateTime.now(),
+                        LocalDateTime.of(2024, 1, 1, 0, 0),
+                        null)));
 
         updateUserInfoUseCase.execute(req);
 
@@ -390,7 +398,9 @@ class UpdateUserInfoUseCaseTest {
                         null,
                         "old-name",
                         LocalDateTime.now(),
-                        LocalDateTime.now())));
+                        LocalDateTime.now(),
+                        LocalDateTime.of(2024, 1, 1, 0, 0),
+                        null)));
         when(objectStore.putAs(any(StoredObject.class), eq("/profile/image/"), eq(USER_ID + ".png")))
                 .thenReturn(S3_KEY);
 

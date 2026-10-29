@@ -16,6 +16,7 @@ package com.example.keirekipro.presentation.shared {
         + ErrorResponse handleMethodArgumentNotValidException(MethodArgumentNotValidException ex)
         + ErrorResponse handleHttpMessageNotReadableException()
         + ErrorResponse handleResourceNotFoundUseCaseException(ResourceNotFoundUseCaseException ex)
+        + EmailNotVerifiedErrorResponse handleEmailNotVerifiedUseCaseException(EmailNotVerifiedUseCaseException ex)
         + ErrorResponse handleBaseException(BaseException ex)
         + ErrorResponse handleUnexpectedException(Exception ex)
         - String resolveJsonPropertyName(String fieldName, Object target)
@@ -25,6 +26,12 @@ package com.example.keirekipro.presentation.shared {
         - String message
         - Map<String, List<String>> errors
     }
+
+    class EmailNotVerifiedErrorResponse {
+        - Kind kind
+    }
+
+    EmailNotVerifiedErrorResponse --|> ErrorResponse
 }
 
 package com.example.keirekipro.presentation.shared.logging {
@@ -230,8 +237,27 @@ package com.example.keirekipro.presentation.auth.dto {
         - String code
     }
 
+    class EmailVerificationTokenRequest {
+        - String token
+    }
+
+    class ResendEmailVerificationForLoginRequest {
+        - String email
+        - String password
+        --
+        + ResendEmailVerificationForLoginCommand toCommand()
+    }
+
+    class VerifyEmailResponse {
+        - String result
+        - String passwordResetToken
+        --
+        + static VerifyEmailResponse convertToResponse(VerifyEmailUseCaseDto dto)
+    }
+
     LoginRequest ..> LoginCommand
     UserRegistrationRequest ..> UserRegistrationCommand
+    ResendEmailVerificationForLoginRequest ..> ResendEmailVerificationForLoginCommand
 }
 
 '========================================
@@ -307,6 +333,24 @@ package com.example.keirekipro.presentation.auth.controller {
         + void handle(TwoFactorAuthRequest request, HttpServletResponse response)
     }
 
+    class VerifyEmailController {
+        - VerifyEmailUseCase verifyEmailUseCase
+        --
+        + VerifyEmailResponse handle(EmailVerificationTokenRequest request)
+    }
+
+    class ResendEmailVerificationController {
+        - ResendEmailVerificationUseCase resendEmailVerificationUseCase
+        --
+        + void handle(EmailVerificationTokenRequest request)
+    }
+
+    class ResendEmailVerificationForLoginController {
+        - ResendEmailVerificationForLoginUseCase resendEmailVerificationForLoginUseCase
+        --
+        + void handle(ResendEmailVerificationForLoginRequest request)
+    }
+
     LoginController --> LoginUseCase
     LoginController --> TwoFactorAuthIssueUseCase
     LoginController --> AuthCookieIssuer
@@ -325,6 +369,9 @@ package com.example.keirekipro.presentation.auth.controller {
     ResetPasswordController --> ResetPasswordUseCase
     TwoFactorAuthController --> TwoFactorAuthVerifyUseCase
     TwoFactorAuthController --> AuthCookieIssuer
+    VerifyEmailController --> VerifyEmailUseCase
+    ResendEmailVerificationController --> ResendEmailVerificationUseCase
+    ResendEmailVerificationForLoginController --> ResendEmailVerificationForLoginUseCase
 }
 
 '========================================
@@ -342,6 +389,7 @@ package com.example.keirekipro.presentation.user.dto {
         - String email
         - String password
         - String confirmPassword
+        - String currentPassword
         --
         + SetEmailAndPasswordCommand toCommand(UUID userId)
     }
@@ -361,6 +409,8 @@ package com.example.keirekipro.presentation.user.dto {
         - String profileImage
         - List<String> authProviders
         - Set<String> roles
+        - boolean emailVerified
+        - String pendingEmail
     }
 
     ChangePasswordRequest ..> ChangePasswordCommand
@@ -402,6 +452,13 @@ package com.example.keirekipro.presentation.user.controller {
         + UserInfoResponse handle(SetEmailAndPasswordRequest request)
     }
 
+    class SendAccountEmailVerificationController {
+        - SendAccountEmailVerificationUseCase sendAccountEmailVerificationUseCase
+        - CurrentUserFacade currentUserFacade
+        --
+        + void handle()
+    }
+
     class RemoveAuthProviderController {
         - RemoveAuthProviderUseCase removeAuthProviderUseCase
         - CurrentUserFacade currentUserFacade
@@ -424,6 +481,8 @@ package com.example.keirekipro.presentation.user.controller {
     ChangePasswordController --> CurrentUserFacade
     SetEmailAndPasswordController --> SetEmailAndPasswordUseCase
     SetEmailAndPasswordController --> CurrentUserFacade
+    SendAccountEmailVerificationController --> SendAccountEmailVerificationUseCase
+    SendAccountEmailVerificationController --> CurrentUserFacade
     RemoveAuthProviderController --> RemoveAuthProviderUseCase
     RemoveAuthProviderController --> CurrentUserFacade
     DeleteUserController --> DeleteUserUseCase

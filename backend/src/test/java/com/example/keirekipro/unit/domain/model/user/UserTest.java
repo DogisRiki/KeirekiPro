@@ -46,6 +46,8 @@ class UserTest {
     private static final String PROFILE_IMAGE = "profile/test-user.jpg";
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2023, 1, 1, 0, 0);
     private static final LocalDateTime UPDATED_AT = LocalDateTime.of(2023, 1, 2, 0, 0);
+    private static final LocalDateTime EMAIL_VERIFIED_AT = LocalDateTime.of(2023, 1, 1, 12, 0);
+    private static final LocalDateTime NOW = LocalDateTime.of(2024, 6, 1, 9, 0);
 
     @Test
     @DisplayName("メールアドレス+パスワードで新規構築用コンストラクタでインスタンス化する")
@@ -184,7 +186,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // ユーザーが正しく生成されたことを検証
         assertThat(user).isNotNull();
@@ -207,55 +211,6 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("メールアドレスを設定する")
-    void test6() {
-        User user = User.reconstruct(
-                ID,
-                null,
-                PASSWORD_HASH,
-                false,
-                AUTH_PROVIDERS,
-                EnumSet.of(RoleName.USER),
-                PROFILE_IMAGE,
-                USERNAME,
-                CREATED_AT,
-                UPDATED_AT);
-
-        User updatedUser = user.setEmail(errorCollector, Email.create(new ErrorCollector(), "new@keirekipro.click"));
-        assertThat(updatedUser.getEmail().getValue()).isEqualTo("new@keirekipro.click");
-        verify(errorCollector, never()).addError(anyString(), anyString());
-    }
-
-    @Test
-    @DisplayName("既にメールアドレスが設定されている状態でメールアドレスを設定するとDomainExceptionをスローする")
-    void test7() {
-        // モックをセットアップ
-        when(errorCollector.hasErrors()).thenReturn(true);
-
-        Email email = Email.create(errorCollector, EMAIL);
-        User user = User.reconstruct(
-                ID,
-                email,
-                PASSWORD_HASH,
-                true,
-                AUTH_PROVIDERS,
-                EnumSet.of(RoleName.USER),
-                PROFILE_IMAGE,
-                USERNAME,
-                CREATED_AT,
-                UPDATED_AT);
-
-        // DomainExceptionがスローされる
-        assertThatThrownBy(() -> {
-            User ignored = user.setEmail(errorCollector, Email.create(errorCollector, "other@keirekipro.click"));
-            assertThat(ignored).isNotNull();
-        }).isInstanceOf(DomainException.class);
-
-        // エラーメッセージが登録される
-        verify(errorCollector, times(1)).addError(eq("email"), eq("メールアドレスが既に設定されているため設定できません。"));
-    }
-
-    @Test
     @DisplayName("パスワードを変更する")
     void test8() {
         Email email = Email.create(errorCollector, EMAIL);
@@ -269,7 +224,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.changePassword(errorCollector, "updatedHashPassword");
         assertThat(updatedUser.getPasswordHash()).isEqualTo("updatedHashPassword");
@@ -293,7 +250,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -319,7 +278,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.changeTwoFactorAuthEnabled(errorCollector, true);
         assertThat(updatedUser.isTwoFactorAuthEnabled()).isTrue();
@@ -340,7 +301,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.changeTwoFactorAuthEnabled(errorCollector, false);
         assertThat(updatedUser.isTwoFactorAuthEnabled()).isFalse();
@@ -364,7 +327,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -384,7 +349,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -411,7 +378,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.removeAuthProvider(errorCollector, "google");
         assertThat(updatedUser.getAuthProviders()).isEmpty();
@@ -436,7 +405,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updated = user.removeAuthProvider(errorCollector, "google");
         assertThat(updated.getAuthProviders()).hasSize(1);
@@ -462,7 +433,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -490,7 +463,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -515,7 +490,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.changeProfileImage("profile/new-user.png");
         assertThat(updatedUser.getProfileImage()).isEqualTo("profile/new-user.png");
@@ -534,7 +511,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.changeUsername(errorCollector, "new-name");
         assertThat(updatedUser.getUsername()).isEqualTo("new-name");
@@ -557,7 +536,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -582,7 +563,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.addAuthProvider(errorCollector, "github", "githubId");
 
@@ -603,7 +586,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         user.addAuthProvider(errorCollector, "google", "otherId");
 
@@ -627,7 +612,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.resetPassword("newResetPasswordHash");
 
@@ -675,7 +662,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // IllegalStateExceptionがスローされる
         assertThatThrownBy(() -> user.register()).isInstanceOf(IllegalStateException.class);
@@ -695,7 +684,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         user.delete();
 
@@ -724,7 +715,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -750,7 +743,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         User updatedUser = user.removeRole(errorCollector, RoleName.USER);
 
@@ -775,7 +770,9 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null);
 
         // DomainExceptionがスローされる
         assertThatThrownBy(() -> {
@@ -802,7 +799,283 @@ class UserTest {
                 PROFILE_IMAGE,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT)).isInstanceOf(DomainException.class)
+                UPDATED_AT,
+                EMAIL_VERIFIED_AT,
+                null)).isInstanceOf(DomainException.class)
                 .hasMessageContaining("管理者の場合は二段階認証が必須です。");
+    }
+
+    @Test
+    @DisplayName("isEmailVerified はメールアドレスと確認の日時がどちらもあるときだけ true を返す")
+    void test30() {
+        Email email = Email.create(new ErrorCollector(), EMAIL);
+
+        assertThat(reconstructUser(email, PASSWORD_HASH, false, AUTH_PROVIDERS, EMAIL_VERIFIED_AT, null)
+                .isEmailVerified()).isTrue();
+        assertThat(reconstructUser(email, PASSWORD_HASH, false, AUTH_PROVIDERS, null, null)
+                .isEmailVerified()).isFalse();
+        assertThat(reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, EMAIL_VERIFIED_AT, null)
+                .isEmailVerified()).isFalse();
+    }
+
+    @Test
+    @DisplayName("createWithVerifiedEmail は指定した ID と確認済みのメールアドレスで新規のユーザーを作る")
+    void test31() {
+        Email email = Email.create(new ErrorCollector(), EMAIL);
+
+        User user = User.createWithVerifiedEmail(new ErrorCollector(), ID, email, PASSWORD_HASH, null, null,
+                USERNAME, NOW);
+
+        assertThat(user.getId()).isEqualTo(ID);
+        assertThat(user.getEmail()).isEqualTo(email);
+        assertThat(user.getPasswordHash()).isEqualTo(PASSWORD_HASH);
+        assertThat(user.getUsername()).isEqualTo(USERNAME);
+        assertThat(user.getEmailVerifiedAt()).isEqualTo(NOW);
+        assertThat(user.getPendingEmail()).isNull();
+        assertThat(user.isEmailVerified()).isTrue();
+        assertThat(user.isTwoFactorAuthEnabled()).isFalse();
+        assertThat(user.getRoles()).containsExactly(RoleName.USER);
+
+        // 新規のユーザーなので register() で UserRegisteredEvent を積める
+        user.register();
+        assertThat(user.getDomainEvents()).hasSize(1);
+        assertThat(user.getDomainEvents().get(0)).isInstanceOf(UserRegisteredEvent.class);
+    }
+
+    @Test
+    @DisplayName("create で作ったユーザーのメールアドレスは確認前になる")
+    void test32() {
+        User user = User.create(new ErrorCollector(), Email.create(new ErrorCollector(), EMAIL), PASSWORD_HASH,
+                null, null, USERNAME);
+
+        assertThat(user.getEmailVerifiedAt()).isNull();
+        assertThat(user.getPendingEmail()).isNull();
+        assertThat(user.isEmailVerified()).isFalse();
+    }
+
+    @Test
+    @DisplayName("verifyEmail は emailVerifiedAt が null のときだけ日時を入れる")
+    void test33() {
+        Email email = Email.create(new ErrorCollector(), EMAIL);
+
+        User unverified = reconstructUser(email, PASSWORD_HASH, false, AUTH_PROVIDERS, null, null);
+        User verified = unverified.verifyEmail(NOW);
+        assertThat(verified.getEmailVerifiedAt()).isEqualTo(NOW);
+        assertThat(verified.getEmail()).isEqualTo(email);
+        assertThat(verified.isEmailVerified()).isTrue();
+
+        // すでに確認済みなら日時を変えない
+        User alreadyVerified = reconstructUser(email, PASSWORD_HASH, false, AUTH_PROVIDERS, EMAIL_VERIFIED_AT, null);
+        assertThat(alreadyVerified.verifyEmail(NOW).getEmailVerifiedAt()).isEqualTo(EMAIL_VERIFIED_AT);
+    }
+
+    @Test
+    @DisplayName("メールアドレスの無いアカウントで verifyEmail を呼ぶと DomainException をスローする")
+    void test34() {
+        User user = reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, null, null);
+
+        assertThatThrownBy(() -> {
+            User ignored = user.verifyEmail(NOW);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    @DisplayName("setPendingEmail は email の無いアカウントの pendingEmail を置き換える")
+    void test35() {
+        Email oldPending = Email.create(new ErrorCollector(), "old@keirekipro.click");
+        Email newPending = Email.create(new ErrorCollector(), "new@keirekipro.click");
+        User user = reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, null, oldPending);
+
+        User updated = user.setPendingEmail(new ErrorCollector(), newPending);
+
+        assertThat(updated.getPendingEmail()).isEqualTo(newPending);
+        assertThat(updated.getEmail()).isNull();
+        assertThat(updated.getEmailVerifiedAt()).isNull();
+        assertThat(updated.isEmailVerified()).isFalse();
+    }
+
+    @Test
+    @DisplayName("メールアドレスのあるアカウントで setPendingEmail を呼ぶと DomainException をスローする")
+    void test36() {
+        when(errorCollector.hasErrors()).thenReturn(true);
+        Email email = Email.create(new ErrorCollector(), EMAIL);
+        User user = reconstructUser(email, PASSWORD_HASH, false, AUTH_PROVIDERS, null, null);
+
+        assertThatThrownBy(() -> {
+            User ignored = user.setPendingEmail(errorCollector,
+                    Email.create(new ErrorCollector(), "new@keirekipro.click"));
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
+
+        verify(errorCollector, times(1)).addError(eq("email"), eq("メールアドレスが既に設定されているため設定できません。"));
+    }
+
+    @Test
+    @DisplayName("promotePendingEmail は pendingEmail を email に移し emailVerifiedAt を入れる")
+    void test37() {
+        Email pending = Email.create(new ErrorCollector(), "pending@keirekipro.click");
+        User user = reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, null, pending);
+
+        User promoted = user.promotePendingEmail(NOW);
+
+        assertThat(promoted.getEmail()).isEqualTo(pending);
+        assertThat(promoted.getPendingEmail()).isNull();
+        assertThat(promoted.getEmailVerifiedAt()).isEqualTo(NOW);
+        assertThat(promoted.isEmailVerified()).isTrue();
+    }
+
+    @Test
+    @DisplayName("設定待ちのメールアドレスが無いか、メールアドレスがあるときに promotePendingEmail を呼ぶと DomainException をスローする")
+    void test38() {
+        User noPending = reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, null, null);
+        assertThatThrownBy(() -> {
+            User ignored = noPending.promotePendingEmail(NOW);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
+
+        User hasEmail = reconstructUser(Email.create(new ErrorCollector(), EMAIL), PASSWORD_HASH, false,
+                AUTH_PROVIDERS, null, Email.create(new ErrorCollector(), "pending@keirekipro.click"));
+        assertThatThrownBy(() -> {
+            User ignored = hasEmail.promotePendingEmail(NOW);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    @DisplayName("確認前のアカウントの delete は UserDeletedEvent を積まない")
+    void test39() {
+        User unverified = reconstructUser(Email.create(new ErrorCollector(), EMAIL), PASSWORD_HASH, false,
+                AUTH_PROVIDERS, null, null);
+        unverified.delete();
+        assertThat(unverified.getDomainEvents()).isEmpty();
+
+        // 設定待ちのメールアドレスだけを持つアカウントも積まない
+        User pendingOnly = reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, null,
+                Email.create(new ErrorCollector(), "pending@keirekipro.click"));
+        pendingOnly.delete();
+        assertThat(pendingOnly.getDomainEvents()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("確認前のアカウントの2段階認証の有効化を断る")
+    void test40() {
+        when(errorCollector.hasErrors()).thenReturn(true);
+
+        // 確認前のメールアドレスとパスワードを持つ
+        User unverified = reconstructUser(Email.create(new ErrorCollector(), EMAIL), PASSWORD_HASH, false,
+                AUTH_PROVIDERS, null, null);
+        assertThatThrownBy(() -> {
+            User ignored = unverified.changeTwoFactorAuthEnabled(errorCollector, true);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
+
+        // 設定待ちのメールアドレスとパスワードを持つ
+        User pendingOnly = reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, null,
+                Email.create(new ErrorCollector(), "pending@keirekipro.click"));
+        assertThatThrownBy(() -> {
+            User ignored = pendingOnly.changeTwoFactorAuthEnabled(errorCollector, true);
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
+
+        verify(errorCollector, times(2)).addError(eq("twoFactorAuthEnabled"),
+                eq("メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。"));
+    }
+
+    @Test
+    @DisplayName("確認前のアカウントでも2段階認証を無効にできる")
+    void test41() {
+        User unverified = reconstructUser(Email.create(new ErrorCollector(), EMAIL), PASSWORD_HASH, true,
+                AUTH_PROVIDERS, null, null);
+
+        User updated = unverified.changeTwoFactorAuthEnabled(errorCollector, false);
+
+        assertThat(updated.isTwoFactorAuthEnabled()).isFalse();
+        verify(errorCollector, never()).addError(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("2段階認証が有効なまま確認前のアカウントを再構築できる")
+    void test42() {
+        User user = reconstructUser(Email.create(new ErrorCollector(), EMAIL), PASSWORD_HASH, true,
+                AUTH_PROVIDERS, null, null);
+
+        assertThat(user.isTwoFactorAuthEnabled()).isTrue();
+        assertThat(user.isEmailVerified()).isFalse();
+    }
+
+    @Test
+    @DisplayName("確認前のアカウントで外部連携が1つのときに解除を断る")
+    void test43() {
+        when(errorCollector.hasErrors()).thenReturn(true);
+
+        // 確認前のメールアドレスとパスワードを持つ
+        User unverified = reconstructUser(Email.create(new ErrorCollector(), EMAIL), PASSWORD_HASH, false,
+                AUTH_PROVIDERS, null, null);
+        assertThatThrownBy(() -> {
+            User ignored = unverified.removeAuthProvider(errorCollector, "google");
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
+
+        // 設定待ちのメールアドレスとパスワードを持つ
+        User pendingOnly = reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, null,
+                Email.create(new ErrorCollector(), "pending@keirekipro.click"));
+        assertThatThrownBy(() -> {
+            User ignored = pendingOnly.removeAuthProvider(errorCollector, "google");
+            assertThat(ignored).isNotNull();
+        }).isInstanceOf(DomainException.class);
+
+        verify(errorCollector, times(2)).addError(eq("authProviders"),
+                eq("メールアドレスとパスワードが設定済みでないと、連携を解除できません。"));
+    }
+
+    @Test
+    @DisplayName("確認前のアカウントでも外部連携が2つあれば1つを解除できる")
+    void test44() {
+        Map<String, AuthProvider> providers = new HashMap<>();
+        providers.put("google", AuthProvider.create(new ErrorCollector(), "google", "googleId"));
+        providers.put("github", AuthProvider.create(new ErrorCollector(), "github", "githubId"));
+        User unverified = reconstructUser(Email.create(new ErrorCollector(), EMAIL), PASSWORD_HASH, false,
+                providers, null, null);
+
+        User updated = unverified.removeAuthProvider(errorCollector, "google");
+
+        assertThat(updated.getAuthProviders()).containsOnlyKeys("github");
+        verify(errorCollector, never()).addError(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("ユーザーを変える操作のあとも emailVerifiedAt と pendingEmail を引き継ぐ")
+    void test45() {
+        Email pending = Email.create(new ErrorCollector(), "pending@keirekipro.click");
+        User user = reconstructUser(null, PASSWORD_HASH, false, AUTH_PROVIDERS, EMAIL_VERIFIED_AT, pending);
+
+        User updated = user.changeUsername(new ErrorCollector(), "renamed")
+                .changeProfileImage("profile/renamed.jpg")
+                .resetPassword("newHash");
+
+        assertThat(updated.getEmailVerifiedAt()).isEqualTo(EMAIL_VERIFIED_AT);
+        assertThat(updated.getPendingEmail()).isEqualTo(pending);
+    }
+
+    private static User reconstructUser(Email email,
+            String passwordHash,
+            boolean twoFactorAuthEnabled,
+            Map<String, AuthProvider> authProviders,
+            LocalDateTime emailVerifiedAt,
+            Email pendingEmail) {
+        return User.reconstruct(
+                ID,
+                email,
+                passwordHash,
+                twoFactorAuthEnabled,
+                authProviders,
+                EnumSet.of(RoleName.USER),
+                PROFILE_IMAGE,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT,
+                emailVerifiedAt,
+                pendingEmail);
     }
 }

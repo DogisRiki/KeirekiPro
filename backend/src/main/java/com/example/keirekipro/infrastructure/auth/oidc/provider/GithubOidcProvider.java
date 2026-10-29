@@ -92,13 +92,10 @@ public class GithubOidcProvider implements OidcProvider {
         }
 
         String id = String.valueOf(userInfo.get("id"));
-        String email = (String) userInfo.get("email");
         String username = (String) userInfo.get("login");
 
-        // メールがnullの場合は /user/emails から取得
-        if (email == null) {
-            email = fetchPrimaryEmail((String) userInfo.get("access_token"));
-        }
+        // GET /user の email は持ち主の確認の有無が分からないため使わず、いつも /user/emails から取得
+        String email = fetchPrimaryEmail((String) userInfo.get("access_token"));
 
         return OidcUserInfoDto.builder()
                 .providerUserId(id)
@@ -112,7 +109,7 @@ public class GithubOidcProvider implements OidcProvider {
      * GitHub API からユーザーのプライマリメールアドレスを取得する
      *
      * @param accessToken アクセストークン
-     * @return プライマリかつverifiedなメールアドレス
+     * @return プライマリかつverifiedなメールアドレス。無いときと取得に失敗したときはnull
      */
     private String fetchPrimaryEmail(String accessToken) {
         try {

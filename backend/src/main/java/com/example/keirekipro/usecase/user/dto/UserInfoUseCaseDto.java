@@ -24,6 +24,8 @@ public class UserInfoUseCaseDto {
     private final boolean twoFactorAuthEnabled;
     private final List<AuthProviderInfo> authProviders;
     private final Set<String> roles;
+    private final boolean emailVerified;
+    private final String pendingEmail;
 
     /**
      * 外部認証連携情報

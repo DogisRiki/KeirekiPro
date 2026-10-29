@@ -13,6 +13,8 @@
         <result property="twoFactorAuthEnabled" column="u_two_factor_auth_enabled"/>
         <result property="createdAt" column="u_created_at"/>
         <result property="updatedAt" column="u_updated_at"/>
+        <result property="emailVerifiedAt" column="u_email_verified_at"/>
+        <result property="pendingEmail" column="u_pending_email"/>
         <collection property="authProviders"
                     ofType="com.example.keirekipro.infrastructure.repository.user.UserDto$AuthProviderDto">
             <id property="id" column="p_id"/>
@@ -36,6 +38,8 @@
             u.two_factor_auth_enabled AS u_two_factor_auth_enabled,
             u.created_at AS u_created_at,
             u.updated_at AS u_updated_at,
+            u.email_verified_at AS u_email_verified_at,
+            u.pending_email AS u_pending_email,
             p.id AS p_id,
             p.provider_name AS p_provider_name,
             p.provider_user_id AS p_provider_user_id,
@@ -61,6 +65,8 @@
             u.two_factor_auth_enabled AS u_two_factor_auth_enabled,
             u.created_at AS u_created_at,
             u.updated_at AS u_updated_at,
+            u.email_verified_at AS u_email_verified_at,
+            u.pending_email AS u_pending_email,
             p.id AS p_id,
             p.provider_name AS p_provider_name,
             p.provider_user_id AS p_provider_user_id,
@@ -86,6 +92,8 @@
             u.two_factor_auth_enabled AS u_two_factor_auth_enabled,
             u.created_at AS u_created_at,
             u.updated_at AS u_updated_at,
+            u.email_verified_at AS u_email_verified_at,
+            u.pending_email AS u_pending_email,
             p.id AS p_id,
             p.provider_name AS p_provider_name,
             p.provider_user_id AS p_provider_user_id,
@@ -111,7 +119,9 @@
             profile_image,
             two_factor_auth_enabled,
             created_at,
-            updated_at
+            updated_at,
+            email_verified_at,
+            pending_email
         )
         VALUES(
             #{id},
@@ -121,7 +131,9 @@
             #{profileImage},
             #{twoFactorAuthEnabled},
             #{createdAt},
-            #{updatedAt}
+            #{updatedAt},
+            #{emailVerifiedAt},
+            #{pendingEmail}
         )
         ON  CONFLICT(
                 id
@@ -133,7 +145,9 @@
                 username = EXCLUDED.username,
                 profile_image = EXCLUDED.profile_image,
                 two_factor_auth_enabled = EXCLUDED.two_factor_auth_enabled,
-                updated_at = EXCLUDED.updated_at
+                updated_at = EXCLUDED.updated_at,
+                email_verified_at = EXCLUDED.email_verified_at,
+                pending_email = EXCLUDED.pending_email
     </insert>
 
     <delete id="delete" parameterType="java.util.UUID">

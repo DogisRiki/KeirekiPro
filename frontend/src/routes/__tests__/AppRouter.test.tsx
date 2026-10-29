@@ -82,6 +82,9 @@ vi.mock("@/pages/Terms", async () => ({
 vi.mock("@/pages/TwoFactor", async () => ({
     TwoFactor: (await import("@/routes/__tests__/routeStubs")).createStubPage("TwoFactor"),
 }));
+vi.mock("@/pages/VerifyEmail", async () => ({
+    VerifyEmail: (await import("@/routes/__tests__/routeStubs")).createStubPage("VerifyEmail"),
+}));
 
 const renderAt = (path: string) => {
     const router = createMemoryRouter(routes, { initialEntries: [path] });
@@ -118,6 +121,7 @@ const openPages = [
     ["/privacy", "Privacy"],
     ["/500", "ServerError"],
     ["/maintenance", "Maintenance"],
+    ["/email/verify", "VerifyEmail"],
 ] as const;
 
 describe("routes", () => {
@@ -163,6 +167,18 @@ describe("routes", () => {
         expect(screen.queryByTestId("layout:protected")).not.toBeInTheDocument();
         expect(PublicLoader).not.toHaveBeenCalled();
         expect(ProtectedLoader).not.toHaveBeenCalled();
+    });
+
+    it("/email/verify はログインしていなくても確認のリンクの画面を出す", async () => {
+        vi.mocked(ProtectedLoader).mockRejectedValue(new Error("unauthorized"));
+
+        renderAt("/email/verify");
+
+        expect(await screen.findByText("page:VerifyEmail")).toBeInTheDocument();
+        expect(screen.queryByTestId("layout:public")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("layout:protected")).not.toBeInTheDocument();
+        expect(ProtectedLoader).not.toHaveBeenCalled();
+        expect(PublicLoader).not.toHaveBeenCalled();
     });
 
     it.each(["/no-such-page", "/resume", "/resume/resume-1/extra"])(

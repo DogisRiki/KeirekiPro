@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -141,12 +142,14 @@ class DeleteUserUseCaseTest {
 
     private static User user(String profileImage) {
         ErrorCollector errorCollector = new ErrorCollector();
-        return User.create(
+        return User.createWithVerifiedEmail(
                 errorCollector,
+                USER_ID,
                 Email.create(errorCollector, "test@example.com"),
                 "passwordHash",
                 null,
                 profileImage,
-                "test-user");
+                "test-user",
+                LocalDateTime.of(2024, 1, 1, 0, 0));
     }
 }

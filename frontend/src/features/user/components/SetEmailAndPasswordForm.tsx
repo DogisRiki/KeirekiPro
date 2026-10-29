@@ -5,10 +5,13 @@ import { Box } from "@mui/material";
 
 export interface SetEmailAndPasswordFormProps {
     showEmailField: boolean;
+    showCurrentPasswordField?: boolean;
     email: string;
+    currentPassword?: string;
     password: string;
     confirmPassword: string;
     onEmailChange: (v: string) => void;
+    onCurrentPasswordChange?: (v: string) => void;
     onPasswordChange: (v: string) => void;
     onConfirmPasswordChange: (v: string) => void;
     onSubmit: () => void;
@@ -20,10 +23,13 @@ export interface SetEmailAndPasswordFormProps {
  */
 export const SetEmailAndPasswordForm = ({
     showEmailField,
+    showCurrentPasswordField = false,
     email,
+    currentPassword = "",
     password,
     confirmPassword,
     onEmailChange,
+    onCurrentPasswordChange,
     onPasswordChange,
     onConfirmPasswordChange,
     onSubmit,
@@ -55,6 +61,22 @@ export const SetEmailAndPasswordForm = ({
                         htmlInput: {
                             maxLength: 255,
                         },
+                        formHelperText: { sx: { whiteSpace: "pre-line" } },
+                    }}
+                    margin="normal"
+                    sx={{ mb: 4 }}
+                />
+            )}
+            {showCurrentPasswordField && (
+                <PasswordTextField
+                    label="現在のパスワード"
+                    fullWidth
+                    required
+                    value={currentPassword}
+                    onChange={(e) => onCurrentPasswordChange?.(e.target.value)}
+                    error={!!errors.currentPassword?.length}
+                    helperText={stringListToBulletList(errors.currentPassword)}
+                    slotProps={{
                         formHelperText: { sx: { whiteSpace: "pre-line" } },
                     }}
                     margin="normal"

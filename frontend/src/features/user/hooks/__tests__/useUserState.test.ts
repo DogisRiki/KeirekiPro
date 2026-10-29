@@ -18,6 +18,8 @@ describe("getUserState", () => {
             hasPassword: true,
             authProviders: [],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_PASSWORD);
     });
@@ -32,6 +34,8 @@ describe("getUserState", () => {
             hasPassword: false,
             authProviders: ["github"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_WITH_PROVIDER);
     });
@@ -46,6 +50,8 @@ describe("getUserState", () => {
             hasPassword: false,
             authProviders: ["google"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.PROVIDER_ONLY);
     });
@@ -60,8 +66,27 @@ describe("getUserState", () => {
             hasPassword: true,
             authProviders: ["github", "google"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.EMAIL_PASSWORD_WITH_PROVIDER);
+    });
+
+    it("メールアドレスが無くパスワードと外部連携があれば PASSWORD_WITH_PROVIDER を返す", () => {
+        // 外部連携だけのアカウントがメールアドレスとパスワードを設定し、メールアドレスが設定待ちのとき
+        const user: User = {
+            id: "6",
+            email: null,
+            username: "test-user6",
+            profileImage: null,
+            twoFactorAuthEnabled: false,
+            hasPassword: true,
+            authProviders: ["google"],
+            roles: ["USER"],
+            emailVerified: false,
+            pendingEmail: "pending@example.com",
+        };
+        expect(getUserState(user)).toBe(UserState.PASSWORD_WITH_PROVIDER);
     });
 
     it("想定外の組み合わせでもUNKNOWNを返すこと", () => {
@@ -74,6 +99,8 @@ describe("getUserState", () => {
             hasPassword: true,
             authProviders: [],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         expect(getUserState(user)).toBe(UserState.UNKNOWN);
     });
@@ -100,6 +127,8 @@ describe("useUserState", () => {
             hasPassword: true,
             authProviders: [],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -118,6 +147,8 @@ describe("useUserState", () => {
             hasPassword: false,
             authProviders: ["github"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -136,6 +167,8 @@ describe("useUserState", () => {
             hasPassword: false,
             authProviders: ["google"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);
@@ -154,6 +187,8 @@ describe("useUserState", () => {
             hasPassword: true,
             authProviders: ["github", "google"],
             roles: ["USER"],
+            emailVerified: true,
+            pendingEmail: null,
         };
         act(() => {
             useUserAuthStore.getState().setLogin(user);

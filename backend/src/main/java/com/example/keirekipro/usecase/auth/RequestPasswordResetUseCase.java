@@ -8,6 +8,8 @@ import com.example.keirekipro.shared.ErrorCollector;
 import com.example.keirekipro.shared.utils.SecurityUtil;
 import com.example.keirekipro.usecase.auth.notification.PasswordResetNotification;
 import com.example.keirekipro.usecase.auth.store.PasswordResetTokenStore;
+import com.example.keirekipro.usecase.auth.verification.EmailVerificationMailer;
+import com.example.keirekipro.usecase.auth.verification.EmailVerificationPurpose;
 import com.example.keirekipro.usecase.shared.notification.NotificationDispatcher;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +32,8 @@ public class RequestPasswordResetUseCase {
 
     private final SecurityUtil securityUtil;
 
+    private final EmailVerificationMailer mailer;
+
     @Value("${frontend-base-url}")
     private String frontendBaseUrl;
 
@@ -48,6 +52,12 @@ public class RequestPasswordResetUseCase {
         // 該当ユーザーを検索（存在しない場合は何もせず終了）
         userRepository.findByEmail(email.getValue())
                 .ifPresent(user -> {
+                    // 確認前のアカウントには、再設定のメールの代わりに確認のメールを送る。1分たっていなくても同じ応答にするため、送れたかは見ない
+                    if (!user.isEmailVerified()) {
+                        mailer.send(email.getValue(), user.getId(), EmailVerificationPurpose.PASSWORD_RESET);
+                        return;
+                    }
+
                     // トークンを生成
                     String token = securityUtil.generateRandomToken();
 

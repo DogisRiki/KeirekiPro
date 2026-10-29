@@ -3,6 +3,7 @@ package com.example.keirekipro.unit.infrastructure.repository.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -125,7 +126,9 @@ class MyBatisUserRepositoryTest {
                 null,
                 USERNAME,
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                null);
 
         // UserDtoのキャプチャ用
         ArgumentCaptor<UserDto> captor = ArgumentCaptor.forClass(UserDto.class);
@@ -265,6 +268,84 @@ class MyBatisUserRepositoryTest {
         assertThatThrownBy(() -> repository.findById(USER_ID))
                 .isInstanceOf(DomainException.class)
                 .hasMessage("管理者の場合は二段階認証が必須です。");
+    }
+
+    @Test
+    @DisplayName("emailVerifiedAt と pendingEmail を保存して読み直すと同じ値が返る")
+    void test6() {
+        // 確認済みのアカウントと、設定待ちのメールアドレスだけを持つアカウントを再構成
+        LocalDateTime verifiedAt = LocalDateTime.of(2024, 6, 1, 9, 0);
+        User verified = User.reconstruct(
+                USER_ID,
+                Email.create(new ErrorCollector(), EMAIL),
+                PASSWORD,
+                false,
+                Collections.emptyMap(),
+                EnumSet.of(RoleName.USER),
+                null,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT,
+                verifiedAt,
+                null);
+        User pendingOnly = User.reconstruct(
+                USER_ID,
+                null,
+                null,
+                false,
+                Map.of(GOOGLE_PROVIDER_NAME, AuthProvider.reconstruct(
+                        GOOGLE_AUTH_PROVIDER_ID,
+                        GOOGLE_PROVIDER_NAME,
+                        GOOGLE_PROVIDER_USER_ID,
+                        CREATED_AT,
+                        UPDATED_AT)),
+                EnumSet.of(RoleName.USER),
+                null,
+                USERNAME,
+                CREATED_AT,
+                UPDATED_AT,
+                null,
+                Email.create(new ErrorCollector(), "pending@keirekipro.click"));
+
+        ArgumentCaptor<UserDto> captor = ArgumentCaptor.forClass(UserDto.class);
+
+        // 保存したDTOを、そのまま読み直しの結果として返す
+        repository.save(verified);
+        repository.save(pendingOnly);
+        verify(mapper, times(2)).upsertUser(captor.capture());
+        UserDto verifiedDto = captor.getAllValues().get(0);
+        UserDto pendingOnlyDto = captor.getAllValues().get(1);
+        assertThat(verifiedDto.getEmailVerifiedAt()).isEqualTo(verifiedAt);
+        assertThat(verifiedDto.getPendingEmail()).isNull();
+        assertThat(pendingOnlyDto.getEmailVerifiedAt()).isNull();
+        assertThat(pendingOnlyDto.getPendingEmail()).isEqualTo("pending@keirekipro.click");
+
+        when(mapper.selectById(USER_ID)).thenReturn(Optional.of(verifiedDto), Optional.of(pendingOnlyDto));
+
+        User reloadedVerified = repository.findById(USER_ID).orElseThrow();
+        assertThat(reloadedVerified.getEmailVerifiedAt()).isEqualTo(verifiedAt);
+        assertThat(reloadedVerified.getPendingEmail()).isNull();
+        assertThat(reloadedVerified.isEmailVerified()).isTrue();
+
+        User reloadedPendingOnly = repository.findById(USER_ID).orElseThrow();
+        assertThat(reloadedPendingOnly.getEmailVerifiedAt()).isNull();
+        assertThat(reloadedPendingOnly.getPendingEmail())
+                .isEqualTo(Email.create(new ErrorCollector(), "pending@keirekipro.click"));
+        assertThat(reloadedPendingOnly.getEmail()).isNull();
+    }
+
+    @Test
+    @DisplayName("email_verified_at が NULL の行は確認前のアカウントとして読まれる")
+    void test7() {
+        UserDto dto = buildDto();
+        dto.setEmailVerifiedAt(null);
+        when(mapper.selectById(USER_ID)).thenReturn(Optional.of(dto));
+
+        User user = repository.findById(USER_ID).orElseThrow();
+
+        assertThat(user.getEmail()).isEqualTo(Email.create(new ErrorCollector(), EMAIL));
+        assertThat(user.getEmailVerifiedAt()).isNull();
+        assertThat(user.isEmailVerified()).isFalse();
     }
 
     /**

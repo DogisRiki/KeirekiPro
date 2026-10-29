@@ -25,6 +25,8 @@ describe("useGetUserInfo", () => {
         hasPassword: true,
         authProviders: ["github"],
         roles: ["USER"],
+        emailVerified: true,
+        pendingEmail: null,
     };
 
     beforeEach(() => {

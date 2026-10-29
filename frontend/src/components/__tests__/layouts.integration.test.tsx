@@ -16,6 +16,8 @@ const testUser: User = {
     hasPassword: true,
     authProviders: [],
     roles: [],
+    emailVerified: true,
+    pendingEmail: null,
 };
 
 const NavigateButton = ({ to, children }: { to: string; children: ReactNode }) => {

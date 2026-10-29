@@ -21,7 +21,20 @@ package com.example.keirekipro.usecase.shared.exception {
         + ResourceNotFoundUseCaseException(String message)
     }
 
+    class EmailNotVerifiedUseCaseException {
+        - Kind kind
+        --
+        + EmailNotVerifiedUseCaseException(Kind kind)
+    }
+
+    enum "EmailNotVerifiedUseCaseException.Kind" as EmailNotVerifiedKind {
+        PENDING_REGISTRATION
+        UNVERIFIED_ACCOUNT_EMAIL
+    }
+
     ResourceNotFoundUseCaseException --|> UseCaseException
+    EmailNotVerifiedUseCaseException --|> UseCaseException
+    EmailNotVerifiedUseCaseException --> EmailNotVerifiedKind
 }
 
 package com.example.keirekipro.usecase.shared.notification {
@@ -98,6 +111,36 @@ package com.example.keirekipro.usecase.auth.store {
         + void increment(UUID userId)
         + void initialize(UUID userId)
     }
+
+    interface PendingRegistrationStore {
+        + void save(PendingRegistration registration, Duration ttl)
+        + Optional<PendingRegistration> findById(UUID id)
+        + List<PendingRegistration> findByEmail(String email, int limit)
+        + void extend(UUID id, Duration ttl)
+        + void delete(PendingRegistration registration)
+    }
+
+    class PendingRegistration <<record>> {
+        + UUID id
+        + String email
+        + String passwordHash
+        + String username
+        + Instant createdAt
+    }
+
+    interface EmailVerificationCurrentTokenStore {
+        + void put(UUID subjectId, String jti, Duration ttl)
+        + Optional<String> find(UUID subjectId)
+        + boolean consume(UUID subjectId, String jti)
+        + void clear(UUID subjectId)
+    }
+
+    interface EmailVerificationSendLimiter {
+        + boolean tryAcquire(String email)
+        + void release(String email)
+    }
+
+    PendingRegistrationStore ..> PendingRegistration
 }
 
 '========================================
@@ -148,6 +191,10 @@ package com.example.keirekipro.usecase.auth.oidc {
         TOKEN_EXCHANGE_FAILED
         USERINFO_FETCH_FAILED
         LOGIN_FAILED
+        UNVERIFIED_ACCOUNT_EMAIL
+    }
+
+    class UnverifiedEmailAccountUseCaseException {
     }
 
     OidcCallbackSuccess ..|> OidcCallbackResult
@@ -155,6 +202,7 @@ package com.example.keirekipro.usecase.auth.oidc {
     OidcCallbackFailure --> OidcCallbackError
     OidcGateway ..> OidcToken
     OidcGateway ..> OidcUserInfo
+    UnverifiedEmailAccountUseCaseException --|> UseCaseException
 }
 
 '========================================
@@ -173,8 +221,17 @@ package com.example.keirekipro.usecase.auth.notification {
         + String applicationName
     }
 
+    class EmailVerificationNotification <<record>> {
+        + String to
+        + String verificationLink
+        + String linkLifetime
+        + String siteName
+        + String siteUrl
+    }
+
     PasswordResetNotification ..|> Notification
     TwoFactorCodeNotification ..|> Notification
+    EmailVerificationNotification ..|> Notification
 }
 
 '========================================
@@ -211,6 +268,14 @@ package com.example.keirekipro.usecase.auth.dto {
         - UUID userId
         - Set<String> roles
     }
+
+    class VerifyEmailUseCaseDto {
+        - EmailVerificationResult result
+        - String passwordResetToken
+        --
+        + static VerifyEmailUseCaseDto of(EmailVerificationResult result)
+        + static VerifyEmailUseCaseDto passwordResetReady(String passwordResetToken)
+    }
 }
 
 '========================================
@@ -225,6 +290,11 @@ package com.example.keirekipro.usecase.auth.command {
     class UserRegistrationCommand {
         - String email
         - String username
+        - String password
+    }
+
+    class ResendEmailVerificationForLoginCommand {
+        - String email
         - String password
     }
 }
@@ -245,22 +315,115 @@ package com.example.keirekipro.usecase.auth.session {
 }
 
 '========================================
+' usecase.auth.verification
+'========================================
+package com.example.keirekipro.usecase.auth.verification {
+    enum EmailVerificationPurpose {
+        REGISTRATION
+        ACCOUNT_EMAIL
+        PENDING_EMAIL
+        PASSWORD_RESET
+        --
+        - Duration linkValidity
+        --
+        + Duration getLinkValidity()
+    }
+
+    class EmailVerificationClaims <<record>> {
+        + String jti
+        + UUID subjectId
+        + EmailVerificationPurpose purpose
+        + String email
+        + Instant linkExpiresAt
+    }
+
+    interface EmailVerificationTokenCodec {
+        + String issue(EmailVerificationClaims claims)
+        + Optional<EmailVerificationClaims> read(String token)
+    }
+
+    class EmailVerificationMailer {
+        - EmailVerificationSendLimiter sendLimiter
+        - EmailVerificationTokenCodec tokenCodec
+        - EmailVerificationCurrentTokenStore currentTokenStore
+        - NotificationDispatcher notificationDispatcher
+        --
+        + SendOutcome send(String email, UUID subjectId, EmailVerificationPurpose purpose)
+    }
+
+    enum "EmailVerificationMailer.SendOutcome" as SendOutcome {
+        SENT
+        RATE_LIMITED
+    }
+
+    class EmailVerificationCompletion {
+        - UserRepository userRepository
+        - UserTokenVersionStore userTokenVersionStore
+        - DomainEventPublisher eventPublisher
+        --
+        + void completeRegistration(PendingRegistration registration)
+        + void verifyAccountEmail(UUID userId, String email)
+        + void promotePendingEmail(UUID userId, String email)
+    }
+
+    enum EmailVerificationResult {
+        VERIFIED
+        PASSWORD_RESET_READY
+        ALREADY_VERIFIED
+        EXPIRED
+        REGISTRATION_GONE
+        EMAIL_TAKEN
+        INVALID
+    }
+
+    class EmailVerificationLinkClassifier {
+        - UserRepository userRepository
+        - EmailVerificationCurrentTokenStore currentTokenStore
+        - PendingRegistrationStore pendingRegistrationStore
+        --
+        + LinkState classify(EmailVerificationClaims claims)
+    }
+
+    enum "EmailVerificationLinkClassifier.LinkState" as LinkState {
+        USABLE
+        ALREADY_VERIFIED
+        EXPIRED
+        REGISTRATION_GONE
+        INVALID
+    }
+
+    EmailVerificationClaims --> EmailVerificationPurpose
+    EmailVerificationTokenCodec ..> EmailVerificationClaims
+    EmailVerificationMailer --> EmailVerificationSendLimiter
+    EmailVerificationMailer --> EmailVerificationTokenCodec
+    EmailVerificationMailer --> EmailVerificationCurrentTokenStore
+    EmailVerificationMailer --> NotificationDispatcher
+    EmailVerificationMailer ..> SendOutcome
+    EmailVerificationMailer ..> EmailVerificationNotification
+    EmailVerificationCompletion --> UserTokenVersionStore
+    EmailVerificationCompletion ..> PendingRegistration
+    EmailVerificationLinkClassifier --> EmailVerificationCurrentTokenStore
+    EmailVerificationLinkClassifier --> PendingRegistrationStore
+    EmailVerificationLinkClassifier ..> LinkState
+}
+
+'========================================
 ' usecase.auth
 '========================================
 package com.example.keirekipro.usecase.auth {
     class LoginUseCase {
         - UserRepository userRepository
         - PasswordEncoder passwordEncoder
+        - PendingRegistrationStore pendingRegistrationStore
         --
         + LoginUseCaseDto execute(LoginCommand command)
     }
 
     class UserRegistrationUseCase {
-        - UserRepository userRepository
         - PasswordEncoder passwordEncoder
-        - DomainEventPublisher eventPublisher
         - UserEmailDuplicationCheckService userEmailDuplicationCheckService
-        - UserTokenVersionStore userTokenVersionStore
+        - PendingRegistrationStore pendingRegistrationStore
+        - EmailVerificationMailer mailer
         --
         + void execute(UserRegistrationCommand command)
     }
@@ -294,6 +457,7 @@ package com.example.keirekipro.usecase.auth {
         - PasswordResetTokenStore passwordResetTokenStore
         - NotificationDispatcher notificationDispatcher
         - SecurityUtil securityUtil
+        - EmailVerificationMailer mailer
         --
         + void execute(String email)
     }
@@ -331,6 +495,37 @@ package com.example.keirekipro.usecase.auth {
         + TwoFactorAuthVerifyResultDto execute(String challengeToken, String code)
     }
 
+    class VerifyEmailUseCase {
+        - EmailVerificationTokenCodec tokenCodec
+        - EmailVerificationCurrentTokenStore currentTokenStore
+        - PendingRegistrationStore pendingRegistrationStore
+        - UserRepository userRepository
+        - EmailVerificationCompletion completion
+        - PasswordResetTokenStore passwordResetTokenStore
+        - EmailVerificationLinkClassifier linkClassifier
+        - SecurityUtil securityUtil
+        --
+        + VerifyEmailUseCaseDto execute(String token)
+    }
+
+    class ResendEmailVerificationUseCase {
+        - EmailVerificationTokenCodec tokenCodec
+        - EmailVerificationLinkClassifier linkClassifier
+        - EmailVerificationMailer mailer
+        - PendingRegistrationStore pendingRegistrationStore
+        --
+        + void execute(String token)
+    }
+
+    class ResendEmailVerificationForLoginUseCase {
+        - UserRepository userRepository
+        - PasswordEncoder passwordEncoder
+        - PendingRegistrationStore pendingRegistrationStore
+        - EmailVerificationMailer mailer
+        --
+        + void execute(ResendEmailVerificationForLoginCommand command)
+    }
+
     ' 依存関係
     LoginUseCase ..> LoginUseCaseDto
     OidcLoginUseCase ..> OidcLoginUseCaseDto
@@ -352,7 +547,25 @@ package com.example.keirekipro.usecase.auth {
     TwoFactorAuthIssueUseCase --> NotificationDispatcher
     TwoFactorAuthVerifyUseCase --> TwoFactorAuthCodeStore
     TwoFactorAuthVerifyUseCase --> TwoFactorAuthChallengeStore
-    UserRegistrationUseCase --> UserTokenVersionStore
+    UserRegistrationUseCase --> PendingRegistrationStore
+    UserRegistrationUseCase --> EmailVerificationMailer
+    LoginUseCase --> PendingRegistrationStore
+    LoginUseCase ..> EmailNotVerifiedUseCaseException
+    RequestPasswordResetUseCase --> EmailVerificationMailer
+    VerifyEmailUseCase --> EmailVerificationTokenCodec
+    VerifyEmailUseCase --> EmailVerificationCurrentTokenStore
+    VerifyEmailUseCase --> PendingRegistrationStore
+    VerifyEmailUseCase --> EmailVerificationCompletion
+    VerifyEmailUseCase --> PasswordResetTokenStore
+    VerifyEmailUseCase --> EmailVerificationLinkClassifier
+    VerifyEmailUseCase ..> VerifyEmailUseCaseDto
+    ResendEmailVerificationUseCase --> EmailVerificationTokenCodec
+    ResendEmailVerificationUseCase --> EmailVerificationLinkClassifier
+    ResendEmailVerificationUseCase --> EmailVerificationMailer
+    ResendEmailVerificationUseCase --> PendingRegistrationStore
+    ResendEmailVerificationForLoginUseCase --> PendingRegistrationStore
+    ResendEmailVerificationForLoginUseCase --> EmailVerificationMailer
+    OidcLoginUseCase ..> UnverifiedEmailAccountUseCaseException
 }
 
 '========================================
@@ -991,6 +1204,8 @@ package com.example.keirekipro.usecase.user.dto {
         - String profileImage
         - List<AuthProviderInfo> authProviders
         - Set<String> roles
+        - boolean emailVerified
+        - String pendingEmail
     }
 }
 
@@ -1008,6 +1223,7 @@ package com.example.keirekipro.usecase.user.command {
         - UUID userId
         - String email
         - String password
+        - String currentPassword
     }
 
     class UpdateUserInfoCommand {
@@ -1054,8 +1270,18 @@ package com.example.keirekipro.usecase.user {
     class SetEmailAndPasswordUseCase {
         - UserRepository userRepository
         - PasswordEncoder passwordEncoder
+        - UserEmailDuplicationCheckService userEmailDuplicationCheckService
+        - EmailVerificationCurrentTokenStore currentTokenStore
+        - EmailVerificationMailer mailer
         --
         + void execute(SetEmailAndPasswordCommand command)
+    }
+
+    class SendAccountEmailVerificationUseCase {
+        - UserRepository userRepository
+        - EmailVerificationMailer mailer
+        --
+        + void execute(UUID userId)
     }
 
     class RemoveAuthProviderUseCase {
@@ -1074,6 +1300,9 @@ package com.example.keirekipro.usecase.user {
     GetUserInfoUseCase ..> UserInfoUseCaseDto
     GetUserInfoUseCase --> ObjectStore
     UpdateUserInfoUseCase --> ObjectStore
+    SetEmailAndPasswordUseCase --> EmailVerificationCurrentTokenStore
+    SetEmailAndPasswordUseCase --> EmailVerificationMailer
+    SendAccountEmailVerificationUseCase --> EmailVerificationMailer
 }
 
 @enduml

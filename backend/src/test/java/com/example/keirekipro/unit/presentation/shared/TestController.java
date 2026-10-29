@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.example.keirekipro.domain.shared.exception.DomainException;
+import com.example.keirekipro.usecase.shared.exception.EmailNotVerifiedUseCaseException;
 import com.example.keirekipro.usecase.shared.exception.ResourceNotFoundUseCaseException;
 import com.example.keirekipro.usecase.shared.exception.UseCaseException;
 
@@ -106,6 +107,16 @@ class TestController {
     @GetMapping("/test14")
     public void throwResourceNotFoundUseCaseException() {
         throw new ResourceNotFoundUseCaseException("対象の職務経歴書データが存在しません。");
+    }
+
+    @GetMapping("/test15")
+    public void throwEmailNotVerifiedUseCaseExceptionForPendingRegistration() {
+        throw new EmailNotVerifiedUseCaseException(EmailNotVerifiedUseCaseException.Kind.PENDING_REGISTRATION);
+    }
+
+    @GetMapping("/test16")
+    public void throwEmailNotVerifiedUseCaseExceptionForUnverifiedAccountEmail() {
+        throw new EmailNotVerifiedUseCaseException(EmailNotVerifiedUseCaseException.Kind.UNVERIFIED_ACCOUNT_EMAIL);
     }
 
     @Data

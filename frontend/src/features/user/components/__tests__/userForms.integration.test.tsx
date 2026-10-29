@@ -35,6 +35,8 @@ const baseUser: User = {
     hasPassword: true,
     authProviders: ["google"],
     roles: [],
+    emailVerified: true,
+    pendingEmail: null,
 };
 
 const messages = {
@@ -137,6 +139,8 @@ describe("user forms", () => {
         renderWithProviders(
             <SettingUserForm
                 email="user@example.com"
+                emailVerified={true}
+                pendingEmail={null}
                 username=""
                 onUsernameChange={vi.fn()}
                 profileImageUrl={null}
@@ -157,6 +161,22 @@ describe("user forms", () => {
         expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
         expect(screen.getByText(/ユーザー名を入力してください。/)).toBeInTheDocument();
         expect(screen.getByText(/連携を解除できません。/)).toBeInTheDocument();
+    });
+
+    it("SettingUserContainerは設定待ちのメールアドレスを確認待ちとして出し、確認済みなら出さないこと", async () => {
+        useUserAuthStore.getState().setLogin({ ...baseUser, pendingEmail: "new@example.com" });
+
+        const { unmount } = renderWithProviders(<SettingUserContainer />);
+
+        expect(await screen.findByText("確認待ちのメールアドレス: new@example.com")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "確認のメールを送る" })).toBeInTheDocument();
+
+        unmount();
+        useUserAuthStore.getState().setLogin(baseUser);
+        renderWithProviders(<SettingUserContainer />);
+
+        expect(await screen.findByRole("textbox", { name: /ユーザー名/ })).toBeInTheDocument();
+        expect(screen.queryByText(/確認待ちのメールアドレス/)).not.toBeInTheDocument();
     });
 
     it("ChangePasswordContainerは成功後に入力値をクリアしsuccess通知を設定すること", async () => {
@@ -218,11 +238,14 @@ describe("user forms", () => {
             hasPassword: false,
             authProviders: ["google" as const],
         };
+        // 設定したメールアドレスは、確認を済ませるまで設定待ちになる
         const updatedUser = {
             ...baseUser,
-            email: "provider@example.com",
+            email: null,
             hasPassword: true,
             authProviders: ["google" as const],
+            emailVerified: false,
+            pendingEmail: "provider@example.com",
         };
         useUserAuthStore.getState().setLogin(providerOnlyUser);
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce({ data: updatedUser } as AxiosResponse<User>);
@@ -236,6 +259,8 @@ describe("user forms", () => {
             { route: paths.emailPassword.set },
         );
 
+        // パスワードを持たないアカウントでは、現在のパスワードの入力欄を出さない
+        expect(screen.queryByLabelText(/^現在のパスワード/)).not.toBeInTheDocument();
         await user.type(screen.getByRole("textbox", { name: /メールアドレス/ }), "provider@example.com");
         const passwordInputs = screen.getAllByLabelText(/パスワード/);
         await user.type(passwordInputs[0], "pass1234");
@@ -251,9 +276,51 @@ describe("user forms", () => {
         );
         expect(useUserAuthStore.getState().user).toEqual(updatedUser);
         expect(useNotificationStore.getState()).toMatchObject({
-            message: "メールアドレスとパスワードを設定しました。",
+            message: "確認のメールを送りました。\nメールの中の確認のリンクを押すまで、メールアドレスは設定待ちです。",
             type: "success",
             isShow: true,
         });
+    });
+
+    it("PASSWORD_WITH_PROVIDER では今のパスワードの入力欄を出し、currentPassword を送る", async () => {
+        // メールアドレスが設定待ちで、パスワードと外部連携があるアカウント
+        const pendingUser: User = {
+            ...baseUser,
+            email: null,
+            hasPassword: true,
+            authProviders: ["google"],
+            emailVerified: false,
+            pendingEmail: "old@example.com",
+        };
+        const updatedUser: User = { ...pendingUser, pendingEmail: "new@example.com" };
+        useUserAuthStore.getState().setLogin(pendingUser);
+        vi.mocked(protectedApiClient.post).mockResolvedValueOnce({ data: updatedUser } as AxiosResponse<User>);
+
+        const { user } = renderWithProviders(
+            <Routes>
+                <Route path={paths.emailPassword.set} element={<SetEmailAndPasswordContainer />} />
+                <Route path={paths.user} element={<div>user destination</div>} />
+                <Route path={paths.login} element={<div>login destination</div>} />
+            </Routes>,
+            { route: paths.emailPassword.set },
+        );
+
+        await user.type(screen.getByRole("textbox", { name: /メールアドレス/ }), "new@example.com");
+        await user.type(screen.getByLabelText(/^現在のパスワード/), "current123");
+        const passwordInputs = screen.getAllByLabelText(/^パスワード/);
+        await user.type(passwordInputs[0], "pass1234");
+        await user.type(passwordInputs[1], "pass1234");
+        await user.click(screen.getByRole("button", { name: "設定" }));
+
+        await waitFor(() =>
+            expect(protectedApiClient.post).toHaveBeenCalledWith("/users/me/email-password", {
+                email: "new@example.com",
+                currentPassword: "current123",
+                password: "pass1234",
+                confirmPassword: "pass1234",
+            }),
+        );
+        expect(useUserAuthStore.getState().user).toEqual(updatedUser);
+        expect(await screen.findByText("user destination")).toBeInTheDocument();
     });
 });

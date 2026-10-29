@@ -72,6 +72,16 @@ public class User extends Entity {
     private final LocalDateTime updatedAt;
 
     /**
+     * メールアドレスの確認を済ませた日時(nullなら確認前)
+     */
+    private final LocalDateTime emailVerifiedAt;
+
+    /**
+     * 確認を済ませるまでアカウントに付けない、設定待ちのメールアドレス
+     */
+    private final Email pendingEmail;
+
+    /**
      * ドメインイベント蓄積用
      */
     private final List<DomainEvent> domainEvents = new ArrayList<>();
@@ -84,15 +94,17 @@ public class User extends Entity {
     /**
      * 新規構築用のコンストラクタ
      */
-    private User(Email email,
+    private User(UUID id,
+            Email email,
             String passwordHash,
             boolean twoFactorAuthEnabled,
             Map<String, AuthProvider> authProviders,
             Set<RoleName> roles,
             String profileImage,
-            String username) {
+            String username,
+            LocalDateTime emailVerifiedAt) {
 
-        super();
+        super(id);
 
         this.email = email;
         this.passwordHash = passwordHash;
@@ -106,6 +118,8 @@ public class User extends Entity {
         this.username = username;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        this.emailVerifiedAt = emailVerifiedAt;
+        this.pendingEmail = null;
         this.isNew = true;
     }
 
@@ -121,7 +135,9 @@ public class User extends Entity {
             String profileImage,
             String username,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt) {
+            LocalDateTime updatedAt,
+            LocalDateTime emailVerifiedAt,
+            Email pendingEmail) {
         super(id);
 
         this.email = email;
@@ -135,6 +151,8 @@ public class User extends Entity {
         this.username = username;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.emailVerifiedAt = emailVerifiedAt;
+        this.pendingEmail = pendingEmail;
         this.isNew = false;
     }
 
@@ -181,13 +199,59 @@ public class User extends Entity {
         throwIfInvalid(errorCollector);
 
         return new User(
+                UUID.randomUUID(),
                 email,
                 passwordHash,
                 twoFactorAuthEnabled,
                 authProviders,
                 resolvedRoles,
                 profileImageUrl,
-                username);
+                username,
+                null);
+    }
+
+    /**
+     * 確認を済ませたメールアドレスで新規構築するファクトリーメソッド
+     *
+     * @param errorCollector エラー収集オブジェクト
+     * @param id 識別子
+     * @param email 確認を済ませたメールアドレス
+     * @param passwordHash パスワードハッシュ
+     * @param authProviders 外部認証連携情報
+     * @param profileImageUrl プロフィール画像
+     * @param username ユーザー名
+     * @param verifiedAt メールアドレスの確認を済ませた日時
+     * @return Userエンティティ
+     */
+    public static User createWithVerifiedEmail(ErrorCollector errorCollector,
+            UUID id,
+            Email email,
+            String passwordHash,
+            Map<String, AuthProvider> authProviders,
+            String profileImageUrl,
+            String username,
+            LocalDateTime verifiedAt) {
+
+        if (authProviders == null || authProviders.isEmpty()) {
+            authProviders = Map.of();
+        } else {
+            authProviders = Map.copyOf(authProviders);
+        }
+
+        validate(errorCollector, email, passwordHash, authProviders);
+
+        throwIfInvalid(errorCollector);
+
+        return new User(
+                id,
+                email,
+                passwordHash,
+                false,
+                authProviders,
+                EnumSet.of(RoleName.defaultRole()),
+                profileImageUrl,
+                username,
+                verifiedAt);
     }
 
     /**
@@ -203,6 +267,8 @@ public class User extends Entity {
      * @param username ユーザー名
      * @param createdAt 作成日時
      * @param updatedAt 更新日時
+     * @param emailVerifiedAt メールアドレスの確認を済ませた日時(nullなら確認前)
+     * @param pendingEmail 設定待ちのメールアドレス
      * @return Userエンティティ
      */
     public static User reconstruct(UUID id,
@@ -214,7 +280,9 @@ public class User extends Entity {
             String profileImageUrl,
             String username,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt) {
+            LocalDateTime updatedAt,
+            LocalDateTime emailVerifiedAt,
+            Email pendingEmail) {
 
         if (authProviders == null || authProviders.isEmpty()) {
             authProviders = Map.of();
@@ -246,7 +314,9 @@ public class User extends Entity {
                 profileImageUrl,
                 username,
                 createdAt,
-                updatedAt);
+                updatedAt,
+                emailVerifiedAt,
+                pendingEmail);
     }
 
     /**
@@ -368,7 +438,9 @@ public class User extends Entity {
                 this.profileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
@@ -408,7 +480,9 @@ public class User extends Entity {
                 this.profileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
@@ -457,17 +531,60 @@ public class User extends Entity {
                 this.profileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
-     * メールアドレスを後から設定する
+     * メールアドレスの確認を済ませているかを判定する
      *
-     * @param errorCollector エラー収集オブジェクト
-     * @param email メールアドレス
+     * @return メールアドレスがあり、確認を済ませていればtrue
+     */
+    public boolean isEmailVerified() {
+        return this.email != null && this.emailVerifiedAt != null;
+    }
+
+    /**
+     * 今のメールアドレスを確認済みにする
+     *
+     * @param now 確認を済ませた日時
      * @return 変更後のUserエンティティ
      */
-    public User setEmail(ErrorCollector errorCollector, Email email) {
+    public User verifyEmail(LocalDateTime now) {
+
+        if (this.email == null) {
+            throw new DomainException("メールアドレスが設定されていないため確認できません。");
+        }
+
+        // すでに確認済みなら日時を変えない
+        if (this.emailVerifiedAt != null) {
+            return this;
+        }
+
+        return new User(
+                this.id,
+                this.email,
+                this.passwordHash,
+                this.twoFactorAuthEnabled,
+                this.authProviders,
+                this.roles,
+                this.profileImage,
+                this.username,
+                this.createdAt,
+                LocalDateTime.now(),
+                now,
+                this.pendingEmail);
+    }
+
+    /**
+     * 設定待ちのメールアドレスを設定する(既にあれば置き換える)
+     *
+     * @param errorCollector エラー収集オブジェクト
+     * @param email 設定待ちにするメールアドレス
+     * @return 変更後のUserエンティティ
+     */
+    public User setPendingEmail(ErrorCollector errorCollector, Email email) {
 
         // 既にメールアドレスがある場合は設定不可
         if (this.email != null) {
@@ -480,7 +597,7 @@ public class User extends Entity {
 
         return new User(
                 this.id,
-                email,
+                this.email,
                 this.passwordHash,
                 this.twoFactorAuthEnabled,
                 this.authProviders,
@@ -488,7 +605,36 @@ public class User extends Entity {
                 this.profileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                email);
+    }
+
+    /**
+     * 設定待ちのメールアドレスを、確認済みのメールアドレスにする
+     *
+     * @param now 確認を済ませた日時
+     * @return 変更後のUserエンティティ
+     */
+    public User promotePendingEmail(LocalDateTime now) {
+
+        if (this.email != null || this.pendingEmail == null) {
+            throw new DomainException("設定待ちのメールアドレスが無いため確認できません。");
+        }
+
+        return new User(
+                this.id,
+                this.pendingEmail,
+                this.passwordHash,
+                this.twoFactorAuthEnabled,
+                this.authProviders,
+                this.roles,
+                this.profileImage,
+                this.username,
+                this.createdAt,
+                LocalDateTime.now(),
+                now,
+                null);
     }
 
     /**
@@ -519,7 +665,9 @@ public class User extends Entity {
                 this.profileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
@@ -540,7 +688,9 @@ public class User extends Entity {
                 this.profileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
@@ -557,8 +707,8 @@ public class User extends Entity {
             errorCollector.addError("twoFactorAuthEnabled", "管理者の場合は二段階認証を無効にできません。");
         }
 
-        // メールアドレスとパスワードが未設定の場合はNG
-        if (twoFactorAuthEnabled && (this.email == null || this.passwordHash == null)) {
+        // 確認済みのメールアドレスとパスワードが未設定の場合はNG(確認前と設定待ちのメールアドレスは無いものとして扱う)
+        if (twoFactorAuthEnabled && (!this.isEmailVerified() || this.passwordHash == null)) {
             errorCollector.addError("twoFactorAuthEnabled", "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。");
         }
 
@@ -576,7 +726,9 @@ public class User extends Entity {
                 this.profileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
@@ -593,8 +745,9 @@ public class User extends Entity {
         // 対象の外部認証連携情報がない場合NG
         if (!this.authProviders.containsKey(key)) {
             errorCollector.addError("authProviders", "連携の解除に失敗しました。");
-            // メールアドレスとパスワードのいずれかが未設定 かつ 外部認証連携が1つしかない場合NG
-        } else if ((this.email == null || this.passwordHash == null) && this.authProviders.size() == 1) {
+            // 確認済みのメールアドレスとパスワードのいずれかが未設定 かつ 外部認証連携が1つしかない場合NG
+            // (確認前と設定待ちのメールアドレスは無いものとして扱う)
+        } else if ((!this.isEmailVerified() || this.passwordHash == null) && this.authProviders.size() == 1) {
             errorCollector.addError("authProviders", "メールアドレスとパスワードが設定済みでないと、連携を解除できません。");
         }
 
@@ -615,7 +768,9 @@ public class User extends Entity {
                 this.profileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
@@ -636,7 +791,9 @@ public class User extends Entity {
                 newProfileImage,
                 this.username,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
@@ -675,7 +832,9 @@ public class User extends Entity {
                 this.profileImage,
                 trimmed,
                 this.createdAt,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                this.emailVerifiedAt,
+                this.pendingEmail);
     }
 
     /**
@@ -697,6 +856,11 @@ public class User extends Entity {
      * ユーザーを削除する
      */
     public void delete() {
+
+        // 確認前と設定待ちのメールアドレスには退会のお知らせを送らないため、イベントを発行しない
+        if (!this.isEmailVerified()) {
+            return;
+        }
 
         // 削除イベントを発行
         UserDeletedEvent event = new UserDeletedEvent(this.id, this.email.getValue(), this.username);

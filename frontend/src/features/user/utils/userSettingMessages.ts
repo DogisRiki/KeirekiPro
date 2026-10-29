@@ -6,9 +6,14 @@ import { UserState } from "@/features/user";
  * ユーザー状態と外部連携数から表示メッセージを生成する
  * @param state ユーザー情報
  * @param providerCount 外部認証連携数
+ * @param emailVerified メールアドレスの確認が済んでいるか
  * @returns メッセージオブジェクト
  */
-export const createUserSettingMessages = (state: UserState, providerCount: number): SettingMessages => {
+export const createUserSettingMessages = (
+    state: UserState,
+    providerCount: number,
+    emailVerified: boolean,
+): SettingMessages => {
     /**
      * メールアドレス + パスワード関連
      */
@@ -47,6 +52,14 @@ export const createUserSettingMessages = (state: UserState, providerCount: numbe
                         emailPasswordIsWarning: true,
                         emailPasswordLinkPath: paths.emailPassword.set,
                     };
+                // メールアドレスが設定待ち (パスワード + 外部連携)
+                case UserState.PASSWORD_WITH_PROVIDER:
+                    return {
+                        emailPasswordStatusLabel: "パスワードは設定済み、メールアドレスは確認待ち",
+                        emailPasswordNavigationMessage: "メールアドレスの設定はこちら",
+                        emailPasswordIsWarning: true,
+                        emailPasswordLinkPath: paths.emailPassword.set,
+                    };
                 // 型安全フォールバック
                 default:
                     return {
@@ -68,6 +81,10 @@ export const createUserSettingMessages = (state: UserState, providerCount: numbe
                 return "パスワードが未設定のため、連携を解除できません。";
             case UserState.PROVIDER_ONLY:
                 return "メールアドレスとパスワードが未設定のため、連携を解除できません。";
+            // メールアドレスの確認が済むまでは、パスワードがあっても解除できない
+            case UserState.PASSWORD_WITH_PROVIDER:
+            case UserState.EMAIL_PASSWORD_WITH_PROVIDER:
+                return emailVerified ? null : "メールアドレスの確認が済んでいないため、連携を解除できません。";
             default:
                 return null;
         }

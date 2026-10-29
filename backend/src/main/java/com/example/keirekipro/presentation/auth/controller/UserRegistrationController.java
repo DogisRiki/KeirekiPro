@@ -32,7 +32,7 @@ public class UserRegistrationController {
      * ユーザー新規登録エンドポイント
      */
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.ACCEPTED)
     @Operation(summary = "ユーザー新規登録", description = "メールアドレスとパスワードによるユーザーの新規登録を行う")
     public void handle(@Valid @RequestBody UserRegistrationRequest request) {
         userRegistrationUseCase.execute(request.toCommand());

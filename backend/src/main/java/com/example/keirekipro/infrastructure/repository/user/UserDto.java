@@ -20,6 +20,8 @@ public class UserDto {
     private boolean twoFactorAuthEnabled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime emailVerifiedAt;
+    private String pendingEmail;
     private List<AuthProviderDto> authProviders;
     private List<String> roles;
 

@@ -55,6 +55,11 @@ public class OidcCallbackController {
     private static final String ERROR_REDIRECT_URL = "/login";
 
     /**
+     * 確認がまだのアカウントへ結び付けなかったときのリダイレクトURL
+     */
+    private static final String UNVERIFIED_EMAIL_REDIRECT_URL = "/login?error=unverified_email";
+
+    /**
      * OIDCプロバイダーからのコールバックを処理する
      * 認可コードを受け取り、アクセストークン取得・ユーザー情報取得・ログイン処理を行う
      *
@@ -96,6 +101,11 @@ public class OidcCallbackController {
 
             // 失敗時のメッセージ
             OidcCallbackError err = ((OidcCallbackResult.Failure) result).getError();
+            if (err == OidcCallbackError.UNVERIFIED_ACCOUNT_EMAIL) {
+                // 画面が確認を先に済ませるよう案内する文を出すため、決まった値で送る
+                response.sendRedirect(frontendBaseUrl + UNVERIFIED_EMAIL_REDIRECT_URL);
+                return;
+            }
             if (err == OidcCallbackError.USERINFO_FETCH_FAILED) {
                 redirectToErrorPage(response, "ユーザー情報の取得に失敗しました。しばらく時間を置いてから再度お試しください。");
                 return;

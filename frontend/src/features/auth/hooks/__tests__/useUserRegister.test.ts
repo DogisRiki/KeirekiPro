@@ -46,9 +46,9 @@ describe("useUserRegister", () => {
         mockedNavigate.mockReset();
     });
 
-    it("成功時はエラーストアをクリアし、通知とリダイレクトが実行されること", async () => {
-        // publicApiClient.postの成功レスポンスをセット
-        const mockResponse = { status: 200, data: undefined } as AxiosResponse<void>;
+    it("登録が 202 で終わると確認のメールを送ったことを伝える文を出す", async () => {
+        // publicApiClient.postの成功レスポンスをセット(1分の制限で送らなかったときも 202 が返る)
+        const mockResponse = { status: 202, data: undefined } as AxiosResponse<void>;
         vi.mocked(publicApiClient.post).mockResolvedValueOnce(mockResponse);
 
         // フックをレンダリング
@@ -65,7 +65,7 @@ describe("useUserRegister", () => {
 
         // setNotificationが正しい引数で呼び出されること
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
-            "新規会員登録が完了しました。\n登録完了の確認メールをお送りいたしましたのでご確認ください。",
+            "確認のメールを送りました。\nメールの中の確認のリンクを押して、登録を済ませてください。",
             "success",
         );
 

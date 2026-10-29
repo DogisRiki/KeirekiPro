@@ -31,6 +31,7 @@ const SetEmailAndPassword = lazy(() =>
 const SettingUser = lazy(() => import("@/pages/SettingUser").then((module) => ({ default: module.SettingUser })));
 const Terms = lazy(() => import("@/pages/Terms").then((module) => ({ default: module.Terms })));
 const TwoFactor = lazy(() => import("@/pages/TwoFactor").then((module) => ({ default: module.TwoFactor })));
+const VerifyEmail = lazy(() => import("@/pages/VerifyEmail").then((module) => ({ default: module.VerifyEmail })));
 
 const routeFallback = <Loading active variant="content" />;
 
@@ -74,6 +75,7 @@ export const routes: RouteObject[] = [
 
     { path: paths.terms, element: <Terms />, errorElement: <ErrorFallback /> },
     { path: paths.privacy, element: <Privacy />, errorElement: <ErrorFallback /> },
+    { path: paths.email.verify, element: <VerifyEmail />, errorElement: <ErrorFallback /> },
     { path: paths.serverError, element: <ServerError />, errorElement: <ErrorFallback /> },
     { path: paths.maintenance, element: <Maintenance />, errorElement: <ErrorFallback /> },
     { path: "*", element: <NotFound />, errorElement: <ErrorFallback /> },

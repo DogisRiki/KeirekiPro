@@ -17,4 +17,6 @@ public class SetEmailAndPasswordCommand {
     private String email;
 
     private String password;
+
+    private String currentPassword;
 }

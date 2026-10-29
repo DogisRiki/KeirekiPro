@@ -43,6 +43,7 @@ class GetUserInfoControllerTest {
 
     private static final UUID USER_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final String EMAIL = "test@keirekipro.click";
+    private static final String PENDING_EMAIL = "pending@keirekipro.click";
     private static final String USERNAME = "test-user";
     private static final String PROFILE_IMAGE_URL = "https://signed-url.example.com/dog.jpg";
     private static final boolean TWO_FACTOR_AUTH_ENABLED = false;
@@ -79,5 +80,47 @@ class GetUserInfoControllerTest {
 
         verify(currentUserFacade).getUserId();
         verify(getUserInfoUseCase).execute(USER_ID);
+    }
+
+    @Test
+    @DisplayName("確認の状態を emailVerified と pendingEmail で返す")
+    void test2() throws Exception {
+        UserInfoUseCaseDto dto = UserInfoUseCaseDto.builder()
+                .id(USER_ID)
+                .email(EMAIL)
+                .username(USERNAME)
+                .authProviders(List.of())
+                .emailVerified(false)
+                .pendingEmail(PENDING_EMAIL)
+                .build();
+
+        when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
+        when(getUserInfoUseCase.execute(USER_ID)).thenReturn(dto);
+
+        mockMvc.perform(get(ENDPOINT))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(EMAIL))
+                .andExpect(jsonPath("$.emailVerified").value(false))
+                .andExpect(jsonPath("$.pendingEmail").value(PENDING_EMAIL));
+    }
+
+    @Test
+    @DisplayName("確認済みで設定待ちのメールアドレスが無いときは emailVerified が true で pendingEmail が null")
+    void test3() throws Exception {
+        UserInfoUseCaseDto dto = UserInfoUseCaseDto.builder()
+                .id(USER_ID)
+                .email(EMAIL)
+                .username(USERNAME)
+                .authProviders(List.of())
+                .emailVerified(true)
+                .build();
+
+        when(currentUserFacade.getUserId()).thenReturn(USER_ID.toString());
+        when(getUserInfoUseCase.execute(USER_ID)).thenReturn(dto);
+
+        mockMvc.perform(get(ENDPOINT))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emailVerified").value(true))
+                .andExpect(jsonPath("$.pendingEmail").doesNotExist());
     }
 }

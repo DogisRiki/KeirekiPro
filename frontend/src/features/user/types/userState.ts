@@ -23,6 +23,11 @@ export enum UserState {
     EMAIL_PASSWORD_WITH_PROVIDER = "EMAIL_PASSWORD_WITH_PROVIDER",
 
     /**
+     * PASSWORD_WITH_PROVIDER : メールアドレス未設定(設定待ち)、パスワード設定済、外部認証あり
+     */
+    PASSWORD_WITH_PROVIDER = "PASSWORD_WITH_PROVIDER",
+
+    /**
      * 未判定（ユーザー情報未取得・ログアウト直後など）
      */
     UNKNOWN = "UNKNOWN",

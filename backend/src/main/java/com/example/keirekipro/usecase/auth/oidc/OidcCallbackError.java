@@ -33,5 +33,10 @@ public enum OidcCallbackError {
     /**
      * ログイン処理に失敗した
      */
-    LOGIN_FAILED
+    LOGIN_FAILED,
+
+    /**
+     * メールアドレスの確認がまだのアカウントへ結び付けなかった
+     */
+    UNVERIFIED_ACCOUNT_EMAIL
 }
