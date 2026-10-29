@@ -14,7 +14,7 @@ import com.example.keirekipro.usecase.auth.store.RefreshTokenStore;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
+import org.springframework.boot.data.redis.test.autoconfigure.DataRedisTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;

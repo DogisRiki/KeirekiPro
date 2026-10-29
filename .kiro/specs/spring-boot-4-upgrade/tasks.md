@@ -94,7 +94,7 @@
   - _要件: 7.3_
   - _対象の部品: テストの書き換え_
 
-- [ ] 2.9 テストの注釈の置き場所と Testcontainers 2 と ArchUnit の部品を書き換える
+- [x] 2.9 テストの注釈の置き場所と Testcontainers 2 と ArchUnit の部品を書き換える
 
   Claude は、`@WebMvcTest`、`@AutoConfigureMockMvc`、`@DataRedisTest`、`RedisProperties` の import を、Spring Boot 4.1.2 の置き場所に替える。Claude は、`org.springframework.boot.test.autoconfigure` の下から import しているほかの注釈も、`@AutoConfigureTestDatabase` を含めて、すべて Spring Boot 4.1.2 の置き場所に替える。MyBatis のテスト用の部品 4.1.0 は、`@AutoConfigureTestDatabase` が入る部品 `spring-boot-jdbc-test` を引き込む。そのため、Claude は `spring-boot-jdbc-test` を足さない。新しい置き場所の注釈が、設計に挙げていない部品を足さないと使えないと分かったときは、Claude は、その部品を足さずに所有者に示す。Claude は、Testcontainers のクラスの import を、コンパイルで置き場所を確かめて Testcontainers 2 の置き場所に替える。Claude は、ArchUnit のテストのファイルを変えない。
   - 完了の確かめ方: `./gradlew compileJava compileTestJava` が通り、`@Test` と `@ParameterizedTest` の数が書き換える前と同じである
@@ -272,3 +272,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 2.3: 部品の版は `./gradlew buildEnvironment dependencies` を1回流して全 configuration を読み、OSV(api.osv.dev の querybatch)に問い合わせる。台本は作業用のフォルダの `vuln-check/`(`parse_deps.py`、`osv_check.py`)にある。版を書かずに宣言した部品は `group:name -> 版` の形で出るので、名前から ` -> 版` を外して読む
 - 2.3: 残したのは buildscript の commons-lang3 と checkstyle の plexus-utils の制約、戻したのは `ext['opentelemetry.version']`(1.67.0)。OpenTelemetry を上げると okhttp と okio の版も上がる(作業用のフォルダの記録にある。PR の本文の版の前後の表に書く)。大タスク4で checkstyle を上げたあと、同じ台本で checkstyle の configuration を調べ直す
 - 2.6: `RedisConfig` の `redisTemplate` は Spring Boot の `JsonMapper` の Bean を受け取るようになった。`RedisClientTest` は `@DataRedisTest` で `RedisConfig` を `@Import` しており、Spring Boot 4 の `@DataRedisTest` が Jackson の自動設定を含まないと Bean が無くて組み立てに失敗する。2.9 と 2.10 でこの失敗が出たら、テストの側で Jackson の自動設定を足す
+- 2.9: Spring Boot 4 の `@DataRedisTest` は Jackson の自動設定を含まない。`RedisConfig` を `@Import` するテストには `@ImportAutoConfiguration(JacksonAutoConfiguration.class)` を足す。ArchUnit のテストは JUnit 6.0.3 の上で18件見つかって実行された

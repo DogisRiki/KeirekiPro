@@ -11,13 +11,17 @@ import com.example.keirekipro.infrastructure.shared.redis.RedisConfig;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.data.redis.test.autoconfigure.DataRedisTest;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestConstructor;
 
 import lombok.RequiredArgsConstructor;
 
 @DataRedisTest
+// RedisConfig が受け取る JsonMapper は Jackson の自動設定が作る。@DataRedisTest はこの自動設定を含まないため足す
+@ImportAutoConfiguration(JacksonAutoConfiguration.class)
 @Import({
         RedisTestContainerConfig.class,
         RedisConfig.class,

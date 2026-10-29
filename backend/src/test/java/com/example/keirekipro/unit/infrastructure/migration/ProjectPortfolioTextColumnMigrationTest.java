@@ -16,7 +16,7 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class ProjectPortfolioTextColumnMigrationTest {
 
     @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17.7-alpine")
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.7-alpine")
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test");
