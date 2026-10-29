@@ -32,13 +32,14 @@ export const SettingUserContainer = () => {
     const [profileImageUrl, setProfileImageUrl] = useState<string | null>(user?.profileImage ?? null);
     const [twoFactor, setTwoFactor] = useState<boolean>(user?.twoFactorAuthEnabled ?? false);
 
-    const twoFactorDisabled = isTwoFactorDisabled(userState);
-    const canRemoveProvider = isProviderRemovable(userState, user?.authProviders);
+    const twoFactorDisabled = isTwoFactorDisabled(user);
+    const canRemoveProvider = isProviderRemovable(user);
     const providerCount = Array.isArray(user?.authProviders) ? user.authProviders.length : 0;
+    const emailVerified = user?.emailVerified ?? false;
 
     const messages: SettingMessages = useMemo(
-        () => createUserSettingMessages(userState, providerCount),
-        [userState, providerCount],
+        () => createUserSettingMessages(userState, providerCount, emailVerified),
+        [userState, providerCount, emailVerified],
     );
 
     const { data, isSuccess } = useGetUserInfo();

@@ -13,7 +13,12 @@ export const ChangePasswordContainer = () => {
     const userState = useUserState();
     const changePasswordMutation = useChangePassword();
 
-    if (userState !== UserState.EMAIL_PASSWORD && userState !== UserState.EMAIL_PASSWORD_WITH_PROVIDER) {
+    // パスワードの変更はメールアドレスを使わないため、メールアドレスが設定待ちでも変更できる
+    if (
+        userState !== UserState.EMAIL_PASSWORD &&
+        userState !== UserState.EMAIL_PASSWORD_WITH_PROVIDER &&
+        userState !== UserState.PASSWORD_WITH_PROVIDER
+    ) {
         return <Navigate to={paths.login} replace />;
     }
 

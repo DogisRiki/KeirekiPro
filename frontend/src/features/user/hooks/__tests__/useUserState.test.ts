@@ -72,6 +72,23 @@ describe("getUserState", () => {
         expect(getUserState(user)).toBe(UserState.EMAIL_PASSWORD_WITH_PROVIDER);
     });
 
+    it("メールアドレスが無くパスワードと外部連携があれば PASSWORD_WITH_PROVIDER を返す", () => {
+        // 外部連携だけのアカウントがメールアドレスとパスワードを設定し、メールアドレスが設定待ちのとき
+        const user: User = {
+            id: "6",
+            email: null,
+            username: "test-user6",
+            profileImage: null,
+            twoFactorAuthEnabled: false,
+            hasPassword: true,
+            authProviders: ["google"],
+            roles: ["USER"],
+            emailVerified: false,
+            pendingEmail: "pending@example.com",
+        };
+        expect(getUserState(user)).toBe(UserState.PASSWORD_WITH_PROVIDER);
+    });
+
     it("想定外の組み合わせでもUNKNOWNを返すこと", () => {
         const user: User = {
             id: "5",
