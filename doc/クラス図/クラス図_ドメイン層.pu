@@ -330,6 +330,8 @@ package com.example.keirekipro.domain.model.user {
         - String username
         - LocalDateTime createdAt
         - LocalDateTime updatedAt
+        - LocalDateTime emailVerifiedAt
+        - Email pendingEmail
         - List<DomainEvent> domainEvents
         --
         + Set<RoleName> getRoles()
@@ -338,13 +340,16 @@ package com.example.keirekipro.domain.model.user {
         + User removeRole(ErrorCollector, RoleName)
         + List<DomainEvent> getDomainEvents()
         + User addAuthProvider(ErrorCollector, ...)
-        + User setEmail(ErrorCollector, Email)
         + User changePassword(ErrorCollector, String)
         + User resetPassword(String)
         + User changeTwoFactorAuthEnabled(ErrorCollector, boolean)
         + User removeAuthProvider(ErrorCollector, String)
         + User changeProfileImage(String)
         + User changeUsername(ErrorCollector, String)
+        + boolean isEmailVerified()
+        + User verifyEmail(LocalDateTime)
+        + User setPendingEmail(ErrorCollector, Email)
+        + User promotePendingEmail(LocalDateTime)
     }
 
     User --|> Entity
