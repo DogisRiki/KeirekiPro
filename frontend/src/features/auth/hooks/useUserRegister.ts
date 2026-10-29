@@ -23,7 +23,7 @@ export const useUserRegister = () => {
         onSuccess: () => {
             clearErrors();
             setNotification(
-                "新規会員登録が完了しました。\n登録完了の確認メールをお送りいたしましたのでご確認ください。",
+                "確認のメールを送りました。\nメールの中の確認のリンクを押して、登録を済ませてください。",
                 "success",
             );
             navigate(paths.login, { replace: true });
