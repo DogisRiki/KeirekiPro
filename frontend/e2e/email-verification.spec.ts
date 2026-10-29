@@ -24,7 +24,7 @@ const mockUnauthenticated = async (page: Page): Promise<void> => {
  */
 const mockAuthenticated = async (
     page: Page,
-    user: { email: string | null; emailVerified: boolean; pendingEmail: string | null },
+    user: { email: string | null; emailVerified: boolean; pendingEmail: string | null; authProviders?: string[] },
 ): Promise<void> => {
     await page.route("**/users/me", (route) =>
         route.fulfill({
@@ -174,6 +174,7 @@ test.describe("メールアドレスの確認", () => {
                 email: null,
                 emailVerified: false,
                 pendingEmail: "new@example.com",
+                authProviders: ["google"],
             });
             let sendCount = 0;
             await page.route("**/users/me/email-verification", (route) => {
