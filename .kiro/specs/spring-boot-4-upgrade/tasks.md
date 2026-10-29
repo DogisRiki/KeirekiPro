@@ -54,7 +54,7 @@
   - _要件: 1.2, 1.4_
   - _対象の部品: libs.versions.toml, build.gradle_
 
-- [ ] 2.4 版の名前を書いた文書を書き換える (並行可)
+- [x] 2.4 版の名前を書いた文書を書き換える (並行可)
 
   Claude は、`README.md` と `.kiro/steering/tech.md` の技術の表の、Spring Boot と JUnit の版の名前を書き換える。
   - 完了の確かめ方: 2つの文書の技術の表に、Spring Boot 4.1 と JUnit 6 と書いてあり、Spring Boot 3 と JUnit 5 の記載が残っていない

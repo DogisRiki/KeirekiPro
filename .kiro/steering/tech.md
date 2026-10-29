@@ -14,7 +14,7 @@
 
 | 領域 | 技術 |
 |---|---|
-| backend | Java 21 / Spring Boot 3.5系 / Gradle(wrapper) |
+| backend | Java 21 / Spring Boot 4.1系 / Gradle(wrapper) |
 | frontend | React 19 / TypeScript 5.9系 / Vite / Node 24 / pnpm(corepack固定) |
 | DB | PostgreSQL 17系 + Flyway(マイグレーション) |
 | キャッシュ | Redis(トークン失効管理等) |
@@ -49,7 +49,7 @@ steeringには転記しない(更新のたびに乖離するため)。
 
 | 対象 | ツール | 方針 |
 |---|---|---|
-| backend単体 | JUnit 5 + Mockito + AssertJ | domain/usecaseは純粋な単体テスト |
+| backend単体 | JUnit 6 + Mockito + AssertJ | domain/usecaseは純粋な単体テスト |
 | backend結合 | Testcontainers(postgres / localstack)+ dind | infrastructureは実物のPostgres/Redisで検証 |
 | backendアーキテクチャ | ArchUnit | 層依存・命名・配置ルールを `check` で強制 |
 | frontend単体 | Vitest + Testing Library + happy-dom | `__tests__/` にコロケーション |

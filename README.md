@@ -169,7 +169,7 @@ flowchart LR
 | カテゴリ | 技術 |
 |---------|------|
 | 言語 | Java 21 |
-| フレームワーク | Spring Boot 3.4 |
+| フレームワーク | Spring Boot 4.1 |
 | データアクセス | MyBatis |
 | マイグレーション | Flyway |
 | 認証 | Spring Security, JWT (java-jwt) |
@@ -178,7 +178,7 @@ flowchart LR
 | AWS連携 | Spring Cloud AWS (S3, SES, Secrets Manager) |
 | API仕様 | Springdoc OpenAPI (Swagger UI) |
 | 監視/トレーシング | Spring Boot Actuator, Micrometer, OpenTelemetry |
-| テスト | JUnit 5, Mockito, AssertJ, Testcontainers |
+| テスト | JUnit 6, Mockito, AssertJ, Testcontainers |
 | アーキテクチャテスト | ArchUnit |
 | カバレッジ | JaCoCo |
 | ビルドツール | Gradle |
