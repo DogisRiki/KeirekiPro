@@ -251,7 +251,7 @@
   - _対象の部品: SendAccountEmailVerificationUseCase_
   - _依存: 4.5_
 
-- [ ] 7. 画面を作る
+- [x] 7. 画面を作る
 - [x] 7.1 frontend の利用者の型に確認の状態を足す
 
   Claude は、frontend の `User` の型に、欄 `emailVerified` と `pendingEmail` を足す。Claude は、テストの中で利用者のデータを作る既存の箇所に、確認済みのアカウントとして `emailVerified: true` と `pendingEmail: null` を足す。
@@ -323,7 +323,7 @@
   - _依存: 7.5_
 
 - [ ] 8. 全体の流れを確かめ、設計図を揃える
-- [ ] 8.1 登録から確認までの流れを結合テストで確かめる
+- [x] 8.1 登録から確認までの流れを結合テストで確かめる
 
   Claude は、Testcontainers の PostgreSQL と Redis を使う結合テスト `EmailVerificationFlowIntegrationTest` を作る。Claude は、メールの送信を、通知を受け取るテスト用の部品に置き換える。テストは、その部品が受け取った確認のメールのリンクから、トークンを読む。
   - 完了の確かめ方: `EmailVerificationFlowIntegrationTest` が通る
