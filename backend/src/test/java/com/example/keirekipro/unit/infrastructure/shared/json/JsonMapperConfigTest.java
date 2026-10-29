@@ -52,18 +52,22 @@ class JsonMapperConfigTest {
         RED, GREEN
     }
 
-    /** 宣言の順(zeta, alpha, ...)と名前の順が違う */
+    /** 宣言の順(zeta, alpha, ...)と名前の順が違う。nullField は、呼ぶ側が null を渡して null の項目の書き方を確かめる */
     @Getter
     static class SampleBean {
         private String zeta = "z";
         private Integer alpha = 1;
-        private String nullField = null;
+        private String nullField;
         private List<String> emptyList = List.of();
         private LocalDate date = LocalDate.of(2026, 10, 29);
         private LocalDateTime dateTime = LocalDateTime.of(2026, 10, 29, 13, 45, 30, 123_000_000);
         private Instant instant = Instant.parse("2026-10-29T04:45:30.123456Z");
         private Color color = Color.GREEN;
         private String emoji = "職務経歴😀👍🏽";
+
+        SampleBean(String nullField) {
+            this.nullField = nullField;
+        }
     }
 
     record SampleRecord(String zeta, Integer alpha, String nullField, List<String> emptyList, LocalDate date,
@@ -80,7 +84,7 @@ class JsonMapperConfigTest {
     @Test
     @DisplayName("クラスを文字列に書くと、項目の名前と並び順と値の書き方と空の項目が見本と同じになる")
     void test1() {
-        assertThat(jsonMapper.writeValueAsString(new SampleBean())).isEqualTo(SAMPLE_STRING);
+        assertThat(jsonMapper.writeValueAsString(new SampleBean(null))).isEqualTo(SAMPLE_STRING);
     }
 
     @Test
@@ -102,7 +106,7 @@ class JsonMapperConfigTest {
     @Test
     @DisplayName("クラスをバイトに書くと、絵文字がサロゲートの対の形で書かれ、見本と同じになる")
     void test4() {
-        byte[] bytes = jsonMapper.writeValueAsBytes(new SampleBean());
+        byte[] bytes = jsonMapper.writeValueAsBytes(new SampleBean(null));
 
         assertThat(new String(bytes, StandardCharsets.UTF_8)).isEqualTo(SAMPLE_BYTES);
     }

@@ -118,7 +118,7 @@
   - _要件: 1.4_
   - _対象の部品: backend/CLAUDE.md_
 
-- [ ] 3. 上げる前と同じ形で書き、上げる前の値を読めることを単体テストで確かめる
+- [x] 3. 上げる前と同じ形で書き、上げる前の値を読めることを単体テストで確かめる
 
   Claude は、小タスク1.1で作った見本を、その見本を使う小タスクの中で、テストのコードの文字列か `src/test/resources` のファイルとしてテストに入れる。CI のテストは、作業用のフォルダを読めないためである。
 
@@ -146,7 +146,7 @@
   - _要件: 5.3_
   - _依存: 3.1_
 
-- [ ] 3.4 Redis の値の書き方が上げる前と同じことを確かめる
+- [x] 3.4 Redis の値の書き方が上げる前と同じことを確かめる
 
   Claude は、`RedisConfigTest` を作り、`RedisTemplate` で JSON の文字列と絵文字を含む文字列を書いたバイトを、小タスク1.1で作った Redis の値の見本と比べる。見本と違うバイトを書いたときは、Claude は、違いの原因を `JsonMapperConfig` で直す。
   - 完了の確かめ方: `RedisConfigTest` が通り、書いたバイトが見本と同じで、見本のバイトを読むと元の文字列に戻る
@@ -273,3 +273,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 2.3: 残したのは buildscript の commons-lang3 と checkstyle の plexus-utils の制約、戻したのは `ext['opentelemetry.version']`(1.67.0)。OpenTelemetry を上げると okhttp と okio の版も上がる(作業用のフォルダの記録にある。PR の本文の版の前後の表に書く)。大タスク4で checkstyle を上げたあと、同じ台本で checkstyle の configuration を調べ直す
 - 2.6: `RedisConfig` の `redisTemplate` は Spring Boot の `JsonMapper` の Bean を受け取るようになった。`RedisClientTest` は `@DataRedisTest` で `RedisConfig` を `@Import` しており、Spring Boot 4 の `@DataRedisTest` が Jackson の自動設定を含まないと Bean が無くて組み立てに失敗する。2.9 と 2.10 でこの失敗が出たら、テストの側で Jackson の自動設定を足す
 - 2.9: Spring Boot 4 の `@DataRedisTest` は Jackson の自動設定を含まない。`RedisConfig` を `@Import` するテストには `@ImportAutoConfiguration(JacksonAutoConfiguration.class)` を足す。ArchUnit のテストは JUnit 6.0.3 の上で18件見つかって実行された
+- 3.4: SpotBugs は、テストのクラスでも、null しか代入しない項目を警告し(`spotbugsTest`)、`check` が落ちる。null の項目を書くテストでは、null をコンストラクタの引数で渡す
