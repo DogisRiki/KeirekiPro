@@ -25,6 +25,7 @@ bash .claude/scripts/parallel/ui.sh start --session <ID>
    - 終了コードが0でないときは、下の「順番待ちと検査できないとき」に従う
 
 2. Playwright MCPで、手順1で出された画面確認の URL を開き、**変更した画面**へ遷移する。Playwright のブラウザは別のコンテナで動くので、`localhost` ではなく出された `host.docker.internal` の URL をそのまま使う。
+   - backend がメールに書くリンクと、ログインのあとに backend が開かせる画面は、所有者のブラウザで開けるよう、「所有者が開く URL」(`localhost`)から始まる。Claude は、メールのリンクを Playwright で開くときは、リンクの `http://localhost:<ポート>` の部分を画面確認の URL に置き換えてから開く
 
 3. 変更したコントロールを実際に操作する(入力・クリック・ドラッグ等)。状態変化を前後のスクリーンショットで記録する。
 

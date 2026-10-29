@@ -11,6 +11,9 @@ Google および GitHub で OAuth アプリケーションを登録し、それ�
 
 - リダイレクトURIの設定には以下を使用する：
   - 開発用: `http://localhost:8080/api/auth/oidc/callback`
+  - Claude が画面確認で起動する開発サーバ用: `http://localhost:<18080+枠の番号>/api/auth/oidc/callback`
+    - 枠の番号は1から、同時に走らせる数の設定 `git config keirekipro.parallelSlots`(初期値1)までである。設定が1なら `http://localhost:18081/api/auth/oidc/callback` だけを足す。設定の数を増やしたときは、増えた番号の分も足す
+    - Google は、登録した戻り先とポートまで同じでないとログインを断る(`エラー 400: redirect_uri_mismatch`)ので、Google Cloud Console の「承認済みのリダイレクト URI」に、枠ごとに足す
 
 ---
 

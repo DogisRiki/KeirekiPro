@@ -204,8 +204,10 @@ kp_ui_start() {
     fi
 
     # 5. backend を起動する(DB の接続先と、画面の URL と CORS の許可だけを上書きする)。
-    #    CORS は、画面確認の frontend と所有者が開く frontend の両方を許す
-    json='{"spring":{"datasource":{"url":"jdbc:postgresql://db:5432/'"$db"'"}},"frontend-base-url":"http://host.docker.internal:'"$fe_port"'","cors":{"allowed-origins":"http://host.docker.internal:'"$fe_port"',http://localhost:'"$own_port"'"}}'
+    #    CORS は、画面確認の frontend と所有者が開く frontend の両方を許す。
+    #    画面の URL は、所有者が開く frontend にする。ログインのあとに開く画面とメールのリンクは、
+    #    所有者のブラウザで開くためである(host.docker.internal は作業PCのブラウザで開けないことがある)
+    json='{"spring":{"datasource":{"url":"jdbc:postgresql://db:5432/'"$db"'"}},"frontend-base-url":"http://localhost:'"$own_port"'","cors":{"allowed-origins":"http://host.docker.internal:'"$fe_port"',http://localhost:'"$own_port"'"}}'
     out=$(docker compose -p keirekipro -f compose.yaml run -d --no-deps --name "kp-ui-$k-backend" -p "$be_port:8080" \
         --label "keirekipro.slot=$k" --label "keirekipro.folder=$key" --label keirekipro.kind=ui \
         -v "kp-gradle-home-$k:/root/.gradle" -v "kp-gradle-project-$key:/home/spring/app/.gradle" \

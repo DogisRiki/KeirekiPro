@@ -312,7 +312,7 @@ t_start_args() {
         || die "鍵の DB があるかを確かめていない: $(cat "$FAKE_DOCKER_LOG")"
     grep -qxF "$WT|compose -p keirekipro exec -T db psql -U postgres -c CREATE DATABASE kp_$KW" "$FAKE_DOCKER_LOG" \
         || die "鍵の DB を作っていない: $(cat "$FAKE_DOCKER_LOG")"
-    json='{"spring":{"datasource":{"url":"jdbc:postgresql://db:5432/kp_'"$KW"'"}},"frontend-base-url":"http://host.docker.internal:15175","cors":{"allowed-origins":"http://host.docker.internal:15175,http://localhost:25175"}}'
+    json='{"spring":{"datasource":{"url":"jdbc:postgresql://db:5432/kp_'"$KW"'"}},"frontend-base-url":"http://localhost:25175","cors":{"allowed-origins":"http://host.docker.internal:15175,http://localhost:25175"}}'
     be="$WT|compose -p keirekipro -f compose.yaml run -d --no-deps --name kp-ui-2-backend -p 18082:8080 --label keirekipro.slot=2 --label keirekipro.folder=$KW --label keirekipro.kind=ui -v kp-gradle-home-2:/root/.gradle -v kp-gradle-project-$KW:/home/spring/app/.gradle -e SPRING_APPLICATION_JSON=$json backend ./gradlew bootRun --args=--spring.profiles.active=dev"
     grep -qxF "$be" "$FAKE_DOCKER_LOG" || die "backend の起動の形が違う: $(run_lines)"
     grep -qxF -- "SPRING_APPLICATION_JSON=$json" "$FAKE_RUNS/backend.args" \
@@ -610,7 +610,7 @@ t_usage() {
 }
 
 echo "--- 画面にそのセッションの変更が出る(要件2.2)"
-run_test "start で、枠 k のポートと鍵の DB と host.docker.internal の VITE_API_URL と SPRING_APPLICATION_JSON が docker に渡り、所有者が開く frontend は localhost の VITE_API_URL で起動する" t_start_args
+run_test "start で、枠 k のポートと鍵の DB と host.docker.internal の VITE_API_URL と、画面の URL を所有者が開く frontend にした SPRING_APPLICATION_JSON が docker に渡り、所有者が開く frontend は localhost の VITE_API_URL で起動する" t_start_args
 run_test "frontend の準備は run-check.sh の関数で、枠のラベルを付けた root のコンテナでストアのボリュームの持ち主を変える" t_store_volume_chown
 run_test "鍵の DB があれば作らない" t_db_exists
 run_test "止まっている共有のサービスだけを本体フォルダで起こし、起こせなければ終了コード69で枠を取らない" t_shared_services_up
