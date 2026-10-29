@@ -7,6 +7,10 @@ import type { AxiosResponse } from "axios";
  */
 export interface SetEmailAndPasswordPayload {
     email?: string;
+    /**
+     * 今のパスワード(パスワードを持つアカウントが設定待ちのメールアドレスを置き換えるときに送る)
+     */
+    currentPassword?: string;
     password: string;
     confirmPassword: string;
 }

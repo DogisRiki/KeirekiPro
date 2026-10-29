@@ -40,24 +40,24 @@ describe("useSetEmailAndPassword", () => {
         vi.spyOn(useUserAuthStore.getState(), "updateUserInfo");
     });
 
-    it("メールアドレス付きペイロードの場合、ストア更新・通知・リダイレクトが実行されること", async () => {
+    it("成功すると確認のメールを送ったことと設定待ちであることを伝える文を出す", async () => {
         const payload: SetEmailAndPasswordPayload = {
             email: "new@example.com",
             password: "pass123",
             confirmPassword: "pass123",
         };
-        // モックレスポンス
+        // モックレスポンス(設定したメールアドレスは、確認を済ませるまで設定待ちになる)
         const returnedUser: User = {
             id: "1",
-            email: "test-user@exmple.com@example.com",
+            email: null,
             username: "test-user",
             profileImage: null,
             twoFactorAuthEnabled: false,
             hasPassword: true,
-            authProviders: [],
+            authProviders: ["google"],
             roles: ["USER"],
-            emailVerified: true,
-            pendingEmail: null,
+            emailVerified: false,
+            pendingEmail: "new@example.com",
         };
         const mockResponse = { status: 200, data: returnedUser } as AxiosResponse<User>;
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce(mockResponse);
@@ -76,7 +76,7 @@ describe("useSetEmailAndPassword", () => {
 
         // setNotificationが正しい引数で呼び出されること
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
-            "メールアドレスとパスワードを設定しました。",
+            "確認のメールを送りました。\nメールの中の確認のリンクを押すまで、メールアドレスは設定待ちです。",
             "success",
         );
 

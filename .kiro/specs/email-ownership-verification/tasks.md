@@ -306,7 +306,7 @@
   - _対象の部品: useUserState、userSettingRules、userSettingMessages、SettingUserContainer、ChangePasswordContainer_
   - _依存: 7.1_
 
-- [ ] 7.6 メールアドレスとパスワードの設定の画面を変える
+- [x] 7.6 メールアドレスとパスワードの設定の画面を変える
 
   Claude は、`SetEmailAndPasswordContainer` が `PROVIDER_ONLY` と `PASSWORD_WITH_PROVIDER` のときにメールアドレスの入力欄を出し、`PASSWORD_WITH_PROVIDER` のときに今のパスワードの入力欄も出すようにする。Claude は、`SetEmailAndPasswordForm` と `setEmailAndPassword` に欄 `currentPassword` を足し、`useSetEmailAndPassword` の成功の文を、確認のメールを送ったことと設定待ちであることを伝える文に変える。
   - 完了の確かめ方: `useSetEmailAndPassword.test.ts` と `userForms.integration.test.tsx` が通る

@@ -220,11 +220,14 @@ describe("user forms", () => {
             hasPassword: false,
             authProviders: ["google" as const],
         };
+        // 設定したメールアドレスは、確認を済ませるまで設定待ちになる
         const updatedUser = {
             ...baseUser,
-            email: "provider@example.com",
+            email: null,
             hasPassword: true,
             authProviders: ["google" as const],
+            emailVerified: false,
+            pendingEmail: "provider@example.com",
         };
         useUserAuthStore.getState().setLogin(providerOnlyUser);
         vi.mocked(protectedApiClient.post).mockResolvedValueOnce({ data: updatedUser } as AxiosResponse<User>);
@@ -238,6 +241,8 @@ describe("user forms", () => {
             { route: paths.emailPassword.set },
         );
 
+        // パスワードを持たないアカウントでは、現在のパスワードの入力欄を出さない
+        expect(screen.queryByLabelText(/^現在のパスワード/)).not.toBeInTheDocument();
         await user.type(screen.getByRole("textbox", { name: /メールアドレス/ }), "provider@example.com");
         const passwordInputs = screen.getAllByLabelText(/パスワード/);
         await user.type(passwordInputs[0], "pass1234");
@@ -253,9 +258,51 @@ describe("user forms", () => {
         );
         expect(useUserAuthStore.getState().user).toEqual(updatedUser);
         expect(useNotificationStore.getState()).toMatchObject({
-            message: "メールアドレスとパスワードを設定しました。",
+            message: "確認のメールを送りました。\nメールの中の確認のリンクを押すまで、メールアドレスは設定待ちです。",
             type: "success",
             isShow: true,
         });
+    });
+
+    it("PASSWORD_WITH_PROVIDER では今のパスワードの入力欄を出し、currentPassword を送る", async () => {
+        // メールアドレスが設定待ちで、パスワードと外部連携があるアカウント
+        const pendingUser: User = {
+            ...baseUser,
+            email: null,
+            hasPassword: true,
+            authProviders: ["google"],
+            emailVerified: false,
+            pendingEmail: "old@example.com",
+        };
+        const updatedUser: User = { ...pendingUser, pendingEmail: "new@example.com" };
+        useUserAuthStore.getState().setLogin(pendingUser);
+        vi.mocked(protectedApiClient.post).mockResolvedValueOnce({ data: updatedUser } as AxiosResponse<User>);
+
+        const { user } = renderWithProviders(
+            <Routes>
+                <Route path={paths.emailPassword.set} element={<SetEmailAndPasswordContainer />} />
+                <Route path={paths.user} element={<div>user destination</div>} />
+                <Route path={paths.login} element={<div>login destination</div>} />
+            </Routes>,
+            { route: paths.emailPassword.set },
+        );
+
+        await user.type(screen.getByRole("textbox", { name: /メールアドレス/ }), "new@example.com");
+        await user.type(screen.getByLabelText(/^現在のパスワード/), "current123");
+        const passwordInputs = screen.getAllByLabelText(/^パスワード/);
+        await user.type(passwordInputs[0], "pass1234");
+        await user.type(passwordInputs[1], "pass1234");
+        await user.click(screen.getByRole("button", { name: "設定" }));
+
+        await waitFor(() =>
+            expect(protectedApiClient.post).toHaveBeenCalledWith("/users/me/email-password", {
+                email: "new@example.com",
+                currentPassword: "current123",
+                password: "pass1234",
+                confirmPassword: "pass1234",
+            }),
+        );
+        expect(useUserAuthStore.getState().user).toEqual(updatedUser);
+        expect(await screen.findByText("user destination")).toBeInTheDocument();
     });
 });

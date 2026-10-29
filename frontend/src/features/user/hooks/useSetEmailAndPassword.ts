@@ -24,8 +24,9 @@ export const useSetEmailAndPassword = () => {
         },
         onSuccess: (response, variables) => {
             clearErrors();
+            // メールアドレスは確認を済ませるまで設定待ちになる(1分の制限で送らなかったときも同じ文を出す)
             const message = variables.email
-                ? "メールアドレスとパスワードを設定しました。"
+                ? "確認のメールを送りました。\nメールの中の確認のリンクを押すまで、メールアドレスは設定待ちです。"
                 : "パスワードを設定しました。";
             setNotification(message, "success");
             patchUser(response.data); // ストアを反映

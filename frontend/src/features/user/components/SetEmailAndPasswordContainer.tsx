@@ -8,17 +8,24 @@ import { Navigate } from "react-router";
  */
 export const SetEmailAndPasswordContainer = () => {
     const [email, setEmail] = useState("");
+    const [currentPassword, setCurrentPassword] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
 
     const userState = useUserState();
     const setEmailAndPasswordMutation = useSetEmailAndPassword();
 
-    // メールアドレス設定可能なのはPROVIDER_ONLYのみ
-    const showEmailField = userState === UserState.PROVIDER_ONLY;
+    // メールアドレス設定可能なのはPROVIDER_ONLYと、メールアドレスが設定待ちのPASSWORD_WITH_PROVIDER
+    const showEmailField = userState === UserState.PROVIDER_ONLY || userState === UserState.PASSWORD_WITH_PROVIDER;
+    // パスワードを持つアカウントが設定待ちのメールアドレスを置き換えるときは、今のパスワードを求める
+    const showCurrentPasswordField = userState === UserState.PASSWORD_WITH_PROVIDER;
 
-    // EMAIL_WITH_PROVIDER / その他はアクセス不可
-    if (userState !== UserState.EMAIL_WITH_PROVIDER && userState !== UserState.PROVIDER_ONLY) {
+    // EMAIL_WITH_PROVIDER / PROVIDER_ONLY / PASSWORD_WITH_PROVIDER 以外はアクセス不可
+    if (
+        userState !== UserState.EMAIL_WITH_PROVIDER &&
+        userState !== UserState.PROVIDER_ONLY &&
+        userState !== UserState.PASSWORD_WITH_PROVIDER
+    ) {
         return <Navigate to={paths.login} replace />;
     }
 
@@ -26,9 +33,10 @@ export const SetEmailAndPasswordContainer = () => {
      * フォーム送信ハンドラ
      */
     const handleSubmit = () => {
-        // PROVIDER_ONLYのときのみemailを含める
+        // メールアドレスの入力欄を出したときのみemailを、今のパスワードの入力欄を出したときのみcurrentPasswordを含める
         const payload = {
             ...(showEmailField ? { email } : {}),
+            ...(showCurrentPasswordField ? { currentPassword } : {}),
             password,
             confirmPassword,
         };
@@ -38,11 +46,16 @@ export const SetEmailAndPasswordContainer = () => {
     return (
         <SetEmailAndPasswordForm
             showEmailField={showEmailField}
+            showCurrentPasswordField={showCurrentPasswordField}
             email={email}
+            currentPassword={currentPassword}
             password={password}
             confirmPassword={confirmPassword}
             onEmailChange={(v) => {
                 setEmail(v);
+            }}
+            onCurrentPasswordChange={(v) => {
+                setCurrentPassword(v);
             }}
             onPasswordChange={(v) => {
                 setPassword(v);
