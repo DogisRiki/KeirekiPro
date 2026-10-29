@@ -64,7 +64,9 @@ describe("EmailVerificationContainer", () => {
 
         const { user } = renderVerifyEmail();
 
-        expect(await screen.findByText("メールアドレスの確認が済みました。ログインしてください。")).toBeInTheDocument();
+        expect(
+            await screen.findByText("メールアドレスの確認が済み、手続きが完了しました。ログインしてください。"),
+        ).toBeInTheDocument();
         expect(publicApiClient.post).toHaveBeenCalledWith("/auth/email-verification/verify", { token: TOKEN });
 
         await user.click(screen.getByRole("button", { name: "ログイン画面へ" }));
@@ -179,7 +181,7 @@ describe("EmailVerificationContainer", () => {
 
         renderVerifyEmail();
 
-        await screen.findByText("メールアドレスの確認が済みました。ログインしてください。");
+        await screen.findByText("メールアドレスの確認が済み、手続きが完了しました。ログインしてください。");
         expect(window.location.hash).toBe("");
         expect(window.location.pathname).toBe(paths.email.verify);
         expect(window.location.search).toBe("?from=mail");
@@ -190,10 +192,12 @@ describe("EmailVerificationContainer", () => {
 
         const { user } = renderWithProviders(<RemountingParent />, { route: `${paths.email.verify}#${TOKEN}` });
 
-        await screen.findByText("メールアドレスの確認が済みました。ログインしてください。");
+        await screen.findByText("メールアドレスの確認が済み、手続きが完了しました。ログインしてください。");
         await user.click(screen.getByRole("button", { name: "出し直す" }));
 
-        expect(screen.getByText("メールアドレスの確認が済みました。ログインしてください。")).toBeInTheDocument();
+        expect(
+            screen.getByText("メールアドレスの確認が済み、手続きが完了しました。ログインしてください。"),
+        ).toBeInTheDocument();
         expect(publicApiClient.post).toHaveBeenCalledTimes(1);
     });
 });

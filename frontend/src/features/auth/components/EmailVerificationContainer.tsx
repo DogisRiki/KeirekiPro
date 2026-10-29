@@ -50,7 +50,9 @@ const VerificationResult = ({ response, token }: { response: VerifyEmailResponse
         case "VERIFIED":
             return (
                 <>
-                    <Typography variant="body1">メールアドレスの確認が済みました。ログインしてください。</Typography>
+                    <Typography variant="body1">
+                        メールアドレスの確認が済み、手続きが完了しました。ログインしてください。
+                    </Typography>
                     {loginButton}
                 </>
             );
