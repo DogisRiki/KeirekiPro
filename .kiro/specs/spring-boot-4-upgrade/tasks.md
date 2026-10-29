@@ -122,7 +122,7 @@
 
   Claude は、小タスク1.1で作った見本を、その見本を使う小タスクの中で、テストのコードの文字列か `src/test/resources` のファイルとしてテストに入れる。CI のテストは、作業用のフォルダを読めないためである。
 
-- [ ] 3.1 JSON の書き出しを上げる前に合わせる設定のクラスを作る (並行可)
+- [x] 3.1 JSON の書き出しを上げる前に合わせる設定のクラスを作る (並行可)
 
   Claude は、`JsonMapperConfig` を作り、サロゲートの対を結合して書く機能を無効にする。サロゲートの対とは、絵文字のような一部の文字を表す2つの符号の組である。Claude は、最初に、`JsonMapperBuilderCustomizer` の置き場所をコンパイルで確かめる。Claude は、`JsonMapperConfigTest` で、Spring Boot が作る `JsonMapper` の書き出しと読み取りを、小タスク1.1で作った JSON の見本と比べる。
   - 完了の確かめ方: `JsonMapperConfigTest` が通り、書き出しの結果が見本と1文字も違わない
