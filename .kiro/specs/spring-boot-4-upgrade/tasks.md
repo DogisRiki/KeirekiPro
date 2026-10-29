@@ -102,7 +102,7 @@
   - _要件: 6.2, 7.3_
   - _対象の部品: テストの書き換え_
 
-- [ ] 2.10 Spring Boot 4 の既定の動きを、アプリの設定のファイルで上げる前に戻す
+- [x] 2.10 Spring Boot 4 の既定の動きを、アプリの設定のファイルで上げる前に戻す
 
   Claude は、`application.yaml` に、Jackson 2 の既定に合わせるプロパティと、名前を改めた追跡のプロパティと、環境変数 `OTEL_*` を読まないプロパティを書く。Claude は、`application-prod.yaml` に、probes を増やさないプロパティと、`X-Forwarded-*` のヘッダを読まないプロパティを書く。probes とは、backend が動いているかを確かめるための `/actuator/health/liveness` と `/actuator/health/readiness` の URL である。Gradle 9 がテストを1つも見つけずに失敗したときは、Claude は、テストの部品が JUnit 6 の engine を見つけるように直す。Claude は、`/verify-backend` を動かし、spotless 8.10.4 の既定の Eclipse JDT 4.41 が整形を変えたファイルを、そのまま変更に入れる。この時点の品質チェックの道具は、上げる前の版のままである。
   - 完了の確かめ方: `./gradlew test` で、今あるテストと ArchUnit のテストがすべて通り、`/verify-backend` が成功する
