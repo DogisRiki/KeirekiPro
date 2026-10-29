@@ -4,9 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -20,7 +19,7 @@ import org.springframework.web.client.RestClient;
 public class GithubOidcProvider implements OidcProvider {
 
     private final RestClient restClient;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     private final String authorizationEndpoint;
     private final String tokenEndpoint;
@@ -38,14 +37,14 @@ public class GithubOidcProvider implements OidcProvider {
             @Value("${oidc.providers.github.scopes}") String scopes,
             @Value("${oidc.providers.github.secretName}") String secretName,
             RestClient restClient,
-            ObjectMapper objectMapper) {
+            JsonMapper jsonMapper) {
         this.authorizationEndpoint = authorizationEndpoint;
         this.tokenEndpoint = tokenEndpoint;
         this.userInfoEndpoint = userInfoEndpoint;
         this.scopes = scopes;
         this.secretName = secretName;
         this.restClient = restClient;
-        this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
     }
 
     @Override
@@ -124,7 +123,7 @@ public class GithubOidcProvider implements OidcProvider {
                     .retrieve()
                     .body(String.class);
 
-            List<Map<String, Object>> emails = objectMapper.readValue(response, new TypeReference<>() {
+            List<Map<String, Object>> emails = jsonMapper.readValue(response, new TypeReference<>() {
             });
 
             return emails.stream()
@@ -132,7 +131,7 @@ public class GithubOidcProvider implements OidcProvider {
                     .map(e -> (String) e.get("email"))
                     .findFirst()
                     .orElse(null);
-        } catch (JsonProcessingException | RuntimeException e) {
+        } catch (RuntimeException e) {
             return null;
         }
     }

@@ -62,7 +62,7 @@
   - _要件: 1.1_
   - _対象の部品: 版の名前を書いた文書_
 
-- [ ] 2.5 JSON を読み書きする infrastructure のクラスを Jackson 3 に書き換える (並行可)
+- [x] 2.5 JSON を読み書きする infrastructure のクラスを Jackson 3 に書き換える (並行可)
 
   Claude は、秘密の値の読み取り、OIDC の呼び出し、職務経歴書のバックアップの読み取り、2つの Redis の store を、Spring Boot が作る Jackson 3 の `JsonMapper` を受け取る形に書き換える。Claude は、Jackson 2 の検査例外を受け止めていた箇所を、Jackson 3 の非検査例外を受け止める形に替える。検査例外とは、受け止めるか、呼び出し元に投げると宣言しないとコンパイルが通らない例外であり、非検査例外とは、その宣言が要らない例外である。受け止めたあとの扱いは変えない。
   - 完了の確かめ方: 設計の部品の節「JSON を読み書きする infrastructure のクラス」に挙げた8つのクラスが、`com.fasterxml.jackson.databind` を import していない

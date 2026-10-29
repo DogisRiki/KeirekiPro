@@ -6,8 +6,8 @@ import java.util.UUID;
 
 import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthChallenge;
 import com.example.keirekipro.usecase.auth.store.TwoFactorAuthChallengeStore;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -34,7 +34,7 @@ public class RedisTwoFactorAuthChallengeStore implements TwoFactorAuthChallengeS
     /**
      * JSONシリアライザ
      */
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     /**
      * チャレンジトークンを保存する
@@ -50,9 +50,9 @@ public class RedisTwoFactorAuthChallengeStore implements TwoFactorAuthChallengeS
                 .attempts(0)
                 .build();
         try {
-            String json = objectMapper.writeValueAsString(challenge);
+            String json = jsonMapper.writeValueAsString(challenge);
             redisTemplate.opsForValue().set(PREFIX + token, json, ttl);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("チャレンジトークンのシリアライズに失敗しました。", e);
         }
     }
@@ -70,8 +70,8 @@ public class RedisTwoFactorAuthChallengeStore implements TwoFactorAuthChallengeS
             return Optional.empty();
         }
         try {
-            return Optional.of(objectMapper.readValue((String) value, TwoFactorAuthChallenge.class));
-        } catch (JsonProcessingException e) {
+            return Optional.of(jsonMapper.readValue((String) value, TwoFactorAuthChallenge.class));
+        } catch (JacksonException e) {
             return Optional.empty();
         }
     }
@@ -93,9 +93,9 @@ public class RedisTwoFactorAuthChallengeStore implements TwoFactorAuthChallengeS
         Long ttlSec = redisTemplate.getExpire(PREFIX + token);
         Duration ttl = (ttlSec != null && ttlSec > 0) ? Duration.ofSeconds(ttlSec) : Duration.ofMinutes(10);
         try {
-            String json = objectMapper.writeValueAsString(challenge);
+            String json = jsonMapper.writeValueAsString(challenge);
             redisTemplate.opsForValue().set(PREFIX + token, json, ttl);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("チャレンジトークンのシリアライズに失敗しました。", e);
         }
         return challenge.getAttempts();

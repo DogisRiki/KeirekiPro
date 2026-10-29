@@ -1,10 +1,9 @@
 package com.example.keirekipro.infrastructure.shared.aws.secrets;
 
-import java.io.IOException;
-
 import com.example.keirekipro.usecase.shared.secret.SecretReader;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.stereotype.Component;
 
@@ -28,7 +27,7 @@ public class SecretsManagerSecretReader implements SecretReader {
     /**
      * JSONパーサー
      */
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     /**
      * JSON形式のシークレットを取得する
@@ -46,8 +45,8 @@ public class SecretsManagerSecretReader implements SecretReader {
         String secretString = secretsManagerClient.getSecretValue(request).secretString();
 
         try {
-            return objectMapper.readTree(secretString);
-        } catch (IOException e) {
+            return jsonMapper.readTree(secretString);
+        } catch (JacksonException e) {
             throw new RuntimeException("シークレットのパースに失敗しました。: " + secretName, e);
         }
     }
