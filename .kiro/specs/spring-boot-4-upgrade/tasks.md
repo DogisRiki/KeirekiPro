@@ -36,7 +36,7 @@
   - _要件: 1.5, 1.11_
   - _対象の部品: Gradle wrapper_
 
-- [ ] 2.2 部品の版の一覧と組み立ての設定を書き換える
+- [x] 2.2 部品の版の一覧と組み立ての設定を書き換える
 
   Claude は、部品の版の一覧 `libs.versions.toml` の版と部品の名前を、設計の表のとおりに書き換える。Claude は、`build.gradle` の制約が使う版の行を、この小タスクでは消さない。制約とは、Gradle が部品を引き込むときに使う版を、`build.gradle` で指定する設定である。その行は、`jackson-bom`、`commons-lang3`、`httpclient5`、`httpcore5`、`commons-compress`、`plexus-utils` の6つである。Claude は、この6つの行を消すか残すかを、小タスク2.3で決める。Claude は、組み立ての設定 `build.gradle` で、起動の部品を Spring Boot 4 の名前に替え、Spring Boot 4 が分けた部品とテスト用の部品を足す。Claude は、`build.gradle` から、`ext` の上書きの行と `commons-logging` の除外を消す。
   - 完了の確かめ方: `./gradlew dependencies --configuration runtimeClasspath` が解決に失敗せず、Spring Boot 4.1.2、Jackson 3.1.7、JUnit 6.0.3 を示す
@@ -267,3 +267,5 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 1.3: 比べない値の規則は、上げる前の2回で実際に値が違った場所(ファイルと、配列の番号を含む道筋)にだけ当てる。パターンに当たる場所すべてに当てると、2回で同じだった値まで上げたあとの比べで隠す。上げたあと(B)は `diff_runs.py A1 B excluded-values.json --at out/varying-A1-A2.json` で比べる
 - 1.3: 値を形に置き換えるときは、要件2.1の書き方(日時の秒の小数と時差、HTTP の日付、UUID の大文字と小文字、記号の列の長さ、整数と小数)を残す。比べ方を作る前に、要件と設計が求める比べ方を全部書き出してから作る(指摘を1つずつ直して確認役と6往復した)
 - 2.1: `./gradlew wrapper` は、動いている Gradle が jar を作る。版を上げるときは2回流す(1回目で設定のファイルだけが新しい版になり、2回目で新しい版の Gradle が jar と gradlew を作り直す)
+- 2.2: archunit-junit6 1.5.1 は junit-platform-engine 6.1.3 を求め、junit-bom 6.1.3 を持ち込んで junit-platform-launcher だけを 6.1.3 に上げる。`build.gradle` で archunit-junit6 から junit-platform-engine を外し、JUnit の部品をすべて Spring Boot の 6.0.3 にそろえた(設計に無い変更。PR 本文に書く)。小タスク2.9・2.10で、ArchUnit のテストが JUnit 6.0.3 の上で見つかって実行されることを確かめる
+- 2.2: 完了の確かめ方は「runtimeClasspath が JUnit 6.0.3 を示す」だが、JUnit はテストだけで使う部品で runtimeClasspath に入らない。JUnit 6.0.3 は testRuntimeClasspath で確かめた(食い違いとして PR 本文に書く)。小タスク2.3で constraints を決めるとき、`build.gradle` の constraints の注記に残る「testcontainers 1.21.4 経由」の古い説明も合わせて直すか消す
