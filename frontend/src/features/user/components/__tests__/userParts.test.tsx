@@ -1,8 +1,23 @@
 import type { SettingMessages } from "@/features/user";
-import { AuthProviderWarningMessage, PasswordStatusBox, ProfileImageField } from "@/features/user";
+import {
+    AuthProviderWarningMessage,
+    EmailVerificationStatus,
+    PasswordStatusBox,
+    ProfileImageField,
+} from "@/features/user";
+import type * as Lib from "@/lib";
+import { protectedApiClient } from "@/lib";
+import { useNotificationStore } from "@/stores";
 import { renderWithProviders, resetStoresAndMocks } from "@/test";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import type { AxiosResponse } from "axios";
 import { vi } from "vitest";
+
+// 確認のメールを送るAPIだけを差し替える
+vi.mock("@/lib", async (importOriginal) => ({
+    ...(await importOriginal<typeof Lib>()),
+    protectedApiClient: { post: vi.fn() },
+}));
 
 const baseMessages: SettingMessages = {
     emailPasswordStatusLabel: "メールアドレスとパスワードは設定済みです",
@@ -146,5 +161,75 @@ describe("AuthProviderWarningMessage", () => {
         renderWithProviders(<AuthProviderWarningMessage messages={{ ...baseMessages, providerMessage }} />);
 
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+});
+
+describe("EmailVerificationStatus", () => {
+    beforeEach(() => {
+        resetStoresAndMocks([]);
+        vi.mocked(protectedApiClient.post).mockReset();
+    });
+
+    it("pendingEmail があれば設定待ちのメールアドレスを確認待ちとして出す", () => {
+        renderWithProviders(
+            <EmailVerificationStatus email={null} emailVerified={false} pendingEmail="pending@example.com" />,
+        );
+
+        const alert = screen.getByRole("alert");
+        expect(alert).toHaveTextContent("確認待ちのメールアドレス: pending@example.com");
+        expect(screen.getByRole("button", { name: "確認のメールを送る" })).toBeInTheDocument();
+    });
+
+    it("emailVerified が false なら email を確認待ちとして出す", () => {
+        renderWithProviders(
+            <EmailVerificationStatus email="unverified@example.com" emailVerified={false} pendingEmail={null} />,
+        );
+
+        expect(screen.getByRole("alert")).toHaveTextContent("確認待ちのメールアドレス: unverified@example.com");
+        expect(screen.getByRole("button", { name: "確認のメールを送る" })).toBeInTheDocument();
+    });
+
+    it("pendingEmail と確認前の email の両方があれば、pendingEmail を確認待ちとして出す", () => {
+        renderWithProviders(
+            <EmailVerificationStatus
+                email="unverified@example.com"
+                emailVerified={false}
+                pendingEmail="pending@example.com"
+            />,
+        );
+
+        expect(screen.getByRole("alert")).toHaveTextContent("確認待ちのメールアドレス: pending@example.com");
+        expect(screen.getByRole("alert")).not.toHaveTextContent("unverified@example.com");
+    });
+
+    it("確認済みでメールアドレスの設定待ちが無いアカウントでは、確認待ちの表示を出さない", () => {
+        renderWithProviders(
+            <EmailVerificationStatus email="verified@example.com" emailVerified={true} pendingEmail={null} />,
+        );
+
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "確認のメールを送る" })).not.toBeInTheDocument();
+    });
+
+    it("送るボタンを押すと POST /api/users/me/email-verification を呼び、トーストを出す", async () => {
+        vi.mocked(protectedApiClient.post).mockResolvedValueOnce({
+            status: 204,
+            data: undefined,
+        } as AxiosResponse<void>);
+        const { user } = renderWithProviders(
+            <EmailVerificationStatus email={null} emailVerified={false} pendingEmail="pending@example.com" />,
+        );
+
+        await user.click(screen.getByRole("button", { name: "確認のメールを送る" }));
+
+        // protectedApiClient の baseURL は /api なので、/users/me/email-verification を呼ぶ
+        await waitFor(() => expect(protectedApiClient.post).toHaveBeenCalledWith("/users/me/email-verification"));
+        await waitFor(() =>
+            expect(useNotificationStore.getState()).toMatchObject({
+                message: "確認のメールを送りました。メールの中の確認のリンクを押してください。",
+                type: "success",
+                isShow: true,
+            }),
+        );
     });
 });

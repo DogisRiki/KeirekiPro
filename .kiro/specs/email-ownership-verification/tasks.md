@@ -314,7 +314,7 @@
   - _要件: 4.1, 4.3, 4.6_
   - _依存: 7.5_
 
-- [ ] 7.7 ユーザー設定の画面に確認待ちの表示と送るボタンを出す
+- [x] 7.7 ユーザー設定の画面に確認待ちの表示と送るボタンを出す
 
   Claude は、ユーザー設定の画面から確認のメールを送る関数とフックと、`EmailVerificationStatus` を `features/user` に作り、`SettingUserForm` に出す。`features/user` は `features/auth` を import しない。
   - 完了の確かめ方: `userParts.test.tsx` と `useSendEmailVerification.test.ts` が通る。確認済みでメールアドレスの設定待ちが無いアカウントでは、確認待ちの表示が出ない

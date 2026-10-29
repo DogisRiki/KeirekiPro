@@ -139,6 +139,8 @@ describe("user forms", () => {
         renderWithProviders(
             <SettingUserForm
                 email="user@example.com"
+                emailVerified={true}
+                pendingEmail={null}
                 username=""
                 onUsernameChange={vi.fn()}
                 profileImageUrl={null}
@@ -159,6 +161,22 @@ describe("user forms", () => {
         expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
         expect(screen.getByText(/ユーザー名を入力してください。/)).toBeInTheDocument();
         expect(screen.getByText(/連携を解除できません。/)).toBeInTheDocument();
+    });
+
+    it("SettingUserContainerは設定待ちのメールアドレスを確認待ちとして出し、確認済みなら出さないこと", async () => {
+        useUserAuthStore.getState().setLogin({ ...baseUser, pendingEmail: "new@example.com" });
+
+        const { unmount } = renderWithProviders(<SettingUserContainer />);
+
+        expect(await screen.findByText("確認待ちのメールアドレス: new@example.com")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "確認のメールを送る" })).toBeInTheDocument();
+
+        unmount();
+        useUserAuthStore.getState().setLogin(baseUser);
+        renderWithProviders(<SettingUserContainer />);
+
+        expect(await screen.findByRole("textbox", { name: /ユーザー名/ })).toBeInTheDocument();
+        expect(screen.queryByText(/確認待ちのメールアドレス/)).not.toBeInTheDocument();
     });
 
     it("ChangePasswordContainerは成功後に入力値をクリアしsuccess通知を設定すること", async () => {

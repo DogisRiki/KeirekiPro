@@ -90,6 +90,8 @@ export const SettingUserContainer = () => {
     return (
         <SettingUserForm
             email={user.email}
+            emailVerified={user.emailVerified}
+            pendingEmail={user.pendingEmail}
             username={username}
             onUsernameChange={setUsername}
             profileImageUrl={profileImageUrl}
