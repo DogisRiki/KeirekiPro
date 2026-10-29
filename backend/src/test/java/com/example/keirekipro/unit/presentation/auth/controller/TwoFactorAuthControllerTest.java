@@ -20,7 +20,7 @@ import com.example.keirekipro.presentation.auth.dto.TwoFactorAuthRequest;
 import com.example.keirekipro.presentation.security.jwt.AuthCookieIssuer;
 import com.example.keirekipro.usecase.auth.TwoFactorAuthVerifyUseCase;
 import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthVerifyResultDto;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +50,7 @@ class TwoFactorAuthControllerTest {
 
     private final MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private static final String ENDPOINT = "/api/auth/2fa/verify";
 

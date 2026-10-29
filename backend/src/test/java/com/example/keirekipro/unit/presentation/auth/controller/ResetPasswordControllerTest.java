@@ -13,7 +13,7 @@ import com.example.keirekipro.presentation.auth.controller.ResetPasswordControll
 import com.example.keirekipro.presentation.auth.dto.ResetPasswordRequest;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.usecase.auth.ResetPasswordUseCase;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,7 @@ class ResetPasswordControllerTest {
 
     private final MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private static final String ENDPOINT = "/api/auth/password/reset";
 

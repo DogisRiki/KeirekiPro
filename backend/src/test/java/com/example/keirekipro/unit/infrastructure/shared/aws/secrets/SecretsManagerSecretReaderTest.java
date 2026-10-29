@@ -7,8 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.keirekipro.infrastructure.shared.aws.secrets.SecretsManagerSecretReader;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class SecretsManagerSecretReaderTest {
     @Mock
     private SecretsManagerClient secretsManagerClient;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     @Test
     @DisplayName("指定したシークレット文字列からJSONデータを取得できる")
@@ -41,7 +41,7 @@ class SecretsManagerSecretReaderTest {
 
         JsonNode result = reader.readJson("dummySecret");
 
-        assertThat(result.get("key").asText()).isEqualTo("value");
+        assertThat(result.get("key").asString()).isEqualTo("value");
 
         ArgumentCaptor<GetSecretValueRequest> captor = ArgumentCaptor.forClass(GetSecretValueRequest.class);
         verify(secretsManagerClient).getSecretValue(captor.capture());

@@ -10,7 +10,7 @@ import com.example.keirekipro.config.RedisTestContainerConfig;
 import com.example.keirekipro.infrastructure.store.auth.RedisTwoFactorAuthChallengeStore;
 import com.example.keirekipro.usecase.auth.dto.TwoFactorAuthChallenge;
 import com.example.keirekipro.usecase.auth.store.TwoFactorAuthChallengeStore;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,8 +57,8 @@ class RedisTwoFactorAuthChallengeStoreTest {
         }
 
         @Bean
-        ObjectMapper objectMapper() {
-            return new ObjectMapper();
+        JsonMapper jsonMapper() {
+            return JsonMapper.builder().build();
         }
     }
 

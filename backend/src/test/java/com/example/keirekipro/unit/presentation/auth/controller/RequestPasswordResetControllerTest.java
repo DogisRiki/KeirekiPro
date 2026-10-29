@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.keirekipro.presentation.auth.controller.RequestPasswordResetController;
 import com.example.keirekipro.presentation.auth.dto.RequestPasswordResetRequest;
 import com.example.keirekipro.usecase.auth.RequestPasswordResetUseCase;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class RequestPasswordResetControllerTest {
 
     private final MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private static final String ENDPOINT = "/api/auth/password/reset/request";
 

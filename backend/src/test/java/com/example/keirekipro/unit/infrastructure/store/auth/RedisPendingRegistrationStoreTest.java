@@ -13,8 +13,7 @@ import com.example.keirekipro.config.RedisTestContainerConfig;
 import com.example.keirekipro.infrastructure.store.auth.RedisPendingRegistrationStore;
 import com.example.keirekipro.usecase.auth.store.PendingRegistration;
 import com.example.keirekipro.usecase.auth.store.PendingRegistrationStore;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,9 +64,9 @@ class RedisPendingRegistrationStoreTest {
         }
 
         @Bean
-        ObjectMapper objectMapper() {
-            // 本番の ObjectMapper と同じく、Instant を読み書きできるようにする
-            return JsonMapper.builder().findAndAddModules().build();
+        JsonMapper jsonMapper() {
+            // 本番の JsonMapper と同じく、Instant を読み書きできる(Jackson 3 は日時の型を標準で扱う)
+            return JsonMapper.builder().build();
         }
     }
 

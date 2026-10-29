@@ -12,7 +12,7 @@ import java.util.Map;
 
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.GithubOidcProvider;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,7 +45,7 @@ class GithubOidcProviderTest {
                 "read:user user:email",
                 "github-secret",
                 builder.build(),
-                new ObjectMapper());
+                JsonMapper.builder().build());
     }
 
     @Test

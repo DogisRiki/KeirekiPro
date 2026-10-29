@@ -14,7 +14,7 @@ import java.util.UUID;
 import com.example.keirekipro.infrastructure.query.resume.MyBatisResumeBackupQuery;
 import com.example.keirekipro.infrastructure.query.resume.ResumeQueryMapper;
 import com.example.keirekipro.usecase.query.resume.dto.ResumeBackupQueryDto;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +33,7 @@ class MyBatisResumeBackupQueryTest {
 
     @BeforeEach
     void setUp() {
-        query = new MyBatisResumeBackupQuery(mapper, new ObjectMapper());
+        query = new MyBatisResumeBackupQuery(mapper, JsonMapper.builder().build());
     }
 
     private static final UUID USER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");

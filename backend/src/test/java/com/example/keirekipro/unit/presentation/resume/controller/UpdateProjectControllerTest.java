@@ -23,8 +23,7 @@ import com.example.keirekipro.presentation.resume.dto.UpdateProjectRequest;
 import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.usecase.resume.UpdateProjectUseCase;
 import com.example.keirekipro.usecase.resume.dto.ResumeInfoUseCaseDto;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,7 +50,7 @@ class UpdateProjectControllerTest {
     private CurrentUserFacade currentUserFacade;
 
     private final MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private static final String ENDPOINT = "/api/resumes/{resumeId}/projects/{projectId}";
     private static final UUID RESUME_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");

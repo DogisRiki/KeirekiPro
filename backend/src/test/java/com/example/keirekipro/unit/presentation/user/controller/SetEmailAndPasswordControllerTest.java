@@ -18,7 +18,7 @@ import com.example.keirekipro.usecase.user.GetUserInfoUseCase;
 import com.example.keirekipro.usecase.user.SetEmailAndPasswordUseCase;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto;
 import com.example.keirekipro.usecase.user.dto.UserInfoUseCaseDto.AuthProviderInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,7 +48,7 @@ class SetEmailAndPasswordControllerTest {
 
     private final MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private static final String ENDPOINT = "/api/users/me/email-password";
 

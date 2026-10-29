@@ -19,9 +19,9 @@ import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProvider;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProviderFactory;
 import com.example.keirekipro.usecase.shared.secret.SecretReader;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,7 +55,7 @@ class OidcClientTest {
     @InjectMocks
     private OidcClient oidcClient;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private static final String PROVIDER_NAME = "google";
     private static final String REDIRECT_URI = "https://keirekipro.click/api/auth/oidc/callback";

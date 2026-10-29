@@ -11,8 +11,8 @@ import java.util.UUID;
 
 import com.example.keirekipro.config.PostgresTestContainerConfig;
 import com.example.keirekipro.infrastructure.query.resume.ResumeQueryMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -301,21 +301,21 @@ class ResumeQueryMapperTest {
 
         assertThat(json).isNotBlank();
 
-        ObjectMapper objectMapper = new ObjectMapper();
+        JsonMapper objectMapper = JsonMapper.builder().build();
         JsonNode root = objectMapper.readTree(json);
 
         // resume
-        assertThat(root.get("resumeName").asText()).isEqualTo("resume");
-        assertThat(root.get("date").asText()).isEqualTo("2025-01-01");
-        assertThat(root.get("lastName").asText()).isEqualTo("山田");
-        assertThat(root.get("firstName").asText()).isEqualTo("太郎");
+        assertThat(root.get("resumeName").asString()).isEqualTo("resume");
+        assertThat(root.get("date").asString()).isEqualTo("2025-01-01");
+        assertThat(root.get("lastName").asString()).isEqualTo("山田");
+        assertThat(root.get("firstName").asString()).isEqualTo("太郎");
 
         // careers
         JsonNode careers = root.get("careers");
         assertThat(careers.isArray()).isTrue();
         assertThat(careers).hasSize(1);
-        assertThat(careers.get(0).get("companyName").asText()).isEqualTo("Company");
-        assertThat(careers.get(0).get("startDate").asText()).isEqualTo("2020-01-01");
+        assertThat(careers.get(0).get("companyName").asString()).isEqualTo("Company");
+        assertThat(careers.get(0).get("startDate").asString()).isEqualTo("2020-01-01");
         assertThat(careers.get(0).get("endDate").isNull()).isTrue();
         assertThat(careers.get(0).get("active").asBoolean()).isTrue();
 
@@ -325,15 +325,15 @@ class ResumeQueryMapperTest {
         assertThat(projects).hasSize(1);
 
         JsonNode project0 = projects.get(0);
-        assertThat(project0.get("companyName").asText()).isEqualTo("Company");
-        assertThat(project0.get("startDate").asText()).isEqualTo("2021-01-01");
+        assertThat(project0.get("companyName").asString()).isEqualTo("Company");
+        assertThat(project0.get("startDate").asString()).isEqualTo("2021-01-01");
         assertThat(project0.get("endDate").isNull()).isTrue();
         assertThat(project0.get("active").asBoolean()).isTrue();
-        assertThat(project0.get("name").asText()).isEqualTo("Project");
-        assertThat(project0.get("overview").asText()).isEqualTo("Overview");
-        assertThat(project0.get("teamComp").asText()).isEqualTo("Team");
-        assertThat(project0.get("role").asText()).isEqualTo("Role");
-        assertThat(project0.get("achievement").asText()).isEqualTo("Achievement");
+        assertThat(project0.get("name").asString()).isEqualTo("Project");
+        assertThat(project0.get("overview").asString()).isEqualTo("Overview");
+        assertThat(project0.get("teamComp").asString()).isEqualTo("Team");
+        assertThat(project0.get("role").asString()).isEqualTo("Role");
+        assertThat(project0.get("achievement").asString()).isEqualTo("Achievement");
 
         JsonNode process = project0.get("process");
         assertThat(process.get("requirements").asBoolean()).isTrue();
@@ -348,67 +348,67 @@ class ResumeQueryMapperTest {
         // frontend
         JsonNode frontend = techStack.get("frontend");
         assertThat(frontend.get("languages")).hasSize(2);
-        assertThat(frontend.get("languages").get(0).asText()).isEqualTo("TypeScript");
-        assertThat(frontend.get("languages").get(1).asText()).isEqualTo("JavaScript");
+        assertThat(frontend.get("languages").get(0).asString()).isEqualTo("TypeScript");
+        assertThat(frontend.get("languages").get(1).asString()).isEqualTo("JavaScript");
         assertThat(frontend.get("frameworks")).hasSize(1);
-        assertThat(frontend.get("frameworks").get(0).asText()).isEqualTo("React");
+        assertThat(frontend.get("frameworks").get(0).asString()).isEqualTo("React");
         assertThat(frontend.get("libraries")).hasSize(1);
-        assertThat(frontend.get("libraries").get(0).asText()).isEqualTo("Redux");
+        assertThat(frontend.get("libraries").get(0).asString()).isEqualTo("Redux");
 
         // backend
         JsonNode backend = techStack.get("backend");
         assertThat(backend.get("languages")).hasSize(1);
-        assertThat(backend.get("languages").get(0).asText()).isEqualTo("Java");
+        assertThat(backend.get("languages").get(0).asString()).isEqualTo("Java");
         assertThat(backend.get("frameworks")).hasSize(1);
-        assertThat(backend.get("frameworks").get(0).asText()).isEqualTo("Spring Boot");
+        assertThat(backend.get("frameworks").get(0).asString()).isEqualTo("Spring Boot");
         assertThat(backend.get("ormTools")).hasSize(1);
-        assertThat(backend.get("ormTools").get(0).asText()).isEqualTo("MyBatis");
+        assertThat(backend.get("ormTools").get(0).asString()).isEqualTo("MyBatis");
         assertThat(backend.get("auth")).hasSize(1);
-        assertThat(backend.get("auth").get(0).asText()).isEqualTo("JWT");
+        assertThat(backend.get("auth").get(0).asString()).isEqualTo("JWT");
 
         // infrastructure
         JsonNode infra = techStack.get("infrastructure");
         assertThat(infra.get("clouds")).hasSize(1);
-        assertThat(infra.get("clouds").get(0).asText()).isEqualTo("AWS");
+        assertThat(infra.get("clouds").get(0).asString()).isEqualTo("AWS");
         assertThat(infra.get("databases")).hasSize(1);
-        assertThat(infra.get("databases").get(0).asText()).isEqualTo("PostgreSQL");
+        assertThat(infra.get("databases").get(0).asString()).isEqualTo("PostgreSQL");
 
         // tools
         JsonNode tools = techStack.get("tools");
         assertThat(tools.get("sourceControls")).hasSize(1);
-        assertThat(tools.get("sourceControls").get(0).asText()).isEqualTo("Git");
+        assertThat(tools.get("sourceControls").get(0).asString()).isEqualTo("Git");
         assertThat(tools.get("communicationTools")).hasSize(1);
-        assertThat(tools.get("communicationTools").get(0).asText()).isEqualTo("Slack");
+        assertThat(tools.get("communicationTools").get(0).asString()).isEqualTo("Slack");
 
         // certifications
         JsonNode certifications = root.get("certifications");
         assertThat(certifications.isArray()).isTrue();
         assertThat(certifications).hasSize(1);
-        assertThat(certifications.get(0).get("name").asText()).isEqualTo("基本情報技術者");
-        assertThat(certifications.get(0).get("date").asText()).isEqualTo("2022-01-01");
+        assertThat(certifications.get(0).get("name").asString()).isEqualTo("基本情報技術者");
+        assertThat(certifications.get(0).get("date").asString()).isEqualTo("2022-01-01");
 
         // portfolios
         JsonNode portfolios = root.get("portfolios");
         assertThat(portfolios.isArray()).isTrue();
         assertThat(portfolios).hasSize(1);
-        assertThat(portfolios.get(0).get("name").asText()).isEqualTo("PF1");
-        assertThat(portfolios.get(0).get("overview").asText()).isEqualTo("overview");
-        assertThat(portfolios.get(0).get("techStack").asText()).isEqualTo("tech");
-        assertThat(portfolios.get(0).get("link").asText()).isEqualTo("https://portfolio.example");
+        assertThat(portfolios.get(0).get("name").asString()).isEqualTo("PF1");
+        assertThat(portfolios.get(0).get("overview").asString()).isEqualTo("overview");
+        assertThat(portfolios.get(0).get("techStack").asString()).isEqualTo("tech");
+        assertThat(portfolios.get(0).get("link").asString()).isEqualTo("https://portfolio.example");
 
         // snsPlatforms
         JsonNode snsPlatforms = root.get("snsPlatforms");
         assertThat(snsPlatforms.isArray()).isTrue();
         assertThat(snsPlatforms).hasSize(1);
-        assertThat(snsPlatforms.get(0).get("name").asText()).isEqualTo("X");
-        assertThat(snsPlatforms.get(0).get("link").asText()).isEqualTo("https://x.example");
+        assertThat(snsPlatforms.get(0).get("name").asString()).isEqualTo("X");
+        assertThat(snsPlatforms.get(0).get("link").asString()).isEqualTo("https://x.example");
 
         // selfPromotions
         JsonNode selfPromotions = root.get("selfPromotions");
         assertThat(selfPromotions.isArray()).isTrue();
         assertThat(selfPromotions).hasSize(1);
-        assertThat(selfPromotions.get(0).get("title").asText()).isEqualTo("PR1");
-        assertThat(selfPromotions.get(0).get("content").asText()).isEqualTo("content");
+        assertThat(selfPromotions.get(0).get("title").asString()).isEqualTo("PR1");
+        assertThat(selfPromotions.get(0).get("content").asString()).isEqualTo("content");
     }
 
     @Test
@@ -430,17 +430,17 @@ class ResumeQueryMapperTest {
 
         String json = resumeQueryMapper.selectResumeForBackup(resumeId, userId);
 
-        ObjectMapper objectMapper = new ObjectMapper();
+        JsonMapper objectMapper = JsonMapper.builder().build();
         JsonNode root = objectMapper.readTree(json);
 
         JsonNode projects = root.get("projects");
         assertThat(projects).hasSize(1);
-        assertThat(projects.get(0).get("overview").asText()).isEqualTo(projectOverview);
-        assertThat(projects.get(0).get("role").asText()).isEqualTo(projectRole);
+        assertThat(projects.get(0).get("overview").asString()).isEqualTo(projectOverview);
+        assertThat(projects.get(0).get("role").asString()).isEqualTo(projectRole);
 
         JsonNode portfolios = root.get("portfolios");
         assertThat(portfolios).hasSize(1);
-        assertThat(portfolios.get(0).get("overview").asText()).isEqualTo(portfolioOverview);
+        assertThat(portfolios.get(0).get("overview").asString()).isEqualTo(portfolioOverview);
     }
 
     private void insertUser(UUID userId) {

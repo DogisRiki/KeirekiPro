@@ -16,8 +16,8 @@ import com.example.keirekipro.infrastructure.auth.oidc.provider.GithubOidcProvid
 import com.example.keirekipro.infrastructure.auth.oidc.provider.GoogleOidcProvider;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProvider;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProviderFactory;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +50,7 @@ class OidcProviderFactoryTest {
                 DUMMY_SCOPES,
                 DUMMY_SECRET_NAME,
                 mock(RestClient.class),
-                mock(ObjectMapper.class));
+                mock(JsonMapper.class));
 
         // OidcProviderFactoryに両プロバイダーを登録
         OidcProviderFactory factory = new OidcProviderFactory(List.of(googleProvider, githubProvider));
@@ -180,7 +180,7 @@ class OidcProviderFactoryTest {
         when(rawHeadersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(String.class)).thenReturn("[]");
 
-        ObjectMapper mockObjectMapper = mock(ObjectMapper.class);
+        JsonMapper mockObjectMapper = mock(JsonMapper.class);
         List<Map<String, Object>> emails = List.of(
                 Map.of("email", "github@example.com", "primary", true, "verified", true));
         when(mockObjectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(emails);
@@ -212,7 +212,7 @@ class OidcProviderFactoryTest {
     @DisplayName("GithubOidcProvider_userInfoがnullの場合、nullを返す")
     void test8() {
         RestClient mockRestClient = mock(RestClient.class);
-        ObjectMapper mockObjectMapper = mock(ObjectMapper.class);
+        JsonMapper mockObjectMapper = mock(JsonMapper.class);
 
         GithubOidcProvider githubProvider = new GithubOidcProvider(
                 DUMMY_AUTH_ENDPOINT,
@@ -259,8 +259,8 @@ class OidcProviderFactoryTest {
         when(rawHeadersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(String.class)).thenReturn(dummyEmailJson);
 
-        // ObjectMapperモック設定
-        ObjectMapper mockObjectMapper = mock(ObjectMapper.class);
+        // JsonMapperモック設定
+        JsonMapper mockObjectMapper = mock(JsonMapper.class);
         List<Map<String, Object>> dummyList = List.of(
                 Map.of("email", "primary@example.com", "primary", true, "verified", true));
         when(mockObjectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(dummyList);

@@ -86,7 +86,7 @@
   - _要件: 2.6_
   - _対象の部品: RestClientConfig_
 
-- [ ] 2.8 テストのコードを Jackson 3 に書き換える
+- [x] 2.8 テストのコードを Jackson 3 に書き換える
 
   Claude は、Jackson 2 の `ObjectMapper` を使うテストを、`JsonMapper` を使う形に書き換える。テストが確かめる内容とアサーションとテストの数は変えない。
   - 完了の確かめ方: テストのコードのどのファイルも `com.fasterxml.jackson.databind` を import しておらず、`@Test` と `@ParameterizedTest` の数が書き換える前と同じである
