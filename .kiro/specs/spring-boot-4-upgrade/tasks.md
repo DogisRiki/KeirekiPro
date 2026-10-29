@@ -78,7 +78,7 @@
   - _要件: 5.3, 5.4_
   - _対象の部品: RedisConfig_
 
-- [ ] 2.7 OIDC の呼び出しに使う RestClient に JSON の変換器を渡す (並行可)
+- [x] 2.7 OIDC の呼び出しに使う RestClient に JSON の変換器を渡す (並行可)
 
   Claude は、`RestClientConfig` が作る `RestClient` に、Spring Boot の `JsonMapper` を使う `JacksonJsonHttpMessageConverter` を明示して渡す。Claude は、Spring Framework 7.0.10 で非推奨でない `RestClient.Builder` のメソッドを使う。今の状態コードの扱いと、10秒の接続と読み取りの打ち切りと、フォームの送信に使う変換器は変えない。
   - 完了の確かめ方: `RestClientConfig` の `restClient` の Bean が `JsonMapper` を受け取り、その `JsonMapper` を使う変換器を `RestClient` に渡している
