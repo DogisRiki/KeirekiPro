@@ -163,7 +163,7 @@
   - _要件: 1.7, 1.8, 1.9, 7.1, 8.1_
   - _対象の部品: 品質チェックの設定の完成品, 脆弱性の抑制のファイル_
 
-- [ ] 4.2 新しい版の道具が出した指摘を、動きを変えずに直す
+- [x] 4.2 新しい版の道具が出した指摘を、動きを変えずに直す
 
   Claude は、作業のブランチの今の中身を、`.commit_template` に従うコミットにする。Claude は、このコミットを `/ship` の前には push しない。Claude は、そのコミットから、ブランチを持たない作業のブランチの写しを `git worktree add --detach` で作る。作業のブランチは作業フォルダが使っているので、写しは同じブランチを使えないためである。Claude は、写しに完成品を置き、`spotlessApply` と `check` を動かす。Claude は、新しい版の checkstyle、spotbugs、pmd が出した指摘を、作業フォルダのコードの書き方を直して無くす。Claude は、作業フォルダでコードを直すたびに、直したコードをコミットし、写しで `git checkout --detach` でそのコミットに移ってから、`check` を動かし直す。写しに置いた完成品は、コミットに含まれないので、移ったあとも写しに残る。
 
@@ -274,3 +274,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 2.6: `RedisConfig` の `redisTemplate` は Spring Boot の `JsonMapper` の Bean を受け取るようになった。`RedisClientTest` は `@DataRedisTest` で `RedisConfig` を `@Import` しており、Spring Boot 4 の `@DataRedisTest` が Jackson の自動設定を含まないと Bean が無くて組み立てに失敗する。2.9 と 2.10 でこの失敗が出たら、テストの側で Jackson の自動設定を足す
 - 2.9: Spring Boot 4 の `@DataRedisTest` は Jackson の自動設定を含まない。`RedisConfig` を `@Import` するテストには `@ImportAutoConfiguration(JacksonAutoConfiguration.class)` を足す。ArchUnit のテストは JUnit 6.0.3 の上で18件見つかって実行された
 - 3.4: SpotBugs は、テストのクラスでも、null しか代入しない項目を警告し(`spotbugsTest`)、`check` が落ちる。null の項目を書くテストでは、null をコンストラクタの引数で渡す
+- 4.2: checkstyle 14.3.0 の TextBlockGoogleStyleFormatting は、spotless の Eclipse の整形が手で折り返した行をつなぎ直すため、どの書き方でも両立しない(`text_block_indentation` を替えても直らない)。所有者が 2026-10-30 に完成品の google_checks.xml からこの規則だけを外すと決めた。checkstyle の警告はビルドを落とさないので、上げる前の警告と比べて新しい指摘を見分ける
