@@ -26,65 +26,50 @@
 
 [versions]
 # プラグイン
-spring-boot = "3.5.16"
+spring-boot = "4.1.2"
 spring-dependency-management = "1.1.7"
-spotless = "7.2.1"
+spotless = "8.10.4"
 spotbugs = "6.5.13"
 pitest = "1.19.0"
 # buildscript の classpath と plugins の両方から参照する。ずれを防ぐため1箇所にする
-flyway = "10.22.0"
+flyway = "13.11.1"
 
 # 依存
-mybatis-spring-boot = "3.0.5"
+mybatis-spring-boot = "4.1.0"
 archunit = "1.5.1"
-springdoc = "2.9.1"
+springdoc = "3.2.0"
 openhtmltopdf = "1.0.10"
 java-jwt = "4.6.2"
-spring-cloud-aws = "3.4.2"
-testcontainers = "1.21.4"
-freemarker = "2.3.35"
+spring-cloud-aws = "4.2.0"
 commons-validator = "1.11.0"
 mybatis-postgresql-typehandlers = "1.0.2"
 
 # Spring Boot の BOM が管理する版を上書きするためのもの(build.gradle の ext で参照)。
 # BOM の版に脆弱性があり、Spring Boot 側がまだ追いついていない場合に使う。
-# 解除の判定: Spring Boot を上げたときに BOM の版がここ以上になっていれば、
-# この行と build.gradle の対応する ext を削除する。
-# BOM の版は spring-boot-dependencies-<版>.pom の netty.version / postgresql.version /
-# tomcat.version / jackson-bom.version / opentelemetry.version / log4j2.version /
-# commons-lang3.version / httpclient5.version / httpcore5.version で見る。
-netty = "4.1.137.Final"
-postgresql = "42.7.13"
-tomcat = "10.1.59"
-jackson-bom = "2.21.7"
-opentelemetry = "1.62.0"
-log4j2 = "2.25.5"
-commons-lang3 = "3.20.0"
-httpclient5 = "5.6.4"
-httpcore5 = "5.4.4"
+# 解除の判定: build.gradle の ext['opentelemetry.version'] の注記を参照する。
+opentelemetry = "1.67.0"
 
-# BOM の管理外で、推移的に入る版を引き上げるためのもの(build.gradle の constraints で参照)。
-# 解除の判定: 持ち込んでいる側(testcontainers / checkstyle)を上げたときに、
-# 解決される版がここ以上になっていれば、この行と build.gradle の対応する constraints を削除する。
-commons-compress = "1.28.0"
-plexus-utils = "3.6.2"
+# build.gradle の constraints で参照する。脆弱性のある版が推移的に入るのを引き上げるためのもの。
+# commons-lang3 は buildscript の constraints(ビルド用プラグイン経由)、
+# guava は dependencies の constraints(checkstyle 経由)で使う。
+# 解除の判定: build.gradle の対応する constraints の注記を参照する。
+commons-lang3 = "3.20.0"
+guava = "33.7.2-jre"
 
 [libraries]
-# Flyway Gradleプラグイン(10系)がDB別モジュールをbuildscriptクラスパスに要求するためのもの。
-# implementation 側の flyway-core / flyway-database-postgresql は Spring Boot のBOM管理下にあり
+# Flyway Gradleプラグインが DB別モジュールをbuildscriptクラスパスに要求するためのもの。
+# implementation 側の spring-boot-starter-flyway / flyway-database-postgresql は Spring Boot のBOM管理下にあり
 # バージョンを持たないため、ここには含めない
 flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 
 mybatis-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter", version.ref = "mybatis-spring-boot" }
 mybatis-test-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter-test", version.ref = "mybatis-spring-boot" }
-archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+archunit-junit6 = { module = "com.tngtech.archunit:archunit-junit6", version.ref = "archunit" }
 springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 openhtmltopdf-core = { module = "com.openhtmltopdf:openhtmltopdf-core", version.ref = "openhtmltopdf" }
 openhtmltopdf-pdfbox = { module = "com.openhtmltopdf:openhtmltopdf-pdfbox", version.ref = "openhtmltopdf" }
 java-jwt = { module = "com.auth0:java-jwt", version.ref = "java-jwt" }
 spring-cloud-aws-dependencies = { module = "io.awspring.cloud:spring-cloud-aws-dependencies", version.ref = "spring-cloud-aws" }
-testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
-freemarker = { module = "org.freemarker:freemarker", version.ref = "freemarker" }
 commons-validator = { module = "commons-validator:commons-validator", version.ref = "commons-validator" }
 mybatis-postgresql-typehandlers = { module = "com.github.onozaty:mybatis-postgresql-typehandlers", version.ref = "mybatis-postgresql-typehandlers" }
 

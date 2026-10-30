@@ -1,5 +1,6 @@
 server:
   shutdown: graceful
+  forward-headers-strategy: none # X-Forwarded-*ヘッダを読まない(Cookie・HSTS・要求元IPをSpring Boot 3のときと同じにする)
 
 spring:
   lifecycle:
@@ -54,3 +55,5 @@ management:
   endpoint:
     health:
       show-details: never  # 詳細情報は非公開（セキュリティ考慮）
+      probes:
+        enabled: false  # liveness/readinessのURLを増やさない

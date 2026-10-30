@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.StandardEnvironment;
 
@@ -50,8 +50,8 @@ class SecretsManagerDottedKeyTest {
         propertySource.init();
         StandardEnvironment environment = new StandardEnvironment();
         environment.getPropertySources().addFirst(propertySource);
-        RedisProperties redisProperties = Binder.get(environment)
-                .bind("spring.data.redis", RedisProperties.class)
+        DataRedisProperties redisProperties = Binder.get(environment)
+                .bind("spring.data.redis", DataRedisProperties.class)
                 .get();
 
         // 検証

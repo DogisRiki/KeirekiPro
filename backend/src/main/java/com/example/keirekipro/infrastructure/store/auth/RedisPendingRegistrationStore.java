@@ -10,8 +10,8 @@ import java.util.UUID;
 
 import com.example.keirekipro.usecase.auth.store.PendingRegistration;
 import com.example.keirekipro.usecase.auth.store.PendingRegistrationStore;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -43,7 +43,7 @@ public class RedisPendingRegistrationStore implements PendingRegistrationStore {
     /**
      * JSONシリアライザ
      */
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     /**
      * 登録を置く。同じIDの登録があれば上書きする
@@ -55,8 +55,8 @@ public class RedisPendingRegistrationStore implements PendingRegistrationStore {
     public void save(PendingRegistration registration, Duration ttl) {
         String json;
         try {
-            json = objectMapper.writeValueAsString(registration);
-        } catch (JsonProcessingException e) {
+            json = jsonMapper.writeValueAsString(registration);
+        } catch (JacksonException e) {
             throw new IllegalStateException("確認前の登録のシリアライズに失敗しました。", e);
         }
         redisTemplate.opsForValue().set(PREFIX + registration.id(), json, ttl);
@@ -79,8 +79,8 @@ public class RedisPendingRegistrationStore implements PendingRegistrationStore {
             return Optional.empty();
         }
         try {
-            return Optional.of(objectMapper.readValue((String) value, PendingRegistration.class));
-        } catch (JsonProcessingException e) {
+            return Optional.of(jsonMapper.readValue((String) value, PendingRegistration.class));
+        } catch (JacksonException e) {
             return Optional.empty();
         }
     }

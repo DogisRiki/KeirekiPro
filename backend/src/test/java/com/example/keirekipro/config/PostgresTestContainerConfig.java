@@ -3,7 +3,7 @@ package com.example.keirekipro.config;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * Postgres Testcontainers設定クラス
@@ -17,8 +17,8 @@ public class PostgresTestContainerConfig {
     @Bean
     @ServiceConnection(name = "postgres")
     @SuppressWarnings("resource")
-    public PostgreSQLContainer<?> postgresContainer() {
-        return new PostgreSQLContainer<>("postgres:17.7-alpine")
+    public PostgreSQLContainer postgresContainer() {
+        return new PostgreSQLContainer("postgres:17.7-alpine")
                 .withDatabaseName("testdb")
                 .withUsername("test")
                 .withPassword("test")

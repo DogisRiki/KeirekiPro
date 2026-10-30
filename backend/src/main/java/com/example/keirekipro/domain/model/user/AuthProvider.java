@@ -81,7 +81,6 @@ public class AuthProvider extends Entity {
     }
 
     /**
-     *
      * @param id 識別子
      * @param providerName プロバイダー名
      * @param providerUserId プロバイダー側ユーザーID

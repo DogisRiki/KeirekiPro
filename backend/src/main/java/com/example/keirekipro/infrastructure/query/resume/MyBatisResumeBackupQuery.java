@@ -10,9 +10,9 @@ import java.util.UUID;
 
 import com.example.keirekipro.usecase.query.resume.ResumeBackupQuery;
 import com.example.keirekipro.usecase.query.resume.dto.ResumeBackupQueryDto;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.stereotype.Repository;
 
@@ -27,7 +27,7 @@ public class MyBatisResumeBackupQuery implements ResumeBackupQuery {
 
     private final ResumeQueryMapper mapper;
 
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     @Override
     public Optional<ResumeBackupQueryDto> findByIdForBackup(UUID resumeId, UUID userId) {
@@ -37,9 +37,9 @@ public class MyBatisResumeBackupQuery implements ResumeBackupQuery {
         }
 
         try {
-            JsonNode root = objectMapper.readTree(json);
+            JsonNode root = jsonMapper.readTree(json);
             return Optional.of(parseResumeBackupQueryDto(root));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("バックアップデータのパースに失敗しました", e);
         }
     }
@@ -328,7 +328,7 @@ public class MyBatisResumeBackupQuery implements ResumeBackupQuery {
         if (arrayNode != null && arrayNode.isArray()) {
             for (JsonNode node : arrayNode) {
                 if (!node.isNull()) {
-                    list.add(node.asText());
+                    list.add(node.asString());
                 }
             }
         }
@@ -343,7 +343,7 @@ public class MyBatisResumeBackupQuery implements ResumeBackupQuery {
         if (fieldNode == null || fieldNode.isNull()) {
             return null;
         }
-        return fieldNode.asText();
+        return fieldNode.asString();
     }
 
     /**
@@ -353,7 +353,7 @@ public class MyBatisResumeBackupQuery implements ResumeBackupQuery {
         if (node == null || node.isNull()) {
             return null;
         }
-        return LocalDate.parse(node.asText());
+        return LocalDate.parse(node.asString());
     }
 
     /**
@@ -363,7 +363,7 @@ public class MyBatisResumeBackupQuery implements ResumeBackupQuery {
         if (node == null || node.isNull()) {
             return null;
         }
-        String dateStr = node.asText();
+        String dateStr = node.asString();
         // DBのDATE型はyyyy-MM-dd形式で返される
         LocalDate localDate = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
         return YearMonth.of(localDate.getYear(), localDate.getMonth());

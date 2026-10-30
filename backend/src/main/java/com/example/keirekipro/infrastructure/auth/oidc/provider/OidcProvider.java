@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 import org.springframework.http.HttpHeaders;
 
@@ -86,8 +86,8 @@ public interface OidcProvider {
      * @param formData フォームデータに追加するコンシューマ
      */
     default void processSecrets(JsonNode secrets, Consumer<Map<String, String>> formData) {
-        String clientId = secrets.get("client_id").asText();
-        String clientSecret = secrets.get("client_secret").asText();
+        String clientId = secrets.get("client_id").asString();
+        String clientSecret = secrets.get("client_secret").asString();
 
         formData.accept(Map.of(
                 "client_id", clientId,

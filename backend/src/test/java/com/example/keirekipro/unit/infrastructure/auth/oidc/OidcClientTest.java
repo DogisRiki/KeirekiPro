@@ -8,6 +8,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,18 +23,27 @@ import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcTokenResponse;
 import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProvider;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProviderFactory;
+import com.example.keirekipro.infrastructure.shared.RestClientConfig;
+import com.example.keirekipro.infrastructure.shared.json.JsonMapperConfig;
 import com.example.keirekipro.usecase.shared.secret.SecretReader;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sun.net.httpserver.HttpServer;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.json.JsonTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -55,7 +69,7 @@ class OidcClientTest {
     @InjectMocks
     private OidcClient oidcClient;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private static final String PROVIDER_NAME = "google";
     private static final String REDIRECT_URI = "https://keirekipro.click/api/auth/oidc/callback";
@@ -490,5 +504,96 @@ class OidcClientTest {
 
         // 検証
         assertThat(result).isNull();
+    }
+
+    /**
+     * RestClientConfig が作る RestClient で、偽物の認可サーバの応答を読む
+     *
+     * JSON の変換器は Spring Boot が作る JsonMapper を使うため、@JsonTest で Spring Boot の Jackson の設定を読み込む
+     */
+    @Nested
+    @JsonTest
+    @Import({ RestClientConfig.class, JsonMapperConfig.class })
+    class WithRestClientConfig {
+
+        @Autowired
+        private RestClient configuredRestClient;
+
+        private HttpServer server;
+
+        private String baseUrl;
+
+        @BeforeEach
+        void startServer() throws IOException {
+            server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            server.start();
+            baseUrl = "http://localhost:" + server.getAddress().getPort();
+        }
+
+        @AfterEach
+        void stopServer() {
+            server.stop(0);
+        }
+
+        private void respondJson(String path, String json) {
+            server.createContext(path, exchange -> {
+                byte[] body = json.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+                exchange.sendResponseHeaders(200, body.length);
+                try (OutputStream out = exchange.getResponseBody()) {
+                    out.write(body);
+                }
+            });
+        }
+
+        @Test
+        @DisplayName("トークンの応答に知らない項目があっても、トークンを読み取れる")
+        void test1() {
+            respondJson("/token", "{\"access_token\":\"access-token\",\"token_type\":\"Bearer\",\"expires_in\":3599,"
+                    + "\"id_token\":\"id-token\",\"refresh_token\":\"refresh-token\",\"scope\":\"openid email\","
+                    + "\"refresh_token_expires_in\":604799,\"unknown_object\":{\"nested\":true}}");
+            OidcProvider provider = mock(OidcProvider.class);
+            OidcProviderFactory factory = mock(OidcProviderFactory.class);
+            when(factory.getProvider(PROVIDER_NAME)).thenReturn(provider);
+            when(provider.getTokenEndpoint()).thenReturn(baseUrl + "/token");
+            OidcClient client = new OidcClient(configuredRestClient, factory, mock(SecretReader.class));
+
+            OidcTokenResponse result = client.getToken(PROVIDER_NAME, CODE, REDIRECT_URI, CODE_VERIFIER);
+
+            assertThat(result.hasError()).isFalse();
+            assertThat(result.getAccessToken()).isEqualTo("access-token");
+            assertThat(result.getTokenType()).isEqualTo("Bearer");
+            assertThat(result.getExpiresIn()).isEqualTo(3599);
+            assertThat(result.getIdToken()).isEqualTo("id-token");
+            assertThat(result.getRefreshToken()).isEqualTo("refresh-token");
+            assertThat(result.getScope()).isEqualTo("openid email");
+        }
+
+        @Test
+        @DisplayName("利用者の情報の応答に知らない項目があっても、利用者の情報を読み取れる")
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        void test2() {
+            respondJson("/userinfo", "{\"sub\":\"123456789\",\"name\":\"Test User\","
+                    + "\"email\":\"test@keirekipro.click\",\"email_verified\":true,"
+                    + "\"unknown_object\":{\"nested\":[1,2]}}");
+            OidcProvider provider = mock(OidcProvider.class);
+            OidcProviderFactory factory = mock(OidcProviderFactory.class);
+            when(factory.getProvider(PROVIDER_NAME)).thenReturn(provider);
+            when(provider.getUserInfoEndpoint()).thenReturn(baseUrl + "/userinfo");
+            OidcUserInfoDto expectedUserInfo = OidcUserInfoDto.builder().providerUserId("123456789").build();
+            ArgumentCaptor<Map> userInfoCaptor = ArgumentCaptor.forClass(Map.class);
+            when(provider.convertToStandardUserInfo(userInfoCaptor.capture())).thenReturn(expectedUserInfo);
+            OidcClient client = new OidcClient(configuredRestClient, factory, mock(SecretReader.class));
+
+            OidcUserInfoDto result = client.getUserInfo(PROVIDER_NAME, ACCESS_TOKEN);
+
+            assertThat(result).isEqualTo(expectedUserInfo);
+            Map<String, Object> userInfo = userInfoCaptor.getValue();
+            assertThat(userInfo.get("sub")).isEqualTo("123456789");
+            assertThat(userInfo.get("name")).isEqualTo("Test User");
+            assertThat(userInfo.get("email")).isEqualTo("test@keirekipro.click");
+            assertThat(userInfo.get("email_verified")).isEqualTo(true);
+            assertThat(userInfo.get("unknown_object")).isEqualTo(Map.of("nested", List.of(1, 2)));
+        }
     }
 }

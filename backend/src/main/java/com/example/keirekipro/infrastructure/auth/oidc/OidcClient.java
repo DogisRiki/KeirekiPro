@@ -8,7 +8,7 @@ import com.example.keirekipro.infrastructure.auth.oidc.dto.OidcUserInfoDto;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProvider;
 import com.example.keirekipro.infrastructure.auth.oidc.provider.OidcProviderFactory;
 import com.example.keirekipro.usecase.shared.secret.SecretReader;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -62,7 +62,7 @@ public class OidcClient {
 
         // シークレットからクライアントIDを取得
         JsonNode secrets = secretReader.readJson(provider.getSecretName());
-        String clientId = secrets.get("client_id").asText();
+        String clientId = secrets.get("client_id").asString();
 
         // 認可URLを構築
         UriComponentsBuilder builder = UriComponentsBuilder

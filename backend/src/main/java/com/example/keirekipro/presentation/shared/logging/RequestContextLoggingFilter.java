@@ -48,7 +48,7 @@ public class RequestContextLoggingFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        long startNs = System.nanoTime();
+        final long startNs = System.nanoTime();
 
         String requestId = resolveOrGenerateRequestId(request);
         MDC.put(MDC_REQUEST_ID_KEY, requestId);

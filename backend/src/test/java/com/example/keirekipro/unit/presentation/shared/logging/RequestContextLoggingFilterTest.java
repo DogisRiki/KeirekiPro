@@ -366,7 +366,7 @@ class RequestContextLoggingFilterTest {
         try {
             filter.doFilter(request, response, filterChain);
         } catch (RuntimeException e) {
-            // 例外は想定通り
+            // RuntimeException は想定通りなので握りつぶす
         }
 
         // MDCはクリアされている

@@ -2,6 +2,8 @@ package com.example.keirekipro.unit.infrastructure.store.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -10,21 +12,31 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.example.keirekipro.config.RedisTestContainerConfig;
+import com.example.keirekipro.infrastructure.shared.json.JsonMapperConfig;
+import com.example.keirekipro.infrastructure.shared.redis.RedisConfig;
 import com.example.keirekipro.infrastructure.store.auth.RedisPendingRegistrationStore;
 import com.example.keirekipro.usecase.auth.store.PendingRegistration;
 import com.example.keirekipro.usecase.auth.store.PendingRegistrationStore;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.json.JsonMapper;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.data.redis.test.autoconfigure.DataRedisTest;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.test.context.NestedTestConfiguration;
+import org.springframework.test.context.NestedTestConfiguration.EnclosingConfiguration;
 import org.springframework.test.context.TestConstructor;
 
 import lombok.RequiredArgsConstructor;
@@ -65,9 +77,9 @@ class RedisPendingRegistrationStoreTest {
         }
 
         @Bean
-        ObjectMapper objectMapper() {
-            // 本番の ObjectMapper と同じく、Instant を読み書きできるようにする
-            return JsonMapper.builder().findAndAddModules().build();
+        JsonMapper jsonMapper() {
+            // 本番の JsonMapper と同じく、Instant を読み書きできる(Jackson 3 は日時の型を標準で扱う)
+            return JsonMapper.builder().build();
         }
     }
 
@@ -188,5 +200,68 @@ class RedisPendingRegistrationStoreTest {
 
         assertThat(pendingRegistrationStore.findById(original.id())).contains(overwritten);
         assertThat(pendingRegistrationStore.findByEmail(email, 10)).containsExactly(overwritten);
+    }
+
+    /**
+     * 上げる前の backend(Spring Boot 3.5.16)が本番の RedisTemplate で書いた値の見本を読む
+     *
+     * 見本は src/test/resources/baseline-samples/redis/ にある。値の書き方を本番と同じにするため、外側のテストの設定を引き継がず、
+     * 本番の RedisConfig と Spring Boot の Jackson の設定を読み込む
+     */
+    @Nested
+    @NestedTestConfiguration(EnclosingConfiguration.OVERRIDE)
+    @DataRedisTest
+    @ImportAutoConfiguration(JacksonAutoConfiguration.class)
+    @Import({
+            RedisTestContainerConfig.class,
+            RedisConfig.class,
+            JsonMapperConfig.class,
+            RedisPendingRegistrationStore.class
+    })
+    class BaselineSample {
+
+        private static final UUID SAMPLE_ID = UUID.fromString("11111111-2222-3333-4444-555555555555");
+
+        private static final String SAMPLE_EMAIL = "taro@example.com";
+
+        private static final String SAMPLE_KEY = "pending-registration:" + SAMPLE_ID;
+
+        private static final String SAMPLE_EMAIL_KEY = "pending-registration:email:" + SAMPLE_EMAIL;
+
+        @Autowired
+        private PendingRegistrationStore baselineStore;
+
+        @Autowired
+        private RedisConnectionFactory connectionFactory;
+
+        @AfterEach
+        void deleteSample() {
+            try (RedisConnection connection = connectionFactory.getConnection()) {
+                connection.keyCommands().del(bytes(SAMPLE_KEY), bytes(SAMPLE_EMAIL_KEY));
+            }
+        }
+
+        @Test
+        @DisplayName("上げる前の backend が書いた登録の見本を、findById と findByEmail で読める")
+        void test1() throws IOException {
+            try (RedisConnection connection = connectionFactory.getConnection()) {
+                connection.stringCommands().set(bytes(SAMPLE_KEY), sample("store-pending-registration.bin"));
+                connection.setCommands().sAdd(bytes(SAMPLE_EMAIL_KEY),
+                        sample("store-pending-registration-email-member.bin"));
+            }
+            PendingRegistration expected = new PendingRegistration(SAMPLE_ID, SAMPLE_EMAIL, "$2a$10$hashhashhash",
+                    "山田太郎😀", Instant.parse("2026-10-29T04:45:30.123456Z"));
+
+            assertThat(baselineStore.findById(SAMPLE_ID)).contains(expected);
+            assertThat(baselineStore.findByEmail(SAMPLE_EMAIL, 10)).containsExactly(expected);
+        }
+
+        private static byte[] bytes(String key) {
+            return key.getBytes(StandardCharsets.UTF_8);
+        }
+
+        private static byte[] sample(String name) throws IOException {
+            return new ClassPathResource("baseline-samples/redis/" + name).getContentAsByteArray();
+        }
     }
 }

@@ -1,6 +1,8 @@
 spring:
   application:
     name: keirekipro
+  jackson:
+    use-jackson2-defaults: true # JSONの書き方をSpring Boot 3(Jackson 2)のときと同じにする
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:keireki_pro}
@@ -72,6 +74,8 @@ logging:
         environment: ${SPRING_PROFILES_ACTIVE:local}
         version: ${APP_VERSION:unknown}
     json:
+      # Spring 7 の Commons Logging が付ける印を tags として出さない(上げる前と同じ項目にする)
+      exclude: tags
       rename:
         traceId: trace.id # traceIdをtrace.idとして出力する
         spanId: span.id # spanIdをspan.idとして出力する
@@ -82,7 +86,8 @@ management:
   tracing:
     sampling:
       probability: 1.0
-  otlp:
-    tracing:
-      export:
+    export:
+      otlp:
         enabled: false # OTLP exportを無効化
+  opentelemetry:
+    map-environment-variables: false # 環境変数OTEL_*を読まない(入っても送り出しを始めない)

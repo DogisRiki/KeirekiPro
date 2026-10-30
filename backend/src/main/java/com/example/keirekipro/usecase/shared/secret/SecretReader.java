@@ -1,6 +1,6 @@
 package com.example.keirekipro.usecase.shared.secret;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 /**
  * シークレット参照ポート

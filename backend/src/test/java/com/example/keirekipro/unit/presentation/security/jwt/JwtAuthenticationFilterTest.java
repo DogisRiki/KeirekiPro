@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
@@ -95,6 +96,7 @@ class JwtAuthenticationFilterTest {
         Cookie expired = findCookie(mockResponse, "accessToken");
         assertThat(expired).isNotNull();
         assertThat(expired.getMaxAge()).isEqualTo(0);
+        assertThat(mockResponse.getHeader(HttpHeaders.SET_COOKIE)).contains("Max-Age=0");
         assertThat(expired.getPath()).isEqualTo("/");
     }
 
@@ -149,6 +151,7 @@ class JwtAuthenticationFilterTest {
         Cookie expired = findCookie(mockResponse, "accessToken");
         assertThat(expired).isNotNull();
         assertThat(expired.getMaxAge()).isEqualTo(0);
+        assertThat(mockResponse.getHeader(HttpHeaders.SET_COOKIE)).contains("Max-Age=0");
         assertThat(expired.getPath()).isEqualTo("/");
     }
 
@@ -254,6 +257,7 @@ class JwtAuthenticationFilterTest {
         Cookie expired = findCookie(mockResponse, "accessToken");
         assertThat(expired).isNotNull();
         assertThat(expired.getMaxAge()).isEqualTo(0);
+        assertThat(mockResponse.getHeader(HttpHeaders.SET_COOKIE)).contains("Max-Age=0");
         assertThat(expired.getPath()).isEqualTo("/");
     }
 

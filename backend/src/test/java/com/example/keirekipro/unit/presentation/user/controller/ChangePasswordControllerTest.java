@@ -15,12 +15,12 @@ import com.example.keirekipro.presentation.security.CurrentUserFacade;
 import com.example.keirekipro.presentation.user.controller.ChangePasswordController;
 import com.example.keirekipro.presentation.user.dto.ChangePasswordRequest;
 import com.example.keirekipro.usecase.user.ChangePasswordUseCase;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -42,7 +42,7 @@ class ChangePasswordControllerTest {
 
     private final MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private static final String ENDPOINT = "/api/users/me/password";
 
