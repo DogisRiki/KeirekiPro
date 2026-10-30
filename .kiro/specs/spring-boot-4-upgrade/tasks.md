@@ -188,7 +188,7 @@
   - 受入基準とテストの対応: 要件6の受入基準2(品質チェックのコマンドが同じコマンドで動き、同じか多い種類の検査を行う)は、`/verify-backend` の成功と、`check` が動かす検査のタスクの一覧を上げる前と比べて確かめる。要件8の受入基準1(2件を見逃す設定を同じ PR の中で消す)は、作業フォルダの抑制のファイルに2件が無いことで確かめる
   - _要件: 6.2, 8.1_
 
-- [ ] 5. 上げる前と上げたあとの backend を比べる
+- [x] 5. 上げる前と上げたあとの backend を比べる
 
   Claude は、大タスク5の比べる手順で差を見つけて設定かコードを直したときは、それまでに終えた大タスク5の比べる手順をすべて流し直す。1か所の直しが、ほかの比べた結果を変えることがあるためである。
 
@@ -224,7 +224,7 @@
   - _要件: 5.1, 5.2, 5.3, 5.4_
   - _対象の部品: 上げる前と比べる手順_
 
-- [ ] 5.5 開発用のコンテナでの起動と、本番のイメージの組み立てを確かめる
+- [x] 5.5 開発用のコンテナでの起動と、本番のイメージの組み立てを確かめる
 
   Claude は、開発用のコンテナの中で、上げる前と同じ起動のコマンドで backend を起動する。Claude は、本番のイメージを今の `docker/backend/Dockerfile.prod` で組み立て、組み立てたイメージで backend を起動する。比べる手順で差を直すためにコードを変えたときは、Claude は `/verify-backend` を動かし直す。
   - 完了の確かめ方: 起動のコマンドが backend を起動する。組み立てたイメージのコンテナが Java 21 で backend を起動し、`/actuator/health` が `{"status":"UP"}` を返す
@@ -279,3 +279,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 5.2: PDF 7つは全ページ0画素、Markdown 4つはバイトで同じ、メール 9通は毎回変わる値を除き同じ。PDF のバイトの差は CreationDate と /ID だけ。手順と結果は compare/out/B-findings.md と compare/pdfcmp/
 - 5.3: Spring 7 の Commons Logging はログの行に COMMONS-LOGGING の印を付け、ECS の JSON に tags として出る。application.yaml の logging.structured.json.exclude: tags で上げる前と同じ項目に戻した。本番の設定のほかの確かめは差が無い(記録は compare/out/B-findings.md)
 - 5.4: old・new・old の入れ替えで、flyway_schema_history は同じ、前の backend の Cookie・2段階の認証の番号・確認前の登録のリンクはすべて受け付けられた。Redis の値の形も同じ(記録は compare/out/B-findings.md)
+- 5.5: 開発用のコンテナの起動は、画面の確かめと同じ `./gradlew bootRun --args=--spring.profiles.active=dev` で確かめる(profile を付けないと localhost のデータベースを探して止まる。上げる前も同じ)。本番のイメージは Dockerfile.prod のまま組み立てられ、Java 21.0.12 と Spring Boot 4.1.2 で起動して health が UP を返した
