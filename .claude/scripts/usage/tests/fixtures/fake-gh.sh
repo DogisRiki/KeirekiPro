@@ -18,7 +18,8 @@
 #     comments を gh の形に直して返し、ほかの欄は同じ名前の値をそのまま返す
 #   - prs: [{number,state("OPEN"|"CLOSED"|"MERGED"),baseRefName,headRefName,body,
 #     mergedAt,mergeCommit,commits, ...}]。gh pr list / view の --json は、同じ名前の値を
-#     そのまま返す。baseRefName が無い PR は main に向けた PR とみなす
+#     そのまま返す。baseRefName が無い PR は main に向けた PR とみなす。gh pr list の
+#     --search は merged:>=<日付> の形だけを受け、mergedAt の日付がその日より前の PR を除く
 #   - check_runs: {"<sha>": [{name,status,conclusion}, ...]}。無い sha は 422 で失敗する
 # - fail: 1行に1つの perl の正規表現。呼ばれた引数を空白でつないだ文字列に当たると、
 #   偽の gh は何もせずに 1 で終わる
@@ -329,12 +330,18 @@ sub cmd_pr {
     $sub //= '';
     if ($sub eq 'list') {
         my ($o) = parse(\@rest, { '--json' => 'json', '--state' => 'state', '-s' => 'state', '--base' => 'base', '-B' => 'base',
-            '--head' => 'head', '-H' => 'head', '--limit' => 'limit', '-L' => 'limit', '-R' => 'repo', '--repo' => 'repo' }, {});
+            '--head' => 'head', '-H' => 'head', '--search' => 'search', '-S' => 'search', '--limit' => 'limit', '-L' => 'limit',
+            '-R' => 'repo', '--repo' => 'repo' }, {});
         my $state = one($o, 'state') // 'open';
-        unsupported("--state $state") unless $state =~ /\A(open|all)\z/;
+        unsupported("--state $state") unless $state =~ /\A(open|merged|all)\z/;
         my ($base, $head) = (one($o, 'base'), one($o, 'head'));
+        my $since;
+        if (defined(my $s = one($o, 'search'))) {
+            ($since) = $s =~ /\Amerged:>=(\d{4}-\d{2}-\d{2})\z/ or unsupported("--search $s");
+        }
         my @r = grep {
-            ($state eq 'all' || $_->{state} eq 'OPEN')
+            ($state eq 'all' || $_->{state} eq uc $state)
+                && (!defined $since || (defined $_->{mergedAt} && substr($_->{mergedAt}, 0, 10) ge $since))
                 && (!defined $base || ($_->{baseRefName} // 'main') eq $base)
                 && (!defined $head || ($_->{headRefName} // '') eq $head)
         } sort { $b->{number} <=> $a->{number} } @{ $db->{prs} };
