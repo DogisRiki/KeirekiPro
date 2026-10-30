@@ -216,7 +216,7 @@
   - _要件: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _対象の部品: 上げる前と比べる手順_
 
-- [ ] 5.4 保存されたデータを互いに読めることを確かめる
+- [x] 5.4 保存されたデータを互いに読めることを確かめる
 
   Claude は、上げたあとの backend が起動したあとに、`flyway_schema_history` の中身を上げる前と比べる。Claude は、上げる前、上げたあと、上げる前の順に backend を入れ替え、同じ Cookie でログインのまま使えるか、片方が送った2段階の認証の番号をもう片方が受け付けるか、Redis の値を互いに読めるかを確かめる。
   - 完了の確かめ方: `flyway_schema_history` の中身が同じで、入れ替えのどの回でも、ログインのまま使え、2段階の認証の番号が受け付けられ、Redis の値を読める
@@ -278,3 +278,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 5.1: A1 と B の違いのうち、所有者が 2026-10-30 に受け入れると決めたもの: ダウンロードのファイル名の filename=(Spring 7 が RFC 2047 をやめて下線にした。filename* は同じ)、入力の誤りの並び順(上げる前から決まっていない)、131件の chunked から Content-Length への変化(本文は同じ)、dev の health の probes と項目の並び、dev の /actuator/caches の消滅(キャッシュは使っていない)。Tomcat 11 は jakarta の Cookie#setMaxAge(0) から Max-Age を書かないので、JwtAuthenticationFilter で ResponseCookie を使うよう直した(属性の並びと Expires の値だけが違い、設計は比べない)。記録は作業用のフォルダの compare/out/B-findings.md
 - 5.2: PDF 7つは全ページ0画素、Markdown 4つはバイトで同じ、メール 9通は毎回変わる値を除き同じ。PDF のバイトの差は CreationDate と /ID だけ。手順と結果は compare/out/B-findings.md と compare/pdfcmp/
 - 5.3: Spring 7 の Commons Logging はログの行に COMMONS-LOGGING の印を付け、ECS の JSON に tags として出る。application.yaml の logging.structured.json.exclude: tags で上げる前と同じ項目に戻した。本番の設定のほかの確かめは差が無い(記録は compare/out/B-findings.md)
+- 5.4: old・new・old の入れ替えで、flyway_schema_history は同じ、前の backend の Cookie・2段階の認証の番号・確認前の登録のリンクはすべて受け付けられた。Redis の値の形も同じ(記録は compare/out/B-findings.md)
