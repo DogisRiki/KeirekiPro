@@ -6,6 +6,8 @@ import java.util.Optional;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -60,10 +62,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.clearContext();
 
             // 不正トークンCookieを失効させて再発を防ぐ
-            Cookie expired = new Cookie(COOKIE_NAME, "");
-            expired.setPath("/");
-            expired.setMaxAge(0);
-            response.addCookie(expired);
+            // Tomcat 11 は Cookie#setMaxAge(0) から Max-Age を書かないため、Set-Cookie を直接組み立てる
+            ResponseCookie expired = ResponseCookie.from(COOKIE_NAME, "")
+                    .path("/")
+                    .maxAge(0)
+                    .build();
+            response.addHeader(HttpHeaders.SET_COOKIE, expired.toString());
         }
         // 次のフィルタへ処理を移譲
         filterChain.doFilter(request, response);

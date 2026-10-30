@@ -192,7 +192,7 @@
 
   Claude は、大タスク5の比べる手順で差を見つけて設定かコードを直したときは、それまでに終えた大タスク5の比べる手順をすべて流し直す。1か所の直しが、ほかの比べた結果を変えることがあるためである。
 
-- [ ] 5.1 API の応答とログインの流れを比べる
+- [x] 5.1 API の応答とログインの流れを比べる
 
   Claude は、比べる手順の間だけ、`spring-boot-properties-migrator` を `runtimeOnly` で足した作業のブランチの bootJar を組み立てる。Claude は、この bootJar を `dev` の設定で起動し、名前が変わったプロパティの警告が出ないことを確かめる。Claude は、この部品を変更に入れない。Claude は、保存した状態から台本の API、URL の一覧、他のサイトからの呼び出し、ログインの流れのシナリオを流す。この回をシナリオ B と呼ぶ。Claude は、小タスク1.3で決めた比べない値を外して、A1 と B を比べる。差が見つかったときは、Claude は差の原因を直してからもう一度比べる。
   - 完了の確かめ方: `dev` の設定での起動で、名前が変わったプロパティの警告が出ない。`compare/` の比べた結果で、状態コード、応答のヘッダ、本文、URL と HTTP メソッドの組、CORS のヘッダ、Cookie の名前と属性に差が無い
@@ -275,3 +275,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 2.9: Spring Boot 4 の `@DataRedisTest` は Jackson の自動設定を含まない。`RedisConfig` を `@Import` するテストには `@ImportAutoConfiguration(JacksonAutoConfiguration.class)` を足す。ArchUnit のテストは JUnit 6.0.3 の上で18件見つかって実行された
 - 3.4: SpotBugs は、テストのクラスでも、null しか代入しない項目を警告し(`spotbugsTest`)、`check` が落ちる。null の項目を書くテストでは、null をコンストラクタの引数で渡す
 - 4.2: checkstyle 14.3.0 の TextBlockGoogleStyleFormatting は、spotless の Eclipse の整形が手で折り返した行をつなぎ直すため、どの書き方でも両立しない(`text_block_indentation` を替えても直らない)。所有者が 2026-10-30 に完成品の google_checks.xml からこの規則だけを外すと決めた。checkstyle の警告はビルドを落とさないので、上げる前の警告と比べて新しい指摘を見分ける
+- 5.1: A1 と B の違いのうち、所有者が 2026-10-30 に受け入れると決めたもの: ダウンロードのファイル名の filename=(Spring 7 が RFC 2047 をやめて下線にした。filename* は同じ)、入力の誤りの並び順(上げる前から決まっていない)、131件の chunked から Content-Length への変化(本文は同じ)、dev の health の probes と項目の並び、dev の /actuator/caches の消滅(キャッシュは使っていない)。Tomcat 11 は jakarta の Cookie#setMaxAge(0) から Max-Age を書かないので、JwtAuthenticationFilter で ResponseCookie を使うよう直した(属性の並びと Expires の値だけが違い、設計は比べない)。記録は作業用のフォルダの compare/out/B-findings.md
