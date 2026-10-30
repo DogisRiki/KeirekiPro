@@ -200,7 +200,7 @@
   - _要件: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
   - _対象の部品: 上げる前と比べる手順_
 
-- [ ] 5.2 PDF と Markdown とメールを比べる
+- [x] 5.2 PDF と Markdown とメールを比べる
 
   Claude は、比べる職務経歴書の2つのデータを、2つの書体と、既定と違う文字の大きさと見出しの色で、上げる前と上げたあとの backend から出力する。Claude は、PDF をページごとの画像にして比べ、Markdown をバイトで比べる。Claude は、LocalStack の SES に届いたメールの差出人と件名と本文を比べる。
   - 完了の確かめ方: PDF のページの数が同じで、ページごとの画像の差が0画素である。Markdown のバイトと、メールの差出人と件名と本文に差が無い
@@ -276,3 +276,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 3.4: SpotBugs は、テストのクラスでも、null しか代入しない項目を警告し(`spotbugsTest`)、`check` が落ちる。null の項目を書くテストでは、null をコンストラクタの引数で渡す
 - 4.2: checkstyle 14.3.0 の TextBlockGoogleStyleFormatting は、spotless の Eclipse の整形が手で折り返した行をつなぎ直すため、どの書き方でも両立しない(`text_block_indentation` を替えても直らない)。所有者が 2026-10-30 に完成品の google_checks.xml からこの規則だけを外すと決めた。checkstyle の警告はビルドを落とさないので、上げる前の警告と比べて新しい指摘を見分ける
 - 5.1: A1 と B の違いのうち、所有者が 2026-10-30 に受け入れると決めたもの: ダウンロードのファイル名の filename=(Spring 7 が RFC 2047 をやめて下線にした。filename* は同じ)、入力の誤りの並び順(上げる前から決まっていない)、131件の chunked から Content-Length への変化(本文は同じ)、dev の health の probes と項目の並び、dev の /actuator/caches の消滅(キャッシュは使っていない)。Tomcat 11 は jakarta の Cookie#setMaxAge(0) から Max-Age を書かないので、JwtAuthenticationFilter で ResponseCookie を使うよう直した(属性の並びと Expires の値だけが違い、設計は比べない)。記録は作業用のフォルダの compare/out/B-findings.md
+- 5.2: PDF 7つは全ページ0画素、Markdown 4つはバイトで同じ、メール 9通は毎回変わる値を除き同じ。PDF のバイトの差は CreationDate と /ID だけ。手順と結果は compare/out/B-findings.md と compare/pdfcmp/
