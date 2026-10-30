@@ -208,7 +208,7 @@
   - _要件: 3.1, 3.2, 3.3, 9.2_
   - _対象の部品: 上げる前と比べる手順_
 
-- [ ] 5.3 本番の設定での起動とログと止まり方を比べる
+- [x] 5.3 本番の設定での起動とログと止まり方を比べる
 
   Claude は、2つの bootJar を、`prod` の設定に、小タスク1.2で作った上書きを足して起動する。Claude は、`prod` の設定での起動でも、名前が変わったプロパティの警告が出ないことを確かめる。Claude は、ログの項目の道筋、動いているかの確認の応答、OTLP のポートへの通信を比べる。項目の道筋とは、`log.level` のような、入れ子をたどった項目の名前である。OTLP とは、処理の追跡の記録を外部に送るときの通信の決まりである。Claude は、環境変数 `AWS_EXECUTION_ENV=AWS_ECS_FARGATE` を付けて起動した backend に、ヘッダ `X-Forwarded-Proto: https` を付けた要求を送り、Cookie の属性と HSTS のヘッダを比べる。Claude は、時間のかかる要求の途中で `SIGTERM` を送り、止まり方を比べる。
   - 完了の確かめ方: `prod` の設定での起動で、名前が変わったプロパティの警告が出ない。ログの項目の道筋の集まりが同じで、`trace.id` と `span.id` が値を持って出る。`/actuator/health` が `{"status":"UP"}` だけを返し、`/actuator/health/liveness` が 404 を返す。4317 番と 4318 番のポートへの通信が無い。Cookie の属性と HSTS のヘッダが同じである。処理中の要求が終わってから backend が止まる
@@ -277,3 +277,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 4.2: checkstyle 14.3.0 の TextBlockGoogleStyleFormatting は、spotless の Eclipse の整形が手で折り返した行をつなぎ直すため、どの書き方でも両立しない(`text_block_indentation` を替えても直らない)。所有者が 2026-10-30 に完成品の google_checks.xml からこの規則だけを外すと決めた。checkstyle の警告はビルドを落とさないので、上げる前の警告と比べて新しい指摘を見分ける
 - 5.1: A1 と B の違いのうち、所有者が 2026-10-30 に受け入れると決めたもの: ダウンロードのファイル名の filename=(Spring 7 が RFC 2047 をやめて下線にした。filename* は同じ)、入力の誤りの並び順(上げる前から決まっていない)、131件の chunked から Content-Length への変化(本文は同じ)、dev の health の probes と項目の並び、dev の /actuator/caches の消滅(キャッシュは使っていない)。Tomcat 11 は jakarta の Cookie#setMaxAge(0) から Max-Age を書かないので、JwtAuthenticationFilter で ResponseCookie を使うよう直した(属性の並びと Expires の値だけが違い、設計は比べない)。記録は作業用のフォルダの compare/out/B-findings.md
 - 5.2: PDF 7つは全ページ0画素、Markdown 4つはバイトで同じ、メール 9通は毎回変わる値を除き同じ。PDF のバイトの差は CreationDate と /ID だけ。手順と結果は compare/out/B-findings.md と compare/pdfcmp/
+- 5.3: Spring 7 の Commons Logging はログの行に COMMONS-LOGGING の印を付け、ECS の JSON に tags として出る。application.yaml の logging.structured.json.exclude: tags で上げる前と同じ項目に戻した。本番の設定のほかの確かめは差が無い(記録は compare/out/B-findings.md)

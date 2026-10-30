@@ -74,6 +74,8 @@ logging:
         environment: ${SPRING_PROFILES_ACTIVE:local}
         version: ${APP_VERSION:unknown}
     json:
+      # Spring 7 の Commons Logging が付ける印を tags として出さない(上げる前と同じ項目にする)
+      exclude: tags
       rename:
         traceId: trace.id # traceIdをtrace.idとして出力する
         spanId: span.id # spanIdをspan.idとして出力する
