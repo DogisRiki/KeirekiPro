@@ -178,8 +178,7 @@ class ExportResumeControllerTest {
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                        """
+                .content("""
                         {
                           "format": "pdf",
                           "disposition": "inline",
@@ -230,8 +229,7 @@ class ExportResumeControllerTest {
 
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                        """
+                .content("""
                         {
                           "format": "pdf",
                           "disposition": "attachment",
@@ -263,8 +261,7 @@ class ExportResumeControllerTest {
     void test7() throws Exception {
         mockMvc.perform(post(ENDPOINT, RESUME_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                        """
+                .content("""
                         {
                           "format": "pdf",
                           "disposition": "inline",

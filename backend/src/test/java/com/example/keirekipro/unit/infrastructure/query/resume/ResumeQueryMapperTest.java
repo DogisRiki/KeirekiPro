@@ -446,8 +446,7 @@ class ResumeQueryMapperTest {
     private void insertUser(UUID userId) {
         Timestamp now = Timestamp.from(Instant.now());
 
-        String sql =
-                """
+        String sql = """
                 INSERT INTO users (
                     id, email, password, username, profile_image,
                     two_factor_auth_enabled, created_at, updated_at
@@ -472,8 +471,7 @@ class ResumeQueryMapperTest {
     private void insertResume(UUID resumeId, UUID userId) {
         Timestamp now = Timestamp.from(Instant.now());
 
-        String sql =
-                """
+        String sql = """
                 INSERT INTO resumes (
                     id, user_id, name, date, last_name, first_name, created_at, updated_at
                 ) VALUES (
@@ -494,8 +492,7 @@ class ResumeQueryMapperTest {
     }
 
     private void insertCareer(UUID careerId, UUID resumeId) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO careers (
                     id, resume_id, company_name, start_date, end_date, is_active
                 ) VALUES (
@@ -514,8 +511,7 @@ class ResumeQueryMapperTest {
     }
 
     private void insertProject(UUID projectId, UUID resumeId) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO projects (
                     id, resume_id, company_name, start_date, end_date, is_active,
                     name, overview, team_comp, role, achievement,
@@ -552,8 +548,7 @@ class ResumeQueryMapperTest {
     }
 
     private void insertProject(UUID projectId, UUID resumeId, String overview, String role) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO projects (
                     id, resume_id, company_name, start_date, end_date, is_active,
                     name, overview, team_comp, role, achievement,
@@ -639,8 +634,7 @@ class ResumeQueryMapperTest {
     }
 
     private void insertProjectTechStacks(UUID projectId) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO project_tech_stacks (
                     project_id,
                     frontend_languages, frontend_framework, frontend_libraries, frontend_build_tool,

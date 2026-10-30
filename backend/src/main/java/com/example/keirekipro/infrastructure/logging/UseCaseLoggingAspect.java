@@ -37,8 +37,7 @@ public class UseCaseLoggingAspect {
      * @return execute(..)の戻り値
      * @throws Throwable execute(..)が送出した例外
      */
-    @Around(
-            """
+    @Around("""
             execution(* com.example.keirekipro.usecase..*.execute(..))
             && !within(com.example.keirekipro.usecase.query..*)
             """)
