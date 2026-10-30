@@ -202,7 +202,8 @@ cmd_pending() {
 }
 
 # まだ出していない Issue と、一覧か案の索引への書き込みが残った Issue を、{"issues":[...]} の1行で出す: pending_select <仕組みが main に入った時刻> pending|context
-# context のときは、ほかの Issue のうち、出してから7日の間(list_checked_until がいまより後)の Issue を recent に足す
+# context のときは、ほかの Issue のうち、出してから7日の間(list_checked_until がいまより後)の Issue を recent に足す。
+# 出していない Issue は、閉じる PR がマージされた Issue だけを出し、閉じる PR が無い Issue には集計しない印を書く
 pending_select() {
     local sys=$1 mode=$2 since list
     # GitHub の検索がどの時間帯で日付を読んでも落とさないように、協定世界時の日付の前の日から探す
@@ -263,7 +264,7 @@ pending_select() {
             }
             close $fh;
         }
-        my (%out, %recent);
+        my (%out, %recent, %check);
         for my $i (@$issues) {
             next unless ref $i eq "HASH" && defined $i->{number} && !ref $i->{number} && $i->{number} =~ /\A[1-9][0-9]{0,9}\z/;
             my $n = $i->{number} + 0;
@@ -279,19 +280,90 @@ pending_select() {
                     $recent{$n} = 1 if defined $until && $until > time;
                 }
             } elsif ($recv{$n}) {
-                $out{$n} = 1;
+                # 閉じる PR がマージされたかは、次の perl で確かめる。集計しない印に書くため、closedAt を添える
+                $check{$n} = $i->{closedAt};
             }
         }
-        my $o = { issues => [ map { $_ + 0 } sort { $a <=> $b } keys %out ] };
+        my $o = { issues => [ map { $_ + 0 } sort { $a <=> $b } keys %out ], check => \%check };
         $o->{recent} = [ map { $_ + 0 } sort { $a <=> $b } keys %recent ] if $mode eq "context";
         print $J->encode($o), "\n";
-    ' "$STATE" "$sys" "$mode" 2>"$STATE/.perl-err.$$" || {
+    ' "$STATE" "$sys" "$mode" >"$STATE/.sel.$$" 2>"$STATE/.perl-err.$$" || {
         local why
         why=$(tail -n 1 "$STATE/.perl-err.$$" 2>/dev/null)
-        rm -f "$STATE/.perl-err.$$"
+        rm -f "$STATE/.perl-err.$$" "$STATE/.sel.$$"
         fail "まだ出していない Issue を決められなかった(${why:-理由の出力なし})。"
     }
     rm -f "$STATE/.perl-err.$$"
+    # 受け持ちの出来事で選んだ Issue があるときだけ、仕組みが入った日の前の日からマージされた PR を読む。
+    # PR を通らずに閉じた Issue を、閉じる PR がマージされたと知らせないためである
+    printf '[]\n' >"$STATE/.prs.$$"
+    if ! grep -q '"check":{}' "$STATE/.sel.$$"; then
+        gh pr list --state merged --base main --search "merged:>=$since" --limit 1000 --json body >"$STATE/.prs.$$" 2>"$STATE/.gh-err.$$" || {
+            local why
+            why=$(tail -n 1 "$STATE/.gh-err.$$" 2>/dev/null)
+            rm -f "$STATE/.gh-err.$$" "$STATE/.sel.$$" "$STATE/.prs.$$"
+            fail "マージされた PR を gh pr list で読めなかった(${why:-理由の出力なし})。"
+        }
+        rm -f "$STATE/.gh-err.$$"
+    fi
+    perl -MJSON::PP -MTime::Local=timegm -e '
+        my ($state, $self, $prsf, $mode) = @ARGV;
+        my $J = JSON::PP->new->utf8->canonical;
+        sub read_json {
+            open(my $fh, "<:raw", $_[0]) or return undef;
+            local $/;
+            return eval { $J->decode(<$fh> // "") };
+        }
+        my ($sel, $prs) = (read_json($self), read_json($prsf));
+        die "選んだ Issue を読み直せなかった\n" unless ref $sel eq "HASH" && ref $sel->{check} eq "HASH";
+        die "gh pr list の出力を JSON の配列として読めなかった\n" unless ref $prs eq "ARRAY";
+        # draft と同じく、本文の行の頭に Closes #<N> を書いた、マージされた PR を、Issue を閉じる PR とする
+        my %closed;
+        for my $p (@$prs) {
+            next unless ref $p eq "HASH" && defined $p->{body} && !ref $p->{body};
+            $closed{ $1 + 0 } = 1 while $p->{body} =~ /^Closes #([0-9]+)(?![0-9])/mg;
+        }
+        # 上限まで読めたときは、読めなかった PR がありうるので、閉じる PR が無いと決めない
+        my $cut = @$prs >= 1000;
+        my %out = map { $_ => 1 } @{ $sel->{issues} };
+        for my $n (keys %{ $sel->{check} }) {
+            if ($cut || $closed{$n}) {
+                $out{$n} = 1;
+                next;
+            }
+            # 閉じてから1時間の中は、GitHub の検索にマージされた PR がまだ載っていないことがあるので、集計しない印を書かない
+            my $at = $sel->{check}{$n};
+            my ($y, $mo, $d, $h, $mi, $s) = (defined $at && !ref $at ? $at : "") =~ /\A(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.\d+)?Z\z/ or next;
+            next if time - timegm($s, $mi, $h, $d, $mo - 1, $y) < 3600;
+            # draft と同じ no-merged-pr の印を書く。draft が錠を持っている Issue には書かない
+            my $lock = "$state/locks/issue-$n";
+            mkdir "$state/locks";
+            mkdir $lock or next;
+            my $f = "$state/issues/$n.json";
+            my $dd = {};
+            if (-e $f) {
+                $dd = read_json($f);
+                if (ref $dd ne "HASH") { rmdir $lock; next }
+            }
+            $dd->{skip} = "no-merged-pr";
+            $dd->{closed_at} = $at;
+            my $tmp = "$f.tmp.$$";
+            my $ok = open(my $o, ">:raw", $tmp);
+            $ok = print $o $J->encode($dd), "\n" if $ok;
+            $ok = close($o) && $ok if $o;
+            unlink $tmp unless $ok && rename($tmp, $f);
+            rmdir $lock;
+        }
+        my $o = { issues => [ map { $_ + 0 } sort { $a <=> $b } keys %out ] };
+        $o->{recent} = $sel->{recent} if $mode eq "context";
+        print $J->encode($o), "\n";
+    ' "$STATE" "$STATE/.sel.$$" "$STATE/.prs.$$" "$mode" 2>"$STATE/.perl-err.$$" || {
+        local why
+        why=$(tail -n 1 "$STATE/.perl-err.$$" 2>/dev/null)
+        rm -f "$STATE/.perl-err.$$" "$STATE/.sel.$$" "$STATE/.prs.$$"
+        fail "まだ出していない Issue を決められなかった(${why:-理由の出力なし})。"
+    }
+    rm -f "$STATE/.perl-err.$$" "$STATE/.sel.$$" "$STATE/.prs.$$"
 }
 
 cmd_draft() {

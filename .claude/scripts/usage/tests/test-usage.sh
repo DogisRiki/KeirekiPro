@@ -250,14 +250,21 @@ newgh pend
 # 110: 仕組みが入る前の日に閉じた、出し済みで list_pending がある Issue
 # 111: 集計しない印の system-pr があり、出し済みで list_pending がある Issue
 # 112: 仕組みが入ったあとに閉じた、受け持ちの出来事が Issue の番号のある start の段階の印だけの Issue
+# 101・102・106・112 は、本文に Closes を書いた PR がマージされて閉じた。ほかの受け持ちの出来事がある Issue に、閉じる PR は無い
+# 113: 仕組みが入ったあとに閉じた、受け持ちの出来事がある Issue。マージされた PR は、本文に Closes #1130 を書いた PR だけである
+# 114: 仕組みが入ったあとに閉じた、受け持ちの出来事がある Issue。Refs: の PR だけがマージされ、Closes の PR はマージせずに閉じた
 pendb() {
     mkdb "issues => [ cl(101, '2026-10-25T01:00:00Z'), cl(102, '2026-10-24T03:00:00Z'), cl(103, '2026-10-24T02:59:59Z'),
         cl(104, '2026-10-25T01:00:00Z'), op(105), cl(106, '$1'), cl(107, '2026-10-25T02:00:00Z'), cl(108, '2026-10-25T03:00:00Z'),
         cl(109, '2026-10-25T04:00:00Z'), cl(110, '2026-10-23T20:00:00Z'), cl(111, '2026-10-25T05:00:00Z'),
-        cl(112, '2026-10-25T08:00:00Z') ]"
+        cl(112, '2026-10-25T08:00:00Z'), cl(113, '2026-10-25T09:00:00Z'), cl(114, '2026-10-25T10:00:00Z') ],
+      prs => [ pr(401, 'MERGED', 'Closes #101', '2026-10-25T01:00:00Z', undef), pr(402, 'MERGED', 'Closes #102', '2026-10-24T03:00:00Z', undef),
+        pr(403, 'MERGED', 'Closes #106', '$1', undef), pr(404, 'MERGED', \"説明\\nCloses #112\", '2026-10-25T08:00:00Z', undef),
+        pr(405, 'MERGED', 'Closes #1130', '2026-10-25T09:00:00Z', undef), pr(406, 'MERGED', 'Refs: #114', '2026-10-25T10:00:00Z', undef),
+        pr(407, 'CLOSED', 'Closes #114', undef, undef) ]"
 }
 pendb "2026-10-25T06:00:00Z"
-for n in 101 102 103 105 106 109 111; do recv "$n"; done
+for n in 101 102 103 105 106 109 111 113 114; do recv "$n"; done
 xrow s2 '{"issue":104,"k":"stage","name":"ship","spec_stage":null,"ts":1761300000}'
 xrow s2 '{"k":"branch","name":"feat/104","ts":1761300001}'
 xrow s3 '{"issue":112,"k":"stage","name":"start","spec_stage":null,"ts":1761300002}'
@@ -268,8 +275,11 @@ issuejson 109 '{"report_url":"https://github.com/owner/repo/issues/109#issuecomm
 issuejson 110 '{"list_pending":true,"report_url":"https://github.com/owner/repo/issues/110#issuecomment-4","reported_at":"2026-10-26T00:00:00Z","skip":"before-system","closed_at":"2026-10-23T20:00:00Z"}'
 issuejson 111 '{"closed_at":"2026-10-25T05:00:00Z","list_pending":true,"report_url":"https://github.com/owner/repo/issues/111#issuecomment-5","reported_at":"2026-10-26T00:00:00Z","skip":"system-pr"}'
 run pending --session S1
-check "pending が、仕組みが入ったあとに閉じた Issue のうち出していないものを出し、gh issue list を1回だけ呼ぶ" \
-    "$RC/$OUT/$(calls)" '0/{"issues":[101,102,107,108,112]}/issue list --state closed --search closed:>=2026-10-23 --limit 200 --json number,closedAt|'
+check "pending が、仕組みが入ったあとに閉じた Issue のうち出していないものを出し、gh issue list と、マージされた PR を読む gh pr list を1回ずつ呼ぶ" \
+    "$RC/$OUT/$(calls)" '0/{"issues":[101,102,107,108,112]}/issue list --state closed --search closed:>=2026-10-23 --limit 200 --json number,closedAt|pr list --state merged --base main --search merged:>=2026-10-23 --limit 1000 --json body|'
+check "閉じる PR がマージされていない Issue を、pending が出さず、集計しない印 no-merged-pr を書く" \
+    "$(statejson issues/113.json)/$(statejson issues/114.json)" \
+    '{"closed_at":"2026-10-25T09:00:00Z","skip":"no-merged-pr"}/{"closed_at":"2026-10-25T10:00:00Z","skip":"no-merged-pr"}'
 check "データのファイルを足したコミットと同じ日の、そのコミットより前の時刻に閉じた Issue を、pending が出さない" \
     "$(printf '%s' "$OUT" | grep -c '103')" "0"
 check "出し済みで list_pending か proposals_pending がある Issue を pending が出す" \
@@ -290,6 +300,33 @@ pendb "2026-10-25T07:00:00Z"
 printf '%s\n' '^issue list' >"$FAKE_GH_DIR/fail"
 run pending
 check "gh issue list が失敗すると、pending が標準出力に何も出さずに 1 で終わり、理由を1行で出す" "$RC/$OUT/$(errline)" "1//one"
+printf '%s\n' '^pr list' >"$FAKE_GH_DIR/fail"
+run pending
+check "gh pr list が失敗すると、pending が標準出力に何も出さずに 1 で終わり、理由を1行で出す" "$RC/$OUT/$(errline)" "1//one"
+
+newrepo pend-recent config
+newgh pend-recent
+# 131: 10分前に閉じた、閉じる PR の無い Issue / 132: 2時間前に閉じた、閉じる PR の無い Issue
+AGO10=$(perl -MPOSIX=strftime -e 'print strftime("%Y-%m-%dT%H:%M:%SZ", gmtime(time - 600))')
+AGO120=$(perl -MPOSIX=strftime -e 'print strftime("%Y-%m-%dT%H:%M:%SZ", gmtime(time - 7200))')
+mkdb "issues => [ cl(131, '$AGO10'), cl(132, '$AGO120') ]"
+for n in 131 132; do recv "$n"; done
+run pending
+check "閉じてから1時間の中の、閉じる PR の無い Issue を、pending が出さず、集計しない印も書かない" \
+    "$RC/$OUT/$(statejson issues/131.json)/$(statejson issues/132.json)" "0/{\"issues\":[]}/none/{\"closed_at\":\"$AGO120\",\"skip\":\"no-merged-pr\"}"
+: >"$FAKE_GH_DIR/calls.log"
+run pending
+check "閉じてから1時間の中で印を書かなかった Issue を、次の pending が確かめ直す" \
+    "$RC/$OUT/$(calls | tr '|' '\n' | grep -c '^pr list')" '0/{"issues":[]}/1'
+newgh pend-nocheck
+# 133: 出し済みで、一覧への書き込みが残っている Issue / 134: 集計しない印がある Issue
+mkdb "issues => [ cl(133, '2026-10-25T01:00:00Z'), cl(134, '2026-10-25T02:00:00Z') ]"
+recv 134
+issuejson 133 '{"list_pending":true,"report_url":"https://github.com/owner/repo/issues/133#issuecomment-1","reported_at":"2026-10-25T02:10:00Z"}'
+issuejson 134 '{"closed_at":"2026-10-25T02:00:00Z","skip":"no-merged-pr"}'
+run pending
+check "閉じる PR を確かめる Issue が無いと、pending が gh pr list を呼ばない" "$RC/$OUT/$(calls)" \
+    '0/{"issues":[133]}/issue list --state closed --search closed:>=2026-10-23 --limit 200 --json number,closedAt|'
 
 newrepo noconf
 newgh noconf
@@ -306,7 +343,7 @@ check "origin/main が無いときも、pending が番号の無い JSON の1行�
 newrepo "pend sp" config
 newgh pend-sp
 recv 101
-mkdb "issues => [ cl(101, '2026-10-25T01:00:00Z') ]"
+mkdb "issues => [ cl(101, '2026-10-25T01:00:00Z') ], prs => [ pr(401, 'MERGED', 'Closes #101', '2026-10-25T01:00:00Z', undef) ]"
 run pending
 check "記録の置き場所のパスに空白があっても、pending が、受け持ちの出来事がある Issue を出す" "$RC/$OUT" '0/{"issues":[101]}'
 
@@ -321,6 +358,7 @@ mktrans dr-a 1
 # 205: 開いていて、PR の無い Issue
 # 206: まとめて閉じた、PR の無い Issue。207: 分けた元の、PR の無い Issue
 # 208: 閉じる PR の mergeCommit が手元に無い Issue
+# drdb <206 を閉じた時刻> [<足す PR>]
 drdb() {
     mkdb "issues => [ cl(201, '2026-10-25T01:00:00Z'), cl(202, '2026-10-25T02:00:00Z'), cl(203, '2026-10-25T03:00:00Z'),
         cl(204, '2026-10-25T04:00:00Z'), op(205), cl(206, '$1', state_reason => 'not_planned'),
@@ -330,7 +368,7 @@ drdb() {
         pr(304, 'MERGED', 'Closes #203', '2026-10-19T15:00:00Z', '$PRE'), pr(305, 'MERGED', 'Closes #203', '2026-10-24T15:00:00Z', '$POST'),
         pr(306, 'MERGED', 'Closes #2031', '2026-10-26T00:00:00Z', '$PRE'),
         pr(307, 'MERGED', 'Refs: #204', '2026-10-24T15:00:00Z', '$POST'), pr(308, 'CLOSED', 'Closes #204', undef, undef),
-        pr(309, 'MERGED', 'Closes #208', '2026-10-25T08:00:00Z', '0123456789abcdef0123456789abcdef01234567') ]"
+        pr(309, 'MERGED', 'Closes #208', '2026-10-25T08:00:00Z', '0123456789abcdef0123456789abcdef01234567'), ${2:-} ]"
 }
 drdb "2026-10-25T06:00:00Z"
 for n in 201 206 207; do recv "$n"; done
@@ -360,9 +398,9 @@ check "まとめて閉じた Issue と分けた元の Issue で、draft が集�
     '2/{"closed_at":"2026-10-25T06:00:00Z","skip":"no-merged-pr"}/2/{"closed_at":"2026-10-25T07:00:00Z","skip":"no-merged-pr"}'
 run pending
 check "draft が集計しない印を書いた Issue を、次の pending が出さない" "$RC/$OUT" '0/{"issues":[]}'
-drdb "2026-10-25T09:00:00Z"
+drdb "2026-10-25T09:00:00Z" "pr(310, 'MERGED', 'Closes #206', '2026-10-25T09:00:00Z', '$POST')"
 run pending
-check "まとめて閉じた Issue を開き直して閉じ直すと、また pending に出る" "$RC/$OUT" '0/{"issues":[206]}'
+check "まとめて閉じた Issue を開き直し、閉じる PR のマージで閉じ直すと、また pending に出る" "$RC/$OUT" '0/{"issues":[206]}'
 run draft 208
 check "閉じる PR の mergeCommit が手元に無く、git merge-base --is-ancestor が 0 と 1 のほかの値で終わると、draft が 1 で終わる" \
     "$RC/$(errline)/$(statejson issues/208.json)" "1/one/none"
@@ -709,9 +747,11 @@ newgh ctx
 # 101: 出していない、閉じた Issue / 105: 開いた Issue / 107: 出し済みで list_pending がある Issue
 # 120: 出してから7日の間で、一覧に行が無い Issue / 121: 出してから7日の間で、一覧に行がある Issue
 # 122: 出してから7日を過ぎ、一覧に行が無い Issue / 123: 出してから7日の間で、一覧に行が無く、集計しない印がある Issue
+# 124: 出していない、閉じた Issue で、閉じる PR が無い。101 は、本文に Closes #101 を書いた PR がマージされて閉じた
 mkdb "issues => [ list(), cl(101, '2026-10-25T01:00:00Z'), op(105), cl(107, '2026-10-25T02:00:00Z'), cl(120, '2026-10-25T03:00:00Z'),
-    cl(121, '2026-10-25T04:00:00Z'), cl(122, '2026-10-25T05:00:00Z'), cl(123, '2026-10-25T06:00:00Z') ]"
-for n in 101 105; do recv "$n"; done
+    cl(121, '2026-10-25T04:00:00Z'), cl(122, '2026-10-25T05:00:00Z'), cl(123, '2026-10-25T06:00:00Z'),
+    cl(124, '2026-10-25T07:00:00Z') ], prs => [ pr(401, 'MERGED', 'Closes #101', '2026-10-25T01:00:00Z', undef) ]"
+for n in 101 105 124; do recv "$n"; done
 ctxrow 121
 issuejson 107 '{"list_pending":true,"report_url":"https://github.com/owner/repo/issues/107#issuecomment-1","reported_at":"2026-10-25T02:10:00Z"}'
 for n in 120 121 123; do
@@ -723,16 +763,17 @@ issuejson 123 "{\"closed_at\":\"2026-10-25T06:00:00Z\",\"list_checked_until\":\"
 run session-context --session S1
 check "session-context が、閉じた Issue だけを知らせ、gh が失敗したら何も知らせずに 0 で終わる(閉じた Issue だけを知らせる)" \
     "$RC/$(ctxlines)/$ERR" "0/issue101,write107,write120/"
+check "閉じる PR がマージされていない Issue を、session-context が知らせない" "$(printf '%s' "$OUT" | grep -c '#124 ')" "0"
 check "出してから7日の間の Issue の行が一覧に無いと、list_pending を書き直してその Issue を知らせる" \
     "$(statejson issues/120.json | grep -c '"list_pending":true')/$(statejson issues/121.json | grep -c list_pending)/$(statejson issues/122.json | grep -c list_pending)/$(statejson issues/123.json | grep -c list_pending)" "1/0/0/0"
-# gh の呼び出しが、閉じた Issue の一覧を読む呼び出しと、本文や欄を付けない gh api の読み取りだけか
+# gh の呼び出しが、閉じた Issue の一覧とマージされた PR の一覧を読む呼び出しと、本文や欄を付けない gh api の読み取りだけか
 check "session-context が gh で GitHub に書かない" \
-    "$([ -n "$(calls)" ] && printf called)/$(calls | tr '|' '\n' | grep -v '^$' | grep -vcE '^(issue list |api )')/$(calls | tr '|' '\n' | grep -cE '^api .*(^| )(-X|--method|-f|-F|--field|--raw-field|--input)( |=|$)')" "called/0/0"
+    "$([ -n "$(calls)" ] && printf called)/$(calls | tr '|' '\n' | grep -v '^$' | grep -vcE '^(issue list |pr list --state merged |api )')/$(calls | tr '|' '\n' | grep -cE '^api .*(^| )(-X|--method|-f|-F|--field|--raw-field|--input)( |=|$)')" "called/0/0"
 check "知らせる文が、usage-report のスキルの手順を指し、所有者に打たせるコマンドを含まない" \
     "$(nlines "$OUT")/$(printf '%s\n' "$OUT" | grep -v "usage-report のスキルの『" | grep -vc '^\[usage\] 会話の相手: 所有者$')/$(printf '%s\n' "$OUT" | grep -cE 'usage\.sh|`|/[a-z]|gh |打')" "3/0/0"
 run session-context
 check "session-context が、出し直した list_pending の Issue を、次の会話でも知らせる" "$RC/$(ctxlines)" "0/issue101,write107,write120"
-for re in '^issue list' '^api '; do
+for re in '^issue list' '^pr list' '^api '; do
     printf '%s\n' "$re" >"$FAKE_GH_DIR/fail"
     run session-context
     check "session-context が、閉じた Issue だけを知らせ、gh が失敗したら何も知らせずに 0 で終わる(失敗させた gh の呼び出し: $re)" "$RC/$OUT/$ERR" "0//"
