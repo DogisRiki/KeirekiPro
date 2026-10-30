@@ -15,12 +15,12 @@ def spotbugsConfidence = spotbugsClassLoader.loadClass('com.github.spotbugs.snom
 def spotbugsTaskClass = spotbugsClassLoader.loadClass('com.github.spotbugs.snom.SpotBugsTask')
 
 checkstyle {
-    toolVersion = '10.26.1'
+    toolVersion = '14.3.0'
     configFile = file("${rootDir}/config/checkstyle/google_checks.xml")
 }
 
 jacoco {
-    toolVersion = '0.8.12'
+    toolVersion = '0.8.15'
 }
 
 spotless {
@@ -40,7 +40,7 @@ spotless {
 }
 
 spotbugs {
-    toolVersion = '4.8.6'
+    toolVersion = '4.10.5'
     effort.set(spotbugsEffort.valueOf('MAX'))
     reportLevel.set(spotbugsConfidence.valueOf('MEDIUM'))
     excludeFilter.set(file("${rootDir}/config/spotbugs/exclude.xml"))
@@ -48,7 +48,7 @@ spotbugs {
 
 // 何も検証していないテストの検出(PMD: UnitTestShouldIncludeAssert 1本のみ)
 pmd {
-    toolVersion = '7.27.0'
+    toolVersion = '7.28.0'
     ruleSets = []
     ruleSetFiles = files("${rootDir}/config/pmd/ruleset.xml")
     consoleOutput = true
@@ -129,7 +129,7 @@ tasks.named('check') {
 // mutation testing(週次レポートモード。checkには含めない)
 // 対象は純粋ユニットテストを持つ domain/usecase のみ(Testcontainers系は実行時間の都合で除外)
 pitest {
-    junit5PluginVersion = '1.2.1'
+    junit5PluginVersion = '1.2.3'
     targetClasses = ['com.example.keirekipro.domain.*', 'com.example.keirekipro.usecase.*']
     targetTests = ['com.example.keirekipro.unit.domain.*', 'com.example.keirekipro.unit.usecase.*']
     threads = 2
