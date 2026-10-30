@@ -239,7 +239,8 @@ class OidcProviderFactoryTest {
         userInfo.put("access_token", "dummy_token");
 
         // GitHub API から返されるダミーJSON
-        String dummyEmailJson = """
+        String dummyEmailJson =
+                """
                 [
                     { "email": "primary@example.com", "primary": true, "verified": true },
                     { "email": "secondary@example.com", "primary": false, "verified": true }

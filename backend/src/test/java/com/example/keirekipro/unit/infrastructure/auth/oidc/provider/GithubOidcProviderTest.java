@@ -54,7 +54,8 @@ class GithubOidcProviderTest {
         server.expect(requestTo(EMAILS_URL))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN))
-                .andRespond(withSuccess("""
+                .andRespond(withSuccess(
+                        """
                         [
                             { "email": "secondary@example.com", "primary": false, "verified": true },
                             { "email": "primary@example.com", "primary": true, "verified": true }
@@ -74,7 +75,8 @@ class GithubOidcProviderTest {
     @DisplayName("verified が false の primary は email を null にする")
     void test2() {
         server.expect(requestTo(EMAILS_URL))
-                .andRespond(withSuccess("""
+                .andRespond(withSuccess(
+                        """
                         [
                             { "email": "primary@example.com", "primary": true, "verified": false },
                             { "email": "secondary@example.com", "primary": false, "verified": true }

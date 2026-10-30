@@ -57,7 +57,8 @@ class MyBatisResumeBackupQueryTest {
     @DisplayName("バックアップ対象の職務経歴書が存在する場合、JSONがDTOに変換されて返る")
     void test2() {
         // モック設定
-        String json = """
+        String json =
+                """
                 {
                     "resumeName":"resume",
                     "date":"2025-01-01",

@@ -93,7 +93,7 @@ public class MyBatisUserRepository implements UserRepository {
                     try {
                         roles.add(RoleName.valueOf(roleName));
                     } catch (IllegalArgumentException e) {
-                        // 不明なロール名は無視
+                        // 不明なロール名の IllegalArgumentException は無視する
                     }
                 }
             }

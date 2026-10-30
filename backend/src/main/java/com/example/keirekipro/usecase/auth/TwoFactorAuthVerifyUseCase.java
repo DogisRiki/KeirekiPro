@@ -33,7 +33,6 @@ public class TwoFactorAuthVerifyUseCase {
     private static final int MAX_ATTEMPTS = 5;
 
     /**
-     *
      * @param challengeToken チャレンジトークン
      * @param code 認証コード
      * @return 検証結果

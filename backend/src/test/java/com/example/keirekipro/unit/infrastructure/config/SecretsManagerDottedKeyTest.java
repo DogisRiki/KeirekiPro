@@ -32,7 +32,8 @@ class SecretsManagerDottedKeyTest {
     @DisplayName("点を含むキーが、キャッシュの接続先とユーザー名の設定として読まれる")
     void test1() {
         // テストデータ
-        String secretJson = """
+        String secretJson =
+                """
                 {
                   "redis-host": "keirekipro-cache.example.com",
                   "redis-port": "6379",
