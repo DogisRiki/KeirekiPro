@@ -231,7 +231,7 @@
   - 受入基準とテストの対応: 要件6の受入基準1(開発用のコンテナで backend を起動するコマンドが、上げる前と同じコマンドのまま動く)は開発用のコンテナでの起動で、受入基準4(本番のコンテナイメージを同じ手順で組み立てられ、そのイメージが Java 21 で backend を起動する)は組み立てたイメージでの起動で確かめる
   - _要件: 6.1, 6.4_
 
-- [ ] 6. 確かめた結果を PR の本文に載せ、CI の結果を確かめる
+- [x] 6. 確かめた結果を PR の本文に載せ、CI の結果を確かめる
 - [x] 6.1 PR の本文を書く
 
   Claude は、`/ship` が PR を作るときに渡す本文を、作業用のフォルダに書く。Claude は、設計の部品の節「PR の本文」に挙げた項目をすべて書き、確かめた方法と結果には、大タスク5の比べた結果の要約を書く。確かめた結果が要件に届かないときは、Claude は、要件に届かない結果の扱いを決めた要件9の受入基準3のとおりに本文と所有者への報告を書き、所有者が合否を決めるまで `/ship` を動かさない。
@@ -240,7 +240,7 @@
   - _要件: 1.2, 1.10, 1.12, 8.3, 9.1, 9.3_
   - _対象の部品: PR の本文_
 
-- [ ] 6.2 PR の CI と container-scan の結果を確かめる
+- [x] 6.2 PR の CI と container-scan の結果を確かめる
 
   Claude は、`/ship` が PR を作ったあと、CI の backend に関わるジョブと `container-scan` の結果を読む。Claude は、`container-scan` の実行をキャンセルしない。`container-scan` が2件のほかの脆弱性を見つけたときは、Claude は、部品の版を上げて直せるかを確かめる。
 
@@ -281,3 +281,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 5.4: old・new・old の入れ替えで、flyway_schema_history は同じ、前の backend の Cookie・2段階の認証の番号・確認前の登録のリンクはすべて受け付けられた。Redis の値の形も同じ(記録は compare/out/B-findings.md)
 - 5.5: 開発用のコンテナの起動は、画面の確かめと同じ `./gradlew bootRun --args=--spring.profiles.active=dev` で確かめる(profile を付けないと localhost のデータベースを探して止まる。上げる前も同じ)。本番のイメージは Dockerfile.prod のまま組み立てられ、Java 21.0.12 と Spring Boot 4.1.2 で起動して health が UP を返した
 - 6.1: 大タスク4のあとに、上げたあとのすべての configuration を OSV に問い合わせ直した(407組)。checkstyle 14.3.0 は plexus-utils を使わなくなったので plexus-utils の制約を消し、checkstyle が持ち込む guava 33.7.1 の脆弱性を、guava 33.7.2 への制約で直した。PR の本文は作業用のフォルダの pr-body.md
+- 6.2: PR #670 の CI で、承認を待つ dependency-gate と escape-hatch のほかの必須の検査がすべて通った。container-scan は58件を見つけ、マージを止めるものは0件だった(上げる前は61件)。58件は、修正版がある CRITICAL か HIGH の脆弱性に当たらないので、版を上げる対象にしなかった。escape-hatch は、PR 本文の早い位置にある Test-Change-Justification の行を読み落とすことがあるので、この行を本文の終わりに置いた。escape-hatch が承認のあとに緑になるかは、所有者のレビューで検査が動き直すまで確かめられない
