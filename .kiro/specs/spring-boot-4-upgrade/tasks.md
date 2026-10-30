@@ -232,7 +232,7 @@
   - _要件: 6.1, 6.4_
 
 - [ ] 6. 確かめた結果を PR の本文に載せ、CI の結果を確かめる
-- [ ] 6.1 PR の本文を書く
+- [x] 6.1 PR の本文を書く
 
   Claude は、`/ship` が PR を作るときに渡す本文を、作業用のフォルダに書く。Claude は、設計の部品の節「PR の本文」に挙げた項目をすべて書き、確かめた方法と結果には、大タスク5の比べた結果の要約を書く。確かめた結果が要件に届かないときは、Claude は、要件に届かない結果の扱いを決めた要件9の受入基準3のとおりに本文と所有者への報告を書き、所有者が合否を決めるまで `/ship` を動かさない。
   - 完了の確かめ方: 本文に設計の節の項目がすべてあり、版の表の版が `dependencies` と `buildEnvironment` の出力と同じである。要件に届かない結果があるときは、所有者が合否を決めた返事がある
@@ -280,3 +280,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 5.3: Spring 7 の Commons Logging はログの行に COMMONS-LOGGING の印を付け、ECS の JSON に tags として出る。application.yaml の logging.structured.json.exclude: tags で上げる前と同じ項目に戻した。本番の設定のほかの確かめは差が無い(記録は compare/out/B-findings.md)
 - 5.4: old・new・old の入れ替えで、flyway_schema_history は同じ、前の backend の Cookie・2段階の認証の番号・確認前の登録のリンクはすべて受け付けられた。Redis の値の形も同じ(記録は compare/out/B-findings.md)
 - 5.5: 開発用のコンテナの起動は、画面の確かめと同じ `./gradlew bootRun --args=--spring.profiles.active=dev` で確かめる(profile を付けないと localhost のデータベースを探して止まる。上げる前も同じ)。本番のイメージは Dockerfile.prod のまま組み立てられ、Java 21.0.12 と Spring Boot 4.1.2 で起動して health が UP を返した
+- 6.1: 大タスク4のあとに、上げたあとのすべての configuration を OSV に問い合わせ直した(407組)。checkstyle 14.3.0 は plexus-utils を使わなくなったので plexus-utils の制約を消し、checkstyle が持ち込む guava 33.7.1 の脆弱性を、guava 33.7.2 への制約で直した。PR の本文は作業用のフォルダの pr-body.md

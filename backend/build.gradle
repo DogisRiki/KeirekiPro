@@ -120,12 +120,12 @@ dependencies {
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 
-    // checkstyle が doxia 経由で持ち込む plexus-utils の版を引き上げる(#361)。本番には入らない。
-    //   plexus-utils 3.3.0 -> CVE-2025-67030(3.6.1 以降で修正)
+    // checkstyle が持ち込む guava の版を引き上げる。本番には入らない。
+    //   guava 33.7.1-jre -> CVE-2026-102554(33.7.2 で修正)
     // 解除の判定: この制約を外して ./gradlew dependencies --configuration checkstyle を実行し、
-    // plexus-utils が 3.6.1 以上なら、この制約と libs.versions.toml の plexus-utils の行を削除する。
+    // guava が 33.7.2 以上なら、この制約と libs.versions.toml の guava の行を削除する。
     constraints {
-        checkstyle "org.codehaus.plexus:plexus-utils:${libs.versions.plexus.utils.get()}"
+        checkstyle "com.google.guava:guava:${libs.versions.guava.get()}"
     }
 }
 

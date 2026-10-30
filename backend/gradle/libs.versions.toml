@@ -51,10 +51,10 @@ opentelemetry = "1.67.0"
 
 # build.gradle の constraints で参照する。脆弱性のある版が推移的に入るのを引き上げるためのもの。
 # commons-lang3 は buildscript の constraints(ビルド用プラグイン経由)、
-# plexus-utils は dependencies の constraints(checkstyle 経由)で使う。
+# guava は dependencies の constraints(checkstyle 経由)で使う。
 # 解除の判定: build.gradle の対応する constraints の注記を参照する。
 commons-lang3 = "3.20.0"
-plexus-utils = "3.6.2"
+guava = "33.7.2-jre"
 
 [libraries]
 # Flyway Gradleプラグインが DB別モジュールをbuildscriptクラスパスに要求するためのもの。
