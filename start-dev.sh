@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ローカル動作確認用。
-# backend / frontend を起動し、それぞれ応答を返すまで待機する。
+# 止まっているコンテナを起動し、backend / frontend を起動して、それぞれ応答を返すまで待機する。
 # 確認URL: http://localhost:5173
 # 停止: docker compose restart frontend backend
 
@@ -26,10 +26,24 @@ BACKEND_RETRY_MAX=150
 # 60周(約80秒)で足りる
 FRONTEND_RETRY_MAX=60
 
-# 指定サービスのコンテナが起動していなければ終了する
-require_container() {
-    if [ -z "$(docker compose ps --status running -q "$1")" ]; then
-        echo "[$1] container is not running. run: docker compose up -d"
+# 開発サーバの起動に要るサービス。backendは db・redis・localstack につながらないと起動できない。
+# dind と terraform は開発サーバに使わないため起動しない
+REQUIRED_SERVICES="backend frontend db redis localstack"
+
+# 起動していないサービスがあれば起動する。起動できなければ終了する
+ensure_containers() {
+    local stopped="" service
+    for service in $REQUIRED_SERVICES; do
+        if [ -z "$(docker compose ps --status running -q "$service")" ]; then
+            stopped="$stopped $service"
+        fi
+    done
+    [ -z "$stopped" ] && return 0
+
+    echo "[containers] starting:${stopped}"
+    # shellcheck disable=SC2086
+    if ! docker compose up -d $stopped; then
+        echo "[containers] failed to start:${stopped}"
         exit 1
     fi
 }
@@ -49,8 +63,7 @@ frontend_listening() {
         'const s=require("net").connect(5173,"127.0.0.1");s.setTimeout(2000);const done=r=>{console.log(r);s.destroy()};s.on("connect",()=>done("open"));s.on("error",()=>done("closed"));s.on("timeout",()=>done("closed"))' || true
 }
 
-require_container backend
-require_container frontend
+ensure_containers
 
 if [ "$(backend_health_status)" = "200" ]; then
     echo "[backend] already running: /actuator/health HTTP 200"
@@ -105,6 +118,16 @@ else
         scan_kill -KILL
     ' || true
     sleep 1
+
+    # 依存の入れ直しを開発サーバの起動の前に済ませる。node_modules がlockfileより古いと、
+    # pnpm は pnpm run dev の中で入れ直しを始める(verifyDepsBeforeRun の既定 install)。
+    # 入れ直しは1分を超えることがあり、待機の上限に数えられて起動の失敗と判定されるため、
+    # ここで出力を見せながら終わるまで待つ。最新なら数秒で終わる
+    echo "[frontend] installing dependencies..."
+    if ! docker compose exec -T -u node -w /home/node/app frontend pnpm install --frozen-lockfile; then
+        echo "[frontend] failed to install dependencies"
+        exit 1
+    fi
 
     echo "[frontend] starting..."
     docker compose exec -d -u node -w /home/node/app frontend sh -lc \
