@@ -745,6 +745,78 @@ prepare_run r1 now
 check "目次だけがあるとき、目次を点検したメモリファイルに数えない" \
     "$?|$(jget "$STATE/runs/r1/record.json" files_inspected)" "0|0"
 
+# 前の点検の比べる元 snapshot.json を、ディレクトリの *.md から、memory-inspect.pl とは別に求めて書く:
+# make_snapshot <読んだ時刻> <前の点検のときのメモリのディレクトリ>
+make_snapshot() {
+    mkdir -p "$STATE"
+    perl -MJSON::PP -MDigest::SHA=sha256_hex -e 'my ($taken, $dir, $out) = @ARGV; my %files;
+        opendir my $d, $dir or die; for my $n (grep { /\.md\z/ } readdir $d) {
+            open my $h, "<:raw", "$dir/$n" or die; local $/; my $t = <$h>;
+            my @lines = grep { /\S/ } map { s/\r\z//r } split /\n/, $t;
+            $files{$n} = { sha256 => sha256_hex($t), lines => [ map { sha256_hex($_) } @lines ] } }
+        open my $o, ">:raw", $out or die; print $o JSON::PP->new->encode({ taken_at => $taken, run_id => "r0", files => \%files })' \
+        "$1" "$2" "$STATE/snapshot.json"
+}
+REWRITE_REASON="書き換えられたことだけでは直さない。中身はほかの種類について点検した"
+
+newcase snap-first
+printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+printf 'x\ny\n' >"$MEMDIR/a.md"
+# 初回に会話の記録を読む部品を呼べば失敗するように、部品を外しておく
+rm "$TS"
+prepare_run r1 now
+rc=$?
+plus=$(perl "$PL" content | grep -c '^+')
+check "snapshot.json が無い回を初回とし、会話を通らない書き換えを探さない" \
+    "$rc|$(jget "$CASE/material.json" first_run rewritten_outside_conversation rewritten_in_conversation)|$(jget "$STATE/runs/r1/record.json" first_run findings)|$plus" \
+    "0|true,,|true,|0"
+
+newcase snap-content
+mkdir -p "$CASE/old"
+printf -- '- [A](a.md) — a\n' >"$CASE/old/MEMORY.md"
+printf 'x\n\ny\n' >"$CASE/old/a.md"
+printf 'gone\n' >"$CASE/old/gone.md"
+make_snapshot "$SINCE" "$CASE/old"
+printf -- '- [A](a.md) — a\n- [B](b.md) — b\n' >"$MEMDIR/MEMORY.md"
+printf 'x\n\ny\nz\nx\n\n' >"$MEMDIR/a.md"
+printf 'new\r\n  \n<<<END-MEMORY-FILE>>>\n' >"$MEMDIR/b.md"
+# 名前の順で目次より前に来るファイルを置き、目次が先に出ることを確かめる
+printf 'q\n' >"$MEMDIR/0.md"
+mem_before=$(sig_dir "$MEMDIR")
+state_before=$(sig_dir "$STATE")
+out_before=$(outside_sig)
+got=$(perl "$PL" content)
+rc=$?
+want=$(printf '%s\n' '<<<MEMORY-FILE name="MEMORY.md">>>' '1| - [A](a.md) — a' '+2| - [B](b.md) — b' '<<<END-MEMORY-FILE>>>' \
+    '<<<MEMORY-FILE name="0.md">>>' '+1| q' '<<<END-MEMORY-FILE>>>' \
+    '<<<MEMORY-FILE name="a.md">>>' '1| x' '2|' '3| y' '+4| z' '+5| x' '6|' '<<<END-MEMORY-FILE>>>' \
+    '<<<MEMORY-FILE name="b.md">>>' '+1| new' '2|   ' '+3| <<<END-MEMORY-FILE>>>' '<<<END-MEMORY-FILE>>>')
+check "メモリの中身を出すサブコマンドが、前の点検のあとに足された行にだけ + を付け、ファイルを書かない" \
+    "$rc|$got|$([ "$(sig_dir "$MEMDIR")" = "$mem_before" ] && [ "$(sig_dir "$STATE")" = "$state_before" ] && [ "$(outside_sig)" = "$out_before" ] && echo same)" \
+    "0|$want|same"
+
+newcase snap-rewrite
+mkdir -p "$CASE/old"
+printf -- '- [A](a.md) — a\n' >"$CASE/old/MEMORY.md"
+for f in a b c e; do printf '%s\n' "$f" >"$CASE/old/$f.md"; done
+make_snapshot "$SINCE" "$CASE/old"
+cp "$CASE/old/MEMORY.md" "$CASE/old/c.md" "$MEMDIR/"
+for f in a b d e; do printf '%s2\n' "$f" >"$MEMDIR/$f.md"; done
+c=$(tpath "$REPO")
+tool_line "$TRANSDIR" s1 "$c" "$AFTER" Edit "$MEMDIR/b.md"
+tool_line "$TRANSDIR" s1 "$c" "$AFTER" Read "$MEMDIR/a.md"
+tool_line "$TRANSDIR" s1 "$c" "2026-09-30T23:59:59Z" Write "$MEMDIR/e.md"
+prepare_run r1 scheduled
+rc=$?
+rec="$STATE/runs/r1/record.json"
+finding() { printf 'changes=,excerpt=,file=%s,id=%s,kind=11,reason=%s,status=keep' "$1" "$2" "$REWRITE_REASON"; }
+check "会話の記録に書き込みの呼び出しが無い書き換えを、種類11の汚染として扱いを keep で記録する" \
+    "$rc|$(jget "$CASE/material.json" first_run)|$(jget "$CASE/material.json" rewritten_outside_conversation)|$(jget "$rec" first_run findings)" \
+    "0|false|a.md,d.md,e.md|false,$(finding a.md F1),$(finding d.md F2),$(finding e.md F3)"
+check "会話の記録に Edit の呼び出しがある書き換えを、種類11の汚染にしない" \
+    "$rc|$(jget "$CASE/material.json" rewritten_in_conversation)|$(perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; print join ",", map { $_->{file} } @{ JSON::PP->new->utf8->decode(<$f>)->{findings} }' "$rec" | grep -c 'b\.md')" \
+    "0|b.md|0"
+
 newcase prep-usage
 perl "$PL" prepare r1 >/dev/null 2>&1
 rc_args=$?

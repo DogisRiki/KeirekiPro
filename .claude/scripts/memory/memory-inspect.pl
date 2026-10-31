@@ -17,13 +17,17 @@
 #     ロックの今の様子を、free か held <回の ID> か stale <回の ID> の1行で出す
 #   prepare <回の ID> <scheduled|now>
 #     メモリを読み、記録 runs/<回の ID>/record.json を状態 running で書き、比べる材料の JSON を標準出力に1行で出す。
-#     メモリを書き換えない。メモリのディレクトリが無いときは、点検したメモリファイルを0とする
+#     メモリを書き換えない。メモリのディレクトリが無いときは、点検したメモリファイルを0とする。
+#     比べる元 snapshot.json があれば、書き換わったファイルを会話の記録と照らし、記録に無い書き換えを汚染の種類11として記録に書く
+#   content
+#     目次とメモリファイルを1つずつ <<<MEMORY-FILE name="<ファイル名>">>> と <<<END-MEMORY-FILE>>> で囲み、
+#     行ごとに「<行番号>| <行>」の形で標準出力に出す。前の点検のあとに足された行は、行番号の前に + を付ける。ファイルに書かない
 # 終了コード: 成功は 0、使い方の誤りは 2、失敗は 1(標準エラーに理由を日本語の1文で出す)
 # 前提: perl(JSON::PP)・git。Windows では、git に渡す場所を C:/... の形で受ける
 # =====================================================================
 use strict;
 use warnings;
-use Encode qw(decode);
+use Encode qw(decode encode);
 use Digest::SHA qw(sha256_hex);
 use Errno qw(EEXIST EPERM);
 use File::Basename qw(dirname);
@@ -38,6 +42,7 @@ my %COMMANDS = (
     tools   => \&cmd_tools,
     lock    => \&cmd_lock,
     prepare => \&cmd_prepare,
+    content => \&cmd_content,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
@@ -48,6 +53,9 @@ my %LOCKS = (run => q{run}, memory => q{memory});
 # 目次のファイルの名前と、目次の行の数と大きさの上限。Claude Code が会話の始めに読む上限の200行と25KBの8割である
 my $INDEX = q{MEMORY.md};
 my %INDEX_LIMIT = (lines => 160, bytes => 20480);
+
+# 会話を通らない書き換え(汚染の種類11)を直さない理由
+my $REWRITE_REASON = q{書き換えられたことだけでは直さない。中身はほかの種類について点検した};
 
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
@@ -71,7 +79,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content\n";
     return 2;
 }
 
@@ -334,6 +342,66 @@ sub index_links {
     return @names;
 }
 
+# ファイルの中身を行に分ける。行の終わりの改行と、その前の \r を除く
+sub split_lines {
+    my ($text) = @_;
+    my @lines = split /\n/, $text, -1;
+    pop @lines if @lines && $lines[-1] eq '';
+    s/\r\z// for @lines;
+    return @lines;
+}
+
+# 比べる元 snapshot.json に書く、1つのファイルの中身のハッシュと、空でない行ごとのハッシュを返す。
+# 比べる元を書く部品は、この形で書く
+sub snapshot_entry {
+    my ($text) = @_;
+    return { sha256 => sha256_hex($text), lines => [ map { sha256_hex($_) } grep { /\S/ } split_lines($text) ] };
+}
+
+# 比べる元を読む。無ければ undef を返す。files の名前は、メモリのディレクトリを読んだ名前と比べられるようにバイトの列にする
+sub read_snapshot {
+    my ($state) = @_;
+    my $snap = read_json("$state/snapshot.json");
+    return undef unless defined $snap;
+    die "比べる元 snapshot.json の形が違う\n"
+        unless ref $snap eq 'HASH' && ref $snap->{files} eq 'HASH' && defined $snap->{taken_at} && !ref $snap->{taken_at};
+    my %files = map { (encode('UTF-8', $_) => $snap->{files}{$_}) } keys %{ $snap->{files} };
+    return { %$snap, files => \%files };
+}
+
+# 前の点検のあとに足された行の番号(1から数える)を、番号 => 1 の表で返す。空の行は足された行にしない。
+# 比べる元の同じファイルにある同じ行は、ある数だけ、足されていない行とみなす。比べる元に無いファイルは、空でない行をすべて足された行とする
+sub added_line_numbers {
+    my ($text, $old) = @_;
+    my %left;
+    $left{$_}++ for ref $old eq 'HASH' && ref $old->{lines} eq 'ARRAY' ? @{ $old->{lines} } : ();
+    my %added;
+    my $n = 0;
+    for my $line (split_lines($text)) {
+        $n++;
+        next unless $line =~ /\S/;
+        my $h = sha256_hex($line);
+        if ($left{$h}) {
+            $left{$h}--;
+            next;
+        }
+        $added{$n} = 1;
+    }
+    return \%added;
+}
+
+# 書き換わったファイルごとに、時刻のあとの会話の記録に書き込みの呼び出しがあったかを、名前(バイトの列)=> 真偽の表で返す
+sub conversation_writes {
+    my ($here, $since, $memdir, @names) = @_;
+    my @cmd = ($^X, "$here/transcript-scan.pl", 'writes', '--since', $since, '--memory-dir', $memdir, @names);
+    open(my $fh, '-|', @cmd) or die "会話の記録を読む部品を動かせなかった($!)\n";
+    my $out = do { local $/; <$fh> };
+    close $fh or die "会話の記録を読む部品が失敗した\n";
+    my $found = eval { $JSON->decode($out // '') };
+    die "会話の記録を読む部品の結果を読めなかった\n" unless ref $found eq 'HASH';
+    return { map { (encode('UTF-8', $_) => ($found->{$_} ? 1 : 0)) } keys %$found };
+}
+
 # ---- サブコマンド ----------------------------------------------------------
 
 sub cmd_paths {
@@ -415,6 +483,33 @@ sub cmd_prepare {
     my @index_without_file = grep { !-f "$memdir/$_" } @links;
     my @file_without_index = grep { $_ ne $INDEX && !$linked{$_} } sort keys %hashes;
 
+    # 比べる元が無い初回は、会話を通らない書き換えを探さない
+    my $snap = read_snapshot($state);
+    my (@outside, @inside, @findings);
+    if ($snap) {
+        my @changed = grep {
+            my $old = $snap->{files}{$_};
+            !(ref $old eq 'HASH' && defined $old->{sha256} && $old->{sha256} eq $hashes{$_});
+        } sort keys %hashes;
+        my $written = @changed ? conversation_writes($here, $snap->{taken_at}, $memdir, @changed) : {};
+        for my $name (@changed) {
+            if ($written->{$name}) {
+                push @inside, $name;
+                next;
+            }
+            push @outside, $name;
+            push @findings, {
+                id      => 'F' . (@findings + 1),
+                kind    => 11,
+                file    => decode('UTF-8', $name),
+                excerpt => '',
+                status  => 'keep',
+                reason  => decode('UTF-8', $REWRITE_REASON),
+                changes => [],
+            };
+        }
+    }
+
     make_path($rundir);
     write_json("$rundir/record.json", {
         run_id               => $run,
@@ -423,13 +518,13 @@ sub cmd_prepare {
         started_at           => $read_at,
         finished_at          => undef,
         interrupt_reason     => undef,
-        first_run            => -e "$state/snapshot.json" ? JSON::PP::false : JSON::PP::true,
+        first_run            => $snap ? JSON::PP::false : JSON::PP::true,
         origin_main          => $origin,
         # 目次はメモリファイルに数えない(要件の用語の定義)
         files_inspected      => scalar(grep { $_ ne $INDEX } keys %hashes),
         index                => { %index },
         read_hashes          => { map { decode('UTF-8', $_) => $hashes{$_} } keys %hashes },
-        findings             => [],
+        findings             => \@findings,
         changes              => [],
         skipped_files        => [],
         relocation_proposals => [],
@@ -440,10 +535,42 @@ sub cmd_prepare {
     });
     print $JSON->encode({
         now                => $read_at,
+        first_run          => $snap ? JSON::PP::false : JSON::PP::true,
         origin_main        => $origin,
         index              => { %index, limit_lines => $INDEX_LIMIT{lines}, limit_bytes => $INDEX_LIMIT{bytes} },
         index_without_file => [ map { decode('UTF-8', $_) } @index_without_file ],
         file_without_index => [ map { decode('UTF-8', $_) } @file_without_index ],
+        rewritten_outside_conversation => [ map { decode('UTF-8', $_) } @outside ],
+        rewritten_in_conversation      => [ map { decode('UTF-8', $_) } @inside ],
     }), "\n";
+    return 0;
+}
+
+# メモリの中身を出す: content
+# 目次を先に、ほかのメモリファイルを名前の順に、1つずつ囲んで出す。行の頭に行番号を付けるのは、
+# メモリの文が囲みの終わりの印を書いても、囲みの終わりと見分けられるようにするためである。ファイルに書かない
+sub cmd_content {
+    my @args = @_;
+    return usage() if @args;
+    my $here = dirname(__FILE__);
+    my $memdir = memory_dir(main_worktree($here));
+    my $snap = read_snapshot(state_dir($here));
+    my @names = memory_files($memdir);
+    @names = ((grep { $_ eq $INDEX } @names), (grep { $_ ne $INDEX } @names));
+    my $out = '';
+    for my $name (@names) {
+        my $text = read_bytes("$memdir/$name");
+        die "メモリファイル $name を読めなかった\n" unless defined $text;
+        my $added = $snap ? added_line_numbers($text, $snap->{files}{$name}) : {};
+        $out .= qq{<<<MEMORY-FILE name="$name">>>\n};
+        my $n = 0;
+        for my $line (split_lines($text)) {
+            $n++;
+            $out .= ($added->{$n} ? '+' : '') . "$n|" . (length($line) ? " $line" : '') . "\n";
+        }
+        $out .= "<<<END-MEMORY-FILE>>>\n";
+    }
+    binmode STDOUT, ':raw';
+    print $out;
     return 0;
 }
