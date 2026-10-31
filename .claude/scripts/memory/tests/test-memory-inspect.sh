@@ -131,6 +131,7 @@ EOF
 #             (PATH の区切りの : と C: の : が見分けられないため)
 #   SH PL     REPO にコミットした memory-inspect.sh と memory-inspect.pl
 #   WTSH WTPL WT の memory-inspect.sh と memory-inspect.pl
+#   TS        REPO にコミットした transcript-scan.pl
 newcase() {
     CASE="$WORK/$1"
     REPO="$CASE/repo"
@@ -139,6 +140,7 @@ newcase() {
     PL="$REPO/.claude/scripts/memory/memory-inspect.pl"
     WTSH="$WT/.claude/scripts/memory/memory-inspect.sh"
     WTPL="$WT/.claude/scripts/memory/memory-inspect.pl"
+    TS="$REPO/.claude/scripts/memory/transcript-scan.pl"
     FHOME="$CASE/home"
     TRANSDIR="$FHOME/.claude/projects/$(encname "$REPO")"
     WTTRANSDIR="$FHOME/.claude/projects/$(encname "$WT")"
@@ -414,6 +416,139 @@ newcase gitstatus
 check "状態の場所が git status に出ない" \
     "$([ -f "$STATE/config.json" ] && echo made)|$(gitq status --porcelain --untracked-files=all)|$(git -C "$WT" status --porcelain --untracked-files=all)" \
     "made||"
+
+# ---------------------------------------------------------------------
+# 会話の記録を読む部品
+# ---------------------------------------------------------------------
+
+SINCE="2026-10-01T00:00:00Z"
+AFTER="2026-10-20T00:00:00.000Z"
+
+# 場所の区切りの / を \ に替えて出す: bspath <場所>
+bspath() { printf '%s' "$1" | sed 's|/|\\|g'; }
+# 場所の英字を大文字にして出す: upath <場所>
+upath() { perl -e 'print uc $ARGV[0]' "$1"; }
+# 場所の C:/ の形を /c/ の形にして出す。ドライブの文字が無い場所はそのまま出す: drivepath <場所>
+drivepath() { printf '%s' "$1" | perl -pe 's{\A([A-Za-z]):}{"/" . lc $1}e'; }
+# 道具の呼び出しの行を、会話の記録に足す: tool_line <記録の置き場所> <会話の ID> <cwd> <時刻> <道具の名前> <file_path>
+tool_line() {
+    transcript_line "$1" "$2" "{\"type\":\"assistant\",\"cwd\":$(jstr "$3"),\"timestamp\":\"$4\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"$5\",\"input\":{\"file_path\":$(jstr "$6")}}]}}"
+}
+# 利用者の行を、会話の記録に足す: user_line <記録の置き場所> <会話の ID> <cwd> <時刻> <content の JSON> [<ほかの欄の JSON>]
+user_line() {
+    transcript_line "$1" "$2" "{\"type\":\"user\",\"cwd\":$(jstr "$3"),\"timestamp\":\"$4\",${6:+$6,}\"message\":{\"role\":\"user\",\"content\":$5}}"
+}
+# writes を、時刻 SINCE と偽のメモリのディレクトリで流す: scan_writes <ファイル名>...
+scan_writes() { perl "$TS" writes --since "$SINCE" --memory-dir "$MEMDIR" "$@"; }
+# utterances の結果の JSON から、記録があったかと、文ごとの「時刻=文」を | でつないで出す
+utter_fields() {
+    perl -MJSON::PP -e 'binmode STDOUT, ":encoding(UTF-8)"; my $j = JSON::PP->new->utf8->decode(do { local $/; <STDIN> });
+        print $j->{found} ? "found" : "none", map { "|$_->{at}=$_->{text}" } @{ $j->{utterances} || [] }'
+}
+# utterances の結果の JSON が20KBに収まるかと、切ったかと、文の数と、文ごとに、元の文
+# (<番号><文字>×<数>)のままか、元の文の頭の部分かを、| でつないで出す: limit_fields <文字> <数>
+limit_fields() {
+    perl -CA -MJSON::PP -e 'my $raw = do { local $/; <STDIN> }; $raw =~ s/\n\z//; my $j = JSON::PP->new->utf8->decode($raw);
+        my @u = @{ $j->{utterances} };
+        print join("|", length($raw) <= 20480 ? "fits" : "over", $j->{truncated} ? "truncated" : "whole", scalar(@u),
+            map { my $t = $u[$_]{text}; my $full = ($_ + 1) . $ARGV[0] x $ARGV[1];
+                $t eq $full ? "full" : length($t) && index($full, $t) == 0 ? "part" : "bad" } 0 .. $#u)' "$@"
+}
+
+newcase scan-writes
+c=$(tpath "$REPO")
+tool_line "$TRANSDIR" s1 "$c" "$AFTER" Write "$(bspath "$MEMDIR/a.md")"
+tool_line "$TRANSDIR" s1 "$c" "$AFTER" Edit "$(upath "$MEMDIR/b.md")"
+tool_line "$TRANSDIR" s1 "$c" "$AFTER" MultiEdit "$MEMDIR/c.md"
+tool_line "$TRANSDIR" s1 "$c" "$AFTER" Read "$MEMDIR/d.md"
+tool_line "$TRANSDIR" s1 "$c" "$AFTER" Write "$CASE/e.md"
+check "Write と Edit と MultiEdit の呼び出しを、パスの区切りと大文字と小文字をそろえて見つける" \
+    "$(scan_writes a.md b.md c.md d.md e.md)" '{"a.md":true,"b.md":true,"c.md":true,"d.md":false,"e.md":false}'
+
+tool_line "$TRANSDIR" s2 "$c" "2026-09-30T23:59:59Z" Write "$MEMDIR/f.md"
+tool_line "$TRANSDIR" s3 "$c" "$AFTER" Write "$MEMDIR/g.md"
+touch -t 202609010000 "$TRANSDIR/s3.jsonl"
+check "時刻より前の書き換えと、時刻より前に更新された記録の書き換えを数えない" "$(scan_writes f.md g.md)" '{"f.md":false,"g.md":false}'
+
+mkdir -p "$TRANSDIR/s1/subagents"
+tool_line "$TRANSDIR/s1/subagents" agent-x "$c" "$AFTER" Write "$MEMDIR/h.md"
+check "サブエージェントの記録の書き換えも見つける" "$(scan_writes h.md)" '{"h.md":true}'
+
+newcase scan-cwd
+mkdir -p "$WT/sub"
+tool_line "$WTTRANSDIR" s1 "$(tpath "$WT/sub")" "$AFTER" Write "$(tpath "$MEMDIR/a.md")"
+user_line "$TRANSDIR" s2 "$(tpath "$REPO")" "$AFTER" '"はい"'
+check "cwd が C:\\ の形で書かれた記録を、本体の作業フォルダの記録として使う" \
+    "$(scan_writes a.md)|$(perl "$TS" utterances s2 | utter_fields)" "{\"a.md\":true}|found|$AFTER=はい"
+
+newcase scan-drive
+tool_line "$TRANSDIR" s1 "$(tpath "$REPO")" "$AFTER" Write "$(tpath "$MEMDIR/a.md")"
+check "file_path が C:\\ の形で、メモリのディレクトリが /c/ の形でも、同じファイルとして見つける" \
+    "$(perl "$TS" writes --since "$SINCE" --memory-dir "$(drivepath "$MEMDIR")" a.md)" '{"a.md":true}'
+
+newcase scan-other
+mkdir -p "$CASE/other" "$CASE/repox"
+tool_line "$TRANSDIR" s1 "$(tpath "$CASE/other")" "$AFTER" Write "$MEMDIR/a.md"
+tool_line "$TRANSDIR" s1 "$(tpath "$CASE/repox")" "$AFTER" Write "$MEMDIR/b.md"
+user_line "$TRANSDIR" s2 "$(tpath "$CASE/other")" "$AFTER" '"ほかの文"'
+check "cwd がほかのプロジェクトの記録を使わない" \
+    "$(scan_writes a.md b.md)|$(perl "$TS" utterances s2)" '{"a.md":false,"b.md":false}|{"found":false}'
+
+newcase scan-similar
+mkdir -p "$CASE/repox" "$CASE/repo-x"
+# repox のディレクトリの名前は、本体の名前の後ろに x が続く。repo-x のディレクトリの名前は、本体の名前の後ろに - が続く
+d1="$FHOME/.claude/projects/$(encname "$CASE/repox")"
+d2="$FHOME/.claude/projects/$(encname "$CASE/repo-x")"
+mkdir -p "$d1" "$d2"
+tool_line "$d1" s1 "$(tpath "$REPO")" "$AFTER" Write "$MEMDIR/a.md"
+tool_line "$d2" s2 "$(tpath "$CASE/repo-x")" "$AFTER" Write "$MEMDIR/b.md"
+user_line "$d1" s3 "$(tpath "$REPO")" "$AFTER" '"似た名前の文"'
+check "名前が似たほかのプロジェクトのディレクトリの記録を使わない" \
+    "$(scan_writes a.md b.md)|$(perl "$TS" utterances s3)" '{"a.md":false,"b.md":false}|{"found":false}'
+
+newcase scan-utter
+c=$(tpath "$REPO")
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:01Z" '"最初の文"' '"origin":{"kind":"human"},"promptSource":"typed"'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:02Z" '[{"type":"tool_result","tool_use_id":"t1","content":"道具の結果"}]'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:03Z" '"メタの文"' '"isMeta":true'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:04Z" '"<task-notification>終わった</task-notification>"' '"origin":{"kind":"task-notification"}'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:05Z" '"<system-reminder>知らせ</system-reminder>"'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:06Z" '"This session is being continued"' '"isCompactSummary":true,"isVisibleInTranscriptOnly":true'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:07Z" '"ほかの会話からの文"' '"origin":{"kind":"peer"}'
+tool_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:08Z" Write "$MEMDIR/a.md"
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:09Z" '"<command-message>start</command-message>"'
+check "utterances が道具の結果と isMeta の行と差し込まれた知らせの行を返さない" "$(perl "$TS" utterances s1 | utter_fields)" \
+    "found|2026-10-20T00:00:01Z=最初の文|2026-10-20T00:00:09Z=<command-message>start</command-message>"
+
+newcase scan-limit
+c=$(tpath "$REPO")
+for i in 1 2 3; do user_line "$TRANSDIR" s1 "$c" "$AFTER" "\"$i$(perl -e 'print "あ" x 3000')\""; done
+user_line "$TRANSDIR" s2 "$c" "$AFTER" "\"1$(perl -e 'print "い" x 10000')\""
+check "utterances が1件を20KBまでで切る" \
+    "$(perl "$TS" utterances s1 | limit_fields あ 3000)/$(perl "$TS" utterances s2 | limit_fields い 10000)" \
+    "fits|truncated|3|full|full|part/fits|truncated|1|part"
+
+newcase scan-none
+got=$(perl "$TS" utterances nosuch)
+check "記録の無い会話に記録が無いと返す" "$got|$?" '{"found":false}|0'
+
+newcase scan-config
+cfgdir="$CASE/cfg/projects/$(encname "$REPO")"
+mkdir -p "$cfgdir"
+tool_line "$cfgdir" s1 "$(tpath "$REPO")" "$AFTER" Write "$MEMDIR/a.md"
+tool_line "$TRANSDIR" s2 "$(tpath "$REPO")" "$AFTER" Write "$MEMDIR/b.md"
+user_line "$cfgdir" s3 "$(tpath "$REPO")" "$AFTER" '"設定の下の文"'
+check "CLAUDE_CONFIG_DIR があればその下の記録を読む" \
+    "$(CLAUDE_CONFIG_DIR="$CASE/cfg" scan_writes a.md b.md)|$(CLAUDE_CONFIG_DIR="$CASE/cfg" perl "$TS" utterances s3 | utter_fields)" \
+    "{\"a.md\":true,\"b.md\":false}|found|$AFTER=設定の下の文"
+
+newcase scan-broken
+c=$(tpath "$REPO")
+printf 'not json\n{"type":"assistant",\n\n[1,2]\n{"cwd":["x"]}\n' >>"$TRANSDIR/s1.jsonl"
+tool_line "$TRANSDIR" s1 "$c" "$AFTER" Write "$MEMDIR/a.md"
+printf '\377\376 broken\n' >>"$TRANSDIR/s1.jsonl"
+user_line "$TRANSDIR" s1 "$c" "$AFTER" '"読める文"'
+check "読めない行を飛ばす" "$(scan_writes a.md)|$(perl "$TS" utterances s1 | utter_fields)" "{\"a.md\":true}|found|$AFTER=読める文"
 
 echo
 echo "$pass ok, $failn NG"
