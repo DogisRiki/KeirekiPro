@@ -106,6 +106,13 @@ run_lock_release() {
     perl "$PL" lock release run "$1"
 }
 
+# 会話の中の操作は、引数をそのまま memory-inspect.pl に渡す。引数の確かめは memory-inspect.pl が行う
+cmd_show() { perl "$PL" show "$@"; }
+cmd_shown() { perl "$PL" shown "$@"; }
+cmd_history() { perl "$PL" history "$@"; }
+cmd_answer() { perl "$PL" answer "$@"; }
+cmd_missed() { perl "$PL" missed "$@"; }
+
 main() {
     [ $# -gt 0 ] || usage
     local sub=$1

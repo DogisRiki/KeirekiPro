@@ -1825,6 +1825,95 @@ perl "$PL" finalize
 rc=$?
 check "メモリのロックを取れないときは何もしない" "$rc|$(run_end r1)|$(lock_owner memory | cut -d'|' -f2)" "0|running:null:無い|r9"
 
+# ---------------------------------------------------------------------
+# 会話の中の操作
+# ---------------------------------------------------------------------
+
+newcase op-show
+make_record r1 now completed 2026-11-01T00:00:00Z
+printf '# 報告\n\n本文の1行目\n' >"$STATE/runs/r1/report.md"
+make_record r2 now running 2026-11-01T01:00:00Z
+out=$(bash "$SH" show r1)
+rc=$?
+bash "$SH" show r2 >/dev/null 2>&1
+check "show がその回の report.md を出す" "$rc|$out|$?" "0|# 報告
+
+本文の1行目|1"
+
+newcase op-shown
+make_record r1 now completed 2026-11-01T00:00:00Z
+bash "$SH" shown r1
+rc=$?
+bash "$SH" shown r9 2>/dev/null
+rc2=$?
+check "shown がその回の示した印を書く" "$rc|$(cat "$STATE/runs/r1/shown")|$rc2|$([ -e "$STATE/runs/r9" ] && printf ある || printf 無い)" \
+    "0|2026-11-02T01:00:00Z|1|無い"
+
+newcase op-history
+mkdir -p "$STATE/runs/r1" "$STATE/runs/r2" "$STATE/runs/r3" "$STATE/runs/r4"
+cat >"$STATE/runs/r1/record.json" <<'JSON'
+{"run_id": "r1", "trigger": "scheduled", "status": "completed", "started_at": "2026-10-26T01:00:00Z", "finished_at": "2026-10-26T01:20:00Z",
+ "findings": [{"id": "F1"}, {"id": "F2"}, {"id": "F3"}],
+ "changes": [{"id": "C1", "file": "a.md", "state": "applied"}, {"id": "C2", "file": "a.md", "state": "applied"},
+             {"id": "C3", "file": "b.md", "state": "applied"}, {"id": "C4", "file": "c.md", "state": "skipped"}],
+ "reverts": [{"change": "C3", "reverted_at": "2026-10-27T00:00:00Z"}]}
+JSON
+cat >"$STATE/runs/r2/record.json" <<'JSON'
+{"run_id": "r2", "trigger": "now", "status": "interrupted", "started_at": "2026-10-28T01:00:00Z", "finished_at": "2026-10-28T02:31:00Z",
+ "findings": [], "changes": [{"id": "C1", "file": "a.md", "state": "not_applied"}]}
+JSON
+cat >"$STATE/runs/r3/record.json" <<'JSON'
+{"run_id": "r3", "trigger": "now", "status": "running", "started_at": "2026-10-27T01:00:00Z", "finished_at": null, "findings": [{"id": "F1"}], "changes": []}
+JSON
+check "history が、回ごとに、回の ID と点検の種類と状態と終わった時刻と汚染の数と直したファイルの数と戻した直しの数を1行で出す" \
+    "$(bash "$SH" history)|$?" \
+    "r1 種類:決まった曜日と時刻の点検 状態:完了 終わった時刻:2026-10-26T01:20:00Z 汚染:3 直したファイル:2 戻した直し:1
+r3 種類:その場で動かした点検 状態:動いている 終わった時刻:- 汚染:1 直したファイル:0 戻した直し:0
+r2 種類:その場で動かした点検 状態:中断 終わった時刻:2026-10-28T02:31:00Z 汚染:0 直したファイル:0 戻した直し:0|0"
+
+# 案への答えは、記録の案の ID から、種類と fingerprint を引いて書く
+answers_fields() {
+    perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; my $a = JSON::PP->new->utf8->decode(<$f>); my $s = sub { defined $_[0] ? $_[0] : "null" };
+        print join ";", (map { my $r = $a->{rule}{$_}; "$_=" . join ",", map { $s->($r->{$_}) } qw(declined_at filed_at issue) } sort keys %{ $a->{rule} }),
+            (map { my $r = $_; "R=" . join ",", map { $s->($r->{$_}) } qw(fingerprint answer issue answered_at) } @{ $a->{relocation} }),
+            (map { my $r = $_; "M=" . join ",", map { $s->($r->{$_}) } qw(run_id proposal answer issue) } @{ $a->{inspection} })' "$STATE/answers.json"
+}
+newcase op-answer
+mkdir -p "$STATE/runs/r1"
+cat >"$STATE/runs/r1/record.json" <<'JSON'
+{"run_id": "r1", "trigger": "scheduled", "status": "completed", "started_at": "2026-10-26T01:00:00Z", "finished_at": "2026-10-26T01:20:00Z",
+ "findings": [{"id": "F1", "kind": 2, "file": "a.md", "fingerprint": "fp-a"}, {"id": "F2", "kind": 10, "file": "b.md", "fingerprint": "fp-b"}],
+ "changes": [],
+ "relocation_proposals": [{"id": "R1", "finding": "F2", "target": "CLAUDE.md", "text": "t"}],
+ "rule_proposals": [{"id": "K1", "kind": 3, "target": "CLAUDE.md", "text": "t"}, {"id": "K2", "kind": 5, "target": "CLAUDE.md", "text": "t"}],
+ "inspection_proposals": [{"id": "M1", "trigger": "missed:X1", "text": "t"}]}
+JSON
+printf '{"rule":{"7":{"declined_at":"2026-10-01T00:00:00Z","filed_at":null,"issue":null}},"relocation":[],"inspection":[]}\n' >"$STATE/answers.json"
+bash "$SH" answer r1 K1 declined
+rcs=$?
+bash "$SH" answer r1 K2 accepted --issue 700
+rcs=$rcs$?
+bash "$SH" answer r1 R1 declined
+rcs=$rcs$?
+bash "$SH" answer r1 M1 accepted --issue 701
+rcs=$rcs$?
+bash "$SH" answer r1 K9 declined 2>/dev/null
+rcs=$rcs$?
+check "answer が、決まりの見直しの案を断った種類と、起票した種類と Issue の番号と、移す先の案と点検のやり方の案への答えを answers.json に書く" \
+    "$rcs|$(answers_fields)" \
+    "00001|3=2026-11-02T01:00:00Z,null,null;5=null,2026-11-02T01:00:00Z,700;7=2026-10-01T00:00:00Z,null,null;R=fp-b,declined,null,2026-11-02T01:00:00Z;M=r1,M1,accepted,701"
+
+newcase op-missed
+mkdir -p "$STATE"
+printf '[{"id":"X1","kind":3,"file":"b.md","summary":"前の見落とし","noted_at":"2026-10-20T00:00:00Z","proposed_in":"r0"}]\n' >"$STATE/missed.json"
+bash "$SH" missed 4 a.md "日付の誤り"
+rc=$?
+bash "$SH" missed 12 a.md "種類が無い" 2>/dev/null
+check "missed が、見落としを missed.json に書く" \
+    "$rc|$?|$(perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; binmode STDOUT, ":utf8";
+        print join ";", map { my $m = $_; join ",", map { defined $m->{$_} ? $m->{$_} : "null" } qw(id kind file summary noted_at proposed_in) } @{ JSON::PP->new->utf8->decode(<$f>) }' "$STATE/missed.json")" \
+    "0|2|X1,3,b.md,前の見落とし,2026-10-20T00:00:00Z,r0;X2,4,a.md,日付の誤り,2026-11-02T01:00:00Z,null"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

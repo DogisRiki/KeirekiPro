@@ -35,6 +35,14 @@
 #     終わっていない回を中断にする。回のロックをその回が持っていないか、始めてから90分を過ぎた回が対象で、
 #     --run を渡したときは、その回を確かめずに渡した理由で中断にする(記録が無ければ作る)。書いている途中の直しは、
 #     メモリの中身で書いたかを見分ける。記録と report.md を書き、比べる元は書き直さない。メモリのロックを取れないときは何もしない
+#   show <回の ID> / shown <回の ID>
+#     その回の report.md を標準出力に出す / その回に、報告を示した印 shown を書く
+#   history
+#     記録のある回を始めた順に、回の ID・点検の種類・状態・終わった時刻・汚染の数・直したメモリファイルの数・戻した直しの数の1行ずつで出す
+#   answer <回の ID> <案の ID> declined|accepted [--issue <番号>]
+#     報告に載った案(R・K・M の番号)への開発者の答えを answers.json に書く
+#   missed <汚染の種類> <メモリファイルの名前> <短い説明>
+#     開発者が会話で指摘した見落としを、X の番号を振って missed.json に書く。メモリのロックの中で読み直してから書く
 # 終了コード: 成功は 0、使い方の誤りは 2、失敗は 1(標準エラーに理由を日本語の1文で出す)
 # 前提: perl(JSON::PP)・git。Windows では、git に渡す場所を C:/... の形で受ける
 # =====================================================================
@@ -59,6 +67,11 @@ my %COMMANDS = (
     lookup  => \&cmd_lookup,
     apply   => \&cmd_apply,
     finalize => \&cmd_finalize,
+    show     => \&cmd_show,
+    shown    => \&cmd_shown,
+    history  => \&cmd_history,
+    answer   => \&cmd_answer,
+    missed   => \&cmd_missed,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
@@ -145,7 +158,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>]\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明>\n";
     return 2;
 }
 
@@ -1615,6 +1628,139 @@ sub cmd_finalize {
     };
     my $err = $@;
     lock_release($lock, $only // 'finalize');
+    die $err unless $ok;
+    return 0;
+}
+
+# ---- 会話の中の操作 ----------------------------------------------------------
+
+# 回の ID が回の場所の名前の形かを返す
+sub valid_run { return defined $_[0] && $_[0] =~ /\A[A-Za-z0-9][A-Za-z0-9_-]*\z/ ? 1 : 0 }
+
+# その回の記録を返す。記録が無いときと、形が違うときは die する
+sub run_record {
+    my ($state, $run) = @_;
+    my $record = read_json("$state/runs/$run/record.json");
+    die "回 $run の記録が無い\n" unless defined $record;
+    die "回 $run の記録の形が違う\n" unless ref $record eq 'HASH';
+    return $record;
+}
+
+# その回の報告を出す: show <回の ID>
+sub cmd_show {
+    my @args = @_;
+    return usage() unless @args == 1 && valid_run($args[0]);
+    my $text = read_bytes(state_dir(dirname(__FILE__)) . "/runs/$args[0]/report.md");
+    die "回 $args[0] の報告が無い\n" unless defined $text;
+    binmode STDOUT, ':raw';
+    print $text;
+    return 0;
+}
+
+# その回の報告を示した印を書く: shown <回の ID>
+sub cmd_shown {
+    my @args = @_;
+    return usage() unless @args == 1 && valid_run($args[0]);
+    my $state = state_dir(dirname(__FILE__));
+    run_record($state, $args[0]);
+    write_bytes("$state/runs/$args[0]/shown", iso_utc(now()) . "\n");
+    return 0;
+}
+
+# 過去の点検を、始めた順に1回ずつ1行で出す: history
+sub cmd_history {
+    my @args = @_;
+    return usage() if @args;
+    my @lines;
+    for my $pair (sort { $a->[1] <=> $b->[1] || report_str($a->[0]{run_id}) cmp report_str($b->[0]{run_id}) }
+        run_records(state_dir(dirname(__FILE__)))) {
+        my $r = $pair->[0];
+        my %files = map { (report_str($_->{file}) => 1) }
+            grep { ref $_ eq 'HASH' && ($_->{state} // '') eq 'applied' } @{ list_of($r->{changes}) };
+        my $status = report_str($r->{status});
+        my $finished = report_str($r->{finished_at});
+        push @lines, join(' ',
+            report_str($r->{run_id}),
+            '種類:' . (report_str($r->{trigger}) eq 'now' ? 'その場で動かした点検' : '決まった曜日と時刻の点検'),
+            '状態:' . ($STATUS_NAME{$status} // $status),
+            '終わった時刻:' . ($finished eq '' ? '-' : $finished),
+            '汚染:' . scalar(grep { ref $_ eq 'HASH' } @{ list_of($r->{findings}) }),
+            '直したファイル:' . scalar(keys %files),
+            '戻した直し:' . scalar(grep { ref $_ eq 'HASH' } @{ list_of($r->{reverts}) })) . "\n";
+    }
+    binmode STDOUT, ':raw';
+    print @lines;
+    return 0;
+}
+
+# 案への答えを answers.json に書く: answer <回の ID> <案の ID> declined|accepted [--issue <番号>]
+sub cmd_answer {
+    my ($run, $id, $answer, @rest) = @_;
+    return usage() unless defined $answer && valid_run($run) && $id =~ /\A[RKM][1-9][0-9]{0,4}\z/ && $answer =~ /\A(?:declined|accepted)\z/;
+    my $issue;
+    if (@rest) {
+        return usage() unless @rest == 2 && $rest[0] eq '--issue' && $rest[1] =~ /\A[1-9][0-9]{0,8}\z/;
+        $issue = 0 + $rest[1];
+    }
+    my $state = state_dir(dirname(__FILE__));
+    my $record = run_record($state, $run);
+    my $list = { R => 'relocation_proposals', K => 'rule_proposals', M => 'inspection_proposals' }->{ substr($id, 0, 1) };
+    my ($p) = grep { ref $_ eq 'HASH' && report_str($_->{id}) eq $id } @{ list_of($record->{$list}) };
+    die "回 $run の記録に案 $id が無い\n" unless $p;
+
+    my $answers = read_state_json("$state/answers.json", 'HASH');
+    $answers->{rule} = {} unless ref $answers->{rule} eq 'HASH';
+    $answers->{$_} = list_of($answers->{$_}) for qw(relocation inspection);
+    my $at = iso_utc(now());
+    if ($id =~ /\AK/) {
+        # 断った種類は、決まりの見直しの案を載せる種類から外し、起票した種類は、起票した時刻よりあとの回だけを数える
+        my $kind = $p->{kind};
+        die "回 $run の案 $id に汚染の種類が無い\n" unless defined $kind && !ref $kind && $kind =~ /\A[1-9][0-9]?\z/;
+        $answers->{rule}{$kind} = $answer eq 'declined'
+            ? { declined_at => $at, filed_at => undef, issue => undef }
+            : { declined_at => undef, filed_at => $at, issue => $issue };
+    } elsif ($id =~ /\AR/) {
+        # 断った移す先の案は、記述の fingerprint が変わらない間、報告から外す
+        my $finding = report_str($p->{finding});
+        my ($f) = grep { ref $_ eq 'HASH' && report_str($_->{id}) eq $finding } @{ list_of($record->{findings}) };
+        my $fp = $f ? $f->{fingerprint} : undef;
+        die "回 $run の案 $id の汚染に fingerprint が無い\n" unless defined $fp && !ref $fp && $fp ne '';
+        $answers->{relocation} = [ (grep { !(ref $_ eq 'HASH' && ($_->{fingerprint} // '') eq $fp) } @{ $answers->{relocation} }),
+            { fingerprint => $fp, answer => $answer, issue => $issue, answered_at => $at } ];
+    } else {
+        $answers->{inspection} = [
+            (grep { !(ref $_ eq 'HASH' && ($_->{run_id} // '') eq $run && ($_->{proposal} // '') eq $id) } @{ $answers->{inspection} }),
+            { run_id => $run, proposal => $id, answer => $answer, issue => $issue } ];
+    }
+    write_json("$state/answers.json", $answers);
+    return 0;
+}
+
+# 開発者が会話で指摘した見落としを missed.json に書く: missed <汚染の種類> <メモリファイルの名前> <短い説明>
+sub cmd_missed {
+    my @args = @_;
+    return usage() unless @args == 3 && $args[0] =~ /\A(?:[1-9]|1[01])\z/ && $args[2] =~ /\S/;
+    my ($kind, $file, $summary) = (0 + $args[0], decode('UTF-8', $args[1]), decode('UTF-8', $args[2]));
+    return usage() unless defined memory_name($file);
+    my $state = state_dir(dirname(__FILE__));
+
+    # 適用の部品が proposed_in を書くのと同じ時に書いて片方が消えないように、メモリのロックの中で読み直してから書く
+    my $lock = lock_dir($state, 'memory');
+    my ($taken, $owner) = lock_take($lock, 'missed', own_pid());
+    die 'メモリのロックを回 ' . ($owner ? encode('UTF-8', $owner->{run}) : '(不明)') . " が取っているので、見落としを書かなかった。少し待ってからもう一度打つ\n"
+        unless $taken;
+    my $ok = eval {
+        my $missed = read_state_json("$state/missed.json", 'ARRAY');
+        my $n = 0;
+        for my $m (grep { ref $_ eq 'HASH' && defined $_->{id} && !ref $_->{id} } @$missed) {
+            $n = $1 if $m->{id} =~ /\AX([0-9]+)\z/ && $1 > $n;
+        }
+        push @$missed, { id => 'X' . ($n + 1), kind => $kind, file => $file, summary => $summary, noted_at => iso_utc(now()), proposed_in => undef };
+        write_json("$state/missed.json", $missed);
+        1;
+    };
+    my $err = $@;
+    lock_release($lock, 'missed');
     die $err unless $ok;
     return 0;
 }
