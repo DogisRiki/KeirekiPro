@@ -16,7 +16,7 @@
   - _要件: 1.6, 1.11_
   - _保留: 親の会話の Claude が、`/kiro-impl` の Step 3 の繰り返しを始める前に行う(実装のメモ)_
 
-- [ ] 1.3 テストの土台と、偽のコマンドを作る
+- [x] 1.3 テストの土台と、偽のコマンドを作る
 
   Claude は、テスト `.claude/scripts/memory/tests/test-memory-inspect.sh` の土台を作る。土台は、テストの場合ごとに一時のディレクトリを作り、その中に、`origin/main` を持つ偽の git のリポジトリと、その worktree と、偽のホームと、偽のメモリのディレクトリと、偽の会話の記録の置き場所を作る。土台は、`HOME` と `USERPROFILE` を偽のホームに替え、所有者の本物のメモリと点検の状態の場所に触れないようにする。土台は、`PATH` の先頭に、偽の `claude` と偽の `gh` を置く。土台は、偽の `powershell.exe`、偽の `launchctl`、偽の `crontab` を、テストの場合が求めたときだけ `PATH` の先頭に置く。タスク1.5のプロセスの見分けが本物の Windows のコマンドを使えるようにするためである。偽の `claude` は、テストが置いた JSON を呼ばれた順に返し、受けた引数と標準入力と環境変数を書き残す。偽の `claude` は、テストが指定したときに、眠って時間切れを起こすか、`is_error` が真の結果を返す。偽の `gh` は、テストが置いた Issue と PR の JSON を返し、受けた引数を書き残す。ほかの3つの偽物は、受けた引数を書き残す。土台は、今の時刻を環境変数 `KP_MEMORY_INSPECTION_NOW` で与える。土台は、偽の会話の記録の `cwd` と `file_path` を、Claude Code が Windows で書く `C:\` の区切りの形でも作れるようにする。Git Bash では、土台は、その形の場所を `pwd -W` で求める。
   - 完了の確かめ方: 3つの環境(実装のメモ)のそれぞれで、土台を確かめるテストの場合「偽の claude が置いた JSON を順に返し、受けた引数と標準入力を書き残す」と「偽のホームの外のファイルが変わらない」が通る。shellcheck(実装のメモ)の指摘が0件である
@@ -311,6 +311,7 @@
   - 結果の JSON の欄の名前: `--json-schema` の形に合う JSON は、結果の `structured_output` の欄にオブジェクトとして入る。`result` の欄には同じ JSON が文字列で入る。`num_turns` は 2 になったので、`--max-turns 4` で足りる
   - 外す環境変数: 会話の中の Claude Code は、子のプロセスに、`CLAUDECODE`、`CLAUDE_CODE_` で始まる名前、`CLAUDE_AGENT_SDK_` で始まる名前、`CLAUDE_PID`、`CLAUDE_EFFORT`、`CLAUDE_PREVIEW_` で始まる名前、`AI_AGENT`、`MCP_` で始まる名前、`BAGGAGE` を渡していた。外さなくても `claude -p` は動いたが、この部品は、これらを名前の形で外してから呼ぶ。ただし `CLAUDE_CONFIG_DIR` は外さない。外したうえで `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` と `KP_MEMORY_INSPECTION_RUN=1` を足して呼んだ `claude -p` は動き、`is_error` は偽、`subtype` は `success` だった。名前の一覧でなく名前の形で外すのは、Claude Code の版が上がって新しい環境変数が増えても、外し漏れが起きないためである
 - タスク1.2で確かめた見分け方(2026-10-31): 別の Git Bash のプロセスは、自分の `/proc/$$/winpid` で Windows のプロセスの番号を読める。この会話の Git Bash から、`tasklist.exe /FI "PID eq <番号>" /NH /FO CSV` の出力に `"<番号>"` が含まれるかで見分ける。プロセスがある間の出力は `"bash.exe","580","Console",...` の行で、無くなったあとの出力は「情報: 指定された条件に一致するタスクは実行されていません。」で、`"580"` を含まなかった。`MSYS2_ARG_CONV_EXCL` があるので、引数は `//FI` でなく `/FI` と書く。同じ Git for Windows の別の Git Bash のプロセスには `kill -0 <MSYS のプロセスの番号>` も効いたが、点検のロックは Windows のプロセスの番号で見分ける
+- タスク1.3で分かったこと: テストは、偽のコマンドを置くディレクトリを `PATH` に `C:/...` の形で足さず、`mktemp -d` が返した `/tmp/...` の形で足す。`C:` の `:` が `PATH` の区切りに読まれ、偽のコマンドより本物の `claude` と `gh` が先に見つかるためである。テストは、テストの場合の初めに、`command -v claude` と `command -v gh` が偽のコマンドを指すことを確かめ、指さなければテスト全体を止める。git が返す場所と比べる場所は、`pwd -W` が無い環境では `pwd -P` で求める。macOS の一時のフォルダはシンボリックリンクの下にあり、`pwd` のままでは git が返す場所と食い違うためである。偽のコマンドが眠るときは、止め方を先に決めてから眠りを裏で始め、止められたら眠りも止める。眠りが残ると、呼んだ側の標準出力が眠りの終わりまで閉じないためである
 
 ## 完了条件(全タスク共通)
 
