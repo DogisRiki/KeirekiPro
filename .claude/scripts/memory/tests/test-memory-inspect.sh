@@ -1730,6 +1730,101 @@ check "snapshot.json が、直したファイルは直したあとのハッシ�
     "$(snap_fields)" \
     "$(jget "$rec" started_at)|r1|$(snap_entry MEMORY.md "$MEMDIR/MEMORY.md"),$(snap_entry a.md "$MEMDIR/a.md"),$(snap_entry b.md "$MEMDIR/b.md"),$(snap_entry c.md "$CASE/old/c.md")"
 
+# ---------------------------------------------------------------------
+# 終わっていない回の後始末
+# ---------------------------------------------------------------------
+
+STOPPED_REASON="点検が途中で止まった。PC が止まったか、点検のプロセスが止められた"
+# 回の状態と中断の理由と、report.md があるかを「状態:理由:報告」の形で出す: run_end <回の ID>
+run_end() {
+    printf '%s:%s:%s' "$(jget "$STATE/runs/$1/record.json" status)" "$(jget "$STATE/runs/$1/record.json" interrupt_reason)" \
+        "$([ -f "$STATE/runs/$1/report.md" ] && printf ある || printf 無い)"
+}
+
+newcase fz-held
+make_record r1 now running "$(shifted_now -600)"
+lock_take run r1 "$(self_pid)" >/dev/null
+perl "$PL" finalize
+rc=$?
+check "点検のロックを取っている回の running の記録を中断にしない" "$rc|$(run_end r1)" "0|running:null:無い"
+
+newcase fz-dead
+make_record r1 now running "$(shifted_now -600)"
+lock_take run r1 "$(dead_pid)" >/dev/null
+# ロックが空くのを待っている決まった曜日と時刻の点検の回は、場所だけがある
+mkdir -p "$STATE/runs/r2"
+perl "$PL" finalize
+rc=$?
+check "ロックを取ったプロセスが無い回の running の記録を、90分を待たずに中断にする" "$rc|$(run_end r1)" "0|interrupted:$STOPPED_REASON:ある"
+check "record.json の無い回を、--run で渡されない限り扱わない" \
+    "$(find "$STATE/runs/r2" -mindepth 1 | wc -l | tr -d ' ')" "0"
+
+newcase fz-old
+make_record r2 now running "$(shifted_now -5340)"
+lock_take run r2 "$(self_pid)" >/dev/null
+perl "$PL" finalize
+rc1=$?
+# r2 はロックを取っていて、始まりから89分なので、1回目では中断にならず、2分あとの2回目で中断になる
+first=$(run_end r2)
+KP_MEMORY_INSPECTION_NOW=$(shifted_now 120) perl "$PL" finalize
+rc2=$?
+check "始まりから90分を過ぎた running の記録を中断にする" "$rc1|$rc2|$first|$(run_end r2)" \
+    "0|0|running:null:無い|interrupted:$STOPPED_REASON:ある"
+
+newcase fz-run
+make_record r1 now running "$(shifted_now -600)"
+lock_take run r1 "$(self_pid)" >/dev/null
+perl "$PL" finalize --run r1 --reason "点検の中の Claude が誤りを返した"
+rc1=$?
+perl "$PL" finalize --run 2026-11-02T100000-now --reason "回の場所を作ったあとに止まった"
+rc2=$?
+check "--run と --reason で渡した回を中断にし、record.json が無ければ作る" \
+    "$rc1|$rc2|$(run_end r1)|$(run_end 2026-11-02T100000-now)|$(jget "$STATE/runs/2026-11-02T100000-now/record.json" run_id trigger started_at finished_at)" \
+    "0|0|interrupted:点検の中の Claude が誤りを返した:ある|interrupted:回の場所を作ったあとに止まった:ある|2026-11-02T100000-now,now,2026-11-02T01:00:00Z,2026-11-02T01:00:00Z"
+
+newcase fz-applying
+mkdir -p "$CASE/old"
+printf -- '- [A](a.md) — a\n- [E](e.md) — e\n' >"$MEMDIR/MEMORY.md"
+printf '新しい文\n前の文\n前の文2残る文\n' >"$MEMDIR/a.md"
+printf '後ろの文\n先頭の文2\n後ろの文2\n' >"$MEMDIR/b.md"
+printf 'まだある\n' >"$MEMDIR/e.md"
+make_snapshot "$SINCE" "$MEMDIR"
+snap_before=$(cksum <"$STATE/snapshot.json")
+mkdir -p "$STATE/runs/r1"
+cat >"$STATE/runs/r1/record.json" <<JSON
+{"run_id": "r1", "trigger": "scheduled", "status": "running", "started_at": "$(shifted_now -600)", "finished_at": null,
+ "interrupt_reason": null, "first_run": false, "origin_main": "0123456789abcdef0123456789abcdef01234567", "files_inspected": 3,
+ "index": {"lines": 2, "bytes": 0}, "read_hashes": {}, "findings": [],
+ "changes": [
+  {"id": "C1", "finding": "F1", "op": "edit", "file": "a.md", "before": "古い文", "after": "新しい文", "removed_index_lines": [], "anchor": null, "anchor_side": null, "state": "applying", "skip_reason": null},
+  {"id": "C2", "finding": "F1", "op": "edit", "file": "a.md", "before": "古い文2", "after": "書かれなかった文", "removed_index_lines": [], "anchor": null, "anchor_side": null, "state": "applying", "skip_reason": null},
+  {"id": "C3", "finding": "F1", "op": "edit", "file": "a.md", "before": "消した文", "after": "", "removed_index_lines": [], "anchor": "前の文", "anchor_side": "before", "state": "applying", "skip_reason": null},
+  {"id": "C4", "finding": "F1", "op": "edit", "file": "a.md", "before": "残る文", "after": "", "removed_index_lines": [], "anchor": "前の文2", "anchor_side": "before", "state": "applying", "skip_reason": null},
+  {"id": "C5", "finding": "F1", "op": "edit", "file": "b.md", "before": "先頭の文\n", "after": "", "removed_index_lines": [], "anchor": "後ろの文", "anchor_side": "after", "state": "applying", "skip_reason": null},
+  {"id": "C6", "finding": "F1", "op": "edit", "file": "b.md", "before": "先頭の文2\n", "after": "", "removed_index_lines": [], "anchor": "後ろの文2", "anchor_side": "after", "state": "applying", "skip_reason": null},
+  {"id": "C7", "finding": "F1", "op": "append_index_line", "file": "MEMORY.md", "before": "", "after": "- [E](e.md) — e", "removed_index_lines": [], "anchor": null, "anchor_side": null, "state": "applying", "skip_reason": null},
+  {"id": "C8", "finding": "F1", "op": "append_index_line", "file": "MEMORY.md", "before": "", "after": "- [F](f.md) — f", "removed_index_lines": [], "anchor": null, "anchor_side": null, "state": "applying", "skip_reason": null},
+  {"id": "C9", "finding": "F1", "op": "delete", "file": "d.md", "before": "消したファイル\n", "after": "", "removed_index_lines": ["- [D](d.md) — d"], "anchor": null, "anchor_side": null, "state": "applying", "skip_reason": null},
+  {"id": "C10", "finding": "F1", "op": "delete", "file": "e.md", "before": "まだある\n", "after": "", "removed_index_lines": ["- [E](e.md) — e"], "anchor": null, "anchor_side": null, "state": "applying", "skip_reason": null}
+ ],
+ "skipped_files": [], "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "notes": []}
+JSON
+perl "$PL" finalize
+rc=$?
+check "applying の直しを、4つの直し方ごとに applied と not_applied に分ける" "$rc|$(rec_list "$STATE/runs/r1/record.json" changes id state)" \
+    "0|C1:applied,C2:not_applied,C3:applied,C4:not_applied,C5:applied,C6:not_applied,C7:applied,C8:not_applied,C9:applied,C10:not_applied"
+check "中断した回に report.md を作って中断の理由を載せ、snapshot.json を書き直さない" \
+    "$(report_head | grep '^- \(状態\|中断の理由\): ')|$(report_section 直したメモリファイル | grep '^### ' | cut -d' ' -f2 | tr '\n' ,)|$([ "$snap_before" = "$(cksum <"$STATE/snapshot.json")" ] && printf 同じ || printf 違う)" \
+    "- 状態: 中断
+- 中断の理由: $STOPPED_REASON|C1,C3,C5,C7,C9,|同じ"
+
+newcase fz-memlock
+make_record r1 now running "$(shifted_now -600)"
+lock_take memory r9 "$(self_pid)" >/dev/null
+perl "$PL" finalize
+rc=$?
+check "メモリのロックを取れないときは何もしない" "$rc|$(run_end r1)|$(lock_owner memory | cut -d'|' -f2)" "0|running:null:無い|r9"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

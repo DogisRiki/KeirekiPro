@@ -31,6 +31,10 @@
 #     点検の中の Claude が返した直し方の JSON(plan-schema.json の形)を標準入力で受け、prepare が記録に書いた汚染に続けて、
 #     汚染に F、直しに C、移す先の案に R、決まりの見直しの案に K、点検のやり方の見直しの案に M の番号を振る。
 #     直しを1つずつ確かめ、行わない直しは状態を skipped にして理由を記録に書く。読んだあとに書き換わったファイルを skipped_files に書く
+#   finalize [--run <回の ID> --reason <理由>]
+#     終わっていない回を中断にする。回のロックをその回が持っていないか、始めてから90分を過ぎた回が対象で、
+#     --run を渡したときは、その回を確かめずに渡した理由で中断にする(記録が無ければ作る)。書いている途中の直しは、
+#     メモリの中身で書いたかを見分ける。記録と report.md を書き、比べる元は書き直さない。メモリのロックを取れないときは何もしない
 # 終了コード: 成功は 0、使い方の誤りは 2、失敗は 1(標準エラーに理由を日本語の1文で出す)
 # 前提: perl(JSON::PP)・git。Windows では、git に渡す場所を C:/... の形で受ける
 # =====================================================================
@@ -54,6 +58,7 @@ my %COMMANDS = (
     content => \&cmd_content,
     lookup  => \&cmd_lookup,
     apply   => \&cmd_apply,
+    finalize => \&cmd_finalize,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
@@ -115,6 +120,8 @@ my %STATUS_NAME = (completed => q{完了}, interrupted => q{中断}, running => 
 my %OP_NAME = (edit => q{文の置き換え}, delete => q{ファイルの削除}, append_index_line => q{目次への行の追加});
 # 書き終わらずに止まった直しの、行わなかった理由
 my $NOT_WRITTEN = q{点検が途中で止まったので、書かなかった};
+# 終わっていない回を、理由を渡されずに中断にしたときの理由
+my $STOPPED_REASON = q{点検が途中で止まった。PC が止まったか、点検のプロセスが止められた};
 
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
@@ -138,7 +145,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>]\n";
     return 2;
 }
 
@@ -1519,4 +1526,95 @@ sub finish_run {
     write_json($path, $out);
     write_bytes(dirname($path) . '/report.md', report_text($out));
     write_json("$state/snapshot.json", next_snapshot($out, $memdir, $read, $written, $old));
+}
+
+# ---- 終わっていない回の後始末 ------------------------------------------------
+
+# 状態が applying のまま止まった直しが、メモリに書かれたかを返す
+sub change_written {
+    my ($c, $memdir) = @_;
+    my $op = report_str($c->{op});
+    my $name = memory_name($c->{file});
+    return 0 unless defined $name;
+    return -e "$memdir/$name" ? 0 : 1 if $op eq 'delete';
+    my $text = read_bytes("$memdir/$name");
+    return 0 unless defined $text;
+    my $after = report_str($c->{after});
+    return (grep { $_ eq $after } split_lines($text)) ? 1 : 0 if $op eq 'append_index_line';
+    return 0 unless $op eq 'edit';
+    return index($text, $after) >= 0 ? 1 : 0 if length $after;
+    # 空の文はどのファイルにもあるので、消した文が anchor の隣に残っていないことで、書かれたと見分ける
+    my ($before, $anchor) = (report_str($c->{before}), report_str($c->{anchor}));
+    my $near = report_str($c->{anchor_side}) eq 'after' ? $before . $anchor : $anchor . $before;
+    return index($text, $near) < 0 ? 1 : 0;
+}
+
+# 回を中断にする。applying の直しを applied か not_applied に分け、記録と report.md を書く。比べる元は書き直さない
+sub interrupt_run {
+    my ($state, $memdir, $run, $record, $reason) = @_;
+    for my $c (grep { ref $_ eq 'HASH' && ($_->{state} // '') eq 'applying' } @{ list_of($record->{changes}) }) {
+        $c->{state} = change_written($c, $memdir) ? 'applied' : 'not_applied';
+    }
+    @$record{qw(status finished_at interrupt_reason)} = ('interrupted', iso_utc(now()), $reason);
+    write_json("$state/runs/$run/record.json", $record);
+    write_bytes("$state/runs/$run/report.md", report_text($record));
+}
+
+# 終わっていない回の後始末をする: finalize [--run <回の ID> --reason <理由>]
+sub cmd_finalize {
+    my @args = @_;
+    my ($only, $reason);
+    if (@args) {
+        return usage() unless @args == 4 && $args[0] eq '--run' && $args[2] eq '--reason';
+        ($only, $reason) = @args[1, 3];
+        return usage() unless $only =~ /\A[A-Za-z0-9][A-Za-z0-9_-]*\z/ && $reason ne '';
+        $reason = decode('UTF-8', $reason);
+    }
+    my $here = dirname(__FILE__);
+    my $state = state_dir($here);
+    my $memdir = memory_dir(main_worktree($here));
+
+    # 直しを書いている回と同じ時に直しの状態を見分けないように、メモリのロックを取れないときは何もしない
+    my $lock = lock_dir($state, 'memory');
+    my ($taken) = lock_take($lock, $only // 'finalize', own_pid());
+    return 0 unless $taken;
+    my $ok = eval {
+        if (defined $only) {
+            my $record = read_json("$state/runs/$only/record.json");
+            if (!defined $record) {
+                make_path("$state/runs/$only");
+                my $at = iso_utc(now());
+                $record = {
+                    run_id => $only, trigger => $only =~ /-now\z/ ? 'now' : 'scheduled', status => 'running',
+                    started_at => $at, finished_at => undef, interrupt_reason => undef, first_run => JSON::PP::false,
+                    origin_main => undef, files_inspected => 0, index => { lines => 0, bytes => 0 }, read_hashes => {},
+                    map { ($_ => []) } qw(findings changes skipped_files relocation_proposals rule_proposals inspection_proposals notes),
+                };
+            }
+            die "回 $only の記録の形が違う\n" unless ref $record eq 'HASH';
+            # 終わった回は、渡されても書き替えない
+            interrupt_run($state, $memdir, $only, $record, $reason) if ($record->{status} // '') eq 'running';
+        } else {
+            my ($run_lock, $owner) = lock_status(lock_dir($state, 'run'));
+            my $holder = $run_lock eq 'held' && $owner ? $owner->{run} : undef;
+            my $limit = limit_sec('KP_MEMORY_INSPECTION_STALE_SEC', 90 * 60);
+            my $default = decode('UTF-8', $STOPPED_REASON);
+            opendir(my $dh, "$state/runs") or return 1;
+            my @ids = sort grep { /\A[A-Za-z0-9][A-Za-z0-9_-]*\z/ } readdir $dh;
+            closedir $dh;
+            for my $run (@ids) {
+                # record.json の無い回は、ロックが空くのを待っている決まった曜日と時刻の点検なので、扱わない
+                my $record = read_json("$state/runs/$run/record.json");
+                next unless ref $record eq 'HASH' && ($record->{status} // '') eq 'running';
+                my $started = epoch($record->{started_at});
+                next if defined $holder && $holder eq $run && defined $started && now() - $started <= $limit;
+                interrupt_run($state, $memdir, $run, $record, $default);
+            }
+        }
+        1;
+    };
+    my $err = $@;
+    lock_release($lock, $only // 'finalize');
+    die $err unless $ok;
+    return 0;
 }
