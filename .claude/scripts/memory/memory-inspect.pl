@@ -93,6 +93,8 @@ my %NOTE_OUT_OF_RANGE = (
     relocation => q{移す先の案の汚染の番号 %s が直し方の汚染の数を超えたので、案を載せなかった},
     inspection => q{点検のやり方の見直しの案の汚染の番号 %s が直し方の汚染の数を超えたので、案を載せなかった},
 );
+# 決まりの見直しの案を載せる種類で、点検の中の Claude が案を書かなかったときに、記録の notes に書く文
+my $NOTE_NO_RULE = q{種類 %s の汚染が直近の点検で繰り返し見つかったが、決まりの見直しの案を作れなかった};
 
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
@@ -535,6 +537,47 @@ sub kind_repeats {
         }
     }
     return \%count;
+}
+
+# answers.json で断られた移す先の案の fingerprint を、fingerprint => 1 の表で返す
+sub declined_fingerprints {
+    my ($answers) = @_;
+    return map { ($_->{fingerprint} => 1) }
+        grep { ref $_ eq 'HASH' && defined $_->{fingerprint} && !ref $_->{fingerprint} && ($_->{answer} // '') eq 'declined' }
+        @{ ref $answers eq 'HASH' && ref $answers->{relocation} eq 'ARRAY' ? $answers->{relocation} : [] };
+}
+
+# ---- 案の絞り込み ----------------------------------------------------------
+
+# 汚染の fingerprint を返す。汚染の種類とファイル名と、空白をそろえた記述の文を、\0 で区切って続けた文字の列の SHA-256 である。
+# 区切るのは、種類 1 の 1a.md と種類 11 の a.md のように、続けると同じ文字の列になる組を分けるためである
+sub fingerprint {
+    my ($f) = @_;
+    my @parts = map { defined $_ && !ref $_ ? $_ : '' } @$f{qw(kind file excerpt)};
+    $parts[2] = squash_space($parts[2]);
+    return sha256_hex(encode('UTF-8', join "\0", @parts));
+}
+
+# 汚染の記述が、前の点検のときにメモリファイルにあったかを返す。記述が今のファイルに現れ、現れた行のどれも、
+# 前の点検のあとに足された行でないときに真である。比べる元が無いときと、記述が空か今のファイルに無いときは偽である。
+# $snap は read_snapshot の比べる元、$mem は memory_state の様子である
+sub existed_before {
+    my ($f, $snap, $mem) = @_;
+    return 0 unless $snap && defined $f->{excerpt} && !ref $f->{excerpt} && length $f->{excerpt};
+    my $name = memory_name($f->{file});
+    return 0 unless defined $name && defined $mem->{text}{$name} && ref $snap->{files}{$name} eq 'HASH';
+    my $text = $mem->{text}{$name};
+    my $part = encode('UTF-8', $f->{excerpt});
+    my $added = added_line_numbers($text, $snap->{files}{$name});
+    my $at = 0;
+    while ((my $i = index($text, $part, $at)) >= 0) {
+        (my $span = $part) =~ s/\n\z//;
+        my $first = 1 + (substr($text, 0, $i) =~ tr/\n//);
+        my $last = $first + ($span =~ tr/\n//);
+        return 1 unless grep { $added->{$_} } $first .. $last;
+        $at = $i + 1;
+    }
+    return 0;
 }
 
 # ---- 事実の調べ ------------------------------------------------------------
@@ -987,9 +1030,7 @@ sub cmd_prepare {
     my @rule_kinds = sort { $a <=> $b } map { 0 + $_ } grep { $repeats->{$_} >= 1 } keys %$repeats;
 
     # 断られた移す先の案。記録の汚染から記述を引き、その記述がまだ同じファイルにあるものだけを並べる
-    my %declined = map { ($_->{fingerprint} => 1) }
-        grep { ref $_ eq 'HASH' && defined $_->{fingerprint} && ($_->{answer} // '') eq 'declined' }
-        @{ ref $answers->{relocation} eq 'ARRAY' ? $answers->{relocation} : [] };
+    my %declined = declined_fingerprints($answers);
     my (@declined_relocations, %declined_seen);
     if (%declined) {
         for my $pair (run_records($state, $run)) {
@@ -1178,33 +1219,63 @@ sub cmd_apply {
         push @findings, { id => $id, (map { ($_ => $pf->{$_}) } qw(kind file excerpt status reason)), changes => \@ids };
     }
 
+    # 前のどの記録にも無い fingerprint の汚染を、新しく見つかった汚染とする
+    my %known;
+    for my $pair (run_records($state, $run)) {
+        $known{ $_->{fingerprint} } = 1
+            for grep { ref $_ eq 'HASH' && defined $_->{fingerprint} && !ref $_->{fingerprint} } @{ list_of($pair->[0]{findings}) };
+    }
+    my $snap = read_snapshot($state);
+    for my $f (@findings) {
+        my $fp = fingerprint($f);
+        %$f = (%$f, fingerprint => $fp, new => $known{$fp} ? JSON::PP::false : JSON::PP::true,
+            existed_before => existed_before($f, $snap, $mem) ? JSON::PP::true : JSON::PP::false);
+    }
+
+    # 今回の結果を足して数え直し、今回を含む直近の4回のうち2回以上の種類を、決まりの見直しの案を載せる種類とする
+    my $answers = read_state_json("$state/answers.json", 'HASH');
+    my $repeats = kind_repeats($answers, { started_at => $record->{started_at}, findings => \@findings },
+        recent_completed_records($state, 3, $run));
+    my %rule_kind = map { ($_ => 1) } grep { $repeats->{$_} >= 2 } keys %$repeats;
+    my %declined = declined_fingerprints($answers);
+
     # 案の汚染の番号は、直し方の findings の1から数えた順番である
-    my $finding_id = sub {
+    my $finding_at = sub {
         my ($n) = @_;
-        return defined $n && !ref $n && $n =~ /\A[1-9][0-9]{0,8}\z/ && $n <= $planned ? 'F' . ($base + $n) : undef;
+        return defined $n && !ref $n && $n =~ /\A[1-9][0-9]{0,8}\z/ && $n <= $planned ? $findings[ $base + $n - 1 ] : undef;
     };
     my @notes = @{ list_of($record->{notes}) };
-    my (@relocations, @rules, @inspections);
+    my (@relocations, @rules, @inspections, %ruled);
     for my $p (grep { ref $_ eq 'HASH' } @{ list_of($plan->{relocation_proposals}) }) {
-        my $fid = $finding_id->($p->{finding});
-        unless (defined $fid) {
+        my $f = $finding_at->($p->{finding});
+        unless (defined $f) {
             push @notes, decode('UTF-8', sprintf($NOTE_OUT_OF_RANGE{relocation}, encode('UTF-8', $p->{finding} // '')));
             next;
         }
-        push @relocations, { id => 'R' . (@relocations + 1), finding => $fid, target => $p->{target}, text => $p->{text} };
+        # 断った移す先の案は、その記述の fingerprint が変わらない間、載せない
+        next if $declined{ $f->{fingerprint} };
+        push @relocations, { id => 'R' . (@relocations + 1), finding => $f->{id}, target => $p->{target}, text => $p->{text} };
     }
     for my $p (grep { ref $_ eq 'HASH' } @{ list_of($plan->{rule_proposals}) }) {
+        my $kind = defined $p->{kind} && !ref $p->{kind} ? $p->{kind} : '';
+        next unless $rule_kind{$kind};
+        $ruled{$kind} = 1;
         push @rules, { id => 'K' . (@rules + 1), kind => $p->{kind}, target => $p->{target}, text => $p->{text} };
     }
+    # 断った種類は、数えた種類に入らないので、作れなかったと書かない
+    push @notes, decode('UTF-8', sprintf($NOTE_NO_RULE, $_))
+        for sort { $a <=> $b } grep { /\A[1-9][0-9]?\z/ && !$ruled{$_} } keys %rule_kind;
     for my $p (grep { ref $_ eq 'HASH' } @{ list_of($plan->{inspection_proposals}) }) {
         my $trigger = defined $p->{trigger} && !ref $p->{trigger} ? $p->{trigger} : '';
         if ($trigger =~ /\Afinding:(.*)\z/s) {
-            my $fid = $finding_id->($1);
-            unless (defined $fid) {
+            my $f = $finding_at->($1);
+            unless (defined $f) {
                 push @notes, decode('UTF-8', sprintf($NOTE_OUT_OF_RANGE{inspection}, encode('UTF-8', $1)));
                 next;
             }
-            $trigger = "finding:$fid";
+            # 前の点検のときに無かった文の汚染は、点検が見落とした汚染ではない
+            next unless $f->{existed_before};
+            $trigger = "finding:$f->{id}";
         }
         push @inspections, { id => 'M' . (@inspections + 1), trigger => $trigger, text => $p->{text} };
     }
@@ -1222,5 +1293,18 @@ sub cmd_apply {
     };
     write_json($path, $out);
     apply_changes($out, $path, $memdir, $state, $run, $mem->{read});
+
+    # 見落としから点検のやり方の見直しの案を作った回の ID を書く。ほかの回で案を作った見落としは書き替えない
+    my %proposed = map { /\Amissed:(.+)\z/s ? ($1 => 1) : () } map { $_->{trigger} } @inspections;
+    if (%proposed) {
+        my $missed = read_state_json("$state/missed.json", 'ARRAY');
+        my $marked = 0;
+        for my $m (grep { ref $_ eq 'HASH' && defined $_->{id} && !ref $_->{id} && $proposed{ $_->{id} } } @$missed) {
+            next if defined $m->{proposed_in} && $m->{proposed_in} ne '';
+            $m->{proposed_in} = $run;
+            $marked++;
+        }
+        write_json("$state/missed.json", $missed) if $marked;
+    }
     return 0;
 }

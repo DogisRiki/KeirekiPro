@@ -1166,6 +1166,8 @@ make_snapshot "$SINCE" "$CASE/old"
 cp "$CASE/old/MEMORY.md" "$CASE/old/b.md" "$MEMDIR/"
 printf 'a の今の中身\n' >"$MEMDIR/a.md"
 printf 'b の一つ目\nb の二つ目\n' >"$MEMDIR/b.md"
+# 種類1と種類2を、前の回にも見つかった種類にして、決まりの見直しの案が報告に残るようにする
+make_record r0 scheduled completed 2026-10-26T01:00:00Z 1:new 2:new
 prepare_run r1 scheduled
 cat >"$CASE/plan.json" <<'JSON'
 {"lookups": [], "plan": {
@@ -1391,6 +1393,148 @@ check "改行のある append_index_line を断る" "$(ap_changes C6)" "C6=skipp
 check "点検のあとに、メモリのディレクトリと状態の場所のほかにファイルが増えず、直す前の文が record.json と report.md のほかに残らない" \
     "$([ "$sig_before" = "$(outside_sig)|$(home_sig)" ] && printf 同じ || printf 違う)|$(cd "$MEMDIR" && find . -mindepth 1 -maxdepth 1 | sed 's|^\./||' | LC_ALL=C sort | tr '\n' ' ')|$(files_with 古い事実の記述)|$(files_with 消してよいファイル)" \
     "同じ|MEMORY.md a.md b.md |./repo/.git/keirekipro-memory-inspection/runs/r1/record.json |./repo/.git/keirekipro-memory-inspection/runs/r1/record.json "
+
+# ---------------------------------------------------------------------
+# 繰り返しの数え方と案の絞り込み
+# ---------------------------------------------------------------------
+
+# 記録を終えた回にする: complete_run <回の ID>
+complete_run() {
+    perl -MJSON::PP -i -pe '$_ = JSON::PP->new->utf8->encode({ %{ decode_json($_) }, status => "completed" }) . "\n"' "$STATE/runs/$1/record.json"
+}
+
+newcase ap-new
+printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+printf '残した  文\n直す文\n移さない文\n' >"$MEMDIR/a.md"
+prepare_run r0 now
+cat >"$CASE/plan0.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 3, "file": "a.md", "excerpt": "残した  文", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 4, "file": "a.md", "excerpt": "直す文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "直す文", "new": "直した文"}]},
+    {"kind": 5, "file": "a.md", "excerpt": "移さない文", "status": "keep", "reason": "", "evidence": "", "changes": []}
+  ],
+  "relocation_proposals": [{"finding": 3, "target": "CLAUDE.md", "text": "移す1"}], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+apply_run r0 "$CASE/plan0.json"
+rc0=$?
+complete_run r0
+# 開発者が C1 を戻し、移す先の案 R1 を断り、会話の中の Claude が a.md に1行を足したとする
+printf '残した  文\n直す文\n移さない文\n変わった移さない文\n' >"$MEMDIR/a.md"
+printf '[{"run_id":"r0","change":"C1","file":"a.md","restored_text":"直す文","restored_sha256":null}]\n' >"$STATE/reverted.json"
+fp=$(perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; print JSON::PP->new->utf8->decode(<$f>)->{findings}[2]{fingerprint}' "$STATE/runs/r0/record.json")
+printf '{"rule":{},"relocation":[{"fingerprint":"%s","answer":"declined","issue":null,"answered_at":"2026-10-27T00:00:00Z"}],"inspection":[]}\n' "$fp" >"$STATE/answers.json"
+prepare_run r1 now
+cat >"$CASE/plan1.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 3, "file": "a.md", "excerpt": "残した 文", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 4, "file": "a.md", "excerpt": "直す文", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 5, "file": "a.md", "excerpt": "移さない文", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 5, "file": "a.md", "excerpt": "変わった移さない文", "status": "keep", "reason": "", "evidence": "", "changes": []}
+  ],
+  "relocation_proposals": [{"finding": 3, "target": "CLAUDE.md", "text": "移す1"}, {"finding": 4, "target": "CLAUDE.md", "text": "移す2"}],
+  "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+apply_run r1 "$CASE/plan1.json"
+rc1=$?
+check "直さずに残した汚染と戻した直しの汚染が、2回目からは新しい汚染に数えられない" \
+    "$rc0|$rc1|$(rec_list "$STATE/runs/r0/record.json" findings id kind new)|$(rec_list "$STATE/runs/r1/record.json" findings id kind new)" \
+    "0|0|F1:3:1,F2:4:1,F3:5:1|F1:3:0,F2:4:0,F3:5:0,F4:5:1"
+check "断った移す先の案を、記述が変わらない間外す" \
+    "$(rec_list "$STATE/runs/r1/record.json" relocation_proposals id finding text)" "R1:F4:移す2"
+
+newcase ap-rules
+printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+printf 'x\n' >"$MEMDIR/a.md"
+# 4回前の回の種類6は数えない。old の汚染の種類9は数えない。種類8は断った
+make_record ra scheduled completed 2026-10-05T01:00:00Z 6:new
+make_record rb scheduled completed 2026-10-12T01:00:00Z 3:new 6:new 8:new
+make_record rc scheduled completed 2026-10-19T01:00:00Z 3:new 8:new 9:old
+make_record rd scheduled completed 2026-10-26T01:00:00Z 5:new 9:old
+cat >"$STATE/answers.json" <<'JSON'
+{"rule":{"8":{"declined_at":"2026-10-27T00:00:00Z","filed_at":null,"issue":null}},"relocation":[],"inspection":[]}
+JSON
+prepare_run r1 scheduled
+cat >"$CASE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 5, "file": "a.md", "excerpt": "x", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 7, "file": "a.md", "excerpt": "x", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 8, "file": "a.md", "excerpt": "x", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 9, "file": "a.md", "excerpt": "x", "status": "keep", "reason": "", "evidence": "", "changes": []}
+  ],
+  "relocation_proposals": [],
+  "rule_proposals": [{"kind": 5, "target": "CLAUDE.md", "text": "決まり5"}, {"kind": 6, "target": "CLAUDE.md", "text": "決まり6"},
+    {"kind": 7, "target": "CLAUDE.md", "text": "決まり7"}, {"kind": 9, "target": "CLAUDE.md", "text": "決まり9"}],
+  "inspection_proposals": [], "summary": ""
+}}
+JSON
+apply_run r1 "$CASE/plan.json"
+rc=$?
+rec="$STATE/runs/r1/record.json"
+check "今回を含む直近の4回のうち2回以上の種類の案だけが残る" "$rc|$(rec_list "$rec" rule_proposals id kind text)" "0|K1:5:決まり5"
+check "案を載せる種類で案が無いと、作れなかったと書く" "$(jget "$rec" notes | grep -c '種類 3 .*決まりの見直しの案を作れなかった')" "1"
+check "断った種類について、作れなかったと書かない" "$(jget "$rec" notes | grep -c '作れなかった')|$(jget "$rec" notes | grep -c '種類 8')" "1|0"
+
+newcase ap-before
+mkdir -p "$CASE/old"
+printf -- '- [A](a.md) — a\n' >"$CASE/old/MEMORY.md"
+printf '前からある文\n二行の一つ目\n' >"$CASE/old/a.md"
+make_snapshot "$SINCE" "$CASE/old"
+cp "$CASE/old/MEMORY.md" "$MEMDIR/"
+printf '前からある文\n新しく足した文\n二行の一つ目\n二行の二つ目\n' >"$MEMDIR/a.md"
+printf '新しいファイルの文\n' >"$MEMDIR/b.md"
+prepare_run r1 now
+cat >"$CASE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 1, "file": "a.md", "excerpt": "前からある文", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 1, "file": "a.md", "excerpt": "新しく足した文", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 1, "file": "a.md", "excerpt": "二行の一つ目\n二行の二つ目", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 1, "file": "b.md", "excerpt": "新しいファイルの文", "status": "keep", "reason": "", "evidence": "", "changes": []},
+    {"kind": 1, "file": "a.md", "excerpt": "からある", "status": "keep", "reason": "", "evidence": "", "changes": []}
+  ],
+  "relocation_proposals": [], "rule_proposals": [],
+  "inspection_proposals": [{"trigger": "finding:1", "text": "やり方1"}, {"trigger": "finding:2", "text": "やり方2"},
+    {"trigger": "finding:3", "text": "やり方3"}, {"trigger": "finding:4", "text": "やり方4"}, {"trigger": "finding:5", "text": "やり方5"},
+    {"trigger": "missed:x1", "text": "やり方6"}],
+  "summary": ""
+}}
+JSON
+apply_run r1 "$CASE/plan.json"
+rc=$?
+rec="$STATE/runs/r1/record.json"
+# F1 と F2 は、prepare が見つけた、会話を通らない書き換えの汚染である
+check "前の点検のときに無かった文の汚染から作った点検のやり方の案を外す" \
+    "$rc|$(rec_list "$rec" findings id existed_before)|$(rec_list "$rec" inspection_proposals id trigger text)" \
+    "0|F1:0,F2:0,F3:1,F4:0,F5:0,F6:0,F7:1|M1:finding:F3:やり方1,M2:finding:F7:やり方5,M3:missed:x1:やり方6"
+
+newcase ap-missed
+printf 'x\n' >"$MEMDIR/a.md"
+mkdir -p "$STATE"
+cat >"$STATE/missed.json" <<'JSON'
+[{"id":"x1","kind":3,"file":"a.md","summary":"見落とし1","noted_at":"2026-10-20T00:00:00Z","proposed_in":null},
+ {"id":"x2","kind":4,"file":"a.md","summary":"見落とし2","noted_at":"2026-10-21T00:00:00Z","proposed_in":null},
+ {"id":"x3","kind":5,"file":"a.md","summary":"見落とし3","noted_at":"2026-10-22T00:00:00Z","proposed_in":"r0"}]
+JSON
+prepare_run r1 now
+cat >"$CASE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [], "relocation_proposals": [], "rule_proposals": [],
+  "inspection_proposals": [{"trigger": "missed:x1", "text": "やり方1"}, {"trigger": "missed:x3", "text": "やり方3"}],
+  "summary": ""
+}}
+JSON
+apply_run r1 "$CASE/plan.json"
+rc=$?
+check "見落としから案を作った回の ID を proposed_in に書く" \
+    "$rc|$(perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; binmode STDOUT, ":utf8";
+        print join ",", map { "$_->{id}:" . ($_->{proposed_in} // "null") . ":$_->{summary}" } @{ JSON::PP->new->utf8->decode(<$f>) }' "$STATE/missed.json")" \
+    "0|x1:r1:見落とし1,x2:null:見落とし2,x3:r0:見落とし3"
 
 echo
 echo "$pass ok, $failn NG"
