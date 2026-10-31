@@ -24,7 +24,7 @@ Run `git diff` to see the actual code changes. This is your primary input. If th
 These limits keep the review's cost down without dropping any check in the checklist below. The checks that the task's completion conditions in tasks.md require always come first: when a limit would skip such a check, run the check. For completion condition 2, run the quality gates only when the controller passed them to you: they run once per major task, in the review of its last sub-task. In tasks.md approved before Issue #663, condition 2 reads `タスクで変えた領域の verify のスキル(...)が、すべて成功している`; the owner decided in Issue #663 that this text is read the same way.
 
 - Do not read large files whole. This applies to requirements.md, design.md, tasks.md, and the changed files. Find the place with `grep -n`, then read only the lines you need. For the spec files, read only the sections referenced by this task
-- Run each validation command once per environment that the task's completion conditions or the validation commands name. Do not re-run the same tests in the same environment, and do not run them in environments that neither names
+- Run each validation command once, in the environments that the controller passed. Do not re-run the same tests in the same environment, and do not run them in other environments. The environments other than this machine's own shell (e.g. Linux and bash 3.2 containers, shellcheck) are quality-gate commands: the controller passes them only for the last task of a major task, even when the task's text in tasks.md names them
 - Do not edit the code to break it and re-run the tests to see whether they notice. Judge Test Quality by reading the assertions against the changed code
 
 ## Core Principle

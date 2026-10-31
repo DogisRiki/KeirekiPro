@@ -29,7 +29,7 @@ Otherwise, load all necessary context:
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to requirement coverage, architecture boundaries, integrations, runtime prerequisites, security/performance constraints, or team conventions that affect implementation readiness
 - Template for document structure: `.kiro/settings/templates/specs/design.md`
-- Writing rules: read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, design.md の書き方, 繰り返しの扱い, Issueの印, the sample 見本2, and the 見出しと目印の一覧 are the writing standard for this spec's `design.md`
+- Writing rules: read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, design.md の書き方, 繰り返しの扱い, テストと品質チェックの書き方, Issueの印, the sample 見本2, and the 見出しと目印の一覧 are the writing standard for this spec's `design.md`
 - Read `rules/design-principles.md` from this skill's directory for design principles
 - `.kiro/settings/templates/specs/research.md` for discovery log structure
 

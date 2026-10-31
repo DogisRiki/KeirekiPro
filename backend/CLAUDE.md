@@ -52,7 +52,7 @@ backend配下を変更するとき常に適用する。アーキテクチャ境�
 - infrastructure: Testcontainers(`config/PostgresTestContainerConfig` / `RedisTestContainerConfig`)で実DB/Redisに対して検証
 - presentation: MockMvcでリクエスト/レスポンス契約を検証
 - テストデータは `helper/`(例: `ResumeObjectBuilder`)を再利用する
-- 新規テストは対象コードを一時的に壊して赤くなることを確認してから戻す(assertの実効性確認)
+- 新規テストは対象コードを一時的に壊して赤くなることを確認してから戻す(assertの実効性確認)。壊す箇所の数と、壊した写しの作り方と流し方は `.kiro/steering/tech.md` の「テストの完全性」に従う
 - `@Disabled`・アサーション削除で「見かけの合格」を作らない(escape-hatchチェックが検知)
 
 ## 完了前コマンド(この順で直列実行)
