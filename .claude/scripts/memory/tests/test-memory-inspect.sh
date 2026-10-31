@@ -52,6 +52,7 @@ gitq() { git -c user.name=test -c user.email=test@example.com -C "$REPO" "$@"; }
 # 偽の claude: n 回目の呼び出しで、fake/claude/<n>.json を出す。<n>.sleep があれば先にその秒数だけ眠り、
 # <n>.exit があればその終了コードで終わる。受けた引数を <n>.args.json に、標準入力を <n>.stdin に、
 # 環境変数を <n>.env.json に、自分のプロセスの番号を <n>.pid に書き残す
+# <n>.orphan があれば、止められても自分では止めない子のプロセスをその秒数だけ眠らせ、その番号を <n>.orphan.pid に書き残す
 write_fake_claude() {
     cat >"$1" <<'EOF'
 #!/usr/bin/env bash
@@ -62,6 +63,11 @@ printf '%s\n' "$$" >"$d/$n.pid"
 perl -MJSON::PP -e 'print JSON::PP->new->canonical->encode([@ARGV])' -- "$@" >"$d/$n.args.json"
 cat >"$d/$n.stdin"
 perl -MJSON::PP -e 'print JSON::PP->new->canonical->encode({%ENV})' >"$d/$n.env.json"
+# 止められても自分では止めない子のプロセス。プロセスの組ごと止められたかを確かめるために使う
+if [ -f "$d/$n.orphan" ]; then
+    sleep "$(cat "$d/$n.orphan")" &
+    printf '%s\n' "$!" >"$d/$n.orphan.pid"
+fi
 # 眠っている間に止められたら、眠る子のプロセスも止める。残った子が標準出力を開いたままにしないためである
 if [ -f "$d/$n.sleep" ]; then
     sp=
@@ -2032,6 +2038,152 @@ cp "$MEMDIR"/*.md "$CASE/now/"
 bash "$SH" revert r1 C4 2>/dev/null
 check "同じ名前のファイルがあると、delete を戻さずに終了コード 1 で終わる" \
     "$?|$(same_dir "$CASE/now")|$(rec_list "$STATE/runs/r1/record.json" reverts change)|$(rv_list)" "1|同じ||"
+
+# ---------------------------------------------------------------------
+# 点検の中の Claude を呼ぶ部品
+# ---------------------------------------------------------------------
+# 汚染の無い直し方。summary は記録と報告に書かれないので、点検の中の Claude の出力が残っていないかを確かめる目印にする
+IC_EMPTY='{"lookups":[],"plan":{"findings":[],"relocation_proposals":[],"rule_proposals":[],"inspection_proposals":[],"summary":"IC-OUTPUT-MARK"}}'
+# a.md の「古い文です」の「古い文」を「新しい文」に直す直し方。old が本文の全体に当たると、直しは行われない
+IC_EDIT='{"lookups":[],"plan":{"findings":[{"kind":1,"file":"a.md","excerpt":"古い文","status":"fix","reason":"r","evidence":"IC-OUTPUT-MARK","changes":[{"op":"edit","file":"a.md","old":"古い文","new":"新しい文"}]}],"relocation_proposals":[],"rule_proposals":[],"inspection_proposals":[],"summary":"IC-OUTPUT-MARK"}}'
+# git を調べてほしいことだけを返す結果
+IC_LOOKUP='{"lookups":[{"type":"command","arg":"git"}],"plan":null}'
+
+# 目次と a.md を置き、回 r1 の比べる材料を作る: ic_setup <テストの場合の名前>
+ic_setup() {
+    newcase "$1"
+    printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+    printf '古い文です\n' >"$MEMDIR/a.md"
+    prepare_run r1 now
+}
+# 点検の中の Claude を呼ぶ部品を、偽の claude で動かす: ic_run <回の ID>
+# 標準エラーを $CASE/ic.err に書き、部品の終了コードを返す
+ic_run() {
+    bash -c '. "$1" && locate && ensure_state && inspect_with_claude "$2" "$3" claude' _ "$SH" "$1" "$(cat "$CASE/material.json")" \
+        >"$CASE/ic.out" 2>"$CASE/ic.err"
+}
+# 部品が出した理由を1行で出す。2行以上なら行の数を出す
+ic_reason() {
+    if [ "$(wc -l <"$CASE/ic.err" | tr -d ' ')" = 1 ]; then cat "$CASE/ic.err"; else printf 'lines=%s' "$(wc -l <"$CASE/ic.err" | tr -d ' ')"; fi
+}
+# 0 でない終了コードを fail と出す
+ic_failed() { if [ "$1" -ne 0 ]; then printf fail; else printf 'ok(%s)' "$1"; fi; }
+# プロセスがまだあるかを出す: ic_alive <プロセスの番号のファイル>
+ic_alive() { if kill -0 "$(cat "$1")" 2>/dev/null; then printf alive; else printf gone; fi; }
+
+ic_setup ic-args
+claude_ok "$IC_EMPTY"
+ic_run r1
+rc=$?
+want=$(perl -MJSON::PP -e 'print JSON::PP->new->canonical->encode([@ARGV])' -- -p --output-format json \
+    --json-schema "$(cat "$REPO/.claude/scripts/memory/plan-schema.json")" --tools "" --permission-mode dontAsk \
+    --setting-sources user --settings '{"disableAllHooks": true}' --strict-mcp-config --no-session-persistence --max-turns 4)
+check '偽の claude が受けた引数に、design の引数の -p と --output-format json と --json-schema と --tools "" と --permission-mode dontAsk と --setting-sources user と --settings のフックを止める設定と --strict-mcp-config と --no-session-persistence と --max-turns 4 が1つずつあり、どれかが欠けると失敗する' \
+    "$rc|$(claude_calls)|$(cat "$FAKE/claude/1.args.json")|$(jget "$STATE/runs/r1/record.json" status)" "0|1|$want|completed"
+
+ic_setup ic-env
+claude_ok "$IC_EMPTY"
+(
+    export CLAUDECODE=1 CLAUDE_CODE_ENTRYPOINT=cli CLAUDE_CODE_DISABLE_AUTO_MEMORY=0 CLAUDE_AGENT_SDK_VERSION=1 CLAUDE_PID=1 \
+        CLAUDE_EFFORT=high CLAUDE_PREVIEW_PORT=1 AI_AGENT=1 MCP_TIMEOUT=1 BAGGAGE=1 CLAUDE_CONFIG_DIR="$FHOME/.claude"
+    ic_run r1
+)
+rc=$?
+envs=
+for name in CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_AGENT_SDK_VERSION CLAUDE_PID CLAUDE_EFFORT CLAUDE_PREVIEW_PORT AI_AGENT MCP_TIMEOUT BAGGAGE \
+    CLAUDE_CODE_DISABLE_AUTO_MEMORY KP_MEMORY_INSPECTION_RUN CLAUDE_CONFIG_DIR; do
+    envs="$envs$(claude_env 1 "$name"),"
+done
+check "偽の claude が受けた環境変数に、auto memory を切る値と KP_MEMORY_INSPECTION_RUN があり、外す環境変数が無い" \
+    "$rc|$envs" "0|<unset>,<unset>,<unset>,<unset>,<unset>,<unset>,<unset>,<unset>,<unset>,1,1,$FHOME/.claude,"
+
+# 1回目の点検で比べる元を書き、a.md に行を足してから2回目の点検をする。worktree のメモリのディレクトリにも .md を置く
+ic_setup ic-stdin
+claude_ok "$IC_EMPTY"
+ic_run r1
+printf '古い文です\n足した文\n' >"$MEMDIR/a.md"
+mkdir -p "$WTTRANSDIR/memory"
+printf 'ほかのメモリ\n' >"$WTTRANSDIR/memory/other.md"
+prepare_run r2 now
+claude_ok "$IC_EMPTY"
+ic_run r2
+rc=$?
+parts=$(perl -e 'local $/; my ($in, $p, $m) = map { open my $f, "<:raw", $_ or die; my $t = <$f>; $t =~ s/\n+\z//; $t } @ARGV;
+    my ($ip, $im, $ic) = (index($in, $p), index($in, $m), index($in, "<<<MEMORY-FILE ", index($in, $m) + length $m));
+    print join "|", ($ip == 0 ? "prompt" : "no-prompt"), ($im >= length $p ? "material" : "no-material"), ($ic > $im ? "content" : "no-content"),
+        join(",", $in =~ /^<<<MEMORY-FILE name="([^"]*)">>>$/mg),
+        (index($in, qq{<<<MEMORY-FILE name="a.md">>>\n1| 古い文です\n+2| 足した文\n<<<END-MEMORY-FILE>>>}) >= 0 ? "marked" : "no-mark")' \
+    "$FAKE/claude/2.stdin" "$REPO/.claude/scripts/memory/inspect-prompt.md" "$CASE/material.json")
+check "標準入力に、指示の全文と材料と、行番号と + の付いたメモリファイルの囲みがある" "$rc|$parts" "0|prompt|material|content|MEMORY.md,a.md|marked"
+
+ic_setup ic-lookup
+claude_ok "$IC_LOOKUP"
+claude_ok '{"lookups":[{"type":"command","arg":"perl"}],"plan":null}'
+claude_ok "$IC_EMPTY"
+ic_run r1
+rc=$?
+looked=
+for n in 1 2 3; do
+    looked="$looked$(perl -e 'local $/; my $in = <STDIN>; print join(",", map { "$_->[0]:$_->[1]" } grep { @$_ }
+        map { [ $_ =~/\A(\d+)">>>\n種類: "command"\n引数: "(\w+)"/ ] } split /^<<<LOOKUP-RESULT id="/m, $in, -1), ";"' <"$FAKE/claude/$n.stdin")"
+done
+check "調べてほしいことが返ると、調べた結果を囲んで次の呼び出しに渡す" \
+    "$rc|$(claude_calls)|$looked|$(jget "$STATE/runs/r1/record.json" status)" "0|3|;1:git;1:git,2:perl;|completed"
+
+ic_setup ic-third
+claude_ok "$IC_LOOKUP"
+claude_ok "$IC_LOOKUP"
+claude_ok "$IC_LOOKUP"
+ic_run r1
+rc=$?
+check "3回目の結果に直し方が無いと中断にする" \
+    "$(ic_failed "$rc")|$(claude_calls)|$(ic_reason | grep -c '3回目')|$(jget "$STATE/runs/r1/record.json" status)" "fail|3|1|running"
+
+ic_setup ic-call-limit
+claude_returns '{"slow":true}' 30
+printf '40\n' >"$FAKE/claude/1.orphan"
+start=$(date +%s)
+KP_MEMORY_INSPECTION_CALL_SEC=2 ic_run r1
+rc=$?
+took=$(($(date +%s) - start))
+check "1回の呼び出しが上限を超えると、プロセスの組ごと止めて、0でない終了コードで終わる" \
+    "$(ic_failed "$rc")|$([ "$took" -lt 20 ] && echo fast || echo "slow($took)")|$(ic_alive "$FAKE/claude/1.pid")|$(ic_alive "$FAKE/claude/1.orphan.pid")|$(ic_reason | grep -c '1回の呼び出し')|$(jget "$STATE/runs/r1/record.json" status)" \
+    "fail|fast|gone|gone|1|running"
+
+ic_setup ic-total
+claude_ok "$IC_LOOKUP"
+claude_ok "$IC_EMPTY" 60
+start=$(date +%s)
+KP_MEMORY_INSPECTION_CALL_SEC=40 KP_MEMORY_INSPECTION_TOTAL_SEC=10 ic_run r1
+rc=$?
+took=$(($(date +%s) - start))
+check "3回の呼び出しの合計が全体の上限を超えると、止めて、0でない終了コードで終わる" \
+    "$(ic_failed "$rc")|$([ "$took" -lt 30 ] && echo fast || echo "slow($took)")|$(claude_calls)|$(ic_reason | grep -c '全体')|$(jget "$STATE/runs/r1/record.json" status)" \
+    "fail|fast|2|1|running"
+
+# どちらの結果も、直し方を持つ。直し方を apply に渡せば a.md が書き換わる
+ic_setup ic-error
+cp -r "$MEMDIR" "$CASE/before"
+claude_returns "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"num_turns\":1,\"result\":\"limit\",\"structured_output\":$IC_EDIT,\"api_error_status\":429,\"terminal_reason\":\"api_error\"}"
+ic_run r1
+rc1=$?
+why1=$(ic_reason)
+claude_returns "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"is_error\":false,\"num_turns\":5,\"result\":\"\",\"structured_output\":$IC_EDIT,\"api_error_status\":null,\"terminal_reason\":\"max_turns\"}"
+ic_run r1
+rc2=$?
+why2=$(ic_reason)
+check "is_error が真の結果と、subtype が success でない結果で、0でない終了コードで終わり、出した理由に subtype と api_error_status と terminal_reason が載り、メモリが書き換わらない" \
+    "$(ic_failed "$rc1")|$(printf '%s' "$why1" | grep -c 'success.*429.*api_error')|$(ic_failed "$rc2")|$(printf '%s' "$why2" | grep -c 'error_max_turns.*null.*max_turns')|$(diff -r "$CASE/before" "$MEMDIR" >/dev/null && echo same)|$(jget "$STATE/runs/r1/record.json" status)" \
+    "fail|1|fail|1|same|running"
+
+ic_setup ic-leftover
+claude_ok "$IC_LOOKUP"
+claude_ok "$IC_EDIT"
+ic_run r1
+rc=$?
+check "点検のあとに、点検の中の Claude の出力と直し方が、work/ と点検の状態の場所に残っていない" \
+    "$rc|$(jget "$STATE/runs/r1/record.json" status)|$(cat "$MEMDIR/a.md")|$(find "$STATE/work" -mindepth 1 2>/dev/null | wc -l | tr -d ' ')|$(grep -rl -e IC-OUTPUT-MARK -e structured_output "$STATE" | wc -l | tr -d ' ')" \
+    "0|completed|新しい文です|0|0"
 
 echo
 echo "$pass ok, $failn NG"

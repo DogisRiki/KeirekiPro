@@ -47,6 +47,14 @@
 #     報告に載った案(R・K・M の番号)への開発者の答えを answers.json に書く
 #   missed <汚染の種類> <メモリファイルの名前> <短い説明>
 #     開発者が会話で指摘した見落としを、X の番号を振って missed.json に書く。メモリのロックの中で読み直してから書く
+#   inspector <秒> <作業フォルダ> <コマンド> [<引数>...]
+#     点検の中の Claude を、会話の中の Claude Code が渡す環境変数を外し、auto memory を切って、作業フォルダで動かす。
+#     新しいプロセスの組で動かし、秒を超えたら組ごと止めて 124 で終わる。終われば、その終了コードで終わる
+#   timed <秒> <コマンド> [<引数>...]
+#     コマンドを、inspector と同じく秒を上限に動かす。環境変数と作業フォルダは変えない
+#   outcome <呼び出しの番号> <claude の終了コード>
+#     点検の中の Claude の結果の JSON を標準入力で受け、直し方なら plan の1行と直し方の JSON を、調べてほしいことなら
+#     lookups <件数> の1行と調べてほしいことの JSON の配列を出す。失敗の結果と、3回目の呼び出しで直し方の無い結果は、失敗にする
 # 終了コード: 成功は 0、使い方の誤りは 2、失敗は 1(標準エラーに理由を日本語の1文で出す)
 # 前提: perl(JSON::PP)・git。Windows では、git に渡す場所を C:/... の形で受ける
 # =====================================================================
@@ -77,6 +85,9 @@ my %COMMANDS = (
     revert   => \&cmd_revert,
     answer   => \&cmd_answer,
     missed   => \&cmd_missed,
+    inspector => \&cmd_inspector,
+    timed     => \&cmd_timed,
+    outcome   => \&cmd_outcome,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
@@ -141,6 +152,16 @@ my $NOT_WRITTEN = q{点検が途中で止まったので、書かなかった};
 # 終わっていない回を、理由を渡されずに中断にしたときの理由
 my $STOPPED_REASON = q{点検が途中で止まった。PC が止まったか、点検のプロセスが止められた};
 
+# 点検の中の Claude に渡さない環境変数の名前。会話の中の Claude Code が子のプロセスに渡すものである
+my $DROP_ENV = qr/\A(?:CLAUDECODE|CLAUDE_CODE_\w*|CLAUDE_AGENT_SDK_\w*|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_PREVIEW_\w*|AI_AGENT|MCP_\w*|BAGGAGE)\z/;
+# 点検の中の Claude に渡す環境変数。auto memory を切り、点検の中の会話であることを知らせる
+my %INSPECTOR_ENV = (CLAUDE_CODE_DISABLE_AUTO_MEMORY => 1, KP_MEMORY_INSPECTION_RUN => 1);
+# 上限を超えて止めたときの終了コードと、TERM を送ってから KILL を送るまでの秒
+my $TIMED_OUT = 124;
+my $KILL_AFTER = 5;
+# 点検の中の Claude を呼ぶ回数の上限。最後の呼び出しでは、直し方を返さなければならない
+my $LAST_CALL = 3;
+
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
 
@@ -163,7 +184,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
     return 2;
 }
 
@@ -1866,5 +1887,122 @@ sub cmd_revert {
     my $err = $@;
     lock_release($lock, 'revert');
     die $err unless $ok;
+    return 0;
+}
+
+# ---- 点検の中の Claude の呼び出し ----------------------------------------------
+
+# コマンドを、新しいプロセスの組で、上限の秒まで動かす。標準入力と標準出力と標準エラーは、このプロセスのものを渡す。
+# 上限を超えたら、プロセスの組に TERM を送り、$KILL_AFTER 秒待っても終わらなければ KILL を送って、$TIMED_OUT を返す。
+# 終われば、その終了コードを返す。シグナルで止まったときは 128 にシグナルの番号を足して返す:
+# run_limited <秒> <フォルダか undef> <環境変数を整えるか> <コマンド> <引数>...
+sub run_limited {
+    my ($sec, $dir, $inspector, @cmd) = @_;
+    my $pid = fork;
+    die "コマンド $cmd[0] を動かせなかった($!)\n" unless defined $pid;
+    if (!$pid) {
+        setpgrp(0, 0);
+        if ($inspector) {
+            delete @ENV{ grep { /$DROP_ENV/ } keys %ENV };
+            @ENV{ keys %INSPECTOR_ENV } = values %INSPECTOR_ENV;
+        }
+        if (defined $dir) {
+            chdir $dir or do { print STDERR "memory-inspect.pl: フォルダ $dir に移れなかった($!)\n"; POSIX::_exit(127) };
+        }
+        { no warnings 'exec'; exec { $cmd[0] } @cmd; }
+        print STDERR "memory-inspect.pl: コマンド $cmd[0] を動かせなかった($!)\n";
+        POSIX::_exit(127);
+    }
+    # 子のプロセスが組を作る前に止めることがあるので、親からも組を作る。子がもう exec したあとの失敗は気にしない
+    setpgrp($pid, $pid);
+    my $end = time() + $sec;
+    my $status = wait_until($pid, $end);
+    if (defined $status) {
+        return $status & 127 ? 128 + ($status & 127) : $status >> 8;
+    }
+    signal_group('TERM', $pid);
+    wait_until($pid, time() + $KILL_AFTER);
+    # 組のほかのプロセスが残っていれば止める。止める相手が無くても害は無い
+    signal_group('KILL', $pid);
+    waitpid $pid, 0;
+    return $TIMED_OUT;
+}
+
+# プロセスの組の全体にシグナルを送る。子の子のプロセスが標準出力を開いたまま残らないためである: signal_group <シグナル> <組の番号>
+sub signal_group {
+    my ($sig, $pid) = @_;
+    kill $sig, -$pid;
+}
+
+# 子のプロセスが終わるのを、時刻まで待つ。終われば終了の状態 $? を返し、時刻を過ぎれば undef を返す: wait_until <番号> <時刻>
+sub wait_until {
+    my ($pid, $end) = @_;
+    while (1) {
+        my $w = waitpid $pid, POSIX::WNOHANG();
+        return $? if $w == $pid;
+        return 0 if $w < 0;
+        return undef if time() >= $end;
+        select(undef, undef, undef, 0.1);
+    }
+}
+
+# 秒の引数を確かめる
+sub limit_arg {
+    my ($sec) = @_;
+    return defined $sec && $sec =~ /\A[1-9]\d*\z/ ? 1 : 0;
+}
+
+sub cmd_inspector {
+    my ($sec, $dir, @cmd) = @_;
+    return usage() unless limit_arg($sec) && defined $dir && @cmd;
+    return run_limited($sec, $dir, 1, @cmd);
+}
+
+sub cmd_timed {
+    my ($sec, @cmd) = @_;
+    return usage() unless limit_arg($sec) && @cmd;
+    return run_limited($sec, undef, 0, @cmd);
+}
+
+# 結果の値を、理由の文に書ける形にする。無い値と null は null と書く
+sub outcome_value {
+    my ($v) = @_;
+    return 'null' unless defined $v;
+    return $JSON->encode($v) if ref $v && !JSON::PP::is_bool($v);
+    return $v ? 'true' : 'false' if JSON::PP::is_bool($v);
+    return encode(q{UTF-8}, $v);
+}
+
+# 点検の中の Claude の結果の JSON を標準入力で受け、直し方なら plan の1行と直し方の JSON を、調べてほしいことなら
+# lookups <件数> の1行と調べてほしいことの JSON の配列を出す。失敗の結果と、読めない結果と、最後の呼び出しで直し方の無い結果では die する:
+# outcome <呼び出しの番号> <claude の終了コード>
+sub cmd_outcome {
+    my ($n, $rc) = @_;
+    return usage() unless defined $rc && $n =~ /\A[1-9]\d*\z/ && $rc =~ /\A\d+\z/;
+    binmode STDIN;
+    my $text = do { local $/; <STDIN> } // '';
+    my $out = eval { $JSON->decode($text) };
+    if (ref $out ne 'HASH') {
+        die "点検の中の Claude が終了コード $rc で終わり、結果の JSON を返さなかった\n" if $rc;
+        die "点検の中の Claude の結果の JSON を読めなかった\n";
+    }
+    my $subtype = $out->{subtype};
+    if ($out->{is_error} || !defined $subtype || ref $subtype || $subtype ne 'success' || $rc) {
+        die sprintf "点検の中の Claude が失敗を返した。終了コードは %s、subtype は %s、api_error_status は %s、terminal_reason は %s だった\n",
+            $rc, map { outcome_value($out->{$_}) } qw(subtype api_error_status terminal_reason);
+    }
+    my $answer = $out->{structured_output};
+    if (ref $answer ne 'HASH' && defined $out->{result} && !ref $out->{result}) {
+        $answer = eval { $JSON->decode(encode(q{UTF-8}, $out->{result})) };
+    }
+    die "点検の中の Claude の結果から、直し方の JSON を読めなかった\n" unless ref $answer eq 'HASH';
+    if (ref $answer->{plan} eq 'HASH') {
+        print "plan\n", $JSON->encode($answer), "\n";
+        return 0;
+    }
+    die "点検の中の Claude の${LAST_CALL}回目の呼び出しの結果に、直し方が無かった\n" if $n >= $LAST_CALL;
+    my $lookups = list_of($answer->{lookups});
+    die "点検の中の Claude の結果に、直し方も調べてほしいことも無かった\n" unless @$lookups;
+    print 'lookups ', scalar @$lookups, "\n", $JSON->encode($lookups), "\n";
     return 0;
 }

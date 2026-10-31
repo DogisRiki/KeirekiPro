@@ -106,6 +106,91 @@ run_lock_release() {
     perl "$PL" lock release run "$1"
 }
 
+# 理由を標準エラーに1文で出す。fail と違い、終わらない
+say_reason() {
+    printf 'memory-inspect.sh: %s\n' "$1" >&2
+}
+
+# 点検の中の Claude を、調べてほしいことに答えながら3回まで呼び、返った直し方を memory-inspect.pl apply に渡して、
+# その終了コードを返す: inspect_with_claude <回の ID> <比べる材料の JSON> <claude の場所>
+# 点検の中の Claude の作業フォルダは、点検の状態の場所の中の空の work/ で、終わったら消す。点検の中の Claude の出力と
+# 直し方は、変数にだけ持ち、ファイルに書かない。失敗したときは、標準エラーに理由を1文で出して 0 でない値を返し、メモリを書き換えない
+inspect_with_claude() {
+    local work="$STATE/work" rc
+    if ! { rm -rf "$work" && mkdir -p "$work"; }; then
+        say_reason "点検の中の Claude の作業フォルダ $work を作れなかった。"
+        return 1
+    fi
+    inspect_calls "$1" "$2" "$3" "$work"
+    rc=$?
+    rm -rf "$work"
+    return "$rc"
+}
+
+# inspect_with_claude の呼び出しの繰り返し: inspect_calls <回の ID> <比べる材料の JSON> <claude の場所> <作業フォルダ>
+# 1回の呼び出しの上限は KP_MEMORY_INSPECTION_CALL_SEC、全体の上限は KP_MEMORY_INSPECTION_TOTAL_SEC の秒で、テストが短くする
+inspect_calls() {
+    local run=$1 material=$2 claude=$3 work=$4 nl='
+'
+    local call=${KP_MEMORY_INSPECTION_CALL_SEC:-1200} total=${KP_MEMORY_INSPECTION_TOTAL_SEC:-3600}
+    local prompt schema content deadline n=1 first=1 looked='' left limit allowed out rc res kind got
+    case "$call" in '' | *[!0-9]* | 0) call=1200 ;; esac
+    case "$total" in '' | *[!0-9]* | 0) total=3600 ;; esac
+    deadline=$(($(date +%s) + total))
+    prompt=$(cat "$HERE/inspect-prompt.md") || { say_reason "点検の指示 inspect-prompt.md を読めなかった。"; return 1; }
+    schema=$(cat "$HERE/plan-schema.json") || { say_reason "直し方の形 plan-schema.json を読めなかった。"; return 1; }
+    content=$(perl "$PL" content) || return 1
+    while :; do
+        left=$((deadline - $(date +%s)))
+        if [ "$left" -le 0 ]; then
+            say_reason "点検の全体の上限の ${total} 秒を超えたので、点検の中の Claude を呼ばずに止めた。"
+            return 1
+        fi
+        limit=$call
+        [ "$left" -lt "$limit" ] && limit=$left
+        if [ "$n" -lt 3 ]; then
+            allowed="この呼び出しで返してよいもの: この呼び出しは${n}回目です。調べてほしいことを lookups に並べて plan を null にするか、lookups を空の配列にして plan に直し方を書いて返してください。"
+        else
+            allowed="この呼び出しで返してよいもの: この呼び出しは3回目です。調べてほしいことは返せません。lookups を空の配列にし、plan に直し方を書いて返してください。確かめられていない汚染は、扱いを unverified にしてください。"
+        fi
+        out=$(printf '%s\n\n%s\n\n%s\n\n%s%s\n' "$prompt" "$material" "$content" "${looked:+$looked$nl$nl}" "$allowed" |
+            perl "$PL" inspector "$limit" "$work" "$claude" -p --output-format json --json-schema "$schema" --tools "" \
+                --permission-mode dontAsk --setting-sources user --settings '{"disableAllHooks": true}' --strict-mcp-config \
+                --no-session-persistence --max-turns 4)
+        rc=$?
+        if [ "$rc" -eq 124 ]; then
+            if [ "$limit" -lt "$call" ]; then
+                say_reason "点検の全体の上限の ${total} 秒を超えたので、${n}回目の点検の中の Claude の呼び出しを止めた。"
+            else
+                say_reason "1回の呼び出しの上限の ${call} 秒を超えたので、${n}回目の点検の中の Claude の呼び出しを止めた。"
+            fi
+            return 1
+        fi
+        res=$(printf '%s\n' "$out" | perl "$PL" outcome "$n" "$rc") || return 1
+        kind=${res%%"$nl"*}
+        res=${res#*"$nl"}
+        if [ "$kind" = plan ]; then
+            printf '%s\n' "$res" | perl "$PL" apply "$run"
+            return
+        fi
+        left=$((deadline - $(date +%s)))
+        if [ "$left" -le 0 ]; then
+            say_reason "点検の全体の上限の ${total} 秒を超えたので、調べてほしいことを調べずに止めた。"
+            return 1
+        fi
+        got=$(printf '%s\n' "$res" | perl "$PL" timed "$left" perl "$PL" lookup "$run" "$first")
+        rc=$?
+        if [ "$rc" -eq 124 ]; then
+            say_reason "点検の全体の上限の ${total} 秒を超えたので、調べてほしいことを調べている途中で止めた。"
+            return 1
+        fi
+        [ "$rc" -eq 0 ] || return 1
+        looked="$looked${looked:+$nl}$got"
+        first=$((first + ${kind#lookups }))
+        n=$((n + 1))
+    done
+}
+
 # 会話の中の操作は、引数をそのまま memory-inspect.pl に渡す。引数の確かめは memory-inspect.pl が行う
 cmd_show() { perl "$PL" show "$@"; }
 cmd_shown() { perl "$PL" shown "$@"; }
