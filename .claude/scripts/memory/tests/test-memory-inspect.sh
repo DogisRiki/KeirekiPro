@@ -1392,7 +1392,7 @@ check "append_index_line で、目次の末尾に1行が足され、記録の af
 check "改行のある append_index_line を断る" "$(ap_changes C6)" "C6=skipped:改行の入った行は目次に足さない"
 check "点検のあとに、メモリのディレクトリと状態の場所のほかにファイルが増えず、直す前の文が record.json と report.md のほかに残らない" \
     "$([ "$sig_before" = "$(outside_sig)|$(home_sig)" ] && printf 同じ || printf 違う)|$(cd "$MEMDIR" && find . -mindepth 1 -maxdepth 1 | sed 's|^\./||' | LC_ALL=C sort | tr '\n' ' ')|$(files_with 古い事実の記述)|$(files_with 消してよいファイル)" \
-    "同じ|MEMORY.md a.md b.md |./repo/.git/keirekipro-memory-inspection/runs/r1/record.json |./repo/.git/keirekipro-memory-inspection/runs/r1/record.json "
+    "同じ|MEMORY.md a.md b.md |./repo/.git/keirekipro-memory-inspection/runs/r1/record.json ./repo/.git/keirekipro-memory-inspection/runs/r1/report.md |./repo/.git/keirekipro-memory-inspection/runs/r1/record.json ./repo/.git/keirekipro-memory-inspection/runs/r1/report.md "
 
 # ---------------------------------------------------------------------
 # 繰り返しの数え方と案の絞り込み
@@ -1441,11 +1441,12 @@ cat >"$CASE/plan1.json" <<'JSON'
 JSON
 apply_run r1 "$CASE/plan1.json"
 rc1=$?
+# r0 が点検の終わりに比べる元を書いたので、r1 の F1 は、会話の外で a.md を書き換えたことの汚染である
 check "直さずに残した汚染と戻した直しの汚染が、2回目からは新しい汚染に数えられない" \
     "$rc0|$rc1|$(rec_list "$STATE/runs/r0/record.json" findings id kind new)|$(rec_list "$STATE/runs/r1/record.json" findings id kind new)" \
-    "0|0|F1:3:1,F2:4:1,F3:5:1|F1:3:0,F2:4:0,F3:5:0,F4:5:1"
+    "0|0|F1:3:1,F2:4:1,F3:5:1|F1:11:1,F2:3:0,F3:4:0,F4:5:0,F5:5:1"
 check "断った移す先の案を、記述が変わらない間外す" \
-    "$(rec_list "$STATE/runs/r1/record.json" relocation_proposals id finding text)" "R1:F4:移す2"
+    "$(rec_list "$STATE/runs/r1/record.json" relocation_proposals id finding text)" "R1:F5:移す2"
 
 newcase ap-rules
 printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
@@ -1535,6 +1536,199 @@ check "見落としから案を作った回の ID を proposed_in に書く" \
     "$rc|$(perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; binmode STDOUT, ":utf8";
         print join ",", map { "$_->{id}:" . ($_->{proposed_in} // "null") . ":$_->{summary}" } @{ JSON::PP->new->utf8->decode(<$f>) }' "$STATE/missed.json")" \
     "0|x1:r1:見落とし1,x2:null:見落とし2,x3:r0:見落とし3"
+
+# ---------------------------------------------------------------------
+# 報告と点検の終わりの書き込み
+# ---------------------------------------------------------------------
+
+# 報告の「## 見出し」の節の本文を、前後の空の行を除いて出す: report_section <見出し>
+report_section() {
+    perl -e 'open my $f, "<", $ARGV[0] or exit 1; my ($in, @out);
+        while (<$f>) { if (/^## /) { last if $in; $in = $_ eq "## $ARGV[1]\n"; next } push @out, $_ if $in }
+        my $t = join "", @out; $t =~ s/\A\n+//; $t =~ s/\n+\z//; print $t' "$STATE/runs/r1/report.md" "$1"
+}
+# 報告の始めの、最初の節より前の行を出す
+report_head() { perl -ne 'last if /^## /; print' "$STATE/runs/r1/report.md"; }
+# 比べる元を「取った日時|回の ID|ファイル:ハッシュ:行ごとのハッシュ,...」の形で出す
+snap_fields() {
+    perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; my $d = JSON::PP->new->utf8->decode(<$f>); binmode STDOUT, ":utf8";
+        print "$d->{taken_at}|$d->{run_id}|", join ",", map { "$_:$d->{files}{$_}{sha256}:" . join("+", @{ $d->{files}{$_}{lines} }) } sort keys %{ $d->{files} }' \
+        "$STATE/snapshot.json"
+}
+# ファイルを比べる元に書くときの形を出す: snap_entry <名前> <ファイル>
+snap_entry() {
+    perl -MDigest::SHA=sha256_hex -e 'open my $f, "<:raw", $ARGV[1] or exit 1; local $/; my $t = <$f>;
+        my @l = grep { /\S/ } map { s/\r\z//r } split /\n/, $t; print "$ARGV[0]:" . sha256_hex($t) . ":" . join "+", map { sha256_hex($_) } @l' "$1" "$2"
+}
+
+newcase rp-clean
+printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+printf '汚れていない文\n' >"$MEMDIR/a.md"
+prepare_run r1 scheduled
+printf '%s\n' '{"lookups": [], "plan": {"findings": [], "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""}}' \
+    >"$CASE/plan.json"
+apply_run r1 "$CASE/plan.json"
+rc=$?
+check "汚染が無い回の報告に、汚染は無かったと載る" "$rc|$(report_section 見つけた汚染)" "0|汚染は無かった。"
+check "初回の報告に、次の点検から会話を通らない書き換えを見つけられると載る" "$(report_section 初回の点検)" \
+    "今回は初回の点検なので、会話を通らない書き換えを探さなかった。次の点検からは、今回の点検が読んだ中身と比べて、会話を通らない書き換えを見つけられる。"
+clean_head="$(report_head)"
+clean_want="# メモリの点検の報告(r1)
+
+- 点検した日時: $(jget "$STATE/runs/r1/record.json" started_at)
+- 点検の種類: 決まった曜日と時刻の点検
+- 点検したメモリファイルの数: 1
+- 状態: 完了
+- 調べたコミット: $(jget "$STATE/runs/r1/record.json" origin_main)"
+
+newcase rp-full
+mkdir -p "$CASE/old"
+printf -- '- [A](a.md) — a\n- [B](b.md) — b\n- [C](c.md) — c\n- [D](d.md) — d\n' >"$CASE/old/MEMORY.md"
+printf '古い事実\n残る文\n' >"$CASE/old/a.md"
+printf '残す文\n重なる文\n' >"$CASE/old/b.md"
+printf '点検の間に書き換わる文\n' >"$CASE/old/c.md"
+printf '消すファイルの文\n' >"$CASE/old/d.md"
+make_snapshot "$SINCE" "$CASE/old"
+cp "$CASE/old/"*.md "$MEMDIR/"
+# 種類3を、前の回にも見つかった種類にして、決まりの見直しの案が報告に残るようにする
+make_record r0 scheduled completed 2026-10-26T01:00:00Z 3:new
+cat >"$STATE/missed.json" <<'JSON'
+[{"id":"x1","kind":3,"file":"b.md","summary":"見落とし1","noted_at":"2026-10-20T00:00:00Z","proposed_in":null}]
+JSON
+prepare_run r1 now
+# 点検の間に、会話の中の Claude が c.md を書き換えたとする
+printf '会話で書き換えた文\n' >"$MEMDIR/c.md"
+cat >"$CASE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 1, "file": "a.md", "excerpt": "古い事実", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "古い事実", "new": "新しい事実"}]},
+    {"kind": 4, "file": "d.md", "excerpt": "消すファイルの文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "d.md"}]},
+    {"kind": 3, "file": "b.md", "excerpt": "残す文", "status": "keep", "reason": "残す理由", "evidence": "", "changes": []},
+    {"kind": 5, "file": "b.md", "excerpt": "重なる文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "b.md", "old": "無い文", "new": "x"}]}
+  ],
+  "relocation_proposals": [{"finding": 3, "target": "CLAUDE.md", "text": "移す文"}],
+  "rule_proposals": [{"kind": 3, "target": "CLAUDE.md", "text": "決まりの文"}],
+  "inspection_proposals": [{"trigger": "missed:x1", "text": "やり方の文"}],
+  "summary": ""
+}}
+JSON
+apply_run r1 "$CASE/plan.json"
+rc=$?
+rec="$STATE/runs/r1/record.json"
+full_want="# メモリの点検の報告(r1)
+
+- 点検した日時: $(jget "$rec" started_at)
+- 点検の種類: その場で動かした点検
+- 点検したメモリファイルの数: 4
+- 状態: 完了"
+check "報告の始めに、点検した日時と点検の種類と点検したメモリファイルの数と状態が載る" \
+    "$rc|$(jget "$rec" status)|$clean_head|$(report_head | sed -n 1,6p)" "0|completed|$clean_want|$full_want"
+
+cat >"$CASE/want.txt" <<'EOF'
+### F1 種類1 古くなった事実(a.md)
+
+```text
+古い事実
+```
+
+### F2 種類4 外から混入した指示(d.md)
+
+```text
+消すファイルの文
+```
+
+### F3 種類3 メモリ同士の矛盾(b.md)
+
+```text
+残す文
+```
+
+### F4 種類5 重複と二重記述(b.md)
+
+```text
+重なる文
+```
+EOF
+check "報告に、汚染ごとに種類とメモリファイルの名前と記述が載る" "$(report_section 見つけた汚染)" "$(cat "$CASE/want.txt")"
+
+cat >"$CASE/want.txt" <<'EOF'
+### 移す先の案
+
+#### R1 F3(b.md)の記述を CLAUDE.md に移す
+
+```text
+移す文
+```
+
+### 決まりの見直しの案
+
+#### K1 種類3 メモリ同士の矛盾 について、CLAUDE.md を見直す
+
+```text
+決まりの文
+```
+
+### 点検のやり方の見直しの案
+
+#### M1 開発者が指摘した見落とし x1 から作った案
+
+```text
+やり方の文
+```
+
+案には、会話で「R1 を了承する」か「R1 を断る」のように、案の ID を書いて答えられる。
+EOF
+check "報告に、移す先の案と決まりの見直しの案と点検のやり方の見直しの案ごとに、ID と案の文と、会話で答えられることが載る" \
+    "$(report_section 案)" "$(cat "$CASE/want.txt")"
+
+cat >"$CASE/want.txt" <<'EOF'
+### C1 a.md の文の置き換え
+
+直す前:
+
+```text
+古い事実
+```
+
+直したあと:
+
+```text
+新しい事実
+```
+
+### C2 d.md のファイルの削除
+
+消す前の全文:
+
+```text
+消すファイルの文
+```
+
+消した目次の行:
+
+```text
+- [D](d.md) — d
+```
+EOF
+check "報告に、直しの ID ごとの直す前の文と直したあとの文と、消したファイルの全文と消した目次の行が載る" \
+    "$(report_section 直したメモリファイル)" "$(cat "$CASE/want.txt")"
+
+check "報告に、直さなかった汚染と行わなかった直しの理由が載る" "$(report_section 直さなかった汚染と、行わなかった直し)" \
+    "- F3(b.md): 直さなかった。理由: 残す理由
+- C3(b.md の文の置き換え): 行わなかった。理由: $SKIP_OLD_COUNT"
+check "報告に、点検の間に書き換えられたので次の点検で点検するファイルが載る" "$(report_section 次の点検で点検するメモリファイル)" \
+    "点検の間に書き換えられたので、次のファイルは今回直さず、次の点検で点検する。
+
+- c.md"
+check "報告に、調べたコミットの ID と直しの戻し方が載る" \
+    "$(report_head | grep '^- 調べたコミット: ')|$(report_section 直しの戻し方)" \
+    "- 調べたコミット: $(gitq rev-parse origin/main)|直しを戻すには、会話で「C1 を戻して」のように直しの ID を書く。Claude が、その直しを戻す。"
+check "snapshot.json が、直したファイルは直したあとのハッシュ、直さなかったファイルは読んだときのハッシュになる" \
+    "$(snap_fields)" \
+    "$(jget "$rec" started_at)|r1|$(snap_entry MEMORY.md "$MEMDIR/MEMORY.md"),$(snap_entry a.md "$MEMDIR/a.md"),$(snap_entry b.md "$MEMDIR/b.md"),$(snap_entry c.md "$CASE/old/c.md")"
 
 echo
 echo "$pass ok, $failn NG"

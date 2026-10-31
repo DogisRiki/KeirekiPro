@@ -96,6 +96,26 @@ my %NOTE_OUT_OF_RANGE = (
 # 決まりの見直しの案を載せる種類で、点検の中の Claude が案を書かなかったときに、記録の notes に書く文
 my $NOTE_NO_RULE = q{種類 %s の汚染が直近の点検で繰り返し見つかったが、決まりの見直しの案を作れなかった};
 
+# 報告に書く名前
+# 汚染の種類の名前(要件2の受入基準1の11種類)
+my %KIND_NAME = (
+    1  => q{古くなった事実},
+    2  => q{誤った一般化と未検証の主張},
+    3  => q{メモリ同士の矛盾},
+    4  => q{外から混入した指示},
+    5  => q{重複と二重記述},
+    6  => q{目次とメモリファイルの食い違いと、目次の肥大},
+    7  => q{いまの仕事に合わなくなった記述},
+    8  => q{目次の説明と本文の食い違い},
+    9  => q{量が多すぎる状態},
+    10 => q{置き場所の誤り},
+    11 => q{会話を通らない直接の書き換え},
+);
+my %STATUS_NAME = (completed => q{完了}, interrupted => q{中断}, running => q{動いている});
+my %OP_NAME = (edit => q{文の置き換え}, delete => q{ファイルの削除}, append_index_line => q{目次への行の追加});
+# 書き終わらずに止まった直しの、行わなかった理由
+my $NOT_WRITTEN = q{点検が途中で止まったので、書かなかった};
+
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
 
@@ -859,47 +879,215 @@ sub change_write {
 # メモリファイルを書き、書いたら記録の状態を applied にする。書く前に、ファイルがほかから書き換わっていたら、
 # その直しを行わず理由を記録に書く
 sub apply_changes {
-    my ($out, $path, $memdir, $state, $run, $read) = @_;
-    my @todo = grep { $_->{state} eq 'not_applied' } @{ $out->{changes} };
-    return unless @todo;
-    my $lock = lock_dir($state, 'memory');
-    my ($taken, $owner) = lock_take($lock, $run, own_pid());
-    die 'メモリのロックを回 ' . ($owner ? encode('UTF-8', $owner->{run}) : '(不明)') . " が取っているので、直しを書かなかった\n"
-        unless $taken;
+    my ($out, $path, $memdir, $read) = @_;
+    my %written;
     my %expect = %$read;
     my %skipped = map { (encode('UTF-8', $_->{file}) => 1) } @{ $out->{skipped_files} };
-    my $ok = eval {
-        for my $e (@todo) {
-            my ($why, $write, $fields) = change_write($e, $memdir, \%expect);
-            if (defined $why) {
-                @$e{qw(state skip_reason)} = ('skipped', decode('UTF-8', $SKIP{$why}));
-                # 断ったときの2つ目の値は、書き換わっていたファイルの名前である
-                my $name = $write;
-                push @{ $out->{skipped_files} }, { file => decode('UTF-8', $name), reason => decode('UTF-8', $SKIP{rewritten}) }
-                    if $why eq 'rewritten' && !$skipped{$name}++;
-                write_json($path, $out);
+    for my $e (grep { $_->{state} eq 'not_applied' } @{ $out->{changes} }) {
+        my ($why, $write, $fields) = change_write($e, $memdir, \%expect);
+        if (defined $why) {
+            @$e{qw(state skip_reason)} = ('skipped', decode('UTF-8', $SKIP{$why}));
+            # 断ったときの2つ目の値は、書き換わっていたファイルの名前である
+            my $name = $write;
+            push @{ $out->{skipped_files} }, { file => decode('UTF-8', $name), reason => decode('UTF-8', $SKIP{rewritten}) }
+                if $why eq 'rewritten' && !$skipped{$name}++;
+            write_json($path, $out);
+            next;
+        }
+        %$e = (%$e, %$fields, state => 'applying');
+        write_json($path, $out);
+        # 消すファイルを先に消す。止まったときに、後始末がファイルの無いことで書かれたと見分けるためである
+        for my $name (sort { defined $write->{$a} <=> defined $write->{$b} || $a cmp $b } keys %$write) {
+            if (defined $write->{$name}) {
+                write_bytes("$memdir/$name", $write->{$name});
+                $expect{$name} = sha256_hex($write->{$name});
+            } else {
+                unlink "$memdir/$name" or die "$name を消せなかった($!)\n";
+                delete $expect{$name};
+            }
+            $written{$name} = $write->{$name};
+        }
+        $e->{state} = 'applied';
+        write_json($path, $out);
+    }
+    return \%written;
+}
+
+# 点検の終わりに書き直す比べる元を返す。直したファイルは直したあとの中身から求め、直さなかったファイルは、
+# prepare で読んだときの中身のままなら今の中身から求める。点検の間にほかから書き換わったファイルは、読んだときのハッシュを書き、
+# 行ごとのハッシュは前の比べる元のものを引き継ぐ(前の比べる元に無ければ空にする)。行の中身は読んだときのものを持っていないためである。
+# 消したファイルと、読んだあとに作られたファイルは書かない
+sub next_snapshot {
+    my ($record, $memdir, $read, $written, $old) = @_;
+    my %files;
+    for my $name (sort keys %$read) {
+        my $entry;
+        if (exists $written->{$name}) {
+            next unless defined $written->{$name};
+            $entry = snapshot_entry($written->{$name});
+        } else {
+            my $text = read_bytes("$memdir/$name");
+            if (defined $text && sha256_hex($text) eq $read->{$name}) {
+                $entry = snapshot_entry($text);
+            } else {
+                my $prev = $old ? $old->{files}{$name} : undef;
+                $entry = { sha256 => $read->{$name}, lines => ref $prev eq 'HASH' && ref $prev->{lines} eq 'ARRAY' ? $prev->{lines} : [] };
+            }
+        }
+        $files{ decode('UTF-8', $name) } = $entry;
+    }
+    return { taken_at => $record->{started_at}, run_id => $record->{run_id}, files => \%files };
+}
+
+# ---- 報告 ------------------------------------------------------------------
+# record.json から report.md の中身を作る。apply と finalize が使う。文はバイトの列で組み立てる
+
+
+# 記録の文字の値を、報告に書くバイトの列にする。文字の列でない値は空にする
+sub report_str {
+    my ($v) = @_;
+    return defined $v && !ref $v ? encode('UTF-8', "$v") : '';
+}
+
+# 汚染の種類を「種類1 古くなった事実」の形にする
+sub kind_label {
+    my ($kind) = @_;
+    my $k = report_str($kind);
+    return "種類$k" . (defined $KIND_NAME{$k} ? " $KIND_NAME{$k}" : '');
+}
+
+# メモリの文や点検の中の Claude の文を、Markdown の囲みに入れる。囲みの印は、文の中のどの ` の続きよりも長くする
+sub fenced {
+    my ($text) = @_;
+    my $long = 0;
+    while ($text =~ /(`+)/g) { $long = length $1 if length $1 > $long; }
+    my $fence = '`' x ($long >= 3 ? $long + 1 : 3);
+    $text .= "\n" unless $text =~ /\n\z/;
+    return "$fence" . "text\n$text$fence\n";
+}
+
+# 理由の文を1行にそろえる
+sub one_line { return squash_space(report_str($_[0])); }
+
+sub report_text {
+    my ($r) = @_;
+    my @findings = grep { ref $_ eq 'HASH' } @{ list_of($r->{findings}) };
+    my @changes = grep { ref $_ eq 'HASH' } @{ list_of($r->{changes}) };
+    my %file_of = map { (report_str($_->{id}) => report_str($_->{file})) } @findings;
+    my $status = report_str($r->{status});
+    my $out = '# メモリの点検の報告(' . report_str($r->{run_id}) . ")\n\n";
+
+    # 1. 点検した日時、点検の種類、点検したメモリファイルの数、状態
+    $out .= '- 点検した日時: ' . report_str($r->{started_at}) . "\n";
+    $out .= '- 点検の種類: ' . (report_str($r->{trigger}) eq 'now' ? 'その場で動かした点検' : '決まった曜日と時刻の点検') . "\n";
+    $out .= '- 点検したメモリファイルの数: ' . report_str($r->{files_inspected}) . "\n";
+    $out .= '- 状態: ' . ($STATUS_NAME{$status} // $status) . "\n";
+    $out .= '- 中断の理由: ' . one_line($r->{interrupt_reason}) . "\n" if $status eq 'interrupted';
+    $out .= '- 調べたコミット: ' . report_str($r->{origin_main}) . "\n";
+
+    # 2. 見つけた汚染
+    $out .= "\n## 見つけた汚染\n\n";
+    $out .= "汚染は無かった。\n" unless @findings;
+    for my $f (@findings) {
+        $out .= '### ' . report_str($f->{id}) . ' ' . kind_label($f->{kind}) . '(' . report_str($f->{file}) . ")\n\n";
+        my $excerpt = report_str($f->{excerpt});
+        $out .= fenced($excerpt) . "\n" if length $excerpt;
+    }
+
+    # 3. 直したメモリファイル
+    my @applied = grep { report_str($_->{state}) eq 'applied' } @changes;
+    if (@applied) {
+        $out .= "## 直したメモリファイル\n\n";
+        for my $c (@applied) {
+            my $op = report_str($c->{op});
+            $out .= '### ' . report_str($c->{id}) . ' ' . report_str($c->{file}) . ' の' . ($OP_NAME{$op} // $op) . "\n\n";
+            if ($op eq 'delete') {
+                $out .= "消す前の全文:\n\n" . fenced(report_str($c->{before})) . "\n";
+                my @lines = map { report_str($_) } @{ list_of($c->{removed_index_lines}) };
+                $out .= @lines ? "消した目次の行:\n\n" . fenced(join("\n", @lines)) . "\n" : "目次に、このファイルの行は無かった。\n\n";
                 next;
             }
-            %$e = (%$e, %$fields, state => 'applying');
-            write_json($path, $out);
-            # 消すファイルを先に消す。止まったときに、後始末がファイルの無いことで書かれたと見分けるためである
-            for my $name (sort { defined $write->{$a} <=> defined $write->{$b} || $a cmp $b } keys %$write) {
-                if (defined $write->{$name}) {
-                    write_bytes("$memdir/$name", $write->{$name});
-                    $expect{$name} = sha256_hex($write->{$name});
-                } else {
-                    unlink "$memdir/$name" or die "$name を消せなかった($!)\n";
-                    delete $expect{$name};
-                }
-            }
-            $e->{state} = 'applied';
-            write_json($path, $out);
+            $out .= "直す前:\n\n" . fenced(report_str($c->{before})) . "\n" if $op eq 'edit';
+            my $after = report_str($c->{after});
+            $out .= length $after ? "直したあと:\n\n" . fenced($after) . "\n" : "直したあと: 文を消した。\n\n";
         }
-        1;
-    };
-    my $err = $@;
-    lock_release($lock, $run);
-    die $err unless $ok;
+    }
+
+    # 4. 直さなかった汚染と、行わなかった直し
+    my @kept = grep { report_str($_->{status}) ne 'fix' } @findings;
+    my @skipped = grep { report_str($_->{state}) ne 'applied' } @changes;
+    if (@kept || @skipped) {
+        $out .= "## 直さなかった汚染と、行わなかった直し\n\n";
+        $out .= '- ' . report_str($_->{id}) . '(' . report_str($_->{file}) . '): 直さなかった。理由: ' . one_line($_->{reason}) . "\n" for @kept;
+        for my $c (@skipped) {
+            my $why = report_str($c->{state}) eq 'skipped' ? one_line($c->{skip_reason}) : $NOT_WRITTEN;
+            my $op = report_str($c->{op});
+            $out .= '- ' . report_str($c->{id}) . '(' . report_str($c->{file}) . ' の' . ($OP_NAME{$op} // $op) . '): 行わなかった。理由: ' . "$why\n";
+        }
+        $out .= "\n";
+    }
+
+    # 5. 点検の間に会話で書き換えられたので、次の点検で点検するメモリファイル
+    my @later = grep { ref $_ eq 'HASH' } @{ list_of($r->{skipped_files}) };
+    if (@later) {
+        $out .= "## 次の点検で点検するメモリファイル\n\n点検の間に書き換えられたので、次のファイルは今回直さず、次の点検で点検する。\n\n";
+        $out .= '- ' . report_str($_->{file}) . "\n" for @later;
+        $out .= "\n";
+    }
+
+    # 6. 移す先の案、決まりの見直しの案、点検のやり方の見直しの案
+    my @relocations = grep { ref $_ eq 'HASH' } @{ list_of($r->{relocation_proposals}) };
+    my @rules = grep { ref $_ eq 'HASH' } @{ list_of($r->{rule_proposals}) };
+    my @inspections = grep { ref $_ eq 'HASH' } @{ list_of($r->{inspection_proposals}) };
+    my @notes = map { one_line($_) } @{ list_of($r->{notes}) };
+    if (@relocations || @rules || @inspections || @notes) {
+        $out .= "## 案\n\n";
+        if (@relocations) {
+            $out .= "### 移す先の案\n\n";
+            for my $p (@relocations) {
+                my $fid = report_str($p->{finding});
+                $out .= '#### ' . report_str($p->{id}) . " $fid(" . ($file_of{$fid} // '') . ')の記述を ' . report_str($p->{target}) . " に移す\n\n"
+                    . fenced(report_str($p->{text})) . "\n";
+            }
+        }
+        if (@rules) {
+            $out .= "### 決まりの見直しの案\n\n";
+            $out .= '#### ' . report_str($_->{id}) . ' ' . kind_label($_->{kind}) . ' について、' . report_str($_->{target}) . " を見直す\n\n"
+                . fenced(report_str($_->{text})) . "\n" for @rules;
+        }
+        if (@inspections) {
+            $out .= "### 点検のやり方の見直しの案\n\n";
+            for my $p (@inspections) {
+                my $trigger = report_str($p->{trigger});
+                my $from = $trigger =~ /\Afinding:(.*)\z/s ? "前の点検のときにあった汚染 $1"
+                    : $trigger =~ /\Amissed:(.*)\z/s ? "開発者が指摘した見落とし $1" : $trigger;
+                $out .= '#### ' . report_str($p->{id}) . " $from から作った案\n\n" . fenced(report_str($p->{text})) . "\n";
+            }
+        }
+        if (@relocations || @rules || @inspections) {
+            my $first = report_str((@relocations, @rules, @inspections)[0]{id});
+            $out .= "案には、会話で「$first を了承する」か「$first を断る」のように、案の ID を書いて答えられる。\n\n";
+        }
+        if (@notes) {
+            $out .= "### 点検が書き残したこと\n\n";
+            $out .= "- $_\n" for @notes;
+            $out .= "\n";
+        }
+    }
+
+    # 7. 初回の点検
+    if ($r->{first_run}) {
+        $out .= "## 初回の点検\n\n今回は初回の点検なので、会話を通らない書き換えを探さなかった。"
+            . "次の点検からは、今回の点検が読んだ中身と比べて、会話を通らない書き換えを見つけられる。\n\n";
+    }
+
+    # 8. 直しの戻し方
+    if (@applied) {
+        my $first = report_str($applied[0]{id});
+        $out .= "## 直しの戻し方\n\n直しを戻すには、会話で「$first を戻して」のように直しの ID を書く。Claude が、その直しを戻す。\n";
+    }
+    $out =~ s/\n+\z/\n/;
+    return $out;
 }
 
 # ---- サブコマンド ----------------------------------------------------------
@@ -1292,19 +1480,43 @@ sub cmd_apply {
         notes                => \@notes,
     };
     write_json($path, $out);
-    apply_changes($out, $path, $memdir, $state, $run, $mem->{read});
 
-    # 見落としから点検のやり方の見直しの案を作った回の ID を書く。ほかの回で案を作った見落としは書き替えない
-    my %proposed = map { /\Amissed:(.+)\z/s ? ($1 => 1) : () } map { $_->{trigger} } @inspections;
-    if (%proposed) {
-        my $missed = read_state_json("$state/missed.json", 'ARRAY');
-        my $marked = 0;
-        for my $m (grep { ref $_ eq 'HASH' && defined $_->{id} && !ref $_->{id} && $proposed{ $_->{id} } } @$missed) {
-            next if defined $m->{proposed_in} && $m->{proposed_in} ne '';
-            $m->{proposed_in} = $run;
-            $marked++;
+    # 直しを書いてから、比べる元を書き直すまでを、メモリのロックの中で行う。比べる元を書く前にほかから書き換わったファイルを、
+    # 次の点検で会話を通らない書き換えと見分けられるようにするためである
+    my $lock = lock_dir($state, 'memory');
+    my ($taken, $owner) = lock_take($lock, $run, own_pid());
+    die 'メモリのロックを回 ' . ($owner ? encode('UTF-8', $owner->{run}) : '(不明)') . " が取っているので、直しを書かなかった\n"
+        unless $taken;
+    my $ok = eval {
+        my $written = apply_changes($out, $path, $memdir, $mem->{read});
+
+        # 見落としから点検のやり方の見直しの案を作った回の ID を書く。ほかの回で案を作った見落としは書き替えない
+        my %proposed = map { /\Amissed:(.+)\z/s ? ($1 => 1) : () } map { $_->{trigger} } @inspections;
+        if (%proposed) {
+            my $missed = read_state_json("$state/missed.json", 'ARRAY');
+            my $marked = 0;
+            for my $m (grep { ref $_ eq 'HASH' && defined $_->{id} && !ref $_->{id} && $proposed{ $_->{id} } } @$missed) {
+                next if defined $m->{proposed_in} && $m->{proposed_in} ne '';
+                $m->{proposed_in} = $run;
+                $marked++;
+            }
+            write_json("$state/missed.json", $missed) if $marked;
         }
-        write_json("$state/missed.json", $missed) if $marked;
-    }
+        finish_run($out, $path, $state, $memdir, $mem->{read}, $written);
+        1;
+    };
+    my $err = $@;
+    lock_release($lock, $run);
+    die $err unless $ok;
     return 0;
+}
+
+# 点検を終える。記録の状態を completed にし、報告 report.md を書き、比べる元 snapshot.json を書き直す
+sub finish_run {
+    my ($out, $path, $state, $memdir, $read, $written) = @_;
+    my $old = read_snapshot($state);
+    @$out{qw(status finished_at)} = ('completed', iso_utc(now()));
+    write_json($path, $out);
+    write_bytes(dirname($path) . '/report.md', report_text($out));
+    write_json("$state/snapshot.json", next_snapshot($out, $memdir, $read, $written, $old));
 }
