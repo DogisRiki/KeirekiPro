@@ -1124,6 +1124,202 @@ rc_notarray=$?
 check "lookup の引数の誤りに終了コード 2 で、記録の無い回と配列でない入力に 1 で終わる" \
     "$rc_args|$rc_first|$rc_id|$rc_norecord|$rc_notarray" "2|2|2|1|1"
 
+# ---------------------------------------------------------------------
+# 直し方の確認
+# ---------------------------------------------------------------------
+
+# 直し方の JSON を標準入力で渡して apply を動かす: apply_run <回の ID> <直し方の JSON のファイル>
+apply_run() { perl "$PL" apply "$1" <"$2" >"$CASE/apply.out"; }
+# 記録の配列の欄の要素ごとに、名前を挙げた欄の値を : でつなぎ、要素を , でつないで出す。配列の値は + でつなぐ:
+# rec_list <記録> <配列の欄> <欄の名前>...
+rec_list() {
+    perl -MJSON::PP -e 'open my $f, "<", shift @ARGV or exit 1; local $/; my $d = JSON::PP->new->utf8->decode(<$f>); my $k = shift @ARGV;
+        binmode STDOUT, ":utf8"; my @keys = @ARGV;
+        print join ",", map { my $e = $_; join ":", map { my $v = $e->{$_}; !defined $v ? "null" : ref $v eq "ARRAY" ? join("+", @$v) : $v } @keys } @{ $d->{$k} || [] }' "$@"
+}
+# 記録の直しのうち、ID を挙げたものを「ID=状態:行わなかった理由」の形で , でつないで出す: ap_changes <ID>...
+ap_changes() {
+    perl -MJSON::PP -e 'open my $f, "<", shift @ARGV or exit 1; local $/; my %want = map { $_ => 1 } @ARGV;
+        my $d = JSON::PP->new->utf8->decode(<$f>); binmode STDOUT, ":utf8";
+        print join ",", map { "$_->{id}=$_->{state}:" . ($_->{skip_reason} // "") } grep { $want{ $_->{id} } } @{ $d->{changes} }' \
+        "$STATE/runs/r1/record.json" "$@"
+}
+SKIP_NOT_FIX="汚染の扱いが fix でない"
+SKIP_KIND="置き場所の誤りと、会話を通らない書き換えは、点検の中で直さない"
+SKIP_NAME="対象がメモリのディレクトリの最上位の .md でない"
+SKIP_MISSING="対象のファイルが無い"
+SKIP_REWRITTEN="点検の間に書き換えられたので、次の点検で点検する"
+SKIP_EXCERPT="汚染の記述がメモリファイルにそのまま無い"
+SKIP_OLD_COUNT="old がメモリファイルにちょうど1回現れない"
+SKIP_WHOLE="old が本文の全体に当たる。ファイルの全体を消すときは delete を使う"
+SKIP_REVERTED="戻された直しの文に重なる"
+SKIP_REVERTED_FILE="戻されてから中身が変わっていないメモリファイルは消さない"
+SKIP_INDEX_DELETE="目次は消さない"
+SKIP_SHAPE="直し方の形が違う"
+
+newcase ap-ids
+mkdir -p "$CASE/old"
+printf -- '- [A](a.md) — a\n- [B](b.md) — b\n' >"$CASE/old/MEMORY.md"
+printf 'a の前の中身\n' >"$CASE/old/a.md"
+printf 'b の一つ目\nb の二つ目\n' >"$CASE/old/b.md"
+make_snapshot "$SINCE" "$CASE/old"
+cp "$CASE/old/MEMORY.md" "$CASE/old/b.md" "$MEMDIR/"
+printf 'a の今の中身\n' >"$MEMDIR/a.md"
+printf 'b の一つ目\nb の二つ目\n' >"$MEMDIR/b.md"
+prepare_run r1 scheduled
+cat >"$CASE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 1, "file": "b.md", "excerpt": "b の一つ目", "status": "fix", "reason": "r1", "evidence": "e1",
+     "changes": [{"op": "edit", "file": "b.md", "old": "b の一つ目", "new": "b の1つ目"}, {"op": "append_index_line", "line": "- [C](c.md) — c"}]},
+    {"kind": 2, "file": "b.md", "excerpt": "b の二つ目", "status": "fix", "reason": "r2", "evidence": "e2",
+     "changes": [{"op": "edit", "file": "b.md", "old": "b の二つ目", "new": "b の2つ目"}]}
+  ],
+  "relocation_proposals": [{"finding": 2, "target": "CLAUDE.md", "text": "移す1"}, {"finding": 1, "target": "doc/x.md", "text": "移す2"},
+    {"finding": 5, "target": "doc/y.md", "text": "範囲の外"}],
+  "rule_proposals": [{"kind": 1, "target": "CLAUDE.md", "text": "決まり1"}, {"kind": 2, "target": "CLAUDE.md", "text": "決まり2"}],
+  "inspection_proposals": [{"trigger": "finding:1", "text": "やり方1"}, {"trigger": "missed:x1", "text": "やり方2"},
+    {"trigger": "finding:3", "text": "範囲の外"}],
+  "summary": "まとめ"
+}}
+JSON
+apply_run r1 "$CASE/plan.json"
+rc=$?
+rec="$STATE/runs/r1/record.json"
+check "標準入力の直し方を読み、prepare の種類11の汚染と合わせて F と C と R と K と M の ID を振る" \
+    "$rc|$(cat "$CASE/apply.out")|$(rec_list "$rec" findings id kind file status changes)|$(rec_list "$rec" changes id finding op file before after)|$(rec_list "$rec" rule_proposals id kind text)" \
+    "0||F1:11:a.md:keep:,F2:1:b.md:fix:C1+C2,F3:2:b.md:fix:C3|C1:F2:edit:b.md:b の一つ目:b の1つ目,C2:F2:append_index_line:MEMORY.md::- [C](c.md) — c,C3:F3:edit:b.md:b の二つ目:b の2つ目|K1:1:決まり1,K2:2:決まり2"
+check "移す先の案の finding と、finding:<番号> の trigger を、F の ID に替える" \
+    "$(rec_list "$rec" relocation_proposals id finding target text)|$(rec_list "$rec" inspection_proposals id trigger text)|$(jget "$rec" notes)" \
+    "R1:F3:CLAUDE.md:移す1,R2:F2:doc/x.md:移す2|M1:finding:F2:やり方1,M2:missed:x1:やり方2|移す先の案の汚染の番号 5 が直し方の汚染の数を超えたので、案を載せなかった,点検のやり方の見直しの案の汚染の番号 3 が直し方の汚染の数を超えたので、案を載せなかった"
+
+newcase ap-refuse
+cat >"$MEMDIR/MEMORY.md" <<'MD'
+- [A](a.md) — a
+- [B](b.md) — b
+- [C](c.md) — c
+- [D](d.md) — d
+MD
+printf -- '---\nname: a\n---\n一行目の記述\n二重の文 二重の文\n戻された文がここにある\nあああ\n無い文の話\n' >"$MEMDIR/a.md"
+printf 'b の全文\n' >"$MEMDIR/b.md"
+printf -- '---\nname: c\n---\n本文だけ\n' >"$MEMDIR/c.md"
+printf '消してよいファイル\n' >"$MEMDIR/d.md"
+printf '戻してから変わったファイル\n' >"$MEMDIR/e.md"
+mkdir -p "$MEMDIR/sub"
+printf 'z\n' >"$MEMDIR/sub/z.md"
+printf 'n\n' >"$MEMDIR/notes.txt"
+mkdir -p "$STATE"
+# a.md の「もう無い文」は戻したあとに消え、e.md は戻したあとに中身が変わったので、どちらへの直しも断らない
+printf '[{"run_id":"r0","change":"C1","file":"a.md","restored_text":"戻された文","restored_sha256":null},{"run_id":"r0","change":"C2","file":"b.md","restored_text":"","restored_sha256":"%s"},{"run_id":"r0","change":"C3","file":"a.md","restored_text":"もう無い文","restored_sha256":null},{"run_id":"r0","change":"C4","file":"e.md","restored_text":"","restored_sha256":"%s"}]\n' \
+    "$(sha_of "$MEMDIR/b.md")" "$(sha_of "$MEMDIR/d.md")" >"$STATE/reverted.json"
+prepare_run r1 now
+cat >"$CASE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 1, "file": "a.md", "excerpt": "一行目の記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "一行目の記述", "new": "直した記述"}]},
+    {"kind": 1, "file": "a.md", "excerpt": "", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "一行目の記述", "new": "x"}]},
+    {"kind": 1, "file": "a.md", "excerpt": "無い記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "一行目の記述", "new": "x"}]},
+    {"kind": 2, "file": "a.md", "excerpt": "二重の文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "二重の文", "new": "x"}]},
+    {"kind": 2, "file": "c.md", "excerpt": "本文だけ", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "c.md", "old": "本文だけ\n", "new": "x"},
+                 {"op": "edit", "file": "c.md", "old": "---\nname: c\n---\n本文だけ\n", "new": "x"}]},
+    {"kind": 10, "file": "a.md", "excerpt": "一行目の記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "一行目の記述", "new": "x"}]},
+    {"kind": 11, "file": "a.md", "excerpt": "一行目の記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "一行目の記述", "new": "x"}]},
+    {"kind": 1, "file": "a.md", "excerpt": "一行目の記述", "status": "unverified", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "一行目の記述", "new": "x"}]},
+    {"kind": 1, "file": "a.md", "excerpt": "一行目の記述", "status": "keep", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "a.md"}]},
+    {"kind": 3, "file": "a.md", "excerpt": "戻された文がここにある", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "戻された文がここにある", "new": "x"},
+                 {"op": "edit", "file": "a.md", "old": "された", "new": "x"}]},
+    {"kind": 3, "file": "b.md", "excerpt": "b の全文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "b.md"}]},
+    {"kind": 4, "file": "d.md", "excerpt": "消してよい", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "d.md"}]},
+    {"kind": 5, "file": "a.md", "excerpt": "一行目の記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "MEMORY.md"}, {"op": "edit", "file": "sub/z.md", "old": "z", "new": "x"},
+                 {"op": "edit", "file": "notes.txt", "old": "n", "new": "x"}, {"op": "edit", "file": "../a.md", "old": "一行目の記述", "new": "x"},
+                 {"op": "edit", "file": "gone.md", "old": "g", "new": "x"}, {"op": "append_index_line", "line": "- [E](e.md) — e"}]},
+    {"kind": 6, "file": "a.md", "excerpt": "一行目の記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "a.md"}, {"op": "edit", "file": "a.md", "old": "ああ", "new": "x"},
+                 {"op": "rename", "file": "a.md"}, {"op": "edit", "file": "a.md", "old": "一行目の記述"}]},
+    {"kind": 3, "file": "a.md", "excerpt": "無い文の話", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "無い文", "new": "x"}]},
+    {"kind": 3, "file": "e.md", "excerpt": "変わったファイル", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "e.md"}]}
+  ],
+  "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+apply_run r1 "$CASE/plan.json"
+rc=$?
+check "記述が無い直しを断る" "$rc|$(ap_changes C1 C2 C3)" "0|C1=not_applied:,C2=skipped:$SKIP_EXCERPT,C3=skipped:$SKIP_EXCERPT"
+check "old が2回現れる直しを断る" "$(ap_changes C4)" "C4=skipped:$SKIP_OLD_COUNT"
+check "本文の全体に当たる old を断る" "$(ap_changes C5 C6)" "C5=skipped:$SKIP_WHOLE,C6=skipped:$SKIP_WHOLE"
+check "種類10と種類11の直しを断る" "$(ap_changes C7 C8)" "C7=skipped:$SKIP_KIND,C8=skipped:$SKIP_KIND"
+check "扱いが fix でない直しを断る" "$(ap_changes C9 C10)" "C9=skipped:$SKIP_NOT_FIX,C10=skipped:$SKIP_NOT_FIX"
+check "戻された文に重なる直しと、戻されてから変わっていないファイルの delete を断る" \
+    "$(ap_changes C11 C12 C13 C14 C21 C25 C26)" \
+    "C11=skipped:$SKIP_REVERTED,C12=skipped:$SKIP_REVERTED,C13=skipped:$SKIP_REVERTED_FILE,C14=not_applied:,C21=skipped:$SKIP_REVERTED,C25=not_applied:,C26=not_applied:"
+check "目次の delete と、最上位の .md でないファイルへの直しと、無いファイルへの直しを断る" \
+    "$(ap_changes C15 C16 C17 C18 C19 C20)" \
+    "C15=skipped:$SKIP_INDEX_DELETE,C16=skipped:$SKIP_NAME,C17=skipped:$SKIP_NAME,C18=skipped:$SKIP_NAME,C19=skipped:$SKIP_MISSING,C20=not_applied:"
+check "重なって2回現れる old と、形の違う直しを断る" \
+    "$(ap_changes C22 C23 C24)" "C22=skipped:$SKIP_OLD_COUNT,C23=skipped:$SKIP_SHAPE,C24=skipped:$SKIP_SHAPE"
+
+newcase ap-rewrite
+printf -- '- [A](a.md) — a\n- [B](b.md) — b\n' >"$MEMDIR/MEMORY.md"
+printf 'a の一つ目\na の二つ目\n' >"$MEMDIR/a.md"
+printf 'b の中身\nb の残り\n' >"$MEMDIR/b.md"
+printf 'c の中身\n' >"$MEMDIR/c.md"
+prepare_run r1 now
+# 点検が読んだあとに、会話の中の Claude が a.md を書き換え、c.md を消し、n.md を作ったとする
+printf 'a の一つ目\na の二つ目\n会話で足した行\n' >"$MEMDIR/a.md"
+rm "$MEMDIR/c.md"
+printf 'n の中身\n' >"$MEMDIR/n.md"
+cat >"$CASE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 1, "file": "a.md", "excerpt": "a の一つ目", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "a の一つ目", "new": "x"}, {"op": "edit", "file": "a.md", "old": "a の二つ目", "new": "y"}]},
+    {"kind": 1, "file": "b.md", "excerpt": "b の中身", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "b.md", "old": "b の中身", "new": "z"}, {"op": "delete", "file": "c.md"}]}
+  ],
+  "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+apply_run r1 "$CASE/plan.json"
+rc=$?
+check "読んだあとに書き換わったファイルへの直しをすべて断り、次の点検で点検すると記録する" \
+    "$rc|$(ap_changes C1 C2 C3 C4)|$(rec_list "$STATE/runs/r1/record.json" skipped_files file reason)" \
+    "0|C1=skipped:$SKIP_REWRITTEN,C2=skipped:$SKIP_REWRITTEN,C3=not_applied:,C4=skipped:$SKIP_REWRITTEN|a.md:$SKIP_REWRITTEN,c.md:$SKIP_REWRITTEN,n.md:$SKIP_REWRITTEN"
+
+newcase ap-usage
+printf 'a\n' >"$MEMDIR/a.md"
+prepare_run r1 now
+printf '{"lookups":[],"plan":null}\n' >"$CASE/null.json"
+perl "$PL" apply <"$CASE/null.json" >/dev/null 2>&1
+rc_args=$?
+perl "$PL" apply 'a/b' <"$CASE/null.json" >/dev/null 2>&1
+rc_id=$?
+perl "$PL" apply r9 <"$CASE/null.json" >/dev/null 2>&1
+rc_norecord=$?
+perl "$PL" apply r1 <"$CASE/null.json" >/dev/null 2>&1
+rc_null=$?
+null_after=$(jget "$STATE/runs/r1/record.json" status changes)
+printf '{"lookups":[],"plan":{"findings":[],"relocation_proposals":[],"rule_proposals":[],"inspection_proposals":[],"summary":""}}\n' >"$CASE/empty.json"
+perl -MJSON::PP -i -pe '$_ = JSON::PP->new->utf8->encode({ %{ decode_json($_) }, status => "completed" }) . "\n"' "$STATE/runs/r1/record.json"
+perl "$PL" apply r1 <"$CASE/empty.json" >/dev/null 2>&1
+rc_done=$?
+check "apply の引数の誤りに終了コード 2 で、記録の無い回と plan が null の入力と running でない回に 1 で終わる" \
+    "$rc_args|$rc_id|$rc_norecord|$rc_null|$null_after|$rc_done" "2|2|1|1|running,|1"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

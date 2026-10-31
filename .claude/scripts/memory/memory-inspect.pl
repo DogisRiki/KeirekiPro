@@ -27,6 +27,10 @@
 #     点検の中の Claude が返した調べてほしいことの JSON の配列を標準入力で受け、その回の記録の origin_main のコミットと
 #     GitHub と会話の記録で調べ、結果を1件ずつ <<<LOOKUP-RESULT id="<番号>">>> と <<<END-LOOKUP-RESULT>>> で囲んで標準出力に出す。
 #     番号は最初の番号から振る。結果の行の頭には | を付ける。コマンドはシェルを通さずに動かし、作業フォルダと git の参照を書き換えない
+#   apply <回の ID>
+#     点検の中の Claude が返した直し方の JSON(plan-schema.json の形)を標準入力で受け、prepare が記録に書いた汚染に続けて、
+#     汚染に F、直しに C、移す先の案に R、決まりの見直しの案に K、点検のやり方の見直しの案に M の番号を振る。
+#     直しを1つずつ確かめ、行わない直しは状態を skipped にして理由を記録に書く。読んだあとに書き換わったファイルを skipped_files に書く
 # 終了コード: 成功は 0、使い方の誤りは 2、失敗は 1(標準エラーに理由を日本語の1文で出す)
 # 前提: perl(JSON::PP)・git。Windows では、git に渡す場所を C:/... の形で受ける
 # =====================================================================
@@ -49,6 +53,7 @@ my %COMMANDS = (
     prepare => \&cmd_prepare,
     content => \&cmd_content,
     lookup  => \&cmd_lookup,
+    apply   => \&cmd_apply,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
@@ -66,6 +71,27 @@ my $REWRITE_REASON = q{書き換えられたことだけでは直さない。中
 # 事実の調べの上限。1回の呼び出しの件数と、1件の結果のバイトの数と、結果の合計のバイトの数である
 my %LOOKUP_LIMIT = (count => 40, item => 20480, total => 204800);
 my $OVER_LIMIT = q{上限を超えたので調べなかった};
+
+# 直し方の確認で、直しを行わなかった理由
+my %SKIP = (
+    not_fix       => q{汚染の扱いが fix でない},
+    kind          => q{置き場所の誤りと、会話を通らない書き換えは、点検の中で直さない},
+    shape         => q{直し方の形が違う},
+    name          => q{対象がメモリのディレクトリの最上位の .md でない},
+    index_delete  => q{目次は消さない},
+    missing       => q{対象のファイルが無い},
+    rewritten     => q{点検の間に書き換えられたので、次の点検で点検する},
+    excerpt       => q{汚染の記述がメモリファイルにそのまま無い},
+    old_count     => q{old がメモリファイルにちょうど1回現れない},
+    whole         => q{old が本文の全体に当たる。ファイルの全体を消すときは delete を使う},
+    reverted      => q{戻された直しの文に重なる},
+    reverted_file => q{戻されてから中身が変わっていないメモリファイルは消さない},
+);
+# 案の汚染の番号が、直し方の汚染の数を超えたときに、記録の notes に書く文
+my %NOTE_OUT_OF_RANGE = (
+    relocation => q{移す先の案の汚染の番号 %s が直し方の汚染の数を超えたので、案を載せなかった},
+    inspection => q{点検のやり方の見直しの案の汚染の番号 %s が直し方の汚染の数を超えたので、案を載せなかった},
+);
 
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
@@ -89,7 +115,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID>\n";
     return 2;
 }
 
@@ -600,6 +626,128 @@ sub lookup_one {
     return ($result, $cut, $over);
 }
 
+# ---- 直し方の確認 ----------------------------------------------------------
+
+# 配列ならその配列を、配列でなければ空の配列を返す
+sub list_of { return ref $_[0] eq 'ARRAY' ? $_[0] : []; }
+
+# 文の中に、別の文が現れる数を、重なる現れ方も数えて返す。空の文は0回とする
+sub count_in {
+    my ($text, $part) = @_;
+    return 0 unless length $part;
+    my ($n, $at) = (0, 0);
+    while ((my $i = index($text, $part, $at)) >= 0) {
+        $n++;
+        $at = $i + 1;
+    }
+    return $n;
+}
+
+# メモリファイルの frontmatter のあとの本文を、前後の空白を除いて返す
+sub memory_body {
+    my ($text) = @_;
+    (my $body = $text) =~ s/\A---[ \t]*\r?\n.*?^---[ \t]*\r?(?:\n|\z)//ms;
+    $body =~ s/\A\s+|\s+\z//g;
+    return $body;
+}
+
+# 直し方の確認に使う、メモリのディレクトリの今の様子を返す。名前はどれもバイトの列である。
+#   read      prepare が読んだときのハッシュ
+#   text      今の中身
+#   reverted  戻された直しのうち、戻した文がまだ残っているもの(texts)と、作り直したファイルが変わっていないこと(unchanged)
+sub memory_state {
+    my ($memdir, $read, $state) = @_;
+    my %read = ref $read eq 'HASH' ? map { (encode('UTF-8', $_) => $read->{$_}) } keys %$read : ();
+    my %text;
+    for my $name (memory_files($memdir)) {
+        my $t = read_bytes("$memdir/$name");
+        $text{$name} = $t if defined $t;
+    }
+    my %reverted;
+    for my $r (@{ read_state_json("$state/reverted.json", 'ARRAY') }) {
+        next unless ref $r eq 'HASH';
+        my $name = memory_name($r->{file});
+        next unless defined $name && defined $text{$name};
+        my $restored = defined $r->{restored_text} && !ref $r->{restored_text} ? encode('UTF-8', $r->{restored_text}) : '';
+        push @{ $reverted{$name}{texts} }, $restored if length $restored && index($text{$name}, $restored) >= 0;
+        $reverted{$name}{unchanged} = 1
+            if defined $r->{restored_sha256} && !ref $r->{restored_sha256} && $r->{restored_sha256} eq sha256_hex($text{$name});
+    }
+    return { read => \%read, text => \%text, reverted => \%reverted };
+}
+
+# prepare が読んだあとに、書き換えられたか、消されたか、作られたメモリファイルの名前を、バイトの列で並べて返す
+sub rewritten_files {
+    my ($mem) = @_;
+    my %names = map { $_ => 1 } keys %{ $mem->{read} }, keys %{ $mem->{text} };
+    return grep {
+        my ($read, $text) = ($mem->{read}{$_}, $mem->{text}{$_});
+        !(defined $read && defined $text && sha256_hex($text) eq $read);
+    } sort keys %names;
+}
+
+# 1つの直しを確かめる。行わない直しなら、%SKIP の理由の名前を返す。行ってよい直しなら undef を返す
+# $f は直し方の汚染、$c はその汚染の直し、$mem は memory_state の様子である
+sub change_refusal {
+    my ($f, $c, $mem) = @_;
+    my $str = sub { my ($h, $k) = @_; return ref $h eq 'HASH' && defined $h->{$k} && !ref $h->{$k}; };
+    return 'not_fix' unless $str->($f, 'status') && $f->{status} eq 'fix';
+    return 'kind' if $str->($f, 'kind') && $f->{kind} =~ /\A(?:10|11)\z/;
+    my $op = $str->($c, 'op') ? $c->{op} : '';
+    return 'shape' unless ($op eq 'edit' && $str->($c, 'file') && $str->($c, 'old') && $str->($c, 'new'))
+        || ($op eq 'append_index_line' && $str->($c, 'line'))
+        || ($op eq 'delete' && $str->($c, 'file'));
+
+    my $name = $op eq 'append_index_line' ? $INDEX : memory_name($c->{file});
+    return 'name' unless defined $name;
+    return 'index_delete' if $op eq 'delete' && $name eq $INDEX;
+    my ($read, $text) = ($mem->{read}{$name}, $mem->{text}{$name});
+    return 'missing' unless defined $read || defined $text;
+    return 'rewritten' unless defined $read && defined $text && sha256_hex($text) eq $read;
+
+    my $fname = memory_name($f->{file});
+    my $ftext = defined $fname ? $mem->{text}{$fname} : undef;
+    my $excerpt = $str->($f, 'excerpt') ? encode('UTF-8', $f->{excerpt}) : '';
+    return 'excerpt' unless length $excerpt && defined $ftext && index($ftext, $excerpt) >= 0;
+
+    my $rev = $mem->{reverted}{$name} || {};
+    my @restored = @{ $rev->{texts} || [] };
+    if ($op eq 'delete') {
+        return 'reverted_file' if $rev->{unchanged};
+        return 'reverted' if @restored;
+        return undef;
+    }
+    return undef unless $op eq 'edit';
+    my $old = encode('UTF-8', $c->{old});
+    return 'old_count' unless count_in($text, $old) == 1;
+    my $body = memory_body($text);
+    return 'whole' if length $body && index($old, $body) >= 0;
+    return 'reverted' if grep { index($old, $_) >= 0 || index($_, $old) >= 0 } @restored;
+    return undef;
+}
+
+# 記録に書く直しを返す。行わない直しは状態を skipped にし、理由を skip_reason に書く。
+# 確認に通った直しは、メモリに書くまで状態を not_applied にする
+sub change_entry {
+    my ($id, $finding, $c, $why) = @_;
+    my $h = ref $c eq 'HASH' ? $c : {};
+    my $str = sub { my $v = $h->{ $_[0] }; return defined $v && !ref $v ? $v : ''; };
+    my $op = $str->('op');
+    return {
+        id                  => $id,
+        finding             => $finding,
+        op                  => $op,
+        file                => $op eq 'append_index_line' ? $INDEX : $str->('file'),
+        before              => $op eq 'edit' ? $str->('old') : '',
+        after               => $op eq 'edit' ? $str->('new') : $op eq 'append_index_line' ? $str->('line') : '',
+        removed_index_lines => [],
+        anchor              => undef,
+        anchor_side         => undef,
+        state               => defined $why ? 'skipped' : 'not_applied',
+        skip_reason         => defined $why ? decode('UTF-8', $SKIP{$why}) : undef,
+    };
+}
+
 # ---- サブコマンド ----------------------------------------------------------
 
 sub cmd_paths {
@@ -875,5 +1023,90 @@ sub cmd_lookup {
     }
     binmode STDOUT, ':raw';
     print $out;
+    return 0;
+}
+
+# 直し方を確かめて適用する: apply <回の ID>
+# 標準入力の直し方の JSON(plan-schema.json の形)を読み、prepare が記録に書いた汚染に続けて、直し方の汚染に番号を振る。
+# 直しを1つずつ確かめ、行わない直しには理由を記録に書く。読んだあとに書き換わったファイルを記録の skipped_files に書く
+sub cmd_apply {
+    my @args = @_;
+    return usage() unless @args == 1;
+    my ($run) = @args;
+    return usage() unless $run =~ /\A[A-Za-z0-9][A-Za-z0-9_-]*\z/;
+    my $here = dirname(__FILE__);
+    my $main = main_worktree($here);
+    my $state = state_dir($here);
+    my $memdir = memory_dir($main);
+    my $path = "$state/runs/$run/record.json";
+    my $record = read_json($path);
+    die "回 $run の記録が無い\n" unless ref $record eq 'HASH';
+    die "回 $run の記録の状態が running でない\n" unless ($record->{status} // '') eq 'running';
+
+    binmode STDIN, ':raw';
+    my $text = do { local $/; <STDIN> };
+    my $input = eval { $JSON->decode($text // '') };
+    die "標準入力が、plan を持つ直し方の JSON でない\n" unless ref $input eq 'HASH' && ref $input->{plan} eq 'HASH';
+    my $plan = $input->{plan};
+
+    my $mem = memory_state($memdir, $record->{read_hashes}, $state);
+    my @findings = grep { ref $_ eq 'HASH' } @{ list_of($record->{findings}) };
+    my $base = @findings;
+    my $planned = @{ list_of($plan->{findings}) };
+    my @changes;
+    for my $f (@{ list_of($plan->{findings}) }) {
+        my $pf = ref $f eq 'HASH' ? $f : {};
+        my $id = 'F' . (@findings + 1);
+        my @ids;
+        for my $c (@{ list_of($pf->{changes}) }) {
+            my $cid = 'C' . (@changes + 1);
+            push @changes, change_entry($cid, $id, $c, change_refusal($pf, $c, $mem));
+            push @ids, $cid;
+        }
+        push @findings, { id => $id, (map { ($_ => $pf->{$_}) } qw(kind file excerpt status reason)), changes => \@ids };
+    }
+
+    # 案の汚染の番号は、直し方の findings の1から数えた順番である
+    my $finding_id = sub {
+        my ($n) = @_;
+        return defined $n && !ref $n && $n =~ /\A[1-9][0-9]{0,8}\z/ && $n <= $planned ? 'F' . ($base + $n) : undef;
+    };
+    my @notes = @{ list_of($record->{notes}) };
+    my (@relocations, @rules, @inspections);
+    for my $p (grep { ref $_ eq 'HASH' } @{ list_of($plan->{relocation_proposals}) }) {
+        my $fid = $finding_id->($p->{finding});
+        unless (defined $fid) {
+            push @notes, decode('UTF-8', sprintf($NOTE_OUT_OF_RANGE{relocation}, encode('UTF-8', $p->{finding} // '')));
+            next;
+        }
+        push @relocations, { id => 'R' . (@relocations + 1), finding => $fid, target => $p->{target}, text => $p->{text} };
+    }
+    for my $p (grep { ref $_ eq 'HASH' } @{ list_of($plan->{rule_proposals}) }) {
+        push @rules, { id => 'K' . (@rules + 1), kind => $p->{kind}, target => $p->{target}, text => $p->{text} };
+    }
+    for my $p (grep { ref $_ eq 'HASH' } @{ list_of($plan->{inspection_proposals}) }) {
+        my $trigger = defined $p->{trigger} && !ref $p->{trigger} ? $p->{trigger} : '';
+        if ($trigger =~ /\Afinding:(.*)\z/s) {
+            my $fid = $finding_id->($1);
+            unless (defined $fid) {
+                push @notes, decode('UTF-8', sprintf($NOTE_OUT_OF_RANGE{inspection}, encode('UTF-8', $1)));
+                next;
+            }
+            $trigger = "finding:$fid";
+        }
+        push @inspections, { id => 'M' . (@inspections + 1), trigger => $trigger, text => $p->{text} };
+    }
+
+    my $rewritten = decode('UTF-8', $SKIP{rewritten});
+    write_json($path, {
+        %$record,
+        findings             => \@findings,
+        changes              => \@changes,
+        skipped_files        => [ map { +{ file => decode('UTF-8', $_), reason => $rewritten } } rewritten_files($mem) ],
+        relocation_proposals => \@relocations,
+        rule_proposals       => \@rules,
+        inspection_proposals => \@inspections,
+        notes                => \@notes,
+    });
     return 0;
 }
