@@ -77,6 +77,7 @@ my %SKIP = (
     not_fix       => q{汚染の扱いが fix でない},
     kind          => q{置き場所の誤りと、会話を通らない書き換えは、点検の中で直さない},
     shape         => q{直し方の形が違う},
+    newline       => q{改行の入った行は目次に足さない},
     name          => q{対象がメモリのディレクトリの最上位の .md でない},
     index_delete  => q{目次は消さない},
     missing       => q{対象のファイルが無い},
@@ -334,6 +335,23 @@ sub write_json {
     print {$fh} $JSON->encode($data), "\n";
     close $fh or die "$path を書けなかった($!)\n";
     rename $tmp, $path or die "$path を書けなかった($!)\n";
+}
+
+# バイトの列を、一時のファイルに書いてから名前を替えて書く。一時のファイルの名前は .md で終わらないので、
+# 途中で止まってもメモリファイルに数えられない
+sub write_bytes {
+    my ($path, $bytes) = @_;
+    my $tmp = "$path.$$.tmp";
+    open(my $fh, '>:raw', $tmp) or die "$path を書けなかった($!)\n";
+    print {$fh} $bytes;
+    close $fh or die "$path を書けなかった($!)\n";
+    rename $tmp, $path or die "$path を書けなかった($!)\n";
+}
+
+# ロックの owner に書くプロセスの番号を返す。Windows(Git Bash)では、pid_alive が見分けられる Windows のプロセスの番号を返す
+sub own_pid {
+    my $win = read_bytes("/proc/$$/winpid");
+    return defined $win && $win =~ /\A\s*([1-9]\d*)\s*\z/ ? $1 : $$;
 }
 
 # ---- メモリ --------------------------------------------------------------
@@ -697,6 +715,7 @@ sub change_refusal {
     return 'shape' unless ($op eq 'edit' && $str->($c, 'file') && $str->($c, 'old') && $str->($c, 'new'))
         || ($op eq 'append_index_line' && $str->($c, 'line'))
         || ($op eq 'delete' && $str->($c, 'file'));
+    return 'newline' if $op eq 'append_index_line' && $c->{line} =~ /[\r\n]/;
 
     my $name = $op eq 'append_index_line' ? $INDEX : memory_name($c->{file});
     return 'name' unless defined $name;
@@ -746,6 +765,98 @@ sub change_entry {
         state               => defined $why ? 'skipped' : 'not_applied',
         skip_reason         => defined $why ? decode('UTF-8', $SKIP{$why}) : undef,
     };
+}
+
+# 1つの直しを、今のメモリに当てた結果を返す。行わない直しなら (%SKIP の理由の名前, 書き換わっていたファイルの名前か undef) を返し、
+# 行う直しなら (undef, {名前 => 書いたあとの中身か、消すなら undef}, 記録に足す欄) を返す。
+# $expect は、ファイルごとに、書く前にあるはずの中身のハッシュである
+sub change_write {
+    my ($e, $memdir, $expect) = @_;
+    my $name = $e->{op} eq 'append_index_line' ? $INDEX : memory_name($e->{file});
+    my $cur = read_bytes("$memdir/$name");
+    return ('missing') unless defined $cur && defined $expect->{$name};
+    return ('rewritten', $name) unless sha256_hex($cur) eq $expect->{$name};
+
+    if ($e->{op} eq 'append_index_line') {
+        my $sep = length $cur && $cur !~ /\n\z/ ? "\n" : '';
+        return (undef, { $name => $cur . $sep . encode('UTF-8', $e->{after}) . "\n" }, {});
+    }
+    if ($e->{op} eq 'delete') {
+        my $index = read_bytes("$memdir/$INDEX");
+        return ('rewritten', $INDEX) if defined $index && !(defined $expect->{$INDEX} && sha256_hex($index) eq $expect->{$INDEX});
+        my (@kept, @removed);
+        for my $line (defined $index ? $index =~ /[^\n]*\n|[^\n]+\z/g : ()) {
+            if (grep { $_ eq $name } index_links($line)) {
+                (my $bare = $line) =~ s/\r?\n\z//;
+                push @removed, decode('UTF-8', $bare);
+            } else {
+                push @kept, $line;
+            }
+        }
+        my %write = ($name => undef);
+        $write{$INDEX} = join '', @kept if @removed;
+        return (undef, \%write, { before => decode('UTF-8', $cur), removed_index_lines => \@removed });
+    }
+    my ($old, $new) = (encode('UTF-8', $e->{before}), encode('UTF-8', $e->{after}));
+    return ('old_count') unless count_in($cur, $old) == 1;
+    my $at = index($cur, $old);
+    my %fields;
+    unless (length $new) {
+        # UTF-8 の文の一致は文字の切れ目で始まり切れ目で終わるので、前と後を文字の列に戻せる
+        my $front = decode('UTF-8', substr($cur, 0, $at));
+        my $back = decode('UTF-8', substr($cur, $at + length $old));
+        %fields = length $front
+            ? (anchor => length $front > 80 ? substr($front, -80) : $front, anchor_side => 'before')
+            : (anchor => substr($back, 0, 80), anchor_side => 'after');
+    }
+    return (undef, { $name => substr($cur, 0, $at) . $new . substr($cur, $at + length $old) }, \%fields);
+}
+
+# 確認に通った直しを、メモリのロックを取ってから1つずつメモリに書く。直しごとに、記録に状態 applying で書いてから
+# メモリファイルを書き、書いたら記録の状態を applied にする。書く前に、ファイルがほかから書き換わっていたら、
+# その直しを行わず理由を記録に書く
+sub apply_changes {
+    my ($out, $path, $memdir, $state, $run, $read) = @_;
+    my @todo = grep { $_->{state} eq 'not_applied' } @{ $out->{changes} };
+    return unless @todo;
+    my $lock = lock_dir($state, 'memory');
+    my ($taken, $owner) = lock_take($lock, $run, own_pid());
+    die 'メモリのロックを回 ' . ($owner ? encode('UTF-8', $owner->{run}) : '(不明)') . " が取っているので、直しを書かなかった\n"
+        unless $taken;
+    my %expect = %$read;
+    my %skipped = map { (encode('UTF-8', $_->{file}) => 1) } @{ $out->{skipped_files} };
+    my $ok = eval {
+        for my $e (@todo) {
+            my ($why, $write, $fields) = change_write($e, $memdir, \%expect);
+            if (defined $why) {
+                @$e{qw(state skip_reason)} = ('skipped', decode('UTF-8', $SKIP{$why}));
+                # 断ったときの2つ目の値は、書き換わっていたファイルの名前である
+                my $name = $write;
+                push @{ $out->{skipped_files} }, { file => decode('UTF-8', $name), reason => decode('UTF-8', $SKIP{rewritten}) }
+                    if $why eq 'rewritten' && !$skipped{$name}++;
+                write_json($path, $out);
+                next;
+            }
+            %$e = (%$e, %$fields, state => 'applying');
+            write_json($path, $out);
+            # 消すファイルを先に消す。止まったときに、後始末がファイルの無いことで書かれたと見分けるためである
+            for my $name (sort { defined $write->{$a} <=> defined $write->{$b} || $a cmp $b } keys %$write) {
+                if (defined $write->{$name}) {
+                    write_bytes("$memdir/$name", $write->{$name});
+                    $expect{$name} = sha256_hex($write->{$name});
+                } else {
+                    unlink "$memdir/$name" or die "$name を消せなかった($!)\n";
+                    delete $expect{$name};
+                }
+            }
+            $e->{state} = 'applied';
+            write_json($path, $out);
+        }
+        1;
+    };
+    my $err = $@;
+    lock_release($lock, $run);
+    die $err unless $ok;
 }
 
 # ---- サブコマンド ----------------------------------------------------------
@@ -1028,7 +1139,8 @@ sub cmd_lookup {
 
 # 直し方を確かめて適用する: apply <回の ID>
 # 標準入力の直し方の JSON(plan-schema.json の形)を読み、prepare が記録に書いた汚染に続けて、直し方の汚染に番号を振る。
-# 直しを1つずつ確かめ、行わない直しには理由を記録に書く。読んだあとに書き換わったファイルを記録の skipped_files に書く
+# 直しを1つずつ確かめ、行わない直しには理由を記録に書く。読んだあとに書き換わったファイルを記録の skipped_files に書く。
+# 確認に通った直しを、apply_changes でメモリに書く
 sub cmd_apply {
     my @args = @_;
     return usage() unless @args == 1;
@@ -1098,7 +1210,7 @@ sub cmd_apply {
     }
 
     my $rewritten = decode('UTF-8', $SKIP{rewritten});
-    write_json($path, {
+    my $out = {
         %$record,
         findings             => \@findings,
         changes              => \@changes,
@@ -1107,6 +1219,8 @@ sub cmd_apply {
         rule_proposals       => \@rules,
         inspection_proposals => \@inspections,
         notes                => \@notes,
-    });
+    };
+    write_json($path, $out);
+    apply_changes($out, $path, $memdir, $state, $run, $mem->{read});
     return 0;
 }

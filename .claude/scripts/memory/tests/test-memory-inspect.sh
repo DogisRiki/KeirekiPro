@@ -1259,17 +1259,17 @@ cat >"$CASE/plan.json" <<'JSON'
 JSON
 apply_run r1 "$CASE/plan.json"
 rc=$?
-check "記述が無い直しを断る" "$rc|$(ap_changes C1 C2 C3)" "0|C1=not_applied:,C2=skipped:$SKIP_EXCERPT,C3=skipped:$SKIP_EXCERPT"
+check "記述が無い直しを断る" "$rc|$(ap_changes C1 C2 C3)" "0|C1=applied:,C2=skipped:$SKIP_EXCERPT,C3=skipped:$SKIP_EXCERPT"
 check "old が2回現れる直しを断る" "$(ap_changes C4)" "C4=skipped:$SKIP_OLD_COUNT"
 check "本文の全体に当たる old を断る" "$(ap_changes C5 C6)" "C5=skipped:$SKIP_WHOLE,C6=skipped:$SKIP_WHOLE"
 check "種類10と種類11の直しを断る" "$(ap_changes C7 C8)" "C7=skipped:$SKIP_KIND,C8=skipped:$SKIP_KIND"
 check "扱いが fix でない直しを断る" "$(ap_changes C9 C10)" "C9=skipped:$SKIP_NOT_FIX,C10=skipped:$SKIP_NOT_FIX"
 check "戻された文に重なる直しと、戻されてから変わっていないファイルの delete を断る" \
     "$(ap_changes C11 C12 C13 C14 C21 C25 C26)" \
-    "C11=skipped:$SKIP_REVERTED,C12=skipped:$SKIP_REVERTED,C13=skipped:$SKIP_REVERTED_FILE,C14=not_applied:,C21=skipped:$SKIP_REVERTED,C25=not_applied:,C26=not_applied:"
+    "C11=skipped:$SKIP_REVERTED,C12=skipped:$SKIP_REVERTED,C13=skipped:$SKIP_REVERTED_FILE,C14=applied:,C21=skipped:$SKIP_REVERTED,C25=applied:,C26=applied:"
 check "目次の delete と、最上位の .md でないファイルへの直しと、無いファイルへの直しを断る" \
     "$(ap_changes C15 C16 C17 C18 C19 C20)" \
-    "C15=skipped:$SKIP_INDEX_DELETE,C16=skipped:$SKIP_NAME,C17=skipped:$SKIP_NAME,C18=skipped:$SKIP_NAME,C19=skipped:$SKIP_MISSING,C20=not_applied:"
+    "C15=skipped:$SKIP_INDEX_DELETE,C16=skipped:$SKIP_NAME,C17=skipped:$SKIP_NAME,C18=skipped:$SKIP_NAME,C19=skipped:$SKIP_MISSING,C20=applied:"
 check "重なって2回現れる old と、形の違う直しを断る" \
     "$(ap_changes C22 C23 C24)" "C22=skipped:$SKIP_OLD_COUNT,C23=skipped:$SKIP_SHAPE,C24=skipped:$SKIP_SHAPE"
 
@@ -1278,9 +1278,11 @@ printf -- '- [A](a.md) — a\n- [B](b.md) — b\n' >"$MEMDIR/MEMORY.md"
 printf 'a の一つ目\na の二つ目\n' >"$MEMDIR/a.md"
 printf 'b の中身\nb の残り\n' >"$MEMDIR/b.md"
 printf 'c の中身\n' >"$MEMDIR/c.md"
+printf 'd の中身\n' >"$MEMDIR/d.md"
 prepare_run r1 now
-# 点検が読んだあとに、会話の中の Claude が a.md を書き換え、c.md を消し、n.md を作ったとする
+# 点検が読んだあとに、会話の中の Claude が a.md と目次を書き換え、c.md を消し、n.md を作ったとする
 printf 'a の一つ目\na の二つ目\n会話で足した行\n' >"$MEMDIR/a.md"
+printf -- '- [N](n.md) — n\n' >>"$MEMDIR/MEMORY.md"
 rm "$MEMDIR/c.md"
 printf 'n の中身\n' >"$MEMDIR/n.md"
 cat >"$CASE/plan.json" <<'JSON'
@@ -1289,16 +1291,17 @@ cat >"$CASE/plan.json" <<'JSON'
     {"kind": 1, "file": "a.md", "excerpt": "a の一つ目", "status": "fix", "reason": "", "evidence": "",
      "changes": [{"op": "edit", "file": "a.md", "old": "a の一つ目", "new": "x"}, {"op": "edit", "file": "a.md", "old": "a の二つ目", "new": "y"}]},
     {"kind": 1, "file": "b.md", "excerpt": "b の中身", "status": "fix", "reason": "", "evidence": "",
-     "changes": [{"op": "edit", "file": "b.md", "old": "b の中身", "new": "z"}, {"op": "delete", "file": "c.md"}]}
+     "changes": [{"op": "edit", "file": "b.md", "old": "b の中身", "new": "z"}, {"op": "delete", "file": "c.md"}, {"op": "delete", "file": "d.md"}]}
   ],
   "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
 }}
 JSON
 apply_run r1 "$CASE/plan.json"
 rc=$?
+# d.md は書き換わっていないが、消すときに書き直す目次が書き換わっているので、消さない
 check "読んだあとに書き換わったファイルへの直しをすべて断り、次の点検で点検すると記録する" \
-    "$rc|$(ap_changes C1 C2 C3 C4)|$(rec_list "$STATE/runs/r1/record.json" skipped_files file reason)" \
-    "0|C1=skipped:$SKIP_REWRITTEN,C2=skipped:$SKIP_REWRITTEN,C3=not_applied:,C4=skipped:$SKIP_REWRITTEN|a.md:$SKIP_REWRITTEN,c.md:$SKIP_REWRITTEN,n.md:$SKIP_REWRITTEN"
+    "$rc|$(ap_changes C1 C2 C3 C4 C5)|$(rec_list "$STATE/runs/r1/record.json" skipped_files file reason)|$([ -e "$MEMDIR/d.md" ] && printf ある || printf 無い)" \
+    "0|C1=skipped:$SKIP_REWRITTEN,C2=skipped:$SKIP_REWRITTEN,C3=applied:,C4=skipped:$SKIP_REWRITTEN,C5=skipped:$SKIP_REWRITTEN|MEMORY.md:$SKIP_REWRITTEN,a.md:$SKIP_REWRITTEN,c.md:$SKIP_REWRITTEN,n.md:$SKIP_REWRITTEN|ある"
 
 newcase ap-usage
 printf 'a\n' >"$MEMDIR/a.md"
@@ -1319,6 +1322,75 @@ perl "$PL" apply r1 <"$CASE/empty.json" >/dev/null 2>&1
 rc_done=$?
 check "apply の引数の誤りに終了コード 2 で、記録の無い回と plan が null の入力と running でない回に 1 で終わる" \
     "$rc_args|$rc_id|$rc_norecord|$rc_null|$null_after|$rc_done" "2|2|1|1|running,|1"
+
+# ---------------------------------------------------------------------
+# 適用のしかた
+# ---------------------------------------------------------------------
+
+# 記録の直しのうち、ID を挙げたものの欄を「ID=欄:欄…」の形で , でつないで出す: ap_fields <欄の名前,…> <ID>...
+ap_fields() {
+    perl -MJSON::PP -e 'open my $f, "<", shift @ARGV or exit 1; local $/; my @keys = split /,/, shift @ARGV; my %want = map { $_ => 1 } @ARGV;
+        my $d = JSON::PP->new->utf8->decode(<$f>); binmode STDOUT, ":utf8";
+        print join ",", map { my $e = $_; "$e->{id}=" . join ":", map { my $v = $e->{$_}; !defined $v ? "null" : ref $v eq "ARRAY" ? join("+", @$v) : $v } @keys }
+            grep { $want{ $_->{id} } } @{ $d->{changes} }' "$STATE/runs/r1/record.json" "$@"
+}
+# 偽のホームのうち、メモリのディレクトリのほかのファイルの名前と中身の検査和を出す
+home_sig() { (cd "$FHOME" && find . -path "./${MEMDIR#"$FHOME/"}" -prune -o -type f -exec cksum {} + | LC_ALL=C sort -k3); }
+# 回の場所のうち、文を含むファイルの名前を、偽のコマンドの書き残しの場所を除いて並べる: files_with <文>
+files_with() { (cd "$CASE" && find . -path ./fake -prune -o -type f -exec grep -lF -- "$1" {} + | LC_ALL=C sort | tr '\n' ' '); }
+
+newcase ap-write
+cat >"$MEMDIR/MEMORY.md" <<'MD'
+- [A](a.md) — a
+- [B](b.md) — b
+- [D](d.md) — d
+MD
+front=$(printf '%085d' 0 | sed 's/0/前/g')
+printf -- '---\nname: a\n---\n古い事実の記述\n%s消す文\n残る行\n' "$front" >"$MEMDIR/a.md"
+back=$(printf '%085d' 0 | sed 's/0/後/g')
+printf '先頭で消す文\n%s\n' "$back" >"$MEMDIR/b.md"
+printf '消してよいファイル\n' >"$MEMDIR/d.md"
+sig_before="$(outside_sig)|$(home_sig)"
+perl "$PL" prepare r1 now >"$FAKE/material.json"
+cat >"$FAKE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 1, "file": "a.md", "excerpt": "古い事実の記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "古い事実の記述", "new": "新しい事実の記述"}]},
+    {"kind": 7, "file": "a.md", "excerpt": "消す文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "消す文", "new": ""}]},
+    {"kind": 7, "file": "b.md", "excerpt": "先頭で消す文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "b.md", "old": "先頭で消す文\n", "new": ""}]},
+    {"kind": 4, "file": "d.md", "excerpt": "消してよいファイル", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "d.md"}]},
+    {"kind": 6, "file": "MEMORY.md", "excerpt": "- [A](a.md) — a", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "append_index_line", "line": "- [E](e.md) — e"}, {"op": "append_index_line", "line": "- [F](f.md) — f\n- [G](g.md) — g"}]}
+  ],
+  "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+perl "$PL" apply r1 <"$FAKE/plan.json" >"$FAKE/apply.out"
+rc=$?
+anchor80=$(printf '%080d' 0 | sed 's/0/前/g')
+back80=$(printf '%080d' 0 | sed 's/0/後/g')
+check "edit で置き換えた文が、記録の before と after に載る" \
+    "$rc|$(ap_fields before,after,state C1)|$(sed -n 4p "$MEMDIR/a.md")" "0|C1=古い事実の記述:新しい事実の記述:applied|新しい事実の記述"
+check "new が空の edit で、消した文の前か後の80文字までが anchor に載る" \
+    "$(ap_fields before,anchor,anchor_side,state C2 C3)|$(sed -n 5p "$MEMDIR/a.md")|$(cat "$MEMDIR/b.md")" \
+    "C2=消す文:$anchor80:before:applied,C3=先頭で消す文
+:$back80:after:applied|$front|$back"
+check "delete で目次の行も消え、消す前の全文と消した目次の行が記録に載る" \
+    "$(ap_fields before,removed_index_lines,state C4)|$([ -e "$MEMDIR/d.md" ] && printf ある || printf 無い)|$(grep -c 'd\.md' "$MEMDIR/MEMORY.md")" \
+    "C4=消してよいファイル
+:- [D](d.md) — d:applied|無い|0"
+check "append_index_line で、目次の末尾に1行が足され、記録の after にその行が載る" \
+    "$(ap_fields after,state C5)|$(cat "$MEMDIR/MEMORY.md")" "C5=- [E](e.md) — e:applied|- [A](a.md) — a
+- [B](b.md) — b
+- [E](e.md) — e"
+check "改行のある append_index_line を断る" "$(ap_changes C6)" "C6=skipped:改行の入った行は目次に足さない"
+check "点検のあとに、メモリのディレクトリと状態の場所のほかにファイルが増えず、直す前の文が record.json と report.md のほかに残らない" \
+    "$([ "$sig_before" = "$(outside_sig)|$(home_sig)" ] && printf 同じ || printf 違う)|$(cd "$MEMDIR" && find . -mindepth 1 -maxdepth 1 | sed 's|^\./||' | LC_ALL=C sort | tr '\n' ' ')|$(files_with 古い事実の記述)|$(files_with 消してよいファイル)" \
+    "同じ|MEMORY.md a.md b.md |./repo/.git/keirekipro-memory-inspection/runs/r1/record.json |./repo/.git/keirekipro-memory-inspection/runs/r1/record.json "
 
 echo
 echo "$pass ok, $failn NG"
