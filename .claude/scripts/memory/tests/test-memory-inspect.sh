@@ -21,8 +21,10 @@ trap 'rm -rf "$TMP_ROOT"' EXIT
 WORK=$(cd "$TMP_ROOT" && { pwd -W 2>/dev/null || pwd -P; })
 BASE_PATH=$PATH
 
-# 場所の英数字でない文字を - に替えた名前を出す。Claude Code がプロジェクトのディレクトリの名前を作る決まりである
-encname() { printf '%s' "$1" | sed 's/[^A-Za-z0-9]/-/g'; }
+# 場所の英数字でない文字を1文字ずつ - に替えた名前を出す。Claude Code がプロジェクトのディレクトリの名前を作る決まりである
+encname() { printf '%s' "$1" | perl -CS -pe 's/[^A-Za-z0-9]/-/g'; }
+# テストするスクリプトのフォルダ。テストの場合ごとに、偽のリポジトリへ写してコミットする
+SRC_DIR="$(cd "$HERE/.." && pwd)"
 
 # 所有者の本物のメモリのディレクトリと、本物の点検の状態の場所。テストの前とあとで変わらないことを確かめる。
 # git のリポジトリの外(検査用の写しやコンテナ)で流したときは、どちらも無い
@@ -127,10 +129,16 @@ EOF
 #   FAKE      偽のコマンドの置いた答えと書き残しの場所。KP_TEST_FAKE_DIR にする
 #   BIN       偽の claude と偽の gh を置くディレクトリ。PATH に入れるので、Windows でも C: の付かない形にする
 #             (PATH の区切りの : と C: の : が見分けられないため)
+#   SH PL     REPO にコミットした memory-inspect.sh と memory-inspect.pl
+#   WTSH WTPL WT の memory-inspect.sh と memory-inspect.pl
 newcase() {
     CASE="$WORK/$1"
     REPO="$CASE/repo"
     WT="$REPO/.claude/worktrees/wt1"
+    SH="$REPO/.claude/scripts/memory/memory-inspect.sh"
+    PL="$REPO/.claude/scripts/memory/memory-inspect.pl"
+    WTSH="$WT/.claude/scripts/memory/memory-inspect.sh"
+    WTPL="$WT/.claude/scripts/memory/memory-inspect.pl"
     FHOME="$CASE/home"
     TRANSDIR="$FHOME/.claude/projects/$(encname "$REPO")"
     WTTRANSDIR="$FHOME/.claude/projects/$(encname "$WT")"
@@ -145,8 +153,15 @@ newcase() {
     git init -q "$REPO"
     gitq symbolic-ref HEAD refs/heads/main
     printf '.claude/worktrees/\n' >"$REPO/.gitignore"
+    # 所有者の git の設定が改行を CRLF に替えて worktree に出さないように、改行を替えない
+    printf '* -text\n' >"$REPO/.gitattributes"
     printf 'a\n' >"$REPO/README"
-    gitq add .gitignore README
+    mkdir -p "$REPO/.claude/scripts/memory"
+    local f
+    for f in "$SRC_DIR"/*; do
+        if [ -f "$f" ]; then cp "$f" "$REPO/.claude/scripts/memory/"; fi
+    done
+    gitq add .gitignore .gitattributes README .claude/scripts
     GIT_COMMITTER_DATE="2026-10-01T00:00:00+09:00" gitq commit -q -m base
     gitq update-ref refs/remotes/origin/main HEAD
     gitq worktree add -q -b feat/wt1 "$WT" >/dev/null 2>&1 || ng "$1: worktree を作れない"
@@ -344,6 +359,61 @@ printf '{}\n' >"$STATE/runs/x/record.json"
 git -C "$WT" status --porcelain >/dev/null
 gitq status --porcelain >/dev/null
 check "偽のホームの外のファイルが変わらない" "$(outside_sig)" "$sig_before"
+
+# ---------------------------------------------------------------------
+# 入口のスクリプトの骨組みと、場所の求め方
+# ---------------------------------------------------------------------
+
+# JSON の1行から、bin.claude・bin.gh・bin.bash・path を | でつないで出す。欄が無ければ undef と出す
+tool_fields() {
+    perl -MJSON::PP -e 'my $j = JSON::PP->new->decode(do { local $/; <STDIN> });
+        print join("|", map { defined $_ ? $_ : "undef" } $j->{bin}{claude}, $j->{bin}{gh}, $j->{bin}{bash}, $j->{path})'
+}
+
+newcase tools
+got=$(bash -c '. "$1" && tool_paths' _ "$SH" | tool_fields)
+check "claude gh bash の場所と今の PATH を返す" "$got" "$BIN/claude|$BIN/gh|$(command -v bash)|$PATH"
+# gh だけが見つからない PATH を作る。perl と bash は、本物を呼ぶ小さなスクリプトを置く
+MIN="$TMP_ROOT/tools/min"
+mkdir -p "$MIN"
+cp "$BIN/claude" "$MIN/claude"
+for t in perl bash; do
+    printf '#!%s\nexec %s "$@"\n' "$(command -v bash)" "$(command -v "$t")" >"$MIN/$t"
+    chmod +x "$MIN/$t"
+done
+got=$(bash -c '. "$1" && PATH=$2 && tool_paths' _ "$SH" "$MIN" | tool_fields)
+check "claude gh bash の場所と今の PATH を返し、見つからないコマンドの場所を空にして返す" "$got" "$MIN/claude||$MIN/bash|$MIN"
+
+newcase locate
+want=$(printf '%s\n%s\n%s' "$REPO" "$STATE" "$MEMDIR")
+from_main=$(cd "$REPO" && perl "$PL" paths "$REPO/.claude/scripts/memory")
+from_wt=$(cd "$CASE" && perl "$WTPL" paths)
+from_wt_sh=$(cd "$WT" && bash -c '. "$1" && locate && printf "%s\n%s\n%s\n" "$MAIN" "$STATE" "$MEMDIR"' _ "$WTSH")
+# do で読み込んだ memory-inspect.pl は何も出さず、関数を直に呼べる
+from_wt_do=$(cd "$CASE" && perl -e 'do $ARGV[0]; die $@ if $@; print main_worktree($ARGV[1]), "\n", state_dir($ARGV[1]), "\n", memory_dir(main_worktree($ARGV[1]))' "$WTPL" "$WT")
+check "worktree の中から求めても、本体の作業フォルダと状態の場所が本体から求めたときと同じになる" \
+    "$from_main#$from_wt#$from_wt_sh#$from_wt_do" "$want#$want#$want#$want"
+
+newcase "mem.dir_x 日本"
+got=$(perl "$PL" paths "$REPO" | sed -n 3p)
+check "メモリのディレクトリの名前が、本体の作業フォルダの場所の英数字でない文字を - に替えた名前になる" \
+    "$got" "$FHOME/.claude/projects/$(encname "$WORK")-mem-dir-x----repo/memory"
+
+newcase usage
+out=$(bash "$SH" nosuch 2>&1)
+rc=$?
+bash "$SH" >/dev/null 2>&1
+rc_none=$?
+check "知らないサブコマンドに終了コード 2 で終わる" \
+    "$rc|$(printf '%s\n' "$out" | grep -c 'nosuch')|$(printf '%s\n' "$out" | grep -c '^  missed <汚染の種類>')|$rc_none|$([ -d "$STATE" ] && echo made)" \
+    "2|1|1|2|"
+
+newcase gitstatus
+(cd "$WT" && bash -c '. "$1" && locate && ensure_state && printf "{}\n" >"$STATE/config.json" &&
+    mkdir -p "$STATE/runs/x" && printf "r\n" >"$STATE/runs/x/report.md"' _ "$WTSH")
+check "状態の場所が git status に出ない" \
+    "$([ -f "$STATE/config.json" ] && echo made)|$(gitq status --porcelain --untracked-files=all)|$(git -C "$WT" status --porcelain --untracked-files=all)" \
+    "made||"
 
 echo
 echo "$pass ok, $failn NG"
