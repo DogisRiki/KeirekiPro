@@ -650,6 +650,110 @@ perl "$PL" lock take run 'a/b' 1 >/dev/null 2>&1
 rc_id=$?
 check "ロックの引数の誤りに終了コード 2 で終わる" "$rc_args|$rc_kind|$rc_id|$([ -d "$STATE/locks" ] && echo made)" "2|2|2|"
 
+# ---------------------------------------------------------------------
+# 点検の材料: メモリを読み、目次を数え、記録を書き始める
+# ---------------------------------------------------------------------
+
+# prepare を動かし、比べる材料を CASE/material.json に書く。終了コードを返す: prepare_run <回の ID> <scheduled|now>
+prepare_run() { perl "$PL" prepare "$1" "$2" >"$CASE/material.json"; }
+# JSON のファイルから、. で区切った欄の名前の値を読み、, でつないで出す: jget <ファイル> <欄の名前>...
+# 配列は要素を , でつなぎ、オブジェクトは名前の順に「名前=値」を , でつなぐ。真と偽は true と false、null は null と出す
+jget() {
+    perl -MJSON::PP -e 'open my $f, "<", shift @ARGV or exit 1; local $/; my $d = JSON::PP->new->utf8->decode(<$f>);
+        sub show { my ($v) = @_; return "null" unless defined $v; return $v ? "true" : "false" if JSON::PP::is_bool($v);
+            return join ",", map { show($_) } @$v if ref $v eq "ARRAY";
+            return join ",", map { "$_=" . show($v->{$_}) } sort keys %$v if ref $v eq "HASH"; return $v }
+        my @out; for my $p (@ARGV) { my $v = $d; $v = ref $v eq "HASH" ? $v->{$_} : undef for split /\./, $p; push @out, show($v) }
+        binmode STDOUT, ":utf8"; print join ",", @out' "$@"
+}
+# 文字の列のバイトの数を出す: byte_len <文字の列>。- で始まる文字の列を perl の指定と読まないように、-- のあとに渡す
+byte_len() { perl -e 'print length($ARGV[0])' -- "$1"; }
+# ファイルの中身の SHA-256 を出す: sha_of <ファイル>
+sha_of() { perl -MDigest::SHA=sha256_hex -e 'open my $f, "<:raw", $ARGV[0] or exit 1; local $/; print sha256_hex(<$f>)' "$1"; }
+
+newcase prep-count
+cat >"$MEMDIR/MEMORY.md" <<'MD'
+---
+name: index
+description: 目次の属性
+---
+<!-- 行の全体の注記 -->
+- [A](a.md) — a
+<!--
+いくつもの行の注記
+-->
+- [B](b.md) — b <!-- 行の中の注記 -->
+MD
+prepare_run r1 scheduled
+rc=$?
+body="- [A](a.md) — a
+- [B](b.md) — b 
+"
+check "目次の行と大きさを、frontmatter と HTML の注記を除いて数える" \
+    "$rc|$(jget "$CASE/material.json" index.lines index.bytes index.limit_lines index.limit_bytes)|$(jget "$STATE/runs/r1/record.json" index)" \
+    "0|2,$(byte_len "$body"),160,20480|bytes=$(byte_len "$body"),lines=2"
+
+newcase prep-links
+cat >"$MEMDIR/MEMORY.md" <<'MD'
+- [A](a.md) — ある
+- [消えた](gone.md) — ファイルが無い
+- [C](./c.md#節) — 節を指す
+- [外](https://example.com/x.md) — 外のページ
+- [図](pic.png) — メモリファイルでない
+<!-- - [D](d.md) — 注記の中の行 -->
+MD
+for f in a c d e; do printf 'x\n' >"$MEMDIR/$f.md"; done
+prepare_run r1 now
+check "目次に行があってファイルが無いものと、ファイルがあって目次に行が無いものを並べる" \
+    "$?|$(jget "$CASE/material.json" index_without_file)#$(jget "$CASE/material.json" file_without_index)" \
+    "0|gone.md#d.md,e.md"
+
+newcase prep-record
+# main に origin/main より新しいコミットを足し、prepare が main でなく origin/main を読むことを確かめる
+GIT_COMMITTER_DATE="2026-10-02T00:00:00+09:00" gitq commit -q --allow-empty -m later
+printf -- '- [A](a.md) — a\n- [メモ](メモ.md) — m\n' >"$MEMDIR/MEMORY.md"
+printf 'aの中身\n' >"$MEMDIR/a.md"
+printf 'メモの中身\n' >"$MEMDIR/メモ.md"
+mkdir -p "$MEMDIR/sub"
+printf 'z\n' >"$MEMDIR/sub/z.md"
+printf 'n\n' >"$MEMDIR/notes.txt"
+mem_before=$(sig_dir "$MEMDIR")
+prepare_run r1 scheduled
+rc1=$?
+rec="$STATE/runs/r1/record.json"
+fields=$(jget "$rec" run_id trigger status started_at origin_main files_inspected first_run read_hashes)
+state_files=$(cd "$STATE" && find . -type f | LC_ALL=C sort | tr '\n' ' ')
+prepare_run r2 now
+rc2=$?
+again=$(perl "$PL" prepare r1 now 2>/dev/null)
+rc_again=$?
+origin=$(gitq rev-parse origin/main)
+check "record.json に、読んだハッシュと読んだ時刻と running と trigger と origin/main のコミットの ID が書かれる" \
+    "$rc1|$fields#$(jget "$CASE/material.json" now origin_main)#$rc2|$(jget "$STATE/runs/r2/record.json" trigger)#$rc_again|$again|$(jget "$rec" trigger)#$state_files#$([ "$(sig_dir "$MEMDIR")" = "$mem_before" ] && echo same)" \
+    "0|r1,scheduled,running,2026-11-02T01:00:00Z,$origin,2,true,MEMORY.md=$(sha_of "$MEMDIR/MEMORY.md"),a.md=$(sha_of "$MEMDIR/a.md"),メモ.md=$(sha_of "$MEMDIR/メモ.md")#2026-11-02T01:00:00Z,$origin#0|now#1||scheduled#./runs/r1/record.json #same"
+
+newcase prep-nomem
+rm -rf "$MEMDIR"
+prepare_run r1 now
+check "メモリのディレクトリが無いと、点検したメモリファイルを0とする" \
+    "$?|$(jget "$STATE/runs/r1/record.json" files_inspected index read_hashes)|$(jget "$CASE/material.json" index_without_file file_without_index)|$([ -e "$MEMDIR" ] && echo made)" \
+    "0|0,bytes=0,lines=0,|,|"
+
+newcase prep-index-only
+printf '# 目次\n' >"$MEMDIR/MEMORY.md"
+prepare_run r1 now
+check "目次だけがあるとき、目次を点検したメモリファイルに数えない" \
+    "$?|$(jget "$STATE/runs/r1/record.json" files_inspected)" "0|0"
+
+newcase prep-usage
+perl "$PL" prepare r1 >/dev/null 2>&1
+rc_args=$?
+perl "$PL" prepare r1 weekly >/dev/null 2>&1
+rc_trigger=$?
+perl "$PL" prepare 'a/b' now >/dev/null 2>&1
+rc_id=$?
+check "prepare の引数の誤りに終了コード 2 で終わり、記録を書かない" "$rc_args|$rc_trigger|$rc_id|$([ -d "$STATE/runs" ] && echo made)" "2|2|2|"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

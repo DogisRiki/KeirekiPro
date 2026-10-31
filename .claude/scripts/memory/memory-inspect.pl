@@ -15,12 +15,16 @@
 #     その回が取っているロックを外す。ほかの回のロックと、取られていないロックには何もしない
 #   lock state <run|memory>
 #     ロックの今の様子を、free か held <回の ID> か stale <回の ID> の1行で出す
+#   prepare <回の ID> <scheduled|now>
+#     メモリを読み、記録 runs/<回の ID>/record.json を状態 running で書き、比べる材料の JSON を標準出力に1行で出す。
+#     メモリを書き換えない。メモリのディレクトリが無いときは、点検したメモリファイルを0とする
 # 終了コード: 成功は 0、使い方の誤りは 2、失敗は 1(標準エラーに理由を日本語の1文で出す)
 # 前提: perl(JSON::PP)・git。Windows では、git に渡す場所を C:/... の形で受ける
 # =====================================================================
 use strict;
 use warnings;
 use Encode qw(decode);
+use Digest::SHA qw(sha256_hex);
 use Errno qw(EEXIST EPERM);
 use File::Basename qw(dirname);
 use File::Path qw(make_path);
@@ -30,15 +34,20 @@ use JSON::PP;
 use Time::Local qw(timegm);
 
 my %COMMANDS = (
-    paths => \&cmd_paths,
-    tools => \&cmd_tools,
-    lock  => \&cmd_lock,
+    paths   => \&cmd_paths,
+    tools   => \&cmd_tools,
+    lock    => \&cmd_lock,
+    prepare => \&cmd_prepare,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
 
 # ロックの種類と、点検の状態の場所の locks/ の下の名前
 my %LOCKS = (run => q{run}, memory => q{memory});
+
+# 目次のファイルの名前と、目次の行の数と大きさの上限。Claude Code が会話の始めに読む上限の200行と25KBの8割である
+my $INDEX = q{MEMORY.md};
+my %INDEX_LIMIT = (lines => 160, bytes => 20480);
 
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
@@ -62,24 +71,31 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]]\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now>\n";
     return 2;
 }
 
 # ---- 場所 ----------------------------------------------------------------
 
-# フォルダを含むリポジトリの git の共通ディレクトリを返す。worktree の中のフォルダからも、本体と同じ場所を返す
-sub git_common_dir {
-    my ($dir) = @_;
+# git をシェルを通さずに動かし、標準出力の1行を返す。失敗したときと、出力が1行でないときは undef を返す: git_line <フォルダ> <引数>...
+sub git_line {
+    my ($dir, @args) = @_;
     open(my $saved, '>&', \*STDERR) or die "標準エラーを控えられなかった($!)\n";
     open(STDERR, '>', File::Spec->devnull) or die "標準エラーを閉じられなかった($!)\n";
-    my $ok = open(my $g, '-|', 'git', '-C', $dir, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+    my $ok = open(my $g, '-|', 'git', '-C', $dir, @args);
     my $out = $ok ? do { local $/; <$g> } : undef;
     my $closed = $ok ? close($g) : 0;
     open(STDERR, '>&', $saved) or die "標準エラーを戻せなかった($!)\n";
-    die "$dir を含む git のリポジトリの共通ディレクトリを求められなかった\n" unless $closed && defined $out;
+    return undef unless $closed && defined $out;
     $out =~ s/\r?\n\z//;
-    die "$dir を含む git のリポジトリの共通ディレクトリを求められなかった\n" unless $out =~ /\S/ && $out !~ /\n/;
+    return $out =~ /\S/ && $out !~ /\n/ ? $out : undef;
+}
+
+# フォルダを含むリポジトリの git の共通ディレクトリを返す。worktree の中のフォルダからも、本体と同じ場所を返す
+sub git_common_dir {
+    my ($dir) = @_;
+    my $out = git_line($dir, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+    die "$dir を含む git のリポジトリの共通ディレクトリを求められなかった\n" unless defined $out;
     return $out;
 }
 
@@ -101,7 +117,9 @@ sub memory_dir {
     my ($main) = @_;
     my $home = $ENV{HOME};
     die "HOME が無いので、メモリのディレクトリを求められなかった\n" unless defined $home && $home ne '';
-    (my $name = decode('UTF-8', $main)) =~ s/[^A-Za-z0-9]/-/g;
+    # 名前は英数字と - だけになるので、バイトの列に戻す。ファイルの名前のバイトの列とつないでも、名前が化けないためである
+    (my $name = decode(q{UTF-8}, $main)) =~ s/[^A-Za-z0-9]/-/g;
+    utf8::downgrade($name);
     $home =~ s{/+\z}{};
     return "$home/.claude/projects/$name/memory";
 }
@@ -243,6 +261,79 @@ sub lock_release {
     rmdir $dir;
 }
 
+# ---- ファイル ------------------------------------------------------------
+
+# ファイルの中身をバイトの列で返す。無いか読めなければ undef を返す
+sub read_bytes {
+    my ($path) = @_;
+    open(my $fh, '<:raw', $path) or return undef;
+    my $text = do { local $/; <$fh> };
+    close $fh;
+    return defined $text ? $text : '';
+}
+
+# JSON のファイルを読む。無ければ undef を返し、読めなければ die する
+sub read_json {
+    my ($path) = @_;
+    my $text = read_bytes($path);
+    return undef unless defined $text;
+    my $data = eval { $JSON->decode($text) };
+    die "$path を JSON として読めなかった\n" unless defined $data;
+    return $data;
+}
+
+# JSON のファイルを、一時のファイルに書いてから名前を替えて書く。読む側が書きかけのファイルを読まないためである
+sub write_json {
+    my ($path, $data) = @_;
+    my $tmp = "$path.$$.tmp";
+    open(my $fh, '>:raw', $tmp) or die "$path を書けなかった($!)\n";
+    print {$fh} $JSON->encode($data), "\n";
+    close $fh or die "$path を書けなかった($!)\n";
+    rename $tmp, $path or die "$path を書けなかった($!)\n";
+}
+
+# ---- メモリ --------------------------------------------------------------
+
+# メモリのディレクトリの最上位の *.md の名前を、バイトの列で並べて返す。ディレクトリが無ければ空を返す
+sub memory_files {
+    my ($memdir) = @_;
+    return () unless -d $memdir;
+    opendir(my $dh, $memdir) or die "メモリのディレクトリ $memdir を読めなかった($!)\n";
+    my @names = sort grep { /\.md\z/ && -f "$memdir/$_" } readdir $dh;
+    closedir $dh;
+    return @names;
+}
+
+# 目次の中身から、frontmatter と HTML の注記を除いた本文を返す。行の全体が注記の行は、行ごと除く
+sub index_body {
+    my ($text) = @_;
+    $text =~ s/\A---[ \t]*\r?\n.*?^---[ \t]*\r?(?:\n|\z)//ms;
+    $text =~ s/^[ \t]*<!--(?:(?!-->).)*-->[ \t]*\r?(?:\n|\z)//gms;
+    $text =~ s/<!--.*?-->//gs;
+    return $text;
+}
+
+# 本文の行の数を返す。最後の行が改行で終わらなくても1行と数える
+sub line_count {
+    my ($text) = @_;
+    my $n = () = $text =~ /\n/g;
+    $n++ if length $text && $text !~ /\n\z/;
+    return $n;
+}
+
+# 目次の本文のリンクが指すメモリファイルの名前を、重ねずに返す
+sub index_links {
+    my ($body) = @_;
+    my (%seen, @names);
+    while ($body =~ /\]\(\s*<?([^)<>\s]+?)>?\s*\)/g) {
+        (my $name = $1) =~ s/#.*\z//;
+        $name =~ s{\A\./}{};
+        next if $name !~ /\.md\z/ || $name =~ m{://};
+        push @names, $name unless $seen{$name}++;
+    }
+    return @names;
+}
+
 # ---- サブコマンド ----------------------------------------------------------
 
 sub cmd_paths {
@@ -287,4 +378,72 @@ sub cmd_lock {
     }
     print 'held ', ($o ? $o->{run} : ''), "\n";
     return 3;
+}
+
+# 比べる材料を作る: prepare <回の ID> <scheduled|now>
+# メモリを読み、記録 runs/<回の ID>/record.json を状態 running で書き、比べる材料の JSON を標準出力に1行で出す。
+# メモリを書き換えず、メモリの中身をファイルに写さない
+sub cmd_prepare {
+    my @args = @_;
+    return usage() unless @args == 2;
+    my ($run, $trigger) = @args;
+    return usage() unless $run =~ /\A[A-Za-z0-9][A-Za-z0-9_-]*\z/ && $trigger =~ /\A(?:scheduled|now)\z/;
+    my $here = dirname(__FILE__);
+    my $main = main_worktree($here);
+    my $state = state_dir($here);
+    my $memdir = memory_dir($main);
+    my $rundir = "$state/runs/$run";
+    die "回 $run の記録がもうある\n" if -e "$rundir/record.json";
+
+    my $origin = git_line($main, 'rev-parse', '--verify', '--quiet', 'origin/main^{commit}');
+    die "本体の作業フォルダの origin/main のコミットを読めなかった\n" unless defined $origin;
+    my $read_at = iso_utc(now());
+
+    my %hashes;
+    my %index = (lines => 0, bytes => 0);
+    my @links;
+    for my $name (memory_files($memdir)) {
+        my $text = read_bytes("$memdir/$name");
+        die "メモリファイル $name を読めなかった\n" unless defined $text;
+        $hashes{$name} = sha256_hex($text);
+        next unless $name eq $INDEX;
+        my $body = index_body($text);
+        %index = (lines => line_count($body), bytes => length $body);
+        @links = index_links($body);
+    }
+    my %linked = map { $_ => 1 } @links;
+    my @index_without_file = grep { !-f "$memdir/$_" } @links;
+    my @file_without_index = grep { $_ ne $INDEX && !$linked{$_} } sort keys %hashes;
+
+    make_path($rundir);
+    write_json("$rundir/record.json", {
+        run_id               => $run,
+        trigger              => $trigger,
+        status               => 'running',
+        started_at           => $read_at,
+        finished_at          => undef,
+        interrupt_reason     => undef,
+        first_run            => -e "$state/snapshot.json" ? JSON::PP::false : JSON::PP::true,
+        origin_main          => $origin,
+        # 目次はメモリファイルに数えない(要件の用語の定義)
+        files_inspected      => scalar(grep { $_ ne $INDEX } keys %hashes),
+        index                => { %index },
+        read_hashes          => { map { decode('UTF-8', $_) => $hashes{$_} } keys %hashes },
+        findings             => [],
+        changes              => [],
+        skipped_files        => [],
+        relocation_proposals => [],
+        rule_proposals       => [],
+        inspection_proposals => [],
+        notes                => [],
+        reverts              => [],
+    });
+    print $JSON->encode({
+        now                => $read_at,
+        origin_main        => $origin,
+        index              => { %index, limit_lines => $INDEX_LIMIT{lines}, limit_bytes => $INDEX_LIMIT{bytes} },
+        index_without_file => [ map { decode('UTF-8', $_) } @index_without_file ],
+        file_without_index => [ map { decode('UTF-8', $_) } @file_without_index ],
+    }), "\n";
+    return 0;
 }
