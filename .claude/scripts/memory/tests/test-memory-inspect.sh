@@ -550,6 +550,106 @@ printf '\377\376 broken\n' >>"$TRANSDIR/s1.jsonl"
 user_line "$TRANSDIR" s1 "$c" "$AFTER" '"読める文"'
 check "読めない行を飛ばす" "$(scan_writes a.md)|$(perl "$TS" utterances s1 | utter_fields)" "{\"a.md\":true}|found|$AFTER=読める文"
 
+# ---------------------------------------------------------------------
+# 点検のロックとメモリのロック
+# ---------------------------------------------------------------------
+
+# 今のプロセスの番号を出す。Windows では、Git Bash の /proc/<番号>/winpid から読んだ Windows のプロセスの番号を出す
+self_pid() { cat "/proc/$$/winpid" 2>/dev/null || printf '%s\n' "$$"; }
+# もう無いプロセスの番号を出す。番号を出して終わった bash の番号である
+dead_pid() { bash -c 'cat "/proc/$$/winpid" 2>/dev/null || printf "%s\n" "$$"'; }
+# ロックを取る: lock_take <run|memory> <回の ID> <プロセスの番号>。出力と終了コードを「出力|終了コード」で出す
+lock_take() {
+    local out rc
+    out=$(perl "$PL" lock take "$@")
+    rc=$?
+    printf '%s|%s' "$out" "$rc"
+}
+lock_state() { perl "$PL" lock state "$1"; }
+# ロックの owner に書かれた欄を出す: lock_owner <run|memory>
+lock_owner() {
+    perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; my $o = JSON::PP->new->decode(<$f>);
+        print join("|", map { defined $_ ? $_ : "undef" } @$o{qw(pid run taken_at)})' "$STATE/locks/$1/owner"
+}
+# 今の時刻(newcase の KP_MEMORY_INSPECTION_NOW)から秒をずらした ISO 8601 の時刻を出す: shifted_now <秒>
+NOW_EPOCH=$(perl -MTime::Local -e 'print timegm(0, 0, 1, 2, 10, 2026)')
+shifted_now() { perl -MPOSIX=strftime -e 'print strftime("%Y-%m-%dT%H:%M:%SZ", gmtime($ARGV[0] + $ARGV[1]))' "$NOW_EPOCH" "$1"; }
+# ディレクトリの更新の時刻を、今の時刻から秒だけ前にする: age_dir <ディレクトリ> <秒>
+age_dir() { perl -e 'my $t = $ARGV[1] - $ARGV[2]; utime $t, $t, $ARGV[0] or exit 1' "$1" "$NOW_EPOCH" "$2"; }
+
+newcase lock-alive
+alive=$(self_pid)
+first=$(lock_take run r1 "$alive")
+owner=$(lock_owner run)
+second=$(lock_take run r2 "$alive")
+state=$(lock_state run)
+perl "$PL" lock release run r2
+after_other=$(lock_state run)
+perl "$PL" lock release run r1
+check "生きているプロセスのロックを古いとみなさない" \
+    "$first#$owner#$second#$state#$after_other#$(lock_state run)#$([ -d "$STATE/locks/run" ] && echo left)" \
+    "taken|0#$alive|r1|2026-11-02T01:00:00Z#held r1|3#held r1#held r1#free#"
+
+newcase lock-dead
+gone=$(dead_pid)
+lock_take run r1 "$gone" >/dev/null
+state=$(lock_state run)
+second=$(lock_take run r2 "$(self_pid)")
+check "owner のプロセスが無いロックを古いとみなし、外して取る" \
+    "$state#$second#$(lock_owner run)" "stale r1#taken|0#$(self_pid)|r2|2026-11-02T01:00:00Z"
+
+newcase lock-old
+lock_take run r1 "$(self_pid)" >/dev/null
+at89=$(KP_MEMORY_INSPECTION_NOW=$(shifted_now 5340) lock_state run)
+at91=$(KP_MEMORY_INSPECTION_NOW=$(shifted_now 5460) lock_state run)
+second=$(KP_MEMORY_INSPECTION_NOW=$(shifted_now 5460) lock_take run r2 "$(self_pid)")
+check "取った時刻から90分を過ぎたロックを古いとみなす" \
+    "$at89#$at91#$second#$(lock_owner run)" "held r1#stale r1#taken|0#$(self_pid)|r2|$(shifted_now 5460)"
+
+newcase lock-noowner
+mkdir -p "$STATE/locks/run"
+age_dir "$STATE/locks/run" 30
+young=$(lock_state run)
+young_take=$(lock_take run r2 "$(self_pid)")
+age_dir "$STATE/locks/run" 61
+old=$(lock_state run)
+old_take=$(lock_take run r2 "$(self_pid)")
+check "owner の無いロックは、作られてから1分以内なら古いとみなさず、1分を過ぎれば古いとみなす" \
+    "$young#$young_take#$old#$old_take#$(lock_owner run)" "held #held |3#stale #taken|0#$(self_pid)|r2|2026-11-02T01:00:00Z"
+
+newcase lock-memory
+first=$(lock_take memory r1 "$(self_pid)")
+second=$(lock_take memory r2 "$(self_pid)")
+run_state=$(lock_state run)
+perl "$PL" lock release memory r1
+gone=$(dead_pid)
+lock_take memory r3 "$gone" >/dev/null
+check "メモリのロックも、点検のロックと別の場所に同じ決まりで取って外す" \
+    "$first#$second#$run_state#$(lock_state memory)#$(lock_take memory r4 "$(self_pid)")" \
+    "taken|0#held r1|3#free#stale r3#taken|0"
+
+newcase lock-sh
+# 入口のスクリプトを読み込んだ bash が、ロックを取り、自分のプロセスの番号を出し、生きている間に2つ目の回でロックを取ろうとする
+inner=$(bash -c '. "$1" && run_lock_take r1 >/dev/null || exit 1
+    me=$(cat "/proc/$$/winpid" 2>/dev/null || printf "%s" "$$")
+    out=$(run_lock_take r2)
+    printf "%s#%s|%s" "$me" "$out" "$?"' _ "$SH")
+inner_pid=${inner%%#*}
+sh_owner=$(lock_owner run)
+after_exit=$(lock_state run)
+bash -c '. "$1" && run_lock_release r1' _ "$SH"
+check "入口のスクリプトは、自分のプロセスの番号で点検のロックを取り、取られていれば回の ID を出して終了コード 3 を返す" \
+    "$inner#$sh_owner#$after_exit#$(lock_state run)" "$inner_pid#held r1|3#$inner_pid|r1|2026-11-02T01:00:00Z#stale r1#free"
+
+newcase lock-usage
+perl "$PL" lock take run r1 >/dev/null 2>&1
+rc_args=$?
+perl "$PL" lock take other r1 1 >/dev/null 2>&1
+rc_kind=$?
+perl "$PL" lock take run 'a/b' 1 >/dev/null 2>&1
+rc_id=$?
+check "ロックの引数の誤りに終了コード 2 で終わる" "$rc_args|$rc_kind|$rc_id|$([ -d "$STATE/locks" ] && echo made)" "2|2|2|"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

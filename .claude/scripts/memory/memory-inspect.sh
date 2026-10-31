@@ -89,6 +89,23 @@ tool_paths() {
     perl "$PL" tools "$c" "$g" "$b" "$PATH"
 }
 
+# 点検のロックに書くプロセスの番号として、このシェルのプロセスの番号を出す。Windows では、Git Bash の
+# /proc/<番号>/winpid から読んだ Windows のプロセスの番号を出す。点検は別の Git Bash から起動されることがあるためである
+owner_pid() {
+    cat "/proc/$$/winpid" 2>/dev/null || printf '%s\n' "$$"
+}
+
+# 点検のロックを、このシェルのプロセスの番号で取る: run_lock_take <回の ID>
+# 取れたら taken を出して 0 を返し、ほかの回が取っていれば held <取っている回の ID> を出して 3 を返す
+run_lock_take() {
+    perl "$PL" lock take run "$1" "$(owner_pid)"
+}
+
+# その回が取っている点検のロックを外す: run_lock_release <回の ID>
+run_lock_release() {
+    perl "$PL" lock release run "$1"
+}
+
 main() {
     [ $# -gt 0 ] || usage
     local sub=$1

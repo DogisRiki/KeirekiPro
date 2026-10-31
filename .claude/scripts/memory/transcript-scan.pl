@@ -23,7 +23,6 @@ use warnings;
 use Encode qw(decode encode);
 use File::Basename qw(dirname);
 use JSON::PP;
-use Time::Local qw(timegm);
 
 my $LIMIT = 20 * 1024;
 my $JSON  = JSON::PP->new->utf8->canonical;
@@ -119,19 +118,6 @@ sub jsonl_in {
     return map { "$dir/$_" } @names;
 }
 
-# ISO 8601 の時刻を、1970年からの秒に直す。読めなければ undef を返す
-sub epoch {
-    my ($t) = @_;
-    return undef unless defined $t && !ref $t;
-    my ($y, $mo, $d, $h, $mi, $se, $frac, $zone, $sign, $zh, $zm)
-        = $t =~ /\A(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(\.\d+)?(Z|([+-])(\d\d):?(\d\d))\z/ or return undef;
-    my $s = eval { timegm($se, $mi, $h, $d, $mo - 1, $y) };
-    return undef unless defined $s;
-    $s += $frac if defined $frac;
-    $s -= ($sign eq '+' ? 1 : -1) * ($zh * 3600 + $zm * 60) if defined $sign;
-    return $s;
-}
-
 # 記録のファイルを1行ずつ読み、cwd が本体の作業フォルダの下の行を $each に渡す。読めない行は飛ばす
 sub each_line {
     my ($file, $top, $each) = @_;
@@ -157,7 +143,7 @@ sub cmd_writes {
         else { push @names, $a; }
     }
     return usage() unless defined $since && defined $memdir && @names;
-    my $from = epoch($since);
+    my $from = main::epoch($since);
     die "時刻 $since を読めなかった\n" unless defined $from;
     my $main = main::main_worktree(dirname(__FILE__));
     my $top  = norm($main);
@@ -168,7 +154,7 @@ sub cmd_writes {
         next unless defined $mtime && $mtime >= int($from);
         each_line($file, $top, sub {
             my ($j) = @_;
-            my $at = epoch($j->{timestamp});
+            my $at = main::epoch($j->{timestamp});
             return if defined $at && $at <= $from;
             my $content = ref $j->{message} eq 'HASH' ? $j->{message}{content} : undef;
             return unless ref $content eq 'ARRAY';
