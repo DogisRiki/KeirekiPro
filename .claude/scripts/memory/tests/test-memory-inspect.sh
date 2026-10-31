@@ -1914,6 +1914,125 @@ check "missed が、見落としを missed.json に書く" \
         print join ";", map { my $m = $_; join ",", map { defined $m->{$_} ? $m->{$_} : "null" } qw(id kind file summary noted_at proposed_in) } @{ JSON::PP->new->utf8->decode(<$f>) }' "$STATE/missed.json")" \
     "0|2|X1,3,b.md,前の見落とし,2026-10-20T00:00:00Z,r0;X2,4,a.md,日付の誤り,2026-11-02T01:00:00Z,null"
 
+# ---------------------------------------------------------------------
+# 直しを戻す操作
+# ---------------------------------------------------------------------
+
+# 戻す操作の場合の土台を作る: rv_setup <名前>
+# 直す前のメモリを CASE/orig に控えてから、回 r1 の prepare と apply で、a.md の文の置き換え C1、c.md の文の消し C2
+# (anchor が消した文の前)、b.md の文の消し C3(anchor が消した文の後)、d.md の削除 C4、目次への行の足し C5 を行う
+rv_setup() {
+    newcase "$1"
+    printf -- '- [A](a.md) — a\n- [B](b.md) — b\n- [C](c.md) — c\n- [D](d.md) — d\n' >"$MEMDIR/MEMORY.md"
+    printf -- '---\nname: a\n---\n古い事実の記述\n残る行\n' >"$MEMDIR/a.md"
+    printf '先頭で消す文\n後ろの行\n' >"$MEMDIR/b.md"
+    printf '前の文で消す文\n残る行\n' >"$MEMDIR/c.md"
+    printf '消してよいファイル\n' >"$MEMDIR/d.md"
+    mkdir -p "$CASE/orig"
+    cp "$MEMDIR"/*.md "$CASE/orig/"
+    perl "$PL" prepare r1 now >"$FAKE/material.json"
+    cat >"$FAKE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 1, "file": "a.md", "excerpt": "古い事実の記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "古い事実の記述", "new": "新しい事実の記述"}]},
+    {"kind": 7, "file": "c.md", "excerpt": "消す文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "c.md", "old": "消す文", "new": ""}]},
+    {"kind": 7, "file": "b.md", "excerpt": "先頭で消す文", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "b.md", "old": "先頭で消す文\n", "new": ""}]},
+    {"kind": 4, "file": "d.md", "excerpt": "消してよいファイル", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "d.md"}]},
+    {"kind": 6, "file": "MEMORY.md", "excerpt": "- [A](a.md) — a", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "append_index_line", "line": "- [E](e.md) — e"}]}
+  ],
+  "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+    perl "$PL" apply r1 <"$FAKE/plan.json" >"$FAKE/apply.out"
+}
+# reverted.json の要素ごとに、回の ID と直しの ID とファイルと戻した文と作り直したファイルのハッシュを : でつなぎ、, でつないで出す
+rv_list() {
+    perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; binmode STDOUT, ":utf8";
+        print join ",", map { my $r = $_; join ":", map { defined $r->{$_} ? $r->{$_} : "null" } qw(run_id change file restored_text restored_sha256) } @{ JSON::PP->new->utf8->decode(<$f>) }' \
+        "$STATE/reverted.json" 2>/dev/null
+}
+# メモリのディレクトリが、控えのディレクトリと同じ名前のファイルを同じ中身で持つかを出す: same_dir <控えのディレクトリ>
+same_dir() { diff -r "$1" "$MEMDIR" >/dev/null 2>&1 && printf 同じ || printf 違う; }
+
+rv_setup rv-all
+rcs=
+for c in C1 C2 C3 C4 C5; do
+    bash "$SH" revert r1 "$c"
+    rcs=$rcs$?
+done
+check "new が空でない edit と、new が空の edit と、delete と、append_index_line を戻すと、メモリと目次が直す前に戻り、記録の reverts に書き足される" \
+    "$rcs|$(same_dir "$CASE/orig")|$(rec_list "$STATE/runs/r1/record.json" reverts change reverted_at)|$(rv_list)" \
+    "00000|同じ|C1:2026-11-02T01:00:00Z,C2:2026-11-02T01:00:00Z,C3:2026-11-02T01:00:00Z,C4:2026-11-02T01:00:00Z,C5:2026-11-02T01:00:00Z|r1:C1:a.md:古い事実の記述:null,r1:C2:c.md:消す文:null,r1:C3:b.md:先頭で消す文
+:null,r1:C4:d.md:消してよいファイル
+:$(sha_of "$MEMDIR/d.md"),r1:C5:MEMORY.md::null"
+
+rv_setup rv-next
+rcs=
+for c in C1 C2 C3 C4 C5; do
+    bash "$SH" revert r1 "$c"
+    rcs=$rcs$?
+done
+# 前の点検の時刻のあとの会話の記録は無いので、比べる元と違うファイルがあれば、会話を通らない書き換えになる
+perl "$PL" prepare r2 now >"$FAKE/material2.json"
+rc=$?
+check "戻したあとの次の回の prepare が、戻したファイルを会話を通らない書き換えにしない" \
+    "$rcs|$rc|$(rec_list "$STATE/runs/r2/record.json" findings kind file)" "00000|0|"
+cat >"$FAKE/plan2.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 1, "file": "a.md", "excerpt": "古い事実の記述", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "edit", "file": "a.md", "old": "古い事実の記述", "new": "新しい事実の記述"}]},
+    {"kind": 4, "file": "d.md", "excerpt": "消してよいファイル", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "d.md"}]}
+  ],
+  "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+perl "$PL" apply r2 <"$FAKE/plan2.json" >"$FAKE/apply2.out"
+rc=$?
+check "戻した直しと同じ直しを次の回に返されても、apply が断る" \
+    "$rc|$(rec_list "$STATE/runs/r2/record.json" changes id state skip_reason)|$(same_dir "$CASE/orig")" \
+    "0|C1:skipped:$SKIP_REVERTED,C2:skipped:$SKIP_REVERTED_FILE|同じ"
+
+rv_setup rv-count
+# a.md に直したあとの文を2つにし、c.md の anchor を消したとする
+printf '新しい事実の記述\n' >>"$MEMDIR/a.md"
+printf '別の文で\n残る行\n' >"$MEMDIR/c.md"
+mkdir -p "$CASE/now"
+cp "$MEMDIR"/*.md "$CASE/now/"
+bash "$SH" revert r1 C1 2>/dev/null
+rcs=$?
+bash "$SH" revert r1 C2 2>/dev/null
+rcs=$rcs$?
+check "直したあとの文か anchor が現れないか2回以上現れると、戻さずに終了コード 1 で終わる" \
+    "$rcs|$(same_dir "$CASE/now")|$(rec_list "$STATE/runs/r1/record.json" reverts change)|$(rv_list)" "11|同じ||"
+
+rv_setup rv-dup
+# 会話の中の Claude が、消した文を元の場所に書き戻したとする
+printf '前の文で消す文\n残る行\n' >"$MEMDIR/c.md"
+printf '先頭で消す文\n後ろの行\n' >"$MEMDIR/b.md"
+mkdir -p "$CASE/now"
+cp "$MEMDIR"/*.md "$CASE/now/"
+bash "$SH" revert r1 C2 2>/dev/null
+rcs=$?
+bash "$SH" revert r1 C3 2>/dev/null
+rcs=$rcs$?
+check "戻す位置にもう直す前の文があると、戻さずに終了コード 1 で終わる" \
+    "$rcs|$(same_dir "$CASE/now")|$(rec_list "$STATE/runs/r1/record.json" reverts change)|$(rv_list)" "11|同じ||"
+
+rv_setup rv-exists
+printf '別の中身のファイル\n' >"$MEMDIR/d.md"
+mkdir -p "$CASE/now"
+cp "$MEMDIR"/*.md "$CASE/now/"
+bash "$SH" revert r1 C4 2>/dev/null
+check "同じ名前のファイルがあると、delete を戻さずに終了コード 1 で終わる" \
+    "$?|$(same_dir "$CASE/now")|$(rec_list "$STATE/runs/r1/record.json" reverts change)|$(rv_list)" "1|同じ||"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

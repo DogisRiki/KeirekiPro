@@ -39,6 +39,10 @@
 #     その回の report.md を標準出力に出す / その回に、報告を示した印 shown を書く
 #   history
 #     記録のある回を始めた順に、回の ID・点検の種類・状態・終わった時刻・汚染の数・直したメモリファイルの数・戻した直しの数の1行ずつで出す
+#   revert <回の ID> <直しの ID>
+#     報告に載った直し(C の番号)を戻し、戻したことを記録の reverts と reverted.json と snapshot.json に書く。
+#     メモリのロックの中で戻す。直したあとの文か anchor がちょうど1回現れないときと、戻す位置にもう直す前の文があるときと、
+#     消したファイルと同じ名前のファイルがあるときは、戻さずに終わる
 #   answer <回の ID> <案の ID> declined|accepted [--issue <番号>]
 #     報告に載った案(R・K・M の番号)への開発者の答えを answers.json に書く
 #   missed <汚染の種類> <メモリファイルの名前> <短い説明>
@@ -70,6 +74,7 @@ my %COMMANDS = (
     show     => \&cmd_show,
     shown    => \&cmd_shown,
     history  => \&cmd_history,
+    revert   => \&cmd_revert,
     answer   => \&cmd_answer,
     missed   => \&cmd_missed,
 );
@@ -158,7 +163,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明>\n";
     return 2;
 }
 
@@ -1761,6 +1766,105 @@ sub cmd_missed {
     };
     my $err = $@;
     lock_release($lock, 'missed');
+    die $err unless $ok;
+    return 0;
+}
+
+# 1つの直しを戻した中身を返す。戻せないときは、理由を書いて die する。
+# 返す値は ({名前 => 書いたあとの中身}, 戻した文, 作り直したファイルのハッシュか undef) である
+sub revert_write {
+    my ($c, $memdir) = @_;
+    my $id = report_str($c->{id});
+    my $op = report_str($c->{op});
+    my $name = memory_name($c->{file});
+    die "直し $id の対象のファイルの名前が違う\n" unless defined $name;
+    my ($before, $after) = (report_str($c->{before}), report_str($c->{after}));
+    my $cur = read_bytes("$memdir/$name");
+
+    if ($op eq 'delete') {
+        die "$name がもうあるので、直し $id を戻さなかった\n" if -e "$memdir/$name";
+        my %write = ($name => $before);
+        my @lines = map { report_str($_) } @{ list_of($c->{removed_index_lines}) };
+        if (@lines) {
+            my $index = read_bytes("$memdir/$INDEX") // '';
+            my $sep = length $index && $index !~ /\n\z/ ? "\n" : '';
+            $write{$INDEX} = $index . $sep . join '', map { "$_\n" } @lines;
+        }
+        return (\%write, $before, sha256_hex($before));
+    }
+    die "$name が無いので、直し $id を戻さなかった\n" unless defined $cur;
+    if ($op eq 'append_index_line') {
+        my (@kept, $found);
+        for my $line ($cur =~ /[^\n]*\n|[^\n]+\z/g) {
+            (my $bare = $line) =~ s/\r?\n\z//;
+            if ($bare eq $after) {
+                $found++;
+            } else {
+                push @kept, $line;
+            }
+        }
+        die "目次に直し $id で足した行がちょうど1回現れないので、戻さなかった\n" unless ($found // 0) == 1;
+        return ({ $name => join '', @kept }, '', undef);
+    }
+    die "直し $id の直し方が違う\n" unless $op eq 'edit';
+    if (length $after) {
+        die "直し $id で直したあとの文が $name にちょうど1回現れないので、戻さなかった\n" unless count_in($cur, $after) == 1;
+        my $at = index($cur, $after);
+        return ({ $name => substr($cur, 0, $at) . $before . substr($cur, $at + length $after) }, $before, undef);
+    }
+    my $anchor = report_str($c->{anchor});
+    die "直し $id の anchor が $name にちょうど1回現れないので、戻さなかった\n" unless count_in($cur, $anchor) == 1;
+    my $at = index($cur, $anchor);
+    $at += length $anchor unless report_str($c->{anchor_side}) eq 'after';
+    my $there = report_str($c->{anchor_side}) eq 'after'
+        ? $at >= length $before && substr($cur, $at - length $before, length $before) eq $before
+        : substr($cur, $at, length $before) eq $before;
+    die "戻す位置にもう直し $id の直す前の文があるので、戻さなかった\n" if $there;
+    return ({ $name => substr($cur, 0, $at) . $before . substr($cur, $at) }, $before, undef);
+}
+
+# 直しを戻す: revert <回の ID> <直しの ID>
+sub cmd_revert {
+    my @args = @_;
+    return usage() unless @args == 2 && valid_run($args[0]) && $args[1] =~ /\AC[0-9]+\z/;
+    my ($run, $id) = @args;
+    my $here = dirname(__FILE__);
+    my $state = state_dir($here);
+    my $memdir = memory_dir(main_worktree($here));
+
+    # 適用の部品が直しを書くのと同じ時に書かないように、メモリのロックの中で記録を読み直してから戻す
+    my $lock = lock_dir($state, 'memory');
+    my ($taken, $owner) = lock_take($lock, 'revert', own_pid());
+    die 'メモリのロックを回 ' . ($owner ? encode('UTF-8', $owner->{run}) : '(不明)') . " が取っているので、直しを戻さなかった。少し待ってからもう一度打つ\n"
+        unless $taken;
+    my $ok = eval {
+        my $record = run_record($state, $run);
+        my ($c) = grep { ref $_ eq 'HASH' && report_str($_->{id}) eq $id } @{ list_of($record->{changes}) };
+        die "回 $run に直し $id が無い\n" unless $c;
+        die "直し $id は行っていないので、戻さなかった\n" unless report_str($c->{state}) eq 'applied';
+        # 欄の無い記録は、戻した直しが無いものとして扱う
+        my $reverts = list_of($record->{reverts});
+        die "直し $id はもう戻した\n" if grep { ref $_ eq 'HASH' && report_str($_->{change}) eq $id } @$reverts;
+        my $snap = read_json("$state/snapshot.json");
+        die "比べる元 snapshot.json の形が違う\n" if defined $snap && !(ref $snap eq 'HASH' && ref $snap->{files} eq 'HASH');
+        my $reverted = read_state_json("$state/reverted.json", 'ARRAY');
+
+        my ($write, $restored, $sha) = revert_write($c, $memdir);
+        write_bytes("$memdir/$_", $write->{$_}) for sort keys %$write;
+        my $at = iso_utc(now());
+        $record->{reverts} = [ @$reverts, { change => $id, reverted_at => $at } ];
+        write_json("$state/runs/$run/record.json", $record);
+        push @$reverted, { run_id => $run, change => $id, file => $c->{file}, restored_text => decode('UTF-8', $restored), restored_sha256 => $sha };
+        write_json("$state/reverted.json", $reverted);
+        # 戻した書き換えを、次の点検が会話を通らない書き換えの疑いとしないように、比べる元を戻したあとの中身にする
+        if (defined $snap) {
+            $snap->{files}{ decode('UTF-8', $_) } = snapshot_entry($write->{$_}) for keys %$write;
+            write_json("$state/snapshot.json", $snap);
+        }
+        1;
+    };
+    my $err = $@;
+    lock_release($lock, 'revert');
     die $err unless $ok;
     return 0;
 }

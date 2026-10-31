@@ -110,6 +110,7 @@ run_lock_release() {
 cmd_show() { perl "$PL" show "$@"; }
 cmd_shown() { perl "$PL" shown "$@"; }
 cmd_history() { perl "$PL" history "$@"; }
+cmd_revert() { perl "$PL" revert "$@"; }
 cmd_answer() { perl "$PL" answer "$@"; }
 cmd_missed() { perl "$PL" missed "$@"; }
 
