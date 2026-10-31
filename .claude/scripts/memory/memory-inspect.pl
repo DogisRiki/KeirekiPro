@@ -19,6 +19,7 @@
 #     メモリを読み、記録 runs/<回の ID>/record.json を状態 running で書き、比べる材料の JSON を標準出力に1行で出す。
 #     メモリを書き換えない。メモリのディレクトリが無いときは、点検したメモリファイルを0とする。
 #     比べる元 snapshot.json があれば、書き換わったファイルを会話の記録と照らし、記録に無い書き換えを汚染の種類11として記録に書く
+#     材料には、まだメモリに残る戻された直しと、決まりの見直しの案を書いてよい種類と、断られた移す先の案と、案をまだ作っていない見落としも入れる
 #   content
 #     目次とメモリファイルを1つずつ <<<MEMORY-FILE name="<ファイル名>">>> と <<<END-MEMORY-FILE>>> で囲み、
 #     行ごとに「<行番号>| <行>」の形で標準出力に出す。前の点検のあとに足された行は、行番号の前に + を付ける。ファイルに書かない
@@ -402,6 +403,87 @@ sub conversation_writes {
     return { map { (encode('UTF-8', $_) => ($found->{$_} ? 1 : 0)) } keys %$found };
 }
 
+# 記録の中のメモリファイルの名前を、メモリのディレクトリの最上位の *.md を指すときだけ、バイトの列で返す
+sub memory_name {
+    my ($name) = @_;
+    return undef unless defined $name && !ref $name;
+    my $bytes = encode('UTF-8', $name);
+    return $bytes =~ m{\A[^/\\.][^/\\]*\.md\z} ? $bytes : undef;
+}
+
+# 空白の続きを1つの空白にそろえる。fingerprint を求めるときの、記述の文のそろえ方である
+sub squash_space {
+    my ($text) = @_;
+    (my $s = $text) =~ s/\s+/ /g;
+    $s =~ s/\A | \z//g;
+    return $s;
+}
+
+# 状態の場所の JSON を読む。無ければ空の値を返し、形が違えば die する
+sub read_state_json {
+    my ($path, $type) = @_;
+    my $data = read_json($path);
+    return $type eq 'ARRAY' ? [] : {} unless defined $data;
+    die "$path の形が違う\n" unless ref $data eq $type;
+    return $data;
+}
+
+# ---- 繰り返しの数え方 ------------------------------------------------------
+# 決まりの見直しの案を載せる種類を、prepare と適用の部品が同じ決まりで求めるための関数である
+
+# 記録のある回を、[記録, 始めた時刻の秒] の組で並べる。except の回は除く
+sub run_records {
+    my ($state, $except) = @_;
+    opendir(my $dh, "$state/runs") or return ();
+    my @ids = sort grep { !/\A\./ && !(defined $except && $_ eq $except) } readdir $dh;
+    closedir $dh;
+    my @records;
+    for my $id (@ids) {
+        my $rec = read_json("$state/runs/$id/record.json");
+        next unless defined $rec;
+        die "回 $id の記録の形が違う\n" unless ref $rec eq 'HASH';
+        my $t = epoch($rec->{started_at});
+        die "回 $id の記録の started_at を読めなかった\n" unless defined $t;
+        push @records, [ $rec, $t ];
+    }
+    return @records;
+}
+
+# 完了した回のうち、新しい順に n 回分の記録を返す。その場で動かした回も数え、中断した回と動いている回は数えない
+sub recent_completed_records {
+    my ($state, $n, $except) = @_;
+    my @done = sort { $b->[1] <=> $a->[1] || ($b->[0]{run_id} // '') cmp ($a->[0]{run_id} // '') }
+        grep { ($_->[0]{status} // '') eq 'completed' } run_records($state, $except);
+    splice(@done, $n) if @done > $n;
+    return map { $_->[0] } @done;
+}
+
+# 種類ごとに、新しく見つかった汚染が1つ以上あった回の数を、種類 => 数の表で返す。
+# answers.json で断られた種類は数えず、Issue を起票した種類は、起票した時刻よりあとに始めた回だけを数える
+sub kind_repeats {
+    my ($answers, @records) = @_;
+    my $rule = ref $answers eq 'HASH' && ref $answers->{rule} eq 'HASH' ? $answers->{rule} : {};
+    my %count;
+    for my $rec (@records) {
+        my $t = epoch($rec->{started_at});
+        my %kinds = map { ($_->{kind} => 1) }
+            grep { ref $_ eq 'HASH' && $_->{new} && defined $_->{kind} } @{ ref $rec->{findings} eq 'ARRAY' ? $rec->{findings} : [] };
+        for my $kind (keys %kinds) {
+            my $answer = $rule->{$kind};
+            if (ref $answer eq 'HASH') {
+                next if defined $answer->{declined_at};
+                if (defined $answer->{filed_at}) {
+                    my $filed = epoch($answer->{filed_at});
+                    die "answers.json の種類 $kind の filed_at を読めなかった\n" unless defined $filed;
+                    next unless defined $t && $t > $filed;
+                }
+            }
+            $count{$kind}++;
+        }
+    }
+    return \%count;
+}
+
 # ---- サブコマンド ----------------------------------------------------------
 
 sub cmd_paths {
@@ -510,6 +592,51 @@ sub cmd_prepare {
         }
     }
 
+    # 戻された直しのうち、戻した文がまだメモリにそのまま残っているもの。消したファイルを戻した直しは、作り直したファイルのハッシュでも見る
+    my (@reverted, %reverted_seen);
+    for my $r (@{ read_state_json("$state/reverted.json", 'ARRAY') }) {
+        next unless ref $r eq 'HASH';
+        my $name = memory_name($r->{file});
+        next unless defined $name && defined $hashes{$name};
+        my $restored = defined $r->{restored_text} && !ref $r->{restored_text} ? $r->{restored_text} : '';
+        my $text = read_bytes("$memdir/$name");
+        next unless defined $text;
+        my $kept = (length $restored && index($text, encode('UTF-8', $restored)) >= 0)
+            || (defined $r->{restored_sha256} && !ref $r->{restored_sha256} && $r->{restored_sha256} eq $hashes{$name});
+        push @reverted, { file => $r->{file}, text => $restored } if $kept && !$reverted_seen{"$name\0$restored"}++;
+    }
+
+    # 決まりの見直しの案を書いてよい種類。前の3回で2回以上の種類と、前の3回で1回の種類を渡す
+    my $answers = read_state_json("$state/answers.json", 'HASH');
+    my $repeats = kind_repeats($answers, recent_completed_records($state, 3, $run));
+    my @rule_kinds = sort { $a <=> $b } map { 0 + $_ } grep { $repeats->{$_} >= 1 } keys %$repeats;
+
+    # 断られた移す先の案。記録の汚染から記述を引き、その記述がまだ同じファイルにあるものだけを並べる
+    my %declined = map { ($_->{fingerprint} => 1) }
+        grep { ref $_ eq 'HASH' && defined $_->{fingerprint} && ($_->{answer} // '') eq 'declined' }
+        @{ ref $answers->{relocation} eq 'ARRAY' ? $answers->{relocation} : [] };
+    my (@declined_relocations, %declined_seen);
+    if (%declined) {
+        for my $pair (run_records($state, $run)) {
+            for my $f (@{ ref $pair->[0]{findings} eq 'ARRAY' ? $pair->[0]{findings} : [] }) {
+                next unless ref $f eq 'HASH' && defined $f->{fingerprint} && $declined{ $f->{fingerprint} };
+                next if $declined_seen{ $f->{fingerprint} }++;
+                my $name = memory_name($f->{file});
+                next unless defined $name && defined $hashes{$name} && defined $f->{excerpt} && !ref $f->{excerpt};
+                my $excerpt = squash_space($f->{excerpt});
+                my $text = read_bytes("$memdir/$name");
+                next unless length $excerpt && defined $text
+                    && index(squash_space(decode('UTF-8', $text)), $excerpt) >= 0;
+                push @declined_relocations, { file => $f->{file}, excerpt => $f->{excerpt} };
+            }
+        }
+    }
+
+    # 開発者が会話で指摘した見落としのうち、まだ点検のやり方の見直しの案を作っていないもの
+    my @missed = map { +{ id => $_->{id}, kind => $_->{kind}, file => $_->{file}, summary => $_->{summary} } }
+        grep { ref $_ eq 'HASH' && !(defined $_->{proposed_in} && $_->{proposed_in} ne '') }
+        @{ read_state_json("$state/missed.json", 'ARRAY') };
+
     make_path($rundir);
     write_json("$rundir/record.json", {
         run_id               => $run,
@@ -542,6 +669,10 @@ sub cmd_prepare {
         file_without_index => [ map { decode('UTF-8', $_) } @file_without_index ],
         rewritten_outside_conversation => [ map { decode('UTF-8', $_) } @outside ],
         rewritten_in_conversation      => [ map { decode('UTF-8', $_) } @inside ],
+        reverted                       => \@reverted,
+        rule_proposal_kinds            => \@rule_kinds,
+        declined_relocations           => \@declined_relocations,
+        missed                         => \@missed,
     }), "\n";
     return 0;
 }

@@ -817,6 +817,128 @@ check "会話の記録に Edit の呼び出しがある書き換えを、種類1
     "$rc|$(jget "$CASE/material.json" rewritten_in_conversation)|$(perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; print join ",", map { $_->{file} } @{ JSON::PP->new->utf8->decode(<$f>)->{findings} }' "$rec" | grep -c 'b\.md')" \
     "0|b.md|0"
 
+# 前の回の記録を書く: make_record <回の ID> <scheduled|now> <状態> <始めた時刻> [<汚染の種類>:<new|old>]...
+# new は新しく見つかった汚染、old は前の回から残っている汚染である
+make_record() {
+    mkdir -p "$STATE/runs/$1"
+    perl -MJSON::PP -e 'my ($id, $trigger, $status, $at, @spec) = @ARGV; my $n = 0;
+        my @findings = map { my ($kind, $age) = split /:/; $n++;
+            +{ id => "F$n", kind => 0 + $kind, file => "a.md", excerpt => "e$n", fingerprint => "fp-$id-$n",
+               new => $age eq "new" ? JSON::PP::true : JSON::PP::false, existed_before => JSON::PP::false,
+               status => "keep", reason => "r", changes => [] } } @spec;
+        print JSON::PP->new->encode({ run_id => $id, trigger => $trigger, status => $status, started_at => $at, findings => \@findings })' \
+        "$@" >"$STATE/runs/$1/record.json"
+}
+# 繰り返しの数え方で、前の3回の種類ごとの回の数を「種類=数」で出す
+repeat_counts() {
+    perl -e 'require $ARGV[0]; my $c = kind_repeats(read_state_json("$ARGV[1]/answers.json", "HASH"), recent_completed_records($ARGV[1], 3, "r1"));
+        print join ",", map { "$_=$c->{$_}" } sort { $a <=> $b } keys %$c' "$PL" "$STATE"
+}
+
+newcase rk-count
+# 4回前の回の種類7は数えない。old の汚染は数えない。1つの回に同じ種類が2つあっても1回と数える
+make_record ra scheduled completed 2026-10-05T01:00:00Z 7:new 3:new
+make_record rb scheduled completed 2026-10-12T01:00:00Z 3:new 5:new 9:old
+make_record rc scheduled completed 2026-10-19T01:00:00Z 3:new 3:new 6:old
+make_record rd scheduled completed 2026-10-26T01:00:00Z 5:new 8:new
+prepare_run r1 scheduled
+check "前の3回で2回以上の種類と1回の種類を rule_proposal_kinds に入れる" \
+    "$?|$(jget "$CASE/material.json" rule_proposal_kinds)|$(repeat_counts)" "0|3,5,8|3=2,5=2,8=1"
+
+newcase rk-declined
+make_record rb scheduled completed 2026-10-12T01:00:00Z 3:new 5:new 6:new
+make_record rd scheduled completed 2026-10-26T01:00:00Z 3:new 5:new
+cat >"$STATE/answers.json" <<'JSON'
+{"rule":{"3":{"declined_at":"2026-10-27T00:00:00Z","filed_at":null,"issue":null},"5":{"declined_at":null,"filed_at":null,"issue":null}},"relocation":[],"inspection":[]}
+JSON
+prepare_run r1 scheduled
+check "断った種類を rule_proposal_kinds に入れない" \
+    "$?|$(jget "$CASE/material.json" rule_proposal_kinds)|$(repeat_counts)" "0|5,6|5=2,6=1"
+
+newcase rk-filed
+# 起票した時刻と同じ時刻に始めた回も、起票した時刻よりあとではないので数えない
+make_record rb scheduled completed 2026-10-12T01:00:00Z 3:new 6:new
+make_record rc scheduled completed 2026-10-19T01:00:00Z 6:new
+make_record rd scheduled completed 2026-10-26T01:00:00Z 3:new
+cat >"$STATE/answers.json" <<'JSON'
+{"rule":{"3":{"declined_at":null,"filed_at":"2026-10-20T00:00:00Z","issue":700},"6":{"declined_at":null,"filed_at":"2026-10-19T10:00:00+09:00","issue":701}},"relocation":[],"inspection":[]}
+JSON
+prepare_run r1 scheduled
+check "起票した種類は、起票した時刻のあとの回だけを数える" \
+    "$?|$(jget "$CASE/material.json" rule_proposal_kinds)|$(repeat_counts)" "0|3|3=1"
+
+newcase rk-now
+# 中断した回と動いている回と、記録の無い回は、前の3回の数に入れない。入れると、いちばん古い回の種類10が数えられなくなる
+make_record rb scheduled completed 2026-10-05T01:00:00Z 10:new
+make_record rc now completed 2026-10-12T01:00:00Z 4:new
+make_record rd scheduled completed 2026-10-19T01:00:00Z
+make_record re scheduled interrupted 2026-10-26T01:00:00Z 2:new
+make_record rf now running 2026-10-27T01:00:00Z 1:new
+mkdir -p "$STATE/runs/rg"
+prepare_run r1 now
+check "その場で動かした回も完了した回として数え、中断した回を数えない" \
+    "$?|$(jget "$CASE/material.json" rule_proposal_kinds)|$(repeat_counts)" "0|4,10|4=1,10=1"
+
+newcase prep-reverted
+mkdir -p "$STATE"
+printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+printf '前の文\n戻した文\n後の文\n' >"$MEMDIR/a.md"
+printf '作り直した全文' >"$MEMDIR/b.md"
+printf '同じ文\n' >"$MEMDIR/c.md"
+printf '戻した文\n' >"$TRANSDIR/x.md"
+b_sha=$(sha_of "$MEMDIR/b.md")
+cat >"$STATE/reverted.json" <<JSON
+[{"run_id":"r0","change":"C1","file":"a.md","restored_text":"戻した文","restored_sha256":null},
+ {"run_id":"r0","change":"C2","file":"a.md","restored_text":"書き換わった文","restored_sha256":null},
+ {"run_id":"r0","change":"C3","file":"gone.md","restored_text":"戻した文","restored_sha256":null},
+ {"run_id":"r0","change":"C4","file":"b.md","restored_text":"作り直す前と違う全文","restored_sha256":"$b_sha"},
+ {"run_id":"r0","change":"C5","file":"c.md","restored_text":"作り直した全文","restored_sha256":"0000"},
+ {"run_id":"r0","change":"C6","file":"../x.md","restored_text":"戻した文","restored_sha256":null}]
+JSON
+prepare_run r1 scheduled
+check "戻した文がまだメモリにある直しだけを並べる" \
+    "$?|$(jget "$CASE/material.json" reverted)" "0|file=a.md,text=戻した文,file=b.md,text=作り直す前と違う全文"
+
+newcase prep-missed
+mkdir -p "$STATE"
+cat >"$STATE/missed.json" <<'JSON'
+[{"id":"X1","kind":4,"file":"a.md","summary":"日付の誤り","noted_at":"2026-10-20T00:00:00Z","proposed_in":null},
+ {"id":"X2","kind":5,"file":"a.md","summary":"案を作った","noted_at":"2026-10-21T00:00:00Z","proposed_in":"r0"},
+ {"id":"X3","kind":2,"file":"b.md","summary":"古い場所","noted_at":"2026-10-22T00:00:00Z"}]
+JSON
+prepare_run r1 scheduled
+check "proposed_in が空の見落としだけを並べる" \
+    "$?|$(jget "$CASE/material.json" missed)" "0|file=a.md,id=X1,kind=4,summary=日付の誤り,file=b.md,id=X3,kind=2,summary=古い場所"
+
+newcase prep-declined
+printf '前の文\n移す\n  文\n' >"$MEMDIR/a.md"
+printf '受けた文\n' >"$MEMDIR/b.md"
+mkdir -p "$STATE/runs/r0"
+cat >"$STATE/runs/r0/record.json" <<'JSON'
+{"run_id":"r0","trigger":"scheduled","status":"completed","started_at":"2026-10-26T01:00:00Z","findings":[
+ {"id":"F1","kind":10,"file":"a.md","excerpt":"移す 文","fingerprint":"fp1","new":true},
+ {"id":"F2","kind":10,"file":"a.md","excerpt":"もう無い文","fingerprint":"fp2","new":true},
+ {"id":"F3","kind":10,"file":"b.md","excerpt":"受けた文","fingerprint":"fp3","new":true}]}
+JSON
+cat >"$STATE/answers.json" <<'JSON'
+{"rule":{},"relocation":[{"fingerprint":"fp1","answer":"declined","issue":null,"answered_at":"2026-10-27T00:00:00Z"},
+ {"fingerprint":"fp2","answer":"declined","issue":null,"answered_at":"2026-10-27T00:00:00Z"},
+ {"fingerprint":"fp3","answer":"accepted","issue":702,"answered_at":"2026-10-27T00:00:00Z"},
+ {"fingerprint":"fp9","answer":"declined","issue":null,"answered_at":"2026-10-27T00:00:00Z"}],"inspection":[]}
+JSON
+prepare_run r1 scheduled
+check "断った移す先の案を、その記述がまだ同じファイルにあるときだけ並べる" \
+    "$?|$(jget "$CASE/material.json" declined_relocations)" "0|excerpt=移す 文,file=a.md"
+
+newcase prep-fields
+printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+prepare_run r1 now
+rc=$?
+keys=$(perl -MJSON::PP -e 'open my $f, "<", $ARGV[0] or exit 1; local $/; my $d = JSON::PP->new->utf8->decode(<$f>);
+    print join ",", (sort keys %$d), "#", sort keys %{ $d->{index} }' "$CASE/material.json")
+check "比べる材料の JSON が design の欄をすべて持つ" "$rc|$keys" \
+    "0|declined_relocations,file_without_index,first_run,index,index_without_file,missed,now,origin_main,reverted,rewritten_in_conversation,rewritten_outside_conversation,rule_proposal_kinds,#,bytes,limit_bytes,limit_lines,lines"
+
 newcase prep-usage
 perl "$PL" prepare r1 >/dev/null 2>&1
 rc_args=$?
