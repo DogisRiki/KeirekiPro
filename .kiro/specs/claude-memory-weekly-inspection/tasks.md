@@ -37,7 +37,7 @@
   - _要件: 1.11_
   - _依存: 1.2_
 
-- [ ] 2. 会話の記録を読む部品と、点検の中の Claude への指示を作る
+- [x] 2. 会話の記録を読む部品と、点検の中の Claude への指示を作る
 - [x] 2.1 会話の記録から、メモリの書き換えと開発者の発言を探す部品を作る
 
   Claude は、部品「transcript-scan.pl」を、`.claude/scripts/memory/transcript-scan.pl` に、design の節の「このリポジトリの会話の記録の選び方」と、`writes` と `utterances` の呼び出し方と、「失敗したとき」のとおりに作る。transcript-scan.pl は、記録の `cwd` と `file_path` と、比べる相手の場所を、`C:\` と `C:/` と `/c/` の形をそろえてから比べる。Windows の Claude Code は記録に `C:\` の形で場所を書き、git と Git Bash は `C:/` と `/c/` の形で場所を返すためである。
@@ -45,7 +45,7 @@
   - 受入基準とテストの対応: 要件1の受入基準7(このリポジトリの会話の記録だけを読む)は、テストの「cwd が C:\ の形で書かれた記録を、本体の作業フォルダの記録として使う」と「cwd がほかのプロジェクトの記録を使わない」と「名前が似たほかのプロジェクトのディレクトリの記録を使わない」で確かめる。要件2の受入基準2(外から混入した指示の出どころを確かめる)は、テストの「cwd が C:\ の形で書かれた記録を、本体の作業フォルダの記録として使う」と「utterances が道具の結果と isMeta の行と差し込まれた知らせの行を返さない」と「記録の無い会話に記録が無いと返す」で確かめる。要件2の受入基準1の11番目の種類(会話を通らない直接の書き換え)の見分けの材料は、テストの「Write と Edit と MultiEdit の呼び出しを、パスの区切りと大文字と小文字をそろえて見つける」と「file_path が C:\ の形で、メモリのディレクトリが /c/ の形でも、同じファイルとして見つける」で確かめる
   - _要件: 1.7, 2.1, 2.2_
 
-- [ ] 2.2 点検の中の Claude に渡す指示の文と、返す JSON の形を作る (並行可)
+- [x] 2.2 点検の中の Claude に渡す指示の文と、返す JSON の形を作る (並行可)
 
   Claude は、部品「inspect-prompt.md と plan-schema.json」を、`.claude/scripts/memory/inspect-prompt.md` と `.claude/scripts/memory/plan-schema.json` に作る。Claude は、inspect-prompt.md に、design の節の「inspect-prompt.md に書くこと」の項目をすべて書く。Claude は、指示の文を日本語で書き、11種類の汚染を、要件2の受入基準1の番号と名前で呼ぶ。Claude は、移す先の案の `finding` と `finding:<番号>` が、直し方の `findings` の1から数えた順番を指すことを、指示の文に書く。Claude は、plan-schema.json を、design の「データの形」の節の「直し方の JSON」のとおりに、JSON Schema で書く。
   - 完了の確かめ方: plan-schema.json を perl の JSON::PP で読め、`lookups` と `plan` と、`plan` の中の `findings` `relocation_proposals` `rule_proposals` `inspection_proposals` `summary` を定めている。`lookups` の `type` が design の表の10の種類に限られ、`changes` の `op` が `edit` `append_index_line` `delete` に限られている。inspect-prompt.md に、11種類の汚染の名前と、design の「inspect-prompt.md に書くこと」の各項目に当たる文がある
@@ -314,6 +314,7 @@
 - タスク1.4で分かったこと: memory-inspect.sh は、本体の作業フォルダと状態の場所を、呼ばれたフォルダからではなく、スクリプト自身の場所から求める。OS の予定の仕組みから動く run は、どのフォルダで動くかが決まらないためである。スクリプトの場所は、git に渡すので、Windows では `pwd -W` の `C:/...` の形にする。会話の中の Claude Code は Git Bash の引数の書き換えを止めるので、`/c/...` の形では git が場所を見つけられない。テストは、偽のリポジトリにスクリプトの写しをコミットして流す。本物のリポジトリのスクリプトを流すと、本物の状態の場所を使うためである。タスク5.3の run-now は、design の手順2の「今の作業フォルダ」に合わせるなら、`memory-inspect.pl paths` に今のフォルダを渡す。タスク5.4の enable は、Windows では `HOME` が `/c/...` の形なので、`memory_dir` が `/c/...` の形になる。enable は、config.json に書く値を、予定の仕組みから動く run が同じ形で使えるかを確かめる
 - タスク2.1で分かったこと: transcript-scan.pl は、本体の作業フォルダの求め方を memory-inspect.pl から読み込んで使う。perl の `require` は、`/` か `./` で始まらない場所(Windows の `C:/...` の形や相対の場所)を `@INC` から探し、読み込んだファイルの関数を呼んだ側のパッケージに置く。このため、transcript-scan.pl は、自分のフォルダを `@INC` の先頭に置き、`package main` の中で読み込む。会話の記録の JSON は文字の列として読めるので、場所を比べる前に UTF-8 のバイトの列に直す。git が返す場所はバイトの列のためである。writes は、ファイルの更新の時刻に加えて、行の `timestamp` も `--since` の時刻よりあとの行だけを使う。前の点検より前の書き換えを数えないためである。writes が受ける時刻は、`Z` か `+09:00` のような時刻の帯の付いた ISO 8601 の形に限る。prepare は、この形で時刻を渡す。utterances は、20KB を超えたとき、会話の前のほうの文を残す。本物の記録では、目次を Bash の `printf` で追記した書き換えを、writes は見つけない。design の「失敗したとき」が受け入れている誤りである
 - タスク1.5で分かったこと: memory-inspect.pl の `lock take <run|memory> <回の ID> <プロセスの番号>` は、取れたら `taken` を出して 0 を返し、ほかの回が取っていれば `held <回の ID>` を出して 3 を返す。`lock state` は `free` か `held <回の ID>` か `stale <回の ID>` を出す。run と run-now と後始末の部品は、この `lock_status` を使う。入口のスクリプトは `run_lock_take` と `run_lock_release` で、自分のプロセスの番号(Windows では `/proc/$$/winpid`)を渡す。テストだけが使う環境変数は、90分が `KP_MEMORY_INSPECTION_STALE_SEC`、`owner` の無いロックを待つ1分が `KP_MEMORY_INSPECTION_OWNERLESS_SEC` である。memory-inspect.pl は、表の変数を `exit main(@ARGV) unless caller` より前に置く。あとに置くと、コマンドとして動いたときに表が空のままになるためである。ISO 8601 の時刻の読み方は memory-inspect.pl の `epoch` の1か所にまとめ、transcript-scan.pl も `main::epoch` を使う。テストは、shellcheck が場所を追えない `. "$SH"` をテストのシェルで直に使わず、`bash -c '. "$1" && ...' _ "$SH"` の形で読み込む
+- タスク2.2で分かったこと: inspect-prompt.md は、調べた結果の囲み `<<<LOOKUP-RESULT id="<番号>">>>` の中に、調べたことの種類と引数と結果が入ると書いた。タスク3.4とタスク5.1は、囲みの中にこの3つを出す。plan-schema.json の `inspection_proposals[].trigger` は `missed:` のあとに英数字と `_` と `-` だけを受けるので、タスク4.6の `missed` は、見落としの ID をこの文字だけで作る。inspect-prompt.md は、種類10と種類11の汚染を、扱いを `keep` にし、`changes` を空にして返すよう書いた。種類11は prepare が記録に書くので、点検の中の Claude が `findings` に同じ汚染を書いたときに、報告に2回載らないかをタスク4.4とタスク8.3で確かめる。この形を `--json-schema` に渡した本物の `claude -p` は、`plan` が null の形と、空の配列の形の両方を `structured_output` に返した
 - 所有者に尋ねること(タスク2.1の確認役の気づき。まだ尋ねていない): design の utterances は、中身が文字の列の行だけを開発者の発言として返す。しかし本物の記録では、開発者が画像を付けて打った文は中身が配列の形で、直近14日の開発者の行の約1,590件のうち25件がこの形だった。この25件は utterances に出ないので、点検の中の Claude は、開発者が画像と一緒に打った指示を「開発者の発言に無い」と読み違えるおそれがある。直すには design の変更が要る。親の会話の Claude は、次に所有者に返事をするときに、直すかを3行で尋ねる
 
 ## 完了条件(全タスク共通)
