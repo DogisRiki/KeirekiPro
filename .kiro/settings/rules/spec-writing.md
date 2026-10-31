@@ -145,6 +145,23 @@ Claude は、requirements.md を書く前に、役割(開発者の全員と、�
 - 外れた文の例: 「所有者は、Windows の管理者のターミナルを開き、本番を変えるコマンドを打つ。」
 - 直した文の例: 「本番を変えてよい開発者は、自分の PC(Windows・macOS・Linux のどれか)で、本番を変えるためのターミナルを開き、本番を変えるコマンドを打つ。」
 
+## テストと品質チェックの書き方
+
+### tasks.md の途中のタスクに全部の品質チェックを書かない
+
+Claude は、tasks.md の大きなまとまり(`1.` や `2.` の見出しのタスク)の途中のタスクの本文に、全部の品質チェックを書かない。全部の品質チェックは、verify のスキル(`/verify-frontend` `/verify-backend` `/verify-terraform`)と、`./gradlew check` と、`pnpm run coverage` と、変異テスト(PIT と Stryker)である。完了条件の2つ目のとおり、全部の品質チェックは、大きなまとまりの最後のタスクの確認で1回だけ流れる。Issue #662 では、途中のタスクの本文が `./gradlew check` と pitest を求めたので、Claude は1回に約13分かかる品質チェックをタスクごとに流した。
+
+Claude は、途中のタスクで流すものを、ツールのタスクの名前(例 `./gradlew compileJava`)と、テストのクラスかファイルと場合の名前で書く。
+
+Claude は、テストを流す環境を名指しするとき(例 Git Bash、Linux のコンテナ、bash 3.2 のコンテナ、shellcheck)も、実装する PC のシェル(Windows では Git Bash)のほかの環境を、大きなまとまりの最後のタスクで1回だけ流すと書く。
+
+- 外れた文の例: 「完了の確かめ方: `./gradlew check` が通り、2つの写しで pitest の結果が同じになる」(大きなまとまりの途中のタスク)
+- 直した文の例: 「完了の確かめ方: `./gradlew test --tests ResumeControllerTest` が通る」
+
+### シェルのテストは場合の名前で選んで流せる形にする
+
+Claude は、design.md の `## テストの方針` で、シェルのスクリプトのテストを、場合の名前で選んで流せる形に決める。たとえば、テストのファイルは、環境変数 `KP_TEST_CASE` に場合の名前が入っていれば、その名前の場合だけを流す。選んで流す形が無いと、Claude は、1件のテストを確かめるたびに、そのファイルの全部の場合を流すことになる。Issue #465 では、1つのファイルに76件の場合を書き、全部を流すのに1回 2.4 分かかった。
+
 ## Issueの印
 
 既存の spec を新しいIssueのために直したとき(`/kiro-spec-init #N <feature>` で開き直し、spec.json に `additional_issues` があるとき)は、

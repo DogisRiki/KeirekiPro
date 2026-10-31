@@ -43,11 +43,15 @@ If any of these cannot be determined from the spec — the requirements are too 
 - Follow the design constraints exactly
 - Keep changes tightly scoped to the assigned task
 - Run only the tests you added and the tests that use the files you changed, by naming them (e.g. `./gradlew test --tests <class>`, `pnpm test <test file>`). Do NOT run the full suite at any point (see Critical Constraints)
+- When tasks.md names several environments to run the tests in (e.g. Git Bash, Linux and bash 3.2 containers, shellcheck), run the tests only in this machine's own shell (Git Bash on Windows) while you implement and fix. The other environments and shellcheck run with the quality gates, once per major task (Step 3 c of `SKILL.md`)
+- Check that each new test fails when the code it tests is broken, following テストの完全性 in `.kiro/steering/tech.md`: break one place per new test, each in its own copy outside the working folder, run only that test in each copy, and run the copies at the same time (up to 10). Do not add tests that tasks.md does not ask for to have more places to break. In tasks.md approved before Issue #675, completion condition 4 reads `...確かめてから、コードを元に戻す`; this procedure satisfies it, because the working folder's code is never broken
 
 ### Step 4: Validate
 - Before you write the status report, find every test that uses the files this task changed: search the test directories with `grep -rln` for the changed files' module, class, or file names (imports and references). Run all the tests you found, together with the tests you added, by naming them. List them in `TESTS_RUN`; the reviewer runs the same tests
 - Prefer the canonical commands from the Preflight over inventing new ones; only add a task-local verification command when that set does not cover the task, and explain why
-- The reviewer runs the quality gates only in the review of the last task of each major task (Step 3 c of `SKILL.md`), so you do not run them
+- The reviewer runs the quality gates only in the review of the last task of each major task (Step 3 c of `SKILL.md`), so you do not run them. For that task, run the formatter's auto-fix of each changed area before the review (`./gradlew spotlessApply`, `pnpm run format:fix`, `terraform fmt -recursive`), so that the reviewer's quality gates do not fail on formatting alone
+- When the reviewer's quality gates fail, run the formatter's auto-fix first (and `pnpm run lint:fix` when lint failed), then fix the rest, and re-run only the checks that failed, by name (e.g. `./gradlew checkstyleMain`, `./gradlew test --tests <failed class>`, `pnpm run lint`, `pnpm test <failed test file>`), until they pass. Do not re-run the full quality gates yourself: the next reviewer runs them once
+- Before you write the status report, check with `ps` that no test run you started in the background is still running. A run left over from a stopped command can keep editing files and spoil the reviewer's tests
 - Re-read the referenced requirement and design sections and compare them against the changed code and tests
 - Confirm the verification method from the Task Brief passes
 - If a validation command fails because of a pre-existing unrelated issue, report that precisely instead of masking it
@@ -65,7 +69,7 @@ If any of these cannot be determined from the spec — the requirements are too 
 
 ## Critical Constraints
 - Do NOT mark the task `[x]` in `tasks.md` or create commits before the reviewer returns `APPROVED` (Step 3 d and e of `SKILL.md`)
-- Do NOT run the full test suite or the quality gates while implementing: `./gradlew check` / `build`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`, mutation tests, or the `/verify-frontend` `/verify-backend` skills. The reviewer runs them once per major task, and running them here too adds the time and cost that running them once per major task removes
+- Do NOT run the full test suite or the quality gates while implementing: `./gradlew check` / `build`, `./gradlew test` without `--tests`, `pnpm test` without test files, `pnpm run coverage`, mutation tests, the `/verify-frontend` `/verify-backend` skills, or the tests in the environments other than this machine's own shell. This holds even when the text of the task in tasks.md names them. The reviewer runs them once per major task, and running them here too adds the time and cost that running them once per major task removes
 - Do NOT expand scope beyond the assigned task and boundary
 - Do NOT silently work around requirement or design mismatches
 - Use the exact section numbers from `requirements.md` and `design.md` in all notes and reports; do NOT invent `REQ-*` aliases
