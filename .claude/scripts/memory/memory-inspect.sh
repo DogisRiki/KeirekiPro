@@ -297,6 +297,41 @@ EOF
     return "$rc"
 }
 
+# 点検をその場で1回行う。config.json の enabled と時刻を確かめず、config.json と OS の予定の仕組みを書き換えない。
+# 点検が完了したら 0、中断したら 1、ほかの点検が動いていれば 3 で終わる
+cmd_run_now() {
+    local tools='' out run='' claude='' path='' held rc
+    [ $# -eq 0 ] || usage
+    locate
+    ensure_state
+    # config.json が無ければ、enable と同じ求め方で、今の PATH から claude の場所を求める
+    if [ ! -f "$STATE/config.json" ]; then
+        tools=$(tool_paths) || fail "claude と gh と bash の場所を求められなかった。"
+    fi
+    out=$(perl "$PL" nowrun "$tools") || fail "その場の点検の回の ID と claude の場所を求められなかった。"
+    {
+        IFS= read -r run && IFS= read -r claude && IFS= read -r path
+    } <<EOF
+$out
+EOF
+    if [ -n "$path" ]; then
+        PATH=$path
+        export PATH
+    fi
+    mkdir -p "$STATE/runs" || fail "点検の状態の場所 $STATE/runs を作れなかった。"
+    mkdir "$STATE/runs/$run" || fail "回の場所 $STATE/runs/$run を作れなかった。"
+    printf '[memory-inspection] run-id: %s\n' "$run"
+    held=$(run_lock_take "$run")
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        rmdir "$STATE/runs/$run"
+        [ "$rc" -eq 3 ] || fail "回 $run の点検のロックを取れなかった。"
+        printf '[memory-inspection] 点検がすでに動いている: %s\n' "${held#held }"
+        exit 3
+    fi
+    inspect_run "$run" now "${claude:-claude}" || exit 1
+}
+
 # 会話の中の操作は、引数をそのまま memory-inspect.pl に渡す。引数の確かめは memory-inspect.pl が行う
 cmd_show() { perl "$PL" show "$@"; }
 cmd_shown() { perl "$PL" shown "$@"; }

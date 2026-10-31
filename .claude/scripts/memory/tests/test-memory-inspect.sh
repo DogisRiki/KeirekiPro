@@ -2315,6 +2315,58 @@ others=$(gh_calls | perl -MJSON::PP -ne 'my $a = decode_json($_); print unless "
 check "点検のあとに、作業フォルダのファイルと git の参照が変わらず、偽の gh に書き込みの呼び出しが無い" \
     "$rc|$(jget "$STATE/runs/$SR_ID/record.json" status)|$(gh_calls | wc -l | tr -d ' ')|$others|$(outside_sig)#$(git_sig)" "0|completed|1||$before"
 
+# ---------------------------------------------------------------------
+# その場の点検
+# ---------------------------------------------------------------------
+# その場の点検を、日本の時刻の帯で、今の時刻を決まった曜日と時刻から5時間あとにして動かす。回の ID はその時刻から作る
+RN_ID=2026-11-02T150000-now
+rn_run() { TZ=JST-9 KP_MEMORY_INSPECTION_NOW=$(shifted_now 18000) bash "$SH" run-now >"$FAKE/rn.out" 2>"$FAKE/rn.err"; }
+
+sr_setup rn-noconfig
+rm -f "$STATE/config.json"
+claude_ok "$IC_EMPTY"
+rn_run
+noconf="$?|$(claude_calls)|$(jget "$STATE/runs/$RN_ID/record.json" trigger status)|$(have "$STATE/config.json")"
+sr_setup rn-disabled false
+claude_ok "$IC_EMPTY"
+rn_run
+check "config.json が無くても、enabled が偽でも、決まった時刻でなくても点検し、記録の trigger が now になる" \
+    "$noconf#$?|$(claude_calls)|$(jget "$STATE/runs/$RN_ID/record.json" trigger status)" "0|1|now,completed|無い#0|1|now,completed"
+
+# config.json の PATH の先頭に、偽の crontab・launchctl・powershell.exe を置く
+sr_setup rn-keep true "$BIN/claude" "$BIN-os:$BIN:$BASE_PATH"
+os_fake crontab launchctl powershell.exe
+conf=$(cksum <"$STATE/config.json")
+claude_ok "$IC_EMPTY"
+rn_run
+check "run-now のあとも、config.json と予定の登録が変わらない" \
+    "$?|$([ "$(cksum <"$STATE/config.json")" = "$conf" ] && echo same)|$(os_calls crontab)$(os_calls launchctl)$(os_calls powershell.exe)|$(jget "$STATE/runs/$RN_ID/record.json" status)" \
+    "0|same||completed"
+
+sr_setup rn-busy
+claude_ok "$IC_EMPTY"
+# ロックは、その場の点検と同じ時刻に取る。前の時刻に取ると、90分を過ぎた古いロックになるためである
+KP_MEMORY_INSPECTION_NOW=$(shifted_now 18000) perl "$PL" lock take run 2026-11-02T1000 "$(self_pid)" >/dev/null
+rn_run
+rc=$?
+check "点検のロックが生きているプロセスに取られていると、点検せずに終了コード 3 で終わり、作った回の場所を消す" \
+    "$rc|$(claude_calls)|$(have "$STATE/runs/$RN_ID")|$(lock_state run)|$(grep -c -F '[memory-inspection] 点検がすでに動いている: 2026-11-02T1000' "$FAKE/rn.out")" \
+    "3|0|無い|held 2026-11-02T1000|1"
+
+sr_setup rn-ok
+claude_ok "$IC_EMPTY"
+rn_run
+ok_end="$?:$(jget "$STATE/runs/$RN_ID/record.json" status)"
+ok_out="$(head -n 1 "$FAKE/rn.out")#$(tail -n 1 "$FAKE/rn.out")"
+sr_setup rn-ng
+claude_error error_max_turns
+rn_run
+ng_end="$?:$(jget "$STATE/runs/$RN_ID/record.json" status)"
+check "標準出力の1行目に回の ID を出し、終わるときに回の ID と状態を出す" \
+    "$ok_out#$(head -n 1 "$FAKE/rn.out")#$(tail -n 1 "$FAKE/rn.out")" \
+    "[memory-inspection] run-id: $RN_ID#[memory-inspection] finished: $RN_ID completed#[memory-inspection] run-id: $RN_ID#[memory-inspection] finished: $RN_ID interrupted"
+check "完了した回は終了コード 0、中断した回は終了コード 1 で終わる" "$ok_end|$ng_end" "0:completed|1:interrupted"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

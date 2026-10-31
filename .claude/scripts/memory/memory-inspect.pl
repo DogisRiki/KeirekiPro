@@ -13,6 +13,9 @@
 #     claude の場所と、PATH を1行ずつ出す。それ以外は何も出さない。曜日と時刻は、この PC の時刻の帯で読む
 #   logtrim <ファイル>
 #     ファイルが1MBを超えていたら古い半分を消し、残りの始まりを行の頭にそろえる。名前を替えずに、その場で切り詰める
+#   nowrun [<tools の JSON>]
+#     その場の点検の、今の時刻から作った回の ID と、claude の場所と、PATH を1行ずつ出す。claude の場所と PATH は、
+#     config.json があればその値を使い、無ければ tools の JSON の値を使う
 #   lock take <run|memory> <回の ID> <プロセスの番号>
 #     点検のロック locks/run/ か、メモリのロック locks/memory を取る。取れたら taken を出して 0 を返す。
 #     ほかの回が取っていて古くなければ、held <取っている回の ID> を出して 3 を返す。古いロックは外してから取り直す
@@ -80,6 +83,7 @@ my %COMMANDS = (
     tools   => \&cmd_tools,
     due     => \&cmd_due,
     logtrim => \&cmd_logtrim,
+    nowrun  => \&cmd_nowrun,
     lock    => \&cmd_lock,
     prepare => \&cmd_prepare,
     content => \&cmd_content,
@@ -197,7 +201,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
     return 2;
 }
 
@@ -1209,6 +1213,19 @@ sub cmd_logtrim {
     print {$fh} $tail;
     truncate($fh, length $tail) or die "$file を切り詰められなかった($!)\n";
     close $fh or die "$file を書けなかった($!)\n";
+    return 0;
+}
+
+sub cmd_nowrun {
+    my @args = @_;
+    return usage() if @args > 1;
+    my $file = state_dir(dirname(__FILE__)) . '/config.json';
+    my $from = -e $file ? read_json($file) : defined $args[0] && $args[0] ne '' ? eval { $JSON->decode($args[0]) } : undef;
+    die(-e $file ? "config.json の中身が JSON のオブジェクトでなかった\n" : "claude の場所と PATH を受けなかった\n") unless ref $from eq 'HASH';
+    my $bin = ref $from->{bin} eq 'HASH' ? $from->{bin} : {};
+    my @out = (strftime('%Y-%m-%dT%H%M%S-now', localtime now()), map { defined $_ && !ref $_ ? encode('UTF-8', $_) : '' } $bin->{claude}, $from->{path});
+    die "claude の場所か PATH に改行がある\n" if grep { /\n/ } @out;
+    print map { "$_\n" } @out;
     return 0;
 }
 
