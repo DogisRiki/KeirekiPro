@@ -8,6 +8,11 @@
 #     点検の状態の場所と、メモリのディレクトリを、この順に1行ずつ出す。どれも作らない
 #   tools <claude の場所> <gh の場所> <bash の場所> <PATH>
 #     {"bin":{"bash":..,"claude":..,"gh":..},"path":..} の1行を出す。見つからないコマンドの場所は空の文字列で受ける
+#   due
+#     config.json の enabled が真で、今の時刻が決まった曜日と時刻から10分以内なら、決まった曜日と時刻から作った回の ID と、
+#     claude の場所と、PATH を1行ずつ出す。それ以外は何も出さない。曜日と時刻は、この PC の時刻の帯で読む
+#   logtrim <ファイル>
+#     ファイルが1MBを超えていたら古い半分を消し、残りの始まりを行の頭にそろえる。名前を替えずに、その場で切り詰める
 #   lock take <run|memory> <回の ID> <プロセスの番号>
 #     点検のロック locks/run/ か、メモリのロック locks/memory を取る。取れたら taken を出して 0 を返す。
 #     ほかの回が取っていて古くなければ、held <取っている回の ID> を出して 3 を返す。古いロックは外してから取り直す
@@ -68,11 +73,13 @@ use File::Path qw(make_path);
 use File::Spec;
 use POSIX qw(strftime);
 use JSON::PP;
-use Time::Local qw(timegm);
+use Time::Local qw(timegm timelocal);
 
 my %COMMANDS = (
     paths   => \&cmd_paths,
     tools   => \&cmd_tools,
+    due     => \&cmd_due,
+    logtrim => \&cmd_logtrim,
     lock    => \&cmd_lock,
     prepare => \&cmd_prepare,
     content => \&cmd_content,
@@ -161,6 +168,12 @@ my $TIMED_OUT = 124;
 my $KILL_AFTER = 5;
 # 点検の中の Claude を呼ぶ回数の上限。最後の呼び出しでは、直し方を返さなければならない
 my $LAST_CALL = 3;
+# config.json の曜日の名前と、localtime の曜日の番号
+my %WDAY = (sun => 0, mon => 1, tue => 2, wed => 3, thu => 4, fri => 5, sat => 6);
+# 決まった曜日と時刻から、点検を始めてよい秒。これを過ぎた週の点検は、遅れて行わない
+my $DUE_WINDOW = 10 * 60;
+# run.log の大きさの上限のバイトの数
+my $LOG_LIMIT = 1024 * 1024;
 
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
@@ -184,7 +197,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
     return 2;
 }
 
@@ -1152,6 +1165,50 @@ sub cmd_tools {
     return usage() unless @args == 4;
     my ($claude, $gh, $bash, $path) = map { decode('UTF-8', $_) } @args;
     print $JSON->encode({ bin => { claude => $claude, gh => $gh, bash => $bash }, path => $path }), "\n";
+    return 0;
+}
+
+sub cmd_due {
+    return usage() if @_;
+    my $config = read_json(state_dir(dirname(__FILE__)) . '/config.json');
+    return 0 unless ref $config eq 'HASH' && JSON::PP::is_bool($config->{enabled}) && $config->{enabled};
+    my ($day, $time) = @$config{qw(day time)};
+    die "config.json の曜日を読めなかった\n" unless defined $day && !ref $day && exists $WDAY{$day};
+    my ($hour, $min) = defined $time && !ref $time ? $time =~ /\A([01]\d|2[0-3]):([0-5]\d)\z/ : ();
+    die "config.json の時刻を読めなかった\n" unless defined $min;
+    my $now = now();
+    # 今の時刻より前の、いちばん新しい決まった曜日と時刻を探す
+    for my $back (0 .. 7) {
+        my @t = localtime($now - $back * 86400);
+        next unless $t[6] == $WDAY{$day};
+        my $at = eval { timelocal(0, $min, $hour, $t[3], $t[4], $t[5] + 1900) };
+        next unless defined $at && $at <= $now;
+        return 0 if $now - $at > $DUE_WINDOW;
+        my $bin = ref $config->{bin} eq 'HASH' ? $config->{bin} : {};
+        my @out = (strftime('%Y-%m-%dT%H%M', localtime $at), map { defined $_ && !ref $_ ? encode('UTF-8', $_) : '' } $bin->{claude}, $config->{path});
+        die "config.json の claude の場所か PATH に改行がある\n" if grep { /\n/ } @out;
+        print map { "$_\n" } @out;
+        return 0;
+    }
+    return 0;
+}
+
+sub cmd_logtrim {
+    my @args = @_;
+    return usage() unless @args == 1;
+    my $file = $args[0];
+    my $size = -s $file;
+    return 0 unless defined $size && $size > $LOG_LIMIT;
+    open(my $fh, '+<:raw', $file) or die "$file を開けなかった($!)\n";
+    # 残す半分の直前の1バイトから読み、最初の改行までを捨てて、残りの始まりを行の頭にそろえる
+    my $from = $size - int($size / 2) - 1;
+    seek($fh, $from, 0) or die "$file を読めなかった($!)\n";
+    my $tail = do { local $/; <$fh> } // '';
+    $tail =~ s/\A[^\n]*\n//;
+    seek($fh, 0, 0) or die "$file を書けなかった($!)\n";
+    print {$fh} $tail;
+    truncate($fh, length $tail) or die "$file を切り詰められなかった($!)\n";
+    close $fh or die "$file を書けなかった($!)\n";
     return 0;
 }
 

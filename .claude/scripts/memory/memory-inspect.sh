@@ -191,6 +191,112 @@ inspect_calls() {
     done
 }
 
+# 段の標準エラーを書いたファイルを、run.log に足すために標準エラーに出してから消し、最後に出た理由の1文を REASON に入れる。
+# 段が失敗したのに理由が無ければ、段の名前と終了コードから理由を作る: stage_reason <ファイル> <終了コード> <段の名前>
+REASON=''
+stage_reason() {
+    local line
+    REASON=''
+    if [ -f "$1" ]; then
+        cat "$1" >&2
+        while IFS= read -r line; do
+            case "$line" in
+            memory-inspect.sh:\ * | memory-inspect.pl:\ *) REASON=${line#*: } ;;
+            esac
+        done <"$1"
+        rm -f "$1"
+    fi
+    if [ "$2" -ne 0 ] && [ -z "$REASON" ]; then
+        REASON="${3}が、理由を出さずに終了コード ${2} で終わった。"
+    fi
+}
+
+# 点検の1回のうち、前の回の後始末から点検のロックを外すまでを行い、点検が完了したら 0 を返す。run と run-now が使う:
+# inspect_run <回の ID> <scheduled|now> <claude の場所>
+# 呼ぶ側が、回の場所を作り、点検のロックをこの回で取ってから呼ぶ。どの段で失敗しても、finalize に理由を渡して
+# その回を中断にし、点検のロックを外す。比べる材料はメモリの文を含むので、変数にだけ持ち、標準出力と標準エラーに出さない
+inspect_run() {
+    local run=$1 trigger=$2 claude=$3 err="$STATE/runs/$1/stage.err" material='' rc=0
+    perl "$PL" finalize 2>"$err" || rc=$?
+    stage_reason "$err" "$rc" "前の回の後始末"
+    if [ "$rc" -eq 0 ]; then
+        material=$(perl "$PL" prepare "$run" "$trigger" 2>"$err") || rc=$?
+        stage_reason "$err" "$rc" "メモリの読み込み"
+    fi
+    if [ "$rc" -eq 0 ]; then
+        inspect_with_claude "$run" "$material" "$claude" 2>"$err" || rc=$?
+        stage_reason "$err" "$rc" "点検の中の Claude を呼ぶ部品"
+    fi
+    if [ "$rc" -ne 0 ]; then
+        perl "$PL" finalize --run "$run" --reason "$REASON" || say_reason "回 $run を中断にできなかった。"
+    fi
+    run_lock_release "$run" || say_reason "回 $run の点検のロックを外せなかった。"
+    if [ "$rc" -eq 0 ]; then
+        printf '[memory-inspection] finished: %s completed\n' "$run"
+    else
+        printf '[memory-inspection] finished: %s interrupted\n' "$run"
+    fi
+    return "$rc"
+}
+
+# 決まった曜日と時刻の点検の流れ。標準出力と標準エラーは、呼ぶ側が run.log に足す:
+# scheduled_run <回の ID> <claude の場所> <PATH>
+# 点検のロックがほかの点検に取られていれば、KP_MEMORY_INSPECTION_RETRY_SEC の秒(テストが短くする)ごとに取り直して待つ
+scheduled_run() {
+    local run=$1 claude=${2:-claude} retry=${KP_MEMORY_INSPECTION_RETRY_SEC:-30} rc held waited=''
+    case "$retry" in '' | *[!0-9]* | 0) retry=30 ;; esac
+    # OS の予定の仕組みから動くと、ターミナルと同じ PATH を持たないので、enable が書いた PATH を使う
+    if [ -n "$3" ]; then
+        PATH=$3
+        export PATH
+    fi
+    if ! mkdir -p "$STATE/runs"; then
+        say_reason "点検の状態の場所 $STATE/runs を作れなかった。"
+        return 1
+    fi
+    # 同じ回がもう動いていれば、回の場所を作れない
+    mkdir "$STATE/runs/$run" 2>/dev/null || return 0
+    printf '[memory-inspection] run-id: %s\n' "$run"
+    while :; do
+        held=$(run_lock_take "$run")
+        rc=$?
+        [ "$rc" -eq 0 ] && break
+        if [ "$rc" -ne 3 ]; then
+            rmdir "$STATE/runs/$run"
+            say_reason "回 $run の点検のロックを取れなかった。"
+            return 1
+        fi
+        if [ -z "$waited" ]; then
+            printf '[memory-inspection] 点検のロックが空くのを待つ: %s\n' "$held"
+            waited=1
+        fi
+        sleep "$retry"
+    done
+    inspect_run "$run" scheduled "$claude"
+}
+
+cmd_run() {
+    local due run='' claude='' path='' log rc
+    [ $# -eq 0 ] || usage
+    locate
+    log="$STATE/run.log"
+    [ -f "$STATE/config.json" ] || return 0
+    if ! due=$(perl "$PL" due 2>&1); then
+        printf '%s\n' "$due" >>"$log"
+        return 1
+    fi
+    [ -n "$due" ] || return 0
+    {
+        IFS= read -r run && IFS= read -r claude && IFS= read -r path
+    } <<EOF
+$due
+EOF
+    scheduled_run "$run" "$claude" "$path" >>"$log" 2>&1
+    rc=$?
+    perl "$PL" logtrim "$log"
+    return "$rc"
+}
+
 # 会話の中の操作は、引数をそのまま memory-inspect.pl に渡す。引数の確かめは memory-inspect.pl が行う
 cmd_show() { perl "$PL" show "$@"; }
 cmd_shown() { perl "$PL" shown "$@"; }

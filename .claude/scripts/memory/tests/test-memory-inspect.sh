@@ -2185,6 +2185,136 @@ check "点検のあとに、点検の中の Claude の出力と直し方が、wo
     "$rc|$(jget "$STATE/runs/r1/record.json" status)|$(cat "$MEMDIR/a.md")|$(find "$STATE/work" -mindepth 1 2>/dev/null | wc -l | tr -d ' ')|$(grep -rl -e IC-OUTPUT-MARK -e structured_output "$STATE" | wc -l | tr -d ' ')" \
     "0|completed|新しい文です|0|0"
 
+# ---------------------------------------------------------------------
+# 決まった曜日と時刻の点検
+# ---------------------------------------------------------------------
+# 決まった曜日と時刻の月曜日の10時から作る回の ID。テストの今の時刻は、日本の時刻の帯で月曜日の10時である
+SR_ID=2026-11-02T1000
+
+# 目次と a.md を置き、月曜日の10時の予定の config.json を書く: sr_setup <テストの場合の名前> [true|false [<claude の場所> [<PATH>]]]
+sr_setup() {
+    newcase "$1"
+    printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+    printf '古い文です\n' >"$MEMDIR/a.md"
+    mkdir -p "$STATE"
+    perl -MJSON::PP -e 'my ($on, @v) = @ARGV; print JSON::PP->new->canonical->encode({
+            enabled => $on eq "true" ? JSON::PP::true : JSON::PP::false, day => "mon", time => "10:00",
+            enabled_at => "2026-10-01T00:00:00Z", disabled_at => undef, scheduler => "cron", task_name => "t",
+            main_worktree => $v[0], memory_dir => $v[1], bin => { claude => $v[2], gh => $v[3], bash => $v[4] }, path => $v[5] }), "\n"' \
+        "${2:-true}" "$REPO" "$MEMDIR" "${3:-$BIN/claude}" "$BIN/gh" "$(command -v bash)" "${4:-$BIN:$BASE_PATH}" >"$STATE/config.json"
+}
+# 決まった曜日と時刻の点検を、日本の時刻の帯で、今の時刻を月曜日の10時から秒だけあとにして動かす: sr_run <秒>
+sr_run() { TZ=JST-9 KP_MEMORY_INSPECTION_NOW=$(shifted_now "$1") bash "$SH" run >"$FAKE/sr.out" 2>"$FAKE/sr.err"; }
+# ファイルかディレクトリがあるかを出す: have <場所>
+have() { if [ -e "$1" ]; then printf ある; else printf 無い; fi; }
+
+sr_setup sr-disabled false
+claude_ok "$IC_EMPTY"
+sr_run 0
+check "enabled が偽なら何もしない" "$?|$(claude_calls)|$(have "$STATE/runs")|$(have "$STATE/run.log")" "0|0|無い|無い"
+
+sr_setup sr-early
+claude_ok "$IC_EMPTY"
+sr_run 540
+early="$?|$(claude_calls)|$(jget "$STATE/runs/$SR_ID/record.json" status)"
+sr_setup sr-late
+claude_ok "$IC_EMPTY"
+sr_run 660
+check "決まった時刻の9分後なら点検し、11分後なら何もしない" \
+    "$early#$?|$(claude_calls)|$(have "$STATE/runs")" "0|1|completed#0|0|無い"
+
+sr_setup sr-twice
+claude_ok "$IC_EMPTY"
+sr_run 0
+first=$(cksum <"$STATE/runs/$SR_ID/record.json")
+claude_ok "$IC_EMPTY"
+sr_run 60
+check "同じ回の2つ目の起動は何もしない" \
+    "$?|$(claude_calls)|$([ "$(cksum <"$STATE/runs/$SR_ID/record.json")" = "$first" ] && echo same)|$(lock_state run)" "0|1|same|free"
+
+sr_setup sr-wait
+claude_ok "$IC_EMPTY"
+perl "$PL" lock take run 2026-11-02T095500-now "$(self_pid)" >/dev/null
+KP_MEMORY_INSPECTION_RETRY_SEC=1 sr_run 0 &
+bg=$!
+sleep 3
+waiting="$(claude_calls)|$(have "$STATE/runs/$SR_ID/record.json")"
+perl "$PL" lock release run 2026-11-02T095500-now
+wait "$bg"
+check "点検のロックがその場の点検に取られていると、空くまで待ってから点検する" \
+    "$waiting#$?|$(claude_calls)|$(jget "$STATE/runs/$SR_ID/record.json" status)" "0|無い#0|1|completed"
+
+sr_setup sr-fail
+claude_returns 'not json' '' 1
+sr_run 0
+rc=$?
+check "途中で失敗すると、finalize に理由を渡して中断にし、ロックを外す" \
+    "$(ic_failed "$rc")|$(run_end "$SR_ID")|$(lock_state run)" \
+    "fail|interrupted:点検の中の Claude が終了コード 1 で終わり、結果の JSON を返さなかった:ある|free"
+
+sr_setup sr-reason
+claude_error error_max_turns
+sr_run 0
+why='点検の中の Claude が失敗を返した。終了コードは 0、subtype は error_max_turns、api_error_status は null、terminal_reason は error だった'
+check "点検の中の Claude を呼ぶ部品が出した中断の理由が、記録の interrupt_reason と report.md に載る" \
+    "$(jget "$STATE/runs/$SR_ID/record.json" interrupt_reason)|$(grep -c -F -e "- 中断の理由: $why" "$STATE/runs/$SR_ID/report.md")" "$why|1"
+
+sr_setup sr-trigger
+claude_ok "$IC_EMPTY"
+sr_run 0
+check "記録の trigger が scheduled になる" "$?|$(jget "$STATE/runs/$SR_ID/record.json" trigger status)" "0|scheduled,completed"
+
+# 起動したときの PATH は、perl と git と基本のコマンドだけを持ち、claude を持たない。config.json の PATH は、claude の無い
+# ディレクトリと起動したときの PATH である。claude は config.json の場所でだけ見つかる
+narrow="/usr/bin:/bin:$(dirname "$(command -v perl)"):$(dirname "$(command -v git)"):$(dirname "$(command -v bash)")"
+sr_setup sr-path true "$BIN/claude" "$TMP_ROOT/sr-path/cfgbin:$narrow"
+mkdir -p "$TMP_ROOT/sr-path/cfgbin"
+claude_ok "$IC_EMPTY"
+if PATH=$narrow command -v claude >/dev/null 2>&1; then
+    ng "起動したときの PATH に claude が無くても、config.json の場所と PATH で点検する (起動したときの PATH に claude がある)"
+else
+    TZ=JST-9 PATH=$narrow "$(command -v bash)" "$SH" run >/dev/null 2>&1
+    check "起動したときの PATH に claude が無くても、config.json の場所と PATH で点検する" \
+        "$?|$(claude_calls)|$(claude_env 1 PATH)|$(jget "$STATE/runs/$SR_ID/record.json" status)" \
+        "0|1|$TMP_ROOT/sr-path/cfgbin:$narrow|completed"
+fi
+
+# 前の週の回が点検の中の Claude の失敗で中断し、次の週の回が a.md と b.md を点検する
+sr_setup sr-next
+printf -- '- [A](a.md) — a\n- [B](b.md) — b\n' >"$MEMDIR/MEMORY.md"
+printf 'べつの文です\n' >"$MEMDIR/b.md"
+claude_error error_during_execution
+sr_run 0
+claude_ok "$IC_EMPTY"
+sr_run $((7 * 86400))
+rc=$?
+next=2026-11-09T1000
+check "前の回が中断した次の回が、すべてのメモリファイルを点検する" \
+    "$(jget "$STATE/runs/$SR_ID/record.json" status)|$rc|$(jget "$STATE/runs/$next/record.json" status files_inspected)|$(claude_stdin 2 | grep -c -e '<<<MEMORY-FILE name="a.md">>>' -e '<<<MEMORY-FILE name="b.md">>>')" \
+    "interrupted|0|completed,2|2"
+
+sr_setup sr-log
+perl -e 'print "old-line-$_\n" for 1 .. 100000' >"$STATE/run.log"
+claude_ok "$IC_EDIT"
+sr_run 0
+rc=$?
+size=$(wc -c <"$STATE/run.log" | tr -d ' ')
+check "run.log が1MBを超えると古い半分が消え、run.log にメモリの文が無い" \
+    "$rc|$([ "$size" -le 1048576 ] && [ "$size" -ge 600000 ] && echo half)|$(head -n 1 "$STATE/run.log" | grep -c '^old-line-[0-9]*$')|$(grep -c -x -e old-line-1 -e old-line-100000 "$STATE/run.log")|$(grep -c -F "run-id: $SR_ID" "$STATE/run.log")|$(grep -c -e 古い文 -e 新しい文 -e IC-OUTPUT-MARK "$STATE/run.log")|$(cat "$MEMDIR/a.md")" \
+    "0|half|1|1|1|0|新しい文です"
+
+sr_setup sr-readonly
+gh_issue 12 '{"number":12,"title":"t"}'
+printf 'dirty\n' >"$WT/untracked.txt"
+claude_ok '{"lookups":[{"type":"issue","arg":"12"},{"type":"file","arg":"README"},{"type":"log","arg":"README"}],"plan":null}'
+claude_ok "$IC_EDIT"
+before="$(outside_sig)#$(git_sig)"
+sr_run 0
+rc=$?
+others=$(gh_calls | perl -MJSON::PP -ne 'my $a = decode_json($_); print unless "$a->[0] $a->[1]" =~ /\A(?:issue view|pr view|issue list)\z/')
+check "点検のあとに、作業フォルダのファイルと git の参照が変わらず、偽の gh に書き込みの呼び出しが無い" \
+    "$rc|$(jget "$STATE/runs/$SR_ID/record.json" status)|$(gh_calls | wc -l | tr -d ' ')|$others|$(outside_sig)#$(git_sig)" "0|completed|1||$before"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]
