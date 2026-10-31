@@ -948,6 +948,182 @@ perl "$PL" prepare 'a/b' now >/dev/null 2>&1
 rc_id=$?
 check "prepare の引数の誤りに終了コード 2 で終わり、記録を書かない" "$rc_args|$rc_trigger|$rc_id|$([ -d "$STATE/runs" ] && echo made)" "2|2|2|"
 
+# ---------------------------------------------------------------------
+# 事実の調べ
+# ---------------------------------------------------------------------
+
+# 調べてほしいことの JSON を標準入力で渡し、worktree の memory-inspect.pl の lookup の出力を、偽のコマンドの書き残しの場所に書く: lookup_run <回の ID> <最初の番号> <JSON>
+lookup_run() { printf '%s\n' "$3" | perl "$WTPL" lookup "$1" "$2" >"$FAKE/lookup.txt"; }
+# 調べた結果の囲みを1つ、lookup が出す形で出す: lk_want <番号> <種類の JSON> <引数の JSON> <コミットか -> <結果> [<出力の行>...]
+lk_want() {
+    local id=$1 type=$2 arg=$3 commit=$4 result=$5 l
+    shift 5
+    printf '<<<LOOKUP-RESULT id="%s">>>\n種類: %s\n引数: %s\n' "$id" "$type" "$arg"
+    if [ "$commit" != - ]; then printf 'コミット: %s\n' "$commit"; fi
+    printf '結果: %s\n' "$result"
+    for l in "$@"; do printf '| %s\n' "$l"; done
+    printf '<<<END-LOOKUP-RESULT>>>\n'
+}
+# lookup の出力の囲みごとに「番号=結果,出力のバイトの数」を1行ずつ出す。続きが切られた囲みには + を付ける
+lk_summary() {
+    perl -e 'my ($id, $res, $n, $cont); while (<STDIN>) {
+        if (/\A<<<LOOKUP-RESULT id="(\d+)">>>\n\z/) { ($id, $res, $n, $cont) = ($1, "", 0, "") }
+        elsif (/\A結果: (.*)\n\z/) { $res = $1 } elsif (/\A\| (.*)\n\z/s) { $n += length $1 } elsif (/\A続き: /) { $cont = "+" }
+        elsif ($_ eq "<<<END-LOOKUP-RESULT>>>\n") { print "$id=$res,$n$cont\n" } }' <"$FAKE/lookup.txt"
+}
+# 表の10の種類を調べる場合の土台を作る。シェルが読むと動く文字を含む行 NEEDLE のファイルを origin/main に足し、
+# prepare で記録を書き、偽の gh の答えと、会話の記録と、ホームの下のファイルと、PATH の上のコマンドを置く
+lk_fixture() {
+    NEEDLE="needle; \$(touch pwned) | x"
+    mkdir -p "$REPO/docs"
+    printf 'line1\n%s\n' "$NEEDLE" >"$REPO/docs/a.txt"
+    printf 'b\n' >"$REPO/docs/日本.txt"
+    gitq add docs
+    GIT_COMMITTER_DATE="2026-10-02T00:00:00+09:00" gitq commit -q -m docs
+    gitq update-ref refs/remotes/origin/main HEAD
+    prepare_run r1 now
+    ORIGIN=$(gitq rev-parse origin/main)
+    gh_issue 12 '{"number":12,"title":"t"}'
+    gh_pr 34 '{"number":34,"title":"p"}'
+    gh_issue_list '[{"number":5}]'
+    user_line "$TRANSDIR" s1 "$(tpath "$REPO")" "2026-10-20T00:00:01Z" '"最初の文"' '"origin":{"kind":"human"},"promptSource":"typed"'
+    mkdir -p "$FHOME/dir"
+    printf 'f\n' >"$FHOME/dir/f"
+    printf '#!/bin/sh\n' >"$BIN/kp-tool"
+    chmod +x "$BIN/kp-tool"
+    LK_ALL="[{\"type\":\"file\",\"arg\":\"docs/a.txt\"},{\"type\":\"ls\",\"arg\":\"docs/\"},{\"type\":\"log\",\"arg\":\"docs/a.txt\"},"
+    LK_ALL="$LK_ALL{\"type\":\"grep\",\"arg\":$(jstr "$NEEDLE")},{\"type\":\"issue\",\"arg\":\"12\"},{\"type\":\"pr\",\"arg\":\"34\"},"
+    LK_ALL="$LK_ALL{\"type\":\"search\",\"arg\":\"a b\"},{\"type\":\"utterances\",\"arg\":\"s1\"},{\"type\":\"command\",\"arg\":\"kp-tool\"},"
+    LK_ALL="$LK_ALL{\"type\":\"command\",\"arg\":\"kp-missing\"},{\"type\":\"home_path\",\"arg\":\"dir\"},{\"type\":\"home_path\",\"arg\":\"dir/f\"},"
+    LK_ALL="$LK_ALL{\"type\":\"home_path\",\"arg\":\"none\"}]"
+}
+
+newcase lk-kinds
+lk_fixture
+lookup_run r1 1 "$LK_ALL"
+rc=$?
+want=$(
+    lk_want 1 '"file"' '"docs/a.txt"' "$ORIGIN" 成功した line1 "$NEEDLE"
+    lk_want 2 '"ls"' '"docs/"' "$ORIGIN" 成功した docs/a.txt docs/日本.txt
+    lk_want 3 '"log"' '"docs/a.txt"' "$ORIGIN" 成功した "$(gitq log --oneline -n 30 "$ORIGIN" -- docs/a.txt)"
+    lk_want 4 '"grep"' "$(jstr "$NEEDLE")" "$ORIGIN" 成功した "$ORIGIN:docs/a.txt:2:$NEEDLE"
+    lk_want 5 '"issue"' '"12"' - 成功した '{"number":12,"title":"t"}'
+    lk_want 6 '"pr"' '"34"' - 成功した '{"number":34,"title":"p"}'
+    lk_want 7 '"search"' '"a b"' - 成功した '[{"number":5}]'
+    lk_want 8 '"utterances"' '"s1"' - 成功した "$(perl "$TS" utterances s1)"
+    lk_want 9 '"command"' '"kp-tool"' - 成功した "ある: $BIN/kp-tool"
+    lk_want 10 '"command"' '"kp-missing"' - 成功した 無い
+    lk_want 11 '"home_path"' '"dir"' - 成功した ディレクトリ
+    lk_want 12 '"home_path"' '"dir/f"' - 成功した ファイル
+    lk_want 13 '"home_path"' '"none"' - 成功した 無い
+)
+calls='["issue","view","12","--json","number,title,state,stateReason,closedAt,body"]|["pr","view","34","--json","number,title,state,mergedAt,body"]'
+calls="$calls"'|["issue","list","--state","all","--search=a b","--limit","20","--json","number,title,state"]|'
+check "表の10の種類が、表のコマンドを引数の配列で動かす" \
+    "$rc|$(cat "$FAKE/lookup.txt")#$(gh_calls | tr '\n' '|')#$(find "$CASE" "$WORK" -name pwned | head -n 1)#$(perl "$TS" utterances s1 | utter_fields)" \
+    "0|$want#$calls##found|2026-10-20T00:00:01Z=最初の文"
+
+newcase lk-refuse
+lk_fixture
+asks='[{"type":"file","arg":"-x"},{"type":"ls","arg":"--output=x"},{"type":"log","arg":"-p"},{"type":"home_path","arg":"-a"},'
+asks="$asks"'{"type":"issue","arg":"#12"},{"type":"pr","arg":"1 2"},{"type":"issue","arg":""},'
+asks="$asks"'{"type":"utterances","arg":"../s1"},{"type":"utterances","arg":"-s1"},{"type":"command","arg":"a b"},'
+asks="$asks"'{"type":"home_path","arg":"../x"},{"type":"home_path","arg":"/etc"},{"type":"home_path","arg":"C:/x"},'
+asks="$asks"'{"type":"grep","arg":"a\nb"},{"type":"rm","arg":"x"},{"type":"pr","arg":null},"file"]'
+lookup_run r1 3 "$asks"
+rc=$?
+check "- で始まるパスと、数字でない Issue と PR の番号と、形の合わない会話の ID を断る" \
+    "$rc|$(lk_summary | tr '\n' ' ')#$(gh_calls)" \
+    "0|3=断った: パスが - で始まる,0 4=断った: パスが - で始まる,0 5=断った: パスが - で始まる,0 6=断った: パスが - で始まる,0 7=断った: 番号が数字でない,0 8=断った: 番号が数字でない,0 9=断った: 引数が空,0 10=断った: 会話の ID の形が合わない,0 11=断った: 会話の ID の形が合わない,0 12=断った: コマンドの名前の形が合わない,0 13=断った: ホームの外を指すパス,0 14=断った: ホームの外を指すパス,0 15=断った: ホームの外を指すパス,0 16=断った: 引数に改行か NUL がある,0 17=断った: 種類が表の10の種類でない,0 18=断った: 引数が文字列でない,0 19=断った: 種類が表の10の種類でない,0 #"
+
+newcase lk-limit
+perl -e 'print "\xe3\x81\x82" x 10000' >"$REPO/big.txt"
+printf 's\n' >"$REPO/small.txt"
+gitq add big.txt small.txt
+GIT_COMMITTER_DATE="2026-10-02T00:00:00+09:00" gitq commit -q -m files
+gitq update-ref refs/remotes/origin/main HEAD
+prepare_run r1 now
+big='{"type":"file","arg":"big.txt"}'
+small='{"type":"file","arg":"small.txt"}'
+lookup_run r1 1 "[$big,$big,$big,$big,$big,$big,$big,$big,$big,$big,$small,$big,$small]"
+bytes=$(lk_summary | tr '\n' ' ')
+cut_ok=$(perl -e 'local $/; my $t = <STDIN>; my ($b) = $t =~ /<<<LOOKUP-RESULT id="12">>>\n.*?\n\| ([^\n]*)\n/s;
+    print defined $b && $b eq "\xe3\x81\x82" x 6 ? "chars" : "broken"' <"$FAKE/lookup.txt")
+dot='{"type":"home_path","arg":"."}'
+asks="[$dot"
+i=1
+while [ "$i" -lt 41 ]; do
+    asks="$asks,$dot"
+    i=$((i + 1))
+done
+lookup_run r1 5 "$asks]"
+count=$(lk_summary | sed -n '1p;40p;41p;42p' | tr '\n' ' ')
+check "41件目からの調べと、20KBと200KBを超えた分に、上限を超えたので調べなかったと書く" "$bytes#$cut_ok#$count" \
+    "1=成功した,20478+ 2=成功した,20478+ 3=成功した,20478+ 4=成功した,20478+ 5=成功した,20478+ 6=成功した,20478+ 7=成功した,20478+ 8=成功した,20478+ 9=成功した,20478+ 10=成功した,20478+ 11=成功した,1 12=成功した,18+ 13=上限を超えたので調べなかった,0 #chars#5=成功した,18 44=成功した,18 45=上限を超えたので調べなかった,0 "
+
+newcase lk-ghfail
+lk_fixture
+lookup_run r1 1 '[{"type":"issue","arg":"99"},{"type":"issue","arg":"12"}]'
+rc=$?
+want=$(
+    lk_want 1 '"issue"' '"99"' - '失敗した(終了コード 1)' '偽の gh: 返す JSON が置かれていない: issue view 99 --json number,title,state,stateReason,closedAt,body'
+    lk_want 2 '"issue"' '"12"' - 成功した '{"number":12,"title":"t"}'
+)
+check "gh が失敗しても、結果に失敗を書いて続ける" "$rc|$(cat "$FAKE/lookup.txt")" "0|$want"
+
+newcase lk-origin
+printf 'old-kp\n' >"$REPO/f.txt"
+gitq add f.txt
+GIT_COMMITTER_DATE="2026-10-02T00:00:00+09:00" gitq commit -q -m old
+gitq update-ref refs/remotes/origin/main HEAD
+prepare_run r1 now
+old=$(gitq rev-parse origin/main)
+gitq checkout -q -b other
+printf 'new-kp\n' >"$REPO/f.txt"
+GIT_COMMITTER_DATE="2026-10-03T00:00:00+09:00" gitq commit -q -am new
+gitq update-ref refs/remotes/origin/main HEAD
+lookup_run r1 1 '[{"type":"file","arg":"f.txt"},{"type":"grep","arg":"old-kp"}]'
+rc=$?
+want=$(
+    lk_want 1 '"file"' '"f.txt"' "$old" 成功した old-kp
+    lk_want 2 '"grep"' '"old-kp"' "$old" 成功した "$old:f.txt:1:old-kp"
+)
+check "worktree がほかのブランチにいても、記録の origin_main のコミットの中身を返す" \
+    "$rc|$(gitq rev-parse --abbrev-ref HEAD)|$(cat "$REPO/f.txt")|$(cat "$FAKE/lookup.txt")" "0|other|new-kp|$want"
+
+newcase lk-readonly
+lk_fixture
+printf 'dirty\n' >"$WT/untracked.txt"
+# 本体の作業フォルダと worktree の git の参照と、作業フォルダの様子を出す
+git_sig() {
+    gitq for-each-ref --format='%(refname) %(objectname)'
+    gitq rev-parse HEAD
+    git -C "$WT" rev-parse HEAD
+    gitq status --porcelain
+    git -C "$WT" status --porcelain
+}
+before="$(outside_sig)#$(git_sig)#$(sig_dir "$STATE")#$(sig_dir "$FHOME")"
+lookup_run r1 1 "$LK_ALL"
+rc=$?
+others=$(gh_calls | perl -MJSON::PP -ne 'my $a = decode_json($_); print unless "$a->[0] $a->[1]" =~ /\A(?:issue view|pr view|issue list)\z/')
+check "調べたあとに、作業フォルダのファイルと git の参照が変わらない" \
+    "$rc|$(gh_calls | wc -l | tr -d ' ')|$others|$(outside_sig)#$(git_sig)#$(sig_dir "$STATE")#$(sig_dir "$FHOME")" "0|3||$before"
+
+newcase lk-usage
+lk_fixture
+printf '[]\n' | perl "$WTPL" lookup r1 >/dev/null 2>&1
+rc_args=$?
+printf '[]\n' | perl "$WTPL" lookup r1 0 >/dev/null 2>&1
+rc_first=$?
+printf '[]\n' | perl "$WTPL" lookup 'a/b' 1 >/dev/null 2>&1
+rc_id=$?
+printf '[]\n' | perl "$WTPL" lookup r9 1 >/dev/null 2>&1
+rc_norecord=$?
+printf '{}\n' | perl "$WTPL" lookup r1 1 >/dev/null 2>&1
+rc_notarray=$?
+check "lookup の引数の誤りに終了コード 2 で、記録の無い回と配列でない入力に 1 で終わる" \
+    "$rc_args|$rc_first|$rc_id|$rc_norecord|$rc_notarray" "2|2|2|1|1"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

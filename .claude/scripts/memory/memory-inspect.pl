@@ -23,6 +23,10 @@
 #   content
 #     目次とメモリファイルを1つずつ <<<MEMORY-FILE name="<ファイル名>">>> と <<<END-MEMORY-FILE>>> で囲み、
 #     行ごとに「<行番号>| <行>」の形で標準出力に出す。前の点検のあとに足された行は、行番号の前に + を付ける。ファイルに書かない
+#   lookup <回の ID> <最初の番号>
+#     点検の中の Claude が返した調べてほしいことの JSON の配列を標準入力で受け、その回の記録の origin_main のコミットと
+#     GitHub と会話の記録で調べ、結果を1件ずつ <<<LOOKUP-RESULT id="<番号>">>> と <<<END-LOOKUP-RESULT>>> で囲んで標準出力に出す。
+#     番号は最初の番号から振る。結果の行の頭には | を付ける。コマンドはシェルを通さずに動かし、作業フォルダと git の参照を書き換えない
 # 終了コード: 成功は 0、使い方の誤りは 2、失敗は 1(標準エラーに理由を日本語の1文で出す)
 # 前提: perl(JSON::PP)・git。Windows では、git に渡す場所を C:/... の形で受ける
 # =====================================================================
@@ -44,6 +48,7 @@ my %COMMANDS = (
     lock    => \&cmd_lock,
     prepare => \&cmd_prepare,
     content => \&cmd_content,
+    lookup  => \&cmd_lookup,
 );
 
 my $JSON = JSON::PP->new->utf8->canonical;
@@ -57,6 +62,10 @@ my %INDEX_LIMIT = (lines => 160, bytes => 20480);
 
 # 会話を通らない書き換え(汚染の種類11)を直さない理由
 my $REWRITE_REASON = q{書き換えられたことだけでは直さない。中身はほかの種類について点検した};
+
+# 事実の調べの上限。1回の呼び出しの件数と、1件の結果のバイトの数と、結果の合計のバイトの数である
+my %LOOKUP_LIMIT = (count => 40, item => 20480, total => 204800);
+my $OVER_LIMIT = q{上限を超えたので調べなかった};
 
 # テストが do で読み込んだときは、呼び出しを動かさない
 exit main(@ARGV) unless caller;
@@ -80,7 +89,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号>\n";
     return 2;
 }
 
@@ -484,6 +493,113 @@ sub kind_repeats {
     return \%count;
 }
 
+# ---- 事実の調べ ------------------------------------------------------------
+
+# コマンドをシェルを通さずに、フォルダで動かし、標準出力と標準エラーを合わせて読む。読むのは頭の上限のバイトの数と4バイトまでで、
+# 残りは読み捨てる。(出力, 終了の状態 $?) を返す: run_capture <フォルダ> <上限> <コマンド> <引数>...
+sub run_capture {
+    my ($dir, $cap, @cmd) = @_;
+    pipe(my $r, my $w) or die "調べるコマンドの出力を受ける管を作れなかった($!)\n";
+    my $pid = fork;
+    die "調べるコマンドを動かせなかった($!)\n" unless defined $pid;
+    if (!$pid) {
+        close $r;
+        open(STDIN, '<', File::Spec->devnull) or POSIX::_exit(127);
+        open(STDOUT, '>&', $w) or POSIX::_exit(127);
+        open(STDERR, '>&', $w) or POSIX::_exit(127);
+        chdir $dir or do { print STDERR "フォルダ $dir に移れなかった($!)\n"; POSIX::_exit(127) };
+        { no warnings 'exec'; exec { $cmd[0] } @cmd; }
+        print STDERR "コマンド $cmd[0] を動かせなかった($!)\n";
+        POSIX::_exit(127);
+    }
+    close $w;
+    binmode $r;
+    my $out = '';
+    my $buf;
+    while (read($r, $buf, 65536)) {
+        $out .= $buf if length $out <= $cap + 4;
+    }
+    close $r;
+    waitpid $pid, 0;
+    return (substr($out, 0, $cap + 4), $?);
+}
+
+# バイトの列を上限のバイトの数で切る。UTF-8 の1文字の途中で切れたときは、その文字を落とす。(切った列, 切ったか) を返す
+sub cut_bytes {
+    my ($s, $n) = @_;
+    return ($s, 0) if length $s <= $n;
+    $s = substr($s, 0, $n);
+    for my $k (1 .. 3) {
+        last if $k > length $s;
+        my $c = ord substr($s, -$k, 1);
+        next if ($c & 0xC0) == 0x80;
+        my $need = $c >= 0xF0 ? 4 : $c >= 0xE0 ? 3 : $c >= 0xC0 ? 2 : 1;
+        substr($s, -$k) = '' if $k < $need;
+        last;
+    }
+    return ($s, 1);
+}
+
+# 調べてほしいことの引数を確かめる。断るときは理由を返し、受けるときは undef を返す: lookup_refusal <種類> <引数のバイトの列>
+sub lookup_refusal {
+    my ($type, $arg) = @_;
+    return q{引数が空} if $arg eq '';
+    return q{引数に改行か NUL がある} if $arg =~ /[\r\n\0]/;
+    if ($type =~ /\A(?:file|ls|log|home_path)\z/) {
+        return q{パスが - で始まる} if $arg =~ /\A-/;
+    }
+    if ($type =~ /\A(?:issue|pr)\z/) {
+        return q{番号が数字でない} unless $arg =~ /\A[0-9]{1,10}\z/;
+    }
+    if ($type eq 'utterances') {
+        return q{会話の ID の形が合わない} unless $arg =~ /\A[A-Za-z0-9][A-Za-z0-9_-]*\z/;
+    }
+    if ($type eq 'command') {
+        return q{コマンドの名前の形が合わない} unless $arg =~ /\A[A-Za-z0-9_.+][A-Za-z0-9_.+-]*\z/;
+    }
+    if ($type eq 'home_path') {
+        return q{ホームの外を指すパス} if $arg =~ m{\A[/\\]} || $arg =~ /\A[A-Za-z]:/ || grep { $_ eq '..' } split m{[/\\]}, $arg;
+    }
+    return undef;
+}
+
+# 1件の調べてほしいことを調べ、(結果の行, 出力, 切ったか) を返す。出力は上限のバイトの数で切る:
+# lookup_one <本体の作業フォルダ> <コミット> <種類> <引数のバイトの列> <上限>
+sub lookup_one {
+    my ($main, $commit, $type, $arg, $cap) = @_;
+    if ($type eq 'home_path') {
+        (my $home = $ENV{HOME} // '') =~ s{/+\z}{};
+        die "HOME が無いので、ホームの下のパスを調べられなかった\n" if $home eq '';
+        my $p = "$home/$arg";
+        my $what = -d $p ? q{ディレクトリ} : -f $p ? q{ファイル} : -e $p ? q{ほかの種類} : q{無い};
+        return (q{成功した}, "$what\n", 0);
+    }
+    my @git = ('git', '-c', 'core.quotePath=false', '-c', 'color.ui=never');
+    (my $dir = $arg) =~ s{/+\z}{};
+    my %cmd = (
+        file       => [@git, 'show', "$commit:$arg"],
+        ls         => [@git, 'ls-tree', '--name-only', $commit, ($dir eq '' || $dir eq '.' ? () : ('--', "$dir/"))],
+        log        => [@git, 'log', '--oneline', '-n', '30', $commit, '--', $arg],
+        grep       => [@git, 'grep', '-n', '-F', '-e', $arg, $commit],
+        issue      => ['gh', 'issue', 'view', $arg, '--json', 'number,title,state,stateReason,closedAt,body'],
+        pr         => ['gh', 'pr', 'view', $arg, '--json', 'number,title,state,mergedAt,body'],
+        search     => ['gh', 'issue', 'list', '--state', 'all', "--search=$arg", '--limit', '20', '--json', 'number,title,state'],
+        utterances => [$^X, dirname(__FILE__) . '/transcript-scan.pl', 'utterances', $arg],
+        command    => ['sh', '-c', 'command -v "$1"', 'sh', $arg],
+    );
+    my ($out, $status) = run_capture($main, $cap, @{ $cmd{$type} });
+    if ($type eq 'command') {
+        (my $where = $out) =~ s/\r?\n\z//;
+        $out = $status == 0 && $where ne '' && $where !~ /\n/ ? q{ある: } . "$where\n" : q{無い} . "\n";
+        $status = 0;
+    }
+    my $result = $status == 0 ? q{成功した}
+        : $status & 127 ? sprintf(q{失敗した(シグナル %d)}, $status & 127)
+        : sprintf(q{失敗した(終了コード %d)}, $status >> 8);
+    my ($cut, $over) = cut_bytes($out, $cap);
+    return ($result, $cut, $over);
+}
+
 # ---- サブコマンド ----------------------------------------------------------
 
 sub cmd_paths {
@@ -700,6 +816,62 @@ sub cmd_content {
             $out .= ($added->{$n} ? '+' : '') . "$n|" . (length($line) ? " $line" : '') . "\n";
         }
         $out .= "<<<END-MEMORY-FILE>>>\n";
+    }
+    binmode STDOUT, ':raw';
+    print $out;
+    return 0;
+}
+
+sub cmd_lookup {
+    my @args = @_;
+    return usage() unless @args == 2;
+    my ($run, $first) = @args;
+    return usage() unless $run =~ /\A[A-Za-z0-9][A-Za-z0-9_-]*\z/ && $first =~ /\A[1-9][0-9]{0,8}\z/;
+    my $here = dirname(__FILE__);
+    my $main = main_worktree($here);
+    my $path = state_dir($here) . "/runs/$run/record.json";
+    my $record = read_json($path);
+    die "回 $run の記録が無い\n" unless ref $record eq 'HASH';
+    my $commit = $record->{origin_main};
+    die "$path に origin_main のコミットが無い\n" unless defined $commit && !ref $commit && $commit =~ /\A[0-9a-f]{40,64}\z/;
+
+    binmode STDIN, ':raw';
+    my $text = do { local $/; <STDIN> };
+    my $asks = eval { $JSON->decode($text // '') };
+    die "標準入力が調べてほしいことの JSON の配列でない\n" unless ref $asks eq 'ARRAY';
+
+    my $show = JSON::PP->new->utf8->allow_nonref->canonical;
+    my $total = 0;
+    my $out = '';
+    for my $i (0 .. $#$asks) {
+        my $ask = $asks->[$i];
+        my ($type, $arg) = ref $ask eq 'HASH' ? ($ask->{type}, $ask->{arg}) : ();
+        my $head = q{種類: } . $show->encode($type) . "\n" . q{引数: } . $show->encode($arg) . "\n";
+        my ($result, $body, $over) = ('', '', 0);
+        my $git = defined $type && !ref $type && $type =~ /\A(?:file|ls|log|grep)\z/;
+        if ($i >= $LOOKUP_LIMIT{count} || $total >= $LOOKUP_LIMIT{total}) {
+            $result = $OVER_LIMIT;
+        } elsif (!defined $type || ref $type || $type !~ /\A(?:file|ls|log|grep|issue|pr|search|utterances|command|home_path)\z/) {
+            $result = q{断った: 種類が表の10の種類でない};
+        } elsif (!defined $arg || ref $arg) {
+            $result = q{断った: 引数が文字列でない};
+        } else {
+            my $bytes = encode('UTF-8', "$arg");
+            my $why = lookup_refusal($type, $bytes);
+            if (defined $why) {
+                $result = q{断った: } . $why;
+            } else {
+                my $cap = $LOOKUP_LIMIT{total} - $total;
+                $cap = $LOOKUP_LIMIT{item} if $cap > $LOOKUP_LIMIT{item};
+                ($result, $body, $over) = lookup_one($main, $commit, $type, $bytes, $cap);
+                $total += length $body;
+                $head .= q{コミット: } . "$commit\n" if $git;
+            }
+        }
+        $out .= sprintf(qq{<<<LOOKUP-RESULT id="%d">>>\n}, $first + $i) . $head . q{結果: } . "$result\n";
+        $out .= "| $_\n" for split_lines($body);
+        $out .= q{続き: } . "$OVER_LIMIT\n" if $over;
+        $out .= "<<<END-LOOKUP-RESULT>>>\n";
     }
     binmode STDOUT, ':raw';
     print $out;
