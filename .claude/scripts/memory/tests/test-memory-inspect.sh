@@ -3007,6 +3007,14 @@ marks=$(
 EOF
 )
 check "inspect-prompt.md に、11種類の汚染の名前と、design の「inspect-prompt.md に書くこと」の11の項目ごとの目印の語がある" "$kinds#$marks" "#"
+whole=$(
+    tx_missing "$SRC_DIR/inspect-prompt.md" <<'EOF'
+`delete` を書く前に、そのメモリファイルの本文を文ごとに読み
+消すべきでない文が1つでも残るときは、あなたは `delete` を使わず
+メモリファイルの中身がすべて消すべき記述のときだけ、あなたは `delete` を使います
+EOF
+)
+check "inspect-prompt.md に、消すべきでない文が残るメモリファイルを delete しない指示がある" "$whole" ""
 
 tx_setup tx-skill-inspection
 missing=$(
