@@ -37,7 +37,7 @@
   - _要件: 1.11_
   - _依存: 1.2_
 
-- [ ] 2. 会話の記録を読む部品と、点検の中の Claude への指示を作る
+- [x] 2. 会話の記録を読む部品と、点検の中の Claude への指示を作る
 - [x] 2.1 会話の記録から、メモリの書き換えと開発者の発言を探す部品を作る
 
   Claude は、部品「transcript-scan.pl」を、`.claude/scripts/memory/transcript-scan.pl` に、design の節の「このリポジトリの会話の記録の選び方」と、`writes` と `utterances` の呼び出し方と、「失敗したとき」のとおりに作る。transcript-scan.pl は、記録の `cwd` と `file_path` と、比べる相手の場所を、`C:\` と `C:/` と `/c/` の形をそろえてから比べる。Windows の Claude Code は記録に `C:\` の形で場所を書き、git と Git Bash は `C:/` と `/c/` の形で場所を返すためである。
@@ -72,7 +72,7 @@
   - _要件: 2.1, 2.2, 3.1, 3.3, 3.5, 6.1, 6.3_
   - _対象の部品: inspect-prompt.md と plan-schema.json_
 
-- [ ] 2.3 開発者が画像と一緒に打った文も、開発者の発言として返す
+- [x] 2.3 開発者が画像と一緒に打った文も、開発者の発言として返す
 
   Claude は、transcript-scan.pl の `utterances` を、design の `utterances` の呼び出し方のとおりに直す。`utterances` は、中身が配列の行から、`type` が `text` の部分の文をつないで返し、`text` の部分が無い行を返さない。
   - 完了の確かめ方: Git Bash で、テストの「utterances が、中身が配列の行から type が text の部分の文をつないで返す」と、タスク2.1のテストの「utterances が道具の結果と isMeta の行と差し込まれた知らせの行を返さない」が通る。Linux のコンテナと bash 3.2 のコンテナで流すテストと、shellcheck の確認は、タスク8.1でまとめて行う

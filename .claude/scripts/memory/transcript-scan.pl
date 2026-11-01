@@ -172,12 +172,17 @@ sub cmd_writes {
     return 0;
 }
 
-# 開発者が打った文の行かを返す。道具の結果の行(中身が配列)と、isMeta の行と、会話の要約の行と、
+# 開発者が打った文の行かを返す。中身が配列の行(画像と一緒に打った文)は、type が text の部分の文を
+# 改行でつなぐ。text の部分が無い行(道具の結果の行)と、isMeta の行と、会話の要約の行と、
 # 開発者でない出どころ(origin.kind が human でない)の行と、会話に差し込まれた知らせの行を除く
 sub developer_text {
     my ($j) = @_;
     return undef unless ($j->{type} // '') eq 'user';
     my $text = ref $j->{message} eq 'HASH' ? $j->{message}{content} : undef;
+    if (ref $text eq 'ARRAY') {
+        my @parts = map { $_->{text} } grep { ref $_ eq 'HASH' && ($_->{type} // '') eq 'text' && defined $_->{text} && !ref $_->{text} } @$text;
+        $text = @parts ? join("\n", @parts) : undef;
+    }
     return undef unless defined $text && !ref $text;
     return undef if $j->{isMeta} || $j->{isCompactSummary} || $j->{isVisibleInTranscriptOnly};
     return undef if ref $j->{origin} eq 'HASH' && ($j->{origin}{kind} // '') ne 'human';

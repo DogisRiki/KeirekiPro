@@ -595,6 +595,16 @@ user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:09Z" '"<command-message>start</c
 check "utterances が道具の結果と isMeta の行と差し込まれた知らせの行を返さない" "$(perl "$TS" utterances s1 | utter_fields)" \
     "found|2026-10-20T00:00:01Z=最初の文|2026-10-20T00:00:09Z=<command-message>start</command-message>"
 
+newcase scan-utter-array
+c=$(tpath "$REPO")
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:01Z" '[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AAAA"}},{"type":"text","text":"画像の文"}]'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:02Z" '[{"type":"text","text":"1つ目"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AAAA"}},{"type":"text","text":"2つ目"}]'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:03Z" '[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AAAA"}}]'
+user_line "$TRANSDIR" s1 "$c" "2026-10-20T00:00:04Z" '[{"type":"text","text":"メタの配列"}]' '"isMeta":true'
+check "utterances が、中身が配列の行から type が text の部分の文をつないで返す" "$(perl "$TS" utterances s1 | utter_fields)" \
+    "found|2026-10-20T00:00:01Z=画像の文|2026-10-20T00:00:02Z=1つ目
+2つ目"
+
 newcase scan-limit
 c=$(tpath "$REPO")
 for i in 1 2 3; do user_line "$TRANSDIR" s1 "$c" "$AFTER" "\"$i$(perl -e 'print "あ" x 3000')\""; done
