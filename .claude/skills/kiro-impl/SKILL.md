@@ -123,7 +123,7 @@ For each task (one at a time):
 - Parse reviewer verdict only from the exact `## Review Verdict` block and `- VERDICT:` field.
 - If `VERDICT` is missing, ambiguous, or replaced with prose, re-dispatch the reviewer once requesting the exact structured verdict only. Do NOT mark the task complete, commit, or continue to the next task without a parseable `APPROVED | REJECTED` value.
 - **APPROVED** → before marking the task `[x]` or making any success claim, apply `kiro-verify-completion` using fresh evidence from the current code state; then mark task `[x]` in tasks.md and perform selective git commit
-- **REJECTED (round 1-2)** → fix the findings yourself following the protocol, write a new Status Report, and dispatch a fresh reviewer
+- **REJECTED (round 1-2)** → fix the findings yourself following the protocol, write a new Status Report, and dispatch a fresh reviewer. When the previous reviewer ran the quality gates, pass the fresh reviewer only the quality-gate commands that failed in the previous review, in the environments where they failed, plus the tests in `TESTS_RUN` by name. Do not pass the quality gates that passed: `/ship` runs `verify-all` on the whole change before the PR
 - **REJECTED (round 3)** → dispatch debug subagent (see section below)
 
 **e) Commit** (main context only, selective staging):
