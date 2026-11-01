@@ -216,7 +216,7 @@
   - _要件: 3.1, 4.3, 4.4, 5.4, 5.5, 6.2, 6.3, 6.4_
   - _対象の部品: memory-inspection のスキル_
 
-- [ ] 6.2 点検をその場で動かす memory-inspect-now のスキルを書く (並行可)
+- [x] 6.2 点検をその場で動かす memory-inspect-now のスキルを書く (並行可)
 
   Claude は、部品「memory-inspect-now のスキル」を、`.claude/skills/memory-inspect-now/SKILL.md` に、design の節の「いつ動くか」と「手順」のとおりに書く。Claude は、スキルの説明の文に、スキルを使う2つの場面を書く。Claude は、スキルの文を `.kiro/settings/rules/owner-writing.md` の決まりで書く。
   - 完了の確かめ方: SKILL.md の frontmatter の `name` が `memory-inspect-now` で、`description` が `/memory-inspect-now` と「今すぐ点検して」の2つの場面を挙げている。本文に、`run-now` を `run_in_background` で動かす手順と、終了コード 0・1・3 とそれ以外の扱いと、報告を memory-inspection のスキルの手順で示す手順がある
@@ -336,6 +336,7 @@
 - 5.5: Windows の命令の文は、memory-inspect.pl の windows-task が作り、powershell.exe に -EncodedCommand で渡す。単一引用符は2つ重ねる(U+2018〜U+201B も)。命令の文の構文は、PowerShell の Parser.ParseInput で、登録せずに確かめられる。タスク スケジューラは、動かすプログラムの引数の %NAME% を展開することがあるので、8.2 で場所に % が無いかを見る
 
 - タスク5.6: 壊して確かめる写しで claude を呼ぶときは標準入力を </dev/null にし、写しのテストに時間の上限を付ける。代わりの claude が入力を待ち続け、写しのテストが2時間止まった。大きなまとまりの最後の shellcheck は、前のタスクの行の指摘も拾うので、各タスクで足した .sh に shellcheck を流しておく
+- タスク6.2: run-now は回の ID の行を出す前の失敗とロックの失敗でも終了コード 1 で終わるため、memory-inspect-now のスキルは、`finished:` の行が無い終了コード 1 を「それ以外」として扱う(design の想定の外を補った)
 ## 完了条件(全タスク共通)
 
 Claude は、どのタスクでも、タスクの箇条書きの欄を書いたうえで、次の4つを満たしたときにタスクを完了とする。
