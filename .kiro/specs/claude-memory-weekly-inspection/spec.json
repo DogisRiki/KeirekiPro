@@ -1,0 +1,71 @@
+{
+  "approval_history" : [
+    {
+      "approved_at" : "2026-10-30T14:09:12Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        465
+      ],
+      "revoked_at" : "2026-10-31T01:09:11Z",
+      "revoked_for" : "所有者の design のレビューによる requirements への差し戻し: 点検をスキルで今すぐ動かせるようにする",
+      "stage" : "requirements"
+    },
+    {
+      "approved_at" : "2026-10-31T01:27:15Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        465
+      ],
+      "revoked_at" : "2026-10-31T01:58:16Z",
+      "revoked_for" : "D2-1-7 による requirements への差し戻し: 要件7 受入基準3 の14日の知らせを、決まった曜日と時刻の点検だけで数える",
+      "stage" : "requirements"
+    },
+    {
+      "approved_at" : "2026-10-31T02:28:44Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        465
+      ],
+      "revoked_at" : "2026-11-01T04:47:12Z",
+      "revoked_for" : "タスク8.2の実地の確かめで、予定から動いた点検の間に窓が出たため、Windows の予定の動かし方を、窓を作らない起動用のプログラムに替える(所有者が会話で決めた)",
+      "stage" : "design"
+    },
+    {
+      "approved_at" : "2026-10-31T03:33:05Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        465
+      ],
+      "revoked_at" : "2026-11-01T04:47:12Z",
+      "revoked_for" : "タスク8.2の実地の確かめで、予定から動いた点検の間に窓が出たため、Windows の予定の動かし方を、窓を作らない起動用のプログラムに替える(所有者が会話で決めた)",
+      "stage" : "tasks"
+    }
+  ],
+  "approvals" : {
+    "design" : {
+      "approved" : true,
+      "approved_at" : "2026-11-01T06:04:20Z",
+      "approved_by" : "DogisRiki",
+      "generated" : true
+    },
+    "requirements" : {
+      "approved" : true,
+      "approved_at" : "2026-10-31T02:28:44Z",
+      "approved_by" : "DogisRiki",
+      "generated" : true
+    },
+    "tasks" : {
+      "approved" : true,
+      "approved_at" : "2026-11-01T06:04:20Z",
+      "approved_by" : "DogisRiki",
+      "generated" : true
+    }
+  },
+  "created_at" : "2026-10-30T07:44:43Z",
+  "feature_name" : "claude-memory-weekly-inspection",
+  "issue" : 465,
+  "language" : "ja",
+  "phase" : "tasks-generated",
+  "review_model" : "opus",
+  "updated_at" : "2026-11-01T06:04:20Z"
+}
