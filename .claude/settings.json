@@ -47,7 +47,8 @@
             "Bash(gh run list *)",
             "Bash(gh run watch *)",
             "Bash(gh label create *)",
-            "Bash(bash .claude/scripts/usage/usage.sh *)"
+            "Bash(bash .claude/scripts/usage/usage.sh *)",
+            "Bash(bash .claude/scripts/memory/memory-inspect.sh *)"
         ],
         "deny": [
             "Bash(git push --force*)",
@@ -109,6 +110,15 @@
                     {
                         "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-hook.sh\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/scripts/memory/memory-inspect.sh\" session-context",
                         "timeout": 10
                     }
                 ]
