@@ -44,7 +44,7 @@ Otherwise, load all necessary context:
 - Read `rules/tasks-generation.md` from this skill's directory for principles
 - Read `rules/tasks-parallel-analysis.md` from this skill's directory for parallel judgement criteria
 - Template for format: Read `.kiro/settings/templates/specs/tasks.md` (supports `(並行可)` markers)
-- Writing rules: read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, 繰り返しの扱い, Issueの印, the sample tasks.md の見本, and the 見出しと目印の一覧 are the writing standard for this spec's `tasks.md`
+- Writing rules: read `.kiro/settings/rules/spec-writing.md`. Its sections 文の書き方, 文書の組み立て, 繰り返しの扱い, テストと品質チェックの書き方, Issueの印, the sample tasks.md の見本, and the 見出しと目印の一覧 are the writing standard for this spec's `tasks.md`
 
 #### Parallel Research
 

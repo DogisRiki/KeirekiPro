@@ -22,7 +22,7 @@ bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 
 - `run-check.sh` は、いまの作業フォルダ(worktree のセッションでは worktree の最上位)を読み込んだ1回きりのコンテナで、コマンドを動かす。Claude は、起動したままの常駐コンテナの中で品質チェックを動かさない
 - Claude は、`./gradlew check` を、`--wait` を付けないときも Bash の `run_in_background` で呼ぶ。1回きりのコンテナでの最初の1回は約10分かかり、Bash を前面で動かすときの上限(600秒)を超えるおそれがあるためである。前面で時間切れになると、コマンドそのものの失敗と見分けられない
-- 失敗したら修正して `check` を再実行する
+- `check` が失敗したら、Claude は、直したあとに先に `spotlessApply` をかけ、落ちたチェックだけを名前で流し直す(例 `./gradlew checkstyleMain`、`./gradlew test --tests <落ちたテストクラス>`)。Claude は、落ちたチェックが通ってから、`check` を1回だけ流す。`check` は1回に約13分かかり、書式の誤りだけでも全体が落ちるためである
 - 単発のテストや検査(`./gradlew test --tests <テストクラス>` など)も、`bash .claude/scripts/parallel/run-check.sh backend ./gradlew test --tests <テストクラス>` のように `run-check.sh` で打つ
 - `./gradlew check` が終了コード0で終わったときだけ、`run-check.sh` が作業フォルダの `.claude/.state/gate-run-backend.txt` に品質チェックが通った時刻を書く
 - Testcontainers が使う `dind` が止まっていれば、`run-check.sh` が本体フォルダのプロジェクトの `dind` を起こしてからコマンドを動かす。起こせなければ、`run-check.sh` は終了コード69で終わる
@@ -47,7 +47,7 @@ bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 - `build.gradle` の `apply from: 'gradle/quality.gradle'` 行の削除・violationRulesの上書き
 
 カバレッジ閾値に届かない場合は、**テストを追加して**満たす。
-新規テストは対象コードを一時的に壊して赤くなることを確認してから戻す。
+新規テストは対象コードを一時的に壊して赤くなることを確認してから戻す。壊す箇所の数と、壊した写しの作り方と流し方は、`.kiro/steering/tech.md` の「テストの完全性」に従う。
 
 ## Report
 

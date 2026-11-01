@@ -131,6 +131,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // テストのクラスを2つの JVM に分けて同時に流す
+    maxParallelForks = 2
     finalizedBy 'jacocoTestReport'
 }
 
