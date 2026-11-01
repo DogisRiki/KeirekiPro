@@ -193,7 +193,7 @@
   - 受入基準とテストの対応: 要件1の受入基準1(使い始める操作を1回すると、毎週1回動く)は、テストの「--day fri --time 18:30 を渡すと、金曜日の18時30分の予定になる」で確かめる。要件1の受入基準2(曜日と時刻を選べ、選ばなければ月曜日の10時)は、テストの「曜日と時刻を渡さないと、月曜日の10時の予定になる」と「--day fri --time 18:30 を渡すと、金曜日の18時30分の予定になる」で確かめる。要件1の受入基準3(2回以上しても週に1回)は、テストの「enable を2回打っても、crontab の印の付いた行は1行だけである」で確かめる。要件1の受入基準5(やめる操作のあとは動かない)は、テストの「disable のあとは、印の付いた行が無くなり、enabled が偽になり、run が何もしない」で確かめる
   - _要件: 1.1, 1.2, 1.3, 1.5_
 
-- [ ] 5.5 Windows のタスク スケジューラと macOS の launchd の登録を作る
+- [x] 5.5 Windows のタスク スケジューラと macOS の launchd の登録を作る
 
   Claude は、部品「memory-inspect.sh の enable と disable」のうち、Windows と macOS の登録と取り外しを、design の「登録する予定」のとおりに作る。Claude は、`powershell.exe` に渡す命令の文を、引数に空白と単一引用符がある場所でも壊れない形で作る。
   - 完了の確かめ方: 3つの環境(実装のメモ)で、テストの「Windows の enable が、Register-ScheduledTask に -Force を付け、曜日と時刻と、電池で動くときの設定と IgnoreNew と3時間の上限を渡し、-StartWhenAvailable を付けない」「Windows の動かすプログラムが、-WindowStyle Hidden の powershell.exe で、bash.exe とスクリプトの場所と run を渡す」「場所に空白と単一引用符があっても、powershell.exe に渡す命令が壊れない」「macOS の enable が、bootout のあとに bootstrap を呼び、plist に Weekday と Hour と Minute と run.log の場所がある」「enable を2回打っても、Windows と macOS の予定の名前が1つだけである」「disable が、Windows と macOS の予定を外す」が通る
@@ -332,6 +332,8 @@
 - タスク5.2で分かったこと: 前の回の後始末から点検のロックを外すまでは `inspect_run <回の ID> <scheduled|now> <claude の場所>` で、呼ぶ側が回の場所を作って点検のロックを取ってから呼ぶ。inspect_run は終わるときに `[memory-inspection] finished: <回の ID> completed|interrupted` を出し、完了で 0、中断で 0 でない値を返す。点検する時刻かの判断は memory-inspect.pl の `due`(点検するときだけ回の ID と claude の場所と PATH の3行を出す)、run.log を短くするのは `logtrim <ファイル>` である。run がロックの空きを待つ間隔は、テストだけが使う環境変数 `KP_MEMORY_INSPECTION_RETRY_SEC`(既定は30秒)で替える。run のテストは、曜日と時刻をこの PC の時刻の帯で読むので、`TZ=JST-9` を付けて流す
 - タスク5.3で分かったこと: run-now は、run と同じく、本体の作業フォルダと状態の場所をスクリプト自身の場所から求める。会話の中では作業フォルダでスクリプトを打つので、今のフォルダから求めたときと同じ場所になり、テストは偽のリポジトリの状態の場所だけを使う。回の ID と claude の場所と PATH は memory-inspect.pl の `nowrun [<tools の JSON>]` が3行で出し、config.json があればその値を、無ければ渡した JSON の値を使う。テストで点検のロックを先に取るときは、コマンドと同じ `KP_MEMORY_INSPECTION_NOW` で取る。違う時刻で取ると、取った時刻から90分を過ぎたロックとして古いとみなされ、外されるためである
 - タスク5.4で分かったこと: enable と disable は、OS を `uname -s` で選び、テストは `KP_MEMORY_INSPECTION_OS`(windows か macos か linux)で替える。`<ID8>` は `perl memory-inspect.pl id8`、crontab の書き換えは `perl memory-inspect.pl cron`、config.json は `perl memory-inspect.pl config enable|disable` が作る。テストのファイルは `KP_TEST_CASES='en-* sr-early'` で、名前の合う場合と、場合の外の部分だけを流せる。場合の段落の中で、ほかの場合が使う関数を定義しない(選ばなかった場合の段落は流れないため。空行で区切った別の段落に置く)。偽の crontab は `write_fake_crontab` で、中身を fake/os/crontab.txt に持つ
+
+- 5.5: Windows の命令の文は、memory-inspect.pl の windows-task が作り、powershell.exe に -EncodedCommand で渡す。単一引用符は2つ重ねる(U+2018〜U+201B も)。命令の文の構文は、PowerShell の Parser.ParseInput で、登録せずに確かめられる。タスク スケジューラは、動かすプログラムの引数の %NAME% を展開することがあるので、8.2 で場所に % が無いかを見る
 
 ## 完了条件(全タスク共通)
 

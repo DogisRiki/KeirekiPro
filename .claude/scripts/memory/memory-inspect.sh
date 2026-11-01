@@ -398,6 +398,53 @@ cron_disable() {
     cron_write "$1"
 }
 
+# Windows のプログラムに渡す場所の形にする。cygpath が無い環境では、そのまま出す: win_path <場所>
+win_path() {
+    if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s\n' "$1"; fi
+}
+
+# 命令の文を、powershell.exe に -EncodedCommand で渡す。失敗したら powershell.exe の出力を添えて終わる:
+# powershell_run <memory-inspect.pl の windows-task の引数>...
+powershell_run() {
+    local cmd out
+    command -v powershell.exe >/dev/null 2>&1 ||
+        fail "powershell.exe が見つからない。Windows の PowerShell を使える状態にしてから、打ち直す。"
+    cmd=$(perl "$PL" windows-task "$@") || fail "powershell.exe に渡す命令の文を作れなかった。"
+    out=$(powershell.exe -NoProfile -NonInteractive -EncodedCommand "$cmd" 2>&1) ||
+        fail "タスク スケジューラの予定を変えられなかった。powershell.exe の出力: $out"
+}
+
+# Windows のタスク スケジューラに、予定を登録する。同じ名前の予定は -Force で置き換わる:
+# windows_enable <予定の名前> <曜日> <HH:MM> <スクリプトの場所>
+windows_enable() {
+    local b
+    b=$(command -v bash)
+    if [ -f "$b.exe" ]; then b="$b.exe"; fi
+    powershell_run enable "$2" "$3" "$1" "$(win_path "$b")" "$(win_path "$4")"
+}
+
+# macOS の launchd に、plist を書いて読み込む。古い登録を外してから読み込むので、予定は1つだけになる:
+# launchd_enable <ラベル> <曜日> <HH:MM> <スクリプトの場所>
+launchd_enable() {
+    local dir="$HOME/Library/LaunchAgents" gui out
+    local plist="$dir/$1.plist"
+    gui="gui/$(id -u)"
+    mkdir -p "$dir" || fail "$dir を作れなかった。"
+    perl "$PL" plist "$1" "$2" "$3" "$4" "$STATE/run.log" >"$plist.tmp" && mv -f "$plist.tmp" "$plist" ||
+        { rm -f "$plist.tmp"; fail "$plist を書けなかった。"; }
+    launchctl bootout "$gui/$1" >/dev/null 2>&1 || true
+    out=$(launchctl bootstrap "$gui" "$plist" 2>&1) || {
+        rm -f "$plist"
+        fail "launchd に予定を読み込めなかった。launchctl の出力: $out"
+    }
+}
+
+# macOS の launchd から予定を外し、plist を消す。予定が無くても何もしないで終わる: launchd_disable <ラベル>
+launchd_disable() {
+    launchctl bootout "gui/$(id -u)/$1" >/dev/null 2>&1 || true
+    rm -f "$HOME/Library/LaunchAgents/$1.plist"
+}
+
 # 点検の予定を登録し、config.json を書く。登録は、本体の作業フォルダのスクリプトを動かす。worktree は消されることがあるためである
 cmd_enable() {
     local day=mon time=10:00 main_sh kind id tools name
@@ -423,11 +470,18 @@ cmd_enable() {
     ensure_state
     # 登録が失敗したら、各 OS の部分が理由を出して終わるので、config.json を書かない
     case "$kind" in
-    cron)
-        cron_enable "$id" "$day" "$time" "$main_sh"
-        name="keirekipro-memory-inspection $id"
+    windows-task)
+        name="KeirekiPro memory inspection $id"
+        windows_enable "$name" "$day" "$time" "$main_sh"
         ;;
-    *) fail "$kind への点検の予定の登録は、まだ作っていない。" ;;
+    launchd)
+        name="com.keirekipro.memory-inspection.$id"
+        launchd_enable "$name" "$day" "$time" "$main_sh"
+        ;;
+    cron)
+        name="KeirekiPro memory inspection $id"
+        cron_enable "$id" "$day" "$time" "$main_sh"
+        ;;
     esac
     perl "$PL" config enable "$day" "$time" "$kind" "$name" "$tools" || fail "予定を登録したが、config.json を書けなかった。"
     printf '[memory-inspection] 点検の予定を登録した: 毎週 %s の %s(%s)\n' "$day" "$time" "$kind"
@@ -441,12 +495,12 @@ cmd_disable() {
     locate
     kind=$(scheduler_kind) || exit 1
     perl "$PL" config disable || fail "config.json の enabled を偽にできなかった。"
+    id=$(perl "$PL" id8) || fail "予定の名前に付ける印を求められなかった。"
+    ensure_state
     case "$kind" in
-    cron)
-        id=$(perl "$PL" id8) || fail "予定の名前に付ける印を求められなかった。"
-        ensure_state
-        cron_disable "$id"
-        ;;
+    windows-task) powershell_run disable "KeirekiPro memory inspection $id" ;;
+    launchd) launchd_disable "com.keirekipro.memory-inspection.$id" ;;
+    cron) cron_disable "$id" ;;
     esac
     printf '[memory-inspection] 点検の予定を外した。\n'
 }

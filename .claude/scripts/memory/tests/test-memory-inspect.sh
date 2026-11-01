@@ -2559,6 +2559,108 @@ check "disable は、予定が無くても成功で終わり、記録とまだ�
     "$?|$(en_writes)|$(have "$STATE/config.json")|$(jget "$STATE/runs/r1/record.json" status)|$(cat "$STATE/runs/r1/report.md")|$(have "$STATE/runs/r1/shown")" \
     "0|0|無い|completed|報告|無い"
 
+# ---------------------------------------------------------------------
+# Windows のタスク スケジューラと macOS の launchd の登録
+# ---------------------------------------------------------------------
+# テストの場合を作り、偽の powershell.exe と launchctl を PATH の先頭に置く: wm_setup <テストの場合の名前>
+# WM_LABEL は macOS のラベル、WM_PLIST はその plist の場所、WM_GUI は launchctl に渡す利用者の領域である
+wm_setup() {
+    newcase "$1"
+    os_fake powershell.exe launchctl
+    EN_ID=$(perl -MDigest::SHA=sha256_hex -e 'print substr(sha256_hex($ARGV[0]), 0, 8)' -- "$REPO/.git")
+    WM_LABEL="com.keirekipro.memory-inspection.$EN_ID"
+    WM_PLIST="$FHOME/Library/LaunchAgents/$WM_LABEL.plist"
+    WM_GUI="gui/$(id -u)"
+}
+# worktree のスクリプトで、OS を替えて enable か disable を打つ: wm_cmd <windows|macos> <enable|disable> [<引数>...]
+wm_cmd() {
+    local os=$1
+    shift
+    KP_MEMORY_INSPECTION_OS=$os bash "$WTSH" "$@" >"$FAKE/en.out" 2>"$FAKE/en.err"
+}
+# 偽の powershell.exe の n 回目の呼び出しの、-EncodedCommand までの引数を1行目に出し、2行目から命令の文を出す: ps_call <n>
+ps_call() {
+    os_calls powershell.exe | sed -n "$1p" | perl -MJSON::PP -MMIME::Base64 -MEncode -ne '
+        my @a = @{ decode_json($_) };
+        my $i = 0;
+        $i++ while $i < $#a && $a[$i] ne "-EncodedCommand";
+        print join(" ", @a[0 .. $i]), "\n";
+        print encode("UTF-8", decode("UTF-16LE", decode_base64($a[$i + 1]))) if $a[$i] eq "-EncodedCommand";'
+}
+# 標準入力の PowerShell の単一引用符の文字列を、中の2つ続いた単一引用符を1つに戻して、1行に1つずつ出す。
+# 文字列の外に単一引用符が残れば BROKEN と出す
+ps_literals() {
+    perl -0777 -ne '
+        while (/\x27((?:[^\x27]|\x27\x27)*)\x27/g) { (my $s = $1) =~ s/\x27\x27/\x27/g; print "$s\n"; }
+        (my $rest = $_) =~ s/\x27(?:[^\x27]|\x27\x27)*\x27//g;
+        print "BROKEN\n" if $rest =~ /\x27/;'
+}
+# Windows の予定の、動かすプログラムに渡す引数の文字列を出す: ps_action_arg <命令の文のファイル>
+ps_action_arg() { ps_literals <"$1" | grep '^-NoProfile -WindowStyle Hidden '; }
+# enable が登録するのと同じ求め方で、この PC の bash の場所を / の区切りで出す
+wm_bash() {
+    local b
+    b=$(command -v bash)
+    if [ -f "$b.exe" ]; then b="$b.exe"; fi
+    if command -v cygpath >/dev/null 2>&1; then cygpath -m "$b"; else printf '%s\n' "$b"; fi
+}
+
+wm_setup wm-win
+wm_cmd windows enable --day fri --time 18:30
+rc=$?
+ps_call 1 >"$FAKE/ps1.txt"
+check "Windows の enable が、Register-ScheduledTask に -Force を付け、曜日と時刻と、電池で動くときの設定と IgnoreNew と3時間の上限を渡し、-StartWhenAvailable を付けない" \
+    "$rc|$(head -n 1 "$FAKE/ps1.txt")|$(grep -c -F "New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At '18:30'" "$FAKE/ps1.txt")|$(grep -c -F 'New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)' "$FAKE/ps1.txt")|$(grep -c -F "Register-ScheduledTask -TaskName 'KeirekiPro memory inspection $EN_ID' -Trigger \$trigger -Settings \$settings -Action \$action -Force" "$FAKE/ps1.txt")|$(grep -c StartWhenAvailable "$FAKE/ps1.txt")|$(jget "$STATE/config.json" enabled scheduler task_name day time)" \
+    "0|-NoProfile -NonInteractive -EncodedCommand|1|1|1|0|true,windows-task,KeirekiPro memory inspection $EN_ID,fri,18:30"
+arg=$(ps_action_arg "$FAKE/ps1.txt")
+check "Windows の動かすプログラムが、-WindowStyle Hidden の powershell.exe で、bash.exe とスクリプトの場所と run を渡す" \
+    "$(grep -c -F "New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -WindowStyle Hidden " "$FAKE/ps1.txt")|$(printf '%s' "$arg" | sed "s/'.*'/Q/")|$(printf '%s' "$arg" | ps_literals | tr '\\' / | tr '\n' '|')" \
+    "1|-NoProfile -WindowStyle Hidden -Command \"& Q run\"|$(wm_bash)|$REPO/.claude/scripts/memory/memory-inspect.sh|"
+
+wm_setup "wm-quote x'y z"
+wm_cmd windows enable
+rc=$?
+ps_call 1 >"$FAKE/ps1.txt"
+check "場所に空白と単一引用符があっても、powershell.exe に渡す命令が壊れない" \
+    "$rc|$(ps_literals <"$FAKE/ps1.txt" | grep -c -x BROKEN)|$(ps_action_arg "$FAKE/ps1.txt" | ps_literals | tr '\\' / | tr '\n' '|')" \
+    "0|0|$(wm_bash)|$REPO/.claude/scripts/memory/memory-inspect.sh|"
+
+wm_setup wm-mac
+wm_cmd macos enable --day fri --time 18:30
+rc=$?
+plist=$(perl -0777 -pe 's/>\s+</></g' "$WM_PLIST" 2>/dev/null)
+check "macOS の enable が、bootout のあとに bootstrap を呼び、plist に Weekday と Hour と Minute と run.log の場所がある" \
+    "$rc|$(os_calls launchctl | tr '\n' '|')|$(printf '%s' "$plist" | grep -c -F "<key>Label</key><string>$WM_LABEL</string>")|$(printf '%s' "$plist" | grep -c -F "<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>")|$(printf '%s' "$plist" | grep -c -F "<key>ProgramArguments</key><array><string>/bin/bash</string><string>$REPO/.claude/scripts/memory/memory-inspect.sh</string><string>run</string></array>")|$(printf '%s' "$plist" | grep -c -F "<key>StandardOutPath</key><string>$STATE/run.log</string><key>StandardErrorPath</key><string>$STATE/run.log</string>")|$(jget "$STATE/config.json" enabled scheduler task_name)" \
+    "0|[\"bootout\",\"$WM_GUI/$WM_LABEL\"]|[\"bootstrap\",\"$WM_GUI\",\"$WM_PLIST\"]||1|1|1|1|true,launchd,$WM_LABEL"
+
+wm_setup wm-twice
+wm_cmd windows enable
+w1=$?
+wm_cmd windows enable --day tue
+w2=$?
+wm_cmd macos enable
+m1=$?
+wm_cmd macos enable --day tue
+m2=$?
+names=$({ ps_call 1; ps_call 2; } | perl -ne 'print "$1\n" if /^Register-ScheduledTask -TaskName (\x27(?:[^\x27]|\x27\x27)*\x27) .* -Force/' | sort -u | wc -l | tr -d ' ')
+labels=$(os_calls launchctl | perl -MJSON::PP -ne 'my $a = decode_json($_); print "$a->[2]\n" if $a->[0] eq "bootstrap"' | sort -u | wc -l | tr -d ' ')
+check "enable を2回打っても、Windows と macOS の予定の名前が1つだけである" \
+    "$w1$w2$m1$m2|$names|$(ls "$FHOME/Library/LaunchAgents" 2>/dev/null | wc -l | tr -d ' ')|$(os_calls launchctl | grep -c bootstrap)|$labels|$(grep -c -F "<integer>2</integer>" "$WM_PLIST" 2>/dev/null)" \
+    "0000|1|1|2|1|1"
+
+wm_setup wm-disable
+wm_cmd windows enable
+wm_cmd windows disable
+wd=$?
+ps_call 2 >"$FAKE/ps2.txt"
+win_off="$wd|$(grep -c -F "Unregister-ScheduledTask -TaskName 'KeirekiPro memory inspection $EN_ID' -Confirm:\$false" "$FAKE/ps2.txt")|$(jget "$STATE/config.json" enabled)"
+wm_cmd macos enable
+wm_cmd macos disable
+md=$?
+check "disable が、Windows と macOS の予定を外す" \
+    "$win_off#$md|$(os_calls launchctl | tail -n 1)|$(have "$WM_PLIST")|$(jget "$STATE/config.json" enabled)" \
+    "0|1|false#0|[\"bootout\",\"$WM_GUI/$WM_LABEL\"]|無い|false"
+
 echo
 echo "$pass ok, $failn NG"
 [ "$failn" -eq 0 ]

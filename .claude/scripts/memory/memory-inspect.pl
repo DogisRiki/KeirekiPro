@@ -25,6 +25,12 @@
 #     config.json を enabled が真で書く。本体の作業フォルダとメモリのディレクトリは paths と同じ求め方で求める
 #   config disable
 #     config.json の enabled を偽にし、disabled_at を書く。config.json が無ければ何もしない
+#   windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所>
+#     タスク スケジューラに予定を登録する命令の文を、powershell.exe の -EncodedCommand に渡す形で出す
+#   windows-task disable <予定の名前>
+#     タスク スケジューラの予定を外す命令の文を、同じ形で出す
+#   plist <ラベル> <曜日> <HH:MM> <スクリプトの場所> <run.log の場所>
+#     launchd の LaunchAgent の plist を出す
 #   lock take <run|memory> <回の ID> <プロセスの番号>
 #     点検のロック locks/run/ か、メモリのロック locks/memory を取る。取れたら taken を出して 0 を返す。
 #     ほかの回が取っていて古くなければ、held <取っている回の ID> を出して 3 を返す。古いロックは外してから取り直す
@@ -85,6 +91,7 @@ use File::Path qw(make_path);
 use File::Spec;
 use POSIX qw(strftime);
 use JSON::PP;
+use MIME::Base64 qw(encode_base64);
 use Time::Local qw(timegm timelocal);
 
 my %COMMANDS = (
@@ -96,6 +103,8 @@ my %COMMANDS = (
     id8     => \&cmd_id8,
     cron    => \&cmd_cron,
     config  => \&cmd_config,
+    'windows-task' => \&cmd_windows_task,
+    plist   => \&cmd_plist,
     lock    => \&cmd_lock,
     prepare => \&cmd_prepare,
     content => \&cmd_content,
@@ -186,6 +195,8 @@ my $KILL_AFTER = 5;
 my $LAST_CALL = 3;
 # config.json の曜日の名前と、localtime の曜日の番号
 my %WDAY = (sun => 0, mon => 1, tue => 2, wed => 3, thu => 4, fri => 5, sat => 6);
+# PowerShell の New-ScheduledTaskTrigger の -DaysOfWeek に渡す曜日の名前
+my %PS_DAY = (sun => 'Sunday', mon => 'Monday', tue => 'Tuesday', wed => 'Wednesday', thu => 'Thursday', fri => 'Friday', sat => 'Saturday');
 # 決まった曜日と時刻から、点検を始めてよい秒。これを過ぎた週の点検は、遅れて行わない
 my $DUE_WINDOW = 10 * 60;
 # run.log の大きさの上限のバイトの数
@@ -213,7 +224,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | id8 | cron <ID8> [<曜日> <HH:MM> <スクリプトの場所> <run.log の場所>] | config enable <曜日> <HH:MM> <予定の仕組み> <予定の名前> <tools の JSON> | config disable | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | id8 | cron <ID8> [<曜日> <HH:MM> <スクリプトの場所> <run.log の場所>] | config enable <曜日> <HH:MM> <予定の仕組み> <予定の名前> <tools の JSON> | config disable | windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> | windows-task disable <予定の名前> | plist <ラベル> <曜日> <HH:MM> <スクリプトの場所> <run.log の場所> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
     return 2;
 }
 
@@ -1250,6 +1261,92 @@ sub schedule_time {
     my ($hour, $min) = defined $time ? $time =~ /\A([01]\d|2[0-3]):([0-5]\d)\z/ : ();
     die "時刻 $time を読めなかった\n" unless defined $min;
     return (0 + $hour, 0 + $min);
+}
+
+# 文字の列を、PowerShell の単一引用符の文字列にする。PowerShell は ' のほかに ‘ ’ ‚ ‛ も単一引用符として読むので、どれも2つ重ねる
+sub ps_quote {
+    my ($s) = @_;
+    $s =~ s/(['\x{2018}-\x{201B}])/$1$1/g;
+    return "'$s'";
+}
+
+# タスク スケジューラに予定を登録する命令の文か、予定を外す命令の文を作り、powershell.exe の -EncodedCommand に渡す形
+# (UTF-16LE の Base64)で出す。命令の文を引数の引用符の解釈に通さないので、場所に空白と単一引用符があっても壊れない:
+# windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> | windows-task disable <予定の名前>
+sub cmd_windows_task {
+    my ($op, @args) = @_;
+    my @body;
+    if (defined $op && $op eq 'enable' && @args == 5) {
+        my ($day, $time) = @args[0, 1];
+        my ($hour, $min) = schedule_time($day, $time);
+        my ($name, $bash, $script) = map { decode('UTF-8', $_) } @args[2 .. 4];
+        # 動かすプログラムの引数は、Windows のコマンドラインとして読まれるので、" と改行を含む場所は渡せない
+        for ($bash, $script) { die "場所 $_ に \" か改行がある\n" if /["\r\n]/; }
+        my $arg = sprintf('-NoProfile -WindowStyle Hidden -Command "& %s %s run"', ps_quote($bash), ps_quote($script));
+        @body = (
+            sprintf("\$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek %s -At '%02d:%02d'", $PS_DAY{$day}, $hour, $min),
+            '$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)',
+            sprintf("\$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument %s", ps_quote($arg)),
+            sprintf('Register-ScheduledTask -TaskName %s -Trigger $trigger -Settings $settings -Action $action -Force | Out-Null', ps_quote($name)),
+        );
+    } elsif (defined $op && $op eq 'disable' && @args == 1) {
+        my $name = ps_quote(decode('UTF-8', $args[0]));
+        @body = ("if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) {",
+            "Unregister-ScheduledTask -TaskName $name -Confirm:\$false", '}');
+    } else {
+        return usage();
+    }
+    my $text = join "\n", "\$ErrorActionPreference = 'Stop'", "\$ProgressPreference = 'SilentlyContinue'", 'try {', @body,
+        '} catch {', '[Console]::Error.WriteLine($_.Exception.Message)', 'exit 1', '}', '';
+    print encode_base64(encode('UTF-16LE', $text), ''), "\n";
+    return 0;
+}
+
+# 文字の列を、XML の文字の中に置ける形にする
+sub xml_text {
+    my ($s) = @_;
+    $s =~ s/&/&amp;/g;
+    $s =~ s/</&lt;/g;
+    $s =~ s/>/&gt;/g;
+    return $s;
+}
+
+# launchd の LaunchAgent の plist を出す: plist <ラベル> <曜日> <HH:MM> <スクリプトの場所> <run.log の場所>
+sub cmd_plist {
+    return usage() unless @_ == 5;
+    my ($label, $day, $time, $script, $log) = @_;
+    my ($hour, $min) = schedule_time($day, $time);
+    my ($l, $s, $o) = map { xml_text($_) } $label, $script, $log;
+    print <<"PLIST";
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$l</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>$s</string>
+        <string>run</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>$WDAY{$day}</integer>
+        <key>Hour</key>
+        <integer>$hour</integer>
+        <key>Minute</key>
+        <integer>$min</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>$o</string>
+    <key>StandardErrorPath</key>
+    <string>$o</string>
+</dict>
+</plist>
+PLIST
+    return 0;
 }
 
 # 場所を、cron の行の中でシェルの単一引用符で囲んだ形にする。cron は、\ の付かない % を改行に替えるので、% に \ を付ける
