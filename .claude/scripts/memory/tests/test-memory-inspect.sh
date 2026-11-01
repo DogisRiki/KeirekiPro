@@ -9,8 +9,70 @@
 # PATH の先頭に偽の claude と偽の gh を置く。偽の powershell.exe と launchctl と crontab は、
 # テストの場合が os_fake で求めたときだけ置く。今の時刻は KP_MEMORY_INSPECTION_NOW で与える。
 # 前提: bash 3.2 以上・perl(JSON::PP)・git。macOS で動く書き方だけを使う
+#
+# 場合を選んで流す: KP_TEST_CASES='en-* sr-early' bash .claude/scripts/memory/tests/test-memory-inspect.sh
+# 名前の合う場合と、場合の外の部分(関数の定義と共通の準備)だけを流す。名前には * と ? を使える。
+# どの場合にも合わない名前があれば、何も流さずに終了コード 2 で終わる
 # =====================================================================
 set -u
+
+# ファイルを空行で区切り、bash -n が警告なしに通るまで区切りをつなげて、1つのまとまりにする。
+# newcase か <名前>_setup で始まるまとまりを場合とし、名前も関数の定義も無いのに check を含むまとまりは、前の場合の続きとして扱う
+if [ -n "${KP_TEST_CASES:-}" ] && [ -z "${KP_TEST_FILTERED:-}" ]; then
+    sel_dir=$(mktemp -d) || exit 1
+    if ! perl - "$0" "$sel_dir" "$BASH" "$KP_TEST_CASES" <<'PERL'
+use strict; use warnings;
+my ($file, $dir, $bash, $want) = @ARGV;
+open my $in, '<', $file or die "$file を読めなかった: $!\n";
+my $text = do { local $/; <$in> };
+my (@chunks, $cur);
+$cur = '';
+for my $piece (split /(?<=\n)(?=[ \t]*\n)/, $text) {
+    $cur .= $piece;
+    open my $out, '>', "$dir/piece.sh" or die "$dir/piece.sh に書けなかった: $!\n";
+    print {$out} $cur;
+    close $out;
+    my $err = `"$bash" -n "$dir/piece.sh" 2>&1`;
+    next if $? != 0 || $err ne '';
+    my @names;
+    while ($cur =~ /^(?:newcase|[a-z_]+_setup) +(?:"([^"]*)"|(\S+))/mg) { push @names, defined $1 ? $1 : $2; }
+    if (!@names && $cur !~ /^\w+\(\)/m && $cur =~ /^\s*check /m) {
+        die "場合の外に check がある: $cur\n" unless @chunks && @{ $chunks[-1]{names} };
+        $chunks[-1]{text} .= $cur;
+    } else {
+        push @chunks, { text => $cur, names => [@names] };
+    }
+    $cur = '';
+}
+die "ファイルの終わりで、まとまりが閉じていない\n" if $cur =~ /\S/;
+my @pats = split ' ', $want;
+my (%hit, $sel);
+$sel = '';
+for my $c (@chunks) {
+    my $take = !@{ $c->{names} };
+    for my $i (0 .. $#pats) {
+        (my $re = quotemeta $pats[$i]) =~ s/\\\*/.*/g;
+        $re =~ s/\\\?/./g;
+        for my $n (@{ $c->{names} }) { next unless $n =~ /\A$re\z/; $hit{$i} = 1; $take = 1; }
+    }
+    $sel .= $c->{text} if $take;
+}
+my @miss = map { $pats[$_] } grep { !$hit{$_} } 0 .. $#pats;
+die "どの場合にも合わない名前: @miss\n" if @miss;
+open my $out, '>', "$dir/selected.sh" or die "$dir/selected.sh に書けなかった: $!\n";
+print {$out} $sel;
+close $out;
+PERL
+    then
+        rm -rf "$sel_dir"
+        exit 2
+    fi
+    # 選んだ場合のファイルを、$0 をこのファイルの場所のままにして流す
+    KP_TEST_FILTERED=1 "$BASH" -c '. "$1"' "$0" "$sel_dir/selected.sh"
+    rc=$?
+    rm -rf "$sel_dir"
+    exit "$rc"
+fi
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TMP_ROOT=$(mktemp -d)
@@ -1097,9 +1159,6 @@ want=$(
 check "worktree がほかのブランチにいても、記録の origin_main のコミットの中身を返す" \
     "$rc|$(gitq rev-parse --abbrev-ref HEAD)|$(cat "$REPO/f.txt")|$(cat "$FAKE/lookup.txt")" "0|other|new-kp|$want"
 
-newcase lk-readonly
-lk_fixture
-printf 'dirty\n' >"$WT/untracked.txt"
 # 本体の作業フォルダと worktree の git の参照と、作業フォルダの様子を出す
 git_sig() {
     gitq for-each-ref --format='%(refname) %(objectname)'
@@ -1108,6 +1167,10 @@ git_sig() {
     gitq status --porcelain
     git -C "$WT" status --porcelain
 }
+
+newcase lk-readonly
+lk_fixture
+printf 'dirty\n' >"$WT/untracked.txt"
 before="$(outside_sig)#$(git_sig)#$(sig_dir "$STATE")#$(sig_dir "$FHOME")"
 lookup_run r1 1 "$LK_ALL"
 rc=$?
@@ -2366,6 +2429,135 @@ check "標準出力の1行目に回の ID を出し、終わるときに回の I
     "$ok_out#$(head -n 1 "$FAKE/rn.out")#$(tail -n 1 "$FAKE/rn.out")" \
     "[memory-inspection] run-id: $RN_ID#[memory-inspection] finished: $RN_ID completed#[memory-inspection] run-id: $RN_ID#[memory-inspection] finished: $RN_ID interrupted"
 check "完了した回は終了コード 0、中断した回は終了コード 1 で終わる" "$ok_end|$ng_end" "0:completed|1:interrupted"
+
+# ---------------------------------------------------------------------
+# 点検の予定の登録と取り外し(OS によらない部分と Linux の cron)
+# ---------------------------------------------------------------------
+
+# 偽の crontab: 利用者の crontab の中身を fake/os/crontab.txt に持つ。-l は中身を出し、中身が無ければ
+# 「no crontab for test」を標準エラーに出して 1 で終わる。- は標準入力を中身にする。fake/os/crontab.fail があれば、
+# - のときに中身を書かず、crontab.fail の中身を標準エラーに出して 1 で終わる。受けた引数は crontab.calls.jsonl に書き残す
+write_fake_crontab() {
+    cat >"$1" <<'EOF'
+#!/usr/bin/env bash
+d="$KP_TEST_FAKE_DIR/os"
+perl -MJSON::PP -e 'print JSON::PP->new->canonical->encode([@ARGV]), "\n"' -- "$@" >>"$d/crontab.calls.jsonl"
+case "${1-}" in
+-l)
+    if [ -f "$d/crontab.txt" ]; then cat "$d/crontab.txt"; else echo "no crontab for test" >&2; exit 1; fi
+    ;;
+-)
+    if [ -f "$d/crontab.fail" ]; then cat "$d/crontab.fail" >&2; exit 1; fi
+    cat >"$d/crontab.txt"
+    ;;
+*) exit 1 ;;
+esac
+EOF
+    chmod +x "$1"
+}
+
+# テストの場合を作り、偽の crontab を PATH の先頭に置き、ほかの予定の行を1行入れておく: en_setup <テストの場合の名前>
+# EN_ID は、git の共通ディレクトリの場所の SHA-256 の先頭8文字である
+en_setup() {
+    newcase "$1"
+    os_fake crontab
+    write_fake_crontab "$BIN-os/crontab"
+    printf '5 4 * * * echo other\n' >"$FAKE/os/crontab.txt"
+    EN_ID=$(perl -MDigest::SHA=sha256_hex -e 'print substr(sha256_hex($ARGV[0]), 0, 8)' -- "$REPO/.git")
+}
+# worktree のスクリプトで、OS を Linux にして enable か disable を打つ: en_cmd <enable|disable> [<引数>...]
+en_cmd() { KP_MEMORY_INSPECTION_OS=linux bash "$WTSH" "$@" >"$FAKE/en.out" 2>"$FAKE/en.err"; }
+# crontab の、この予定の印の付いた行を出す
+en_marked() { grep -F "# keirekipro-memory-inspection $EN_ID" "$FAKE/os/crontab.txt"; }
+# 決まった曜日と時刻に動く cron の行を出す: en_line <分> <時> <曜日の番号>
+en_line() {
+    printf "%s %s * * %s /bin/bash '%s' run >> '%s' 2>&1 # keirekipro-memory-inspection %s" \
+        "$1" "$2" "$3" "$REPO/.claude/scripts/memory/memory-inspect.sh" "$STATE/run.log" "$EN_ID"
+}
+# 偽の crontab が - で呼ばれた回数を出す
+en_writes() { os_calls crontab | grep -c -x -F '["-"]'; }
+
+en_setup en-twice
+en_cmd enable
+first=$?
+en_cmd enable
+check "enable を2回打っても、crontab の印の付いた行は1行だけである" \
+    "$first|$?|$(en_marked | wc -l | tr -d ' ')|$(grep -c -x -F '5 4 * * * echo other' "$FAKE/os/crontab.txt")" "0|0|1|1"
+check "曜日と時刻を渡さないと、月曜日の10時の予定になる" \
+    "$(en_marked)|$(jget "$STATE/config.json" enabled day time scheduler disabled_at)" "$(en_line 0 10 1)|true,mon,10:00,cron,null"
+check "enable は、本体の作業フォルダと、メモリのディレクトリと、claude と gh と bash の場所と、PATH を config.json に書く" \
+    "$(jget "$STATE/config.json" main_worktree memory_dir bin.claude bin.gh bin.bash path enabled_at)" \
+    "$REPO,$MEMDIR,$BIN/claude,$BIN/gh,$(command -v bash),$PATH,2026-11-02T01:00:00Z"
+
+en_setup en-fri
+en_cmd enable --day fri --time 18:30
+check "--day fri --time 18:30 を渡すと、金曜日の18時30分の予定になる" \
+    "$?|$(en_marked)|$(jget "$STATE/config.json" day time)" "0|$(en_line 30 18 5)|fri,18:30"
+
+en_setup en-bad
+bad=
+for args in "--day xyz" "--day Mon" "--time 25:00" "--time 9:00" "--time 10:60" "--day" "--time" "--hour 10"; do
+    # shellcheck disable=SC2086 # 引数を空白で分けて渡す
+    en_cmd enable $args
+    bad="$bad$?,"
+done
+check "不正な曜日か時刻を渡すと、何も登録せずに終了コード 2 で終わる" \
+    "$bad|$(os_calls crontab)|$(have "$STATE/config.json")|$(grep -c -F -e '--day mon|tue|wed|thu|fri|sat|sun' "$FAKE/en.err")" \
+    "2,2,2,2,2,2,2,2,||無い|1"
+
+en_setup en-noscript
+rm "$REPO/.claude/scripts/memory/memory-inspect.sh"
+en_cmd enable
+check "本体の作業フォルダにスクリプトが無いと、終了コード 1 で終わる" \
+    "$?|$(os_calls crontab)|$(have "$STATE/config.json")|$(grep -c -F 'main' "$FAKE/en.err")" "1||無い|1"
+
+# crontab の無い PATH を作る。この PC の PATH に crontab があるとき(Linux のコンテナ)は、点検のスクリプトが
+# enable の中で使うコマンドだけへのリンクを置いたディレクトリを、PATH にする
+nocron_path() {
+    if ! PATH=$BASE_PATH command -v crontab >/dev/null 2>&1; then
+        printf '%s' "$BIN:$BASE_PATH"
+        return
+    fi
+    local d="$TMP_ROOT/nocron-bin" c
+    mkdir -p "$d"
+    for c in perl git dirname mkdir uname cat; do ln -s "$(PATH=$BASE_PATH command -v "$c")" "$d/$c"; done
+    printf '%s' "$BIN:$d"
+}
+en_setup en-nocron
+KP_MEMORY_INSPECTION_OS=linux PATH=$(nocron_path) "$(command -v bash)" "$WTSH" enable >"$FAKE/en.out" 2>"$FAKE/en.err"
+check "crontab が無いと、終了コード 1 で終わる" \
+    "$?|$(os_calls crontab)|$(have "$STATE/config.json")|$(grep -c -F 'cron を入れて' "$FAKE/en.err")" "1||無い|1"
+
+en_setup en-fail
+printf 'crontab: write refused\n' >"$FAKE/os/crontab.fail"
+en_cmd enable
+check "登録が失敗すると、config.json を書かない" \
+    "$?|$(en_writes)|$(have "$STATE/config.json")|$(grep -c -F 'crontab: write refused' "$FAKE/en.err")|$(cat "$FAKE/os/crontab.txt")" \
+    "1|1|無い|1|5 4 * * * echo other"
+
+en_setup en-disable
+printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+printf '古い文です\n' >"$MEMDIR/a.md"
+en_cmd enable
+claude_ok "$IC_EMPTY"
+TZ=JST-9 bash "$SH" run >/dev/null 2>&1
+before_off="$(claude_calls)|$(jget "$STATE/runs/$SR_ID/record.json" status)"
+KP_MEMORY_INSPECTION_NOW=$(shifted_now 3600) en_cmd disable
+off=$?
+claude_ok "$IC_EMPTY"
+TZ=JST-9 KP_MEMORY_INSPECTION_NOW=$(shifted_now $((7 * 86400))) bash "$SH" run >/dev/null 2>&1
+check "disable のあとは、印の付いた行が無くなり、enabled が偽になり、run が何もしない" \
+    "$before_off#$off|$(en_marked | wc -l | tr -d ' ')|$(cat "$FAKE/os/crontab.txt")|$(jget "$STATE/config.json" enabled disabled_at day)|$(claude_calls)|$(have "$STATE/runs/2026-11-09T1000")" \
+    "1|completed#0|0|5 4 * * * echo other|false,2026-11-02T02:00:00Z,mon|1|無い"
+
+en_setup en-none
+rm -f "$FAKE/os/crontab.txt"
+make_record r1 scheduled completed 2026-10-26T01:00:00Z
+printf '報告\n' >"$STATE/runs/r1/report.md"
+en_cmd disable
+check "disable は、予定が無くても成功で終わり、記録とまだ示していない報告を消さない" \
+    "$?|$(en_writes)|$(have "$STATE/config.json")|$(jget "$STATE/runs/r1/record.json" status)|$(cat "$STATE/runs/r1/report.md")|$(have "$STATE/runs/r1/shown")" \
+    "0|0|無い|completed|報告|無い"
 
 echo
 echo "$pass ok, $failn NG"

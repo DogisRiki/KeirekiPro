@@ -332,6 +332,125 @@ EOF
     inspect_run "$run" now "${claude:-claude}" || exit 1
 }
 
+# enable の受け付ける形を、理由と一緒に標準エラーに出して、終了コード 2 で終わる: enable_usage <理由>
+enable_usage() {
+    printf 'memory-inspect.sh: %s\n' "$1" >&2
+    printf '受け付ける形: enable [--day mon|tue|wed|thu|fri|sat|sun] [--time HH:MM](曜日の初期値は mon、時刻の初期値は 10:00)\n' >&2
+    exit 2
+}
+
+# この PC の OS の予定の仕組みの名前(windows-task か launchd か cron)を出す。
+# テストは KP_MEMORY_INSPECTION_OS(windows か macos か linux)で OS を替える
+scheduler_kind() {
+    local os=${KP_MEMORY_INSPECTION_OS:-}
+    if [ -z "$os" ]; then
+        case "$(uname -s 2>/dev/null)" in
+        Linux) os=linux ;;
+        Darwin) os=macos ;;
+        MINGW* | MSYS* | CYGWIN*) os=windows ;;
+        esac
+    fi
+    case "$os" in
+    windows) printf 'windows-task\n' ;;
+    macos) printf 'launchd\n' ;;
+    linux) printf 'cron\n' ;;
+    *) fail "この OS の予定の仕組みに対応していない。点検の予定は、Windows と macOS と Linux で登録できる。" ;;
+    esac
+}
+
+# 利用者の今の crontab の中身を出す。crontab がまだ無いときは、何も出さない。locate のあとで呼ぶ
+cron_list() {
+    local err="$STATE/crontab.err" out rc=0
+    out=$(crontab -l 2>"$err") || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        if grep -q -i 'no crontab' "$err"; then
+            rm -f "$err"
+            return 0
+        fi
+        say_reason "crontab の中身を読めなかった。crontab の出力: $(cat "$err")"
+        rm -f "$err"
+        return 1
+    fi
+    rm -f "$err"
+    printf '%s\n' "$out"
+}
+
+# 利用者の crontab を、印の付いた行を替えた中身で書き戻す。中身が変わらないときは書き戻さない:
+# cron_write <ID8> [<曜日> <HH:MM> <スクリプトの場所>]
+cron_write() {
+    local current table out
+    current=$(cron_list) || exit 1
+    table=$(printf '%s\n' "$current" | perl "$PL" cron "$@" ${2:+"$STATE/run.log"}) || fail "crontab に書く中身を作れなかった。"
+    [ "$table" != "$current" ] || return 0
+    out=$(printf '%s\n' "$table" | crontab - 2>&1) || fail "crontab に予定を書けなかった。crontab の出力: $out"
+}
+
+# Linux の利用者の crontab に、印の付いた行を1行だけ置く: cron_enable <ID8> <曜日> <HH:MM> <スクリプトの場所>
+cron_enable() {
+    command -v crontab >/dev/null 2>&1 ||
+        fail "crontab が見つからない。cron を入れてから(Debian と Ubuntu では sudo apt install cron、Fedora では sudo dnf install cronie)、enable を打ち直す。"
+    cron_write "$@"
+}
+
+# Linux の利用者の crontab から、印の付いた行を消す。crontab が無ければ、予定も無いので何もしない: cron_disable <ID8>
+cron_disable() {
+    command -v crontab >/dev/null 2>&1 || return 0
+    cron_write "$1"
+}
+
+# 点検の予定を登録し、config.json を書く。登録は、本体の作業フォルダのスクリプトを動かす。worktree は消されることがあるためである
+cmd_enable() {
+    local day=mon time=10:00 main_sh kind id tools name
+    while [ $# -gt 0 ]; do
+        case "$1" in
+        --day | --time)
+            [ $# -ge 2 ] || enable_usage "$1 のあとに値が無い。"
+            if [ "$1" = --day ]; then day=$2; else time=$2; fi
+            shift 2
+            ;;
+        *) enable_usage "知らない引数 $1 を受けた。" ;;
+        esac
+    done
+    case "$day" in mon | tue | wed | thu | fri | sat | sun) ;; *) enable_usage "曜日 $day を受け付けない。" ;; esac
+    case "$time" in [01][0-9]:[0-5][0-9] | 2[0-3]:[0-5][0-9]) ;; *) enable_usage "時刻 $time を受け付けない。" ;; esac
+    locate
+    main_sh="$MAIN/.claude/scripts/memory/memory-inspect.sh"
+    [ -f "$main_sh" ] ||
+        fail "本体の作業フォルダ $MAIN に .claude/scripts/memory/memory-inspect.sh が無い。本体の作業フォルダを main に合わせてから、enable を打ち直す。"
+    kind=$(scheduler_kind) || exit 1
+    id=$(perl "$PL" id8) || fail "予定の名前に付ける印を求められなかった。"
+    tools=$(tool_paths) || fail "claude と gh と bash の場所を求められなかった。"
+    ensure_state
+    # 登録が失敗したら、各 OS の部分が理由を出して終わるので、config.json を書かない
+    case "$kind" in
+    cron)
+        cron_enable "$id" "$day" "$time" "$main_sh"
+        name="keirekipro-memory-inspection $id"
+        ;;
+    *) fail "$kind への点検の予定の登録は、まだ作っていない。" ;;
+    esac
+    perl "$PL" config enable "$day" "$time" "$kind" "$name" "$tools" || fail "予定を登録したが、config.json を書けなかった。"
+    printf '[memory-inspection] 点検の予定を登録した: 毎週 %s の %s(%s)\n' "$day" "$time" "$kind"
+}
+
+# config.json の enabled を偽にしてから、点検の予定を外す。先に enabled を偽にするので、予定を外せなかったときも、
+# 予定から動いた run は何もしない。予定が無くても成功で終わる。記録と、まだ示していない報告は消さない
+cmd_disable() {
+    local kind id
+    [ $# -eq 0 ] || usage
+    locate
+    kind=$(scheduler_kind) || exit 1
+    perl "$PL" config disable || fail "config.json の enabled を偽にできなかった。"
+    case "$kind" in
+    cron)
+        id=$(perl "$PL" id8) || fail "予定の名前に付ける印を求められなかった。"
+        ensure_state
+        cron_disable "$id"
+        ;;
+    esac
+    printf '[memory-inspection] 点検の予定を外した。\n'
+}
+
 # 会話の中の操作は、引数をそのまま memory-inspect.pl に渡す。引数の確かめは memory-inspect.pl が行う
 cmd_show() { perl "$PL" show "$@"; }
 cmd_shown() { perl "$PL" shown "$@"; }

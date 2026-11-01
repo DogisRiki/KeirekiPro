@@ -16,6 +16,15 @@
 #   nowrun [<tools の JSON>]
 #     その場の点検の、今の時刻から作った回の ID と、claude の場所と、PATH を1行ずつ出す。claude の場所と PATH は、
 #     config.json があればその値を使い、無ければ tools の JSON の値を使う
+#   id8
+#     予定の名前に付ける、git の共通ディレクトリの場所の SHA-256 の先頭8文字を出す
+#   cron <ID8> [<曜日> <HH:MM> <スクリプトの場所> <run.log の場所>]
+#     標準入力で受けた crontab の中身から、末尾に「# keirekipro-memory-inspection <ID8>」の付いた行を消して出す。
+#     曜日と時刻を渡したときは、その曜日と時刻に run を動かす印の付いた行を1行足して出す
+#   config enable <曜日> <HH:MM> <windows-task|launchd|cron> <予定の名前> <tools の JSON>
+#     config.json を enabled が真で書く。本体の作業フォルダとメモリのディレクトリは paths と同じ求め方で求める
+#   config disable
+#     config.json の enabled を偽にし、disabled_at を書く。config.json が無ければ何もしない
 #   lock take <run|memory> <回の ID> <プロセスの番号>
 #     点検のロック locks/run/ か、メモリのロック locks/memory を取る。取れたら taken を出して 0 を返す。
 #     ほかの回が取っていて古くなければ、held <取っている回の ID> を出して 3 を返す。古いロックは外してから取り直す
@@ -84,6 +93,9 @@ my %COMMANDS = (
     due     => \&cmd_due,
     logtrim => \&cmd_logtrim,
     nowrun  => \&cmd_nowrun,
+    id8     => \&cmd_id8,
+    cron    => \&cmd_cron,
+    config  => \&cmd_config,
     lock    => \&cmd_lock,
     prepare => \&cmd_prepare,
     content => \&cmd_content,
@@ -201,7 +213,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | id8 | cron <ID8> [<曜日> <HH:MM> <スクリプトの場所> <run.log の場所>] | config enable <曜日> <HH:MM> <予定の仕組み> <予定の名前> <tools の JSON> | config disable | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
     return 2;
 }
 
@@ -1227,6 +1239,88 @@ sub cmd_nowrun {
     die "claude の場所か PATH に改行がある\n" if grep { /\n/ } @out;
     print map { "$_\n" } @out;
     return 0;
+}
+
+# ---- 予定の登録 ----------------------------------------------------------
+
+# 曜日と HH:MM の時刻を確かめ、時と分を返す。読めなければ die する: schedule_time <曜日> <HH:MM>
+sub schedule_time {
+    my ($day, $time) = @_;
+    die "曜日 $day を読めなかった\n" unless defined $day && exists $WDAY{$day};
+    my ($hour, $min) = defined $time ? $time =~ /\A([01]\d|2[0-3]):([0-5]\d)\z/ : ();
+    die "時刻 $time を読めなかった\n" unless defined $min;
+    return (0 + $hour, 0 + $min);
+}
+
+# 場所を、cron の行の中でシェルの単一引用符で囲んだ形にする。cron は、\ の付かない % を改行に替えるので、% に \ を付ける
+sub cron_quote {
+    my ($s) = @_;
+    $s =~ s/'/'\\''/g;
+    $s =~ s/%/\\%/g;
+    return "'$s'";
+}
+
+sub cmd_id8 {
+    return usage() if @_;
+    print substr(sha256_hex(git_common_dir(dirname(__FILE__))), 0, 8), "\n";
+    return 0;
+}
+
+sub cmd_cron {
+    my @args = @_;
+    return usage() unless @args == 1 || @args == 5;
+    my ($id, $day, $time, $script, $log) = @args;
+    die "予定の印 $id を読めなかった\n" unless $id =~ /\A[0-9a-f]{8}\z/;
+    my $mark = "# keirekipro-memory-inspection $id";
+    my $text = do { local $/; <STDIN> } // '';
+    my @lines = grep { !/\Q$mark\E\s*\z/ } split /\n/, $text;
+    if (@args == 5) {
+        my ($hour, $min) = schedule_time($day, $time);
+        die "スクリプトか run.log の場所に改行がある\n" if grep { /[\r\n]/ } $script, $log;
+        push @lines, sprintf('%d %d * * %d /bin/bash %s run >> %s 2>&1 %s', $min, $hour, $WDAY{$day}, cron_quote($script), cron_quote($log), $mark);
+    }
+    print map { "$_\n" } @lines;
+    return 0;
+}
+
+sub cmd_config {
+    my ($what, @args) = @_;
+    return usage() unless defined $what;
+    my $here = dirname(__FILE__);
+    my $file = state_dir($here) . '/config.json';
+    if ($what eq 'enable' && @args == 5) {
+        my ($day, $time, $scheduler, $name, $tools) = @args;
+        schedule_time($day, $time);
+        die "予定の仕組み $scheduler を読めなかった\n" unless $scheduler =~ /\A(?:windows-task|launchd|cron)\z/;
+        my $from = eval { $JSON->decode($tools) };
+        die "claude と gh と bash の場所と PATH を読めなかった\n" unless ref $from eq 'HASH' && ref $from->{bin} eq 'HASH';
+        my $main = main_worktree($here);
+        my $text = sub { my ($v) = @_; return defined $v && !ref $v ? $v : '' };
+        write_json($file, {
+            enabled       => JSON::PP::true,
+            day           => $day,
+            time          => $time,
+            enabled_at    => iso_utc(now()),
+            disabled_at   => undef,
+            scheduler     => $scheduler,
+            task_name     => decode('UTF-8', $name),
+            main_worktree => decode('UTF-8', $main),
+            memory_dir    => decode('UTF-8', memory_dir($main)),
+            bin           => { map { $_ => $text->($from->{bin}{$_}) } qw(claude gh bash) },
+            path          => $text->($from->{path}),
+        });
+        return 0;
+    }
+    if ($what eq 'disable' && !@args) {
+        my $config = read_json($file);
+        return 0 unless defined $config;
+        die "config.json の中身が JSON のオブジェクトでなかった\n" unless ref $config eq 'HASH';
+        $config->{enabled} = JSON::PP::false;
+        $config->{disabled_at} = iso_utc(now());
+        write_json($file, $config);
+        return 0;
+    }
+    return usage();
 }
 
 sub cmd_lock {
