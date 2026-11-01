@@ -208,7 +208,7 @@
   - _要件: 4.3, 7.3, 7.4_
 
 - [ ] 6. 会話の中の Claude の手順と、開発者向けの手順書を書く
-- [ ] 6.1 報告と案を扱う memory-inspection のスキルを書く (並行可)
+- [x] 6.1 報告と案を扱う memory-inspection のスキルを書く (並行可)
 
   Claude は、部品「memory-inspection のスキル」を、`.claude/skills/memory-inspection/SKILL.md` に、design の節の「いつ動くか」と「手順」のとおりに書く。Claude は、スキルの説明の文に、スキルを使う2つの場面を書く。Claude は、スキルの文を `.kiro/settings/rules/owner-writing.md` の決まりで書く。
   - 完了の確かめ方: SKILL.md の frontmatter の `name` が `memory-inspection` で、`description` が2つの場面を挙げている。本文に、`show` `shown` `revert` `answer` `missed` `history` と `enable` を打つ手順と、報告と記録の中身を Issue と PR に書き写さない決まりと、了承した案を `file-issue` の決まりで起票して `/start` を頼む手順がある
