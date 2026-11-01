@@ -462,6 +462,13 @@ for t in perl bash; do
 done
 got=$(bash -c '. "$1" && PATH=$2 && tool_paths' _ "$SH" "$MIN" | tool_fields)
 check "claude gh bash の場所と今の PATH を返し、見つからないコマンドの場所を空にして返す" "$got" "$MIN/claude||$MIN/bash|$MIN"
+# Windows では、PATH に無い /usr/bin と /bin だけを後ろに足し、ほかの OS では PATH を変えない
+got="$(bash -c 'PATH=$2; . "$1" >/dev/null 2>&1; printf "%s" "$PATH"' _ "$SH" "$MIN")#$(bash -c 'PATH=$2; . "$1" >/dev/null 2>&1; printf "%s" "$PATH"' _ "$SH" "$MIN:/usr/bin")"
+case ${OSTYPE:-} in
+msys* | cygwin*) want="$MIN:/usr/bin:/bin#$MIN:/usr/bin:/bin" ;;
+*) want="$MIN#$MIN:/usr/bin" ;;
+esac
+check "Windows では、PATH に無い /usr/bin と /bin だけを PATH の後ろに足し、ほかの OS では PATH を変えない" "$got" "$want"
 
 newcase locate
 want=$(printf '%s\n%s\n%s' "$REPO" "$STATE" "$MEMDIR")
@@ -2453,9 +2460,14 @@ exec "$(command -v git)" "\$@"
 EOF
 chmod +x "$TMP_ROOT/sr-ospath/gitonly/git"
 claude_ok "$IC_EMPTY"
-TZ=JST-9 PATH=$TMP_ROOT/sr-ospath/gitonly "$(command -v bash)" "$SH" run >/dev/null 2>&1
-check "起動したときの PATH に perl も dirname も無くても、点検する" \
-    "$?|$(claude_calls)|$(jget "$STATE/runs/$SR_ID/record.json" status)" "0|1|completed"
+# ほかの OS の予定の仕組みは /usr/bin と /bin を含む PATH で動かすので、この場合は Windows でだけ起きる
+case ${OSTYPE:-} in
+msys* | cygwin*)
+    TZ=JST-9 PATH=$TMP_ROOT/sr-ospath/gitonly "$(command -v bash)" "$SH" run >/dev/null 2>&1
+    check "Windows で、起動したときの PATH に perl も dirname も無くても、点検する" \
+        "$?|$(claude_calls)|$(jget "$STATE/runs/$SR_ID/record.json" status)" "0|1|completed"
+    ;;
+esac
 
 # 前の週の回が点検の中の Claude の失敗で中断し、次の週の回が a.md と b.md を点検する
 sr_setup sr-next
@@ -2732,7 +2744,7 @@ check "Windows の enable が、Register-ScheduledTask に -Force を付け、�
     "$rc|$(head -n 1 "$FAKE/ps2.txt")|$(grep -c -F "New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At '18:30'" "$FAKE/ps2.txt")|$(grep -c -F 'New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)' "$FAKE/ps2.txt")|$(grep -c -F "Register-ScheduledTask -TaskName 'KeirekiPro memory inspection $EN_ID' -Trigger \$trigger -Settings \$settings -Action \$action -Force" "$FAKE/ps2.txt")|$(grep -c StartWhenAvailable "$FAKE/ps2.txt")|$(jget "$STATE/config.json" enabled scheduler task_name day time)" \
     "0|-NoProfile -NonInteractive -EncodedCommand|1|1|1|0|true,windows-task,KeirekiPro memory inspection $EN_ID,fri,18:30"
 check "Windows の動かすプログラムが windows-launcher.exe で、bash.exe とスクリプトの場所と run を渡す" \
-    "$(grep -c -F 'New-ScheduledTaskAction -Execute ' "$FAKE/ps2.txt")|$(grep -c -F 'powershell.exe' "$FAKE/ps2.txt")|$(ps_line "$FAKE/ps2.txt" '$action = ')" \
+    "$(grep -c -F 'New-ScheduledTaskAction -Execute ' "$FAKE/ps2.txt")|$(grep -c -F 'powershell.exe' "$FAKE/ps2.txt")|$(ps_line "$FAKE/ps2.txt" "\$action = ")" \
     "1|0|$(wm_path "$STATE/windows-launcher.exe")|\"$(wm_bash)\" \"$REPO/.claude/scripts/memory/memory-inspect.sh\" run|"
 
 # 偽の powershell.exe は windows-launcher.exe を作らないので、テストが作り、更新の時刻を替える
@@ -2750,7 +2762,7 @@ wm_cmd windows enable
 r3=$?
 ps_call 5 >"$FAKE/ps5.txt"
 check "Windows の enable が、windows-launcher.exe が無いときと windows-launcher.cs より古いときに、Add-Type に -OutputType WindowsApplication を付けて起動用のプログラムを作り、新しいときは作らない" \
-    "$r1$r2$r3|$(grep -c -F ' -OutputType WindowsApplication' "$FAKE/ps1.txt")$(grep -c -F 'Add-Type' "$FAKE/ps3.txt")$(grep -c -F ' -OutputType WindowsApplication' "$FAKE/ps5.txt")|$(ps_line "$FAKE/ps1.txt" 'Add-Type ')#$(ps_line "$FAKE/ps3.txt" '$p = Start-Process ')#$(grep -c -F -x "if (\$p.ExitCode -ne 0) { throw ('windows-launcher.exe exited with code ' + \$p.ExitCode) }" "$FAKE/ps3.txt")" \
+    "$r1$r2$r3|$(grep -c -F ' -OutputType WindowsApplication' "$FAKE/ps1.txt")$(grep -c -F 'Add-Type' "$FAKE/ps3.txt")$(grep -c -F ' -OutputType WindowsApplication' "$FAKE/ps5.txt")|$(ps_line "$FAKE/ps1.txt" 'Add-Type ')#$(ps_line "$FAKE/ps3.txt" "\$p = Start-Process ")#$(grep -c -F -x "if (\$p.ExitCode -ne 0) { throw ('windows-launcher.exe exited with code ' + \$p.ExitCode) }" "$FAKE/ps3.txt")" \
     "000|101|$(wm_path "$REPO/.claude/scripts/memory/windows-launcher.cs")|$(wm_path "$STATE/windows-launcher.exe")|#$(wm_path "$STATE/windows-launcher.exe")|\"$(wm_bash)\" -c \"exit 0\"|#1"
 
 wm_setup wm-trial
@@ -2768,7 +2780,7 @@ rc=$?
 ps_call 1 >"$FAKE/ps1.txt"
 ps_call 2 >"$FAKE/ps2.txt"
 check "場所に空白と単一引用符があっても、powershell.exe に渡す命令が壊れない" \
-    "$rc|$(cat "$FAKE/ps1.txt" "$FAKE/ps2.txt" | ps_literals | grep -c -x BROKEN)|$(ps_line "$FAKE/ps1.txt" 'Add-Type ')#$(ps_line "$FAKE/ps2.txt" '$action = ')" \
+    "$rc|$(cat "$FAKE/ps1.txt" "$FAKE/ps2.txt" | ps_literals | grep -c -x BROKEN)|$(ps_line "$FAKE/ps1.txt" 'Add-Type ')#$(ps_line "$FAKE/ps2.txt" "\$action = ")" \
     "0|0|$(wm_path "$REPO/.claude/scripts/memory/windows-launcher.cs")|$(wm_path "$STATE/windows-launcher.exe")|#$(wm_path "$STATE/windows-launcher.exe")|\"$(wm_bash)\" \"$REPO/.claude/scripts/memory/memory-inspect.sh\" run|"
 
 wm_setup wm-mac

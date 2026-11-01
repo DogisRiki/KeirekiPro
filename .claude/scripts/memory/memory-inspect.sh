@@ -31,8 +31,14 @@
 set -u
 
 # Windows のタスク スケジューラは、Git の usr/bin を含まない Windows の PATH で bash を起動する。
-# dirname と perl を見つけられるように、/usr/bin と /bin を後ろに足す。ほかの OS では、もとから含まれている
-PATH="$PATH:/usr/bin:/bin"
+# dirname と perl を見つけられるように、Windows では、PATH に無い /usr/bin と /bin を後ろに足す。
+# ほかの OS の予定の仕組みは、/usr/bin と /bin を含む PATH で動かすので、PATH を変えない
+case ${OSTYPE:-} in
+msys* | cygwin*)
+    case ":$PATH:" in *:/usr/bin:*) ;; *) PATH="$PATH:/usr/bin" ;; esac
+    case ":$PATH:" in *:/bin:*) ;; *) PATH="$PATH:/bin" ;; esac
+    ;;
+esac
 
 # git に渡すので、Windows では C:/... の形にする。会話の中の Claude Code は Git Bash の引数の書き換えを止めるので、
 # /c/... の形のままでは git が場所を見つけられない
