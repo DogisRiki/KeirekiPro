@@ -94,7 +94,7 @@ flowchart LR
 **使う技術**:
 - 実行環境: bash 3.2 以上と perl 5 の標準の部品 `JSON::PP` `Digest::SHA` `File::Temp` `POSIX`。Windows では Git for Windows の bash と perl を使う
 - 点検の判断: Claude Code の `claude -p`。点検の中の Claude を呼ぶ部品は、`claude -p` にモデルの引数を渡さず、開発者の既定のモデルで点検の中の Claude を動かす
-- 定期実行: Windows のタスク スケジューラを PowerShell の `Register-ScheduledTask` で登録する。macOS は launchd の LaunchAgent、Linux は利用者の crontab を使う
+- 定期実行: Windows のタスク スケジューラを PowerShell の `Register-ScheduledTask` で登録する。Windows の予定は、窓を作らない起動用のプログラムを通して bash を動かす。起動用のプログラムは、`enable` が Windows PowerShell 5.1 の `Add-Type` で C# のソースから作る。macOS は launchd の LaunchAgent、Linux は利用者の crontab を使う
 - 事実の調べ: `git` で本体の作業フォルダの `origin/main` を読み、`gh` で Issue と PR を読む
 - 会話の始めの知らせ: Claude Code の SessionStart のフック
 
@@ -107,6 +107,7 @@ Claude が新しく作るファイル:
 - `.claude/scripts/memory/transcript-scan.pl`: 会話の記録を読む perl のスクリプトである。メモリファイルを指す Write と Edit の呼び出しを探すことと、1つの会話から開発者が打った文だけを抜き出すことを受け持つ
 - `.claude/scripts/memory/inspect-prompt.md`: 点検の中の Claude に渡す指示の文である。11種類の汚染の見分け方と直し方、調べてほしいことの書き方、メモリの中身を材料としてだけ読むことを書く
 - `.claude/scripts/memory/plan-schema.json`: 点検の中の Claude が返す JSON の形を定める JSON Schema である
+- `.claude/scripts/memory/windows-launcher.cs`: Windows の予定が動かす起動用のプログラムの C# のソースである。`enable` が、このソースから点検の状態の場所に `windows-launcher.exe` を作る
 - `.claude/scripts/memory/tests/test-memory-inspect.sh`: 点検のスクリプトのテストである。`claude` と OS の予定の仕組みのコマンドを偽物に替えて動かす
 - `.claude/skills/memory-inspection/SKILL.md`: 会話の中の Claude が、報告を示し、直しを戻し、案に答え、見落としを記録し、過去の点検を答えるときの手順である
 - `.claude/skills/memory-inspect-now/SKILL.md`: 会話の中の Claude が、点検をその場で動かし、終わった点検の報告を示すときの手順である。開発者は `/memory-inspect-now` と打つか、会話で「今すぐ点検して」のように頼む
@@ -148,7 +149,6 @@ sequenceDiagram
 - 回の印: スクリプトは、回ごとの場所 `runs/<回の ID>/` を `mkdir` で作る。回の ID は決まった曜日と時刻から作るので、同じ回に2つの起動があっても、`mkdir` に先に成功した1つだけが点検を進める
 - 点検のロック: 2つの点検を同時に動かさないため、スクリプトは、点検のロック `locks/run/` を `mkdir` で取ってから、メモリを読む。決まった曜日と時刻の点検は、ロックが空くまで待つ。その場で動かす点検は、待たずに断る。ロックの中身と、古いロックの見分け方は、`run` の部品の節に書く
 - 点検の中の Claude の呼び出し: スクリプトは、点検の中の Claude を3回まで呼ぶ。1回目と2回目の呼び出しでは、点検の中の Claude は、調べてほしいことを返すか、直し方を返す。調べてほしいことが返ったら、スクリプトはそれを調べ、結果を足して次の呼び出しをする。3回目の呼び出しでは、スクリプトは調べてほしいことを受け付けず、点検の中の Claude は直し方を返す
-- 再試行: 点検の途中で `claude -p` が失敗しても、スクリプトはその回の点検をやり直さない。次の回の点検は、その回の結果に関わらず、すべてのメモリファイルを点検する
 
 ## 部品
 
@@ -168,14 +168,29 @@ sequenceDiagram
 **登録する予定**:
 - 予定の名前: `KeirekiPro memory inspection <ID8>`。macOS のラベルは `com.keirekipro.memory-inspection.<ID8>` である。`<ID8>` は、git の共通ディレクトリの場所の SHA-256 の先頭8文字である。同じ PC に同じリポジトリの写しが2つあっても、予定の名前は重ならない
 - 動かすコマンド: 本体の作業フォルダの `.claude/scripts/memory/memory-inspect.sh run`。本体の作業フォルダとは、git の共通ディレクトリの親のフォルダである。worktree は消されることがあるので、`enable` は worktree の場所を登録しない。`enable` は、本体の作業フォルダにこのスクリプトが無いときは、本体の作業フォルダを main に合わせるよう示して終了コード 1 で終わる
-- Windows: `enable` は、`powershell.exe -NoProfile -NonInteractive` で、`New-ScheduledTaskTrigger -Weekly -DaysOfWeek <曜日> -At <時刻>` と、`New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)` を作り、`Register-ScheduledTask -Force` で登録する。動かすプログラムは `powershell.exe -NoProfile -WindowStyle Hidden -Command "& '<bash.exe の場所>' '<スクリプトの場所>' run"` である。`enable` は、`-StartWhenAvailable` を付けない。予定は、登録した開発者が Windows にログオンしている間だけ動く
+- Windows: `enable` は、`powershell.exe -NoProfile -NonInteractive` で、次の4つを順に行う。どれかが失敗したら、そのあとを行わない
+  - `enable` は、点検の状態の場所に `windows-launcher.exe` が無いときと、`windows-launcher.exe` が本体の作業フォルダの `windows-launcher.cs` より古いときに、`Add-Type -Path <windows-launcher.cs の場所> -OutputAssembly <windows-launcher.exe の場所> -OutputType WindowsApplication` で、起動用のプログラムを作る
+  - `enable` は、`Start-Process -Wait -PassThru` で、`windows-launcher.exe` に `"<bash.exe の場所>" -c "exit 0"` を渡して1回動かし、終了コードが 0 かを確かめる。その PC で作った `windows-launcher.exe` には署名が無いので、Smart App Control やウイルス対策の道具が、`windows-launcher.exe` が動き出すのを止めることがある。`windows-launcher.exe` が止められる PC で `enable` が予定を登録すると、点検は一度も動かず、点検が動かない原因はどこにも残らない
+  - `enable` は、`New-ScheduledTaskTrigger -Weekly -DaysOfWeek <曜日> -At <時刻>` と、`New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)` を作る
+  - `enable` は、`Register-ScheduledTask -Force` で予定を登録する。動かすプログラムは `windows-launcher.exe` で、引数は `"<bash.exe の場所>" "<スクリプトの場所>" run` である
+- `enable` は、Windows の予定に `-StartWhenAvailable` を付けない
+- Windows の予定は、登録した開発者が Windows にログオンしている間だけ動く
+- `disable` は `windows-launcher.exe` を消さない。次の `enable` が同じ `windows-launcher.exe` を使う
+- 起動用のプログラム `windows-launcher.exe` は、窓を持たない種類のプログラムである。このプログラムは、受けた1つ目の引数のプログラムを、残りの引数を付けて、`UseShellExecute` を偽、`CreateNoWindow` を真にして起動し、終わるのを待ち、そのプログラムの終了コードで終わる
+- `windows-launcher.exe` は、.NET Framework の `ProcessStartInfo` に引数を1つの文字列で渡すので、残りの引数のうち空白か二重引用符を含むものを二重引用符で囲み、Windows のコマンドラインの決まりのとおりに、引用符の前の逆斜線と、中の二重引用符を、逆斜線でエスケープする。エスケープとは、文字の前に逆斜線を置いて、その文字が引数の区切りや囲みとして読まれないようにすることである。引数を空白でつなぐだけだと、スクリプトの場所に空白がある PC で、予定から動いた点検が毎回失敗するためである
+- Windows 11 は、コンソールのプログラムが窓を作るときに、その窓を既定の端末の Windows Terminal に引き継ぐ。窓を作らずに起動したコンソールのプログラムは、Windows Terminal に引き継がれない。bash から起動した claude や git や gh も、親の窓の無いコンソールを受け継ぐ。そのため、点検の間に窓は出ない
+- 採らなかった Windows の動かし方と理由は、次のとおりである。根拠は research.md に書く
+  - 予定が `powershell.exe -WindowStyle Hidden` から bash を動かすと、既定の端末が Windows Terminal の PC では、Windows Terminal が点検の間ずっと窓を出す。Windows 11 は、初期の設定で Windows Terminal を使う
+  - `conhost.exe --headless` から動かす形は、Microsoft が支援していない使い方で、窓が一瞬出る報告がある
+  - ログオンしていなくても動く設定(ログオンの種類 S4U)で予定を登録すると、予定から動いた点検は、ネットワークと暗号化されたファイルを使えない。点検は、資格情報マネージャーにある `gh` のログインで Issue と PR を読むので、この設定では動かない
+  - パスワードを保存する設定は、開発者の Windows のパスワードを予定に保存させる。開発者が Windows のパスワードを変えると、予定は動かなくなる
 - macOS: `enable` は、`~/Library/LaunchAgents/com.keirekipro.memory-inspection.<ID8>.plist` を書く。plist の `StartCalendarInterval` には `Weekday` `Hour` `Minute` を書き、`ProgramArguments` には `/bin/bash` とスクリプトの場所と `run` を書き、`StandardOutPath` と `StandardErrorPath` には点検の状態の場所の `run.log` を書く。`enable` は、`launchctl bootout gui/<uid>/<ラベル>` で古い登録を外してから、`launchctl bootstrap gui/<uid> <plist>` で読み込む
 - Linux: `enable` は、`crontab -l` の出力から、末尾に `# keirekipro-memory-inspection <ID8>` が付いた行を消し、`<分> <時> * * <曜日> /bin/bash '<スクリプトの場所>' run >> '<run.log の場所>' 2>&1 # keirekipro-memory-inspection <ID8>` の1行を足して、`crontab -` で書き戻す
-- `enable` は、`command -v` で `claude` と `gh` と `bash` の場所を探し、そのときの `PATH` と一緒に `config.json` に書く。OS の予定の仕組みから動くスクリプトは、ターミナルと同じ `PATH` を持たないので、`run` は `config.json` の `PATH` を使う
+- `enable` は、`command -v` で `claude` と `gh` と `bash` の場所を探し、そのときの `PATH` と一緒に `config.json` に書く。OS の予定の仕組みから動くスクリプトは、ターミナルと同じ `PATH` を持たないので、`run` は `config.json` の `PATH` を使う。Windows のタスク スケジューラは、Git の `usr/bin` を含まない Windows の `PATH` で bash を動かす。そのため、`memory-inspect.sh` は、`config.json` を読む前に `perl` と `dirname` を見つけられるように、始めに `PATH` の後ろに `/usr/bin` と `/bin` を足す
 
 **状態の持ち方**: `enable` は、同じ名前の予定を上書きして登録する。そのため、開発者が `enable` を何度打っても、予定は1つだけである。曜日か時刻を変えたいときも、開発者は `enable` を打ち直す。`disable` は、予定が無くても成功で終わる。
 
-**失敗したとき**: OS の予定の仕組みへの登録が失敗したら、`enable` は、`config.json` を書かずに、OS のコマンドの出力を示して終了コード 1 で終わる。Linux で `crontab` が無いときは、`enable` は cron の入れ方を示して終了コード 1 で終わる。
+**失敗したとき**: OS の予定の仕組みへの登録が失敗したら、`enable` は、`config.json` を書かずに、OS のコマンドの出力を示して終了コード 1 で終わる。`enable` は、Windows で起動用のプログラムを作れなかったときと、作った起動用のプログラムを試しに動かして終了コードが 0 でなかったときも、予定を登録せず、`config.json` を書かずに、OS のコマンドの出力を示して終了コード 1 で終わる。起動用のプログラムを作れなかったときと、試しに動かして終了コードが 0 でなかったときには、セキュリティの道具が `Add-Type` のコンパイルを止めたときと、`windows-launcher.exe` を動かすのを止めたときが入る。Linux で `crontab` が無いときは、`enable` は cron の入れ方を示して終了コード 1 で終わる。
 
 ### memory-inspect.sh の run(点検を1回行うコマンド)
 
@@ -293,7 +308,7 @@ sequenceDiagram
 - この部品は、目次に行があるのにファイルが無いメモリファイルと、ファイルがあるのに目次に行が無いメモリファイルを並べる
 - この部品は、比べる元 `snapshot.json` があれば、ファイルごとのハッシュと行ごとのハッシュを比べ、前の点検のあとに書き換わったファイルと、足された行を見つける。`snapshot.json` が無ければ、この回を初回とし、会話を通らない書き換えを探さない
 - この部品は、書き換わったファイルごとに、`transcript-scan.pl writes` で、前の点検の時刻のあとの会話の記録に、そのファイルを指す Write か Edit の呼び出しがあるかを調べる。呼び出しが無ければ、この部品は、そのファイルを会話を通らない書き換えの疑いとし、汚染の種類11の、会話を通らない直接の書き換えとして記録に書く。この汚染の扱いは「直さない」で、理由は「書き換えられたことだけでは直さない。中身はほかの種類について点検した」である
-- この部品は、`reverted.json` から、戻された直しのうち、戻した文がまだメモリにそのまま残っているものを並べる
+- この部品は、`reverted.json` から、戻された直しのうち次の4つを、戻された直しの一覧として並べる。1つ目は、`restored_text` がまだメモリにそのまま残っている `edit` である。2つ目は、`file` のハッシュが `restored_sha256` から変わっていない `delete` である。3つ目は、`file` のハッシュが `restored_sha256` から変わっていない `append_index_line` である。4つ目は、`file` が目次である `append_index_line` である
 - この部品は、前の3回の記録と `answers.json` から、決まりの見直しの案を書いてよい汚染の種類を求める。求め方は、データの形の節の「繰り返しの数え方」に書く
 - この部品は、`missed.json` から、開発者が会話で指摘した、点検の見落としのうち、まだ見直しの案を作っていないものを並べる
 
@@ -307,7 +322,7 @@ sequenceDiagram
 
 **呼び出し方**:
 - `transcript-scan.pl writes --since <時刻> --memory-dir <場所> <ファイル名>...`: この部品は、更新の時刻が `<時刻>` よりあとの記録から、道具の呼び出しのうち、名前が `Write` `Edit` `MultiEdit` で、`file_path` がメモリのディレクトリの中のファイルを指すものを探す。この部品は、パスの区切りと大文字と小文字の違いをそろえてから比べる。この部品は、ファイル名ごとに、見つかったかどうかを JSON で返す
-- `transcript-scan.pl utterances <会話の ID>`: この部品は、その会話の記録から、`type` が `user` で、中身が文字の列で、`isMeta` が真でない行の文だけを、時刻と一緒に返す。この部品は、道具の結果の行と、会話に差し込まれた知らせの行を返さない。この部品は、1件の結果を20KBまでで切る
+- `transcript-scan.pl utterances <会話の ID>`: この部品は、その会話の記録から、`type` が `user` で、`isMeta` が真でない行の文だけを、時刻と一緒に返す。中身が文字の列の行では、この部品はその文を返す。中身が配列の行では、この部品は、`type` が `text` の部分の文をつないで返し、`text` の部分が無い行を返さない。画像と一緒に打った文を落とさないためである。この部品は、道具の結果の行と、会話に差し込まれた知らせの行を返さない。この部品は、1件の結果を20KBまでで切る
 
 **失敗したとき**: 記録が読めない行は、この部品は飛ばす。記録の形が変わって何も読めなかったときは、`writes` は「見つからなかった」と返す。記録の形が変わって `writes` が「見つからなかった」と返しても、その誤りで起きるのは、会話の中の書き換えを、会話を通らない書き換えの疑いとして扱うことだけである。疑いのファイルは、ほかの種類について点検されるだけで、消されも戻されもしない。`utterances` は、記録が無いか読めないときに「記録が無い」と返す。点検の中の Claude は、そのとき、外から混入した指示の疑いを「確かめられなかった」とする。
 
@@ -324,7 +339,7 @@ sequenceDiagram
 - 量が多すぎる状態は、ほかの種類の直しを行ったあとの目次の行の数と大きさで判断し、直し方を書くこと。スクリプトは、直したあとの目次の行の数と大きさを、ほかの直しの `old` と `new` から求めて材料に添えない。点検の中の Claude が、ほかの直しで減る行を見込んで判断する
 - 事実を確かめてから直すこと。確かめられなかったときは、扱いを `unverified` にし、直し方を書かないこと
 - 外から混入した指示の疑いは、`utterances` で開発者の発言を調べてから扱いを決めること。メモリファイルの frontmatter の `originSessionId` が、そのメモリを書いた会話の ID である
-- 戻された直しの一覧にある文は、文が変わっていない限り、同じ直しをしないこと
+- 戻された直しの一覧にある文は、文が変わっていない限り、同じ直しをしないこと。戻された直しの一覧にある `append_index_line` の直しについては、その直しの `file` を指す行を、言い回しを変えても目次に足さないこと
 - 決まりの見直しの案を書いてよい種類にだけ、決まりの見直しの案を書くこと
 - 印 `+` の無い行の汚染のうち、前の点検のときにすでに汚染だったものには、点検のやり方の見直しの案を書くこと。古くなった事実のように、前の点検のあとに事実が変わって汚染になったものには書かないこと
 - 開発者が指摘した見落としごとに、点検のやり方の見直しの案を書くこと
@@ -345,8 +360,10 @@ sequenceDiagram
 - 汚染の種類が、置き場所の誤りの10か、会話を通らない書き換えの11である
 - `edit` の `old` が、そのメモリファイルにちょうど1回現れない
 - `edit` の `old` が、そのメモリファイルの frontmatter のあとの本文の全体に当たる。この部品は、この確認で、1つのメモリファイルの全体の書き直しを断る。ファイルの全体を消すときは、点検の中の Claude は `delete` を使う
-- `edit` の `old` が、戻された直しの一覧の文を含むか、その文に含まれる
+- `edit` の `old` が、戻された直しの一覧の `edit` と `delete` の文を含むか、その文に含まれる
 - `delete` の対象が、戻されてから中身が変わっていないメモリファイルである
+- `append_index_line` の足す行が指すメモリファイルが、戻された直しの一覧の `append_index_line` の直しの `file` である。足す行の言い回しが違っても、開発者が目次から外したメモリファイルを、次の点検が目次に足し直さないためである
+- `append_index_line` の足す行が、戻された直しの一覧の、`file` が目次である `append_index_line` の直しの `restored_text` と同じである
 - 対象のファイルの名前が、メモリのディレクトリの最上位の `.md` でない
 - 対象が目次で、直し方が `delete` である
 - 対象のファイルが無い
@@ -419,8 +436,8 @@ sequenceDiagram
 - `revert <回の ID> <直しの ID>`: 直しを戻す。直しの ID は `C1` `C2` のような、報告に載る番号である
   - `new` が空でない `edit` を戻すとき、このコマンドは、直したあとの文がメモリファイルにちょうど1回現れることを確かめ、直す前の文に置き換える。現れないか2回以上現れるときは、このコマンドは戻さず、その理由を出して終了コード 1 で終わる
   - `new` が空の `edit` を戻すとき、このコマンドは、記録の `anchor` がメモリファイルにちょうど1回現れることを確かめる。`anchor_side` が `before` のときは、このコマンドは、直す前の文を `anchor` の直後に戻す。`anchor_side` が `after` のときは、このコマンドは、直す前の文を `anchor` の直前に戻す。`anchor` が現れないか2回以上現れるときは、このコマンドは戻さず、その理由を出して終了コード 1 で終わる。戻す位置にもう直す前の文があるときも、このコマンドは戻さず、その理由を出して終了コード 1 で終わる。同じ記述が2つにならないようにするためである
-  - `delete` を戻すとき、このコマンドは、記録の消す前の全文でメモリファイルを作り直し、記録の消した目次の行を目次の末尾に足す。同じ名前のファイルがもうあるときは、このコマンドは戻さずに終了コード 1 で終わる
-  - `append_index_line` を戻すとき、このコマンドは目次からその行を消す
+  - `delete` を戻すとき、このコマンドは、記録の消す前の全文でメモリファイルを作り直し、記録の消した目次の行を目次の末尾に足す。同じ名前のファイルがもうあるときは、このコマンドは戻さずに終了コード 1 で終わる。このコマンドは、`reverted.json` の `restored_sha256` に、作り直したファイルのハッシュを書く
+  - `append_index_line` を戻すとき、このコマンドは目次からその行を消す。このコマンドは、`reverted.json` に、`file` として消した行が指すメモリファイルの名前を、`restored_text` として消した行を、`restored_sha256` としてそのメモリファイルの今のハッシュを書く。消した行がメモリファイルを指さないときは、このコマンドは、`file` に目次の名前を書き、`restored_sha256` を書かない
   - このコマンドは、メモリのロックを取ってから書く。このコマンドは、戻したことを、その回の `record.json` の `reverts` に書き足し、`reverted.json` に戻した文を足し、`snapshot.json` のそのファイルのハッシュを戻したあとのハッシュにする。戻した書き換えを、次の点検が会話を通らない書き換えの疑いとしないためである
 - `answer <回の ID> <案の ID> declined|accepted [--issue <番号>]`: 案への開発者の答えを `answers.json` に書く。案の ID は、移す先の案が `R1`、決まりの見直しの案が `K1`、点検のやり方の見直しの案が `M1` のような、報告に載る番号である
 - `missed <汚染の種類> <メモリファイルの名前> <短い説明>`: 開発者が会話で指摘した見落としを `missed.json` に書く。短い説明には、メモリの文を写さず、どの記述の見落としかが分かる言葉だけを書く
@@ -479,6 +496,7 @@ keirekipro-memory-inspection/
   answers.json
   missed.json
   run.log
+  windows-launcher.exe
   locks/memory/
   locks/run/owner
   work/
@@ -570,7 +588,7 @@ keirekipro-memory-inspection/
 - `fingerprint` は、汚染の種類とファイル名と、空白をそろえた記述の文を続けた文字の列の SHA-256 である
 - `trigger` は、決まった曜日と時刻の点検なら `scheduled`、その場で動かした点検なら `now` である
 
-**reverted.json(戻された直し)**: `[{ "run_id", "change", "file", "restored_text", "restored_sha256" }]`。`restored_text` は、戻したあとにメモリにある文である。`revert` のコマンドは、`delete` を戻したときは、`restored_sha256` に作り直したファイルのハッシュを書く。適用の部品は、`restored_text` がメモリにそのまま残っている間と、作り直したファイルのハッシュが変わっていない間、同じ直しを断る。
+**reverted.json(戻された直し)**: `[{ "run_id", "change", "file", "restored_text", "restored_sha256" }]`。`restored_text` は、`edit` と `delete` を戻したときは、戻したあとにメモリにある文である。`revert` のコマンドが直し方ごとに何を書くかは、部品の節の「会話の中の操作」の `revert` に書く。適用の部品がどの直しを断るかは、部品の節の「直し方の確認」に書く。
 
 **answers.json(案への答え)**:
 
@@ -672,9 +690,9 @@ keirekipro-memory-inspection/
 
 - 単体テスト:
   - 時刻の確認: 決まった時刻の9分後なら点検を始め、11分後なら何もしない。macOS の起きたときの1回で、逃した回が遅れて行われないことを確かめる
-  - 直し方の確認: 記述が無い直し、`old` が2回現れる直し、本文の全体に当たる `old`、置き場所の誤りの種類10と会話を通らない書き換えの種類11の直し、`unverified` の直し、戻された文に重なる直し、読んだあとに書き換わったファイルへの直しを、すべて断って理由を書く
+  - 直し方の確認: 記述が無い直し、`old` が2回現れる直し、本文の全体に当たる `old`、置き場所の誤りの種類10と会話を通らない書き換えの種類11の直し、`unverified` の直し、戻された文に重なる直し、戻された `append_index_line` の `file` を、言い回しの違う行で指す直し、読んだあとに書き換わったファイルへの直しを、すべて断って理由を書く。戻された `append_index_line` の `file` の中身が変わったあとは、そのファイルを指す行を足す直しを行う
   - 繰り返しの数え方: 前の3回の記録から、案を載せる種類が正しく求まる。直さずに残した汚染と戻した直しの汚染が、2回目からは新しい汚染として数えられない。断った種類が除かれる。断った種類について、適用の部品が報告に「決まりの見直しの案を作れなかった」と書かない
-  - 会話の記録の読み方: Write と Edit の呼び出しを見つける。`cwd` がほかのプロジェクトの記録を使わない。`utterances` が道具の結果と `isMeta` の行を返さない
+  - 会話の記録の読み方: Write と Edit の呼び出しを見つける。`transcript-scan.pl` は、`cwd` がほかのプロジェクトの場所である記録を使わない。`utterances` が道具の結果と `isMeta` の行を返さない。`utterances` が、中身が配列の行から `type` が `text` の部分の文をつないで返す
   - 目次の数え方: frontmatter と HTML の注記を除いて行と大きさを数える
 - 結合テスト:
   - 偽の `claude` が直し方を返すと、メモリが書き換わり、`record.json` と `report.md` に直す前の文と直したあとの文が載り、`snapshot.json` が書き直される。汚染が無い回も報告が作られ、「汚染は無かった」が載る
@@ -688,10 +706,13 @@ keirekipro-memory-inspection/
   - 終わっていない回の後始末の部品は、点検のロックを取っている回の `running` の記録を中断にせず、ロックを取ったプロセスが無い回の `running` の記録を、90分を待たずに中断にする
 - 予定の登録のテスト:
   - `enable` を2回打っても、`crontab` の印の付いた行は1行だけで、`Register-ScheduledTask` には `-Force` が付き、`launchctl` は `bootout` のあとに `bootstrap` が呼ばれる
+  - Windows の `enable` は、`windows-launcher.exe` が無いときと `windows-launcher.cs` より古いときに、`Add-Type` に `-OutputType WindowsApplication` を付けて起動用のプログラムを作り、新しいときは作らない。予定の動かすプログラムは `windows-launcher.exe` で、引数は bash.exe の場所とスクリプトの場所と `run` である。試しに動かした `windows-launcher.exe` の終了コードが 0 でないときは、`enable` は予定を登録せずに終了コード 1 で終わる
+  - 起動したときの `PATH` に `perl` も `dirname` も無くても、`run` は点検する
   - `enable` に曜日と時刻を渡さないと、登録する予定は月曜日の10時になる。`--day fri --time 18:30` を渡すと、登録する予定は金曜日の18時30分になる
   - `disable` のあとは、印の付いた行が無くなり、`config.json` の `enabled` が偽になり、`run` が何もしない
-- 手で確かめること: 実装のときに、開発者の PC で次の6つを手で確かめる。
+- 手で確かめること: 実装のときに、開発者の PC で次の7つを手で確かめる。
   - Windows で、予定から動いた点検の間に窓が出ないこと
+  - Windows で、起動用のプログラムが、空白を含む場所のスクリプトを予定から動かせること
   - `--tools ""` で点検の中の Claude が道具を1つも持たないこと
   - `--json-schema` の結果を受ける欄の名前が何か
   - 会話の中から `run-now` を動かしたときに、外す環境変数の一覧で `claude -p` が動くこと

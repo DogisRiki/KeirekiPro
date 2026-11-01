@@ -109,9 +109,26 @@ OS の予定と `claude -p` を選んだ。
 - 選んだ案: 新しい印を足さない。PR がマージされたあとの点検で、同じ記述がリポジトリの文書にもあるので、点検は、その記述を重複と二重記述の汚染として消す
 - 理由: マージと結び付ける記録を足すと、記録の形と読み分けが増える(steering の `pipeline-design.md` の「一度きりの事情のために仕組みを足さない」)
 
+### Windows の予定の動かし方(実装のときの見直し)
+
+- 背景: タスク8.2の実地の確かめ(2026-11-01、Windows 11、既定の端末は「Windows に任せる」)で、`powershell.exe -NoProfile -WindowStyle Hidden` から動かした予定は、Windows Terminal の窓を点検の間ずっと出した。`-WindowStyle Hidden` は、OS が先に窓を作ってから隠す指定で、既定の端末が Windows Terminal のときは効かない
+- 選んだ案: 窓を持たない種類の小さな起動用のプログラムが、`CreateNoWindow` で bash を起動する。窓を作らない起動では、Windows Terminal への引き継ぎが起きない。子のプロセスは親の窓の無いコンソールを受け継ぐ。実地の確かめで、10秒のあいだ20ミリ秒ごとに数えて窓は1つも増えず、`gh` の Issue の読み出しと `claude` の起動が動いた
+- 採らなかった案: `conhost.exe --headless` は、Microsoft が支援していない使い方で、窓が一瞬出る報告と、セキュリティの検知の規則がある。ログオンの種類 S4U は、ネットワークと暗号化されたファイルを使えず、資格情報マネージャーにある `gh` のログインを読めない。パスワードを保存する設定は、開発者の Windows のパスワードを保存させる。VBScript から隠して動かす形は、VBScript が廃止に向かっている
+- 根拠:
+  - https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags — `CREATE_NO_WINDOW`
+  - https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.processstartinfo.createnowindow — `CreateNoWindow` は `UseShellExecute` が偽のときに効く
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/add-type?view=powershell-5.1 — `-OutputType WindowsApplication`
+  - https://learn.microsoft.com/en-us/windows/console/creation-of-a-console — 子のプロセスは親のコンソールを受け継ぐ
+  - https://github.com/microsoft/terminal/blob/main/doc/specs/%23492%20-%20Default%20Terminal/spec.md — 既定の端末への引き継ぎは窓を作るときに起きる
+  - https://github.com/microsoft/terminal/issues/12464 — `-WindowStyle Hidden` が Windows Terminal で効かない
+  - https://github.com/microsoft/terminal/issues/13914 — `conhost --headless` は支援されていない
+  - https://learn.microsoft.com/en-us/windows/win32/api/taskschd/ne-taskschd-task_logon_type — S4U の制限
+  - https://detection.fyi/sigmahq/sigma/windows/process_creation/proc_creation_win_csc_susp_dynamic_compilation — 動的なコンパイルの検知の規則
+
 ## おそれと手当て
 
-- Windows で、タスク スケジューラが `bash.exe` を動かすと、点検の間、黒い窓が出るおそれがある。窓を閉じると点検が途中で終わる。手当て: 予定の動かし方を `powershell.exe -NoProfile -WindowStyle Hidden` からにする。Windows Terminal が既定の端末のときにも窓が隠れるかは、実装のときに手で確かめる
+- Windows で、タスク スケジューラが `bash.exe` を動かすと、点検の間、黒い窓が出るおそれがある。窓を閉じると点検が途中で終わる。手当て: 予定は、窓を作らない起動用のプログラム `windows-launcher.exe` を通して bash を動かす(下の「Windows の予定の動かし方(実装のときの見直し)」)
+- 起動用のプログラムを `Add-Type` で作る操作を、セキュリティの道具が動的なコンパイルとして止めるおそれがある。手当て: `enable` は、起動用のプログラムを、AppData と一時のフォルダの外の点検の状態の場所に、必要なときだけ作る。毎週の点検はコンパイルしない。止められたときは、`enable` が PowerShell の出力を示して終わる
 - 会話の記録の形が Claude Code の版で変わると、書き換えの見分けと、開発者の発言の抜き出しが働かなくなる。手当て: 読めないときは、書き換えの疑いとして点検し、外から混入した指示は確かめられなかったとする。どちらも、消す向きに倒さない
 - 点検に使うモデルは、開発者の既定のモデルになる。手当て: 引数でモデルを決めない。モデルの選びは開発者の設定に任せる
 - 会話の記録は初期値で30日で消える。点検は週に1回なので、前の点検のあとの記録は残っている
