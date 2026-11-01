@@ -25,7 +25,8 @@
 #     config.json を enabled が真で書く。本体の作業フォルダとメモリのディレクトリは paths と同じ求め方で求める
 #   config disable
 #     config.json の enabled を偽にし、disabled_at を書く。config.json が無ければ何もしない
-#   windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所>
+#   windows-task launcher <0|1> <windows-launcher.cs の場所> <windows-launcher.exe の場所> <bash.exe の場所>
+#   windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> <windows-launcher.exe の場所>
 #     タスク スケジューラに予定を登録する命令の文を、powershell.exe の -EncodedCommand に渡す形で出す
 #   windows-task disable <予定の名前>
 #     タスク スケジューラの予定を外す命令の文を、同じ形で出す
@@ -230,7 +231,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | id8 | cron <ID8> [<曜日> <HH:MM> <スクリプトの場所> <run.log の場所>] | config enable <曜日> <HH:MM> <予定の仕組み> <予定の名前> <tools の JSON> | config disable | windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> | windows-task disable <予定の名前> | plist <ラベル> <曜日> <HH:MM> <スクリプトの場所> <run.log の場所> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | session-context | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | id8 | cron <ID8> [<曜日> <HH:MM> <スクリプトの場所> <run.log の場所>] | config enable <曜日> <HH:MM> <予定の仕組み> <予定の名前> <tools の JSON> | config disable | windows-task launcher <0|1> <windows-launcher.cs の場所> <windows-launcher.exe の場所> <bash.exe の場所> | windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> <windows-launcher.exe の場所> | windows-task disable <予定の名前> | plist <ラベル> <曜日> <HH:MM> <スクリプトの場所> <run.log の場所> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | session-context | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
     return 2;
 }
 
@@ -1318,23 +1319,33 @@ sub ps_quote {
     return "'$s'";
 }
 
-# タスク スケジューラに予定を登録する命令の文か、予定を外す命令の文を作り、powershell.exe の -EncodedCommand に渡す形
-# (UTF-16LE の Base64)で出す。命令の文を引数の引用符の解釈に通さないので、場所に空白と単一引用符があっても壊れない:
-# windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> | windows-task disable <予定の名前>
+# 起動用のプログラムを作って試しに動かす命令の文か、タスク スケジューラに予定を登録する命令の文か、予定を外す命令の文を作り、
+# powershell.exe の -EncodedCommand に渡す形(UTF-16LE の Base64)で出す。命令の文を引数の引用符の解釈に通さないので、
+# 場所に空白と単一引用符があっても壊れない。launcher の 1 は、起動用のプログラムを作ってから試しに動かすことを、0 は作らずに試しに動かすことを表す:
+# windows-task launcher <0|1> <windows-launcher.cs の場所> <windows-launcher.exe の場所> <bash.exe の場所>
+# | windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> <windows-launcher.exe の場所>
+# | windows-task disable <予定の名前>
 sub cmd_windows_task {
     my ($op, @args) = @_;
     my @body;
-    if (defined $op && $op eq 'enable' && @args == 5) {
+    # 起動用のプログラムに渡す引数は、Windows のコマンドラインとして読まれるので、" と改行を含む場所は渡せない
+    my $plain = sub { for (@_) { die "場所 $_ に \" か改行がある\n" if /["\r\n]/; } };
+    if (defined $op && $op eq 'launcher' && @args == 4 && $args[0] =~ /\A[01]\z/) {
+        my ($cs, $exe, $bash) = map { decode('UTF-8', $_) } @args[1 .. 3];
+        $plain->($bash);
+        push @body, sprintf('Add-Type -Path %s -OutputAssembly %s -OutputType WindowsApplication', ps_quote($cs), ps_quote($exe)) if $args[0];
+        # 署名の無い起動用のプログラムを、セキュリティの道具が止める PC では、予定を登録しても点検が一度も動かないので、先に試す
+        push @body, sprintf('$p = Start-Process -FilePath %s -ArgumentList %s -Wait -PassThru', ps_quote($exe), ps_quote(qq{"$bash" -c "exit 0"})),
+            q{if ($p.ExitCode -ne 0) { throw ('windows-launcher.exe exited with code ' + $p.ExitCode) }};
+    } elsif (defined $op && $op eq 'enable' && @args == 6) {
         my ($day, $time) = @args[0, 1];
         my ($hour, $min) = schedule_time($day, $time);
-        my ($name, $bash, $script) = map { decode('UTF-8', $_) } @args[2 .. 4];
-        # 動かすプログラムの引数は、Windows のコマンドラインとして読まれるので、" と改行を含む場所は渡せない
-        for ($bash, $script) { die "場所 $_ に \" か改行がある\n" if /["\r\n]/; }
-        my $arg = sprintf('-NoProfile -WindowStyle Hidden -Command "& %s %s run"', ps_quote($bash), ps_quote($script));
+        my ($name, $bash, $script, $exe) = map { decode('UTF-8', $_) } @args[2 .. 5];
+        $plain->($bash, $script);
         @body = (
             sprintf("\$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek %s -At '%02d:%02d'", $PS_DAY{$day}, $hour, $min),
             '$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)',
-            sprintf("\$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument %s", ps_quote($arg)),
+            sprintf('$action = New-ScheduledTaskAction -Execute %s -Argument %s', ps_quote($exe), ps_quote(qq{"$bash" "$script" run})),
             sprintf('Register-ScheduledTask -TaskName %s -Trigger $trigger -Settings $settings -Action $action -Force | Out-Null', ps_quote($name)),
         );
     } elsif (defined $op && $op eq 'disable' && @args == 1) {

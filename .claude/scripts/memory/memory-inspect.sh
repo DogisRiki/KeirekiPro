@@ -30,6 +30,10 @@
 # =====================================================================
 set -u
 
+# Windows のタスク スケジューラは、Git の usr/bin を含まない Windows の PATH で bash を起動する。
+# dirname と perl を見つけられるように、/usr/bin と /bin を後ろに足す。ほかの OS では、もとから含まれている
+PATH="$PATH:/usr/bin:/bin"
+
 # git に渡すので、Windows では C:/... の形にする。会話の中の Claude Code は Git Bash の引数の書き換えを止めるので、
 # /c/... の形のままでは git が場所を見つけられない
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && { pwd -W 2>/dev/null || pwd -P; })
@@ -403,24 +407,33 @@ win_path() {
     if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s\n' "$1"; fi
 }
 
-# 命令の文を、powershell.exe に -EncodedCommand で渡す。失敗したら powershell.exe の出力を添えて終わる:
-# powershell_run <memory-inspect.pl の windows-task の引数>...
+# 命令の文を、powershell.exe に -EncodedCommand で渡す。失敗したら、失敗したときの文に powershell.exe の出力を添えて終わる:
+# powershell_run <失敗したときの文> <memory-inspect.pl の windows-task の引数>...
 powershell_run() {
-    local cmd out
+    local msg=$1 cmd out
+    shift
     command -v powershell.exe >/dev/null 2>&1 ||
         fail "powershell.exe が見つからない。Windows の PowerShell を使える状態にしてから、打ち直す。"
     cmd=$(perl "$PL" windows-task "$@") || fail "powershell.exe に渡す命令の文を作れなかった。"
-    out=$(powershell.exe -NoProfile -NonInteractive -EncodedCommand "$cmd" 2>&1) ||
-        fail "タスク スケジューラの予定を変えられなかった。powershell.exe の出力: $out"
+    out=$(powershell.exe -NoProfile -NonInteractive -EncodedCommand "$cmd" 2>&1) || fail "$msg powershell.exe の出力: $out"
 }
 
-# Windows のタスク スケジューラに、予定を登録する。同じ名前の予定は -Force で置き換わる:
+# 起動用のプログラム windows-launcher.exe を試しに動かしてから、Windows のタスク スケジューラに、windows-launcher.exe が
+# bash.exe でスクリプトの run を動かす予定を登録する。windows-launcher.exe が無いときと、本体の作業フォルダの
+# windows-launcher.cs より古いときは、先に作り直す。同じ名前の予定は -Force で置き換わる:
 # windows_enable <予定の名前> <曜日> <HH:MM> <スクリプトの場所>
 windows_enable() {
-    local b
+    local b cs exe build=0
     b=$(command -v bash)
     if [ -f "$b.exe" ]; then b="$b.exe"; fi
-    powershell_run enable "$2" "$3" "$1" "$(win_path "$b")" "$(win_path "$4")"
+    cs="$(dirname "$4")/windows-launcher.cs"
+    exe="$STATE/windows-launcher.exe"
+    [ -f "$cs" ] ||
+        fail "本体の作業フォルダに $cs が無い。本体の作業フォルダを main に合わせてから、enable を打ち直す。"
+    if [ ! -f "$exe" ] || [ "$exe" -ot "$cs" ]; then build=1; fi
+    powershell_run "起動用のプログラム windows-launcher.exe を作れなかったか、試しに動かすと 0 でない終了コードで終わったので、予定を登録しなかった。セキュリティの道具が止めていないかを確かめてから、打ち直す。" \
+        launcher "$build" "$(win_path "$cs")" "$(win_path "$exe")" "$(win_path "$b")"
+    powershell_run "タスク スケジューラの予定を変えられなかった。" enable "$2" "$3" "$1" "$(win_path "$b")" "$(win_path "$4")" "$(win_path "$exe")"
 }
 
 # macOS の launchd に、plist を書いて読み込む。古い登録を外してから読み込むので、予定は1つだけになる:
@@ -500,7 +513,7 @@ cmd_disable() {
     id=$(perl "$PL" id8) || fail "予定の名前に付ける印を求められなかった。"
     ensure_state
     case "$kind" in
-    windows-task) powershell_run disable "KeirekiPro memory inspection $id" ;;
+    windows-task) powershell_run "タスク スケジューラの予定を変えられなかった。" disable "KeirekiPro memory inspection $id" ;;
     launchd) launchd_disable "com.keirekipro.memory-inspection.$id" ;;
     cron) cron_disable "$id" ;;
     esac

@@ -171,7 +171,7 @@
   - 受入基準とテストの対応: 要件4の受入基準5(戻した直しを同じようにしない)は、テストの「戻された append_index_line のメモリファイルを、言い回しの違う行で指す直しを、次の回の apply が断る」で確かめる
   - _要件: 4.5_
 
-- [ ] 5. 点検を動かす入口のコマンドを作る
+- [x] 5. 点検を動かす入口のコマンドを作る
 - [x] 5.1 点検の中の Claude を呼ぶ部品を作る
 
   Claude は、部品「点検の中の Claude を呼ぶ部品」のうち、`claude -p` を呼ぶ部分を、memory-inspect.sh に作る。呼ぶ部分は、design の引数と環境変数と作業フォルダで `claude -p` を呼ぶ。道具を無くす引数の形と、外す環境変数の一覧は、タスク1.1で確かめた値を使う。呼ぶ部分は、design の「呼び出し方」の5つを順に並べた文を標準入力で渡す。呼ぶ部分は、3つ目のメモリの中身に、タスク3.2で作ったサブコマンドの出力を使う。呼ぶ部分は、3回目までに受けた直し方を、ファイルに書かずに、パイプで apply の標準入力に渡す。呼ぶ部分は、点検の中の Claude を3回まで呼び、調べてほしいことが返ったらタスク3.4の調べる部分で調べ、結果を足して次の呼び出しをする。3回目の結果に直し方が無いときは、呼ぶ部分は、直し方の JSON が読めないときと同じく、その回を中断とする。呼ぶ部分は、1回の呼び出しを20分で、点検の1回の全体を60分で打ち切り、プロセスの組ごと止める。呼ぶ部分は、design の「失敗したとき」に当たったときは、直し方を apply に渡さずに、中断の理由を標準エラーの1行に出して、0でない終了コードで終わる。中断の理由を `finalize --run --reason` で記録に書くのは、タスク5.2の run である。呼ぶ部分は、点検の中の Claude の出力を、`work/` と点検の状態の場所に残さない。
@@ -207,7 +207,7 @@
   - 受入基準とテストの対応: 要件1の受入基準1(使い始める操作を1回すると、毎週1回動く)は、テストの「--day fri --time 18:30 を渡すと、金曜日の18時30分の予定になる」で確かめる。要件1の受入基準2(曜日と時刻を選べ、選ばなければ月曜日の10時)は、テストの「曜日と時刻を渡さないと、月曜日の10時の予定になる」と「--day fri --time 18:30 を渡すと、金曜日の18時30分の予定になる」で確かめる。要件1の受入基準3(2回以上しても週に1回)は、テストの「enable を2回打っても、crontab の印の付いた行は1行だけである」で確かめる。要件1の受入基準5(やめる操作のあとは動かない)は、テストの「disable のあとは、印の付いた行が無くなり、enabled が偽になり、run が何もしない」で確かめる
   - _要件: 1.1, 1.2, 1.3, 1.5_
 
-- [ ] 5.5 Windows のタスク スケジューラと macOS の launchd の登録を作る
+- [x] 5.5 Windows のタスク スケジューラと macOS の launchd の登録を作る
 
   Claude は、部品「memory-inspect.sh の enable と disable」のうち、Windows と macOS の登録と取り外しを、design の「登録する予定」のとおりに作る。Claude は、`powershell.exe` に渡す命令の文を、引数に空白と単一引用符がある場所でも壊れない形で作る。Claude は、Windows の予定が動かす起動用のプログラムのソース `.claude/scripts/memory/windows-launcher.cs` を書く。起動用のプログラムは、空白か二重引用符を含む引数を、Windows のコマンドラインの決まりのとおりに囲んでエスケープする。エスケープとは、文字の前に逆斜線を置いて、その文字が引数の区切りや囲みとして読まれないようにすることである。Claude は、`enable` が予定を登録する前に、起動用のプログラム `windows-launcher.exe` を試しに1回動かす形にする。Claude は、`memory-inspect.sh` の始めで、`PATH` の後ろに `/usr/bin` と `/bin` を足す。
   - 完了の確かめ方: 3つの環境(実装のメモ)で、テストの「Windows の enable が、Register-ScheduledTask に -Force を付け、曜日と時刻と、電池で動くときの設定と IgnoreNew と3時間の上限を渡し、-StartWhenAvailable を付けない」「Windows の enable が、windows-launcher.exe が無いときと windows-launcher.cs より古いときに、Add-Type に -OutputType WindowsApplication を付けて起動用のプログラムを作り、新しいときは作らない」「Windows の動かすプログラムが windows-launcher.exe で、bash.exe とスクリプトの場所と run を渡す」「試しに動かした windows-launcher.exe が 0 以外で終わると、Windows の enable は予定を登録せずに終了コード 1 で終わる」「起動したときの PATH に perl も dirname も無くても、点検する」「場所に空白と単一引用符があっても、powershell.exe に渡す命令が壊れない」「macOS の enable が、bootout のあとに bootstrap を呼び、plist に Weekday と Hour と Minute と run.log の場所がある」「enable を2回打っても、Windows と macOS の予定の名前が1つだけである」「disable が、Windows と macOS の予定を外す」が通る

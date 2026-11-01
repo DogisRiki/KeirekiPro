@@ -178,11 +178,13 @@ EOF
     chmod +x "$1"
 }
 
-# 偽の powershell.exe・launchctl・crontab: 受けた引数を fake/os/<名前>.calls.jsonl に1行ずつ書き残し、成功で終わる
+# 偽の powershell.exe・launchctl・crontab: 受けた引数を fake/os/<名前>.calls.jsonl に1行ずつ書き残し、成功で終わる。
+# fake/os/<名前>.fail があれば、引数を書き残したあと、fail の中身を標準エラーに出して 1 で終わる
 write_fake_os() {
     cat >"$1" <<'EOF'
 #!/usr/bin/env bash
 perl -MJSON::PP -e 'print JSON::PP->new->canonical->encode([@ARGV]), "\n"' -- "$@" >>"$KP_TEST_FAKE_DIR/os/${0##*/}.calls.jsonl"
+if [ -f "$KP_TEST_FAKE_DIR/os/${0##*/}.fail" ]; then cat "$KP_TEST_FAKE_DIR/os/${0##*/}.fail" >&2; exit 1; fi
 EOF
     chmod +x "$1"
 }
@@ -2442,6 +2444,19 @@ else
         "0|1|$TMP_ROOT/sr-path/cfgbin:$narrow|completed"
 fi
 
+# Windows のタスク スケジューラは、Git の usr/bin を含まない Windows の PATH で bash を起動する。git だけが見つかる PATH で動かす
+sr_setup sr-ospath
+mkdir -p "$TMP_ROOT/sr-ospath/gitonly"
+cat >"$TMP_ROOT/sr-ospath/gitonly/git" <<EOF
+#!/bin/sh
+exec "$(command -v git)" "\$@"
+EOF
+chmod +x "$TMP_ROOT/sr-ospath/gitonly/git"
+claude_ok "$IC_EMPTY"
+TZ=JST-9 PATH=$TMP_ROOT/sr-ospath/gitonly "$(command -v bash)" "$SH" run >/dev/null 2>&1
+check "起動したときの PATH に perl も dirname も無くても、点検する" \
+    "$?|$(claude_calls)|$(jget "$STATE/runs/$SR_ID/record.json" status)" "0|1|completed"
+
 # 前の週の回が点検の中の Claude の失敗で中断し、次の週の回が a.md と b.md を点検する
 sr_setup sr-next
 printf -- '- [A](a.md) — a\n- [B](b.md) — b\n' >"$MEMDIR/MEMORY.md"
@@ -2695,35 +2710,66 @@ ps_literals() {
         (my $rest = $_) =~ s/\x27(?:[^\x27]|\x27\x27)*\x27//g;
         print "BROKEN\n" if $rest =~ /\x27/;'
 }
-# Windows の予定の、動かすプログラムに渡す引数の文字列を出す: ps_action_arg <命令の文のファイル>
-ps_action_arg() { ps_literals <"$1" | grep '^-NoProfile -WindowStyle Hidden '; }
+# 命令の文のファイルのうち、指定の文字で始まる行の単一引用符の文字列を、\ を / に替え、| でつないで出す:
+# ps_line <命令の文のファイル> <行の始まりの文字>
+ps_line() { awk -v p="$2" 'index($0, p) == 1' "$1" | ps_literals | sed 's|\\|/|g' | tr '\n' '|'; }
+# 場所を、enable が Windows に渡す形の \ を / に替えた形で出す: wm_path <場所>
+wm_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi; }
 # enable が登録するのと同じ求め方で、この PC の bash の場所を / の区切りで出す
 wm_bash() {
     local b
     b=$(command -v bash)
     if [ -f "$b.exe" ]; then b="$b.exe"; fi
-    if command -v cygpath >/dev/null 2>&1; then cygpath -m "$b"; else printf '%s\n' "$b"; fi
+    wm_path "$b"
 }
 
+# enable の1回目の powershell.exe の呼び出しは、起動用のプログラムを作って試しに動かす命令で、2回目は予定を登録する命令である
 wm_setup wm-win
 wm_cmd windows enable --day fri --time 18:30
 rc=$?
-ps_call 1 >"$FAKE/ps1.txt"
+ps_call 2 >"$FAKE/ps2.txt"
 check "Windows の enable が、Register-ScheduledTask に -Force を付け、曜日と時刻と、電池で動くときの設定と IgnoreNew と3時間の上限を渡し、-StartWhenAvailable を付けない" \
-    "$rc|$(head -n 1 "$FAKE/ps1.txt")|$(grep -c -F "New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At '18:30'" "$FAKE/ps1.txt")|$(grep -c -F 'New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)' "$FAKE/ps1.txt")|$(grep -c -F "Register-ScheduledTask -TaskName 'KeirekiPro memory inspection $EN_ID' -Trigger \$trigger -Settings \$settings -Action \$action -Force" "$FAKE/ps1.txt")|$(grep -c StartWhenAvailable "$FAKE/ps1.txt")|$(jget "$STATE/config.json" enabled scheduler task_name day time)" \
+    "$rc|$(head -n 1 "$FAKE/ps2.txt")|$(grep -c -F "New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At '18:30'" "$FAKE/ps2.txt")|$(grep -c -F 'New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)' "$FAKE/ps2.txt")|$(grep -c -F "Register-ScheduledTask -TaskName 'KeirekiPro memory inspection $EN_ID' -Trigger \$trigger -Settings \$settings -Action \$action -Force" "$FAKE/ps2.txt")|$(grep -c StartWhenAvailable "$FAKE/ps2.txt")|$(jget "$STATE/config.json" enabled scheduler task_name day time)" \
     "0|-NoProfile -NonInteractive -EncodedCommand|1|1|1|0|true,windows-task,KeirekiPro memory inspection $EN_ID,fri,18:30"
-arg=$(ps_action_arg "$FAKE/ps1.txt")
-check "Windows の動かすプログラムが、-WindowStyle Hidden の powershell.exe で、bash.exe とスクリプトの場所と run を渡す" \
-    "$(grep -c -F "New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -WindowStyle Hidden " "$FAKE/ps1.txt")|$(printf '%s' "$arg" | sed "s/'.*'/Q/")|$(printf '%s' "$arg" | ps_literals | sed 's|\\|/|g' | tr '\n' '|')" \
-    "1|-NoProfile -WindowStyle Hidden -Command \"& Q run\"|$(wm_bash)|$REPO/.claude/scripts/memory/memory-inspect.sh|"
+check "Windows の動かすプログラムが windows-launcher.exe で、bash.exe とスクリプトの場所と run を渡す" \
+    "$(grep -c -F 'New-ScheduledTaskAction -Execute ' "$FAKE/ps2.txt")|$(grep -c -F 'powershell.exe' "$FAKE/ps2.txt")|$(ps_line "$FAKE/ps2.txt" '$action = ')" \
+    "1|0|$(wm_path "$STATE/windows-launcher.exe")|\"$(wm_bash)\" \"$REPO/.claude/scripts/memory/memory-inspect.sh\" run|"
+
+# 偽の powershell.exe は windows-launcher.exe を作らないので、テストが作り、更新の時刻を替える
+wm_setup wm-build
+wm_cmd windows enable
+r1=$?
+ps_call 1 >"$FAKE/ps1.txt"
+printf 'exe\n' >"$STATE/windows-launcher.exe"
+touch -t 203001010000 "$STATE/windows-launcher.exe"
+wm_cmd windows enable
+r2=$?
+ps_call 3 >"$FAKE/ps3.txt"
+touch -t 200001010000 "$STATE/windows-launcher.exe"
+wm_cmd windows enable
+r3=$?
+ps_call 5 >"$FAKE/ps5.txt"
+check "Windows の enable が、windows-launcher.exe が無いときと windows-launcher.cs より古いときに、Add-Type に -OutputType WindowsApplication を付けて起動用のプログラムを作り、新しいときは作らない" \
+    "$r1$r2$r3|$(grep -c -F ' -OutputType WindowsApplication' "$FAKE/ps1.txt")$(grep -c -F 'Add-Type' "$FAKE/ps3.txt")$(grep -c -F ' -OutputType WindowsApplication' "$FAKE/ps5.txt")|$(ps_line "$FAKE/ps1.txt" 'Add-Type ')#$(ps_line "$FAKE/ps3.txt" '$p = Start-Process ')#$(grep -c -F -x "if (\$p.ExitCode -ne 0) { throw ('windows-launcher.exe exited with code ' + \$p.ExitCode) }" "$FAKE/ps3.txt")" \
+    "000|101|$(wm_path "$REPO/.claude/scripts/memory/windows-launcher.cs")|$(wm_path "$STATE/windows-launcher.exe")|#$(wm_path "$STATE/windows-launcher.exe")|\"$(wm_bash)\" -c \"exit 0\"|#1"
+
+wm_setup wm-trial
+printf 'windows-launcher.exe exited with code 3\n' >"$FAKE/os/powershell.exe.fail"
+wm_cmd windows enable
+rc=$?
+ps_call 1 >"$FAKE/ps1.txt"
+check "試しに動かした windows-launcher.exe が 0 以外で終わると、Windows の enable は予定を登録せずに終了コード 1 で終わる" \
+    "$rc|$(os_calls powershell.exe | wc -l | tr -d ' ')|$(grep -c -F 'Start-Process' "$FAKE/ps1.txt")$(grep -c -F 'Register-ScheduledTask' "$FAKE/ps1.txt")|$(have "$STATE/config.json")|$(grep -c -F '起動用のプログラム windows-launcher.exe を作れなかったか' "$FAKE/en.err")$(grep -c -F 'exited with code 3' "$FAKE/en.err")" \
+    "1|1|10|無い|11"
 
 wm_setup "wm-quote x'y z"
 wm_cmd windows enable
 rc=$?
 ps_call 1 >"$FAKE/ps1.txt"
+ps_call 2 >"$FAKE/ps2.txt"
 check "場所に空白と単一引用符があっても、powershell.exe に渡す命令が壊れない" \
-    "$rc|$(ps_literals <"$FAKE/ps1.txt" | grep -c -x BROKEN)|$(ps_action_arg "$FAKE/ps1.txt" | ps_literals | sed 's|\\|/|g' | tr '\n' '|')" \
-    "0|0|$(wm_bash)|$REPO/.claude/scripts/memory/memory-inspect.sh|"
+    "$rc|$(cat "$FAKE/ps1.txt" "$FAKE/ps2.txt" | ps_literals | grep -c -x BROKEN)|$(ps_line "$FAKE/ps1.txt" 'Add-Type ')#$(ps_line "$FAKE/ps2.txt" '$action = ')" \
+    "0|0|$(wm_path "$REPO/.claude/scripts/memory/windows-launcher.cs")|$(wm_path "$STATE/windows-launcher.exe")|#$(wm_path "$STATE/windows-launcher.exe")|\"$(wm_bash)\" \"$REPO/.claude/scripts/memory/memory-inspect.sh\" run|"
 
 wm_setup wm-mac
 wm_cmd macos enable --day fri --time 18:30
@@ -2742,7 +2788,7 @@ wm_cmd macos enable
 m1=$?
 wm_cmd macos enable --day tue
 m2=$?
-names=$({ ps_call 1; ps_call 2; } | perl -ne 'print "$1\n" if /^Register-ScheduledTask -TaskName (\x27(?:[^\x27]|\x27\x27)*\x27) .* -Force/' | sort -u | wc -l | tr -d ' ')
+names=$({ ps_call 2; ps_call 4; } | perl -ne 'print "$1\n" if /^Register-ScheduledTask -TaskName (\x27(?:[^\x27]|\x27\x27)*\x27) .* -Force/' | sort -u | wc -l | tr -d ' ')
 labels=$(os_calls launchctl | perl -MJSON::PP -ne 'my $a = decode_json($_); print "$a->[2]\n" if $a->[0] eq "bootstrap"' | sort -u | wc -l | tr -d ' ')
 check "enable を2回打っても、Windows と macOS の予定の名前が1つだけである" \
     "$w1$w2$m1$m2|$names|$(find "$FHOME/Library/LaunchAgents" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')|$(os_calls launchctl | grep -c bootstrap)|$labels|$(grep -c -F "<integer>2</integer>" "$WM_PLIST" 2>/dev/null)" \
@@ -2752,8 +2798,8 @@ wm_setup wm-disable
 wm_cmd windows enable
 wm_cmd windows disable
 wd=$?
-ps_call 2 >"$FAKE/ps2.txt"
-win_off="$wd|$(grep -c -F "Unregister-ScheduledTask -TaskName 'KeirekiPro memory inspection $EN_ID' -Confirm:\$false" "$FAKE/ps2.txt")|$(jget "$STATE/config.json" enabled)"
+ps_call 3 >"$FAKE/ps3.txt"
+win_off="$wd|$(grep -c -F "Unregister-ScheduledTask -TaskName 'KeirekiPro memory inspection $EN_ID' -Confirm:\$false" "$FAKE/ps3.txt")|$(jget "$STATE/config.json" enabled)"
 wm_cmd macos enable
 wm_cmd macos disable
 md=$?
