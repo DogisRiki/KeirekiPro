@@ -158,6 +158,7 @@ my %SKIP = (
     whole         => q{old が本文の全体に当たる。ファイルの全体を消すときは delete を使う},
     reverted      => q{戻された直しの文に重なる},
     reverted_file => q{戻されてから中身が変わっていないメモリファイルは消さない},
+    reverted_index => q{戻された直しで目次から外したメモリファイルと行は、目次に足し直さない},
 );
 # 案の汚染の番号が、直し方の汚染の数を超えたときに、記録の notes に書く文
 my %NOTE_OUT_OF_RANGE = (
@@ -823,10 +824,46 @@ sub memory_body {
     return $body;
 }
 
+# 戻された直しの一覧を、reverted.json の順に返す。$text は、メモリファイルの名前から今の中身への表である。
+# 要素は { file, op, name, restored } で、name と restored はバイトの列である。直し方は、その回の記録から求め、
+# 記録を引けないときは、restored_sha256 があれば delete、無ければ edit とする。並べるのは、戻した文がまだ残っている edit と、
+# 作り直したファイルが変わっていない delete と、目次から消した行が指したメモリファイルが変わっていない append_index_line と、
+# メモリファイルを指さない行を目次から消した append_index_line(file が目次)である
+sub reverted_list {
+    my ($state, $text) = @_;
+    my (%ops, @list);
+    for my $r (@{ read_state_json("$state/reverted.json", 'ARRAY') }) {
+        next unless ref $r eq 'HASH';
+        my $name = memory_name($r->{file});
+        next unless defined $name && defined $text->{$name};
+        my $sha = defined $r->{restored_sha256} && !ref $r->{restored_sha256} ? $r->{restored_sha256} : undef;
+        my $op;
+        if (valid_run($r->{run_id})) {
+            $ops{ $r->{run_id} } //= do {
+                my $record = eval { read_json("$state/runs/$r->{run_id}/record.json") };
+                ref $record eq 'HASH'
+                    ? { map { (report_str($_->{id}) => report_str($_->{op})) } grep { ref $_ eq 'HASH' } @{ list_of($record->{changes}) } }
+                    : {};
+            };
+            $op = $ops{ $r->{run_id} }{ report_str($r->{change}) };
+        }
+        $op = defined $sha ? 'delete' : 'edit' unless defined $op && $op =~ /\A(?:edit|delete|append_index_line)\z/;
+        my $restored = defined $r->{restored_text} && !ref $r->{restored_text} ? encode('UTF-8', $r->{restored_text}) : '';
+        my $unchanged = defined $sha && $sha eq sha256_hex($text->{$name});
+        my $kept = $op eq 'edit' ? length $restored && index($text->{$name}, $restored) >= 0
+            : $op eq 'delete' ? $unchanged
+            : $name eq $INDEX ? length $restored
+            : $unchanged;
+        push @list, { file => $r->{file}, op => $op, name => $name, restored => $restored } if $kept;
+    }
+    return @list;
+}
+
 # 直し方の確認に使う、メモリのディレクトリの今の様子を返す。名前はどれもバイトの列である。
 #   read      prepare が読んだときのハッシュ
 #   text      今の中身
-#   reverted  戻された直しのうち、戻した文がまだ残っているもの(texts)と、作り直したファイルが変わっていないこと(unchanged)
+#   reverted  ファイルごとの、戻された edit と delete の文のうちまだ残っているもの(texts)と、作り直したファイルが変わっていないこと
+#             (unchanged)。目次には、戻された append_index_line が目次から消した行(lines)と、その行が指したメモリファイル(files)
 sub memory_state {
     my ($memdir, $read, $state) = @_;
     my %read = ref $read eq 'HASH' ? map { (encode('UTF-8', $_) => $read->{$_}) } keys %$read : ();
@@ -836,14 +873,17 @@ sub memory_state {
         $text{$name} = $t if defined $t;
     }
     my %reverted;
-    for my $r (@{ read_state_json("$state/reverted.json", 'ARRAY') }) {
-        next unless ref $r eq 'HASH';
-        my $name = memory_name($r->{file});
-        next unless defined $name && defined $text{$name};
-        my $restored = defined $r->{restored_text} && !ref $r->{restored_text} ? encode('UTF-8', $r->{restored_text}) : '';
-        push @{ $reverted{$name}{texts} }, $restored if length $restored && index($text{$name}, $restored) >= 0;
-        $reverted{$name}{unchanged} = 1
-            if defined $r->{restored_sha256} && !ref $r->{restored_sha256} && $r->{restored_sha256} eq sha256_hex($text{$name});
+    for my $r (reverted_list($state, \%text)) {
+        if ($r->{op} eq 'append_index_line') {
+            if ($r->{name} eq $INDEX) {
+                $reverted{$INDEX}{lines}{ $r->{restored} } = 1;
+            } else {
+                $reverted{$INDEX}{files}{ $r->{name} } = 1;
+            }
+            next;
+        }
+        push @{ $reverted{ $r->{name} }{texts} }, $r->{restored} if length $r->{restored};
+        $reverted{ $r->{name} }{unchanged} = 1 if $r->{op} eq 'delete';
     }
     return { read => \%read, text => \%text, reverted => \%reverted };
 }
@@ -883,14 +923,17 @@ sub change_refusal {
     my $excerpt = $str->($f, 'excerpt') ? encode('UTF-8', $f->{excerpt}) : '';
     return 'excerpt' unless length $excerpt && defined $ftext && index($ftext, $excerpt) >= 0;
 
+    # delete は戻された delete とだけ、目次への行の足しは戻された append_index_line とだけ、edit は同じファイルの戻された edit と delete とだけ照らす
     my $rev = $mem->{reverted}{$name} || {};
     my @restored = @{ $rev->{texts} || [] };
-    if ($op eq 'delete') {
-        return 'reverted_file' if $rev->{unchanged};
-        return 'reverted' if @restored;
+    return $rev->{unchanged} ? 'reverted_file' : undef if $op eq 'delete';
+    if ($op eq 'append_index_line') {
+        my %lines = %{ $rev->{lines} || {} };
+        my %files = %{ $rev->{files} || {} };
+        return 'reverted_index' if $lines{ encode('UTF-8', $c->{line}) };
+        return 'reverted_index' if grep { my $n = memory_name($_); defined $n && $files{$n} } index_links($c->{line});
         return undef;
     }
-    return undef unless $op eq 'edit';
     my $old = encode('UTF-8', $c->{old});
     return 'old_count' unless count_in($text, $old) == 1;
     my $body = memory_body($text);
@@ -1471,13 +1514,14 @@ sub cmd_prepare {
     die "本体の作業フォルダの origin/main のコミットを読めなかった\n" unless defined $origin;
     my $read_at = iso_utc(now());
 
-    my %hashes;
+    my (%hashes, %texts);
     my %index = (lines => 0, bytes => 0);
     my @links;
     for my $name (memory_files($memdir)) {
         my $text = read_bytes("$memdir/$name");
         die "メモリファイル $name を読めなかった\n" unless defined $text;
         $hashes{$name} = sha256_hex($text);
+        $texts{$name} = $text;
         next unless $name eq $INDEX;
         my $body = index_body($text);
         %index = (lines => line_count($body), bytes => length $body);
@@ -1514,18 +1558,11 @@ sub cmd_prepare {
         }
     }
 
-    # 戻された直しのうち、戻した文がまだメモリにそのまま残っているもの。消したファイルを戻した直しは、作り直したファイルのハッシュでも見る
+    # 戻された直しの一覧。並べる直しは reverted_list に書く
     my (@reverted, %reverted_seen);
-    for my $r (@{ read_state_json("$state/reverted.json", 'ARRAY') }) {
-        next unless ref $r eq 'HASH';
-        my $name = memory_name($r->{file});
-        next unless defined $name && defined $hashes{$name};
-        my $restored = defined $r->{restored_text} && !ref $r->{restored_text} ? $r->{restored_text} : '';
-        my $text = read_bytes("$memdir/$name");
-        next unless defined $text;
-        my $kept = (length $restored && index($text, encode('UTF-8', $restored)) >= 0)
-            || (defined $r->{restored_sha256} && !ref $r->{restored_sha256} && $r->{restored_sha256} eq $hashes{$name});
-        push @reverted, { file => $r->{file}, text => $restored } if $kept && !$reverted_seen{"$name\0$restored"}++;
+    for my $r (reverted_list($state, \%texts)) {
+        push @reverted, { file => $r->{file}, op => $r->{op}, text => decode('UTF-8', $r->{restored}) }
+            unless $reverted_seen{"$r->{op}\0$r->{name}\0$r->{restored}"}++;
     }
 
     # 決まりの見直しの案を書いてよい種類。前の3回で2回以上の種類と、前の3回で1回の種類を渡す
@@ -2101,7 +2138,9 @@ sub cmd_missed {
 }
 
 # 1つの直しを戻した中身を返す。戻せないときは、理由を書いて die する。
-# 返す値は ({名前 => 書いたあとの中身}, 戻した文, 作り直したファイルのハッシュか undef) である
+# 返す値は ({名前 => 書いたあとの中身}, 戻した文, ハッシュか undef, reverted.json の file にする名前か undef) である。
+# append_index_line を戻したときは、戻した文は目次から消した行で、名前とハッシュは、その行が指すメモリファイルの名前と今のハッシュである。
+# 行がメモリファイルを指さないか、指すメモリファイルが無いときは、名前は目次で、ハッシュは undef である
 sub revert_write {
     my ($c, $memdir) = @_;
     my $id = report_str($c->{id});
@@ -2134,7 +2173,11 @@ sub revert_write {
             }
         }
         die "目次に直し $id で足した行がちょうど1回現れないので、戻さなかった\n" unless ($found // 0) == 1;
-        return ({ $name => join '', @kept }, '', undef);
+        my ($target) = grep { $_ ne $INDEX && -f "$memdir/$_" } grep { defined } map { memory_name(decode('UTF-8', $_)) } index_links($after);
+        return ({ $name => join '', @kept }, $after, undef, $INDEX) unless defined $target;
+        my $target_text = read_bytes("$memdir/$target");
+        die "$target を読めなかったので、直し $id を戻さなかった\n" unless defined $target_text;
+        return ({ $name => join '', @kept }, $after, sha256_hex($target_text), $target);
     }
     die "直し $id の直し方が違う\n" unless $op eq 'edit';
     if (length $after) {
@@ -2179,12 +2222,12 @@ sub cmd_revert {
         die "比べる元 snapshot.json の形が違う\n" if defined $snap && !(ref $snap eq 'HASH' && ref $snap->{files} eq 'HASH');
         my $reverted = read_state_json("$state/reverted.json", 'ARRAY');
 
-        my ($write, $restored, $sha) = revert_write($c, $memdir);
+        my ($write, $restored, $sha, $file) = revert_write($c, $memdir);
         write_bytes("$memdir/$_", $write->{$_}) for sort keys %$write;
         my $at = iso_utc(now());
         $record->{reverts} = [ @$reverts, { change => $id, reverted_at => $at } ];
         write_json("$state/runs/$run/record.json", $record);
-        push @$reverted, { run_id => $run, change => $id, file => $c->{file}, restored_text => decode('UTF-8', $restored), restored_sha256 => $sha };
+        push @$reverted, { run_id => $run, change => $id, file => defined $file ? decode('UTF-8', $file) : $c->{file}, restored_text => decode('UTF-8', $restored), restored_sha256 => $sha };
         write_json("$state/reverted.json", $reverted);
         # 戻した書き換えを、次の点検が会話を通らない書き換えの疑いとしないように、比べる元を戻したあとの中身にする
         if (defined $snap) {

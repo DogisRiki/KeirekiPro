@@ -982,7 +982,7 @@ cat >"$STATE/reverted.json" <<JSON
 JSON
 prepare_run r1 scheduled
 check "戻した文がまだメモリにある直しだけを並べる" \
-    "$?|$(jget "$CASE/material.json" reverted)" "0|file=a.md,text=戻した文,file=b.md,text=作り直す前と違う全文"
+    "$?|$(jget "$CASE/material.json" reverted)" "0|file=a.md,op=edit,text=戻した文,file=b.md,op=delete,text=作り直す前と違う全文"
 
 newcase prep-missed
 mkdir -p "$STATE"
@@ -1240,6 +1240,7 @@ SKIP_OLD_COUNT="old がメモリファイルにちょうど1回現れない"
 SKIP_WHOLE="old が本文の全体に当たる。ファイルの全体を消すときは delete を使う"
 SKIP_REVERTED="戻された直しの文に重なる"
 SKIP_REVERTED_FILE="戻されてから中身が変わっていないメモリファイルは消さない"
+SKIP_REVERTED_INDEX="戻された直しで目次から外したメモリファイルと行は、目次に足し直さない"
 SKIP_INDEX_DELETE="目次は消さない"
 SKIP_SHAPE="直し方の形が違う"
 
@@ -1293,12 +1294,14 @@ printf 'b の全文\n' >"$MEMDIR/b.md"
 printf -- '---\nname: c\n---\n本文だけ\n' >"$MEMDIR/c.md"
 printf '消してよいファイル\n' >"$MEMDIR/d.md"
 printf '戻してから変わったファイル\n' >"$MEMDIR/e.md"
+printf 'g の戻された文\n' >"$MEMDIR/g.md"
 mkdir -p "$MEMDIR/sub"
 printf 'z\n' >"$MEMDIR/sub/z.md"
 printf 'n\n' >"$MEMDIR/notes.txt"
 mkdir -p "$STATE"
-# a.md の「もう無い文」は戻したあとに消え、e.md は戻したあとに中身が変わったので、どちらへの直しも断らない
-printf '[{"run_id":"r0","change":"C1","file":"a.md","restored_text":"戻された文","restored_sha256":null},{"run_id":"r0","change":"C2","file":"b.md","restored_text":"","restored_sha256":"%s"},{"run_id":"r0","change":"C3","file":"a.md","restored_text":"もう無い文","restored_sha256":null},{"run_id":"r0","change":"C4","file":"e.md","restored_text":"","restored_sha256":"%s"}]\n' \
+# a.md の「もう無い文」は戻したあとに消え、e.md は戻したあとに中身が変わったので、どちらへの直しも断らない。
+# g.md は、戻された edit の文を持つが、delete を戻したファイルではないので、g.md の delete を断らない
+printf '[{"run_id":"r0","change":"C1","file":"a.md","restored_text":"戻された文","restored_sha256":null},{"run_id":"r0","change":"C2","file":"b.md","restored_text":"","restored_sha256":"%s"},{"run_id":"r0","change":"C3","file":"a.md","restored_text":"もう無い文","restored_sha256":null},{"run_id":"r0","change":"C4","file":"e.md","restored_text":"","restored_sha256":"%s"},{"run_id":"r0","change":"C5","file":"g.md","restored_text":"g の戻された文","restored_sha256":null}]\n' \
     "$(sha_of "$MEMDIR/b.md")" "$(sha_of "$MEMDIR/d.md")" >"$STATE/reverted.json"
 prepare_run r1 now
 cat >"$CASE/plan.json" <<'JSON'
@@ -1335,7 +1338,7 @@ cat >"$CASE/plan.json" <<'JSON'
                  {"op": "edit", "file": "notes.txt", "old": "n", "new": "x"}, {"op": "edit", "file": "../a.md", "old": "一行目の記述", "new": "x"},
                  {"op": "edit", "file": "gone.md", "old": "g", "new": "x"}, {"op": "append_index_line", "line": "- [E](e.md) — e"}]},
     {"kind": 6, "file": "a.md", "excerpt": "一行目の記述", "status": "fix", "reason": "", "evidence": "",
-     "changes": [{"op": "delete", "file": "a.md"}, {"op": "edit", "file": "a.md", "old": "ああ", "new": "x"},
+     "changes": [{"op": "delete", "file": "g.md"}, {"op": "edit", "file": "a.md", "old": "ああ", "new": "x"},
                  {"op": "rename", "file": "a.md"}, {"op": "edit", "file": "a.md", "old": "一行目の記述"}]},
     {"kind": 3, "file": "a.md", "excerpt": "無い文の話", "status": "fix", "reason": "", "evidence": "",
      "changes": [{"op": "edit", "file": "a.md", "old": "無い文", "new": "x"}]},
@@ -1354,7 +1357,7 @@ check "種類10と種類11の直しを断る" "$(ap_changes C7 C8)" "C7=skipped:
 check "扱いが fix でない直しを断る" "$(ap_changes C9 C10)" "C9=skipped:$SKIP_NOT_FIX,C10=skipped:$SKIP_NOT_FIX"
 check "戻された文に重なる直しと、戻されてから変わっていないファイルの delete を断る" \
     "$(ap_changes C11 C12 C13 C14 C21 C25 C26)" \
-    "C11=skipped:$SKIP_REVERTED,C12=skipped:$SKIP_REVERTED,C13=skipped:$SKIP_REVERTED_FILE,C14=applied:,C21=skipped:$SKIP_REVERTED,C25=applied:,C26=applied:"
+    "C11=skipped:$SKIP_REVERTED,C12=skipped:$SKIP_REVERTED,C13=skipped:$SKIP_REVERTED_FILE,C14=applied:,C21=applied:,C25=applied:,C26=applied:"
 check "目次の delete と、最上位の .md でないファイルへの直しと、無いファイルへの直しを断る" \
     "$(ap_changes C15 C16 C17 C18 C19 C20)" \
     "C15=skipped:$SKIP_INDEX_DELETE,C16=skipped:$SKIP_NAME,C17=skipped:$SKIP_NAME,C18=skipped:$SKIP_NAME,C19=skipped:$SKIP_MISSING,C20=applied:"
@@ -2055,7 +2058,7 @@ check "new が空でない edit と、new が空の edit と、delete と、appe
     "$rcs|$(same_dir "$CASE/orig")|$(rec_list "$STATE/runs/r1/record.json" reverts change reverted_at)|$(rv_list)" \
     "00000|同じ|C1:2026-11-02T01:00:00Z,C2:2026-11-02T01:00:00Z,C3:2026-11-02T01:00:00Z,C4:2026-11-02T01:00:00Z,C5:2026-11-02T01:00:00Z|r1:C1:a.md:古い事実の記述:null,r1:C2:c.md:消す文:null,r1:C3:b.md:先頭で消す文
 :null,r1:C4:d.md:消してよいファイル
-:$(sha_of "$MEMDIR/d.md"),r1:C5:MEMORY.md::null"
+:$(sha_of "$MEMDIR/d.md"),r1:C5:MEMORY.md:- [E](e.md) — e:null"
 
 rv_setup rv-next
 rcs=
@@ -2118,6 +2121,86 @@ cp "$MEMDIR"/*.md "$CASE/now/"
 bash "$SH" revert r1 C4 2>/dev/null
 check "同じ名前のファイルがあると、delete を戻さずに終了コード 1 で終わる" \
     "$?|$(same_dir "$CASE/now")|$(rec_list "$STATE/runs/r1/record.json" reverts change)|$(rv_list)" "1|同じ||"
+
+# 目次の行の足しを戻す場合の土台を作る: ri_setup <名前>
+# 回 r1 の prepare と apply で、目次に、f.md を指す行を足す C1 と、メモリファイルを指さない行を足す C2 を行い、両方を戻す
+ri_setup() {
+    newcase "$1"
+    printf -- '- [A](a.md) — a\n' >"$MEMDIR/MEMORY.md"
+    printf 'a の中身\n' >"$MEMDIR/a.md"
+    printf 'f の中身\n' >"$MEMDIR/f.md"
+    perl "$PL" prepare r1 now >"$FAKE/material.json"
+    cat >"$FAKE/plan.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 6, "file": "f.md", "excerpt": "f の中身", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "append_index_line", "line": "- [F](f.md) — f"}]},
+    {"kind": 6, "file": "MEMORY.md", "excerpt": "- [A](a.md) — a", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "append_index_line", "line": "- メモ"}]}
+  ],
+  "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+    perl "$PL" apply r1 <"$FAKE/plan.json" >"$FAKE/apply.out"
+    bash "$SH" revert r1 C1
+    ri_rcs=$?
+    bash "$SH" revert r1 C2
+    ri_rcs=$ri_rcs$?
+}
+
+ri_setup ri-revert
+check "append_index_line を戻すと、reverted.json に、消した行が指すメモリファイルと消した行とそのハッシュが書かれる" \
+    "$ri_rcs|$(cat "$MEMDIR/MEMORY.md")|$(rv_list)" \
+    "00|- [A](a.md) — a|r1:C1:f.md:- [F](f.md) — f:$(sha_of "$MEMDIR/f.md"),r1:C2:MEMORY.md:- メモ:null"
+
+ri_setup ri-prepare
+perl "$PL" prepare r2 now >"$CASE/material.json"
+check "次の回の prepare が、戻された直しの一覧に、append_index_line を戻した直しを並べる" \
+    "$?|$(jget "$CASE/material.json" reverted)" \
+    "0|file=f.md,op=append_index_line,text=- [F](f.md) — f,file=MEMORY.md,op=append_index_line,text=- メモ"
+
+ri_setup ri-refuse
+perl "$PL" prepare r2 now >"$FAKE/material2.json"
+cat >"$FAKE/plan2.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 6, "file": "f.md", "excerpt": "f の中身", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "append_index_line", "line": "- [ファイルF](./f.md) — 別の言い方"}]},
+    {"kind": 6, "file": "MEMORY.md", "excerpt": "- [A](a.md) — a", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "append_index_line", "line": "- メモ"}]},
+    {"kind": 4, "file": "f.md", "excerpt": "f の中身", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "delete", "file": "f.md"}]}
+  ],
+  "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+perl "$PL" apply r2 <"$FAKE/plan2.json" >"$FAKE/apply2.out"
+rc=$?
+# 目次への行の足しを戻したメモリファイルでも、delete では消せる
+check "戻された append_index_line のメモリファイルを、言い回しの違う行で指す直しを、次の回の apply が断る" \
+    "$rc|$(rec_list "$STATE/runs/r2/record.json" changes id state skip_reason | cut -d, -f1,3)|$([ -e "$MEMDIR/f.md" ] && printf ある || printf 無い)" \
+    "0|C1:skipped:$SKIP_REVERTED_INDEX,C3:applied:null|無い"
+check "メモリファイルを指さない行を戻すと、同じ行を足す直しを、次の回の apply が断る" \
+    "$(rec_list "$STATE/runs/r2/record.json" changes id state skip_reason | cut -d, -f2)|$(grep -c 'メモ' "$MEMDIR/MEMORY.md")" \
+    "C2:skipped:$SKIP_REVERTED_INDEX|0"
+
+ri_setup ri-changed
+printf 'f の新しい中身\n' >"$MEMDIR/f.md"
+perl "$PL" prepare r2 now >"$FAKE/material2.json"
+cat >"$FAKE/plan2.json" <<'JSON'
+{"lookups": [], "plan": {
+  "findings": [
+    {"kind": 6, "file": "f.md", "excerpt": "f の新しい中身", "status": "fix", "reason": "", "evidence": "",
+     "changes": [{"op": "append_index_line", "line": "- [F](f.md) — 新しい f"}]}
+  ],
+  "relocation_proposals": [], "rule_proposals": [], "inspection_proposals": [], "summary": ""
+}}
+JSON
+perl "$PL" apply r2 <"$FAKE/plan2.json" >"$FAKE/apply2.out"
+rc=$?
+check "戻された append_index_line のメモリファイルの中身が変わったあとは、そのファイルを指す行を足す" \
+    "$rc|$(jget "$FAKE/material2.json" reverted)|$(rec_list "$STATE/runs/r2/record.json" changes id state)|$(tail -n 1 "$MEMDIR/MEMORY.md")" \
+    "0|file=MEMORY.md,op=append_index_line,text=- メモ|C1:applied|- [F](f.md) — 新しい f"
 
 # ---------------------------------------------------------------------
 # 点検の中の Claude を呼ぶ部品
