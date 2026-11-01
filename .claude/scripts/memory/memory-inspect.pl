@@ -58,6 +58,10 @@
 #     終わっていない回を中断にする。回のロックをその回が持っていないか、始めてから90分を過ぎた回が対象で、
 #     --run を渡したときは、その回を確かめずに渡した理由で中断にする(記録が無ければ作る)。書いている途中の直しは、
 #     メモリの中身で書いたかを見分ける。記録と report.md を書き、比べる元は書き直さない。メモリのロックを取れないときは何もしない
+#   session-context
+#     終わっていない回を中断にしてから、まだ示していない回の ID を始めた順に並べた行を出す。config.json の enabled が真で、
+#     決まった曜日と時刻の最後に完了した回と enabled_at の新しいほうから14日を超えたときは、長く動いていない知らせの行も出す。
+#     点検の状態の場所が無いときは何も出さない
 #   show <回の ID> / shown <回の ID>
 #     その回の report.md を標準出力に出す / その回に、報告を示した印 shown を書く
 #   history
@@ -111,6 +115,7 @@ my %COMMANDS = (
     lookup  => \&cmd_lookup,
     apply   => \&cmd_apply,
     finalize => \&cmd_finalize,
+    'session-context' => \&cmd_session_context,
     show     => \&cmd_show,
     shown    => \&cmd_shown,
     history  => \&cmd_history,
@@ -224,7 +229,7 @@ sub guarded {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | id8 | cron <ID8> [<曜日> <HH:MM> <スクリプトの場所> <run.log の場所>] | config enable <曜日> <HH:MM> <予定の仕組み> <予定の名前> <tools の JSON> | config disable | windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> | windows-task disable <予定の名前> | plist <ラベル> <曜日> <HH:MM> <スクリプトの場所> <run.log の場所> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
+    print STDERR "使い方: perl memory-inspect.pl paths [<フォルダ>] | tools <claude の場所> <gh の場所> <bash の場所> <PATH> | due | logtrim <ファイル> | nowrun [<tools の JSON>] | id8 | cron <ID8> [<曜日> <HH:MM> <スクリプトの場所> <run.log の場所>] | config enable <曜日> <HH:MM> <予定の仕組み> <予定の名前> <tools の JSON> | config disable | windows-task enable <曜日> <HH:MM> <予定の名前> <bash.exe の場所> <スクリプトの場所> | windows-task disable <予定の名前> | plist <ラベル> <曜日> <HH:MM> <スクリプトの場所> <run.log の場所> | lock take|release|state <run|memory> [<回の ID> [<プロセスの番号>]] | prepare <回の ID> <scheduled|now> | content | lookup <回の ID> <最初の番号> | apply <回の ID> | finalize [--run <回の ID> --reason <理由>] | session-context | show <回の ID> | shown <回の ID> | history | revert <回の ID> <直しの ID> | answer <回の ID> <案の ID> declined|accepted [--issue <番号>] | missed <汚染の種類> <メモリファイルの名前> <短い説明> | inspector <秒> <作業フォルダ> <コマンド> [<引数>...] | timed <秒> <コマンド> [<引数>...] | outcome <呼び出しの番号> <claude の終了コード>\n";
     return 2;
 }
 
@@ -592,7 +597,7 @@ sub read_state_json {
 # ---- 繰り返しの数え方 ------------------------------------------------------
 # 決まりの見直しの案を載せる種類を、prepare と適用の部品が同じ決まりで求めるための関数である
 
-# 記録のある回を、[記録, 始めた時刻の秒] の組で並べる。except の回は除く
+# 記録のある回を、[記録, 始めた時刻の秒, 回の場所の名前] の組で並べる。except の回は除く
 sub run_records {
     my ($state, $except) = @_;
     opendir(my $dh, "$state/runs") or return ();
@@ -605,7 +610,7 @@ sub run_records {
         die "回 $id の記録の形が違う\n" unless ref $rec eq 'HASH';
         my $t = epoch($rec->{started_at});
         die "回 $id の記録の started_at を読めなかった\n" unless defined $t;
-        push @records, [ $rec, $t ];
+        push @records, [ $rec, $t, $id ];
     }
     return @records;
 }
@@ -1920,6 +1925,45 @@ sub cmd_finalize {
     my $err = $@;
     lock_release($lock, $only // 'finalize');
     die $err unless $ok;
+    return 0;
+}
+
+# ---- 会話の始めの知らせ --------------------------------------------------------
+
+# 会話の始めに、まだ示していない回の一覧と、決まった曜日と時刻の点検が長く動いていないことを出す: session-context
+# 終わっていない回を先に中断にする。報告の中身は出さない。点検の状態の場所が無いときは何もしない
+sub cmd_session_context {
+    my @args = @_;
+    return usage() if @args;
+    my $state = state_dir(dirname(__FILE__));
+    return 0 unless -d $state;
+    my $rc = cmd_finalize();
+    return $rc if $rc;
+    my @records = run_records($state);
+    my @lines;
+    my @unshown = map { $_->[2] }
+        sort { $a->[1] <=> $b->[1] || $a->[2] cmp $b->[2] }
+        grep { ($_->[0]{status} // '') ne 'running' && !-e "$state/runs/$_->[2]/shown" } @records;
+    push @lines, "[memory-inspection] まだ示していない点検の報告がある: @unshown",
+        'Claude は、最初の返事の前に、memory-inspection のスキルに従って、これらの報告を示す。' if @unshown;
+    my $config = read_state_json("$state/config.json", 'HASH');
+    if ($config->{enabled}) {
+        # その場で動かした回は数えない。決まった曜日と時刻の点検が動いていないことを隠さないためである
+        my ($last, $last_at);
+        for my $pair (@records) {
+            my $r = $pair->[0];
+            next unless ($r->{trigger} // '') eq 'scheduled' && ($r->{status} // '') eq 'completed';
+            my $t = epoch($r->{finished_at});
+            ($last, $last_at) = ($t, $r->{finished_at}) if defined $t && (!defined $last || $t > $last);
+        }
+        my $since = epoch($config->{enabled_at});
+        $since = $last if defined $last && (!defined $since || $last > $since);
+        die "config.json の enabled_at を読めなかった\n" unless defined $since;
+        push @lines, '[memory-inspection] 決まった曜日と時刻の点検が14日を超えて動いていない。最後に決まった曜日と時刻の点検が終わった日時: '
+            . (defined $last_at ? $last_at : 'まだ一度も終わっていない') if now() - $since > 14 * 86400;
+    }
+    binmode STDOUT, ':raw';
+    print map { "$_\n" } @lines;
     return 0;
 }
 

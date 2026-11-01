@@ -430,8 +430,10 @@ launchd_enable() {
     local plist="$dir/$1.plist"
     gui="gui/$(id -u)"
     mkdir -p "$dir" || fail "$dir を作れなかった。"
-    perl "$PL" plist "$1" "$2" "$3" "$4" "$STATE/run.log" >"$plist.tmp" && mv -f "$plist.tmp" "$plist" ||
-        { rm -f "$plist.tmp"; fail "$plist を書けなかった。"; }
+    if ! { perl "$PL" plist "$1" "$2" "$3" "$4" "$STATE/run.log" >"$plist.tmp" && mv -f "$plist.tmp" "$plist"; }; then
+        rm -f "$plist.tmp"
+        fail "$plist を書けなかった。"
+    fi
     launchctl bootout "$gui/$1" >/dev/null 2>&1 || true
     out=$(launchctl bootstrap "$gui" "$plist" 2>&1) || {
         rm -f "$plist"
@@ -503,6 +505,16 @@ cmd_disable() {
     cron) cron_disable "$id" ;;
     esac
     printf '[memory-inspection] 点検の予定を外した。\n'
+}
+
+# 会話の始めのフックが Claude の文脈に入れる文を出す。点検の中の Claude の会話では何も出さない。
+# 会話の始めを止めないように、8秒で打ち切り(テストは KP_MEMORY_INSPECTION_CONTEXT_SEC で短くする)、失敗したときは何も出さずに 0 で終わる。gh と claude を呼ばない
+cmd_session_context() {
+    local out
+    [ -z "${KP_MEMORY_INSPECTION_RUN:-}" ] || return 0
+    out=$(perl "$PL" timed "${KP_MEMORY_INSPECTION_CONTEXT_SEC:-8}" perl "$PL" session-context "$@" 2>/dev/null) || return 0
+    if [ -n "$out" ]; then printf '%s\n' "$out"; fi
+    return 0
 }
 
 # 会話の中の操作は、引数をそのまま memory-inspect.pl に渡す。引数の確かめは memory-inspect.pl が行う

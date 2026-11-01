@@ -68,7 +68,7 @@ PERL
         exit 2
     fi
     # 選んだ場合のファイルを、$0 をこのファイルの場所のままにして流す
-    KP_TEST_FILTERED=1 "$BASH" -c '. "$1"' "$0" "$sel_dir/selected.sh"
+    KP_TEST_FILTERED=1 "$BASH" -c ". \"\$1\"" "$0" "$sel_dir/selected.sh"
     rc=$?
     rm -rf "$sel_dir"
     exit "$rc"
@@ -2614,7 +2614,7 @@ check "Windows の enable が、Register-ScheduledTask に -Force を付け、�
     "0|-NoProfile -NonInteractive -EncodedCommand|1|1|1|0|true,windows-task,KeirekiPro memory inspection $EN_ID,fri,18:30"
 arg=$(ps_action_arg "$FAKE/ps1.txt")
 check "Windows の動かすプログラムが、-WindowStyle Hidden の powershell.exe で、bash.exe とスクリプトの場所と run を渡す" \
-    "$(grep -c -F "New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -WindowStyle Hidden " "$FAKE/ps1.txt")|$(printf '%s' "$arg" | sed "s/'.*'/Q/")|$(printf '%s' "$arg" | ps_literals | tr '\\' / | tr '\n' '|')" \
+    "$(grep -c -F "New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -WindowStyle Hidden " "$FAKE/ps1.txt")|$(printf '%s' "$arg" | sed "s/'.*'/Q/")|$(printf '%s' "$arg" | ps_literals | sed 's|\\|/|g' | tr '\n' '|')" \
     "1|-NoProfile -WindowStyle Hidden -Command \"& Q run\"|$(wm_bash)|$REPO/.claude/scripts/memory/memory-inspect.sh|"
 
 wm_setup "wm-quote x'y z"
@@ -2622,7 +2622,7 @@ wm_cmd windows enable
 rc=$?
 ps_call 1 >"$FAKE/ps1.txt"
 check "場所に空白と単一引用符があっても、powershell.exe に渡す命令が壊れない" \
-    "$rc|$(ps_literals <"$FAKE/ps1.txt" | grep -c -x BROKEN)|$(ps_action_arg "$FAKE/ps1.txt" | ps_literals | tr '\\' / | tr '\n' '|')" \
+    "$rc|$(ps_literals <"$FAKE/ps1.txt" | grep -c -x BROKEN)|$(ps_action_arg "$FAKE/ps1.txt" | ps_literals | sed 's|\\|/|g' | tr '\n' '|')" \
     "0|0|$(wm_bash)|$REPO/.claude/scripts/memory/memory-inspect.sh|"
 
 wm_setup wm-mac
@@ -2645,7 +2645,7 @@ m2=$?
 names=$({ ps_call 1; ps_call 2; } | perl -ne 'print "$1\n" if /^Register-ScheduledTask -TaskName (\x27(?:[^\x27]|\x27\x27)*\x27) .* -Force/' | sort -u | wc -l | tr -d ' ')
 labels=$(os_calls launchctl | perl -MJSON::PP -ne 'my $a = decode_json($_); print "$a->[2]\n" if $a->[0] eq "bootstrap"' | sort -u | wc -l | tr -d ' ')
 check "enable を2回打っても、Windows と macOS の予定の名前が1つだけである" \
-    "$w1$w2$m1$m2|$names|$(ls "$FHOME/Library/LaunchAgents" 2>/dev/null | wc -l | tr -d ' ')|$(os_calls launchctl | grep -c bootstrap)|$labels|$(grep -c -F "<integer>2</integer>" "$WM_PLIST" 2>/dev/null)" \
+    "$w1$w2$m1$m2|$names|$(find "$FHOME/Library/LaunchAgents" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')|$(os_calls launchctl | grep -c bootstrap)|$labels|$(grep -c -F "<integer>2</integer>" "$WM_PLIST" 2>/dev/null)" \
     "0000|1|1|2|1|1"
 
 wm_setup wm-disable
@@ -2660,6 +2660,127 @@ md=$?
 check "disable が、Windows と macOS の予定を外す" \
     "$win_off#$md|$(os_calls launchctl | tail -n 1)|$(have "$WM_PLIST")|$(jget "$STATE/config.json" enabled)" \
     "0|1|false#0|[\"bootout\",\"$WM_GUI/$WM_LABEL\"]|無い|false"
+
+# ---------------------------------------------------------------------
+# 会話の始めの知らせ
+# ---------------------------------------------------------------------
+# 今の時刻は 2026-11-02T01:00:00Z で、その14日前は 2026-10-19T01:00:00Z である
+SC_UNSHOWN='[memory-inspection] まだ示していない点検の報告がある:'
+SC_TELL='Claude は、最初の返事の前に、memory-inspection のスキルに従って、これらの報告を示す。'
+SC_STALE='[memory-inspection] 決まった曜日と時刻の点検が14日を超えて動いていない。最後に決まった曜日と時刻の点検が終わった日時:'
+# 回の記録を、終わった時刻を付けて書く: sc_record <回の ID> <scheduled|now> <状態> <始めた時刻> [<終わった時刻>]
+sc_record() {
+    make_record "$1" "$2" "$3" "$4"
+    if [ $# -ge 5 ]; then
+        SC_AT=$5 perl -MJSON::PP -i -pe '$_ = JSON::PP->new->utf8->encode({ %{ decode_json($_) }, finished_at => $ENV{SC_AT} }) . "\n"' \
+            "$STATE/runs/$1/record.json"
+    fi
+}
+# config.json を書く: sc_config <true|false> <enabled_at>
+sc_config() {
+    mkdir -p "$STATE"
+    perl -MJSON::PP -e 'print JSON::PP->new->canonical->encode({ enabled => $ARGV[0] eq "true" ? JSON::PP::true : JSON::PP::false,
+            day => "mon", time => "10:00", enabled_at => $ARGV[1], disabled_at => undef, scheduler => "cron", task_name => "t" }), "\n"' \
+        "$1" "$2" >"$STATE/config.json"
+}
+# session-context を動かし、出力を「終了コード|標準出力の行を | でつないだもの|標準エラー」で出す
+sc_run() {
+    local rc=0
+    bash "$SH" session-context >"$FAKE/sc.out" 2>"$FAKE/sc.err" || rc=$?
+    printf '%s|%s|%s' "$rc" "$(tr '\n' '|' <"$FAKE/sc.out")" "$(cat "$FAKE/sc.err")"
+}
+
+newcase sc-order
+# 回の ID の順と始めた順を逆にして、始めた順に並ぶことを確かめる
+sc_record rz scheduled completed 2026-10-26T01:00:00Z 2026-10-26T01:30:00Z
+sc_record ry now completed 2026-10-27T01:00:00Z 2026-10-27T01:20:00Z
+sc_record rx scheduled interrupted 2026-10-28T01:00:00Z 2026-10-28T01:10:00Z
+check "まだ示していない回を古い順に並べ、その場で動かした回も並べる" "$(sc_run)" "0|$SC_UNSHOWN rz ry rx|$SC_TELL||"
+
+newcase sc-shown
+sc_record ra scheduled completed 2026-10-26T01:00:00Z 2026-10-26T01:30:00Z
+sc_record rb now completed 2026-10-27T01:00:00Z 2026-10-27T01:20:00Z
+bash "$SH" shown ra
+first=$(sc_run)
+bash "$SH" shown rb
+check "shown のあとの回を並べない" "$first#$(sc_run)" "0|$SC_UNSHOWN rb|$SC_TELL||#0||"
+
+newcase sc-skip
+sc_record ra scheduled completed 2026-10-26T01:00:00Z 2026-10-26T01:30:00Z
+# ロックが空くのを待っている決まった曜日と時刻の点検の回は、場所だけがある
+mkdir -p "$STATE/runs/rb"
+sc_record rc now running "$(shifted_now -600)"
+lock_take run rc "$(self_pid)" >/dev/null
+check "record.json の無い回と running の回を並べない" "$(sc_run)|$(jget "$STATE/runs/rc/record.json" status)" \
+    "0|$SC_UNSHOWN ra|$SC_TELL|||running"
+
+newcase sc-dead
+sc_record ra scheduled completed 2026-10-26T01:00:00Z 2026-10-26T01:30:00Z
+sc_record rb now running "$(shifted_now -600)"
+lock_take run rb "$(dead_pid)" >/dev/null
+check "ロックを取ったプロセスの無い running の回を、中断にしてから並べる" "$(sc_run)|$(run_end rb)" \
+    "0|$SC_UNSHOWN ra rb|$SC_TELL|||interrupted:$STOPPED_REASON:ある"
+
+newcase sc-stale
+sc_config true 2026-09-01T00:00:00Z
+sc_record ra scheduled completed 2026-10-18T01:00:00Z 2026-10-18T01:30:00Z
+bash "$SH" shown ra
+stale=$(sc_run)
+sc_record rb scheduled completed 2026-10-19T01:00:00Z 2026-10-19T01:40:00Z
+bash "$SH" shown rb
+check "enabled が真で、決まった曜日と時刻の最後に完了した回から14日を超えたときだけ、長く動いていない知らせを出す" \
+    "$stale#$(sc_run)" "0|$SC_STALE 2026-10-18T01:30:00Z||#0||"
+
+newcase sc-now-hides
+sc_config true 2026-09-01T00:00:00Z
+sc_record ra scheduled completed 2026-10-12T01:00:00Z 2026-10-12T01:30:00Z
+# 中断した決まった曜日と時刻の回も、完了した回として数えない
+sc_record rb scheduled interrupted 2026-10-26T01:00:00Z 2026-10-26T01:10:00Z
+sc_record rc now completed 2026-11-01T01:00:00Z 2026-11-01T01:20:00Z
+bash "$SH" shown ra
+bash "$SH" shown rb
+bash "$SH" shown rc
+check "その場で動かした回が14日の間に完了していても、決まった曜日と時刻の回が14日を超えて完了していなければ知らせを出す" \
+    "$(sc_run)" "0|$SC_STALE 2026-10-12T01:30:00Z||"
+
+newcase sc-never
+sc_config true 2026-10-01T00:00:00Z
+sc_record ra now completed 2026-11-01T01:00:00Z 2026-11-01T01:20:00Z
+bash "$SH" shown ra
+check "決まった曜日と時刻の完了した回が無いときは、まだ一度も終わっていないと出す" \
+    "$(sc_run)" "0|$SC_STALE まだ一度も終わっていない||"
+
+newcase sc-fresh
+sc_config true 2026-10-20T00:00:00Z
+check "enable から14日以内なら、決まった曜日と時刻の完了した回が無くても知らせを出さない" "$(sc_run)" "0||"
+
+newcase sc-disabled
+sc_record ra scheduled completed 2026-10-01T01:00:00Z 2026-10-01T01:30:00Z
+none=$(sc_run)
+sc_config false 2026-09-01T00:00:00Z
+check "disable のあとは長く動いていない知らせを出さず、まだ示していない回は並べる" \
+    "$none#$(sc_run)" "0|$SC_UNSHOWN ra|$SC_TELL||#0|$SC_UNSHOWN ra|$SC_TELL||"
+
+newcase sc-inner
+sc_config true 2026-09-01T00:00:00Z
+sc_record ra scheduled completed 2026-10-01T01:00:00Z 2026-10-01T01:30:00Z
+check "KP_MEMORY_INSPECTION_RUN があるときは何も出さない" "$(KP_MEMORY_INSPECTION_RUN=ra sc_run)" "0||"
+
+newcase sc-broken
+sc_config true 2026-09-01T00:00:00Z
+sc_record ra scheduled completed 2026-10-01T01:00:00Z 2026-10-01T01:30:00Z
+mkdir -p "$STATE/runs/rb"
+printf '{"run_id": ' >"$STATE/runs/rb/record.json"
+broken_run=$(sc_run)
+rm -f "$STATE/runs/rb/record.json"
+printf '{"enabled": ' >"$STATE/config.json"
+check "途中で失敗しても、何も出さずに終了コード 0 で終わる" "$broken_run#$(sc_run)" "0||#0||"
+
+newcase sc-no-tools
+sc_config true 2026-09-01T00:00:00Z
+sc_record ra scheduled completed 2026-10-01T01:00:00Z 2026-10-01T01:30:00Z
+out=$(sc_run)
+check "gh と claude を呼ばない" "$(printf '%s' "$out" | cut -d '|' -f 1)|$(claude_calls)|$(gh_calls | wc -l | tr -d ' ')" "0|0|0"
 
 echo
 echo "$pass ok, $failn NG"
