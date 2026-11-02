@@ -99,7 +99,7 @@
   - _対象の部品: memory-inspect-now のスキル_
   - _依存: 1_
 
-- [ ] 5. 前の点検の部品を消し、設定を替える
+- [x] 5. 前の点検の部品を消し、設定を替える
 - [x] 5.1 設定の写しを作り、所有者に写してもらう
 
   Claude は、部品「前の点検の部品の削除と settings.json」の「呼び出し方」のとおりに、今の `.claude/settings.json` から写しを作り、`.claude/.state/claude-memory-one-by-one-inspection/place-1/settings.json` に置く。Claude は、写しを `.claude/settings.json` に写すコマンドを所有者に示し、写すよう頼む。依頼には、Claude が `deny` の規則のために `.claude/settings.json` を書けないことを添える。前の点検のテスト `test-memory-inspect.sh` のうち、`.claude/settings.json` に `session-context` のフックと `Bash(bash .claude/scripts/memory/memory-inspect.sh *)` の許可があることを確かめる場合は、所有者が写したあとに失敗する。Claude は、このテストのファイルを、タスク「前の点検のスクリプトとテストとスキルを消す」で消す。そのため、Claude は、このタスクの完了条件の「タスクで変えたファイルを使うテスト」に `test-memory-inspect.sh` を含めず、失敗した場合の名前をタスクの報告に書く。
@@ -108,7 +108,7 @@
   - _要件: 1.2, 6.1_
   - _対象の部品: 前の点検の部品の削除と settings.json_
 
-- [ ] 5.2 前の点検のスクリプトとテストとスキルを消す
+- [x] 5.2 前の点検のスクリプトとテストとスキルを消す
 
   Claude は、部品「前の点検の部品の削除と settings.json」のとおりに、前の点検のスクリプトとテストの7つのファイルと、スキル `memory-inspection` を `git rm` で消す。Claude は、テスト `test-memory-files.sh` に、前の点検の予定が動かすコマンドが何も書き換えないことを確かめる結合の場合を足す。
   - 完了の確かめ方: `git ls-files .claude/scripts/memory` の出力が、`memory-files.pl` と `old-inspection-cleanup.pl` と `tests/test-memory-files.sh` の3つだけである。`.claude/skills/memory-inspection/` が無い。`git grep -n -e 'memory-inspect\.sh' -e 'skills/memory-inspection' -- . ':!.kiro/specs/claude-memory-weekly-inspection' ':!.kiro/specs/claude-memory-one-by-one-inspection'` の結果が、足した結合の場合と、参加者セットアップ手順のメモリの点検の節「5. Claude のメモリの点検を使い始める(任意)」だけである。タスク「参加者セットアップ手順のメモリの点検の節を消し、README に点検のスキルの行を足す」が先に終わっていれば、メモリの点検の節は結果に出ない。足した結合の場合が、Git Bash で通る

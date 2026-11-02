@@ -461,7 +461,7 @@ addcase cleanup_macos
 
 case_cleanup_linux() {
     osfakes
-    printf '%s\n' "0 9 * * 1 /bin/bash '/x/memory-inspect.sh' run >> '/x/run.log' 2>&1 # keirekipro-memory-inspection $ID8" \
+    printf '%s\n' "0 9 * * 1 /bin/bash '/x/inspect.sh' run >> '/x/run.log' 2>&1 # keirekipro-memory-inspection $ID8" \
         '# ほかの予定' '5 4 * * *  echo hi  ' '0 9 * * 1 /bin/bash /y run # keirekipro-memory-inspection deadbeef' >"$CASE/fake/crontab.table"
     out=$(cleanup linux)
     rc=$?
@@ -511,6 +511,44 @@ case_cleanup_errors() {
         "$args|$nogit|$(grep -c '共通ディレクトリを求められなかった' "$CASE/err")" "|2||1|1"
 }
 addcase cleanup_errors
+
+# ---------------------------------------------------------------------
+# 前の点検のファイルを消したあとの、残った前の点検の予定
+# ---------------------------------------------------------------------
+
+# 偽のホームの下のファイルを、場所と SHA-256 の組で名前の順に1行ずつ出す
+homefiles() {
+    perl -MFile::Find -MDigest::SHA=sha256_hex -e '
+        my $top = $ARGV[0];
+        my @rows;
+        find({ no_chdir => 1, wanted => sub {
+            return unless -f $_;
+            open my $f, "<:raw", $_ or die "$_: $!";
+            local $/;
+            push @rows, substr($_, length $top) . " " . sha256_hex(<$f>);
+        } }, $top);
+        print "$_\n" for sort @rows;
+    ' "$HOME"
+}
+
+# 前の点検の予定は、本体の作業フォルダの memory-inspect.sh に run を渡して bash で動かす。
+# このテストのファイルがある作業フォルダを本体の作業フォルダとし、その作業フォルダとこのテストの偽のリポジトリのメモリを用意する
+case_old_schedule_after_removal() {
+    top=$(cd "$HERE/../../../.." && pwd)
+    memfile a.md 'a'
+    printf '%s\n' '- [a](a.md) — a' >"$MEMDIR/MEMORY.md"
+    topmem="$HOME/.claude/projects/$(encname "$(cd "$top" && { pwd -W 2>/dev/null || pwd -P; })")/memory"
+    mkdir -p "$topmem"
+    printf '%s' 'b' >"$topmem/b.md"
+    printf '%s\n' '- [b](b.md) — b' >"$topmem/MEMORY.md"
+    before=$(homefiles)
+    bash "$top/.claude/scripts/memory/memory-inspect.sh" run >/dev/null 2>&1
+    rc=$?
+    check "前の点検のファイルを消したあとに前の点検の予定のコマンドを打つと、0 でない終了コードで終わり、偽のホームの下のファイルが変わらない" \
+        "$([ "$rc" -ne 0 ] && echo nonzero || echo "rc=$rc")|$([ "$(homefiles)" = "$before" ] && echo same || echo changed)" \
+        "nonzero|same"
+}
+addcase old_schedule_after_removal
 
 # ---------------------------------------------------------------------
 # 選んだ場合を流す
