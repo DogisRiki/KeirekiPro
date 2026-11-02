@@ -40,7 +40,7 @@ archunit = "1.5.1"
 springdoc = "3.2.0"
 openhtmltopdf = "1.0.10"
 java-jwt = "4.6.2"
-spring-cloud-aws = "4.2.0"
+spring-cloud-aws = "4.2.1"
 commons-validator = "1.11.0"
 mybatis-postgresql-typehandlers = "1.0.2"
 
