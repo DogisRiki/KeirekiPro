@@ -113,7 +113,7 @@ flowchart TB
 - PR の検査と週次監査: GitHub Actions のワークフロー(ubuntu-latest)と bash のスクリプト。`gh` で GitHub の API を呼び、`jq` で JSON を読む
 - 依存グラフ: `gradle/actions/dependency-submission` v6.4.0 と、その中の github-dependency-graph-gradle-plugin。環境変数 `DEPENDENCY_GRAPH_RUNTIME_INCLUDE_CONFIGURATIONS` で scope を付ける
 - 悪意のある部品の一覧: OSV の `POST /v1/querybatch` と `GET /v1/vulns/{id}`
-- npm の来歴の検証: `gh attestation verify`(ubuntu-latest の gh)と `openssl x509`
+- npm の来歴の検証: `gh attestation verify`(ubuntu-latest の gh)と `openssl asn1parse`
 - Maven の署名の検証: `gpg`(ubuntu-latest の GnuPG)
 - CI の道具の署名の検証: 開発者の PC の bash と Docker、コンテナの中の `gpg` と `cosign`、開発者の PC の `gh attestation verify`
 
@@ -286,14 +286,14 @@ paths:
 
 **使う部品**:
 - `POST <OSV_API_BASE>/v1/querybatch`(既定 `https://api.osv.dev`)。要素は `{"package":{"ecosystem":"npm"|"Maven","name"},"version"}`。maven の名前は `groupId:artifactId` のまま渡す。1回に送る要素は1000までにし、超えたら分けて送る。`next_page_token` が付いた要素は、`page_token` を付けてその要素だけ送り直す
-- `GET <OSV_API_BASE>/v1/vulns/{id}`。`MAL-` で始まらない ID について、`CWE-506` を含むかを読むために呼ぶ。公表の記載として `summary` と、`references` の最初の URL も読む
+- `GET <OSV_API_BASE>/v1/vulns/{id}`。このスクリプトは、querybatch が返したすべての ID について、この API を呼ぶ。`MAL-` で始まらない ID では、`CWE-506` を含むかを読む。どの ID でも、公表の記載として `summary` と、`references` の最初の URL を読む。`references` が空なら、URL は `https://osv.dev/vulnerability/<ID>` にする。`MAL-` で始まる ID も呼ぶのは、止めた理由の報告に、公表の記載の要約と URL を出すためである
 
 **呼び出し方**:
 - 使い方: `cooldown-check-malware.sh <入力のファイル>`。入力は部品の JSON の配列 `[{"ecosystem","name","version"}]`
 - 出力: 標準出力に、入力と同じ順の JSON の配列を出す。要素は `{"ecosystem","name","version","result":"clean"|"malicious"|"unknown","advisories":[{"id","summary","url"}]}` である
 - 終了コード: 0 = 判定できた(`unknown` を含む)、2 = 引数か入力の誤り
 
-**失敗したとき**: 1つの問い合わせの打ち切りは30秒にし、再試行は1回にする。querybatch が失敗したら、その回で送った要素をすべて `unknown` にする。`vulns/{id}` が失敗したら、その ID を持つ部品を `unknown` にする。
+**失敗したとき**: このスクリプトは、1つの問い合わせの打ち切りを30秒にし、再試行を1回にする。querybatch が失敗したら、その回で送った要素をすべて `unknown` にする。`MAL-` で始まらない ID の `vulns/{id}` が失敗したら、その ID を持つ部品を `unknown` にする。`MAL-` で始まる ID の `vulns/{id}` が失敗しても、このスクリプトは、その ID を持つ部品を `malicious` のままにし、公表の記載の要約を空にし、URL を `https://osv.dev/vulnerability/<ID>` にする。`MAL-` の ID は、querybatch の答えだけで悪意のある部品と分かるためである。
 
 ### cooldown-check-signer.sh(前の版と新しい版の署名した者を比べるスクリプト)
 
@@ -303,12 +303,13 @@ paths:
 
 **npm のとき**:
 - このスクリプトは、来歴として、`<NPM_REGISTRY_BASE>/-/npm/v1/attestations/<名前>@<版>` の `attestations[]` のうち、`predicateType` が `https://slsa.dev/provenance/v1` のものを使う。404 か SLSA の来歴が無ければ、その版には署名が無い
-- 署名した者は、来歴の証明書の3つの欄の組である。このスクリプトは、証明書を `bundle.verificationMaterial.certificate.rawBytes` から取り、`openssl x509 -inform DER` で読む。3つの欄は、OIDC の発行元(拡張 1.3.6.1.4.1.57264.1.8)、元のリポジトリの ID(1.15)、組み立ての設定の URI(1.18)の `@` より前の部分である。OIDC の発行元とは、組み立てを動かした CI に、その CI の身元を示す証明を出したサービスである。`@` より後ろはタグごとに変わるので比べない
-- このスクリプトは、新しい版の来歴の bundle を `gh attestation verify <tgz> --bundle <bundle> --digest-alg sha512 --repo <前の版の元のリポジトリ>` で検証する。このスクリプトは、tgz を部品の文書の `dist.tarball` の URL から取り、`dist.integrity` の値と照らす。tgz とは、npm の部品の中身を1つにまとめて圧縮したファイルである。前の版の来歴は、registry から読んだまま使う。前の版はすでにこのリポジトリが使っている版なので、検証の対象は新しい版である
+- 署名した者は、来歴の証明書の3つの欄の組である。このスクリプトは、証明書を `bundle.verificationMaterial.certificate.rawBytes` から取り、そこに無ければ `bundle.verificationMaterial.x509CertificateChain.certificates[0].rawBytes` から取る。来歴の bundle の版によって、証明書の置き場所が違うためである。bundle とは、来歴の記録と、その署名と、署名に使った証明書をまとめた JSON である。このスクリプトは、証明書の拡張を `openssl asn1parse` で読む。`openssl x509 -text` は、名前の無い拡張の値を、UTF8String の頭の2バイトを含む形で出すためである。UTF8String とは、証明書の中で文字列を入れるときの型である。3つの欄は、OIDC の発行元(拡張 1.3.6.1.4.1.57264.1.8)、元のリポジトリの ID(1.15)、組み立ての設定の URI(1.18)の `@` より前の部分である。OIDC の発行元とは、組み立てを動かした CI に、その CI の身元を示す証明を出したサービスである。`@` より後ろはタグごとに変わるので、このスクリプトは `@` より後ろを比べない
+- このスクリプトは、新しい版の来歴の bundle を `gh attestation verify <tgz> --bundle <bundle> --digest-alg sha512 --repo <前の版の元のリポジトリ>` で検証する。前の版の元のリポジトリは、前の版の証明書の拡張 1.3.6.1.4.1.57264.1.12 にある、元のリポジトリの URI から読む。3つの欄が前の版と違うときは、このスクリプトは、tgz を取る前に `different` を返す。tgz とは、npm の部品の中身を1つにまとめて圧縮したファイルである。検証できても、署名した者が違うことは変わらないためである。このスクリプトは、tgz を部品の文書の `dist.tarball` の URL から取り、`dist.integrity` の値と照らす。このスクリプトは、前の版の来歴を、registry から読んだまま使う。前の版はすでにこのリポジトリが使っている版なので、検証の対象は新しい版である
 
 **maven のとき**:
-- このスクリプトは、署名として、`<配布元>/<group のパス>/<artifact>/<版>/<artifact>-<版>.pom.asc` を使う。配布元は、公開日時を読んだのと同じ配布元(Maven Central か Gradle Plugin Portal)である。404 なら、その版には署名が無い
+- このスクリプトは、署名として、`<配布元>/<group のパス>/<artifact>/<版>/<artifact>-<版>.pom.asc` を使う。配布元は、公開日時を読んだのと同じ配布元(Maven Central か Gradle Plugin Portal)である。404 なら、その版には署名が無い。Gradle Plugin Portal は `.pom` と `.pom.asc` を別の URL へ転送して返すので、このスクリプトは転送を追う
 - このスクリプトは、公開鍵を、`gpg --list-packets` で署名から読んだ発行者の指紋で、`<KEYSERVER_BASE>/pks/lookup?op=get&options=mr&search=0x<指紋>`(既定 `https://keyserver.ubuntu.com`)から取り、使い捨ての `GNUPGHOME` に入れる
+- 署名に発行者の指紋が無く、発行者の鍵 ID だけがあるときは、このスクリプトは、鍵 ID で `search=0x<鍵 ID>` から公開鍵を取る。鍵 ID とは、指紋の後ろの16桁である。backend の部品には、postgresql や archunit のように、署名に鍵 ID だけを持つものがある。鍵サーバが同じ鍵 ID の別の鍵を返しても、このスクリプトは、署名を検証できた鍵の主鍵の指紋で、前の版と新しい版の署名した者を比べるので、別の者を同じ者とみなさない
 - このスクリプトは、`gpg --status-fd 1 --verify <pom.asc> <pom>` の `VALIDSIG` の行の最後の欄にある主鍵の指紋を、署名した者とする。このスクリプトは、公開元が副鍵を替えても主鍵が同じなら、同じ者とみなす
 
 **呼び出し方**:
@@ -317,7 +318,7 @@ paths:
 - 結果: `same`(同じ者)、`no-prior-signature`(前の版に署名が無い)、`different`(違う者)、`no-new-signature`(前の版に署名があり、新しい版に無い)、`unknown`(調べられなかった)。`no-prior-signature` は、`check-dependency-cooldown.sh` が変更を止める理由にならない
 - 終了コード: 0 = 判定できた(`unknown` を含む)、2 = 引数の誤り
 
-**失敗したとき**: 問い合わせの打ち切りは60秒にし、tgz の取得の打ち切りは300秒にし、再試行は1回にする。取得の失敗、`gh attestation verify` の失敗、`gpg --verify` が `VALIDSIG` を出さないとき、署名から指紋を読めないときは `unknown` にする。`gh attestation verify` の失敗は、署名が中身と合わないことを含むので、`different` ではなく `unknown` にする。このスクリプトが `different` と `unknown` のどちらを返しても、`check-dependency-cooldown.sh` はその版を公開から72時間経つまで止めるので、その版が入るかどうかは変わらない。
+**失敗したとき**: 問い合わせの打ち切りは60秒にし、tgz の取得の打ち切りは300秒にし、再試行は1回にする。このスクリプトは、次の4つのときに結果を `unknown` にする。取得に失敗したとき、`gh attestation verify` が失敗したとき、`gpg --verify` が `VALIDSIG` を出さないとき、署名から発行者の指紋も鍵 ID も読めないときである。`gh attestation verify` の失敗は、署名が中身と合わないことを含むので、`different` ではなく `unknown` にする。このスクリプトが `different` と `unknown` のどちらを返しても、`check-dependency-cooldown.sh` はその版を公開から72時間経つまで止めるので、その版が入るかどうかは変わらない。
 
 ### cooldown-check-pnpm-exclude.sh(除外の欄に版の要素があるかを確かめるスクリプト)
 
@@ -617,6 +618,7 @@ Claude は、Node.js の `fingerprints` に、`nodejs/release-keys` の README �
   - 警告の API が失敗したら `alerts-unreadable` になる
 - 単体テスト(`test-cooldown-check-malware.sh`):
   - `MAL-` の ID が返った部品は `malicious` になり、公表の記載が返る(要件3の1と7の3)
+  - `MAL-` の ID の `vulns/{id}` が失敗しても、その部品は `malicious` のままになる(要件3の1)
   - `GHSA-` の ID で `CWE-506` を含む部品は `malicious` になり、含まない部品は `clean` になる
   - querybatch が失敗したら、送った部品がすべて `unknown` になる。`next_page_token` が付いた要素だけが送り直される(要件3の2)
 - 単体テスト(`test-cooldown-check-signer.sh`):
@@ -624,6 +626,7 @@ Claude は、Node.js の `fingerprints` に、`nodejs/release-keys` の README �
   - npm で前の版に SLSA の来歴が無ければ `no-prior-signature`、前の版にあり新しい版に無ければ `no-new-signature` になる(要件4の1と4の4)
   - registry の署名だけがある版は、署名が無いものとして扱われる(要件4の3)
   - maven で主鍵の指紋が同じなら `same`、違えば `different`、鍵を取れなければ `unknown` になる(要件4の1と4の5)
+  - maven で署名に発行者の指紋が無く鍵 ID だけがあるときは、`cooldown-check-signer.sh` は、鍵 ID で公開鍵を取り、主鍵の指紋で前の版と新しい版の署名した者を比べる(要件4の2)
   - `gh attestation verify` が失敗したら `unknown` になる(要件4の5)
 - 単体テスト(`test-cooldown-check-pnpm-exclude.sh`):
   - `name@1.2.3` と `name@1.2.3 || 1.2.4` の要素は `present` になり、名前だけの要素とパターンの要素は `present` にならない(要件1の8)
@@ -667,7 +670,7 @@ Claude は、Node.js の `fingerprints` に、`nodejs/release-keys` の README �
 - 記録のコメントに数えるのは、`github-actions[bot]` が書いたコメントだけである。承認に数えるのは、所有者のアカウントのレビューだけである。第三者が同じ目印を書いても、記録にも承認にもならない
 - 同じリポジトリのブランチから PR を出す者は、PR の head の `.github/scripts/` を変えて、`dependency-cooldown` の判定を変えられる。`.github/` を変える PR には、CODEOWNERS と escape-hatch が所有者の承認を求める。そのため、PR の head の `.github/scripts/` を変えて判定を変えられることは、ワークフロー設計.md の「受容した残余リスク」の4つ目の、PR で追加されたワークフローがマージの前に動くというリスクの範囲に収まる
 - PR の本文の CI の道具の記録は、書き込みの権限を持つ者なら書ける。偽の記録は週次監査の一覧に余計な行を足すだけで、記録を消すことにはならない
-- 外部へ送るデータは、部品の名前と版(npm registry、Maven Central、Gradle Plugin Portal、OSV)と、鍵の指紋(keyserver.ubuntu.com)だけである。どれも公開のリポジトリの lockfile から分かる情報である。リポジトリの外へデータを送る変更なので、所有者の承認が要る。この変更は `.github/` を含むので、CODEOWNERS が承認を求める
+- 外部へ送るデータは、次の2つだけである。部品の名前と版は、npm registry、Maven Central、Gradle Plugin Portal、OSV へ送る。鍵の指紋か鍵 ID は、keyserver.ubuntu.com へ送る。どれも公開のリポジトリの lockfile から分かる情報である。リポジトリの外へデータを送る変更なので、所有者の承認が要る。この変更は `.github/` を含むので、CODEOWNERS が承認を求める
 
 ## 性能
 

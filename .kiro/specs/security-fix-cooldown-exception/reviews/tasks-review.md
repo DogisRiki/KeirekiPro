@@ -73,3 +73,67 @@
 なし
 
 - 往復: 2回で収束 / 未解決: 0件
+
+## サイクル2 往復1(2026-11-02)
+
+### 審査の範囲
+
+範囲: 差分
+
+- tasks.md タスク1.4 の本文・完了の確かめ方・受入基準とテストの対応: 今回の直しの3か所。design.md の cooldown-check-signer.sh の「maven のとき」の節(鍵 ID で `search=0x<鍵 ID>` から取る箇条)と「失敗したとき」(発行者の指紋も鍵 ID も読めないときは `unknown`)、design.md のテストの方針の signer の単体テストに足した箇条(要件4の2)と照らした。鍵 ID の説明(指紋の後ろの16桁)と止まる条件(指紋も鍵 ID も読めないとき)は design と合う。新しいテストの名前を要件4の受入基準1と2に当てたことも、design の箇条(要件4の2)と食い違わない
+- design.md の「maven のとき」の1つ目の箇条に足された、Gradle Plugin Portal の転送を追う文: 同じ節の直しなので、タスク1.4 のテストで扱われるかを見た(T2-1-2)
+- 本番で動く部品で鍵 ID だけの署名を持つもの: 直しのきっかけの部品のうち `org.postgresql:postgresql` が `backend/build.gradle` の79行目で `runtimeOnly` であり、本番で動く部品の範囲(要件1)に入ることを確かめた(T2-1-1)
+- tasks.md タスク1.1・1.2・1.3・1.5 の箱の `[x]`: 実装の進み具合の印で、本文は変わっていない。依存と並行可の指定にも影響しない
+- tasks.md 実装のメモの `place-1/dot-github/` の項目: タスク1.x〜4.x の置き場所の読み替えと、タスク8.1 の所有者に置いてもらうコマンドの形に当たるので、8.1 の本文(「`place-1/` のファイルを本来の場所に写すコマンド」)と実装のメモの2つ目・4つ目と食い違わないかを見た。読み替えの決まりが同じメモにあるので食い違わない
+- tasks.md 実装のメモの `cooldown-check-malware.sh`(`MAL-` の項目も `vulns/{id}` で読む)の項目と、`cooldown-check-signer.sh`(証明書の読み先、`openssl asn1parse`、`--repo` の読み先、3つの欄が違えば検証しない)の項目: design.md の cooldown-check-malware.sh の節(289行目・296行目)、cooldown-check-signer.sh の npm のときの節(306行目・307行目)、外部の機能の一覧(116行目)、テストの方針(620行目)と照らした(前の段階への指摘 T2-1-3)
+- タスク1.4 以外のタスク: 今回の直しは signer の maven の部分の中で閉じ、ほかのタスクの対象の部品と依存は変わらないので、読み直していない
+
+### 申告
+
+差分で新しく申告に当たる決めごとは無い。サイクル1の申告1〜3は変わらない。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| T2-1-1 | 中 | tasks.md タスク1.4 の完了の確かめ方(「実際の backend の部品1つの今の版と1つ前の版から1回取った `.pom` と `.pom.asc` と鍵サーバの公開鍵で、主鍵の指紋が同じなら same になる場合を持つ」) | 今回足した鍵 ID の道筋を実物の署名で確かめることが、完了の確かめ方に無い。実物の部品は「1つ」としか決めていないので、発行者の指紋を持つ部品(サイクル1の T1-1-2 の直し方の案の例の `spring-core` など)を選ぶと、鍵 ID の道筋は、テストの中で作った使い捨ての鍵の署名でしか動かない。今の gpg は既定で署名に発行者の指紋を付けるので、鍵 ID だけの署名をテストの中で作るには、gpg の出力をまねたスタブなど実物と違う形に頼りやすい。そのまねが実物の `gpg --list-packets` の出力や鍵サーバの答えとずれても、テストは通り、実装は合格のまま終わる。直しのきっかけの `org.postgresql:postgresql` は `backend/build.gradle` で `runtimeOnly` の本番で動く部品なので、そのとき、postgresql に high か critical の警告が出た場面で初めて `unknown` で止まって分かり、要件1の受入基準1が postgresql で満たされない | 完了の確かめ方の実物の部品を、鍵 ID だけの署名を持つ本番で動く部品(`org.postgresql:postgresql` の今の版と1つ前の版)にする。または、今の「部品1つ」に加えて、postgresql の2つの版の `.pom` と `.pom.asc` と、鍵 ID で鍵サーバから取った公開鍵で `same` になる場合を持つと書く |
+| T2-1-2 | 低 | tasks.md タスク1.4 の受入基準とテストの対応(「Maven Central が 404 を返す部品は Gradle Plugin Portal の署名を読む」) | design.md の「maven のとき」の1つ目の箇条に、Gradle Plugin Portal は `.pom` と `.pom.asc` を別の URL へ転送して返すので転送を追う、と足された。タスク1.4 のテストは `curl` をスタブにするので、転送を追わない実装でも通る。ただし、Gradle Plugin Portal から取る部品は組み立ての道具で、本番で動く部品(要件1の範囲)にはまず入らないので、実装への影響は小さい | タスク1.4 の対応の行に「Gradle Plugin Portal が転送を返したら転送先の署名を読む」のテストを足すか、スタブが転送の答えを返す形にする |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| T2-1-3 | design | design.md の cooldown-check-signer.sh の npm のときの節(306行目「証明書を `bundle.verificationMaterial.certificate.rawBytes` から取り、`openssl x509 -inform DER` で読む」、307行目の `--repo <前の版の元のリポジトリ>`)、外部の機能の一覧(116行目「`openssl x509`」)、cooldown-check-malware.sh の節(289行目「`MAL-` で始まらない ID について」呼ぶ、296行目)とテストの方針(620行目「`MAL-` の ID が返った部品は `malicious` になり、公表の記載が返る」) | tasks.md の実装のメモに、タスク1.2 と1.3 の実装で design と違う形にしたことが書かれた。1つ目に、registry から取った実物の来歴(bundle の版 0.2)では、証明書が design の書いた欄ではなく `x509CertificateChain.certificates[0].rawBytes` にあり、拡張は `openssl x509` ではなく `openssl asn1parse` で読むこと。2つ目に、`--repo` に渡す元のリポジトリを拡張 1.12 から読むこと(design は読み先を書いていない)。3つ目に、`MAL-` の項目も `vulns/{id}` で読み、読めなくても `malicious` のままにすること(design の289行目は `MAL-` では呼ばないとし、620行目は `MAL-` でも公表の記載が返るとしていて、design の中で揃っていない)。どれも要件の結果は変わらないが、design の本文は実物の形と合わないままである。PR の段階の codex-review は design を基準に判定するので、実装のメモを読まなければ食い違いとして扱いうる。design を直している今、これらの箇所を実装のメモに合わせると揃う。戻る先は design である |
+
+- 往復: 1回目 / 高0 中1 低1
+
+## サイクル2 往復2(2026-11-02)
+
+### 審査の範囲
+
+範囲: 差分
+
+- tasks.md タスク1.4 の完了の確かめ方: T2-1-1 の直し。実物の部品を `org.postgresql:postgresql` の今の版と1つ前の版にしたことを、design.md の cooldown-check-signer.sh の「maven のとき」の鍵 ID の箇条(312行目。postgresql を鍵 ID だけを持つ部品の例に挙げる)と、spec.json の `approval_history` の取り消しの理由(postgresql の `.pom.asc` に鍵 ID だけがある)と照らした。postgresql は `backend/build.gradle` の79行目の `runtimeOnly` で、版は Spring Boot の BOM が決めるので、「今の版」はこのリポジトリが使う版と読める。鍵 ID の道筋が実物の署名で動くので、T2-1-1 は解消した。止まる条件(指紋も鍵 ID も読めないとき)は design.md の321行目と合う
+- tasks.md タスク8.2 の見出し: 見出しを「dependency-cooldown と、依存グラフの scope と、guardrails の3つ」に直したので、design.md のテストの方針の「Claude が実際の環境で確認すること」(662〜665行目)の3つと、8.2 の完了の確かめ方の3つと、8.2 を挙げるタスク3.1(80行目)・3.2(88行目)と実装のメモ(211行目)と照らした。どれも「実装の PR の検査の結果で実際の環境を確かめるタスク 8.2」と呼んでおり、見出しの中身と食い違わない
+- tasks.md 実装のメモの `cooldown-check-malware.sh` の項目: 書き方の直し。差分の語 `MAL-` と `vulns/{id}` で tasks.md と design.md を検索し、タスク1.2 の受入基準とテストの対応(16行目)と、design.md の289行目・296行目・テストの方針の620〜621行目と照らした。要件3の受入基準1と2の括弧の言い換えは requirements.md の要件3の1と2の文と合う(T2-2-1、T2-2-2)
+- tasks.md 実装のメモの `cooldown-check-signer.sh` の項目: 書き方の直し。差分の語 `x509CertificateChain` `asn1parse` `57264` で tasks.md と design.md を検索し、タスク1.3 の本文と受入基準とテストの対応(22〜24行目)と、design.md の116行目・306行目・307行目と照らした。3つの欄が違うときに tgz を取らずに `different` を返すことは、design.md の307行目と合う(T2-2-1、T2-2-2)
+- 実装のメモの shellcheck の項目(209行目): 1文を2文に分けただけで、意味は変わらない。サイクル1の T1-1-6(記録のみ)の理由の書き方は変わっていない
+- 置き場所の `place-1/dot-github/scripts/tests/` の `test-cooldown-check-malware.sh`(270〜277行目)と `test-cooldown-check-signer.sh`(182行目): タスク1.2 と1.3 は `[x]` なので、design の直しで足されたテストの箇条が実装のテストにあるかを確かめた。`MAL-` の項目を読めなくても malicious のままになる場合と、証明書が `x509CertificateChain` にある bundle の場合が、どちらもある
+- そのほかのタスク: 差分の語が現れず、対象の部品と依存も変わらないので、読み直していない。T2-1-2 は記録のみで、却下ではないのでもう一度出さない
+
+### 申告
+
+差分で新しく申告に当たる決めごとは無い。サイクル1の申告1〜3は変わらない。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| T2-2-1 | 低 | tasks.md タスク1.2 の受入基準とテストの対応(「vulns の取得が失敗したら、その ID を持つ部品が unknown になる」)、タスク1.3 の受入基準とテストの対応 | design.md の直しで、テストの方針に「`MAL-` の ID の `vulns/{id}` が失敗しても、その部品は `malicious` のままになる」(621行目)が足され、証明書の置き場所が2つになった(306行目)。タスク1.2 の対応の行は、この場合を挙げず、`vulns` の取得の失敗を ID の種類によらず `unknown` と書いたままである。タスク1.3 の対応の行も、証明書が `x509CertificateChain` にある bundle の場合を挙げていない。ただし、置き場所の実装のテストには、どちらの場合もすでにある(`test-cooldown-check-malware.sh` の270〜277行目、`test-cooldown-check-signer.sh` の182行目)ので、実装には影響しない | タスク1.2 の対応の行の失敗の場合を「`MAL-` で始まらない ID の vulns の取得が失敗したら、その ID を持つ部品が unknown になる」にし、「`MAL-` の項目を読めなくても malicious のままになる」を要件3の受入基準1の行に足す。タスク1.3 の対応の行に「証明書が x509CertificateChain にある bundle でも3つの欄を読める」を足す |
+| T2-2-2 | 低 | tasks.md 実装のメモの `cooldown-check-malware.sh` の項目(「design の失敗したときの扱いは「`vulns/{id}` が失敗したら、その ID を持つ部品を unknown にする」である。ただし」)と `cooldown-check-signer.sh` の項目(「証明書は design の書いた欄ではなく後者にあったためである」) | どちらの項目も、直す前の design を引いて、実装が design と違う形にしたと読める書き方のままである。直した design.md は、296行目で `MAL-` の項目を読めなくても `malicious` のままにすると書き、306行目で2つの置き場所から証明書を取ると書いているので、今は design と実装は同じである。実装の結果は変わらない | 2つの項目を、design の直した内容と同じであると分かる書き方にするか、design に入ったので項目を消す |
+
+### 前の段階への指摘
+
+なし
+
+- 往復: 2回で収束 / 未解決: 0件
