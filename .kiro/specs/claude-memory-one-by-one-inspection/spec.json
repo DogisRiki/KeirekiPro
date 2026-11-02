@@ -49,12 +49,32 @@
          "revoked_at" : "2026-11-02T10:41:30Z",
          "revoked_for" : "実装のときの所有者の確認による design への差し戻し: 3つの事柄を選択肢の画面の問いの文に入れ、きっかけを発言の引用と Claude が書いた理由の文で書く",
          "stage" : "tasks"
+      },
+      {
+         "approved_at" : "2026-11-02T10:56:30Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            693
+         ],
+         "revoked_at" : "2026-11-02T14:50:49Z",
+         "revoked_for" : "実装のときの所有者の確認による design への差し戻し: 1回目の点検で、消すメモリファイルとほかのメモリファイルの目次の行が1行につながっていたため、残したメモリファイルの目次の行も消えた。消す処理が、ほかのメモリファイルを指す部分を残すようにする",
+         "stage" : "design"
+      },
+      {
+         "approved_at" : "2026-11-02T12:08:29Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            693
+         ],
+         "revoked_at" : "2026-11-02T14:50:49Z",
+         "revoked_for" : "実装のときの所有者の確認による design への差し戻し: 1回目の点検で、消すメモリファイルとほかのメモリファイルの目次の行が1行につながっていたため、残したメモリファイルの目次の行も消えた。消す処理が、ほかのメモリファイルを指す部分を残すようにする",
+         "stage" : "tasks"
       }
    ],
    "approvals" : {
       "design" : {
          "approved" : true,
-         "approved_at" : "2026-11-02T10:56:30Z",
+         "approved_at" : "2026-11-02T22:12:59Z",
          "approved_by" : "DogisRiki",
          "generated" : true
       },
@@ -65,9 +85,7 @@
          "generated" : true
       },
       "tasks" : {
-         "approved" : true,
-         "approved_at" : "2026-11-02T12:08:29Z",
-         "approved_by" : "DogisRiki",
+         "approved" : false,
          "generated" : true
       }
    },
@@ -77,5 +95,5 @@
    "language" : "ja",
    "phase" : "tasks-generated",
    "review_model" : "opus",
-   "updated_at" : "2026-11-02T12:08:29Z"
+   "updated_at" : "2026-11-02T22:12:59Z"
 }
