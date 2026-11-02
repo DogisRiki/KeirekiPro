@@ -107,7 +107,7 @@
   - _対象の部品: check-audit-cooldown-exceptions.sh_
   - _依存: 1.6_
 
-- [ ] 4.2 止まっている Dependabot の PR の見分けに、記録のコメントを使う (並行可)
+- [x] 4.2 止まっている Dependabot の PR の見分けに、記録のコメントを使う (並行可)
 
   Claude は、部品「check-audit-dependabot-stuck.sh」とそのテスト `test-check-audit-dependabot-stuck.sh` の今の版を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に写して変える。このスクリプトは、`dependency-cooldown` の赤だけを、`record-cooldown-exception.sh exists` の結果で、承認待ちと滞留に分ける。Claude は、テストを、`KP_TEST_CASE` で場合を選んで流せる形にする。
   - 完了の確かめ方: Linux のコンテナで流した `test-check-audit-dependabot-stuck.sh` の、今ある場合と新しい場合が、すべて通る。このテストは、`gh` だけをスタブにし、`record-cooldown-exception.sh` の本物を呼ぶ。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
@@ -215,6 +215,7 @@
 - Claude は、出荷の PR の本文に、CI の道具の記録の目印(`<!-- ci-tool-cooldown-exception`)の文字列を書かない。週次監査の `check-audit-cooldown-exceptions.sh` は、PR の本文の目印の数を数え、読める記録の数と合わない PR を、読めなかった PR として報告するためである
 - 週次監査の自己テストは GitHub Actions のランナーで流れ、ランナーは `GITHUB_REPOSITORY` などの環境変数を渡す。そのため、Claude は、環境変数が無いときの動きを確かめるテストで、`env -u` を使って変数を明示して外す。前に書いた代入は変数を足すだけで、引き継いだ変数を消さない
 - Claude の Edit ツールは、バックスラッシュと u と4桁の16進数で書いた文字の書き方を、その文字そのものに直して保存する。jq のコードにその書き方を残すときは、Claude は、perl でバックスラッシュを `chr(92)` として書き、日本語を含む行を書くときは `-Mutf8 -CSD` を付ける
+- テストの `check_summary` と `check_lacks` は `grep -F` で探すので、Claude は、期待の文字列に改行を入れない。`grep -F` は、改行で区切った文字列を別々の候補として読み、どれか1つが当たれば通るためである。ほかの行が混ざらないことを確かめるときは、混ざったときにだけ現れる文字列が無いことを `check_lacks` で確かめる
 
 ## 完了条件(全タスク共通)
 
