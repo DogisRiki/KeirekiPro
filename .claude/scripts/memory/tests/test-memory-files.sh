@@ -164,6 +164,68 @@ case_show_too_many() {
 addcase show_too_many
 
 # ---------------------------------------------------------------------
+# prune-index と delete
+# ---------------------------------------------------------------------
+
+case_prune_index() {
+    memfile a.md 'a'
+    printf '%s\r\n' '# MEMORY' '' '- [A](a.md) — 残る' '- [消えた](gone.md) — 消える' '- リンクの無い行' '- [どちらか](gone2.md) と [A](a.md)' '- [外](https://example.com/z.md)' >"$MEMDIR/MEMORY.md"
+    out=$(perl "$PL" prune-index)
+    check "prune-index は指すファイルの無い行だけを消し、リンクの無い行を残す" \
+        "$?|$(printf '%s' "$out" | pj 'join ";", @{$d->{removed}}')|$(sha "$MEMDIR/MEMORY.md")" \
+        "0|- [消えた](gone.md) — 消える|$(printf '%s\r\n' '# MEMORY' '' '- [A](a.md) — 残る' '- リンクの無い行' '- [どちらか](gone2.md) と [A](a.md)' '- [外](https://example.com/z.md)' >"$CASE/want" && sha "$CASE/want")"
+}
+addcase prune_index
+
+case_delete_same() {
+    memfile a.md 'a'
+    memfile b.md 'b'
+    printf '%s\r\n' '# MEMORY' '- [A](a.md) — 消える' '- [B](b.md) — 残る' '- [A と B](./a.md#x) と [B](b.md)' >"$MEMDIR/MEMORY.md"
+    printf '%s' '- 最後の行は改行で終わらない' >>"$MEMDIR/MEMORY.md"
+    out=$(perl "$PL" delete "a.md=$(sha "$MEMDIR/a.md")")
+    check "delete は SHA-256 が同じなら、メモリファイルとそのファイルへのリンクを持つ目次の行を消し、ほかの目次の行と改行の形を変えない" \
+        "$?|$(printf '%s' "$out" | pj 'join ";", map { join ",", $_->{name}, $_->{result}, @{$_->{removed_index_lines}} } @{$d->{results}}')|$([ -e "$MEMDIR/a.md" ] && echo exists)|$(sha "$MEMDIR/MEMORY.md")" \
+        "0|a.md,deleted,- [A](a.md) — 消える,- [A と B](./a.md#x) と [B](b.md)||$({ printf '%s\r\n' '# MEMORY' '- [B](b.md) — 残る'; printf '%s' '- 最後の行は改行で終わらない'; } >"$CASE/want" && sha "$CASE/want")"
+}
+addcase delete_same
+
+case_delete_changed_missing() {
+    memfile a.md 'a'
+    printf '%s\n' '- [A](a.md)' '- [G](gone.md)' >"$MEMDIR/MEMORY.md"
+    index_before=$(sha "$MEMDIR/MEMORY.md")
+    other=$(printf 'x' | perl -MDigest::SHA=sha256_hex -e 'print sha256_hex(<STDIN>)')
+    out=$(perl "$PL" delete "a.md=$other" "gone.md=$other")
+    check "delete は SHA-256 が違えば changed、ファイルが無ければ missing を返し、どちらも何も消さない" \
+        "$?|$(printf '%s' "$out" | pj 'join ";", map { "$_->{name},$_->{result}" } @{$d->{results}}')|$(cat "$MEMDIR/a.md")|$(sha "$MEMDIR/MEMORY.md")" \
+        "0|a.md,changed;gone.md,missing|a|$index_before"
+}
+addcase delete_changed_missing
+
+case_delete_invalid() {
+    memfile MEMORY.md "$(printf '%s\n' '- [X](../x.md)' '- [B](a/b.md)')"
+    mkdir -p "$MEMDIR/a"
+    printf 'b' >"$MEMDIR/a/b.md"
+    printf 'x' >"$MEMDIR/../x.md"
+    out=$(perl "$PL" delete "../x.md=$(sha "$MEMDIR/../x.md")" "MEMORY.md=$(sha "$MEMDIR/MEMORY.md")" "a/b.md=$(sha "$MEMDIR/a/b.md")")
+    check "delete は ../x.md、MEMORY.md、a/b.md を invalid にし、メモリのディレクトリの外のファイルを消さない" \
+        "$?|$(printf '%s' "$out" | pj 'join ";", map { "$_->{name},$_->{result}" } @{$d->{results}}')|$(cat "$MEMDIR/../x.md" "$MEMDIR/a/b.md")|$(grep -c . "$MEMDIR/MEMORY.md")" \
+        "0|../x.md,invalid;MEMORY.md,invalid;a/b.md,invalid|xb|2"
+}
+addcase delete_invalid
+
+case_show_then_delete() {
+    memfile a.md '前の中身'
+    printf '%s\n' '- [A](a.md)' >"$MEMDIR/MEMORY.md"
+    hash=$(perl "$PL" show a.md | pj '$d->{files}[0]{sha256}')
+    printf '%s' '書き換えた中身' >"$MEMDIR/a.md"
+    out=$(perl "$PL" delete "a.md=$hash")
+    check "show のあとにメモリファイルを書き換えると、delete は changed を返して消さない" \
+        "$?|$(printf '%s' "$out" | pj '$d->{results}[0]{result}')|$(cat "$MEMDIR/a.md")|$(cat "$MEMDIR/MEMORY.md")" \
+        "0|changed|書き換えた中身|- [A](a.md)"
+}
+addcase show_then_delete
+
+# ---------------------------------------------------------------------
 # 選んだ場合を流す
 # ---------------------------------------------------------------------
 

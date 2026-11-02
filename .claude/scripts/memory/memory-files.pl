@@ -11,6 +11,14 @@
 #   show <名前>...
 #     名前ごとに、中身と SHA-256 を {"files":[{"name":..,"sha256":..,"content":..,"decode_error":..}]} の1行で出す。
 #     無い名前は result が missing、決まりに合わない名前は result が invalid になる。名前は4つまで
+#   prune-index
+#     目次を読み直し、リンクの指すファイルがどれもメモリのディレクトリに無い行を消し、{"removed":[<消した行>]} の1行を出す。
+#     リンクの無い行は残す
+#   delete <名前>=<sha256>...
+#     名前ごとに、今の中身の SHA-256 が渡した値と同じときだけ、メモリファイルと、そのファイルへのリンクを持つ目次の行を消し、
+#     {"results":[{"name":..,"result":..,"removed_index_lines":[..]}]} の1行を出す。result は deleted・changed・missing・invalid・error のどれかである
+# 目次を書き換えるときは、消す直前に読み直し、同じディレクトリの一時のファイルに書いてから名前を替えて置き換える。
+# 改行の形(\n か \r\n)と、消さない行のバイトの列は変えない
 # メモリのディレクトリ: 今の作業フォルダを含むリポジトリの git の共通ディレクトリの親を本体の作業フォルダとし、
 # その場所の英数字でない文字を1文字ずつ - に替えた名前の $HOME/.claude/projects/<名前>/memory である
 # メモリファイルの名前: / と \ を含まず、. で始まらず、.md で終わり、MEMORY.md でない名前
@@ -36,6 +44,8 @@ my $MAX_NAMES = 4;
 my %COMMANDS = (
     list => \&cmd_list,
     show => \&cmd_show,
+    'prune-index' => \&cmd_prune_index,
+    delete => \&cmd_delete,
 );
 
 # old-inspection-cleanup.pl が require で読み込んだときは、サブコマンドを動かさない
@@ -54,7 +64,7 @@ sub main {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-files.pl list | show <名前>...(4つまで)\n";
+    print STDERR "使い方: perl memory-files.pl list | show <名前>...(4つまで) | prune-index | delete <名前>=<sha256>...\n";
     return 2;
 }
 
@@ -219,6 +229,107 @@ sub cmd_show {
         };
     }
     return emit({ files => \@files });
+}
+
+# 目次を読み直し、$drop が真を返す行を消して置き換える。消した行の文を並べて返す。$drop は、行の終わりの改行を除いた行の文を受ける。
+# 目次が無いときと、消す行が無いときは、目次を書き換えない
+sub rewrite_index {
+    my ($memdir, $drop) = @_;
+    my $path  = "$memdir/$INDEX";
+    my $bytes = -d $memdir ? read_bytes($path) : undef;
+    return () unless defined $bytes;
+    my ($kept, @removed) = ('');
+    # 行の終わりの改行を付けたまま分けるので、残す行のバイトの列と改行の形は変わらない
+    for my $raw (split /(?<=\n)/, $bytes) {
+        (my $text = $raw) =~ s/\r?\n\z//;
+        if ($drop->($text)) { push @removed, $text; } else { $kept .= $raw; }
+    }
+    return () unless @removed;
+    # 一時のファイルの名前は .md で終わらないので、途中で止まってもメモリファイルに数えられない
+    my $tmp = "$path.$$.tmp";
+    # 失敗した理由は、失敗した処理の直後に控える。あとの処理が $! を上書きするためである
+    my $why;
+    if (open(my $fh, '>:raw', $tmp)) {
+        $why = "$!" unless print {$fh} $kept;
+        $why //= "$!" unless close $fh;
+    } else {
+        $why = "$!";
+    }
+    # 書き終えられなかった一時のファイルで目次を置き換えないように、書き終えたときだけ名前を替える
+    $why = "$!" if !defined $why && !rename $tmp, $path;
+    if (defined $why) {
+        unlink $tmp;
+        die "目次 $path を書き換えられなかった($why)\n";
+    }
+    return @removed;
+}
+
+sub cmd_prune_index {
+    return usage() if @_;
+    my $memdir  = memory_dir();
+    my @removed = rewrite_index($memdir, sub {
+        my @links = index_links($_[0]);
+        return @links && !grep { -e "$memdir/$_" } @links;
+    });
+    return emit({ removed => [ map { text_of($_) } @removed ] });
+}
+
+# 1つのメモリファイルを消せなかった結果を書き、同じ理由を標準エラーに1文で出す。理由はバイトの列で受ける
+sub fail_one {
+    my ($result, $why) = @_;
+    ($result->{result}, $result->{error}) = ('error', text_of($why));
+    print STDERR "memory-files.pl: $why\n";
+}
+
+sub cmd_delete {
+    my @args = @_;
+    return usage() unless @args;
+    my @pairs;
+    for my $arg (@args) {
+        my ($name, $sha) = $arg =~ /\A(.*)=([0-9a-fA-F]{64})\z/s or return usage();
+        push @pairs, [ $name, lc $sha ];
+    }
+    my $memdir = memory_dir();
+    my ($failed, @results) = (0);
+    for my $pair (@pairs) {
+        my ($name, $sha) = @$pair;
+        my $result = { name => text_of($name) };
+        push @results, $result;
+        if (!valid_name($name)) {
+            $result->{result} = 'invalid';
+            next;
+        }
+        my $path  = "$memdir/$name";
+        my $bytes = eval { -f $path ? read_bytes($path) : undef };
+        if ($@) {
+            fail_one($result, $@ =~ s/\s+\z//r);
+            $failed = 1;
+            next;
+        }
+        if (!defined $bytes) {
+            $result->{result} = 'missing';
+            next;
+        }
+        if (sha256_hex($bytes) ne $sha) {
+            $result->{result} = 'changed';
+            next;
+        }
+        if (!unlink $path) {
+            fail_one($result, "$path を消せなかった($!)");
+            $failed = 1;
+            next;
+        }
+        $result->{result} = 'deleted';
+        my @removed = eval { rewrite_index($memdir, sub { grep { $_ eq $name } index_links($_[0]) }) };
+        if ($@) {
+            # メモリファイルは消えたが、目次の行が残った。行は list の dangling に出る
+            print STDERR "memory-files.pl: $@";
+            $failed = 1;
+        }
+        $result->{removed_index_lines} = [ map { text_of($_) } @removed ];
+    }
+    emit({ results => \@results });
+    return $failed ? 1 : 0;
 }
 
 1;
