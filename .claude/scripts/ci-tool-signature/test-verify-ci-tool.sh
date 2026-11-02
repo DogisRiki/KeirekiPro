@@ -173,6 +173,17 @@ esac
 STUB
 chmod +x "$WORK/bin/gh"
 
+# chmod: 引数を $STUB_CALLS に "CHMOD <引数>" の1行で記録し、この PC の chmod を動かす。
+#   Git Bash の chmod は権限の値を変えないので、テストは、権限の値の代わりに呼び出しを見る。
+#   $STUB_DIR/chmod.fail があれば終了コード 1
+cat >"$WORK/bin/chmod" <<'STUB'
+#!/usr/bin/env bash
+echo "CHMOD $*" >>"${STUB_CALLS:?}"
+[ -e "${STUB_DIR:?}/chmod.fail" ] && { echo "chmod: Operation not permitted" >&2; exit 1; }
+PATH="${PATH#"$(dirname "$0")":}" exec chmod "$@"
+STUB
+chmod +x "$WORK/bin/chmod"
+
 # --- テストの鍵 ------------------------------------------------------------------------
 MAKER="$WORK/gpg-maker"
 mkdir "$MAKER"
@@ -305,7 +316,7 @@ tf_put() {
 }
 
 reset() {
-    rm -rf "${STUB:?}"/web/* "$STUB"/gh/* "$STUB/gh.fail" "$STUB/docker.fail" "$STUB/docker-run.fail" "$STUB/cosign.fail"
+    rm -rf "${STUB:?}"/web/* "$STUB"/gh/* "$STUB/gh.fail" "$STUB/docker.fail" "$STUB/docker-run.fail" "$STUB/cosign.fail" "$STUB/chmod.fail"
     : >"$WORK/calls.log"
     publish_key "$FT" "$FT"
 }
@@ -629,6 +640,28 @@ if want trivy_ok; then
     expect_calls "Trivy の取得の打ち切りは300秒" "^GET https://github\.com/aquasecurity/trivy/releases/download/v${TV}/.* max-time=300$" 2
     expect_calls "Trivy の公開日時を、リリースのタグで読む" \
         "^GH api repos/aquasecurity/trivy/releases/tags/v${TV} --jq \.published_at$" 1
+    # cosign のイメージは番号 65532 の利用者として動くので、Linux では、作業フォルダをほかの利用者も
+    # 読める権限にしないと cosign がファイルを読めない
+    MOUNT=$(sed -n "s|^DOCKER run --rm -v \(.*\):/work:ro .*|\1|p" "$WORK/calls.log")
+    expect_calls "cosign に渡す作業フォルダを、ほかの利用者も開ける権限にする" "^CHMOD a+rx ${MOUNT}$" 1
+    expect_calls "cosign に渡す署名と tarball を、ほかの利用者も読める権限にする" \
+        "^CHMOD a+r ${MOUNT}/trivy\.sigstore\.json ${MOUNT}/trivy\.tar\.gz$" 1
+    if [ -n "$MOUNT" ] && awk '/^CHMOD /{ c = NR } /^DOCKER run .*cosign/{ d = NR } END { exit !(c && d && c < d) }' "$WORK/calls.log"; then
+        pass "cosign のコンテナを動かす前に権限を変える"
+    else
+        fail "cosign のコンテナを動かす前に権限を変える" "$(cat "$WORK/calls.log")"
+    fi
+    expect_calls "作業フォルダに書き込みの権限は与えない" "^CHMOD .*[+=][rx]*w" 0
+fi
+
+if want trivy_chmod_fail; then
+    reset
+    trivy_put "$(at 3600)"
+    : >"$STUB/chmod.fail"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "作業フォルダの権限を変えられなければ終了コード 2 になる" 2 unknown
+    expect_detail "作業フォルダの権限を変えられなければ理由が出る" "作業フォルダの権限を変えられませんでした。"
+    expect_calls "作業フォルダの権限を変えられなければ cosign を動かさない" "^DOCKER run " 0
 fi
 
 if want trivy_badsig; then
