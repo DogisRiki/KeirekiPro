@@ -15,8 +15,14 @@
 #     目次を読み直し、リンクの指すファイルがどれもメモリのディレクトリに無い行を消し、{"removed":[<消した行>]} の1行を出す。
 #     リンクの無い行は残す
 #   delete <名前>=<sha256>...
-#     名前ごとに、今の中身の SHA-256 が渡した値と同じときだけ、メモリファイルと、そのファイルへのリンクを持つ目次の行を消し、
-#     {"results":[{"name":..,"result":..,"removed_index_lines":[..]}]} の1行を出す。result は deleted・changed・missing・invalid・error のどれかである
+#     名前ごとに、今の中身の SHA-256 が渡した値と同じときだけ、メモリファイルを消し、目次からそのファイルの項目を消して、
+#     {"results":[{"name":..,"result":..,"removed_index_lines":[..],"kept_index_lines":[..]}]} の1行を出す。
+#     result は deleted・changed・missing・invalid・error のどれかである。
+#     目次の行は、行の中の「- [」から、次の「- [」の直前か行の終わりまでを1つの項目として読む。行の始めが「- [」でなければ、
+#     行の始めから最初の「- [」の直前までも1つの項目とする。リンクがすべて消すファイルを指す行は、行をまるごと消す。
+#     ほかのファイルへのリンクも持つ行からは、消すファイルへのリンクを持つ項目だけを消し、残す項目を元の順と元の文字のままつなぐ。
+#     消すファイルへのリンクを持つ項目がほかのファイルへのリンクも持つ行は、変えずに残して kept_index_lines に並べる。
+#     removed_index_lines には、消した行か、消した項目の文字が入る
 #   origins <名前>...
 #     名前ごとに、会話の記録の中の、メモリファイルへの最も早い書き込みを探し、{"origins":[..]} の1行を出す。名前は4つまで。
 #     最も早い書き込みが Write で、その結果が update でなければ、found を真にし、その会話の、書き込みまでの開発者の文を utterances に
@@ -26,7 +32,7 @@
 # 会話の記録: projects/ のうち、名前が本体の作業フォルダの名前と同じか、その名前に - を付けたもので始まるディレクトリの直下の *.jsonl。
 # projects/ は、CLAUDE_CONFIG_DIR が空でなければその下、空なら $HOME/.claude の下にある。cwd が本体の作業フォルダかその下の行だけを使う
 # 目次を書き換えるときは、消す直前に読み直し、同じディレクトリの一時のファイルに書いてから名前を替えて置き換える。
-# 改行の形(\n か \r\n)と、消さない行のバイトの列は変えない
+# 改行の形(\n か \r\n)と、消さない行のバイトの列と、項目を消した行の残す項目のバイトの列は変えない
 # メモリのディレクトリ: 今の作業フォルダを含むリポジトリの git の共通ディレクトリの親を本体の作業フォルダとし、
 # その場所の英数字でない文字を1文字ずつ - に替えた名前の $HOME/.claude/projects/<名前>/memory である
 # メモリファイルの名前: / と \ を含まず、. で始まらず、.md で終わり、MEMORY.md でない名前
@@ -243,20 +249,22 @@ sub cmd_show {
     return emit({ files => \@files });
 }
 
-# 目次を読み直し、$drop が真を返す行を消して置き換える。消した行の文を並べて返す。$drop は、行の終わりの改行を除いた行の文を受ける。
-# 目次が無いときと、消す行が無いときは、目次を書き換えない
+# 目次を読み直し、行ごとに $edit を呼んで置き換える。$edit は、行の終わりの改行を除いた行の文を受け、新しい行の文を返す。
+# undef を返した行は消す。目次が無いときと、どの行も変わらないときは、目次を書き換えない
 sub rewrite_index {
-    my ($memdir, $drop) = @_;
+    my ($memdir, $edit) = @_;
     my $path  = "$memdir/$INDEX";
     my $bytes = -d $memdir ? read_bytes($path) : undef;
-    return () unless defined $bytes;
-    my ($kept, @removed) = ('');
-    # 行の終わりの改行を付けたまま分けるので、残す行のバイトの列と改行の形は変わらない
+    return unless defined $bytes;
+    my ($kept, $changed) = ('', 0);
+    # 行の終わりの改行を分けて控え、新しい行の文に元の改行を付け直すので、改行の形は変わらない
     for my $raw (split /(?<=\n)/, $bytes) {
-        (my $text = $raw) =~ s/\r?\n\z//;
-        if ($drop->($text)) { push @removed, $text; } else { $kept .= $raw; }
+        my ($text, $eol) = $raw =~ /\A(.*?)(\r?\n)?\z/s;
+        my $new = $edit->($text);
+        $changed = 1 if !defined $new || $new ne $text;
+        $kept .= $new . ($eol // '') if defined $new;
     }
-    return () unless @removed;
+    return unless $changed;
     # 一時のファイルの名前は .md で終わらないので、途中で止まってもメモリファイルに数えられない
     my $tmp = "$path.$$.tmp";
     # 失敗した理由は、失敗した処理の直後に控える。あとの処理が $! を上書きするためである
@@ -273,15 +281,18 @@ sub rewrite_index {
         unlink $tmp;
         die "目次 $path を書き換えられなかった($why)\n";
     }
-    return @removed;
+    return;
 }
 
 sub cmd_prune_index {
     return usage() if @_;
-    my $memdir  = memory_dir();
-    my @removed = rewrite_index($memdir, sub {
+    my $memdir = memory_dir();
+    my @removed;
+    rewrite_index($memdir, sub {
         my @links = index_links($_[0]);
-        return @links && !grep { -e "$memdir/$_" } @links;
+        return $_[0] unless @links && !grep { -e "$memdir/$_" } @links;
+        push @removed, $_[0];
+        return undef;
     });
     return emit({ removed => [ map { text_of($_) } @removed ] });
 }
@@ -291,6 +302,35 @@ sub fail_one {
     my ($result, $why) = @_;
     ($result->{result}, $result->{error}) = ('error', text_of($why));
     print STDERR "memory-files.pl: $why\n";
+}
+
+# 目次の行から、メモリファイル $name の項目を消した行の文を返す。行をまるごと消すときは undef を返す。
+# 消した行か項目を $removed に、見分けられずに変えずに残した行を $kept に足す
+sub drop_items {
+    my ($name, $line, $removed, $kept) = @_;
+    my @links = index_links($line);
+    return $line unless grep { $_ eq $name } @links;
+    if (!grep { $_ ne $name } @links) {
+        push @$removed, $line;
+        return undef;
+    }
+    my ($rest, @dropped) = ('');
+    # 先読みで分けるので、項目の文字は1文字も欠けない。行の始めの「- [」の前の文字も1つの項目になる
+    for my $item (split /(?=- \[)/, $line) {
+        my @item_links = index_links($item);
+        if (!grep { $_ eq $name } @item_links) {
+            $rest .= $item;
+            next;
+        }
+        # どこまでが $name の案内かを見分けられないので、行を変えずに残す
+        if (grep { $_ ne $name } @item_links) {
+            push @$kept, $line;
+            return $line;
+        }
+        push @dropped, $item;
+    }
+    push @$removed, @dropped;
+    return $rest;
 }
 
 sub cmd_delete {
@@ -332,13 +372,16 @@ sub cmd_delete {
             next;
         }
         $result->{result} = 'deleted';
-        my @removed = eval { rewrite_index($memdir, sub { grep { $_ eq $name } index_links($_[0]) }) };
+        my (@removed, @kept);
+        eval { rewrite_index($memdir, sub { drop_items($name, $_[0], \@removed, \@kept) }) };
         if ($@) {
             # メモリファイルは消えたが、目次の行が残った。行は list の dangling に出る
             print STDERR "memory-files.pl: $@";
             $failed = 1;
+            @removed = @kept = ();
         }
         $result->{removed_index_lines} = [ map { text_of($_) } @removed ];
+        $result->{kept_index_lines}    = [ map { text_of($_) } @kept ];
     }
     emit({ results => \@results });
     return $failed ? 1 : 0;

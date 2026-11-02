@@ -189,14 +189,52 @@ addcase prune_index
 case_delete_same() {
     memfile a.md 'a'
     memfile b.md 'b'
-    printf '%s\r\n' '# MEMORY' '- [A](a.md) — 消える' '- [B](b.md) — 残る' '- [A と B](./a.md#x) と [B](b.md)' >"$MEMDIR/MEMORY.md"
+    printf '%s\r\n' '# MEMORY' '- [A](a.md) — 消える' '- [B](b.md) — 残る' '- [A2](./a.md#x) — 消える' >"$MEMDIR/MEMORY.md"
     printf '%s' '- 最後の行は改行で終わらない' >>"$MEMDIR/MEMORY.md"
     out=$(perl "$PL" delete "a.md=$(sha "$MEMDIR/a.md")")
-    check "delete は SHA-256 が同じなら、メモリファイルとそのファイルへのリンクを持つ目次の行を消し、ほかの目次の行と改行の形を変えない" \
+    check "delete は SHA-256 が同じなら、メモリファイルと、そのファイルだけを指す目次の行を消し、ほかの目次の行と改行の形を変えない" \
         "$?|$(printf '%s' "$out" | pj 'join ";", map { join ",", $_->{name}, $_->{result}, @{$_->{removed_index_lines}} } @{$d->{results}}')|$([ -e "$MEMDIR/a.md" ] && echo exists)|$(sha "$MEMDIR/MEMORY.md")" \
-        "0|a.md,deleted,- [A](a.md) — 消える,- [A と B](./a.md#x) と [B](b.md)||$({ printf '%s\r\n' '# MEMORY' '- [B](b.md) — 残る'; printf '%s' '- 最後の行は改行で終わらない'; } >"$CASE/want" && sha "$CASE/want")"
+        "0|a.md,deleted,- [A](a.md) — 消える,- [A2](./a.md#x) — 消える||$({ printf '%s\r\n' '# MEMORY' '- [B](b.md) — 残る'; printf '%s' '- 最後の行は改行で終わらない'; } >"$CASE/want" && sha "$CASE/want")"
 }
 addcase delete_same
+
+# 消すメモリファイル a.md の項目と、残すメモリファイル b.md の項目が1行につながった目次で、a.md を消した結果を確かめる。
+# 改行が \n のときと \r\n のときの両方を確かめる: joined_check <場合の名前> <つながった行> <消したあとの行>
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+joined_check() {
+    for eol in '\n' '\r\n'; do
+        memfile a.md 'a'
+        memfile b.md 'b'
+        printf "%s$eol" '# MEMORY' "$2" '- [C](c.md) — 残る' >"$MEMDIR/MEMORY.md"
+        out=$(perl "$PL" delete "a.md=$(sha "$MEMDIR/a.md")")
+        check "delete は、つながった行から消すメモリファイルの項目だけを消し、残す項目の文字と改行の形を変えない($1・$eol)" \
+            "$?|$(printf '%s' "$out" | pj 'my $r = $d->{results}[0]; join ";", $r->{result}, @{$r->{removed_index_lines}}, "kept", @{$r->{kept_index_lines}}')|$([ -e "$MEMDIR/a.md" ] && echo exists)|$(sha "$MEMDIR/MEMORY.md")" \
+            "0|deleted;- [A](a.md) — a の案内;kept||$(printf "%s$eol" '# MEMORY' "$3" '- [C](c.md) — 残る' >"$CASE/want" && sha "$CASE/want")"
+    done
+}
+
+case_delete_joined_front() {
+    joined_check '前' '- [A](a.md) — a の案内- [B](b.md) — b の案内' '- [B](b.md) — b の案内'
+}
+addcase delete_joined_front
+
+case_delete_joined_back() {
+    joined_check '後ろ' '- [B](b.md) — b の案内- [A](a.md) — a の案内' '- [B](b.md) — b の案内'
+}
+addcase delete_joined_back
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+case_delete_mixed_item() {
+    memfile a.md 'a'
+    memfile b.md 'b'
+    printf '%s\r\n' '# MEMORY' '- [B](b.md) — 残る' '- [A と B](./a.md#x) と [B](b.md)' >"$MEMDIR/MEMORY.md"
+    index_before=$(sha "$MEMDIR/MEMORY.md")
+    out=$(perl "$PL" delete "a.md=$(sha "$MEMDIR/a.md")")
+    check "delete は、見分けられない行を変えずに kept_index_lines に出す" \
+        "$?|$(printf '%s' "$out" | pj 'my $r = $d->{results}[0]; join ";", $r->{result}, scalar @{$r->{removed_index_lines}}, @{$r->{kept_index_lines}}')|$([ -e "$MEMDIR/a.md" ] && echo exists)|$(sha "$MEMDIR/MEMORY.md")" \
+        "0|deleted;0;- [A と B](./a.md#x) と [B](b.md)||$index_before"
+}
+addcase delete_mixed_item
 
 # shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_delete_changed_missing() {

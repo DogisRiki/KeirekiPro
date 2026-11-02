@@ -134,7 +134,7 @@
   - _対象の部品: CLAUDE.md の要約の決まり_
 
 - [ ] 7. ほかのメモリファイルの項目と1行につながった目次の行から、消すメモリファイルの項目だけを消す
-- [ ] 7.1 `delete` が目次の行を項目に分けて消すようにする
+- [x] 7.1 `delete` が目次の行を項目に分けて消すようにする
 
   Claude は、部品「memory-files.pl」の、目次の行を項目に分けて読む段落と3つの場合のとおりに、`.claude/scripts/memory/memory-files.pl` の `delete` を直す。`delete` の結果には、`kept_index_lines` を足す。Claude は、スクリプトの先頭の説明の、`delete` の結果の形の行も直す。`prune-index` と `list` は変えない。Claude は、`test-memory-files.sh` に、次の3つの場合を足す。
 
