@@ -81,7 +81,7 @@
   - _要件: 1.1, 1.2, 1.7, 5.2, 7.1_
   - _依存: 2.3_
 
-- [ ] 3.2 backend の依存グラフに scope を付ける
+- [x] 3.2 backend の依存グラフに scope を付ける
 
   Claude は、部品「dependency-graph.yaml と dependency-review.yaml の generate ジョブ」の変更後のワークフローを、置き場所の `place-1/.github/workflows/` に作る。2つのワークフローは、依存グラフを作るステップに、環境変数 `DEPENDENCY_GRAPH_RUNTIME_INCLUDE_CONFIGURATIONS: productionRuntimeClasspath` を持つ。このタスクは、dependency-cooldown のジョブを変えるタスク 3.1 と同じ `dependency-review.yaml` を変えるので、3.1 のあとに行う。
   - 完了の確かめ方: 2つのワークフローの `gradle/actions/dependency-submission` のステップに同じ環境変数があり、actionlint の指摘が0件である
