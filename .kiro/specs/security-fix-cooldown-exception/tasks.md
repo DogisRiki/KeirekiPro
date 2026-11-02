@@ -133,7 +133,7 @@
   - _要件: 6.3_
   - _対象の部品: trusted-signers.json_
 
-- [ ] 5.2 Node.js と Terraform の版を gpg の署名で確かめるスクリプトを作る
+- [x] 5.2 Node.js と Terraform の版を gpg の署名で確かめるスクリプトを作る
 
   Claude は、部品「verify-ci-tool.sh」のうち、引数と記録の出力と、Node.js と Terraform の確かめ方と、そのテスト `test-verify-ci-tool.sh` を、`.claude/scripts/ci-tool-signature/` に作る。このスクリプトは、JSON を `perl -MJSON::PP` で読み、`gpg` を、gpg を動かすコンテナを作るタスク 5.1 で作ったコンテナで動かし、取得したファイルを毎回新しく作る空の作業フォルダに置く。
   - 完了の確かめ方: Git Bash で流した `test-verify-ci-tool.sh` の Node.js と Terraform の場合が、すべて通る。テストは `docker` と `curl` と `gh` をスタブにしている。テストの署名は、テストの中で作った鍵で作ってある。テストは、`TRUSTED_SIGNERS_FILE` でその鍵の指紋を渡している。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
@@ -217,6 +217,7 @@
 - Claude の Edit ツールは、バックスラッシュと u と4桁の16進数で書いた文字の書き方を、その文字そのものに直して保存する。jq のコードにその書き方を残すときは、Claude は、perl でバックスラッシュを `chr(92)` として書き、日本語を含む行を書くときは `-Mutf8 -CSD` を付ける
 - テストの `check_summary` と `check_lacks` は `grep -F` で探すので、Claude は、期待の文字列に改行を入れない。`grep -F` は、改行で区切った文字列を別々の候補として読み、どれか1つが当たれば通るためである。ほかの行が混ざらないことを確かめるときは、混ざったときにだけ現れる文字列が無いことを `check_lacks` で確かめる
 - `trusted-signers.json` の Node.js の `fingerprints` は、Claude が 2026-11-02 に https://github.com/nodejs/release-keys/blob/main/README.md の「Active releasers keys」の節(コミット `481637f8`)から写した8つの主鍵の指紋である。`Dockerfile` の Debian のイメージ `debian:trixie-slim` の digest は、同じ日に読んだもので、イメージの作られた日時は 2026-10-27 である
+- この PC の Git Bash の `curl` は Windows 向けに作られたもので、`MSYS2_ARG_CONV_EXCL` により `/tmp/...` の形のパスを読めない。そのため、`verify-ci-tool.sh` は、作業フォルダを `pwd -W` で `C:/...` の形にしてから、`curl` と `docker` に渡す。GNU tar は `C:` のようにコロンを含むパスを別の機械の名前と読むので、`verify-ci-tool.sh` は tarball を tar に標準入力で渡す。2026-11-02 に、スタブ無しで Node.js 24.22.1 と Terraform 1.9.0 を確かめ、どちらも署名を確かめられたという結果で終わった
 
 ## 完了条件(全タスク共通)
 
