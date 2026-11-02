@@ -226,6 +226,143 @@ case_show_then_delete() {
 addcase show_then_delete
 
 # ---------------------------------------------------------------------
+# origins
+# ---------------------------------------------------------------------
+
+# 場所 <cwd> で動いた会話の記録のディレクトリを出す: logdir <cwd>
+logdir() { printf '%s/.claude/projects/%s' "$HOME" "$(encname "$1")"; }
+
+# 会話の記録に1行足す: logline <会話の記録のファイル> <cwd> <時刻> <種類> <値>...
+#   dev <文>: 開発者が打った文の行
+#   meta <文>: isMeta の行
+#   use <道具の呼び出しの ID> <道具の名前> <file_path>: 道具を呼んだ行
+#   result <道具の呼び出しの ID> <file_path> <toolUseResult.type>: 道具の結果の行
+logline() {
+    mkdir -p "$(dirname "$1")"
+    perl -MJSON::PP -e '
+        my ($file, $cwd, $at, $kind, @v) = @ARGV;
+        utf8::decode($_) for $cwd, @v;
+        (my $sid = $file) =~ s{\A.*/|\.jsonl\z}{}g;
+        my %l = (cwd => $cwd, timestamp => $at, sessionId => $sid);
+        if ($kind eq "dev" || $kind eq "meta") {
+            %l = (%l, type => "user", message => { role => "user", content => $v[0] });
+            $l{isMeta} = JSON::PP::true if $kind eq "meta";
+        } elsif ($kind eq "use") {
+            %l = (%l, type => "assistant", message => { role => "assistant",
+                content => [{ type => "tool_use", id => $v[0], name => $v[1], input => { file_path => $v[2], content => "x" } }] });
+        } elsif ($kind eq "result") {
+            %l = (%l, type => "user", message => { role => "user", content => [{ type => "tool_result", tool_use_id => $v[0], content => "ok" }] },
+                toolUseResult => { type => $v[2], filePath => $v[1] });
+        } else {
+            die "logline の種類が正しくない: $kind\n";
+        }
+        print JSON::PP->new->utf8->canonical->encode(\%l), "\n";
+    ' "$@" >>"$1"
+}
+
+case_origins_found() {
+    p="$MEMDIR/a.md"
+    # 名前が <本体の名前>- で始まるほかのプロジェクトの記録の、それより早い書き込みは使わない
+    o="$CASE/repo-other"
+    logline "$(logdir "$o")/s0.jsonl" "$o" 2026-10-20T09:00:00Z dev 'ほかのプロジェクトの文'
+    logline "$(logdir "$o")/s0.jsonl" "$o" 2026-10-20T09:01:00Z use t9 Write "$p"
+    # worktree の会話の記録の書き込みを見つける
+    w="$REPO/.claude/worktrees/w"
+    f="$(logdir "$w")/s1.jsonl"
+    logline "$f" "$w" 2026-10-20T10:00:00Z dev '前の文'
+    logline "$f" "$w" 2026-10-20T10:01:00Z result t0 "$REPO/x.txt" create
+    logline "$f" "$w" 2026-10-20T10:02:00Z meta 'メタの文'
+    logline "$f" "$o" 2026-10-20T10:02:30Z dev 'ほかのプロジェクトの別の文'
+    logline "$f" "$w" 2026-10-20T10:03:00Z dev '覚えて'
+    logline "$f" "$w" 2026-10-20T10:04:00Z use t1 Write "$p"
+    logline "$f" "$w" 2026-10-20T10:05:00Z result t1 "$p" create
+    logline "$f" "$w" 2026-10-20T10:06:00Z dev 'あとの文'
+    # それよりあとの会話の書き込みは選ばない
+    logline "$(logdir "$REPO")/s2.jsonl" "$REPO" 2026-10-21T10:00:00Z use t2 Edit "$p"
+    out=$(perl "$PL" origins a.md)
+    check "最も早い書き込みが Write なら、その会話の、書き込みまでの開発者の文だけを返す" \
+        "$?|$(printf '%s' "$out" | pj 'my $o = $d->{origins}[0]; join "|", $o->{name}, $o->{found} ? 1 : 0, $o->{session}, $o->{written_on}, $o->{truncated} ? 1 : 0, map { "$_->{at}=$_->{text}" } @{ $o->{utterances} }')" \
+        "0|a.md|1|s1|2026-10-20|0|2026-10-20T10:00:00Z=前の文|2026-10-20T10:03:00Z=覚えて"
+}
+addcase origins_found
+
+case_origins_windows_path() {
+    # Git Bash の HOME は /c/… の形で、記録の file_path は C:\… の形である
+    # 一時のディレクトリは Git Bash では /tmp/… の形で返るので、C:/… の形から /c/… の形を作る
+    export HOME="$(printf '%s' "$HOME" | perl -pe 's{\A([A-Za-z]):}{"/" . lc $1}e')"
+    win=$(printf '%s' "$MEMDIR/a.md" | perl -pe 's{/}{\\}g; s{\A\\([A-Za-z])\\}{\U$1\E:\\}; s{\A([a-z]):}{\U$1:}')
+    f="$(logdir "$REPO")/s1.jsonl"
+    logline "$f" "$REPO" 2026-10-20T10:00:00Z dev '覚えて'
+    logline "$f" "$REPO" 2026-10-20T10:01:00Z use t1 Write "$win"
+    out=$(perl "$PL" origins a.md)
+    check 'Windows の C:\…\memory\a.md の形の file_path を、a.md の書き込みとして見つける' \
+        "$?|$(printf '%s' "$out" | pj 'my $o = $d->{origins}[0]; join "|", $o->{found} ? 1 : 0, map { $_->{text} } @{ $o->{utterances} }')" \
+        "0|1|覚えて"
+}
+addcase origins_windows_path
+
+case_origins_truncate() {
+    f="$(logdir "$REPO")/s1.jsonl"
+    # 1つの文は JSON にすると1,034バイトなので、6,000バイトまでに収まるのは書き込みに近い5つである
+    long=$(perl -e 'print "あ" x 330')
+    for i in 01 02 03 04 05 06 07 08 09 10; do
+        logline "$f" "$REPO" "2026-10-20T10:00:${i}Z" dev "文$i$long"
+    done
+    logline "$f" "$REPO" 2026-10-20T10:01:00Z use t1 Write "$MEMDIR/c.md"
+    out=$(perl "$PL" origins c.md)
+    check "utterances を名前1つあたり6,000バイトまでにし、古い文から外して truncated を真にする" \
+        "$?|$(printf '%s' "$out" | pj 'my $o = $d->{origins}[0]; my $u = $o->{utterances}; join "|", $o->{truncated} ? 1 : 0, scalar @$u, length(JSON::PP->new->utf8->canonical->encode($u)) <= 6000 ? "fits" : "over", substr($u->[0]{text}, 0, 3), substr($u->[-1]{text}, 0, 3)')" \
+        "0|1|5|fits|文06|文10"
+}
+addcase origins_truncate
+
+case_origins_too_many() {
+    out=$(perl "$PL" origins a.md b.md c.md d.md e.md 2>/dev/null)
+    rc=$?
+    four=$(perl "$PL" origins a.md b.md c.md d.md | pj 'scalar @{$d->{origins}}')
+    check "origins は名前を5つ以上渡すと 2 で終わり、何も出さない" "$rc|[$out]|$four" "2|[]|4"
+}
+addcase origins_too_many
+
+case_origins_edit_nowrite() {
+    f="$(logdir "$REPO")/s1.jsonl"
+    logline "$f" "$REPO" 2026-10-20T10:00:00Z dev '直して'
+    logline "$f" "$REPO" 2026-10-20T10:01:00Z use t1 Edit "$MEMDIR/d.md"
+    logline "$(logdir "$REPO")/s2.jsonl" "$REPO" 2026-10-21T10:00:00Z use t2 Write "$MEMDIR/d.md"
+    logline "$(logdir "$REPO")/s2.jsonl" "$REPO" 2026-10-21T10:01:00Z result t2 "$MEMDIR/d.md" create
+    out=$(perl "$PL" origins d.md e.md)
+    check "最も早い書き込みが Edit なら first-write-not-kept を、書き込みが無ければ no-write を返す" \
+        "$?|$(printf '%s' "$out" | pj 'join "|", map { join ",", $_->{name}, $_->{found} ? 1 : 0, $_->{reason} } @{ $d->{origins} }')" \
+        "0|d.md,0,first-write-not-kept|e.md,0,no-write"
+}
+addcase origins_edit_nowrite
+
+case_origins_update() {
+    f="$(logdir "$REPO")/s1.jsonl"
+    logline "$f" "$REPO" 2026-10-20T10:00:00Z dev '書き直して'
+    logline "$f" "$REPO" 2026-10-20T10:01:00Z use t1 Write "$MEMDIR/f.md"
+    logline "$f" "$REPO" 2026-10-20T10:02:00Z result t1 "$MEMDIR/f.md" update
+    out=$(perl "$PL" origins f.md)
+    check "最も早い書き込みが、結果が update の Write なら first-write-not-kept を返す" \
+        "$?|$(printf '%s' "$out" | pj 'my $o = $d->{origins}[0]; join ",", $o->{found} ? 1 : 0, $o->{reason}')" \
+        "0|0,first-write-not-kept"
+}
+addcase origins_update
+
+case_origins_invalid() {
+    # メモリのディレクトリの外の場所への書き込みがあっても、決まりに合わない名前は探さない
+    f="$(logdir "$REPO")/s1.jsonl"
+    logline "$f" "$REPO" 2026-10-20T10:00:00Z dev '書いて'
+    logline "$f" "$REPO" 2026-10-20T10:01:00Z use t1 Write "$MEMDIR/../x.md"
+    logline "$f" "$REPO" 2026-10-20T10:02:00Z use t2 Write "$MEMDIR/MEMORY.md"
+    out=$(perl "$PL" origins ../x.md MEMORY.md a/b.md)
+    check "origins は決まりに合わない名前を探さず、reason に invalid を書く" \
+        "$?|$(printf '%s' "$out" | pj 'join "|", map { join ",", $_->{name}, $_->{found} ? 1 : 0, $_->{reason} } @{ $d->{origins} }')" \
+        "0|../x.md,0,invalid|MEMORY.md,0,invalid|a/b.md,0,invalid"
+}
+addcase origins_invalid
+
+# ---------------------------------------------------------------------
 # 選んだ場合を流す
 # ---------------------------------------------------------------------
 

@@ -17,6 +17,14 @@
 #   delete <名前>=<sha256>...
 #     名前ごとに、今の中身の SHA-256 が渡した値と同じときだけ、メモリファイルと、そのファイルへのリンクを持つ目次の行を消し、
 #     {"results":[{"name":..,"result":..,"removed_index_lines":[..]}]} の1行を出す。result は deleted・changed・missing・invalid・error のどれかである
+#   origins <名前>...
+#     名前ごとに、会話の記録の中の、メモリファイルへの最も早い書き込みを探し、{"origins":[..]} の1行を出す。名前は4つまで。
+#     最も早い書き込みが Write で、その結果が update でなければ、found を真にし、その会話の、書き込みまでの開発者の文を utterances に
+#     並べる。utterances は JSON にして6,000バイトまでにし、古い文から外して truncated を真にする。
+#     最も早い書き込みが Edit か MultiEdit か、結果が update の Write なら reason が first-write-not-kept、書き込みが無ければ no-write、
+#     決まりに合わない名前なら invalid になる
+# 会話の記録: projects/ のうち、名前が本体の作業フォルダの名前と同じか、その名前に - を付けたもので始まるディレクトリの直下の *.jsonl。
+# projects/ は、CLAUDE_CONFIG_DIR が空でなければその下、空なら $HOME/.claude の下にある。cwd が本体の作業フォルダかその下の行だけを使う
 # 目次を書き換えるときは、消す直前に読み直し、同じディレクトリの一時のファイルに書いてから名前を替えて置き換える。
 # 改行の形(\n か \r\n)と、消さない行のバイトの列は変えない
 # メモリのディレクトリ: 今の作業フォルダを含むリポジトリの git の共通ディレクトリの親を本体の作業フォルダとし、
@@ -35,17 +43,21 @@ use File::Basename qw(dirname);
 use File::Spec;
 use JSON::PP;
 use POSIX qw(strftime);
+use Time::Local qw(timegm);
 
 my $JSON  = JSON::PP->new->utf8->canonical;
 my $INDEX = 'MEMORY.md';
 # show と origins に1回で渡せる名前の数。1回の出力を、Bash の道具がそのまま返すおよそ30,000文字に収めるためである
 my $MAX_NAMES = 4;
+# origins が名前1つあたりに出す開発者の文の、JSON にしたときのバイトの数の上限
+my $MAX_UTTERANCE_BYTES = 6000;
 
 my %COMMANDS = (
     list => \&cmd_list,
     show => \&cmd_show,
     'prune-index' => \&cmd_prune_index,
     delete => \&cmd_delete,
+    origins => \&cmd_origins,
 );
 
 # old-inspection-cleanup.pl が require で読み込んだときは、サブコマンドを動かさない
@@ -64,7 +76,7 @@ sub main {
 }
 
 sub usage {
-    print STDERR "使い方: perl memory-files.pl list | show <名前>...(4つまで) | prune-index | delete <名前>=<sha256>...\n";
+    print STDERR "使い方: perl memory-files.pl list | show <名前>...(4つまで) | prune-index | delete <名前>=<sha256>... | origins <名前>...(4つまで)\n";
     return 2;
 }
 
@@ -330,6 +342,197 @@ sub cmd_delete {
     }
     emit({ results => \@results });
     return $failed ? 1 : 0;
+}
+
+# ---- 会話の記録 ------------------------------------------------------------
+
+# 場所の形をそろえる。C:\ と C:/ と /c/ の形を c:/ の形にし、区切りを / にそろえ、大文字と小文字をそろえる
+sub norm {
+    my ($p) = @_;
+    $p =~ s{\\}{/}g;
+    $p =~ s{\A/([A-Za-z])(?=/|\z)}{$1:};
+    $p =~ s{/+}{/}g;
+    $p =~ s{(?<=.)/\z}{};
+    return lc $p;
+}
+
+# 場所 $p が、場所 $top か、その下の場所かを返す。どちらも norm でそろえた形で受ける
+sub under {
+    my ($p, $top) = @_;
+    return $p eq $top || index($p, "$top/") == 0;
+}
+
+# このリポジトリの会話の記録のファイルを返す。projects/ のうち、名前が本体の作業フォルダの名前と同じか、その名前に - を付けたもので
+# 始まるディレクトリの直下の *.jsonl である。場所に空白や記号があっても読めるように、glob を使わない
+sub transcript_files {
+    my ($main) = @_;
+    my $base = defined $ENV{CLAUDE_CONFIG_DIR} && $ENV{CLAUDE_CONFIG_DIR} ne '' ? $ENV{CLAUDE_CONFIG_DIR} : do {
+        die "HOME が無いので、会話の記録の場所を求められなかった\n" unless defined $ENV{HOME} && $ENV{HOME} ne '';
+        "$ENV{HOME}/.claude";
+    };
+    $base =~ s{[/\\]+\z}{};
+    my $root = "$base/projects";
+    my $name = project_name($main);
+    opendir(my $dh, $root) or return ();
+    my @dirs = sort grep { ($_ eq $name || index($_, "$name-") == 0) && -d "$root/$_" } readdir $dh;
+    closedir $dh;
+    my @files;
+    for my $dir (map { "$root/$_" } @dirs) {
+        opendir(my $d, $dir) or die "$dir を読めなかった($!)\n";
+        push @files, map { "$dir/$_" } sort grep { /\.jsonl\z/ && -f "$dir/$_" } readdir $d;
+        closedir $d;
+    }
+    return @files;
+}
+
+# 記録のファイルを1行ずつ読み、$keep が真を返す行だけを JSON として読み、cwd が本体の作業フォルダかその下の行を $each に渡す。
+# $keep は、JSON として読む前の行のバイトの列を受ける。JSON として読む行を減らし、大きな記録を速く読むためである。JSON として読めない行は飛ばす
+sub each_line {
+    my ($file, $top, $keep, $each) = @_;
+    open(my $fh, '<:raw', $file) or die "$file を読めなかった($!)\n";
+    while (my $line = <$fh>) {
+        next unless $keep->($line);
+        my $j = eval { $JSON->decode($line) };
+        next unless ref $j eq 'HASH' && defined $j->{cwd} && !ref $j->{cwd};
+        next unless under(norm(encode('UTF-8', $j->{cwd})), $top);
+        $each->($j);
+    }
+    close $fh;
+}
+
+# 開発者が打った文の行かを返す。中身が配列の行(画像と一緒に打った文)は、type が text の部分の文を
+# 改行でつなぐ。text の部分が無い行(道具の結果の行)と、isMeta の行と、会話の要約の行と、
+# 開発者でない出どころ(origin.kind が human でない)の行と、会話に差し込まれた知らせの行を除く
+sub developer_text {
+    my ($j) = @_;
+    return undef unless ($j->{type} // '') eq 'user';
+    my $text = ref $j->{message} eq 'HASH' ? $j->{message}{content} : undef;
+    if (ref $text eq 'ARRAY') {
+        my @parts = map { $_->{text} } grep { ref $_ eq 'HASH' && ($_->{type} // '') eq 'text' && defined $_->{text} && !ref $_->{text} } @$text;
+        $text = @parts ? join("\n", @parts) : undef;
+    }
+    return undef unless defined $text && !ref $text;
+    return undef if $j->{isMeta} || $j->{isCompactSummary} || $j->{isVisibleInTranscriptOnly};
+    return undef if ref $j->{origin} eq 'HASH' && ($j->{origin}{kind} // '') ne 'human';
+    return undef if $text =~ /\A\s*<(?:task-notification|system-reminder|local-command-stdout|local-command-caveat|agent-message)\b/;
+    return $text;
+}
+
+# 記録のファイルから、開発者が打った文を、{at, text} の一覧で古い順に返す
+sub developer_texts {
+    my ($file, $top) = @_;
+    my @said;
+    # 開発者が打った文の行は、行の中に "type":"user" を持つ。道具の結果の行は、中身が "type":"tool_result" の部分を持つ配列で、
+    # "type":"text" の部分を持たなければ developer_text が文を返さない。大きな記録を速く読むために、どちらの行も JSON として読まない
+    each_line($file, $top, sub {
+        my ($line) = @_;
+        return index($line, '"type":"user"') >= 0 && (index($line, '"type":"tool_result"') < 0 || index($line, '"type":"text"') >= 0);
+    }, sub {
+        my ($j) = @_;
+        my $text = developer_text($j);
+        push @said, { at => $j->{timestamp}, text => $text } if defined $text && defined $j->{timestamp} && !ref $j->{timestamp};
+    });
+    return @said;
+}
+
+# 開発者の文の一覧を、JSON にしたときに $MAX_UTTERANCE_BYTES までに収める。書き込みに近い文を残し、古い文から外す。
+# 書き込みに最も近い文だけでも収まらないときは、その文の終わりを切って収める。収めた一覧と、外したか切ったかを返す
+sub fit {
+    my ($said) = @_;
+    my ($size, @kept) = (2);   # 2 は、配列を囲む [ と ] のバイトの数である
+    for my $u (reverse @$said) {
+        my $len = length($JSON->encode($u)) + (@kept ? 1 : 0);   # 1 は、文と文の間の , のバイトの数である
+        last if $size + $len > $MAX_UTTERANCE_BYTES;
+        $size += $len;
+        unshift @kept, $u;
+    }
+    if (!@kept && @$said) {
+        my $u = $said->[-1];
+        my ($lo, $hi) = (0, length $u->{text});
+        while ($lo < $hi) {
+            my $mid = int(($lo + $hi + 1) / 2);
+            if (length($JSON->encode([{ %$u, text => substr($u->{text}, 0, $mid) }])) <= $MAX_UTTERANCE_BYTES) { $lo = $mid; } else { $hi = $mid - 1; }
+        }
+        @kept = ({ %$u, text => substr($u->{text}, 0, $lo) }) if $lo > 0;
+    }
+    return (\@kept, @kept < @$said || (@kept && $kept[-1]{text} ne $said->[-1]{text}) ? 1 : 0);
+}
+
+# 記録の時刻(UTC の ISO 8601 の形)を、この PC の時刻の日付にする。読めない形なら、先頭の10文字を返す
+sub local_date {
+    my ($at) = @_;
+    my @t = $at =~ /\A(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)/ or return substr($at, 0, 10);
+    my $epoch = eval { timegm($t[5], $t[4], $t[3], $t[2], $t[1] - 1, $t[0]) };
+    return defined $epoch ? strftime('%Y-%m-%d', localtime $epoch) : substr($at, 0, 10);
+}
+
+sub cmd_origins {
+    my @names = @_;
+    return usage() if !@names || @names > $MAX_NAMES;
+    my $main   = main_worktree();
+    my $top    = norm($main);
+    my $memdir = memory_dir();
+    # 決まりに合わない名前は探さない。メモリのディレクトリの外の場所への書き込みを、メモリファイルへの書き込みとして見つけないためである
+    my @valid  = grep { valid_name($_) } @names;
+    my %want   = map { (norm("$memdir/$_") => $_) } @valid;
+    # %first は名前ごとの最も早い書き込み、%type_of は道具の呼び出しの ID ごとの結果の toolUseResult.type である
+    my (%first, %type_of);
+    for my $file (@valid ? transcript_files($main) : ()) {
+        # 書き込みの行と、その結果の行は、どちらも行の中にメモリファイルの名前を持つ
+        each_line($file, $top, sub { my ($line) = @_; grep { index($line, $_) >= 0 } @valid }, sub {
+            my ($j) = @_;
+            my $content = ref $j->{message} eq 'HASH' ? $j->{message}{content} : undef;
+            return unless ref $content eq 'ARRAY';
+            if (ref $j->{toolUseResult} eq 'HASH') {
+                for my $c (grep { ref $_ eq 'HASH' && ($_->{type} // '') eq 'tool_result' } @$content) {
+                    $type_of{ $c->{tool_use_id} } = $j->{toolUseResult}{type} // '' if defined $c->{tool_use_id} && !ref $c->{tool_use_id};
+                }
+            }
+            my $at = $j->{timestamp};
+            return unless defined $at && !ref $at;
+            for my $c (@$content) {
+                next unless ref $c eq 'HASH' && ($c->{type} // '') eq 'tool_use';
+                next unless ($c->{name} // '') =~ /\A(?:Write|Edit|MultiEdit)\z/;
+                my $path = ref $c->{input} eq 'HASH' ? $c->{input}{file_path} : undef;
+                next unless defined $path && !ref $path;
+                my $name = $want{ norm(encode('UTF-8', $path)) };
+                # 時刻は、どの記録も同じ ISO 8601 の形なので、文字の列のまま比べる
+                next if !defined $name || ($first{$name} && $first{$name}{at} le $at);
+                my ($sid) = $file =~ m{([^/]+)\.jsonl\z};
+                $first{$name} = {
+                    at      => $at,
+                    tool    => $c->{name},
+                    id      => defined $c->{id} && !ref $c->{id} ? $c->{id} : undef,
+                    file    => $file,
+                    session => defined $j->{sessionId} && !ref $j->{sessionId} ? $j->{sessionId} : decode('UTF-8', $sid),
+                };
+            }
+        });
+    }
+    my (%said, @origins);
+    for my $name (@names) {
+        my $w = $first{$name};
+        my $reason = !valid_name($name) ? 'invalid'
+            : !$w ? 'no-write'
+            : $w->{tool} ne 'Write' || (defined $w->{id} && ($type_of{ $w->{id} } // '') eq 'update') ? 'first-write-not-kept'
+            : undef;
+        if (defined $reason) {
+            push @origins, { name => text_of($name), found => JSON::PP::false, reason => $reason };
+            next;
+        }
+        # 選んだ記録は、開発者の文を読むためにもう一度読む。同じ記録は1回だけ読む
+        $said{ $w->{file} } //= [ developer_texts($w->{file}, $top) ];
+        my ($utterances, $truncated) = fit([ grep { $_->{at} le $w->{at} } @{ $said{ $w->{file} } } ]);
+        push @origins, {
+            name       => text_of($name),
+            found      => JSON::PP::true,
+            session    => $w->{session},
+            written_on => local_date($w->{at}),
+            utterances => $utterances,
+            truncated  => $truncated ? JSON::PP::true : JSON::PP::false,
+        };
+    }
+    return emit({ origins => \@origins });
 }
 
 1;
