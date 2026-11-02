@@ -125,7 +125,7 @@
   - _依存: 4.1_
 
 - [ ] 5. CI の道具の版を72時間待たずに変える手順を作る
-- [ ] 5.1 信頼する署名した者のファイルと、gpg を動かすコンテナを作る (並行可)
+- [x] 5.1 信頼する署名した者のファイルと、gpg を動かすコンテナを作る (並行可)
 
   Claude は、部品「trusted-signers.json」と、`gpg` を動かす1回きりのコンテナの `Dockerfile` を、`.claude/scripts/ci-tool-signature/` に作る。`trusted-signers.json` は、design.md のデータの形の節の形で、4つの道具の信頼する署名した者と、版を書く場所を持つ。`Dockerfile` は、Debian の slim のイメージを digest で固定し、`gnupg` を入れる。digest とは、イメージの中身から計算した値で、中身が変わると値も変わる。
   - 完了の確かめ方: `perl -MJSON::PP` で読める。Node.js の `fingerprints` が、`nodejs/release-keys` の README にある今の担当者の主鍵の指紋8つと一致する。Terraform の指紋が `C874011F0AB405110D02105534365D9472D7468F` である。`locations` に書いたファイルが、どれもリポジトリにあり、その道具の版を書いている。`docker build` でイメージが作れ、そのイメージで `gpg --version` が動く
@@ -216,6 +216,7 @@
 - 週次監査の自己テストは GitHub Actions のランナーで流れ、ランナーは `GITHUB_REPOSITORY` などの環境変数を渡す。そのため、Claude は、環境変数が無いときの動きを確かめるテストで、`env -u` を使って変数を明示して外す。前に書いた代入は変数を足すだけで、引き継いだ変数を消さない
 - Claude の Edit ツールは、バックスラッシュと u と4桁の16進数で書いた文字の書き方を、その文字そのものに直して保存する。jq のコードにその書き方を残すときは、Claude は、perl でバックスラッシュを `chr(92)` として書き、日本語を含む行を書くときは `-Mutf8 -CSD` を付ける
 - テストの `check_summary` と `check_lacks` は `grep -F` で探すので、Claude は、期待の文字列に改行を入れない。`grep -F` は、改行で区切った文字列を別々の候補として読み、どれか1つが当たれば通るためである。ほかの行が混ざらないことを確かめるときは、混ざったときにだけ現れる文字列が無いことを `check_lacks` で確かめる
+- `trusted-signers.json` の Node.js の `fingerprints` は、Claude が 2026-11-02 に https://github.com/nodejs/release-keys/blob/main/README.md の「Active releasers keys」の節(コミット `481637f8`)から写した8つの主鍵の指紋である。`Dockerfile` の Debian のイメージ `debian:trixie-slim` の digest は、同じ日に読んだもので、イメージの作られた日時は 2026-10-27 である
 
 ## 完了条件(全タスク共通)
 
