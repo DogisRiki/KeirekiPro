@@ -50,7 +50,7 @@
   - _対象の部品: record-cooldown-exception.sh_
 
 - [ ] 2. 判定のスクリプトを新しい判定の順番にする
-- [ ] 2.1 npm の部品の公開日時を読み、警告の API を読めるかを確かめる
+- [x] 2.1 npm の部品の公開日時を読み、警告の API を読めるかを確かめる
 
   Claude は、部品「check-dependency-cooldown.sh」とそのテスト `test-check-dependency-cooldown.sh` の今の版を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に写して変える。このスクリプトは、依存グラフの比較の API の `npm` の部品も読み、npm の registry の部品の文書から公開日時を読む。このスクリプトは、前の版を、同じ名前の `removed` の部品のうち最も高い版として取り出す。このスクリプトは、警告の API を読めるかを1回確かめ、結果の1行を報告に書く。Claude は、テストを、`KP_TEST_CASE` で場合を選んで流せる形にする。
   - 完了の確かめ方: Linux のコンテナで流した `test-check-dependency-cooldown.sh` の、今ある場合と新しい場合が、すべて通る。`KP_TEST_CASE` に場合の名前を入れると、その場合だけが流れる。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
