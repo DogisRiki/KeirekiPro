@@ -95,6 +95,11 @@ jobs:
       - name: Test verified Terraform install
         run: bash .github/scripts/tests/test-install-verified-terraform.sh
 
+      # Codex CLI を配布元の来歴を確かめてから入れるスクリプト(.github/actions/verified-codex の中身)の
+      # テスト。偽の registry を file:// で読ませ、gh attestation verify はスタブに替えるため、ネットワークを使わない
+      - name: Test verified Codex CLI install
+        run: bash .github/scripts/tests/test-install-verified-codex.sh
+
       # Trivy を配布元の署名を確かめてから入れるスクリプト(.github/actions/verified-trivy の中身)の
       # テスト。偽の配布物を file:// で読ませ、cosign を動かす docker を偽物に置き換えるため、ネットワークを使わない
       - name: Test verified Trivy install
