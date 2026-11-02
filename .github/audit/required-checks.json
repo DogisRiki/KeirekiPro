@@ -21,7 +21,7 @@
     { "context": "dependency-graph-generate", "mode": "always", "state": "active", "approval_gated": false },
     { "context": "dependency-graph-submit", "mode": "conditional", "state": "active", "approval_gated": false },
     { "context": "dependency-review", "mode": "always", "state": "active", "approval_gated": false },
-    { "context": "dependency-cooldown", "mode": "conditional", "state": "active", "approval_gated": false },
+    { "context": "dependency-cooldown", "mode": "conditional", "state": "active", "approval_gated": true },
     { "context": "gradle-wrapper", "mode": "always", "state": "active", "approval_gated": false },
     { "context": "docker-smoke", "mode": "conditional", "state": "active", "approval_gated": false },
     { "context": "detect-changes", "mode": "always", "state": "active", "approval_gated": false },

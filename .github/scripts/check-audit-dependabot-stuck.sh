@@ -9,6 +9,8 @@
 #         approval_gated: false のcontextに滞留結論 → 滞留。1件以上で exit 1
 #                          (逸脱あり。対象のPR番号とチェック名と結論を列挙)
 #         approval_gated: true のcontextの滞留結論 → 「承認待ち」として報告のみ
+#           ただし dependency-cooldown は、PR に記録のコメント(72時間待たずに
+#           入れる版の記録)が無ければ滞留に数える。読めなければ判定不能
 #         実行中(結論なし)・すべて緑・skipped・neutral・承認待ちのみ・
 #         open PRゼロ → exit 0(逸脱なし)
 #         期待一覧のスキーマ不正・API失敗 → exit 2(判定不能。fail closed)
@@ -43,6 +45,15 @@
 #   しまう(受容済みの残余リスク)。緩和策として、承認待ちPRの一覧を
 #   Job Summaryへ常時出力し、長期の滞留が人間の目に入るようにする。
 #
+# なぜ dependency-cooldown の赤だけ記録のコメントで分けるのか:
+#   dependency-cooldown の赤には、所有者の承認を待つ赤と、公開から72時間
+#   経っていない版で止めた赤の2つがある。後者は、72時間経っても再実行され
+#   なければ赤のまま残る。所有者の承認を待つ赤は、記録のコメントがある PR に
+#   しか出ないため、記録のコメントが無い PR の赤を滞留に数える。記録のコメントが
+#   前の head のものでも承認待ちに数える(承認待ちの一覧に毎週出るため、止まった
+#   まま気づかれないことは無い)。
+#   記録のコメントの有無は record-cooldown-exception.sh exists の結果で決める。
+#
 # なぜ同一contextの複数check-runは最新で判定するのか:
 #   再実行・イベントの多重発火で同じcontextのcheck-runが複数残るため。
 #   古いfailureを拾うと再実行で直ったPRが偽赤になり、古いsuccessを拾うと
@@ -57,6 +68,8 @@
 # テスト: .github/scripts/tests/test-check-audit-dependabot-stuck.sh
 # 使い方: check-audit-dependabot-stuck.sh <期待一覧(required-checks.json)のパス>
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須)
+#     / GITHUB_REPOSITORY_OWNER(dependency-cooldown が赤の PR があるときに必須。
+#       record-cooldown-exception.sh が使う。Actions のランナーが設定する)
 # =====================================================================
 set -Eeuo pipefail
 # ガードしていないコマンドの失敗は、逸脱(1)ではなく判定不能(2)にする。
@@ -80,6 +93,7 @@ fi
 
 CHECKS_FILE="$1"
 REPO="$GITHUB_REPOSITORY"
+RECORD="$(cd "$(dirname "$0")" && pwd)/record-cooldown-exception.sh"
 
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
@@ -190,6 +204,24 @@ while [ "$i" -lt "$pr_count" ]; do
             | sort_by(.name)
         else empty end' 2>/dev/null); then
         report_undecidable "PR #${number} のcheck-runs APIの応答を解釈できませんでした。"
+    fi
+
+    # dependency-cooldown の赤だけは、PR の記録のコメントの有無で分ける。
+    # 記録のコメントが無ければ、72時間経っていない版で止めた赤なので滞留に数える。
+    if jq -e 'any(.[]; .name == "dependency-cooldown" and .gated)' <<<"$failures_json" >/dev/null; then
+        record_out=""
+        if ! record_out=$(bash "$RECORD" exists "$number"); then
+            report_undecidable "PR #${number} の記録のコメント(72時間待たずに入れる版の記録)を読めませんでした。"
+        fi
+        case "$record_out" in
+        exists=true) ;;
+        exists=false)
+            failures_json=$(jq -c 'map(if .name == "dependency-cooldown" then .gated = false else . end)' <<<"$failures_json")
+            ;;
+        *)
+            report_undecidable "PR #${number} の記録のコメントの有無を判定できませんでした(想定外の出力: ${record_out})。"
+            ;;
+        esac
     fi
 
     # 報告には結論を併記する(cancelledとfailureでは人間の対処が違うため)。

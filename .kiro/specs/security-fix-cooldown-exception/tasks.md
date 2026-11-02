@@ -181,7 +181,7 @@
   - _対象の部品: 監査手順.md, tech.md, pnpm-workspace.yaml_
 
 - [ ] 8. 所有者が置いたファイルで全体を確かめる
-- [ ] 8.1 所有者にファイルを置いてもらい、置いた場所でテストを流す
+- [x] 8.1 所有者にファイルを置いてもらい、置いた場所でテストを流す
 
   親のセッションは、置き場所の `place-1/` のファイルを本来の場所に写すコマンドを所有者に示し、そのコマンドでファイルを置くよう所有者に頼む。依頼には、Claude が `.github/` に書き込めないこと(`settings.json` の `deny`)を添える。所有者が置いたら、親のセッションは、本来の場所で、この spec で作るか変えたシェルのテストのすべてと、shellcheck と、actionlint を流す。親のセッションは、`test-verify-ci-tool.sh` を、Git Bash に加えて Linux のコンテナでも1回流す。
   - 完了の確かめ方: Linux のコンテナで流した `.github/scripts/tests/` の、この spec で作るか変えたテストと `test-lib-notice-comment.sh` が、すべて通る。`test-verify-ci-tool.sh` が Git Bash と Linux のコンテナの両方で通る。shellcheck と actionlint の指摘が0件である。親のセッションは、shellcheck を `koalaman/shellcheck:v0.11.0` のイメージで動かし、`git ls-files -z --cached --others --exclude-standard '*.sh'` が返すファイルに流す。親のセッションは、actionlint を `rhysd/actionlint:1.7.12` のイメージで動かす。結果を実装のメモに記録してある
@@ -223,6 +223,7 @@
 - GitHub が README の Mermaid の図を描く版は 12.2.0 である。Claude は、2026-11-02 に、GitHub の図の描画のページ(`viewscreen.githubusercontent.com/markdown/mermaid`)が読み込む部品のうち、info の図の部品に書かれた版を読んだ。同じ日に、Claude は、書き直した README の図を、`cdn.jsdelivr.net/npm/mermaid@12.2.0` の Mermaid で parse と render にかけ、12個の枠がすべて描けることを確かめた
 - Claude は、README の `rerun-approval-gated-checks.yaml` の行を変えなかった。この行は「承認前に失敗したままのゲートチェックを再実行し」と書き、再実行する検査の名前を並べていないので、`dependency-cooldown` を足しても今の記述のまま当たるためである。`dependency-graph.yaml` の行には、依存グラフに scope を付けることを足した
 - Claude は、監査手順.md の「`dependency-cooldown` が赤いとき」で、「公開から 72 時間を経過していないパッケージ」の見出しを、判定不能の手順に含めた。check-dependency-cooldown.sh の report_cooldown は、公開時刻を読めなかったときにしか呼ばれず、この見出しは「公開時刻を取得できませんでした(判定不能)」の見出しと一緒にしか出ないためである
+- タスク 8.1 の結果(2026-11-02): 所有者が置いた `.github/` の22個のファイルは、置き場所のものと同じだった。`ubuntu:24.04` に `jq` `curl` `openssl` `gnupg` `perl` を入れたコンテナ(bash 5.2.21)で、作業フォルダを読むだけの形で渡し、`.github/scripts/tests/` のこの spec で作るか変えた8本と `test-lib-notice-comment.sh` と `test-verify-ci-tool.sh` を流し、10本すべてが終了コード 0 で、PASS は718件、FAIL は0件だった。`test-verify-ci-tool.sh` は Git Bash でも終了コード 0 で、PASS は144件、FAIL は0件だった。`koalaman/shellcheck:v0.11.0` を、`git ls-files -z --cached --others --exclude-standard '*.sh'` が返す108個のファイルに流し、指摘は0件だった。このイメージには `sh` が無いので、ファイルの一覧は手元の `xargs -0` から `docker run` の引数で渡した。`rhysd/actionlint:1.7.12` を作業フォルダの最上位で流し、指摘は0件だった
 
 ## 完了条件(全タスク共通)
 
