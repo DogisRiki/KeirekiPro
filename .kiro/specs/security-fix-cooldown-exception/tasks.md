@@ -98,7 +98,7 @@
   - _対象の部品: rerun-approval-gated-checks.yaml, required-checks.json_
 
 - [ ] 4. 週次監査に、72時間待たずに入れた版の一覧と、止まった Dependabot の PR の見分けを足す
-- [ ] 4.1 72時間待たずに入れた版の一覧を報告するスクリプトを作る (並行可)
+- [x] 4.1 72時間待たずに入れた版の一覧を報告するスクリプトを作る (並行可)
 
   Claude は、部品「check-audit-cooldown-exceptions.sh」と、そのテスト `test-check-audit-cooldown-exceptions.sh` を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に作る。このスクリプトは、前の回の週次監査からの窓の中でマージされた PR を読み、マージした head の記録のコメントと、PR の本文の CI の道具の記録を、一覧にして報告する。窓とは、このスクリプトが調べる期間で、前の回の週次監査の実行の始まりから今の時刻までである。
   - 完了の確かめ方: Linux のコンテナで流した `test-check-audit-cooldown-exceptions.sh` の場合が、すべて通る。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
@@ -212,6 +212,9 @@
 - Claude は、`audit-weekly.yaml` の自己テストの一覧に、design のとおり `test-check-audit-cooldown-exceptions` だけを足す。止まっている Dependabot の PR の見分けを変えるタスク 4.2 のあとの `check-audit-dependabot-stuck.sh` は、`record-cooldown-exception.sh` を呼ぶ。`test-check-audit-dependabot-stuck.sh` は、`gh` だけをスタブにして、`record-cooldown-exception.sh` の本物を呼ぶ。そのため、週次監査の自己テストでも記録のコメントの読み取りが流れる。`test-record-cooldown-exception.sh` そのものは、`dependency-cooldown` のジョブで流れる
 - 共通の完了条件の1(確かめるテストの無い受入基準を残さない)には、2つの例外がある。1つ目は、ワークフローの起動と権限と承認の読み取りを変えるタスク 3.1、3.2、3.3、4.3 である。これらのタスクは、actionlint と、照合と、実装の PR の検査の結果で実際の環境を確かめるタスク 8.2 で確かめる。2つ目は、手順の文書を書くタスク 5.4 と 6 である。これらのタスクは、照合で確かめる
 - マージのあとの確認: Claude は、出荷の PR の本文に、design の移行の節の2つの確認を書く。1つ目は、マージのあとの警告の `dependency.scope` が `runtime` か `development` になっていることである。2つ目は、次の Dependabot の PR の `dependency-cooldown` の報告に「脆弱性の警告を読めた」の行が出ることと、記録のコメントの一覧を読めたことである
+- Claude は、出荷の PR の本文に、CI の道具の記録の目印(`<!-- ci-tool-cooldown-exception`)の文字列を書かない。週次監査の `check-audit-cooldown-exceptions.sh` は、PR の本文の目印の数を数え、読める記録の数と合わない PR を、読めなかった PR として報告するためである
+- 週次監査の自己テストは GitHub Actions のランナーで流れ、ランナーは `GITHUB_REPOSITORY` などの環境変数を渡す。そのため、Claude は、環境変数が無いときの動きを確かめるテストで、`env -u` を使って変数を明示して外す。前に書いた代入は変数を足すだけで、引き継いだ変数を消さない
+- Claude の Edit ツールは、バックスラッシュと u と4桁の16進数で書いた文字の書き方を、その文字そのものに直して保存する。jq のコードにその書き方を残すときは、Claude は、perl でバックスラッシュを `chr(92)` として書き、日本語を含む行を書くときは `-Mutf8 -CSD` を付ける
 
 ## 完了条件(全タスク共通)
 
