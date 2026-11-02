@@ -17,7 +17,7 @@
   - _要件: 3.1, 3.2, 7.3_
   - _対象の部品: cooldown-check-malware.sh_
 
-- [ ] 1.3 npm の部品の署名した者を比べるスクリプトを作る (並行可)
+- [x] 1.3 npm の部品の署名した者を比べるスクリプトを作る (並行可)
 
   Claude は、部品「cooldown-check-signer.sh」のうち npm の部品を比べる部分と、そのテスト `test-cooldown-check-signer.sh` を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に作る。このスクリプトは、前の版と新しい版の SLSA の来歴の証明書から、design.md の cooldown-check-signer.sh の節に書いた3つの欄を読んで比べ、新しい版の来歴を `gh attestation verify` で検証する。来歴とは、その版をどのリポジトリのどの組み立ての設定で作ったかを、組み立てたサービスが署名して残した記録である。
   - 完了の確かめ方: Linux のコンテナで流した `test-cooldown-check-signer.sh` の npm の場合が、すべて通る。テストのスタブが返す来歴の証明書は、実際の npm の部品の来歴から1回取った証明書をもとにしてある。スタブとは、テストのときに、外部のサービスやコマンドの代わりに決まった答えを返す偽物である。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
@@ -204,6 +204,7 @@
 - テストのスタブが返す OSV と npm の来歴と Dependabot の警告の JSON と、maven の部品の `.pom.asc` と公開鍵は、Claude が実際のサービスから1回取った答えの形をもとにする。テストはネットワークを使わない
 - `place-1/.github/` には、Claude は書けない。`settings.json` の `deny` の `.github/**` が、置き場所の中の `place-1/.github/` にも当たるためである。そのため、Claude は、`.github/` の下に置くファイルを、`place-1/dot-github/` に、`.github/` と同じ並びで作る。タスクの本文の `place-1/.github/` は、`place-1/dot-github/` と読む。所有者に置いてもらうときのコマンドは、`place-1/dot-github/` の中身を `.github/` に写す形にする
 - `cooldown-check-malware.sh` は、`MAL-` の ID の項目も `vulns/{id}` で読む。止めた理由の報告に、公表の記載の要約と URL を出すためである。design の失敗したときの扱いは「`vulns/{id}` が失敗したら、その ID を持つ部品を unknown にする」だが、`MAL-` の項目だけは、読めなくても malicious のままにする。`MAL-` の ID は querybatch の答えだけで悪意のある部品と分かり、malicious でも unknown でも72時間待たずには入らないので、要件3の1と3の2は変わらない。このとき、要約は空にし、URL は osv.dev の項目のページにする
+- `cooldown-check-signer.sh` は、npm の来歴の証明書を、`verificationMaterial.certificate.rawBytes` に加えて `verificationMaterial.x509CertificateChain.certificates[0].rawBytes` からも読む。2026-11-02 に registry.npmjs.org から取った `sigstore@3.0.0` と `3.1.0` の来歴は bundle の版 0.2 で、証明書は design の書いた欄ではなく後者にあったためである。証明書の拡張は、`openssl x509 -text` ではなく `openssl asn1parse` で読む。`x509 -text` は、名前の無い拡張の値を、UTF8String の頭の2バイトを含む形で出すためである。`gh attestation verify` の `--repo` に渡す前の版の元のリポジトリは、前の版の証明書の拡張 1.3.6.1.4.1.57264.1.12(元のリポジトリの URI)から読む。3つの欄が違うときは、tgz を取らず、検証もしないで `different` を返す。検証できても署名した者が違うことは変わらず、`different` でも `unknown` でも呼ぶ側はその版を止めるためである
 - 所有者への依頼は、親のセッションが行う。実装役のサブエージェントは、所有者に依頼する手前で止まり、用意したもの(置き場所のパス)を親のセッションに返す。確認役は、置く前の成果を置き場所のパスで確かめる
 - この spec が frontend で変えるのは `pnpm-workspace.yaml` のコメントだけなので、共通の完了条件の2(verify のスキル)のうち当てはまるのは、監査手順と steering と除外の欄のコメントを書き直すタスク 7.2 の `/verify-frontend` だけである。代わりに、Claude は、シェルのスクリプトを作るか変えるタスクごとに、そのタスクのスクリプトとテストに shellcheck を流す。判定に使う確認のスクリプトを作る大きなまとまり1のタスクは並行に進むので、まとまりの最後のタスクで流すと、まだ終わっていないタスクのスクリプトを見落とすためである
 - Claude は、`audit-weekly.yaml` の自己テストの一覧に、design のとおり `test-check-audit-cooldown-exceptions` だけを足す。止まっている Dependabot の PR の見分けを変えるタスク 4.2 のあとの `check-audit-dependabot-stuck.sh` は、`record-cooldown-exception.sh` を呼ぶ。`test-check-audit-dependabot-stuck.sh` は、`gh` だけをスタブにして、`record-cooldown-exception.sh` の本物を呼ぶ。そのため、週次監査の自己テストでも記録のコメントの読み取りが流れる。`test-record-cooldown-exception.sh` そのものは、`dependency-cooldown` のジョブで流れる
