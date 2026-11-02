@@ -69,7 +69,7 @@
   - _要件: 6.3, 6.4, 6.5_
   - _対象の部品: old-inspection-cleanup.pl_
 
-- [ ] 4. 点検のスキルの手順を書き直す (並行可)
+- [x] 4. 点検のスキルの手順を書き直す (並行可)
 
   Claude は、部品「memory-inspect-now のスキル」のとおりに、`.claude/skills/memory-inspect-now/SKILL.md` を、その場で前の点検を動かす手順から、会話の中で点検する手順に書き直す。Claude は、SKILL.md の frontmatter の `description` と `allowed-tools` を、部品の「いつ動くか」と「権限」の欄のとおりに書く。frontmatter とは、SKILL.md の先頭の `---` の行で囲んだ、スキルの設定を書く部分である。
 
