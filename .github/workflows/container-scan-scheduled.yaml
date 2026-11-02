@@ -24,14 +24,9 @@ name: Scheduled Container Image Vulnerability Scan
 #   指定すると OIDC の sub が repo:OWNER/REPO:environment:NAME になり、
 #   ロールの信頼ポリシーの該当条件に合致しなくなる。
 #
-# 採用する外部部品について:
-#   aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567(v0.3.1)を使う。
-#   このアクションは 2026-03-19 に全7タグが情報窃取マルウェアへ force-push された
-#   (GHSA-69fq-xp46-6x23 / CVE-2026-33634、Critical。露出は同日 ~17:43 〜 ~21:44 の約4時間)。
-#   出典: https://github.com/advisories/GHSA-69fq-xp46-6x23
-#   採用SHAのコミット日時は 2026-06-03T12:03:56Z で露出期間の終了から2ヶ月半後、
-#   署名は verified、リリースは immutable。
-#   選定の全文は design.md の Security Considerations にある。
+# Trivy の入れ方について:
+#   Trivy 本体は .github/actions/verified-trivy で、配布元の署名を確かめてから入れる。
+#   理由は container-scan.yaml の冒頭の「採用する外部部品について」にある。
 
 on:
   schedule:
@@ -110,12 +105,12 @@ jobs:
             echo "DETECTED_JSON=${RUNNER_TEMP}/container-scan-detected.json"
           } >>"$GITHUB_ENV"
 
-      # cache は有効にしない。理由は container-scan.yaml の同じステップの
-      # コメントを参照(キャッシュヒット時に固定したインストール経路を通らない)。
+      # Trivy の本体はキャッシュから戻さない。理由は container-scan.yaml の
+      # 同じステップのコメントにある。
       - name: Setup Trivy
-        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        uses: ./.github/actions/verified-trivy
         with:
-          version: v${{ env.TRIVY_VERSION }}
+          trivy-version: ${{ env.TRIVY_VERSION }}
 
       - name: Verify Trivy version
         env:

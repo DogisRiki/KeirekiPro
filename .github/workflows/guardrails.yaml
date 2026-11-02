@@ -100,6 +100,11 @@ jobs:
       - name: Test verified Codex CLI install
         run: bash .github/scripts/tests/test-install-verified-codex.sh
 
+      # Trivy を配布元の署名を確かめてから入れるスクリプト(.github/actions/verified-trivy の中身)の
+      # テスト。偽の配布物を file:// で読ませ、cosign を動かす docker を偽物に置き換えるため、ネットワークを使わない
+      - name: Test verified Trivy install
+        run: bash .github/scripts/tests/test-install-verified-trivy.sh
+
       - name: Check owner approval
         id: approval
         env:

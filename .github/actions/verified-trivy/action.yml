@@ -1,0 +1,17 @@
+name: Verified Trivy
+description: >-
+  Trivy を GitHub のリリースから取り、配布元の署名を確かめてから PATH に足す。
+  確かめられなければ、Trivy を PATH に足さずに失敗する。
+  中身は .github/scripts/install-verified-trivy.sh にある。
+inputs:
+  trivy-version:
+    description: '入れる Trivy の版。v を付けない(例: 0.74.0)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Trivy の署名を確かめてから PATH に足す
+      shell: bash
+      env:
+        TRIVY_VERSION: ${{ inputs.trivy-version }}
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/install-verified-trivy.sh" "$TRIVY_VERSION"

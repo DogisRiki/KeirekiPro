@@ -13,16 +13,12 @@ name: Container Image Vulnerability Scan
 #   出典: https://github.com/advisories/GHSA-69fq-xp46-6x23
 #   露出期間は 2026-03-19 ~17:43 〜 ~21:44 の約4時間。
 #
-#   採用する aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567
-#   (v0.3.1)のコミット日時は 2026-06-03T12:03:56Z で、露出期間の終了から
-#   2ヶ月半後にあたる。署名は verified、リリースは immutable。
-#   採用の根拠の全文は
-#   .kiro/specs/container-image-vulnerability-scanning/design.md の
-#   Security Considerations にある。
-#
-#   アクションをSHAで固定してもTrivy本体は固定されない。setup-trivy の
-#   version 入力の既定は latest のため、env.TRIVY_VERSION を明示し、
-#   導入直後に check-trivy-version.sh で実行時の版を突き合わせる。
+#   Trivy 本体は、setup-trivy を使わず、.github/actions/verified-trivy で入れる。
+#   GitHub のリリースの tarball を、aquasecurity/trivy のリリースのワークフローが
+#   env.TRIVY_VERSION のタグで署名したことを cosign で確かめてから PATH に足す。
+#   setup-trivy は、同じリリースの checksums.txt と照らすだけで、リリースそのものが
+#   偽物のときに見分けられない(#700)。
+#   入れたあとに check-trivy-version.sh で実行時の版を突き合わせる。
 
 on:
   pull_request:
@@ -88,6 +84,10 @@ jobs:
               - 'backend/**'
               - '.github/container-scan-suppressions.json'
               - '.github/workflows/container-scan.yaml'
+              # Trivy の入れ方を変える変更も、本物の Trivy を入れて検査を通す
+              - '.github/actions/verified-trivy/**'
+              - '.github/scripts/install-verified-trivy.sh'
+              - '.claude/scripts/ci-tool-signature/trusted-signers.json'
             scripts:
               - '.github/scripts/check-container-scan.sh'
               - '.github/scripts/check-trivy-version.sh'
@@ -174,19 +174,15 @@ jobs:
             echo "DETECTED_JSON=${RUNNER_TEMP}/container-scan-detected.json"
           } >>"$GITHUB_ENV"
 
-      # バージョンの検証はビルドの前に置く。組み立てに10分掛けたあとで
+      # 署名とバージョンの検証はビルドの前に置く。組み立てに10分掛けたあとで
       # 前提の不一致に気づく形にしない。
       #
-      # cache は有効にしない。setup-trivy v0.3.1 はキャッシュヒット時に
-      # インストールのステップ自体を飛ばすため、SHA固定したインストール
-      # スクリプトを通らず、復元したバイナリがそのまま PATH に入る。
-      # check-trivy-version.sh が見るのは trivy の自己申告のみで、この2経路を
-      # 区別できない。この spec は Trivy 系ツールの供給網侵害を発端とするため、
-      # バイナリの入手経路を増やさない。
+      # Trivy の本体はキャッシュから戻さない。キャッシュから戻すと、署名を
+      # 確かめた配布物でない物が PATH に入る経路が増える。
       - name: Setup Trivy
-        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        uses: ./.github/actions/verified-trivy
         with:
-          version: v${{ env.TRIVY_VERSION }}
+          trivy-version: ${{ env.TRIVY_VERSION }}
 
       - name: Verify Trivy version
         env:
