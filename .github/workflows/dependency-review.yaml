@@ -8,7 +8,8 @@
 #   generate: build.gradle を実行する。contents: read のみ
 #   submit  : スナップショットを送るだけ。Gradleもcheckoutも実行しない
 #   review  : 送信完了後に base と head の依存グラフを差分比較し、脆弱性を見る
-#   cooldown: 同じ差分から、追加されたパッケージの公開経過時間を見る
+#   cooldown: 同じ差分から、追加されたパッケージの公開経過時間を見る。
+#             72時間待たずに入れてよい版かを判定し、所有者の承認を読む
 #
 # needs で直列化しているため、送信前に後段が走る競合は構造的に起きない。
 #
@@ -60,6 +61,14 @@ jobs:
       # 生成したスナップショットはアーティファクトとして保存し、送信は次のジョブが行う
       - name: Generate dependency graph
         uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        # 依存グラフに scope を付ける。この configuration(Spring Boot が作る、本番の jar に
+        # 入る部品の組)で解決された部品を runtime にし、ほかを development にする。
+        # 警告に scope が載り、dependency-cooldown が本番で動く部品の警告を見分けられる。
+        # dependency-graph.yaml と同じ値にし、PR と main で付け方をそろえる。
+        # 値は configuration の名前に当てる正規表現。
+        # 参照: https://github.com/gradle/github-dependency-graph-gradle-plugin
+        env:
+          DEPENDENCY_GRAPH_RUNTIME_INCLUDE_CONFIGURATIONS: productionRuntimeClasspath
         with:
           build-root-directory: backend
           dependency-graph: generate-and-upload
@@ -140,24 +149,29 @@ jobs:
     name: dependency-cooldown
     needs: [generate, submit]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # 対象外にする条件が review ジョブと異なる。
     #
-    # 依存更新の自動化が作成したPRは対象外にする。バージョン更新には自動化側の
-    # 既定クールダウンが効いており二重になる。脆弱性対応の更新にはクールダウンが
-    # 適用されないため、一律に適用すると修正のマージを最大72時間遅らせることになる。
+    # 依存更新の自動化が作成したPRも対象にする。最初の修正版に上げる変更は、
+    # 誰が作ったかによらず同じ決まりで判定する。セキュリティの更新のPRと、
+    # PRに一緒に入る推移的な部品も、72時間の待ちと、待たずに入れる判定を受ける。
     #
-    # フォークPRも対象外になる。submit がスキップされ head 側のスナップショットが
+    # フォークPRは対象外になる。submit がスキップされ head 側のスナップショットが
     # 無いため、追加されたパッケージを特定する経路そのものが成立しない。
     # ここでは submit の成功を要求することでそれを表す(review は submit が
     # スキップでも frontend を検査できるため条件が緩い)。
     if: >-
       ${{ !cancelled()
       && github.event.pull_request.head.repo.full_name == github.repository
-      && github.event.pull_request.user.login != 'dependabot[bot]'
       && needs.generate.result == 'success'
       && needs.submit.result == 'success' }}
+    # contents: read はスクリプトの checkout、pull-requests: write は記録のコメントを
+    # 書くこととレビューを読むこと、vulnerability-alerts: read は Dependabot の警告を
+    # 読むために使う
     permissions:
       contents: read
+      pull-requests: write
+      vulnerability-alerts: read
     steps:
       # 検査スクリプトを取得するために checkout する。判定は依存グラフの差分比較API
       # だけを入力にするため、履歴の深さは要らない
@@ -166,17 +180,47 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      # 判定スクリプト自身のテスト。落ちた場合は検査も失敗させる(fail-closed)。
-      # 外部への問い合わせはスタブするためネットワークを必要としない
+      # 判定スクリプトと、判定に使う確認のスクリプト自身のテスト。1本でも落ちた
+      # 場合は検査も失敗させる(fail-closed)。外部への問い合わせはスタブするため
+      # ネットワークを必要としない
       - name: Test dependency cooldown check
-        run: bash .github/scripts/tests/test-check-dependency-cooldown.sh
+        run: |
+          set -euo pipefail
+          for t in check-dependency-cooldown cooldown-match-alerts cooldown-check-malware \
+            cooldown-check-signer cooldown-check-pnpm-exclude record-cooldown-exception \
+            lib-notice-comment; do
+            bash ".github/scripts/tests/test-${t}.sh"
+          done
+
+      # 式は dependency-gate.yaml の「Check owner approval」と同じにする。
+      # 今の head に所有者が付けた最後の判定だけを読む。API が失敗したら
+      # set -e でステップを失敗にし、承認を確かめられないまま緑にしない
+      - name: Check owner approval
+        id: approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          owner="${{ github.repository_owner }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          verdict=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate --slurp \
+            | jq -r --arg owner "$owner" --arg head "$head_sha" '[.[][] | select(.user.login == $owner) | select(.commit_id == $head) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
+          echo "Owner review verdict: $verdict"
+          if [ "$verdict" = "APPROVED" ]; then
+            echo "approved=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "approved=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # 比較する2点は dependency-review-action の既定と揃える。送信された
       # スナップショットがこの2点に対応していることは、同じrunのreviewジョブが
-      # 追加パッケージを検出できている実績で確認できる
+      # 追加パッケージを検出できている実績で確認できる。
+      # GITHUB_REPOSITORY と GITHUB_REPOSITORY_OWNER は、ランナーが既定で渡す
       - name: Check dependency cooldown
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          OWNER_APPROVED: ${{ steps.approval.outputs.approved }}
         run: |
           chmod +x .github/scripts/check-dependency-cooldown.sh
           .github/scripts/check-dependency-cooldown.sh \
