@@ -11,20 +11,32 @@
 #              ハッシュを照らす。CI の setup-node が入れるのは actions/node-versions が詰め直した
 #              tarball なので、その tarball の bin/node のハッシュが、確かめた tarball の bin/node と
 #              同じことも確かめる。公開日時は actions/node-versions のそのリリースの published_at
+#   trivy:     GitHub のリリースの trivy_<版>_Linux-64bit.tar.gz を、同じ名前に .sigstore.json を
+#              足した署名で、cosign verify-blob で確かめる。身元は trusted-signers.json の
+#              identity_template の {version} に版を入れたもの。公開日時はリリースの published_at
+#   codex:     trusted-signers.json の packages の2つの部品(@openai/codex の版と、その linux-x64 の版)の
+#              tgz を npm の registry から取り、来歴の bundle を gh attestation verify で確かめる。
+#              公開日時は、部品の文書の time の、1つ目の部品の版の値
 #   terraform: releases.hashicorp.com の terraform_<版>_SHA256SUMS を .sig で gpg で確かめ、
 #              terraform_<版>_linux_amd64.zip のハッシュを照らす。公開日時は
 #              api.releases.hashicorp.com の timestamp_created
 #
 # 署名した者:
-#   gpg --verify の VALIDSIG の行の最後の欄にある主鍵の指紋である。公開鍵は、信頼する者の
+#   node と terraform: gpg --verify の VALIDSIG の行の最後の欄にある主鍵の指紋である。公開鍵は、信頼する者の
 #   指紋ごとに鍵サーバから取る。鍵サーバが別の鍵を返しても、署名を検証できた鍵の主鍵の指紋を
 #   信頼する者の指紋と比べるので、別の者を信頼する者とみなさない。
+#   trivy: cosign に渡した身元。codex: gh attestation verify が返した証明書の身元
+#   (subjectAlternativeName。来歴を作ったワークフローとタグ)。1つ目の部品のものを出す。
 #
 # なぜ gpg をコンテナで動かすのか:
 #   開発者の PC に gpg が無くても、同じ版の gpg で確かめられるようにするため。コンテナは、
 #   このスクリプトの隣の Dockerfile から作り、ネットワークを外して1回きりで動かす。
 #   鍵の置き場(GNUPGHOME)はコンテナの中に作る。gpg の補助の仕組みが置き場に作る
 #   ソケットは、Windows の PC の作業フォルダの上では作れないことがあるため。
+#
+# なぜ cosign はネットワークを外さないのか:
+#   cosign は、署名の証明書と透明性ログの記録を確かめるために、Sigstore の信頼の起点のデータを
+#   取りに行くため。cosign のコンテナには、作業フォルダを読むだけの形で渡す。
 #
 # 取得したファイルは、毎回新しく作る空の作業フォルダに置き、スクリプトの置き場とは分ける。
 # 取得したファイルの中のスクリプトは動かさない。tarball は、bin/node を標準出力へ取り出して
@@ -33,7 +45,7 @@
 # 問い合わせ: 打ち切りは300秒、再試行は1回。404 は再試行しない。
 #
 # テスト: .claude/scripts/ci-tool-signature/test-verify-ci-tool.sh
-# 使い方: verify-ci-tool.sh <node|terraform> <版> <所有者の指示の要約>
+# 使い方: verify-ci-tool.sh <node|trivy|codex|terraform> <版> <所有者の指示の要約>
 #   出力(標準出力): 1行目 result=verified / unverified / unknown
 #     確かめられたとき: 2行目から PR の本文に書く Markdown の文。公開から72時間経っていなければ、
 #       最後に記録の目印の行 <!-- ci-tool-cooldown-exception data=<base64> -->
@@ -46,14 +58,14 @@ set -euo pipefail
 
 usage() {
     echo "result=unknown"
-    echo "detail=使い方: verify-ci-tool.sh <node|terraform> <版> <所有者の指示の要約>"
+    echo "detail=使い方: verify-ci-tool.sh <node|trivy|codex|terraform> <版> <所有者の指示の要約>"
     exit 2
 }
 [ "$#" -eq 3 ] || usage
 TOOL="$1"
 VERSION="$2"
 OWNER_INSTRUCTION="$3"
-case "$TOOL" in node | terraform) ;; *) usage ;; esac
+case "$TOOL" in node | trivy | codex | terraform) ;; *) usage ;; esac
 case "$VERSION" in "" | *[!0-9A-Za-z.+-]*) usage ;; esac
 [ -n "$OWNER_INSTRUCTION" ] || usage
 
@@ -61,6 +73,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 SIGNERS="${TRUSTED_SIGNERS_FILE:-$HERE/trusted-signers.json}"
 IMAGE="kp-ci-tool-gpg:local"
 KEYSERVER="https://keyserver.ubuntu.com"
+NPM_REGISTRY="https://registry.npmjs.org"
+# cosign のイメージ。digest で固定する(ghcr.io/sigstore/cosign/cosign:v3.1.4 の、2026-11-02 に読んだ値)
+COSIGN_IMAGE="ghcr.io/sigstore/cosign/cosign@sha256:0f06154836d2de34f887a5c273506d52ca43edaa1d9e53e6510fa78a48f69c2d"
 
 # Windows の Git Bash では C:/... の形のパスを返す。docker と、Windows 向けに作られた curl は、
 # /tmp/... の形のパスを読めないため
@@ -103,6 +118,21 @@ must_fetch() {
     [ "$code" = 200 ] || unknown "${3}を取れませんでした(HTTP ${code}): $1"
 }
 
+# 使い方: last_line <ファイル>。空でない最後の行を出す
+last_line() {
+    grep -v '^[[:space:]]*$' "$1" 2>/dev/null | tail -n 1 | tr -d '\r' || true
+}
+
+# 使い方: integrity_of <ファイル>。npm の dist.integrity と同じ形(sha512-<base64>)のハッシュを出す
+integrity_of() {
+    perl -MDigest::SHA -MMIME::Base64 -e '
+        open my $f, "<:raw", $ARGV[0] or die;
+        my $s = Digest::SHA->new(512);
+        $s->addfile($f);
+        print "sha512-", encode_base64($s->digest, "");
+    ' "$1"
+}
+
 sha256_of() {
     if command -v sha256sum >/dev/null 2>&1; then
         sha256sum | awk '{ print $1 }'
@@ -114,16 +144,20 @@ sha256_of() {
 # --- 信頼する署名した者 --------------------------------------------------------------
 
 [ -f "$SIGNERS" ] || unknown "信頼する署名した者のファイルがありません: ${SIGNERS}"
-if ! TRUSTED=$(perl -MJSON::PP -e '
-    local $/;
-    open my $f, "<", $ARGV[0] or die;
-    my $d = decode_json(<$f>);
-    my $l = $d->{$ARGV[1]}{fingerprints};
-    die unless ref $l eq "ARRAY" && @$l;
-    for (@$l) { die unless defined && !ref && /\A[0-9A-F]{40}\z/; print "$_\n" }
-' "$SIGNERS" "$TOOL" 2>/dev/null); then
-    unknown "信頼する署名した者のファイルから、${TOOL} の鍵の指紋を読めませんでした: ${SIGNERS}"
-fi
+
+# 使い方: read_signers <欄の名前> <値の形の正規表現>。この道具の欄の値を1行に1つずつ出す。
+# 欄は文字列か、文字列の空でない配列。欄が無いか、値が形に合わなければ終了コード 1
+read_signers() {
+    perl -MJSON::PP -e '
+        local $/;
+        open my $f, "<", $ARGV[0] or die;
+        my $v = decode_json(<$f>)->{ $ARGV[1] }{ $ARGV[2] };
+        my $re = qr/$ARGV[3]/;
+        my @l = ref $v eq "ARRAY" ? @$v : ($v);
+        die unless @l;
+        for (@l) { die unless defined && !ref && /$re/; print "$_\n" }
+    ' "$SIGNERS" "$TOOL" "$1" "$2" 2>/dev/null
+}
 
 # --- gpg のコンテナ --------------------------------------------------------------------
 
@@ -146,9 +180,14 @@ exit 0
 STEPS
 )
 
-if ! MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker build -q -t "$IMAGE" "$(host_path "$HERE")" >/dev/null 2>&1; then
-    unknown "gpg を動かすコンテナのイメージを作れませんでした。Docker が動いているか確かめてください。"
-fi
+# 使い方: prepare_gpg。信頼する者の鍵の指紋を TRUSTED に読み、gpg のコンテナのイメージを作る
+prepare_gpg() {
+    TRUSTED=$(read_signers fingerprints '\A[0-9A-F]{40}\z') ||
+        unknown "信頼する署名した者のファイルから、${TOOL} の鍵の指紋を読めませんでした: ${SIGNERS}"
+    if ! MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker build -q -t "$IMAGE" "$(host_path "$HERE")" >/dev/null 2>&1; then
+        unknown "gpg を動かすコンテナのイメージを作れませんでした。Docker が動いているか確かめてください。"
+    fi
+}
 
 # 使い方: verify_signature <clear|detached> <署名のファイル名> <中身か出力のファイル名> <理由に出す署名の名前>
 # ファイル名は作業フォルダの中の名前。SIGNER に署名した者の主鍵の指紋を入れる
@@ -219,6 +258,7 @@ node_binary_hash() {
 check_node() {
     local base="https://nodejs.org/dist/v${VERSION}" tarball="node-v${VERSION}-linux-x64.tar.gz"
     local code want got urls download_url release_url tag official repack
+    prepare_gpg
     code=$(fetch "${base}/SHASUMS256.txt.asc" "$TMP/SHASUMS256.txt.asc")
     if [ "$code" = 404 ]; then
         code=$(fetch "${base}/SHASUMS256.txt" "$TMP/SHASUMS256.txt")
@@ -277,6 +317,7 @@ check_node() {
 check_terraform() {
     local base="https://releases.hashicorp.com/terraform/${VERSION}" zip="terraform_${VERSION}_linux_amd64.zip"
     local sums="terraform_${VERSION}_SHA256SUMS" code want got
+    prepare_gpg
     must_fetch "${base}/${sums}" "$TMP/sums.txt" "${sums} "
     code=$(fetch "${base}/${sums}.sig" "$TMP/sums.sig")
     [ "$code" = 404 ] && unverified "${sums} に、署名(${sums}.sig)がありません。"
@@ -305,9 +346,120 @@ check_terraform() {
     TOOL_NAME="Terraform"
 }
 
+check_trivy() {
+    local base="https://github.com/aquasecurity/trivy/releases/download/v${VERSION}"
+    local file="trivy_${VERSION}_Linux-64bit.tar.gz" issuer template identity code rc
+    issuer=$(read_signers oidc_issuer '\Ahttps://[!-~]+\z') ||
+        unknown "信頼する署名した者のファイルから、trivy の oidc_issuer を読めませんでした: ${SIGNERS}"
+    template=$(read_signers identity_template '\Ahttps://[!-~]*\{version\}[!-~]*\z') ||
+        unknown "信頼する署名した者のファイルから、trivy の identity_template を読めませんでした: ${SIGNERS}"
+    identity="${template//\{version\}/$VERSION}"
+    if ! MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker pull -q "$COSIGN_IMAGE" >/dev/null 2>&1; then
+        unknown "cosign のコンテナのイメージを取れませんでした。Docker が動いているか確かめてください。"
+    fi
+
+    code=$(fetch "${base}/${file}.sigstore.json" "$TMP/trivy.sigstore.json")
+    [ "$code" = 404 ] && unverified "${file} に、署名(${file}.sigstore.json)がありません。"
+    [ "$code" = 200 ] || unknown "${file}.sigstore.json を取れませんでした(HTTP ${code})。"
+    must_fetch "${base}/${file}" "$TMP/trivy.tar.gz" "${file} "
+
+    rc=0
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm -v "$TMP:/work:ro" -w /work "$COSIGN_IMAGE" \
+        verify-blob --bundle /work/trivy.sigstore.json --certificate-oidc-issuer "$issuer" \
+        --certificate-identity "$identity" /work/trivy.tar.gz >/dev/null 2>"$TMP/cosign.err" || rc=$?
+    case "$rc" in
+    0) ;;
+    125 | 126 | 127) unknown "cosign のコンテナを動かせませんでした。Docker が動いているか確かめてください。" ;;
+    *) unverified "${file} の署名を、${identity} の署名として確かめられませんでした。cosign の出力: $(last_line "$TMP/cosign.err")" ;;
+    esac
+
+    if ! PUBLISHED=$(gh api "repos/aquasecurity/trivy/releases/tags/v${VERSION}" --jq .published_at 2>/dev/null) || [ -z "$PUBLISHED" ]; then
+        unknown "aquasecurity/trivy のリリース v${VERSION} の公開日時を読めませんでした。"
+    fi
+    SIGNER="$identity"
+    METHOD="cosign verify-blob"
+    HOW="GitHub のリリースの ${file} の署名(${file}.sigstore.json)を cosign で確かめた"
+    TOOL_NAME="Trivy"
+}
+
+check_codex() {
+    local repo workflow packages pkg name ver n=0 meta tarball integrity code san first_name="" first_ver="" listed=""
+    repo=$(read_signers repo '\A[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\z') ||
+        unknown "信頼する署名した者のファイルから、codex の repo を読めませんでした: ${SIGNERS}"
+    workflow=$(read_signers signer_workflow '\A[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[!-~]+\z') ||
+        unknown "信頼する署名した者のファイルから、codex の signer_workflow を読めませんでした: ${SIGNERS}"
+    packages=$(read_signers packages '\A(@[a-z0-9._-]+/)?[a-z0-9._-]+@[!-~]*\{version\}[!-~]*\z') ||
+        unknown "信頼する署名した者のファイルから、codex の packages を読めませんでした: ${SIGNERS}"
+
+    for pkg in $packages; do
+        pkg="${pkg//\{version\}/$VERSION}"
+        name="${pkg%@*}"
+        ver="${pkg##*@}"
+        n=$((n + 1))
+        [ -n "$first_name" ] || { first_name="$name"; first_ver="$ver"; }
+        must_fetch "${NPM_REGISTRY}/${name}/${ver}" "$TMP/codex-${n}.json" "${pkg} の部品の文書"
+        if ! meta=$(perl -MJSON::PP -e '
+            local $/;
+            open my $f, "<", $ARGV[0] or die;
+            my $d = decode_json(<$f>)->{dist};
+            for (qw(tarball integrity)) { die unless defined $d->{$_} && !ref $d->{$_} && $d->{$_} =~ /\A[!-~]+\z/ }
+            print "$d->{tarball}\n$d->{integrity}\n";
+        ' "$TMP/codex-${n}.json" 2>/dev/null); then
+            unknown "${pkg} の部品の文書から、tgz の URL とハッシュを読めませんでした。"
+        fi
+        tarball=$(printf '%s\n' "$meta" | sed -n 1p)
+        integrity=$(printf '%s\n' "$meta" | sed -n 2p)
+        case "$tarball" in "${NPM_REGISTRY}/"*) ;; *) unknown "${pkg} の tgz の URL が、npm の registry ではありません。" ;; esac
+
+        code=$(fetch "${NPM_REGISTRY}/-/npm/v1/attestations/${name/\//%2f}@${ver}" "$TMP/codex-${n}-attestations.json")
+        [ "$code" = 404 ] && unverified "${pkg} に、来歴がありません。"
+        [ "$code" = 200 ] || unknown "${pkg} の来歴を取れませんでした(HTTP ${code})。"
+        if ! perl -MJSON::PP -e '
+            local $/;
+            open my $f, "<", $ARGV[0] or die;
+            for (@{ decode_json(<$f>)->{attestations} || [] }) {
+                next unless ($_->{predicateType} // "") eq "https://slsa.dev/provenance/v1" && ref $_->{bundle} eq "HASH";
+                print JSON::PP->new->utf8->canonical->encode($_->{bundle});
+                exit 0;
+            }
+            exit 1;
+        ' "$TMP/codex-${n}-attestations.json" >"$TMP/codex-${n}.bundle.json" 2>/dev/null; then
+            unverified "${pkg} の来歴に、SLSA の来歴がありません。"
+        fi
+
+        must_fetch "$tarball" "$TMP/codex-${n}.tgz" "${pkg} の tgz "
+        [ "$(integrity_of "$TMP/codex-${n}.tgz")" = "$integrity" ] ||
+            unverified "${pkg} の tgz のハッシュが、部品の文書の値と違います。"
+        if ! san=$(gh attestation verify "$TMP/codex-${n}.tgz" --bundle "$TMP/codex-${n}.bundle.json" \
+            --digest-alg sha512 --repo "$repo" --signer-workflow "$workflow" \
+            --format json --jq '.[0].verificationResult.signature.certificate.subjectAlternativeName' 2>"$TMP/gh.err"); then
+            unverified "${pkg} の来歴を、${workflow} の署名として確かめられませんでした。gh の出力: $(last_line "$TMP/gh.err")"
+        fi
+        [ -n "$san" ] || unknown "${pkg} の来歴から、署名した者を読めませんでした。"
+        [ -n "$SIGNER" ] || SIGNER="$san"
+        listed="${listed:+${listed} と }${pkg}"
+    done
+
+    must_fetch "${NPM_REGISTRY}/${first_name/\//%2f}" "$TMP/codex-packument.json" "${first_name} の部品の文書"
+    if ! PUBLISHED=$(perl -MJSON::PP -e '
+        local $/;
+        open my $f, "<", $ARGV[0] or die;
+        my $t = decode_json(<$f>)->{time}{ $ARGV[1] };
+        die unless defined $t && !ref $t && length $t;
+        print $t;
+    ' "$TMP/codex-packument.json" "$first_ver" 2>/dev/null); then
+        unknown "${first_name} の部品の文書から、${first_ver} の公開日時を読めませんでした。"
+    fi
+    METHOD="gh attestation verify"
+    HOW="npm の registry の ${listed} の tgz の来歴を gh で確かめた"
+    TOOL_NAME="Codex CLI"
+}
+
 SIGNER="" PUBLISHED="" METHOD="" HOW="" TOOL_NAME=""
 case "$TOOL" in
 node) check_node ;;
+trivy) check_trivy ;;
+codex) check_codex ;;
 terraform) check_terraform ;;
 esac
 

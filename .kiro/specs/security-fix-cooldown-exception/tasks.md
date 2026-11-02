@@ -140,7 +140,7 @@
   - 受入基準とテストの対応: 要件6の受入基準3(配布元の署名で確かめる)と受入基準5(署名を確かめた結果を PR の本文に書く)は、テストの「Node.js の署名が合えば終了コード 0 になり、本文の文と記録の目印の行が出る」「Terraform の署名が合えば終了コード 0 になり、本文の文と記録の目印の行が出る」で確かめる。要件6の受入基準4(確かめられなければ版を変えない)は「署名が合わなければ終了コード 1 になる」「署名が無ければ終了コード 1 になる」「署名した者が信頼する者と違えば終了コード 1 になる」「取得できなければ終了コード 2 になり、理由が出る」「Node.js の詰め直しの tarball の bin/node が違えば終了コード 1 になる」で確かめる。要件5の受入基準3(CI の道具の記録に、道具と版と公開日時と所有者の指示と署名の結果と PR が載る)は「記録の目印の行の owner_instruction に3つ目の引数が入る」「3つ目の引数が無いか空なら終了コード 2 になる」「公開から72時間経っていれば記録の目印の行を出さない」で確かめる
   - _要件: 5.3, 6.3, 6.4, 6.5_
 
-- [ ] 5.3 Trivy と Codex CLI の版を確かめる部分を足す
+- [x] 5.3 Trivy と Codex CLI の版を確かめる部分を足す
 
   Claude は、部品「verify-ci-tool.sh」に、Trivy を `cosign verify-blob` で確かめる部分と、Codex CLI を `gh attestation verify` で確かめる部分を足し、テストに2つの道具の場合を足す。このスクリプトは、`cosign` を、digest で固定した `ghcr.io/sigstore/cosign/cosign` のイメージで動かす。Claude は、その digest をスクリプトの定数に書く。
   - 完了の確かめ方: Git Bash で流した `test-verify-ci-tool.sh` の4つの道具の場合が、すべて通る。Claude は、4つの道具の、今 CI が使っている版で、`verify-ci-tool.sh` をスタブ無しで1回ずつ動かし、どれも署名を確かめられたという結果で終わることを確かめ、結果を実装のメモに書いてある。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
@@ -218,6 +218,7 @@
 - テストの `check_summary` と `check_lacks` は `grep -F` で探すので、Claude は、期待の文字列に改行を入れない。`grep -F` は、改行で区切った文字列を別々の候補として読み、どれか1つが当たれば通るためである。ほかの行が混ざらないことを確かめるときは、混ざったときにだけ現れる文字列が無いことを `check_lacks` で確かめる
 - `trusted-signers.json` の Node.js の `fingerprints` は、Claude が 2026-11-02 に https://github.com/nodejs/release-keys/blob/main/README.md の「Active releasers keys」の節(コミット `481637f8`)から写した8つの主鍵の指紋である。`Dockerfile` の Debian のイメージ `debian:trixie-slim` の digest は、同じ日に読んだもので、イメージの作られた日時は 2026-10-27 である
 - この PC の Git Bash の `curl` は Windows 向けに作られたもので、`MSYS2_ARG_CONV_EXCL` により `/tmp/...` の形のパスを読めない。そのため、`verify-ci-tool.sh` は、作業フォルダを `pwd -W` で `C:/...` の形にしてから、`curl` と `docker` に渡す。GNU tar は `C:` のようにコロンを含むパスを別の機械の名前と読むので、`verify-ci-tool.sh` は tarball を tar に標準入力で渡す。2026-11-02 に、スタブ無しで Node.js 24.22.1 と Terraform 1.9.0 を確かめ、どちらも署名を確かめられたという結果で終わった
+- `verify-ci-tool.sh` の `COSIGN_IMAGE` の digest は、Claude が 2026-11-02 に読んだ `ghcr.io/sigstore/cosign/cosign` の v3.1.4 の index の digest である。cosign のコンテナは、Sigstore の信頼の根を取るためにネットワークを使う。同じ日に、スタブ無しで、今 CI が使っている4つの版(Node.js 24.22.1、Terraform 1.9.0、Trivy 0.74.0、Codex CLI 0.147.0)を確かめ、どれも署名を確かめられたという結果で終わった。Trivy の署名した者は `https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.74.0`、Codex CLI の署名した者は `https://github.com/openai/codex/.github/workflows/rust-release.yml@refs/tags/rust-v0.147.0` だった。テストの docker の代わりは、cosign のイメージのときだけ、`/work/` で始まる引数だけを書き換える。身元の URL の中の `/workflows` を書き換えないためである
 
 ## 完了条件(全タスク共通)
 

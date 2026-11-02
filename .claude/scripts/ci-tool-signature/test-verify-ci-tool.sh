@@ -2,11 +2,13 @@
 # =====================================================================
 # verify-ci-tool.sh の自動テスト(Claude が Git Bash で流す)
 #
-# docker と curl と gh をスタブし、Node.js と Terraform の版の確かめ方と、確かめられないときの
-# 扱いを検証する。署名は、テストの中で作った使い捨ての鍵で作り、その鍵の指紋を
-# TRUSTED_SIGNERS_FILE で渡す。docker のスタブは、コンテナの代わりに、この PC の gpg で
-# 同じ手順を動かす。配布物の並びは、2026-11-02 に nodejs.org と actions/node-versions と
-# releases.hashicorp.com から取った答えの形をもとにしてある。
+# docker と curl と gh をスタブし、Node.js と Trivy と Codex CLI と Terraform の版の確かめ方と、
+# 確かめられないときの扱いを検証する。gpg の署名は、テストの中で作った使い捨ての鍵で作り、
+# その鍵の指紋を TRUSTED_SIGNERS_FILE で渡す。docker のスタブは、gpg のコンテナの代わりに、
+# この PC の gpg で同じ手順を動かす。cosign と gh attestation verify は、スタブが、署名の代わりの
+# ファイルの値を照らして代わりに答える。配布物の並びは、2026-11-02 に nodejs.org と
+# actions/node-versions と releases.hashicorp.com と、Trivy の GitHub のリリースと、
+# npm の registry の @openai/codex から取った答えの形をもとにしてある。
 #
 # 環境変数 KP_TEST_CASE に場合の名前を入れると、その場合だけを流す。
 # 外部への問い合わせを行わないため、実行にネットワークを必要としない。
@@ -26,33 +28,65 @@ mkdir -p "$WORK/bin" "$STUB/web" "$STUB/gh" "$WORK/gtmp"
 
 # --- docker と curl と gh のスタブ -----------------------------------------------------
 # docker: 引数を $STUB_CALLS に "DOCKER <引数>" の1行で記録する。
-#   build: $STUB_DIR/docker.fail があれば終了コード 1
-#   run: -v <フォルダ>:/work のフォルダを読み、イメージの名前より後ろの引数の /work を
-#     そのフォルダに置き換えて、この PC で動かす
+#   build と pull: $STUB_DIR/docker.fail があれば終了コード 1
+#   run: $STUB_DIR/docker-run.fail があれば終了コード 125。-v <フォルダ>:/work(:ro)のフォルダを読み、
+#     イメージの名前より後ろの引数の /work をそのフォルダに置き換える。cosign のイメージでは、
+#     身元の URL の /workflows を置き換えないよう、/work/ で始まる引数だけを置き換える。
+#     cosign のイメージなら、cosign verify-blob の代わりに、--bundle のファイルの sha256= と
+#     identity= と issuer= の行を、中身のファイルのハッシュと --certificate-identity と
+#     --certificate-oidc-issuer の値に照らす。$STUB_DIR/cosign.fail があれば終了コード 1。
+#     それ以外のイメージなら、置き換えた引数をこの PC で動かす
 cat >"$WORK/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 echo "DOCKER $*" >>"${STUB_CALLS:?}"
 cmd="$1"
 shift
 case "$cmd" in
-build)
+build | pull)
     [ -e "${STUB_DIR:?}/docker.fail" ] && exit 1
     echo "sha256:0"
     exit 0
     ;;
 run)
+    [ -e "${STUB_DIR:?}/docker-run.fail" ] && exit 125
     host=""
     while [ "$#" -gt 0 ]; do
         case "$1" in
         --rm) shift ;;
         --network | --user | -w) shift 2 ;;
-        -v) host="${2%:/work}"; shift 2 ;;
+        -v) host="${2%:ro}"; host="${host%:}"; host="${host%:/work}"; shift 2 ;;
         *) break ;;
         esac
     done
     [ -n "$host" ] || exit 125
+    image="$1"
     shift
     args=()
+    case "$image" in
+    ghcr.io/sigstore/cosign/cosign@*)
+        for a in "$@"; do case "$a" in /work/*) args+=("$host${a#/work}") ;; *) args+=("$a") ;; esac; done
+        [ -e "$STUB_DIR/cosign.fail" ] && { echo "Error: fetching trusted root failed" >&2; exit 1; }
+        set -- "${args[@]}"
+        [ "$1" = verify-blob ] || exit 1
+        shift
+        bundle="" identity="" issuer=""
+        while [ "$#" -gt 1 ]; do
+            case "$1" in
+            --bundle) bundle="$2"; shift 2 ;;
+            --certificate-identity) identity="$2"; shift 2 ;;
+            --certificate-oidc-issuer) issuer="$2"; shift 2 ;;
+            *) exit 1 ;;
+            esac
+        done
+        [ "$(sha256sum "$1" | awk '{ print $1 }')" = "$(sed -n 's/^sha256=//p' "$bundle")" ] ||
+            { echo "Error: invalid signature when validating ASN.1 encoded signature" >&2; exit 1; }
+        [ "$identity" = "$(sed -n 's/^identity=//p' "$bundle")" ] &&
+            [ "$issuer" = "$(sed -n 's/^issuer=//p' "$bundle")" ] ||
+            { echo "Error: no matching CertificateIdentity found" >&2; exit 1; }
+        echo "Verified OK" >&2
+        exit 0
+        ;;
+    esac
     for a in "$@"; do args+=("${a//\/work/$host}"); done
     TMPDIR="${STUB_TMP:?}" exec "${args[@]}"
     ;;
@@ -92,17 +126,47 @@ STUB
 chmod +x "$WORK/bin/curl"
 
 # gh: 引数を $STUB_CALLS に "GH <引数>" の1行で記録する。
-#   api repos/actions/node-versions/releases/tags/<タグ> --jq .published_at: $STUB_DIR/gh/<タグ> を出す。
-#   ファイルが無いか、$STUB_DIR/gh.fail があれば終了コード 1
+#   api repos/<所有者>/<リポジトリ>/releases/tags/<タグ> --jq .published_at:
+#     $STUB_DIR/gh/<所有者>/<リポジトリ>/<タグ> を出す。ファイルが無ければ終了コード 1
+#   attestation verify <tgz> --bundle <bundle> ... --repo <R> --signer-workflow <W> ...:
+#     gh attestation verify の代わりに、bundle の JSON の test の sha512 と repo と workflow を、
+#     tgz のハッシュ(dist.integrity の形)と --repo と --signer-workflow の値に照らし、
+#     合えば test の san を出す。合わなければ終了コード 1
+#   $STUB_DIR/gh.fail があれば、どの呼び出しも終了コード 1
 cat >"$WORK/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 echo "GH $*" >>"${STUB_CALLS:?}"
 [ -e "${STUB_DIR:?}/gh.fail" ] && { echo "HTTP 500" >&2; exit 1; }
 case "$1 $2" in
-"api repos/actions/node-versions/releases/tags/"*)
-    f="${STUB_DIR}/gh/${2##*/tags/}"
+"api repos/"*"/releases/tags/"*)
+    f="${2#repos/}"
+    f="${STUB_DIR}/gh/${f%%/releases/tags/*}/${2##*/tags/}"
     [ -f "$f" ] || { echo "HTTP 404" >&2; exit 1; }
     cat "$f"
+    ;;
+"attestation verify")
+    tgz="$3" bundle="" repo="" workflow=""
+    shift 3
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+        --bundle) bundle="$2"; shift 2 ;;
+        --repo) repo="$2"; shift 2 ;;
+        --signer-workflow) workflow="$2"; shift 2 ;;
+        *) shift ;;
+        esac
+    done
+    perl -MJSON::PP -MDigest::SHA -MMIME::Base64 -e '
+        my ($tgz, $bundle, $repo, $workflow) = @ARGV;
+        local $/;
+        open my $f, "<", $bundle or exit 1;
+        my $t = decode_json(<$f>)->{test} or exit 1;
+        open my $g, "<:raw", $tgz or exit 1;
+        my $s = Digest::SHA->new(512);
+        $s->addfile($g);
+        exit 1 unless $t->{sha512} eq "sha512-" . encode_base64($s->digest, "")
+            && $t->{repo} eq $repo && $t->{workflow} eq $workflow;
+        print "$t->{san}\n";
+    ' "$tgz" "$bundle" "$repo" "$workflow" || { echo 'Error: verifying with issuer "sigstore.dev"' >&2; exit 1; }
     ;;
 *) exit 1 ;;
 esac
@@ -119,8 +183,19 @@ fpr_of() { gpgm --list-keys --with-colons "$1" 2>/dev/null | awk -F: '/^fpr/ { p
 FT=$(fpr_of release@example.invalid)
 FO=$(fpr_of other@example.invalid)
 [ -n "$FT" ] && [ -n "$FO" ] || exit 1
-printf '{"node":{"fingerprints":["%s"],"locations":[]},"terraform":{"fingerprints":["%s"],"locations":[]}}\n' \
-    "$FT" "$FT" >"$WORK/signers.json"
+TRIVY_ISSUER="https://issuer.example.invalid"
+TRIVY_TEMPLATE="https://github.com/example/trivy/.github/workflows/release.yaml@refs/tags/v{version}"
+CODEX_REPO="example/codex"
+CODEX_WORKFLOW="example/codex/.github/workflows/release.yml"
+cat >"$WORK/signers.json" <<JSON
+{
+  "node": {"fingerprints": ["$FT"], "locations": []},
+  "trivy": {"oidc_issuer": "$TRIVY_ISSUER", "identity_template": "$TRIVY_TEMPLATE", "locations": []},
+  "codex": {"repo": "$CODEX_REPO", "signer_workflow": "$CODEX_WORKFLOW",
+            "packages": ["@openai/codex@{version}", "@openai/codex@{version}-linux-x64"], "locations": []},
+  "terraform": {"fingerprints": ["$FT"], "locations": []}
+}
+JSON
 
 # 使い方: at <今から何秒前か>。その時刻を ISO 8601 の UTC で出す
 at() { perl -MPOSIX -e 'print strftime("%Y-%m-%dT%H:%M:%SZ", gmtime(time - $ARGV[0]))' "$1"; }
@@ -175,7 +250,58 @@ node_put() {
 ]
 JSON
     tarball "$REPACK" "." "node binary $V"
-    printf '%s\n' "$1" >"$STUB/gh/$TAG"
+    mkdir -p "$STUB/gh/actions/node-versions"
+    printf '%s\n' "$1" >"$STUB/gh/actions/node-versions/$TAG"
+}
+
+TV=0.99.3
+TRIVY_FILE="trivy_${TV}_Linux-64bit.tar.gz"
+TRIVY_DIST="$STUB/web/github.com/aquasecurity/trivy/releases/download/v$TV"
+TRIVY_IDENTITY="https://github.com/example/trivy/.github/workflows/release.yaml@refs/tags/v$TV"
+
+# 使い方: trivy_put <公開日時> [署名の身元] [署名の発行者]
+# tarball と、cosign のスタブが読む .sigstore.json と、リリースの公開日時を置く
+trivy_put() {
+    mkdir -p "$TRIVY_DIST" "$STUB/gh/aquasecurity/trivy"
+    printf 'trivy tarball %s' "$TV" >"$TRIVY_DIST/$TRIVY_FILE"
+    {
+        echo "sha256=$(sha "$TRIVY_DIST/$TRIVY_FILE")"
+        echo "identity=${2:-$TRIVY_IDENTITY}"
+        echo "issuer=${3:-$TRIVY_ISSUER}"
+    } >"$TRIVY_DIST/$TRIVY_FILE.sigstore.json"
+    printf '%s\n' "$1" >"$STUB/gh/aquasecurity/trivy/v$TV"
+}
+
+CV=0.999.0
+REG="$STUB/web/registry.npmjs.org"
+CODEX_SAN="https://github.com/example/codex/.github/workflows/release.yml@refs/tags/rust-v$CV"
+integrity() { perl -MDigest::SHA -MMIME::Base64 -e 'open my $f, "<:raw", $ARGV[0] or die; my $s = Digest::SHA->new(512); $s->addfile($f); print "sha512-", encode_base64($s->digest, "")' "$1"; }
+
+# 使い方: codex_put <公開日時>
+# 2つの部品(CV と CV-linux-x64)の tgz と部品の文書と来歴と、部品の文書の公開日時を置く。
+# 2つ目の部品の来歴の署名した者は、1つ目と違う値にする(本文と記録に1つ目のものが出ることを確かめるため)。
+# 来歴の一覧には、npm の publish attestation(合わない bundle)を先に置き、SLSA の来歴を後に置く
+codex_put() {
+    local p integ san="$CODEX_SAN"
+    mkdir -p "$REG/@openai/codex/-" "$REG/-/npm/v1/attestations"
+    for p in "$CV" "$CV-linux-x64"; do
+        printf 'codex tgz %s' "$p" >"$REG/@openai/codex/-/codex-$p.tgz"
+        integ=$(integrity "$REG/@openai/codex/-/codex-$p.tgz")
+        [ "$p" = "$CV" ] || san="${CODEX_SAN}-linux-x64"
+        printf '{"name":"@openai/codex","version":"%s","dist":{"tarball":"https://registry.npmjs.org/@openai/codex/-/codex-%s.tgz","integrity":"%s"}}\n' \
+            "$p" "$p" "$integ" >"$REG/@openai/codex/$p"
+        cat >"$REG/-/npm/v1/attestations/@openai%2fcodex@$p" <<JSON
+{"attestations": [
+  {"predicateType": "https://github.com/npm/attestation/tree/main/specs/publish/v0.1",
+   "bundle": {"test": {"sha512": "sha512-x", "repo": "npm/cli", "workflow": "npm/cli/.github/workflows/publish.yml", "san": "npm"}}},
+  {"predicateType": "https://slsa.dev/provenance/v1",
+   "bundle": {"test": {"sha512": "$integ", "repo": "$CODEX_REPO", "workflow": "$CODEX_WORKFLOW",
+                       "san": "$san"}}}
+]}
+JSON
+    done
+    printf '{"name":"@openai/codex","time":{"%s":"%s","%s-linux-x64":"2020-01-01T00:00:00Z"}}\n' "$CV" "$1" "$CV" \
+        >"$REG/@openai%2fcodex"
 }
 
 TF=1.99.2
@@ -196,7 +322,7 @@ tf_put() {
 }
 
 reset() {
-    rm -rf "${STUB:?}"/web/* "$STUB"/gh/* "$STUB/gh.fail" "$STUB/docker.fail"
+    rm -rf "${STUB:?}"/web/* "$STUB"/gh/* "$STUB/gh.fail" "$STUB/docker.fail" "$STUB/docker-run.fail" "$STUB/cosign.fail"
     : >"$WORK/calls.log"
     publish_key "$FT" "$FT"
 }
@@ -242,13 +368,14 @@ expect_calls() {
 
 markers() { grep -c '^<!-- ci-tool-cooldown-exception data=' "$WORK/out.txt"; }
 
-# 使い方: expect_record <説明> <道具> <版> <公開日時>。記録の目印の行が1つだけあり、
-# その JSON が、道具と版と公開日時と所有者の指示の要約と署名の結果を持つ
+# 使い方: expect_record <説明> <道具> <版> <公開日時> [確かめ方] [署名した者]。記録の目印の行が1つだけあり、
+# その JSON が、道具と版と公開日時と所有者の指示の要約と署名の結果を持つ。
+# 確かめ方の既定は gpg --verify、署名した者の既定はテストの信頼する鍵の指紋
 expect_record() {
     local data
     data=$(sed -n 's/^<!-- ci-tool-cooldown-exception data=\([A-Za-z0-9+\/=]*\) -->$/\1/p' "$WORK/out.txt")
     if [ "$(markers)" -eq 1 ] && [ -n "$data" ] && perl -MJSON::PP -MMIME::Base64 -e '
-        my ($b64, $tool, $ver, $pub, $own, $signer) = @ARGV;
+        my ($b64, $tool, $ver, $pub, $own, $method, $signer) = @ARGV;
         utf8::decode($own);
         my $d = JSON::PP->new->utf8->decode(decode_base64($b64));
         my @k = sort keys %$d;
@@ -257,9 +384,9 @@ expect_record() {
         exit(("@k" eq "entries schema" && $d->{schema} == 1 && @{ $d->{entries} } == 1
             && $e->{tool} eq $tool && $e->{version} eq $ver && $e->{published_at} eq $pub
             && $e->{owner_instruction} eq $own
-            && $s->{result} eq "verified" && $s->{method} eq "gpg --verify" && $s->{signer} eq $signer
+            && $s->{result} eq "verified" && $s->{method} eq $method && $s->{signer} eq $signer
             && $s->{checked_at} =~ /\A\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ\z/) ? 0 : 1);
-    ' "$data" "$2" "$3" "$4" "$INSTRUCTION" "$FT"; then
+    ' "$data" "$2" "$3" "$4" "$INSTRUCTION" "${5:-gpg --verify}" "${6:-$FT}"; then
         pass "$1"
     else
         fail "$1" "記録の目印の行の JSON が違います / $(detail)"
@@ -514,6 +641,209 @@ fi
 
 # --- 場合(共通) -------------------------------------------------------------------------
 
+# --- 場合(Trivy) ------------------------------------------------------------------------
+
+COSIGN_RE="ghcr\.io/sigstore/cosign/cosign@sha256:[0-9a-f]\{64\}"
+
+if want trivy_ok; then
+    reset
+    PUB=$(at 3600)
+    trivy_put "$PUB"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "Trivy の署名が合えば終了コード 0 になる" 0 verified
+    expect_line "Trivy の署名が合えば本文の文が出る(道具)" "- 道具: Trivy"
+    expect_line "Trivy の署名が合えば本文の文が出る(版)" "- 版: $TV"
+    expect_line "Trivy の署名が合えば本文の文が出る(公開日時はリリースの日時)" "- 公開日時: $PUB"
+    expect_line "Trivy の署名が合えば本文の文が出る(署名した者は身元)" "- 署名した者: $TRIVY_IDENTITY"
+    expect_record "Trivy の署名が合えば記録の目印の行が出て、owner_instruction に3つ目の引数が入る" \
+        trivy "$TV" "$PUB" "cosign verify-blob" "$TRIVY_IDENTITY"
+    expect_calls "cosign に渡す身元が identity_template の {version} に版を入れたものになる" \
+        "^DOCKER run --rm -v .*:/work:ro -w /work ${COSIGN_RE} verify-blob --bundle /work/trivy\.sigstore\.json --certificate-oidc-issuer ${TRIVY_ISSUER} --certificate-identity https://github\.com/example/trivy/\.github/workflows/release\.yaml@refs/tags/v${TV} /work/trivy\.tar\.gz$" 1
+    expect_calls "Trivy の署名を確かめる前に、digest で固定した cosign のイメージを取る" "^DOCKER pull -q ${COSIGN_RE}$" 1
+    expect_calls "Trivy では gpg のコンテナのイメージを作らない" "^DOCKER build " 0
+    expect_calls "Trivy の取得の打ち切りは300秒" "^GET https://github\.com/aquasecurity/trivy/releases/download/v${TV}/.* max-time=300$" 2
+    expect_calls "Trivy の公開日時を、リリースのタグで読む" \
+        "^GH api repos/aquasecurity/trivy/releases/tags/v${TV} --jq \.published_at$" 1
+fi
+
+if want trivy_badsig; then
+    reset
+    trivy_put "$(at 3600)"
+    printf 'changed' >>"$TRIVY_DIST/$TRIVY_FILE"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "cosign の検証が失敗したら終了コード 1 になる" 1 unverified
+    expect_detail "cosign の検証が失敗したら理由と cosign の出力が出る" \
+        "の署名として確かめられませんでした。cosign の出力: Error: invalid signature when validating ASN.1 encoded signature"
+    reset
+    trivy_put "$(at 3600)" "https://github.com/attacker/trivy/.github/workflows/release.yaml@refs/tags/v$TV"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "署名の身元が信頼する身元と違えば終了コード 1 になる" 1 unverified
+    expect_detail "署名の身元が信頼する身元と違えば理由が出る" "no matching CertificateIdentity found"
+    reset
+    trivy_put "$(at 3600)" "" "https://other-issuer.example.invalid"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "署名の発行者が信頼する発行者と違えば終了コード 1 になる" 1 unverified
+    reset
+    trivy_put "$(at 3600)"
+    : >"$STUB/cosign.fail"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "cosign が信頼の起点を取れずに失敗しても verified にならず終了コード 1 になる" 1 unverified
+fi
+
+if want trivy_nosig; then
+    reset
+    trivy_put "$(at 3600)"
+    rm -f "$TRIVY_DIST/$TRIVY_FILE.sigstore.json"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "Trivy の .sigstore.json が無ければ終了コード 1 になる" 1 unverified
+    expect_detail "Trivy の .sigstore.json が無ければ理由が出る" "${TRIVY_FILE} に、署名(${TRIVY_FILE}.sigstore.json)がありません。"
+    expect_calls "Trivy の .sigstore.json が無ければ tarball を取らない" "\.tar\.gz max-time" 0
+fi
+
+if want trivy_fetch_fail; then
+    reset
+    trivy_put "$(at 3600)"
+    : >"$TRIVY_DIST/$TRIVY_FILE.sigstore.json.fail"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "Trivy の .sigstore.json を取得できなければ終了コード 2 になる" 2 unknown
+    expect_detail "Trivy の .sigstore.json を取得できなければ理由が出る" "${TRIVY_FILE}.sigstore.json を取れませんでした(HTTP 500)。"
+    expect_calls "Trivy の .sigstore.json の取得は1回だけやり直す" "\.sigstore\.json max-time" 2
+    reset
+    trivy_put "$(at 3600)"
+    : >"$TRIVY_DIST/$TRIVY_FILE.fail"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "Trivy の tarball を取得できなければ終了コード 2 になる" 2 unknown
+    reset
+    trivy_put "$(at 3600)"
+    rm -f "$STUB/gh/aquasecurity/trivy/v$TV"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "Trivy のリリースの公開日時を読めなければ終了コード 2 になる" 2 unknown
+    expect_detail "Trivy のリリースの公開日時を読めなければ理由が出る" "aquasecurity/trivy のリリース v${TV} の公開日時を読めませんでした。"
+    reset
+    trivy_put "$(at 3600)"
+    : >"$STUB/gh/aquasecurity/trivy/v$TV"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "Trivy のリリースの公開日時が空なら終了コード 2 になる" 2 unknown
+    expect_detail "Trivy のリリースの公開日時が空なら理由が出る" "aquasecurity/trivy のリリース v${TV} の公開日時を読めませんでした。"
+    reset
+    trivy_put "$(at 3600)"
+    : >"$STUB/docker.fail"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "cosign のイメージを取れなければ終了コード 2 になる" 2 unknown
+    expect_detail "cosign のイメージを取れなければ理由が出る" "cosign のコンテナのイメージを取れませんでした。"
+    expect_calls "cosign のイメージを取れなければ何も取りに行かない" "^GET " 0
+    reset
+    trivy_put "$(at 3600)"
+    : >"$STUB/docker-run.fail"
+    run trivy "$TV" "$INSTRUCTION"
+    expect "cosign のコンテナを動かせなければ終了コード 2 になる" 2 unknown
+    expect_detail "cosign のコンテナを動かせなければ理由が出る" "cosign のコンテナを動かせませんでした。"
+fi
+
+if want trivy_signers; then
+    reset
+    trivy_put "$(at 3600)"
+    perl -pe 's/\{version\}//' "$WORK/signers.json" >"$WORK/bad-signers.json"
+    PATH="$WORK/bin:$PATH" STUB_DIR="$STUB" STUB_CALLS="$WORK/calls.log" STUB_TMP="$WORK/gtmp" \
+        TRUSTED_SIGNERS_FILE="$WORK/bad-signers.json" bash "$SCRIPT" trivy "$TV" "$INSTRUCTION" >"$WORK/out.txt" 2>"$WORK/err.log"
+    RC=$?
+    expect "identity_template に {version} が無ければ終了コード 2 になる" 2 unknown
+    expect_detail "identity_template に {version} が無ければ理由が出る" "trivy の identity_template を読めませんでした"
+fi
+
+# --- 場合(Codex CLI) --------------------------------------------------------------------
+
+if want codex_ok; then
+    reset
+    PUB=$(at 3600)
+    codex_put "$PUB"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の2つの tgz の来歴が合えば終了コード 0 になる" 0 verified
+    expect_line "Codex CLI の来歴が合えば本文の文が出る(道具)" "- 道具: Codex CLI"
+    expect_line "Codex CLI の来歴が合えば本文の文が出る(版)" "- 版: $CV"
+    expect_line "Codex CLI の来歴が合えば本文の文が出る(公開日時は部品の文書の time の値)" "- 公開日時: $PUB"
+    expect_line "Codex CLI の来歴が合えば本文の文が出る(署名した者は1つ目の部品の証明書の身元)" "- 署名した者: $CODEX_SAN"
+    expect_line "Codex CLI の来歴が合えば本文の文が出る(確かめ方)" \
+        "- 確かめ方: npm の registry の @openai/codex@${CV} と @openai/codex@${CV}-linux-x64 の tgz の来歴を gh で確かめた(gh attestation verify)"
+    expect_record "Codex CLI の2つの tgz の来歴が合えば記録の目印の行が出て、owner_instruction に3つ目の引数が入る" \
+        codex "$CV" "$PUB" "gh attestation verify" "$CODEX_SAN"
+    expect_calls "Codex CLI の2つの tgz を、信頼する repo と signer_workflow で確かめる" \
+        "^GH attestation verify .*/codex-[12]\.tgz --bundle .*/codex-[12]\.bundle\.json --digest-alg sha512 --repo ${CODEX_REPO} --signer-workflow ${CODEX_WORKFLOW} " 2
+    expect_calls "Codex CLI の来歴は、名前の / を %2f にして取る" \
+        "^GET https://registry\.npmjs\.org/-/npm/v1/attestations/@openai%2fcodex@${CV}\(-linux-x64\)\? " 2
+    expect_calls "Codex CLI の取得の打ち切りは300秒" "^GET https://registry\.npmjs\.org/.* max-time=300$" 7
+    expect_calls "Codex CLI では docker を使わない" "^DOCKER " 0
+fi
+
+if want codex_badprov; then
+    for n in 1 2; do
+        reset
+        codex_put "$(at 3600)"
+        p="$CV"
+        [ "$n" -eq 2 ] && p="$CV-linux-x64"
+        perl -pi -e 's/"repo": "example\/codex"/"repo": "attacker\/codex"/' "$REG/-/npm/v1/attestations/@openai%2fcodex@$p"
+        run codex "$CV" "$INSTRUCTION"
+        expect "Codex CLI の ${n} つ目の tgz の来歴が合わなければ終了コード 1 になる" 1 unverified
+        expect_detail "Codex CLI の ${n} つ目の tgz の来歴が合わなければ理由と gh の出力が出る" \
+            "@openai/codex@${p} の来歴を、${CODEX_WORKFLOW} の署名として確かめられませんでした。gh の出力: Error: verifying with issuer"
+    done
+fi
+
+if want codex_noprov; then
+    reset
+    codex_put "$(at 3600)"
+    rm -f "$REG/-/npm/v1/attestations/@openai%2fcodex@$CV-linux-x64"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の tgz に来歴が無ければ終了コード 1 になる" 1 unverified
+    expect_detail "Codex CLI の tgz に来歴が無ければ理由が出る" "@openai/codex@${CV}-linux-x64 に、来歴がありません。"
+    reset
+    codex_put "$(at 3600)"
+    perl -0pi -e 's/,\s*\{"predicateType": "https:\/\/slsa\.dev\/provenance\/v1".*\]/\n]/s' "$REG/-/npm/v1/attestations/@openai%2fcodex@$CV"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の来歴に SLSA の来歴が無ければ終了コード 1 になる" 1 unverified
+    expect_detail "Codex CLI の来歴に SLSA の来歴が無ければ理由が出る" "@openai/codex@${CV} の来歴に、SLSA の来歴がありません。"
+fi
+
+if want codex_integrity; then
+    reset
+    codex_put "$(at 3600)"
+    printf 'changed' >>"$REG/@openai/codex/-/codex-$CV.tgz"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の tgz が部品の文書のハッシュと違えば終了コード 1 になる" 1 unverified
+    expect_detail "Codex CLI の tgz が部品の文書のハッシュと違えば理由が出る" "@openai/codex@${CV} の tgz のハッシュが、部品の文書の値と違います。"
+    reset
+    codex_put "$(at 3600)"
+    perl -pi -e 's/registry\.npmjs\.org\/\@openai/registry.example.invalid\/\@openai/' "$REG/@openai/codex/$CV"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の tgz の URL が npm の registry でなければ終了コード 2 になる" 2 unknown
+    expect_calls "Codex CLI の tgz の URL が npm の registry でなければ取りに行かない" "registry\.example\.invalid" 0
+fi
+
+if want codex_fetch_fail; then
+    reset
+    codex_put "$(at 3600)"
+    : >"$REG/@openai/codex/$CV-linux-x64.fail"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の部品の文書を取得できなければ終了コード 2 になる" 2 unknown
+    reset
+    codex_put "$(at 3600)"
+    : >"$REG/-/npm/v1/attestations/@openai%2fcodex@$CV.fail"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の来歴を取得できなければ終了コード 2 になる" 2 unknown
+    expect_detail "Codex CLI の来歴を取得できなければ理由が出る" "@openai/codex@${CV} の来歴を取れませんでした(HTTP 500)。"
+    reset
+    codex_put "$(at 3600)"
+    : >"$REG/@openai/codex/-/codex-$CV.tgz.fail"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の tgz を取得できなければ終了コード 2 になる" 2 unknown
+    reset
+    codex_put "$(at 3600)"
+    printf '{"name":"@openai/codex","time":{}}\n' >"$REG/@openai%2fcodex"
+    run codex "$CV" "$INSTRUCTION"
+    expect "Codex CLI の公開日時を読めなければ終了コード 2 になる" 2 unknown
+    expect_detail "Codex CLI の公開日時を読めなければ理由が出る" "@openai/codex の部品の文書から、${CV} の公開日時を読めませんでした。"
+fi
+
 if want docker_fail; then
     reset
     node_put "$(at 3600)"
@@ -533,7 +863,7 @@ if want args; then
     expect "3つ目の引数が空なら終了コード 2 と result=unknown になる" 2 unknown
     run python "$V" "$INSTRUCTION"
     expect "知らない道具なら終了コード 2 と result=unknown になる" 2 unknown
-    expect_detail "知らない道具なら使い方が出る" "使い方: verify-ci-tool.sh <node|terraform> <版> <所有者の指示の要約>"
+    expect_detail "知らない道具なら使い方が出る" "使い方: verify-ci-tool.sh <node|trivy|codex|terraform> <版> <所有者の指示の要約>"
     run node "24.99.1/../x" "$INSTRUCTION"
     expect "版に使えない文字があれば終了コード 2 と result=unknown になる" 2 unknown
     expect_calls "引数の誤りなら何も取りに行かない" "^GET \|^DOCKER " 0
