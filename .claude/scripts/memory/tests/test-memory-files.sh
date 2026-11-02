@@ -202,14 +202,15 @@ addcase delete_same
 # 改行が \n のときと \r\n のときの両方を確かめる: joined_check <場合の名前> <つながった行> <消したあとの行>
 # shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 joined_check() {
-    for eol in '\n' '\r\n'; do
+    for eol_name in LF CRLF; do
+        if [ "$eol_name" = LF ]; then eol=$'\n'; else eol=$'\r\n'; fi
         memfile a.md 'a'
         memfile b.md 'b'
-        printf "%s$eol" '# MEMORY' "$2" '- [C](c.md) — 残る' >"$MEMDIR/MEMORY.md"
+        printf '%s' "# MEMORY$eol$2$eol- [C](c.md) — 残る$eol" >"$MEMDIR/MEMORY.md"
         out=$(perl "$PL" delete "a.md=$(sha "$MEMDIR/a.md")")
-        check "delete は、つながった行から消すメモリファイルの項目だけを消し、残す項目の文字と改行の形を変えない($1・$eol)" \
+        check "delete は、つながった行から消すメモリファイルの項目だけを消し、残す項目の文字と改行の形を変えない($1・$eol_name)" \
             "$?|$(printf '%s' "$out" | pj 'my $r = $d->{results}[0]; join ";", $r->{result}, @{$r->{removed_index_lines}}, "kept", @{$r->{kept_index_lines}}')|$([ -e "$MEMDIR/a.md" ] && echo exists)|$(sha "$MEMDIR/MEMORY.md")" \
-            "0|deleted;- [A](a.md) — a の案内;kept||$(printf "%s$eol" '# MEMORY' "$3" '- [C](c.md) — 残る' >"$CASE/want" && sha "$CASE/want")"
+            "0|deleted;- [A](a.md) — a の案内;kept||$(printf '%s' "# MEMORY$eol$3$eol- [C](c.md) — 残る$eol" >"$CASE/want" && sha "$CASE/want")"
     done
 }
 
