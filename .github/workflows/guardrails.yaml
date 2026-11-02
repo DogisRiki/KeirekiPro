@@ -90,6 +90,11 @@ jobs:
       - name: Test verified Node.js install
         run: bash .github/scripts/tests/test-install-verified-node.sh
 
+      # Terraform を配布元の署名を確かめてから入れるスクリプト(.github/actions/verified-terraform の中身)の
+      # テスト。使い捨ての鍵で署名した偽の配布物を file:// で読ませるため、ネットワークを使わない
+      - name: Test verified Terraform install
+        run: bash .github/scripts/tests/test-install-verified-terraform.sh
+
       - name: Check owner approval
         id: approval
         env:

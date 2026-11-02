@@ -92,6 +92,8 @@ flowchart LR
 
 Node.jsを使うワークフロー(ci.yaml・guardrails.yaml・codex-review.yml・mutation-report.yaml・frontend-vuln-fix.yaml)は、Node.jsをnodejs.orgから取り、配布元の署名を確かめてから使います。確かめられなければ、Node.jsを使う前に失敗します。
 
+terraform-apply.yamlは、Terraformをreleases.hashicorp.comから取り、配布元の署名を確かめてから使います。確かめられなければ、Terraformを使う前に失敗します。
+
 各ワークフローの詳細は次のとおりです。
 
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
@@ -101,7 +103,7 @@ Node.jsを使うワークフロー(ci.yaml・guardrails.yaml・codex-review.yml�
 | 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。ただし、本番で動く部品の深刻度がhighかcriticalの脆弱性の警告が示す最初の修正版は、そのPRで追加されたすべての部品が悪意のある部品の一覧に載っておらず、最初の修正版の署名した者が前の版と変わっていなければ、PRに記録のコメントを残したうえで、所有者のApproveで72時間待たずに入れる。前の版に署名が無いときは、署名した者を比べない。DependabotのPRも同じ判定を受ける。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする。部品には、本番のjarに入る部品(runtime)か開発のときだけ使う部品(development)かを付け、アラートで本番で動く部品を見分けられるようにする |
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。本番用のイメージをarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、Node.jsの署名を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、Node.jsとTerraformの署名を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
@@ -113,7 +115,7 @@ Node.jsを使うワークフロー(ci.yaml・guardrails.yaml・codex-review.yml�
 | 依存の更新 | frontend-vuln-fix.yaml | 日次 (schedule) / 手動 | Dependabotが修正のプルリクエストを作らないfrontendの間接依存の脆弱性の警告を読み、部品と最初の修正版の組ごとに、警告が消える版に上げるプルリクエストを作る。まずlockfileだけを直し、それでも脆弱な版が残るときは`pnpm-workspace.yaml`のoverridesに版の指定を足す(所有者の承認が要る)。修正版が公開から72時間経っていないときは、本番で動く部品のhighかcriticalの警告なら`minimumReleaseAgeExclude`に足して作り、それ以外は72時間経ってからの実行で作る。修正版の無い警告と、同じ組のブランチがすでにある警告では作らない。上げられなかったときは実行が失敗で終わる |
 | ラベル | sync-labels.yaml | push (main、`.github/labels.json` などの変更) / 手動 | ラベルの一覧のファイル`.github/labels.json`のとおりに、GitHubのラベルを作り・直し・名前を変え・消す。ファイルに前の名前が書かれたラベルは、消さずに名前だけを変える。先に合わせ込みのスクリプトのテストを流し、ファイルが検証に通らなければラベルを1つも変えずに失敗で終わる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
-| リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
+| リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。Terraformは配布元の署名を確かめてから使う。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |

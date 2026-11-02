@@ -1,0 +1,17 @@
+name: Verified Terraform
+description: >-
+  Terraform を releases.hashicorp.com から取り、配布元の署名を確かめてから PATH に足す。
+  確かめられなければ、Terraform を PATH に足さずに失敗する。
+  中身は .github/scripts/install-verified-terraform.sh にある。
+inputs:
+  terraform-version:
+    description: '入れる Terraform の版(例: 1.9.0)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Terraform の署名を確かめてから PATH に足す
+      shell: bash
+      env:
+        TERRAFORM_VERSION: ${{ inputs.terraform-version }}
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/install-verified-terraform.sh" "$TERRAFORM_VERSION"
