@@ -9,7 +9,7 @@
   - _要件: 1.1, 1.3, 1.4, 1.5, 1.6, 2.1_
   - _対象の部品: cooldown-match-alerts.sh_
 
-- [ ] 1.2 部品を悪意のある部品の一覧に照らすスクリプトを作る (並行可)
+- [x] 1.2 部品を悪意のある部品の一覧に照らすスクリプトを作る (並行可)
 
   Claude は、部品「cooldown-check-malware.sh」と、そのテスト `test-cooldown-check-malware.sh` を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に作る。このスクリプトは、部品の一覧を OSV の querybatch に1000件ずつ送り、部品ごとに、悪意のある部品として公表されているかと、公表の記載を返す。
   - 完了の確かめ方: Linux のコンテナで流した `test-cooldown-check-malware.sh` の場合が、すべて通る。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
@@ -203,6 +203,7 @@
 - `.github/scripts/` のテストは `jq` を使うので、Claude は、Git Bash ではなく、`jq` `curl` `openssl` `gnupg` `perl` を入れた Linux のコンテナ(`ubuntu:24.04`)で流す。`perl` を入れるのは、`ubuntu:24.04` の `perl-base` に `JSON::PP` が無く、所有者が置いたファイルでテストを流すタスク 8.1 で流す `test-verify-ci-tool.sh` が `JSON::PP` を使うためである。Claude は、リポジトリの写しを scratchpad の一時フォルダに作り、`place-1/` のファイルを重ねてから、その写しをコンテナに読むだけの形で渡す。Claude は、作業フォルダに無いファイルを `docker run -v` で作業フォルダに重ねない。Docker が作業フォルダに0バイトのファイルを作るためである
 - テストのスタブが返す OSV と npm の来歴と Dependabot の警告の JSON と、maven の部品の `.pom.asc` と公開鍵は、Claude が実際のサービスから1回取った答えの形をもとにする。テストはネットワークを使わない
 - `place-1/.github/` には、Claude は書けない。`settings.json` の `deny` の `.github/**` が、置き場所の中の `place-1/.github/` にも当たるためである。そのため、Claude は、`.github/` の下に置くファイルを、`place-1/dot-github/` に、`.github/` と同じ並びで作る。タスクの本文の `place-1/.github/` は、`place-1/dot-github/` と読む。所有者に置いてもらうときのコマンドは、`place-1/dot-github/` の中身を `.github/` に写す形にする
+- `cooldown-check-malware.sh` は、`MAL-` の ID の項目も `vulns/{id}` で読む。止めた理由の報告に、公表の記載の要約と URL を出すためである。design の失敗したときの扱いは「`vulns/{id}` が失敗したら、その ID を持つ部品を unknown にする」だが、`MAL-` の項目だけは、読めなくても malicious のままにする。`MAL-` の ID は querybatch の答えだけで悪意のある部品と分かり、malicious でも unknown でも72時間待たずには入らないので、要件3の1と3の2は変わらない。このとき、要約は空にし、URL は osv.dev の項目のページにする
 - 所有者への依頼は、親のセッションが行う。実装役のサブエージェントは、所有者に依頼する手前で止まり、用意したもの(置き場所のパス)を親のセッションに返す。確認役は、置く前の成果を置き場所のパスで確かめる
 - この spec が frontend で変えるのは `pnpm-workspace.yaml` のコメントだけなので、共通の完了条件の2(verify のスキル)のうち当てはまるのは、監査手順と steering と除外の欄のコメントを書き直すタスク 7.2 の `/verify-frontend` だけである。代わりに、Claude は、シェルのスクリプトを作るか変えるタスクごとに、そのタスクのスクリプトとテストに shellcheck を流す。判定に使う確認のスクリプトを作る大きなまとまり1のタスクは並行に進むので、まとまりの最後のタスクで流すと、まだ終わっていないタスクのスクリプトを見落とすためである
 - Claude は、`audit-weekly.yaml` の自己テストの一覧に、design のとおり `test-check-audit-cooldown-exceptions` だけを足す。止まっている Dependabot の PR の見分けを変えるタスク 4.2 のあとの `check-audit-dependabot-stuck.sh` は、`record-cooldown-exception.sh` を呼ぶ。`test-check-audit-dependabot-stuck.sh` は、`gh` だけをスタブにして、`record-cooldown-exception.sh` の本物を呼ぶ。そのため、週次監査の自己テストでも記録のコメントの読み取りが流れる。`test-record-cooldown-exception.sh` そのものは、`dependency-cooldown` のジョブで流れる
