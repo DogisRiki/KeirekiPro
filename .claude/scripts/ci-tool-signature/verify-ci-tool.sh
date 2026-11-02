@@ -37,6 +37,12 @@
 #   cosign は、署名の証明書と透明性ログの記録を確かめるために、Sigstore の信頼の起点のデータを
 #   取りに行くため。cosign のコンテナには、作業フォルダを読むだけの形で渡す。
 #
+# なぜ cosign に渡す前に作業フォルダをほかの利用者も読める権限にするのか:
+#   cosign のイメージは、番号 65532 の利用者として動く。mktemp -d は、作った利用者しか開けない
+#   フォルダを作る。Linux の Docker は、フォルダの持ち主と権限をそのままコンテナに見せるので、
+#   権限を変えないと、cosign は作業フォルダの中のファイルを読めない。置くのは公開された配布物と
+#   署名だけで、書き込みの権限は与えない。
+#
 # 取得したファイルは、毎回新しく作る空の作業フォルダに置き、スクリプトの置き場とは分ける。
 # 取得したファイルの中のスクリプトは動かさない。tarball は、ハッシュを計るだけにする。
 #
@@ -319,6 +325,9 @@ check_trivy() {
     [ "$code" = 404 ] && unverified "${file} に、署名(${file}.sigstore.json)がありません。"
     [ "$code" = 200 ] || unknown "${file}.sigstore.json を取れませんでした(HTTP ${code})。"
     must_fetch "${base}/${file}" "$TMP/trivy.tar.gz" "${file} "
+    if ! chmod a+rx "$TMP" || ! chmod a+r "$TMP/trivy.sigstore.json" "$TMP/trivy.tar.gz"; then
+        unknown "cosign のコンテナが読めるように、作業フォルダの権限を変えられませんでした。"
+    fi
 
     rc=0
     MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm -v "$TMP:/work:ro" -w /work "$COSIGN_IMAGE" \
