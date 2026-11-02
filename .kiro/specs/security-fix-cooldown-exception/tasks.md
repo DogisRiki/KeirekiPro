@@ -154,7 +154,7 @@
   - 受入基準とテストの対応: 要件6の受入基準1と受入基準2(所有者が指示したときだけ版を変える)、要件6の受入基準4のうち返事に理由を書くこと、要件6の受入基準5(署名を確かめた結果を PR の本文に書く)、要件5の受入基準3のうち PR に記録を残すことは、手順の文書なので、完了の確かめ方の照合で確かめる
   - _要件: 5.3, 6.1, 6.2, 6.4, 6.5_
 
-- [ ] 6. /ship が dependency-cooldown の赤を見分けるようにする (並行可)
+- [x] 6. /ship が dependency-cooldown の赤を見分けるようにする (並行可)
 
   Claude は、部品「ship のスキル」の `.claude/skills/ship/SKILL.md` のうち、`approval_gated: true` の検査の赤を所有者の承認待ちに数える手順7の4の5を変える。`/ship` は、`dependency-cooldown` の赤を、`gh api --paginate .../comments --jq` で記録のコメントがあるときだけ承認待ちに数え、無いときは `::error::` の行から止めた部品と版と時刻を読んで報告し、見届けを終える。Claude は、報告の「見届けを終えた理由」の選択肢に「72時間の待ち」を足し、所有者の依頼で再実行する手順と、記録のコメントを読めなかったときの扱いを足す。
   - 完了の確かめ方: 手順7の4の5の承認待ちのゲートの検査の一覧に `dependency-cooldown` がある。記録のコメントを見分けるコマンドの `--jq` の式を、Claude が、テストの PR のコメントの一覧の形の JSON に `gh` の外の jq で当てて、github-actions[bot] の記録のコメントだけを1行出すことを確かめてある
@@ -219,6 +219,7 @@
 - `trusted-signers.json` の Node.js の `fingerprints` は、Claude が 2026-11-02 に https://github.com/nodejs/release-keys/blob/main/README.md の「Active releasers keys」の節(コミット `481637f8`)から写した8つの主鍵の指紋である。`Dockerfile` の Debian のイメージ `debian:trixie-slim` の digest は、同じ日に読んだもので、イメージの作られた日時は 2026-10-27 である
 - この PC の Git Bash の `curl` は Windows 向けに作られたもので、`MSYS2_ARG_CONV_EXCL` により `/tmp/...` の形のパスを読めない。そのため、`verify-ci-tool.sh` は、作業フォルダを `pwd -W` で `C:/...` の形にしてから、`curl` と `docker` に渡す。GNU tar は `C:` のようにコロンを含むパスを別の機械の名前と読むので、`verify-ci-tool.sh` は tarball を tar に標準入力で渡す。2026-11-02 に、スタブ無しで Node.js 24.22.1 と Terraform 1.9.0 を確かめ、どちらも署名を確かめられたという結果で終わった
 - `verify-ci-tool.sh` の `COSIGN_IMAGE` の digest は、Claude が 2026-11-02 に読んだ `ghcr.io/sigstore/cosign/cosign` の v3.1.4 の index の digest である。cosign のコンテナは、Sigstore の信頼の根を取るためにネットワークを使う。同じ日に、スタブ無しで、今 CI が使っている4つの版(Node.js 24.22.1、Terraform 1.9.0、Trivy 0.74.0、Codex CLI 0.147.0)を確かめ、どれも署名を確かめられたという結果で終わった。Trivy の署名した者は `https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.74.0`、Codex CLI の署名した者は `https://github.com/openai/codex/.github/workflows/rust-release.yml@refs/tags/rust-v0.147.0` だった。テストの docker の代わりは、cosign のイメージのときだけ、`/work/` で始まる引数だけを書き換える。身元の URL の中の `/workflows` を書き換えないためである
+- `gh run view --log-failed` のログでは、スクリプトが出した `::error::` の行は、行の頭が `##[error]` に替わって出る(2026-11-02 に、この repo の失敗した実行のログで確かめた)。そのため、`/ship` の手順は、止めた部品の行を、`::error::` ではなく本文の `72時間の待ちで止めた部品:` で探す。記録のコメントを見分ける `--jq` の式は、同じ日に、本物のコメントの一覧と同じ形(`user.login` と文字列の `body`)の5つのコメントの JSON に `ghcr.io/jqlang/jq:1.8.1` で当て、`github-actions[bot]` が書いた `kind=exception` のコメントの ID の1行だけを出すことを確かめた。空の一覧には何も出さず、終了コード 0 で終わった
 
 ## 完了条件(全タスク共通)
 
