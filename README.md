@@ -94,6 +94,8 @@ Node.jsを使うワークフロー(ci.yaml・guardrails.yaml・codex-review.yml�
 
 terraform-apply.yamlは、Terraformをreleases.hashicorp.comから取り、配布元の署名を確かめてから使います。確かめられなければ、Terraformを使う前に失敗します。
 
+codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリリースのワークフローが作ったことを示す来歴を確かめてから使います。確かめられなければ、Codex CLIを使う前に失敗します。
+
 各ワークフローの詳細は次のとおりです。
 
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
@@ -103,11 +105,11 @@ terraform-apply.yamlは、Terraformをreleases.hashicorp.comから取り、配�
 | 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。ただし、本番で動く部品の深刻度がhighかcriticalの脆弱性の警告が示す最初の修正版は、そのPRで追加されたすべての部品が悪意のある部品の一覧に載っておらず、最初の修正版の署名した者が前の版と変わっていなければ、PRに記録のコメントを残したうえで、所有者のApproveで72時間待たずに入れる。前の版に署名が無いときは、署名した者を比べない。DependabotのPRも同じ判定を受ける。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする。部品には、本番のjarに入る部品(runtime)か開発のときだけ使う部品(development)かを付け、アラートで本番で動く部品を見分けられるようにする |
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。本番用のイメージをarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、Node.jsとTerraformの署名を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、Node.jsとTerraformの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
-| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック。Issue本文の『決めた方式』の見出しがあるときは、その方式から外れたPRも、理由の有無に関わらずブロック |
+| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。Codex CLIは配布元の来歴を確かめてから使う。コード品質と仕様への適合を審査し、問題があればマージをブロック。Issue本文の『決めた方式』の見出しがあるときは、その方式から外れたPRも、理由の有無に関わらずブロック |
 | マージ | auto-merge.yaml | pull_request (opened / reopened / ready_for_review / synchronize / auto_merge_disabled) / 30分ごと (schedule) / 手動 | main向けのプルリクエストにauto-mergeを予約する。作成者がAIか所有者かに依らず予約し、下書きの間は予約しない。予約が外れたときは、所有者が手で外した場合も含めて理由を問わず付け直し、30分ごとの見直しで予約の無いプルリクエストにも予約する。マージを保留するときはpre-merge-checkラベルを付けるか下書きにする。DependabotのPR・カナリアPR・forkのPRは対象外で、DependabotのPRはdependabot-auto-merge.yamlが予約する。予約に失敗したときと、同じコミットで3回を超えて外れて付け直しを止めたときは、プルリクエストへのコメントで所有者に知らせる |
 | マージ | close-linked-issues.yaml | pull_request (closed) / 毎時 (schedule) / 手動 | mainへマージされたプルリクエストの本文に`Closes #番号`で書かれたIssueが開いたままなら閉じ、どのプルリクエストのマージで閉じたかをIssueにコメントで記録する。マージされずに閉じたプルリクエストでは動かない。閉じられなかったときと、`Refs: #番号`にだけ書かれたIssueが開いたままのときは、Issueへのコメントで所有者に知らせる。閉じたIssueが、あるIssueから分けた部分のIssue(サブIssue)で、分けた部分がすべて閉じたときは、元のIssueも閉じて記録をコメントする。元のIssueが別のリポジトリにあるときは扱わない。分けた部分がすべて閉じたかを確かめられなかったときと、元のIssueを閉じられなかったときは、元のIssueへのコメントで所有者に知らせる。毎時の見直しで、マージから7日以内のプルリクエストの閉じ漏れを拾う |
 | 依存の更新 | dependabot-auto-merge.yaml | pull_request / 日次 (schedule) / 手動 | Dependabotが作成したプルリクエストにauto-mergeを予約する。tflintの更新は、GitHubのリリースの公開から72時間経つまで予約を保留し、毎日の見直しで予約する。公開日時を取れない更新と、版が同じで中身だけが変わった更新は予約せず、プルリクエストへのコメントで所有者に知らせる |
