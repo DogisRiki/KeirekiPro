@@ -180,7 +180,7 @@
   - _要件: 1.8, 5.6_
   - _対象の部品: 監査手順.md, tech.md, pnpm-workspace.yaml_
 
-- [ ] 8. 所有者が置いたファイルで全体を確かめる
+- [x] 8. 所有者が置いたファイルで全体を確かめる
 - [x] 8.1 所有者にファイルを置いてもらい、置いた場所でテストを流す
 
   親のセッションは、置き場所の `place-1/` のファイルを本来の場所に写すコマンドを所有者に示し、そのコマンドでファイルを置くよう所有者に頼む。依頼には、Claude が `.github/` に書き込めないこと(`settings.json` の `deny`)を添える。所有者が置いたら、親のセッションは、本来の場所で、この spec で作るか変えたシェルのテストのすべてと、shellcheck と、actionlint を流す。親のセッションは、`test-verify-ci-tool.sh` を、Git Bash に加えて Linux のコンテナでも1回流す。
@@ -188,7 +188,7 @@
   - 受入基準とテストの対応: 各タスクの受入基準とテストの対応のとおり
   - _要件: 1.1, 1.2, 3.1, 4.1, 5.1, 5.6, 6.3, 7.1_
 
-- [ ] 8.2 実装の PR の検査の結果で、dependency-cooldown と、依存グラフの scope と、guardrails の3つを確かめる
+- [x] 8.2 実装の PR の検査の結果で、dependency-cooldown と、依存グラフの scope と、guardrails の3つを確かめる
 
   Claude は、`/ship` が実装の PR を作ったあとに、PR の検査の結果で、design のテストの方針の節の「Claude が実際の環境で確認すること」の3つを確かめる。このタスクは PR が要るので、Claude は、所有者が置いたファイルでテストを流すタスク 8.1 までを終えたら `/ship` に進み、`/ship` の見届けの中でこのタスクを終える。この PR は `.github/` を変えるので、所有者が承認するまでマージされない。そのため、Claude は、マージの前にこの確認を終えられる。
   - 完了の確かめ方: 実装の PR の `dependency-cooldown` が緑で、報告に「脆弱性の警告を読めた」の行がある。実装の PR の依存グラフの比較で、`org.springframework:spring-core` が `runtime`、`com.diffplug.spotless:spotless-lib` が `development` になっている。実装の PR の `guardrails` が緑である。結果を実装のメモに記録してある。どれかが違えば、Claude は、設計を見直すきっかけに当たるかを所有者に報告して止まる。依存グラフの比較に2つの部品が出ないときは、Claude は、scope を確かめられなかったと実装のメモと PR の本文に書き、合格とは書かない。そのときは、design.md の移行の節に書いた、マージのあとの警告の scope の確認が、scope を確かめる唯一の確認になる
@@ -224,6 +224,7 @@
 - Claude は、README の `rerun-approval-gated-checks.yaml` の行を変えなかった。この行は「承認前に失敗したままのゲートチェックを再実行し」と書き、再実行する検査の名前を並べていないので、`dependency-cooldown` を足しても今の記述のまま当たるためである。`dependency-graph.yaml` の行には、依存グラフに scope を付けることを足した
 - Claude は、監査手順.md の「`dependency-cooldown` が赤いとき」で、「公開から 72 時間を経過していないパッケージ」の見出しを、判定不能の手順に含めた。check-dependency-cooldown.sh の report_cooldown は、公開時刻を読めなかったときにしか呼ばれず、この見出しは「公開時刻を取得できませんでした(判定不能)」の見出しと一緒にしか出ないためである
 - タスク 8.1 の結果(2026-11-02): 所有者が置いた `.github/` の22個のファイルは、置き場所のものと同じだった。`ubuntu:24.04` に `jq` `curl` `openssl` `gnupg` `perl` を入れたコンテナ(bash 5.2.21)で、作業フォルダを読むだけの形で渡し、`.github/scripts/tests/` のこの spec で作るか変えた8本と `test-lib-notice-comment.sh` と `test-verify-ci-tool.sh` を流し、10本すべてが終了コード 0 で、PASS は718件、FAIL は0件だった。`test-verify-ci-tool.sh` は Git Bash でも終了コード 0 で、PASS は144件、FAIL は0件だった。`koalaman/shellcheck:v0.11.0` を、`git ls-files -z --cached --others --exclude-standard '*.sh'` が返す108個のファイルに流し、指摘は0件だった。このイメージには `sh` が無いので、ファイルの一覧は手元の `xargs -0` から `docker run` の引数で渡した。`rhysd/actionlint:1.7.12` を作業フォルダの最上位で流し、指摘は0件だった
+- タスク 8.2 の結果(2026-11-02、PR #694 の head ecea4ded): `dependency-cooldown` は緑だった。「脆弱性の警告を読めた」の行は実行の Summary に書かれるが、Summary の画面はサインインしないと読めないので、Claude は行そのものを読んでいない。代わりに、警告の API を読めなかったときにだけ出る「脆弱性の警告を読めませんでした」の注意が、ジョブのログにも注記の一覧にも無いことを確かめた。`check-dependency-cooldown.sh` は2つの行のどちらか一方を必ず書くので、「読めた」の行が書かれている。依存グラフの比較(base 50b98dad と head ecea4ded)では、`org.springframework:spring-core` 7.0.10 が runtime、`com.diffplug.spotless:spotless-lib` 4.10.4 が development で added になり、どちらも前の runtime の行が removed になった。Guardrails の `escape-hatch` のジョブでは、actionlint と shellcheck の段が通った。赤だったのは、所有者の承認を待つ最後の段だけだった。所有者が承認したあとの再実行で `escape-hatch` は緑になり、Guardrails のほかの必須の検査も緑だった。PR #694 は 2026-11-02 にマージされた
 
 ## 完了条件(全タスク共通)
 
