@@ -1,0 +1,17 @@
+name: Verified Codex CLI
+description: >-
+  Codex CLI を npm の registry から取り、配布元の来歴を確かめてから PATH に足す。
+  確かめられなければ、Codex CLI を PATH に足さずに失敗する。
+  中身は .github/scripts/install-verified-codex.sh にある。
+inputs:
+  codex-version:
+    description: '入れる Codex CLI の版(例: 0.147.0)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Codex CLI の来歴を確かめてから PATH に足す
+      shell: bash
+      env:
+        CODEX_VERSION: ${{ inputs.codex-version }}
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/install-verified-codex.sh" "$CODEX_VERSION"
