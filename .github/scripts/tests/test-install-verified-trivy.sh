@@ -37,6 +37,7 @@ if [ -n "${FAKE_DOCKER_RC:-}" ]; then
     echo "fake docker: cannot run" >&2
     exit "$FAKE_DOCKER_RC"
 fi
+[ "$1" = pull ] && exit 0
 src="" bundle="" issuer="" identity="" blob="" verify=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -53,6 +54,9 @@ done
 b="$src${bundle#/work}"
 f="$src${blob#/work}"
 [ -f "$b" ] && [ -f "$f" ] || { echo "fake cosign: file not found" >&2; exit 1; }
+# 本物の cosign は root でない利用者で動くので、ほかの利用者に読めないと開けない
+[ -n "$(find "$src" -maxdepth 0 -perm -005)" ] && [ -n "$(find "$b" "$f" -perm -004 | sed -n 2p)" ] ||
+    { echo "fake cosign: permission denied" >&2; exit 1; }
 want_sha=$(sed -n 's/^sha=//p' "$b")
 want_identity=$(sed -n 's/^identity=//p' "$b")
 want_issuer=$(sed -n 's/^issuer=//p' "$b")

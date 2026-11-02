@@ -76,6 +76,15 @@ IDENTITY="${TEMPLATE//\{version\}/$VERSION}"
 get "${BASE}/${TARBALL}.sigstore.json" "$WORK/${TARBALL}.sigstore.json"
 get "${BASE}/${TARBALL}" "$WORK/${TARBALL}"
 
+# cosign のイメージは root でない利用者で動き、mktemp -d のフォルダ(0700)の中を読めない。
+# 置いたのは公開の配布物だけなので、ほかの利用者にも読めるようにする
+chmod 755 "$WORK"
+chmod 644 "$WORK/${TARBALL}.sigstore.json" "$WORK/${TARBALL}"
+
+# イメージを先に取る。取る途中の表示が、cosign の誤りの文を押し出さないようにするため
+docker pull -q "$COSIGN_IMAGE" >/dev/null 2>"$WORK/pull.err" ||
+    fail "cosign のコンテナを動かせませんでした: $(head -c 500 "$WORK/pull.err")"
+
 rc=0
 docker run --rm -v "$WORK:/work:ro" "$COSIGN_IMAGE" verify-blob \
     --bundle "/work/${TARBALL}.sigstore.json" \
