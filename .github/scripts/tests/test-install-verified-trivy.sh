@@ -64,6 +64,13 @@ echo "Verified OK" >&2
 EOF
 chmod +x "$WORK/bin/docker"
 
+# 偽の uname。ランナーの CPU を FAKE_UNAME_M で差し替える(既定は x64)
+cat >"$WORK/bin/uname" <<'EOF'
+#!/usr/bin/env bash
+echo "${FAKE_UNAME_M:-x86_64}"
+EOF
+chmod +x "$WORK/bin/uname"
+
 # 使い方: build <名前>。偽の配布物を $WORK/<名前> に作り、一覧どおりの身元で署名する
 build() {
     local d="$WORK/$1"
@@ -189,6 +196,26 @@ expect_fail badver "版の形が違えば失敗する" "版の形が違います
 build vprefix
 run vprefix "v${VERSION}"
 expect_fail vprefix "v を付けた版は失敗する" "版の形が違います"
+
+# 12. arm64 のランナーでは、arm64 の tarball を確かめて入れる
+TARBALL="trivy_${VERSION}_Linux-ARM64.tar.gz"
+build armgood
+TARBALL="trivy_${VERSION}_Linux-64bit.tar.gz"
+FAKE_UNAME_M=aarch64 run armgood
+if [ "$RC" -eq 0 ] && [ "$(cat "$WORK/armgood/github_path")" = "$WORK/armgood/install/v${VERSION}" ] &&
+    [ "$("$WORK/armgood/install/v${VERSION}/trivy")" = fake-trivy ]; then
+    ok "arm64 のランナーでは、arm64 の tarball を確かめて入れる"
+else
+    ng "arm64 のランナーでは、arm64 の tarball を確かめて入れる (exit=${RC} / 標準エラー: $(cat "$WORK/armgood/err"))"
+fi
+build armonlyx64
+FAKE_UNAME_M=aarch64 run armonlyx64
+expect_fail armonlyx64 "arm64 のランナーで、x64 の tarball しか無ければ失敗する" "取れませんでした"
+
+# 13. x64 でも arm64 でもないランナー
+build otherarch
+FAKE_UNAME_M=s390x run otherarch
+expect_fail otherarch "x64 でも arm64 でもないランナーでは失敗する" "x64 と arm64 のランナーにだけ対応しています"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "install-verified-trivy.sh のテストに失敗しました"

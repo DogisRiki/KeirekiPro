@@ -14,7 +14,9 @@
 #      (.claude/scripts/ci-tool-signature/trusted-signers.json の trivy)から読む。
 #      身元は identity_template の {version} に版を入れたもの。指定した版のタグで、
 #      aquasecurity/trivy のリリースのワークフローが署名した物だけが通る
-#   2. trivy_<版>_Linux-64bit.tar.gz と、同じ名前に .sigstore.json を足した署名を取る
+#   2. ランナーの CPU に合う trivy_<版>_Linux-64bit.tar.gz か trivy_<版>_Linux-ARM64.tar.gz と、
+#      同じ名前に .sigstore.json を足した署名を取る。container-scan はイメージを arm64 の
+#      ランナーで検査し、ほかのジョブは x64 のランナーで動くため、両方に対応する
 #   3. cosign verify-blob で、2 の tarball の署名を確かめる。cosign は、verify-ci-tool.sh と
 #      同じ digest で固定したコンテナのイメージで動かす
 #   4. 確かめた tarball だけを展開し、その置き場を GITHUB_PATH に足す
@@ -38,13 +40,18 @@ fail() {
 [ "$#" -eq 1 ] || fail "使い方: install-verified-trivy.sh <版>"
 VERSION="$1"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "版の形が違います: ${VERSION}"
-[ "$(uname -m)" = x86_64 ] || fail "x64 のランナーにだけ対応しています: $(uname -m)"
+MACHINE="$(uname -m)"
+case "$MACHINE" in
+x86_64) ARCH=64bit ;;
+aarch64 | arm64) ARCH=ARM64 ;;
+*) fail "x64 と arm64 のランナーにだけ対応しています: ${MACHINE}" ;;
+esac
 [ -n "${GITHUB_PATH:-}" ] || fail "GITHUB_PATH がありません。"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SIGNERS="${TRUSTED_SIGNERS_FILE:-$ROOT/.claude/scripts/ci-tool-signature/trusted-signers.json}"
 BASE="${TRIVY_RELEASE_BASE:-https://github.com/aquasecurity/trivy/releases/download}/v${VERSION}"
-TARBALL="trivy_${VERSION}_Linux-64bit.tar.gz"
+TARBALL="trivy_${VERSION}_Linux-${ARCH}.tar.gz"
 DEST="${TRIVY_INSTALL_DIR:-${RUNNER_TEMP:-/tmp}/verified-trivy}/v${VERSION}"
 
 WORK=$(mktemp -d)
