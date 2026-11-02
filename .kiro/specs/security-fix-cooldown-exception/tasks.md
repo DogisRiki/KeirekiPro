@@ -164,7 +164,7 @@
   - _依存: 1.6_
 
 - [ ] 7. 文書を新しい判定に合わせる
-- [ ] 7.1 ワークフローの一覧と設計の文書を書き直す (並行可)
+- [x] 7.1 ワークフローの一覧と設計の文書を書き直す (並行可)
 
   Claude は、`README.md` のワークフローの一覧の表の `dependency-review.yaml` と `audit-weekly.yaml` の行と、Mermaid の図の週次監査の節を更新する。Claude は、この spec で変えるほかの2つのワークフロー `dependency-graph.yaml` と `rerun-approval-gated-checks.yaml` の README の行と図も読み、変える要る記述があれば更新する。Claude は、`doc/インフラ設計/Github Actions設計/ワークフロー設計.md` の「自動チェックの一覧」の表の `dependency-cooldown` の行と、frontend の `minimumReleaseAge` の行と、注3を、新しい判定に合わせて書き直す。
   - 完了の確かめ方: README の Mermaid の図が、GitHub の表示と同じ Mermaid の版で描ける。ワークフロー設計.md の注3に、Dependabot の PR を `dependency-cooldown` の対象から外すという記述が残っていない。`dependency-graph.yaml` と `rerun-approval-gated-checks.yaml` の README の行を変えなかったときは、変えなかった理由を実装のメモに書いてある
@@ -220,6 +220,8 @@
 - この PC の Git Bash の `curl` は Windows 向けに作られたもので、`MSYS2_ARG_CONV_EXCL` により `/tmp/...` の形のパスを読めない。そのため、`verify-ci-tool.sh` は、作業フォルダを `pwd -W` で `C:/...` の形にしてから、`curl` と `docker` に渡す。GNU tar は `C:` のようにコロンを含むパスを別の機械の名前と読むので、`verify-ci-tool.sh` は tarball を tar に標準入力で渡す。2026-11-02 に、スタブ無しで Node.js 24.22.1 と Terraform 1.9.0 を確かめ、どちらも署名を確かめられたという結果で終わった
 - `verify-ci-tool.sh` の `COSIGN_IMAGE` の digest は、Claude が 2026-11-02 に読んだ `ghcr.io/sigstore/cosign/cosign` の v3.1.4 の index の digest である。cosign のコンテナは、Sigstore の信頼の根を取るためにネットワークを使う。同じ日に、スタブ無しで、今 CI が使っている4つの版(Node.js 24.22.1、Terraform 1.9.0、Trivy 0.74.0、Codex CLI 0.147.0)を確かめ、どれも署名を確かめられたという結果で終わった。Trivy の署名した者は `https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.74.0`、Codex CLI の署名した者は `https://github.com/openai/codex/.github/workflows/rust-release.yml@refs/tags/rust-v0.147.0` だった。テストの docker の代わりは、cosign のイメージのときだけ、`/work/` で始まる引数だけを書き換える。身元の URL の中の `/workflows` を書き換えないためである
 - `gh run view --log-failed` のログでは、スクリプトが出した `::error::` の行は、行の頭が `##[error]` に替わって出る(2026-11-02 に、この repo の失敗した実行のログで確かめた)。そのため、`/ship` の手順は、止めた部品の行を、`::error::` ではなく本文の `72時間の待ちで止めた部品:` で探す。記録のコメントを見分ける `--jq` の式は、同じ日に、本物のコメントの一覧と同じ形(`user.login` と文字列の `body`)の5つのコメントの JSON に `ghcr.io/jqlang/jq:1.8.1` で当て、`github-actions[bot]` が書いた `kind=exception` のコメントの ID の1行だけを出すことを確かめた。空の一覧には何も出さず、終了コード 0 で終わった
+- GitHub が README の Mermaid の図を描く版は 12.2.0 である。Claude は、2026-11-02 に、GitHub の図の描画のページ(`viewscreen.githubusercontent.com/markdown/mermaid`)が読み込む部品のうち、info の図の部品に書かれた版を読んだ。同じ日に、Claude は、書き直した README の図を、`cdn.jsdelivr.net/npm/mermaid@12.2.0` の Mermaid で parse と render にかけ、12個の枠がすべて描けることを確かめた
+- Claude は、README の `rerun-approval-gated-checks.yaml` の行を変えなかった。この行は「承認前に失敗したままのゲートチェックを再実行し」と書き、再実行する検査の名前を並べていないので、`dependency-cooldown` を足しても今の記述のまま当たるためである。`dependency-graph.yaml` の行には、依存グラフに scope を付けることを足した
 
 ## 完了条件(全タスク共通)
 

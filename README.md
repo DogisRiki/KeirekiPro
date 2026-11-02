@@ -61,7 +61,7 @@ flowchart LR
         Z[検査回避の検知・差分サイズ・<br>シークレットスキャン・<br>ワークフローの静的検証・<br>Gradle本体の検証・<br>読み込まれる文書の量]
     end
     subgraph s3[系統3: 人間の関門]
-        H[ビルド設定・ライブラリの入手先・<br>pre-merge-checkラベル・保護パスの変更は<br>所有者がApproveするまで赤]
+        H[ビルド設定・ライブラリの入手先・<br>72時間待たずに入れる脆弱性の修正版・<br>pre-merge-checkラベル・保護パスの変更は<br>所有者がApproveするまで赤]
     end
     subgraph s4[系統4: AIレビュー]
         A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回<br>Dependabotのプルリクエストは対象外<br>Issueの決めた方式からの外れも止める]
@@ -79,7 +79,7 @@ flowchart LR
     M -->|ラベルの一覧のファイルが変わったとき| Labels[sync-labels<br>GitHubのラベルを<br>ラベルの一覧のファイルのとおりに合わせる]
 
     subgraph s5[定期の監査]
-        AW[audit-weekly<br>週次で定期スキャンと棚卸しの鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜けを判定し<br>結果をIssueで通知]
+        AW[audit-weekly<br>週次で定期スキャンと棚卸しの鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜けを判定し<br>72時間待たずに入れた版の一覧とともに<br>結果をIssueで通知]
         CV[canary-verify<br>月次でカナリアPRが<br>期待どおり赤になったかを照合し<br>結果をIssueで通知]
         AI[audit-inventory<br>月次で版とサポート期限を集め<br>判定せずに台帳のIssueへ報告]
     end
@@ -96,8 +96,8 @@ flowchart LR
 |---|---|---|---|
 | 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存。テスト結果とカバレッジの成果物は、mainへのpushでは90日、プルリクエストでは7日保持する |
 | 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査。本番のAWSには接続しない(本番との差分は terraform-apply.yaml が適用の直前に出す)。terraform関連の変更が無いPRでは各ジョブをスキップする |
-| 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
-| 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする |
+| 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。ただし、本番で動く部品の深刻度がhighかcriticalの脆弱性の警告が示す最初の修正版は、そのPRで追加されたすべての部品が悪意のある部品の一覧に載っておらず、最初の修正版の署名した者が前の版と変わっていなければ、PRに記録のコメントを残したうえで、所有者のApproveで72時間待たずに入れる。前の版に署名が無いときは、署名した者を比べない。DependabotのPRも同じ判定を受ける。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
+| 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする。部品には、本番のjarに入る部品(runtime)か開発のときだけ使う部品(development)かを付け、アラートで本番で動く部品を見分けられるようにする |
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。本番用のイメージをarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
 | ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
@@ -117,7 +117,7 @@ flowchart LR
 | 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート。frontendは前回の結果を使い回して変わった箇所だけを測り直し、毎月最初の定期実行で全件を測り直す。レポートは90日間保持する。実行のたびにスコアと測定方式(全件か差分か)をIssue「メトリクス台帳: mutationスコア」に1行追記する。全件を測り直した回は、前回の全件の回との差と、mainで最後にテストを実行したCIのカバレッジ(実測と基準値)を同じIssueにコメントして所有者に知らせる。良し悪しの判定はしない |
 | 定期 | container-scan-scheduled.yaml | 週次 (schedule) / 手動 | 稼働中の本番イメージをECSのサービス定義から特定してTrivyで再検査し、検出した脆弱性をIssueに反映する。イメージから検出されなくなった脆弱性のIssueは自動でクローズする |
 | 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
-| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる5項目を自動判定する。定期スキャンの直近成功が8日未満か、棚卸し(audit-inventory.yaml)の直近成功が35日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いか、PRの検査と定期検査でTrivyの版が揃っているかを確認する。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
+| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる6項目を自動判定する。定期スキャンの直近成功が8日未満か、棚卸し(audit-inventory.yaml)の直近成功が35日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いか、PRの検査と定期検査でTrivyの版が揃っているかを確認し、前の回から公開後72時間待たずに入れたライブラリとCIの道具の版の一覧を作る。dependency-cooldownの赤のDependabot PRは、72時間待たずに入れる版の記録のコメントがあるときだけ承認待ちとみなし、無ければ滞留に数える。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ(72時間待たずに入れた版の一覧は「週次監査: 逸脱あり」に載せる)、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 | 定期 | canary-verify.yaml | 月次 (schedule) / 手動 | canary.yamlが生成したカナリアPR6件が期待どおりのチェックで赤になっているかを照合する。実行の長いチェックの結論が出揃うよう生成の3日後に発火する。逸脱があればIssue「カナリア照合: 逸脱あり」、判定できなければIssue「カナリア照合: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 | 定期 | audit-inventory.yaml | 月次 (schedule) / 手動 | 開発環境・本番・検査ツールの版とサポート期限を集め、使っている版・最新のリリース・サポート期限の表をIssue「棚卸し台帳: 版とサポート期限」にコメントして所有者に知らせる。良し悪しの判定はせず、取得できなかった欄は理由を添えて表に残す。実行が失敗で終わるのは、スクリプトの自己テストに失敗したときと、Issueへの書き込みに失敗したときに限る |
 
