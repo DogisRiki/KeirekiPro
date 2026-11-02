@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 判定に使う確認のスクリプトを作る
+- [x] 1. 判定に使う確認のスクリプトを作る
 - [x] 1.1 公開から72時間経っていない版を脆弱性の警告に照らすスクリプトを作る (並行可)
 
   Claude は、部品「cooldown-match-alerts.sh」と、そのテスト `test-cooldown-match-alerts.sh` を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に作る。このスクリプトは、Dependabot の警告の API を部品ごとに読み、版ごとに、72時間待たずに入れてよいかと、理由の種類と、理由になった警告を返す。
@@ -41,7 +41,7 @@
   - _要件: 1.8_
   - _対象の部品: cooldown-check-pnpm-exclude.sh_
 
-- [ ] 1.6 記録のコメントを書き、読むスクリプトを作る (並行可)
+- [x] 1.6 記録のコメントを書き、読むスクリプトを作る (並行可)
 
   Claude は、部品「record-cooldown-exception.sh」と、そのテスト `test-record-cooldown-exception.sh` を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に作る。このスクリプトは、`lib-notice-comment.sh` の `notice_post` と `notice_last_kind` を使い、design.md のデータの形の節の形の記録のコメントを head ごとに1つ書くことと、PR に記録のコメントがあるかを読むことを受け持つ。head とは、PR のブランチの最新のコミットである。
   - 完了の確かめ方: Linux のコンテナで流した `test-record-cooldown-exception.sh` の場合が、すべて通る。書いたコメントの記録の JSON の行を base64 から戻すと、渡した記録の JSON と同じになる。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
@@ -206,6 +206,7 @@
 - `cooldown-check-malware.sh` は、`MAL-` の ID の項目も `vulns/{id}` で読む。止めた理由の報告に、公表の記載の要約と URL を出すためである。design の失敗したときの扱いは「`vulns/{id}` が失敗したら、その ID を持つ部品を unknown にする」である。ただし、`cooldown-check-malware.sh` は、`MAL-` の項目だけは、`vulns/{id}` を読めなくても malicious のままにする。`MAL-` の ID の部品は、querybatch の答えだけで悪意のある部品と分かる。また、malicious の部品も unknown の部品も、72時間待たずには入らない。そのため、`MAL-` の項目を読めなくても malicious のままにしても、要件3の受入基準1(変更で入るすべての部品を一覧に照らす)と受入基準2(一覧に照らせなければ入らない)の結果は変わらない。`MAL-` の項目を読めなかったときは、`cooldown-check-malware.sh` は、要約を空にし、URL を osv.dev の項目のページにする
 - `cooldown-check-signer.sh` は、npm の来歴の証明書を、`verificationMaterial.certificate.rawBytes` に加えて `verificationMaterial.x509CertificateChain.certificates[0].rawBytes` からも読む。2026-11-02 に registry.npmjs.org から取った `sigstore@3.0.0` と `3.1.0` の来歴は bundle の版 0.2 で、証明書は design の書いた欄ではなく後者にあったためである。`cooldown-check-signer.sh` は、証明書の拡張を、`openssl x509 -text` ではなく `openssl asn1parse` で読む。`x509 -text` は、名前の無い拡張の値を、UTF8String の頭の2バイトを含む形で出すためである。`cooldown-check-signer.sh` は、`gh attestation verify` の `--repo` に渡す、前の版の元のリポジトリを、前の版の証明書の拡張 1.3.6.1.4.1.57264.1.12(元のリポジトリの URI)から読む。3つの欄が違うときは、`cooldown-check-signer.sh` は、tgz の取得と来歴の検証を飛ばして、`different` を返す。検証できても、署名した者が違うことは変わらないためである。また、呼ぶ側のスクリプトは、`different` の版も `unknown` の版も止めるためである
 - `cooldown-check-signer.sh` の maven の部分は、発行者の鍵 ID だけを持つ署名を、テストの中で作った使い捨ての鍵では確かめない。gpg 2.4.4 は、`--rfc4880` を付けても、署名にいつも発行者の指紋を入れるためである。そのため、鍵 ID で公開鍵を取る動きは、2026-11-02 に取った `org.postgresql:postgresql` 42.7.13 と 42.7.14 の本物の `.pom` と `.pom.asc` と公開鍵で確かめる。テストの curl の代わりは、`-L` を、`-sSL` のようにまとめた短い指定の中からも読む
+- CI の shellcheck は、追跡されているすべての `.sh` を一度に渡す。そのため、`source` で読み込む `lib-notice-comment.sh` が入力に入り、指摘が出ない。Claude は、手元で shellcheck を流すときも、`# shellcheck source=.github/scripts/lib-notice-comment.sh` を書いたうえで、ライブラリを入力に含める。テストの期待の文字列にバッククォートが要るときは、単引用符ではなく二重引用符で書き、指摘を止める指定は使わない
 - 所有者への依頼は、親のセッションが行う。実装役のサブエージェントは、所有者に依頼する手前で止まり、用意したもの(置き場所のパス)を親のセッションに返す。確認役は、置く前の成果を置き場所のパスで確かめる
 - この spec が frontend で変えるのは `pnpm-workspace.yaml` のコメントだけなので、共通の完了条件の2(verify のスキル)のうち当てはまるのは、監査手順と steering と除外の欄のコメントを書き直すタスク 7.2 の `/verify-frontend` だけである。代わりに、Claude は、シェルのスクリプトを作るか変えるタスクごとに、そのタスクのスクリプトとテストに shellcheck を流す。判定に使う確認のスクリプトを作る大きなまとまり1のタスクは、並行に進む。そのため、Claude がまとまりの最後のタスクで shellcheck を流すと、まだ終わっていないタスクのスクリプトを見落とす
 - Claude は、`audit-weekly.yaml` の自己テストの一覧に、design のとおり `test-check-audit-cooldown-exceptions` だけを足す。止まっている Dependabot の PR の見分けを変えるタスク 4.2 のあとの `check-audit-dependabot-stuck.sh` は、`record-cooldown-exception.sh` を呼ぶ。`test-check-audit-dependabot-stuck.sh` は、`gh` だけをスタブにして、`record-cooldown-exception.sh` の本物を呼ぶ。そのため、週次監査の自己テストでも記録のコメントの読み取りが流れる。`test-record-cooldown-exception.sh` そのものは、`dependency-cooldown` のジョブで流れる
