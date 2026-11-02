@@ -325,8 +325,9 @@ check_trivy() {
     [ "$code" = 404 ] && unverified "${file} に、署名(${file}.sigstore.json)がありません。"
     [ "$code" = 200 ] || unknown "${file}.sigstore.json を取れませんでした(HTTP ${code})。"
     must_fetch "${base}/${file}" "$TMP/trivy.tar.gz" "${file} "
-    chmod a+rx "$TMP" && chmod a+r "$TMP/trivy.sigstore.json" "$TMP/trivy.tar.gz" ||
+    if ! chmod a+rx "$TMP" || ! chmod a+r "$TMP/trivy.sigstore.json" "$TMP/trivy.tar.gz"; then
         unknown "cosign のコンテナが読めるように、作業フォルダの権限を変えられませんでした。"
+    fi
 
     rc=0
     MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm -v "$TMP:/work:ro" -w /work "$COSIGN_IMAGE" \
