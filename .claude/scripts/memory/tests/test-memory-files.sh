@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-# メモリを読み、確かめてから消すスクリプト(memory-files.pl)のテスト
+# メモリを読み、確かめてから消すスクリプト(memory-files.pl)と、前の点検を片付けるスクリプト(old-inspection-cleanup.pl)のテスト
 #
 # 実行: bash .claude/scripts/memory/tests/test-memory-files.sh
 # テストの場合ごとに、一時のディレクトリ(newcase)に、偽の git のリポジトリと、偽のホームと、偽のメモリのディレクトリを作る。
@@ -361,6 +361,156 @@ case_origins_invalid() {
         "0|../x.md,0,invalid|MEMORY.md,0,invalid|a/b.md,0,invalid"
 }
 addcase origins_invalid
+
+# ---------------------------------------------------------------------
+# old-inspection-cleanup.pl
+# ---------------------------------------------------------------------
+
+# 偽の powershell.exe・launchctl・crontab を $CASE/bin に置く。受けた引数を $CASE/fake/<名前>.calls に JSON の1行ずつ書き残す。
+#   powershell.exe: $CASE/fake/powershell.exe.out を出し、$CASE/fake/powershell.exe.err があれば標準エラーに出して 1 で終わる
+#   launchctl:      print は $CASE/fake/launchctl.loaded があれば 0 で終わり、bootout はそのファイルを消す
+#   crontab:        -l は $CASE/fake/crontab.table を出し、無ければ「no crontab」を出して 1 で終わる。- は標準入力をそのファイルに書く
+osfakes() {
+    local n
+    mkdir -p "$CASE/bin" "$CASE/fake"
+    for n in powershell.exe launchctl crontab; do
+        cat >"$CASE/bin/$n" <<'FAKE'
+#!/bin/bash
+f="$KP_TEST_FAKE/${0##*/}"
+perl -MJSON::PP -e 'print JSON::PP->new->canonical->encode([@ARGV]), "\n"' -- "$@" >>"$f.calls"
+case "${0##*/}:${1:-}" in
+powershell.exe:*)
+    cat "$f.out" 2>/dev/null
+    if [ -f "$f.err" ]; then cat "$f.err" >&2; exit 1; fi
+    ;;
+launchctl:print) [ -f "$f.loaded" ] ;;
+launchctl:bootout) rm -f "$f.loaded" ;;
+crontab:-l)
+    if [ -f "$f.table" ]; then cat "$f.table"; else echo "no crontab for test" >&2; exit 1; fi
+    ;;
+crontab:-) cat >"$f.table" ;;
+esac
+FAKE
+        chmod +x "$CASE/bin/$n"
+    done
+    # PATH は : で区切るので、Windows の C:/… の形でなく、pwd の形の場所を入れる
+    FAKEBIN=$(cd "$CASE/bin" && pwd)
+    CL="$(dirname "$PL")/old-inspection-cleanup.pl"
+    STATE="$REPO/.git/keirekipro-memory-inspection"
+    ID8=$(git rev-parse --path-format=absolute --git-common-dir | perl -MDigest::SHA=sha256_hex -ne 'chomp; print substr(sha256_hex($_), 0, 8)')
+}
+
+# 偽のコマンドを PATH の先頭に置き、OS を替えて old-inspection-cleanup.pl を動かす: cleanup <KP_MEMORY_CLEANUP_OS の値> [引数]...
+cleanup() {
+    local os=$1
+    shift
+    PATH="$FAKEBIN:$PATH" KP_TEST_FAKE="$CASE/fake" KP_MEMORY_CLEANUP_OS=$os perl "$CL" "$@"
+}
+
+# 状態の場所に、前の点検の報告と記録の代わりのファイルを置く
+oldstate() { mkdir -p "$STATE/runs/r1" && printf 'x' >"$STATE/report.md" && printf 'y' >"$STATE/runs/r1/log.jsonl"; }
+
+# 状態の場所があれば there、無ければ gone を出す
+statemark() { if [ -e "$STATE" ]; then printf there; else printf gone; fi; }
+
+# 出力の JSON から、schedule・state・manual_command を | でつないで出す
+cleanup_fields() { pj 'join "|", @$d{qw(schedule state manual_command)}'; }
+
+case_cleanup_windows() {
+    osfakes
+    oldstate
+    printf 'removed\r\n' >"$CASE/fake/powershell.exe.out"
+    out=$(cleanup msys)
+    rc=$?
+    printf 'absent\r\n' >"$CASE/fake/powershell.exe.out"
+    again=$(cleanup msys)
+    check "3つの OS それぞれで、予定があれば外して removed を、無ければ absent を返す(Windows)" \
+        "$rc|$(printf '%s' "$out" | cleanup_fields)|$(statemark)|$(printf '%s' "$again" | cleanup_fields)" \
+        "0|removed|removed||gone|absent|absent|"
+    check "Windows では、予定の名前を入れた命令の文を powershell.exe に -EncodedCommand で渡す" \
+        "$(head -1 "$CASE/fake/powershell.exe.calls" | perl -MJSON::PP -MMIME::Base64 -MEncode=decode -ne '
+            my @a = @{ JSON::PP->new->decode($_) };
+            my $s = decode("UTF-16LE", decode_base64($a[3]));
+            print join ",", @a[0 .. 2], $s =~ /\QUnregister-ScheduledTask -TaskName '"'"'KeirekiPro memory inspection '"$ID8"''"'"' -Confirm:$false\E/ ? "unregister" : "none"')" \
+        "-NoProfile,-NonInteractive,-EncodedCommand,unregister"
+}
+addcase cleanup_windows
+
+case_cleanup_macos() {
+    osfakes
+    uid=$(perl -e 'print $<')
+    label="com.keirekipro.memory-inspection.$ID8"
+    mkdir -p "$HOME/Library/LaunchAgents"
+    printf 'p' >"$HOME/Library/LaunchAgents/$label.plist"
+    printf 'other' >"$HOME/Library/LaunchAgents/com.example.other.plist"
+    : >"$CASE/fake/launchctl.loaded"
+    out=$(cleanup darwin)
+    rc=$?
+    first=$(perl -MJSON::PP -ne 'print join(" ", @{ JSON::PP->new->decode($_) }), ";"' "$CASE/fake/launchctl.calls")
+    again=$(cleanup darwin)
+    printf 'p' >"$HOME/Library/LaunchAgents/$label.plist"
+    plist_only=$(cleanup darwin)
+    check "3つの OS それぞれで、予定があれば外して removed を、無ければ absent を返す(macOS)" \
+        "$rc|$(printf '%s' "$out" | cleanup_fields)|$(printf '%s' "$again" | cleanup_fields)|$(printf '%s' "$plist_only" | cleanup_fields)" \
+        "0|removed|absent||absent|absent||removed|absent|"
+    check "macOS では、launchctl bootout で予定を外し、印の付いた plist だけを消す" \
+        "$first|$(ls "$HOME/Library/LaunchAgents")" \
+        "print gui/$uid/$label;bootout gui/$uid/$label;|com.example.other.plist"
+}
+addcase cleanup_macos
+
+case_cleanup_linux() {
+    osfakes
+    printf '%s\n' "0 9 * * 1 /bin/bash '/x/memory-inspect.sh' run >> '/x/run.log' 2>&1 # keirekipro-memory-inspection $ID8" \
+        '# ほかの予定' '5 4 * * *  echo hi  ' '0 9 * * 1 /bin/bash /y run # keirekipro-memory-inspection deadbeef' >"$CASE/fake/crontab.table"
+    out=$(cleanup linux)
+    rc=$?
+    table=$(cat "$CASE/fake/crontab.table")
+    again=$(cleanup linux)
+    writes=$(grep -c '^\["-"\]' "$CASE/fake/crontab.calls")
+    rm -f "$CASE/fake/crontab.table"
+    none=$(cleanup linux)
+    check "3つの OS それぞれで、予定があれば外して removed を、無ければ absent を返す。Linux では印の付いた行だけを消し、ほかの行を変えない" \
+        "$rc|$(printf '%s' "$out" | cleanup_fields)|$table|$(printf '%s' "$again" | cleanup_fields)|$writes|$(printf '%s' "$none" | cleanup_fields)" \
+        "0|removed|absent||# ほかの予定
+5 4 * * *  echo hi  
+0 9 * * 1 /bin/bash /y run # keirekipro-memory-inspection deadbeef|absent|absent||1|absent|absent|"
+}
+addcase cleanup_linux
+
+case_cleanup_state_only() {
+    osfakes
+    oldstate
+    out=$(cleanup linux)
+    rc=$?
+    gone=$(statemark)
+    again=$(cleanup linux)
+    check "予定が無くても、状態の場所があれば消して state を removed にする" \
+        "$rc|$(printf '%s' "$out" | pj 'join "|", @$d{qw(schedule state state_error)}, $d->{state_path}')|$gone|$(printf '%s' "$again" | cleanup_fields)" \
+        "0|absent|removed||$STATE|gone|absent|absent|"
+}
+addcase cleanup_state_only
+
+case_cleanup_ps_fail() {
+    osfakes
+    oldstate
+    printf 'アクセスが拒否されました。\r\n' >"$CASE/fake/powershell.exe.err"
+    out=$(cleanup MSWin32)
+    check "偽の powershell.exe が失敗したとき、schedule を failed にし、manual_command に予定の名前の入ったコマンドを入れ、状態の場所は消す" \
+        "$?|$(printf '%s' "$out" | cleanup_fields)|$(printf '%s' "$out" | pj 'my $e = $d->{schedule_error}; utf8::encode($e); $e =~ /アクセスが拒否されました/ ? "said" : $d->{schedule_error}')|$(statemark)" \
+        "0|failed|removed|Unregister-ScheduledTask -TaskName 'KeirekiPro memory inspection $ID8' -Confirm:\$false|said|gone"
+}
+addcase cleanup_ps_fail
+
+case_cleanup_errors() {
+    osfakes
+    args=$(cleanup linux x 2>/dev/null; printf '|%s' "$?")
+    cd "$CASE/home" || exit 1
+    nogit=$(GIT_CEILING_DIRECTORIES="$CASE" cleanup linux 2>"$CASE/err"; printf '|%s' "$?")
+    check "old-inspection-cleanup.pl は引数を受けると 2 で、git の共通ディレクトリを求められないと 1 で終わり、何も出さない" \
+        "$args|$nogit|$(grep -c '共通ディレクトリを求められなかった' "$CASE/err")" "|2||1|1"
+}
+addcase cleanup_errors
 
 # ---------------------------------------------------------------------
 # 選んだ場合を流す
