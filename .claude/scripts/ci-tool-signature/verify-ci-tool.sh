@@ -8,9 +8,8 @@
 #
 # 道具ごとの確かめ方:
 #   node:      nodejs.org の SHASUMS256.txt.asc を gpg で確かめ、node-v<版>-linux-x64.tar.gz の
-#              ハッシュを照らす。CI の setup-node が入れるのは actions/node-versions が詰め直した
-#              tarball なので、その tarball の bin/node のハッシュが、確かめた tarball の bin/node と
-#              同じことも確かめる。公開日時は actions/node-versions のそのリリースの published_at
+#              ハッシュを照らす。CI はこの tarball をそのまま入れる(.github/scripts/install-verified-node.sh)。
+#              公開日時は nodejs/node の GitHub のリリース v<版> の published_at
 #   trivy:     GitHub のリリースの trivy_<版>_Linux-64bit.tar.gz を、同じ名前に .sigstore.json を
 #              足した署名で、cosign verify-blob で確かめる。身元は trusted-signers.json の
 #              identity_template の {version} に版を入れたもの。公開日時はリリースの published_at
@@ -39,8 +38,7 @@
 #   取りに行くため。cosign のコンテナには、作業フォルダを読むだけの形で渡す。
 #
 # 取得したファイルは、毎回新しく作る空の作業フォルダに置き、スクリプトの置き場とは分ける。
-# 取得したファイルの中のスクリプトは動かさない。tarball は、bin/node を標準出力へ取り出して
-# ハッシュを計るだけにする。
+# 取得したファイルの中のスクリプトは動かさない。tarball は、ハッシュを計るだけにする。
 #
 # 問い合わせ: 打ち切りは300秒、再試行は1回。404 は再試行しない。
 #
@@ -244,20 +242,11 @@ listed_hash() {
     awk -v n="$2" '($2 == n || $2 == "*" n) && $1 ~ /^[0-9a-f]{64}$/ { print $1; exit }' "$1"
 }
 
-# 使い方: node_binary_hash <tarball>。最上位か、最上位の1つのフォルダの下の bin/node のハッシュを出す
-# tar には標準入力で渡す。GNU tar は、C: のようにコロンを含むパスを別の機械の名前と読むため
-node_binary_hash() {
-    local entries
-    entries=$(tar -tzf - <"$1" 2>/dev/null | grep -E '^(\./)?([^/]+/)?bin/node$' || true)
-    [ -n "$entries" ] && [ "$(printf '%s\n' "$entries" | wc -l)" -eq 1 ] || return 1
-    tar -xzOf - "$entries" <"$1" | sha256_of
-}
-
 # --- 道具ごとの確かめ方 ----------------------------------------------------------------
 
 check_node() {
     local base="https://nodejs.org/dist/v${VERSION}" tarball="node-v${VERSION}-linux-x64.tar.gz"
-    local code want got urls download_url release_url tag official repack
+    local code want got
     prepare_gpg
     code=$(fetch "${base}/SHASUMS256.txt.asc" "$TMP/SHASUMS256.txt.asc")
     if [ "$code" = 404 ]; then
@@ -274,43 +263,11 @@ check_node() {
     got=$(sha256_of <"$TMP/official.tar.gz")
     [ "$got" = "$want" ] || unverified "${tarball} のハッシュが、署名された SHASUMS256.txt の値と違います。"
 
-    must_fetch "https://raw.githubusercontent.com/actions/node-versions/main/versions-manifest.json" \
-        "$TMP/manifest.json" "actions/node-versions の versions-manifest.json "
-    if ! urls=$(perl -MJSON::PP -e '
-        local $/;
-        open my $f, "<", $ARGV[0] or die;
-        my $d = decode_json(<$f>);
-        for my $e (@$d) {
-            next unless ref $e eq "HASH" && ($e->{version} // "") eq $ARGV[1];
-            for my $x (@{ $e->{files} || [] }) {
-                next unless ($x->{platform} // "") eq "linux" && ($x->{arch} // "") eq "x64";
-                print "$x->{download_url}\n$e->{release_url}\n";
-                exit 0;
-            }
-        }
-        exit 1;
-    ' "$TMP/manifest.json" "$VERSION" 2>/dev/null); then
-        unknown "actions/node-versions の versions-manifest.json に、Node.js ${VERSION} の linux の x64 の tarball がありません。"
-    fi
-    download_url=$(printf '%s\n' "$urls" | sed -n 1p)
-    release_url=$(printf '%s\n' "$urls" | sed -n 2p)
-    tag="${release_url##*/tag/}"
-    case "$download_url:$tag" in
-    https://github.com/actions/node-versions/releases/download/*:* ) ;;
-    *) unknown "versions-manifest.json の Node.js ${VERSION} の URL が、actions/node-versions のリリースではありません。" ;;
-    esac
-    case "$tag" in "" | */* | "$release_url") unknown "versions-manifest.json の Node.js ${VERSION} のリリースの URL を読めませんでした。" ;; esac
-    must_fetch "$download_url" "$TMP/repack.tar.gz" "actions/node-versions の詰め直しの tarball "
-
-    official=$(node_binary_hash "$TMP/official.tar.gz") || unverified "${tarball} の中に bin/node が1つだけ入っていません。"
-    repack=$(node_binary_hash "$TMP/repack.tar.gz") || unverified "actions/node-versions の詰め直しの tarball の中に bin/node が1つだけ入っていません。"
-    [ "$official" = "$repack" ] || unverified "actions/node-versions の詰め直しの tarball の bin/node が、確かめた ${tarball} の bin/node と違います。"
-
-    if ! PUBLISHED=$(gh api "repos/actions/node-versions/releases/tags/${tag}" --jq .published_at 2>/dev/null) || [ -z "$PUBLISHED" ]; then
-        unknown "actions/node-versions のリリース ${tag} の公開日時を読めませんでした。"
+    if ! PUBLISHED=$(gh api "repos/nodejs/node/releases/tags/v${VERSION}" --jq .published_at 2>/dev/null) || [ -z "$PUBLISHED" ]; then
+        unknown "nodejs/node のリリース v${VERSION} の公開日時を読めませんでした。"
     fi
     METHOD="gpg --verify"
-    HOW="nodejs.org の SHASUMS256.txt.asc の署名を gpg で確かめ、${tarball} のハッシュを照らし、actions/node-versions の詰め直しの tarball の bin/node のハッシュが同じことを確かめた"
+    HOW="nodejs.org の SHASUMS256.txt.asc の署名を gpg で確かめ、${tarball} のハッシュを照らした"
     TOOL_NAME="Node.js"
 }
 
