@@ -73,7 +73,7 @@
   - _要件: 1.2, 1.8, 2.2, 7.1, 7.2, 7.3, 7.4_
 
 - [ ] 3. PR の検査のワークフローにつなぐ
-- [ ] 3.1 dependency-cooldown のジョブを、Dependabot の PR でも動かし、所有者の承認を読むようにする
+- [x] 3.1 dependency-cooldown のジョブを、Dependabot の PR でも動かし、所有者の承認を読むようにする
 
   Claude は、部品「dependency-review.yaml の cooldown ジョブ」の変更後のワークフローと、部品「actionlint.yaml」を、置き場所の `place-1/.github/` に作る。このジョブは、Dependabot の除外を外した条件で動き、design.md の cooldown ジョブの節に書いた、`vulnerability-alerts: read` を含む3つの権限を持ち、同じ節に書いた7本のテストを流し、所有者が今の head を承認したかを読んで `check-dependency-cooldown.sh` に渡す。
   - 完了の確かめ方: リポジトリの写しに置き場所のファイルを重ねて流した actionlint(`rhysd/actionlint:1.7.12`)の指摘が0件である。`.github/actionlint.yaml` を外して流すと、`unknown permission scope "vulnerability-alerts"` の指摘だけが出る。ジョブの条件に `dependabot[bot]` が無く、`timeout-minutes: 30` がある
