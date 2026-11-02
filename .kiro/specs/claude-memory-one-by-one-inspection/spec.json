@@ -1,0 +1,81 @@
+{
+   "approval_history" : [
+      {
+         "approved_at" : "2026-11-02T04:51:51Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            693
+         ],
+         "revoked_at" : "2026-11-02T05:23:27Z",
+         "revoked_for" : "D1-1-13 による requirements への差し戻し: 要件7の受入基準2が git fetch の書き込みを許していない",
+         "stage" : "requirements"
+      },
+      {
+         "approved_at" : "2026-11-02T06:06:26Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            693
+         ],
+         "revoked_at" : "2026-11-02T08:19:22Z",
+         "revoked_for" : "T1-1-6 と所有者の指示による requirements への差し戻し: 参加者セットアップ手順のメモリの点検の節を消し、README の主なカスタムスキルに点検のスキルを書く",
+         "stage" : "requirements"
+      },
+      {
+         "approved_at" : "2026-11-02T07:42:04Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            693
+         ],
+         "revoked_at" : "2026-11-02T08:19:22Z",
+         "revoked_for" : "T1-1-6 と所有者の指示による requirements への差し戻し: 参加者セットアップ手順のメモリの点検の節を消し、README の主なカスタムスキルに点検のスキルを書く",
+         "stage" : "design"
+      },
+      {
+         "approved_at" : "2026-11-02T09:22:45Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            693
+         ],
+         "revoked_at" : "2026-11-02T10:41:30Z",
+         "revoked_for" : "実装のときの所有者の確認による design への差し戻し: 3つの事柄を選択肢の画面の問いの文に入れ、きっかけを発言の引用と Claude が書いた理由の文で書く",
+         "stage" : "design"
+      },
+      {
+         "approved_at" : "2026-11-02T09:50:53Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            693
+         ],
+         "revoked_at" : "2026-11-02T10:41:30Z",
+         "revoked_for" : "実装のときの所有者の確認による design への差し戻し: 3つの事柄を選択肢の画面の問いの文に入れ、きっかけを発言の引用と Claude が書いた理由の文で書く",
+         "stage" : "tasks"
+      }
+   ],
+   "approvals" : {
+      "design" : {
+         "approved" : true,
+         "approved_at" : "2026-11-02T10:56:30Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      },
+      "requirements" : {
+         "approved" : true,
+         "approved_at" : "2026-11-02T09:09:24Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      },
+      "tasks" : {
+         "approved" : true,
+         "approved_at" : "2026-11-02T12:08:29Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      }
+   },
+   "created_at" : "2026-11-02T04:06:55Z",
+   "feature_name" : "claude-memory-one-by-one-inspection",
+   "issue" : 693,
+   "language" : "ja",
+   "phase" : "tasks-generated",
+   "review_model" : "opus",
+   "updated_at" : "2026-11-02T12:08:29Z"
+}
