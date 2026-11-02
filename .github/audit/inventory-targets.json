@@ -71,6 +71,7 @@
             ".github/workflows/ci.yaml",
             ".github/workflows/mutation-report.yaml",
             ".github/workflows/codex-review.yml",
+            ".github/workflows/frontend-vuln-fix.yaml",
             ".github/workflows/guardrails.yaml"
           ],
           "pattern": "(?m)^[ \\t]*node-version:[ \\t]*['\"]?(?<version>[0-9][0-9.]*)"
