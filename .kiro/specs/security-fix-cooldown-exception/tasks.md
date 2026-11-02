@@ -124,7 +124,7 @@
   - _要件: 5.6, 5.7, 5.8_
   - _依存: 4.1_
 
-- [ ] 5. CI の道具の版を72時間待たずに変える手順を作る
+- [x] 5. CI の道具の版を72時間待たずに変える手順を作る
 - [x] 5.1 信頼する署名した者のファイルと、gpg を動かすコンテナを作る (並行可)
 
   Claude は、部品「trusted-signers.json」と、`gpg` を動かす1回きりのコンテナの `Dockerfile` を、`.claude/scripts/ci-tool-signature/` に作る。`trusted-signers.json` は、design.md のデータの形の節の形で、4つの道具の信頼する署名した者と、版を書く場所を持つ。`Dockerfile` は、Debian の slim のイメージを digest で固定し、`gnupg` を入れる。digest とは、イメージの中身から計算した値で、中身が変わると値も変わる。
@@ -147,7 +147,7 @@
   - 受入基準とテストの対応: 要件6の受入基準3(配布元の署名で確かめる)と受入基準5(署名を確かめた結果を PR の本文に書く)は、テストの「Trivy の署名が合えば終了コード 0 になり、本文の文と記録の目印の行が出る」「Codex CLI の2つの tgz の来歴が合えば終了コード 0 になり、本文の文と記録の目印の行が出る」で確かめる。要件6の受入基準4(確かめられなければ版を変えない)は「cosign の検証が失敗したら終了コード 1 になる」「Codex CLI の2つの tgz のどちらかの来歴が合わなければ終了コード 1 になる」「Trivy の .sigstore.json を取得できなければ終了コード 2 になる」で確かめる。あわせて、「cosign に渡す身元が identity_template の {version} に版を入れたものになる」のテストを作る
   - _要件: 5.3, 6.3, 6.4, 6.5_
 
-- [ ] 5.4 CI の道具の版を変える Claude の手順と、CLAUDE.md の1行を書く
+- [x] 5.4 CI の道具の版を変える Claude の手順と、CLAUDE.md の1行を書く
 
   Claude は、部品「ci-tool-fast-update のスキル」の `.claude/skills/ci-tool-fast-update/SKILL.md` を書き、部品「CLAUDE.md の「自律動作の境界」の1行」を `CLAUDE.md` に足す。スキルの description は、4つの道具の名前と「72時間」「脆弱性」を含む。Claude は、スキルの手順を、design.md の ci-tool-fast-update のスキルの節に書いた5つの手順のとおりにする。
   - 完了の確かめ方: `bash .github/scripts/check-claude-md-size.sh` が通る。スキルの手順が、所有者の指示を確かめる手順、`verify-ci-tool.sh` を動かす手順、確かめられなければ版を変えずに理由を返事に書く手順、`locations` のすべての場所を変える手順、`/ship` で本文に結果の文と記録の目印の行を書く手順を、この順に持つ
