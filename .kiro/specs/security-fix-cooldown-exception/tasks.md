@@ -33,7 +33,7 @@
   - _要件: 4.1, 4.2, 4.4, 4.5_
   - _依存: 1.3_
 
-- [ ] 1.5 除外の欄に版の要素があるかを確かめるスクリプトを作る (並行可)
+- [x] 1.5 除外の欄に版の要素があるかを確かめるスクリプトを作る (並行可)
 
   Claude は、部品「cooldown-check-pnpm-exclude.sh」と、そのテスト `test-cooldown-check-pnpm-exclude.sh` を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に作る。このスクリプトは、`frontend/pnpm-workspace.yaml` の `minimumReleaseAgeExclude` を読み、渡された npm の版ごとに、その版を指す要素があるかと、足すべき1行を返す。
   - 完了の確かめ方: Linux のコンテナで流した `test-cooldown-check-pnpm-exclude.sh` の場合が、すべて通る。このタスクで作るか変えたスクリプトとテストに流した shellcheck の指摘が0件である
