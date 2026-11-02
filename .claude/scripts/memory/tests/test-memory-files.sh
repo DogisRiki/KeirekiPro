@@ -72,6 +72,7 @@ addcase() { CASES="$CASES $1"; }
 # list
 # ---------------------------------------------------------------------
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_list_order() {
     memfile b.md 'b'
     memfile a.md 'a'
@@ -100,6 +101,7 @@ case_list_order() {
 }
 addcase list_order
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_list_dangling() {
     memfile a.md 'a'
     printf '%s\r\n' '# MEMORY' '- [A](a.md)' '- [消えた](gone.md) — 説明' '- [どちらか](gone2.md) と [A](a.md)' '- リンクの無い行' >"$MEMDIR/MEMORY.md"
@@ -110,6 +112,7 @@ case_list_dangling() {
 }
 addcase list_dangling
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_list_no_dir() {
     out=$(perl "$PL" list)
     check "list はメモリのディレクトリが無いとき、files と dangling を空にして 0 で終わる" \
@@ -117,6 +120,7 @@ case_list_no_dir() {
 }
 addcase list_no_dir
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_worktree() {
     memfile a.md 'a'
     git -C "$REPO" worktree add -q "$CASE/wt" 2>/dev/null
@@ -132,6 +136,7 @@ addcase worktree
 # show
 # ---------------------------------------------------------------------
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_show_basic() {
     memfile 'あ.md' "$(printf '一行目\r\n二行目')"
     memfile b.md 'b'
@@ -144,6 +149,7 @@ case_show_basic() {
 }
 addcase show_basic
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_show_decode() {
     mkdir -p "$MEMDIR"
     printf 'ok\377\376' >"$MEMDIR/bad.md"
@@ -154,6 +160,7 @@ case_show_decode() {
 }
 addcase show_decode
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_show_too_many() {
     memfile a.md 'a'
     out=$(perl "$PL" show a.md a.md a.md a.md a.md 2>/dev/null)
@@ -167,6 +174,7 @@ addcase show_too_many
 # prune-index と delete
 # ---------------------------------------------------------------------
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_prune_index() {
     memfile a.md 'a'
     printf '%s\r\n' '# MEMORY' '' '- [A](a.md) — 残る' '- [消えた](gone.md) — 消える' '- リンクの無い行' '- [どちらか](gone2.md) と [A](a.md)' '- [外](https://example.com/z.md)' >"$MEMDIR/MEMORY.md"
@@ -177,6 +185,7 @@ case_prune_index() {
 }
 addcase prune_index
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_delete_same() {
     memfile a.md 'a'
     memfile b.md 'b'
@@ -189,6 +198,7 @@ case_delete_same() {
 }
 addcase delete_same
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_delete_changed_missing() {
     memfile a.md 'a'
     printf '%s\n' '- [A](a.md)' '- [G](gone.md)' >"$MEMDIR/MEMORY.md"
@@ -201,6 +211,7 @@ case_delete_changed_missing() {
 }
 addcase delete_changed_missing
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_delete_invalid() {
     memfile MEMORY.md "$(printf '%s\n' '- [X](../x.md)' '- [B](a/b.md)')"
     mkdir -p "$MEMDIR/a"
@@ -213,6 +224,7 @@ case_delete_invalid() {
 }
 addcase delete_invalid
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_show_then_delete() {
     memfile a.md '前の中身'
     printf '%s\n' '- [A](a.md)' >"$MEMDIR/MEMORY.md"
@@ -260,6 +272,7 @@ logline() {
     ' "$@" >>"$1"
 }
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_origins_found() {
     p="$MEMDIR/a.md"
     # 名前が <本体の名前>- で始まるほかのプロジェクトの記録の、それより早い書き込みは使わない
@@ -286,10 +299,12 @@ case_origins_found() {
 }
 addcase origins_found
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_origins_windows_path() {
     # Git Bash の HOME は /c/… の形で、記録の file_path は C:\… の形である
     # 一時のディレクトリは Git Bash では /tmp/… の形で返るので、C:/… の形から /c/… の形を作る
-    export HOME="$(printf '%s' "$HOME" | perl -pe 's{\A([A-Za-z]):}{"/" . lc $1}e')"
+    HOME="$(printf '%s' "$HOME" | perl -pe 's{\A([A-Za-z]):}{"/" . lc $1}e')"
+    export HOME
     win=$(printf '%s' "$MEMDIR/a.md" | perl -pe 's{/}{\\}g; s{\A\\([A-Za-z])\\}{\U$1\E:\\}; s{\A([a-z]):}{\U$1:}')
     f="$(logdir "$REPO")/s1.jsonl"
     logline "$f" "$REPO" 2026-10-20T10:00:00Z dev '覚えて'
@@ -301,6 +316,7 @@ case_origins_windows_path() {
 }
 addcase origins_windows_path
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_origins_truncate() {
     f="$(logdir "$REPO")/s1.jsonl"
     # 1つの文は JSON にすると1,034バイトなので、6,000バイトまでに収まるのは書き込みに近い5つである
@@ -316,6 +332,7 @@ case_origins_truncate() {
 }
 addcase origins_truncate
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_origins_too_many() {
     out=$(perl "$PL" origins a.md b.md c.md d.md e.md 2>/dev/null)
     rc=$?
@@ -324,6 +341,7 @@ case_origins_too_many() {
 }
 addcase origins_too_many
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_origins_edit_nowrite() {
     f="$(logdir "$REPO")/s1.jsonl"
     logline "$f" "$REPO" 2026-10-20T10:00:00Z dev '直して'
@@ -337,6 +355,7 @@ case_origins_edit_nowrite() {
 }
 addcase origins_edit_nowrite
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_origins_update() {
     f="$(logdir "$REPO")/s1.jsonl"
     logline "$f" "$REPO" 2026-10-20T10:00:00Z dev '書き直して'
@@ -349,6 +368,7 @@ case_origins_update() {
 }
 addcase origins_update
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_origins_invalid() {
     # メモリのディレクトリの外の場所への書き込みがあっても、決まりに合わない名前は探さない
     f="$(logdir "$REPO")/s1.jsonl"
@@ -414,6 +434,7 @@ oldstate() { mkdir -p "$STATE/runs/r1" && printf 'x' >"$STATE/report.md" && prin
 statemark() { if [ -e "$STATE" ]; then printf there; else printf gone; fi; }
 
 # 出力の JSON から、schedule・state・manual_command を | でつないで出す
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 cleanup_fields() { pj 'join "|", @$d{qw(schedule state manual_command)}'; }
 
 case_cleanup_windows() {
@@ -478,6 +499,7 @@ case_cleanup_linux() {
 }
 addcase cleanup_linux
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_cleanup_state_only() {
     osfakes
     oldstate
@@ -491,6 +513,7 @@ case_cleanup_state_only() {
 }
 addcase cleanup_state_only
 
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
 case_cleanup_ps_fail() {
     osfakes
     oldstate

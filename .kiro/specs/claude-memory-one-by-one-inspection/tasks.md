@@ -134,7 +134,7 @@
   - _対象の部品: CLAUDE.md の要約の決まり_
 
 - [ ] 7. 全体を確かめる
-- [ ] 7.1 テストを Linux のコンテナと shellcheck でも流す
+- [x] 7.1 テストを Linux のコンテナと shellcheck でも流す
 
   Claude は、`test-memory-files.sh` の全部の場合を、Git Bash で流したうえで、Linux のコンテナでも1回流す。Claude は、`.github/CLAUDE.md` の見本と同じく、作業フォルダを読むだけの形で `alpine:3` のコンテナに渡し、`apk add --no-cache bash perl git` のあとで、`.claude/scripts/memory` をコンテナの中の別のフォルダに写して `chmod -R a-x` し、`bash` でテストを起動する。Claude は、新しいファイルを `git add` してから、CI と同じく、`git ls-files` のすべての `.sh` を `koalaman/shellcheck:v0.11.0` に渡す。Claude が新しいファイルを `git add` するのは、まだ追跡していないファイルを `git ls-files` が出さないためである。また、まだ追跡していないファイルを作業フォルダに `-v` で重ねてコンテナに渡すと、作業フォルダに0バイトのファイルが残る。
   - 完了の確かめ方: Git Bash と Linux のコンテナの両方で、全部の場合が通る。shellcheck の指摘が0件である。`git grep -n -e 'memory-inspect\.sh' -e 'skills/memory-inspection' -- . ':!.kiro/specs/claude-memory-weekly-inspection' ':!.kiro/specs/claude-memory-one-by-one-inspection'` の結果が、タスク「前の点検のスクリプトとテストとスキルを消す」で足した結合の場合だけである
