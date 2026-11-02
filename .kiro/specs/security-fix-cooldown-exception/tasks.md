@@ -163,7 +163,7 @@
   - _対象の部品: ship のスキル_
   - _依存: 1.6_
 
-- [ ] 7. 文書を新しい判定に合わせる
+- [x] 7. 文書を新しい判定に合わせる
 - [x] 7.1 ワークフローの一覧と設計の文書を書き直す (並行可)
 
   Claude は、`README.md` のワークフローの一覧の表の `dependency-review.yaml` と `audit-weekly.yaml` の行と、Mermaid の図の週次監査の節を更新する。Claude は、この spec で変えるほかの2つのワークフロー `dependency-graph.yaml` と `rerun-approval-gated-checks.yaml` の README の行と図も読み、変える要る記述があれば更新する。Claude は、`doc/インフラ設計/Github Actions設計/ワークフロー設計.md` の「自動チェックの一覧」の表の `dependency-cooldown` の行と、frontend の `minimumReleaseAge` の行と、注3を、新しい判定に合わせて書き直す。
@@ -172,7 +172,7 @@
   - _要件: 1.7_
   - _対象の部品: README.md, ワークフロー設計.md_
 
-- [ ] 7.2 監査手順と steering と除外の欄のコメントを書き直す (並行可)
+- [x] 7.2 監査手順と steering と除外の欄のコメントを書き直す (並行可)
 
   Claude は、`doc/開発フロー/監査手順.md` に、週次監査の `cooldown-exceptions` の項目の読み方と、Dependabot の PR が `dependency-cooldown` で止まったときの扱いを足す。Claude は、`.kiro/steering/tech.md` の「バージョンカタログを承認境界にする」に、72時間待たずに入れる例外を足す。Claude は、`frontend/pnpm-workspace.yaml` の `minimumReleaseAgeExclude` のコメントを、72時間待たずに入れる版の要素を書く使い方に書き直し、設定の値は変えない。
   - 完了の確かめ方: `git diff frontend/pnpm-workspace.yaml` がコメントの行だけを変えている。`/verify-frontend` が成功する
@@ -222,6 +222,7 @@
 - `gh run view --log-failed` のログでは、スクリプトが出した `::error::` の行は、行の頭が `##[error]` に替わって出る(2026-11-02 に、この repo の失敗した実行のログで確かめた)。そのため、`/ship` の手順は、止めた部品の行を、`::error::` ではなく本文の `72時間の待ちで止めた部品:` で探す。記録のコメントを見分ける `--jq` の式は、同じ日に、本物のコメントの一覧と同じ形(`user.login` と文字列の `body`)の5つのコメントの JSON に `ghcr.io/jqlang/jq:1.8.1` で当て、`github-actions[bot]` が書いた `kind=exception` のコメントの ID の1行だけを出すことを確かめた。空の一覧には何も出さず、終了コード 0 で終わった
 - GitHub が README の Mermaid の図を描く版は 12.2.0 である。Claude は、2026-11-02 に、GitHub の図の描画のページ(`viewscreen.githubusercontent.com/markdown/mermaid`)が読み込む部品のうち、info の図の部品に書かれた版を読んだ。同じ日に、Claude は、書き直した README の図を、`cdn.jsdelivr.net/npm/mermaid@12.2.0` の Mermaid で parse と render にかけ、12個の枠がすべて描けることを確かめた
 - Claude は、README の `rerun-approval-gated-checks.yaml` の行を変えなかった。この行は「承認前に失敗したままのゲートチェックを再実行し」と書き、再実行する検査の名前を並べていないので、`dependency-cooldown` を足しても今の記述のまま当たるためである。`dependency-graph.yaml` の行には、依存グラフに scope を付けることを足した
+- Claude は、監査手順.md の「`dependency-cooldown` が赤いとき」で、「公開から 72 時間を経過していないパッケージ」の見出しを、判定不能の手順に含めた。check-dependency-cooldown.sh の report_cooldown は、公開時刻を読めなかったときにしか呼ばれず、この見出しは「公開時刻を取得できませんでした(判定不能)」の見出しと一緒にしか出ないためである
 
 ## 完了条件(全タスク共通)
 

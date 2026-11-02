@@ -13,7 +13,12 @@ packages:
 # Dependabotは独自リゾルバでこの設定に従わず、security updates にはクールダウンが
 # 適用されないため、DependabotのfrontendのPRがこれに当たることがある。
 # 時間の経過で解消するため、通常は再実行を待てばよい。
-# 急いで通す必要がある場合のみ minimumReleaseAgeExclude に対象を一時的に追加する。
+# 本番で動く部品の深刻度が high か critical の脆弱性の警告が示す最初の修正版を、
+# 72時間待たずに入れるときだけ、minimumReleaseAgeExclude に、その版を指す要素を
+# '<名前>@<版>' の形で1つ足す(同じ部品の版が2つあるときは '<名前>@<版1> || <版2>')。
+# 名前だけの要素やパターンの要素は、72時間待たずに入れる版の要素に数えない。
+# 値はキーと同じ行に書かず、キーの下の行に「- '<名前>@<版>'」の形で並べる。
+# この要素を足したPRは、dependency-cooldown が確かめ、所有者の承認を求める。
 minimumReleaseAge: 4320
 
 overrides:
