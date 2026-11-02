@@ -97,7 +97,7 @@
   - _要件: 1.2_
   - _対象の部品: rerun-approval-gated-checks.yaml, required-checks.json_
 
-- [ ] 4. 週次監査に、72時間待たずに入れた版の一覧と、止まった Dependabot の PR の見分けを足す
+- [x] 4. 週次監査に、72時間待たずに入れた版の一覧と、止まった Dependabot の PR の見分けを足す
 - [x] 4.1 72時間待たずに入れた版の一覧を報告するスクリプトを作る (並行可)
 
   Claude は、部品「check-audit-cooldown-exceptions.sh」と、そのテスト `test-check-audit-cooldown-exceptions.sh` を、置き場所の `place-1/.github/scripts/` と、テストを置く `place-1/.github/scripts/tests/` に作る。このスクリプトは、前の回の週次監査からの窓の中でマージされた PR を読み、マージした head の記録のコメントと、PR の本文の CI の道具の記録を、一覧にして報告する。窓とは、このスクリプトが調べる期間で、前の回の週次監査の実行の始まりから今の時刻までである。
@@ -116,7 +116,7 @@
   - _対象の部品: check-audit-dependabot-stuck.sh_
   - _依存: 1.6_
 
-- [ ] 4.3 週次監査のワークフローに新しい項目をつなぐ
+- [x] 4.3 週次監査のワークフローに新しい項目をつなぐ
 
   Claude は、`audit-weekly.yaml` の変更後のワークフローを、置き場所の `place-1/.github/workflows/` に作る。このワークフローは、自己テストの一覧に `test-check-audit-cooldown-exceptions` を持ち、ほかの項目のあとに `run_check cooldown-exceptions "72時間待たずに入れた版の一覧" .github/scripts/check-audit-cooldown-exceptions.sh` を持ち、冒頭の項目の説明に1行を持つ。
   - 完了の確かめ方: actionlint の指摘が0件である。ワークフローの権限が、今の `pull-requests: read` と `issues: write` のままである
