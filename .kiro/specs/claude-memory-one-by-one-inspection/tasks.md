@@ -100,7 +100,7 @@
   - _依存: 1_
 
 - [ ] 5. 前の点検の部品を消し、設定を替える
-- [ ] 5.1 設定の写しを作り、所有者に写してもらう
+- [x] 5.1 設定の写しを作り、所有者に写してもらう
 
   Claude は、部品「前の点検の部品の削除と settings.json」の「呼び出し方」のとおりに、今の `.claude/settings.json` から写しを作り、`.claude/.state/claude-memory-one-by-one-inspection/place-1/settings.json` に置く。Claude は、写しを `.claude/settings.json` に写すコマンドを所有者に示し、写すよう頼む。依頼には、Claude が `deny` の規則のために `.claude/settings.json` を書けないことを添える。前の点検のテスト `test-memory-inspect.sh` のうち、`.claude/settings.json` に `session-context` のフックと `Bash(bash .claude/scripts/memory/memory-inspect.sh *)` の許可があることを確かめる場合は、所有者が写したあとに失敗する。Claude は、このテストのファイルを、タスク「前の点検のスクリプトとテストとスキルを消す」で消す。そのため、Claude は、このタスクの完了条件の「タスクで変えたファイルを使うテスト」に `test-memory-inspect.sh` を含めず、失敗した場合の名前をタスクの報告に書く。
   - 完了の確かめ方: 写しが JSON として読める。写しと HEAD の `.claude/settings.json` の違いが、`hooks.SessionStart` の `memory-inspect.sh" session-context` を呼ぶ要素1つを外したことと、`permissions.allow` の `Bash(bash .claude/scripts/memory/memory-inspect.sh *)` の1行を、`Bash(perl .claude/scripts/memory/memory-files.pl *)` と `Bash(perl .claude/scripts/memory/old-inspection-cleanup.pl)` の2行に替えたことだけである。所有者が写したあと、`.claude/settings.json` のバイトの列が写しと同じである
