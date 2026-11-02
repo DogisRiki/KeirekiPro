@@ -7,7 +7,7 @@
 # その鍵の指紋を TRUSTED_SIGNERS_FILE で渡す。docker のスタブは、gpg のコンテナの代わりに、
 # この PC の gpg で同じ手順を動かす。cosign と gh attestation verify は、スタブが、署名の代わりの
 # ファイルの値を照らして代わりに答える。配布物の並びは、2026-11-02 に nodejs.org と
-# actions/node-versions と releases.hashicorp.com と、Trivy の GitHub のリリースと、
+# nodejs/node の GitHub のリリースと releases.hashicorp.com と、Trivy の GitHub のリリースと、
 # npm の registry の @openai/codex から取った答えの形をもとにしてある。
 #
 # 環境変数 KP_TEST_CASE に場合の名前を入れると、その場合だけを流す。
@@ -209,10 +209,8 @@ publish_key() {
 
 V=24.99.1
 NODE_DIST="$STUB/web/nodejs.org/dist/v$V"
-TAG="$V-1234567890"
-REPACK="$STUB/web/github.com/actions/node-versions/releases/download/$TAG/node-$V-linux-x64.tar.gz"
 
-# 使い方: tarball <出力のファイル> <最上位のフォルダか .> <bin/node の中身>
+# 使い方: tarball <出力のファイル> <最上位のフォルダ> <bin/node の中身>
 tarball() {
     local d
     d=$(mktemp -d -p "$WORK")
@@ -226,7 +224,7 @@ tarball() {
 
 # 使い方: node_put <公開日時> [署名に使う鍵の指紋]
 # 公式の tarball と SHASUMS256.txt と、その鍵で作った SHASUMS256.txt.asc と、
-# versions-manifest.json と、詰め直しの tarball と、リリースの公開日時を置く
+# nodejs/node のリリースの公開日時を置く
 node_put() {
     local key="${2:-$FT}"
     tarball "$NODE_DIST/node-v$V-linux-x64.tar.gz" "node-v$V-linux-x64" "node binary $V"
@@ -235,23 +233,8 @@ node_put() {
         echo "$(sha "$NODE_DIST/node-v$V-linux-x64.tar.gz")  node-v$V-linux-x64.tar.gz"
     } >"$NODE_DIST/SHASUMS256.txt"
     gpgm -u "$key!" --clearsign -o "$NODE_DIST/SHASUMS256.txt.asc" "$NODE_DIST/SHASUMS256.txt" 2>/dev/null || exit 1
-    mkdir -p "$STUB/web/raw.githubusercontent.com/actions/node-versions/main"
-    cat >"$STUB/web/raw.githubusercontent.com/actions/node-versions/main/versions-manifest.json" <<JSON
-[
-  {"version": "$V", "stable": true,
-   "release_url": "https://github.com/actions/node-versions/releases/tag/$TAG",
-   "files": [
-     {"filename": "node-$V-darwin-arm64.tar.gz", "arch": "arm64", "platform": "darwin",
-      "download_url": "https://github.com/actions/node-versions/releases/download/$TAG/node-$V-darwin-arm64.tar.gz"},
-     {"filename": "node-$V-linux-x64.tar.gz", "arch": "x64", "platform": "linux",
-      "download_url": "https://github.com/actions/node-versions/releases/download/$TAG/node-$V-linux-x64.tar.gz"}
-   ]},
-  {"version": "24.99.0", "stable": true, "release_url": "https://github.com/actions/node-versions/releases/tag/24.99.0-1", "files": []}
-]
-JSON
-    tarball "$REPACK" "." "node binary $V"
-    mkdir -p "$STUB/gh/actions/node-versions"
-    printf '%s\n' "$1" >"$STUB/gh/actions/node-versions/$TAG"
+    mkdir -p "$STUB/gh/nodejs/node"
+    printf '%s\n' "$1" >"$STUB/gh/nodejs/node/v$V"
 }
 
 TV=0.99.3
@@ -412,18 +395,21 @@ if want node_ok; then
     expect "Node.js の署名が合えば終了コード 0 になる" 0 verified
     expect_line "Node.js の署名が合えば本文の文が出る(道具)" "- 道具: Node.js"
     expect_line "Node.js の署名が合えば本文の文が出る(版)" "- 版: $V"
-    expect_line "Node.js の署名が合えば本文の文が出る(公開日時は詰め直しのリリースの日時)" "- 公開日時: $PUB"
+    expect_line "Node.js の署名が合えば本文の文が出る(公開日時は nodejs/node のリリースの日時)" "- 公開日時: $PUB"
+    expect_line "Node.js の署名が合えば本文の文が出る(確かめ方)" \
+        "- 確かめ方: nodejs.org の SHASUMS256.txt.asc の署名を gpg で確かめ、node-v${V}-linux-x64.tar.gz のハッシュを照らした(gpg --verify)"
     expect_line "Node.js の署名が合えば本文の文が出る(72時間経っていない)" "- 公開から72時間: 経っていない(所有者の指示で、72時間待たずに入れる)"
     expect_line "Node.js の署名が合えば本文の文が出る(署名した者は主鍵の指紋)" "- 署名した者: $FT"
     expect_record "Node.js の署名が合えば記録の目印の行が出て、owner_instruction に3つ目の引数が入る" node "$V" "$PUB"
     expect_calls "Node.js の署名を、ネットワークを外したコンテナの gpg で確かめる" \
         "^DOCKER run --rm --network none .* kp-ci-tool-gpg:local sh -c " 1
     expect_calls "Node.js の署名を確かめる前に、gpg のコンテナのイメージを作る" "^DOCKER build -q -t kp-ci-tool-gpg:local " 1
-    expect_calls "Node.js の取得の打ち切りは300秒" "^GET https://.* max-time=300$" 5
+    expect_calls "Node.js の取得の打ち切りは300秒" "^GET https://.* max-time=300$" 3
     expect_calls "Node.js の信頼する者の公開鍵を、指紋で鍵サーバから取る" \
         "^GET https://keyserver\.ubuntu\.com/pks/lookup?op=get&options=mr&search=0x${FT} " 1
-    expect_calls "Node.js の公開日時を、詰め直しのリリースのタグで読む" \
-        "^GH api repos/actions/node-versions/releases/tags/${TAG} --jq \.published_at$" 1
+    expect_calls "Node.js の公開日時を、nodejs/node のリリースのタグで読む" \
+        "^GH api repos/nodejs/node/releases/tags/v${V} --jq \.published_at$" 1
+    expect_calls "Node.js を確かめるときに、actions/node-versions を取りに行かない" "node-versions" 0
 fi
 
 if want node_old; then
@@ -503,15 +489,20 @@ if want node_fetch_fail; then
     expect_detail "Node.js の版が無ければ理由が出る" "版が無いかもしれません。"
     reset
     node_put "$(at 3600)"
-    : >"$REPACK.fail"
+    : >"$NODE_DIST/node-v$V-linux-x64.tar.gz.fail"
     run node "$V" "$INSTRUCTION"
-    expect "詰め直しの tarball を取得できなければ終了コード 2 になる" 2 unknown
+    expect "Node.js の tarball を取得できなければ終了コード 2 になる" 2 unknown
     reset
     node_put "$(at 3600)"
     : >"$STUB/gh.fail"
     run node "$V" "$INSTRUCTION"
-    expect "詰め直しのリリースの公開日時を読めなければ終了コード 2 になる" 2 unknown
-    expect_detail "詰め直しのリリースの公開日時を読めなければ理由が出る" "リリース ${TAG} の公開日時を読めませんでした。"
+    expect "nodejs/node のリリースの公開日時を読めなければ終了コード 2 になる" 2 unknown
+    expect_detail "nodejs/node のリリースの公開日時を読めなければ理由が出る" "nodejs/node のリリース v${V} の公開日時を読めませんでした。"
+    reset
+    node_put "$(at 3600)"
+    rm -f "$STUB/gh/nodejs/node/v$V"
+    run node "$V" "$INSTRUCTION"
+    expect "nodejs/node にその版のリリースが無ければ終了コード 2 になる" 2 unknown
 fi
 
 if want node_key_fail; then
@@ -523,15 +514,6 @@ if want node_key_fail; then
     expect_detail "信頼する者の公開鍵を取れなければ理由が出る" "信頼する者の公開鍵のうち 1 個を取れなかった"
 fi
 
-if want node_repack_diff; then
-    reset
-    node_put "$(at 3600)"
-    tarball "$REPACK" "." "tampered node binary"
-    run node "$V" "$INSTRUCTION"
-    expect "Node.js の詰め直しの tarball の bin/node が違えば終了コード 1 になる" 1 unverified
-    expect_detail "Node.js の詰め直しの tarball の bin/node が違えば理由が出る" "詰め直しの tarball の bin/node が、確かめた node-v${V}-linux-x64.tar.gz の bin/node と違います。"
-fi
-
 if want node_tarball_hash; then
     reset
     node_put "$(at 3600)"
@@ -539,23 +521,6 @@ if want node_tarball_hash; then
     run node "$V" "$INSTRUCTION"
     expect "Node.js の tarball のハッシュが署名された値と違えば終了コード 1 になる" 1 unverified
     expect_detail "Node.js の tarball のハッシュが違えば理由が出る" "node-v${V}-linux-x64.tar.gz のハッシュが、署名された SHASUMS256.txt の値と違います。"
-fi
-
-if want node_manifest; then
-    reset
-    node_put "$(at 3600)"
-    perl -pi -e 's/"version": "\Q'"$V"'\E"/"version": "0.0.0"/' \
-        "$STUB/web/raw.githubusercontent.com/actions/node-versions/main/versions-manifest.json"
-    run node "$V" "$INSTRUCTION"
-    expect "versions-manifest.json にその版が無ければ終了コード 2 になる" 2 unknown
-    expect_detail "versions-manifest.json にその版が無ければ理由が出る" "linux の x64 の tarball がありません。"
-    reset
-    node_put "$(at 3600)"
-    perl -pi -e 's{https://github.com/actions/node-versions/releases/download/\Q'"$TAG"'\E/node-\Q'"$V"'\E-linux-x64}{https://example.invalid/node-'"$V"'-linux-x64}' \
-        "$STUB/web/raw.githubusercontent.com/actions/node-versions/main/versions-manifest.json"
-    run node "$V" "$INSTRUCTION"
-    expect "versions-manifest.json の URL が actions/node-versions のリリースでなければ終了コード 2 になる" 2 unknown
-    expect_calls "versions-manifest.json の URL が actions/node-versions のリリースでなければ取りに行かない" "example\.invalid" 0
 fi
 
 # --- 場合(Terraform) --------------------------------------------------------------------
