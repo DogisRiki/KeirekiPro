@@ -5,6 +5,8 @@
 #   1. pnpm update <名前> で lockfile だけを直す(使っている側の範囲の中で上げる)
 #   2. 脆弱な版が残れば overrides に版の指定を足す(dependency-gate が所有者の承認を求める)
 #   3. それでも残れば PR を作らず、失敗で終える
+#   4. ci.yaml の frontend-test と同じ検査を流し、通らなければ PR を作らず、消せなかった警告を
+#      実行の記録に出して失敗で終える(overrides が、ほかの部品が使う古い版まで置き換えることがある)
 # 同じ組のブランチが origin にあれば作らない。修正版が公開から72時間経っていないときは、
 # 本番で動く部品の high か critical の警告なら minimumReleaseAgeExclude に足して進み、
 # それ以外は経ってからの実行に回す(pnpm-workspace.yaml の minimumReleaseAge の決まり)。
@@ -13,6 +15,8 @@
 set -euo pipefail
 
 FRONTEND=frontend
+# ci.yaml の frontend-test が流す pnpm のコマンドを、同じ順に並べる(そろっていることはテストが確かめる)
+FRONTEND_TEST=("install --frozen-lockfile" "run format" "run lint" "test" "run coverage" "run build")
 
 plan() {
     jq '[ .[] | if type == "array" then .[] else . end
@@ -97,6 +101,18 @@ still_vulnerable() {
     return 1
 }
 
+# frontend-test と同じ検査を流す。1つでも失敗すればそこで止め、0 以外で終わる。
+# 部品のスクリプトに bot の PAT を渡さないよう、GH_TOKEN を外して呼ぶ
+frontend_test() {
+    local c args
+    for c in "${FRONTEND_TEST[@]}"; do
+        read -ra args <<<"$c"
+        echo "::group::pnpm ${c}"
+        if ! env -u GH_TOKEN pnpm --dir "$FRONTEND" "${args[@]}" </dev/null; then echo "::endgroup::"; return 1; fi
+        echo "::endgroup::"
+    done
+}
+
 # shellcheck disable=SC2016 # 本文の ` は Markdown の印であり、シェルの展開ではない
 pr_body() {
     printf '## 概要\nDependabot が PR を作らない frontend の間接依存 `%s` を、警告が消える `%s` 以上に上げる。\n' "$2" "$3"
@@ -135,6 +151,9 @@ run() {
         fi
         if still_vulnerable "$name" "$group" || git diff --quiet; then
             echo "::error::${name} を ${ver} 以上に上げられませんでした。手で直してください。"; failed=1; continue; fi
+        if ! frontend_test; then
+            echo "::error::${name} を ${ver} 以上に上げると frontend-test の検査が通らないので、PR を作りません。手で直してください。消せなかった警告: $(jq -r '[.alerts[].html_url] | join(" ")' <<<"$group")"
+            failed=1; continue; fi
         git switch -q -c "$branch"
         git add "$FRONTEND/pnpm-lock.yaml" "$FRONTEND/pnpm-workspace.yaml"
         git commit -q -m "$title" -m "Changes:
@@ -152,6 +171,6 @@ Refs: N/A"
 }
 
 case "${1:-}" in
-    run | plan | vulnerable | decide | override | exclude) "$@" ;;
-    *) echo "使い方: frontend-vuln-fix.sh run | plan | vulnerable | decide | override | exclude" >&2; exit 2 ;;
+    run | plan | vulnerable | decide | override | exclude | frontend_test) "$@" ;;
+    *) echo "使い方: frontend-vuln-fix.sh run | plan | vulnerable | decide | override | exclude | frontend_test" >&2; exit 2 ;;
 esac
