@@ -36,7 +36,7 @@ Claude は `perl .claude/scripts/memory/old-inspection-cleanup.pl` を打ち、�
 | `absent` | `absent` | 何も示さない |
 
 - `schedule` が `failed` のとき: Claude は「前の点検の予定を外せなかった。」の行と、出力の `manual_command` のコマンドを `bash` か `powershell` のコードの囲みで示し、点検を続ける。Claude は、`state` が `removed` なら「前の点検の報告と記録を消した。」の行を示し、`state` が `absent` なら `state` についての行を示さない
-- `state` が `failed` のとき: Claude は「前の点検の報告と記録を消せなかった。」の行と、出力の `state_path` の場所を示し、点検を続ける
+- `state` が `failed` のとき: Claude は「前の点検の報告と記録を消せなかった。」の行と、出力の `state_path` の場所を示し、点検を続ける。Claude は、`schedule` が `removed` なら「前の点検の予定を外した。」の行も示す
 
 ### 手順2 main の取り込みとメモリの一覧
 
@@ -172,6 +172,7 @@ Claude は、了承された一覧を `memory-files.pl delete <名前>=<sha256> 
 - `deleted` のメモリファイル: 「消した: `<名前>`、…」の1行にまとめる。`deleted` のメモリファイルが無いときは、Claude はこの行を出さない
 - `changed` のメモリファイル: 「`<名前>` は、示したあとに中身が変わっていたので、消さなかった。」の1行ずつ
 - `missing` のメモリファイル: 「`<名前>` は、すでに無かった。」の1行ずつ
+- `error` のメモリファイル: 「`<名前>` は、消せなかった。」の1行と、結果の `error` の理由を1行ずつ。`error` の結果があると `delete` は 1 で終わるが、同じ呼び出しで `deleted` になったメモリファイルは消えているので、Claude は、ほかの結果もこの一覧のとおりに示してから点検を止める
 - `kept_index_lines` の目次の行: 「目次の行「<行>」は、ほかのメモリファイルも指しているので、消さずに残した。」の1行ずつ
 - 最後に、Claude は、「手順7 消す一覧の了承」の残したメモリファイルの行を足す
 
