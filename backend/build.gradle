@@ -63,6 +63,31 @@ repositories {
 // libs.versions.toml の opentelemetry の版以上なら、この行と libs.versions.toml の opentelemetry の行を削除する。
 ext['opentelemetry.version'] = libs.versions.opentelemetry.get()
 
+// Dependabot が PR を作らない部品の脆弱性の警告を消すため、libs.versions.toml の名前が vuln-fix- で始まる行の部品を
+// その版に引き上げる(#643。行は backend-vuln-fix.yaml が足す)。BOM が決めた版には constraints が効かないため
+// 解決の規則で指定し、解決した版のほうが新しければ下げない。
+// 解除の判定: ./gradlew dependencies で、行を消しても部品が行の版以上なら、その行を消す。
+def vulnFixCatalog = versionCatalogs.named('libs')
+def vulnFixes = vulnFixCatalog.libraryAliases.findAll { it.startsWith('vuln.fix.') }
+        .collect { vulnFixCatalog.findLibrary(it).get().get() }
+// 版 a が版 b より古いか。数字の区切りは数で、それ以外は文字で比べる
+def vulnFixOlder = { String a, String b ->
+    def (pa, pb) = [(a ?: '').tokenize('.-'), b.tokenize('.-')]
+    def i = (0..<Math.max(pa.size(), pb.size())).find { (pa[it] ?: '0') != (pb[it] ?: '0') }
+    if (i == null) { return false }
+    def (x, y) = [pa[i] ?: '0', pb[i] ?: '0']
+    x.isBigInteger() && y.isBigInteger() ? x.toBigInteger() < y.toBigInteger() : x < y
+}
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+        def pinned = vulnFixes.find { it.module.group == details.requested.group && it.module.name == details.requested.name }?.versionConstraint?.requiredVersion
+        if (pinned && vulnFixOlder(details.target.version, pinned)) {
+            details.useVersion(pinned)
+            details.because('libs.versions.toml の vuln-fix- の行')
+        }
+    }
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'

@@ -1,0 +1,30 @@
+name: Backend Vulnerability Fix
+# Dependabot が PR を作らない backend の部品の警告を消す PR を作る(動きは .github/scripts/backend-vuln-fix.sh の先頭)。
+# 警告のイベントは Actions に無いので毎日読む。bot の PAT を使う(GITHUB_TOKEN の PR では CI が動かない。canary.yaml と同じ)
+on:
+  schedule:
+    - cron: '13 1 * * *' # 毎日 10:13 JST
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: backend-vuln-fix
+  cancel-in-progress: false
+jobs:
+  backend-vuln-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test script # 壊れたスクリプトで PR を作らない
+        run: bash .github/scripts/tests/test-backend-vuln-fix.sh
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Create pull requests
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: bash .github/scripts/backend-vuln-fix.sh run

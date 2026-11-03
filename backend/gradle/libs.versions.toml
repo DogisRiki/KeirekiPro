@@ -56,6 +56,9 @@ opentelemetry = "1.67.0"
 commons-lang3 = "3.20.0"
 guava = "33.7.2-jre"
 
+# Dependabot が PR を作らない部品の警告を消すための版。build.gradle の vuln-fix の処理が使い、行は backend-vuln-fix.yaml が足す
+# backend-vuln-fix.yaml は、この下に vuln-fix- の行を足す
+
 [libraries]
 # Flyway Gradleプラグインが DB別モジュールをbuildscriptクラスパスに要求するためのもの。
 # implementation 側の spring-boot-starter-flyway / flyway-database-postgresql は Spring Boot のBOM管理下にあり
@@ -72,6 +75,8 @@ java-jwt = { module = "com.auth0:java-jwt", version.ref = "java-jwt" }
 spring-cloud-aws-dependencies = { module = "io.awspring.cloud:spring-cloud-aws-dependencies", version.ref = "spring-cloud-aws" }
 commons-validator = { module = "commons-validator:commons-validator", version.ref = "commons-validator" }
 mybatis-postgresql-typehandlers = { module = "com.github.onozaty:mybatis-postgresql-typehandlers", version.ref = "mybatis-postgresql-typehandlers" }
+
+# backend-vuln-fix.yaml は、この下に vuln-fix- の行を足す
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
