@@ -217,6 +217,15 @@
                 "hooks": [
                     {
                         "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-ship-watch-before-stop.sh\"",
+                        "timeout": 60
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
                         "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/resume-after-usage-limit.sh\"",
                         "asyncRewake": true,
                         "timeout": 691200
