@@ -4,11 +4,12 @@
 #
 # PR を作る run は gh・git・pnpm・npm のレジストリにつながるので、ここでは流さない。
 # run が使う判断の部品(警告の絞り込みとまとめ方、脆弱な版の見つけ方、72時間の判断、
-# pnpm-workspace.yaml の書き換え)を、サブコマンドで1つずつ呼んで確かめる。
+# pnpm-workspace.yaml の書き換え、frontend-test と同じ検査)を、サブコマンドで1つずつ呼んで確かめる。
 # =====================================================================
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/frontend-vuln-fix.sh"
+CI_YAML="$(cd "$(dirname "$0")/../.." && pwd)/workflows/ci.yaml"
 WORK=$(mktemp -d) || exit 1
 [ -n "$WORK" ] && [ -d "$WORK" ] || exit 1
 trap 'rm -rf "$WORK"' EXIT
@@ -182,6 +183,35 @@ expect_eq "キーは1つのまま" "$(grep -c '^minimumReleaseAgeExclude:' "$WOR
 printf 'packages:\n  - .\n' >"$WORK/w.yaml"
 bash "$SCRIPT" exclude "$WORK/w.yaml" 'qs@6.16.1'
 expect_eq "どちらのキーも無ければ最後に作る" "$(tail -n 2 "$WORK/w.yaml" | tr '\n' '|')" "minimumReleaseAgeExclude:|  - 'qs@6.16.1'|"
+
+# --- frontend_test ------------------------------------------------------
+echo "frontend_test: frontend-test と同じ検査"
+# pnpm の代わりに、受け取った引数を記録し、PNPM_FAIL と同じ引数のときだけ失敗する偽物を置く
+mkdir -p "$WORK/bin"
+cat >"$WORK/bin/pnpm" <<'EOF'
+#!/usr/bin/env bash
+echo "$*" >>"$PNPM_LOG"
+[ -z "${GH_TOKEN+x}" ] || echo "GH_TOKEN が渡った" >>"$PNPM_LOG"
+[ "$*" != "${PNPM_FAIL:-}" ]
+EOF
+chmod +x "$WORK/bin/pnpm"
+fake_test() { # 失敗させる引数
+    : >"$WORK/pnpm.log"
+    PATH="$WORK/bin:$PATH" PNPM_LOG="$WORK/pnpm.log" PNPM_FAIL="$1" GH_TOKEN=secret \
+        bash "$SCRIPT" frontend_test >/dev/null
+}
+ci_cmds=$(awk '/^  frontend-test:/ { f = 1; next } f && /^  [^ #]/ { f = 0 }
+               f && /run: pnpm / { sub(/.*run: pnpm /, ""); print "--dir frontend " $0 }' "$CI_YAML")
+if [ "$(wc -l <<<"$ci_cmds")" -ge 5 ]; then ok "ci.yaml の frontend-test から pnpm のコマンドを読めた"
+else ng "ci.yaml の frontend-test から pnpm のコマンドを読めない: [$ci_cmds]"; fi
+if fake_test ''; then ok "すべて通れば 0 で終わる"; else ng "すべて通ったのに 0 以外で終わった"; fi
+expect_eq "ci.yaml の frontend-test と同じコマンドを同じ順に流す" "$(cat "$WORK/pnpm.log")" "$ci_cmds"
+if fake_test '--dir frontend run lint'; then ng "ESLint が失敗したのに 0 で終わった"
+else ok "ESLint が失敗すれば 0 以外で終わる"; fi
+expect_eq "失敗したところで止め、後ろの検査を流さない" "$(tail -n 1 "$WORK/pnpm.log")" '--dir frontend run lint'
+if fake_test '--dir frontend run build'; then ng "組み立てが失敗したのに 0 で終わった"
+else ok "最後の組み立てが失敗しても 0 以外で終わる"; fi
+expect_eq "部品のスクリプトに GH_TOKEN を渡さない" "$(grep -c 'GH_TOKEN' "$WORK/pnpm.log")" 0
 
 # --- 使い方 -------------------------------------------------------------
 echo "使い方"
