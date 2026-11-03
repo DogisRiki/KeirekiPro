@@ -25,6 +25,16 @@ mkdir -p "$BIN" "$FIX"
 git init -q "$REPO"
 git -C "$REPO" checkout -q -B main
 printf '.claude/.state/\n' >"$REPO/.gitignore"
+mkdir -p "$REPO/.github/audit"
+cat >"$REPO/.github/audit/required-checks.json" <<'JSON'
+{
+  "checks": [
+    { "context": "size-check", "mode": "always", "state": "active", "approval_gated": false },
+    { "context": "escape-hatch", "mode": "always", "state": "active", "approval_gated": true },
+    { "context": "pre-merge-check", "mode": "always", "state": "active", "approval_gated": true }
+  ]
+}
+JSON
 git -C "$REPO" add -A
 git -C "$REPO" "${GITC[@]}" commit -q -m seed
 git -C "$REPO" checkout -q -b fix/x
@@ -159,19 +169,68 @@ t_merging_blocks() {
     expect_err "マージされるまで見届けを続けて"
 }
 
-t_review_required_passes() {
-    set_pr OPEN BLOCKED REVIEW_REQUIRED yes
-    set_checks size-check=pass gitleaks=skipping
-    run_hook
-    expect_rc 0 "所有者の承認を待っている"
+# 承認を待つスクリプトの心拍のファイルに、いまから <秒> 前の時刻を書く
+set_beat() { # <秒>
+    mkdir -p "$REPO/.claude/.state/ship-watch"
+    echo $(($(date +%s) - $1)) >"$REPO/.claude/.state/ship-watch/approval-wait-42"
 }
 
-t_gate_red_passes() {
+t_review_required_without_wait_blocks() {
+    set_pr OPEN BLOCKED REVIEW_REQUIRED yes
+    set_checks size-check=pass gitleaks=skipping
+    run_hook p-1
+    expect_rc 2 "承認待ちで承認を待つコマンドが動いていない"
+    expect_err "PR #42 は所有者の承認を待っていますが"
+    expect_err "bash .claude/scripts/ship/wait-approval.sh 42 を Bash の run_in_background で"
+    run_hook p-1
+    expect_rc 0 "同じ返答の中で同じ状態の2回目"
+}
+
+t_review_required_with_wait_passes() {
+    set_pr OPEN BLOCKED REVIEW_REQUIRED yes
+    set_checks size-check=pass gitleaks=skipping
+    set_beat 30
+    run_hook
+    expect_rc 0 "承認を待つコマンドが動いている"
+}
+
+t_review_required_with_stale_wait_blocks() {
+    set_pr OPEN BLOCKED REVIEW_REQUIRED yes
+    set_checks size-check=pass
+    set_beat 600
+    run_hook
+    expect_rc 2 "心拍が10分前で、承認を待つコマンドが止まっている"
+    expect_err "承認を待つコマンドが動いていません"
+}
+
+t_gate_red_without_wait_blocks() {
+    set_pr OPEN BLOCKED APPROVED yes
+    set_checks size-check=pass escape-hatch=fail pre-merge-check=cancel
+    echo 1 >"$FIX/checks.exit"
+    run_hook
+    expect_rc 2 "承認待ちのゲートだけが赤で、承認を待つコマンドが動いていない"
+    expect_err "PR #42 は所有者の承認を待っていますが"
+    set_beat 0
+    run_hook p-2
+    expect_rc 0 "承認を待つコマンドが動いている"
+}
+
+t_other_red_passes() {
+    set_pr OPEN BLOCKED REVIEW_REQUIRED yes
+    set_checks size-check=fail escape-hatch=fail
+    echo 1 >"$FIX/checks.exit"
+    run_hook
+    expect_rc 0 "承認待ちのゲートのほかにも赤の検査がある"
+}
+
+t_unreadable_expected_list_treats_red_as_other() {
+    rm -f "$REPO/.github/audit/required-checks.json"
     set_pr OPEN BLOCKED APPROVED yes
     set_checks size-check=pass escape-hatch=fail
     echo 1 >"$FIX/checks.exit"
     run_hook
-    expect_rc 0 "赤の検査があって結果待ちの検査が無い"
+    git -C "$REPO" checkout -q -- .github/audit/required-checks.json
+    expect_rc 0 "期待一覧を読めないので、赤を承認待ちのゲートと見分けない"
 }
 
 t_no_reservation_passes() {
@@ -253,8 +312,12 @@ run_test "結果待ちの検査があれば、同じ返答の中で1回だけ止
 run_test "head が変われば、同じ返答の中でもまた止める" t_new_head_blocks_again
 run_test "main と衝突していれば止める" t_dirty_blocks
 run_test "検査がすべて通り予約があれば止める" t_merging_blocks
-run_test "所有者の承認待ちなら通す" t_review_required_passes
-run_test "赤の検査だけなら通す" t_gate_red_passes
+run_test "承認待ちで、承認を待つコマンドが動いていなければ止める" t_review_required_without_wait_blocks
+run_test "承認待ちで、承認を待つコマンドが動いていれば通す" t_review_required_with_wait_passes
+run_test "承認待ちで、承認を待つコマンドの心拍が古ければ止める" t_review_required_with_stale_wait_blocks
+run_test "承認待ちのゲートだけが赤で、承認を待つコマンドが動いていなければ止める" t_gate_red_without_wait_blocks
+run_test "承認待ちのゲートのほかにも赤があれば通す" t_other_red_passes
+run_test "期待一覧を読めなければ、赤の検査を承認待ちのゲートと見分けずに通す" t_unreadable_expected_list_treats_red_as_other
 run_test "自動マージの予約が無ければ通す" t_no_reservation_passes
 run_test "必須の検査を読めなければ通す" t_unreadable_checks_passes
 run_test "マージ後に集計がまだなら、会話ごとに1回止める" t_merged_unreported_blocks_once_per_session
