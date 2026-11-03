@@ -43,10 +43,16 @@ jobs:
         with:
           package_json_file: frontend/package.json
 
+      # Node.js は配布元の署名を確かめてから入れる(.github/actions/verified-node)。
+      # setup-node は node-version を省くと PATH の Node.js を使うので、pnpm のキャッシュにだけ使う
       - name: Use Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: ./.github/actions/verified-node
         with:
           node-version: '24.22.1'
+
+      - name: Cache pnpm store
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
 

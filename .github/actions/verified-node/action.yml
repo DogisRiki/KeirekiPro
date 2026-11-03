@@ -1,0 +1,17 @@
+name: Verified Node.js
+description: >-
+  Node.js を nodejs.org から取り、配布元の署名を確かめてから PATH に足す。
+  確かめられなければ、Node.js を PATH に足さずに失敗する。
+  中身は .github/scripts/install-verified-node.sh にある。
+inputs:
+  node-version:
+    description: '入れる Node.js の版(例: 24.22.1)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Node.js の署名を確かめてから PATH に足す
+      shell: bash
+      env:
+        NODE_VERSION: ${{ inputs.node-version }}
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/install-verified-node.sh" "$NODE_VERSION"

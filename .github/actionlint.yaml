@@ -1,0 +1,14 @@
+# actionlint の設定。CI の guardrails が読む。
+#
+# actionlint 1.7.12 は、ワークフローの標準のトークンの権限 vulnerability-alerts を
+# 知らず、dependency-review.yaml の cooldown ジョブの vulnerability-alerts: read を
+# 「unknown permission scope」として指摘する。この1件の指摘だけを無視させる。
+# ほかのファイルの指摘と、dependency-review.yaml のほかの種類の指摘は、今と同じく
+# guardrails を赤にする。
+#
+# actionlint がこの権限を知る版を出したら(rhysd/actionlint#713、rhysd/actionlint#666)、
+# guardrails.yaml の actionlint の版を上げ、このファイルを消す。
+paths:
+  .github/workflows/dependency-review.yaml:
+    ignore:
+      - 'unknown permission scope "vulnerability-alerts"'

@@ -85,6 +85,26 @@ jobs:
       - name: Check labels file
         run: bash .github/scripts/sync-labels.sh --check
 
+      # Node.js を配布元の署名を確かめてから入れるスクリプト(.github/actions/verified-node の中身)の
+      # テスト。使い捨ての鍵で署名した偽の配布物を file:// で読ませるため、ネットワークを使わない
+      - name: Test verified Node.js install
+        run: bash .github/scripts/tests/test-install-verified-node.sh
+
+      # Terraform を配布元の署名を確かめてから入れるスクリプト(.github/actions/verified-terraform の中身)の
+      # テスト。使い捨ての鍵で署名した偽の配布物を file:// で読ませるため、ネットワークを使わない
+      - name: Test verified Terraform install
+        run: bash .github/scripts/tests/test-install-verified-terraform.sh
+
+      # Codex CLI を配布元の来歴を確かめてから入れるスクリプト(.github/actions/verified-codex の中身)の
+      # テスト。偽の registry を file:// で読ませ、gh attestation verify はスタブに替えるため、ネットワークを使わない
+      - name: Test verified Codex CLI install
+        run: bash .github/scripts/tests/test-install-verified-codex.sh
+
+      # Trivy を配布元の署名を確かめてから入れるスクリプト(.github/actions/verified-trivy の中身)の
+      # テスト。偽の配布物を file:// で読ませ、cosign を動かす docker を偽物に置き換えるため、ネットワークを使わない
+      - name: Test verified Trivy install
+        run: bash .github/scripts/tests/test-install-verified-trivy.sh
+
       - name: Check owner approval
         id: approval
         env:
@@ -284,10 +304,16 @@ jobs:
         with:
           package_json_file: frontend/package.json
 
+      # Node.js は配布元の署名を確かめてから入れる(.github/actions/verified-node)。
+      # setup-node は node-version を省くと PATH の Node.js を使うので、pnpm のキャッシュにだけ使う
       - name: Use Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: ./.github/actions/verified-node
         with:
           node-version: '24.22.1'
+
+      - name: Cache pnpm store
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
 

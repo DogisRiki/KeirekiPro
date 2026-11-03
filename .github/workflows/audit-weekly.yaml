@@ -1,7 +1,7 @@
 name: Audit Weekly
 
 # 週次監査(#310 段階1): 人間が画面を開いて行っていた定期監査のうち、
-# 機械判定できる5項目を自動判定に置き換える。
+# 機械判定できる6項目を自動判定に置き換える。
 #
 #   scan-freshness   定期スキャン(container-scan-scheduled.yaml)の直近成功が
 #                    8日未満かを確認する(旧・週次8)
@@ -14,6 +14,7 @@ name: Audit Weekly
 #                    ままマージされたPRの検知(新規)
 #   trivy-version    PRの検査と定期検査の TRIVY_VERSION が一致しているかを
 #                    確認する(旧・月次4の一部。#334)
+#   cooldown-exceptions 公開から72時間待たずに入れた版の一覧を報告する(新規。#641)
 #
 # 判定・通知・結論の3段で動く(#347):
 #   - 判定: 各判定スクリプトの終了コードを 0=逸脱なし / 1=逸脱あり /
@@ -111,14 +112,14 @@ jobs:
             echo ""
           } >>"$GITHUB_STEP_SUMMARY"
 
-      # 判定。自己テスト → 本判定5本 → 集約 の順に行い、結果をステップ出力
+      # 判定。自己テスト → 本判定6本 → 集約 の順に行い、結果をステップ出力
       # result(none / deviation / undecidable)に書く。このステップ自体は
       # 常に成功で終わり(set +e で途中の失敗でも止めない)、成否は Conclude が
       # 決める。
       #
       # 自己テストを先に置く。壊れた判定スクリプトの結論(緑も赤も)を信用せず、
       # 1本でも失敗したら本判定を行わずに判定不能とする(dependency-review.yaml
-      # の cooldown ジョブと同じ、自テスト後に本判定の型)。自己テストの4本は
+      # の cooldown ジョブと同じ、自テスト後に本判定の型)。自己テストの5本は
       # 途中で失敗しても全部実行する(container-scan-scheduled.yaml のテスト
       # 集約と同じ方式)。scan-freshness と inventory-freshness は同じ判定
       # スクリプトを使うため、自己テストは1本で両方を受け持つ。
@@ -130,8 +131,9 @@ jobs:
       # 報告ファイルへの書き込みに失敗したら、Issueで内容を伝えられないため
       # 判定不能に倒す。
       #
-      # 各スクリプトは GITHUB_REPOSITORY / GITHUB_RUN_ID(ランナーの既定環境変数)
-      # と GH_TOKEN を前提とする。secrets は使わない(github.token のみ)。
+      # 各スクリプトは GITHUB_REPOSITORY / GITHUB_REPOSITORY_OWNER / GITHUB_RUN_ID
+      # (ランナーの既定環境変数)と GH_TOKEN を前提とする。secrets は使わない
+      # (github.token のみ)。
       # スクリプトには実行ビットが無い(core.fileMode=false で 100644 として
       # 記録される)。直接起動すると exit 126 になるため bash 経由で起動する。
       - name: Judge
@@ -202,7 +204,7 @@ jobs:
           }
 
           selftest_failed=0
-          for t in test-check-audit-scan-freshness test-check-audit-dependabot-stuck test-check-audit-skipped-required test-check-audit-trivy-version; do
+          for t in test-check-audit-scan-freshness test-check-audit-dependabot-stuck test-check-audit-skipped-required test-check-audit-trivy-version test-check-audit-cooldown-exceptions; do
             echo "::group::${t}.sh"
             if ! bash ".github/scripts/tests/${t}.sh"; then
               echo "::error::${t}.sh が失敗しました。"
@@ -228,6 +230,7 @@ jobs:
             run_check trivy-version "Trivy の版の一致" \
               .github/scripts/check-audit-trivy-version.sh \
               .github/workflows/container-scan.yaml .github/workflows/container-scan-scheduled.yaml
+            run_check cooldown-exceptions "72時間待たずに入れた版の一覧" .github/scripts/check-audit-cooldown-exceptions.sh
           fi
 
           echo "週次監査の結果: ${overall}"

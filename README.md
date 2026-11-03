@@ -52,7 +52,7 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 
 ```mermaid
 flowchart LR
-    PR[プルリクエスト<br>Claude Code または Dependabot]
+    PR[プルリクエスト<br>Claude Code・Dependabot・<br>frontend-vuln-fix]
 
     subgraph s1[系統1: 品質の検査]
         Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>依存の脆弱性検査・<br>コンテナイメージの脆弱性検査・<br>公開直後のライブラリの遮断]
@@ -61,7 +61,7 @@ flowchart LR
         Z[検査回避の検知・差分サイズ・<br>シークレットスキャン・<br>ワークフローの静的検証・<br>Gradle本体の検証・<br>読み込まれる文書の量]
     end
     subgraph s3[系統3: 人間の関門]
-        H[ビルド設定・ライブラリの入手先・<br>pre-merge-checkラベル・保護パスの変更は<br>所有者がApproveするまで赤]
+        H[ビルド設定・ライブラリの入手先・<br>72時間待たずに入れる脆弱性の修正版・<br>pre-merge-checkラベル・保護パスの変更は<br>所有者がApproveするまで赤]
     end
     subgraph s4[系統4: AIレビュー]
         A[Codexがコード品質と仕様適合を審査<br>指摘の修正往復は最大5回<br>Dependabotのプルリクエストは対象外<br>Issueの決めた方式からの外れも止める]
@@ -79,7 +79,7 @@ flowchart LR
     M -->|ラベルの一覧のファイルが変わったとき| Labels[sync-labels<br>GitHubのラベルを<br>ラベルの一覧のファイルのとおりに合わせる]
 
     subgraph s5[定期の監査]
-        AW[audit-weekly<br>週次で定期スキャンと棚卸しの鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜けを判定し<br>結果をIssueで通知]
+        AW[audit-weekly<br>週次で定期スキャンと棚卸しの鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜けを判定し<br>72時間待たずに入れた版の一覧とともに<br>結果をIssueで通知]
         CV[canary-verify<br>月次でカナリアPRが<br>期待どおり赤になったかを照合し<br>結果をIssueで通知]
         AI[audit-inventory<br>月次で版とサポート期限を集め<br>判定せずに台帳のIssueへ報告]
     end
@@ -90,38 +90,47 @@ flowchart LR
 
 4つの系統がすべて緑になるまで、プルリクエストはマージされません。mainが進んだときとプルリクエストを出したときに、プルリクエストのブランチは自動でmainの最新に合わせられ、検査が再実行されます。マージされても本番への反映は行われず、人間による手動実行だけが本番を更新できます。
 
+Node.jsを使うワークフロー(ci.yaml・guardrails.yaml・codex-review.yml・mutation-report.yaml・frontend-vuln-fix.yaml)は、Node.jsをnodejs.orgから取り、配布元の署名を確かめてから使います。確かめられなければ、Node.jsを使う前に失敗します。
+
+terraform-apply.yamlは、Terraformをreleases.hashicorp.comから取り、配布元の署名を確かめてから使います。確かめられなければ、Terraformを使う前に失敗します。
+
+Trivyを使うワークフロー(container-scan.yaml・container-scan-scheduled.yaml)は、TrivyをGitHubのリリースから取り、aquasecurity/trivyのリリースのワークフローが指定の版のタグで署名したことを確かめてから使います。確かめられなければ、Trivyを使う前に失敗します。
+
+codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリリースのワークフローが作ったことを示す来歴を確かめてから使います。確かめられなければ、Codex CLIを使う前に失敗します。
+
 各ワークフローの詳細は次のとおりです。
 
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
 |---|---|---|---|
 | 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存。テスト結果とカバレッジの成果物は、mainへのpushでは90日、プルリクエストでは7日保持する |
 | 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査。本番のAWSには接続しない(本番との差分は terraform-apply.yaml が適用の直前に出す)。terraform関連の変更が無いPRでは各ジョブをスキップする |
-| 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
-| 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする |
+| 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。ただし、本番で動く部品の深刻度がhighかcriticalの脆弱性の警告が示す最初の修正版は、そのPRで追加されたすべての部品が悪意のある部品の一覧に載っておらず、最初の修正版の署名した者が前の版と変わっていなければ、PRに記録のコメントを残したうえで、所有者のApproveで72時間待たずに入れる。前の版に署名が無いときは、署名した者を比べない。DependabotのPRも同じ判定を受ける。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
+| 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする。部品には、本番のjarに入る部品(runtime)か開発のときだけ使う部品(development)かを付け、アラートで本番で動く部品を見分けられるようにする |
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。本番用のイメージをarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、リリースゲートのテスト、Node.jsとTerraformとTrivyの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複・Javaテストの検証有無)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |
-| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。コード品質と仕様への適合を審査し、問題があればマージをブロック。Issue本文の『決めた方式』の見出しがあるときは、その方式から外れたPRも、理由の有無に関わらずブロック |
+| AIレビュー | codex-review.yml | pull_request | Codexによる自動コードレビュー。Codex CLIは配布元の来歴を確かめてから使う。コード品質と仕様への適合を審査し、問題があればマージをブロック。Issue本文の『決めた方式』の見出しがあるときは、その方式から外れたPRも、理由の有無に関わらずブロック |
 | マージ | auto-merge.yaml | pull_request (opened / reopened / ready_for_review / synchronize / auto_merge_disabled) / 30分ごと (schedule) / 手動 | main向けのプルリクエストにauto-mergeを予約する。作成者がAIか所有者かに依らず予約し、下書きの間は予約しない。予約が外れたときは、所有者が手で外した場合も含めて理由を問わず付け直し、30分ごとの見直しで予約の無いプルリクエストにも予約する。マージを保留するときはpre-merge-checkラベルを付けるか下書きにする。DependabotのPR・カナリアPR・forkのPRは対象外で、DependabotのPRはdependabot-auto-merge.yamlが予約する。予約に失敗したときと、同じコミットで3回を超えて外れて付け直しを止めたときは、プルリクエストへのコメントで所有者に知らせる |
 | マージ | close-linked-issues.yaml | pull_request (closed) / 毎時 (schedule) / 手動 | mainへマージされたプルリクエストの本文に`Closes #番号`で書かれたIssueが開いたままなら閉じ、どのプルリクエストのマージで閉じたかをIssueにコメントで記録する。マージされずに閉じたプルリクエストでは動かない。閉じられなかったときと、`Refs: #番号`にだけ書かれたIssueが開いたままのときは、Issueへのコメントで所有者に知らせる。閉じたIssueが、あるIssueから分けた部分のIssue(サブIssue)で、分けた部分がすべて閉じたときは、元のIssueも閉じて記録をコメントする。元のIssueが別のリポジトリにあるときは扱わない。分けた部分がすべて閉じたかを確かめられなかったときと、元のIssueを閉じられなかったときは、元のIssueへのコメントで所有者に知らせる。毎時の見直しで、マージから7日以内のプルリクエストの閉じ漏れを拾う |
 | 依存の更新 | dependabot-auto-merge.yaml | pull_request / 日次 (schedule) / 手動 | Dependabotが作成したプルリクエストにauto-mergeを予約する。tflintの更新は、GitHubのリリースの公開から72時間経つまで予約を保留し、毎日の見直しで予約する。公開日時を取れない更新と、版が同じで中身だけが変わった更新は予約せず、プルリクエストへのコメントで所有者に知らせる |
 | 依存の更新 | update-pr-branches.yaml | push (main) / pull_request (opened / reopened / ready_for_review) | 開いているプルリクエストのブランチをmainの最新に合わせる。マージしないカナリアPRは対象外 |
+| 依存の更新 | frontend-vuln-fix.yaml | 日次 (schedule) / 手動 | Dependabotが修正のプルリクエストを作らないfrontendの間接依存の脆弱性の警告を読み、部品と最初の修正版の組ごとに、警告が消える版に上げるプルリクエストを作る。まずlockfileだけを直し、それでも脆弱な版が残るときは`pnpm-workspace.yaml`のoverridesに版の指定を足す(所有者の承認が要る)。修正版が公開から72時間経っていないときは、本番で動く部品のhighかcriticalの警告なら`minimumReleaseAgeExclude`に足して作り、それ以外は72時間経ってからの実行で作る。修正版の無い警告と、同じ組のブランチがすでにある警告では作らない。上げられなかったときは実行が失敗で終わる |
 | ラベル | sync-labels.yaml | push (main、`.github/labels.json` などの変更) / 手動 | ラベルの一覧のファイル`.github/labels.json`のとおりに、GitHubのラベルを作り・直し・名前を変え・消す。ファイルに前の名前が書かれたラベルは、消さずに名前だけを変える。先に合わせ込みのスクリプトのテストを流し、ファイルが検証に通らなければラベルを1つも変えずに失敗で終わる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
-| リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
+| リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。Terraformは配布元の署名を確かめてから使う。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
 | 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート。frontendは前回の結果を使い回して変わった箇所だけを測り直し、毎月最初の定期実行で全件を測り直す。レポートは90日間保持する。実行のたびにスコアと測定方式(全件か差分か)をIssue「メトリクス台帳: mutationスコア」に1行追記する。全件を測り直した回は、前回の全件の回との差と、mainで最後にテストを実行したCIのカバレッジ(実測と基準値)を同じIssueにコメントして所有者に知らせる。良し悪しの判定はしない |
 | 定期 | container-scan-scheduled.yaml | 週次 (schedule) / 手動 | 稼働中の本番イメージをECSのサービス定義から特定してTrivyで再検査し、検出した脆弱性をIssueに反映する。イメージから検出されなくなった脆弱性のIssueは自動でクローズする |
 | 定期 | canary.yaml | 月次 (schedule) / 手動 | 検査の仕組み自体が機能しているかを確かめるための、意図的に問題を含むPRの自動生成 |
-| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる5項目を自動判定する。定期スキャンの直近成功が8日未満か、棚卸し(audit-inventory.yaml)の直近成功が35日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いか、PRの検査と定期検査でTrivyの版が揃っているかを確認する。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
+| 定期 | audit-weekly.yaml | 週次 (schedule) / 手動 | 人間が行っていた定期監査のうち機械判定できる6項目を自動判定する。定期スキャンの直近成功が8日未満か、棚卸し(audit-inventory.yaml)の直近成功が35日未満か、必須チェックの失敗で止まっているDependabot PRが無いか、必須チェックがスキップのままマージされたPRが無いか、PRの検査と定期検査でTrivyの版が揃っているかを確認し、前の回から公開後72時間待たずに入れたライブラリとCIの道具の版の一覧を作る。dependency-cooldownの赤のDependabot PRは、72時間待たずに入れる版の記録のコメントがあるときだけ承認待ちとみなし、無ければ滞留に数える。逸脱があればIssue「週次監査: 逸脱あり」、判定できなければIssue「週次監査: 判定不能」で所有者に知らせ(72時間待たずに入れた版の一覧は「週次監査: 逸脱あり」に載せる)、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 | 定期 | canary-verify.yaml | 月次 (schedule) / 手動 | canary.yamlが生成したカナリアPR6件が期待どおりのチェックで赤になっているかを照合する。実行の長いチェックの結論が出揃うよう生成の3日後に発火する。逸脱があればIssue「カナリア照合: 逸脱あり」、判定できなければIssue「カナリア照合: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 | 定期 | audit-inventory.yaml | 月次 (schedule) / 手動 | 開発環境・本番・検査ツールの版とサポート期限を集め、使っている版・最新のリリース・サポート期限の表をIssue「棚卸し台帳: 版とサポート期限」にコメントして所有者に知らせる。良し悪しの判定はせず、取得できなかった欄は理由を添えて表に残す。実行が失敗で終わるのは、スクリプトの自己テストに失敗したときと、Issueへの書き込みに失敗したときに限る |
 
-依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)・frontend(npm)・Dockerのベースイメージ・terraformの検査ツール(tflintとcheckov)は週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます。tflintの更新は、公開から72時間経つまでauto-mergeが予約されません)。Dependabotが扱わないメジャー更新とサポート期限は、audit-inventory.yamlが月1回まとめて所有者に報告します。
+依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)・frontend(npm)・Dockerのベースイメージ・terraformの検査ツール(tflintとcheckov)は週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます。tflintの更新は、公開から72時間経つまでauto-mergeが予約されません)。Dependabotが修正のプルリクエストを作らないfrontendの間接依存の脆弱性の警告は、frontend-vuln-fix.yamlが毎日読み、警告が消える版に上げるプルリクエストを作ります。Dependabotが扱わないメジャー更新とサポート期限は、audit-inventory.yamlが月1回まとめて所有者に報告します。
 
 本番リリースは、release.yamlを人間が手動で実行したときにのみ行われます。対象はmainブランチのCIが成功したコミットに限られ、featureブランチからは起動できません。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 

@@ -98,15 +98,19 @@ jobs:
       - name: Test decided-method extraction
         run: bash .github/scripts/tests/test-extract-decided-method.sh
 
+      # Node.js は配布元の署名を確かめてから入れる(.github/actions/verified-node)
       - name: Use Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: ./.github/actions/verified-node
         with:
           node-version: '24.22.1'
 
+      # Codex CLI は配布元の来歴を確かめてから入れる(.github/actions/verified-codex)。
+      # バージョンは固定する(未固定だと実行のたびに最新版が入り、
+      # CLI側の仕様変更でリポジトリの変更が無くてもゲートの挙動が変わるため)
       - name: Install Codex CLI
-        # バージョンは固定する(未固定だと実行のたびに最新版が入り、
-        # CLI側の仕様変更でリポジトリの変更が無くてもゲートの挙動が変わるため)
-        run: npm install -g @openai/codex@0.147.0
+        uses: ./.github/actions/verified-codex
+        with:
+          codex-version: '0.147.0'
 
       - name: Authenticate Codex
         # Codex CLIは環境変数のOPENAI_API_KEYでは認証せず、$CODEX_HOME/auth.json を参照する。

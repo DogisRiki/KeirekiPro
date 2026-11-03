@@ -1,6 +1,6 @@
 name: Rerun Approval Gated Checks
 
-# 所有者のApproveで結果が変わるチェック(escape-hatch / dependency-gate / pre-merge-check)は、
+# 所有者のApproveで結果が変わるチェック(escape-hatch / dependency-gate / pre-merge-check / dependency-cooldown)は、
 # 承認前の pull_request イベントで一度失敗する。これは正しい動作だが、承認後に
 # pull_request_review で成功の実行が生まれても、先の失敗した実行が残り続ける。
 # 同一SHAに同名のチェックが複数あると、1つでも失敗していればマージがブロックされるため、
@@ -50,7 +50,7 @@ jobs:
           fetch_targets() {
             gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100&filter=all" \
               --paginate --slurp \
-              | jq '[.[].check_runs[] | .name as $n | select(["escape-hatch","dependency-gate","pre-merge-check"] | index($n))]'
+              | jq '[.[].check_runs[] | .name as $n | select(["escape-hatch","dependency-gate","pre-merge-check","dependency-cooldown"] | index($n))]'
           }
 
           # 承認がゲートの実行完了より先に届くことがある。実行中のまま検索すると
