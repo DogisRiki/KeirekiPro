@@ -37,6 +37,32 @@ git ls-files -z '*.sh' | xargs -0 docker run --rm -v "$(pwd -W):/mnt" koalaman/s
   `git archive HEAD | tar -x -C <scratchpad の一時フォルダ>` で写した先に置いて流すか、ファイルを引数で直に渡す
 - バックスラッシュを含むテストの JSON は、Write でファイルに書いて標準入力に流す。Bash のコマンドの文字列では `\\` が `\` になる
 
+## CI で動くスクリプトを手元で確かめる
+
+CI のワークフローが呼ぶスクリプトを作るか直すときは、PR を出す前に、次の2つを手元で確かめる。`.github/scripts/` の下のスクリプトも、`.claude/scripts/ci-tool-signature/` のように `.claude/scripts/` の下にあって CI が呼ぶスクリプトも、対象にする。
+手元の PC と CI のランナーとでは、CPU とファイルの権限の扱いが違うので、手元で通ったスクリプトが CI だけで失敗することがある。
+
+### ランナーの CPU
+
+- スクリプトを呼ぶジョブの `runs-on` を読む。`ubuntu-24.04-arm` のように名前が `-arm` で終わるランナーは arm64 の CPU で動き、`ubuntu-latest` は x86_64 の CPU で動く
+- 手元の Docker の CPU は `docker info --format '{{.Architecture}}'` で読む。ランナーの CPU と違うときは、テストを流す `docker run --rm` のあとに `--platform linux/arm64` か `--platform linux/amd64` を足す。
+  Docker Desktop は違う CPU のコンテナを真似て動かすので遅くなるが、`uname -m` で配布物を選ぶ処理は、この形でしかランナーと同じ側を試せない
+
+### Linux のファイルの権限
+
+- Docker Desktop は、Windows と Mac のフォルダをコンテナにつなぐとき、ファイルの権限をコンテナに見せない。Linux のランナーの Docker は見せる。
+  そのため、`mktemp -d` で作ったフォルダを `docker run -v` でコンテナに見せるスクリプトは、手元で通っても、ランナーでは失敗することがある。`mktemp -d` のフォルダは作った利用者しか開けず、別の利用者で動くコンテナ(cosign など)が読めないためである
+- このようなスクリプトは、docker の CLI の入ったコンテナの中で流す。Docker のソケットと、Docker の動く Linux の中のフォルダ(下の `/tmp/kp-check`)を同じパスで渡し、`TMPDIR` をそのフォルダにする。
+  スクリプトが作るフォルダは Linux の中にでき、スクリプトが動かすコンテナにも Linux の権限のまま見える。Claude の Bash はパスの書き換えを止めてあるので、`/tmp/kp-check` は Docker の動く Linux の中のパスとして渡る
+
+```bash
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /tmp/kp-check:/tmp/kp-check -e TMPDIR=/tmp/kp-check -v "$(pwd -W):/w:ro" docker:cli sh -c 'apk add --no-cache bash >/dev/null 2>&1 && bash /w/<スクリプトのパス> <引数>'
+```
+
+- スクリプトが使う道具(`curl` `jq` `perl` など)は、`apk add` に足す
+- 権限を広げる処理を足したときは、その処理を外すと失敗し、戻すと通ることを、この形で確かめる
+- Docker のソケットを渡すコマンドは、自動の許可の判定に止められることがある。止められたら、別の形に変えて通さず、何を確かめるためのコマンドかを添えて所有者に許可を求める
+
 ## 期待一覧を変えるとき
 
 - `.github/audit/required-checks.json` か ruleset の本数を変える PR では、期待一覧を読む3本のテスト
