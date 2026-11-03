@@ -21,7 +21,8 @@ concurrency:
 jobs:
   frontend-vuln-fix:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # PR を作る組ごとに、ci.yaml の frontend-test と同じ検査(テストと組み立てを含む)を流すので長めにとる
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
