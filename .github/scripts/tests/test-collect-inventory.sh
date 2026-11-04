@@ -10,7 +10,7 @@
 #     「読み取れず」、サポート期限の公表が無い対象の「公表なし」、
 #     表に入れる値からの `|` と改行の除去、良し悪しの記号を付けないこと)
 #   - 版から系列を取り出す正規表現
-#   - 外部の取得元(GitHub のリリース、endoflife.date、PyPI、Docker Hub)からの
+#   - 外部の取得元(GitHub のリリース、endoflife.date、PyPI、npm、Docker Hub)からの
 #     最新版とサポート期限の取得。curl と gh は PATH の先頭の偽物に置き換える
 #     (応答の値の変換、複数の系列、タグの選び方、取得の失敗の「取得できず」と
 #     表の下の理由、curl の呼び出しに認証ヘッダが無いこと)
@@ -230,18 +230,22 @@ inv_validate_targets "$REAL_TARGETS" >/dev/null 2>&1
 check_rc 0 $? "今のリポジトリの設定ファイルは形が正しい"
 
 count=$(jq '.targets | length' "$REAL_TARGETS" 2>/dev/null)
-check_eq "13" "$count" "今のリポジトリの設定ファイルの対象は13件"
+check_eq "14" "$count" "今のリポジトリの設定ファイルの対象は14件"
 
 names=$(jq -r '[.targets[].name] | join(",")' "$REAL_TARGETS" 2>/dev/null)
-check_eq "tflint,tflint の AWS 用ルールセット,checkov,Trivy,Java,Node.js,PostgreSQL(開発),PostgreSQL(本番),Valkey(開発),Valkey(本番),Terraform,Docker(dind),LocalStack" \
+check_eq "tflint,tflint の AWS 用ルールセット,checkov,Trivy,Codex CLI,Java,Node.js,PostgreSQL(開発),PostgreSQL(本番),Valkey(開発),Valkey(本番),Terraform,Docker(dind),LocalStack" \
     "$names" "対象は設計の一覧のとおり(要件1-1)"
 
 got=$(jq -r '.targets[] | select(.name == "LocalStack") | .latest.tag_pattern' "$REAL_TARGETS" 2>/dev/null)
 check_eq '^[0-9]{4}\.[1-9][0-9]?\.[0-9]+$' "$got" "LocalStack のタグの正規表現は月の先頭の0を許さない"
 
 got=$(jq -r '[.targets[] | select(.support == null) | .name] | join(",")' "$REAL_TARGETS" 2>/dev/null)
-check_eq "tflint,tflint の AWS 用ルールセット,checkov,Trivy,LocalStack" "$got" \
+check_eq "tflint,tflint の AWS 用ルールセット,checkov,Trivy,Codex CLI,LocalStack" "$got" \
     "サポート期限の公表が無い対象は support が null(要件1-5)"
+
+got=$(jq -c '.targets[] | select(.name == "Codex CLI") | [[.declarations[].files[]], .latest]' "$REAL_TARGETS" 2>/dev/null)
+check_eq '[[".github/workflows/codex-review.yml"],{"type":"npm","package":"@openai/codex"}]' "$got" \
+    "Codex CLI は codex-review.yml を宣言し、最新の版を npm の @openai/codex から取る(要件7-1)"
 
 inv_validate_targets "$WORK/targets.json" >/dev/null 2>&1
 check_rc 0 $? "仮の設定ファイルは形が正しい"
@@ -260,7 +264,9 @@ check_invalid '.targets[0].declarations = []' "declarations が空"
 check_invalid '.targets[0].declarations[0].files = []' "files が空"
 check_invalid 'del(.targets[0].declarations[0].pattern)' "pattern が無い"
 check_invalid 'del(.targets[0].latest)' "latest が無い"
-check_invalid '.targets[0].latest = {"type": "npm", "package": "x"}' "latest の種類が不明"
+check_invalid '.targets[0].latest = {"type": "cargo", "package": "x"}' "latest の種類が不明"
+check_invalid '.targets[0].latest = {"type": "npm"}' "npm に package が無い"
+check_invalid '.targets[0].latest = {"type": "npm", "package": ""}' "npm の package が空"
 check_invalid 'del(.targets[2].latest.repo)' "github-release に repo が無い"
 check_invalid 'del(.targets[4].latest.package)' "pypi に package が無い"
 check_invalid 'del(.targets[6].latest.tag_pattern)' "dockerhub-tags に tag_pattern が無い"
@@ -469,6 +475,7 @@ PATH="$WORK/bin:$PATH"
 export STUB_CALLS="$WORK/calls.log" STUB_RESP="$WORK/resp"
 export ENDOFLIFE_BASE="https://eol.invalid"
 export PYPI_BASE="https://pypi.invalid/pypi"
+export NPM_BASE="https://npm.invalid"
 export DOCKERHUB_BASE="https://hub.invalid/v2"
 # curl に渡らないことを確かめるための値
 export GH_TOKEN="stub-token-must-not-be-sent"
@@ -515,6 +522,10 @@ T_LOCALSTACK=$(jq -n -c --arg p "$LS_PATTERN" \
     '{name: "LocalStack", declarations: [{files: ["wf/localstack"], pattern: "localstack:(?<version>[0-9][^@]*)"}], latest: {type: "dockerhub-tags", repository: "localstack/localstack", tag_pattern: $p}, support: null}')
 T_JAVA='{"name": "Java", "declarations": [{"files": ["wf/java.txt"], "pattern": "(?m)^v: (?<version>[^\\n]+)"}], "latest": {"type": "endoflife", "product": "eclipse-temurin"}, "support": {"type": "endoflife", "product": "eclipse-temurin", "cycle_pattern": "^(?<cycle>[0-9]+)"}}'
 T_NOVERSION='{"name": "版なし", "declarations": [{"files": ["missing/Dockerfile"], "pattern": "(?<version>x)"}], "latest": {"type": "endoflife", "product": "nodejs"}, "support": {"type": "endoflife", "product": "nodejs", "cycle_pattern": "^(?<cycle>[0-9]+)"}}'
+printf 'jobs:\n  review:\n    with:\n      codex-version: '"'"'0.147.0'"'"'\n' >"$ROOT/wf/codex.yml"
+CODEX_PATTERN=$(jq -r '.targets[] | select(.name == "Codex CLI") | .declarations[0].pattern' "$REAL_TARGETS")
+T_CODEX=$(jq -n -c --arg p "$CODEX_PATTERN" \
+    '{name: "Codex CLI", declarations: [{files: ["wf/codex.yml"], pattern: $p}], latest: {type: "npm", package: "@openai/codex"}, support: null}')
 NODE_ROW_USED='24.21.0(docker/frontend/Dockerfile:1)<br>24.16.0(wf/a.yaml:3 ほか2か所)<br>22.1.0(wf/c.yaml:5)'
 
 # --- endoflife.date ---
@@ -566,6 +577,35 @@ got=$(collected_row "$T_CHECKOV")
 check_eq '| checkov | 3.2.0(wf/requirements.txt:1) | 3.3.20 | 公表なし | 公表なし | 公表なし |' \
     "$got" "PyPI: info.version を最新のリリースにする(要件1-3)"
 check_eq "1" "$(calls_of "https://pypi.invalid/pypi/checkov/json")" "接続先を PYPI_BASE で差し替えられる"
+
+# --- npm ---
+reset_stub
+resp @openai%2fcodex_latest 200 '{"name":"@openai/codex","version":"0.166.0","dist":{"tarball":"x"}}'
+got=$(collected_row "$T_CODEX")
+check_eq '| Codex CLI | 0.147.0(wf/codex.yml:4) | 0.166.0 | 公表なし | 公表なし | 公表なし |' \
+    "$got" "取り方 npm が registry の latest の version を最新の版にする(要件7-1)"
+check_eq "1" "$(calls_of "https://npm.invalid/@openai%2fcodex/latest")" \
+    "スコープ付きのパッケージの名前の / を %2f にして URL に入れる(接続先は NPM_BASE で差し替えられる)"
+reset_stub
+(unset NPM_BASE; collected "$T_CODEX" >/dev/null 2>&1)
+check_eq "1" "$(calls_of "https://registry.npmjs.org/@openai%2fcodex/latest")" "npm の既定の接続先は registry.npmjs.org"
+reset_stub
+resp @openai%2fcodex_latest 404 '{"error":"Not found"}'
+record=$(collected "$T_CODEX")
+check_eq "取得できず" "$(jq -r '.latest' <<<"$record")" "npm の 404: 最新のリリースを「取得できず」にする"
+check_eq '["Codex CLI の最新のリリース: HTTP 404"]' "$(jq -c '.failures' <<<"$record")" "npm の 404: 理由に状態コードを書く"
+reset_stub
+resp @openai%2fcodex_latest 200 '{"name":"@openai/codex"}'
+record=$(collected "$T_CODEX")
+check_eq "取得できず" "$(jq -r '.latest' <<<"$record")" "キーが無い(npm の version): 「取得できず」にする"
+check_has "形式が想定と違う" "$(jq -r '.failures[0]' <<<"$record")" "キーが無い(npm の version): 理由を「形式が想定と違う」にする"
+
+# マージのあとの表に新しい版が載る(要件7-2)
+cp "$ROOT/wf/codex.yml" "$WORK/codex.yml.orig"
+sed 's/0\.147\.0/0.166.0/' "$WORK/codex.yml.orig" >"$ROOT/wf/codex.yml"
+got=$(inv_read_target "$ROOT" "$T_CODEX" | jq -r '[.used[].version] | join(",")')
+check_eq "0.166.0" "$got" "宣言のファイルの版を書き換えると、使っている版が書き換えた版になる(要件7-2)"
+cp "$WORK/codex.yml.orig" "$ROOT/wf/codex.yml"
 
 # --- Docker Hub ---
 reset_stub
@@ -758,9 +798,11 @@ reset_stub
 inv_build_table "$ROOT" "$WORK/targets.json" >/dev/null 2>&1
 inv_collect_external "$(inv_read_target "$ROOT" "$T_CHECKOV")" "$T_CHECKOV" >/dev/null 2>&1
 inv_collect_external "$(inv_read_target "$ROOT" "$T_LOCALSTACK")" "$T_LOCALSTACK" >/dev/null 2>&1
+inv_collect_external "$(inv_read_target "$ROOT" "$T_CODEX")" "$T_CODEX" >/dev/null 2>&1
 curl_calls=$(grep '^curl ' "$WORK/calls.log")
-for host in eol pypi hub; do
-    if printf '%s\n' "$curl_calls" | grep -qF " https://${host}.invalid/"; then
+for host in eol pypi npm hub; do
+    # パイプにしない(grep -q が先に終わると printf が SIGPIPE になり、pipefail で失敗になる)
+    if grep -qF " https://${host}.invalid/" <<<"$curl_calls"; then
         pass "curl の呼び出しが記録されている(${host}.invalid)"
     else
         fail "curl の呼び出しが記録されている(${host}.invalid)"
@@ -773,7 +815,7 @@ else
     pass "curl の呼び出しに認証ヘッダや認証情報を付けない(要件6-1)"
 fi
 check_eq "0" "$(printf '%s\n' "$curl_calls" | awk '!/ -sS / || !/ --max-time 20 /' | grep -c .)" "curl は全て -sS --max-time 20 で呼ぶ"
-check_eq "0" "$(printf '%s\n' "$curl_calls" | grep -cvE ' https://(eol|pypi|hub)\.invalid/')" "curl の接続先は差し替えた取得元だけ"
+check_eq "0" "$(printf '%s\n' "$curl_calls" | grep -cvE ' https://(eol|pypi|npm|hub)\.invalid/')" "curl の接続先は差し替えた取得元だけ"
 
 # ---------------------------------------------------------------------------
 echo "--- 実行の全体(台帳へのコメントと終了コード) ---"
@@ -1085,7 +1127,7 @@ reset_main
 run_main "$WORK/none.json"
 check_rc 2 "$MAIN_EXIT" "設定ファイルが無いと終了コード 2"
 reset_main
-jq '.targets[0].latest = {"type": "npm", "package": "x"}' "$WORK/main-targets.json" >"$WORK/main-bad.json"
+jq '.targets[0].latest = {"type": "cargo", "package": "x"}' "$WORK/main-targets.json" >"$WORK/main-bad.json"
 run_main "$WORK/main-bad.json"
 check_rc 2 "$MAIN_EXIT" "設定ファイルの形が違うと終了コード 2"
 check_eq "0" "$(grep -cE '^(gh|curl) ' "$WORK/calls.log")" "設定ファイルの形が違うときは gh も curl も呼ばない"

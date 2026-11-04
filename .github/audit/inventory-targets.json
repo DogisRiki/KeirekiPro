@@ -45,6 +45,17 @@
       "support": null
     },
     {
+      "name": "Codex CLI",
+      "declarations": [
+        {
+          "files": [".github/workflows/codex-review.yml"],
+          "pattern": "(?m)^[ \\t]*codex-version:[ \\t]*['\"]?(?<version>[0-9][0-9.]*)"
+        }
+      ],
+      "latest": { "type": "npm", "package": "@openai/codex" },
+      "support": null
+    },
+    {
       "name": "Java",
       "declarations": [
         {

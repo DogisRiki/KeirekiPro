@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "tools": {
+    "node": {
+      "name": "Node.js",
+      "inventory_name": "Node.js",
+      "keys": ["node-version", "NODE_VERSION", "node"],
+      "ci": [
+        { "file": ".github/workflows/ci.yaml", "key": "node-version" },
+        { "file": ".github/workflows/codex-review.yml", "key": "node-version" },
+        { "file": ".github/workflows/frontend-vuln-fix.yaml", "key": "node-version" },
+        { "file": ".github/workflows/guardrails.yaml", "key": "node-version" },
+        { "file": ".github/workflows/mutation-report.yaml", "key": "node-version" }
+      ],
+      "dev": {
+        "file": "docker/frontend/Dockerfile",
+        "image": "node",
+        "hub_repository": "library/node",
+        "tag_suffix": "-bookworm-slim"
+      }
+    },
+    "trivy": {
+      "name": "Trivy",
+      "inventory_name": "Trivy",
+      "keys": ["trivy-version", "TRIVY_VERSION", "aquasec/trivy"],
+      "ci": [
+        { "file": ".github/workflows/container-scan.yaml", "key": "TRIVY_VERSION" },
+        { "file": ".github/workflows/container-scan-scheduled.yaml", "key": "TRIVY_VERSION" }
+      ]
+    },
+    "codex": {
+      "name": "Codex CLI",
+      "inventory_name": "Codex CLI",
+      "keys": ["codex-version", "@openai/codex"],
+      "ci": [
+        { "file": ".github/workflows/codex-review.yml", "key": "codex-version" }
+      ]
+    },
+    "terraform": {
+      "name": "Terraform",
+      "inventory_name": "Terraform",
+      "keys": ["terraform-version", "TF_VERSION", "TERRAFORM_VERSION", "hashicorp/terraform"],
+      "ci": [
+        { "file": ".github/workflows/terraform-apply.yaml", "key": "TF_VERSION" }
+      ],
+      "dev": {
+        "file": "docker/terraform/Dockerfile",
+        "image": "hashicorp/terraform",
+        "hub_repository": "hashicorp/terraform",
+        "tag_suffix": ""
+      }
+    }
+  },
+  "excluded": [
+    { "file": ".github/workflows/backend-vuln-fix.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
+    { "file": ".github/workflows/ci.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
+    { "file": ".github/workflows/dependency-graph.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
+    { "file": ".github/workflows/dependency-review.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
+    { "file": ".github/workflows/guardrails.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
+    { "file": ".github/workflows/mutation-report.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
+    { "file": ".github/workflows/guardrails.yaml", "key": "rhysd/actionlint", "reason": "検査の道具で、版を上げると検査の結果が変わるため、所有者が起票して個別に上げる" },
+    { "file": ".github/workflows/guardrails.yaml", "key": "koalaman/shellcheck", "reason": "検査の道具で、版を上げると検査の結果が変わるため、所有者が起票して個別に上げる" }
+  ]
+}
