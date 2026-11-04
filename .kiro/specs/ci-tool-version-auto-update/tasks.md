@@ -157,7 +157,7 @@
   - _要件: 6.1, 6.2, 6.3, 6.4_
   - _対象の部品: check-ci-tool-placement.sh_
 
-- [ ] 5. 文書を新しい仕組みに合わせる
+- [x] 5. 文書を新しい仕組みに合わせる
 
   Claude は、`README.md` のワークフローの一覧の表と Mermaid の図に `ci-tool-version-update.yaml` を足し、Dependabot の段落に、開発環境の Node.js と Terraform の版を Dependabot が上げないことを書く。Claude は、`doc/インフラ設計/Github Actions設計/ワークフロー設計.md` に `ci-tool-version-update.yaml` の行を足し、`doc/開発フロー/監査手順.md` の知らせの Issue の題名の表に `CI の道具の版の更新: 判定不能` を足す。
   - 完了の確かめ方: Claude は、GitHub の図の描画のページ(`viewscreen.githubusercontent.com/markdown/mermaid`)が読み込む部品から、GitHub が README の図を描く Mermaid の版を読む。Claude は、その版の `cdn.jsdelivr.net/npm/mermaid@<版>` の Mermaid で、README の図を解析し、描画する。その Mermaid で、README の図のすべての枠が描ける。3つの文書の差分が、この段落に書いた追記だけである

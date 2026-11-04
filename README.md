@@ -52,7 +52,7 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 
 ```mermaid
 flowchart LR
-    PR[プルリクエスト<br>Claude Code・Dependabot・<br>frontend-vuln-fix・backend-vuln-fix]
+    PR[プルリクエスト<br>Claude Code・Dependabot・<br>frontend-vuln-fix・backend-vuln-fix・<br>ci-tool-version-update]
 
     subgraph s1[系統1: 品質の検査]
         Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>依存の脆弱性検査・<br>コンテナイメージの脆弱性検査・<br>公開直後のライブラリの遮断]
@@ -118,6 +118,7 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 | 依存の更新 | update-pr-branches.yaml | push (main) / pull_request (opened / reopened / ready_for_review) | 開いているプルリクエストのブランチをmainの最新に合わせる。マージしないカナリアPRは対象外 |
 | 依存の更新 | frontend-vuln-fix.yaml | 日次 (schedule) / 手動 | Dependabotが修正のプルリクエストを作らないfrontendの間接依存の脆弱性の警告を読み、部品と最初の修正版の組ごとに、警告が消える版に上げるプルリクエストを作る。まずlockfileだけを直し、それでも脆弱な版が残るときは`pnpm-workspace.yaml`のoverridesに版の指定を足す(所有者の承認が要る)。修正版が公開から72時間経っていないときは、本番で動く部品のhighかcriticalの警告なら`minimumReleaseAgeExclude`に足して作り、それ以外は72時間経ってからの実行で作る。修正版の無い警告と、同じ組のブランチがすでにある警告では作らない。上げられなかったときは実行が失敗で終わる |
 | 依存の更新 | backend-vuln-fix.yaml | 日次 (schedule) / 手動 | Dependabotが修正のプルリクエストを作らないbackendの部品(Spring BootのBOMが版を決める部品や間接依存)の脆弱性の警告を読み、部品と最初の修正版の組ごとに、警告が消える版に上げるプルリクエストを作る。`backend/gradle/libs.versions.toml`の`vuln-fix-`の行に部品と版を書くだけなので、所有者の承認は要らない。修正版が公開から72時間経っていないときは、本番で動く部品のhighかcriticalの警告なら作り(dependency-cooldownが所有者の承認を求める)、それ以外は72時間経ってからの実行で作る。版の一覧に書いた部品とGradleのプラグイン、Dependabotのプルリクエストが開いている部品、修正版の無い警告、同じ組のブランチがすでにある警告では作らない。ビルド用のプラグインが持ち込む部品など、上げられなかったときは実行が失敗で終わる |
+| 依存の更新 | ci-tool-version-update.yaml | 週次 (schedule) / 手動 | CIの道具(Node.js・Trivy・Codex CLI・Terraform)の版を上げるプルリクエストを、道具ごとに作る。上げる先は、今の版と同じメジャー版で公開から72時間経った版のうち、最も新しい版とする。Node.jsとTerraformでは、その版を入れた配布元のイメージも公開から72時間経っている版に限り、開発環境の版も同じ版にそろえる。同じ道具の更新のプルリクエストが開いていれば、それを書き換える。更新のプルリクエストは、検査がすべて通っても所有者が承認するまでマージされない。プルリクエストを作る前にスクリプトのテストを流し、テストが失敗したときか、版を上げられなかった道具があるときは、Issue「CI の道具の版の更新: 判定不能」で所有者に知らせ、次に成功した実行でIssueを自動でクローズする |
 | ラベル | sync-labels.yaml | push (main、`.github/labels.json` などの変更) / 手動 | ラベルの一覧のファイル`.github/labels.json`のとおりに、GitHubのラベルを作り・直し・名前を変え・消す。ファイルに前の名前が書かれたラベルは、消さずに名前だけを変える。先に合わせ込みのスクリプトのテストを流し、ファイルが検証に通らなければラベルを1つも変えずに失敗で終わる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
 | リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。Terraformは配布元の署名を確かめてから使う。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
@@ -131,7 +132,7 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 | 定期 | canary-verify.yaml | 月次 (schedule) / 手動 | canary.yamlが生成したカナリアPR6件が期待どおりのチェックで赤になっているかを照合する。実行の長いチェックの結論が出揃うよう生成の3日後に発火する。逸脱があればIssue「カナリア照合: 逸脱あり」、判定できなければIssue「カナリア照合: 判定不能」で所有者に知らせ、解消したIssueは自動でクローズする。実行が失敗で終わるのは、判定不能のときとIssueへの反映に失敗したときに限る |
 | 定期 | audit-inventory.yaml | 月次 (schedule) / 手動 | 開発環境・本番・検査ツールの版とサポート期限を集め、使っている版・最新のリリース・サポート期限の表をIssue「棚卸し台帳: 版とサポート期限」にコメントして所有者に知らせる。良し悪しの判定はせず、取得できなかった欄は理由を添えて表に残す。実行が失敗で終わるのは、スクリプトの自己テストに失敗したときと、Issueへの書き込みに失敗したときに限る |
 
-依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)・frontend(npm)・Dockerのベースイメージ・terraformの検査ツール(tflintとcheckov)は週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます。tflintの更新は、公開から72時間経つまでauto-mergeが予約されません)。Dependabotが修正のプルリクエストを作らないfrontendの間接依存の脆弱性の警告は、frontend-vuln-fix.yamlが毎日読み、警告が消える版に上げるプルリクエストを作ります。backendの部品の同じ警告は、backend-vuln-fix.yamlが毎日読み、同じようにプルリクエストを作ります。Dependabotが扱わないメジャー更新とサポート期限は、audit-inventory.yamlが月1回まとめて所有者に報告します。
+依存パッケージの更新はDependabotが担当します。設定は`.github/dependabot.yml`にあります。backend(Gradle)・frontend(npm)・Dockerのベースイメージ・terraformの検査ツール(tflintとcheckov)は週次でメジャー更新を除いたバージョン更新、GitHub Actionsのアクションは月次でメジャー更新も含めたバージョン更新のプルリクエストを作成します。ただし、開発環境のNode.jsとTerraformのイメージの版は、Dependabotが上げず、ci-tool-version-update.yamlがCIの道具の版と同じ版に上げます。脆弱性が検知された場合は、スケジュールに関係なく修正のプルリクエストの作成が試みられます。Dependabotのプルリクエストにもauto-mergeが予約され、検査がすべて緑になった時点でマージされます(`.github/workflows/`を変更するGitHub Actionsの更新のみ、CODEOWNERSにより所有者の承認後にマージされます。tflintの更新は、公開から72時間経つまでauto-mergeが予約されません)。Dependabotが修正のプルリクエストを作らないfrontendの間接依存の脆弱性の警告は、frontend-vuln-fix.yamlが毎日読み、警告が消える版に上げるプルリクエストを作ります。backendの部品の同じ警告は、backend-vuln-fix.yamlが毎日読み、同じようにプルリクエストを作ります。Dependabotが扱わないメジャー更新とサポート期限は、audit-inventory.yamlが月1回まとめて所有者に報告します。
 
 本番リリースは、release.yamlを人間が手動で実行したときにのみ行われます。対象はmainブランチのCIが成功したコミットに限られ、featureブランチからは起動できません。frontendとbackendの両方をリリースする場合はbackend、frontendの順にデプロイし、backendのデプロイに失敗した場合はfrontendを公開しません。frontendの公開に失敗した場合は、成功済みのartifactを再配布して復旧します。
 
