@@ -101,7 +101,7 @@
   - _対象の部品: ci-tool-version-update.sh_
 
 - [ ] 4. ワークフローと既存の仕組みにつなぐ
-- [ ] 4.1 知らせの種類を足す (並行可)
+- [x] 4.1 知らせの種類を足す (並行可)
 
   Claude は、部品「audit-issue.sh」とそのテスト `test-audit-issue.sh` の今の版を、置き場所に写す。Claude は、このスクリプトに、知らせの種類 `ci-tool-update` を足す。
   - 完了の確かめ方: Linux のコンテナで流した `test-audit-issue.sh` の、今ある場合と新しい場合が、すべて通る
