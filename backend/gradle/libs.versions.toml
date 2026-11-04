@@ -32,7 +32,7 @@ spotless = "8.10.4"
 spotbugs = "6.5.13"
 pitest = "1.19.0"
 # buildscript の classpath と plugins の両方から参照する。ずれを防ぐため1箇所にする
-flyway = "13.11.1"
+flyway = "13.12.0"
 
 # 依存
 mybatis-spring-boot = "4.1.0"
