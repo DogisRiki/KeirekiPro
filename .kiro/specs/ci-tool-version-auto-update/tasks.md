@@ -42,7 +42,7 @@
   - _要件: 1.3, 4.2, 5.1, 5.2, 5.3_
   - _対象の部品: lib-ci-tool-releases.sh_
 
-- [ ] 2. PR の検査を作る
+- [x] 2. PR の検査を作る
 - [x] 2.1 版の書き場所の検査を作る (並行可)
 
   Claude は、部品「check-ci-tool-placement.sh」と、そのテスト `test-check-ci-tool-placement.sh` を、置き場所に作る。このスクリプトは、版の行を見つける関数が見つけたすべての版の行を、データのファイル `ci-tool-versions.json` と棚卸しの対象の一覧に照らす。テストは、一時のフォルダに、ワークフローとアクションとデータのファイルと棚卸しの対象の一覧を置いて流す。
@@ -59,7 +59,7 @@
   - _要件: 5.1, 5.2, 5.3, 5.4, 5.5_
   - _対象の部品: check-ci-tool-release-age.sh_
 
-- [ ] 2.3 開発環境の版の変更に所有者の承認を求める検知を足す (並行可)
+- [x] 2.3 開発環境の版の変更に所有者の承認を求める検知を足す (並行可)
 
   Claude は、部品「check-dependency-additions.sh」とそのテスト `test-check-dependency-additions.sh` の今の版を、置き場所に写す。Claude は、このスクリプトに、開発環境の Node.js と Terraform の `FROM` の行のタグの版の変更を、3つ目の検知として足す。
   - 完了の確かめ方: Linux のコンテナで流した `test-check-dependency-additions.sh` の、今ある場合と新しい場合が、すべて通る
