@@ -205,6 +205,9 @@
 - Dependabot は、node の digest だけが変わった PR(#550)の本文の `update-type` に `version-update:semver-patch` と書いた。dependabot-core の除外は、本文のこの欄ではなく、今の版を含まない版の範囲で判定するので、タスク 4.4 の除外は digest だけが変わる PR を止めないと判断した。この判断は動かして確かめていないので、Claude は、出荷の PR の本文のマージのあとの確かめ方に、digest だけが変わる node と hashicorp/terraform の PR が届き続けることを確かめる手順を書く。このことは、タスク 4.4 の審査で分かった
 - 週1回の実行のワークフローは、design.md の文に2つを足した。1つ目に、checkout に `ref: main` を書き、別のブランチから手で起動したときも main のスクリプトを流す。2つ目に、テストは通ったのに週1回の実行のスクリプトが報告を書かずに失敗したときも、知らせのステップが報告のファイルに1行を書く。書かないと `audit-issue.sh` が報告のファイルが無いことで止まり、知らせの Issue が作られないためである。Claude は、この2つを、出荷の PR の本文に design.md と違えた箇所として書く
 - `.claude/scripts/ci-tool-signature/test-verify-ci-tool.sh` を Linux のコンテナで流すときは、コンテナに `perl` を足す。`.claude/` の下のスクリプトは perl で JSON を読むので、perl が無いと、署名した者の鍵の指紋を読めずに多くの場合が失敗する。このことは、タスク 6.1 で分かった
+- 機能全体の確かめで、`.github/scripts/tests/` のテストを全部 Linux のコンテナで流すときは、コンテナに `zip` と `openssl` も足す。`test-install-verified-terraform.sh` は `zip` を、`test-check-dependency-cooldown.sh` と `test-cooldown-check-signer.sh` は `openssl` を使う。足さないと、この spec の変更と関係なく失敗する
+- `check-dependency-additions.sh` は、design.md の全体の構成の図と違い、データのファイルを直に読まずに `lib-ci-tool-versions.sh` の開発環境の版の読み方を使う。版の読み方を1か所にまとめるためである。出荷の PR の本文の、design.md と違えた箇所にも書く
+- 機能全体の確かめで、README の一覧の表の dependency-review.yaml と guardrails.yaml と dependency-gate.yaml の行、Mermaid の図の系統2と系統3の枠、ワークフロー設計.md の自動チェックの一覧、監査手順.md の知らせの節が、足した検査と知らせを反映していなかった。design.md のファイルの構成の節がこれらの文書の行を挙げていなかったためである。Claude が3つの文書を直し、README の図は Mermaid 12.2.0 で描けることを確かめた
 
 ## 完了条件(全タスク共通)
 
