@@ -18,8 +18,8 @@ name: Audit Inventory
 #     (collect-inventory.sh の終了コード 2)
 #
 # なぜ週次監査(audit-weekly.yaml)と別のワークフローにするか:
-#   棚卸しは GitHub 以外の外部サービス(endoflife.date・PyPI・Docker Hub)に
-#   問い合わせる。週次監査は判定の1つでも判定不能になると全体を判定不能にし、
+#   棚卸しは GitHub 以外の外部サービス(endoflife.date・PyPI・npm の配布元
+#   (registry.npmjs.org)・Docker Hub)に問い合わせる。週次監査は判定の1つでも判定不能になると全体を判定不能にし、
 #   逸脱のIssueに触らなくなる。外部サービスの不調で週次監査を判定不能に
 #   しないため、実行を分ける。週次監査とカナリア照合は、今までどおり
 #   GitHub 以外に問い合わせない。
