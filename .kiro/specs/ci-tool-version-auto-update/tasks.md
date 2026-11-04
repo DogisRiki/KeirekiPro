@@ -109,7 +109,7 @@
   - _要件: 8.1, 8.2_
   - _対象の部品: audit-issue.sh の種類 ci-tool-update_
 
-- [ ] 4.2 棚卸しの表に Codex CLI を足す (並行可)
+- [x] 4.2 棚卸しの表に Codex CLI を足す (並行可)
 
   Claude は、`inventory-targets.json` と、部品「collect-inventory.sh」とそのテスト `test-collect-inventory.sh` の今の版を、置き場所に写す。Claude は、`inventory-targets.json` に Codex CLI の対象を足し、`collect-inventory.sh` に最新の版の取り方 `npm` を足す。
   - 完了の確かめ方: Linux のコンテナで流した `test-collect-inventory.sh` の、今ある場合と新しい場合が、すべて通る。Linux のコンテナの jq で、置き場所の `inventory-targets.json` に Codex CLI の対象があり、`codex-review.yml` を宣言していることを確かめてある
@@ -201,6 +201,7 @@
 - `test-check-ci-tool-placement.sh` の場合 main_snapshot は、本物の `inventory-targets.json` に Codex CLI の対象が無いときだけ、テストの中で対象を足してから流す。Claude は、タスク 4.2 で本物に Codex CLI の対象を足したら、この分岐を消し、本物をそのまま使う形にする。分岐を残すと、Codex CLI の対象が本物から消えても、このテストが気づかないためである
 - 公開からの時間の検査は、変わった版をまとめて判定する関数が失敗を返したのに結果の行を1行も出さなかったとき、その変更を止めずに通す。Claude は、このスクリプトを変えるタスク 4.6 で、この場合も止める形に直し、テストを足す。検査が失敗したときは止める側に倒すためである。このことは、タスク 2.2 の審査で分かった
 - 更新の PR の本文は、開発環境の版だけを変える PR で、design.md の題名と本文の箇条の文と2か所違う。1つ目に、Terraform の本番に適用する版の節には、本番に適用する版が変わらないことを書く。2つ目に、承認の節には、`.github/` を変えることではなく、dependency-gate の検査が所有者の承認を求めることを書く。開発環境の版だけを変える PR は `.github/` を変えないので、design の文のとおりに書くと、事実と違う文になるためである。このことは、タスク 3.2 で分かった。Claude は、出荷の PR の本文にも、この違いを書く
+- テストで、`set -o pipefail` の下で `printf '%s\n' "$大きな値" | grep -q …` と書かない。`grep -q` が一致で先に終わると `printf` が SIGPIPE で止まり、一致していてもパイプ全体が失敗になるためである。Claude は、`grep -q … <<<"$大きな値"` と書く。このことは、タスク 4.2 で `test-collect-inventory.sh` が1回だけ落ちたことで分かった
 
 ## 完了条件(全タスク共通)
 
