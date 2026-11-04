@@ -35,7 +35,7 @@ jobs:
       # Node.js は配布元の署名を確かめてから入れる(.github/actions/verified-node)
       - uses: ./.github/actions/verified-node
         with:
-          node-version: '24.22.1'
+          node-version: '24.22.2'
       - name: Create pull requests
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
