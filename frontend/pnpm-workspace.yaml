@@ -34,6 +34,21 @@ overrides:
   # CVE-2026-73088(ReDoS)。修正版は 4.28.7 以降。babel経由の推移的依存で、
   # pnpm は推移的依存の狙い撃ち更新を非対応(pnpm/pnpm#12744)のため上書きする
   browserslist: "^4.28.7"
+  # minimatch の脆弱性の警告は 11.0.1 より古い版をすべて対象にし、古い版の修正版は無い。
+  # ESLint とプラグインは minimatch 11 で動く版をまだ出していないので、下の patchedDependencies で
+  # 読み込み方を書き換えてから 11 にそろえる
+  minimatch@<11.0.1: "^11.0.1"
+
+# minimatch 11 は既定の書き出しと makeRe を消したので、それを使う部品を minimatch 11 で動くように書き換える。
+# 書き換えるのは minimatch の読み込みの行だけである。eslint-plugin-import では、makeRe を使う2行も書き換える。
+# 版の範囲から外れる版に上がると、差分ファイルが使われずにインストールが失敗する(allowUnusedPatches の既定)。
+# そのときは、新しい版で差分ファイルを作り直すか、その部品が minimatch 11 に対応していれば消す
+patchedDependencies:
+  "@eslint/config-array@^0.21.2": patches/@eslint__config-array.patch
+  "@eslint/eslintrc@^3.3.7": patches/@eslint__eslintrc.patch
+  eslint-plugin-import@^2.32.0: patches/eslint-plugin-import.patch
+  eslint-plugin-jsx-a11y@^6.10.2: patches/eslint-plugin-jsx-a11y.patch
+  eslint-plugin-react@^7.37.5: patches/eslint-plugin-react.patch
 
 allowBuilds:
   esbuild: false
