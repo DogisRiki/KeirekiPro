@@ -133,11 +133,11 @@
       "declarations": [
         {
           "files": ["terraform/modules/elasticache/main.tf"],
-          "pattern": "(?m)^[ \\t]*engine_version[ \\t]*=[ \\t]*\"(?<version>[0-9][^\"]*)\""
+          "pattern": "(?m)^[ \\t]*major_engine_version[ \\t]*=[ \\t]*\"(?<version>[0-9][^\"]*)\""
         }
       ],
       "latest": { "type": "endoflife", "product": "valkey" },
-      "support": { "type": "endoflife", "product": "valkey", "cycle_pattern": "^(?<cycle>[0-9]+\\.[0-9]+)" }
+      "support": { "type": "endoflife", "product": "valkey", "cycle_pattern": "^(?<cycle>[0-9]+)", "newest_in_cycle": true }
     },
     {
       "name": "Terraform",
