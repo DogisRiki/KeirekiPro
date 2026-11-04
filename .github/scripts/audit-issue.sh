@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================
-# 監査の結果を通知Issueに反映する(audit-weekly / canary-verify から実行)
+# 監査の結果を通知Issueに反映する(audit-weekly / canary-verify / ci-tool-version-update から実行)
 #
 # 判定: 状態遷移表どおりの操作をすべて終えれば exit 0。
 #       引数・環境変数の不正、Issueの検索・起票・追記・クローズの
@@ -34,8 +34,9 @@
 #
 # テスト: .github/scripts/tests/test-audit-issue.sh
 # 使い方: audit-issue.sh <kind> <result> [report-file]
-#   kind:        weekly | canary
+#   kind:        weekly | canary | ci-tool-update
 #   result:      none | deviation | undecidable
+#                (ci-tool-update は逸脱を判定しないので、none と undecidable だけを使う)
 #   report-file: 報告のMarkdown。deviation と undecidable では必須
 #                (none では使わない)
 #   環境変数 GH_TOKEN / GITHUB_REPOSITORY / GITHUB_REPOSITORY_OWNER /
@@ -60,12 +61,17 @@ REPORT_FILE="${3:-}"
 case "$KIND" in
     weekly) KIND_NAME="週次監査" ;;
     canary) KIND_NAME="カナリア照合" ;;
-    *) die "監査の種類が不正です(weekly か canary): '${KIND}'" ;;
+    ci-tool-update) KIND_NAME="CI の道具の版の更新" ;;
+    *) die "監査の種類が不正です(weekly か canary か ci-tool-update): '${KIND}'" ;;
 esac
 
 case "$RESULT" in
     none) ;;
     deviation | undecidable)
+        # CI の道具の版の更新は逸脱を判定しない。逸脱のIssueを作らせない
+        if [ "$KIND" = "ci-tool-update" ] && [ "$RESULT" = "deviation" ]; then
+            die "監査の種類 ci-tool-update は結果 deviation を使いません。"
+        fi
         # 報告の無い起票・追記は、何が起きたかを伝えられない
         if [ -z "$REPORT_FILE" ] || [ ! -f "$REPORT_FILE" ]; then
             die "報告ファイルがありません: '${REPORT_FILE}'"
@@ -183,6 +189,10 @@ rerun_guide() {
             ;;
         canary)
             printf 'Re-run と新規の手動実行のどちらでもよい。\n'
+            ;;
+        ci-tool-update)
+            # 外部の API の一時的な失敗は、どちらでやり直しても直る
+            printf '失敗した実行の Re-run と、新しく手で起動する(workflow_dispatch)ことの、どちらでやり直してもよい。\n'
             ;;
     esac
 }

@@ -33,12 +33,14 @@ bash .claude/scripts/ci-tool-signature/verify-ci-tool.sh <node|trivy|codex|terra
 - Claude は、所有者への返事に、版を変えなかったことと、出力の2行目の `detail=` の理由を書く
 - Claude は、署名を確かめずに版を変える別の方法を探さない。同じコマンドを、Docker の起動のような手元の原因を直さずに繰り返さない
 
-## Step 4: 確かめられたら、すべての場所の版を変える
+## Step 4: 確かめられたら、CI の書き場所の版を変える
 
 出力の1行目が `result=verified`(終了コード 0)のときだけ、Claude は次のことをする。
 
-- Claude は、`trusted-signers.json` のその道具の `locations` に並んだファイルを、すべて読む。それぞれのファイルで、Claude は、その道具の今の版を `grep -n` で探し、すべてを新しい版に変える。1つでも変え残すと、CI の中で道具の版がそろわないためである
-- `locations` のファイルは `.github/` の下にあり、Claude は書けない。Claude は、今のファイルを Read で読み、版だけを変えた完成品を scratchpad に、リポジトリと同じ並びで作る
+- Claude は、`.github/ci-tool-versions.json` の `tools` の中の、Step 2 のコマンドに渡した道具の名前(`node` `trivy` `codex` `terraform`)の `ci` を読む。`ci` の組は、ファイル(`file`)と、そのファイルで版を書いた行の名前(`key`)の組である
+- Claude は、`ci` の組ごとに、そのファイルの中のその名前の行を `grep -n` で探し、当たった行のすべての版を新しい版に変える。Claude は、`ci` の組を1つも変え残さない。1つでも変え残すと、CI の中で道具の版がそろわないためである
+- Claude は、このスキルの手順で、開発環境の版(`ci-tool-versions.json` の `dev` のファイル、たとえば `docker/frontend/Dockerfile`)を変えない。公開からの時間の検査は、記録に書いた道具の CI の版だけを72時間待たずに通し、開発環境の版の変更はこの例外に入れないためである。開発環境の版は、その版を入れた配布元のイメージが公開から72時間経った週に、週1回の実行が CI の版にそろえる
+- `ci` の組のファイルは `.github/` の下にあり、Claude は書けない。Claude は、今のファイルを Read で読み、版だけを変えた完成品を scratchpad に、リポジトリと同じ並びで作る
 - Claude は、所有者に、完成品を置くコマンドを示す。コマンドは、scratchpad の完成品を作業フォルダの `.github/` の下に `cp` で写す形にし、ファイルごとに1行で書く。置いたあとに所有者が確かめる方法として、`git diff --stat` に変えたファイルだけが出ることを書く
 - 所有者が置いたあと、Claude は `git diff` で、変わったのが版の文字列だけであることを確かめる
 

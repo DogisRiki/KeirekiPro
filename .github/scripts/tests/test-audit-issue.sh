@@ -810,6 +810,80 @@ for v in GH_TOKEN GITHUB_REPOSITORY GITHUB_REPOSITORY_OWNER GITHUB_SERVER_URL GI
 done
 
 # ---------------------------------------------------------------------
+# 11. 種類 ci-tool-update(週1回の CI の道具の版の更新の失敗の知らせ)
+#     結果は none と undecidable だけを使う
+# ---------------------------------------------------------------------
+T_UND="CI の道具の版の更新: 判定不能"
+CREATE_T_UND="issue create title=${T_UND} label=audit assignee="
+T_UND_ISSUE='{"number":40,"title":"CI の道具の版の更新: 判定不能"}'
+T_REPORT_LINE="- Node.js: 新しい版を調べられなかった(版の一覧を取れませんでした(HTTP 500))"
+T_RERUN_RERUN="失敗した実行の Re-run"
+T_RERUN_DISPATCH="新しく手で起動する(workflow_dispatch)"
+
+# 使い方: t_setup <open issues json>
+# 報告のファイルを、週1回の実行が書く形の行にする
+t_setup() {
+    setup "$1"
+    printf '%s\n' "$T_REPORT_LINE" >"$REPORT"
+}
+
+t_setup "${DEV}, ${UND}"
+run ci-tool-update undecidable "$REPORT"
+if [ "$LAST_EXIT" -eq 0 ] && [ "$(grep -E '^issue (create|comment|close) ' "$CALLS" || true)" = "$CREATE_T_UND" ]; then
+    pass "ci-tool-update の undecidable で、題名が CI の道具の版の更新: 判定不能 の Issue を作る"
+else
+    fail "ci-tool-update の undecidable で、題名が CI の道具の版の更新: 判定不能 の Issue を作る (exit=${LAST_EXIT})"
+    sed 's/^/     | /' "$CALLS"
+fi
+check_first_line "$CREATE_T_UND" "@owner " "ci-tool-update の起票: 1行目の先頭で所有者にメンションする"
+f=$(body_file_of "$CREATE_T_UND" || true)
+if [ -n "$f" ] && grep -qxF -- "$T_REPORT_LINE" "$f" && grep -qF -- "- 実行: ${RUN_URL}" "$f"; then
+    pass "本文に報告のファイルの行と失敗した実行へのリンクが入る"
+else
+    fail "本文に報告のファイルの行と失敗した実行へのリンクが入る"
+    [ -z "$f" ] || echo "     本文: $(head -c 600 "$f" | tr '\n' '|')"
+fi
+if [ -n "$f" ] && grep -qF -- "$RERUN_HEADING" "$f" && grep -qF -- "$T_RERUN_RERUN" "$f" && grep -qF -- "$T_RERUN_DISPATCH" "$f"; then
+    pass "やり直しの案内に、Re-run と手での起動の両方が入る"
+else
+    fail "やり直しの案内に、Re-run と手での起動の両方が入る"
+    [ -z "$f" ] || echo "     本文: $(head -c 600 "$f" | tr '\n' '|')"
+fi
+check_body_lacks "$CREATE_T_UND" "$W_RERUN" "ci-tool-update の起票: 週次の再実行の方法は入らない"
+
+t_setup "${DEV}, ${UND}, ${T_UND_ISSUE}"
+run ci-tool-update undecidable "$REPORT"
+if [ "$LAST_EXIT" -eq 0 ] && [ "$(grep -E '^issue (create|comment|close) ' "$CALLS" || true)" = "issue comment 40" ]; then
+    pass "開いている Issue があれば追記する"
+else
+    fail "開いている Issue があれば追記する (exit=${LAST_EXIT})"
+    sed 's/^/     | /' "$CALLS"
+fi
+check_body_has "issue comment 40" "$T_REPORT_LINE" "ci-tool-update の追記: 今回の報告の行が入る"
+check_body_has "issue comment 40" "$T_RERUN_DISPATCH" "ci-tool-update の追記: 手での起動の案内が入る"
+
+t_setup "${DEV}, ${UND}, ${T_UND_ISSUE}"
+run ci-tool-update none
+if [ "$LAST_EXIT" -eq 0 ] && [ "$(grep -E '^issue (create|comment|close) ' "$CALLS" || true)" = "issue comment 40
+issue close 40" ]; then
+    pass "ci-tool-update の none で、開いている Issue を閉じる"
+else
+    fail "ci-tool-update の none で、開いている Issue を閉じる (exit=${LAST_EXIT})"
+    sed 's/^/     | /' "$CALLS"
+fi
+
+t_setup "${T_UND_ISSUE}"
+run weekly none
+check_exit 0 "週次・逸脱なし・CI の道具の版の更新の Issue のみ: 正常終了する"
+check_calls "" "週次の実行は CI の道具の版の更新の Issue に触らない"
+
+# この種類は逸脱を判定しない。誤って deviation を渡したら、起票せずに失敗にする
+t_setup ""
+run ci-tool-update deviation "$REPORT"
+check_exit 1 "ci-tool-update の deviation は exit 1"
+check_no_gh "ci-tool-update の deviation では gh を呼ばない"
+
+# ---------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then
     echo "::error::audit-issue.sh のテストに失敗しました。"
     exit 1

@@ -200,11 +200,11 @@ CODEX_REPO="example/codex"
 CODEX_WORKFLOW="example/codex/.github/workflows/release.yml"
 cat >"$WORK/signers.json" <<JSON
 {
-  "node": {"fingerprints": ["$FT"], "locations": []},
-  "trivy": {"oidc_issuer": "$TRIVY_ISSUER", "identity_template": "$TRIVY_TEMPLATE", "locations": []},
+  "node": {"fingerprints": ["$FT"]},
+  "trivy": {"oidc_issuer": "$TRIVY_ISSUER", "identity_template": "$TRIVY_TEMPLATE"},
   "codex": {"repo": "$CODEX_REPO", "signer_workflow": "$CODEX_WORKFLOW",
-            "packages": ["@openai/codex@{version}", "@openai/codex@{version}-linux-x64"], "locations": []},
-  "terraform": {"fingerprints": ["$FT"], "locations": []}
+            "packages": ["@openai/codex@{version}", "@openai/codex@{version}-linux-x64"]},
+  "terraform": {"fingerprints": ["$FT"]}
 }
 JSON
 

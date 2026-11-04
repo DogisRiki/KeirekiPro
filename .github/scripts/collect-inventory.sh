@@ -73,6 +73,7 @@
 # 外部の取得元(設定ファイルの latest.type と support.type):
 #   github-release  gh api repos/{repo}/releases/latest の tag_name
 #   pypi            GET {PYPI_BASE}/{package}/json の info.version
+#   npm             GET {NPM_BASE}/{package}/latest の version(package の / は %2f にする)
 #   dockerhub-tags  GET {DOCKERHUB_BASE}/namespaces/{ns}/repositories/{repo}/tags
 #                   ?page_size=100&ordering=last_updated の results[].name のうち、
 #                   tag_pattern に一致するものの版として最大のもの(sort -V)
@@ -80,7 +81,8 @@
 #                   系列ごと)と /releases/latest(最新の系列。latest.type が endoflife
 #                   なら、その latest.name を最新のリリースにもする)
 #   既定の接続先: ENDOFLIFE_BASE=https://endoflife.date/api/v1、
-#   PYPI_BASE=https://pypi.org/pypi、DOCKERHUB_BASE=https://hub.docker.com/v2
+#   PYPI_BASE=https://pypi.org/pypi、NPM_BASE=https://registry.npmjs.org、
+#   DOCKERHUB_BASE=https://hub.docker.com/v2
 #   (テストで差し替える)。GitHub 以外は curl -sS --max-time 20 の GET だけで、
 #   認証ヘッダを付けない。送るのは URL の中の製品名・パッケージ名だけ(要件6-1)。
 #   eolFrom が null は「未定」、isEol は「はい」「いいえ」と書き、isLts が false の
@@ -134,6 +136,7 @@ and all(.targets[];
     and (.latest | type == "object"
         and ((.type == "github-release" and (.repo | nonempty_str))
             or (.type == "pypi" and (.package | nonempty_str))
+            or (.type == "npm" and (.package | nonempty_str))
             or (.type == "dockerhub-tags" and (.repository | nonempty_str) and (.tag_pattern | nonempty_str))
             or (.type == "endoflife" and (.product | nonempty_str))))
     and has("support")
@@ -242,9 +245,10 @@ inv_table_row() {
 # 外部の取得元への問い合わせ
 # ---------------------------------------------------------------------
 
-# 既定の接続先(環境変数 ENDOFLIFE_BASE / PYPI_BASE / DOCKERHUB_BASE で差し替える)
+# 既定の接続先(環境変数 ENDOFLIFE_BASE / PYPI_BASE / NPM_BASE / DOCKERHUB_BASE で差し替える)
 _INV_ENDOFLIFE_DEFAULT='https://endoflife.date/api/v1'
 _INV_PYPI_DEFAULT='https://pypi.org/pypi'
+_INV_NPM_DEFAULT='https://registry.npmjs.org'
 _INV_DOCKERHUB_DEFAULT='https://hub.docker.com/v2'
 
 # _inv_json_array <文字列...>  文字列を JSON の配列にする(0個なら [])
@@ -330,6 +334,17 @@ _inv_pypi_latest() {
         return 1
     }
     _inv_pick "$body" '.info.version'
+}
+
+# _inv_npm_latest <パッケージ>  npm の registry の latest の version を出す。
+# スコープ付きの名前(@openai/codex)の / は %2f にして URL に入れる
+_inv_npm_latest() {
+    local body
+    body=$(_inv_fetch "${NPM_BASE:-$_INV_NPM_DEFAULT}/${1//\//%2f}/latest") || {
+        printf '%s' "$body"
+        return 1
+    }
+    _inv_pick "$body" '.version'
 }
 
 # _inv_dockerhub_latest <namespace/repository> <tag_pattern>
@@ -421,6 +436,9 @@ inv_collect_external() {
         ;;
     pypi)
         latest=$(_inv_pypi_latest "$(jq -r '.latest.package' <<<"$target")") || lrc=1
+        ;;
+    npm)
+        latest=$(_inv_npm_latest "$(jq -r '.latest.package' <<<"$target")") || lrc=1
         ;;
     dockerhub-tags)
         latest=$(_inv_dockerhub_latest "$(jq -r '.latest.repository' <<<"$target")" \

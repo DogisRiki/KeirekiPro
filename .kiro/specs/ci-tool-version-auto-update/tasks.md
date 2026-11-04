@@ -165,7 +165,7 @@
   - _要件: 1.1, 4.5, 8.1_
 
 - [ ] 6. 所有者が置いたファイルで全体を確かめる
-- [ ] 6.1 所有者にファイルを置いてもらい、置いた場所でテストと検査を流す
+- [x] 6.1 所有者にファイルを置いてもらい、置いた場所でテストと検査を流す
 
   親のセッションは、置き場所の `dot-github/` と `dot-claude/` のファイルを本来の場所に写すコマンドを所有者に示し、そのコマンドでファイルを置くよう所有者に頼む。依頼には、Claude が `.github/` に書けないことと、`.claude/` の下のゲートの設定を Claude が変えない決まりを添える。所有者が置いたら、親のセッションは、置いたファイルが置き場所のファイルと同じかを `cmp` で確かめ、本来の場所で、この spec で作るか変えたシェルのテストのすべてと、shellcheck と、actionlint と、版の書き場所の検査を流す。
   - 完了の確かめ方: 所有者が置いたファイルが、置き場所のファイルとすべて同じである。Linux のコンテナで流した、この spec で作るか変えた `.github/scripts/tests/` のテストが、すべて通る。`test-verify-ci-tool.sh` が Git Bash と Linux のコンテナの両方で通る。shellcheck と actionlint の指摘が0件である。本来の場所で流した `check-ci-tool-placement.sh` が、指摘を出さずに 0 で終わる
@@ -204,6 +204,7 @@
 - テストで、`set -o pipefail` の下で `printf '%s\n' "$大きな値" | grep -q …` と書かない。`grep -q` が一致で先に終わると `printf` が SIGPIPE で止まり、一致していてもパイプ全体が失敗になるためである。Claude は、`grep -q … <<<"$大きな値"` と書く。このことは、タスク 4.2 で `test-collect-inventory.sh` が1回だけ落ちたことで分かった
 - Dependabot は、node の digest だけが変わった PR(#550)の本文の `update-type` に `version-update:semver-patch` と書いた。dependabot-core の除外は、本文のこの欄ではなく、今の版を含まない版の範囲で判定するので、タスク 4.4 の除外は digest だけが変わる PR を止めないと判断した。この判断は動かして確かめていないので、Claude は、出荷の PR の本文のマージのあとの確かめ方に、digest だけが変わる node と hashicorp/terraform の PR が届き続けることを確かめる手順を書く。このことは、タスク 4.4 の審査で分かった
 - 週1回の実行のワークフローは、design.md の文に2つを足した。1つ目に、checkout に `ref: main` を書き、別のブランチから手で起動したときも main のスクリプトを流す。2つ目に、テストは通ったのに週1回の実行のスクリプトが報告を書かずに失敗したときも、知らせのステップが報告のファイルに1行を書く。書かないと `audit-issue.sh` が報告のファイルが無いことで止まり、知らせの Issue が作られないためである。Claude は、この2つを、出荷の PR の本文に design.md と違えた箇所として書く
+- `.claude/scripts/ci-tool-signature/test-verify-ci-tool.sh` を Linux のコンテナで流すときは、コンテナに `perl` を足す。`.claude/` の下のスクリプトは perl で JSON を読むので、perl が無いと、署名した者の鍵の指紋を読めずに多くの場合が失敗する。このことは、タスク 6.1 で分かった
 
 ## 完了条件(全タスク共通)
 
