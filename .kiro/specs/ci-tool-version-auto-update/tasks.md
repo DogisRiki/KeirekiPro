@@ -141,7 +141,7 @@
   - _要件: 1.1, 1.8, 8.1, 8.2_
   - _対象の部品: ci-tool-version-update.yaml_
 
-- [ ] 4.6 dependency-cooldown に公開からの時間の検査と署名の確認をつなぐ (並行可)
+- [x] 4.6 dependency-cooldown に公開からの時間の検査と署名の確認をつなぐ (並行可)
 
   Claude は、`dependency-review.yaml` の今の版を置き場所に写す。Claude は、ジョブ `cooldown` のテストの繰り返しに `lib-ci-tool-releases` と `check-ci-tool-release-age` を足し、テストのステップに `id: cooldown_tests` を付ける。Claude は、ステップ「Check dependency cooldown」の次に、公開からの時間の検査のステップと、PR で変わった CI の版の署名を確かめるステップを足す。
   - 完了の確かめ方: `guardrails.yaml` と同じ版の actionlint のイメージで流した actionlint の指摘が0件である。署名を確かめるステップのシェルの部分を Linux のコンテナで動かすと、変わった CI の版の無いファイルでは何もせずに 0 で終わり、今の CI の Terraform の版を書いたファイルでは署名を確かめて 0 で終わり、存在しない版を書いたファイルでは失敗する。置き場所のファイルを重ねたリポジトリの写しで流した `check-ci-tool-placement.sh` が、このタスクで変えたワークフローのファイルの行に指摘を出さない。ほかのファイルの指摘は、棚卸しの対象を足すタスク 4.2 が終わる前には出ることがあるので、合否に使わない
