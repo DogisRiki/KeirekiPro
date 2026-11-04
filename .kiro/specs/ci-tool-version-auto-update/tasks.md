@@ -125,7 +125,7 @@
   - _要件: 5.4_
   - _対象の部品: ci-tool-fast-update のスキルと trusted-signers.json_
 
-- [ ] 4.4 Dependabot が開発環境の Node.js と Terraform の版を上げないようにする (並行可)
+- [x] 4.4 Dependabot が開発環境の Node.js と Terraform の版を上げないようにする (並行可)
 
   Claude は、`dependabot.yml` の今の版を置き場所に写し、docker の `ignore` に、`node` と `hashicorp/terraform` のマイナー版とパッチ版の除外を足す。
   - 完了の確かめ方: Linux のコンテナの Python の yaml で読んだ置き場所の `dependabot.yml` の docker の `ignore` に、`node` と `hashicorp/terraform` の要素があり、どちらの `update-types` も `version-update:semver-minor` と `version-update:semver-patch` である。今の版との差分が、足した2つの要素の行だけである
@@ -202,6 +202,7 @@
 - 公開からの時間の検査は、変わった版をまとめて判定する関数が失敗を返したのに結果の行を1行も出さなかったとき、その変更を止めずに通す。Claude は、このスクリプトを変えるタスク 4.6 で、この場合も止める形に直し、テストを足す。検査が失敗したときは止める側に倒すためである。このことは、タスク 2.2 の審査で分かった
 - 更新の PR の本文は、開発環境の版だけを変える PR で、design.md の題名と本文の箇条の文と2か所違う。1つ目に、Terraform の本番に適用する版の節には、本番に適用する版が変わらないことを書く。2つ目に、承認の節には、`.github/` を変えることではなく、dependency-gate の検査が所有者の承認を求めることを書く。開発環境の版だけを変える PR は `.github/` を変えないので、design の文のとおりに書くと、事実と違う文になるためである。このことは、タスク 3.2 で分かった。Claude は、出荷の PR の本文にも、この違いを書く
 - テストで、`set -o pipefail` の下で `printf '%s\n' "$大きな値" | grep -q …` と書かない。`grep -q` が一致で先に終わると `printf` が SIGPIPE で止まり、一致していてもパイプ全体が失敗になるためである。Claude は、`grep -q … <<<"$大きな値"` と書く。このことは、タスク 4.2 で `test-collect-inventory.sh` が1回だけ落ちたことで分かった
+- Dependabot は、node の digest だけが変わった PR(#550)の本文の `update-type` に `version-update:semver-patch` と書いた。dependabot-core の除外は、本文のこの欄ではなく、今の版を含まない版の範囲で判定するので、タスク 4.4 の除外は digest だけが変わる PR を止めないと判断した。この判断は動かして確かめていないので、Claude は、出荷の PR の本文のマージのあとの確かめ方に、digest だけが変わる node と hashicorp/terraform の PR が届き続けることを確かめる手順を書く。このことは、タスク 4.4 の審査で分かった
 
 ## 完了条件(全タスク共通)
 
