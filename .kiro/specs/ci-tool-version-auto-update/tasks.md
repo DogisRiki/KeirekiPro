@@ -100,7 +100,7 @@
   - _要件: 1.6, 8.1, 8.3_
   - _対象の部品: ci-tool-version-update.sh_
 
-- [ ] 4. ワークフローと既存の仕組みにつなぐ
+- [x] 4. ワークフローと既存の仕組みにつなぐ
 - [x] 4.1 知らせの種類を足す (並行可)
 
   Claude は、部品「audit-issue.sh」とそのテスト `test-audit-issue.sh` の今の版を、置き場所に写す。Claude は、このスクリプトに、知らせの種類 `ci-tool-update` を足す。
@@ -149,7 +149,7 @@
   - _要件: 3.1, 5.1, 5.2, 5.3, 5.4, 5.5_
   - _対象の部品: check-ci-tool-release-age.sh, PR で変わった CI の版の署名の確認_
 
-- [ ] 4.7 escape-hatch に版の書き場所の検査をつなぐ (並行可)
+- [x] 4.7 escape-hatch に版の書き場所の検査をつなぐ (並行可)
 
   Claude は、`guardrails.yaml` の今の版を置き場所に写す。Claude は、ジョブ `escape-hatch` に、`test-lib-ci-tool-versions.sh` と `test-check-ci-tool-placement.sh` と `test-ci-tool-version-update.sh` を流すステップと、ステップ「Check action pinning」の次に版の書き場所の検査のステップを足す。
   - 完了の確かめ方: `guardrails.yaml` と同じ版の actionlint のイメージで流した actionlint の指摘が0件である。置き場所のファイルを重ねたリポジトリの写しで流した `check-ci-tool-placement.sh` が、このタスクで変えたワークフローのファイルの行に指摘を出さない。ほかのファイルの指摘は、棚卸しの対象を足すタスク 4.2 が終わる前には出ることがあるので、合否に使わない
