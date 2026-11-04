@@ -5,9 +5,18 @@ name: Terraform Apply
 # PRで動く terraform-plan.yaml は本番の状態を読まない検査だけを行う。本番の状態との
 # 差分は、承認のあと、適用の直前にこのワークフローのログへ出す。
 # 本番の秘密は production environment の secrets に置き、承認が通ったジョブにだけ渡る。
+#
+# 実行するときに「plan_only」にチェックを付けると、差分をログに出したところで止まり、
+# 本番には適用しない。Terraform の版を上げたあとなど、適用の前に差分だけを見たいときに使う。
+# terraform plan は本番の資源も状態ファイルも書き換えない。
 
 on:
   workflow_dispatch:
+    inputs:
+      plan_only:
+        description: 'チェックを付けると、差分をログに出したところで止まり、本番には適用しない'
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -73,4 +82,16 @@ jobs:
             -var="alert_email_address=${{ secrets.TF_VAR_alert_email_address }}"
 
       - name: Terraform Apply
+        if: ${{ !inputs.plan_only }}
         run: terraform apply -auto-approve tfplan
+
+      # plan_only で動かしたときは、適用していないことを実行の概要に書く
+      - name: 適用しなかったことの記録
+        if: ${{ inputs.plan_only }}
+        run: |
+          {
+            echo "## 差分を出したところで止めました"
+            echo ""
+            echo "plan_only にチェックを付けて動かしたため、本番には適用していません。"
+            echo "差分は「Terraform Plan (差分の事前表示)」の記録にあります。"
+          } >> "$GITHUB_STEP_SUMMARY"

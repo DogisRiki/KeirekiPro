@@ -75,7 +75,7 @@ flowchart LR
     Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ<br>予約はワークフローが行い、外れたら付け直す<br>マージ後は対応するIssueを閉じる]
 
     M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
-    M -->|人間が Terraform Apply を実行| Infra[本番環境<br>インフラ]
+    M -->|人間が Terraform Apply を実行<br>plan_onlyでは差分の表示だけ| Infra[本番環境<br>インフラ]
     M -->|ラベルの一覧のファイルが変わったとき| Labels[sync-labels<br>GitHubのラベルを<br>ラベルの一覧のファイルのとおりに合わせる]
 
     subgraph s5[定期の監査]
@@ -121,7 +121,7 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 | 依存の更新 | ci-tool-version-update.yaml | 週次 (schedule) / 手動 | CIの道具(Node.js・Trivy・Codex CLI・Terraform)の版を上げるプルリクエストを、道具ごとに作る。上げる先は、今の版と同じメジャー版で公開から72時間経った版のうち、最も新しい版とする。Node.jsとTerraformでは、その版を入れた配布元のイメージも公開から72時間経っている版に限り、開発環境の版も同じ版にそろえる。同じ道具の更新のプルリクエストが開いていれば、それを書き換える。更新のプルリクエストは、検査がすべて通っても所有者が承認するまでマージされない。プルリクエストを作る前にスクリプトのテストを流し、テストが失敗したときか、版を上げられなかった道具があるときは、Issue「CI の道具の版の更新: 判定不能」で所有者に知らせ、次に成功した実行でIssueを自動でクローズする |
 | ラベル | sync-labels.yaml | push (main、`.github/labels.json` などの変更) / 手動 | ラベルの一覧のファイル`.github/labels.json`のとおりに、GitHubのラベルを作り・直し・名前を変え・消す。ファイルに前の名前が書かれたラベルは、消さずに名前だけを変える。先に合わせ込みのスクリプトのテストを流し、ファイルが検証に通らなければラベルを1つも変えずに失敗で終わる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
-| リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。Terraformは配布元の署名を確かめてから使う。apply直前にplanで差分を表示し、そのplanをそのまま適用 |
+| リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。Terraformは配布元の署名を確かめてから使う。apply直前にplanで差分を表示し、そのplanをそのまま適用。plan_onlyを選んで動かすと、差分を表示したところで止まり、適用しない |
 | リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
