@@ -34,7 +34,7 @@
   - _対象の部品: lib-ci-tool-releases.sh_
   - _依存: 1.3_
 
-- [ ] 1.5 配布元のイメージのタグを取り、公開からの時間を判定する関数を足す
+- [x] 1.5 配布元のイメージのタグを取り、公開からの時間を判定する関数を足す
 
   Claude は、部品「lib-ci-tool-releases.sh」に、配布元のイメージのタグの digest と公開日時を取る関数と、公開から72時間経っているかを判定する関数と、検査が通るようになる日時を出す関数と、変わった版をまとめて判定する関数 `ci_tool_age_check` を足す。digest とは、イメージの中身から計算した値で、イメージの中身が変わると digest も変わる。Claude は、これらの関数の場合を `test-lib-ci-tool-releases.sh` に足す。
   - 完了の確かめ方: Linux のコンテナで流した `test-lib-ci-tool-releases.sh` の場合が、すべて通る
