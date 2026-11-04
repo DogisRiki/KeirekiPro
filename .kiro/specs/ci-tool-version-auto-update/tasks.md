@@ -117,7 +117,7 @@
   - _要件: 7.1, 7.2, 7.3_
   - _対象の部品: 棚卸しの対象と取り方 npm の追加_
 
-- [ ] 4.3 ci-tool-fast-update のスキルが新しいデータのファイルから書き場所を読むようにする (並行可)
+- [x] 4.3 ci-tool-fast-update のスキルが新しいデータのファイルから書き場所を読むようにする (並行可)
 
   Claude は、ci-tool-fast-update のスキルの `SKILL.md` と、`trusted-signers.json` と、スクリプト `verify-ci-tool.sh` のテスト `test-verify-ci-tool.sh` の今の版を、置き場所の `dot-claude/` に写す。Claude は、スキルの Step 4 で読む書き場所を `ci-tool-versions.json` のその道具の `ci` に替え、スキルの手順で開発環境の版を変えないことを書く。Claude は、`trusted-signers.json` と、テストが作る `trusted-signers.json` から、`locations` を消す。
   - 完了の確かめ方: Git Bash で流した、置き場所の `test-verify-ci-tool.sh` の場合が、すべて通る。置き場所のスキルと `trusted-signers.json` と、今の `verify-ci-tool.sh` に、`locations` の語が残っていないことを `grep` で確かめてある
