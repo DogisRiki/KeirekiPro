@@ -9,7 +9,7 @@
   - _要件: 4.1, 6.5, 6.6_
   - _対象の部品: ci-tool-versions.json_
 
-- [ ] 1.2 ワークフローとアクションから版の行を見つける関数を作る
+- [x] 1.2 ワークフローとアクションから版の行を見つける関数を作る
 
   Claude は、部品「lib-ci-tool-versions.sh」のうち、ワークフローとアクションのファイルから版の行を見つける関数 `civ_scan` と、そのテスト `test-lib-ci-tool-versions.sh` を、置き場所に作る。Claude は、テストを、`KP_TEST_CASE` で場合を選んで流せる形にする。
   - 完了の確かめ方: Linux のコンテナで流した `test-lib-ci-tool-versions.sh` の、版の行を見つける場合が、すべて通る。`KP_TEST_CASE` に場合の名前を入れると、その場合だけが流れる
