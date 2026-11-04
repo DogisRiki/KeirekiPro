@@ -247,8 +247,35 @@ got=$(jq -c '.targets[] | select(.name == "Codex CLI") | [[.declarations[].files
 check_eq '[[".github/workflows/codex-review.yml"],{"type":"npm","package":"@openai/codex"}]' "$got" \
     "Codex CLI は codex-review.yml を宣言し、最新の版を npm の @openai/codex から取る(要件7-1)"
 
+# 本番の Valkey は ElastiCache Serverless で、主な版だけを major_engine_version に書く(#738)
+got=$(jq -c '.targets[] | select(.name == "Valkey(本番)") | .support' "$REAL_TARGETS" 2>/dev/null)
+check_eq '{"type":"endoflife","product":"valkey","cycle_pattern":"^(?<cycle>[0-9]+)","newest_in_cycle":true}' "$got" \
+    "Valkey(本番) は主な版から、その主な版の最も新しい系列の期限を引く"
+got=$(jq -r '[.targets[] | select(.support.newest_in_cycle == true) | .name] | join(",")' "$REAL_TARGETS" 2>/dev/null)
+check_eq "Valkey(本番)" "$got" "newest_in_cycle を使う対象は Valkey(本番) だけ"
+VALKEY_PROD_PATTERN=$(jq -r '.targets[] | select(.name == "Valkey(本番)") | .declarations[0].pattern' "$REAL_TARGETS")
+mkdir -p "$ROOT/tf/elasticache"
+cat >"$ROOT/tf/elasticache/main.tf" <<'TXT'
+resource "aws_elasticache_user" "app" {
+  engine        = "valkey"
+}
+
+resource "aws_elasticache_serverless_cache" "main" {
+  engine               = "valkey"
+  major_engine_version = "8"
+}
+TXT
+got=$(inv_read_target "$ROOT" "$(jq -n -c --arg p "$VALKEY_PROD_PATTERN" \
+    '{name: "v", declarations: [{files: ["tf/elasticache/main.tf"], pattern: $p}], latest: {type: "endoflife", product: "valkey"}, support: null}')" \
+    | jq -c '.used')
+check_eq '[{"file":"tf/elasticache/main.tf","line":7,"version":"8"}]' "$got" \
+    "Valkey(本番) の宣言の正規表現は major_engine_version の主な版を読む"
+
 inv_validate_targets "$WORK/targets.json" >/dev/null 2>&1
 check_rc 0 $? "仮の設定ファイルは形が正しい"
+jq '.targets[0].support.newest_in_cycle = true' "$WORK/targets.json" >"$WORK/ok.json"
+inv_validate_targets "$WORK/ok.json" >/dev/null 2>&1
+check_rc 0 $? "support の newest_in_cycle は真偽値なら形が正しい"
 
 # 使い方: check_invalid <jq の変換> <説明>
 # 仮の設定ファイルを変換したものが、形の違反として見分けられること
@@ -274,6 +301,7 @@ check_invalid 'del(.targets[0].latest.product)' "endoflife に product が無い
 check_invalid 'del(.targets[2].support)' "support が無い(null と区別する)"
 check_invalid 'del(.targets[0].support.cycle_pattern)' "support に cycle_pattern が無い"
 check_invalid '.targets[0].support.type = "other"' "support の種類が不明"
+check_invalid '.targets[0].support.newest_in_cycle = "true"' "support の newest_in_cycle が真偽値でない"
 printf '{"targets": [' >"$WORK/broken.json"
 inv_validate_targets "$WORK/broken.json" >/dev/null 2>&1
 check_rc 1 $? "形の違反: JSON として読めない"
@@ -560,6 +588,58 @@ resp products_nodejs_releases_22 200 "$(eol 22 false '"2027-04-30"' true 22.22.0
 resp products_nodejs_releases_latest 200 "$(eol 24 false '"2028-04-30"' true 24.21.0)"
 got=$(collected "$(target_of "Node.js")" | jq -r '.support.latest_cycle | if type == "array" then join(",") else . end')
 check_eq "24" "$got" "LTS の最新の系列には「(LTS ではない)」を付けない"
+
+# newest_in_cycle: 主な版 8 から、8 で始まる系列のうち最も新しいもの(8.10)を選ぶ。
+# 8 と同じ名前の系列、80 で始まる系列、ほかの主な版の系列は、選び方を確かめるために混ぜる
+T_VALKEY_PROD='{"name": "Valkey(本番)", "declarations": [{"files": ["tf/elasticache/main.tf"], "pattern": "(?m)^[ \\t]*major_engine_version[ \\t]*=[ \\t]*\"(?<version>[0-9][^\"]*)\""}], "latest": {"type": "endoflife", "product": "valkey"}, "support": {"type": "endoflife", "product": "valkey", "cycle_pattern": "^(?<cycle>[0-9]+)", "newest_in_cycle": true}}'
+VALKEY_LIST='{"schema_version":"1.2.1","result":{"name":"valkey","releases":[{"name":"9.1"},{"name":"80.1"},{"name":"8.2"},{"name":"8.10"},{"name":"8"},{"name":"8.1"},{"name":"7.2"}]}}'
+reset_stub
+resp products_valkey 200 "$VALKEY_LIST"
+resp products_valkey_releases_8.10 200 "$(eol 8.10 false '"2030-03-31"' false 8.10.2)"
+resp products_valkey_releases_latest 200 "$(eol 9.1 false '"2031-05-19"' false 9.1.3)"
+record=$(collected "$T_VALKEY_PROD")
+got=$(inv_table_row "$record")
+check_eq '| Valkey(本番) | 8(tf/elasticache/main.tf:7) | 9.1.3 | 8.10: 2030-03-31 | 8.10: いいえ | 9.1(LTS ではない) |' \
+    "$got" "newest_in_cycle: 主な版で始まる系列のうち最も新しい系列の期限と期限切れを出す"
+check_eq "[]" "$(jq -c '.failures' <<<"$record")" "newest_in_cycle: 全て取得できたときは理由が無い"
+check_eq "1" "$(grep -c 'https://eol\.invalid/products/valkey$' "$WORK/calls.log")" "newest_in_cycle: 系列の一覧を1回だけ問い合わせる"
+check_eq "1" "$(calls_of "/products/valkey/releases/8.10")" "newest_in_cycle: 選んだ系列の期限を問い合わせる"
+check_eq "0" "$(grep -c '/products/valkey/releases/8$' "$WORK/calls.log")" "newest_in_cycle: 主な版のままでは問い合わせない"
+
+# newest_in_cycle を付けない対象は、系列の一覧を問い合わせない
+reset_stub
+resp products_terraform_releases_1.16 200 "$(eol 1.16 false null false 1.16.4)"
+resp products_terraform_releases_1.9 200 "$(eol 1.9 true '"2025-02-27"' false 1.9.8)"
+resp products_terraform_releases_latest 200 "$(eol 1.16 false null false 1.16.4)"
+collected "$(target_of "Terraform")" >/dev/null
+check_eq "0" "$(grep -c 'https://eol\.invalid/products/terraform$' "$WORK/calls.log")" "newest_in_cycle が無い対象は系列の一覧を問い合わせない"
+
+# 系列の一覧を取得できない: 期限と期限切れを「取得できず」にし、理由を書く
+reset_stub
+resp products_valkey 500 '{"error":"x"}'
+resp products_valkey_releases_latest 200 "$(eol 9.1 false '"2031-05-19"' false 9.1.3)"
+record=$(collected "$T_VALKEY_PROD")
+got=$(inv_table_row "$record")
+check_eq '| Valkey(本番) | 8(tf/elasticache/main.tf:7) | 9.1.3 | 8: 取得できず | 8: 取得できず | 9.1(LTS ではない) |' \
+    "$got" "newest_in_cycle: 系列の一覧が 500 なら、期限と期限切れを「取得できず」にする"
+check_eq '["Valkey(本番) の 8 系列のサポート期限と期限切れ: 系列の一覧: HTTP 500"]' "$(jq -c '.failures' <<<"$record")" \
+    "newest_in_cycle: 系列の一覧が 500: 理由を書く"
+
+# 系列の一覧に当てはまる系列が無い
+reset_stub
+resp products_valkey 200 '{"result":{"releases":[{"name":"9.1"},{"name":"80.1"}]}}'
+resp products_valkey_releases_latest 200 "$(eol 9.1 false '"2031-05-19"' false 9.1.3)"
+record=$(collected "$T_VALKEY_PROD")
+check_eq '["Valkey(本番) の 8 系列のサポート期限と期限切れ: 系列の一覧: 系列の一覧に 8 で始まる系列が無い"]' \
+    "$(jq -c '.failures' <<<"$record")" "newest_in_cycle: 当てはまる系列が無ければ理由を書く"
+
+# 系列の一覧の形が違う
+reset_stub
+resp products_valkey 200 '{"result":{"name":"valkey"}}'
+resp products_valkey_releases_latest 200 "$(eol 9.1 false '"2031-05-19"' false 9.1.3)"
+record=$(collected "$T_VALKEY_PROD")
+check_eq '["Valkey(本番) の 8 系列のサポート期限と期限切れ: 系列の一覧: 形式が想定と違う(.result.releases が無い)"]' \
+    "$(jq -c '.failures' <<<"$record")" "newest_in_cycle: 一覧に releases が無ければ理由を書く"
 
 # --- GitHub のリリース ---
 reset_stub
