@@ -342,20 +342,12 @@ OIDCプロバイダーはAWSコンソールから手動で作成・管理する�
         "arn:aws:s3:::keirekipro-terraform-state",
         "arn:aws:s3:::keirekipro-terraform-state/*"
       ]
-    },
-    {
-      "Sid": "TerraformDynamoDBLock",
-      "Effect": "Allow",
-      "Action": [
-        "dynamodb:GetItem",
-        "dynamodb:PutItem",
-        "dynamodb:DeleteItem"
-      ],
-      "Resource": "arn:aws:dynamodb:ap-northeast-1:${AWS_ACCOUNT_ID}:table/keirekipro-terraform-lock"
     }
   ]
 }
 ```
+
+`keirekipro-terraform-state/*` には、状態ファイルの鍵のファイル `terraform.tfstate.tflock` も含まれる。Terraform は、鍵をかけるときにこのファイルを読み、書き、消すので、`s3:GetObject` `s3:PutObject` `s3:DeleteObject` が要る。
 
 ## 6. 開発者のIAMユーザーと変更用のロール
 

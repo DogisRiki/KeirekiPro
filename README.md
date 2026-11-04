@@ -144,7 +144,7 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 | Build once / Deploy same artifact | Frontendのproduction buildをCIで行い、検証済みartifactを配布・rollbackに再利用 |
 | ローリングアップデート | ECSサービスの無停止デプロイと回路ブレーカーによるbackend自動rollback |
 | キャッシュ無効化 | フロントエンド配布・rollback時のCloudFrontキャッシュ自動無効化 |
-| State管理 | Terraform StateのS3保存とDynamoDBによるロック制御 |
+| State管理 | Terraform StateのS3保存と、同じS3に置く鍵のファイルによるロック制御 |
 
 ### セキュリティ対策
 
