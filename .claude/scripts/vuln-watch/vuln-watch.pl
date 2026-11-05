@@ -8,6 +8,14 @@
 #   標準出力に、実行の ID と、材料と項目のファイルと判断の JSON の場所と、項目の数を持つ JSON の1行を出す。
 #   出どころと GitHub と記事のページへの要求が失敗しても 0 で終わり、失敗を材料の failed と github に残す。
 #   作業フォルダが git のリポジトリでないときと、実行のフォルダを作れないときは、標準エラーに理由を1行出して 2 で終わる。
+# 呼び出し方: perl .claude/scripts/vuln-watch/vuln-watch.pl show --run <実行の ID>
+#   show は、実行のフォルダの材料と、主の Claude が書いた判断の JSON(result.json)を読み、判断を確かめてから、
+#   render.pl で組み立てた表示の文を実行のフォルダの show.md に書き、標準出力に {"show":"<show.md の場所>"} の1行を出す。
+#   判断が材料と合わないときは、合わない項目の key と欄を標準エラーに1行ずつ出して 2 で終わり、show.md を書かない。
+#   判断の JSON が無いか JSON として読めないときも 2 で終わる。実行のフォルダか材料か項目のファイルが無いときは 3 で終わる。
+# 呼び出し方: perl .claude/scripts/vuln-watch/vuln-watch.pl clean --run <実行の ID>
+#   clean は、実行のフォルダを中のファイルごと消す。実行のフォルダが無いときも 0 で終わる。
+# show と clean は、<実行の ID> が実行の ID の形でないときは、標準エラーに理由を出して 2 で終わり、何も読み書きしない。
 # 今の時刻は、テストのときだけ、環境変数 KP_VULN_WATCH_TEST_NOW の YYYY-MM-DDThh:mm:ssZ で替える。
 # 前提: perl(JSON::PP・Time::Local)と、git・curl 7.66 以上・gh 2.x
 # =====================================================================
@@ -43,9 +51,15 @@ my $VW_JSON = JSON::PP->new->utf8->canonical->pretty->indent_length(1);
 exit main(@ARGV);
 
 sub main {
-    my ($command) = @_;
-    return collect() if defined $command && $command eq 'collect' && @_ == 1;
-    print STDERR "vuln-watch.pl: 使い方: perl vuln-watch.pl collect\n";
+    my ($command, @args) = @_;
+    $command //= '';
+    return collect() if $command eq 'collect' && !@args;
+    if (@args == 2 && $args[0] eq '--run') {
+        return show($args[1]) if $command eq 'show';
+        return clean($args[1]) if $command eq 'clean';
+    }
+    binmode STDERR, ':encoding(UTF-8)';
+    print STDERR "vuln-watch.pl: 使い方: perl vuln-watch.pl collect | show --run <実行の ID> | clean --run <実行の ID>\n";
     return 2;
 }
 
@@ -123,6 +137,135 @@ sub collect {
         result   => _vw_text("$run_dir/result.json"),
         entries  => scalar @entries,
     }), "\n";
+    return 0;
+}
+
+# ---------------------------------------------------------------------
+# show
+# ---------------------------------------------------------------------
+sub show {
+    my ($run) = @_;
+    my $run_dir = _vw_run_dir($run);
+    -d $run_dir or _vw_fail('実行のフォルダが無い: ' . _vw_text($run_dir), 3);
+    my $material_file = "$run_dir/material.json";
+    my $material = _vw_load($material_file);
+    _vw_fail('材料が無いか、JSON として読めない: ' . _vw_text($material_file), 3)
+        unless $material && ref $material->{parts} eq 'ARRAY';
+    my @entries;
+    for my $part (@{ $material->{parts} }) {
+        # 項目のファイルは、collect が書いた場所でなく、実行のフォルダの中の同じ名前のファイルを読む
+        my ($base) = (defined $part && !ref $part && $part =~ m{([^/\\]+)\z}) ? ($1) : ();
+        my $file = (defined $base && $base =~ /\Aentries-\d+\.json\z/) ? "$run_dir/$base" : undef;
+        my $loaded = defined $file ? _vw_load($file) : undef;
+        _vw_fail('項目のファイルが無いか、JSON として読めない: ' . (defined $file ? _vw_text($file) : $part // ''), 3)
+            unless $loaded && ref $loaded->{entries} eq 'ARRAY';
+        push @entries, @{ $loaded->{entries} };
+    }
+    # 前に書いた show.md を消してから確かめる。判断を退けたときに、前の判断の表示の文が残らないようにするためである
+    my $show_file = "$run_dir/show.md";
+    unlink $show_file;
+    my $result_file = "$run_dir/result.json";
+    my $result = _vw_load($result_file) // _vw_fail('判断の JSON が無いか、JSON として読めない: ' . _vw_text($result_file));
+    my @problems = _vw_check_result($result, \@entries);
+    if (@problems) {
+        binmode STDERR, ':encoding(UTF-8)';
+        print STDERR "vuln-watch.pl: 判断の JSON が合わない: $_\n" for @problems;
+        return 2;
+    }
+    require "$VW_DIR/render.pl";
+    my $text = render_text($material, \@entries, $result);
+    my $h;
+    my $written = open($h, '>:encoding(UTF-8)', $show_file) && print({$h} $text);
+    ($written && close $h) or _vw_fail('表示の文を書けない: ' . _vw_text($show_file), 3);
+    print JSON::PP->new->utf8->canonical->encode({ show => _vw_text($show_file) }), "\n";
+    return 0;
+}
+
+# 判断の JSON が材料と合うかを確かめ、合わない項目ごとに「<key> の <欄>: <直し方>」を返す
+sub _vw_check_result {
+    my ($result, $entries) = @_;
+    return ('version: 1 にする') unless defined $result->{version} && !ref $result->{version} && $result->{version} eq '1';
+    return ('entries: 項目の一覧にする') unless ref $result->{entries} eq 'ARRAY';
+    my %material = map { $_->{key} => $_ } @$entries;
+    my (%seen, @problems);
+    for my $i (0 .. $#{ $result->{entries} }) {
+        my $j = $result->{entries}[$i];
+        unless (ref $j eq 'HASH' && _vw_str($j->{key})) {
+            push @problems, sprintf('%d件目の項目の key: 空でない文字列にする', $i + 1);
+            next;
+        }
+        my $key = $j->{key};
+        if ($seen{$key}++) {
+            push @problems, "$key の key: 判断の JSON に2回ある";
+            next;
+        }
+        my $e = $material{$key};
+        unless ($e) {
+            push @problems, "$key の key: 材料に無い";
+            next;
+        }
+        push @problems, map { "$key の $_" } _vw_check_judgement($j, $e);
+    }
+    push @problems, map { "$_->{key} の key: 判断の JSON に無い" } grep { !$seen{ $_->{key} } } @$entries;
+    return @problems;
+}
+
+# 判断の項目の1つを確かめ、合わない欄ごとに「<欄>: <直し方>」を返す
+sub _vw_check_judgement {
+    my ($j, $e) = @_;
+    my @missing = grep { !exists $j->{$_} } qw(name damage exploited exploited_note software verdict action reason check pc);
+    return map { "$_: 欄が無い" } @missing if @missing;
+    my @p;
+    for my $f (qw(name damage software)) {
+        push @p, "$f: 空でない文字列にする" unless _vw_str($j->{$f});
+    }
+    if (!JSON::PP::is_bool($j->{exploited})) {
+        push @p, 'exploited: 真か偽にする';
+    } elsif (defined $e->{kev} && !$j->{exploited}) {
+        push @p, 'exploited: CISA の一覧に載った脆弱性では真にする';
+    }
+    push @p, 'exploited_note: 文字列か null にする' if ref $j->{exploited_note};
+    my $v = (defined $j->{verdict} && !ref $j->{verdict}) ? $j->{verdict} : '';
+    my $s = $e->{suggested} // '';
+    if ($v !~ /\A(?:affected|undeterminable|not_affected|unrelated)\z/) {
+        push @p, 'verdict: affected か undeterminable か not_affected か unrelated にする';
+    } elsif (($s eq 'affected' || $s eq 'undeterminable') && $v ne $s) {
+        push @p, "verdict: 判定の案が $s の項目では $s にする";
+    } elsif (($s eq 'not_affected' || $s eq 'unrelated') && $v ne $s && $v ne 'undeterminable') {
+        push @p, "verdict: 判定の案が $s の項目では $s か undeterminable にする";
+    }
+    for my $need ([ action => 'affected' ], [ reason => 'undeterminable' ], [ check => 'undeterminable' ]) {
+        my ($f, $when) = @$need;
+        if ($v eq $when) {
+            push @p, "$f: $when の項目では空でない文字列にする" unless _vw_str($j->{$f});
+        } elsif (defined $j->{$f}) {
+            push @p, "$f: $when でない項目では null にする";
+        }
+    }
+    if (ref $j->{pc} ne 'ARRAY') {
+        push @p, 'pc: 一覧にする';
+    } else {
+        for my $n (0 .. $#{ $j->{pc} }) {
+            my $pc = $j->{pc}[$n];
+            for my $f (qw(software versions fixed check)) {
+                push @p, sprintf('pc の%d件目の %s: 空でない文字列にする', $n + 1, $f) unless ref $pc eq 'HASH' && _vw_str($pc->{$f});
+            }
+        }
+    }
+    return @p;
+}
+
+# 空白でない文字を持つ文字列なら真
+sub _vw_str { defined $_[0] && !ref $_[0] && $_[0] =~ /\S/ }
+
+# ---------------------------------------------------------------------
+# clean
+# ---------------------------------------------------------------------
+sub clean {
+    my ($run) = @_;
+    my $run_dir = _vw_run_dir($run);
+    remove_tree($run_dir) if -e $run_dir;
+    _vw_fail('実行のフォルダを消せない: ' . _vw_text($run_dir), 3) if -e $run_dir;
     return 0;
 }
 
@@ -418,6 +561,14 @@ sub _vw_remove_old {
     }
 }
 
+# 実行の ID を確かめ、実行のフォルダの場所を返す。実行の ID の形でないときと、git のリポジトリでないときは 2 で終わる
+sub _vw_run_dir {
+    my ($run) = @_;
+    _vw_fail('実行の ID の形でない: ' . _vw_text($run)) unless $run =~ $VW_RUN_ID;
+    my $root = _vw_toplevel() // _vw_fail('作業フォルダが git のリポジトリでない');
+    return "$root/$VW_STATE/$run";
+}
+
 # 今のフォルダで git rev-parse --show-toplevel を動かし、作業フォルダの最上位を返す。git のリポジトリでなければ undef を返す
 sub _vw_toplevel {
     open my $saved, '>&', \*STDERR or return undef;
@@ -459,13 +610,16 @@ sub _vw_mkpath {
     return mkdir($path) || -d $path;
 }
 
-sub _vw_read_json {
+sub _vw_read_json { _vw_load($_[0]) // {} }
+
+# JSON のファイルを読み、オブジェクトを返す。無いか、JSON のオブジェクトとして読めないときは undef を返す
+sub _vw_load {
     my ($file) = @_;
-    open my $h, '<:raw', $file or return {};
+    open my $h, '<:raw', $file or return undef;
     my $text = do { local $/; <$h> };
     close $h;
     my $value = eval { JSON::PP->new->utf8->decode($text) };
-    return ref $value eq 'HASH' ? $value : {};
+    return ref $value eq 'HASH' ? $value : undef;
 }
 
 sub _vw_write_json {
@@ -475,9 +629,10 @@ sub _vw_write_json {
     return close($h) && $written;
 }
 
+# 標準エラーに理由を1行出して終わる。終了コードは、渡さないときは 2 とする
 sub _vw_fail {
-    my ($message) = @_;
+    my ($message, $code) = @_;
     binmode STDERR, ':encoding(UTF-8)';
     print STDERR "vuln-watch.pl: $message\n";
-    exit 2;
+    exit($code // 2);
 }

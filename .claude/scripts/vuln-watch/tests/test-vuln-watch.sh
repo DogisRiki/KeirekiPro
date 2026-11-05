@@ -56,6 +56,12 @@ pj() {
     ' "$1"
 }
 
+# フォルダの中のファイルとフォルダの名前を、. で始まる名前も含めて、名前の順に1行ずつ出す。フォルダが無いときは何も出さない
+names() {
+    [ -d "$1" ] || return 0
+    (shopt -s nullglob dotglob; cd "$1" && for f in *; do printf '%s\n' "$f"; done) | LC_ALL=C sort
+}
+
 # URL の英数字でない文字を _ に替えた、偽の curl の見本の名前を出す
 sample() { printf '%s/%s' "$KP_FAKE_CURL_DIR" "$(printf '%s' "$1" | perl -pe 's/[^A-Za-z0-9]/_/g')"; }
 
@@ -142,8 +148,35 @@ $(mat 'join "\n", @{ $d->{parts} }')
 EOF
     printf '[%s]' "$all" | pj 'my %e = map { $_->{key} => $_ } map { @{ $_->{entries} } } @$d; '"$1"
 }
-# 鍵ごとの「鍵=判定の案」を、鍵の順に並べる式
-SUGGESTED='join " ", map { "$_=$e{$_}{suggested}" } sort keys %e'
+# collect が作った実行のフォルダの場所を出す
+run_dir() {
+    local m
+    m=$(out '$d->{material}')
+    printf '%s' "${m%/material.json}"
+}
+# 実行のフォルダに判断の JSON を書く。式を渡したときは、式で判断を変えてから書く: result [<perl の式>]
+result() { perl "$VFIX/make-result.pl" "$(run_dir)" "$@" || exit 2; }
+# $VW_IN(無ければリポジトリのフォルダ)で show と clean を呼ぶ。
+# 標準出力を $CASE/<サブコマンド>.out に、標準エラーを $CASE/<サブコマンド>.err に、終了コードを $CASE/<サブコマンド>.rc に書く
+vw() {
+    local cmd=$1
+    shift
+    (cd "${VW_IN:-$CASE/repo}" && perl "$VW" "$cmd" "$@" >"$CASE/$cmd.out" 2>"$CASE/$cmd.err"; echo $? >"$CASE/$cmd.rc")
+}
+# show.md があれば yes、無ければ no を出す
+has_show() { if [ -e "$(run_dir)/show.md" ]; then echo yes; else echo no; fi; }
+# show.md に「脆弱性の名前 <鍵>」が書かれていない項目の鍵を、鍵の順に出す
+missing_names() {
+    ent 'my $f = "'"$(run_dir)"'/show.md"; open my $h, "<:encoding(UTF-8)", $f or die "show.md が無い\n"; my $t = do { local $/; <$h> }; join " ", grep { index($t, "脆弱性の名前 $_") < 0 } sort keys %e'
+}
+# 判断の JSON を式で変えて show を呼び、2 で終わり、show.md を書かず、標準エラーが期待どおりかを確かめる: rejects <名前> <式> <標準エラー>
+rejects() {
+    result "$2"
+    vw show --run "$(out '$d->{run}')"
+    check "$1(終了コード)" "$(cat "$CASE/show.rc")" "2"
+    check "$1(show.md を書かない)" "$(has_show)" "no"
+    check "$1(標準エラー)" "$(cat "$CASE/show.err")" "$3"
+}
 
 CASES=''
 addcase() { CASES="$CASES $1"; }
@@ -182,7 +215,7 @@ case_verdicts() {
         "$dir/material.json $dir/entries-1.json $dir/result.json"
     check "$name(項目の数)" "$(out '$d->{entries}')" "10"
     check "$name(材料の parts が、出した場所と同じ)" "$(mat 'join " ", @{ $d->{parts} }')" "$(out '$d->{parts}[0]')"
-    check "$name(作業の場所を残さない)" "$(ls "$CASE/repo/.claude/.state/vuln-watch/$(out '$d->{run}')" | tr '\n' ' ')" "entries-1.json material.json "
+    check "$name(作業の場所を残さない)" "$(names "$CASE/repo/.claude/.state/vuln-watch/$(out '$d->{run}')" | tr '\n' ' ')" "entries-1.json material.json "
 }
 addcase verdicts
 
@@ -368,7 +401,7 @@ case_fatal() {
     (cd "$CASE/repo" && perl "$VW" collect extra >"$CASE/out.json" 2>"$CASE/err.txt"; echo $? >"$CASE/rc")
     name="collect に引数を付けると、使い方を出して 2 で終わり、実行のフォルダを作らない"
     check "$name(終了コード)" "$(cat "$CASE/rc")" "2"
-    check "$name(実行のフォルダ)" "$(ls "$CASE/repo/.claude/.state/vuln-watch" 2>/dev/null | wc -l | tr -d ' ')" "0"
+    check "$name(実行のフォルダ)" "$(names "$CASE/repo/.claude/.state/vuln-watch" | wc -l | tr -d ' ')" "0"
 }
 addcase fatal
 
@@ -422,6 +455,15 @@ case_large() {
         "npm:@openai/codex npm:pnpm"
     # npm の部品は、見本の3件と足した700件と、npm:pnpm と npm:@openai/codex の705件。Maven の部品は足した500件
     check "$name(部品の数)" "$(mat 'my $c = $d->{inventory}{counts}; "npm=$c->{npm} maven=$c->{maven}"')" "npm=705 maven=500"
+
+    name="大きな見本で、show が分かれたすべての項目のファイルを読んで表示の文を組み立てる"
+    result
+    vw show --run "$(out '$d->{run}')"
+    check "$name(終了コード)" "$(cat "$CASE/show.rc")" "0"
+    # どの項目のファイルの項目も、名前が show.md に書かれる
+    check "$name(名前の無い項目)" "$(missing_names)" ""
+    check "$name(最後の項目のファイルの項目)" \
+        "$(pj 'scalar @{ $d->{entries} } > 0 ? "has_entries" : "empty"' <"$(out '$d->{parts}[-1]')")" "has_entries"
 }
 addcase large
 
@@ -452,6 +494,136 @@ case_git_ranges() {
         "nvd:oracle:java_se nvd:oracle:graalvm"
 }
 addcase git_ranges
+
+# ---------------------------------------------------------------------
+# 要件2の受入基準3・要件4の受入基準1と3: show が判断の JSON を確かめ、表示の文を書く
+# ---------------------------------------------------------------------
+case_show() {
+    newcase
+    collect
+    local run dir name
+    run=$(out '$d->{run}')
+    dir=$(run_dir)
+    result
+    vw show --run "$run"
+    name="show が、材料のすべての項目を確かめに通る判断の JSON で、表示の文を show.md に書き、その場所を標準出力に出す"
+    check "$name(終了コード)" "$(cat "$CASE/show.rc")" "0"
+    check "$name(標準エラーに何も出さない)" "$(cat "$CASE/show.err")" ""
+    check "$name(標準出力)" "$(cat "$CASE/show.out")" "{\"show\":\"$dir/show.md\"}"
+    check "$name(見出し)" "$(head -n 1 "$dir/show.md")" "## 直近7日に出た脆弱性(2026-10-28から2026-11-04まで)"
+    check "$name(組の見出し)" "$(grep '^### ' "$dir/show.md" | tr '\n' ' ')" \
+        "### このリポジトリの部品に影響がある脆弱性と、影響があるかを決められない脆弱性 ### そのほかの脆弱性 "
+    check "$name(名前の無い項目)" "$(missing_names)" ""
+
+    result '$j{"CVE-2026-2040"}{verdict} = "undeterminable"; $j{"CVE-2026-2040"}{reason} = "理由"; $j{"CVE-2026-2040"}{check} = "手順"; $j{"CVE-2026-2020"}{verdict} = "undeterminable"; $j{"CVE-2026-2020"}{reason} = "理由"; $j{"CVE-2026-2020"}{check} = "手順"'
+    vw show --run "$run"
+    check "show が、判定の案が not_affected の項目と unrelated の項目を undeterminable にした判断の JSON を受け入れる" "$(cat "$CASE/show.rc")" "0"
+
+    name="show が、affected を not_affected にした判断の JSON と、undeterminable に reason の無い判断の JSON と、kev がある項目の exploited を偽にした判断の JSON と、項目の足りない判断の JSON を、2 で終わって退け、show.md を書かない"
+    rejects "$name(affected を not_affected にした)" '$j{"CVE-2026-2001"}{verdict} = "not_affected"; $j{"CVE-2026-2001"}{action} = undef' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2001 の verdict: 判定の案が affected の項目では affected にする"
+    rejects "$name(undeterminable に reason が無い)" '$j{"CVE-2026-2002"}{reason} = undef' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2002 の reason: undeterminable の項目では空でない文字列にする"
+    rejects "$name(kev がある項目の exploited が偽)" '$j{"CVE-2026-2003"}{exploited} = JSON::PP::false' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2003 の exploited: CISA の一覧に載った脆弱性では真にする"
+    rejects "$name(項目が足りない)" '$r->{entries} = [ grep { $_->{key} ne "CVE-2026-2020" } @{ $r->{entries} } ]' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2020 の key: 判断の JSON に無い"
+
+    name="show が、affected の項目の action が null の判断の JSON と、pc の要素の check が空の判断の JSON と、damage が空の判断の JSON と、材料に無い key を持つ判断の JSON と、suggested が unrelated の項目の verdict を affected にした判断の JSON を、2 で終わって退け、標準エラーに key と欄を出す"
+    rejects "$name(affected の action が null)" '$j{"CVE-2026-2001"}{action} = undef' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2001 の action: affected の項目では空でない文字列にする"
+    rejects "$name(pc の要素の check が空)" '$j{"CVE-2026-2020"}{pc} = [ { software => "Windows 11", versions => "24H2", fixed => "26100.4000", check => "" } ]' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2020 の pc の1件目の check: 空でない文字列にする"
+    rejects "$name(damage が空)" '$j{"CVE-2026-2040"}{damage} = ""' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2040 の damage: 空でない文字列にする"
+    rejects "$name(材料に無い key)" 'push @{ $r->{entries} }, { %{ $j{"CVE-2026-2020"} }, key => "CVE-2099-0001" }' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2099-0001 の key: 材料に無い"
+    rejects "$name(unrelated を affected にした)" '$j{"CVE-2026-2020"}{verdict} = "affected"; $j{"CVE-2026-2020"}{action} = "上げる"' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2020 の verdict: 判定の案が unrelated の項目では unrelated か undeterminable にする"
+    rejects "$name(欄が無い)" 'delete $j{"CVE-2026-2040"}{exploited_note}' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2040 の exploited_note: 欄が無い"
+    rejects "$name(合わない項目が2つ)" '$j{"CVE-2026-2001"}{name} = ""; $j{"CVE-2026-2002"}{check} = undef' \
+        "vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2001 の name: 空でない文字列にする
+vuln-watch.pl: 判断の JSON が合わない: CVE-2026-2002 の check: undeterminable の項目では空でない文字列にする"
+
+    name="判断の JSON が無いか JSON として読めないとき、show は標準エラーに理由を1行出して 2 で終わる"
+    rm -f "$dir/result.json"
+    vw show --run "$run"
+    check "$name(無い)" "$(cat "$CASE/show.rc"):$(cat "$CASE/show.err")" "2:vuln-watch.pl: 判断の JSON が無いか、JSON として読めない: $dir/result.json"
+    printf '{"version":1,' >"$dir/result.json"
+    vw show --run "$run"
+    check "$name(読めない)" "$(cat "$CASE/show.rc"):$(cat "$CASE/show.err")" "2:vuln-watch.pl: 判断の JSON が無いか、JSON として読めない: $dir/result.json"
+
+    name="実行のフォルダか material.json か parts のファイルが無いとき、show は標準エラーに理由を1行出して 3 で終わる"
+    result
+    vw show --run 20261104T000000Z-1
+    check "$name(実行のフォルダ)" "$(cat "$CASE/show.rc"):$(cat "$CASE/show.err")" \
+        "3:vuln-watch.pl: 実行のフォルダが無い: $CASE/repo/.claude/.state/vuln-watch/20261104T000000Z-1"
+    mv "$dir/entries-1.json" "$dir/entries-1.json.bak"
+    vw show --run "$run"
+    check "$name(parts のファイル)" "$(cat "$CASE/show.rc"):$(cat "$CASE/show.err"):$(has_show)" \
+        "3:vuln-watch.pl: 項目のファイルが無いか、JSON として読めない: $dir/entries-1.json:no"
+    mv "$dir/entries-1.json.bak" "$dir/entries-1.json"
+    mv "$dir/material.json" "$dir/material.json.bak"
+    vw show --run "$run"
+    check "$name(material.json)" "$(cat "$CASE/show.rc"):$(cat "$CASE/show.err")" \
+        "3:vuln-watch.pl: 材料が無いか、JSON として読めない: $dir/material.json"
+    mv "$dir/material.json.bak" "$dir/material.json"
+
+    name="show と clean は、--run に実行の ID の形でない値を渡されると、標準エラーに理由を出して 2 で終わる。--run が無いときは使い方を出して 2 で終わる"
+    vw show --run ../vuln-watch
+    check "$name(show)" "$(cat "$CASE/show.rc"):$(cat "$CASE/show.err")" "2:vuln-watch.pl: 実行の ID の形でない: ../vuln-watch"
+    vw show
+    check "$name(show の --run が無い)" "$(cat "$CASE/show.rc"):$(grep -c "^vuln-watch.pl: 使い方: " "$CASE/show.err")" "2:1"
+    vw clean
+    check "$name(clean の --run が無い)" "$(cat "$CASE/clean.rc"):$(grep -c "^vuln-watch.pl: 使い方: " "$CASE/clean.err")" "2:1"
+}
+addcase show
+
+# ---------------------------------------------------------------------
+# 要件6の受入基準2: 集めた情報と示した脆弱性を記録に残さない
+# ---------------------------------------------------------------------
+case_clean() {
+    newcase
+    mkdir -p "$CASE/tmp"
+    local state="$CASE/repo/.claude/.state/vuln-watch" run name
+    (cd "$CASE/repo" && TMPDIR="$CASE/tmp" TMP="$CASE/tmp" TEMP="$CASE/tmp" perl "$VW" collect >"$CASE/out.json" 2>"$CASE/err.txt")
+    run=$(out '$d->{run}')
+    result
+    TMPDIR="$CASE/tmp" TMP="$CASE/tmp" TEMP="$CASE/tmp" vw show --run "$run"
+    TMPDIR="$CASE/tmp" TMP="$CASE/tmp" TEMP="$CASE/tmp" vw clean --run "$run"
+    name="collect と show と clean のあと、受け渡しの場所に実行のフォルダが残らず、HOME の一時フォルダにも、.claude/.state/ のほかの場所にも、ファイルが書かれない"
+    check "$name(show と clean の終了コード)" "$(cat "$CASE/show.rc") $(cat "$CASE/clean.rc")" "0 0"
+    check "$name(clean は何も出さない)" "$(cat "$CASE/clean.out")$(cat "$CASE/clean.err")" ""
+    check "$name(受け渡しの場所)" "$(names "$state" | tr '\n' ' ')" ""
+    check "$name(HOME の一時フォルダ)" "$(find "$CASE/home" -mindepth 1 | tr '\n' ' ')" ""
+    check "$name(一時ファイルの場所)" "$(find "$CASE/tmp" -mindepth 1 | tr '\n' ' ')" ""
+    check "$name(リポジトリ)" "$(git -C "$CASE/repo" status --porcelain --untracked-files=all --ignored)" ""
+    vw clean --run "$run"
+    check "clean は、実行のフォルダが無いときも 0 で終わる" "$(cat "$CASE/clean.rc")" "0"
+
+    newcase
+    state="$CASE/repo/.claude/.state/vuln-watch"
+    mkdir -p "$state/keep-me"
+    (cd "$CASE/repo/frontend" && env -u CLAUDE_PROJECT_DIR perl "$VW" collect >"$CASE/out.json" 2>"$CASE/err.txt"; echo $? >"$CASE/rc")
+    run=$(out '$d->{run}')
+    name="CLAUDE_PROJECT_DIR を消して、リポジトリの下のフォルダで collect と show と clean を呼ぶと、受け渡しの場所が見つかる。clean は、実行の ID の形でない値を退け、何も消さない"
+    check "$name(collect)" "$(cat "$CASE/rc"):$(out '$d->{material}')" "0:$state/$run/material.json"
+    result
+    export VW_IN="$CASE/repo/frontend"
+    (unset CLAUDE_PROJECT_DIR; vw show --run "$run")
+    check "$name(show)" "$(cat "$CASE/show.rc"):$(cat "$CASE/show.out")" "0:{\"show\":\"$state/$run/show.md\"}"
+    local bad
+    for bad in keep-me ../vuln-watch "$run/.." 20261104T120000Z; do
+        (unset CLAUDE_PROJECT_DIR; vw clean --run "$bad")
+        check "$name(clean --run $bad)" "$(cat "$CASE/clean.rc"):$(cat "$CASE/clean.err")" "2:vuln-watch.pl: 実行の ID の形でない: $bad"
+    done
+    check "$name(実行の ID の形でない値では何も消さない)" "$(names "$state" | tr '\n' ' ')" "$(printf '%s\n' "$run" keep-me | LC_ALL=C sort | tr '\n' ' ')"
+    (unset CLAUDE_PROJECT_DIR; vw clean --run "$run")
+    check "$name(clean)" "$(cat "$CASE/clean.rc"):$(names "$state" | tr '\n' ' ')" "0:keep-me "
+    unset VW_IN
+}
+addcase clean
 
 # ---------------------------------------------------------------------
 # 流す
