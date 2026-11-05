@@ -18,6 +18,7 @@ use JSON::PP ();
 use File::Spec ();
 use File::Basename qw(dirname);
 use File::Path qw(remove_tree);
+use Scalar::Util qw(refaddr);
 use Time::Local qw(timegm);
 use POSIX qw(strftime);
 
@@ -28,6 +29,13 @@ my $VW_WINDOW = 7 * 24 * 3600;              # 直近7日
 my $VW_BUDGET = 150;                        # 外部への要求の全体を打ち切る秒数
 my $VW_NAME_MIN = 4;                        # 名前の手がかりに使う部品の鍵の名前の、最も短い文字数
 my $VW_NAME_HITS_MAX = 10;                  # 名前の手がかりに入れる部品の鍵の数
+my $VW_PRODUCTS_MAX = 10;                   # 1つの項目に入れる製品の数
+my $VW_RANGES_MAX = 5;                      # 製品ごとに入れる範囲の数
+my $VW_ORIGINS_MAX = 5;                     # 1つの項目に入れる元の発表の URL の数
+my $VW_DESCRIPTIONS_FROM = 6;               # 説明を絞る、項目の CVE の番号の数
+my $VW_DESCRIPTIONS_FIRST = 3;              # 説明を絞るときに残す、先頭の番号の数
+my $VW_PART_BYTES = 40_000;                 # 項目のファイルの1つの大きさの上限
+my %VW_KEEP_KEYS = map { $_ => 1 } ('npm:pnpm', 'npm:@openai/codex'); # 材料の部品の一覧に残す npm の鍵
 my $VW_RUN_ID = qr/\A(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-\d+\z/;
 
 my $VW_JSON = JSON::PP->new->utf8->canonical->pretty->indent_length(1);
@@ -74,8 +82,9 @@ sub collect {
     my $components = $inventory->{components} // {};
     my $kev_info = _vw_kev_info($feeds->{kev});
     my $names = _vw_component_names($components);
-    my @entries = map { _vw_entry($_, $lookup, $matches, $refs, $kev_info, $names) } @items;
-    my $entries_file = "$run_dir/entries-1.json";
+    my @entries = map { _vw_entry($_, $lookup, $matches, $refs, $kev_info, $names, $kev_names) } @items;
+    my @parts = _vw_parts(\@entries);
+    my @part_files = map { "$run_dir/entries-$_.json" } 1 .. @parts;
     my $material_file = "$run_dir/material.json";
     my %counts = (npm => 0, maven => 0);
     for my $key (keys %$components) {
@@ -96,18 +105,21 @@ sub collect {
             ref     => $inventory->{ref},
             commit  => $inventory->{commit},
             fetched => _vw_bool($inventory->{fetched}),
-            keys    => [ sort keys %$components ],
+            # npm と Maven の部品は千件を超えるので、npm:pnpm と npm:@openai/codex のほかは数だけを入れる
+            keys    => [ grep { !/\A(?:npm|maven):/ || $VW_KEEP_KEYS{$_} } sort keys %$components ],
             counts  => \%counts,
         },
-        parts => [ _vw_text($entries_file) ],
+        parts => [ map { _vw_text($_) } @part_files ],
     };
-    _vw_write_json($entries_file, { entries => \@entries }) or _vw_fail("材料を書けない: $entries_file");
+    for my $n (0 .. $#parts) {
+        _vw_write_json($part_files[$n], { entries => $parts[$n] }) or _vw_fail("材料を書けない: $part_files[$n]");
+    }
     _vw_write_json($material_file, $material) or _vw_fail("材料を書けない: $material_file");
     remove_tree($work);
     print JSON::PP->new->utf8->canonical->encode({
         run      => $run,
         material => _vw_text($material_file),
-        parts    => [ _vw_text($entries_file) ],
+        parts    => [ map { _vw_text($_) } @part_files ],
         result   => _vw_text("$run_dir/result.json"),
         entries  => scalar @entries,
     }), "\n";
@@ -116,7 +128,7 @@ sub collect {
 
 # 項目の1つを、材料の項目にする
 sub _vw_entry {
-    my ($item, $lookup, $matches, $refs, $kev_info, $names) = @_;
+    my ($item, $lookup, $matches, $refs, $kev_info, $names, $kev_names) = @_;
     my @cves = @{ $item->{cves} };
     my (%descriptions, @products, @matches, %seen, @kev_dates);
     my $feeds_descriptions = $item->{descriptions} // {};
@@ -124,12 +136,22 @@ sub _vw_entry {
         my $l = $lookup->{$cve} // {};
         my $text = $l->{descriptions}{en} // $feeds_descriptions->{$cve};
         $descriptions{$cve} = $text if defined $text;
-        push @products, _vw_products($l);
+        push @products, _vw_products($l, _vw_used_ranges($matches->{$cve}), _vw_kev_vendors($kev_names->{$cve}));
         push @kev_dates, $kev_info->{$cve}{date} if $kev_info->{$cve} && defined $kev_info->{$cve}{date};
         for my $m (@{ $matches->{$cve}{matches} // [] }) {
             push @matches, $m unless $seen{ JSON::PP->new->canonical->encode($m) }++;
         }
     }
+    # 名前の手がかりは、説明を絞る前の、すべての番号の説明から作る
+    my @name_hits = _vw_name_hits($item, \%descriptions, $names);
+    # CVE の番号の多い項目では、部品の名前が合った番号と、先頭の番号の説明だけを入れる
+    if (@cves >= $VW_DESCRIPTIONS_FROM) {
+        my %keep = map { $_ => 1 } @cves[0 .. $VW_DESCRIPTIONS_FIRST - 1];
+        $keep{$_} = 1 for grep { grep { $_->{key} ne '*' } @{ $matches->{$_}{matches} // [] } } @cves;
+        delete @descriptions{ grep { !$keep{$_} } keys %descriptions };
+    }
+    my ($kept_products, $omitted) = _vw_limit_products(\@products);
+    my @origins = _vw_origins($item, $lookup, $kev_info);
     my $item_refs = $refs->{ $item->{key} } // [];
     return {
         key          => $item->{key},
@@ -140,9 +162,11 @@ sub _vw_entry {
         kev          => @kev_dates ? (sort @kev_dates)[0] : undef,
         descriptions => \%descriptions,
         article_text => $item->{article_text},
-        products     => \@products,
-        origins      => [ _vw_origins($item, $lookup, $kev_info) ],
-        name_hits    => [ _vw_name_hits($item, \%descriptions, $names) ],
+        products     => $kept_products,
+        products_omitted => $omitted,
+        origins      => [ @origins > $VW_ORIGINS_MAX ? @origins[0 .. $VW_ORIGINS_MAX - 1] : @origins ],
+        origins_total => scalar @origins,
+        name_hits    => \@name_hits,
         matches      => \@matches,
         refs         => $item_refs,
         suggested    => _vw_suggest($item, \@matches, $item_refs),
@@ -162,13 +186,16 @@ sub _vw_suggest {
 }
 
 # CVE の番号の1つについて、CVE の記録と GitHub の勧告と NVD の製品の名前と範囲を並べる
+# 製品の一覧を作る。製品ごとに、部品に当てた範囲を持つか(_matched)と、KEV に載った製品か(_kev)の目印を、
+# 並べ替えのためだけに付ける。目印は _vw_limit_products が外す
 sub _vw_products {
-    my ($l) = @_;
+    my ($l, $used, $kev_vendors) = @_;
     my @products;
     for my $p (@{ $l->{products} // [] }) {
         push @products, {
             from => $p->{from}, vendor => $p->{vendor}, product => $p->{product},
-            package => $p->{packageName}, ranges => $p->{versions} // [],
+            package => $p->{packageName}, ranges => [ @{ $p->{versions} // [] } ],
+            _matched => $used->{ refaddr $p } ? 1 : 0,
         };
     }
     $_->{fixed} = _vw_fixed('cve', $_->{ranges}) for @products;
@@ -177,8 +204,9 @@ sub _vw_products {
         for my $v (@{ $a->{vulnerabilities} // [] }) {
             my $name = join ':', map { $_ // '' } @$v{qw(ecosystem name)};
             push @github_order, $name unless $github{$name};
-            $github{$name} //= { from => 'github', vendor => $v->{ecosystem}, product => $v->{name}, package => $v->{name}, ranges => [] };
+            $github{$name} //= { from => 'github', vendor => $v->{ecosystem}, product => $v->{name}, package => $v->{name}, ranges => [], _matched => 0 };
             push @{ $github{$name}{ranges} }, { map { $_ => $v->{$_} } qw(vulnerable_version_range first_patched_version) };
+            $github{$name}{_matched} = 1 if $used->{ refaddr $v };
         }
     }
     $github{$_}{fixed} = _vw_fixed('ghsa', $github{$_}{ranges}) for @github_order;
@@ -188,12 +216,88 @@ sub _vw_products {
         my @f = split /:/, $c->{criteria} // '';
         my $name = join ':', map { $_ // '' } @f[3, 4];
         push @nvd_order, $name unless $nvd{$name};
-        $nvd{$name} //= { from => 'nvd', vendor => $f[3], product => $f[4], package => undef, ranges => [] };
+        $nvd{$name} //= { from => 'nvd', vendor => $f[3], product => $f[4], package => undef, ranges => [], _matched => 0 };
         push @{ $nvd{$name}{ranges} }, $c;
+        $nvd{$name}{_matched} = 1 if ref $c && $used->{ refaddr $c };
     }
     $nvd{$_}{fixed} = _vw_fixed('nvd', $nvd{$_}{ranges}) for @nvd_order;
     push @products, map { $nvd{$_} } @nvd_order;
+    $_->{_kev} = $kev_vendors->{ _vw_norm($_->{vendor}) } ? 1 : 0 for @products;
     return @products;
+}
+
+# ranges_match が CVE の番号ごとに返した、部品の鍵ごとに当てた範囲の一覧から、当てた範囲の元の要素
+# (CVE の記録の製品、GitHub の勧告の vulnerabilities の要素、NVD の cpeMatch)の場所の一覧を作る
+sub _vw_used_ranges {
+    my ($m) = @_;
+    my %used;
+    for my $level (values %{ ref $m eq 'HASH' && ref $m->{ranges} eq 'HASH' ? $m->{ranges} : {} }) {
+        for my $cand (ref $level eq 'ARRAY' ? @$level : ()) {
+            $used{ refaddr $cand->[2] } = 1 if ref $cand eq 'ARRAY' && ref $cand->[2];
+        }
+    }
+    return \%used;
+}
+
+# KEV の、CVE の番号の [vendorProject, product] の組の一覧から、vendorProject の名前の一覧を作る
+sub _vw_kev_vendors {
+    my ($pairs) = @_;
+    my %vendors;
+    for my $k (ref $pairs eq 'ARRAY' ? @$pairs : ()) {
+        my $vendor = ref $k eq 'ARRAY' ? $k->[0] : ref $k eq 'HASH' ? $k->{vendor} : undef;
+        my $n = _vw_norm($vendor);
+        $vendors{$n} = 1 if length $n;
+    }
+    return \%vendors;
+}
+
+# 名前を、大文字と小文字を区別せず、空白を _ にした形に直す
+sub _vw_norm {
+    my ($s) = @_;
+    return '' unless defined $s && !ref $s;
+    $s =~ s/\A\s+|\s+\z//g;
+    $s =~ s/\s+/_/g;
+    return lc $s;
+}
+
+# 製品を、部品に当てた範囲を持つ製品、KEV に載った製品、そのほかの製品の順に並べ(同じ順位の中では元の順)、
+# <vendor>:<product> の重複を除いて10件まで残す。重複は並べたあとの先の製品を残すので、部品に範囲を当てた製品が残る。
+# 製品ごとの範囲は、versionType が git の範囲を後に回してから先頭の5件を残す。
+# fixed は、_vw_products が絞る前の範囲の全部から決めてある。残した製品の一覧と、入れなかった製品の数を返す
+sub _vw_limit_products {
+    my ($products) = @_;
+    my $rank = sub { $_[0]{_matched} ? 0 : $_[0]{_kev} ? 1 : 2 };
+    my @order = map { $products->[$_] } sort { $rank->($products->[$a]) <=> $rank->($products->[$b]) || $a <=> $b } 0 .. $#$products;
+    my (%seen, @uniq);
+    for my $p (@order) {
+        push @uniq, $p unless $seen{ join ':', map { $_ // '' } @$p{qw(vendor product)} }++;
+    }
+    my @kept = @uniq > $VW_PRODUCTS_MAX ? @uniq[0 .. $VW_PRODUCTS_MAX - 1] : @uniq;
+    my $git = sub { ref $_[0] eq 'HASH' && lc($_[0]{versionType} // '') eq 'git' ? 1 : 0 };
+    my @out;
+    for my $p (@kept) {
+        my @ranges = @{ $p->{ranges} };
+        my @sorted = map { $ranges[$_] } sort { $git->($ranges[$a]) <=> $git->($ranges[$b]) || $a <=> $b } 0 .. $#ranges;
+        splice @sorted, $VW_RANGES_MAX if @sorted > $VW_RANGES_MAX;
+        push @out, { (map { $_ => $p->{$_} } qw(from vendor product package fixed)), ranges => \@sorted };
+    }
+    return (\@out, @uniq - @kept);
+}
+
+# 項目を前から順に、1つのファイルが40,000バイトを超える前に次のファイルに移るように分ける。
+# 項目が無いときも、空の一覧の1つのファイルにする。1つの項目だけで上限を超えるときは、その項目だけを1つのファイルにする
+sub _vw_parts {
+    my ($entries) = @_;
+    my @parts = ([]);
+    for my $e (@$entries) {
+        my $cur = $parts[-1];
+        if (@$cur && length($VW_JSON->encode({ entries => [ @$cur, $e ] })) > $VW_PART_BYTES) {
+            push @parts, [$e];
+        } else {
+            push @$cur, $e;
+        }
+    }
+    return @parts;
 }
 
 # 製品の範囲ごとに直った版を決め、null を除いて範囲の順に ", " でつなぐ。どの範囲からも得られなければ undef を返す

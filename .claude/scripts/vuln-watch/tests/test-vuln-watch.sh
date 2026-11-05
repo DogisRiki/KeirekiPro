@@ -131,11 +131,16 @@ collect() {
 out() { pj "$1" <"$CASE/out.json"; }
 # collect が出した材料の material.json を読む
 mat() { pj "$1" <"$(out '$d->{material}')"; }
-# collect が出した項目のファイルを読む。項目の鍵ごとの項目を %e に置いて式を評価する
+# collect が出した項目のファイルを、material.json の parts の順にすべて読む。項目の鍵ごとの項目を %e に置いて式を評価する
 ent() {
-    local part
-    part=$(out '$d->{parts}[0]')
-    pj 'my %e = map { $_->{key} => $_ } @{ $d->{entries} }; '"$1" <"$part"
+    local part all='' sep=''
+    while IFS= read -r part; do
+        all="$all$sep$(cat "$part")"
+        sep=','
+    done <<EOF
+$(mat 'join "\n", @{ $d->{parts} }')
+EOF
+    printf '[%s]' "$all" | pj 'my %e = map { $_->{key} => $_ } map { @{ $_->{entries} } } @$d; '"$1"
 }
 # 鍵ごとの「鍵=判定の案」を、鍵の順に並べる式
 SUGGESTED='join " ", map { "$_=$e{$_}{suggested}" } sort keys %e'
@@ -209,10 +214,11 @@ case_products() {
     local name="材料の項目が、feeds.pl の descriptions と article_text と、製品の名前と範囲を持つ products を持つ"
     check "$name(CVE の記録の説明)" "$(ent '$e{"CVE-2026-2001"}{descriptions}{"CVE-2026-2001"}')" "Next.js before 15.5.3 allows authorization bypass."
     check "$name(記事の本文)" "$(ent '$e{"CVE-2026-2010"}{article_text} =~ /Oracle Java SE の脆弱性/ ? "ok" : $e{"CVE-2026-2010"}{article_text} // "<undef>"')" "ok"
+    # npm:next に範囲を当てたのは GitHub の勧告なので、GitHub の勧告の製品が先に並ぶ
     check "$name(製品)" \
         "$(ent 'join " ", map { "$_->{from}:$_->{vendor}:$_->{product}:" . scalar @{ $_->{ranges} } } @{ $e{"CVE-2026-2001"}{products} }')" \
-        "cna:vercel:next.js:1 github:npm:next:1"
-    check "$name(GitHub の勧告の範囲)" "$(ent 'my $r = $e{"CVE-2026-2001"}{products}[1]{ranges}[0]; "$r->{vulnerable_version_range}/$r->{first_patched_version}"')" \
+        "github:npm:next:1 cna:vercel:next.js:1"
+    check "$name(GitHub の勧告の範囲)" "$(ent 'my $r = $e{"CVE-2026-2001"}{products}[0]{ranges}[0]; "$r->{vulnerable_version_range}/$r->{first_patched_version}"')" \
         ">= 15.0.0, < 15.5.3/15.5.3"
 }
 addcase products
@@ -239,9 +245,9 @@ case_origins() {
         "cna:microsoft:windows_11:2:10.0.22631.4567, 10.0.26100.1234 cna:microsoft:windows_server_2019:1:null"
     check "$name(部品に当たらない製品の項目は、部品を持たない)" "$(ent 'scalar @{ $e{"CVE-2026-2003"}{matches} }')" "0"
     check "$name(GitHub の勧告の製品の直った版)" "$(ent 'join " ", map { "$_->{from}=" . ($_->{fixed} // "null") } @{ $e{"CVE-2026-2001"}{products} }')" \
-        "cna=15.5.3 github=15.5.3"
+        "github=15.5.3 cna=15.5.3"
     check "$name(部品に当たる製品の、CVE の記録と GitHub の勧告の直った版)" "$(ent 'join " ", map { "$_->{from}=" . ($_->{fixed} // "null") } @{ $e{"CVE-2026-2040"}{products} }')" \
-        "cna=19.0.0 github=19.0.0"
+        "github=19.0.0 cna=19.0.0"
     check "$name(並ぶ順)" "$(ent 'join " ", @{ $e{"CVE-2026-2010"}{origins} }')" \
         "https://oracle.example/security-alerts/cpuoct2026.html https://www.jpcert.or.jp/at/2026/at260101.html https://oracle.example/security-alerts/alert-cve-2026-2010.html"
     check "$name(重複と CISA の指令の URL を除く)" "$(ent 'join " ", @{ $e{"CVE-2026-2003"}{origins} }')" \
@@ -260,8 +266,10 @@ case_name_hits() {
     newcase
     collect
     local name="題名に Valkey を含み、表に名前の無い製品の項目の name_hits に image:valkey/valkey が入る。4文字より短い名前の部品の鍵は name_hits に入らない"
-    check "$name(部品の一覧に、名前の短い部品がある)" "$(mat 'join " ", grep { $_ eq "npm:ws" || $_ eq "image:valkey/valkey" } @{ $d->{inventory}{keys} }')" \
-        "image:valkey/valkey npm:ws"
+    # 見本の frontend/pnpm-lock.yaml の npm の部品は next と react と ws の3件で、package.json の pnpm を合わせて4件になる
+    check "$name(部品の一覧に、Valkey のイメージと、名前の短い部品を含む npm の部品がある)" \
+        "$(mat 'join " ", (grep { $_ eq "image:valkey/valkey" } @{ $d->{inventory}{keys} }), $d->{inventory}{counts}{npm}')" \
+        "image:valkey/valkey 4"
     # 見本の Valkey の名前は題名にだけ出て、React と Nextcloud と ws は記事の本文にだけ出る。Nextcloud の Next は語の一部なので合わない
     check "$name(名前の手がかり)" "$(ent 'join " ", @{ $e{"CVE-2026-2060"}{name_hits} }')" "image:valkey/valkey npm:react"
     check "$name(CVE の記録の説明にだけ出る名前)" "$(ent 'join " ", @{ $e{"CVE-2026-2040"}{name_hits} }')" "npm:react"
@@ -363,6 +371,87 @@ case_fatal() {
     check "$name(実行のフォルダ)" "$(ls "$CASE/repo/.claude/.state/vuln-watch" 2>/dev/null | wc -l | tr -d ' ')" "0"
 }
 addcase fatal
+
+# ---------------------------------------------------------------------
+# 要件2の受入基準2・要件3の受入基準3・要件4の受入基準1と3: 材料の量を抑え、項目のファイルを分けて書く
+# ---------------------------------------------------------------------
+case_large() {
+    newcase
+    # 大きな見本(fixtures/test-vuln-watch/make-large.pl の頭に書いたもの)を置き、リポジトリの部品の見本を足して push する
+    perl "$VFIX/make-large.pl" "$VFIX" "$CASE" || exit 2
+    g "$CASE/repo" add -A
+    g "$CASE/repo" commit -q -m large
+    g "$CASE/repo" push -q origin main
+    g "$CASE/repo" fetch -q origin
+    collect
+    check "collect の終了コード(大きな見本)" "$(cat "$CASE/rc")" "0"
+
+    local name="大きな見本で collect を呼ぶと、CVE の番号を300件持つ記事があっても、KEV の項目の番号と、CVE の番号を1件だけ持つ IPA の項目の番号の looked_up が真になる"
+    # 確かめられなかった番号には、鍵 * の1件が matches に入る。* の無い項目は、どの番号も確かめられた
+    check "$name(KEV の項目と IPA の項目)" \
+        "$(ent 'join " ", map { my $k = $_; "$k=" . ((grep { $_->{key} eq "*" } @{ $e{$k}{matches} }) ? "not_looked_up" : "looked_up") } qw(CVE-2026-2001 CVE-2026-2002 CVE-2026-2003 CVE-2026-2010 CVE-2026-2020)')" \
+        "CVE-2026-2001=looked_up CVE-2026-2002=looked_up CVE-2026-2003=looked_up CVE-2026-2010=looked_up CVE-2026-2020=looked_up"
+    check "$name(300件の番号の項目は、確かめられなかった番号を持つ)" \
+        "$(ent 'scalar(@{ $e{"CVE-2026-5000"}{cves} }) . ":" . join(",", map { $_->{reason} } grep { $_->{key} eq "*" } @{ $e{"CVE-2026-5000"}{matches} })')" \
+        "300:not_looked_up"
+
+    name="大きな見本で collect を呼ぶと、material.json とどの entries-<番号>.json も40,000バイト以下になり、項目のファイルが2つ以上に分かれる。どの項目も products が10件以下で origins が5件以下になり、inventory.keys に npm:pnpm と npm:@openai/codex のほかの npm: と maven: の鍵が入らない"
+    check "$name(40,000バイトを超えるファイル)" "$(out 'join " ", grep { -s $_ > 40000 } $d->{material}, @{ $d->{parts} }')" ""
+    check "$name(項目のファイルの数が2つ以上)" "$(out 'scalar(@{ $d->{parts} }) >= 2 ? "yes" : scalar @{ $d->{parts} }')" "yes"
+    check "$name(products が10件を超えるか origins が5件を超える項目)" \
+        "$(ent 'join " ", grep { @{ $e{$_}{products} } > 10 || @{ $e{$_}{origins} } > 5 } sort keys %e')" ""
+    # 300件の番号の項目の製品は、vendor-<0から49>:prod-<同じ数> の50種類と vercel:next.js の51種類。
+    # 部品の npm:next に範囲を当てた vercel:next.js が先頭に来て、そのあとに番号の大きい順(項目の番号の並び)で9件が続く
+    check "$name(300件の番号の項目の製品と、入れなかった製品の数)" \
+        "$(ent 'my $x = $e{"CVE-2026-5000"}; join(" ", map { "$_->{vendor}:$_->{product}" } @{ $x->{products} }) . " omitted=$x->{products_omitted}"')" \
+        "vercel:next.js vendor-49:prod-49 vendor-48:prod-48 vendor-47:prod-47 vendor-46:prod-46 vendor-45:prod-45 vendor-44:prod-44 vendor-43:prod-43 vendor-42:prod-42 vendor-41:prod-41 omitted=41"
+    check "$name(300件の番号の項目の元の発表の URL は5件で、全体の数は5件より多い)" \
+        "$(ent 'my $x = $e{"CVE-2026-5000"}; scalar(@{ $x->{origins} }) . ":" . ($x->{origins_total} > 5 ? "more" : $x->{origins_total})')" \
+        "5:more"
+    # 300件の番号の項目の説明は、先頭の3件の番号(番号の大きい順)と、部品の名前が合った CVE-2026-5200 だけになる
+    check "$name(300件の番号の項目の説明)" "$(ent 'join " ", sort keys %{ $e{"CVE-2026-5000"}{descriptions} }')" \
+        "CVE-2026-5200 CVE-2026-5297 CVE-2026-5298 CVE-2026-5299"
+
+    name="大きな見本で collect を呼ぶと、CVE の番号が多く説明を絞った項目でも、絞る前のすべての番号の説明から name_hits を作る"
+    # CVE-2026-5100 の説明は材料に入らないが、その説明にある Valkey の名前が name_hits に入る
+    check "$name" "$(ent 'my $x = $e{"CVE-2026-5000"}; (exists $x->{descriptions}{"CVE-2026-5100"} ? "kept" : "dropped") . " " . join(" ", grep { $_ eq "image:valkey/valkey" } @{ $x->{name_hits} })')" \
+        "dropped image:valkey/valkey"
+
+    name="大きな見本で collect を呼ぶと、material.json とどの entries-<番号>.json も40,000バイト以下になり、項目のファイルが2つ以上に分かれる。どの項目も products が10件以下で origins が5件以下になり、inventory.keys に npm:pnpm と npm:@openai/codex のほかの npm: と maven: の鍵が入らない"
+    check "$name(部品の一覧の npm: と maven: の鍵)" "$(mat 'join " ", grep { /\A(?:npm|maven):/ } @{ $d->{inventory}{keys} }')" \
+        "npm:@openai/codex npm:pnpm"
+    # npm の部品は、見本の3件と足した700件と、npm:pnpm と npm:@openai/codex の705件。Maven の部品は足した500件
+    check "$name(部品の数)" "$(mat 'my $c = $d->{inventory}{counts}; "npm=$c->{npm} maven=$c->{maven}"')" "npm=705 maven=500"
+}
+addcase large
+
+case_git_ranges() {
+    newcase
+    # この場合だけ、KEV に載った CVE-2026-2003 の記録を、git の範囲を10件と unaffected の範囲を7件持つ linux:linux_kernel と、
+    # 部品の npm:next に当たらない範囲と当たる範囲の2件の vercel:next.js と、KEV に載った Microsoft の製品と、
+    # そのほかの製品を持つ記録に替える。KEV の vendorProject は Microsoft で、記録の vendor も Microsoft と大文字で始める
+    put "${CVE_URL}CVE-2026-2003" 200 "$VFIX/cve-git-ranges.json"
+    # KEV に載った Oracle の CVE-2026-2010 は、記録に製品が無く、image:eclipse-temurin に範囲を当てられないので NVD を引く。
+    # NVD の応答は、部品に当たらない oracle:graalvm と、部品に当たる oracle:java_se の順に範囲を持つ
+    put "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2026-2010" 200 "$VFIX/nvd-CVE-2026-2010.json"
+    collect
+    local name="git の範囲を10件と unaffected の範囲を7件持つ製品の見本で collect を呼ぶと、材料のその製品の範囲が、git でない範囲から先に残った5件になり、製品の fixed に7件の unaffected の範囲から得た直った版がすべて入る"
+    check "$name(範囲)" \
+        "$(ent 'my ($p) = grep { $_->{product} eq "linux_kernel" } @{ $e{"CVE-2026-2003"}{products} }; join " ", map { "$_->{version}/$_->{versionType}" } @{ $p->{ranges} }')" \
+        "5.10.230/semver 5.15.170/semver 6.1.120/semver 6.6.60/semver 6.11.7/semver"
+    check "$name(直った版)" \
+        "$(ent 'my ($p) = grep { $_->{product} eq "linux_kernel" } @{ $e{"CVE-2026-2003"}{products} }; $p->{fixed} // "null"')" \
+        "5.10.230, 5.15.170, 6.1.120, 6.6.60, 6.11.7, 6.12.1, 6.13"
+
+    name="材料の製品は、部品に範囲を当てた製品、KEV に載った製品、そのほかの製品の順に並び、同じ順位の中では元の順に並ぶ。<vendor>:<product> が重なる製品は、先に並んだ製品だけが残る"
+    check "$name(CVE の記録の製品)" "$(ent 'join " ", map { "$_->{vendor}:$_->{product}" } @{ $e{"CVE-2026-2003"}{products} }')" \
+        "vercel:next.js Microsoft:windows_11 acme:tool linux:linux_kernel"
+    check "$name(重なる製品は、部品に範囲を当てた製品が残る)" "$(ent 'join " ", map { $_->{version} } @{ $e{"CVE-2026-2003"}{products}[0]{ranges} }')" \
+        "15.0.0"
+    check "$name(NVD の製品)" "$(ent 'join " ", map { "$_->{from}:$_->{vendor}:$_->{product}" } @{ $e{"CVE-2026-2010"}{products} }')" \
+        "nvd:oracle:java_se nvd:oracle:graalvm"
+}
+addcase git_ranges
 
 # ---------------------------------------------------------------------
 # 流す
