@@ -54,14 +54,16 @@
 #     looked_up が偽の番号には、鍵 * で reason が not_looked_up の1件を足す。
 #     CVE の番号ごとに、ranges_refs のために、勧告の GHSA の番号の一覧 ghsa_ids と、部品の鍵ごとに当てた範囲の
 #     [出どころ, 範囲の形, 範囲] の一覧 ranges も返す。collect は、材料に matches だけを入れる
-#   ranges_refs(\%items, \%matches) は、(\%refs, $refs_ok) を返す。%items は項目の鍵ごとの {cves} を持つ項目、
+#   ranges_refs(\%items, \%matches, $deadline) は、(\%refs, $refs_ok) を返す。%items は項目の鍵ごとの {cves} を持つ項目、
 #     %matches は ranges_match が返した値とする。%refs は項目の鍵ごとの [{kind(pr か issue), number}] で、
 #     脆弱性をすでに扱っている Dependabot の PR とコンテナの脆弱性の Issue を、PR、Issue の順に番号の小さい順に並べる。
 #     PR は、題名か本文が項目の CVE の番号か GHSA の番号を含むものと、題名の bump <名前> from <版> to <版> か
 #     本文の Updates `<名前>` from <版> to <版> の名前が、名前の合った部品の鍵の : よりあとと同じで、
 #     上げた先の版が当てた範囲に入らないものとする。Issue は、題名 コンテナ脆弱性: <ID> の ID が、
 #     項目の CVE の番号か GHSA の番号と同じものとする。
-#     PR と Issue の一覧を gh で1回ずつ取り、どちらかを取れなければ、どの項目の refs も空にし、$refs_ok を偽にする
+#     PR と Issue の一覧を gh で1回ずつ取り、どちらかを取れなければ、どの項目の refs も空にし、$refs_ok を偽にする。
+#     $deadline を渡したときは、gh を待つ時間を $deadline の時刻までに抑え、$deadline の時刻を過ぎていれば gh を呼ばずに、
+#     一覧を取れなかったときと同じく返す
 #
 # 版の比べ方: 先頭の v を除き、. と - と + で区切った数の並びとして比べる。足りない桁は 0 とする。
 # 英字で始まる部分(.Final や -jre や -M1 や .x)は末尾にあるときだけ除く。途中にあるとき(1.0.0-rc.1)や、
@@ -907,12 +909,12 @@ sub _ranges_package_key {
 # ---------------------------------------------------------------------
 
 sub ranges_refs {
-    my ($items, $matches) = @_;
+    my ($items, $matches, $deadline) = @_;
     $items = {} unless ref $items eq 'HASH';
     $matches = {} unless ref $matches eq 'HASH';
     my %refs = map { $_ => [] } keys %$items;
-    my $prs = _ranges_gh_list(@RANGES_PR_LIST);
-    my $issues = $prs ? _ranges_gh_list(@RANGES_ISSUE_LIST) : undef;
+    my $prs = _ranges_gh_list($deadline, @RANGES_PR_LIST);
+    my $issues = $prs ? _ranges_gh_list($deadline, @RANGES_ISSUE_LIST) : undef;
     return (\%refs, 0) unless $prs && $issues;
     # PR ごとに、題名と本文と、上げる部品の [名前, 上げた先の版] の一覧を読む
     my @pr;
@@ -966,11 +968,14 @@ sub ranges_refs {
     return (\%refs, 1);
 }
 
-# gh で一覧を取り、JSON の配列を返す。取れなければ undef を返す
+# gh で一覧を取り、JSON の配列を返す。取れなければ undef を返す。
+# $deadline が定まっていれば、待つ時間を $deadline の時刻までに抑え、時刻を過ぎていれば gh を呼ばずに undef を返す
 sub _ranges_gh_list {
-    my @cmd = @_;
+    my ($deadline, @cmd) = @_;
+    my $seconds = defined $deadline ? _ranges_min($RANGES_REFS_TIMEOUT, $deadline - time) : $RANGES_REFS_TIMEOUT;
+    return undef if $seconds <= 0;
     my $out;
-    my $rc = _ranges_run_limited($RANGES_REFS_TIMEOUT, \$out, @cmd);
+    my $rc = _ranges_run_limited($seconds, \$out, @cmd);
     return undef unless $rc == 0 && defined $out;
     my $list = eval { JSON::PP->new->utf8->decode($out) };
     return ref $list eq 'ARRAY' ? [grep { ref eq 'HASH' } @$list] : undef;

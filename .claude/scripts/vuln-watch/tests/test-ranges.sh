@@ -779,16 +779,18 @@ case_nvdwait() {
 }
 
 # ranges_match と ranges_refs を呼び、返した値を JSON で $CASE/out.json に書く
-# run_refs <CVE の番号ごとの引いた値の JSON のファイル> <部品の一覧の JSON のファイル> <項目の JSON のファイル>
+# run_refs <CVE の番号ごとの引いた値の JSON のファイル> <部品の一覧の JSON のファイル> <項目の JSON のファイル> [期限]
+# 期限は今の時刻からの秒数で、渡したときだけ ranges_refs に期限の時刻を渡す
 run_refs() {
     perl -MJSON::PP -e '
         require $ARGV[0];
         my $j = JSON::PP->new->utf8;
         my $read = sub { open my $h, "<", $_[0] or die "$_[0]: $!"; local $/; $j->decode(<$h>) };
         my $matches = ranges_match($read->($ARGV[2]), $read->($ARGV[3]), $read->($ARGV[1]), {});
-        my ($refs, $ok) = ranges_refs($read->($ARGV[4]), $matches);
+        my @deadline = length $ARGV[5] ? (time + $ARGV[5]) : ();
+        my ($refs, $ok) = ranges_refs($read->($ARGV[4]), $matches, @deadline);
         print $j->canonical->encode({ refs => $refs, refs_ok => ($ok ? JSON::PP::true : JSON::PP::false) });
-    ' "$RANGES" "$ALIASES" "$1" "$2" "$3" >"$CASE/out.json" 2>"$CASE/err.txt"
+    ' "$RANGES" "$ALIASES" "$1" "$2" "$3" "${4:-}" >"$CASE/out.json" 2>"$CASE/err.txt"
 }
 
 # 項目ごとの PR と Issue の番号を、項目の鍵の順に「鍵:pr701,issue801」の形で空白で区切り、最後に「;refs_ok」を付けて出す
@@ -844,7 +846,7 @@ EOF
   {"number": 803, "title": "コンテナ脆弱性: GHSA-dddd-eeee-ffff"}
 ]
 EOF
-    run_refs "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/items.json"
+    run_refs "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/items.json" "${KP_TEST_REFS_DEADLINE:-}"
 }
 
 case_refs() {
@@ -865,6 +867,16 @@ issue list --state open --label container-vuln --json number,title --limit 200"
         check "$name($fail を失敗させると、どの項目の refs も空になる)" "$(refs_of)" \
             "CVE-2026-7001: CVE-2026-7002: CVE-2026-7005: JVNDB-2026-000001:;false"
     done
+    unset KP_FAKE_GH_FAIL
+    newcase
+    KP_TEST_REFS_DEADLINE=60 put_refs
+    check "$name(collect の期限まで時間が残っていれば、期限を渡さないときと同じ PR と Issue を選ぶ)" "$(refs_of)" \
+        "CVE-2026-7001:pr701,pr705,pr706 CVE-2026-7002:pr703 CVE-2026-7005: JVNDB-2026-000001:issue801,issue803;true"
+    newcase
+    KP_TEST_REFS_DEADLINE=-1 put_refs
+    check "$name(collect の期限を過ぎていると、gh を呼ばずに、どの項目の refs も空にして refs_ok を偽にする)" \
+        "$(refs_of);$(cat "$CASE/gh.log" 2>/dev/null)" \
+        "CVE-2026-7001: CVE-2026-7002: CVE-2026-7005: JVNDB-2026-000001:;false;"
 }
 
 CASES='compare forms uncomparable partial lookup token limit failures deadline aliases match sources undecided notlooked fixed nvd nvdwait refs'

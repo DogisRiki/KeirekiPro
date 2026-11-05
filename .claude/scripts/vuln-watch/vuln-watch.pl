@@ -91,7 +91,7 @@ sub collect {
     my ($cves, $priority) = _vw_lookup_order(\@items);
     my ($lookup, $advisories_ok) = ranges_lookup($cves, $priority, $inventory, $aliases, $kev_names, $work, $deadline);
     my $matches = ranges_match($lookup, $inventory, $aliases, $kev_names);
-    my ($refs, $refs_ok) = ranges_refs({ map { $_->{key} => { cves => $_->{cves} } } @items }, $matches);
+    my ($refs, $refs_ok) = ranges_refs({ map { $_->{key} => { cves => $_->{cves} } } @items }, $matches, $deadline);
 
     my $components = $inventory->{components} // {};
     my $kev_info = _vw_kev_info($feeds->{kev});
