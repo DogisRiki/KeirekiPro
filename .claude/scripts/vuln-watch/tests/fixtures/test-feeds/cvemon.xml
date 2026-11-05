@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0" xmlns:intruder="https://cvemon.intruder.io/rss">
+    <channel>
+        <title><![CDATA[cvemon | CVE Trends]]></title>
+        <description><![CDATA[Get the latest rankings and info for CVEs currently trending on social media]]></description>
+        <link>https://cvemon.intruder.io</link>
+        <image>
+            <url>https://cvemon.intruder.io/og.png</url>
+            <title>cvemon | CVE Trends</title>
+            <link>https://cvemon.intruder.io</link>
+        </image>
+        <generator>RSS for Node</generator>
+        <lastBuildDate>Thu, 01 Oct 2026 01:00:50 GMT</lastBuildDate>
+        <atom:link href="https://cvemon.intruder.io/rss/cvetrends/latest" rel="self" type="application/rss+xml"/>
+        <pubDate>Thu, 01 Oct 2026 00:17:01 GMT</pubDate>
+        <item>
+            <title><![CDATA[CVE-2024-27834]]></title>
+            <description><![CDATA[Currently trending CVE - Hype Score: 12 - The issue was addressed with improved checks. This issue is fixed in Safari 17.5, iOS 16.7.8 and iPadOS 16.7.8, iOS 17.5 and iPadOS 17.5, macOS Sonoma 14.5, tvOS 17.5, watchOS 10.5. An attacker with arbitrary read and write capability may be able to bypass Pointer Authentication.]]></description>
+            <link>https://cvemon.intruder.io/cves/CVE-2024-27834</link>
+            <guid isPermaLink="true">https://cvemon.intruder.io/cves/CVE-2024-27834</guid>
+            <pubDate>Thu, 01 Oct 2026 00:17:01 GMT</pubDate>
+            <enclosure url="https://cvemon.intruder.io/og.png" length="0" type="image/png"/>
+            <intruder:rank>1</intruder:rank>
+            <intruder:hypeScore>12</intruder:hypeScore>
+            <intruder:cveUrl>https://cvemon.intruder.io/cves/CVE-2024-27834</intruder:cveUrl>
+        </item>
+        <item>
+            <title><![CDATA[Trending this week]]></title>
+            <description><![CDATA[Currently trending topics]]></description>
+            <link>https://cvemon.intruder.io/trending</link>
+            <guid isPermaLink="true">https://cvemon.intruder.io/trending</guid>
+            <pubDate>Thu, 01 Oct 2026 00:17:01 GMT</pubDate>
+            <intruder:rank>2</intruder:rank>
+        </item>
+        <item>
+            <title><![CDATA[CVE-2024-10441]]></title>
+            <description><![CDATA[Currently trending CVE - Hype Score: 11 - Improper encoding or escaping of output vulnerability in the system plugin daemon in Synology BeeStation OS (BSM) before 1.1-65374 and Synology DiskStation Manager (DSM) before 7.2-64570-4, 7.2.1-69057-6 and 7.2.2-72806-1 allows remote attackers to execute arbitrary code via ...]]></description>
+            <link>https://cvemon.intruder.io/cves/CVE-2024-10441</link>
+            <guid isPermaLink="true">https://cvemon.intruder.io/cves/CVE-2024-10441</guid>
+            <pubDate>Thu, 01 Oct 2026 00:17:01 GMT</pubDate>
+            <enclosure url="https://cvemon.intruder.io/og.png" length="0" type="image/png"/>
+            <intruder:rank>3</intruder:rank>
+            <intruder:hypeScore>11</intruder:hypeScore>
+            <intruder:cveUrl>https://cvemon.intruder.io/cves/CVE-2024-10441</intruder:cveUrl>
+        </item>
+    </channel>
+</rss>
