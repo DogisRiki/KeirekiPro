@@ -1,0 +1,8 @@
+services:
+  cache:
+    image: "valkey/valkey:8.0.12"
+  dind:
+    image: docker:29-dind # 注記
+  app:
+    build:
+      context: docker/app

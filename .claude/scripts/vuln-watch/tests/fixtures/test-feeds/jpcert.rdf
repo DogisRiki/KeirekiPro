@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<rdf:RDF
+  xmlns="http://purl.org/rss/1.0/"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:dcterms="http://purl.org/dc/terms/"
+  xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xml:lang="ja">
+
+  <channel rdf:about="https://www.jpcert.or.jp/rss/jpcert.rdf">
+    <title>JPCERT/CC RSS Feed</title>
+    <link>https://www.jpcert.or.jp/</link>
+    <description>注意喚起と緊急報告、Weekly Report の新着情報</description>
+    <dc:publisher>JPCERT/CC</dc:publisher>
+    <dc:creator>webmaster@jpcert.or.jp</dc:creator>
+    <items>
+      <rdf:Seq>
+        <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260035.html" />
+        <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260033.html" />
+        <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260034.html" />
+        <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260033.html" />
+        <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260032.html" />
+        <rdf:li rdf:resource="https://www.jpcert.or.jp/wr/2026/wr261028.html#1" />
+      </rdf:Seq>
+    </items>
+  </channel>
+
+  <item rdf:about="https://www.jpcert.or.jp/at/2026/at260035.html">
+    <title>注意喚起: Apache Tomcatにおける複数の脆弱性（CVE-2026-130001等）に関する注意喚起  (公開)</title>
+
+    <link>https://www.jpcert.or.jp/at/2026/at260035.html</link>
+    <dc:identifier>at260035</dc:identifier>
+    <dc:date>2026-11-02T10:00+09:00</dc:date>
+  </item>
+
+  <item rdf:about="https://www.jpcert.or.jp/at/2026/at260033.html">
+    <title>注意喚起: PHPにおける複数の脆弱性（CVE-2026-109618、CVE-2026-109619）に関する注意喚起  (更新)</title>
+    
+    <link>https://www.jpcert.or.jp/at/2026/at260033.html</link>
+    <dc:identifier>at260033</dc:identifier>
+    <dc:date>2026-10-30T15:43+09:00</dc:date>
+  </item>
+  
+  <item rdf:about="https://www.jpcert.or.jp/at/2026/at260034.html">
+    <title>注意喚起: BrotliのC言語実装における境界外書き込みの脆弱性（CVE-2026-111497）に関する注意喚起  (公開)</title>
+    
+    <link>https://www.jpcert.or.jp/at/2026/at260034.html</link>
+    <dc:identifier>at260034</dc:identifier>
+    <dc:date>2026-10-28T21:01+09:00</dc:date>
+  </item>
+  
+  <item rdf:about="https://www.jpcert.or.jp/at/2026/at260033.html">
+    <title>注意喚起: PHPにおける複数の脆弱性（CVE-2026-109618、CVE-2026-109619）に関する注意喚起  (公開)</title>
+    
+    <link>https://www.jpcert.or.jp/at/2026/at260033.html</link>
+    <dc:identifier>at260033</dc:identifier>
+    <dc:date>2026-10-29T10:12+09:00</dc:date>
+  </item>
+  
+  <item rdf:about="https://www.jpcert.or.jp/at/2026/at260032.html">
+    <title>注意喚起: SiteGuard Server EditionにおけるOSコマンドインジェクションの脆弱性（CVE-2026-106931）に関する注意喚起  (公開)</title>
+    
+    <link>https://www.jpcert.or.jp/at/2026/at260032.html</link>
+    <dc:identifier>at260032</dc:identifier>
+    <dc:date>2026-10-28T20:59+09:00</dc:date>
+  </item>
+  
+  <item rdf:about="https://www.jpcert.or.jp/wr/2026/wr261028.html#1">
+    <title>Weekly Report: VeloCloud OrchestratorにSQLインジェクションの脆弱性（CVE-2026-90001）</title>
+    <description>VeloCloud OrchestratorにSQLインジェクションの脆弱性</description>    
+	<content:encoded>
+	<![CDATA[VeloCloud OrchestratorにSQLインジェクションの脆弱性<a href="https://www.jpcert.or.jp/wr/2026/wr261028.html#1">続きを読む</a>]]>
+	</content:encoded>
+    <link>https://www.jpcert.or.jp/wr/2026/wr261028.html#1</link>
+    <dc:identifier>wr261028</dc:identifier>
+    <dc:date>2026-11-01T09:07+09:00</dc:date>
+  </item>
+  
+</rdf:RDF>

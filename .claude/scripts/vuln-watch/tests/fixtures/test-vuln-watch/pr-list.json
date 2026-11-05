@@ -1,0 +1,4 @@
+[
+  {"number": 731, "title": "chore: Bump next from 15.5.2 to 15.5.3 in /frontend", "body": "Bumps next from 15.5.2 to 15.5.3. Fixes CVE-2026-2001."},
+  {"number": 760, "title": "chore: Bump lodash from 4.17.20 to 4.17.21 in /frontend", "body": "Bumps lodash."}
+]

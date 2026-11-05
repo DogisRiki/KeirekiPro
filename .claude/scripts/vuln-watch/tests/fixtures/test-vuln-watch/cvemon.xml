@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:intruder="https://cvemon.intruder.io/rss" version="2.0">
+    <channel>
+        <title><![CDATA[cvemon | CVE Trends]]></title>
+        <link>https://cvemon.intruder.io</link>
+        <item>
+            <title><![CDATA[CVE-2026-2040]]></title>
+            <link>https://cvemon.intruder.io/cves/CVE-2026-2040</link>
+            <pubDate>Tue, 04 Nov 2026 01:00:00 GMT</pubDate>
+            <intruder:rank>1</intruder:rank>
+        </item>
+        <item>
+            <title><![CDATA[CVE-2026-2041]]></title>
+            <link>https://cvemon.intruder.io/cves/CVE-2026-2041</link>
+            <pubDate>Tue, 04 Nov 2026 01:00:00 GMT</pubDate>
+            <intruder:rank>2</intruder:rank>
+        </item>
+    </channel>
+</rss>

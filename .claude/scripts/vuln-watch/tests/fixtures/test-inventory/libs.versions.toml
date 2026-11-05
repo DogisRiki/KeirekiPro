@@ -1,0 +1,11 @@
+# 版の一覧の見本
+[versions]
+spring-boot = "4.1.2"
+mybatis-spring-boot = "4.0.1"
+
+[libraries]
+mybatis-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter", version.ref = "mybatis-spring-boot" }
+java-jwt = { module = "com.auth0:java-jwt", version = "4.5.0" } # 版を直に書いた行
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

@@ -1,0 +1,40 @@
+{
+  "sbom": {
+    "spdxVersion": "SPDX-2.3",
+    "packages": [
+      {
+        "name": "com.github.example/repo",
+        "externalRefs": [
+          {"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:github/example/repo@main"}
+        ]
+      },
+      {
+        "name": "org.yaml:snakeyaml",
+        "versionInfo": "2.4",
+        "externalRefs": [
+          {"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:maven/org.yaml/snakeyaml@2.4"}
+        ]
+      },
+      {
+        "name": "com.auth0:java-jwt",
+        "versionInfo": "4.5.0",
+        "externalRefs": [
+          {"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:maven/com.auth0/java-jwt@4.5.0?type=jar"}
+        ]
+      },
+      {
+        "name": "npm:zeta",
+        "versionInfo": "9.9.9",
+        "externalRefs": [
+          {"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:npm/zeta@9.9.9"}
+        ]
+      },
+      {
+        "name": "actions/checkout",
+        "externalRefs": [
+          {"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:githubactions/actions/checkout@7.0.1"}
+        ]
+      }
+    ]
+  }
+}
