@@ -46,6 +46,7 @@ rr() {
 }
 
 FIX="$HERE/fixtures"
+ALIASES="$(cd "$HERE/.." && pwd)/aliases.json"
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
 WORK=$(cd "$TMP_ROOT" && { pwd -W 2>/dev/null || pwd -P; })
@@ -53,6 +54,7 @@ ORIG_PATH=$PATH
 
 CVE_URL=https://cveawg.mitre.org/api/cve/
 GHSA_URL='https://api.github.com/advisories?cve_id='
+NVD_URL='https://services.nvd.nist.gov/rest/json/cves/2.0?cveId='
 # 偽の gh が gh auth token の答えとして出す値。本物のトークンではない
 FAKE_TOKEN=gho_vulnwatchFAKE0123456789abcdef
 
@@ -83,15 +85,18 @@ pj() {
 }
 
 # ranges_lookup を呼び、返した値と、かかった秒数を JSON で $CASE/out.json に書く。
-# run_lookup <空白で区切った CVE の番号> <先に引く順の JSON> [<打ち切りまでの秒数>]
+# 部品の一覧と KEV の名前のファイルを渡したときは、本物の aliases.json と合わせて渡す。渡さなければ、どれも空にする。
+# run_lookup <空白で区切った CVE の番号> <先に引く順の JSON> [<打ち切りまでの秒数> [<部品の一覧の JSON のファイル> <KEV の名前の JSON のファイル>]]
 run_lookup() {
     (cd "$CASE/work" && perl -MJSON::PP -MTime::HiRes=time -e '
         require $ARGV[0];
         my @cves = split " ", $ARGV[1];
+        my $read = sub { return {} unless length $_[0]; open my $h, "<", $_[0] or die "$_[0]: $!"; local $/; JSON::PP->new->utf8->decode(<$h>) };
+        my ($inventory, $aliases, $kev) = length $ARGV[5] ? map { $read->($_) } @ARGV[5 .. 7] : ({}, {}, {});
         my $t0 = time;
-        my ($lookup, $ok) = ranges_lookup(\@cves, JSON::PP->new->decode($ARGV[2]), {}, {}, {}, $ARGV[3], time + $ARGV[4]);
+        my ($lookup, $ok) = ranges_lookup(\@cves, JSON::PP->new->decode($ARGV[2]), $inventory, $aliases, $kev, $ARGV[3], time + $ARGV[4]);
         print JSON::PP->new->utf8->canonical->encode({ lookup => $lookup, advisories_ok => ($ok ? JSON::PP::true : JSON::PP::false), elapsed => time - $t0 });
-    ' "$RANGES" "$1" "$2" "$CASE/work" "${3:-60}" >"$CASE/out.json" 2>"$CASE/err.txt")
+    ' "$RANGES" "$1" "$2" "$CASE/work" "${3:-60}" "${4:-}" "$ALIASES" "${5:-}" >"$CASE/out.json" 2>"$CASE/err.txt")
 }
 
 out() { pj "$1" <"$CASE/out.json"; }
@@ -122,7 +127,7 @@ newcase() {
     fi
     export HOME="$CASE/home"
     export KP_FAKE_CURL_DIR="$CASE/curl" KP_FAKE_GH_DIR="$CASE/gh" KP_FAKE_CURL_LOG="$CASE/curl.log"
-    unset KP_FAKE_CURL_DELAY KP_FAKE_GH_FAIL
+    unset KP_FAKE_CURL_DELAY KP_FAKE_GH_FAIL KP_VULN_WATCH_NVD_WAIT
     printf '%s\n' "$FAKE_TOKEN" >"$CASE/gh/auth-token.out"
     printf '[]' >"$CASE/empty.json"
 }
@@ -389,8 +394,6 @@ case_deadline() {
         "$(out 'join ",", $d->{lookup}{"CVE-2025-29927"}{looked_up} ? "true" : "false", $d->{advisories_ok} ? "true" : "false"');$([ -e "$CASE/curl.log" ] && echo called)" \
         "false,false;"
 }
-
-ALIASES="$(cd "$HERE/.." && pwd)/aliases.json"
 
 # ranges_match を呼び、返した値を JSON で $CASE/out.json に書く。aliases.json のファイルを渡さなければ、本物の aliases.json を使う。
 # run_match <CVE の番号ごとの引いた値の JSON のファイル> <部品の一覧の JSON のファイル> <KEV の名前の JSON のファイル> [<aliases.json のファイル>]
@@ -660,7 +663,120 @@ EOF
     check "$name2(looked_up が偽の番号の、範囲に入る部品と鍵 *)" "$(mf CVE-2026-5003)" "*|null||null npm:next|true|15.5.2|16.0.0"
 }
 
-CASES='compare forms uncomparable partial lookup token limit failures deadline aliases match sources undecided notlooked fixed'
+# 範囲を持たない Tomcat の製品と、範囲を持つ Tomcat の製品と、名前の合わない製品の CVE の記録の見本を置く
+put_nvd_records() {
+    printf '%s' '{"containers": {"cna": {"affected": [{"vendor": "Apache Software Foundation", "product": "Apache Tomcat", "versions": []}]}}}' >"$CASE/norange.json"
+    printf '%s' '{"containers": {"cna": {"affected": [{"vendor": "Apache Software Foundation", "product": "Apache Tomcat", "versions": [{"version": "10.1.0", "lessThan": "10.1.20", "status": "affected"}]}]}}}' >"$CASE/range.json"
+    printf '%s' '{"containers": {"cna": {"affected": [{"vendor": "Example", "product": "Other", "versions": [{"version": "1.0", "lessThan": "2.0", "status": "affected"}]}]}}}' >"$CASE/other.json"
+    printf '%s' '{"components": {"maven:org.apache.tomcat.embed:tomcat-embed-core": {"versions": ["10.1.30"], "files": ["backend/build.gradle"], "partial": false}, "image:debian": {"versions": ["12"], "files": ["docker/backend/Dockerfile"], "partial": true}}}' >"$CASE/inventory.json"
+    printf '{}' >"$CASE/kev.json"
+}
+
+# $CASE/out.json の lookup を $CASE/lookup.json に書く
+save_lookup() {
+    perl -MJSON::PP -e 'my $j = JSON::PP->new->utf8; local $/; my $d = $j->decode(<STDIN>); print $j->encode($d->{lookup})' <"$CASE/out.json" >"$CASE/lookup.json"
+}
+
+case_nvd() {
+    newcase
+    put_nvd_records
+    # 6001 から 6006 は、範囲を当てられない Tomcat の部品がある番号。6007 は範囲を当てられる番号、6008 は名前の合う部品が無い番号。
+    # 6007 と 6008 を先に引く順にし、NVD の要求の対象から外れることを確かめる
+    local n cves=''
+    for n in 1 2 3 4 5 6 7 8; do cves="$cves CVE-2026-600$n"; done
+    for n in 1 2 3 4 5 6; do put_cve "CVE-2026-600$n" 200 "$CASE/norange.json" 200 "$CASE/empty.json"; done
+    put_cve CVE-2026-6007 200 "$CASE/range.json" 200 "$CASE/empty.json"
+    put_cve CVE-2026-6008 200 "$CASE/other.json" 200 "$CASE/empty.json"
+    put "${NVD_URL}CVE-2026-6001" 200 "$FIX/test-ranges/nvd-CVE-2025-24813.json"
+    export KP_VULN_WATCH_NVD_WAIT=0
+    run_lookup "$cves" '{"CVE-2026-6007": 0, "CVE-2026-6008": 1}' 60 "$CASE/inventory.json" "$CASE/kev.json"
+    local name="NVD への要求が、範囲の当て方の1から3のどれでも範囲を当てられなかった部品がある番号だけで行われ、5回で止まる"
+    check "$name" \
+        "$(requested "$NVD_URL");$(for n in 1 2 3 4 5 6 7 8; do printf '%s,' "$(requested "${NVD_URL}CVE-2026-600$n")"; done)" \
+        "5;1,1,1,1,1,0,0,0,"
+    check "$name(NVD への要求ごとに curl を1回呼ぶ)" \
+        "$(grep -c '^CALL' "$CASE/curl.log")" "6"
+
+    local name3="NVD の CPE の範囲が、aliases.json で部品の鍵に引ける CPE にだけ当たる。NVD の CPE だけに名前が出る製品は、どの部品にも合わない"
+    check "$name3(NVD を引いた番号の nvd に、vulnerable が真の cpeMatch だけが入る)" \
+        "$(out 'join " ", map { $_->{criteria} } @{ $d->{lookup}{"CVE-2026-6001"}{nvd} }');$(out 'scalar @{ $d->{lookup}{"CVE-2026-6002"}{nvd} }')" \
+        "cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:* cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:* cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:* cpe:2.3:a:apache:tomcat:10.1.0:milestone1:*:*:*:*:*:* cpe:2.3:o:debian:debian_linux:11.0:*:*:*:*:*:*:* cpe:2.3:o:netapp:bootstrap_os:-:*:*:*:*:*:*:*;0"
+    save_lookup
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    check "$name3(Tomcat の部品に NVD の apache:tomcat の範囲が当たり、debian:debian_linux の CPE は image:debian に合わない)" \
+        "$(ms CVE-2026-6001)" "maven:org.apache.tomcat.embed:tomcat-embed-core|true|nvd|-"
+    check "$name3(NVD を引けなかった番号は、範囲が無いままになる)" \
+        "$(ms CVE-2026-6002)" "maven:org.apache.tomcat.embed:tomcat-embed-core|null|-|no_range"
+
+    newcase
+    cat >"$CASE/lookup.json" <<'EOF'
+{
+  "CVE-2026-6101": {"looked_up": true, "products": [], "advisories": [], "nvd": [
+    {"criteria": "cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*", "versionEndExcluding": "11.0.0"}]},
+  "CVE-2026-6102": {"looked_up": true, "advisories": [],
+    "products": [{"from": "cna", "vendor": "Apache Software Foundation", "product": "Apache Tomcat", "versions": []}],
+    "nvd": [
+      {"criteria": "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*", "versionEndExcluding": "99.0"},
+      {"criteria": "cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*", "versionStartIncluding": "9.0.0", "versionEndExcluding": "10.1.0"}]}
+}
+EOF
+    printf '%s' '{"components": {"maven:org.apache.tomcat.embed:tomcat-embed-core": {"versions": ["10.1.30"], "files": ["backend/build.gradle"], "partial": false}, "image:node": {"versions": ["20.11.0"], "files": ["compose.yaml"], "partial": false}}}' >"$CASE/inventory.json"
+    printf '%s' '{"CVE-2026-6102": [["Nodejs", "Node"]]}' >"$CASE/kev.json"
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    check "$name3(CPE だけに名前が出る製品は、どの部品にも合わない)" "$(ms CVE-2026-6101)" ""
+    check "$name3(部品の鍵に引けない apache:http_server の CPE の範囲は当たらない)" \
+        "$(ms CVE-2026-6102)" "image:node|null|-|no_range maven:org.apache.tomcat.embed:tomcat-embed-core|false|nvd|-"
+
+    local name4="NVD の versionEndExcluding が直った版になり、versionEndIncluding だけを持つ範囲からは直った版が null になる"
+    check "$name4(範囲の1つから決める)" \
+        "$(rr 'join " ", map { F("nvd", $_) } (q({"criteria":"cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*","versionStartIncluding":"10.1.1","versionEndExcluding":"10.1.35"}), q({"criteria":"cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*","versionStartIncluding":"1.0","versionEndIncluding":"1.2"}), q({"criteria":"cpe:2.3:a:apache:tomcat:10.1.0:milestone1:*:*:*:*:*:*"}))')" \
+        "10.1.35 null null"
+    newcase
+    put_nvd_records
+    put_cve CVE-2026-6001 200 "$CASE/norange.json" 200 "$CASE/empty.json"
+    put "${NVD_URL}CVE-2026-6001" 200 "$FIX/test-ranges/nvd-CVE-2025-24813.json"
+    export KP_VULN_WATCH_NVD_WAIT=0
+    run_lookup CVE-2026-6001 '{}' 60 "$CASE/inventory.json" "$CASE/kev.json"
+    save_lookup
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    check "$name4(NVD の範囲に入った部品の fixed)" \
+        "$(mf CVE-2026-6001)" "maven:org.apache.tomcat.embed:tomcat-embed-core|true|10.1.30|10.1.35"
+}
+
+case_nvdwait() {
+    newcase
+    local name="KP_VULN_WATCH_NVD_WAIT が無いときの待つ秒数が 6 である"
+    check "$name" "$(rr 'ranges_nvd_wait()')" "6"
+    check "$name(数でない値のときも 6 にする)" "$(KP_VULN_WATCH_NVD_WAIT=abc rr 'ranges_nvd_wait()')" "6"
+    check "$name(テストのときは替えられる)" "$(KP_VULN_WATCH_NVD_WAIT=0 rr 'ranges_nvd_wait()')" "0"
+
+    put_nvd_records
+    local n
+    for n in 1 2 3; do put_cve "CVE-2026-600$n" 200 "$CASE/norange.json" 200 "$CASE/empty.json"; done
+    export KP_VULN_WATCH_NVD_WAIT=1
+    run_lookup "CVE-2026-6001 CVE-2026-6002 CVE-2026-6003" '{}' 60 "$CASE/inventory.json" "$CASE/kev.json"
+    check "$name(NVD への要求の間を、待つ秒数だけ空ける)" \
+        "$(requested "$NVD_URL");$(out '$d->{elapsed} >= 2 ? "waited" : "not waited: $d->{elapsed}"')" "3;waited"
+
+    newcase
+    put_nvd_records
+    for n in 1 2; do put_cve "CVE-2026-600$n" 200 "$CASE/norange.json" 200 "$CASE/empty.json"; done
+    export KP_VULN_WATCH_NVD_WAIT=5
+    run_lookup "CVE-2026-6001 CVE-2026-6002" '{}' 3 "$CASE/inventory.json" "$CASE/kev.json"
+    check "$name(待つと打ち切りの時刻を過ぎるときは、次の要求をしない)" \
+        "$(requested "$NVD_URL");$(out '$d->{elapsed} < 3 ? "stopped" : "not stopped: $d->{elapsed}"')" "1;stopped"
+
+    # GitHub の勧告の応答を打ち切りの時刻より遅らせる。CVE の記録は届き、範囲を当てられない部品が残る
+    newcase
+    put_nvd_records
+    put_cve CVE-2026-6001 200 "$CASE/norange.json" 200 "$CASE/empty.json"
+    export KP_VULN_WATCH_NVD_WAIT=0 KP_FAKE_CURL_DELAY="${GHSA_URL}CVE-2026-6001=4"
+    run_lookup CVE-2026-6001 '{}' 2 "$CASE/inventory.json" "$CASE/kev.json"
+    check "$name(打ち切りの時刻を過ぎたあとは、NVD を引かない)" \
+        "$(requested "$NVD_URL");$(out 'scalar @{ $d->{lookup}{"CVE-2026-6001"}{products} }')" "0;1"
+}
+
+CASES='compare forms uncomparable partial lookup token limit failures deadline aliases match sources undecided notlooked fixed nvd nvdwait'
 
 # ---------------------------------------------------------------------
 # 選んだ場合を流す

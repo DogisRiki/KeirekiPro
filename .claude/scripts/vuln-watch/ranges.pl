@@ -14,31 +14,40 @@
 #     $partial が真のときは、$version を一部だけの版(21 なら 21 以上 22 未満の幅)として比べる。
 #     $source が cve で、版が versions[] の要素に当たったときは、3つ目の値にその要素を返す
 #   ranges_fixed($source, $range) は、範囲の1つから決めた直った版を返す。直った版が無ければ undef を返す。
-#     $range は、ghsa では vulnerabilities[] の要素、cve では versions[] の要素とする。
+#     $range は、ghsa では vulnerabilities[] の要素、cve では versions[] の要素、nvd では cpeMatch[] の要素とする。
 #       ghsa: first_patched_version
+#       nvd:  versionEndExcluding。versionEndIncluding だけを持つ範囲と、criteria の版の欄だけを持つ範囲からは取らない
 #       cve:  versionType が git の範囲からは取らない。status が affected の範囲では lessThan か、version の式の < の値。
 #             lessThanOrEqual だけを持つ範囲からは取らない。status が unaffected の範囲では、lessThan を持たず、
 #             version が 0 でも式でも境が無いことを示す値でもないときの version
 #   ranges_lookup(\@cves, \%priority, \%inventory, \%aliases, \%kev_names, $work_dir, $deadline) は、
 #     (\%lookup, $advisories_ok) を返す。%lookup は CVE の番号ごとに
-#     {products, advisories, vendor_advisories, descriptions, looked_up} を持つ。
+#     {products, advisories, vendor_advisories, descriptions, nvd, looked_up} を持つ。
 #     products は CVE の記録の CNA と CISA-ADP の affected[] の製品で、
 #       {from(cna か adp), vendor, product, packageName, collectionURL, defaultStatus, versions} を持つ。
 #     advisories は GitHub の勧告で、{ghsa_id, repository_advisory_url, vulnerabilities} を持ち、
 #       vulnerabilities は {ecosystem, name, vulnerable_version_range, first_patched_version} を持つ。
 #     vendor_advisories は CNA の references[] のうち vendor-advisory の付いた URL を3件まで、
 #       descriptions は英語の説明 {en} を600文字まで持つ。
+#     nvd は NVD の cpeMatch[] のうち vulnerable が真のもので、{criteria, versionStart*, versionEnd*} を持つ。
+#       CVE の記録と GitHub の勧告を取ったあとに ranges_match と同じ突き合わせを行い、範囲の当て方の1から3で範囲を
+#       当てられなかった部品がある番号だけ NVD を引く。NVD への要求ごとに curl を1回呼び、要求の間を ranges_nvd_wait の
+#       秒数だけ空け、1回の実行で5回までにする。引かなかった番号と、引けなかった番号の nvd は空の一覧とする。
 #     looked_up は、CVE の記録と GitHub の勧告の両方を得られたときだけ真とする。
 #     $advisories_ok は、GitHub の勧告をすべての番号について得られたときだけ真とする。
 #     %priority は CVE の番号ごとの、先に引く順の値で、値の小さい番号から引く。値の無い番号は最後に引く。
 #     同じ値の番号は @cves の順に引く。引くのは300件の番号までとする。
 #     curl の出力と設定ファイルは $work_dir のフォルダに書く。$deadline の時刻を過ぎたら curl を止める。
 #     %inventory と %aliases と %kev_names は、NVD を引く番号を決めるために受け取る
+#   ranges_nvd_wait() は、NVD への要求の間に待つ秒数を返す。既定は6秒とし、テストのときだけ
+#     環境変数 KP_VULN_WATCH_NVD_WAIT の0以上の数で替える
 #   ranges_match(\%lookup, \%inventory, \%aliases, \%kev_names) は、CVE の番号ごとに {matches => [...]} を返す。
 #     %lookup は ranges_lookup が返した値、%inventory は inventory_read が返した値、%aliases は aliases.json を読んだ値、
 #     %kev_names は CVE の番号ごとの KEV の [vendorProject, product] の組の一覧とする。
 #     matches の要素は {key, repo_versions, file, in_range, fixed, range_source, reason} を持つ。
-#     file は部品を読んだファイルを ", " でつないだ文字列、range_source は範囲を当てた出どころ(github・cna・adp)とする。
+#     file は部品を読んだファイルを ", " でつないだ文字列、range_source は範囲を当てた出どころ(github・cna・adp・nvd)とする。
+#     NVD の CPE の範囲は、CPE の <vendor>:<product> が aliases.json でその部品の鍵に引けるものだけを当てる。
+#     CPE の名前は、名前の合う部品を見つけるためには使わない
 #     fixed は、in_range が真の部品にだけ、部品の版が入った範囲の直った版を、重複を除いて ", " でつないで入れる。
 #     CVE の記録の製品で、版がどの要素にも当たらず defaultStatus で入ったときは、その製品の範囲の直った版のうち、
 #     部品の版より大きい最も小さい版を入れる
@@ -70,6 +79,11 @@ my $RANGES_AUTH_FILE = 'ranges-auth.txt';
 my $RANGES_DESCRIPTION_MAX = 600;
 my $RANGES_VENDOR_ADVISORY_MAX = 3;
 
+# NVD を引く数と、要求の間に待つ秒数の既定
+my $RANGES_NVD_URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=';
+my $RANGES_NVD_LIMIT = 5;
+my $RANGES_NVD_WAIT = 6;
+
 sub ranges_version_cmp {
     my ($x, $y) = @_;
     my ($p, $wp) = _ranges_parse($x);
@@ -95,6 +109,7 @@ sub ranges_fixed {
     my ($source, $range) = @_;
     return undef unless ref $range eq 'HASH';
     return _ranges_fixed_value(_ranges_str($range->{first_patched_version})) if $source eq 'ghsa';
+    return _ranges_fixed_value(_ranges_str($range->{versionEndExcluding})) if $source eq 'nvd';
     return undef unless $source eq 'cve';
     return undef if lc(_ranges_str($range->{versionType}) // '') eq 'git';
     my $status = _ranges_str($range->{status}) // '';
@@ -386,7 +401,7 @@ sub ranges_lookup {
         next unless defined $cve && !ref $cve && $cve =~ /\ACVE-\d{4}-\d{4,}\z/ && !$seen{$cve}++;
         $index{$cve} = scalar @uniq;
         push @uniq, $cve;
-        $lookup{$cve} = { products => [], advisories => [], vendor_advisories => [], descriptions => {}, looked_up => JSON::PP::false };
+        $lookup{$cve} = { products => [], advisories => [], vendor_advisories => [], descriptions => {}, nvd => [], looked_up => JSON::PP::false };
     }
     # KEV と cvemon の項目の番号(先に引く順の値が小さい番号)を先に引く。同じ値の番号は渡された順に引く
     my $rank = sub { my $p = $priority->{ $_[0] }; defined $p && !ref $p && $p =~ /\A\d+(?:\.\d+)?\z/ ? $p : 9**9 };
@@ -433,7 +448,49 @@ sub ranges_lookup {
         $advisories_ok = 0 unless $ghsa;
         $lookup{$cve}{looked_up} = $record && $ghsa ? JSON::PP::true : JSON::PP::false;
     }
+
+    # 範囲の当て方の1から3で範囲を当てられなかった部品がある番号だけ、NVD を引く
+    my $matches = ranges_match(\%lookup, $inventory, $aliases, $kev_names);
+    my @nvd = grep {
+        my $cve = $_;
+        grep { ($_->{reason} // '') eq 'no_range' } @{ $matches->{$cve}{matches} }
+    } @pick;
+    my $wait = ranges_nvd_wait();
+    my $count = 0;
+    for my $cve (@nvd) {
+        # NVD は、アカウント無しの要求を30秒に5回までに抑えるので、2回目からは要求の前に待つ。
+        # 待つと打ち切りの時刻を過ぎるときは、次の要求をしない
+        last if $count >= $RANGES_NVD_LIMIT || time + ($count ? $wait : 0) >= $deadline;
+        select(undef, undef, undef, $wait) if $count;
+        $count++;
+        my $req = { url => "$RANGES_NVD_URL$cve", out => "ranges-nvd-$count.json" };
+        my $json = _ranges_response($work_dir, _ranges_curl($work_dir, [$req], undef, $deadline), $req, 'HASH');
+        $lookup{$cve}{nvd} = _ranges_read_nvd($json) if $json;
+    }
     return (\%lookup, $advisories_ok ? JSON::PP::true : JSON::PP::false);
+}
+
+sub ranges_nvd_wait {
+    my $w = $ENV{KP_VULN_WATCH_NVD_WAIT};
+    return defined $w && $w =~ /\A\d+(?:\.\d+)?\z/ ? $w + 0 : $RANGES_NVD_WAIT;
+}
+
+# NVD の応答の vulnerabilities[].cve.configurations[].nodes[].cpeMatch[] のうち、vulnerable が真のものを読む
+sub _ranges_read_nvd {
+    my ($json) = @_;
+    my $list = sub { grep { ref eq 'HASH' } @{ ref $_[0] eq 'ARRAY' ? $_[0] : [] } };
+    my @out;
+    for my $v ($list->($json->{vulnerabilities})) {
+        next unless ref $v->{cve} eq 'HASH';
+        for my $node (map { $list->($_->{nodes}) } $list->($v->{cve}{configurations})) {
+            for my $m ($list->($node->{cpeMatch})) {
+                next unless $m->{vulnerable} && defined _ranges_str($m->{criteria});
+                push @out, { map { defined _ranges_str($m->{$_}) ? ($_ => $m->{$_}) : () }
+                        qw(criteria versionStartIncluding versionStartExcluding versionEndIncluding versionEndExcluding) };
+            }
+        }
+    }
+    return \@out;
 }
 
 sub _ranges_min { $_[0] < $_[1] ? $_[0] : $_[1] }
@@ -718,15 +775,17 @@ sub ranges_match {
             $add->($_, undef) for defined $n ? @{ $by_name{$n} // [] } : ();
         }
         my @cna = grep { (_ranges_str($_->{from}) // '') eq 'cna' } @products;
+        my @nvd = grep { ref eq 'HASH' } @{ ref $l->{nvd} eq 'ARRAY' ? $l->{nvd} : [] };
         my @matches;
         for my $key (@order) {
             my %names = map { $_ => 1 } grep { defined && !ref } @{ ref $table->{$key} eq 'ARRAY' ? $table->{$key} : [] };
             my @named = grep { my $n = _ranges_name($_->{vendor}, $_->{product}); defined $n && $names{$n} } @products;
-            # 範囲の当て方の1から3。4の NVD の CPE の範囲は、ほかのタスクで足す
+            # 範囲の当て方の1から4
             my @levels = (
                 $hit{$key},
                 [map { [_ranges_str($_->{from}) // 'cna', 'cve', $_] } @named],
                 @cna == 1 ? [['cna', 'cve', $cna[0]]] : [],
+                [map { ['nvd', 'nvd', $_] } grep { my $n = _ranges_cpe_name($_->{criteria}); defined $n && $names{$n} } @nvd],
             );
             push @matches, _ranges_assign($key, $components->{$key}, \@levels);
         }
@@ -804,6 +863,13 @@ sub _ranges_name {
     }
     return undef if grep { !length } @parts;
     return lc join ':', @parts;
+}
+
+# NVD の CPE の名前(cpe:2.3:<種類>:<vendor>:<product>:...)を、aliases.json の表の形の <vendor>:<product> に直す。
+# 名前に \ で書いた記号を持つ CPE は、表の名前に合わず、範囲を当てない側に倒れる
+sub _ranges_cpe_name {
+    my $criteria = _ranges_str($_[0]);
+    return defined $criteria ? _ranges_name((split /:/, $criteria)[3, 4]) : undef;
 }
 
 # CVE の記録の製品の collectionURL が npm か Maven の登録所で packageName があれば、部品の鍵を返す
