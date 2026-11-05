@@ -26,6 +26,8 @@ my $VW_STATE = '.claude/.state/vuln-watch'; # 受け渡しの場所(作業フォ
 my $VW_KEEP = 24 * 3600;                    # 古い実行のフォルダを消すまでの秒数
 my $VW_WINDOW = 7 * 24 * 3600;              # 直近7日
 my $VW_BUDGET = 150;                        # 外部への要求の全体を打ち切る秒数
+my $VW_NAME_MIN = 4;                        # 名前の手がかりに使う部品の鍵の名前の、最も短い文字数
+my $VW_NAME_HITS_MAX = 10;                  # 名前の手がかりに入れる部品の鍵の数
 my $VW_RUN_ID = qr/\A(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-\d+\z/;
 
 my $VW_JSON = JSON::PP->new->utf8->canonical->pretty->indent_length(1);
@@ -69,10 +71,12 @@ sub collect {
     my $matches = ranges_match($lookup, $inventory, $aliases, $kev_names);
     my ($refs, $refs_ok) = ranges_refs({ map { $_->{key} => { cves => $_->{cves} } } @items }, $matches);
 
-    my @entries = map { _vw_entry($_, $lookup, $matches, $refs) } @items;
+    my $components = $inventory->{components} // {};
+    my $kev_info = _vw_kev_info($feeds->{kev});
+    my $names = _vw_component_names($components);
+    my @entries = map { _vw_entry($_, $lookup, $matches, $refs, $kev_info, $names) } @items;
     my $entries_file = "$run_dir/entries-1.json";
     my $material_file = "$run_dir/material.json";
-    my $components = $inventory->{components} // {};
     my %counts = (npm => 0, maven => 0);
     for my $key (keys %$components) {
         $counts{$1}++ if $key =~ /\A(npm|maven):/;
@@ -112,15 +116,16 @@ sub collect {
 
 # 項目の1つを、材料の項目にする
 sub _vw_entry {
-    my ($item, $lookup, $matches, $refs) = @_;
+    my ($item, $lookup, $matches, $refs, $kev_info, $names) = @_;
     my @cves = @{ $item->{cves} };
-    my (%descriptions, @products, @matches, %seen);
+    my (%descriptions, @products, @matches, %seen, @kev_dates);
     my $feeds_descriptions = $item->{descriptions} // {};
     for my $cve (@cves) {
         my $l = $lookup->{$cve} // {};
         my $text = $l->{descriptions}{en} // $feeds_descriptions->{$cve};
         $descriptions{$cve} = $text if defined $text;
         push @products, _vw_products($l);
+        push @kev_dates, $kev_info->{$cve}{date} if $kev_info->{$cve} && defined $kev_info->{$cve}{date};
         for my $m (@{ $matches->{$cve}{matches} // [] }) {
             push @matches, $m unless $seen{ JSON::PP->new->canonical->encode($m) }++;
         }
@@ -131,9 +136,13 @@ sub _vw_entry {
         cves         => \@cves,
         sources      => $item->{sources},
         article_ok   => _vw_bool($item->{article_ok}),
+        # 番号のどれかが KEV に載っていれば、最も早く載った日を入れる
+        kev          => @kev_dates ? (sort @kev_dates)[0] : undef,
         descriptions => \%descriptions,
         article_text => $item->{article_text},
         products     => \@products,
+        origins      => [ _vw_origins($item, $lookup, $kev_info) ],
+        name_hits    => [ _vw_name_hits($item, \%descriptions, $names) ],
         matches      => \@matches,
         refs         => $item_refs,
         suggested    => _vw_suggest($item, \@matches, $item_refs),
@@ -162,6 +171,7 @@ sub _vw_products {
             package => $p->{packageName}, ranges => $p->{versions} // [],
         };
     }
+    $_->{fixed} = _vw_fixed('cve', $_->{ranges}) for @products;
     my (%github, @github_order);
     for my $a (@{ $l->{advisories} // [] }) {
         for my $v (@{ $a->{vulnerabilities} // [] }) {
@@ -171,6 +181,7 @@ sub _vw_products {
             push @{ $github{$name}{ranges} }, { map { $_ => $v->{$_} } qw(vulnerable_version_range first_patched_version) };
         }
     }
+    $github{$_}{fixed} = _vw_fixed('ghsa', $github{$_}{ranges}) for @github_order;
     push @products, map { $github{$_} } @github_order;
     my (%nvd, @nvd_order);
     for my $c (@{ $l->{nvd} // [] }) {
@@ -180,8 +191,82 @@ sub _vw_products {
         $nvd{$name} //= { from => 'nvd', vendor => $f[3], product => $f[4], package => undef, ranges => [] };
         push @{ $nvd{$name}{ranges} }, $c;
     }
+    $nvd{$_}{fixed} = _vw_fixed('nvd', $nvd{$_}{ranges}) for @nvd_order;
     push @products, map { $nvd{$_} } @nvd_order;
     return @products;
+}
+
+# 製品の範囲ごとに直った版を決め、null を除いて範囲の順に ", " でつなぐ。どの範囲からも得られなければ undef を返す
+sub _vw_fixed {
+    my ($source, $ranges) = @_;
+    my @fixed = grep { defined } map { ranges_fixed($source, $_) } @{ $ranges // [] };
+    return @fixed ? join(', ', @fixed) : undef;
+}
+
+# KEV の本文から、CVE の番号ごとの、載った日(dateAdded)と notes の URL を作る。
+# notes の URL のうち、CISA が連邦機関に向けて出した指令の URL は、元の発表ではないので除く(feeds.pl と同じ決まり)
+sub _vw_kev_info {
+    my ($kev) = @_;
+    my %info;
+    for my $v (ref $kev eq 'HASH' && ref $kev->{vulnerabilities} eq 'ARRAY' ? @{ $kev->{vulnerabilities} } : ()) {
+        next unless ref $v eq 'HASH' && defined $v->{cveID} && !ref $v->{cveID};
+        my $i = $info{ $v->{cveID} } //= { date => undef, notes => [] };
+        my $date = defined $v->{dateAdded} && !ref $v->{dateAdded} ? $v->{dateAdded} : undef;
+        $i->{date} = $date if defined $date && (!defined $i->{date} || $date lt $i->{date});
+        my $notes = defined $v->{notes} && !ref $v->{notes} ? $v->{notes} : '';
+        push @{ $i->{notes} }, grep { !m{\Ahttps?://(?:www\.)?cisa\.gov/news-events/directives/} } $notes =~ m{(https?://[^\s;]+)}g;
+    }
+    return \%info;
+}
+
+# 元の発表の URL を、KEV の notes の URL、JPCERT/CC と IPA の記事の URL、CVE の記録の vendor-advisory の URL の順に、
+# 重複を除いて並べる。ほかの URL が無い CVE の番号には、cve.org の URL を足す。cvemon のページの URL は入れない。
+# 記事は項目のどの番号も扱うので、記事の URL がある項目の番号には cve.org の URL を足さない
+sub _vw_origins {
+    my ($item, $lookup, $kev_info) = @_;
+    my @cves = @{ $item->{cves} };
+    my @articles = map { $_->{url} } grep { ($_->{source} eq 'jpcert' || $_->{source} eq 'ipa') && defined $_->{url} } @{ $item->{sources} };
+    my (%has, @urls);
+    for my $cve (@cves) {
+        my @notes = @{ ($kev_info->{$cve} // {})->{notes} // [] };
+        push @urls, @notes;
+        $has{$cve} = 1 if @notes || @articles;
+    }
+    push @urls, @articles;
+    for my $cve (@cves) {
+        my @advisories = @{ ($lookup->{$cve} // {})->{vendor_advisories} // [] };
+        push @urls, @advisories;
+        $has{$cve} = 1 if @advisories;
+    }
+    push @urls, map { "https://www.cve.org/CVERecord?id=$_" } grep { !$has{$_} } @cves;
+    my %seen;
+    return grep { !$seen{$_}++ } @urls;
+}
+
+# 部品の鍵ごとに、名前の手がかりに使う名前を語として探す正規表現を作る。npm の部品はパッケージの名前、Maven の部品は
+# artifact の名前、そのほかの部品は : よりあとの最後の / よりあとの部分を名前とする。4文字より短い名前の鍵は使わない
+sub _vw_component_names {
+    my ($components) = @_;
+    my %names;
+    for my $key (sort keys %$components) {
+        my ($kind, $rest) = $key =~ /\A([^:]+):(.+)\z/ or next;
+        my ($name) = $kind eq 'npm' ? ($rest)
+            : $kind eq 'maven' ? ($rest =~ /([^:]+)\z/)
+            : ($rest =~ m{([^/]+)\z});
+        next unless defined $name && length $name >= $VW_NAME_MIN;
+        $names{$key} = qr/(?<![A-Za-z0-9_])\Q$name\E(?![A-Za-z0-9_])/i;
+    }
+    return \%names;
+}
+
+# 部品の鍵の名前が、項目の題名と説明と記事の本文に語として出る部品の鍵を、鍵の順に10件まで返す
+sub _vw_name_hits {
+    my ($item, $descriptions, $names) = @_;
+    my $text = join "\n", (map { $_->{title} // '' } @{ $item->{sources} }),
+        (map { $descriptions->{$_} } sort keys %$descriptions), $item->{article_text} // '';
+    my @hits = grep { $text =~ $names->{$_} } sort keys %$names;
+    splice @hits, $VW_NAME_HITS_MAX if @hits > $VW_NAME_HITS_MAX;
+    return @hits;
 }
 
 # KEV の本文から、CVE の番号ごとの [vendorProject, product] の組の一覧を作る

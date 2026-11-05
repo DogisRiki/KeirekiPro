@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:17.6
+  cache:
+    image: valkey/valkey:8.1
   app:
     build:
       context: docker/app

@@ -96,6 +96,7 @@ newcase() {
     put https://www.jpcert.or.jp/at/2026/at260102.html 503 "$VFIX/article-jpcert-at260102.html"
     put https://www.ipa.go.jp/security/security-alert/2026/1101-cms.html 200 "$VFIX/article-ipa-1101-cms.html"
     put https://www.ipa.go.jp/security/security-alert/2026/1102-glibc.html 200 "$VFIX/article-ipa-1102-glibc.html"
+    put https://www.ipa.go.jp/security/security-alert/2026/1103-valkey.html 200 "$VFIX/article-ipa-1103-valkey.html"
     local f cve
     for f in "$VFIX/records/"cve-*.json; do
         cve=${f##*/cve-}
@@ -162,7 +163,7 @@ case_verdicts() {
     check "$name(記事のページを取れなかった項目)" "$(ent '$e{"CVE-2026-2011"}{article_ok} ? "true" : "false"')" "false"
     check "$name(扱っている PR と Issue の番号)" \
         "$(ent 'join " ", map { my $k = $_; "$k:" . join(",", map { "$_->{kind}$_->{number}" } @{ $e{$k}{refs} }) } sort keys %e')" \
-        "CVE-2026-2001:pr731 CVE-2026-2002: CVE-2026-2010: CVE-2026-2011: CVE-2026-2020: CVE-2026-2030:issue801 CVE-2026-2040: CVE-2026-2041:"
+        "CVE-2026-2001:pr731 CVE-2026-2002: CVE-2026-2003: CVE-2026-2010: CVE-2026-2011: CVE-2026-2020: CVE-2026-2030:issue801 CVE-2026-2040: CVE-2026-2041: CVE-2026-2060:"
     check "$name(材料の github)" "$(mat 'join " ", map { "$_=" . ($d->{github}{$_} ? "true" : "false") } sort keys %{ $d->{github} }')" \
         "advisories_ok=true refs_ok=true sbom_ok=true"
 
@@ -174,7 +175,7 @@ case_verdicts() {
     dir="$CASE/repo/.claude/.state/vuln-watch/$(out '$d->{run}')"
     check "$name(場所)" "$(out 'join " ", $d->{material}, @{ $d->{parts} }, $d->{result}')" \
         "$dir/material.json $dir/entries-1.json $dir/result.json"
-    check "$name(項目の数)" "$(out '$d->{entries}')" "8"
+    check "$name(項目の数)" "$(out '$d->{entries}')" "10"
     check "$name(材料の parts が、出した場所と同じ)" "$(mat 'join " ", @{ $d->{parts} }')" "$(out '$d->{parts}[0]')"
     check "$name(作業の場所を残さない)" "$(ls "$CASE/repo/.claude/.state/vuln-watch/$(out '$d->{run}')" | tr '\n' ' ')" "entries-1.json material.json "
 }
@@ -215,6 +216,60 @@ case_products() {
         ">= 15.0.0, < 15.5.3/15.5.3"
 }
 addcase products
+
+# ---------------------------------------------------------------------
+# 要件4の受入基準3・要件3の受入基準3・要件2の受入基準1と3: 悪用と、製品の直った版と、元の発表のリンクと、名前の手がかり
+# ---------------------------------------------------------------------
+case_kev() {
+    newcase
+    collect
+    local name="20日前に KEV に載った CVE の番号を持つ JPCERT/CC の直近7日の項目の kev に、その dateAdded が入る。KEV のどこにも無い番号だけを持つ項目の kev が null になる"
+    check "$name(20日前に KEV に載った番号の項目)" "$(ent '$e{"CVE-2026-2010"}{kev}')" "2026-10-15"
+    check "$name(KEV の項目)" "$(ent '$e{"CVE-2026-2003"}{kev}')" "2026-11-03"
+    check "$name(KEV のどこにも無い番号の項目)" "$(ent 'join " ", map { exists $e{$_}{kev} ? $e{$_}{kev} // "null" : "<none>" } qw(CVE-2026-2020 CVE-2026-2040 CVE-2026-2060)')" "null null null"
+}
+addcase kev
+
+case_origins() {
+    newcase
+    collect
+    local name="products に、リポジトリの部品に当たらない製品の範囲と直った版が入る。origins に、KEV の notes の URL、記事の URL、vendor-advisory の URL の順に URL が並び、cvemon のページの URL が入らない。ほかの URL がある番号には cve.org の URL が入らない"
+    check "$name(部品に当たらない製品)" \
+        "$(ent 'join " ", map { "$_->{from}:$_->{vendor}:$_->{product}:" . scalar(@{ $_->{ranges} }) . ":" . ($_->{fixed} // "null") } @{ $e{"CVE-2026-2003"}{products} }')" \
+        "cna:microsoft:windows_11:2:10.0.22631.4567, 10.0.26100.1234 cna:microsoft:windows_server_2019:1:null"
+    check "$name(部品に当たらない製品の項目は、部品を持たない)" "$(ent 'scalar @{ $e{"CVE-2026-2003"}{matches} }')" "0"
+    check "$name(GitHub の勧告の製品の直った版)" "$(ent 'join " ", map { "$_->{from}=" . ($_->{fixed} // "null") } @{ $e{"CVE-2026-2001"}{products} }')" \
+        "cna=15.5.3 github=15.5.3"
+    check "$name(部品に当たる製品の、CVE の記録と GitHub の勧告の直った版)" "$(ent 'join " ", map { "$_->{from}=" . ($_->{fixed} // "null") } @{ $e{"CVE-2026-2040"}{products} }')" \
+        "cna=19.0.0 github=19.0.0"
+    check "$name(並ぶ順)" "$(ent 'join " ", @{ $e{"CVE-2026-2010"}{origins} }')" \
+        "https://oracle.example/security-alerts/cpuoct2026.html https://www.jpcert.or.jp/at/2026/at260101.html https://oracle.example/security-alerts/alert-cve-2026-2010.html"
+    check "$name(重複と CISA の指令の URL を除く)" "$(ent 'join " ", @{ $e{"CVE-2026-2003"}{origins} }')" \
+        "https://msrc.example/update-guide/vulnerability/CVE-2026-2003"
+    check "$name(cvemon のページの URL が無い)" "$(ent 'join " ", grep { /cvemon/ } map { @{ $_->{origins} } } values %e')" ""
+    check "$name(記事の URL だけを持つ項目に cve.org の URL が無い)" "$(ent 'join " ", @{ $e{"CVE-2026-2020"}{origins} }')" \
+        "https://www.ipa.go.jp/security/security-alert/2026/1101-cms.html"
+
+    name="cvemon だけに載り、vendor-advisory の URL を持たない番号の項目の origins に、その番号の cve.org の URL が入る"
+    check "$name" "$(ent 'join " ", map { @{ $e{$_}{origins} } } qw(CVE-2026-2040 CVE-2026-2041)')" \
+        "https://www.cve.org/CVERecord?id=CVE-2026-2040 https://www.cve.org/CVERecord?id=CVE-2026-2041"
+}
+addcase origins
+
+case_name_hits() {
+    newcase
+    collect
+    local name="題名に Valkey を含み、表に名前の無い製品の項目の name_hits に image:valkey/valkey が入る。4文字より短い名前の部品の鍵は name_hits に入らない"
+    check "$name(部品の一覧に、名前の短い部品がある)" "$(mat 'join " ", grep { $_ eq "npm:ws" || $_ eq "image:valkey/valkey" } @{ $d->{inventory}{keys} }')" \
+        "image:valkey/valkey npm:ws"
+    # 見本の Valkey の名前は題名にだけ出て、React と Nextcloud と ws は記事の本文にだけ出る。Nextcloud の Next は語の一部なので合わない
+    check "$name(名前の手がかり)" "$(ent 'join " ", @{ $e{"CVE-2026-2060"}{name_hits} }')" "image:valkey/valkey npm:react"
+    check "$name(CVE の記録の説明にだけ出る名前)" "$(ent 'join " ", @{ $e{"CVE-2026-2040"}{name_hits} }')" "npm:react"
+    check "$name(表に名前が無いので、部品は合わない)" "$(ent 'scalar(@{ $e{"CVE-2026-2060"}{matches} }) . " " . $e{"CVE-2026-2060"}{suggested}')" "0 unrelated"
+    check "$name(題名の Next.js の Next が語として合う)" "$(ent 'join " ", @{ $e{"CVE-2026-2001"}{name_hits} }')" "npm:next"
+    check "$name(名前が出ない項目)" "$(ent 'scalar @{ $e{"CVE-2026-2020"}{name_hits} }')" "0"
+}
+addcase name_hits
 
 case_two_cves() {
     newcase

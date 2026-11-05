@@ -1,6 +1,6 @@
 {
   "catalogVersion": "2026.11.04",
-  "count": 3,
+  "count": 4,
   "dateReleased": "2026-11-04T10:00:00.000Z",
   "title": "CISA Catalog of Known Exploited Vulnerabilities",
   "vulnerabilities": [
@@ -21,6 +21,15 @@
       "dateAdded": "2026-11-02",
       "shortDescription": "PostgreSQL contains a code execution vulnerability.",
       "notes": "https://postgres.example/support/security/CVE-2026-2002/"
+    },
+    {
+      "cveID": "CVE-2026-2003",
+      "vendorProject": "Microsoft",
+      "product": "Windows",
+      "vulnerabilityName": "Microsoft Windows Kernel Privilege Escalation Vulnerability",
+      "dateAdded": "2026-11-03",
+      "shortDescription": "Microsoft Windows Kernel contains a privilege escalation vulnerability.",
+      "notes": "https://msrc.example/update-guide/vulnerability/CVE-2026-2003 ; https://www.cisa.gov/news-events/directives/bod-22-01-reducing-significant-risk-known-exploited-vulnerabilities"
     },
     {
       "cveID": "CVE-2026-2010",

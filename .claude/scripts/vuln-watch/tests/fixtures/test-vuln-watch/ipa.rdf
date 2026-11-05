@@ -18,4 +18,9 @@
   <link>https://www.ipa.go.jp/security/security-alert/2026/1102-glibc.html</link>
   <dc:date>2026-11-02T00:00:00+09:00</dc:date>
  </item>
+ <item rdf:about="https://www.ipa.go.jp/security/security-alert/2026/1103-valkey.html">
+  <title>Valkey Bloom の脆弱性対策について(CVE-2026-2060)</title>
+  <link>https://www.ipa.go.jp/security/security-alert/2026/1103-valkey.html</link>
+  <dc:date>2026-11-03T00:00:00+09:00</dc:date>
+ </item>
 </rdf:RDF>

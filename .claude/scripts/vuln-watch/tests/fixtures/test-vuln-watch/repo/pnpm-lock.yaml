@@ -13,6 +13,9 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.0.0
+      ws:
+        specifier: ^8.18.0
+        version: 8.18.0
 
 packages:
 
@@ -22,10 +25,15 @@ packages:
   react@19.0.0:
     resolution: {integrity: sha512-react}
 
+  ws@8.18.0:
+    resolution: {integrity: sha512-ws}
+
 snapshots:
 
   next@15.5.2(react@19.0.0):
     dependencies:
       react: 19.0.0
+
+  ws@8.18.0: {}
 
   react@19.0.0: {}
