@@ -17,6 +17,7 @@
              <rdf:li rdf:resource="https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html" />
              <rdf:li rdf:resource="https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html" />
              <rdf:li rdf:resource="https://www.ipa.go.jp/security/security-alert/2026/1014-ms.html" />
+             <rdf:li rdf:resource="https://example.com/security/alert-20261101.html" />
          </rdf:Seq>
      </items>
  </channel>
@@ -43,6 +44,12 @@
   <link>https://www.ipa.go.jp/security/security-alert/2026/1014-ms.html</link>
   <dc:creator>情報処理推進機構（IPA）</dc:creator>
   <dc:date>2026-10-27T00:00:00+09:00</dc:date>
+ </item>
+ <item rdf:about="https://example.com/security/alert-20261101.html">
+  <title>ほかのサイトの注意喚起について(CVE-2026-140001)</title>
+  <link>https://example.com/security/alert-20261101.html</link>
+  <dc:creator>情報処理推進機構（IPA）</dc:creator>
+  <dc:date>2026-11-01T00:00:00+09:00</dc:date>
  </item>
 
 </rdf:RDF>

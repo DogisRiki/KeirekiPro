@@ -1,6 +1,9 @@
 # =====================================================================
 # 4つの出どころを取り、直近7日の項目に直すモジュール
 #
+# 1回目の curl の呼び出しで4つの出どころを、2回目の呼び出しで直近7日の JPCERT/CC と IPA の記事のページを取り、
+# CVE の番号を共有する項目を1つにまとめる。2回の呼び出しを合わせて40秒で打ち切る。
+#
 # vuln-watch.pl が require で読み込む。呼び出し方は feeds_collect($now, $work_dir) だけで、
 # {items => [...], failed => [{source, name, error}], kev => <KEV の本文を読んだ値か undef>} を返す。
 # このモジュールはファイルを書かない。ただし、curl が書くファイルだけを $work_dir に置く。
@@ -25,6 +28,8 @@ my @FEEDS_SOURCES = (
 my $FEEDS_BUDGET = 40;            # 2回の curl の呼び出しを合わせて打ち切る秒数
 my $FEEDS_WINDOW = 7 * 24 * 3600; # 直近7日
 my $FEEDS_JST = 9 * 3600;         # IPA の日付を読む時間帯(UTC+9)
+my $FEEDS_ARTICLES = 20;          # 2回目の curl の呼び出しで取る記事のページの数の上限
+my $FEEDS_ARTICLE_CHARS = 2500;   # 記事の本文を持つ文字数の上限
 
 sub feeds_collect {
     my ($now, $work_dir) = @_;
@@ -53,7 +58,91 @@ sub feeds_collect {
             push @items, _feeds_cvemon_items($body);
         }
     }
-    return { items => \@items, failed => \@failed, kev => $kev };
+    _feeds_articles($work_dir, \@items, $deadline);
+    return { items => _feeds_merge(\@items), failed => \@failed, kev => $kev };
+}
+
+# 直近7日の JPCERT/CC と IPA の記事のページを2回目の curl の呼び出しで取り、項目に記事の本文と CVE の番号を足す。
+# 記事のページを取れなかった項目は、題名から拾った番号だけを持ち、article_ok が偽のままになる
+sub _feeds_articles {
+    my ($work_dir, $items, $deadline) = @_;
+    my @targets = grep {
+        my $s = $_->{sources}[0];
+        ($s->{source} eq 'jpcert' || $s->{source} eq 'ipa') && ($s->{url} // '') =~ m{\Ahttps://www\.(?:jpcert\.or\.jp|ipa\.go\.jp)/};
+    } @$items;
+    splice @targets, $FEEDS_ARTICLES if @targets > $FEEDS_ARTICLES;
+    return unless @targets && time < $deadline;
+    my @reqs = map { { url => $targets[$_]{sources}[0]{url}, out => "article-$_.body" } } 0 .. $#targets;
+    my $res = _feeds_curl($work_dir, \@reqs, ['--parallel'], [ '--max-time', '15' ], $deadline, 'articles');
+    for my $n (0 .. $#targets) {
+        my $r = $res->{ $reqs[$n]{url} };
+        next unless defined $r && $r->{code} eq '200';
+        open my $f, '<:raw', "$work_dir/$reqs[$n]{out}" or next;
+        my $html = do { local $/; <$f> };
+        close $f;
+        next unless utf8::decode($html);
+        my $item = $targets[$n];
+        $item->{cves} = [ _feeds_cves($item->{sources}[0]{title}, $html) ];
+        ($item->{key}) = sort { _feeds_cve_cmp($a, $b) } @{ $item->{cves} } if @{ $item->{cves} };
+        $item->{article_text} = substr(_feeds_html_text($html), 0, $FEEDS_ARTICLE_CHARS);
+        $item->{article_ok} = JSON::PP::true;
+    }
+}
+
+# 記事の HTML から、head と script と style とコメントとタグを外し、空白を1つにまとめた本文を返す
+sub _feeds_html_text {
+    my ($html) = @_;
+    $html =~ s{<!--.*?-->}{ }gs;
+    $html =~ s{<(head|script|style|noscript)\b[^>]*>.*?</\1\s*>}{ }gis;
+    $html =~ s{<[^>]*>}{ }gs;
+    my $text = _feeds_text($html) // '';
+    $text =~ s/\s+/ /g;
+    return $text;
+}
+
+# CVE の番号を1つでも共有する項目どうしを、1つの項目にまとめる。共有が連なる項目も、すべて1つにまとめる。
+# まとめた項目の出どころのうち1つでも記事のページを取れなかったときは、まとめた項目の article_ok を偽にする
+sub _feeds_merge {
+    my ($items) = @_;
+    my @parent = (0 .. $#$items);
+    my $root = sub {
+        my ($n) = @_;
+        $n = $parent[$n] while $parent[$n] != $n;
+        return $n;
+    };
+    my %owner;
+    for my $n (0 .. $#$items) {
+        for my $cve (@{ $items->[$n]{cves} }) {
+            if (exists $owner{$cve}) {
+                my ($x, $y) = sort { $a <=> $b } ($root->($owner{$cve}), $root->($n));
+                $parent[$y] = $x if $x != $y;
+            } else {
+                $owner{$cve} = $n;
+            }
+        }
+    }
+    my (%groups, @order);
+    for my $n (0 .. $#$items) {
+        my $r = $root->($n);
+        push @order, $r unless $groups{$r};
+        push @{ $groups{$r} }, $items->[$n];
+    }
+    my @merged;
+    for my $r (@order) {
+        my @members = @{ $groups{$r} };
+        if (@members == 1) {
+            push @merged, $members[0];
+            next;
+        }
+        my $item = _feeds_item([ _feeds_cves(map { @{ $_->{cves} } } @members) ], $members[0]{sources}[0],
+            article_ok => !grep { !$_->{article_ok} } @members);
+        $item->{sources} = [ map { @{ $_->{sources} } } @members ];
+        my @texts = grep { defined && length } map { $_->{article_text} } @members;
+        $item->{article_text} = @texts ? join("\n\n", @texts) : undef;
+        $item->{descriptions} = { map { %{ $_->{descriptions} } } @members };
+        push @merged, $item;
+    }
+    return \@merged;
 }
 
 # 出どころの本文を読む。読めたときは (読んだ値, undef) を、読めないときは (undef, 理由) を返す

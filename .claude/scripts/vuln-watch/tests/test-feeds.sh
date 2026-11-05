@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2016 # $d や $i などは pj と item_with に渡す perl の式の変数で、シェルの変数ではない
 # =====================================================================
 # 4つの出どころを取り、直近7日の項目に直すモジュール(feeds.pl)のテスト
 #
@@ -88,11 +89,21 @@ newcase() {
     put "$JPCERT_URL" 200 "$FIX/test-feeds/jpcert.rdf"
     put "$IPA_URL" 200 "$FIX/test-feeds/ipa.rdf"
     put "$CVEMON_URL" 200 "$FIX/test-feeds/cvemon.xml"
+    # 記事のページ。at260034 は状態 503 で返し、記事のページを取れなかった項目にする
+    put https://www.jpcert.or.jp/at/2026/at260033.html 200 "$FIX/test-feeds/article-jpcert-at260033.html"
+    put https://www.jpcert.or.jp/at/2026/at260034.html 503 "$FIX/test-feeds/article-jpcert-at260034.html"
+    put https://www.jpcert.or.jp/at/2026/at260035.html 200 "$FIX/test-feeds/article-jpcert-at260035.html"
+    put https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html 200 "$FIX/test-feeds/article-ipa-alert20261022.html"
+    put https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html 200 "$FIX/test-feeds/article-ipa-1021-jre.html"
 }
 ORIG_PATH=$PATH
 
-# 出どころの項目の一覧を「<出どころ>=<id>」の形で、並べ替えて空白でつないで出す式
-SRC_IDS='join " ", sort map { my $i = $_; map { "$_->{source}=$_->{id}" } @{ $i->{sources} } } @{ $d->{items} }'
+# 出どころ <source> の id が <id> の出どころを持つ項目を $i に置いて、続く式を評価する式を作る: item_with <source> <id> '<式>'
+item_with() {
+    printf 'my ($i) = grep { grep { $_->{source} eq "%s" && $_->{id} eq "%s" } @{ $_->{sources} } } @{ $d->{items} }; defined $i ? do { %s } : "<no item>"' "$1" "$2" "$3"
+}
+# $i の key と、出どころの一覧を「<出どころ>=<id>」の形で並べ替えて出す式
+KEY_SOURCES='join " ", $i->{key}, sort map { "$_->{source}=$_->{id}" } @{ $i->{sources} }'
 
 CASES=''
 addcase() { CASES="$CASES $1"; }
@@ -120,10 +131,10 @@ case_window_kev_ipa() {
     run_feeds
     check "KEV は7日前の日付の項目と6日前の項目が集まり、8日前の項目が集まらない" \
         "$(out 'join " ", sort map { $_->{id} } grep { $_->{source} eq "kev" } map { @{ $_->{sources} } } @{ $d->{items} }')" \
-        "CVE-2026-119977 CVE-2026-76418"
+        "CVE-2026-111497 CVE-2026-119977 CVE-2026-120010 CVE-2026-76418"
     check "IPA は7日前の日付の項目と6日前の項目が集まり、8日前の項目が集まらない" \
         "$(out 'join " ", sort map { $_->{url} } grep { $_->{source} eq "ipa" } map { @{ $_->{sources} } } @{ $d->{items} }')" \
-        "https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html"
+        "https://example.com/security/alert-20261101.html https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html"
 }
 addcase window_kev_ipa
 
@@ -131,7 +142,7 @@ case_window_jpcert() {
     run_feeds
     check "JPCERT/CC は7日前の時刻より1分新しい項目が集まり、1分古い項目が集まらない" \
         "$(out 'join " ", sort map { $_->{id} } grep { $_->{source} eq "jpcert" } map { @{ $_->{sources} } } @{ $d->{items} }')" \
-        "at260033 at260034"
+        "at260033 at260034 at260035"
 }
 addcase window_jpcert
 
@@ -142,7 +153,7 @@ case_cvemon_all() {
     run_feeds
     check "cvemon は日付によらず全件が集まる" \
         "$(out 'join " ", map { "$_->{id}:$_->{rank}" } sort { $a->{rank} <=> $b->{rank} } grep { $_->{source} eq "cvemon" } map { @{ $_->{sources} } } @{ $d->{items} }')" \
-        "CVE-2024-27834:1 CVE-2024-10441:3"
+        "CVE-2024-27834:1 CVE-2024-10441:3 CVE-2026-111497:4"
 }
 addcase cvemon_all
 
@@ -196,6 +207,64 @@ case_kev_body() {
         "CVE-2016-3427=2026-10-15"
 }
 addcase kev_body
+
+# ---------------------------------------------------------------------
+# 要件4の受入基準5: 同じ脆弱性を1回だけ示す(CVE の番号を共有する項目をまとめる)
+# ---------------------------------------------------------------------
+case_merge_three() {
+    run_feeds
+    check "KEV と JPCERT/CC と cvemon に同じ CVE の番号が載ると、3つの出どころを持つ1つの項目になる" \
+        "$(out "$(item_with kev CVE-2026-111497 "$KEY_SOURCES")")" \
+        "CVE-2026-111497 cvemon=CVE-2026-111497 jpcert=at260034 kev=CVE-2026-111497"
+    check "CVE-2026-111497 を持つ項目が1つだけある" \
+        "$(out 'scalar grep { grep { $_ eq "CVE-2026-111497" } @{ $_->{cves} } } @{ $d->{items} }')" "1"
+}
+addcase merge_three
+
+case_merge_chain() {
+    run_feeds
+    check "A と B が番号を共有し、B と C が別の番号を共有すると、3つが1つの項目になる" \
+        "$(out "$(item_with jpcert at260035 "$KEY_SOURCES")")" \
+        "CVE-2026-120010 ipa=https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html jpcert=at260035 kev=CVE-2026-120010"
+    check "まとめた項目が、3つの項目の CVE の番号を、番号の大きい順に持つ" \
+        "$(out "$(item_with jpcert at260035 'join " ", @{ $i->{cves} }')")" \
+        "CVE-2026-130003 CVE-2026-130002 CVE-2026-130001 CVE-2026-120010"
+    check "KEV の説明が、まとめた項目に残る" \
+        "$(out "$(item_with jpcert at260035 'join " ", sort keys %{ $i->{descriptions} }')")" "CVE-2026-120010"
+}
+addcase merge_chain
+
+case_article_cves() {
+    run_feeds
+    check "記事の HTML から、題名で「等」と省かれた番号も拾われる" \
+        "$(out "$(item_with jpcert at260035 'join " ", grep { /CVE-2026-13000[23]/ } @{ $i->{cves} }')")" \
+        "CVE-2026-130003 CVE-2026-130002"
+    check "記事のページを取れなかった項目は、題名の番号だけを持ち、article_ok が偽になる" \
+        "$(out "$(item_with jpcert at260034 'join(" ", @{ $i->{cves} }) . " " . ($i->{article_ok} ? "true" : "false")')")" \
+        "CVE-2026-111497 false"
+    check "記事のページを取れた項目は、article_ok が真になる" \
+        "$(out "$(item_with jpcert at260035 '$i->{article_ok} ? "true" : "false"')")" "true"
+    check "記事の本文は、HTML のタグを外して記事ごとに2,500文字まで持つ" \
+        "$(out "$(item_with jpcert at260035 'my @t = split /\n\n/, $i->{article_text}; join "|", scalar @t, length $t[0], ($t[0] =~ /<p>|<li>|<h1>|var shown|color: red/ ? "tag" : "no-tag"), substr($t[0], 0, 49), ($t[0] =~ /(\S+ & \S+)/ ? $1 : "<none>"), $t[1]')")" \
+        "2|2500|no-tag|Apache Tomcatにおける複数の脆弱性（CVE-2026-130001等）に関する注意喚起|<影響> & 対策|Oracle Java の脆弱性対策について(2026年10月) Oracle Java SE には、CVE-2026-120010 と CVE-2026-130003 の脆弱性があります。"
+    check "ほかのサイトの URL を持つ項目は、記事のページを取らず、題名の番号だけを持つ" \
+        "$(out "$(item_with ipa https://example.com/security/alert-20261101.html 'join(" ", @{ $i->{cves} }) . " " . ($i->{article_ok} ? "true" : "false")')")" \
+        "CVE-2026-140001 false"
+}
+addcase article_cves
+
+# 偽の curl の記録が、ほかのサイトの URL を持たない
+case_no_other_site() {
+    run_feeds
+    check "偽の curl の記録が、ほかのサイトの URL を持たない" \
+        "$(grep '^ARG http' "$CASE/curl.log" | grep -cv '^ARG https://www\.\(cisa\.gov\|jpcert\.or\.jp\|ipa\.go\.jp\)/\|^ARG https://cvemon\.intruder\.io/')" "0"
+    check "2回目の curl の呼び出しが、直近7日の JPCERT/CC と IPA の記事のページを取る" \
+        "$(awk '/^CALL$/ { n++ } n == 2 && /^ARG https?:/ { print $2 }' "$CASE/curl.log" | sort | tr '\n' ' ')" \
+        "https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html https://www.jpcert.or.jp/at/2026/at260033.html https://www.jpcert.or.jp/at/2026/at260034.html https://www.jpcert.or.jp/at/2026/at260035.html "
+    check "2回目の curl の呼び出しが、記事のページごとに15秒で打ち切る" \
+        "$(awk '/^CALL$/ { n++ } n == 2 && prev == "ARG --max-time" { print $2 } { prev = $0 }' "$CASE/curl.log" | sort -u | tr '\n' ' ')" "15 "
+}
+addcase no_other_site
 
 # ---------------------------------------------------------------------
 # 選んだ場合を流す

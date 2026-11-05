@@ -1,6 +1,6 @@
 {
    "catalogVersion" : "2026.11.04",
-   "count" : 4,
+   "count" : 6,
    "dateReleased" : "2026-11-04T10:00:00.000Z",
    "title" : "CISA Catalog of Known Exploited Vulnerabilities",
    "vulnerabilities" : [
@@ -65,6 +65,36 @@
          "shortDescription" : "Oracle Java SE and JRockit contains an unspecified vulnerability that allows remote attackers to affect confidentiality, integrity, and availability via vectors related to Java Management Extensions (JMX). This vulnerability can be exploited through sandboxed Java Web Start applications and sandboxed Java applets. It can also be exploited by supplying data to APIs in the specified component without using sandboxed Java Web Start applications or sandboxed Java applets, such as through a web service.",
          "vendorProject" : "Oracle",
          "vulnerabilityName" : "Oracle Java SE and JRockit Unspecified Vulnerability"
+      },
+      {
+         "cveID" : "CVE-2026-111497",
+         "cwes" : [
+            "CWE-787"
+         ],
+         "dateAdded" : "2026-10-30",
+         "dueDate" : "2026-11-20",
+         "knownRansomwareCampaignUse" : "Unknown",
+         "notes" : "https://github.com/google/brotli/security/advisories ; https://nvd.nist.gov/vuln/detail/CVE-2026-111497",
+         "product" : "Brotli",
+         "requiredAction" : "Apply mitigations per vendor instructions.",
+         "shortDescription" : "Google Brotli contains an out-of-bounds write vulnerability in its C implementation.",
+         "vendorProject" : "Google",
+         "vulnerabilityName" : "Google Brotli Out-of-Bounds Write Vulnerability"
+      },
+      {
+         "cveID" : "CVE-2026-120010",
+         "cwes" : [
+            "CWE-20"
+         ],
+         "dateAdded" : "2026-11-01",
+         "dueDate" : "2026-11-22",
+         "knownRansomwareCampaignUse" : "Unknown",
+         "notes" : "https://www.oracle.com/security-alerts/cpuoct2026.html ; https://nvd.nist.gov/vuln/detail/CVE-2026-120010",
+         "product" : "Java SE",
+         "requiredAction" : "Apply mitigations per vendor instructions.",
+         "shortDescription" : "Oracle Java SE contains an improper input validation vulnerability in the Networking component.",
+         "vendorProject" : "Oracle",
+         "vulnerabilityName" : "Oracle Java SE Improper Input Validation Vulnerability"
       }
    ]
 }

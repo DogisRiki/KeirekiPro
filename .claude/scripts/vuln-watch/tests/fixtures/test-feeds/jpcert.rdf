@@ -17,6 +17,7 @@
     <dc:creator>webmaster@jpcert.or.jp</dc:creator>
     <items>
       <rdf:Seq>
+        <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260035.html" />
         <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260033.html" />
         <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260034.html" />
         <rdf:li rdf:resource="https://www.jpcert.or.jp/at/2026/at260033.html" />
@@ -25,6 +26,14 @@
       </rdf:Seq>
     </items>
   </channel>
+
+  <item rdf:about="https://www.jpcert.or.jp/at/2026/at260035.html">
+    <title>注意喚起: Apache Tomcatにおける複数の脆弱性（CVE-2026-130001等）に関する注意喚起  (公開)</title>
+
+    <link>https://www.jpcert.or.jp/at/2026/at260035.html</link>
+    <dc:identifier>at260035</dc:identifier>
+    <dc:date>2026-11-02T10:00+09:00</dc:date>
+  </item>
 
   <item rdf:about="https://www.jpcert.or.jp/at/2026/at260033.html">
     <title>注意喚起: PHPにおける複数の脆弱性（CVE-2026-109618、CVE-2026-109619）に関する注意喚起  (更新)</title>

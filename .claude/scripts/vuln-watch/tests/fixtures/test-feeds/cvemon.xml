@@ -42,5 +42,15 @@
             <intruder:hypeScore>11</intruder:hypeScore>
             <intruder:cveUrl>https://cvemon.intruder.io/cves/CVE-2024-10441</intruder:cveUrl>
         </item>
+        <item>
+            <title><![CDATA[CVE-2026-111497]]></title>
+            <description><![CDATA[Currently trending CVE - Hype Score: 9 - Out-of-bounds write in the C implementation of Brotli.]]></description>
+            <link>https://cvemon.intruder.io/cves/CVE-2026-111497</link>
+            <guid isPermaLink="true">https://cvemon.intruder.io/cves/CVE-2026-111497</guid>
+            <pubDate>Thu, 01 Oct 2026 00:17:01 GMT</pubDate>
+            <intruder:rank>4</intruder:rank>
+            <intruder:hypeScore>9</intruder:hypeScore>
+            <intruder:cveUrl>https://cvemon.intruder.io/cves/CVE-2026-111497</intruder:cveUrl>
+        </item>
     </channel>
 </rss>
