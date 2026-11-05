@@ -18,6 +18,10 @@
 # - -w <書式>: URL が終わるたびに標準出力に出す行。%{url_effective} %{http_code}
 #   %{response_code} %{exitcode} と \n \t を置き換える
 # - -H <ヘッダー> / -H @<ファイル>: 受け取って記録する
+# - -K <ファイル>: 設定ファイルを読み、1行を1つのオプションとして、その場所に引数を足す。
+#   行は「--<名前> <値>」「-<1文字> <値>」「<名前> = <値>」の形とし、値は " で囲めば
+#   \\ \" \t \n \r \v を読む。url の行の値は URL とし、--output --write-out --header --user-agent は
+#   -o -w -H -A と同じに読む。# で始まる行と空の行は読まない
 # 受け付けて値を使わないオプション: --parallel-max --max-time --compressed -A -s
 # そのほかのオプションは、標準エラーに1行を出して 2 で終わる。テストが、偽の curl の
 # 答えない呼び出しに気づかないまま通ることを防ぐためである。
@@ -25,6 +29,7 @@
 # 環境変数
 # - KP_FAKE_CURL_LOG: 呼び出しごとに、受け取った引数と、-H @<ファイル> の中身を書き足すファイル。
 #   1回の呼び出しは「CALL」の行で始まり、引数を1つにつき1行「ARG <引数>」で、
+#   -K の設定ファイルから読んだ引数は「KARG <引数>」で、
 #   -H @<ファイル> の中身を1行につき1行「HFILE <ファイル> <行>」で書く
 # - KP_FAKE_CURL_DELAY: 空白で区切った「<URL>=<秒>」。その URL の応答を、その秒数だけ遅らせる
 #
@@ -47,13 +52,68 @@ sub unsupported {
 my $dir = $ENV{KP_FAKE_CURL_DIR};
 unsupported('KP_FAKE_CURL_DIR is not set') unless defined $dir && length $dir;
 
-my @args = @ARGV;
+# 設定ファイルの1行の値を読む。" で囲んだ値は、決まった文字の前の \ を読む
+sub config_value {
+    my ($v) = @_;
+    return $v unless $v =~ /\A"(.*)"\s*\z/s;
+    my $q = $1;
+    my %esc = ('\\' => '\\', '"' => '"', t => "\t", n => "\n", r => "\r", v => "\x0b");
+    $q =~ s/\\(.)/exists $esc{$1} ? $esc{$1} : $1/ge;
+    return $q;
+}
+
+# -K の設定ファイルを読み、引数の一覧に直す
+sub read_config {
+    my ($file) = @_;
+    open my $h, '<', $file or unsupported("-K $file: $!");
+    my %long = ('--output' => '-o', '--write-out' => '-w', '--header' => '-H', '--user-agent' => '-A');
+    my @out;
+    while (my $line = <$h>) {
+        $line =~ s/\r?\n\z//;
+        $line =~ s/\A\s+//;
+        next if $line eq '' || $line =~ /\A#/;
+        my ($opt, $rest) = $line =~ /\A([^\s=:]+)\s*(.*)\z/s or unsupported("-K line: $line");
+        if ($opt !~ /\A-/) {
+            $rest =~ s/\A[=:]\s*//;
+            $opt = "--$opt";
+        }
+        $opt = $long{$opt} // $opt;
+        if ($opt eq '--url') {
+            push @out, ['url', config_value($rest)];
+        } elsif ($rest eq '') {
+            push @out, ['opt', $opt];
+        } else {
+            push @out, ['opt', $opt], ['opt', config_value($rest)];
+        }
+    }
+    close $h;
+    return @out;
+}
+
+# -K の設定ファイルを、その場所の引数に開く。$from_config には、設定ファイルから読んだ引数の場所を残す
+my (@args, %from_config);
+{
+    my @raw = @ARGV;
+    while (@raw) {
+        my $arg = shift @raw;
+        if ($arg eq '-K' || $arg eq '--config') {
+            unsupported('-K needs a value') unless @raw;
+            for my $t (read_config(shift @raw)) {
+                # url の行の値は、- で始まってもオプションとして読まない
+                $from_config{ scalar @args } = $t->[0];
+                push @args, $t->[1];
+            }
+            next;
+        }
+        push @args, $arg;
+    }
+}
 
 # 呼び出しを記録する。-H @<ファイル> の中身は、呼び出しのあとにファイルが消されても残るよう、最初に読む
 if (defined $ENV{KP_FAKE_CURL_LOG} && length $ENV{KP_FAKE_CURL_LOG}) {
     open my $log, '>>', $ENV{KP_FAKE_CURL_LOG} or die "fake-curl: cannot open log: $!";
     print $log "CALL\n";
-    print $log "ARG $_\n" for @args;
+    print $log ($from_config{$_} ? "KARG" : "ARG") . " $args[$_]\n" for 0 .. $#args;
     for my $i (0 .. $#args - 1) {
         next unless $args[$i] eq '-H' && $args[$i + 1] =~ /\A@(.+)\z/s;
         my $file = $1;
@@ -81,8 +141,15 @@ for my $pair (split ' ', $ENV{KP_FAKE_CURL_DELAY} // '') {
 my $parallel = 0;
 my @groups = ({ urls => [], outs => [], write => undef });
 my %with_value = map { $_ => 1 } qw(-o -w -H -A --parallel-max --max-time);
+my $pos = 0;
 while (@args) {
+    my $is_url = ($from_config{$pos} // '') eq 'url';
     my $arg = shift @args;
+    $pos++;
+    if ($is_url) {
+        push @{ $groups[-1]{urls} }, $arg;
+        next;
+    }
     if ($arg eq '--next') {
         push @groups, { urls => [], outs => [], write => undef };
         next;
@@ -92,6 +159,7 @@ while (@args) {
     if ($with_value{$arg}) {
         unsupported("$arg needs a value") unless @args;
         my $v = shift @args;
+        $pos++;
         if    ($arg eq '-o') { push @{ $groups[-1]{outs} }, $v }
         elsif ($arg eq '-w') { $groups[-1]{write} = $v }
         next;
