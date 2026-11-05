@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "aliases": {
+    "image:eclipse-temurin": ["oracle:java_se", "oracle:java_runtime_environment_(jre)", "oracle:java_se_jdk_and_jre", "oracle_corporation:java_se_jdk_and_jre", "oracle:openjdk", "eclipse:temurin"],
+    "runtime:java": ["oracle:java_se", "oracle:java_runtime_environment_(jre)", "oracle:java_se_jdk_and_jre", "oracle_corporation:java_se_jdk_and_jre", "oracle:openjdk", "eclipse:temurin"],
+    "image:postgres": ["postgresql:postgresql", "n/a:postgresql"],
+    "aws:rds": ["postgresql:postgresql", "n/a:postgresql"],
+    "image:valkey/valkey": ["lfprojects:valkey", "valkey-io:valkey"],
+    "aws:elasticache": ["lfprojects:valkey", "valkey-io:valkey"],
+    "image:node": ["nodejs:node", "nodejs:nodejs", "nodejs:node.js"],
+    "ci:node": ["nodejs:node", "nodejs:nodejs", "nodejs:node.js"],
+    "image:docker": ["moby:moby", "docker:moby", "docker:docker"],
+    "image:debian": ["debian:debian_linux"],
+    "image:hashicorp/terraform": ["hashicorp:terraform"],
+    "image:localstack/localstack": ["localstack:localstack"],
+    "image:ghcr.io/terraform-linters/tflint": ["terraform-linters:tflint"],
+    "tool:gradle": ["gradle:gradle"],
+    "ci:trivy": ["aquasecurity:trivy"],
+    "maven:org.apache.tomcat.embed:tomcat-embed-core": ["apache_software_foundation:apache_tomcat", "apache:tomcat"]
+  }
+}

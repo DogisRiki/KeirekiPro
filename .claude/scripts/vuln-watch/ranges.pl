@@ -27,6 +27,12 @@
 #     同じ値の番号は @cves の順に引く。引くのは300件の番号までとする。
 #     curl の出力と設定ファイルは $work_dir のフォルダに書く。$deadline の時刻を過ぎたら curl を止める。
 #     %inventory と %aliases と %kev_names は、NVD を引く番号を決めるために受け取る
+#   ranges_match(\%lookup, \%inventory, \%aliases, \%kev_names) は、CVE の番号ごとに {matches => [...]} を返す。
+#     %lookup は ranges_lookup が返した値、%inventory は inventory_read が返した値、%aliases は aliases.json を読んだ値、
+#     %kev_names は CVE の番号ごとの KEV の [vendorProject, product] の組の一覧とする。
+#     matches の要素は {key, repo_versions, file, in_range, fixed, range_source, reason} を持つ。
+#     file は部品を読んだファイルを ", " でつないだ文字列、range_source は範囲を当てた出どころ(github・cna・adp)とする。
+#     looked_up が偽の番号には、鍵 * で reason が not_looked_up の1件を足す
 #
 # 版の比べ方: 先頭の v を除き、. と - と + で区切った数の並びとして比べる。足りない桁は 0 とする。
 # 英字で始まる部分(.Final や -jre や -M1 や .x)は末尾にあるときだけ除く。途中にあるとき(1.0.0-rc.1)や、
@@ -613,6 +619,135 @@ sub _ranges_curl {
         close $f;
     }
     return \%res;
+}
+
+
+# ---------------------------------------------------------------------
+# 部品と範囲を突き合わせる
+# ---------------------------------------------------------------------
+
+sub ranges_match {
+    my ($lookup, $inventory, $aliases, $kev_names) = @_;
+    my $components = ref $inventory eq 'HASH' && ref $inventory->{components} eq 'HASH' ? $inventory->{components} : {};
+    my $table = ref $aliases eq 'HASH' && ref $aliases->{aliases} eq 'HASH' ? $aliases->{aliases} : {};
+    $kev_names = {} unless ref $kev_names eq 'HASH';
+    # 製品の名前から、その名前を表に持つ部品の鍵を引く
+    my %by_name;
+    for my $key (sort keys %$table) {
+        next unless ref $table->{$key} eq 'ARRAY';
+        push @{ $by_name{$_} }, $key for grep { defined && !ref } @{ $table->{$key} };
+    }
+    my %result;
+    for my $cve (sort keys %{ ref $lookup eq 'HASH' ? $lookup : {} }) {
+        my $l = $lookup->{$cve};
+        next unless ref $l eq 'HASH';
+        my @products = grep { ref eq 'HASH' } @{ ref $l->{products} eq 'ARRAY' ? $l->{products} : [] };
+        my @advisories = grep { ref eq 'HASH' } @{ ref $l->{advisories} eq 'ARRAY' ? $l->{advisories} : [] };
+        # 名前が合った部品の鍵ごとに、名前が合った出どころの範囲 [出どころ, 範囲の形, 範囲] を集める
+        my (%hit, @order);
+        my $add = sub {
+            my ($key, $cand) = @_;
+            return unless ref $components->{$key} eq 'HASH';
+            push @order, $key unless $hit{$key};
+            $hit{$key} //= [];
+            push @{ $hit{$key} }, $cand if $cand;
+        };
+        for my $a (@advisories) {
+            # repository_advisory_url が空の勧告は、名前の突き合わせにだけ使う
+            my $url = _ranges_str($a->{repository_advisory_url});
+            my $use = defined $url && length $url;
+            for my $v (grep { ref eq 'HASH' } @{ ref $a->{vulnerabilities} eq 'ARRAY' ? $a->{vulnerabilities} : [] }) {
+                my $eco = lc(_ranges_str($v->{ecosystem}) // '');
+                my $name = _ranges_str($v->{name});
+                next unless defined $name && ($eco eq 'npm' || $eco eq 'maven');
+                $add->("$eco:$name", $use ? ['github', 'ghsa', $v] : undef);
+            }
+        }
+        for my $p (@products) {
+            my $pkg = _ranges_package_key($p);
+            $add->($pkg, [_ranges_str($p->{from}) // 'cna', 'cve', $p]) if defined $pkg;
+            # aliases.json で合った製品の範囲は、範囲の当て方の2で当てる
+            my $n = _ranges_name($p->{vendor}, $p->{product});
+            $add->($_, undef) for defined $n ? @{ $by_name{$n} // [] } : ();
+        }
+        for my $k (@{ ref $kev_names->{$cve} eq 'ARRAY' ? $kev_names->{$cve} : [] }) {
+            my @pair = ref $k eq 'ARRAY' ? @$k[0, 1] : ref $k eq 'HASH' ? @$k{qw(vendor product)} : ();
+            my $n = @pair ? _ranges_name(@pair) : undef;
+            # KEV は範囲を持たないので、名前だけを合わせる
+            $add->($_, undef) for defined $n ? @{ $by_name{$n} // [] } : ();
+        }
+        my @cna = grep { (_ranges_str($_->{from}) // '') eq 'cna' } @products;
+        my @matches;
+        for my $key (@order) {
+            my %names = map { $_ => 1 } grep { defined && !ref } @{ ref $table->{$key} eq 'ARRAY' ? $table->{$key} : [] };
+            my @named = grep { my $n = _ranges_name($_->{vendor}, $_->{product}); defined $n && $names{$n} } @products;
+            # 範囲の当て方の1から3。4の NVD の CPE の範囲と、直った版は、ほかのタスクで足す
+            my @levels = (
+                $hit{$key},
+                [map { [_ranges_str($_->{from}) // 'cna', 'cve', $_] } @named],
+                @cna == 1 ? [['cna', 'cve', $cna[0]]] : [],
+            );
+            push @matches, _ranges_assign($key, $components->{$key}, \@levels);
+        }
+        # 名前を確かめられなかった番号を、関係が無いと決めないために、鍵 * の1件を足す
+        push @matches, {
+            key => '*', repo_versions => [], file => undef, in_range => undef,
+            fixed => undef, range_source => undef, reason => 'not_looked_up',
+        } unless $l->{looked_up};
+        $result{$cve} = { matches => \@matches };
+    }
+    return \%result;
+}
+
+# 部品に、範囲の当て方の順に、最初に見つかった範囲を当てる。$levels は、当て方ごとの [出どころ, 範囲の形, 範囲] の一覧。
+# 1つの当て方に範囲が2つ以上あるときと、部品の版が2つ以上あるときは、1つでも入れば入るとし、
+# 入るものが無く決められないものがあれば決められないとする。範囲が無い(no_range の)ものは、範囲が見つからなかったとする
+sub _ranges_assign {
+    my ($key, $c, $levels) = @_;
+    my @versions = grep { defined && !ref } @{ ref $c->{versions} eq 'ARRAY' ? $c->{versions} : [] };
+    my @files = grep { defined && !ref } @{ ref $c->{files} eq 'ARRAY' ? $c->{files} : [] };
+    my %m = (key => $key, repo_versions => \@versions, file => @files ? join(', ', @files) : undef, fixed => undef);
+    for my $level (@$levels) {
+        my @found;
+        for my $cand (@$level) {
+            my ($source, $kind, $range) = @$cand;
+            my @r = map { [ranges_in_range($kind, $range, $_, $c->{partial})] } (@versions ? @versions : (undef));
+            next if grep { !defined $_->[0] && ($_->[1] // '') eq 'no_range' } @r;
+            push @found, map { [$source, @$_] } @r;
+        }
+        next unless @found;
+        my ($pick) = ((grep { defined $_->[1] && $_->[1] } @found), (grep { !defined $_->[1] } @found), @found);
+        return {
+            %m,
+            in_range     => defined $pick->[1] ? ($pick->[1] ? JSON::PP::true : JSON::PP::false) : undef,
+            range_source => $pick->[0],
+            reason       => defined $pick->[1] ? undef : $pick->[2],
+        };
+    }
+    return { %m, in_range => undef, range_source => undef, reason => 'no_range' };
+}
+
+# CVE の記録の製品の名前を、aliases.json の表の形(小文字にし、空白を _ にした <vendor>:<product>)に直す
+sub _ranges_name {
+    my @parts = map { _ranges_str($_) } @_[0, 1];
+    return undef if grep { !defined } @parts;
+    for (@parts) {
+        s/\A\s+|\s+\z//g;
+        s/\s+/_/g;
+    }
+    return undef if grep { !length } @parts;
+    return lc join ':', @parts;
+}
+
+# CVE の記録の製品の collectionURL が npm か Maven の登録所で packageName があれば、部品の鍵を返す
+sub _ranges_package_key {
+    my ($p) = @_;
+    my $url = _ranges_str($p->{collectionURL});
+    my $name = _ranges_str($p->{packageName});
+    return undef unless defined $url && defined $name && length $name;
+    return "npm:$name" if $url =~ m{\Ahttps?://(?:www\.|registry\.)?npmjs\.(?:com|org)(?:/|\z)}i;
+    return "maven:$name" if $url =~ m{\Ahttps?://(?:repo1?\.maven\.apache\.org|central\.sonatype\.com|search\.maven\.org)(?:/|\z)}i;
+    return undef;
 }
 
 1;

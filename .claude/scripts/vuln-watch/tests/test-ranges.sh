@@ -384,7 +384,190 @@ case_deadline() {
         "false,false;"
 }
 
-CASES='compare forms uncomparable partial lookup token limit failures deadline'
+ALIASES="$(cd "$HERE/.." && pwd)/aliases.json"
+
+# ranges_match を、本物の aliases.json で呼び、返した値を JSON で $CASE/out.json に書く。
+# run_match <CVE の番号ごとの引いた値の JSON のファイル> <部品の一覧の JSON のファイル> <KEV の名前の JSON のファイル>
+run_match() {
+    perl -MJSON::PP -e '
+        require $ARGV[0];
+        my $j = JSON::PP->new->utf8;
+        my $read = sub { open my $h, "<", $_[0] or die "$_[0]: $!"; local $/; $j->decode(<$h>) };
+        my $aliases = $read->($ARGV[1]);
+        print $j->canonical->encode(ranges_match($read->($ARGV[2]), $read->($ARGV[3]), $aliases, $read->($ARGV[4])));
+    ' "$RANGES" "$ALIASES" "$1" "$2" "$3" >"$CASE/out.json" 2>"$CASE/err.txt"
+}
+
+# CVE の番号の突き合わせの結果を、部品の鍵の順に「鍵|in_range|range_source|reason」の形で、空白で区切って出す: ms <CVE の番号>
+ms() {
+    KP_CVE=$1 pj 'join " ", map { join "|", $_->{key}, (defined $_->{in_range} ? ($_->{in_range} ? "true" : "false") : "null"), $_->{range_source} // "-", $_->{reason} // "-" } sort { $a->{key} cmp $b->{key} } @{ $d->{$ENV{KP_CVE}}{matches} }' <"$CASE/out.json"
+}
+
+case_aliases() {
+    check "aliases.json が JSON として読め、部品「aliases.json」の表の12行の部品の鍵を持つ" \
+        "$(pj 'join " ", $d->{version}, sort keys %{ $d->{aliases} }' <"$ALIASES")" \
+        "1 aws:elasticache aws:rds ci:node ci:trivy image:debian image:docker image:eclipse-temurin image:ghcr.io/terraform-linters/tflint image:hashicorp/terraform image:localstack/localstack image:node image:postgres image:valkey/valkey maven:org.apache.tomcat.embed:tomcat-embed-core runtime:java tool:gradle"
+    check "aliases.json が JSON として読め、部品「aliases.json」の表の12行の部品の鍵を持つ(名前は小文字で空白を持たない <vendor>:<product> の形)" \
+        "$(pj 'my @bad = grep { my $l = $d->{aliases}{$_}; ref $l ne "ARRAY" || !@$l || grep { !/\A[^:\sA-Z]+:[^:\sA-Z]+\z/ } @$l } sort keys %{ $d->{aliases} }; join " ", @bad' <"$ALIASES")" \
+        ""
+    check "aliases.json が JSON として読め、部品「aliases.json」の表の12行の部品の鍵を持つ(同じ行の部品の鍵は同じ名前を持つ)" \
+        "$(pj 'my $a = $d->{aliases}; join " ", map { join(",", @{ $a->{$_->[0]} }) eq join(",", @{ $a->{$_->[1]} }) ? 1 : 0 } (["image:eclipse-temurin", "runtime:java"], ["image:postgres", "aws:rds"], ["image:valkey/valkey", "aws:elasticache"], ["image:node", "ci:node"])' <"$ALIASES")" \
+        "1 1 1 1"
+}
+
+case_match() {
+    newcase
+    cat >"$CASE/lookup.json" <<'EOF'
+{
+  "CVE-2026-1001": {"looked_up": true, "products": [], "advisories": []},
+  "CVE-2024-27983": {"looked_up": true, "advisories": [], "products": [
+    {"from": "cna", "vendor": "NodeJS", "product": "Node", "defaultStatus": "unaffected", "versions": [
+      {"version": "20.0.0", "lessThan": "20.12.1", "status": "affected", "versionType": "semver"},
+      {"version": "22.0.0", "lessThan": "22.1.0", "status": "affected", "versionType": "semver"}]}]},
+  "CVE-2026-1002": {"looked_up": true, "advisories": [], "products": [
+    {"from": "cna", "vendor": "Example", "product": "Other", "versions": [{"version": "0", "lessThan": "99", "status": "affected"}]}]},
+  "CVE-2026-1004": {"looked_up": true, "advisories": [], "products": [
+    {"from": "cna", "vendor": "Moby", "product": "Moby", "versions": [{"version": "0", "lessThan": "99", "status": "affected"}]}]}
+}
+EOF
+    cat >"$CASE/inventory.json" <<'EOF'
+{"components": {
+  "image:eclipse-temurin": {"versions": ["21"], "files": ["docker/backend/Dockerfile"], "partial": true},
+  "runtime:java": {"versions": ["21"], "files": ["backend/build.gradle"], "partial": true},
+  "image:node": {"versions": ["20.11.0"], "files": ["docker/frontend/Dockerfile", "compose.yaml"], "partial": false},
+  "ci:node": {"versions": ["21"], "files": [".github/workflows/ci.yaml"], "partial": true},
+  "npm:next": {"versions": ["15.5.2"], "files": ["frontend/pnpm-lock.yaml"], "partial": false}
+}}
+EOF
+    printf '%s' '{"CVE-2026-1001": [["Oracle", "Java SE"]]}' >"$CASE/kev.json"
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    local name="KEV の Oracle の Java SE が image:eclipse-temurin と runtime:java に合い、CNA の NodeJS の Node が image:node と ci:node に合う"
+    check "$name(KEV の名前)" "$(ms CVE-2026-1001)" "image:eclipse-temurin|null|-|no_range runtime:java|null|-|no_range"
+    check "$name(CNA の名前と、その製品の範囲)" "$(ms CVE-2024-27983)" "ci:node|false|cna|- image:node|true|cna|-"
+    check "$name(名前が表に無い製品は、CNA の製品が1つだけでも、どの部品にも合わない)" "$(ms CVE-2026-1002)" ""
+    check "$name(表で引いた部品の鍵が部品の一覧に無ければ、合わない)" "$(ms CVE-2026-1004)" ""
+    check "$name(部品の版と、読んだファイル)" \
+        "$(pj 'my ($m) = grep { $_->{key} eq "image:node" } @{ $d->{"CVE-2024-27983"}{matches} }; join "|", join(",", @{ $m->{repo_versions} }), $m->{file}, defined $m->{fixed} ? $m->{fixed} : "null"' <"$CASE/out.json")" \
+        "20.11.0|docker/frontend/Dockerfile, compose.yaml|null"
+}
+
+case_sources() {
+    newcase
+    cat >"$CASE/lookup.json" <<'EOF'
+{
+  "CVE-2025-24813": {"looked_up": true,
+    "advisories": [{"ghsa_id": "GHSA-83qj-6fr2-vhqg", "repository_advisory_url": null, "vulnerabilities": [
+      {"ecosystem": "maven", "name": "org.apache.tomcat.embed:tomcat-embed-core", "vulnerable_version_range": "< 11.0.3", "first_patched_version": "11.0.3"}]}],
+    "products": [
+      {"from": "cna", "vendor": "Apache Software Foundation", "product": "Apache Tomcat", "versions": [{"version": "11.0.0-M1", "lessThan": "11.0.6", "status": "affected", "versionType": "semver"}]},
+      {"from": "cna", "vendor": "Apache Software Foundation", "product": "Apache Tomcat Connectors", "versions": [{"version": "1.0", "lessThan": "1.2.50", "status": "affected"}]}]},
+  "CVE-2025-29927": {"looked_up": true,
+    "advisories": [{"ghsa_id": "GHSA-f82v-jwr5-mffw", "repository_advisory_url": "https://github.com/vercel/next.js/security/advisories/GHSA-f82v-jwr5-mffw", "vulnerabilities": [
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": ">= 15.0.0, < 15.2.3", "first_patched_version": "15.2.3"}]}],
+    "products": [{"from": "cna", "vendor": "vercel", "product": "next.js", "versions": [{"version": "0", "lessThan": "16.0.0", "status": "affected"}]}]},
+  "CVE-2026-2001": {"looked_up": true,
+    "advisories": [{"ghsa_id": "GHSA-xxxx-xxxx-xxx1", "repository_advisory_url": null, "vulnerabilities": [
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": "< 16.0.0", "first_patched_version": "16.0.0"}]}],
+    "products": []},
+  "CVE-2026-2006": {"looked_up": true,
+    "advisories": [{"ghsa_id": "GHSA-xxxx-xxxx-xxx6", "repository_advisory_url": "https://github.com/apache/tomcat/security/advisories/GHSA-xxxx-xxxx-xxx6", "vulnerabilities": [
+      {"ecosystem": "maven", "name": "org.apache.tomcat.embed:tomcat-embed-core", "vulnerable_version_range": "< 11.0.3", "first_patched_version": "11.0.3"}]}],
+    "products": [
+      {"from": "cna", "vendor": "Apache Software Foundation", "product": "Apache Tomcat", "versions": [{"version": "11.0.0-M1", "lessThan": "11.0.6", "status": "affected", "versionType": "semver"}]}]},
+  "CVE-2026-2003": {"looked_up": true,
+    "advisories": [{"ghsa_id": "GHSA-xxxx-xxxx-xxx3", "repository_advisory_url": null, "vulnerabilities": [
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": "< 15.0.0", "first_patched_version": "15.0.0"}]}],
+    "products": [{"from": "cna", "vendor": "vercel", "product": "next.js", "versions": [{"version": "0", "lessThan": "16.0.0", "status": "affected"}]}]},
+  "CVE-2026-2004": {"looked_up": true,
+    "advisories": [{"ghsa_id": "GHSA-xxxx-xxxx-xxx4", "repository_advisory_url": "https://github.com/vercel/next.js/security/advisories/GHSA-xxxx-xxxx-xxx4", "vulnerabilities": [
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": null, "first_patched_version": null}]}],
+    "products": [{"from": "cna", "vendor": "vercel", "product": "next.js", "versions": [{"version": "0", "lessThan": "16.0.0", "status": "affected"}]}]},
+  "CVE-2026-2005": {"looked_up": true,
+    "advisories": [{"ghsa_id": "GHSA-xxxx-xxxx-xxx5", "repository_advisory_url": "https://github.com/facebook/react/security/advisories/GHSA-xxxx-xxxx-xxx5", "vulnerabilities": [
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": ">= 13.0.0, < 13.5.9", "first_patched_version": "13.5.9"},
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": ">= 15.0.0, < 15.5.3", "first_patched_version": "15.5.3"},
+      {"ecosystem": "npm", "name": "react", "vulnerable_version_range": "< 18.3.0", "first_patched_version": "18.3.0"}]}],
+    "products": []},
+  "CVE-2026-2002": {"looked_up": true, "advisories": [],
+    "products": [
+      {"from": "cna", "vendor": "example", "product": "left pad", "collectionURL": "https://www.npmjs.com", "packageName": "left-pad", "versions": [{"version": "0", "lessThan": "1.3.0", "status": "affected"}]},
+      {"from": "adp", "vendor": "example", "product": "right pad", "collectionURL": "https://repo.maven.apache.org/maven2", "packageName": "org.example:right-pad", "versions": [{"version": "2.0", "lessThan": "2.1", "status": "affected"}]}]}
+}
+EOF
+    cat >"$CASE/inventory.json" <<'EOF'
+{"components": {
+  "maven:org.apache.tomcat.embed:tomcat-embed-core": {"versions": ["11.0.5"], "files": ["dependency-graph/sbom"], "partial": false},
+  "npm:next": {"versions": ["15.5.2"], "files": ["frontend/pnpm-lock.yaml"], "partial": false},
+  "npm:left-pad": {"versions": ["1.1.0"], "files": ["frontend/pnpm-lock.yaml"], "partial": false},
+  "npm:react": {"versions": ["19.0.0", "18.2.0"], "files": ["frontend/pnpm-lock.yaml"], "partial": false},
+  "maven:org.example:right-pad": {"versions": ["2.1.0"], "files": ["backend/gradle/libs.versions.toml"], "partial": false}
+}}
+EOF
+    printf '{}' >"$CASE/kev.json"
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    check "Tomcat のように、名前が合った出どころと範囲を読む出どころが違うとき、aliases.json の対応で CVE の記録の製品の範囲が使われる" \
+        "$(ms CVE-2025-24813)" "maven:org.apache.tomcat.embed:tomcat-embed-core|true|cna|-"
+    check "Tomcat のように、名前が合った出どころと範囲を読む出どころが違うとき、aliases.json の対応で CVE の記録の製品の範囲が使われる(名前が合った勧告が範囲を持てば、勧告の範囲が先に使われる)" \
+        "$(ms CVE-2026-2006)" "maven:org.apache.tomcat.embed:tomcat-embed-core|false|github|-"
+    check "repository_advisory_url が空の GitHub の勧告の範囲が使われない" \
+        "$(ms CVE-2026-2001)" "npm:next|null|-|no_range"
+    check "repository_advisory_url が空の GitHub の勧告の範囲が使われない(空でない勧告の範囲は、CVE の記録の製品の範囲より先に使われる)" \
+        "$(ms CVE-2025-29927)" "npm:next|false|github|-"
+    check "名前が合った出どころと aliases.json の対応のどちらにも範囲が無ければ、CNA の製品が1つだけのときにその製品の範囲が使われる" \
+        "$(ms CVE-2026-2003)" "npm:next|true|cna|-"
+    check "名前が合った出どころと aliases.json の対応のどちらにも範囲が無ければ、CNA の製品が1つだけのときにその製品の範囲が使われる(範囲の式を持たない勧告は、範囲が無いとする)" \
+        "$(ms CVE-2026-2004)" "npm:next|true|cna|-"
+    check "1つの出どころに範囲が2つ以上あるときと、部品の版が2つ以上あるときは、1つでも入れば範囲に入る" \
+        "$(ms CVE-2026-2005)" "npm:next|true|github|- npm:react|true|github|-"
+    check "CVE の記録の collectionURL が npm か Maven の登録所の製品は、packageName で部品の鍵に合う" \
+        "$(ms CVE-2026-2002)" "maven:org.example:right-pad|false|adp|- npm:left-pad|true|cna|-"
+}
+
+case_undecided() {
+    newcase
+    cat >"$CASE/lookup.json" <<'EOF'
+{
+  "CVE-2026-3001": {"looked_up": true, "advisories": [], "products": [
+    {"from": "cna", "vendor": "PostgreSQL", "product": "PostgreSQL", "versions": []},
+    {"from": "cna", "vendor": "PostgreSQL", "product": "pgAdmin", "versions": [{"version": "0", "lessThan": "9", "status": "affected"}]}]},
+  "CVE-2026-3002": {"looked_up": true, "advisories": [], "products": [
+    {"from": "cna", "vendor": "Debian", "product": "Debian Linux", "versions": [{"version": "0", "lessThan": "13", "status": "affected"}]}]}
+}
+EOF
+    cat >"$CASE/inventory.json" <<'EOF'
+{"components": {
+  "image:postgres": {"versions": ["17.6"], "files": ["compose.yaml"], "partial": false},
+  "aws:rds": {"versions": ["17.6"], "files": ["terraform/modules/rds/main.tf"], "partial": false},
+  "image:debian": {"versions": [], "files": ["docker/backend/Dockerfile"], "partial": false}
+}}
+EOF
+    printf '{}' >"$CASE/kev.json"
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    local name="範囲が無い番号と、版が分からない部品が、in_range が null で、no_range と no_version になる"
+    check "$name(範囲が無い番号)" "$(ms CVE-2026-3001)" "aws:rds|null|-|no_range image:postgres|null|-|no_range"
+    check "$name(版が分からない部品)" "$(ms CVE-2026-3002)" "image:debian|null|cna|no_version"
+}
+
+case_notlooked() {
+    newcase
+    cat >"$CASE/lookup.json" <<'EOF'
+{
+  "CVE-2026-4001": {"looked_up": false, "advisories": [], "products": []},
+  "CVE-2026-4002": {"looked_up": false, "advisories": [], "products": [
+    {"from": "cna", "vendor": "NodeJS", "product": "Node", "versions": [{"version": "20.0.0", "lessThan": "20.12.1", "status": "affected"}]}]},
+  "CVE-2026-4003": {"looked_up": true, "advisories": [], "products": []}
+}
+EOF
+    printf '%s' '{"components": {"image:node": {"versions": ["20.11.0"], "files": ["compose.yaml"], "partial": false}}}' >"$CASE/inventory.json"
+    printf '{}' >"$CASE/kev.json"
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    local name="looked_up が偽の番号が、名前の合った部品が無くても、鍵 * と not_looked_up の1件を返す"
+    check "$name" "$(ms CVE-2026-4001)" "*|null|-|not_looked_up"
+    check "$name(名前の合った部品があれば、その部品と、鍵 * の1件を返す)" "$(ms CVE-2026-4002)" "*|null|-|not_looked_up image:node|true|cna|-"
+    check "$name(looked_up が真で名前の合った部品が無い番号は、何も返さない)" "$(ms CVE-2026-4003)" ""
+}
+
+CASES='compare forms uncomparable partial lookup token limit failures deadline aliases match sources undecided notlooked'
 
 # ---------------------------------------------------------------------
 # 選んだ場合を流す
