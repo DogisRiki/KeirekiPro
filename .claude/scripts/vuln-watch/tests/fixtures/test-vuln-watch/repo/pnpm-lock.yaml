@@ -1,0 +1,31 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+
+importers:
+
+  .:
+    dependencies:
+      next:
+        specifier: 15.5.2
+        version: 15.5.2(react@19.0.0)
+      react:
+        specifier: ^19.0.0
+        version: 19.0.0
+
+packages:
+
+  next@15.5.2:
+    resolution: {integrity: sha512-next}
+
+  react@19.0.0:
+    resolution: {integrity: sha512-react}
+
+snapshots:
+
+  next@15.5.2(react@19.0.0):
+    dependencies:
+      react: 19.0.0
+
+  react@19.0.0: {}

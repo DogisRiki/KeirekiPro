@@ -194,8 +194,7 @@ sub _feeds_curl {
         open STDIN, '<', File::Spec->devnull;
         open STDOUT, '>', $out or POSIX::_exit(126);
         open STDERR, '>', "$tag.curl-err";
-        exec 'curl', @args;
-        POSIX::_exit(127);
+        exec('curl', @args) or POSIX::_exit(127);
     }
     my $done = 0;
     while (1) {

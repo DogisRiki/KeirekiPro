@@ -1,0 +1,6 @@
+services:
+  db:
+    image: postgres:17.6
+  app:
+    build:
+      context: docker/app

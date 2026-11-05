@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<rdf:RDF
+  xmlns="http://purl.org/rss/1.0/"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xml:lang="ja">
+ <channel rdf:about="https://www.ipa.go.jp/security/alert-rss.rdf">
+  <title>緊急対策情報・注意喚起（重要なセキュリティ情報）RSS</title>
+  <link>https://www.ipa.go.jp/security/index.html</link>
+ </channel>
+ <item rdf:about="https://www.ipa.go.jp/security/security-alert/2026/1101-cms.html">
+  <title>ある CMS の脆弱性対策について(CVE-2026-2020)</title>
+  <link>https://www.ipa.go.jp/security/security-alert/2026/1101-cms.html</link>
+  <dc:date>2026-11-01T00:00:00+09:00</dc:date>
+ </item>
+ <item rdf:about="https://www.ipa.go.jp/security/security-alert/2026/1102-glibc.html">
+  <title>GNU C Library の脆弱性対策について(CVE-2026-2030)</title>
+  <link>https://www.ipa.go.jp/security/security-alert/2026/1102-glibc.html</link>
+  <dc:date>2026-11-02T00:00:00+09:00</dc:date>
+ </item>
+</rdf:RDF>
