@@ -1,0 +1,5 @@
+{
+  "name": "fixture-frontend",
+  "private": true,
+  "packageManager": "pnpm@11.10.0+sha512.0123456789abcdef"
+}

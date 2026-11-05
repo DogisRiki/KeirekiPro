@@ -1,0 +1,37 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+
+importers:
+
+  .:
+    dependencies:
+      react:
+        specifier: ^19.0.0
+        version: 19.0.0
+
+packages:
+
+  '@scope/alpha@1.2.3':
+    resolution: {integrity: sha512-alpha}
+
+  beta@2.0.0:
+    resolution: {integrity: sha512-beta200}
+
+  beta@2.1.0:
+    resolution: {integrity: sha512-beta210}
+
+  'gamma@3.0.0(react@19.0.0)':
+    resolution: {integrity: sha512-gamma}
+
+  epsilon@5.0.0(beta@2.0.0):
+    resolution: {integrity: sha512-epsilon}
+
+  react@19.0.0:
+    resolution: {integrity: sha512-react}
+
+snapshots:
+
+  delta@4.0.0:
+    dependencies: {}
