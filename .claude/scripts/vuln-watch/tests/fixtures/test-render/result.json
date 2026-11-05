@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {"key": "CVE-2026-1001", "name": "Next.js の認可の回避", "damage": "認可を回避されて、管理の画面を開かれる", "exploited": false, "exploited_note": null, "software": "Next.js", "verdict": "affected", "action": "frontend の next を 15.5.3 に上げる", "reason": null, "check": null,
+      "pc": [{"software": "Node.js", "versions": "22.0.0 から 22.11.0 まで", "fixed": "22.11.1", "check": "node --version を打つ"}]},
+    {"key": "CVE-2026-1003", "name": "Apache Tomcat の情報の漏えい", "damage": "設定のファイルを読まれる", "exploited": false, "exploited_note": null, "software": "Apache Tomcat", "verdict": "undeterminable", "action": null, "reason": "11.0 の系列の範囲が発表されていない", "check": "Tomcat の発表で 11.0.2 が直った版より前かを読む", "pc": []},
+    {"key": "CVE-2026-1012", "name": "Vite の開発サーバのファイルの読み出し", "damage": "開発サーバから任意のファイルを読まれる", "exploited": false, "exploited_note": null, "software": "Vite", "verdict": "undeterminable", "action": null, "reason": "範囲が発表されていない", "check": "Vite の発表で 7.1.0 が入るかを読む", "pc": []},
+    {"key": "CVE-2026-1002", "name": "PostgreSQL の任意のコードの実行", "damage": "データベースの上で任意のコードを動かされる", "exploited": true, "exploited_note": null, "software": "PostgreSQL", "verdict": "affected", "action": "compose.yaml の postgres のイメージを上げる", "reason": null, "check": null, "pc": []},
+    {"key": "CVE-2026-1014", "name": "7-Zip の任意のコードの実行", "damage": "細工した書庫を開くと任意のコードを動かされる", "exploited": false, "exploited_note": null, "software": "7-Zip", "verdict": "not_affected", "action": null, "reason": null, "check": null,
+      "pc": [
+        {"software": "7-Zip", "versions": "25.00 より前", "fixed": "25.00", "check": "7-Zip の「ヘルプ」の「バージョン情報」を開く"},
+        {"software": "7-Zip のコマンド", "versions": "25.00 より前", "fixed": "25.00", "check": "7z を引数なしで打つ"}
+      ]},
+    {"key": "JVNDB-2026-000001", "name": "家庭用ルータの認証の回避", "damage": "管理の画面に入られる", "exploited": false, "exploited_note": null, "software": "家庭用ルータ", "verdict": "unrelated", "action": null, "reason": null, "check": null, "pc": []},
+    {"key": "CVE-2026-1010", "name": "axios のサーバ側の要求の偽造", "damage": "内部のサーバに要求を送らされる", "exploited": true, "exploited_note": "作り手が悪用を確かめた", "software": "axios", "verdict": "undeterminable", "action": null, "reason": "範囲が発表されていない", "check": "axios の発表で 1.12.0 が入るかを読む", "pc": []},
+    {"key": "CVE-2026-1013", "name": "esbuild の開発サーバの要求の読み出し", "damage": "開発サーバへの要求を読まれる", "exploited": false, "exploited_note": null, "software": "esbuild", "verdict": "undeterminable", "action": null, "reason": "範囲が発表されていない", "check": "esbuild の発表で 0.25.0 が入るかを読む", "pc": []},
+    {"key": "CVE-2026-1017", "name": "Oracle Java SE の情報の漏えい", "damage": "通信の中身を読まれる", "exploited": false, "exploited_note": null, "software": "Oracle Java SE", "verdict": "not_affected", "action": null, "reason": null, "check": null, "pc": []},
+    {"key": "CVE-2026-1011", "name": "OpenSSH の任意のコードの実行", "damage": "SSH のサーバの上で任意のコードを動かされる", "exploited": false, "exploited_note": null, "software": "OpenSSH", "verdict": "undeterminable", "action": null, "reason": "記事のページを読めなかった", "check": "JPCERT/CC の注意喚起で影響を受ける版を読む", "pc": []},
+    {"key": "CVE-2026-1015", "name": "Windows の権限の昇格", "damage": "一般の利用者が管理者の権限を得る", "exploited": true, "exploited_note": null, "software": "Microsoft Windows", "verdict": "unrelated", "action": null, "reason": null, "check": null,
+      "pc": [{"software": "Windows 11", "versions": "2026年10月の更新より前", "fixed": "2026年10月の累積の更新", "check": "設定の「Windows Update」の「更新の履歴」を開く"}]},
+    {"key": "CVE-2026-1020", "name": "ある CMS の入力の検証の漏れ", "damage": "記事を書き換えられる", "exploited": false, "exploited_note": null, "software": "ある CMS", "verdict": "unrelated", "action": null, "reason": null, "check": null, "pc": []}
+  ]
+}

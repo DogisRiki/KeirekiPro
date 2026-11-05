@@ -1,0 +1,14 @@
+{
+  "sbom": {
+    "spdxVersion": "SPDX-2.3",
+    "packages": [
+      {
+        "name": "org.yaml:snakeyaml",
+        "versionInfo": "2.4",
+        "externalRefs": [
+          {"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:maven/org.yaml/snakeyaml@2.4"}
+        ]
+      }
+    ]
+  }
+}

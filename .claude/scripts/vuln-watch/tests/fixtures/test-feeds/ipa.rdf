@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<rdf:RDF
+  xmlns="http://purl.org/rss/1.0/"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:dcterms="http://purl.org/dc/terms/"
+  xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+  xml:lang="ja">
+ <channel rdf:about="https://www.ipa.go.jp/security/alert-rss.rdf">
+     <title>緊急対策情報・注意喚起（重要なセキュリティ情報）RSS</title>
+     <link>https://www.ipa.go.jp/security/index.html</link>
+     <description>緊急対策情報・注意喚起（重要なセキュリティ情報）RSS</description>
+     <dc:language>ja-jp</dc:language>
+     <items>
+         <rdf:Seq>
+             <rdf:li rdf:resource="https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html" />
+             <rdf:li rdf:resource="https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html" />
+             <rdf:li rdf:resource="https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html" />
+             <rdf:li rdf:resource="https://www.ipa.go.jp/security/security-alert/2026/1014-ms.html" />
+             <rdf:li rdf:resource="https://example.com/security/alert-20261101.html" />
+         </rdf:Seq>
+     </items>
+ </channel>
+ <item rdf:about="https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html">
+  <title>更新：PHPの脆弱性対策について(CVE-2026-109618、CVE-2026-109619：PHP2shell)</title>
+  <link>https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html</link>
+  <dc:creator>情報処理推進機構（IPA）</dc:creator>
+  <dc:date>2026-10-28T00:00:00+09:00</dc:date>
+ </item>
+ <item rdf:about="https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html">
+  <title>Oracle Java の脆弱性対策について(2026年10月)</title>
+  <link>https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html</link>
+  <dc:creator>情報処理推進機構（IPA）</dc:creator>
+  <dc:date>2026-10-29T00:00:00+09:00</dc:date>
+ </item>
+ <item rdf:about="https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html">
+  <title>PHPの脆弱性対策について(CVE-2026-109618、CVE-2026-109619：PHP2shell)</title>
+  <link>https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html</link>
+  <dc:creator>情報処理推進機構（IPA）</dc:creator>
+  <dc:date>2026-10-22T00:00:00+09:00</dc:date>
+ </item>
+ <item rdf:about="https://www.ipa.go.jp/security/security-alert/2026/1014-ms.html">
+  <title>Microsoft 製品の脆弱性対策について(2026年10月)</title>
+  <link>https://www.ipa.go.jp/security/security-alert/2026/1014-ms.html</link>
+  <dc:creator>情報処理推進機構（IPA）</dc:creator>
+  <dc:date>2026-10-27T00:00:00+09:00</dc:date>
+ </item>
+ <item rdf:about="https://example.com/security/alert-20261101.html">
+  <title>ほかのサイトの注意喚起について(CVE-2026-140001)</title>
+  <link>https://example.com/security/alert-20261101.html</link>
+  <dc:creator>情報処理推進機構（IPA）</dc:creator>
+  <dc:date>2026-11-01T00:00:00+09:00</dc:date>
+ </item>
+
+</rdf:RDF>

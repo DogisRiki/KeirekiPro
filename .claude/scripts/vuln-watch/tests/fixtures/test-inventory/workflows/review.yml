@@ -1,0 +1,11 @@
+name: review
+jobs:
+  review:
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        with:
+          node-version: "24.22.3"
+      - uses: ./.github/actions/setup-tool
+        with:
+          codex-version: '0.166.0'
