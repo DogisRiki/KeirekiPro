@@ -184,11 +184,12 @@ jobs:
       # 場合は検査も失敗させる(fail-closed)。外部への問い合わせはスタブするため
       # ネットワークを必要としない
       - name: Test dependency cooldown check
+        id: cooldown_tests
         run: |
           set -euo pipefail
           for t in check-dependency-cooldown cooldown-match-alerts cooldown-check-malware \
             cooldown-check-signer cooldown-check-pnpm-exclude record-cooldown-exception \
-            lib-notice-comment; do
+            lib-notice-comment lib-ci-tool-releases check-ci-tool-release-age; do
             bash ".github/scripts/tests/test-${t}.sh"
           done
 
@@ -226,3 +227,37 @@ jobs:
           .github/scripts/check-dependency-cooldown.sh \
             "${{ github.event.pull_request.base.sha }}" \
             "${{ github.event.pull_request.head.sha }}"
+
+      # CI の道具(Node.js・Trivy・Codex CLI・Terraform)の版の公開からの時間の検査。
+      # 外部のパッケージの検査が失敗しても、この検査の結果を出す
+      - name: Check CI tool release age
+        id: ci_tool_age
+        if: ${{ !cancelled() && steps.cooldown_tests.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CI_TOOL_CHANGED_FILE: ${{ runner.temp }}/ci-tool-changed.tsv
+        run: |
+          bash .github/scripts/check-ci-tool-release-age.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
+
+      # PR で変わった CI の版を、配布元の署名で確かめる。道具は動かさず、
+      # 置き場を足す GITHUB_PATH には使い捨ての空のファイルを渡す
+      - name: Verify CI tool signatures
+        if: ${{ !cancelled() && steps.ci_tool_age.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGED: ${{ runner.temp }}/ci-tool-changed.tsv
+        run: |
+          set -euo pipefail
+          if [ ! -s "$CHANGED" ]; then
+            echo "変わった CI の版はありません。"
+            exit 0
+          fi
+          while IFS="$(printf '\t')" read -r tool version; do
+            [ -n "$tool" ] || continue
+            echo "::group::${tool} ${version}"
+            GITHUB_PATH="$(mktemp)" bash ".github/scripts/install-verified-${tool}.sh" "$version"
+            echo "::endgroup::"
+          done <"$CHANGED"

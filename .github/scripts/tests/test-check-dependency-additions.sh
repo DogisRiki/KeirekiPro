@@ -18,6 +18,29 @@ export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com
 export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
 FAILED=0
 
+# 開発環境の書き場所だけを持つ、CI の道具の版の書き場所の一覧のデータのファイル
+write_data() {
+    mkdir -p .github
+    cat >.github/ci-tool-versions.json <<'EOF'
+{
+  "schema": 1,
+  "tools": {
+    "node": {
+      "name": "Node.js",
+      "ci": [],
+      "dev": { "file": "docker/frontend/Dockerfile", "image": "node", "tag_suffix": "-bookworm-slim" }
+    },
+    "trivy": { "name": "Trivy", "ci": [] },
+    "terraform": {
+      "name": "Terraform",
+      "ci": [],
+      "dev": { "file": "docker/terraform/Dockerfile", "image": "hashicorp/terraform", "tag_suffix": "" }
+    }
+  }
+}
+EOF
+}
+
 seed() {
     rm -rf "$WORK/repo"
     mkdir -p "$WORK/repo/backend/gradle/wrapper" "$WORK/repo/frontend"
@@ -31,6 +54,11 @@ seed() {
     echo '{"dependencies":{"react":"^19.0.0"},"devDependencies":{}}' >frontend/package.json
     printf 'packages:\n  - .\n\noverrides:\n  follow-redirects: ">=1.16.0"\n' >frontend/pnpm-workspace.yaml
     printf "lockfileVersion: '9.0'\n\npackages:\n\n  react@19.0.0:\n    resolution: {integrity: sha512-aaa}\n\n  '@scope/dep@1.0.0':\n    resolution: {integrity: sha512-bbb}\n" >frontend/pnpm-lock.yaml
+    # SEED_DATA=no のときは、分かれ目にデータのファイルを置かない(データのファイルを足す PR の形)
+    [ "${SEED_DATA:-yes}" = yes ] && write_data
+    mkdir -p docker/frontend docker/terraform
+    printf 'FROM node:24.22.2-bookworm-slim@sha256:aaa\nRUN echo frontend\n' >docker/frontend/Dockerfile
+    printf 'FROM ghcr.io/terraform-linters/tflint:v0.65.0@sha256:ttt AS tflint\n\nFROM hashicorp/terraform:1.17.1@sha256:bbb\nCOPY --from=tflint /usr/local/bin/tflint /usr/local/bin/tflint\n' >docker/terraform/Dockerfile
     git add -A && git commit -qm base
     BASE=$(git rev-parse HEAD)
 }
@@ -95,6 +123,16 @@ m_lock_only() { sed -i 's|react@19.0.0|react@19.1.0|' frontend/pnpm-lock.yaml; }
 m_workspace_override() { sed -i 's|follow-redirects: ">=1.16.0"|follow-redirects: ">=1.16.0"\n  evil: "npm:totally-different@1.0.0"|' frontend/pnpm-workspace.yaml; }
 m_npmrc_add() { echo "minimum-release-age=0" >frontend/.npmrc; }
 m_pnpmfile_add() { echo "module.exports = { hooks: {} };" >frontend/.pnpmfile.cjs; }
+m_dev_node() { sed -i 's|node:24.22.2-bookworm-slim@sha256:aaa|node:24.23.0-bookworm-slim@sha256:ccc|' docker/frontend/Dockerfile; }
+m_dev_tf() { sed -i 's|hashicorp/terraform:1.17.1@sha256:bbb|hashicorp/terraform:1.17.2@sha256:ddd|' docker/terraform/Dockerfile; }
+m_dev_digest() {
+    sed -i 's|@sha256:aaa|@sha256:ccc|' docker/frontend/Dockerfile
+    sed -i 's|@sha256:bbb|@sha256:ddd|' docker/terraform/Dockerfile
+}
+m_tflint() { sed -i 's|tflint:v0.65.0@sha256:ttt|tflint:v0.66.0@sha256:uuu|' docker/terraform/Dockerfile; }
+# 分かれ目に無いデータのファイルを足し、Dockerfile は digest だけを変える
+m_add_data() { write_data; m_dev_digest; }
+m_dev_no_from() { sed -i 's|^FROM hashicorp/terraform:|FROM example/terraform:|' docker/terraform/Dockerfile; }
 
 # --- 承認を要求しないもの --------------------------------------------------------
 check 0 false "依存定義以外のみの変更" m_none
@@ -129,6 +167,18 @@ check 0 true "pnpm-workspace.yaml の変更 + 所有者Approve済み" m_workspac
 check_summary "pnpm-workspace.yaml" "" "対象のファイル名がSummaryに出る" m_workspace_override
 # lockfile からパッケージ名を抽出する報告は、lockfile が対象外になったため無くなった
 check_summary "build.gradle" "新しく現れたパッケージ" "報告の節は残っていない" m_dep_add
+
+# --- 開発環境の Node.js と Terraform の版 -----------------------------------------
+# 開発環境の版だけを変える PR は .github/ を変えないので、CODEOWNERS では承認が要らない。
+# この検知が、その PR に所有者の承認を求める
+check 1 false "開発環境の Node.js の FROM のタグの版の変更を検知し、所有者の承認が無ければ失敗する" m_dev_node
+check 1 false "開発環境の Terraform の FROM のタグの版の変更を検知する" m_dev_tf
+check 0 true "所有者の承認があれば通る" m_dev_node
+check 0 false "digest だけの変更を検知しない" m_dev_digest
+check 0 false "tflint の FROM の行の変更を検知しない" m_tflint
+SEED_DATA=no check 0 false "分かれ目にデータのファイルが無く、FROM の行を変えない PR で検知しない" m_add_data
+check 1 false "開発環境の FROM の行を読めなければ、承認を求める" m_dev_no_from
+check_summary "docker/frontend/Dockerfile: Node.js の版 24.22.2 を 24.23.0 に変更" "" "変えた開発環境の版が Summary に出る" m_dev_node
 
 if [ "$FAILED" -ne 0 ]; then
     echo "::error::check-dependency-additions.sh のテストが失敗しました。"

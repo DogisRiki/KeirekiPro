@@ -61,6 +61,22 @@ jobs:
         # actionlintはこの形式を検査しないため、独立した検査として持つ
         run: bash .github/scripts/check-action-pinning.sh
 
+      - name: Check CI tool version placement
+        # CI の道具(Node.js・Trivy・Codex CLI・Terraform)の版の行が、すべて
+        # .github/ci-tool-versions.json の書き場所か対象外の一覧にあるかを検査する。
+        # 書き場所に無い版の行は、週1回の更新で書き換えられずに古いまま残るため
+        run: bash .github/scripts/check-ci-tool-placement.sh
+
+      # 版の書き場所の一覧を読むライブラリと、それを使う検査と週1回の実行の
+      # スクリプトのテスト。gh と curl は偽物に置き換え、push は一時のフォルダの
+      # 中のリモートに送るため、権限もネットワークも使わない
+      - name: Test CI tool version scripts
+        run: |
+          set -euo pipefail
+          for t in lib-ci-tool-versions check-ci-tool-placement ci-tool-version-update; do
+            bash ".github/scripts/tests/test-${t}.sh"
+          done
+
       # 自動マージの予約と Issue クローズの判定スクリプトのテスト。
       # これらのスクリプトは、使う側のワークフロー(auto-merge / close-linked-issues)の
       # 中でも実行の直前に自己テストされる。ただしそちらが動くのはPRの作成後や
@@ -309,7 +325,7 @@ jobs:
       - name: Use Node.js
         uses: ./.github/actions/verified-node
         with:
-          node-version: '24.22.1'
+          node-version: '24.22.2'
 
       - name: Cache pnpm store
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

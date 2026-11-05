@@ -102,7 +102,7 @@ jobs:
       - name: Use Node.js
         uses: ./.github/actions/verified-node
         with:
-          node-version: '24.22.1'
+          node-version: '24.22.2'
 
       # Codex CLI は配布元の来歴を確かめてから入れる(.github/actions/verified-codex)。
       # バージョンは固定する(未固定だと実行のたびに最新版が入り、
@@ -110,7 +110,7 @@ jobs:
       - name: Install Codex CLI
         uses: ./.github/actions/verified-codex
         with:
-          codex-version: '0.147.0'
+          codex-version: '0.166.0'
 
       - name: Authenticate Codex
         # Codex CLIは環境変数のOPENAI_API_KEYでは認証せず、$CODEX_HOME/auth.json を参照する。

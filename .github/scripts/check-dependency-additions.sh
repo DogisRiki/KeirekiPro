@@ -4,11 +4,15 @@
 #
 # 判定: 対象の変更あり かつ 所有者のApproveなし -> exit 1(赤)。それ以外は exit 0(緑)
 #
-# 判定対象(いずれも「変更されたこと自体」を見る。中身は解析しない):
+# 判定対象(上の2つは「変更されたこと自体」を見る。中身は解析しない):
 #   - frontend の取得元と防御設定
 #     (pnpm-workspace.yaml / .npmrc / .pnpmfile.cjs / .pnpmfile.mjs)
 #   - backend のビルドスクリプト
 #     (*.gradle / *.gradle.kts。取得元の定義 repositories {} を含むため)
+#   - 開発環境の Node.js と Terraform の版
+#     (head の .github/ci-tool-versions.json の dev に書いた Dockerfile の FROM の行の
+#      タグの版。digest だけの変更は見ない。開発環境の版だけを変える PR は .github/ を
+#      変えないので、CODEOWNERS では所有者の承認が要らない。この検知が承認を求める)
 #
 # 判定対象から外したもの(#182 で機械の関門に置き換えた):
 #   - frontend/package.json / frontend/pnpm-lock.yaml
@@ -65,6 +69,53 @@ changed_build=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
     grep -E '^backend/.*\.(gradle|gradle\.kts)$' || true)
 if [ -n "$changed_build" ]; then
     detected+="[変更された backend のビルドスクリプト]"$'\n'"$changed_build"$'\n'
+fi
+
+# --- 開発環境の Node.js と Terraform の版(FROM の行のタグの版を比べる) ---
+# 書き場所は head のデータのファイルの dev から読み、分かれ目のデータのファイルは読まない。
+# データのファイルを足す PR では、分かれ目にデータのファイルが無いためである。
+# head にデータのファイルが無ければ、この検知をしない。データのファイルを消す PR は
+# .github/ を変えるので、CODEOWNERS が所有者の承認を求める
+if git cat-file -e "${HEAD_SHA}:.github/ci-tool-versions.json" 2>/dev/null; then
+    # shellcheck source=.github/scripts/lib-ci-tool-versions.sh
+    source "$(cd "$(dirname "$0")" && pwd)/lib-ci-tool-versions.sh"
+    DEV_TMP=$(mktemp -d) || exit 1
+    [ -n "$DEV_TMP" ] && [ -d "$DEV_TMP" ] || exit 1
+    trap 'rm -rf "$DEV_TMP"' EXIT
+    mkdir -p "$DEV_TMP/base/.github" "$DEV_TMP/head/.github"
+    git show "${HEAD_SHA}:.github/ci-tool-versions.json" >"$DEV_TMP/head/.github/ci-tool-versions.json"
+    cp "$DEV_TMP/head/.github/ci-tool-versions.json" "$DEV_TMP/base/.github/ci-tool-versions.json"
+    changed_dev=""
+    # 読めないときは、承認を求める側に倒す
+    if ! dev_tools=$(jq -r '.tools | to_entries[] | select(.value.dev) | [.key, .value.dev.file, (.value.name // .key)] | @tsv' \
+        "$DEV_TMP/head/.github/ci-tool-versions.json" 2>/dev/null); then
+        changed_dev=".github/ci-tool-versions.json: データのファイルを読めませんでした"$'\n'
+        dev_tools=""
+    fi
+    while IFS=$'\t' read -r tool file name; do
+        [ -n "$tool" ] || continue
+        for side in base head; do
+            sha="$MERGE_BASE"
+            [ "$side" = head ] && sha="$HEAD_SHA"
+            mkdir -p "$DEV_TMP/$side/$(dirname "$file")"
+            # 分かれ目に無いファイルは、空のファイルとして読む
+            git show "${sha}:${file}" >"$DEV_TMP/$side/$file" 2>/dev/null || : >"$DEV_TMP/$side/$file"
+        done
+        if ! head_dev=$(civ_dev_from "$DEV_TMP/head" "$tool" 2>/dev/null); then
+            changed_dev+="${file}: ${name} の版を読めませんでした"$'\n'
+            continue
+        fi
+        base_dev=$(civ_dev_from "$DEV_TMP/base" "$tool" 2>/dev/null) || base_dev=""
+        hv=$(printf '%s\n' "$head_dev" | cut -f1)
+        bv=$(printf '%s\n' "$base_dev" | cut -f1)
+        # digest だけの変更は検知しない。Dependabot が中身だけを新しくする PR は承認を待たない
+        if [ "$hv" != "$bv" ]; then
+            changed_dev+="${file}: ${name} の版 ${bv:-(無し)} を ${hv} に変更"$'\n'
+        fi
+    done <<<"$dev_tools"
+    if [ -n "$changed_dev" ]; then
+        detected+="[変更された開発環境の Node.js か Terraform の版]"$'\n'"$changed_dev"
+    fi
 fi
 
 if [ -z "$detected" ]; then

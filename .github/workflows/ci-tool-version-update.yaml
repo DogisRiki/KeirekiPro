@@ -1,0 +1,71 @@
+name: CI Tool Version Update
+# CI の道具(Node.js・Trivy・Codex CLI・Terraform)の版を上げる更新の PR を、道具ごとに作る
+# (動きと書き換え先の版の決め方は .github/scripts/ci-tool-version-update.sh の先頭)。
+# 道具の版は Dependabot が届けないので週1回調べる。push と PR には bot の PAT を使う
+# (GITHUB_TOKEN の PR では CI が動かない。backend-vuln-fix.yaml と同じ)。
+# 失敗は知らせの Issue「CI の道具の版の更新: 判定不能」で届け、成功したら閉じる。
+# 定期実行の失敗の通知は cron を最後に書き換えた利用者にしか届かないためである
+# (https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)。
+on:
+  schedule:
+    - cron: '23 0 * * 1' # 毎週月曜 09:23 JST
+  workflow_dispatch:
+# issues: write は、知らせのスクリプトが GITHUB_TOKEN で知らせの Issue を作るために使う
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: ci-tool-version-update
+  cancel-in-progress: false
+jobs:
+  ci-tool-version-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Test scripts # 壊れたスクリプトで PR を作らない
+        id: test
+        run: |
+          set -uo pipefail
+          failed=0
+          for t in test-lib-ci-tool-versions test-lib-ci-tool-releases test-ci-tool-version-update; do
+            echo "::group::${t}.sh"
+            if ! bash ".github/scripts/tests/${t}.sh"; then
+              echo "::error::${t}.sh が失敗しました。"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$failed"
+      - name: Create pull requests
+        id: update
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          CI_TOOL_UPDATE_REPORT: ${{ runner.temp }}/ci-tool-update-report.md
+        run: bash .github/scripts/ci-tool-version-update.sh run
+      - name: Notify
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          UPDATE_OUTCOME: ${{ steps.update.outcome }}
+          REPORT: ${{ runner.temp }}/ci-tool-update-report.md
+        run: |
+          set -euo pipefail
+          if [ "$TEST_OUTCOME" = success ] && [ "$UPDATE_OUTCOME" = success ]; then
+            bash .github/scripts/audit-issue.sh ci-tool-update none
+            exit 0
+          fi
+          # 報告が空のまま起票すると、何が起きたかを伝えられない
+          if [ ! -s "$REPORT" ]; then
+            if [ "$TEST_OUTCOME" != success ]; then
+              echo "- スクリプトのテストが失敗した(実行ログの Test scripts ステップを確認してください)" >>"$REPORT"
+            else
+              echo "- 週1回の実行のスクリプトが、報告を書かずに失敗した(実行ログの Create pull requests ステップを確認してください)" >>"$REPORT"
+            fi
+          fi
+          bash .github/scripts/audit-issue.sh ci-tool-update undecidable "$REPORT"

@@ -69,18 +69,28 @@
 # 系列(設定ファイルの support.cycle_pattern):
 #   使っている版から、サポート期限を問い合わせる系列を取り出す正規表現。
 #   名前付きグループ cycle を1つ持たせる(例: 21-jdk → 21、1.16.4 → 1.16)。
+#   support.newest_in_cycle が true の対象では、取り出した値を系列の頭として扱い、
+#   endoflife.date の系列の一覧から、その頭で始まる系列のうち最も新しいもの
+#   (sort -V で最大)の期限を出す(例: 8 → 8.1)。主な版だけを宣言し、細かい版を
+#   提供元が自動で上げる対象(ElastiCache Serverless の major_engine_version)に使う。
+#   本番で動くのはその主な版の最新の細かい版で、所有者が主な版を上げる作業が要る
+#   のはその系列の期限が来たときのため。
 #
 # 外部の取得元(設定ファイルの latest.type と support.type):
 #   github-release  gh api repos/{repo}/releases/latest の tag_name
 #   pypi            GET {PYPI_BASE}/{package}/json の info.version
+#   npm             GET {NPM_BASE}/{package}/latest の version(package の / は %2f にする)
 #   dockerhub-tags  GET {DOCKERHUB_BASE}/namespaces/{ns}/repositories/{repo}/tags
 #                   ?page_size=100&ordering=last_updated の results[].name のうち、
 #                   tag_pattern に一致するものの版として最大のもの(sort -V)
 #   endoflife       GET {ENDOFLIFE_BASE}/products/{product}/releases/{系列}(使っている
 #                   系列ごと)と /releases/latest(最新の系列。latest.type が endoflife
-#                   なら、その latest.name を最新のリリースにもする)
+#                   なら、その latest.name を最新のリリースにもする)。support.newest_in_cycle
+#                   が true の対象は、先に GET {ENDOFLIFE_BASE}/products/{product}(系列の
+#                   一覧。対象ごとに1回)の result.releases[].name から系列を選ぶ
 #   既定の接続先: ENDOFLIFE_BASE=https://endoflife.date/api/v1、
-#   PYPI_BASE=https://pypi.org/pypi、DOCKERHUB_BASE=https://hub.docker.com/v2
+#   PYPI_BASE=https://pypi.org/pypi、NPM_BASE=https://registry.npmjs.org、
+#   DOCKERHUB_BASE=https://hub.docker.com/v2
 #   (テストで差し替える)。GitHub 以外は curl -sS --max-time 20 の GET だけで、
 #   認証ヘッダを付けない。送るのは URL の中の製品名・パッケージ名だけ(要件6-1)。
 #   eolFrom が null は「未定」、isEol は「はい」「いいえ」と書き、isLts が false の
@@ -134,12 +144,14 @@ and all(.targets[];
     and (.latest | type == "object"
         and ((.type == "github-release" and (.repo | nonempty_str))
             or (.type == "pypi" and (.package | nonempty_str))
+            or (.type == "npm" and (.package | nonempty_str))
             or (.type == "dockerhub-tags" and (.repository | nonempty_str) and (.tag_pattern | nonempty_str))
             or (.type == "endoflife" and (.product | nonempty_str))))
     and has("support")
     and (.support == null
         or (.support | type == "object" and .type == "endoflife"
-            and (.product | nonempty_str) and (.cycle_pattern | nonempty_str))))
+            and (.product | nonempty_str) and (.cycle_pattern | nonempty_str)
+            and ((has("newest_in_cycle") | not) or (.newest_in_cycle | type == "boolean")))))
 '
 
 # 1つのファイルから version を全て取り出す。行番号は version の開始位置より前の
@@ -242,9 +254,10 @@ inv_table_row() {
 # 外部の取得元への問い合わせ
 # ---------------------------------------------------------------------
 
-# 既定の接続先(環境変数 ENDOFLIFE_BASE / PYPI_BASE / DOCKERHUB_BASE で差し替える)
+# 既定の接続先(環境変数 ENDOFLIFE_BASE / PYPI_BASE / NPM_BASE / DOCKERHUB_BASE で差し替える)
 _INV_ENDOFLIFE_DEFAULT='https://endoflife.date/api/v1'
 _INV_PYPI_DEFAULT='https://pypi.org/pypi'
+_INV_NPM_DEFAULT='https://registry.npmjs.org'
 _INV_DOCKERHUB_DEFAULT='https://hub.docker.com/v2'
 
 # _inv_json_array <文字列...>  文字列を JSON の配列にする(0個なら [])
@@ -332,6 +345,17 @@ _inv_pypi_latest() {
     _inv_pick "$body" '.info.version'
 }
 
+# _inv_npm_latest <パッケージ>  npm の registry の latest の version を出す。
+# スコープ付きの名前(@openai/codex)の / は %2f にして URL に入れる
+_inv_npm_latest() {
+    local body
+    body=$(_inv_fetch "${NPM_BASE:-$_INV_NPM_DEFAULT}/${1//\//%2f}/latest") || {
+        printf '%s' "$body"
+        return 1
+    }
+    _inv_pick "$body" '.version'
+}
+
 # _inv_dockerhub_latest <namespace/repository> <tag_pattern>
 # 最終更新の新しい順の100件のタグから、tag_pattern に一致するものを版として比べ、
 # 最大のものを出す(sort -V)。別名(2026.08.4)や -arm64 付きは tag_pattern で除く
@@ -363,6 +387,32 @@ _inv_dockerhub_latest() {
 # _inv_eol_url <product> <系列 または latest>
 _inv_eol_url() {
     printf '%s/products/%s/releases/%s' "${ENDOFLIFE_BASE:-$_INV_ENDOFLIFE_DEFAULT}" "$1" "$2"
+}
+
+# _inv_eol_product_url <product>  系列の一覧の URL
+_inv_eol_product_url() {
+    printf '%s/products/%s' "${ENDOFLIFE_BASE:-$_INV_ENDOFLIFE_DEFAULT}" "$1"
+}
+
+# _inv_eol_newest_in <本文> <系列の頭>
+# 系列の一覧の応答から、名前が「頭」と同じか「頭.」で始まる系列のうち、最も新しい
+# もの(sort -V で最大)を出す。0 = 出した / 1 = 一覧の形が違う・当てはまる系列が
+# 無い(理由を出す)
+_inv_eol_newest_in() {
+    local names top
+    if ! names=$(jq -r -e '.result.releases | select(type == "array")
+            | [.[] | .name | select(type == "string") | gsub("[\r\n]"; "")] | .[]' \
+        <<<"$1" 2>/dev/null); then
+        printf '形式が想定と違う(.result.releases が無い)'
+        return 1
+    fi
+    top=$(printf '%s\n' "$names" | awk -v p="$2" '$0 == p || index($0, p ".") == 1' \
+        | sort -V | tail -n 1)
+    if [ -z "$top" ]; then
+        printf '系列の一覧に %s で始まる系列が無い' "$2"
+        return 1
+    fi
+    printf '%s' "$top"
 }
 
 # _inv_eol_cycle_values <本文>
@@ -409,6 +459,7 @@ inv_collect_external() {
     local record="$1" target="$2" name ltype latest lrc=0 v c body reason vals
     local sproduct cpattern lcycle="" support="null" versions
     local lp_product="" lp_body="" lp_rc=0
+    local newest="false" pl_loaded=0 pl_body="" pl_rc=0 picked
     local -a failures=() deadlines=() eols=()
     local -A seen=()
     name=$(jq -r '.name' <<<"$record") || return 1
@@ -421,6 +472,9 @@ inv_collect_external() {
         ;;
     pypi)
         latest=$(_inv_pypi_latest "$(jq -r '.latest.package' <<<"$target")") || lrc=1
+        ;;
+    npm)
+        latest=$(_inv_npm_latest "$(jq -r '.latest.package' <<<"$target")") || lrc=1
         ;;
     dockerhub-tags)
         latest=$(_inv_dockerhub_latest "$(jq -r '.latest.repository' <<<"$target")" \
@@ -451,6 +505,7 @@ inv_collect_external() {
     if [ "$(jq -r '.support != null' <<<"$target")" = "true" ]; then
         sproduct=$(jq -r '.support.product' <<<"$target")
         cpattern=$(jq -r '.support.cycle_pattern' <<<"$target")
+        newest=$(jq -r '.support.newest_in_cycle == true' <<<"$target") || return 1
         versions=$(jq -r '[.used[] | select(.version != null) | .version | gsub("[\r\n]"; "")]
             | reduce .[] as $v ([]; if any(.[]; . == $v) then . else . + [$v] end) | .[]' <<<"$record") || return 1
         while IFS= read -r v; do
@@ -460,6 +515,29 @@ inv_collect_external() {
                 eols+=("${v}: 取得できず")
                 failures+=("${name} のサポート期限と期限切れ: 版 ${v} から系列を取り出せない")
                 continue
+            fi
+            # 系列の頭から、その頭で始まる最も新しい系列を選ぶ(一覧は対象ごとに1回だけ取る)
+            if [ "$newest" = "true" ]; then
+                if [ "$pl_loaded" -eq 0 ]; then
+                    pl_loaded=1
+                    pl_body=$(_inv_fetch "$(_inv_eol_product_url "$sproduct")") || pl_rc=1
+                fi
+                if [ "$pl_rc" -ne 0 ]; then
+                    reason="系列の一覧: ${pl_body}"
+                elif ! picked=$(_inv_eol_newest_in "$pl_body" "$c"); then
+                    reason="系列の一覧: ${picked}"
+                else
+                    reason=""
+                fi
+                if [ -n "$reason" ]; then
+                    [ -z "${seen[$c]:-}" ] || continue
+                    seen[$c]=1
+                    deadlines+=("${c}: 取得できず")
+                    eols+=("${c}: 取得できず")
+                    failures+=("${name} の ${c} 系列のサポート期限と期限切れ: ${reason}")
+                    continue
+                fi
+                c="$picked"
             fi
             [ -z "${seen[$c]:-}" ] || continue
             seen[$c]=1

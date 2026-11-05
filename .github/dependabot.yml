@@ -112,6 +112,10 @@ updates:
       # 系列を上げるときは、本番の engine_version と一緒に人間が上げる。
       - dependency-name: "valkey/valkey"
         update-types: ["version-update:semver-minor"]
+      - dependency-name: "node"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "hashicorp/terraform"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
 
   # checkov の版は docker/terraform/requirements.txt で固定し、更新はこのレーンのPRで届く。
   # 新しい版でルールが増えると、そのPRの terraform-static が赤になって自動マージされない。
