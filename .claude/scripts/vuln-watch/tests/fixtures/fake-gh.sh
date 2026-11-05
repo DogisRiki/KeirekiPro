@@ -19,6 +19,8 @@
 # 環境変数
 # - KP_FAKE_GH_FAIL: 空白で区切ったサブコマンドの名前。その名前の呼び出しでは、
 #   標準エラーに1行を出して 1 で終わる
+# - KP_FAKE_GH_LOG: ファイルの場所。偽の gh は、呼ばれるたびに、引数を空白でつないだ1行を
+#   このファイルに足す。テストが、gh に渡した引数を確かめるためである
 # =====================================================================
 : <<'__PERL__'
 #!perl
@@ -34,6 +36,12 @@ my $dir = $ENV{KP_FAKE_GH_DIR};
 unsupported('KP_FAKE_GH_DIR is not set') unless defined $dir && length $dir;
 
 my @args = @ARGV;
+my $log = $ENV{KP_FAKE_GH_LOG};
+if (defined $log && length $log) {
+    open my $l, '>>', $log or unsupported("cannot write $log");
+    print $l join(' ', @args), "\n";
+    close $l;
+}
 for my $arg (@args) {
     unsupported("option $arg") if $arg eq "--jq" || $arg eq "-q" || $arg eq "--template" || $arg eq "-t";
 }

@@ -51,7 +51,17 @@
 #     fixed は、in_range が真の部品にだけ、部品の版が入った範囲の直った版を、重複を除いて ", " でつないで入れる。
 #     CVE の記録の製品で、版がどの要素にも当たらず defaultStatus で入ったときは、その製品の範囲の直った版のうち、
 #     部品の版より大きい最も小さい版を入れる
-#     looked_up が偽の番号には、鍵 * で reason が not_looked_up の1件を足す
+#     looked_up が偽の番号には、鍵 * で reason が not_looked_up の1件を足す。
+#     CVE の番号ごとに、ranges_refs のために、勧告の GHSA の番号の一覧 ghsa_ids と、部品の鍵ごとに当てた範囲の
+#     [出どころ, 範囲の形, 範囲] の一覧 ranges も返す。collect は、材料に matches だけを入れる
+#   ranges_refs(\%items, \%matches) は、(\%refs, $refs_ok) を返す。%items は項目の鍵ごとの {cves} を持つ項目、
+#     %matches は ranges_match が返した値とする。%refs は項目の鍵ごとの [{kind(pr か issue), number}] で、
+#     脆弱性をすでに扱っている Dependabot の PR とコンテナの脆弱性の Issue を、PR、Issue の順に番号の小さい順に並べる。
+#     PR は、題名か本文が項目の CVE の番号か GHSA の番号を含むものと、題名の bump <名前> from <版> to <版> か
+#     本文の Updates `<名前>` from <版> to <版> の名前が、名前の合った部品の鍵の : よりあとと同じで、
+#     上げた先の版が当てた範囲に入らないものとする。Issue は、題名 コンテナ脆弱性: <ID> の ID が、
+#     項目の CVE の番号か GHSA の番号と同じものとする。
+#     PR と Issue の一覧を gh で1回ずつ取り、どちらかを取れなければ、どの項目の refs も空にし、$refs_ok を偽にする
 #
 # 版の比べ方: 先頭の v を除き、. と - と + で区切った数の並びとして比べる。足りない桁は 0 とする。
 # 英字で始まる部分(.Final や -jre や -M1 や .x)は末尾にあるときだけ除く。途中にあるとき(1.0.0-rc.1)や、
@@ -83,6 +93,11 @@ my $RANGES_VENDOR_ADVISORY_MAX = 3;
 my $RANGES_NVD_URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=';
 my $RANGES_NVD_LIMIT = 5;
 my $RANGES_NVD_WAIT = 6;
+
+# 脆弱性をすでに扱っている PR と Issue の一覧の取り方
+my @RANGES_PR_LIST = ('gh', 'pr', 'list', '--state', 'open', '--author', 'app/dependabot', '--json', 'number,title,body', '--limit', '100');
+my @RANGES_ISSUE_LIST = ('gh', 'issue', 'list', '--state', 'open', '--label', 'container-vuln', '--json', 'number,title', '--limit', '200');
+my $RANGES_REFS_TIMEOUT = 20;
 
 sub ranges_version_cmp {
     my ($x, $y) = @_;
@@ -776,7 +791,7 @@ sub ranges_match {
         }
         my @cna = grep { (_ranges_str($_->{from}) // '') eq 'cna' } @products;
         my @nvd = grep { ref eq 'HASH' } @{ ref $l->{nvd} eq 'ARRAY' ? $l->{nvd} : [] };
-        my @matches;
+        my (@matches, %ranges);
         for my $key (@order) {
             my %names = map { $_ => 1 } grep { defined && !ref } @{ ref $table->{$key} eq 'ARRAY' ? $table->{$key} : [] };
             my @named = grep { my $n = _ranges_name($_->{vendor}, $_->{product}); defined $n && $names{$n} } @products;
@@ -787,21 +802,25 @@ sub ranges_match {
                 @cna == 1 ? [['cna', 'cve', $cna[0]]] : [],
                 [map { ['nvd', 'nvd', $_] } grep { my $n = _ranges_cpe_name($_->{criteria}); defined $n && $names{$n} } @nvd],
             );
-            push @matches, _ranges_assign($key, $components->{$key}, \@levels);
+            my ($m, $level) = _ranges_assign($key, $components->{$key}, \@levels);
+            push @matches, $m;
+            $ranges{$key} = $level;
         }
         # 名前を確かめられなかった番号を、関係が無いと決めないために、鍵 * の1件を足す
         push @matches, {
             key => '*', repo_versions => [], file => undef, in_range => undef,
             fixed => undef, range_source => undef, reason => 'not_looked_up',
         } unless $l->{looked_up};
-        $result{$cve} = { matches => \@matches };
+        my @ghsa = grep { defined } map { _ranges_str($_->{ghsa_id}) } @advisories;
+        $result{$cve} = { matches => \@matches, ghsa_ids => \@ghsa, ranges => \%ranges };
     }
     return \%result;
 }
 
 # 部品に、範囲の当て方の順に、最初に見つかった範囲を当てる。$levels は、当て方ごとの [出どころ, 範囲の形, 範囲] の一覧。
 # 1つの当て方に範囲が2つ以上あるときと、部品の版が2つ以上あるときは、1つでも入れば入るとし、
-# 入るものが無く決められないものがあれば決められないとする。範囲が無い(no_range の)ものは、範囲が見つからなかったとする
+# 入るものが無く決められないものがあれば決められないとする。範囲が無い(no_range の)ものは、範囲が見つからなかったとする。
+# 突き合わせの結果と、当てた当て方の [出どころ, 範囲の形, 範囲] の一覧を返す
 sub _ranges_assign {
     my ($key, $c, $levels) = @_;
     my @versions = grep { defined && !ref } @{ ref $c->{versions} eq 'ARRAY' ? $c->{versions} : [] };
@@ -824,15 +843,15 @@ sub _ranges_assign {
             my $v = _ranges_found_fixed(@$f[3 .. 6]);
             push @fixed, $v if defined $v && !$seen{$v}++;
         }
-        return {
+        return ({
             %m,
             fixed        => @fixed ? join(', ', @fixed) : undef,
             in_range     => defined $pick->[1] ? ($pick->[1] ? JSON::PP::true : JSON::PP::false) : undef,
             range_source => $pick->[0],
             reason       => defined $pick->[1] ? undef : $pick->[2],
-        };
+        }, $level);
     }
-    return { %m, in_range => undef, range_source => undef, reason => 'no_range' };
+    return ({ %m, in_range => undef, range_source => undef, reason => 'no_range' }, []);
 }
 
 # 範囲に入った部品の版の直った版を返す。CVE の記録の製品では、版が当たった要素の直った版を返し、
@@ -881,6 +900,94 @@ sub _ranges_package_key {
     return "npm:$name" if $url =~ m{\Ahttps?://(?:www\.|registry\.)?npmjs\.(?:com|org)(?:/|\z)}i;
     return "maven:$name" if $url =~ m{\Ahttps?://(?:repo1?\.maven\.apache\.org|central\.sonatype\.com|search\.maven\.org)(?:/|\z)}i;
     return undef;
+}
+
+# ---------------------------------------------------------------------
+# 脆弱性をすでに扱っている PR と Issue を突き合わせる
+# ---------------------------------------------------------------------
+
+sub ranges_refs {
+    my ($items, $matches) = @_;
+    $items = {} unless ref $items eq 'HASH';
+    $matches = {} unless ref $matches eq 'HASH';
+    my %refs = map { $_ => [] } keys %$items;
+    my $prs = _ranges_gh_list(@RANGES_PR_LIST);
+    my $issues = $prs ? _ranges_gh_list(@RANGES_ISSUE_LIST) : undef;
+    return (\%refs, 0) unless $prs && $issues;
+    # PR ごとに、題名と本文と、上げる部品の [名前, 上げた先の版] の一覧を読む
+    my @pr;
+    for my $p (@$prs) {
+        my $number = _ranges_number($p) // next;
+        my $title = _ranges_str($p->{title}) // '';
+        my $body = _ranges_str($p->{body}) // '';
+        my @bumps;
+        push @bumps, [$1, $2] while $title =~ /\bbump\s+(\S+)\s+from\s+\S+\s+to\s+(\S+)/gi;
+        push @bumps, [$1, $2] while $body =~ /\bUpdates\s+`([^`]+)`\s+from\s+\S+\s+to\s+(\S+)/g;
+        push @pr, { number => $number, text => "$title\n$body", bumps => \@bumps };
+    }
+    # Issue の題名の ID ごとに、Issue の番号を引く
+    my %issue_of;
+    for my $i (@$issues) {
+        my $number = _ranges_number($i) // next;
+        my $title = _ranges_str($i->{title}) // '';
+        push @{ $issue_of{$1} }, $number if $title =~ /\Aコンテナ脆弱性:\s*(\S+)\s*\z/;
+    }
+    for my $key (keys %$items) {
+        my $item = $items->{$key};
+        my @cves = grep { defined && !ref } @{ ref $item eq 'HASH' && ref $item->{cves} eq 'ARRAY' ? $item->{cves} : [] };
+        # 項目の CVE の番号と GHSA の番号と、名前の合った部品の名前ごとの当てた範囲を集める
+        my (%ids, %ranges_of);
+        for my $cve (@cves) {
+            $ids{$cve} = 1;
+            my $m = $matches->{$cve};
+            next unless ref $m eq 'HASH';
+            $ids{$_} = 1 for grep { defined && !ref } @{ ref $m->{ghsa_ids} eq 'ARRAY' ? $m->{ghsa_ids} : [] };
+            my $ranges = ref $m->{ranges} eq 'HASH' ? $m->{ranges} : {};
+            for my $k (keys %$ranges) {
+                next unless ref $ranges->{$k} eq 'ARRAY' && $k =~ /:(.+)\z/s;
+                push @{ $ranges_of{$1} }, $ranges->{$k};
+            }
+        }
+        my (%pr, %issue);
+        for my $p (@pr) {
+            my $hit = grep { $p->{text} =~ /(?<![\w-])\Q$_\E(?![\w-])/ } keys %ids;
+            $hit ||= grep {
+                my ($name, $to) = @$_;
+                grep { _ranges_out_of_range($_, $to) } @{ $ranges_of{$name} // [] };
+            } @{ $p->{bumps} };
+            $pr{ $p->{number} } = 1 if $hit;
+        }
+        $issue{$_} = 1 for map { @{ $issue_of{$_} // [] } } keys %ids;
+        $refs{$key} = [
+            (map { { kind => 'pr', number => $_ } } sort { $a <=> $b } keys %pr),
+            (map { { kind => 'issue', number => $_ } } sort { $a <=> $b } keys %issue),
+        ];
+    }
+    return (\%refs, 1);
+}
+
+# gh で一覧を取り、JSON の配列を返す。取れなければ undef を返す
+sub _ranges_gh_list {
+    my @cmd = @_;
+    my $out;
+    my $rc = _ranges_run_limited($RANGES_REFS_TIMEOUT, \$out, @cmd);
+    return undef unless $rc == 0 && defined $out;
+    my $list = eval { JSON::PP->new->utf8->decode($out) };
+    return ref $list eq 'ARRAY' ? [grep { ref eq 'HASH' } @$list] : undef;
+}
+
+# PR か Issue の番号を返す。番号でなければ undef を返す
+sub _ranges_number {
+    my $n = _ranges_str($_[0]{number});
+    return defined $n && $n =~ /\A[1-9][0-9]*\z/ ? $n + 0 : undef;
+}
+
+# 版が、当てた範囲 [出どころ, 範囲の形, 範囲] のどれにも入らないと決められれば真を返す。
+# 当てた範囲が無いときと、入るか決められない範囲が1つでもあるときは偽を返す
+sub _ranges_out_of_range {
+    my ($level, $version) = @_;
+    return 0 unless @$level;
+    return grep({ my ($in) = ranges_in_range($_->[1], $_->[2], $version, 0); !defined $in || $in } @$level) ? 0 : 1;
 }
 
 1;

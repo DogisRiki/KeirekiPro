@@ -126,7 +126,7 @@ newcase() {
         exit 2
     fi
     export HOME="$CASE/home"
-    export KP_FAKE_CURL_DIR="$CASE/curl" KP_FAKE_GH_DIR="$CASE/gh" KP_FAKE_CURL_LOG="$CASE/curl.log"
+    export KP_FAKE_CURL_DIR="$CASE/curl" KP_FAKE_GH_DIR="$CASE/gh" KP_FAKE_CURL_LOG="$CASE/curl.log" KP_FAKE_GH_LOG="$CASE/gh.log"
     unset KP_FAKE_CURL_DELAY KP_FAKE_GH_FAIL KP_VULN_WATCH_NVD_WAIT
     printf '%s\n' "$FAKE_TOKEN" >"$CASE/gh/auth-token.out"
     printf '[]' >"$CASE/empty.json"
@@ -322,6 +322,8 @@ case_limit() {
     done
     cves="$cves CVE-2026-9001 CVE-2026-9002"
     prio="{$prio\"CVE-2026-9001\":0,\"CVE-2026-9002\":0}"
+    local -a cve_list
+    read -r -a cve_list <<<"$cves"
     # すべての番号に見本を置き、引いた番号はすべて looked_up が真になるようにする
     perl -e '
         my ($dir, $cve_body, $ghsa_body, @cves) = @ARGV;
@@ -334,7 +336,7 @@ case_limit() {
                 print $o do { local $/; <$i> }; close $i; close $o;
             }
         }
-    ' "$KP_FAKE_CURL_DIR" "$FIX/test-ranges/cve-CVE-2025-29927.json" "$CASE/empty.json" $cves
+    ' "$KP_FAKE_CURL_DIR" "$FIX/test-ranges/cve-CVE-2025-29927.json" "$CASE/empty.json" "${cve_list[@]}"
     run_lookup "$cves" "$prio"
     local name="CVE の番号が300件を超えるとき、引かなかった番号の looked_up が偽になる。KEV の項目の番号が、CVE の番号を多く持つ記事の番号より先に引かれる"
     check "$name(300件まで引く)" \
@@ -776,7 +778,96 @@ case_nvdwait() {
         "$(requested "$NVD_URL");$(out 'scalar @{ $d->{lookup}{"CVE-2026-6001"}{products} }')" "0;1"
 }
 
-CASES='compare forms uncomparable partial lookup token limit failures deadline aliases match sources undecided notlooked fixed nvd nvdwait'
+# ranges_match と ranges_refs を呼び、返した値を JSON で $CASE/out.json に書く
+# run_refs <CVE の番号ごとの引いた値の JSON のファイル> <部品の一覧の JSON のファイル> <項目の JSON のファイル>
+run_refs() {
+    perl -MJSON::PP -e '
+        require $ARGV[0];
+        my $j = JSON::PP->new->utf8;
+        my $read = sub { open my $h, "<", $_[0] or die "$_[0]: $!"; local $/; $j->decode(<$h>) };
+        my $matches = ranges_match($read->($ARGV[2]), $read->($ARGV[3]), $read->($ARGV[1]), {});
+        my ($refs, $ok) = ranges_refs($read->($ARGV[4]), $matches);
+        print $j->canonical->encode({ refs => $refs, refs_ok => ($ok ? JSON::PP::true : JSON::PP::false) });
+    ' "$RANGES" "$ALIASES" "$1" "$2" "$3" >"$CASE/out.json" 2>"$CASE/err.txt"
+}
+
+# 項目ごとの PR と Issue の番号を、項目の鍵の順に「鍵:pr701,issue801」の形で空白で区切り、最後に「;refs_ok」を付けて出す
+refs_of() {
+    out 'join(" ", map { my $k = $_; "$k:" . join(",", map { "$_->{kind}$_->{number}" } @{ $d->{refs}{$k} }) } sort keys %{ $d->{refs} }) . ";" . ($d->{refs_ok} ? "true" : "false")'
+}
+
+# 引いた値と部品の一覧と項目と、偽の gh の PR と Issue の一覧の見本を置き、ranges_refs を呼ぶ
+put_refs() {
+    # 7001 は next の範囲 15.0.0 以上 15.5.3 未満を持つ。7002 は、repository_advisory_url の無い勧告で react の名前だけが合い、
+    # react に範囲を当てられない。7004 は repository_advisory_url の無い勧告の GHSA の番号だけを持つ
+    cat >"$CASE/lookup.json" <<'EOF'
+{
+  "CVE-2026-7001": {"looked_up": true, "products": [], "advisories": [
+    {"ghsa_id": "GHSA-aaaa-bbbb-cccc", "repository_advisory_url": "https://github.com/vercel/next.js/security/advisories/GHSA-aaaa-bbbb-cccc",
+     "vulnerabilities": [{"ecosystem": "npm", "name": "next", "vulnerable_version_range": ">= 15.0.0, < 15.5.3", "first_patched_version": "15.5.3"}]}]},
+  "CVE-2026-7002": {"looked_up": true, "products": [], "advisories": [
+    {"ghsa_id": "GHSA-rrrr-ssss-tttt", "repository_advisory_url": null,
+     "vulnerabilities": [{"ecosystem": "npm", "name": "react", "vulnerable_version_range": "< 19.0.1", "first_patched_version": "19.0.1"}]}]},
+  "CVE-2026-7003": {"looked_up": true, "products": [], "advisories": []},
+  "CVE-2026-7004": {"looked_up": true, "products": [], "advisories": [{"ghsa_id": "GHSA-dddd-eeee-ffff", "repository_advisory_url": null, "vulnerabilities": []}]}
+}
+EOF
+    printf '%s' '{"components": {"npm:next": {"versions": ["15.5.2"], "files": ["frontend/pnpm-lock.yaml"], "partial": false}, "npm:react": {"versions": ["19.0.0"], "files": ["frontend/pnpm-lock.yaml"], "partial": false}}}' >"$CASE/inventory.json"
+    cat >"$CASE/items.json" <<'EOF'
+{
+  "CVE-2026-7001": {"key": "CVE-2026-7001", "cves": ["CVE-2026-7001"]},
+  "CVE-2026-7002": {"key": "CVE-2026-7002", "cves": ["CVE-2026-7002"]},
+  "CVE-2026-7005": {"key": "CVE-2026-7005", "cves": ["CVE-2026-7005"]},
+  "JVNDB-2026-000001": {"key": "JVNDB-2026-000001", "cves": ["CVE-2026-7003", "CVE-2026-7004"]}
+}
+EOF
+    # 701 は範囲の外の版に上げる PR、702 は範囲の中の版に上げる PR、703 は本文に CVE の番号を持つ PR、
+    # 704 は番号の続きに数字のある番号を持つ PR、705 は本文の Updates の行で範囲の外の版に上げる PR、
+    # 706 は題名に GHSA の番号を持つ PR、708 は、7001 では名前の合わない部品を、7002 では範囲を当てられない部品を上げる PR、
+    # 709 は、範囲と比べられない版(コミットの番号の形)に上げる PR
+    cat >"$CASE/gh/pr-list.json" <<'EOF'
+[
+  {"number": 701, "title": "chore: Bump next from 15.5.2 to 15.5.3 in /frontend", "body": "Bumps [next](https://github.com/vercel/next.js) from 15.5.2 to 15.5.3."},
+  {"number": 702, "title": "Bump next from 15.4.0 to 15.5.1 in /frontend", "body": "Bumps [next](https://github.com/vercel/next.js) from 15.4.0 to 15.5.1."},
+  {"number": 703, "title": "Bump org.apache.tomcat.embed:tomcat-embed-core in /backend", "body": "Fixes CVE-2026-7002."},
+  {"number": 704, "title": "Bump example in /backend", "body": "Fixes CVE-2026-70010."},
+  {"number": 705, "title": "Bump the npm-minor group across 1 directory with 2 updates", "body": "Updates `react` from 19.0.0 to 19.1.0\nUpdates `next` from 15.5.2 to 15.6.0\n"},
+  {"number": 706, "title": "Fix GHSA-aaaa-bbbb-cccc", "body": ""},
+  {"number": 708, "title": "Bump react from 19.0.0 to 19.1.0 in /frontend", "body": null},
+  {"number": 709, "title": "chore: Bump next from `eee6c6e` to `266d3c2` in /frontend", "body": "Bumps next from `eee6c6e` to `266d3c2`."}
+]
+EOF
+    cat >"$CASE/gh/issue-list.json" <<'EOF'
+[
+  {"number": 801, "title": "コンテナ脆弱性: CVE-2026-7003"},
+  {"number": 802, "title": "コンテナ脆弱性: CVE-2026-70030"},
+  {"number": 803, "title": "コンテナ脆弱性: GHSA-dddd-eeee-ffff"}
+]
+EOF
+    run_refs "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/items.json"
+}
+
+case_refs() {
+    newcase
+    put_refs
+    local name="CVE の番号を本文に持つ PR と、範囲の外の版に上げる PR と、題名の ID が合うコンテナの脆弱性の Issue が選ばれ、範囲の中の版に上げる PR が選ばれない。gh の一覧を失敗させると refs_ok が偽になる"
+    check "$name" "$(refs_of)" \
+        "CVE-2026-7001:pr701,pr705,pr706 CVE-2026-7002:pr703 CVE-2026-7005: JVNDB-2026-000001:issue801,issue803;true"
+    check "$name(標準エラーに何も出さない)" "$(cat "$CASE/err.txt")" ""
+    check "$name(PR と Issue の一覧を、決めた引数で1回ずつ呼ぶ)" "$(cat "$CASE/gh.log")" \
+        "pr list --state open --author app/dependabot --json number,title,body --limit 100
+issue list --state open --label container-vuln --json number,title --limit 200"
+    local fail
+    for fail in pr-list issue-list; do
+        newcase
+        export KP_FAKE_GH_FAIL=$fail
+        put_refs
+        check "$name($fail を失敗させると、どの項目の refs も空になる)" "$(refs_of)" \
+            "CVE-2026-7001: CVE-2026-7002: CVE-2026-7005: JVNDB-2026-000001:;false"
+    done
+}
+
+CASES='compare forms uncomparable partial lookup token limit failures deadline aliases match sources undecided notlooked fixed nvd nvdwait refs'
 
 # ---------------------------------------------------------------------
 # 選んだ場合を流す
