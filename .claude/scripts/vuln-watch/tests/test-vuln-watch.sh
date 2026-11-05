@@ -626,6 +626,28 @@ case_clean() {
 addcase clean
 
 # ---------------------------------------------------------------------
+# 要件5の受入基準1・要件6の受入基準1: スキルの設定と、決まりの置き場所
+# ---------------------------------------------------------------------
+case_skill() {
+    local skill="$HERE/../../../skills/vuln-watch/SKILL.md" name want line_rules line_steps
+    name="SKILL.md のフロントマターが disable-model-invocation: true と、部品の節の allowed-tools を持つ。本文で、決まりの見出しが手順の見出しより前にあり、公開の場所に書かない決まりの文を持つ"
+    want='---
+name: vuln-watch
+description: 直近7日に出た脆弱性を4つの出どころから集め、このリポジトリの部品と開発者の PC のソフトへの影響を示す手順。開発者が /vuln-watch と打ったときだけ動く。
+disable-model-invocation: true
+allowed-tools: Read, Write, Bash(perl .claude/scripts/vuln-watch/vuln-watch.pl *)
+---'
+    check "$name(フロントマター)" "$(head -n 6 "$skill" 2>/dev/null | tr -d '\r')" "$want"
+    line_rules=$(grep -n -x '## 決まり' "$skill" 2>/dev/null | head -n 1 | cut -d: -f1)
+    line_steps=$(grep -n -x '## 手順' "$skill" 2>/dev/null | head -n 1 | cut -d: -f1)
+    check "$name(決まりの見出しが手順の見出しより前にある)" \
+        "$([ -n "$line_rules" ] && [ -n "$line_steps" ] && [ "$line_rules" -lt "$line_steps" ] && echo yes || echo no)" "yes"
+    check "$name(公開の場所に書かない決まり)" \
+        "$(head -n "${line_steps:-0}" "$skill" 2>/dev/null | grep -c -x -F -e '- 主の Claude は、この会話の終わりまで、開発者の PC のソフトが脆弱性の影響を受けることと、PC のソフトの名前と版を、Issue の本文、PR の本文、PR のコメント、コミットのメッセージに書かない。開発者が会話で、自分の PC が影響を受けると答えたときも書かない。このリポジトリの部品に影響がある脆弱性は、それを直す PR と、コンテナの脆弱性の Issue に書いてよい')" "1"
+}
+addcase skill
+
+# ---------------------------------------------------------------------
 # 流す
 # ---------------------------------------------------------------------
 run_cases="$CASES"
