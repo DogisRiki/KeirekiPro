@@ -11,7 +11,14 @@
 #             defaultStatus を読む
 #       ghsa: GitHub の勧告の vulnerabilities[] の要素。vulnerable_version_range の式を読む
 #       nvd:  NVD の cpeMatch[] の要素。versionStart*・versionEnd* と、criteria の版の欄を読む
-#     $partial が真のときは、$version を一部だけの版(21 なら 21 以上 22 未満の幅)として比べる
+#     $partial が真のときは、$version を一部だけの版(21 なら 21 以上 22 未満の幅)として比べる。
+#     $source が cve で、版が versions[] の要素に当たったときは、3つ目の値にその要素を返す
+#   ranges_fixed($source, $range) は、範囲の1つから決めた直った版を返す。直った版が無ければ undef を返す。
+#     $range は、ghsa では vulnerabilities[] の要素、cve では versions[] の要素とする。
+#       ghsa: first_patched_version
+#       cve:  versionType が git の範囲からは取らない。status が affected の範囲では lessThan か、version の式の < の値。
+#             lessThanOrEqual だけを持つ範囲からは取らない。status が unaffected の範囲では、lessThan を持たず、
+#             version が 0 でも式でも境が無いことを示す値でもないときの version
 #   ranges_lookup(\@cves, \%priority, \%inventory, \%aliases, \%kev_names, $work_dir, $deadline) は、
 #     (\%lookup, $advisories_ok) を返す。%lookup は CVE の番号ごとに
 #     {products, advisories, vendor_advisories, descriptions, looked_up} を持つ。
@@ -32,6 +39,9 @@
 #     %kev_names は CVE の番号ごとの KEV の [vendorProject, product] の組の一覧とする。
 #     matches の要素は {key, repo_versions, file, in_range, fixed, range_source, reason} を持つ。
 #     file は部品を読んだファイルを ", " でつないだ文字列、range_source は範囲を当てた出どころ(github・cna・adp)とする。
+#     fixed は、in_range が真の部品にだけ、部品の版が入った範囲の直った版を、重複を除いて ", " でつないで入れる。
+#     CVE の記録の製品で、版がどの要素にも当たらず defaultStatus で入ったときは、その製品の範囲の直った版のうち、
+#     部品の版より大きい最も小さい版を入れる
 #     looked_up が偽の番号には、鍵 * で reason が not_looked_up の1件を足す
 #
 # 版の比べ方: 先頭の v を除き、. と - と + で区切った数の並びとして比べる。足りない桁は 0 とする。
@@ -79,6 +89,37 @@ sub ranges_in_range {
     my $w = _ranges_width($version, $partial);
     return (undef, 'uncomparable') unless $w;
     return $prepared->{decide}->($w);
+}
+
+sub ranges_fixed {
+    my ($source, $range) = @_;
+    return undef unless ref $range eq 'HASH';
+    return _ranges_fixed_value(_ranges_str($range->{first_patched_version})) if $source eq 'ghsa';
+    return undef unless $source eq 'cve';
+    return undef if lc(_ranges_str($range->{versionType}) // '') eq 'git';
+    my $status = _ranges_str($range->{status}) // '';
+    my $v = _ranges_str($range->{version});
+    if ($status eq 'affected') {
+        return _ranges_fixed_value(_ranges_str($range->{lessThan})) if defined $range->{lessThan};
+        return undef unless defined $v && $v =~ /\A\s*[<>=]/;
+        my ($hi) = $v =~ /(?:\A|,)\s*<(?!=)\s*([^\s,]+)/;
+        return _ranges_fixed_value($hi);
+    }
+    if ($status eq 'unaffected') {
+        return undef if defined $range->{lessThan};
+        return undef unless defined $v && $v !~ /\A\s*[<>=]/;
+        return undef if $RANGES_NO_LOWER{ lc $v } || $v =~ /\A\s*v?0(?:\.0)*\s*\z/i;
+        return _ranges_fixed_value($v);
+    }
+    return undef;
+}
+
+# 直った版の値の前後の空白を除く。空のときと、* を含む(版でない)ときは undef を返す
+sub _ranges_fixed_value {
+    my ($v) = @_;
+    return undef unless defined $v;
+    $v =~ s/\A\s+|\s+\z//g;
+    return length $v && $v !~ /\*/ ? $v : undef;
 }
 
 # 版を数の並びに直す。比べられない形なら空の一覧を返す。
@@ -285,7 +326,7 @@ sub _ranges_eval_cve {
                 my $segs = _ranges_cve_segments($e);
                 return (undef, 'uncomparable') unless $segs;
                 my @r = _ranges_pick($w, $segs);
-                return @r if @r;
+                return ($r[0], $r[1], $e) if @r;
             }
             return defined $default ? _ranges_status($default) : (0);
         },
@@ -681,7 +722,7 @@ sub ranges_match {
         for my $key (@order) {
             my %names = map { $_ => 1 } grep { defined && !ref } @{ ref $table->{$key} eq 'ARRAY' ? $table->{$key} : [] };
             my @named = grep { my $n = _ranges_name($_->{vendor}, $_->{product}); defined $n && $names{$n} } @products;
-            # 範囲の当て方の1から3。4の NVD の CPE の範囲と、直った版は、ほかのタスクで足す
+            # 範囲の当て方の1から3。4の NVD の CPE の範囲は、ほかのタスクで足す
             my @levels = (
                 $hit{$key},
                 [map { [_ranges_str($_->{from}) // 'cna', 'cve', $_] } @named],
@@ -708,23 +749,49 @@ sub _ranges_assign {
     my @files = grep { defined && !ref } @{ ref $c->{files} eq 'ARRAY' ? $c->{files} : [] };
     my %m = (key => $key, repo_versions => \@versions, file => @files ? join(', ', @files) : undef, fixed => undef);
     for my $level (@$levels) {
+        # @found の要素は [出どころ, $in, $reason, 範囲の形, 範囲, 部品の版, 当たった要素]
         my @found;
         for my $cand (@$level) {
             my ($source, $kind, $range) = @$cand;
-            my @r = map { [ranges_in_range($kind, $range, $_, $c->{partial})] } (@versions ? @versions : (undef));
-            next if grep { !defined $_->[0] && ($_->[1] // '') eq 'no_range' } @r;
-            push @found, map { [$source, @$_] } @r;
+            my @r = map { [$_, ranges_in_range($kind, $range, $_, $c->{partial})] } (@versions ? @versions : (undef));
+            next if grep { !defined $_->[1] && ($_->[2] // '') eq 'no_range' } @r;
+            push @found, map { [$source, $_->[1], $_->[2], $kind, $range, $_->[0], $_->[3]] } @r;
         }
         next unless @found;
-        my ($pick) = ((grep { defined $_->[1] && $_->[1] } @found), (grep { !defined $_->[1] } @found), @found);
+        my @in = grep { defined $_->[1] && $_->[1] } @found;
+        my ($pick) = (@in, (grep { !defined $_->[1] } @found), @found);
+        my (@fixed, %seen);
+        for my $f (@in) {
+            my $v = _ranges_found_fixed(@$f[3 .. 6]);
+            push @fixed, $v if defined $v && !$seen{$v}++;
+        }
         return {
             %m,
+            fixed        => @fixed ? join(', ', @fixed) : undef,
             in_range     => defined $pick->[1] ? ($pick->[1] ? JSON::PP::true : JSON::PP::false) : undef,
             range_source => $pick->[0],
             reason       => defined $pick->[1] ? undef : $pick->[2],
         };
     }
     return { %m, in_range => undef, range_source => undef, reason => 'no_range' };
+}
+
+# 範囲に入った部品の版の直った版を返す。CVE の記録の製品では、版が当たった要素の直った版を返し、
+# どの要素にも当たらなかった(defaultStatus で入った)ときは、製品の範囲の直った版のうち、部品の版より大きい最も小さい版を返す
+sub _ranges_found_fixed {
+    my ($kind, $range, $version, $element) = @_;
+    return ranges_fixed($kind, $element) if $element;
+    return ranges_fixed($kind, $range) unless $kind eq 'cve';
+    my $best;
+    for my $e (@{ ref $range->{versions} eq 'ARRAY' ? $range->{versions} : [] }) {
+        my $f = ranges_fixed('cve', $e);
+        next unless defined $f;
+        my $over = ranges_version_cmp($f, $version);
+        next unless defined $over && $over > 0;
+        my $lower = defined $best ? ranges_version_cmp($f, $best) : -1;
+        $best = $f if defined $lower && $lower < 0;
+    }
+    return $best;
 }
 
 # CVE の記録の製品の名前を、aliases.json の表の形(小文字にし、空白を _ にした <vendor>:<product>)に直す

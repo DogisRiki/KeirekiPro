@@ -24,6 +24,7 @@ check() { if [ "$2" = "$3" ]; then ok "$1"; else ng "$1 (want [$3] got [$2])"; f
 # 式の中では次の2つを使う。範囲は JSON の文字列で書く
 #   C(<版>, <版>): ranges_version_cmp の値。比べられなければ undef と出す
 #   IN(<出どころ>, <範囲の JSON>, <版>, <一部だけの版か>): ranges_in_range の値を true・false・null:<理由> で出す
+#   F(<出どころ>, <範囲の JSON か、読んだ範囲>): ranges_fixed の値。直った版が無ければ null と出す
 rr() {
     perl -MJSON::PP -e '
         require $ARGV[0];
@@ -32,6 +33,11 @@ rr() {
             my ($source, $json, $version, $partial) = @_;
             my ($in, $why) = ranges_in_range($source, JSON::PP->new->decode($json), $version, $partial);
             defined $in ? ($in ? "true" : "false") : "null:" . (defined $why ? $why : "");
+        }
+        sub F {
+            my ($source, $range) = @_;
+            my $f = ranges_fixed($source, ref $range ? $range : JSON::PP->new->decode($range));
+            defined $f ? $f : "null";
         }
         my $v = eval $ARGV[1];
         die $@ if $@;
@@ -386,8 +392,8 @@ case_deadline() {
 
 ALIASES="$(cd "$HERE/.." && pwd)/aliases.json"
 
-# ranges_match を、本物の aliases.json で呼び、返した値を JSON で $CASE/out.json に書く。
-# run_match <CVE の番号ごとの引いた値の JSON のファイル> <部品の一覧の JSON のファイル> <KEV の名前の JSON のファイル>
+# ranges_match を呼び、返した値を JSON で $CASE/out.json に書く。aliases.json のファイルを渡さなければ、本物の aliases.json を使う。
+# run_match <CVE の番号ごとの引いた値の JSON のファイル> <部品の一覧の JSON のファイル> <KEV の名前の JSON のファイル> [<aliases.json のファイル>]
 run_match() {
     perl -MJSON::PP -e '
         require $ARGV[0];
@@ -395,7 +401,7 @@ run_match() {
         my $read = sub { open my $h, "<", $_[0] or die "$_[0]: $!"; local $/; $j->decode(<$h>) };
         my $aliases = $read->($ARGV[1]);
         print $j->canonical->encode(ranges_match($read->($ARGV[2]), $read->($ARGV[3]), $aliases, $read->($ARGV[4])));
-    ' "$RANGES" "$ALIASES" "$1" "$2" "$3" >"$CASE/out.json" 2>"$CASE/err.txt"
+    ' "$RANGES" "${4:-$ALIASES}" "$1" "$2" "$3" >"$CASE/out.json" 2>"$CASE/err.txt"
 }
 
 # CVE の番号の突き合わせの結果を、部品の鍵の順に「鍵|in_range|range_source|reason」の形で、空白で区切って出す: ms <CVE の番号>
@@ -448,7 +454,7 @@ EOF
     check "$name(表で引いた部品の鍵が部品の一覧に無ければ、合わない)" "$(ms CVE-2026-1004)" ""
     check "$name(部品の版と、読んだファイル)" \
         "$(pj 'my ($m) = grep { $_->{key} eq "image:node" } @{ $d->{"CVE-2024-27983"}{matches} }; join "|", join(",", @{ $m->{repo_versions} }), $m->{file}, defined $m->{fixed} ? $m->{fixed} : "null"' <"$CASE/out.json")" \
-        "20.11.0|docker/frontend/Dockerfile, compose.yaml|null"
+        "20.11.0|docker/frontend/Dockerfile, compose.yaml|20.12.1"
 }
 
 case_sources() {
@@ -567,7 +573,94 @@ EOF
     check "$name(looked_up が真で名前の合った部品が無い番号は、何も返さない)" "$(ms CVE-2026-4003)" ""
 }
 
-CASES='compare forms uncomparable partial lookup token limit failures deadline aliases match sources undecided notlooked'
+# CVE の番号の突き合わせの結果を、部品の鍵の順に「鍵|in_range|部品の版を , でつないだ文字列|fixed」の形で、空白で区切って出す: mf <CVE の番号>
+mf() {
+    KP_CVE=$1 pj 'join " ", map { join "|", $_->{key}, (defined $_->{in_range} ? ($_->{in_range} ? "true" : "false") : "null"), join(",", @{ $_->{repo_versions} }), $_->{fixed} // "null" } sort { $a->{key} cmp $b->{key} } @{ $d->{$ENV{KP_CVE}}{matches} }' <"$CASE/out.json"
+}
+
+case_fixed() {
+    local name="GitHub の勧告の first_patched_version と、CVE の記録の affected の範囲の lessThan と、version に書かれた式の < の値と、CVE の記録の unaffected の範囲の version が、直った版になる。範囲に入った部品の fixed が、部品の版が入った範囲の直った版になる"
+    check "$name(範囲の1つから決める)" \
+        "$(rr 'join " ", map { F(@$_) } (["ghsa", q({"first_patched_version":"15.2.3"})], ["cve", q({"version":"1.0","lessThan":"1.2.3","status":"affected"})], ["cve", q({"version":">= 14.0.0, < 14.2.25","status":"affected"})], ["cve", q({"version":"6.1.117","lessThanOrEqual":"6.1.*","status":"unaffected","versionType":"semver"})])')" \
+        "15.2.3 1.2.3 14.2.25 6.1.117"
+    local name2="lessThanOrEqual だけを持つ affected の範囲と、lessThan を持つ unaffected の範囲と、git の範囲からは、直った版が null になる。in_range が偽か null の部品の fixed が null になる"
+    check "$name2(範囲の1つから決める)" \
+        "$(rr 'join " ", map { F(@$_) } (["cve", q({"version":"1.0","lessThanOrEqual":"1.2","status":"affected"})], ["cve", q({"version":"0","lessThan":"3.12","status":"unaffected","versionType":"semver"})], ["cve", q({"version":"27ce405039bfe6d3f4143415c638f56a3df77dca","lessThan":"e7ea60184e1e88a3c9e437b3265cbb6439aa7e26","status":"affected","versionType":"git"})], ["ghsa", q({"first_patched_version":null})], ["cve", q({"version":">= 1.0, <= 1.2","status":"affected"})], ["cve", q({"version":"2.0","lessThan":"2.5","status":"unaffected"})], ["cve", q({"version":"0","lessThanOrEqual":"2.*","status":"unaffected"})], ["cve", q({"version":"unspecified","lessThanOrEqual":"2.*","status":"unaffected"})], ["cve", q({"version":"1.0","lessThan":"*","status":"affected"})], ["ghsa", q({"first_patched_version":""})])')" \
+        "null null null null null null null null null null"
+
+    newcase
+    put_cve CVE-2024-50302 200 "$FIX/test-ranges/cve-CVE-2024-50302.json" 200 "$CASE/empty.json"
+    run_lookup CVE-2024-50302 '{}'
+    check "$name(CVE-2024-50302 の CVE の記録の、範囲ごとの直った版)" \
+        "$(rr 'my $d = JSON::PP->new->utf8->decode(do { open my $h, "<", $ARGV[2] or die "$ARGV[2]: $!"; local $/; <$h> }); join " / ", map { join " ", map { F("cve", $_) } @{ $_->{versions} } } @{ $d->{lookup}{"CVE-2024-50302"}{products} }' "$CASE/out.json")" \
+        "null null null 3.11 3.12 / null null 4.19.324 5.4.286 5.10.230 5.15.172 6.1.117 6.6.61 6.11.8 6.12"
+    perl -MJSON::PP -e 'my $j = JSON::PP->new->utf8; local $/; my $d = $j->decode(<STDIN>); print $j->encode($d->{lookup})' <"$CASE/out.json" >"$CASE/lookup.json"
+    cat >"$CASE/aliases.json" <<'EOF'
+{"version": 1, "aliases": {"os:linux": ["linux:linux"], "os:linux-lts": ["linux:linux"], "os:linux-new": ["linux:linux"], "os:linux-old": ["linux:linux"]}}
+EOF
+    cat >"$CASE/inventory.json" <<'EOF'
+{"components": {
+  "os:linux": {"versions": ["6.1.100"], "files": ["a"], "partial": false},
+  "os:linux-lts": {"versions": ["3.12"], "files": ["a"], "partial": false},
+  "os:linux-new": {"versions": ["6.12.3"], "files": ["a"], "partial": false},
+  "os:linux-old": {"versions": ["2.6.0"], "files": ["a"], "partial": false}
+}}
+EOF
+    printf '{}' >"$CASE/kev.json"
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json" "$CASE/aliases.json"
+    check "$name(版の系列ごとに直った版を書いた CVE の記録では、部品の版より大きい最も小さい直った版になる)" \
+        "$(mf CVE-2024-50302)" \
+        "os:linux|true|6.1.100|6.1.117 os:linux-lts|true|3.12|null os:linux-new|null|6.12.3|null os:linux-old|null|2.6.0|null"
+
+    newcase
+    cat >"$CASE/lookup.json" <<'EOF'
+{
+  "CVE-2025-29927": {"looked_up": true, "products": [],
+    "advisories": [{"ghsa_id": "GHSA-f82v-jwr5-mffw", "repository_advisory_url": "https://github.com/vercel/next.js/security/advisories/GHSA-f82v-jwr5-mffw", "vulnerabilities": [
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": ">= 13.0.0, < 13.5.9", "first_patched_version": "13.5.9"},
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": ">= 15.0.0, < 15.2.3", "first_patched_version": "15.2.3"},
+      {"ecosystem": "npm", "name": "react", "vulnerable_version_range": "< 18.3.0", "first_patched_version": null}]}]},
+  "CVE-2026-5001": {"looked_up": true, "advisories": [], "products": [
+    {"from": "cna", "vendor": "example", "product": "left pad", "collectionURL": "https://www.npmjs.com", "packageName": "left-pad", "versions": [
+      {"version": ">= 1.0.0, < 1.3.0", "status": "affected"},
+      {"version": "2.0.0", "lessThanOrEqual": "2.1.0", "status": "affected"}]}]}
+}
+EOF
+    cat >"$CASE/inventory.json" <<'EOF'
+{"components": {
+  "npm:next": {"versions": ["13.4.0", "15.0.0", "15.1.0", "15.5.2"], "files": ["frontend/pnpm-lock.yaml"], "partial": false},
+  "npm:react": {"versions": ["18.2.0"], "files": ["frontend/pnpm-lock.yaml"], "partial": false},
+  "npm:left-pad": {"versions": ["1.1.0", "2.0.5"], "files": ["frontend/pnpm-lock.yaml"], "partial": false}
+}}
+EOF
+    printf '{}' >"$CASE/kev.json"
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    check "$name(GitHub の勧告で、部品の版が入った範囲ごとの直った版)" \
+        "$(mf CVE-2025-29927)" \
+        "npm:next|true|13.4.0,15.0.0,15.1.0,15.5.2|13.5.9, 15.2.3 npm:react|true|18.2.0|null"
+    check "$name(CVE の記録の version の式の直った版と、lessThanOrEqual だけを持つ範囲)" \
+        "$(mf CVE-2026-5001)" \
+        "npm:left-pad|true|1.1.0,2.0.5|1.3.0"
+
+    newcase
+    cat >"$CASE/lookup.json" <<'EOF'
+{
+  "CVE-2026-5002": {"looked_up": true, "products": [],
+    "advisories": [{"ghsa_id": "GHSA-xxxx-xxxx-xx52", "repository_advisory_url": "https://github.com/vercel/next.js/security/advisories/GHSA-xxxx-xxxx-xx52", "vulnerabilities": [
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": ">= 15.0.0, < 15.2.3", "first_patched_version": "15.2.3"}]}]},
+  "CVE-2026-5003": {"looked_up": false, "products": [],
+    "advisories": [{"ghsa_id": "GHSA-xxxx-xxxx-xx53", "repository_advisory_url": "https://github.com/vercel/next.js/security/advisories/GHSA-xxxx-xxxx-xx53", "vulnerabilities": [
+      {"ecosystem": "npm", "name": "next", "vulnerable_version_range": "< 16.0.0", "first_patched_version": "16.0.0"}]}]}
+}
+EOF
+    printf '%s' '{"components": {"npm:next": {"versions": ["15.5.2"], "files": ["frontend/pnpm-lock.yaml"], "partial": false}, "image:node": {"versions": ["24"], "files": ["compose.yaml"], "partial": true}}}' >"$CASE/inventory.json"
+    printf '{}' >"$CASE/kev.json"
+    run_match "$CASE/lookup.json" "$CASE/inventory.json" "$CASE/kev.json"
+    check "$name2(範囲に入らない部品)" "$(mf CVE-2026-5002)" "npm:next|false|15.5.2|null"
+    check "$name2(looked_up が偽の番号の、範囲に入る部品と鍵 *)" "$(mf CVE-2026-5003)" "*|null||null npm:next|true|15.5.2|16.0.0"
+}
+
+CASES='compare forms uncomparable partial lookup token limit failures deadline aliases match sources undecided notlooked fixed'
 
 # ---------------------------------------------------------------------
 # 選んだ場合を流す
