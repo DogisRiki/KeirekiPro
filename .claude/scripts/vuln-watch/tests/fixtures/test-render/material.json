@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "run": "20261104T200000Z-4242",
+  "collected_at": "2026-11-04T20:00:00Z",
+  "window_from": "2026-10-28T20:00:00Z",
+  "failed": [
+    {"source": "jpcert", "name": "JPCERT/CC の注意喚起", "error": "HTTP 503"},
+    {"source": "cvemon", "name": "cvemon の話題の一覧", "error": "timeout"}
+  ],
+  "github": {"advisories_ok": true, "sbom_ok": true, "refs_ok": true},
+  "inventory": {"ref": "origin/main", "commit": "3e02dcc6a1b2c3d4e5f60718293a4b5c6d7e8f90", "fetched": true, "keys": ["npm:pnpm", "image:postgres"], "counts": {"npm": 2, "maven": 1}},
+  "parts": ["entries.json"]
+}

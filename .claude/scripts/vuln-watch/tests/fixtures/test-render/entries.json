@@ -1,0 +1,191 @@
+{
+  "entries": [
+    {
+      "key": "CVE-2026-1001",
+      "cves": ["CVE-2026-1001"],
+      "sources": [
+        {"source": "jpcert", "id": "JPCERT-AT-2026-0001", "title": "Next.js の脆弱性に関する注意喚起", "url": "https://www.jpcert.or.jp/at/2026/at260001.html", "published": "2026-11-03T10:00+09:00", "rank": null},
+        {"source": "cvemon", "id": "CVE-2026-1001", "title": "CVE-2026-1001", "url": "https://cvemon.intruder.io/cves/CVE-2026-1001", "published": "Mon, 03 Nov 2026 01:00:00 GMT", "rank": 9}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.jpcert.or.jp/at/2026/at260001.html", "https://nextjs.example/blog/security-1001"],
+      "origins_total": 2,
+      "name_hits": ["npm:next"],
+      "matches": [
+        {"key": "npm:next", "repo_versions": ["15.5.2"], "file": "frontend/pnpm-lock.yaml", "in_range": true, "fixed": "15.5.3", "range_source": "github", "reason": null},
+        {"key": "npm:react", "repo_versions": ["19.1.0"], "file": "frontend/pnpm-lock.yaml", "in_range": false, "fixed": null, "range_source": "github", "reason": null},
+        {"key": "maven:org.example:lib", "repo_versions": ["1.0", "1.1"], "file": "backend/gradle/libs.versions.toml, github:dependency-graph", "in_range": true, "fixed": null, "range_source": "cna", "reason": null}
+      ],
+      "refs": [{"kind": "pr", "number": 731}, {"kind": "issue", "number": 802}],
+      "suggested": "affected"
+    },
+    {
+      "key": "CVE-2026-1003",
+      "cves": ["CVE-2026-1003", "CVE-2026-1004", "CVE-2026-1005", "CVE-2026-1006", "CVE-2026-1007", "CVE-2026-1008", "CVE-2026-1009"],
+      "sources": [
+        {"source": "ipa", "id": "https://www.ipa.go.jp/security/security-alert/2026/tomcat.html", "title": "Apache Tomcat の脆弱性対策について", "url": "https://www.ipa.go.jp/security/security-alert/2026/tomcat.html", "published": "2026-11-04T09:00:00+09:00", "rank": null}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.ipa.go.jp/security/security-alert/2026/tomcat.html", "https://tomcat.example/security-11.html", "https://tomcat.example/security-10.html", "https://tomcat.example/security-9.html", "https://lists.example/thread/1003"],
+      "origins_total": 8,
+      "name_hits": ["maven:org.apache.tomcat.embed:tomcat-embed-core"],
+      "matches": [
+        {"key": "maven:org.apache.tomcat.embed:tomcat-embed-core", "repo_versions": ["11.0.2"], "file": "github:dependency-graph", "in_range": null, "fixed": null, "range_source": null, "reason": "no_range"}
+      ],
+      "refs": [],
+      "suggested": "undeterminable"
+    },
+    {
+      "key": "CVE-2026-1012",
+      "cves": ["CVE-2026-1012"],
+      "sources": [
+        {"source": "cvemon", "id": "CVE-2026-1012", "title": "CVE-2026-1012", "url": "https://cvemon.intruder.io/cves/CVE-2026-1012", "published": "Tue, 04 Nov 2026 01:00:00 GMT", "rank": 2}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.cve.org/CVERecord?id=CVE-2026-1012"],
+      "origins_total": 1,
+      "name_hits": ["npm:vite"],
+      "matches": [{"key": "npm:vite", "repo_versions": ["7.1.0"], "file": "frontend/pnpm-lock.yaml", "in_range": null, "fixed": null, "range_source": null, "reason": "no_range"}],
+      "refs": [],
+      "suggested": "undeterminable"
+    },
+    {
+      "key": "CVE-2026-1002",
+      "cves": ["CVE-2026-1002"],
+      "sources": [
+        {"source": "kev", "id": "CVE-2026-1002", "title": "PostgreSQL Code Execution Vulnerability", "url": null, "published": "2026-11-01", "rank": null}
+      ],
+      "article_ok": true,
+      "kev": "2026-11-01",
+      "origins": ["https://postgres.example/support/security/CVE-2026-1002/"],
+      "origins_total": 1,
+      "name_hits": ["image:postgres"],
+      "matches": [{"key": "image:postgres", "repo_versions": ["17.6"], "file": "compose.yaml", "in_range": null, "fixed": null, "range_source": null, "reason": "no_range"}],
+      "refs": [{"kind": "issue", "number": 801}, {"kind": "issue", "number": 803}],
+      "suggested": "affected"
+    },
+    {
+      "key": "CVE-2026-1014",
+      "cves": ["CVE-2026-1014"],
+      "sources": [
+        {"source": "jpcert", "id": "JPCERT-AT-2026-0003", "title": "7-Zip の脆弱性に関する注意喚起", "url": "https://www.jpcert.or.jp/at/2026/at260003.html", "published": "2026-11-02T12:00+09:00", "rank": null}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.jpcert.or.jp/at/2026/at260003.html"],
+      "origins_total": 1,
+      "name_hits": [],
+      "matches": [{"key": "npm:7zip-bin", "repo_versions": ["5.2.0"], "file": "frontend/pnpm-lock.yaml", "in_range": false, "fixed": null, "range_source": "cna", "reason": null}],
+      "refs": [{"kind": "pr", "number": 750}],
+      "suggested": "not_affected"
+    },
+    {
+      "key": "JVNDB-2026-000001",
+      "cves": ["CVE-2026-1016"],
+      "sources": [
+        {"source": "jpcert", "id": "JPCERT-AT-2026-0004", "title": "複数の製品の脆弱性に関する注意喚起", "url": "https://www.jpcert.or.jp/at/2026/at260004.html", "published": "2026-11-03T08:00+09:00", "rank": null}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.jpcert.or.jp/at/2026/at260004.html", "https://router.example/advisory"],
+      "origins_total": 2,
+      "name_hits": [],
+      "matches": [],
+      "refs": [],
+      "suggested": "unrelated"
+    },
+    {
+      "key": "CVE-2026-1010",
+      "cves": ["CVE-2026-1010"],
+      "sources": [
+        {"source": "cvemon", "id": "CVE-2026-1010", "title": "CVE-2026-1010", "url": "https://cvemon.intruder.io/cves/CVE-2026-1010", "published": "Tue, 04 Nov 2026 02:00:00 GMT", "rank": 3}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.cve.org/CVERecord?id=CVE-2026-1010"],
+      "origins_total": 1,
+      "name_hits": ["npm:axios"],
+      "matches": [{"key": "npm:axios", "repo_versions": ["1.12.0"], "file": "frontend/pnpm-lock.yaml", "in_range": null, "fixed": null, "range_source": null, "reason": "no_range"}],
+      "refs": [{"kind": "pr", "number": 740}],
+      "suggested": "undeterminable"
+    },
+    {
+      "key": "CVE-2026-1013",
+      "cves": ["CVE-2026-1013"],
+      "sources": [
+        {"source": "cvemon", "id": "CVE-2026-1013", "title": "CVE-2026-1013", "url": "https://cvemon.intruder.io/cves/CVE-2026-1013", "published": "Tue, 04 Nov 2026 03:00:00 GMT", "rank": 1}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.cve.org/CVERecord?id=CVE-2026-1013"],
+      "origins_total": 1,
+      "name_hits": ["npm:esbuild"],
+      "matches": [{"key": "npm:esbuild", "repo_versions": ["0.25.0"], "file": "frontend/pnpm-lock.yaml", "in_range": null, "fixed": null, "range_source": null, "reason": "no_range"}],
+      "refs": [],
+      "suggested": "undeterminable"
+    },
+    {
+      "key": "CVE-2026-1017",
+      "cves": ["CVE-2026-1017"],
+      "sources": [
+        {"source": "ipa", "id": "https://www.ipa.go.jp/security/security-alert/2026/oracle.html", "title": "Oracle 製品の脆弱性対策について", "url": "https://www.ipa.go.jp/security/security-alert/2026/oracle.html", "published": "2026-11-04", "rank": null}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.ipa.go.jp/security/security-alert/2026/oracle.html"],
+      "origins_total": 1,
+      "name_hits": [],
+      "matches": [{"key": "runtime:java", "repo_versions": ["21"], "file": "backend/build.gradle", "in_range": false, "fixed": null, "range_source": "cna", "reason": null}],
+      "refs": [],
+      "suggested": "not_affected"
+    },
+    {
+      "key": "CVE-2026-1011",
+      "cves": ["CVE-2026-1011"],
+      "sources": [
+        {"source": "jpcert", "id": "JPCERT-AT-2026-0002", "title": "OpenSSH の脆弱性に関する注意喚起", "url": "https://www.jpcert.or.jp/at/2026/at260002.html", "published": "2026-11-02T08:00+09:00", "rank": null}
+      ],
+      "article_ok": false,
+      "kev": null,
+      "origins": ["https://www.jpcert.or.jp/at/2026/at260002.html"],
+      "origins_total": 1,
+      "name_hits": ["image:node"],
+      "matches": [],
+      "refs": [],
+      "suggested": "undeterminable"
+    },
+    {
+      "key": "CVE-2026-1015",
+      "cves": ["CVE-2026-1015"],
+      "sources": [
+        {"source": "kev", "id": "CVE-2026-1015", "title": "Microsoft Windows Privilege Escalation Vulnerability", "url": null, "published": "2026-10-30", "rank": null}
+      ],
+      "article_ok": true,
+      "kev": "2026-10-30",
+      "origins": ["https://msrc.example/update-guide/vulnerability/CVE-2026-1015"],
+      "origins_total": 1,
+      "name_hits": [],
+      "matches": [],
+      "refs": [],
+      "suggested": "unrelated"
+    },
+    {
+      "key": "CVE-2026-1020",
+      "cves": ["CVE-2026-1020"],
+      "sources": [
+        {"source": "cvemon", "id": "CVE-2026-1020", "title": "CVE-2026-1020", "url": "https://cvemon.intruder.io/cves/CVE-2026-1020", "published": "Tue, 04 Nov 2026 04:00:00 GMT", "rank": 4}
+      ],
+      "article_ok": true,
+      "kev": null,
+      "origins": ["https://www.cve.org/CVERecord?id=CVE-2026-1020"],
+      "origins_total": 1,
+      "name_hits": [],
+      "matches": [],
+      "refs": [],
+      "suggested": "unrelated"
+    }
+  ]
+}
