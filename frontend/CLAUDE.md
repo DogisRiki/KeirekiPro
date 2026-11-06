@@ -56,7 +56,6 @@ frontend配下を変更するとき常に適用する。ディレクトリ間の
 bash .claude/scripts/parallel/run-check.sh frontend pnpm run format
 bash .claude/scripts/parallel/run-check.sh frontend pnpm run lint
 bash .claude/scripts/parallel/run-check.sh frontend pnpm run typecheck
-bash .claude/scripts/parallel/run-check.sh frontend pnpm test
 bash .claude/scripts/parallel/run-check.sh frontend pnpm run coverage
 ```
 

@@ -102,7 +102,7 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
 |---|---|---|---|
-| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・テスト・カバレッジ・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存。テスト結果とカバレッジの成果物は、mainへのpushでは90日、プルリクエストでは7日保持する |
+| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・カバレッジを測りながら1回だけ流すテスト・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを実行。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存。テスト結果とカバレッジの成果物は、mainへのpushでは90日、プルリクエストでは7日保持する |
 | 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査。本番のAWSには接続しない(本番との差分は terraform-apply.yaml が適用の直前に出す)。terraform関連の変更が無いPRでは各ジョブをスキップする |
 | 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。ただし、本番で動く部品の深刻度がhighかcriticalの脆弱性の警告が示す最初の修正版は、そのPRで追加されたすべての部品が悪意のある部品の一覧に載っておらず、最初の修正版の署名した者が前の版と変わっていなければ、PRに記録のコメントを残したうえで、所有者のApproveで72時間待たずに入れる。前の版に署名が無いときは、署名した者を比べない。DependabotのPRも同じ判定を受ける。CIの道具(Node.js・Trivy・Codex CLI・Terraform)の版を変えたPRでは、公開から72時間を経過していない版を落とし、変わったCIの版を配布元の署名で確かめる。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする。部品には、本番のjarに入る部品(runtime)か開発のときだけ使う部品(development)かを付け、アラートで本番で動く部品を見分けられるようにする |
