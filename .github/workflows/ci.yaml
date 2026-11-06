@@ -176,10 +176,8 @@ jobs:
       - name: Run ESLint
         run: pnpm run lint
 
-      - name: Run tests
-        run: pnpm test
-
-      - name: Run coverage
+      # coverage は単体テストを全部流してカバレッジを測る。pnpm test を別に流すと同じテストが2回流れる(#746)
+      - name: Run tests with coverage
         run: pnpm run coverage
 
       - name: Build for production

@@ -1,5 +1,5 @@
 ---
-description: frontendの品質ゲート(format→lint→typecheck→test→coverage)を順次実行し、結果を要約報告する。frontend配下を変更したら完了報告前に必ず実行する。
+description: frontendの品質ゲート(format→lint→typecheck→テストを流してcoverageを測る)を順次実行し、結果を要約報告する。frontend配下を変更したら完了報告前に必ず実行する。
 ---
 
 # verify-frontend
@@ -16,9 +16,10 @@ frontendの品質ゲートを規定の順序で直列実行し、PASS/FAILを判
 bash .claude/scripts/parallel/run-check.sh frontend pnpm run format
 bash .claude/scripts/parallel/run-check.sh frontend pnpm run lint
 bash .claude/scripts/parallel/run-check.sh frontend pnpm run typecheck
-bash .claude/scripts/parallel/run-check.sh frontend pnpm test
 bash .claude/scripts/parallel/run-check.sh frontend pnpm run coverage
 ```
+
+- `pnpm run coverage` は、単体テストを全部流してカバレッジを測る。Claude は、全部のテストを流す `pnpm test` を、別に流さない。別に流すと、同じテストが2回流れる
 
 - `run-check.sh` は、いまの作業フォルダ(worktree のセッションでは worktree の最上位)を読み込んだ1回きりのコンテナで、コマンドを動かす。Claude は、起動したままの常駐コンテナの中で品質チェックを動かさない
 - format失敗時は `pnpm run format:fix`、lint失敗時は `pnpm run lint:fix` で自動修正を先に試す。自動修正も `bash .claude/scripts/parallel/run-check.sh frontend pnpm run format:fix` のように `run-check.sh` で呼ぶ
@@ -56,8 +57,7 @@ frontend の品質チェックの結果:
 - format による書式の整え: <通った、または通らなかった>
 - lint による書き方の検査: <通った、または通らなかった>
 - typecheck による型の検査: <通った、または通らなかった>
-- test によるテストの実行: <通った、または通らなかった>。テストの数は<数>件
-- coverage によるカバレッジの検査: <通った、または通らなかった>。カバレッジは、テストで動いたコードの割合です
+- coverage によるテストの実行とカバレッジの検査: <通った、または通らなかった>。テストの数は<数>件。カバレッジは、テストで動いたコードの割合です
   - 文の割合: <数>%
   - 分岐の割合: <数>%
   - 関数の割合: <数>%
