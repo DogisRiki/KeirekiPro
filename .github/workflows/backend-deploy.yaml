@@ -30,7 +30,10 @@ env:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # ECS は arm64 の CPU で動くため、イメージも arm64 の CPU の機械で作る。
+    # x86_64 の機械で arm64 の CPU をまねて作ると、Gradle の組み立てが
+    # 十数分かかる(#749)。container-scan も同じ機械で同じ Dockerfile から作っている。
+    runs-on: ubuntu-24.04-arm
     environment: production
 
     steps:
@@ -67,6 +70,9 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
+      # GitHub のキャッシュは読みも書きもしない(#749)。書き出しに1分半ほどかかるうえ、
+      # キャッシュが当たると Dockerfile.prod の apt-get upgrade が飛ばされ、
+      # ビルドのたびに OS の部品の修正版を取り込む意図(#453)が崩れるため。
       - name: Build and push Docker image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -76,8 +82,6 @@ jobs:
           tags: |
             ${{ steps.vars.outputs.ecr_repository_url }}:${{ github.sha }}
           platforms: linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           provenance: false
 
       - name: Get current task definition

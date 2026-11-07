@@ -122,7 +122,7 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 | ラベル | sync-labels.yaml | push (main、`.github/labels.json` などの変更) / 手動 | ラベルの一覧のファイル`.github/labels.json`のとおりに、GitHubのラベルを作り・直し・名前を変え・消す。ファイルに前の名前が書かれたラベルは、消さずに名前だけを変える。先に合わせ込みのスクリプトのテストを流し、ファイルが検証に通らなければラベルを1つも変えずに失敗で終わる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
 | リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。Terraformは配布元の署名を確かめてから使う。apply直前にplanで差分を表示し、そのplanをそのまま適用。plan_onlyを選んで動かすと、差分を表示したところで止まり、適用しない |
-| リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し) |
+| リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し)。本番用のイメージは、arm64のランナーでGitHubのキャッシュを使わずに組み立てる |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
 | 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backend)によるテスト有効性の測定レポート。frontendは前回の結果を使い回して変わった箇所だけを測り直し、毎月最初の定期実行で全件を測り直す。レポートは90日間保持する。実行のたびにスコアと測定方式(全件か差分か)をIssue「メトリクス台帳: mutationスコア」に1行追記する。全件を測り直した回は、前回の全件の回との差と、mainで最後にテストを実行したCIのカバレッジ(実測と基準値)を同じIssueにコメントして所有者に知らせる。良し悪しの判定はしない |
