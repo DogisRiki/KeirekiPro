@@ -1,0 +1,203 @@
+name: CodeQL
+
+# CodeQL でソースコードを診断し、結果をコードスキャンに送る。
+#
+# 診断する言語は固定の一覧で書かず、.github/codeql/languages.tsv と照らして
+# detect-codeql-languages.sh が毎回見つける。言語を足した PR で一覧を直し忘れて、
+# その言語が診断されないまま main に入るのを防ぐためである。
+#
+# 診断の対象からファイルやクエリを外す設定は書かない。
+# 外す設定を書くと、警告を出さずにマージへ進む抜け道になる。
+# 診断の設定は全部 .github/ の下に置き、CODEOWNERS で所有者の承認を求める。
+#
+# ジョブを分ける理由:
+#   analyze は PR のコード(backend/gradlew と Gradle のビルドのスクリプト)を動かす。
+#   そのため analyze には書き込みの権限を持たせず、checkout のトークンも残さない。
+#   結果を送る権限(security-events: write)は、PR のコードを動かさない upload だけが持つ。
+#
+# 採用する外部部品について:
+#   github/codeql-action の入力の名前は、v4.39.2 の init / analyze / upload-sarif の
+#   action.yml で確かめた(2026-11-07)。
+#   https://github.com/github/codeql-action/blob/1fc58d04a4d4374f921bdac573c3811c240f9c26/init/action.yml
+#   https://github.com/github/codeql-action/blob/1fc58d04a4d4374f921bdac573c3811c240f9c26/analyze/action.yml
+#   https://github.com/github/codeql-action/blob/1fc58d04a4d4374f921bdac573c3811c240f9c26/upload-sarif/action.yml
+
+on:
+  pull_request:
+    # reopened を含めるのは、close→reopen で診断が一度も走らないまま
+    # 緑が残る経路を塞ぐため。
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # 毎週日曜 03:41 UTC。PR が無い週も、新しく見つかるようになった警告を拾う。
+    - cron: '41 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  # 取り消された実行は cancelled で残り、必須の検査が成功にならないため、取り消さない。
+  cancel-in-progress: false
+
+jobs:
+  detect-codeql-languages:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.detect.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test the language detection
+        run: bash .github/scripts/tests/test-detect-codeql-languages.sh
+
+      - name: Detect languages to analyze
+        id: detect
+        run: bash .github/scripts/detect-codeql-languages.sh .github/codeql/languages.tsv
+
+  analyze:
+    needs: detect-codeql-languages
+    runs-on: ubuntu-latest
+    # 権限を足さない。このジョブは PR のコードを動かすため、書き込みの権限を持たせない。
+    strategy:
+      # 1つの言語の失敗で、ほかの言語の診断を止めない。
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.detect-codeql-languages.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # PR のコードからトークンを読めないようにする。
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4.39.2
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # queries は渡さない。渡さなければ既定の組で診断する。
+          # init は queries の値の default を組の名前として読まないため、default を渡すと失敗する。
+
+      - name: Build
+        if: matrix.build-mode == 'manual'
+        env:
+          # 対応表のビルドの命令は env で受け取り、run の中では変数として読む。
+          # run に式を直に書くと、CodeQL の actions の診断がコードの注入の警告を出すおそれがある。
+          BUILD_COMMAND: ${{ matrix.build-command }}
+        run: bash -c "$BUILD_COMMAND"
+
+      - name: Perform CodeQL analysis
+        id: analyze
+        uses: github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4.39.2
+        with:
+          category: /language:${{ matrix.language }}
+          # 結果は upload のジョブが送る。このジョブには送る権限が無い。
+          upload: never
+          # データベースを送る権限も無いので、送らない。
+          upload-database: false
+
+      - name: Keep the SARIF file
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: ${{ steps.analyze.outputs.sarif-output }}
+          if-no-files-found: error
+          retention-days: 1
+
+  upload:
+    needs: [detect-codeql-languages, analyze]
+    runs-on: ubuntu-latest
+    # このジョブは PR のコードを取り出さず、動かさない。結果を送る権限はこのジョブだけが持つ。
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.detect-codeql-languages.outputs.matrix) }}
+    steps:
+      - name: Download the SARIF file
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: sarif
+
+      - name: Upload the SARIF file to code scanning
+        uses: github/codeql-action/upload-sarif@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4.39.2
+        with:
+          sarif_file: sarif
+          category: /language:${{ matrix.language }}
+          # GitHub が結果を取り込み終えるまで待つ。codeql-complete が警告を数える前に、
+          # 結果が警告の一覧に入っているようにするため。
+          wait-for-processing: true
+
+  codeql-complete:
+    # 必須の検査として ruleset に登録するジョブ。言語ごとの結論と、PR が持ち込んだ警告で
+    # マージの可否を決める。matrix のジョブの名前は言語ごとに変わるので、必須の検査には
+    # このジョブだけを登録する。
+    needs: [detect-codeql-languages, analyze, upload]
+    # 前のジョブが失敗しても skipped で終わらず、必ず赤か緑の結論を残す。
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: read
+    steps:
+      - name: Check the results of the analysis jobs
+        env:
+          DETECT_RESULT: ${{ needs.detect-codeql-languages.result }}
+          ANALYZE_RESULT: ${{ needs.analyze.result }}
+          UPLOAD_RESULT: ${{ needs.upload.result }}
+        run: |
+          failed=0
+          for pair in "detect-codeql-languages=$DETECT_RESULT" "analyze=$ANALYZE_RESULT" "upload=$UPLOAD_RESULT"; do
+              if [ "${pair#*=}" != "success" ]; then
+                  echo "::error::${pair%%=*} のジョブの結論が success ではありません(${pair#*=})。"
+                  failed=1
+              fi
+          done
+          exit "$failed"
+
+      - name: Refuse manual runs outside main
+        # PR のブランチで手で動かした実行が、警告を数えずに成功の codeql-complete を
+        # PR の先頭のコミットに付けないようにする。
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUN_REF: ${{ github.ref }}
+        run: |
+          if [ "$RUN_REF" != "refs/heads/main" ]; then
+              echo "::error::手で動かす実行は main でだけ受け付けます(${RUN_REF})。"
+              exit 1
+          fi
+
+      - name: Checkout code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test the PR alert check
+        if: github.event_name == 'pull_request'
+        run: bash .github/scripts/tests/test-check-codeql-pr-alerts.sh
+
+      - name: Check alerts introduced by the PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/check-codeql-pr-alerts.sh "$PR_NUMBER"

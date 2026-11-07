@@ -13,6 +13,10 @@
 # 3つ目の引数(表示名)は、渡したときと省略したときの両方で報告の文面を
 # 1バイト単位で比べる。省略したときは今の文面から変わらないことを確かめる。
 #
+# 4つ目の引数(ブランチ)は、問い合わせに branch= が付くかと、ブランチで絞った
+# 実行の一覧で判定するかを確かめる。スタブは、問い合わせに branch=main が
+# 付いたときだけ、main の実行の一覧($STUB_RUNS_MAIN)を返す。
+#
 # 外部への問い合わせを行わないため、実行にネットワークを必要としない。
 # 時刻は NOW_EPOCH で固定し、8日ちょうどの境界値を再現可能にする。
 # =====================================================================
@@ -31,6 +35,8 @@ mkdir -p "$WORK/bin"
 
 # --- gh のスタブ ---------------------------------------------------------------
 # 呼び出しの引数を $STUB_CALLS に記録し、$STUB_RUNS の内容をそのまま返す。
+# STUB_RUNS_MAIN が設定されていて、問い合わせに branch=main が付いているときは、
+# 代わりに $STUB_RUNS_MAIN の内容を返す(main の実行だけに絞った一覧の再現)。
 # STUB_GH_FAIL が設定されているときは、標準出力を空にして異常終了する
 # (実行一覧APIの応答が得られない状況の再現)。
 cat >"$WORK/bin/gh" <<'STUB'
@@ -39,6 +45,14 @@ printf '%s\n' "$*" >>"${STUB_CALLS:?}"
 if [ -n "${STUB_GH_FAIL:-}" ]; then
     echo "stub: API failure" >&2
     exit 1
+fi
+if [ -n "${STUB_RUNS_MAIN:-}" ]; then
+    case "$*" in
+    *branch=main*)
+        cat "$STUB_RUNS_MAIN"
+        exit 0
+        ;;
+    esac
 fi
 cat "${STUB_RUNS:?}"
 STUB
@@ -65,20 +79,29 @@ exec "$REAL_DATE" "\$@"
 STUB
 chmod +x "$WORK/bin/date"
 
-# 使い方: [RUN_LABEL=<表示名>] run <APIレスポンスJSON> [gh失敗] [date失敗]
+# 使い方: [RUN_LABEL=<表示名>] [RUN_BRANCH=<ブランチ>] [RUN_MAIN=<main の応答JSON>] run <APIレスポンスJSON> [gh失敗] [date失敗]
 # RUN_LABEL が設定されているときだけ、3つ目の引数(表示名)として渡す。
+# RUN_BRANCH が設定されているときだけ、4つ目の引数(ブランチ)として渡す(RUN_LABEL も要る)。
+# RUN_MAIN が設定されているときは、branch=main の問い合わせにその応答を返す。
 # 設定されていなければ引数を2個にし、今の呼び出し(定期スキャン、8日)を再現する。
 # 標準出力と標準エラーは、報告の文面を確かめるためにファイルへ残す。
 run() {
-    local label_args=()
+    local label_args=() main_file=""
     if [ -n "${RUN_LABEL+x}" ]; then
         label_args=("$RUN_LABEL")
     fi
+    if [ -n "${RUN_BRANCH+x}" ]; then
+        label_args+=("$RUN_BRANCH")
+    fi
     printf '%s' "$1" >"$WORK/runs.json"
+    if [ -n "${RUN_MAIN+x}" ]; then
+        main_file="$WORK/runs-main.json"
+        printf '%s' "$RUN_MAIN" >"$main_file"
+    fi
     : >"$WORK/calls.log"
     : >"$WORK/summary.md"
     PATH="$WORK/bin:$PATH" \
-        STUB_RUNS="$WORK/runs.json" STUB_CALLS="$WORK/calls.log" \
+        STUB_RUNS="$WORK/runs.json" STUB_RUNS_MAIN="$main_file" STUB_CALLS="$WORK/calls.log" \
         STUB_GH_FAIL="${2:-}" STUB_DATE_FAIL="${3:-}" \
         GITHUB_REPOSITORY="owner/repo" GH_TOKEN="dummy" NOW_EPOCH="$NOW" \
         GITHUB_STEP_SUMMARY="$WORK/summary.md" \
@@ -166,6 +189,15 @@ check_calls() {
     else
         echo "FAIL: $2 (呼び出しログに '$1' が現れない)"
         FAILED=1
+    fi
+}
+
+check_calls_lack() {
+    if grep -qF "$1" "$WORK/calls.log"; then
+        echo "FAIL: $2 (呼び出しログに '$1' が現れた)"
+        FAILED=1
+    else
+        echo "PASS: $2"
     fi
 }
 
@@ -414,14 +446,50 @@ for bad in '#' '`' '*' '_' '[' ']' '<' '>' '|' "\\" '~' '@' '&'; do
     check_no_calls "表示名に ${bad} が入っていればAPIへ問い合わせない"
 done
 
-check_invocation 2 "引数が4個以上なら判定不能として2を返す" "" \
-    container-scan-scheduled.yaml 8 棚卸し extra
-check_no_calls "引数が4個以上ならAPIへ問い合わせない"
+# 4つ目の引数(ブランチ)を足したため、上限を確かめる値は5個にする。
+# 4個目の extra はブランチの名前の形に当たるため、4個では上限を確かめられない。
+check_invocation 2 "引数が5個以上なら判定不能として2を返す" "" \
+    container-scan-scheduled.yaml 8 棚卸し main extra
+check_no_calls "引数が5個以上ならAPIへ問い合わせない"
 
 check_invocation 0 "表示名が日本語の語なら判定まで進む(表示名の検査の対照)" "" \
     container-scan-scheduled.yaml 8 棚卸し
 check_invocation 0 "表示名に空白や括弧が入っていても判定まで進む" "" \
     container-scan-scheduled.yaml 8 "棚卸し (月次)"
+
+echo "--- ブランチ(4つ目の引数) ---"
+# main の実行の一覧は8日より前の成功だけ、絞らない一覧は PR の実行の新しい成功を返す。
+MAIN_OLD_RUNS=$(runs_json "$CREATED_OLD")
+ALL_NEW_RUNS=$(runs_json "$CREATED_JUST_UNDER_8D")
+
+RUN_LABEL=ソースコードの診断 RUN_BRANCH=main RUN_MAIN="$ALL_NEW_RUNS" \
+    check 0 "4つ目の引数に main を渡すと、実行の一覧の問い合わせに branch=main が付く: 判定まで進む" "$ALL_NEW_RUNS"
+check_calls "runs?status=success&per_page=1&branch=main" "4つ目の引数に main を渡すと、実行の一覧の問い合わせに branch=main が付く"
+check_single_call "4つ目の引数に main を渡すと、実行の一覧の問い合わせに branch=main が付く: 問い合わせは1回で済む"
+
+RUN_LABEL=ソースコードの診断 RUN_BRANCH=main RUN_MAIN="$MAIN_OLD_RUNS" \
+    check 1 "main の直近の成功が8日より前なら、PR の実行の成功が新しくても逸脱ありになる" "$ALL_NEW_RUNS"
+check_summary "### :rotating_light: ソースコードの診断が止まっています" \
+    "main の直近の成功が8日より前なら、PR の実行の成功が新しくても逸脱ありになる: 止まっていることを報告する"
+check_summary "2025-12-01 00:00 UTC" \
+    "main の直近の成功が8日より前なら、PR の実行の成功が新しくても逸脱ありになる: main の最終成功日時を報告する"
+
+RUN_MAIN="$MAIN_OLD_RUNS" check 0 "4つ目の引数を省くと、問い合わせにブランチが付かず、報告が今と同じになる: 絞らない一覧で判定する" "$ALL_NEW_RUNS"
+check_calls_lack "branch=" "4つ目の引数を省くと、問い合わせにブランチが付かず、報告が今と同じになる: 問い合わせに branch= が付かない"
+check_exact "$WORK/stdout.log" "4つ目の引数を省くと、問い合わせにブランチが付かず、報告が今と同じになる: 緑の文面は今のまま" <<'EOF'
+定期スキャン(container-scan-scheduled.yaml)は稼働しています(最終成功: 2026-01-02 00:01 UTC)。
+EOF
+check_exact "$WORK/summary.md" "4つ目の引数を省くと、問い合わせにブランチが付かず、報告が今と同じになる: Summaryに何も書かない" </dev/null
+
+for bad in "" "-main" "main&status=failure" "main?x" "ma in" $'main\n' "ブランチ"; do
+    # テストの名前が2行に分かれないよう、名前の中では改行を \n と書く
+    shown="${bad//$'\n'/\\n}"
+    check_invocation 2 "4つ目の引数にブランチの名前の形でない値を渡すと終了コード2になる: '${shown}'" "" \
+        container-scan-scheduled.yaml 8 ソースコードの診断 "$bad"
+    check_no_calls "4つ目の引数にブランチの名前の形でない値を渡すと終了コード2になる: '${shown}' ではAPIへ問い合わせない"
+done
+check_invocation 0 "4つ目の引数にブランチの名前の形の値を渡すと判定まで進む(ブランチの検査の対照)" "" \
+    container-scan-scheduled.yaml 8 ソースコードの診断 release/v1.2_x-y
 
 if [ "$FAILED" -eq 0 ]; then
     echo "すべてのテストがPASSしました。"

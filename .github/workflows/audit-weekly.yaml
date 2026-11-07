@@ -1,7 +1,7 @@
 name: Audit Weekly
 
 # 週次監査(#310 段階1): 人間が画面を開いて行っていた定期監査のうち、
-# 機械判定できる6項目を自動判定に置き換える。
+# 機械判定できる8項目を自動判定に置き換える。
 #
 #   scan-freshness   定期スキャン(container-scan-scheduled.yaml)の直近成功が
 #                    8日未満かを確認する(旧・週次8)
@@ -15,6 +15,10 @@ name: Audit Weekly
 #   trivy-version    PRの検査と定期検査の TRIVY_VERSION が一致しているかを
 #                    確認する(旧・月次4の一部。#334)
 #   cooldown-exceptions 公開から72時間待たずに入れた版の一覧を報告する(新規。#641)
+#   codeql-alerts    main に残った CodeQL の警告の数と、所有者のほかの人の却下を
+#                    報告する。警告の中身は書かない(新規。#532)
+#   codeql-freshness main でのソースコードの診断(codeql.yaml)の直近成功が
+#                    8日未満かを確認する(新規。#532)
 #
 # 判定・通知・結論の3段で動く(#347):
 #   - 判定: 各判定スクリプトの終了コードを 0=逸脱なし / 1=逸脱あり /
@@ -58,11 +62,13 @@ on:
 
 # 判定はread系のみ。書き込みは通知のための issues: write だけを加える
 # (contents・pull-requests への書き込みは持たない)。secrets は使わない。
+# security-events: read は codeql-alerts が main の CodeQL の警告を読むために使う。
 permissions:
   contents: read
   actions: read
   pull-requests: read
   checks: read
+  security-events: read
   issues: write
 
 concurrency:
@@ -112,17 +118,17 @@ jobs:
             echo ""
           } >>"$GITHUB_STEP_SUMMARY"
 
-      # 判定。自己テスト → 本判定6本 → 集約 の順に行い、結果をステップ出力
+      # 判定。自己テスト → 本判定8本 → 集約 の順に行い、結果をステップ出力
       # result(none / deviation / undecidable)に書く。このステップ自体は
       # 常に成功で終わり(set +e で途中の失敗でも止めない)、成否は Conclude が
       # 決める。
       #
       # 自己テストを先に置く。壊れた判定スクリプトの結論(緑も赤も)を信用せず、
       # 1本でも失敗したら本判定を行わずに判定不能とする(dependency-review.yaml
-      # の cooldown ジョブと同じ、自テスト後に本判定の型)。自己テストの5本は
+      # の cooldown ジョブと同じ、自テスト後に本判定の型)。自己テストの6本は
       # 途中で失敗しても全部実行する(container-scan-scheduled.yaml のテスト
-      # 集約と同じ方式)。scan-freshness と inventory-freshness は同じ判定
-      # スクリプトを使うため、自己テストは1本で両方を受け持つ。
+      # 集約と同じ方式)。scan-freshness と inventory-freshness と codeql-freshness は
+      # 同じ判定スクリプトを使うため、自己テストは1本で3つを受け持つ。
       #
       # 本判定は1本目が逸脱・判定不能でも残りを実行する。途中で止めると、
       # 最初の結果の陰に残りの逸脱が隠れて翌週まで見えなくなる。各スクリプトの
@@ -204,7 +210,7 @@ jobs:
           }
 
           selftest_failed=0
-          for t in test-check-audit-scan-freshness test-check-audit-dependabot-stuck test-check-audit-skipped-required test-check-audit-trivy-version test-check-audit-cooldown-exceptions; do
+          for t in test-check-audit-scan-freshness test-check-audit-dependabot-stuck test-check-audit-skipped-required test-check-audit-trivy-version test-check-audit-cooldown-exceptions test-check-audit-codeql-alerts; do
             echo "::group::${t}.sh"
             if ! bash ".github/scripts/tests/${t}.sh"; then
               echo "::error::${t}.sh が失敗しました。"
@@ -231,6 +237,9 @@ jobs:
               .github/scripts/check-audit-trivy-version.sh \
               .github/workflows/container-scan.yaml .github/workflows/container-scan-scheduled.yaml
             run_check cooldown-exceptions "72時間待たずに入れた版の一覧" .github/scripts/check-audit-cooldown-exceptions.sh
+            run_check codeql-alerts "main に残った CodeQL の警告の数" .github/scripts/check-audit-codeql-alerts.sh
+            run_check codeql-freshness "main のソースコードの診断の稼働確認" \
+              .github/scripts/check-audit-scan-freshness.sh codeql.yaml 8 ソースコードの診断 main
           fi
 
           echo "週次監査の結果: ${overall}"

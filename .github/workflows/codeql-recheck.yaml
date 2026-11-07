@@ -1,0 +1,128 @@
+name: CodeQL Recheck
+
+# 所有者が CodeQL の警告を却下したあとに、赤のままの codeql-complete を動かし直す。
+#
+# codeql-complete は、所有者が却下した警告を数えない。ただし、却下の前に終わった
+# codeql-complete は赤のまま残る。GitHub Actions は警告の却下で起動できない
+# (code_scanning_alert はワークフローを起動するイベントに無い)ので、このワークフローは
+# 定期実行で、所有者の却下のあとに赤のままの判定だけを動かし直す。
+# 所有者は、却下のほかに操作をしなくてよい。
+#
+# 動かし直すのは、所有者が却下し、却下の時刻が codeql-complete の終わった時刻より
+# あとの警告がある PR だけである。動かし直した codeql-complete は新しい時刻で終わるので、
+# 同じ却下で2回は動かし直さない。所有者のほかの人の却下では動かし直さない。
+# 動かし直しても、所有者のほかの人が却下した警告は check-codeql-pr-alerts.sh が数えるので、
+# 赤のままになる。
+#
+# このワークフローは PR のコードを取り出さず、動かさない。所有者は、main の
+# .github/CODEOWNERS の /.github/ の行から、check-codeql-pr-alerts.sh と同じ読み方で読む。
+#
+# このワークフローが止まっても、PR は赤のまま止まり、マージされない。所有者は、
+# codeql-complete を画面の「Re-run failed jobs」で動かし直せる。
+
+on:
+  schedule:
+    # GitHub の定期実行は、混んでいるときに遅れる。
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+  checks: read
+  pull-requests: read
+  security-events: read
+
+concurrency:
+  # 実行が重なって、同じ実行を2回動かし直そうとするのを避ける。
+  group: codeql-recheck
+  cancel-in-progress: false
+
+jobs:
+  recheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # 手で動かしたときも、所有者は main の CODEOWNERS から読む。
+          ref: main
+          persist-credentials: false
+
+      - name: Rerun codeql-complete after the owner's dismissals
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # check-codeql-pr-alerts.sh と同じ読み方で、所有者を読む。
+          owners=$(awk '
+              { sub(/#.*/, "") }
+              $1 == "/.github/" { line = $0 }
+              END {
+                  n = split(line, f, /[ \t]+/)
+                  for (i = 1; i <= n; i++) if (f[i] ~ /^@[A-Za-z0-9][A-Za-z0-9-]*$/) print tolower(substr(f[i], 2))
+              }' .github/CODEOWNERS)
+          if [ -z "$owners" ]; then
+              echo "::error::CODEOWNERS の /.github/ の行に、所有者のアカウントがありません。"
+              exit 1
+          fi
+
+          is_owner() {
+              local login="${1,,}" owner
+              [ -n "$login" ] || return 1
+              while IFS= read -r owner; do
+                  [ "$owner" = "$login" ] && return 0
+              done <<<"$owners"
+              return 1
+          }
+
+          # 同じリポジトリのブランチから作られた、開いている PR の番号と先頭のコミット。
+          # fork からの PR では GITHUB_TOKEN が読み取り専用になり、動かし直せないので対象にしない。
+          prs=$(gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | "\(.number) \(.head.sha)"')
+
+          failed=0
+          while read -r pr sha; do
+              [ -n "$pr" ] || continue
+
+              # 1. PR の先頭のコミットの、最後に終わった codeql-complete の検査を読む。
+              check=$(gh api "repos/$REPO/commits/$sha/check-runs?check_name=codeql-complete&filter=latest&per_page=100" \
+                  --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | last // empty | "\(.conclusion) \(.completed_at) \(.details_url)"')
+              [ -n "$check" ] || continue
+              read -r conclusion completed_at details_url <<<"$check"
+              [ "$conclusion" = "failure" ] || continue
+
+              # 2. 所有者が却下し、却下の時刻が検査の終わった時刻よりあとの警告があるかを読む。
+              #    時刻はどちらも UTC の ISO 8601(末尾 Z)なので、文字列で比べられる。
+              dismissals=$(gh api --paginate "repos/$REPO/code-scanning/alerts?tool_name=CodeQL&state=dismissed&ref=refs/pull/$pr/merge&per_page=100" \
+                  --jq '.[] | "\(.dismissed_by.login // "") \(.dismissed_at // "")"')
+              found=0
+              while read -r login at; do
+                  [ -n "$login" ] || continue
+                  if is_owner "$login" && [[ "$at" > "$completed_at" ]]; then
+                      found=1
+                      break
+                  fi
+              done <<<"$dismissals"
+              [ "$found" -eq 1 ] || continue
+
+              # 3. 検査の実行を動かし直す。details_url は .../actions/runs/<run_id>/job/<job_id> の形。
+              run_id=$(awk -F'/' '{ for (i = 1; i < NF; i++) if ($i == "runs") print $(i + 1) }' <<<"$details_url")
+              if ! [[ "$run_id" =~ ^[0-9]+$ ]]; then
+                  echo "::warning::PR #$pr の codeql-complete の実行を読めませんでした。"
+                  failed=$((failed + 1))
+                  continue
+              fi
+              echo "動かし直す: PR #$pr run=$run_id"
+              if ! gh api -X POST "repos/$REPO/actions/runs/$run_id/rerun-failed-jobs" >/dev/null; then
+                  echo "::warning::PR #$pr の codeql-complete を動かし直せませんでした: run=$run_id"
+                  failed=$((failed + 1))
+              fi
+          done <<<"$prs"
+
+          if [ "$failed" -gt 0 ]; then
+              echo "::error::${failed} 件の PR で codeql-complete を動かし直せませんでした。画面の「Re-run failed jobs」で動かし直してください。"
+              exit 1
+          fi

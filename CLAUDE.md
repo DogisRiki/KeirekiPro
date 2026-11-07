@@ -45,6 +45,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - 必須チェックを新しく足すときは、期待一覧(`.github/audit/required-checks.json`)への登録も同じ変更に含めて人間に提案する。スキップのままマージされたことを週次監査が見つけられるのは、期待一覧に登録したチェックだけである(登録が漏れると、rulesetとの食い違いとして週次監査が報告する)
 - **コンテナイメージの脆弱性の抑制(`.github/container-scan-suppressions.json`)を自分の判断で足さない。** これは `container-scan` を緑にする唯一の手段であり、「見かけの合格」を作る経路にあたる。追加が要ると判断したときは、脆弱性ごとに理由と期限を添えて人間に提案する。`.github/` 配下のためCODEOWNERSとescape-hatchが承認を機械強制する
 - **`container-scan` の実行を自律側からキャンセルしない。** キャンセルされたジョブは `cancelled` として報告され、必須ステータスチェックは成功にならない(2026-08-20 実測。緑は残らない)。ただしその後に再検査を発火させるイベントが無いため、**再実行するまでPRは赤のまま進まなくなる。** 実行が長い(本番イメージの組み立てを含む)ことを理由に止めない
+- **CodeQL の警告を却下しない。却下は所有者だけが行う**
 - 200行(実装のコード差分。テストとドキュメントは計上しない)を超えるPRは、spec駆動(Lane A)のPRとしてPR本文に `Spec: .kiro/specs/<feature>` を記載したものしか通らない(size-checkが機械判定する)。
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
 - DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う

@@ -41,9 +41,18 @@
 #   判定不能(2)として受け付けない。見出しが切れたり、強調・リンク・HTML・
 #   メンションとして解釈されたりするのを防ぐ。
 #
+# ブランチ(4つ目の引数)について:
+#   PR でも動くワークフロー(例: ソースコードの診断の codeql.yaml)では、PR の実行の
+#   成功を数えると、main の実行が止まっていても、直近の成功が新しく見える。
+#   4つ目の引数を渡すと、数える実行を branch=<ブランチ> の実行に絞る。
+#   省略したときは今と同じくブランチで絞らず、報告の文面も変わらない。
+#   値は実行の一覧の問い合わせにそのまま入るため、英数字で始まり、英数字と
+#   . _ / - だけからなるブランチの名前の形に限る。それ以外は判定不能(2)とする。
+#
 # テスト: .github/scripts/tests/test-check-audit-scan-freshness.sh
-# 使い方: check-audit-scan-freshness.sh <workflow_file> <threshold_days> [表示名]
-#   表示名 省略時は「定期スキャン」
+# 使い方: check-audit-scan-freshness.sh <workflow_file> <threshold_days> [表示名] [ブランチ]
+#   表示名 省略時は「定期スキャン」。ブランチを渡すときは表示名も渡す
+#   ブランチ 省略時はブランチで実行を絞らない
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須)
 #   NOW_EPOCH(テスト用の時刻固定)
 # =====================================================================
@@ -54,13 +63,13 @@ trap 'exit 2' ERR
 
 # 引数・環境変数の欠落を ${n:?} に任せると終了コード1(逸脱あり)になるため、
 # 明示的に検査して判定不能(2)に倒す。
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ] || [ -z "$1" ] || [ -z "$2" ]; then
-    echo "::error::引数は2個か3個で指定してください: <workflow_file> <threshold_days> [表示名]"
+if [ "$#" -lt 2 ] || [ "$#" -gt 4 ] || [ -z "$1" ] || [ -z "$2" ]; then
+    echo "::error::引数は2個から4個で指定してください: <workflow_file> <threshold_days> [表示名] [ブランチ]"
     exit 2
 fi
 # 表示名は渡したときだけ検査する。空の値を渡したときは、省略とみなさず
 # 誤った呼び出しとして止める(見出しが「が止まっています」だけになるため)。
-if [ "$#" -eq 3 ]; then
+if [ "$#" -ge 3 ]; then
     if [ -z "$3" ]; then
         echo "::error::表示名を渡すときは空にしないでください"
         exit 2
@@ -70,6 +79,16 @@ if [ "$#" -eq 3 ]; then
         echo "::error::表示名に改行などの制御文字と Markdown の記号・メンション(\` * _ [ ] < > # | \\ ~ @ &)は使えません"
         exit 2
     fi
+fi
+# ブランチは渡したときだけ検査する。問い合わせの URL に入るため、
+# & や ? や空白で別の条件を足せないよう、ブランチの名前の形に限る。
+BRANCH_QUERY=""
+if [ "$#" -eq 4 ]; then
+    if ! [[ "$4" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
+        echo "::error::ブランチは英数字で始まり、英数字と . _ / - だけからなる名前で指定してください"
+        exit 2
+    fi
+    BRANCH_QUERY="&branch=$4"
 fi
 # 算術展開に渡す外部由来の値は、先に形を確かめる。英字は未定義変数、
 # 先頭0は8進数(08・09 は範囲外)として扱われ、いずれも ERR トラップを
@@ -126,11 +145,12 @@ report_undecidable() {
 
 # --- 直近の成功実行の取得 -------------------------------------------------------
 # status=success で絞り、最新1件だけを取る(1リクエスト)。
+# ブランチを渡したときは、そのブランチの実行に絞る。
 # 取得の失敗を「成功ゼロ」と混同しない。混同すると、API障害のたびに
 # 「スキャンが止まった」という誤った報告になり、赤の意味が信用できなくなる。
 runs_json=""
 if ! runs_json=$(gh api \
-    "repos/${REPO}/actions/workflows/${WORKFLOW_FILE}/runs?status=success&per_page=1" 2>/dev/null); then
+    "repos/${REPO}/actions/workflows/${WORKFLOW_FILE}/runs?status=success&per_page=1${BRANCH_QUERY}" 2>/dev/null); then
     report_undecidable "実行一覧APIへの問い合わせに失敗しました。"
 fi
 
