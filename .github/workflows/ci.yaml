@@ -272,19 +272,52 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # 部品の版は libs.versions.toml に集約してあるので、鍵に含めないと版を上げても
+      # キャッシュが保存し直されない。wrapper は Gradle の本体で、毎回のダウンロードを避ける。
       - name: Cache Gradle dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.gradle/caches
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'backend/gradle/libs.versions.toml') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 
       - name: Grant execute permission to Gradle wrapper
         run: chmod +x ./gradlew
 
+      # Configuration Cache を使うと、Gradle は1つのプロジェクトの中のタスクも同時に動かす
+      # (https://docs.gradle.org/current/userguide/configuration_cache.html)。
+      # Spotless・SpotBugs・Checkstyle がテストを待たずに動く。CI のこのジョブだけに付ける。
       - name: Run backend checks
-        run: ./gradlew check
+        run: ./gradlew check --configuration-cache
+
+      # PMD の UnitTestShouldIncludeAssert は check の pmdTest で流れている。別のジョブで
+      # 流し直さず、check が作ったレポートから件数を要約する。警告のみなのでジョブを赤にしない。
+      - name: Summarize PMD report
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          report="build/reports/pmd/test.xml"
+          {
+            echo "### :mag: 何も検証していないJavaテストのレポート(PMD UnitTestShouldIncludeAssert・警告のみ)"
+            echo ""
+            if [ ! -f "$report" ]; then
+              echo "PMD のレポートが作られなかった。check が pmdTest より前に失敗したため、件数を数えられない。"
+            else
+              count=$(grep -c "<violation" "$report" || true)
+              echo "検出件数: **${count} 件**"
+              if [ "$count" -gt 0 ]; then
+                echo ""
+                echo "誤検知(ヘルパーメソッド経由で検証しているテスト)は、backend/config/pmd/ruleset.xml の"
+                echo "extraAssertMethodNames に検証メソッド名を追加して抑える。"
+              fi
+            fi
+            echo ""
+            echo "> 昇格条件: 誤検知の設定整理が完了して実検出が0になったら、backend/gradle/quality.gradle の"
+            echo "> PMD設定 ignoreFailures を false にしてビルド失敗へ昇格する(昇格はIssueを起票して行う)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload backend check results
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
