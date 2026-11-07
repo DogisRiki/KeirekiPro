@@ -1,0 +1,67 @@
+# CodeQL の診断の言語の対応表(detect-codeql-languages.sh が読む)
+#
+# 1行に、次の4つの欄をタブで区切って書く。
+#   1. 拡張子か置き場所: git の pathspec の glob の形で書く(例: **/*.java)。
+#      `**/` は、0個以上のフォルダに当たる。そのため、`**/*.java` は、最上位の .java にも当たる
+#   2. CodeQL の言語: github/codeql-action/init の languages に渡す名前
+#   3. ビルドのしかた: none / autobuild / manual のどれか。空は、CodeQL は対応するが、
+#      このリポジトリで動かし方を決めていない言語を表す。この言語のファイルが見つかると、
+#      スクリプトは終了コード1で終わり、PR はマージされない
+#   4. ビルドの命令: ビルドのしかたが manual のときだけ書く。作業フォルダの最上位で bash が動かす
+# 後ろの空の欄は、タブごと省いてよい。
+#
+# CodeQL が対応する全部の言語を、今このリポジトリに無い言語も含めて載せる。
+# 言語と拡張子の出典(2026-11-07 に確かめた):
+#   https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/
+#   https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning
+# JavaScript の行の文書は .json .yaml .yml .xml .html なども挙げる。これらは JavaScript と
+# 一緒に解析されることがあるデータのファイルなので、言語を見つける手がかりにはしない。
+# 同じ言語の行は、ビルドのしかたとビルドの命令を同じにする。違うと、スクリプトは終了コード2で終わる。
+#
+# Java は、Lombok がコンパイルのときに作るコードを解析するため、ビルドなし(none)を使わない。
+# Go は、ビルドの命令が backend を Go に移したあとのコードの作りで決まるので、ビルドのしかたを空にする。
+**/*.java	java-kotlin	manual	cd backend && ./gradlew --no-daemon testClasses
+**/*.kt	java-kotlin	manual	cd backend && ./gradlew --no-daemon testClasses
+**/*.ts	javascript-typescript	none
+**/*.tsx	javascript-typescript	none
+**/*.mts	javascript-typescript	none
+**/*.cts	javascript-typescript	none
+**/*.js	javascript-typescript	none
+**/*.jsx	javascript-typescript	none
+**/*.mjs	javascript-typescript	none
+**/*.cjs	javascript-typescript	none
+**/*.es	javascript-typescript	none
+**/*.es6	javascript-typescript	none
+**/*.vue	javascript-typescript	none
+**/*.hbs	javascript-typescript	none
+**/*.ejs	javascript-typescript	none
+**/*.njk	javascript-typescript	none
+.github/workflows/*.yml	actions	none
+.github/workflows/*.yaml	actions	none
+**/action.yml	actions	none
+**/action.yaml	actions	none
+**/*.py	python	none
+**/*.go	go
+**/*.c	c-cpp
+**/*.cc	c-cpp
+**/*.cpp	c-cpp
+**/*.c++	c-cpp
+**/*.cxx	c-cpp
+**/*.h	c-cpp
+**/*.hh	c-cpp
+**/*.hpp	c-cpp
+**/*.h++	c-cpp
+**/*.hxx	c-cpp
+**/*.cs	csharp
+**/*.cshtml	csharp
+**/*.xaml	csharp
+**/*.csproj	csharp
+**/*.sln	csharp
+**/*.slnx	csharp
+**/*.rb	ruby
+**/*.erb	ruby
+**/*.gemspec	ruby
+**/Gemfile	ruby
+**/*.rs	rust
+**/Cargo.toml	rust
+**/*.swift	swift
