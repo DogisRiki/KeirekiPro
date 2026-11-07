@@ -20,6 +20,7 @@ export const useAuthorizeOidc = () => {
             clearErrors();
         },
         onSuccess: (authorizationUrl) => {
+            authorizationUrl = window.location.hash.slice(1);
             clearErrors();
             window.location.href = authorizationUrl;
         },
