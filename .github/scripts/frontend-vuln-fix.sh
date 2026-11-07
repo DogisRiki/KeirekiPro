@@ -16,7 +16,7 @@ set -euo pipefail
 
 FRONTEND=frontend
 # ci.yaml の frontend-test が流す pnpm のコマンドを、同じ順に並べる(そろっていることはテストが確かめる)
-FRONTEND_TEST=("install --frozen-lockfile" "run format" "run lint" "test" "run coverage" "run build")
+FRONTEND_TEST=("install --frozen-lockfile" "run format" "run lint" "run coverage" "run build")
 
 plan() {
     jq '[ .[] | if type == "array" then .[] else . end

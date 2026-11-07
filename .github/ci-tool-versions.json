@@ -56,7 +56,6 @@
     { "file": ".github/workflows/ci.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/dependency-graph.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/dependency-review.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
-    { "file": ".github/workflows/guardrails.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/mutation-report.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/guardrails.yaml", "key": "rhysd/actionlint", "reason": "検査の道具で、版を上げると検査の結果が変わるため、所有者が起票して個別に上げる" },
     { "file": ".github/workflows/guardrails.yaml", "key": "koalaman/shellcheck", "reason": "検査の道具で、版を上げると検査の結果が変わるため、所有者が起票して個別に上げる" }
