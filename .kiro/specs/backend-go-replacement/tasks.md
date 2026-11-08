@@ -92,7 +92,7 @@
   - 受入基準とテストの対応: 要件3の受入基準2(どの OS でも1つのコマンド)は、`run-check.sh backend-go` がこのイメージで動くことで確かめる。テストのコードは無い
   - _要件: 3.2_
 
-- [ ] 2.2 API の仕様書を入れ、HTTP の受け口のコードを生成する
+- [x] 2.2 API の仕様書を入れ、HTTP の受け口のコードを生成する
 
   Claude は、タスク1.10で入れた `.kiro/specs/backend-go-replacement/openapi.yaml` を `git mv` で `backend/api/openapi.yaml` に移し、`backend/api/oapi-codegen.yaml`(`std-http-server` と `strict-server` と `models`)と `backend/sqlc.yaml`(マイグレーションのファイルを V1 から順に1つずつ並べる)を作る。Claude は、`backend/Makefile` に `generate` と `generate-check` を作る。`generate-check` は、一時のフォルダに生成し、リポジトリのファイルと `diff -r` で比べる。
   - 完了の確かめ方: `run-check.sh backend-go make generate` で `backend/internal/httpapi/gen/api.gen.go` ができ、`run-check.sh backend-go make generate-check` が成功し、生成したファイルを1行変えると `generate-check` が失敗する
@@ -635,6 +635,7 @@
   - D3-3-2: 表の形の履歴の `description` の書き方である。タスク2.4で扱う
   - D3-2-2: Dependabot の docker の項目の `open-pull-requests-limit` である。タスク5.1で扱う
   - D3-1-6: 比べる検査のコードを `make lint` が読むかである。タスク2.3で扱う
+- コードの生成(タスク2.2で分かったこと): oapi-codegen は、設定のファイルに `output` があると `-o` を使わない。そのため `api/oapi-codegen.yaml` には `output` を書かず、Makefile が `-o` で出力の場所を渡す。sqlc は、問い合わせのファイルが1つも無いと失敗するので、Makefile は `db/queries/*.sql` があるときだけ sqlc を動かす。sqlc は設定のファイルのフォルダから相対のパスを読むので、`generate-check` は設定とマイグレーションと問い合わせを `cp --parents` で一時のフォルダに写して生成する。問い合わせを作るタスク(2.5 以降)で、Claude は `db/queries/` に SQL を置き、`make generate` で `internal/platform/database/sqlcgen/` を作る
 
 ## 完了条件(全タスク共通)
 
