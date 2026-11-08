@@ -69,7 +69,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(公開から72時間たっていない部品を止める)は、`test-check-release-age.sh` に足す「gomod の版が72時間より新しければ止める」「gomod の版が古ければ通す」の場合で確かめる
   - _要件: 3.1_
 
-- [ ] 1.9 承認の対象と守る対象と escape-hatch の検知を Go に対応させる (並行可)
+- [x] 1.9 承認の対象と守る対象と escape-hatch の検知を Go に対応させる (並行可)
 
   Claude は、`.github/scripts/check-dependency-additions.sh` の承認の対象に `backend/Makefile` `backend/.golangci.yml` `backend/.testcoverage.yml` `backend/.gremlins.yaml` `backend/api/oapi-codegen.yaml` `backend/sqlc.yaml` を足す。Claude は、`.github/CODEOWNERS` に同じ6つのファイルを足す。Claude は、`.github/scripts/check-escape-hatches.sh` に、Go のテストの飛ばし(`t.Skip` `t.SkipNow` `t.Skipf`)と `//nolint` の追加を見つける形を足し、同じ6つのファイルを、所有者の承認があれば通るゲート隣接ファイルの一覧に足す。`check-escape-hatches.sh` は、`.testcoverage.yml` に除外を足す変更を、ゲート隣接ファイルの扱いで、所有者の承認が無ければ止める。Claude は、`check-dependency-additions.sh` と `CODEOWNERS` と `check-escape-hatches.sh` の完成版と、2つのスクリプトのテストを、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、`test-check-dependency-additions.sh` と `test-check-escape-hatches.sh` が成功する
@@ -641,6 +641,7 @@
 - 公開のリポジトリ: Claude は、まだ直していないセキュリティの穴を、Issue、PR、コミット、spec の本文に書かない
 - 公開の時刻の検査のテストの環境(タスク1.7で分かったこと): `test-check-dependency-cooldown.sh` は openssl と gnupg を使う。Linux のコンテナで流すときは、`apk add` に `openssl gnupg` を足す
 - Go のモジュールの索引の読み方(タスク1.8で分かったこと): index.golang.org は1回の問い合わせに約4秒かかり、73時間分を順に読むと約10分かかって、判定の手順の5分の上限に収まらない。そのため `lib-gomod-index.sh` は、73時間を4時間ずつの区間(`GOMOD_INDEX_SEGMENT_HOURS`)に分け、約19本を同時に読む。design.md の「索引を順に読む」の書き方とは違う。区間の中のページは、最後の行の時刻を秒に切り上げた値が区間の終わりと同じときも、次のページを読む(`-le`)。check-release-age.sh は、go.mod の go・toolchain・module・exclude・retract・tool・godebug・ignore の行を照らさない。Dependabot が toolchain の行を変えるかは確かめていない
+- Go の検査の外しの検知(タスク1.9で決めたこと): `check-escape-hatches.sh` は、`backend/` の下のすべての `.go` で、足した `.Skip(` `.SkipNow(` `.Skipf(` と `//nolint` と `// coverage-ignore`(go-test-coverage がカバレッジから外すコメント)を見つける。受け手の名前は `t` に限らない。gosec の `// #nosec` は見つけない。そのため、Claude は、タスク2.3で `.golangci.yml` を作るとき、gosec が `#nosec` のコメントに従わない設定にする。Claude は、タスク2.3で `Makefile` から golangci-lint と gremlins を呼ぶとき、設定のファイルを名前で指定する。承認の対象の6つのファイルと別の名前の設定のファイルを、道具が読まないようにするためである
 - design の審査で残った記録: 次の5つを、それぞれ次のタスクで扱う。
   - D3-3-1: 6-1 の `backend-vuln-fix` が版を上げる場所の一覧である。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」に書き足したとおりに、タスク10.7で扱う
   - D5-1-1: 6-1 での `backend-vuln-fix.yaml` の Java 版の仕事の扱いである。タスク10.7で扱う
