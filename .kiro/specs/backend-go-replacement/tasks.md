@@ -85,7 +85,7 @@
   - _要件: 1.2, 3.5, 7.2, 7.3_
 
 - [ ] 2. Go 版の土台と品質チェックの設定と開発環境を入れる(PR 2-2)
-- [ ] 2.1 Go のモジュールと開発環境のイメージと compose のサービスを作る
+- [x] 2.1 Go のモジュールと開発環境のイメージと compose のサービスを作る
 
   Claude は、`backend/go.mod` と `backend/go.sum` を作り、`toolchain go1.27.3` と、`tool` の指定で oapi-codegen と sqlc と go-test-coverage と gremlins と govulncheck の版を書く。Claude は、`docker/backend-go/Dockerfile` を作る。このイメージは、`golang:1.27.3-trixie` に、タスク1.5で `ci.yaml` に固定したのと同じ版の golangci-lint と、poppler-utils と、Docker の CLI と、Debian の `chromium` と、`fonts-noto-cjk` を入れる。Claude は、`compose.yaml` にサービス `backend-go` とボリューム `backend-go-cache` を足す。サービス `backend-go` は、ホストの 8081 をコンテナの 8080 につなぐ。
   - 完了の確かめ方: `docker compose build backend-go` が成功し、`bash .claude/scripts/parallel/run-check.sh backend-go go version` が `go1.27.3` を返す
