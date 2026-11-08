@@ -26,7 +26,7 @@
   - _要件: 3.2_
   - _依存: 1.1_
 
-- [ ] 1.4 backend-test の判定のスクリプトを作る (並行可)
+- [x] 1.4 backend-test の判定のスクリプトを作る (並行可)
 
   Claude は、`.github/scripts/backend-test-verdict.sh` とそのテスト `.github/scripts/tests/test-backend-test-verdict.sh` を、置き場に作る。このスクリプトは、3つの見分け(`backend_java` `backend_go` `backend_compat`)と3つの仕事の結果を受け取り、見分けが当たった仕事の結果が `success` でないとき、または見分けが当たったのに飛ばされた仕事があるときに失敗する。テストは、環境変数 `KP_TEST_CASE` に場合の名前を入れれば、その場合だけを流せる。
   - 完了の確かめ方: 検査用の写しで、`test-backend-test-verdict.sh` が成功する
@@ -625,6 +625,7 @@
 - 受入基準の確かめ方: 要件の受入基準のうち、Claude の進め方の決まり(要件1の受入基準1と2と6、要件2、要件7、要件8)と、文書と PR の本文と所有者への返事で満たすものは、テストのコードでなく、「受入基準とテストの対応」の行に書いた文書か記録を読んで確かめる。要件2の受入基準1から4(設計を書く前に、今と同じにできるかが分からない動きを洗い出し、試しに作って確かめる)の結果は、Claude が段階1の記録として research.md に書き終えてある
 - 置き場: Claude は、`.github/` と `.claude/hooks/` と `.claude/settings.json` の下のファイルの完成版を、作業フォルダの中の `.claude/.state/backend-go-replacement/place-<大タスクの番号>/` に、本来のパスと同じフォルダの形で作る。`.claude/.state/` は git の管理外である。`.claude/scripts/` と `.claude/skills/` は Claude が直接書ける
 - 所有者に置いてもらう: Claude は、所有者に、`cd <作業フォルダのパス>` と、置き場から本来の場所への `cp` を、1つずつのコマンドで示し、置く理由を添える。所有者が置いたあと、Claude は `cmp` で置き場と本来の場所を比べる。`cmp` が止められたら、Read で両方を読んで比べる
+- `.github/` の置き場(タスク1.4で分かったこと): 許可の設定の `Write(.github/**)` は、作業フォルダの中の置き場の下の `.github/` にも当たり、Claude は書けない。そのため、Claude は `.github/` の下のファイルの完成版を、`.github/CLAUDE.md` のとおり、会話の scratchpad の `place-<大タスクの番号>/` に、本来のパスと同じフォルダの形で作る。scratchpad は会話ごとのフォルダなので、Claude は、大タスクの最後の小タスクで所有者に置いてもらうまで、同じ会話で進める
 - 検査用の写し: Claude は、作業フォルダを `git archive HEAD` で scratchpad の一時フォルダに写し、まだコミットしていないファイルと置き場のファイルを本来のパスで重ねた写しで、置き場のファイルのテストを流す。まだリポジトリに無いファイルを `docker -v` で作業フォルダに重ねると、作業フォルダに0バイトのファイルが残るので、Claude はそうしない
 - テストを流す環境: 大きなまとまりの途中の小タスクでは、Claude は、そのタスクで変えたファイルのテストだけを、この PC の Git Bash で流す。大きなまとまりの最後の小タスクでは、Claude は、`docker run --rm -v "<フォルダ>:/src:ro" alpine:3` で写しを読むだけの形で渡し、コンテナの中で別のフォルダに写してから、`apk add --no-cache bash perl git curl jq` のあとですべてのテストを流す。shellcheck は、CI の `guardrails.yaml` と同じく `koalaman/shellcheck:v0.11.0` に対象の `.sh` をまとめて渡し、actionlint は `rhysd/actionlint:1.7.12` で流す
 - CI で動くスクリプト: CI のワークフローが呼ぶスクリプトを作るか直すときは、`.github/CLAUDE.md` の「CI で動くスクリプトを手元で確かめる」に従い、ランナーの CPU とファイルの権限を確かめる
