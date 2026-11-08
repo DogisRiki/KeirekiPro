@@ -954,6 +954,17 @@ if want maven_fetch_fail; then
     expect_result "1回目の取得が失敗しても、再試行で取れれば判定する(maven)" same
 fi
 
+if want gomod_no_signature; then
+    reset
+    run gomod github.com/Example/Tool 1.1.0 1.2.0
+    expect_result "gomod の部品は、署名の仕組みが無いので no-prior-signature になる" no-prior-signature
+    if [ -s "$WORK/calls.log" ]; then
+        fail "gomod の部品は、外部に問い合わせない" "$(head -c 300 "$WORK/calls.log")"
+    else
+        pass "gomod の部品は、外部に問い合わせない"
+    fi
+fi
+
 if want bad_args; then
     reset
     run npm widget 1.0.0

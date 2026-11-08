@@ -156,6 +156,10 @@ STUB
 # OSV: querybatch には、$STUB_OSV_MAL の各行 "<名前>@<版>\t<ID>" に当たる要素に、その ID を返す。
 #   vulns/<ID> には、要約と URL を持つ項目を返す。要約は、STUB_OSV_SUMMARY があればその値にする。
 #   STUB_OSV_FAIL があれば、どちらも 500 を返す。
+# Go のモジュールの索引: URL の since の値を名前にしたファイルを $STUB_GOMOD_DIR から探し、-o の先に写す。
+#   ファイルが無ければ、curl -f が HTTP の誤りの応答を受けたときと同じく 22 で終わる。
+#   区間の長さ(GOMOD_INDEX_SEGMENT_HOURS)は73時間にして、索引を1つの区間で読ませる。
+#   区間に分けて読む動きは test-lib-gomod-index.sh で確かめる。
 # 呼ばれたURLは $STUB_CALLS に記録する。
 cat >"$WORK/bin/curl" <<'STUB'
 #!/usr/bin/env bash
@@ -195,6 +199,16 @@ case "$url" in
     *) exit 6 ;;
     esac
     printf 200
+    exit 0
+    ;;
+"${GOMOD_INDEX_BASE}"/*)
+    since="${url#*since=}"
+    since="${since%%&*}"
+    if [ ! -f "${STUB_GOMOD_DIR:?}/${since}" ]; then
+        echo "curl: (22) The requested URL returned error: 500" >&2
+        exit 22
+    fi
+    cat "${STUB_GOMOD_DIR}/${since}" >"${out:?}"
     exit 0
     ;;
 "${NPM_REGISTRY_BASE}"/*)
@@ -240,8 +254,8 @@ chmod +x "$WORK/bin/gh" "$WORK/bin/curl"
 # 外部のサービスの状態を空にする。PR のコメントは無し、警告は無し、悪意のある部品は無し、
 # 除外の欄は要素無し
 reset_all() {
-    rm -rf "$WORK/npm" "$WORK/alerts"
-    mkdir -p "$WORK/npm" "$WORK/alerts"
+    rm -rf "$WORK/npm" "$WORK/alerts" "$WORK/gomod"
+    mkdir -p "$WORK/npm" "$WORK/alerts" "$WORK/gomod"
     printf '[]\n' >"$WORK/comments.json"
     : >"$WORK/osv_mal.tsv"
     pnpm_exclude
@@ -265,6 +279,7 @@ run() {
         MAVEN_CENTRAL_BASE="https://central.invalid/maven2" \
         PLUGIN_PORTAL_BASE="https://portal.invalid/m2" \
         NPM_REGISTRY_BASE="https://npm.invalid" \
+        GOMOD_INDEX_BASE="https://gomod.invalid" STUB_GOMOD_DIR="$WORK/gomod" GOMOD_INDEX_SEGMENT_HOURS=73 \
         OSV_API_BASE="https://osv.invalid" \
         KEYSERVER_BASE="https://keys.invalid" \
         PNPM_WORKSPACE_FILE="$WORK/pnpm-workspace.yaml" \
@@ -559,9 +574,9 @@ if want filter; then
         "[$(entry removed maven org.example:removed 9.9.9),$(entry removed npm left-pad 1.0.0)]" ""
     check_no_calls "removed だけなら配布元へ問い合わせない"
 
-    check 0 "maven と npm 以外のエコシステムは対象にしない" \
+    check 0 "maven と npm と gomod 以外のエコシステムは対象にしない" \
         "[$(entry added github-actions actions/checkout v9.9.9),$(entry added pip requests 9.9.9)]" ""
-    check_no_calls "maven と npm 以外だけなら配布元へ問い合わせない"
+    check_no_calls "maven と npm と gomod 以外だけなら配布元へ問い合わせない"
 
     check 1 "混在していても added かつ maven のものだけを見る" \
         "[$(entry added github-actions actions/checkout v9.9.9),$(entry removed maven org.example:old 1.0.0),$(entry added maven org.example:lib 1.0.0)]" \
@@ -1005,6 +1020,77 @@ if want record_post_fail; then
     setup_eligible_axios
     STUB_COMMENTS_FAIL=post OWNER_APPROVED=true check 1 "記録のコメントを書けなかったら赤になる(所有者の承認があっても赤)" "[$COMPARE_AXIOS]" ""
     check_records 0 "記録のコメントを書けなかったら赤になる(記録が無い)"
+fi
+
+# --- gomod(Go のモジュール)の部品 ----------------------------------------------------
+# 索引を読み始める時刻。基準時刻の73時間前
+GOMOD_SINCE="2026-01-06T23:00:00Z"
+# 使い方: gomod_index <モジュール> <版> <取り込まれた時刻>。読み始めのページに索引の1行を足す
+gomod_index() {
+    printf '{"Path":"%s","Version":"%s","Timestamp":"%s"}\n' "$1" "$2" "$3" >>"$WORK/gomod/$GOMOD_SINCE"
+}
+GOMOD_INDEX_URL="https://gomod.invalid/index?since=${GOMOD_SINCE}&limit=2000"
+COMPARE_GOTOOL="$(entry removed gomod github.com/Example/Tool 1.1.0),$(entry added gomod github.com/Example/Tool 1.2.0)"
+
+if want gomod_young; then
+    gomod_index github.com/Example/Tool v1.2.0 2026-01-08T00:00:00Z
+    check 1 "gomod の部品が新しければ止める" "[$COMPARE_GOTOOL]" ""
+    check_summary "| github.com/Example/Tool | 1.2.0 | 2026-01-08 00:00 UTC | 公開から72時間経っていない。開いている脆弱性の警告が無い | 2026-01-11 00:00 UTC |" \
+        "gomod の部品が新しければ止める(索引に取り込まれた時刻と、それに72時間を足した時刻が表に出る)"
+    check_out "::error::72時間の待ちで止めた部品: github.com/Example/Tool 1.2.0。理由: 公開から72時間経っていない。開いている脆弱性の警告が無い。入るようになる時刻: 2026-01-11 00:00 UTC" \
+        "gomod の部品が新しければ止める(::error:: の行が出る)"
+    check_calls "$GOMOD_INDEX_URL" "gomod の部品が新しければ止める(索引を判定の時刻の73時間前から読む)"
+    check_gh_match "ecosystem=go&package=github.com%2FExample%2FTool" 1 "gomod の部品が新しければ止める(警告は go のエコシステムで問い合わせる)"
+fi
+
+if want gomod_mature; then
+    # 72時間30分前に取り込まれた部品と、索引の読んだ範囲に無い部品
+    gomod_index github.com/example/old v2.0.0 2026-01-06T23:30:00Z
+    check 0 "gomod の部品が古ければ通す" \
+        "[$(entry added gomod github.com/example/old 2.0.0),$(entry added gomod golang.org/x/text 0.22.0)]" ""
+    check_out "追加された部品: gomod golang.org/x/text 0.22.0" "gomod の部品が古ければ通す(索引の読んだ範囲に無い部品も見る)"
+    if [ "$(grep -cF 'https://gomod.invalid/' "$WORK/calls.log")" -eq 1 ]; then
+        echo "PASS: gomod の部品が2つあっても、索引を1度だけ読む"
+    else
+        echo "FAIL: gomod の部品が2つあっても、索引を1度だけ読む ($(grep -cF 'https://gomod.invalid/' "$WORK/calls.log") 回読んだ)"
+        FAILED=1
+    fi
+fi
+
+if want gomod_unknown; then
+    # 索引のページを置かないので、索引を読めない
+    check 1 "索引を読めなければ、gomod の部品を判定不能にして赤にする" \
+        "[$(entry added gomod github.com/example/a 1.0.0),$(entry added gomod github.com/example/b 2.0.0)]" ""
+    check_summary "判定不能" "索引を読めなければ、gomod の部品を判定不能にして赤にする(判定不能の見出しが出る)"
+    check_summary "- github.com/example/a@1.0.0(Go のモジュールの索引を読めませんでした)" \
+        "索引を読めなければ、gomod の部品を判定不能にして赤にする(1つ目の部品が出る)"
+    check_summary "- github.com/example/b@2.0.0(Go のモジュールの索引を読めませんでした)" \
+        "索引を読めなければ、gomod の部品を判定不能にして赤にする(2つ目の部品が出る)"
+    check_summary "https://gomod.invalid" "索引を読めなければ、gomod の部品を判定不能にして赤にする(問い合わせ先に索引が出る)"
+fi
+
+if want gomod_eligible; then
+    gomod_index github.com/Example/Tool v1.2.0 2026-01-08T00:00:00Z
+    # 警告の API は、Go のモジュールのエコシステムを go と呼ぶ。最初の修正版は、先頭の v の有無によらず照らす
+    alert go github.com/Example/Tool v1.2.0
+    check 1 "gomod の部品が警告の最初の修正版なら、記録を書いて所有者の承認を待つ" "[$COMPARE_GOTOOL]" ""
+    check_summary "所有者の承認待ち" "gomod の部品が警告の最初の修正版なら、記録を書いて所有者の承認を待つ(承認待ちが出る)"
+    check_record_json '.entries == [{ecosystem: "gomod", name: "github.com/Example/Tool", version: "1.2.0", published_at: "2026-01-08T00:00:00Z", alerts: [{number: 210, ghsa_id: "GHSA-aaaa-bbbb-cccc", severity: "high", html_url: "https://github.com/owner/repo/security/dependabot/210"}]}]' \
+        "gomod の部品が警告の最初の修正版なら、記録を書いて所有者の承認を待つ(記録に版と公開日時と理由の警告が載る)"
+    check_no_call_to "attestations" "gomod の部品が警告の最初の修正版なら、記録を書いて所有者の承認を待つ(npm の来歴を読まない)"
+    OWNER_APPROVED=true check 0 "gomod の部品が警告の最初の修正版なら、承認があれば緑になる" "[$COMPARE_GOTOOL]" ""
+fi
+
+if want gomod_malicious; then
+    # 索引の読んだ範囲に無い古い部品が、悪意のある部品として公表されている
+    gomod_index github.com/Example/Tool v1.2.0 2026-01-08T00:00:00Z
+    alert go github.com/Example/Tool 1.2.0
+    printf 'github.com/evil/dep@1.0.0\tMAL-2026-3\n' >"$WORK/osv_mal.tsv"
+    OWNER_APPROVED=true check 1 "gomod の部品が悪意のある部品なら赤になる" \
+        "[$COMPARE_GOTOOL,$(entry added gomod github.com/evil/dep 1.0.0)]" ""
+    check_summary "| github.com/evil/dep | 1.0.0 | 2026-01-06 23:00 UTC より前 | 悪意のある部品として公表されている(MAL-2026-3 Malicious code in package (MAL-2026-3) https://advisories.invalid/MAL-2026-3) | 入らない |" \
+        "gomod の部品が悪意のある部品なら赤になる(索引の読んだ範囲に無い部品は、読み始めた時刻より前に公開したと出る)"
+    check_records 0 "gomod の部品が悪意のある部品なら赤になる(記録を書かない)"
 fi
 
 if [ "$RAN" -eq 0 ]; then

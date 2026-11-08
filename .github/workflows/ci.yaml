@@ -30,6 +30,9 @@ jobs:
     outputs:
       frontend_changed: ${{ steps.filter.outputs.frontend }}
       backend_changed: ${{ steps.filter.outputs.backend }}
+      backend_java: ${{ steps.backend.outputs.backend_java }}
+      backend_go: ${{ steps.backend.outputs.backend_go }}
+      backend_compat: ${{ steps.backend.outputs.backend_compat }}
       dockerfile_changed: ${{ steps.filter.outputs.dockerfile }}
       dockerfile_files: ${{ steps.filter.outputs.dockerfile_files }}
     steps:
@@ -52,10 +55,76 @@ jobs:
           filters: |
             frontend:
               - 'frontend/**'
+            # backend-test を動かすかの見分け。Go 版の本番のイメージの Dockerfile は
+            # docker/backend-go/ にあるので、docker/backend*/** も含める。
             backend:
               - 'backend/**'
+              - 'docker/backend*/**'
+            # 下の3つは、backend の3つの仕事を動かすかを決めるもとの見分け。
+            # ファイルの形は design.md の「CI の仕事」の一覧と同じにする。
+            # マイグレーションのファイルは、Java 版と Go 版が同じものを読むので、
+            # backend_java(backend/src/** に含まれる)と backend_go の両方に当たる。
+            backend_java:
+              - 'backend/src/**'
+              - 'backend/*.gradle'
+              - 'backend/gradle/**'
+              - 'backend/config/**'
+              - 'backend/gradlew*'
+              - 'docker/backend/**'
+            backend_go:
+              - 'backend/**/*.go'
+              - 'backend/go.mod'
+              - 'backend/go.sum'
+              - 'backend/Makefile'
+              - 'backend/.golangci.yml'
+              - 'backend/.testcoverage.yml'
+              - 'backend/.gremlins.yaml'
+              - 'backend/api/**'
+              - 'backend/sqlc.yaml'
+              - 'backend/assets/**'
+              - 'backend/src/main/resources/db/migration/**'
+              - 'docker/backend-go/**'
+            backend_compat:
+              - 'backend/compat/**'
             dockerfile:
               - 'docker/**/Dockerfile*'
+
+      # backend の3つの仕事の見分けを、検査するコミットにあるファイルで絞る。
+      # backend_go は、backend/go.mod があるときだけ当てる。Go 版の土台が main に入る前に、
+      # マイグレーションのファイルか backend/api/** を変えた PR で、Go 版のコードが無いまま
+      # backend-go が動いて失敗しないようにするため。
+      # backend_compat は、backend/compat/ があり、変わったファイルが Java 版か Go 版か
+      # 比べる検査のファイルに当たるときだけ当てる。比べる検査のコードが main に入る前に、
+      # backend-compat がコードの無いまま動いて失敗しないようにするため。
+      # paths-filter の値が true でも false でもないときは、成功に倒さず失敗にする。
+      - name: Decide backend jobs
+        id: backend
+        env:
+          JAVA_FILES: ${{ steps.filter.outputs.backend_java }}
+          GO_FILES: ${{ steps.filter.outputs.backend_go }}
+          COMPAT_FILES: ${{ steps.filter.outputs.backend_compat }}
+        run: |
+          set -euo pipefail
+          for v in "$JAVA_FILES" "$GO_FILES" "$COMPAT_FILES"; do
+            if [ "$v" != true ] && [ "$v" != false ]; then
+              echo "::error::paths-filter の backend の見分けの値(${v})を読めませんでした。"
+              exit 1
+            fi
+          done
+          go=false
+          if [ "$GO_FILES" = true ] && [ -f backend/go.mod ]; then
+            go=true
+          fi
+          compat=false
+          if [ -d backend/compat ] && { [ "$JAVA_FILES" = true ] || [ "$GO_FILES" = true ] || [ "$COMPAT_FILES" = true ]; }; then
+            compat=true
+          fi
+          {
+            echo "backend_java=${JAVA_FILES}"
+            echo "backend_go=${go}"
+            echo "backend_compat=${compat}"
+          } >> "$GITHUB_OUTPUT"
+          echo "backend の見分け: backend_java=${JAVA_FILES} backend_go=${go} backend_compat=${compat}"
 
       # 週次監査(audit-weekly.yaml)自体が止まったことを次のPRで検知する(死活確認)。
       # 監査を監視する専用の仕組みは「それを誰が監視するか」の入れ子になるため作らず、
@@ -254,10 +323,17 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 7
 
-  backend-test:
+  # backend は、Java 版と Go 版と、2つの版の応答を比べる検査の3つの仕事に分けて検査する。
+  # 3つの仕事は、detect-changes の見分け(backend_java / backend_go / backend_compat)が
+  # 当たったときだけ動く。必須の検査 backend-test は、3つの仕事の結果を
+  # backend-test-verdict.sh で判定する。見分けが当たった仕事が success でないとき、
+  # または見分けが当たったのに飛ばされた仕事があるときに、backend-test は失敗する。
+  backend-java:
     needs: detect-changes
-    if: needs.detect-changes.outputs.backend_changed == 'true'
+    if: needs.detect-changes.outputs.backend_java == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: backend
@@ -319,6 +395,8 @@ jobs:
             echo "> PMD設定 ignoreFailures を false にしてビルド失敗へ昇格する(昇格はIssueを起票して行う)"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # 成果物の名前は backend-check-results のまま変えない。月1回の mutation の記録
+      # (collect-coverage.sh)が、この名前で main の直近のカバレッジを読むため。
       - name: Upload backend check results
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -330,6 +408,120 @@ jobs:
           # 月1回の mutation の記録が main の直近のカバレッジを読むため、main への push は
           # 公開リポジトリの上限の90日残す(ci.yaml の push は main だけで起動する)。PR は7日のまま。
           retention-days: ${{ github.event_name == 'push' && 90 || 7 }}
+
+  backend-go:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend_go == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      # PR では、変えた箇所の変異テスト(make mutation-diff)が main との差分を git で読むため、
+      # 履歴のすべてを取る。PR と push で値を分ける式は書かない。式の中の数の 0 は偽として
+      # 扱われ、`cond && 0 || 1` の形はいつも 1 になるため(PR でも履歴を取れなくなる)。
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Go の版は backend/go.mod に書いた版を使う。開発環境のイメージと同じ版で検査するため。
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # golangci-lint は、公式が勧める、版を固定した実行ファイルで入れる(go tool では入れない)。
+      # 版は docker/backend-go/Dockerfile の golangci-lint の版とそろえる。
+      # install-only なので、このステップは検査を動かさず、PATH に足すだけにする。
+      # 検査は make check の中の make lint が動かす。
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          install-only: true
+
+      - name: Run backend checks
+        run: make check
+
+      # 変えた箇所の変異テストは、git の履歴を読むので CI でだけ動かす。
+      # 比べる元の枝の名前は、run: に式を直に書かず、環境変数で渡す。
+      - name: Run mutation tests on changed code
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: make mutation-diff BASE="origin/${BASE_REF}"
+
+  backend-compat:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend_compat == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # 比べる検査は、2つの版が作った PDF を poppler-utils(pdftotext・pdffonts・pdftoppm)で読んで比べる。
+      - name: Install poppler-utils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils
+
+      # 比べる検査は、Java 版と Go 版の本番のイメージを、この機械の Docker に組み立てさせてから比べる。
+      - name: Run compatibility tests
+        run: make compat
+
+      - name: Run cross-version tests
+        run: make compat-cross
+
+      # 違いの報告と、失敗したときの両方の版のコンテナのログは、backend/compat/report/ に書かれる。
+      - name: Upload compatibility report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: backend-compat-report
+          path: backend/compat/report/**
+          retention-days: ${{ github.event_name == 'push' && 90 || 7 }}
+
+  # 必須の検査。名前は required-checks.json と ruleset に登録した backend-test のまま変えない。
+  # always() を付けるのは、3つの仕事のどれかが失敗または飛ばされても、この判定を必ず動かすため。
+  # 付けないと、needs の仕事が失敗したときにこの仕事が飛ばされ、飛ばされた必須の検査は
+  # 成功と同じに扱われるので、失敗した PR が main に入ってしまう。
+  backend-test:
+    needs: [detect-changes, backend-java, backend-go, backend-compat]
+    if: always() && needs.detect-changes.outputs.backend_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Judge backend jobs
+        env:
+          BACKEND_JAVA: ${{ needs.detect-changes.outputs.backend_java }}
+          BACKEND_GO: ${{ needs.detect-changes.outputs.backend_go }}
+          BACKEND_COMPAT: ${{ needs.detect-changes.outputs.backend_compat }}
+          JAVA_RESULT: ${{ needs.backend-java.result }}
+          GO_RESULT: ${{ needs.backend-go.result }}
+          COMPAT_RESULT: ${{ needs.backend-compat.result }}
+        run: bash .github/scripts/backend-test-verdict.sh
 
   # Dockerfileの変更だけでは frontend-test / backend-test / e2e-smoke がどれも動かない。
   # ベースイメージの更新はDependabotによって自動マージされるため、このジョブが無いと
@@ -377,7 +569,7 @@ jobs:
             # ビルドコンテキストは compose.yaml と backend-deploy.yaml の指定に合わせる。
             # 食い違うと、ここが通ってもデプロイ時のビルドが落ちる。
             case "$f" in
-              docker/backend/Dockerfile.prod) context="./backend" ;;
+              docker/backend/Dockerfile.prod | docker/backend-go/Dockerfile.prod) context="./backend" ;;
               *) context="." ;;
             esac
 

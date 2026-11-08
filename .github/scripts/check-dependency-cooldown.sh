@@ -2,7 +2,7 @@
 # =====================================================================
 # 依存クールダウン検査(dependency-review CI から実行)
 #
-# 判定: このPRで新しく追加された maven と npm のパッケージのうち、公開から一定時間を
+# 判定: このPRで新しく追加された maven と npm と gomod のパッケージのうち、公開から一定時間を
 #       経過していないものが1件でもあれば exit 1(赤)。全て経過していれば exit 0。
 #       公開時刻を取得できないものが1件でもあれば exit 1(fail closed)。
 #
@@ -13,6 +13,9 @@
 #   パッケージを追加する経路には何も効かない。この穴を埋める。
 #   npm の部品も読むのは、脆弱性の修正の版を72時間待たずに入れるとき、pnpm の除外の欄に
 #   足した版を、ほかの版と同じ判定に通すためである。
+#   gomod(Go のモジュール)の部品も読む。Go のモジュールにも、公開直後の版を弾く
+#   標準の機構が無いためである。gomod の部品の公開時刻は、Go のモジュールの索引
+#   (index.golang.org)に初めて取り込まれた時刻とし、lib-gomod-index.sh で調べる。
 #
 # なぜ依存グラフの差分比較を入力にするのか:
 #   バージョンカタログやビルド定義を解析すると、推移的依存とBOM管理下の版が見えない。
@@ -38,7 +41,7 @@
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須) / GITHUB_REPOSITORY_OWNER(必須) / PR_NUMBER(必須)
 #   OWNER_APPROVED(既定 false。true のときだけ所有者の承認があるとみなす)
 #   COOLDOWN_HOURS(既定72) / NOW_EPOCH(テスト用の時刻固定)
-#   MAVEN_CENTRAL_BASE / PLUGIN_PORTAL_BASE / NPM_REGISTRY_BASE(テスト用の配布元差し替え)
+#   MAVEN_CENTRAL_BASE / PLUGIN_PORTAL_BASE / NPM_REGISTRY_BASE / GOMOD_INDEX_BASE(テスト用の配布元差し替え)
 #   PNPM_WORKSPACE_FILE(既定 frontend/pnpm-workspace.yaml)
 #
 # 公開から72時間経っていない版があるときの流れ(順に確かめ、止める版があればそこで赤にする):
@@ -74,8 +77,11 @@ NOW_EPOCH="${NOW_EPOCH:-$(date -u +%s)}"
 export MAVEN_CENTRAL_BASE="${MAVEN_CENTRAL_BASE:-https://repo1.maven.org/maven2}"
 export PLUGIN_PORTAL_BASE="${PLUGIN_PORTAL_BASE:-https://plugins.gradle.org/m2}"
 export NPM_REGISTRY_BASE="${NPM_REGISTRY_BASE:-https://registry.npmjs.org}"
+export GOMOD_INDEX_BASE="${GOMOD_INDEX_BASE:-https://index.golang.org}"
 PNPM_WORKSPACE_FILE="${PNPM_WORKSPACE_FILE:-frontend/pnpm-workspace.yaml}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=.github/scripts/lib-gomod-index.sh
+. "$SCRIPT_DIR/lib-gomod-index.sh"
 
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 COOLDOWN_SECONDS=$((COOLDOWN_HOURS * 3600))
@@ -132,7 +138,7 @@ if [ -n "$warn_b64" ]; then
 fi
 
 # --- 追加と削除のパッケージの取得 -----------------------------------------------
-# change_type が added か removed で、maven か npm のものだけを見る。removed は前の版を
+# change_type が added か removed で、maven か npm か gomod のものだけを見る。removed は前の版を
 # 取り出すために読む。github-actions のエコシステムはアクション参照のSHA固定検査が
 # 別に担っているため対象にしない。
 #
@@ -143,12 +149,14 @@ fi
 # 小文字にして返すことがあり(例: biz.aQute.bnd:biz.aqute.bnd.annotation)、
 # Maven Central のパスは大文字小文字を区別するため 404 になって判定不能で止まる。
 # package_url(pkg:maven/<groupId>/<artifactId>@<version>)は元の表記を保っている。
-# package_url が無いエントリと npm のエントリは name を使う。
+# package_url が無いエントリと npm と gomod のエントリは name を使う。gomod の name は
+# モジュールの元の表記を保っている(例: github.com/BurntSushi/toml)。gomod の version は
+# 先頭の v を落として返る(例: 1.8.7)。
 compare_out=""
 if ! compare_out=$(gh api --paginate \
     "repos/${REPO}/dependency-graph/compare/${BASE_SHA}...${HEAD_SHA}" \
     --jq '.[] | select(.change_type == "added" or .change_type == "removed")
-        | select(.ecosystem == "maven" or .ecosystem == "npm")
+        | select(.ecosystem == "maven" or .ecosystem == "npm" or .ecosystem == "gomod")
         | "\(.change_type)\t\(.ecosystem)\t\(if .ecosystem == "maven" and ((.package_url // "") | startswith("pkg:maven/"))
              then (.package_url | ltrimstr("pkg:maven/") | sub("[@?#].*"; "") | sub("/"; ":"))
              else .name end)\t\(.version)"'); then
@@ -192,7 +200,7 @@ fi
 
 # 追加が0件でも、前の head の記録のコメントがあれば所有者の承認を確かめるため、ここでは終えない
 if [ -z "$added" ]; then
-    echo "このPRで新しく追加された maven と npm のパッケージはありません。"
+    echo "このPRで新しく追加された maven と npm と gomod のパッケージはありません。"
 else
     echo "追加されたパッケージ: $(printf '%s\n' "$added" | wc -l) 件"
 fi
@@ -257,9 +265,9 @@ prior_version() {
         sort -V | tail -1
 }
 
-# 報告に出す部品の名前。npm は <名前>@<版>、maven は <groupId>:<artifactId>:<版>
+# 報告に出す部品の名前。npm と gomod は <名前>@<版>、maven は <groupId>:<artifactId>:<版>
 label_of() {
-    if [ "$1" = npm ]; then
+    if [ "$1" = npm ] || [ "$1" = gomod ]; then
         printf '%s@%s' "$2" "$3"
     else
         printf '%s:%s' "$2" "$3"
@@ -271,32 +279,61 @@ unknown=""  # 公開時刻を取得できなかったもの
 latest_clear=0
 # クールダウン未満の版の一覧。各行は "<ecosystem>\t<名前>\t<版>\t<公開時刻のエポック秒>\t<報告の名前>"
 : >"$TMP/young.tsv"
-# 公開時刻を読めたすべての版の一覧。止めた部品の表に使う。各行は "<報告の名前>\t<名前>\t<版>\t<公開時刻のエポック秒>"
+# 公開時刻を読めたすべての版の一覧。止めた部品の表に使う。
+# 各行は "<報告の名前>\t<名前>\t<版>\t<公開時刻のエポック秒>\t<公開時刻の書き方>"。
+# 公開時刻の書き方は、gomod の部品が索引の読んだ範囲に無いときだけ before にする。そのときの
+# 公開時刻のエポック秒は索引を読み始めた時刻で、部品はその時刻より前に取り込まれている。
 : >"$TMP/published.tsv"
+
+# gomod: Go のモジュールの索引(index.golang.org)に初めて取り込まれた時刻を使う。
+# 索引は、PR のすべての gomod の部品について1度だけ読む(lib-gomod-index.sh)。
+# 索引を読めなければ、すべての gomod の部品を公開時刻の取得できないものにする。
+printf '%s\n' "$added" | awk -F'\t' '$1 == "gomod" { print $2 "\t" $3 }' >"$TMP/gomod-wanted.tsv"
+gomod_ok=true
+gomod_index_ages "$TMP/gomod-wanted.tsv" "$TMP/gomod-ages.tsv" || gomod_ok=false
 
 while IFS=$'\t' read -r eco name version; do
     [ -n "$name" ] || continue
     prior=$(prior_version "$eco" "$name")
     echo "追加された部品: ${eco} ${name} ${version}(前の版: ${prior:-なし})"
     label=$(label_of "$eco" "$name" "$version")
-    if [ "$eco" = npm ]; then
-        lm=$(npm_published "$name" "$version")
+    form=""
+    if [ "$eco" = gomod ]; then
+        if [ "$gomod_ok" != true ]; then
+            unknown+="- ${label}(Go のモジュールの索引を読めませんでした)"$'\n'
+            continue
+        fi
+        row=$(awk -F'\t' -v n="$name" -v v="$version" '$1 == n && $2 == v { print $3 "\t" $4; exit }' \
+            "$TMP/gomod-ages.tsv")
+        if [ -z "$row" ]; then
+            unknown+="- ${label}(Go のモジュールの索引に照らした結果がありません)"$'\n'
+            continue
+        fi
+        published="${row#*$'\t'}"
+        if [ -z "$published" ]; then
+            published=$(gomod_index_since)
+            form=before
+        fi
     else
-        lm=$(maven_published "$name" "$version")
+        if [ "$eco" = npm ]; then
+            lm=$(npm_published "$name" "$version")
+        else
+            lm=$(maven_published "$name" "$version")
+        fi
+
+        if [ -z "$lm" ]; then
+            unknown+="- ${label}"$'\n'
+            continue
+        fi
+
+        published=$(date -u -d "$lm" +%s 2>/dev/null || true)
+        if [ -z "$published" ]; then
+            unknown+="- ${label}(公開時刻の書式を解釈できません: ${lm})"$'\n'
+            continue
+        fi
     fi
 
-    if [ -z "$lm" ]; then
-        unknown+="- ${label}"$'\n'
-        continue
-    fi
-
-    published=$(date -u -d "$lm" +%s 2>/dev/null || true)
-    if [ -z "$published" ]; then
-        unknown+="- ${label}(公開時刻の書式を解釈できません: ${lm})"$'\n'
-        continue
-    fi
-
-    printf '%s\t%s\t%s\t%s\n' "$label" "$name" "$version" "$published" >>"$TMP/published.tsv"
+    printf '%s\t%s\t%s\t%s\t%s\n' "$label" "$name" "$version" "$published" "$form" >>"$TMP/published.tsv"
     age=$((NOW_EPOCH - published))
     if [ "$age" -lt "$COOLDOWN_SECONDS" ]; then
         clear_at=$((published + COOLDOWN_SECONDS))
@@ -314,7 +351,7 @@ report_cooldown() {
             echo "### :warning: 公開時刻を取得できませんでした(判定不能)"
             echo ""
             echo "$unknown"
-            echo "問い合わせ先: ${MAVEN_CENTRAL_BASE} / ${PLUGIN_PORTAL_BASE} / ${NPM_REGISTRY_BASE}"
+            echo "問い合わせ先: ${MAVEN_CENTRAL_BASE} / ${PLUGIN_PORTAL_BASE} / ${NPM_REGISTRY_BASE} / ${GOMOD_INDEX_BASE}"
             echo ""
             echo "**外部要因による失敗です。時間の経過では解消しません。**"
             echo "配布元の応答または応答形式を人間が確認してください。"
@@ -447,7 +484,7 @@ cell() {
 # 止めた版ごとに、部品と版と入るようになる時刻を書いた ::error:: の行を標準出力に出す
 stop_if_blocked() {
     [ -s "$TMP/blocked.tsv" ] || return 0
-    local label kind detail row name version published reason clear_at published_at
+    local label kind detail row name version published form reason clear_at published_at
     local external=false malicious=false
     {
         echo "### :no_entry: ${COOLDOWN_HOURS}時間の待ちで止めた部品"
@@ -457,8 +494,8 @@ stop_if_blocked() {
     } >>"$SUMMARY"
     echo "${COOLDOWN_HOURS}時間の待ちで止めた部品があります:" >&2
     while IFS=$'\t' read -r label kind detail; do
-        row=$(awk -F'\t' -v l="$label" '$1 == l { print $2 "\t" $3 "\t" $4; exit }' "$TMP/published.tsv")
-        IFS=$'\t' read -r name version published <<<"$row"
+        row=$(awk -F'\t' -v l="$label" '$1 == l { print $2 "\t" $3 "\t" $4 "\t" $5; exit }' "$TMP/published.tsv")
+        IFS=$'\t' read -r name version published form <<<"$row"
         reason=$(reason_text "$kind")
         [ -z "$detail" ] || reason+="(${detail})"
         case "$kind" in
@@ -470,6 +507,11 @@ stop_if_blocked() {
         if [ -n "$published" ]; then
             published_at=$(date -u -d "@${published}" +'%Y-%m-%d %H:%M UTC')
             clear_at=$(date -u -d "@$((published + COOLDOWN_SECONDS))" +'%Y-%m-%d %H:%M UTC')
+            # Go のモジュールの索引の読んだ範囲に無い部品は、読み始めた時刻より前に取り込まれている
+            if [ "$form" = before ]; then
+                published_at+=" より前"
+                clear_at+=" より前"
+            fi
         else
             # 公開時刻を読めなかった版は先に赤で終えているので、ここに来るのは名前を照らせなかったときだけ
             name="$label" version="不明" published_at="不明" clear_at="不明"
@@ -508,7 +550,7 @@ stop_if_blocked() {
 jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t") | {ecosystem: .[0], name: .[1], version: .[2]})' \
     "$TMP/young.tsv" >"$TMP/young.json"
 if ! bash "$SCRIPT_DIR/cooldown-match-alerts.sh" "$TMP/young.json" >"$TMP/alerts.json" </dev/null ||
-    ! jq -r '.[] | [(if .ecosystem == "npm" then "\(.name)@\(.version)" else "\(.name):\(.version)" end),
+    ! jq -r '.[] | [(if .ecosystem == "npm" or .ecosystem == "gomod" then "\(.name)@\(.version)" else "\(.name):\(.version)" end),
             (if .eligible == true then "waiting-others" else .reason end),
             (if (.first_patched | length) > 0 then "最初の修正版: " + (.first_patched | join(", ")) else "" end)]
         | @tsv' "$TMP/alerts.json" >"$TMP/alerts.tsv" 2>/dev/null; then
@@ -527,7 +569,7 @@ printf '%s\n' "$added" |
         >"$TMP/added.json"
 if bash "$SCRIPT_DIR/cooldown-check-malware.sh" "$TMP/added.json" >"$TMP/malware.json" </dev/null &&
     jq -r '.[] | select(.result != "clean")
-        | [(if .ecosystem == "npm" then "\(.name)@\(.version)" else "\(.name):\(.version)" end),
+        | [(if .ecosystem == "npm" or .ecosystem == "gomod" then "\(.name)@\(.version)" else "\(.name):\(.version)" end),
            (if .result == "malicious" then "malicious" else "malware-unknown" end),
            ([.advisories[] | "\(.id) \(.summary) \(.url)"] | join("、"))]
         | @tsv' "$TMP/malware.json" >"$TMP/malware.tsv" 2>/dev/null; then

@@ -9,13 +9,13 @@
 #        (apply from は拡張子を問わず任意のファイルを読み込めるため、
 #         読み込み先の拡張子には依存せず「apply from の存在」自体を検査する)
 #      - violationRules / jacocoTestCoverageVerification の build.gradle への記述禁止
-#   2. テストの skip/only/@Disabled 追加
+#   2. テストの skip/only/@Disabled 追加と、Go のテストの t.Skip / t.SkipNow / t.Skipf 追加
 #   3. @ts-ignore / @ts-expect-error / @ts-nocheck の追加
-#   4. eslint-disable インラインコメントの追加
+#   4. eslint-disable インラインコメントの追加と、Go の //nolint と // coverage-ignore の追加
 #   5. 既存テストのアサーション変更・削除(PR本文に Test-Change-Justification: が無ければ赤。
 #      ユニットテスト .test. とE2E .spec. の両方が対象)
 #   6. ゲート隣接ファイルの変更(リポジトリ所有者のApproveが無ければ赤。
-#      CODEOWNERSの必須レビューと二重の防御)
+#      CODEOWNERSの必須レビューと二重の防御。Go 版の品質チェックとコード生成の設定を含む)
 #
 # 差分の読み方について:
 #   ファイル名は `git diff -z --name-only` でNUL区切りの生のパスとして取得し、
@@ -166,6 +166,16 @@ if [ -n "$found" ]; then
     report "Javaテストの @Disabled 追加" "$found"
 fi
 
+# --- 2c. Go のテストの飛ばしの追加 ---
+# t.Skip / t.SkipNow / t.Skipf を見つける。受け手の名前は t に限らない(tb や b、
+# テストの外の助けの関数から呼ぶ形もある)ため、.Skip の呼び出しの形で見る。
+# _test.go に限らないのは、Docker が無いときに飛ばす助けの関数を、テストの外の
+# .go のファイルに置けるためである
+found=$(added_lines_for '^backend/.*\.go$' | grep -E '\.Skip(Now|f)?[[:space:]]*\(' || true)
+if [ -n "$found" ]; then
+    report "Go のテストの飛ばしの追加" "$found"
+fi
+
 # --- 3. TypeScript 型チェック抑止の追加 ---
 found=$(added_lines_for '^frontend/.*\.(ts|tsx)$' | grep -E '@ts-ignore|@ts-expect-error|@ts-nocheck' || true)
 if [ -n "$found" ]; then
@@ -177,6 +187,15 @@ found=$(added_lines_for '^frontend/src/.*\.(ts|tsx|js|jsx)$' | grep -E 'eslint-d
 if [ -n "$found" ]; then
     report "eslint-disable インライン追加" "$found
 例外が必要な場合はインラインではなく eslint.config.js(所有者承認必須)へ理由付きで定義してください。"
+fi
+
+# --- 4b. Go の検査の外しとカバレッジの除外の追加 ---
+# //nolint は golangci-lint の検査を外す。// coverage-ignore は go-test-coverage の
+# カバレッジの計算からその関数やブロックを外す。どちらも、コメントの後ろの空白の有無を問わずに見る
+found=$(added_lines_for '^backend/.*\.go$' | grep -E '//[[:space:]]*(nolint|coverage-ignore)' || true)
+if [ -n "$found" ]; then
+    report "Go の検査の外しの追加" "$found
+例外が必要な場合はコードのコメントではなく backend/.golangci.yml か backend/.testcoverage.yml(所有者承認必須)へ理由付きで定義してください。"
 fi
 
 # --- 5. 既存テストのアサーション変更・削除(.test. と .spec. の両方) ---
@@ -193,7 +212,9 @@ ${java_asserts}"
 fi
 
 # --- 6. ゲート隣接ファイルの変更(所有者Approveが必要) ---
-gate_files=$(echo "$changed_files" | grep -E '^(\.github/|\.claude/|frontend/eslint\.config\.js|frontend/vite\.config\.ts|frontend/playwright\.config\.ts|backend/gradle/quality\.gradle|backend/config/|backend/src/test/java/com/example/keirekipro/unit/architecture/)' || true)
+# Go 版の品質チェックとコード生成の設定は、ファイルの名前で完全に一致させる($ で終える)。
+# .testcoverage.yml に除外を足す変更も、ここで所有者の承認を求める
+gate_files=$(echo "$changed_files" | grep -E '^(\.github/|\.claude/|frontend/eslint\.config\.js|frontend/vite\.config\.ts|frontend/playwright\.config\.ts|backend/gradle/quality\.gradle|backend/config/|backend/src/test/java/com/example/keirekipro/unit/architecture/|backend/(Makefile|\.golangci\.yml|\.testcoverage\.yml|\.gremlins\.yaml|api/oapi-codegen\.yaml|sqlc\.yaml)$)' || true)
 if [ -n "$gate_files" ]; then
     if [ "$OWNER_APPROVED" != "true" ]; then
         report "ゲート設定ファイルの変更(所有者未承認)" "以下のゲート設定ファイルが変更されています。リポジトリ所有者のApproveレビュー後にこのチェックは緑になります。

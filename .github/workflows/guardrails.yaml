@@ -91,6 +91,12 @@ jobs:
       - name: Test close linked issues
         run: bash .github/scripts/tests/test-close-linked-issues.sh
 
+      # ci.yaml の必須の検査 backend-test が、backend の3つの仕事の結果から合否を決める
+      # スクリプトのテスト。判定を誤ると、失敗した仕事や飛ばされた仕事を見逃したまま
+      # PR が main に入るので、PR の時点で流す。外部の道具もネットワークも使わない
+      - name: Test backend-test verdict
+        run: bash .github/scripts/tests/test-backend-test-verdict.sh
+
       # ラベルの一覧のファイル(.github/labels.json)の検証と、その合わせ込みのスクリプトのテスト。
       # 誤ったファイルを main に入れないために、PRの時点で流す。.github/ を変えるPRでも
       # 承認を待たずに動くよう、承認待ちで失敗するステップより前に置く。

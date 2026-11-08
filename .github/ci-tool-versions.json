@@ -54,6 +54,7 @@
   "excluded": [
     { "file": ".github/workflows/backend-vuln-fix.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/ci.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
+    { "file": ".github/workflows/ci.yaml", "key": "version", "reason": "golangci-lint の版は、開発環境のイメージ docker/backend-go/Dockerfile の版とそろえて手で上げるため。週1回の自動の更新は Node.js・Trivy・Codex CLI・Terraform の版だけを上げる" },
     { "file": ".github/workflows/codeql.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/dependency-graph.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/dependency-review.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },

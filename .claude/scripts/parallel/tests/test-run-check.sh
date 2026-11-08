@@ -3,6 +3,8 @@
 # run-check.sh(品質チェックのコマンドを1回きりのコンテナで動かすスクリプト)のテスト
 #
 # 実行: bash .claude/scripts/parallel/tests/test-run-check.sh
+# 場合を選んで流す: KP_TEST_CASE='t_dind_up t_backend_go_area' bash .claude/scripts/parallel/tests/test-run-check.sh
+#   KP_TEST_CASE に空白で区切って書いた関数の名前の場合だけを流す。知らない名前があれば何も流さずに失敗する
 # 一時的な git のリポジトリ(本体)と worktree を作り、その中で run-check.sh を呼ぶ。
 # docker は偽物(PATH の先頭に置く)に差し替える。偽物は、呼ばれたフォルダと引数を
 # $FAKE_DOCKER_LOG に1行ずつ書き、次の環境変数とファイルで振る舞いを変える。
@@ -210,6 +212,9 @@ pass=0
 fail=0
 run_test() { # <テスト名> <関数>
     local name="$1" fn="$2" out
+    if [ -n "${KP_TEST_CASE:-}" ]; then
+        case " $KP_TEST_CASE " in *" $fn "*) ;; *) return 0 ;; esac
+    fi
     reset_state
     if out=$("$fn" 2>&1); then
         pass=$((pass + 1))
@@ -646,9 +651,94 @@ t_trap_release() {
     [ ! -e "$WT_DIR/.claude/.state/gate-run-frontend.txt" ] || die "止められたのに記録を書いた"
 }
 
+# =====================================================================
+# Go 版の品質チェックの領域 backend-go(backend-go-replacement の要件3.2)
+# =====================================================================
+t_backend_go_area() {
+    local line
+    rc "$WT_DIR" backend-go make lint
+    [ "$RC" = 0 ] || die "終了コード $RC: $OUT"
+    line=$(run_lines)
+    [ "$(printf '%s\n' "$line" | grep -c .)" = 1 ] || die "品質チェックのコンテナが1つでない: $(cat "$FAKE_DOCKER_LOG")"
+    case "$line" in
+        "$WT|compose -p keirekipro -f compose.yaml run --rm --no-deps -T --label keirekipro.slot=1 "*" --entrypoint sh backend-go -c "*" -- make lint") ;;
+        *) die "サービス backend-go でコマンドを動かしていない: $line" ;;
+    esac
+    [ ! -d "$STATE/slots/1" ] || die "終わったのに枠を返していない"
+}
+
+t_backend_go_gate_record() {
+    local f="$WT_DIR/.claude/.state/gate-run-backend-go.txt" t0 v
+    rc "$WT_DIR" backend-go make lint
+    [ "$RC" = 0 ] || die "lint: 終了コード $RC"
+    [ ! -e "$f" ] || die "make lint で記録を書いた"
+    export FAKE_RUN_RC=2
+    rc "$WT_DIR" backend-go make check
+    [ "$RC" = 2 ] || die "make check の失敗: 期待 2 / 実際 $RC"
+    [ ! -e "$f" ] || die "make check が失敗したのに記録を書いた"
+    export FAKE_RUN_RC=0
+    t0=$(now)
+    rc "$WT_DIR" backend-go make check
+    [ "$RC" = 0 ] || die "make check: 終了コード $RC"
+    [ -f "$f" ] || die "make check が0で終わったのに worktree に記録が無い"
+    v=$(tr -d '\r\n' <"$f")
+    case "$v" in '' | *[!0-9]*) die "記録が UNIX 秒でない: '$v'" ;; esac
+    [ "$v" -ge "$t0" ] && [ "$v" -le "$(now)" ] || die "記録の時刻が違う: $v"
+    [ ! -e "$WT_DIR/.claude/.state/gate-run-backend.txt" ] || die "Go 版の検査で Java 版の記録を書いた"
+    [ ! -d "$MAIN_DIR/.claude/.state" ] || die "本体フォルダに記録を書いた"
+}
+
+t_backend_go_dind() {
+    local up
+    : >"$FAKE_DIND_PS"
+    rc "$WT_DIR" backend-go make check
+    [ "$RC" = 0 ] || die "終了コード $RC: $OUT"
+    grep -q "^$WT|compose -p keirekipro ps --status running -q dind$" "$FAKE_DOCKER_LOG" \
+        || die "dind が動いているかを確かめていない: $(cat "$FAKE_DOCKER_LOG")"
+    up=$(grep '| *compose .* up ' "$FAKE_DOCKER_LOG")
+    case "$up" in
+        *"--project-directory $MAIN -f $MAIN/compose.yaml up -d dind") ;;
+        *) die "本体フォルダで up -d dind を打っていない: $up" ;;
+    esac
+    [ -n "$(run_lines)" ] || die "dind を起こしたあとに品質チェックを動かしていない"
+}
+
+t_backend_go_repo_mount() {
+    local pairs
+    rc "$WT_DIR" backend-go make check
+    [ "$RC" = 0 ] || die "終了コード $RC: $OUT"
+    # 品質チェックのコンテナの引数を、隣り合う2つずつの組にする
+    pairs=$(awk 'NR > 1 { print prev "|" $0 } { prev = $0 }' "$FAKE_LAST_RUN")
+    printf '%s\n' "$pairs" | grep -qxF -- "-v|$WT:/repo:ro" \
+        || die "作業フォルダの最上位を /repo に読み取り専用で差し込んでいない: $(tr '\n' ' ' <"$FAKE_LAST_RUN")"
+    printf '%s\n' "$pairs" | grep -qxF -- "-e|KEIREKIPRO_REPO_ROOT=/repo" \
+        || die "KEIREKIPRO_REPO_ROOT=/repo を渡していない: $(tr '\n' ' ' <"$FAKE_LAST_RUN")"
+    # Java 版の backend には差し込まない
+    reset_state
+    rc "$WT_DIR" backend ./gradlew check
+    if grep -q '/repo' "$FAKE_LAST_RUN"; then
+        die "Java 版の backend にも /repo を差し込んだ: $(tr '\n' ' ' <"$FAKE_LAST_RUN")"
+    fi
+}
+
+# 知らない名前を選んだら、何も流さずに失敗する
+for want in ${KP_TEST_CASE:-}; do
+    case "$want" in
+        t_*) declare -F "$want" >/dev/null && continue ;;
+    esac
+    echo "どの場合にも合わない名前: $want" >&2
+    exit 2
+done
+
 echo "--- そのセッションの作業フォルダを検査する(要件2.1)"
 run_test "worktree で呼ぶとその最上位で -p keirekipro run --rm --no-deps と枠のラベルが渡る" t_worktree_run
-run_test "領域が frontend backend terraform のどれでもなければ終了コード69になる" t_unknown_area
+run_test "領域が frontend backend backend-go terraform のどれでもなければ終了コード69になる" t_unknown_area
+
+echo "--- Go 版の品質チェックの領域 backend-go(backend-go-replacement の要件3.2)"
+run_test "backend-go の領域を受け付ける" t_backend_go_area
+run_test "backend-go の make check が通ったときだけ記録を書く" t_backend_go_gate_record
+run_test "backend-go で dind を起こす" t_backend_go_dind
+run_test "backend-go に /repo を読み取り専用で差し込む" t_backend_go_repo_mount
 
 echo "--- 検査できないときは合格にしない(要件2.4)"
 run_test "compose の読み込みに失敗すると終了コード69で記録を書かない" t_config_fail

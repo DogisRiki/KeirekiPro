@@ -25,6 +25,7 @@ export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
 FAILED=0
 
 JAVA_TEST_DIR="backend/src/test/java/com/example/keirekipro/unit"
+GO_DIR="backend/internal/sample"
 REAL_GIT=$(command -v git)
 
 # git diff --name-only だけを失敗させるシム。変更ファイルの一覧が取れないときに
@@ -75,6 +76,27 @@ seed() {
 
     echo "name: dummy" >.github/workflows/dummy.yaml
     echo "readme" >README.md
+
+    # Go 版のコードとテスト
+    mkdir -p "$GO_DIR"
+    {
+        echo 'package sample'
+        echo ''
+        echo 'func Add(a, b int) int {'
+        echo '    return a + b'
+        echo '}'
+    } >"$GO_DIR/sample.go"
+    {
+        echo 'package sample'
+        echo ''
+        echo 'import "testing"'
+        echo ''
+        echo 'func TestAdd(t *testing.T) {'
+        echo '    if Add(1, 2) != 3 {'
+        echo '        t.Fatal("wrong")'
+        echo '    }'
+        echo '}'
+    } >"$GO_DIR/sample_test.go"
 
     git add -A && git commit -qm base
     BASE=$(git rev-parse HEAD)
@@ -155,6 +177,34 @@ delete_test_file() { git rm -q frontend/src/plain.test.ts; }
 
 skip_outside_scope() { sed -i 's/^it(/it.skip(/' doc/sample.test.ts; }
 add_plusplus_disable() { echo '++counter; // eslint-disable-line no-plusplus' >>frontend/src/app.ts; }
+
+# Go 版のテストの飛ばしと検査の外し
+go_skip() { sed -i 's/^func TestAdd(t \*testing.T) {/&\n    t.Skip("later")/' "$GO_DIR/sample_test.go"; }
+go_skip_now() { sed -i 's/^func TestAdd(t \*testing.T) {/&\n    t.SkipNow()/' "$GO_DIR/sample_test.go"; }
+go_skipf() { sed -i 's/^func TestAdd(t \*testing.T) {/&\n    t.Skipf("later %d", 1)/' "$GO_DIR/sample_test.go"; }
+# テストの外の助けの関数で、t 以外の名前の値から飛ばす
+go_skip_helper() { printf 'package sample\n\nimport "testing"\n\nfunc needDocker(tb testing.TB) {\n    tb.Skip("no docker")\n}\n' >"$GO_DIR/helper.go"; }
+go_nolint() { sed -i 's/^    return a + b$/    return a + b \/\/nolint:gosec/' "$GO_DIR/sample.go"; }
+go_nolint_spaced() { sed -i '1i // nolint' "$GO_DIR/sample.go"; }
+go_coverage_ignore() { sed -i 's/^func Add(a, b int) int {$/& \/\/ coverage-ignore/' "$GO_DIR/sample.go"; }
+go_plain_change() { sed -i 's/^    return a + b$/    sum := a + b\n    return sum/' "$GO_DIR/sample.go"; }
+# backend の外の Go のファイルは見ない
+go_skip_outside() { mkdir -p tools && printf 'package tools\n\nfunc f(t T) { t.Skip() }\n' >tools/x_test.go; }
+
+# Go 版の品質チェックとコード生成の設定(所有者の承認があれば通るゲート隣接ファイル)
+go_testcoverage_in_base() {
+    printf 'threshold:\n  total: 93\n' >backend/.testcoverage.yml
+    git add -A && git commit -qm base2
+    BASE=$(git rev-parse HEAD)
+}
+go_testcoverage_exclude() { printf 'exclude:\n  paths:\n    - ^internal/sample\n' >>backend/.testcoverage.yml; }
+go_testcoverage_new() { printf 'threshold:\n  total: 93\n' >backend/.testcoverage.yml; }
+go_makefile() { printf 'check:\n\tgo test ./...\n' >backend/Makefile; }
+go_golangci() { printf 'version: "2"\n' >backend/.golangci.yml; }
+go_gremlins() { printf 'unleash:\n  threshold:\n    efficacy: 80\n' >backend/.gremlins.yaml; }
+go_oapi() { mkdir -p backend/api && printf 'package: gen\n' >backend/api/oapi-codegen.yaml; }
+go_sqlc() { printf 'version: "2"\n' >backend/sqlc.yaml; }
+go_nested_makefile() { mkdir -p backend/tools && printf 'all:\n' >backend/tools/Makefile; }
 
 echo "--- 対象外の変更 ---"
 seed
@@ -269,6 +319,94 @@ check_summary "TypeScript 型チェック抑止の追加" "リネームで全行
 seed
 delete_test_file
 run_check 1 "アサーションを含むテストファイルの削除を検知する"
+
+echo "--- 2c. Go のテストの飛ばしの追加 ---"
+seed
+go_skip
+run_check 1 "t.Skip の追加を見つける"
+check_summary "Go のテストの飛ばしの追加" "t.Skip の追加が報告される"
+check_summary "sample_test.go" "t.Skip を足したファイルの名前が報告される"
+
+seed
+go_skip_now
+run_check 1 "t.SkipNow の追加を見つける"
+
+seed
+go_skipf
+run_check 1 "t.Skipf の追加を見つける"
+
+seed
+go_skip_helper
+run_check 1 "テストの外の助けの関数での t 以外の名前の Skip の追加を見つける"
+
+seed
+go_skip_outside
+run_check 0 "backend の外の Go のファイルの Skip の追加は通す"
+
+seed
+go_plain_change
+run_check 0 "飛ばしと外しを含まない Go のコードの変更は通す"
+
+echo "--- 4b. Go の検査の外しとカバレッジの除外の追加 ---"
+seed
+go_nolint
+run_check 1 "nolint の追加を見つける"
+check_summary "Go の検査の外しの追加" "nolint の追加が報告される"
+
+seed
+go_nolint_spaced
+run_check 1 "空白を挟んだ nolint の追加を見つける"
+
+seed
+go_coverage_ignore
+run_check 1 "coverage-ignore の追加を見つける"
+check_summary "Go の検査の外しの追加" "coverage-ignore の追加が報告される"
+
+echo "--- 6b. Go 版の品質チェックとコード生成の設定 ---"
+seed
+go_testcoverage_in_base
+go_testcoverage_exclude
+run_check 1 ".testcoverage.yml の変更は所有者の承認が無ければ失敗する"
+check_summary "backend/.testcoverage.yml" ".testcoverage.yml がゲート設定ファイルとして報告される"
+
+seed
+go_testcoverage_in_base
+go_testcoverage_exclude
+approve
+run_check 0 ".testcoverage.yml の変更は所有者の承認があれば通る"
+
+seed
+go_testcoverage_new
+approve
+run_check 0 ".testcoverage.yml を新しく作る変更は所有者の承認があれば通る"
+
+seed
+go_testcoverage_new
+run_check 1 ".testcoverage.yml を新しく作る変更は所有者の承認が無ければ失敗する"
+
+seed
+go_makefile
+run_check 1 "Makefile の変更は所有者の承認が無ければ失敗する"
+
+seed
+go_golangci
+run_check 1 ".golangci.yml の変更は所有者の承認が無ければ失敗する"
+
+seed
+go_gremlins
+run_check 1 ".gremlins.yaml の変更は所有者の承認が無ければ失敗する"
+
+seed
+go_oapi
+run_check 1 "api/oapi-codegen.yaml の変更は所有者の承認が無ければ失敗する"
+
+seed
+go_sqlc
+run_check 1 "sqlc.yaml の変更は所有者の承認が無ければ失敗する"
+
+seed
+go_nested_makefile
+run_check 0 "backend の直下でない Makefile の変更は通す"
 
 echo "--- 変更ファイルの一覧が取れない場合 ---"
 seed

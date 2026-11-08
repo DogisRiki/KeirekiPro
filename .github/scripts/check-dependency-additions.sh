@@ -4,11 +4,16 @@
 #
 # 判定: 対象の変更あり かつ 所有者のApproveなし -> exit 1(赤)。それ以外は exit 0(緑)
 #
-# 判定対象(上の2つは「変更されたこと自体」を見る。中身は解析しない):
+# 判定対象(上の3つは「変更されたこと自体」を見る。中身は解析しない):
 #   - frontend の取得元と防御設定
 #     (pnpm-workspace.yaml / .npmrc / .pnpmfile.cjs / .pnpmfile.mjs)
 #   - backend のビルドスクリプト
 #     (*.gradle / *.gradle.kts。取得元の定義 repositories {} を含むため)
+#   - backend の Go 版の品質チェックとコード生成の設定
+#     (backend/ の直下の Makefile / .golangci.yml / .testcoverage.yml / .gremlins.yaml /
+#      sqlc.yaml と、backend/api/oapi-codegen.yaml。品質チェックの合格の基準と
+#      コード生成の指定を、所有者の承認なしに緩められないようにするため。
+#      go.mod / go.sum は依存のバージョン宣言として、下の「判定対象から外したもの」と同じく扱う)
 #   - 開発環境の Node.js と Terraform の版
 #     (head の .github/ci-tool-versions.json の dev に書いた Dockerfile の FROM の行の
 #      タグの版。digest だけの変更は見ない。開発環境の版だけを変える PR は .github/ を
@@ -69,6 +74,12 @@ changed_build=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
     grep -E '^backend/.*\.(gradle|gradle\.kts)$' || true)
 if [ -n "$changed_build" ]; then
     detected+="[変更された backend のビルドスクリプト]"$'\n'"$changed_build"$'\n'
+fi
+
+changed_go_config=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
+    grep -E '^backend/(Makefile|\.golangci\.yml|\.testcoverage\.yml|\.gremlins\.yaml|api/oapi-codegen\.yaml|sqlc\.yaml)$' || true)
+if [ -n "$changed_go_config" ]; then
+    detected+="[変更された backend の Go 版の品質チェックとコード生成の設定]"$'\n'"$changed_go_config"$'\n'
 fi
 
 # --- 開発環境の Node.js と Terraform の版(FROM の行のタグの版を比べる) ---
