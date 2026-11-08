@@ -25,9 +25,17 @@ git diff --name-only origin/main...HEAD
 
 2. 変更されたパスに応じて、該当領域のverifyを**この順で直列**に実行する(並列実行禁止):
    - `frontend/` に変更あり → `/verify-frontend` の手順
-   - `backend/` に変更あり → `/verify-backend` の手順
+   - Java 版のファイルに変更あり → `/verify-backend` の Java 版の手順
+   - Go 版のファイルに変更あり → `/verify-backend` の Go 版の手順。コマンドは `bash .claude/scripts/parallel/run-check.sh backend-go make check` の1つである
    - `terraform/` に変更あり → `/verify-terraform` の手順
    - 上記以外のみ(doc/.github等) → コマンド実行は不要。その旨を報告する
+
+   Java 版のファイルと Go 版のファイルは、`ci.yaml` の見分け `backend_java` と `backend_go` と同じ形で見分ける。
+
+   - Java 版のファイル: `backend/src/**` `backend/*.gradle` `backend/gradle/**` `backend/config/**` `backend/gradlew*` `docker/backend/**`
+   - Go 版のファイル: `backend/**/*.go` `backend/go.mod` `backend/go.sum` `backend/Makefile` `backend/.golangci.yml` `backend/.testcoverage.yml` `backend/.gremlins.yaml` `backend/api/**` `backend/sqlc.yaml` `backend/assets/**` `backend/src/main/resources/db/migration/**` `docker/backend-go/**`。作業フォルダに `backend/go.mod` があるときだけ当てる
+   - マイグレーションのファイル(`backend/src/main/resources/db/migration/**`)は両方に当たるので、Claude は Java 版、Go 版の順に両方の手順を動かす
+   - `backend/` の下でも、どちらにも当たらないファイル(`backend/CLAUDE.md` など)だけが変わったときは、backend のコマンドは動かさない
 
    各verifyの手順は、コマンドを `bash .claude/scripts/parallel/run-check.sh <領域> <コマンド>` で呼び、いまの作業フォルダ(worktree のセッションでは worktree の最上位)を1回きりのコンテナで検査する。
    変更領域の判定の `git` も、いまの作業フォルダで打つ。
@@ -47,7 +55,8 @@ git diff --name-only origin/main...HEAD
 品質チェックの結果:
 - 変更があった領域: frontend、backend
 - /verify-frontend による frontend の品質チェック: <通った、または通らなかった>
-- /verify-backend による backend の品質チェック: <通った、または通らなかった>
+- /verify-backend による backend の Java 版の品質チェック: <通った、または通らなかった>
+- /verify-backend による backend の Go 版の品質チェック: <通った、または通らなかった、または Go 版のファイルの変更が無いので動かしていない>
 - /verify-terraform による terraform の品質チェック: 変更が無いので動かしていない
 ```
 

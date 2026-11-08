@@ -18,7 +18,7 @@
   - _要件: 3.2_
   - _依存: 1.1_
 
-- [ ] 1.3 verify のスキルに Go 版の手順を足す
+- [x] 1.3 verify のスキルに Go 版の手順を足す
 
   Claude は、`.claude/skills/verify-backend/SKILL.md` と `verify-all` のスキルに、Go 版のファイルが変わったときに `bash .claude/scripts/parallel/run-check.sh backend-go make check` を動かす手順を足す。Java 版の手順は変えない。
   - 完了の確かめ方: 2つのスキルの本文に、Go 版のファイルの見分け方と、領域 `backend-go` で `make check` を動かす手順がある

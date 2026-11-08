@@ -1,5 +1,5 @@
 ---
-description: backendの品質ゲート(spotlessApply→check)を順次実行し、結果を要約報告する。backend配下を変更したら完了報告前に必ず実行する。
+description: backendの品質ゲート(Java 版は spotlessApply→check、Go 版は make check)を順次実行し、結果を要約報告する。backend配下を変更したら完了報告前に必ず実行する。
 ---
 
 # verify-backend
@@ -8,7 +8,17 @@ description: backendの品質ゲート(spotlessApply→check)を順次実行し�
 
 backendの品質ゲートを規定の順序で直列実行し、PASS/FAILを判定する。ループの検証端点。
 
-## Steps
+## Java 版と Go 版の見分け
+
+backend には、Java 版と Go 版の2つがある。Claude は、変わったファイルを次の形で見分け、当たった版の手順を動かす。この見分けは、`ci.yaml` の見分け `backend_java` と `backend_go` と同じである。
+
+- Java 版のファイル: `backend/src/**` `backend/*.gradle` `backend/gradle/**` `backend/config/**` `backend/gradlew*` `docker/backend/**`
+- Go 版のファイル: `backend/**/*.go` `backend/go.mod` `backend/go.sum` `backend/Makefile` `backend/.golangci.yml` `backend/.testcoverage.yml` `backend/.gremlins.yaml` `backend/api/**` `backend/sqlc.yaml` `backend/assets/**` `backend/src/main/resources/db/migration/**` `docker/backend-go/**`
+- Go 版のファイルの見分けは、作業フォルダに `backend/go.mod` があるときだけ当てる。`backend/go.mod` が無いときは、Go 版の品質チェックを動かせないためである
+- マイグレーションのファイル(`backend/src/main/resources/db/migration/**`)は、両方に当たる。Java 版と Go 版が同じマイグレーションのファイルを読むためである。Claude は、両方の手順を、Java 版、Go 版の順に動かす
+- どちらにも当たらないファイル(`backend/CLAUDE.md` など)だけが変わったときは、Claude はコマンドを動かさず、その旨を報告する
+
+## Steps(Java 版)
 
 以下を**この順で1つずつ**実行する(並列実行禁止)。
 
@@ -26,6 +36,22 @@ bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 - 単発のテストや検査(`./gradlew test --tests <テストクラス>` など)も、`bash .claude/scripts/parallel/run-check.sh backend ./gradlew test --tests <テストクラス>` のように `run-check.sh` で打つ
 - `./gradlew check` が終了コード0で終わったときだけ、`run-check.sh` が作業フォルダの `.claude/.state/gate-run-backend.txt` に品質チェックが通った時刻を書く
 - Testcontainers が使う `dind` が止まっていれば、`run-check.sh` が本体フォルダのプロジェクトの `dind` を起こしてからコマンドを動かす。起こせなければ、`run-check.sh` は終了コード69で終わる
+
+## Steps(Go 版)
+
+Go 版の品質チェックは、次の1つのコマンドで動かす。
+
+```
+bash .claude/scripts/parallel/run-check.sh backend-go make check
+```
+
+`make check` は、書式の検査(`fmt-check`)、生成したコードの食い違いの検査(`generate-check`)、静的な検査と依存の向きの検査(`lint`)、テスト(`test`)、カバレッジの下限の検査(`coverage`)、ビルド(`build`)を順に動かす。
+
+- `run-check.sh` は、Go 版の領域 `backend-go` でも、いまの作業フォルダを読み込んだ1回きりのコンテナでコマンドを動かす。Java 版と比べる検査のために、`run-check.sh` は作業フォルダの最上位を読み取り専用で `/repo` に差し込む
+- Claude は、`make check` を Bash の `run_in_background` で呼ぶ。結合テストが testcontainers-go で Postgres と Redis を動かすので、前面で動かすときの上限(600秒)を超えるおそれがあるためである
+- `make check` が失敗したら、Claude は、直したあとに、落ちた検査だけを make のターゲットの名前(`lint` `test` など)で流し直す。書式の検査で落ちたときは、`make fmt` で書式を直す。Claude は、落ちた検査が通ってから、`make check` を1回だけ流す
+- `make check` が終了コード0で終わったときだけ、`run-check.sh` が作業フォルダの `.claude/.state/gate-run-backend-go.txt` に品質チェックが通った時刻を書く。Java 版の記録 `gate-run-backend.txt` とは別の記録である
+- testcontainers-go が使う `dind` が止まっていれば、Java 版と同じく、`run-check.sh` が本体フォルダのプロジェクトの `dind` を起こしてからコマンドを動かす
 
 ## 順番待ちと検査できないとき
 
@@ -45,6 +71,9 @@ bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 - 既存テストのアサーション削除・弱体化(意図的な変更はPR本文に `Test-Change-Justification:` を記載)
 - `gradle/quality.gradle`(閾値)・`config/`(checkstyle/spotbugs除外)・ArchUnitテストの変更(CODEOWNERS保護対象)
 - `build.gradle` の `apply from: 'gradle/quality.gradle'` 行の削除・violationRulesの上書き
+- Go 版のテストへの `t.Skip` の追加
+- Go 版のコードへの `//nolint` の追加
+- Go 版の検査の設定(`Makefile` `.golangci.yml` `.testcoverage.yml` `.gremlins.yaml`)を緩める変更
 
 カバレッジ閾値に届かない場合は、**テストを追加して**満たす。
 新規テストは対象コードを一時的に壊して赤くなることを確認してから戻す。壊す箇所の数と、壊した写しの作り方と流し方は、`.kiro/steering/tech.md` の「テストの完全性」に従う。
@@ -60,4 +89,13 @@ backend の品質チェックの結果:
   - SpotBugs の指摘: <数>件
 ```
 
-通らなかったチェックがあるときは、Claude は、失敗したクラスとテストの名前と、エラーの要点と、どう直すかを添える。
+Go 版の手順を動かしたときは、Claude は次の形で報告する。両方の手順を動かしたときは、Java 版の報告のあとに続ける。
+
+```
+backend の Go 版の品質チェックの結果:
+- make check による品質チェックの全体: <通った、または通らなかった>
+  - 通らなかった検査: <fmt-check、generate-check、lint、test、coverage、build のうち落ちたもの。全部通ったときは「なし」>
+  - カバレッジ: <数>%。カバレッジは、テストで動いたコードの割合です
+```
+
+通らなかったチェックがあるときは、Claude は、失敗したクラスやパッケージとテストの名前と、エラーの要点と、どう直すかを添える。
