@@ -47,7 +47,7 @@
   - _要件: 3.1, 3.2, 3.4, 4.7, 13.6_
   - _依存: 1.4_
 
-- [ ] 1.6 CodeQL の Go の組み立て方を決める (並行可)
+- [x] 1.6 CodeQL の Go の組み立て方を決める (並行可)
 
   Claude は、`.github/codeql/languages.tsv` の Go の行を、組み立て方 `manual`、組み立てのコマンド `cd backend && go build ./...` にした完成版を、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、`.github/scripts/tests/test-detect-codeql-languages.sh` が成功する
@@ -636,6 +636,7 @@
 - ワークフローを変える PR: ワークフローを追加・変更・削除した PR では、Claude は、README のワークフローの一覧の表と Mermaid の図も直す
 - 比べる検査の報告の置き場(タスク1.5で決めたこと): `ci.yaml` の `backend-compat` は、`backend/compat/report/` の下のファイルを成果物 `backend-compat-report` に残す。Claude は、比べる検査を作るタスクで、違いの報告と、失敗したときの両方の版のコンテナのログを、このフォルダに書くように作り、このフォルダを `backend/.gitignore` に足す
 - golangci-lint の版(タスク1.5で決めたこと): `ci.yaml` の `backend-go` は、golangci-lint の版を v2.15.0 に固定し、`.github/ci-tool-versions.json` の excluded に載せた。週1回の自動の更新はこの版を上げない。Claude は、`docker/backend-go/Dockerfile` に同じ版を書き、版を上げるときは2か所を同じ PR で上げる
+- CodeQL の Go の解析(タスク1.6で分かったこと): `codeql.yaml` には `actions/setup-go` の手順が無く、Go の行の組み立ては、GitHub Actions の機械に入っている Go と、`go.mod` の `toolchain` の指定による Go の自動の入手に頼る。Claude は、`backend/go.mod` を足す PR 2-2 で、CodeQL の `go` の仕事が成功したことを `gh run view` で確かめ、失敗したときは `setup-go` の手順を足す提案を所有者に出す
 - PR の本文: この spec の PR の本文には、`Spec: .kiro/specs/backend-go-replacement` と `Refs: #445` を書く。所有者の承認が要る PR では、「承認が要る理由」と「main に入れたときに本番で起きること」の2つの欄を書き、PR を作ったときの所有者への返事に、この2つの欄をそのまま写す
 - 公開のリポジトリ: Claude は、まだ直していないセキュリティの穴を、Issue、PR、コミット、spec の本文に書かない
 - design の審査で残った記録: 次の5つを、それぞれ次のタスクで扱う。
