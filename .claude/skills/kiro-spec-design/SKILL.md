@@ -186,12 +186,12 @@ Provide brief summary in the language specified in spec.json:
 **Requirements Not Approved**:
 - **Stop Execution**: Cannot proceed without approved requirements
 - **User Message**: 「要件がまだ承認されていません。設計を作る前に、要件の承認が要ります。」
-- **Suggested Action**: 「`requirements.md` を読んで承認してから、もう一度 `/kiro-spec-design {feature}` を打ってください。CLAUDE.md が自動の承認を禁じているので、`-y` は付けないでください。」
+- **Suggested Action**: 「`requirements.md` を読んで承認してください。CLAUDE.md が自動の承認を禁じているので、`-y` は付けないでください。承認したら、もう一度、次のコマンドを打ってください。」 Follow it with `/kiro-spec-design {feature}` alone in a code block with no language name, so the owner can copy the command in one action
 
 **Missing Requirements**:
 - **Stop Execution**: Requirements document must exist
 - **User Message**: 「`.kiro/specs/{feature}/requirements.md` が見つかりません。」
-- **Suggested Action**: 「先に `/kiro-spec-requirements {feature}` を打って、要件を作ってください。」
+- **Suggested Action**: 「先に、次のコマンドを打って、要件を作ってください。」 Follow it with `/kiro-spec-requirements {feature}` alone in a code block with no language name
 
 **Template Missing**:
 - **User Message**: 「設計の雛形のファイル `.kiro/settings/templates/specs/design.md` が見つかりません。」
@@ -208,7 +208,7 @@ Provide brief summary in the language specified in spec.json:
 **Spec Gap Found During Design Review**:
 - **Stop Execution**: Do not write a patched-over `design.md`
 - **User Message**: 「設計の見直しで、要件に足りない点か、2通りに読める点が見つかりました。Claude は、足りない点と2通りに読める点を、下に並べます。要件をどう直すかを、この会話で答えてください。」
-- **Suggested Action**: Refine `requirements.md` following the owner's answer, then re-run `/kiro-spec-design {feature}`
+- **Suggested Action**: Refine `requirements.md` following the owner's answer, then ask the owner to type `/kiro-spec-design {feature}` again, showing the command alone in a code block with no language name
 
 ### Next Phase: Task Generation
 
@@ -218,7 +218,7 @@ Provide brief summary in the language specified in spec.json:
 **If Design Approved**:
 - **Optional**: Run `/kiro-validate-design {feature}` for interactive quality review
 - Run `/kiro-spec-tasks {feature}` to generate implementation tasks
-- When guiding the user to approve and continue, always tell them to type `/clear` first: 「承認するなら、`/clear` を打ってから `/kiro-spec-tasks {feature}` を打ってください。」 `/clear` keeps this stage's skill text and review exchange out of the next stage's conversation; spec.json and the review records under `reviews/` carry everything the next stage needs
+- When guiding the user to approve and continue, always tell them to type `/clear` first: 「承認するなら、次の2つのコマンドを、上から順に1つずつ打ってください。」 Follow it with `/clear` and `/kiro-spec-tasks {feature}`, each alone in its own code block with no language name, in that order. `/clear` keeps this stage's skill text and review exchange out of the next stage's conversation; spec.json and the review records under `reviews/` carry everything the next stage needs
 
 **If Modifications Needed**:
 - Provide feedback and re-run `/kiro-spec-design {feature}`

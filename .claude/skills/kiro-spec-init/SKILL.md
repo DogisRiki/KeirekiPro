@@ -100,7 +100,7 @@ Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-
      <new Issue body, with headings demoted by two levels>
      ```
    - Do not change anything else in requirements.md (existing requirements, their numbered items, and their numbers stay as they are).
-5. **Show the next step**: Show `/kiro-spec-requirements <feature>` as the command the owner types next, and list which stage approvals were revoked (with their approver and date as recorded in `approval_history`).
+5. **Show the next step**: Show `/kiro-spec-requirements <feature>` as the command the owner types next, alone in a code block with no language name, and list which stage approvals were revoked (with their approver and date as recorded in `approval_history`).
 
 ## Important Constraints
 - Do NOT generate requirements, design, or tasks. This skill only creates spec.json and requirements.md (or, in update mode, updates them).
@@ -114,14 +114,14 @@ Provide output in the language specified in `spec.json` with the following struc
 1. **Generated Feature Name**: `feature-name` format with 1-2 sentence rationale
 2. **Project Summary**: Brief summary (1 sentence)
 3. **Created Files**: Bullet list with full paths
-4. **Next Step**: Command block showing `/kiro-spec-requirements <feature-name>`
+4. **Next Step**: A code block with no language name that holds only `/kiro-spec-requirements <feature-name>`, with the feature name filled in
 
 In update mode, use this structure instead:
 
 1. **Updated Spec**: `feature-name` and the added Issue (`#N` and its title)
 2. **Revoked Approvals**: Each revoked stage with its approver and approval date (as written to `approval_history`), or "none" if no stage was approved
 3. **Updated Files**: Bullet list of `spec.json` and `requirements.md` with full paths
-4. **Next Step**: Command block showing `/kiro-spec-requirements <feature-name>`
+4. **Next Step**: A code block with no language name that holds only `/kiro-spec-requirements <feature-name>`, with the feature name filled in
 
 If #N was already in the spec (Update Mode Step 2), report only that fact, the current progress, and the next command; say that nothing was written. If Step 2 found the requirements.md block missing and only Step 4 was redone, say so and list only `requirements.md` as updated.
 

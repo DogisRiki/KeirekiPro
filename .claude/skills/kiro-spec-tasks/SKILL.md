@@ -133,7 +133,7 @@ This skill's **Right After Generation (before approval)** item under Next Phase 
   - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "auto:-y"`
     and `approved_at` (ISO 8601)
   - Display task summary (task count, major groups, parallel markers)
-  - Respond: 「タスクを作り、自動で承認しました。`/kiro-impl {feature}` を打つと、実装が始まります。」
+  - Respond: 「タスクを作り、自動で承認しました。次のコマンドを打つと、実装が始まります。」 Follow it with `/kiro-impl {feature}` alone in a code block with no language name
   - Note: CLAUDE.md prohibits `-y`; this branch is kept only as the upstream behavior. Do not add any other automatic approval path
 - Otherwise (interactive):
   1. Display a summary of the generated tasks (task count, major groups, parallel markers)
@@ -142,7 +142,7 @@ This skill's **Right After Generation (before approval)** item under Next Phase 
   - If the user approves:
     - Set `approvals.tasks.approved: true` in spec.json, with `approved_by: "DogisRiki"`
       and `approved_at` (ISO 8601)
-    - Respond: 「タスクの承認を記録しました。`/clear` を打ってから `/kiro-impl {feature}` を打つと、実装が始まります。」 `/clear` keeps the spec stages' skill text and review exchange out of the implementation conversation; spec.json, tasks.md and the review records carry everything `/kiro-impl` needs. Do not ask the user to type `/clear` or `/kiro-impl` again in the middle of implementation
+    - Respond: 「タスクの承認を記録しました。次の2つのコマンドを、上から順に1つずつ打つと、実装が始まります。」 Follow it with `/clear` and `/kiro-impl {feature}`, each alone in its own code block with no language name, in that order, so the owner can copy each command in one action. `/clear` keeps the spec stages' skill text and review exchange out of the implementation conversation; spec.json, tasks.md and the review records carry everything `/kiro-impl` needs. Do not ask the user to type `/clear` or `/kiro-impl` again in the middle of implementation
   - If the user wants changes:
     - Keep `approvals.tasks.approved: false`
     - Respond with guidance on what to adjust and re-run
@@ -186,12 +186,12 @@ Provide brief summary in the language specified in spec.json:
 **Requirements or Design Not Approved**:
 - **Stop Execution**: Cannot proceed without approved requirements and design
 - **User Message**: 「タスクを作る前に、要件と設計の承認が要ります。」
-- **Suggested Action**: 「まだ承認されていない要件か設計を読んで承認してから、もう一度 `/kiro-spec-tasks {feature}` を打ってください。CLAUDE.md が自動の承認を禁じているので、`-y` は付けないでください。」
+- **Suggested Action**: 「まだ承認されていない要件か設計を読んで承認してください。CLAUDE.md が自動の承認を禁じているので、`-y` は付けないでください。承認したら、もう一度、次のコマンドを打ってください。」 Follow it with `/kiro-spec-tasks {feature}` alone in a code block with no language name
 
 **Missing Requirements or Design**:
 - **Stop Execution**: Both documents must exist
 - **User Message**: 「`.kiro/specs/{feature}/` に、`requirements.md` か `design.md` がありません。」
-- **Suggested Action**: 「先に、`/kiro-spec-requirements {feature}` と `/kiro-spec-design {feature}` のうち、まだ打っていないコマンドを打ち、要件と設計を作って承認してください。そのあと、もう一度 `/kiro-spec-tasks {feature}` を打ってください。」
+- **Suggested Action**: 「先に、次のコマンドを上から順に1つずつ打ち、要件と設計を作って承認してください。そのあと、もう一度、最後のコマンドを打ってください。」 Follow it with each command alone in its own code block with no language name, in this order: `/kiro-spec-requirements {feature}` (only when `requirements.md` is missing), `/kiro-spec-design {feature}` (only when `design.md` is missing), then `/kiro-spec-tasks {feature}`
 
 **Incomplete Requirements Coverage**:
 - **Warning**: 「どのタスクにも割り当てられていない要件があります。Claude は、その要件の番号を下に並べます。わざとタスクにしていない要件か、Claude がタスクを作り直す要件かを、この会話で答えてください。」
@@ -200,7 +200,7 @@ Provide brief summary in the language specified in spec.json:
 **Spec Gap Found During Task Review**:
 - **Stop Execution**: Do not write a patched-over `tasks.md`
 - **User Message**: 「タスクを作る途中で、要件か設計に足りない点か、2通りに読める点が見つかりました。Claude は、足りない点と2通りに読める点を、下に並べます。要件か設計をどう直すかを、この会話で答えてください。」
-- **Suggested Action**: Refine requirements.md or design.md following the owner's answer, then re-run `/kiro-spec-tasks {feature}`
+- **Suggested Action**: Refine requirements.md or design.md following the owner's answer, then ask the owner to type `/kiro-spec-tasks {feature}` again, showing the command alone in a code block with no language name
 
 **Template/Rules Missing**:
 - **User Message**: 「`.kiro/settings/` に、タスクの雛形か決まりのファイルがありません。」 (the template is `.kiro/settings/templates/specs/tasks.md`)
