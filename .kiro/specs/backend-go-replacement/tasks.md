@@ -55,7 +55,7 @@
   - _要件: 3.1_
   - _対象の部品: CodeQL とイメージの検査と組み立てて動かす検査_
 
-- [ ] 1.7 index.golang.org から gomod の部品の公開の時刻を読む部品を作り、公開の時刻の検査につなぐ
+- [x] 1.7 index.golang.org から gomod の部品の公開の時刻を読む部品を作り、公開の時刻の検査につなぐ
 
   Claude は、`.github/scripts/lib-gomod-index.sh` とそのテストを置き場に作る。この部品は、index.golang.org の索引を、検査の時刻の73時間前から `since` で順に1度だけ読み、モジュールと版の組ごとに初めて取り込まれた時刻を返す。proxy.golang.org の `.info` の時刻は使わない。Claude は、`check-dependency-cooldown.sh` と、そこから呼ぶ `cooldown-check-*.sh` と `cooldown-match-alerts.sh` を、gomod の部品に対応させる。
   - 完了の確かめ方: 検査用の写しで、`test-lib-gomod-index.sh`、`test-check-dependency-cooldown.sh`、`test-cooldown-match-alerts.sh` が成功する
@@ -639,6 +639,7 @@
 - CodeQL の Go の解析(タスク1.6で分かったこと): `codeql.yaml` には `actions/setup-go` の手順が無く、Go の行の組み立ては、GitHub Actions の機械に入っている Go と、`go.mod` の `toolchain` の指定による Go の自動の入手に頼る。Claude は、`backend/go.mod` を足す PR 2-2 で、CodeQL の `go` の仕事が成功したことを `gh run view` で確かめ、失敗したときは `setup-go` の手順を足す提案を所有者に出す
 - PR の本文: この spec の PR の本文には、`Spec: .kiro/specs/backend-go-replacement` と `Refs: #445` を書く。所有者の承認が要る PR では、「承認が要る理由」と「main に入れたときに本番で起きること」の2つの欄を書き、PR を作ったときの所有者への返事に、この2つの欄をそのまま写す
 - 公開のリポジトリ: Claude は、まだ直していないセキュリティの穴を、Issue、PR、コミット、spec の本文に書かない
+- 公開の時刻の検査のテストの環境(タスク1.7で分かったこと): `test-check-dependency-cooldown.sh` は openssl と gnupg を使う。Linux のコンテナで流すときは、`apk add` に `openssl gnupg` を足す
 - design の審査で残った記録: 次の5つを、それぞれ次のタスクで扱う。
   - D3-3-1: 6-1 の `backend-vuln-fix` が版を上げる場所の一覧である。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」に書き足したとおりに、タスク10.7で扱う
   - D5-1-1: 6-1 での `backend-vuln-fix.yaml` の Java 版の仕事の扱いである。タスク10.7で扱う
