@@ -10,7 +10,7 @@
   - 受入基準とテストの対応: 要件3の受入基準2(どの OS でも1つのコマンドで Go 版の品質チェックを動かせる)は、`test-run-check.sh` の「backend-go の領域を受け付ける」「backend-go の make check が通ったときだけ記録を書く」「backend-go で dind を起こす」「backend-go に /repo を読み取り専用で差し込む」の場合で確かめる
   - _要件: 3.2_
 
-- [ ] 1.2 作業を終えるときの確認のフックで、Java 版と Go 版の記録を分ける
+- [x] 1.2 作業を終えるときの確認のフックで、Java 版と Go 版の記録を分ける
 
   Claude は、`.claude/hooks/check-verify-before-stop.sh` とそのテストの完成版を、置き場(実装のメモの「置き場」)に作る。このフックは、変わったファイルを、design.md の「CI の仕事」の見分け `backend_java` と `backend_go` と同じ形で分け、Java 版のファイルが変わったときは Java 版の記録を、Go 版のファイルが変わったときは Go 版の記録を求める。マイグレーションのファイルが変わったときは、両方の記録を求める。
   - 完了の確かめ方: 検査用の写しで、`.claude/hooks/tests/test-check-verify-before-stop.sh` が成功する
