@@ -145,6 +145,20 @@ m_go_mod() { printf 'module example.com/backend\n\ngo 1.26\n' >backend/go.mod; p
 m_go_src() { mkdir -p backend/internal/a && printf 'package a\n' >backend/internal/a/a.go; }
 # 承認の対象のファイルと同じ名前でも、置き場所が違えば対象にしない
 m_go_makefile_nested() { mkdir -p backend/tools && printf 'all:\n' >backend/tools/Makefile; }
+# 承認の対象のファイルを、対象の外の名前に移す(中身は変えない)
+m_workspace_move_out() { git mv frontend/pnpm-workspace.yaml frontend/ws.yaml; }
+m_build_move_out() { git mv backend/build.gradle backend/build.gradle.off; }
+# 対象の外のファイルを、移して対象の名前にする
+m_move_into_npmrc() { echo "minimum-release-age=0" >frontend/npmrc.txt && git add frontend/npmrc.txt && git commit -qm pre && git mv frontend/npmrc.txt frontend/.npmrc; }
+# 対象の外のファイルどうしの移動
+m_move_src_only() { mkdir -p frontend/src && echo "export const a = 1;" >frontend/src/a.ts && git add -A && git commit -qm pre && git mv frontend/src/a.ts frontend/src/b.ts; }
+# 日本語・空白・改行・UTF-8 として正しくないバイトを含む名前のビルドスクリプト
+m_gradle_japanese() { echo "// x" >"backend/gradle/設定.gradle"; }
+m_gradle_space() { echo "// x" >"backend/gradle/my build.gradle"; }
+m_gradle_newline() { echo "// x" >"backend/gradle/a"$'\n'"b.gradle"; }
+m_gradle_bad_utf8() { echo "// x" >"backend/gradle/"$'\xff'".gradle"; }
+# 対象の外の日本語の名前のファイル
+m_src_japanese() { mkdir -p backend/src && echo "x" >"backend/src/説明.txt"; }
 
 # --- 承認を要求しないもの --------------------------------------------------------
 check 0 false "依存定義以外のみの変更" m_none
@@ -205,6 +219,23 @@ check 0 false "go.mod と go.sum の変更は承認の対象にしない" m_go_m
 check 0 false "Go のコードの変更は承認の対象にしない" m_go_src
 check 0 false "backend の直下でない Makefile は承認の対象にしない" m_go_makefile_nested
 check_summary "backend/.testcoverage.yml" "" "変えた Go 版の設定のファイル名が Summary に出る" m_go_testcoverage
+
+# --- ファイルの移動と、ファイルの名前の書き方 ------------------------------------
+# git が日本語の名前を記号に置き換える設定(core.quotePath の既定の true)でも見逃さないことを確かめる
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.quotePath GIT_CONFIG_VALUE_0=true
+check 1 false "pnpm-workspace.yaml を対象の外の名前に移す変更を承認の対象にする" m_workspace_move_out
+check 1 false "build.gradle を対象の外の名前に移す変更を承認の対象にする" m_build_move_out
+check 1 false "対象の外のファイルを移して .npmrc にする変更を承認の対象にする" m_move_into_npmrc
+check 0 false "対象の外のファイルどうしの移動は承認の対象にしない" m_move_src_only
+check 0 true "pnpm-workspace.yaml を移す変更は所有者の承認があれば通る" m_workspace_move_out
+check 1 false "日本語の名前のビルドスクリプトの追加を承認の対象にする" m_gradle_japanese
+check 1 false "空白を含む名前のビルドスクリプトの追加を承認の対象にする" m_gradle_space
+check 1 false "改行を含む名前のビルドスクリプトの追加を承認の対象にする" m_gradle_newline
+check 1 false "UTF-8 として正しくないバイトを含む名前のビルドスクリプトの追加を承認の対象にする" m_gradle_bad_utf8
+check 0 false "対象の外の日本語の名前のファイルは承認の対象にしない" m_src_japanese
+check_summary "frontend/pnpm-workspace.yaml" "" "移す前の対象のファイル名が Summary に出る" m_workspace_move_out
+check_summary "backend/gradle/設定.gradle" "" "日本語の名前が記号に置き換えられずに Summary に出る" m_gradle_japanese
+unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
 
 if [ "$FAILED" -ne 0 ]; then
     echo "::error::check-dependency-additions.sh のテストが失敗しました。"
