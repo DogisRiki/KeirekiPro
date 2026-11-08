@@ -28,6 +28,12 @@
 #   公開元が副鍵を替えても、主鍵が同じなら同じ者とみなす。
 #   鍵は版ごとの使い捨ての GNUPGHOME に入れる。
 #
+# gomod(Go のモジュール)の署名した者:
+#   Go のモジュールには、公開した者が版に署名する仕組みが無い。sum.golang.org の記録は、
+#   版の中身が後から変わらないことを示すが、誰が公開したかは示さない。そのため、前の版にも
+#   署名が無いものとして no-prior-signature を返す。maven で前の版に署名が無いときと同じく、
+#   呼ぶ側は止めず、所有者の承認で入れるかを決める。
+#
 # なぜ証明書を2か所から読むのか:
 #   bundle の版 0.3 は verificationMaterial.certificate に、版 0.2 は
 #   verificationMaterial.x509CertificateChain.certificates[0] に証明書を置く。
@@ -43,7 +49,7 @@
 # テスト: .github/scripts/tests/test-cooldown-check-signer.sh
 # 使い方: cooldown-check-signer.sh <ecosystem> <名前> <前の版> <新しい版>
 #   出力(標準出力): 1行目 result=<結果>、2行目 detail=<理由の説明>
-#   <名前> は、npm なら部品の名前、maven なら <groupId>:<artifactId>
+#   <名前> は、npm なら部品の名前、maven なら <groupId>:<artifactId>、gomod ならモジュールのパス
 #   環境変数 NPM_REGISTRY_BASE(既定 https://registry.npmjs.org)、
 #     MAVEN_CENTRAL_BASE(既定 https://repo1.maven.org/maven2)、
 #     PLUGIN_PORTAL_BASE(既定 https://plugins.gradle.org/m2)、
@@ -294,6 +300,9 @@ maven)
     *) usage ;;
     esac
     check_maven
+    ;;
+gomod)
+    answer no-prior-signature "Go のモジュールには、公開した者が版に署名する仕組みがありません。前の版 ${PREV} にも新しい版 ${NEW} にも署名がありません。"
     ;;
 *) usage ;;
 esac

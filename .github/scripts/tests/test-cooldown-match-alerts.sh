@@ -248,6 +248,44 @@ if want broken_page; then
         '.[0].reason == "alerts-unreadable" and .[0].eligible == false'
 fi
 
+if want gomod_eligible; then
+    reset
+    # 警告の API は Go のモジュールのエコシステムを go と呼ぶ。名前の大文字と小文字と、
+    # 最初の修正版の先頭の v の有無が、差分比較の API と違っても照らす。
+    # gomod と書いた警告と npm の警告は、エコシステムが違うので外れる
+    page 'github.com%2FExample%2FTool' "$(alert 260 go github.com/example/tool high runtime v1.2.0)" \
+        "$(alert 261 gomod github.com/Example/Tool high runtime 1.2.0)" \
+        "$(alert 262 npm github.com/Example/Tool high runtime 1.2.0)"
+    run '[{"ecosystem":"gomod","name":"github.com/Example/Tool","version":"1.2.0"}]'
+    expect_rc "gomod の部品は go のエコシステムの警告に照らす(終了コード)" 0
+    expect "gomod の部品は go のエコシステムの警告に照らす" \
+        '.[0].eligible == true and .[0].reason == "eligible" and [.[0].alerts[].number] == [260]
+         and .[0].ecosystem == "gomod" and .[0].name == "github.com/Example/Tool" and .[0].version == "1.2.0"'
+    if grep -qF 'ecosystem=go&package=github.com%2FExample%2FTool' "$WORK/calls.log"; then
+        echo "PASS: gomod の部品は go のエコシステムの警告に照らす(問い合わせの形)"
+    else
+        echo "FAIL: gomod の部品は go のエコシステムの警告に照らす(問い合わせの形: $(cat "$WORK/calls.log"))"
+        FAILED=1
+    fi
+fi
+
+if want gomod_not_first_patched; then
+    reset
+    page 'github.com%2FExample%2FTool' "$(alert 263 go github.com/Example/Tool high runtime 1.2.0)"
+    run '[{"ecosystem":"gomod","name":"github.com/Example/Tool","version":"1.2.1"}]'
+    expect "gomod の部品が最初の修正版より新しければ not-first-patched になる" \
+        '.[0].eligible == false and .[0].reason == "not-first-patched" and .[0].first_patched == ["1.2.0"]'
+fi
+
+if want npm_case; then
+    reset
+    # 大文字と小文字を区別せずに照らすのは gomod の部品だけである
+    page axios "$(alert 264 npm Axios high runtime 1.2.3)"
+    run '[{"ecosystem":"npm","name":"axios","version":"1.2.3"}]'
+    expect "npm の部品は、名前の大文字と小文字が違う警告に照らさない" \
+        '.[0].eligible == false and .[0].reason == "no-alert"'
+fi
+
 if [ "$RAN" -eq 0 ]; then
     echo "FAIL: KP_TEST_CASE=${CASE} に当たる場合がありません"
     FAILED=1

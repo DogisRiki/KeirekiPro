@@ -189,7 +189,7 @@ jobs:
           set -euo pipefail
           for t in check-dependency-cooldown cooldown-match-alerts cooldown-check-malware \
             cooldown-check-signer cooldown-check-pnpm-exclude record-cooldown-exception \
-            lib-notice-comment lib-ci-tool-releases check-ci-tool-release-age; do
+            lib-notice-comment lib-ci-tool-releases check-ci-tool-release-age lib-gomod-index; do
             bash ".github/scripts/tests/test-${t}.sh"
           done
 

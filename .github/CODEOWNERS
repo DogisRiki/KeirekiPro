@@ -28,6 +28,15 @@
 # backend 品質ゲートの外部設定(checkstyle/formatter/spotbugs除外/pmd)
 /backend/config/                                @DogisRiki
 
+# backend の Go 版の品質ゲート定義とコード生成の設定
+# (合格の基準・検査の外し・カバレッジの除外・変異テストの基準・コード生成の指定)
+/backend/Makefile                               @DogisRiki
+/backend/.golangci.yml                          @DogisRiki
+/backend/.testcoverage.yml                      @DogisRiki
+/backend/.gremlins.yaml                         @DogisRiki
+/backend/api/oapi-codegen.yaml                  @DogisRiki
+/backend/sqlc.yaml                              @DogisRiki
+
 # アーキテクチャ境界の機械強制(ArchUnit)
 /backend/src/test/java/com/example/keirekipro/unit/architecture/  @DogisRiki
 

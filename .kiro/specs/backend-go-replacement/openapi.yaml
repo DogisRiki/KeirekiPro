@@ -1,0 +1,2545 @@
+openapi: 3.1.0
+info:
+  title: KeirekiPro API
+  version: 1.0.0
+  description: |
+    KeirekiPro の backend の HTTP API の取り決め。
+
+    この文書は、main の 492ae6ae 時点の Java 版(Spring Boot)の backend のコード
+    (presentation 層の controller と DTO、`AppExceptionHandler`、`SecurityConfig`、Cookie を作るコード、
+    `application*.yaml`)と、動いている Java 版から springdoc が出した定義を突き合わせて書いた。
+    「同じ振る舞い」の正は Java 版が実際に返す値と保存する値であり、細部(検証の規則、文言、
+    項目の並び)は Java 版と Go 版を比べる差分テストで確かめる。
+
+    ## 共通の決まり
+
+    - 本文は UTF-8 の JSON。日時の書き方は次のとおり。
+      - `LocalDate`(例 `2026-11-07`)は `format: date`。
+      - `YearMonth` は `yyyy-MM`(例 `2026-11`)の文字列。
+      - `LocalDateTime` は、時差を付けない日本時間の文字列(例 `2026-11-07T22:55:54.072661`)。
+        `format: date-time` ではない(RFC 3339 の時差が無いため)。
+      - `Instant`(バックアップの `exportedAt` だけ)は、UTC の `Z` 付きの文字列(`format: date-time`)。
+    - JSON の本文が読めない(壊れた JSON、型の合わない値、`yyyy-MM` でない年月など)ときは
+      400 と `{"message":"入力エラーがあります。","errors":{}}` を返す。
+    - DTO の検証(Bean Validation)に落ちたときは 400 と、項目名ごとの文言の一覧
+      (`errors`)を返す。入れ子の項目の名前は `pdfSettings.fontSizes.title` のような
+      点区切りのパスになる。DTO の長さ・形式などの規則はこの文書に書き写していない
+      (正は Java の DTO の注釈)。`required` は、Java の DTO が `@NotNull`/`@NotBlank` で
+      必須にしている項目だけに付けた。必須の項目が無いときも Java は 400 と項目ごとの文言を返す。
+    - 想定外の例外は 500 と `{"message":"予期せぬエラーが発生しました。","errors":{}}` を返す。
+      Java 版は `@ExceptionHandler(Exception.class)` がすべてを受けるため、
+      Spring が本来 405・415・413 などを返す場面(許されないメソッド、Content-Type の不一致、
+      2MB を超える multipart、必須のクエリが無い、UUID でない `{careerId}` など)も 500 になる。
+    - すべての応答に `X-Request-Id` ヘッダーが付く(要求に `X-Request-Id` があればその値、
+      無ければ新しい UUID)。
+
+    ## 認証
+
+    - 認証は HttpOnly の Cookie `accessToken`(JWT、有効 10 分)で行う。`/api/auth/**` 以外はすべて認証が要る。
+    - `refreshToken`(有効 7 日。サーバー側の保存先は Redis)で `POST /api/auth/token/refresh` から `accessToken` を作り直す。
+    - `twoFactorChallenge`(Path `/api/auth/2fa`、Max-Age 600)は二段階認証の途中だけ使う。
+    - Cookie の属性は `Path=/; HttpOnly; SameSite=Lax`。設定 `cookie.secure` が true の環境(本番)では `Secure` も付く。
+      `accessToken` と `refreshToken` に `Max-Age` は付かない(ブラウザーを閉じるまで)。
+    - 消すときは同じ名前で値を空にし、`Max-Age=0` と `Expires=Thu, 01 Jan 1970 00:00:00 GMT` を付ける。
+    - `accessToken` が検証できないとき、要求は未認証として扱われ、`accessToken` を消す
+      `Set-Cookie`(`Path=/; Max-Age=0`。HttpOnly などは付かない)が応答に付く。
+
+    ## CSRF
+
+    - `/api/auth/**` を除く、状態を変える要求(POST・PUT・PATCH・DELETE)は、Cookie `XSRF-TOKEN` の値を
+      ヘッダー `X-XSRF-TOKEN` にそのまま入れて送る(double submit cookie。マスクしない)。
+    - 無いか一致しないときは 403 と `{"message":"アクセス権限がありません。"}` を返す。
+      このとき、要求に `XSRF-TOKEN` Cookie が無ければ、新しい `XSRF-TOKEN` を `Set-Cookie` で返す。
+      CSRF の検査は認証の検査より先に行うため、未認証でも CSRF が無ければ 401 ではなく 403 になる。
+    - `XSRF-TOKEN` Cookie(HttpOnly なし、`Path=/`)は、要求に無ければ、OPTIONS 以外の
+      すべての応答(`/api/auth/**` と GET を含む)で発行される。
+
+    ## CORS
+
+    許す送り元は設定 `cors.allowed-origins`。資格情報(Cookie)を許し、メソッドは
+    GET・POST・PUT・DELETE・PATCH・OPTIONS、ヘッダーはすべて許す。ブラウザーに見せるヘッダーは
+    `Content-Disposition` と `X-Request-Id`。OPTIONS(プリフライト)は認証なしで通す。
+
+    ## API でない URL
+
+    この文書に載せていない、Java 版が受け付ける URL は次のとおり。
+    - `/actuator/health`: ヘルスチェック(ALB のターゲットグループと ECS のコンテナのヘルスチェックが使う)。
+      認証不要。本番は `health` だけを公開し、詳細は出さない(`{"status":"UP"}`)。
+      開発の設定では `/actuator/**` をすべて公開している。
+    - `/v3/api-docs`、`/v3/api-docs/**`、`/swagger-ui.html`、`/swagger-ui/**`: springdoc の定義と画面。
+      認証不要。本番の設定でも無効にしていない。
+    - `/error`: Spring Boot の既定のエラーの URL(エラーの転送先)。
+    - `/api/admin/**`: 管理者(ROLE_ADMIN)だけに許す規則があるが、受け付ける controller は無い。
+servers:
+  - url: /
+tags:
+  - name: auth
+    description: 認証(ログイン、トークン、登録、メールアドレスの確認、パスワードの再設定、OIDC)。認証不要で、CSRF の検査も無い。
+  - name: users
+    description: ログインしている利用者のアカウント
+  - name: resumes
+    description: 職務経歴書とその中身、バックアップ、エクスポート
+  - name: masters
+    description: 画面の入力補助のための一覧
+security:
+  - cookieAuth: []
+paths:
+  /api/auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: ログイン
+      description: |
+        メールアドレスとパスワードでログインする。
+        二段階認証が無効なら 200 と `accessToken`・`refreshToken` の Cookie を返す。
+        有効なら 202 と `twoFactorChallenge` の Cookie を返し、認証コードをメールで送る
+        (続きは `POST /api/auth/2fa/verify`)。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: ログインした(本文なし)
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetCookieAuthTokens'
+        '202':
+          description: 二段階認証へ進む(本文なし)
+          headers:
+            Set-Cookie:
+              description: |
+                `twoFactorChallenge=<チャレンジトークン>; Path=/api/auth/2fa; Max-Age=600; Expires=...; HttpOnly; SameSite=Lax`
+                (本番は `Secure` も付く)
+              schema:
+                type: string
+        '400':
+          description: |
+            入力が足りない、またはメールアドレスかパスワードが違う
+            (`errors` は空。文言はアカウントの有無で変えない)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: |
+            パスワードは合っているが、メールアドレスの確認が済んでいない。
+            `kind` は、確認前の登録(アカウントがまだ無い)なら `PENDING_REGISTRATION`、
+            アカウントのメールアドレスの確認がまだなら `UNVERIFIED_ACCOUNT_EMAIL`。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailNotVerifiedErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: ログアウト
+      description: |
+        `refreshToken`(無ければ `accessToken`)から利用者を特定できれば、その利用者が
+        全端末でそれまでに発行したトークンを無効にする。`refreshToken` があればサーバー側から消す。
+        Cookie が無くても、トークンが無効でも 204 を返す。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RefreshTokenCookie'
+        - $ref: '#/components/parameters/AccessTokenCookie'
+      responses:
+        '204':
+          description: ログアウトした
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetCookieClearAuthTokens'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/token/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshToken
+      summary: アクセストークンの再発行
+      description: |
+        `refreshToken` の Cookie から新しい `accessToken` を作る。`refreshToken` は作り直さない。
+        `refreshToken` が無い、サーバー側に無い、またはトークンの版が今の版と違うときは 401
+        (版が違うときはサーバー側の `refreshToken` を消す)。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RefreshTokenCookie'
+      responses:
+        '200':
+          description: 再発行した(本文なし)
+          headers:
+            Set-Cookie:
+              description: '`accessToken=<JWT>; Path=/; HttpOnly; SameSite=Lax`(本番は `Secure` も付く)'
+              schema:
+                type: string
+        '401':
+          description: '`refreshToken` が無いか無効。本文は常に `{"message":"認証に失敗しました。","errors":{}}`。Cookie は消さない。'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/register:
+    post:
+      tags: [auth]
+      operationId: registerUser
+      summary: 利用者の新規登録
+      description: |
+        メールアドレスとパスワードで登録を受け付け、確認のメールを送る。
+        アカウントは確認のリンクを開いたとき(`POST /api/auth/email-verification/verify`)に作られる。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+      responses:
+        '202':
+          description: 受け付けた(本文なし)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/2fa/verify:
+    post:
+      tags: [auth]
+      operationId: verifyTwoFactorAuth
+      summary: 二段階認証の認証コードの確認
+      description: |
+        `twoFactorChallenge` の Cookie と認証コードを確かめ、ログインを済ませる。
+        Cookie が無い、期限切れ、コードが違う、試行回数の上限に達したときは 400。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TwoFactorChallengeCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorAuthRequest'
+      responses:
+        '200':
+          description: ログインした(本文なし)
+          headers:
+            Set-Cookie:
+              description: |
+                3つの `Set-Cookie` が付く。`accessToken` と `refreshToken` の発行
+                (`Path=/; HttpOnly; SameSite=Lax`)と、`twoFactorChallenge` を消すもの
+                (`twoFactorChallenge=; Path=/api/auth/2fa; Max-Age=0; Expires=...; HttpOnly; SameSite=Lax`)。
+                本番は `Secure` も付く。
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/email-verification/verify:
+    post:
+      tags: [auth]
+      operationId: verifyEmail
+      summary: メールアドレスの確認
+      description: 確認のリンクのトークンを受け取り、確認の結果を返す。結果が失敗の種類(`EXPIRED` など)でも 200 で返す。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerificationTokenRequest'
+      responses:
+        '200':
+          description: 確認の結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyEmailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/email-verification/resend:
+    post:
+      tags: [auth]
+      operationId: resendEmailVerification
+      summary: 確認のメールの送り直し
+      description: 期限の切れた確認のリンクのトークンから、確認のメールを送り直す。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerificationTokenRequest'
+      responses:
+        '204':
+          description: 送った
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/email-verification/resend-for-login:
+    post:
+      tags: [auth]
+      operationId: resendEmailVerificationForLogin
+      summary: ログインの画面からの確認のメールの送信
+      description: メールアドレスとパスワードを確かめ、確認がまだのアカウント(または確認前の登録)へ確認のメールを送る。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendEmailVerificationForLoginRequest'
+      responses:
+        '204':
+          description: 送った
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/password/reset/request:
+    post:
+      tags: [auth]
+      operationId: requestPasswordReset
+      summary: パスワードの再設定の要求
+      description: パスワードの再設定のリンクをメールで送る。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordResetRequest'
+      responses:
+        '204':
+          description: 受け付けた
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/password/reset/verify:
+    post:
+      tags: [auth]
+      operationId: verifyPasswordResetToken
+      summary: パスワードの再設定のトークンの確認
+      description: |
+        トークンが有効かを確かめる。無効または期限切れなら 400。
+        Java の DTO は検証の注釈を持たない(`@Valid` も付いていない)。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordResetVerifyRequest'
+      responses:
+        '204':
+          description: 有効
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/password/reset:
+    post:
+      tags: [auth]
+      operationId: resetPassword
+      summary: パスワードの再設定
+      description: |
+        トークンが無効または期限切れなら 400。トークンは有効だが利用者がもう居ないときは 401
+        (`{"message":"不正なアクセスです。","errors":{}}` と、`accessToken`・`refreshToken` を消す `Set-Cookie`)。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '204':
+          description: 再設定した
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/oidc/authorize:
+    get:
+      tags: [auth]
+      operationId: startOidcAuthorization
+      summary: OIDC の認可の開始
+      description: |
+        OIDC プロバイダーの認可 URL(state と PKCE の code_challenge を含む)を作って返す。
+        画面はこの URL へ移動する。コールバック先は、本番は `app.api-base-url` + `/api/auth/oidc/callback`、
+        開発は要求の scheme・host・port + `/api/auth/oidc/callback`。
+        本文は URL の文字列そのもの(JSON の文字列としての引用符は付かない)。
+        Content-Type は Accept で変わる(Spring の文字列の変換器が書くため。`text/plain` のほか、
+        Accept に `application/json` が先に来ると `application/json` のまま引用符なしの本文になる)。
+        `provider` が無い、または知らないプロバイダーのときは 500。
+      security: []
+      parameters:
+        - name: provider
+          in: query
+          required: true
+          description: プロバイダーの名前(`google` か `github`。大文字小文字は区別しない)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 認可 URL
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/auth/oidc/callback:
+    get:
+      tags: [auth]
+      operationId: handleOidcCallback
+      summary: OIDC のコールバック
+      description: |
+        OIDC プロバイダーから戻ってきたときの処理。結果によらず、例外が起きても 302 で画面へ戻す。
+        - 成功: `accessToken`・`refreshToken` の Cookie を発行し、`{frontend-base-url}/resume/list` へ。
+        - アカウントのメールアドレスの確認がまだ: `{frontend-base-url}/login?error=unverified_email` へ。
+        - 利用者の情報が取れない: `{frontend-base-url}/login?error=<URL エンコードした文言>` へ
+          (文言は「ユーザー情報の取得に失敗しました。しばらく時間を置いてから再度お試しください。」)。
+        - その他の失敗と例外: `{frontend-base-url}/login?error=<URL エンコードした文言>` へ
+          (文言は「認証に失敗しました。しばらく時間を置いてから再度お試しください。」)。
+        URL エンコードは Java の `URLEncoder`(空白は `+`)。
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: 画面へ戻す(本文なし)
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Set-Cookie:
+              description: 成功したときだけ、`accessToken` と `refreshToken` を発行する(`Path=/; HttpOnly; SameSite=Lax`、本番は `Secure` も付く)。
+              schema:
+                type: string
+  /api/users/me:
+    get:
+      tags: [users]
+      operationId: getUserInfo
+      summary: 利用者の情報の取得
+      responses:
+        '200':
+          description: 利用者の情報
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfoResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags: [users]
+      operationId: updateUserInfo
+      summary: 利用者の情報の更新
+      description: |
+        multipart/form-data で受け取る。送った項目だけを変える。
+        Java 版は `@RequestParam` で読むため、`username` と `twoFactorAuthEnabled` はクエリ文字列で送っても受け付ける。
+        画像は JPEG・PNG・GIF だけ、縦横 4096 ピクセル以下(違えば 400)。
+        multipart の大きさの上限は 1ファイル 2MB・要求全体 2MB で、超えると Java 版は 500 を返す。
+        multipart でない Content-Type も Java 版は 500 を返す。
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateUserInfoRequest'
+            encoding:
+              profileImage:
+                contentType: image/jpeg, image/png, image/gif
+      responses:
+        '200':
+          description: 更新したあとの利用者の情報
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [users]
+      operationId: deleteUser
+      summary: 退会
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 退会した
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetCookieClearAuthTokens'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/users/me/email-verification:
+    post:
+      tags: [users]
+      operationId: sendAccountEmailVerification
+      summary: 確認のメールの送信
+      description: ログインしている利用者のアカウントの、確認がまだのメールアドレスへ確認のメールを送る。
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 送った
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/users/me/email-password:
+    post:
+      tags: [users]
+      operationId: setEmailAndPassword
+      summary: メールアドレスとパスワードの設定
+      description: OIDC で作ったアカウントなどに、メールアドレスとパスワードを設定する。
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEmailAndPasswordRequest'
+      responses:
+        '200':
+          description: 設定したあとの利用者の情報
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/users/me/password:
+    patch:
+      tags: [users]
+      operationId: changePassword
+      summary: パスワードの変更
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: 変更した
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/users/me/auth-provider/{provider}:
+    delete:
+      tags: [users]
+      operationId: removeAuthProvider
+      summary: 外部認証の連携の解除
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: プロバイダーの名前(例 `google`、`github`)
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 解除した
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes:
+    get:
+      tags: [resumes]
+      operationId: listResumes
+      summary: 職務経歴書の一覧
+      responses:
+        '200':
+          description: ログインしている利用者の職務経歴書の一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetResumeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [resumes]
+      operationId: createResume
+      summary: 職務経歴書の作成
+      description: |
+        `resumeId` が無ければ空の職務経歴書を作る(日付は作った日)。
+        `resumeId` があれば、その職務経歴書を写して作る(写し元が無いか他人のものなら 404)。
+        作れる数の上限を超えるときは 400。
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResumeRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ResumeInfoCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/restore:
+    post:
+      tags: [resumes]
+      operationId: restoreResume
+      summary: バックアップからの職務経歴書の復元
+      description: |
+        `GET /api/resumes/{resumeId}/backup` が返した JSON をそのまま受け取り、新しい職務経歴書として作る。
+        `version` が `1.0` でないとき、作れる数の上限を超えるとき、中身が規則に合わないときは 400。
+        Java の DTO は検証の注釈を持たず、検証はドメインで行う。`resume` が無いと Java 版は 500 を返す。
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResumeBackup'
+      responses:
+        '201':
+          $ref: '#/components/responses/ResumeInfoCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    get:
+      tags: [resumes]
+      operationId: getResume
+      summary: 職務経歴書の取得
+      responses:
+        '200':
+          $ref: '#/components/responses/ResumeInfoOk'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [resumes]
+      operationId: deleteResume
+      summary: 職務経歴書の削除
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 削除した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/basic:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    put:
+      tags: [resumes]
+      operationId: updateResumeBasic
+      summary: 職務経歴書の基本情報の更新
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateResumeBasicRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResumeInfoOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/backup:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    get:
+      tags: [resumes]
+      operationId: backupResume
+      summary: 職務経歴書のバックアップ
+      description: 職務経歴書を JSON のファイルとしてダウンロードさせる。ファイル名は `<職務経歴書名を整えたもの>_backup.json`(名前が使えなければ `resume_backup.json`)。
+      responses:
+        '200':
+          description: バックアップの JSON
+          headers:
+            Content-Disposition:
+              $ref: '#/components/headers/ContentDispositionAttachment'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeBackup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/export:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    get:
+      tags: [resumes]
+      operationId: exportResume
+      summary: 職務経歴書のエクスポート(Accept で形式を選ぶ)
+      description: |
+        形式は要求の `Accept` ヘッダーの文字列で決める(内容交渉の規則ではなく、部分文字列で調べる)。
+        - `Accept` が `application/pdf` を含めば PDF(既定のフォントと色)。
+        - そうでなく `text/markdown` を含めば Markdown。
+        - どちらも含まなければ 406 と `{"message":"対応していない形式が指定されました。","errors":{}}`。
+        成功のときの `Content-Type` は `Accept` によらず、PDF なら `application/pdf`、
+        Markdown なら `text/markdown;charset=utf-8`。`Content-Disposition` は常に `attachment`、
+        ファイル名は `<職務経歴書名を整えたもの>.pdf` か `.md`。
+        画面は `Accept: application/pdf, application/json`(または `text/markdown, application/json`)を送り、
+        失敗のときは JSON のエラーを受け取る。`Accept` が JSON を受け付けないとき、Java 版の失敗の応答の本文は
+        書けない(Spring の既定の動き。差分テストで確かめる)。
+        職務経歴書がエクスポートの前提の規則に合わないときは 400
+        (`message` は「職務経歴書をエクスポートできません。」に、改行と `- ` で始まる理由を並べたもの。`errors` は空)。
+      responses:
+        '200':
+          description: エクスポートしたファイル
+          headers:
+            Content-Disposition:
+              $ref: '#/components/headers/ContentDispositionAttachment'
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/markdown:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '406':
+          $ref: '#/components/responses/NotAcceptable'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [resumes]
+      operationId: exportResumeWithSettings
+      summary: 職務経歴書のエクスポート(設定を指定する)
+      description: |
+        本文の `format` で形式を、`disposition` で `Content-Disposition` の種類(`inline` はプレビュー用)を決める。
+        `format` が `pdf` なら `pdfSettings` が要る(無ければ 400、`errors` の項目名は `pdfSettingsRequired`)。
+        `format` が `markdown` のときは `pdfSettings` を使わない。
+        成功のときの `Content-Type` は、PDF なら `application/pdf`、Markdown なら `text/markdown;charset=utf-8`。
+        `Accept` は形式の選びに使わない。
+        職務経歴書がエクスポートの前提の規則に合わないときは 400。`message` は、`disposition` が `inline` なら
+        「入力エラーがあるため、PDFプレビューを表示できません。」、`attachment` なら「職務経歴書をエクスポートできません。」に、
+        改行と `- ` で始まる理由を並べたもの(`errors` は空)。
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportResumeRequest'
+      responses:
+        '200':
+          description: エクスポートしたファイル
+          headers:
+            Content-Disposition:
+              description: |
+                `disposition` が `inline` なら `inline`、`attachment` なら `attachment` で始まり、
+                ファイル名(`<職務経歴書名を整えたもの>.pdf` か `.md`)を UTF-8 で書く(Spring の `ContentDisposition` が組み立てる)。
+              schema:
+                type: string
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/markdown:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/careers:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    post:
+      tags: [resumes]
+      operationId: createCareer
+      summary: 職歴の追加
+      description: 期間が他の職歴と重なるときなどは 400。
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CareerRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ResumeInfoCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/careers/{careerId}:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+      - $ref: '#/components/parameters/CareerId'
+    put:
+      tags: [resumes]
+      operationId: updateCareer
+      summary: 職歴の更新
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CareerRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResumeInfoOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [resumes]
+      operationId: deleteCareer
+      summary: 職歴の削除
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 削除した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/projects:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    post:
+      tags: [resumes]
+      operationId: createProject
+      summary: プロジェクトの追加
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ResumeInfoCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/projects/{projectId}:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+      - $ref: '#/components/parameters/ProjectId'
+    put:
+      tags: [resumes]
+      operationId: updateProject
+      summary: プロジェクトの更新
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResumeInfoOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [resumes]
+      operationId: deleteProject
+      summary: プロジェクトの削除
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 削除した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/certifications:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    post:
+      tags: [resumes]
+      operationId: createCertification
+      summary: 資格の追加
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificationRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ResumeInfoCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/certifications/{certificationId}:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+      - $ref: '#/components/parameters/CertificationId'
+    put:
+      tags: [resumes]
+      operationId: updateCertification
+      summary: 資格の更新
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificationRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResumeInfoOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [resumes]
+      operationId: deleteCertification
+      summary: 資格の削除
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 削除した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/portfolios:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    post:
+      tags: [resumes]
+      operationId: createPortfolio
+      summary: ポートフォリオの追加
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortfolioRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ResumeInfoCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/portfolios/{portfolioId}:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+      - $ref: '#/components/parameters/PortfolioId'
+    put:
+      tags: [resumes]
+      operationId: updatePortfolio
+      summary: ポートフォリオの更新
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortfolioRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResumeInfoOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [resumes]
+      operationId: deletePortfolio
+      summary: ポートフォリオの削除
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 削除した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/sns-platforms:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    post:
+      tags: [resumes]
+      operationId: createSnsPlatform
+      summary: SNS の追加
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SnsPlatformRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ResumeInfoCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/sns-platforms/{snsPlatformId}:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+      - $ref: '#/components/parameters/SnsPlatformId'
+    put:
+      tags: [resumes]
+      operationId: updateSnsPlatform
+      summary: SNS の更新
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SnsPlatformRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResumeInfoOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [resumes]
+      operationId: deleteSnsPlatform
+      summary: SNS の削除
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 削除した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/self-promotions:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+    post:
+      tags: [resumes]
+      operationId: createSelfPromotion
+      summary: 自己 PR の追加
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelfPromotionRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ResumeInfoCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/resumes/{resumeId}/self-promotions/{selfPromotionId}:
+    parameters:
+      - $ref: '#/components/parameters/ResumeId'
+      - $ref: '#/components/parameters/SelfPromotionId'
+    put:
+      tags: [resumes]
+      operationId: updateSelfPromotion
+      summary: 自己 PR の更新
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelfPromotionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResumeInfoOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [resumes]
+      operationId: deleteSelfPromotion
+      summary: 自己 PR の削除
+      parameters:
+        - $ref: '#/components/parameters/XsrfTokenHeader'
+        - $ref: '#/components/parameters/XsrfTokenCookie'
+      responses:
+        '204':
+          description: 削除した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/certifications:
+    get:
+      tags: [masters]
+      operationId: listCertificationNames
+      summary: 資格の名前の一覧
+      description: 画面の入力補助のための資格の名前の一覧。
+      responses:
+        '200':
+          description: 資格の名前の一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/sns-platforms:
+    get:
+      tags: [masters]
+      operationId: listSnsPlatformNames
+      summary: SNS の名前の一覧
+      description: 画面の入力補助のための SNS の名前の一覧。
+      responses:
+        '200':
+          description: SNS の名前の一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnsPlatformListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/tech-stacks:
+    get:
+      tags: [masters]
+      operationId: listTechStacks
+      summary: 技術スタックの一覧
+      description: 画面の入力補助のための技術スタックの名前の一覧(分類ごと)。
+      responses:
+        '200':
+          description: 技術スタックの一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TechStackListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+      description: |
+        HttpOnly の Cookie `accessToken` に入れた JWT。`/api/auth/**` 以外のすべての操作に要る。
+        無いか検証できないときは 401(本文なし)。
+  parameters:
+    XsrfTokenHeader:
+      name: X-XSRF-TOKEN
+      in: header
+      required: false
+      description: |
+        Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
+        Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+        (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
+      schema:
+        type: string
+    XsrfTokenCookie:
+      name: XSRF-TOKEN
+      in: cookie
+      required: false
+      description: |
+        CSRF のトークン。サーバーが `Set-Cookie: XSRF-TOKEN=<値>; Path=/`(HttpOnly なし)で発行し、
+        画面はこの値を `X-XSRF-TOKEN` ヘッダーに写す。
+      schema:
+        type: string
+    RefreshTokenCookie:
+      name: refreshToken
+      in: cookie
+      required: false
+      description: リフレッシュトークン(HttpOnly)。
+      schema:
+        type: string
+    AccessTokenCookie:
+      name: accessToken
+      in: cookie
+      required: false
+      description: アクセストークン(HttpOnly の JWT)。
+      schema:
+        type: string
+    TwoFactorChallengeCookie:
+      name: twoFactorChallenge
+      in: cookie
+      required: false
+      description: |
+        ログインの 202 で発行した二段階認証のチャレンジトークン(HttpOnly、Path `/api/auth/2fa`)。
+        無いときは 400 と「認証セッションが無効または期限切れです。もう一度最初からお試しください。」。
+      schema:
+        type: string
+    ResumeId:
+      name: resumeId
+      in: path
+      required: true
+      description: |
+        職務経歴書の ID(UUID)。Java 版は文字列で受け取り、UUID として読めない値・存在しない値・
+        他人の職務経歴書は、どれも 404 と「対象の職務経歴書データが存在しません。」を返す。
+      schema:
+        type: string
+    CareerId:
+      name: careerId
+      in: path
+      required: true
+      description: 職歴の ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      schema:
+        type: string
+        format: uuid
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      description: プロジェクトの ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      schema:
+        type: string
+        format: uuid
+    CertificationId:
+      name: certificationId
+      in: path
+      required: true
+      description: 資格の ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      schema:
+        type: string
+        format: uuid
+    PortfolioId:
+      name: portfolioId
+      in: path
+      required: true
+      description: ポートフォリオの ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      schema:
+        type: string
+        format: uuid
+    SnsPlatformId:
+      name: snsPlatformId
+      in: path
+      required: true
+      description: SNS の ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      schema:
+        type: string
+        format: uuid
+    SelfPromotionId:
+      name: selfPromotionId
+      in: path
+      required: true
+      description: 自己 PR の ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      schema:
+        type: string
+        format: uuid
+  headers:
+    SetCookieAuthTokens:
+      description: |
+        2つの `Set-Cookie` が付く。
+        `accessToken=<JWT>; Path=/; HttpOnly; SameSite=Lax` と
+        `refreshToken=<トークン>; Path=/; HttpOnly; SameSite=Lax`(本番はどちらにも `Secure` が付く)。
+      schema:
+        type: string
+    SetCookieClearAuthTokens:
+      description: |
+        2つの `Set-Cookie` が付く。
+        `accessToken=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax` と、
+        同じ形の `refreshToken=; ...`(本番はどちらにも `Secure` が付く)。
+      schema:
+        type: string
+    ContentDispositionAttachment:
+      description: |
+        `attachment` で始まり、ファイル名を UTF-8 で書く(RFC 5987 の `filename*=UTF-8''<パーセントエンコード>` を含む。
+        Spring の `ContentDisposition` が組み立てる。正確な文字列は差分テストで確かめる)。
+      schema:
+        type: string
+    Location:
+      description: 移動先の URL(`frontend-base-url` で始まる)。
+      schema:
+        type: string
+  responses:
+    ResumeInfoOk:
+      description: 更新したあとの職務経歴書の全体
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResumeInfoResponse'
+    ResumeInfoCreated:
+      description: 作ったあとの職務経歴書の全体
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResumeInfoResponse'
+    BadRequest:
+      description: |
+        入力の誤り。DTO の検証に落ちたときは `message` が「入力エラーがあります。」で、`errors` に
+        項目名ごとの文言の一覧が入る。JSON が読めないときは `errors` が空。ユースケースやドメインの規則に
+        合わないときは、その文言が `message` に入り、`errors` は項目ごとの文言か空。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: |
+        認証されていない。次の2つの形がある。
+        - `accessToken` が無いか検証できない: 本文なし(Spring Security の `HttpStatusEntryPoint`)。
+          検証できなかったときは `accessToken` を消す `Set-Cookie` が付く。
+        - トークンは正しいが利用者が見つからない(退会のあとなど): `{"message":"不正なアクセスです。","errors":{}}` と、
+          `accessToken`・`refreshToken` を消す `Set-Cookie`。
+      headers:
+        Set-Cookie:
+          description: 上のとおり、トークンの Cookie を消すことがある。
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: |
+        CSRF のトークンが無いか一致しない(または権限が足りない)。本文は `{"message":"アクセス権限がありません。"}`
+        だけで、`errors` は無い。Content-Type は `application/json;charset=UTF-8`。
+      headers:
+        Set-Cookie:
+          description: 要求に `XSRF-TOKEN` Cookie が無ければ、新しい `XSRF-TOKEN=<値>; Path=/` が付く。
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ForbiddenResponse'
+    NotFound:
+      description: |
+        対象が無い(他人のものも含む)。`message` は「対象の職務経歴書データが存在しません。」や
+        「対象の職歴が存在しません。」など。`errors` は空。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotAcceptable:
+      description: '`Accept` が PDF も Markdown も含まない。`{"message":"対応していない形式が指定されました。","errors":{}}`'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalServerError:
+      description: 想定外の誤り。`{"message":"予期せぬエラーが発生しました。","errors":{}}`
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      description: 失敗のときの本文(Java の `ErrorResponse`)。
+      required: [message, errors]
+      properties:
+        message:
+          type: string
+          description: 全体の文言
+        errors:
+          type: object
+          description: 項目名ごとの文言の一覧。無いときは空のオブジェクト `{}`。
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      examples:
+        - message: 入力エラーがあります。
+          errors:
+            resumeName:
+              - 職務経歴書名は入力必須です。
+    EmailNotVerifiedErrorResponse:
+      type: object
+      description: メールアドレスの確認が済んでいないときの本文。`message` は常に「メールアドレスの確認が済んでいません。」、`errors` は常に空。
+      required: [message, errors, kind]
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        kind:
+          type: string
+          enum: [PENDING_REGISTRATION, UNVERIFIED_ACCOUNT_EMAIL]
+    ForbiddenResponse:
+      type: object
+      description: 403 の本文。`errors` を持たない。
+      required: [message]
+      properties:
+        message:
+          type: string
+          const: アクセス権限がありません。
+    YearMonth:
+      type: string
+      description: 年月(`yyyy-MM`)。
+      pattern: '^[0-9]{4}-[0-9]{2}$'
+      examples:
+        - '2026-11'
+    LocalDateTime:
+      type: string
+      description: |
+        時差を付けない日本時間の日時(Java の `LocalDateTime` を ISO_LOCAL_DATE_TIME で書いたもの)。
+        秒の小数部の桁数は値によって変わる(例 `2026-11-07T22:55:54.072661`)。
+      examples:
+        - '2026-11-07T22:55:54.072661'
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    UserRegistrationRequest:
+      type: object
+      description: '`password` と `confirmPassword` が違うときは、`confirmPassword` の項目の誤りとして 400。'
+      required: [email, username, password, confirmPassword]
+      properties:
+        email:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        confirmPassword:
+          type: string
+    EmailVerificationTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    ResendEmailVerificationForLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    RequestPasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+    RequestPasswordResetVerifyRequest:
+      type: object
+      properties:
+        token:
+          type: [string, 'null']
+    ResetPasswordRequest:
+      type: object
+      description: '`password` と `confirmPassword` が違うときは、`confirmPassword` の項目の誤りとして 400。'
+      required: [password, confirmPassword]
+      properties:
+        password:
+          type: string
+        confirmPassword:
+          type: string
+        token:
+          type: [string, 'null']
+          description: メールのリンクで受け取ったトークン(Java の DTO は必須にしていない)
+    TwoFactorAuthRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+    VerifyEmailResponse:
+      type: object
+      required: [result, passwordResetToken]
+      properties:
+        result:
+          type: string
+          enum:
+            - VERIFIED
+            - PASSWORD_RESET_READY
+            - ALREADY_VERIFIED
+            - EXPIRED
+            - REGISTRATION_GONE
+            - EMAIL_TAKEN
+            - INVALID
+        passwordResetToken:
+          type: [string, 'null']
+          description: '`result` が `PASSWORD_RESET_READY` のときのパスワードの再設定のトークン。それ以外は null。'
+    ChangePasswordRequest:
+      type: object
+      required: [nowPassword, newPassword]
+      properties:
+        nowPassword:
+          type: string
+        newPassword:
+          type: string
+    SetEmailAndPasswordRequest:
+      type: object
+      description: '`password` と `confirmPassword` が違うときは、`confirmPassword` の項目の誤りとして 400(どちらかが null なら比べない)。'
+      required: [password]
+      properties:
+        email:
+          type: [string, 'null']
+        password:
+          type: string
+        confirmPassword:
+          type: [string, 'null']
+        currentPassword:
+          type: [string, 'null']
+    UpdateUserInfoRequest:
+      type: object
+      description: multipart/form-data の部品。どれも省略できる。
+      properties:
+        username:
+          type: string
+        profileImage:
+          type: string
+          format: binary
+          description: プロフィール画像(JPEG・PNG・GIF、縦横 4096 ピクセル以下、2MB 以下)
+        twoFactorAuthEnabled:
+          type: boolean
+          description: '`true` か `false` の文字列'
+    UserInfoResponse:
+      type: object
+      required:
+        - id
+        - email
+        - username
+        - hasPassword
+        - profileImage
+        - twoFactorAuthEnabled
+        - authProviders
+        - roles
+        - emailVerified
+        - pendingEmail
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: [string, 'null']
+          description: メールアドレス(OIDC だけで作ったアカウントなどでは null)
+        username:
+          type: string
+        hasPassword:
+          type: boolean
+        profileImage:
+          type: [string, 'null']
+          description: プロフィール画像の、有効 10 分の取得用 URL(署名付き URL)。画像が無ければ null。
+        twoFactorAuthEnabled:
+          type: boolean
+        authProviders:
+          type: [array, 'null']
+          description: 連携している外部認証のプロバイダーの名前の一覧
+          items:
+            type: string
+        roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        emailVerified:
+          type: boolean
+        pendingEmail:
+          type: [string, 'null']
+          description: 確認を待っている新しいメールアドレス。無ければ null。
+    CreateResumeRequest:
+      type: object
+      required: [resumeName]
+      properties:
+        resumeName:
+          type: string
+        resumeId:
+          type: [string, 'null']
+          format: uuid
+          description: 写し元の職務経歴書の ID。指定すると写して作る。UUID として読めない値は 400(JSON が読めない扱い)。
+    UpdateResumeBasicRequest:
+      type: object
+      required: [resumeName, date, lastName, firstName]
+      properties:
+        resumeName:
+          type: string
+        date:
+          type: string
+          format: date
+        lastName:
+          type: string
+        firstName:
+          type: string
+    CareerRequest:
+      type: object
+      description: 職歴の追加と更新の本文(Java の `CreateCareerRequest` と `UpdateCareerRequest`。項目は同じ)。
+      required: [companyName, startDate, isActive]
+      properties:
+        companyName:
+          type: string
+        startDate:
+          $ref: '#/components/schemas/YearMonth'
+        endDate:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+        isActive:
+          type: boolean
+          description: 在籍中か。要求では `isActive`、応答では `active` という名前になる。
+    CertificationRequest:
+      type: object
+      description: 資格の追加と更新の本文(Java の `CreateCertificationRequest` と `UpdateCertificationRequest`)。
+      required: [name, date]
+      properties:
+        name:
+          type: string
+        date:
+          $ref: '#/components/schemas/YearMonth'
+    PortfolioRequest:
+      type: object
+      description: ポートフォリオの追加と更新の本文(Java の `CreatePortfolioRequest` と `UpdatePortfolioRequest`)。`link` は https の URL。
+      required: [name, overview, link]
+      properties:
+        name:
+          type: string
+        overview:
+          type: string
+        techStack:
+          type: [string, 'null']
+        link:
+          type: string
+    SnsPlatformRequest:
+      type: object
+      description: SNS の追加と更新の本文(Java の `CreateSnsPlatformRequest` と `UpdateSnsPlatformRequest`)。`link` は https の URL。
+      required: [name, link]
+      properties:
+        name:
+          type: string
+        link:
+          type: string
+    SelfPromotionRequest:
+      type: object
+      description: 自己 PR の追加と更新の本文(Java の `CreateSelfPromotionRequest` と `UpdateSelfPromotionRequest`)。
+      required: [title, content]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+    ProjectRequest:
+      type: object
+      description: |
+        プロジェクトの追加と更新の本文(Java の `CreateProjectRequest` と `UpdateProjectRequest`。項目は同じ)。
+        作業工程は真偽値の平らな項目で、技術スタックは分類ごとの文字列の配列の平らな項目で受け取る
+        (応答では `process` と `techStack` の入れ子になる)。技術スタックの配列は省略でき、省略すると null のまま保存される。
+      required:
+        - companyName
+        - startDate
+        - isActive
+        - name
+        - overview
+        - teamComp
+        - role
+        - achievement
+        - requirements
+        - basicDesign
+        - detailedDesign
+        - implementation
+        - integrationTest
+        - systemTest
+        - maintenance
+      properties:
+        companyName:
+          type: string
+        startDate:
+          $ref: '#/components/schemas/YearMonth'
+        endDate:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+        isActive:
+          type: boolean
+          description: 継続中か。要求では `isActive`、応答では `active` という名前になる。
+        name:
+          type: string
+        overview:
+          type: string
+        teamComp:
+          type: string
+        role:
+          type: string
+        achievement:
+          type: string
+        requirements:
+          type: boolean
+        basicDesign:
+          type: boolean
+        detailedDesign:
+          type: boolean
+        implementation:
+          type: boolean
+        integrationTest:
+          type: boolean
+        systemTest:
+          type: boolean
+        maintenance:
+          type: boolean
+        frontendLanguages:
+          $ref: '#/components/schemas/NullableStringList'
+        frontendFrameworks:
+          $ref: '#/components/schemas/NullableStringList'
+        frontendLibraries:
+          $ref: '#/components/schemas/NullableStringList'
+        frontendBuildTools:
+          $ref: '#/components/schemas/NullableStringList'
+        frontendPackageManagers:
+          $ref: '#/components/schemas/NullableStringList'
+        frontendLinters:
+          $ref: '#/components/schemas/NullableStringList'
+        frontendFormatters:
+          $ref: '#/components/schemas/NullableStringList'
+        frontendTestingTools:
+          $ref: '#/components/schemas/NullableStringList'
+        backendLanguages:
+          $ref: '#/components/schemas/NullableStringList'
+        backendFrameworks:
+          $ref: '#/components/schemas/NullableStringList'
+        backendLibraries:
+          $ref: '#/components/schemas/NullableStringList'
+        backendBuildTools:
+          $ref: '#/components/schemas/NullableStringList'
+        backendPackageManagers:
+          $ref: '#/components/schemas/NullableStringList'
+        backendLinters:
+          $ref: '#/components/schemas/NullableStringList'
+        backendFormatters:
+          $ref: '#/components/schemas/NullableStringList'
+        backendTestingTools:
+          $ref: '#/components/schemas/NullableStringList'
+        ormTools:
+          $ref: '#/components/schemas/NullableStringList'
+        auth:
+          $ref: '#/components/schemas/NullableStringList'
+        clouds:
+          $ref: '#/components/schemas/NullableStringList'
+        operatingSystems:
+          $ref: '#/components/schemas/NullableStringList'
+        containers:
+          $ref: '#/components/schemas/NullableStringList'
+        databases:
+          $ref: '#/components/schemas/NullableStringList'
+        webServers:
+          $ref: '#/components/schemas/NullableStringList'
+        ciCdTools:
+          $ref: '#/components/schemas/NullableStringList'
+        iacTools:
+          $ref: '#/components/schemas/NullableStringList'
+        monitoringTools:
+          $ref: '#/components/schemas/NullableStringList'
+        loggingTools:
+          $ref: '#/components/schemas/NullableStringList'
+        sourceControls:
+          $ref: '#/components/schemas/NullableStringList'
+        projectManagements:
+          $ref: '#/components/schemas/NullableStringList'
+        communicationTools:
+          $ref: '#/components/schemas/NullableStringList'
+        documentationTools:
+          $ref: '#/components/schemas/NullableStringList'
+        apiDevelopmentTools:
+          $ref: '#/components/schemas/NullableStringList'
+        designTools:
+          $ref: '#/components/schemas/NullableStringList'
+        editors:
+          $ref: '#/components/schemas/NullableStringList'
+        developmentEnvironments:
+          $ref: '#/components/schemas/NullableStringList'
+    NullableStringList:
+      type: [array, 'null']
+      items:
+        type: string
+    ExportResumeRequest:
+      type: object
+      description: |
+        `format` が `pdf` なら `pdfSettings` が要る(無ければ 400、`errors` の項目名は `pdfSettingsRequired`)。
+      required: [format, disposition]
+      properties:
+        format:
+          type: string
+          enum: [pdf, markdown]
+        disposition:
+          type: string
+          enum: [inline, attachment]
+        pdfSettings:
+          oneOf:
+            - $ref: '#/components/schemas/PdfSettings'
+            - type: 'null'
+    PdfSettings:
+      type: object
+      description: PDF の見た目の設定(Java の `ExportResumeRequest.PdfSettingsRequest`)。
+      required: [fontFamily, fontSizes, tableHeaderColor]
+      properties:
+        fontFamily:
+          type: string
+          enum: [NotoSansJP, NotoSerifJP]
+        fontSizes:
+          $ref: '#/components/schemas/FontSizes'
+        tableHeaderColor:
+          $ref: '#/components/schemas/TableHeaderColor'
+    FontSizes:
+      type: object
+      description: 文字の大きさ(pt)。どれも 6 以上 72 以下の小数。
+      required: [title, date, fullName, sectionHeading]
+      properties:
+        title:
+          type: number
+        date:
+          type: number
+        fullName:
+          type: number
+        sectionHeading:
+          type: number
+    TableHeaderColor:
+      type: object
+      description: |
+        表の見出しの色。`hex` と `rgb` のちょうど一方を指定する(両方か、どちらも無いときは 400、
+        `errors` の項目名は `pdfSettings.tableHeaderColor.specifiedOnce`)。
+      properties:
+        hex:
+          type: [string, 'null']
+          description: '`#` を付けない6桁の16進数(大文字も可)'
+          pattern: '^[0-9a-fA-F]{6}$'
+        rgb:
+          oneOf:
+            - $ref: '#/components/schemas/Rgb'
+            - type: 'null'
+    Rgb:
+      type: object
+      description: 0 から 255 の整数の色。
+      required: [r, g, b]
+      properties:
+        r:
+          type: integer
+          minimum: 0
+          maximum: 255
+        g:
+          type: integer
+          minimum: 0
+          maximum: 255
+        b:
+          type: integer
+          minimum: 0
+          maximum: 255
+    GetResumeListResponse:
+      type: object
+      required: [resumes]
+      properties:
+        resumes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResumeSummary'
+    ResumeSummary:
+      type: object
+      required: [id, resumeName, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        resumeName:
+          type: string
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        updatedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+    ResumeInfoResponse:
+      type: object
+      description: |
+        職務経歴書の全体。`lastName`・`firstName` は null なら項目ごと書かない。
+        `careers` などの一覧は空なら項目ごと書かない。
+      required: [id, resumeName, date, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        resumeName:
+          type: string
+        date:
+          type: string
+          format: date
+        lastName:
+          type: string
+        firstName:
+          type: string
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        updatedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        careers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CareerResponse'
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectResponse'
+        certifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/CertificationResponse'
+        portfolios:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortfolioResponse'
+        snsPlatforms:
+          type: array
+          items:
+            $ref: '#/components/schemas/SnsPlatformResponse'
+        selfPromotions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SelfPromotionResponse'
+    CareerResponse:
+      type: object
+      description: 職歴。`endDate` は在籍中なら null として書く。
+      required: [id, companyName, startDate, endDate, active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        companyName:
+          type: string
+        startDate:
+          $ref: '#/components/schemas/YearMonth'
+        endDate:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+        active:
+          type: boolean
+    ProjectResponse:
+      type: object
+      required:
+        - id
+        - companyName
+        - startDate
+        - endDate
+        - active
+        - name
+        - overview
+        - teamComp
+        - role
+        - achievement
+        - process
+        - techStack
+      properties:
+        id:
+          type: string
+          format: uuid
+        companyName:
+          type: string
+        startDate:
+          $ref: '#/components/schemas/YearMonth'
+        endDate:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+        active:
+          type: boolean
+        name:
+          type: string
+        overview:
+          type: string
+        teamComp:
+          type: string
+        role:
+          type: string
+        achievement:
+          type: string
+        process:
+          $ref: '#/components/schemas/Process'
+        techStack:
+          $ref: '#/components/schemas/TechStack'
+    Process:
+      type: object
+      description: 作業工程
+      required:
+        - requirements
+        - basicDesign
+        - detailedDesign
+        - implementation
+        - integrationTest
+        - systemTest
+        - maintenance
+      properties:
+        requirements:
+          type: boolean
+        basicDesign:
+          type: boolean
+        detailedDesign:
+          type: boolean
+        implementation:
+          type: boolean
+        integrationTest:
+          type: boolean
+        systemTest:
+          type: boolean
+        maintenance:
+          type: boolean
+    TechStack:
+      type: object
+      description: |
+        技術スタック(分類ごと)。職務経歴書の応答では、各分類のすべての項目を書き、値は配列か null。
+        バックアップでは、空か null の配列は項目ごと書かない。
+      properties:
+        frontend:
+          $ref: '#/components/schemas/FrontendTechStack'
+        backend:
+          $ref: '#/components/schemas/BackendTechStack'
+        infrastructure:
+          $ref: '#/components/schemas/InfrastructureTechStack'
+        tools:
+          $ref: '#/components/schemas/ToolsTechStack'
+    FrontendTechStack:
+      type: object
+      properties:
+        languages:
+          $ref: '#/components/schemas/NullableStringList'
+        frameworks:
+          $ref: '#/components/schemas/NullableStringList'
+        libraries:
+          $ref: '#/components/schemas/NullableStringList'
+        buildTools:
+          $ref: '#/components/schemas/NullableStringList'
+        packageManagers:
+          $ref: '#/components/schemas/NullableStringList'
+        linters:
+          $ref: '#/components/schemas/NullableStringList'
+        formatters:
+          $ref: '#/components/schemas/NullableStringList'
+        testingTools:
+          $ref: '#/components/schemas/NullableStringList'
+    BackendTechStack:
+      type: object
+      properties:
+        languages:
+          $ref: '#/components/schemas/NullableStringList'
+        frameworks:
+          $ref: '#/components/schemas/NullableStringList'
+        libraries:
+          $ref: '#/components/schemas/NullableStringList'
+        buildTools:
+          $ref: '#/components/schemas/NullableStringList'
+        packageManagers:
+          $ref: '#/components/schemas/NullableStringList'
+        linters:
+          $ref: '#/components/schemas/NullableStringList'
+        formatters:
+          $ref: '#/components/schemas/NullableStringList'
+        testingTools:
+          $ref: '#/components/schemas/NullableStringList'
+        ormTools:
+          $ref: '#/components/schemas/NullableStringList'
+        auth:
+          $ref: '#/components/schemas/NullableStringList'
+    InfrastructureTechStack:
+      type: object
+      properties:
+        clouds:
+          $ref: '#/components/schemas/NullableStringList'
+        operatingSystems:
+          $ref: '#/components/schemas/NullableStringList'
+        containers:
+          $ref: '#/components/schemas/NullableStringList'
+        databases:
+          $ref: '#/components/schemas/NullableStringList'
+        webServers:
+          $ref: '#/components/schemas/NullableStringList'
+        ciCdTools:
+          $ref: '#/components/schemas/NullableStringList'
+        iacTools:
+          $ref: '#/components/schemas/NullableStringList'
+        monitoringTools:
+          $ref: '#/components/schemas/NullableStringList'
+        loggingTools:
+          $ref: '#/components/schemas/NullableStringList'
+    ToolsTechStack:
+      type: object
+      properties:
+        sourceControls:
+          $ref: '#/components/schemas/NullableStringList'
+        projectManagements:
+          $ref: '#/components/schemas/NullableStringList'
+        communicationTools:
+          $ref: '#/components/schemas/NullableStringList'
+        documentationTools:
+          $ref: '#/components/schemas/NullableStringList'
+        apiDevelopmentTools:
+          $ref: '#/components/schemas/NullableStringList'
+        designTools:
+          $ref: '#/components/schemas/NullableStringList'
+        editors:
+          $ref: '#/components/schemas/NullableStringList'
+        developmentEnvironments:
+          $ref: '#/components/schemas/NullableStringList'
+    CertificationResponse:
+      type: object
+      required: [id, name, date]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        date:
+          $ref: '#/components/schemas/YearMonth'
+    PortfolioResponse:
+      type: object
+      required: [id, name, overview, techStack, link]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        overview:
+          type: string
+        techStack:
+          type: [string, 'null']
+        link:
+          type: string
+    SnsPlatformResponse:
+      type: object
+      required: [id, name, link]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        link:
+          type: string
+    SelfPromotionResponse:
+      type: object
+      required: [id, title, content]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content:
+          type: string
+    ResumeBackup:
+      type: object
+      description: |
+        バックアップの JSON(Java の `BackupResumeResponse` と `RestoreResumeRequest`)。
+        バックアップの応答では `version`・`exportedAt`・`resume` を必ず書く。
+        復元の要求では Java の DTO はどれも必須にしていない(`version` は `1.0` でなければ 400)。
+      properties:
+        version:
+          type: string
+          description: バックアップの形式の版。今は `1.0`。
+          examples:
+            - '1.0'
+        exportedAt:
+          type: string
+          format: date-time
+          description: バックアップした日時(UTC、`Z` 付き。例 `2026-11-07T13:55:54.072661Z`)。復元では使わない。
+        resume:
+          $ref: '#/components/schemas/BackupResume'
+    BackupResume:
+      type: object
+      description: |
+        職務経歴書の中身(ID と日時を持たない)。バックアップの応答では、`lastName`・`firstName` は null なら、
+        一覧は空なら項目ごと書かない。
+      properties:
+        resumeName:
+          type: string
+        date:
+          type: string
+          format: date
+        lastName:
+          type: string
+        firstName:
+          type: string
+        careers:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupCareer'
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupProject'
+        certifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupCertification'
+        portfolios:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupPortfolio'
+        snsPlatforms:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupSnsPlatform'
+        selfPromotions:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupSelfPromotion'
+    BackupCareer:
+      type: object
+      description: 職歴。`endDate` は null なら項目ごと書かない。`active` は職務経歴書の操作の要求の `isActive` と違う名前。
+      properties:
+        companyName:
+          type: string
+        startDate:
+          $ref: '#/components/schemas/YearMonth'
+        endDate:
+          $ref: '#/components/schemas/YearMonth'
+        active:
+          type: boolean
+    BackupProject:
+      type: object
+      description: プロジェクト。`endDate` は null なら項目ごと書かない。
+      properties:
+        companyName:
+          type: string
+        startDate:
+          $ref: '#/components/schemas/YearMonth'
+        endDate:
+          $ref: '#/components/schemas/YearMonth'
+        active:
+          type: boolean
+        name:
+          type: string
+        overview:
+          type: string
+        teamComp:
+          type: string
+        role:
+          type: string
+        achievement:
+          type: string
+        process:
+          $ref: '#/components/schemas/Process'
+        techStack:
+          $ref: '#/components/schemas/TechStack'
+    BackupCertification:
+      type: object
+      properties:
+        name:
+          type: string
+        date:
+          $ref: '#/components/schemas/YearMonth'
+    BackupPortfolio:
+      type: object
+      description: ポートフォリオ。`techStack` は null なら項目ごと書かない。
+      properties:
+        name:
+          type: string
+        overview:
+          type: string
+        techStack:
+          type: string
+        link:
+          type: string
+    BackupSnsPlatform:
+      type: object
+      properties:
+        name:
+          type: string
+        link:
+          type: string
+    BackupSelfPromotion:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+    CertificationListResponse:
+      type: object
+      required: [names]
+      properties:
+        names:
+          type: array
+          items:
+            type: string
+    SnsPlatformListResponse:
+      type: object
+      required: [names]
+      properties:
+        names:
+          type: array
+          items:
+            type: string
+    TechStackListResponse:
+      type: object
+      description: 技術スタックの名前の一覧(分類ごと)。項目の形は `TechStack` と同じ。
+      required: [frontend, backend, infrastructure, tools]
+      properties:
+        frontend:
+          $ref: '#/components/schemas/FrontendTechStack'
+        backend:
+          $ref: '#/components/schemas/BackendTechStack'
+        infrastructure:
+          $ref: '#/components/schemas/InfrastructureTechStack'
+        tools:
+          $ref: '#/components/schemas/ToolsTechStack'

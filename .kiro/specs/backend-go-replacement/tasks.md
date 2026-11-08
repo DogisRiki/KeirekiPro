@@ -2,7 +2,7 @@
 
 この spec のタスクは、design.md の「移行」の節の「段階ごとの PR」に合わせて、大タスク1つを PR 1つに当てる。大タスク1は PR 2-1、大タスク2は PR 2-2、大タスク3は PR 2-3、大タスク4は PR 2-4、大タスク5は PR 2-5、大タスク6は PR 4-1、大タスク7は PR 4-2、大タスク8は PR 4-3 である。大タスク9は段階5の確認と記録、大タスク10から14は段階6の PR 6-1 から 6-5 である。段階3の機能のまとまりの Go 版は、まとまりの spec で作るので、この tasks.md には無い。この spec の進め方は、末尾の「実装のメモ」に書いてある。
 
-- [ ] 1. ゲート設定を Go 版に対応させる(PR 2-1)
+- [x] 1. ゲート設定を Go 版に対応させる(PR 2-1)
 - [x] 1.1 run-check.sh に領域 backend-go を足す
 
   Claude は、`.claude/scripts/parallel/run-check.sh` に領域 `backend-go` を足す。この領域は、compose のサービス `backend-go` で1回きりのコンテナを作り、dind を起こし、リポジトリの最上位を読み取り専用で `/repo` に差し込み、環境変数 `KEIREKIPRO_REPO_ROOT=/repo` を渡す。この領域の最後の検査は `make check` である。`run-check.sh` は、`make check` が通ったときだけ、Go 版の品質チェックを動かした記録を書く。
@@ -77,7 +77,7 @@
   - _要件: 3.3_
   - _対象の部品: Makefile、.golangci.yml と .testcoverage.yml と .gremlins.yaml_
 
-- [ ] 1.10 所有者に置いてもらい、ゲート設定のテストをすべて流して PR を出す
+- [x] 1.10 所有者に置いてもらい、ゲート設定のテストをすべて流して PR を出す
 
   Claude は、実装のメモの「所有者に置いてもらう」のとおりに、置き場のファイルを所有者に本来の場所へ置いてもらったあと、`.github/scripts/tests/` と `.claude/scripts/parallel/tests/` と `.claude/hooks/tests/` のテストを Linux のコンテナで流し、shellcheck v0.11.0 をすべての `.sh` に流す。この PR には、この spec の文書(spec.json、requirements.md、design.md、research.md、tasks.md、reviews/)を入れる。Claude は、作業フォルダの `backend/api/openapi.yaml` を `.kiro/specs/backend-go-replacement/openapi.yaml` に移し、この PR に入れる。Claude は、仕様書を `backend/api/` に置く変更を、仕様書からコードを生成する設定を作るタスク2.2と同じ PR に入れる。仕様書と、仕様書から生成したコードが、別々の PR に分かれて食い違わないようにするためである。Claude は、PR 2-2 を、main から作る新しいブランチで進める。そのため、git で管理していない仕様書は、今の作業フォルダが片付けられると失われる。
   - 完了の確かめ方: すべてのテストと shellcheck と actionlint が成功し、PR の本文に `Spec: .kiro/specs/backend-go-replacement` と `Refs: #445` と、「承認が要る理由」と「main に入れたときに本番で起きること」の2つの欄がある
@@ -624,7 +624,7 @@
 - `/kiro-validate-impl` の範囲: `/kiro-validate-impl` は、その PR で進めた大タスクだけを判定する。`_保留:_` のまま残した大タスクは、未完了として扱わない
 - 受入基準の確かめ方: 要件の受入基準のうち、Claude の進め方の決まり(要件1の受入基準1と2と6、要件2、要件7、要件8)と、文書と PR の本文と所有者への返事で満たすものは、テストのコードでなく、「受入基準とテストの対応」の行に書いた文書か記録を読んで確かめる。要件2の受入基準1から4(設計を書く前に、今と同じにできるかが分からない動きを洗い出し、試しに作って確かめる)の結果は、Claude が段階1の記録として research.md に書き終えてある
 - 置き場: Claude は、`.github/` と `.claude/hooks/` と `.claude/settings.json` の下のファイルの完成版を、作業フォルダの中の `.claude/.state/backend-go-replacement/place-<大タスクの番号>/` に、本来のパスと同じフォルダの形で作る。`.claude/.state/` は git の管理外である。`.claude/scripts/` と `.claude/skills/` は Claude が直接書ける
-- 所有者に置いてもらう: Claude は、所有者に、`cd <作業フォルダのパス>` と、置き場から本来の場所への `cp` を、1つずつのコマンドで示し、置く理由を添える。所有者が置いたあと、Claude は `cmp` で置き場と本来の場所を比べる。`cmp` が止められたら、Read で両方を読んで比べる
+- 所有者に置いてもらう: Claude は、所有者に、置き場から本来の場所への `cp -r <置き場>/. <本来の場所>/` を、絶対パスで書き、置き場ごとの `cp` を `&&` でつないだ1つのコマンドで示し、置く理由を添える(タスク1.10で、ファイルごとに `cp` を並べると打ち漏らすと所有者に指摘された)。所有者が置いたあと、Claude は `cmp` で置き場と本来の場所を比べる。`cmp` が止められたら、Read で両方を読んで比べる
 - `.github/` の置き場(タスク1.4で分かったこと): 許可の設定の `Write(.github/**)` は、作業フォルダの中の置き場の下の `.github/` にも当たり、Claude は書けない。そのため、Claude は `.github/` の下のファイルの完成版を、`.github/CLAUDE.md` のとおり、会話の scratchpad の `place-<大タスクの番号>/` に、本来のパスと同じフォルダの形で作る。scratchpad は会話ごとのフォルダなので、Claude は、大タスクの最後の小タスクで所有者に置いてもらうまで、同じ会話で進める
 - 検査用の写し: Claude は、作業フォルダを `git archive HEAD` で scratchpad の一時フォルダに写し、まだコミットしていないファイルと置き場のファイルを本来のパスで重ねた写しで、置き場のファイルのテストを流す。まだリポジトリに無いファイルを `docker -v` で作業フォルダに重ねると、作業フォルダに0バイトのファイルが残るので、Claude はそうしない
 - テストを流す環境: 大きなまとまりの途中の小タスクでは、Claude は、そのタスクで変えたファイルのテストだけを、この PC の Git Bash で流す。大きなまとまりの最後の小タスクでは、Claude は、`docker run --rm -v "<フォルダ>:/src:ro" alpine:3` で写しを読むだけの形で渡し、コンテナの中で別のフォルダに写してから、`apk add --no-cache bash perl git curl jq` のあとですべてのテストを流す。shellcheck は、CI の `guardrails.yaml` と同じく `koalaman/shellcheck:v0.11.0` に対象の `.sh` をまとめて渡し、actionlint は `rhysd/actionlint:1.7.12` で流す

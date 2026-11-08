@@ -11,6 +11,12 @@
 #   - dependency.scope が runtime
 #   - security_vulnerability.first_patched_version.identifier が、その版と同じ
 #
+# gomod(Go のモジュール)の部品:
+#   依存グラフの差分比較の API は gomod と呼び、警告の API は go と呼ぶので、go に直して
+#   問い合わせ、照らす。名前は大文字と小文字を区別せずに照らし、版は先頭の v の有無によらず
+#   照らす。Go のモジュールの名前は、配布元によって大文字と小文字の書き方が変わることがあり、
+#   差分比較の API は版の先頭の v を落として返すためである。
+#
 # なぜ vulnerable_version_range を読まないのか:
 #   警告は main の依存に対して開く。開いている警告があること自体が、このリポジトリが
 #   今その部品の脆弱な版を使っていることを示す。72時間待たずに入れるのは最初の修正版
@@ -26,7 +32,7 @@
 #
 # テスト: .github/scripts/tests/test-cooldown-match-alerts.sh
 # 使い方: cooldown-match-alerts.sh <入力のファイル>
-#   入力: [{"ecosystem":"npm"|"maven","name","version"}]
+#   入力: [{"ecosystem":"npm"|"maven"|"gomod","name","version"}]
 #   出力(標準出力): 入力と同じ順の配列。要素は
 #     {"ecosystem","name","version","eligible","alerts":[{"number","ghsa_id","severity","html_url"}],
 #      "reason","first_patched":["<版>"]}
@@ -56,11 +62,14 @@ fi
 # 1つの部品の警告(--paginate --slurp のページの配列)を、その版の判定にする。
 # shellcheck disable=SC2016 # jq の変数であり、シェルの展開ではない
 CLASSIFY='
-($item.ecosystem | ascii_downcase) as $eco | $item.name as $name | $item.version as $ver
-| [ .[] | if type == "array" then .[] else . end ] as $all
+($item.ecosystem | ascii_downcase | if . == "gomod" then "go" else . end) as $eco
+| $item.name as $name | $item.version as $ver
+| def same_name: if $eco == "go" then ascii_downcase == ($name | ascii_downcase) else . == $name end;
+  def same_ver: if $eco == "go" then (. // "" | ltrimstr("v")) == ($ver | ltrimstr("v")) else . == $ver end;
+[ .[] | if type == "array" then .[] else . end ] as $all
 | [ $all[] | select(.state == "open")
     | select(((.dependency.package.ecosystem // "") | ascii_downcase) == $eco
-        and .dependency.package.name == $name) ] as $alerts
+        and ((.dependency.package.name // "") | same_name)) ] as $alerts
 | [ $alerts[]
     | ((.security_advisory.severity // "") | ascii_downcase) as $sev
     | .dependency.scope as $scope
@@ -70,7 +79,7 @@ CLASSIFY='
         class: (if ($sev == "high" or $sev == "critical") | not then "low-severity"
                 elif $scope == "development" then "development"
                 elif $scope != "runtime" then "no-scope"
-                elif $fp != $ver then "not-first-patched"
+                elif ($fp | same_ver) | not then "not-first-patched"
                 else "eligible" end) } ] as $c
 | (first(("eligible", "not-first-patched", "no-scope", "development", "low-severity") as $o
          | select(any($c[]; .class == $o)) | $o) // "no-alert") as $reason
@@ -90,7 +99,7 @@ trap 'rm -rf "$TMP"' EXIT
 count=$(jq 'length' "$INPUT")
 for ((i = 0; i < count; i++)); do
     item=$(jq -c ".[$i]" "$INPUT")
-    query=$(jq -r '"ecosystem=\(.ecosystem | ascii_downcase | @uri)&package=\(.name | @uri)"' <<<"$item")
+    query=$(jq -r '"ecosystem=\(.ecosystem | ascii_downcase | if . == "gomod" then "go" else . end | @uri)&package=\(.name | @uri)"' <<<"$item")
     pages=""
     result=""
     # 答えが配列でないときと、要素が警告の形でなく判定の jq が失敗したときも、読めなかったものにする

@@ -23,6 +23,8 @@ ACTIONS_ROW='{"language":"actions","build-mode":"none","build-command":""}'
 JAVA_ROW="{\"language\":\"java-kotlin\",\"build-mode\":\"manual\",\"build-command\":\"${JAVA_BUILD}\"}"
 JS_ROW='{"language":"javascript-typescript","build-mode":"none","build-command":""}'
 PYTHON_ROW='{"language":"python","build-mode":"none","build-command":""}'
+GO_BUILD='cd backend && go build ./...'
+GO_ROW="{\"language\":\"go\",\"build-mode\":\"manual\",\"build-command\":\"${GO_BUILD}\"}"
 
 REPO_NO=0
 # 新しい空の git のリポジトリを作り、REPO に入れる
@@ -153,19 +155,31 @@ if want python-none; then
     check_out "[${JAVA_ROW},${PYTHON_ROW}]" ".py のファイルを足すと python を none で出す: python の組が none で出る"
 fi
 
-if want go-undecided; then
+if want go-manual; then
     new_repo
     add_file backend/src/main/java/com/example/App.java
-    add_file cmd/api/main.go
-    add_file internal/server/server.go
+    add_file backend/cmd/api/main.go
+    add_file backend/internal/server/server.go
     run_real
-    check_rc 1 ".go のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: 終了コード1で終わる"
-    check_err "CodeQL の言語 go のファイルがあります" ".go のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: 言語の名前が出る"
-    check_err "ファイルの例: cmd/api/main.go" ".go のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: ファイルの例が出る"
-    check_err_lacks "internal/server/server.go" ".go のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: ファイルの例は1つだけ出る"
-    check_err_lacks "java-kotlin" ".go のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: ビルドのしかたがある言語は報告しない"
-    check_out "" ".go のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: 標準出力に JSON を出さない"
-    check_github_output "" ".go のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: GITHUB_OUTPUT に matrix を書かない"
+    check_rc 0 ".go のファイルを含む変更で go の行を manual で選ぶ: 終了コード0で終わる"
+    check_out "[${GO_ROW},${JAVA_ROW}]" ".go のファイルを含む変更で go の行を manual で選ぶ: go の組が manual と go build の命令で出る"
+    check_github_output "matrix=[${GO_ROW},${JAVA_ROW}]" ".go のファイルを含む変更で go の行を manual で選ぶ: GITHUB_OUTPUT に matrix を書く"
+fi
+
+# ビルドのしかたを決めていない言語の例には、このリポジトリに無い Rust を使う
+if want rust-undecided; then
+    new_repo
+    add_file backend/src/main/java/com/example/App.java
+    add_file tools/src/main.rs
+    add_file tools/src/lib.rs
+    run_real
+    check_rc 1 ".rs のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: 終了コード1で終わる"
+    check_err "CodeQL の言語 rust のファイルがあります" ".rs のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: 言語の名前が出る"
+    check_err "ファイルの例: tools/src/lib.rs" ".rs のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: ファイルの例が出る"
+    check_err_lacks "tools/src/main.rs" ".rs のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: ファイルの例は1つだけ出る"
+    check_err_lacks "java-kotlin" ".rs のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: ビルドのしかたがある言語は報告しない"
+    check_out "" ".rs のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: 標準出力に JSON を出さない"
+    check_github_output "" ".rs のファイルがあると、言語とファイルの例を1つ出して終了コード1で終わる: GITHUB_OUTPUT に matrix を書かない"
 fi
 
 if want github-output; then

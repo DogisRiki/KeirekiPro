@@ -3,6 +3,8 @@
 # check-verify-before-stop.sh(作業の終わりに品質チェックを済ませたかを確かめるフック)のテスト
 #
 # 実行: bash .claude/hooks/tests/test-check-verify-before-stop.sh
+# 場合を選んで流す: KP_TEST_CASE='t_bad_record_blocks t_migration_requires_both' bash .claude/hooks/tests/test-check-verify-before-stop.sh
+#   KP_TEST_CASE に空白で区切って書いた関数の名前の場合だけを流す。知らない名前があれば何も流さずに失敗する
 # 一時的な git のリポジトリ(本体)と worktree を作り、フックに Claude Code の Stop フックの入力(JSON)を渡して、
 # 終了コード(0 は通す、2 は止める)と標準エラーを確かめる。
 # 品質チェックが通った記録 .claude/.state/gate-run-<領域>.txt は、run-check.sh と同じく作業フォルダの最上位に置く。
@@ -33,6 +35,7 @@ echo seed >"$MAIN_DIR/README.md"
 printf '.claude/.state/\n' >"$MAIN_DIR/.gitignore"
 git -C "$MAIN_DIR" add -A
 git -C "$MAIN_DIR" "${GITC[@]}" commit -q -m seed
+SEED=$(git -C "$MAIN_DIR" rev-parse HEAD)
 git -C "$MAIN_DIR" worktree add -q "$WT_DIR" -b feat/wt
 mkdir -p "$OUTSIDE_DIR"
 MAIN=$(git -C "$MAIN_DIR" rev-parse --show-toplevel)
@@ -49,17 +52,20 @@ die() {
     exit 1
 }
 
-# 2つの作業フォルダを、コミットした状態に戻し、記録を消す
+# 2つの作業フォルダを、最初のコミットの状態に戻し、記録を消す(場合の中で足したコミットも戻す)
 reset_folders() {
     local d
     for d in "$MAIN" "$WT"; do
-        git -C "$d" reset -q --hard
+        git -C "$d" reset -q --hard "$SEED"
         git -C "$d" clean -q -fdx
     done
 }
 
 run_test() { # <テスト名> <関数>
     local name="$1" fn="$2" out
+    if [ -n "${KP_TEST_CASE:-}" ]; then
+        case " $KP_TEST_CASE " in *" $fn "*) ;; *) return 0 ;; esac
+    fi
     reset_folders
     if out=$("$fn" 2>&1); then
         pass=$((pass + 1))
@@ -131,6 +137,22 @@ expect_block() { # <止める理由に出るはずの領域>...
             *) die "止める理由に $a が出ていない: $ERR" ;;
         esac
     done
+}
+
+# 止めたうえで、止める理由に挙がった領域の一覧が、与えた一覧(", " 区切り)と同じかを確かめる
+# (backend と backend-go のように、一方が他方を含む名前を取り違えないため)
+expect_areas() { # <領域の一覧>
+    local got
+    [ "$RC" = 2 ] || die "止めるはずが終了コード $RC だった($ERR)"
+    got=$(printf '%s\n' "$ERR" | sed -n 's/^品質ゲート未実行の変更があります: //p')
+    [ "$got" = "$1" ] || die "止める理由の領域: 期待 '$1' / 実際 '$got'($ERR)"
+}
+
+# 作業フォルダに backend/go.mod をコミットする(Go 版のコードがある作業フォルダにする)
+commit_go_mod() { # <作業フォルダ>
+    printf 'module example.com/keirekipro\n' >"$1/backend/go.mod"
+    git -C "$1" add backend/go.mod
+    git -C "$1" "${GITC[@]}" commit -q -m go.mod
 }
 
 expect_not_in_err() { # <出てはいけない領域>...
@@ -321,6 +343,77 @@ t_japanese_and_renamed_paths() {
 }
 
 # ---------------------------------------------------------------------
+# Java 版と Go 版の記録を分ける(backend-go-replacement の要件3.2)
+
+t_go_only_uses_go_record() {
+    commit_go_mod "$WT"
+    # git が追っていない新しいフォルダの中の Go のファイルも、Go 版のファイルとして見分ける
+    change "$WT" backend/internal/foo/foo.go $((T0 + 20))
+    stamp "$WT" backend-go $((T0 + 10))
+    call_hook "$MAIN" "$WT"
+    expect_areas backend-go
+    # Go 版の記録が新しければ、Java 版の記録が無くても止めない
+    change "$WT" docker/backend-go/Dockerfile $((T0 + 20))
+    change "$WT" backend/api/openapi.yaml $((T0 + 20))
+    change "$WT" backend/Makefile $((T0 + 20))
+    stamp "$WT" backend-go $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_pass
+    # backend/go.mod が無い作業フォルダでは、Go 版のファイルが変わっても記録を求めない
+    reset_folders
+    change "$WT" backend/internal/foo/foo.go $((T0 + 20))
+    change "$WT" backend/api/openapi.yaml $((T0 + 20))
+    call_hook "$MAIN" "$WT"
+    expect_pass
+}
+
+t_java_only_requires_java_record() {
+    commit_go_mod "$WT"
+    # Go 版の記録が新しくても、Java 版のファイルが変われば Java 版の記録を求める
+    change "$WT" backend/src/a.txt $((T0 + 20))
+    change "$WT" docker/backend/Dockerfile $((T0 + 20))
+    change "$WT" backend/build.gradle $((T0 + 20))
+    stamp "$WT" backend-go $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_areas backend
+    # Java 版の記録が新しければ止めない(Go 版の記録は求めない)
+    rm -f "$WT/.claude/.state/gate-run-backend-go.txt"
+    stamp "$WT" backend $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_pass
+    # Java 版の記録より新しい Java 版のファイルがあれば止める
+    change "$WT" docker/backend/Dockerfile $((T0 + 40))
+    call_hook "$MAIN" "$WT"
+    expect_areas backend
+}
+
+t_migration_requires_both() {
+    commit_go_mod "$WT"
+    change "$WT" backend/src/main/resources/db/migration/V2__add.sql $((T0 + 20))
+    call_hook "$MAIN" "$WT"
+    expect_areas "backend, backend-go"
+    stamp "$WT" backend $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_areas backend-go
+    stamp "$WT" backend-go $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_pass
+    # Java 版の記録だけが古ければ Java 版だけを挙げる
+    stamp "$WT" backend $((T0 + 10))
+    call_hook "$MAIN" "$WT"
+    expect_areas backend
+}
+
+# ---------------------------------------------------------------------
+
+# 知らない名前を選んだら、何も流さずに失敗する
+for want in ${KP_TEST_CASE:-}; do
+    case "$want" in
+        t_*) declare -F "$want" >/dev/null && continue ;;
+    esac
+    echo "どの場合にも合わない名前: $want" >&2
+    exit 2
+done
 
 echo "--- 作業フォルダの決め方(要件2.5)"
 run_test "cwd が worktree のとき worktree の変更と記録を見る" t_worktree_uses_worktree_changes_and_record
@@ -338,6 +431,11 @@ run_test "stop_hook_active が真なら通す" t_stop_hook_active_passes
 run_test "変更のある領域のうち記録の無い領域だけで止める" t_each_area_and_clean
 run_test "記録が UNIX 秒で読めなければ止める" t_bad_record_blocks
 run_test "日本語のファイル名とリネームの新しいパスで判定する" t_japanese_and_renamed_paths
+
+echo "--- Java 版と Go 版の記録を分ける(backend-go-replacement の要件3.2)"
+run_test "Go 版のファイルだけが変わったときは Go 版の記録で止めない" t_go_only_uses_go_record
+run_test "Java 版のファイルだけが変わったときは Java 版の記録を求める" t_java_only_requires_java_record
+run_test "マイグレーションのファイルが変わったときは両方の記録を求める" t_migration_requires_both
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"

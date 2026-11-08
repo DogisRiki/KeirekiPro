@@ -23,14 +23,27 @@
 #   同じ版の名前のまま中身(digest)が差し替えられた状態で、版の公開日時では待つかどうかを
 #   決められない。人が確かめるまで予約しない。
 #
+# Go のモジュール(gomod)の更新:
+#   PR の差分の go.mod で足された行から、モジュールと版の組を読む。組ごとに、Go のモジュールの
+#   索引(index.golang.org)に初めて取り込まれた時刻を lib-gomod-index.sh で調べる。
+#   公開の時刻の検査(check-dependency-cooldown.sh)と同じ調べ方である。
+#     72時間経っていない組がある → wait(1日1回の見直しで確かめ直す)
+#     すべて72時間経った         → reserve
+#     索引を読めない             → notify(PR にコメントして所有者に知らせる。見直しは続ける)
+#   go の行と toolchain の行は、モジュールの版ではなく Go の版の指定なので、照らさない。
+#   go.sum は、go.mod の組の指紋を書くだけなので読まない。
+#   公開の時刻の検査と同じ基準で、自動マージの予約も、公開から72時間経つまで付けない。
+#
 # 判定できないとき(終了コード 2):
 #   差分を取れない、対象のイメージの行が差分にあるのにタグや digest を読み取れない、
+#   go.mod の差分を読めない(差分が大きすぎる、足された行を読み取れない)、
 #   知らせのコメントを確実に付けられない。予約してよいという判定を出さずに止める。
 #
 # テスト: .github/scripts/tests/test-check-release-age.sh
 # 使い方: check-release-age.sh <PR番号>
 #   環境変数 GH_TOKEN / GITHUB_REPOSITORY / GITHUB_REPOSITORY_OWNER(必須)
 #   NOW_EPOCH(任意。テスト用の時刻固定)
+#   GOMOD_INDEX_BASE(任意。テスト用の索引の差し替え。既定 https://index.golang.org)
 # 出力: 標準出力に次の2行だけを出す($GITHUB_OUTPUT にそのまま足せる形)。
 #   decision=reserve|wait|notify
 #   reason=<理由>
@@ -63,6 +76,11 @@ NOW_EPOCH="${NOW_EPOCH:-$(date -u +%s)}"
 
 TMP=$(mktemp -d) || undecided "作業用のディレクトリを作れません"
 trap 'rm -rf "$TMP"' EXIT
+
+export GOMOD_INDEX_BASE="${GOMOD_INDEX_BASE:-https://index.golang.org}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=.github/scripts/lib-gomod-index.sh
+. "$SCRIPT_DIR/lib-gomod-index.sh"
 
 # --- PR の差分 -------------------------------------------------------------------
 # --paginate はページごとの配列を続けて出すため、jq -s でまとめて読む。
@@ -168,6 +186,122 @@ judge_target() {
     fi
 }
 
+# --- Go のモジュールの更新の判定 ---------------------------------------------------
+# 結果は judge_target と同じ T_DECISION / T_REASON / T_KEY / T_DETAIL に入れる。
+# go.mod の足された行に組が1つも無ければ reserve にし、T_GOMOD を空にする。
+
+# 使い方: gomod_unquote <モジュールの名前>。go.mod の書き方で囲んだ引用符(" か `)を外す
+gomod_unquote() {
+    local m="$1"
+    case "$m" in
+    \"*\" | \`*\`) m="${m:1:${#m}-2}" ;;
+    esac
+    printf '%s' "$m"
+}
+
+judge_gomod() {
+    local nopatch lines line body rhs young first ready block=""
+    local re_pair='^(require[[:space:]]+)?([^[:space:]()]+)[[:space:]]+(v[0-9][^[:space:]]*)$'
+    local re_rhs='^([^[:space:]]+)[[:space:]]+(v[0-9][^[:space:]]*)$'
+    # 版を照らさない指示: Go の版の指定(go と toolchain)、モジュールの名前、道具の指定、
+    # GODEBUG の指定、使わない版の指定(exclude と retract)、Go の道具が見ないフォルダの指定(ignore)
+    local re_skip='^(go|toolchain|module|tool|godebug|exclude|retract|ignore)([[:space:]]|$)'
+
+    T_DECISION="reserve"
+    T_REASON="Go のモジュールの更新ではない"
+    T_KEY=""
+    T_DETAIL=""
+    T_GOMOD=""
+
+    nopatch=$(jq -s -r '
+        add | .[]
+        | select((.patch | type) != "string")
+        | .filename // ""
+        | select(test("(^|/)go[.]mod$"))' "$TMP/files.json") ||
+        undecided "PR #${PR} のファイル一覧を読めません"
+    if [ -n "$nopatch" ]; then
+        undecided "差分が大きすぎて中身を読めない go.mod があります: $(printf '%s' "$nopatch" | tr '\n' ' ')"
+    fi
+    # 足された行(+)と、ブロックの中かを知るための前後の行(空白で始まる行)を読む。
+    # 差分のまとまりの境(@@ の行)では、ブロックの中かが分からないので、ブロックの外として読む
+    lines=$(jq -s -r '
+        add | .[]
+        | select((.filename // "") | test("(^|/)go[.]mod$"))
+        | .patch | split("\n") | .[]
+        | rtrimstr("\r")
+        | select(startswith("+") or startswith(" ") or startswith("@@"))' "$TMP/files.json") ||
+        undecided "PR #${PR} の差分を読めません"
+    [ -n "$lines" ] || return 0
+
+    # 足された行からモジュールと版の組を読む。行の末尾の注釈(// indirect など)は外す。
+    # replace の行は、置き換え先にモジュールと版があれば、その組を照らす(手元のフォルダへの置き換えは照らさない)。
+    # exclude・retract・tool・godebug・ignore のブロックの中の行は照らさない。
+    # モジュールの名前を引用符(" か `)で囲んだ行は、引用符を外して照らす。
+    : >"$TMP/gomod-wanted.tsv"
+    while IFS= read -r line; do
+        if [ "${line:0:2}" = "@@" ]; then
+            block=""
+            continue
+        fi
+        body="${line:1}"
+        body="${body%%//*}"
+        body=$(printf '%s' "$body" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+        if [[ "$body" =~ ^(require|replace|exclude|retract|tool|godebug|ignore)[[:space:]]*\($ ]]; then
+            block="${BASH_REMATCH[1]}"
+            continue
+        fi
+        if [ "$body" = ")" ]; then
+            block=""
+            continue
+        fi
+        [ "${line:0:1}" = "+" ] || continue
+        [ -n "$body" ] || continue
+        case "$block" in
+        exclude | retract | tool | godebug | ignore) continue ;;
+        esac
+        case "$body" in
+        *"=>"*)
+            rhs=$(printf '%s' "${body#*=>}" | sed -e 's/^[[:space:]]*//')
+            if [[ "$rhs" =~ $re_rhs ]]; then
+                printf '%s\t%s\n' "$(gomod_unquote "${BASH_REMATCH[1]}")" "${BASH_REMATCH[2]}" >>"$TMP/gomod-wanted.tsv"
+            elif ! [[ "$rhs" =~ ^[^[:space:]]+$ ]]; then
+                undecided "go.mod の足された行を読み取れません: ${line}"
+            fi
+            continue
+            ;;
+        esac
+        [[ "$body" =~ $re_skip ]] && continue
+        if [[ "$body" =~ $re_pair ]]; then
+            printf '%s\t%s\n' "$(gomod_unquote "${BASH_REMATCH[2]}")" "${BASH_REMATCH[3]}" >>"$TMP/gomod-wanted.tsv"
+        else
+            undecided "go.mod の足された行を読み取れません: ${line}"
+        fi
+    done <<<"$lines"
+    [ -s "$TMP/gomod-wanted.tsv" ] || return 0
+    T_GOMOD=1
+
+    if ! gomod_index_ages "$TMP/gomod-wanted.tsv" "$TMP/gomod-ages.tsv"; then
+        T_DECISION="notify"
+        T_REASON="公開の時刻を取れない(Go のモジュールの索引 ${GOMOD_INDEX_BASE})"
+        T_KEY="gomod-unavailable"
+        T_DETAIL="Go のモジュールの索引(${GOMOD_INDEX_BASE})を読めなかったため、更新した Go のモジュールが公開から72時間経ったかを確かめられません。"
+        return 0
+    fi
+
+    # 72時間経っていない組を「モジュール@版(取り込み <時刻>)」の形で並べる
+    young=$(awk -F'\t' '$3 == "new" { print $1 "@" $2 "\t" $4 }' "$TMP/gomod-ages.tsv")
+    if [ -z "$young" ]; then
+        T_REASON="Go のモジュールの更新は、すべて公開から72時間経った"
+        return 0
+    fi
+    first=$(printf '%s\n' "$young" | sort -t$'\t' -k2,2nr | head -n 1 | cut -f2)
+    ready=$(jq -n -r --argjson t "$((first + WAIT_SECONDS))" '$t | todate')
+    T_DECISION="wait"
+    T_REASON="Go のモジュール $(printf '%s\n' "$young" | while IFS=$'\t' read -r pair t; do
+        printf '%s(取り込み %s)、' "$pair" "$(jq -n -r --argjson t "$t" '$t | todate')"
+    done | sed 's/、$//') は公開から72時間経っていない(${ready} 以降の見直しで予約する)"
+}
+
 # 対象が複数あるときは、知らせる > 待つ > 予約する の順に強い方を採る。
 DECISION="reserve"
 REASON=""
@@ -189,6 +323,16 @@ for entry in "${TARGETS[@]}"; do
         DETAIL="$T_DETAIL"
     fi
 done
+# Go のモジュールの更新も、同じ順で強い方を採る。どちらも予約するときは、理由を並べる。
+judge_gomod
+if [ "$(rank "$T_DECISION")" -gt "$(rank "$DECISION")" ]; then
+    DECISION="$T_DECISION"
+    REASON="$T_REASON"
+    KEY="$T_KEY"
+    DETAIL="$T_DETAIL"
+elif [ -n "$T_GOMOD" ] && [ "$DECISION" = "reserve" ]; then
+    REASON="${REASON}、${T_REASON}"
+fi
 
 # --- 知らせ(notify のとき)---------------------------------------------------------
 # 同じ目印のコメントが既にあれば重ねない。目印を数えるのは、このスクリプトが使う
@@ -220,6 +364,8 @@ if [ "$DECISION" = "notify" ]; then
     if [ "$exists" != "true" ]; then
         if [ "$KEY" = "digest-only" ]; then
             ask="Claude Code に「PR #${PR} の tflint の中身だけの更新を調べて」と依頼してください。このPRは自動の見直しの対象から外れているため、調べ終わるまで自動ではマージされません。"
+        elif [ "$KEY" = "gomod-unavailable" ]; then
+            ask="何もしなくてかまいません。1日1回の見直しで Go のモジュールの索引をもう一度読み、公開から72時間経っていれば自動マージを予約します。数日たっても予約されないときは、Claude Code に「PR #${PR} の Go のモジュールの公開の時刻を取れない理由を調べて」と依頼してください。"
         else
             ask="何もしなくてかまいません。1日1回の見直しで公開日時をもう一度確かめ、公開から72時間経っていれば自動マージを予約します。数日たっても予約されないときは、Claude Code に「PR #${PR} の tflint のリリースの公開日時を取れない理由を調べて」と依頼してください。"
         fi

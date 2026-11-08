@@ -10,6 +10,8 @@
 # 想定していない呼び出しは失敗させ、呼び出しの記録を残す。
 # curl・docker など GitHub の API 以外に問い合わせる道具も偽物に置き換え、
 # 呼ばれたら記録する(公開日時にイメージの中の作成日時を使わないことの確認)。
+# ただし curl は、Go のモジュールの索引(偽の置き場 http://index.test)を読むときだけ、
+# $STUB_GOMOD_PAGE の中身を返す。
 #
 # 外部への問い合わせを行わないため、実行にネットワークを必要としない。
 # =====================================================================
@@ -111,7 +113,7 @@ chmod +x "$WORK/bin/gh"
 
 # --- GitHub の API 以外に問い合わせる道具の偽物 -------------------------------------
 # 呼ばれたら $STUB_FORBIDDEN に記録して失敗する。
-for tool in curl wget docker skopeo crane regctl oras; do
+for tool in wget docker skopeo crane regctl oras; do
     cat >"$WORK/bin/$tool" <<STUB
 #!/usr/bin/env bash
 printf '%s %s\n' "$tool" "\$*" >>"\${STUB_FORBIDDEN:?}"
@@ -121,6 +123,40 @@ STUB
 done
 : >"$WORK/forbidden.log"
 : >"$WORK/all-calls.log"
+
+# curl の偽物: Go のモジュールの索引の問い合わせ(http://index.test/index?since=...)だけに答える。
+#   呼び出しを $STUB_GOMOD_CALLS に記録し、$STUB_GOMOD_PAGE の中身を -o のファイルに書く。
+#   STUB_GOMOD_FAIL があれば、索引を読めなかったとして失敗する。
+#   索引ではない URL は $STUB_FORBIDDEN に記録して失敗する。
+# 索引を区間に分けて読む動きと、ページをめくる動きは test-lib-gomod-index.sh で確かめる。
+# ここでは区間の長さを73時間にして、索引を1度だけ読ませる。
+cat >"$WORK/bin/curl" <<'STUB'
+#!/usr/bin/env bash
+out="" url=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+    -o) out="$2"; shift 2 ;;
+    --max-time | --retry) shift 2 ;;
+    -*) shift ;;
+    *) url="$1"; shift ;;
+    esac
+done
+case "$url" in
+http://index.test/index\?since=*)
+    printf '%s\n' "$url" >>"${STUB_GOMOD_CALLS:?}"
+    if [ -n "${STUB_GOMOD_FAIL:-}" ]; then
+        echo "curl: (22) The requested URL returned error: 503" >&2
+        exit 22
+    fi
+    cp "${STUB_GOMOD_PAGE:?}" "${out:?}"
+    ;;
+*)
+    printf 'curl %s\n' "$url" >>"${STUB_FORBIDDEN:?}"
+    exit 1
+    ;;
+esac
+STUB
+chmod +x "$WORK/bin/curl"
 
 # --- 差分の材料 -------------------------------------------------------------------
 # 今のリポジトリの docker/terraform/Dockerfile の1行目と同じ書き方
@@ -176,13 +212,18 @@ reset_scenario() {
     FAIL_COMMENTS=""
     FAIL_POST=""
     USER_MODE="ok"
+    : >"$WORK/gomod-page.ndjson"
+    GOMOD_FAIL=""
 }
 
 run() {
     : >"$WORK/calls.log"
+    : >"$WORK/gomod-calls.log"
     rm -rf "$WORK/posted"
     mkdir -p "$WORK/posted"
     PATH="$WORK/bin:$PATH" \
+        STUB_GOMOD_CALLS="$WORK/gomod-calls.log" STUB_GOMOD_PAGE="$WORK/gomod-page.ndjson" \
+        STUB_GOMOD_FAIL="$GOMOD_FAIL" GOMOD_INDEX_BASE="http://index.test" GOMOD_INDEX_SEGMENT_HOURS=73 \
         STUB_CALLS="$WORK/calls.log" STUB_FORBIDDEN="$WORK/forbidden.log" \
         STUB_FILES="$WORK/files.json" STUB_COMMENTS="$WORK/comments.json" \
         STUB_POSTED_DIR="$WORK/posted" \
@@ -246,6 +287,18 @@ expect_posted() {
         ok "$name"
     else
         echo "FAIL: $name (コメントの数 期待 $want、実際 $POSTED)"
+        FAILED=1
+    fi
+}
+
+# 使い方: expect_gomod_calls <説明> <索引を読んだ回数>
+expect_gomod_calls() {
+    local name="$1" want="$2" got
+    got=$(wc -l <"$WORK/gomod-calls.log" | tr -d ' ')
+    if [ "$got" -eq "$want" ]; then
+        ok "$name"
+    else
+        echo "FAIL: $name (索引を読んだ回数 期待 $want、実際 $got)"
         FAILED=1
     fi
 }
@@ -511,6 +564,208 @@ expect_undecided "既存のコメントを読めなければ判定できない"
 expect_posted "既存のコメントを読めなければコメントしない" 0
 
 # =====================================================================
+# Go のモジュール(gomod)の更新: 索引に取り込まれてから72時間を数える
+# =====================================================================
+# Dependabot の gomod の更新の差分(require のブロックの1行を入れ替える)
+gomod_patch() {
+    printf '@@ -5,7 +5,7 @@ go 1.25.0\n require (\n \tgithub.com/labstack/echo/v4 v4.13.4\n-\tgithub.com/jackc/pgx/v5 v5.7.5\n+\tgithub.com/jackc/pgx/v5 %s\n \tgolang.org/x/text v0.28.0 // indirect\n )\n' "$1"
+}
+# 使い方: gomod_index <モジュール> <版> <判定の時刻からさかのぼる秒> [...]
+gomod_index() {
+    : >"$WORK/gomod-page.ndjson"
+    while [ $# -ge 3 ]; do
+        jq -c -n --arg p "$1" --arg v "$2" --argjson t "$((NOW - $3))" \
+            '{Path: $p, Version: $v, Timestamp: ($t | todate)}' >>"$WORK/gomod-page.ndjson"
+        shift 3
+    done
+}
+# 使い方: epoch_iso <1970-01-01T00:00:00Z からの秒>
+epoch_iso() {
+    jq -n -r --argjson t "$1" '$t | todate'
+}
+
+reset_scenario
+files_json "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+gomod_index github.com/jackc/pgx/v5 v5.7.6 3600
+run
+expect_decision "gomod の版が72時間より新しければ止める" wait "github.com/jackc/pgx/v5@v5.7.6"
+expect_decision "gomod で止めた理由に、予約する見直しの時刻を書く" wait "$(epoch_iso "$((NOW - 3600 + 259200))") 以降の見直しで予約する"
+expect_posted "gomod の版を待つときはコメントしない" 0
+expect_gomod_calls "gomod の更新では索引を1度読む" 1
+if grep -qxF "http://index.test/index?since=$(epoch_iso "$((NOW - 73 * 3600))")&limit=2000" "$WORK/gomod-calls.log"; then
+    ok "索引は判定の時刻の73時間前から読む"
+else
+    echo "FAIL: 索引は判定の時刻の73時間前から読む (実際: $(cat "$WORK/gomod-calls.log"))"
+    FAILED=1
+fi
+
+reset_scenario
+files_json "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+gomod_index github.com/jackc/pgx/v5 v5.7.6 "$((72 * 3600 + 60))"
+run
+expect_decision "gomod の版が古ければ通す" reserve "Go のモジュールの更新は、すべて公開から72時間経った"
+expect_decision "gomod の版が古ければ、tflint の判定の理由も並べる" reserve "tflint の更新ではない、Go"
+expect_posted "gomod の版が古ければコメントしない" 0
+
+reset_scenario
+files_json "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+gomod_index github.com/jackc/pgx/v5 v5.7.6 "$((72 * 3600))"
+run
+expect_decision "gomod の版が取り込みからちょうど72時間なら通す" reserve "すべて公開から72時間経った"
+gomod_index github.com/jackc/pgx/v5 v5.7.6 "$((72 * 3600 - 1))"
+run
+expect_decision "gomod の版が取り込みから72時間に1秒足りなければ止める" wait "github.com/jackc/pgx/v5@v5.7.6"
+
+reset_scenario
+files_json "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+gomod_index github.com/other/mod v1.0.0 3600
+run
+expect_decision "索引の読んだ範囲に無い gomod の版は、73時間より前に取り込まれたとして通す" reserve "すべて公開から72時間経った"
+
+# 版の先頭の v と、モジュールの名前の大文字と小文字は lib-gomod-index.sh が照らす
+reset_scenario
+files_json "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+gomod_index github.com/Jackc/pgx/v5 v5.7.6 3600
+run
+expect_decision "モジュールの名前の大文字と小文字が違っても照らす" wait "github.com/jackc/pgx/v5@v5.7.6"
+
+# 2つの go.mod の更新は、新しい方の取り込みの時刻で待つ
+reset_scenario
+files_json "backend/go.mod" "$(gomod_patch v5.7.6)" \
+    "tools/go.mod" "$(printf '@@ -3,3 +3,3 @@\n require (\n-\tgolang.org/x/tools v0.36.0\n+\tgolang.org/x/tools v0.37.0\n )\n')" >"$WORK/files.json"
+gomod_index github.com/jackc/pgx/v5 v5.7.6 7200 golang.org/x/tools v0.37.0 3600
+run
+expect_decision "複数の go.mod の新しい組をすべて理由に書く" wait "pgx/v5@v5.7.6.*golang.org/x/tools@v0.37.0"
+expect_decision "複数の go.mod では、いちばん新しい取り込みから72時間で予約する" wait "$(epoch_iso "$((NOW - 3600 + 259200))") 以降"
+expect_gomod_calls "複数の go.mod でも索引は1度だけ読む" 1
+
+# replace の行は置き換え先の組を照らす。手元のフォルダへの置き換えは照らさない
+reset_scenario
+files_json "backend/go.mod" "$(printf '@@ -20,0 +20,2 @@\n+replace github.com/a/b => github.com/c/d v1.2.3\n+replace github.com/e/f v1.0.0 => ../local/f\n')" >"$WORK/files.json"
+gomod_index github.com/c/d v1.2.3 60
+run
+expect_decision "replace の置き換え先の版が新しければ止める" wait "github.com/c/d@v1.2.3"
+if grep -q 'github.com/e/f' "$WORK/out.txt"; then
+    ng "手元のフォルダへの置き換えは照らさない"
+else
+    ok "手元のフォルダへの置き換えは照らさない"
+fi
+
+# go・toolchain の行と exclude のブロックの中の行は、使うモジュールの版ではないので照らさない
+reset_scenario
+files_json "backend/go.mod" "$(printf '@@ -1,8 +1,8 @@\n module example.com/m\n \n-go 1.25.0\n+go 1.25.1\n-toolchain go1.25.0\n+toolchain go1.25.1\n exclude (\n+\tgithub.com/z/z v1.0.0\n )\n')" >"$WORK/files.json"
+run
+expect_decision "go・toolchain・exclude の行だけの更新は、索引を読まずに通す" reserve "tflint の更新ではない"
+expect_gomod_calls "go・toolchain・exclude の行だけの更新では索引を読まない" 0
+if grep -q '^reason=.*Go のモジュール' "$WORK/out.txt"; then
+    ng "照らす組が無ければ、Go のモジュールの判定の理由を並べない"
+else
+    ok "照らす組が無ければ、Go のモジュールの判定の理由を並べない"
+fi
+
+# 引用符で囲んだモジュールの名前は、引用符を外して照らす
+reset_scenario
+files_json "backend/go.mod" "$(printf '@@ -5,3 +5,4 @@\n require (\n \tgithub.com/labstack/echo/v4 v4.13.4\n+\t"example.com/quoted" v1.0.0\n+\t%sexample.com/raw%s v2.0.0\n )\n' "\`" "\`")" >"$WORK/files.json"
+gomod_index example.com/quoted v1.0.0 3600 example.com/raw v2.0.0 3600
+run
+expect_decision "引用符で囲んだモジュールの名前も照らす" wait "example.com/quoted@v1.0.0.*example.com/raw@v2.0.0"
+
+# ignore の指示は、使うモジュールの版ではないので照らさない
+reset_scenario
+files_json "backend/go.mod" "$(printf '@@ -3,0 +3,5 @@\n+ignore ./node_modules\n+ignore (\n+\t./tmp\n+\tthird_party/x v1\n+)\n')" >"$WORK/files.json"
+run
+expect_decision "ignore の行だけの更新は、索引を読まずに通す" reserve "tflint の更新ではない"
+expect_gomod_calls "ignore の行だけの更新では索引を読まない" 0
+
+# 行の末尾の注釈(// indirect)を外して組を読む
+reset_scenario
+files_json "backend/go.mod" "$(printf '@@ -5,3 +5,3 @@\n require (\n-\tgolang.org/x/text v0.28.0 // indirect\n+\tgolang.org/x/text v0.29.0 // indirect\n )\n')" >"$WORK/files.json"
+gomod_index golang.org/x/text v0.29.0 3600
+run
+expect_decision "行の末尾に // indirect がある版も照らす" wait "golang.org/x/text@v0.29.0"
+
+# exclude のブロックが閉じたあとの行は照らす
+reset_scenario
+files_json "backend/go.mod" "$(printf '@@ -8,4 +8,5 @@\n exclude (\n \tgithub.com/z/z v1.0.0\n )\n+require github.com/n/n v1.1.0\n')" >"$WORK/files.json"
+gomod_index github.com/n/n v1.1.0 3600
+run
+expect_decision "exclude のブロックが閉じたあとの require の行は照らす" wait "github.com/n/n@v1.1.0"
+
+# 差分のまとまり(@@ の行)が替わったら、前のまとまりのブロックの中かを持ち越さない
+reset_scenario
+files_json "backend/go.mod" "$(printf '@@ -8,2 +8,2 @@\n exclude (\n \tgithub.com/z/z v1.0.0\n@@ -20,3 +20,3 @@\n-\tgithub.com/n/n v1.0.0\n+\tgithub.com/n/n v1.1.0\n )\n')" >"$WORK/files.json"
+gomod_index github.com/n/n v1.1.0 3600
+run
+expect_decision "前の差分のまとまりで始まった exclude のブロックを持ち越さない" wait "github.com/n/n@v1.1.0"
+
+reset_scenario
+files_json "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+GOMOD_FAIL=1
+run
+expect_decision "索引を読めなければ notify" notify "公開の時刻を取れない(Go のモジュールの索引"
+expect_posted "索引を読めなければコメントを1件付ける" 1
+body="$WORK/posted/posted_1.md"
+if [ -f "$body" ] && [ "$(head -n 1 "$body")" = "@owner-name" ] &&
+    [ "$(grep -v '^[[:space:]]*$' "$body" | tail -n 1)" = "<!-- release-age: gomod-unavailable -->" ] &&
+    grep -q '1日1回の見直しで Go のモジュールの索引をもう一度読み' "$body" &&
+    grep -q 'PR #7 の Go のモジュールの公開の時刻を取れない理由を調べて' "$body"; then
+    ok "索引を読めないコメントはメンション・毎日の見直し・調べさせる依頼・目印を持つ"
+else
+    echo "FAIL: 索引を読めないコメントはメンション・毎日の見直し・調べさせる依頼・目印を持つ"
+    [ -f "$body" ] && sed 's/^/  /' "$body"
+    FAILED=1
+fi
+
+# tflint の更新と gomod の更新が同じPRにあれば、強い方の判定を採る
+reset_scenario
+files_json "docker/terraform/Dockerfile" "$(tflint_patch "$OLD_LINE" "$NEW_LINE")" \
+    "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+gomod_index github.com/jackc/pgx/v5 v5.7.6 3600
+run
+expect_decision "tflint が経っていて gomod が新しければ止める" wait "github.com/jackc/pgx/v5@v5.7.6"
+
+reset_scenario
+files_json "docker/terraform/Dockerfile" "$(tflint_patch "$OLD_LINE" "$NEW_LINE")" \
+    "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+NOW="$((PUB_EPOCH + 3600))"
+gomod_index github.com/jackc/pgx/v5 v5.7.6 "$((72 * 3600 + 60))"
+run
+expect_decision "tflint が新しくて gomod が経っていれば、tflint で止める" wait "tflint v0.61.0 は公開から72時間経っていない"
+
+reset_scenario
+files_json "docker/terraform/Dockerfile" "$(tflint_patch "$OLD_LINE" "$NEW_LINE")" \
+    "backend/go.mod" "$(gomod_patch v5.7.6)" >"$WORK/files.json"
+NOW="$((PUB_EPOCH + 3600))"
+GOMOD_FAIL=1
+run
+expect_decision "tflint を待つ更新と索引を読めない更新が同じPRにあれば知らせる" notify "公開の時刻を取れない(Go のモジュールの索引"
+
+# tflint だけの更新では索引を読まない
+reset_scenario
+files_json "docker/terraform/Dockerfile" "$(tflint_patch "$OLD_LINE" "$NEW_LINE")" >"$WORK/files.json"
+run
+expect_gomod_calls "tflint だけの更新では索引を読まない" 0
+
+# go.mod を読めないときは判定できない
+reset_scenario
+files_json "backend/go.mod" "-" >"$WORK/files.json"
+run
+expect_undecided "差分が大きすぎて patch の無い go.mod があれば判定できない"
+if grep -q '差分が大きすぎて中身を読めない go.mod があります: backend/go.mod' "$WORK/err.txt"; then
+    ok "patch の無い go.mod の名前を理由に書く"
+else
+    ng "patch の無い go.mod の名前を理由に書く"
+fi
+expect_gomod_calls "patch の無い go.mod では索引を読まない" 0
+
+reset_scenario
+files_json "backend/go.mod" "$(printf '@@ -5,3 +5,3 @@\n require (\n-\tgithub.com/jackc/pgx/v5 v5.7.5\n+\tgithub.com/jackc/pgx/v5 latest\n )\n')" >"$WORK/files.json"
+run
+expect_undecided "go.mod の足された行に版が読み取れなければ判定できない"
+expect_gomod_calls "読み取れない行があれば索引を読まない" 0
+expect_posted "go.mod を読めないときはコメントしない" 0
+
+# =====================================================================
 # 使い方の誤り
 # =====================================================================
 check_invocation() {
@@ -538,14 +793,14 @@ check_invocation "GITHUB_REPOSITORY_OWNER が無ければ判定できない" GIT
 check_invocation "GH_TOKEN が無ければ判定できない" GH_TOKEN 7
 
 # =====================================================================
-# 公開日時は GitHub のリリースだけから取る(全ての場面を通して)
+# 公開日時は GitHub のリリースと Go のモジュールの索引だけから取る(全ての場面を通して)
 # =====================================================================
 if [ -s "$WORK/forbidden.log" ]; then
-    echo "FAIL: GitHub の API 以外に問い合わせていない"
+    echo "FAIL: GitHub の API と Go のモジュールの索引のほかに問い合わせていない"
     sed 's/^/  /' "$WORK/forbidden.log"
     FAILED=1
 else
-    ok "GitHub の API 以外に問い合わせていない(curl・docker・skopeo 等を呼ばない)"
+    ok "GitHub の API と Go のモジュールの索引のほかに問い合わせていない(docker・skopeo 等を呼ばない)"
 fi
 if grep -Eq 'ghcr\.io|manifests|/packages/|/blobs/|/config' "$WORK/all-calls.log"; then
     echo "FAIL: イメージの置き場や中身(image config)を読んでいない"

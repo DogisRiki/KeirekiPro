@@ -19,7 +19,7 @@
 # 同じ言語の行は、ビルドのしかたとビルドの命令を同じにする。違うと、スクリプトは終了コード2で終わる。
 #
 # Java は、Lombok がコンパイルのときに作るコードを解析するため、ビルドなし(none)を使わない。
-# Go は、ビルドの命令が backend を Go に移したあとのコードの作りで決まるので、ビルドのしかたを空にする。
+# Go は、backend の下の Go のコードを go build で組み立てて解析する(manual)。go.mod は backend にある。
 **/*.java	java-kotlin	manual	cd backend && ./gradlew --no-daemon testClasses
 **/*.kt	java-kotlin	manual	cd backend && ./gradlew --no-daemon testClasses
 **/*.ts	javascript-typescript	none
@@ -41,7 +41,7 @@
 **/action.yml	actions	none
 **/action.yaml	actions	none
 **/*.py	python	none
-**/*.go	go
+**/*.go	go	manual	cd backend && go build ./...
 **/*.c	c-cpp
 **/*.cc	c-cpp
 **/*.cpp	c-cpp

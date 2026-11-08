@@ -133,6 +133,18 @@ m_tflint() { sed -i 's|tflint:v0.65.0@sha256:ttt|tflint:v0.66.0@sha256:uuu|' doc
 # 分かれ目に無いデータのファイルを足し、Dockerfile は digest だけを変える
 m_add_data() { write_data; m_dev_digest; }
 m_dev_no_from() { sed -i 's|^FROM hashicorp/terraform:|FROM example/terraform:|' docker/terraform/Dockerfile; }
+# Go 版の品質チェックとコード生成の設定。分かれ目には無いので、どれも新しく作る変更になる
+m_go_makefile() { printf 'check:\n\tgo test ./...\n' >backend/Makefile; }
+m_go_golangci() { printf 'version: "2"\n' >backend/.golangci.yml; }
+m_go_testcoverage() { printf 'threshold:\n  total: 93\n' >backend/.testcoverage.yml; }
+m_go_gremlins() { printf 'unleash:\n  threshold:\n    efficacy: 80\n' >backend/.gremlins.yaml; }
+m_go_oapi() { mkdir -p backend/api && printf 'package: gen\n' >backend/api/oapi-codegen.yaml; }
+m_go_sqlc() { printf 'version: "2"\n' >backend/sqlc.yaml; }
+# 承認の対象の外の Go のファイル(依存のバージョン宣言とコード)
+m_go_mod() { printf 'module example.com/backend\n\ngo 1.26\n' >backend/go.mod; printf '' >backend/go.sum; }
+m_go_src() { mkdir -p backend/internal/a && printf 'package a\n' >backend/internal/a/a.go; }
+# 承認の対象のファイルと同じ名前でも、置き場所が違えば対象にしない
+m_go_makefile_nested() { mkdir -p backend/tools && printf 'all:\n' >backend/tools/Makefile; }
 
 # --- 承認を要求しないもの --------------------------------------------------------
 check 0 false "依存定義以外のみの変更" m_none
@@ -179,6 +191,20 @@ check 0 false "tflint の FROM の行の変更を検知しない" m_tflint
 SEED_DATA=no check 0 false "分かれ目にデータのファイルが無く、FROM の行を変えない PR で検知しない" m_add_data
 check 1 false "開発環境の FROM の行を読めなければ、承認を求める" m_dev_no_from
 check_summary "docker/frontend/Dockerfile: Node.js の版 24.22.2 を 24.23.0 に変更" "" "変えた開発環境の版が Summary に出る" m_dev_node
+
+# --- Go 版の品質チェックとコード生成の設定 ---------------------------------------
+# 品質チェックとコード生成の指定を、所有者の承認なしに緩められないようにする(要件3の受入基準3)
+check 1 false ".testcoverage.yml の変更を承認の対象にする" m_go_testcoverage
+check 1 false "Makefile の変更を承認の対象にする" m_go_makefile
+check 1 false ".golangci.yml の変更を承認の対象にする" m_go_golangci
+check 1 false ".gremlins.yaml の変更を承認の対象にする" m_go_gremlins
+check 1 false "api/oapi-codegen.yaml の変更を承認の対象にする" m_go_oapi
+check 1 false "sqlc.yaml の変更を承認の対象にする" m_go_sqlc
+check 0 true ".testcoverage.yml の変更は所有者の承認があれば通る" m_go_testcoverage
+check 0 false "go.mod と go.sum の変更は承認の対象にしない" m_go_mod
+check 0 false "Go のコードの変更は承認の対象にしない" m_go_src
+check 0 false "backend の直下でない Makefile は承認の対象にしない" m_go_makefile_nested
+check_summary "backend/.testcoverage.yml" "" "変えた Go 版の設定のファイル名が Summary に出る" m_go_testcoverage
 
 if [ "$FAILED" -ne 0 ]; then
     echo "::error::check-dependency-additions.sh のテストが失敗しました。"
