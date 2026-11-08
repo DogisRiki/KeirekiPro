@@ -55,7 +55,7 @@ flowchart LR
     PR[プルリクエスト<br>Claude Code・Dependabot・<br>frontend-vuln-fix・backend-vuln-fix・<br>ci-tool-version-update]
 
     subgraph s1[系統1: 品質の検査]
-        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>依存の脆弱性検査・<br>コンテナイメージの脆弱性検査・<br>ソースコードの脆弱性の診断・<br>公開直後のライブラリの遮断]
+        Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>Java版とGo版の比べる検査・<br>依存の脆弱性検査・<br>コンテナイメージの脆弱性検査・<br>ソースコードの脆弱性の診断・<br>公開直後のライブラリの遮断]
     end
     subgraph s2[系統2: ずるの検査]
         Z[検査回避の検知・差分サイズ・<br>シークレットスキャン・<br>ワークフローの静的検証・<br>CIの道具の版の書き場所・<br>Gradle本体の検証・<br>読み込まれる文書の量]
@@ -104,14 +104,14 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 
 | 系統 | ワークフロー名 | 発火条件 | 役割 |
 |---|---|---|---|
-| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・カバレッジを測りながら1回だけ流すテスト・ビルドとPlaywrightによるスモークテスト、BackendはGradle checkを、Configuration Cacheを使ってタスクを同時に動かしながら実行し、プルリクエストでは何も検証していないJavaテストの件数(PMD)を実行の要約に出す。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存。テスト結果とカバレッジの成果物は、mainへのpushでは90日、プルリクエストでは7日保持する |
+| 品質の検査 | ci.yaml | push (main) / pull_request | paths-filterによる変更検知。Frontendはフォーマット・Lint・カバレッジを測りながら1回だけ流すテスト・ビルドとPlaywrightによるスモークテスト、Backendは、変わったファイルに合わせて、Java版の検査とGo版の検査とJava版とGo版の応答の比べる検査を分けて動かし、必須の検査backend-testが3つの結果をまとめて判定する。Java版の検査はGradle checkを、Configuration Cacheを使ってタスクを同時に動かしながら実行し、プルリクエストでは何も検証していないJavaテストの件数(PMD)を実行の要約に出す。Go版の検査はmake checkを実行し、プルリクエストでは変えた箇所の変異テストも動かす。Go版の検査はbackend/go.modがあるときだけ、比べる検査はbackend/compat/があるときだけ動く。Dockerfileが変わった場合はそのイメージをビルドして確認する。mainへのpush時はデプロイ用成果物を保存。テスト結果とカバレッジの成果物は、mainへのpushでは90日、プルリクエストでは7日保持する |
 | 品質の検査 | terraform-plan.yaml | pull_request | paths-filterによる変更検知。フォーマット・Validate・tflint・checkovによる静的検査。本番のAWSには接続しない(本番との差分は terraform-apply.yaml が適用の直前に出す)。terraform関連の変更が無いPRでは各ジョブをスキップする |
 | 品質の検査 | dependency-review.yaml | pull_request | 依存の検査。backendの依存グラフを生成するジョブと送信するジョブを権限を分けて実行し、baseとheadの依存グラフを比較して、そのPRで新しく増えた脆弱性と、公開から72時間を経過していないライブラリを落とす。ただし、本番で動く部品の深刻度がhighかcriticalの脆弱性の警告が示す最初の修正版は、そのPRで追加されたすべての部品が悪意のある部品の一覧に載っておらず、最初の修正版の署名した者が前の版と変わっていなければ、PRに記録のコメントを残したうえで、所有者のApproveで72時間待たずに入れる。前の版に署名が無いときは、署名した者を比べない。DependabotのPRも同じ判定を受ける。CIの道具(Node.js・Trivy・Codex CLI・Terraform)の版を変えたPRでは、公開から72時間を経過していない版を落とし、変わったCIの版を配布元の署名で確かめる。フォークPRでは送信ジョブをスキップし、frontendのみを検査する |
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする。部品には、本番のjarに入る部品(runtime)か開発のときだけ使う部品(development)かを付け、アラートで本番で動く部品を見分けられるようにする |
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。本番用のイメージをarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
 | 品質の検査 | codeql.yaml | pull_request / push (main) / 週次 (schedule) / 手動 | CodeQLでソースコードの脆弱性を診断し、結果をGitHubのコードスキャンに送る。診断する言語は、`.github/codeql/languages.tsv`と照らして実行のたびに見つける。プルリクエストでは、言語ごとの診断がすべて成功し、そのプルリクエストが持ち込んだ重さが中以上の警告が無いときだけ、`codeql-complete`が緑になる。所有者が却下した警告は数えない。診断の対象からファイルやクエリを外す設定は置かない。mainへのpushと週1回の実行で、mainに残った警告を見つける |
 | 品質の検査 | codeql-recheck.yaml | 10分ごと (schedule) / 手動 | 所有者がCodeQLの警告を却下したあとに、赤のままの`codeql-complete`を動かし直す。GitHub Actionsは警告の却下で起動できないため、定期実行で、所有者が却下し、却下の時刻が判定の終わった時刻よりあとの警告があるプルリクエストだけを動かし直す。プルリクエストのコードは取り出さない |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、CIの道具の版を決まった書き場所に書いているかの検査、リリースゲートのテスト、Node.jsとTerraformとTrivyの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、CIの道具の版を決まった書き場所に書いているかの検査、リリースゲートのテスト、backend-testの判定のスクリプトのテスト、Node.jsとTerraformとTrivyの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更と、開発環境のNode.jsとTerraformのイメージの版の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更と、イメージの版を変えずに中身(digest)だけを変える変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | 承認前に失敗したままのゲートチェックを再実行し、承認結果を反映させる |

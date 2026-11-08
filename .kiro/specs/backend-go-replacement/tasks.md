@@ -34,7 +34,7 @@
   - _要件: 3.4, 3.5, 4.7, 13.6_
   - _対象の部品: CI の仕事_
 
-- [ ] 1.5 ci.yaml の backend の仕事を3つに分け、まとめの仕事で判定する
+- [x] 1.5 ci.yaml の backend の仕事を3つに分け、まとめの仕事で判定する
 
   Claude は、`.github/workflows/ci.yaml` の完成版を置き場に作る。完成版で変えるものは、次の4つである。
 
@@ -634,6 +634,8 @@
 - 部品と道具の版: Claude は、design.md の「使う技術」の版が公開から72時間たっていればその版を、たっていなければ1つ前の版を使う。版は `backend/go.mod` に書き、`tool` の指定で道具の版も `go.mod` に集める
 - 必須の検査の期待一覧: Claude は、`.github/audit/required-checks.json` を、大タスク10(PR 6-1)まで変えない
 - ワークフローを変える PR: ワークフローを追加・変更・削除した PR では、Claude は、README のワークフローの一覧の表と Mermaid の図も直す
+- 比べる検査の報告の置き場(タスク1.5で決めたこと): `ci.yaml` の `backend-compat` は、`backend/compat/report/` の下のファイルを成果物 `backend-compat-report` に残す。Claude は、比べる検査を作るタスクで、違いの報告と、失敗したときの両方の版のコンテナのログを、このフォルダに書くように作り、このフォルダを `backend/.gitignore` に足す
+- golangci-lint の版(タスク1.5で決めたこと): `ci.yaml` の `backend-go` は、golangci-lint の版を v2.15.0 に固定し、`.github/ci-tool-versions.json` の excluded に載せた。週1回の自動の更新はこの版を上げない。Claude は、`docker/backend-go/Dockerfile` に同じ版を書き、版を上げるときは2か所を同じ PR で上げる
 - PR の本文: この spec の PR の本文には、`Spec: .kiro/specs/backend-go-replacement` と `Refs: #445` を書く。所有者の承認が要る PR では、「承認が要る理由」と「main に入れたときに本番で起きること」の2つの欄を書き、PR を作ったときの所有者への返事に、この2つの欄をそのまま写す
 - 公開のリポジトリ: Claude は、まだ直していないセキュリティの穴を、Issue、PR、コミット、spec の本文に書かない
 - design の審査で残った記録: 次の5つを、それぞれ次のタスクで扱う。
