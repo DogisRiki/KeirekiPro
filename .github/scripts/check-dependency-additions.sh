@@ -63,21 +63,33 @@ MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
 
 detected=""
 
-# --- 変更されたこと自体を検知する対象(grep は -q 無しで全入力を読む) ---
-changed_frontend=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
-    grep -E '^frontend/(pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.(c|m)?js)$' || true)
+# --- 変更されたこと自体を検知する対象 ---
+# 変更されたファイルの名前の一覧を、1行に1つずつ取る。
+#   --no-renames: 名前を変えて移したファイルを、消したファイルと足したファイルの2つとして出す。
+#     これが無いと、移したあとの名前だけが出て、対象のファイルを対象の外の名前に移す変更
+#     (設定を消すのと同じ)を見逃す
+#   -z: ファイルの名前を、core.quotePath の設定に依らず、記号に置き換えずにそのまま出す。
+#     置き換えられると、日本語などを含む名前が "backend/\346..." の形になり、下の照合に当たらない。
+#     -z の区切りの NUL を改行に変え、名前の中の改行は \001 に変えて、1つの名前を1行に保つ
+changed_paths=$(git diff --no-renames --name-only -z "$MERGE_BASE" "$HEAD_SHA" | tr '\n\0' '\001\n')
+
+# 一覧から、照合に当たる名前だけを出す(grep は -q 無しで全入力を読む)。
+# LC_ALL=C と -a で、UTF-8 として正しくないバイトを含む名前も、. で照合し、行のまま出す
+pick_changed() { # <照合の式>
+    printf '%s\n' "$changed_paths" | LC_ALL=C grep -a -E "$1" || true
+}
+
+changed_frontend=$(pick_changed '^frontend/(pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.(c|m)?js)$')
 if [ -n "$changed_frontend" ]; then
     detected+="[変更された frontend の取得元・防御設定]"$'\n'"$changed_frontend"$'\n'
 fi
 
-changed_build=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
-    grep -E '^backend/.*\.(gradle|gradle\.kts)$' || true)
+changed_build=$(pick_changed '^backend/.*\.(gradle|gradle\.kts)$')
 if [ -n "$changed_build" ]; then
     detected+="[変更された backend のビルドスクリプト]"$'\n'"$changed_build"$'\n'
 fi
 
-changed_go_config=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" |
-    grep -E '^backend/(Makefile|\.golangci\.yml|\.testcoverage\.yml|\.gremlins\.yaml|api/oapi-codegen\.yaml|sqlc\.yaml)$' || true)
+changed_go_config=$(pick_changed '^backend/(Makefile|\.golangci\.yml|\.testcoverage\.yml|\.gremlins\.yaml|api/oapi-codegen\.yaml|sqlc\.yaml)$')
 if [ -n "$changed_go_config" ]; then
     detected+="[変更された backend の Go 版の品質チェックとコード生成の設定]"$'\n'"$changed_go_config"$'\n'
 fi
