@@ -91,7 +91,6 @@
   - 完了の確かめ方: `docker compose build backend-go` が成功し、`bash .claude/scripts/parallel/run-check.sh backend-go go version` が `go1.27.3` を返す
   - 受入基準とテストの対応: 要件3の受入基準2(どの OS でも1つのコマンド)は、`run-check.sh backend-go` がこのイメージで動くことで確かめる。テストのコードは無い
   - _要件: 3.2_
-  - _保留: PR 2-1 が main に入ったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク2を行う_
 
 - [ ] 2.2 API の仕様書を入れ、HTTP の受け口のコードを生成する
 
@@ -99,7 +98,6 @@
   - 完了の確かめ方: `run-check.sh backend-go make generate` で `backend/internal/httpapi/gen/api.gen.go` ができ、`run-check.sh backend-go make generate-check` が成功し、生成したファイルを1行変えると `generate-check` が失敗する
   - 受入基準とテストの対応: 要件4の受入基準3(すべての API を仕様書に書く)は、`internal/httpapi/gen_test.go` の `TestGeneratedOperationsCount`(生成した `StrictServerInterface` が50の操作を持つ)で、要件14の受入基準2(仕様書と受け口の食い違いを品質チェックが止める)は、`make generate-check` が生成したコードの書き換えで失敗することで確かめる
   - _要件: 4.3, 14.2_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.3 静的な検査とカバレッジと変異テストの設定と、品質チェックの入口を作る
 
@@ -107,7 +105,6 @@
   - 完了の確かめ方: `run-check.sh backend-go make lint` が成功し、`internal/platform` の下に `internal/httpapi` を読む仮のファイルを置くと `make lint` が depguard で失敗する
   - 受入基準とテストの対応: 要件3の受入基準1(書式、静的な検査、依存の向き、カバレッジ、変異テスト、脆弱性)は、Makefile のタスクの一覧と、depguard の違反を置いたときの `make lint` の失敗で、要件3の受入基準3(下限 93% と分岐の割合の代わり)は、`.testcoverage.yml` の `threshold` と `make mutation-diff` の `--threshold-efficacy 80 --threshold-mcover 93` で確かめる。`.golangci.yml` に `run.build-tags: [compat]` を書くのは、design の審査の D3-1-6(比べる検査のコードを `make lint` が読むか)への答えである
   - _要件: 3.1, 3.2, 3.3_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.4 表の形の履歴の部品を作る
 
@@ -115,7 +112,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/platform/migrate/...` が成功する
   - 受入基準とテストの対応: 要件12の受入基準4(表の形の履歴を引き継ぐ)は、`migrate_test.go` の `TestChecksum_V1toV7`(research.md の7つの値と一致)、`TestRun_ValidateOnly_ChecksumMismatch`、`TestRun_ValidateOnly_FailedRow`、`TestRun_ValidateOnly_UnknownVersion`、`TestRun_ValidateOnly_WritesNothing`、`TestDescription_FromFileName` と、結合テスト `migrate_integration_test.go` の `TestValidateOnly_FlywayWrittenHistory`(testcontainers-go の Postgres に Flyway の形の表を作って通る)で、要件1の受入基準5(表の形を変えない)は、`TestRun_ValidateOnly_WritesNothing` で確かめる
   - _要件: 1.5, 12.4_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.5 データベースと Redis と AWS につなぐ部品を作る (並行可)
 
@@ -124,7 +120,6 @@
   - 受入基準とテストの対応: 要件12の受入基準1(データベースをそのまま読み書き)は `database_integration_test.go` の `TestPool_TimeZoneTokyo` で、要件13の受入基準5(形を変えてもログアウトされない取り決め)の土台の Redis の形は `redisstore_integration_test.go` の `TestScripts_SameResultAsJava`(Java 版と同じ Lua のスクリプトが同じ結果を返す)で、要件12の受入基準3(画像が同じに表示される)の土台の S3 のつなぎ方は `awsclient_test.go` の `TestNew_DevUsesPathStyleEndpoint` で確かめる
   - _要件: 12.1, 12.3, 13.5_
   - _対象の部品: database と redisstore と awsclient_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.6 設定と秘密の値の読み込みを作る
 
@@ -132,7 +127,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/platform/config/...` が成功する
   - 受入基準とテストの対応: 要件5の受入基準1(本番の設定を Java 版のままでも動く形で先に入れる)と要件12の受入基準2(同じアカウントでログインできる設定を読む)は、`config_test.go` の `TestLoad_ProdReadsSecretKeys`、`TestLoad_MissingKeyErrorHasNoValue`、`TestLoad_DevReadsJavaEnvNames`、`TestLoad_DefaultEnvIsDev`、`TestLoad_OIDCEndpointOverride` で確かめる
   - _要件: 5.1, 12.2_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.7 ログの形を作る (並行可)
 
@@ -141,7 +135,6 @@
   - 受入基準とテストの対応: 要件5の受入基準8(Java 版と同じ場所と形のログ)は、`logging_test.go` の `TestHandler_ECSFieldNames` と `TestHandler_ErrorFields` で確かめる
   - _要件: 5.8_
   - _対象の部品: logging_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.8 HTTP の受け口の共通部分を作る
 
@@ -149,7 +142,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/httpapi/...` が成功する
   - 受入基準とテストの対応: 要件9の受入基準4(偽の要求を断る)は `csrf_test.go` の `TestCSRF_MismatchReturns403WithNewCookie`、`TestCSRF_GetPasses`、`TestCSRF_RunsBeforeAuth` で、要件9の受入基準1と2(同じ URL とエラーの形)は `server_test.go` の `TestUnimplementedReturns501`、`TestBadJSONReturns400MessageErrors` で、要件9の受入基準5(Go の標準の形への変更を許す)の土台は `TestPanicReturns500JavaBody` で、要件14の受入基準3(本番で説明画面を開けない)は `TestUnknownRouteReturns404`(`/swagger-ui/index.html` と `/v3/api-docs` に 404)で、生きているかの確認は `health_test.go` の `TestHealth_UpAndDown` で確かめる
   - _要件: 9.1, 9.2, 9.4, 9.5, 14.2, 14.3_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.9 PDF を作る部品を作る (並行可)
 
@@ -158,7 +150,6 @@
   - 受入基準とテストの対応: 要件10の受入基準1(同じ見た目の PDF)の土台と要件13の受入基準1(PDF の出力がエラーにならない)は、`pdf_test.go` の `TestRender_A4`、`TestRender_ThirdWaitsForFirst`、`TestRender_TimeoutReturnsError`、`TestRender_RestartsAfterCrash`、`TestRender_BlocksNetwork`、`TestNew_NoBrowserReturnsError` で確かめる。CI の機械の Google Chrome で動くことは、タスク2.13の PR の CI の `backend-go` で確かめる。見た目が Java 版と同じことは、Claude が、出力のまとまりの spec で作る比べる検査で確かめる
   - _要件: 10.1, 13.1_
   - _対象の部品: pdf_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.10 起動の入口を作る
 
@@ -166,7 +157,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test ./cmd/keirekipro/...` が成功する
   - 受入基準とテストの対応: 要件5の受入基準7(出荷が途中で失敗したら Java 版のまま)の土台は `main_test.go` の `TestRun_ExitsWithCode1OnMigrateError`、`TestRun_ExitsWithCode1OnDBUnreachable` で、要件5の受入基準6(戻してもログアウトされない)の土台の止め方は `TestRun_GracefulShutdownWaits` で、要件5の受入基準8(ログ)は `TestRun_LogsStartupFailureReason` で、要件9の受入基準4(偽の要求を断る中間処理がつながる)は `TestRun_MiddlewareOrder` で確かめる
   - _要件: 5.6, 5.7, 5.8, 9.4_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.11 Go 版の本番のイメージを作る
 
@@ -174,7 +164,6 @@
   - 完了の確かめ方: `docker build -f docker/backend-go/Dockerfile.prod backend` が成功し、できたイメージを接続先なしで起動すると終了コード1で終わり、`docker run --entrypoint fc-list` で4つのフォントが出る
   - 受入基準とテストの対応: 要件3の受入基準1(本番と同じ形のイメージを組み立てて動かす検査)と要件5の受入基準2(1回の出荷で切り替えられるイメージ)と要件10の受入基準1(同じフォント)は、`docker build` の成功と `fc-list` の出力で確かめる
   - _要件: 3.1, 5.2, 10.1_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.12 開発の手順と進み具合の表を書き、機能のまとまりの子の Issue を起票する
 
@@ -190,7 +179,6 @@
   - 完了の確かめ方: `gh api repos/{owner}/{repo}/issues/445/sub_issues` が5つの Issue を返し、progress.md のまとまりの表に5つの Issue の番号がある
   - 受入基準とテストの対応: この小タスクの受入基準は、Claude の進め方の決まりと文書であり、テストのコードは無い。要件1の受入基準1と2と6(6つの段階、PR の本文の2つの行、一方を直すときはもう一方も直す)、要件2の受入基準1から5(設計の前に試しに作って確かめる)、要件4の受入基準1と2(まとまりごとの子の Issue と spec、要件を書き写さない)、要件7の受入基準1と3から5(所有者がする6つの操作、承認が要る理由と本番で起きること、進み具合を1か所で見られる、会話が途切れても続ける)、要件8の受入基準1から3(決めた方式のとおりに作れないときなどに止まって報告する)は progress.md の本文で、要件4の受入基準1(子の Issue)は `gh api` の sub-issues の結果で、要件6の受入基準4(Go 版の説明を足す)と要件13の受入基準5(2回の出荷の決まり)は `backend/CLAUDE.md` の本文で確かめる
   - _要件: 1.1, 1.2, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 4.1, 4.2, 6.4, 7.1, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3, 13.5_
-  - _保留: 2.1 と同じ_
 
 - [ ] 2.13 Go 版の品質チェックを通し、PR を出す
 
@@ -198,7 +186,6 @@
   - 完了の確かめ方: `make check` が成功し、Go 版の品質チェックの記録が書かれ、PR の CI の `backend-go` と `backend-test` が成功する
   - 受入基準とテストの対応: 要件3の受入基準1から3(9種類の品質チェックをそろえる、1つのコマンドで動かせる、合格の基準を緩くしない)は、`make check` と、CI の `backend-go` の仕事の `make mutation-diff` の結果で確かめる。要件7の受入基準3(承認が要る理由と、main に入れたときに本番で起きることを示す)は、`gh pr view` で読んだ PR の本文で確かめる
   - _要件: 3.1, 3.2, 3.3, 7.3_
-  - _保留: 2.1 と同じ_
 
 - [ ] 3. Java 版と Go 版を比べる検査を入れる(PR 2-3)
 - [ ] 3.1 比べる検査の土台を作る
