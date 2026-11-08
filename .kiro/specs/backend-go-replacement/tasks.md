@@ -62,7 +62,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(公開から72時間たっていない部品を止める)は、`test-lib-gomod-index.sh` の「72時間より新しい組を新しいと返す」「72時間より古い組を古いと返す」「索引を1度だけ読む」の場合と、`test-check-dependency-cooldown.sh` に足す「gomod の部品が新しければ止める」の場合で確かめる
   - _要件: 3.1_
 
-- [ ] 1.8 Dependabot の PR の公開の時刻の検査を gomod に対応させる
+- [x] 1.8 Dependabot の PR の公開の時刻の検査を gomod に対応させる
 
   Claude は、`.github/scripts/check-release-age.sh` を、タスク1.7で作る `lib-gomod-index.sh` で gomod の部品の公開の時刻を調べる形にした完成版を、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、`test-check-release-age.sh` が成功する
@@ -640,6 +640,7 @@
 - PR の本文: この spec の PR の本文には、`Spec: .kiro/specs/backend-go-replacement` と `Refs: #445` を書く。所有者の承認が要る PR では、「承認が要る理由」と「main に入れたときに本番で起きること」の2つの欄を書き、PR を作ったときの所有者への返事に、この2つの欄をそのまま写す
 - 公開のリポジトリ: Claude は、まだ直していないセキュリティの穴を、Issue、PR、コミット、spec の本文に書かない
 - 公開の時刻の検査のテストの環境(タスク1.7で分かったこと): `test-check-dependency-cooldown.sh` は openssl と gnupg を使う。Linux のコンテナで流すときは、`apk add` に `openssl gnupg` を足す
+- Go のモジュールの索引の読み方(タスク1.8で分かったこと): index.golang.org は1回の問い合わせに約4秒かかり、73時間分を順に読むと約10分かかって、判定の手順の5分の上限に収まらない。そのため `lib-gomod-index.sh` は、73時間を4時間ずつの区間(`GOMOD_INDEX_SEGMENT_HOURS`)に分け、約19本を同時に読む。design.md の「索引を順に読む」の書き方とは違う。区間の中のページは、最後の行の時刻を秒に切り上げた値が区間の終わりと同じときも、次のページを読む(`-le`)。check-release-age.sh は、go.mod の go・toolchain・module・exclude・retract・tool・godebug・ignore の行を照らさない。Dependabot が toolchain の行を変えるかは確かめていない
 - design の審査で残った記録: 次の5つを、それぞれ次のタスクで扱う。
   - D3-3-1: 6-1 の `backend-vuln-fix` が版を上げる場所の一覧である。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」に書き足したとおりに、タスク10.7で扱う
   - D5-1-1: 6-1 での `backend-vuln-fix.yaml` の Java 版の仕事の扱いである。タスク10.7で扱う
