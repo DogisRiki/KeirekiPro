@@ -3,14 +3,14 @@
 # 品質チェックのコマンドを1回きりのコンテナで動かすスクリプト(run-check.sh)
 #
 # 使い方: bash .claude/scripts/parallel/run-check.sh [--wait] <領域> <コマンド>...
-#   <領域>     frontend / backend / terraform
-#   <コマンド> 品質チェックのコマンド(例 pnpm run lint、./gradlew check、terraform fmt -check -recursive)
+#   <領域>     frontend / backend / backend-go / terraform
+#   <コマンド> 品質チェックのコマンド(例 pnpm run lint、./gradlew check、make check、terraform fmt -check -recursive)
 # 枠を取ってから、いまの作業フォルダを読み込んだ1回きりのコンテナ(docker compose -p keirekipro run)で
 # コマンドを動かし、終わったら枠を返す。コマンドの中身は書き換えない。
 #
 # 終了コード: コマンドの終了コード、10(枠が埋まっていて待たなかった)、
 #             69(検査の環境を用意できなかった)、75(待ちの上限に達した)。
-# 最後の品質チェック(frontend の pnpm run coverage、backend の ./gradlew check、
+# 最後の品質チェック(frontend の pnpm run coverage、backend の ./gradlew check、backend-go の make check、
 # terraform の checkov で始まるコマンド)が0で終わったときだけ、作業フォルダの
 # .claude/.state/gate-run-<領域>.txt に UNIX 秒を書く。
 #
@@ -123,6 +123,7 @@ _kp_rc_is_final() { # <領域> <コマンド>...
     case "$area:$*" in
         "frontend:pnpm run coverage" | "frontend:pnpm run coverage "*) return 0 ;;
         "backend:./gradlew check" | "backend:./gradlew check "*) return 0 ;;
+        "backend-go:make check" | "backend-go:make check "*) return 0 ;;
         "terraform:checkov" | "terraform:checkov "*) return 0 ;;
     esac
     return 1
@@ -141,8 +142,8 @@ kp_run_check_main() {
     area="${1:-}"
     shift || true
     case "$area" in
-        frontend | backend | terraform) service=$area ;;
-        *) _kp_rc_fail69 "領域 '$area' は frontend backend terraform のどれでもない(使い方: run-check.sh [--wait] <領域> <コマンド>...)" ;;
+        frontend | backend | backend-go | terraform) service=$area ;;
+        *) _kp_rc_fail69 "領域 '$area' は frontend backend backend-go terraform のどれでもない(使い方: run-check.sh [--wait] <領域> <コマンド>...)" ;;
     esac
     [ $# -ge 1 ] || _kp_rc_fail69 "コマンドが無い(使い方: run-check.sh [--wait] <領域> <コマンド>...)"
 
@@ -152,8 +153,8 @@ kp_run_check_main() {
     key=$(kp_folder_key 2>&1) || _kp_rc_fail69 "$key"
     n=$(kp_slots 2>&1) || _kp_rc_fail69 "$n"
 
-    # 2. backend は Testcontainers が使う本体のプロジェクトの dind が動いているかを確かめ、止まっていれば起こす
-    if [ "$area" = backend ]; then
+    # 2. backend と backend-go は Testcontainers が使う本体のプロジェクトの dind が動いているかを確かめ、止まっていれば起こす
+    if [ "$area" = backend ] || [ "$area" = backend-go ]; then
         out=$(docker compose -p keirekipro ps --status running -q dind 2>&1) \
             || _kp_rc_fail69 "dind が動いているかを確かめられない: $out"
         if [ -z "$out" ]; then
@@ -219,6 +220,11 @@ kp_run_check_main() {
             ;;
         backend)
             args=(-v "kp-gradle-home-$k:/root/.gradle" -v "kp-gradle-project-$key:/home/spring/app/.gradle")
+            ;;
+        backend-go)
+            # Java 版と Go 版を比べる検査が ./backend の外の docker/ の Dockerfile からイメージを組み立てるので、
+            # 作業フォルダの最上位を読み取り専用で /repo に差し込み、その場所を KEIREKIPRO_REPO_ROOT で渡す
+            args=(-v "$folder:/repo:ro" -e "KEIREKIPRO_REPO_ROOT=/repo")
             ;;
         terraform)
             args=(-v "kp-tf-plugins-$k:/tf-plugin-cache" -e "TF_PLUGIN_CACHE_DIR=/tf-plugin-cache")
