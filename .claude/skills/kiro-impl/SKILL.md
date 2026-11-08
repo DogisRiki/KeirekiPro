@@ -195,7 +195,7 @@ Before writing any code, read the relevant sections of requirements.md and desig
 - If validation returns MANUAL_VERIFY_REQUIRED → stop and report the missing verification step
 
 **Manual mode**:
-- Suggest running `/kiro-validate-impl {feature}` but do not auto-execute
+- Suggest running `/kiro-validate-impl {feature}` but do not auto-execute. Show the command alone in a code block with no language name, so the owner can copy it in one action
 
 ## Feature Flag Protocol
 
@@ -235,7 +235,7 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 
 **Tasks Not Approved or Missing Spec Files**:
 - **Stop Execution**: All spec files must exist and tasks must be approved
-- **Suggested Action**: 「spec のファイルがそろっていないか、タスクがまだ承認されていません。`/kiro-spec-requirements`、`/kiro-spec-design`、`/kiro-spec-tasks` のうち、終わっていない段階のコマンドを打ち、その段階を承認してください。」
+- **Suggested Action**: 「spec のファイルがそろっていないか、タスクがまだ承認されていません。次のコマンドを上から順に1つずつ打ち、段階ごとに承認してください。」 Follow it with the commands of the stages that are not finished, each alone in its own code block with no language name, in the order `/kiro-spec-requirements {feature}`, `/kiro-spec-design {feature}`, `/kiro-spec-tasks {feature}`
 
 **Test Failures**:
 - **Stop Implementation**: Fix failing tests before continuing

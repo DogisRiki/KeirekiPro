@@ -169,11 +169,11 @@ Next: Review generated specs, then start implementation with /kiro-impl <feature
 - Log the error, skip the failed feature
 - Continue with remaining features in the wave
 - Report failed features in the summary
-- Suggest: "Run `/kiro-spec-init <feature>` manually for failed features."
+- Suggest: "Run `/kiro-spec-init <feature>` manually for failed features." Show each command alone in its own code block with no language name, with the feature name filled in
 
 **Circular dependencies**:
 - If dependency graph has cycles, report the cycle and stop
 - Suggest: "Fix dependency ordering in roadmap.md"
 
 **Roadmap not found**:
-- Stop and report: 「`.kiro/steering/roadmap.md` が見つかりません。このスキルは、roadmap.md に並べた spec をまとめて作るので、roadmap.md が無いと spec を作れません。spec は、`/kiro-spec-init #<Issue番号>` を打って、1つずつ作ってください。」
+- Stop and report: 「`.kiro/steering/roadmap.md` が見つかりません。このスキルは、roadmap.md に並べた spec をまとめて作るので、roadmap.md が無いと spec を作れません。spec は、Issue ごとに次のコマンドを打って、1つずつ作ってください。」 Follow it with `/kiro-spec-init #<Issue番号>` alone in a code block with no language name
