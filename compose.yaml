@@ -36,6 +36,42 @@ services:
     networks:
       - my-network
 
+  # Go 版の backend。Java 版から切り替えるまでは、Java 版(8080)と並べてホストの 8081 で開く
+  backend-go:
+    container_name: backend-go
+    build:
+      context: .
+      dockerfile: docker/backend-go/Dockerfile
+    ports:
+      - 8081:8080
+    tty: true
+    working_dir: /app
+    command: go run ./cmd/keirekipro
+    volumes:
+      - ./backend:/app
+      # Go のモジュールとビルドのキャッシュ(Dockerfile の GOMODCACHE と GOCACHE が /cache の下を指す)
+      - type: volume
+        source: backend-go-cache
+        target: /cache
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      - KEIREKIPRO_ENV=dev
+      # db と redis と localstack への接続。名前は Java 版の application.yaml と同じで、
+      # Java 版の既定の localhost では、このコンテナの中を指してしまうため、サービスの名前を書く。
+      # ポートとデータベースの名前と利用者とパスワードは、Java 版の既定と db と redis のサービスの値が同じなので書かない
+      - DB_HOST=db
+      - REDIS_HOST=redis
+      - KEIREKIPRO_AWS_ENDPOINT=http://localstack:4566
+      # testcontainers-go は dind を Docker として使う
+      - DOCKER_HOST=tcp://dind:2375
+      # 接続先のホストを dind に固定する
+      - TESTCONTAINERS_HOST_OVERRIDE=dind
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+    networks:
+      - my-network
+
   frontend:
     container_name: react
     build:
@@ -145,6 +181,8 @@ volumes:
     name: named-localstack
   backend-gradle-cache:
     name: named-backend-gradle-cache
+  backend-go-cache:
+    name: named-backend-go-cache
 
 configs:
   postgres_config:
