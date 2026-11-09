@@ -106,7 +106,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(書式、静的な検査、依存の向き、カバレッジ、変異テスト、脆弱性)は、Makefile のタスクの一覧と、depguard の違反を置いたときの `make lint` の失敗で、要件3の受入基準3(下限 93% と分岐の割合の代わり)は、`.testcoverage.yml` の `threshold` と `make mutation-diff` の `--threshold-efficacy 80 --threshold-mcover 93` で確かめる。`.golangci.yml` に `run.build-tags: [compat]` を書くのは、design の審査の D3-1-6(比べる検査のコードを `make lint` が読むか)への答えである
   - _要件: 3.1, 3.2, 3.3_
 
-- [ ] 2.4 表の形の履歴の部品を作る
+- [x] 2.4 表の形の履歴の部品を作る
 
   Claude は、`backend/migrations.go`(`//go:embed src/main/resources/db/migration/*.sql`)と `backend/internal/platform/migrate/` を作る。この部品は、design.md の「migrate」のとおり、検査の値を計算し、`ValidateOnly` と `Apply` の2つの動かし方を持ち、`pg_advisory_lock` で1つずつ動く。`description` には、ファイル名から `V<版>__` と `.sql` を除き、`_` を空白にしたものを書く。この書き方は、design の審査で D3-3-2 として残った、`description` をどう書くかへの答えである。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/platform/migrate/...` が成功する
@@ -638,6 +638,9 @@
 - コードの生成(タスク2.2で分かったこと): oapi-codegen は、設定のファイルに `output` があると `-o` を使わない。そのため `api/oapi-codegen.yaml` には `output` を書かず、Makefile が `-o` で出力の場所を渡す。sqlc は、問い合わせのファイルが1つも無いと失敗するので、Makefile は `db/queries/*.sql` があるときだけ sqlc を動かす。sqlc は設定のファイルのフォルダから相対のパスを読むので、`generate-check` は設定とマイグレーションと問い合わせを `cp --parents` で一時のフォルダに写して生成する。問い合わせを作るタスク(2.5 以降)で、Claude は `db/queries/` に SQL を置き、`make generate` で `internal/platform/database/sqlcgen/` を作る
 - 比べる検査の3つの入口(タスク2.3で決めたこと): Makefile の `compat` `compat-cross` `compat-perf` は、テストの関数の名前で分ける。Claude は、タスク3で、`cross_test.go` のテストを `TestCross`、`perf_test.go` のテストを `TestPerf` で始まる名前にし、`compat_test.go` のテストをそれ以外の名前にする
 - カバレッジの測り方(タスク2.3で決めたこと): `make coverage` は、`coverage.out` から1行目と `internal/` の下のファイルの行だけを `coverage.internal.out` に写し、go-test-coverage にそのファイルを読ませる。go-test-coverage の除外の規則は、モジュールの名前を除いた `internal/...` の形のパスと比べる
+- 表の形の履歴の BASELINE の行(タスク2.4で決めたこと): Java 版は `baseline-on-migrate: true` と `baseline-version: 0` で動くので、本番の履歴に種類 `BASELINE` の行があるかもしれない。migrate は、`BASELINE` の行を受け付け、その版以下のファイルを適用済みとして扱う。design.md の失敗の一覧には無い扱いである。開発環境の履歴には `BASELINE` の行は無い
+- Go のテストの BOM と検査の値(タスク2.4で分かったこと): Go のソースの文字列に BOM のバイトをそのまま書くと、コンパイラが「illegal byte order mark」で止まるので、`"\xEF\xBB\xBF"` と書く。CRC32 は `hash.Write` でなく `crc32.Update` で計算する。`hash.Write` の誤りを捨てると gosec の G104 が止めるためである
+- testcontainers-go の Postgres(タスク2.4で決めたこと): テストの Postgres のイメージは、`docker/db/Dockerfile` と同じ版の `postgres:17.11-alpine` にする。パッケージの `TestMain` で1つのコンテナを動かし、テストごとに `CREATE DATABASE` で空のデータベースを作る
 - depguard の機能のパッケージの規則(タスク2.3で分かったこと): `.golangci.yml` の depguard の規則 `feature` は、機能のパッケージが自分の下のパッケージを読むこと(例: `internal/auth` から `internal/auth/x`)も断る。機能のパッケージを作るまとまりの spec で、Claude は、その読み込みの許可を `allow` に足す
 
 ## 完了条件(全タスク共通)
