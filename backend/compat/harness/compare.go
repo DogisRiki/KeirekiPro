@@ -78,6 +78,8 @@ type Comparer struct {
 	Scenario string
 	// PDF は、PDF の本文の比べ方である。nil のときは、PDF の本文を比べられないことを違いとして報告する。
 	PDF PDFComparer
+	// Behaviors は、変えた動きの一覧である。一覧の match に当たる違いは、報告で止める違いにしない。
+	Behaviors []ChangedBehavior
 
 	java  *Normalizer
 	goVer *Normalizer
@@ -212,6 +214,8 @@ func (c *Comparer) compareJSON(step StepRef, java, goBody []byte) {
 		c.compareText(step, java, goBody)
 		return
 	}
+	sortOrderOnly(c.Behaviors, step, c.java, jv)
+	sortOrderOnly(c.Behaviors, step, c.goVer, gv)
 	diffJSON("$", c.java.value(jv, true), c.goVer.value(gv, true), func(path string, j, g any) {
 		c.add(step, TargetBody, path, describeJSON(j), describeJSON(g))
 	})

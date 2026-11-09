@@ -17,6 +17,8 @@ type Report struct {
 	Scenario string
 	// Diffs は、段の順に並べた違いである。同じ段の中では、見つけた順のままにする。
 	Diffs []Diff
+	// Allowed は、変えた動きの一覧の match が許した違いである。止める違いにしないが、報告に残す。段の順に並べる。
+	Allowed []AllowedDiff
 }
 
 // NewReport は、筋書き scenario の違いを、段の順に並べた報告にする。
@@ -26,9 +28,21 @@ func NewReport(scenario string, diffs []Diff) Report {
 	return Report{Scenario: scenario, Diffs: sorted}
 }
 
-// Report は、これまでに見つけた違いの報告を返す。
+// Report は、これまでに見つけた違いの報告を返す。変えた動きの一覧の match に当たる違いは、Allowed に分ける。
 func (c *Comparer) Report() Report {
-	return NewReport(c.Scenario, c.diffs)
+	var failed []Diff
+	var allowed []AllowedDiff
+	for _, d := range c.diffs {
+		if id := allowedBy(c.Behaviors, d); id != "" {
+			allowed = append(allowed, AllowedDiff{ID: id, Diff: d})
+		} else {
+			failed = append(failed, d)
+		}
+	}
+	r := NewReport(c.Scenario, failed)
+	slices.SortStableFunc(allowed, func(a, b AllowedDiff) int { return a.Diff.Step.Index - b.Diff.Step.Index })
+	r.Allowed = allowed
+	return r
 }
 
 // Failed は、報告に違いがあるかを返す。
@@ -42,24 +56,36 @@ func (r Report) String() string {
 	fmt.Fprintf(&b, "筋書き: %s\n", r.Scenario)
 	if !r.Failed() {
 		b.WriteString("違い: 0 件\n")
-		return b.String()
+	} else {
+		first := r.Diffs[0].Step
+		fmt.Fprintf(&b, "違い: %d 件(最初に違いが見つかった段: %s)\n", len(r.Diffs), describeStep(first))
+		for i, d := range r.Diffs {
+			fmt.Fprintf(&b, "\n[%d] 筋書き: %s / 段: %s\n", i+1, r.Scenario, describeStep(d.Step))
+			writeDiff(&b, d)
+		}
 	}
-	first := r.Diffs[0].Step
-	fmt.Fprintf(&b, "違い: %d 件(最初に違いが見つかった段: %s)\n", len(r.Diffs), describeStep(first))
-	for i, d := range r.Diffs {
-		fmt.Fprintf(&b, "\n[%d] 筋書き: %s / 段: %s\n", i+1, r.Scenario, describeStep(d.Step))
-		fmt.Fprintf(&b, "    比べたもの: %s", d.Target)
-		if d.Path != "" {
-			fmt.Fprintf(&b, " / 場所: %s", d.Path)
+	if len(r.Allowed) > 0 {
+		fmt.Fprintf(&b, "\n変えた動きの一覧が許した違い: %d 件\n", len(r.Allowed))
+		for i, a := range r.Allowed {
+			fmt.Fprintf(&b, "\n[許した違い %d] %s / 段: %s\n", i+1, a.ID, describeStep(a.Diff.Step))
+			writeDiff(&b, a.Diff)
 		}
-		if d.Step.JavaStatus != 0 || d.Step.GoStatus != 0 {
-			fmt.Fprintf(&b, " / ステータス: Java 版 %d、Go 版 %d", d.Step.JavaStatus, d.Step.GoStatus)
-		}
-		b.WriteString("\n")
-		writeValue(&b, "Java 版", d.Java)
-		writeValue(&b, "Go 版", d.Go)
 	}
 	return b.String()
+}
+
+// writeDiff は、1つの違いの、比べたものと場所とステータスと、両方の版の値を書く。
+func writeDiff(b *strings.Builder, d Diff) {
+	fmt.Fprintf(b, "    比べたもの: %s", d.Target)
+	if d.Path != "" {
+		fmt.Fprintf(b, " / 場所: %s", d.Path)
+	}
+	if d.Step.JavaStatus != 0 || d.Step.GoStatus != 0 {
+		fmt.Fprintf(b, " / ステータス: Java 版 %d、Go 版 %d", d.Step.JavaStatus, d.Step.GoStatus)
+	}
+	b.WriteString("\n")
+	writeValue(b, "Java 版", d.Java)
+	writeValue(b, "Go 版", d.Go)
 }
 
 func describeStep(s StepRef) string {
