@@ -46,10 +46,10 @@ info:
 
     ## CSRF
 
-    - `/api/auth/**` を除く、状態を変える要求(POST・PUT・PATCH・DELETE)は、Cookie `XSRF-TOKEN` の値を
+    - `/api/auth/**` を除く、GET・HEAD・OPTIONS のほかの要求(POST・PUT・PATCH・DELETE など)は、Cookie `XSRF-TOKEN` の値を
       ヘッダー `X-XSRF-TOKEN` にそのまま入れて送る(double submit cookie。マスクしない)。
     - 無いか一致しないときは 403 と `{"message":"アクセス権限がありません。"}` を返す。
-      このとき、要求に `XSRF-TOKEN` Cookie が無ければ、新しい `XSRF-TOKEN` を `Set-Cookie` で返す。
+      このとき、新しい `XSRF-TOKEN` を `Set-Cookie` で返す。
       CSRF の検査は認証の検査より先に行うため、未認証でも CSRF が無ければ 401 ではなく 403 になる。
     - `XSRF-TOKEN` Cookie(HttpOnly なし、`Path=/`)は、要求に無ければ、OPTIONS 以外の
       すべての応答(`/api/auth/**` と GET を含む)で発行される。
@@ -1397,8 +1397,8 @@ components:
       in: header
       required: false
       description: |
-        Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-        Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+        Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+        サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
         (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
       schema:
         type: string
@@ -1560,7 +1560,7 @@ components:
         だけで、`errors` は無い。Content-Type は `application/json;charset=UTF-8`。
       headers:
         Set-Cookie:
-          description: 要求に `XSRF-TOKEN` Cookie が無ければ、新しい `XSRF-TOKEN=<値>; Path=/` が付く。
+          description: CSRF のトークンが無いか一致しないときは、新しい `XSRF-TOKEN=<値>; Path=/` が付く。
           schema:
             type: string
       content:

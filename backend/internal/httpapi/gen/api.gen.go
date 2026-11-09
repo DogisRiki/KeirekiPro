@@ -887,8 +887,8 @@ type RefreshTokenParams struct {
 
 // CreateResumeParams defines parameters for CreateResume.
 type CreateResumeParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -899,8 +899,8 @@ type CreateResumeParams struct {
 
 // RestoreResumeParams defines parameters for RestoreResume.
 type RestoreResumeParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -911,8 +911,8 @@ type RestoreResumeParams struct {
 
 // DeleteResumeParams defines parameters for DeleteResume.
 type DeleteResumeParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -923,8 +923,8 @@ type DeleteResumeParams struct {
 
 // UpdateResumeBasicParams defines parameters for UpdateResumeBasic.
 type UpdateResumeBasicParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -935,8 +935,8 @@ type UpdateResumeBasicParams struct {
 
 // CreateCareerParams defines parameters for CreateCareer.
 type CreateCareerParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -947,8 +947,8 @@ type CreateCareerParams struct {
 
 // DeleteCareerParams defines parameters for DeleteCareer.
 type DeleteCareerParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -959,8 +959,8 @@ type DeleteCareerParams struct {
 
 // UpdateCareerParams defines parameters for UpdateCareer.
 type UpdateCareerParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -971,8 +971,8 @@ type UpdateCareerParams struct {
 
 // CreateCertificationParams defines parameters for CreateCertification.
 type CreateCertificationParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -983,8 +983,8 @@ type CreateCertificationParams struct {
 
 // DeleteCertificationParams defines parameters for DeleteCertification.
 type DeleteCertificationParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -995,8 +995,8 @@ type DeleteCertificationParams struct {
 
 // UpdateCertificationParams defines parameters for UpdateCertification.
 type UpdateCertificationParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1007,8 +1007,8 @@ type UpdateCertificationParams struct {
 
 // ExportResumeWithSettingsParams defines parameters for ExportResumeWithSettings.
 type ExportResumeWithSettingsParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1019,8 +1019,8 @@ type ExportResumeWithSettingsParams struct {
 
 // CreatePortfolioParams defines parameters for CreatePortfolio.
 type CreatePortfolioParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1031,8 +1031,8 @@ type CreatePortfolioParams struct {
 
 // DeletePortfolioParams defines parameters for DeletePortfolio.
 type DeletePortfolioParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1043,8 +1043,8 @@ type DeletePortfolioParams struct {
 
 // UpdatePortfolioParams defines parameters for UpdatePortfolio.
 type UpdatePortfolioParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1055,8 +1055,8 @@ type UpdatePortfolioParams struct {
 
 // CreateProjectParams defines parameters for CreateProject.
 type CreateProjectParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1067,8 +1067,8 @@ type CreateProjectParams struct {
 
 // DeleteProjectParams defines parameters for DeleteProject.
 type DeleteProjectParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1079,8 +1079,8 @@ type DeleteProjectParams struct {
 
 // UpdateProjectParams defines parameters for UpdateProject.
 type UpdateProjectParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1091,8 +1091,8 @@ type UpdateProjectParams struct {
 
 // CreateSelfPromotionParams defines parameters for CreateSelfPromotion.
 type CreateSelfPromotionParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1103,8 +1103,8 @@ type CreateSelfPromotionParams struct {
 
 // DeleteSelfPromotionParams defines parameters for DeleteSelfPromotion.
 type DeleteSelfPromotionParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1115,8 +1115,8 @@ type DeleteSelfPromotionParams struct {
 
 // UpdateSelfPromotionParams defines parameters for UpdateSelfPromotion.
 type UpdateSelfPromotionParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1127,8 +1127,8 @@ type UpdateSelfPromotionParams struct {
 
 // CreateSnsPlatformParams defines parameters for CreateSnsPlatform.
 type CreateSnsPlatformParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1139,8 +1139,8 @@ type CreateSnsPlatformParams struct {
 
 // DeleteSnsPlatformParams defines parameters for DeleteSnsPlatform.
 type DeleteSnsPlatformParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1151,8 +1151,8 @@ type DeleteSnsPlatformParams struct {
 
 // UpdateSnsPlatformParams defines parameters for UpdateSnsPlatform.
 type UpdateSnsPlatformParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1163,8 +1163,8 @@ type UpdateSnsPlatformParams struct {
 
 // DeleteUserParams defines parameters for DeleteUser.
 type DeleteUserParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1175,8 +1175,8 @@ type DeleteUserParams struct {
 
 // UpdateUserInfoParams defines parameters for UpdateUserInfo.
 type UpdateUserInfoParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1187,8 +1187,8 @@ type UpdateUserInfoParams struct {
 
 // RemoveAuthProviderParams defines parameters for RemoveAuthProvider.
 type RemoveAuthProviderParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1199,8 +1199,8 @@ type RemoveAuthProviderParams struct {
 
 // SetEmailAndPasswordParams defines parameters for SetEmailAndPassword.
 type SetEmailAndPasswordParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1211,8 +1211,8 @@ type SetEmailAndPasswordParams struct {
 
 // SendAccountEmailVerificationParams defines parameters for SendAccountEmailVerification.
 type SendAccountEmailVerificationParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 
@@ -1223,8 +1223,8 @@ type SendAccountEmailVerificationParams struct {
 
 // ChangePasswordParams defines parameters for ChangePassword.
 type ChangePasswordParams struct {
-	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の状態を変える要求に要る。
-	// Java 版は、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
+	// XXSRFTOKEN Cookie `XSRF-TOKEN` の値をそのまま入れる(CSRF 対策)。`/api/auth/**` 以外の、GET・HEAD・OPTIONS のほかの要求に要る。
+	// サーバーは、無いか Cookie と一致しないときに 403 と `{"message":"アクセス権限がありません。"}` を返す
 	// (要求の形の誤りとしての 400 にはしない。そのためこの文書では `required: false` にしている)。
 	XXSRFTOKEN *XsrfTokenHeader `json:"X-XSRF-TOKEN,omitempty"`
 

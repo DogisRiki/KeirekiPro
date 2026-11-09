@@ -7,14 +7,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/middleware"
 )
 
-// uuidCookie は、Java 版の CookieCsrfTokenRepository と同じ形の Set-Cookie である。
-var uuidCookie = regexp.MustCompile(`^XSRF-TOKEN=[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}; Path=/$`)
+const uuidPattern = `[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`
+
+// newCookie は、新しいトークンの Set-Cookie の行の形である。
+var newCookie = regexp.MustCompile(`^XSRF-TOKEN=` + uuidPattern + `; Path=/$`)
 
 const sampleCSRF = "4f1c2b7e-1d2a-4c3b-9e8f-0a1b2c3d4e5f"
 
@@ -53,39 +56,44 @@ func assertForbidden(t *testing.T, rec *httptest.ResponseRecorder, passed bool) 
 		t.Errorf("Content-Type = %q, want application/json;charset=UTF-8", got)
 	}
 	if got := rec.Body.String(); got != `{"message":"アクセス権限がありません。"}` {
-		t.Errorf("本文 = %s, want Java 版と同じ本文", got)
+		t.Errorf("本文 = %s, want {\"message\":\"アクセス権限がありません。\"}", got)
 	}
 }
 
-// Cookie とヘッダが一致しない要求に、Java 版と同じ 403 と本文を返し、Cookie が無ければ新しい Cookie を付けることを確かめる。
+// assertNewCookie は、新しいトークンの Cookie を1つだけ付けたことを確かめる。
+func assertNewCookie(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if cookies := rec.Header().Values("Set-Cookie"); len(cookies) != 1 || !newCookie.MatchString(cookies[0]) {
+		t.Errorf("Set-Cookie = %q, want XSRF-TOKEN=<UUID>; Path=/ を1つ", cookies)
+	}
+}
+
+// Cookie とヘッダが一致しない要求に、403 と本文を返し、いつも新しいトークンの Cookie を付けることを確かめる。
 func TestCSRF_MismatchReturns403WithNewCookie(t *testing.T) {
 	t.Run("Cookie が無ければ新しい Cookie を付けて 403", func(t *testing.T) {
 		rec, passed := serve(t, withToken(httptest.NewRequest(http.MethodPost, "/api/resumes", nil), "", sampleCSRF))
 		assertForbidden(t, rec, passed)
-		cookies := rec.Header().Values("Set-Cookie")
-		if len(cookies) != 1 || !uuidCookie.MatchString(cookies[0]) {
-			t.Errorf("Set-Cookie = %q, want XSRF-TOKEN=<UUID>; Path=/ を1つ", cookies)
-		}
+		assertNewCookie(t, rec)
 	})
-	t.Run("空の Cookie は無いと同じに扱う", func(t *testing.T) {
+	t.Run("空の Cookie と空のヘッダは一致とみなさない", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPut, "/api/users/me", nil)
 		req.Header.Set("Cookie", "XSRF-TOKEN=")
 		rec, passed := serve(t, req)
 		assertForbidden(t, rec, passed)
-		if cookies := rec.Header().Values("Set-Cookie"); len(cookies) != 1 || !uuidCookie.MatchString(cookies[0]) {
-			t.Errorf("Set-Cookie = %q, want 新しい XSRF-TOKEN", cookies)
-		}
+		assertNewCookie(t, rec)
 	})
 	for _, tc := range []struct{ name, method, header string }{
 		{"ヘッダが違う", http.MethodPost, "different"},
 		{"ヘッダが無い", http.MethodDelete, ""},
 		{"PATCH も検査する", http.MethodPatch, "different"},
+		{"TRACE も検査する", http.MethodTrace, "different"},
 	} {
-		t.Run(tc.name+"なら、Cookie を替えずに 403", func(t *testing.T) {
+		t.Run(tc.name+"なら、新しい Cookie を付けて 403", func(t *testing.T) {
 			rec, passed := serve(t, withToken(httptest.NewRequest(tc.method, "/api/resumes/x", nil), sampleCSRF, tc.header))
 			assertForbidden(t, rec, passed)
-			if cookies := rec.Header().Values("Set-Cookie"); len(cookies) != 0 {
-				t.Errorf("Set-Cookie = %q, want なし(Java 版は Cookie があるときに作り直さない)", cookies)
+			assertNewCookie(t, rec)
+			if strings.Contains(rec.Header().Get("Set-Cookie"), sampleCSRF) {
+				t.Errorf("Set-Cookie = %q, want 要求の Cookie と違う新しいトークン", rec.Header().Get("Set-Cookie"))
 			}
 		})
 	}
@@ -98,34 +106,32 @@ func TestCSRF_MismatchReturns403WithNewCookie(t *testing.T) {
 			t.Errorf("Set-Cookie = %q, want なし", cookies)
 		}
 	})
-	for _, path := range []string{"/api/auth/login", "/api/auth", "/actuator/health"} {
-		t.Run(path+" は Java 版と同じく検査しないが、Cookie を付ける", func(t *testing.T) {
+	for _, path := range []string{"/api/auth/login", "/api/auth"} {
+		t.Run(path+" は検査しないが、Cookie を付ける", func(t *testing.T) {
 			rec, passed := serve(t, httptest.NewRequest(http.MethodPost, path, nil))
 			if !passed {
 				t.Errorf("%s の POST を断りました", path)
 			}
-			if cookies := rec.Header().Values("Set-Cookie"); len(cookies) != 1 || !uuidCookie.MatchString(cookies[0]) {
-				t.Errorf("Set-Cookie = %q, want 新しい XSRF-TOKEN", cookies)
-			}
+			assertNewCookie(t, rec)
 		})
 	}
-	t.Run("/api/authx は検査から外さない", func(t *testing.T) {
-		rec, passed := serve(t, httptest.NewRequest(http.MethodPost, "/api/authx", nil))
-		assertForbidden(t, rec, passed)
-	})
+	for _, path := range []string{"/api/authx", "/actuator/health"} {
+		t.Run(path+" は検査から外さない", func(t *testing.T) {
+			rec, passed := serve(t, httptest.NewRequest(http.MethodPost, path, nil))
+			assertForbidden(t, rec, passed)
+		})
+	}
 }
 
-// GET と HEAD と TRACE と OPTIONS を、トークンが無くても通すことを確かめる。
+// GET と HEAD と OPTIONS を、トークンが無くても通すことを確かめる。
 func TestCSRF_GetPasses(t *testing.T) {
-	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodTrace} {
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
 		t.Run(method+" はトークンが無くても通し、Cookie を付ける", func(t *testing.T) {
 			rec, passed := serve(t, httptest.NewRequest(method, "/api/resumes", nil))
 			if !passed || rec.Code != http.StatusNoContent {
 				t.Errorf("通った %t, ステータス %d, want 通して 204", passed, rec.Code)
 			}
-			if cookies := rec.Header().Values("Set-Cookie"); len(cookies) != 1 || !uuidCookie.MatchString(cookies[0]) {
-				t.Errorf("Set-Cookie = %q, want 新しい XSRF-TOKEN", cookies)
-			}
+			assertNewCookie(t, rec)
 		})
 	}
 	t.Run("Cookie があれば作り直さない", func(t *testing.T) {
@@ -174,6 +180,7 @@ func TestCSRF_RunsBeforeAuth(t *testing.T) {
 	if rec.Code != http.StatusForbidden || authCalled != 0 {
 		t.Errorf("トークンの無い POST: ステータス %d, ログインの検査を %d 回呼んだ, want 403 で 0 回", rec.Code, authCalled)
 	}
+	assertNewCookie(t, rec)
 
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, withToken(httptest.NewRequest(http.MethodPost, "/api/resumes", bytes.NewBufferString("{}")), sampleCSRF, sampleCSRF))
