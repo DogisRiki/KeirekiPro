@@ -1,0 +1,197 @@
+{
+  "version": "0.9",
+  "exportedAt": "2026-02-05T01:00:00Z",
+  "resume": {
+    "resumeName": "版の違うバックアップの経歴書",
+    "date": "2026-02-05",
+    "lastName": "高橋",
+    "firstName": "次郎",
+    "careers": [
+      {
+        "companyName": "株式会社もどす",
+        "startDate": "2016-04",
+        "endDate": "2020-03",
+        "active": false
+      },
+      {
+        "companyName": "Restore Works 株式会社",
+        "startDate": "2020-04",
+        "active": true
+      }
+    ],
+    "projects": [
+      {
+        "companyName": "株式会社もどす",
+        "startDate": "2016-04",
+        "endDate": "2019-09",
+        "active": false,
+        "name": "在庫の管理の画面の開発",
+        "overview": "倉庫の在庫を数える作業を、手書きの帳票から画面に置き換えた。",
+        "teamComp": "全体6名",
+        "role": "画面と処理の実装を受け持った。",
+        "achievement": "棚卸しにかかる時間を半分にした。\n数え間違いを月に20件から2件に減らした。",
+        "process": {
+          "requirements": false,
+          "basicDesign": true,
+          "detailedDesign": true,
+          "implementation": true,
+          "integrationTest": true,
+          "systemTest": false,
+          "maintenance": false
+        },
+        "techStack": {
+          "frontend": {
+            "languages": ["JavaScript"],
+            "frameworks": ["Vue.js"],
+            "libraries": [],
+            "buildTools": ["webpack"],
+            "packageManagers": ["npm"],
+            "linters": ["ESLint"],
+            "formatters": ["Prettier"],
+            "testingTools": ["Jest"]
+          },
+          "backend": {
+            "languages": ["PHP"],
+            "frameworks": ["Laravel"],
+            "libraries": [],
+            "buildTools": [],
+            "packageManagers": ["Composer"],
+            "linters": [],
+            "formatters": [],
+            "testingTools": ["PHPUnit"],
+            "ormTools": ["Eloquent"],
+            "auth": []
+          },
+          "infrastructure": {
+            "clouds": ["AWS"],
+            "operatingSystems": ["Linux"],
+            "containers": [],
+            "databases": ["MySQL"],
+            "webServers": ["Nginx"],
+            "ciCdTools": ["Jenkins"],
+            "iacTools": [],
+            "monitoringTools": [],
+            "loggingTools": []
+          },
+          "tools": {
+            "sourceControls": ["Git"],
+            "projectManagements": ["Backlog"],
+            "communicationTools": ["Slack"],
+            "documentationTools": [],
+            "apiDevelopmentTools": [],
+            "designTools": [],
+            "editors": ["Visual Studio Code"],
+            "developmentEnvironments": []
+          }
+        }
+      },
+      {
+        "companyName": "Restore Works 株式会社",
+        "startDate": "2020-04",
+        "active": true,
+        "name": "問い合わせの窓口の開発",
+        "overview": "問い合わせを受け付けて、担当者に振り分ける窓口のシステムを作った。",
+        "teamComp": "全体4名",
+        "role": "設計と実装を受け持った。",
+        "achievement": "返事までの時間を平均で2日から半日に短くした。",
+        "process": {
+          "requirements": true,
+          "basicDesign": true,
+          "detailedDesign": true,
+          "implementation": true,
+          "integrationTest": true,
+          "systemTest": true,
+          "maintenance": true
+        },
+        "techStack": {
+          "frontend": {
+            "languages": ["TypeScript"],
+            "frameworks": ["React"],
+            "libraries": [],
+            "buildTools": ["Vite"],
+            "packageManagers": ["pnpm"],
+            "linters": ["ESLint"],
+            "formatters": ["Prettier"],
+            "testingTools": ["Vitest"]
+          },
+          "backend": {
+            "languages": ["Go"],
+            "frameworks": [],
+            "libraries": [],
+            "buildTools": [],
+            "packageManagers": [],
+            "linters": ["golangci-lint"],
+            "formatters": [],
+            "testingTools": [],
+            "ormTools": [],
+            "auth": []
+          },
+          "infrastructure": {
+            "clouds": ["AWS"],
+            "operatingSystems": [],
+            "containers": ["Docker"],
+            "databases": ["PostgreSQL"],
+            "webServers": [],
+            "ciCdTools": ["GitHub Actions"],
+            "iacTools": ["Terraform"],
+            "monitoringTools": [],
+            "loggingTools": []
+          },
+          "tools": {
+            "sourceControls": ["Git"],
+            "projectManagements": ["Jira"],
+            "communicationTools": ["Slack"],
+            "documentationTools": ["Notion"],
+            "apiDevelopmentTools": [],
+            "designTools": ["Figma"],
+            "editors": ["Visual Studio Code"],
+            "developmentEnvironments": []
+          }
+        }
+      }
+    ],
+    "certifications": [
+      {
+        "name": "基本情報技術者試験",
+        "date": "2016-11"
+      },
+      {
+        "name": "データベーススペシャリスト試験",
+        "date": "2021-04"
+      }
+    ],
+    "portfolios": [
+      {
+        "name": "A 旅の記録",
+        "overview": "旅先の写真と行程を地図に残す。",
+        "techStack": "TypeScript、React",
+        "link": "https://example.com/portfolio/travel"
+      },
+      {
+        "name": "B 習慣の記録",
+        "overview": "毎日の習慣が続いているかを記録する。",
+        "link": "https://example.com/portfolio/habit"
+      }
+    ],
+    "snsPlatforms": [
+      {
+        "name": "GitHub",
+        "link": "https://github.com/example-restore"
+      },
+      {
+        "name": "Zenn",
+        "link": "https://zenn.dev/example-restore"
+      }
+    ],
+    "selfPromotions": [
+      {
+        "title": "A 小さく作って確かめる",
+        "content": "大きな機能も、小さく分けて作り、利用者に早く見てもらいます。\n見てもらった声を、次の作業に生かします。"
+      },
+      {
+        "title": "B 文書を残す",
+        "content": "決めたことと理由を文書に残し、あとから入った人が迷わないようにしています。"
+      }
+    ]
+  }
+}
