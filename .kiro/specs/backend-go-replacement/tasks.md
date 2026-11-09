@@ -136,7 +136,7 @@
   - _要件: 5.8_
   - _対象の部品: logging_
 
-- [ ] 2.8 HTTP の受け口の共通部分を作る
+- [x] 2.8 HTTP の受け口の共通部分を作る
 
   Claude は、`backend/internal/httpapi/server.go`、`middleware/`、`health.go` を作る。Claude は、中間処理を、パニックの受け止め、要求のログ、偽の送信の検査、ログインの状態の検査の差し込み口の順に並べる。パニックとは、Go のプログラムが、処理を続けられない誤りに当たって、その処理を途中で打ち切ることである。HTTP の受け口の共通部分は、まだ作っていない操作への要求に、501 と `{"message":"未実装です。"}` を返す。HTTP の受け口の共通部分は、仕様書に無い経路への要求に 404 を返す。HTTP の受け口の共通部分は、`/actuator/health` と `/healthz` への要求を受けると、データベースに `SELECT 1` を送り、200 と `{"status":"UP"}` か、503 と `{"status":"DOWN"}` を返す。HTTP の受け口の共通部分は、形の誤った要求に、Java 版と同じ `{message, errors}` の形の本文で 400 を返す。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/httpapi/...` が成功する
@@ -648,6 +648,7 @@
 - 外部のログインの秘密の値の読み方(タスク2.6で決めたこと): config は、`keirekipro/oidc/google` と `keirekipro/oidc/github` を、`prod` に限らず `dev` と `test` でも Secrets Manager から読む。Java 版も `dev` でこの2つを localstack から読み、比べる検査も fakeaws に登録するためである。`KEIREKIPRO_AWS_ENDPOINT` が無いときの接続先は、`dev` と `test` では Java 版の application-dev.yaml と同じ `http://localstack:4566`、`prod` では空(本当の AWS)にした
 - gosec の G101(タスク2.6で分かったこと): gosec は、名前に secret や password や token を含む定数と、その名前のキーや項目にじかに書いた文字列を、秘密の値の書き込みとみなす。テストのコードも対象である。Claude は、検査を外すコメントを書かず、定数の名前を中身を表す別の名前(例: 秘密の値の名前なら `nameRDS`)にするか、テストの値を名前付きの定数に移す
 - ログの形(タスク2.7で決めたこと): Java 版の Spring Boot 4.1.2 の ECS のログは、`log.level` のような点を含む名前を、平らなキーでなく入れ子のオブジェクト(`{"log":{"level":...}}`)で書く。`slog.JSONHandler` は最上位の level と msg と time を入れ子に移せないので、logging は自作の `slog.Handler` にした。`logging.ErrorAttr` は nil の誤りを受け付けないので、呼び出し元は nil でない誤りだけを渡す
+- HTTP の受け口の共通部分(タスク2.8で決めたこと): 偽の送信の検査は、design の「httpapi」の節の文と3か所で違い、3か所とも Java 版の実際の動きに合わせた。1つ目に、Java 版の CookieCsrfTokenRepository は、Cookie XSRF-TOKEN が無いか空のときだけ新しいトークンを作り、トークンが一致しないだけでは Cookie を作り直さない。2つ目に、Java 版の CsrfFilter は、GET と HEAD と OPTIONS に加えて TRACE も検査しない。3つ目に、Java 版の SecurityConfig は、/api/auth の下と /actuator の下の経路を検査から外す。要件9の受入基準1と4が Java 版と同じ動きを求めるためである。この違いは、出荷の前に所有者の判断を受ける。gosec の G124 は `http.Cookie` に Secure と HttpOnly と SameSite のすべてを求めるが、XSRF-TOKEN は画面の JavaScript が読むので HttpOnly を付けられない。そのため、csrf.go は `http.Cookie` を使わずに Set-Cookie の行をじかに書く。テストの要求の Cookie は、`req.AddCookie` でなく Cookie のヘッダで送る。生成したコードが経路と問い合わせと Cookie とヘッダの値の形の誤りで呼ぶ受け口は、Java 版と同じ 500 を返し、ログには誤りの型だけを書く。誤りの文が Cookie の値を含みうるためである。4xx に変えるかは、まとまりの spec が決める。許していないメソッドの要求には、net/http の ServeMux が 405 を返す(Java 版は 500。design の「変えた動きの一覧に項目を足す候補」の表にある)。要求のログの経路の型は、ServeMux が要求の `r.Pattern` に書いた値を RecordRoute が読む。各パッケージのカバレッジは、そのパッケージのテストだけで数えるので、middleware の部品は middleware のパッケージのテストでも確かめる
 
 ## 完了条件(全タスク共通)
 
