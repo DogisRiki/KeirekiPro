@@ -188,7 +188,7 @@
   - _要件: 3.1, 3.2, 3.3, 7.3_
 
 - [ ] 3. Java 版と Go 版を比べる検査を入れる(PR 2-3)
-- [ ] 3.1 比べる検査の土台を作る
+- [x] 3.1 比べる検査の土台を作る
 
   Claude は、`backend/compat/harness/`(ビルドタグ `compat`)に、次の3つの処理を作る。1つ目は、`KEIREKIPRO_REPO_ROOT` から design.md の6つのイメージを testcontainers-go の Dockerfile からの組み立てで作る処理である。2つ目は、検査ごとに Docker のネットワークを1つ作り、`java` `go` `fakeaws` `fakeoidc` などの名前でコンテナを入れる処理である。3つ目は、筋書きのファイルを読む処理である。harness は、コンテナの起動を5分で、1つの要求を60秒で打ち切り、失敗したら両方の版のコンテナのログを残す。harness は、検査の始めに、各データベースに migrate の `Apply` で V1〜V7 を適用する。harness は、Go 版のコンテナを起動するときに、起動から `/healthz` が 200 を返すまでの時間を測り、10秒を超えたら検査を失敗にする。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
@@ -669,6 +669,11 @@
   - フォントの設定: fontconfig のパッケージは依存として DejaVu のフォントを入れるので、`backend/assets/fonts.conf` の `<rejectfont>` で `/usr/share/fonts/truetype/*` を使わせず、sans-serif と serif と monospace を Noto に向けた
   - `run-check.sh` のコンテナで書ける場所: `run-check.sh` のコンテナでは `/repo` は読むだけで、`/app`(backend)には書ける
   - 本番のイメージでの PDF の部品の確かめ方: PDF の部品を本番のイメージで確かめるときは、`CGO_ENABLED=0 go test -c -o /app/<名前>` でテストのプログラムを作り、`docker run --entrypoint` でイメージの中で流す
+
+- 比べる検査の土台(タスク3.1で分かったこと): 次の3つが分かった。
+  - gremlins の読むファイル: gremlins v0.6.0 は、ビルドタグを見ずに、テストでないすべての .go のファイルを変異の対象にするので、`backend/compat/` のファイルの変異は NOT COVERED になり、CI の `make mutation-diff` の下限を割る。比べる検査は `make check` のテストに入らないためである。直すには `.gremlins.yaml` の `exclude-files` に `^compat/` を足す。`.gremlins.yaml` は承認の対象のゲート設定なので、Claude は、タスク3.10で PR を出すときに、理由を添えて所有者に提案する
+  - Dockerfile が組み立ての文脈の外にあるときの組み立て方: testcontainers-go の FromDockerfile は Dockerfile が文脈の中にあることを求めるので、harness は、`.dockerignore` を当てた文脈の tar を自分で作り、Dockerfile を `.compat-dockerfile` の名前で tar に足して組み立てる
+  - イメージの名前: 同じ dind を使う検査どうしでイメージを取り違えないように、harness は、組み立てるたびに乱数のタグを付け、検査の終わりにタグだけを消す。層は消さずに、次の組み立てのキャッシュに使う
 
 ## 完了条件(全タスク共通)
 
