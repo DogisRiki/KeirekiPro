@@ -1,0 +1,33 @@
+# Go 版の backend の変異テストの設定(gremlins)。
+# make mutation-diff と make mutation-full が、このファイルを --config で名前を指定して読む。
+# 下限(--threshold-efficacy 80 と --threshold-mcover 93)は、make mutation-diff が引数で渡す。
+unleash:
+  # 生成したコードには変異を作らない
+  exclude-files:
+    - ^internal/httpapi/gen/
+    - ^internal/platform/database/sqlcgen/
+
+# 作る変異は、条件の反転、条件の境目、算術の演算子、増減、符号の反転の5つにする
+mutants:
+  arithmetic-base:
+    enabled: true
+  conditionals-boundary:
+    enabled: true
+  conditionals-negation:
+    enabled: true
+  increment-decrement:
+    enabled: true
+  invert-negatives:
+    enabled: true
+  invert-assignments:
+    enabled: false
+  invert-bitwise:
+    enabled: false
+  invert-bwassign:
+    enabled: false
+  invert-logical:
+    enabled: false
+  invert-loopctrl:
+    enabled: false
+  remove-self-assignments:
+    enabled: false

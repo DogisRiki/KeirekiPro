@@ -1,0 +1,71 @@
+# Go 版の backend の本番のイメージ。
+#
+# 組み立ての文脈は ./backend である(Java 版の docker/backend/Dockerfile.prod と同じ)。
+#   docker build -f docker/backend-go/Dockerfile.prod --build-arg VERSION=<コミットの SHA> backend
+# 1つ目の工程で Go のプログラムを組み立て、2つ目の工程で、PDF を作る Chromium の入った土台に、
+# プログラムと、Java 版と同じ Noto の4つのフォントを置く。
+
+# -----------------------------------------------------------------------------
+# 組み立ての工程
+# -----------------------------------------------------------------------------
+FROM golang:1.27.3-trixie@sha256:af1bfc2614ebb1dbd31af514b78740fd678850e76498762b425ecee4c5c6ea80 AS builder
+
+# TARGETARCH は、Docker が組み立て先の CPU の種類(amd64 か arm64)を入れる
+ARG TARGETARCH
+# VERSION は、ログの service.version に書く版である。出荷のワークフローがコミットの SHA を渡す
+ARG VERSION=dev
+
+WORKDIR /src
+
+# 依存を先に取り込み、コードだけが変わったときは、この層を組み立て直さない
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY migrations.go ./
+COPY cmd cmd
+COPY internal internal
+# 表の形の履歴を確かめるために、Java 版のマイグレーションのファイルをプログラムに埋め込む
+COPY src/main/resources/db/migration src/main/resources/db/migration
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath \
+        -ldflags="-s -w -X main.version=${VERSION}" \
+        -o /out/keirekipro ./cmd/keirekipro
+
+# -----------------------------------------------------------------------------
+# 実行の工程
+# -----------------------------------------------------------------------------
+# headless-shell は、Debian trixie-slim の上に、PDF を作る Chromium を入れたイメージである。
+# Chromium は /headless-shell にあり、PATH に入っているので、chromedp の既定の探し方で見つかる。
+FROM chromedp/headless-shell:157.0.8103.27@sha256:7bee201478b2f6266aae01243740ee85c16281e32f42d3aed9fdf04f4eace7a1
+
+# OS のパッケージを最新にし、生きているかの確認に使う curl と、フォントを探す fontconfig を入れる。
+# 土台のイメージの作り直しは、OS の配布元が修正版を出してから遅れるので、
+# その間も修正版を取り込むために、組み立てのたびに upgrade する(Java 版と同じ。#453)。
+RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends curl fontconfig && \
+    rm -rf /var/lib/apt/lists/*
+
+# fonts-noto-cjk は入れず、Java 版が使う4つのフォントのファイルだけを置く。
+# 同じフォントのファイルを使うと、Java 版と同じ字形で PDF を作れる。
+COPY src/main/resources/fonts/NotoSansJP-Regular.ttf \
+     src/main/resources/fonts/NotoSansJP-Bold.ttf \
+     src/main/resources/fonts/NotoSerifJP-Regular.ttf \
+     src/main/resources/fonts/NotoSerifJP-Bold.ttf \
+     /usr/share/fonts/keirekipro/
+COPY assets/fonts.conf /etc/fonts/local.conf
+RUN fc-cache -f
+
+# root で動かさないように、uid 10001 の利用者でプログラムを動かす
+RUN groupadd --system --gid 10001 keirekipro && \
+    useradd --system --uid 10001 --gid keirekipro --create-home --home-dir /home/keirekipro \
+        --shell /usr/sbin/nologin keirekipro
+
+COPY --from=builder /out/keirekipro /app/keirekipro
+
+USER 10001:10001
+WORKDIR /app
+
+EXPOSE 8080
+
+ENTRYPOINT ["/app/keirekipro"]
