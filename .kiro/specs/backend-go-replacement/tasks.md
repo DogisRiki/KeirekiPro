@@ -240,7 +240,7 @@
   - 受入基準とテストの対応: 要件10の受入基準3(いろいろな経歴書のデータで比べる)は、`fixtures_test.go` の `TestFixtures_AllLoadable` と `TestFixtures_ResumeKindsPresent` で確かめる
   - _要件: 10.3_
 
-- [ ] 3.8 版をまたぐ確認を作る
+- [x] 3.8 版をまたぐ確認を作る
 
   Claude は、`backend/compat/cross_test.go` と harness の版をまたぐ動かし方を作る。harness は、版をまたぐ動かし方では、Java 版と Go 版を1つの Postgres と1つの Redis と1つの fakeaws につなぎ、筋書きごとに、Java 版から Go 版へ、Go 版から Java 版へ、2つの版へ交互に、の3つの送り先の組を試し、最後の段でもう一方の版から保存した内容を読む。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat -run Cross ./compat/...` が成功する
@@ -710,6 +710,13 @@
   - 利用者と ID: `users/basic.sql` は、`user1@example.com` と `user2@example.com` の2人を作る。パスワードはどちらも `Passw0rd!` である。user2 は権限の無い操作を確かめるための、経歴書を持たない利用者である。ID は `00000000-0000-4000-8000-` に続く12桁で決めて書き、経歴書は `…0101`(空)、`…0201`(多い)、`…0301`(長い文)、`…0401`(フォント)で、どれも user1 のものである
   - バックアップ: `backups/` は、正しいもの(`basic.json`)、版が 0.9 のもの(`wrong-version.json`)、`resume` を含まないもの(`no-resume.json`)、途中で切れて JSON として読めないもの(`broken.json`)の4つを置く。筋書きの「形の誤ったバックアップ」と「版の違うバックアップ」に使う
   - パスワードの確かめの部品: テストが、初めのデータのパスワードの暗号の値を `golang.org/x/crypto/bcrypt` で確かめるので、`go.mod` で x/crypto が直接の依存になった。同じ整理で、タスク3.2から直接使っている `github.com/aws/smithy-go` も直接の依存に移った
+- 版をまたぐ確認(タスク3.8で決めたこと): 次の6つを決めた。
+  - 送り先の組: Java 版から Go 版へ、Go 版から Java 版へ、の2つは、最初の段をその向きの元の版に送り、`to: other` の段で送り先を替える。交互は、段ごとに送り先を替える。どの組でも、最後の段は、その前の段と違う版に送る。こうして、最後の段でもう一方の版から保存した内容を読む
+  - 確かめる応答: 筋書きの `expect` に、ステータスに加えて、応答の本文の JSON に無ければならない項目の場所 `fields` を足した。版をまたぐ筋書きは、2つ以上の段を持ち、どの段にも `status` を書く。読み込みのときに、この形を確かめる
+  - 利用者の Cookie: 1つの利用者の Cookie は、2つの版で共有する。`csrf: true` の段は、Cookie `XSRF-TOKEN` の値をヘッダ `X-XSRF-TOKEN` に写す
+  - 筋書きの間の片付け: 送り先の組ごとに、マイグレーションのすぐあとに行のある表(今は、権限と、技術・資格・SNS の一覧)を残し、それ以外の表を空にし、Redis を空にし、fakeaws の記録を消す。そのあと、筋書きの初めのデータを入れ直す
+  - fakeaws と fakeoidc: 2つの版は、1つの fakeaws の同じ版の秘密の値を読む。fakeoidc には、2つの版の戻り先(`/api/auth/oidc/callback`)を両方登録する
+  - 筋書きの置き場: 版をまたぐ筋書きは `backend/compat/scenarios/` の下にまとまりごとに置く。まだ1つも無いので、`TestCross_Scenarios` は、無いことを書き残して成功する。筋書きは、まとまりの spec で足す
 
 ## 完了条件(全タスク共通)
 

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -68,6 +69,8 @@ type Request struct {
 // Expect は、版をまたぐ動かし方で確かめる応答である。
 type Expect struct {
 	Status int `yaml:"status"`
+	// Fields は、応答の本文の JSON に無ければならない項目の場所($ で始める)である。
+	Fields []string `yaml:"fields"`
 }
 
 // HasMode は、筋書きがその動かし方で動くかを返す。
@@ -92,6 +95,45 @@ func LoadScenario(file string) (Scenario, error) {
 		return Scenario{}, fmt.Errorf("harness: 筋書き %s: %w", file, err)
 	}
 	return s, nil
+}
+
+// ScenariosDir は、筋書きのファイルのフォルダ backend/compat/scenarios/ を返す。筋書きは、まとまりごとのフォルダに置く。
+func ScenariosDir() string {
+	return filepath.Join(FixturesDir(), "..", "scenarios")
+}
+
+// LoadScenarios は、dir の下のすべての .yaml のファイルを、パスの順に読み、mode で動く筋書きを返す。
+// dir が無いときは、筋書きが無いとして空を返す。1つでも読めない筋書きがあれば、誤りを返す。
+func LoadScenarios(dir, mode string) ([]Scenario, error) {
+	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	var files []string
+	err := filepath.WalkDir(dir, func(file string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && filepath.Ext(file) == ".yaml" {
+			files = append(files, file)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("harness: 筋書きのフォルダ %s を読めません: %w", dir, err)
+	}
+	var scenarios []Scenario
+	var errs []error
+	for _, file := range files {
+		s, err := LoadScenario(file)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if s.HasMode(mode) {
+			scenarios = append(scenarios, s)
+		}
+	}
+	return scenarios, errors.Join(errs...)
 }
 
 func (s Scenario) validate() error {
@@ -120,6 +162,35 @@ func (s Scenario) validate() error {
 		if step.Request.Method == "" || step.Request.Path == "" {
 			errs = append(errs, fmt.Errorf("段 %s の request に method と path がありません", step.Name))
 		}
+		for _, name := range sortedKeys(step.Capture) {
+			if _, err := splitJSONPath(step.Capture[name]); err != nil {
+				errs = append(errs, fmt.Errorf("段 %s の capture %s: %w", step.Name, name, err))
+			}
+		}
+		for _, path := range step.Expect.Fields {
+			if _, err := splitJSONPath(path); err != nil {
+				errs = append(errs, fmt.Errorf("段 %s の expect の fields: %w", step.Name, err))
+			}
+		}
+	}
+	if s.HasMode(ModeCross) {
+		errs = append(errs, s.validateCross()...)
 	}
 	return errors.Join(errs...)
+}
+
+// validateCross は、版をまたぐ動かし方で動く筋書きの形を確かめる。
+// 版をまたぐには2つ以上の段が要る。どの段も、ステータスを確かめないと、もう一方の版で失敗した操作を見逃すので、
+// expect の status を求める。
+func (s Scenario) validateCross() []error {
+	var errs []error
+	if len(s.Steps) < 2 {
+		errs = append(errs, fmt.Errorf("動かし方 %s の筋書きには2つ以上の段が要りますが、%d 段です", ModeCross, len(s.Steps)))
+	}
+	for _, step := range s.Steps {
+		if step.Expect.Status == 0 {
+			errs = append(errs, fmt.Errorf("動かし方 %s の筋書きの段 %s に expect の status がありません", ModeCross, step.Name))
+		}
+	}
+	return errs
 }
