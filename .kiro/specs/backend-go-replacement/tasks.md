@@ -84,7 +84,7 @@
   - 受入基準とテストの対応: 要件1の受入基準2(PR の本文の2つの行)と要件7の受入基準3(承認が要る理由と本番で起きること)は、テストでなく、`gh pr view` で読んだ PR の本文で確かめる。要件3の受入基準5(Go 版のコードは、Go 版の土台を入れる PR 2-2 から main に入る)は、`git diff --name-only origin/main` に `.go` のファイルが無いことで確かめる
   - _要件: 1.2, 3.5, 7.2, 7.3_
 
-- [ ] 2. Go 版の土台と品質チェックの設定と開発環境を入れる(PR 2-2)
+- [x] 2. Go 版の土台と品質チェックの設定と開発環境を入れる(PR 2-2)
 - [x] 2.1 Go のモジュールと開発環境のイメージと compose のサービスを作る
 
   Claude は、`backend/go.mod` と `backend/go.sum` を作り、`toolchain go1.27.3` と、`tool` の指定で oapi-codegen と sqlc と go-test-coverage と gremlins と govulncheck の版を書く。Claude は、`docker/backend-go/Dockerfile` を作る。このイメージは、`golang:1.27.3-trixie` に、タスク1.5で `ci.yaml` に固定したのと同じ版の golangci-lint と、poppler-utils と、Docker の CLI と、Debian の `chromium` と、`fonts-noto-cjk` を入れる。Claude は、`compose.yaml` にサービス `backend-go` とボリューム `backend-go-cache` を足す。サービス `backend-go` は、ホストの 8081 をコンテナの 8080 につなぐ。
@@ -180,7 +180,7 @@
   - 受入基準とテストの対応: この小タスクの受入基準は、Claude の進め方の決まりと文書であり、テストのコードは無い。要件1の受入基準1と2と6(6つの段階、PR の本文の2つの行、一方を直すときはもう一方も直す)、要件2の受入基準1から5(設計の前に試しに作って確かめる)、要件4の受入基準1と2(まとまりごとの子の Issue と spec、要件を書き写さない)、要件7の受入基準1と3から5(所有者がする6つの操作、承認が要る理由と本番で起きること、進み具合を1か所で見られる、会話が途切れても続ける)、要件8の受入基準1から3(決めた方式のとおりに作れないときなどに止まって報告する)は progress.md の本文で、要件4の受入基準1(子の Issue)は `gh api` の sub-issues の結果で、要件6の受入基準4(Go 版の説明を足す)と要件13の受入基準5(2回の出荷の決まり)は `backend/CLAUDE.md` の本文で確かめる
   - _要件: 1.1, 1.2, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 4.1, 4.2, 6.4, 7.1, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3, 13.5_
 
-- [ ] 2.13 Go 版の品質チェックを通し、PR を出す
+- [x] 2.13 Go 版の品質チェックを通し、PR を出す
 
   Claude は、`/verify-backend` を動かし、`bash .claude/scripts/parallel/run-check.sh backend-go make check` と `run-check.sh backend-go make vuln` を通す。Claude は、`docker build -f docker/backend-go/Dockerfile.prod backend` も通す。Claude は、PR の本文の「承認が要る理由」の欄に、Makefile などの品質チェックの設定が承認の対象であることを書き、「main に入れたときに本番で起きること」の欄に、本番で起きることは無いと書く。
   - 完了の確かめ方: `make check` が成功し、Go 版の品質チェックの記録が書かれ、PR の CI の `backend-go` と `backend-test` が成功する
