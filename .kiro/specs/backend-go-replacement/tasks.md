@@ -151,7 +151,7 @@
   - _要件: 10.1, 13.1_
   - _対象の部品: pdf_
 
-- [ ] 2.10 起動の入口を作る
+- [x] 2.10 起動の入口を作る
 
   Claude は、`backend/cmd/keirekipro/main.go` を作る。入口は、設定を読み、`ValidateOnly` で表の形の履歴を確かめ、データベースと Redis と AWS と PDF の部品をつなぎ、8080 を開く。入口は、`SIGTERM` を受けたら、最大90秒待ってから、8080 で開いた受け口を閉じる。最初の接続のどれかが失敗したら、理由をログに書き、終了コード1で終わる。
   - 完了の確かめ方: `run-check.sh backend-go go test ./cmd/keirekipro/...` が成功する
@@ -650,6 +650,7 @@
 - ログの形(タスク2.7で決めたこと): Java 版の Spring Boot 4.1.2 の ECS のログは、`log.level` のような点を含む名前を、平らなキーでなく入れ子のオブジェクト(`{"log":{"level":...}}`)で書く。`slog.JSONHandler` は最上位の level と msg と time を入れ子に移せないので、logging は自作の `slog.Handler` にした。`logging.ErrorAttr` は nil の誤りを受け付けないので、呼び出し元は nil でない誤りだけを渡す
 - HTTP の受け口の共通部分(タスク2.8で決めたこと): 偽の送信の検査は、design の「httpapi」の節の文と3か所で違い、3か所とも Java 版の実際の動きに合わせた。1つ目に、Java 版の CookieCsrfTokenRepository は、Cookie XSRF-TOKEN が無いか空のときだけ新しいトークンを作り、トークンが一致しないだけでは Cookie を作り直さない。2つ目に、Java 版の CsrfFilter は、GET と HEAD と OPTIONS に加えて TRACE も検査しない。3つ目に、Java 版の SecurityConfig は、/api/auth の下と /actuator の下の経路を検査から外す。要件9の受入基準1と4が Java 版と同じ動きを求めるためである。この違いは、出荷の前に所有者の判断を受ける。gosec の G124 は `http.Cookie` に Secure と HttpOnly と SameSite のすべてを求めるが、XSRF-TOKEN は画面の JavaScript が読むので HttpOnly を付けられない。そのため、csrf.go は `http.Cookie` を使わずに Set-Cookie の行をじかに書く。テストの要求の Cookie は、`req.AddCookie` でなく Cookie のヘッダで送る。生成したコードが経路と問い合わせと Cookie とヘッダの値の形の誤りで呼ぶ受け口は、Java 版と同じ 500 を返し、ログには誤りの型だけを書く。誤りの文が Cookie の値を含みうるためである。4xx に変えるかは、まとまりの spec が決める。許していないメソッドの要求には、net/http の ServeMux が 405 を返す(Java 版は 500。design の「変えた動きの一覧に項目を足す候補」の表にある)。要求のログの経路の型は、ServeMux が要求の `r.Pattern` に書いた値を RecordRoute が読む。各パッケージのカバレッジは、そのパッケージのテストだけで数えるので、middleware の部品は middleware のパッケージのテストでも確かめる
 - PDF を作る部品(タスク2.9で決めたこと): chromedp は v0.23.0 で、総称型の新しい書き方(`chromedp.Run[T]`、`chromedp.Action[T]`、`cdp.Call`、`cdp.Events`)を使う。部品は、HTML を `Page.setDocumentContent` で空のタブに置き、`Page.loadEventFired` を待ってから印刷する。外への通信は `Fetch.enable` の型 `*` で止め、止めた要求をすべて `Fetch.failRequest` で断る。`data:` の読み込みは通信ではないので、Chromium は Fetch で止めずに通す(テストで確かめた)。紙の大きさは、CSS の `@page` が無いページのために A4 を既定にし、`preferCSSPageSize` で CSS の大きさを優先する。Chromium が落ちたかは、ブラウザの context の終わりと `Browser.LostConnection` で見る。chromedp の DOM の追跡は、`setDocumentContent` のたびに「top-level frame が無い」という知らせを誤りとして書く。部品は DOM の追跡を使わないので、chromedp の知らせを DEBUG のログに回す。同じ理由で、テストで DOM を読むときは `chromedp.Text` でなく `Runtime.evaluate` を使う(`chromedp.Text` は終わらない)。ブラウザが無いことの確かめは、CI の機械に `/usr/bin/google-chrome` があり PATH を空にしても見つかるので、実行ファイルの場所を存在しない場所に替えて確かめる。要求の context が部品の打ち切りより先に期限で終わったときは、`Render` は chromedp の Canceled を包んで返すので、呼び出し側は要求の期限切れを `ctx.Err()` で見分ける
+- 起動の入口(タスク2.10で分かったこと): gremlins v0.6.0 は、パッケージの名前が main でフォルダの名前と違うと、最上位のパッケージのテストを流すので、`cmd/keirekipro/main.go` の変異は、すべて LIVED か NOT COVERED になる(https://github.com/go-gremlins/gremlins/issues/268 、直す PR は未マージ)。Claude は、入口を design のとおり `cmd/keirekipro` に置き、PR の CI の `make mutation-diff` が赤になったら所有者の判断を受ける。入口のテストは、受け口を先に開いてから入口を動かすので、テストの HTTP のクライアントには期限を付ける(期限が無いと、入口が受け口を使わずに終わったとき、要求が終わらずにテストが止まる)。Redis のクライアントを閉じたかは、接続の数でなく、閉じたクライアントへの命令が `redis.ErrClosed` を返すかで確かめる(使われなくなった接続は Go のメモリの片付けが閉じるため)。Chromium の処理は、名前でなく、テストの処理の子孫を `/proc/<pid>/status` の PPid でたどって数える(同時に流れる pdf のテストの Chromium を数えないため)。ReadHeaderTimeout はテストせず、gosec の G112 が守る
 
 ## 完了条件(全タスク共通)
 
