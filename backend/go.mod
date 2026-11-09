@@ -17,10 +17,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.33.15
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.15
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.8
-	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.9
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.4
 	github.com/aws/aws-sdk-go-v2/service/ses v1.42.8
 	github.com/chromedp/cdproto v0.159.0
-	github.com/chromedp/chromedp v0.22.1
+	github.com/chromedp/chromedp v0.21.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/oapi-codegen/runtime v1.8.0
 	github.com/redis/go-redis/v9 v9.23.0
