@@ -1,0 +1,65 @@
+# Go 版の backend の静的な検査と書式の検査の設定(golangci-lint v2)。
+# make lint と make fmt と make fmt-check が、このファイルを --config で名前を指定して読む。
+version: "2"
+
+run:
+  # 比べる検査のコード(ビルドタグ compat を付けた backend/compat/ の下のファイル)も検査する
+  build-tags:
+    - compat
+
+linters:
+  # 標準の組(errcheck govet ineffassign staticcheck unused)に、次の5つを足す
+  default: standard
+  enable:
+    - bodyclose
+    - depguard
+    - errcheck
+    - gosec
+    - sqlclosecheck
+  settings:
+    gosec:
+      config:
+        global:
+          # gosec が、コードのコメント #nosec に従わずに検査する。
+          # 検査の外しの検知(check-escape-hatches.sh)は #nosec を見つけないので、
+          # #nosec で gosec の指摘を黙らせられないようにするためである
+          nosec: true
+    depguard:
+      # 依存の向きは、cmd/keirekipro から internal/httpapi、internal/httpapi から機能のパッケージ、
+      # 機能のパッケージから internal/platform の順の一方向とする。
+      # lax では、禁止に当たる読み込みのうち、禁止より長い許可に当たるものだけを許す
+      rules:
+        platform:
+          list-mode: lax
+          files:
+            - "**/internal/platform/**"
+          allow:
+            - github.com/DogisRiki/KeirekiPro/backend/internal/platform
+          deny:
+            - pkg: github.com/DogisRiki/KeirekiPro/backend/internal
+              desc: internal/platform は、internal/httpapi と機能のパッケージを読まない
+            - pkg: github.com/DogisRiki/KeirekiPro/backend/cmd
+              desc: internal/platform は、cmd を読まない
+        feature:
+          list-mode: lax
+          files:
+            - "**/internal/**"
+            - "!**/internal/platform/**"
+            - "!**/internal/httpapi/**"
+          # 機能のパッケージどうしの依存は、まとまりの spec で、ここに許可を足したものだけを許す
+          allow:
+            - github.com/DogisRiki/KeirekiPro/backend/internal/platform
+          deny:
+            - pkg: github.com/DogisRiki/KeirekiPro/backend/internal
+              desc: 機能のパッケージは、internal/httpapi と、許可していないほかの機能のパッケージを読まない
+            - pkg: github.com/DogisRiki/KeirekiPro/backend/cmd
+              desc: 機能のパッケージは、cmd を読まない
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/DogisRiki/KeirekiPro/backend

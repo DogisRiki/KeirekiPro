@@ -99,7 +99,7 @@
   - 受入基準とテストの対応: 要件4の受入基準3(すべての API を仕様書に書く)は、`internal/httpapi/gen_test.go` の `TestGeneratedOperationsCount`(生成した `StrictServerInterface` が50の操作を持つ)で、要件14の受入基準2(仕様書と受け口の食い違いを品質チェックが止める)は、`make generate-check` が生成したコードの書き換えで失敗することで確かめる
   - _要件: 4.3, 14.2_
 
-- [ ] 2.3 静的な検査とカバレッジと変異テストの設定と、品質チェックの入口を作る
+- [x] 2.3 静的な検査とカバレッジと変異テストの設定と、品質チェックの入口を作る
 
   Claude は、`backend/.golangci.yml` と `backend/.testcoverage.yml` と `backend/.gremlins.yaml` を作る。`.golangci.yml` には、`version: "2"` と、gofumpt と goimports と、標準の組と depguard と errcheck と gosec と bodyclose と sqlclosecheck と、`run.build-tags: [compat]` を書く。`.testcoverage.yml` には、`./internal/...` の文の割合の下限 93% を書き、数えないフォルダを `internal/httpapi/gen/` と sqlc の出力のフォルダだけにする。Claude は、`backend/Makefile` に `fmt` `fmt-check` `lint` `test` `coverage` `build` `check` `mutation-diff` `mutation-full` `vuln` `compat` `compat-cross` `compat-perf` を足す。`build` は `go build ./...` を動かし、`backend/compat/` があるときだけ `go build -tags compat ./compat/...` も動かす。depguard の規則は、`internal/platform/**` が `internal/httpapi` と機能のパッケージを読むことと、機能のパッケージが `internal/httpapi` と `cmd` を読むことを断る。
   - 完了の確かめ方: `run-check.sh backend-go make lint` が成功し、`internal/platform` の下に `internal/httpapi` を読む仮のファイルを置くと `make lint` が depguard で失敗する
@@ -636,6 +636,9 @@
   - D3-2-2: Dependabot の docker の項目の `open-pull-requests-limit` である。タスク5.1で扱う
   - D3-1-6: 比べる検査のコードを `make lint` が読むかである。タスク2.3で扱う
 - コードの生成(タスク2.2で分かったこと): oapi-codegen は、設定のファイルに `output` があると `-o` を使わない。そのため `api/oapi-codegen.yaml` には `output` を書かず、Makefile が `-o` で出力の場所を渡す。sqlc は、問い合わせのファイルが1つも無いと失敗するので、Makefile は `db/queries/*.sql` があるときだけ sqlc を動かす。sqlc は設定のファイルのフォルダから相対のパスを読むので、`generate-check` は設定とマイグレーションと問い合わせを `cp --parents` で一時のフォルダに写して生成する。問い合わせを作るタスク(2.5 以降)で、Claude は `db/queries/` に SQL を置き、`make generate` で `internal/platform/database/sqlcgen/` を作る
+- 比べる検査の3つの入口(タスク2.3で決めたこと): Makefile の `compat` `compat-cross` `compat-perf` は、テストの関数の名前で分ける。Claude は、タスク3で、`cross_test.go` のテストを `TestCross`、`perf_test.go` のテストを `TestPerf` で始まる名前にし、`compat_test.go` のテストをそれ以外の名前にする
+- カバレッジの測り方(タスク2.3で決めたこと): `make coverage` は、`coverage.out` から1行目と `internal/` の下のファイルの行だけを `coverage.internal.out` に写し、go-test-coverage にそのファイルを読ませる。go-test-coverage の除外の規則は、モジュールの名前を除いた `internal/...` の形のパスと比べる
+- depguard の機能のパッケージの規則(タスク2.3で分かったこと): `.golangci.yml` の depguard の規則 `feature` は、機能のパッケージが自分の下のパッケージを読むこと(例: `internal/auth` から `internal/auth/x`)も断る。機能のパッケージを作るまとまりの spec で、Claude は、その読み込みの許可を `allow` に足す
 
 ## 完了条件(全タスク共通)
 
