@@ -62,14 +62,14 @@ info:
 
     ## API でない URL
 
-    この文書に載せていない、Java 版が受け付ける URL は次のとおり。
-    - `/actuator/health`: ヘルスチェック(ALB のターゲットグループと ECS のコンテナのヘルスチェックが使う)。
-      認証不要。本番は `health` だけを公開し、詳細は出さない(`{"status":"UP"}`)。
-      開発の設定では `/actuator/**` をすべて公開している。
-    - `/v3/api-docs`、`/v3/api-docs/**`、`/swagger-ui.html`、`/swagger-ui/**`: springdoc の定義と画面。
-      認証不要。本番の設定でも無効にしていない。
-    - `/error`: Spring Boot の既定のエラーの URL(エラーの転送先)。
-    - `/api/admin/**`: 管理者(ROLE_ADMIN)だけに許す規則があるが、受け付ける controller は無い。
+    この文書に載せていない URL のうち、Go 版が受け付けるのは次の2つだけである。ほかの URL には 404 を返す。
+    - `/actuator/health` と `/healthz`: 生きているかの確認。認証不要。Go 版は、データベースに `SELECT 1` を送り、
+      通れば 200 と `{"status":"UP"}` を、通らなければ 503 と `{"status":"DOWN"}` を返す。
+      ALB とコンテナは、Java 版を消すまで `/actuator/health` を使い、Java 版を消すときに `/healthz` に替える。
+
+    API の説明画面は、backend でなく、開発環境の compose のサービス `api-docs` がこの文書から作る。
+    Java 版が受け付けていた springdoc の URL(`/v3/api-docs` と `/swagger-ui/**` など)と、
+    Spring Boot のエラーの転送先 `/error` と、受け付ける処理の無い `/api/admin/**` は、Go 版には無い。
 servers:
   - url: /
 tags:

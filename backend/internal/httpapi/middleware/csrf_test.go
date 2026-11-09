@@ -14,10 +14,11 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/middleware"
 )
 
-const uuidPattern = `[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`
+// base32Text は、crypto/rand.Text が作るトークンの形(base32 の大文字と数字で26文字以上)である。
+const base32Text = `[A-Z2-7]{26,}`
 
 // newCookie は、新しいトークンの Set-Cookie の行の形である。
-var newCookie = regexp.MustCompile(`^XSRF-TOKEN=` + uuidPattern + `; Path=/$`)
+var newCookie = regexp.MustCompile(`^XSRF-TOKEN=` + base32Text + `; Path=/$`)
 
 const sampleCSRF = "4f1c2b7e-1d2a-4c3b-9e8f-0a1b2c3d4e5f"
 
@@ -64,7 +65,7 @@ func assertForbidden(t *testing.T, rec *httptest.ResponseRecorder, passed bool) 
 func assertNewCookie(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
 	if cookies := rec.Header().Values("Set-Cookie"); len(cookies) != 1 || !newCookie.MatchString(cookies[0]) {
-		t.Errorf("Set-Cookie = %q, want XSRF-TOKEN=<UUID>; Path=/ を1つ", cookies)
+		t.Errorf("Set-Cookie = %q, want XSRF-TOKEN=<トークン>; Path=/ を1つ", cookies)
 	}
 }
 

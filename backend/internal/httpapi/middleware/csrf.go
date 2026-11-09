@@ -3,7 +3,6 @@ package middleware
 import (
 	"crypto/rand"
 	"crypto/subtle"
-	"fmt"
 	"net/http"
 	"strings"
 )
@@ -48,10 +47,10 @@ func CSRF(next http.Handler) http.Handler {
 // setTokenCookie は、新しいトークンの Cookie XSRF-TOKEN を付ける。
 // 画面の JavaScript がこの Cookie を読んでヘッダ X-XSRF-TOKEN に写すので、HttpOnly を付けない。
 // gosec は、http.Cookie に Secure と HttpOnly と SameSite のすべてを求める。この Cookie は HttpOnly を付けられないので、
-// http.Cookie を使わずに Set-Cookie の行を書く。トークンは newToken が作る UUID なので、行を壊す文字を含まない。
+// http.Cookie を使わずに Set-Cookie の行を書く。トークンは crypto/rand.Text が作る base32 の文字だけなので、行を壊す文字を含まない。
 // Cookie の性質(Path=/ だけを付ける)は、design の「安全」の節のとおり、今と同じにする。
 func setTokenCookie(w http.ResponseWriter) {
-	w.Header().Add("Set-Cookie", csrfCookieName+"="+newToken()+"; Path=/")
+	w.Header().Add("Set-Cookie", csrfCookieName+"="+rand.Text()+"; Path=/")
 }
 
 // requiresCSRFCheck は、偽の送信の検査をする要求かを返す。
@@ -66,14 +65,4 @@ func requiresCSRFCheck(r *http.Request) bool {
 // underPath は、path が prefix そのものか、prefix の下の経路かを返す。
 func underPath(path, prefix string) bool {
 	return path == prefix || strings.HasPrefix(path, prefix+"/")
-}
-
-// newToken は、乱数の UUID(版4)の形のトークンを作る。
-func newToken() string {
-	var b [16]byte
-	// crypto/rand.Read は、誤りを返さない(Go 1.24 からは、乱数を読めなければプログラムを止める)
-	_, _ = rand.Read(b[:])
-	b[6] = b[6]&0x0f | 0x40
-	b[8] = b[8]&0x3f | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
