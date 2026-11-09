@@ -22,7 +22,8 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/migrate"
 )
 
-// 比べる検査は TestCompare で始まる名前で、make compat が動かす。
+// make compat は、TestCross と TestPerf で始まる名前を除く、このパッケージのテストを動かす。
+// 版をまたぐ確認は make compat-cross が、応答の時間の比べ方は make compat-perf が動かす。
 
 // requireAllOperations は、TestCoverage_Operations が、仕様書のすべての操作を筋書きに求めるかである。
 // false の間は、progress.md で完了と記したまとまりの操作だけを、そのまとまりの筋書きに求める。
@@ -117,6 +118,12 @@ func TestSelf_SameImageNoDiff(t *testing.T) {
 	cmp := startSelfCompare(t)
 	if cmp.Stores[harness.VersionJava].DBConn == cmp.Stores[harness.VersionGo].DBConn {
 		t.Fatalf("2つの版が同じデータベースにつながっています: %s", cmp.Stores[harness.VersionGo].DBConn)
+	}
+	// 両方の位置に置いた Go 版の本番のイメージは、起動の時間を測られ、上限の内に起動している
+	for _, version := range []string{harness.VersionJava, harness.VersionGo} {
+		if d, ok := cmp.Startup[version]; !ok || d <= 0 || d > harness.GoStartupLimit {
+			t.Errorf("版 %s の位置の Go 版の起動の時間 = %s(測った: %t), want 0 より長く %s 以内", version, d, ok, harness.GoStartupLimit)
+		}
 	}
 	report, err := cmp.Run(t.Context(), writeScenario(t, selfCompare))
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
@@ -38,6 +39,9 @@ type Backend struct {
 	Env func(Backing) map[string]string
 	// HealthPath は、起動を待つときに 200 を待つパスである。
 	HealthPath string
+	// MeasureStartup が true なら、起動から /healthz が 200 を返すまでの時間を測り、GoStartupLimit を超えたら起動を失敗にする。
+	// Go 版の本番のイメージを置くときに true にする。
+	MeasureStartup bool
 }
 
 // JavaBackend は、Java 版のイメージを、Java 版の起動の仕方で置く。
@@ -48,7 +52,7 @@ func JavaBackend(image string) Backend {
 // GoBackend は、Go 版のイメージを、Go 版の起動の仕方で置く。
 // 検査の土台を確かめるときは、Java 版の位置にも Go 版のイメージを置く。
 func GoBackend(image string) Backend {
-	return Backend{Image: image, Env: GoEnv, HealthPath: "/healthz"}
+	return Backend{Image: image, Env: GoEnv, HealthPath: "/healthz", MeasureStartup: true}
 }
 
 // Store は、1つの版がつなぐ、1つの Postgres と1つの Redis である。
@@ -282,23 +286,33 @@ func startStack(ctx context.Context, env *Env, images Images) (*Stack, error) {
 }
 
 // startBackend は、env のネットワークに、backend-<version> の名前で、つなぐ先 b の be を起動し、
-// 起動したコンテナと、テストの処理から届く URL を返す。
-func startBackend(ctx context.Context, env *Env, version string, be Backend, b Backing) (*Container, string, error) {
-	ctr, err := env.Start(ctx, ContainerSpec{
+// 起動したコンテナと、テストの処理から届く URL と、起動の時間を返す。
+// be.MeasureStartup が true なら、起動から /healthz が 200 を返すまでの時間を測り、GoStartupLimit を超えたら失敗を返す。
+// false なら、起動の時間を測らず、0 を返す。
+func startBackend(ctx context.Context, env *Env, version string, be Backend, b Backing) (*Container, string, time.Duration, error) {
+	spec := ContainerSpec{
 		Name:         "backend-" + version,
 		Image:        be.Image,
 		Env:          be.Env(b),
 		ExposedPorts: []string{backendPort},
 		WaitingFor:   wait.ForHTTP(be.HealthPath).WithPort(backendPort),
-	})
+	}
+	var ctr *Container
+	var startup time.Duration
+	var err error
+	if be.MeasureStartup {
+		ctr, startup, err = env.StartGo(ctx, spec)
+	} else {
+		ctr, err = env.Start(ctx, spec)
+	}
 	if err != nil {
-		return nil, "", err
+		return nil, "", 0, fmt.Errorf("harness: 版 %s の位置の backend を起動できません: %w", version, err)
 	}
 	u, err := ctr.BaseURL(ctx, backendPort)
 	if err != nil {
-		return nil, "", err
+		return nil, "", 0, err
 	}
-	return ctr, u, nil
+	return ctr, u, startup, nil
 }
 
 // registerRedirects は、backendURLs の backend の外部のログインの口を、fakeoidc の転送してよい先に登録する。

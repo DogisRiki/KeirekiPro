@@ -36,7 +36,7 @@ func StartPerfEnv(ctx context.Context, env *Env, images Images, version string, 
 	if err != nil {
 		return nil, err
 	}
-	ctr, url, err := startBackend(ctx, env, version, be, stack.backing)
+	ctr, url, _, err := startBackend(ctx, env, version, be, stack.backing)
 	if err == nil {
 		err = stack.registerRedirects(ctx, []string{url})
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/DogisRiki/KeirekiPro/backend/compat/fakeaws"
 	"github.com/DogisRiki/KeirekiPro/backend/compat/pdfcmp"
@@ -26,6 +27,9 @@ type CompareEnv struct {
 	Stores map[string]*Store
 	// URLs は、版の名前ごとの、テストの処理から届く backend の URL である。
 	URLs map[string]string
+	// Startup は、版の名前ごとの、その位置に置いた backend の起動から /healthz が 200 を返すまでの時間である。
+	// 起動の時間を測る backend(Go 版のイメージ)の位置の分だけを持つ。
+	Startup map[string]time.Duration
 	// Behaviors は、変えた動きの一覧である。StartCompareEnv が changed-behaviors.yaml から読む。
 	Behaviors []ChangedBehavior
 	// PDF は、PDF の本文の比べ方である。StartCompareEnv が pdfcmp にする。
@@ -61,7 +65,7 @@ func StartCompareEnv(ctx context.Context, env *Env, images Images, backends map[
 		return nil, err
 	}
 	c := &CompareEnv{
-		Stores: map[string]*Store{}, URLs: map[string]string{},
+		Stores: map[string]*Store{}, URLs: map[string]string{}, Startup: map[string]time.Duration{},
 		Behaviors: behaviors, PDF: pdfcmp.Describe, Operations: ops, client: NewHTTPClient(),
 	}
 	if err := c.start(ctx, env, images, backends); err != nil {
@@ -91,9 +95,12 @@ func (c *CompareEnv) start(ctx context.Context, env *Env, images Images, backend
 		if err := RegisterSecrets(ctx, f.client, f.AWSURL, version, JavaSecrets(b)); err != nil {
 			return err
 		}
-		_, url, err := startBackend(ctx, env, version, backends[version], b)
+		_, url, startup, err := startBackend(ctx, env, version, backends[version], b)
 		if err != nil {
 			return err
+		}
+		if backends[version].MeasureStartup {
+			c.Startup[version] = startup
 		}
 		c.URLs[version] = url
 		urls = append(urls, url)
@@ -198,10 +205,15 @@ func (c *CompareEnv) compareState(ctx context.Context, cmp *Comparer, step StepR
 // dropRepeated は、from より後ろに足した違いのうち、seen にある違いと、比べたものと場所と両方の値が同じ違いを消し、
 // 残した違いを seen に覚える。保存された内容は段をまたいで残るので、ある段で生まれた違いは、後の段でも同じ違いとして
 // 見つかる。後の段の操作の違いとして重ねて報告すると、変えた動きの一覧の match が、違いを生んだ段の操作で当たらなくなる。
+// 違いに repeatKey があれば、両方の値の代わりに repeatKey で見分ける。
 func (c *Comparer) dropRepeated(from int, seen map[string]bool) {
 	kept := c.diffs[:from]
 	for _, d := range c.diffs[from:] {
-		key := d.Target + "\x00" + d.Path + "\x00" + d.Java + "\x00" + d.Go
+		values := d.repeatKey
+		if values == "" {
+			values = d.Java + "\x00" + d.Go
+		}
+		key := d.Target + "\x00" + d.Path + "\x00" + values
 		if seen[key] {
 			continue
 		}

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // realOperations は、backend/api/openapi.yaml の操作を読む。
@@ -218,5 +219,35 @@ func TestComparer_DropRepeated(t *testing.T) {
 	got := c.Diffs()
 	if len(got) != 3 || got[0].Step.Index != 1 || got[1].Target != TargetBody || got[2].Path != "users" {
 		t.Errorf("違い = %+v, want 1段目の resumes、2段目の本文と users", got)
+	}
+}
+
+// Redis のキーの残りの有効な時間は段が進むたびに減るので、値が同じままの違いは、時間が減っても重ねて報告しない。
+func TestComparer_DropRepeatedRedisIgnoresTTL(t *testing.T) {
+	c := NewComparer("s")
+	seen := map[string]bool{}
+	step1 := StepRef{Index: 1, Name: "login", Operation: "login"}
+	step2 := StepRef{Index: 2, Name: "read", Operation: "getResume"}
+	step3 := StepRef{Index: 3, Name: "update", Operation: "updateResume"}
+	entry := func(value string, ttl time.Duration) []RedisEntry {
+		return []RedisEntry{{Key: "k", Type: "string", Value: value, TTL: ttl}}
+	}
+	for _, s := range []struct {
+		step        StepRef
+		java, goVer []RedisEntry
+	}{
+		{step1, entry("a", 900*time.Second), entry("b", 900*time.Second)},
+		// 値の違いは1段目と同じで、両方の版の残りの時間だけが減った
+		{step2, entry("a", 897*time.Second), entry("b", 897*time.Second)},
+		// 値が変わった違いは、新しい違いとして報告する
+		{step3, entry("a", 895*time.Second), entry("c", 895*time.Second)},
+	} {
+		from := len(c.diffs)
+		c.CompareRedis(s.step, s.java, s.goVer)
+		c.dropRepeated(from, seen)
+	}
+	got := c.Diffs()
+	if len(got) != 2 || got[0].Step.Index != 1 || got[1].Step.Index != 3 {
+		t.Errorf("違い = %+v, want 1段目と3段目の2件", got)
 	}
 }

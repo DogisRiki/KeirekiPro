@@ -60,6 +60,8 @@ type Diff struct {
 	Path string
 	Java string
 	Go   string
+	// repeatKey は、前の段と同じ違いかを見分けるときに、両方の値の代わりに使う文字である。空なら両方の値を使う。
+	repeatKey string
 }
 
 // Response は、1つの版の応答である。
@@ -427,13 +429,36 @@ func (c *Comparer) CompareRedis(step StepRef, java, goEntries []RedisEntry) {
 		ge, gok := g[k]
 		switch {
 		case !jok:
-			c.add(step, TargetRedis, k, absent, ge.describe())
+			c.addRedis(step, k, nil, &ge)
 		case !gok:
-			c.add(step, TargetRedis, k, je.describe(), absent)
+			c.addRedis(step, k, &je, nil)
 		case je.Type != ge.Type || je.Value != ge.Value || !ttlClose(je.TTL, ge.TTL):
-			c.add(step, TargetRedis, k, je.describe(), ge.describe())
+			c.addRedis(step, k, &je, &ge)
 		}
 	}
+}
+
+// addRedis は、キー key の Redis の違いを足す。無い側は nil で渡す。
+// 残りの有効な時間は段が進むたびに減るので、前の段と同じ違いかは、時間の有無だけを残した値で見分ける。
+func (c *Comparer) addRedis(step StepRef, key string, java, goEntry *RedisEntry) {
+	describe := func(e *RedisEntry) (string, string) {
+		if e == nil {
+			return absent, absent
+		}
+		return e.describe(), e.withoutTTL()
+	}
+	j, jKey := describe(java)
+	g, gKey := describe(goEntry)
+	c.add(step, TargetRedis, key, j, g)
+	c.diffs[len(c.diffs)-1].repeatKey = jKey + "\x00" + gKey
+}
+
+// withoutTTL は、describe から残りの有効な時間の長さを除いた文字を返す。
+func (e RedisEntry) withoutTTL() string {
+	if e.TTL >= 0 {
+		return e.Type + " " + e.Value + " (有効な時間あり)"
+	}
+	return e.Type + " " + e.Value + " (有効な時間なし)"
 }
 
 func (e RedisEntry) describe() string {
