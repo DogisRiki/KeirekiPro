@@ -194,7 +194,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準5(同じ要求を送って比べる検査を作る)の土台は、`harness_test.go` の `TestLoadScenario_ParsesSteps`、`TestLoadScenario_RejectsUnknownMode`、`TestNetwork_ContainersResolveByName` で、Go 版の本番のイメージの起動の時間は `TestStartup_Over10sFails` と `TestStartup_Within10sPasses` で確かめる
   - _要件: 4.5_
-  - _保留: PR 2-2 が main に入ったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク3を行う_
 
 - [ ] 3.2 AWS の代わりを作る (並行可)
 
@@ -203,7 +202,6 @@
   - 受入基準とテストの対応: 要件9の受入基準3(メールの件名と本文を比べられる)は `fakeaws_test.go` の `TestSendEmail_RecordsPerVersion` で、要件12の受入基準3(画像を比べられる)は `TestS3_PutGetDelete` と `TestS3_PresignedGet` で、Java 版の起動に要る秘密の値は `TestSecretsManager_GetSecretValue` で確かめる
   - _要件: 9.3, 12.3_
   - _対象の部品: fakeaws と fakeoidc_
-  - _保留: 3.1 と同じ_
 
 - [ ] 3.3 外部のログインの代わりを作る (並行可)
 
@@ -212,7 +210,6 @@
   - 受入基準とテストの対応: 要件12の受入基準2(Google と GitHub のアカウントでログインできることを比べられる)は、`fakeoidc_test.go` の `TestGoogleFlow_ReturnsScenarioUser` と `TestGitHubFlow_ReturnsScenarioUserAndEmails` で確かめる
   - _要件: 12.2_
   - _対象の部品: fakeaws と fakeoidc_
-  - _保留: 3.1 と同じ_
 
 - [ ] 3.4 正規化と比べる処理と報告を作る
 
@@ -220,7 +217,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準4と5(実際の応答と保存したデータを正解にして比べる)と要件4の受入基準6(違いがあれば止める)は、`compare_test.go` の `TestCompareJSON_UUIDNumbering`、`TestCompareJSON_TokenClaims`、`TestCompareHeaders_OnlySelected`、`TestCompareDB_SortsAfterNormalize`、`TestCompareRedis_TTLTolerance5s`、`TestCompareMail_TokenInURL` と、`report_test.go` の `TestReport_FirstDiffStepFirst` で、要件9の受入基準1から3(画面が使う URL とデータの形、エラーの文言と条件、メールの件名と本文を同じにする)、要件10の受入基準2(Markdown が1文字も違わない)、要件11の受入基準1から3(バックアップを同じに戻し、同じ形で書き出し、誤ったものを同じに拒む)、要件12の受入基準1(データベースをそのまま読み書きする)は、同じテストの「ヘッダ」「本文」「Markdown は1文字も違わない」「S3」「メール」「データベース」の場合で確かめる
   - _要件: 4.4, 4.5, 4.6, 9.1, 9.2, 9.3, 10.2, 11.1, 11.2, 11.3, 12.1_
-  - _保留: 3.1 と同じ_
 
 - [ ] 3.5 変えた動きの一覧と違いを許す範囲を作る
 
@@ -228,7 +224,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準6(一覧に載せた違いでは止めない)と要件9の受入基準5と6(変えた動きの一覧)は、`match_test.go` の `TestMatch_OrderOnlyAllowsReorder`、`TestMatch_OtherOperationNotAllowed`、`TestMatch_AnyOperation`、`TestMatch_StatusLimitsScope`(`status` を書いた項目が、ほかのステータスの違いを許さない)、`TestMatch_HeaderPath`、`TestLoadChangedBehaviors_RequiredFields`、`TestLoadChangedBehaviors_CB005HasNoMatch` で確かめる
   - _要件: 4.6, 9.5, 9.6_
-  - _保留: 3.1 と同じ_
 
 - [ ] 3.6 PDF の比べ方を作る (並行可)
 
@@ -237,7 +232,6 @@
   - 受入基準とテストの対応: 要件10の受入基準1と4(配置、フォント、文字の大きさ、表の色、改頁の位置を比べる方法と許す違い)は、`pdfcmp_test.go` の `TestCompare_Allows2ptShift`、`TestCompare_Rejects2_5ptShift`、`TestCompare_RejectsOneCharDiff`、`TestCompare_RejectsPageBreakDiff`、`TestCompare_FontSubsetPrefixIgnored`、`TestCompare_TableColorTolerance` で確かめる
   - _要件: 10.1, 10.3, 10.4_
   - _対象の部品: pdfcmp_
-  - _保留: 3.1 と同じ_
 
 - [ ] 3.7 比べる経歴書とバックアップと画像の初めのデータを置く
 
@@ -245,7 +239,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` の `TestFixtures_AllLoadable` が成功する
   - 受入基準とテストの対応: 要件10の受入基準3(いろいろな経歴書のデータで比べる)は、`fixtures_test.go` の `TestFixtures_AllLoadable` と `TestFixtures_ResumeKindsPresent` で確かめる
   - _要件: 10.3_
-  - _保留: 3.1 と同じ_
 
 - [ ] 3.8 版をまたぐ確認を作る
 
@@ -253,7 +246,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat -run Cross ./compat/...` が成功する
   - 受入基準とテストの対応: 要件13の受入基準1から4と6(切り替えの間と後に、操作が失敗せず、保存が消えず、ログアウトされず、途中の手順をまたぐ操作を終えられることを、切り替えの前に版をまたいで確かめる)と要件5の受入基準6(戻してもログアウトされず保存が残る)の土台は、`cross_test.go` の `TestCross_SelfPairPasses`(同じイメージを両方の位置に置いた筋書きが通る)、`TestCross_WrongStatusFailsWithStepAndDirection`、`TestCross_ThreeDirectionsRun` で確かめる。10の操作の筋書きは、Claude が、まとまりの spec で足す
   - _要件: 5.6, 13.1, 13.2, 13.3, 13.4, 13.6_
-  - _保留: 3.1 と同じ_
 
 - [ ] 3.9 応答の時間の比べ方を作る
 
@@ -261,7 +253,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` の `TestPerfJudge_*` が成功する
   - 受入基準とテストの対応: 要件9の受入基準7(決めた幅で比べる)は、`perf_judge_test.go` の `TestPerfJudge_WithinTolerance`、`TestPerfJudge_ExceedsTolerance`、`TestPerfJudge_MemoryOver1792MBFails` で確かめる
   - _要件: 9.7_
-  - _保留: 3.1 と同じ_
 
 - [ ] 3.10 比べる検査の入口と自分を確かめる筋書きを作り、PR を出す
 
@@ -269,7 +260,6 @@
   - 完了の確かめ方: `make check` と `make compat` と `make compat-cross` が成功し、PR の CI の `backend-compat` と `backend-test` が成功する
   - 受入基準とテストの対応: 要件4の受入基準5から7(比べる検査を作り、違いがあれば止め、一覧に載せた違いでは止めない)は `compat_test.go` の `TestSelf_SameImageNoDiff`、`TestSelf_OneCharFakeFails`、`TestSelf_MatchedDiffPasses` で、要件4の受入基準7(CI で動き続ける)は PR と main の CI の `backend-compat` の結果で、要件12の受入基準4(履歴の続きとして変える)は `TestApply_JavaFlywayValidatePasses` で、要件9の受入基準1(すべての操作を比べる)の土台は `TestCoverage_Operations` と、その判定の関数の単体テスト `TestCoverageJudge_CompletedOnly` と `TestCoverageJudge_All50` で確かめる
   - _要件: 4.5, 4.6, 4.7, 9.1, 12.4_
-  - _保留: 3.1 と同じ_
 
 - [ ] 4. API の説明画面と開発の手順の文書を入れる(PR 2-4)
 - [ ] 4.1 開発環境の API の説明画面を作る
