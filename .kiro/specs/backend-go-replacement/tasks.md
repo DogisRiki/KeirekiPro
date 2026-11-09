@@ -203,7 +203,7 @@
   - _要件: 9.3, 12.3_
   - _対象の部品: fakeaws と fakeoidc_
 
-- [ ] 3.3 外部のログインの代わりを作る (並行可)
+- [x] 3.3 外部のログインの代わりを作る (並行可)
 
   Claude は、`backend/compat/fakeoidc/`(ビルドタグ `compat`)とその `Dockerfile` を作る。fakeoidc は、Google の認可と token と userinfo と、GitHub の認可と `access_token` と `/user` と `/user/emails` に、筋書きが決めた利用者の値で応答を返す。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/fakeoidc/...` が成功する
@@ -679,6 +679,11 @@
   - 比べる検査の口: 秘密の値の登録は `PUT /_compat/<版>/secrets/<名前>`、覚えたものの読み出しは `GET /_compat/<版>/objects` と `GET /_compat/<版>/emails`、記録を空にするのは `DELETE /_compat/records`(秘密の値は残す)。S3 と SES と Secrets Manager の受けると決めていない操作と、どの口にも当たらないパスは、501 で断り、`fakeaws_unexpected_request` をログに出す。ログの `operation` に、断った操作の名前が入る。ただし、`/_compat/` の下の決めていないパスへの GET と PUT と DELETE は、S3 のオブジェクトの操作として扱われるので、harness は `/_compat/` の口の名前を書き誤らないようにする
   - Java 版の署名付きの URL: Java 版の開発の設定(`LocalstackPresignedUrlTransformer`)は、署名付きの URL のホストを localhost に置き換えるので、harness がその URL を読むときは、宛先と Host を fakeaws の版の名前に直して読む
   - 本文の形: AWS の SDK が aws-chunked の形で送る本文は、fakeaws が中身を取り出して覚える。ETag は本文の SHA-256 の先頭から作る(SDK は ETag でなく CRC32 で本文を確かめる)。Java 版の SDK がこの形で読み書きできるかは、タスク3.10で Java 版を動かすまで確かめられない
+- ログインの代わり(タスク3.3で分かったこと): 次の4つが分かった。
+  - 口のパス: fakeoidc は、本物と同じパスで受ける。Google は `/o/oauth2/v2/auth` と `/token` と `/v1/userinfo`、GitHub は `/login/oauth/authorize` と `/login/oauth/access_token` と `/user` と `/user/emails` である。どの口にも当たらないパスは、501 で断り、`fakeoidc_unexpected_request` をログに出す
+  - クライアントと利用者の登録: fakeoidc は、クライアントの値を固定で持たない。harness は、筋書きの前に、`PUT /_compat/clients/<google|github>` に `Client.Form()` の本文で、クライアントの ID と秘密の値と転送先の一覧を登録し、同じ ID と秘密の値を fakeaws の `keirekipro/oidc/google` と `keirekipro/oidc/github` にも登録する。登録の本文を JSON でなく URL の形にしたのは、gosec の G117 が、秘密の値の項目を JSON にすることを止めるためである。利用者は `PUT /_compat/users/<google|github>` に JSON で登録する。認可の口は、登録した転送先と同じ redirect_uri にだけ転送する
+  - fakeoidc が確かめること: 認可のコードは1回だけ使える。token の口は、クライアントの値と redirect_uri と PKCE の code_verifier を確かめる。GitHub の token の口は、誤りを 200 と本文の error で返し、Accept が JSON を求めないときは URL の形の本文で返す。GitHub の文書は、誤りの HTTP のステータスを書いていないためである
+  - GitHub のメールアドレスの口: Java 版の `GithubOidcProvider` は、`https://api.github.com/user/emails` をコードに書いていて、設定で替えられない。そのため、比べる検査で Java 版の GitHub のログインを fakeoidc に向けるには、URL の設定のほかの手立てが要る(例: fakeoidc のコンテナに api.github.com の名前と TLS の証明書を持たせ、Java 版にその証明書を信じさせる)。Claude は、タスク3.10で手立てを決め、手立てが spec と合わないときは所有者に尋ねる。Go 版の config にも、メールアドレスの口の URL の設定は無い
 
 ## 完了条件(全タスク共通)
 
