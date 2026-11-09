@@ -128,7 +128,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1(本番の設定を Java 版のままでも動く形で先に入れる)と要件12の受入基準2(同じアカウントでログインできる設定を読む)は、`config_test.go` の `TestLoad_ProdReadsSecretKeys`、`TestLoad_MissingKeyErrorHasNoValue`、`TestLoad_DevReadsJavaEnvNames`、`TestLoad_DefaultEnvIsDev`、`TestLoad_OIDCEndpointOverride` で確かめる
   - _要件: 5.1, 12.2_
 
-- [ ] 2.7 ログの形を作る (並行可)
+- [x] 2.7 ログの形を作る (並行可)
 
   Claude は、`backend/internal/platform/logging/` を作る。この部品は、`slog` の JSON の書き手を標準出力に置き、項目の名前を、design.md の「logging」に書いた Elastic Common Schema の10の名前に合わせる。Elastic Common Schema は、ログの項目の名前の決まりである。要求ごとのログに、Cookie と Authorization と要求の本文を書かない。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/platform/logging/...` が成功する
@@ -647,6 +647,7 @@
 - depguard の機能のパッケージの規則(タスク2.3で分かったこと): `.golangci.yml` の depguard の規則 `feature` は、機能のパッケージが自分の下のパッケージを読むこと(例: `internal/auth` から `internal/auth/x`)も断る。機能のパッケージを作るまとまりの spec で、Claude は、その読み込みの許可を `allow` に足す
 - 外部のログインの秘密の値の読み方(タスク2.6で決めたこと): config は、`keirekipro/oidc/google` と `keirekipro/oidc/github` を、`prod` に限らず `dev` と `test` でも Secrets Manager から読む。Java 版も `dev` でこの2つを localstack から読み、比べる検査も fakeaws に登録するためである。`KEIREKIPRO_AWS_ENDPOINT` が無いときの接続先は、`dev` と `test` では Java 版の application-dev.yaml と同じ `http://localstack:4566`、`prod` では空(本当の AWS)にした
 - gosec の G101(タスク2.6で分かったこと): gosec は、名前に secret や password や token を含む定数と、その名前のキーや項目にじかに書いた文字列を、秘密の値の書き込みとみなす。テストのコードも対象である。Claude は、検査を外すコメントを書かず、定数の名前を中身を表す別の名前(例: 秘密の値の名前なら `nameRDS`)にするか、テストの値を名前付きの定数に移す
+- ログの形(タスク2.7で決めたこと): Java 版の Spring Boot 4.1.2 の ECS のログは、`log.level` のような点を含む名前を、平らなキーでなく入れ子のオブジェクト(`{"log":{"level":...}}`)で書く。`slog.JSONHandler` は最上位の level と msg と time を入れ子に移せないので、logging は自作の `slog.Handler` にした。`logging.ErrorAttr` は nil の誤りを受け付けないので、呼び出し元は nil でない誤りだけを渡す
 
 ## 完了条件(全タスク共通)
 
