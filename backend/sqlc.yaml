@@ -1,0 +1,22 @@
+# SQL から、型の付いた問い合わせのコードを生成する設定。
+# make generate と make generate-check がこの設定を使う。生成したコードは手で直さない。
+# 表の形は、Java 版が Flyway で当てるマイグレーションのファイルから読む。
+# ファイルは V1 から順に1つずつ並べる(フォルダで指定すると、sqlc は名前の順に読むため、
+# V10 が V2 より先に来る)。マイグレーションを足したら、ここにも足す
+version: "2"
+sql:
+  - engine: postgresql
+    schema:
+      - src/main/resources/db/migration/V1__create_tables.sql
+      - src/main/resources/db/migration/V2__insert_mst_data.sql
+      - src/main/resources/db/migration/V3__create_user_token_versions.sql
+      - src/main/resources/db/migration/V4__update_master_data.sql
+      - src/main/resources/db/migration/V5__allow_nullable_portfolio_tech_stack.sql
+      - src/main/resources/db/migration/V6__change_project_portfolio_text_columns_to_text.sql
+      - src/main/resources/db/migration/V7__add_email_verification_columns.sql
+    queries: db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/platform/database/sqlcgen
+        sql_package: pgx/v5

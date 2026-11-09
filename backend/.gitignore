@@ -32,3 +32,8 @@ out/
 /dist/
 /nbdist/
 /.nb-gradle/
+
+### Go 版の backend の Makefile が書くファイル ###
+/coverage.out
+/coverage.internal.out
+/mutation-report.json

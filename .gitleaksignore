@@ -1,0 +1,7 @@
+# gitleaks の誤検知として除外する箇所(所有者が 2026-11-09 に PR #775 で受け入れた)
+# Redis のイメージの名前「valkey/valkey:8.0.12-alpine」は、名前に「key」を含むので、
+# generic-api-key の規則に秘密の値と見られる。秘密の値ではない。
+6d6405d01e52241b7e0a963f0683f421460f6707:.kiro/specs/backend-go-replacement/tasks.md:generic-api-key:644
+1b4a34adcaeca895166e94ccd085ed9224074908:.kiro/specs/backend-go-replacement/tasks.md:generic-api-key:644
+1b4a34adcaeca895166e94ccd085ed9224074908:backend/internal/platform/redisstore/redisstore_integration_test.go:generic-api-key:14
+ffee86e89d63bbcef7c2acbffe286e9aec38fa73:backend/cmd/keirekipro/main_test.go:generic-api-key:41

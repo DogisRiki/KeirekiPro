@@ -1,0 +1,15 @@
+# Go 版の backend のカバレッジの下限の設定(go-test-coverage)。
+# make coverage が、このファイルを --config で名前を指定して読む。
+# make coverage は、make test が書いた coverage.out から internal/ の下のファイルの行だけを
+# coverage.internal.out に写してから、このファイルの下限と比べる。下限の対象を ./internal/... にするためである
+profile: coverage.internal.out
+
+threshold:
+  # ./internal/... の全体の文の割合の下限
+  total: 93
+
+exclude:
+  # 数えないのは、生成したコードだけにする。パスは、モジュールの名前を除いた形で比べる
+  paths:
+    - ^internal/httpapi/gen/
+    - ^internal/platform/database/sqlcgen/

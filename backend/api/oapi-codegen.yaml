@@ -1,0 +1,9 @@
+# 仕様書 api/openapi.yaml から HTTP の受け口のコードを生成する設定。
+# make generate と make generate-check がこの設定を使う。生成したコードは手で直さない。
+# 出力の場所は Makefile が -o で渡す。ここに output を書くと、oapi-codegen は -o を使わないため、
+# generate-check が一時のフォルダに生成できなくなる
+package: gen
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
