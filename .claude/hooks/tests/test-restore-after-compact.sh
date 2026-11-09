@@ -542,6 +542,7 @@ t_claude_md_compact_instructions() {
         '/spec-review|CYCLE|ROUND|CHANGED|受け入れた指摘|却下した指摘|直さなかった外れ|Opus 5.5' \
         '/kiro-impl|検査のコマンド一式|REJECTED|debug の補助役を動かした回数' \
         '/ship|同じ失敗が続いた回数' \
+        '/memory-inspect-now|どの手順にいるか|何番目の組まで尋ねたか|「消す」と答えたメモリファイルの名前|SHA-256|「点検を中止する」を選んだかどうか' \
         '答えを待っている問いの全文|まだ Issue の本文か spec.json に書いていないもの' \
         '所有者が会話で伝えたこと|まだ作業に使っていないもの' \
         '補助役の会話なら|識別の欄の全部|FEATURE・STAGE・CYCLE・ROUND・REVIEW_FILE|判定' \
@@ -581,7 +582,7 @@ run_test "SessionStart に matcher compact で restore-after-compact.sh を呼�
 run_test "settings.json に model と effortLevel のキーが無く、spec-reviewer.md の model が claude-fable-5-1 のまま" t_settings_no_model_keys
 
 echo "--- 要約のあとに作業を続けるための文書(要件2.3・3.1・3.2・3.3・4.3)"
-run_test "CLAUDE.md に # Compact instructions の節があり、8つの項目の言葉が入っている" t_claude_md_compact_instructions
+run_test "CLAUDE.md に # Compact instructions の節があり、9つの項目の言葉が入っている" t_claude_md_compact_instructions
 run_test "spec-review の SKILL.md に「会話が要約されたあとに続けるとき」の節がある" t_spec_review_resume_section
 run_test "spec-reviewer.md に要約されたときの決まりがある" t_spec_reviewer_compact_rule
 
