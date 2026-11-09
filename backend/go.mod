@@ -17,10 +17,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.33.15
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.15
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.8
-	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.10
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.9
 	github.com/aws/aws-sdk-go-v2/service/ses v1.42.8
 	github.com/chromedp/cdproto v0.159.0
-	github.com/chromedp/chromedp v0.23.0
+	github.com/chromedp/chromedp v0.22.1
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/oapi-codegen/runtime v1.8.0
 	github.com/redis/go-redis/v9 v9.23.0
@@ -73,7 +73,7 @@ require (
 	github.com/fatih/structtag v1.2.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/getkin/kin-openapi v0.142.0 // indirect
+	github.com/getkin/kin-openapi v0.152.0 // indirect
 	github.com/go-gremlins/gremlins v0.6.0 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260213210345-44df1a37e875 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -127,7 +127,7 @@ require (
 	github.com/riza-io/grpc-go v0.2.0 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.6 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.3 // indirect
