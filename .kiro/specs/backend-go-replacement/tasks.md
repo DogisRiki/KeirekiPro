@@ -121,7 +121,7 @@
   - _要件: 12.1, 12.3, 13.5_
   - _対象の部品: database と redisstore と awsclient_
 
-- [ ] 2.6 設定と秘密の値の読み込みを作る
+- [x] 2.6 設定と秘密の値の読み込みを作る
 
   Claude は、`backend/internal/platform/config/` を作る。この部品は、`KEIREKIPRO_ENV` の値 `prod` `dev` `test` で環境を決める。`KEIREKIPRO_ENV` が無ければ、この部品は環境を `dev` にする。この部品は、Java 版の `application*.yaml` と同じ既定の値を持つ。`prod` では、タスク2.5の awsclient の Secrets Manager で design.md の表の5つの秘密の値を読み、`dev` と `test` では Java 版と同じ名前の環境変数と `KEIREKIPRO_OIDC_*` を読む。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/platform/config/...` が成功する
@@ -645,6 +645,8 @@
 - S3 のパスの形のテスト(タスク2.5で分かったこと): S3 の部品は、接続先が IP アドレスのとき、`UsePathStyle` の設定によらずパスの形で送る。`httptest` のサーバの宛先は IP アドレスなので、パスの形の確かめは、受けた要求のパスに加えて `Options().UsePathStyle` も見る
 - AWS の部品の版(タスク2.5で決めたこと): aws-sdk-go-v2 の 2026-11-06 の版は、タスク2.5の時点で公開から72時間たっていなかったので、1つ前の 2026-11-05 の版(本体 v1.47.7、config v1.33.15、s3 v1.114.8、ses v1.42.8、secretsmanager v1.50.10)を使った
 - depguard の機能のパッケージの規則(タスク2.3で分かったこと): `.golangci.yml` の depguard の規則 `feature` は、機能のパッケージが自分の下のパッケージを読むこと(例: `internal/auth` から `internal/auth/x`)も断る。機能のパッケージを作るまとまりの spec で、Claude は、その読み込みの許可を `allow` に足す
+- 外部のログインの秘密の値の読み方(タスク2.6で決めたこと): config は、`keirekipro/oidc/google` と `keirekipro/oidc/github` を、`prod` に限らず `dev` と `test` でも Secrets Manager から読む。Java 版も `dev` でこの2つを localstack から読み、比べる検査も fakeaws に登録するためである。`KEIREKIPRO_AWS_ENDPOINT` が無いときの接続先は、`dev` と `test` では Java 版の application-dev.yaml と同じ `http://localstack:4566`、`prod` では空(本当の AWS)にした
+- gosec の G101(タスク2.6で分かったこと): gosec は、名前に secret や password や token を含む定数と、その名前のキーや項目にじかに書いた文字列を、秘密の値の書き込みとみなす。テストのコードも対象である。Claude は、検査を外すコメントを書かず、定数の名前を中身を表す別の名前(例: 秘密の値の名前なら `nameRDS`)にするか、テストの値を名前付きの定数に移す
 
 ## 完了条件(全タスク共通)
 
