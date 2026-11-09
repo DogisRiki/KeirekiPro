@@ -113,7 +113,7 @@
   - 受入基準とテストの対応: 要件12の受入基準4(表の形の履歴を引き継ぐ)は、`migrate_test.go` の `TestChecksum_V1toV7`(research.md の7つの値と一致)、`TestRun_ValidateOnly_ChecksumMismatch`、`TestRun_ValidateOnly_FailedRow`、`TestRun_ValidateOnly_UnknownVersion`、`TestRun_ValidateOnly_WritesNothing`、`TestDescription_FromFileName` と、結合テスト `migrate_integration_test.go` の `TestValidateOnly_FlywayWrittenHistory`(testcontainers-go の Postgres に Flyway の形の表を作って通る)で、要件1の受入基準5(表の形を変えない)は、`TestRun_ValidateOnly_WritesNothing` で確かめる
   - _要件: 1.5, 12.4_
 
-- [ ] 2.5 データベースと Redis と AWS につなぐ部品を作る (並行可)
+- [x] 2.5 データベースと Redis と AWS につなぐ部品を作る (並行可)
 
   Claude は、`backend/internal/platform/database/` と `redisstore/` と `awsclient/` を作る。database は、接続ごとに `TimeZone` を `Asia/Tokyo` にし、接続の最大を10にする。redisstore は、本番ではクラスタの形と TLS と利用者の名前でつなぎ、`dev` と `test` では1台の形でつなぎ、Java 版と同じ Lua のスクリプトの文字列を持つ。awsclient は、S3 と SES v1 と Secrets Manager につなぎ、`dev` と `test` では `KEIREKIPRO_AWS_ENDPOINT` とパスの形を使う。3つの部品は、つなぎ先の値を引数で受け取り、設定の部品を読まない。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/platform/database/... ./internal/platform/redisstore/... ./internal/platform/awsclient/...` が成功する
@@ -641,6 +641,9 @@
 - 表の形の履歴の BASELINE の行(タスク2.4で決めたこと): Java 版は `baseline-on-migrate: true` と `baseline-version: 0` で動くので、本番の履歴に種類 `BASELINE` の行があるかもしれない。migrate は、`BASELINE` の行を受け付け、その版以下のファイルを適用済みとして扱う。design.md の失敗の一覧には無い扱いである。開発環境の履歴には `BASELINE` の行は無い
 - Go のテストの BOM と検査の値(タスク2.4で分かったこと): Go のソースの文字列に BOM のバイトをそのまま書くと、コンパイラが「illegal byte order mark」で止まるので、`"\xEF\xBB\xBF"` と書く。CRC32 は `hash.Write` でなく `crc32.Update` で計算する。`hash.Write` の誤りを捨てると gosec の G104 が止めるためである
 - testcontainers-go の Postgres(タスク2.4で決めたこと): テストの Postgres のイメージは、`docker/db/Dockerfile` と同じ版の `postgres:17.11-alpine` にする。パッケージの `TestMain` で1つのコンテナを動かし、テストごとに `CREATE DATABASE` で空のデータベースを作る
+- testcontainers-go の使い方(タスク2.5で分かったこと): v0.45.0 の `MappedPort` は moby の `network.Port` を返し、`Int()` が無い。つなぎ先は `PortEndpoint(ctx, "5432/tcp", "")` で「ホスト:ポート」を読む。Redis のテストのイメージは、`docker/redis/Dockerfile` と同じ版の `valkey/valkey:8.0.12-alpine` を `testcontainers.Run` で動かす
+- S3 のパスの形のテスト(タスク2.5で分かったこと): S3 の部品は、接続先が IP アドレスのとき、`UsePathStyle` の設定によらずパスの形で送る。`httptest` のサーバの宛先は IP アドレスなので、パスの形の確かめは、受けた要求のパスに加えて `Options().UsePathStyle` も見る
+- AWS の部品の版(タスク2.5で決めたこと): aws-sdk-go-v2 の 2026-11-06 の版は、タスク2.5の時点で公開から72時間たっていなかったので、1つ前の 2026-11-05 の版(本体 v1.47.7、config v1.33.15、s3 v1.114.8、ses v1.42.8、secretsmanager v1.50.10)を使った
 - depguard の機能のパッケージの規則(タスク2.3で分かったこと): `.golangci.yml` の depguard の規則 `feature` は、機能のパッケージが自分の下のパッケージを読むこと(例: `internal/auth` から `internal/auth/x`)も断る。機能のパッケージを作るまとまりの spec で、Claude は、その読み込みの許可を `allow` に足す
 
 ## 完了条件(全タスク共通)
