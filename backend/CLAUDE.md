@@ -1,6 +1,8 @@
-# backend ガイド(Spring Boot / オニオン+DDD+CQRS)
+# backend ガイド(Spring Boot / オニオン+DDD+CQRS と、置き換え中の Go 版)
 
-backend配下を変更するとき常に適用する。アーキテクチャ境界の多くはArchUnit
+backend配下を変更するとき常に適用する。backend には、今の本番で動く Java 版と、Issue #445 で置き換える Go 版がある。
+Java 版の決まりはこの節から「完了前コマンド」までに、Go 版の決まりは末尾の「Go 版」の節に書く。
+Java 版のアーキテクチャ境界の多くはArchUnit
 (`src/test/java/.../unit/architecture/BackendArchitectureTest.java`)が機械強制する。
 ここには機械で表現できない配置判断だけを書く。
 
@@ -64,3 +66,52 @@ bash .claude/scripts/parallel/run-check.sh backend ./gradlew check
 
 `check` = spotlessCheck + test + jacocoTestReport + **jacocoTestCoverageVerification(カバレッジ閾値)** + spotbugsMain/Test。
 閾値定義は `gradle/quality.gradle`(CODEOWNERS保護・編集禁止)。
+
+## Go 版
+
+Go 版は、Java 版を置き換えるまで、Java 版と同じ `backend/` に並べて置く。進め方と進み具合は
+`.kiro/specs/backend-go-replacement/progress.md` に書く。Java 版のオニオンの層の分け方は写さず、Go で標準的な、機能ごとのパッケージに分ける。
+
+### パッケージの分け方と依存の向き
+
+| パッケージ | 置くもの |
+|---|---|
+| `cmd/keirekipro` | 起動の入口。設定を読み、部品をつなぎ、HTTP の受け口を開く。業務の処理は書かない |
+| `internal/httpapi` | 経路の登録、まとまりの処理の束ね、共通の受け口の処理(`middleware/`)、生きているかの確認 |
+| `internal/httpapi/gen` | `api/openapi.yaml` から生成したコード。手で直さない(`make generate` で作り直す) |
+| `internal/<機能>` | 機能のまとまりごとの処理(例: `internal/auth`)。まとまりの spec で足す |
+| `internal/platform/<部品>` | 機能によらない部品(設定、データベース、表の形の履歴、Redis、AWS、ログ、PDF) |
+| `internal/platform/database/sqlcgen` | `db/queries/*.sql` から sqlc で生成したコード。手で直さない |
+
+- 依存の向きは、`cmd/keirekipro` → `internal/httpapi` → 機能のパッケージ → `internal/platform` の一方向とする。`.golangci.yml` の depguard が機械で止める
+- 機能のパッケージどうしの依存は、まとまりの spec で depguard の許可に足したものだけを許す。`.golangci.yml` はゲート設定なので、足すときは理由を添えて所有者に提案する
+- HTTP の受け口の型は、仕様書(`api/openapi.yaml`)から生成する。受け口を変えるときは、仕様書を直してから `make generate` を動かす
+- 表の形は、Java 版を削除するまで Java 版の Flyway が変える。Go 版は、起動のときに履歴を確かめるだけにする
+
+### 品質チェックのコマンド
+
+すべて作業フォルダの最上位から、`run-check.sh` の領域 `backend-go` で動かす。
+
+```
+bash .claude/scripts/parallel/run-check.sh backend-go make fmt
+bash .claude/scripts/parallel/run-check.sh backend-go make check
+```
+
+- `make check` は、書式の検査、生成したコードの食い違いの検査、静的な検査と依存の向きの検査、テスト(`-race`)、カバレッジの下限(`./internal/...` の文の93%)の検査、ビルドを順に動かす。Java 版の `./gradlew check` に当たる
+- 作業の途中は、変えたパッケージのテストだけを流す(例: `bash .claude/scripts/parallel/run-check.sh backend-go go test -race -count=1 ./internal/platform/pdf/...`)
+- `make vuln` は呼ばれる箇所のある脆弱性を調べる。`make mutation-diff BASE=<git の参照>` は変えた箇所の変異テストで、git の履歴が要るので CI で動く
+- 本番のイメージは、`docker build -f docker/backend-go/Dockerfile.prod backend` で組み立てる
+- 結合テストは testcontainers-go で Postgres と Redis を動かす。Docker は compose の `dind` を使う
+- テストを足したら、Java 版と同じく、対象のコードを壊して赤くなることを確かめてから戻す(`.kiro/steering/tech.md` の「テストの完全性」)
+- `t.Skip`・`//nolint`・検査の設定を緩める変更で、見かけの合格を作らない(escape-hatch の検査が見つける)
+
+### Redis と S3 の形を変えるとき(2回の出荷)
+
+Redis のキーの名前と値の形、S3 のオブジェクトのキーの形は、Java 版と Go 版の取り決めである。Go 版は Java 版と同じ形を使う。
+Java 版を削除したあとに形を変えるときは、利用者がログアウトされず、途中の手順をまたぐ操作を最後まで終えられるように、変更を2回の出荷に分ける。
+
+1. 1回目の出荷: Go 版は、古い形と新しい形の両方を読み、古い形で書く
+2. 古い形で書いた値がすべて期限切れになるまで待つ。ログインを続けるためのトークンの有効な時間が7日なので、7日待つ
+3. 2回目の出荷: Go 版は、新しい形で書く
+
+1回の出荷で読み方と書き方を同時に変えない。ECS の入れ替えの途中では、古い版と新しい版の両方が同じ Redis と S3 を読み書きするためである。

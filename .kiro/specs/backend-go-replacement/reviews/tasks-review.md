@@ -86,3 +86,94 @@
 | T2-1-2 | design | 「段階6の削除と書き換え」の 6-1 の「段階2で足した移行のための条件を、次の5つのとおりに消すか元の1つの形に戻す」の一覧(758〜765行目)、「CI の仕事」の `backend_go` の `backend/go.mod` の条件の段(459行目)と、`check-verify-before-stop.sh` の見分け方の箇条(96行目) | design に足した「検査するコミットに `backend/go.mod` があるときだけ当たる」条件は、段階2で足す移行のための条件だが、6-1 で消す5つの一覧に無く、`backend_compat` の見分けのように「6-1 で消す」とも書いていない。tasks の 10.5 は 6-1 でこの条件を消すと書いており、tasks のほうが design より先に決めている。食い違いではないが、design の一覧に6つ目として足せば、10.5 の根拠が design に揃う。また、96行目の「見分け方は …`backend_java` と `backend_go` と同じにする」が、この条件を含むかも design に書くと、tasks の 1.2(指摘 T2-1-1)の読み方が1つに決まる |
 
 - 往復: 1回で収束 / 未解決: 0件
+
+## サイクル3 往復1(2026-11-09)
+
+### 審査の範囲
+
+範囲: 差分
+
+- tasks.md タスク3.5(227〜229行目。CB-001 から CB-009 の9つ、記録だけの項目、`match` の照らし方、足したテスト)、design.md 「変えた動きの一覧の形」の `match` の説明(842行目)と表(846〜856行目)と CB-005〜CB-009 の箇条(862〜866行目)、「compat harness」の比べるヘッダの箇条(563行目)、「テストの方針」の比べる検査の土台(944行目)、「安全」の1つ目の箇条(959行目): 3.5 の項目の数、記録だけにする4つの項目、`operation: "*"` と `status` と `target: header` の `path` の読み方が design と合うかを照らした。合っている。記録だけの項目の確かめと書き方は指摘 T3-1-1
+- tasks.md タスク3.4(`TestCompareHeaders_OnlySelected`)、タスク8.3、13.x の `changed-behaviors.yaml` を名指す行: 3.5 の項目の数が変わったことで、ヘッダの比べ方と一覧を示す・移す手順が変わるかを確かめた。どれも項目の数を書いていないので、影響なし
+- tasks.md 大タスク1と2の箱の [x] と、2.1〜2.13 の `_保留:_` の削除: 実装を進めた印の差分で、タスクの本文と確かめ方は変わっていない。影響なし
+- tasks.md 実装のメモ「所有者に置いてもらう」「`.github/` の置き場」、`.claude/settings.json` の `Write(.github/**)`、`.github/CLAUDE.md` の scratchpad の決まり、requirements.md 要件7の受入基準5: `.github/` の下の完成版を会話ごとの scratchpad に作る決まりと、会話が途切れたときの続け方を照らした。指摘 T3-1-3
+- tasks.md 実装のメモ「Go のモジュールの索引の読み方」、タスク1.7 の本文と「受入基準とテストの対応」、design.md 「Dependabot と公開の時刻の検査と脆弱性の直し」(507行目と509行目)、`.github/scripts/check-release-age.sh`(33行目と206〜208行目)、`.github/scripts/tests/test-check-release-age.sh`(654〜659行目): 索引を区間に分けて同時に読む形と、design の「順に読む」の文と、`toolchain` の行を照らさないことを確かめた。指摘 T3-1-2、前の段階への指摘 T3-1-5、申告2
+- tasks.md 実装のメモ「表の形の履歴の BASELINE の行」、タスク2.4、design.md 「migrate」の失敗したとき(343行目)、`backend/internal/platform/migrate/migrate.go`(65行目)と `migrate_test.go`(153行目): BASELINE の行を受け付ける扱いが design の文と合うかを照らした。指摘 T3-1-2、前の段階への指摘 T3-1-6
+- tasks.md 実装のメモ「外部のログインの秘密の値の読み方」、タスク2.6、design.md 「config」の環境ごとの値(316〜325行目)と「compat harness」の秘密の値(593行目): `dev` と `test` で外部のログインの秘密の値を Secrets Manager から読む扱いが design の文と合うかを照らした。前の段階への指摘 T3-1-7
+- tasks.md 実装のメモ「HTTP の受け口の共通部分」の9つの箇条、design.md 「httpapi」の中間処理の3(367〜373行目)、CB-006〜CB-009、`backend/src/main/java/com/example/keirekipro/presentation/security/config/SecurityConfig.java`(136〜141行目)、`backend/src/main/resources/application-prod.yaml`(3行目)、`backend/internal/httpapi/middleware/csrf.go`(49〜53行目): Cookie `XSRF-TOKEN` の性質を Path=/ だけにする扱いを Java 版と照らした。Java 版は `CookieCsrfTokenRepository` で `Secure` を要求が TLS かで決め、本番は `forward-headers-strategy: none` なので、本番でも `Secure` は付かない。Go 版の Path=/ だけと合う。ほかの箇条も design の文と合う。影響なし
+- tasks.md 実装のメモ「Go の検査の外しの検知」、タスク2.3、`backend/.golangci.yml`(6〜8行目、23〜26行目)、`backend/Makefile`(20〜22行目、74〜116行目): gosec が `#nosec` に従わない設定と、設定のファイルを名前で渡すことが入っていることを確かめた。影響なし
+- tasks.md 実装のメモ「起動の入口」の gremlins の制約、タスク2.10、2.13: 入口の変異が数えられないことと、PR の CI の `make mutation-diff` の扱いを照らした。申告1
+- tasks.md 実装のメモ「depguard の機能のパッケージの規則」、タスク2.3: 規則が広く断ることを、まとまりの spec に任せる扱いを照らした。申告3
+- tasks.md 実装のメモ「CodeQL の Go の解析」、タスク2.13 の「完了の確かめ方」: PR 2-2 で確かめることが、2.13 の確かめ方にあるかを照らした。指摘 T3-1-4
+- tasks.md 実装のメモのほかの足した箇条(報告の置き場、golangci-lint の版、テストの環境、コードの生成、3つの入口、カバレッジの測り方、BOM と検査の値、testcontainers-go、S3 のパスの形、AWS の部品の版、gosec の G101、ログの形、PDF の部品、本番のイメージ): 前後の文と、名指すタスク(1.5、2.1〜2.11、3.1、3.4、3.8〜3.9)と design の同じ部品の文を読み、タスクの本文と食い違わないことを確かめた。影響なし
+
+### 申告
+
+**1. 起動の入口を `cmd/keirekipro/main.go` に置いたまま、gremlins が入口の変異を数えられないことを受け入れる** — tasks.md 実装のメモ「起動の入口(タスク2.10で分かったこと)」、タスク2.10、2.13
+
+- Issue の記載: あり。「今と同じ種類の自動品質チェックを、Go側にそろえてから切り替える」。入口の置き場所は書いていない
+- 決めたこと: 入口を design のとおり `cmd/keirekipro` に置く。gremlins v0.6.0 では、そこの変異がすべて LIVED か NOT COVERED になる。PR の CI の `make mutation-diff` が赤になったら、所有者の判断を受ける
+- 他にありえた選択肢: 起動の処理(設定の読み込み、部品のつなぎ、止め方)を、名前が main でない別のパッケージ(例: `internal/app`)に置き、`main.go` には `os.Exit(app.Run(...))` の1行だけを残す。そうすれば、変異のほとんどが数えられるパッケージに入る
+- 外れていた場合: PR 2-2 だけでなく、まとまりの spec が機能の受け口を入口につなぐたびに、差分が小さい PR ほど `--threshold-mcover 93` に届かず、`backend-go` が赤になる。そのたびに所有者の判断が要る。あとで別のパッケージに移すと、入口のテストの書き直しが要る
+
+**2. go.mod の `toolchain` の行を、Dependabot の PR の公開の時刻の検査で照らさず、Dependabot がこの行を変えるかを確かめていない** — tasks.md 実装のメモ「Go のモジュールの索引の読み方(タスク1.8で分かったこと)」の最後の2文、タスク1.8、`.github/scripts/check-release-age.sh` 206〜208行目
+
+- Issue の記載: なし(要件3の受入基準1が「公開から72時間たっていない部品を止める検査」を求める)
+- 決めたこと: `check-release-age.sh` は `go` と `toolchain` の行を照らさない。`toolchain` の行だけを変える Dependabot の PR は、索引を読まずに予約の判定(reserve)になる(テストの654〜659行目)。Dependabot がこの行を変えるかは、あとに残した
+- 他にありえた選択肢: `toolchain` の行の版を、Go の公式の配布の一覧(go.dev の版の一覧)の公開の時刻で照らす。または `toolchain` の行が変わった PR は通知(notify)にする
+- 外れていた場合: Dependabot が `toolchain` を上げる PR を作ると、公開から72時間たっていない Go の版が自動でマージされ、CI と本番のイメージの組み立てで使われる。design.md 509行目は、`backend-vuln-fix` が `toolchain` を上げる PR について「公開から72時間たっていなければ公開の時刻の検査で止まる」と書いており、`check-dependency-cooldown.sh` が `toolchain` の行を拾うかも確かめられていない
+
+**3. depguard の規則 `feature` が機能のパッケージから自分の下のパッケージを読むことも断るのを、今は直さず、まとまりの spec で `allow` を足す** — tasks.md 実装のメモ「depguard の機能のパッケージの規則(タスク2.3で分かったこと)」
+
+- Issue の記載: なし
+- 決めたこと: PR 2-2 の `.golangci.yml` の規則は広く断ったままにし、機能のパッケージを作るまとまりの spec が、その機能の読み込みの許可を足す
+- 他にありえた選択肢: PR 2-2 で、5つのまとまりのパッケージの名前の分の `allow` を先に書く
+- 外れていた場合: `.golangci.yml` は承認の対象なので、まとまりの spec の PR ごとに所有者の承認が要る。まとまりの spec がこのメモを読まずに作ると、`make lint` が depguard で落ちてから気づく。手戻りは小さい
+
+**4. テストを省略可能な印(`- [ ]*`)にしたタスク**: 今回の差分には無い
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| T3-1-1 | 低 | tasks.md タスク3.5 の本文(「CB-005 の…項目と、CB-007 の…、CB-008 の…、CB-009 の…の3つの項目を、`match` を持たない記録だけの項目にする」)と「受入基準とテストの対応」 | 記録だけの項目は4つだが、本文は4つを並べたあとに「3つの項目」と書くので、CB-005 を数に入れるのかで読み方が2つになる。また、確かめのテストは `TestLoadChangedBehaviors_CB005HasNoMatch` だけで、CB-007〜CB-009 が `match` を持たないことを確かめるテストが無い。どれかに `match` を書いてしまうと、許す範囲が広がっても止まらない。ただし、design ではこの3つの経路と要求を比べる検査が送らないので、実装への影響は小さい | 本文を「CB-005、CB-007、CB-008、CB-009 の4つの項目を、`match` を持たない記録だけの項目にする」と書く。テストを `TestLoadChangedBehaviors_RecordOnlyHaveNoMatch`(4つの項目が `match` を持たない)にする |
+| T3-1-2 | 低 | tasks.md タスク1.7 の本文(「73時間前から `since` で順に1度だけ読み」)と、タスク2.4 の本文(「design.md の「migrate」のとおり」)。実装のメモ「Go のモジュールの索引の読み方」「表の形の履歴の BASELINE の行」 | 実装のメモは、1.7 の索引を4時間ずつの区間に分けて約19本を同時に読むことと、2.4 の migrate が BASELINE の行を受け付けることを、design の文と違う扱いとして書いた。一方、2つのタスクの本文はそのまま「順に読む」「design のとおり」と書く。タスクの本文と実装のメモが食い違い、本文だけを読むと今のコードが誤りに見える。2つのタスクは終わっているので、実装は変わらない | 1.7 と 2.4 の本文に「実装のメモの「…」のとおり、…とした」の1文を足す |
+| T3-1-3 | 低 | tasks.md 実装のメモ「`.github/` の置き場(タスク1.4で分かったこと)」(「大タスクの最後の小タスクで所有者に置いてもらうまで、同じ会話で進める」) | `.github/` の下のファイルの完成版を、会話ごとの scratchpad に作ると決めた。残りの大タスク5、7、10も `.github/` の下を変える。要件7の受入基準5は、会話が途切れても、リポジトリと GitHub の記録から読み直して続けることを求める。新しい会話は、前の会話の scratchpad の場所を知らないので、前の会話で作った完成版を見つけられず、作り直すことになる。作り直せば済み、実装の中身は変わらない | 大タスクの最初に `.github/` の完成版を作るとき、Claude が scratchpad の絶対パスを `.claude/.state/backend-go-replacement/place-<大タスクの番号>/github-scratchpad.txt` に書き、会話が途切れたら新しい会話でそのパスから読み直す、と1文足す |
+| T3-1-4 | 低 | tasks.md タスク2.13「完了の確かめ方」、実装のメモ「CodeQL の Go の解析(タスク1.6で分かったこと)」 | 実装のメモは、`backend/go.mod` を足す PR 2-2 で、CodeQL の `go` の仕事が成功したことを `gh run view` で確かめると決めた。しかし、PR 2-2 を出すタスク2.13 の「完了の確かめ方」は `backend-go` と `backend-test` の成功だけを挙げ、CodeQL の `go` の仕事が無い。2.13 は [x] になっている。CodeQL が必須の検査なら、失敗すれば PR が止まって気づくので、影響は小さい | 2.13 の「完了の確かめ方」に「PR の CI の CodeQL の `go` の仕事が成功する(失敗したら `setup-go` の手順を足す提案を所有者に出す)」を足す |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| T3-1-5 | design | 「Dependabot と公開の時刻の検査と脆弱性の直し」の公開の時刻の検査の段落(507行目。「72時間と1時間前から `since` で順に読み」「索引は1回の検査で1度だけ読み」) | タスク1.8 で、index.golang.org は1回の問い合わせに約4秒かかり、順に読むと約10分かかって判定の手順の5分の上限に収まらないと分かった。そのため `lib-gomod-index.sh` は、73時間を4時間ずつの区間に分けて約19本を同時に読む。design の文は「順に読む」のままである。PR の判定の基準は design なので、このスクリプトを直す PR で、design の文と食い違って見える。design の文を、区間に分けて同時に読み、区間の中は順に読む形に直すかを、所有者に確かめてもらう |
+| T3-1-6 | design | 「migrate」の失敗したとき(343行目。「記録の版がファイルに無いときは、この部品はエラーを返す」)と、「テストの方針」の migrate(936行目) | Java 版は `baseline-on-migrate: true` と `baseline-version: 0` で動くので、本番の履歴に種類 `BASELINE` で版 `0` の行があるかもしれない。版 `0` のファイルは無いので、design の文のとおりに作ると、Go 版はその行でエラーを返して起動しない。タスク2.4 は BASELINE の行を受け付ける形で作ったが(実装のメモ「表の形の履歴の BASELINE の行」)、design の文は変わっていない。PR 2-2 の判定の基準は design なので、design の失敗したときの文に、BASELINE の行を受け付け、その版以下を適用済みとして扱う一文を足すかを、所有者に確かめてもらう |
+| T3-1-7 | design | 「config」の環境ごとの値(325行目。「Go 版は、`dev` と `test` では、秘密の値の代わりに…環境変数…を読む」) | タスク2.6 で、config は `keirekipro/oidc/google` と `keirekipro/oidc/github` を、`dev` と `test` でも Secrets Manager から読むことにした(実装のメモ「外部のログインの秘密の値の読み方」)。Java 版も `dev` でこの2つを localstack から読み、比べる検査も fakeaws に登録する(593行目)ためである。また、`KEIREKIPRO_AWS_ENDPOINT` が無いときの接続先を、`dev` と `test` では `http://localstack:4566` にした。design の325行目は、`dev` と `test` では秘密の値の代わりに環境変数を読むと書き、外部のログインの秘密の値をどこから読むかを書いていない。design の文に、外部のログインの秘密の値は `dev` と `test` でも Secrets Manager から読むことと、接続先の既定を足すかを、所有者に確かめてもらう |
+
+- 往復: 1回で収束 / 未解決: 0件
+
+## サイクル4 往復1(2026-11-09)
+
+### 審査の範囲
+
+範囲: 差分
+
+- tasks.md タスク1.7 の本文と「受入基準とテストの対応」、実装のメモ「Go のモジュールの索引の読み方」、design.md 「Dependabot と公開の時刻の検査と脆弱性の直し」(518行目)、`.github/scripts/tests/test-lib-gomod-index.sh`(195〜201行目、296〜345行目): 1.7 の本文が design の節を名指して「4時間ずつの区間に分けて同時に読み、区間の中は `since` で順に読む」と書くようになった。design の518行目に同じ読み方と理由が書かれ、名指した節の見出しが505行目にあることを確かめた。「1度だけ読み」は design の「索引は1回の検査で1度だけ読み」と合い、テストの「索引を1度だけ読む」の場合もある。実装のメモの「design.md の…にも、この読み方を書いた」も事実と合う。サイクル3の T3-1-2 と T3-1-5 は解消している。影響なし
+- tasks.md タスク2.4 の本文と「受入基準とテストの対応」(`TestRun_ValidateOnly_BaselineRow` の追加)、実装のメモ「表の形の履歴の BASELINE の行」、design.md 「migrate」の失敗したとき(354行目)と「テストの方針」の migrate(947行目)、`backend/internal/platform/migrate/migrate_test.go`: 2.4 が design の「migrate」を名指して BASELINE の行を受け付けると書くようになった。design の354行目と947行目に同じ扱いがあり、`migrate_test.go` の150行目に `TestRun_ValidateOnly_BaselineRow` があることを確かめた。サイクル3の T3-1-2 と T3-1-6 は解消している。影響なし
+- tasks.md タスク3.5 の本文と「受入基準とテストの対応」、design.md 「変えた動きの一覧の形」(835行目): 記録だけの項目を「CB-005、CB-007、CB-008、CB-009 の4つ」と書くようになり、T3-1-1 の数の読み方の揺れが無くなった。照らし方は design の節を名指して文の位置を前に移しただけで、`operation: "*"`、`status`、`target: header` の読み方は変わっていない。テストは `TestLoadChangedBehaviors_CB005HasNoMatch` のままで、これは T3-1-1 の後半(低)であり、今回の差分では変わっていないので、もう一度出さない
+- tasks.md タスク7.1 と 12.x の `_保留:_`(`plan_only` の手順の文を消した)、タスク6.1(349〜355行目)、11.1(515〜521行目)、7.3(378行目)、実装のメモ「`terraform-apply.yaml` の実行の確かめ方」(609行目)、design.md 「runbook.md」の操作1(1022行目): `_保留:_` の行から消した `plan_only` の2回の起動の手順が、6.1 と 11.1 の本文と 7.3 の runbook と design に残っていること、保留の条件(本番に反映したあと)を確かめる手順が609行目の「Terraform Apply」のステップの成功で残っていることを確かめた。手順は失われていない。影響なし
+- tasks.md タスク10.3 と design.md 「消す一覧」(1052行目): Java 版と一緒に消えるものの文を分けただけで、並べたものは前と同じである。design の1052行目の並びのうち `docker/backend/Dockerfile` の使われない `COPY` は、10.3 が `docker/backend/` を消すことで扱われる。差分の前からの形で、影響なし
+- tasks.md タスク1.1、2.7、3.1、3.7、3.8、3.9、7.2、10.x(`gradle-wrapper` を消すタスク)、実装のメモ「所有者に置いてもらう」「golangci-lint の版」「カバレッジの測り方」「testcontainers-go の使い方」「S3 のパスの形のテスト」「ログの形」「HTTP の受け口の共通部分」の検査するメソッドと経路、「PDF を作る部品」「起動の入口」: 書き方の点検で、主語を足し、長い文と括弧の中の文を分け、語を言い換えた差分。前後の文と、名指す design の部品(「logging」「compat harness」「cross」「perf」「backend-deploy.yaml と release.yaml」「httpapi」)を読み、数・名前・値・条件が前と同じで、中身が変わっていないことを確かめた。影響なし
+
+### 申告
+
+(今回の差分で新しく申告するものはない。差分は、サイクル3の指摘と前の段階への指摘への直しと、書き方の点検の直しであり、新しく決めたことを含まない)
+
+### 指摘
+
+(指摘なし)
+
+### 前の段階への指摘
+
+(なし)
+
+- 往復: 1回で収束 / 未解決: 0件
