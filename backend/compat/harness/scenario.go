@@ -44,6 +44,9 @@ type Scenario struct {
 	Fixtures []string `yaml:"fixtures"`
 	Modes    []string `yaml:"modes"`
 	Steps    []Step   `yaml:"steps"`
+	// MeasureMemory が true のとき、応答の時間の比べ方は、最後の段を同時に PerfConcurrency 件送ったときの、
+	// Go 版のコンテナのメモリの最大も測る。PDF の出力の筋書きに書く。
+	MeasureMemory bool `yaml:"measure_memory"`
 }
 
 // Step は、筋書きの1つの段である。
@@ -176,7 +179,28 @@ func (s Scenario) validate() error {
 	if s.HasMode(ModeCross) {
 		errs = append(errs, s.validateCross()...)
 	}
+	errs = append(errs, s.validatePerf()...)
 	return errors.Join(errs...)
+}
+
+// validatePerf は、応答の時間の比べ方の欄を確かめる。
+// 測るのは最後の段なので、最後の段が成功したかを確かめるために、最後の段の expect の status を求める。
+// 失敗の応答の時間を測っても、操作の時間を比べたことにならないためである。
+func (s Scenario) validatePerf() []error {
+	if !s.HasMode(ModePerf) {
+		if s.MeasureMemory {
+			return []error{fmt.Errorf("measure_memory は、動かし方 %s の筋書きにだけ書けます", ModePerf)}
+		}
+		return nil
+	}
+	if len(s.Steps) == 0 {
+		return nil
+	}
+	last := s.Steps[len(s.Steps)-1]
+	if last.Expect.Status == 0 {
+		return []error{fmt.Errorf("動かし方 %s の筋書きの最後の段 %s に expect の status がありません", ModePerf, last.Name)}
+	}
+	return nil
 }
 
 // validateCross は、版をまたぐ動かし方で動く筋書きの形を確かめる。

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"regexp"
 	"slices"
@@ -47,6 +48,15 @@ type sessionCookie struct{ name, value, path string }
 // NewSession は、Cookie も取り出した値も無い Session を返す。
 func NewSession() *Session {
 	return &Session{cookies: map[cookieKey]string{}, vars: map[string]string{}, now: time.Now}
+}
+
+// Clone は、今の Cookie と取り出した値を写した、別の Session を返す。
+// 1つの Session は同時に使えないので、同じ利用者として同時に要求を送るときは、要求ごとに写しを使う。
+func (s *Session) Clone() *Session {
+	c := &Session{cookies: make(map[cookieKey]string, len(s.cookies)), vars: make(map[string]string, len(s.vars)), now: s.now}
+	maps.Copy(c.cookies, s.cookies)
+	maps.Copy(c.vars, s.vars)
+	return c
 }
 
 // Send は、段 step の要求を baseURL の版に送り、応答を返す。応答の Set-Cookie を覚え、capture の値を取り出す。
