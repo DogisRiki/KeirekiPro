@@ -195,7 +195,7 @@
   - 受入基準とテストの対応: 要件4の受入基準5(同じ要求を送って比べる検査を作る)の土台は、`harness_test.go` の `TestLoadScenario_ParsesSteps`、`TestLoadScenario_RejectsUnknownMode`、`TestNetwork_ContainersResolveByName` で、Go 版の本番のイメージの起動の時間は `TestStartup_Over10sFails` と `TestStartup_Within10sPasses` で確かめる
   - _要件: 4.5_
 
-- [ ] 3.2 AWS の代わりを作る (並行可)
+- [x] 3.2 AWS の代わりを作る (並行可)
 
   Claude は、`backend/compat/fakeaws/`(ビルドタグ `compat`)と、その `Dockerfile`(`golang:1.27.3-trixie` で組み立て、digest で固定した `gcr.io/distroless/static-debian13:nonroot` に置く)を作る。fakeaws は、S3 のパスの形の `PutObject` `GetObject` `DeleteObject` と署名付きの URL の `GetObject`、SES v1 の `SendEmail`、Secrets Manager の `GetSecretValue` を受け、受けたものを版ごとに覚えて返す。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/fakeaws/...` が成功する
@@ -674,6 +674,11 @@
   - gremlins の読むファイル: gremlins v0.6.0 は、ビルドタグを見ずに、テストでないすべての .go のファイルを変異の対象にするので、`backend/compat/` のファイルの変異は NOT COVERED になり、CI の `make mutation-diff` の下限を割る。比べる検査は `make check` のテストに入らないためである。直すには `.gremlins.yaml` の `exclude-files` に `^compat/` を足す。`.gremlins.yaml` は承認の対象のゲート設定なので、Claude は、タスク3.10で PR を出すときに、理由を添えて所有者に提案する
   - Dockerfile が組み立ての文脈の外にあるときの組み立て方: testcontainers-go の FromDockerfile は Dockerfile が文脈の中にあることを求めるので、harness は、`.dockerignore` を当てた文脈の tar を自分で作り、Dockerfile を `.compat-dockerfile` の名前で tar に足して組み立てる
   - イメージの名前: 同じ dind を使う検査どうしでイメージを取り違えないように、harness は、組み立てるたびに乱数のタグを付け、検査の終わりにタグだけを消す。層は消さずに、次の組み立てのキャッシュに使う
+- AWS の代わり(タスク3.2で分かったこと): 次の4つが分かった。
+  - 版の分け方: fakeaws は、要求の宛先のホスト名で版を分ける。`fakeaws-java` なら java、`fakeaws-go` なら go で、そのほかの名前(版をまたぐ確認で両方がつなぐ `fakeaws` など)は共有の版 `shared` になる。harness の `ContainerSpec` は名前を1つしか持たないので、比べる検査では、fakeaws のコンテナに `fakeaws-java` と `fakeaws-go` の2つの名前を付けられるようにする
+  - 比べる検査の口: 秘密の値の登録は `PUT /_compat/<版>/secrets/<名前>`、覚えたものの読み出しは `GET /_compat/<版>/objects` と `GET /_compat/<版>/emails`、記録を空にするのは `DELETE /_compat/records`(秘密の値は残す)。S3 と SES と Secrets Manager の受けると決めていない操作と、どの口にも当たらないパスは、501 で断り、`fakeaws_unexpected_request` をログに出す。ログの `operation` に、断った操作の名前が入る。ただし、`/_compat/` の下の決めていないパスへの GET と PUT と DELETE は、S3 のオブジェクトの操作として扱われるので、harness は `/_compat/` の口の名前を書き誤らないようにする
+  - Java 版の署名付きの URL: Java 版の開発の設定(`LocalstackPresignedUrlTransformer`)は、署名付きの URL のホストを localhost に置き換えるので、harness がその URL を読むときは、宛先と Host を fakeaws の版の名前に直して読む
+  - 本文の形: AWS の SDK が aws-chunked の形で送る本文は、fakeaws が中身を取り出して覚える。ETag は本文の SHA-256 の先頭から作る(SDK は ETag でなく CRC32 で本文を確かめる)。Java 版の SDK がこの形で読み書きできるかは、タスク3.10で Java 版を動かすまで確かめられない
 
 ## 完了条件(全タスク共通)
 
