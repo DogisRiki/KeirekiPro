@@ -63,6 +63,7 @@ info:
     ## API でない URL
 
     この文書に載せていない URL のうち、Go 版が受け付けるのは次の2つだけである。ほかの URL には 404 を返す。
+    ただし、GET・HEAD・OPTIONS のほかの要求は、先に CSRF の検査にかけるので、トークンが一致しなければ 403 を返す。
     - `/actuator/health` と `/healthz`: 生きているかの確認。認証不要。Go 版は、データベースに `SELECT 1` を送り、
       通れば 200 と `{"status":"UP"}` を、通らなければ 503 と `{"status":"DOWN"}` を返す。
       ALB とコンテナは、Java 版を消すまで `/actuator/health` を使い、Java 版を消すときに `/healthz` に替える。

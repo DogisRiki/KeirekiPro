@@ -224,9 +224,9 @@
 
 - [ ] 3.5 変えた動きの一覧と違いを許す範囲を作る
 
-  Claude は、`backend/compat/changed-behaviors.yaml` に、design.md の変えた動きの一覧の CB-001 から CB-005 の5つの項目を書き、比べる検査が違いを一覧の `match` と照らす処理を作る。Claude は、CB-005 の、JSON で文字を `\uXXXX` の形で書くかどうかの項目を、`match` を持たない記録だけの項目にする。
+  Claude は、`backend/compat/changed-behaviors.yaml` に、design.md の変えた動きの一覧の CB-001 から CB-009 の9つの項目を書き、比べる検査が違いを一覧の `match` と照らす処理を作る。Claude は、CB-005 の、JSON で文字を `\uXXXX` の形で書くかどうかの項目と、CB-007 の `TRACE` の要求の偽の送信の検査、CB-008 の `/actuator` の下の要求の偽の送信の検査、CB-009 の API の説明画面の経路への要求の偽の送信の検査の3つの項目を、`match` を持たない記録だけの項目にする。比べる検査は、design.md の「変えた動きの一覧の形」のとおりに、違いを `match` と照らす。比べる検査は、`operation` が `"*"` の項目をすべての操作に当て、`status` を書いた項目を両方の版のステータスがその値のときだけ当て、`target` が header の項目では `path` をヘッダの名前として読む。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
-  - 受入基準とテストの対応: 要件4の受入基準6(一覧に載せた違いでは止めない)と要件9の受入基準5と6(変えた動きの一覧)は、`match_test.go` の `TestMatch_OrderOnlyAllowsReorder`、`TestMatch_OtherOperationNotAllowed`、`TestLoadChangedBehaviors_RequiredFields`、`TestLoadChangedBehaviors_CB005HasNoMatch` で確かめる
+  - 受入基準とテストの対応: 要件4の受入基準6(一覧に載せた違いでは止めない)と要件9の受入基準5と6(変えた動きの一覧)は、`match_test.go` の `TestMatch_OrderOnlyAllowsReorder`、`TestMatch_OtherOperationNotAllowed`、`TestMatch_AnyOperation`、`TestMatch_StatusLimitsScope`(`status` を書いた項目が、ほかのステータスの違いを許さない)、`TestMatch_HeaderPath`、`TestLoadChangedBehaviors_RequiredFields`、`TestLoadChangedBehaviors_CB005HasNoMatch` で確かめる
   - _要件: 4.6, 9.5, 9.6_
   - _保留: 3.1 と同じ_
 
@@ -648,10 +648,37 @@
 - 外部のログインの秘密の値の読み方(タスク2.6で決めたこと): config は、`keirekipro/oidc/google` と `keirekipro/oidc/github` を、`prod` に限らず `dev` と `test` でも Secrets Manager から読む。Java 版も `dev` でこの2つを localstack から読み、比べる検査も fakeaws に登録するためである。`KEIREKIPRO_AWS_ENDPOINT` が無いときの接続先は、`dev` と `test` では Java 版の application-dev.yaml と同じ `http://localstack:4566`、`prod` では空(本当の AWS)にした
 - gosec の G101(タスク2.6で分かったこと): gosec は、名前に secret や password や token を含む定数と、その名前のキーや項目にじかに書いた文字列を、秘密の値の書き込みとみなす。テストのコードも対象である。Claude は、検査を外すコメントを書かず、定数の名前を中身を表す別の名前(例: 秘密の値の名前なら `nameRDS`)にするか、テストの値を名前付きの定数に移す
 - ログの形(タスク2.7で決めたこと): Java 版の Spring Boot 4.1.2 の ECS のログは、`log.level` のような点を含む名前を、平らなキーでなく入れ子のオブジェクト(`{"log":{"level":...}}`)で書く。`slog.JSONHandler` は最上位の level と msg と time を入れ子に移せないので、logging は自作の `slog.Handler` にした。`logging.ErrorAttr` は nil の誤りを受け付けないので、呼び出し元は nil でない誤りだけを渡す
-- HTTP の受け口の共通部分(タスク2.8で決めたこと): 偽の送信の検査は、design の「httpapi」の節の文のとおりに作り、Java と Spring の内部の動きには合わせない(要件9が同じにするのは画面から見える動きだけで、受入基準5は利用者が目にしない動きを Go の作り方に変えてよいとする)。Go 版は、トークンが合わない要求に 403 を返すとき、毎回新しい Cookie XSRF-TOKEN を付ける。検査しないメソッドは GET と HEAD と OPTIONS だけで、TRACE も検査する。/actuator の下は検査から外さない(Go 版の /actuator の下は GET だけである)。Cookie XSRF-TOKEN の性質は、design の「安全」の節が Java 版と同じにすると決めているので、Path=/ だけを付け、SameSite と Secure を足さない。トークンは、Spring の UUID の形を写さず、Go の標準の crypto/rand.Text で作る。design の文に無いこととして、/api/auth の下だけは検査から外す。画面がログインに使う通信の部品(frontend の publicApiClient)がトークンをヘッダに写さないので、検査すると今の画面からログインできなくなるためである(要件9の受入基準1)。Java 版と変えた3つの動き(403 のときの Cookie の作り直し、TRACE の検査、/actuator の POST の検査)は、「httpapi」の節の文には従うが、「安全」の節の「偽の送信の検査は、比べる検査が Java 版と同じであることを確かめる」と食い違う。design の変えた動きの一覧(CB-001〜CB-005)にも、この3つは無い。この食い違いと /api/auth の除外は、出荷の前に所有者の判断を受ける。gosec の G124 は `http.Cookie` に Secure と HttpOnly と SameSite のすべてを求めるが、XSRF-TOKEN は画面の JavaScript が読むので HttpOnly を付けられない。そのため、csrf.go は `http.Cookie` を使わずに Set-Cookie の行をじかに書く。テストの要求の Cookie は、`req.AddCookie` でなく Cookie のヘッダで送る。生成したコードが経路と問い合わせと Cookie とヘッダの値の形の誤りで呼ぶ受け口は、Java 版と同じ 500 を返し、ログには誤りの型だけを書く。誤りの文が Cookie の値を含みうるためである。4xx に変えるかは、まとまりの spec が決める。許していないメソッドの要求には、net/http の ServeMux が 405 を返す(Java 版は 500。design の「変えた動きの一覧に項目を足す候補」の表にある)。要求のログの経路の型は、ServeMux が要求の `r.Pattern` に書いた値を RecordRoute が読む。各パッケージのカバレッジは、そのパッケージのテストだけで数えるので、middleware の部品は middleware のパッケージのテストでも確かめる
-- PDF を作る部品(タスク2.9で決めたこと): chromedp は v0.23.0 で、総称型の新しい書き方(`chromedp.Run[T]`、`chromedp.Action[T]`、`cdp.Call`、`cdp.Events`)を使う。部品は、HTML を `Page.setDocumentContent` で空のタブに置き、`Page.loadEventFired` を待ってから印刷する。外への通信は `Fetch.enable` の型 `*` で止め、止めた要求をすべて `Fetch.failRequest` で断る。`data:` の読み込みは通信ではないので、Chromium は Fetch で止めずに通す(テストで確かめた)。紙の大きさは、CSS の `@page` が無いページのために A4 を既定にし、`preferCSSPageSize` で CSS の大きさを優先する。Chromium が落ちたかは、ブラウザの context の終わりと `Browser.LostConnection` で見る。chromedp の DOM の追跡は、`setDocumentContent` のたびに「top-level frame が無い」という知らせを誤りとして書く。部品は DOM の追跡を使わないので、chromedp の知らせを DEBUG のログに回す。同じ理由で、テストで DOM を読むときは `chromedp.Text` でなく `Runtime.evaluate` を使う(`chromedp.Text` は終わらない)。ブラウザが無いことの確かめは、CI の機械に `/usr/bin/google-chrome` があり PATH を空にしても見つかるので、実行ファイルの場所を存在しない場所に替えて確かめる。要求の context が部品の打ち切りより先に期限で終わったときは、`Render` は chromedp の Canceled を包んで返すので、呼び出し側は要求の期限切れを `ctx.Err()` で見分ける
-- 起動の入口(タスク2.10で分かったこと): gremlins v0.6.0 は、パッケージの名前が main でフォルダの名前と違うと、最上位のパッケージのテストを流すので、`cmd/keirekipro/main.go` の変異は、すべて LIVED か NOT COVERED になる(https://github.com/go-gremlins/gremlins/issues/268 、直す PR は未マージ)。Claude は、入口を design のとおり `cmd/keirekipro` に置き、PR の CI の `make mutation-diff` が赤になったら所有者の判断を受ける。入口のテストは、受け口を先に開いてから入口を動かすので、テストの HTTP のクライアントには期限を付ける(期限が無いと、入口が受け口を使わずに終わったとき、要求が終わらずにテストが止まる)。Redis のクライアントを閉じたかは、接続の数でなく、閉じたクライアントへの命令が `redis.ErrClosed` を返すかで確かめる(使われなくなった接続は Go のメモリの片付けが閉じるため)。Chromium の処理は、名前でなく、テストの処理の子孫を `/proc/<pid>/status` の PPid でたどって数える(同時に流れる pdf のテストの Chromium を数えないため)。ReadHeaderTimeout はテストせず、gosec の G112 が守る
-- 本番のイメージ(タスク2.11で決めたこと): 土台の `chromedp/headless-shell` は、2026-11-08 公開の 158.0.8127.18 が72時間たっていなかったので、1つ前の 157.0.8103.27(index の digest `7bee2014…`、amd64 と arm64 の両方を持つ)にした。research.md の digest `830fa77…` は 158 のものである。Chromium は `/headless-shell` にあり、土台の PATH に入っているので、chromedp の既定の探し方で見つかる。fontconfig のパッケージは依存として DejaVu のフォントを入れるので、`backend/assets/fonts.conf` の `<rejectfont>` で `/usr/share/fonts/truetype/*` を使わせず、sans-serif と serif と monospace を Noto に向けた。`run-check.sh` のコンテナでは `/repo` は読むだけで、`/app`(backend)には書ける。PDF の部品を本番のイメージで確かめるときは、`CGO_ENABLED=0 go test -c -o /app/<名前>` でテストのプログラムを作り、`docker run --entrypoint` でイメージの中で流す
+- HTTP の受け口の共通部分(タスク2.8で決めたこと): 次の9つを決めた。
+  - 作り方の方針: Claude は、偽の送信の検査を、design.md の「httpapi」の節の文のとおりに作り、Java と Spring の内部の動きには合わせない。要件9が Java 版と同じにするのは画面から見える動きだけであり、要件9の受入基準5は、利用者が目にしない動きを Go の作り方に変えてよいとしているためである
+  - 検査するメソッドと経路: Go 版が偽の送信の検査をしないメソッドは、GET と HEAD と OPTIONS だけである。そのため、Go 版は TRACE の要求も検査する。Go 版は、/actuator の下への要求も検査から外さない。Go 版が /actuator の下で受け付ける要求は、GET だけである。Go 版は、design.md の文に無い除外として、/api/auth の下への要求だけを検査から外す。画面がログインに使う通信の部品である frontend の publicApiClient は、トークンをヘッダに写さない。そのため、Go 版が /api/auth の下を検査すると、今の画面からログインできなくなり、今の画面を直さずにそのまま動かすとした要件9の受入基準1を満たせないためである。Claude は、/api/auth の下を検査から外すことも、design.md の「httpapi」の節に書き足した
+  - Cookie の性質とトークンの作り方: design.md の「安全」の節は、Cookie XSRF-TOKEN の性質を Java 版と同じにすると決めている。そのため、Go 版は、Cookie XSRF-TOKEN に Path=/ だけを付け、SameSite と Secure を足さない。Go 版は、トークンを、Spring の UUID の形を写さずに、Go の標準の crypto/rand.Text で作る
+  - Cookie を付ける場面: Go 版は、トークンが合わない要求に 403 を返すとき、毎回新しい Cookie XSRF-TOKEN を付ける。Go 版は、OPTIONS のほかの要求で Cookie が無いか値が空なら、検査を通った要求と検査しない要求にも新しい Cookie を付け、OPTIONS には Cookie を付けない。Cookie を持たない利用者の最初の書き込みを 403 にしないためである
+  - 変えた動きの一覧への記録: Java 版と変えた動きは、403 のときの Cookie の作り直し、TRACE の検査、/actuator の POST の検査の3つである。所有者は、この3つを 2026-11-09 に受け入れた。Claude は、この3つを、design.md の変えた動きの一覧の CB-006 から CB-008 に足した。Java 版は、API の説明画面の経路への要求を検査から外す。Go 版は、要件14の受入基準3のとおりにこの経路を受け付けないので、Claude は、この違いを CB-009 として記録だけの項目に足した
+  - Set-Cookie の行の書き方とテストの Cookie の送り方: gosec の G124 は、`http.Cookie` に Secure と HttpOnly と SameSite のすべてを求める。一方、Cookie XSRF-TOKEN は画面の JavaScript が読むので、Go 版は XSRF-TOKEN に HttpOnly を付けられない。そのため、csrf.go は `http.Cookie` を使わずに Set-Cookie の行をじかに書く。Claude は、テストの要求の Cookie を、`req.AddCookie` でなく Cookie のヘッダで送る
+  - 誤りの応答: 生成したコードが経路と問い合わせと Cookie とヘッダの値の形の誤りで呼ぶ受け口は、Java 版と同じ 500 を返し、ログには誤りの型だけを書く。誤りの文が Cookie の値を含みうるためである。4xx に変えるかは、まとまりの spec が決める。許していないメソッドの要求には、net/http の ServeMux が 405 を返す。Java 版は、この要求に 500 を返す。この違いは、design.md の「変えた動きの一覧に項目を足す候補」の表にある
+  - 要求のログの経路の型: RecordRoute は、ServeMux が要求の `r.Pattern` に書いた値を読み、要求のログの経路の型にする
+  - カバレッジの数え方: カバレッジは、パッケージごとに、そのパッケージのテストだけで数えられる。そのため、Claude は、middleware の部品を、middleware のパッケージのテストでも確かめる
+- PDF を作る部品(タスク2.9で決めたこと): 次の8つを決めた。
+  - chromedp の版と書き方: chromedp は v0.23.0 で、総称型の新しい書き方(`chromedp.Run[T]`、`chromedp.Action[T]`、`cdp.Call`、`cdp.Events`)を使う
+  - 印刷までの手順: 部品は、HTML を `Page.setDocumentContent` で空のタブに置き、`Page.loadEventFired` を待ってから印刷する
+  - 外への通信の止め方: 外への通信は `Fetch.enable` の型 `*` で止め、止めた要求をすべて `Fetch.failRequest` で断る。`data:` の読み込みは通信ではないので、Chromium は Fetch で止めずに通す(テストで確かめた)
+  - 紙の大きさ: 紙の大きさは、CSS の `@page` が無いページのために A4 を既定にし、`preferCSSPageSize` で CSS の大きさを優先する
+  - Chromium が落ちたことの見分け方: Chromium が落ちたかは、ブラウザの context の終わりと `Browser.LostConnection` で見る
+  - DOM の追跡の知らせの扱い: chromedp の DOM の追跡は、`setDocumentContent` のたびに「top-level frame が無い」という知らせを誤りとして書く。部品は DOM の追跡を使わないので、chromedp の知らせを DEBUG のログに回す。同じ理由で、テストで DOM を読むときは `chromedp.Text` でなく `Runtime.evaluate` を使う(`chromedp.Text` は終わらない)
+  - ブラウザが無いことの確かめ方: ブラウザが無いことの確かめは、CI の機械に `/usr/bin/google-chrome` があり PATH を空にしても見つかるので、実行ファイルの場所を存在しない場所に替えて確かめる
+  - 要求の期限切れの見分け方: 要求の context が部品の打ち切りより先に期限で終わったときは、`Render` は chromedp の Canceled を包んで返すので、呼び出し側は要求の期限切れを `ctx.Err()` で見分ける
+- 起動の入口(タスク2.10で分かったこと): 次の5つが分かった。
+  - gremlins の制約: gremlins v0.6.0 は、パッケージの名前が main でフォルダの名前と違うと、最上位のパッケージのテストを流すので、`cmd/keirekipro/main.go` の変異は、すべて LIVED か NOT COVERED になる(https://github.com/go-gremlins/gremlins/issues/268 、直す PR は未マージ)。Claude は、入口を design のとおり `cmd/keirekipro` に置き、PR の CI の `make mutation-diff` が赤になったら所有者の判断を受ける
+  - 入口のテストの HTTP のクライアントの期限: 入口のテストは、受け口を先に開いてから入口を動かすので、テストの HTTP のクライアントには期限を付ける(期限が無いと、入口が受け口を使わずに終わったとき、要求が終わらずにテストが止まる)
+  - Redis のクライアントを閉じたかの確かめ方: Redis のクライアントを閉じたかは、接続の数でなく、閉じたクライアントへの命令が `redis.ErrClosed` を返すかで確かめる(使われなくなった接続は Go のメモリの片付けが閉じるため)
+  - Chromium の処理の数え方: Chromium の処理は、名前でなく、テストの処理の子孫を `/proc/<pid>/status` の PPid でたどって数える(同時に流れる pdf のテストの Chromium を数えないため)
+  - ReadHeaderTimeout の扱い: ReadHeaderTimeout はテストせず、gosec の G112 が守る
+- 本番のイメージ(タスク2.11で決めたこと): 次の5つを決めた。
+  - 土台のイメージの版: 土台の `chromedp/headless-shell` は、2026-11-08 公開の 158.0.8127.18 が72時間たっていなかったので、1つ前の 157.0.8103.27(index の digest `7bee2014…`、amd64 と arm64 の両方を持つ)にした。research.md の digest `830fa77…` は 158 のものである
+  - Chromium の場所: Chromium は `/headless-shell` にあり、土台の PATH に入っているので、chromedp の既定の探し方で見つかる
+  - フォントの設定: fontconfig のパッケージは依存として DejaVu のフォントを入れるので、`backend/assets/fonts.conf` の `<rejectfont>` で `/usr/share/fonts/truetype/*` を使わせず、sans-serif と serif と monospace を Noto に向けた
+  - `run-check.sh` のコンテナで書ける場所: `run-check.sh` のコンテナでは `/repo` は読むだけで、`/app`(backend)には書ける
+  - 本番のイメージでの PDF の部品の確かめ方: PDF の部品を本番のイメージで確かめるときは、`CGO_ENABLED=0 go test -c -o /app/<名前>` でテストのプログラムを作り、`docker run --entrypoint` でイメージの中で流す
 
 ## 完了条件(全タスク共通)
 

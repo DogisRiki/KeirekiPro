@@ -698,3 +698,75 @@
 | (なし) | | | |
 
 - 往復: 1回で収束 / 未解決: 0件
+
+## サイクル8 往復1(2026-11-09)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 「httpapi」の中間処理の3(367行目。`/api/auth` の下を検査しない文と、トークンを `crypto/rand.Text` で作る文を足した)、`backend/src/main/java/com/example/keirekipro/presentation/security/config/SecurityConfig.java` 57〜71行目と116〜117行目、同じフォルダの `CsrfCookieFilter.java`、`frontend/src/lib/protectedApiClient.ts` 25〜30行目と `publicApiClient.ts`: Java 版が偽の送信の検査から外す経路と、Java 版が Cookie `XSRF-TOKEN` を付ける場面を、Go 版の文と照らした。`/api/auth` の下を外す理由(ログインに使う通信の部品はヘッダを写さない)は、ヘッダを写すのが `protectedApiClient.ts` だけであることと合う。Cookie を付ける場面は指摘 D8-1-1、Swagger の経路は指摘 D8-1-3、トークンの値の形は指摘 D8-1-5
+- design.md 「変えた動きの一覧の形」の表の CB-006〜CB-008 と、同じ節の箇条、`match` の形(823〜836行目)、「compat harness」の比べるヘッダの箇条(557行目)と `match` の照らし方(562行目)、「テストの方針」の比べる検査の筋書き(939行目。まとまりごとに偽の送信の検査に通らない要求を送る): CB-006 の `match` を今の `match` の形で書けるかを確かめた(指摘 D8-1-2)。CB-006 の Java 版の動き(Cookie が無いときだけ付ける)は、Spring Security の CsrfFilter が断るときに、遅れて読むトークンを Cookie が無いときだけ作って保存する動きと合う。CB-007 の Java 版の動きは指摘 D8-1-4。CB-008 の Java 版の動きは `ignoringRequestMatchers` の `/actuator/**` と合い、Go 版が受け付ける経路が `GET /actuator/health` だけであることは「httpapi」の呼び出し方(372行目)と合う
+- design.md 「安全」の1つ目の箇条(951行目): 「3つは、Go 版の動きが Java 版と違う」が、上の2つの照らしの結果と合うかを確かめた(指摘 D8-1-3)
+- design.md 「テストの方針」の httpapi の偽の送信の検査の単体テスト(930行目): 中間処理の3の動きが増えたので、足した動きを確かめるテストが方針にあるかを確かめた(指摘 D8-1-1 に含めた)
+- design.md 「変えた動きの一覧の形」の表の前の文(838行目。CB-006〜CB-008 を所有者が 2026-11-09 に受け入れた): 起動の文の背景と合う。CB-005 は記録だけの項目で、所有者が受け入れた違いの数に入らないことは、サイクル5 往復1で確かめたとおりである。影響なし
+- requirements.md 要件9の受入基準1・4・5・6: 4(偽の要求を断ることを Java 版と同じに守る)について、`/api/auth` の下を外すのは Java 版と同じで、CB-007 と CB-008 は検査を広げる向きなので、対策を弱めない。6(変えた動きを1つずつ一覧にし、変えた動き・Java 版の動き・Go 版の動き・画面に影響が無い理由を書く)について、CB-006〜CB-008 はどれも4つの欄を持つ。一覧に無い違いは指摘 D8-1-3 と D8-1-5。1(画面は直さずに動く)は指摘 D8-1-1
+- tasks.md タスク3.5(CB-001 から CB-008 の8つ): 項目の数は design の表と合う。tasks の審査は範囲の外なので、D8-1-2 と D8-1-3 の直しで tasks が変わりうることだけを記す
+- `backend/internal/httpapi/middleware/csrf.go`: 指摘 D8-1-1 の事実(今の実装は、検査を通った要求と検査しない要求にも、Cookie が無ければ新しい Cookie を付けている)を確かめるために読んだ。実装の審査はしていない
+
+### 申告
+
+(今回の差分で新しく申告するものはない)
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D8-1-1 | 中 | design.md 「httpapi」の中間処理の3(367行目)、「テストの方針」の httpapi の偽の送信の検査(930行目) | 中間処理の3は、新しい `XSRF-TOKEN` の Cookie を付ける場面を、検査で断るときだけ書いている。Java 版は、`CsrfCookieFilter`(SecurityConfig.java 116〜117行目)で、`OPTIONS` のほかのすべての要求について、要求に Cookie `XSRF-TOKEN` が無ければ新しい Cookie を付ける。検査を通った要求と、検査しない `GET` と、`/api/auth` の下の要求も含む。画面は、ログインや `GET` の応答でこの Cookie を受け取り、次の書き込みの要求でヘッダに写す(protectedApiClient.ts 25〜30行目)。この動きが無いと、Cookie を持たない利用者(初めてログインした利用者、Cookie を消した利用者)の最初の書き込みの操作は、必ず 403 になり、画面にエラーが出る。要件9の受入基準1(画面は直さずに動く)を支える動きが、design に無い。今の `csrf.go` はこの Cookie を付けているが、PR の判定の基準は design なので、design に無い動きは codex-review の照らしの外になる。認証のまとまりの spec で中間処理を直すときにこの動きを落としても、design とは食い違わない。比べる検査は `Set-Cookie` の名前と性質を比べる(557行目)ので、落とせば比べる検査で見つかり、戻って直すことになる。テストの方針の単体テストも、断るときの Cookie と `GET` を通すことだけを挙げ、Cookie を付ける動きと `/api/auth` の下を検査しない動きを挙げていない | 中間処理の3に、たとえば「この中間処理は、`OPTIONS` のほかの要求で、要求に Cookie `XSRF-TOKEN` が無いか空なら、検査を通った要求と検査しない要求にも新しい Cookie を付ける。画面は、この Cookie を受け取ってから書き込みの要求を送るためである。Java 版も同じ動きをする」を足す。テストの方針の httpapi の行に、Cookie の無い `GET` と `/api/auth` の下の `POST` に新しい Cookie を付けて通すこと、Cookie のある要求と `OPTIONS` には付けないこと、`/api/auth` の下の `POST` を検査しないことを足す |
+| D8-1-2 | 中 | design.md 「変えた動きの一覧の形」の CB-006 の箇条(「Claude は、CB-006 の `match` を、403 の応答の `Set-Cookie` のヘッダの違いだけを許す範囲にする」)、同じ節の `match` の形(823〜836行目)、「compat harness」の `match` の照らし方(562行目)、「テストの方針」の比べる検査の筋書き(939行目) | `match` の形は、1つの操作の名前(`operation`)と、比べるもの(`target`)と、JSON の場所(`path`)と、`order_only` の組である。ステータスで絞る欄も、すべての操作に当てる書き方も無い。CB-006 の違いは、偽の送信の検査で断られる要求のすべてで出る。939行目のとおり、まとまりの spec は、まとまりごとに偽の送信の検査に通らない要求を送る筋書きを足す。harness は Cookie を版ごとに覚えるので、Cookie を持ったまま断られる段では、Java 版の応答に `Set-Cookie` が無く、Go 版の応答にはある。この違いが毎回出る。今の形で書くと、操作ごとに項目を足すか、`operation` を書かずにすべての応答の `Set-Cookie` の違いを許すことになる。前者では CB-006 が1つの項目でなくなる。後者では、断らない応答の `Set-Cookie` の違いも許すので、D8-1-1 の動きを落としても比べる検査が見つけられなくなる。タスク3.5 で `changed-behaviors.yaml` を書くときに必ず突き当たり、design の形を直しに戻る | `match` の形に、ステータスで絞る欄(例: `status: 403`)と、すべての操作に当てる書き方(例: `operation: "*"`)を足す。CB-006 の `match` を、たとえば `{operation: "*", status: 403, target: header, path: Set-Cookie}` と書くと決める。`target: header` のときの `path` はヘッダの名前と読むことも書く。あわせて、「テストの方針」の比べる検査の土台(936行目)に、ステータスで絞った項目が、ほかのステータスの応答の違いを許さないことの確かめを足す |
+| D8-1-3 | 中 | design.md 「httpapi」の中間処理の3(`/api/auth` の下だけを検査しない)、「変えた動きの一覧の形」の表と CB-008、「安全」の1つ目の箇条(「この3つは、変えた動きの一覧の CB-006 から CB-008 に載せた」) | Java 版は、`/api/auth/**` と `/actuator/**` のほかに、`/swagger-ui/**` と `/swagger-ui.html` と `/v3/api-docs` と `/v3/api-docs/**` も、偽の送信の検査から外している(SecurityConfig.java 65〜71行目)。Go 版はこれらの経路も検査する。たとえば、Cookie もヘッダも無い `POST /v3/api-docs` に、Java 版は検査をせずに先の処理の応答を返し、Go 版は 403 を返す。CB-008 と同じ種類の違いだが、一覧に無い。「安全」の箇条は、偽の送信の検査の違いを3つと言い切っている。要件9の受入基準6は変えた動きを1つずつ一覧にすることを求め、所有者は設計の承認のときに、この一覧で違いを確かめる。比べる検査はこれらの経路に要求を送らないので、一覧に無いままでも、後の工程の誰も気づかない。画面への影響は無い | CB-009 を足すか、CB-008 に含める。例: 「Java 版は、`/swagger-ui` と `/v3/api-docs` の下の経路への要求を、偽の送信の検査にかけない。Go 版は、この経路を受け付けず、`GET` `HEAD` `OPTIONS` のほかの要求を検査する。API の説明画面は開発環境の `api-docs` のサービスに移り、画面はこの経路を呼ばないので、画面の動きは変わらない。比べる検査はこの経路に要求を送らないので、記録だけの項目にする」。所有者の受け入れが要る。「安全」の箇条の数と、表の前の文と、タスク3.5 の項目の数も合わせて直す |
+| D8-1-4 | 低 | design.md 「変えた動きの一覧の形」の CB-007 の箇条(「Java 版は、`TRACE` の要求を偽の送信の検査にかけない」) | Spring Security の既定の検査は `GET` `HEAD` `TRACE` `OPTIONS` を外すので、文は Spring Security の設定としては正しい。ただし、Spring Boot に入っている Tomcat は、既定(コネクタの `allowTrace` が false)では、`TRACE` の要求を Spring Security の検査より前に 405 で断ると考える。そうであれば、Java 版の動きは「405 で断る」と書くほうが正確である。Go 版は、Cookie とヘッダの無い `TRACE` に 403 を返す。違いがあることも画面に影響が無いことも変わらず、`match` も持たないので、実装には影響しない。私は実測していない | 比べる検査の Java 版に `TRACE` を1回送って確かめ、CB-007 の Java 版の動きの欄を、確かめた結果に合わせる |
+| D8-1-5 | 低 | design.md 「httpapi」の中間処理の3(「Cookie `XSRF-TOKEN` の値を、Go の標準ライブラリの関数 `crypto/rand.Text` で作る」)、「変えた動きの一覧の形」 | Java 版の `CookieCsrfTokenRepository` はトークンを UUID の文字列(36文字)で作る。Go 版の `crypto/rand.Text` は base32 の26文字を返す。Cookie の値の形が変わるが、一覧に無い。画面は値をそのまま写し、両方の版とも Cookie とヘッダが一致するかだけを見るので、切り替えの途中に版をまたいでも通る。比べる検査も Cookie の値を比べない(557行目)。実装には影響しない | 一覧に記録だけの項目として足す。または、値の形は利用者が目にしない動きに当たらないと判断した理由を、中間処理の3に1文で書く |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| (なし) | | | |
+
+- 往復: 1回目 / 高0 中3 低2
+
+## サイクル8 往復2(2026-11-09)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 「httpapi」の中間処理の3(367〜373行目。6つの箇条に分け、Cookie を付ける場面と `OPTIONS` の扱いを足した)、`backend/src/main/java/com/example/keirekipro/presentation/security/config/CsrfCookieFilter.java`、`SecurityConfig.java` 57〜71行目と110〜117行目、`backend/src/main/java/com/example/keirekipro/presentation/security/jwt/JwtAuthenticationFilter.java`: 足した2つ目と3つ目の箇条を Java 版の動きと照らした。Java 版の `CsrfCookieFilter` は `OPTIONS` を除くすべての要求で、Cookie が無ければトークンを作って保存する。値が空の Cookie も、`CookieCsrfTokenRepository.loadToken` が無いものとして扱うので、新しい Cookie が付く。`/api/auth/**` のような検査から外す経路では、`CsrfFilter` が属性を置いたあとに `getToken()` が呼ばれる。Go 版の「無いか値が空なら付ける」「`OPTIONS` には付けない」と合う。D8-1-1 は解消した。6つ目の箇条(ログインの状態の検査より前に置く)は、Java 版の `JwtAuthenticationFilter` が `CsrfFilter` より前に動くことと照らした。結果は指摘 D8-2-1 に含めた
+- design.md 「変えた動きの一覧の形」の `match` の説明(842行目)、CB-006 の箇条(863行目)、「compat harness」の比べるヘッダの箇条(563行目)と `match` の照らし方(568行目)、「テストの方針」の比べる検査の土台(944行目): `operation: "*"` と `status` と、`target: header` のときの `path` の読み方を、CB-006 の `match` で書けるかを確かめた。Cookie を持ったまま断られる要求では、Java 版の 403 に `Set-Cookie` が無く、Go 版の 403 にはある。この違いを許すことと、200 の応答の Cookie を付ける動きの違いを許さないことは書けている。D8-1-2 は解消した。ほかの Cookie の違いも許す範囲が残る点は指摘 D8-2-1
+- design.md 「変えた動きの一覧の形」の表の CB-009 と箇条(856行目、866行目)、「api-docs」(400〜404行目。対応する要件 14.1, 14.3, 14.4、Go 版のコードに説明画面も仕様書の配信も入れない)、`backend/src/main/resources/application-dev.yaml` の springdoc、requirements.md 要件14の受入基準3・4: CB-009 の Java 版の経路4つは `ignoringRequestMatchers` と合う。Go 版がこれらの経路を受け付けないことは「api-docs」の節の決定と合い、要件14の受入基準3を挙げるのは、「api-docs」が 14.3 を受け持つ書き方と食い違わない。4つの欄(変えた動き、Java 版、Go 版、画面に影響が無い理由)がある。D8-1-3 は解消した
+- design.md 「変えた動きの一覧の形」の表の前の文(844行目。CB-006〜CB-008 を所有者が 2026-11-09 に受け入れた): CB-009 はこの文に入っていない。response のとおり、所有者が設計の承認のときに確かめる項目であり、本文はまだ受け入れたとは書いていないので、食い違わない。影響なし
+- design.md 「安全」の1つ目の箇条(959行目): 数を4つにし、CB-006 から CB-009 を挙げることが、表と合う。前の往復で照らしたほかの経路(`/api/auth`、`/actuator`)と合わせて、Java 版が検査から外す経路はすべて一覧で扱われた。影響なし
+- design.md 「テストの方針」の httpapi の偽の送信の検査(938行目): 中間処理の3の箇条とテストの文を照らした。指摘 D8-2-2
+- requirements.md 要件9の受入基準1・4・5・6: 1は、Cookie を持たない利用者の最初の書き込みが 403 にならない動きが design に入り、満たされた。4は、足した動きが Cookie を付けるだけで検査を弱めないので満たされる。6は、CB-009 で一覧が埋まった。5は、変えた動きがどれも利用者が目にしない動きに当たる。CB-006 の Java 版の欄の細かい書き方は指摘 D8-2-3
+- tasks.md タスク3.5(227行目。CB-001 から CB-008 の8つ、記録だけの項目に CB-009 が無い): CB-009 を足したので、design と食い違う。tasks の審査は範囲の外なので、tasks を直す必要があることだけを記す
+
+### 申告
+
+(今回の差分で新しく申告するものはない)
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D8-2-1 | 低 | design.md CB-006 の箇条(863行目。`path: Set-Cookie`)、`match` の説明(842行目)、中間処理の3の6つ目の箇条(373行目) | 比べる検査は `Set-Cookie` を Cookie の名前ごとに比べる(563行目)。一方、CB-006 の `match` は、ヘッダの名前 `Set-Cookie` で当てる。そのため、403 の応答なら、`XSRF-TOKEN` のほかの Cookie の違いも許す。たとえば、Java 版の `JwtAuthenticationFilter` は `CsrfFilter` より前に動き、ログインの状態のトークンが不正なら、偽の送信の検査で断る 403 の応答にも、`accessToken` を消す `Set-Cookie` を付ける。Go 版は、偽の送信の検査をログインの状態の検査より前に置くので、この Cookie を付けないことがありうる。この違いは CB-006 の `match` に当たるので、比べる検査が見つけず、一覧にも載らない。どちらの版でも次の要求でこの Cookie は消えるので、画面の動きは変わらず、実装には影響しない | `target: header` で `Set-Cookie` を当てるときは Cookie の名前まで書ける形にし(例: `path: Set-Cookie`、`cookie: XSRF-TOKEN`)、CB-006 の `match` を `XSRF-TOKEN` に絞る。あわせて、認証のまとまりの spec で、断る 403 の応答で `accessToken` を消すかを Java 版と照らすと1文足す |
+| D8-2-2 | 低 | design.md 「テストの方針」の httpapi の偽の送信の検査(938行目。「Cookie のある要求と `OPTIONS` の要求に Cookie を付けないこと」) | 同じ行の1つ目の文と中間処理の3の1つ目の箇条では、Cookie とヘッダが一致しない `POST` には、要求が Cookie を持っていても新しい Cookie を付ける。文字どおりに読むと、「Cookie のある要求に Cookie を付けない」と食い違う。中間処理の3の2つ目の箇条から、検査を通った要求と検査しない要求のことだと読めるので、実装には影響しない | 「Cookie のある要求のうち、検査を通った要求と検査しない要求と、`OPTIONS` の要求に Cookie を付けないこと」と書く |
+| D8-2-3 | 低 | design.md CB-006 の箇条(863行目。「要求に Cookie `XSRF-TOKEN` が無い場合だけ、新しい Cookie を付ける」) | Java 版の `CookieCsrfTokenRepository.loadToken` は、値が空の Cookie も無いものとして扱う。そのため、Java 版は、値が空の Cookie で断られる要求にも新しい Cookie を付ける。中間処理の3の2つ目の箇条は「無いか値が空なら」と書いており、CB-006 の Java 版の欄だけが空の場合を落としている。比べる検査は Cookie の値を比べず、`match` も 403 の `Set-Cookie` を許すので、実装には影響しない | CB-006 の Java 版の欄を「要求に Cookie `XSRF-TOKEN` が無いか値が空の場合だけ」にする |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| (なし) | | | |
+
+- 往復: 2回で収束 / 未解決: 0件
