@@ -93,7 +93,12 @@ Claude は、次の変更を、所有者の承認が要る PR として出す。
 `ci.yaml`、`languages.tsv`、`dependabot.yml`、公開の時刻の検査、`container-scan`、`backend-vuln-fix`、`release.yaml` と `backend-deploy.yaml` の変更の中身と理由は、「部品」の節の「CI の仕事」「Dependabot と公開の時刻の検査と脆弱性の直し」「CodeQL とイメージの検査と組み立てて動かす検査」「backend-deploy.yaml と release.yaml」に書いた。部品の節に無い変更の中身と理由は、次のとおりである。
 
 - `run-check.sh`: Claude は、領域 `backend-go` を足し、その領域の最後の検査を `make check` にする。開発者がどの OS でも1つのコマンドで Go 版の品質チェックを動かせるようにするためである。`make check` が通ると、`run-check.sh` は Go 版の品質チェックを動かした記録を書く。Claude は、dind を起こす領域にも `backend-go` を足す。Claude は、領域 `backend-go` の1回きりのコンテナに、リポジトリの最上位を読み取り専用で `/repo` に差し込む。比べる検査が、`./backend` の外にある `docker/` の Dockerfile からイメージを組み立てるためである。段階6で、Claude は領域の名前を `backend` に戻し、リポジトリの最上位の差し込みを消す。比べる検査を消すと、`./backend` の外のファイルを読む処理が無くなるためである
-- `check-verify-before-stop.sh` とそのテスト: このフックは、今は `backend/` の下のファイルが変わると、Java 版の品質チェック `./gradlew check` を動かした記録を求める。Claude は、変わったファイルを Java 版のファイルと Go 版のファイルに分け、Java 版のファイルが変わったときは Java 版の記録を、Go 版のファイルが変わったときは Go 版の記録を求めるようにする。Java 版のファイルと Go 版のファイルの見分け方は、「CI の仕事」の見分け `backend_java` と `backend_go` と同じにする。このフックも、見分け `backend_go` と同じく、作業フォルダに `backend/go.mod` があるときだけ Go 版の記録を求める。`backend/go.mod` が無いときは、Go 版の品質チェックを動かせず、記録を書けないためである。マイグレーションのファイルが変わったときは、このフックは Java 版の記録と Go 版の記録の両方を求める。Go 版だけを直す会話で、Claude が Go 版の品質チェックを動かしたのに、作業を終えるときにこのフックに止められることが無いようにするためである。段階6で、Claude はこの分け方を消し、`backend/` の下の変更に Go 版の記録だけを求める形に戻す
+- `check-verify-before-stop.sh` とそのテスト: このフックは、今は `backend/` の下のファイルが変わると、Java 版の品質チェック `./gradlew check` を動かした記録を求める。Claude は、このフックを次の5つのように変える。
+  - 記録を分ける: Claude は、変わったファイルを Java 版のファイルと Go 版のファイルに分け、Java 版のファイルが変わったときは Java 版の記録を、Go 版のファイルが変わったときは Go 版の記録を求めるようにする。このフックが、変わったファイルを Java 版のファイルと Go 版のファイルに分けるのは、Go 版だけを直す会話で、Claude が Go 版の品質チェックを動かしたのに、作業を終えるときにこのフックに止められることが無いようにするためである
+  - ファイルの見分け方: Java 版のファイルと Go 版のファイルの見分け方は、「CI の仕事」の見分け `backend_java` と `backend_go` と同じにする
+  - `backend/go.mod` が無いとき: このフックも、見分け `backend_go` と同じく、作業フォルダに `backend/go.mod` があるときだけ Go 版の記録を求める。`backend/go.mod` が無いときは、Go 版の品質チェックを動かせず、記録を書けないためである
+  - マイグレーションのファイル: マイグレーションのファイルが変わったときは、このフックは Java 版の記録と Go 版の記録の両方を求める
+  - 段階6: 段階6で、Claude はこの分け方を消し、`backend/` の下の変更に Go 版の記録だけを求める形に戻す
 - verify のスキル: Claude は、Go 版の品質チェックの手順を足す。段階6で、Claude はスキルを言語に依存しない書き方にする。Claude が品質チェックを動かす手順を、Go 版に合わせるためである
 - `check-release-age.sh`: Claude は、gomod の部品の公開の時刻を、公開の時刻の検査と同じ方法で調べるようにする。Dependabot の PR の自動マージで、公開から72時間たっていない版を止めるためである
 - `check-dependency-additions.sh`: Claude は、`backend/Makefile`、`.golangci.yml`、`.testcoverage.yml`、`.gremlins.yaml`、`api/oapi-codegen.yaml`、`sqlc.yaml` を承認の対象に足す。品質チェックとコード生成の指定を、所有者の承認なしに緩められないようにするためである
@@ -164,7 +169,7 @@ Claude は、Go 版のコードを、Go で標準的な、機能ごとのパッ�
 - 言語と実行環境: Go 1.27(go1.27.3)。`go.mod` の `toolchain` で版を固定する。本番の実行ファイルは `CGO_ENABLED=0` で組み立てる
 - HTTP の受け口: 標準の `net/http` の `ServeMux`。oapi-codegen v2.8.2 の `std-http-server` と `strict-server` で、仕様書から経路の登録と型を生成する
 - データベース: pgx v5.11.0(`pgxpool`)と sqlc v1.31.1。SQL から型の付いた問い合わせのコードを生成する
-- Redis: go-redis v9.23.0 の `UniversalClient`。本番はクラスタの形と TLS で、開発環境と検査は1台の形でつなぐ。TLS とは、通信の中身を暗号化して、途中で読まれたり書き換えられたりしないようにつなぐ方式である
+- Redis: go-redis v9.23.0 の `UniversalClient`。本番(`prod`)はクラスタの形と TLS で、`dev` と `test` は1台の形でつなぐ。TLS とは、通信の中身を暗号化して、途中で読まれたり書き換えられたりしないようにつなぐ方式である
 - AWS: AWS SDK for Go v2(S3、SES v1、Secrets Manager)。開発環境と比べる検査では接続先を `BaseEndpoint` で替え、S3 はパスの形にする。パスの形とは、バケットの名前を、接続先のホスト名ではなく URL のパスに入れて S3 を呼ぶ形である
 - 認証の部品: golang-jwt v5.3.1、golang.org/x/crypto v0.58.0(bcrypt)、golang.org/x/oauth2 v0.37.0、go-oidc v3.21.0。これらを使う処理は、認証のまとまりの spec で作る
 - PDF: chromedp と、同じイメージに入れる headless-shell の Chromium と、Noto のフォント(NotoSansJP と NotoSerifJP の Regular と Bold)
@@ -233,7 +238,7 @@ Claude が変えるファイル:
 - `backend/CLAUDE.md`: Go 版の作り方の説明を足す(段階2)。段階6で Java 版の説明を消す
 - `terraform/main.tf`: 段階4と段階6で、`keirekipro/redis` の秘密の値のキーを変える。変える値は、「データの形」の節の「本番の設定の値の変わり方」の表に書く
 - `terraform/modules/ecs/main.tf`: 段階4と段階6で、タスク定義の環境変数と生きているかの確認の経路を変える。変える値は、同じ表に書く
-- `terraform/modules/alb/` の対象のグループの定義: 段階6で、生きているかの確認の経路を変える。変える値は、同じ表に書く
+- `terraform/modules/alb/` のターゲットグループの定義: 段階6で、生きているかの確認の経路を変える。変える値は、同じ表に書く
 - `.kiro/specs/backend-go-replacement/research.md`: 段階1の記録と、設計の段階の記録を持つ。段階1の記録は書き換えない
 - 「所有者に提案するゲート設定の変更」の表に書いたファイル
 - 段階6で書き換えるファイルと消すファイル: 「移行」の節の「段階6の書き換え」と「消す一覧」に書く
@@ -322,7 +327,13 @@ flowchart TB
 | `keirekipro/jwt` | `jwt-secret` |
 | `keirekipro/oidc/google` と `keirekipro/oidc/github` | `client_id` `client_secret` |
 
-config は、`test` の既定の値を、`dev` の既定の値と同じにする。Go 版は、`dev` と `test` では、秘密の値の代わりに、Java 版の `application.yaml` の既定と同じ名前の環境変数(`DB_HOST` `DB_PORT` `DB_NAME` `DB_USERNAME` `DB_PASSWORD` `REDIS_HOST` `REDIS_PORT` `REDIS_PASSWORD` `JWT_SECRET`)を読む。外部のログインの接続先の URL は、環境変数 `KEIREKIPRO_OIDC_<GOOGLE|GITHUB>_<AUTH|TOKEN|USERINFO>_URL` で替えられる。比べる検査は、この環境変数で、Go 版をログインの代わりにつなぐ。
+config は、`dev` と `test` で次の5つのように動く。
+
+- 既定の値: config は、`test` の既定の値を、`dev` の既定の値と同じにする
+- 環境変数: Go 版は、`dev` と `test` では、秘密の値の代わりに、Java 版の `application.yaml` の既定と同じ名前の環境変数(`DB_HOST` `DB_PORT` `DB_NAME` `DB_USERNAME` `DB_PASSWORD` `REDIS_HOST` `REDIS_PORT` `REDIS_PASSWORD` `JWT_SECRET`)を読む
+- 外部のログインの秘密の値: config は、`keirekipro/oidc/google` と `keirekipro/oidc/github` を、`dev` と `test` でも Secrets Manager から読む。Java 版も `dev` でこの2つを localstack から読み、比べる検査もこの2つを fakeaws に置くためである
+- AWS の接続先: `dev` と `test` で `KEIREKIPRO_AWS_ENDPOINT` が無いときは、config は AWS の接続先を、Java 版の `application-dev.yaml` と同じ `http://localstack:4566` にする
+- 外部のログインの接続先: 外部のログインの接続先の URL は、環境変数 `KEIREKIPRO_OIDC_<GOOGLE|GITHUB>_<AUTH|TOKEN|USERINFO>_URL` で替えられる。比べる検査は、この環境変数で、Go 版をログインの代わりにつなぐ
 
 **失敗したとき**: config は、足りない値と読めない秘密の値を、値を書かずにキーの名前だけでエラーにする。
 
@@ -340,7 +351,7 @@ config は、`test` の既定の値を、`dev` の既定の値と同じにする
 - 書く行の列と値: この部品が書く行の列は、`installed_rank`、`version`、`description`、`type`、`script`、`checksum`、`installed_by`、`installed_on`、`execution_time`、`success` である。この部品は、`installed_rank` に今の最大に1を足した数を書き、`description` にファイル名の `__` の後ろの `_` を空白にしたものを書く。この部品は、`type` に `SQL` を、`script` にファイル名を、`installed_by` に接続の利用者を、`execution_time` にミリ秒の数を書く。
 - 同時に起動したタスクの扱い: 同時に起動した複数のタスクが同じファイルを適用しないように、この部品は、`pg_advisory_lock` で1つずつ動き、ファイルごとに1つのトランザクションでファイルの適用と行の記録をする。`pg_advisory_lock` は、同じ鍵の番号を取ろうとするほかの接続を、鍵が放されるまで待たせる PostgreSQL の関数である。トランザクションとは、データベースへの複数の書き込みを、すべて反映するか、すべて取り消すかのどちらかにするまとまりである。
 
-**失敗したとき**: 検査の値が合わないとき、記録に `success = false` の行があるとき、記録の版がファイルに無いときは、この部品はエラーを返す。エラーを受けた入口は、起動を止める。
+**失敗したとき**: 検査の値が合わないとき、記録に `success = false` の行があるとき、記録の版がファイルに無いときは、この部品はエラーを返す。エラーを受けた入口は、起動を止める。ただし、この部品は、種類が `BASELINE` の行を受け付け、その行の版以下のファイルを適用済みとして扱う。Java 版は `baseline-on-migrate: true` と `baseline-version: 0` で動く。そのため、本番の履歴には、種類 `BASELINE` で版 `0` の行があるかもしれない。この部品がこの行でエラーを返すと、Go 版が起動しない。この部品が種類 `BASELINE` の行を受け付けるのは、このためである。
 
 #### database と redisstore と awsclient(外とつなぐ部品)
 
@@ -504,7 +515,7 @@ config は、`test` の既定の値を、`dev` の既定の値と同じにする
 
 PR で脆弱性のある Go の部品を足すのを止めるのは、今の dependency-review である。dependency-review は `go.mod` を読むので、設定を変えずに Go の部品も調べる。
 
-公開の時刻の検査は、gomod の部品ごとに、index.golang.org の索引を、PR を検査する時刻の72時間と1時間前から `since` で順に読み、モジュールと版の組が初めて取り込まれた時刻を探す。72時間より新しければ、その PR を止める。索引は1回の検査で1度だけ読み、PR のすべての Go の部品をまとめて照らす。proxy.golang.org の `.info` の時刻は、後から古い時刻にできるので使わない。
+公開の時刻の検査は、gomod の部品ごとに、index.golang.org の索引を、PR を検査する時刻の72時間と1時間前から読み、モジュールと版の組が初めて取り込まれた時刻を探す。公開の時刻の検査は、この73時間を4時間ずつの区間に分けて区間を同時に読み、区間の中は `since` で順に読む。index.golang.org は1回の問い合わせに約4秒かかり、73時間を順に読むと約10分かかって、判定の手順の5分の上限に収まらないためである。モジュールと版の組が初めて取り込まれた時刻が、PR を検査する時刻から72時間より新しければ、公開の時刻の検査はその PR を止める。索引は1回の検査で1度だけ読み、PR のすべての Go の部品をまとめて照らす。proxy.golang.org の `.info` の時刻は、後から古い時刻にできるので使わない。
 
 Claude は、`backend-vuln-fix.yaml` に Go の仕事を足す。この仕事は、毎日 `make vuln` を動かす。`backend-vuln-fix.yaml` の Go の仕事は、呼ばれる箇所のある脆弱性が見つかったら、直す PR を作る。脆弱性が部品にあるときは、この仕事は、`go get <モジュール>@<直した版>` と `go mod tidy` で直す。脆弱性が Go の標準ライブラリにあるときは、この仕事は、`go.mod` の `toolchain` と、`docker/backend-go/` と `backend/compat/fakeaws/` と `backend/compat/fakeoidc/` の `golang` のイメージの版を、1つの PR で上げて直す。直した版が公開から72時間たっていなければ、その PR は公開の時刻の検査で止まる。そのときは、今の Java 版の扱いと同じく、所有者が、`ci-tool-fast-update` の決まりで、止まった PR をどう扱うかを判断する。
 
@@ -799,7 +810,7 @@ Claude は、PR の本文を次の決まりで書く。この spec の PR の本
 - 6-4 で書き換える記述は、「移行」の節の「段階6の書き換え」に書いた
 - 6-5 は、Issue #445 を閉じる最後の PR であり、Claude は PR の本文に `Closes #445` を書く
 
-6-4 の PR の検査として、Claude は、`git grep -n -i -o -E '(^|[^[:alnum:]])(<語の一覧>)[[:alnum:]_]*'` を、言語を書いてよいファイルと `.kiro/specs/` を除いて動かす。語の一覧は、`|` でつないだ次の語である。
+Java と Spring を前提にした記述を書き換える PR 6-4 の検査として、Claude は、`git grep -n -i -o -E '(^|[^[:alnum:]])(<語の一覧>)[[:alnum:]_]*'` を、言語を書いてよいファイルと `.kiro/specs/` を除いて動かす。語の一覧は、`|` でつないだ次の語である。
 
 | 種類 | 語 |
 |---|---|
@@ -863,7 +874,7 @@ Claude は、PR の本文を次の決まりで書く。この spec の PR の本
 - CB-006: Java 版は、偽の送信の検査で要求を断るとき、要求に Cookie `XSRF-TOKEN` が無い場合だけ、新しい Cookie を付ける。Go 版は、要求を断るたびに新しい Cookie を付ける。画面は次の要求で新しい Cookie の値をヘッダに写すので、画面の動きは変わらない。Claude は、CB-006 の `match` を、`operation: "*"`、`status: 403`、`target: header`、`path: Set-Cookie` にする。この `match` は、403 の応答の `Set-Cookie` のヘッダの違いだけを許す。そのため、検査を通った要求と検査しない要求で、Go 版が Cookie を付ける動きが Java 版と違えば、比べる検査はその違いを見つける
 - CB-007: Java 版は、`TRACE` の要求を偽の送信の検査にかけない。Go 版は、`GET` `HEAD` `OPTIONS` のほかのすべての要求を検査するので、`TRACE` の要求も検査する。画面は `TRACE` の要求を送らないので、画面の動きは変わらない。比べる検査は `TRACE` の要求を送らないので、Claude は、CB-007 を、`match` を持たない記録だけの項目にする
 - CB-008: Java 版は、`/actuator` の下の経路への要求を偽の送信の検査にかけない。Go 版は、`/actuator` の下への要求も検査する。Go 版が `/actuator` の下で受け付ける要求は `GET /actuator/health` だけなので、ALB とコンテナが backend の生きているかを確かめる動きは変わらない。比べる検査は `/actuator` の下に `GET` のほかの要求を送らないので、Claude は、CB-008 を、`match` を持たない記録だけの項目にする
-- CB-009: Java 版は、API の説明画面の経路 `/swagger-ui/**`、`/swagger-ui.html`、`/v3/api-docs`、`/v3/api-docs/**` への要求を、偽の送信の検査にかけない。Go 版は、要件14の受入基準3のとおりこれらの経路を受け付けず、ほかの経路と同じく検査するので、`GET` `HEAD` `OPTIONS` のほかの要求に、404 の前に 403 を返す。画面はこれらの経路に要求を送らないので、画面の動きは変わらない。開発者は、API の説明画面を compose の `api-docs` で開く。比べる検査はこれらの経路に要求を送らないので、Claude は、CB-009 を、`match` を持たない記録だけの項目にする
+- CB-009: Java 版は、API の説明画面の経路 `/swagger-ui/**`、`/swagger-ui.html`、`/v3/api-docs`、`/v3/api-docs/**` への要求を、偽の送信の検査にかけない。Go 版は、本番では利用者が API の説明画面を開けないとした要件14の受入基準3のとおり、これらの経路を受け付けず、ほかの経路と同じく検査するので、`GET` `HEAD` `OPTIONS` のほかの要求に、404 の前に 403 を返す。画面はこれらの経路に要求を送らないので、画面の動きは変わらない。開発者は、API の説明画面を compose の `api-docs` で開く。比べる検査はこれらの経路に要求を送らないので、Claude は、CB-009 を、`match` を持たない記録だけの項目にする
 
 次の Java 版の動きは、変えた動きの一覧に項目を足す候補である。どれも Java 版は 500 を返している。
 
@@ -933,7 +944,7 @@ steps:
 ## テストの方針
 
 - 単体テスト:
-  - migrate: V1〜V7 のファイルから、research.md の検査の値の7つを計算すること。検査の値が合わない行、`success = false` の行、ファイルに無い版の行でエラーを返すこと。`ValidateOnly` で行を書かないこと
+  - migrate: V1〜V7 のファイルから、research.md の検査の値の7つを計算すること。検査の値が合わない行、`success = false` の行、ファイルに無い版の行でエラーを返すこと。種類が `BASELINE` の行を受け付け、その版以下のファイルを適用済みとして扱うこと。`ValidateOnly` で行を書かないこと
   - config: `prod` で5つの秘密の値の決まったキーを読むこと。足りないキーのエラーに値を書かないこと。`dev` で Java 版と同じ名前の環境変数を読むこと
   - httpapi の偽の送信の検査: Cookie とヘッダが一致しない `POST` に 403 と決まった本文と新しい Cookie を返すこと。`GET` は通すこと。Cookie の無い `GET` と、経路が `/api/auth` の下の `POST` に、新しい Cookie を付けて通すこと。Cookie のある要求と `OPTIONS` の要求に Cookie を付けないこと。ログインの状態の検査より前に動くこと
   - pdf: 同時に3件を頼んだとき、3件目が1件目の終わりまで待つこと。30秒を超えた要求が 500 になること。Chromium を止めたあとの要求で Chromium を起動し直すこと

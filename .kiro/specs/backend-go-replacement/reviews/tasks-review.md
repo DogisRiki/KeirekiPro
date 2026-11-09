@@ -150,3 +150,30 @@
 | T3-1-7 | design | 「config」の環境ごとの値(325行目。「Go 版は、`dev` と `test` では、秘密の値の代わりに…環境変数…を読む」) | タスク2.6 で、config は `keirekipro/oidc/google` と `keirekipro/oidc/github` を、`dev` と `test` でも Secrets Manager から読むことにした(実装のメモ「外部のログインの秘密の値の読み方」)。Java 版も `dev` でこの2つを localstack から読み、比べる検査も fakeaws に登録する(593行目)ためである。また、`KEIREKIPRO_AWS_ENDPOINT` が無いときの接続先を、`dev` と `test` では `http://localstack:4566` にした。design の325行目は、`dev` と `test` では秘密の値の代わりに環境変数を読むと書き、外部のログインの秘密の値をどこから読むかを書いていない。design の文に、外部のログインの秘密の値は `dev` と `test` でも Secrets Manager から読むことと、接続先の既定を足すかを、所有者に確かめてもらう |
 
 - 往復: 1回で収束 / 未解決: 0件
+
+## サイクル4 往復1(2026-11-09)
+
+### 審査の範囲
+
+範囲: 差分
+
+- tasks.md タスク1.7 の本文と「受入基準とテストの対応」、実装のメモ「Go のモジュールの索引の読み方」、design.md 「Dependabot と公開の時刻の検査と脆弱性の直し」(518行目)、`.github/scripts/tests/test-lib-gomod-index.sh`(195〜201行目、296〜345行目): 1.7 の本文が design の節を名指して「4時間ずつの区間に分けて同時に読み、区間の中は `since` で順に読む」と書くようになった。design の518行目に同じ読み方と理由が書かれ、名指した節の見出しが505行目にあることを確かめた。「1度だけ読み」は design の「索引は1回の検査で1度だけ読み」と合い、テストの「索引を1度だけ読む」の場合もある。実装のメモの「design.md の…にも、この読み方を書いた」も事実と合う。サイクル3の T3-1-2 と T3-1-5 は解消している。影響なし
+- tasks.md タスク2.4 の本文と「受入基準とテストの対応」(`TestRun_ValidateOnly_BaselineRow` の追加)、実装のメモ「表の形の履歴の BASELINE の行」、design.md 「migrate」の失敗したとき(354行目)と「テストの方針」の migrate(947行目)、`backend/internal/platform/migrate/migrate_test.go`: 2.4 が design の「migrate」を名指して BASELINE の行を受け付けると書くようになった。design の354行目と947行目に同じ扱いがあり、`migrate_test.go` の150行目に `TestRun_ValidateOnly_BaselineRow` があることを確かめた。サイクル3の T3-1-2 と T3-1-6 は解消している。影響なし
+- tasks.md タスク3.5 の本文と「受入基準とテストの対応」、design.md 「変えた動きの一覧の形」(835行目): 記録だけの項目を「CB-005、CB-007、CB-008、CB-009 の4つ」と書くようになり、T3-1-1 の数の読み方の揺れが無くなった。照らし方は design の節を名指して文の位置を前に移しただけで、`operation: "*"`、`status`、`target: header` の読み方は変わっていない。テストは `TestLoadChangedBehaviors_CB005HasNoMatch` のままで、これは T3-1-1 の後半(低)であり、今回の差分では変わっていないので、もう一度出さない
+- tasks.md タスク7.1 と 12.x の `_保留:_`(`plan_only` の手順の文を消した)、タスク6.1(349〜355行目)、11.1(515〜521行目)、7.3(378行目)、実装のメモ「`terraform-apply.yaml` の実行の確かめ方」(609行目)、design.md 「runbook.md」の操作1(1022行目): `_保留:_` の行から消した `plan_only` の2回の起動の手順が、6.1 と 11.1 の本文と 7.3 の runbook と design に残っていること、保留の条件(本番に反映したあと)を確かめる手順が609行目の「Terraform Apply」のステップの成功で残っていることを確かめた。手順は失われていない。影響なし
+- tasks.md タスク10.3 と design.md 「消す一覧」(1052行目): Java 版と一緒に消えるものの文を分けただけで、並べたものは前と同じである。design の1052行目の並びのうち `docker/backend/Dockerfile` の使われない `COPY` は、10.3 が `docker/backend/` を消すことで扱われる。差分の前からの形で、影響なし
+- tasks.md タスク1.1、2.7、3.1、3.7、3.8、3.9、7.2、10.x(`gradle-wrapper` を消すタスク)、実装のメモ「所有者に置いてもらう」「golangci-lint の版」「カバレッジの測り方」「testcontainers-go の使い方」「S3 のパスの形のテスト」「ログの形」「HTTP の受け口の共通部分」の検査するメソッドと経路、「PDF を作る部品」「起動の入口」: 書き方の点検で、主語を足し、長い文と括弧の中の文を分け、語を言い換えた差分。前後の文と、名指す design の部品(「logging」「compat harness」「cross」「perf」「backend-deploy.yaml と release.yaml」「httpapi」)を読み、数・名前・値・条件が前と同じで、中身が変わっていないことを確かめた。影響なし
+
+### 申告
+
+(今回の差分で新しく申告するものはない。差分は、サイクル3の指摘と前の段階への指摘への直しと、書き方の点検の直しであり、新しく決めたことを含まない)
+
+### 指摘
+
+(指摘なし)
+
+### 前の段階への指摘
+
+(なし)
+
+- 往復: 1回で収束 / 未解決: 0件

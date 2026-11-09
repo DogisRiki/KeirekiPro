@@ -770,3 +770,36 @@
 | (なし) | | | |
 
 - 往復: 2回で収束 / 未解決: 0件
+
+## サイクル9 往復1(2026-11-09)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 「所有者に提案するゲート設定の変更」の `check-verify-before-stop.sh` の箇条(96〜101行目。1つの段を5つの箇条に分けた): 分ける前の段の中身(記録を分けること、見分け方を CI の `backend_java` `backend_go` と同じにすること、`backend/go.mod` があるときだけ Go 版の記録を求めることとその理由、マイグレーションのファイルで両方の記録を求めること、段階6で戻すこと)が5つの箇条にすべてあることを確かめた。「Go 版だけを直す会話で…止められることが無いようにするため」の理由の文は、分ける前はマイグレーションの文の後ろにあり、「記録を分ける」の箇条に移った。この理由は記録を分けることの理由であり、マイグレーションのファイルで両方を求めることの理由ではないので、移した先は正しい。サイクル6 往復1とサイクル7 往復1で照らした中身は変わっていない。影響なし
+- design.md 「Dependabot と公開の時刻の検査と脆弱性の直し」の公開の時刻の検査の段(518行目。T3-1-5 の直し)、`.github/scripts/lib-gomod-index.sh` 1〜40行目と129〜171行目、`check-dependency-cooldown.sh` 83〜84行目と `check-release-age.sh` 82〜83行目(どちらも `lib-gomod-index.sh` を読み込む)、`.github/workflows/dependabot-auto-merge.yaml` 110〜112行目(`Check release age` の `timeout-minutes: 5`)、`dependency-review.yaml` 152行目(`timeout-minutes: 30`): 読み始め(検査の時刻の73時間前)、4時間ずつの区間に分けて同時に読むこと、区間の中を `since` で順に読むこと、1回の問い合わせに約4秒、73時間を順に読むと約10分は、ライブラリの説明と処理に合う。「索引は1回の検査で1度だけ読み」も、区間ごとに1度ずつ読む形と矛盾しない(区間の境の行を2度読むことはあるが、照らし方で新しい方の時刻を使う)。5分の上限がどの手順のものかは指摘 D9-1-1
+- design.md 「所有者に提案するゲート設定の変更」の `check-release-age.sh` の箇条(103行目。「公開の時刻の検査と同じ方法で調べる」): 同じライブラリを読み込む実装と合うので、区間に分けて読む形はこの箇条にもそのまま当たる。影響なし
+- design.md 「migrate」の失敗したとき(354行目。T3-1-6 の直し)、同じ節の役割(344行目)と状態の持ち方の書く行(351行目)、「テストの方針」の migrate(947行目)、`backend/internal/platform/migrate/migrate.go` 62〜65行目と321〜364行目、`backend/src/main/resources/application.yaml` 21〜22行目: Java 版が `baseline-on-migrate: true` と `baseline-version: 0` で動くこと、実装が種類 `BASELINE` の行を版の照らしから外し、その版以下のファイルを未適用に数えないことを確かめた。本文と合う。役割の「適用済みの版の検査の値が合わなければ、起動を止める」とは、BASELINE の行がファイルに当たる適用済みの版でないので食い違わない。書く行の `type` が `SQL` だけであることは、この部品が BASELINE の行を書かないことと合う。テストの方針にも同じ動きが足された。影響なし
+- design.md 「config」の `dev` と `test` の5つの箇条(330〜336行目。T3-1-7 の直し)、同じ節の失敗したとき(338行目)、`backend/internal/platform/config/config.go` 84〜142行目と230〜249行目、`docker/localstack/init-localstack.sh` 40〜49行目、「fakeaws と fakeoidc」の使う部品(598〜606行目)、「database と redisstore と awsclient」の役割(360行目)、「使う既存の仕組み」の本番の行(32行目): 実装が外部のログインの2つの秘密の値をどの環境でも Secrets Manager から読むこと、`KEIREKIPRO_AWS_ENDPOINT` が無いときの既定を `dev` と `test` で `http://localstack:4566`、`prod` で空にすることを確かめた。本文と合う。開発環境の localstack は2つの秘密の値を作るので、`dev` で Go 版を起こしても失敗したときの「読めない秘密の値」のエラーにはならない。比べる検査が fakeaws に2つの秘密の値を置くこと(604行目)と、Go 版を `KEIREKIPRO_AWS_ENDPOINT` で fakeaws につなぐこと(606行目)とも合う。理由の「Java 版も `dev` でこの2つを localstack から読み」は、600行目の Java 版の `dev` が Secrets Manager から読むことと合う。2つ目の箇条の「秘密の値の代わりに」は、挙げた環境変数が `keirekipro/rds` `keirekipro/redis` `keirekipro/jwt` の分だけで、3つ目の箇条が外部のログインの分を名指しするので、読み違えない。テストの方針との関係は指摘 D9-1-2
+- design.md 「使う技術」の Redis の行(172行目。「本番(`prod`)」と「`dev` と `test`」に言い換えた)、「ファイルの構成」の `terraform/modules/alb/` の行(「ターゲットグループ」に言い換えた)、「段階6の削除と書き換え」の 6-4 の検査の文(764行目の表の 6-4 の名前を足した)、CB-009 の箇条(要件14の受入基準3の中身を足した。requirements.md 267行目): 言い換えと語の説明の追加だけで、設計の中身が変わっていないことを、前後の文と参照先(360行目の redisstore、764行目の表、requirements.md 267行目)で確かめた。影響なし
+- tasks.md: tasks の審査は範囲の外。今回の design の3つの直しは、tasks-review のサイクル3 往復1の T3-1-5〜T3-1-7 が求めた中身と合う
+
+### 申告
+
+(今回の差分で新しく申告するものはない)
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D9-1-1 | 低 | design.md 「Dependabot と公開の時刻の検査と脆弱性の直し」の公開の時刻の検査の段(518行目。「判定の手順の5分の上限に収まらないためである」) | この段の主語は公開の時刻の検査(dependency-cooldown。41行目の呼び方)で、その仕事の上限は `dependency-review.yaml` 152行目の30分である。順に読んで約10分でも、この仕事は30分に収まる。5分の上限は、`dependabot-auto-merge.yaml` の判定の手順 `Check release age`(110〜112行目)のもので、この手順が動かす `check-release-age.sh` も同じ `lib-gomod-index.sh` で索引を読む(`lib-gomod-index.sh` 29行目の説明もこの手順の上限を理由に挙げている)。本文の「判定の手順」は design のどこにも定義が無く、公開の時刻の検査の手順と読める。そのため、区間に分けて読む理由が、主語の検査について事実と合わない。実装は同じライブラリで両方を区間に分けて読んでおり、design の文で実装が変わることはないので、実装には影響しない | 理由の文を「73時間を順に読むと約10分かかり、同じ読み方を使う Dependabot の PR の自動マージの判定(`dependabot-auto-merge.yaml` の `Check release age`。103行目の `check-release-age.sh`)の5分の上限に収まらないためである」のように、どの手順の上限かを名指しする形にする |
+| D9-1-2 | 低 | design.md 「テストの方針」の config の行(948行目)、「config」の `dev` と `test` の3つ目と4つ目の箇条(334〜335行目) | 今回の直しで、config に、`dev` と `test` でも外部のログインの2つの秘密の値を Secrets Manager から読む動きと、`KEIREKIPRO_AWS_ENDPOINT` が無いときの接続先の既定が `dev` と `test` で `http://localstack:4566`(`prod` では空)になる動きが足された。同じ直しで migrate のテストの方針には BASELINE の行の動きが足されたが、config のテストの方針は「`prod` で5つの秘密の値」「`dev` で環境変数」のままで、足した2つの動きを確かめるテストを挙げていない。実装は済んでおり、design の文で実装が変わることはないので、実装には影響しない | config の行に「`dev` と `test` でも外部のログインの2つの秘密の値を Secrets Manager から読むこと。`KEIREKIPRO_AWS_ENDPOINT` が無いとき、`dev` と `test` は `http://localstack:4566` に、`prod` は AWS の既定の接続先につなぐこと」を足す |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| (なし) | | | |
+
+- 往復: 1回で収束 / 未解決: 0件

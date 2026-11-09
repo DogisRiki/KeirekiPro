@@ -5,7 +5,7 @@
 - [x] 1. ゲート設定を Go 版に対応させる(PR 2-1)
 - [x] 1.1 run-check.sh に領域 backend-go を足す
 
-  Claude は、`.claude/scripts/parallel/run-check.sh` に領域 `backend-go` を足す。この領域は、compose のサービス `backend-go` で1回きりのコンテナを作り、dind を起こし、リポジトリの最上位を読み取り専用で `/repo` に差し込み、環境変数 `KEIREKIPRO_REPO_ROOT=/repo` を渡す。この領域の最後の検査は `make check` である。`run-check.sh` は、`make check` が通ったときだけ、Go 版の品質チェックを動かした記録を書く。
+  Claude は、`.claude/scripts/parallel/run-check.sh` に領域 `backend-go` を足す。`run-check.sh` は、領域が `backend-go` のときは、compose のサービス `backend-go` で1回きりのコンテナを作り、dind を起こし、リポジトリの最上位を読み取り専用で `/repo` に差し込み、環境変数 `KEIREKIPRO_REPO_ROOT=/repo` を渡す。この領域の最後の検査は `make check` である。`run-check.sh` は、`make check` が通ったときだけ、Go 版の品質チェックを動かした記録を書く。
   - 完了の確かめ方: `bash .claude/scripts/parallel/tests/test-run-check.sh` が、足した場合を含めて成功する
   - 受入基準とテストの対応: 要件3の受入基準2(どの OS でも1つのコマンドで Go 版の品質チェックを動かせる)は、`test-run-check.sh` の「backend-go の領域を受け付ける」「backend-go の make check が通ったときだけ記録を書く」「backend-go で dind を起こす」「backend-go に /repo を読み取り専用で差し込む」の場合で確かめる
   - _要件: 3.2_
@@ -57,7 +57,7 @@
 
 - [x] 1.7 index.golang.org から gomod の部品の公開の時刻を読む部品を作り、公開の時刻の検査につなぐ
 
-  Claude は、`.github/scripts/lib-gomod-index.sh` とそのテストを置き場に作る。この部品は、index.golang.org の索引を、検査の時刻の73時間前から `since` で順に1度だけ読み、モジュールと版の組ごとに初めて取り込まれた時刻を返す。proxy.golang.org の `.info` の時刻は使わない。Claude は、`check-dependency-cooldown.sh` と、そこから呼ぶ `cooldown-check-*.sh` と `cooldown-match-alerts.sh` を、gomod の部品に対応させる。
+  Claude は、`.github/scripts/lib-gomod-index.sh` とそのテストを置き場に作る。この部品は、index.golang.org の索引を、検査の時刻の73時間前から1度だけ読み、モジュールと版の組ごとに初めて取り込まれた時刻を返す。この部品は、design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」のとおり、73時間を4時間ずつの区間に分けて区間を同時に読み、区間の中は `since` で順に読む。proxy.golang.org の `.info` の時刻は使わない。Claude は、`check-dependency-cooldown.sh` と、そこから呼ぶ `cooldown-check-*.sh` と `cooldown-match-alerts.sh` を、gomod の部品に対応させる。
   - 完了の確かめ方: 検査用の写しで、`test-lib-gomod-index.sh`、`test-check-dependency-cooldown.sh`、`test-cooldown-match-alerts.sh` が成功する
   - 受入基準とテストの対応: 要件3の受入基準1(公開から72時間たっていない部品を止める)は、`test-lib-gomod-index.sh` の「72時間より新しい組を新しいと返す」「72時間より古い組を古いと返す」「索引を1度だけ読む」の場合と、`test-check-dependency-cooldown.sh` に足す「gomod の部品が新しければ止める」の場合で確かめる
   - _要件: 3.1_
@@ -108,9 +108,9 @@
 
 - [x] 2.4 表の形の履歴の部品を作る
 
-  Claude は、`backend/migrations.go`(`//go:embed src/main/resources/db/migration/*.sql`)と `backend/internal/platform/migrate/` を作る。この部品は、design.md の「migrate」のとおり、検査の値を計算し、`ValidateOnly` と `Apply` の2つの動かし方を持ち、`pg_advisory_lock` で1つずつ動く。`description` には、ファイル名から `V<版>__` と `.sql` を除き、`_` を空白にしたものを書く。この書き方は、design の審査で D3-3-2 として残った、`description` をどう書くかへの答えである。
+  Claude は、`backend/migrations.go`(`//go:embed src/main/resources/db/migration/*.sql`)と `backend/internal/platform/migrate/` を作る。この部品は、design.md の「migrate」のとおり、検査の値を計算し、`ValidateOnly` と `Apply` の2つの動かし方を持ち、`pg_advisory_lock` で1つずつ動く。この部品は、design.md の「migrate」のとおり、種類が `BASELINE` の行を受け付け、その版以下のファイルを適用済みとして扱う。`description` には、ファイル名から `V<版>__` と `.sql` を除き、`_` を空白にしたものを書く。この書き方は、design の審査で D3-3-2 として残った、`description` をどう書くかへの答えである。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/platform/migrate/...` が成功する
-  - 受入基準とテストの対応: 要件12の受入基準4(表の形の履歴を引き継ぐ)は、`migrate_test.go` の `TestChecksum_V1toV7`(research.md の7つの値と一致)、`TestRun_ValidateOnly_ChecksumMismatch`、`TestRun_ValidateOnly_FailedRow`、`TestRun_ValidateOnly_UnknownVersion`、`TestRun_ValidateOnly_WritesNothing`、`TestDescription_FromFileName` と、結合テスト `migrate_integration_test.go` の `TestValidateOnly_FlywayWrittenHistory`(testcontainers-go の Postgres に Flyway の形の表を作って通る)で、要件1の受入基準5(表の形を変えない)は、`TestRun_ValidateOnly_WritesNothing` で確かめる
+  - 受入基準とテストの対応: 要件12の受入基準4(表の形の履歴を引き継ぐ)は、`migrate_test.go` の `TestChecksum_V1toV7`(research.md の7つの値と一致)、`TestRun_ValidateOnly_ChecksumMismatch`、`TestRun_ValidateOnly_FailedRow`、`TestRun_ValidateOnly_UnknownVersion`、`TestRun_ValidateOnly_BaselineRow`、`TestRun_ValidateOnly_WritesNothing`、`TestDescription_FromFileName` と、結合テスト `migrate_integration_test.go` の `TestValidateOnly_FlywayWrittenHistory`(testcontainers-go の Postgres に Flyway の形の表を作って通る)で、要件1の受入基準5(表の形を変えない)は、`TestRun_ValidateOnly_WritesNothing` で確かめる
   - _要件: 1.5, 12.4_
 
 - [x] 2.5 データベースと Redis と AWS につなぐ部品を作る (並行可)
@@ -130,7 +130,7 @@
 
 - [x] 2.7 ログの形を作る (並行可)
 
-  Claude は、`backend/internal/platform/logging/` を作る。この部品は、`slog` の JSON の書き手を標準出力に置き、項目の名前を、design.md の「logging」に書いた Elastic Common Schema の10の名前に合わせる。Elastic Common Schema は、ログの項目の名前の決まりである。要求ごとのログに、Cookie と Authorization と要求の本文を書かない。
+  Claude は、`backend/internal/platform/logging/` を作る。この部品は、`slog` の JSON の書き手を標準出力に置き、項目の名前を、design.md の「logging」に書いた Elastic Common Schema の10の名前に合わせる。Elastic Common Schema は、ログの項目の名前の決まりである。この部品は、要求ごとのログに、Cookie と Authorization と要求の本文を書かない。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/platform/logging/...` が成功する
   - 受入基準とテストの対応: 要件5の受入基準8(Java 版と同じ場所と形のログ)は、`logging_test.go` の `TestHandler_ECSFieldNames` と `TestHandler_ErrorFields` で確かめる
   - _要件: 5.8_
@@ -190,7 +190,7 @@
 - [ ] 3. Java 版と Go 版を比べる検査を入れる(PR 2-3)
 - [ ] 3.1 比べる検査の土台を作る
 
-  Claude は、`backend/compat/harness/`(ビルドタグ `compat`)に、`KEIREKIPRO_REPO_ROOT` から design.md の6つのイメージを testcontainers-go の Dockerfile からの組み立てで作る処理と、検査ごとに Docker のネットワークを1つ作り `java` `go` `fakeaws` `fakeoidc` などの名前でコンテナを入れる処理と、筋書きのファイルを読む処理を作る。harness は、コンテナの起動を5分で、1つの要求を60秒で打ち切り、失敗したら両方の版のコンテナのログを残す。harness は、検査の始めに、各データベースに migrate の `Apply` で V1〜V7 を適用する。harness は、Go 版のコンテナを起動するときに、起動から `/healthz` が 200 を返すまでの時間を測り、10秒を超えたら検査を失敗にする。
+  Claude は、`backend/compat/harness/`(ビルドタグ `compat`)に、次の3つの処理を作る。1つ目は、`KEIREKIPRO_REPO_ROOT` から design.md の6つのイメージを testcontainers-go の Dockerfile からの組み立てで作る処理である。2つ目は、検査ごとに Docker のネットワークを1つ作り、`java` `go` `fakeaws` `fakeoidc` などの名前でコンテナを入れる処理である。3つ目は、筋書きのファイルを読む処理である。harness は、コンテナの起動を5分で、1つの要求を60秒で打ち切り、失敗したら両方の版のコンテナのログを残す。harness は、検査の始めに、各データベースに migrate の `Apply` で V1〜V7 を適用する。harness は、Go 版のコンテナを起動するときに、起動から `/healthz` が 200 を返すまでの時間を測り、10秒を超えたら検査を失敗にする。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準5(同じ要求を送って比べる検査を作る)の土台は、`harness_test.go` の `TestLoadScenario_ParsesSteps`、`TestLoadScenario_RejectsUnknownMode`、`TestNetwork_ContainersResolveByName` で、Go 版の本番のイメージの起動の時間は `TestStartup_Over10sFails` と `TestStartup_Within10sPasses` で確かめる
   - _要件: 4.5_
@@ -224,7 +224,7 @@
 
 - [ ] 3.5 変えた動きの一覧と違いを許す範囲を作る
 
-  Claude は、`backend/compat/changed-behaviors.yaml` に、design.md の変えた動きの一覧の CB-001 から CB-009 の9つの項目を書き、比べる検査が違いを一覧の `match` と照らす処理を作る。Claude は、CB-005 の、JSON で文字を `\uXXXX` の形で書くかどうかの項目と、CB-007 の `TRACE` の要求の偽の送信の検査、CB-008 の `/actuator` の下の要求の偽の送信の検査、CB-009 の API の説明画面の経路への要求の偽の送信の検査の3つの項目を、`match` を持たない記録だけの項目にする。比べる検査は、design.md の「変えた動きの一覧の形」のとおりに、違いを `match` と照らす。比べる検査は、`operation` が `"*"` の項目をすべての操作に当て、`status` を書いた項目を両方の版のステータスがその値のときだけ当て、`target` が header の項目では `path` をヘッダの名前として読む。
+  Claude は、`backend/compat/changed-behaviors.yaml` に、design.md の変えた動きの一覧の CB-001 から CB-009 の9つの項目を書き、比べる検査が、design.md の「変えた動きの一覧の形」のとおりに、違いを一覧の `match` と照らす処理を作る。Claude は、CB-005、CB-007、CB-008、CB-009 の4つの項目を、`match` を持たない記録だけの項目にする。CB-005 は JSON で文字を `\uXXXX` の形で書くかどうかの項目、CB-007 は `TRACE` の要求の偽の送信の検査の項目、CB-008 は `/actuator` の下の要求の偽の送信の検査の項目、CB-009 は API の説明画面の経路への要求の偽の送信の検査の項目である。比べる検査は、`operation` が `"*"` の項目をすべての操作に当て、`status` を書いた項目を両方の版のステータスがその値のときだけ当て、`target` が header の項目では `path` をヘッダの名前として読む。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準6(一覧に載せた違いでは止めない)と要件9の受入基準5と6(変えた動きの一覧)は、`match_test.go` の `TestMatch_OrderOnlyAllowsReorder`、`TestMatch_OtherOperationNotAllowed`、`TestMatch_AnyOperation`、`TestMatch_StatusLimitsScope`(`status` を書いた項目が、ほかのステータスの違いを許さない)、`TestMatch_HeaderPath`、`TestLoadChangedBehaviors_RequiredFields`、`TestLoadChangedBehaviors_CB005HasNoMatch` で確かめる
   - _要件: 4.6, 9.5, 9.6_
@@ -241,7 +241,7 @@
 
 - [ ] 3.7 比べる経歴書とバックアップと画像の初めのデータを置く
 
-  Claude は、`backend/compat/fixtures/` に、利用者の初めのデータと、`resumes/` の4種類の経歴書(項目が空、職歴と案件が多く3ページ以上、長い文と改行、2つのフォントのそれぞれ)と、バックアップと画像のファイルを置く。どのデータを使うかは、Claude が、まとまりの spec で作る筋書きに書く。
+  Claude は、`backend/compat/fixtures/` に、利用者の初めのデータと、`resumes/` の4種類の経歴書と、バックアップと画像のファイルを置く。4種類の経歴書は、項目が空の経歴書、職歴と案件が多く3ページ以上になる経歴書、長い文と改行を含む経歴書、2つのフォントのそれぞれを選んだ経歴書である。どのデータを使うかは、Claude が、まとまりの spec で作る筋書きに書く。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` の `TestFixtures_AllLoadable` が成功する
   - 受入基準とテストの対応: 要件10の受入基準3(いろいろな経歴書のデータで比べる)は、`fixtures_test.go` の `TestFixtures_AllLoadable` と `TestFixtures_ResumeKindsPresent` で確かめる
   - _要件: 10.3_
@@ -249,7 +249,7 @@
 
 - [ ] 3.8 版をまたぐ確認を作る
 
-  Claude は、`backend/compat/cross_test.go` と harness の版をまたぐ動かし方を作る。この動かし方は、Java 版と Go 版を1つの Postgres と1つの Redis と1つの fakeaws につなぎ、筋書きごとに、Java 版から Go 版へ、Go 版から Java 版へ、2つの版へ交互に、の3つの送り先の組を試し、最後の段でもう一方の版から保存した内容を読む。
+  Claude は、`backend/compat/cross_test.go` と harness の版をまたぐ動かし方を作る。harness は、版をまたぐ動かし方では、Java 版と Go 版を1つの Postgres と1つの Redis と1つの fakeaws につなぎ、筋書きごとに、Java 版から Go 版へ、Go 版から Java 版へ、2つの版へ交互に、の3つの送り先の組を試し、最後の段でもう一方の版から保存した内容を読む。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat -run Cross ./compat/...` が成功する
   - 受入基準とテストの対応: 要件13の受入基準1から4と6(切り替えの間と後に、操作が失敗せず、保存が消えず、ログアウトされず、途中の手順をまたぐ操作を終えられることを、切り替えの前に版をまたいで確かめる)と要件5の受入基準6(戻してもログアウトされず保存が残る)の土台は、`cross_test.go` の `TestCross_SelfPairPasses`(同じイメージを両方の位置に置いた筋書きが通る)、`TestCross_WrongStatusFailsWithStepAndDirection`、`TestCross_ThreeDirectionsRun` で確かめる。10の操作の筋書きは、Claude が、まとまりの spec で足す
   - _要件: 5.6, 13.1, 13.2, 13.3, 13.4, 13.6_
@@ -257,7 +257,7 @@
 
 - [ ] 3.9 応答の時間の比べ方を作る
 
-  Claude は、`backend/compat/perf_test.go` と harness の時間の動かし方を作る。この動かし方は、20回の測らない要求のあと200回ずつ順に送り、操作ごとに95パーセンタイルを「Go 版 ≤ Java 版 × 1.2 + 20ミリ秒」で比べ、PDF の出力では同時2件のときのメモリの最大が 1792MB 以内かを確かめる。
+  Claude は、`backend/compat/perf_test.go` と harness の時間の動かし方を作る。harness は、時間の動かし方では、20回の測らない要求のあと200回ずつ順に送り、操作ごとに95パーセンタイルを「Go 版 ≤ Java 版 × 1.2 + 20ミリ秒」で比べ、PDF の出力では同時2件のときのメモリの最大が 1792MB 以内かを確かめる。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` の `TestPerfJudge_*` が成功する
   - 受入基準とテストの対応: 要件9の受入基準7(決めた幅で比べる)は、`perf_judge_test.go` の `TestPerfJudge_WithinTolerance`、`TestPerfJudge_ExceedsTolerance`、`TestPerfJudge_MemoryOver1792MBFails` で確かめる
   - _要件: 9.7_
@@ -359,15 +359,15 @@
 - [ ] 7. 出荷の版の選び方と切り替えの手順書を入れる(PR 4-2)
 - [ ] 7.1 出荷する版を決めるスクリプトを作る
 
-  Claude は、`.github/scripts/backend-deploy-impl.sh` とそのテストを、置き場に作る。このスクリプトは、入力 `current` `java` `go` と、今のタスク定義のイメージのタグを受け取り、版と、Dockerfile と、組み立ての文脈 `./backend` と、イメージのタグを返す。返すイメージのタグは、Java 版ではコミットの SHA、Go 版では `go-<SHA>` である。`current` では、タグが `go-` で始まれば Go 版、そうでなければ Java 版にする。
+  Claude は、`.github/scripts/backend-deploy-impl.sh` とそのテストを、置き場に作る。このスクリプトは、入力 `current` `java` `go` と、今のタスク定義のイメージのタグを受け取り、版と、Dockerfile と、組み立ての文脈 `./backend` と、イメージのタグを返す。返すイメージのタグは、Java 版ではコミットの SHA、Go 版では `go-<SHA>` である。このスクリプトは、入力が `current` のときは、今のタスク定義のイメージのタグが `go-` で始まれば Go 版を、そうでなければ Java 版を選ぶ。
   - 完了の確かめ方: 検査用の写しで、`test-backend-deploy-impl.sh` が成功する
   - 受入基準とテストの対応: 要件5の受入基準2(1回の出荷で切り替えと戻し)は、`test-backend-deploy-impl.sh` の「go を選ぶと Go 版の Dockerfile と go- のタグ」「java を選ぶと Java 版の Dockerfile と SHA のタグ」の場合で、要件1の受入基準3と4(切り替えるまでは Java 版のまま出荷が成功する)と要件5の受入基準7(失敗したら Java 版のまま)は「current で今のタグが SHA なら Java 版」「current で今のタグが go- なら Go 版」の場合で確かめる
   - _要件: 1.3, 1.4, 5.2, 5.7_
-  - _保留: Claude は、大タスク7を、所有者が PR 4-1 を本番に反映したあとに、所有者が `/kiro-impl backend-go-replacement` を打った会話で行う。PR 4-1 の反映では、Claude が `plan_only` の実行の差分を照らした結果を所有者に示し、そのあと所有者が `plan_only` のチェックを外して `terraform-apply.yaml` を動かす_
+  - _保留: Claude は、大タスク7を、所有者が PR 4-1 を本番に反映したあとに、所有者が `/kiro-impl backend-go-replacement` を打った会話で行う_
 
 - [ ] 7.2 出荷のワークフローに入力 backend_impl を足す
 
-  Claude は、`.github/workflows/release.yaml` と `backend-deploy.yaml` の完成版を、置き場に作る。`release.yaml` は、入力 `backend_impl` を受け取り、`backend-deploy.yaml` に渡す。`backend_impl` の既定の値は `current` である。`backend-deploy.yaml` は、最初のステップで `aws ecs describe-task-definition` を動かして今のタスク定義を読み、タスク7.1の `backend-deploy-impl.sh` で版を決め、決めた版をワークフローの要約に書く。そのあとの4つのステップは変えない。
+  Claude は、`.github/workflows/release.yaml` と `backend-deploy.yaml` の完成版を、置き場に作る。`release.yaml` は、入力 `backend_impl` を受け取り、`backend-deploy.yaml` に渡す。`backend_impl` の既定の値は `current` である。`backend-deploy.yaml` は、最初のステップで `aws ecs describe-task-definition` を動かして今のタスク定義を読み、タスク7.1の `backend-deploy-impl.sh` で版を決め、決めた版をワークフローの要約に書く。Claude は、`backend-deploy.yaml` のそのあとの4つのステップを変えない。
   - 完了の確かめ方: 検査用の写しで、actionlint と `check-action-pinning.sh` と `node .github/scripts/tests/test-release-gate.mjs` が成功する
   - 受入基準とテストの対応: 要件5の受入基準2(1回の出荷で切り替えと戻しができる)と要件1の受入基準4(どの PR のあとでも出荷が成功する)は、actionlint が通る2つのワークフローで入力が渡ることと、タスク7.1の `test-backend-deploy-impl.sh` で確かめる
   - _要件: 1.3, 1.4, 5.2_
@@ -451,7 +451,7 @@
 
 - [ ] 10.3 Java 版のコードと、Java 版と Go 版を比べる検査を消す
 
-  Claude は、Java 版のコード、Gradle の設定と wrapper、`docker/backend/`、ArchUnit のテスト、`backend/compat/` を消す。Claude は、消す前に、`backend/compat/changed-behaviors.yaml` を `.kiro/specs/backend-go-replacement/changed-behaviors.yaml` に移す。design.md の「消す一覧」の冒頭に書いた、Java 版と一緒に消えるもの(`backend/.vscode/`、`backend/.gitignore` の Spring Initializr の行、Gradle の Flyway のプラグイン、PMD と OpenTelemetry の設定)も消す。作業を終えるときの確認のフックが Java 版の品質チェックの記録を求めたら、Claude は、Java 版のコードを消したので Java 版の品質チェックを動かせないことを、報告に書く。
+  Claude は、Java 版のコード、Gradle の設定と wrapper、`docker/backend/`、ArchUnit のテスト、`backend/compat/` を消す。Claude は、消す前に、`backend/compat/changed-behaviors.yaml` を `.kiro/specs/backend-go-replacement/changed-behaviors.yaml` に移す。Claude は、design.md の「消す一覧」の冒頭に書いた、Java 版と一緒に消えるものも消す。Java 版と一緒に消えるものは、`backend/.vscode/`、`backend/.gitignore` の Spring Initializr の行、Gradle の Flyway のプラグイン、PMD と OpenTelemetry の設定である。作業を終えるときの確認のフックが Java 版の品質チェックの記録を求めたら、Claude は、Java 版のコードを消したので Java 版の品質チェックを動かせないことを、報告に書く。
   - 完了の確かめ方: `git ls-files backend | grep -E '\.java$|gradle|compat/'` が何も返さず、changed-behaviors.yaml が spec のフォルダにあり、`run-check.sh backend-go make check` が成功する
   - 受入基準とテストの対応: 要件6の受入基準2(Java 版のコードを消す)は、`git ls-files` の結果で確かめる。ArchUnit のテストと Gradle の設定を消すのは所有者の承認が要る変更なので、Claude は、タスク10.9で、PR の本文の「承認が要る理由」にこのことを書く
   - _要件: 6.2_
@@ -477,7 +477,7 @@
 
   Claude は、次の完成版を置き場に作る。`dependency-review.yaml` の仕事 `dependency-graph-generate` と `dependency-graph-submit` と、`dependency-graph.yaml` の main への push の送信を、次のように替える。`dependency-graph-generate` は `go mod verify` に、`dependency-graph-submit` と main への push の送信は `actions/go-dependency-submission` v2.0.3(`go-mod-path: backend/go.mod`、`go-build-target: backend/cmd/keirekipro/main.go`)に替える。`guardrails.yaml` から `gradle-wrapper` の仕事を消し、`check-gradle-wrapper.sh` とそのテストを消す。`.github/audit/required-checks.json` から `gradle-wrapper` の行を消す。
   - 完了の確かめ方: 検査用の写しで、actionlint と `check-action-pinning.sh` と `test-check-audit-skipped-required.sh` が成功し、`guardrails.yaml` に `gradle-wrapper` の仕事が無く、`required-checks.json` に `gradle-wrapper` の行が無く、`check-gradle-wrapper.sh` とそのテストが無い
-  - 受入基準とテストの対応: 要件6の受入基準2(Java 版だけの品質チェックを消す)は、完了の確かめ方に書いた `guardrails.yaml` と `required-checks.json` と `check-gradle-wrapper.sh` の3つの確かめの結果と、`test-check-audit-skipped-required.sh` が今の期待一覧で成功することで確かめる
+  - 受入基準とテストの対応: 要件6の受入基準2(Java 版だけの品質チェックを消す)は、完了の確かめ方に書いた `guardrails.yaml` と `required-checks.json` と `check-gradle-wrapper.sh` の3つの確認の結果と、`test-check-audit-skipped-required.sh` が今の期待一覧で成功することで確かめる
   - _要件: 6.2_
   - _保留: 10.1 と同じ_
 
@@ -529,7 +529,7 @@
   - 完了の確かめ方: `git grep` の結果が文書の行だけで、`make check` が成功する
   - 受入基準とテストの対応: 要件6の受入基準3(Go 版だけで今のとおりに動く)は、`health_test.go` の `TestHealth_ActuatorPathRemoved`(`/actuator/health` に 404)と `TestHealth_UpAndDown` で確かめる
   - _要件: 6.3_
-  - _保留: Claude は、大タスク12を、所有者が PR 6-2 を本番に反映したあとに、所有者が `/kiro-impl backend-go-replacement` を打った会話で行う。PR 6-2 の反映では、Claude が `plan_only` の実行の差分を照らした結果を所有者に示し、そのあと所有者が `plan_only` のチェックを外して `terraform-apply.yaml` を動かす_
+  - _保留: Claude は、大タスク12を、所有者が PR 6-2 を本番に反映したあとに、所有者が `/kiro-impl backend-go-replacement` を打った会話で行う_
 
 - [ ] 13. Java と Spring を前提にした記述を書き換える(PR 6-4)
 - [ ] 13.1 言語を書いてよい文書を Go 版に合わせて書き直す (並行可)
@@ -611,7 +611,7 @@
 - `/kiro-validate-impl` の範囲: `/kiro-validate-impl` は、その PR で進めた大タスクだけを判定する。`_保留:_` のまま残した大タスクは、未完了として扱わない
 - 受入基準の確かめ方: 要件の受入基準のうち、Claude の進め方の決まり(要件1の受入基準1と2と6、要件2、要件7、要件8)と、文書と PR の本文と所有者への返事で満たすものは、テストのコードでなく、「受入基準とテストの対応」の行に書いた文書か記録を読んで確かめる。要件2の受入基準1から4(設計を書く前に、今と同じにできるかが分からない動きを洗い出し、試しに作って確かめる)の結果は、Claude が段階1の記録として research.md に書き終えてある
 - 置き場: Claude は、`.github/` と `.claude/hooks/` と `.claude/settings.json` の下のファイルの完成版を、作業フォルダの中の `.claude/.state/backend-go-replacement/place-<大タスクの番号>/` に、本来のパスと同じフォルダの形で作る。`.claude/.state/` は git の管理外である。`.claude/scripts/` と `.claude/skills/` は Claude が直接書ける
-- 所有者に置いてもらう: Claude は、所有者に、置き場から本来の場所への `cp -r <置き場>/. <本来の場所>/` を、絶対パスで書き、置き場ごとの `cp` を `&&` でつないだ1つのコマンドで示し、置く理由を添える(タスク1.10で、ファイルごとに `cp` を並べると打ち漏らすと所有者に指摘された)。所有者が置いたあと、Claude は `cmp` で置き場と本来の場所を比べる。`cmp` が止められたら、Read で両方を読んで比べる
+- 所有者に置いてもらう: Claude は、所有者に、置き場から本来の場所への `cp -r <置き場>/. <本来の場所>/` を、絶対パスで書き、置き場ごとの `cp` を `&&` でつないだ1つのコマンドで示し、置く理由を添える。タスク1.10で、ファイルごとに `cp` を並べると打ち漏らすと、所有者に指摘されたためである。所有者が置いたあと、Claude は `cmp` で置き場と本来の場所を比べる。`cmp` が止められたら、Read で両方を読んで比べる
 - `.github/` の置き場(タスク1.4で分かったこと): 許可の設定の `Write(.github/**)` は、作業フォルダの中の置き場の下の `.github/` にも当たり、Claude は書けない。そのため、Claude は `.github/` の下のファイルの完成版を、`.github/CLAUDE.md` のとおり、会話の scratchpad の `place-<大タスクの番号>/` に、本来のパスと同じフォルダの形で作る。scratchpad は会話ごとのフォルダなので、Claude は、大タスクの最後の小タスクで所有者に置いてもらうまで、同じ会話で進める
 - 検査用の写し: Claude は、作業フォルダを `git archive HEAD` で scratchpad の一時フォルダに写し、まだコミットしていないファイルと置き場のファイルを本来のパスで重ねた写しで、置き場のファイルのテストを流す。まだリポジトリに無いファイルを `docker -v` で作業フォルダに重ねると、作業フォルダに0バイトのファイルが残るので、Claude はそうしない
 - テストを流す環境: 大きなまとまりの途中の小タスクでは、Claude は、そのタスクで変えたファイルのテストだけを、この PC の Git Bash で流す。大きなまとまりの最後の小タスクでは、Claude は、`docker run --rm -v "<フォルダ>:/src:ro" alpine:3` で写しを読むだけの形で渡し、コンテナの中で別のフォルダに写してから、`apk add --no-cache bash perl git curl jq` のあとですべてのテストを流す。shellcheck は、CI の `guardrails.yaml` と同じく `koalaman/shellcheck:v0.11.0` に対象の `.sh` をまとめて渡し、actionlint は `rhysd/actionlint:1.7.12` で流す
@@ -622,12 +622,12 @@
 - 必須の検査の期待一覧: Claude は、`.github/audit/required-checks.json` を、大タスク10(PR 6-1)まで変えない
 - ワークフローを変える PR: ワークフローを追加・変更・削除した PR では、Claude は、README のワークフローの一覧の表と Mermaid の図も直す
 - 比べる検査の報告の置き場(タスク1.5で決めたこと): `ci.yaml` の `backend-compat` は、`backend/compat/report/` の下のファイルを成果物 `backend-compat-report` に残す。Claude は、比べる検査を作るタスクで、違いの報告と、失敗したときの両方の版のコンテナのログを、このフォルダに書くように作り、このフォルダを `backend/.gitignore` に足す
-- golangci-lint の版(タスク1.5で決めたこと): `ci.yaml` の `backend-go` は、golangci-lint の版を v2.15.0 に固定し、`.github/ci-tool-versions.json` の excluded に載せた。週1回の自動の更新はこの版を上げない。Claude は、`docker/backend-go/Dockerfile` に同じ版を書き、版を上げるときは2か所を同じ PR で上げる
+- golangci-lint の版(タスク1.5で決めたこと): Claude は、`ci.yaml` の `backend-go` で golangci-lint の版を v2.15.0 に固定し、その版を `.github/ci-tool-versions.json` の excluded に載せた。週1回の自動の更新はこの版を上げない。Claude は、`docker/backend-go/Dockerfile` に同じ版を書き、版を上げるときは2か所を同じ PR で上げる
 - CodeQL の Go の解析(タスク1.6で分かったこと): `codeql.yaml` には `actions/setup-go` の手順が無く、Go の行の組み立ては、GitHub Actions の機械に入っている Go と、`go.mod` の `toolchain` の指定による Go の自動の入手に頼る。Claude は、`backend/go.mod` を足す PR 2-2 で、CodeQL の `go` の仕事が成功したことを `gh run view` で確かめ、失敗したときは `setup-go` の手順を足す提案を所有者に出す
 - PR の本文: この spec の PR の本文には、`Spec: .kiro/specs/backend-go-replacement` と `Refs: #445` を書く。所有者の承認が要る PR では、「承認が要る理由」と「main に入れたときに本番で起きること」の2つの欄を書き、PR を作ったときの所有者への返事に、この2つの欄をそのまま写す
 - 公開のリポジトリ: Claude は、まだ直していないセキュリティの穴を、Issue、PR、コミット、spec の本文に書かない
 - 公開の時刻の検査のテストの環境(タスク1.7で分かったこと): `test-check-dependency-cooldown.sh` は openssl と gnupg を使う。Linux のコンテナで流すときは、`apk add` に `openssl gnupg` を足す
-- Go のモジュールの索引の読み方(タスク1.8で分かったこと): index.golang.org は1回の問い合わせに約4秒かかり、73時間分を順に読むと約10分かかって、判定の手順の5分の上限に収まらない。そのため `lib-gomod-index.sh` は、73時間を4時間ずつの区間(`GOMOD_INDEX_SEGMENT_HOURS`)に分け、約19本を同時に読む。design.md の「索引を順に読む」の書き方とは違う。区間の中のページは、最後の行の時刻を秒に切り上げた値が区間の終わりと同じときも、次のページを読む(`-le`)。check-release-age.sh は、go.mod の go・toolchain・module・exclude・retract・tool・godebug・ignore の行を照らさない。Dependabot が toolchain の行を変えるかは確かめていない
+- Go のモジュールの索引の読み方(タスク1.8で分かったこと): index.golang.org は1回の問い合わせに約4秒かかり、73時間分を順に読むと約10分かかって、判定の手順の5分の上限に収まらない。そのため `lib-gomod-index.sh` は、73時間を4時間ずつの区間(`GOMOD_INDEX_SEGMENT_HOURS`)に分け、約19本を同時に読む。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」にも、この読み方を書いた。`lib-gomod-index.sh` は、区間の中で、最後の行の時刻を秒に切り上げた値が区間の終わりと同じときも、次のページを読む(`-le`)。check-release-age.sh は、go.mod の go・toolchain・module・exclude・retract・tool・godebug・ignore の行を照らさない。Dependabot が toolchain の行を変えるかは確かめていない
 - Go の検査の外しの検知(タスク1.9で決めたこと): `check-escape-hatches.sh` は、`backend/` の下のすべての `.go` で、足した `.Skip(` `.SkipNow(` `.Skipf(` と `//nolint` と `// coverage-ignore`(go-test-coverage がカバレッジから外すコメント)を見つける。受け手の名前は `t` に限らない。gosec の `// #nosec` は見つけない。そのため、Claude は、タスク2.3で `.golangci.yml` を作るとき、gosec が `#nosec` のコメントに従わない設定にする。Claude は、タスク2.3で `Makefile` から golangci-lint と gremlins を呼ぶとき、設定のファイルを名前で指定する。承認の対象の6つのファイルと別の名前の設定のファイルを、道具が読まないようにするためである
 - design の審査で残った記録: 次の5つを、それぞれ次のタスクで扱う。
   - D3-3-1: 6-1 の `backend-vuln-fix` が版を上げる場所の一覧である。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」に書き足したとおりに、タスク10.7で扱う
@@ -637,20 +637,20 @@
   - D3-1-6: 比べる検査のコードを `make lint` が読むかである。タスク2.3で扱う
 - コードの生成(タスク2.2で分かったこと): oapi-codegen は、設定のファイルに `output` があると `-o` を使わない。そのため `api/oapi-codegen.yaml` には `output` を書かず、Makefile が `-o` で出力の場所を渡す。sqlc は、問い合わせのファイルが1つも無いと失敗するので、Makefile は `db/queries/*.sql` があるときだけ sqlc を動かす。sqlc は設定のファイルのフォルダから相対のパスを読むので、`generate-check` は設定とマイグレーションと問い合わせを `cp --parents` で一時のフォルダに写して生成する。問い合わせを作るタスク(2.5 以降)で、Claude は `db/queries/` に SQL を置き、`make generate` で `internal/platform/database/sqlcgen/` を作る
 - 比べる検査の3つの入口(タスク2.3で決めたこと): Makefile の `compat` `compat-cross` `compat-perf` は、テストの関数の名前で分ける。Claude は、タスク3で、`cross_test.go` のテストを `TestCross`、`perf_test.go` のテストを `TestPerf` で始まる名前にし、`compat_test.go` のテストをそれ以外の名前にする
-- カバレッジの測り方(タスク2.3で決めたこと): `make coverage` は、`coverage.out` から1行目と `internal/` の下のファイルの行だけを `coverage.internal.out` に写し、go-test-coverage にそのファイルを読ませる。go-test-coverage の除外の規則は、モジュールの名前を除いた `internal/...` の形のパスと比べる
-- 表の形の履歴の BASELINE の行(タスク2.4で決めたこと): Java 版は `baseline-on-migrate: true` と `baseline-version: 0` で動くので、本番の履歴に種類 `BASELINE` の行があるかもしれない。migrate は、`BASELINE` の行を受け付け、その版以下のファイルを適用済みとして扱う。design.md の失敗の一覧には無い扱いである。開発環境の履歴には `BASELINE` の行は無い
+- カバレッジの測り方(タスク2.3で決めたこと): `make coverage` は、`coverage.out` から1行目と `internal/` の下のファイルの行だけを `coverage.internal.out` に写し、go-test-coverage にそのファイルを読ませる。go-test-coverage は、除外の規則を、モジュールの名前を除いた `internal/...` の形のパスと比べる
+- 表の形の履歴の BASELINE の行(タスク2.4で決めたこと): Java 版は `baseline-on-migrate: true` と `baseline-version: 0` で動くので、本番の履歴に種類 `BASELINE` の行があるかもしれない。migrate は、`BASELINE` の行を受け付け、その版以下のファイルを適用済みとして扱う。design.md の「migrate」にも、この扱いを書いた。開発環境の履歴には `BASELINE` の行は無い
 - Go のテストの BOM と検査の値(タスク2.4で分かったこと): Go のソースの文字列に BOM のバイトをそのまま書くと、コンパイラが「illegal byte order mark」で止まるので、`"\xEF\xBB\xBF"` と書く。CRC32 は `hash.Write` でなく `crc32.Update` で計算する。`hash.Write` の誤りを捨てると gosec の G104 が止めるためである
 - testcontainers-go の Postgres(タスク2.4で決めたこと): テストの Postgres のイメージは、`docker/db/Dockerfile` と同じ版の `postgres:17.11-alpine` にする。パッケージの `TestMain` で1つのコンテナを動かし、テストごとに `CREATE DATABASE` で空のデータベースを作る
-- testcontainers-go の使い方(タスク2.5で分かったこと): v0.45.0 の `MappedPort` は moby の `network.Port` を返し、`Int()` が無い。つなぎ先は `PortEndpoint(ctx, "5432/tcp", "")` で「ホスト:ポート」を読む。Redis のテストのイメージは、`docker/redis/Dockerfile` と同じ版の `valkey/valkey:8.0.12-alpine` を `testcontainers.Run` で動かす
-- S3 のパスの形のテスト(タスク2.5で分かったこと): S3 の部品は、接続先が IP アドレスのとき、`UsePathStyle` の設定によらずパスの形で送る。`httptest` のサーバの宛先は IP アドレスなので、パスの形の確かめは、受けた要求のパスに加えて `Options().UsePathStyle` も見る
+- testcontainers-go の使い方(タスク2.5で分かったこと): v0.45.0 の `MappedPort` は moby の `network.Port` を返し、`Int()` が無い。つなぎ先は `PortEndpoint(ctx, "5432/tcp", "")` で「ホスト:ポート」を読む。Redis のテストは、`docker/redis/Dockerfile` と同じ版の `valkey/valkey:8.0.12-alpine` のイメージを `testcontainers.Run` で動かす
+- S3 のパスの形のテスト(タスク2.5で分かったこと): S3 の部品は、接続先が IP アドレスのとき、`UsePathStyle` の設定によらずパスの形で送る。`httptest` のサーバの宛先は IP アドレスなので、パスの形を確かめるテストは、受けた要求のパスに加えて `Options().UsePathStyle` も見る
 - AWS の部品の版(タスク2.5で決めたこと): aws-sdk-go-v2 の 2026-11-06 の版は、タスク2.5の時点で公開から72時間たっていなかったので、1つ前の 2026-11-05 の版(本体 v1.47.7、config v1.33.15、s3 v1.114.8、ses v1.42.8、secretsmanager v1.50.10)を使った
 - depguard の機能のパッケージの規則(タスク2.3で分かったこと): `.golangci.yml` の depguard の規則 `feature` は、機能のパッケージが自分の下のパッケージを読むこと(例: `internal/auth` から `internal/auth/x`)も断る。機能のパッケージを作るまとまりの spec で、Claude は、その読み込みの許可を `allow` に足す
 - 外部のログインの秘密の値の読み方(タスク2.6で決めたこと): config は、`keirekipro/oidc/google` と `keirekipro/oidc/github` を、`prod` に限らず `dev` と `test` でも Secrets Manager から読む。Java 版も `dev` でこの2つを localstack から読み、比べる検査も fakeaws に登録するためである。`KEIREKIPRO_AWS_ENDPOINT` が無いときの接続先は、`dev` と `test` では Java 版の application-dev.yaml と同じ `http://localstack:4566`、`prod` では空(本当の AWS)にした
 - gosec の G101(タスク2.6で分かったこと): gosec は、名前に secret や password や token を含む定数と、その名前のキーや項目にじかに書いた文字列を、秘密の値の書き込みとみなす。テストのコードも対象である。Claude は、検査を外すコメントを書かず、定数の名前を中身を表す別の名前(例: 秘密の値の名前なら `nameRDS`)にするか、テストの値を名前付きの定数に移す
-- ログの形(タスク2.7で決めたこと): Java 版の Spring Boot 4.1.2 の ECS のログは、`log.level` のような点を含む名前を、平らなキーでなく入れ子のオブジェクト(`{"log":{"level":...}}`)で書く。`slog.JSONHandler` は最上位の level と msg と time を入れ子に移せないので、logging は自作の `slog.Handler` にした。`logging.ErrorAttr` は nil の誤りを受け付けないので、呼び出し元は nil でない誤りだけを渡す
+- ログの形(タスク2.7で決めたこと): Java 版の Spring Boot 4.1.2 の Elastic Common Schema のログは、`log.level` のような点を含む名前を、平らなキーでなく入れ子のオブジェクト(`{"log":{"level":...}}`)で書く。`slog.JSONHandler` は最上位の level と msg と time を入れ子に移せないので、logging は自作の `slog.Handler` にした。`logging.ErrorAttr` は nil の誤りを受け付けないので、呼び出し元は nil でない誤りだけを渡す
 - HTTP の受け口の共通部分(タスク2.8で決めたこと): 次の9つを決めた。
   - 作り方の方針: Claude は、偽の送信の検査を、design.md の「httpapi」の節の文のとおりに作り、Java と Spring の内部の動きには合わせない。要件9が Java 版と同じにするのは画面から見える動きだけであり、要件9の受入基準5は、利用者が目にしない動きを Go の作り方に変えてよいとしているためである
-  - 検査するメソッドと経路: Go 版が偽の送信の検査をしないメソッドは、GET と HEAD と OPTIONS だけである。そのため、Go 版は TRACE の要求も検査する。Go 版は、/actuator の下への要求も検査から外さない。Go 版が /actuator の下で受け付ける要求は、GET だけである。Go 版は、design.md の文に無い除外として、/api/auth の下への要求だけを検査から外す。画面がログインに使う通信の部品である frontend の publicApiClient は、トークンをヘッダに写さない。そのため、Go 版が /api/auth の下を検査すると、今の画面からログインできなくなり、今の画面を直さずにそのまま動かすとした要件9の受入基準1を満たせないためである。Claude は、/api/auth の下を検査から外すことも、design.md の「httpapi」の節に書き足した
+  - 検査するメソッドと経路: Go 版が偽の送信の検査をしないメソッドは、GET と HEAD と OPTIONS だけである。そのため、Go 版は TRACE の要求も検査する。Go 版は、/actuator の下への要求も検査から外さない。Go 版が /actuator の下で受け付ける要求は、GET だけである。Go 版は、design.md の文に無い除外として、/api/auth の下への要求だけを検査から外す。画面がログインに使う通信の部品である frontend の publicApiClient は、トークンをヘッダに写さない。Go 版が /api/auth の下を検査すると、利用者は今の画面からログインできなくなる。Go 版が /api/auth の下を検査から外すのは、利用者がログインできなくなると、今の画面を直さずにそのまま動かすとした要件9の受入基準1を満たせないためである。Claude は、/api/auth の下を検査から外すことも、design.md の「httpapi」の節に書き足した
   - Cookie の性質とトークンの作り方: design.md の「安全」の節は、Cookie XSRF-TOKEN の性質を Java 版と同じにすると決めている。そのため、Go 版は、Cookie XSRF-TOKEN に Path=/ だけを付け、SameSite と Secure を足さない。Go 版は、トークンを、Spring の UUID の形を写さずに、Go の標準の crypto/rand.Text で作る
   - Cookie を付ける場面: Go 版は、トークンが合わない要求に 403 を返すとき、毎回新しい Cookie XSRF-TOKEN を付ける。Go 版は、OPTIONS のほかの要求で Cookie が無いか値が空なら、検査を通った要求と検査しない要求にも新しい Cookie を付け、OPTIONS には Cookie を付けない。Cookie を持たない利用者の最初の書き込みを 403 にしないためである
   - 変えた動きの一覧への記録: Java 版と変えた動きは、403 のときの Cookie の作り直し、TRACE の検査、/actuator の POST の検査の3つである。所有者は、この3つを 2026-11-09 に受け入れた。Claude は、この3つを、design.md の変えた動きの一覧の CB-006 から CB-008 に足した。Java 版は、API の説明画面の経路への要求を検査から外す。Go 版は、要件14の受入基準3のとおりにこの経路を受け付けないので、Claude は、この違いを CB-009 として記録だけの項目に足した
@@ -661,17 +661,17 @@
 - PDF を作る部品(タスク2.9で決めたこと): 次の8つを決めた。
   - chromedp の版と書き方: chromedp は v0.23.0 で、総称型の新しい書き方(`chromedp.Run[T]`、`chromedp.Action[T]`、`cdp.Call`、`cdp.Events`)を使う
   - 印刷までの手順: 部品は、HTML を `Page.setDocumentContent` で空のタブに置き、`Page.loadEventFired` を待ってから印刷する
-  - 外への通信の止め方: 外への通信は `Fetch.enable` の型 `*` で止め、止めた要求をすべて `Fetch.failRequest` で断る。`data:` の読み込みは通信ではないので、Chromium は Fetch で止めずに通す(テストで確かめた)
+  - 外への通信の止め方: 外への通信は `Fetch.enable` の型 `*` で止め、止めた要求をすべて `Fetch.failRequest` で断る。`data:` の読み込みは通信ではないので、Chromium は Fetch で止めずに通す。Claude は、このことをテストで確かめた
   - 紙の大きさ: 紙の大きさは、CSS の `@page` が無いページのために A4 を既定にし、`preferCSSPageSize` で CSS の大きさを優先する
   - Chromium が落ちたことの見分け方: Chromium が落ちたかは、ブラウザの context の終わりと `Browser.LostConnection` で見る
   - DOM の追跡の知らせの扱い: chromedp の DOM の追跡は、`setDocumentContent` のたびに「top-level frame が無い」という知らせを誤りとして書く。部品は DOM の追跡を使わないので、chromedp の知らせを DEBUG のログに回す。同じ理由で、テストで DOM を読むときは `chromedp.Text` でなく `Runtime.evaluate` を使う(`chromedp.Text` は終わらない)
-  - ブラウザが無いことの確かめ方: ブラウザが無いことの確かめは、CI の機械に `/usr/bin/google-chrome` があり PATH を空にしても見つかるので、実行ファイルの場所を存在しない場所に替えて確かめる
+  - ブラウザが無いことの確かめ方: ブラウザが無いことを確かめるテストは、CI の機械に `/usr/bin/google-chrome` があり PATH を空にしても見つかるので、実行ファイルの場所を存在しない場所に替えて確かめる
   - 要求の期限切れの見分け方: 要求の context が部品の打ち切りより先に期限で終わったときは、`Render` は chromedp の Canceled を包んで返すので、呼び出し側は要求の期限切れを `ctx.Err()` で見分ける
 - 起動の入口(タスク2.10で分かったこと): 次の5つが分かった。
-  - gremlins の制約: gremlins v0.6.0 は、パッケージの名前が main でフォルダの名前と違うと、最上位のパッケージのテストを流すので、`cmd/keirekipro/main.go` の変異は、すべて LIVED か NOT COVERED になる(https://github.com/go-gremlins/gremlins/issues/268 、直す PR は未マージ)。Claude は、入口を design のとおり `cmd/keirekipro` に置き、PR の CI の `make mutation-diff` が赤になったら所有者の判断を受ける
-  - 入口のテストの HTTP のクライアントの期限: 入口のテストは、受け口を先に開いてから入口を動かすので、テストの HTTP のクライアントには期限を付ける(期限が無いと、入口が受け口を使わずに終わったとき、要求が終わらずにテストが止まる)
-  - Redis のクライアントを閉じたかの確かめ方: Redis のクライアントを閉じたかは、接続の数でなく、閉じたクライアントへの命令が `redis.ErrClosed` を返すかで確かめる(使われなくなった接続は Go のメモリの片付けが閉じるため)
-  - Chromium の処理の数え方: Chromium の処理は、名前でなく、テストの処理の子孫を `/proc/<pid>/status` の PPid でたどって数える(同時に流れる pdf のテストの Chromium を数えないため)
+  - gremlins の制約: gremlins v0.6.0 は、パッケージの名前が main でフォルダの名前と違うと、最上位のパッケージのテストを流すので、`cmd/keirekipro/main.go` の変異は、すべて LIVED か NOT COVERED になる。この動きは https://github.com/go-gremlins/gremlins/issues/268 に書かれていて、直す PR はまだマージされていない。Claude は、入口を design のとおり `cmd/keirekipro` に置き、PR の CI の `make mutation-diff` が赤になったら所有者の判断を受ける
+  - 入口のテストの HTTP のクライアントの期限: 入口のテストは、受け口を先に開いてから入口を動かすので、テストの HTTP のクライアントには期限を付ける。期限が無いと、入口が受け口を使わずに終わったとき、要求が終わらずにテストが止まるためである。
+  - Redis のクライアントを閉じたかの確かめ方: Redis のクライアントを閉じたかは、接続の数でなく、閉じたクライアントへの命令が `redis.ErrClosed` を返すかで確かめる。使われなくなった接続は、Go のメモリの片付けが閉じるためである。
+  - Chromium の処理の数え方: Chromium の処理は、名前でなく、テストの処理の子孫を `/proc/<pid>/status` の PPid でたどって数える。同時に流れる pdf のテストの Chromium を数えないためである。
   - ReadHeaderTimeout の扱い: ReadHeaderTimeout はテストせず、gosec の G112 が守る
 - 本番のイメージ(タスク2.11で決めたこと): 次の5つを決めた。
   - 土台のイメージの版: 土台の `chromedp/headless-shell` は、2026-11-08 公開の 158.0.8127.18 が72時間たっていなかったので、1つ前の 157.0.8103.27(index の digest `7bee2014…`、amd64 と arm64 の両方を持つ)にした。research.md の digest `830fa77…` は 158 のものである
