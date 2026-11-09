@@ -31,10 +31,12 @@ type Env struct {
 // ContainerSpec は、Env に入れる1つのコンテナである。
 type ContainerSpec struct {
 	// Name は、ネットワークの中でほかのコンテナがこのコンテナを呼ぶ名前である。
-	Name  string
-	Image string
-	Env   map[string]string
-	Cmd   []string
+	Name string
+	// Aliases は、Name のほかに、ネットワークの中でこのコンテナを呼ぶ名前である。
+	Aliases []string
+	Image   string
+	Env     map[string]string
+	Cmd     []string
 	// ExposedPorts は、テストの処理から要求を送るために外に出すポート(例: "8080/tcp")である。
 	ExposedPorts []string
 	// WaitingFor は、起動を待つ条件である。nil なら、コンテナが動き始めたところで戻る。
@@ -63,7 +65,7 @@ func (e *Env) Start(ctx context.Context, spec ContainerSpec) (*Container, error)
 	defer cancel()
 
 	opts := []testcontainers.ContainerCustomizer{
-		network.WithNetwork([]string{spec.Name}, e.Network),
+		network.WithNetwork(append([]string{spec.Name}, spec.Aliases...), e.Network),
 		testcontainers.WithEnv(spec.Env),
 		testcontainers.WithExposedPorts(spec.ExposedPorts...),
 	}

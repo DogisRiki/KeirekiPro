@@ -5,10 +5,12 @@ package harness
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -49,38 +51,34 @@ func GoBackend(image string) Backend {
 	return Backend{Image: image, Env: GoEnv, HealthPath: "/healthz"}
 }
 
-// Stack は、backend がつなぐ、1つの Postgres と1つの Redis と1つの fakeaws と1つの fakeoidc である。
-type Stack struct {
+// Store は、1つの版がつなぐ、1つの Postgres と1つの Redis である。
+type Store struct {
 	// DBConn は、テストの処理から Postgres につなぐ接続の文字である。
 	DBConn string
 	// Redis は、テストの処理から Redis につなぐクライアントである。
 	Redis *redis.Client
-	// AWSURL は、テストの処理から届く fakeaws の URL である。
-	AWSURL string
 
-	oidcURL string
-	backing Backing
-	client  *http.Client
-	// seeded は、表の形の履歴を適用した直後に行のあった表である。Reset は、この表の行を残す。
+	// dbHost と redisHost は、ネットワークの中で backend が Postgres と Redis を呼ぶ名前である。
+	dbHost, redisHost string
+	// seeded は、表の形の履歴を適用した直後に行のあった表である。reset は、この表の行を残す。
 	seeded map[string]bool
 }
 
-// startStack は、env のネットワークに、Postgres と Redis と fakeaws と fakeoidc を起動し、表の形の履歴を適用する。
-// backend が読む秘密の値は、fakeaws の共有の版に登録する。
-// 表の形の履歴は、backend を起動する前に適用する。Go 版は起動のときに履歴を確かめるだけで、表を作らないためである。
-// 途中で失敗したときは、作った Redis のクライアントを閉じて誤りを返す。コンテナは env が片付ける。
-func startStack(ctx context.Context, env *Env, images Images) (*Stack, error) {
-	s := &Stack{client: NewHTTPClient()}
-	if err := s.start(ctx, env, images); err != nil {
-		_ = s.Close()
+// startStore は、env のネットワークに、postgres<suffix> と redis<suffix> の名前で Postgres と Redis を起動し、
+// 表の形の履歴を適用する。表の形の履歴は、backend を起動する前に適用する。Go 版は起動のときに履歴を確かめるだけで、
+// 表を作らないためである。途中で失敗したときは、作った Redis のクライアントを閉じて誤りを返す。コンテナは env が片付ける。
+func startStore(ctx context.Context, env *Env, images Images, suffix string) (*Store, error) {
+	st := &Store{dbHost: "postgres" + suffix, redisHost: "redis" + suffix}
+	if err := st.start(ctx, env, images); err != nil {
+		_ = st.Close()
 		return nil, err
 	}
-	return s, nil
+	return st, nil
 }
 
-func (s *Stack) start(ctx context.Context, env *Env, images Images) error {
+func (st *Store) start(ctx context.Context, env *Env, images Images) error {
 	pg, err := env.Start(ctx, ContainerSpec{
-		Name:  "postgres",
+		Name:  st.dbHost,
 		Image: images[ImagePostgres],
 		Env: map[string]string{
 			"POSTGRES_DB": crossDBName, "POSTGRES_USER": crossDBUser, "POSTGRES_PASSWORD": crossDBPassword,
@@ -96,7 +94,7 @@ func (s *Stack) start(ctx context.Context, env *Env, images Images) error {
 		return err
 	}
 	rd, err := env.Start(ctx, ContainerSpec{
-		Name:         "redis",
+		Name:         st.redisHost,
 		Image:        images[ImageRedis],
 		ExposedPorts: []string{"6379/tcp"},
 		WaitingFor:   wait.ForLog("Ready to accept connections"),
@@ -104,14 +102,87 @@ func (s *Stack) start(ctx context.Context, env *Env, images Images) error {
 	if err != nil {
 		return err
 	}
+	dbEndpoint, err := pg.PortEndpoint(ctx, "5432/tcp", "")
+	if err != nil {
+		return fmt.Errorf("harness: Postgres の宛先を読めません: %w", err)
+	}
+	st.DBConn = "postgres://" + crossDBUser + ":" + crossDBPassword + "@" + dbEndpoint + "/" + crossDBName + "?sslmode=disable"
+	if _, err := ApplyMigrations(ctx, st.DBConn); err != nil {
+		return err
+	}
+	if st.seeded, err = seededTables(ctx, st.DBConn); err != nil {
+		return err
+	}
+	redisEndpoint, err := rd.PortEndpoint(ctx, "6379/tcp", "")
+	if err != nil {
+		return fmt.Errorf("harness: Redis の宛先を読めません: %w", err)
+	}
+	st.Redis = redis.NewClient(&redis.Options{Addr: redisEndpoint})
+	return nil
+}
+
+// reset は、データベースの、表の形の履歴を適用した直後に行の無かった表を空にし、履歴が入れた行(役割など)は残す。
+// Redis はすべてのキーを消す。
+func (st *Store) reset(ctx context.Context) error {
+	conn, err := pgx.Connect(ctx, st.DBConn)
+	if err != nil {
+		return fmt.Errorf("harness: データベースにつなげません: %w", err)
+	}
+	defer func() { _ = conn.Close(context.Background()) }()
+	tables, err := publicTables(ctx, conn)
+	if err != nil {
+		return err
+	}
+	var names []string
+	for _, table := range tables {
+		if !st.seeded[table] {
+			names = append(names, pgx.Identifier{table}.Sanitize())
+		}
+	}
+	if len(names) > 0 {
+		// 1つの文で空にするので、空にする表どうしの外部キーは止めない。残す表から空にする表への外部キーがあれば、失敗にする。
+		if _, err := conn.Exec(ctx, "TRUNCATE "+strings.Join(names, ", ")); err != nil {
+			return fmt.Errorf("harness: 表を空にできません: %w", err)
+		}
+	}
+	if err := st.Redis.FlushAll(ctx).Err(); err != nil {
+		return fmt.Errorf("harness: Redis を空にできません: %w", err)
+	}
+	return nil
+}
+
+// Close は、Redis のクライアントを閉じる。コンテナは Env が片付ける。
+func (st *Store) Close() error {
+	if st == nil || st.Redis == nil {
+		return nil
+	}
+	return st.Redis.Close()
+}
+
+// fakes は、fakeaws と fakeoidc と、backend が使う JWT の値と外部のログインのクライアントである。
+type fakes struct {
+	// AWSURL は、テストの処理から届く fakeaws の URL である。
+	AWSURL string
+
+	oidcURL   string
+	jwtSecret string
+	google    fakeoidc.Client
+	github    fakeoidc.Client
+	client    *http.Client
+}
+
+// startFakes は、env のネットワークに、fakeaws と fakeoidc を起動する。awsAliases は、fakeaws を呼ぶ別の名前である。
+// fakeaws は、要求の宛先のホスト名 fakeaws-<版> で版を分けるので、版ごとに記録を分けるときは fakeaws-<版> を渡す。
+func startFakes(ctx context.Context, env *Env, images Images, awsAliases ...string) (*fakes, error) {
 	aws, err := env.Start(ctx, ContainerSpec{
 		Name:         "fakeaws",
+		Aliases:      awsAliases,
 		Image:        images[ImageFakeAWS],
 		ExposedPorts: []string{fakeaws.Port + "/tcp"},
 		WaitingFor:   wait.ForHTTP("/_compat/healthz").WithPort(fakeaws.Port + "/tcp"),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	oidc, err := env.Start(ctx, ContainerSpec{
 		Name:         "fakeoidc",
@@ -120,75 +191,127 @@ func (s *Stack) start(ctx context.Context, env *Env, images Images) error {
 		WaitingFor:   wait.ForHTTP("/_compat/healthz").WithPort(fakeoidc.Port + "/tcp"),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	dbEndpoint, err := pg.PortEndpoint(ctx, "5432/tcp", "")
-	if err != nil {
-		return fmt.Errorf("harness: Postgres の宛先を読めません: %w", err)
+	f := &fakes{
+		jwtSecret: rand.Text() + rand.Text(),
+		google:    fakeoidc.Client{ID: "google-" + rand.Text(), Secret: rand.Text()},
+		github:    fakeoidc.Client{ID: "github-" + rand.Text(), Secret: rand.Text()},
+		client:    NewHTTPClient(),
 	}
-	s.DBConn = "postgres://" + crossDBUser + ":" + crossDBPassword + "@" + dbEndpoint + "/" + crossDBName + "?sslmode=disable"
-	if _, err := ApplyMigrations(ctx, s.DBConn); err != nil {
-		return err
+	if f.AWSURL, err = aws.BaseURL(ctx, fakeaws.Port+"/tcp"); err != nil {
+		return nil, err
 	}
-	if s.seeded, err = seededTables(ctx, s.DBConn); err != nil {
-		return err
+	if f.oidcURL, err = oidc.BaseURL(ctx, fakeoidc.Port+"/tcp"); err != nil {
+		return nil, err
 	}
-	redisEndpoint, err := rd.PortEndpoint(ctx, "6379/tcp", "")
-	if err != nil {
-		return fmt.Errorf("harness: Redis の宛先を読めません: %w", err)
-	}
-	s.Redis = redis.NewClient(&redis.Options{Addr: redisEndpoint})
-	if s.AWSURL, err = aws.BaseURL(ctx, fakeaws.Port+"/tcp"); err != nil {
-		return err
-	}
-	if s.oidcURL, err = oidc.BaseURL(ctx, fakeoidc.Port+"/tcp"); err != nil {
-		return err
-	}
-
-	s.backing = Backing{
-		DBHost: "postgres", DBPort: "5432", DBName: crossDBName, DBUser: crossDBUser, DBPassword: crossDBPassword,
-		RedisHost: "redis", RedisPort: "6379",
-		JWTSecret:   rand.Text() + rand.Text(),
-		AWSEndpoint: "http://fakeaws:" + fakeaws.Port,
-		OIDCBaseURL: "http://fakeoidc:" + fakeoidc.Port,
-		Google:      fakeoidc.Client{ID: "google-" + rand.Text(), Secret: rand.Text()},
-		GitHub:      fakeoidc.Client{ID: "github-" + rand.Text(), Secret: rand.Text()},
-	}
-	// JavaSecrets は GoSecrets を含むので、どちらの版が読む秘密の値も、共有の版に1度に登録する。
-	return RegisterSecrets(ctx, s.client, s.AWSURL, fakeaws.SharedVersion, JavaSecrets(s.backing))
+	return f, nil
 }
 
-// startBackend は、env のネットワークに、backend-<version> の名前で be を起動し、起動したコンテナと、テストの処理から届く URL を返す。
-func (s *Stack) startBackend(ctx context.Context, env *Env, version string, be Backend) (*Container, string, error) {
+// backingFor は、st の Postgres と Redis と、ネットワークの中の名前 awsHost の fakeaws につなぐ、版のつなぐ先を返す。
+// どの版も、同じ JWT の値と同じ外部のログインのクライアントを使う。
+func (f *fakes) backingFor(st *Store, awsHost string) Backing {
+	return Backing{
+		DBHost: st.dbHost, DBPort: "5432", DBName: crossDBName, DBUser: crossDBUser, DBPassword: crossDBPassword,
+		RedisHost: st.redisHost, RedisPort: "6379",
+		JWTSecret:   f.jwtSecret,
+		AWSEndpoint: "http://" + awsHost + ":" + fakeaws.Port,
+		OIDCBaseURL: "http://fakeoidc:" + fakeoidc.Port,
+		Google:      f.google,
+		GitHub:      f.github,
+	}
+}
+
+// clearRecords は、fakeaws が覚えたオブジェクトとメールを、すべての版について消す。
+// 秘密の値は残す。backend が起動のときに読んだ値と同じでなければならないためである。
+func (f *fakes) clearRecords(ctx context.Context) error {
+	return f.admin(ctx, http.MethodDelete, f.AWSURL+"/_compat/records", "", "")
+}
+
+// records は、fakeaws が版 version について覚えた kind(objects か emails)を、JSON から v に読む。
+func (f *fakes) records(ctx context.Context, version, kind string, v any) error {
+	target := f.AWSURL + "/_compat/" + url.PathEscape(version) + "/" + kind
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return fmt.Errorf("harness: GET %s の要求を作れません: %w", target, err)
+	}
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("harness: GET %s を送れません: %w", target, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return errors.New("harness: GET " + target + " が " + resp.Status + " で断られました: " + string(msg))
+	}
+	if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+		return fmt.Errorf("harness: GET %s の応答を読めません: %w", target, err)
+	}
+	return nil
+}
+
+// Stack は、backend がつなぐ、1つの Postgres と1つの Redis と1つの fakeaws と1つの fakeoidc である。
+// 版をまたぐ確認と応答の時間の比べ方が使う。
+type Stack struct {
+	*Store
+	*fakes
+
+	backing Backing
+}
+
+// startStack は、env のネットワークに、Postgres と Redis と fakeaws と fakeoidc を起動し、表の形の履歴を適用する。
+// backend が読む秘密の値は、fakeaws の共有の版に登録する。
+// 途中で失敗したときは、作った Redis のクライアントを閉じて誤りを返す。コンテナは env が片付ける。
+func startStack(ctx context.Context, env *Env, images Images) (*Stack, error) {
+	st, err := startStore(ctx, env, images, "")
+	if err != nil {
+		return nil, err
+	}
+	f, err := startFakes(ctx, env, images)
+	if err != nil {
+		_ = st.Close()
+		return nil, err
+	}
+	s := &Stack{Store: st, fakes: f, backing: f.backingFor(st, "fakeaws")}
+	// JavaSecrets は GoSecrets を含むので、どちらの版が読む秘密の値も、共有の版に1度に登録する。
+	if err := RegisterSecrets(ctx, f.client, f.AWSURL, fakeaws.SharedVersion, JavaSecrets(s.backing)); err != nil {
+		_ = st.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
+// startBackend は、env のネットワークに、backend-<version> の名前で、つなぐ先 b の be を起動し、
+// 起動したコンテナと、テストの処理から届く URL を返す。
+func startBackend(ctx context.Context, env *Env, version string, be Backend, b Backing) (*Container, string, error) {
 	ctr, err := env.Start(ctx, ContainerSpec{
 		Name:         "backend-" + version,
 		Image:        be.Image,
-		Env:          be.Env(s.backing),
+		Env:          be.Env(b),
 		ExposedPorts: []string{backendPort},
 		WaitingFor:   wait.ForHTTP(be.HealthPath).WithPort(backendPort),
 	})
 	if err != nil {
 		return nil, "", err
 	}
-	url, err := ctr.BaseURL(ctx, backendPort)
+	u, err := ctr.BaseURL(ctx, backendPort)
 	if err != nil {
 		return nil, "", err
 	}
-	return ctr, url, nil
+	return ctr, u, nil
 }
 
 // registerRedirects は、backendURLs の backend の外部のログインの口を、fakeoidc の転送してよい先に登録する。
 // 外部のログインの提供元は、利用者を、要求を受けた backend の URL の口に戻す。テストの処理は外に出したポートで
 // backend を呼ぶので、その URL を登録する。
-func (s *Stack) registerRedirects(ctx context.Context, backendURLs []string) error {
+func (f *fakes) registerRedirects(ctx context.Context, backendURLs []string) error {
 	var redirects []string
 	for _, u := range backendURLs {
 		redirects = append(redirects, u+oidcCallbackPath)
 	}
-	for provider, client := range map[string]fakeoidc.Client{fakeoidc.Google: s.backing.Google, fakeoidc.GitHub: s.backing.GitHub} {
+	for provider, client := range map[string]fakeoidc.Client{fakeoidc.Google: f.google, fakeoidc.GitHub: f.github} {
 		client.RedirectURIs = redirects
-		if err := s.admin(ctx, http.MethodPut, s.oidcURL+"/_compat/clients/"+provider,
+		if err := f.admin(ctx, http.MethodPut, f.oidcURL+"/_compat/clients/"+provider,
 			"application/x-www-form-urlencoded", client.Form().Encode()); err != nil {
 			return err
 		}
@@ -238,43 +361,22 @@ func publicTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 // 履歴が入れた行(役割など)は残す。Redis はすべてのキーを消し、fakeaws は覚えたオブジェクトとメールを消す。
 // fakeaws の秘密の値は残す。backend が起動のときに読んだ値と同じでなければならないためである。
 func (s *Stack) Reset(ctx context.Context) error {
-	conn, err := pgx.Connect(ctx, s.DBConn)
-	if err != nil {
-		return fmt.Errorf("harness: データベースにつなげません: %w", err)
-	}
-	defer func() { _ = conn.Close(context.Background()) }()
-	tables, err := publicTables(ctx, conn)
-	if err != nil {
+	if err := s.reset(ctx); err != nil {
 		return err
 	}
-	var names []string
-	for _, table := range tables {
-		if !s.seeded[table] {
-			names = append(names, pgx.Identifier{table}.Sanitize())
-		}
-	}
-	if len(names) > 0 {
-		// 1つの文で空にするので、空にする表どうしの外部キーは止めない。残す表から空にする表への外部キーがあれば、失敗にする。
-		if _, err := conn.Exec(ctx, "TRUNCATE "+strings.Join(names, ", ")); err != nil {
-			return fmt.Errorf("harness: 表を空にできません: %w", err)
-		}
-	}
-	if err := s.Redis.FlushAll(ctx).Err(); err != nil {
-		return fmt.Errorf("harness: Redis を空にできません: %w", err)
-	}
-	return s.admin(ctx, http.MethodDelete, s.AWSURL+"/_compat/records", "", "")
+	return s.clearRecords(ctx)
 }
 
 // Close は、Redis のクライアントを閉じる。コンテナは Env が片付ける。
 func (s *Stack) Close() error {
-	if s == nil || s.Redis == nil {
+	if s == nil {
 		return nil
 	}
-	return s.Redis.Close()
+	return s.Store.Close()
 }
 
 // admin は、fakeaws と fakeoidc の /_compat/ の口に要求を送り、2xx でなければ誤りを返す。
-func (s *Stack) admin(ctx context.Context, method, target, contentType, body string) error {
+func (f *fakes) admin(ctx context.Context, method, target, contentType, body string) error {
 	req, err := http.NewRequestWithContext(ctx, method, target, strings.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("harness: %s %s の要求を作れません: %w", method, target, err)
@@ -282,7 +384,7 @@ func (s *Stack) admin(ctx context.Context, method, target, contentType, body str
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	resp, err := s.client.Do(req)
+	resp, err := f.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("harness: %s %s を送れません: %w", method, target, err)
 	}

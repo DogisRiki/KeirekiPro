@@ -254,7 +254,7 @@
   - 受入基準とテストの対応: 要件9の受入基準7(決めた幅で比べる)は、`perf_judge_test.go` の `TestPerfJudge_WithinTolerance`、`TestPerfJudge_ExceedsTolerance`、`TestPerfJudge_MemoryOver1792MBFails` で確かめる
   - _要件: 9.7_
 
-- [ ] 3.10 比べる検査の入口と自分を確かめる筋書きを作り、PR を出す
+- [x] 3.10 比べる検査の入口と自分を確かめる筋書きを作り、PR を出す
 
   Claude は、`backend/compat/compat_test.go` に、筋書きを読んで比べる入口と、筋書きに出てくる操作の確認 `TestCoverage_Operations` を作る。この確認は、定数 `requireAllOperations` が `false` の間は、`progress.md` で完了と記した操作がそのまとまりの筋書きに1回以上出てくることを確かめ、`true` のときは、仕様書の50の操作のすべてが筋書きに出てくることを確かめる。この確認は、どちらの値でも必ず動く。Claude は、比べる検査そのものが正しく動くかを確かめる3つの筋書きを作る。1つ目は、同じイメージを両方の位置に置き、違いが0件になる筋書きである。2つ目は、1文字変える偽物を置き、検査が失敗する筋書きである。3つ目は、`match` に当たる違いだけがあり、検査が通る筋書きである。Claude は、`Apply` で作った表を Java 版の Flyway の `validate` が通すことの確認も作る。最後に、Claude は `/verify-backend` と `run-check.sh backend-go make check` と `run-check.sh backend-go make compat` と `make compat-cross` を通して PR を出す。
   - 完了の確かめ方: `make check` と `make compat` と `make compat-cross` が成功し、PR の CI の `backend-compat` と `backend-test` が成功する
@@ -723,6 +723,14 @@
   - メモリの最大の読み方: コンテナの中の `/sys/fs/cgroup/memory.peak` を読む。これはコンテナを起動してからの最大なので、同時に送ったときの最大より小さくならない。上限を超えたと出たときは、ほかの操作で増えた分も含むことに気をつけて調べる
   - 環境: 版ごとに別の Docker のネットワークに、その版だけの Postgres・Redis・fakeaws・fakeoidc を起動する。筋書きごとに、Java 版、Go 版の順に、保存された内容を空にして初めのデータを読み込んでから測る。Postgres などを起動する部分は、版をまたぐ確認と共通にした
   - テストの名前: Makefile の `compat` は `TestPerf` で始まるテストを飛ばすので、tasks.md が名前を決めた `TestPerfJudge_*` は、PR の検査(`make compat`)では動かず、`make compat-perf` とタスクの完了の確かめ方のコマンドで動く。harness の、測り方のほかのテストは、PR の検査で動くように、`TestPerf` で始まらない名前にした
+- 比べる検査の入口(タスク3.10で決めたこと): 次の7つを決めた。
+  - 環境: 1つの Docker のネットワークに、版ごとの Postgres と Redis と、共有の fakeaws と fakeoidc を起動する。fakeaws には別名 `fakeaws-java` と `fakeaws-go` を付け、版ごとの別名で呼ばせて、オブジェクトとメールの記録を版ごとに分ける。Postgres と Redis を起動する部分(`Store`)と fakeaws と fakeoidc を起動する部分(`fakes`)は、版をまたぐ確認と応答の時間の比べ方と共通にした
+  - 段の操作の名前: 仕様書の `paths` から操作を読み、段の `method` と `path` で操作の名前を引く。筋書きの `{名前}` は、前の段で取り出す値なので、仕様書の `{名前}` の部分にだけ当たる。当たる形が2つ以上あれば、決まった文字の部分の多い形を選ぶ
+  - まとまりの分け方: design.md の表のとおり、`/api/auth/` の下を認証、`/api/users/` の下を利用者、`exportResume` と `exportResumeWithSettings` を出力、`backupResume` と `restoreResume` をバックアップ、残りをマスタと経歴書とする(13、7、26、2、2)
+  - 保存された内容の違い: データベースなどの違いは後の段にも残るので、前の段と同じ違いは重ねて報告しない。後の段の操作の違いとして報告すると、変えた動きの一覧の `match` が、違いを生んだ段の操作で当たらなくなるためである
+  - 筋書きに出てくる操作の確認: `progress.md` のまとまりの表の状態が「作り終えた」「比べる検査に通った」「本番で動いている」のどれかなら、完了と読む。知らないまとまりと知らない状態と、表に無いまとまりは、誤りにする。書き誤りで確かめる操作が減らないようにするためである
+  - Java 版の Flyway の validate の確かめ方: `Apply` で表を作ったデータベースに Java 版を起動する。Java 版は起動のときに validate を動かすので、起動の確認が 200 を返せば validate が通っている。加えて、起動のあとも履歴が7行のままで、BASELINE の行が無く、Go 版の確かめるだけの動かし方が7つをすべて適用済みと読むことを確かめる
+  - まとまりの spec に残すこと: 外部のログインの筋書きで、応答が fakeoidc を指す URL を返したときの送り直し方、GitHub のメールの取り方の違い、2段階の確認の6桁の数の扱いは、認証のまとまりの spec で決める。`resumes/many-pages.sql` の経歴書が PDF で3ページ以上になるかは、PDF の筋書きがまだ無いので確かめていない。出力のまとまりの spec で確かめる
 
 ## 完了条件(全タスク共通)
 

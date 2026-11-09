@@ -35,7 +35,7 @@ func StartCrossEnv(ctx context.Context, env *Env, images Images, backends map[st
 	c := &CrossEnv{Stack: stack, URLs: map[string]string{}, client: NewHTTPClient()}
 	var urls []string
 	for _, version := range []string{VersionJava, VersionGo} {
-		_, url, err := stack.startBackend(ctx, env, version, backends[version])
+		_, url, err := startBackend(ctx, env, version, backends[version], stack.backing)
 		if err != nil {
 			_ = stack.Close()
 			return nil, err
