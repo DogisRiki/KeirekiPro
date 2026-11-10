@@ -5,8 +5,20 @@ name: CodeQL Recheck
 # codeql-complete は、所有者が却下した警告を数えない。ただし、却下の前に終わった
 # codeql-complete は赤のまま残る。GitHub Actions は警告の却下で起動できない
 # (code_scanning_alert はワークフローを起動するイベントに無い)ので、このワークフローは
-# 定期実行で、所有者の却下のあとに赤のままの判定だけを動かし直す。
+# 10分ごとに動き、所有者の却下のあとに赤のままの判定だけを動かし直す。
 # 所有者は、却下のほかに操作をしなくてよい。
+#
+# 10分ごとに動かす仕組み:
+#   GitHub の定期実行(schedule)は、混んでいるときに遅れ、取りやめられることもある。
+#   https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+#   このリポジトリでは、10分ごとの定期実行が3時間から10時間おきにしか動かなかった(Issue #783)。
+#   そのため、このワークフローは、CodeQL のワークフローが赤で終わったとき(workflow_run)に動き始める。
+#   ほかのワークフローが終わったことでの起動は、定期実行の混雑では遅れない。
+#   動いた実行は、赤か動いている途中の codeql-complete を持つ PR が残っていれば、
+#   実行の中で10分待ってから、次の実行を workflow_dispatch で起動する。
+#   GITHUB_TOKEN での workflow_dispatch は、新しい実行を必ず作る。
+#   https://docs.github.com/en/actions/concepts/security/github_token
+#   10分ごとの定期実行は、起動を取りこぼしたときの予備として残す。
 #
 # 動かし直すのは、所有者が却下し、却下の時刻が codeql-complete の終わった時刻より
 # あとの警告がある PR だけである。動かし直した codeql-complete は新しい時刻で終わるので、
@@ -21,8 +33,11 @@ name: CodeQL Recheck
 # codeql-complete を画面の「Re-run failed jobs」で動かし直せる。
 
 on:
+  workflow_run:
+    workflows: [CodeQL]
+    types: [completed]
   schedule:
-    # GitHub の定期実行は、混んでいるときに遅れる。
+    # 起動を取りこぼしたときの予備。GitHub の定期実行は、混んでいるときに遅れる。
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
@@ -33,14 +48,19 @@ permissions:
   pull-requests: read
   security-events: read
 
-concurrency:
-  # 実行が重なって、同じ実行を2回動かし直そうとするのを避ける。
-  group: codeql-recheck
-  cancel-in-progress: false
-
 jobs:
   recheck:
+    # CodeQL のワークフローが緑で終わったときは、赤の codeql-complete は増えていないので動かない。
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure'
     runs-on: ubuntu-latest
+    # 実行が重なって、同じ実行を2回動かし直そうとするのを避ける。
+    # 前の実行が終わるまで、あとから起動された実行は待つ。待つ実行は1つだけ残り、
+    # それより前に待っていた実行は取り消される。
+    # concurrency をジョブに書くのは、緑で終わった CodeQL で起動されてジョブを飛ばす実行が、
+    # 待っている実行を取り消さないようにするためである。
+    concurrency:
+      group: codeql-recheck
+      cancel-in-progress: false
     steps:
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,6 +70,7 @@ jobs:
           persist-credentials: false
 
       - name: Rerun codeql-complete after the owner's dismissals
+        id: recheck
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -84,15 +105,20 @@ jobs:
               --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | "\(.number) \(.head.sha)"')
 
           failed=0
+          # 赤か動いている途中の codeql-complete を持つ PR の数。1以上なら、次の実行で見張りを続ける。
+          watch=0
           while read -r pr sha; do
               [ -n "$pr" ] || continue
 
-              # 1. PR の先頭のコミットの、最後に終わった codeql-complete の検査を読む。
+              # 1. PR の先頭のコミットの、最後に作られた codeql-complete の検査を読む。
+              #    検査の id は作られた順に大きくなる。動いている途中の検査は赤で終わるかもしれないので数える。
               check=$(gh api "repos/$REPO/commits/$sha/check-runs?check_name=codeql-complete&filter=latest&per_page=100" \
-                  --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | last // empty | "\(.conclusion) \(.completed_at) \(.details_url)"')
+                  --jq '.check_runs | sort_by(.id) | last // empty | "\(.status) \(.conclusion) \(.completed_at) \(.details_url)"')
               [ -n "$check" ] || continue
-              read -r conclusion completed_at details_url <<<"$check"
+              read -r status conclusion completed_at details_url <<<"$check"
+              [ "$status" = "completed" ] || { watch=$((watch + 1)); continue; }
               [ "$conclusion" = "failure" ] || continue
+              watch=$((watch + 1))
 
               # 2. 所有者が却下し、却下の時刻が検査の終わった時刻よりあとの警告があるかを読む。
               #    時刻はどちらも UTC の ISO 8601(末尾 Z)なので、文字列で比べられる。
@@ -122,7 +148,21 @@ jobs:
               fi
           done <<<"$prs"
 
+          echo "watch=$watch" >>"$GITHUB_OUTPUT"
           if [ "$failed" -gt 0 ]; then
-              echo "::error::${failed} 件の PR で codeql-complete を動かし直せませんでした。画面の「Re-run failed jobs」で動かし直してください。"
+              echo "::error::${failed} 件の PR で codeql-complete を動かし直せませんでした。10分後の次の実行で動かし直します。"
               exit 1
           fi
+
+      # PR の一覧か検査を読めずに止まったときは、数が書かれないので、次の実行を起動しない。
+      # そのときは、次に CodeQL のワークフローが赤で終わったときか、定期実行で動き始める。
+      - name: Start the next check in 10 minutes
+        if: ${{ !cancelled() && steps.recheck.outputs.watch != '' && steps.recheck.outputs.watch != '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WATCH: ${{ steps.recheck.outputs.watch }}
+        run: |
+          echo "赤か動いている途中の codeql-complete を持つ PR が ${WATCH} 件あります。10分後に次の実行を起動します。"
+          sleep 600
+          gh workflow run codeql-recheck.yaml --repo "$REPO" --ref main
