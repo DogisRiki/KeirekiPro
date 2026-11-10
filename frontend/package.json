@@ -28,8 +28,8 @@
         "@mui/material": "^9.5.0",
         "@mui/x-date-pickers": "^9.17.0",
         "@react-router/node": "8.5.1",
-        "@tanstack/react-query": "^5.106.1",
-        "@tanstack/react-query-devtools": "^5.106.1",
+        "@tanstack/react-query": "^5.107.1",
+        "@tanstack/react-query-devtools": "^5.107.1",
         "axios": "^1.21.0",
         "axios-auth-refresh": "^5.0.2",
         "dayjs": "^1.11.23",
@@ -45,7 +45,7 @@
         "react-router": "8.5.1",
         "react-verification-input": "^4.2.2",
         "use-debounce": "^10.1.1",
-        "zustand": "^5.0.16"
+        "zustand": "^5.1.0"
     },
     "devDependencies": {
         "@eslint/compat": "^1.4.1",
@@ -55,7 +55,7 @@
         "@react-router/dev": "8.5.1",
         "@stryker-mutator/core": "^9.6.1",
         "@stryker-mutator/vitest-runner": "^9.6.1",
-        "@tanstack/eslint-plugin-query": "^5.106.1",
+        "@tanstack/eslint-plugin-query": "^5.107.1",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/react": "^16.3.3",
         "@testing-library/user-event": "^14.6.8",
