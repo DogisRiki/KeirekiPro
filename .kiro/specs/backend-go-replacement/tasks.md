@@ -347,7 +347,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(変異テスト)は、`test-record-mutation-metrics.sh` に足す「gremlins の報告から割合を読む」の場合で確かめる
   - _要件: 3.1_
 
-- [ ] 5.5 週次のカバレッジの集計に Go 版を足す (並行可)
+- [x] 5.5 週次のカバレッジの集計に Go 版を足す (並行可)
 
   Claude は、`.github/scripts/collect-coverage.sh` に、Go 版の `coverage.out` から文の割合を集める処理を足した完成版を、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、`test-collect-coverage.sh` が成功する
@@ -779,6 +779,8 @@
 - タスク5.3の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): ブランチがあるかを読む `git ls-remote` が通信の誤りで失敗すると、Go の仕事はブランチが無いと扱う(そのあとの push の失敗で仕事は失敗になるので、誤りは隠れない。Java の仕事と同じ作り)。呼ばれる箇所があっても直した版の無い脆弱性だけのときは、Go の仕事は warning を出して成功で終わるので、誰にも知らされない(design は、この場合を決めていない。Java の仕事も、修正版の無い警告を黙って除く)
 - gremlins v0.6.0 の JSON の報告(タスク5.4でソースの `internal/report` を読んで確かめた): 1行の JSON で、最上位に `mutants_killed` `mutants_lived` `mutants_not_covered` `mutants_not_viable` などの数を持つ。test efficacy は KILLED/(KILLED+LIVED)、変異のカバーは (KILLED+LIVED)/(KILLED+LIVED+NOT COVERED) で、TIMED OUT と NOT VIABLE はどちらにも数えない。変異が0件のときは報告のファイルを書かない。週次の台帳は、この2つの割合を Go 版の欄に書き、前回との差は test efficacy で比べる
 - 変異テストの台帳の表(タスク5.4): 既存の5列の表「記録(測定方式つき)」に6列の行を足すと、GitHub の表示が表の頭より多い欄を捨てて「実行」の欄が消える。そこで、見出し「記録(Go 版つき)」の6列の表を別に作って追記し、前回の全件の行は5列と6列の両方の表から探す。段階6で Java 版の欄を消すときは、この6列の表から PIT の列を消す形になる
+- Go 版の文の割合の数え方(タスク5.5で go-test-coverage v2.22.0 のソースを読んで確かめた): 週次の集計は、`make coverage` が下限と比べる値と同じ範囲で数える。数えるのは go.mod の module の名前に /internal/ を続けたパスの下だけで、`.testcoverage.yml` の exclude: の paths: の正規表現にモジュールの名前を除いたパスが当たるファイルは数えない。同じ箇所は1つとして数え、小数第1位に四捨五入する。go-test-coverage と違うのは、ソースのコメントで外す指定(coverage-ignore)を読まないことと、パッケージの最上位の関数リテラルの中の箇所も数えることの2つで、今のコードはどちらも使っていない
+- ci.yaml の backend-go の仕事に、成果物 backend-go-coverage(coverage.out)を残すステップを足した(タスク5.5)。週次の集計が Go 版の値を読む元が、ほかに無いためである。design の「PR 2-5 で変えるファイル」の一覧は collect-coverage.sh だけで、ci.yaml はその外にある。このことを、タスク5.6で所有者にファイルを置いてもらうときと PR の本文に書く
 
 ## 完了条件(全タスク共通)
 
