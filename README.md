@@ -82,11 +82,12 @@ flowchart LR
         AW[audit-weekly<br>週次で定期スキャンと棚卸しと<br>mainのソースコードの診断の鮮度・<br>Dependabotの滞留・<br>必須チェックのすり抜け・<br>PRと定期検査のTrivyの版の食い違いを判定し<br>mainに残ったCodeQLの警告の数と<br>72時間待たずに入れた版の一覧とともに<br>結果をIssueで通知]
         CV[canary-verify<br>月次でカナリアPRが<br>期待どおり赤になったかを照合し<br>結果をIssueで通知]
         AI[audit-inventory<br>月次で版とサポート期限を集め<br>判定せずに台帳のIssueへ報告]
-        CR[codeql-recheck<br>10分ごとに、所有者が警告を<br>却下したPRの診断の判定を<br>動かし直す]
+        CR[codeql-recheck<br>診断の判定が赤のPRがあるあいだ<br>10分ごとに、所有者が警告を<br>却下したPRの診断の判定を<br>動かし直す]
     end
 
     AW & CV -.検査の仕組みを監視.-> M
     AW -.止まっていないかを確認.-> AI
+    Q -.ソースコードの診断が赤で終わったら起動.-> CR
     CR -.赤のままの判定を動かし直す.-> Q
 ```
 
@@ -110,7 +111,7 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 | 品質の検査 | dependency-graph.yaml | push (main) | mainの依存グラフをGitHubへ送信。dependency-review.yamlが比較する基準側のスナップショットを用意し、あわせてbackendのDependabotアラートを有効にする。部品には、本番のjarに入る部品(runtime)か開発のときだけ使う部品(development)かを付け、アラートで本番で動く部品を見分けられるようにする |
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。本番用のイメージをarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
 | 品質の検査 | codeql.yaml | pull_request / push (main) / 週次 (schedule) / 手動 | CodeQLでソースコードの脆弱性を診断し、結果をGitHubのコードスキャンに送る。診断する言語は、`.github/codeql/languages.tsv`と照らして実行のたびに見つける。プルリクエストでは、言語ごとの診断がすべて成功し、そのプルリクエストが持ち込んだ重さが中以上の警告が無いときだけ、`codeql-complete`が緑になる。所有者が却下した警告は数えない。診断の対象からファイルやクエリを外す設定は置かない。mainへのpushと週1回の実行で、mainに残った警告を見つける |
-| 品質の検査 | codeql-recheck.yaml | 10分ごと (schedule) / 手動 | 所有者がCodeQLの警告を却下したあとに、赤のままの`codeql-complete`を動かし直す。GitHub Actionsは警告の却下で起動できないため、定期実行で、所有者が却下し、却下の時刻が判定の終わった時刻よりあとの警告があるプルリクエストだけを動かし直す。プルリクエストのコードは取り出さない |
+| 品質の検査 | codeql-recheck.yaml | codeql.yamlが赤で終わったとき (workflow_run) / 10分ごと (schedule) / 手動 | 所有者がCodeQLの警告を却下したあとに、赤のままの`codeql-complete`を動かし直す。GitHub Actionsは警告の却下で起動できないため、`codeql-complete`が赤か動いている途中のプルリクエストがあるあいだ、10分ごとに確かめ、所有者が却下し、却下の時刻が判定の終わった時刻よりあとの警告があるプルリクエストだけを動かし直す。GitHubの定期実行は混んでいると数時間遅れるので、codeql.yamlが赤で終わったときに動き始め、確かめたあとに実行の中で10分待ってから、次の実行を自分で起動する。10分ごとの定期実行は、起動を取りこぼしたときの予備である。プルリクエストのコードは取り出さない |
 | ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、CIの道具の版を決まった書き場所に書いているかの検査、リリースゲートのテスト、backend-testの判定のスクリプトのテスト、Node.jsとTerraformとTrivyの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更と、backendのGo版の品質チェックとコード生成の設定(`backend/Makefile`・`.golangci.yml`・`.testcoverage.yml`・`.gremlins.yaml`・`api/oapi-codegen.yaml`・`sqlc.yaml`)の変更と、開発環境のNode.jsとTerraformのイメージの版の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更と、イメージの版を変えずに中身(digest)だけを変える変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
