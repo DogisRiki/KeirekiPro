@@ -196,3 +196,29 @@ func TestUnknownRouteReturns404(t *testing.T) {
 		})
 	}
 }
+
+// CORS の処理が、偽の送信の検査より前に動くことを確かめる。
+// 偽の送信の検査は OPTIONS の要求を検査しないので、プリフライトでは順を見分けられない。
+// そのため、許す送り元からのヘッダ X-XSRF-TOKEN の無い POST に、偽の送信の検査が返す 403 の応答に
+// Access-Control-Allow-Origin が付くことで、CORS の処理が先に動いたことを確かめる。
+func TestCORS_RunsBeforeCSRF(t *testing.T) {
+	handler := httpapi.New(httpapi.Options{
+		Logger:             logging.New(&bytes.Buffer{}, logging.Options{Service: logging.Service{Name: "keirekipro"}}),
+		CORSAllowedOrigins: []string{"http://localhost:5173", "http://localhost:8082"},
+	})
+	req := httptest.NewRequest(http.MethodPost, "http://localhost:8081/api/resumes", strings.NewReader("{}"))
+	req.Header.Set("Origin", "http://localhost:8082")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden || rec.Body.String() != `{"message":"アクセス権限がありません。"}` {
+		t.Errorf("応答 = %d %s, want 偽の送信の検査の 403", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:8082" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want http://localhost:8082", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+		t.Errorf("Access-Control-Allow-Credentials = %q, want true", got)
+	}
+}

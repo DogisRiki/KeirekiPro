@@ -26,12 +26,14 @@ type Options struct {
 	DB HealthDB
 	// Handlers は、仕様書の操作を受け持つ、まとまりのパッケージの処理を束ねた型である。nil なら、すべての操作に 501 を返す。
 	Handlers gen.StrictServerInterface
+	// CORSAllowedOrigins は、CORS の処理が許す送り元である。config の App.CORSAllowedOrigins を渡す。
+	CORSAllowedOrigins []string
 	// Auth は、ログインの状態の検査の差し込み口である。認証のまとまりの spec が作る。nil なら、何もせずに通す。
 	Auth func(http.Handler) http.Handler
 }
 
 // New は、仕様書の経路と生きているかの確認の経路を登録し、中間処理を、外から
-// パニックの受け止め、要求のログ、偽の送信の検査、ログインの状態の検査の順に並べた http.Handler を返す。
+// パニックの受け止め、要求のログ、CORS の処理、偽の送信の検査、ログインの状態の検査の順に並べた http.Handler を返す。
 // 登録していない経路への要求には 404 を返す。
 func New(opts Options) http.Handler {
 	logger := logging.Named(opts.Logger, "httpapi")
@@ -76,6 +78,7 @@ func New(opts Options) http.Handler {
 	}
 	return middleware.Recover(logger)(
 		middleware.RequestLog(logger)(
-			middleware.CSRF(
-				auth(middleware.RecordRoute(mux)))))
+			middleware.CORS(opts.CORSAllowedOrigins)(
+				middleware.CSRF(
+					auth(middleware.RecordRoute(mux))))))
 }

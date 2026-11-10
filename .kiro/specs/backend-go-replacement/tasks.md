@@ -277,7 +277,7 @@
   - _要件: 14.4_
 
 - [ ] 15. CORS の処理と、API の説明画面から Go 版を呼ぶ設定を入れる(PR 2-6)
-- [ ] 15.1 Java 版の CORS の応答を確かめ、Go 版の CORS の処理を作る
+- [x] 15.1 Java 版の CORS の応答を確かめ、Go 版の CORS の処理を作る
 
   Claude は、実装の前に、開発環境の Java 版に `Origin` を付けた要求を `curl` で送り、応答のステータスと CORS のヘッダを記録する。CORS とは、画面と別の送り元で動く API に、ブラウザが要求を送ってよいかを、API が応答のヘッダで示す仕組みである。送る要求は、次の8つである。
 
@@ -775,6 +775,8 @@
   - 日本語の氏名の並びの違いを、Markdown と PDF の出力の比べ方では許せない
   - Google と GitHub のログインで、応答が示すログインの画面へ進む動き(送り直し)は作っていない。認証のまとまりの spec で作る
 - 作業フォルダで開発環境を起動するとき(タスク4.2で分かったこと): compose.yaml のコンテナの名前は固定で、compose のプロジェクトの名前は既定でフォルダの名前になる。そのため、git worktree の作業フォルダでそのまま `bash start-dev.sh` を打つと、本体フォルダのプロジェクト `keirekipro` の動いているコンテナと名前がぶつかり、起動に失敗する。Claude は、作業フォルダでは `COMPOSE_PROJECT_NAME=keirekipro bash start-dev.sh` で、本体フォルダと同じ開発環境を起動する。このとき、止まっていたコンテナは作業フォルダのファイルを読む形で作り直される
+- Java 版の CORS の応答と design の CORS の処理の5つの箇条の食い違い(タスク15.1で分かったこと): Claude は、次の4つを Java 版の応答に合わせた。1つ目に、Java 版は、`Vary` の3つの値を、1行でなく値ごとに別の行で返す。2つ目に、Java 版は、許したプリフライトの応答にも `Access-Control-Expose-Headers` を付けるので、プリフライトの応答のヘッダは4つでなく5つになる。3つ目に、Java 版は、`Invalid CORS request` の 403 に `Content-Type` を付けない。Go の標準の受け口は本文から推した `Content-Type` を付けるので、Go 版はその値を空にして止める。テストの記録用の応答の部品はこの推しをしないので、この動きは本物の受け口を立てて確かめる。4つ目に、Java 版は、`Access-Control-Allow-Headers` を、要求の名前を「, 」でつなぎ直した値で返す。このほかに、許す送り元からのプリフライトでない `TRACE` に、Java 版は 401 を返し、Go 版は design のとおり 403 を返す。Java 版の 401 の応答には `Vary` が無いので、この 401 は Java 版の CORS の処理より前で返っている。Go 版の CORS の処理ではこの 401 を作れない。8つの要求でメソッドを確かめる代表は `HEAD` で、`HEAD` では両方の版が 403 を返す
+  - Java 版の応答の記録の取り方: 作業フォルダからは本体フォルダの開発環境の Java 版を動かせないので、Claude は、`run-check.sh backend sh -c './gradlew bootRun --args=--spring.profiles.active=dev & ... curl ...'` で、1回きりのコンテナの中で Java 版を起動して `curl` を送った。`curl -X HEAD` は本文を待って止まるので、`HEAD` は `curl -I` で送る
 
 ## 完了条件(全タスク共通)
 
