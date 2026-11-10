@@ -138,6 +138,7 @@ t_pending_blocks_once() {
     expect_err "PR #42 の必須の検査に、結果がまだ出ていないもの"
     expect_err "escape-hatch"
     expect_err "同じ状態では1回だけ止めます"
+    expect_err "問いをもう一度全部書いてください"
     run_hook p-1
     expect_rc 0 "同じ返答の中で同じ状態の2回目"
     run_hook p-2
