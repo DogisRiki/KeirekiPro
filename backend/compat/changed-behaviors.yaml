@@ -1,0 +1,108 @@
+# 変えた動きの一覧。Go 版が Java 版と違う動きをするところと、比べる検査がその違いを許す範囲(match)を書く。
+# 形は .kiro/specs/backend-go-replacement/design.md の「変えた動きの一覧の形」のとおりである。
+# match は、1つの形か、並びの形で書く。match の無い項目は、記録だけの項目である。比べる検査は、match に当たらない違いで止まる。
+# match で違いを許す範囲は、できるだけ狭く書く。
+
+- id: CB-001
+  group: 3
+  変えた動き: 日本語の名前の並び順
+  java: ポートフォリオ、SNS、自己PR を、Java の日本語の並べ替えの規則(java.text.Collator)で並べる
+  go: ポートフォリオ、SNS、自己PR を、golang.org/x/text/collate の日本語の規則で並べる
+  画面に影響が無い理由: 画面と PDF の並び順が変わる。所有者が 2026-11-07 に受け入れた(Issue #445 の決めた方式)
+  # 経歴書の JSON の並びは、経歴書を返すすべての操作で順だけの違いを許す。バックアップの JSON では、並びが resume の下にある。
+  match:
+    - operation: "*"
+      target: body
+      path: $.portfolios[*]
+      order_only: true
+    - operation: "*"
+      target: body
+      path: $.snsPlatforms[*]
+      order_only: true
+    - operation: "*"
+      target: body
+      path: $.selfPromotions[*]
+      order_only: true
+    - operation: backupResume
+      target: body
+      path: $.resume.portfolios[*]
+      order_only: true
+    - operation: backupResume
+      target: body
+      path: $.resume.snsPlatforms[*]
+      order_only: true
+    - operation: backupResume
+      target: body
+      path: $.resume.selfPromotions[*]
+      order_only: true
+
+- id: CB-002
+  group: 2
+  変えた動き: プロフィール画像の受け入れ
+  java: 中身が BMP と WBMP のファイルと、途中で切れた JPEG を受け入れる
+  go: 中身が PNG、JPEG、GIF のファイルだけを受け入れ、途中で切れた JPEG を断る
+  画面に影響が無い理由: 画面は PNG、JPEG、GIF の選び方を案内しており、ほかのファイルを選んだときは画面にエラーが出る。所有者が 2026-11-07 に受け入れた
+  # match を書かない。match の形では、操作とステータスの違いを、送ったファイルの中身で絞れない。
+  # 操作で許すと、PNG を送ったときのステータスの違いも許してしまう。比べる検査は、PNG、JPEG、GIF のほかのファイルを送らない。
+
+- id: CB-003
+  group: 4
+  変えた動き: 入力の足りない経歴書の書き出し
+  java: 要求の Accept に application/json が無いと、401 と空の本文を返す
+  go: Accept によらず、400 と足りない項目の一覧を返す
+  画面に影響が無い理由: 画面は Accept に application/json を付けて送るので、画面の動きは変わらない。所有者が 2026-11-07 に受け入れた
+  # match を書かない。比べる検査は、画面と同じ Accept を付けて送るので、この違いは出ない。
+  # 操作のステータスの違いを許すと、ほかの理由で 401 や 400 になる違いも許してしまう。
+
+- id: CB-004
+  group: 4
+  変えた動き: PDF の文字の位置と、写したときの「〜」
+  java: openhtmltopdf で文字を配置し、PDF から文字を写すと「～」(U+FF5E)になる
+  go: Chromium で文字を配置するので位置が 1〜2pt ずれ、写すと「〜」(U+301C)のままになる
+  画面に影響が無い理由: 配置、フォント、文字の大きさ、表の色、改頁の位置は同じである。所有者が 2026-11-07 に受け入れた
+  # match を書かない。PDF の比べ方が、2pt までの位置のずれと「～」と「〜」の違いを許す。
+  # PDF の違いを match で許すと、ほかの PDF の違いも許してしまう。
+
+- id: CB-005
+  group: 1
+  変えた動き: JSON で文字を \uXXXX の形で書くかどうか
+  java: 絵文字を \uXXXX の形で書き、<>& と U+2028 と U+2029 をそのままの文字で書く
+  go: 絵文字をそのままの文字で書き、U+2028 と U+2029 を \uXXXX の形で書く
+  画面に影響が無い理由: 画面は JSON を解析してから使うので、表示される文字は同じである
+  # match を書かない。比べる検査は解析した値で比べる。
+
+- id: CB-006
+  group: 1
+  変えた動き: 偽の送信の検査で断るときの Cookie の作り直し
+  java: 要求を断るとき、要求に Cookie XSRF-TOKEN が無い場合だけ、新しい Cookie を付ける
+  go: 要求を断るたびに新しい Cookie を付ける
+  画面に影響が無い理由: 画面は次の要求で新しい Cookie の値をヘッダに写すので、画面の動きは変わらない。所有者が 2026-11-09 に受け入れた
+  match:
+    operation: "*"
+    target: header
+    path: Set-Cookie
+    status: 403
+
+- id: CB-007
+  group: 1
+  変えた動き: TRACE の要求の偽の送信の検査
+  java: TRACE の要求を偽の送信の検査にかけない
+  go: GET、HEAD、OPTIONS のほかのすべての要求を検査するので、TRACE の要求も検査する
+  画面に影響が無い理由: 画面は TRACE の要求を送らないので、画面の動きは変わらない。所有者が 2026-11-09 に受け入れた
+  # match を書かない。比べる検査は TRACE の要求を送らない。
+
+- id: CB-008
+  group: 1
+  変えた動き: /actuator の下の要求の偽の送信の検査
+  java: /actuator の下の経路への要求を偽の送信の検査にかけない
+  go: /actuator の下への要求も検査する。受け付ける要求は GET /actuator/health だけである
+  画面に影響が無い理由: ALB とコンテナが backend の生きているかを確かめる動きは変わらない。所有者が 2026-11-09 に受け入れた
+  # match を書かない。比べる検査は /actuator の下に GET のほかの要求を送らない。
+
+- id: CB-009
+  group: 1
+  変えた動き: API の説明画面の経路への要求の偽の送信の検査
+  java: /swagger-ui/**、/swagger-ui.html、/v3/api-docs、/v3/api-docs/** への要求を、偽の送信の検査にかけない
+  go: これらの経路を受け付けず、ほかの経路と同じく検査するので、GET、HEAD、OPTIONS のほかの要求に、404 の前に 403 を返す
+  画面に影響が無い理由: 画面はこれらの経路に要求を送らないので、画面の動きは変わらない。開発者は、API の説明画面を compose の api-docs で開く
+  # match を書かない。比べる検査はこれらの経路に要求を送らない。

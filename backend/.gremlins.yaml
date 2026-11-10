@@ -2,10 +2,12 @@
 # make mutation-diff と make mutation-full が、このファイルを --config で名前を指定して読む。
 # 下限(--threshold-efficacy 80 と --threshold-mcover 93)は、make mutation-diff が引数で渡す。
 unleash:
-  # 生成したコードには変異を作らない
+  # 生成したコードと、比べる検査のコード(compat/)には変異を作らない。
+  # 比べる検査のテストは make check のテストに入らないので、compat/ の変異はどのテストも通らず、下限を割るためである
   exclude-files:
     - ^internal/httpapi/gen/
     - ^internal/platform/database/sqlcgen/
+    - ^compat/
 
 # 作る変異は、条件の反転、条件の境目、算術の演算子、増減、符号の反転の5つにする
 mutants:

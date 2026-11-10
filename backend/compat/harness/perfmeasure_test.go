@@ -1,0 +1,289 @@
+//go:build compat
+
+package harness
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+func TestPercentile95(t *testing.T) {
+	ms := func(values ...int) []time.Duration {
+		var out []time.Duration
+		for _, v := range values {
+			out = append(out, time.Duration(v)*time.Millisecond)
+		}
+		return out
+	}
+	// 200 個の 1〜200ms を逆の順に並べる。短いほうから190番目は 190ms である。
+	var reversed []int
+	for v := 200; v >= 1; v-- {
+		reversed = append(reversed, v)
+	}
+	for name, tc := range map[string]struct {
+		samples []time.Duration
+		want    time.Duration
+	}{
+		"200個":       {ms(reversed...), 190 * time.Millisecond},
+		"1個":         {ms(7), 7 * time.Millisecond},
+		"切り上げる位置":    {ms(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), 11 * time.Millisecond},
+		"95%ちょうどの位置": {ms(20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1), 19 * time.Millisecond},
+	} {
+		before := append([]time.Duration(nil), tc.samples...)
+		got, err := Percentile95(tc.samples)
+		if err != nil || got != tc.want {
+			t.Errorf("%s: Percentile95 = %v, %v, want %v", name, got, err, tc.want)
+		}
+		for i := range before {
+			if tc.samples[i] != before[i] {
+				t.Errorf("%s: 渡した時間の並びを変えました", name)
+				break
+			}
+		}
+	}
+	if _, err := Percentile95(nil); err == nil {
+		t.Error("測った時間が無いのに誤りを返しませんでした")
+	}
+}
+
+// perfScenario は、ログインして Cookie を受けたあと、/work を測る筋書きである。
+func perfScenario(workStatus int) Scenario {
+	return Scenario{Name: "work", Modes: []string{ModePerf}, Steps: []Step{
+		{Name: "login", Request: Request{Method: http.MethodPost, Path: "/login"}, Expect: Expect{Status: http.StatusOK}},
+		{Name: "work", Request: Request{Method: http.MethodGet, Path: "/work"}, Expect: Expect{Status: workStatus}},
+	}}
+}
+
+func loginThenWork(delay time.Duration) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			w.Header().Add("Set-Cookie", "session=s1; Path=/")
+		case "/work":
+			time.Sleep(delay)
+			if r.Header.Get("Cookie") != "session=s1" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		}
+		_, _ = w.Write([]byte("{}"))
+	}
+}
+
+func TestMeasureLatency_WarmsUpThenTimesLastStep(t *testing.T) {
+	const delay = 5 * time.Millisecond
+	srv, reqs := recordingServer(t, loginThenWork(delay))
+	samples, err := MeasureLatency(t.Context(), NewHTTPClient(), srv.URL, perfScenario(http.StatusOK), 3, 7)
+	if err != nil {
+		t.Fatalf("MeasureLatency: %v", err)
+	}
+	if len(samples) != 7 {
+		t.Fatalf("測った時間の数 = %d, want 7", len(samples))
+	}
+	for i, d := range samples {
+		if d < delay {
+			t.Errorf("%d 回目の時間 %v が、応答にかかる %v より短い", i+1, d, delay)
+		}
+	}
+	var paths []string
+	for _, r := range reqs() {
+		paths = append(paths, r.Path)
+	}
+	want := "/login" + strings.Repeat(" /work", 10)
+	if got := strings.Join(paths, " "); got != want {
+		t.Errorf("送った要求 = %s, want %s", got, want)
+	}
+}
+
+func TestMeasureLatency_FailsOnUnexpectedResponse(t *testing.T) {
+	for name, tc := range map[string]struct {
+		s        Scenario
+		handle   func(w http.ResponseWriter, r *http.Request)
+		wantStep string
+	}{
+		"準備の段": {perfScenario(http.StatusOK), func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		}, "login"},
+		"測る段": {perfScenario(http.StatusCreated), loginThenWork(0), "work"},
+		"測る段の途中": {perfScenario(http.StatusOK), func() func(http.ResponseWriter, *http.Request) {
+			var mu sync.Mutex
+			n := 0
+			return func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				n++
+				fail := n == 4
+				mu.Unlock()
+				if fail {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+			}
+		}(), "work"},
+	} {
+		srv, _ := recordingServer(t, tc.handle)
+		_, err := MeasureLatency(t.Context(), NewHTTPClient(), srv.URL, tc.s, 1, 5)
+		if err == nil || !strings.Contains(err.Error(), "段 "+tc.wantStep) {
+			t.Errorf("%s: 誤り = %v, want 段 %s の誤り", name, err, tc.wantStep)
+		}
+	}
+	if _, err := MeasureLatency(t.Context(), NewHTTPClient(), "http://127.0.0.1:1", Scenario{Name: "empty"}, 1, 1); err == nil {
+		t.Error("段の無い筋書きで誤りを返しませんでした")
+	}
+}
+
+// barrier は、n 件の要求が届くまで、どの要求にも答えないサーバの処理である。n 件が同時に届かなければ 500 を返す。
+func barrier(n int) func(w http.ResponseWriter, r *http.Request) {
+	var mu sync.Mutex
+	arrived := 0
+	all := make(chan struct{})
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" {
+			w.Header().Add("Set-Cookie", "session=s1; Path=/")
+			return
+		}
+		mu.Lock()
+		arrived++
+		if arrived == n {
+			close(all)
+		}
+		mu.Unlock()
+		select {
+		case <-all:
+		case <-time.After(5 * time.Second):
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if r.Header.Get("Cookie") != "session=s1" {
+			w.WriteHeader(http.StatusUnauthorized)
+		}
+	}
+}
+
+func TestMeasureConcurrentPeak_SendsInParallelThenReadsPeak(t *testing.T) {
+	srv, reqs := recordingServer(t, barrier(2))
+	var readAt int
+	peak := func(context.Context) (uint64, error) {
+		readAt = len(reqs())
+		return 1234, nil
+	}
+	got, err := MeasureConcurrentPeak(t.Context(), NewHTTPClient(), srv.URL, perfScenario(http.StatusOK), 2, peak)
+	if err != nil || got != 1234 {
+		t.Fatalf("MeasureConcurrentPeak = %d, %v, want 1234", got, err)
+	}
+	if readAt != 3 {
+		t.Errorf("メモリの最大を読んだときの要求の数 = %d, want 3(準備1件と同時の2件)", readAt)
+	}
+}
+
+func TestMeasureConcurrentPeak_FailsWithoutReadingPeak(t *testing.T) {
+	broken := errors.New("読めない")
+	for name, tc := range map[string]struct {
+		handle func(w http.ResponseWriter, r *http.Request)
+		peak   func(context.Context) (uint64, error)
+		want   string
+	}{
+		"期待と違う応答": {func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/work" {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}, func(context.Context) (uint64, error) {
+			t.Error("失敗した要求のあとでメモリの最大を読みました")
+			return 0, nil
+		}, "段 work"},
+		"準備の失敗": {
+			func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) },
+			func(context.Context) (uint64, error) {
+				t.Error("準備の失敗のあとでメモリの最大を読みました")
+				return 0, nil
+			}, "段 login",
+		},
+		"メモリの最大を読めない": {barrier(2), func(context.Context) (uint64, error) { return 0, broken }, "読めない"},
+	} {
+		srv, _ := recordingServer(t, tc.handle)
+		_, err := MeasureConcurrentPeak(t.Context(), NewHTTPClient(), srv.URL, perfScenario(http.StatusOK), 2, tc.peak)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: 誤り = %v, want %q を含む誤り", name, err, tc.want)
+		}
+	}
+}
+
+func TestSession_CloneIsIndependent(t *testing.T) {
+	s := NewSession()
+	s.cookies[cookieKey{"a", "/"}] = "1"
+	s.vars["id"] = "x"
+	c := s.Clone()
+	c.cookies[cookieKey{"b", "/"}] = "2"
+	c.vars["id"] = "y"
+	if len(s.cookies) != 1 || s.vars["id"] != "x" {
+		t.Errorf("写しを変えたら元が変わりました: %v %v", s.cookies, s.vars)
+	}
+	if c.cookies[cookieKey{"a", "/"}] != "1" || c.now == nil {
+		t.Errorf("写しに元の Cookie と時計がありません: %v", c.cookies)
+	}
+}
+
+func TestParseMemoryPeak(t *testing.T) {
+	if got, err := parseMemoryPeak([]byte("1879048192\n")); err != nil || got != 1879048192 {
+		t.Errorf("parseMemoryPeak = %d, %v, want 1879048192", got, err)
+	}
+	for _, bad := range []string{"", "max\n", "-1", "12MB"} {
+		if _, err := parseMemoryPeak([]byte(bad)); err == nil {
+			t.Errorf("parseMemoryPeak(%q) が誤りを返しませんでした", bad)
+		}
+	}
+}
+
+func TestLoadScenario_PerfFields(t *testing.T) {
+	perf := strings.Replace(designScenario, "modes: [compare, cross]", "modes: [perf]\nmeasure_memory: true", 1)
+	s, err := LoadScenario(writeScenario(t, perf))
+	if err != nil || !s.MeasureMemory {
+		t.Fatalf("LoadScenario = %+v, %v, want measure_memory を読む", s, err)
+	}
+	for name, tc := range map[string]struct {
+		content, want string
+	}{
+		"perf でない筋書きの measure_memory": {strings.Replace(designScenario, "modes: [compare, cross]", "modes: [compare]\nmeasure_memory: true", 1), "measure_memory"},
+		"最後の段の status が無い": {strings.Replace(strings.Replace(designScenario, "modes: [compare, cross]", "modes: [perf]", 1),
+			"      json: {name: 新しい名前}\n    expect: {status: 200}\n", "      json: {name: 新しい名前}\n", 1), "save-basic"},
+	} {
+		_, err := LoadScenario(writeScenario(t, tc.content))
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: 誤り = %v, want %q を含む誤り", name, err, tc.want)
+		}
+	}
+	// 最後でない段は status が無くてもよい
+	first := strings.Replace(strings.Replace(designScenario, "modes: [compare, cross]", "modes: [perf]", 1),
+		"    capture: {}\n    expect: {status: 200}\n", "    capture: {}\n", 1)
+	if _, err := LoadScenario(writeScenario(t, first)); err != nil {
+		t.Errorf("最後でない段の status が無い筋書きを断りました: %v", err)
+	}
+}
+
+func TestWritePerfReport(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "report")
+	report := PerfReport{Latencies: []LatencyResult{{Operation: "login", Java: time.Millisecond, Go: time.Millisecond}}}
+	file, err := report.Write(dir)
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if file != filepath.Join(dir, "perf.txt") {
+		t.Errorf("書いたファイル = %s", file)
+	}
+	b, err := os.ReadFile(filepath.Clean(file))
+	if err != nil || string(b) != report.String() {
+		t.Errorf("書いた中身 = %q, %v, want %q", b, err, report.String())
+	}
+	blocked := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocked, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := report.Write(filepath.Join(blocked, "sub")); err == nil {
+		t.Error("フォルダを作れないのに誤りを返しませんでした")
+	}
+}

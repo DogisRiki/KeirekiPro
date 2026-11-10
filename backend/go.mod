@@ -19,13 +19,18 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.8
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.4
 	github.com/aws/aws-sdk-go-v2/service/ses v1.42.8
+	github.com/aws/smithy-go v1.28.8
 	github.com/chromedp/cdproto v0.159.0
 	github.com/chromedp/chromedp v0.21.0
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/moby/moby/client v0.6.2
+	github.com/moby/patternmatcher v0.6.1
 	github.com/oapi-codegen/runtime v1.8.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/testcontainers/testcontainers-go v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
+	go.yaml.in/yaml/v3 v3.0.5
+	golang.org/x/crypto v0.58.0
 )
 
 require (
@@ -52,7 +57,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.39.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.44.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.8 // indirect
-	github.com/aws/smithy-go v1.28.8 // indirect
 	github.com/bluekeyes/go-gitdiff v0.8.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -103,8 +107,6 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.3 // indirect
 	github.com/moby/moby/api v1.56.1 // indirect
-	github.com/moby/moby/client v0.6.2 // indirect
-	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
 	github.com/moby/sys/user v0.4.1 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
@@ -157,8 +159,6 @@ require (
 	go.uber.org/atomic v1.12.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/image v0.41.0 // indirect
 	golang.org/x/mod v0.42.0 // indirect

@@ -187,89 +187,79 @@
   - 受入基準とテストの対応: 要件3の受入基準1から3(9種類の品質チェックをそろえる、1つのコマンドで動かせる、合格の基準を緩くしない)は、`make check` と、CI の `backend-go` の仕事の `make mutation-diff` の結果で確かめる。要件7の受入基準3(承認が要る理由と、main に入れたときに本番で起きることを示す)は、`gh pr view` で読んだ PR の本文で確かめる
   - _要件: 3.1, 3.2, 3.3, 7.3_
 
-- [ ] 3. Java 版と Go 版を比べる検査を入れる(PR 2-3)
-- [ ] 3.1 比べる検査の土台を作る
+- [x] 3. Java 版と Go 版を比べる検査を入れる(PR 2-3)
+- [x] 3.1 比べる検査の土台を作る
 
   Claude は、`backend/compat/harness/`(ビルドタグ `compat`)に、次の3つの処理を作る。1つ目は、`KEIREKIPRO_REPO_ROOT` から design.md の6つのイメージを testcontainers-go の Dockerfile からの組み立てで作る処理である。2つ目は、検査ごとに Docker のネットワークを1つ作り、`java` `go` `fakeaws` `fakeoidc` などの名前でコンテナを入れる処理である。3つ目は、筋書きのファイルを読む処理である。harness は、コンテナの起動を5分で、1つの要求を60秒で打ち切り、失敗したら両方の版のコンテナのログを残す。harness は、検査の始めに、各データベースに migrate の `Apply` で V1〜V7 を適用する。harness は、Go 版のコンテナを起動するときに、起動から `/healthz` が 200 を返すまでの時間を測り、10秒を超えたら検査を失敗にする。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準5(同じ要求を送って比べる検査を作る)の土台は、`harness_test.go` の `TestLoadScenario_ParsesSteps`、`TestLoadScenario_RejectsUnknownMode`、`TestNetwork_ContainersResolveByName` で、Go 版の本番のイメージの起動の時間は `TestStartup_Over10sFails` と `TestStartup_Within10sPasses` で確かめる
   - _要件: 4.5_
-  - _保留: PR 2-2 が main に入ったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク3を行う_
 
-- [ ] 3.2 AWS の代わりを作る (並行可)
+- [x] 3.2 AWS の代わりを作る (並行可)
 
   Claude は、`backend/compat/fakeaws/`(ビルドタグ `compat`)と、その `Dockerfile`(`golang:1.27.3-trixie` で組み立て、digest で固定した `gcr.io/distroless/static-debian13:nonroot` に置く)を作る。fakeaws は、S3 のパスの形の `PutObject` `GetObject` `DeleteObject` と署名付きの URL の `GetObject`、SES v1 の `SendEmail`、Secrets Manager の `GetSecretValue` を受け、受けたものを版ごとに覚えて返す。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/fakeaws/...` が成功する
   - 受入基準とテストの対応: 要件9の受入基準3(メールの件名と本文を比べられる)は `fakeaws_test.go` の `TestSendEmail_RecordsPerVersion` で、要件12の受入基準3(画像を比べられる)は `TestS3_PutGetDelete` と `TestS3_PresignedGet` で、Java 版の起動に要る秘密の値は `TestSecretsManager_GetSecretValue` で確かめる
   - _要件: 9.3, 12.3_
   - _対象の部品: fakeaws と fakeoidc_
-  - _保留: 3.1 と同じ_
 
-- [ ] 3.3 外部のログインの代わりを作る (並行可)
+- [x] 3.3 外部のログインの代わりを作る (並行可)
 
   Claude は、`backend/compat/fakeoidc/`(ビルドタグ `compat`)とその `Dockerfile` を作る。fakeoidc は、Google の認可と token と userinfo と、GitHub の認可と `access_token` と `/user` と `/user/emails` に、筋書きが決めた利用者の値で応答を返す。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/fakeoidc/...` が成功する
   - 受入基準とテストの対応: 要件12の受入基準2(Google と GitHub のアカウントでログインできることを比べられる)は、`fakeoidc_test.go` の `TestGoogleFlow_ReturnsScenarioUser` と `TestGitHubFlow_ReturnsScenarioUserAndEmails` で確かめる
   - _要件: 12.2_
   - _対象の部品: fakeaws と fakeoidc_
-  - _保留: 3.1 と同じ_
 
-- [ ] 3.4 正規化と比べる処理と報告を作る
+- [x] 3.4 正規化と比べる処理と報告を作る
 
   Claude は、`backend/compat/harness/` に、design.md の「比べ方」の表の9つのものの正規化と比べ方と、違いの報告を作る。違いの報告には、筋書きの名前、段、比べたもの、Java 版の値、Go 版の値を書き、違いの見つかった最初の段を先頭に置く。比べる検査は、Java 版を `SPRING_PROFILES_ACTIVE=dev` と fakeaws に登録した秘密の値で、Go 版を `KEIREKIPRO_ENV=dev` で動かす。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準4と5(実際の応答と保存したデータを正解にして比べる)と要件4の受入基準6(違いがあれば止める)は、`compare_test.go` の `TestCompareJSON_UUIDNumbering`、`TestCompareJSON_TokenClaims`、`TestCompareHeaders_OnlySelected`、`TestCompareDB_SortsAfterNormalize`、`TestCompareRedis_TTLTolerance5s`、`TestCompareMail_TokenInURL` と、`report_test.go` の `TestReport_FirstDiffStepFirst` で、要件9の受入基準1から3(画面が使う URL とデータの形、エラーの文言と条件、メールの件名と本文を同じにする)、要件10の受入基準2(Markdown が1文字も違わない)、要件11の受入基準1から3(バックアップを同じに戻し、同じ形で書き出し、誤ったものを同じに拒む)、要件12の受入基準1(データベースをそのまま読み書きする)は、同じテストの「ヘッダ」「本文」「Markdown は1文字も違わない」「S3」「メール」「データベース」の場合で確かめる
   - _要件: 4.4, 4.5, 4.6, 9.1, 9.2, 9.3, 10.2, 11.1, 11.2, 11.3, 12.1_
-  - _保留: 3.1 と同じ_
 
-- [ ] 3.5 変えた動きの一覧と違いを許す範囲を作る
+- [x] 3.5 変えた動きの一覧と違いを許す範囲を作る
 
   Claude は、`backend/compat/changed-behaviors.yaml` に、design.md の変えた動きの一覧の CB-001 から CB-009 の9つの項目を書き、比べる検査が、design.md の「変えた動きの一覧の形」のとおりに、違いを一覧の `match` と照らす処理を作る。Claude は、CB-005、CB-007、CB-008、CB-009 の4つの項目を、`match` を持たない記録だけの項目にする。CB-005 は JSON で文字を `\uXXXX` の形で書くかどうかの項目、CB-007 は `TRACE` の要求の偽の送信の検査の項目、CB-008 は `/actuator` の下の要求の偽の送信の検査の項目、CB-009 は API の説明画面の経路への要求の偽の送信の検査の項目である。比べる検査は、`operation` が `"*"` の項目をすべての操作に当て、`status` を書いた項目を両方の版のステータスがその値のときだけ当て、`target` が header の項目では `path` をヘッダの名前として読む。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準6(一覧に載せた違いでは止めない)と要件9の受入基準5と6(変えた動きの一覧)は、`match_test.go` の `TestMatch_OrderOnlyAllowsReorder`、`TestMatch_OtherOperationNotAllowed`、`TestMatch_AnyOperation`、`TestMatch_StatusLimitsScope`(`status` を書いた項目が、ほかのステータスの違いを許さない)、`TestMatch_HeaderPath`、`TestLoadChangedBehaviors_RequiredFields`、`TestLoadChangedBehaviors_CB005HasNoMatch` で確かめる
   - _要件: 4.6, 9.5, 9.6_
-  - _保留: 3.1 と同じ_
 
-- [ ] 3.6 PDF の比べ方を作る (並行可)
+- [x] 3.6 PDF の比べ方を作る (並行可)
 
   Claude は、`backend/compat/pdfcmp/`(ビルドタグ `compat`)を作る。pdfcmp は、design.md の「pdfcmp」の表の6つを poppler-utils で読んで比べ、語の位置は 2pt、文字の大きさは 0.5pt、表の色は RGB のそれぞれ 2 まで許す。フォントの名前は先頭の6文字の付け足しを除き、ページの文字は「～」(U+FF5E)を「〜」(U+301C)に直してから比べる。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/pdfcmp/...` が成功する
   - 受入基準とテストの対応: 要件10の受入基準1と4(配置、フォント、文字の大きさ、表の色、改頁の位置を比べる方法と許す違い)は、`pdfcmp_test.go` の `TestCompare_Allows2ptShift`、`TestCompare_Rejects2_5ptShift`、`TestCompare_RejectsOneCharDiff`、`TestCompare_RejectsPageBreakDiff`、`TestCompare_FontSubsetPrefixIgnored`、`TestCompare_TableColorTolerance` で確かめる
   - _要件: 10.1, 10.3, 10.4_
   - _対象の部品: pdfcmp_
-  - _保留: 3.1 と同じ_
 
-- [ ] 3.7 比べる経歴書とバックアップと画像の初めのデータを置く
+- [x] 3.7 比べる経歴書とバックアップと画像の初めのデータを置く
 
   Claude は、`backend/compat/fixtures/` に、利用者の初めのデータと、`resumes/` の4種類の経歴書と、バックアップと画像のファイルを置く。4種類の経歴書は、項目が空の経歴書、職歴と案件が多く3ページ以上になる経歴書、長い文と改行を含む経歴書、2つのフォントのそれぞれを選んだ経歴書である。どのデータを使うかは、Claude が、まとまりの spec で作る筋書きに書く。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` の `TestFixtures_AllLoadable` が成功する
   - 受入基準とテストの対応: 要件10の受入基準3(いろいろな経歴書のデータで比べる)は、`fixtures_test.go` の `TestFixtures_AllLoadable` と `TestFixtures_ResumeKindsPresent` で確かめる
   - _要件: 10.3_
-  - _保留: 3.1 と同じ_
 
-- [ ] 3.8 版をまたぐ確認を作る
+- [x] 3.8 版をまたぐ確認を作る
 
   Claude は、`backend/compat/cross_test.go` と harness の版をまたぐ動かし方を作る。harness は、版をまたぐ動かし方では、Java 版と Go 版を1つの Postgres と1つの Redis と1つの fakeaws につなぎ、筋書きごとに、Java 版から Go 版へ、Go 版から Java 版へ、2つの版へ交互に、の3つの送り先の組を試し、最後の段でもう一方の版から保存した内容を読む。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat -run Cross ./compat/...` が成功する
   - 受入基準とテストの対応: 要件13の受入基準1から4と6(切り替えの間と後に、操作が失敗せず、保存が消えず、ログアウトされず、途中の手順をまたぐ操作を終えられることを、切り替えの前に版をまたいで確かめる)と要件5の受入基準6(戻してもログアウトされず保存が残る)の土台は、`cross_test.go` の `TestCross_SelfPairPasses`(同じイメージを両方の位置に置いた筋書きが通る)、`TestCross_WrongStatusFailsWithStepAndDirection`、`TestCross_ThreeDirectionsRun` で確かめる。10の操作の筋書きは、Claude が、まとまりの spec で足す
   - _要件: 5.6, 13.1, 13.2, 13.3, 13.4, 13.6_
-  - _保留: 3.1 と同じ_
 
-- [ ] 3.9 応答の時間の比べ方を作る
+- [x] 3.9 応答の時間の比べ方を作る
 
   Claude は、`backend/compat/perf_test.go` と harness の時間の動かし方を作る。harness は、時間の動かし方では、20回の測らない要求のあと200回ずつ順に送り、操作ごとに95パーセンタイルを「Go 版 ≤ Java 版 × 1.2 + 20ミリ秒」で比べ、PDF の出力では同時2件のときのメモリの最大が 1792MB 以内かを確かめる。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` の `TestPerfJudge_*` が成功する
   - 受入基準とテストの対応: 要件9の受入基準7(決めた幅で比べる)は、`perf_judge_test.go` の `TestPerfJudge_WithinTolerance`、`TestPerfJudge_ExceedsTolerance`、`TestPerfJudge_MemoryOver1792MBFails` で確かめる
   - _要件: 9.7_
-  - _保留: 3.1 と同じ_
 
-- [ ] 3.10 比べる検査の入口と自分を確かめる筋書きを作り、PR を出す
+- [x] 3.10 比べる検査の入口と自分を確かめる筋書きを作り、PR を出す
 
   Claude は、`backend/compat/compat_test.go` に、筋書きを読んで比べる入口と、筋書きに出てくる操作の確認 `TestCoverage_Operations` を作る。この確認は、定数 `requireAllOperations` が `false` の間は、`progress.md` で完了と記した操作がそのまとまりの筋書きに1回以上出てくることを確かめ、`true` のときは、仕様書の50の操作のすべてが筋書きに出てくることを確かめる。この確認は、どちらの値でも必ず動く。Claude は、比べる検査そのものが正しく動くかを確かめる3つの筋書きを作る。1つ目は、同じイメージを両方の位置に置き、違いが0件になる筋書きである。2つ目は、1文字変える偽物を置き、検査が失敗する筋書きである。3つ目は、`match` に当たる違いだけがあり、検査が通る筋書きである。Claude は、`Apply` で作った表を Java 版の Flyway の `validate` が通すことの確認も作る。最後に、Claude は `/verify-backend` と `run-check.sh backend-go make check` と `run-check.sh backend-go make compat` と `make compat-cross` を通して PR を出す。
   - 完了の確かめ方: `make check` と `make compat` と `make compat-cross` が成功し、PR の CI の `backend-compat` と `backend-test` が成功する
   - 受入基準とテストの対応: 要件4の受入基準5から7(比べる検査を作り、違いがあれば止め、一覧に載せた違いでは止めない)は `compat_test.go` の `TestSelf_SameImageNoDiff`、`TestSelf_OneCharFakeFails`、`TestSelf_MatchedDiffPasses` で、要件4の受入基準7(CI で動き続ける)は PR と main の CI の `backend-compat` の結果で、要件12の受入基準4(履歴の続きとして変える)は `TestApply_JavaFlywayValidatePasses` で、要件9の受入基準1(すべての操作を比べる)の土台は `TestCoverage_Operations` と、その判定の関数の単体テスト `TestCoverageJudge_CompletedOnly` と `TestCoverageJudge_All50` で確かめる
   - _要件: 4.5, 4.6, 4.7, 9.1, 12.4_
-  - _保留: 3.1 と同じ_
 
 - [ ] 4. API の説明画面と開発の手順の文書を入れる(PR 2-4)
 - [ ] 4.1 開発環境の API の説明画面を作る
@@ -679,6 +669,73 @@
   - フォントの設定: fontconfig のパッケージは依存として DejaVu のフォントを入れるので、`backend/assets/fonts.conf` の `<rejectfont>` で `/usr/share/fonts/truetype/*` を使わせず、sans-serif と serif と monospace を Noto に向けた
   - `run-check.sh` のコンテナで書ける場所: `run-check.sh` のコンテナでは `/repo` は読むだけで、`/app`(backend)には書ける
   - 本番のイメージでの PDF の部品の確かめ方: PDF の部品を本番のイメージで確かめるときは、`CGO_ENABLED=0 go test -c -o /app/<名前>` でテストのプログラムを作り、`docker run --entrypoint` でイメージの中で流す
+
+- 比べる検査の土台(タスク3.1で分かったこと): 次の3つが分かった。
+  - gremlins の読むファイル: gremlins v0.6.0 は、ビルドタグを見ずに、テストでないすべての .go のファイルを変異の対象にするので、`backend/compat/` のファイルの変異は NOT COVERED になり、CI の `make mutation-diff` の下限を割る。比べる検査は `make check` のテストに入らないためである。直すには `.gremlins.yaml` の `exclude-files` に `^compat/` を足す。`.gremlins.yaml` は承認の対象のゲート設定なので、Claude は、タスク3.10で PR を出すときに、理由を添えて所有者に提案する
+  - Dockerfile が組み立ての文脈の外にあるときの組み立て方: testcontainers-go の FromDockerfile は Dockerfile が文脈の中にあることを求めるので、harness は、`.dockerignore` を当てた文脈の tar を自分で作り、Dockerfile を `.compat-dockerfile` の名前で tar に足して組み立てる
+  - イメージの名前: 同じ dind を使う検査どうしでイメージを取り違えないように、harness は、組み立てるたびに乱数のタグを付け、検査の終わりにタグだけを消す。層は消さずに、次の組み立てのキャッシュに使う
+- AWS の代わり(タスク3.2で分かったこと): 次の4つが分かった。
+  - 版の分け方: fakeaws は、要求の宛先のホスト名で版を分ける。`fakeaws-java` なら java、`fakeaws-go` なら go で、そのほかの名前(版をまたぐ確認で両方がつなぐ `fakeaws` など)は共有の版 `shared` になる。harness の `ContainerSpec` は名前を1つしか持たないので、比べる検査では、fakeaws のコンテナに `fakeaws-java` と `fakeaws-go` の2つの名前を付けられるようにする
+  - 比べる検査の口: 秘密の値の登録は `PUT /_compat/<版>/secrets/<名前>`、覚えたものの読み出しは `GET /_compat/<版>/objects` と `GET /_compat/<版>/emails`、記録を空にするのは `DELETE /_compat/records`(秘密の値は残す)。S3 と SES と Secrets Manager の受けると決めていない操作と、どの口にも当たらないパスは、501 で断り、`fakeaws_unexpected_request` をログに出す。ログの `operation` に、断った操作の名前が入る。ただし、`/_compat/` の下の決めていないパスへの GET と PUT と DELETE は、S3 のオブジェクトの操作として扱われるので、harness は `/_compat/` の口の名前を書き誤らないようにする
+  - Java 版の署名付きの URL: Java 版の開発の設定(`LocalstackPresignedUrlTransformer`)は、署名付きの URL のホストを localhost に置き換えるので、harness がその URL を読むときは、宛先と Host を fakeaws の版の名前に直して読む
+  - 本文の形: AWS の SDK が aws-chunked の形で送る本文は、fakeaws が中身を取り出して覚える。ETag は本文の SHA-256 の先頭から作る(SDK は ETag でなく CRC32 で本文を確かめる)。Java 版の SDK がこの形で読み書きできるかは、タスク3.10で Java 版を動かすまで確かめられない
+- ログインの代わり(タスク3.3で分かったこと): 次の4つが分かった。
+  - 口のパス: fakeoidc は、本物と同じパスで受ける。Google は `/o/oauth2/v2/auth` と `/token` と `/v1/userinfo`、GitHub は `/login/oauth/authorize` と `/login/oauth/access_token` と `/user` と `/user/emails` である。どの口にも当たらないパスは、501 で断り、`fakeoidc_unexpected_request` をログに出す
+  - クライアントと利用者の登録: fakeoidc は、クライアントの値を固定で持たない。harness は、筋書きの前に、`PUT /_compat/clients/<google|github>` に `Client.Form()` の本文で、クライアントの ID と秘密の値と転送先の一覧を登録し、同じ ID と秘密の値を fakeaws の `keirekipro/oidc/google` と `keirekipro/oidc/github` にも登録する。登録の本文を JSON でなく URL の形にしたのは、gosec の G117 が、秘密の値の項目を JSON にすることを止めるためである。利用者は `PUT /_compat/users/<google|github>` に JSON で登録する。認可の口は、登録した転送先と同じ redirect_uri にだけ転送する
+  - fakeoidc が確かめること: 認可のコードは1回だけ使える。token の口は、クライアントの値と redirect_uri と PKCE の code_verifier を確かめる。GitHub の token の口は、誤りを 200 と本文の error で返し、Accept が JSON を求めないときは URL の形の本文で返す。GitHub の文書は、誤りの HTTP のステータスを書いていないためである
+  - GitHub のメールアドレスの口: Java 版の `GithubOidcProvider` は、`https://api.github.com/user/emails` をコードに書いていて、設定で替えられない。そのため、比べる検査で Java 版の GitHub のログインを fakeoidc に向けるには、URL の設定のほかの手立てが要る(例: fakeoidc のコンテナに api.github.com の名前と TLS の証明書を持たせ、Java 版にその証明書を信じさせる)。Claude は、タスク3.10で手立てを決め、手立てが spec と合わないときは所有者に尋ねる。Go 版の config にも、メールアドレスの口の URL の設定は無い
+- 比べる処理(タスク3.4で分かったこと): design.md の「比べ方」の表に書いていない値を、次のように読んで正規化した。どれも「版ごとに違って当然の値を記号に置き換える」の読み方である。
+  - 乱数のトークン: Java 版は、ログインを続けるためのトークン、パスワードの再設定のトークン、外部のログインの state と code_verifier を、32バイトの乱数を base64url にした43文字で作り、URL と Redis のキーに書く。比べる検査は、base64url の文字だけでできたちょうど43文字の語を `<token:N>` に置き換える。置き換えるのは、URL(`Location` のヘッダとメールの本文)のパスの区切りと問い合わせの値の中と、Redis のキーと値の中だけである。問い合わせの名前は置き換えない。N は版ごとに現れた順の番号で、メールに出たトークンと Redis のキーのトークンは同じ番号になる。長さを43文字に絞るのは、`error=unverified_email` のような画面が読む値と、`code_challenge_method` のような問い合わせの名前を置き換えると、版の本当の違いを見逃すためである。Go 版が43文字でないトークンを作ると、比べる検査はその違いを報告する
+  - パスワードのハッシュ: bcrypt のハッシュは塩が乱数なので、`<bcrypt:$2a$10$>` のように版と強さだけを残す
+  - S3 のキーと Redis のキー: 表は S3 を「正規化なし」としているが、キーに UUID が入るので、S3 のキーの中の UUID だけは番号に置き換えてから、キーの形として比べる。S3 のキーのほかの部分と中身のバイトは置き換えない。正規化したあとのキーが重なったとき(例: 日時だけが違う Redis のキー)、比べる検査は、2つ目からのキーに「同じ形の N 個目」を付けて、記録を捨てずに比べる
+  - 日時: 小数の秒の桁は形に入れない(Java 版の ISO 8601 の書き方は末尾の0を書かないので、同じ形でも値によって桁の数が変わる)。日付だけの値(例: 生年月日や職歴の年月)は置き換えずにそのまま比べる。暦に無い日時は形が誤っているので置き換えない
+  - メール: 表の「送り元と宛先と件名と本文」に加えて、Cc と Bcc と返信先と HTML の本文も比べる
+  - 行の並び: データベースの行は、応答に現れない UUID を仮の記号にして並べ、その順に番号を付けてから、もう一度並べる。UUID だけが違ってほかの列がすべて同じ行どうしは、番号の付く順が決まらないので、そうした行を作る筋書きでは、行のほかの列で区別できるようにする
+  - 2段階の認証のコード: Java 版の `TwoFactorAuthIssueUseCase` は、2段階の認証のコードを6桁の乱数で作り、Redis に置き、メールにも書く。比べる検査は6桁の数を置き換えないので、2段階の認証の筋書きでは、メールの本文と Redis の値に毎回違いが出る。Claude は、タスク3.10で筋書きを組むときに扱いを決める。6桁の数を一律に置き換えると、本当の違いを隠すおそれがあるので、置き換えるのはコードが入る場所だけに絞る
+- 変えた動きの一覧(タスク3.5で決めたこと): 次の5つを決めた。
+  - match のある項目: match を書いたのは CB-001 と CB-006 の2つだけである。タスク3.5の本文は、match の無い項目を CB-005 と CB-007 から CB-009 の4つとしているが、Claude は、CB-002 から CB-004 の3つにも match を書かなかった。match の形(操作、比べるもの、場所、ステータス)では、この3つの違いを狭く書けず、書くとほかの違いも許してしまうためである。CB-002 は、PNG を送ったときのステータスの違いも許してしまう。CB-003 は、ほかの理由で 401 や 400 になる違いも許してしまう。CB-004 は、PDF の比べ方が位置のずれと「～」をすでに許すので、match で PDF の違いを許すと、ほかの PDF の違いも許してしまう。Claude は、タスク3.10で筋書きを組むとき、比べる検査が PNG、JPEG、GIF のほかのファイルを送らないことと、画面と同じ Accept を付けて送ることを守る。タスクの本文との食い違いは、所有者に報告して合否を決めてもらう
+  - match の書き方: 1つの項目の match は、1つの形と並びの形の両方で書ける。CB-001 は、経歴書の JSON の3つの並びと、バックアップの JSON の `resume` の下の3つの並びの、6つの match を持つ
+  - 順だけの違いの許し方: `order_only` の項目に当たる並びは、比べる前に、両方の版で、番号の無い UUID を仮の記号にした値の順に並べ替える。並べ替えたあとに UUID の番号を付けるので、番号は両方の版で同じ中身の要素にそろう。並べ替えたあとに残った違いは許さない
+  - 同じ名前の要素の順: Java 版の並べ替えは、名前が同じ要素を UUID の順に並べる。UUID は版ごとに違うので、名前が同じ要素が並ぶと、CB-001 によらず順が版ごとに変わる。順だけの項目で並べ替えるので、経歴書の JSON ではこの違いは出ない。経歴、プロジェクト、資格は期間か日付が同じなら UUID の順になり、一覧に項目が無いので、Claude は、筋書きで期間と日付を重ねない
+  - 許した違いの報告: 一覧の match に当たった違いは、止める違いにせず、報告の末尾に項目の番号と一緒に書く。Markdown と PDF の本文の並び順の違い(CB-001)は、Markdown を行で比べ、PDF を pdfcmp で比べるので、順だけの項目では許せない。Claude は、筋書きで、並べ替えの規則によらず順が決まる名前を使う
+- PDF の比べ方(タスク3.6で決めたこと): 次の5つを決めた。
+  - 画像の作り方: `pdftoppm` に、縁を滑らかにする処理を切る指定(`-aa no -aaVector no`)を付ける。縁の画素の色が位置のわずかなずれで変わり、表の色の箱を割ってしまうためである。72dpi なので、1画素が 1pt になる。本物の経歴書の PDF の細い罫線が、この画像で消えたり割れたりして、組にならない箱が出ないかを、Claude は、タスク3.10の比べる検査で確かめる
+  - 表の色の箱: 語の箱を1画素広げて除いたあと、白でない同じ色の画素が上下左右でつながった広がりを、1つの箱とする。9画素より小さい広がりは数えない。Java 版の箱のそれぞれに、中心が最も近い Go 版の箱を組にして色を比べ、組にならない箱は違いにする
+  - ページの文字: `pdftotext -layout` の行の中の空白の続きを1つの空白にし、行の前後の空白と空の行を除いてから比べる。-layout は文字の位置から空白と空の行の数を決めるので、許す幅の中のずれでも数が変わるためである。位置の違いは語の位置で比べる
+  - フォント: `pdffonts` の名前だけを、付け足しを除き、重ならないように並べて比べる。種類、文字コード、埋め込みの有無の欄は比べない。design.md が、名前で比べると決めているためである。比べる検査で、名前が同じで種類などが違うことが見つかったら、所有者に報告する
+  - 道具の動かし方: poppler-utils の道具は、版ごとの作業のフォルダで、引数をすべて決まった文字にして動かす。静的な検査(gosec)が、変数の文字を引数にして外の道具を動かすことを止めるためである。`pdfinfo` の最後のページの番号には、どの PDF のページの数よりも大きい 1000000 を渡す(pdfinfo は、ページの数に縮める)
+- 初めのデータ(タスク3.7で決めたこと): 次の5つを決めた。
+  - フォントの経歴書: フォントは経歴書に保存されず、書き出しの要求の `pdfSettings.fontFamily` で選ぶ。そのため、4種類目の経歴書は、`resumes/fonts.sql` の1つの経歴書と、画面の初めの設定にフォントだけを替えた2つの書き出しの設定 `resumes/fonts-NotoSansJP.json` と `resumes/fonts-NotoSerifJP.json` で表す。筋書きは、同じ経歴書を2つの設定で書き出して比べる
+  - 3ページ以上: `resumes/many-pages.sql` は、職歴12件と案件24件と資格8件を持つ。実際に3ページ以上になるかは、Java 版を動かすタスク3.10で確かめ、足りなければ件数を増やす
+  - 利用者と ID: `users/basic.sql` は、`user1@example.com` と `user2@example.com` の2人を作る。パスワードはどちらも `Passw0rd!` である。user2 は権限の無い操作を確かめるための、経歴書を持たない利用者である。ID は `00000000-0000-4000-8000-` に続く12桁で決めて書き、経歴書は `…0101`(空)、`…0201`(多い)、`…0301`(長い文)、`…0401`(フォント)で、どれも user1 のものである
+  - バックアップ: `backups/` は、正しいもの(`basic.json`)、版が 0.9 のもの(`wrong-version.json`)、`resume` を含まないもの(`no-resume.json`)、途中で切れて JSON として読めないもの(`broken.json`)の4つを置く。筋書きの「形の誤ったバックアップ」と「版の違うバックアップ」に使う
+  - パスワードの確かめの部品: テストが、初めのデータのパスワードの暗号の値を `golang.org/x/crypto/bcrypt` で確かめるので、`go.mod` で x/crypto が直接の依存になった。同じ整理で、タスク3.2から直接使っている `github.com/aws/smithy-go` も直接の依存に移った
+- 版をまたぐ確認(タスク3.8で決めたこと): 次の6つを決めた。
+  - 送り先の組: Java 版から Go 版へ、Go 版から Java 版へ、の2つは、最初の段をその向きの元の版に送り、`to: other` の段で送り先を替える。交互は、段ごとに送り先を替える。どの組でも、最後の段は、その前の段と違う版に送る。こうして、最後の段でもう一方の版から保存した内容を読む
+  - 確かめる応答: 筋書きの `expect` に、ステータスに加えて、応答の本文の JSON に無ければならない項目の場所 `fields` を足した。版をまたぐ筋書きは、2つ以上の段を持ち、どの段にも `status` を書く。読み込みのときに、この形を確かめる
+  - 利用者の Cookie: 1つの利用者の Cookie は、2つの版で共有する。`csrf: true` の段は、Cookie `XSRF-TOKEN` の値をヘッダ `X-XSRF-TOKEN` に写す
+  - 筋書きの間の片付け: 送り先の組ごとに、マイグレーションのすぐあとに行のある表(今は、権限と、技術・資格・SNS の一覧)を残し、それ以外の表を空にし、Redis を空にし、fakeaws の記録を消す。そのあと、筋書きの初めのデータを入れ直す
+  - fakeaws と fakeoidc: 2つの版は、1つの fakeaws の同じ版の秘密の値を読む。fakeoidc には、2つの版の戻り先(`/api/auth/oidc/callback`)を両方登録する
+  - 筋書きの置き場: 版をまたぐ筋書きは `backend/compat/scenarios/` の下にまとまりごとに置く。まだ1つも無いので、`TestCross_Scenarios` は、無いことを書き残して成功する。筋書きは、まとまりの spec で足す
+- 応答の時間の比べ方(タスク3.9で決めたこと): 次の5つを決めた。
+  - 測る段: `modes` に `perf` を書いた筋書きは、1つの操作を測る。最後の段が測る操作で、それより前の段は、ログインのような準備として1回ずつ送る。最後の段には `expect` の `status` を書く。失敗の応答の時間を測っても、操作の時間を比べたことにならないためである。測る途中で期待と違う応答があれば、測るのを止めて誤りにする
+  - メモリを測る筋書き: PDF の出力の筋書きには `measure_memory: true` を書く。時間を測ったあと、最後の段を同じ利用者として同時に2件 Go 版に送り、Go 版のコンテナのメモリの最大を読む
+  - メモリの最大の読み方: コンテナの中の `/sys/fs/cgroup/memory.peak` を読む。これはコンテナを起動してからの最大なので、同時に送ったときの最大より小さくならない。上限を超えたと出たときは、ほかの操作で増えた分も含むことに気をつけて調べる
+  - 環境: 版ごとに別の Docker のネットワークに、その版だけの Postgres・Redis・fakeaws・fakeoidc を起動する。筋書きごとに、Java 版、Go 版の順に、保存された内容を空にして初めのデータを読み込んでから測る。Postgres などを起動する部分は、版をまたぐ確認と共通にした
+  - テストの名前: Makefile の `compat` は `TestCross_` と `TestPerf_` で始まるテストを飛ばし、`compat-cross` と `compat-perf` はそれぞれ `TestCross_` と `TestPerf_` で始まるテストだけを動かす。tasks.md が名前を決めた `TestPerfJudge_*` と、harness の `TestCrossReport_*` は、下線が付かないので、PR の検査(`make compat`)で動く。初めは下線の無い `TestPerf` で見分けていて `TestPerfJudge_*` が PR の検査で動かなかったので、spec 全体の確かめのあとに所有者が Makefile を置き換えた
+- 比べる検査の入口(タスク3.10で決めたこと): 次の8つを決めた。
+  - 環境: 1つの Docker のネットワークに、版ごとの Postgres と Redis と、共有の fakeaws と fakeoidc を起動する。fakeaws には別名 `fakeaws-java` と `fakeaws-go` を付け、版ごとの別名で呼ばせて、オブジェクトとメールの記録を版ごとに分ける。Postgres と Redis を起動する部分(`Store`)と fakeaws と fakeoidc を起動する部分(`fakes`)は、版をまたぐ確認と応答の時間の比べ方と共通にした
+  - 段の操作の名前: 仕様書の `paths` から操作を読み、段の `method` と `path` で操作の名前を引く。筋書きの `{名前}` は、前の段で取り出す値なので、仕様書の `{名前}` の部分にだけ当たる。当たる形が2つ以上あれば、決まった文字の部分の多い形を選ぶ
+  - まとまりの分け方: design.md の表のとおり、`/api/auth/` の下を認証、`/api/users/` の下を利用者、`exportResume` と `exportResumeWithSettings` を出力、`backupResume` と `restoreResume` をバックアップ、残りをマスタと経歴書とする(13、7、26、2、2)
+  - 保存された内容の違い: データベースなどの違いは後の段にも残るので、前の段と同じ違いは重ねて報告しない。後の段の操作の違いとして報告すると、変えた動きの一覧の `match` が、違いを生んだ段の操作で当たらなくなるためである。Redis の違いは、残りの有効な時間が段ごとに減るので、時間の長さを除き、時間の有無と値だけで同じ違いかを見分ける
+  - Go 版の起動の時間: 比べる検査と版をまたぐ確認と応答の時間の比べ方は、Go 版のイメージを置く位置の backend を、起動から `/healthz` が 200 を返すまでの時間を測って起動し、10秒を超えたら失敗にする。タスク3.1 で作った測り方を、spec 全体の確かめで、すべての環境の起動につないだ
+  - 筋書きに出てくる操作の確認: `progress.md` のまとまりの表の状態が「作り終えた」「比べる検査に通った」「本番で動いている」のどれかなら、完了と読む。知らないまとまりと知らない状態と、表に無いまとまりは、誤りにする。書き誤りで確かめる操作が減らないようにするためである
+  - Java 版の Flyway の validate の確かめ方: `Apply` で表を作ったデータベースに Java 版を起動する。Java 版は起動のときに validate を動かすので、起動の確認が 200 を返せば validate が通っている。加えて、起動のあとも履歴が7行のままで、BASELINE の行が無く、Go 版の確かめるだけの動かし方が7つをすべて適用済みと読むことを確かめる
+  - まとまりの spec に残すこと: 外部のログインの筋書きで、応答が fakeoidc を指す URL を返したときの送り直し方、GitHub のメールの取り方の違い、2段階の確認の6桁の数の扱いは、認証のまとまりの spec で決める。`resumes/many-pages.sql` の経歴書が PDF で3ページ以上になるかは、PDF の筋書きがまだ無いので確かめていない。出力のまとまりの spec で確かめる。筋書きから fakeoidc の利用者を決める欄と、筋書きごとに fakeoidc の利用者と認可の状態を消す処理は、まだ無い。外部のログインの筋書きを足す認証のまとまりの spec で作る。Java 版の署名付きの URL の宛先と Host を fakeaws の版の名前に直す処理と、署名の値の正規化も、まだ無い。署名付きの URL を返す操作の筋書きを足すまとまりの spec で作る
+- spec 全体の確かめで見つけた、spec の約束に届いていない3つのこと(2026-11-10 に所有者が、このまま出荷してよいと決めた): どれも、その操作の筋書きをまだ1つも書いていないので、今の比べる検査の結果は変わらない。筋書きを足すまとまりの spec で作る
+  - 変えた動きの一覧のうち、プロフィール画像の形式の違い、作りかけの経歴書を出力したときの誤りの違い、PDF の文字の位置の違いの3つを、比べる検査は許してよい違いとして扱えない。比べる検査が、これらの違いを見分ける比べ方をまだ持たないためである
+  - 日本語の氏名の並びの違いを、Markdown と PDF の出力の比べ方では許せない
+  - Google と GitHub のログインで、応答が示すログインの画面へ進む動き(送り直し)は作っていない。認証のまとまりの spec で作る
 
 ## 完了条件(全タスク共通)
 
