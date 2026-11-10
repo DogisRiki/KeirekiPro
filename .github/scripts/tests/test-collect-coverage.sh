@@ -7,8 +7,11 @@
 #     見て、最新の main の成果物を選ぶ)
 #   - coverage-summary.json と JaCoCo の XML からの値の計算(小数第1位。
 #     JaCoCo はレポート全体の counter、つまり末尾の counter を使う)
-#   - 基準値の読み取り(今のリポジトリの vite.config.ts と quality.gradle が
-#     読めること、今の書き方のまま値を変えたときに値が追えること、
+#   - Go 版の coverage.out からの文の割合の計算(internal/ の下だけを数え、
+#     .testcoverage.yml の数えないパスを除き、同じ箇所を1つとして数える。
+#     形の違う coverage.out と、go.mod・.testcoverage.yml を読めないときの「取得できず」)
+#   - 基準値の読み取り(今のリポジトリの vite.config.ts と quality.gradle と
+#     .testcoverage.yml が読めること、今の書き方のまま値を変えたときに値が追えること、
 #     読めないときの「読み取れず」)
 #   - 2種類の「取得できず」(90日以内に main の成果物が無い、成果物に
 #     カバレッジのファイルが無い。後者では古い成果物を探さない)
@@ -28,6 +31,8 @@ SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/collect-coverage.sh"
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 REAL_VITE="${REPO_ROOT}/frontend/vite.config.ts"
 REAL_GRADLE="${REPO_ROOT}/backend/gradle/quality.gradle"
+REAL_GO_MOD="${REPO_ROOT}/backend/go.mod"
+REAL_TESTCOVERAGE="${REPO_ROOT}/backend/.testcoverage.yml"
 WORK=$(mktemp -d) || exit 1
 [ -n "$WORK" ] && [ -d "$WORK" ] || exit 1
 trap 'rm -rf "$WORK"' EXIT
@@ -37,7 +42,7 @@ if [ ! -f "$SCRIPT" ]; then
     echo "FAIL: ${SCRIPT} がありません"
     exit 1
 fi
-for f in "$REAL_VITE" "$REAL_GRADLE"; do
+for f in "$REAL_VITE" "$REAL_GRADLE" "$REAL_GO_MOD" "$REAL_TESTCOVERAGE"; do
     if [ ! -f "$f" ]; then
         echo "FAIL: ${f} がありません(REPO_ROOT を確かめる)"
         exit 1
@@ -95,6 +100,17 @@ check_not_has() {
 # 表の中の種別の行を取り出す(例: "| lines | 95.6% | 80% |")
 row() {
     printf '%s\n' "$1" | grep -E "^\| $2 \|" | head -n 1
+}
+
+# 使い方: go_row <出力>
+# Go 版の見出しより後ろの statements の行を取り出す(frontend の statements の行と分ける)
+go_row() {
+    printf '%s\n' "$1" | sed -n '/^backend Go 版:/,$p' | grep -E '^\| statements \|' | head -n 1
+}
+
+# 使い方: go_header <出力> → Go 版の見出しの行
+go_header() {
+    printf '%s\n' "$1" | grep -E '^backend Go 版:' | head -n 1
 }
 
 # ---------------------------------------------------------------------
@@ -210,6 +226,38 @@ put_backend() {
     fi
 }
 
+# 使い方: put_backend_go <run_id> <coverage.out の内容>(空なら成果物にファイルを置かない)
+put_backend_go() {
+    local d="${FAKE}/runs/$1/backend-go-coverage"
+    mkdir -p "$d"
+    if [ -n "$2" ]; then
+        printf '%s' "$2" >"$d/coverage.out"
+    else
+        echo 'other' >"$d/other.txt"
+    fi
+}
+
+# 今の go.mod のモジュールの名前(coverage.out の箇所の行の先頭に付く)
+MODULE=$(tr -d '\r' <"$REAL_GO_MOD" | awk '$1 == "module" { print $2; exit }')
+if [ -z "$MODULE" ]; then
+    echo "FAIL: ${REAL_GO_MOD} からモジュールの名前を読めません"
+    exit 1
+fi
+
+# 使い方: go_profile [計り方] <パス:行.列,行.列 文の数 回数>...
+# パスはモジュールの名前を除いた形で渡す(先頭にモジュールの名前を付けて書く)。
+# 1つ目の引数が「mode: 」で始まれば計り方の行として使い、無ければ mode: atomic にする
+go_profile() {
+    local mode="mode: atomic" b
+    case "${1-}" in
+        "mode: "*) mode="$1"; shift ;;
+    esac
+    printf '%s\n' "$mode"
+    for b in "$@"; do
+        printf '%s/%s\n' "$MODULE" "$b"
+    done
+}
+
 # 使い方: new_case <名前>。FAKE と基準値のリポジトリ(今のファイルの写し)を用意する
 new_case() {
     FAKE="$WORK/$1"
@@ -217,6 +265,8 @@ new_case() {
     : >"$FAKE/calls.log"
     cp "$REAL_VITE" "$FAKE/root/frontend/vite.config.ts"
     cp "$REAL_GRADLE" "$FAKE/root/backend/gradle/quality.gradle"
+    cp "$REAL_GO_MOD" "$FAKE/root/backend/go.mod"
+    cp "$REAL_TESTCOVERAGE" "$FAKE/root/backend/.testcoverage.yml"
     export FAKE
 }
 
@@ -258,6 +308,28 @@ put_frontend 104 "$(summary_json 94.41 81.7 95.2 95.56)"
 page "$(artifact_json 201 2026-09-21T00:00:00Z main false "$SHA_E")" \
     >"$FAKE/api/backend-check-results/page1.json"
 put_backend 201 "$(jacoco_xml 904 19038 381 1078 242 4478)"
+# backend Go 版: main 以外の新しいものと、最新の main(これを選ぶ)
+mkdir -p "$FAKE/api/backend-go-coverage"
+page "$(artifact_json 251 2026-09-24T00:00:00Z feat/y false "$SHA_A")" \
+    "$(artifact_json 252 2026-09-22T00:00:00Z main false "$SHA_C")" \
+    >"$FAKE/api/backend-go-coverage/page1.json"
+put_backend_go 251 "$(go_profile 'internal/a/a.go:1.1,2.2 1 0')"
+# 数える箇所: a.go の3つ(3文は動いた、2文は動かず、4文は2回目の出現で動いた)と
+# b.go の2文(動かず)。同じ箇所の2回目の出現は数え直さない。
+# 数えない箇所: internal/ の外、internal で始まる別のフォルダ、生成したコードの2つ、
+# 別のモジュールの internal/
+put_backend_go 252 "$(go_profile \
+    'internal/a/a.go:1.1,2.2 3 1' \
+    'internal/a/a.go:3.1,4.2 2 0' \
+    'internal/a/a.go:5.1,6.2 4 0' \
+    'internal/a/a.go:5.1,6.2 4 2' \
+    'internal/a/a.go:3.1,4.2 2 0' \
+    'internal/b/b.go:1.1,9.2 2 0' \
+    'cmd/x/main.go:1.1,2.2 100 0' \
+    'internalx/c.go:1.1,2.2 30 0' \
+    'internal/httpapi/gen/g.go:1.1,2.2 50 0' \
+    'internal/platform/database/sqlcgen/q.go:1.1,2.2 50 0'
+    printf 'github.com/example/other/internal/z.go:1.1,2.2 30 0\n')"
 run_script
 check_rc 0 "$RC" "値を読めたら終了コード 0"
 check_has "--paginate" "$(grep 'api' "$FAKE/calls.log" | head -n 1)" "成果物の一覧をページ送りで取る"
@@ -284,6 +356,15 @@ check_has "https://github.example/o/r/actions/runs/104" "$OUT" "frontend の実�
 check_has "2026-09-21" "$OUT" "backend の実行の日付を添える"
 check_has "\`eeeeeee\`" "$OUT" "backend のコミットを添える"
 check_has "https://github.example/o/r/actions/runs/201" "$OUT" "backend の実行へのリンクを添える"
+check_has "actions/artifacts?name=backend-go-coverage&per_page=100" "$(cat "$FAKE/calls.log")" "Go 版の成果物を名前で探す"
+check_has "run download 252" "$(cat "$FAKE/calls.log")" "最新の main の Go 版の成果物を取る"
+check_not_has "run download 251" "$(cat "$FAKE/calls.log")" "main 以外の Go 版の成果物は取らない"
+check_has "-n backend-go-coverage" "$(grep 'run download 252' "$FAKE/calls.log")" "Go 版の成果物の名前を指定して取る"
+# 7/11=63.63…(同じ箇所を2回数えると 7/17、生成したコードなどを数えると分母が増える)
+check_eq "| statements | 63.6% |" "$(go_row "$OUT" | cut -d'|' -f1-3)|" "Go 版の coverage.out から文の割合を出す"
+check_has "backend Go 版: 実行の日付 2026-09-22(UTC)、コミット \`ccccccc\`" "$(go_header "$OUT")" "Go 版の実行の日付とコミットを添える"
+check_has "https://github.example/o/r/actions/runs/252" "$(go_header "$OUT")" "Go 版の実行へのリンクを添える"
+check_eq "2" "$(printf '%s\n' "$OUT" | grep -c '^| statements |')" "statements の行は frontend と Go 版の1行ずつ"
 check_not_has "取得できず" "$OUT" "全て読めたときは取得できずが無い"
 check_eq "" "$(printf '%s' "$OUT" | head -n 1 | grep -E '^\|')" "1行目を表から始めない"
 # 判定をしない(要件3-8)
@@ -302,11 +383,18 @@ for k in statements branches functions lines LINE BRANCH INSTRUCTION; do
         fail "今のファイルから $k の基準値を読める(実際: $cell)"
     fi
 done
+cell=$(go_row "$OUT" | cut -d'|' -f4 | sed 's/^ *//; s/ *$//')
+if printf '%s' "$cell" | grep -qE '^[0-9]+(\.[0-9]+)?%$'; then
+    pass "今の .testcoverage.yml から Go 版の基準値を読める($cell)"
+else
+    fail "今の .testcoverage.yml から Go 版の基準値を読める(実際: $cell)"
+fi
 # 値を追えていることを、今の書き方のまま数値だけを変えた写しで確かめる
 new_case thresholds
 sed -E -i 's/(statements:[[:space:]]*)[0-9.]+/\111/; s/(branches:[[:space:]]*)[0-9.]+/\122.5/; s/(functions:[[:space:]]*)[0-9.]+/\133/; s/(lines:[[:space:]]*)[0-9.]+/\144/' \
     "$FAKE/root/frontend/vite.config.ts"
 sed -E -i 's/(minimum[[:space:]]*=[[:space:]]*)[0-9.]+/\10.555/' "$FAKE/root/backend/gradle/quality.gradle"
+sed -E -i 's/^([[:space:]]+total:[[:space:]]*)[0-9.]+/\188.5/' "$FAKE/root/backend/.testcoverage.yml"
 run_script
 check_rc 0 "$RC" "基準値だけでも終了コード 0"
 check_eq "| statements | 取得できず | 11% |" "$(row "$OUT" statements)" "今の書き方の vite.config.ts から statements を読む"
@@ -316,6 +404,25 @@ check_eq "| lines | 取得できず | 44% |" "$(row "$OUT" lines)" "lines を読
 check_eq "| LINE | 取得できず | 55.5% |" "$(row "$OUT" LINE)" "今の書き方の quality.gradle から LINE を読む(割合を%にする)"
 check_eq "| BRANCH | 取得できず | 55.5% |" "$(row "$OUT" BRANCH)" "BRANCH を読む"
 check_eq "| INSTRUCTION | 取得できず | 55.5% |" "$(row "$OUT" INSTRUCTION)" "INSTRUCTION を読む"
+check_eq "| statements | 取得できず | 88.5% |" "$(go_row "$OUT")" "今の書き方の .testcoverage.yml から Go 版の基準値を読む"
+
+# threshold: の外の total: は Go 版の基準値にしない(並びを今と変えた設定)
+new_case go_threshold_order
+cat >"$FAKE/root/backend/.testcoverage.yml" <<'EOF'
+profile: coverage.internal.out
+override:
+  total: 10
+# コメント
+threshold:
+  # 全体の下限
+  file: 20
+  total: 77
+exclude:
+  paths:
+    - ^internal/httpapi/gen/
+EOF
+run_script
+check_eq "| statements | 取得できず | 77% |" "$(go_row "$OUT")" "threshold: の中の total: を Go 版の基準値にする"
 
 # counter と直後の minimum の対応(並びを今と変えた設定)
 new_case gradle_order
@@ -367,12 +474,19 @@ check_eq "| BRANCH | 取得できず | 読み取れず |" "$(row "$OUT" BRANCH)"
 check_not_has "読み取れず" "$(row "$OUT" LINE)" "LINE は読める"
 
 new_case nofile
-rm "$FAKE/root/frontend/vite.config.ts" "$FAKE/root/backend/gradle/quality.gradle"
+rm "$FAKE/root/frontend/vite.config.ts" "$FAKE/root/backend/gradle/quality.gradle" "$FAKE/root/backend/.testcoverage.yml"
 run_script
 check_rc 0 "$RC" "設定のファイルが無くても終了コード 0"
 for k in statements branches functions lines LINE BRANCH INSTRUCTION; do
     check_eq "| $k | 取得できず | 読み取れず |" "$(row "$OUT" "$k")" "ファイルが無いと $k は読み取れず"
 done
+check_eq "| statements | 取得できず | 読み取れず |" "$(go_row "$OUT")" "ファイルが無いと Go 版の基準値は読み取れず"
+
+new_case go_no_threshold
+# total: が数でない(threshold: の中に数の total: が無い)
+sed -E -i 's/^([[:space:]]+total:[[:space:]]*)[0-9.]+/\1high/' "$FAKE/root/backend/.testcoverage.yml"
+run_script
+check_eq "| statements | 取得できず | 読み取れず |" "$(go_row "$OUT")" "total: が数でないと Go 版の基準値は読み取れず"
 
 # =====================================================================
 echo "== 90日以内に main の成果物が無いとき =="
@@ -389,6 +503,9 @@ run_script
 check_rc 0 "$RC" "成果物が無くても終了コード 0"
 check_has "frontend: 取得できず(90日以内に main でテストを実行したCIが無い)" "$OUT" "frontend に理由を併記する"
 check_has "backend: 取得できず(90日以内に main でテストを実行したCIが無い)" "$OUT" "backend に理由を併記する"
+check_eq "backend Go 版: 取得できず(90日以内に main でテストを実行したCIが無い)" "$(go_header "$OUT")" "Go 版に理由を併記する"
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "Go 版の値の欄も取得できず"
+check_not_has "読み取れず" "$(go_row "$OUT")" "Go 版も取得できずでも基準値は並べる"
 check_not_has "run download" "$(cat "$FAKE/calls.log")" "成果物が無いときは取りに行かない"
 check_has "| lines | 取得できず | " "$(row "$OUT" lines)" "値の欄は取得できず"
 check_not_has "読み取れず" "$(row "$OUT" lines)" "取得できずでも基準値は並べる"
@@ -409,6 +526,12 @@ page "$(artifact_json 501 2026-09-02T00:00:00Z main false "$SHA_C")" \
     >"$FAKE/api/backend-check-results/page1.json"
 put_backend 501 "$(jacoco_xml 1 1 1 1 1 1)"
 put_backend 502 ""
+mkdir -p "$FAKE/api/backend-go-coverage"
+page "$(artifact_json 551 2026-09-03T00:00:00Z main false "$SHA_E")" \
+    "$(artifact_json 552 2026-09-24T00:00:00Z main false "$SHA_E")" \
+    >"$FAKE/api/backend-go-coverage/page1.json"
+put_backend_go 551 "$(go_profile 'internal/a/a.go:1.1,2.2 1 1' 'internal/a/a.go:3.1,4.2 1 0')"
+put_backend_go 552 ""
 run_script
 check_rc 0 "$RC" "ファイルが無くても終了コード 0"
 check_has "frontend: 取得できず(成果物にカバレッジのファイルが無い)" "$OUT" "frontend に理由を併記する"
@@ -418,6 +541,10 @@ check_not_has "run download 501" "$(cat "$FAKE/calls.log")" "backend の古い�
 check_not_has "50.0%" "$OUT" "古い成果物の値を出さない"
 check_has "https://github.example/o/r/actions/runs/402" "$OUT" "ファイルが無いときも実行へのリンクを添える"
 check_has "\`ddddddd\`" "$OUT" "ファイルが無いときも backend のコミットを添える"
+check_has "backend Go 版: 取得できず(成果物にカバレッジのファイルが無い)" "$(go_header "$OUT")" "Go 版に理由を併記する"
+check_not_has "run download 551" "$(cat "$FAKE/calls.log")" "Go 版の古い成果物を探さない"
+check_has "https://github.example/o/r/actions/runs/552" "$(go_header "$OUT")" "ファイルが無いときも Go 版の実行へのリンクを添える"
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "Go 版の値の欄は取得できず"
 
 # =====================================================================
 echo "== 値の一部を読めないとき =="
@@ -456,6 +583,7 @@ run_script
 check_rc 0 "$RC" "一覧を取れなくても終了コード 0"
 check_has "frontend: 取得できず(成果物の一覧を取得できない)" "$OUT" "一覧の失敗を併記する"
 check_has "backend: 取得できず(成果物の一覧を取得できない)" "$OUT" "backend も一覧の失敗を併記する"
+check_eq "backend Go 版: 取得できず(成果物の一覧を取得できない)" "$(go_header "$OUT")" "Go 版も一覧の失敗を併記する"
 
 new_case dlfail
 mkdir -p "$FAKE/api/frontend-test-results"
@@ -466,6 +594,121 @@ run_script
 check_rc 0 "$RC" "取得に失敗しても終了コード 0"
 check_has "frontend: 取得できず(成果物をダウンロードできない)" "$OUT" "取得の失敗を併記する"
 check_has "https://github.example/o/r/actions/runs/801" "$OUT" "取得の失敗でも実行へのリンクを添える"
+
+# =====================================================================
+echo "== Go 版の coverage.out から文の割合を出す =="
+# 使い方: go_case <名前> <coverage.out の内容>
+# Go 版の成果物だけを置いた場合を作る(設定のファイルを変えるときは、run_script の前に変える)
+go_case() {
+    new_case "$1"
+    mkdir -p "$FAKE/api/backend-go-coverage"
+    page "$(artifact_json 1001 2026-09-20T00:00:00Z main false "$SHA_A")" \
+        >"$FAKE/api/backend-go-coverage/page1.json"
+    put_backend_go 1001 "$2"
+}
+
+go_case go_all "$(go_profile 'internal/a/a.go:1.1,2.2 3 1' 'internal/a/a.go:3.1,4.2 2 5')"
+run_script
+check_rc 0 "$RC" "Go 版を読めたら終了コード 0"
+check_eq "| statements | 100.0% |" "$(go_row "$OUT" | cut -d'|' -f1-3)|" "すべて動いたら 100.0%"
+
+go_case go_round_up "$(go_profile 'internal/a/a.go:1.1,2.2 1 1' 'internal/a/a.go:3.1,4.2 15 0')"
+run_script
+# 1/16=6.25 は go-test-coverage と同じく 6.3 に丸める(偶数への丸めの 6.2 にしない)
+check_eq "| statements | 6.3% |" "$(go_row "$OUT" | cut -d'|' -f1-3)|" "小数第2位の5は切り上げる"
+
+go_case go_round_down "$(go_profile 'internal/a/a.go:1.1,2.2 2 1' 'internal/a/a.go:3.1,4.2 1 0')"
+run_script
+check_eq "| statements | 66.7% |" "$(go_row "$OUT" | cut -d'|' -f1-3)|" "2/3 を小数第1位に丸める"
+
+go_case go_mode_set "$(go_profile 'mode: set' 'internal/a/a.go:1.1,2.2 1 1' 'internal/a/a.go:3.1,4.2 3 0')"
+run_script
+check_eq "| statements | 25.0% |" "$(go_row "$OUT" | cut -d'|' -f1-3)|" "計り方が set でも読む"
+
+go_case go_mode_count "$(go_profile 'mode: count' 'internal/a/a.go:1.1,2.2 1 4' 'internal/a/a.go:3.1,4.2 1 0')"
+run_script
+check_eq "| statements | 50.0% |" "$(go_row "$OUT" | cut -d'|' -f1-3)|" "計り方が count でも読む"
+
+go_case go_crlf "$(go_profile 'internal/a/a.go:1.1,2.2 1 1' 'internal/a/a.go:3.1,4.2 3 0' | sed 's/$/\r/')"
+run_script
+check_eq "| statements | 25.0% |" "$(go_row "$OUT" | cut -d'|' -f1-3)|" "改行が CRLF でも読む"
+
+# .testcoverage.yml の数えないパスを読む(今の値と違うパスに変えた写し)
+go_case go_excludes "$(go_profile \
+    'internal/a/a.go:1.1,2.2 1 1' \
+    'internal/b/b.go:1.1,2.2 1 0' \
+    'internal/c/c.go:1.1,2.2 1 0' \
+    'internal/httpapi/gen/g.go:1.1,2.2 1 0')"
+cat >"$FAKE/root/backend/.testcoverage.yml" <<'EOF'
+profile: coverage.internal.out
+threshold:
+  total: 93
+exclude:
+  # 生成したコード
+  paths:
+    - "^internal/b/"
+    - '^internal/c/' # 引用符とコメント
+  files: x
+other:
+  paths:
+    - ^internal/a/
+EOF
+run_script
+# a(動いた)と gen(動かず)を数え、b と c は数えない。exclude: の外の paths: は使わない
+check_eq "| statements | 50.0% |" "$(go_row "$OUT" | cut -d'|' -f1-3)|" ".testcoverage.yml の数えないパスを読む"
+
+# 取得できずの場合
+go_case go_badmode "$(go_profile 'mode: unknown' 'internal/a/a.go:1.1,2.2 1 1')"
+run_script
+check_rc 0 "$RC" "Go 版の計り方の行が違っても終了コード 0"
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "計り方の行が違うと取得できず"
+check_not_has "取得できず(" "$(go_header "$OUT")" "成果物は取れたので見出しに理由は書かない"
+
+go_case go_nomode "$(printf '%s/internal/a/a.go:1.1,2.2 1 1\n' "$MODULE")"
+run_script
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "計り方の行が無いと取得できず"
+
+go_case go_fields "$(go_profile 'internal/a/a.go:1.1,2.2 1 1' 'internal/a/a.go:3.1,4.2 1')"
+run_script
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "欄の足りない行があると取得できず"
+
+go_case go_notnum "$(go_profile 'internal/a/a.go:1.1,2.2 1 1' 'internal/a/a.go:3.1,4.2 x 0')"
+run_script
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "文の数が数でないと取得できず"
+
+go_case go_negative "$(go_profile 'internal/a/a.go:1.1,2.2 1 1' 'internal/a/a.go:3.1,4.2 1 -1')"
+run_script
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "回数が負の数だと取得できず"
+
+go_case go_badblock "$(go_profile 'internal/a/a.go:1.1,2.2 1 1' 'internal/a/a.go:3-4 1 0')"
+run_script
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "箇所の形が違うと取得できず"
+
+go_case go_only_mode "$(go_profile)"
+run_script
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "箇所が1つも無いと取得できず"
+
+go_case go_no_internal "$(go_profile 'cmd/x/main.go:1.1,2.2 3 1' 'internal/httpapi/gen/g.go:1.1,2.2 3 1')"
+run_script
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "数える箇所が無いと取得できず(0% にしない)"
+
+go_case go_no_gomod "$(go_profile 'internal/a/a.go:1.1,2.2 1 1')"
+rm "$FAKE/root/backend/go.mod"
+run_script
+check_rc 0 "$RC" "go.mod が無くても終了コード 0"
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "go.mod が無いと取得できず"
+check_not_has "読み取れず" "$(go_row "$OUT")" "go.mod が無くても基準値は読む"
+
+go_case go_no_module "$(go_profile 'internal/a/a.go:1.1,2.2 1 1')"
+printf 'go 1.27.0\n' >"$FAKE/root/backend/go.mod"
+run_script
+check_has "| statements | 取得できず | " "$(go_row "$OUT")" "go.mod に module の行が無いと取得できず"
+
+go_case go_no_config "$(go_profile 'internal/a/a.go:1.1,2.2 1 1')"
+rm "$FAKE/root/backend/.testcoverage.yml"
+run_script
+check_rc 0 "$RC" ".testcoverage.yml が無くても終了コード 0"
+check_eq "| statements | 取得できず | 読み取れず |" "$(go_row "$OUT")" ".testcoverage.yml が無いと値も基準値も読めない"
 
 # =====================================================================
 echo "== 表に入れる値の検査 =="

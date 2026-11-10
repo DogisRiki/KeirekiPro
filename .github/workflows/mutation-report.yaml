@@ -7,6 +7,7 @@ name: Mutation Report
 # 直前の全件の回との差と、main で最後にテストを実行した CI のカバレッジ
 # (値と基準値)を台帳のIssueにコメントし、所有者にメンションする(#415)。
 # 差分の回は追記だけで、コメントしない。良し悪しは判定しない。
+# backend は、Java 版(PIT)と Go 版(gremlins の make mutation-full)の両方を測る(#445)。
 
 on:
   schedule:
@@ -163,6 +164,45 @@ jobs:
           retention-days: 90
           if-no-files-found: ignore
 
+  # Go 版の backend の全体の変異テスト(make mutation-full)。PIT と同じく、毎回全件を測る。
+  # gremlins は JSON の報告を backend/mutation-report.json に書き(Makefile の MUTATION_REPORT)、
+  # record-metrics がそれを台帳に記録する。変異が1つも作られなかったときは、gremlins は
+  # 報告を書かない(台帳には「取得できず」と残る)。
+  # 結合テストは testcontainers-go がランナーの Docker で Postgres と Redis を動かす
+  # (CI の backend-go の仕事と同じ)。
+  backend-go-mutation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Go の版は backend/go.mod に書いた版を使う(CI の backend-go の仕事と同じ)
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Run gremlins (report mode)
+        shell: bash
+        continue-on-error: true
+        run: |
+          make mutation-full 2>&1 | tail -30 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload gremlins report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: gremlins-report
+          path: backend/mutation-report.json
+          retention-days: 90
+          if-no-files-found: ignore
+
   # スコアを台帳のIssueに1行追記する。レポートが無い側は「取得できず」と記録し、
   # 測定が止まったことを台帳の上で見えるようにする(実例: #372)。
   # 監査のワークフローは状態を持たない(audit-automation の要件6-3)ため、
@@ -170,13 +210,13 @@ jobs:
   #
   # 測定方式(MUTATION_MODE)は frontend-mutation の出力 mode を使う。frontend の
   # job が途中で失敗して出力が無いときは、前回の結果なしの全件として扱う
-  # (backend の PIT は毎回全件を測るため)。全件の回は、直前の全件の回との差と
+  # (backend の PIT と gremlins は毎回全件を測るため)。全件の回は、直前の全件の回との差と
   # カバレッジを台帳のIssueにコメントし、差分の回は行の追記だけにする。
   # カバレッジは測り直さず、main で最後にテストを実行した CI の成果物と
   # ゲート設定の基準値を読む(collect-coverage.sh)。カバレッジを読めなくても
   # 記録とコメントは止めず、コメントのカバレッジの欄を「取得できず」にする。
   record-metrics:
-    needs: [frontend-mutation, backend-mutation]
+    needs: [frontend-mutation, backend-mutation, backend-go-mutation]
     if: always()
     runs-on: ubuntu-latest
     # actions: read は、カバレッジを載せた CI の成果物の一覧と取得に使う
@@ -210,6 +250,13 @@ jobs:
           name: stryker-report
           path: ${{ runner.temp }}/stryker-report
 
+      - name: Download gremlins report
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: gremlins-report
+          path: ${{ runner.temp }}/gremlins-report
+
       # 記録の前にスクリプトのテストを行う。壊れたスクリプトで台帳を書き換えない。
       # 2本は途中で失敗しても両方実行し、1本でも失敗したら赤で終える
       # (以降の記録は行わない)
@@ -231,7 +278,8 @@ jobs:
           fi
 
       # カバレッジの読み取りのテスト。このテストは今のリポジトリのゲート設定
-      # (vite.config.ts と quality.gradle)も読むため、設定の書き方が変わると
+      # (vite.config.ts と quality.gradle と backend/.testcoverage.yml)と
+      # backend/go.mod も読むため、設定の書き方が変わると
       # 失敗する。失敗しても記録は止めず(continue-on-error)、カバレッジの
       # 読み取りだけを行わない(コメントのカバレッジの欄が「取得できず」になる)
       - name: Test coverage collector
@@ -262,4 +310,5 @@ jobs:
         run: |
           bash .github/scripts/record-mutation-metrics.sh \
             "${RUNNER_TEMP}/pitest-report/mutations.xml" \
-            "${RUNNER_TEMP}/stryker-report/mutation/mutation.json"
+            "${RUNNER_TEMP}/stryker-report/mutation/mutation.json" \
+            "${RUNNER_TEMP}/gremlins-report/mutation-report.json"

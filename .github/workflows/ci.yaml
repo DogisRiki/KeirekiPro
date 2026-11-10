@@ -448,6 +448,21 @@ jobs:
       - name: Run backend checks
         run: make check
 
+      # 成果物の名前は backend-go-coverage のまま変えない。週次の mutation の記録
+      # (collect-coverage.sh)が、この名前で main の直近の Go 版のカバレッジを読むため。
+      # make test が書く coverage.out の1つだけを残す(成果物の最上位に置かれる)。
+      # make check が test より前で失敗して coverage.out が無いときは、何も残さない。
+      - name: Upload Go coverage profile
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: backend-go-coverage
+          path: backend/coverage.out
+          if-no-files-found: ignore
+          # 週次の mutation の記録が main の直近のカバレッジを読むため、main への push は
+          # 公開リポジトリの上限の90日残す(ci.yaml の push は main だけで起動する)。PR は7日のまま。
+          retention-days: ${{ github.event_name == 'push' && 90 || 7 }}
+
       # 変えた箇所の変異テストは、git の履歴を読むので CI でだけ動かす。
       # 比べる元の枝の名前は、run: に式を直に書かず、環境変数で渡す。
       - name: Run mutation tests on changed code

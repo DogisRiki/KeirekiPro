@@ -1,6 +1,8 @@
 name: Backend Vulnerability Fix
 # Dependabot が PR を作らない backend の部品の警告を消す PR を作る(動きは .github/scripts/backend-vuln-fix.sh の先頭)。
 # 警告のイベントは Actions に無いので毎日読む。bot の PAT を使う(GITHUB_TOKEN の PR では CI が動かない。canary.yaml と同じ)
+# backend-go-vuln-fix の仕事は、Go 版の部品と標準ライブラリの脆弱性のうち、make vuln が呼ばれる箇所を見つけたものを直す PR を作る
+# (動きは同じスクリプトの go_run)。Java 版の仕事とは別の仕事にし、片方が失敗してももう片方の PR を作る
 on:
   schedule:
     - cron: '13 1 * * *' # 毎日 10:13 JST
@@ -28,3 +30,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
         run: bash .github/scripts/backend-vuln-fix.sh run
+  backend-go-vuln-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test script # 壊れたスクリプトで PR を作らない
+        run: bash .github/scripts/tests/test-backend-vuln-fix.sh
+      # Go の版は backend/go.mod に書いた版を使う(ci.yaml の backend-go の仕事と同じ)
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Create pull requests
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: bash .github/scripts/backend-vuln-fix.sh go_run

@@ -316,7 +316,7 @@
   - _要件: 14.5, 14.6, 14.7_
   - _依存: 15.1_
 
-- [ ] 5. Go のファイルがあることを前提にするゲート設定を Go 版に対応させる(PR 2-5)
+- [x] 5. Go のファイルがあることを前提にするゲート設定を Go 版に対応させる(PR 2-5)
 - [x] 5.1 Dependabot に gomod と Java 版と Go 版を比べる検査の Dockerfile を足す
 
   Claude は、`.github/dependabot.yml` に gomod の項目(`/backend`)を足し、docker の項目の `directories` に `/backend/compat/fakeaws` と `/backend/compat/fakeoidc` を足した完成版を、置き場に作る。`docker/backend-go/` と `docker/api-docs/` は、今の `/docker/*` に当たるので足さない。Claude は、docker の項目の `open-pull-requests-limit` 10 で足りるかを、Dependabot の公式の文書で上限の意味を読んで決め、決めた結果と根拠の URL を PR の本文に書く。これは、design の審査で D3-2-2 として残った問いへの答えである。
@@ -354,7 +354,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(カバレッジ)は、`test-collect-coverage.sh` に足す「Go の coverage.out から文の割合を出す」の場合で確かめる
   - _要件: 3.1_
 
-- [ ] 5.6 所有者に置いてもらい、ゲート設定のテストをすべて流して PR を出す
+- [x] 5.6 所有者に置いてもらい、ゲート設定のテストをすべて流して PR を出す
 
   Claude は、実装のメモの「所有者に置いてもらう」のとおりに、置き場のファイルを所有者に本来の場所へ置いてもらったあと、`.github/scripts/tests/` のテストを Linux のコンテナで流し、shellcheck v0.11.0 と actionlint を流す。
   - 完了の確かめ方: すべてのテストと shellcheck と actionlint が成功し、PR の本文に「承認が要る理由」と「main に入れたときに本番で起きること」の欄がある
