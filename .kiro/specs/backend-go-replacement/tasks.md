@@ -317,7 +317,7 @@
   - _依存: 15.1_
 
 - [ ] 5. Go のファイルがあることを前提にするゲート設定を Go 版に対応させる(PR 2-5)
-- [ ] 5.1 Dependabot に gomod と Java 版と Go 版を比べる検査の Dockerfile を足す
+- [x] 5.1 Dependabot に gomod と Java 版と Go 版を比べる検査の Dockerfile を足す
 
   Claude は、`.github/dependabot.yml` に gomod の項目(`/backend`)を足し、docker の項目の `directories` に `/backend/compat/fakeaws` と `/backend/compat/fakeoidc` を足した完成版を、置き場に作る。`docker/backend-go/` と `docker/api-docs/` は、今の `/docker/*` に当たるので足さない。Claude は、docker の項目の `open-pull-requests-limit` 10 で足りるかを、Dependabot の公式の文書で上限の意味を読んで決め、決めた結果と根拠の URL を PR の本文に書く。これは、design の審査で D3-2-2 として残った問いへの答えである。
   - 完了の確かめ方: 検査用の写しで、置き場の `dependabot.yml` を、版を固定した `mikefarah/yq` のイメージで読み、gomod の項目と docker の項目の `directories` の2つのフォルダが出る
@@ -771,6 +771,7 @@
 - 作業フォルダで開発環境を起動するとき(タスク4.2で分かったこと): compose.yaml のコンテナの名前は固定で、compose のプロジェクトの名前は既定でフォルダの名前になる。そのため、git worktree の作業フォルダでそのまま `bash start-dev.sh` を打つと、本体フォルダのプロジェクト `keirekipro` の動いているコンテナと名前がぶつかり、起動に失敗する。Claude は、作業フォルダでは `COMPOSE_PROJECT_NAME=keirekipro bash start-dev.sh` で、本体フォルダと同じ開発環境を起動する。このとき、止まっていたコンテナは作業フォルダのファイルを読む形で作り直される
 - Java 版の CORS の応答と design の CORS の処理の5つの箇条の食い違い(タスク15.1で分かったこと): Claude は、次の4つを Java 版の応答に合わせた。1つ目に、Java 版は、`Vary` の3つの値を、1行でなく値ごとに別の行で返す。2つ目に、Java 版は、許したプリフライトの応答にも `Access-Control-Expose-Headers` を付けるので、プリフライトの応答のヘッダは4つでなく5つになる。3つ目に、Java 版は、`Invalid CORS request` の 403 に `Content-Type` を付けない。Go の標準の受け口は本文から推した `Content-Type` を付けるので、Go 版はその値を空にして止める。テストの記録用の応答の部品はこの推しをしないので、この動きは本物の受け口を立てて確かめる。4つ目に、Java 版は、`Access-Control-Allow-Headers` を、要求の名前を「, 」でつなぎ直した値で返す。このほかに、許す送り元からのプリフライトでない `TRACE` に、Java 版は 401 を返し、Go 版は design のとおり 403 を返す。Java 版の 401 の応答には `Vary` が無いので、この 401 は Java 版の CORS の処理より前で返っている。Go 版の CORS の処理ではこの 401 を作れない。8つの要求でメソッドを確かめる代表は `HEAD` で、`HEAD` では両方の版が 403 を返す
   - Java 版の応答の記録の取り方: 作業フォルダからは本体フォルダの開発環境の Java 版を動かせないので、Claude は、`run-check.sh backend sh -c './gradlew bootRun --args=--spring.profiles.active=dev & ... curl ...'` で、1回きりのコンテナの中で Java 版を起動して `curl` を送った。`curl -X HEAD` は本文を待って止まるので、`HEAD` は `curl -I` で送る
+- Dependabot の docker の項目の上限(タスク5.1で決めたこと): 公式の文書(https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#open-pull-requests-limit-)は、上限を、その項目で開いている version update の PR の数に掛け、security update の PR は別の固定の上限10で数え、上限に達すると開いている PR がマージか close されるまで新しい PR を作らないと書く。docker の項目のフォルダは、`docker/` の下の9つと `backend/compat/` の2つで11になる。digest の更新はフォルダごとに別の PR になり、docker の PR は close できないので、Claude は、今と同じ1つの余裕を足して上限を12にした。Claude は、この判断と根拠の URL を、タスク5.6で PR の本文に書く。フォルダの数が変わる PR 6-1 で、上限を見直す
 
 ## 完了条件(全タスク共通)
 
