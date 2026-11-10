@@ -72,6 +72,26 @@ services:
     networks:
       - my-network
 
+  # 開発環境の API の説明画面。ホストの 8082 で開く。Go 版の仕様書 backend/api/openapi.yaml から作る
+  api-docs:
+    container_name: api-docs
+    build:
+      context: .
+      dockerfile: docker/api-docs/Dockerfile
+    ports:
+      - 8082:8080
+    environment:
+      - SWAGGER_JSON=/spec/openapi.yaml
+    volumes:
+      # ファイルでなくフォルダを差し込む。ファイルを差し込むと、git の切り替えなどで
+      # ファイルが置き換わったときに、コンテナが古い中身を見続けるため
+      - type: bind
+        source: ./backend/api
+        target: /spec
+        read_only: true
+    networks:
+      - my-network
+
   frontend:
     container_name: react
     build:

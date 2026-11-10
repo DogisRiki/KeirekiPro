@@ -261,22 +261,20 @@
   - 受入基準とテストの対応: 要件4の受入基準5から7(比べる検査を作り、違いがあれば止め、一覧に載せた違いでは止めない)は `compat_test.go` の `TestSelf_SameImageNoDiff`、`TestSelf_OneCharFakeFails`、`TestSelf_MatchedDiffPasses` で、要件4の受入基準7(CI で動き続ける)は PR と main の CI の `backend-compat` の結果で、要件12の受入基準4(履歴の続きとして変える)は `TestApply_JavaFlywayValidatePasses` で、要件9の受入基準1(すべての操作を比べる)の土台は `TestCoverage_Operations` と、その判定の関数の単体テスト `TestCoverageJudge_CompletedOnly` と `TestCoverageJudge_All50` で確かめる
   - _要件: 4.5, 4.6, 4.7, 9.1, 12.4_
 
-- [ ] 4. API の説明画面と開発の手順の文書を入れる(PR 2-4)
-- [ ] 4.1 開発環境の API の説明画面を作る
+- [x] 4. API の説明画面と開発の手順の文書を入れる(PR 2-4)
+- [x] 4.1 開発環境の API の説明画面を作る
 
   Claude は、digest で固定した `swaggerapi/swagger-ui` をもとにする `docker/api-docs/Dockerfile` を作る。Claude は、`compose.yaml` にサービス `api-docs` を作り、このサービスをホストの 8082 につなぎ、`backend/api/openapi.yaml` を読み取りだけで差し込み、`SWAGGER_JSON=/spec/openapi.yaml` を渡す。Claude は、`start-dev.sh` に `api-docs` を足す。仕様書の `servers` は `http://localhost:8081` にする。
   - 完了の確かめ方: `docker compose up -d api-docs` のあと、`curl -s http://localhost:8082/` が Swagger UI の HTML を返し、`curl -s http://localhost:8082/openapi.yaml` が仕様書を返す
   - 受入基準とテストの対応: 要件14の受入基準1(開発環境で開ける)は、`curl` の2つの応答で確かめる。要件14の受入基準3(本番で開けない)は、2.8 の `TestUnknownRouteReturns404` で確かめてある
   - _要件: 14.1, 14.3_
-  - _保留: PR 2-3 が main に入ったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク4を行う_
 
-- [ ] 4.2 開発の手順の文書に URL を書き、PR を出す
+- [x] 4.2 開発の手順の文書に URL を書き、PR を出す
 
   Claude は、`doc/開発フロー/参加者セットアップ手順.md` に、API の説明画面の URL `http://localhost:8082` と、Go 版の開発サーバの URL `http://localhost:8081` を書く。最後に、Claude は、`start-dev.sh` で開発環境を起動し、`backend-go` の `/healthz` と `api-docs` が応答することを確かめて PR を出す。
   - 完了の確かめ方: 文書に2つの URL があり、`start-dev.sh` で起動した開発環境で `curl -s http://localhost:8081/healthz` が `{"status":"UP"}` を返す
   - 受入基準とテストの対応: 要件14の受入基準4(URL を文書に書く)は、テストでなく、文書の本文で確かめる
   - _要件: 14.4_
-  - _保留: 4.1 と同じ_
 
 - [ ] 5. Go のファイルがあることを前提にするゲート設定を Go 版に対応させる(PR 2-5)
 - [ ] 5.1 Dependabot に gomod と比べる検査の Dockerfile を足す
@@ -736,6 +734,7 @@
   - 変えた動きの一覧のうち、プロフィール画像の形式の違い、作りかけの経歴書を出力したときの誤りの違い、PDF の文字の位置の違いの3つを、比べる検査は許してよい違いとして扱えない。比べる検査が、これらの違いを見分ける比べ方をまだ持たないためである
   - 日本語の氏名の並びの違いを、Markdown と PDF の出力の比べ方では許せない
   - Google と GitHub のログインで、応答が示すログインの画面へ進む動き(送り直し)は作っていない。認証のまとまりの spec で作る
+- 作業フォルダで開発環境を起動するとき(タスク4.2で分かったこと): compose.yaml のコンテナの名前は固定で、compose のプロジェクトの名前は既定でフォルダの名前になる。そのため、git worktree の作業フォルダでそのまま `bash start-dev.sh` を打つと、本体フォルダのプロジェクト `keirekipro` の動いているコンテナと名前がぶつかり、起動に失敗する。Claude は、作業フォルダでは `COMPOSE_PROJECT_NAME=keirekipro bash start-dev.sh` で、本体フォルダと同じ開発環境を起動する。このとき、止まっていたコンテナは作業フォルダのファイルを読む形で作り直される
 
 ## 完了条件(全タスク共通)
 
