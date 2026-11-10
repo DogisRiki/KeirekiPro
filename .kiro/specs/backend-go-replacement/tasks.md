@@ -316,56 +316,50 @@
   - _要件: 14.5, 14.6, 14.7_
   - _依存: 15.1_
 
-- [ ] 5. Go のファイルがあることを前提にするゲート設定を Go 版に対応させる(PR 2-5)
-- [ ] 5.1 Dependabot に gomod と Java 版と Go 版を比べる検査の Dockerfile を足す
+- [x] 5. Go のファイルがあることを前提にするゲート設定を Go 版に対応させる(PR 2-5)
+- [x] 5.1 Dependabot に gomod と Java 版と Go 版を比べる検査の Dockerfile を足す
 
   Claude は、`.github/dependabot.yml` に gomod の項目(`/backend`)を足し、docker の項目の `directories` に `/backend/compat/fakeaws` と `/backend/compat/fakeoidc` を足した完成版を、置き場に作る。`docker/backend-go/` と `docker/api-docs/` は、今の `/docker/*` に当たるので足さない。Claude は、docker の項目の `open-pull-requests-limit` 10 で足りるかを、Dependabot の公式の文書で上限の意味を読んで決め、決めた結果と根拠の URL を PR の本文に書く。これは、design の審査で D3-2-2 として残った問いへの答えである。
   - 完了の確かめ方: 検査用の写しで、置き場の `dependabot.yml` を、版を固定した `mikefarah/yq` のイメージで読み、gomod の項目と docker の項目の `directories` の2つのフォルダが出る
   - 受入基準とテストの対応: 要件3の受入基準6(Go 版の部品の版を上げる PR を作る)と要件1の受入基準7(Java 版の項目を今のとおり続ける)は、テストでなく、置いたあとの `dependabot.yml` の項目と、Dependabot の画面で gomod の更新の確認が動いたことで確かめる
   - _要件: 1.7, 3.6_
-  - _保留: PR 2-6 が main に入ったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク5を行う_
 
-- [ ] 5.2 イメージの検査に Go 版の本番のイメージを足す (並行可)
+- [x] 5.2 イメージの検査に Go 版の本番のイメージを足す (並行可)
 
   Claude は、`.github/workflows/container-scan.yaml` と `container-scan-scheduled.yaml` に、`docker/backend-go/Dockerfile.prod` から組み立てたイメージを Trivy で調べる仕事を足した完成版を、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、actionlint と `check-action-pinning.sh` と `test-check-container-scan.sh` が成功する
   - 受入基準とテストの対応: 要件3の受入基準1(本番のイメージの脆弱性の検査)は、`test-check-container-scan.sh` に足す「backend-go のイメージの結果を読む」の場合で確かめる
   - _要件: 3.1_
   - _対象の部品: CodeQL とイメージの検査と組み立てて動かす検査_
-  - _保留: 5.1 と同じ_
 
-- [ ] 5.3 脆弱性を直す仕組みに Go の仕事を足す (並行可)
+- [x] 5.3 脆弱性を直す仕組みに Go の仕事を足す (並行可)
 
   Claude は、`.github/workflows/backend-vuln-fix.yaml` と `.github/scripts/backend-vuln-fix.sh` に、毎日 `make vuln` を動かし、呼ばれる箇所のある脆弱性を直す PR を作る Go の仕事を足した完成版を、置き場に作る。Go の仕事は、部品の脆弱性を、`go get <モジュール>@<直した版>` と `go mod tidy` で直す。Go の仕事は、標準ライブラリの脆弱性を、`go.mod` の `toolchain` と、`docker/backend-go/` と `backend/compat/fakeaws/` と `backend/compat/fakeoidc/` の `golang` のイメージの版を1つの PR で上げて直す。上げる Dockerfile は、`docker/backend-go/` の `Dockerfile` と `Dockerfile.prod` と、fakeaws と fakeoidc の `Dockerfile` の4つである。
   - 完了の確かめ方: 検査用の写しで、`test-backend-vuln-fix.sh` と actionlint が成功する
   - 受入基準とテストの対応: 要件3の受入基準6(Go 版の部品の脆弱性を直す PR を作る)は、`test-backend-vuln-fix.sh` に足す「Go の部品の脆弱性で go get の PR を作る」「標準ライブラリの脆弱性で toolchain と4つの Dockerfile を上げる」「呼ばれる箇所の無い脆弱性では PR を作らない」の場合で確かめる
   - _要件: 3.6_
   - _対象の部品: Dependabot と公開の時刻の検査と脆弱性の直し_
-  - _保留: 5.1 と同じ_
 
-- [ ] 5.4 週次の変異テストの報告に Go 版を足す (並行可)
+- [x] 5.4 週次の変異テストの報告に Go 版を足す (並行可)
 
   Claude は、`.github/workflows/mutation-report.yaml` と `.github/scripts/record-mutation-metrics.sh` に、`make mutation-full` の JSON の報告を週次で集める処理を足した完成版を、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、`test-record-mutation-metrics.sh` と actionlint が成功する
   - 受入基準とテストの対応: 要件3の受入基準1(変異テスト)は、`test-record-mutation-metrics.sh` に足す「gremlins の報告から割合を読む」の場合で確かめる
   - _要件: 3.1_
-  - _保留: 5.1 と同じ_
 
-- [ ] 5.5 週次のカバレッジの集計に Go 版を足す (並行可)
+- [x] 5.5 週次のカバレッジの集計に Go 版を足す (並行可)
 
   Claude は、`.github/scripts/collect-coverage.sh` に、Go 版の `coverage.out` から文の割合を集める処理を足した完成版を、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、`test-collect-coverage.sh` が成功する
   - 受入基準とテストの対応: 要件3の受入基準1(カバレッジ)は、`test-collect-coverage.sh` に足す「Go の coverage.out から文の割合を出す」の場合で確かめる
   - _要件: 3.1_
-  - _保留: 5.1 と同じ_
 
-- [ ] 5.6 所有者に置いてもらい、ゲート設定のテストをすべて流して PR を出す
+- [x] 5.6 所有者に置いてもらい、ゲート設定のテストをすべて流して PR を出す
 
   Claude は、実装のメモの「所有者に置いてもらう」のとおりに、置き場のファイルを所有者に本来の場所へ置いてもらったあと、`.github/scripts/tests/` のテストを Linux のコンテナで流し、shellcheck v0.11.0 と actionlint を流す。
   - 完了の確かめ方: すべてのテストと shellcheck と actionlint が成功し、PR の本文に「承認が要る理由」と「main に入れたときに本番で起きること」の欄がある
   - 受入基準とテストの対応: 要件7の受入基準3(承認が要る理由と、main に入れたときに本番で起きることを示す)は、`gh pr view` で読んだ PR の本文で確かめる
   - _要件: 7.3_
-  - _保留: 5.1 と同じ_
 
 - [ ] 6. 切り替えの出荷より前に入れる本番の設定の変更を入れる(PR 4-1)
 - [ ] 6.1 タスク定義と Redis の秘密の値に Go 版が読む値を足し、PR を出す
@@ -777,6 +771,16 @@
 - 作業フォルダで開発環境を起動するとき(タスク4.2で分かったこと): compose.yaml のコンテナの名前は固定で、compose のプロジェクトの名前は既定でフォルダの名前になる。そのため、git worktree の作業フォルダでそのまま `bash start-dev.sh` を打つと、本体フォルダのプロジェクト `keirekipro` の動いているコンテナと名前がぶつかり、起動に失敗する。Claude は、作業フォルダでは `COMPOSE_PROJECT_NAME=keirekipro bash start-dev.sh` で、本体フォルダと同じ開発環境を起動する。このとき、止まっていたコンテナは作業フォルダのファイルを読む形で作り直される
 - Java 版の CORS の応答と design の CORS の処理の5つの箇条の食い違い(タスク15.1で分かったこと): Claude は、次の4つを Java 版の応答に合わせた。1つ目に、Java 版は、`Vary` の3つの値を、1行でなく値ごとに別の行で返す。2つ目に、Java 版は、許したプリフライトの応答にも `Access-Control-Expose-Headers` を付けるので、プリフライトの応答のヘッダは4つでなく5つになる。3つ目に、Java 版は、`Invalid CORS request` の 403 に `Content-Type` を付けない。Go の標準の受け口は本文から推した `Content-Type` を付けるので、Go 版はその値を空にして止める。テストの記録用の応答の部品はこの推しをしないので、この動きは本物の受け口を立てて確かめる。4つ目に、Java 版は、`Access-Control-Allow-Headers` を、要求の名前を「, 」でつなぎ直した値で返す。このほかに、許す送り元からのプリフライトでない `TRACE` に、Java 版は 401 を返し、Go 版は design のとおり 403 を返す。Java 版の 401 の応答には `Vary` が無いので、この 401 は Java 版の CORS の処理より前で返っている。Go 版の CORS の処理ではこの 401 を作れない。8つの要求でメソッドを確かめる代表は `HEAD` で、`HEAD` では両方の版が 403 を返す
   - Java 版の応答の記録の取り方: 作業フォルダからは本体フォルダの開発環境の Java 版を動かせないので、Claude は、`run-check.sh backend sh -c './gradlew bootRun --args=--spring.profiles.active=dev & ... curl ...'` で、1回きりのコンテナの中で Java 版を起動して `curl` を送った。`curl -X HEAD` は本文を待って止まるので、`HEAD` は `curl -I` で送る
+- Dependabot の docker の項目の上限(タスク5.1で決めたこと): 公式の文書(https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#open-pull-requests-limit-)は、上限を、その項目で開いている version update の PR の数に掛け、security update の PR は別の固定の上限10で数え、上限に達すると開いている PR がマージか close されるまで新しい PR を作らないと書く。docker の項目のフォルダは、`docker/` の下の9つと `backend/compat/` の2つで11になる。digest の更新はフォルダごとに別の PR になり、docker の PR は close できないので、Claude は、今と同じ1つの余裕を足して上限を12にした。Claude は、この判断と根拠の URL を、タスク5.6で PR の本文に書く。フォルダの数が変わる PR 6-1 で、上限を見直す
+- 週次のイメージの検査の Go 版(タスク5.2で決めたこと): Go 版はまだ本番で動いておらず ECR に稼働中のイメージが無いので、`container-scan-scheduled.yaml` の新しい仕事 `scheduled-go-image-scan` が、main の `docker/backend-go/Dockerfile.prod` から arm64 のイメージを組み立てて report モードで調べ、結果を成果物で今の仕事に渡す。今の仕事は、稼働中のイメージの結果と Go 版の結果を `jq -s 'add'` で1つにまとめてから、`container-scan-issue.sh` を1回だけ呼ぶ。イメージごとに呼ぶと、Issue を ID だけで突き合わせるため、片方にだけある脆弱性の Issue を、もう片方の呼び出しが閉じてしまう。PR の検査は、必須の検査の名前を変えないよう、同じ `container-scan` の仕事の中で2つのイメージを組み立てて調べ、両方を判定してから失敗にする
+- `test-check-container-scan.sh` の場合の選び方(タスク5.2で足したこと): 今の確かめを、区切りの見出しごとに16の場合に分け、`if want <名前>; then` で囲んだ。囲むために字下げを足したので、差分の行数は大きいが、確かめの中身は変えていない(分ける前と後で、ok の行が同じことを Linux のコンテナで確かめた)
+- タスク5.2の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): `container-scan-issue.sh` が起票する Issue の本文は「稼働中の本番イメージから」で始まるので、main の Go 版のイメージにだけある脆弱性でもこの文で起票する(対象イメージの欄に2つのイメージを並べるので見分けられる。このスクリプトはタスク5.2で変えていない)。週次の検査を手で動かすときに main 以外のブランチを選ぶと、組み立てるのはそのブランチなのに、Summary と Issue の対象イメージの欄には「main の Go 版」と出る
+- govulncheck の出力(タスク5.3で実物を流して確かめた): `-format json` は、整形した複数行の JSON を並べて出し、脆弱性があっても0で終わる。finding は部品・package・関数の3つの深さで出て、呼ばれる箇所のある finding だけが `trace[0].function` を持つ。`make vuln` のテキストの形は、呼ばれる箇所のある脆弱性があれば3で終わり、呼ばれない脆弱性だけなら0で終わる。`GOTOOLCHAIN=auto` にすると、go のコマンドは go.mod の toolchain の行の Go に切り替わり、govulncheck もその Go の標準ライブラリを調べる。そのため、Go の仕事は、直したあとの調べ直しを `GOTOOLCHAIN=auto` で動かす
+- タスク5.3の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): ブランチがあるかを読む `git ls-remote` が通信の誤りで失敗すると、Go の仕事はブランチが無いと扱う(そのあとの push の失敗で仕事は失敗になるので、誤りは隠れない。Java の仕事と同じ作り)。呼ばれる箇所があっても直した版の無い脆弱性だけのときは、Go の仕事は warning を出して成功で終わるので、誰にも知らされない(design は、この場合を決めていない。Java の仕事も、修正版の無い警告を黙って除く)
+- gremlins v0.6.0 の JSON の報告(タスク5.4でソースの `internal/report` を読んで確かめた): 1行の JSON で、最上位に `mutants_killed` `mutants_lived` `mutants_not_covered` `mutants_not_viable` などの数を持つ。test efficacy は KILLED/(KILLED+LIVED)、変異のカバーは (KILLED+LIVED)/(KILLED+LIVED+NOT COVERED) で、TIMED OUT と NOT VIABLE はどちらにも数えない。変異が0件のときは報告のファイルを書かない。週次の台帳は、この2つの割合を Go 版の欄に書き、前回との差は test efficacy で比べる
+- 変異テストの台帳の表(タスク5.4): 既存の5列の表「記録(測定方式つき)」に6列の行を足すと、GitHub の表示が表の頭より多い欄を捨てて「実行」の欄が消える。そこで、見出し「記録(Go 版つき)」の6列の表を別に作って追記し、前回の全件の行は5列と6列の両方の表から探す。段階6で Java 版の欄を消すときは、この6列の表から PIT の列を消す形になる
+- Go 版の文の割合の数え方(タスク5.5で go-test-coverage v2.22.0 のソースを読んで確かめた): 週次の集計は、`make coverage` が下限と比べる値と同じ範囲で数える。数えるのは go.mod の module の名前に /internal/ を続けたパスの下だけで、`.testcoverage.yml` の exclude: の paths: の正規表現にモジュールの名前を除いたパスが当たるファイルは数えない。同じ箇所は1つとして数え、小数第1位に四捨五入する。go-test-coverage と違うのは、ソースのコメントで外す指定(coverage-ignore)を読まないことと、パッケージの最上位の関数リテラルの中の箇所も数えることの2つで、今のコードはどちらも使っていない
+- ci.yaml の backend-go の仕事に、成果物 backend-go-coverage(coverage.out)を残すステップを足した(タスク5.5)。週次の集計が Go 版の値を読む元が、ほかに無いためである。design の「PR 2-5 で変えるファイル」の一覧は collect-coverage.sh だけで、ci.yaml はその外にある。このことを、タスク5.6で所有者にファイルを置いてもらうときと PR の本文に書く
 
 ## 完了条件(全タスク共通)
 

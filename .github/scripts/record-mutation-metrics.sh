@@ -2,7 +2,8 @@
 # =====================================================================
 # mutation testing のスコアを台帳のIssueに1行追記する(mutation-report CI から実行)
 #
-# 処理: PIT(backend)の mutations.xml と Stryker(frontend)の mutation.json から
+# 処理: PIT(backend)の mutations.xml と Stryker(frontend)の mutation.json と、
+#       gremlins(backend の Go 版。make mutation-full)の mutation-report.json から
 #       スコアを計算し、固定タイトルのIssue「メトリクス台帳: mutationスコア」の
 #       本文の表に、測定方式と合わせて1行追記する。Issueが無ければ作成する。
 #       全件を測り直した回は、直前の全件の回との差とカバレッジを台帳のIssueに
@@ -29,13 +30,18 @@
 # なぜ測定方式を行ごとに残し、全件の回どうしで比べるのか:
 #   frontend の Stryker は、前回の結果を使える回は変更のあった部分だけを測り直す
 #   (差分)。差分の回のスコアは測り方が違うため、全件の回と並べて比べると
-#   差が測り方の違いを含んでしまう。比べる相手は、新しい表の中の直前の全件の行に
-#   限る。backend の PIT は毎回全件を測る。
+#   差が測り方の違いを含んでしまう。比べる相手は、測定方式を持つ表の中の直前の
+#   全件の行に限る。backend の PIT と、backend の Go 版の gremlins は毎回全件を測る。
 #   4列の古い表は測定方式を持たないため、比較に使わない。書き換えもしない。
 #
 # 台帳の本文:
-#   見出し「## 記録(測定方式つき)」の下の5列の表に追記する。本文にこの見出しが
-#   無ければ(測定方式の列ができる前の台帳)、末尾に見出しと表の頭を1回だけ足す。
+#   見出し「## 記録(Go 版つき)」の下の6列の表に追記する。本文にこの見出しが
+#   無ければ(Go 版の列ができる前の台帳)、末尾に見出しと表の頭を1回だけ足す。
+#   Go 版の列ができる前の見出し「## 記録(測定方式つき)」の下の5列の表も、
+#   測定方式を持つので、直前の全件の行を探すときに読む。5列の表の行には
+#   Go 版の記録が無いので、Go 版の前回は「記録なし」とする。5列の表は書き換えない。
+#   6列の表を別に作るのは、5列の表に6列の行を足すと、GitHub の表示が
+#   表の頭より多い欄を捨てる(最後の「実行」の欄が消える)ためである。
 #
 # 測定方式(環境変数 MUTATION_MODE。mutation-report.yaml が決める):
 #   full-scheduled    全件(月初の定期)
@@ -48,10 +54,17 @@
 #   backend  = 検出数 / 生成数(PIT の "Killed N (x%)")。detected='true' を検出とする
 #   frontend = (Killed + Timeout) / (Killed + Timeout + Survived + NoCoverage)
 #              (Stryker の mutation score。CompileError / RuntimeError / Ignored は除く)
-# 差: 今回と前回の百分率の差(ポイント)。小数第1位、符号つき。0 は ±0.0
+#   backend の Go 版 = KILLED / (KILLED + LIVED)(gremlins の "Test efficacy")。
+#              欄には続けて、変異のカバー (KILLED + LIVED) / (KILLED + LIVED + NOT COVERED)
+#              (gremlins の "Mutator coverage")を書く。PR の make mutation-diff が
+#              この2つの割合で止めるためである。TIMED OUT と NOT VIABLE は、gremlins の
+#              表示と同じく数えない。数は報告の最上位の mutants_killed /
+#              mutants_lived / mutants_not_covered から読む
+# 差: 今回と前回の百分率の差(ポイント)。小数第1位、符号つき。0 は ±0.0。
+#     backend の Go 版は、欄の先頭の test efficacy で比べる
 #
 # テスト: .github/scripts/tests/test-record-mutation-metrics.sh
-# 使い方: record-mutation-metrics.sh <mutations.xml のパス> <mutation.json のパス>
+# 使い方: record-mutation-metrics.sh <mutations.xml のパス> <mutation.json のパス> <gremlins の mutation-report.json のパス>
 #   ファイルが無い場合もパスは渡す(「取得できず」として記録する)
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須) / GITHUB_REPOSITORY_OWNER(必須)
 #   GITHUB_RUN_ID(必須) / MUTATION_MODE(必須。上の4値)
@@ -62,8 +75,8 @@
 set -Eeuo pipefail
 trap 'exit 2' ERR
 
-if [ "$#" -lt 2 ]; then
-    echo "::error::引数は2個必要です: <mutations.xml のパス> <mutation.json のパス>"
+if [ "$#" -lt 3 ]; then
+    echo "::error::引数は3個必要です: <mutations.xml のパス> <mutation.json のパス> <gremlins の mutation-report.json のパス>"
     exit 2
 fi
 for v in GH_TOKEN GITHUB_REPOSITORY GITHUB_REPOSITORY_OWNER GITHUB_RUN_ID MUTATION_MODE; do
@@ -98,6 +111,7 @@ esac
 
 PIT_XML="$1"
 STRYKER_JSON="$2"
+GREMLINS_JSON="$3"
 REPO="$GITHUB_REPOSITORY"
 RUN_URL="${GITHUB_SERVER_URL:-https://github.com}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
 NOW_EPOCH="${NOW_EPOCH:-$(date -u +%s)}"
@@ -107,9 +121,11 @@ if ! [[ "$NOW_EPOCH" =~ ^[1-9][0-9]{0,11}$ ]]; then
 fi
 TITLE="メトリクス台帳: mutationスコア"
 UNAVAILABLE="取得できず"
-HEADING="## 記録(測定方式つき)"
-TABLE_HEADER="| 実行日(UTC) | 測定方式 | backend(PIT) | frontend(Stryker) | 実行 |"
-TABLE_SEPARATOR="|---|---|---|---|---|"
+HEADING="## 記録(Go 版つき)"
+TABLE_HEADER="| 実行日(UTC) | 測定方式 | backend(PIT) | backend Go 版(gremlins) | frontend(Stryker) | 実行 |"
+TABLE_SEPARATOR="|---|---|---|---|---|---|"
+# Go 版の列ができる前の見出し。この下の5列の表は、直前の全件の行を探すときだけ読む
+MODE_HEADING="## 記録(測定方式つき)"
 
 # shellcheck source=.github/scripts/lib-ledger-issue.sh
 if ! self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) ||
@@ -181,8 +197,25 @@ if [ -r "$STRYKER_JSON" ]; then
     fi
 fi
 
+# --- backend の Go 版(gremlins) ---------------------------------------------------
+# gremlins v0.6.0 の --output の JSON。最上位の数を、0以上の整数のときだけ読む。
+# test efficacy の分母が0でも、変異のカバーが出せればそれだけを書く。
+backend_go="$UNAVAILABLE"
+if [ -r "$GREMLINS_JSON" ]; then
+    if counts=$(jq -er '
+        [.mutants_killed, .mutants_lived, .mutants_not_covered]
+        | if all(type == "number" and . >= 0 and . == floor) then "\(.[0]) \(.[1]) \(.[2])" else empty end' \
+        "$GREMLINS_JSON" 2>/dev/null); then
+        read -r killed lived not_covered <<<"$counts"
+        mcover=$(format_score "$((killed + lived))" "$((killed + lived + not_covered))")
+        if [ "$mcover" != "$UNAVAILABLE" ]; then
+            backend_go="$(format_score "$killed" "$((killed + lived))")、変異のカバー ${mcover}"
+        fi
+    fi
+fi
+
 today=$(date -u -d "@${NOW_EPOCH}" +%Y-%m-%d)
-row="| ${today} | ${MODE_LABEL} | ${backend} | ${frontend} | [実行](${RUN_URL}) |"
+row="| ${today} | ${MODE_LABEL} | ${backend} | ${backend_go} | ${frontend} | [実行](${RUN_URL}) |"
 echo "追記する行: ${row}"
 
 # --- 台帳のIssueを探す・作る ----------------------------------------------------
@@ -209,25 +242,38 @@ if ! body=$(gh api "repos/${REPO}/issues/${number}" --jq '.body // ""' 2>/dev/nu
     exit 2
 fi
 
-# 見出しより後ろの行だけを新しい表として読む。Web で編集された本文の CRLF も扱う。
-# 列: 実行日 / 測定方式 / backend / frontend / 実行
-row_re='^[|] ([0-9]{4}-[0-9]{2}-[0-9]{2}) [|] ([^|]+) [|] ([^|]+) [|] ([^|]+) [|] .* [|]$'
+# 2つの見出しより後ろの行を、それぞれの表として読む。Web で編集された本文の CRLF も扱う。
+# 5列の表の列: 実行日 / 測定方式 / backend / frontend / 実行
+# 6列の表の列: 実行日 / 測定方式 / backend / backend の Go 版 / frontend / 実行
+row5_re='^[|] ([0-9]{4}-[0-9]{2}-[0-9]{2}) [|] ([^|]+) [|] ([^|]+) [|] ([^|]+) [|] .* [|]$'
+row6_re='^[|] ([0-9]{4}-[0-9]{2}-[0-9]{2}) [|] ([^|]+) [|] ([^|]+) [|] ([^|]+) [|] ([^|]+) [|] .* [|]$'
 has_heading=0
+section=""
 prev_date=""
 prev_backend=""
+prev_backend_go=""
 prev_frontend=""
 while IFS= read -r line || [ -n "$line" ]; do
     line="${line%$'\r'}"
     if [ "$line" = "$HEADING" ]; then
         has_heading=1
+        section=6
         continue
     fi
-    if [ "$has_heading" -eq 1 ] && [[ "$line" =~ $row_re ]]; then
-        if [[ "${BASH_REMATCH[2]}" == 全件* ]]; then
-            prev_date="${BASH_REMATCH[1]}"
-            prev_backend="${BASH_REMATCH[3]}"
-            prev_frontend="${BASH_REMATCH[4]}"
-        fi
+    if [ "$line" = "$MODE_HEADING" ]; then
+        section=5
+        continue
+    fi
+    if [ "$section" = 6 ] && [[ "$line" =~ $row6_re ]] && [[ "${BASH_REMATCH[2]}" == 全件* ]]; then
+        prev_date="${BASH_REMATCH[1]}"
+        prev_backend="${BASH_REMATCH[3]}"
+        prev_backend_go="${BASH_REMATCH[4]}"
+        prev_frontend="${BASH_REMATCH[5]}"
+    elif [ "$section" = 5 ] && [[ "$line" =~ $row5_re ]] && [[ "${BASH_REMATCH[2]}" == 全件* ]]; then
+        prev_date="${BASH_REMATCH[1]}"
+        prev_backend="${BASH_REMATCH[3]}"
+        prev_backend_go="記録なし"
+        prev_frontend="${BASH_REMATCH[4]}"
     fi
 done <<<"$body"
 
@@ -259,6 +305,7 @@ if [ -n "$prev_date" ]; then
 else
     prev_heading="前回の全件"
     prev_backend="記録なし"
+    prev_backend_go="記録なし"
     prev_frontend="記録なし"
 fi
 
@@ -278,10 +325,11 @@ fi
     echo "| | 今回 | ${prev_heading} | 差 |"
     echo "|---|---|---|---|"
     echo "| backend(PIT) | ${backend} | ${prev_backend} | $(format_diff "$backend" "$prev_backend") |"
+    echo "| backend Go 版(gremlins) | ${backend_go} | ${prev_backend_go} | $(format_diff "$backend_go" "$prev_backend_go") |"
     echo "| frontend(Stryker) | ${frontend} | ${prev_frontend} | $(format_diff "$frontend" "$prev_frontend") |"
     echo ""
-    echo "全件になった理由: ${FULL_REASON}backend(PIT)は毎回全件を測ります。"
-    echo "差は、台帳の「${HEADING#\#\# }」の表の直前の全件の行との比較です。差分の回と、測定方式の列ができる前の行は比べません。"
+    echo "全件になった理由: ${FULL_REASON}backend(PIT)と backend の Go 版(gremlins)も毎回全件を測ります。"
+    echo "差は、台帳の「${HEADING#\#\# }」と「${MODE_HEADING#\#\# }」の表の直前の全件の行との比較です。差分の回と、測定方式の列ができる前の行は比べません。backend の Go 版は、test efficacy(gremlins の Test efficacy)で比べます。"
     echo ""
     echo "### カバレッジ"
     echo ""

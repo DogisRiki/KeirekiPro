@@ -1,6 +1,11 @@
 name: Container Image Vulnerability Scan
 
 # PRの内容で本番イメージを arm64 で組み立て、脆弱性を検査してマージ可否を報告する。
+# 本番イメージは、Java 版(docker/backend/Dockerfile.prod)と Go 版
+# (docker/backend-go/Dockerfile.prod)の2つである。Java 版のコードを消すまで、
+# 1つの container-scan のジョブで両方を組み立てて調べ、どちらかに止めるものが
+# あれば失敗にする。ジョブを分けたり matrix にしたりすると、必須の検査の名前
+# container-scan が変わり、ブランチ保護の設定と食い違う。
 #
 # 判定そのものは .github/scripts/check-container-scan.sh が持つ。
 # ここが持つのは実行前提の検証(Trivyのバージョン一致・30分の上限)だけで、
@@ -81,6 +86,7 @@ jobs:
           filters: |
             run:
               - 'docker/backend/Dockerfile.prod'
+              - 'docker/backend-go/Dockerfile.prod'
               - 'backend/**'
               - '.github/container-scan-suppressions.json'
               - '.github/workflows/container-scan.yaml'
@@ -155,6 +161,8 @@ jobs:
     # auto-merge の待ち時間に直結するため明示する(要件 1.10)。
     # 内訳はベースイメージの pull、Gradle ビルド、tar 書き出し、脆弱性DBの取得、
     # fat jar の入れ子解析。実測は合計91秒(タスク1.2、research.md の実測記録)。
+    # Go 版のイメージの組み立て(go build と Chromium の入った土台の pull)と
+    # スキャンが加わっても、30分に収まる見込みである。
     timeout-minutes: 30
 
     steps:
@@ -172,6 +180,11 @@ jobs:
             echo "SCAN_JSON=${RUNNER_TEMP}/container-scan-result.json"
             echo "BLOCKING_JSON=${RUNNER_TEMP}/container-scan-blocking.json"
             echo "DETECTED_JSON=${RUNNER_TEMP}/container-scan-detected.json"
+            # Go 版のイメージのファイル。Java 版のファイルと分け、判定が互いの結果を上書きしないようにする
+            echo "GO_IMAGE_TAR=${RUNNER_TEMP}/container-scan-go-image.tar"
+            echo "GO_SCAN_JSON=${RUNNER_TEMP}/container-scan-go-result.json"
+            echo "GO_BLOCKING_JSON=${RUNNER_TEMP}/container-scan-go-blocking.json"
+            echo "GO_DETECTED_JSON=${RUNNER_TEMP}/container-scan-go-detected.json"
           } >>"$GITHUB_ENV"
 
       # 署名とバージョンの検証はビルドの前に置く。組み立てに10分掛けたあとで
@@ -197,7 +210,9 @@ jobs:
       # --platform はアサーションにならないため、検査対象が arm64 であることの
       # 保証は判定スクリプト側の architecture の突き合わせが担う。ここでの
       # type=docker(単一プラットフォーム専用)はその前提を作るためのもの。
-      - name: Build production image for arm64
+      #
+      # 組み立ての文脈は、どちらのイメージも ./backend である(backend-deploy.yaml と同じ)。
+      - name: Build production images for arm64
         run: |
           set -euo pipefail
           start=$(date +%s)
@@ -209,13 +224,22 @@ jobs:
             --output "type=docker,dest=${IMAGE_TAR}" \
             ./backend
 
+          docker buildx build \
+            --platform linux/arm64 \
+            --file docker/backend-go/Dockerfile.prod \
+            --tag keirekipro-backend-go:container-scan \
+            --output "type=docker,dest=${GO_IMAGE_TAR}" \
+            ./backend
+
           elapsed=$(( $(date +%s) - start ))
           echo "BUILD_SECONDS=${elapsed}" >>"$GITHUB_ENV"
           echo "::notice::イメージの組み立てに ${elapsed} 秒かかりました。"
 
       # --ignore-unfixed も --severity も付けない。付けると出力から件が消え、
       # 「全件を、抑制中かどうか区別できる形で提示する」を満たせない。
-      - name: Scan image
+      # Go 版のイメージでは、Trivy が、土台の Debian の部品(os-pkgs)に加えて、
+      # プログラムに組み込まれた Go の標準ライブラリと部品(gobinary)を調べる。
+      - name: Scan images
         run: |
           set -euo pipefail
           start=$(date +%s)
@@ -225,32 +249,62 @@ jobs:
             --format json \
             --output "${SCAN_JSON}"
 
+          trivy image \
+            --input "${GO_IMAGE_TAR}" \
+            --format json \
+            --output "${GO_SCAN_JSON}"
+
           elapsed=$(( $(date +%s) - start ))
           echo "SCAN_SECONDS=${elapsed}" >>"$GITHUB_ENV"
           echo "::notice::脆弱性データベースの取得を含むスキャンに ${elapsed} 秒かかりました。"
 
       # 終了コードは 0 / 1 / 2 の3値。ここでは 0 以外をすべて失敗として扱うが、
       # 所要時間を残すために set -e には飲ませず捕捉する。
-      - name: Judge scan result
+      #
+      # 2つのイメージの終了コードを別々に控え、両方を判定してから失敗にする。
+      # Java 版で止まったところで終えると、Go 版の結果が Summary に出ず、
+      # 直したあとの run で初めて Go 版の指摘に気づくことになる。
+      # 判定スクリプトの Summary の見出しは固定なので、その前に、どちらの
+      # イメージの表かを示す見出しを書く。
+      - name: Judge scan results
         run: |
           set -euo pipefail
           start=$(date +%s)
 
-          rc=0
+          echo "## Java 版のイメージ(docker/backend/Dockerfile.prod)" >>"$GITHUB_STEP_SUMMARY"
+          java_rc=0
           bash .github/scripts/check-container-scan.sh \
             "${SCAN_JSON}" \
             arm64 \
             .github/container-scan-suppressions.json \
             judge \
             "${BLOCKING_JSON}" \
-            "${DETECTED_JSON}" || rc=$?
+            "${DETECTED_JSON}" || java_rc=$?
+
+          echo "## Go 版のイメージ(docker/backend-go/Dockerfile.prod)" >>"$GITHUB_STEP_SUMMARY"
+          go_rc=0
+          bash .github/scripts/check-container-scan.sh \
+            "${GO_SCAN_JSON}" \
+            arm64 \
+            .github/container-scan-suppressions.json \
+            judge \
+            "${GO_BLOCKING_JSON}" \
+            "${GO_DETECTED_JSON}" || go_rc=$?
 
           elapsed=$(( $(date +%s) - start ))
           echo "JUDGE_SECONDS=${elapsed}" >>"$GITHUB_ENV"
           echo "::notice::判定に ${elapsed} 秒かかりました。"
 
-          if [ "$rc" -ne 0 ]; then
-            echo "::error::コンテナイメージの脆弱性検査に失敗しました(終了コード ${rc})。"
+          failed=0
+          if [ "$java_rc" -ne 0 ]; then
+            echo "::error::Java 版のイメージの脆弱性検査に失敗しました(終了コード ${java_rc})。"
+            failed=1
+          fi
+          if [ "$go_rc" -ne 0 ]; then
+            echo "::error::Go 版のイメージの脆弱性検査に失敗しました(終了コード ${go_rc})。"
+            failed=1
+          fi
+          if [ "$failed" -ne 0 ]; then
             exit 1
           fi
 

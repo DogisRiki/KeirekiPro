@@ -2,7 +2,9 @@
 # Dependabot が PR を作らない backend の部品の警告の、部品と修正版の組ごとに、libs.versions.toml の vuln-fix- の行に版を書く PR を作る。
 # [libraries] の部品とプラグイン(Dependabot が上げる)、Dependabot の PR かブランチがある組、main が脆弱でない組は作らない。
 # 行を書いても脆弱な版が残れば失敗で終える。修正版が公開から72時間未満なら、本番で動く部品の high か critical だけ作る。
-# 使い方: backend-vuln-fix.sh run(GH_TOKEN と GITHUB_REPOSITORY が要る)。ほかはテストが呼ぶ
+# go_run は、Go 版の部品と標準ライブラリの脆弱性のうち、make vuln(govulncheck)が呼ばれる箇所を見つけたものを直す PR を作る。
+# 部品は go get と go mod tidy で直し、標準ライブラリは go.mod の toolchain と golang のイメージの版を1つの PR で上げる。
+# 使い方: backend-vuln-fix.sh run(GH_TOKEN と GITHUB_REPOSITORY が要る)か go_run(GH_TOKEN が要る)。ほかはテストが呼ぶ
 set -euo pipefail
 BACKEND=backend
 CATALOG=$BACKEND/gradle/libs.versions.toml
@@ -132,7 +134,116 @@ Refs: N/A"
     done 3<<<"$groups"
     return "$failed"
 }
+# --- Go の仕事(go_run)----------------------------------------------------
+# golang のイメージの版を上げる Dockerfile。PR 6-1 で docker/backend/ の Dockerfile だけにする(design.md)
+GO_DOCKERFILES="docker/backend-go/Dockerfile docker/backend-go/Dockerfile.prod backend/compat/fakeaws/Dockerfile backend/compat/fakeoidc/Dockerfile"
+# govulncheck の JSON(整形した JSON の並び)から、呼ばれる箇所のある脆弱性(trace[0] に function のある finding)を、
+# 標準ライブラリと部品ごとにまとめ、直した版のうちいちばん新しい版を選ぶ。直した版の無い脆弱性は nofix に出す
+go_plan() {
+    jq -s 'def vkey: ltrimstr("v") | split("+")[0] | split("-") as $p
+                | ($p[0] | split(".") | map(tonumber? // 0)) + [if ($p | length) > 1 then 0 else 1 end];
+        def std: .trace[0].module | IN("stdlib", "toolchain");
+        [ .[] | .finding? // empty | select(.trace[0].function != null) ] as $called
+        | ($called | map(select(.fixed_version != null))) as $fix
+        | { stdlib: ($fix | map(select(std))
+                | if length == 0 then null
+                  else { version: (map(.fixed_version) | max_by(vkey) | ltrimstr("v")), osv: (map(.osv) | unique) } end),
+            modules: ($fix | map(select(std | not)) | group_by(.trace[0].module)
+                | map({ module: .[0].trace[0].module, version: (map(.fixed_version) | max_by(vkey)), osv: (map(.osv) | unique) })),
+            nofix: ($called | map(select(.fixed_version == null) | .osv) | unique) }' "$1"
+}
+# govulncheck の JSON を $1 に書く。go.mod の toolchain の行の Go で調べるため、GOTOOLCHAIN=auto にする
+vulncheck() { (cd "$BACKEND" && env -u GH_TOKEN GOTOOLCHAIN=auto go tool govulncheck -format json ./... </dev/null) >"$1"; }
+# イメージ $1 の digest(CPU ごとのイメージをまとめた索引の digest)を出す
+digest() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -re '.digest | select(test("^sha256:[0-9a-f]{64}$"))'; }
+# go.mod の toolchain の行と、Dockerfile の golang のイメージ(golang:<版>-<種類>@sha256:<digest>)を Go $1 にする。
+# digest は種類ごとに1度だけ読む。toolchain の行が無いか、上げられない Dockerfile があれば 0 以外
+go_bump() {
+    local kinds kind d f
+    grep -q '^toolchain go' "$BACKEND/go.mod" || return 1
+    sed -i -E "s/^toolchain go[^ ]+\$/toolchain go$1/" "$BACKEND/go.mod"
+    # shellcheck disable=SC2086 # GO_DOCKERFILES は空白で区切った一覧
+    kinds=$(sed -nE 's/^FROM golang:[0-9.]+-([a-z0-9]+)@sha256:[0-9a-f]{64}( .*)?$/\1/p' $GO_DOCKERFILES | LC_ALL=C sort -u)
+    for kind in $kinds; do
+        d=$(digest "golang:$1-$kind") || return 1
+        for f in $GO_DOCKERFILES; do
+            sed -i -E "s/^FROM golang:[0-9.]+-$kind@sha256:[0-9a-f]{64}/FROM golang:$1-$kind@$d/" "$f"
+        done
+    done
+    for f in $GO_DOCKERFILES; do
+        grep -q "^FROM golang:$1-" "$f" && ! grep -E '^FROM golang:' "$f" | grep -qvF "FROM golang:$1-" || return 1
+    done
+}
+# shellcheck disable=SC2016 # 本文の ` は Markdown の印であり、シェルの展開ではない
+go_pr_body() {
+    printf '## 概要\n%s。\n' "$2"
+    printf 'この PR は、定期実行のワークフロー backend-vuln-fix の Go の仕事が、`make vuln`(govulncheck)で呼ばれる箇所のある脆弱性を見つけて作った。\n'
+    printf '直した版が公開から72時間たっていなければ、公開の時刻の検査がこの PR を止める。そのときは、所有者が ci-tool-fast-update の決まりで扱いを決める。\n'
+    printf '\n## 消える脆弱性\n'
+    jq -r '.osv[] | "- https://pkg.go.dev/vuln/\(.)"' <<<"$1"
+    printf '\nRefs: N/A\n'
+}
+# 直したあとに調べ直し、jq の式 $1 が真なら(脆弱性が消えていれば)、ブランチ $2 に題 $3 でコミットして PR を作る。
+# $4 は直し方の説明、$5 は組の JSON。直せていないか、送れなければ 0 以外
+go_ship() {
+    local after; after=$(mktemp)
+    if git diff --quiet || ! vulncheck "$after" || ! go_plan "$after" | jq -e "$1" >/dev/null; then
+        echo "::error::$3 ができませんでした。手で直してください。"; return 1; fi
+    git switch -q -c "$2" && git add -u && git commit -q -m "$3" -m "Changes:
+- $4
+Reason:
+- 呼ばれる箇所のある Go の脆弱性を消すため(backend-vuln-fix の Go の仕事が自動で作った)
+BREAKING CHANGE: N/A
+Related: N/A
+Refs: N/A" && git push -q -u origin "$2" </dev/null &&
+        gh pr create --base main --head "$2" --title "$3" --body "$(go_pr_body "$5" "$4")" </dev/null
+}
+# ブランチ $1 があるか、題に部品 $2 の名前を含む Dependabot の PR があれば 0
+go_exists() {
+    { [ -n "$2" ] && grep -qF " $2 " <<<"$open"; } || git ls-remote --exit-code --heads origin "$1" >/dev/null
+}
+go_run() {
+    local json plan open group mod ver branch title failed=0
+    json=$(mktemp)
+    if (cd "$BACKEND" && env -u GH_TOKEN GOTOOLCHAIN=auto make vuln </dev/null); then
+        echo "呼ばれる箇所のある Go の脆弱性はありません。"; return 0; fi
+    vulncheck "$json" || { echo "::error::govulncheck の JSON を読めませんでした。"; return 1; }
+    plan=$(go_plan "$json")
+    jq -r '.nofix[] | "::warning::\(.) は直した版が無いので、PR を作りません。"' <<<"$plan"
+    if jq -e '.stdlib == null and (.modules | length) == 0' <<<"$plan" >/dev/null; then
+        jq -e '.nofix | length > 0' <<<"$plan" >/dev/null && return 0
+        echo "::error::make vuln が失敗しましたが、呼ばれる箇所のある脆弱性を読めませんでした。"; return 1; fi
+    open=$(gh pr list --author app/dependabot --state open --limit 200 --json title --jq '.[].title')
+    gh auth setup-git
+    git config user.name "keirekipro-vuln-fix-bot" && git config user.email "vuln-fix-bot@users.noreply.github.com"
+    group=$(jq -c '.stdlib // empty' <<<"$plan")
+    if [ -n "$group" ]; then
+        ver=$(jq -r .version <<<"$group"); branch="chore/backend-vuln-fix-go-stdlib-$(slug "$ver")"
+        title="chore: backend の Go を ${ver} に上げる"
+        if go_exists "$branch" ""; then echo "::notice::Go ${ver}: ブランチ ${branch} があるので作りません。"
+        else
+            git switch -q -f --detach origin/main
+            if go_bump "$ver"; then
+                go_ship '.stdlib == null' "$branch" "$title" \
+                    "go.mod の toolchain と4つの Dockerfile の golang のイメージを Go ${ver} に上げ、標準ライブラリの脆弱性を消す" "$group" || failed=1
+            else echo "::error::Go を ${ver} に上げられませんでした。手で直してください。"; failed=1; fi
+        fi
+    fi
+    while IFS= read -r group <&3; do
+        mod=$(jq -r .module <<<"$group"); ver=$(jq -r .version <<<"$group")
+        branch="chore/backend-vuln-fix-go-$(slug "${mod}-${ver}")"; title="chore: backend の Go の部品 ${mod} を ${ver} 以上に上げる"
+        if go_exists "$branch" "$mod"; then
+            echo "::notice::${mod} ${ver}: Dependabot の PR かブランチ ${branch} があるので作りません。"; continue; fi
+        git switch -q -f --detach origin/main
+        if (cd "$BACKEND" && env -u GH_TOKEN GOTOOLCHAIN=auto go get "${mod}@${ver}" </dev/null &&
+            env -u GH_TOKEN GOTOOLCHAIN=auto go mod tidy </dev/null); then
+            go_ship "[.modules[] | select(.module == \"${mod}\")] | length == 0" "$branch" "$title" \
+                "Go の部品 ${mod} を、go get と go mod tidy で ${ver} に上げ、脆弱性を消す" "$group" || failed=1
+        else echo "::error::${mod} を ${ver} に上げられませんでした。手で直してください。"; failed=1; fi
+    done 3< <(jq -c '.modules[]' <<<"$plan")
+    return "$failed"
+}
 case "${1:-}" in
-    run | plan | resolved | vulnerable | decide | pin) "$@" ;;
-    *) echo "使い方: backend-vuln-fix.sh run | plan | resolved | vulnerable | decide | pin" >&2; exit 2 ;;
+    run | go_run | plan | resolved | vulnerable | decide | pin | go_plan) "$@" ;;
+    *) echo "使い方: backend-vuln-fix.sh run | go_run | plan | resolved | vulnerable | decide | pin | go_plan" >&2; exit 2 ;;
 esac
