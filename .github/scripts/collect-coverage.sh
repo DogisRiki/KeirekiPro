@@ -15,8 +15,11 @@
 #   frontend-test-results  coverage/coverage-summary.json の total.<種別>.pct
 #   backend-check-results  reports/jacoco/test/jacocoTestReport.xml の末尾の counter
 #                          (レポート全体の値)から covered / (missed + covered)
+#   backend-go-coverage    coverage.out(Go 版の make test が書く)から、make coverage の
+#                          下限と同じ範囲の文の割合(下の「Go 版の文の割合」)
 #   成果物の中のパスは、upload-artifact に渡した複数のパスの共通の親からの相対に
-#   なる(frontend は frontend/、backend は backend/build/)。
+#   なる(frontend は frontend/、backend は backend/build/、Go 版は backend/ の
+#   coverage.out の1つだけなので成果物の最上位)。
 #   gh api --paginate で一覧を全ページ取り、期限切れでなく
 #   workflow_run.head_branch が main のものを created_at の新しい順に並べ、
 #   先頭の1つだけを使う(mutation-report.yaml の前回の Stryker の結果の探し方と同じ)。
@@ -25,7 +28,23 @@
 # 基準値(ファイルは読むだけで変えない):
 #   frontend/vite.config.ts        thresholds の中の statements branches functions lines
 #   backend/gradle/quality.gradle  counter = '<種別>' と、その直後の minimum = <割合>
+#   backend/.testcoverage.yml      threshold: の中の total: <割合>
 #   読めなければ「読み取れず」。
+#
+# Go 版の文の割合(make coverage が go-test-coverage で下限と比べる値と同じ範囲):
+#   - backend/go.mod の module の名前に /internal/ を続けたパスの下のファイルだけを数える
+#     (make coverage が coverage.out から coverage.internal.out に写す行と同じ)
+#   - backend/.testcoverage.yml の exclude: の paths: の正規表現に、モジュールの名前を
+#     除いたパスが当たるファイルは数えない(生成したコード)
+#   - 同じ箇所(ファイルと行と列)が何度も出てきたら1つとして数え、どれかの回数が
+#     1以上なら動いたとする。動いた箇所の文の数 / すべての箇所の文の数を、
+#     go-test-coverage と同じく小数第1位に四捨五入する
+#   - ソースのコメントで外す指定(coverage-ignore)は読まない。今のコードはこの指定を
+#     使っていない。使うようになると、ここで出す値は下限と比べる値より低く出る
+#   - go-test-coverage は、パッケージの最上位に置いた関数リテラルの中の箇所を数えない。
+#     ここではそれも数える。今のコードにはこの書き方が無いため、値は変わらない
+#   - go.mod と .testcoverage.yml のどちらかを読めないときは、正しい範囲で数えられない
+#     ので「取得できず」にする。計り方の行や箇所の行の形が違うときも「取得できず」
 #
 # 出力の形(台帳のコメントに埋め込むため、1行目は表にしない):
 #   <1行の説明>
@@ -36,6 +55,8 @@
 #   ...
 #   (空行)
 #   backend: ...
+#   (空行)
+#   backend Go 版: ...(種別は statements の1つ)
 #   値を読めない種別は、その行の実測を「取得できず」にする。
 #   外部から来た値(日付・コミット・実行の番号)は形を確かめてから入れ、
 #   形が違えば「不明」にする。表に入れる値からは `|` と改行を取り除く。
@@ -56,6 +77,7 @@ REASON_DOWNLOAD_FAILED="取得できず(成果物をダウンロードできな�
 
 FRONTEND_KINDS=(statements branches functions lines)
 BACKEND_KINDS=(LINE BRANCH INSTRUCTION)
+GO_KINDS=(statements)
 
 # 表に入れる値から `|` と改行を取り除く
 sanitize() {
@@ -160,6 +182,110 @@ backend_value() {
     awk -v m="$missed" -v c="$covered" 'BEGIN { printf "%.1f%%", c * 100 / (m + c) }'
 }
 
+# 使い方: go_threshold <.testcoverage.yml> → 「NN%」または「読み取れず」
+# 行頭から始まる threshold: の中で、最初に現れる total: <割合> を読む
+go_threshold() {
+    local file="$1" v=""
+    if [ -f "$file" ]; then
+        v=$(tr -d '\r' <"$file" | awk '
+            /^[^ \t#]/ { in_threshold = ($0 ~ /^threshold:/); next }
+            in_threshold && match($0, /^[ \t]+total:[ \t]*[0-9]+(\.[0-9]+)?/) {
+                m = substr($0, RSTART, RLENGTH)
+                sub(/^[ \t]+total:[ \t]*/, "", m)
+                print m
+                exit
+            }')
+    fi
+    if is_number "$v"; then
+        printf '%s%%' "$v"
+    else
+        printf '%s' "$UNREADABLE"
+    fi
+}
+
+# 使い方: go_module <go.mod> → モジュールの名前(読めなければ空)
+go_module() {
+    local v=""
+    [ -f "$1" ] && v=$(tr -d '\r' <"$1" | awk '$1 == "module" { print $2; exit }')
+    v="${v#\"}"
+    v="${v%\"}"
+    if printf '%s' "$v" | grep -qE '^[A-Za-z0-9._~/-]+$'; then
+        printf '%s' "$v"
+    fi
+}
+
+# 使い方: go_excludes <.testcoverage.yml> → 数えないパスの正規表現(1行に1つ)
+# 行頭から始まる exclude: の中の paths: の下の「- <正規表現>」を読む。
+# 値を囲む引用符は外す
+go_excludes() {
+    tr -d '\r' <"$1" | awk '
+        /^[^ \t#]/ { in_exclude = ($0 ~ /^exclude:/); in_paths = 0; next }
+        in_exclude && /^[ \t]+paths:/ { in_paths = 1; next }
+        in_exclude && /^[ \t]+[A-Za-z_]+:/ { in_paths = 0; next }
+        in_paths && /^[ \t]+-[ \t]/ {
+            v = $0
+            sub(/^[ \t]+-[ \t]+/, "", v)
+            sub(/[ \t]+#.*$/, "", v)
+            sub(/[ \t]+$/, "", v)
+            if (v ~ /^".*"$/ || v ~ /^'"'"'.*'"'"'$/) v = substr(v, 2, length(v) - 2)
+            if (v != "") print v
+        }'
+}
+
+# 使い方: go_value <coverage.out> → 「NN.N%」または「取得できず」
+# 数え方は、冒頭の説明の「Go 版の文の割合」のとおり
+go_value() {
+    local file="$1" module config="${ROOT}/backend/.testcoverage.yml" v
+    module=$(go_module "${ROOT}/backend/go.mod")
+    if [ -z "$module" ] || [ ! -f "$config" ]; then
+        printf '%s' "$NOT_FOUND"
+        return
+    fi
+    v=$(tr -d '\r' <"$file" | GO_EXCLUDES="$(go_excludes "$config")" awk -v module="$module" '
+        BEGIN {
+            n = split(ENVIRON["GO_EXCLUDES"], patterns, "\n")
+            prefix = module "/internal/"
+        }
+        NR == 1 {
+            if ($0 !~ /^mode: (set|count|atomic)$/) bad = 1
+            next
+        }
+        /^[ \t]*$/ { next }
+        {
+            if (NF != 3 || $1 !~ /\.go:[0-9]+\.[0-9]+,[0-9]+\.[0-9]+$/ || $2 !~ /^[0-9]+$/ || $3 !~ /^[0-9]+$/) {
+                bad = 1
+                next
+            }
+            path = $1
+            sub(/:[0-9]+\.[0-9]+,[0-9]+\.[0-9]+$/, "", path)
+            if (index(path, prefix) != 1) next
+            rel = substr(path, length(module) + 2)
+            for (i = 1; i <= n; i++) {
+                if (patterns[i] != "" && rel ~ patterns[i]) next
+            }
+            stmts[$1] = $2 + 0
+            if ($3 + 0 > 0) hit[$1] = 1
+        }
+        END {
+            if (bad || NR == 0) exit
+            for (b in stmts) {
+                total += stmts[b]
+                if (b in hit) covered += stmts[b]
+            }
+            if (total == 0) exit
+            if (covered == total) {
+                print "100.0"
+                exit
+            }
+            printf "%.1f\n", int(covered * 1000 / total + 0.5) / 10
+        }')
+    if is_number "$v"; then
+        printf '%s%%' "$v"
+    else
+        printf '%s' "$NOT_FOUND"
+    fi
+}
+
 # ---------------------------------------------------------------------
 # 成果物
 # ---------------------------------------------------------------------
@@ -200,35 +326,42 @@ run_info() {
     printf '実行の日付 %s、コミット %s、%s' "$date" "$commit" "$link"
 }
 
-# 使い方: side_section <frontend|backend>
+# 使い方: side_section <frontend|backend|backend-go>
 # 成果物を探して取り、見出しの行と表を出す
 side_section() {
-    local side="$1" name inner kinds found run_id sha created dir header file="" k value threshold
+    local side="$1" label name inner kinds found run_id sha created dir header file="" k value threshold
     if [ "$side" = frontend ]; then
+        label=frontend
         name=frontend-test-results
         inner=coverage/coverage-summary.json
         kinds=("${FRONTEND_KINDS[@]}")
-    else
+    elif [ "$side" = backend ]; then
+        label=backend
         name=backend-check-results
         inner=reports/jacoco/test/jacocoTestReport.xml
         kinds=("${BACKEND_KINDS[@]}")
+    else
+        label="backend Go 版"
+        name=backend-go-coverage
+        inner=coverage.out
+        kinds=("${GO_KINDS[@]}")
     fi
 
     if ! found=$(latest_main_artifact "$name"); then
-        header="${side}: ${REASON_LIST_FAILED}"
+        header="${label}: ${REASON_LIST_FAILED}"
     elif [ -z "$found" ]; then
-        header="${side}: ${REASON_NO_ARTIFACT}"
+        header="${label}: ${REASON_NO_ARTIFACT}"
     else
         # 空の欄で詰まらないよう、空白でない区切り(US)で分ける
         IFS=$'\x1f' read -r run_id sha created <<<"$found"
         dir="${TMP_DIR}/${name}"
         if [ -z "$run_id" ] || ! gh run download "$run_id" -R "$GITHUB_REPOSITORY" -n "$name" -D "$dir" >/dev/null 2>&1; then
-            header="${side}: ${REASON_DOWNLOAD_FAILED}。$(run_info "$run_id" "$sha" "$created")"
+            header="${label}: ${REASON_DOWNLOAD_FAILED}。$(run_info "$run_id" "$sha" "$created")"
         elif [ ! -f "${dir}/${inner}" ]; then
-            header="${side}: ${REASON_NO_FILE}。$(run_info "$run_id" "$sha" "$created")"
+            header="${label}: ${REASON_NO_FILE}。$(run_info "$run_id" "$sha" "$created")"
         else
             file="${dir}/${inner}"
-            header="${side}: $(run_info "$run_id" "$sha" "$created")"
+            header="${label}: $(run_info "$run_id" "$sha" "$created")"
         fi
     fi
 
@@ -239,13 +372,17 @@ side_section() {
             value="$NOT_FOUND"
         elif [ "$side" = frontend ]; then
             value=$(frontend_value "$file" "$k")
-        else
+        elif [ "$side" = backend ]; then
             value=$(backend_value "$file" "$k")
+        else
+            value=$(go_value "$file")
         fi
         if [ "$side" = frontend ]; then
             threshold=$(frontend_threshold "${ROOT}/frontend/vite.config.ts" "$k")
-        else
+        elif [ "$side" = backend ]; then
             threshold=$(backend_threshold "${ROOT}/backend/gradle/quality.gradle" "$k")
+        else
+            threshold=$(go_threshold "${ROOT}/backend/.testcoverage.yml")
         fi
         printf '| %s | %s | %s |\n' "$k" "$(sanitize "$value")" "$(sanitize "$threshold")"
     done
@@ -269,10 +406,12 @@ TMP_DIR=$(mktemp -d) || exit 2
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 {
-    printf 'カバレッジ(main で最後にテストを実行した CI の成果物の値と、vite.config.ts・quality.gradle の基準値。良し悪しは判定しない)\n\n'
+    printf 'カバレッジ(main で最後にテストを実行した CI の成果物の値と、vite.config.ts・quality.gradle・.testcoverage.yml の基準値。良し悪しは判定しない)\n\n'
     side_section frontend
     printf '\n'
     side_section backend
+    printf '\n'
+    side_section backend-go
 } >"$OUT_FILE" || {
     echo "出力ファイルに書けません: ${OUT_FILE}" >&2
     exit 2

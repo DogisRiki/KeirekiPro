@@ -31,6 +31,27 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
+  # Go 版(backend/go.mod)の部品と、go.mod の tool の指定で入れる道具の版を上げる。
+  # 上の gradle の項目(Java 版)は、Java 版のコードを消すまで残す。
+  # gomod には Dependabot の既定のクールダウン(3日)が効き、公開から72時間の待機は
+  # dependency-cooldown が index.golang.org の取り込みの時刻でも確かめる。
+  - package-ecosystem: "gomod"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    groups:
+      backend-go-dependencies:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   # pnpm 11 への対応はDependabot側でベータ扱い(dependabot-core#14794、2026-09-15 close)。
   # 公式の対応表(supported-ecosystems-and-repositories)にはまだ v10 までしか載っていない。
   # 既知の不具合は、lockfileが複数のYAML文書(`---` 区切り)になった場合に依存グラフが
@@ -72,7 +93,11 @@ updates:
       github-actions:
         update-types: ["minor", "patch"]
 
-  # Dockerfileは docker/ 配下の7ディレクトリに集約しているため、globの1行で全て対象になる。
+  # 開発環境と本番の Dockerfile は docker/ 配下の9ディレクトリにあり、globの1行で全て対象になる。
+  # Java 版と Go 版を比べる検査の Dockerfile は backend/compat/ の fakeaws と fakeoidc にあるので、
+  # 2つのディレクトリを足している。足さないと、golang と distroless のイメージの版が上がらず、
+  # go.mod の Go の版を上げたときに比べる検査のイメージを組み立てられなくなる。
+  # backend/compat/ を消すときは、この2行も消す。
   # ベースイメージは digest 固定してあり、タグが動かなくても digest 比較で更新PRが出る。
   #
   # メジャー更新の除外は必須。eclipse-temurin の `21-jre` は Dependabot のタグ比較で
@@ -85,15 +110,22 @@ updates:
   #
   # digest更新はgroupsに入らず(現在バージョンと最新が同じタグ文字列になるため)、
   # ディレクトリごとの個別PRになる。上限はディレクトリ数を下回らない値にする。
+  # 上限は、この項目で開いている version update のPRの数に掛かり、security update のPRは
+  # 別の固定の上限(10)で数える。上限に達すると、開いているPRがマージかcloseされるまで
+  # 新しいPRを作らない。このレーンのPRはcloseできず、赤のPRが残ると枠を使い続けるので、
+  # ディレクトリ数(11)に1つの余裕を足して12にしている。ディレクトリ数が変わったら直す。
+  # 参照: https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#open-pull-requests-limit-
   - package-ecosystem: "docker"
     directories:
       - "/docker/*"
+      - "/backend/compat/fakeaws"
+      - "/backend/compat/fakeoidc"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
       timezone: "Asia/Tokyo"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 12
     commit-message:
       prefix: "chore"
     groups:
