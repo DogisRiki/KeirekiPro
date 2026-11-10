@@ -340,7 +340,7 @@
   - _要件: 3.6_
   - _対象の部品: Dependabot と公開の時刻の検査と脆弱性の直し_
 
-- [ ] 5.4 週次の変異テストの報告に Go 版を足す (並行可)
+- [x] 5.4 週次の変異テストの報告に Go 版を足す (並行可)
 
   Claude は、`.github/workflows/mutation-report.yaml` と `.github/scripts/record-mutation-metrics.sh` に、`make mutation-full` の JSON の報告を週次で集める処理を足した完成版を、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、`test-record-mutation-metrics.sh` と actionlint が成功する
@@ -777,6 +777,8 @@
 - タスク5.2の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): `container-scan-issue.sh` が起票する Issue の本文は「稼働中の本番イメージから」で始まるので、main の Go 版のイメージにだけある脆弱性でもこの文で起票する(対象イメージの欄に2つのイメージを並べるので見分けられる。このスクリプトはタスク5.2で変えていない)。週次の検査を手で動かすときに main 以外のブランチを選ぶと、組み立てるのはそのブランチなのに、Summary と Issue の対象イメージの欄には「main の Go 版」と出る
 - govulncheck の出力(タスク5.3で実物を流して確かめた): `-format json` は、整形した複数行の JSON を並べて出し、脆弱性があっても0で終わる。finding は部品・package・関数の3つの深さで出て、呼ばれる箇所のある finding だけが `trace[0].function` を持つ。`make vuln` のテキストの形は、呼ばれる箇所のある脆弱性があれば3で終わり、呼ばれない脆弱性だけなら0で終わる。`GOTOOLCHAIN=auto` にすると、go のコマンドは go.mod の toolchain の行の Go に切り替わり、govulncheck もその Go の標準ライブラリを調べる。そのため、Go の仕事は、直したあとの調べ直しを `GOTOOLCHAIN=auto` で動かす
 - タスク5.3の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): ブランチがあるかを読む `git ls-remote` が通信の誤りで失敗すると、Go の仕事はブランチが無いと扱う(そのあとの push の失敗で仕事は失敗になるので、誤りは隠れない。Java の仕事と同じ作り)。呼ばれる箇所があっても直した版の無い脆弱性だけのときは、Go の仕事は warning を出して成功で終わるので、誰にも知らされない(design は、この場合を決めていない。Java の仕事も、修正版の無い警告を黙って除く)
+- gremlins v0.6.0 の JSON の報告(タスク5.4でソースの `internal/report` を読んで確かめた): 1行の JSON で、最上位に `mutants_killed` `mutants_lived` `mutants_not_covered` `mutants_not_viable` などの数を持つ。test efficacy は KILLED/(KILLED+LIVED)、変異のカバーは (KILLED+LIVED)/(KILLED+LIVED+NOT COVERED) で、TIMED OUT と NOT VIABLE はどちらにも数えない。変異が0件のときは報告のファイルを書かない。週次の台帳は、この2つの割合を Go 版の欄に書き、前回との差は test efficacy で比べる
+- 変異テストの台帳の表(タスク5.4): 既存の5列の表「記録(測定方式つき)」に6列の行を足すと、GitHub の表示が表の頭より多い欄を捨てて「実行」の欄が消える。そこで、見出し「記録(Go 版つき)」の6列の表を別に作って追記し、前回の全件の行は5列と6列の両方の表から探す。段階6で Java 版の欄を消すときは、この6列の表から PIT の列を消す形になる
 
 ## 完了条件(全タスク共通)
 
