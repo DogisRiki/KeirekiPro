@@ -324,7 +324,7 @@
   - 受入基準とテストの対応: 要件3の受入基準6(Go 版の部品の版を上げる PR を作る)と要件1の受入基準7(Java 版の項目を今のとおり続ける)は、テストでなく、置いたあとの `dependabot.yml` の項目と、Dependabot の画面で gomod の更新の確認が動いたことで確かめる
   - _要件: 1.7, 3.6_
 
-- [ ] 5.2 イメージの検査に Go 版の本番のイメージを足す (並行可)
+- [x] 5.2 イメージの検査に Go 版の本番のイメージを足す (並行可)
 
   Claude は、`.github/workflows/container-scan.yaml` と `container-scan-scheduled.yaml` に、`docker/backend-go/Dockerfile.prod` から組み立てたイメージを Trivy で調べる仕事を足した完成版を、置き場に作る。
   - 完了の確かめ方: 検査用の写しで、actionlint と `check-action-pinning.sh` と `test-check-container-scan.sh` が成功する
@@ -772,6 +772,9 @@
 - Java 版の CORS の応答と design の CORS の処理の5つの箇条の食い違い(タスク15.1で分かったこと): Claude は、次の4つを Java 版の応答に合わせた。1つ目に、Java 版は、`Vary` の3つの値を、1行でなく値ごとに別の行で返す。2つ目に、Java 版は、許したプリフライトの応答にも `Access-Control-Expose-Headers` を付けるので、プリフライトの応答のヘッダは4つでなく5つになる。3つ目に、Java 版は、`Invalid CORS request` の 403 に `Content-Type` を付けない。Go の標準の受け口は本文から推した `Content-Type` を付けるので、Go 版はその値を空にして止める。テストの記録用の応答の部品はこの推しをしないので、この動きは本物の受け口を立てて確かめる。4つ目に、Java 版は、`Access-Control-Allow-Headers` を、要求の名前を「, 」でつなぎ直した値で返す。このほかに、許す送り元からのプリフライトでない `TRACE` に、Java 版は 401 を返し、Go 版は design のとおり 403 を返す。Java 版の 401 の応答には `Vary` が無いので、この 401 は Java 版の CORS の処理より前で返っている。Go 版の CORS の処理ではこの 401 を作れない。8つの要求でメソッドを確かめる代表は `HEAD` で、`HEAD` では両方の版が 403 を返す
   - Java 版の応答の記録の取り方: 作業フォルダからは本体フォルダの開発環境の Java 版を動かせないので、Claude は、`run-check.sh backend sh -c './gradlew bootRun --args=--spring.profiles.active=dev & ... curl ...'` で、1回きりのコンテナの中で Java 版を起動して `curl` を送った。`curl -X HEAD` は本文を待って止まるので、`HEAD` は `curl -I` で送る
 - Dependabot の docker の項目の上限(タスク5.1で決めたこと): 公式の文書(https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#open-pull-requests-limit-)は、上限を、その項目で開いている version update の PR の数に掛け、security update の PR は別の固定の上限10で数え、上限に達すると開いている PR がマージか close されるまで新しい PR を作らないと書く。docker の項目のフォルダは、`docker/` の下の9つと `backend/compat/` の2つで11になる。digest の更新はフォルダごとに別の PR になり、docker の PR は close できないので、Claude は、今と同じ1つの余裕を足して上限を12にした。Claude は、この判断と根拠の URL を、タスク5.6で PR の本文に書く。フォルダの数が変わる PR 6-1 で、上限を見直す
+- 週次のイメージの検査の Go 版(タスク5.2で決めたこと): Go 版はまだ本番で動いておらず ECR に稼働中のイメージが無いので、`container-scan-scheduled.yaml` の新しい仕事 `scheduled-go-image-scan` が、main の `docker/backend-go/Dockerfile.prod` から arm64 のイメージを組み立てて report モードで調べ、結果を成果物で今の仕事に渡す。今の仕事は、稼働中のイメージの結果と Go 版の結果を `jq -s 'add'` で1つにまとめてから、`container-scan-issue.sh` を1回だけ呼ぶ。イメージごとに呼ぶと、Issue を ID だけで突き合わせるため、片方にだけある脆弱性の Issue を、もう片方の呼び出しが閉じてしまう。PR の検査は、必須の検査の名前を変えないよう、同じ `container-scan` の仕事の中で2つのイメージを組み立てて調べ、両方を判定してから失敗にする
+- `test-check-container-scan.sh` の場合の選び方(タスク5.2で足したこと): 今の確かめを、区切りの見出しごとに16の場合に分け、`if want <名前>; then` で囲んだ。囲むために字下げを足したので、差分の行数は大きいが、確かめの中身は変えていない(分ける前と後で、ok の行が同じことを Linux のコンテナで確かめた)
+- タスク5.2の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): `container-scan-issue.sh` が起票する Issue の本文は「稼働中の本番イメージから」で始まるので、main の Go 版のイメージにだけある脆弱性でもこの文で起票する(対象イメージの欄に2つのイメージを並べるので見分けられる。このスクリプトはタスク5.2で変えていない)。週次の検査を手で動かすときに main 以外のブランチを選ぶと、組み立てるのはそのブランチなのに、Summary と Issue の対象イメージの欄には「main の Go 版」と出る
 
 ## 完了条件(全タスク共通)
 
