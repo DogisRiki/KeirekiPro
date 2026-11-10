@@ -268,7 +268,6 @@
   - 完了の確かめ方: `docker compose up -d api-docs` のあと、`curl -s http://localhost:8082/` が Swagger UI の HTML を返し、`curl -s http://localhost:8082/openapi.yaml` が仕様書を返す
   - 受入基準とテストの対応: 要件14の受入基準1(開発環境で開ける)は、`curl` の2つの応答で確かめる。要件14の受入基準3(本番で開けない)は、2.8 の `TestUnknownRouteReturns404` で確かめてある
   - _要件: 14.1, 14.3_
-  - _保留: PR 2-3 が main に入ったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク4を行う_
 
 - [ ] 4.2 開発の手順の文書に URL を書き、PR を出す
 
@@ -276,7 +275,6 @@
   - 完了の確かめ方: 文書に2つの URL があり、`start-dev.sh` で起動した開発環境で `curl -s http://localhost:8081/healthz` が `{"status":"UP"}` を返す
   - 受入基準とテストの対応: 要件14の受入基準4(URL を文書に書く)は、テストでなく、文書の本文で確かめる
   - _要件: 14.4_
-  - _保留: 4.1 と同じ_
 
 - [ ] 5. Go のファイルがあることを前提にするゲート設定を Go 版に対応させる(PR 2-5)
 - [ ] 5.1 Dependabot に gomod と比べる検査の Dockerfile を足す
