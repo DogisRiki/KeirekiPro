@@ -3,6 +3,7 @@
 # 止まっているコンテナを起動し、backend / frontend を起動して、それぞれ応答を返すまで待機する。
 # 確認URL: http://localhost:5173
 # Go 版の backend: http://localhost:8081(Java 版から切り替えるまで、Java 版と並べて動かす)
+# API の説明画面: http://localhost:8082(Go 版の仕様書 backend/api/openapi.yaml から作る)
 # 停止: docker compose restart frontend backend
 # Go 版の backend は、コンテナを起動すると動き出す。コードを変えたあとは docker compose restart backend-go で組み立て直して起動し直す
 
@@ -34,8 +35,9 @@ BACKEND_GO_RETRY_MAX=120
 FRONTEND_RETRY_MAX=60
 
 # 開発サーバの起動に要るサービス。backendとbackend-goは db・redis・localstack につながらないと起動できない。
+# api-docs は API の説明画面で、ほかのサービスにつながらずに起動する。
 # dind と terraform は開発サーバに使わないため起動しない
-REQUIRED_SERVICES="backend backend-go frontend db redis localstack"
+REQUIRED_SERVICES="backend backend-go api-docs frontend db redis localstack"
 
 # 起動していないサービスがあれば起動する。起動できなければ終了する
 ensure_containers() {

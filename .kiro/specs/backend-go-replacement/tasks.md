@@ -262,7 +262,7 @@
   - _要件: 4.5, 4.6, 4.7, 9.1, 12.4_
 
 - [ ] 4. API の説明画面と開発の手順の文書を入れる(PR 2-4)
-- [ ] 4.1 開発環境の API の説明画面を作る
+- [x] 4.1 開発環境の API の説明画面を作る
 
   Claude は、digest で固定した `swaggerapi/swagger-ui` をもとにする `docker/api-docs/Dockerfile` を作る。Claude は、`compose.yaml` にサービス `api-docs` を作り、このサービスをホストの 8082 につなぎ、`backend/api/openapi.yaml` を読み取りだけで差し込み、`SWAGGER_JSON=/spec/openapi.yaml` を渡す。Claude は、`start-dev.sh` に `api-docs` を足す。仕様書の `servers` は `http://localhost:8081` にする。
   - 完了の確かめ方: `docker compose up -d api-docs` のあと、`curl -s http://localhost:8082/` が Swagger UI の HTML を返し、`curl -s http://localhost:8082/openapi.yaml` が仕様書を返す

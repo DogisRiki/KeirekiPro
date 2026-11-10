@@ -72,7 +72,9 @@ info:
     Java 版が受け付けていた springdoc の URL(`/v3/api-docs` と `/swagger-ui/**` など)と、
     Spring Boot のエラーの転送先 `/error` と、受け付ける処理の無い `/api/admin/**` は、Go 版には無い。
 servers:
-  - url: /
+  # 開発環境の Go 版。API の説明画面の「Try it out」は、この宛先に要求を送る
+  - url: http://localhost:8081
+    description: 開発環境の Go 版
 tags:
   - name: auth
     description: 認証(ログイン、トークン、登録、メールアドレスの確認、パスワードの再設定、OIDC)。認証不要で、CSRF の検査も無い。
