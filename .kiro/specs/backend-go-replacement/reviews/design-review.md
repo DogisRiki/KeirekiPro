@@ -803,3 +803,82 @@
 | (なし) | | | |
 
 - 往復: 1回で収束 / 未解決: 0件
+
+## サイクル10 往復1(2026-11-10)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 「httpapi」の対応する要件(372行目)と中間処理の3(378〜383行目。CORS の処理の5つの箇条)と、番号が繰り下がった4と5(384〜391行目)、`backend/src/main/java/com/example/keirekipro/presentation/security/config/SecurityConfig.java` 52〜55行目と122〜133行目: 足した CORS の処理を、Java 版の CORS の設定(許す送り元は `cors.allowed-origins`、6つのメソッド、ヘッダはすべて、Cookie を付けた要求を許す、ブラウザに見せるヘッダ `Content-Disposition` と `X-Request-Id`、プリフライトの結果を覚える時間は決めない)と、Spring の CORS の処理(`DefaultCorsProcessor`)の動きに照らした。すべての応答に `Vary` の3つの値を付けること、`Origin` が無い要求と同じ送り元の要求を CORS の要求として扱わないこと、許さない送り元とメソッドに 403 と本文 `Invalid CORS request` を返すこと、プリフライトに 200 を返して先に渡さないこと、`Access-Control-Expose-Headers` をプリフライトでない応答だけに付けること、`Access-Control-Max-Age` を付けないことは合う。Spring の動きは私の知る Spring Framework 6 のソースによるもので、実測していない。プリフライトでない要求のメソッドの照らしと、`Access-Control-Request-Headers` が無いプリフライトの扱いは指摘 D10-1-3。CORS の処理を偽の送信の検査とログインの状態の検査より前に置く順は、Java 版の Spring Security で CORS の処理が `CsrfFilter` より前に動くことと合う。中間処理の4の `OPTIONS` の扱い(検査せず、Cookie を付けない)は、許す送り元のプリフライトが3で返るので食い違わない
+- design.md 「config」の環境ごとの値(321行目)と `dev` と `test` の1つ目の箇条(332行目)、`backend/src/main/resources/application-dev.yaml` 29〜30行目と `application-prod.yaml` 34〜35行目: Java 版の `dev` の許す送り元が `http://localhost:5173`、`prod` が `https://app.keirekipro.click` であることと合う。`test` の既定の値を `dev` と同じにすることと、`test` にも `http://localhost:8082` を足すことは食い違わない。影響なし
+- design.md 「api-docs」の対応する要件と Go 版を呼ぶ設定(419〜429行目)、「作るもの」(19行目)、「ファイルの構成」の `compose.yaml` と `doc/開発フロー/参加者セットアップ手順.md` の行(235行目、237行目)、`backend/api/openapi.yaml` 74〜77行目(`servers` は `http://localhost:8081`)と1398〜1405行目(`XsrfTokenHeader` は `in: header` の `X-XSRF-TOKEN`)、`compose.yaml` 76〜87行目、`backend/src/main/java/com/example/keirekipro/presentation/shared/utils/CookieUtil.java`(ログインの状態の Cookie は `SameSite=Lax`)、`backend/internal/httpapi/middleware/csrf.go`(`XSRF-TOKEN` は `Path=/` だけで `HttpOnly` を付けない): 「Try it out」の3つの手順が成り立つかを確かめた。`localhost:8082` と `localhost:8081` は送り元が違うがサイトは同じ(サイトはポートを見ない)なので、Cookie を付けて送らせれば `SameSite=Lax` の Cookie も送られる。Swagger UI の公式のイメージが環境変数 `WITH_CREDENTIALS` を設定 `withCredentials` に写すことは、私の知る Swagger UI の文書によるもので、このリポジトリでは実測していない。Go 版のログインの API が、段階3の認証のまとまりの spec まで 501 を返すことは指摘 D10-1-2
+- design.md 「fakeaws と fakeoidc」の使う部品(612行目)、「compat harness」の比べるヘッダの箇条(588行目)、`backend/compat/harness/` を `Origin` と `Vary` で Grep した結果: harness に `Origin` を付ける処理は無く(`Vary` は `compare_test.go` 257行目の比べないヘッダの試験だけ)、`Vary` は比べるヘッダに入っていないので、「CORS の許す送り元の違いは比べる結果に出ない」は事実と合う。影響なし
+- design.md 「変えた動きの一覧の形」の表の前の文と CB-010 の行と箇条(869行目、882行目、893行目)、requirements.md 要件9の受入基準5・6: CB-010 は4つの欄(変えた動き、Java 版、Go 版、画面に影響が無い理由)を持ち、`match` を持たない理由(比べる検査は `Origin` を付けない)は上の照らしと合う。本番の許す送り元は両方の版で同じなので、利用者が目にしない動きに当たる。影響なし
+- design.md 「安全」の2つ目の箇条(987行目)と「テストの方針」の単体テスト(962〜967行目)、`frontend/.env.production`(`VITE_API_URL=https://app.keirekipro.click/api/`)、`terraform/modules/alb/main.tf`(聞き口は `HTTPS`、ターゲットグループは `HTTP`): 「CORS の処理が Java 版と同じ応答を返すことを Go 版の単体テストで確かめる」を、テストの方針が裏付けるかを確かめた。本番の画面と API は同じ送り元だが、ブラウザは同じ送り元への書き込みの要求にも `Origin` を付け、ALB が TLS を終えるので Go 版からは方式が `http` に見え、同じ送り元と判定されない。そのため、本番でも画面の書き込みの要求は許す送り元の照らしを通る(指摘 D10-1-1)
+- design.md 「作るもの」(13行目)、「ファイルの構成」の `middleware/` の行(203行目)、「段階ごとの PR」の表の 2-6 と箇条(1028行目、1038行目)、「所有者に提案するゲート設定の変更」の表、`.kiro/specs/backend-go-replacement/progress.md` 17行目: 2-6 が変えるファイル(Go 版のコード、`compose.yaml`、`changed-behaviors.yaml`、手順の文書)にゲート設定のファイルが無く、承認が「要らない」と合うこと、「作るもの」「ファイルの構成」「2-6 の箇条」の中身がそろうことを確かめた。progress.md 17行目の「段階2の PR は 2-1〜2-5」は 2-6 を含まないが、progress.md は実装で書き換えるファイルで、design の誤りではない。影響なし
+- requirements.md 要件14の受入基準5〜7: 5(読み取りと書き込みを止めない)は CORS の処理の4つ目と5つ目の箇条と `WITH_CREDENTIALS` が、6(ログインの状態を付けて送る)は Cookie を付けた要求を許すことと Cookie がポートで分かれないことが、7(ヘッダを付けられる。`/api/auth` の下は除く)は `XsrfTokenHeader` の入力の欄と中間処理の4が裏付ける。「httpapi」と「api-docs」の対応する要件に3つとも載っている。確かめる時期は指摘 D10-1-2
+
+### 申告
+
+**1. 説明画面から Go 版を呼ぶために、開発環境の Go 版の CORS の許す送り元に説明画面の送り元を足す** — 「config」の環境ごとの値、「httpapi」の中間処理の3、CB-010
+
+- Issue の記載: あり。「開発者向けのAPI説明画面を、開発環境で開ける」。要件14の受入基準5〜7は、所有者の指示で足された
+- 決めたこと: `dev` と `test` の許す送り元を `http://localhost:5173` と `http://localhost:8082` の2つにし、Swagger UI に Cookie を付けて送らせる。Java 版との違いは CB-010 に載せる
+- 他にありえた選択肢: `api-docs` のサービスに、Go 版への要求を同じ送り元のまま中継させる(説明画面の配信と同じ送り元の `/api` を Go 版に転送する)。この形なら CORS の処理に開発環境だけの送り元が要らず、CB-010 も要らない。ただし、`servers` の宛先と、中継の設定を持つ自作の設定ファイルが要る
+- 外れていた場合: 所有者が Java 版との違いを増やしたくないと考えていたときは、config の既定の値と CB-010 を戻し、`api-docs` に中継の設定を足すことになる。手戻りは開発環境の設定と config の2行に限られ、本番の動きは変わらない
+
+**2. 偽の送信の検査のヘッダの値を、開発者がブラウザの開発者ツールで読んで手で写す形にし、Swagger UI に自動で写させない** — 「api-docs」の Go 版を呼ぶ設定
+
+- Issue の記載: なし。要件14の受入基準7は、ヘッダを付けられることだけを求める
+- 決めたこと: 初期化のファイルを足さず、手順の文書に、Cookie の値を読んでヘッダの欄に入れる手順を書く
+- 他にありえた選択肢: Swagger UI の要求の前の処理(`requestInterceptor`)で Cookie の値をヘッダに写す初期化のファイルを足す
+- 外れていた場合: 書き込みの「Try it out」のたびに開発者が値を写す手間が残る。土台のイメージの更新で動かなくなるおそれのあるファイルは増えないので、手戻りは小さい
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D10-1-1 | 低 | design.md 「テストの方針」の単体テスト(962〜967行目)、「安全」の2つ目の箇条(987行目)、「config」の環境ごとの値(321行目) | 「安全」は、比べる検査が `Origin` を付けないので、CORS の処理が Java 版と同じ応答を返すことを Go 版の単体テストで確かめると書く。しかし、「テストの方針」の単体テストには CORS の処理の行が無く、config の行にも環境ごとの許す送り元(`prod` は `https://app.keirekipro.click` だけ、`dev` と `test` は2つ)を確かめることが無い。本番の画面と API は同じ送り元(`frontend/.env.production`)だが、ブラウザは書き込みの要求に `Origin` を付け、ALB が TLS を終えるので Go 版からは方式が `http` に見え、同じ送り元と判定されない。そのため、本番の画面の書き込みの要求はすべて許す送り元の照らしを通る。`prod` の許す送り元か照らし方を誤ると、切り替えのあと本番の書き込みの操作がすべて 403 になるが、比べる検査はこれを見つけない。単体テストがこの唯一の機械の確かめである。「安全」に単体テストで確かめると書いてあるので、tasks で拾える見込みは高く、低とする | 「テストの方針」の単体テストに、たとえば「httpapi の CORS の処理: 許す送り元のプリフライトに 200 と4つのヘッダを返して先に渡さず、`Access-Control-Max-Age` を付けないこと。許さない送り元と、6つのほかのメソッドのプリフライトに 403 と `Invalid CORS request` を返すこと。プリフライトでない要求に3つのヘッダを付けて先に渡すこと。`Origin` の無い要求と同じ送り元の要求に `Vary` だけを付けること。偽の送信の検査より前に動くこと」を足す。config の行に「`prod` の許す送り元が `https://app.keirekipro.click` だけで、`dev` と `test` が2つであること」を足す。あわせて、方式が `http` に見える要求に `Origin: https://app.keirekipro.click` を付けた `prod` の書き込みの要求が通ることも確かめると書く |
+| D10-1-2 | 低 | design.md 「api-docs」の Go 版を呼ぶ設定(423〜429行目)、「段階ごとの PR」の 2-6 の箇条(1038行目)、「httpapi」の役割(374行目。まだ作っていない操作は 501 を返す)、requirements.md 要件14の受入基準6・7 | 2-6 は段階2の PR であり、Go 版のログインの API `POST /api/auth/login` は、段階3の認証のまとまりの spec で作るまで、501 と `{"message":"未実装です。"}` を返す仮の実装である。そのため、2-6 で手順の文書に書く「Try it out」の手順1(ログインする)は、2-6 が main に入ってから認証のまとまりが入るまで、手順どおりに動かない。また、design は、受入基準6(ログインした開発者の要求にログインの状態を付けて送り、その開発者への応答を返す)と7を、いつ、誰が、どう確かめるかを書いていない。比べる検査は `Origin` を付けないので、この確かめは機械には無い。Swagger UI と Cookie の扱いはブラウザの標準の動きで、外れる見込みは小さいので、低とする | 2-6 の箇条に、2-6 で確かめること(説明画面から仮の実装の操作に送った要求の 501 の応答が画面に出ること、書き込みの要求のプリフライトが通ること)を書く。受入基準6と7は、認証のまとまりの spec が終わったあとに確かめると書く(たとえば、認証のまとまりの spec の確かめに含めるか、progress.md の段階3の決まりに書く)。手順の文書には、認証のまとまりが入るまでログインの手順が使えないことを書く |
+| D10-1-3 | 低 | design.md 「httpapi」の中間処理の3の4つ目と5つ目の箇条(382〜383行目)、「安全」の2つ目の箇条(987行目) | Spring の `DefaultCorsProcessor` は、プリフライトでない CORS の要求でも、要求のメソッドを許すメソッドの一覧と照らす。一覧に無いメソッドの要求には 403 と `Invalid CORS request` を返す。たとえば `HEAD` がそうで、Java 版の一覧は `GET` `POST` `PUT` `DELETE` `PATCH` `OPTIONS` の6つで `HEAD` を含まない。5つ目の箇条は、許す送り元からのプリフライトでない要求を、メソッドによらずヘッダを付けて先に渡すので、Java 版と違う。また、Spring は、プリフライトに `Access-Control-Request-Headers` が無いときは `Access-Control-Allow-Headers` を付けないが、4つ目の箇条は無いときも付けると読める。「安全」は、本番で許すメソッドを Java 版と同じにすると書く。画面は `HEAD` を送らず、比べる検査は `Origin` を付けないので、画面の動きは変わらず、実装には影響しない。Spring の動きは私の知る Spring Framework 6 のソースによるもので、実測していない | 5つ目の箇条に「要求のメソッドが6つのメソッドのどれでもなければ、403 と `Invalid CORS request` を返し、先に渡さない」を足す。4つ目の箇条を「要求に `Access-Control-Request-Headers` があれば、`Access-Control-Allow-Headers` にその値を付ける」にする。直す前に Java 版に `Origin` 付きの `HEAD` を1回送って動きを確かめるとよい。違いを残すなら、CB-010 と同じく記録だけの項目にする |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| (なし) | | | |
+
+- 往復: 1回で収束 / 未解決: 0件
+
+## サイクル11 往復1(2026-11-10)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 「httpapi」の中間処理の3の5つ目の箇条(383行目。T5-1-5 の直し)、`backend/src/main/java/com/example/keirekipro/presentation/security/config/SecurityConfig.java` 123〜131行目: Java 版の許すメソッドは `GET` `POST` `PUT` `DELETE` `PATCH` `OPTIONS` の6つで、`HEAD` を含まない。Spring の `DefaultCorsProcessor` は、許す送り元の照らしのあと、プリフライトでない要求ではその要求のメソッドを許すメソッドの一覧と照らし、無ければ 403 と本文 `Invalid CORS request` を返して先に渡さない。一覧にあれば、`Access-Control-Allow-Origin` と `Access-Control-Expose-Headers` と `Access-Control-Allow-Credentials` を付けて先に渡す。直した箇条はこの動きと合い、D10-1-3 の前半(プリフライトでない要求のメソッドの照らし)は解消した。Spring の動きは私の知る Spring Framework 6 のソースによるもので、実測していない。`Access-Control-Request-Method` の無い `OPTIONS` は、プリフライトでない要求として照らされ、`OPTIONS` が6つに入るので先に渡る。これも Java 版と同じである。箇条の数は「次の5つのことをする」と合う
+- design.md 「httpapi」の中間処理の4(偽の送信の検査。384〜390行目): 5つ目の箇条の直しで、許す送り元からの `HEAD` は CORS の処理で 403 になり、偽の送信の検査に届かない。偽の送信の検査が `GET` `HEAD` `OPTIONS` を検査しないことと食い違わない。`Origin` の無い `HEAD`(ALB とコンテナの生きているかの確認を含む)は CORS の要求でないので、今までどおり先に渡る。影響なし
+- design.md 「安全」の2つ目の箇条(987行目)と「テストの方針」: 「本番で許すメソッドを Java 版と同じにする」は、直した5つ目の箇条で、プリフライトでない要求についても裏付けられた。「テストの方針」に CORS の処理の行が無いことは D10-1-1(低、記録のみ)の範囲で、新しい指摘にしない。4つ目の箇条の `Access-Control-Request-Headers` が無いプリフライトの扱い(D10-1-3 の後半)は、今回の差分で直されていない箇所で、D10-1-3(低、記録のみ)の範囲である。新しい指摘にしない
+- requirements.md 要件14の受入基準5(269行目)、`backend/api/openapi.yaml`: 説明画面の「Try it out」が送るのは仕様書の操作のメソッドである。仕様書に `head` `trace` `options` の操作は無い(Grep で0件)ので、説明画面から Go 版への読み取りと書き込みの要求は、どれも6つのメソッドに入り、5つ目の箇条で止められない。受入基準5は満たされたままである。影響なし
+- design.md 「httpapi」の中間処理の3の1〜3つ目の箇条(379〜381行目。`Vary` の説明の追加と、文の分け直し)、「api-docs」の最後の段(429行目。手順の文書に書く中身を「上の3つの手順」と名指しした)、「fakeaws と fakeoidc」の使う部品(612行目。文の分け直し)、「安全」の2つ目の箇条(987行目。主語の言い換え): 語の説明の追加と文の分け直しだけで、設計の中身が変わっていないことを前後の文で確かめた。429行目の「上の3つの手順」は、425〜427行目の3つの手順と合う。影響なし
+- design.md 「変えた動きの一覧の形」の表の前の文(869行目。CB-001〜CB-004、CB-006〜CB-008、CB-010 に中身の名前を足した)、同じ節の表(871〜882行目): 足した名前が、表の CB-001〜CB-004、CB-006〜CB-008、CB-010 の「変えた動き」の欄と合うことを確かめた。どの項目を所有者がいつ受け入れたかは変わっていない。影響なし
+- design.md 「段階ごとの PR」の 2-6 の箇条(1038行目。2-4、2-5、CB-010 に中身の名前を足した)、同じ節の表(1022〜1029行目): 足した名前が、表の 2-4「API の説明画面と開発の手順の文書」、2-5「Go のファイルがあることを前提にするゲート設定の Go への対応」、CB-010「開発環境の CORS の許す送り元」と合うことを確かめた。2-6 の中身と承認の要否は変わっていない。影響なし
+
+### 申告
+
+(今回の差分で新しく申告するものはない)
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| (なし) | | | | |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| (なし) | | | |
+
+- 往復: 1回で収束 / 未解決: 0件

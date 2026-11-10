@@ -156,11 +156,12 @@ func loadEnv(lookup Lookup) (Env, error) {
 
 // defaultApp は、環境ごとの既定の値を返す。test は dev と同じにする。
 func defaultApp(env Env) App {
+	// dev と test の CORS の許す送り元は、画面に加えて、API の説明画面も許す。開発者が説明画面の「Try it out」で Go 版を呼べるようにするためである(CB-010)
 	app := App{
 		SiteName:           "KeirekiPro",
 		SiteURL:            "https://app.keirekipro.click",
 		FrontendBaseURL:    "http://localhost:5173",
-		CORSAllowedOrigins: []string{"http://localhost:5173"},
+		CORSAllowedOrigins: []string{"http://localhost:5173", "http://localhost:8082"},
 		SESFromAddress:     "no-reply@keirekipro.click",
 		S3Bucket:           "keirekipro-storage",
 	}

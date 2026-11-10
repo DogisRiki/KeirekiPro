@@ -292,7 +292,7 @@ func TestLoad_DefaultEnvIsDev(t *testing.T) {
 				SiteName:           "KeirekiPro",
 				SiteURL:            "https://app.keirekipro.click",
 				FrontendBaseURL:    "http://localhost:5173",
-				CORSAllowedOrigins: []string{"http://localhost:5173"},
+				CORSAllowedOrigins: []string{"http://localhost:5173", "http://localhost:8082"},
 				SESFromAddress:     "no-reply@keirekipro.click",
 				S3Bucket:           "keirekipro-storage",
 			}
@@ -319,6 +319,32 @@ func TestLoad_DefaultEnvIsDev(t *testing.T) {
 			t.Errorf("Load の誤り = %v, want KEIREKIPRO_ENV の誤り", err)
 		}
 	})
+}
+
+// CORS の許す送り元が、prod では画面の送り元の1つだけで、dev と test では画面と API の説明画面の2つであることを確かめる。
+// dev と test で API の説明画面の送り元を許すのは、開発者が説明画面の「Try it out」で Go 版を呼べるようにするためである(CB-010)。
+func TestLoad_CORSAllowedOriginsByEnv(t *testing.T) {
+	devOrigins := []string{"http://localhost:5173", "http://localhost:8082"}
+	for _, tc := range []struct {
+		env     string
+		secrets map[string]string
+		want    []string
+	}{
+		{env: "prod", secrets: prodSecrets(), want: []string{"https://app.keirekipro.click"}},
+		{env: "dev", secrets: oidcSecrets(), want: devOrigins},
+		{env: "test", secrets: oidcSecrets(), want: devOrigins},
+	} {
+		t.Run(tc.env, func(t *testing.T) {
+			server := fakeSecretsManager(t, tc.secrets)
+			cfg, err := Load(t.Context(), envOf(map[string]string{"KEIREKIPRO_ENV": tc.env, "KEIREKIPRO_AWS_ENDPOINT": server.URL}))
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if !reflect.DeepEqual(cfg.App.CORSAllowedOrigins, tc.want) {
+				t.Errorf("CORSAllowedOrigins = %v, want %v", cfg.App.CORSAllowedOrigins, tc.want)
+			}
+		})
+	}
 }
 
 // 外部のログインの接続先の URL を KEIREKIPRO_OIDC_* で替えられ、替えない URL は Java 版と同じ既定のままであることを確かめる。

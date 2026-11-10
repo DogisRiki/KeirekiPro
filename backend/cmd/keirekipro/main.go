@@ -151,7 +151,7 @@ func run(ctx context.Context, d deps) int {
 		return fail(logger, "startup_failed", "HTTP の受け口を開けません", err)
 	}
 	server := &http.Server{
-		Handler:           httpapi.New(httpapi.Options{Logger: logger, DB: pool}),
+		Handler:           httpapi.New(httpapi.Options{Logger: logger, DB: pool, CORSAllowedOrigins: cfg.App.CORSAllowedOrigins}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		ErrorLog:          slog.NewLogLogger(logging.Named(logger, "http").Handler(), slog.LevelWarn),
 	}

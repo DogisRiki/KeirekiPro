@@ -771,6 +771,23 @@ func TestRun_MiddlewareOrder(t *testing.T) {
 		t.Errorf("トークンのある POST = %d, want 501", status)
 	}
 
+	// 入口が、config の CORS の許す送り元を CORS の処理に渡すことを、API の説明画面の送り元からのプリフライトで確かめる
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodOptions, base+"/api/resumes", nil)
+	if err != nil {
+		t.Fatalf("要求を作れません: %v", err)
+	}
+	req.Header.Set("Origin", "http://localhost:8082")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	res, err = httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("プリフライトを送れません: %v", err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK || res.Header.Get("Access-Control-Allow-Origin") != "http://localhost:8082" {
+		t.Errorf("説明画面の送り元からのプリフライト = %d, Access-Control-Allow-Origin = %q, want 200 と http://localhost:8082",
+			res.StatusCode, res.Header.Get("Access-Control-Allow-Origin"))
+	}
+
 	var forbidden map[string]any
 	for _, record := range h.logs.records(t) {
 		if record["message"] == "request" && field(record, "http.response.status_code") == float64(403) {
