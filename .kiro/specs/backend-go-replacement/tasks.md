@@ -332,7 +332,7 @@
   - _要件: 3.1_
   - _対象の部品: CodeQL とイメージの検査と組み立てて動かす検査_
 
-- [ ] 5.3 脆弱性を直す仕組みに Go の仕事を足す (並行可)
+- [x] 5.3 脆弱性を直す仕組みに Go の仕事を足す (並行可)
 
   Claude は、`.github/workflows/backend-vuln-fix.yaml` と `.github/scripts/backend-vuln-fix.sh` に、毎日 `make vuln` を動かし、呼ばれる箇所のある脆弱性を直す PR を作る Go の仕事を足した完成版を、置き場に作る。Go の仕事は、部品の脆弱性を、`go get <モジュール>@<直した版>` と `go mod tidy` で直す。Go の仕事は、標準ライブラリの脆弱性を、`go.mod` の `toolchain` と、`docker/backend-go/` と `backend/compat/fakeaws/` と `backend/compat/fakeoidc/` の `golang` のイメージの版を1つの PR で上げて直す。上げる Dockerfile は、`docker/backend-go/` の `Dockerfile` と `Dockerfile.prod` と、fakeaws と fakeoidc の `Dockerfile` の4つである。
   - 完了の確かめ方: 検査用の写しで、`test-backend-vuln-fix.sh` と actionlint が成功する
@@ -775,6 +775,8 @@
 - 週次のイメージの検査の Go 版(タスク5.2で決めたこと): Go 版はまだ本番で動いておらず ECR に稼働中のイメージが無いので、`container-scan-scheduled.yaml` の新しい仕事 `scheduled-go-image-scan` が、main の `docker/backend-go/Dockerfile.prod` から arm64 のイメージを組み立てて report モードで調べ、結果を成果物で今の仕事に渡す。今の仕事は、稼働中のイメージの結果と Go 版の結果を `jq -s 'add'` で1つにまとめてから、`container-scan-issue.sh` を1回だけ呼ぶ。イメージごとに呼ぶと、Issue を ID だけで突き合わせるため、片方にだけある脆弱性の Issue を、もう片方の呼び出しが閉じてしまう。PR の検査は、必須の検査の名前を変えないよう、同じ `container-scan` の仕事の中で2つのイメージを組み立てて調べ、両方を判定してから失敗にする
 - `test-check-container-scan.sh` の場合の選び方(タスク5.2で足したこと): 今の確かめを、区切りの見出しごとに16の場合に分け、`if want <名前>; then` で囲んだ。囲むために字下げを足したので、差分の行数は大きいが、確かめの中身は変えていない(分ける前と後で、ok の行が同じことを Linux のコンテナで確かめた)
 - タスク5.2の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): `container-scan-issue.sh` が起票する Issue の本文は「稼働中の本番イメージから」で始まるので、main の Go 版のイメージにだけある脆弱性でもこの文で起票する(対象イメージの欄に2つのイメージを並べるので見分けられる。このスクリプトはタスク5.2で変えていない)。週次の検査を手で動かすときに main 以外のブランチを選ぶと、組み立てるのはそのブランチなのに、Summary と Issue の対象イメージの欄には「main の Go 版」と出る
+- govulncheck の出力(タスク5.3で実物を流して確かめた): `-format json` は、整形した複数行の JSON を並べて出し、脆弱性があっても0で終わる。finding は部品・package・関数の3つの深さで出て、呼ばれる箇所のある finding だけが `trace[0].function` を持つ。`make vuln` のテキストの形は、呼ばれる箇所のある脆弱性があれば3で終わり、呼ばれない脆弱性だけなら0で終わる。`GOTOOLCHAIN=auto` にすると、go のコマンドは go.mod の toolchain の行の Go に切り替わり、govulncheck もその Go の標準ライブラリを調べる。そのため、Go の仕事は、直したあとの調べ直しを `GOTOOLCHAIN=auto` で動かす
+- タスク5.3の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): ブランチがあるかを読む `git ls-remote` が通信の誤りで失敗すると、Go の仕事はブランチが無いと扱う(そのあとの push の失敗で仕事は失敗になるので、誤りは隠れない。Java の仕事と同じ作り)。呼ばれる箇所があっても直した版の無い脆弱性だけのときは、Go の仕事は warning を出して成功で終わるので、誰にも知らされない(design は、この場合を決めていない。Java の仕事も、修正版の無い警告を黙って除く)
 
 ## 完了条件(全タスク共通)
 
