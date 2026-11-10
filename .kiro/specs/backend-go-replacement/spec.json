@@ -2,7 +2,7 @@
   "feature_name": "backend-go-replacement",
   "issue": 445,
   "created_at": "2026-11-07T11:52:44Z",
-  "updated_at": "2026-11-09T06:25:16Z",
+  "updated_at": "2026-11-10T05:30:04Z",
   "language": "ja",
   "review_model": "opus",
   "phase": "tasks-generated",
@@ -11,19 +11,19 @@
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-11-08T01:50:26Z"
+      "approved_at": "2026-11-10T03:53:12Z"
     },
     "design": {
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-11-09T06:25:16Z"
+      "approved_at": "2026-11-10T05:10:09Z"
     },
     "tasks": {
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-11-09T06:25:16Z"
+      "approved_at": "2026-11-10T05:30:04Z"
     }
   },
   "approval_history": [
@@ -50,6 +50,38 @@
       "issues": [445],
       "revoked_at": "2026-11-09T04:25:51Z",
       "revoked_for": "design の直しに伴う取り消し: タスク3.5の変えた動きの一覧の項目の数を直す"
+    },
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-08T01:50:26Z",
+      "issues": [445],
+      "revoked_at": "2026-11-10T02:56:22Z",
+      "revoked_for": "所有者の指示による requirements の直し: API の説明画面の「Try it out」で開発環境の Go 版を呼べることを、要件14の合格の条件に足す"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-09T06:25:16Z",
+      "issues": [445],
+      "revoked_at": "2026-11-10T02:56:22Z",
+      "revoked_for": "所有者の指示による design の直し: Go 版の共通の中間処理に CORS の処理を足し、開発環境で API の説明画面の送り元も許す"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-09T06:25:16Z",
+      "issues": [445],
+      "revoked_at": "2026-11-10T02:56:22Z",
+      "revoked_for": "design の直しに伴う取り消し: CORS の処理を足すタスクを大タスク5の前に入れる"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-10T04:25:22Z",
+      "issues": [445],
+      "revoked_at": "2026-11-10T04:46:05Z",
+      "revoked_for": "T5-1-5 による design への差し戻し: CORS の処理の5つ目の箇条が、プリフライトでない要求をメソッドによらず次の処理に渡すとしていて、許す6つのメソッドのほかに 403 を返す Java 版と食い違う"
     }
   ]
 }

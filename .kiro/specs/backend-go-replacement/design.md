@@ -10,13 +10,13 @@ Claude は、Go 版のコードを、Java 版と同じ `backend/` に置く。�
 
 ### 作るもの
 
-- Go 版の土台: Claude は、Go のモジュール、起動の入口、設定と秘密の値を読み込む部品、表の形の履歴(`flyway_schema_history`)の部品、データベースと Redis と AWS へ接続する部品、ログの部品、PDF を作る部品を作る。Claude は、HTTP の受け口の共通部分として、偽の送信の検査と、エラーの応答の形と、要求のログを作る。偽の送信の検査とは、ほかのサイトの画面から利用者になりすまして送られた要求を見分けて断る検査である。Claude は、API の仕様書 `backend/api/openapi.yaml` からコードを生成する
+- Go 版の土台: Claude は、Go のモジュール、起動の入口、設定と秘密の値を読み込む部品、表の形の履歴(`flyway_schema_history`)の部品、データベースと Redis と AWS へ接続する部品、ログの部品、PDF を作る部品を作る。Claude は、HTTP の受け口の共通部分として、CORS の処理と、偽の送信の検査と、エラーの応答の形と、要求のログを作る。CORS の処理とは、別の送り元の画面から API を呼んでよいかを、応答のヘッダでブラウザに伝える処理である。送り元とは、画面の URL のうち、方式(`http` か `https`)とホスト名とポートの組である。偽の送信の検査とは、ほかのサイトの画面から利用者になりすまして送られた要求を見分けて断る検査である。Claude は、API の仕様書 `backend/api/openapi.yaml` からコードを生成する
 - Go 版の品質チェック: Claude は、開発環境のイメージとサービス、`run-check.sh` の領域、`make check`、静的な検査と書式の検査と層の依存の検査の設定、カバレッジの下限、変更した箇所の変異テスト、CI の仕事を作る。Claude は、Dependabot と公開の時刻の検査と脆弱性の直しと、CodeQL とイメージの検査を、Go 版にも当てはまるように直す
 - 比べる検査: Claude は、比べる検査の本体と、版をまたぐ確認と、応答の時間の比べ方と、PDF の比べ方と、AWS と外部のログインの代わりと、変えた動きの一覧を作る。比べる検査の本体は、筋書きのファイルから Java 版と Go 版に要求を送り、応答とデータベースと Redis と保存したファイルと送ったメールを比べる。筋書きとは、比べる検査が順に送る要求と、要求ごとの期待を書いたファイルであり、筋書きの中の1つの要求を段と呼ぶ
 - 出荷の仕組み: Claude は、Go 版の本番のイメージと、出荷のワークフローが出荷する版を選ぶ仕組みと、段階4の本番の設定の変更と、切り替えの手順書を作る
 - 進め方の記録: Claude は、機能のまとまりの分け方と順番と、まとまりごとの子の Issue と、進み具合の表を作る
 - 段階6の作業: Claude は、段階6で、Java 版を削除し、Java と Spring を前提にした記述を書き換え、消す一覧に載せたものを削除し、段階6の本番の設定を変える
-- Claude は、開発環境で開ける API の説明画面を作る
+- Claude は、開発環境で開ける API の説明画面と、説明画面の「Try it out」から開発環境の Go 版を呼ぶための設定を作る
 
 ### 作らないもの
 
@@ -200,7 +200,7 @@ Claude が段階2で新しく作る、Go 版の土台のファイル:
 - `backend/internal/platform/pdf/`: PDF を作る部品
 - `backend/internal/httpapi/gen/api.gen.go`: 仕様書から生成するコード(手で直さない)
 - `backend/internal/httpapi/server.go`: 経路の登録と、まとまりの処理の束ね
-- `backend/internal/httpapi/middleware/`: 偽の送信の検査、要求のログ、パニックの受け止め、エラーの応答の形
+- `backend/internal/httpapi/middleware/`: CORS の処理、偽の送信の検査、要求のログ、パニックの受け止め、エラーの応答の形
 - `backend/internal/httpapi/health.go`: `/actuator/health` と `/healthz`
 
 Claude が段階2で新しく作る、品質チェックのファイル:
@@ -232,9 +232,9 @@ Claude が新しく作るファイル(そのほか):
 
 Claude が変えるファイル:
 
-- `compose.yaml`: 段階2で、サービス `backend-go` と `api-docs` と、ボリューム `backend-go-cache` を足す。`backend-go` はホストの 8081 をコンテナの 8080 につなぎ、`api-docs` はホストの 8082 をコンテナの 8080 につなぐ。段階6で `backend` のサービスを Go 版に替え、`backend-go` を消す
+- `compose.yaml`: 段階2で、サービス `backend-go` と `api-docs` と、ボリューム `backend-go-cache` を足す。`backend-go` はホストの 8081 をコンテナの 8080 につなぎ、`api-docs` はホストの 8082 をコンテナの 8080 につなぐ。CORS の処理と、API の説明画面から Go 版を呼ぶ設定を入れる PR 2-6 で、`api-docs` に環境変数 `WITH_CREDENTIALS=true` を足す。段階6で `backend` のサービスを Go 版に替え、`backend-go` を消す
 - `start-dev.sh`: `backend-go` と `api-docs` を起動の対象に足す(段階2)
-- `doc/開発フロー/参加者セットアップ手順.md`: API の説明画面の URL と、Go 版の開発サーバの URL を書く(段階2)
+- `doc/開発フロー/参加者セットアップ手順.md`: API の説明画面の URL と、Go 版の開発サーバの URL を書く(段階2)。CORS の処理と、API の説明画面から Go 版を呼ぶ設定を入れる PR 2-6 で、説明画面の「Try it out」でログインし、書き込みの要求にヘッダ `X-XSRF-TOKEN` を付けて送る手順を足す
 - `backend/CLAUDE.md`: Go 版の作り方の説明を足す(段階2)。段階6で Java 版の説明を消す
 - `terraform/main.tf`: 段階4と段階6で、`keirekipro/redis` の秘密の値のキーを変える。変える値は、「データの形」の節の「本番の設定の値の変わり方」の表に書く
 - `terraform/modules/ecs/main.tf`: 段階4と段階6で、タスク定義の環境変数と生きているかの確認の経路を変える。変える値は、同じ表に書く
@@ -318,7 +318,7 @@ flowchart TB
 
 **呼び出し方**: `func Load(ctx context.Context, env Lookup) (Config, error)`。
 
-**環境ごとの値**: config は、環境の名前を環境変数 `KEIREKIPRO_ENV`(`prod` `dev` `test`)で決め、環境変数が無ければ `dev` とする。環境ごとの既定の値は、サイトの URL、Cookie の `Secure`、CORS の許す送り元、SES の送り元、S3 のバケット、トークンの有効な時間である。CORS の許す送り元とは、ほかのサイトの画面から API を呼んでよいとブラウザに伝える、画面の送り元の一覧である。config は、これらの既定の値として、Java 版の `application.yaml` と `application-prod.yaml` と `application-dev.yaml` と同じ値をコードに持つ。`prod` では、次の秘密の値を読む。
+**環境ごとの値**: config は、環境の名前を環境変数 `KEIREKIPRO_ENV`(`prod` `dev` `test`)で決め、環境変数が無ければ `dev` とする。環境ごとの既定の値は、サイトの URL、Cookie の `Secure`、CORS の許す送り元、SES の送り元、S3 のバケット、トークンの有効な時間である。CORS の許す送り元とは、ほかのサイトの画面から API を呼んでよいとブラウザに伝える、画面の送り元の一覧である。config は、これらの既定の値として、Java 版の `application.yaml` と `application-prod.yaml` と `application-dev.yaml` と同じ値をコードに持つ。ただし、`dev` と `test` の CORS の許す送り元は、Java 版の `http://localhost:5173` に、API の説明画面の `http://localhost:8082` を足した2つにする。開発者が説明画面の「Try it out」で Go 版を呼べるようにするためである。この違いは、変えた動きの一覧の CB-010 に載せた。`prod` の CORS の許す送り元は、Java 版と同じ `https://app.keirekipro.click` だけである。config は、`prod` では、次の秘密の値を読む。
 
 | 秘密の値 | 読むキー |
 |---|---|
@@ -369,20 +369,26 @@ config は、`dev` と `test` で次の5つのように動く。
 
 #### httpapi(HTTP の受け口の共通部分)
 
-対応する要件: 9.1, 9.2, 9.4, 9.5, 14.2
+対応する要件: 9.1, 9.2, 9.4, 9.5, 14.2, 14.5, 14.6, 14.7
 
 **役割**: この部品は、生成したコードの `StrictServerInterface` を、まとまりのパッケージの処理を束ねた型で満たし、`ServeMux` に登録する。まだ作っていない操作は、501 と `{"message":"未実装です。"}` を返す仮の実装で満たす。この部品は、共通の中間処理を次の順に置く。中間処理とは、まとまりの処理より前に、すべての要求に対して動く共通の処理である。
 
 1. パニックの受け止め: パニックとは、Go の処理が想定外の誤りで途中で止まることである。この中間処理は、パニックが起きたら、500 と Java 版と同じエラーの本文を返し、パニックが起きたときの関数の呼び出しの順(スタック)をログに書く
 2. 要求のログ
-3. 偽の送信の検査: この中間処理は、次の6つのことをする。
+3. CORS の処理: この中間処理は、Java 版の `SecurityConfig` の CORS の設定と同じ応答を、Go の標準ライブラリだけで返す。この部品がこの中間処理を Java 版と同じく偽の送信の検査より前に置くのは、ブラウザが本当の要求の前に送るプリフライトを、偽の送信の検査とログインの状態の検査で断らないためである。プリフライトとは、ブラウザが、別の送り元への書き込みの要求の前に、`OPTIONS` で、その要求を送ってよいかを確かめる要求である。この中間処理は、次の5つのことをする。
+   - すべての応答に、ヘッダ `Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers` を付ける。`Vary` は、同じ URL への要求でも、並べた要求のヘッダの値が違えば別の応答として扱うよう、ブラウザとキャッシュに伝えるヘッダである。Java 版の CORS の処理も、すべての応答にこのヘッダを付けるためである
+   - ヘッダ `Origin` が無い要求と、`Origin` が要求の宛先と同じ送り元の要求は、CORS の要求でない。この中間処理は、これらの要求には何もしないで、次の処理に渡す
+   - `Origin` が config の CORS の許す送り元に無い CORS の要求には、403 と本文 `Invalid CORS request` を返し、次の処理に渡さない。この応答は、Java 版の CORS の処理が返す応答と同じである
+   - 許す送り元からのプリフライトでは、ヘッダ `Access-Control-Request-Method` が `GET` `POST` `PUT` `DELETE` `PATCH` `OPTIONS` のどれかなら、200 を返し、次の処理に渡さない。この中間処理は、この応答に、`Access-Control-Allow-Origin` に要求の `Origin` を、`Access-Control-Allow-Methods` に6つのメソッドを、`Access-Control-Allow-Headers` に要求の `Access-Control-Request-Headers` の値を、`Access-Control-Allow-Credentials: true` を付ける。Java 版の CORS の設定は、ブラウザがプリフライトの結果を覚えておく時間を決めていないので、この中間処理も、その時間をブラウザに伝えるヘッダ `Access-Control-Max-Age` を付けない。この中間処理は、`Access-Control-Request-Method` が6つのメソッドのどれでもないプリフライトには、403 と本文 `Invalid CORS request` を返す
+   - 許す送り元からのプリフライトでない要求のうち、メソッドが6つのメソッドのどれでもない要求には、403 と本文 `Invalid CORS request` を返し、次の処理に渡さない。Java 版の CORS の処理も、プリフライトでない要求のメソッドを、許すメソッドと照らすためである。この中間処理は、許す送り元からのプリフライトでない要求のうち、メソッドが6つのメソッドのどれかの要求には、`Access-Control-Allow-Origin` に要求の `Origin` を、`Access-Control-Allow-Credentials: true` を、`Access-Control-Expose-Headers: Content-Disposition, X-Request-Id` を付けて、次の処理に渡す。`Access-Control-Expose-Headers` は、画面の JavaScript が読んでよい応答のヘッダをブラウザに伝えるヘッダである。ブラウザは、応答に `Access-Control-Allow-Credentials: true` があるので、画面と API の説明画面が受け取ったログインの状態の Cookie を保存し、次の要求に付けて送る
+4. 偽の送信の検査: この中間処理は、次の6つのことをする。
    - `GET` `HEAD` `OPTIONS` のほかの要求で、Cookie `XSRF-TOKEN` とヘッダ `X-XSRF-TOKEN` が一致しなければ、403 と `{"message":"アクセス権限がありません。"}` を返し、新しい `XSRF-TOKEN` の Cookie を付ける
    - `OPTIONS` のほかの要求で、要求に Cookie `XSRF-TOKEN` が無いか値が空なら、検査を通った要求と検査しない要求にも、新しい `XSRF-TOKEN` の Cookie を付ける。この中間処理がこの Cookie を付けるのは、Cookie を持たない利用者の最初の書き込みの要求が 403 にならないようにするためである。画面は、この Cookie の値を、次の書き込みの要求のヘッダに写す
    - `OPTIONS` の要求を、検査しないで次の処理に渡す。この中間処理は、`OPTIONS` の要求への応答には Cookie を付けない
    - 経路が `/api/auth` の下の要求を検査しない。画面がログインに使う通信の部品は、Cookie `XSRF-TOKEN` の値をヘッダ `X-XSRF-TOKEN` に写さない。この中間処理が `/api/auth` の下の要求を検査すると、利用者が今の画面からログインできなくなるためである
    - Cookie `XSRF-TOKEN` の値を、Go の標準ライブラリの関数 `crypto/rand.Text` で作る
    - この部品は、偽の送信の検査を、Java 版と同じく、ログインの状態の検査より前に置く
-4. ログインの状態の検査: Claude が認証のまとまりの spec で作り、ここに差し込む
+5. ログインの状態の検査: Claude が認証のまとまりの spec で作り、ここに差し込む
 
 この部品は、要求の形の誤りを、生成したコードの誤りの受け口で、Java 版と同じ `{message, errors}` の形の 400 にする。要求の形の誤りとは、JSON の構文の誤りと、値の型の誤りと、必須の値が無いことである。Java 版が 500 で答えている形の誤りを 4xx に変えるかは、まとまりの spec が決める。Claude は、4xx に変えた形の誤りを、変えた動きの一覧に載せる。
 
@@ -410,9 +416,17 @@ config は、`dev` と `test` で次の5つのように動く。
 
 #### api-docs(開発環境の API の説明画面)
 
-対応する要件: 14.1, 14.3, 14.4
+対応する要件: 14.1, 14.3, 14.4, 14.5, 14.6, 14.7
 
 **役割**: compose のサービス `api-docs` は、`docker/api-docs/Dockerfile` のイメージで、`backend/api/openapi.yaml` を読み取りだけで差し込み、環境変数 `SWAGGER_JSON=/spec/openapi.yaml` で表示する。このイメージの土台は、digest で固定した `swaggerapi/swagger-ui` である。開発者は、API の説明画面を `http://localhost:8082` で開く。Swagger UI の「Try it out」で送る要求の宛先は、仕様書の `servers` の `http://localhost:8081` とする。Claude は、Go 版の本番のイメージと Go 版のコードに、説明画面も仕様書の配信も入れない。
+
+**Go 版を呼ぶ設定**: 説明画面と Go 版は送り元が違うので、Swagger UI は、既定では、「Try it out」の要求にブラウザの Cookie を付けない。Claude は、`api-docs` に環境変数 `WITH_CREDENTIALS=true` を足し、Swagger UI に Cookie を付けて送らせる。説明画面と Go 版は、どちらも `localhost` で動く。ブラウザは、Cookie をポートで分けずに扱う。そのため、ブラウザは、Go 版がログインの API の応答で付けたログインの状態の Cookie と `XSRF-TOKEN` の Cookie を、説明画面から Go 版への次の要求にも付ける。開発者は、次の順に「Try it out」を使う。
+
+1. 開発者は、ログインの API `POST /api/auth/login` を「Try it out」で呼び、ログインする
+2. 開発者は、ブラウザの開発者ツールで `localhost` の Cookie `XSRF-TOKEN` の値を読む
+3. 開発者は、書き込みの要求の「Try it out」で、ヘッダ `X-XSRF-TOKEN` の欄に、読んだ値を入れて送る。仕様書は、偽の送信の検査を受ける書き込みの操作に、ヘッダの引数 `XsrfTokenHeader` を書いているので、Swagger UI はこのヘッダの入力の欄を出す
+
+Claude は、Swagger UI に自分で書いた初期化のファイルを足して、Cookie の値をヘッダに自動で写させることはしない。初期化のファイルを足すと、土台のイメージの更新のたびに、そのファイルが新しい版の Swagger UI で動くかを確かめることになるためである。Claude は、開発者が「Try it out」でログインし、書き込みの要求を送る上の3つの手順を、`doc/開発フロー/参加者セットアップ手順.md` に書く。
 
 ### Go 版の品質チェック
 
@@ -595,7 +609,7 @@ Java 版と比べる検査を消す PR 6-1 で、`backend/compat/` は消え、`
 
 fakeoidc は、Google の認可と token と userinfo への要求と、GitHub の認可と `access_token` と `/user` と `/user/emails` への要求に、筋書きが決めた利用者の値で応答を返す。
 
-**使う部品**: 比べる検査は、Java 版を `dev` のプロファイル(`SPRING_PROFILES_ACTIVE=dev`)で動かし、Go 版を `KEIREKIPRO_ENV=dev` で動かす。どちらの版も、Cookie の `Secure` を付けず、CORS の許す送り元を `http://localhost:5173` にし、Redis に TLS なしでつなぐ。両方の版の設定を Java 版の `application-dev.yaml` の値にそろえるのは、`Set-Cookie` の比べで、設定の違いによる偽の違いが出ないようにするためである。比べる検査は、Java 版を、Spring の環境変数の `SPRING_CLOUD_AWS_ENDPOINT` と `OIDC_PROVIDERS_<GOOGLE|GITHUB>_*` で、fakeaws と fakeoidc につなぐ。
+**使う部品**: 比べる検査は、Java 版を `dev` のプロファイル(`SPRING_PROFILES_ACTIVE=dev`)で動かし、Go 版を `KEIREKIPRO_ENV=dev` で動かす。どちらの版も、Cookie の `Secure` を付けず、Redis に TLS なしでつなぐ。両方の版の設定を Java 版の `application-dev.yaml` の値にそろえるのは、`Set-Cookie` の比べで、設定の違いによる偽の違いが出ないようにするためである。CORS の許す送り元は、Java 版と Go 版でそろっていない(CB-010)。ただし、比べる検査は、要求にヘッダ `Origin` を付けない。そのため、どちらの版の CORS の処理も、応答に `Vary` のヘッダを付けるだけである。比べる検査が比べる応答のヘッダは、CORS の処理では変わらない。そのため、この違いは比べる結果に出ない。比べる検査は、Java 版を、Spring の環境変数の `SPRING_CLOUD_AWS_ENDPOINT` と `OIDC_PROVIDERS_<GOOGLE|GITHUB>_*` で、fakeaws と fakeoidc につなぐ。
 
 Java 版の `dev` は、データベースと Redis と JWT の値を、環境変数でなく Secrets Manager の `keirekipro/rds` `keirekipro/redis` `keirekipro/jwt` から読み、読めなければ起動しない。JWT とは、backend がログインの状態を表すために署名して渡すトークンの形式であり、JWT の値とは、その署名に使う秘密の値である。そのため、比べる検査は、Java 版を起動する前に、fakeaws に次の秘密の値を登録する。
 
@@ -852,7 +866,7 @@ Java と Spring を前提にした記述を書き換える PR 6-4 の検査と�
 
 `match` は、操作の名前と、比べるものと、JSON の場所の組である。`operation` に `"*"` を書いた `match` は、すべての操作の応答に当たる。`match` には、ステータスの欄 `status` を書ける。`status` を書いた `match` は、Java 版と Go 版の応答のステータスがどちらもその値のときだけ当たる。`target` が `header` の `match` では、`path` にヘッダの名前を書く。Claude は、`match` で違いを許す範囲を、できるだけ狭く書く。
 
-この spec の設計の承認のときに載せる項目は次のとおりである。CB-001 から CB-004 の4つは、所有者が 2026-11-07 に受け入れた違いである。CB-006 から CB-008 の3つは、所有者が 2026-11-09 に受け入れた違いである。
+この spec の設計の承認のときに載せる項目は次のとおりである。日本語の名前の並び順、プロフィール画像の受け入れ、入力の足りない経歴書の書き出し、PDF の文字の位置と写したときの「〜」の4つの違い CB-001 から CB-004 は、所有者が 2026-11-07 に受け入れた違いである。偽の送信の検査で断るときの Cookie の作り直し、`TRACE` の要求の偽の送信の検査、`/actuator` の下の要求の偽の送信の検査の3つの違い CB-006 から CB-008 は、所有者が 2026-11-09 に受け入れた違いである。開発環境の CORS の許す送り元の違い CB-010 は、所有者が 2026-11-10 に了承した方針で生じる違いである。
 
 | id | 変えた動き |
 |---|---|
@@ -865,6 +879,7 @@ Java と Spring を前提にした記述を書き換える PR 6-4 の検査と�
 | CB-007 | `TRACE` の要求の偽の送信の検査 |
 | CB-008 | `/actuator` の下の要求の偽の送信の検査 |
 | CB-009 | API の説明画面の経路への要求の偽の送信の検査 |
+| CB-010 | 開発環境の CORS の許す送り元 |
 
 - CB-001: 並び順が変わるのは、ポートフォリオ、SNS、自己PR などの日本語の名前である。Java 版は、Java の日本語の並べ替えの規則で並べる。Go 版は、golang.org/x/text/collate の日本語の規則で並べる。画面と PDF の並び順が変わる。所有者は、この違いを受け入れた
 - CB-002: Java 版は、中身が BMP と WBMP のファイルと、途中で切れた JPEG を受け入れる。Go 版は、中身が PNG、JPEG、GIF のファイルだけを受け入れ、途中で切れた JPEG を断る。画面は PNG、JPEG、GIF の選び方を案内しており、ほかのファイルを選んだときは画面にエラーが出る。所有者は、この違いを受け入れた
@@ -875,6 +890,7 @@ Java と Spring を前提にした記述を書き換える PR 6-4 の検査と�
 - CB-007: Java 版は、`TRACE` の要求を偽の送信の検査にかけない。Go 版は、`GET` `HEAD` `OPTIONS` のほかのすべての要求を検査するので、`TRACE` の要求も検査する。画面は `TRACE` の要求を送らないので、画面の動きは変わらない。比べる検査は `TRACE` の要求を送らないので、Claude は、CB-007 を、`match` を持たない記録だけの項目にする
 - CB-008: Java 版は、`/actuator` の下の経路への要求を偽の送信の検査にかけない。Go 版は、`/actuator` の下への要求も検査する。Go 版が `/actuator` の下で受け付ける要求は `GET /actuator/health` だけなので、ALB とコンテナが backend の生きているかを確かめる動きは変わらない。比べる検査は `/actuator` の下に `GET` のほかの要求を送らないので、Claude は、CB-008 を、`match` を持たない記録だけの項目にする
 - CB-009: Java 版は、API の説明画面の経路 `/swagger-ui/**`、`/swagger-ui.html`、`/v3/api-docs`、`/v3/api-docs/**` への要求を、偽の送信の検査にかけない。Go 版は、本番では利用者が API の説明画面を開けないとした要件14の受入基準3のとおり、これらの経路を受け付けず、ほかの経路と同じく検査するので、`GET` `HEAD` `OPTIONS` のほかの要求に、404 の前に 403 を返す。画面はこれらの経路に要求を送らないので、画面の動きは変わらない。開発者は、API の説明画面を compose の `api-docs` で開く。比べる検査はこれらの経路に要求を送らないので、Claude は、CB-009 を、`match` を持たない記録だけの項目にする
+- CB-010: Java 版の開発環境は、CORS の許す送り元を `http://localhost:5173` だけにする。Go 版の開発環境は、API の説明画面の `http://localhost:8082` も許す。開発者が説明画面の「Try it out」で Go 版を呼べるようにするためである。本番の許す送り元は、どちらの版も `https://app.keirekipro.click` だけなので、利用者の画面の動きは変わらない。比べる検査は要求に `Origin` を付けないので、Claude は、CB-010 を、`match` を持たない記録だけの項目にする
 
 次の Java 版の動きは、変えた動きの一覧に項目を足す候補である。どれも Java 版は 500 を返している。
 
@@ -968,6 +984,7 @@ steps:
 ## 安全
 
 - 偽の送信の検査、Cookie の名前と性質、ログインの状態の有効な時間、2段階の認証、確認のメールを送り直せる間隔の制限は、比べる検査が Java 版と同じであることを確かめる。偽の送信の検査のうち、断るときの Cookie の作り直しと、`TRACE` の要求の検査と、`/actuator` の下の要求の検査と、API の説明画面の経路への要求の検査の4つは、Go 版の動きが Java 版と違う。この4つは、変えた動きの一覧の CB-006 から CB-009 に載せた
+- CORS の処理は、本番では、許す送り元とメソッドとヘッダと、Cookie を付けた要求を許すことと、ブラウザに見せるヘッダを、Java 版と同じにする。比べる検査は要求に `Origin` を付けないので、Claude は、CORS の処理が Java 版と同じ応答を返すことを、Go 版の単体テストで確かめる。Go 版の CORS の処理は、開発環境でだけ、API の説明画面の送り元も許す(CB-010)。開発環境の Go 版は開発者の PC の中だけで動くので、許す送り元を1つ足しても、利用者のデータは外に出ない
 - 出力のまとまりの spec で作る Go 版のコードは、テンプレートに入れる利用者の入力のうち、Java 版のテンプレートが置き換えているのと同じ5つの文字 `<` `>` `&` `"` `'` を、HTML の中でただの文字として表示される書き方に置き換える
 - 本番の組み立ては `-tags` を付けないので、`compat` のビルドタグの中にある AWS とログインの代わりは、本番の実行ファイルに入らない
 - 公開のリポジトリなので、Claude は、まだ直していないセキュリティの穴を、Issue、PR、コミット、spec の本文に書かない
@@ -1008,6 +1025,7 @@ flowchart TB
 | 2 | 2-2 | Go 版の土台と品質チェックの設定と開発環境 | 要る |
 | 2 | 2-3 | 比べる検査と、AWS とログインの代わりと、PDF の比べ方と、変えた動きの一覧 | 要らない |
 | 2 | 2-4 | API の説明画面と開発の手順の文書 | 要らない |
+| 2 | 2-6 | CORS の処理と、API の説明画面から Go 版を呼ぶ設定 | 要らない |
 | 2 | 2-5 | Go のファイルがあることを前提にするゲート設定の Go への対応 | 要る |
 | 3 | まとまりごと | まとまりの spec で作るもの | まとまりの spec で決まる |
 | 4 | 4-1 | 切り替えの出荷より前に入れる terraform の変更 | 要らない |
@@ -1017,6 +1035,7 @@ flowchart TB
 
 - 2-1 で変えるファイルは、「所有者に提案するゲート設定の変更」の表の番号が 2-1 のファイルである。2-1 は Go のファイルを含まない
 - 2-2 は、`backend/go.mod` ほかの Go 版の土台、`docker/backend-go/`、compose、`start-dev.sh`、`backend/CLAUDE.md`、`progress.md` を入れる。2-2 で所有者の承認が要るのは、`Makefile` ほかの品質チェックの設定が承認の対象になるためである
+- 2-6 は、API の説明画面と開発の手順の文書を入れる PR 2-4 が main に入ったあとに足した PR である。そのため、2-6 の番号は、Go のファイルがあることを前提にするゲート設定を Go に対応させる PR 2-5 より大きい。Claude は、2-6 を 2-5 より先に main に入れる。2-6 は、CORS の処理、config の開発環境の許す送り元、`api-docs` の `WITH_CREDENTIALS`、変えた動きの一覧の、開発環境の CORS の許す送り元の項目 CB-010、開発の手順の文書の「Try it out」の手順を入れる。2-6 は、ゲート設定のファイルを変えないので、所有者の承認は要らない
 - 2-5 で変えるファイルは、「所有者に提案するゲート設定の変更」の表の番号が 2-5 のファイルである。Claude は、イメージの検査と Dependabot の gomod の項目を、2-1 でなく 2-5 で足す。イメージの検査は自分のワークフローのファイルが変わると動くので、2-1 で足すと、2-1 の PR でまだ無い `docker/backend-go/Dockerfile.prod` を組み立てようとして失敗し、2-1 が main に入らないためである。Dependabot の gomod の項目も、`backend/go.mod` が main に無い間は、読むファイルが無いと失敗する
 - 4-1 と 6-2 は、terraform のファイルだけを変える。`.github/CODEOWNERS` は、terraform のファイルのうち `terraform/.checkov.baseline` だけを守る。そのため、4-1 と 6-2 は、所有者の承認を待たずに、品質チェックに通ると main に入る。本番の設定は、main に入っただけでは変わらない。本番の設定は、所有者が `terraform-apply.yaml` を動かしたときに変わる。`terraform-apply.yaml` は、`environment: production` の承認が通ったあとに、本番との差分をログに出し、そのまま適用する。そのため、所有者は、4-1 と 6-2 を本番に反映するとき、次の2回に分けて `terraform-apply.yaml` を動かす。2回に分けるのは、所有者が差分を見てから本番に反映するかを決めるためである
   1. 所有者は、入力 `plan_only` にチェックを付けて動かす。うまくいったときは、実行の概要に「本番には適用していません」が出る。Claude は、`gh run view --log` でその実行のログの差分を読み、PR の本文に書いた変わるはずの資源と値と照らし、照らした結果を所有者に返事で示す
