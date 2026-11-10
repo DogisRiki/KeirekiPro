@@ -1,0 +1,16 @@
+{
+  "format": "pdf",
+  "disposition": "attachment",
+  "pdfSettings": {
+    "fontFamily": "NotoSerifJP",
+    "fontSizes": {
+      "title": 16,
+      "date": 10,
+      "fullName": 10,
+      "sectionHeading": 11.5
+    },
+    "tableHeaderColor": {
+      "hex": "d9d9d9"
+    }
+  }
+}

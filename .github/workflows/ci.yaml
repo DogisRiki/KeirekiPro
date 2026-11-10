@@ -462,6 +462,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # 比べる検査は、イメージの組み立てと仕様書と進み具合の表を読むために、リポジトリの最上位のパスを
+    # 環境変数 KEIREKIPRO_REPO_ROOT で受け取る。渡さないと、比べる検査は始めに失敗する。
+    env:
+      KEIREKIPRO_REPO_ROOT: ${{ github.workspace }}
     defaults:
       run:
         working-directory: backend

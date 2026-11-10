@@ -5,3 +5,5 @@
 1b4a34adcaeca895166e94ccd085ed9224074908:.kiro/specs/backend-go-replacement/tasks.md:generic-api-key:644
 1b4a34adcaeca895166e94ccd085ed9224074908:backend/internal/platform/redisstore/redisstore_integration_test.go:generic-api-key:14
 ffee86e89d63bbcef7c2acbffe286e9aec38fa73:backend/cmd/keirekipro/main_test.go:generic-api-key:41
+# PR #778 の比べる検査のテストにある、同じイメージの名前
+c7f7d2d1d4f4152fd64f813c2f5c632040a33e18:backend/compat/harness/snapshot_test.go:generic-api-key:22

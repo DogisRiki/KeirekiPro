@@ -37,3 +37,4 @@ out/
 /coverage.out
 /coverage.internal.out
 /mutation-report.json
+/compat/report/
