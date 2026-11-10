@@ -22,7 +22,7 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/migrate"
 )
 
-// make compat は、TestCross と TestPerf で始まる名前を除く、このパッケージのテストを動かす。
+// make compat は、TestCross_ と TestPerf_ で始まる名前を除く、このパッケージのテストを動かす。
 // 版をまたぐ確認は make compat-cross が、応答の時間の比べ方は make compat-perf が動かす。
 
 // requireAllOperations は、TestCoverage_Operations が、仕様書のすべての操作を筋書きに求めるかである。
