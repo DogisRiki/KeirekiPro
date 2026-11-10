@@ -318,15 +318,15 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	for _, b := range got {
 		byID[b.ID] = b
 	}
-	for _, id := range []string{"CB-001", "CB-002", "CB-003", "CB-004", "CB-005", "CB-006", "CB-007", "CB-008", "CB-009"} {
+	for _, id := range []string{"CB-001", "CB-002", "CB-003", "CB-004", "CB-005", "CB-006", "CB-007", "CB-008", "CB-009", "CB-010"} {
 		if _, ok := byID[id]; !ok {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 9 {
-		t.Errorf("一覧の項目は9つのはずですが、%d です", len(got))
+	if len(got) != 10 {
+		t.Errorf("一覧の項目は10のはずですが、%d です", len(got))
 	}
-	for _, id := range []string{"CB-005", "CB-007", "CB-008", "CB-009"} {
+	for _, id := range []string{"CB-005", "CB-007", "CB-008", "CB-009", "CB-010"} {
 		if m := byID[id].Matches; len(m) != 0 {
 			t.Errorf("%s は記録だけの項目のはずですが、match があります: %+v", id, m)
 		}

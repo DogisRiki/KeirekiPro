@@ -276,7 +276,7 @@
   - 受入基準とテストの対応: 要件14の受入基準4(URL を文書に書く)は、テストでなく、文書の本文で確かめる
   - _要件: 14.4_
 
-- [ ] 15. CORS の処理と、API の説明画面から Go 版を呼ぶ設定を入れる(PR 2-6)
+- [x] 15. CORS の処理と、API の説明画面から Go 版を呼ぶ設定を入れる(PR 2-6)
 - [x] 15.1 Java 版の CORS の応答を確かめ、Go 版の CORS の処理を作る
 
   Claude は、実装の前に、開発環境の Java 版に `Origin` を付けた要求を `curl` で送り、応答のステータスと CORS のヘッダを記録する。CORS とは、画面と別の送り元で動く API に、ブラウザが要求を送ってよいかを、API が応答のヘッダで示す仕組みである。送る要求は、次の8つである。
@@ -305,7 +305,7 @@
   - _要件: 14.5_
   - _対象の部品: httpapi、config_
 
-- [ ] 15.2 説明画面に Cookie を付けて送らせ、変えた動きの一覧と手順の文書を直し、PR を出す
+- [x] 15.2 説明画面に Cookie を付けて送らせ、変えた動きの一覧と手順の文書を直し、PR を出す
 
   Claude は、`compose.yaml` の `api-docs` に環境変数 `WITH_CREDENTIALS=true` を足す。Claude は、`backend/compat/changed-behaviors.yaml` に CB-010 を、`match` を持たない記録だけの項目として足す。Claude は、`doc/開発フロー/参加者セットアップ手順.md` に、design.md の api-docs の節の3つの手順を書き、Go 版のログインの API は認証のまとまりの spec で作るまで 501 を返すので、それまで手順1のログインは使えないことを書く。Claude は、`.kiro/specs/backend-go-replacement/progress.md` の認証のまとまりの決まりに、認証のまとまりの spec の確認で、説明画面の「Try it out」でログインし、ログインの要る API に要求を送って、ログインした開発者への応答が返ることを確かめると書く。
   最後に、Claude は、`start-dev.sh` で開発環境を起動し、Claude Code の中のブラウザで `http://localhost:8082` を開いて、次の2つを確かめ、PR を出す。Claude Code の中のブラウザが使えないときも、Claude は、次の2つの確認に使うブラウザを Playwright のブラウザに替えない。Playwright のブラウザに替えない理由は、次のとおりである。Playwright のブラウザは別のコンテナで動き、説明画面を `http://localhost:8082` でなく別の送り元で開く。その送り元は Go 版の CORS の処理が許す送り元に当たらないので、Claude は、Playwright のブラウザでは次の2つを確かめられない。Claude Code の中のブラウザが使えないときは、Claude は、次の2つの確認の手順を所有者に示して止まり、所有者が確かめた結果を受けてから PR を出す。

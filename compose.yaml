@@ -82,6 +82,8 @@ services:
       - 8082:8080
     environment:
       - SWAGGER_JSON=/spec/openapi.yaml
+      # 「Try it out」の要求に、ブラウザの Cookie を付けて Go 版に送らせる。ログインの状態の Cookie と XSRF-TOKEN の Cookie を送るためである
+      - WITH_CREDENTIALS=true
     volumes:
       # ファイルでなくフォルダを差し込む。ファイルを差し込むと、git の切り替えなどで
       # ファイルが置き換わったときに、コンテナが古い中身を見続けるため
