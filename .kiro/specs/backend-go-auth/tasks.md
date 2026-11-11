@@ -168,7 +168,7 @@
   - 受入基準とテストの対応: 要件1の受入基準3(ログインが終わったときと失敗したときの移る先と文言)は、`oidc_integration_test.go` の `TestHandleOIDCCallback_NewUser` `TestHandleOIDCCallback_LinkExisting` `TestHandleOIDCCallback_UnverifiedEmail` `TestHandleOIDCCallback_Denied` `TestHandleOIDCCallback_ErrorMessageURLEncoderEscape` で確かめる。要件3の受入基準7(確認済みのメールアドレスだけを使い、`state` の記録が無ければ断る)は `TestHandleOIDCCallback_GitHubPrimaryVerifiedOnly` と `TestHandleOIDCCallback_MissingState` で確かめる
   - _要件: 1.3, 3.7, 4.2_
 
-- [ ] 4. 認証の受け口をつなぐ
+- [x] 4. 認証の受け口をつなぐ
 - [x] 4.1 認証の操作の応答の型と誤りの本文を作る
 
   Claude は、認証の操作の応答を、Cookie を2つ以上書ける自分で書いた型で返す `authresponses.go` を作る。Claude は、`*auth.Error` を、Error の部品の節の5つの形の本文と状態の番号と Cookie に変える処理を作る。
@@ -199,7 +199,7 @@
   - _依存: 2.1, 2.3_
 
 - [ ] 5. Java 版と Go 版を比べる検査を広げる
-- [ ] 5.1 偽のログインのサービスに断る動きと TLS の受け口と初めに戻す口を足す (並行可)
+- [x] 5.1 偽のログインのサービスに断る動きと TLS の受け口と初めに戻す口を足す (並行可)
 
   Claude は、偽のログインのサービスに、提供元ごとの断る残りの回数を持たせ、`PUT /_compat/deny/{provider}` を受けるたびに1増やし、残りの回数が1以上のときに次のログインの開始を `error=access_denied&state=<state>` で戻して1減らす動きを足す。Claude は、ネットワークの別名 `api.github.com` のポート 443 で TLS を受けて `/user/emails` だけに答える働きを足す。偽のログインのサービスは、起動のときに証明書と鍵のファイルの場所を渡されたときだけ、この働きを始める。証明書と鍵を検査の起動から渡すのは小タスク5.9 である。偽のログインのサービスが、証明書と鍵のファイルの場所を渡されたときだけこの働きを始めるのは、小タスク5.9 より前に偽のログインのサービスを起動する harness のテストも動くようにするためである。Claude は、提供元ごとの利用者の設定と断る残りの回数を初めの状態に戻す口を足す。今の偽のログインのサービスには利用者の設定を消す口が無く、空の値を送ると中身の空の利用者が登録されるためである。
   - 完了の確かめ方: `go test -tags compat ./compat/fakeoidc/...` が通る
@@ -395,6 +395,8 @@
 - Cookie の値の形の誤りは、生成したコードの `ErrorHandlerFunc` に届かない。生成したコードは Cookie の引数を string の別名で受け、値を変換せずに渡すためである。そのため、6.5 の候補には控えない
 - 6.5 の変えた動きの一覧に載せる: Google と GitHub から戻ったときの問い合わせで `code` か `state` が2つある要求は、Java 版では誤りの画面への 302、Go 版では設計のとおり 400 と入力の誤りの本文(手元の Java 版で確かめた)
 - 起動のテスト(`cmd/keirekipro/main_test.go`)のデータベースには、表が無い(マイグレーションの履歴を確かめるだけの作りのため)。起動のテストで認証の操作を確かめるときは、表を読む前に断られる要求(入力の検査で断られる要求、受け付けないログインの状態の値)を使う。表を読む答えは、6.x の Java 版と Go 版を比べる検査で確かめる
+- 5.1 で、偽のログインのサービスの初めに戻す口を `POST /_compat/reset` にした。戻すのは両方の提供元の利用者の設定と断る残りの回数だけで、クライアントの値と発行済みのコードとアクセストークンは残す。断らせる口は `PUT /_compat/deny/{provider}`
+- 5.9 で、偽のログインのサービスに証明書と鍵を渡すときは、環境変数の名前の定数 `fakeoidc.CertFileEnv` と `fakeoidc.KeyFileEnv` を使う。TLS の受け口のポートは `fakeoidc.TLSPort`(443)。イメージは distroless の nonroot 版で、root でない利用者が 443 を受けられるのは Docker の既定の設定(コンテナの `net.ipv4.ip_unprivileged_port_start=0`)に頼っているので、5.9 でコンテナの中で 443 を受けられることを確かめる
 
 ## 完了条件(全タスク共通)
 
