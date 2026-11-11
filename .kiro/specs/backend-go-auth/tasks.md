@@ -190,7 +190,7 @@
   - 受入基準とテストの対応: 要件1の受入基準3(Java 版と同じ画面に移る)は、`auth_test.go` の `TestAuthOIDCHandlers_ContentTypeByAccept` `TestAuthOIDCHandlers_RedirectURIPort80` `TestAuthOIDCHandlers_CallbackFailure302NoBody` で確かめる
   - _要件: 1.3_
 
-- [ ] 4.4 中間処理の順と処理の束ねを変えて起動につなぐ
+- [x] 4.4 中間処理の順と処理の束ねを変えて起動につなぐ
 
   Claude は、`httpapi.New` の `Options` に `Identify` と `AuthHandlers` を足し、中間処理の順、受け口の埋め込みの深さ、経路が `/api/auth/` の下の問い合わせの誤りの 400 を、「httpapi.New の変更」の節のとおりにする。Claude は、`main.go` で `Service` を組み立てて渡す。Claude は、Cookie の値の形の誤りが `ErrorHandlerFunc` に届く場面があるかを確かめ、届くなら Java 版の答えとの違いを 6.5 の変えた動きの一覧の候補に控える。
   - 完了の確かめ方: `go test ./internal/httpapi/ ./cmd/...` が通り、`go build ./cmd/keirekipro` が通る。4つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通り、カバレッジが下限の 93% に届く
@@ -391,6 +391,10 @@
 - 11の操作の受け口は、`auth.go` の型 `authHandlers` に置き、認証の処理をインタフェース `authService` で受ける(テストで処理の代わりを使うため)。4.3 で Google と GitHub の2つの操作を足すときは、`authService` に `StartOIDC` と `HandleOIDCCallback` を足す。無い Cookie と本文の任意の項目は空の値にして処理に渡す。Java 版は、空の値の Cookie `twoFactorChallenge` を、Cookie が無いときの例外を投げずに空の値のまま処理に渡すので、空の値の Cookie の答えが Go 版と同じかを、6.1〜6.3 の `two-factor.yaml` の筋書きで突き合わせる
 - Google と GitHub の2つの操作の受け口は、`auth.go` に置いた。4.4 では、`NewStrictHandlerWithOptions` に中間処理 `authRequestMiddleware` を渡し(要求の Host と Accept を context に入れる)、`newAuthHandlers` に、ログの出力先、Cookie の Secure、設定の `App.APIBaseURL`(本番の戻り先の URL の基底)、`time.Now` を渡す。`startOidcAuthorization` の Content-Type は、設計の簡単な規則では `*/*, application/json` などで Java 版と食い違ったので、Spring と Tomcat の取り決めを写した。処理は、Java 版と同じく、Accept を調べる前に呼ぶ
 - 6.5 の変えた動きの一覧に載せる、`startOidcAuthorization` の Accept と Host の違い(どれも手元の Java 版で答えを確かめた): (1) `image/*` `application/*+xml`、ASCII でない Accept、`Q=abc` や `Q=2` のような正しくない大文字の Q は、Java 版では誤りの画面の都合で 401、Go 版では 406。(2) 名前の形が正しいが Java が知らない charset は、Java 版では 406、Go 版では受け入れる。(3) 受けられる型の候補が50を超える Accept(`*/*` と `a/b1`〜`a/b49` の50個)は、Java 版では内部の誤りで 500、Go 版では 200。(4) Host の port が数字でない(`8o` `+80`)ときは、Java 版では Tomcat が 400、Go 版では Host をそのまま使うか port を落とす。(5) provider が正しくなく Accept も受けられないときは、Java 版では 500 か 401、Go 版では 400
+- 4.4 で、`server.go` に、認証の受け口を深さ1に、ほかの操作の答えを深さ2に埋め込む型 `routes` を置いた。ほかのまとまりの spec は、自分の受け口を `routes` に深さ1で足し、問い合わせの誤りに 400 で答える経路を `queryErrorAs400Prefix` の条件に足す。認証の処理の型は、`Options.AuthHandlers` に渡すため、外から使える名前 `AuthService` にした
+- Cookie の値の形の誤りは、生成したコードの `ErrorHandlerFunc` に届かない。生成したコードは Cookie の引数を string の別名で受け、値を変換せずに渡すためである。そのため、6.5 の候補には控えない
+- 6.5 の変えた動きの一覧に載せる: Google と GitHub から戻ったときの問い合わせで `code` か `state` が2つある要求は、Java 版では誤りの画面への 302、Go 版では設計のとおり 400 と入力の誤りの本文(手元の Java 版で確かめた)
+- 起動のテスト(`cmd/keirekipro/main_test.go`)のデータベースには、表が無い(マイグレーションの履歴を確かめるだけの作りのため)。起動のテストで認証の操作を確かめるときは、表を読む前に断られる要求(入力の検査で断られる要求、受け付けないログインの状態の値)を使う。表を読む答えは、6.x の Java 版と Go 版を比べる検査で確かめる
 
 ## 完了条件(全タスク共通)
 

@@ -13,8 +13,8 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/logging"
 )
 
-// authService は、受け口が使う認証の処理である。*auth.Service が満たす。
-type authService interface {
+// AuthService は、受け口が使う認証の処理である。*auth.Service が満たす。
+type AuthService interface {
 	Login(ctx context.Context, email, password string) (auth.LoginResult, error)
 	VerifyTwoFactor(ctx context.Context, challenge, code string) (auth.SessionTokens, error)
 	Refresh(ctx context.Context, refreshToken string) (string, error)
@@ -30,13 +30,13 @@ type authService interface {
 	HandleOIDCCallback(ctx context.Context, code, state, errParam *string, redirectURI string) auth.OIDCCallbackResult
 }
 
-var _ authService = (*auth.Service)(nil)
+var _ AuthService = (*auth.Service)(nil)
 
 // authHandlers は、認証の操作の受け口である。要求の値を検査して認証の処理に渡し、結果を Java 版の受け口と同じ
 // 状態の番号と Cookie と本文で答える。*auth.Error は authErrorResponse の形で答え、ほかの誤りは、生成したコードの
 // 誤りの処理に渡して 500 にする。
 type authHandlers struct {
-	svc authService
+	svc AuthService
 	// logger は、Google と GitHub から戻ったときの失敗の元の誤りを書く。
 	logger *slog.Logger
 	// secure は、Cookie に Secure を付けるかである。
@@ -48,7 +48,7 @@ type authHandlers struct {
 }
 
 // newAuthHandlers は、認証の操作の受け口を作る。
-func newAuthHandlers(svc authService, logger *slog.Logger, secure bool, apiBaseURL string, now func() time.Time) *authHandlers {
+func newAuthHandlers(svc AuthService, logger *slog.Logger, secure bool, apiBaseURL string, now func() time.Time) *authHandlers {
 	return &authHandlers{svc: svc, logger: logger, secure: secure, apiBaseURL: apiBaseURL, now: now}
 }
 

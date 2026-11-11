@@ -286,7 +286,7 @@ func (f *fakeAuth) ResetPassword(_ context.Context, token, newPassword string) e
 }
 
 // newTestAuthHandlers は、今の時刻を testNow に決めた受け口を作る。
-func newTestAuthHandlers(svc authService, secure bool) *authHandlers {
+func newTestAuthHandlers(svc AuthService, secure bool) *authHandlers {
 	return newAuthHandlers(svc, slog.New(slog.NewTextHandler(io.Discard, nil)), secure, "", func() time.Time { return testNow })
 }
 
@@ -1050,5 +1050,83 @@ func TestAuthOIDCHandlers_CompatibleWith(t *testing.T) {
 		if got := mt(c.a).compatibleWith(mt(c.b)); got != c.want {
 			t.Errorf("%s と %s が重なるか = %v、期待 = %v", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+// TestNew_PassesAuthOptions は、New が、Cookie の Secure と本番の戻り先の URL の基底を認証の受け口に渡し、
+// 要求の Host と Accept を context に入れる中間処理を生成したコードに渡すことを確かめる。
+func TestNew_PassesAuthOptions(t *testing.T) {
+	newServer := func(f *fakeAuth, secure bool, base string) http.Handler {
+		return New(Options{
+			Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+			AuthHandlers: f,
+			CookieSecure: secure,
+			APIBaseURL:   base,
+		})
+	}
+	login := func(handler http.Handler) []string {
+		r := httptest.NewRequest(http.MethodPost, "/api/auth/login",
+			strings.NewReader(`{"email":"user@example.com","password":"Passw0rd1"}`))
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != http.StatusOK {
+			t.Fatalf("ログインの応答 = %d %s, want 200", w.Code, w.Body.String())
+		}
+		return w.Header().Values("Set-Cookie")
+	}
+	for _, secure := range []bool{true, false} {
+		for _, c := range login(newServer(sessionFake(), secure, "")) {
+			if strings.HasPrefix(c, "XSRF-TOKEN=") {
+				continue
+			}
+			if got := strings.Contains(c, "; Secure"); got != secure {
+				t.Errorf("CookieSecure が %v のときの Cookie %q, want Secure の有無 %v", secure, c, secure)
+			}
+		}
+	}
+
+	// 受け口が今の時刻を読めることを、Cookie twoFactorChallenge の Expires が今から数分の先であることで確かめる
+	twoFactor := &fakeAuth{login: auth.LoginResult{TwoFactorChallenge: "challenge"}}
+	r := httptest.NewRequest(http.MethodPost, "/api/auth/login",
+		strings.NewReader(`{"email":"user@example.com","password":"Passw0rd1"}`))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	before := time.Now()
+	newServer(twoFactor, false, "").ServeHTTP(w, r)
+	var expires time.Time
+	for _, line := range w.Header().Values("Set-Cookie") {
+		if c, err := http.ParseSetCookie(line); err == nil && c.Name == auth.ChallengeCookieName {
+			expires = c.Expires
+		}
+	}
+	if w.Code != http.StatusAccepted || expires.Before(before) || expires.After(before.Add(time.Hour)) {
+		t.Errorf("2段階認証の途中の応答 = %d, Expires %s, want 202 と今から1時間以内の先", w.Code, expires)
+	}
+
+	const path = "/api/auth/oidc/callback"
+	cases := []struct{ name, base, host, accept, wantURI, wantType string }{
+		{
+			name: "要求の Host と Accept", host: "localhost:8080", accept: "application/json",
+			wantURI: "http://localhost:8080" + path, wantType: "application/json",
+		},
+		{
+			name: "本番の基底", base: "https://app.keirekipro.click", host: "localhost:8080", accept: "text/plain",
+			wantURI: "https://app.keirekipro.click" + path, wantType: "text/plain;charset=UTF-8",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := &fakeAuth{oidcURL: "https://accounts.example/auth"}
+			r := httptest.NewRequest(http.MethodGet, "/api/auth/oidc/authorize?provider=google", http.NoBody)
+			r.Host = c.host
+			r.Header.Set("Accept", c.accept)
+			w := httptest.NewRecorder()
+			newServer(f, false, c.base).ServeHTTP(w, r)
+			if w.Code != http.StatusOK || w.Header().Get("Content-Type") != c.wantType {
+				t.Errorf("応答 = %d %q, want 200 %q", w.Code, w.Header().Get("Content-Type"), c.wantType)
+			}
+			checkCalls(t, c.name, f, "StartOIDC(google,"+c.wantURI+")")
+		})
 	}
 }
