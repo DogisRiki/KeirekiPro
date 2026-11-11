@@ -52,7 +52,7 @@
   - _要件: 1.1_
   - _対象の部品: SecurityHeaders_
 
-- [ ] 2.2 ログインの状態の値を作る
+- [x] 2.2 ログインの状態の値を作る
 
   Claude は、Java 版の `JwtProvider` と `UserTokenVersionStore` を写し、ログインの状態の JWT の発行と検証と、ログインの状態の世代の番号の読み書きを作る。データベースを読むテストは `accesstoken_integration_test.go` に、データベースを読まないテストは `accesstoken_test.go` に置く。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestAccessToken` が通る
