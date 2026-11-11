@@ -66,7 +66,7 @@
   - 受入基準とテストの対応: 要件2の受入基準1(ログインの状態の無い要求を断る、`OPTIONS` と生きているかの確認は通す)は、`middleware_test.go` の `TestRequireLogin_PublicPathBoundaries`(`/api/auth`、`/api/authx`、`/actuator`、`/healthz`、`OPTIONS`)と `TestRequireLogin_NoUser401` で確かめる。`/api/admin/` の 403 と `Content-Type` は `middleware_test.go` の `TestRequireLogin_AdminForbidden` で確かめる。要件2の受入基準2(無効な値を断り Cookie を消す)は `middleware_integration_test.go` の `TestIdentify_InvalidTokenClearsCookie` で、要件2の受入基準3(利用者が居るかを確かめない)は `TestIdentify_DoesNotCheckUserExists` で確かめる。データベースが読めないときの 500 は `TestIdentify_DBError500` で確かめる。要件6の受入基準2(ログインした要求を処理に渡す)は、`middleware_test.go` の `TestRequireLogin_PassesAuthctxUser` と、Java 版の `JwtProvider` と同じ項目と鍵で作った JWT を Cookie `accessToken` に持つ要求が次の処理に届く、`middleware_integration_test.go` の `TestIdentify_AcceptsJavaIssuedToken` で確かめる
   - _要件: 2.1, 2.2, 2.3, 6.2_
 
-- [ ] 3. 認証の操作ごとの処理を作る
+- [x] 3. 認証の操作ごとの処理を作る
 - [x] 3.1 要求の入力の検査を作る (並行可)
 
   Claude は、Java 版の要求の型の注釈を、13の操作ごとの検査の関数に写す。Claude は、`@PasswordMatches` の項目の名前を `PasswordMatchesValidator` で確かめる。
@@ -161,7 +161,7 @@
   - 受入基準とテストの対応: 要件1の受入基準3(Java 版と同じ画面に移る)のうち URL の形は、`oidc_integration_test.go` の `TestStartOIDC_URLParamsOrder` で確かめる。要件3の受入基準7(同じブラウザが始めたログインと組になっていることを確かめる)のうち記録の形は `TestStartOIDC_StoresStateFor10Minutes` で確かめる。要件5の受入基準5(対象の外の `provider` を 400 にする)は、400 で答え、Redis に `oidc:` のキーが残らないことを確かめる `TestStartOIDC_UnknownProvider400` で確かめる
   - _要件: 1.3, 3.7, 4.2, 5.5_
 
-- [ ] 3.14 Google と GitHub から戻ったあとの処理を作る
+- [x] 3.14 Google と GitHub から戻ったあとの処理を作る
 
   Claude は、`Service` の `HandleOIDCCallback` を作り、コードの交換、利用者の情報の読み出し、GitHub のメールアドレスの一覧の読み出し、アカウントの決め方、失敗したときの文言とエスケープを、OIDC の部品の節のとおりに作る。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestHandleOIDCCallback` が、Google と GitHub の代わりの `httptest` のサーバを相手に通る。3つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
@@ -386,6 +386,7 @@
 - `commonsemail.go` は、Java 版の `Email.create` が使う Apache Commons Validator 1.11.0 の `EmailValidator.getInstance(false, false)` を写した。トップレベルドメインの表(`commons_tld_table.go`)と期待(`testdata/commonsemail/vectors.txt`)は、`testdata/commonsemail/Gen.java` を Java 版の依存の版で動かして作り直す。ドメインに基本多言語面の外の文字があると変えずに返すので、呼ぶ側は入力の検査(`isEmailLikeHibernate`)を先に通す。`Register` は、Java 版がパスワードのハッシュを作ってから入力の誤りで断るのに対し、ハッシュを作らずに断る(答えは同じ)。`VerifyEmail` の目的 PASSWORD_RESET の再設定の値の有効な時間は、Java 版の `Duration.toMillis` と同じくミリ秒に切り捨て、1ミリ秒より短いと置かずに誤りを返す(Java 版は Redis に断られて 500 になる)。`errors.go` に `MessageEmailNotRegistrable` を足した
 - `passwordreset.go` の `ResetPassword` は、`invalidateSessions` を呼ばずに、`inTransaction` の中で `BumpTokenVersion` にトランザクションの `q` を渡し、続けて `removeAllRefreshTokens` を呼ぶ。`invalidateSessions` はトランザクションの外で世代の番号を上げるので、Java 版の `@Transactional` と同じ取り消しにならないためである。利用者が居ないときの誤りを操作ごとに変えるときは、`emailverification.go` の `loadStoredUserOr` に誤りを渡す(`loadStoredUser` は確認のリンクが無効な 400 を渡す)
 - 対象の外の `provider` を受けた Java 版は、`StartOidcAuthorizationUseCase` が Redis に `oidc:provider:` `oidc:state:` `oidc:code_verifier:` の3つの記録を置いたあとに、`OidcProviderFactory.getProvider` が RuntimeException を投げ、`AppExceptionHandler` の Exception の扱いで 500「予期せぬエラーが発生しました。」で答え、3つの記録を残す(コードを読んで確かめた)。`oidc.go` の `StartOIDC` は、記録を置く前に 400「入力エラーがあります。」と空の `errors` で断る。この違いは、design.md の変えた動きの一覧の節のとおり、タスク6.5で一覧に載せる。`provider` の大文字と小文字は Java 版と同じく区別せず、Redis には受けたままの `provider` を置く
+- Google と GitHub から戻ったあとの処理は、`oidc.go` ではなく同じパッケージの `oidccallback.go` に置いた(約700行あり、開始の処理と分けたほうが読みやすいため)。`HandleOIDCCallback` は、移る先の URL の全体を `OIDCCallbackResult` の `Location` に入れて返し、成功のときだけ `Session` にログインの状態の値を入れる。受け口(タスク4.3)はこの値をそのまま使う。Java 版の RestClient はどの状態の番号の応答でも本文を読み(`RestClientConfig` の `defaultStatusHandler`)、Jackson は `spring.jackson.use-jackson2-defaults` で先頭の JSON の値のあとを読まないので、Go 版も Google と GitHub の応答を状態の番号によらず読み、先頭の値のあとを読まない。トークンの応答の `expires_in` は、Java 版の `Integer` の項目と同じく `parseJacksonInt` の規則で読めるかだけを確かめ、値は使わない。Google と GitHub の応答の本文は 1 MiB までしか読まない。GitHub の `id` が整数でない数か、オブジェクトか配列のときは、Java 版の `String.valueOf` と同じ文字列を作れないので、利用者の情報の失敗にする。この違いはタスク6.5で変えた動きの一覧に載せる
 
 ## 完了条件(全タスク共通)
 
