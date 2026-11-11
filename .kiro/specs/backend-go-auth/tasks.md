@@ -215,7 +215,7 @@
   - _要件: 4.3, 5.1, 5.6_
   - _対象の部品: harness_
 
-- [ ] 5.3 値の取り出しと差し込みと Host を広げる
+- [x] 5.3 値の取り出しと差し込みと Host を広げる
 
   Claude は、`capture.go` に、本文の全体 `text`、ヘッダ `header:<名前>`、ヘッダの URL の問い合わせの項目 `header:<名前>?<項目>`、応答の `Set-Cookie` の値 `cookie:<名前>`、その段のあとに届いた最後のメールの本文 `mail:<正規表現>` の5つの取り出しの元を作る。Claude は、harness が、`{名前}` の差し込みを、経路に加えて、JSON の本文の文字列の値と、`Cookie` ヘッダを含むヘッダの値にも行うようにする。Claude は、harness が、版に送るすべての要求の `Host` の項目に `compat.test` を入れ、送る先のアドレスを版のポートのままにするようにする。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestCapture|TestSubstitute|TestSend_HostIsCompatTest'` が通る
@@ -399,6 +399,8 @@
 - 5.9 で、偽のログインのサービスに証明書と鍵を渡すときは、環境変数の名前の定数 `fakeoidc.CertFileEnv` と `fakeoidc.KeyFileEnv` を使う。TLS の受け口のポートは `fakeoidc.TLSPort`(443)。イメージは distroless の nonroot 版で、root でない利用者が 443 を受けられるのは Docker の既定の設定(コンテナの `net.ipv4.ip_unprivileged_port_start=0`)に頼っているので、5.9 でコンテナの中で 443 を受けられることを確かめる
 - 5.2 で、design.md に名前の無い段の欄を次の形にした。Redis の段は `redis: {del: [キー], set: [{key, value, ttl_seconds}]}`(ttl_seconds は1以上)、期限切れの段は `expire: {cookie: <名前>}` か `expire: {var: <名前>}`、絶対の URL の段は `request.url`。種類は `Step.Kind()` で引く。`oidc_users` の型は harness の `OIDCUsers` で、json の名前は fakeoidc の `GoogleUser` `GitHubUser` と同じ
 - 5.8 で、版に送る段だけを数えて版に割り当てるように直すのは `cross.go` の段の割り当てだけでなく、`compareenv.go` と `coverage.go` の、どの段にも `Request.Method` と `Request.Path` で操作を引く箇所も含む
+- 5.3 で、取り出しの元 `mail:` のメールは `Session.SetMailReader` で渡す部品から読む。5.8 で、compare と cross と perf の動かし方から、版ごとの偽の AWS のメール(compareenv の `records(ctx, version, "emails", ...)`)を読む部品を渡す。部品が無い Session は、`mail:` を持つ段を送らずに失敗する
+- 5.4 で、絶対の URL の段の `request.url` への差し込みには、capture.go の `Session.expand` を使う(パスとヘッダと本文の差し込みと同じ誤りの文になる)
 
 ## 完了条件(全タスク共通)
 

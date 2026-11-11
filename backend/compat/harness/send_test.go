@@ -359,3 +359,30 @@ func TestRunCross_WritesShortTextBodyAndHashesOthers(t *testing.T) {
 		}
 	}
 }
+
+func TestSend_HostIsCompatTest(t *testing.T) {
+	var hosts []string
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		hosts = append(hosts, r.Host+" "+r.Header.Get("Host"))
+	}))
+	t.Cleanup(srv.Close)
+	step := get("h", "/h")
+	step.Request.Headers = map[string]string{"Host": "other.example"}
+	for _, s := range []Step{get("plain", "/p"), step} {
+		if _, err := NewSession().Send(t.Context(), srv.Client(), srv.URL, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	// 要求は版のポートに届き、Host は compat.test になる。Go の net/http は、ヘッダの欄に書いた Host を送らない
+	if want := []string{CompatHost + " ", CompatHost + " "}; !slices.Equal(hosts, want) {
+		t.Errorf("届いた Host = %q, want %q", hosts, want)
+	}
+	if CompatHost != "compat.test" {
+		t.Errorf("CompatHost = %q", CompatHost)
+	}
+}

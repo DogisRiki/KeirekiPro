@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -16,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/DogisRiki/KeirekiPro/backend/compat/fakeaws"
 )
 
 // 偽の送信の検査で、画面が Cookie からヘッダへ写す名前である。Java 版と Go 版で同じ名前を使う。
@@ -37,6 +38,8 @@ type Session struct {
 	cookies map[cookieKey]string
 	vars    map[string]string
 	now     func() time.Time
+	// mail は、取り出しの元 mail: で読むメールの読み方である。SetMailReader で決める。
+	mail MailReader
 }
 
 // cookieKey は、覚える Cookie の名前と、当てはめるパスである。
@@ -53,36 +56,57 @@ func NewSession() *Session {
 // Clone は、今の Cookie と取り出した値を写した、別の Session を返す。
 // 1つの Session は同時に使えないので、同じ利用者として同時に要求を送るときは、要求ごとに写しを使う。
 func (s *Session) Clone() *Session {
-	c := &Session{cookies: make(map[cookieKey]string, len(s.cookies)), vars: make(map[string]string, len(s.vars)), now: s.now}
+	c := &Session{cookies: make(map[cookieKey]string, len(s.cookies)), vars: make(map[string]string, len(s.vars)), now: s.now, mail: s.mail}
 	maps.Copy(c.cookies, s.cookies)
 	maps.Copy(c.vars, s.vars)
 	return c
 }
 
 // Send は、段 step の要求を baseURL の版に送り、応答を返す。応答の Set-Cookie を覚え、capture の値を取り出す。
-// 要求を作れないとき、送れないとき、capture の値が応答に無いときは、エラーを返す。
+// パスと本文の文字列の値とヘッダの値の {名前} は、前の段で取り出した値に置き換える。要求の Host は CompatHost にする。
+// 要求を作れないとき、送れないとき、capture の値が無いときは、エラーを返す。
 func (s *Session) Send(ctx context.Context, client *http.Client, baseURL string, step Step) (Response, error) {
-	path, err := s.expandPath(step.Request.Path)
+	path, err := s.expand(step, "パス", step.Request.Path)
+	if err != nil {
+		return Response{}, err
+	}
+	headers := make(map[string]string, len(step.Request.Headers))
+	for _, name := range sortedKeys(step.Request.Headers) {
+		v, err := s.expand(step, "ヘッダ "+name+" の値", step.Request.Headers[name])
+		if err != nil {
+			return Response{}, err
+		}
+		headers[name] = v
+	}
+	b, err := s.requestBody(step)
 	if err != nil {
 		return Response{}, err
 	}
 	var body io.Reader
-	if step.Request.JSON != nil {
-		b, err := json.Marshal(step.Request.JSON)
-		if err != nil {
-			return Response{}, fmt.Errorf("harness: 段 %s の本文を JSON にできません: %w", step.Name, err)
-		}
+	if b != nil {
 		body = bytes.NewReader(b)
+	}
+	// 取り出しの元 mail: は、この段のあとに届いたメールから取り出すので、送る前のメールの数を数えておく
+	mailsBefore := 0
+	wantMail := capturesMail(step)
+	if wantMail {
+		mails, err := s.readMails(ctx, step)
+		if err != nil {
+			return Response{}, err
+		}
+		mailsBefore = len(mails)
 	}
 	req, err := http.NewRequestWithContext(ctx, step.Request.Method, strings.TrimSuffix(baseURL, "/")+path, body)
 	if err != nil {
 		return Response{}, fmt.Errorf("harness: 段 %s の要求を作れません: %w", step.Name, err)
 	}
+	// Go の http.Client は、ヘッダの Host を使わず req.Host を使う
+	req.Host = CompatHost
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	for _, name := range sortedKeys(step.Request.Headers) {
-		req.Header.Set(name, step.Request.Headers[name])
+	for _, name := range sortedKeys(headers) {
+		req.Header.Set(name, headers[name])
 	}
 	// ブラウザと同じく、送る Cookie を1つの Cookie ヘッダに「名前=値」を「; 」でつないで書く
 	var pairs []string
@@ -108,33 +132,24 @@ func (s *Session) Send(ctx context.Context, client *http.Client, baseURL string,
 		return Response{}, fmt.Errorf("harness: 段 %s の要求を送れません: %w", step.Name, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return Response{}, fmt.Errorf("harness: 段 %s の応答を読めません: %w", step.Name, err)
 	}
-	out := Response{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: b}
+	out := Response{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: respBody}
 	s.storeCookies(resp.Cookies())
-	if err := s.capture(step, out); err != nil {
+	var newMails []fakeaws.Email
+	if wantMail {
+		mails, err := s.readMails(ctx, step)
+		if err != nil {
+			return out, err
+		}
+		newMails = mails[min(mailsBefore, len(mails)):]
+	}
+	if err := s.capture(step, out, newMails); err != nil {
 		return out, err
 	}
 	return out, nil
-}
-
-// expandPath は、パスの {名前} を、前の段で取り出した値に置き換える。取り出していない名前はエラーにする。
-func (s *Session) expandPath(path string) (string, error) {
-	var missing []string
-	expanded := pathVariable.ReplaceAllStringFunc(path, func(m string) string {
-		name := m[1 : len(m)-1]
-		v, ok := s.vars[name]
-		if !ok {
-			missing = append(missing, name)
-		}
-		return v
-	})
-	if len(missing) > 0 {
-		return "", fmt.Errorf("harness: パス %s の %v を、前の段の capture で取り出していません", path, missing)
-	}
-	return expanded, nil
 }
 
 // storeCookies は、応答の Set-Cookie を覚える。Max-Age が0以下か、期限の過ぎた Cookie は、同じ名前とパスの Cookie を消す。
@@ -189,27 +204,6 @@ func pathMatches(cookiePath, requestPath string) bool {
 		return false
 	}
 	return len(requestPath) == len(cookiePath) || strings.HasSuffix(cookiePath, "/") || requestPath[len(cookiePath)] == '/'
-}
-
-// capture は、段の capture に書いた名前ごとに、応答の本文の JSON の場所から1つの値を取り出して覚える。
-func (s *Session) capture(step Step, resp Response) error {
-	if len(step.Capture) == 0 {
-		return nil
-	}
-	v, err := decodeJSON(resp.Body)
-	if err != nil {
-		return fmt.Errorf("harness: 段 %s の capture のために、応答の本文を JSON として読めません: %w", step.Name, err)
-	}
-	var errs []error
-	for _, name := range sortedKeys(step.Capture) {
-		value, err := captureValue(v, step.Capture[name])
-		if err != nil {
-			errs = append(errs, fmt.Errorf("harness: 段 %s の capture %s: %w", step.Name, name, err))
-			continue
-		}
-		s.vars[name] = value
-	}
-	return errors.Join(errs...)
 }
 
 // captureValue は、JSON の場所 path にある1つの文字か数か真偽の値を、文字にして返す。

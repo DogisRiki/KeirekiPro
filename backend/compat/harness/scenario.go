@@ -259,7 +259,7 @@ func (s Scenario) validate() error {
 		}
 		errs = append(errs, step.validateKind()...)
 		for _, name := range sortedKeys(step.Capture) {
-			if _, err := splitJSONPath(step.Capture[name]); err != nil {
+			if _, err := parseCaptureSource(step.Capture[name]); err != nil {
 				errs = append(errs, fmt.Errorf("段 %s の capture %s: %w", step.Name, name, err))
 			}
 		}
