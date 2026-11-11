@@ -1,0 +1,8 @@
+{
+   "body" : "http://localhost:5173/email/verify#eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJrZWlyZWtpcHJvLWVtYWlsLXZlcmlmaWNhdGlvbiIsImp0aSI6ImIwNGQ1YjU3LThkMGMtNGJiMi04YTIyLTkzNzliN2YzZDFjMCIsInN1YiI6IjBhMGQ2YjdkLTM4NWQtNDVhMC1iZGIzLWVkZTBlNmYzZWE1ZCIsInB1cnBvc2UiOiJSRUdJU1RSQVRJT04iLCJlbWFpbCI6Im1haWxnZW4tMTc5NDM3ODMzM0BleGFtcGxlLmNvbSIsImxleHAiOjE3OTQ0NjQ3MzN9.ZEFdhpRC2tyTrQXYKSo85Pq78Z44A7zJ1Htoj8MoK1g\n\n上記のリンクにアクセスし、メールアドレスの確認を完了してください。\nなお、確認のリンクの有効期限は本メール受信後から24時間以内です。\n期限を過ぎた場合は、リンクを開いた画面の案内に従ってください。\n\n※このメールの内容に心当たりがない方は、本メールを破棄してください。\n\nkeirekipro\nhttp://localhost:5173\n",
+   "from" : "no-reply@keirekipro.click",
+   "subject" : "【keirekipro】メールアドレスの確認",
+   "to" : [
+      "mailgen-1794378333@example.com"
+   ]
+}
