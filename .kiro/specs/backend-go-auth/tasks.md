@@ -230,7 +230,7 @@
   - _要件: 5.1, 5.3_
   - _依存: 5.1_
 
-- [ ] 5.5 値を期限切れにする段を足す
+- [x] 5.5 値を期限切れにする段を足す
 
   Claude は、`expire.go` に、筋書きの中の JWT の値を期限の過ぎた値に書き換えて署名し直す処理を作る。`expire.cookie` を持つ段では、`expire.go` の処理は、Cookie の束のうち `expire.cookie` に書いた名前の Cookie を書き換える。`expire.var` を持つ段では、`expire.go` の処理は、`expire.var` に書いた名前の取り出した値を書き換える。`expire.go` の処理は、2つの JWT を、JWT の項目に `aud` があるかで見分ける。どちらも `alg` は `HS256` なので、`alg` では見分けられない。`expire.go` の処理は、ログインの状態の値では、`iat` を今の11分前に、`exp` を今の1分前にして、`JWT.Secret` の値で署名する。`expire.go` の処理は、メールアドレスの確認のリンクの値では、`lexp` を今の1分前にして、HMAC-SHA256(`JWT.Secret` の値, `keirekipro-email-verification-v1`)で署名する。書き換える値が無いときは、その段の誤りとして筋書きを失敗にする。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run TestExpire` が通る
@@ -403,6 +403,7 @@
 - 5.4 で、絶対の URL の段の `request.url` への差し込みには、capture.go の `Session.expand` を使う(パスとヘッダと本文の差し込みと同じ誤りの文になる)
 - 5.8 で、compare と cross と perf の動かし方は、筋書きごとに初めに stack.go の `resetOIDC` を呼び、筋書きの `oidc_users` を `setOIDCUsers` で登録する(5.4 で処理だけを足し、呼び出しはまだ無い)
 - 5.8 で、段の種類で送り方を選ぶ。版の段は `Send`、絶対の URL の段は steps.go の `SendAbsolute` にテストの処理から届く fakeoidc のアドレス(`oidcURL`)を渡す、Redis の段は `ApplyRedis` にその版の Redis の部品を渡す。絶対の URL の段は版の Cookie を送らず、Set-Cookie も覚えず、応答を比べない
+- 5.8 で、値を期限切れにする段は expire.go の `Session.Expire(step, jwtKey)` を呼ぶ。`jwtKey` には stack.go の `jwtSecret`(両方の版に渡した JWT.Secret)を渡し、比べる動かし方では版ごとの Session で1回ずつ呼ぶ。compare_test.go に関数 `jwt` があるので、harness のテストで golang-jwt を読むときは別名(expire_test.go では `gojwt`)を付ける
 
 ## 完了条件(全タスク共通)
 
