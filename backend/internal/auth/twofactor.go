@@ -215,17 +215,9 @@ func (s *Service) deleteKey(ctx context.Context, key string) error {
 //   - 知らない項目は飛ばす。同じ項目が2回あるときは、あとの値を使う
 //   - userId と attempts は、parseJacksonUUID と parseJacksonInt の規則で読む。読めないときは見つからないとする
 func parseTwoFactorChallenge(text string) (twoFactorChallenge, bool, error) {
-	var top json.RawMessage
-	if err := json.NewDecoder(strings.NewReader(text)).Decode(&top); err != nil {
-		return twoFactorChallenge{}, false, nil
-	}
-	top = bytes.TrimLeft(top, " \t\r\n")
-	if bytes.Equal(top, []byte("null")) {
-		return twoFactorChallenge{}, false, fmt.Errorf("auth: 2段階認証の途中の記録が null である")
-	}
-	var fields map[string]json.RawMessage
-	if top[0] != '{' || json.Unmarshal(top, &fields) != nil {
-		return twoFactorChallenge{}, false, nil
+	fields, ok, err := parseJacksonObject(text)
+	if err != nil || !ok {
+		return twoFactorChallenge{}, false, err
 	}
 	var c twoFactorChallenge
 	if raw, ok := fields["userId"]; ok {
@@ -243,6 +235,27 @@ func parseTwoFactorChallenge(text string) (twoFactorChallenge, bool, error) {
 		c.Attempts = n
 	}
 	return c, true, nil
+}
+
+// parseJacksonObject は、Java 版の Jackson の readValue(text, 記録の型.class) と同じ規則で、
+// 文字列 text の先頭の1つの JSON の値を、JSON のオブジェクトとして読み、項目ごとの JSON を返す。
+// 前の空白は飛ばし、値のあとの文字は見ない。同じ項目が2回あるときは、あとの値を使う。
+// 読めないとき、または値が JSON のオブジェクトでないときは、偽を返す。
+// 値が null のときは、Java 版が null の記録を Optional.of に渡して例外にするので、誤りを返す。
+func parseJacksonObject(text string) (map[string]json.RawMessage, bool, error) {
+	var top json.RawMessage
+	if err := json.NewDecoder(strings.NewReader(text)).Decode(&top); err != nil {
+		return nil, false, nil
+	}
+	top = bytes.TrimLeft(top, " \t\r\n")
+	if bytes.Equal(top, []byte("null")) {
+		return nil, false, fmt.Errorf("auth: Redis の記録が null である")
+	}
+	var fields map[string]json.RawMessage
+	if top[0] != '{' || json.Unmarshal(top, &fields) != nil {
+		return nil, false, nil
+	}
+	return fields, true, nil
 }
 
 // parseJacksonUUID は、Jackson の UUIDDeserializer と同じ規則で、JSON の値を UUID として読む。

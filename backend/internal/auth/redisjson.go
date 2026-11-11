@@ -33,7 +33,20 @@ func encodeJSON(v any) (string, error) {
 	if err := enc.Encode(v); err != nil {
 		return "", fmt.Errorf("auth: 値を JSON にできない: %w", err)
 	}
-	return toJacksonEscapes(bytes.TrimSuffix(buf.Bytes(), []byte("\n"))), nil
+	return toJacksonEscapes(bytes.TrimSuffix(buf.Bytes(), []byte("\n")), true), nil
+}
+
+// encodeJSONText は、値を、Java 版の jsonMapper.writeValueAsString と同じ形の JSON にする。
+// writeValueAsString は文字の並びに書くので、encodeJSON と違い、U+10000 以上の文字(絵文字など)を
+// UTF-16 の2つ組にせず、そのまま書く。Java 版が、記録を JSON にしてから RedisTemplate で置く値の、内側の JSON に使う。
+func encodeJSONText(v any) (string, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return "", fmt.Errorf("auth: 値を JSON にできない: %w", err)
+	}
+	return toJacksonEscapes(bytes.TrimSuffix(buf.Bytes(), []byte("\n")), false), nil
 }
 
 // toJacksonEscapes は、Encoder が書いた JSON の文字の書き方を、Java 版の Jackson と同じにする。
@@ -42,13 +55,14 @@ func encodeJSON(v any) (string, error) {
 //   - Encoder は、U+2028 と U+2029 を \u2028 と \u2029 に置き換えるが、Jackson はそのまま書く
 //   - Encoder は、制御文字を小文字の16進で \u001f と書くが、Jackson は大文字の16進で \u001F と書く
 //   - Encoder は、U+10000 以上の文字(絵文字など)を UTF-8 のまま書くが、Jackson は UTF-16 の2つ組にして、
-//     大文字の16進で \uD83D\uDE00 のように書く
+//     大文字の16進で \uD83D\uDE00 のように書く。ただし、Jackson は、文字の並びに書くとき(writeValueAsString)は、
+//     U+10000 以上の文字をそのまま書く。pairSupplementary が偽のときは、この3つ目を直さない
 //
 // Encoder が書いた JSON では、逆斜線は、文字列の中の逃がしの始まりにしか現れず、
 // U+10000 以上の文字は、文字列の中にしか現れない。
 // そのため、逆斜線ごとに、続く1文字(\u のときは続く5文字)を1つの逃がしとして読めば、
 // 元の文字列にあった逆斜線のあとの文字を書き換えることはない。
-func toJacksonEscapes(b []byte) string {
+func toJacksonEscapes(b []byte, pairSupplementary bool) string {
 	out := make([]byte, 0, len(b))
 	for i := 0; i < len(b); {
 		switch {
@@ -69,7 +83,7 @@ func toJacksonEscapes(b []byte) string {
 			i += 6
 		case b[i] >= utf8.RuneSelf:
 			r, size := utf8.DecodeRune(b[i:])
-			if r >= 0x10000 {
+			if r >= 0x10000 && pairSupplementary {
 				high, low := utf16.EncodeRune(r)
 				out = appendUnicodeEscape(appendUnicodeEscape(out, high), low)
 			} else {

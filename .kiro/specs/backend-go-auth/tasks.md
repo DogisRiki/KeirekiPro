@@ -105,7 +105,7 @@
   - 受入基準とテストの対応: 要件3の受入基準2(コードの有効な時間と誤りの回数の上限)は、`twofactor_integration_test.go` の `TestTwoFactor_TTL10Minutes` `TestTwoFactor_FifthWrongCodeDeletes` と、誤ったコードで残りの有効な時間が保たれる `TestTwoFactor_WrongCodeKeepsTTL` で確かめる。要件4の受入基準2(途中の手順をまたぐ操作を、版をまたいでも終えられる)のうち途中の記録の形は `TestTwoFactor_ChallengeIsDoubleEncodedJSON` で確かめる
   - _要件: 3.2, 4.2_
 
-- [ ] 3.6 登録の途中の記録を作る
+- [x] 3.6 登録の途中の記録を作る
 
   Claude は、Java 版の `PendingRegistrationStore` の Redis の実装を写す。Claude は、`createdAt` の書き方と、集合の要素の形と、メールアドレスで最大5件を読む順を、Java 版が置いた値で確かめてから書く。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestRegistration` が通る
@@ -375,6 +375,7 @@
 - LocalStack の SES が受けたメールは、`curl localhost:4566/_aws/ses` で JSON として読める。Java 版の FreeMarker は、拡張子が `.ftl` のひな形では HTML の特別な文字を逃がさず、利用者の名前の `<&>` や `${x}` もそのまま差し込む。Claude は、Java 版の CSRF の検査を通すため、先に GET の要求で `XSRF-TOKEN` の Cookie を受け取り、POST の要求の `X-XSRF-TOKEN` の見出しに同じ値を入れる
 - `spring_query.go` の正解の `testdata/springquery/vectors.txt` は、`testdata/springquery/Gen.java` を spring のコンテナの Java 21 で、Java 版と同じ Spring 7.0.10 の jar(spring-core と spring-web と commons-logging と jspecify)を渡して動かして作る。`springQuery` は先頭の `?` を付けないので、Claude は、小タスク3.13 で、問い合わせの無い認可の URL のあとに `?` と `springQuery` の結果をつなぐ
 - Java 版の Jackson が Redis の中の JSON を読む規則(前後の文字、数の小数と文字列、UUID の形、値が null や JSON でないとき)は、開発環境の Java 版の Redis に値を置いて API を呼べば調べられる。`twofactor.go` の `parseJacksonUUID` と `parseJacksonInt` はその結果を写したもので、表は `TestTwoFactor_ReadsChallengeLikeJackson` にある。Claude は、ほかの途中の記録を読むときも、この2つの関数を使う
+- Redis の値の中に JSON を文字列として入れる記録(Java 版の `writeValueAsString` で作った文字列を、もう一度 JSON の文字列にして置く記録)では、中の JSON を `encodeJSONText` で作る。中の JSON は U+10000 以上の文字(絵文字など)をそのまま書き、外の JSON の文字列にするときだけ `encodeJSON` が2つ組の `\u` にする。日時の項目は、Jackson が数、秒の数の文字列、時差の付いた ISO 8601、空の文字列も読むので、`registration.go` の `parseJacksonInstant` を使う
 
 ## 完了条件(全タスク共通)
 
