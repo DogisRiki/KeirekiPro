@@ -119,7 +119,7 @@
   - 受入基準とテストの対応: 要件1の受入基準2(ログイン、2段階認証、ログアウトを終えられる)は `login_integration_test.go` の `TestLogin_Success` `TestVerifyTwoFactor_Success` `TestLogout_Success` で確かめる。要件3の受入基準6(アカウントが無いのかパスワードが違うのかを見分けられない)は `TestLogin_NoAccountAndWrongPasswordSameError` で、要件3の受入基準5(ログアウトでほかの端末も使えなくする)は `TestLogout_InvalidatesAllSessions` で、要件3の受入基準1(作り直し)は `TestRefresh_RejectsOldVersion` で確かめる。登録の途中のアカウントの 409 は `TestLogin_PendingRegistration409` で確かめる
   - _要件: 1.2, 3.1, 3.2, 3.5, 3.6_
 
-- [ ] 3.8 メールアドレスの確認のリンクと送り直しの制限を作る
+- [x] 3.8 メールアドレスの確認のリンクと送り直しの制限を作る
 
   Claude は、Java 版の `JwtEmailVerificationTokenCodec` と `EmailVerificationCurrentTokenStore` と `EmailVerificationMailer` を写し、確認のリンクの値の発行と読み出し、今のリンクの記録、送り直せる間隔の制限、確認のメールの送り出しを作る。
   - 完了の確かめ方: `go test ./internal/auth/ -run 'TestEmailVerificationToken|TestEmailVerificationRate'` が通る
@@ -379,6 +379,8 @@
 - `login.go` の `passwordMatches` は、Spring の `BCryptPasswordEncoder.matches` を、開発環境の Java 版で確かめた規則で写す。ハッシュは `$2a$` `$2b$` `$2y$` の形だけを照らす(`$2$` は、Go の bcrypt が鍵の末尾に0のバイトを足して計算し、Java 版と結果が変わるので、照らさずに合わないとする)。強さが4から31の外のハッシュは、Java 版が 500 で答えるので誤りを返す。塩の22文字目に使われない下位の4ビットが立つハッシュは合わないとする。パスワードは先頭の72バイトだけを使う(Go の `bcrypt.CompareHashAndPassword` も先頭の72バイトだけを使うので切り詰めない。72バイトを超えると誤りにするのは `bcrypt.GenerateFromPassword` だけで、ハッシュを作る操作では先に切り詰める)。Claude は、パスワードを照らすほかの操作でも、この関数を使う
 - `login.go` の `accountFromRows` は、役割を USER、ADMIN の順に並べる。Java 版は役割を順の決まらない集合で持つので、ログインの状態の値とログインを続けるための値の `roles` の順が、Java 版では JVM ごとに変わる。Claude は、小タスク6.5 で、この違いを変えた動きの一覧に載せるかを決め、所有者に報告する
 - Java 版の `User.reconstruct` は、利用者を読むたびに、2段階認証が有効でメールアドレスかパスワードが無い利用者と、2段階認証が無効な管理者を、DomainException の 400 で断る。Go 版は、`login.go` の `accountFromRows` で同じ順に確かめる。Claude は、Java 版が `UserRepository` で利用者を読むほかの操作(パスワードの再設定、確認のメールの送り直し、メールアドレスの確認、Google と GitHub のログイン)でも、`findAccountByEmail` か `findAccountByID` を通して読み、この確かめを外さない
+- `emailverification.go` の `issueEmailVerificationToken` は、golang-jwt の `SignedString` を使わずに、決まったヘッダと `encodeJSONText` で書いた本体に `jwt.SigningMethodHS256.Sign` で署名する。`SignedString` は本体を `json.Marshal` で書き、< > & を逃がして Java 版と違う値になるためである。値を読む `readEmailVerificationToken` は、開発環境の java-jwt 4.6.2 で確かめた動き(`testdata/emailverification/Probe.java`)に合わせ、署名の末尾の = を受け付け、exp と nbf と iat があれば確かめる。lexp が小数の値と、形の崩れた UUID の sub は、Java 版と読み方が違う可能性があり確かめていないが、サーバーの鍵でしか署名できないので外から見える違いは無い
+- `sendEmailVerification` は、送り直せる間隔の中で送れないとき、偽と nil の誤りを返す。Claude は、小タスク3.10 と3.11 で、これを Java 版の RATE_LIMITED と同じ 400 の答え(MessageResendRateLimited)に写す。テストの `javaDevSigningKey` と `javaSample` で始まる定数は、開発環境の Java 版が実際に送った確認のリンクの値とその項目なので、後のタスクのテストでも使える
 
 ## 完了条件(全タスク共通)
 
