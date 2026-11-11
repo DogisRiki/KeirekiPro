@@ -44,7 +44,7 @@
   - _要件: 1.1, 2.2_
 
 - [ ] 2. ログインの状態を確かめる仕組みを作る
-- [ ] 2.1 安全のヘッダの中間処理を作る (並行可)
+- [x] 2.1 安全のヘッダの中間処理を作る (並行可)
 
   Claude は、Spring Security と同じ6つのヘッダを、次の処理に渡す前に応答に置く中間処理を作る。
   - 完了の確かめ方: `go test ./internal/httpapi/middleware/ -run TestSecurityHeaders` が通る
