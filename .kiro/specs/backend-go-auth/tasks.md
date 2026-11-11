@@ -237,7 +237,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1(期限の切れたリンクの要求を筋書きに含める)を支える段は、`expire_test.go` の `TestExpire_AccessTokenKeepsClaims`、`TestExpire_EmailVerificationLexp`、`TestExpire_MissingValueFails` で確かめる。`TestExpire_AccessTokenKeepsClaims` は、書き換えたログインの状態の値で、`sub` と世代の番号と `jti` が残り、`exp` だけが過去になることを確かめる
   - _要件: 5.1_
 
-- [ ] 5.6 確認のコードとリンクの値と文字の本文の正規化を足す
+- [x] 5.6 確認のコードとリンクの値と文字の本文の正規化を足す
 
   Claude は、harness の正規化の処理が、2段階認証の確認のコードを、件名が「2段階認証コードのお知らせ」のメールの本文の1行目と、Redis のキー `2fa:<UUID>` の値でだけ `<code:N>` に置き換えるようにする。Claude は、文字の本文を比べる処理に、`Location` と同じ URL の置き換えを通す。Claude は、URL を置き換える処理が、`#` のあとで `=` を持たない部分も JWT と UUID と乱数の値の置き換えに渡す形に変える。Claude は、harness の正規化の処理が、メールアドレスの確認のリンクの JWT の `aud` `sub` `purpose` `email` を比べ、`lexp` を、harness がメールを送らせた段の応答を受けた時刻との差として比べ、Redis の残りの有効な時間と同じく5秒のずれを許すようにする。偽の AWS の記録には時刻が無いので、harness が自分で持つ時刻を基準にする。確認のリンクの値には `iat` も `exp` も無く、今の正規化の `exp - iat` の差では比べられないためである。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestNormalizeTwoFactorCode|TestNormalizeEmailVerificationJWT|TestNormalizeTextBodyURL|TestNormalizeURLFragment'` が通る
@@ -404,6 +404,7 @@
 - 5.8 で、compare と cross と perf の動かし方は、筋書きごとに初めに stack.go の `resetOIDC` を呼び、筋書きの `oidc_users` を `setOIDCUsers` で登録する(5.4 で処理だけを足し、呼び出しはまだ無い)
 - 5.8 で、段の種類で送り方を選ぶ。版の段は `Send`、絶対の URL の段は steps.go の `SendAbsolute` にテストの処理から届く fakeoidc のアドレス(`oidcURL`)を渡す、Redis の段は `ApplyRedis` にその版の Redis の部品を渡す。絶対の URL の段は版の Cookie を送らず、Set-Cookie も覚えず、応答を比べない
 - 5.8 で、値を期限切れにする段は expire.go の `Session.Expire(step, jwtKey)` を呼ぶ。`jwtKey` には stack.go の `jwtSecret`(両方の版に渡した JWT.Secret)を渡し、比べる動かし方では版ごとの Session で1回ずつ呼ぶ。compare_test.go に関数 `jwt` があるので、harness のテストで golang-jwt を読むときは別名(expire_test.go では `gojwt`)を付ける
+- 5.8 で、比べる動かし方は、段ごとに `CompareResponse` を `CompareMail` より先に呼ぶ。`CompareResponse` が `Response.Received`(`Send` が入れる応答の時刻)を正規化の基準の時刻に写し、メールの `lexp` はその時刻との差で比べるためである。`Response` を手で作るときは `Received` も入れる
 
 ## 完了条件(全タスク共通)
 

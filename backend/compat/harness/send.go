@@ -127,7 +127,7 @@ func (s *Session) send(ctx context.Context, client *http.Client, target string, 
 	if err != nil {
 		return Response{}, fmt.Errorf("harness: 段 %s の応答を読めません: %w", step.Name, err)
 	}
-	out := Response{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: respBody}
+	out := Response{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: respBody, Received: s.now()}
 	if toVersion {
 		s.storeCookies(resp.Cookies())
 	}
