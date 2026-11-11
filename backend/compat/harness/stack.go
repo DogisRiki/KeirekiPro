@@ -335,6 +335,35 @@ func (f *fakes) resetOIDC(ctx context.Context) error {
 	return f.admin(ctx, http.MethodPost, f.oidcURL+"/_compat/reset", "", "")
 }
 
+// withOIDC は、fakeoidc を初めの状態に戻して users を登録してから run を呼び、run が失敗したときも、
+// 終わりに fakeoidc を初めの状態に戻す。筋書きが途中で替えた利用者や断る動きを、次の筋書きに残さないためである。
+func (f *fakes) withOIDC(ctx context.Context, users *OIDCUsers, run func() error) (err error) {
+	if err := f.resetOIDC(ctx); err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, f.resetOIDC(context.WithoutCancel(ctx))) }()
+	if err := f.setOIDCUsers(ctx, users); err != nil {
+		return err
+	}
+	return run()
+}
+
+// mailReader は、fakeaws が版 version について覚えたメールを読む部品を返す。
+func (f *fakes) mailReader(version string) MailReader {
+	return func(ctx context.Context) ([]fakeaws.Email, error) {
+		var mails []fakeaws.Email
+		if err := f.records(ctx, version, "emails", &mails); err != nil {
+			return nil, err
+		}
+		return mails, nil
+	}
+}
+
+// tools は、client で fakeoidc に送り、rdb を書き換え、fakeaws の版 version のメールを読む stepTools を返す。
+func (f *fakes) tools(client *http.Client, rdb *redis.Client, version string) stepTools {
+	return stepTools{client: client, oidcURL: f.oidcURL, jwtKey: f.jwtSecret, redis: rdb, mail: f.mailReader(version)}
+}
+
 // setOIDCUsers は、筋書きの oidc_users の利用者を、Google、GitHub の順に fakeoidc に登録する。users が nil なら何もしない。
 func (f *fakes) setOIDCUsers(ctx context.Context, users *OIDCUsers) error {
 	if users == nil {

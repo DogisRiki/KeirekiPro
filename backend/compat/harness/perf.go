@@ -133,24 +133,28 @@ func (r PerfReport) Write(dir string) (string, error) {
 	return file, nil
 }
 
-// prepare は、筋書き s の最後の段より前の段を、1回ずつ順に baseURL に送り、送ったあとの Session を返す。
-// 最後の段より前の段は、ログインのような、測る操作の準備である。期待に合わない段があれば誤りを返す。
-func prepare(ctx context.Context, client *http.Client, baseURL string, s Scenario) (*Session, error) {
+// prepare は、筋書き s の最後の段より前の段を、1回ずつ順に tools で動かし、動かしたあとの Session を返す。
+// 最後の段より前の段は、ログインのような、測る操作の準備である。応答が期待に合わない段があれば誤りを返す。
+func prepare(ctx context.Context, tools stepTools, baseURL string, s Scenario) (*Session, error) {
 	if len(s.Steps) == 0 {
 		return nil, fmt.Errorf("harness: 筋書き %s に、測る段がありません", s.Name)
 	}
-	session := NewSession()
+	if last := s.Steps[len(s.Steps)-1]; last.Kind() != StepVersion {
+		return nil, fmt.Errorf("harness: 筋書き %s の測る最後の段 %s は、版に送る段でなければなりません", s.Name, last.Name)
+	}
+	session := tools.newSession()
 	for _, step := range s.Steps[:len(s.Steps)-1] {
-		if err := sendExpect(ctx, session, client, baseURL, step); err != nil {
+		if err := sendExpect(ctx, tools, session, baseURL, step); err != nil {
 			return nil, err
 		}
 	}
 	return session, nil
 }
 
-// sendExpect は、段 step を送り、応答が期待に合わなければ誤りを返す。
-func sendExpect(ctx context.Context, session *Session, client *http.Client, baseURL string, step Step) error {
-	resp, err := session.Send(ctx, client, baseURL, step)
+// sendExpect は、段 step を tools で動かし、応答が期待に合わなければ誤りを返す。
+// 絶対の URL の段の expect の status は、SendAbsolute が確かめて誤りを返す。要求を送らない段には expect が無い。
+func sendExpect(ctx context.Context, tools stepTools, session *Session, baseURL string, step Step) error {
+	resp, err := tools.send(ctx, session, baseURL, step)
 	if err != nil {
 		return err
 	}
@@ -165,8 +169,14 @@ func sendExpect(ctx context.Context, session *Session, client *http.Client, base
 // s.PrepareEach が真なら、慣らしの回と測る回のそれぞれの前に、準備の段を新しい Session で送り直す。
 // 確認のコードのような、1回使うと消える値を最後の段で使う操作を測るためである。準備の段の時間は測らない。
 // 期待に合わない応答があれば、誤りを返す。失敗の応答の時間を測っても、操作の時間を比べたことにならないためである。
+// Redis もメールも fakeoidc も持たないので、それらを使う準備の段は、誤りになる。
 func MeasureLatency(ctx context.Context, client *http.Client, baseURL string, s Scenario, warmup, samples int) ([]time.Duration, error) {
-	session, err := prepare(ctx, client, baseURL, s)
+	return measureLatency(ctx, stepTools{client: client}, baseURL, s, warmup, samples)
+}
+
+// measureLatency は、MeasureLatency の測り方で、準備の段を tools で動かす。最後の段は版に送る段である。
+func measureLatency(ctx context.Context, tools stepTools, baseURL string, s Scenario, warmup, samples int) ([]time.Duration, error) {
+	session, err := prepare(ctx, tools, baseURL, s)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +185,7 @@ func MeasureLatency(ctx context.Context, client *http.Client, baseURL string, s 
 		if !s.PrepareEach || i == 0 {
 			return session, nil
 		}
-		return prepare(ctx, client, baseURL, s)
+		return prepare(ctx, tools, baseURL, s)
 	}
 	last := s.Steps[len(s.Steps)-1]
 	for i := range warmup {
@@ -183,7 +193,7 @@ func MeasureLatency(ctx context.Context, client *http.Client, baseURL string, s 
 		if err != nil {
 			return nil, err
 		}
-		if err := sendExpect(ctx, sess, client, baseURL, last); err != nil {
+		if err := sendExpect(ctx, tools, sess, baseURL, last); err != nil {
 			return nil, err
 		}
 	}
@@ -194,7 +204,7 @@ func MeasureLatency(ctx context.Context, client *http.Client, baseURL string, s 
 			return nil, err
 		}
 		start := time.Now()
-		resp, err := sess.Send(ctx, client, baseURL, last)
+		resp, err := sess.Send(ctx, tools.client, baseURL, last)
 		elapsed := time.Since(start)
 		if err != nil {
 			return nil, err
@@ -212,7 +222,14 @@ func MeasureLatency(ctx context.Context, client *http.Client, baseURL string, s 
 func MeasureConcurrentPeak(ctx context.Context, client *http.Client, baseURL string, s Scenario, n int,
 	peak func(context.Context) (uint64, error),
 ) (uint64, error) {
-	session, err := prepare(ctx, client, baseURL, s)
+	return measureConcurrentPeak(ctx, stepTools{client: client}, baseURL, s, n, peak)
+}
+
+// measureConcurrentPeak は、MeasureConcurrentPeak の測り方で、準備の段を tools で動かす。
+func measureConcurrentPeak(ctx context.Context, tools stepTools, baseURL string, s Scenario, n int,
+	peak func(context.Context) (uint64, error),
+) (uint64, error) {
+	session, err := prepare(ctx, tools, baseURL, s)
 	if err != nil {
 		return 0, err
 	}
@@ -221,7 +238,7 @@ func MeasureConcurrentPeak(ctx context.Context, client *http.Client, baseURL str
 	var wg sync.WaitGroup
 	for i := range n {
 		clone := session.Clone()
-		wg.Go(func() { errs[i] = sendExpect(ctx, clone, client, baseURL, last) })
+		wg.Go(func() { errs[i] = sendExpect(ctx, tools, clone, baseURL, last) })
 	}
 	wg.Wait()
 	if err := errors.Join(errs...); err != nil {

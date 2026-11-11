@@ -92,3 +92,43 @@ func (s *Session) ApplyRedis(ctx context.Context, client *redis.Client, step Ste
 	}
 	return nil
 }
+
+// stepTools は、筋書きの1回の実行に渡す、段を種類に合わせて動かす部品である。比べる動かし方では版ごとに1つ、
+// 版をまたぐ動かし方では1つ、応答の時間の比べ方では版の環境ごとに1つ作る。
+type stepTools struct {
+	client *http.Client
+	// oidcURL は、テストの処理から届く fakeoidc のアドレスである。絶対の URL の段の送る先にする。
+	oidcURL string
+	// jwtKey は、値を期限切れにする段で署名し直す、版に渡した JWT.Secret の値である。
+	jwtKey string
+	// redis は、Redis を書き換える段で書き換える Redis である。
+	redis *redis.Client
+	// mail は、取り出しの元 mail: で読むメールの読み方である。
+	mail MailReader
+}
+
+// newSession は、mail: のメールを t.mail で読む、新しい Session を返す。
+func (t stepTools) newSession() *Session {
+	s := NewSession()
+	s.SetMailReader(t.mail)
+	return s
+}
+
+// send は、段 step を種類に合わせて session で動かし、応答を返す。版に送る段は baseURL に送り、
+// 絶対の URL の段は fakeoidc に送る。Redis を書き換える段と値を期限切れにする段は、要求を送らずに、空の応答を返す。
+// 絶対の URL の段の応答は版の動きではないので、呼び出し元は比べない。絶対の URL の段の expect の status は、SendAbsolute が確かめる。
+func (t stepTools) send(ctx context.Context, session *Session, baseURL string, step Step) (Response, error) {
+	switch step.Kind() {
+	case StepAbsoluteURL:
+		return session.SendAbsolute(ctx, t.client, t.oidcURL, step)
+	case StepRedis:
+		if t.redis == nil {
+			return Response{}, fmt.Errorf("harness: 段 %s で書き換える Redis がありません", step.Name)
+		}
+		return Response{}, session.ApplyRedis(ctx, t.redis, step)
+	case StepExpire:
+		return Response{}, session.Expire(step, t.jwtKey)
+	default:
+		return session.Send(ctx, t.client, baseURL, step)
+	}
+}

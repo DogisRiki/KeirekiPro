@@ -12,6 +12,8 @@ import (
 	"time"
 
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
+
+	"github.com/DogisRiki/KeirekiPro/backend/compat/fakeaws"
 )
 
 // memoryPeakFile は、コンテナの中で読む、cgroup v2 のメモリの最大のファイルである。
@@ -99,7 +101,7 @@ func RunPerf(ctx context.Context, envs map[string]*PerfEnv, scenarios []Scenario
 		report.Latencies = append(report.Latencies, result)
 		if s.MeasureMemory {
 			goEnv := envs[VersionGo]
-			peak, err := MeasureConcurrentPeak(ctx, goEnv.client, goEnv.URL, s, opts.Concurrency, goEnv.MemoryPeak)
+			peak, err := goEnv.measurePeak(ctx, s, opts)
 			if err != nil {
 				return report, fmt.Errorf("harness: 筋書き %s のメモリの最大を測れません: %w", s.Name, err)
 			}
@@ -110,7 +112,8 @@ func RunPerf(ctx context.Context, envs map[string]*PerfEnv, scenarios []Scenario
 }
 
 // measure は、保存された内容を空にして筋書き s の初めのデータを読み込み、最後の段の95パーセンタイルを返す。
-// prepare_each が真の筋書きでは、MeasureLatency が回ごとに準備の段を送り直し、最後の段の時間だけを測る。
+// prepare_each が真の筋書きでは、measureLatency が回ごとに準備の段を送り直し、最後の段の時間だけを測る。
+// 測る前に fakeoidc を初めの状態に戻して oidc_users の利用者を登録し、測ったあとに、失敗したときも、初めの状態に戻す。
 func (p *PerfEnv) measure(ctx context.Context, s Scenario, opts PerfOptions) (time.Duration, error) {
 	if err := p.Reset(ctx); err != nil {
 		return 0, err
@@ -118,9 +121,29 @@ func (p *PerfEnv) measure(ctx context.Context, s Scenario, opts PerfOptions) (ti
 	if err := LoadFixtures(ctx, p.DBConn, s.Fixtures); err != nil {
 		return 0, err
 	}
-	samples, err := MeasureLatency(ctx, p.client, p.URL, s, opts.Warmup, opts.Samples)
+	var samples []time.Duration
+	err := p.withOIDC(ctx, s.OIDCUsers, func() (err error) {
+		samples, err = measureLatency(ctx, p.stepTools(), p.URL, s, opts.Warmup, opts.Samples)
+		return err
+	})
 	if err != nil {
 		return 0, err
 	}
 	return Percentile95(samples)
+}
+
+// measurePeak は、筋書き s の最後の段を同時に opts.Concurrency 件送ったときの、backend のコンテナのメモリの最大を返す。
+// measure と同じく、fakeoidc を初めの状態に戻して oidc_users の利用者を登録し、終わりに初めの状態に戻す。
+func (p *PerfEnv) measurePeak(ctx context.Context, s Scenario, opts PerfOptions) (uint64, error) {
+	var peak uint64
+	err := p.withOIDC(ctx, s.OIDCUsers, func() (err error) {
+		peak, err = measureConcurrentPeak(ctx, p.stepTools(), p.URL, s, opts.Concurrency, p.MemoryPeak)
+		return err
+	})
+	return peak, err
+}
+
+// stepTools は、この環境の Redis と、fakeaws の版によらない記録のメールで段を動かす道具を返す。
+func (p *PerfEnv) stepTools() stepTools {
+	return p.tools(p.client, p.Redis, fakeaws.SharedVersion)
 }

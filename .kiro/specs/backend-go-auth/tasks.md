@@ -251,7 +251,7 @@
   - 受入基準とテストの対応: 要件5の受入基準6(主な操作の応答の時間を測る)のうち、2段階認証の確認を測れることは、`perfmeasure_test.go` の `TestMeasureLatency_PrepareEach` で確かめる。`TestMeasureLatency_PrepareEach` は、準備の段が回ごとに送られ、最後の段の時間だけが返ることを確かめる
   - _要件: 5.6_
 
-- [ ] 5.8 新しい段と取り出しを3つの動かし方につなぐ
+- [x] 5.8 新しい段と取り出しを3つの動かし方につなぐ
 
   Claude は、筋書きの1回の実行に、メールを読む部品と Redis を書き換える部品を渡す。比べる動かし方(`compareenv.go` `compare.go`)は、Cookie の束と取り出した値を版ごとに持ち、絶対の URL の段を版ごとに1回ずつ送り、Redis を書き換える段と値を期限切れにする段を版ごとの値で行い、メールを版ごとの偽の AWS の記録から読む。比べる動かし方は、段ごとに応答を受けた時刻を持ち、確認のリンクの `lexp` を比べる正規化の処理に渡す。版をまたぐ動かし方(`crossenv.go` `cross.go`)は、送り先の版を版に送る段だけに割り当て、ほかの3種類の段を数えず、Redis を1回だけ書き換え、メールを1つの偽の AWS の記録から読む。Claude は、3つの動かし方が、筋書きの始めに偽のログインのサービスを初めの状態に戻してから `oidc_users` の利用者を設定し、筋書きの終わりに、筋書きが失敗したときも、初めの状態に戻すようにする。版をまたぐ動かし方の `CrossEnv.Run` は、1つの筋書きを3つの向きで続けて動かし、向きごとに `Reset` と初期のデータの読み込みをやり直す。そのため Claude は、版をまたぐ動かし方では、向きごとに、`Reset` と同じところで、偽のログインのサービスを初めの状態に戻してから `oidc_users` の利用者を設定し直すようにする。設定し直さないと、2つ目と3つ目の向きが、前の向きの途中で替えた利用者のまま始まり、筋書きの場面と違う利用者でログインしたことに検査が気づかない。応答の時間を測る動かし方(`perfenv.go` `perf.go`)は、メールを、その段を送った版の環境の偽の AWS の記録から読む。`perfenv.go` の `StartPerfEnv` が版ごとに環境を作り、偽の AWS は環境ごとに1つずつあるためである。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestCompareEnv_NewSteps|TestCrossRoute_OnlyVersionSteps|TestCrossEnv_NewSteps|TestPerfEnv_NewSteps'` が通る。3つの動かし方のテストは、`oidc_users` の欄と、`mail:` の取り出しと、Redis を書き換える段と、値を期限切れにする段を含む筋書きを動かす。`TestCompareEnv_NewSteps` は、確認のリンクの `lexp` を、メールを送らせた段の応答を受けた時刻との差として比べる場合を含む。`TestCrossEnv_NewSteps` は、途中で `oidc_users` の利用者を替える筋書きを3つの向きで動かし、どの向きの始めにも `oidc_users` の利用者が設定し直されていることを確かめる場合を含む
@@ -406,6 +406,8 @@
 - 5.8 で、値を期限切れにする段は expire.go の `Session.Expire(step, jwtKey)` を呼ぶ。`jwtKey` には stack.go の `jwtSecret`(両方の版に渡した JWT.Secret)を渡し、比べる動かし方では版ごとの Session で1回ずつ呼ぶ。compare_test.go に関数 `jwt` があるので、harness のテストで golang-jwt を読むときは別名(expire_test.go では `gojwt`)を付ける
 - 5.8 で、比べる動かし方は、段ごとに `CompareResponse` を `CompareMail` より先に呼ぶ。`CompareResponse` が `Response.Received`(`Send` が入れる応答の時刻)を正規化の基準の時刻に写し、メールの `lexp` はその時刻との差で比べるためである。`Response` を手で作るときは `Received` も入れる
 - 5.8 で、測る動かし方にメールを読む部品を渡すときは、perf.go の `prepare` が作る Session に `SetMailReader` を呼ぶ。prepare_each が真の筋書きでは、`MeasureLatency` が回ごとに `prepare` で新しい Session を作るので、初めの Session だけに渡すと2回目から `mail:` の取り出しが誤りになる
+- 5.8 で、段の種類による動かし方は steps.go の `stepTools.send` にまとめた。絶対の URL の段の expect の status は `SendAbsolute` が確かめて誤りを返すので、呼び出し元で `CheckExpect` を重ねない。版をまたぐ動かし方と測る動かし方は、最後の段が版に送る段でない筋書きを誤りにする
+- 5.8 で、測る動かし方は fakeoidc を、測る処理全体の初めと終わりに1回ずつだけ初めの状態に戻す。prepare_each が真の筋書きで、準備の段が fakeoidc の利用者を替えると、2回目からの回は替えたあとの利用者で始まる
 
 ## 完了条件(全タスク共通)
 
