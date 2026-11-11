@@ -133,7 +133,7 @@
   - 受入基準とテストの対応: 要件3の受入基準3(再設定の値の有効な時間)は、`passwordreset_integration_test.go` の `TestPasswordResetToken_TTL10Minutes` で確かめる。要件4の受入基準2(途中の手順をまたぐ操作を、版をまたいでも終えられる)のうち値の形は、`TestPasswordResetToken_ValueIsUserIDJSON` で確かめる
   - _要件: 3.3, 4.2_
 
-- [ ] 3.10 確認のリンクの分類と確認の書き換えを作る
+- [x] 3.10 確認のリンクの分類と確認の書き換えを作る
 
   Claude は、Java 版の `EmailVerificationLinkClassifier` と `EmailVerificationCompletion` を写し、リンクを結果の名前に分類する処理と、目的ごとの書き換えを1つのトランザクションで行う処理を作る。書き換えは、目的が `REGISTRATION` のときの登録の完了、`ACCOUNT_EMAIL` のときの確認済みにする書き換え(Java 版の `User.verifyEmail`)、`PENDING_EMAIL` のときのメールアドレスの付け替え(Java 版の `User.promotePendingEmail`)の3つである。Go 版にはメールアドレスの変更の操作がまだ無いので、`PENDING_EMAIL` の場面は Java 版と Go 版を比べる検査では作れない。Claude は、この場面を結合テストだけで確かめる。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestEmailVerificationComplete` が通る
@@ -382,6 +382,7 @@
 - `emailverification.go` の `issueEmailVerificationToken` は、golang-jwt の `SignedString` を使わずに、決まったヘッダと `encodeJSONText` で書いた本体に `jwt.SigningMethodHS256.Sign` で署名する。`SignedString` は本体を `json.Marshal` で書き、< > & を逃がして Java 版と違う値になるためである。値を読む `readEmailVerificationToken` は、開発環境の java-jwt 4.6.2 で確かめた動き(`testdata/emailverification/Probe.java`)に合わせ、署名の末尾の = を受け付け、exp と nbf と iat があれば確かめる。lexp が小数の値と、形の崩れた UUID の sub は、Java 版と読み方が違う可能性があり確かめていないが、サーバーの鍵でしか署名できないので外から見える違いは無い
 - `sendEmailVerification` は、送り直せる間隔の中で送れないとき、偽と nil の誤りを返す。Claude は、小タスク3.10 と3.11 で、これを Java 版の RATE_LIMITED と同じ 400 の答え(MessageResendRateLimited)に写す。テストの `javaDevSigningKey` と `javaSample` で始まる定数は、開発環境の Java 版が実際に送った確認のリンクの値とその項目なので、後のタスクのテストでも使える
 - `passwordreset.go` の `storePasswordResetToken` は、渡された有効な時間を付け、0以下なら記録を置かずに誤りを返す。Claude は、小タスク3.11 の `VerifyEmail` で、Java 版と同じく確認のリンクの残りの時間を渡す。残りが1ミリ秒より短いと、go-redis は1ミリ秒に切り上げて置き、Java 版は Redis に断られて 500 になりうるので、3.11 でこの境目の扱いを Java 版と比べる
+- `emailverification.go` の `inTransaction` と `loadStoredUser` と `saveUser` は、Java 版の `@Transactional` と `UserRepository.findById` と `MyBatisUserRepository.save` を写した。小タスク3.12 と3.14 で利用者の行を書き換えるときは、これを使う。`isIntegrityViolation` は、Spring が `DataIntegrityViolationException` に訳す SQLSTATE(21000 と、分類 01 02 22 23 27 44)を見分ける。小タスク3.11 の `Register` は、Java 版の `UserRegistrationUseCase` が呼ぶ `Email.create`(Apache Commons の `EmailValidator`。Hibernate の確かめとは別)を写すか、変えた動きの一覧に書く。登録の完了(`completeRegistration`)は、登録の受け付けで確かめ済みのメールアドレスしか届かないので、この確かめを写していない。`loadStoredUser` は連携の行を行の ID でまとめ、Java 版の `toEntity` は小文字にした連携の名前でまとめるので、同じ名前の連携の行が2つあると保存の結果が違う。Java 版の保存ではこの行を作れないので写していないが、小タスク6.5 の変えた動きの一覧に書く
 
 ## 完了条件(全タスク共通)
 

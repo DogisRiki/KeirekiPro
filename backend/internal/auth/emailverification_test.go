@@ -5,12 +5,15 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"hash"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
 )
@@ -260,6 +263,36 @@ func TestEmailVerificationToken_LifetimeText(t *testing.T) {
 	for _, tc := range cases {
 		if got := linkLifetimeText(tc.d); got != tc.want {
 			t.Errorf("linkLifetimeText(%v) = %q, want %q", tc.d, got, tc.want)
+		}
+	}
+}
+
+// TestEmailVerificationComplete_IntegrityViolationCodes は、Spring の SQLErrorCodeSQLExceptionTranslator が
+// DataIntegrityViolationException に訳す PostgreSQL の SQLSTATE を、同じく一意の制約などの違反と見なすことを確かめる。
+// 21000 は sql-error-codes.xml の duplicateKeyCodes から、01 02 22 23 27 44 の分類は SQLStateSQLExceptionTranslator から来る。
+func TestEmailVerificationComplete_IntegrityViolationCodes(t *testing.T) {
+	for code, want := range map[string]bool{
+		"23505": true, "23502": true, "23503": true, "23514": true, "23000": true, "23P01": true,
+		"21000": true, "22001": true, "01000": true, "02000": true, "27000": true, "44000": true,
+		"21001": false, "42P01": false, "40001": false, "08006": false, "57014": false, "2": false, "": false,
+	} {
+		if got := isIntegrityViolation(fmt.Errorf("包んだ誤り: %w", &pgconn.PgError{Code: code})); got != want {
+			t.Errorf("isIntegrityViolation(%q) = %v, want %v", code, got, want)
+		}
+	}
+	if isIntegrityViolation(errors.New("データベースの誤りでない")) {
+		t.Error("isIntegrityViolation(データベースの誤りでない) = true, want false")
+	}
+}
+
+// TestEmailVerificationComplete_PasswordResetLeftToCaller は、目的が PASSWORD_RESET のリンクの書き換えを、
+// 再設定の値を作る呼び出し元に任せ、書き換えずに誤りを返すことを確かめる。
+func TestEmailVerificationComplete_PasswordResetLeftToCaller(t *testing.T) {
+	s := newEmailVerificationTokenService(time.Unix(javaSampleIssuedAt, 0))
+	for _, p := range []emailVerificationPurpose{purposePasswordReset, "UNKNOWN"} {
+		c := emailVerificationClaims{JTI: javaSampleJTI, SubjectID: uuid.New(), Purpose: p, Email: "a@example.com"}
+		if got, err := s.completeEmailVerification(t.Context(), c); err == nil {
+			t.Errorf("completeEmailVerification(%s) = %q, nil, want 誤り", p, got)
 		}
 	}
 }

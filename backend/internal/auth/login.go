@@ -50,6 +50,8 @@ type account struct {
 	TwoFactorEnabled bool
 	// EmailVerified は、Java 版の User.isEmailVerified と同じく、メールアドレスと確認した日時の両方があるときに真である。
 	EmailVerified bool
+	// PendingEmail は、確認を待っている設定待ちのメールアドレスである。無ければ Valid が偽である。
+	PendingEmail pgtype.Text
 	// Roles は、knownRoles の順に並べた役割の名前である。役割が無ければ空の並びで、nil にしない。
 	Roles []string
 }
@@ -274,6 +276,7 @@ func accountFromRows(rows []sqlcgen.GetUserRowsByEmailRow) (account, bool, error
 		PasswordHash:     first.UPassword,
 		TwoFactorEnabled: first.UTwoFactorAuthEnabled,
 		EmailVerified:    first.UEmail.Valid && first.UEmailVerifiedAt.Valid,
+		PendingEmail:     first.UPendingEmail,
 		Roles:            roles,
 	}, true, nil
 }

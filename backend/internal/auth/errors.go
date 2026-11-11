@@ -40,6 +40,9 @@ const (
 	MessageTwoFactorPrerequisiteMissing = "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。"
 	// MessageAdminNeedsTwoFactor は、2段階認証が無効な管理者を読んだときの文言である(User.reconstruct)。
 	MessageAdminNeedsTwoFactor = "管理者の場合は二段階認証が必須です。"
+	// MessagePendingEmailMissing は、メールアドレスがすでにある利用者の設定待ちのメールアドレスを、
+	// 確認のリンクで付け替えようとしたときの文言である(User.promotePendingEmail)。
+	MessagePendingEmailMissing = "設定待ちのメールアドレスが無いため確認できません。"
 
 	// MessageOIDCUnverifiedAccount は、確認の済んでいないアカウントに Google か GitHub のログインを
 	// 結び付けようとしたときの文言である(UnverifiedEmailAccountUseCaseException)。
