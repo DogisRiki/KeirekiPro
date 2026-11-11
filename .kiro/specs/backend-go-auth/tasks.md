@@ -183,7 +183,7 @@
   - 受入基準とテストの対応: 要件1の受入基準1と2(画面の操作に Java 版と同じ答え)は、`auth_test.go` の `TestAuthHandlers_LoginNoBody` `TestAuthHandlers_VerifyTwoFactorCookieOrder` `TestAuthHandlers_VerifyTwoFactorNoChallenge400` `TestAuthHandlers_VerifyEmailNullToken` で確かめる。Java 版との突き合わせは、小タスク6.1 から 6.3 で書く `login.yaml` `two-factor.yaml` `refresh-logout.yaml` `register.yaml` `email-verification.yaml` `password-reset.yaml` の筋書きで確かめる
   - _要件: 1.1, 1.2_
 
-- [ ] 4.3 Google と GitHub の2つの操作の受け口を作る
+- [x] 4.3 Google と GitHub の2つの操作の受け口を作る
 
   Claude は、`startOidcAuthorization` と `handleOidcCallback` の受け口と、要求の `Host` と `Accept` を `context` に入れる生成したコードの中間処理を作る。Claude は、`Content-Type` を Accept で決める規則と、戻り先の URL の作り方を、認証の受け口の節と処理の流れの節のとおりにする。Claude は、Accept が無い要求、`*/*`、axios の既定、`text/plain`、`application/json`、`*/*, application/json` の6つで、Java 版の `Content-Type` の文字列を確かめ、規則と食い違えば Java 版に合わせる。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestAuthOIDCHandlers` が通る
@@ -389,6 +389,8 @@
 - Google と GitHub から戻ったあとの処理は、`oidc.go` ではなく同じパッケージの `oidccallback.go` に置いた(約700行あり、開始の処理と分けたほうが読みやすいため)。`HandleOIDCCallback` は、移る先の URL の全体を `OIDCCallbackResult` の `Location` に入れて返し、成功のときだけ `Session` にログインの状態の値を入れる。受け口(タスク4.3)はこの値をそのまま使う。Java 版の RestClient はどの状態の番号の応答でも本文を読み(`RestClientConfig` の `defaultStatusHandler`)、Jackson は `spring.jackson.use-jackson2-defaults` で先頭の JSON の値のあとを読まないので、Go 版も Google と GitHub の応答を状態の番号によらず読み、先頭の値のあとを読まない。トークンの応答の `expires_in` は、Java 版の `Integer` の項目と同じく `parseJacksonInt` の規則で読めるかだけを確かめ、値は使わない。Google と GitHub の応答の本文は 1 MiB までしか読まない。GitHub の `id` が整数でない数か、オブジェクトか配列のときは、Java 版の `String.valueOf` と同じ文字列を作れないので、利用者の情報の失敗にする。この違いはタスク6.5で変えた動きの一覧に載せる
 - 認証の13の操作は、生成した応答の型ではなく `httpapi` の `authresponses.go` の `authResponse` で答える。生成した応答の型は Set-Cookie を1つしか書けないためである。受け口(タスク4.2、4.3)は、`*auth.Error` を `authErrorResponse` で状態の番号と本文と Cookie に変え、偽が返ったときだけほかの誤りとして扱う。入力の誤りの `errors` の項目は名前の順に書く。Java 版は HashMap の順だが、Java 版との突き合わせの仕組みは JSON の項目を名前で比べるので、食い違いにならない
 - 11の操作の受け口は、`auth.go` の型 `authHandlers` に置き、認証の処理をインタフェース `authService` で受ける(テストで処理の代わりを使うため)。4.3 で Google と GitHub の2つの操作を足すときは、`authService` に `StartOIDC` と `HandleOIDCCallback` を足す。無い Cookie と本文の任意の項目は空の値にして処理に渡す。Java 版は、空の値の Cookie `twoFactorChallenge` を、Cookie が無いときの例外を投げずに空の値のまま処理に渡すので、空の値の Cookie の答えが Go 版と同じかを、6.1〜6.3 の `two-factor.yaml` の筋書きで突き合わせる
+- Google と GitHub の2つの操作の受け口は、`auth.go` に置いた。4.4 では、`NewStrictHandlerWithOptions` に中間処理 `authRequestMiddleware` を渡し(要求の Host と Accept を context に入れる)、`newAuthHandlers` に、ログの出力先、Cookie の Secure、設定の `App.APIBaseURL`(本番の戻り先の URL の基底)、`time.Now` を渡す。`startOidcAuthorization` の Content-Type は、設計の簡単な規則では `*/*, application/json` などで Java 版と食い違ったので、Spring と Tomcat の取り決めを写した。処理は、Java 版と同じく、Accept を調べる前に呼ぶ
+- 6.5 の変えた動きの一覧に載せる、`startOidcAuthorization` の Accept と Host の違い(どれも手元の Java 版で答えを確かめた): (1) `image/*` `application/*+xml`、ASCII でない Accept、`Q=abc` や `Q=2` のような正しくない大文字の Q は、Java 版では誤りの画面の都合で 401、Go 版では 406。(2) 名前の形が正しいが Java が知らない charset は、Java 版では 406、Go 版では受け入れる。(3) 受けられる型の候補が50を超える Accept(`*/*` と `a/b1`〜`a/b49` の50個)は、Java 版では内部の誤りで 500、Go 版では 200。(4) Host の port が数字でない(`8o` `+80`)ときは、Java 版では Tomcat が 400、Go 版では Host をそのまま使うか port を落とす。(5) provider が正しくなく Accept も受けられないときは、Java 版では 500 か 401、Go 版では 400
 
 ## 完了条件(全タスク共通)
 

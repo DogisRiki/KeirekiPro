@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -224,12 +226,14 @@ var errTestBoom = errors.New("データベースの誤りの代わり")
 
 // fakeAuth は、認証の処理の代わりである。呼ばれた操作と引数を calls に記録し、決めた結果と err を返す。
 type fakeAuth struct {
-	calls  []string
-	login  auth.LoginResult
-	tokens auth.SessionTokens
-	access string
-	verify auth.VerifyEmailResult
-	err    error
+	calls    []string
+	login    auth.LoginResult
+	tokens   auth.SessionTokens
+	access   string
+	verify   auth.VerifyEmailResult
+	oidcURL  string
+	callback auth.OIDCCallbackResult
+	err      error
 }
 
 func (f *fakeAuth) record(format string, args ...any) error {
@@ -283,7 +287,7 @@ func (f *fakeAuth) ResetPassword(_ context.Context, token, newPassword string) e
 
 // newTestAuthHandlers は、今の時刻を testNow に決めた受け口を作る。
 func newTestAuthHandlers(svc authService, secure bool) *authHandlers {
-	return newAuthHandlers(svc, secure, func() time.Time { return testNow })
+	return newAuthHandlers(svc, slog.New(slog.NewTextHandler(io.Discard, nil)), secure, "", func() time.Time { return testNow })
 }
 
 // handled は、受け口が返した答えを書いた応答を読む。受け口が誤りを返したら、テストを止める。
@@ -594,7 +598,7 @@ func TestAuthHandlers_VerifyTwoFactorCookieOrder(t *testing.T) {
 // 入力の検査のあとに 400 と「認証セッションが無効または期限切れです。…」で答えることを確かめる(要件1.1、1.2)。
 // 本物の認証の処理を使う。この断り方は、Redis とデータベースを読む前に決まる。
 func TestAuthHandlers_VerifyTwoFactorNoChallenge400(t *testing.T) {
-	h := newAuthHandlers(auth.New(auth.Deps{}), false, time.Now)
+	h := newTestAuthHandlers(auth.New(auth.Deps{}), false)
 	ctx := context.Background()
 	session := &auth.Error{Status: 400, Message: auth.MessageInvalidTwoFactorSession, Errors: map[string][]string{}}
 	cases := []struct {
@@ -655,5 +659,396 @@ func TestAuthHandlers_VerifyEmailNullToken(t *testing.T) {
 			Body: &gen.EmailVerificationTokenRequest{Token: "verify-9"},
 		})
 		checkResponse(t, c.result.Result, handled(t, resp, err), wantResponse{status: 200, contentType: "application/json", body: c.body})
+	}
+}
+
+func (f *fakeAuth) StartOIDC(_ context.Context, provider, redirectURI string) (string, error) {
+	if err := f.record("StartOIDC(%s,%s)", provider, redirectURI); err != nil {
+		return "", err
+	}
+	return f.oidcURL, nil
+}
+
+func (f *fakeAuth) HandleOIDCCallback(_ context.Context, code, state, errParam *string, redirectURI string) auth.OIDCCallbackResult {
+	_ = f.record("HandleOIDCCallback(%s,%s,%s,%s)", show(code), show(state), show(errParam), redirectURI)
+	return f.callback
+}
+
+// show は、無い値を <nil> と書く。
+func show(p *string) string {
+	if p == nil {
+		return "<nil>"
+	}
+	return *p
+}
+
+// oidcTestServer は、Google と GitHub の2つの操作だけを受け口に渡す、生成したコードの受け口の束である。
+type oidcTestServer struct {
+	Unimplemented
+	h *authHandlers
+}
+
+func (s oidcTestServer) StartOidcAuthorization(
+	ctx context.Context, req gen.StartOidcAuthorizationRequestObject,
+) (gen.StartOidcAuthorizationResponseObject, error) {
+	return s.h.StartOidcAuthorization(ctx, req)
+}
+
+func (s oidcTestServer) HandleOidcCallback(
+	ctx context.Context, req gen.HandleOidcCallbackRequestObject,
+) (gen.HandleOidcCallbackResponseObject, error) {
+	return s.h.HandleOidcCallback(ctx, req)
+}
+
+// oidcServer は、受け口 h を、要求の Host と Accept を context に入れる中間処理を通して呼ぶ形にする。
+// 受け口が誤りを返したときは 500 と errTestBoom の文で答える。
+func oidcServer(h *authHandlers) gen.ServerInterface {
+	return gen.NewStrictHandlerWithOptions(oidcTestServer{h: h}, []gen.StrictMiddlewareFunc{authRequestMiddleware},
+		gen.StrictHTTPServerOptions{
+			ResponseErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			},
+		})
+}
+
+// startOIDC は、Host と Accept の行を付けたログインの開始の要求を送る。accept が nil なら Accept を付けない。
+func startOIDC(h *authHandlers, provider, host string, accept []string) *httptest.ResponseRecorder {
+	r := httptest.NewRequest(http.MethodGet, "/api/auth/oidc/authorize?provider="+provider, http.NoBody)
+	r.Host = host
+	for _, a := range accept {
+		r.Header.Add("Accept", a)
+	}
+	w := httptest.NewRecorder()
+	oidcServer(h).StartOidcAuthorization(w, r, gen.StartOidcAuthorizationParams{Provider: provider})
+	return w
+}
+
+// TestAuthOIDCHandlers_ContentTypeByAccept は、ログインの開始の応答の Content-Type が、Java 版の Spring と同じく
+// Accept で決まることを確かめる(要件1.3)。期待する値は、Java 版に同じ Accept を送って返った文字列である。
+// Java 版の Spring は、Accept の型を q の値と具体さの順に並べ、文字列を書ける型のうち最初の具体的な型を選ぶ。
+func TestAuthOIDCHandlers_ContentTypeByAccept(t *testing.T) {
+	const plain = "text/plain;charset=UTF-8"
+	many := func(n int) []string { return []string{strings.TrimSuffix(strings.Repeat("*/*,", n), ",")} }
+	cases := []struct {
+		name   string
+		accept []string
+		want   string
+	}{
+		{name: "Accept が無い", accept: nil, want: plain},
+		{name: "*/*", accept: []string{"*/*"}, want: plain},
+		{name: "axios の既定", accept: []string{"application/json, text/plain, */*"}, want: "application/json"},
+		{name: "text/plain", accept: []string{"text/plain"}, want: plain},
+		{name: "application/json", accept: []string{"application/json"}, want: "application/json"},
+		{name: "*/* のあとの application/json", accept: []string{"*/*, application/json"}, want: "application/json"},
+		{name: "空の Accept", accept: []string{""}, want: plain},
+		{name: "* だけ", accept: []string{"*"}, want: plain},
+		{name: "大文字の型", accept: []string{"TEXT/Plain"}, want: plain},
+		{name: "q の値の大きい text/plain", accept: []string{"application/json;q=0.5, text/plain"}, want: plain},
+		{name: "q=0 も選ぶ", accept: []string{"text/plain;q=0, application/json;q=0.1"}, want: "application/json"},
+		{name: "*/*;q=0", accept: []string{"*/*;q=0"}, want: plain},
+		{name: "text/* より application/json", accept: []string{"text/*, application/json"}, want: "application/json"},
+		{name: "application/*", accept: []string{"application/*"}, want: "application/json"},
+		{name: "application/*+json", accept: []string{"application/*+json;q=0.5, text/plain"}, want: plain},
+		{name: "同じ q の */* と application/json", accept: []string{"*/*;q=0.5, application/json;q=0.5"}, want: "application/json"},
+		{name: "同じ q の text/plain", accept: []string{"*/*;q=0.9, text/plain;q=0.9"}, want: plain},
+		{name: "先に書いた text/plain", accept: []string{"text/plain, application/json"}, want: plain},
+		{name: "先に書いた application/json", accept: []string{"application/json, text/plain"}, want: "application/json"},
+		{
+			name:   "ブラウザの既定",
+			accept: []string{"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+			want:   "text/html;charset=UTF-8",
+		},
+		{name: "image/png", accept: []string{"image/png"}, want: "image/png;charset=UTF-8"},
+		{name: "application/xml", accept: []string{"application/xml"}, want: "application/xml;charset=UTF-8"},
+		{name: "+json の型", accept: []string{"application/problem+json"}, want: "application/problem+json"},
+		{name: "json で終わらない型", accept: []string{"a+b/c+json"}, want: "a+b/c+json;charset=UTF-8"},
+		{name: "JSON の引数はそのまま", accept: []string{"application/json;Foo=Bar"}, want: "application/json;Foo=Bar"},
+		{
+			name:   "JSON の charset は最後",
+			accept: []string{"application/vnd.a+json;charset=utf-8;x=y"},
+			want:   "application/vnd.a+json;x=y;charset=utf-8",
+		},
+		{name: "JSON の charset", accept: []string{"application/json;charset=UTF-8"}, want: "application/json;charset=UTF-8"},
+		{name: "charset の名前の大文字", accept: []string{"text/plain;Charset=utf-8"}, want: "text/plain;charset=utf-8"},
+		{name: "引用符の charset", accept: []string{`text/plain;charset="utf-8"`}, want: "text/plain;charset=utf-8"},
+		{name: "空白の入った charset", accept: []string{"text/plain ; charset = utf-8"}, want: "text/plain;charset=utf-8"},
+		{
+			name:   "charset のあとの引数",
+			accept: []string{"text/plain;charset=utf-8;format=flowed"},
+			want:   "text/plain;format=flowed;charset=utf-8",
+		},
+		{name: "引数の名前は小文字", accept: []string{"text/plain;Format=flowed"}, want: "text/plain;format=flowed;charset=UTF-8"},
+		{
+			name:   "q を除いた引数",
+			accept: []string{"text/plain; format=flowed; q=0.9"},
+			want:   "text/plain;format=flowed;charset=UTF-8",
+		},
+		{name: "q のあとの引数", accept: []string{"text/plain;a=b;q=0.5;c=d"}, want: "text/plain;a=b;c=d;charset=UTF-8"},
+		{name: "大文字の Q は残る", accept: []string{"text/plain;Q=0.5"}, want: "text/plain;q=0.5;charset=UTF-8"},
+		{name: "引用符の中の区切り", accept: []string{`text/plain;a="b,c"`}, want: `text/plain;a="b,c";charset=UTF-8`},
+		{name: "引用符の中の空白", accept: []string{`text/plain;a="b c"`}, want: `text/plain;a="b c";charset=UTF-8`},
+		{name: "= の無い引数", accept: []string{"text/plain;foo"}, want: plain},
+		{name: "引数の多い型", accept: []string{"text/plain;a=1, text/plain"}, want: "text/plain;a=1;charset=UTF-8"},
+		{name: "後の q", accept: []string{"text/plain;q=0.5;q=0.7"}, want: plain},
+		{name: "引用符の q", accept: []string{`text/plain;q="0.5"`}, want: plain},
+		{name: "小数点で始まる q", accept: []string{"text/plain;q=.5"}, want: plain},
+		{name: "d で終わる q", accept: []string{"text/plain;q=0.5d"}, want: plain},
+		{name: "指数の q", accept: []string{"text/plain;q=1e0"}, want: plain},
+		{name: "charset の別名", accept: []string{"text/plain;charset=Shift_JIS"}, want: "text/plain;charset=Shift_JIS"},
+		{name: "2行の Accept", accept: []string{"text/plain;q=0.1", "application/json"}, want: "application/json"},
+		{name: "空の行と Accept", accept: []string{"", "application/json"}, want: "application/json"},
+		{name: "50の型", accept: many(50), want: plain},
+		{name: "q の高い具体的な型", accept: []string{"text/html;q=0.8, */*;q=0.5"}, want: "text/html;charset=UTF-8"},
+		{
+			name:   "名前の大文字と小文字の違う charset",
+			accept: []string{"text/plain;Charset=utf-8;charset=EUC-JP"},
+			want:   "text/plain;charset=EUC-JP",
+		},
+		{name: "同じ名前の引数", accept: []string{"text/plain;a=1;b=2;a=3"}, want: "text/plain;a=3;b=2;charset=UTF-8"},
+		{name: `\ のあとの引用符`, accept: []string{`text/plain;a="b\",c"`}, want: `text/plain;a="b\",c";charset=UTF-8`},
+		{name: "引用符の中の ;", accept: []string{`text/plain;a="b;c"`}, want: `text/plain;a="b;c";charset=UTF-8`},
+		{name: "最後の空の型", accept: []string{"text/plain, "}, want: plain},
+		{name: "application/*+json だけ", accept: []string{"application/*+json"}, want: "application/json"},
+		{name: "text/*", accept: []string{"text/*"}, want: plain},
+		{name: "違う型の引数の数", accept: []string{"text/plain, application/json;a=1"}, want: plain},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := &fakeAuth{oidcURL: "https://accounts.example/auth?x=1&y=2"}
+			w := startOIDC(newTestAuthHandlers(f, false), "google", "localhost:8080", c.accept)
+			if w.Code != http.StatusOK || w.Header().Get("Content-Type") != c.want || w.Body.String() != f.oidcURL {
+				t.Errorf("答え = %d %q %q、期待 = 200 %q %q", w.Code, w.Header().Get("Content-Type"), w.Body.String(), c.want, f.oidcURL)
+			}
+		})
+	}
+
+	// Java 版が 406 で答える Accept。Java 版で 401 になる image/* は、406 の答えを Java 版の誤りの画面が 401 に
+	// 書き換えたものである(変えた動きの一覧に書く)
+	rejected := []struct {
+		name   string
+		accept []string
+	}{
+		{name: "型でない", accept: []string{"foo"}},
+		{name: "下位の型だけ", accept: []string{"text"}},
+		{name: "型の無い", accept: []string{"/plain"}},
+		{name: "下位の型の無い", accept: []string{"text/"}},
+		{name: "* の型", accept: []string{"*/json"}},
+		{name: "空白の入った型", accept: []string{"text/pl ain"}},
+		{name: "日本語の型", accept: []string{"text/文字"}},
+		{name: "1 を超える q", accept: []string{"text/plain;q=2"}},
+		{name: "大文字の Q の誤り", accept: []string{"text/plain;Q=abc"}},
+		{name: "数でない q", accept: []string{"text/plain;q=abc"}},
+		{name: "負の q", accept: []string{"text/plain;q=-0.1"}},
+		{name: "空の引数の値", accept: []string{"text/plain;a="}},
+		{name: "空の引数の名前", accept: []string{"text/plain;=x"}},
+		{name: "空白の入った引数の値", accept: []string{"text/plain;a=b c"}},
+		{name: "記号で始まる charset", accept: []string{"text/plain;charset=-utf8"}},
+		{name: "空の charset", accept: []string{`text/plain;charset=""`}},
+		{name: "記号の入った charset", accept: []string{"text/plain;Charset=utf/8"}},
+		{name: "51の型", accept: many(51)},
+		{name: "具体的な型が無い", accept: []string{"image/*"}},
+		{name: "2行目の誤り", accept: []string{"text/plain", "foo"}},
+	}
+	for _, c := range rejected {
+		t.Run("406 "+c.name, func(t *testing.T) {
+			f := &fakeAuth{oidcURL: "https://accounts.example/auth"}
+			w := startOIDC(newTestAuthHandlers(f, false), "google", "localhost:8080", c.accept)
+			if w.Code != http.StatusNotAcceptable || w.Header().Get("Content-Type") != "" || w.Body.Len() != 0 {
+				t.Errorf("答え = %d %q %q、期待 = 406 で本文と Content-Type が無い", w.Code, w.Header().Get("Content-Type"), w.Body.String())
+			}
+			checkCalls(t, c.name, f, "StartOIDC(google,http://localhost:8080/api/auth/oidc/callback)")
+		})
+	}
+}
+
+// TestAuthOIDCHandlers_StartErrorBeforeAccept は、ログインの開始の処理の誤りが、Java 版と同じく Accept を見る前に
+// 決まることを確かめる(要件1.3)。知らない provider は、読めない Accept でも 400 と誤りの本文で答える。
+func TestAuthOIDCHandlers_StartErrorBeforeAccept(t *testing.T) {
+	w := startOIDC(newTestAuthHandlers(auth.New(auth.Deps{}), false), "nope", "localhost:8080", []string{"foo"})
+	if w.Code != http.StatusBadRequest || w.Body.String() != `{"message":"入力エラーがあります。","errors":{}}` {
+		t.Errorf("答え = %d %q、期待 = 400 と入力の誤りの本文", w.Code, w.Body.String())
+	}
+
+	f := &fakeAuth{err: errTestBoom}
+	w = startOIDC(newTestAuthHandlers(f, false), "google", "localhost:8080", []string{"foo"})
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), errTestBoom.Error()) {
+		t.Errorf("答え = %d %q、期待 = 誤りを返して 500", w.Code, w.Body.String())
+	}
+}
+
+// TestAuthOIDCHandlers_RedirectURIPort80 は、戻り先の URL を、Java 版の DevBaseUrlResolver と同じく要求の Host から、
+// 本番では設定 App.APIBaseURL から作ることを確かめる(要件1.3)。期待する値は、Java 版に同じ Host を送って
+// 返った redirect_uri である。ポートが 80 ならポートを書かず、ポートは数として読み直す。
+func TestAuthOIDCHandlers_RedirectURIPort80(t *testing.T) {
+	const path = "/api/auth/oidc/callback"
+	cases := []struct {
+		name, base, host, want string
+	}{
+		{name: "ポート80", host: "localhost:80", want: "http://localhost" + path},
+		{name: "ポートが無い", host: "localhost", want: "http://localhost" + path},
+		{name: "検査の Host", host: "compat.test", want: "http://compat.test" + path},
+		{name: "ポート8080", host: "localhost:8080", want: "http://localhost:8080" + path},
+		{name: "大文字の名前", host: "LocalHost:8080", want: "http://LocalHost:8080" + path},
+		{name: "ポート443", host: "example.com:443", want: "http://example.com:443" + path},
+		{name: "0 で始まるポート", host: "localhost:08080", want: "http://localhost:8080" + path},
+		{name: "0 で始まるポート80", host: "localhost:0080", want: "http://localhost" + path},
+		{name: "空のポート", host: "localhost:", want: "http://localhost:0" + path},
+		{name: "IPv6", host: "[::1]:8080", want: "http://[::1]:8080" + path},
+		{name: "IPv6 のポート80", host: "[::1]:80", want: "http://[::1]" + path},
+		{name: "IPv6 のポートが無い", host: "[::1]", want: "http://[::1]" + path},
+		{name: "数でないポート", host: "localhost:8o", want: "http://localhost:8o" + path},
+		{name: "本番", base: "https://app.keirekipro.click", host: "localhost:80", want: "https://app.keirekipro.click" + path},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := &fakeAuth{oidcURL: "https://accounts.example/auth"}
+			h := newTestAuthHandlers(f, false)
+			h.apiBaseURL = c.base
+			startOIDC(h, "github", c.host, nil)
+			w := callbackOIDC(h, c.host, gen.HandleOidcCallbackParams{})
+			if w.Code != http.StatusFound {
+				t.Fatalf("戻り先の答え = %d、期待 = 302", w.Code)
+			}
+			checkCalls(t, c.name, f, "StartOIDC(github,"+c.want+")", "HandleOIDCCallback(<nil>,<nil>,<nil>,"+c.want+")")
+		})
+	}
+}
+
+// TestAuthOIDCHandlers_MiddlewareOnlyOIDC は、要求の Host と Accept を context に入れる中間処理が、Google と GitHub の
+// 2つの操作のときだけ値を入れることを確かめる。
+func TestAuthOIDCHandlers_MiddlewareOnlyOIDC(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+	r.Host = "compat.test"
+	r.Header.Add("Accept", "text/plain")
+	r.Header.Add("Accept", "application/json")
+	for op, want := range map[string]authRequestInfo{
+		"StartOidcAuthorization": {host: "compat.test", accept: []string{"text/plain", "application/json"}},
+		"HandleOidcCallback":     {host: "compat.test", accept: []string{"text/plain", "application/json"}},
+		"Login":                  {},
+	} {
+		var got authRequestInfo
+		next := func(ctx context.Context, _ http.ResponseWriter, _ *http.Request, _ any) (any, error) {
+			got = requestInfo(ctx)
+			return nil, nil
+		}
+		if _, err := authRequestMiddleware(next, op)(context.Background(), httptest.NewRecorder(), r, nil); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s の context の値 = %+v、期待 = %+v", op, got, want)
+		}
+	}
+}
+
+// callbackOIDC は、Host を付けた戻り先の要求を送る。
+func callbackOIDC(h *authHandlers, host string, p gen.HandleOidcCallbackParams) *httptest.ResponseRecorder {
+	r := httptest.NewRequest(http.MethodGet, "/api/auth/oidc/callback", http.NoBody)
+	r.Host = host
+	w := httptest.NewRecorder()
+	oidcServer(h).HandleOidcCallback(w, r, p)
+	return w
+}
+
+// TestAuthOIDCHandlers_CallbackFailure302NoBody は、戻り先の要求に、Java 版の OidcCallbackController と同じく、
+// 成功なら 302 と Cookie accessToken と refreshToken で、失敗なら 302 だけで、どちらも本文を書かずに答えることを
+// 確かめる(要件1.3)。失敗の元の誤りはログに書く。
+func TestAuthOIDCHandlers_CallbackFailure302NoBody(t *testing.T) {
+	const front = "http://localhost:5174"
+	session := auth.SessionTokens{AccessToken: "a.b.c", RefreshToken: "d.e.f"}
+	cases := []struct {
+		name     string
+		secure   bool
+		result   auth.OIDCCallbackResult
+		cookies  []string
+		logWants []string
+	}{
+		{
+			name:   "成功",
+			result: auth.OIDCCallbackResult{Location: front + "/resume/list", Session: session},
+			cookies: []string{
+				auth.SessionCookie("accessToken", "a.b.c", false), auth.SessionCookie("refreshToken", "d.e.f", false),
+			},
+		},
+		{
+			name:   "Secure の成功",
+			secure: true,
+			result: auth.OIDCCallbackResult{Location: front + "/resume/list", Session: session},
+			cookies: []string{
+				auth.SessionCookie("accessToken", "a.b.c", true), auth.SessionCookie("refreshToken", "d.e.f", true),
+			},
+		},
+		{
+			name:     "失敗",
+			result:   auth.OIDCCallbackResult{Location: front + "/login?error=x", Cause: errTestBoom},
+			logWants: []string{`"msg":"oidc_callback_error"`, `"level":"ERROR"`, errTestBoom.Error()},
+		},
+		{
+			name:   "元の誤りの無い失敗",
+			result: auth.OIDCCallbackResult{Location: front + "/login?error=unverified_email"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var logs strings.Builder
+			f := &fakeAuth{callback: c.result}
+			h := newTestAuthHandlers(f, c.secure)
+			h.logger = slog.New(slog.NewJSONHandler(&logs, nil))
+			code, state, denied := "c1", "s1", "access_denied"
+			w := callbackOIDC(h, "localhost:8080", gen.HandleOidcCallbackParams{Code: &code, State: &state, Error: &denied})
+			checkCalls(t, c.name, f, "HandleOIDCCallback(c1,s1,access_denied,http://localhost:8080/api/auth/oidc/callback)")
+			if w.Code != http.StatusFound || w.Header().Get("Location") != c.result.Location {
+				t.Errorf("答え = %d %q、期待 = 302 %q", w.Code, w.Header().Get("Location"), c.result.Location)
+			}
+			if got := w.Header().Values("Set-Cookie"); !reflect.DeepEqual(got, c.cookies) {
+				t.Errorf("Set-Cookie = %q、期待 = %q", got, c.cookies)
+			}
+			if w.Body.Len() != 0 || w.Header().Get("Content-Type") != "" {
+				t.Errorf("本文 = %q、Content-Type = %q、期待 = どちらも無い", w.Body.String(), w.Header().Get("Content-Type"))
+			}
+			for _, s := range c.logWants {
+				if !strings.Contains(logs.String(), s) {
+					t.Errorf("ログ = %q、期待 = %q を含む", logs.String(), s)
+				}
+			}
+			if c.logWants == nil && logs.Len() != 0 {
+				t.Errorf("ログ = %q、期待 = 書かない", logs.String())
+			}
+		})
+	}
+}
+
+// TestAuthOIDCHandlers_CompatibleWith は、型が重なるかの判定が、Spring の MimeType.isCompatibleWith の説明の例と
+// 同じになることを確かめる。+ のあとが同じ型どうしは、Accept の型と文字列を書ける型の組み合わせでは答えに出ないため、
+// ここで直接確かめる。
+func TestAuthOIDCHandlers_CompatibleWith(t *testing.T) {
+	mt := func(s string) mediaType {
+		m, ok := parseMediaType(s)
+		if !ok {
+			t.Fatalf("%q を読めない", s)
+		}
+		return m
+	}
+	cases := []struct {
+		a, b string
+		want bool
+	}{
+		{a: "*/*", b: "text/plain", want: true},
+		{a: "text/plain", b: "*/*", want: true},
+		{a: "text/*", b: "text/plain", want: true},
+		{a: "text/plain", b: "text/*", want: true},
+		{a: "text/plain", b: "text/html", want: false},
+		{a: "text/plain", b: "application/plain", want: false},
+		{a: "application/*+xml", b: "application/soap+xml", want: true},
+		{a: "application/soap+xml", b: "application/*+xml", want: true},
+		{a: "application/*+json", b: "application/json", want: true},
+		{a: "application/json", b: "application/*+json", want: true},
+		{a: "application/*+json", b: "application/*+xml", want: false},
+		{a: "application/*+json", b: "text/json", want: false},
+		{a: "application/xml", b: "application/*+json", want: false},
+	}
+	for _, c := range cases {
+		if got := mt(c.a).compatibleWith(mt(c.b)); got != c.want {
+			t.Errorf("%s と %s が重なるか = %v、期待 = %v", c.a, c.b, got, c.want)
+		}
 	}
 }
