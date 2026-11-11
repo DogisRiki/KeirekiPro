@@ -207,7 +207,7 @@
   - _要件: 5.3_
   - _対象の部品: fakeoidc_
 
-- [ ] 5.2 段の4つの種類と、段ごとの欄を確認する処理を足す (並行可)
+- [x] 5.2 段の4つの種類と、段ごとの欄を確認する処理を足す (並行可)
 
   Claude は、筋書きの段を、版に送る段、絶対の URL の段、Redis を書き換える段、値を期限切れにする段の4種類にする。harness は、筋書きを読むときに、段ごとに種類に要る欄があるかと、ほかの種類の欄が無いかを確かめ、外れた段の名前を誤りとして返す。Claude は、筋書きに `oidc_users` と `prepare_each` の欄を足す。harness は、`prepare_each` が真の筋書きに `measure_memory` があれば、その筋書きを読み込みで断る。Claude は、版をまたいで確かめる検査の筋書きの検査(`validateCross`)を、`to` と `expect.status` を版に送る段にだけ求め、最後の段が版に送る段であることを求める形に変える。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestScenarioValidate_StepKinds|TestScenario_PrepareEachRejectsMeasureMemory|TestValidateCross_OnlyVersionSteps'` が通る
@@ -397,6 +397,8 @@
 - 起動のテスト(`cmd/keirekipro/main_test.go`)のデータベースには、表が無い(マイグレーションの履歴を確かめるだけの作りのため)。起動のテストで認証の操作を確かめるときは、表を読む前に断られる要求(入力の検査で断られる要求、受け付けないログインの状態の値)を使う。表を読む答えは、6.x の Java 版と Go 版を比べる検査で確かめる
 - 5.1 で、偽のログインのサービスの初めに戻す口を `POST /_compat/reset` にした。戻すのは両方の提供元の利用者の設定と断る残りの回数だけで、クライアントの値と発行済みのコードとアクセストークンは残す。断らせる口は `PUT /_compat/deny/{provider}`
 - 5.9 で、偽のログインのサービスに証明書と鍵を渡すときは、環境変数の名前の定数 `fakeoidc.CertFileEnv` と `fakeoidc.KeyFileEnv` を使う。TLS の受け口のポートは `fakeoidc.TLSPort`(443)。イメージは distroless の nonroot 版で、root でない利用者が 443 を受けられるのは Docker の既定の設定(コンテナの `net.ipv4.ip_unprivileged_port_start=0`)に頼っているので、5.9 でコンテナの中で 443 を受けられることを確かめる
+- 5.2 で、design.md に名前の無い段の欄を次の形にした。Redis の段は `redis: {del: [キー], set: [{key, value, ttl_seconds}]}`(ttl_seconds は1以上)、期限切れの段は `expire: {cookie: <名前>}` か `expire: {var: <名前>}`、絶対の URL の段は `request.url`。種類は `Step.Kind()` で引く。`oidc_users` の型は harness の `OIDCUsers` で、json の名前は fakeoidc の `GoogleUser` `GitHubUser` と同じ
+- 5.8 で、版に送る段だけを数えて版に割り当てるように直すのは `cross.go` の段の割り当てだけでなく、`compareenv.go` と `coverage.go` の、どの段にも `Request.Method` と `Request.Path` で操作を引く箇所も含む
 
 ## 完了条件(全タスク共通)
 
