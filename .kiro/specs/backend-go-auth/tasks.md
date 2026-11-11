@@ -67,7 +67,7 @@
   - _要件: 2.1, 2.2, 2.3, 6.2_
 
 - [ ] 3. 認証の操作ごとの処理を作る
-- [ ] 3.1 要求の入力の検査を作る (並行可)
+- [x] 3.1 要求の入力の検査を作る (並行可)
 
   Claude は、Java 版の要求の型の注釈を、13の操作ごとの検査の関数に写す。Claude は、`@PasswordMatches` の項目の名前を `PasswordMatchesValidator` で確かめる。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestValidate` が通る
@@ -368,6 +368,10 @@
 - gosec は、`Secure` `HttpOnly` `SameSite` を付けない `http.Cookie` の値を止める(G124)。テストの要求に Cookie を付けるときも当たるので、Claude は、テストでは `r.Header.Add("Cookie", "名前=値")` と書く
 - `auth.Identify` は、データベースを読めないとき、包んだ誤りでパニックにする。`internal/auth` は depguard の決まりで `internal/httpapi/middleware` を読めず、ログを書く部品も持たないので、いちばん外側の `Recover` が、誤りをログに書き、決まった本文の 500 で答える。Claude は、`httpapi.New` に中間処理を並べるタスクで、`Recover` を `Identify` より外に置き、データベースを読めない `Identify` を含めてつないだ場合に、決まった本文の 500 が返ることもテストで確かめる
 - `auth.RequireLogin` は、Spring の `/api/admin/**` に合わせ、`/api/admin` そのものにも役割 `ADMIN` を求める。`/api/adminx` には求めない
+- `@Email` の判定は、Hibernate Validator が呼ぶ JDK の `java.net.IDN.toASCII` を写すため、`idna.go` に nameprep(Unicode 3.2)と Punycode を持つ。表の `nameprep_table.go` は `testdata/nameprep/Gen.java` が JDK から読み出して作り、テストの期待の `email_vectors.txt` と `idna_vectors.txt` は `testdata/nameprep/Vectors.java` が Java 版の判定を動かして作る。どちらも spring のコンテナの Java 21 で動かす(使い方は各ファイルの先頭の注釈)。Claude は、作るときに、基本多言語面のすべての文字を4つの位置に置いた25万件(`Vectors.java exhaustive`)で、Go 版と Java 版の判定の食い違いが0件であることも写しの中で確かめた。Go 版は、`golang.org/x/text` を直接の依存にしない(design.md は go.mod に足す依存を2つに限る)
+- 生成した要求の型は項目を `string` で持つので、Go 版は、項目が無い要求を空の文字列の要求と同じに検査する。Java 版は、項目が無いと値が null になり、`@NotBlank` の文言だけを返す(`@Size` `@Pattern` `@MaxUtf8Bytes` は null を誤りにせず、`@PasswordMatches` は null どうしを一致とみなす)。そのため、`password` の項目が無い要求には「8文字以上」と「英小文字、英大文字、数字」の文言が、`confirmPassword` だけが無い要求には「一致していません」の文言が、Go 版で増える。Claude は、小タスク6.5 で、この違いを変えた動きの一覧に足し、所有者に報告する
+- Claude の Edit の道具は、文字と結合する文字の並び(「ا」と U+0653 など)を、合成した1文字に変えることがある。Claude は、結合する文字をファイルに書くときは、Java では `(char) 0x0301` のように、Go のテストでは `ch(0x0301)` のように、文字の番号で書く
+- 要求の JSON に対になっていないサロゲートの書き方(たとえば `"\ud800"`)があると、Go の `encoding/json` は U+FFFD(UTF-8 で3バイト)に置き換え、Java 版の `MaxUtf8BytesValidator` は `?`(1バイト)と数える。そのため、72バイトの境目の近くのパスワードで、2つの版の判定が変わることがある。画面からは送られない入力である。Claude は、小タスク6.5 で、この違いを、項目が無い要求の違いと並べて、変えた動きの一覧に載せるかを決め、所有者に報告する。
 
 ## 完了条件(全タスク共通)
 
