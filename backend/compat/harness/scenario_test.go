@@ -10,6 +10,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/DogisRiki/KeirekiPro/backend/compat/fakeoidc"
 )
@@ -327,5 +332,97 @@ func TestValidateCross_OnlyVersionSteps(t *testing.T) {
 				t.Errorf("%s: 誤り = %v, want %q を含む", name, err, w)
 			}
 		}
+	}
+}
+
+func TestRedisStep_DelAndSetWithVersionValues(t *testing.T) {
+	ctx := t.Context()
+	container, err := testcontainers.Run(ctx, valkeyImage,
+		testcontainers.WithExposedPorts("6379/tcp"),
+		testcontainers.WithWaitStrategy(wait.ForListeningPort("6379/tcp")),
+	)
+	t.Cleanup(func() {
+		if err := testcontainers.TerminateContainer(container); err != nil {
+			t.Errorf("Valkey のコンテナを止められません: %v", err)
+		}
+	})
+	if err != nil {
+		t.Fatalf("Valkey のコンテナを動かせません: %v", err)
+	}
+	addr, err := container.PortEndpoint(ctx, "6379/tcp", "")
+	if err != nil {
+		t.Fatalf("つなぎ先を読めません: %v", err)
+	}
+	// Java 版と Go 版の Redis の代わりに、1つの Valkey の2つのデータベースを使う
+	clients := map[string]*redis.Client{}
+	for version, db := range map[string]int{"java": 0, "go": 1} {
+		c := redis.NewClient(&redis.Options{Addr: addr, DB: db})
+		t.Cleanup(func() { _ = c.Close() })
+		clients[version] = c
+	}
+	values := map[string]string{"java": "j-1", "go": "g-1"}
+	for version, c := range clients {
+		v := values[version]
+		if err := c.Set(ctx, "refresh:"+v, "old", 0).Err(); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.Set(ctx, "pwreset:"+v, "old", 0).Err(); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.Set(ctx, "keep", "k", 0).Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	step := Step{Name: "expire-link", Redis: &RedisStep{
+		Del: []string{"refresh:{token}", "pwreset:{token}"},
+		Set: []RedisSet{{Key: "reset:{token}", Value: `{"userId":"{token}","n":1}`, TTLSeconds: 60}},
+	}}
+	sessions := map[string]*Session{}
+	for version, v := range values {
+		s := NewSession()
+		s.vars["token"] = v
+		sessions[version] = s
+		if err := s.ApplyRedis(ctx, clients[version], step); err != nil {
+			t.Fatalf("%s: ApplyRedis: %v", version, err)
+		}
+	}
+	for version, c := range clients {
+		v := values[version]
+		keys, err := c.Keys(ctx, "*").Result()
+		if err != nil {
+			t.Fatal(err)
+		}
+		slices.Sort(keys)
+		if want := []string{"keep", "reset:" + v}; !slices.Equal(keys, want) {
+			t.Errorf("%s のキー = %v, want %v", version, keys, want)
+		}
+		if got, _ := c.Get(ctx, "reset:"+v).Result(); got != `{"userId":"`+v+`","n":1}` {
+			t.Errorf("%s の値 = %q", version, got)
+		}
+		if ttl, _ := c.TTL(ctx, "reset:"+v).Result(); ttl <= 50*time.Second || ttl > 60*time.Second {
+			t.Errorf("%s の有効な時間 = %s, want 60秒", version, ttl)
+		}
+	}
+
+	// 差し込めない名前があるときと、差し込んだ値が JSON でないときは、Redis を書き換えずに段の名前を誤りに書く
+	for name, bad := range map[string]*RedisStep{
+		"nothing": {Del: []string{"keep"}, Set: []RedisSet{{Key: "x:{nothing}", Value: `1`, TTLSeconds: 1}}},
+		"del":     {Del: []string{"keep", "y:{nothing}"}},
+		"value":   {Del: []string{"keep"}, Set: []RedisSet{{Key: "x", Value: `{"a":{nothing}}`, TTLSeconds: 1}}},
+		"JSON":    {Del: []string{"keep"}, Set: []RedisSet{{Key: "x", Value: `{"a":{token}}`, TTLSeconds: 1}}},
+	} {
+		err := sessions["java"].ApplyRedis(ctx, clients["java"], Step{Name: "bad", Redis: bad})
+		if err == nil || !strings.Contains(err.Error(), "段 bad") || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s: 誤り = %v, want 段 bad と %q を含む", name, err, name)
+		}
+	}
+	if n, _ := clients["java"].Exists(ctx, "keep").Result(); n != 1 {
+		t.Errorf("誤りの段で keep を消しました")
+	}
+	// つなげない Redis は誤りにする
+	closed := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", MaxRetries: -1, DialTimeout: time.Second})
+	t.Cleanup(func() { _ = closed.Close() })
+	if err := sessions["java"].ApplyRedis(ctx, closed, step); err == nil || !strings.Contains(err.Error(), "段 expire-link") {
+		t.Errorf("つなげない Redis の誤り = %v", err)
 	}
 }

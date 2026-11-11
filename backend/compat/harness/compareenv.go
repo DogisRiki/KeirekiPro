@@ -88,7 +88,6 @@ func (c *CompareEnv) start(ctx context.Context, env *Env, images Images, backend
 		return err
 	}
 	c.fakes = f
-	var urls []string
 	for _, version := range []string{VersionJava, VersionGo} {
 		b := f.backingFor(c.Stores[version], awsHost(version))
 		// JavaSecrets は GoSecrets を含むので、どちらの版のイメージを置いても、読む秘密の値がそろう。
@@ -103,9 +102,8 @@ func (c *CompareEnv) start(ctx context.Context, env *Env, images Images, backend
 			c.Startup[version] = startup
 		}
 		c.URLs[version] = url
-		urls = append(urls, url)
 	}
-	return f.registerRedirects(ctx, urls)
+	return f.registerRedirects(ctx)
 }
 
 // Reset は、両方の版の保存された内容を空にする。データベースは、表の形の履歴を適用した直後に行の無かった表を空にし、

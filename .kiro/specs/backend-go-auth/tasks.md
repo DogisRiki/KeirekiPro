@@ -222,7 +222,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1(リンクや確認のコードを使う要求を筋書きに含める)を支える取り出しは、`capture_test.go` の `TestCapture_Sources`(5つの元)と、値が無いときと正規表現が当たらないときに段と取り出しの名前で失敗する `TestCapture_MissingFailsWithNames` で確かめる。差し込みは `TestSubstitute_BodyHeaderAndCookie` で確かめる。要件5の受入基準3(Google と GitHub のログインの戻り先を版の間で同じにする)を支える `Host` は、`send_test.go` の `TestSend_HostIsCompatTest` で確かめる
   - _要件: 5.1, 5.3_
 
-- [ ] 5.4 絶対の URL の段と Redis を書き換える段を足す
+- [x] 5.4 絶対の URL の段と Redis を書き換える段を足す
 
   Claude は、絶対の URL の段を、`request.url` のホストが `fakeoidc` のときにテストの処理から届くアドレスに書き換えて送り、リダイレクトを追わず、`expect.status` があれば状態の番号だけを確かめ、応答を比べない形で作る。Claude は、Redis を書き換える段を、`redis.del` と `redis.set` を、その版の筋書きの値を差し込んだキーと値で、その版の Redis に書く形で作る。Claude は、`stack.go` の偽のサービスの部品に、偽のログインのサービスを初めの状態に戻す処理と、`oidc_users` の利用者を設定する処理を足す。Claude は、3つの動かし方からこの2つの処理を呼ぶようにする変更を、新しい段と取り出しを3つの動かし方につなぐ小タスク5.8 で行う。Claude は、偽のログインのサービスに登録する戻り先を、版ごとの URL から `http://compat.test/api/auth/oidc/callback` に変える。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestAbsoluteURL|TestRedisStep|TestOIDCUsers|TestStack_RedirectURIIsCompatTest'` が通る
@@ -401,6 +401,8 @@
 - 5.8 で、版に送る段だけを数えて版に割り当てるように直すのは `cross.go` の段の割り当てだけでなく、`compareenv.go` と `coverage.go` の、どの段にも `Request.Method` と `Request.Path` で操作を引く箇所も含む
 - 5.3 で、取り出しの元 `mail:` のメールは `Session.SetMailReader` で渡す部品から読む。5.8 で、compare と cross と perf の動かし方から、版ごとの偽の AWS のメール(compareenv の `records(ctx, version, "emails", ...)`)を読む部品を渡す。部品が無い Session は、`mail:` を持つ段を送らずに失敗する
 - 5.4 で、絶対の URL の段の `request.url` への差し込みには、capture.go の `Session.expand` を使う(パスとヘッダと本文の差し込みと同じ誤りの文になる)
+- 5.8 で、compare と cross と perf の動かし方は、筋書きごとに初めに stack.go の `resetOIDC` を呼び、筋書きの `oidc_users` を `setOIDCUsers` で登録する(5.4 で処理だけを足し、呼び出しはまだ無い)
+- 5.8 で、段の種類で送り方を選ぶ。版の段は `Send`、絶対の URL の段は steps.go の `SendAbsolute` にテストの処理から届く fakeoidc のアドレス(`oidcURL`)を渡す、Redis の段は `ApplyRedis` にその版の Redis の部品を渡す。絶対の URL の段は版の Cookie を送らず、Set-Cookie も覚えず、応答を比べない
 
 ## 完了条件(全タスク共通)
 

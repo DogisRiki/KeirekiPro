@@ -315,18 +315,48 @@ func startBackend(ctx context.Context, env *Env, version string, be Backend, b B
 	return ctr, u, startup, nil
 }
 
-// registerRedirects は、backendURLs の backend の外部のログインの口を、fakeoidc の転送してよい先に登録する。
-// 外部のログインの提供元は、利用者を、要求を受けた backend の URL の口に戻す。テストの処理は外に出したポートで
-// backend を呼ぶので、その URL を登録する。
-func (f *fakes) registerRedirects(ctx context.Context, backendURLs []string) error {
-	var redirects []string
-	for _, u := range backendURLs {
-		redirects = append(redirects, u+oidcCallbackPath)
-	}
+// registerRedirects は、backend の外部のログインの口 http://compat.test/api/auth/oidc/callback を、
+// fakeoidc の転送してよい先に登録する。版に送るすべての要求の Host は CompatHost なので、Java 版と Go 版は、
+// どちらもこの URL を戻り先にする。版ごとのポートの URL は登録しない。
+func (f *fakes) registerRedirects(ctx context.Context) error {
+	redirects := []string{"http://" + CompatHost + oidcCallbackPath}
 	for provider, client := range map[string]fakeoidc.Client{fakeoidc.Google: f.google, fakeoidc.GitHub: f.github} {
 		client.RedirectURIs = redirects
 		if err := f.admin(ctx, http.MethodPut, f.oidcURL+"/_compat/clients/"+provider,
 			"application/x-www-form-urlencoded", client.Form().Encode()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// resetOIDC は、fakeoidc が覚えた利用者と、断る動きを消す。
+func (f *fakes) resetOIDC(ctx context.Context) error {
+	return f.admin(ctx, http.MethodPost, f.oidcURL+"/_compat/reset", "", "")
+}
+
+// setOIDCUsers は、筋書きの oidc_users の利用者を、Google、GitHub の順に fakeoidc に登録する。users が nil なら何もしない。
+func (f *fakes) setOIDCUsers(ctx context.Context, users *OIDCUsers) error {
+	if users == nil {
+		return nil
+	}
+	put := func(provider string, user any) error {
+		b, err := json.Marshal(user)
+		if err != nil {
+			return fmt.Errorf("harness: %s の利用者を JSON にできません: %w", provider, err)
+		}
+		if err := f.admin(ctx, http.MethodPut, f.oidcURL+"/_compat/users/"+provider, "application/json", string(b)); err != nil {
+			return fmt.Errorf("harness: %s の利用者を登録できません: %w", provider, err)
+		}
+		return nil
+	}
+	if users.Google != nil {
+		if err := put(fakeoidc.Google, users.Google); err != nil {
+			return err
+		}
+	}
+	if users.GitHub != nil {
+		if err := put(fakeoidc.GitHub, users.GitHub); err != nil {
 			return err
 		}
 	}

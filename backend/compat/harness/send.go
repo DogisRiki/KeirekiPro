@@ -70,6 +70,12 @@ func (s *Session) Send(ctx context.Context, client *http.Client, baseURL string,
 	if err != nil {
 		return Response{}, err
 	}
+	return s.send(ctx, client, strings.TrimSuffix(baseURL, "/")+path, step, true)
+}
+
+// send は、段 step の要求を target に送る。toVersion が真なら、版に送る要求として、Host を CompatHost にし、
+// Cookie の束の Cookie と csrf のヘッダを付け、応答の Set-Cookie を覚える。偽なら、Cookie の束を使わない。
+func (s *Session) send(ctx context.Context, client *http.Client, target string, step Step, toVersion bool) (Response, error) {
 	headers := make(map[string]string, len(step.Request.Headers))
 	for _, name := range sortedKeys(step.Request.Headers) {
 		v, err := s.expand(step, "ヘッダ "+name+" の値", step.Request.Headers[name])
@@ -96,18 +102,53 @@ func (s *Session) Send(ctx context.Context, client *http.Client, baseURL string,
 		}
 		mailsBefore = len(mails)
 	}
-	req, err := http.NewRequestWithContext(ctx, step.Request.Method, strings.TrimSuffix(baseURL, "/")+path, body)
+	req, err := http.NewRequestWithContext(ctx, step.Request.Method, target, body)
 	if err != nil {
 		return Response{}, fmt.Errorf("harness: 段 %s の要求を作れません: %w", step.Name, err)
 	}
-	// Go の http.Client は、ヘッダの Host を使わず req.Host を使う
-	req.Host = CompatHost
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	for _, name := range sortedKeys(headers) {
 		req.Header.Set(name, headers[name])
 	}
+	if toVersion {
+		if err := s.prepareVersionRequest(req, step); err != nil {
+			return Response{}, err
+		}
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return Response{}, fmt.Errorf("harness: 段 %s の要求を送れません: %w", step.Name, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
+	if err != nil {
+		return Response{}, fmt.Errorf("harness: 段 %s の応答を読めません: %w", step.Name, err)
+	}
+	out := Response{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: respBody}
+	if toVersion {
+		s.storeCookies(resp.Cookies())
+	}
+	var newMails []fakeaws.Email
+	if wantMail {
+		mails, err := s.readMails(ctx, step)
+		if err != nil {
+			return out, err
+		}
+		newMails = mails[min(mailsBefore, len(mails)):]
+	}
+	if err := s.capture(step, out, newMails); err != nil {
+		return out, err
+	}
+	return out, nil
+}
+
+// prepareVersionRequest は、版に送る要求 req の Host を CompatHost にし、Cookie の束の Cookie と csrf のヘッダを付ける。
+func (s *Session) prepareVersionRequest(req *http.Request, step Step) error {
+	// Go の http.Client は、ヘッダの Host を使わず req.Host を使う
+	req.Host = CompatHost
 	// ブラウザと同じく、送る Cookie を1つの Cookie ヘッダに「名前=値」を「; 」でつないで書く
 	var pairs []string
 	if h := req.Header.Get("Cookie"); h != "" {
@@ -122,34 +163,11 @@ func (s *Session) Send(ctx context.Context, client *http.Client, baseURL string,
 	if step.Request.CSRF {
 		token, ok := s.cookie(csrfCookie, req.URL.Path)
 		if !ok {
-			return Response{}, fmt.Errorf("harness: 段 %s は csrf を求めますが、Cookie %s がありません", step.Name, csrfCookie)
+			return fmt.Errorf("harness: 段 %s は csrf を求めますが、Cookie %s がありません", step.Name, csrfCookie)
 		}
 		req.Header.Set(csrfHeader, token)
 	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return Response{}, fmt.Errorf("harness: 段 %s の要求を送れません: %w", step.Name, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
-	if err != nil {
-		return Response{}, fmt.Errorf("harness: 段 %s の応答を読めません: %w", step.Name, err)
-	}
-	out := Response{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: respBody}
-	s.storeCookies(resp.Cookies())
-	var newMails []fakeaws.Email
-	if wantMail {
-		mails, err := s.readMails(ctx, step)
-		if err != nil {
-			return out, err
-		}
-		newMails = mails[min(mailsBefore, len(mails)):]
-	}
-	if err := s.capture(step, out, newMails); err != nil {
-		return out, err
-	}
-	return out, nil
+	return nil
 }
 
 // storeCookies は、応答の Set-Cookie を覚える。Max-Age が0以下か、期限の過ぎた Cookie は、同じ名前とパスの Cookie を消す。

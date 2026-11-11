@@ -3,6 +3,7 @@
 package harness
 
 import (
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -384,5 +385,97 @@ func TestSend_HostIsCompatTest(t *testing.T) {
 	}
 	if CompatHost != "compat.test" {
 		t.Errorf("CompatHost = %q", CompatHost)
+	}
+}
+
+func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
+	type got struct{ uri, host, cookie, test string }
+	var mu sync.Mutex
+	var reqs []got
+	oidc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		reqs = append(reqs, got{uri: r.URL.RequestURI(), host: r.Host, cookie: r.Header.Get("Cookie"), test: r.Header.Get("X-Test")})
+		mu.Unlock()
+		http.SetCookie(w, &http.Cookie{Name: "oidcSession", Value: "o-1", Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+		// 追えば、名前を引けない compat.test へ送ることになり、誤りになる
+		w.Header().Set("Location", "http://compat.test/api/auth/oidc/callback?code=c-9&state=st")
+		w.WriteHeader(http.StatusFound)
+	}))
+	t.Cleanup(oidc.Close)
+	recordedReqs := func() []got {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(reqs)
+	}
+	following := oidc.Client() // リダイレクトを追うクライアント
+
+	s := NewSession()
+	s.vars["state"] = "st"
+	s.vars["id"] = "u-1"
+	s.storeCookies([]*http.Cookie{{Name: "accessToken", Value: "a-1", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode}})
+	step := Step{
+		Name:    "authorize",
+		Request: Request{Method: http.MethodGet, URL: "http://fakeoidc:8080/o/oauth2/v2/auth?state={state}&x=1", Headers: map[string]string{"X-Test": "h-{id}"}},
+		Capture: map[string]string{"code": "header:Location?code"},
+		Expect:  Expect{Status: http.StatusFound},
+	}
+	resp, err := s.SendAbsolute(t.Context(), following, oidc.URL, step)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Status != http.StatusFound {
+		t.Errorf("状態 = %d, want 302(リダイレクトを追わない)", resp.Status)
+	}
+	if s.vars["code"] != "c-9" {
+		t.Errorf("取り出した code = %q", s.vars["code"])
+	}
+	oidcHost := strings.TrimPrefix(oidc.URL, "http://")
+	// ホスト fakeoidc は、テストの処理から届くアドレスに書き換える。版の Cookie は送らず、偽のログインのサービスの Cookie は覚えない
+	want := []got{{uri: "/o/oauth2/v2/auth?state=st&x=1", host: oidcHost, test: "h-u-1"}}
+	if r := recordedReqs(); !slices.Equal(r, want) {
+		t.Errorf("届いた要求 = %+v, want %+v", r, want)
+	}
+	if want := map[cookieKey]string{{name: "accessToken", path: "/"}: "a-1"}; !maps.Equal(s.cookies, want) {
+		t.Errorf("Cookie の束 = %v, want %v", s.cookies, want)
+	}
+
+	// ホストが fakeoidc でない URL は、書き換えずにそのまま送る
+	direct := step
+	direct.Name = "direct"
+	direct.Request.URL = oidc.URL + "/direct?state={state}"
+	if _, err := s.SendAbsolute(t.Context(), following, "http://127.0.0.1:1", direct); err != nil {
+		t.Fatal(err)
+	}
+	if r := recordedReqs(); len(r) != 2 || r[1].uri != "/direct?state=st" {
+		t.Errorf("ホストが fakeoidc でない段の要求 = %+v", r)
+	}
+
+	// expect.status と違う状態は、段の名前と状態を誤りに書く。expect.status が無ければ確かめない
+	wrong := step
+	wrong.Name = "wrong"
+	wrong.Expect = Expect{Status: http.StatusOK}
+	if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, wrong); err == nil || !strings.Contains(err.Error(), "段 wrong") || !strings.Contains(err.Error(), "302") {
+		t.Errorf("状態の違う段の誤り = %v", err)
+	}
+	free := step
+	free.Name = "free"
+	free.Expect = Expect{}
+	if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, free); err != nil {
+		t.Errorf("expect の無い段の誤り = %v", err)
+	}
+
+	// url の差し込めない名前は、送らずに誤りにする。fakeoidc のアドレスを読めないときも誤りにする
+	before := len(recordedReqs())
+	missing := step
+	missing.Name = "missing"
+	missing.Request.URL = "http://fakeoidc:8080/x?state={nothing}"
+	if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, missing); err == nil || !strings.Contains(err.Error(), "段 missing") || !strings.Contains(err.Error(), "nothing") {
+		t.Errorf("差し込めない url の誤り = %v", err)
+	}
+	if _, err := s.SendAbsolute(t.Context(), following, "://bad", step); err == nil || !strings.Contains(err.Error(), "段 authorize") {
+		t.Errorf("読めない fakeoidc のアドレスの誤り = %v", err)
+	}
+	if n := len(recordedReqs()) - before; n != 0 {
+		t.Errorf("送れない段で %d 件の要求を送りました", n)
 	}
 }
