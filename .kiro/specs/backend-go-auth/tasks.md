@@ -112,7 +112,7 @@
   - 受入基準とテストの対応: 要件4の受入基準2(登録を版をまたいで終えられる)のうち記録の形は、`registration_integration_test.go` の `TestRegistration_RecordShape` と `TestRegistration_FindByEmailMax5` と `TestRegistration_Extend24h` で確かめる
   - _要件: 4.2_
 
-- [ ] 3.7 ログインと2段階認証の確認と作り直しとログアウトを作る
+- [x] 3.7 ログインと2段階認証の確認と作り直しとログアウトを作る
 
   Claude は、`Service` の `Login` `VerifyTwoFactor` `Refresh` `Logout` を、Java 版の `LoginUseCase` と `LogoutController` などが処理を進める順と同じ順で処理を進めるように作る。
   - 完了の確かめ方: `go test ./internal/auth/ -run 'TestLogin|TestVerifyTwoFactor|TestRefresh|TestLogout'` が通る
@@ -376,6 +376,9 @@
 - `spring_query.go` の正解の `testdata/springquery/vectors.txt` は、`testdata/springquery/Gen.java` を spring のコンテナの Java 21 で、Java 版と同じ Spring 7.0.10 の jar(spring-core と spring-web と commons-logging と jspecify)を渡して動かして作る。`springQuery` は先頭の `?` を付けないので、Claude は、小タスク3.13 で、問い合わせの無い認可の URL のあとに `?` と `springQuery` の結果をつなぐ
 - Java 版の Jackson が Redis の中の JSON を読む規則(前後の文字、数の小数と文字列、UUID の形、値が null や JSON でないとき)は、開発環境の Java 版の Redis に値を置いて API を呼べば調べられる。`twofactor.go` の `parseJacksonUUID` と `parseJacksonInt` はその結果を写したもので、表は `TestTwoFactor_ReadsChallengeLikeJackson` にある。Claude は、ほかの途中の記録を読むときも、この2つの関数を使う
 - Redis の値の中に JSON を文字列として入れる記録(Java 版の `writeValueAsString` で作った文字列を、もう一度 JSON の文字列にして置く記録)では、中の JSON を `encodeJSONText` で作る。中の JSON は U+10000 以上の文字(絵文字など)をそのまま書き、外の JSON の文字列にするときだけ `encodeJSON` が2つ組の `\u` にする。日時の項目は、Jackson が数、秒の数の文字列、時差の付いた ISO 8601、空の文字列も読むので、`registration.go` の `parseJacksonInstant` を使う
+- `login.go` の `passwordMatches` は、Spring の `BCryptPasswordEncoder.matches` を、開発環境の Java 版で確かめた規則で写す。ハッシュは `$2a$` `$2b$` `$2y$` の形だけを照らす(`$2$` は、Go の bcrypt が鍵の末尾に0のバイトを足して計算し、Java 版と結果が変わるので、照らさずに合わないとする)。強さが4から31の外のハッシュは、Java 版が 500 で答えるので誤りを返す。塩の22文字目に使われない下位の4ビットが立つハッシュは合わないとする。パスワードは先頭の72バイトだけを使う(Go の `bcrypt.CompareHashAndPassword` も先頭の72バイトだけを使うので切り詰めない。72バイトを超えると誤りにするのは `bcrypt.GenerateFromPassword` だけで、ハッシュを作る操作では先に切り詰める)。Claude は、パスワードを照らすほかの操作でも、この関数を使う
+- `login.go` の `accountFromRows` は、役割を USER、ADMIN の順に並べる。Java 版は役割を順の決まらない集合で持つので、ログインの状態の値とログインを続けるための値の `roles` の順が、Java 版では JVM ごとに変わる。Claude は、小タスク6.5 で、この違いを変えた動きの一覧に載せるかを決め、所有者に報告する
+- Java 版の `User.reconstruct` は、利用者を読むたびに、2段階認証が有効でメールアドレスかパスワードが無い利用者と、2段階認証が無効な管理者を、DomainException の 400 で断る。Go 版は、`login.go` の `accountFromRows` で同じ順に確かめる。Claude は、Java 版が `UserRepository` で利用者を読むほかの操作(パスワードの再設定、確認のメールの送り直し、メールアドレスの確認、Google と GitHub のログイン)でも、`findAccountByEmail` か `findAccountByID` を通して読み、この確かめを外さない
 
 ## 完了条件(全タスク共通)
 

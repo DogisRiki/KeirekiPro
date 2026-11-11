@@ -39,6 +39,9 @@ func TestError_MessagesMatchJava(t *testing.T) {
 		{"MessageInvalidTwoFactorCode", MessageInvalidTwoFactorCode, "認証コードが無効または期限切れです。もう一度最初からお試しください。"},
 		{"MessageTwoFactorAttemptsExceeded", MessageTwoFactorAttemptsExceeded, "試行回数の上限に達しました。もう一度最初からお試しください。"},
 		{"MessageUserInfoUnavailable", MessageUserInfoUnavailable, "ユーザー情報の取得に失敗しました。"},
+		// User.reconstruct
+		{"MessageTwoFactorPrerequisiteMissing", MessageTwoFactorPrerequisiteMissing, "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。"},
+		{"MessageAdminNeedsTwoFactor", MessageAdminNeedsTwoFactor, "管理者の場合は二段階認証が必須です。"},
 		// UnverifiedEmailAccountUseCaseException と OidcCallbackController
 		{"MessageOIDCUnverifiedAccount", MessageOIDCUnverifiedAccount, "メールアドレスの確認が済んでいないアカウントには外部連携を結び付けられません。"},
 		{"MessageOIDCUserInfoFailed", MessageOIDCUserInfoFailed, "ユーザー情報の取得に失敗しました。しばらく時間を置いてから再度お試しください。"},

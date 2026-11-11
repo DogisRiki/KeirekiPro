@@ -35,6 +35,11 @@ const (
 	MessageTwoFactorAttemptsExceeded = "試行回数の上限に達しました。もう一度最初からお試しください。"
 	// MessageUserInfoUnavailable は、2段階認証の確認のあとに利用者を読めないときの文言である。
 	MessageUserInfoUnavailable = "ユーザー情報の取得に失敗しました。"
+	// MessageTwoFactorPrerequisiteMissing は、2段階認証が有効なのにメールアドレスかパスワードが無い利用者を
+	// 読んだときの文言である(User.reconstruct)。
+	MessageTwoFactorPrerequisiteMissing = "メールアドレスとパスワードが未設定の場合は二段階認証を有効にできません。"
+	// MessageAdminNeedsTwoFactor は、2段階認証が無効な管理者を読んだときの文言である(User.reconstruct)。
+	MessageAdminNeedsTwoFactor = "管理者の場合は二段階認証が必須です。"
 
 	// MessageOIDCUnverifiedAccount は、確認の済んでいないアカウントに Google か GitHub のログインを
 	// 結び付けようとしたときの文言である(UnverifiedEmailAccountUseCaseException)。
