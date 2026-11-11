@@ -29,7 +29,7 @@
   - 受入基準とテストの対応: 要件3の受入基準6(アカウントが無いのかパスワードが違うのかを見分けられない)は、`errors_test.go` の `TestError_LoginFailureMessageIsSingle` と、3.7 の `login_integration_test.go` の `TestLogin_NoAccountAndWrongPasswordSameError` で確かめる。要件1の受入基準4(エラーの文言)は、`errors_test.go` の `TestError_MessagesMatchJava` で確かめる。500 と 403 の文言が、置き換えの spec の土台の文言と重ならないかも、このテストで確かめる
   - _要件: 1.4, 3.6_
 
-- [ ] 1.5 Redis の JSON の読み書きと結合テストの土台を作る
+- [x] 1.5 Redis の JSON の読み書きと結合テストの土台を作る
 
   Claude は、Java 版の `RedisConfig` と同じ JSON の形で Redis に書いて読む `redisjson.go` を作る。Claude は、`internal/auth` の結合テストのための `TestMain` を作る。`TestMain` は、testcontainers-go で Postgres と Valkey を起動し、`backend.Migrations()` を `migrate.Run` の `Apply` で流して表を作る。Claude は、結合テストのファイルを `_integration_test.go` で終わる名前にし、そのファイルにビルドタグを付けない。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestRedisJSON` が、Postgres と Valkey のコンテナを起動して通る
@@ -361,6 +361,8 @@
 - Claude は、`make compat` `make compat-cross` `make compat-perf` を、筋書きを書く6つ目の大きなまとまりのタスクでだけ流す。どれも Java 版と Go 版のイメージを組み立てるので、1回に長い時間がかかる
 - この PC の `keirekipro.parallelSlots` は1である。Claude は、壊して確かめる写しの `run-check.sh` を同時に流すと、2つ目以降が順番待ちの表示だけを出して終わり、テストが流れない。Claude は、写しを1つずつ、`run-check.sh --wait` で流す
 - `internal/auth` は depguard の決まりで `internal/httpapi/middleware` を読めないので、`auth.MessageUnexpected` と `auth.MessageForbidden` は middleware と同じ文字列を別に持つ。Claude は、両方を読める `internal/httpapi` のテストで、2つの定数が middleware の定数と同じかを確かめる。`errInvalidInput` は渡した束をそのまま `Errors` に入れるので、Claude は nil を渡さない
+- Java 版の Redis の値は、application.yaml の `use-jackson2-defaults` と `JsonMapperConfig` の設定を当てた Jackson で書かれる。そのため、絵文字などの U+10000 以上の文字は、大文字の16進の2つ組の逃がしになる。Claude は、期待する値を設定の無い JsonMapper で作らず、`backend/src/test/resources/baseline-samples/redis/` にある Java 版が置いた値の見本と比べる。`redisjson.go` の `toJacksonEscapes` が、Go の Encoder と Jackson の3つの違いを直す
+- Claude のツールの引数は、逆斜線と u と4桁の16進の並びを、その並びが表す文字に変えてしまう。Claude は、この並びをファイルに書くときは、perl の置き換えで逆斜線を `\x5c` と書き、日本語を含む置き換えには perl を使わない
 
 ## 完了条件(全タスク共通)
 
