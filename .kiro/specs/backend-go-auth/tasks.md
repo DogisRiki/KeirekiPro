@@ -198,7 +198,7 @@
   - _要件: 2.1, 2.2, 2.4, 6.1_
   - _依存: 2.1, 2.3_
 
-- [ ] 5. Java 版と Go 版を比べる検査を広げる
+- [x] 5. Java 版と Go 版を比べる検査を広げる
 - [x] 5.1 偽のログインのサービスに断る動きと TLS の受け口と初めに戻す口を足す (並行可)
 
   Claude は、偽のログインのサービスに、提供元ごとの断る残りの回数を持たせ、`PUT /_compat/deny/{provider}` を受けるたびに1増やし、残りの回数が1以上のときに次のログインの開始を `error=access_denied&state=<state>` で戻して1減らす動きを足す。Claude は、ネットワークの別名 `api.github.com` のポート 443 で TLS を受けて `/user/emails` だけに答える働きを足す。偽のログインのサービスは、起動のときに証明書と鍵のファイルの場所を渡されたときだけ、この働きを始める。証明書と鍵を検査の起動から渡すのは小タスク5.9 である。偽のログインのサービスが、証明書と鍵のファイルの場所を渡されたときだけこの働きを始めるのは、小タスク5.9 より前に偽のログインのサービスを起動する harness のテストも動くようにするためである。Claude は、提供元ごとの利用者の設定と断る残りの回数を初めの状態に戻す口を足す。今の偽のログインのサービスには利用者の設定を消す口が無く、空の値を送ると中身の空の利用者が登録されるためである。
@@ -259,7 +259,7 @@
   - _要件: 4.3, 5.1, 5.6_
   - _依存: 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-- [ ] 5.9 `api.github.com` の証明書と信頼の束を検査の起動につなぐ
+- [x] 5.9 `api.github.com` の証明書と信頼の束を検査の起動につなぐ
 
   Claude は、`tlsalias.go` で、自己署名の認証局と `api.github.com` の証明書を検査のたびに作る。Claude は、`stack.go` の検査の起動を変え、Java 版に `keytool` で作った PKCS12 の信頼の束を `JAVA_TOOL_OPTIONS` で渡し、Go 版に認証局の証明書を `SSL_CERT_FILE` で渡し、偽のログインのサービスに証明書と鍵とネットワークの別名 `api.github.com` を渡すようにする。信頼の束とは、Java 版が信頼する認証局の証明書をまとめたファイルで、Java ではトラストストアと呼ぶ。今の harness には、コンテナにファイルを写す手段が無い。そのため Claude は、`env.go` の `ContainerSpec` に、testcontainers の `Files` でファイルを写す欄を足す。Claude は、`versions.go` の `Backing` と `JavaEnv` と `GoEnv` に、信頼の束と認証局の証明書の置き場を渡す値を足す。Claude は、PKCS12 の信頼の束を、Java 版のイメージで `keytool` を1回だけ動かすコンテナで作る。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestTLSAlias|TestVersionsEnv_TLS'` が通る。5つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る。`/verify-backend` は `-tags compat` のテストを流さないので、加えて `go test -tags compat ./compat/harness/ ./compat/fakeoidc/...` も通る
@@ -408,6 +408,8 @@
 - 5.8 で、測る動かし方にメールを読む部品を渡すときは、perf.go の `prepare` が作る Session に `SetMailReader` を呼ぶ。prepare_each が真の筋書きでは、`MeasureLatency` が回ごとに `prepare` で新しい Session を作るので、初めの Session だけに渡すと2回目から `mail:` の取り出しが誤りになる
 - 5.8 で、段の種類による動かし方は steps.go の `stepTools.send` にまとめた。絶対の URL の段の expect の status は `SendAbsolute` が確かめて誤りを返すので、呼び出し元で `CheckExpect` を重ねない。版をまたぐ動かし方と測る動かし方は、最後の段が版に送る段でない筋書きを誤りにする
 - 5.8 で、測る動かし方は fakeoidc を、測る処理全体の初めと終わりに1回ずつだけ初めの状態に戻す。prepare_each が真の筋書きで、準備の段が fakeoidc の利用者を替えると、2回目からの回は替えたあとの利用者で始まる
+- 5.9 で、`api.github.com` の証明書と鍵と、Java 版の信頼の束は、`NewEnv` が作る作業用のフォルダ(`Env.WorkDir`)に置き、`Terminate` で消す。コンテナに写すファイルは、backend と fakeoidc が root でない利用者で動くので、`ContainerSpec.Files` で 0644 にして写す
+- 5.9 で、`startBackend` が Java 版の位置で `BuildTrustStore` を呼ぶ分かれ道は、harness のテストでは通らない。6.4 の `oidc-github.yaml` で、本物の Java 版のイメージで通ることを確かめる。`JAVA_TOOL_OPTIONS` の信頼の束のパスワードは、JVM の起動の行でコンテナのログに出るが、検査ごとの乱数である
 
 ## 完了条件(全タスク共通)
 

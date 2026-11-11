@@ -42,11 +42,14 @@ type Backend struct {
 	// MeasureStartup が true なら、起動から /healthz が 200 を返すまでの時間を測り、GoStartupLimit を超えたら起動を失敗にする。
 	// Go 版の本番のイメージを置くときに true にする。
 	MeasureStartup bool
+	// JavaTrustStore が true なら、起動の前に、このイメージの keytool で信頼の束を作り、コンテナに写す。
+	// Java 版のイメージを置くときに true にする。
+	JavaTrustStore bool
 }
 
 // JavaBackend は、Java 版のイメージを、Java 版の起動の仕方で置く。
 func JavaBackend(image string) Backend {
-	return Backend{Image: image, Env: JavaEnv, HealthPath: "/actuator/health"}
+	return Backend{Image: image, Env: JavaEnv, HealthPath: "/actuator/health", JavaTrustStore: true}
 }
 
 // GoBackend は、Go 版のイメージを、Go 版の起動の仕方で置く。
@@ -173,6 +176,8 @@ type fakes struct {
 	google    fakeoidc.Client
 	github    fakeoidc.Client
 	client    *http.Client
+	// tls は、fakeoidc が api.github.com として TLS を受ける証明書と、版が信頼する認証局である。
+	tls *TLSAlias
 }
 
 // startFakes は、env のネットワークに、fakeaws と fakeoidc を起動する。awsAliases は、fakeaws を呼ぶ別の名前である。
@@ -188,16 +193,17 @@ func startFakes(ctx context.Context, env *Env, images Images, awsAliases ...stri
 	if err != nil {
 		return nil, err
 	}
-	oidc, err := env.Start(ctx, ContainerSpec{
-		Name:         "fakeoidc",
-		Image:        images[ImageFakeOIDC],
-		ExposedPorts: []string{fakeoidc.Port + "/tcp"},
-		WaitingFor:   wait.ForHTTP("/_compat/healthz").WithPort(fakeoidc.Port + "/tcp"),
-	})
+	// 証明書と鍵は検査のたびに作り、env の作業用のフォルダに置く
+	alias, err := NewTLSAlias(env.WorkDir())
+	if err != nil {
+		return nil, err
+	}
+	oidc, err := env.Start(ctx, fakeOIDCSpec(images[ImageFakeOIDC], alias))
 	if err != nil {
 		return nil, err
 	}
 	f := &fakes{
+		tls:       alias,
 		jwtSecret: rand.Text() + rand.Text(),
 		google:    fakeoidc.Client{ID: "google-" + rand.Text(), Secret: rand.Text()},
 		github:    fakeoidc.Client{ID: "github-" + rand.Text(), Secret: rand.Text()},
@@ -214,8 +220,9 @@ func startFakes(ctx context.Context, env *Env, images Images, awsAliases ...stri
 
 // backingFor は、st の Postgres と Redis と、ネットワークの中の名前 awsHost の fakeaws につなぐ、版のつなぐ先を返す。
 // どの版も、同じ JWT の値と同じ外部のログインのクライアントを使う。
+// fakeoidc が api.github.com として TLS を受けるときは、版が信頼する認証局と信頼の束の置き場も渡す。
 func (f *fakes) backingFor(st *Store, awsHost string) Backing {
-	return Backing{
+	b := Backing{
 		DBHost: st.dbHost, DBPort: "5432", DBName: crossDBName, DBUser: crossDBUser, DBPassword: crossDBPassword,
 		RedisHost: st.redisHost, RedisPort: "6379",
 		JWTSecret:   f.jwtSecret,
@@ -224,6 +231,13 @@ func (f *fakes) backingFor(st *Store, awsHost string) Backing {
 		Google:      f.google,
 		GitHub:      f.github,
 	}
+	if f.tls != nil {
+		b.TrustStore = TrustStorePath
+		b.TrustStorePassword = f.tls.TrustStorePassword
+		b.CACert = CACertPath
+		b.tls = f.tls
+	}
+	return b
 }
 
 // clearRecords は、fakeaws が覚えたオブジェクトとメールを、すべての版について消す。
@@ -289,17 +303,20 @@ func startStack(ctx context.Context, env *Env, images Images) (*Stack, error) {
 // 起動したコンテナと、テストの処理から届く URL と、起動の時間を返す。
 // be.MeasureStartup が true なら、起動から /healthz が 200 を返すまでの時間を測り、GoStartupLimit を超えたら失敗を返す。
 // false なら、起動の時間を測らず、0 を返す。
+// be.JavaTrustStore が true で、b が TLS の別名を持てば、起動の前に be のイメージの keytool で信頼の束を作る。
+// 信頼の束は、検査の中で1回だけ作り、Java 版の位置のどの backend にも同じものを写す。
 func startBackend(ctx context.Context, env *Env, version string, be Backend, b Backing) (*Container, string, time.Duration, error) {
-	spec := ContainerSpec{
-		Name:         "backend-" + version,
-		Image:        be.Image,
-		Env:          be.Env(b),
-		ExposedPorts: []string{backendPort},
-		WaitingFor:   wait.ForHTTP(be.HealthPath).WithPort(backendPort),
+	if be.JavaTrustStore && b.tls != nil {
+		if err := b.tls.BuildTrustStore(ctx, env, be.Image); err != nil {
+			return nil, "", 0, fmt.Errorf("harness: 版 %s の位置の backend の信頼の束を作れません: %w", version, err)
+		}
+	}
+	spec, err := backendSpec(version, be, b)
+	if err != nil {
+		return nil, "", 0, err
 	}
 	var ctr *Container
 	var startup time.Duration
-	var err error
 	if be.MeasureStartup {
 		ctr, startup, err = env.StartGo(ctx, spec)
 	} else {
