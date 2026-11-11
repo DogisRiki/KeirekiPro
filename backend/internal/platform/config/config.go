@@ -33,8 +33,10 @@ type Lookup func(key string) (string, bool)
 
 // App は、サイトと画面と Cookie と送り先の設定である。
 type App struct {
-	SiteName string
-	SiteURL  string
+	// ApplicationName は、Java 版の spring.application.name にあたる名前である。メールアドレスの確認とパスワードの再設定のメールの siteName に使う
+	ApplicationName string
+	SiteName        string
+	SiteURL         string
 	// APIBaseURL は、本番で API の URL を組み立てる元である。dev と test では空にし、要求から組み立てる。
 	APIBaseURL         string
 	FrontendBaseURL    string
@@ -158,6 +160,7 @@ func loadEnv(lookup Lookup) (Env, error) {
 func defaultApp(env Env) App {
 	// dev と test の CORS の許す送り元は、画面に加えて、API の説明画面も許す。開発者が説明画面の「Try it out」で Go 版を呼べるようにするためである(CB-010)
 	app := App{
+		ApplicationName:    "keirekipro",
 		SiteName:           "KeirekiPro",
 		SiteURL:            "https://app.keirekipro.click",
 		FrontendBaseURL:    "http://localhost:5173",

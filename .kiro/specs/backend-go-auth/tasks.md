@@ -1,0 +1,370 @@
+# タスク
+
+- [ ] 1. 認証の処理の土台を作る
+- [x] 1.1 依存と設定とメールのひな形の埋め込みを足す
+
+  Claude は、golang-jwt v5.3.1 を Go 版の依存に足し、google/uuid を直接の依存に変える。Claude は、設定に `App.ApplicationName`(値 `keirekipro`)を足し、Java 版のメールのひな形4つを Go 版に埋め込む `mailtemplates.go` と、埋め込んだひな形から4つのファイル名が読めることを確かめる `mailtemplates_test.go` を作る。Claude は、`docker/backend-go/Dockerfile.prod` の組み立ての段に、`mailtemplates.go` と `src/main/resources/mail` をコピーする手順を、`migrations.go` とマイグレーションのファイルをコピーする手順の隣に足す。この変更は、イメージに入れるファイルを足すだけで、本番の設定の変更ではない。
+  - 完了の確かめ方: `go test ./internal/platform/config/ .` が通り、埋め込んだひな形から4つのファイル名が読める。作業フォルダの最上位で、`docker build -f docker/backend-go/Dockerfile.prod backend` が通る
+  - 受入基準とテストの対応: この小タスクは土台であり、受入基準を直接は確かめない。要件1の受入基準5(メールの件名と本文)は、小タスク3.2 の `mail_test.go` の `TestMail_FourKindsMatchJava` と、小タスク6.2 で書く `register.yaml` と `email-verification.yaml` の筋書きで確かめる
+  - _要件: 1.5_
+
+- [ ] 1.2 ログインした利用者の受け渡しを作る
+
+  Claude は、ログインした利用者の ID と役割を `context` に入れて取り出す `authctx` を作る。ほかのまとまりのパッケージは、`authctx` を呼び出して利用者の ID を得る。
+  - 完了の確かめ方: `authctx_test.go` の、入れた ID と役割を取り出せる場合と、入れていない `context` で `UserID` が `false` を返す場合が通る
+  - 受入基準とテストの対応: 要件2の受入基準4(ほかのまとまりは検査を作り直さず使う)は、`authctx_test.go` の `TestWithAndUserID` と、2.3 の `middleware_test.go` の `TestRequireLogin_PassesAuthctxUser` で確かめる
+  - _要件: 2.4_
+
+- [ ] 1.3 認証の操作の SQL の問い合わせを書いて生成する
+
+  Claude は、認証の操作が `users` `roles` `user_roles` `user_auth_providers` `user_token_versions` を読み書きする問い合わせを `auth.sql` に書き、sqlc でコードを生成する。Claude は、確認の済んでいるかの列と、V7 のマイグレーションで足した列の書き方を、Java 版の MyBatis の問い合わせと `EmailVerificationCompletion` の問い合わせで確かめてから書く。
+  - 完了の確かめ方: `make generate` が `sqlcgen` に認証の問い合わせのコードを生成し、`make generate-check` が通る
+  - 受入基準とテストの対応: この小タスクは土台であり、受入基準を直接は確かめない。要件4の受入基準1と2(版の間で記録を互いに読める)は、6.6 の版をまたいで確かめる検査で確かめる
+  - _要件: 4.1, 4.2_
+
+- [ ] 1.4 認証の処理の入口と誤りの型と乱数を作る
+
+  Claude は、`internal/auth` に、次の3つを作る。1つ目は、認証の処理の入口 `Service` と、部品の束 `Deps` と、組み立ての関数 `New` である。2つ目は、操作の誤りの型 `Error` と、Java 版の文言の定数である。3つ目は、32バイトの乱数の base64url の値と6桁の確認のコードを作る関数である。Claude は、`Error` の部品の節の5つの答えの形を `Error` の項目で表せるようにする。
+  - 完了の確かめ方: `go test ./internal/auth/ -run 'TestError|TestRandom'` が通る
+  - 受入基準とテストの対応: 要件3の受入基準6(アカウントが無いのかパスワードが違うのかを見分けられない)は、`errors_test.go` の `TestError_LoginFailureMessageIsSingle` と、3.7 の `login_integration_test.go` の `TestLogin_NoAccountAndWrongPasswordSameError` で確かめる。要件1の受入基準4(エラーの文言)は、`errors_test.go` の `TestError_MessagesMatchJava` で確かめる。500 と 403 の文言が、置き換えの spec の土台の文言と重ならないかも、このテストで確かめる
+  - _要件: 1.4, 3.6_
+
+- [ ] 1.5 Redis の JSON の読み書きと結合テストの土台を作る
+
+  Claude は、Java 版の `RedisConfig` と同じ JSON の形で Redis に書いて読む `redisjson.go` を作る。Claude は、`internal/auth` の結合テストのための `TestMain` を作る。`TestMain` は、testcontainers-go で Postgres と Valkey を起動し、`backend.Migrations()` を `migrate.Run` の `Apply` で流して表を作る。Claude は、結合テストのファイルを `_integration_test.go` で終わる名前にし、そのファイルにビルドタグを付けない。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestRedisJSON` が、Postgres と Valkey のコンテナを起動して通る
+  - 受入基準とテストの対応: 要件4の受入基準1と2(版の間で記録を互いに読める)のうち値の形は、`redisjson_integration_test.go` の `TestRedisJSON_MatchesJackson`(`<` `>` `&` を置き換えない場合を含む)で確かめる
+  - _要件: 4.1, 4.2_
+
+- [ ] 1.6 Cookie の書き方を作る
+
+  Claude は、Java 版の `CookieUtil` と同じ文字列で `Set-Cookie` の値を作る4つの関数を作る。Claude は、属性の順と `Secure` を置く位置を、Java 版の応答の文字列で確かめる。
+  - 完了の確かめ方: `go test ./internal/auth/ -run Cookie` が、4つの関数の `Secure` の有無ごとの場合で通る。1つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
+  - 受入基準とテストの対応: 要件1の受入基準1(同じ Cookie の名前と性質)は、`cookies_test.go` の `TestSessionCookie` `TestChallengeCookie` `TestDeleteCookie` `TestExpiredAccessTokenCookie` で確かめる
+  - _要件: 1.1, 2.2_
+
+- [ ] 2. ログインの状態を確かめる仕組みを作る
+- [ ] 2.1 安全のヘッダの中間処理を作る (並行可)
+
+  Claude は、Spring Security と同じ6つのヘッダを、次の処理に渡す前に応答に置く中間処理を作る。
+  - 完了の確かめ方: `go test ./internal/httpapi/middleware/ -run TestSecurityHeaders` が通る
+  - 受入基準とテストの対応: 要件1の受入基準1(Java 版と同じ答え)のうちヘッダは、`securityheaders_test.go` の `TestSecurityHeaders_OnAllStatuses`(200、404、403、500)と `TestSecurityHeaders_HandlerOverrideKept` で確かめる。ほかの中間処理が返す応答にもヘッダが付くことは、4.4 の `TestNew_SecurityHeadersOnAllResponses` で確かめる
+  - _要件: 1.1_
+  - _対象の部品: SecurityHeaders_
+
+- [ ] 2.2 ログインの状態の値を作る
+
+  Claude は、Java 版の `JwtProvider` と `UserTokenVersionStore` を写し、ログインの状態の JWT の発行と検証と、ログインの状態の世代の番号の読み書きを作る。データベースを読むテストは `accesstoken_integration_test.go` に、データベースを読まないテストは `accesstoken_test.go` に置く。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestAccessToken` が通る
+  - 受入基準とテストの対応: 要件3の受入基準1(有効な時間)は `accesstoken_integration_test.go` の `TestAccessToken_ExpiresIn10Minutes` で確かめる。要件2の受入基準2(期限切れ、書き換え、使えなくなった値を断る)は、`accesstoken_test.go` の `TestAccessToken_RejectsExpired` `TestAccessToken_RejectsBadSignature` `TestAccessToken_RejectsAlgNone` `TestAccessToken_RejectsNonUUIDSub` と、`accesstoken_integration_test.go` の `TestAccessToken_RejectsOldVersion` で確かめる。要件4の受入基準1(版をまたいでログインし続けられる)のうち値の形は、`accesstoken_integration_test.go` の `TestAccessToken_HeaderAndClaims` で確かめる
+  - _要件: 2.2, 3.1, 4.1_
+
+- [ ] 2.3 値を読む段とログインを求める段を作る
+
+  Claude は、Java 版の `JwtAuthenticationFilter` にあたる `Identify` と、Java 版の `authorizeHttpRequests` にあたる `RequireLogin` の2つの中間処理を作る。`RequireLogin` は、`/api/admin/` の下の 403 の応答の `Content-Type` を、Java 版の `accessDeniedHandler` と同じ `application/json;charset=UTF-8` にする。`Identify` は、データベースが読めないときに、要求を次の処理に渡さず、状態の番号 500 で答える。Claude は、データベースを読むテストを `middleware_integration_test.go` に、データベースを読まないテストを `middleware_test.go` に置く。
+  - 完了の確かめ方: `go test ./internal/auth/ -run 'TestIdentify|TestRequireLogin'` が通る。2つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
+  - 受入基準とテストの対応: 要件2の受入基準1(ログインの状態の無い要求を断る、`OPTIONS` と生きているかの確認は通す)は、`middleware_test.go` の `TestRequireLogin_PublicPathBoundaries`(`/api/auth`、`/api/authx`、`/actuator`、`/healthz`、`OPTIONS`)と `TestRequireLogin_NoUser401` で確かめる。`/api/admin/` の 403 と `Content-Type` は `middleware_test.go` の `TestRequireLogin_AdminForbidden` で確かめる。要件2の受入基準2(無効な値を断り Cookie を消す)は `middleware_integration_test.go` の `TestIdentify_InvalidTokenClearsCookie` で、要件2の受入基準3(利用者が居るかを確かめない)は `TestIdentify_DoesNotCheckUserExists` で確かめる。データベースが読めないときの 500 は `TestIdentify_DBError500` で確かめる。要件6の受入基準2(ログインした要求を処理に渡す)は、`middleware_test.go` の `TestRequireLogin_PassesAuthctxUser` と、Java 版の `JwtProvider` と同じ項目と鍵で作った JWT を Cookie `accessToken` に持つ要求が次の処理に届く、`middleware_integration_test.go` の `TestIdentify_AcceptsJavaIssuedToken` で確かめる
+  - _要件: 2.1, 2.2, 2.3, 6.2_
+
+- [ ] 3. 認証の操作ごとの処理を作る
+- [ ] 3.1 要求の入力の検査を作る (並行可)
+
+  Claude は、Java 版の要求の型の注釈を、13の操作ごとの検査の関数に写す。Claude は、`@PasswordMatches` の項目の名前を `PasswordMatchesValidator` で確かめる。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestValidate` が通る
+  - 受入基準とテストの対応: 要件1の受入基準4(入力の誤りの条件と文言)は、`validate_test.go` の `TestValidate_Boundaries`(空白だけ、50文字と51文字、UTF-8 の72バイトと73バイト、全角の文字、改行を含むパスワード)と `TestValidate_EmailLikeHibernate` で確かめる。要件5の受入基準5(形の誤った要求)は、小タスク6.5 で書く `validation.yaml` の「形の誤った要求」と、変えた動きの一覧の項目で確かめる
+  - _要件: 1.4_
+  - _対象の部品: Validate_
+
+- [ ] 3.2 メールの送り出しを作る (並行可)
+
+  Claude は、埋め込んだひな形の `${名前}` を差し込み、SES で送る `mail.go` を作る。Claude は、4種類のメールの件名と差し込む値を、Mail の部品の節の表のとおりにする。research.md には、試作で Java 版と一致したことだけが書かれ、比べる正解の文字列は無い。そのため Claude は、開発環境の Java 版に4種類のメールを送らせ、LocalStack の SES が受けたメールの件名と本文を、`internal/auth/testdata/mail/` に正解のファイルとして置く。Claude は、正解のファイルと一緒に、Java 版がそのメールに差し込んだ値を `testdata/mail/` に置く。`TestMail_FourKindsMatchJava` は、同じ値を `mail.go` に渡し、件名と本文の全体を正解のファイルと比べる。確認のリンクと確認のコードと利用者の名前は、送るたびに違うためである。Claude は、2段階認証の確認のコードのメールを、開発環境で2段階認証を有効にした利用者でログインして送らせる。Claude は、登録の完了のメールを、開発環境で登録を最後まで済ませて送らせる。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestMail` が通る
+  - 受入基準とテストの対応: 要件1の受入基準5(メールの件名と本文)は、`mail_test.go` の `TestMail_FourKindsMatchJava`(`testdata/mail/` の正解のファイルと比べる)と `TestMail_RejectsOtherTemplateSyntax` で確かめる
+  - _要件: 1.5_
+  - _対象の部品: Mail_
+
+- [ ] 3.3 問い合わせのエスケープを作る (並行可)
+
+  Claude は、URL の問い合わせの部分を Spring の `UriComponentsBuilder.encode()` と同じ規則でエスケープする `spring_query.go` を作る。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestSpringQuery` が通る
+  - 受入基準とテストの対応: 要件1の受入基準3(Google か GitHub のログインの開始の URL が Java 版と同じ)は、`spring_query_test.go` の `TestSpringQuery_MatchesSpring`(空白、`+`、`/`、`:`、`!$'()*+,;:@/?`、日本語)で確かめる
+  - _要件: 1.3_
+  - _対象の部品: OIDC_
+
+- [ ] 3.4 ログインを続けるための値を作る
+
+  Claude は、Java 版の `RedisRefreshTokenStore` と `AuthSessionInvalidator` を写し、ログインを続けるための値の発行と読み出しと削除と、利用者のログインの状態をまとめて使えなくする処理を作る。
+  - 完了の確かめ方: `go test ./internal/auth/ -run 'TestRefreshToken|TestInvalidateSessions'` が通る
+  - 受入基準とテストの対応: 要件3の受入基準1(ログインし直さずに使い続けられる時間)は `refreshtoken_integration_test.go` の `TestRefreshToken_TTL7Days` で、要件3の受入基準5(ほかの端末のログインの状態も使えなくする)は `TestInvalidateSessions_RemovesAllTokens` で確かめる。要件4の受入基準1(版をまたいでログインし続けられる)のうち値の形は `TestRefreshToken_HashFieldsAsJSON` で確かめる
+  - _要件: 3.1, 3.5, 4.1_
+
+- [ ] 3.5 2段階認証の確認のコードと途中の記録を作る
+
+  Claude は、Java 版の `TwoFactorAuthIssueUseCase` と `TwoFactorAuthVerifyUseCase` の、確認のコードと途中の記録の発行と照合を作る。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestTwoFactor` が通る
+  - 受入基準とテストの対応: 要件3の受入基準2(コードの有効な時間と誤りの回数の上限)は、`twofactor_integration_test.go` の `TestTwoFactor_TTL10Minutes` `TestTwoFactor_FifthWrongCodeDeletes` と、誤ったコードで残りの有効な時間が保たれる `TestTwoFactor_WrongCodeKeepsTTL` で確かめる。要件4の受入基準2(途中の手順をまたぐ操作を、版をまたいでも終えられる)のうち途中の記録の形は `TestTwoFactor_ChallengeIsDoubleEncodedJSON` で確かめる
+  - _要件: 3.2, 4.2_
+
+- [ ] 3.6 登録の途中の記録を作る
+
+  Claude は、Java 版の `PendingRegistrationStore` の Redis の実装を写す。Claude は、`createdAt` の書き方と、集合の要素の形と、メールアドレスで最大5件を読む順を、Java 版が置いた値で確かめてから書く。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestRegistration` が通る
+  - 受入基準とテストの対応: 要件4の受入基準2(登録を版をまたいで終えられる)のうち記録の形は、`registration_integration_test.go` の `TestRegistration_RecordShape` と `TestRegistration_FindByEmailMax5` と `TestRegistration_Extend24h` で確かめる
+  - _要件: 4.2_
+
+- [ ] 3.7 ログインと2段階認証の確認と作り直しとログアウトを作る
+
+  Claude は、`Service` の `Login` `VerifyTwoFactor` `Refresh` `Logout` を、Java 版の `LoginUseCase` と `LogoutController` などが処理を進める順と同じ順で処理を進めるように作る。
+  - 完了の確かめ方: `go test ./internal/auth/ -run 'TestLogin|TestVerifyTwoFactor|TestRefresh|TestLogout'` が通る
+  - 受入基準とテストの対応: 要件1の受入基準2(ログイン、2段階認証、ログアウトを終えられる)は `login_integration_test.go` の `TestLogin_Success` `TestVerifyTwoFactor_Success` `TestLogout_Success` で確かめる。要件3の受入基準6(アカウントが無いのかパスワードが違うのかを見分けられない)は `TestLogin_NoAccountAndWrongPasswordSameError` で、要件3の受入基準5(ログアウトでほかの端末も使えなくする)は `TestLogout_InvalidatesAllSessions` で、要件3の受入基準1(作り直し)は `TestRefresh_RejectsOldVersion` で確かめる。登録の途中のアカウントの 409 は `TestLogin_PendingRegistration409` で確かめる
+  - _要件: 1.2, 3.1, 3.2, 3.5, 3.6_
+
+- [ ] 3.8 メールアドレスの確認のリンクと送り直しの制限を作る
+
+  Claude は、Java 版の `JwtEmailVerificationTokenCodec` と `EmailVerificationCurrentTokenStore` と `EmailVerificationMailer` を写し、確認のリンクの値の発行と読み出し、今のリンクの記録、送り直せる間隔の制限、確認のメールの送り出しを作る。
+  - 完了の確かめ方: `go test ./internal/auth/ -run 'TestEmailVerificationToken|TestEmailVerificationRate'` が通る
+  - 受入基準とテストの対応: 要件3の受入基準3(リンクの有効な時間、新しいリンクで前のリンクが使えない)は、`emailverification_integration_test.go` の `TestEmailVerificationToken_TTLByPurpose` と `TestEmailVerificationToken_NewLinkReplacesOld` で確かめる。要件3の受入基準4(送り直せる間隔)は `TestEmailVerificationRate_60Seconds` で確かめる
+  - _要件: 3.3, 3.4_
+
+- [ ] 3.9 パスワードの再設定の値の置き場を作る
+
+  Claude は、Java 版の `PasswordResetTokenStore` の Redis の実装を写し、`passwordreset.go` に、再設定の値を `password-reset:<値>` に10分置く処理と、読む処理と、消す処理を作る。3.11 の `VerifyEmail` と 3.12 の再設定の操作が、この置き場を使う。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestPasswordResetToken` が通る
+  - 受入基準とテストの対応: 要件3の受入基準3(再設定の値の有効な時間)は、`passwordreset_integration_test.go` の `TestPasswordResetToken_TTL10Minutes` で確かめる。要件4の受入基準2(途中の手順をまたぐ操作を、版をまたいでも終えられる)のうち値の形は、`TestPasswordResetToken_ValueIsUserIDJSON` で確かめる
+  - _要件: 3.3, 4.2_
+
+- [ ] 3.10 確認のリンクの分類と確認の書き換えを作る
+
+  Claude は、Java 版の `EmailVerificationLinkClassifier` と `EmailVerificationCompletion` を写し、リンクを結果の名前に分類する処理と、目的ごとの書き換えを1つのトランザクションで行う処理を作る。書き換えは、目的が `REGISTRATION` のときの登録の完了、`ACCOUNT_EMAIL` のときの確認済みにする書き換え(Java 版の `User.verifyEmail`)、`PENDING_EMAIL` のときのメールアドレスの付け替え(Java 版の `User.promotePendingEmail`)の3つである。Go 版にはメールアドレスの変更の操作がまだ無いので、`PENDING_EMAIL` の場面は Java 版と Go 版を比べる検査では作れない。Claude は、この場面を結合テストだけで確かめる。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestEmailVerificationComplete` が通る
+  - 受入基準とテストの対応: 要件3の受入基準3(1回しか使えない)は、`emailverification_integration_test.go` の `TestEmailVerificationComplete_SecondUseAlreadyVerified` で確かめる。要件4の受入基準2(どちらの版に届いた登録も残る)のうち行の形は、`TestEmailVerificationComplete_RowsInOneTransaction` と `TestEmailVerificationComplete_EmailTaken` で確かめる。目的が `ACCOUNT_EMAIL` の書き換えは `TestEmailVerificationComplete_AccountEmailVerified` で、目的が `PENDING_EMAIL` の付け替えは `TestEmailVerificationComplete_PendingEmailPromoted` と、付け替え先のメールアドレスがほかの利用者に使われているときの `TestEmailVerificationComplete_PendingEmailTaken`(結果 `EMAIL_TAKEN`)で確かめる
+  - _要件: 3.3, 4.2_
+
+- [ ] 3.11 新規の登録とメールアドレスの確認と送り直しを作る
+
+  Claude は、`Service` の `Register` `VerifyEmail` `ResendEmailVerification` `ResendEmailVerificationForLogin` を、Java 版のユースケースが処理を進める順と同じ順で処理を進めるように作る。`Register` は、メールの送り出しに失敗したら、置いた登録の途中の記録を消してから誤りを返す。`VerifyEmail` は、Java 版の `VerifyEmailUseCase` と同じく、目的が `PASSWORD_RESET` のリンクでは、3.9 の置き場に再設定の値を置き、結果 `PASSWORD_RESET_READY` と再設定の値を返す。
+  - 完了の確かめ方: `go test ./internal/auth/ -run 'TestRegister|TestVerifyEmail|TestResend'` が通る
+  - 受入基準とテストの対応: 要件1の受入基準2(新規の登録とメールアドレスの確認を終えられる)は、`register_integration_test.go` の `TestRegister_ThenVerifyEmail` で確かめる。要件3の受入基準4(送り直せる間隔)は `TestResend_RateLimited` で、要件3の受入基準3(送り直すと前のリンクが使えない)は `TestResend_OldLinkInvalid` で確かめる。メールの失敗で記録を消すことは `TestRegister_MailFailureRemovesPending` で、目的が `PASSWORD_RESET` のリンクの結果は `TestVerifyEmail_PasswordResetReady` で確かめる
+  - _要件: 1.2, 3.3, 3.4_
+
+- [ ] 3.12 パスワードの再設定を作る
+
+  Claude は、Java 版の `RequestPasswordResetUseCase` `VerifyPasswordResetTokenUseCase` `ResetPasswordUseCase` を写し、`Service` の `RequestPasswordReset` `VerifyPasswordResetToken` `ResetPassword` を、3.9 の置き場を使って作る。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestPasswordReset` が通る
+  - 受入基準とテストの対応: 要件1の受入基準2(再設定のメールを受け取り新しいパスワードでログインできる)は、`passwordreset_integration_test.go` の `TestPasswordReset_ThenLogin` で確かめる。要件3の受入基準3(再設定の値を1回だけ使える)は `TestPasswordReset_TokenSingleUse` で、要件3の受入基準5(ほかの端末のログインの状態を使えなくする)は `TestPasswordReset_InvalidatesAllSessions` で、要件3の受入基準6(アカウントの有無を見分けられない)は `TestPasswordReset_RequestSame204` で確かめる。利用者が居ないときの 401 は `TestPasswordReset_UserGoneClearSession` で確かめる
+  - _要件: 1.2, 3.3, 3.5, 3.6_
+
+- [ ] 3.13 Google と GitHub のログインの開始を作る
+
+  Claude は、`Service` の `StartOIDC` を作る。`StartOIDC` は、`state` と `code_verifier` を Redis に10分置いて、ログインの開始の URL を作る。Claude は、対象の外の `provider` を受けた Java 版の状態の番号と Redis に残るものを確かめる。Claude は、確かめた結果が要件5の受入基準5の形の誤った要求に当たるときは、`StartOIDC` が Redis に記録を残さずに誤りを返すように作る。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestStartOIDC` が通る
+  - 受入基準とテストの対応: 要件1の受入基準3(Java 版と同じ画面に移る)のうち URL の形は、`oidc_integration_test.go` の `TestStartOIDC_URLParamsOrder` で確かめる。要件3の受入基準7(同じブラウザが始めたログインと組になっていることを確かめる)のうち記録の形は `TestStartOIDC_StoresStateFor10Minutes` で確かめる。要件5の受入基準5(対象の外の `provider` を 400 にする)は、400 で答え、Redis に `oidc:` のキーが残らないことを確かめる `TestStartOIDC_UnknownProvider400` で確かめる
+  - _要件: 1.3, 3.7, 4.2, 5.5_
+
+- [ ] 3.14 Google と GitHub から戻ったあとの処理を作る
+
+  Claude は、`Service` の `HandleOIDCCallback` を作り、コードの交換、利用者の情報の読み出し、GitHub のメールアドレスの一覧の読み出し、アカウントの決め方、失敗したときの文言とエスケープを、OIDC の部品の節のとおりに作る。
+  - 完了の確かめ方: `go test ./internal/auth/ -run TestHandleOIDCCallback` が、Google と GitHub の代わりの `httptest` のサーバを相手に通る。3つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
+  - 受入基準とテストの対応: 要件1の受入基準3(ログインが終わったときと失敗したときの移る先と文言)は、`oidc_integration_test.go` の `TestHandleOIDCCallback_NewUser` `TestHandleOIDCCallback_LinkExisting` `TestHandleOIDCCallback_UnverifiedEmail` `TestHandleOIDCCallback_Denied` `TestHandleOIDCCallback_ErrorMessageURLEncoderEscape` で確かめる。要件3の受入基準7(確認済みのメールアドレスだけを使い、`state` の記録が無ければ断る)は `TestHandleOIDCCallback_GitHubPrimaryVerifiedOnly` と `TestHandleOIDCCallback_MissingState` で確かめる
+  - _要件: 1.3, 3.7, 4.2_
+
+- [ ] 4. 認証の受け口をつなぐ
+- [ ] 4.1 認証の操作の応答の型と誤りの本文を作る
+
+  Claude は、認証の操作の応答を、Cookie を2つ以上書ける自分で書いた型で返す `authresponses.go` を作る。Claude は、`*auth.Error` を、Error の部品の節の5つの形の本文と状態の番号と Cookie に変える処理を作る。
+  - 完了の確かめ方: `go test ./internal/httpapi/ -run TestAuthResponses` が通る
+  - 受入基準とテストの対応: 要件1の受入基準1(同じ状態の番号、本文、Cookie)は、`auth_test.go` の `TestAuthResponses_StatusBodyCookies` で確かめる。要件1の受入基準4(エラーの文言)のうち本文の形は、`TestAuthResponses_ErrorBodies`(400、409 の `kind`、401 の Cookie の削除)で確かめる
+  - _要件: 1.1, 1.4_
+
+- [ ] 4.2 ログインと登録と再設定の11の操作の受け口を作る
+
+  Claude は、`auth.go` に、`login` から `resetPassword` までの、Google と GitHub のほかの11の操作の受け口を作る。受け口は、生成した要求の型から値を取り、`Validate` で検査し、`Service` を呼び、4.1 の応答の型で返す。
+  - 完了の確かめ方: `go test ./internal/httpapi/ -run TestAuthHandlers` が通る
+  - 受入基準とテストの対応: 要件1の受入基準1と2(画面の操作に Java 版と同じ答え)は、`auth_test.go` の `TestAuthHandlers_LoginNoBody` `TestAuthHandlers_VerifyTwoFactorCookieOrder` `TestAuthHandlers_VerifyTwoFactorNoChallenge400` `TestAuthHandlers_VerifyEmailNullToken` で確かめる。Java 版との突き合わせは、小タスク6.1 から 6.3 で書く `login.yaml` `two-factor.yaml` `refresh-logout.yaml` `register.yaml` `email-verification.yaml` `password-reset.yaml` の筋書きで確かめる
+  - _要件: 1.1, 1.2_
+
+- [ ] 4.3 Google と GitHub の2つの操作の受け口を作る
+
+  Claude は、`startOidcAuthorization` と `handleOidcCallback` の受け口と、要求の `Host` と `Accept` を `context` に入れる生成したコードの中間処理を作る。Claude は、`Content-Type` を Accept で決める規則と、戻り先の URL の作り方を、認証の受け口の節と処理の流れの節のとおりにする。Claude は、Accept が無い要求、`*/*`、axios の既定、`text/plain`、`application/json`、`*/*, application/json` の6つで、Java 版の `Content-Type` の文字列を確かめ、規則と食い違えば Java 版に合わせる。
+  - 完了の確かめ方: `go test ./internal/httpapi/ -run TestAuthOIDCHandlers` が通る
+  - 受入基準とテストの対応: 要件1の受入基準3(Java 版と同じ画面に移る)は、`auth_test.go` の `TestAuthOIDCHandlers_ContentTypeByAccept` `TestAuthOIDCHandlers_RedirectURIPort80` `TestAuthOIDCHandlers_CallbackFailure302NoBody` で確かめる
+  - _要件: 1.3_
+
+- [ ] 4.4 中間処理の順と処理の束ねを変えて起動につなぐ
+
+  Claude は、`httpapi.New` の `Options` に `Identify` と `AuthHandlers` を足し、中間処理の順、受け口の埋め込みの深さ、経路が `/api/auth/` の下の問い合わせの誤りの 400 を、「httpapi.New の変更」の節のとおりにする。Claude は、`main.go` で `Service` を組み立てて渡す。Claude は、Cookie の値の形の誤りが `ErrorHandlerFunc` に届く場面があるかを確かめ、届くなら Java 版の答えとの違いを 6.5 の変えた動きの一覧の候補に控える。
+  - 完了の確かめ方: `go test ./internal/httpapi/ ./cmd/...` が通り、`go build ./cmd/keirekipro` が通る。4つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通り、カバレッジが下限の 93% に届く
+  - 受入基準とテストの対応: 要件2の受入基準1(ログインの要る操作の 401)は、`server_test.go` の `TestNew_RequireLoginBeforeUnimplemented` で確かめる。要件2の受入基準2(偽の送信の検査で断られた要求でも Cookie を消す)は `TestNew_IdentifyBeforeCSRF` で確かめる。要件6の受入基準1(説明画面からログインできる)のうち経路は `TestNew_AuthHandlersShadowUnimplemented` で確かめる。`/api/auth/` の下の問い合わせの誤りの 400 は `TestNew_AuthQueryError400` で確かめる。要件1の受入基準1(Java 版と同じ答え)のうち、偽の送信の検査が返す 403、パニックの受け止めが返す 500、`/healthz` の応答にも安全のヘッダが付くことは、`TestNew_SecurityHeadersOnAllResponses` で確かめる
+  - _要件: 2.1, 2.2, 2.4, 6.1_
+  - _依存: 2.1, 2.3_
+
+- [ ] 5. Java 版と Go 版を比べる検査を広げる
+- [ ] 5.1 偽のログインのサービスに断る動きと TLS の受け口と初めに戻す口を足す (並行可)
+
+  Claude は、偽のログインのサービスに、提供元ごとの断る残りの回数を持たせ、`PUT /_compat/deny/{provider}` を受けるたびに1増やし、残りの回数が1以上のときに次のログインの開始を `error=access_denied&state=<state>` で戻して1減らす動きを足す。Claude は、ネットワークの別名 `api.github.com` のポート 443 で TLS を受けて `/user/emails` だけに答える働きを足す。偽のログインのサービスは、起動のときに証明書と鍵のファイルの場所を渡されたときだけ、この働きを始める。証明書と鍵を検査の起動から渡すのは小タスク5.9 である。偽のログインのサービスが、証明書と鍵のファイルの場所を渡されたときだけこの働きを始めるのは、小タスク5.9 より前に偽のログインのサービスを起動する harness のテストも動くようにするためである。Claude は、提供元ごとの利用者の設定と断る残りの回数を初めの状態に戻す口を足す。今の偽のログインのサービスには利用者の設定を消す口が無く、空の値を送ると中身の空の利用者が登録されるためである。
+  - 完了の確かめ方: `go test -tags compat ./compat/fakeoidc/...` が通る
+  - 受入基準とテストの対応: 要件5の受入基準3(Google か GitHub がログインを断ったとき)を支える動きは、`fakeoidc_test.go` の `TestDeny_CountsDown` で確かめる。`TestDeny_CountsDown` は、偽のログインのサービスが `PUT /_compat/deny/{provider}` を2回受けると、次のログインの開始を2回断り、3回目は通すことを確かめる。GitHub のメールアドレスの読み出しを支える受け口は `TestTLS_UserEmailsOnly` で、証明書と鍵のファイルが渡されないときに TLS を受けずに起動することは `TestTLS_DisabledWithoutCertFiles` で、初めの状態に戻す口は `TestReset_ClearsUsersAndDenyCount` で確かめる
+  - _要件: 5.3_
+  - _対象の部品: fakeoidc_
+
+- [ ] 5.2 段の4つの種類と、段ごとの欄を確認する処理を足す (並行可)
+
+  Claude は、筋書きの段を、版に送る段、絶対の URL の段、Redis を書き換える段、値を期限切れにする段の4種類にする。harness は、筋書きを読むときに、段ごとに種類に要る欄があるかと、ほかの種類の欄が無いかを確かめ、外れた段の名前を誤りとして返す。Claude は、筋書きに `oidc_users` と `prepare_each` の欄を足す。harness は、`prepare_each` が真の筋書きに `measure_memory` があれば、その筋書きを読み込みで断る。Claude は、版をまたいで確かめる検査の筋書きの検査(`validateCross`)を、`to` と `expect.status` を版に送る段にだけ求め、最後の段が版に送る段であることを求める形に変える。
+  - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestScenarioValidate_StepKinds|TestScenario_PrepareEachRejectsMeasureMemory|TestValidateCross_OnlyVersionSteps'` が通る
+  - 受入基準とテストの対応: 要件5の受入基準1(リンクや確認のコードを使う要求を筋書きに含める)を支える段の形は、`scenario_test.go` の `TestScenarioValidate_StepKinds` で確かめる。`TestScenarioValidate_StepKinds` は、harness が、4種類の段のそれぞれで、要る欄が無い段と、ほかの種類の欄を持つ段を断ることを確かめる。要件5の受入基準6(主な操作の応答の時間を測る)を支える `prepare_each` の欄の制限は `TestScenario_PrepareEachRejectsMeasureMemory` で、要件4の受入基準3(版をまたいで確かめる検査に筋書きを足し、CI で動かす)を支える版をまたぐ筋書きの形は `TestValidateCross_OnlyVersionSteps` で確かめる
+  - _要件: 4.3, 5.1, 5.6_
+  - _対象の部品: harness_
+
+- [ ] 5.3 値の取り出しと差し込みと Host を広げる
+
+  Claude は、`capture.go` に、本文の全体 `text`、ヘッダ `header:<名前>`、ヘッダの URL の問い合わせの項目 `header:<名前>?<項目>`、応答の `Set-Cookie` の値 `cookie:<名前>`、その段のあとに届いた最後のメールの本文 `mail:<正規表現>` の5つの取り出しの元を作る。Claude は、harness が、`{名前}` の差し込みを、経路に加えて、JSON の本文の文字列の値と、`Cookie` ヘッダを含むヘッダの値にも行うようにする。Claude は、harness が、版に送るすべての要求の `Host` の項目に `compat.test` を入れ、送る先のアドレスを版のポートのままにするようにする。
+  - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestCapture|TestSubstitute|TestSend_HostIsCompatTest'` が通る
+  - 受入基準とテストの対応: 要件5の受入基準1(リンクや確認のコードを使う要求を筋書きに含める)を支える取り出しは、`capture_test.go` の `TestCapture_Sources`(5つの元)と、値が無いときと正規表現が当たらないときに段と取り出しの名前で失敗する `TestCapture_MissingFailsWithNames` で確かめる。差し込みは `TestSubstitute_BodyHeaderAndCookie` で確かめる。要件5の受入基準3(Google と GitHub のログインの戻り先を版の間で同じにする)を支える `Host` は、`send_test.go` の `TestSend_HostIsCompatTest` で確かめる
+  - _要件: 5.1, 5.3_
+
+- [ ] 5.4 絶対の URL の段と Redis を書き換える段を足す
+
+  Claude は、絶対の URL の段を、`request.url` のホストが `fakeoidc` のときにテストの処理から届くアドレスに書き換えて送り、リダイレクトを追わず、`expect.status` があれば状態の番号だけを確かめ、応答を比べない形で作る。Claude は、Redis を書き換える段を、`redis.del` と `redis.set` を、その版の筋書きの値を差し込んだキーと値で、その版の Redis に書く形で作る。Claude は、`stack.go` の偽のサービスの部品に、偽のログインのサービスを初めの状態に戻す処理と、`oidc_users` の利用者を設定する処理を足す。Claude は、3つの動かし方からこの2つの処理を呼ぶようにする変更を、新しい段と取り出しを3つの動かし方につなぐ小タスク5.8 で行う。Claude は、偽のログインのサービスに登録する戻り先を、版ごとの URL から `http://compat.test/api/auth/oidc/callback` に変える。
+  - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestAbsoluteURL|TestRedisStep|TestOIDCUsers|TestStack_RedirectURIIsCompatTest'` が通る
+  - 受入基準とテストの対応: 要件5の受入基準1(期限の切れたリンクの要求)を作る段は、`scenario_test.go` の `TestRedisStep_DelAndSetWithVersionValues`(版ごとの値で差し込んだキーを消して置く)で確かめる。要件5の受入基準3(偽のログインのサービスで比べる)を支える段は、`send_test.go` の `TestAbsoluteURL_RewritesHostNoFollow` と、`harness_test.go` の `TestOIDCUsers_ResetAndSet` と `TestStack_RedirectURIIsCompatTest` で確かめる
+  - _要件: 5.1, 5.3_
+  - _依存: 5.1_
+
+- [ ] 5.5 値を期限切れにする段を足す
+
+  Claude は、`expire.go` に、筋書きの中の JWT の値を期限の過ぎた値に書き換えて署名し直す処理を作る。`expire.cookie` を持つ段では、`expire.go` の処理は、Cookie の束のうち `expire.cookie` に書いた名前の Cookie を書き換える。`expire.var` を持つ段では、`expire.go` の処理は、`expire.var` に書いた名前の取り出した値を書き換える。`expire.go` の処理は、2つの JWT を、JWT の項目に `aud` があるかで見分ける。どちらも `alg` は `HS256` なので、`alg` では見分けられない。`expire.go` の処理は、ログインの状態の値では、`iat` を今の11分前に、`exp` を今の1分前にして、`JWT.Secret` の値で署名する。`expire.go` の処理は、メールアドレスの確認のリンクの値では、`lexp` を今の1分前にして、HMAC-SHA256(`JWT.Secret` の値, `keirekipro-email-verification-v1`)で署名する。書き換える値が無いときは、その段の誤りとして筋書きを失敗にする。
+  - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run TestExpire` が通る
+  - 受入基準とテストの対応: 要件5の受入基準1(期限の切れたリンクの要求を筋書きに含める)を支える段は、`expire_test.go` の `TestExpire_AccessTokenKeepsClaims`、`TestExpire_EmailVerificationLexp`、`TestExpire_MissingValueFails` で確かめる。`TestExpire_AccessTokenKeepsClaims` は、書き換えたログインの状態の値で、`sub` と世代の番号と `jti` が残り、`exp` だけが過去になることを確かめる
+  - _要件: 5.1_
+
+- [ ] 5.6 確認のコードとリンクの値と文字の本文の正規化を足す
+
+  Claude は、harness の正規化の処理が、2段階認証の確認のコードを、件名が「2段階認証コードのお知らせ」のメールの本文の1行目と、Redis のキー `2fa:<UUID>` の値でだけ `<code:N>` に置き換えるようにする。Claude は、文字の本文を比べる処理に、`Location` と同じ URL の置き換えを通す。Claude は、URL を置き換える処理が、`#` のあとで `=` を持たない部分も JWT と UUID と乱数の値の置き換えに渡す形に変える。Claude は、harness の正規化の処理が、メールアドレスの確認のリンクの JWT の `aud` `sub` `purpose` `email` を比べ、`lexp` を、harness がメールを送らせた段の応答を受けた時刻との差として比べ、Redis の残りの有効な時間と同じく5秒のずれを許すようにする。偽の AWS の記録には時刻が無いので、harness が自分で持つ時刻を基準にする。確認のリンクの値には `iat` も `exp` も無く、今の正規化の `exp - iat` の差では比べられないためである。
+  - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestNormalizeTwoFactorCode|TestNormalizeEmailVerificationJWT|TestNormalizeTextBodyURL|TestNormalizeURLFragment'` が通る
+  - 受入基準とテストの対応: 要件5の受入基準4(要求のたびに違う値は形を比べる)は、`normalize_test.go` の `TestNormalizeTwoFactorCode_OnlyTargetPlaces`、`TestNormalizeEmailVerificationJWT_LexpAsDelta`、`TestNormalizeTextBodyURL_StateAndChallenge`、`TestNormalizeURLFragment_JWTWithoutEquals` で確かめる。`TestNormalizeEmailVerificationJWT_LexpAsDelta` は、`lexp` の4秒のずれを許し、6秒のずれを差にすることを確かめる。要件5の受入基準2(メールと Redis を比べる)のうち正規化の範囲も、同じテストで確かめる
+  - _要件: 5.2, 5.4_
+
+- [ ] 5.7 回ごとに準備の段を送り直す測り方を足す
+
+  Claude は、`perf.go` の `MeasureLatency` と `perfenv.go` の `measure` を、`prepare_each` が真の筋書きでは、慣らしの回と測る回のそれぞれの前に最後の段より前の段を送り直し、最後の段の時間だけを測る形に変える。慣らしの回数と測る回数は変えない。
+  - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run TestMeasureLatency_PrepareEach` が通る
+  - 受入基準とテストの対応: 要件5の受入基準6(主な操作の応答の時間を測る)のうち、2段階認証の確認を測れることは、`perfmeasure_test.go` の `TestMeasureLatency_PrepareEach` で確かめる。`TestMeasureLatency_PrepareEach` は、準備の段が回ごとに送られ、最後の段の時間だけが返ることを確かめる
+  - _要件: 5.6_
+
+- [ ] 5.8 新しい段と取り出しを3つの動かし方につなぐ
+
+  Claude は、筋書きの1回の実行に、メールを読む部品と Redis を書き換える部品を渡す。比べる動かし方(`compareenv.go` `compare.go`)は、Cookie の束と取り出した値を版ごとに持ち、絶対の URL の段を版ごとに1回ずつ送り、Redis を書き換える段と値を期限切れにする段を版ごとの値で行い、メールを版ごとの偽の AWS の記録から読む。比べる動かし方は、段ごとに応答を受けた時刻を持ち、確認のリンクの `lexp` を比べる正規化の処理に渡す。版をまたぐ動かし方(`crossenv.go` `cross.go`)は、送り先の版を版に送る段だけに割り当て、ほかの3種類の段を数えず、Redis を1回だけ書き換え、メールを1つの偽の AWS の記録から読む。Claude は、3つの動かし方が、筋書きの始めに偽のログインのサービスを初めの状態に戻してから `oidc_users` の利用者を設定し、筋書きの終わりに、筋書きが失敗したときも、初めの状態に戻すようにする。版をまたぐ動かし方の `CrossEnv.Run` は、1つの筋書きを3つの向きで続けて動かし、向きごとに `Reset` と初期のデータの読み込みをやり直す。そのため Claude は、版をまたぐ動かし方では、向きごとに、`Reset` と同じところで、偽のログインのサービスを初めの状態に戻してから `oidc_users` の利用者を設定し直すようにする。設定し直さないと、2つ目と3つ目の向きが、前の向きの途中で替えた利用者のまま始まり、筋書きの場面と違う利用者でログインしたことに検査が気づかない。応答の時間を測る動かし方(`perfenv.go` `perf.go`)は、メールを、その段を送った版の環境の偽の AWS の記録から読む。`perfenv.go` の `StartPerfEnv` が版ごとに環境を作り、偽の AWS は環境ごとに1つずつあるためである。
+  - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestCompareEnv_NewSteps|TestCrossRoute_OnlyVersionSteps|TestCrossEnv_NewSteps|TestPerfEnv_NewSteps'` が通る。3つの動かし方のテストは、`oidc_users` の欄と、`mail:` の取り出しと、Redis を書き換える段と、値を期限切れにする段を含む筋書きを動かす。`TestCompareEnv_NewSteps` は、確認のリンクの `lexp` を、メールを送らせた段の応答を受けた時刻との差として比べる場合を含む。`TestCrossEnv_NewSteps` は、途中で `oidc_users` の利用者を替える筋書きを3つの向きで動かし、どの向きの始めにも `oidc_users` の利用者が設定し直されていることを確かめる場合を含む
+  - 受入基準とテストの対応: 要件5の受入基準1(リンクや確認のコードを使う要求を筋書きに含める)を3つの動かし方で使えることは、上の3つの `NewSteps` のテストで確かめる。要件4の受入基準3(版をまたいで確かめる検査に筋書きを足し、CI で動かす)を支える送り先の決め方は、`TestCrossRoute_OnlyVersionSteps` で確かめる。`TestCrossRoute_OnlyVersionSteps` は、交互の向きで、ほかの3種類の段をはさんでも、版に送る段の数で版が替わることを確かめる
+  - _要件: 4.3, 5.1, 5.6_
+  - _依存: 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
+
+- [ ] 5.9 `api.github.com` の証明書と信頼の束を検査の起動につなぐ
+
+  Claude は、`tlsalias.go` で、自己署名の認証局と `api.github.com` の証明書を検査のたびに作る。Claude は、`stack.go` の検査の起動を変え、Java 版に `keytool` で作った PKCS12 の信頼の束を `JAVA_TOOL_OPTIONS` で渡し、Go 版に認証局の証明書を `SSL_CERT_FILE` で渡し、偽のログインのサービスに証明書と鍵とネットワークの別名 `api.github.com` を渡すようにする。信頼の束とは、Java 版が信頼する認証局の証明書をまとめたファイルで、Java ではトラストストアと呼ぶ。今の harness には、コンテナにファイルを写す手段が無い。そのため Claude は、`env.go` の `ContainerSpec` に、testcontainers の `Files` でファイルを写す欄を足す。Claude は、`versions.go` の `Backing` と `JavaEnv` と `GoEnv` に、信頼の束と認証局の証明書の置き場を渡す値を足す。Claude は、PKCS12 の信頼の束を、Java 版のイメージで `keytool` を1回だけ動かすコンテナで作る。
+  - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestTLSAlias|TestVersionsEnv_TLS'` が通る。5つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る。`/verify-backend` は `-tags compat` のテストを流さないので、加えて `go test -tags compat ./compat/harness/ ./compat/fakeoidc/...` も通る
+  - 受入基準とテストの対応: 要件5の受入基準3(GitHub の比べ方)を支える証明書は、`tlsalias_test.go` の `TestTLSAlias_CertValidForAPIGitHub` と `TestTLSAlias_FilesStayInWorkDir` で確かめる。版に渡す環境変数は、`versions_test.go` の `TestVersionsEnv_TLS`(Java 版の `JAVA_TOOL_OPTIONS` と Go 版の `SSL_CERT_FILE`)で確かめる。Java 版と Go 版が TLS でつながることは、6.4 の `oidc-github.yaml` で確かめる
+  - _要件: 5.3_
+  - _依存: 5.1_
+
+- [ ] 6. 認証の操作の筋書きで Java 版と Go 版を比べる
+- [ ] 6.1 初期のデータとログインと2段階認証と作り直しとログアウトの筋書きを書く
+
+  Claude は、認証の操作の筋書きのために、次の7つを書く。
+
+  1. 確認の済んでいない利用者と、2段階認証を有効にした利用者の2人を置く `fixtures/users/auth-users.sql`。2人は、`basic.sql` の利用者と同じパスワードと、違うメールアドレスを持つ
+  2. design の「認証の操作の筋書き」の筋書きごとの場面のとおりの `login.yaml` `two-factor.yaml` `refresh-logout.yaml`。Claude は、3つの筋書きの `fixtures` に `users/basic.sql` と `users/auth-users.sql` を書く
+  3. 筋書きの動かし方の表のとおりの `modes: [compare, cross]` と、版に送る段ごとの `expect.status`。Claude は、この2つを、この小タスクの3つの筋書きと、小タスク6.2 から 6.4 で書く `register.yaml` `email-verification.yaml` `password-reset.yaml` `oidc-google.yaml` `oidc-github.yaml` に書く。版をまたいで確かめる検査が、版に送る段に `expect.status` を求めるためである
+  4. `login.yaml` の、管理者の経路 `GET /api/admin/users` への段。Claude は、この段を正しいログインの段のすぐあとに置き、`to: other` を付ける
+  5. `refresh-logout.yaml` の、ログアウトのあとの管理者の経路への段。Claude は、この段をログアウトの段のすぐあとに置き、`to: other` を付ける。Claude が管理者の経路への2つの段をすぐあとに置くと、版をまたいで確かめる検査の交互の向きでも、その2つの段は、ログインした版と違う版に送られる
+  6. 2つの値の期限切れ。Claude は、ログインの状態の値の期限切れを `expire.cookie: accessToken` で作り、ログインを続けるための値の期限切れを、Redis を書き換える段で `refresh-token:{取り出した値}` を消して作る
+  7. 途中の手順をまたぐ5つの操作と、作り直しとログアウトの段の `to: other`。Claude は、この小タスクの3つの筋書きと、小タスク6.2 から 6.4 で書く5つの筋書きで、手順の2つ目からの要求を送る段に `to: other` を付ける。その段は、2段階認証の確認の段、作り直しの段、ログアウトの段、確認のリンクでの確認の段、送り直したリンクでの確認の段、再設定の確認の段と再設定の段、`handleOidcCallback` の段である。版をまたいで確かめる検査の送り先を決める `CrossRoute` は、Java 版から Go 版の向きと Go 版から Java 版の向きでは、`to: other` を付けた段と最後の段でだけ版を替える。そのため、Claude が `to: other` を付けないと、手順の1つ目と2つ目の要求が同じ版に送られ、版をまたいで確かめる検査は、1つ目の要求と2つ目からの要求が別々の版に届く場面(要件4の受入基準2)を確かめられない
+
+  - 完了の確かめ方: `make compat` の全体が通り、3つの筋書きの答え、Cookie、ヘッダ、データベース、Redis、メールに違いが出ない。`make compat` の全体には、5つ目の大きなまとまりで harness を変えたあとも、置き換えの spec の段階2の検査(版を自分と比べる検査と、操作の数の検査)が通ることが含まれる
+  - 受入基準とテストの対応: 要件1の受入基準1(Java 版と同じ状態の番号、本文、Cookie)と受入基準2(今の画面で登録、ログイン、2段階認証、ログアウト、再設定を終えられる)は、`login.yaml` の「正しいログイン」と `two-factor.yaml` の「2段階認証のログインと確認」で確かめる。要件3の受入基準1(ログインの状態の有効な時間と、ログインし直さずに使い続けられる時間)は、`refresh-logout.yaml` の「作り直し」と「ログインの状態の値の期限が切れたあとの作り直し」と「ログインを続けるための値の期限が切れたあとの作り直し」で確かめる。要件3の受入基準2(確認のコードの有効な時間と、誤りの回数の上限)は、`two-factor.yaml` の「誤ったコード」と「5回目で上限」で確かめる。要件3の受入基準5(ログアウトでほかの端末のログインの状態も使えなくする)は、`refresh-logout.yaml` の「ログアウトのあとの作り直しとログインの要る操作」で確かめる。要件3の受入基準6(アカウントが無いのかパスワードが違うのかを見分けられない)は、`login.yaml` の「パスワードの誤り」と「アカウントが無い」で確かめる。要件2の受入基準1(ログインの状態を持たない要求を断る)と受入基準2(期限切れ、書き換え、使えなくなったログインの状態の要求を断る)のうち管理者の経路の答えは、`login.yaml` と `refresh-logout.yaml` の管理者の経路への場面で確かめる。Java 版と Go 版は、管理者の経路への要求に、ログインの状態の値を受け入れれば 403 で答え、受け入れなければ 401 で答える。要件5の受入基準1(誤りのある要求も含めた筋書きを書く)と受入基準2(データベースとログインの状態の保存先とメールを比べる)と受入基準4(要求のたびに違う値は形を比べる)は、この3つの筋書きの比べた結果で確かめる
+  - _要件: 1.1, 1.2, 2.1, 2.2, 3.1, 3.2, 3.5, 3.6, 5.1, 5.2, 5.4_
+  - _依存: 4.4, 5.9_
+
+- [ ] 6.2 新規の登録と確認のメールの送り直しの筋書きを書く
+
+  Claude は、`register.yaml` と `email-verification.yaml` を、筋書きごとの場面のとおりに書く。確認のリンクの値は `mail:` で取り出す。期限の切れたリンクは、取り出したリンクの値を `expire.var` で書き換えて作る。Claude は、ログインの画面からの送り直しの場面と「前のリンクが使えないこと」の場面では、Redis を書き換える段で `email-verification:rate:<メールアドレス>` を消してから、送り直しの要求を送る段を置く。
+  - 完了の確かめ方: `make compat` で、2つの筋書きの答えと残したものとメールに違いが出ない
+  - 受入基準とテストの対応: 要件1の受入基準2(新規の登録とメールアドレスの確認を終えられる)は、`register.yaml` の「確認のリンクでの登録の完了」で確かめる。要件1の受入基準5(メールの件名と本文)は、`register.yaml` の「登録の完了のメール」と `email-verification.yaml` の確認のメールで確かめる。要件3の受入基準3(リンクの有効な時間と、1回しか使えないことと、新しいリンクで前のリンクが使えなくなること)は、`register.yaml` の「使い終わったリンク」と `email-verification.yaml` の「期限の切れたリンクでの送り直し」と「前のリンクが使えないこと」で確かめる。要件3の受入基準4(送り直せる間隔の制限)は、`email-verification.yaml` の「送り直せる間隔の制限」で確かめる
+  - _要件: 1.2, 1.5, 3.3, 3.4, 5.1, 5.2_
+
+- [ ] 6.3 パスワードの再設定の筋書きを書く
+
+  Claude は、`password-reset.yaml` を、筋書きごとの場面のとおりに書く。再設定の値は `mail:` で取り出す。期限の切れた値は Redis を書き換える段で `password-reset:{取り出した値}` を消して作り、値は有効だが利用者が居ない場面は、Redis を書き換える段で、筋書きに書いた値のキーに居ない利用者の ID を置いて作る。ほかの端末のログインの状態は、再設定の前のログインで `cookie:accessToken` で取り出した値を、再設定のあとに `Cookie` ヘッダに差し込んで送る。
+  - 完了の確かめ方: `make compat` で、`password-reset.yaml` の答えと残したものとメールに違いが出ない
+  - 受入基準とテストの対応: 要件1の受入基準2(再設定のメールを受け取り、新しいパスワードでログインできる)は、`password-reset.yaml` の「再設定」で確かめる。要件3の受入基準3(再設定のリンクの有効な時間と、1回しか使えないこと)は、`password-reset.yaml` の「期限の切れた値」と「使い終わった値」で確かめる。要件3の受入基準5(再設定でほかの端末のログインの状態も使えなくする)は、`password-reset.yaml` の「再設定のあとのほかの端末のログインの状態」で確かめる。要件3の受入基準6(アカウントがあるかを答えから見分けられない)は、`password-reset.yaml` の「アカウントが無いメールアドレス」で確かめる
+  - _要件: 1.2, 3.3, 3.5, 3.6, 5.1_
+
+- [ ] 6.4 Google と GitHub のアカウントでのログインの筋書きを書く
+
+  Claude は、`oidc-google.yaml` と `oidc-github.yaml` を、筋書きごとの場面のとおりに書く。開始の要求は、Accept が無いものと、axios の既定の Accept を付けたものの2つを送る。どの場面も、開始の応答から `text` でログインの開始の URL を取り出し、絶対の URL の段で偽のログインのサービスに送り、`header:Location?code` と `header:Location?state` で取り出した値を差し込んで、`handleOidcCallback` を `request.path` の形の版に送る段で送る。`path` の形で送るのは、操作の数の検査(`TestCoverage_Operations`)が、`path` の形の段だけを操作として数えるためである。Claude は、「断られたとき」の場面の筋書きを、絶対の URL の段で `PUT /_compat/deny/<提供元>` を送ってから、ログインの開始の要求を送る形で書く。Claude は、途中で利用者を替える場面の筋書きでは、利用者を替えるところに、絶対の URL の段で `PUT /_compat/users/<提供元>` を送る段を置く。
+  - 完了の確かめ方: `make compat` で、2つの筋書きの答え、`Location`、Cookie、データベース、Redis に違いが出ない
+  - 受入基準とテストの対応: 要件5の受入基準3(Google か GitHub のアカウントでのログインを、偽のログインのサービスを使って比べる)の4つの場面は、2つの筋書きの「初めての利用者」「登録済みのアカウントへのつなぎ」「確認の済んでいないアカウント」「断られたとき」で確かめる。要件1の受入基準3(Google か GitHub でログインでき、Java 版と同じ画面に移り、同じ文言を見せる)は、同じ場面の `Location` と開始の応答の比べた結果で確かめる。要件3の受入基準7(確認済みのメールアドレスだけを使い、同じブラウザが始めたログインと組になっていることを確かめる)は、`oidc-github.yaml` の「確認済みのメールアドレスが無い利用者」と、両方の「`state` の記録が無いとき」で確かめる
+  - _要件: 1.3, 3.7, 5.3_
+
+- [ ] 6.5 ログインの状態の検査と入力の誤りの筋書きと変えた動きの一覧を書く
+
+  Claude は、`require-login.yaml` と `validation.yaml` を、design の「認証の操作の筋書き」の筋書きごとの場面のとおりに、筋書きの動かし方の表のとおり `modes: [compare]` で書き、`changed-behaviors.yaml` に CB-011 からの項目を、変えた動きの一覧の項目の節のとおりに足す。期限を切らした値は `expire.cookie: accessToken` で作り、書き換えた値は筋書きに書いた署名の合わない JWT を `Cookie` ヘッダで送り、ログアウトで使えなくなった値は取り出した値を `Cookie` ヘッダに差し込んで送る。Claude は、小タスク4.4 で控えた、Cookie の値の形の誤りが `ErrorHandlerFunc` に届く場面の Java 版との違いと、筋書きで見つかった、Java 版が 500 で答える要求を、要求ごとに1つの項目にする。
+  - 完了の確かめ方: `make compat` で、2つの筋書きに、変えた動きの一覧に載せた違いのほかの違いが出ない
+  - 受入基準とテストの対応: 要件2の受入基準1(ログインの状態を持たない要求を断り、`OPTIONS` と生きているかの確認は通す)と受入基準2(期限切れ、書き換え、使えなくなったログインの状態の要求を断る)は `require-login.yaml` の「Cookie の無い要求」「期限を切らした値」「書き換えた値」「ログアウトで使えなくなった値」「無効な値での書き込みの要求」「`OPTIONS` と `/actuator/health`」で確かめる。要件2の受入基準3(利用者が居るかを確かめない)は、2.3 の `TestIdentify_DoesNotCheckUserExists` で確かめる。要件1の受入基準4(入力の誤りの条件とエラーの文言)は `validation.yaml` の13の操作の入力の誤りで、要件5の受入基準1のうち偽の要求を見分けるヘッダを付けない要求は `validation.yaml` の「偽の送信の検査のヘッダを付けない要求」で、要件5の受入基準5(形の誤った要求に 400 で答え、変えた動きの一覧に載せる)は `validation.yaml` の「形の誤った要求」と変えた動きの一覧の項目で確かめる
+  - _要件: 1.4, 2.1, 2.2, 2.3, 5.1, 5.5_
+
+- [ ] 6.6 版をまたいで確かめる検査を通す
+
+  Claude は、6.1 から 6.4 で `modes` に `cross` を書いた筋書きを、Java 版から Go 版、Go 版から Java 版、交互の3つの向きで動かし、違いが出た筋書きを直す。この検査は、途中の手順をまたぐ5つの操作と、ログインした版と違う版への管理者の経路への要求を含む。
+  - 完了の確かめ方: `make compat-cross` が通る。`go test -tags compat -run TestCrossRoute_AuthProcedureSteps ./compat/harness/` が通る。このテストは、認証の筋書きを読み、Java 版から Go 版の向きと Go 版から Java 版の向きのそれぞれの `CrossRoute` の結果で、管理者の経路への段と、小タスク6.1 で `to: other` を付けた、途中の手順の2つ目からの要求を送る段と作り直しの段とログアウトの段が、その前の版に送る段と違う版に送られることを確かめる。Claude は、このテストを、`backend/compat/harness/cross.go` のテストのファイルとして `backend/compat/harness/cross_test.go` を作って置く
+  - 受入基準とテストの対応: 要件4の受入基準1(一方の版でログインした利用者が、もう一方の版でもログインし直さずに使い続けられる)は、ログインした版と違う版への管理者の経路への要求と、作り直しとログアウトの3つの向きで確かめる。要件4の受入基準2(途中の手順をまたぐ5つの操作を、版をまたいでも終えられる)は5つの操作の3つの向きで、要件4の受入基準3(版をまたいで確かめる検査に筋書きを足し、CI で動かす)は `make compat-cross` が CI で動く `TestCross_` の検査で確かめる
+  - _要件: 4.1, 4.2, 4.3_
+
+- [ ] 6.7 主な操作の応答の時間を測る
+
+  Claude は、`login-perf.yaml` `two-factor-perf.yaml` `refresh-perf.yaml` `register-perf.yaml` を、筋書きの動かし方の表のとおりに、`modes` を `perf` にして書く。`two-factor-perf.yaml` は、`prepare_each` を真にし、`measure_memory` を付けず、`auth-users.sql` の2段階認証を有効にした利用者を使い、ログインの段のあとに届いたメールから確認のコードを `mail:` で取り出す。Claude は、置き換えの spec の測り方で4つの操作の応答の時間を測り、結果を `progress.md` の決まりのとおりに書く。
+  - 完了の確かめ方: `make compat-perf` が4つの操作を測り、`progress.md` に結果が書かれる。6つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
+  - 受入基準とテストの対応: 要件5の受入基準6(主な操作の応答の時間を測る)は、`make compat-perf` の `TestPerf_` の検査の結果で確かめる
+  - _要件: 5.6_
+
+- [ ] 7. API の説明画面で確かめて進み具合を書く
+- [ ] 7.1 API の説明画面でログインを確かめる
+
+  Claude は、この作業フォルダの最上位から compose の `backend-go` を作り直して起動し、この作業フォルダのコードを動かす。Claude は、Go 版の `registerUser` と `verifyEmail` の操作で、ログインに使う利用者を作る。確認のリンクの値は、開発環境の LocalStack の SES が受けたメールから読む。Claude は、開発環境の compose の `api-docs`(ポート 8082)を Playwright で開き、API の説明画面での確認の節の3つを確かめ、結果を PR の本文に書く準備をする。
+  - 完了の確かめ方: ログインする前の `GET /api/users/me` が 401 を、作った利用者での `POST /api/auth/login` が 200 を、ログインしたあとの `GET /api/users/me` が 501 と「未実装です。」を返す
+  - 受入基準とテストの対応: 要件6の受入基準1(説明画面の「Try it out」でログインできる)は `POST /api/auth/login` の「Try it out」の 200 で、要件6の受入基準2(ログインした開発者の要求を操作の処理に渡す)はログインの前後の `GET /api/users/me` の 401 と 501 で確かめる
+  - _要件: 6.1, 6.2_
+
+- [ ] 7.2 進み具合の表と試作の記録を書き足す
+
+  Claude は、このタスクで、次の4つをする。
+
+  1. `progress.md` のまとまりの表の認証の行の spec の列に `.kiro/specs/backend-go-auth` を書き、状態の列を「作り終えた」にする。状態の列を「作り終えた」にすると、操作の数の検査(`TestCoverage_Operations`)が、認証の13の操作がすべて比べる筋書きに出てくることを求め始める
+  2. 表の下の、API の説明画面での確認の決まりを、API の説明画面での確認の節のとおりに書き直す
+  3. 実装で確かめた Java 版の値の形を、research.md に書き足す
+  4. 状態の列を「比べる検査に通った」にする作業が残ることを、PR の本文に書く
+
+  Claude は、このタスクで、次の2つを扱わない。
+
+  1. 状態の列の「spec の作成中」。これは spec を出す PR で書く
+  2. 状態の列を「比べる検査に通った」にすること。Claude は、状態の列を「比べる検査に通った」にすることを、置き換えの spec の段階2の終わりを書いたときと同じく、別の PR で行う。Claude がその PR を作るのは、この PR の CI で Java 版と Go 版を比べる検査が通り、この PR がマージされたあとである。この PR は必須のチェックが通るとすぐに自動でマージされるので、この PR の中で CI が通ったあとに書く機会が無いためである
+
+  このタスクの完了は、状態の列を「作り終えた」にしたところまでとする。
+  - 完了の確かめ方: `progress.md` の認証の行が、spec の列に `.kiro/specs/backend-go-auth`、状態の列に「作り終えた」を持ち、表の下の決まりと research.md の書き足しが、この小タスクの文のとおりになっている。`go test -tags compat -run TestCoverage_Operations ./compat/` が通る。7つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
+  - 受入基準とテストの対応: 要件6の受入基準3(進み具合の表の下の決まりを書き直す)と要件7の受入基準3(進み具合の表に、この spec の場所とまとまりの状態を書く)は、`progress.md` の文で確かめる。要件7の受入基準1(設計の前に試しに作り、方法と結果を research.md に書く)と受入基準2(同じにできない動きが見つかれば止まって所有者に報告する)は、research.md の試作の記録と書き足しで確かめる。この4つの受入基準を確かめるテストは無い。認証の13の操作が比べる筋書きに出てくることは、`compat_test.go` の `TestCoverage_Operations` で確かめる
+  - _要件: 6.3, 7.1, 7.2, 7.3_
+
+## 実装のメモ
+
+- Claude は、途中のタスクのテストを、`bash .claude/scripts/parallel/run-check.sh backend-go <コマンド>` の形で流す。タスクの「完了の確かめ方」の `go test` と `make` のコマンドは、この `<コマンド>` にあたる。Claude は、`go test` を、`backend/` を作業の場所として流す
+- `backend/compat/` の下のファイルは、すべて `//go:build compat` を持つ。Claude は、5つ目の大きなまとまりで新しく作る `capture.go` `expire.go` `tlsalias.go` `deny.go` とそれぞれのテストにも、同じビルドタグを付ける。`backend/compat/` の下のファイルのテストは、`-tags compat` を付けないと組み立てに入らない。`/verify-backend`(`make check`)は、これらのテストを流さない
+- Claude は、`make compat` `make compat-cross` `make compat-perf` を、筋書きを書く6つ目の大きなまとまりのタスクでだけ流す。どれも Java 版と Go 版のイメージを組み立てるので、1回に長い時間がかかる
+
+## 完了条件(全タスク共通)
+
+Claude は、どのタスクでも、タスクの箇条書きの欄を書いたうえで、次の4つを満たしたときにタスクを完了とする。
+
+1. Claude は、タスクが満たす requirements.md の受入基準(要件の番号付きの項目)ごとに、それを確かめるテストのファイル名とテスト名を「受入基準とテストの対応」の行に書く。Claude は、確かめるテストの無い受入基準を残さない。
+2. タスクで変えたファイルを使うテストが、すべて成功している。`1.` や `2.` の見出しのタスクを大きなまとまりと呼ぶ。大きなまとまりの最後のタスクでは、加えて、そのまとまりのタスクで変えた領域の verify のスキル(`/verify-frontend` `/verify-backend` `/verify-terraform`)が、すべて成功している。
+3. Claude は、テストを飛ばす設定、アサーションの削除、カバレッジや lint の対象からの除外を足して、完了条件を満たしたように見せない。CI の escape-hatch の検査が、これらの追加を機械で見つける。
+4. Claude は、新しく書いたテストについて、テストの対象のコードを一時的に壊してテストが失敗することを確かめる。Claude は、新しいテスト1件につき1か所だけを、作業フォルダの外の写しで壊し、そのテストだけを流す。壊した写しの作り方と流し方は、`.kiro/steering/tech.md` の「テストの完全性」に従う。

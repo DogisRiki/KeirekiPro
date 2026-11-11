@@ -124,6 +124,7 @@ func TestLoad_ProdReadsSecretKeys(t *testing.T) {
 	}
 
 	wantApp := App{
+		ApplicationName:    "keirekipro",
 		SiteName:           "KeirekiPro",
 		SiteURL:            "https://app.keirekipro.click",
 		APIBaseURL:         "https://app.keirekipro.click",
@@ -289,6 +290,7 @@ func TestLoad_DefaultEnvIsDev(t *testing.T) {
 				t.Errorf("JWT.Secret = %q", cfg.JWT.Secret)
 			}
 			wantApp := App{
+				ApplicationName:    "keirekipro",
 				SiteName:           "KeirekiPro",
 				SiteURL:            "https://app.keirekipro.click",
 				FrontendBaseURL:    "http://localhost:5173",

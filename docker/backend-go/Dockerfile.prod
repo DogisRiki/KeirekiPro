@@ -21,11 +21,13 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY migrations.go ./
+COPY migrations.go mailtemplates.go ./
 COPY cmd cmd
 COPY internal internal
 # 表の形の履歴を確かめるために、Java 版のマイグレーションのファイルをプログラムに埋め込む
 COPY src/main/resources/db/migration src/main/resources/db/migration
+# 認証の操作のメールを Java 版と同じ件名と本文で送るために、Java 版のメールのひな形をプログラムに埋め込む
+COPY src/main/resources/mail src/main/resources/mail
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath \
         -ldflags="-s -w -X main.version=${VERSION}" \
