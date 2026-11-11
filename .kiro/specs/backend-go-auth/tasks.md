@@ -22,7 +22,7 @@
   - 受入基準とテストの対応: この小タスクは土台であり、受入基準を直接は確かめない。要件4の受入基準1と2(版の間で記録を互いに読める)は、6.6 の版をまたいで確かめる検査で確かめる
   - _要件: 4.1, 4.2_
 
-- [ ] 1.4 認証の処理の入口と誤りの型と乱数を作る
+- [x] 1.4 認証の処理の入口と誤りの型と乱数を作る
 
   Claude は、`internal/auth` に、次の3つを作る。1つ目は、認証の処理の入口 `Service` と、部品の束 `Deps` と、組み立ての関数 `New` である。2つ目は、操作の誤りの型 `Error` と、Java 版の文言の定数である。3つ目は、32バイトの乱数の base64url の値と6桁の確認のコードを作る関数である。Claude は、`Error` の部品の節の5つの答えの形を `Error` の項目で表せるようにする。
   - 完了の確かめ方: `go test ./internal/auth/ -run 'TestError|TestRandom'` が通る
@@ -360,6 +360,7 @@
 - `backend/compat/` の下のファイルは、すべて `//go:build compat` を持つ。Claude は、5つ目の大きなまとまりで新しく作る `capture.go` `expire.go` `tlsalias.go` `deny.go` とそれぞれのテストにも、同じビルドタグを付ける。`backend/compat/` の下のファイルのテストは、`-tags compat` を付けないと組み立てに入らない。`/verify-backend`(`make check`)は、これらのテストを流さない
 - Claude は、`make compat` `make compat-cross` `make compat-perf` を、筋書きを書く6つ目の大きなまとまりのタスクでだけ流す。どれも Java 版と Go 版のイメージを組み立てるので、1回に長い時間がかかる
 - この PC の `keirekipro.parallelSlots` は1である。Claude は、壊して確かめる写しの `run-check.sh` を同時に流すと、2つ目以降が順番待ちの表示だけを出して終わり、テストが流れない。Claude は、写しを1つずつ、`run-check.sh --wait` で流す
+- `internal/auth` は depguard の決まりで `internal/httpapi/middleware` を読めないので、`auth.MessageUnexpected` と `auth.MessageForbidden` は middleware と同じ文字列を別に持つ。Claude は、両方を読める `internal/httpapi` のテストで、2つの定数が middleware の定数と同じかを確かめる。`errInvalidInput` は渡した束をそのまま `Errors` に入れるので、Claude は nil を渡さない
 
 ## 完了条件(全タスク共通)
 
