@@ -169,7 +169,7 @@
   - _要件: 1.3, 3.7, 4.2_
 
 - [ ] 4. 認証の受け口をつなぐ
-- [ ] 4.1 認証の操作の応答の型と誤りの本文を作る
+- [x] 4.1 認証の操作の応答の型と誤りの本文を作る
 
   Claude は、認証の操作の応答を、Cookie を2つ以上書ける自分で書いた型で返す `authresponses.go` を作る。Claude は、`*auth.Error` を、Error の部品の節の5つの形の本文と状態の番号と Cookie に変える処理を作る。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestAuthResponses` が通る
@@ -387,6 +387,7 @@
 - `passwordreset.go` の `ResetPassword` は、`invalidateSessions` を呼ばずに、`inTransaction` の中で `BumpTokenVersion` にトランザクションの `q` を渡し、続けて `removeAllRefreshTokens` を呼ぶ。`invalidateSessions` はトランザクションの外で世代の番号を上げるので、Java 版の `@Transactional` と同じ取り消しにならないためである。利用者が居ないときの誤りを操作ごとに変えるときは、`emailverification.go` の `loadStoredUserOr` に誤りを渡す(`loadStoredUser` は確認のリンクが無効な 400 を渡す)
 - 対象の外の `provider` を受けた Java 版は、`StartOidcAuthorizationUseCase` が Redis に `oidc:provider:` `oidc:state:` `oidc:code_verifier:` の3つの記録を置いたあとに、`OidcProviderFactory.getProvider` が RuntimeException を投げ、`AppExceptionHandler` の Exception の扱いで 500「予期せぬエラーが発生しました。」で答え、3つの記録を残す(コードを読んで確かめた)。`oidc.go` の `StartOIDC` は、記録を置く前に 400「入力エラーがあります。」と空の `errors` で断る。この違いは、design.md の変えた動きの一覧の節のとおり、タスク6.5で一覧に載せる。`provider` の大文字と小文字は Java 版と同じく区別せず、Redis には受けたままの `provider` を置く
 - Google と GitHub から戻ったあとの処理は、`oidc.go` ではなく同じパッケージの `oidccallback.go` に置いた(約700行あり、開始の処理と分けたほうが読みやすいため)。`HandleOIDCCallback` は、移る先の URL の全体を `OIDCCallbackResult` の `Location` に入れて返し、成功のときだけ `Session` にログインの状態の値を入れる。受け口(タスク4.3)はこの値をそのまま使う。Java 版の RestClient はどの状態の番号の応答でも本文を読み(`RestClientConfig` の `defaultStatusHandler`)、Jackson は `spring.jackson.use-jackson2-defaults` で先頭の JSON の値のあとを読まないので、Go 版も Google と GitHub の応答を状態の番号によらず読み、先頭の値のあとを読まない。トークンの応答の `expires_in` は、Java 版の `Integer` の項目と同じく `parseJacksonInt` の規則で読めるかだけを確かめ、値は使わない。Google と GitHub の応答の本文は 1 MiB までしか読まない。GitHub の `id` が整数でない数か、オブジェクトか配列のときは、Java 版の `String.valueOf` と同じ文字列を作れないので、利用者の情報の失敗にする。この違いはタスク6.5で変えた動きの一覧に載せる
+- 認証の13の操作は、生成した応答の型ではなく `httpapi` の `authresponses.go` の `authResponse` で答える。生成した応答の型は Set-Cookie を1つしか書けないためである。受け口(タスク4.2、4.3)は、`*auth.Error` を `authErrorResponse` で状態の番号と本文と Cookie に変え、偽が返ったときだけほかの誤りとして扱う。入力の誤りの `errors` の項目は名前の順に書く。Java 版は HashMap の順だが、Java 版との突き合わせの仕組みは JSON の項目を名前で比べるので、食い違いにならない
 
 ## 完了条件(全タスク共通)
 
