@@ -98,7 +98,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(ログインし直さずに使い続けられる時間)は `refreshtoken_integration_test.go` の `TestRefreshToken_TTL7Days` で、要件3の受入基準5(ほかの端末のログインの状態も使えなくする)は `TestInvalidateSessions_RemovesAllTokens` で確かめる。要件4の受入基準1(版をまたいでログインし続けられる)のうち値の形は `TestRefreshToken_HashFieldsAsJSON` で確かめる
   - _要件: 3.1, 3.5, 4.1_
 
-- [ ] 3.5 2段階認証の確認のコードと途中の記録を作る
+- [x] 3.5 2段階認証の確認のコードと途中の記録を作る
 
   Claude は、Java 版の `TwoFactorAuthIssueUseCase` と `TwoFactorAuthVerifyUseCase` の、確認のコードと途中の記録の発行と照合を作る。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestTwoFactor` が通る
@@ -374,6 +374,7 @@
 - 要求の JSON に対になっていないサロゲートの書き方(たとえば `"\ud800"`)があると、Go の `encoding/json` は U+FFFD(UTF-8 で3バイト)に置き換え、Java 版の `MaxUtf8BytesValidator` は `?`(1バイト)と数える。そのため、72バイトの境目の近くのパスワードで、2つの版の判定が変わることがある。画面からは送られない入力である。Claude は、小タスク6.5 で、この違いを、項目が無い要求の違いと並べて、変えた動きの一覧に載せるかを決め、所有者に報告する。
 - LocalStack の SES が受けたメールは、`curl localhost:4566/_aws/ses` で JSON として読める。Java 版の FreeMarker は、拡張子が `.ftl` のひな形では HTML の特別な文字を逃がさず、利用者の名前の `<&>` や `${x}` もそのまま差し込む。Claude は、Java 版の CSRF の検査を通すため、先に GET の要求で `XSRF-TOKEN` の Cookie を受け取り、POST の要求の `X-XSRF-TOKEN` の見出しに同じ値を入れる
 - `spring_query.go` の正解の `testdata/springquery/vectors.txt` は、`testdata/springquery/Gen.java` を spring のコンテナの Java 21 で、Java 版と同じ Spring 7.0.10 の jar(spring-core と spring-web と commons-logging と jspecify)を渡して動かして作る。`springQuery` は先頭の `?` を付けないので、Claude は、小タスク3.13 で、問い合わせの無い認可の URL のあとに `?` と `springQuery` の結果をつなぐ
+- Java 版の Jackson が Redis の中の JSON を読む規則(前後の文字、数の小数と文字列、UUID の形、値が null や JSON でないとき)は、開発環境の Java 版の Redis に値を置いて API を呼べば調べられる。`twofactor.go` の `parseJacksonUUID` と `parseJacksonInt` はその結果を写したもので、表は `TestTwoFactor_ReadsChallengeLikeJackson` にある。Claude は、ほかの途中の記録を読むときも、この2つの関数を使う
 
 ## 完了条件(全タスク共通)
 
