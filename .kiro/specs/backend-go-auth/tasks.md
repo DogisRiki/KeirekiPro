@@ -154,7 +154,7 @@
   - 受入基準とテストの対応: 要件1の受入基準2(再設定のメールを受け取り新しいパスワードでログインできる)は、`passwordreset_integration_test.go` の `TestPasswordReset_ThenLogin` で確かめる。要件3の受入基準3(再設定の値を1回だけ使える)は `TestPasswordReset_TokenSingleUse` で、要件3の受入基準5(ほかの端末のログインの状態を使えなくする)は `TestPasswordReset_InvalidatesAllSessions` で、要件3の受入基準6(アカウントの有無を見分けられない)は `TestPasswordReset_RequestSame204` で確かめる。利用者が居ないときの 401 は `TestPasswordReset_UserGoneClearSession` で確かめる
   - _要件: 1.2, 3.3, 3.5, 3.6_
 
-- [ ] 3.13 Google と GitHub のログインの開始を作る
+- [x] 3.13 Google と GitHub のログインの開始を作る
 
   Claude は、`Service` の `StartOIDC` を作る。`StartOIDC` は、`state` と `code_verifier` を Redis に10分置いて、ログインの開始の URL を作る。Claude は、対象の外の `provider` を受けた Java 版の状態の番号と Redis に残るものを確かめる。Claude は、確かめた結果が要件5の受入基準5の形の誤った要求に当たるときは、`StartOIDC` が Redis に記録を残さずに誤りを返すように作る。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestStartOIDC` が通る
@@ -385,6 +385,7 @@
 - `emailverification.go` の `inTransaction` と `loadStoredUser` と `saveUser` は、Java 版の `@Transactional` と `UserRepository.findById` と `MyBatisUserRepository.save` を写した。小タスク3.12 と3.14 で利用者の行を書き換えるときは、これを使う。`isIntegrityViolation` は、Spring が `DataIntegrityViolationException` に訳す SQLSTATE(21000 と、分類 01 02 22 23 27 44)を見分ける。小タスク3.11 の `Register` は、Java 版の `UserRegistrationUseCase` が呼ぶ `Email.create`(Apache Commons の `EmailValidator`。Hibernate の確かめとは別)を写すか、変えた動きの一覧に書く。登録の完了(`completeRegistration`)は、登録の受け付けで確かめ済みのメールアドレスしか届かないので、この確かめを写していない。`loadStoredUser` は連携の行を行の ID でまとめ、Java 版の `toEntity` は小文字にした連携の名前でまとめるので、同じ名前の連携の行が2つあると保存の結果が違う。Java 版の保存ではこの行を作れないので写していないが、小タスク6.5 の変えた動きの一覧に書く
 - `commonsemail.go` は、Java 版の `Email.create` が使う Apache Commons Validator 1.11.0 の `EmailValidator.getInstance(false, false)` を写した。トップレベルドメインの表(`commons_tld_table.go`)と期待(`testdata/commonsemail/vectors.txt`)は、`testdata/commonsemail/Gen.java` を Java 版の依存の版で動かして作り直す。ドメインに基本多言語面の外の文字があると変えずに返すので、呼ぶ側は入力の検査(`isEmailLikeHibernate`)を先に通す。`Register` は、Java 版がパスワードのハッシュを作ってから入力の誤りで断るのに対し、ハッシュを作らずに断る(答えは同じ)。`VerifyEmail` の目的 PASSWORD_RESET の再設定の値の有効な時間は、Java 版の `Duration.toMillis` と同じくミリ秒に切り捨て、1ミリ秒より短いと置かずに誤りを返す(Java 版は Redis に断られて 500 になる)。`errors.go` に `MessageEmailNotRegistrable` を足した
 - `passwordreset.go` の `ResetPassword` は、`invalidateSessions` を呼ばずに、`inTransaction` の中で `BumpTokenVersion` にトランザクションの `q` を渡し、続けて `removeAllRefreshTokens` を呼ぶ。`invalidateSessions` はトランザクションの外で世代の番号を上げるので、Java 版の `@Transactional` と同じ取り消しにならないためである。利用者が居ないときの誤りを操作ごとに変えるときは、`emailverification.go` の `loadStoredUserOr` に誤りを渡す(`loadStoredUser` は確認のリンクが無効な 400 を渡す)
+- 対象の外の `provider` を受けた Java 版は、`StartOidcAuthorizationUseCase` が Redis に `oidc:provider:` `oidc:state:` `oidc:code_verifier:` の3つの記録を置いたあとに、`OidcProviderFactory.getProvider` が RuntimeException を投げ、`AppExceptionHandler` の Exception の扱いで 500「予期せぬエラーが発生しました。」で答え、3つの記録を残す(コードを読んで確かめた)。`oidc.go` の `StartOIDC` は、記録を置く前に 400「入力エラーがあります。」と空の `errors` で断る。この違いは、design.md の変えた動きの一覧の節のとおり、タスク6.5で一覧に載せる。`provider` の大文字と小文字は Java 版と同じく区別せず、Redis には受けたままの `provider` を置く
 
 ## 完了条件(全タスク共通)
 
