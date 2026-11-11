@@ -479,6 +479,33 @@ func TestCompareRedis_TTLTolerance5s(t *testing.T) {
 		goEntries := []RedisEntry{entry("refresh:"+goURLWord, goUser, time.Hour), entry("password-reset:"+otherWord, goUser, time.Hour)}
 		assertNoDiff(t, compare(java, goEntries))
 	})
+	t.Run("JSON の文字列を JSON の配列にした集合の値のトークンも置き換えて比べる", func(t *testing.T) {
+		// 集合 user-refresh-tokens:<利用者の ID> の値は、DumpRedis が、JSON の文字列の要素を JSON の配列にしたものである
+		set := func(key, token string) RedisEntry {
+			return RedisEntry{Key: key, Type: "set", Value: canonicalJSON([]string{`"` + token + `"`}), TTL: time.Hour}
+		}
+		java := []RedisEntry{set("user-refresh-tokens:"+javaUser, javaURLWord)}
+		goEntries := []RedisEntry{set("user-refresh-tokens:"+goUser, goURLWord)}
+		assertNoDiff(t, compare(java, goEntries))
+	})
+	t.Run("集合の要素は、トークンを番号に置き換えたあとの順で比べる", func(t *testing.T) {
+		// 集合の要素は、DumpRedis が置き換える前の値の順に並べる。トークンの番号は現れた順に付くので、
+		// 置き換えたあとの順は版ごとに違いうる。ここでは、Java 版は2つ目の要素が、Go 版は1つ目の要素が、先の段で番号 1 を受ける
+		javaFirst, goSecond := "P"+javaURLWord[1:], "S"+goURLWord[1:]
+		set := func(key string, tokens ...string) RedisEntry {
+			members := make([]string, len(tokens))
+			for i, tok := range tokens {
+				members[i] = `"` + tok + `"`
+			}
+			return RedisEntry{Key: key, Type: "set", Value: canonicalJSON(members), TTL: time.Hour}
+		}
+		c := NewComparer("筋書き")
+		c.CompareRedis(step1, []RedisEntry{entry("seen", javaURLWord, -1)}, []RedisEntry{entry("seen", goURLWord, -1)})
+		c.CompareRedis(step1,
+			[]RedisEntry{set("user-refresh-tokens:"+javaUser, javaFirst, javaURLWord)},
+			[]RedisEntry{set("user-refresh-tokens:"+goUser, goURLWord, goSecond)})
+		assertNoDiff(t, c.Diffs())
+	})
 	t.Run("正規化したキーが重なっても、記録を捨てない", func(t *testing.T) {
 		java := []RedisEntry{entry("a:2026-11-09T10:00:00", "1", -1), entry("a:2026-11-10T10:00:00", "1", -1)}
 		diffs := compare(java, []RedisEntry{entry("a:2026-11-09T10:00:00", "1", -1)})

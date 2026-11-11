@@ -416,7 +416,8 @@ type RedisEntry struct {
 }
 
 // redisSeps は、Redis のキーと値を、トークンかを調べる語に分ける区切りである。
-const redisSeps = ":\"'{}[],= \t\n&/?"
+// 逆斜線を含めるのは、集合の値が、JSON の文字列の要素を JSON の配列にした形(["\"値\""])で、値の後ろに逆斜線が続くためである。
+const redisSeps = ":\"'{}[],= \t\n&/?\\"
 
 // CompareRedis は、Redis のキーの名前と型と値を比べ、残りの有効な時間は RedisTTLTolerance のずれを許して比べる。
 // 有効な時間の有無は、同じでなければならない。
@@ -486,7 +487,7 @@ func ttlClose(a, b time.Duration) bool {
 // redisByKey は、Redis のキーと値を正規化し、正規化したキーごとに返す。
 func redisByKey(n *Normalizer, entries []RedisEntry) map[string]RedisEntry {
 	records := normalizeRecords(entries, func(e RedisEntry, assign bool) string {
-		return n.words(e.Key, redisSeps, assign) + "\n" + e.Type + "\n" + n.words(n.redisValue(e.Key, e.Value, assign), redisSeps, assign)
+		return n.words(e.Key, redisSeps, assign) + "\n" + e.Type + "\n" + sortedSetValue(e.Type, n.words(n.redisValue(e.Key, e.Value, assign), redisSeps, assign))
 	})
 	out := make(map[string]RedisEntry, len(records))
 	for _, r := range records {
@@ -496,6 +497,18 @@ func redisByKey(n *Normalizer, entries []RedisEntry) map[string]RedisEntry {
 		out[key] = RedisEntry{Key: key, Type: typ, Value: value, TTL: entries[r.Index].TTL}
 	}
 	return out
+}
+
+// sortedSetValue は、型 typ が集合のときに、正規化した値 value(JSON の文字列の配列)の要素を並べ替えて返す。
+// DumpRedis は要素を置き換える前の値の順に並べるが、トークンの番号は現れた順に付くので、置き換えたあとの順は版ごとに違いうる。
+// 集合の要素には順が無いので、並べ替えても違いを隠さない。
+func sortedSetValue(typ, value string) string {
+	var members []string
+	if typ != "set" || json.Unmarshal([]byte(value), &members) != nil {
+		return value
+	}
+	slices.Sort(members)
+	return canonicalJSON(members)
 }
 
 // CompareS3 は、S3 のオブジェクトのキーの形と中身のバイトを比べる。キーの中の UUID は番号に置き換える。

@@ -268,7 +268,7 @@
   - _依存: 5.1_
 
 - [ ] 6. 認証の操作の筋書きで Java 版と Go 版を比べる
-- [ ] 6.1 初期のデータとログインと2段階認証と作り直しとログアウトの筋書きを書く
+- [x] 6.1 初期のデータとログインと2段階認証と作り直しとログアウトの筋書きを書く
 
   Claude は、認証の操作の筋書きのために、次の7つを書く。
 
@@ -410,6 +410,12 @@
 - 5.8 で、測る動かし方は fakeoidc を、測る処理全体の初めと終わりに1回ずつだけ初めの状態に戻す。prepare_each が真の筋書きで、準備の段が fakeoidc の利用者を替えると、2回目からの回は替えたあとの利用者で始まる
 - 5.9 で、`api.github.com` の証明書と鍵と、Java 版の信頼の束は、`NewEnv` が作る作業用のフォルダ(`Env.WorkDir`)に置き、`Terminate` で消す。コンテナに写すファイルは、backend と fakeoidc が root でない利用者で動くので、`ContainerSpec.Files` で 0644 にして写す
 - 5.9 で、`startBackend` が Java 版の位置で `BuildTrustStore` を呼ぶ分かれ道は、harness のテストでは通らない。6.4 の `oidc-github.yaml` で、本物の Java 版のイメージで通ることを確かめる。`JAVA_TOOL_OPTIONS` の信頼の束のパスワードは、JVM の起動の行でコンテナのログに出るが、検査ごとの乱数である
+- 6.1 で、比べる検査(compare)は Java 版と Go 版の答えを比べるだけで、筋書きの `expect.status` を確かめない。筋書きの状態の番号は、版をまたぐ検査(cross)で確かめる
+- 6.1 で、初めのデータの利用者には、ログインの状態の世代の行(表 `user_token_versions`)を置く。行が無いと、Java 版も Go 版もログアウトで世代を上げられず、古いアクセストークンが使えたままになる。確認の済んでいない利用者は、fixtures_test.go の `unverifiedFixtureUsers` に挙げる
+- 6.1 で、版をまたぐ検査の送り先は、`to: other` の段で直前の版と違う版に替わるので、`to: other` が2つ続くと元の版に戻る。版をまたがせたい段は、cross.go の `CrossRoute` で3つの向きの送り先を確かめてから並べる
+- 6.1 で、`refresh-logout.yaml` の `refresh-after-logout` には `to: other` を付けない。付けると、その前の段 `admin-users-after-logout` の `to: other` と2つ続き、ログアウトの段と同じ版に戻る。付けないと、Java 版から Go 版の向きと Go 版から Java 版の向きでは、ログアウトの段と違う版に届く(交互の向きでは同じ版に届く)。6.6 の `TestCrossRoute_AuthProcedureSteps` は、この段を `to: other` の段として数えない
+- 6.1 で、Redis の集合の値は、トークンを番号に置き換えたあとに要素を並べ替えてから比べる(compare.go の `sortedSetValue`)。`DumpRedis` は置き換える前の値の順に並べ、トークンの番号は現れた順に付くので、置き換えたあとの順は版ごとに違いうる。`redisSeps` には逆斜線を含める。集合の値は JSON の文字列を JSON の配列にした形で、値の後ろに逆斜線が続く
+- 6.1 で、置き換えの spec の段階2の自分と比べる検査(compat_test.go の `selfCompare`、cross_test.go の `selfPair`)の筋書きは、初めにログインの段を置く。経歴書の操作の受け口がログインを求めるため、ログインしないと 501 に届かない
 
 ## 完了条件(全タスク共通)
 

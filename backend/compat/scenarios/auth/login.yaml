@@ -1,0 +1,51 @@
+# ログインの筋書き。正しいログイン、パスワードの誤り、アカウントが無い、確認の済んでいないアカウント、
+# 登録の途中のアカウント、ログインした利用者の管理者の経路への要求を確かめる。
+name: auth-login
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [compare, cross]
+steps:
+  - name: login
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # ログインした版と違う版に送り、ログインの状態の値を受け入れて、役割 USER だけなので 403 になることを確かめる
+  - name: admin-users-after-login
+    to: other
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 403}
+  - name: login-wrong-password
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Wrong0rd!}
+    expect: {status: 400}
+  - name: login-no-account
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: nobody@example.com, password: Passw0rd!}
+    expect: {status: 400}
+  - name: login-unverified-account
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: unverified@example.com, password: Passw0rd!}
+    expect: {status: 409}
+  # 登録の途中のアカウントは、先に登録の段を送り、同じパスワードでログインして作る
+  - name: register-pending
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: pending@example.com, username: 登録 五郎, password: Passw0rd!, confirmPassword: Passw0rd!}
+    expect: {status: 202}
+  - name: login-pending-registration
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: pending@example.com, password: Passw0rd!}
+    expect: {status: 409}

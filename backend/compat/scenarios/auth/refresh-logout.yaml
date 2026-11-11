@@ -1,0 +1,71 @@
+# 作り直しとログアウトの筋書き。作り直し、ログアウト、ログアウトのあとの作り直しとログインの要る操作、
+# ログインの状態の値の期限が切れたあとの作り直し、ログインを続けるための値の期限が切れたあとの作り直しを確かめる。
+# ログアウトのあとの場面は、ログアウトの前に取り出した値を Cookie ヘッダに差し込んで送り、
+# Cookie の無い要求ではなく、ログアウトで使えなくなった値を断ることを確かめる。
+name: auth-refresh-logout
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [compare, cross]
+steps:
+  - name: login
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    capture: {access1: 'cookie:accessToken', refresh1: 'cookie:refreshToken'}
+    expect: {status: 200}
+  - name: refresh
+    to: other
+    request:
+      method: POST
+      path: /api/auth/token/refresh
+    expect: {status: 200}
+  - name: logout
+    to: other
+    request:
+      method: POST
+      path: /api/auth/logout
+    expect: {status: 204}
+  # ログアウトした版と違う版に送り、ログアウトで使えなくなったログインの状態の値を 401 で断ることを確かめる
+  - name: admin-users-after-logout
+    to: other
+    request:
+      method: GET
+      path: /api/admin/users
+      headers: {Cookie: 'accessToken={access1}'}
+    expect: {status: 401}
+  - name: refresh-after-logout
+    request:
+      method: POST
+      path: /api/auth/token/refresh
+      headers: {Cookie: 'refreshToken={refresh1}'}
+    expect: {status: 401}
+  - name: login-again
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    capture: {refresh2: 'cookie:refreshToken'}
+    expect: {status: 200}
+  - name: expire-access-token
+    expire: {cookie: accessToken}
+  - name: admin-users-after-access-expired
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 401}
+  - name: refresh-after-access-expired
+    to: other
+    request:
+      method: POST
+      path: /api/auth/token/refresh
+    expect: {status: 200}
+  - name: expire-refresh-token
+    redis:
+      del: ['refresh-token:{refresh2}']
+  - name: refresh-after-refresh-expired
+    to: other
+    request:
+      method: POST
+      path: /api/auth/token/refresh
+    expect: {status: 401}
