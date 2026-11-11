@@ -466,6 +466,11 @@ type storedUser struct {
 // loadStoredUser は、トランザクションの中で利用者 id の行を読む。Java 版の UserRepository.findById と同じく、
 // User.reconstruct の確かめに反すれば 400 の誤りを返す。居なければ、確認のリンクが無効な 400 の誤りを返す。
 func loadStoredUser(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID) (storedUser, error) {
+	return loadStoredUserOr(ctx, q, id, errBusiness(MessageInvalidVerificationLink))
+}
+
+// loadStoredUserOr は、loadStoredUser と同じく利用者 id の行を読み、居なければ notFound を返す。
+func loadStoredUserOr(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID, notFound error) (storedUser, error) {
 	rows, err := q.GetUserRowsByID(ctx, pgtype.UUID{Bytes: id, Valid: true})
 	if err != nil {
 		return storedUser{}, fmt.Errorf("auth: 利用者を読めない: %w", err)
@@ -479,7 +484,7 @@ func loadStoredUser(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID) (stor
 		return storedUser{}, err
 	}
 	if !found {
-		return storedUser{}, errBusiness(MessageInvalidVerificationLink)
+		return storedUser{}, notFound
 	}
 	first := rows[0]
 	u := storedUser{

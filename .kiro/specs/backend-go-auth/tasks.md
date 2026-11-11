@@ -147,7 +147,7 @@
   - 受入基準とテストの対応: 要件1の受入基準2(新規の登録とメールアドレスの確認を終えられる)は、`register_integration_test.go` の `TestRegister_ThenVerifyEmail` で確かめる。要件3の受入基準4(送り直せる間隔)は `TestResend_RateLimited` で、要件3の受入基準3(送り直すと前のリンクが使えない)は `TestResend_OldLinkInvalid` で確かめる。メールの失敗で記録を消すことは `TestRegister_MailFailureRemovesPending` で、目的が `PASSWORD_RESET` のリンクの結果は `TestVerifyEmail_PasswordResetReady` で確かめる
   - _要件: 1.2, 3.3, 3.4_
 
-- [ ] 3.12 パスワードの再設定を作る
+- [x] 3.12 パスワードの再設定を作る
 
   Claude は、Java 版の `RequestPasswordResetUseCase` `VerifyPasswordResetTokenUseCase` `ResetPasswordUseCase` を写し、`Service` の `RequestPasswordReset` `VerifyPasswordResetToken` `ResetPassword` を、3.9 の置き場を使って作る。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestPasswordReset` が通る
@@ -384,6 +384,7 @@
 - `passwordreset.go` の `storePasswordResetToken` は、渡された有効な時間を付け、0以下なら記録を置かずに誤りを返す。Claude は、小タスク3.11 の `VerifyEmail` で、Java 版と同じく確認のリンクの残りの時間を渡す。残りが1ミリ秒より短いと、go-redis は1ミリ秒に切り上げて置き、Java 版は Redis に断られて 500 になりうるので、3.11 でこの境目の扱いを Java 版と比べる
 - `emailverification.go` の `inTransaction` と `loadStoredUser` と `saveUser` は、Java 版の `@Transactional` と `UserRepository.findById` と `MyBatisUserRepository.save` を写した。小タスク3.12 と3.14 で利用者の行を書き換えるときは、これを使う。`isIntegrityViolation` は、Spring が `DataIntegrityViolationException` に訳す SQLSTATE(21000 と、分類 01 02 22 23 27 44)を見分ける。小タスク3.11 の `Register` は、Java 版の `UserRegistrationUseCase` が呼ぶ `Email.create`(Apache Commons の `EmailValidator`。Hibernate の確かめとは別)を写すか、変えた動きの一覧に書く。登録の完了(`completeRegistration`)は、登録の受け付けで確かめ済みのメールアドレスしか届かないので、この確かめを写していない。`loadStoredUser` は連携の行を行の ID でまとめ、Java 版の `toEntity` は小文字にした連携の名前でまとめるので、同じ名前の連携の行が2つあると保存の結果が違う。Java 版の保存ではこの行を作れないので写していないが、小タスク6.5 の変えた動きの一覧に書く
 - `commonsemail.go` は、Java 版の `Email.create` が使う Apache Commons Validator 1.11.0 の `EmailValidator.getInstance(false, false)` を写した。トップレベルドメインの表(`commons_tld_table.go`)と期待(`testdata/commonsemail/vectors.txt`)は、`testdata/commonsemail/Gen.java` を Java 版の依存の版で動かして作り直す。ドメインに基本多言語面の外の文字があると変えずに返すので、呼ぶ側は入力の検査(`isEmailLikeHibernate`)を先に通す。`Register` は、Java 版がパスワードのハッシュを作ってから入力の誤りで断るのに対し、ハッシュを作らずに断る(答えは同じ)。`VerifyEmail` の目的 PASSWORD_RESET の再設定の値の有効な時間は、Java 版の `Duration.toMillis` と同じくミリ秒に切り捨て、1ミリ秒より短いと置かずに誤りを返す(Java 版は Redis に断られて 500 になる)。`errors.go` に `MessageEmailNotRegistrable` を足した
+- `passwordreset.go` の `ResetPassword` は、`invalidateSessions` を呼ばずに、`inTransaction` の中で `BumpTokenVersion` にトランザクションの `q` を渡し、続けて `removeAllRefreshTokens` を呼ぶ。`invalidateSessions` はトランザクションの外で世代の番号を上げるので、Java 版の `@Transactional` と同じ取り消しにならないためである。利用者が居ないときの誤りを操作ごとに変えるときは、`emailverification.go` の `loadStoredUserOr` に誤りを渡す(`loadStoredUser` は確認のリンクが無効な 400 を渡す)
 
 ## 完了条件(全タスク共通)
 
