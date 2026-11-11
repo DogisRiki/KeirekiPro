@@ -126,7 +126,7 @@
   - 受入基準とテストの対応: 要件3の受入基準3(リンクの有効な時間、新しいリンクで前のリンクが使えない)は、`emailverification_integration_test.go` の `TestEmailVerificationToken_TTLByPurpose` と `TestEmailVerificationToken_NewLinkReplacesOld` で確かめる。要件3の受入基準4(送り直せる間隔)は `TestEmailVerificationRate_60Seconds` で確かめる
   - _要件: 3.3, 3.4_
 
-- [ ] 3.9 パスワードの再設定の値の置き場を作る
+- [x] 3.9 パスワードの再設定の値の置き場を作る
 
   Claude は、Java 版の `PasswordResetTokenStore` の Redis の実装を写し、`passwordreset.go` に、再設定の値を `password-reset:<値>` に10分置く処理と、読む処理と、消す処理を作る。3.11 の `VerifyEmail` と 3.12 の再設定の操作が、この置き場を使う。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestPasswordResetToken` が通る
@@ -381,6 +381,7 @@
 - Java 版の `User.reconstruct` は、利用者を読むたびに、2段階認証が有効でメールアドレスかパスワードが無い利用者と、2段階認証が無効な管理者を、DomainException の 400 で断る。Go 版は、`login.go` の `accountFromRows` で同じ順に確かめる。Claude は、Java 版が `UserRepository` で利用者を読むほかの操作(パスワードの再設定、確認のメールの送り直し、メールアドレスの確認、Google と GitHub のログイン)でも、`findAccountByEmail` か `findAccountByID` を通して読み、この確かめを外さない
 - `emailverification.go` の `issueEmailVerificationToken` は、golang-jwt の `SignedString` を使わずに、決まったヘッダと `encodeJSONText` で書いた本体に `jwt.SigningMethodHS256.Sign` で署名する。`SignedString` は本体を `json.Marshal` で書き、< > & を逃がして Java 版と違う値になるためである。値を読む `readEmailVerificationToken` は、開発環境の java-jwt 4.6.2 で確かめた動き(`testdata/emailverification/Probe.java`)に合わせ、署名の末尾の = を受け付け、exp と nbf と iat があれば確かめる。lexp が小数の値と、形の崩れた UUID の sub は、Java 版と読み方が違う可能性があり確かめていないが、サーバーの鍵でしか署名できないので外から見える違いは無い
 - `sendEmailVerification` は、送り直せる間隔の中で送れないとき、偽と nil の誤りを返す。Claude は、小タスク3.10 と3.11 で、これを Java 版の RATE_LIMITED と同じ 400 の答え(MessageResendRateLimited)に写す。テストの `javaDevSigningKey` と `javaSample` で始まる定数は、開発環境の Java 版が実際に送った確認のリンクの値とその項目なので、後のタスクのテストでも使える
+- `passwordreset.go` の `storePasswordResetToken` は、渡された有効な時間を付け、0以下なら記録を置かずに誤りを返す。Claude は、小タスク3.11 の `VerifyEmail` で、Java 版と同じく確認のリンクの残りの時間を渡す。残りが1ミリ秒より短いと、go-redis は1ミリ秒に切り上げて置き、Java 版は Redis に断られて 500 になりうるので、3.11 でこの境目の扱いを Java 版と比べる
 
 ## 完了条件(全タスク共通)
 
