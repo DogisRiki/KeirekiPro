@@ -15,7 +15,7 @@
   - 受入基準とテストの対応: 要件2の受入基準4(ほかのまとまりは検査を作り直さず使う)は、`authctx_test.go` の `TestWithAndUserID` と、2.3 の `middleware_test.go` の `TestRequireLogin_PassesAuthctxUser` で確かめる
   - _要件: 2.4_
 
-- [ ] 1.3 認証の操作の SQL の問い合わせを書いて生成する
+- [x] 1.3 認証の操作の SQL の問い合わせを書いて生成する
 
   Claude は、認証の操作が `users` `roles` `user_roles` `user_auth_providers` `user_token_versions` を読み書きする問い合わせを `auth.sql` に書き、sqlc でコードを生成する。Claude は、確認の済んでいるかの列と、V7 のマイグレーションで足した列の書き方を、Java 版の MyBatis の問い合わせと `EmailVerificationCompletion` の問い合わせで確かめてから書く。
   - 完了の確かめ方: `make generate` が `sqlcgen` に認証の問い合わせのコードを生成し、`make generate-check` が通る
