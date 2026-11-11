@@ -8,7 +8,7 @@
   - 受入基準とテストの対応: この小タスクは土台であり、受入基準を直接は確かめない。要件1の受入基準5(メールの件名と本文)は、小タスク3.2 の `mail_test.go` の `TestMail_FourKindsMatchJava` と、小タスク6.2 で書く `register.yaml` と `email-verification.yaml` の筋書きで確かめる
   - _要件: 1.5_
 
-- [ ] 1.2 ログインした利用者の受け渡しを作る
+- [x] 1.2 ログインした利用者の受け渡しを作る
 
   Claude は、ログインした利用者の ID と役割を `context` に入れて取り出す `authctx` を作る。ほかのまとまりのパッケージは、`authctx` を呼び出して利用者の ID を得る。
   - 完了の確かめ方: `authctx_test.go` の、入れた ID と役割を取り出せる場合と、入れていない `context` で `UserID` が `false` を返す場合が通る
@@ -359,6 +359,7 @@
 - Claude は、途中のタスクのテストを、`bash .claude/scripts/parallel/run-check.sh backend-go <コマンド>` の形で流す。タスクの「完了の確かめ方」の `go test` と `make` のコマンドは、この `<コマンド>` にあたる。Claude は、`go test` を、`backend/` を作業の場所として流す
 - `backend/compat/` の下のファイルは、すべて `//go:build compat` を持つ。Claude は、5つ目の大きなまとまりで新しく作る `capture.go` `expire.go` `tlsalias.go` `deny.go` とそれぞれのテストにも、同じビルドタグを付ける。`backend/compat/` の下のファイルのテストは、`-tags compat` を付けないと組み立てに入らない。`/verify-backend`(`make check`)は、これらのテストを流さない
 - Claude は、`make compat` `make compat-cross` `make compat-perf` を、筋書きを書く6つ目の大きなまとまりのタスクでだけ流す。どれも Java 版と Go 版のイメージを組み立てるので、1回に長い時間がかかる
+- この PC の `keirekipro.parallelSlots` は1である。Claude は、壊して確かめる写しの `run-check.sh` を同時に流すと、2つ目以降が順番待ちの表示だけを出して終わり、テストが流れない。Claude は、写しを1つずつ、`run-check.sh --wait` で流す
 
 ## 完了条件(全タスク共通)
 
