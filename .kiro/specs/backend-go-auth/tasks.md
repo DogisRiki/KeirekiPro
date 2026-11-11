@@ -43,7 +43,7 @@
   - 受入基準とテストの対応: 要件1の受入基準1(同じ Cookie の名前と性質)は、`cookies_test.go` の `TestSessionCookie` `TestChallengeCookie` `TestDeleteCookie` `TestExpiredAccessTokenCookie` で確かめる
   - _要件: 1.1, 2.2_
 
-- [ ] 2. ログインの状態を確かめる仕組みを作る
+- [x] 2. ログインの状態を確かめる仕組みを作る
 - [x] 2.1 安全のヘッダの中間処理を作る (並行可)
 
   Claude は、Spring Security と同じ6つのヘッダを、次の処理に渡す前に応答に置く中間処理を作る。
@@ -59,7 +59,7 @@
   - 受入基準とテストの対応: 要件3の受入基準1(有効な時間)は `accesstoken_integration_test.go` の `TestAccessToken_ExpiresIn10Minutes` で確かめる。要件2の受入基準2(期限切れ、書き換え、使えなくなった値を断る)は、`accesstoken_test.go` の `TestAccessToken_RejectsExpired` `TestAccessToken_RejectsBadSignature` `TestAccessToken_RejectsAlgNone` `TestAccessToken_RejectsNonUUIDSub` と、`accesstoken_integration_test.go` の `TestAccessToken_RejectsOldVersion` で確かめる。要件4の受入基準1(版をまたいでログインし続けられる)のうち値の形は、`accesstoken_integration_test.go` の `TestAccessToken_HeaderAndClaims` で確かめる
   - _要件: 2.2, 3.1, 4.1_
 
-- [ ] 2.3 値を読む段とログインを求める段を作る
+- [x] 2.3 値を読む段とログインを求める段を作る
 
   Claude は、Java 版の `JwtAuthenticationFilter` にあたる `Identify` と、Java 版の `authorizeHttpRequests` にあたる `RequireLogin` の2つの中間処理を作る。`RequireLogin` は、`/api/admin/` の下の 403 の応答の `Content-Type` を、Java 版の `accessDeniedHandler` と同じ `application/json;charset=UTF-8` にする。`Identify` は、データベースが読めないときに、要求を次の処理に渡さず、状態の番号 500 で答える。Claude は、データベースを読むテストを `middleware_integration_test.go` に、データベースを読まないテストを `middleware_test.go` に置く。
   - 完了の確かめ方: `go test ./internal/auth/ -run 'TestIdentify|TestRequireLogin'` が通る。2つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
@@ -365,6 +365,9 @@
 - Claude のツールの引数は、逆斜線と u と4桁の16進の並びを、その並びが表す文字に変えてしまう。Claude は、この並びをファイルに書くときは、perl の置き換えで逆斜線を `\x5c` と書き、日本語を含む置き換えには perl を使わない
 - Spring の `ResponseCookie` は、Max-Age が0以上のとき、必ず `Expires=` も書く。そのため、`auth.ChallengeCookie` は、design.md の表と違って `now time.Time` を3つ目の引数に取り、`Expires=` に now の600秒後を書く。`auth.DeleteCookie` と `auth.ExpiredAccessTokenCookie` も `Expires=Thu, 01 Jan 1970 00:00:00 GMT` を書く。Claude は、httpapi のタスクで、`ChallengeCookie` に要求を受けた時刻を渡し、Cookie の名前と Path は `auth.ChallengeCookieName` と `auth.ChallengeCookiePath` を使う
 - golangci-lint の gosec は、名前に cred、pass、pwd、secret、token などを含む文字列の定数を、秘密の値として止める(G101)。また、変数のパスを `os.ReadFile` に渡すと止める(G304)。`.golangci.yml` は `nosec: true` なので、`#nosec` では黙らせられない。Claude は、文言の定数にそれらを含まない名前を付け、テストのファイルは `fs.ReadFile(os.DirFS(<置き場>), <名前>)` で読む
+- gosec は、`Secure` `HttpOnly` `SameSite` を付けない `http.Cookie` の値を止める(G124)。テストの要求に Cookie を付けるときも当たるので、Claude は、テストでは `r.Header.Add("Cookie", "名前=値")` と書く
+- `auth.Identify` は、データベースを読めないとき、包んだ誤りでパニックにする。`internal/auth` は depguard の決まりで `internal/httpapi/middleware` を読めず、ログを書く部品も持たないので、いちばん外側の `Recover` が、誤りをログに書き、決まった本文の 500 で答える。Claude は、`httpapi.New` に中間処理を並べるタスクで、`Recover` を `Identify` より外に置き、データベースを読めない `Identify` を含めてつないだ場合に、決まった本文の 500 が返ることもテストで確かめる
+- `auth.RequireLogin` は、Spring の `/api/admin/**` に合わせ、`/api/admin` そのものにも役割 `ADMIN` を求める。`/api/adminx` には求めない
 
 ## 完了条件(全タスク共通)
 

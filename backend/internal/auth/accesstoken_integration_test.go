@@ -57,17 +57,17 @@ func tokenVersionRow(t *testing.T, id uuid.UUID) (version int64, updatedAt time.
 		t.Fatalf("世代の番号の行を読めない: %v", err)
 	}
 	defer rows.Close()
-	for rows.Next() {
-		var ts pgtype.Timestamp
-		if err := rows.Scan(&version, &ts); err != nil {
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
 			t.Fatalf("世代の番号の行を読めない: %v", err)
 		}
-		return version, ts.Time, true
+		return 0, time.Time{}, false
 	}
-	if err := rows.Err(); err != nil {
+	var ts pgtype.Timestamp
+	if err := rows.Scan(&version, &ts); err != nil {
 		t.Fatalf("世代の番号の行を読めない: %v", err)
 	}
-	return 0, time.Time{}, false
+	return version, ts.Time, true
 }
 
 // decodeSegment は、値の1つの部分を、base64url として読んだバイトの並びにする。
