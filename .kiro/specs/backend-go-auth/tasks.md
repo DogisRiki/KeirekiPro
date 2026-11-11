@@ -140,7 +140,7 @@
   - 受入基準とテストの対応: 要件3の受入基準3(1回しか使えない)は、`emailverification_integration_test.go` の `TestEmailVerificationComplete_SecondUseAlreadyVerified` で確かめる。要件4の受入基準2(どちらの版に届いた登録も残る)のうち行の形は、`TestEmailVerificationComplete_RowsInOneTransaction` と `TestEmailVerificationComplete_EmailTaken` で確かめる。目的が `ACCOUNT_EMAIL` の書き換えは `TestEmailVerificationComplete_AccountEmailVerified` で、目的が `PENDING_EMAIL` の付け替えは `TestEmailVerificationComplete_PendingEmailPromoted` と、付け替え先のメールアドレスがほかの利用者に使われているときの `TestEmailVerificationComplete_PendingEmailTaken`(結果 `EMAIL_TAKEN`)で確かめる
   - _要件: 3.3, 4.2_
 
-- [ ] 3.11 新規の登録とメールアドレスの確認と送り直しを作る
+- [x] 3.11 新規の登録とメールアドレスの確認と送り直しを作る
 
   Claude は、`Service` の `Register` `VerifyEmail` `ResendEmailVerification` `ResendEmailVerificationForLogin` を、Java 版のユースケースが処理を進める順と同じ順で処理を進めるように作る。`Register` は、メールの送り出しに失敗したら、置いた登録の途中の記録を消してから誤りを返す。`VerifyEmail` は、Java 版の `VerifyEmailUseCase` と同じく、目的が `PASSWORD_RESET` のリンクでは、3.9 の置き場に再設定の値を置き、結果 `PASSWORD_RESET_READY` と再設定の値を返す。
   - 完了の確かめ方: `go test ./internal/auth/ -run 'TestRegister|TestVerifyEmail|TestResend'` が通る
@@ -383,6 +383,7 @@
 - `sendEmailVerification` は、送り直せる間隔の中で送れないとき、偽と nil の誤りを返す。Claude は、小タスク3.10 と3.11 で、これを Java 版の RATE_LIMITED と同じ 400 の答え(MessageResendRateLimited)に写す。テストの `javaDevSigningKey` と `javaSample` で始まる定数は、開発環境の Java 版が実際に送った確認のリンクの値とその項目なので、後のタスクのテストでも使える
 - `passwordreset.go` の `storePasswordResetToken` は、渡された有効な時間を付け、0以下なら記録を置かずに誤りを返す。Claude は、小タスク3.11 の `VerifyEmail` で、Java 版と同じく確認のリンクの残りの時間を渡す。残りが1ミリ秒より短いと、go-redis は1ミリ秒に切り上げて置き、Java 版は Redis に断られて 500 になりうるので、3.11 でこの境目の扱いを Java 版と比べる
 - `emailverification.go` の `inTransaction` と `loadStoredUser` と `saveUser` は、Java 版の `@Transactional` と `UserRepository.findById` と `MyBatisUserRepository.save` を写した。小タスク3.12 と3.14 で利用者の行を書き換えるときは、これを使う。`isIntegrityViolation` は、Spring が `DataIntegrityViolationException` に訳す SQLSTATE(21000 と、分類 01 02 22 23 27 44)を見分ける。小タスク3.11 の `Register` は、Java 版の `UserRegistrationUseCase` が呼ぶ `Email.create`(Apache Commons の `EmailValidator`。Hibernate の確かめとは別)を写すか、変えた動きの一覧に書く。登録の完了(`completeRegistration`)は、登録の受け付けで確かめ済みのメールアドレスしか届かないので、この確かめを写していない。`loadStoredUser` は連携の行を行の ID でまとめ、Java 版の `toEntity` は小文字にした連携の名前でまとめるので、同じ名前の連携の行が2つあると保存の結果が違う。Java 版の保存ではこの行を作れないので写していないが、小タスク6.5 の変えた動きの一覧に書く
+- `commonsemail.go` は、Java 版の `Email.create` が使う Apache Commons Validator 1.11.0 の `EmailValidator.getInstance(false, false)` を写した。トップレベルドメインの表(`commons_tld_table.go`)と期待(`testdata/commonsemail/vectors.txt`)は、`testdata/commonsemail/Gen.java` を Java 版の依存の版で動かして作り直す。ドメインに基本多言語面の外の文字があると変えずに返すので、呼ぶ側は入力の検査(`isEmailLikeHibernate`)を先に通す。`Register` は、Java 版がパスワードのハッシュを作ってから入力の誤りで断るのに対し、ハッシュを作らずに断る(答えは同じ)。`VerifyEmail` の目的 PASSWORD_RESET の再設定の値の有効な時間は、Java 版の `Duration.toMillis` と同じくミリ秒に切り捨て、1ミリ秒より短いと置かずに誤りを返す(Java 版は Redis に断られて 500 になる)。`errors.go` に `MessageEmailNotRegistrable` を足した
 
 ## 完了条件(全タスク共通)
 

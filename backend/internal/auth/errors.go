@@ -21,6 +21,9 @@ const (
 	MessageResendRateLimited = "確認のメールは1分に1回まで送れます。少し待ってからもう一度お試しください。"
 	// MessageNotResendable は、送り直しに使えないリンクの値で送り直しを求められたときの文言である。
 	MessageNotResendable = "このリンクでは確認のメールを送り直せません。"
+	// MessageEmailNotRegistrable は、登録にすでにある利用者のメールアドレスを使ったときの文言である
+	// (UserEmailDuplicationCheckService)。
+	MessageEmailNotRegistrable = "このメールアドレスは登録できません。"
 	// MessageInvalidVerificationLink は、メールアドレスの確認のリンクが無効なときの文言である(EmailVerificationCompletion)。
 	MessageInvalidVerificationLink = "確認のリンクが無効です。"
 	// MessageInvalidResetLink は、パスワードの再設定の値が無いか期限が切れているときの文言である。
