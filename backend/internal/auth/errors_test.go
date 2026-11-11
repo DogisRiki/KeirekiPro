@@ -25,7 +25,7 @@ func TestError_MessagesMatchJava(t *testing.T) {
 		// SecurityConfig の accessDeniedHandler
 		{"MessageForbidden", MessageForbidden, "アクセス権限がありません。"},
 		// LoginUseCase と ResendEmailVerificationForLoginUseCase
-		{"MessageInvalidCredentials", MessageInvalidCredentials, "メールアドレスまたはパスワードが正しくありません。"},
+		{"MessageLoginFailed", MessageLoginFailed, "メールアドレスまたはパスワードが正しくありません。"},
 		// ResendEmailVerificationUseCase と ResendEmailVerificationForLoginUseCase
 		{"MessageResendRateLimited", MessageResendRateLimited, "確認のメールは1分に1回まで送れます。少し待ってからもう一度お試しください。"},
 		{"MessageNotResendable", MessageNotResendable, "このリンクでは確認のメールを送り直せません。"},
@@ -120,7 +120,7 @@ func TestError_UnwrapsWithErrorsAs(t *testing.T) {
 	if !errors.As(wrapped, &e) {
 		t.Fatalf("errors.As が *Error を取り出せない: %v", wrapped)
 	}
-	if e.Error() != MessageInvalidCredentials {
-		t.Errorf("Error() = %q, want %q", e.Error(), MessageInvalidCredentials)
+	if e.Error() != MessageLoginFailed {
+		t.Errorf("Error() = %q, want %q", e.Error(), MessageLoginFailed)
 	}
 }

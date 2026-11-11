@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -80,7 +81,7 @@ var javaSamples = []struct {
 // readJavaSample は、Java 版のテストの資源の置き場から、Redis の値の見本を読む。
 func readJavaSample(t *testing.T, file string) []byte {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "..", "src", "test", "resources", "baseline-samples", "redis", file))
+	b, err := fs.ReadFile(os.DirFS(filepath.Join("..", "..", "src", "test", "resources", "baseline-samples", "redis")), file)
 	if err != nil {
 		t.Fatalf("見本 %s を読めない: %v", file, err)
 	}

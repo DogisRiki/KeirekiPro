@@ -14,9 +14,9 @@ const (
 	// MessageForbidden は、役割の足りない要求を断るときの文言である。internal/httpapi/middleware の MessageForbidden と同じにする。
 	MessageForbidden = "アクセス権限がありません。"
 
-	// MessageInvalidCredentials は、ログインに失敗したときの文言である。アカウントが無いときも
+	// MessageLoginFailed は、ログインに失敗したときの文言である。アカウントが無いときも
 	// パスワードが違うときも、この1つを使う(LoginUseCase、ResendEmailVerificationForLoginUseCase)。
-	MessageInvalidCredentials = "メールアドレスまたはパスワードが正しくありません。"
+	MessageLoginFailed = "メールアドレスまたはパスワードが正しくありません。"
 	// MessageResendRateLimited は、確認のメールを送り直せる間隔の前に送り直しを求められたときの文言である。
 	MessageResendRateLimited = "確認のメールは1分に1回まで送れます。少し待ってからもう一度お試しください。"
 	// MessageNotResendable は、送り直しに使えないリンクの値で送り直しを求められたときの文言である。
@@ -92,7 +92,7 @@ func errBusiness(message string) *Error {
 // errInvalidCredentials は、ログインに失敗したときの誤りを作る。アカウントが無いときも
 // パスワードが違うときも、この関数で作り、答えから2つを見分けられないようにする。
 func errInvalidCredentials() *Error {
-	return errBusiness(MessageInvalidCredentials)
+	return errBusiness(MessageLoginFailed)
 }
 
 // errEmailNotVerified は、確認の済んでいないメールアドレスのときの 409 の誤りを作る。

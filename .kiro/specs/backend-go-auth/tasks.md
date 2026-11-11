@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 認証の処理の土台を作る
+- [x] 1. 認証の処理の土台を作る
 - [x] 1.1 依存と設定とメールのひな形の埋め込みを足す
 
   Claude は、golang-jwt v5.3.1 を Go 版の依存に足し、google/uuid を直接の依存に変える。Claude は、設定に `App.ApplicationName`(値 `keirekipro`)を足し、Java 版のメールのひな形4つを Go 版に埋め込む `mailtemplates.go` と、埋め込んだひな形から4つのファイル名が読めることを確かめる `mailtemplates_test.go` を作る。Claude は、`docker/backend-go/Dockerfile.prod` の組み立ての段に、`mailtemplates.go` と `src/main/resources/mail` をコピーする手順を、`migrations.go` とマイグレーションのファイルをコピーする手順の隣に足す。この変更は、イメージに入れるファイルを足すだけで、本番の設定の変更ではない。
@@ -36,7 +36,7 @@
   - 受入基準とテストの対応: 要件4の受入基準1と2(版の間で記録を互いに読める)のうち値の形は、`redisjson_integration_test.go` の `TestRedisJSON_MatchesJackson`(`<` `>` `&` を置き換えない場合を含む)で確かめる
   - _要件: 4.1, 4.2_
 
-- [ ] 1.6 Cookie の書き方を作る
+- [x] 1.6 Cookie の書き方を作る
 
   Claude は、Java 版の `CookieUtil` と同じ文字列で `Set-Cookie` の値を作る4つの関数を作る。Claude は、属性の順と `Secure` を置く位置を、Java 版の応答の文字列で確かめる。
   - 完了の確かめ方: `go test ./internal/auth/ -run Cookie` が、4つの関数の `Secure` の有無ごとの場合で通る。1つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
@@ -363,6 +363,8 @@
 - `internal/auth` は depguard の決まりで `internal/httpapi/middleware` を読めないので、`auth.MessageUnexpected` と `auth.MessageForbidden` は middleware と同じ文字列を別に持つ。Claude は、両方を読める `internal/httpapi` のテストで、2つの定数が middleware の定数と同じかを確かめる。`errInvalidInput` は渡した束をそのまま `Errors` に入れるので、Claude は nil を渡さない
 - Java 版の Redis の値は、application.yaml の `use-jackson2-defaults` と `JsonMapperConfig` の設定を当てた Jackson で書かれる。そのため、絵文字などの U+10000 以上の文字は、大文字の16進の2つ組の逃がしになる。Claude は、期待する値を設定の無い JsonMapper で作らず、`backend/src/test/resources/baseline-samples/redis/` にある Java 版が置いた値の見本と比べる。`redisjson.go` の `toJacksonEscapes` が、Go の Encoder と Jackson の3つの違いを直す
 - Claude のツールの引数は、逆斜線と u と4桁の16進の並びを、その並びが表す文字に変えてしまう。Claude は、この並びをファイルに書くときは、perl の置き換えで逆斜線を `\x5c` と書き、日本語を含む置き換えには perl を使わない
+- Spring の `ResponseCookie` は、Max-Age が0以上のとき、必ず `Expires=` も書く。そのため、`auth.ChallengeCookie` は、design.md の表と違って `now time.Time` を3つ目の引数に取り、`Expires=` に now の600秒後を書く。`auth.DeleteCookie` と `auth.ExpiredAccessTokenCookie` も `Expires=Thu, 01 Jan 1970 00:00:00 GMT` を書く。Claude は、httpapi のタスクで、`ChallengeCookie` に要求を受けた時刻を渡し、Cookie の名前と Path は `auth.ChallengeCookieName` と `auth.ChallengeCookiePath` を使う
+- golangci-lint の gosec は、名前に cred、pass、pwd、secret、token などを含む文字列の定数を、秘密の値として止める(G101)。また、変数のパスを `os.ReadFile` に渡すと止める(G304)。`.golangci.yml` は `nosec: true` なので、`#nosec` では黙らせられない。Claude は、文言の定数にそれらを含まない名前を付け、テストのファイルは `fs.ReadFile(os.DirFS(<置き場>), <名前>)` で読む
 
 ## 完了条件(全タスク共通)
 
