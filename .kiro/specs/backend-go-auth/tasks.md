@@ -244,7 +244,7 @@
   - 受入基準とテストの対応: 要件5の受入基準4(要求のたびに違う値は形を比べる)は、`normalize_test.go` の `TestNormalizeTwoFactorCode_OnlyTargetPlaces`、`TestNormalizeEmailVerificationJWT_LexpAsDelta`、`TestNormalizeTextBodyURL_StateAndChallenge`、`TestNormalizeURLFragment_JWTWithoutEquals` で確かめる。`TestNormalizeEmailVerificationJWT_LexpAsDelta` は、`lexp` の4秒のずれを許し、6秒のずれを差にすることを確かめる。要件5の受入基準2(メールと Redis を比べる)のうち正規化の範囲も、同じテストで確かめる
   - _要件: 5.2, 5.4_
 
-- [ ] 5.7 回ごとに準備の段を送り直す測り方を足す
+- [x] 5.7 回ごとに準備の段を送り直す測り方を足す
 
   Claude は、`perf.go` の `MeasureLatency` と `perfenv.go` の `measure` を、`prepare_each` が真の筋書きでは、慣らしの回と測る回のそれぞれの前に最後の段より前の段を送り直し、最後の段の時間だけを測る形に変える。慣らしの回数と測る回数は変えない。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run TestMeasureLatency_PrepareEach` が通る
@@ -405,6 +405,7 @@
 - 5.8 で、段の種類で送り方を選ぶ。版の段は `Send`、絶対の URL の段は steps.go の `SendAbsolute` にテストの処理から届く fakeoidc のアドレス(`oidcURL`)を渡す、Redis の段は `ApplyRedis` にその版の Redis の部品を渡す。絶対の URL の段は版の Cookie を送らず、Set-Cookie も覚えず、応答を比べない
 - 5.8 で、値を期限切れにする段は expire.go の `Session.Expire(step, jwtKey)` を呼ぶ。`jwtKey` には stack.go の `jwtSecret`(両方の版に渡した JWT.Secret)を渡し、比べる動かし方では版ごとの Session で1回ずつ呼ぶ。compare_test.go に関数 `jwt` があるので、harness のテストで golang-jwt を読むときは別名(expire_test.go では `gojwt`)を付ける
 - 5.8 で、比べる動かし方は、段ごとに `CompareResponse` を `CompareMail` より先に呼ぶ。`CompareResponse` が `Response.Received`(`Send` が入れる応答の時刻)を正規化の基準の時刻に写し、メールの `lexp` はその時刻との差で比べるためである。`Response` を手で作るときは `Received` も入れる
+- 5.8 で、測る動かし方にメールを読む部品を渡すときは、perf.go の `prepare` が作る Session に `SetMailReader` を呼ぶ。prepare_each が真の筋書きでは、`MeasureLatency` が回ごとに `prepare` で新しい Session を作るので、初めの Session だけに渡すと2回目から `mail:` の取り出しが誤りになる
 
 ## 完了条件(全タスク共通)
 

@@ -162,22 +162,39 @@ func sendExpect(ctx context.Context, session *Session, client *http.Client, base
 
 // MeasureLatency は、筋書き s の準備の段を送ったあと、最後の段を、時間を測らずに warmup 回、時間を測って samples 回、
 // 1つずつ順に baseURL に送り、測った時間を返す。時間は、要求を送ってから応答の本文を読み終えるまでである。
+// s.PrepareEach が真なら、慣らしの回と測る回のそれぞれの前に、準備の段を新しい Session で送り直す。
+// 確認のコードのような、1回使うと消える値を最後の段で使う操作を測るためである。準備の段の時間は測らない。
 // 期待に合わない応答があれば、誤りを返す。失敗の応答の時間を測っても、操作の時間を比べたことにならないためである。
 func MeasureLatency(ctx context.Context, client *http.Client, baseURL string, s Scenario, warmup, samples int) ([]time.Duration, error) {
 	session, err := prepare(ctx, client, baseURL, s)
 	if err != nil {
 		return nil, err
 	}
+	// round は、i 回目(慣らしの回から数える)の最後の段を送る Session を返す
+	round := func(i int) (*Session, error) {
+		if !s.PrepareEach || i == 0 {
+			return session, nil
+		}
+		return prepare(ctx, client, baseURL, s)
+	}
 	last := s.Steps[len(s.Steps)-1]
-	for range warmup {
-		if err := sendExpect(ctx, session, client, baseURL, last); err != nil {
+	for i := range warmup {
+		sess, err := round(i)
+		if err != nil {
+			return nil, err
+		}
+		if err := sendExpect(ctx, sess, client, baseURL, last); err != nil {
 			return nil, err
 		}
 	}
 	durations := make([]time.Duration, 0, samples)
-	for range samples {
+	for i := range samples {
+		sess, err := round(warmup + i)
+		if err != nil {
+			return nil, err
+		}
 		start := time.Now()
-		resp, err := session.Send(ctx, client, baseURL, last)
+		resp, err := sess.Send(ctx, client, baseURL, last)
 		elapsed := time.Since(start)
 		if err != nil {
 			return nil, err

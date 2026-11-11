@@ -110,6 +110,7 @@ func RunPerf(ctx context.Context, envs map[string]*PerfEnv, scenarios []Scenario
 }
 
 // measure は、保存された内容を空にして筋書き s の初めのデータを読み込み、最後の段の95パーセンタイルを返す。
+// prepare_each が真の筋書きでは、MeasureLatency が回ごとに準備の段を送り直し、最後の段の時間だけを測る。
 func (p *PerfEnv) measure(ctx context.Context, s Scenario, opts PerfOptions) (time.Duration, error) {
 	if err := p.Reset(ctx); err != nil {
 		return 0, err
