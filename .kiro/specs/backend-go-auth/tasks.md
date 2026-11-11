@@ -91,7 +91,7 @@
   - _要件: 1.3_
   - _対象の部品: OIDC_
 
-- [ ] 3.4 ログインを続けるための値を作る
+- [x] 3.4 ログインを続けるための値を作る
 
   Claude は、Java 版の `RedisRefreshTokenStore` と `AuthSessionInvalidator` を写し、ログインを続けるための値の発行と読み出しと削除と、利用者のログインの状態をまとめて使えなくする処理を作る。
   - 完了の確かめ方: `go test ./internal/auth/ -run 'TestRefreshToken|TestInvalidateSessions'` が通る
