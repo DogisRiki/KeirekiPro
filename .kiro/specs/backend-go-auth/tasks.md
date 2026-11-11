@@ -83,7 +83,7 @@
   - _要件: 1.5_
   - _対象の部品: Mail_
 
-- [ ] 3.3 問い合わせのエスケープを作る (並行可)
+- [x] 3.3 問い合わせのエスケープを作る (並行可)
 
   Claude は、URL の問い合わせの部分を Spring の `UriComponentsBuilder.encode()` と同じ規則でエスケープする `spring_query.go` を作る。
   - 完了の確かめ方: `go test ./internal/auth/ -run TestSpringQuery` が通る
@@ -373,6 +373,7 @@
 - Claude の Edit の道具は、文字と結合する文字の並び(「ا」と U+0653 など)を、合成した1文字に変えることがある。Claude は、結合する文字をファイルに書くときは、Java では `(char) 0x0301` のように、Go のテストでは `ch(0x0301)` のように、文字の番号で書く
 - 要求の JSON に対になっていないサロゲートの書き方(たとえば `"\ud800"`)があると、Go の `encoding/json` は U+FFFD(UTF-8 で3バイト)に置き換え、Java 版の `MaxUtf8BytesValidator` は `?`(1バイト)と数える。そのため、72バイトの境目の近くのパスワードで、2つの版の判定が変わることがある。画面からは送られない入力である。Claude は、小タスク6.5 で、この違いを、項目が無い要求の違いと並べて、変えた動きの一覧に載せるかを決め、所有者に報告する。
 - LocalStack の SES が受けたメールは、`curl localhost:4566/_aws/ses` で JSON として読める。Java 版の FreeMarker は、拡張子が `.ftl` のひな形では HTML の特別な文字を逃がさず、利用者の名前の `<&>` や `${x}` もそのまま差し込む。Claude は、Java 版の CSRF の検査を通すため、先に GET の要求で `XSRF-TOKEN` の Cookie を受け取り、POST の要求の `X-XSRF-TOKEN` の見出しに同じ値を入れる
+- `spring_query.go` の正解の `testdata/springquery/vectors.txt` は、`testdata/springquery/Gen.java` を spring のコンテナの Java 21 で、Java 版と同じ Spring 7.0.10 の jar(spring-core と spring-web と commons-logging と jspecify)を渡して動かして作る。`springQuery` は先頭の `?` を付けないので、Claude は、小タスク3.13 で、問い合わせの無い認可の URL のあとに `?` と `springQuery` の結果をつなぐ
 
 ## 完了条件(全タスク共通)
 
