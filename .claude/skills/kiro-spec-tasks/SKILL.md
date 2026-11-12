@@ -59,6 +59,7 @@ After all parallel research completes, synthesize findings before generating tas
 - Map all requirements to tasks and list numeric requirement IDs only (comma-separated) without descriptive suffixes, parentheses, translations, or free-form labels
 - Ensure all design components included
 - Verify task progression is logical and incremental
+- 確かめの道具(テストの道具、筋書き、測る仕組み、版ごとの送り先などを機械で確かめるテスト、開発環境の利用者やテスト用の値)を作るタスクを、その道具で完了を確かめるタスクより前に置き、使う側の `_依存:_` に作る側の番号を書く(`.kiro/settings/rules/spec-writing.md` の「確かめの道具を作るタスクを、使うタスクより前に置く」)。あとのタスクの成果物をまとめて確かめるテストを、最後のタスクにまとめない
 - Ensure each executable sub-task includes at least one detail bullet that states what "done" looks like in observable terms
 - Keep normal implementation tasks within a single responsibility boundary; if work crosses boundaries, make it an explicit integration task
 - tasks.md の雛形(`.kiro/settings/templates/specs/tasks.md`)と `.kiro/settings/rules/spec-writing.md` の tasks.md の見本に従い、`(並行可)` の印を付ける:
@@ -80,6 +81,7 @@ After all parallel research completes, synthesize findings before generating tas
   - Each sub-task has a verifiable deliverable
   - Each executable sub-task includes an observable completion bullet
   - No implicit prerequisites remain hidden
+  - No task uses a verification tool (test helper, scenario, measuring harness, test that checks other tasks' outputs, dev-environment user or test data) that is built by a later task
   - `_依存:_`, `_対象の部品:_`, and `(並行可)` markers still match the dependency graph and architecture boundaries (the 見出しと目印の一覧 in `.kiro/settings/rules/spec-writing.md`)
 - If issues are task-plan-local, repair the draft and re-run the review gate before writing
 - Keep the review bounded to at most 2 repair passes
@@ -93,7 +95,7 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
 - Provide only file paths, the draft task plan, and merge context if an existing `tasks.md` is being updated. The reviewer should read `requirements.md`, `design.md`, and the task-generation rules directly instead of relying on a parent-synthesized coverage summary.
 - Check only:
   - hidden prerequisites or missing setup tasks
-  - dependency or ordering mistakes
+  - dependency or ordering mistakes, including a verification tool (test helper, scenario, measuring harness, a test that mechanically checks other tasks' outputs) built by a task placed after the tasks whose completion it checks
   - boundary overlap or ambiguous ownership between tasks
   - tasks that are too large, too vague, cross boundaries without being explicit integration tasks, or are missing a verifiable deliverable
   - contradictions introduced between requirements, design, and the task graph
