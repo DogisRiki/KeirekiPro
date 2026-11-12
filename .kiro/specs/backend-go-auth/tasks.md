@@ -328,7 +328,7 @@
   - _要件: 5.6_
 
 - [ ] 7. API の説明画面で確かめて進み具合を書く
-- [ ] 7.1 API の説明画面でログインを確かめる
+- [x] 7.1 API の説明画面でログインを確かめる
 
   Claude は、この作業フォルダの最上位から compose の `backend-go` を作り直して起動し、この作業フォルダのコードを動かす。Claude は、Go 版の `registerUser` と `verifyEmail` の操作で、ログインに使う利用者を作る。確認のリンクの値は、開発環境の LocalStack の SES が受けたメールから読む。Claude は、開発環境の compose の `api-docs`(ポート 8082)を Playwright で開き、API の説明画面での確認の節の3つを確かめ、結果を PR の本文に書く準備をする。
   - 完了の確かめ方: ログインする前の `GET /api/users/me` が 401 を、作った利用者での `POST /api/auth/login` が 200 を、ログインしたあとの `GET /api/users/me` が 501 と「未実装です。」を返す
@@ -429,6 +429,7 @@
 - 6.6 で、`refresh-logout.yaml` の管理者の経路の段 `admin-users-after-access-expired` に `to: other` を付け、次の作り直しの段 `refresh-after-access-expired` から `to: other` を外した。管理者の経路の段に付けないと、Java 版から Go 版の向きと Go 版から Java 版の向きで、ログインし直した段 `login-again` と同じ版に届く。作り直しの段にも付けると、前の段の `to: other` と2つ続き、ログインし直した版に戻る。外せば、2つの段のどちらも、その2つの向きでログインし直した版と違う版に届く。このため、作り直しの段は、タスクの本文の「6.1 で `to: other` を付けた作り直しの段」に当たるが、`TestCrossRoute_AuthProcedureSteps` はこの段を数えない。この食い違いは、出荷の前に所有者に示して合否を決めてもらい、PR の本文にも書く
 - 6.6 の `TestCrossRoute_AuthProcedureSteps` は、確かめる段を筋書きごとに名前で挙げた一覧(`authCrossSteps`)と比べる。筋書きの段の `to: other` を足したり外したりしたら、この一覧も直す
 - 6.7 で、置き換えの spec の `perf_test.go` の自分と比べる筋書き `selfPerf` にだけログインの段が無く、`make compat-perf` が 401 で失敗した。Go 版がログインの状態を確かめる経路を足したら、`compat_test.go` `cross_test.go` `perf_test.go` の3つの自分と比べる筋書きをそろえて直す。応答の時間の結果は `progress.md` の節「Java 版と Go 版の応答の時間を比べた結果」の表に書く
+- 7.1 で、Playwright MCP のブラウザは別のコンテナで動くので `http://localhost:8082` を開けなかった。`host.docker.internal:8082` で開くと、説明画面の送り元が開発環境の CORS の許す送り元から外れる。そこで、作業PCの上で動く Claude のデスクトップアプリのブラウザで説明画面を開いて確かめた。Swagger UI の本文の欄は、ブラウザの道具の `form_input` で値を入れると `[object Object]` が送られるので、欄を選んで打ち込む
 
 ## 完了条件(全タスク共通)
 
