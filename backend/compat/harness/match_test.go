@@ -3,6 +3,7 @@
 package harness
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -318,15 +319,16 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	for _, b := range got {
 		byID[b.ID] = b
 	}
-	for _, id := range []string{"CB-001", "CB-002", "CB-003", "CB-004", "CB-005", "CB-006", "CB-007", "CB-008", "CB-009", "CB-010"} {
-		if _, ok := byID[id]; !ok {
+	for i := 1; i <= 26; i++ {
+		if id := fmt.Sprintf("CB-%03d", i); byID[id].ID != id {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 10 {
-		t.Errorf("一覧の項目は10のはずですが、%d です", len(got))
+	if len(got) != 26 {
+		t.Errorf("一覧の項目は26のはずですが、%d です", len(got))
 	}
-	for _, id := range []string{"CB-005", "CB-007", "CB-008", "CB-009", "CB-010"} {
+	for _, id := range []string{"CB-005", "CB-007", "CB-008", "CB-009", "CB-010",
+		"CB-013", "CB-014", "CB-015", "CB-016", "CB-017", "CB-018", "CB-019", "CB-020", "CB-021", "CB-022", "CB-023", "CB-025", "CB-026"} {
 		if m := byID[id].Matches; len(m) != 0 {
 			t.Errorf("%s は記録だけの項目のはずですが、match があります: %+v", id, m)
 		}
@@ -338,5 +340,36 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	}
 	if m := byID["CB-006"].Matches; len(m) != 1 || m[0] != (Match{Operation: "*", Target: TargetHeader, Path: "Set-Cookie", Status: 403}) {
 		t.Errorf("CB-006 の match = %+v", m)
+	}
+	// 入力の誤りの文言の並びは、2つ以上の文言を持ちうる操作と項目の、順だけの違いを許す
+	wantOrder := []string{
+		"registerUser $.errors.email[*]", "registerUser $.errors.username[*]", "registerUser $.errors.password[*]",
+		"registerUser $.errors.confirmPassword[*]", "resetPassword $.errors.password[*]",
+		"resetPassword $.errors.confirmPassword[*]", "requestPasswordReset $.errors.email[*]",
+		"verifyEmail $.errors.token[*]", "resendEmailVerification $.errors.token[*]",
+	}
+	var gotOrder []string
+	for _, m := range byID["CB-011"].Matches {
+		if !m.OrderOnly || m.Target != TargetBody || m.Status != 0 {
+			t.Errorf("CB-011 の match は本文の順だけを許すはずですが、%+v", m)
+		}
+		gotOrder = append(gotOrder, m.Operation+" "+m.Path)
+	}
+	if !slices.Equal(gotOrder, wantOrder) {
+		t.Errorf("CB-011 の match の操作と場所 = %v, want %v", gotOrder, wantOrder)
+	}
+	wantCB012 := Matches{
+		{Operation: "startOidcAuthorization", Target: TargetStatus},
+		{Operation: "startOidcAuthorization", Target: TargetBody, Path: "$.message"},
+	}
+	if m := byID["CB-012"].Matches; !slices.Equal(m, wantCB012) {
+		t.Errorf("CB-012 の match = %+v, want %+v", m, wantCB012)
+	}
+	wantCB024 := Matches{
+		{Operation: "*", Target: TargetBody, Path: "$.components", Status: 200},
+		{Operation: "*", Target: TargetBody, Path: "$.groups", Status: 200},
+	}
+	if m := byID["CB-024"].Matches; !slices.Equal(m, wantCB024) {
+		t.Errorf("CB-024 の match = %+v, want %+v", m, wantCB024)
 	}
 }

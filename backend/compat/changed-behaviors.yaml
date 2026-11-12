@@ -114,3 +114,186 @@
   go: 開発環境とテストの環境の CORS の許す送り元に、API の説明画面の http://localhost:8082 を足す。開発者が説明画面の「Try it out」で Go 版を呼べるようにするためである
   画面に影響が無い理由: 本番の許す送り元は、どちらの版も https://app.keirekipro.click だけなので、利用者の画面の動きは変わらない。所有者が 2026-11-10 に了承した方針で生じる違いである
   # match を書かない。比べる検査は要求に Origin を付けないので、この違いは出ない。
+
+- id: CB-011
+  group: 1
+  変えた動き: 入力の誤りの文言の並び
+  java: 1つの項目に2つ以上の誤りがあるとき、項目の文言の並びが、Hibernate Validator の誤りの集まりの順で決まり、要求ごとに変わることがある
+  go: 1つの項目に2つ以上の誤りがあるとき、項目の文言を、Java 版の要求の型に注釈を書いた順に並べる
+  画面に影響が無い理由: 画面は項目ごとの文言を並びのまま出すので、文言の順だけが変わり、出る文言は変わらない
+  # 2つ以上の文言を持ちうる項目だけを並べる。ログインと確認のメールの送り直し(ログインの画面から)と2段階認証の確認の項目は、
+  # @NotBlank の文言だけを持つので並べない。
+  match:
+    - operation: registerUser
+      target: body
+      path: $.errors.email[*]
+      order_only: true
+    - operation: registerUser
+      target: body
+      path: $.errors.username[*]
+      order_only: true
+    - operation: registerUser
+      target: body
+      path: $.errors.password[*]
+      order_only: true
+    - operation: registerUser
+      target: body
+      path: $.errors.confirmPassword[*]
+      order_only: true
+    - operation: resetPassword
+      target: body
+      path: $.errors.password[*]
+      order_only: true
+    - operation: resetPassword
+      target: body
+      path: $.errors.confirmPassword[*]
+      order_only: true
+    - operation: requestPasswordReset
+      target: body
+      path: $.errors.email[*]
+      order_only: true
+    - operation: verifyEmail
+      target: body
+      path: $.errors.token[*]
+      order_only: true
+    - operation: resendEmailVerification
+      target: body
+      path: $.errors.token[*]
+      order_only: true
+
+- id: CB-012
+  group: 1
+  変えた動き: Google と GitHub のどちらでログインするかの指定が無い、ログインの開始の要求
+  java: 問い合わせに provider が無い GET /api/auth/oidc/authorize に、500 と「予期せぬエラーが発生しました。」を返す
+  go: 400 と、文言「入力エラーがあります。」と空の errors を返す
+  画面に影響が無い理由: 画面はログインの開始の要求に必ず provider を付けるので、画面の動きは変わらない
+  # 状態の番号の違いは、要求の中身で絞れないので、操作で許す。Google と GitHub のログインの筋書きの開始の段の状態の番号は、
+  # 版をまたぐ検査が段ごとの期待と比べるので、開始の段の状態の番号の誤りは、版をまたぐ検査が見つける。
+  match:
+    - operation: startOidcAuthorization
+      target: status
+    - operation: startOidcAuthorization
+      target: body
+      path: $.message
+
+- id: CB-013
+  group: 1
+  変えた動き: 対象の外の provider でのログインの開始の要求
+  java: 'provider が google と github のどちらでもない要求に、Redis にキーが oidc:provider:、oidc:state:、oidc:code_verifier: で始まる3つの記録を置いたあとで、500 と「予期せぬエラーが発生しました。」を返し、3つの記録を残す'
+  go: Redis に記録を置く前に、400 と、文言「入力エラーがあります。」と空の errors を返す
+  画面に影響が無い理由: 画面は google か github だけを provider に付けるので、画面の動きは変わらない
+  # match を書かない。Redis の違いを操作で許すと、開始の段の Redis の記録の違いをすべて許してしまうので、比べる検査はこの要求を送らない。
+
+- id: CB-014
+  group: 1
+  変えた動き: Google と GitHub から戻ったときの、code か state が2つある要求
+  java: 誤りの画面への 302 を返す
+  go: 400 と、文言「入力エラーがあります。」と空の errors を返す
+  画面に影響が無い理由: Google と GitHub は code と state を1つずつ付けて戻すので、利用者がログインするときの動きは変わらない
+  # match を書かない。戻り先の状態の番号と Location の違いを操作で許すと、戻り先の移る先の違いをすべて許してしまうので、比べる検査はこの要求を送らない。
+
+- id: CB-015
+  group: 1
+  変えた動き: ログインの開始の要求の、受けられない Accept
+  java: Accept が image/* や application/*+xml のとき、Accept が ASCII でない文字を含むとき、Q=abc や Q=2 のような正しくない大文字の Q を含むときに、誤りの画面の都合で 401 を返す
+  go: 406 を返す
+  画面に影響が無い理由: 画面は Accept を付けないか、application/json, text/plain, */* を付けて送るので、画面の動きは変わらない
+  # match を書かない。比べる検査はこの Accept を送らない。
+
+- id: CB-016
+  group: 1
+  変えた動き: ログインの開始の要求の、Java が知らない charset を持つ Accept
+  java: Accept の charset が、名前の形は正しいが Java が知らない名前のとき、406 を返す
+  go: その Accept を受け入れて答える
+  画面に影響が無い理由: 画面は Accept に charset を付けないので、画面の動きは変わらない
+  # match を書かない。比べる検査はこの Accept を送らない。
+
+- id: CB-017
+  group: 1
+  変えた動き: ログインの開始の要求の、受けられる型の候補が50を超える Accept
+  java: Accept の型の候補が50を超えるとき(*/* と a/b1 から a/b49 までの50個)、内部の誤りで 500 と「予期せぬエラーが発生しました。」を返す
+  go: その Accept を受け入れて 200 で答える
+  画面に影響が無い理由: 画面は Accept の型の候補を3つまでしか付けないので、画面の動きは変わらない
+  # match を書かない。比べる検査はこの Accept を送らない。
+
+- id: CB-018
+  group: 1
+  変えた動き: ログインの開始の要求の、port が数字でない Host
+  java: Host の port が 8o や +80 のように数字でないとき、Tomcat が 400 を返す
+  go: Host をそのまま使うか、port を落とした Host を使って答える
+  画面に影響が無い理由: ブラウザは Host に数字の port だけを付け、本番では ALB が Host を受けるので、画面の動きは変わらない
+  # match を書かない。比べる検査はこの Host を送らない。
+
+- id: CB-019
+  group: 1
+  変えた動き: provider が正しくなく、Accept も受けられない、ログインの開始の要求
+  java: 500 か 401 を返す
+  go: provider の誤りとして 400 を返す
+  画面に影響が無い理由: 画面は google か github だけを provider に付け、受けられる Accept を付けるので、画面の動きは変わらない
+  # match を書かない。比べる検査はこの要求を送らない。
+
+- id: CB-020
+  group: 1
+  変えた動き: 本文の項目が無い要求の入力の誤り
+  java: 項目が無いと値を null として検査し、@NotBlank の文言だけを返す。password が無い要求には「入力必須」の文言だけを、confirmPassword だけが無い要求には「入力必須」の文言だけを返す
+  go: 項目が無い要求を空の文字列の要求と同じに検査するので、password が無い要求に「8文字以上」と「英小文字、英大文字、数字」の文言を足し、confirmPassword だけが無い要求に「一致していません」の文言を足す
+  画面に影響が無い理由: 画面はどの項目も文字列で送り、項目を省かないので、画面の動きは変わらない
+  # match を書かない。比べる検査は項目を省いた要求を送らない。
+
+- id: CB-021
+  group: 1
+  変えた動き: パスワードの対になっていないサロゲートの数え方
+  java: 要求の JSON の "\ud800" のような対になっていないサロゲートを、半角72文字の上限の検査で1バイトと数える
+  go: 対になっていないサロゲートを U+FFFD に置き換え、3バイトと数える。そのため、72バイトの境目の近くのパスワードで、入力の誤りになるかが変わることがある
+  画面に影響が無い理由: ブラウザは対になっていないサロゲートを JSON に書かないので、画面の動きは変わらない
+  # match を書かない。比べる検査は対になっていないサロゲートを送らない。
+
+- id: CB-022
+  group: 1
+  変えた動き: ログインの状態の値とログインを続けるための値の役割の並び
+  java: 役割を順の決まらない集合で持つので、USER と ADMIN を持つ利用者の roles の並びが JVM ごとに変わる
+  go: roles を、いつも USER、ADMIN の順に並べる
+  画面に影響が無い理由: 画面は roles を読まない。どちらの版も、roles に ADMIN が含まれるかだけで管理者の経路を許し、並びの順を使わないので、画面の動きは変わらない
+  # match を書かない。比べる検査の初期のデータの利用者は役割 USER だけを持つので、この違いは出ない。
+
+- id: CB-023
+  group: 1
+  変えた動き: GitHub の利用者の id が整数でないときのログイン
+  java: id が小数や指数の形の数のとき、Java の String.valueOf で文字にした値を GitHub の利用者の ID にして、ログインを続ける
+  go: Java 版と同じ文字を作れないので、利用者の情報を読めない失敗として、誤りの画面に移す
+  画面に影響が無い理由: GitHub は利用者の id を整数で返すので、利用者がログインするときの動きは変わらない
+  # match を書かない。偽のログインのサービスは id を整数で返す。
+
+- id: CB-024
+  group: 1
+  変えた動き: 開発環境の /actuator/health の中身
+  java: 開発環境では、データベースとディスクの空きの詳しい状態(components)と、liveness と readiness の組(groups)も返す
+  go: どの環境でも {"status":"UP"} だけを返す
+  画面に影響が無い理由: 画面はこの経路を呼ばない。本番の Java 版は詳しい状態を出さず {"status":"UP"} だけを返すので、ALB とコンテナの確かめの動きも変わらない
+  # 仕様書の操作でない経路の段は、操作の名前を持たないので、すべての操作で許す。仕様書の操作の答えは、どれも先頭に components と groups を持たない。
+  match:
+    - operation: "*"
+      target: body
+      path: $.components
+      status: 200
+    - operation: "*"
+      target: body
+      path: $.groups
+      status: 200
+
+- id: CB-025
+  group: 1
+  変えた動き: 同じ名前の連携の行を2つ持つ利用者の保存
+  java: 利用者を読むときに、連携の行を小文字にした連携の名前でまとめ、同じ名前の行のうち後に読んだ1つだけを残す。保存では連携の行をすべて消してから入れ直すので、同じ名前のほかの行は消える
+  go: 利用者を読むときに、連携の行を行の ID でまとめるので、同じ名前の行をすべて残し、保存のあとも残す
+  画面に影響が無い理由: Java 版も Go 版も、1人の利用者に同じ名前の連携の行を2つ作らないので、画面から使える利用者にこの違いは出ない
+  # match を書かない。比べる検査の初期のデータと筋書きは、同じ名前の連携の行を2つ持つ利用者を作らないので、この違いは出ない。
+
+- id: CB-026
+  group: 1
+  変えた動き: プリフライトでない OPTIONS の要求への答え
+  java: 経路のある URL(例 /api/auth/login と /api/resumes)には、200 と空の本文を返す。経路の無い URL(例 /api/admin/users)には、500 と「予期せぬエラーが発生しました。」を返す
+  go: 経路のある URL には、405 と文字の本文「Method Not Allowed」を返す。経路の無い URL には、404 と文字の本文「404 page not found」を返す
+  画面に影響が無い理由: 画面は OPTIONS を自分で送らない。ブラウザが送る OPTIONS は Origin と Access-Control-Request-Method を付けたプリフライトで、プリフライトへの答えはどちらの版も同じなので、画面の動きは変わらない
+  # match を書かない。違いを操作で許すと、同じ経路のほかの要求の違いも許してしまうので、比べる検査はプリフライトでない OPTIONS を送らない。
+  # プリフライトは require-login.yaml の段 options-admin-users で比べる。どちらの版も、プリフライトでない OPTIONS をログインの状態の検査で断らない。

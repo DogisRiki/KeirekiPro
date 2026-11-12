@@ -1,0 +1,92 @@
+# ログインの状態の検査の筋書き。ログインの要る操作への、Cookie の無い要求、書き換えた値、無効な値での書き込みの要求、
+# 期限を切らした値、ログアウトで使えなくなった値を断ることと、OPTIONS と /actuator/health を通すことを確かめる。
+# 値を受け入れたかは、管理者の経路 GET /api/admin/users の答えで確かめる。受け入れなければ 401、
+# 受け入れて役割が USER だけなら 403 になる。
+# 書き換えた値は、利用者 user1@example.com の ID と役割 USER を持ち、期限が 2100 年の、署名の合わない JWT である。
+name: auth-require-login
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [compare]
+steps:
+  - name: admin-users-no-cookie
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 401}
+  - name: admin-users-tampered-token
+    request:
+      method: GET
+      path: /api/admin/users
+      headers: {Cookie: 'accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJVU0VSIl0sInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjQxMDI0NDQ4MDB9.bm90LXRoZS1zaWduYXR1cmUtb2YtdGhpcy10b2tlbiE'}
+    expect: {status: 401}
+  # 無効な値での書き込みの要求は、偽の送信の検査のヘッダを付け、ログインの状態の検査で断られることを確かめる
+  - name: create-resume-invalid-token
+    request:
+      method: POST
+      path: /api/resumes
+      headers: {Cookie: 'accessToken=not-a-jwt'}
+      csrf: true
+      json: {resumeName: 職務経歴書}
+    expect: {status: 401}
+  - name: create-resume-tampered-token
+    request:
+      method: POST
+      path: /api/resumes
+      headers: {Cookie: 'accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJVU0VSIl0sInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjQxMDI0NDQ4MDB9.bm90LXRoZS1zaWduYXR1cmUtb2YtdGhpcy10b2tlbiE'}
+      csrf: true
+      json: {resumeName: 職務経歴書}
+    expect: {status: 401}
+  # OPTIONS は、画面の送り元からのプリフライト(Origin と Access-Control-Request-Method を付けた OPTIONS)で送る。
+  # プリフライトでない OPTIONS は、どちらの版もログインの状態の検査を通るが、答えが揃わない。
+  # 答えの違いは、変えた動きの一覧の CB-026 に記録だけの項目として載せてある
+  - name: options-admin-users
+    request:
+      method: OPTIONS
+      path: /api/admin/users
+      headers: {Origin: 'http://localhost:5173', Access-Control-Request-Method: GET}
+    expect: {status: 200}
+  # Accept を付けないと、Java 版は Content-Type を application/vnd.spring-boot.actuator.v3+json にする。
+  # ALB とコンテナの確かめは答えの状態の番号だけを見るので、Content-Type をそろえるために Accept を付ける
+  - name: actuator-health
+    request:
+      method: GET
+      path: /actuator/health
+      headers: {Accept: application/json}
+    expect: {status: 200}
+  - name: login
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: admin-users-after-login
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 403}
+  - name: expire-access-token
+    expire: {cookie: accessToken}
+  - name: admin-users-expired-token
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 401}
+  # ログアウトで使えなくなった値は、ログアウトの前に取り出した値を、ログアウトのあとに Cookie ヘッダに差し込んで送る
+  - name: login-again
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    capture: {access2: 'cookie:accessToken'}
+    expect: {status: 200}
+  - name: logout
+    request:
+      method: POST
+      path: /api/auth/logout
+    expect: {status: 204}
+  - name: admin-users-logged-out-token
+    request:
+      method: GET
+      path: /api/admin/users
+      headers: {Cookie: 'accessToken={access2}'}
+    expect: {status: 401}
