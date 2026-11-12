@@ -122,6 +122,8 @@ After all findings return, synthesize in main context before proceeding.
      - If `gh pr list` fails, do not stop the generation. State in the generation report that the search failed, and at the end of design.md leave one empty line followed by the line 「spec 無しのPRの検索に失敗したため、食い違いを拾えていない」
      - Among the places those lines point to, fix the ones in design.md to match the behavior the PR changed, and append `(PR #<そのPRの番号> で変更済み)` to the end of each fixed item. Do not use `(#N で変更)` for them: that behavior is not written in the body of the additional Issue #N and has already shipped. Do not fix places whose text already matches the PR's behavior
    - Apply design rules: Type Safety, Visual Communication. 文の調子は `.kiro/settings/rules/spec-writing.md` の文の書き方の節に従う
+   - **今あるもの(コード、設定、開発環境、CI、コンテナイメージ、旧版の動き)について書く文は、`.kiro/settings/rules/spec-writing.md` の「今あるものについて書く文」の節に従う。** 書く前にその実ファイルを開いて確かめ、開いたファイルと行を research.md の `## 今あるものについて確かめた文` に1件1行で控える。記憶や会話の要約から書かない。会話が要約されたあとは、要約の前に読んだファイルも開き直す
+   - **作るときに要る前提を design に書き切る。** 検査の仕組み(テストの道具、筋書き、測り方)が今の開発環境と CI でそのまま動くかを、`compose.yaml`・`docker/`・`.github/workflows/`・Dockerfile を開いて確かめる。動かすのに要るもの(開発環境の利用者、テスト用の値、版ごとに違うポートや戻り先の URL、イメージに入れるファイル)と、変えるファイルのすべてを、design に書く。書き漏らすと、tasks の作成か実装で見つかり、design の承認を取り消すことになる
    - Use language specified in spec.json
    - Keep this as a draft until the review gate passes; do not write `design.md` yet
 
