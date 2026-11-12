@@ -116,12 +116,11 @@ case "$rc" in
 esac
 
 # --- 報告 -------------------------------------------------------------------------
+declare -A LABEL=([gitleaks]="gitleaks(秘密の値)")
+CHECKS=(gitleaks)
 status=0
-for key in gitleaks; do
-    case "$key" in
-    gitleaks) label="gitleaks(秘密の値)" ;;
-    esac
-    echo "${label}: ${RESULT[$key]}"
+for key in "${CHECKS[@]}"; do
+    echo "${LABEL[$key]}: ${RESULT[$key]}"
     [ -z "${DETAIL[$key]:-}" ] || echo "${DETAIL[$key]}"
     case "${RESULT[$key]}" in
     止まった) status=1 ;;

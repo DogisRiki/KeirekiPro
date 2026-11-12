@@ -21,7 +21,7 @@ check() {
         pass=$((pass + 1))
     else
         echo "FAIL: $name(期待 $want_rc「$want_text」、実際 $got_rc)"
-        echo "$out" | sed 's/^/    /'
+        while IFS= read -r line; do echo "    $line"; done <<<"$out"
         fail=$((fail + 1))
     fi
 }
