@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # =====================================================================
-# push の前に、このブランチで増えた部品(名前と版の組)を書き出す(pre-push-dependency-review.sh と pre-push-dependency-cooldown.sh が呼ぶ)
+# push の前に、このブランチで増えた部品(名前と版の組)を書き出す(pre-push-dependency-review.sh が呼ぶ)
 #
 # 使い方: perl pre-push-deps.pl <基準のフォルダ> <対象のフォルダ>
 #   どちらのフォルダにも、次のファイルがあれば読む(無いファイルは部品が無いものとして読む)。

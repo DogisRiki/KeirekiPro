@@ -24,7 +24,6 @@ NOW_EPOCH="${NOW_EPOCH:-$(date -u +%s)}"
 COOLDOWN_HOURS="${COOLDOWN_HOURS:-72}"
 export NOW_EPOCH COOLDOWN_HOURS
 NPM_REGISTRY_BASE="https://registry.npmjs.org"
-WAIT=$((COOLDOWN_HOURS * 3600))
 
 # shellcheck source=.github/scripts/lib-gomod-index.sh
 . "$LIB"
@@ -34,15 +33,6 @@ trap 'rm -rf "$TMP"' EXIT
 : >"$OUT"
 
 emit() { printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@" >>"$OUT"; }
-
-judge() {
-    local eco="$1" name="$2" version="$3" published="$4"
-    if [ $((NOW_EPOCH - published)) -lt "$WAIT" ]; then
-        emit "$eco" "$name" "$version" young "$published" ""
-    else
-        emit "$eco" "$name" "$version" old "$published" ""
-    fi
-}
 
 # --- gomod: 索引を1度だけ読み、すべての組を照らす ---
 awk -F'\t' '$1 == "gomod" { print $2 "\t" $3 }' "$ADDED" >"$TMP/gomod-wanted.tsv"
@@ -84,6 +74,8 @@ while IFS=$'\t' read -r eco name version; do
         emit npm "$name" "$version" unknown "" "registry の文書に版の公開時刻が無い"
         continue
     fi
-    judge npm "$name" "$version" "$published"
+    state=old
+    [ $((NOW_EPOCH - published)) -ge $((COOLDOWN_HOURS * 3600)) ] || state=young
+    emit npm "$name" "$version" "$state" "$published" ""
 done <"$ADDED"
 
