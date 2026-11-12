@@ -1,0 +1,13 @@
+# 新規の登録の応答の時間を測る筋書き。新規の登録を繰り返して測る。
+# 登録は、確認のリンクを使うまで利用者を作らないので、同じメールアドレスで繰り返しても受け付ける。
+name: auth-register-perf
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [perf]
+steps:
+  - name: register
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: perfuser@example.com, username: 測定 太郎, password: Passw0rd!, confirmPassword: Passw0rd!}
+    expect: {status: 202}

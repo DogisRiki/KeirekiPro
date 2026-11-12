@@ -49,6 +49,16 @@ type Backing struct {
 	OIDCBaseURL string
 	Google      fakeoidc.Client
 	GitHub      fakeoidc.Client
+
+	// TrustStore は、コンテナの中の、Java 版が信頼する PKCS12 の信頼の束の置き場である。空なら Java 版に渡さない。
+	TrustStore string
+	// TrustStorePassword は、信頼の束を開くパスワードである。
+	TrustStorePassword string
+	// CACert は、コンテナの中の、Go 版が信頼する認証局の証明書の置き場である。空なら Go 版に渡さない。
+	CACert string
+
+	// tls は、置き場に写す手元のファイルである。TLS の別名を使わない検査では nil である。
+	tls *TLSAlias
 }
 
 // oidcPaths は、fakeoidc が本物と同じパスで受ける、提供元ごとの認可と token と利用者の口のパスである。
@@ -70,6 +80,13 @@ func JavaEnv(b Backing) map[string]string {
 		env[prefix+"AUTHORIZATIONENDPOINT"] = b.OIDCBaseURL + paths[0]
 		env[prefix+"TOKENENDPOINT"] = b.OIDCBaseURL + paths[1]
 		env[prefix+"USERINFOENDPOINT"] = b.OIDCBaseURL + paths[2]
+	}
+	// Java 版は、GitHub のメールアドレスを https://api.github.com で読むので、検査の認証局を入れた信頼の束を信頼させる。
+	// JVM は起動のときに JAVA_TOOL_OPTIONS を読むので、イメージの入口を変えずに渡せる。
+	if b.TrustStore != "" {
+		env["JAVA_TOOL_OPTIONS"] = "-Djavax.net.ssl.trustStore=" + b.TrustStore +
+			" -Djavax.net.ssl.trustStorePassword=" + b.TrustStorePassword +
+			" -Djavax.net.ssl.trustStoreType=PKCS12"
 	}
 	return env
 }
@@ -96,6 +113,10 @@ func GoEnv(b Backing) map[string]string {
 		env[prefix+"AUTH_URL"] = b.OIDCBaseURL + paths[0]
 		env[prefix+"TOKEN_URL"] = b.OIDCBaseURL + paths[1]
 		env[prefix+"USERINFO_URL"] = b.OIDCBaseURL + paths[2]
+	}
+	// Go 版は、Linux では SSL_CERT_FILE の証明書を、システムの認証局の代わりに信頼する。
+	if b.CACert != "" {
+		env["SSL_CERT_FILE"] = b.CACert
 	}
 	return env
 }

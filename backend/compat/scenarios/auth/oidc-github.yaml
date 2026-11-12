@@ -1,0 +1,179 @@
+# GitHub のアカウントでのログインの筋書き。初めての利用者、登録済みのアカウントへのつなぎ、確認の済んでいないアカウント、
+# 確認済みのメールアドレスが無い利用者、断られたとき、state の記録が無いときを、利用者を替えながら順に確かめる。
+# どの場面も、開始の応答の本文(ログインの開始の URL)を取り出し、絶対の URL の段で偽のログインのサービスに送り、
+# 戻り先の Location から取り出した code と state を、戻り先の段で版に送る。
+# 版は、メールアドレスの一覧を api.github.com から TLS で読む。偽のログインのサービスが api.github.com として答える。
+# 開始の要求は、Accept が無いものと、画面の axios の既定の Accept を付けたものを、場面ごとに交互に送る。
+name: auth-oidc-github
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [compare, cross]
+oidc_users:
+  github:
+    id: 7001
+    login: github-new
+    emails:
+      - {email: github-new@example.com, primary: true, verified: true}
+steps:
+  # 1つ目の場面: 初めての利用者。アカウントを作り、ログインの状態の Cookie を出して、経歴書の一覧の画面へ移す
+  - name: start-new-user
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=github
+    capture: {authURL1: text}
+    expect: {status: 200}
+  - name: authorize-new-user
+    request:
+      method: GET
+      url: '{authURL1}'
+    capture: {code1: 'header:Location?code', state1: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-new-user
+    to: other
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code1}&state={state1}
+    expect: {status: 302}
+  # 戻り先の段と違う版に送り、出したログインの状態の値を受け入れることを確かめる。役割が USER だけなので 403 になる
+  - name: admin-users-new-user
+    to: other
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 403}
+  # 2つ目の場面: 登録済みのアカウントへのつなぎ。主で確認済みのメールアドレスが同じ利用者 user1 に GitHub をつなぐ。
+  # 一覧の先頭の、主でない確認済みのメールアドレスは使わない
+  - name: switch-to-registered-user
+    request:
+      method: PUT
+      url: http://fakeoidc/_compat/users/github
+      json:
+        id: 7002
+        login: github-user1
+        emails:
+          - {email: user1-sub@example.com, primary: false, verified: true}
+          - {email: user1@example.com, primary: true, verified: true}
+    expect: {status: 204}
+  - name: start-registered-user
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=github
+      headers: {Accept: 'application/json, text/plain, */*'}
+    capture: {authURL2: text}
+    expect: {status: 200}
+  - name: authorize-registered-user
+    request:
+      method: GET
+      url: '{authURL2}'
+    capture: {code2: 'header:Location?code', state2: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-registered-user
+    to: other
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code2}&state={state2}
+    expect: {status: 302}
+  - name: admin-users-registered-user
+    to: other
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 403}
+  # 3つ目の場面: 確認の済んでいないアカウント。同じメールアドレスの利用者の確認が済んでいないので、つながずに
+  # ログインの画面へ unverified_email で戻す
+  - name: switch-to-unverified-user
+    request:
+      method: PUT
+      url: http://fakeoidc/_compat/users/github
+      json:
+        id: 7003
+        login: github-unverified
+        emails:
+          - {email: unverified@example.com, primary: true, verified: true}
+    expect: {status: 204}
+  - name: start-unverified-user
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=github
+    capture: {authURL3: text}
+    expect: {status: 200}
+  - name: authorize-unverified-user
+    request:
+      method: GET
+      url: '{authURL3}'
+    capture: {code3: 'header:Location?code', state3: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-unverified-user
+    to: other
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code3}&state={state3}
+    expect: {status: 302}
+  # 4つ目の場面: 確認済みのメールアドレスが無い利用者。主のメールアドレスが確認済みでないので、メールアドレスの無い
+  # アカウントを作り、ログインの状態の Cookie を出す
+  - name: switch-to-no-verified-email-user
+    request:
+      method: PUT
+      url: http://fakeoidc/_compat/users/github
+      json:
+        id: 7004
+        login: github-no-email
+        emails:
+          - {email: github-no-email@example.com, primary: true, verified: false}
+    expect: {status: 204}
+  - name: start-no-verified-email-user
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=github
+      headers: {Accept: 'application/json, text/plain, */*'}
+    capture: {authURL4: text}
+    expect: {status: 200}
+  - name: authorize-no-verified-email-user
+    request:
+      method: GET
+      url: '{authURL4}'
+    capture: {code4: 'header:Location?code', state4: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-no-verified-email-user
+    to: other
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code4}&state={state4}
+    expect: {status: 302}
+  - name: admin-users-no-verified-email-user
+    to: other
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 403}
+  # 5つ目の場面: 断られたとき。偽のログインのサービスが error=access_denied で戻り先へ戻す
+  - name: deny-next-login
+    request:
+      method: PUT
+      url: http://fakeoidc/_compat/deny/github
+    expect: {status: 204}
+  - name: start-denied
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=github
+    capture: {authURL5: text}
+    expect: {status: 200}
+  - name: authorize-denied
+    request:
+      method: GET
+      url: '{authURL5}'
+    capture: {error5: 'header:Location?error', state5: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-denied
+    to: other
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?error={error5}&state={state5}
+    expect: {status: 302}
+  # 6つ目の場面: state の記録が無いとき。筋書きに書いた code と state で戻り先に送る
+  - name: callback-unknown-state
+    to: other
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code=fakeoidc-code-unknown&state=compatUnknownState0000000000000000000000000
+    expect: {status: 302}

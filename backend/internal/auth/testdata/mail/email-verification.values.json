@@ -1,0 +1,5 @@
+{
+   "linkLifetime" : "24時間",
+   "to" : "mailgen-1794378333@example.com",
+   "verificationLink" : "http://localhost:5173/email/verify#eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJrZWlyZWtpcHJvLWVtYWlsLXZlcmlmaWNhdGlvbiIsImp0aSI6ImIwNGQ1YjU3LThkMGMtNGJiMi04YTIyLTkzNzliN2YzZDFjMCIsInN1YiI6IjBhMGQ2YjdkLTM4NWQtNDVhMC1iZGIzLWVkZTBlNmYzZWE1ZCIsInB1cnBvc2UiOiJSRUdJU1RSQVRJT04iLCJlbWFpbCI6Im1haWxnZW4tMTc5NDM3ODMzM0BleGFtcGxlLmNvbSIsImxleHAiOjE3OTQ0NjQ3MzN9.ZEFdhpRC2tyTrQXYKSo85Pq78Z44A7zJ1Htoj8MoK1g"
+}

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +30,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/DogisRiki/KeirekiPro/backend"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/awsclient"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/migrate"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/pdf"
@@ -290,7 +292,8 @@ func newHarness(t *testing.T, env map[string]string) *harness {
 			h.listen.Store(true)
 			return listener, nil
 		},
-		migrations: backend.Migrations,
+		migrations:    backend.Migrations,
+		mailTemplates: backend.MailTemplates,
 		newRedis: func(opts redisstore.Options) redis.UniversalClient {
 			h.store = redisstore.New(opts)
 			return h.store
@@ -480,6 +483,9 @@ func TestRun_LogsStartupFailureReason(t *testing.T) {
 				return awsclient.Clients{}, broken
 			}
 		}, "AWS のクライアントを作れません: 壊れた部品"},
+		{"メールのひな形のファイルを読めない", func(_ *testing.T, _ map[string]string, d *deps) {
+			d.mailTemplates = func() (fs.FS, error) { return nil, broken }
+		}, "メールのひな形のファイルを読めません: 壊れた部品"},
 		{"PDF を作る部品を起動できない", func(_ *testing.T, _ map[string]string, d *deps) {
 			d.newPDF = func(pdf.Options) (*pdf.Engine, error) { return nil, broken }
 		}, "PDF を作る部品を起動できません: 壊れた部品"},
@@ -623,7 +629,7 @@ func assertReleased(t *testing.T, h *harness, name string) {
 // 返す関数は、本文の残りを送り、応答のステータスを返す。
 func slowRequest(t *testing.T, addr string) (net.Conn, func() (int, error)) {
 	t.Helper()
-	body := `{"email":"a@example.com","password":"x"}`
+	body := `{"email":"","password":""}`
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		t.Fatalf("受け口につなげません: %v", err)
@@ -670,8 +676,8 @@ func TestRun_GracefulShutdownWaits(t *testing.T) {
 		t.Error("止め始めたあとも、新しい接続を受けました")
 	}
 	status, err := finish()
-	if err != nil || status != http.StatusNotImplemented {
-		t.Errorf("受けていた要求の応答 = %d, %v, want 501", status, err)
+	if err != nil || status != http.StatusBadRequest {
+		t.Errorf("受けていた要求の応答 = %d, %v, want 入力の検査の 400", status, err)
 	}
 	select {
 	case code := <-done:
@@ -712,7 +718,7 @@ func TestRun_GracefulShutdownWaits(t *testing.T) {
 	})
 }
 
-// 入口が、HTTP の受け口の共通の中間処理とデータベースをつないだ受け口を開くことを確かめる。
+// 入口が、HTTP の受け口の共通の中間処理と、認証のまとまりと、データベースをつないだ受け口を開くことを確かめる。
 func TestRun_MiddlewareOrder(t *testing.T) {
 	h := newHarness(t, testEnv(t, newDatabase(t)))
 	stop, done := h.start(t)
@@ -728,8 +734,28 @@ func TestRun_MiddlewareOrder(t *testing.T) {
 	}
 	body, _ := io.ReadAll(res.Body)
 	_ = res.Body.Close()
-	if res.StatusCode != http.StatusOK || string(body) != `{"status":"UP"}` {
-		t.Errorf("生きているかの確認 = %d %s, want 200 UP", res.StatusCode, body)
+	if res.StatusCode != http.StatusOK || string(body) != `{"status":"UP"}` || res.Header.Get("X-Frame-Options") != "DENY" {
+		t.Errorf("生きているかの確認 = %d %s X-Frame-Options %q, want 200 UP と安全のヘッダ",
+			res.StatusCode, body, res.Header.Get("X-Frame-Options"))
+	}
+
+	// 入口が、認証の受け口を渡すことを、空のメールアドレスとパスワードのログインが、未実装の答えでなく、認証の受け口の
+	// 入力の検査の 400 で断られることで確かめる。このテストのデータベースには表が無いので、表を読む前に断られる要求を送る
+	login, err := http.NewRequestWithContext(t.Context(), http.MethodPost, base+"/api/auth/login",
+		strings.NewReader(`{"email":"","password":""}`))
+	if err != nil {
+		t.Fatalf("要求を作れません: %v", err)
+	}
+	login.Header.Set("Content-Type", "application/json")
+	res, err = httpClient.Do(login)
+	if err != nil {
+		t.Fatalf("ログインの要求を送れません: %v", err)
+	}
+	body, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest || !strings.Contains(string(body), `"message":"入力エラーがあります。"`) ||
+		!strings.Contains(string(body), `"email":[`) {
+		t.Errorf("空のメールアドレスとパスワードのログイン = %d %s, want 認証の受け口の入力の検査の 400", res.StatusCode, body)
 	}
 
 	res, err = httpClient.Get(base + "/api/resumes")
@@ -743,18 +769,20 @@ func TestRun_MiddlewareOrder(t *testing.T) {
 			token = cookie.Value
 		}
 	}
-	if res.StatusCode != http.StatusNotImplemented || token == "" {
-		t.Fatalf("経歴書の一覧 = %d, XSRF-TOKEN = %q, want 501 と新しいトークン", res.StatusCode, token)
+	if res.StatusCode != http.StatusUnauthorized || token == "" {
+		t.Fatalf("ログインしていない経歴書の一覧 = %d, XSRF-TOKEN = %q, want 401 と新しいトークン", res.StatusCode, token)
 	}
 
+	// 入口が、ログインの状態の値を読む段を渡すことを、受け付けないログインの状態の値の Cookie が消されることで確かめる
 	post := func(withToken bool) int {
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, base+"/api/resumes", strings.NewReader(`{}`))
 		if err != nil {
 			t.Fatalf("要求を作れません: %v", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Add("Cookie", "accessToken=not-a-jwt")
 		if withToken {
-			req.Header.Set("Cookie", "XSRF-TOKEN="+token)
+			req.Header.Add("Cookie", "XSRF-TOKEN="+token)
 			req.Header.Set("X-XSRF-TOKEN", token)
 		}
 		res, err := httpClient.Do(req)
@@ -762,13 +790,16 @@ func TestRun_MiddlewareOrder(t *testing.T) {
 			t.Fatalf("要求を送れません: %v", err)
 		}
 		_ = res.Body.Close()
+		if !slices.Contains(res.Header.Values("Set-Cookie"), auth.ExpiredAccessTokenCookie()) {
+			t.Errorf("Set-Cookie = %q, want Cookie accessToken を消す", res.Header.Values("Set-Cookie"))
+		}
 		return res.StatusCode
 	}
 	if status := post(false); status != http.StatusForbidden {
 		t.Errorf("トークンの無い POST = %d, want 403", status)
 	}
-	if status := post(true); status != http.StatusNotImplemented {
-		t.Errorf("トークンのある POST = %d, want 501", status)
+	if status := post(true); status != http.StatusUnauthorized {
+		t.Errorf("トークンがあり、ログインの状態の値を受け付けない POST = %d, want 401", status)
 	}
 
 	// 入口が、config の CORS の許す送り元を CORS の処理に渡すことを、API の説明画面の送り元からのプリフライトで確かめる

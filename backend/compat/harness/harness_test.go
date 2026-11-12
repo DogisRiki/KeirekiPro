@@ -5,17 +5,25 @@ package harness
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/DogisRiki/KeirekiPro/backend/compat/fakeoidc"
 )
 
 // writeScenario は、筋書きのファイルを一時のフォルダに書き、そのパスを返す。
@@ -213,5 +221,150 @@ func TestStartup_Within10sPasses(t *testing.T) {
 	}
 	if elapsed < 9*time.Second || elapsed > GoStartupLimit {
 		t.Errorf("測った時間 = %s, want 9秒から %s の間", elapsed, GoStartupLimit)
+	}
+}
+
+// oidcRecorder は、本物の偽のログインのサービスの前で、受けた管理の要求の method とパスと本文を記録する。
+type oidcRecorder struct {
+	mu   sync.Mutex
+	reqs []string
+}
+
+func (o *oidcRecorder) server(t *testing.T) *httptest.Server {
+	t.Helper()
+	oidc := fakeoidc.NewServer()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/_compat/") {
+			body, _ := io.ReadAll(r.Body)
+			o.mu.Lock()
+			o.reqs = append(o.reqs, r.Method+" "+r.URL.Path+" "+string(body))
+			o.mu.Unlock()
+			r.Body = io.NopCloser(bytes.NewReader(body))
+		}
+		oidc.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func (o *oidcRecorder) take() []string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	out := o.reqs
+	o.reqs = nil
+	return out
+}
+
+func TestOIDCUsers_ResetAndSet(t *testing.T) {
+	rec := &oidcRecorder{}
+	srv := rec.server(t)
+	f := &fakes{oidcURL: srv.URL, client: srv.Client()}
+	ctx := t.Context()
+
+	if err := f.resetOIDC(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec.take(); !slices.Equal(got, []string{"POST /_compat/reset "}) {
+		t.Errorf("初めに戻す要求 = %q", got)
+	}
+
+	// 書いた提供元にだけ登録する。偽のログインのサービスは、知らない項目を断るので、2xx は形が合うことも示す
+	users := &OIDCUsers{
+		Google: &OIDCGoogleUser{Sub: "g-sub", Name: "G", Email: "g@example.com", EmailVerified: true},
+		GitHub: &OIDCGitHubUser{ID: 7, Login: "gh", Emails: []OIDCGitHubEmail{{Email: "gh@example.com", Primary: true, Verified: true}}},
+	}
+	if err := f.setOIDCUsers(ctx, &OIDCUsers{Google: users.Google}); err != nil {
+		t.Fatal(err)
+	}
+	got := rec.take()
+	if len(got) != 1 || !strings.HasPrefix(got[0], "PUT /_compat/users/google ") {
+		t.Fatalf("Google だけの登録の要求 = %q", got)
+	}
+	var g fakeoidc.GoogleUser
+	if err := json.Unmarshal([]byte(strings.TrimPrefix(got[0], "PUT /_compat/users/google ")), &g); err != nil {
+		t.Fatal(err)
+	}
+	if want := (fakeoidc.GoogleUser{Sub: "g-sub", Name: "G", Email: "g@example.com", EmailVerified: true}); g != want {
+		t.Errorf("Google の利用者 = %+v, want %+v", g, want)
+	}
+	if err := f.setOIDCUsers(ctx, users); err != nil {
+		t.Fatal(err)
+	}
+	got = rec.take()
+	if len(got) != 2 || !strings.HasPrefix(got[0], "PUT /_compat/users/google ") || !strings.HasPrefix(got[1], "PUT /_compat/users/github ") {
+		t.Fatalf("両方の登録の要求 = %q", got)
+	}
+	var gh fakeoidc.GitHubUser
+	if err := json.Unmarshal([]byte(strings.TrimPrefix(got[1], "PUT /_compat/users/github ")), &gh); err != nil {
+		t.Fatal(err)
+	}
+	if want := (fakeoidc.GitHubUser{ID: 7, Login: "gh", Emails: []fakeoidc.GitHubEmail{{Email: "gh@example.com", Primary: true, Verified: true}}}); !reflect.DeepEqual(gh, want) {
+		t.Errorf("GitHub の利用者 = %+v, want %+v", gh, want)
+	}
+	// 利用者の無い筋書きでは、何も送らない
+	if err := f.setOIDCUsers(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec.take(); len(got) != 0 {
+		t.Errorf("利用者の無い筋書きの要求 = %q", got)
+	}
+
+	// 偽のログインのサービスが断れば、誤りにする
+	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusInternalServerError) }))
+	t.Cleanup(refusing.Close)
+	bad := &fakes{oidcURL: refusing.URL, client: refusing.Client()}
+	if err := bad.resetOIDC(ctx); err == nil {
+		t.Error("断られた初めに戻す要求が誤りになりません")
+	}
+	if err := bad.setOIDCUsers(ctx, users); err == nil || !strings.Contains(err.Error(), "google") {
+		t.Errorf("断られた登録の誤り = %v", err)
+	}
+	if err := bad.setOIDCUsers(ctx, &OIDCUsers{GitHub: users.GitHub}); err == nil || !strings.Contains(err.Error(), "github") {
+		t.Errorf("断られた GitHub の登録の誤り = %v", err)
+	}
+}
+
+func TestStack_RedirectURIIsCompatTest(t *testing.T) {
+	rec := &oidcRecorder{}
+	srv := rec.server(t)
+	f := &fakes{
+		oidcURL: srv.URL, client: srv.Client(),
+		google: fakeoidc.Client{ID: "google-id", Secret: "x"},
+		github: fakeoidc.Client{ID: "github-id", Secret: "x"},
+	}
+	ctx := t.Context()
+	if err := f.registerRedirects(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.setOIDCUsers(ctx, &OIDCUsers{
+		Google: &OIDCGoogleUser{Sub: "s", Email: "g@example.com", EmailVerified: true},
+		GitHub: &OIDCGitHubUser{ID: 1, Login: "l"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const callback = "http://compat.test/api/auth/oidc/callback"
+	authorize := func(path, clientID, redirect string) (int, string) {
+		t.Helper()
+		q := url.Values{"client_id": {clientID}, "redirect_uri": {redirect}, "response_type": {"code"}, "state": {"st"}}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+path+"?"+q.Encode(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := NewHTTPClient().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode, resp.Header.Get("Location")
+	}
+	// 2つの提供元とも、compat.test の戻り先を受け、版のポートの URL は受けない
+	for path, id := range map[string]string{"/o/oauth2/v2/auth": "google-id", "/login/oauth/authorize": "github-id"} {
+		status, location := authorize(path, id, callback)
+		if status != http.StatusFound || !strings.HasPrefix(location, callback+"?") {
+			t.Errorf("%s: 状態 = %d、Location = %q, want 302 で %s へ", path, status, location, callback)
+		}
+		if status, _ := authorize(path, id, "http://127.0.0.1:8080/api/auth/oidc/callback"); status != http.StatusBadRequest {
+			t.Errorf("%s: 版のポートの戻り先の状態 = %d, want 400", path, status)
+		}
 	}
 }

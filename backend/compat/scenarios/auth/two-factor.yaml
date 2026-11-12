@@ -1,0 +1,121 @@
+# 2段階認証の筋書き。Cookie の無い確認、2段階認証のログインと確認、誤ったコードとそのあとの確認、5回目で上限を確かめる。
+# 確認のコードは、ログインの段のあとに届いたメールの先頭の6桁から取り出す。
+# 誤ったコードには数字でない値を送る。確認のコードは6桁の数字なので、誤って一致することが無い。
+name: auth-two-factor
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [compare, cross]
+steps:
+  # Cookie の無い確認は、ログインより前の段に置く
+  - name: verify-without-challenge
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: "123456"}
+    expect: {status: 400}
+  # 空の値の Cookie は、Java 版では Cookie が無いときの誤りにならず、空の値のまま処理に渡る。Go 版も同じ答えかを確かめる
+  - name: verify-empty-challenge
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      headers: {Cookie: 'twoFactorChallenge='}
+      json: {code: "123456"}
+    expect: {status: 400}
+  - name: login-two-factor
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: twofactor@example.com, password: Passw0rd!}
+    capture: {code1: 'mail:(\d{6})'}
+    expect: {status: 202}
+  # 版をまたぐ検査の送り先は、to: other の段で直前の版と違う版に替わるので、to: other が2つ続くと元の版に戻る。
+  # 成功する確認の段は、3つの向きのどれでも、そのコードを送らせたログインの段と違う版に届くように並べる。
+  # Java 版から Go 版の向きでは、ログインが Java 版、確認が Go 版になる。交互の向きでも、版に送る段の3つ目と4つ目なので版が違う
+  - name: verify-code
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: "{code1}"}
+    expect: {status: 200}
+  # 誤ったコードを2回送ったあとに、正しいコードで確認できる。確認の段には、どれも to: other を付ける。
+  # ログインの段には to: other を付けないので、Java 版から Go 版の向きでは、ログインが Go 版、誤ったコードの1回目が Java 版、
+  # 2回目が Go 版、正しいコードが Java 版になる。交互の向きでは、ログインの段から数えて3つ先の段になるので、版が違う
+  - name: login-two-factor-retry
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: twofactor@example.com, password: Passw0rd!}
+    capture: {code2: 'mail:(\d{6})'}
+    expect: {status: 202}
+  - name: verify-wrong-code
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: wrong-code}
+    expect: {status: 400}
+  - name: verify-wrong-code-again
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: wrong-code}
+    expect: {status: 400}
+  - name: verify-code-after-wrong
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: "{code2}"}
+    expect: {status: 200}
+  # 5回誤ると途中の記録が消え、正しいコードでも確認できなくなる
+  - name: login-two-factor-again
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: twofactor@example.com, password: Passw0rd!}
+    capture: {code3: 'mail:(\d{6})'}
+    expect: {status: 202}
+  - name: verify-wrong-1
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: wrong-code}
+    expect: {status: 400}
+  - name: verify-wrong-2
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: wrong-code}
+    expect: {status: 400}
+  - name: verify-wrong-3
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: wrong-code}
+    expect: {status: 400}
+  - name: verify-wrong-4
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: wrong-code}
+    expect: {status: 400}
+  - name: verify-wrong-5-limit
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: wrong-code}
+    expect: {status: 400}
+  - name: verify-code-after-limit
+    to: other
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: "{code3}"}
+    expect: {status: 400}

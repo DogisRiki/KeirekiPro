@@ -21,6 +21,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DogisRiki/KeirekiPro/backend"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/awsclient"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
@@ -58,6 +59,8 @@ type deps struct {
 	listen func() (net.Listener, error)
 	// migrations は、マイグレーションのファイルを返す。
 	migrations func() (fs.FS, error)
+	// mailTemplates は、メールのひな形のファイルを返す。
+	mailTemplates func() (fs.FS, error)
 	// newRedis は、Redis のクライアントを作る。
 	newRedis func(redisstore.Options) redis.UniversalClient
 	// newAWS は、AWS のクライアントを作る。
@@ -84,6 +87,7 @@ func start() int {
 			return lc.Listen(context.Background(), "tcp", listenAddr)
 		},
 		migrations:      backend.Migrations,
+		mailTemplates:   backend.MailTemplates,
 		newRedis:        redisstore.New,
 		newAWS:          awsclient.New,
 		newPDF:          pdf.New,
@@ -136,9 +140,24 @@ func run(ctx context.Context, d deps) int {
 	}
 
 	// AWS のクライアントは、まとまりの spec が、機能のパッケージに渡す
-	if _, err := d.newAWS(ctx, cfg.AWS); err != nil {
+	clients, err := d.newAWS(ctx, cfg.AWS)
+	if err != nil {
 		return fail(logger, "startup_failed", "AWS のクライアントを作れません", err)
 	}
+
+	templates, err := d.mailTemplates()
+	if err != nil {
+		return fail(logger, "startup_failed", "メールのひな形のファイルを読めません", err)
+	}
+	authService := auth.New(auth.Deps{
+		Pool:          pool,
+		Redis:         store,
+		SES:           clients.SES,
+		App:           cfg.App,
+		JWT:           cfg.JWT,
+		OIDC:          cfg.OIDC,
+		MailTemplates: templates,
+	})
 
 	engine, err := d.newPDF(pdf.Options{Logger: logging.Named(logger, "pdf")})
 	if err != nil {
@@ -151,7 +170,16 @@ func run(ctx context.Context, d deps) int {
 		return fail(logger, "startup_failed", "HTTP の受け口を開けません", err)
 	}
 	server := &http.Server{
-		Handler:           httpapi.New(httpapi.Options{Logger: logger, DB: pool, CORSAllowedOrigins: cfg.App.CORSAllowedOrigins}),
+		Handler: httpapi.New(httpapi.Options{
+			Logger:             logger,
+			DB:                 pool,
+			CORSAllowedOrigins: cfg.App.CORSAllowedOrigins,
+			Identify:           auth.Identify(authService),
+			Auth:               auth.RequireLogin(),
+			AuthHandlers:       authService,
+			CookieSecure:       cfg.App.CookieSecure,
+			APIBaseURL:         cfg.App.APIBaseURL,
+		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		ErrorLog:          slog.NewLogLogger(logging.Named(logger, "http").Handler(), slog.LevelWarn),
 	}

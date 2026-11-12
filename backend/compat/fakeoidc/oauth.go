@@ -42,6 +42,10 @@ func (s *Server) authorize(provider string) http.HandlerFunc {
 			http.Error(w, "code_challenge_method が S256 ではありません", http.StatusBadRequest)
 			return
 		}
+		if s.takeDeny(provider) {
+			writeDenied(w, redirect, q.Get("state"))
+			return
+		}
 
 		s.mu.Lock()
 		g := grant{provider: provider, redirectURI: redirect.String(), codeChallenge: challenge}

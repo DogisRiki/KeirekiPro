@@ -1,0 +1,7 @@
+{
+   "applicationName" : "keirekipro",
+   "frontendBaseUrl" : "http://localhost:5173",
+   "sesFromAddress" : "no-reply@keirekipro.click",
+   "siteName" : "KeirekiPro",
+   "siteUrl" : "https://app.keirekipro.click"
+}

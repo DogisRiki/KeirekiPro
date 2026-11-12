@@ -42,11 +42,14 @@ type Backend struct {
 	// MeasureStartup が true なら、起動から /healthz が 200 を返すまでの時間を測り、GoStartupLimit を超えたら起動を失敗にする。
 	// Go 版の本番のイメージを置くときに true にする。
 	MeasureStartup bool
+	// JavaTrustStore が true なら、起動の前に、このイメージの keytool で信頼の束を作り、コンテナに写す。
+	// Java 版のイメージを置くときに true にする。
+	JavaTrustStore bool
 }
 
 // JavaBackend は、Java 版のイメージを、Java 版の起動の仕方で置く。
 func JavaBackend(image string) Backend {
-	return Backend{Image: image, Env: JavaEnv, HealthPath: "/actuator/health"}
+	return Backend{Image: image, Env: JavaEnv, HealthPath: "/actuator/health", JavaTrustStore: true}
 }
 
 // GoBackend は、Go 版のイメージを、Go 版の起動の仕方で置く。
@@ -173,6 +176,8 @@ type fakes struct {
 	google    fakeoidc.Client
 	github    fakeoidc.Client
 	client    *http.Client
+	// tls は、fakeoidc が api.github.com として TLS を受ける証明書と、版が信頼する認証局である。
+	tls *TLSAlias
 }
 
 // startFakes は、env のネットワークに、fakeaws と fakeoidc を起動する。awsAliases は、fakeaws を呼ぶ別の名前である。
@@ -188,16 +193,17 @@ func startFakes(ctx context.Context, env *Env, images Images, awsAliases ...stri
 	if err != nil {
 		return nil, err
 	}
-	oidc, err := env.Start(ctx, ContainerSpec{
-		Name:         "fakeoidc",
-		Image:        images[ImageFakeOIDC],
-		ExposedPorts: []string{fakeoidc.Port + "/tcp"},
-		WaitingFor:   wait.ForHTTP("/_compat/healthz").WithPort(fakeoidc.Port + "/tcp"),
-	})
+	// 証明書と鍵は検査のたびに作り、env の作業用のフォルダに置く
+	alias, err := NewTLSAlias(env.WorkDir())
+	if err != nil {
+		return nil, err
+	}
+	oidc, err := env.Start(ctx, fakeOIDCSpec(images[ImageFakeOIDC], alias))
 	if err != nil {
 		return nil, err
 	}
 	f := &fakes{
+		tls:       alias,
 		jwtSecret: rand.Text() + rand.Text(),
 		google:    fakeoidc.Client{ID: "google-" + rand.Text(), Secret: rand.Text()},
 		github:    fakeoidc.Client{ID: "github-" + rand.Text(), Secret: rand.Text()},
@@ -214,8 +220,9 @@ func startFakes(ctx context.Context, env *Env, images Images, awsAliases ...stri
 
 // backingFor は、st の Postgres と Redis と、ネットワークの中の名前 awsHost の fakeaws につなぐ、版のつなぐ先を返す。
 // どの版も、同じ JWT の値と同じ外部のログインのクライアントを使う。
+// fakeoidc が api.github.com として TLS を受けるときは、版が信頼する認証局と信頼の束の置き場も渡す。
 func (f *fakes) backingFor(st *Store, awsHost string) Backing {
-	return Backing{
+	b := Backing{
 		DBHost: st.dbHost, DBPort: "5432", DBName: crossDBName, DBUser: crossDBUser, DBPassword: crossDBPassword,
 		RedisHost: st.redisHost, RedisPort: "6379",
 		JWTSecret:   f.jwtSecret,
@@ -224,6 +231,13 @@ func (f *fakes) backingFor(st *Store, awsHost string) Backing {
 		Google:      f.google,
 		GitHub:      f.github,
 	}
+	if f.tls != nil {
+		b.TrustStore = TrustStorePath
+		b.TrustStorePassword = f.tls.TrustStorePassword
+		b.CACert = CACertPath
+		b.tls = f.tls
+	}
+	return b
 }
 
 // clearRecords は、fakeaws が覚えたオブジェクトとメールを、すべての版について消す。
@@ -289,17 +303,20 @@ func startStack(ctx context.Context, env *Env, images Images) (*Stack, error) {
 // 起動したコンテナと、テストの処理から届く URL と、起動の時間を返す。
 // be.MeasureStartup が true なら、起動から /healthz が 200 を返すまでの時間を測り、GoStartupLimit を超えたら失敗を返す。
 // false なら、起動の時間を測らず、0 を返す。
+// be.JavaTrustStore が true で、b が TLS の別名を持てば、起動の前に be のイメージの keytool で信頼の束を作る。
+// 信頼の束は、検査の中で1回だけ作り、Java 版の位置のどの backend にも同じものを写す。
 func startBackend(ctx context.Context, env *Env, version string, be Backend, b Backing) (*Container, string, time.Duration, error) {
-	spec := ContainerSpec{
-		Name:         "backend-" + version,
-		Image:        be.Image,
-		Env:          be.Env(b),
-		ExposedPorts: []string{backendPort},
-		WaitingFor:   wait.ForHTTP(be.HealthPath).WithPort(backendPort),
+	if be.JavaTrustStore && b.tls != nil {
+		if err := b.tls.BuildTrustStore(ctx, env, be.Image); err != nil {
+			return nil, "", 0, fmt.Errorf("harness: 版 %s の位置の backend の信頼の束を作れません: %w", version, err)
+		}
+	}
+	spec, err := backendSpec(version, be, b)
+	if err != nil {
+		return nil, "", 0, err
 	}
 	var ctr *Container
 	var startup time.Duration
-	var err error
 	if be.MeasureStartup {
 		ctr, startup, err = env.StartGo(ctx, spec)
 	} else {
@@ -315,18 +332,77 @@ func startBackend(ctx context.Context, env *Env, version string, be Backend, b B
 	return ctr, u, startup, nil
 }
 
-// registerRedirects は、backendURLs の backend の外部のログインの口を、fakeoidc の転送してよい先に登録する。
-// 外部のログインの提供元は、利用者を、要求を受けた backend の URL の口に戻す。テストの処理は外に出したポートで
-// backend を呼ぶので、その URL を登録する。
-func (f *fakes) registerRedirects(ctx context.Context, backendURLs []string) error {
-	var redirects []string
-	for _, u := range backendURLs {
-		redirects = append(redirects, u+oidcCallbackPath)
-	}
+// registerRedirects は、backend の外部のログインの口 http://compat.test/api/auth/oidc/callback を、
+// fakeoidc の転送してよい先に登録する。版に送るすべての要求の Host は CompatHost なので、Java 版と Go 版は、
+// どちらもこの URL を戻り先にする。版ごとのポートの URL は登録しない。
+func (f *fakes) registerRedirects(ctx context.Context) error {
+	redirects := []string{"http://" + CompatHost + oidcCallbackPath}
 	for provider, client := range map[string]fakeoidc.Client{fakeoidc.Google: f.google, fakeoidc.GitHub: f.github} {
 		client.RedirectURIs = redirects
 		if err := f.admin(ctx, http.MethodPut, f.oidcURL+"/_compat/clients/"+provider,
 			"application/x-www-form-urlencoded", client.Form().Encode()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// resetOIDC は、fakeoidc が覚えた利用者と、断る動きを消す。
+func (f *fakes) resetOIDC(ctx context.Context) error {
+	return f.admin(ctx, http.MethodPost, f.oidcURL+"/_compat/reset", "", "")
+}
+
+// withOIDC は、fakeoidc を初めの状態に戻して users を登録してから run を呼び、run が失敗したときも、
+// 終わりに fakeoidc を初めの状態に戻す。筋書きが途中で替えた利用者や断る動きを、次の筋書きに残さないためである。
+func (f *fakes) withOIDC(ctx context.Context, users *OIDCUsers, run func() error) (err error) {
+	if err := f.resetOIDC(ctx); err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, f.resetOIDC(context.WithoutCancel(ctx))) }()
+	if err := f.setOIDCUsers(ctx, users); err != nil {
+		return err
+	}
+	return run()
+}
+
+// mailReader は、fakeaws が版 version について覚えたメールを読む部品を返す。
+func (f *fakes) mailReader(version string) MailReader {
+	return func(ctx context.Context) ([]fakeaws.Email, error) {
+		var mails []fakeaws.Email
+		if err := f.records(ctx, version, "emails", &mails); err != nil {
+			return nil, err
+		}
+		return mails, nil
+	}
+}
+
+// tools は、client で fakeoidc に送り、rdb を書き換え、fakeaws の版 version のメールを読む stepTools を返す。
+func (f *fakes) tools(client *http.Client, rdb *redis.Client, version string) stepTools {
+	return stepTools{client: client, oidcURL: f.oidcURL, jwtKey: f.jwtSecret, redis: rdb, mail: f.mailReader(version)}
+}
+
+// setOIDCUsers は、筋書きの oidc_users の利用者を、Google、GitHub の順に fakeoidc に登録する。users が nil なら何もしない。
+func (f *fakes) setOIDCUsers(ctx context.Context, users *OIDCUsers) error {
+	if users == nil {
+		return nil
+	}
+	put := func(provider string, user any) error {
+		b, err := json.Marshal(user)
+		if err != nil {
+			return fmt.Errorf("harness: %s の利用者を JSON にできません: %w", provider, err)
+		}
+		if err := f.admin(ctx, http.MethodPut, f.oidcURL+"/_compat/users/"+provider, "application/json", string(b)); err != nil {
+			return fmt.Errorf("harness: %s の利用者を登録できません: %w", provider, err)
+		}
+		return nil
+	}
+	if users.Google != nil {
+		if err := put(fakeoidc.Google, users.Google); err != nil {
+			return err
+		}
+	}
+	if users.GitHub != nil {
+		if err := put(fakeoidc.GitHub, users.GitHub); err != nil {
 			return err
 		}
 	}

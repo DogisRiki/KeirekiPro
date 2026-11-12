@@ -1,0 +1,61 @@
+{
+   "approval_history" : [
+      {
+         "approved_at" : "2026-11-10T13:31:07Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            770
+         ],
+         "revoked_at" : "2026-11-10T13:49:21Z",
+         "revoked_for" : "tasks の作成中のタスクの並びの点検で見つかった design の不足: 2段階認証の確認の応答の時間の測り方が無い、Go 版のイメージにメールのひな形が入らない、開発環境に API の説明画面でログインする利用者が無い",
+         "stage" : "design"
+      },
+      {
+         "approved_at" : "2026-11-10T14:41:19Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            770
+         ],
+         "revoked_at" : "2026-11-11T01:07:43Z",
+         "revoked_for" : "tasks の作成中のタスクの並びの点検で見つかった design の不足: Google と GitHub のログインで版ごとに戻り先の URL のポートが違う、ログインの状態の値(JWT)の期限切れを筋書きで作れない",
+         "stage" : "design"
+      },
+      {
+         "approved_at" : "2026-11-11T02:00:55Z",
+         "approved_by" : "DogisRiki",
+         "issues" : [
+            770
+         ],
+         "revoked_at" : "2026-11-11T02:37:20Z",
+         "revoked_for" : "T1-1-7 と T1-1-8 による design への差し戻し: ファイルの構成に tasks が変えるファイルが載っていない、応答の時間を測る環境の偽の AWS の数と JWT の見分け方の2つの文が事実と違う",
+         "stage" : "design"
+      }
+   ],
+   "approvals" : {
+      "design" : {
+         "approved" : true,
+         "approved_at" : "2026-11-11T03:31:43Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      },
+      "requirements" : {
+         "approved" : true,
+         "approved_at" : "2026-11-10T11:52:23Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      },
+      "tasks" : {
+         "approved" : true,
+         "approved_at" : "2026-11-11T04:02:55Z",
+         "approved_by" : "DogisRiki",
+         "generated" : true
+      }
+   },
+   "created_at" : "2026-11-10T10:09:33Z",
+   "feature_name" : "backend-go-auth",
+   "issue" : 770,
+   "language" : "ja",
+   "phase" : "tasks-generated",
+   "review_model" : "opus",
+   "updated_at" : "2026-11-11T04:02:55Z"
+}

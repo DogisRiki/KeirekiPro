@@ -11,13 +11,17 @@ import (
 // 応答の時間の比べ方は TestPerf で始まる名前で、make compat-perf が動かす。PR の検査では動かさない。
 
 // selfPerf は、Go 版のイメージを両方の位置に置いて、応答の時間の比べ方を確かめる筋書きである。
-// 1つ目の段で偽の送信の検査の Cookie を受け取り、最後の段を測る。Go 版の経歴書の操作はまだ 501 を返す。
+// 1つ目の段でログインし、2つ目の段で偽の送信の検査の Cookie を受け取り、最後の段を測る。
+// Go 版の経歴書の操作はまだ 501 を返すので、ログインの確かめと偽の送信の検査を通ったことを 501 で確かめる。
 const selfPerf = `name: self-perf
 group: 0
 fixtures: [users/basic.sql]
 modes: [perf]
 measure_memory: true
 steps:
+  - name: login
+    request: {method: POST, path: /api/auth/login, json: {email: user1@example.com, password: Passw0rd!}}
+    expect: {status: 200}
   - name: get-token
     request: {method: GET, path: /healthz}
     expect: {status: 200}

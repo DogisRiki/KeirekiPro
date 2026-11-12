@@ -7,11 +7,19 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/gen"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/logging"
 )
 
@@ -220,5 +228,196 @@ func TestCORS_RunsBeforeCSRF(t *testing.T) {
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
 		t.Errorf("Access-Control-Allow-Credentials = %q, want true", got)
+	}
+}
+
+// jwtKey は、テストのログインの状態の値に署名する鍵である。
+func jwtKey() string { return strings.Repeat("k", 64) }
+
+// authServer は、認証のまとまりをつないだ HTTP の受け口を作る。データベースは、つながらない宛先にする。
+// change は、つなぐ前に Options を替える。
+func authServer(t *testing.T, change func(*httpapi.Options)) (http.Handler, *bytes.Buffer) {
+	t.Helper()
+	pool, err := pgxpool.New(t.Context(), "postgres://keirekipro@127.0.0.1:1/keirekipro?connect_timeout=2")
+	if err != nil {
+		t.Fatalf("接続の束を作れません: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	svc := auth.New(auth.Deps{Pool: pool, JWT: config.JWT{Secret: jwtKey(), AccessTokenValidity: time.Hour}})
+	logs := &bytes.Buffer{}
+	opts := httpapi.Options{
+		Logger:       logging.New(logs, logging.Options{Service: logging.Service{Name: "keirekipro"}}),
+		DB:           &fakeDB{},
+		Identify:     auth.Identify(svc),
+		Auth:         auth.RequireLogin(),
+		AuthHandlers: svc,
+	}
+	if change != nil {
+		change(&opts)
+	}
+	return httpapi.New(opts), logs
+}
+
+// ログインの要る操作に、ログインの状態を持たない要求が届いたら、未実装の答えより先に、Java 版と同じ 401 と
+// 空の本文で断ることを確かめる。
+func TestNew_RequireLoginBeforeUnimplemented(t *testing.T) {
+	handler, _ := authServer(t, nil)
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/api/resumes"},
+		{http.MethodPost, "/api/resumes"},
+		{http.MethodDelete, "/api/users/me"},
+	} {
+		rec := send(handler, tc.method, tc.path, "{}")
+		if rec.Code != http.StatusUnauthorized || rec.Body.Len() != 0 {
+			t.Errorf("%s %s = %d %s, want 401 と空の本文", tc.method, tc.path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// 値を読む段が偽の送信の検査より前に動き、偽の送信の検査で断った要求でも、受け付けないログインの状態の
+// Cookie accessToken を消すことを確かめる。
+func TestNew_IdentifyBeforeCSRF(t *testing.T) {
+	handler, _ := authServer(t, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/resumes", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("Cookie", "accessToken=not-a-jwt")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden || rec.Body.String() != `{"message":"アクセス権限がありません。"}` {
+		t.Errorf("応答 = %d %s, want 偽の送信の検査の 403", rec.Code, rec.Body.String())
+	}
+	if cookies := rec.Header().Values("Set-Cookie"); !slices.Contains(cookies, auth.ExpiredAccessTokenCookie()) {
+		t.Errorf("Set-Cookie = %q, want %q を含む", cookies, auth.ExpiredAccessTokenCookie())
+	}
+}
+
+// 認証の受け口が、同じ名前の未実装の答えより先に使われ、ほかの操作は Handlers の答えのままであることを確かめる。
+func TestNew_AuthHandlersShadowUnimplemented(t *testing.T) {
+	handler, _ := authServer(t, func(o *httpapi.Options) { o.Auth = nil })
+	rec := send(handler, http.MethodPost, "/api/auth/login", `{"email":"","password":""}`)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"message":"入力エラーがあります。"`) ||
+		!strings.Contains(rec.Body.String(), `"email":[`) {
+		t.Errorf("ログインの応答 = %d %s, want 認証の受け口の検査の 400", rec.Code, rec.Body.String())
+	}
+	rec = send(handler, http.MethodGet, "/api/resumes", "")
+	assertBody(t, rec, http.StatusNotImplemented, "application/json", `{"message":"未実装です。"}`)
+
+	t.Run("Handlers を渡せば、認証の操作でない操作は Handlers が答える", func(t *testing.T) {
+		handler, _ := authServer(t, func(o *httpapi.Options) {
+			o.Auth = nil
+			o.Handlers = panicking{}
+		})
+		rec := send(handler, http.MethodGet, "/api/resumes/"+sampleResumeID, "")
+		assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
+		rec = send(handler, http.MethodPost, "/api/auth/login", `{"email":"","password":""}`)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("ログインの応答 = %d, want 認証の受け口の 400", rec.Code)
+		}
+	})
+}
+
+// 経路が /api/auth/ の下の問い合わせの誤りに 400 と Java 版の入力の誤りの本文を返し、ほかの経路は 500 のままで
+// あることを確かめる。
+func TestNew_AuthQueryError400(t *testing.T) {
+	handler, logs := authServer(t, nil)
+	for _, path := range []string{
+		"/api/auth/oidc/authorize",
+		"/api/auth/oidc/callback?code=a&code=b&state=s",
+		"/api/auth/oidc/callback?code=a&state=x&state=y",
+	} {
+		rec := send(handler, http.MethodGet, path, "")
+		assertBody(t, rec, http.StatusBadRequest, "application/json", javaBadRequest)
+	}
+	if strings.Contains(logs.String(), "unexpected_exception") {
+		t.Errorf("問い合わせの誤りを想定外の誤りとしてログに書きました: %s", logs.String())
+	}
+
+	t.Run("ほかの経路の値の形の誤りは 500 のまま", func(t *testing.T) {
+		handler, _ := authServer(t, func(o *httpapi.Options) { o.Auth = nil })
+		rec := send(handler, http.MethodDelete, "/api/resumes/"+sampleResumeID+"/careers/not-a-uuid", "")
+		assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
+	})
+}
+
+// securityHeaders は、design の安全のヘッダの節の6つのヘッダである。
+var securityHeaders = map[string]string{
+	"Cache-Control":          "no-cache, no-store, max-age=0, must-revalidate",
+	"Pragma":                 "no-cache",
+	"Expires":                "0",
+	"X-Content-Type-Options": "nosniff",
+	"X-Frame-Options":        "DENY",
+	"X-XSS-Protection":       "0",
+}
+
+func assertSecurityHeaders(t *testing.T, name string, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	for key, want := range securityHeaders {
+		if got := rec.Header().Get(key); got != want {
+			t.Errorf("%s の %s = %q, want %q", name, key, got, want)
+		}
+	}
+}
+
+// 偽の送信の検査の 403、CORS の処理の 403、パニックの 500、生きているかの確認の応答にも、安全のヘッダが付くことを確かめる。
+func TestNew_SecurityHeadersOnAllResponses(t *testing.T) {
+	handler, _ := authServer(t, func(o *httpapi.Options) {
+		o.Handlers = panicking{}
+		o.Auth = nil
+		o.CORSAllowedOrigins = []string{"http://localhost:5173"}
+	})
+
+	csrf := httptest.NewRequest(http.MethodPost, "/api/resumes", strings.NewReader("{}"))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, csrf)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("偽の送信の検査の応答 = %d, want 403", rec.Code)
+	}
+	assertSecurityHeaders(t, "偽の送信の検査の 403", rec)
+
+	cors := httptest.NewRequest(http.MethodGet, "/api/resumes", http.NoBody)
+	cors.Header.Set("Origin", "http://evil.example.com")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, cors)
+	if rec.Code != http.StatusForbidden || rec.Body.String() != "Invalid CORS request" {
+		t.Errorf("CORS の処理の応答 = %d %s, want 403", rec.Code, rec.Body.String())
+	}
+	assertSecurityHeaders(t, "CORS の処理の 403", rec)
+
+	rec = send(handler, http.MethodGet, "/api/resumes", "")
+	assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
+	assertSecurityHeaders(t, "パニックの 500", rec)
+
+	rec = send(handler, http.MethodGet, "/healthz", "")
+	if rec.Code != http.StatusOK {
+		t.Errorf("生きているかの確認の応答 = %d, want 200", rec.Code)
+	}
+	assertSecurityHeaders(t, "生きているかの確認", rec)
+}
+
+// 値を読む段がデータベースを読めずにパニックを起こしても、パニックの受け止めが外にあるので、Java 版と同じ 500 と
+// 決まった本文と安全のヘッダで答えることを確かめる。
+func TestNew_RecoverOutsideIdentify(t *testing.T) {
+	handler, logs := authServer(t, nil)
+	now := time.Now()
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":          uuid.NewString(),
+		"roles":        []string{"USER"},
+		"tokenVersion": 0,
+		"iat":          now.Unix(),
+		"exp":          now.Add(time.Hour).Unix(),
+	}).SignedString([]byte(jwtKey()))
+	if err != nil {
+		t.Fatalf("ログインの状態の値を作れません: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/resumes", http.NoBody)
+	req.Header.Add("Cookie", "accessToken="+token)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
+	assertSecurityHeaders(t, "値を読む段のパニックの 500", rec)
+	if !strings.Contains(logs.String(), "unexpected_exception") {
+		t.Errorf("パニックのログがありません: %s", logs.String())
 	}
 }

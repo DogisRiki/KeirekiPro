@@ -1,4 +1,4 @@
-# gitleaks の誤検知として除外する箇所(所有者が 2026-11-09 に PR #775 で受け入れた)
+# gitleaks の誤検知として除外する箇所(所有者が 2026-11-09 に PR #775 で、2026-11-12 に PR #799 で受け入れた)
 # Redis のイメージの名前「valkey/valkey:8.0.12-alpine」は、名前に「key」を含むので、
 # generic-api-key の規則に秘密の値と見られる。秘密の値ではない。
 6d6405d01e52241b7e0a963f0683f421460f6707:.kiro/specs/backend-go-replacement/tasks.md:generic-api-key:644
@@ -7,3 +7,19 @@
 ffee86e89d63bbcef7c2acbffe286e9aec38fa73:backend/cmd/keirekipro/main_test.go:generic-api-key:41
 # PR #778 の比べる検査のテストにある、同じイメージの名前
 c7f7d2d1d4f4152fd64f813c2f5c632040a33e18:backend/compat/harness/snapshot_test.go:generic-api-key:22
+# PR #799 の Go 版の認証のテストと審査の記録にある、同じイメージの名前
+4db7d3f6500e78399b432c0fa3ac0be10ade7617:backend/internal/auth/main_integration_test.go:generic-api-key:25
+953ae17c9bdaf1b76aa5d8335eacb2ce6ba77bfa:.kiro/specs/backend-go-auth/reviews/design-review.md:generic-api-key:118
+# PR #799 のテストだけで値に署名する鍵。本番の鍵ではない
+70e9e6383e40fcbeca5bc52b1fed3ef3e9480698:backend/internal/auth/accesstoken_test.go:generic-api-key:14
+# PR #799 のテストで使う、Java 版の開発環境の署名の鍵(docker/localstack/init-localstack.sh の keirekipro/jwt と同じ値で、main に既にある)と、
+# その鍵で署名したメールアドレスの確認のリンクの値。本番の鍵と値ではない
+e6f2b0454239fc7291020fc39eef0bba384d4eb1:backend/internal/auth/emailverification_test.go:generic-api-key:20
+e6f2b0454239fc7291020fc39eef0bba384d4eb1:backend/internal/auth/testdata/emailverification/Probe.java:generic-api-key:18
+e6f2b0454239fc7291020fc39eef0bba384d4eb1:backend/internal/auth/testdata/emailverification/Probe.java:jwt:19
+d3cb6b715628d0b198a3999a2d23e012637881fb:backend/internal/auth/testdata/mail/email-verification.json:jwt:2
+d3cb6b715628d0b198a3999a2d23e012637881fb:backend/internal/auth/testdata/mail/email-verification.values.json:jwt:4
+# PR #799 のパスワードの再設定のテストで入れる、テストだけの新しいパスワード
+81957c9cdfcb9948e8125169f8b0e9d101dc4e93:backend/internal/auth/passwordreset_integration_test.go:generic-api-key:289
+81957c9cdfcb9948e8125169f8b0e9d101dc4e93:backend/internal/auth/passwordreset_integration_test.go:generic-api-key:293
+81957c9cdfcb9948e8125169f8b0e9d101dc4e93:backend/internal/auth/passwordreset_integration_test.go:generic-api-key:495
