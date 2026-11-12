@@ -14,6 +14,9 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
 ## Steps
 
 1. **verify**: `/verify-all` の手順を実行し、全PASSを確認する。FAILがあれば出荷しない。
+   全PASSのあと、AIは `bash .claude/scripts/ship/pre-push-ci-checks.sh` を実行する。このスクリプトは、push のあとに CI で初めて赤になっていた gitleaks の検査を、main からの差分(まだ commit していない変更を含む)に手元で当てる。
+   - スクリプトが「止まった」か「調べられなかった」を出したときは、AIは commit も push もしない。「調べられなかった」のまま push すると、秘密の値を調べないままリポジトリの外へ出すことになるためである。AIは、出力の理由を直してから、スクリプトを実行し直す
+   - AIは、gitleaks が止めた箇所のうち、秘密の値ではないと考える箇所を、自分で除外しない。AIは、出力の一覧のファイルと行と規則を所有者に示し、所有者の判断を受ける。所有者が受け入れたら、AIは commit してからスクリプトを実行し直し、そのときに出た指紋を `.gitleaksignore` に書き足す。指紋には commit の番号が入り、commit する前に出た指紋は仮の番号を含むので、`.gitleaksignore` に書けるのは commit したあとに出た指紋になる。AIは、`.gitleaksignore` を書き足した変更を commit し、スクリプトを実行し直して通ることを確かめてから push する
 
 2. **ブランチ確認**: `git branch --show-current` で現在のブランチを確認する。
    - mainにいる場合: `.branch_name_template` に従い `git switch -c <type>/<short-description>` で作成
