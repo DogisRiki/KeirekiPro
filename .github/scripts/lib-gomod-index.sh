@@ -27,8 +27,22 @@
 # なぜ区間に分けて同時に読むか:
 #   索引の1回の問い合わせは、応答までに約4秒かかる(2026-11-08 に測った)。73時間分の索引を
 #   1本で順に読むと約10分かかり、Dependabot の PR の自動マージの判定の時間の上限(5分)に
-#   収まらない。区間ごとに同時に読めば、4時間の区間で約20本になり、1分ほどで読み終える。
-#   16本を同時に問い合わせても、応答は4秒でそろった(2026-11-08 に確かめた)。
+#   収まらない。4時間の区間に分けると約20区間になる。
+#
+# なぜ同時に読む本数を GOMOD_INDEX_PARALLEL 本までにするか:
+#   2026-11-12 に、約20区間をすべて同時に読むと、GitHub のランナーからの問い合わせが
+#   読み始めて約20秒で 429(問い合わせが多すぎる)で断られた。同じ日に手元の PC から
+#   19本を同時に問い合わせると断られなかったので、断るかどうかは問い合わせる側によって変わる。
+#   索引の公式の説明には、問い合わせの数の上限が書かれていない。
+#   同時に読む本数を8本にすると、1秒あたりの問い合わせは半分より少なくなる。
+#   8本なら約200ページを2分ほどで読み終え、Dependabot の判定の上限(5分)に収まる。
+#   4本にすると読み終えるまで4分ほどかかり、再試行の待ちを足すと上限を超えることがある。
+#   区間は、1本目が1、9、17番目のように、8つ飛びに受け持って順に読む。
+#
+# なぜ 429 を6回まで再試行するか:
+#   curl は、429 を受けると、1秒、2秒、4秒のように待ちを倍にして再試行する。6回なら
+#   待ちは合わせて約1分になる。応答に Retry-After があれば、curl はその秒数だけ待つ。
+#   待ちが長くなりすぎないように、最初の問い合わせから120秒を過ぎたら再試行を始めない。
 #
 # 照らし方:
 #   - 版は、先頭の v の有無によらず照らす。依存グラフの差分比較の API は、版の先頭の v を
@@ -43,12 +57,13 @@
 #   NOW_EPOCH(判定の時刻。既定は今の時刻)
 #   COOLDOWN_HOURS(待つ時間。既定 72)
 #   GOMOD_INDEX_MAX_PAGES(読むページの上限。区間ごと。既定 1000)
-#   GOMOD_INDEX_SEGMENT_HOURS(同時に読む区間の長さ。時間の単位の正の整数。既定 4)
-# 問い合わせは curl -fsS --max-time 120 --retry 2 で行う。
+#   GOMOD_INDEX_SEGMENT_HOURS(読む区間の長さ。時間の単位の正の整数。既定 4)
+#   GOMOD_INDEX_PARALLEL(同時に読む本数の上限。正の整数。既定 8)
+# 問い合わせは curl -fsS --max-time 120 --retry 6 --retry-max-time 120 で行う。
 #
 # source しても何もしない。関数を定義するだけで、シェルの設定(set -e など)と
 # trap を変えない。関数は exit せず、戻り値で成否を返す。
-# 区間ごとの読み取りは、裏で動かすサブシェルで動かし、すべての終わりを待ってから返す。
+# 区間の読み取りは、裏で動かすサブシェルで動かし、すべての終わりを待ってから返す。
 #
 # 関数と戻り値:
 #   gomod_index_ages <照らす組のファイル> <出力のファイル>
@@ -98,7 +113,7 @@ _gmi_segment() {
             return 1
         fi
         url="${base}/index?since=${since}&limit=2000"
-        if ! curl -fsS --max-time 120 --retry 2 -o "$d/body.$i" "$url" 2>"$d/curl.$i"; then
+        if ! curl -fsS --max-time 120 --retry 6 --retry-max-time 120 -o "$d/body.$i" "$url" 2>"$d/curl.$i"; then
             _gmi_fail "索引を読めませんでした(${url}: $(head -n 1 "$d/curl.$i"))"
             return 1
         fi
@@ -126,12 +141,17 @@ _gmi_segment() {
 # 使い方: _gmi_read <一時のフォルダ> <照らす組のファイル> <出力のファイル>
 _gmi_read() {
     local d="$1" wanted="$2" out="$3"
-    local now hours seg s e since i=0 j rc=0 pids=() ranges=()
+    local now hours seg par s e since w j rc=0 pids=() ranges=()
     now="${NOW_EPOCH:-$(date -u +%s)}"
     hours="${COOLDOWN_HOURS:-72}"
     seg="${GOMOD_INDEX_SEGMENT_HOURS:-4}"
+    par="${GOMOD_INDEX_PARALLEL:-8}"
     if ! [[ "$seg" =~ ^[1-9][0-9]*$ ]]; then
         _gmi_fail "索引の区間の長さ(GOMOD_INDEX_SEGMENT_HOURS=${seg})が正の整数ではありません"
+        return 1
+    fi
+    if ! [[ "$par" =~ ^[1-9][0-9]*$ ]]; then
+        _gmi_fail "索引を同時に読む本数(GOMOD_INDEX_PARALLEL=${par})が正の整数ではありません"
         return 1
     fi
     seg=$((seg * 3600))
@@ -141,7 +161,7 @@ _gmi_read() {
         v = $2; sub(/^v/, "", v); print tolower($1) "\tv" v }' "$wanted" | sort -u >"$d/keys"
 
     # 読み始めから判定の時刻までを区間に分ける。区間の読み始めの時刻をすべて決めてから、
-    # 区間ごとの読み取りを同時に動かす(途中で失敗して、動いている読み取りを残さないため)
+    # 読み取りを動かす(途中で失敗して、動いている読み取りを残さないため)
     s=$(NOW_EPOCH="$now" COOLDOWN_HOURS="$hours" gomod_index_since)
     while [ "$s" -lt "$now" ]; do
         e=$((s + seg))
@@ -150,17 +170,27 @@ _gmi_read() {
         ranges+=("${since} ${e}")
         s="$e"
     done
-    for i in "${!ranges[@]}"; do
-        _gmi_segment "$d" "$i" "${ranges[$i]% *}" "${ranges[$i]#* }" 2>"$d/err.$i" &
+    # 同時に読む本数だけ読み手を動かす。w 番目の読み手は、w、w + par、w + 2 * par 番目の区間を
+    # 順に読み、1つの区間を読めなければ、残りの区間を読まずに失敗で終わる
+    for ((w = 0; w < par && w < ${#ranges[@]}; w++)); do
+        (
+            j="$w"
+            while [ "$j" -lt "${#ranges[@]}" ]; do
+                _gmi_segment "$d" "$j" "${ranges[$j]% *}" "${ranges[$j]#* }" 2>"$d/err.$j" || exit 1
+                j=$((j + par))
+            done
+        ) &
         pids+=("$!")
     done
     for j in "${!pids[@]}"; do
         wait "${pids[$j]}" || rc=1
-        cat "$d/err.$j" >&2
+    done
+    for j in "${!ranges[@]}"; do
+        [ ! -f "$d/err.$j" ] || cat "$d/err.$j" >&2
     done
     [ "$rc" -eq 0 ] || return 1
     : >"$d/hits"
-    for j in "${!pids[@]}"; do
+    for j in "${!ranges[@]}"; do
         cat "$d/hits.$j" >>"$d/hits"
     done
 
