@@ -26,7 +26,9 @@ mkdir -p "$WORK/bin" "$WORK/pages"
 # --- curl のスタブ ---------------------------------------------------------------
 # URL の since の値を名前にしたファイル($STUB_PAGES/<since>)を、-o の先に写す。
 # ファイルが無ければ、curl -f が HTTP の誤りの応答を受けたときと同じく 22 で終わる。
-# 呼ばれた URL は $STUB_CALLS に1行ずつ記録する。
+# 呼ばれた URL は $STUB_CALLS に1行ずつ記録し、引数のすべては $STUB_ARGS に1行ずつ記録する。
+# $STUB_ACTIVE にフォルダを渡すと、問い合わせのたびに 0.3 秒待ち、待つ前に、同時に動いている
+# 問い合わせの数を $STUB_ACTIVE.max に1行ずつ記録する
 cat >"$WORK/bin/curl" <<'STUB'
 #!/usr/bin/env bash
 url=""
@@ -38,6 +40,13 @@ for a in "$@"; do
     prev="$a"
 done
 echo "$url" >>"${STUB_CALLS:?}"
+echo "$*" >>"${STUB_ARGS:?}"
+if [ -n "${STUB_ACTIVE:-}" ]; then
+    : >"$STUB_ACTIVE/$$"
+    find "$STUB_ACTIVE" -type f | wc -l >>"$STUB_ACTIVE.max"
+    sleep 0.3
+    rm -f "$STUB_ACTIVE/$$"
+fi
 since="${url#*since=}"
 since="${since%%&*}"
 if [ ! -f "${STUB_PAGES:?}/${since}" ]; then
@@ -59,9 +68,12 @@ want() {
         echo "--- $1 ---"
         rm -f "$WORK/pages/"*
         : >"$WORK/calls.log"
+        : >"$WORK/args.log"
         : >"$WORK/wanted.tsv"
         SEG_HOURS=73
         MAX_PAGES=1000
+        PARALLEL=8
+        ACTIVE=""
         return 0
     fi
     return 1
@@ -84,11 +96,14 @@ wanted() {
 
 # 部品を source した別のシェルで gomod_index_ages を呼ぶ。
 # 区間の長さ(SEG_HOURS)は、場合ごとに73時間に戻す。73時間なら区間は1つで、ページを順に読む動きを確かめられる
+# 同時に読む本数(PARALLEL)は、場合ごとに既定の8本に戻す
 run() {
     (
         export PATH="$WORK/bin:$PATH" STUB_CALLS="$WORK/calls.log" STUB_PAGES="$WORK/pages"
+        export STUB_ARGS="$WORK/args.log" STUB_ACTIVE="$ACTIVE"
         export NOW_EPOCH="$NOW" GOMOD_INDEX_BASE
         export GOMOD_INDEX_SEGMENT_HOURS="$SEG_HOURS" GOMOD_INDEX_MAX_PAGES="$MAX_PAGES"
+        export GOMOD_INDEX_PARALLEL="$PARALLEL"
         # shellcheck source=/dev/null
         . "$LIB"
         gomod_index_ages "$WORK/wanted.tsv" "$WORK/out.tsv"
@@ -368,6 +383,76 @@ if want bad_segment; then
     check_rc 1 "区間の長さが正の整数でなければ失敗で終わる: 失敗で終わる"
     check_calls 0 "区間の長さが正の整数でなければ失敗で終わる: 索引を読まない"
     check_err "GOMOD_INDEX_SEGMENT_HOURS=0" "区間の長さが正の整数でなければ失敗で終わる: 理由を標準エラーに出す"
+fi
+
+if want retry_args; then
+    # 問い合わせが多すぎると断られたとき(429)に、待ちを倍にしながら6回まで再試行する
+    entry example.com/a v1.0.0 2026-01-08T00:00:00Z | page "$SINCE"
+    wanted example.com/a 1.0.0
+    run
+    check_rc 0 "断られたときに再試行する: 成功で終わる"
+    if grep -qF -- "--retry 6 --retry-max-time 120" "$WORK/args.log"; then
+        echo "PASS: 断られたときに再試行する: 6回まで、最初の問い合わせから120秒までの間、再試行するよう curl に渡す"
+    else
+        fail "断られたときに再試行する: 6回まで、最初の問い合わせから120秒までの間、再試行するよう curl に渡す"
+        sed 's/^/    args: /' "$WORK/args.log"
+    fi
+fi
+
+if want parallel_limit; then
+    # 12時間ずつの区間に分けると7つの区間になる。同時に読む本数を2本にすると、
+    # 2本の読み手が、1本目は1、3、5、7番目の区間を、2本目は2、4、6番目の区間を順に読む
+    SEG_HOURS=12
+    PARALLEL=2
+    ACTIVE="$WORK/active"
+    mkdir -p "$ACTIVE"
+    : >"$ACTIVE.max"
+    for s in 2026-01-06T23:00:00Z 2026-01-07T11:00:00Z 2026-01-07T23:00:00Z 2026-01-08T11:00:00Z \
+        2026-01-08T23:00:00Z 2026-01-09T11:00:00Z; do
+        : | page "$s"
+    done
+    entry example.com/a v1.0.0 2026-01-09T23:30:00Z | page "2026-01-09T23:00:00Z"
+    wanted example.com/a 1.0.0
+    run
+    check_rc 0 "同時に読む本数を上限までにする: 成功で終わる"
+    check_calls 7 "同時に読む本数を上限までにする: 7つの区間をすべて読む"
+    most=$(sort -n "$ACTIVE.max" | tail -n 1)
+    if [ -n "$most" ] && [ "$most" -le 2 ]; then
+        echo "PASS: 同時に読む本数を上限までにする: 同時に動く問い合わせは2本まで"
+    else
+        fail "同時に読む本数を上限までにする: 同時に動く問い合わせは2本まで (実際: ${most})"
+    fi
+    check_out "example.com/a${TAB}1.0.0${TAB}new${TAB}1768001400" "同時に読む本数を上限までにする: 最後の区間の組を返す"
+fi
+
+if want parallel_fail; then
+    # 24時間ずつの4つの区間を2本で読む。2本目の読み手が受け持つ2番目の区間のページを置かないので、
+    # 2本目は失敗し、受け持ちの残りの4番目の区間を読まない
+    SEG_HOURS=24
+    PARALLEL=2
+    entry example.com/a v1.0.0 2026-01-06T23:30:00Z | page "$SINCE"
+    : | page "2026-01-08T23:00:00Z"
+    entry example.com/c v3.0.0 2026-01-09T23:30:00Z | page "2026-01-09T23:00:00Z"
+    wanted example.com/a 1.0.0
+    run
+    check_rc 1 "読み手の1本が区間を読めなければ失敗で終わる: 失敗で終わる"
+    check_err "索引を読めませんでした(${GOMOD_INDEX_BASE}/index?since=2026-01-07T23:00:00Z&limit=2000" "読み手の1本が区間を読めなければ失敗で終わる: 読めなかった区間の URL を標準エラーに出す"
+    if grep -qF "since=2026-01-09T23:00:00Z" "$WORK/calls.log"; then
+        fail "読み手の1本が区間を読めなければ失敗で終わる: 失敗した読み手は受け持ちの残りの区間を読まない"
+        sed 's/^/    call: /' "$WORK/calls.log"
+    else
+        echo "PASS: 読み手の1本が区間を読めなければ失敗で終わる: 失敗した読み手は受け持ちの残りの区間を読まない"
+    fi
+    check_out "" "読み手の1本が区間を読めなければ失敗で終わる: 何も出さない"
+fi
+
+if want bad_parallel; then
+    PARALLEL=0
+    wanted example.com/a 1.0.0
+    run
+    check_rc 1 "同時に読む本数が正の整数でなければ失敗で終わる: 失敗で終わる"
+    check_calls 0 "同時に読む本数が正の整数でなければ失敗で終わる: 索引を読まない"
+    check_err "GOMOD_INDEX_PARALLEL=0" "同時に読む本数が正の整数でなければ失敗で終わる: 理由を標準エラーに出す"
 fi
 
 if want page_cap; then
