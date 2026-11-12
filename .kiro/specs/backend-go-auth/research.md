@@ -188,6 +188,51 @@ Claude は、Go の試作の1つのプログラムに、確かめる動きごと
 - 作るか使うか: JWT は golang-jwt v5.3.1 を使う。bcrypt は golang.org/x/crypto を使う。Google と GitHub とのやり取りと、Spring と同じ URL の逃がし方は、合う部品が無いので書く。メールの差し込みは標準の `text/template` を使う
 - 簡素化の見直し: はじめは、管理者の役割の検査(`/api/admin` の下の操作に `ADMIN` を求める検査)を作らないと決めた。今の API の仕様書に `/api/admin` の下の操作が無いためである。設計を書く中で、この決めを改め、検査を作ることにした。ログインを求める段は、仕様書に無い経路への要求にも Java 版と同じ答えを返すので、`/api/admin` の下への要求にも Java 版と同じく 403 を返すためである。検査は数行で、ログインを求める段の中に収まる
 
+## 実装で確かめた Java 版の値の形
+
+この節は、実装の中で Claude が開発環境の Java 版か Java 版のコードで確かめた、Java 版の値の形と読み方を残す。Go 版は、どれも同じ形で書き、同じ規則で読む。Java 版と違えた動きは、変えた動きの一覧(`backend/compat/changed-behaviors.yaml`)に載せた。ただし、「ログインと利用者」の bcrypt の箇条に書く `$2$` の形のハッシュの照らし方の違いは、一覧に載っていない。
+
+### Redis の値
+
+- Java 版は、Redis の値を、application.yaml の `use-jackson2-defaults` と `JsonMapperConfig` の設定を当てた Jackson で書く。そのため、絵文字のような U+10000 以上の文字は、大文字の16進で書いた2つ組の逃がしになる。Go 版の `redisjson.go` は、Go の JSON の書き方と Jackson の3つの違いを直す
+- Java 版が `writeValueAsString` で作った JSON を、もう一度 JSON の文字列にして置く記録がある。中の JSON は U+10000 以上の文字をそのまま書き、外の JSON の文字列にするときだけ2つ組の逃がしにする
+- Java 版の Jackson は、日時の項目を、数、秒の数の文字列、時差の付いた ISO 8601、空の文字列のどれでも読む。UUID と数の項目の読み方も、開発環境の Java 版の Redis に値を置いて API を呼んで確かめた。Go 版の `parseJacksonInstant` `parseJacksonUUID` `parseJacksonInt` が、確かめた規則を写す
+
+### Cookie
+
+- Spring の `ResponseCookie` は、Max-Age が0以上のとき、必ず `Expires=` も書く。そのため、Go 版も、2段階認証の途中の Cookie に要求を受けた時刻の600秒後を書き、消す Cookie に `Expires=Thu, 01 Jan 1970 00:00:00 GMT` を書く
+
+### 入力の検査
+
+- Java 版の `@Email` は、JDK の `java.net.IDN.toASCII`(nameprep は Unicode 3.2)でドメインを変えてから判定する。Go 版の `idna.go` は、JDK から読み出した表で同じ変え方をする。基本多言語面のすべての文字を4つの位置に置いた25万件で、2つの版の判定の食い違いが0件であることを確かめた
+- Java 版の `Email.create` は、Apache Commons Validator 1.11.0 の `EmailValidator.getInstance(false, false)` で判定する。Go 版の `commonsemail.go` は、Java 版の依存の版で作った表と期待で、同じ判定をする
+- Java 版は、要求の JSON に項目が無いと値を null にし、`@NotBlank` の文言だけを返す。`@Size` `@Pattern` `@MaxUtf8Bytes` は null を誤りにせず、`@PasswordMatches` は null どうしを一致とみなす。Go 版は項目が無い要求を空の文字列の要求と同じに検査するので、文言が増える(CB-020)
+- 要求の JSON に対になっていないサロゲートの書き方があると、Java 版の `MaxUtf8BytesValidator` はその文字を `?`(1バイト)と数える。Go 版の JSON の読み方は U+FFFD(3バイト)に置き換えるので、72バイトの境目の近くで判定が変わる(CB-021)
+
+### メールとリンク
+
+- Java 版の FreeMarker は、拡張子が `.ftl` のひな形では HTML の特別な文字を逃がさず、利用者の名前の `<&>` や `${x}` もそのまま差し込む
+- Java 版は、Google と GitHub の認可の URL の問い合わせの部分を、Spring 7.0.10 の `UriComponentsBuilder` で逃がす。Go 版の `spring_query.go` の期待は、同じ版の Spring の jar を動かして作った
+- Java 版のメールアドレスの確認の値は、java-jwt 4.6.2 で読む。java-jwt は、署名の末尾の `=` を受け付け、exp と nbf と iat があれば確かめる。Go 版は、値の本体を `<` `>` `&` を逃がさずに書き、同じ規則で読む
+- Java 版のメールアドレスの確認の操作は、結果が VERIFIED、EXPIRED、ALREADY_VERIFIED のどれでも 200 を返す
+
+### ログインと利用者
+
+- Java 版の `BCryptPasswordEncoder.matches` は、`$2a$` `$2b$` `$2y$` の形のハッシュを照らし、強さが4から31の外のハッシュでは 500 で答える。パスワードは先頭の72バイトだけを使う。Go 版の `passwordMatches` は、開発環境の Java 版で確かめたこの規則を写し、塩の使われないビットが立つハッシュは、合わないとする
+- Java 版の `BCryptPasswordEncoder.matches` は、`$2$` の形のハッシュも照らす。Go の bcrypt は、`$2$` の形でも鍵の末尾に0のバイトを足して計算し、Java 版と違う値になる。そのため、Go 版の `passwordMatches` は、`$2$` の形のハッシュを照らさずに合わないとする。Java 版は、パスワードのハッシュを `new BCryptPasswordEncoder()` の既定の `$2a$` の形で作るので、API の要求で `$2$` の形のハッシュを持つ利用者はできない。この違いは、変えた動きの一覧に載っていない
+- Java 版は、利用者の役割を順の決まらない集合で持つので、`roles` の並びが JVM ごとに変わる。Go 版は USER、ADMIN の順に並べる(CB-022)
+- Java 版の `User.reconstruct` は、利用者を読むたびに、2段階認証が有効でメールアドレスかパスワードが無い利用者と、2段階認証が無効な管理者を、400 で断る。Go 版も、利用者を読むすべての操作で同じ順に確かめる
+
+### Google と GitHub
+
+- Java 版の RestClient は、どの状態の番号の応答でも本文を読む。Java 版の Jackson は、先頭の JSON の値のあとを読まない。Go 版も同じに読む
+- 対象の外の `provider` を受けた Java 版は、Redis に3つの記録を置いたあとに 500 で答え、記録を残す(コードを読んで確かめた)。Go 版は記録を置く前に 400 で断る
+- Java 版は、`startOidcAuthorization` の要求の Accept と Host の一部の形で、Go 版と違う状態の番号を返す。手元の Java 版で答えを確かめ、変えた動きの一覧に載せた
+
+### プリフライトでない OPTIONS の要求
+
+- プリフライトでない OPTIONS の要求に、Java 版は、経路のある URL では 200、経路の無い URL では 500 で答える。Go 版は 405 と 404 で答える(CB-026)
+
 ## 危うい点と備え
 
 - Java 版の細かい動きの見落とし。備えとして、認証の操作のすべてについて、筋書きに入力の誤りと期限切れと上限の要求を含め、データベースと Redis とメールも比べる(要件5の受入基準1と2)
