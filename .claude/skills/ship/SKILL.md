@@ -14,6 +14,8 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
 ## Steps
 
 1. **verify**: `/verify-all` の手順を実行し、全PASSを確認する。FAILがあれば出荷しない。
+   全PASSのあと、`bash .claude/scripts/ship/pre-push-dependency-review.sh` を実行する。push のあとに CI の dependency-review が赤にする、増えた部品の moderate 以上の脆弱性を、main からの差分(まだ commit していない変更を含む)で手元で見つける。
+   「止まった」と出たら、commit も push もせず、出力の部品を、脆弱性の直った版か、止まらない別の版に替える。「調べられなかった」と出たら、出力の理由を直してから実行し直す。直せないときは、出力をそのまま所有者に示す。
 
 2. **ブランチ確認**: `git branch --show-current` で現在のブランチを確認する。
    - mainにいる場合: `.branch_name_template` に従い `git switch -c <type>/<short-description>` で作成

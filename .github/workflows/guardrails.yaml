@@ -220,6 +220,7 @@ jobs:
             ':(exclude).github/scripts/tests/**'
             ':(exclude).claude/hooks/tests/**'
             ':(exclude).claude/scripts/parallel/tests/**'
+            ':(exclude).claude/scripts/ship/tests/**'
           )
 
           count() {
