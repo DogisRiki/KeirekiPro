@@ -18,6 +18,9 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
    - スクリプトが「止まった」か「調べられなかった」を出したときは、AIは commit も push もしない。「調べられなかった」のまま push すると、秘密の値を調べないままリポジトリの外へ出すことになるためである。AIは、出力の理由を直してから、スクリプトを実行し直す
    - AIは、gitleaks が止めた箇所のうち、秘密の値ではないと考える箇所を、自分で除外しない。AIは、出力の一覧のファイルと行と規則を所有者に示し、所有者の判断を受ける。所有者が受け入れたら、AIは commit してからスクリプトを実行し直し、そのときに出た指紋を `.gitleaksignore` に書き足す。指紋には commit の番号が入り、commit する前に出た指紋は仮の番号を含むので、`.gitleaksignore` に書けるのは commit したあとに出た指紋になる。AIは、`.gitleaksignore` を書き足した変更を commit し、スクリプトを実行し直して通ることを確かめてから push する
 
+   続けて、AIは `bash .claude/scripts/ship/pre-push-dependency-review.sh` を実行する。push のあとに CI の dependency-review が赤にする、増えた部品の moderate 以上の脆弱性を、main からの差分(まだ commit していない変更を含む)で手元で見つける。
+   「止まった」と出たら、commit も push もせず、出力の部品を、脆弱性の直った版か、止まらない別の版に替える。「調べられなかった」と出たら、出力の理由を直してから実行し直す。直せないときは、出力をそのまま所有者に示す。
+
 2. **ブランチ確認**: `git branch --show-current` で現在のブランチを確認する。
    - mainにいる場合: `.branch_name_template` に従い `git switch -c <type>/<short-description>` で作成
    - featureブランチにいる場合: 作業内容と合っているか確認
