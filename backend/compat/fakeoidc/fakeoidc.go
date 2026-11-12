@@ -10,18 +10,34 @@
 // token の口は、クライアントの値と redirect_uri と PKCE の code_verifier を確かめてから、アクセストークンを返す。
 // userinfo と /user と /user/emails の口は、比べる検査が筋書きの始めに登録した利用者の値を返す。
 //
-// 比べる検査は、/_compat/ の下の口で、クライアントの値と利用者の値を登録する。
+// 比べる検査は、/_compat/ の下の口で、クライアントの値と利用者の値を登録し、ログインの開始を断らせ、
+// 利用者の値と断る残りの回数を初めの状態に戻す。
+//
+// 起動のときに証明書と鍵のファイルの場所を渡されたときだけ、ネットワークの別名 api.github.com として、
+// ポート 443 で TLS を受け、/user/emails の口だけに答える。Java 版と Go 版は、GitHub のメールアドレスを
+// 設定の URL ではなく決まった https://api.github.com/user/emails から読むためである。
 package fakeoidc
 
 import (
+	"crypto/tls"
+	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 )
 
 const (
 	// Port は、このサーバが受けるポートである。
 	Port = "8080"
+	// TLSPort は、api.github.com として TLS を受けるポートである。
+	TLSPort = "443"
+
+	// CertFileEnv は、api.github.com の証明書の PEM のファイルの場所を渡す環境変数の名前である。
+	CertFileEnv = "FAKEOIDC_TLS_CERT_FILE"
+	// KeyFileEnv は、api.github.com の証明書の鍵の PEM のファイルの場所を渡す環境変数の名前である。
+	KeyFileEnv = "FAKEOIDC_TLS_KEY_FILE"
 
 	// Google は、Google の提供元の名前である。
 	Google = "google"
@@ -86,16 +102,20 @@ type Server struct {
 	codes      map[string]grant
 	tokens     map[string]grant
 	issued     int
+	// denies は、提供元ごとの断る残りの回数である。
+	denies map[string]int
 }
 
 // NewServer は、クライアントと利用者を登録していない Server を作る。
 func NewServer() *Server {
-	s := &Server{clients: map[string]Client{}, codes: map[string]grant{}, tokens: map[string]grant{}}
+	s := &Server{clients: map[string]Client{}, codes: map[string]grant{}, tokens: map[string]grant{}, denies: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /_compat/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("PUT /_compat/clients/{provider}", s.putClient)
 	mux.HandleFunc("PUT /_compat/users/google", s.putGoogleUser)
 	mux.HandleFunc("PUT /_compat/users/github", s.putGitHubUser)
+	mux.HandleFunc("PUT /_compat/deny/{provider}", s.putDeny)
+	mux.HandleFunc("POST /_compat/reset", s.postReset)
 	mux.HandleFunc("GET /o/oauth2/v2/auth", s.authorize(Google))
 	mux.HandleFunc("POST /token", s.token(Google))
 	mux.HandleFunc("GET /v1/userinfo", s.googleUserInfo)
@@ -142,4 +162,27 @@ func (s *Server) SetGitHubUser(u GitHubUser) {
 	defer s.mu.Unlock()
 	u.Emails = append([]GitHubEmail{}, u.Emails...)
 	s.githubUser = &u
+}
+
+// TLSServer は、証明書 certFile と鍵 keyFile で、api.github.com としてポート 443 の TLS を受けるサーバを作る。
+// サーバは /user/emails の口だけに答え、ほかの口を 501 で断る。
+// certFile と keyFile がどちらも空のときは、TLS を受けないので、nil を返す。
+// 片方だけが空のときと、ファイルを読めないときは、誤りを返す。空の場所のファイルは読めないので、片方だけが空のときも読む誤りになる。
+func (s *Server) TLSServer(certFile, keyFile string) (*http.Server, error) {
+	if certFile == "" && keyFile == "" {
+		return nil, nil
+	}
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("TLS の証明書と鍵を読めません: %w", err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /user/emails", s.githubEmails)
+	mux.HandleFunc("/", s.notImplemented)
+	return &http.Server{
+		Addr:              net.JoinHostPort("", TLSPort),
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}},
+	}, nil
 }

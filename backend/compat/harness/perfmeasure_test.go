@@ -5,9 +5,12 @@ package harness
 import (
 	"context"
 	"errors"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -135,6 +138,120 @@ func TestMeasureLatency_FailsOnUnexpectedResponse(t *testing.T) {
 	if _, err := MeasureLatency(t.Context(), NewHTTPClient(), "http://127.0.0.1:1", Scenario{Name: "empty"}, 1, 1); err == nil {
 		t.Error("段の無い筋書きで誤りを返しませんでした")
 	}
+}
+
+// prepareEachScenario は、ログインして確認のコードを受けたあと、そのコードを付けて /verify を測る筋書きである。
+// 確認のコードは1回使うと消えるので、prepare_each を真にする。
+func prepareEachScenario() Scenario {
+	return Scenario{Name: "verify", Modes: []string{ModePerf}, PrepareEach: true, Steps: []Step{
+		{Name: "login", Request: Request{Method: http.MethodPost, Path: "/login"}, Expect: Expect{Status: http.StatusOK}},
+		{
+			Name: "challenge", Request: Request{Method: http.MethodPost, Path: "/challenge"},
+			Capture: map[string]string{"code": "$.code"}, Expect: Expect{Status: http.StatusOK},
+		},
+		{
+			Name: "verify", Request: Request{Method: http.MethodPost, Path: "/verify", Headers: map[string]string{"X-Code": "{code}"}},
+			Expect: Expect{Status: http.StatusOK},
+		},
+	}}
+}
+
+// oneTimeCodes は、ログインのたびに新しい Cookie を、確認のコードを求めるたびに新しいコードを渡し、
+// /verify では、いちばん新しい Cookie とコードの組を1回だけ受けるサーバの処理である。ログインには loginDelay、
+// 確認のコードには challengeDelay、/verify には verifyDelay だけかける。failLoginAt 回目のログインは 500 で答える。
+func oneTimeCodes(loginDelay, challengeDelay, verifyDelay time.Duration, failLoginAt int) func(w http.ResponseWriter, r *http.Request) {
+	var mu sync.Mutex
+	logins, codes := 0, 0
+	used := true
+	return func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch r.URL.Path {
+		case "/login":
+			time.Sleep(loginDelay)
+			logins++
+			if logins == failLoginAt {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Add("Set-Cookie", "session=s"+strconv.Itoa(logins)+"; Path=/")
+			_, _ = w.Write([]byte("{}"))
+		case "/challenge":
+			time.Sleep(challengeDelay)
+			codes++
+			used = false
+			_, _ = w.Write([]byte(`{"code":"c` + strconv.Itoa(codes) + `"}`))
+		case "/verify":
+			time.Sleep(verifyDelay)
+			if used || r.Header.Get("Cookie") != "session=s"+strconv.Itoa(logins) || r.Header.Get("X-Code") != "c"+strconv.Itoa(codes) {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			used = true
+			_, _ = w.Write([]byte("{}"))
+		}
+	}
+}
+
+func TestMeasureLatency_PrepareEach(t *testing.T) {
+	t.Run("慣らしの回と測る回のそれぞれの前に、最後の段より前の段を送り直す", func(t *testing.T) {
+		srv, reqs := recordingServer(t, oneTimeCodes(0, 0, 0, 0))
+		samples, err := MeasureLatency(t.Context(), NewHTTPClient(), srv.URL, prepareEachScenario(), 2, 3)
+		if err != nil {
+			t.Fatalf("MeasureLatency: %v", err)
+		}
+		if len(samples) != 3 {
+			t.Fatalf("測った時間の数 = %d, want 3", len(samples))
+		}
+		var paths []string
+		for _, r := range reqs() {
+			paths = append(paths, r.Path)
+		}
+		want := strings.TrimSpace(strings.Repeat("/login /challenge /verify ", 5))
+		if got := strings.Join(paths, " "); got != want {
+			t.Errorf("送った要求 = %s, want %s", got, want)
+		}
+	})
+
+	t.Run("最後の段の時間だけを返す", func(t *testing.T) {
+		const prepareDelay, verifyDelay = 150 * time.Millisecond, 5 * time.Millisecond
+		for name, delays := range map[string][2]time.Duration{
+			"ログインの段が遅い":      {prepareDelay, 0},
+			"確認のコードを求める段が遅い": {0, prepareDelay},
+		} {
+			srv, _ := recordingServer(t, oneTimeCodes(delays[0], delays[1], verifyDelay, 0))
+			samples, err := MeasureLatency(t.Context(), NewHTTPClient(), srv.URL, prepareEachScenario(), 1, 3)
+			if err != nil {
+				t.Fatalf("%s: MeasureLatency: %v", name, err)
+			}
+			for i, d := range samples {
+				if d < verifyDelay || d >= prepareDelay {
+					t.Errorf("%s: %d 回目の時間 %v は、最後の段にかかる %v 以上で、準備の段にかかる %v より短いはず", name, i+1, d, verifyDelay, prepareDelay)
+				}
+			}
+		}
+	})
+
+	t.Run("送り直した準備の段が期待に合わなければ誤りを返す", func(t *testing.T) {
+		for name, failAt := range map[string]int{"慣らしの回の前": 2, "測る回の前": 4} {
+			srv, _ := recordingServer(t, oneTimeCodes(0, 0, 0, failAt))
+			_, err := MeasureLatency(t.Context(), NewHTTPClient(), srv.URL, prepareEachScenario(), 2, 3)
+			if err == nil || !strings.Contains(err.Error(), "段 login") {
+				t.Errorf("%s: 誤り = %v, want 段 login の誤り", name, err)
+			}
+		}
+	})
+
+	t.Run("prepare_each が偽なら準備の段を1回だけ送る", func(t *testing.T) {
+		srv, reqs := recordingServer(t, loginThenWork(0))
+		s := perfScenario(http.StatusOK)
+		if _, err := MeasureLatency(t.Context(), NewHTTPClient(), srv.URL, s, 2, 3); err != nil {
+			t.Fatalf("MeasureLatency: %v", err)
+		}
+		if n := len(reqs()); n != 6 {
+			t.Errorf("送った要求の数 = %d, want 6(準備の段1回と最後の段5回)", n)
+		}
+	})
 }
 
 // barrier は、n 件の要求が届くまで、どの要求にも答えないサーバの処理である。n 件が同時に届かなければ 500 を返す。
@@ -265,6 +382,69 @@ func TestLoadScenario_PerfFields(t *testing.T) {
 	}
 }
 
+// TestLoadScenarios_AuthPerf は、認証の筋書きのうち、応答の時間を測る筋書きが、ログイン、2段階認証の確認、作り直し、
+// 新規の登録の4つの操作を最後の段で送ることを確かめる。2段階認証の確認は、確認のコードが1回使うと消えるので、
+// 回ごとに準備の段を送り直し、ログインの段のあとに届いたメールからコードを取り出す。メモリの最大はどれも測らない。
+func TestLoadScenarios_AuthPerf(t *testing.T) {
+	scenarios, err := LoadScenarios(filepath.Join("..", "scenarios", "auth"), ModePerf)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	type want struct {
+		last        string
+		steps       int
+		prepareEach bool
+	}
+	wants := map[string]want{
+		"auth-login-perf":      {"POST /api/auth/login", 1, false},
+		"auth-two-factor-perf": {"POST /api/auth/2fa/verify", 2, true},
+		"auth-refresh-perf":    {"POST /api/auth/token/refresh", 2, false},
+		"auth-register-perf":   {"POST /api/auth/register", 1, false},
+	}
+	got := map[string]Scenario{}
+	for _, s := range scenarios {
+		got[s.Name] = s
+	}
+	if len(got) != len(wants) {
+		t.Errorf("測る筋書きの数 = %d, want %d(読んだ筋書きは %v)", len(got), len(wants), slices.Sorted(maps.Keys(got)))
+	}
+	for name, w := range wants {
+		s, ok := got[name]
+		if !ok {
+			t.Errorf("測る筋書き %s がありません", name)
+			continue
+		}
+		if len(s.Steps) != w.steps {
+			t.Errorf("筋書き %s の段の数 = %d, want %d", name, len(s.Steps), w.steps)
+			continue
+		}
+		last := s.Steps[len(s.Steps)-1]
+		if op := last.Request.Method + " " + last.Request.Path; op != w.last {
+			t.Errorf("筋書き %s の最後の段 = %s, want %s", name, op, w.last)
+		}
+		if s.PrepareEach != w.prepareEach {
+			t.Errorf("筋書き %s の prepare_each = %v, want %v", name, s.PrepareEach, w.prepareEach)
+		}
+		if s.MeasureMemory {
+			t.Errorf("筋書き %s が measure_memory を持ちます。メモリの最大は PDF の出力の筋書きだけで測ります", name)
+		}
+	}
+	if s, ok := got["auth-two-factor-perf"]; ok && len(s.Steps) == 2 {
+		login, verify := s.Steps[0], s.Steps[1]
+		if login.Request.Path != "/api/auth/login" || jsonField(login.Request.JSON, "email") != "twofactor@example.com" {
+			t.Errorf("2段階認証の確認の準備の段 = %s %v, want 2段階認証を有効にした利用者 twofactor@example.com のログイン",
+				login.Request.Path, login.Request.JSON)
+		}
+		capture := login.Capture["code"]
+		if !strings.HasPrefix(capture, "mail:") {
+			t.Errorf("2段階認証の確認のコードの取り出し = %q, want mail: から始まる取り出し", capture)
+		}
+		if code := jsonField(verify.Request.JSON, "code"); code != "{code}" {
+			t.Errorf("2段階認証の確認の段のコード = %v, want 取り出した {code}", code)
+		}
+	}
+}
+
 func TestWritePerfReport(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "report")
 	report := PerfReport{Latencies: []LatencyResult{{Operation: "login", Java: time.Millisecond, Go: time.Millisecond}}}
@@ -286,4 +466,13 @@ func TestWritePerfReport(t *testing.T) {
 	if _, err := report.Write(filepath.Join(blocked, "sub")); err == nil {
 		t.Error("フォルダを作れないのに誤りを返しませんでした")
 	}
+}
+
+// jsonField は、段の本文 body が項目の並びなら、項目 key の値を返す。項目の並びでなければ nil を返す。
+func jsonField(body any, key string) any {
+	fields, ok := body.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return fields[key]
 }

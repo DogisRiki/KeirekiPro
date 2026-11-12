@@ -1,0 +1,165 @@
+# 入力の誤りの筋書き。認証の13の操作の入力の誤り、偽の送信の検査のヘッダを付けない要求、形の誤った要求を確かめる。
+# 文言を2つ以上持つ項目は、Java 版では文言の並びが決まらないので、変えた動きの一覧が並びの違いを許す。
+# 画面が送らない要求のうち、Java 版と Go 版の答えが違い、比べる検査の違いを狭く許せない要求は、送らない。
+# それらは、変えた動きの一覧に、記録だけの項目として載せてある。
+name: auth-validation
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [compare]
+steps:
+  # ログイン
+  - name: login-blank
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: '', password: ''}
+    expect: {status: 400}
+  - name: login-whitespace
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: ' ', password: '　'}
+    expect: {status: 400}
+  # ログアウトと作り直しは本文を持たないので、使えない Cookie の値を送る
+  - name: logout-invalid-cookie
+    request:
+      method: POST
+      path: /api/auth/logout
+      headers: {Cookie: 'refreshToken=not-a-token; accessToken=not-a-jwt'}
+    expect: {status: 204}
+  - name: refresh-empty-cookie
+    request:
+      method: POST
+      path: /api/auth/token/refresh
+      headers: {Cookie: 'refreshToken='}
+    expect: {status: 401}
+  # 新規の登録。どの項目も文言を2つ以上持つ要求と、空の要求と、正しくない値の要求
+  - name: register-all-blank
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: '', username: '', password: '', confirmPassword: ''}
+    expect: {status: 400}
+  - name: register-multiple-messages
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com', username: '                                                   ', password: 'abc', confirmPassword: 'abd'}
+    expect: {status: 400}
+  - name: register-invalid-values
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: not-an-email, username: 登録 六郎, password: password1, confirmPassword: password1}
+    expect: {status: 400}
+  - name: register-too-long-password
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: new@example.com, username: 登録 七郎, password: 'Aa1あいうえおかきくけこさしすせそたちつてとなにぬねの', confirmPassword: 'Aa1あいうえおかきくけこさしすせそたちつてとなにぬねの'}
+    expect: {status: 400}
+  # 2段階認証の確認。Cookie の無い要求と、空のコードの要求
+  - name: two-factor-blank-code
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: ''}
+    expect: {status: 400}
+  # メールアドレスの確認と、確認のメールの送り直し
+  - name: verify-email-blank-token
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: ''}
+    expect: {status: 400}
+  - name: verify-email-blank-too-long-token
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: '                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 '}
+    expect: {status: 400}
+  - name: resend-blank-token
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend
+      json: {token: ''}
+    expect: {status: 400}
+  - name: resend-blank-too-long-token
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend
+      json: {token: '                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 '}
+    expect: {status: 400}
+  - name: resend-for-login-blank
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend-for-login
+      json: {email: '', password: ''}
+    expect: {status: 400}
+  # パスワードの再設定
+  - name: password-reset-request-whitespace
+    request:
+      method: POST
+      path: /api/auth/password/reset/request
+      json: {email: ' '}
+    expect: {status: 400}
+  - name: password-reset-request-invalid
+    request:
+      method: POST
+      path: /api/auth/password/reset/request
+      json: {email: not-an-email}
+    expect: {status: 400}
+  - name: password-reset-verify-blank-token
+    request:
+      method: POST
+      path: /api/auth/password/reset/verify
+      json: {token: ''}
+    expect: {status: 400}
+  - name: password-reset-blank
+    request:
+      method: POST
+      path: /api/auth/password/reset
+      json: {token: unknown-token, password: '', confirmPassword: ''}
+    expect: {status: 400}
+  - name: password-reset-multiple-messages
+    request:
+      method: POST
+      path: /api/auth/password/reset
+      json: {token: unknown-token, password: 'abc', confirmPassword: 'abd'}
+    expect: {status: 400}
+  # Google と GitHub のアカウントでのログイン。戻り先は、code と state の無い要求を送る
+  - name: oidc-callback-no-params
+    request:
+      method: GET
+      path: /api/auth/oidc/callback
+    expect: {status: 302}
+  # 偽の送信の検査のヘッダを付けない要求。ログインの要る書き込みの操作に送る
+  - name: create-resume-without-csrf-header
+    request:
+      method: POST
+      path: /api/resumes
+      json: {resumeName: 職務経歴書}
+    expect: {status: 403}
+  # 形の誤った要求。本文の無い要求、型の違う項目、オブジェクトでない本文、provider の無い開始の要求
+  - name: login-no-body
+    request:
+      method: POST
+      path: /api/auth/login
+    expect: {status: 400}
+  - name: login-array-field
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: [user1@example.com], password: Passw0rd!}
+    expect: {status: 400}
+  - name: register-array-body
+    request:
+      method: POST
+      path: /api/auth/register
+      json: [1]
+    expect: {status: 400}
+  - name: oidc-authorize-no-provider
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize
+    expect: {status: 400}

@@ -1,0 +1,4 @@
+{
+   "to" : "mailgen-1794378333@example.com",
+   "username" : "メール<&>\"確認' ${x}{{.y}}"
+}

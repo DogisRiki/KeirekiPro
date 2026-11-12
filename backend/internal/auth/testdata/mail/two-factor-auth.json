@@ -1,0 +1,8 @@
+{
+   "body" : "137175\n\n上記の認証コードを入力して、認証を完了させてください。\nなお、認証コードの有効期限は本メール受信後から10分以内です。\n期限内に受付を完了できなかった場合は、\n恐れ入りますが、初めから操作をお願いいたします。\n\n※このメールの内容に心当たりがない方は、本メールを破棄してください。\n\nKeirekiPro\nhttps://app.keirekipro.click\n",
+   "from" : "no-reply@keirekipro.click",
+   "subject" : "【KeirekiPro】2段階認証コードのお知らせ",
+   "to" : [
+      "mailgen-1794378333@example.com"
+   ]
+}

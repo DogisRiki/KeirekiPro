@@ -1,0 +1,8 @@
+{
+   "body" : "メール<&>\"確認' ${x}{{.y}} 様\n\nユーザー登録が完了しました。\nご登録ありがとうございます。\n\n※このメールの内容に心当たりがない方は、本メールを破棄してください。\n\nKeirekiPro\nhttps://app.keirekipro.click\n",
+   "from" : "no-reply@keirekipro.click",
+   "subject" : "【KeirekiPro】新規登録完了のお知らせ",
+   "to" : [
+      "mailgen-1794378333@example.com"
+   ]
+}

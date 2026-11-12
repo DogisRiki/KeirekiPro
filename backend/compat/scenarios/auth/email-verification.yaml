@@ -1,0 +1,141 @@
+# 確認のメールの送り直しの筋書き。送り直せる間隔の制限、期限の切れたリンクでの送り直し、ログインの画面からの送り直し、
+# 前のリンクが使えないことを確かめる。確認のリンクの値は、届いた確認のメールの本文の、/email/verify# のあとから取り出す。
+# 送り直せる間隔は、メールアドレスごとの Redis のキー email-verification:rate:<メールアドレス> が持つ。
+# メールアドレスは筋書きに書いた値なので、どちらの版でも同じキーになる。
+name: auth-email-verification
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [compare, cross]
+steps:
+  # 1つ目の場面: 登録の途中の利用者の、送り直せる間隔の制限と、期限の切れたリンクでの送り直し
+  - name: register-for-resend
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: resend@example.com, username: 再送 六郎, password: Passw0rd!, confirmPassword: Passw0rd!}
+    capture: {link1: 'mail:/email/verify#(\S+)'}
+    expect: {status: 202}
+  - name: expire-link1
+    expire: {var: link1}
+  # 送り直せる間隔の制限は、登録の直後に送り直して作る
+  - name: resend-rate-limited
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend
+      json: {token: "{link1}"}
+    expect: {status: 400}
+  - name: clear-rate-resend
+    redis: {del: ['email-verification:rate:resend@example.com']}
+  # 期限の切れたリンクでの送り直しには to: other を付け、登録した版と違う版で送り直す
+  - name: resend-expired-link
+    to: other
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend
+      json: {token: "{link1}"}
+    capture: {link2: 'mail:/email/verify#(\S+)'}
+    expect: {status: 204}
+  # 送り直したリンクでの確認の段は、送り直した版と違う版に届く
+  - name: verify-resent-link
+    to: other
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{link2}"}
+    expect: {status: 200}
+  # 確認の操作は、結果が VERIFIED でも EXPIRED でも 200 を返し、版をまたぐ検査は状態の番号しか確かめない。
+  # そのため、確認の段のあとにログインの段を置き、確認が済んだか(200)、済んでいないか(409)を状態の番号で確かめる
+  - name: login-resent-user
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: resend@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 2つ目の場面: 確認の済んでいないアカウントの、ログインの画面からの送り直しと、前のリンクが使えないこと
+  - name: clear-rate-unverified
+    redis: {del: ['email-verification:rate:unverified@example.com']}
+  # パスワードが違うと送り直さない。この段は Redis もデータベースも変えない
+  - name: resend-for-login-wrong-password
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend-for-login
+      json: {email: unverified@example.com, password: Wrong0rd!}
+    expect: {status: 400}
+  - name: resend-for-login
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend-for-login
+      json: {email: unverified@example.com, password: Passw0rd!}
+    capture: {linkA: 'mail:/email/verify#(\S+)'}
+    expect: {status: 204}
+  - name: clear-rate-unverified-again
+    redis: {del: ['email-verification:rate:unverified@example.com']}
+  - name: resend-for-login-again
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend-for-login
+      json: {email: unverified@example.com, password: Passw0rd!}
+    capture: {linkB: 'mail:/email/verify#(\S+)'}
+    expect: {status: 204}
+  # 前のリンクは、新しいリンクを送ったあとは使えない(結果は EXPIRED で、状態の番号は 200)。
+  # 前のリンクの確認のあとのログインが 409 になることで、前のリンクで確認が済まなかったことを確かめる。
+  # このログインの段は、前のリンクの確認と新しいリンクの確認のあいだで、to: other を付けて版を替える。
+  # to: other が2つ続くと元の版に戻るので、この段が無いと、新しいリンクの確認が、新しいリンクを送った版と同じ版に届く。
+  # Java 版から Go 版の向きでは、2つのリンクを送った版と違う版に、前のリンクの確認と新しいリンクの確認が届く
+  - name: verify-previous-link
+    to: other
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{linkA}"}
+    expect: {status: 200}
+  - name: login-after-previous-link
+    to: other
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: unverified@example.com, password: Passw0rd!}
+    expect: {status: 409}
+  - name: verify-latest-link
+    to: other
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{linkB}"}
+    expect: {status: 200}
+  - name: login-after-verification
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: unverified@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 3つ目の場面: 登録の途中の利用者の、ログインの画面からの送り直し
+  - name: register-pending-login
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: pendinglogin@example.com, username: 途中 八郎, password: Passw0rd!, confirmPassword: Passw0rd!}
+    expect: {status: 202}
+  - name: clear-rate-pending-login
+    redis: {del: ['email-verification:rate:pendinglogin@example.com']}
+  - name: resend-for-login-registration
+    request:
+      method: POST
+      path: /api/auth/email-verification/resend-for-login
+      json: {email: pendinglogin@example.com, password: Passw0rd!}
+    capture: {linkP: 'mail:/email/verify#(\S+)'}
+    expect: {status: 204}
+  - name: verify-login-resent-link
+    to: other
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{linkP}"}
+    expect: {status: 200}
+  # 最後の段は、登録の途中の利用者が利用者になったことを、もう一方の版のログインで読む
+  - name: login-pending-user
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: pendinglogin@example.com, password: Passw0rd!}
+    expect: {status: 200}

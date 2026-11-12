@@ -1,0 +1,39 @@
+# 新規の登録の筋書き。新規の登録、確認のリンクでの登録の完了、使い終わったリンク、登録の完了のメールを確かめる。
+# 確認のリンクの値は、登録の段のあとに届いた確認のメールの本文の、/email/verify# のあとから取り出す。
+# 登録の完了のメールは、確認のリンクでの確認の段で届き、比べる検査がメールの件名と本文を比べる。
+name: auth-register
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [compare, cross]
+steps:
+  - name: register
+    request:
+      method: POST
+      path: /api/auth/register
+      json: {email: newuser@example.com, username: 新規 七郎, password: Passw0rd!, confirmPassword: Passw0rd!}
+    capture: {link1: 'mail:/email/verify#(\S+)'}
+    expect: {status: 202}
+  # 確認のリンクでの確認の段には to: other を付ける。Java 版から Go 版の向きでは、登録が Java 版、確認が Go 版、
+  # 使い終わったリンクが Java 版になる。交互の向きでも、版に送る段の1つ目と2つ目なので版が違う
+  - name: verify-registration-link
+    to: other
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{link1}"}
+    expect: {status: 200}
+  # 使い終わったリンクは、同じ値をもう一度送って作る
+  - name: verify-used-link
+    to: other
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{link1}"}
+    expect: {status: 200}
+  # 登録を終えた利用者でログインできる
+  - name: login-registered-user
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: newuser@example.com, password: Passw0rd!}
+    expect: {status: 200}

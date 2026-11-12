@@ -22,6 +22,8 @@ require (
 	github.com/aws/smithy-go v1.28.8
 	github.com/chromedp/cdproto v0.159.0
 	github.com/chromedp/chromedp v0.21.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/moby/moby/client v0.6.2
 	github.com/moby/patternmatcher v0.6.1
@@ -91,7 +93,6 @@ require (
 	github.com/google/cel-go v0.29.2 // indirect
 	github.com/google/go-github/v88 v88.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hako/durafmt v0.0.0-20210608085754-5c1018a4e16b // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+
+	"github.com/DogisRiki/KeirekiPro/backend/compat/fakeaws"
 )
 
 // CrossEnv は、Java 版と Go 版を、1つの Postgres と1つの Redis と1つの fakeaws と1つの fakeoidc につないだ環境である。
@@ -33,7 +35,6 @@ func StartCrossEnv(ctx context.Context, env *Env, images Images, backends map[st
 		return nil, err
 	}
 	c := &CrossEnv{Stack: stack, URLs: map[string]string{}, client: NewHTTPClient()}
-	var urls []string
 	for _, version := range []string{VersionJava, VersionGo} {
 		_, url, _, err := startBackend(ctx, env, version, backends[version], stack.backing)
 		if err != nil {
@@ -41,16 +42,17 @@ func StartCrossEnv(ctx context.Context, env *Env, images Images, backends map[st
 			return nil, err
 		}
 		c.URLs[version] = url
-		urls = append(urls, url)
 	}
-	if err := stack.registerRedirects(ctx, urls); err != nil {
+	if err := stack.registerRedirects(ctx); err != nil {
 		_ = stack.Close()
 		return nil, err
 	}
 	return c, nil
 }
 
-// Run は、筋書き s を、3つの送り先の組で1つずつ動かす。組ごとに、保存された内容を空にしてから筋書きの初めのデータを読み込む。
+// Run は、筋書き s を、3つの送り先の組で1つずつ動かす。組ごとに、保存された内容を空にしてから筋書きの初めのデータを読み込み、
+// fakeoidc を初めの状態に戻して oidc_users の利用者を登録する。組の終わりに、段が失敗したときも、fakeoidc を初めの状態に戻す。
+// Redis を書き換える段は1つの Redis を1回書き換え、メールは1つの fakeaws の記録から読む。
 // 環境を整えられないときは、誤りを返す。筋書きの段が期待に合わないときは、報告の Failures に書く。
 func (c *CrossEnv) Run(ctx context.Context, s Scenario) (CrossReport, error) {
 	report := CrossReport{Scenario: s.Name, Directions: CrossDirections}
@@ -61,8 +63,16 @@ func (c *CrossEnv) Run(ctx context.Context, s Scenario) (CrossReport, error) {
 		if err := LoadFixtures(ctx, c.DBConn, s.Fixtures); err != nil {
 			return report, err
 		}
-		if f := RunCross(ctx, c.client, s, direction, c.URLs); f != nil {
-			report.Failures = append(report.Failures, *f)
+		var failure *CrossFailure
+		err := c.withOIDC(ctx, s.OIDCUsers, func() error {
+			failure = runCross(ctx, c.tools(c.client, c.Redis, fakeaws.SharedVersion), s, direction, c.URLs)
+			return nil
+		})
+		if err != nil {
+			return report, err
+		}
+		if failure != nil {
+			report.Failures = append(report.Failures, *failure)
 		}
 	}
 	return report, nil

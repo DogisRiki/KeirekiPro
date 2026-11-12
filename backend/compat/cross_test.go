@@ -185,13 +185,17 @@ func TestCross_WrongStatusFailsWithStepAndDirection(t *testing.T) {
 	}
 }
 
-// selfPair は、Go 版のイメージを両方の位置に置いて確かめる筋書きである。偽の送信の検査の Cookie を1つ目の位置で受け取り、
-// もう一方の位置で使う。Go 版の経歴書の操作はまだ 501 を返すので、偽の送信の検査を通ったことを 501 で確かめる。
+// selfPair は、Go 版のイメージを両方の位置に置いて確かめる筋書きである。ログインの状態の Cookie と偽の送信の検査の Cookie を
+// 1つ目の位置で受け取り、もう一方の位置で使う。Go 版の経歴書の操作はまだ 501 を返すので、ログインの確かめと
+// 偽の送信の検査を通ったことを 501 で確かめる。
 const selfPair = `name: self-pair
 group: 0
 fixtures: [users/basic.sql, resumes/many-pages.sql]
 modes: [cross]
 steps:
+  - name: login
+    request: {method: POST, path: /api/auth/login, json: {email: user1@example.com, password: Passw0rd!}}
+    expect: {status: 200}
   - name: get-token
     request: {method: GET, path: /healthz}
     expect: {status: 200, fields: [$.status]}

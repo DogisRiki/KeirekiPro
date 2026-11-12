@@ -27,6 +27,10 @@ import (
 // fixturePassword は、users/basic.sql の利用者のパスワードである。筋書きはこの値でログインする。
 const fixturePassword = "Passw0rd!"
 
+// unverifiedFixtureUsers は、メールアドレスの確認が済んでいないことを確かめる筋書きのために、
+// 確認を済ませずに置く利用者である(users/auth-users.sql)。ほかの利用者は確認を済ませている。
+var unverifiedFixtureUsers = map[string]bool{"unverified@example.com": true}
+
 // 経歴書の4種類の名前。resumes/ の SQL のファイルが、この名前の経歴書を作る。
 const (
 	resumeEmpty     = "空の経歴書"
@@ -327,20 +331,21 @@ func TestFixtures_AllLoadable(t *testing.T) {
 	db := fixtureDB(t)
 	ctx := t.Context()
 
-	t.Run("利用者が決まったパスワードでログインでき、USER の役割を持つ", func(t *testing.T) {
+	t.Run("利用者が決まったパスワードでログインでき、USER の役割とログインの状態の世代の行を持つ", func(t *testing.T) {
 		rows, err := db.Query(ctx, `SELECT u.email, u.password, u.email_verified_at IS NOT NULL,
-			EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id AND r.name = 'USER')
+			EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id AND r.name = 'USER'),
+			EXISTS (SELECT 1 FROM user_token_versions v WHERE v.user_id = u.id)
 			FROM users u ORDER BY u.email`)
 		if err != nil {
 			t.Fatalf("利用者を読めません: %v", err)
 		}
 		type user struct {
-			email, hash      string
-			verified, member bool
+			email, hash               string
+			verified, member, version bool
 		}
 		users, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (user, error) {
 			var u user
-			err := r.Scan(&u.email, &u.hash, &u.verified, &u.member)
+			err := r.Scan(&u.email, &u.hash, &u.verified, &u.member, &u.version)
 			return u, err
 		})
 		if err != nil {
@@ -353,8 +358,22 @@ func TestFixtures_AllLoadable(t *testing.T) {
 			if err := bcrypt.CompareHashAndPassword([]byte(u.hash), []byte(fixturePassword)); err != nil {
 				t.Errorf("%s: パスワード %s でログインできません: %v", u.email, fixturePassword, err)
 			}
-			if !u.verified || !u.member {
-				t.Errorf("%s: メールアドレスの確認(%v)か USER の役割(%v)がありません", u.email, u.verified, u.member)
+			if u.verified == unverifiedFixtureUsers[u.email] {
+				t.Errorf("%s: メールアドレスの確認 = %v, want %v", u.email, u.verified, !unverifiedFixtureUsers[u.email])
+			}
+			if !u.member {
+				t.Errorf("%s: USER の役割がありません", u.email)
+			}
+			// 行が無い利用者では、ログアウトが世代を上げられず、古いアクセストークンが使えたままになる
+			// (Java 版は、メールアドレスの確認を終えたときに行を作る)
+			if !u.version {
+				t.Errorf("%s: ログインの状態の世代の行(user_token_versions)がありません", u.email)
+			}
+		}
+		// 確認を済ませずに置く利用者は、初めのデータに入っている
+		for email := range unverifiedFixtureUsers {
+			if !slices.ContainsFunc(users, func(u user) bool { return u.email == email }) {
+				t.Errorf("確認を済ませずに置く利用者 %s が初めのデータにありません", email)
 			}
 		}
 	})
@@ -408,11 +427,12 @@ func TestFixtures_AllLoadable(t *testing.T) {
 	// タスク3.4の実装のメモ「行の並び」: UUID と日時のほかの列がすべて同じ行どうしは、データベースを写すときの番号の付く順が
 	// 版ごとに変わりうるので、初めのデータに置かない。日時は正規化で形に置き換わるので、区別に使えない。
 	// user_roles は、UUID と日時の列しか持たず、データの側では区別できない。Java 版も利用者ごとに同じ形の行を作るので、確かめから外す。
+	// user_token_versions も、ほかに世代の番号しか持たず、Java 版は利用者ごとに番号 0 の同じ形の行を作るので、同じ理由で外す。
 	t.Run("UUID と日時のほかが同じ行が無い", func(t *testing.T) {
 		rows, err := db.Query(t.Context(), `SELECT c.table_name,
 				coalesce(array_agg(c.column_name::text) FILTER (WHERE c.data_type = 'uuid' OR c.data_type LIKE 'timestamp%'), '{}')
 			FROM information_schema.columns c JOIN information_schema.tables t USING (table_schema, table_name)
-			WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE' AND c.table_name NOT IN ('flyway_schema_history', 'user_roles')
+			WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE' AND c.table_name NOT IN ('flyway_schema_history', 'user_roles', 'user_token_versions')
 			GROUP BY 1 ORDER BY 1`)
 		if err != nil {
 			t.Fatalf("表の列を読めません: %v", err)

@@ -10,3 +10,9 @@ INSERT INTO users (id, email, password, username, profile_image, two_factor_auth
 INSERT INTO user_roles (user_id, role_id, created_at)
 SELECT u.id, r.id, '2026-01-05 09:00:00' FROM users u CROSS JOIN roles r
 WHERE u.id IN ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002') AND r.name = 'USER';
+
+-- ログインの状態の世代。Java 版は、メールアドレスの確認を終えたときにこの行を作る。
+-- 行が無い利用者では、ログアウトが世代を上げられず、古いアクセストークンが使えたままになる。
+INSERT INTO user_token_versions (user_id, token_version, updated_at) VALUES
+    ('00000000-0000-4000-8000-000000000001', 0, '2026-01-05 09:05:00'),
+    ('00000000-0000-4000-8000-000000000002', 0, '2026-01-06 09:05:00');

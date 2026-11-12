@@ -26,6 +26,8 @@ type Env struct {
 
 	mu         sync.Mutex
 	containers []*Container
+	// workDir は、この検査の作業用のフォルダである。検査のたびに作る証明書や鍵を置き、Terminate で消す。
+	workDir string
 }
 
 // ContainerSpec は、Env に入れる1つのコンテナである。
@@ -37,6 +39,11 @@ type ContainerSpec struct {
 	Image   string
 	Env     map[string]string
 	Cmd     []string
+	// Entrypoint は、空でなければ、イメージの入口(ENTRYPOINT)の代わりに動かすコマンドである。
+	Entrypoint []string
+	// Files は、コンテナを作ってから動かし始める前に、コンテナの中に写すファイルである。
+	// コンテナの中の利用者は root でないことがあるので、FileMode は、その利用者が読める権限にする。
+	Files []testcontainers.ContainerFile
 	// ExposedPorts は、テストの処理から要求を送るために外に出すポート(例: "8080/tcp")である。
 	ExposedPorts []string
 	// WaitingFor は、起動を待つ条件である。nil なら、コンテナが動き始めたところで戻る。
@@ -49,13 +56,22 @@ type Container struct {
 	testcontainers.Container
 }
 
-// NewEnv は、検査のための Docker のネットワークを1つ作る。
+// NewEnv は、検査のための Docker のネットワークを1つと、作業用のフォルダを1つ作る。
 func NewEnv(ctx context.Context) (*Env, error) {
+	dir, err := os.MkdirTemp("", "keirekipro-compat-")
+	if err != nil {
+		return nil, fmt.Errorf("harness: 作業用のフォルダを作れません: %w", err)
+	}
 	nw, err := network.New(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("harness: Docker のネットワークを作れません: %w", err)
+		return nil, errors.Join(fmt.Errorf("harness: Docker のネットワークを作れません: %w", err), os.RemoveAll(dir))
 	}
-	return &Env{Network: nw}, nil
+	return &Env{Network: nw, workDir: dir}, nil
+}
+
+// WorkDir は、この検査の作業用のフォルダを返す。フォルダは Terminate で消す。
+func (e *Env) WorkDir() string {
+	return e.workDir
 }
 
 // Start は、コンテナを名前を付けてネットワークに入れて起動する。
@@ -71,6 +87,12 @@ func (e *Env) Start(ctx context.Context, spec ContainerSpec) (*Container, error)
 	}
 	if len(spec.Cmd) > 0 {
 		opts = append(opts, testcontainers.WithCmd(spec.Cmd...))
+	}
+	if len(spec.Entrypoint) > 0 {
+		opts = append(opts, testcontainers.WithEntrypoint(spec.Entrypoint...))
+	}
+	if len(spec.Files) > 0 {
+		opts = append(opts, testcontainers.WithFiles(spec.Files...))
 	}
 	if spec.WaitingFor != nil {
 		opts = append(opts, testcontainers.WithWaitStrategyAndDeadline(StartupTimeout, spec.WaitingFor))
@@ -124,7 +146,7 @@ func saveLog(ctx context.Context, c *Container, file string) error {
 	return out.Close()
 }
 
-// Terminate は、Env に入れたすべてのコンテナを止めて消し、ネットワークを消す。
+// Terminate は、Env に入れたすべてのコンテナを止めて消し、ネットワークと作業用のフォルダを消す。
 func (e *Env) Terminate(ctx context.Context) error {
 	e.mu.Lock()
 	containers := e.containers
@@ -139,6 +161,11 @@ func (e *Env) Terminate(ctx context.Context) error {
 	}
 	if err := e.Network.Remove(ctx); err != nil {
 		errs = append(errs, fmt.Errorf("harness: Docker のネットワークを消せません: %w", err))
+	}
+	if e.workDir != "" {
+		if err := os.RemoveAll(e.workDir); err != nil {
+			errs = append(errs, fmt.Errorf("harness: 作業用のフォルダ %s を消せません: %w", e.workDir, err))
+		}
 	}
 	return errors.Join(errs...)
 }

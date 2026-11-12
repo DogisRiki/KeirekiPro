@@ -20,6 +20,9 @@ import (
 //   - JWT: <jwt:{...}>。中身の項目のうち iat と exp と jti を除き、exp から iat を引いた長さを exp-iat に入れる
 //   - URL の中のトークン: <token:N>。N は、その版で現れた順の番号である
 //   - bcrypt のハッシュ: <bcrypt:$2a$10$>。版と強さだけを残す
+//   - 2段階認証の確認のコード: <code:N>。N は、その版で現れた順の番号である。件名が「2段階認証コードのお知らせ」の
+//     メールの本文の1行目と、Redis のキー 2fa:<UUID> の値でだけ置き換える
+//   - JWT の lexp: <lexp:+秒>。メールアドレスの確認のリンクの値の期限を、その版の応答を受けた時刻からの秒の差にする
 
 var (
 	uuidPattern     = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`)
@@ -30,25 +33,91 @@ var (
 	// tokenPattern は、トークンとみなす語である。Java 版は、トークンを、32バイトの乱数を base64url にした43文字で作る。
 	// 長さで絞るのは、画面が読む値(例: error=unverified_email)や問い合わせの名前を置き換えて、本当の違いを隠さないためである。
 	tokenPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	// twoFactorCodePattern は、2段階認証の確認のコードである。Java 版は、コードを6桁の数字で作る。
+	twoFactorCodePattern = regexp.MustCompile(`\b[0-9]{6}\b`)
+	// twoFactorKeyPattern は、Java 版が確認のコードを置く Redis のキー 2fa:<利用者の ID> である。
+	twoFactorKeyPattern = regexp.MustCompile(`(?i)^2fa:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	// lexpMarkerPattern は、JWT の lexp を置き換えた記号である。
+	lexpMarkerPattern = regexp.MustCompile(`<lexp:([+-][0-9]+)>`)
 )
+
+// twoFactorMailSubject は、Java 版が確認のコードを送るメールの件名に含まれる文字である。
+const twoFactorMailSubject = "2段階認証コードのお知らせ"
 
 // Normalizer は、1つの版の値を正規化する。UUID とトークンの番号は、1つの筋書きの中で、その版で現れた順に付ける。
 // 応答とデータベースと Redis と S3 とメールで同じ Normalizer を使うので、応答に現れた UUID は、データベースでも同じ番号になる。
 type Normalizer struct {
 	uuids  map[string]int
 	tokens map[string]int
+	codes  map[string]int
+	// received は、JWT の lexp を差にするときの基準の時刻である。ふだんはその版の応答を最後に受けた時刻で、
+	// メールを正規化する間だけ、そのメールを初めて見た段の応答の時刻にする。
+	received time.Time
+	// mailReceived は、i 通目のメールを初めて見た段の応答の時刻である。
+	mailReceived []time.Time
 }
 
 // NewNormalizer は、番号を1つも付けていない Normalizer を作る。
 func NewNormalizer() *Normalizer {
-	return &Normalizer{uuids: map[string]int{}, tokens: map[string]int{}}
+	return &Normalizer{uuids: map[string]int{}, tokens: map[string]int{}, codes: map[string]int{}}
 }
 
-// unknownUUID と unknownToken は、まだ番号を付けない UUID とトークンを、並べ替えのために仮に置き換える記号である。
+// unknownUUID と unknownToken と unknownCode は、まだ番号を付けない値を、並べ替えのために仮に置き換える記号である。
 const (
 	unknownUUID  = "<uuid:?>"
 	unknownToken = "<token:?>"
+	unknownCode  = "<code:?>"
 )
+
+func (n *Normalizer) code(s string, assign bool) string {
+	if num, ok := n.codes[s]; ok {
+		return fmt.Sprintf("<code:%d>", num)
+	}
+	if !assign {
+		return unknownCode
+	}
+	n.codes[s] = len(n.codes) + 1
+	return fmt.Sprintf("<code:%d>", n.codes[s])
+}
+
+// twoFactorCodes は、文字列の中の6桁の数字を <code:N> に置き換える。呼ぶ側が、確認のコードの置かれる場所でだけ呼ぶ。
+func (n *Normalizer) twoFactorCodes(s string, assign bool) string {
+	return twoFactorCodePattern.ReplaceAllStringFunc(s, func(m string) string { return n.code(m, assign) })
+}
+
+// redisValue は、Redis のキー key の値 value のうち、確認のコードを置き換える。キーが 2fa:<UUID> のときだけ置き換える。
+func (n *Normalizer) redisValue(key, value string, assign bool) string {
+	if !twoFactorKeyPattern.MatchString(key) {
+		return value
+	}
+	return n.twoFactorCodes(value, assign)
+}
+
+// mailText は、件名 subject のメールの本文 text のうち、確認のコードを置き換える。
+// 件名が2段階認証のメールのときだけ、本文の1行目を置き換える。
+func (n *Normalizer) mailText(subject, text string) string {
+	if !strings.Contains(subject, twoFactorMailSubject) {
+		return text
+	}
+	first, rest, found := strings.Cut(text, "\n")
+	first = n.twoFactorCodes(first, true)
+	if !found {
+		return first
+	}
+	return first + "\n" + rest
+}
+
+// atMail は、i 通目のメールを初めて見た段の応答の時刻を lexp の基準にして f を呼び、基準を戻す。
+// メールは段をまたいで残るので、あとの段で同じメールを比べても、lexp の差が変わらないようにする。
+func (n *Normalizer) atMail(i int, f func()) {
+	for len(n.mailReceived) <= i {
+		n.mailReceived = append(n.mailReceived, n.received)
+	}
+	received := n.received
+	n.received = n.mailReceived[i]
+	defer func() { n.received = received }()
+	f()
+}
 
 func (n *Normalizer) uuid(s string, assign bool) string {
 	key := strings.ToLower(s)
@@ -133,6 +202,13 @@ func (n *Normalizer) jwt(m string, assign bool) string {
 			claims["exp-iat"] = e - i
 		}
 	}
+	// メールアドレスの確認のリンクの値は iat も exp も持たないので、期限 lexp を、応答を受けた時刻からの差にする。
+	// 差のずれは、比べる処理が sameNormalized で許す
+	if lexp, ok := claims["lexp"].(json.Number); ok {
+		if v, err := lexp.Int64(); err == nil {
+			claims["lexp"] = fmt.Sprintf("<lexp:%+d>", v-n.received.Unix())
+		}
+	}
 	return "<jwt:" + canonicalJSON(n.value(claims, assign)) + ">"
 }
 
@@ -168,7 +244,7 @@ func (n *Normalizer) value(v any, assign bool) any {
 	}
 }
 
-// URLs は、文字列の中の URL のパスの区切りと問い合わせの値のうち、トークンとみなす語を <token:N> に置き換える。
+// URLs は、文字列の中の URL のパスの区切りと問い合わせの値と # のあとの値のうち、トークンとみなす語を <token:N> に置き換える。
 // URL の中の JWT と UUID も置き換える。問い合わせの名前と、URL の外の文字は変えない。
 func (n *Normalizer) URLs(s string) string {
 	return n.urls(s, true)
@@ -176,23 +252,34 @@ func (n *Normalizer) URLs(s string) string {
 
 func (n *Normalizer) urls(s string, assign bool) string {
 	word := func(w string) string { return n.word(w, assign) }
+	// pair は、名前=値 の組の値だけを置き換える。= の無い部分は変えない。
+	pair := func(p string) string {
+		name, value, ok := strings.Cut(p, "=")
+		if !ok {
+			return p
+		}
+		return name + "=" + word(value)
+	}
+	// fragmentPart は、# のあとの部分を置き換える。= の無い部分は、メールアドレスの確認のリンク /email/verify#<値> の
+	// ように、部分そのものを値とみなす。
+	fragmentPart := func(p string) string {
+		if strings.Contains(p, "=") {
+			return pair(p)
+		}
+		return word(p)
+	}
 	return urlPattern.ReplaceAllStringFunc(s, func(u string) string {
-		path, query, hasQuery := strings.Cut(u, "?")
-		if !hasQuery {
-			path, query, hasQuery = strings.Cut(u, "#")
-		}
+		rest, fragment, hasFragment := strings.Cut(u, "#")
+		path, query, hasQuery := strings.Cut(rest, "?")
 		out := splitReplace(path, "/;", word)
-		if !hasQuery {
-			return out
+		// 問い合わせは、名前=値 の組を & か ; で区切ったものとみなす。# のあとは、# でも区切る
+		if hasQuery {
+			out += "?" + splitReplace(query, "&;", pair)
 		}
-		// 問い合わせと # のあとは、名前=値 の組を & か ; か # で区切ったものとみなし、値だけを置き換える。
-		return out + u[len(path):len(path)+1] + splitReplace(query, "&;#", func(pair string) string {
-			name, value, ok := strings.Cut(pair, "=")
-			if !ok {
-				return pair
-			}
-			return name + "=" + word(value)
-		})
+		if hasFragment {
+			out += "#" + splitReplace(fragment, "&;#", fragmentPart)
+		}
+		return out
 	})
 }
 

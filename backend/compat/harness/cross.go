@@ -33,38 +33,52 @@ func other(version string) string {
 	return VersionJava
 }
 
-// CrossRoute は、送り先の組 direction で、筋書きの段ごとに送る版の名前を返す。
-// 最後の段は、筋書きの to によらず、その前の段と違う版に送る。片方の版が保存した内容を、もう一方の版から読んで、
-// 消えていないことを確かめるためである。筋書きの最後の段には、保存した内容を読む要求を書く。
+// CrossRoute は、送り先の組 direction で、筋書きの段ごとに送る版の名前を返す。版を決めるのは版に送る段だけで、
+// 絶対の URL の段と Redis を書き換える段と値を期限切れにする段には、空の名前を返す。交互の組も、版に送る段の数で交互にする。
+// 最後の段は、筋書きの to によらず、その前の版に送る段と違う版に送る。片方の版が保存した内容を、もう一方の版から読んで、
+// 消えていないことを確かめるためである。筋書きの最後の段には、保存した内容を読む要求を書き、版に送る段にする。
 func CrossRoute(s Scenario, direction string) ([]string, error) {
-	if len(s.Steps) < 2 {
-		return nil, fmt.Errorf("harness: 筋書き %s は、版をまたぐために2つ以上の段が要りますが、%d 段です", s.Name, len(s.Steps))
+	var indices []int
+	for i, step := range s.Steps {
+		if step.Kind() == StepVersion {
+			indices = append(indices, i)
+		}
 	}
-	route := make([]string, len(s.Steps))
+	if len(indices) < 2 {
+		return nil, fmt.Errorf("harness: 筋書き %s は、版をまたぐために版に送る段が2つ以上要りますが、%d 段です", s.Name, len(indices))
+	}
+	if last := s.Steps[len(s.Steps)-1]; last.Kind() != StepVersion {
+		return nil, fmt.Errorf("harness: 筋書き %s の最後の段 %s は、版に送る段でなければなりません", s.Name, last.Name)
+	}
+	seq := make([]string, len(indices))
 	switch direction {
 	case CrossJavaToGo, CrossGoToJava:
-		route[0] = VersionJava
+		seq[0] = VersionJava
 		if direction == CrossGoToJava {
-			route[0] = VersionGo
+			seq[0] = VersionGo
 		}
-		for i := 1; i < len(s.Steps); i++ {
-			route[i] = route[i-1]
-			if s.Steps[i].To == ToOther {
-				route[i] = other(route[i-1])
+		for n := 1; n < len(indices); n++ {
+			seq[n] = seq[n-1]
+			if s.Steps[indices[n]].To == ToOther {
+				seq[n] = other(seq[n-1])
 			}
 		}
 	case CrossAlternate:
-		for i := range s.Steps {
-			route[i] = VersionJava
-			if i%2 == 1 {
-				route[i] = VersionGo
+		for n := range indices {
+			seq[n] = VersionJava
+			if n%2 == 1 {
+				seq[n] = VersionGo
 			}
 		}
 	default:
 		return nil, fmt.Errorf("harness: 送り先の組 %q は %v のどれでもありません", direction, CrossDirections)
 	}
-	last := len(route) - 1
-	route[last] = other(route[last-1])
+	last := len(seq) - 1
+	seq[last] = other(seq[last-1])
+	route := make([]string, len(s.Steps))
+	for n, i := range indices {
+		route[i] = seq[n]
+	}
 	return route, nil
 }
 
@@ -140,21 +154,35 @@ func (r CrossReport) Write(dir string) (string, error) {
 // urls は、版の名前ごとの、テストの処理から届く URL である。2つの版に1つの Session を使い、Cookie と取り出した値を引き継ぐ。
 // 応答は比べず、各段の応答が expect に合うかを確かめる。合わない段があれば、その段の失敗を返し、残りの段は送らない。
 // 後の段は前の段の結果を前提にするので、続けても意味のある確かめにならないためである。
+// Redis もメールも fakeoidc も持たないので、それらを使う段は、段を動かせない失敗になる。
 func RunCross(ctx context.Context, client *http.Client, s Scenario, direction string, urls map[string]string) *CrossFailure {
+	return runCross(ctx, stepTools{client: client}, s, direction, urls)
+}
+
+// runCross は、RunCross の動かし方で、版に送る段でない段も、tools で1回ずつ動かす。版に送る段でない段は版を持たないので、
+// 失敗の Version を空にする。版に送る段は、応答が expect に合うかを CheckExpect で確かめる。絶対の URL の段の expect の status は SendAbsolute が確かめ、要求を送らない段には expect が無い。
+func runCross(ctx context.Context, tools stepTools, s Scenario, direction string, urls map[string]string) *CrossFailure {
 	route, err := CrossRoute(s, direction)
 	if err != nil {
 		return &CrossFailure{Direction: direction, Problems: []string{err.Error()}}
 	}
-	session := NewSession()
+	session := tools.newSession()
 	for i, step := range s.Steps {
 		version := route[i]
 		ref := StepRef{Index: i + 1, Name: step.Name}
-		baseURL, ok := urls[version]
-		if !ok {
-			return &CrossFailure{Direction: direction, Step: ref, Version: version, Problems: []string{"版 " + version + " の URL がありません"}}
+		baseURL := ""
+		if version != "" {
+			var ok bool
+			if baseURL, ok = urls[version]; !ok {
+				return &CrossFailure{Direction: direction, Step: ref, Version: version, Problems: []string{"版 " + version + " の URL がありません"}}
+			}
 		}
-		resp, err := session.Send(ctx, client, baseURL, step)
-		problems := CheckExpect(step, resp)
+		resp, err := tools.send(ctx, session, baseURL, step)
+		// 絶対の URL の段の expect の status は、SendAbsolute が確かめて誤りを返すので、同じ違いを2回書かない
+		var problems []string
+		if step.Kind() == StepVersion {
+			problems = CheckExpect(step, resp)
+		}
 		if err != nil {
 			problems = append(problems, err.Error())
 		}

@@ -88,13 +88,17 @@ func TestCoverage_Operations(t *testing.T) {
 		len(ops), completed, len(scenarios), requireAllOperations)
 }
 
-// selfCompare は、比べる検査そのものを確かめる筋書きである。偽の送信の検査の Cookie を1つ目の段で受け取り、
-// 2つ目の段で使う。Go 版の経歴書の操作はまだ 501 を返すので、偽の送信の検査を通ったことを 501 で確かめる。
+// selfCompare は、比べる検査そのものを確かめる筋書きである。1つ目の段でログインし、偽の送信の検査の Cookie を
+// 2つ目の段で受け取り、3つ目の段で使う。Go 版の経歴書の操作はまだ 501 を返すので、ログインの確かめと偽の送信の検査を
+// 通ったことを 501 で確かめる。
 const selfCompare = `name: self-compare
 group: 0
 fixtures: [users/basic.sql, resumes/many-pages.sql]
 modes: [compare]
 steps:
+  - name: login
+    request: {method: POST, path: /api/auth/login, json: {email: user1@example.com, password: Passw0rd!}}
+    expect: {status: 200}
   - name: get-token
     request: {method: GET, path: /healthz}
     expect: {status: 200, fields: [$.status]}
@@ -154,8 +158,8 @@ func TestSelf_OneCharFakeFails(t *testing.T) {
 		t.Fatalf("違い = %+v, want 1件", report.Diffs)
 	}
 	d := report.Diffs[0]
-	if d.Target != harness.TargetBody || d.Path != "$.message" || d.Step.Index != 2 || d.Step.Name != "delete-with-token" || d.Step.Operation != "deleteResume" {
-		t.Errorf("違い = %+v, want 2段目 delete-with-token(deleteResume)の本文の $.message", d)
+	if d.Target != harness.TargetBody || d.Path != "$.message" || d.Step.Index != 3 || d.Step.Name != "delete-with-token" || d.Step.Operation != "deleteResume" {
+		t.Errorf("違い = %+v, want 3段目 delete-with-token(deleteResume)の本文の $.message", d)
 	}
 	text := report.String()
 	for _, want := range []string{"未実装です。", "未実装です！", "deleteResume"} {

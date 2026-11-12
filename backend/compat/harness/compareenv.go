@@ -88,7 +88,6 @@ func (c *CompareEnv) start(ctx context.Context, env *Env, images Images, backend
 		return err
 	}
 	c.fakes = f
-	var urls []string
 	for _, version := range []string{VersionJava, VersionGo} {
 		b := f.backingFor(c.Stores[version], awsHost(version))
 		// JavaSecrets は GoSecrets を含むので、どちらの版のイメージを置いても、読む秘密の値がそろう。
@@ -103,9 +102,8 @@ func (c *CompareEnv) start(ctx context.Context, env *Env, images Images, backend
 			c.Startup[version] = startup
 		}
 		c.URLs[version] = url
-		urls = append(urls, url)
 	}
-	return f.registerRedirects(ctx, urls)
+	return f.registerRedirects(ctx)
 }
 
 // Reset は、両方の版の保存された内容を空にする。データベースは、表の形の履歴を適用した直後に行の無かった表を空にし、
@@ -132,9 +130,13 @@ func (c *CompareEnv) Close() error {
 }
 
 // Run は、保存された内容を空にして筋書き s の初めのデータを両方のデータベースに読み込み、筋書きの段を1つずつ、
-// Java 版、Go 版の順に送って比べる。段ごとに、応答と、データベースと Redis と S3 のオブジェクトと送ったメールを比べる。
-// 保存された内容の違いは、前の段と同じ違いなら重ねて報告しない。
-// 環境を整えられないときと、段を送れないときは、誤りを返す。違いは、返す報告に書く。
+// Java 版、Go 版の順に動かして比べる。版に送る段ごとに、応答と、データベースと Redis と S3 のオブジェクトと送ったメールを比べる。
+// Cookie の束と取り出した値は版ごとに持ち、版に送る段でない段も、版ごとの Session と Redis で1回ずつ動かす。
+// 絶対の URL の段と Redis を書き換える段と値を期限切れにする段は、応答もそのあとの保存された内容も比べない。
+// 絶対の URL の段は、応答が expect の status と違えば、SendAbsolute が返す誤りを返す。
+// 保存された内容の違いは、前の段と同じ違いなら重ねて報告しない。筋書きの始めに fakeoidc を初めの状態に戻して
+// oidc_users の利用者を登録し、終わりに、筋書きが失敗したときも、初めの状態に戻す。
+// 環境を整えられないときと、段を動かせないときは、誤りを返す。違いは、返す報告に書く。
 func (c *CompareEnv) Run(ctx context.Context, s Scenario) (Report, error) {
 	if err := c.Reset(ctx); err != nil {
 		return Report{}, err
@@ -147,26 +149,43 @@ func (c *CompareEnv) Run(ctx context.Context, s Scenario) (Report, error) {
 	cmp := NewComparer(s.Name)
 	cmp.PDF = c.PDF
 	cmp.Behaviors = c.Behaviors
-	sessions := map[string]*Session{VersionJava: NewSession(), VersionGo: NewSession()}
+	err := c.fakes.withOIDC(ctx, s.OIDCUsers, func() error { return c.runSteps(ctx, s, cmp) })
+	return cmp.Report(), err
+}
+
+// runSteps は、筋書き s の段を1つずつ、Java 版、Go 版の順に動かし、版に送る段ごとに cmp で比べる。
+func (c *CompareEnv) runSteps(ctx context.Context, s Scenario, cmp *Comparer) error {
+	tools := map[string]stepTools{}
+	sessions := map[string]*Session{}
+	for _, version := range []string{VersionJava, VersionGo} {
+		// メールは、版ごとの fakeaws の記録から読む
+		tools[version] = c.fakes.tools(c.client, c.Stores[version].Redis, version)
+		sessions[version] = tools[version].newSession()
+	}
 	seen := map[string]bool{}
 	for i, step := range s.Steps {
 		resp := map[string]Response{}
 		for _, version := range []string{VersionJava, VersionGo} {
-			r, err := sessions[version].Send(ctx, c.client, c.URLs[version], step)
+			r, err := tools[version].send(ctx, sessions[version], c.URLs[version], step)
 			if err != nil {
-				return cmp.Report(), fmt.Errorf("harness: 筋書き %s の段 %d「%s」を版 %s で送れません: %w", s.Name, i+1, step.Name, version, err)
+				return fmt.Errorf("harness: 筋書き %s の段 %d「%s」を版 %s で送れません: %w", s.Name, i+1, step.Name, version, err)
 			}
 			resp[version] = r
 		}
+		if step.Kind() != StepVersion {
+			continue
+		}
+		// CompareResponse は、応答を受けた時刻を正規化の基準の時刻に写す。メールの lexp をその時刻との差で比べるので、
+		// 保存された内容より先に比べる
 		ref := StepRef{Index: i + 1, Name: step.Name, Operation: c.Operations.Lookup(step.Request.Method, step.Request.Path)}
 		ref = cmp.CompareResponse(ref, resp[VersionJava], resp[VersionGo])
 		from := len(cmp.diffs)
 		if err := c.compareState(ctx, cmp, ref); err != nil {
-			return cmp.Report(), fmt.Errorf("harness: 筋書き %s の段 %d「%s」のあとの保存された内容を読めません: %w", s.Name, i+1, step.Name, err)
+			return fmt.Errorf("harness: 筋書き %s の段 %d「%s」のあとの保存された内容を読めません: %w", s.Name, i+1, step.Name, err)
 		}
 		cmp.dropRepeated(from, seen)
 	}
-	return cmp.Report(), nil
+	return nil
 }
 
 // compareState は、両方の版のデータベースと Redis と、fakeaws が覚えた S3 のオブジェクトと送ったメールを読んで比べる。

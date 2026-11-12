@@ -1,0 +1,12 @@
+# ログインの応答の時間を測る筋書き。正しいログインを最後の段に置き、Java 版と Go 版で同じ要求を繰り返して測る。
+name: auth-login-perf
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [perf]
+steps:
+  - name: login
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}

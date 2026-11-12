@@ -5,14 +5,26 @@ package fakeoidc_test
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"io"
 	"log/slog"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -491,4 +503,242 @@ func captureLog(t *testing.T) *syncBuffer {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(logs, nil)))
 	t.Cleanup(func() { slog.SetDefault(previous) })
 	return logs
+}
+
+// putDeny は、比べる検査の口で、提供元 provider の次のログインの開始を1回断らせる。
+func (f fixture) putDeny(provider string) {
+	f.t.Helper()
+	if status, _, body := f.do(f.request(http.MethodPut, "/_compat/deny/"+provider, http.NoBody)); status != http.StatusNoContent {
+		f.t.Fatalf("%s の断る回数の追加 = %d %s, want 204", provider, status, body)
+	}
+}
+
+// authorizePathOf は、提供元 provider の認可の口のパスと、認可の要求の問い合わせを返す。
+func authorizePathOf(provider, state string) (string, url.Values) {
+	if provider == fakeoidc.GitHub {
+		return "/login/oauth/authorize", githubAuthParams(state)
+	}
+	return "/o/oauth2/v2/auth", googleAuthParams(state)
+}
+
+// TestDeny_CountsDown は、PUT /_compat/deny/{provider} を2回受けると、その提供元の次のログインの開始を2回、
+// redirect_uri への error=access_denied と state で断り、3回目は認可のコードを付けて通すことを確かめる。
+// 断る回数は提供元ごとに持ち、クライアントの値が違う要求は断る回数を使わずに 400 で断ることも確かめる。
+func TestDeny_CountsDown(t *testing.T) {
+	for _, tc := range []struct{ provider, other string }{
+		{fakeoidc.Google, fakeoidc.GitHub},
+		{fakeoidc.GitHub, fakeoidc.Google},
+	} {
+		t.Run(tc.provider, func(t *testing.T) {
+			f := newFixture(t)
+			f.putUser(fakeoidc.Google, googleUser)
+			f.putUser(fakeoidc.GitHub, githubUser)
+			f.putDeny(tc.provider)
+			f.putDeny(tc.provider)
+
+			// ほかの提供元のログインの開始は断らない
+			otherPath, otherParams := authorizePathOf(tc.other, "state-o")
+			if code := f.authorize(otherPath, otherParams).Query().Get("code"); code == "" {
+				t.Errorf("%s を断る回数を足したあとの %s の認可の口が、認可のコードを付けずに転送しました", tc.provider, tc.other)
+			}
+
+			// クライアントの値が違う要求は、断る回数を使わずに 400 で断る
+			path, params := authorizePathOf(tc.provider, "state-x")
+			params.Set("client_id", "wrong-client")
+			if status, _, body := f.do(f.request(http.MethodGet, path+"?"+params.Encode(), http.NoBody)); status != http.StatusBadRequest {
+				t.Errorf("client_id が違う認可の口 = %d %s, want 400", status, body)
+			}
+
+			for i, state := range []string{"state-d1", "state-d2"} {
+				path, params := authorizePathOf(tc.provider, state)
+				location := f.authorize(path, params)
+				q := location.Query()
+				if location.Scheme+"://"+location.Host+location.Path != redirectURI || q.Get("error") != "access_denied" ||
+					q.Get("state") != state || q.Has("code") || len(q) != 2 {
+					t.Errorf("%d回目の転送先 = %s, want %s?error=access_denied&state=%s", i+1, location, redirectURI, state)
+				}
+			}
+			path, params = authorizePathOf(tc.provider, "state-ok")
+			q := f.authorize(path, params).Query()
+			if q.Get("code") == "" || q.Has("error") || q.Get("state") != "state-ok" {
+				t.Errorf("3回目の転送先の問い合わせ = %v, want 認可のコードと state=state-ok", q)
+			}
+		})
+	}
+
+	f := newFixture(t)
+	if status, _, _ := f.do(f.request(http.MethodPut, "/_compat/deny/twitter", http.NoBody)); status != http.StatusNotFound {
+		t.Errorf("知らない提供元の断る回数の追加 = %d, want 404", status)
+	}
+}
+
+// TestReset_ClearsUsersAndDenyCount は、POST /_compat/reset が、両方の提供元の利用者の設定と断る残りの回数を
+// 初めの状態に戻し、クライアントの値は残すことを確かめる。
+func TestReset_ClearsUsersAndDenyCount(t *testing.T) {
+	f := newFixture(t)
+	f.putUser(fakeoidc.Google, googleUser)
+	f.putUser(fakeoidc.GitHub, githubUser)
+	f.putDeny(fakeoidc.Google)
+	f.putDeny(fakeoidc.GitHub)
+
+	if status, _, body := f.do(f.request(http.MethodPost, "/_compat/reset", http.NoBody)); status != http.StatusNoContent {
+		t.Fatalf("初めの状態に戻す口 = %d %s, want 204", status, body)
+	}
+	// クライアントの値は残るので client_id の検査は通り、利用者が居ないので 409 になる。断る回数が残っていれば 302 になる
+	for _, provider := range []string{fakeoidc.Google, fakeoidc.GitHub} {
+		path, params := authorizePathOf(provider, "s")
+		if status, header, body := f.do(f.request(http.MethodGet, path+"?"+params.Encode(), http.NoBody)); status != http.StatusConflict {
+			t.Errorf("戻したあとの %s の認可の口 = %d %s %s, want 409", provider, status, header.Get("Location"), body)
+		}
+	}
+	f.putUser(fakeoidc.Google, googleUser)
+	if q := f.authorize(authorizePathOf(fakeoidc.Google, "s")).Query(); q.Get("code") == "" || q.Has("error") {
+		t.Errorf("戻したあとに利用者を設定した認可の口の問い合わせ = %v, want 認可のコード", q)
+	}
+}
+
+// writeTestCert は、api.github.com の自己署名の証明書と鍵を作り、PEM の形でファイルに書いて、
+// ファイルの場所と、証明書を信頼する束を返す。
+func writeTestCert(t *testing.T) (certFile, keyFile string, roots *x509.CertPool) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "api.github.com"},
+		DNSNames:              []string{"api.github.com"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	certFile, keyFile = filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem")
+	if err := os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	roots = x509.NewCertPool()
+	roots.AddCert(cert)
+	return certFile, keyFile, roots
+}
+
+// TestTLS_UserEmailsOnly は、証明書と鍵のファイルを渡したときに、api.github.com の証明書でポート 443 の TLS を受け、
+// /user/emails の要求にだけ、ポート 8080 の口と同じ利用者のメールアドレスで答えることを確かめる。
+func TestTLS_UserEmailsOnly(t *testing.T) {
+	s := fakeoidc.NewServer()
+	plain := httptest.NewServer(s)
+	t.Cleanup(plain.Close)
+	f := fixture{t: t, base: plain.URL, client: noRedirectClient()}
+	f.putClient(fakeoidc.GitHub, testClient(fakeoidc.GitHub))
+	f.putUser(fakeoidc.GitHub, githubUser)
+	code := f.authorize("/login/oauth/authorize", githubAuthParams("s")).Query().Get("code")
+	_, _, body := f.postToken("/login/oauth/access_token", tokenForm(fakeoidc.GitHub, code), "application/json")
+	accessToken := decode[map[string]string](t, body)["access_token"]
+
+	certFile, keyFile, roots := writeTestCert(t)
+	server, err := s.TLSServer(certFile, keyFile)
+	if err != nil || server == nil {
+		t.Fatalf("TLSServer = %v, %v, want TLS のサーバ", server, err)
+	}
+	if server.Addr != ":"+fakeoidc.TLSPort || fakeoidc.TLSPort != "443" {
+		t.Errorf("TLS のサーバの Addr = %q, want :443", server.Addr)
+	}
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	served := make(chan error, 1)
+	go func() { served <- server.ServeTLS(ln, "", "") }()
+	t.Cleanup(func() {
+		_ = server.Close()
+		if err := <-served; !errors.Is(err, http.ErrServerClosed) {
+			t.Errorf("ServeTLS = %v, want %v", err, http.ErrServerClosed)
+		}
+	})
+
+	base := "https://" + ln.Addr().String()
+	// サーバが TLS を始められないと、接続が答えを待ち続けるので、時間の上限を付ける
+	tf := fixture{t: t, base: base, client: &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{RootCAs: roots, ServerName: "api.github.com", MinVersion: tls.VersionTLS12},
+	}}}
+	status, body := tf.getWithToken("/user/emails", accessToken)
+	if got := decode[[]fakeoidc.GitHubEmail](t, body); status != http.StatusOK || !reflect.DeepEqual(got, githubUser.Emails) {
+		t.Errorf("TLS の /user/emails = %d %s, want 200 %+v", status, body, githubUser.Emails)
+	}
+	if status, _ := tf.getWithToken("/user/emails", "fakeoidc-token-unknown"); status != http.StatusUnauthorized {
+		t.Errorf("知らないアクセストークンの TLS の /user/emails = %d, want 401", status)
+	}
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/user"},
+		{http.MethodGet, "/login/oauth/authorize"},
+		{http.MethodPost, "/login/oauth/access_token"},
+		{http.MethodGet, "/_compat/healthz"},
+		{http.MethodPut, "/_compat/deny/github"},
+		{http.MethodPost, "/_compat/reset"},
+		{http.MethodPost, "/user/emails"},
+	} {
+		if status, _, _ := tf.do(tf.request(tc.method, tc.path, http.NoBody)); status != http.StatusNotImplemented {
+			t.Errorf("TLS の %s %s = %d, want 501", tc.method, tc.path, status)
+		}
+	}
+	// 別の名前の証明書として確かめると、TLS の接続が失敗する(渡したファイルの証明書を使っている)
+	other := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{RootCAs: roots, ServerName: "github.com", MinVersion: tls.VersionTLS12},
+	}}
+	req := tf.request(http.MethodGet, "/user/emails", http.NoBody)
+	if resp, err := other.Do(req); err == nil {
+		_ = resp.Body.Close()
+		t.Error("github.com として確かめた TLS の接続が成功しました, want 証明書の名前の誤り")
+	}
+}
+
+// TestTLS_DisabledWithoutCertFiles は、証明書と鍵のファイルの場所が渡されないときは TLS のサーバを作らず、
+// 片方だけのときと、ファイルを読めないときは誤りを返すことを確かめる。
+func TestTLS_DisabledWithoutCertFiles(t *testing.T) {
+	s := fakeoidc.NewServer()
+	if server, err := s.TLSServer("", ""); server != nil || err != nil {
+		t.Errorf("TLSServer(\"\", \"\") = %v, %v, want nil, nil", server, err)
+	}
+	certFile, keyFile, _ := writeTestCert(t)
+	missing := filepath.Join(t.TempDir(), "missing.pem")
+	for _, tc := range []struct{ name, cert, key string }{
+		{"証明書だけ", certFile, ""},
+		{"鍵だけ", "", keyFile},
+		{"証明書のファイルが無い", missing, keyFile},
+		{"鍵のファイルが無い", certFile, missing},
+		{"証明書と鍵が逆", keyFile, certFile},
+	} {
+		if server, err := s.TLSServer(tc.cert, tc.key); server != nil || err == nil {
+			t.Errorf("%s の TLSServer = %v, %v, want nil と誤り", tc.name, server, err)
+		}
+	}
+	// TLS を受けないときも、ポート 8080 の口は動く
+	srv := httptest.NewServer(s)
+	t.Cleanup(srv.Close)
+	f := fixture{t: t, base: srv.URL, client: noRedirectClient()}
+	if status, _, _ := f.do(f.request(http.MethodGet, "/_compat/healthz", http.NoBody)); status != http.StatusOK {
+		t.Errorf("/_compat/healthz = %d, want 200", status)
+	}
+	if fakeoidc.CertFileEnv != "FAKEOIDC_TLS_CERT_FILE" || fakeoidc.KeyFileEnv != "FAKEOIDC_TLS_KEY_FILE" {
+		t.Errorf("環境変数の名前 = %s %s", fakeoidc.CertFileEnv, fakeoidc.KeyFileEnv)
+	}
 }

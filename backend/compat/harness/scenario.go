@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -47,21 +48,115 @@ type Scenario struct {
 	// MeasureMemory が true のとき、応答の時間の比べ方は、最後の段を同時に PerfConcurrency 件送ったときの、
 	// Go 版のコンテナのメモリの最大も測る。PDF の出力の筋書きに書く。
 	MeasureMemory bool `yaml:"measure_memory"`
+	// PrepareEach が true のとき、応答の時間の比べ方は、慣らしの回と測る回のそれぞれの前に、最後の段より前の段を送り直す。
+	// 2段階認証の確認のコードのように、1回使うと消える値を最後の段で使う筋書きに書く。
+	PrepareEach bool `yaml:"prepare_each"`
+	// OIDCUsers は、筋書きの始めに偽のログインのサービスに登録する、Google と GitHub でログインする利用者である。
+	OIDCUsers *OIDCUsers `yaml:"oidc_users"`
 }
+
+// OIDCUsers は、筋書きの始めに偽のログインのサービスに登録する利用者である。書かない提供元には登録しない。
+type OIDCUsers struct {
+	Google *OIDCGoogleUser `yaml:"google"`
+	GitHub *OIDCGitHubUser `yaml:"github"`
+}
+
+// OIDCGoogleUser は、Google の userinfo が返す利用者の値である。
+// harness は、偽のログインのサービスの /_compat/users/google の口へ、この値を JSON にして送る。
+type OIDCGoogleUser struct {
+	Sub           string `yaml:"sub" json:"sub"`
+	Name          string `yaml:"name" json:"name"`
+	Email         string `yaml:"email" json:"email"`
+	EmailVerified bool   `yaml:"email_verified" json:"email_verified"`
+}
+
+// OIDCGitHubUser は、GitHub の /user と /user/emails が返す利用者の値である。
+// harness は、偽のログインのサービスの /_compat/users/github の口へ、この値を JSON にして送る。
+type OIDCGitHubUser struct {
+	ID     int64             `yaml:"id" json:"id"`
+	Login  string            `yaml:"login" json:"login"`
+	Emails []OIDCGitHubEmail `yaml:"emails" json:"emails"`
+}
+
+// OIDCGitHubEmail は、GitHub の /user/emails が返すメールアドレスの1件である。
+type OIDCGitHubEmail struct {
+	Email    string `yaml:"email" json:"email"`
+	Primary  bool   `yaml:"primary" json:"primary"`
+	Verified bool   `yaml:"verified" json:"verified"`
+}
+
+// StepKind は、段の種類である。1つの段は、どれか1つの種類だけを持つ。
+type StepKind int
+
+// 段の種類である。
+const (
+	// StepVersion は、request の method と path を持ち、版に送る段である。
+	StepVersion StepKind = iota + 1
+	// StepAbsoluteURL は、request の method と url を持ち、偽のログインのサービスの絶対の URL へ送る段である。
+	StepAbsoluteURL
+	// StepRedis は、redis を持ち、要求を送らずに版の Redis を書き換える段である。
+	StepRedis
+	// StepExpire は、expire を持ち、要求を送らずに筋書きの中の JWT の値を期限の過ぎた値に書き換える段である。
+	StepExpire
+)
 
 // Step は、筋書きの1つの段である。
 type Step struct {
 	Name    string            `yaml:"name"`
 	To      string            `yaml:"to"`
 	Request Request           `yaml:"request"`
+	Redis   *RedisStep        `yaml:"redis"`
+	Expire  *ExpireStep       `yaml:"expire"`
 	Capture map[string]string `yaml:"capture"`
 	Expect  Expect            `yaml:"expect"`
 }
 
+// Kind は、段の種類を返す。筋書きを読むときに、段が1つの種類の欄だけを持つことを確かめてある。
+func (s Step) Kind() StepKind {
+	switch {
+	case s.Redis != nil:
+		return StepRedis
+	case s.Expire != nil:
+		return StepExpire
+	case s.Request.URL != "":
+		return StepAbsoluteURL
+	default:
+		return StepVersion
+	}
+}
+
+// RedisStep は、Redis を書き換える段で、版の Redis に行う書き換えである。キーと値には {名前} を差し込める。
+type RedisStep struct {
+	// Del は、消すキーの並びである。
+	Del []string `yaml:"del"`
+	// Set は、置くキーと値の並びである。
+	Set []RedisSet `yaml:"set"`
+}
+
+// RedisSet は、Redis を書き換える段で置く1つのキーと値である。
+type RedisSet struct {
+	Key string `yaml:"key"`
+	// Value は、置く JSON の値の文字列である。
+	Value string `yaml:"value"`
+	// TTLSeconds は、置く値の有効な時間の秒である。
+	TTLSeconds int `yaml:"ttl_seconds"`
+}
+
+// ExpireStep は、値を期限切れにする段で、書き換える JWT の値である。Cookie と Var のどちらか1つを書く。
+type ExpireStep struct {
+	// Cookie は、Cookie の束のうち、書き換える Cookie の名前である。
+	Cookie string `yaml:"cookie"`
+	// Var は、書き換える取り出した値の名前である。
+	Var string `yaml:"var"`
+}
+
 // Request は、段で送る要求である。
 type Request struct {
-	Method  string            `yaml:"method"`
-	Path    string            `yaml:"path"`
+	Method string `yaml:"method"`
+	// Path は、版に送る段で、版の基底の URL のあとに付ける経路である。
+	Path string `yaml:"path"`
+	// URL は、絶対の URL の段で送る先の絶対の URL である。Path と一緒には書けない。
+	URL     string            `yaml:"url"`
 	Headers map[string]string `yaml:"headers"`
 	// CSRF が true のとき、検査は Cookie XSRF-TOKEN の値をヘッダ X-XSRF-TOKEN に写して送る。
 	CSRF bool `yaml:"csrf"`
@@ -162,11 +257,9 @@ func (s Scenario) validate() error {
 		if step.To != "" && !slices.Contains(knownTos, step.To) {
 			errs = append(errs, fmt.Errorf("段 %s の送り先 %q は %v のどれでもありません", step.Name, step.To, knownTos))
 		}
-		if step.Request.Method == "" || step.Request.Path == "" {
-			errs = append(errs, fmt.Errorf("段 %s の request に method と path がありません", step.Name))
-		}
+		errs = append(errs, step.validateKind()...)
 		for _, name := range sortedKeys(step.Capture) {
-			if _, err := splitJSONPath(step.Capture[name]); err != nil {
+			if _, err := parseCaptureSource(step.Capture[name]); err != nil {
 				errs = append(errs, fmt.Errorf("段 %s の capture %s: %w", step.Name, name, err))
 			}
 		}
@@ -183,37 +276,162 @@ func (s Scenario) validate() error {
 	return errors.Join(errs...)
 }
 
+// validateKind は、段が1つの種類の欄だけを持ち、その種類に要る欄があり、ほかの種類の欄が無いかを確かめる。
+func (s Step) validateKind() []error {
+	hasRequest := s.Request.Method != "" || s.Request.Path != "" || s.Request.URL != "" ||
+		len(s.Request.Headers) > 0 || s.Request.CSRF || s.Request.JSON != nil
+	kinds := 0
+	for _, has := range []bool{hasRequest, s.Redis != nil, s.Expire != nil} {
+		if has {
+			kinds++
+		}
+	}
+	// どの種類の欄も無い段は、版に送る段として、method と path が無いことで断る
+	if kinds > 1 {
+		return []error{fmt.Errorf("段 %s は request と redis と expire のうち1つだけを持てます", s.Name)}
+	}
+	switch s.Kind() {
+	case StepVersion:
+		if s.Request.Method == "" || s.Request.Path == "" {
+			return []error{fmt.Errorf("段 %s の request に method と path がありません", s.Name)}
+		}
+		return nil
+	case StepAbsoluteURL:
+		return s.validateAbsoluteURL()
+	case StepRedis:
+		return append(s.validateRedis(), s.notRequestFields()...)
+	default:
+		var errs []error
+		if (s.Expire.Cookie == "") == (s.Expire.Var == "") {
+			errs = append(errs, fmt.Errorf("段 %s の expire には cookie と var のどちらか1つを書きます", s.Name))
+		}
+		return append(errs, s.notRequestFields()...)
+	}
+}
+
+// validateAbsoluteURL は、絶対の URL の段の欄を確かめる。
+// この段の応答は偽のログインのサービスが作るので、版の Cookie の束から作る csrf と、版の応答の項目を確かめる fields を書けない。
+func (s Step) validateAbsoluteURL() []error {
+	var errs []error
+	if s.Request.Method == "" {
+		errs = append(errs, fmt.Errorf("段 %s の request に method がありません", s.Name))
+	}
+	if s.Request.Path != "" {
+		errs = append(errs, fmt.Errorf("段 %s の request に path と url の両方があります", s.Name))
+	}
+	if !absoluteURLTemplate(s.Request.URL) {
+		errs = append(errs, fmt.Errorf("段 %s の request の url %q は絶対の URL ではありません", s.Name, s.Request.URL))
+	}
+	if s.Request.CSRF {
+		errs = append(errs, fmt.Errorf("段 %s の request の csrf は、版に送る段にだけ書けます", s.Name))
+	}
+	if s.To != "" {
+		errs = append(errs, fmt.Errorf("段 %s の to は、版に送る段にだけ書けます", s.Name))
+	}
+	if len(s.Expect.Fields) > 0 {
+		errs = append(errs, fmt.Errorf("段 %s の expect の fields は、版に送る段にだけ書けます", s.Name))
+	}
+	return errs
+}
+
+// absoluteURLTemplate は、絶対の URL の段の url raw が、差し込む前の形として正しいかを返す。
+// 差し込む名前 {名前} で始まる url は、前の段で取り出した URL の頭か全体を差し込むので、読み込みのときには確かめず、
+// 送るときに SendAbsolute が、差し込んだあとの url を確かめる。それ以外の url は、差し込む名前を仮の文字 x に置き換えて、
+// スキームとホストのある絶対の URL かを確かめる。
+func absoluteURLTemplate(raw string) bool {
+	if loc := pathVariable.FindStringIndex(raw); loc != nil && loc[0] == 0 {
+		return true
+	}
+	u, err := url.Parse(pathVariable.ReplaceAllString(raw, "x"))
+	return err == nil && u.IsAbs() && u.Host != ""
+}
+
+// validateRedis は、Redis を書き換える段の欄を確かめる。
+// 置く値には有効な時間を求める。有効な時間の無い値は、筋書きのあとも版の Redis に残り続けるためである。
+func (s Step) validateRedis() []error {
+	var errs []error
+	if len(s.Redis.Del) == 0 && len(s.Redis.Set) == 0 {
+		errs = append(errs, fmt.Errorf("段 %s の redis に del と set のどちらもありません", s.Name))
+	}
+	if slices.Contains(s.Redis.Del, "") {
+		errs = append(errs, fmt.Errorf("段 %s の redis の del に空のキーがあります", s.Name))
+	}
+	for i, set := range s.Redis.Set {
+		if set.Key == "" || set.Value == "" || set.TTLSeconds <= 0 {
+			errs = append(errs, fmt.Errorf("段 %s の redis の set の %d 番目には key と value と1以上の ttl_seconds が要ります", s.Name, i+1))
+		}
+	}
+	return errs
+}
+
+// notRequestFields は、要求を送らない段に、要求の段の欄 to と capture と expect が無いかを確かめる。
+func (s Step) notRequestFields() []error {
+	var errs []error
+	if s.To != "" {
+		errs = append(errs, fmt.Errorf("段 %s の to は、版に送る段にだけ書けます", s.Name))
+	}
+	if len(s.Capture) > 0 {
+		errs = append(errs, fmt.Errorf("段 %s は要求を送らないので、capture を書けません", s.Name))
+	}
+	if s.Expect.Status != 0 || len(s.Expect.Fields) > 0 {
+		errs = append(errs, fmt.Errorf("段 %s は要求を送らないので、expect を書けません", s.Name))
+	}
+	return errs
+}
+
 // validatePerf は、応答の時間の比べ方の欄を確かめる。
-// 測るのは最後の段なので、最後の段が成功したかを確かめるために、最後の段の expect の status を求める。
+// 測るのは最後の段なので、最後の段に、版に送る段であることと、成功したかを確かめるための expect の status を求める。
 // 失敗の応答の時間を測っても、操作の時間を比べたことにならないためである。
 func (s Scenario) validatePerf() []error {
 	if !s.HasMode(ModePerf) {
+		var errs []error
 		if s.MeasureMemory {
-			return []error{fmt.Errorf("measure_memory は、動かし方 %s の筋書きにだけ書けます", ModePerf)}
+			errs = append(errs, fmt.Errorf("measure_memory は、動かし方 %s の筋書きにだけ書けます", ModePerf))
 		}
-		return nil
+		if s.PrepareEach {
+			errs = append(errs, fmt.Errorf("prepare_each は、動かし方 %s の筋書きにだけ書けます", ModePerf))
+		}
+		return errs
+	}
+	var errs []error
+	// 同時に送る要求が、1回使うと消える1つの値を取り合うためである
+	if s.PrepareEach && s.MeasureMemory {
+		errs = append(errs, errors.New("prepare_each が真の筋書きには measure_memory を書けません"))
 	}
 	if len(s.Steps) == 0 {
-		return nil
+		return errs
 	}
 	last := s.Steps[len(s.Steps)-1]
-	if last.Expect.Status == 0 {
-		return []error{fmt.Errorf("動かし方 %s の筋書きの最後の段 %s に expect の status がありません", ModePerf, last.Name)}
+	switch {
+	case last.Kind() != StepVersion:
+		errs = append(errs, fmt.Errorf("動かし方 %s の筋書きの最後の段 %s は、版に送る段でなければなりません", ModePerf, last.Name))
+	case last.Expect.Status == 0:
+		errs = append(errs, fmt.Errorf("動かし方 %s の筋書きの最後の段 %s に expect の status がありません", ModePerf, last.Name))
 	}
-	return nil
+	return errs
 }
 
 // validateCross は、版をまたぐ動かし方で動く筋書きの形を確かめる。
-// 版をまたぐには2つ以上の段が要る。どの段も、ステータスを確かめないと、もう一方の版で失敗した操作を見逃すので、
-// expect の status を求める。
+// 版を割り当てるのは版に送る段だけなので、版をまたぐには版に送る段が2つ以上要る。版に送る段は、ステータスを確かめないと、
+// もう一方の版で失敗した操作を見逃すので、expect の status を求める。最後の段は、版に送る段でなければならない。
 func (s Scenario) validateCross() []error {
 	var errs []error
-	if len(s.Steps) < 2 {
-		errs = append(errs, fmt.Errorf("動かし方 %s の筋書きには2つ以上の段が要りますが、%d 段です", ModeCross, len(s.Steps)))
-	}
+	versionSteps := 0
 	for _, step := range s.Steps {
+		if step.Kind() != StepVersion {
+			continue
+		}
+		versionSteps++
 		if step.Expect.Status == 0 {
 			errs = append(errs, fmt.Errorf("動かし方 %s の筋書きの段 %s に expect の status がありません", ModeCross, step.Name))
+		}
+	}
+	if versionSteps < 2 {
+		errs = append(errs, fmt.Errorf("動かし方 %s の筋書きには版に送る段が2つ以上要りますが、%d 段です", ModeCross, versionSteps))
+	}
+	if len(s.Steps) > 0 {
+		if last := s.Steps[len(s.Steps)-1]; last.Kind() != StepVersion {
+			errs = append(errs, fmt.Errorf("動かし方 %s の筋書きの最後の段 %s は、版に送る段でなければなりません", ModeCross, last.Name))
 		}
 	}
 	return errs

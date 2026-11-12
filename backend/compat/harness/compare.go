@@ -69,6 +69,9 @@ type Response struct {
 	Status int
 	Header http.Header
 	Body   []byte
+	// Received は、harness が応答を読み終えた時刻である。メールアドレスの確認のリンクの lexp を、この時刻との差で比べる。
+	// 偽の AWS が覚えたメールには時刻が無いので、harness が自分で持つ時刻を基準にする。
+	Received time.Time
 }
 
 // PDFComparer は、2つの PDF を比べ、違いの説明と、許す幅に収まるかを返す。pdfcmp が実装する。
@@ -98,7 +101,9 @@ func (c *Comparer) add(step StepRef, target, path, java, goValue string) {
 }
 
 // CompareResponse は、段の応答のステータスとヘッダと本文を比べる。step の JavaStatus と GoStatus は、応答の値で埋める。
+// 応答を受けた時刻は、版ごとに、JWT の lexp を差にするときの基準にする。
 func (c *Comparer) CompareResponse(step StepRef, java, goResp Response) StepRef {
+	c.java.received, c.goVer.received = java.Received, goResp.Received
 	step.JavaStatus, step.GoStatus = java.Status, goResp.Status
 	if java.Status != goResp.Status {
 		c.add(step, TargetStatus, "", strconv.Itoa(java.Status), strconv.Itoa(goResp.Status))
@@ -291,11 +296,12 @@ func diffJSON(path string, j, g any, emit func(path string, j, g any)) {
 	}
 }
 
-// compareText は、Markdown のような文字の本文を、UUID と日時を置き換えてから1文字も違わないかで比べる。
-// 違うときは、最初に違う行を報告する。
+// compareText は、Markdown のような文字の本文を、UUID と日時と、Location と同じく URL の中のトークンを置き換えてから、
+// 1文字も違わないかで比べる。Java 版のログインの開始の応答は、開始の URL をそのまま本文にした文字列で、state と
+// code_challenge に版ごとに違う乱数を含むためである。違うときは、最初に違う行を報告する。
 func (c *Comparer) compareText(step StepRef, java, goBody []byte) {
-	j := strings.Split(c.java.Text(string(java)), "\n")
-	g := strings.Split(c.goVer.Text(string(goBody)), "\n")
+	j := strings.Split(c.java.URLs(c.java.Text(string(java))), "\n")
+	g := strings.Split(c.goVer.URLs(c.goVer.Text(string(goBody))), "\n")
 	for i := 0; i < max(len(j), len(g)); i++ {
 		jl, gl := absent, absent
 		if i < len(j) {
@@ -410,7 +416,8 @@ type RedisEntry struct {
 }
 
 // redisSeps は、Redis のキーと値を、トークンかを調べる語に分ける区切りである。
-const redisSeps = ":\"'{}[],= \t\n&/?"
+// 逆斜線を含めるのは、集合の値が、JSON の文字列の要素を JSON の配列にした形(["\"値\""])で、値の後ろに逆斜線が続くためである。
+const redisSeps = ":\"'{}[],= \t\n&/?\\"
 
 // CompareRedis は、Redis のキーの名前と型と値を比べ、残りの有効な時間は RedisTTLTolerance のずれを許して比べる。
 // 有効な時間の有無は、同じでなければならない。
@@ -480,7 +487,7 @@ func ttlClose(a, b time.Duration) bool {
 // redisByKey は、Redis のキーと値を正規化し、正規化したキーごとに返す。
 func redisByKey(n *Normalizer, entries []RedisEntry) map[string]RedisEntry {
 	records := normalizeRecords(entries, func(e RedisEntry, assign bool) string {
-		return n.words(e.Key, redisSeps, assign) + "\n" + e.Type + "\n" + n.words(e.Value, redisSeps, assign)
+		return n.words(e.Key, redisSeps, assign) + "\n" + e.Type + "\n" + sortedSetValue(e.Type, n.words(n.redisValue(e.Key, e.Value, assign), redisSeps, assign))
 	})
 	out := make(map[string]RedisEntry, len(records))
 	for _, r := range records {
@@ -490,6 +497,18 @@ func redisByKey(n *Normalizer, entries []RedisEntry) map[string]RedisEntry {
 		out[key] = RedisEntry{Key: key, Type: typ, Value: value, TTL: entries[r.Index].TTL}
 	}
 	return out
+}
+
+// sortedSetValue は、型 typ が集合のときに、正規化した値 value(JSON の文字列の配列)の要素を並べ替えて返す。
+// DumpRedis は要素を置き換える前の値の順に並べるが、トークンの番号は現れた順に付くので、置き換えたあとの順は版ごとに違いうる。
+// 集合の要素には順が無いので、並べ替えても違いを隠さない。
+func sortedSetValue(typ, value string) string {
+	var members []string
+	if typ != "set" || json.Unmarshal([]byte(value), &members) != nil {
+		return value
+	}
+	slices.Sort(members)
+	return canonicalJSON(members)
 }
 
 // CompareS3 は、S3 のオブジェクトのキーの形と中身のバイトを比べる。キーの中の UUID は番号に置き換える。
@@ -551,39 +570,65 @@ func (c *Comparer) CompareMail(step StepRef, java, goMails []fakeaws.Email) {
 		path := fmt.Sprintf("%d 通目", i+1)
 		switch {
 		case i >= len(java):
-			c.add(step, TargetMail, path, absent, describeMail(c.goVer, goMails[i]))
+			c.add(step, TargetMail, path, absent, describeMail(c.goVer, goMails[i], i))
 			continue
 		case i >= len(goMails):
-			c.add(step, TargetMail, path, describeMail(c.java, java[i]), absent)
+			c.add(step, TargetMail, path, describeMail(c.java, java[i], i), absent)
 			continue
 		}
-		jf, gf := mailFields(c.java, java[i]), mailFields(c.goVer, goMails[i])
+		jf, gf := mailFields(c.java, java[i], i), mailFields(c.goVer, goMails[i], i)
 		for f := range jf {
-			if jf[f].value != gf[f].value {
+			if !sameNormalized(jf[f].value, gf[f].value) {
 				c.add(step, TargetMail, path+"の"+jf[f].name, jf[f].value, gf[f].value)
 			}
 		}
 	}
 }
 
-type mailField struct{ name, value string }
-
-func mailFields(n *Normalizer, m fakeaws.Email) []mailField {
-	return []mailField{
-		{"送り元", m.Source},
-		{"宛先", strings.Join(m.To, ", ")},
-		{"Cc", strings.Join(m.Cc, ", ")},
-		{"Bcc", strings.Join(m.Bcc, ", ")},
-		{"返信先", strings.Join(m.ReplyTo, ", ")},
-		{"件名", m.Subject},
-		{"本文", n.URLs(m.Text)},
-		{"HTML の本文", n.URLs(m.HTML)},
+// sameNormalized は、正規化した2つの文字が同じかを返す。JWT の lexp の差は、Redis の残りの有効な時間と同じく
+// RedisTTLTolerance のずれを許す。版ごとに、メールを送ってから応答を受けるまでの時間が違うためである。
+func sameNormalized(j, g string) bool {
+	if j == g {
+		return true
 	}
+	if lexpMarkerPattern.ReplaceAllString(j, "<lexp>") != lexpMarkerPattern.ReplaceAllString(g, "<lexp>") {
+		return false
+	}
+	jm, gm := lexpMarkerPattern.FindAllStringSubmatch(j, -1), lexpMarkerPattern.FindAllStringSubmatch(g, -1)
+	tolerance := int64(RedisTTLTolerance / time.Second)
+	for i := range jm {
+		a, errA := strconv.ParseInt(jm[i][1], 10, 64)
+		b, errB := strconv.ParseInt(gm[i][1], 10, 64)
+		if errA != nil || errB != nil || a-b > tolerance || b-a > tolerance {
+			return false
+		}
+	}
+	return true
 }
 
-func describeMail(n *Normalizer, m fakeaws.Email) string {
+type mailField struct{ name, value string }
+
+// mailFields は、i 通目のメール m の比べる項目を、正規化して返す。
+func mailFields(n *Normalizer, m fakeaws.Email, i int) []mailField {
+	var fields []mailField
+	n.atMail(i, func() {
+		fields = []mailField{
+			{"送り元", m.Source},
+			{"宛先", strings.Join(m.To, ", ")},
+			{"Cc", strings.Join(m.Cc, ", ")},
+			{"Bcc", strings.Join(m.Bcc, ", ")},
+			{"返信先", strings.Join(m.ReplyTo, ", ")},
+			{"件名", m.Subject},
+			{"本文", n.URLs(n.mailText(m.Subject, m.Text))},
+			{"HTML の本文", n.URLs(m.HTML)},
+		}
+	})
+	return fields
+}
+
+func describeMail(n *Normalizer, m fakeaws.Email, i int) string {
 	lines := make([]string, 0, 8)
-	for _, f := range mailFields(n, m) {
+	for _, f := range mailFields(n, m, i) {
 		lines = append(lines, f.name+": "+f.value)
 	}
 	return strings.Join(lines, "\n")

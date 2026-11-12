@@ -115,6 +115,10 @@ func MissingOperations(ops Operations, scenarios []Scenario, completed []int, re
 	anywhere := map[string]bool{}
 	for _, s := range scenarios {
 		for _, step := range s.Steps {
+			// 版に送る段だけが backend の操作を呼ぶ
+			if step.Kind() != StepVersion {
+				continue
+			}
 			id := ops.Lookup(step.Request.Method, step.Request.Path)
 			if id == "" {
 				continue

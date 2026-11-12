@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/testcontainers/testcontainers-go"
 
 	"github.com/DogisRiki/KeirekiPro/backend/compat/fakeaws"
 	"github.com/DogisRiki/KeirekiPro/backend/compat/fakeoidc"
@@ -195,5 +197,132 @@ func TestRegisterSecrets_FailsOnRejection(t *testing.T) {
 	}
 	if err := RegisterSecrets(t.Context(), server.Client(), "http://\x7f", "go", map[string]string{"a": "1"}); err == nil {
 		t.Error("読めない宛先で誤りになりません")
+	}
+}
+
+func TestVersionsEnv_TLS(t *testing.T) {
+	b := sampleBacking()
+	b.TrustStore = TrustStorePath
+	b.TrustStorePassword = sample("store")
+	b.CACert = CACertPath
+	java := JavaEnv(b)
+	want := "-Djavax.net.ssl.trustStore=" + TrustStorePath +
+		" -Djavax.net.ssl.trustStorePassword=" + b.TrustStorePassword +
+		" -Djavax.net.ssl.trustStoreType=PKCS12"
+	if java["JAVA_TOOL_OPTIONS"] != want {
+		t.Errorf("Java 版の JAVA_TOOL_OPTIONS = %q, want %q", java["JAVA_TOOL_OPTIONS"], want)
+	}
+	if _, ok := java["SSL_CERT_FILE"]; ok {
+		t.Error("Java 版に SSL_CERT_FILE を渡しています")
+	}
+	goEnv := GoEnv(b)
+	if goEnv["SSL_CERT_FILE"] != CACertPath {
+		t.Errorf("Go 版の SSL_CERT_FILE = %q, want %q", goEnv["SSL_CERT_FILE"], CACertPath)
+	}
+	if _, ok := goEnv["JAVA_TOOL_OPTIONS"]; ok {
+		t.Error("Go 版に JAVA_TOOL_OPTIONS を渡しています")
+	}
+	// 置き場が空なら、どちらの版にも渡さない(TLS の別名を使わない検査の土台のテストのため)
+	plain := sampleBacking()
+	if _, ok := JavaEnv(plain)["JAVA_TOOL_OPTIONS"]; ok {
+		t.Error("信頼の束が無いのに、Java 版に JAVA_TOOL_OPTIONS を渡しています")
+	}
+	if _, ok := GoEnv(plain)["SSL_CERT_FILE"]; ok {
+		t.Error("認証局の証明書が無いのに、Go 版に SSL_CERT_FILE を渡しています")
+	}
+}
+
+// specFile は、spec の、コンテナの中のパス path に写すファイルを返す。無ければ nil を返す。
+func specFile(spec ContainerSpec, path string) *testcontainers.ContainerFile {
+	for i := range spec.Files {
+		if spec.Files[i].ContainerFilePath == path {
+			return &spec.Files[i]
+		}
+	}
+	return nil
+}
+
+func TestBackendSpec_CopiesTLSFiles(t *testing.T) {
+	a, err := NewTLSAlias(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	fk := &fakes{jwtSecret: sample("jwt"), tls: a}
+	b := fk.backingFor(&Store{dbHost: "postgres", redisHost: "redis"}, "fakeaws")
+	if b.TrustStore != TrustStorePath || b.CACert != CACertPath || b.TrustStorePassword != a.TrustStorePassword {
+		t.Errorf("つなぐ先の置き場 = %q %q %q, want %q %q と信頼の束のパスワード", b.TrustStore, b.CACert, b.TrustStorePassword, TrustStorePath, CACertPath)
+	}
+
+	// Java 版は、信頼の束を作る前には起動の形を作れない
+	if _, err := backendSpec(VersionJava, JavaBackend("java-image"), b); err == nil {
+		t.Error("信頼の束を作る前に、Java 版の起動の形を作れました")
+	}
+	a.TrustStoreFile = filepath.Join(filepath.Dir(a.CACertFile), "truststore.p12")
+	java, err := backendSpec(VersionJava, JavaBackend("java-image"), b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := specFile(java, TrustStorePath); f == nil || f.HostFilePath != a.TrustStoreFile {
+		t.Errorf("Java 版に写す信頼の束 = %+v, want %s", f, a.TrustStoreFile)
+	}
+	if f := specFile(java, CACertPath); f == nil || f.HostFilePath != a.CACertFile {
+		t.Errorf("Java 版に写す認証局の証明書 = %+v, want %s", f, a.CACertFile)
+	}
+	if java.Env["JAVA_TOOL_OPTIONS"] == "" || java.Name != "backend-"+VersionJava || java.Image != "java-image" {
+		t.Errorf("Java 版の起動の形 = %+v", java)
+	}
+
+	goSpec, err := backendSpec(VersionGo, GoBackend("go-image"), b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := specFile(goSpec, CACertPath); f == nil || f.HostFilePath != a.CACertFile {
+		t.Errorf("Go 版に写す認証局の証明書 = %+v, want %s", f, a.CACertFile)
+	}
+	if specFile(goSpec, TrustStorePath) != nil {
+		t.Error("Go 版にも信頼の束を写しています")
+	}
+	if goSpec.Env["SSL_CERT_FILE"] != CACertPath {
+		t.Errorf("Go 版の SSL_CERT_FILE = %q", goSpec.Env["SSL_CERT_FILE"])
+	}
+	for _, s := range []ContainerSpec{java, goSpec} {
+		for _, file := range s.Files {
+			if file.FileMode != 0o644 {
+				t.Errorf("%s に写す %s の権限 = %o, want 0644(root でない利用者が読める)", s.Name, file.ContainerFilePath, file.FileMode)
+			}
+		}
+	}
+
+	// TLS の別名が無ければ、何も写さず、置き場も渡さない
+	plain := (&fakes{}).backingFor(&Store{}, "fakeaws")
+	if plain.TrustStore != "" || plain.CACert != "" {
+		t.Errorf("TLS の別名が無いときの置き場 = %q %q, want 空", plain.TrustStore, plain.CACert)
+	}
+	spec, err := backendSpec(VersionJava, JavaBackend("java-image"), plain)
+	if err != nil || len(spec.Files) != 0 {
+		t.Errorf("TLS の別名が無いときの Java 版の起動の形 = %+v, %v, want 写すファイル無し", spec.Files, err)
+	}
+}
+
+func TestFakeOIDCSpec_TLS(t *testing.T) {
+	a, err := NewTLSAlias(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := fakeOIDCSpec("oidc-image", a)
+	if spec.Name != "fakeoidc" || spec.Image != "oidc-image" || len(spec.Aliases) != 1 || spec.Aliases[0] != GitHubAPIHost {
+		t.Errorf("fakeoidc の起動の形 = %+v, want 名前 fakeoidc と別名 %s", spec, GitHubAPIHost)
+	}
+	if spec.Env[fakeoidc.CertFileEnv] != TLSCertPath || spec.Env[fakeoidc.KeyFileEnv] != TLSKeyPath {
+		t.Errorf("fakeoidc の環境変数 = %v", spec.Env)
+	}
+	if f := specFile(spec, TLSCertPath); f == nil || f.HostFilePath != a.CertFile || f.FileMode != 0o644 {
+		t.Errorf("fakeoidc に写す証明書 = %+v", f)
+	}
+	if f := specFile(spec, TLSKeyPath); f == nil || f.HostFilePath != a.KeyFile || f.FileMode != 0o644 {
+		t.Errorf("fakeoidc に写す鍵 = %+v", f)
+	}
+	if spec.WaitingFor == nil || len(spec.ExposedPorts) != 1 || spec.ExposedPorts[0] != fakeoidc.Port+"/tcp" {
+		t.Errorf("fakeoidc の外に出すポートと待ち方 = %v %v", spec.ExposedPorts, spec.WaitingFor)
 	}
 }
