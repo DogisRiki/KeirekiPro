@@ -21,6 +21,11 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
    続けて、AIは `bash .claude/scripts/ship/pre-push-dependency-review.sh` を実行する。push のあとに CI の dependency-review が赤にする、増えた部品の moderate 以上の脆弱性を、main からの差分(まだ commit していない変更を含む)で手元で見つける。
    「止まった」と出たら、commit も push もせず、出力の部品を、脆弱性の直った版か、止まらない別の版に替える。「調べられなかった」と出たら、出力の理由を直してから実行し直す。直せないときは、出力をそのまま所有者に示す。
 
+   続けて、AIは `bash .claude/scripts/ship/pre-push-dependency-cooldown.sh` を実行する。push のあとに CI の dependency-cooldown が赤にする、増えた部品のうち公開から72時間経っていない版を、main からの差分(まだ commit していない変更を含む)で手元で見つける。
+   - 「止まった」と出たら、AIは commit も push もしない。AIは、出力の部品を、公開から72時間経った古い版に替え、品質チェックとこのスクリプトを実行し直す。どちらも通れば出荷を続ける
+   - 古い版では品質チェックが通らないときと、脆弱性を直した版を72時間待たずに入れたいときは、AIは push しない。AIは、出力の部品と、入れられるようになる時刻を所有者に示し、所有者の判断を受ける。依存の検査で止まったときは、まず止まらない古い版に替える。ゲート設定の変更を提案するのは最後の手段とする
+   - 「調べられなかった」と出たら、AIは push しない。公開時刻を確かめないまま push すると、CI で同じ検査が赤になり、push をやり直すことになるためである。AIは、出力の理由を直してから実行し直す。直せないときは、出力をそのまま所有者に示す
+
 2. **ブランチ確認**: `git branch --show-current` で現在のブランチを確認する。
    - mainにいる場合: `.branch_name_template` に従い `git switch -c <type>/<short-description>` で作成
    - featureブランチにいる場合: 作業内容と合っているか確認
