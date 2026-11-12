@@ -30,6 +30,10 @@ func (s *Session) SendAbsolute(ctx context.Context, client *http.Client, oidcURL
 	if err != nil {
 		return Response{}, fmt.Errorf("harness: 段 %s の url %q を読めません: %w", step.Name, raw, err)
 	}
+	// 読み込みのときに確かめられない、差し込む名前で始まる url は、差し込んだあとにここで確かめる
+	if !u.IsAbs() || u.Host == "" {
+		return Response{}, fmt.Errorf("harness: 段 %s の差し込んだあとの url %q は絶対の URL ではありません", step.Name, raw)
+	}
 	if u.Hostname() == fakeoidcHost {
 		base, err := url.Parse(oidcURL)
 		if err != nil {

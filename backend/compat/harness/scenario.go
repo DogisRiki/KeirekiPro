@@ -319,7 +319,7 @@ func (s Step) validateAbsoluteURL() []error {
 	if s.Request.Path != "" {
 		errs = append(errs, fmt.Errorf("段 %s の request に path と url の両方があります", s.Name))
 	}
-	if u, err := url.Parse(s.Request.URL); err != nil || !u.IsAbs() || u.Host == "" {
+	if !absoluteURLTemplate(s.Request.URL) {
 		errs = append(errs, fmt.Errorf("段 %s の request の url %q は絶対の URL ではありません", s.Name, s.Request.URL))
 	}
 	if s.Request.CSRF {
@@ -332,6 +332,18 @@ func (s Step) validateAbsoluteURL() []error {
 		errs = append(errs, fmt.Errorf("段 %s の expect の fields は、版に送る段にだけ書けます", s.Name))
 	}
 	return errs
+}
+
+// absoluteURLTemplate は、絶対の URL の段の url raw が、差し込む前の形として正しいかを返す。
+// 差し込む名前 {名前} で始まる url は、前の段で取り出した URL の頭か全体を差し込むので、読み込みのときには確かめず、
+// 送るときに SendAbsolute が、差し込んだあとの url を確かめる。それ以外の url は、差し込む名前を仮の文字 x に置き換えて、
+// スキームとホストのある絶対の URL かを確かめる。
+func absoluteURLTemplate(raw string) bool {
+	if loc := pathVariable.FindStringIndex(raw); loc != nil && loc[0] == 0 {
+		return true
+	}
+	u, err := url.Parse(pathVariable.ReplaceAllString(raw, "x"))
+	return err == nil && u.IsAbs() && u.Host != ""
 }
 
 // validateRedis は、Redis を書き換える段の欄を確かめる。

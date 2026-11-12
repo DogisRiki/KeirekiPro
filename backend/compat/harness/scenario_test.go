@@ -219,6 +219,38 @@ func TestScenarioValidate_StepKinds(t *testing.T) {
 	}
 }
 
+// 前の段で取り出した URL の全体を差し込む url と、差し込む名前を含む絶対の URL は、読み込みのときには誤りにしない。
+// 全体を差し込む url が絶対の URL かは、送るときに SendAbsolute が確かめる
+func TestScenarioValidate_AbsoluteURLWithVariables(t *testing.T) {
+	for name, url := range map[string]string{
+		"全体を差し込む url":       "{authURL}",
+		"頭を差し込み、続きを書いた url": "{base}/x?state={state}",
+		"問い合わせに差し込む url":    "http://fakeoidc:8080/x?state={state}",
+		"ホストに差し込む url":      "http://{host}/x",
+	} {
+		steps := "  - name: abs\n    request: {method: GET, url: \"" + url + "\"}\n  - name: last\n    request: {method: GET, path: /x}\n"
+		s, err := LoadScenario(writeScenario(t, kindsScenario("compare", steps)))
+		if err != nil {
+			t.Errorf("%s: 誤り = %v, want 誤りなし", name, err)
+			continue
+		}
+		if got := s.Steps[0].Request.URL; got != url {
+			t.Errorf("%s: 読んだ url = %q", name, got)
+		}
+	}
+	// 差し込む名前で始まらない url は、名前を置き換えても絶対の URL でなければ、読み込みのときに誤りにする
+	for name, url := range map[string]string{
+		"差し込む名前を含む、絶対でない url":   "/x?state={state}",
+		"差し込む名前を含む、ホストの無い url":  "http:///x?state={state}",
+		"差し込む名前を含む、スキームの無い url": "//fakeoidc:8080/{x}",
+	} {
+		steps := "  - name: bad\n    request: {method: GET, url: \"" + url + "\"}\n  - name: last\n    request: {method: GET, path: /x}\n"
+		if _, err := LoadScenario(writeScenario(t, kindsScenario("compare", steps))); err == nil || !strings.Contains(err.Error(), "段 bad ") || !strings.Contains(err.Error(), "絶対の URL ではありません") {
+			t.Errorf("%s: 誤り = %v, want 段 bad の絶対の URL でない誤り", name, err)
+		}
+	}
+}
+
 func TestScenario_PrepareEachRejectsMeasureMemory(t *testing.T) {
 	steps := "  - name: login\n    request: {method: POST, path: /api/auth/login}\n" +
 		"  - name: verify\n    request: {method: POST, path: /api/auth/2fa/verify}\n    expect: {status: 200}\n"

@@ -464,6 +464,18 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 		t.Errorf("expect の無い段の誤り = %v", err)
 	}
 
+	// 前の段で取り出した URL の全体を差し込む段も、ホストが fakeoidc なら送る先を書き換える
+	s.vars["whole"] = "http://fakeoidc:8080/whole?state=st"
+	whole := step
+	whole.Name = "whole"
+	whole.Request.URL = "{whole}"
+	if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, whole); err != nil {
+		t.Fatal(err)
+	}
+	if r := recordedReqs(); r[len(r)-1].uri != "/whole?state=st" || r[len(r)-1].host != oidcHost {
+		t.Errorf("全体を差し込んだ段の要求 = %+v", r[len(r)-1])
+	}
+
 	// url の差し込めない名前は、送らずに誤りにする。fakeoidc のアドレスを読めないときも誤りにする
 	before := len(recordedReqs())
 	missing := step
@@ -474,6 +486,17 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 	}
 	if _, err := s.SendAbsolute(t.Context(), following, "://bad", step); err == nil || !strings.Contains(err.Error(), "段 authorize") {
 		t.Errorf("読めない fakeoidc のアドレスの誤り = %v", err)
+	}
+	// 差し込んだあとの url が絶対の URL でないときは、送らずに誤りにする
+	s.vars["relative"] = "/x?state=st"
+	s.vars["hostless"] = "http:///x"
+	for _, name := range []string{"relative", "hostless"} {
+		bad := step
+		bad.Name = "bad-" + name
+		bad.Request.URL = "{" + name + "}"
+		if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, bad); err == nil || !strings.Contains(err.Error(), "段 bad-"+name) || !strings.Contains(err.Error(), "絶対の URL ではありません") {
+			t.Errorf("差し込んだあとの url が絶対でない段 %s の誤り = %v", name, err)
+		}
 	}
 	if n := len(recordedReqs()) - before; n != 0 {
 		t.Errorf("送れない段で %d 件の要求を送りました", n)
