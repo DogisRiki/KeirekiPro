@@ -34,7 +34,17 @@ steps:
       path: /api/admin/users
       headers: {Cookie: 'accessToken={access1}'}
     expect: {status: 401}
+  # ログアウトした版にも送り、同じ版でも 401 で断ることを確かめる。この段で送り先をログアウトした版に戻し、
+  # 次の作り直しの段の to: other で、ログアウトした版と違う版に届くようにする
+  - name: admin-users-after-logout-same-version
+    to: other
+    request:
+      method: GET
+      path: /api/admin/users
+      headers: {Cookie: 'accessToken={access1}'}
+    expect: {status: 401}
   - name: refresh-after-logout
+    to: other
     request:
       method: POST
       path: /api/auth/token/refresh
@@ -56,9 +66,16 @@ steps:
       method: GET
       path: /api/admin/users
     expect: {status: 401}
-  # to: other を付けない。付けると、前の段の to: other と2つ続き、ログインした版に戻る。
-  # 付けなければ、Java 版から Go 版の向きと Go 版から Java 版の向きで、ログインした版と違う版で作り直す
+  # ログインした版にも送り、同じ版でも 401 で断ることを確かめる。この段で送り先をログインした版に戻し、
+  # 次の作り直しの段の to: other で、ログインした版と違う版で作り直すようにする
+  - name: admin-users-after-access-expired-same-version
+    to: other
+    request:
+      method: GET
+      path: /api/admin/users
+    expect: {status: 401}
   - name: refresh-after-access-expired
+    to: other
     request:
       method: POST
       path: /api/auth/token/refresh

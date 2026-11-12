@@ -190,7 +190,7 @@ Claude は、Go の試作の1つのプログラムに、確かめる動きごと
 
 ## 実装で確かめた Java 版の値の形
 
-この節は、実装の中で Claude が開発環境の Java 版か Java 版のコードで確かめた、Java 版の値の形と読み方を残す。Go 版は、どれも同じ形で書き、同じ規則で読む。Java 版と違えた動きは、変えた動きの一覧(`backend/compat/changed-behaviors.yaml`)に載せた。ただし、「ログインと利用者」の bcrypt の箇条に書く `$2$` の形のハッシュの照らし方の違いは、一覧に載っていない。
+この節は、実装の中で Claude が開発環境の Java 版か Java 版のコードで確かめた、Java 版の値の形と読み方を残す。Go 版は、どれも同じ形で書き、同じ規則で読む。Java 版と違えた動きは、変えた動きの一覧(`backend/compat/changed-behaviors.yaml`)に載せた。
 
 ### Redis の値
 
@@ -219,7 +219,7 @@ Claude は、Go の試作の1つのプログラムに、確かめる動きごと
 ### ログインと利用者
 
 - Java 版の `BCryptPasswordEncoder.matches` は、`$2a$` `$2b$` `$2y$` の形のハッシュを照らし、強さが4から31の外のハッシュでは 500 で答える。パスワードは先頭の72バイトだけを使う。Go 版の `passwordMatches` は、開発環境の Java 版で確かめたこの規則を写し、塩の使われないビットが立つハッシュは、合わないとする
-- Java 版の `BCryptPasswordEncoder.matches` は、`$2$` の形のハッシュも照らす。Go の bcrypt は、`$2$` の形でも鍵の末尾に0のバイトを足して計算し、Java 版と違う値になる。そのため、Go 版の `passwordMatches` は、`$2$` の形のハッシュを照らさずに合わないとする。Java 版は、パスワードのハッシュを `new BCryptPasswordEncoder()` の既定の `$2a$` の形で作るので、API の要求で `$2$` の形のハッシュを持つ利用者はできない。この違いは、変えた動きの一覧に載っていない
+- Java 版の `BCryptPasswordEncoder.matches` は、`$2$` の形のハッシュも照らす。Go の bcrypt は、`$2$` の形でも鍵の末尾に0のバイトを足して計算し、Java 版と違う値になる。そのため、Go 版の `passwordMatches` は、`$2$` の形のハッシュを照らさずに合わないとする。Java 版は、パスワードのハッシュを `new BCryptPasswordEncoder()` の既定の `$2a$` の形で作るので、API の要求で `$2$` の形のハッシュを持つ利用者はできない(CB-027)
 - Java 版は、利用者の役割を順の決まらない集合で持つので、`roles` の並びが JVM ごとに変わる。Go 版は USER、ADMIN の順に並べる(CB-022)
 - Java 版の `User.reconstruct` は、利用者を読むたびに、2段階認証が有効でメールアドレスかパスワードが無い利用者と、2段階認証が無効な管理者を、400 で断る。Go 版も、利用者を読むすべての操作で同じ順に確かめる
 

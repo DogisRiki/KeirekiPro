@@ -319,17 +319,18 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	for _, b := range got {
 		byID[b.ID] = b
 	}
-	for i := 1; i <= 26; i++ {
+	for i := 1; i <= 27; i++ {
 		if id := fmt.Sprintf("CB-%03d", i); byID[id].ID != id {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 26 {
-		t.Errorf("一覧の項目は26のはずですが、%d です", len(got))
+	if len(got) != 27 {
+		t.Errorf("一覧の項目は27のはずですが、%d です", len(got))
 	}
 	for _, id := range []string{
 		"CB-005", "CB-007", "CB-008", "CB-009", "CB-010",
 		"CB-013", "CB-014", "CB-015", "CB-016", "CB-017", "CB-018", "CB-019", "CB-020", "CB-021", "CB-022", "CB-023", "CB-025", "CB-026",
+		"CB-027",
 	} {
 		if m := byID[id].Matches; len(m) != 0 {
 			t.Errorf("%s は記録だけの項目のはずですが、match があります: %+v", id, m)

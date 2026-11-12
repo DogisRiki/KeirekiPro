@@ -11,8 +11,8 @@ import (
 
 // authCrossSteps は、認証の筋書きごとに、その前の版に送る段と違う版に送られるべき段の名前を、筋書きの順に挙げる。
 // 管理者の経路への段と、to: other を付けた、途中の手順の2つ目からの要求を送る段と作り直しの段とログアウトの段である。
-// refresh-logout.yaml の refresh-after-logout と refresh-after-access-expired、password-reset.yaml の verify-used-token と
-// reset-expired-token は、to: other を付けると前の to: other の段と2つ続いて元の版に戻るので、to: other を付けず、ここに挙げない。
+// to: other の段が2つ続くと元の版に戻るので、値を出した版と違う版に届けたい段が2つ続くときは、その間に、値を出した版へ戻す段
+// (名前の終わりが -same-version の段か、password-reset.yaml の login-old-password)を置く。
 var authCrossSteps = map[string][]string{
 	"auth-login": {"admin-users-after-login"},
 	"auth-two-factor": {
@@ -20,7 +20,8 @@ var authCrossSteps = map[string][]string{
 		"verify-wrong-1", "verify-wrong-2", "verify-wrong-3", "verify-wrong-4", "verify-wrong-5-limit", "verify-code-after-limit",
 	},
 	"auth-refresh-logout": {
-		"refresh", "logout", "admin-users-after-logout", "admin-users-after-access-expired",
+		"refresh", "logout", "admin-users-after-logout", "admin-users-after-logout-same-version", "refresh-after-logout",
+		"admin-users-after-access-expired", "admin-users-after-access-expired-same-version", "refresh-after-access-expired",
 		"refresh-after-refresh-expired",
 	},
 	"auth-register": {"verify-registration-link", "verify-used-link"},
@@ -29,8 +30,9 @@ var authCrossSteps = map[string][]string{
 		"verify-latest-link", "verify-login-resent-link",
 	},
 	"auth-password-reset": {
-		"verify-reset-token", "login-other-device", "reset-password", "admin-users-after-reset",
-		"reset-used-token", "verify-expired-token", "verify-missing-user-token", "reset-missing-user",
+		"verify-reset-token", "login-other-device", "reset-password", "admin-users-after-reset", "login-old-password",
+		"verify-used-token", "reset-used-token", "verify-expired-token", "verify-expired-token-same-version",
+		"reset-expired-token", "verify-missing-user-token", "reset-missing-user",
 	},
 	"auth-oidc-google": {
 		"callback-new-user", "admin-users-new-user", "callback-registered-user", "admin-users-registered-user",
