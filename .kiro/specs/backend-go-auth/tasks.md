@@ -313,7 +313,7 @@
   - 受入基準とテストの対応: 要件2の受入基準1(ログインの状態を持たない要求を断り、`OPTIONS` と生きているかの確認は通す)と受入基準2(期限切れ、書き換え、使えなくなったログインの状態の要求を断る)は `require-login.yaml` の「Cookie の無い要求」「期限を切らした値」「書き換えた値」「ログアウトで使えなくなった値」「無効な値での書き込みの要求」「`OPTIONS` と `/actuator/health`」で確かめる。要件2の受入基準3(利用者が居るかを確かめない)は、2.3 の `TestIdentify_DoesNotCheckUserExists` で確かめる。要件1の受入基準4(入力の誤りの条件とエラーの文言)は `validation.yaml` の13の操作の入力の誤りで、要件5の受入基準1のうち偽の要求を見分けるヘッダを付けない要求は `validation.yaml` の「偽の送信の検査のヘッダを付けない要求」で、要件5の受入基準5(形の誤った要求に 400 で答え、変えた動きの一覧に載せる)は `validation.yaml` の「形の誤った要求」と変えた動きの一覧の項目で確かめる
   - _要件: 1.4, 2.1, 2.2, 2.3, 5.1, 5.5_
 
-- [ ] 6.6 版をまたいで確かめる検査を通す
+- [x] 6.6 版をまたいで確かめる検査を通す
 
   Claude は、6.1 から 6.4 で `modes` に `cross` を書いた筋書きを、Java 版から Go 版、Go 版から Java 版、交互の3つの向きで動かし、違いが出た筋書きを直す。この検査は、途中の手順をまたぐ5つの操作と、ログインした版と違う版への管理者の経路への要求を含む。
   - 完了の確かめ方: `make compat-cross` が通る。`go test -tags compat -run TestCrossRoute_AuthProcedureSteps ./compat/harness/` が通る。このテストは、認証の筋書きを読み、Java 版から Go 版の向きと Go 版から Java 版の向きのそれぞれの `CrossRoute` の結果で、管理者の経路への段と、小タスク6.1 で `to: other` を付けた、途中の手順の2つ目からの要求を送る段と作り直しの段とログアウトの段が、その前の版に送る段と違う版に送られることを確かめる。Claude は、このテストを、`backend/compat/harness/cross.go` のテストのファイルとして `backend/compat/harness/cross_test.go` を作って置く
@@ -426,6 +426,8 @@
 - 6.5 で、仕様書に無い経路(例 `/actuator/health`)の段は操作の名前を持たないので、その段の違いを許す match の operation は `"*"` にする。開発の設定の Java 版の `/actuator/health` は、Accept を付けないと Content-Type が `application/vnd.spring-boot.actuator.v3+json` になるので、筋書きは `Accept: application/json` を付けて送る
 - 6.5 で、プリフライトでない OPTIONS は、Java 版が経路のある URL に 200、経路の無い URL に 500 で答え、Go 版が 405 と 404 で答える(CB-026)。OPTIONS を比べる段は、Origin と Access-Control-Request-Method を付けたプリフライトで送る
 - 6.5 で、比べる検査の違いを狭く許せない要求(違いを許すと、ほかの場面の同じ操作の違いも許してしまう要求)は筋書きで送らず、変えた動きの一覧に match の無い記録だけの項目として載せる。一覧に項目を足したら、`match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` の項目の数と、記録だけの項目の並びも直す
+- 6.6 で、`refresh-logout.yaml` の管理者の経路の段 `admin-users-after-access-expired` に `to: other` を付け、次の作り直しの段 `refresh-after-access-expired` から `to: other` を外した。管理者の経路の段に付けないと、Java 版から Go 版の向きと Go 版から Java 版の向きで、ログインし直した段 `login-again` と同じ版に届く。作り直しの段にも付けると、前の段の `to: other` と2つ続き、ログインし直した版に戻る。外せば、2つの段のどちらも、その2つの向きでログインし直した版と違う版に届く。このため、作り直しの段は、タスクの本文の「6.1 で `to: other` を付けた作り直しの段」に当たるが、`TestCrossRoute_AuthProcedureSteps` はこの段を数えない。この食い違いは、出荷の前に所有者に示して合否を決めてもらい、PR の本文にも書く
+- 6.6 の `TestCrossRoute_AuthProcedureSteps` は、確かめる段を筋書きごとに名前で挙げた一覧(`authCrossSteps`)と比べる。筋書きの段の `to: other` を足したり外したりしたら、この一覧も直す
 
 ## 完了条件(全タスク共通)
 

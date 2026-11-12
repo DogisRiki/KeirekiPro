@@ -49,13 +49,16 @@ steps:
     expect: {status: 200}
   - name: expire-access-token
     expire: {cookie: accessToken}
+  # ログインした版と違う版に送り、期限の切れたログインの状態の値を 401 で断ることを確かめる
   - name: admin-users-after-access-expired
+    to: other
     request:
       method: GET
       path: /api/admin/users
     expect: {status: 401}
+  # to: other を付けない。付けると、前の段の to: other と2つ続き、ログインした版に戻る。
+  # 付けなければ、Java 版から Go 版の向きと Go 版から Java 版の向きで、ログインした版と違う版で作り直す
   - name: refresh-after-access-expired
-    to: other
     request:
       method: POST
       path: /api/auth/token/refresh
