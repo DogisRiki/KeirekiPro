@@ -5,9 +5,11 @@ package harness
 import (
 	"context"
 	"errors"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -380,6 +382,69 @@ func TestLoadScenario_PerfFields(t *testing.T) {
 	}
 }
 
+// TestLoadScenarios_AuthPerf は、認証の筋書きのうち、応答の時間を測る筋書きが、ログイン、2段階認証の確認、作り直し、
+// 新規の登録の4つの操作を最後の段で送ることを確かめる。2段階認証の確認は、確認のコードが1回使うと消えるので、
+// 回ごとに準備の段を送り直し、ログインの段のあとに届いたメールからコードを取り出す。メモリの最大はどれも測らない。
+func TestLoadScenarios_AuthPerf(t *testing.T) {
+	scenarios, err := LoadScenarios(filepath.Join("..", "scenarios", "auth"), ModePerf)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	type want struct {
+		last        string
+		steps       int
+		prepareEach bool
+	}
+	wants := map[string]want{
+		"auth-login-perf":      {"POST /api/auth/login", 1, false},
+		"auth-two-factor-perf": {"POST /api/auth/2fa/verify", 2, true},
+		"auth-refresh-perf":    {"POST /api/auth/token/refresh", 2, false},
+		"auth-register-perf":   {"POST /api/auth/register", 1, false},
+	}
+	got := map[string]Scenario{}
+	for _, s := range scenarios {
+		got[s.Name] = s
+	}
+	if len(got) != len(wants) {
+		t.Errorf("測る筋書きの数 = %d, want %d(読んだ筋書きは %v)", len(got), len(wants), slices.Sorted(maps.Keys(got)))
+	}
+	for name, w := range wants {
+		s, ok := got[name]
+		if !ok {
+			t.Errorf("測る筋書き %s がありません", name)
+			continue
+		}
+		if len(s.Steps) != w.steps {
+			t.Errorf("筋書き %s の段の数 = %d, want %d", name, len(s.Steps), w.steps)
+			continue
+		}
+		last := s.Steps[len(s.Steps)-1]
+		if op := last.Request.Method + " " + last.Request.Path; op != w.last {
+			t.Errorf("筋書き %s の最後の段 = %s, want %s", name, op, w.last)
+		}
+		if s.PrepareEach != w.prepareEach {
+			t.Errorf("筋書き %s の prepare_each = %v, want %v", name, s.PrepareEach, w.prepareEach)
+		}
+		if s.MeasureMemory {
+			t.Errorf("筋書き %s が measure_memory を持ちます。メモリの最大は PDF の出力の筋書きだけで測ります", name)
+		}
+	}
+	if s, ok := got["auth-two-factor-perf"]; ok && len(s.Steps) == 2 {
+		login, verify := s.Steps[0], s.Steps[1]
+		if login.Request.Path != "/api/auth/login" || jsonField(login.Request.JSON, "email") != "twofactor@example.com" {
+			t.Errorf("2段階認証の確認の準備の段 = %s %v, want 2段階認証を有効にした利用者 twofactor@example.com のログイン",
+				login.Request.Path, login.Request.JSON)
+		}
+		capture := login.Capture["code"]
+		if !strings.HasPrefix(capture, "mail:") {
+			t.Errorf("2段階認証の確認のコードの取り出し = %q, want mail: から始まる取り出し", capture)
+		}
+		if code := jsonField(verify.Request.JSON, "code"); code != "{code}" {
+			t.Errorf("2段階認証の確認の段のコード = %v, want 取り出した {code}", code)
+		}
+	}
+}
+
 func TestWritePerfReport(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "report")
 	report := PerfReport{Latencies: []LatencyResult{{Operation: "login", Java: time.Millisecond, Go: time.Millisecond}}}
@@ -401,4 +466,13 @@ func TestWritePerfReport(t *testing.T) {
 	if _, err := report.Write(filepath.Join(blocked, "sub")); err == nil {
 		t.Error("フォルダを作れないのに誤りを返しませんでした")
 	}
+}
+
+// jsonField は、段の本文 body が項目の並びなら、項目 key の値を返す。項目の並びでなければ nil を返す。
+func jsonField(body any, key string) any {
+	fields, ok := body.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return fields[key]
 }

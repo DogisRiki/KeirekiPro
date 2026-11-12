@@ -15,20 +15,32 @@ import (
 // reset-expired-token は、to: other を付けると前の to: other の段と2つ続いて元の版に戻るので、to: other を付けず、ここに挙げない。
 var authCrossSteps = map[string][]string{
 	"auth-login": {"admin-users-after-login"},
-	"auth-two-factor": {"verify-code", "verify-wrong-code", "verify-wrong-code-again", "verify-code-after-wrong",
-		"verify-wrong-1", "verify-wrong-2", "verify-wrong-3", "verify-wrong-4", "verify-wrong-5-limit", "verify-code-after-limit"},
-	"auth-refresh-logout": {"refresh", "logout", "admin-users-after-logout", "admin-users-after-access-expired",
-		"refresh-after-refresh-expired"},
+	"auth-two-factor": {
+		"verify-code", "verify-wrong-code", "verify-wrong-code-again", "verify-code-after-wrong",
+		"verify-wrong-1", "verify-wrong-2", "verify-wrong-3", "verify-wrong-4", "verify-wrong-5-limit", "verify-code-after-limit",
+	},
+	"auth-refresh-logout": {
+		"refresh", "logout", "admin-users-after-logout", "admin-users-after-access-expired",
+		"refresh-after-refresh-expired",
+	},
 	"auth-register": {"verify-registration-link", "verify-used-link"},
-	"auth-email-verification": {"resend-expired-link", "verify-resent-link", "verify-previous-link", "login-after-previous-link",
-		"verify-latest-link", "verify-login-resent-link"},
-	"auth-password-reset": {"verify-reset-token", "login-other-device", "reset-password", "admin-users-after-reset",
-		"reset-used-token", "verify-expired-token", "verify-missing-user-token", "reset-missing-user"},
-	"auth-oidc-google": {"callback-new-user", "admin-users-new-user", "callback-registered-user", "admin-users-registered-user",
-		"callback-unverified-user", "callback-denied", "callback-unknown-state"},
-	"auth-oidc-github": {"callback-new-user", "admin-users-new-user", "callback-registered-user", "admin-users-registered-user",
+	"auth-email-verification": {
+		"resend-expired-link", "verify-resent-link", "verify-previous-link", "login-after-previous-link",
+		"verify-latest-link", "verify-login-resent-link",
+	},
+	"auth-password-reset": {
+		"verify-reset-token", "login-other-device", "reset-password", "admin-users-after-reset",
+		"reset-used-token", "verify-expired-token", "verify-missing-user-token", "reset-missing-user",
+	},
+	"auth-oidc-google": {
+		"callback-new-user", "admin-users-new-user", "callback-registered-user", "admin-users-registered-user",
+		"callback-unverified-user", "callback-denied", "callback-unknown-state",
+	},
+	"auth-oidc-github": {
+		"callback-new-user", "admin-users-new-user", "callback-registered-user", "admin-users-registered-user",
 		"callback-unverified-user", "callback-no-verified-email-user", "admin-users-no-verified-email-user", "callback-denied",
-		"callback-unknown-state"},
+		"callback-unknown-state",
+	},
 }
 
 // crossCheckedStep は、その前の版に送る段と違う版に送られるべき段かを返す。管理者の経路への段と、to: other の段である。

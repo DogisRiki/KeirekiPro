@@ -1,0 +1,21 @@
+# 2段階認証の確認の応答の時間を測る筋書き。確認のコードは1回使うと消えるので、prepare_each を真にし、
+# 回ごとにログインの段を送り直して、届いたメールの先頭の6桁から新しいコードを取り出す。
+name: auth-two-factor-perf
+group: 1
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [perf]
+prepare_each: true
+steps:
+  - name: login-two-factor
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: twofactor@example.com, password: Passw0rd!}
+    capture: {code: 'mail:(\d{6})'}
+    expect: {status: 202}
+  - name: verify-code
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: "{code}"}
+    expect: {status: 200}

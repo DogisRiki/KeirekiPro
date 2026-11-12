@@ -320,7 +320,7 @@
   - 受入基準とテストの対応: 要件4の受入基準1(一方の版でログインした利用者が、もう一方の版でもログインし直さずに使い続けられる)は、ログインした版と違う版への管理者の経路への要求と、作り直しとログアウトの3つの向きで確かめる。要件4の受入基準2(途中の手順をまたぐ5つの操作を、版をまたいでも終えられる)は5つの操作の3つの向きで、要件4の受入基準3(版をまたいで確かめる検査に筋書きを足し、CI で動かす)は `make compat-cross` が CI で動く `TestCross_` の検査で確かめる
   - _要件: 4.1, 4.2, 4.3_
 
-- [ ] 6.7 主な操作の応答の時間を測る
+- [x] 6.7 主な操作の応答の時間を測る
 
   Claude は、`login-perf.yaml` `two-factor-perf.yaml` `refresh-perf.yaml` `register-perf.yaml` を、筋書きの動かし方の表のとおりに、`modes` を `perf` にして書く。`two-factor-perf.yaml` は、`prepare_each` を真にし、`measure_memory` を付けず、`auth-users.sql` の2段階認証を有効にした利用者を使い、ログインの段のあとに届いたメールから確認のコードを `mail:` で取り出す。Claude は、置き換えの spec の測り方で4つの操作の応答の時間を測り、結果を `progress.md` の決まりのとおりに書く。
   - 完了の確かめ方: `make compat-perf` が4つの操作を測り、`progress.md` に結果が書かれる。6つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
@@ -428,6 +428,7 @@
 - 6.5 で、比べる検査の違いを狭く許せない要求(違いを許すと、ほかの場面の同じ操作の違いも許してしまう要求)は筋書きで送らず、変えた動きの一覧に match の無い記録だけの項目として載せる。一覧に項目を足したら、`match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` の項目の数と、記録だけの項目の並びも直す
 - 6.6 で、`refresh-logout.yaml` の管理者の経路の段 `admin-users-after-access-expired` に `to: other` を付け、次の作り直しの段 `refresh-after-access-expired` から `to: other` を外した。管理者の経路の段に付けないと、Java 版から Go 版の向きと Go 版から Java 版の向きで、ログインし直した段 `login-again` と同じ版に届く。作り直しの段にも付けると、前の段の `to: other` と2つ続き、ログインし直した版に戻る。外せば、2つの段のどちらも、その2つの向きでログインし直した版と違う版に届く。このため、作り直しの段は、タスクの本文の「6.1 で `to: other` を付けた作り直しの段」に当たるが、`TestCrossRoute_AuthProcedureSteps` はこの段を数えない。この食い違いは、出荷の前に所有者に示して合否を決めてもらい、PR の本文にも書く
 - 6.6 の `TestCrossRoute_AuthProcedureSteps` は、確かめる段を筋書きごとに名前で挙げた一覧(`authCrossSteps`)と比べる。筋書きの段の `to: other` を足したり外したりしたら、この一覧も直す
+- 6.7 で、置き換えの spec の `perf_test.go` の自分と比べる筋書き `selfPerf` にだけログインの段が無く、`make compat-perf` が 401 で失敗した。Go 版がログインの状態を確かめる経路を足したら、`compat_test.go` `cross_test.go` `perf_test.go` の3つの自分と比べる筋書きをそろえて直す。応答の時間の結果は `progress.md` の節「Java 版と Go 版の応答の時間を比べた結果」の表に書く
 
 ## 完了条件(全タスク共通)
 
