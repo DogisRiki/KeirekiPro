@@ -79,7 +79,7 @@
   - _要件: 1.3_
   - _依存: 1.2_
 
-- [ ] 2.3 multipart の本文を部分に分ける
+- [x] 2.3 multipart の本文を部分に分ける
 
   Claude は、`multipart.go` に、`Content-Type` の `boundary` で本文を部分に分け、部分ごとにヘッダと中身を取り出す処理を作る。multipart は、1つの要求の本文を、区切りの文字列 `boundary` で複数の部分に分けて、名前や画像のファイルを部分ごとに入れて送る形である。この処理は、部分のヘッダに制御文字があっても読む。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestMultipart` が通る
@@ -367,6 +367,11 @@
 - Go の `strings.Builder.WriteRune` は、サロゲートの範囲の字を U+FFFD にして書く。そのため、`jdkutf8.go` は、3バイトの字がサロゲートの範囲かを自分で調べない
 - Java 版の Spring は、`ContentDisposition.parse` の結果のうちファイルの名前だけを使う。部分の名前は、Tomcat の `Part.getName()` が Tomcat の読み方で読んだものである(`StandardMultipartHttpServletRequest.parseRequest`)。小タスク2.3 と2.4 は、部分の名前の端の場合(項目の名前の大文字と小文字、引用符の無い値の逆スラッシュ、`form-data` で始まらない見出し)を Java 版の答えで確かめ、食い違えば Java 版に合わせる。Spring は、すべての部分で `ContentDisposition.parse` を呼び、例外を `MultipartException` にする。そのため、どれか1つの部分で `parseContentDisposition` が誤りを返せば、要求の全体を誤りとして扱う。そのときの Java 版の状態の番号も、小タスク2.4 で Java 版の答えで確かめる
 - 小タスク2.2 の `contentdisposition.go` は、RFC 2047 の書き方(`=?文字コード?B?…?=`)の文字コードを、UTF-8 と ISO-8859-1 と US-ASCII と、その JDK の別名に限り、ほかの文字コード(`Shift_JIS` など)を誤りにする。Java 版は、JDK が読める文字コードなら解いて受け付ける(research.md の P4 の節)。この違いは、Java 版が 200 で答え、Go 版が受け付けない違いなので、変えた動きの一覧に項目を足す小タスクの「Java 版の 500 を Go 版の 400 にする」決まりには当たらない。Claude は、変えた動きの一覧に項目を足す小タスクで所有者に項目の一覧を示すときに、この違いも示し、項目を足すかを所有者に決めてもらう。PR の本文にも書く
+- 小タスク2.3 の `multipart.go` は、Java 版の Tomcat 11.0.27 の fileupload(`FileUploadBase` `MultipartStream` `ParameterParser` `MimeUtility` `RFC2231Utility`)を写した。Claude は、本物の `tomcat-embed-core` の `FileUpload` に、Spring Boot と同じ上限(部分の中身と本文の全体が 2097152 バイト、部分の見出しが 512 バイト、部分の数が 50)を付けて、乱数で作った本文を合わせて50万通りと、決めた本文68通りを渡し、答えを比べた。食い違いは、次の1つの種類だけだった
+  - 部分の見出しの項目(`name` `filename` と、入れ子の `multipart/mixed` の `boundary`)の RFC 2047 と RFC 2231 の書き方の文字コード。Go 版は、小タスク2.2 と同じく、UTF-8 と ISO-8859-1 と US-ASCII のほかの文字コードを誤りにする。Java 版は、JDK が読める文字コード(`Shift_JIS` など)なら解いて受け付け、名前の形は正しいが JDK が知らない文字コードなら、解かずにそのままの値を使う。Go 版は、この2つ目の場合も誤りにする。Claude は、この違いを小タスク2.2 の違いと一緒に所有者に示す
+  - Tomcat は、multipart の本文を読めないとき、どの誤りでも例外を投げ、Spring はそれを `MultipartException` にする。そのため、Java 版は 500 で答えるはずである。小タスク2.4 は、この状態の番号を Java 版の答えで確かめる
+  - Tomcat の `Request.parseParts` は、部分の数の上限を、`maxParameterCount`(1000)から URL の問い合わせの項目の数を引いた数と、`maxPartCount`(50)の小さいほうにする。`parseMultipart` は 50 だけを見る。小タスク2.4 は、問い合わせの項目が 950 を超える要求を扱うかを決める
+  - Tomcat の `Request.parseParts` は、ファイルの名前の無い部分ごとに、解いたあとの名前と中身のバイト数に2を足して合計し、`maxPostSize`(Spring Boot の `server.tomcat.max-http-form-post-size`、既定は 2MB)を超えると例外を投げる。部分の名前を RFC 2047 の書き方で送ると、解いたあとのバイト数が本文の中のバイト数より大きくなるので、2MB に近い本文では Java 版だけが誤りになりうる。小タスク2.4 は、部分の数の上限と一緒に、この検査を写すかを決める
 
 ## 完了条件(全タスク共通)
 
