@@ -297,7 +297,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1(ログインの状態を持たない要求、切れた要求、偽の要求を見分けるヘッダを付けない要求)は、`require-login.yaml` の7つの操作の場面で確かめる。要件5の受入基準4(答えを変えた要求を変えた動きの一覧に載せる)は、`match_test.go` の `TestChangedBehaviors_UserItems` で確かめる。このテストは、match を書かない項目が match を持たないことを確かめる
   - _要件: 5.1, 5.4_
 
-- [ ] 6.6 版をまたいで確かめる筋書きを書いて通す
+- [x] 6.6 版をまたいで確かめる筋書きを書いて通す
 
   Claude は、まず、版をまたいで確かめる筋書きの送り先を確かめるテスト `TestCrossRoute_UserSteps` を `backend/compat/harness/cross_test.go` に作る。このテストは、`scenarios/users/` の、`modes` に `cross` を書いた筋書きを読み、Java 版から Go 版の向きと Go 版から Java 版の向きのそれぞれで、`expect.values` か `expect.body_file` を持つ段と前のログインの状態を送る段が、その前の変える段と違う版に送られることを確かめる。このテストは、`cross-update.yaml` と `cross-email-password.yaml` と `cross-invalidate.yaml` のどれかが無ければ失敗する。Claude は、そのあとで、利用者の操作の筋書きの節のとおりに、`cross-update.yaml` と `cross-email-password.yaml` と `cross-invalidate.yaml` を書く。
   - 完了の確かめ方: `go test -tags compat -run TestCrossRoute_UserSteps ./compat/harness/` が通る。`make compat-cross` が、Java 版から Go 版、Go 版から Java 版、交互の3つの向きで通る
