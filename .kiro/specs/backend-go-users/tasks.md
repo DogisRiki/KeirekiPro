@@ -95,7 +95,7 @@
   - _対象の部品: 本文を読む中間処理と multipart の読み方_
   - _依存: 1.2_
 
-- [ ] 3. 利用者の操作の処理を作る
+- [x] 3. 利用者の操作の処理を作る
 - [x] 3.1 画像を検査する (並行可)
 
   Claude は、ImageCheck の部品の節の6つの検査の順のとおりに、画像を検査する `checkImage` と、拡張子の取り出しを `image.go` に作る。
@@ -175,7 +175,7 @@
   - _対象の部品: Delete_
   - _依存: 1.3, 1.4, 3.2_
 
-- [ ] 3.9 パスワードを変え、メールアドレスとパスワードを設定する
+- [x] 3.9 パスワードを変え、メールアドレスとパスワードを設定する
 
   Claude は、Password の部品の節のとおりに、`ChangePassword` と `SetEmailAndPassword` を `password.go` に作る。
   - 完了の確かめ方: `go test ./internal/users/ -run 'TestChangePassword|TestSetEmailAndPassword'` が通る。3つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
@@ -382,6 +382,8 @@
 - 小タスク3.6 の `userinfo.go` の `UserInfo` は、JSON の名前を持たない Go の型である。小タスク4.1 は、受け口の応答の型にこの10の項目を同じ順で写す。nil のポインタは null に、空の並びは `[]` にする。値の有無で文字の列のポインタを作る `textPointer` も `userinfo.go` にある。`userinfo_integration_test.go` は、偽の AWS につなぐ `userInfoService` と、利用者の行を読んで変えて書き戻す `changeUser` を持つ。役割 ADMIN の利用者は2段階認証を使う設定でないと読めないので、テストは ADMIN を足す前に2段階認証を使う設定にする
 - 小タスク3.7 の `update.go` は、名前の前後の空白を除いて長さを確かめる `normalizeUsername`、画像の名前を作る `profileImageKey`、役割 ADMIN を持つかを返す `isAdmin` を持つ。`update_integration_test.go` は、どの項目の 400 の入力の誤りも確かめる `wantInputErrors`、偽の AWS の置き場所から画像を読む `storedObject`、2段階認証を使う設定の管理者を作る `adminUser` を持つ。小タスク3.8 の退会で画像が消えたかを確かめるときも、`storedObject` を使う。4.1 の受け口は、Java 版の受け口と同じく、`UpdateUserInfo` のあとで `GetUserInfo` を呼んで答える
 - 小タスク3.8 の `delete.go` の `DeleteUser` は、1つのトランザクションの中で、11の表の行を消し、画像を消し、世代の番号を上げ、ログインを続けるための値を消し、確認の済んだメールアドレスへメールを送る。`delete_integration_test.go` は、8つの表に履歴書の行を1行ずつ足す `insertAccountRows`、11の表の行の数を確かめる `wantAccountRows`、本物のログインで2つの値を作る `login`、Java 版の形で Redis のキーを組み立てる `sessionKeys`、世代の番号の行を足す `insertTokenVersion` を持つ。小タスク3.9 のパスワードの変更のテストは、これらを使える。4.x の退会の受け口は、204 と、Cookie を消す2つの `Set-Cookie` で答える
+- 小タスク3.9 の `password.go` の `ChangePassword` は、Java 版と同じくトランザクションを使わず、`SetEmailAndPassword` は1つのトランザクションの中で動く。4.x の受け口は、パスワードの変更には 204 で、メールアドレスとパスワードの設定には `GetUserInfo` の結果の 200 で答える。`password_integration_test.go` は、パスワードが合うかを確かめる `wantPhrase`、居ない利用者の 401 を確かめる `wantUserGone`、パスワードと `updated_at` と設定待ちのメールアドレスだけが変わったことを確かめる `wantPhraseChanged`、パスワードだけを持つ利用者を作る `phraseOnlyUser`、Google の連携だけを持つ利用者を作る `googleOnlyUser`、利用者ごとに違うメールアドレスを作る `newAddress` を持つ
+- テストの対象のコードを壊した写しで、変数を使う唯一の箇所を消すと、Go は使わない変数を誤りにしてビルドが通らない。Claude は、条件を `x || true` のように書き換えて壊す
 
 ## 完了条件(全タスク共通)
 
