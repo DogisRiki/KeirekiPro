@@ -109,11 +109,10 @@ AIがIssueの本文とその時点のコードを調べ、4つの観点で判断
   AIは起動しない(`disable-model-invocation` により、AIからは起動できない)。必要なときは所有者に打つよう依頼する
 - Phase 1(仕様化):
   - `/kiro-spec-init #N`(既存の spec を新しいIssueのために直すときは `/kiro-spec-init #N <feature>`)→ `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
-  - 審査役のモデルは、Fable と Opus のどちらかの系統で選び、審査役はその系統の、その Claude Code で使える最新のモデルで動く。既定は Fable の系統で、所有者は spec ごとに Opus の系統を選べる。
-    ただし、本体の会話が審査役と同じ系統で動いているときは、審査役は本体の会話と同じ版で動く。審査役が実際に動いた版は、往復ごとの審査の記録に残る。所有者は、spec を始めるときに、選んだモデルを会話で伝える。
+  - 審査役は Fable か Opus の系統の最新のモデルで動く。既定は Fable で、所有者は spec ごとに Opus を選べる。
+    本体の会話が同じ系統のときは、審査役は本体の会話と同じ版で動く。所有者は、選んだモデルを spec の始めに会話で伝える(版を付けて伝えたときは `/kiro-spec-init` の SKILL.md に従う)。
     所有者がモデルを伝えたときと、spec の途中で選び直したときに、実装セッションは、その spec の spec.json の `review_model` に `fable` か `opus` を書き、書いた値を所有者に1行で示す。
     spec.json がまだ無いときは、`/kiro-spec-init` が spec.json を作った直後に書く。所有者が選んでいない spec では `review_model` を書かない
-  - 所有者が「Fable 5.1」のように版を付けて審査役のモデルを伝えたときは、実装セッションは、その版の系統(`fable` か `opus`)を `review_model` に書く。実装セッションは、書いた値を示す1行に添えて、次の3つを返事に書く。1つ目は、版は選べないことである。2つ目は、その spec の審査役がその系統の最新のモデルで動くことである。3つ目は、本体の会話が同じ系統で動いているときは、審査役が本体の会話と同じ版で動くことである
   - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
   - `/kiro-validate-design` は使わない(`/spec-review` が置き換えた)。cc-sdd のスキルの出力で案内されても起動しない
 - Phase 2(実装): `/kiro-impl {feature}`(タスクごとに実装+確認役の独立レビュー+最終検証)
