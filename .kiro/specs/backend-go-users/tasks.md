@@ -63,7 +63,7 @@
   - _依存: 1.6_
 
 - [ ] 2. 名前と画像と2段階認証の設定の変更の要求の本文を読む部品を作る
-- [ ] 2.1 JDK の UTF-8 の読み方を写す
+- [x] 2.1 JDK の UTF-8 の読み方を写す
 
   Claude は、本文を読む中間処理と multipart の読み方の節のとおりに、JDK の UTF-8 の読み方を写した、バイトの並びを文字列にする処理を `jdkutf8.go` に作る。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestJDKUTF8` が通る
@@ -363,6 +363,8 @@
 - 小タスク1.5 の `internal/users/errors.go` は、Java 版のユースケースと `User` と要求の型の注釈の文言だけを持つ。メールアドレスとパスワードの設定で、ほかの利用者が使っているメールアドレスを断る文言「このメールアドレスは登録できません。」は、Java 版のドメインのサービス `UserEmailDuplicationCheckService` の文言である。Claude は、この文言に、認証の spec が公開した `auth.MessageEmailNotRegistrable` を使う
 - 小タスク1.6 で、偽の AWS の `fakeaws.go` の `ServeHTTP` は、`ServeMux` に渡す前に、URL のパスから置き場所の名前と画像の名前を取り出し、`r.SetPathValue` で要求に入れる。`s3.go` の処理は、今までどおり `r.PathValue` で、その取り出した名前を読む。そのため、`s3.go` は変えていない
 - 小タスク1.7 の `internal/users/main_integration_test.go` は、Postgres への接続の束 `testPool`、Valkey の「ホスト:ポート」`testRedisAddr`、偽の AWS の URL `testAWSEndpoint`、置き場所の名前 `testBucket` と、本番と同じ `awsclient.New` で S3 のクライアントを作る `newTestS3` を持つ。小タスク3.2 と3.4 から3.9 の結合テストは、これらを使う
+- Java の動きを写した Go のコードは、本物の Java と突き合わせられる。Claude は、`backend/build/` の下(git が無視するフォルダ)に Java の1つのファイルのプログラムを置き、`bash .claude/scripts/parallel/run-check.sh --wait backend sh -c 'java build/<フォルダ>/<名前>.java'` で動かして答えをファイルに書かせ、Go の一時のテストで読んで比べる。比べ終えたら、一時のテストと `backend/build/` の下のファイルを消す。小タスク2.1 は、この形で30万通りのバイト列を比べ、すべて一致した
+- Go の `strings.Builder.WriteRune` は、サロゲートの範囲の字を U+FFFD にして書く。そのため、`jdkutf8.go` は、3バイトの字がサロゲートの範囲かを自分で調べない
 
 ## 完了条件(全タスク共通)
 
