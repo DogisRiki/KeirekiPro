@@ -36,9 +36,10 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 ## 自律動作の境界
 
 - 作業は必ずfeatureブランチで行う。mainブランチではcommit/pushしない(hookでもブロックされる)
-- ゲート設定ファイル(`.github/` `.claude/` `eslint.config.js` `vite.config.ts` `backend/gradle/quality.gradle` `backend/config/` ArchUnitテスト `CODEOWNERS`)は変更しない。変更が必要なときは理由を添えて人間に提案する
-- 人間の承認が必要な変更: ライブラリの入手先と実行設定(`frontend/.npmrc` `.pnpmfile.cjs` `.pnpmfile.mjs` `pnpm-workspace.yaml`)の変更・backendのビルドスクリプト(`*.gradle` `*.gradle.kts`)の変更・DBスキーマ変更(マイグレーション)・ゲート設定の変更・リポジトリ外部へのデータ送信。これらを含むPRは承認まで自動マージされない(dependency-gate / CODEOWNERSが機械強制)
-- 依存のバージョン宣言(`package.json` `pnpm-lock.yaml` `libs.versions.toml` `gradle-wrapper.properties`)は承認の対象外。dependency-review(新規の脆弱性)・dependency-cooldown(公開から72時間未満)・gradle-wrapper(配布元と公表チェックサム)が代わりに止める。**バージョンは `backend/gradle/libs.versions.toml` に集約し、`build.gradle` に直書きしない**(直書きすると承認が必要な側に戻る)
+- ゲート設定ファイル(次の箇条の一覧)は変更しない。変更が必要なときは理由を添えて人間に提案する
+- 人間の承認が必要な変更: ライブラリの入手先と実行設定(`frontend/.npmrc` `.pnpmfile.cjs` `.pnpmfile.mjs` `pnpm-workspace.yaml`)の変更・backendのビルドスクリプト(`*.gradle` `*.gradle.kts`)の変更・DBスキーマ変更(マイグレーション)・ゲート設定ファイルの変更・リポジトリ外部へのデータ送信。これらを含むPRは承認まで自動マージされない(dependency-gate / escape-hatch / CODEOWNERSが機械強制)
+  - ゲート設定ファイル(品質チェックが何を調べるかを決めるファイル): `.github/` `.claude/` `.gitleaksignore` `.gitleaks.toml` `.editorconfig`。frontend の `eslint.config.*` `vite.config.*` `vitest.config.*` `vitest.workspace.*` `playwright.config.*` `tsconfig*.json` `.prettierrc*` `prettier.config.*` `.prettierignore` `knip.*` `stryker.conf*` と、`package.json` の依存の版と `packageManager` のほかの欄。backend の `gradle/quality.gradle` `config/` ArchUnitテスト `Makefile` `.golangci.yml` `.testcoverage.yml` `.gremlins.yaml` `api/oapi-codegen.yaml` `sqlc.yaml`。terraform の `.checkov.yaml` `.tflint.hcl` `.checkov.baseline` と、`docker/terraform/Dockerfile` の FROM の版のほかの行
+- 依存のバージョン宣言(`package.json` の依存の版 `pnpm-lock.yaml` `libs.versions.toml` `gradle-wrapper.properties`)は承認の対象外。dependency-review(新規の脆弱性)・dependency-cooldown(公開から72時間未満)・gradle-wrapper(配布元と公表チェックサム)が代わりに止める。**バージョンは `backend/gradle/libs.versions.toml` に集約し、`build.gradle` に直書きしない**(直書きすると承認が必要な側に戻る)
 - CI の Node.js・Trivy・Codex CLI・Terraform の版を、公開から72時間経っていない版に変えるのは、所有者が会話で指示したときだけにし、`ci-tool-fast-update` のスキルに従う
 - テストのskip化・アサーション削除・カバレッジ/lint除外の追加で「見かけの合格」を作らない(escape-hatchチェックが機械検知)
 - 確かめの結果が、承認済みの spec かIssueの本文の合格の条件に届かないときは、合格と書かず、食い違いと目的を満たすと考える理由を報告・記録・PR本文に書く。合否は所有者が決め、決まるまで出荷しない
