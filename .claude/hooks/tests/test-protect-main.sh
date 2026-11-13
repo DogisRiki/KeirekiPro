@@ -24,7 +24,7 @@ fail=0
 hook_stderr() {
     printf '%s' "$2" \
         | perl -MJSON::PP -e 'local $/; my $c = <STDIN>; print JSON::PP->new->encode({tool_input => {command => $c}, cwd => $ARGV[0]})' -- "$WORK/$1" \
-        | bash "$HOOK" 2>&1 >/dev/null
+        | { bash "$HOOK" >/dev/null; } 2>&1
 }
 
 # expect <期待する終了コード> <リポジトリ(feature|main)> <コマンド>

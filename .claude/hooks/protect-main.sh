@@ -44,7 +44,10 @@ command=$(extract tool_input command)
 # 引数ごと読み飛ばす。引数は、引用符で囲んだ空白入りの形も読み飛ばす。
 # それ以外の - で始まる語(--no-pager、-P、--git-dir=<path> など)は1語として読み飛ばす。
 # 指定の一覧: https://git-scm.com/docs/git#_options
-GIT_RE='git((?:\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace|--attr-source|--config-env)\s+(?:"[^"]*"|\x27[^\x27]*\x27|[^\s"\x27;&|]+)+|-[^\s;&|]*))*)\s+'
+# 正規表現は引用符と \ を含むので、シェルに解釈させないよう、引用符付きのヒアドキュメントで読む。
+read -r -d '' GIT_RE <<'RE'
+git((?:\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace|--attr-source|--config-env)\s+(?:"[^"]*"|'[^']*'|[^\s"';&|]+)+|-[^\s;&|]*))*)\s+
+RE
 export GIT_RE
 
 # コマンドの文字列が、perl の正規表現 $1 に当たるかを返す(0 = 当たる)。
