@@ -71,7 +71,7 @@
   - _要件: 1.1_
   - _依存: 1.2_
 
-- [ ] 2.2 部分の名前とファイルの名前の読み方を写す
+- [x] 2.2 部分の名前とファイルの名前の読み方を写す
 
   Claude は、本文を読む中間処理と multipart の読み方の節のとおりに、Spring 7.0.10 の `ContentDisposition.parse` を写した読み方を `contentdisposition.go` に作る。Claude は、写す元の Spring のソースを、Java 版の依存の jar から開いて確かめる。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestContentDisposition` が通る
@@ -365,6 +365,8 @@
 - 小タスク1.7 の `internal/users/main_integration_test.go` は、Postgres への接続の束 `testPool`、Valkey の「ホスト:ポート」`testRedisAddr`、偽の AWS の URL `testAWSEndpoint`、置き場所の名前 `testBucket` と、本番と同じ `awsclient.New` で S3 のクライアントを作る `newTestS3` を持つ。小タスク3.2 と3.4 から3.9 の結合テストは、これらを使う
 - Java の動きを写した Go のコードは、本物の Java と突き合わせられる。Claude は、`backend/build/` の下(git が無視するフォルダ)に Java の1つのファイルのプログラムを置き、`bash .claude/scripts/parallel/run-check.sh --wait backend sh -c 'java build/<フォルダ>/<名前>.java'` で動かして答えをファイルに書かせ、Go の一時のテストで読んで比べる。比べ終えたら、一時のテストと `backend/build/` の下のファイルを消す。小タスク2.1 は、この形で30万通りのバイト列を比べ、すべて一致した
 - Go の `strings.Builder.WriteRune` は、サロゲートの範囲の字を U+FFFD にして書く。そのため、`jdkutf8.go` は、3バイトの字がサロゲートの範囲かを自分で調べない
+- Java 版の Spring は、`ContentDisposition.parse` の結果のうちファイルの名前だけを使う。部分の名前は、Tomcat の `Part.getName()` が Tomcat の読み方で読んだものである(`StandardMultipartHttpServletRequest.parseRequest`)。小タスク2.3 と2.4 は、部分の名前の端の場合(項目の名前の大文字と小文字、引用符の無い値の逆スラッシュ、`form-data` で始まらない見出し)を Java 版の答えで確かめ、食い違えば Java 版に合わせる。Spring は、すべての部分で `ContentDisposition.parse` を呼び、例外を `MultipartException` にする。そのため、どれか1つの部分で `parseContentDisposition` が誤りを返せば、要求の全体を誤りとして扱う。そのときの Java 版の状態の番号も、小タスク2.4 で Java 版の答えで確かめる
+- 小タスク2.2 の `contentdisposition.go` は、RFC 2047 の書き方(`=?文字コード?B?…?=`)の文字コードを、UTF-8 と ISO-8859-1 と US-ASCII と、その JDK の別名に限り、ほかの文字コード(`Shift_JIS` など)を誤りにする。Java 版は、JDK が読める文字コードなら解いて受け付ける(research.md の P4 の節)。この違いは、Java 版が 200 で答え、Go 版が受け付けない違いなので、変えた動きの一覧に項目を足す小タスクの「Java 版の 500 を Go 版の 400 にする」決まりには当たらない。Claude は、変えた動きの一覧に項目を足す小タスクで所有者に項目の一覧を示すときに、この違いも示し、項目を足すかを所有者に決めてもらう。PR の本文にも書く
 
 ## 完了条件(全タスク共通)
 
