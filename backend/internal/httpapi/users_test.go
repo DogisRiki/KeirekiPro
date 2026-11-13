@@ -5,12 +5,21 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
+
+	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/gen"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/authctx"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/users"
 )
 
 const formCT = "multipart/form-data; boundary=XB"
@@ -369,5 +378,398 @@ func TestUpdateUserInfoBody_BodyReadError(t *testing.T) {
 	mustReject400(t, "本文を読めない", runUpdateUserInfoForm(t, "", formCT, body))
 	if _, ok := updateUserInfoFormFrom(context.Background()); ok {
 		t.Error("項目を入れていない context から項目を読めた")
+	}
+}
+
+// handlerUserID は、受け口のテストでログインしている利用者の ID である。
+var handlerUserID = uuid.MustParse("6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b")
+
+// loggedIn は、handlerUserID の利用者がログインしている context を返す。
+func loggedIn() context.Context {
+	return authctx.With(context.Background(), handlerUserID, []string{"USER"})
+}
+
+// withForm は、本文を読む中間処理が form を入れた context を返す。
+func withForm(ctx context.Context, form updateUserInfoForm) context.Context {
+	return context.WithValue(ctx, updateUserInfoFormKey{}, form)
+}
+
+// fakeUsers は、利用者の処理の代わりである。呼ばれた操作と引数を calls に記録し、errs に操作の名前で決めた誤りを返す。
+// GetUserInfo は、誤りが無ければ info を返す。
+type fakeUsers struct {
+	calls []string
+	info  users.UserInfo
+	errs  map[string]error
+}
+
+func (f *fakeUsers) record(op, format string, args ...any) error {
+	f.calls = append(f.calls, op+"("+fmt.Sprintf(format, args...)+")")
+	return f.errs[op]
+}
+
+func (f *fakeUsers) GetUserInfo(_ context.Context, userID uuid.UUID) (users.UserInfo, error) {
+	if err := f.record("GetUserInfo", "%s", userID); err != nil {
+		return users.UserInfo{}, err
+	}
+	return f.info, nil
+}
+
+func (f *fakeUsers) UpdateUserInfo(_ context.Context, in users.UpdateInput) error {
+	image := "nil"
+	if in.ProfileImage != nil {
+		image = fmt.Sprintf("%q %q %q", in.ProfileImage.FileName, in.ProfileImage.ContentType, in.ProfileImage.Content)
+	}
+	return f.record("UpdateUserInfo", "%s, username=%s twoFactor=%s image=%s",
+		in.UserID, optText(in.Username), optBool(in.TwoFactorAuthEnabled), image)
+}
+
+func (f *fakeUsers) DeleteUser(_ context.Context, userID uuid.UUID) error {
+	return f.record("DeleteUser", "%s", userID)
+}
+
+func (f *fakeUsers) SendAccountEmailVerification(_ context.Context, userID uuid.UUID) error {
+	return f.record("SendAccountEmailVerification", "%s", userID)
+}
+
+func (f *fakeUsers) SetEmailAndPassword(_ context.Context, in users.SetEmailAndPasswordInput) error {
+	return f.record("SetEmailAndPassword", "%s, email=%s password=%q current=%s",
+		in.UserID, optText(in.Email), in.Password, optText(in.CurrentPassword))
+}
+
+func (f *fakeUsers) ChangePassword(_ context.Context, userID uuid.UUID, nowPassword, newPassword string) error {
+	return f.record("ChangePassword", "%s, %q, %q", userID, nowPassword, newPassword)
+}
+
+func (f *fakeUsers) RemoveAuthProvider(_ context.Context, userID uuid.UUID, provider string) error {
+	return f.record("RemoveAuthProvider", "%s, %q", userID, provider)
+}
+
+func optText(p *string) string {
+	if p == nil {
+		return "nil"
+	}
+	return strconv.Quote(*p)
+}
+
+func optBool(p *bool) string {
+	if p == nil {
+		return "nil"
+	}
+	return strconv.FormatBool(*p)
+}
+
+// fullInfo は、すべての項目に値がある利用者の情報である。名前の < > & は、Java 版の Jackson と同じく逃がさずに書く。
+func fullInfo() users.UserInfo {
+	return users.UserInfo{
+		ID:                   handlerUserID,
+		Email:                ptr("user@example.com"),
+		Username:             ptr("名前<a&b>"),
+		HasPassword:          true,
+		ProfileImage:         ptr("http://localhost:4566/bucket/profile-image.png?X-Amz-Signature=abc&X-Amz-Expires=600"),
+		TwoFactorAuthEnabled: true,
+		AuthProviders:        []string{"github", "google"},
+		Roles:                []string{"ADMIN", "USER"},
+		EmailVerified:        true,
+		PendingEmail:         ptr("next@example.com"),
+	}
+}
+
+// fullInfoJSON は、fullInfo を Java 版の UserInfoResponse の項目の順で書いた本文である。
+const fullInfoJSON = `{"id":"6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b","email":"user@example.com","username":"名前<a&b>",` +
+	`"hasPassword":true,"profileImage":"http://localhost:4566/bucket/profile-image.png?X-Amz-Signature=abc&X-Amz-Expires=600",` +
+	`"twoFactorAuthEnabled":true,"authProviders":["github","google"],"roles":["ADMIN","USER"],"emailVerified":true,` +
+	`"pendingEmail":"next@example.com"}`
+
+// deleteSessionCookies は、Java 版の CookieUtil.deleteCookie が accessToken と refreshToken を消す Set-Cookie である。
+func deleteSessionCookies(secure bool) []string {
+	attrs := "; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax"
+	if secure {
+		attrs = "; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; SameSite=Lax"
+	}
+	return []string{"accessToken=" + attrs, "refreshToken=" + attrs}
+}
+
+// userOp は、利用者の受け口の1つの操作である。call は、検査を通る値で受け口を呼ぶ。calls は、処理がすべて成功するときの
+// 処理の呼び出しで、want は、そのときの応答である。
+type userOp struct {
+	name  string
+	call  func(ctx context.Context, h *userHandlers) (any, error)
+	calls []string
+	want  func(secure bool) wantResponse
+}
+
+func infoWant(bool) wantResponse {
+	return wantResponse{status: http.StatusOK, contentType: "application/json", body: fullInfoJSON}
+}
+
+func noContentWant(bool) wantResponse { return wantResponse{status: http.StatusNoContent} }
+
+func userOps() []userOp {
+	id := handlerUserID.String()
+	return []userOp{
+		{
+			name: "GetUserInfo",
+			call: func(ctx context.Context, h *userHandlers) (any, error) {
+				return h.GetUserInfo(ctx, gen.GetUserInfoRequestObject{})
+			},
+			calls: []string{"GetUserInfo(" + id + ")"},
+			want:  infoWant,
+		},
+		{
+			name: "UpdateUserInfo",
+			call: func(ctx context.Context, h *userHandlers) (any, error) {
+				form := updateUserInfoForm{
+					Username:             ptr("新しい名前"),
+					TwoFactorAuthEnabled: boolPtr(true),
+					ProfileImage:         &profileImageInput{FileName: "a.PNG", ContentType: "image/png", Content: []byte("PNG")},
+				}
+				return h.UpdateUserInfo(withForm(ctx, form), gen.UpdateUserInfoRequestObject{})
+			},
+			calls: []string{
+				"UpdateUserInfo(" + id + `, username="新しい名前" twoFactor=true image="a.PNG" "image/png" "PNG")`,
+				"GetUserInfo(" + id + ")",
+			},
+			want: infoWant,
+		},
+		{
+			name: "DeleteUser",
+			call: func(ctx context.Context, h *userHandlers) (any, error) {
+				return h.DeleteUser(ctx, gen.DeleteUserRequestObject{})
+			},
+			calls: []string{"DeleteUser(" + id + ")"},
+			want: func(secure bool) wantResponse {
+				return wantResponse{status: http.StatusNoContent, cookies: deleteSessionCookies(secure)}
+			},
+		},
+		{
+			name: "SendAccountEmailVerification",
+			call: func(ctx context.Context, h *userHandlers) (any, error) {
+				return h.SendAccountEmailVerification(ctx, gen.SendAccountEmailVerificationRequestObject{})
+			},
+			calls: []string{"SendAccountEmailVerification(" + id + ")"},
+			want:  noContentWant,
+		},
+		{
+			name: "SetEmailAndPassword",
+			call: func(ctx context.Context, h *userHandlers) (any, error) {
+				body := gen.SetEmailAndPasswordJSONRequestBody{
+					Email: ptr("next@example.com"), Password: "Passw0rd!", ConfirmPassword: ptr("Passw0rd!"),
+					CurrentPassword: ptr("Old-Passw0rd!"),
+				}
+				return h.SetEmailAndPassword(ctx, gen.SetEmailAndPasswordRequestObject{Body: &body})
+			},
+			calls: []string{
+				"SetEmailAndPassword(" + id + `, email="next@example.com" password="Passw0rd!" current="Old-Passw0rd!")`,
+				"GetUserInfo(" + id + ")",
+			},
+			want: infoWant,
+		},
+		{
+			name: "ChangePassword",
+			call: func(ctx context.Context, h *userHandlers) (any, error) {
+				body := gen.ChangePasswordJSONRequestBody{NowPassword: "Old-Passw0rd!", NewPassword: "New-Passw0rd!"}
+				return h.ChangePassword(ctx, gen.ChangePasswordRequestObject{Body: &body})
+			},
+			calls: []string{"ChangePassword(" + id + `, "Old-Passw0rd!", "New-Passw0rd!")`},
+			want:  noContentWant,
+		},
+		{
+			name: "RemoveAuthProvider",
+			call: func(ctx context.Context, h *userHandlers) (any, error) {
+				return h.RemoveAuthProvider(ctx, gen.RemoveAuthProviderRequestObject{Provider: "GitHub"})
+			},
+			calls: []string{"RemoveAuthProvider(" + id + `, "GitHub")`},
+			want:  noContentWant,
+		},
+	}
+}
+
+// opName は、処理の呼び出しの記録から、処理の名前を取り出す。
+func opName(call string) string {
+	name, _, _ := strings.Cut(call, "(")
+	return name
+}
+
+// TestUserHandlers_SuccessResponses は、利用者の受け口が、Java 版の7つの受け口と同じ状態の番号と本文と Cookie で答える
+// ことを確かめる(要件1の受入基準1と2)。名前と画像と2段階認証の設定の変更と、メールアドレスとパスワードの設定は、
+// 変えたあとに利用者の情報を読んで答える。処理が *auth.Error を返せば Java 版の AppExceptionHandler と同じ形で答え、
+// 続く処理を呼ばない。ほかの誤りは、生成したコードの誤りの処理に渡す。
+func TestUserHandlers_SuccessResponses(t *testing.T) {
+	ops := userOps()
+	if len(ops) != 7 {
+		t.Fatalf("操作の数 = %d, want 7", len(ops))
+	}
+	business := auth.ErrBusiness("業務の誤りの文言")
+	for _, op := range ops {
+		for _, secure := range []bool{false, true} {
+			name := fmt.Sprintf("%s(secure=%v)", op.name, secure)
+			f := &fakeUsers{info: fullInfo()}
+			resp, err := op.call(loggedIn(), newUserHandlers(f, secure))
+			checkResponse(t, name+" の成功", handled(t, resp, err), op.want(secure))
+			checkUserCalls(t, name+" の成功", f, op.calls...)
+
+			for i, call := range op.calls {
+				f = &fakeUsers{info: fullInfo(), errs: map[string]error{opName(call): business}}
+				resp, err = op.call(loggedIn(), newUserHandlers(f, secure))
+				label := fmt.Sprintf("%s の %s の *auth.Error", name, opName(call))
+				checkResponse(t, label, handled(t, resp, err), errorWant(t, business, secure))
+				checkUserCalls(t, label, f, op.calls[:i+1]...)
+
+				f = &fakeUsers{info: fullInfo(), errs: map[string]error{opName(call): fmt.Errorf("包む: %w", errTestBoom)}}
+				if _, err = op.call(loggedIn(), newUserHandlers(f, secure)); !errors.Is(err, errTestBoom) {
+					t.Errorf("%s の %s のほかの誤り = %v, want %v を包んだ誤り", name, opName(call), err, errTestBoom)
+				}
+				checkUserCalls(t, name+" の "+opName(call)+" のほかの誤り", f, op.calls[:i+1]...)
+			}
+		}
+	}
+}
+
+// TestUserHandlers_DeleteUserClearsCookies は、退会が、Java 版の DeleteUserController と同じく、204 と、本文を書かずに、
+// accessToken と refreshToken をこの順に消す2つの Set-Cookie で答えることを確かめる(要件1の受入基準1と2)。
+func TestUserHandlers_DeleteUserClearsCookies(t *testing.T) {
+	for _, secure := range []bool{false, true} {
+		f := &fakeUsers{}
+		resp, err := newUserHandlers(f, secure).DeleteUser(loggedIn(), gen.DeleteUserRequestObject{})
+		got := handled(t, resp, err)
+		want := wantResponse{status: http.StatusNoContent, cookies: deleteSessionCookies(secure)}
+		checkResponse(t, fmt.Sprintf("退会(secure=%v)", secure), got, want)
+	}
+}
+
+// TestUserHandlers_UserGoneClearsCookies は、すでに居ない利用者の要求に、7つの受け口が、Java 版と同じ 401 と
+// 「不正なアクセスです。」の本文と、accessToken と refreshToken を消す2つの Set-Cookie で答えることを確かめる
+// (要件1の受入基準6)。変えたあとに利用者の情報を読む2つの操作は、読むときに居なくなった場合も同じに答える。
+func TestUserHandlers_UserGoneClearsCookies(t *testing.T) {
+	gone := auth.ErrCredentialsNotFound(users.MessageInvalidAccess)
+	for _, op := range userOps() {
+		for _, call := range op.calls {
+			for _, secure := range []bool{false, true} {
+				f := &fakeUsers{info: fullInfo(), errs: map[string]error{opName(call): gone}}
+				resp, err := op.call(loggedIn(), newUserHandlers(f, secure))
+				want := wantResponse{
+					status:      http.StatusUnauthorized,
+					cookies:     deleteSessionCookies(secure),
+					contentType: "application/json",
+					body:        `{"message":"不正なアクセスです。","errors":{}}`,
+				}
+				checkResponse(t, fmt.Sprintf("%s の %s で居ない利用者(secure=%v)", op.name, opName(call), secure),
+					handled(t, resp, err), want)
+			}
+		}
+	}
+}
+
+// TestUserHandlers_NullAndEmptyFields は、値の無い項目を null で、連携と役割が無いときを空の並びで書くことを確かめる。
+// Java 版の UserInfoResponse は、null の項目も省かずに書く。
+func TestUserHandlers_NullAndEmptyFields(t *testing.T) {
+	for _, info := range []users.UserInfo{
+		{ID: handlerUserID},
+		{ID: handlerUserID, AuthProviders: []string{}, Roles: []string{}},
+	} {
+		f := &fakeUsers{info: info}
+		resp, err := newUserHandlers(f, false).GetUserInfo(loggedIn(), gen.GetUserInfoRequestObject{})
+		want := wantResponse{
+			status:      http.StatusOK,
+			contentType: "application/json",
+			body: `{"id":"6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b","email":null,"username":null,"hasPassword":false,` +
+				`"profileImage":null,"twoFactorAuthEnabled":false,"authProviders":[],"roles":[],"emailVerified":false,` +
+				`"pendingEmail":null}`,
+		}
+		checkResponse(t, fmt.Sprintf("値の無い項目(連携 %#v)", info.AuthProviders), handled(t, resp, err), want)
+	}
+}
+
+// TestUserHandlers_OptionalValues は、本文の任意の項目が無い要求で、受け口が nil を処理に渡すことを確かめる。
+func TestUserHandlers_OptionalValues(t *testing.T) {
+	id := handlerUserID.String()
+	f := &fakeUsers{info: fullInfo()}
+	h := newUserHandlers(f, false)
+	resp, err := h.UpdateUserInfo(withForm(loggedIn(), updateUserInfoForm{}), gen.UpdateUserInfoRequestObject{})
+	checkResponse(t, "項目の無い変更", handled(t, resp, err), infoWant(false))
+	checkUserCalls(t, "項目の無い変更", f,
+		"UpdateUserInfo("+id+", username=nil twoFactor=nil image=nil)", "GetUserInfo("+id+")")
+
+	f = &fakeUsers{info: fullInfo()}
+	h = newUserHandlers(f, false)
+	body := gen.SetEmailAndPasswordJSONRequestBody{Password: "Passw0rd!"}
+	setResp, err := h.SetEmailAndPassword(loggedIn(), gen.SetEmailAndPasswordRequestObject{Body: &body})
+	checkResponse(t, "パスワードだけの設定", handled(t, setResp, err), infoWant(false))
+	checkUserCalls(t, "パスワードだけの設定", f,
+		"SetEmailAndPassword("+id+`, email=nil password="Passw0rd!" current=nil)`, "GetUserInfo("+id+")")
+}
+
+// TestUserHandlers_ValidationErrors は、パスワードの変更と、メールアドレスとパスワードの設定が、要求を検査し、誤りが
+// あれば処理を呼ばずに 400 と入力の誤りの本文で答えることを確かめる。検査の中身は users のテストが確かめる。
+func TestUserHandlers_ValidationErrors(t *testing.T) {
+	f := &fakeUsers{}
+	h := newUserHandlers(f, false)
+	change := gen.ChangePasswordJSONRequestBody{NowPassword: " ", NewPassword: "short"}
+	resp, err := h.ChangePassword(loggedIn(), gen.ChangePasswordRequestObject{Body: &change})
+	got := handled(t, resp, err)
+	if got.status != http.StatusBadRequest {
+		t.Errorf("パスワードの変更の検査の誤りの状態の番号 = %d, want 400", got.status)
+	}
+	checkResponse(t, "パスワードの変更の検査の誤り", got, errorWant(t, users.ValidateChangePassword(" ", "short"), false))
+
+	set := gen.SetEmailAndPasswordJSONRequestBody{Email: ptr("not-an-address"), Password: "", ConfirmPassword: ptr("x")}
+	setResp, err := h.SetEmailAndPassword(loggedIn(), gen.SetEmailAndPasswordRequestObject{Body: &set})
+	got = handled(t, setResp, err)
+	if got.status != http.StatusBadRequest {
+		t.Errorf("メールアドレスとパスワードの設定の検査の誤りの状態の番号 = %d, want 400", got.status)
+	}
+	want := errorWant(t, users.ValidateSetEmailAndPassword(set.Email, set.Password, set.ConfirmPassword), false)
+	checkResponse(t, "メールアドレスとパスワードの設定の検査の誤り", got, want)
+	checkUserCalls(t, "検査の誤り", f)
+}
+
+// TestUserHandlers_MissingContext は、ログインした利用者の ID が context に無いときと、名前と画像と2段階認証の設定の
+// 変更で本文を読む中間処理の結果が無いときに、受け口が処理を呼ばずに誤りを返すことを確かめる。どちらも、受け口の前の
+// 段が組み立ての誤りで抜けたときにだけ起きるので、生成したコードの誤りの処理が 500 にする。
+func TestUserHandlers_MissingContext(t *testing.T) {
+	for _, op := range userOps() {
+		f := &fakeUsers{}
+		_, err := op.call(withForm(context.Background(), updateUserInfoForm{}), newUserHandlers(f, false))
+		if !errors.Is(err, errNoLoginUser) {
+			t.Errorf("%s のログインした利用者の無い context の誤り = %v, want %v", op.name, err, errNoLoginUser)
+		}
+		checkUserCalls(t, op.name+" のログインした利用者の無い context", f)
+	}
+	f := &fakeUsers{}
+	_, err := newUserHandlers(f, false).UpdateUserInfo(loggedIn(), gen.UpdateUserInfoRequestObject{})
+	if !errors.Is(err, errNoUpdateUserInfoForm) {
+		t.Errorf("本文を読んだ結果の無い変更の誤り = %v, want %v", err, errNoUpdateUserInfoForm)
+	}
+	checkUserCalls(t, "本文を読んだ結果の無い変更", f)
+}
+
+// checkUserCalls は、利用者の処理が want の順に呼ばれたことを確かめる。
+func checkUserCalls(t *testing.T, name string, f *fakeUsers, want ...string) {
+	t.Helper()
+	if len(f.calls) == 0 && len(want) == 0 {
+		return
+	}
+	if !reflect.DeepEqual(f.calls, want) {
+		t.Errorf("%s の処理の呼び出し = %q, want %q", name, f.calls, want)
+	}
+}
+
+// TestUserResponses_AllOperationsWrite は、利用者の7つの操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
+// 渡した順の2つの Set-Cookie と、Content-Type と、本文を書くことを確かめる。
+func TestUserResponses_AllOperationsWrite(t *testing.T) {
+	r := authJSON(http.StatusOK, map[string]string{"a": "<&>"}, "c1=1", "c2=2")
+	want := wantResponse{
+		status: http.StatusOK, cookies: []string{"c1=1", "c2=2"}, contentType: "application/json", body: `{"a":"<&>"}`,
+	}
+	for name, visit := range map[string]func(http.ResponseWriter) error{
+		"GetUserInfo":                  r.VisitGetUserInfoResponse,
+		"UpdateUserInfo":               r.VisitUpdateUserInfoResponse,
+		"DeleteUser":                   r.VisitDeleteUserResponse,
+		"SendAccountEmailVerification": r.VisitSendAccountEmailVerificationResponse,
+		"SetEmailAndPassword":          r.VisitSetEmailAndPasswordResponse,
+		"ChangePassword":               r.VisitChangePasswordResponse,
+		"RemoveAuthProvider":           r.VisitRemoveAuthProviderResponse,
+	} {
+		checkResponse(t, name, recordResponse(t, visit), want)
 	}
 }

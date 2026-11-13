@@ -185,7 +185,7 @@
   - _依存: 3.3_
 
 - [ ] 4. 利用者の受け口をつなぐ
-- [ ] 4.1 利用者の7つの操作の受け口と応答の型を作る
+- [x] 4.1 利用者の7つの操作の受け口と応答の型を作る
 
   Claude は、`users.go` に、利用者の受け口の節のとおりの型 `userHandlers` と7つの操作のメソッドを作り、`userresponses.go` に7つの操作の `Visit<操作の名前>Response` を作る。受け口は、利用者の処理をインタフェースで受ける。テストで処理の代わりを使うためである。`updateUserInfo` の受け口は、小タスク2.4 の中間処理が `context` に入れた項目を読む。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run 'TestUserHandlers|TestUserResponses'` が通る
@@ -384,6 +384,7 @@
 - 小タスク3.8 の `delete.go` の `DeleteUser` は、1つのトランザクションの中で、11の表の行を消し、画像を消し、世代の番号を上げ、ログインを続けるための値を消し、確認の済んだメールアドレスへメールを送る。`delete_integration_test.go` は、8つの表に履歴書の行を1行ずつ足す `insertAccountRows`、11の表の行の数を確かめる `wantAccountRows`、本物のログインで2つの値を作る `login`、Java 版の形で Redis のキーを組み立てる `sessionKeys`、世代の番号の行を足す `insertTokenVersion` を持つ。小タスク3.9 のパスワードの変更のテストは、これらを使える。4.x の退会の受け口は、204 と、Cookie を消す2つの `Set-Cookie` で答える
 - 小タスク3.9 の `password.go` の `ChangePassword` は、Java 版と同じくトランザクションを使わず、`SetEmailAndPassword` は1つのトランザクションの中で動く。4.x の受け口は、パスワードの変更には 204 で、メールアドレスとパスワードの設定には `GetUserInfo` の結果の 200 で答える。`password_integration_test.go` は、パスワードが合うかを確かめる `wantPhrase`、居ない利用者の 401 を確かめる `wantUserGone`、パスワードと `updated_at` と設定待ちのメールアドレスだけが変わったことを確かめる `wantPhraseChanged`、パスワードだけを持つ利用者を作る `phraseOnlyUser`、Google の連携だけを持つ利用者を作る `googleOnlyUser`、利用者ごとに違うメールアドレスを作る `newAddress` を持つ
 - テストの対象のコードを壊した写しで、変数を使う唯一の箇所を消すと、Go は使わない変数を誤りにしてビルドが通らない。Claude は、条件を `x || true` のように書き換えて壊す
+- 小タスク4.1 の `users_test.go` は、利用者の処理の偽物 `fakeUsers`(呼ばれた操作と引数を記録し、操作の名前ごとに決めた誤りを返す)、ログインした context を作る `loggedIn`、本文を読んだ結果を入れる `withForm`、7つの操作を並べた `userOps`、消す Cookie の文字列 `deleteSessionCookies` を持つ。小タスク4.2 と5.x のテストは、これらを使える。
 
 ## 完了条件(全タスク共通)
 

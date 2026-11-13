@@ -10,8 +10,13 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+
+	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/gen"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/middleware"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/authctx"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/users"
 )
 
 // 名前と画像と2段階認証の設定の変更の要求の上限である。どれも Java 版の Spring Boot と Tomcat の設定の値にあたる。
@@ -375,4 +380,165 @@ func formProfileImageValue(parts []formPart) (*profileImageInput, bool) {
 		return &profileImageInput{FileName: p.springFileName, ContentType: contentType, Content: p.Body}, ok
 	}
 	return nil, false
+}
+
+// UserService は、受け口が使う利用者の処理である。*users.Service が満たす。
+type UserService interface {
+	GetUserInfo(ctx context.Context, userID uuid.UUID) (users.UserInfo, error)
+	UpdateUserInfo(ctx context.Context, in users.UpdateInput) error
+	DeleteUser(ctx context.Context, userID uuid.UUID) error
+	SendAccountEmailVerification(ctx context.Context, userID uuid.UUID) error
+	SetEmailAndPassword(ctx context.Context, in users.SetEmailAndPasswordInput) error
+	ChangePassword(ctx context.Context, userID uuid.UUID, nowPassword, newPassword string) error
+	RemoveAuthProvider(ctx context.Context, userID uuid.UUID, provider string) error
+}
+
+var _ UserService = (*users.Service)(nil)
+
+// userHandlers は、利用者の7つの操作の受け口である。
+type userHandlers struct {
+	svc    UserService
+	secure bool
+}
+
+// errNoLoginUser は、ログインした利用者の ID が context に無いことを表す。認可の中間処理が抜けた組み立ての誤りで
+// だけ起き、生成したコードの誤りの処理が 500 にする。
+var errNoLoginUser = errors.New("httpapi: ログインした利用者が context にありません")
+
+// errNoUpdateUserInfoForm は、名前と画像と2段階認証の設定の変更で、本文を読む中間処理の結果が context に無いことを
+// 表す。中間処理が抜けた組み立ての誤りでだけ起き、生成したコードの誤りの処理が 500 にする。
+var errNoUpdateUserInfoForm = errors.New("httpapi: 本文を読んだ結果が context にありません")
+
+// newUserHandlers は、利用者の操作の受け口を作る。
+func newUserHandlers(svc UserService, secure bool) *userHandlers {
+	return &userHandlers{svc: svc, secure: secure}
+}
+
+// fail は、err が *auth.Error を含めばその応答を、含まなければ err をそのまま返す。
+func (h *userHandlers) fail(err error) (authResponse, error) {
+	if r, ok := authErrorResponse(err, h.secure); ok {
+		return r, nil
+	}
+	return authResponse{}, err
+}
+
+// info は、Java 版の受け口と同じく、利用者の情報を読み、200 と UserInfoResponse の本文で答える。
+func (h *userHandlers) info(ctx context.Context, userID uuid.UUID) (authResponse, error) {
+	u, err := h.svc.GetUserInfo(ctx, userID)
+	if err != nil {
+		return h.fail(err)
+	}
+	return authJSON(http.StatusOK, newUserInfoBody(u)), nil
+}
+
+// GetUserInfo は、利用者の情報を答える。
+func (h *userHandlers) GetUserInfo(ctx context.Context, _ gen.GetUserInfoRequestObject) (gen.GetUserInfoResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	return h.info(ctx, id)
+}
+
+// UpdateUserInfo は、名前と画像と2段階認証の設定を変え、Java 版の UpdateUserInfoController と同じく、変えたあとの
+// 利用者の情報を 200 で答える。本文は、受け口の前の中間処理が読んで context に入れてある。
+func (h *userHandlers) UpdateUserInfo(
+	ctx context.Context, _ gen.UpdateUserInfoRequestObject,
+) (gen.UpdateUserInfoResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	form, ok := updateUserInfoFormFrom(ctx)
+	if !ok {
+		return authResponse{}, errNoUpdateUserInfoForm
+	}
+	in := users.UpdateInput{UserID: id, Username: form.Username, TwoFactorAuthEnabled: form.TwoFactorAuthEnabled}
+	if img := form.ProfileImage; img != nil {
+		in.ProfileImage = &users.ImageInput{FileName: img.FileName, ContentType: img.ContentType, Content: img.Content}
+	}
+	if err := h.svc.UpdateUserInfo(ctx, in); err != nil {
+		return h.fail(err)
+	}
+	return h.info(ctx, id)
+}
+
+// DeleteUser は、退会する。Java 版の DeleteUserController と同じく、204 と、Cookie accessToken と refreshToken を
+// 消す Cookie で答える。
+func (h *userHandlers) DeleteUser(ctx context.Context, _ gen.DeleteUserRequestObject) (gen.DeleteUserResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	if err := h.svc.DeleteUser(ctx, id); err != nil {
+		return h.fail(err)
+	}
+	return authNoBody(http.StatusNoContent,
+		auth.DeleteCookie("accessToken", "/", h.secure), auth.DeleteCookie("refreshToken", "/", h.secure)), nil
+}
+
+// SendAccountEmailVerification は、確認のメールを送る。204 で答える。
+func (h *userHandlers) SendAccountEmailVerification(
+	ctx context.Context, _ gen.SendAccountEmailVerificationRequestObject,
+) (gen.SendAccountEmailVerificationResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	if err := h.svc.SendAccountEmailVerification(ctx, id); err != nil {
+		return h.fail(err)
+	}
+	return authNoBody(http.StatusNoContent), nil
+}
+
+// SetEmailAndPassword は、メールアドレスとパスワードを設定し、Java 版の SetEmailAndPasswordController と同じく、
+// 設定したあとの利用者の情報を 200 で答える。要求の検査は、Java 版の @Valid にあたる。
+func (h *userHandlers) SetEmailAndPassword(
+	ctx context.Context, req gen.SetEmailAndPasswordRequestObject,
+) (gen.SetEmailAndPasswordResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	b := req.Body
+	if e := users.ValidateSetEmailAndPassword(b.Email, b.Password, b.ConfirmPassword); e != nil {
+		return h.fail(e)
+	}
+	in := users.SetEmailAndPasswordInput{UserID: id, Email: b.Email, Password: b.Password, CurrentPassword: b.CurrentPassword}
+	if err := h.svc.SetEmailAndPassword(ctx, in); err != nil {
+		return h.fail(err)
+	}
+	return h.info(ctx, id)
+}
+
+// ChangePassword は、パスワードを変える。要求の検査は、Java 版の @Valid にあたる。204 で答える。
+func (h *userHandlers) ChangePassword(
+	ctx context.Context, req gen.ChangePasswordRequestObject,
+) (gen.ChangePasswordResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	b := req.Body
+	if e := users.ValidateChangePassword(b.NowPassword, b.NewPassword); e != nil {
+		return h.fail(e)
+	}
+	if err := h.svc.ChangePassword(ctx, id, b.NowPassword, b.NewPassword); err != nil {
+		return h.fail(err)
+	}
+	return authNoBody(http.StatusNoContent), nil
+}
+
+// RemoveAuthProvider は、経路の provider の連携を解除する。204 で答える。
+func (h *userHandlers) RemoveAuthProvider(
+	ctx context.Context, req gen.RemoveAuthProviderRequestObject,
+) (gen.RemoveAuthProviderResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	if err := h.svc.RemoveAuthProvider(ctx, id, req.Provider); err != nil {
+		return h.fail(err)
+	}
+	return authNoBody(http.StatusNoContent), nil
 }
