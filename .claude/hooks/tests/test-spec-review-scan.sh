@@ -10,11 +10,14 @@
 # 点検の記録は、spec.json の欄に依らず、人の承認の無い段階のすべてで判定される。
 # 人の承認には、所有者が出した承認のほか、特例で承認済みにした段階
 # (approved_by が DogisRiki で、approval_history に特例の要素を持つ段階)も含まれる。
+# 後半では、判定の対象の段階の選び方と、spec が多いときに Stop フックと
+# 知らせるフックがフックの時間の上限の内に終わることを確かめる(#828)。
 # 前提: bash・perl(JSON::PP)。
 # =====================================================================
 set -u
 
-SCAN="$(cd "$(dirname "$0")/.." && pwd)/spec-review-scan.sh"
+HOOKS="$(cd "$(dirname "$0")/.." && pwd)"
+SCAN="$HOOKS/spec-review-scan.sh"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
@@ -162,6 +165,106 @@ make_stage "$P" spec design
 expect_no_style_reason "特例で承認済みにした段階・記録なし" "$P" spec requirements
 # 同じ spec の未承認の段階は判定される(承認の有無だけで分かれていることの確かめ)
 expect_reasons "特例の spec の未承認の段階・記録なし" "$P" spec design "$NO_RECORD"
+
+# scan_targets <プロジェクト>: 出た行の "<feature>|<stage>" を出た順に出す
+scan_targets() {
+    (
+        # shellcheck source=/dev/null
+        . "$SCAN"
+        spec_review_scan "$1"
+    ) | awk -F'|' '{print $1 "|" $2}'
+}
+
+# expect_targets <名前> <プロジェクト> <期待する "<feature>|<stage>" の並び(改行区切り)>
+expect_targets() {
+    local got
+    got=$(scan_targets "$2")
+    if [ "$got" = "$3" ]; then
+        ok "$1"
+    else
+        ng "$1 (期待: '$(printf '%s' "$3" | tr '\n' ' ')' / 実際: '$(printf '%s' "$got" | tr '\n' ' ')')"
+    fi
+}
+
+SPEC_APPROVED='{"feature_name":"f","phase":"tasks-generated","approvals":{"requirements":{"generated":true,"approved":true,"approved_by":"dogis"},"design":{"generated":true,"approved":true,"approved_by":"dogis"},"tasks":{"generated":true,"approved":true,"approved_by":"dogis"}}}'
+
+echo "--- 7. phase が initialized の spec は、生成済みの段階があっても判定しない"
+P="$WORK/case7"
+make_spec "$P" init '{"feature_name":"f","phase":"initialized","approvals":{"requirements":{"generated":true,"approved":false}}}'
+expect_targets "initialized の spec" "$P" ""
+
+echo "--- 8. JSON として読めない spec.json は飛ばし、ほかの spec は判定する"
+P="$WORK/case8"
+make_spec "$P" a-broken '{"feature_name":'
+make_spec "$P" b-array '[1,2]'
+make_spec "$P" c-ok "$SPEC_UNAPPROVED"
+expect_targets "読めない spec.json を飛ばす" "$P" "c-ok|requirements"
+
+echo "--- 9. 判定の対象の段階を、spec の名前の順、段階の順に出す"
+P="$WORK/case9"
+make_spec "$P" a '{"feature_name":"a","phase":"tasks-generated","approvals":{"requirements":{"generated":true,"approved":true,"approved_by":"dogis"},"design":{"generated":true,"approved":false},"tasks":{"generated":true,"approved":true,"approved_by":"auto:batch"}}}'
+make_spec "$P" b '{"feature_name":"b","phase":"requirements-generated","approvals":{"requirements":{"generated":"true","approved":true,"approved_by":""},"design":{"generated":false,"approved":false}}}'
+make_spec "$P" c "$SPEC_APPROVED"
+expect_targets "対象の段階の並び" "$P" "a|design
+a|tasks
+b|requirements"
+
+echo "--- 10. spec が多くても、2つのフックが時間の上限の内に終わり、審査の残りを示す"
+# 上限は settings.json の notify-spec-review.sh の 20 秒(Stop フックは 30 秒)
+LIMIT=20
+P="$WORK/case10"
+mkdir -p "$P/.claude/hooks"
+cp "$SCAN" "$P/.claude/hooks/spec-review-scan.sh"
+i=0
+while [ "$i" -lt 80 ]; do
+    make_spec "$P" "approved-$i" "$SPEC_APPROVED"
+    i=$((i + 1))
+done
+make_spec "$P" z-pending "$SPEC_UNAPPROVED"
+
+start=$SECONDS
+err=$(printf '{"prompt_id":"p10","session_id":"s10"}' \
+    | CLAUDE_PROJECT_DIR="$P" bash "$HOOKS/check-spec-review-before-stop.sh" 2>&1 >/dev/null)
+code=$?
+took=$((SECONDS - start))
+if [ "$code" -eq 2 ] && printf '%s' "$err" | grep -q 'z-pending の requirements: レビュー未実施'; then
+    ok "Stop フックが審査の残りで止める"
+else
+    ng "Stop フックが審査の残りで止める (終了コード: $code / 出力: $err)"
+fi
+if [ "$took" -lt "$LIMIT" ]; then
+    ok "Stop フックが ${LIMIT} 秒より前に終わる (${took} 秒)"
+else
+    ng "Stop フックが ${LIMIT} 秒より前に終わる (${took} 秒)"
+fi
+
+start=$SECONDS
+out=$(printf '{"prompt":"x"}' | CLAUDE_PROJECT_DIR="$P" bash "$HOOKS/notify-spec-review.sh" 2>/dev/null)
+code=$?
+took=$((SECONDS - start))
+if [ "$code" -eq 0 ] && printf '%s' "$out" | grep -q 'z-pending / requirements: レビュー未完了(レビュー未実施'; then
+    ok "知らせるフックが審査の残りを示す"
+else
+    ng "知らせるフックが審査の残りを示す (終了コード: $code / 出力: $out)"
+fi
+if [ "$took" -lt "$LIMIT" ]; then
+    ok "知らせるフックが ${LIMIT} 秒より前に終わる (${took} 秒)"
+else
+    ng "知らせるフックが ${LIMIT} 秒より前に終わる (${took} 秒)"
+fi
+
+echo "--- 11. 審査の残りが無ければ、Stop フックは止めない"
+P="$WORK/case11"
+mkdir -p "$P/.claude/hooks"
+cp "$SCAN" "$P/.claude/hooks/spec-review-scan.sh"
+make_spec "$P" approved "$SPEC_APPROVED"
+printf '{"prompt_id":"p11"}' | CLAUDE_PROJECT_DIR="$P" bash "$HOOKS/check-spec-review-before-stop.sh" >/dev/null 2>&1
+code=$?
+if [ "$code" -eq 0 ]; then
+    ok "審査の残りが無ければ止めない"
+else
+    ng "審査の残りが無ければ止めない (終了コード: $code)"
+fi
 
 echo
 printf '結果: 成功 %d / 失敗 %d\n' "$pass" "$fail"
