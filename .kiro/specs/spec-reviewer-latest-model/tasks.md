@@ -103,7 +103,7 @@
 
 - [ ] 6. フックのファイルを本来の場所に置き、全体を確かめる
 
-- [ ] 6.1 写しで3つのテストをまとめて流し、所有者に写すコマンドを示す
+- [x] 6.1 写しで3つのテストをまとめて流し、所有者に写すコマンドを示す
 
   Claude は、設計の「ファイルの構成」の節の手順のとおりに、`git archive HEAD` の写しに、作業フォルダで変えたファイルと新しく作ったファイルと、`place/` の下の3つのファイルを、本来のパスで重ねる。Claude は、その写しで、`test-agent-model.sh`、`test-record-spec-review.sh`、`test-restore-after-compact.sh` の3つのテストを流す。3つとも通ったら、Claude は、作業フォルダの最上位で打つ `cp -r .claude/.state/spec-reviewer-latest-model/place/.claude/hooks/. .claude/hooks/` を、所有者に1つだけ示し、所有者が写すまで止まる。
   - 完了の確かめ方: 次の2つが起きる

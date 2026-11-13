@@ -81,14 +81,23 @@ marker=$(grep -v '^[[:space:]]*$' "$abs" | tail -1 | tr -d '\r')
 printf '%s' "$marker" | grep -qE '^-[[:space:]]*往復:.*未解決:[[:space:]]*[0-9]+' || exit 0
 
 # レビュー役のモデルの確認。
-# agent_transcript_path が渡る経路(SubagentStop)では、記録にモデル名が残るため
-# Fable 5.1 と Opus 5.5 のどちらかで動いたレビューの証跡だけを書き、
-# ほかのモデルで動いたレビューの証跡は書かない(実測でモデル名が残ることを確認済み)。
-# PostToolUse(SubagentHandback)経路では渡らないため、その場合は確認を省く。
+# agent_transcript_path が渡る経路(SubagentStop)では、記録に最後に応答したモデルが残るため、
+# agent-model.pl でその系統を読み、Fable と Opus の系統で動いたレビューの証跡だけを版によらず書く。
+# ほかの系統(Sonnet、Haiku など)で動いたレビューの証跡は書かない。版の番号はこのフックに持たない。
+# agent-model.pl はこのフックの置き場所から探す(CLAUDE_PROJECT_DIR によらず同じリポジトリのものを呼ぶ)。
+# agent-model.pl が0でない終了コードで終わったら、判定できないものとして証跡を書かない。
+# 記録にモデルが無いとき(model= が空)は、確認を省く。
+# PostToolUse(SubagentHandback)経路では記録が渡らないため、その場合も確認を省く。
 agent_transcript=$(extract agent_transcript_path)
 if [ -n "$agent_transcript" ] && [ -f "$agent_transcript" ]; then
-    if grep -q '"model":' "$agent_transcript" 2>/dev/null; then
-        grep -qE '"model":"claude-(fable-5-1|opus-5-5)"' "$agent_transcript" 2>/dev/null || exit 0
+    model_info=$(perl "$(dirname "$0")/../scripts/spec-review/agent-model.pl" --transcript "$agent_transcript" 2>/dev/null) || exit 0
+    model_id=$(printf '%s\n' "$model_info" | sed -n 's/^model=//p' | head -1 | tr -d '\r')
+    model_family=$(printf '%s\n' "$model_info" | sed -n 's/^family=//p' | head -1 | tr -d '\r')
+    if [ -n "$model_id" ]; then
+        case "$model_family" in
+            fable|opus) ;;
+            *) exit 0 ;;
+        esac
     fi
 fi
 
