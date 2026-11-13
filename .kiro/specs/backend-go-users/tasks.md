@@ -139,7 +139,7 @@
   - _対象の部品: Provider_
   - _依存: 1.7_
 
-- [ ] 3.5 確認のメールを送る (並行可)
+- [x] 3.5 確認のメールを送る (並行可)
 
   Claude は、EmailVerification の部品の節のとおりに、確認のメールを送る `SendAccountEmailVerification` を `emailverification.go` に作る。
   - 完了の確かめ方: `go test ./internal/users/ -run TestSendAccountEmailVerification` が通る
@@ -378,6 +378,7 @@
 - 小タスク3.2 の `objectstore.go` は、画像を置く処理 `put` と消す処理 `delete` と署名付きの URL を作る処理 `presign` を、`Service` のメソッドとして持つ。`presign` は、資格情報を取るために、名前と時間のほかに `context.Context` を受け取る。署名の時刻は `Deps.Now` である。`testdata/presign/PresignExpected.java` を動かすには、AWS SDK for Java の jar のほかに、`reactive-streams` と `slf4j-api` の jar を `--class-path` に並べる。動かし方は、ファイルの先頭の注釈にある
 - 小タスク3.3 の `ValidateSetEmailAndPassword` は、項目 `password` を省いた本文を空の文字列の本文と同じに検査する。そのため、`password` を省き、空でない `confirmPassword` を送った要求には、Go 版だけが項目 `confirmPassword` に一致の文言を足す。Java 版の `@PasswordMatches` は、`password` が null のとき通すためである。Claude は、変えた動きの一覧に項目を省いた要求の違いを書くとき、この場合も名前を挙げて書く
 - 小タスク3.4 の `provider.go` は、Java 版の `LocalDateTime.now()` と同じ見た目の今の時刻を返す `javaNow` と、東京の時間帯 `javaZone` を持つ。小タスク3.7 から3.9 で `updated_at` を書くときも、これを使う。経路の名前を小文字にする `asciiLower` は `image.go` にある。`provider_integration_test.go` は、利用者の行を作る `insertUser`、読む `loadUser`、時刻の見本 `oldStamp` と `testNow`、`testNow` を東京の時刻の見た目にする `javaWallClock`、`pgtype.Text` を作る `someText` を持つ。小タスク3.5 から3.9 の結合テストも、これらを使う
+- 小タスク3.5 の `emailverification_integration_test.go` は、送ったメールを記録する偽の SES `recordingSES`、本物の認証の `Service` と Valkey をつないだ組 `newVerificationEnv`、リンクの JWT の中身を読んで目的と宛先と利用者を確かめる `wantLink`、400 の業務の誤りを確かめる `wantBusinessError` を持つ。小タスク3.8 と3.9 の結合テストも、これらを使う。`insertUser` は、メールアドレスには利用者の ID を前に付けるが、設定待ちのメールアドレスには付けないので、テストは設定待ちのメールアドレスを利用者ごとに変える。認証の `VerifyEmail` は、メールアドレスをすでに持つ利用者の設定待ちのメールアドレスを、「設定待ちのメールアドレスが無いため確認できません。」で断る。そのため、そういう利用者のリンクは、`VerifyEmail` を呼ばずに `wantLink` で確かめる
 
 ## 完了条件(全タスク共通)
 
