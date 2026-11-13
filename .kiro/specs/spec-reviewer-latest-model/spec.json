@@ -1,0 +1,61 @@
+{
+  "feature_name": "spec-reviewer-latest-model",
+  "issue": 815,
+  "created_at": "2026-11-13T01:16:56Z",
+  "updated_at": "2026-11-13T08:10:59Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T03:36:47Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T07:49:57Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T08:10:59Z"
+    }
+  },
+  "review_model": "opus",
+  "approval_history": [
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T02:13:40Z",
+      "issues": [
+        815
+      ],
+      "revoked_at": "2026-11-13T02:54:31Z",
+      "revoked_for": "D1-2-5 による requirements への差し戻し: 本体の会話が審査役と同じ系統の古い版で動くと審査役が最新のモデルで動かず、要件1の1から3と要件2の1を満たせない"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T04:30:02Z",
+      "issues": [
+        815
+      ],
+      "revoked_at": "2026-11-13T07:11:19Z",
+      "revoked_for": "所有者の指示による design の修正: 設計が CLAUDE.md に足すと決めた文で、CLAUDE.md が CI の大きさの上限 21000 バイトを 494 バイト超えるため、版を付けて審査役のモデルを伝えたときの扱いの文を /kiro-spec-init の手順に移す"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T04:51:07Z",
+      "issues": [
+        815
+      ],
+      "revoked_at": "2026-11-13T07:11:19Z",
+      "revoked_for": "所有者の指示による design の修正に続くタスクの修正: 版を付けて審査役のモデルを伝えたときの扱いの文を CLAUDE.md から /kiro-spec-init の手順に移すタスクを足す"
+    }
+  ]
+}

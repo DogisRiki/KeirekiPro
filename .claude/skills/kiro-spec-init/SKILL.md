@@ -102,6 +102,9 @@ Reopen the existing spec `.kiro/specs/<feature>/` for the new Issue #N. Steps 1-
    - Do not change anything else in requirements.md (existing requirements, their numbered items, and their numbers stay as they are).
 5. **Show the next step**: Show `/kiro-spec-requirements <feature>` as the command the owner types next, alone in a code block with no language name, and list which stage approvals were revoked (with their approver and date as recorded in `approval_history`).
 
+## 版を付けて審査役のモデルを伝えられたとき
+- 所有者が「Fable 5.1」のように版を付けて審査役のモデルを伝えたときは、実装セッションは、その版の系統(`fable` か `opus`)を `review_model` に書く。実装セッションは、書いた値を示す1行に添えて、次の3つを返事に書く。1つ目は、版は選べないことである。2つ目は、その spec の審査役がその系統の最新のモデルで動くことである。3つ目は、本体の会話が同じ系統で動いているときは、審査役が本体の会話と同じ版で動くことである。
+
 ## Important Constraints
 - Do NOT generate requirements, design, or tasks. This skill only creates spec.json and requirements.md (or, in update mode, updates them).
 - In update mode, do NOT create a new directory or a new feature name.

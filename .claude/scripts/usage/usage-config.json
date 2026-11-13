@@ -1,11 +1,15 @@
 {
   "prices": {
     "source": "https://platform.claude.com/docs/en/about-claude/pricing",
-    "checked_on": "2026-10-26",
+    "checked_on": "2026-11-13",
     "unit": "USD per 1,000,000 tokens",
     "geo_us_multiplier": 1.1,
     "web_search_per_1000": 10,
     "models": {
+      "claude-fable-5-2": {
+        "in": 8, "cw5": 10, "cw1h": 16, "cr": 0.2, "out": 40,
+        "fast": {"in": 16, "cw5": 20, "cw1h": 32, "cr": 0.4, "out": 80}
+      },
       "claude-fable-5-1": {"in": 10, "cw5": 12.5, "cw1h": 20, "cr": 0.25, "out": 50},
       "claude-fable-5": {"in": 10, "cw5": 12.5, "cw1h": 20, "cr": 1, "out": 50},
       "claude-opus-5-5": {

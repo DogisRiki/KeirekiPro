@@ -532,14 +532,14 @@ t_settings_session_start() {
 
 t_settings_no_model_keys() {
     expect_no_problems "$(settings_problems no_model)"
-    expect_no_problems "$(doc_problems model "$SPEC_REVIEWER" claude-fable-5-1)"
+    expect_no_problems "$(doc_problems model "$SPEC_REVIEWER" fable)"
 }
 
 t_claude_md_compact_instructions() {
     expect_no_problems "$(doc_problems compact "$CLAUDE_MD" \
         '実行中のスキルの名前|手順のどこにいるか|Step の番号' \
         'Issue の番号|spec の名前と段階|作業のブランチ|PR の番号' \
-        '/spec-review|CYCLE|ROUND|CHANGED|受け入れた指摘|却下した指摘|直さなかった外れ|Opus 5.5' \
+        '/spec-review|CYCLE|ROUND|CHANGED|受け入れた指摘|却下した指摘|直さなかった外れ|Opus の審査役に替えたかどうか' \
         '/kiro-impl|検査のコマンド一式|REJECTED|debug の補助役を動かした回数' \
         '/ship|同じ失敗が続いた回数' \
         '/memory-inspect-now|どの手順にいるか|何番目の組まで尋ねたか|「消す」と答えたメモリファイルの名前|SHA-256|「点検を中止する」を選んだかどうか' \
@@ -579,7 +579,7 @@ run_test "origin/main が無いとき、ブランチで変えた spec を飛ば�
 echo "--- 全員に同じく効く設定(要件1.1・2.1・2.2・2.3・4.1・5.1・5.2・5.3)"
 run_test "settings.json の env の CLAUDE_CODE_AUTO_COMPACT_WINDOW が \"250000\"" t_settings_compact_window
 run_test "SessionStart に matcher compact で restore-after-compact.sh を呼ぶ項目があり、matcher の無い session-registry.sh の項目が残っている" t_settings_session_start
-run_test "settings.json に model と effortLevel のキーが無く、spec-reviewer.md の model が claude-fable-5-1 のまま" t_settings_no_model_keys
+run_test "settings.json に model と effortLevel のキーが無く、spec-reviewer.md の model が版を持たない fable" t_settings_no_model_keys
 
 echo "--- 要約のあとに作業を続けるための文書(要件2.3・3.1・3.2・3.3・4.3)"
 run_test "CLAUDE.md に # Compact instructions の節があり、9つの項目の言葉が入っている" t_claude_md_compact_instructions

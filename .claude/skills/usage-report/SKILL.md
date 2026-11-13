@@ -57,6 +57,71 @@ Claude は、会話の相手に、このリポジトリの所有者かどうか�
    - `no` のときは、Claude は、案を尋ねない。案は、所見に残る。所有者が次に Claude の会話を始めたときに、会話の始めのフックが案を知らせる。
    - `unknown` のときは、Claude は、上の「所有者かを尋ねるとき」の手順に進む。
 5. `usage.sh draft` か `usage.sh publish` が 1 で終わったときは、Claude は、集計を GitHub に出せなかったことと、標準エラーに出た理由を、会話の相手に書く。Claude は、あわせて、この PC で次に Claude の会話を開いたときに、Claude が集計を出し直すことを書く。
+6. 3で `usage.sh publish` が 0 で終わったときは、Claude は、4の案の扱いを終えたあとに、下の「料金表に価格を足す手順」を行う。案が無かったときは、Claude は、3のあとすぐに、その手順を行う。
+
+## 料金表に価格を足す手順
+
+この手順は、集計で価格が分からなかったモデルの価格を、公式の料金ページから料金表 `.claude/scripts/usage/usage-config.json` に足す PR を作り、PR がマージされるか閉じられるまで見届ける手順である。Claude は、この手順で、集計のスクリプトと集計の表を変えない。Claude は、この手順で、Issue を起票しない。Claude は、この手順で、所有者に PR の承認のほかの作業を頼まない。
+
+1. Claude は、`usage.sh draft` が出した下書きの場所の `report.json` を読み、`totals.usd_unknown_models` から「不明」を外したモデルの ID を対象にする。対象が無ければ、Claude は、この手順を終える。
+2. Claude は、対象のモデルごとに、次のコマンドの `<ID>` をモデルの ID にして実行し、同じモデルの価格を足す PR が開いているかを確かめる。番号が返ったモデルを、Claude は対象から外す。対象が無くなれば、Claude は、この手順を終える。`gh` が失敗したら、Claude は、PR を作らずに、失敗したことと理由を会話の相手に書いて、この手順を終える。
+
+   ```bash
+   gh pr list --state open --limit 200 --json number,body --jq '[.[] | select(.body | contains("- 料金表に価格を足したモデル: `<ID>`")) | .number]'
+   ```
+
+3. Claude は、作業フォルダの最上位(`git rev-parse --show-toplevel` の出力)を覚え、`git fetch origin main` を実行する。Claude は、続けて、最上位で `git worktree add -b chore/usage-prices-<YYYYMMDD> .claude/worktrees/usage-prices-<YYYYMMDD> origin/main` を実行する。`<YYYYMMDD>` は今日の日付である。同じ名前のブランチか worktree があれば、Claude は、名前の末尾に `-2`、`-3` を付ける。Claude は、次に、`cd` だけのコマンドで、その worktree に移る。`git worktree add` が失敗したら、Claude は、PR を作らずに、失敗の理由を会話の相手に書いて、この手順を終える。
+4. Claude は、公式の料金ページ `https://platform.claude.com/docs/en/about-claude/pricing` を WebFetch で読み、読んだ日を覚える。WebFetch を使えない会話では、Claude は、web-fetch の補助役にページを読ませる。ページを読めなかったら、Claude は、PR を作らずに、下の11のとおりに worktree を片付け、ページを読めなかったことを会話の相手に書いて、この手順を終える。
+5. Claude は、worktree の `.claude/scripts/usage/usage-config.json` を、次のとおりに直す。
+   - Claude は、モデルの ID の末尾の `-<8桁の日付>` を外した名前を、料金表のキーにする。集計のスクリプトが、日付を外した名前でも価格を引くためである。Claude は、ID を、系統と版で、ページのモデルの名前に読み替える。たとえば、Claude は、`claude-fable-5-2` を「Fable 5.2」に読み替える。
+   - 料金表に無いモデルには、Claude は、ページに載っている種類の価格をすべて足す。足す種類は、`in` `cw5` `cw1h` `cr` `out` と、ページに速い出力の価格があれば `fast` と、ページに入力の長さで価格が変わる段があれば `long_input` である。料金表にあるモデルには、Claude は、ページに載っていて料金表に無い種類の価格だけを足す。
+   - ページが値で載せている価格には、Claude は、その値を使う。ページが倍率で示している価格(速い出力のキャッシュの3つ)には、Claude は、ページに書かれた倍率を速い出力の入力の価格に掛けた値を使う。
+   - ページに載っていないモデルについては、Claude は、料金表に何も足さず、そのモデルを「価格が見つからなかったモデル」として覚える。
+   - ページにモデルが載っていても、料金表に無い種類の価格がページに無いモデルについては、Claude は、料金表に何も足さず、そのモデルを「料金表とページを突き合わせても足す価格が無かったモデル」として覚える。origin/main の料金表にすでに価格があるモデルと、集計に要る種類の価格がページに無いモデルが、これに当たる。
+6. 価格を1つも足さなかったときは、Claude は、料金表のほかのモデルの突き合わせと `prices.checked_on` の書き換えをせず、PR を作らない。Claude は、作業フォルダの最上位に `cd` で戻り、`git worktree remove <worktree>` と `git branch -D <ブランチ>` を実行する。Claude は、価格が見つからなかったモデルと、突き合わせても足す価格が無かったモデルの名前を会話の相手に書いて、この手順を終える。価格を1つ以上足したときは、Claude は、料金表に次の2つを書く。
+   - Claude は、料金表にあるほかのモデルのうち、ページに載っているモデルの価格をページと突き合わせ、違う値をページの値に直す。Claude は、直したモデルと種類と、直す前と後の値を覚える。ページに載っていないモデルの価格を、Claude は変えない。
+   - Claude は、`prices.checked_on` を読んだ日にする。ページの場所が `prices.source` と違えば、Claude は、`prices.source` を読んだ場所にする。
+7. Claude は、worktree で `bash .claude/scripts/usage/tests/test-report.sh` を流す。価格を直したために既存の場合の期待の値が外れたら、Claude は、期待の値を新しい価格で求め直した値に直し、直したことを PR の本文の `Test-Change-Justification` に書く。Claude は、続けて、`/ship` の手順1(verify と push の前の3つの検査)を worktree で行う。
+8. Claude は、`/ship` の手順3と手順4のとおりに、worktree を作業のフォルダにして、`git commit -F <scratchpad のメッセージのファイル>` と `git push -u origin <ブランチ>` を、それぞれ単独のコマンドで実行する。メッセージは `.commit_template` に従い、prefix を `chore` に、`Refs:` を `N/A` にする。
+9. Claude は、PR の本文を下の見本の形で scratchpad のファイルに書き、`gh pr create --base main --head <ブランチ> --title "chore: 作業の集計の料金表に <モデルの名前> の価格を足す" --body-file <本文のファイル>` を実行する。本文に `Closes` を書かない。
+10. Claude は、worktree を作業のフォルダにしたまま、`/ship` の手順6(自動マージの予約の確認)と手順7(CI の見届け)を行う。手順7の所有者の承認待ちでは、Claude は、`wait-approval.sh` を裏で動かし、承認を待っていることを会話の相手に書く。CI が赤になったら、Claude は、worktree で直して push する。同じ失敗が3回続いたら、Claude は、止めて報告する。
+11. PR がマージされたか、所有者が PR を閉じたら、Claude は、作業フォルダの最上位に `cd` で戻り、`git worktree remove <worktree>` と `git branch -D <ブランチ>` を実行する。所有者が閉じた PR を、Claude は作り直さない。次の集計でそのモデルの価格がまだ分からなければ、Claude は、その集計のときに、この手順に従って PR をもう一度作る。
+12. Claude は、PR の URL と、価格を足したモデルと、価格が見つからなかったモデルと、突き合わせても足す価格が無かったモデルの名前を、会話の相手に書く。
+
+Claude は、この手順の状態をファイルに持たない。同じモデルの PR が開いているかを、Claude は、そのたびに GitHub の PR の本文から読む。
+
+### PR の本文の見本
+
+```markdown
+## 概要
+
+作業の集計で価格が分からなかったモデルの公表価格を、公式の料金ページから料金表に足す。
+
+## 足した価格
+
+- 料金表に価格を足したモデル: `claude-fable-5-3`
+  - 入力 8、5分のキャッシュの書き込み 10、1時間のキャッシュの書き込み 16、キャッシュの読み込み 0.2、出力 40(100万トークンあたりの米ドル)
+  - 速い出力: 入力 16、5分のキャッシュの書き込み 20、1時間のキャッシュの書き込み 32、キャッシュの読み込み 0.4、出力 80(キャッシュの3つは、ページの倍率で求めた)
+
+## 直した価格
+
+- `claude-opus-5-5` の出力: 20 → 18
+
+## 読んだ公式の料金ページ
+
+- 場所: https://platform.claude.com/docs/en/about-claude/pricing
+- 読んだ日: 2026-12-01
+
+## 価格が見つからなかったモデル
+
+- `claude-xxx-9`(ページに載っていない)
+
+Refs: N/A
+```
+
+- 「足した価格」の節には、いつも1つ以上のモデルがある。Claude は、価格を1つ以上足したときだけ PR を作るためである。
+- 直した価格が無いときは、Claude は、「直した価格」の節に「無し」と書く。価格が見つからなかったモデルが無いときは、Claude は、「価格が見つからなかったモデル」の節に「無し」と書く。
+- `- 料金表に価格を足したモデル: ` の行は、上の2で開いている PR を探すときに使う。Claude は、この行を、モデルごとに1行ずつ、この形のまま書く。
 
 ## 案を尋ねる手順
 
