@@ -36,6 +36,15 @@ resource "aws_cloudfront_vpc_origin" "alb" {
   }
 }
 
+# SPA の画面の URL を /index.html に書き換える関数
+resource "aws_cloudfront_function" "spa_rewrite" {
+  name    = "${var.project_name}-spa-rewrite"
+  runtime = "cloudfront-js-2.0"
+  comment = "Rewrite SPA routes to /index.html"
+  publish = true
+  code    = file("${path.module}/spa-rewrite.js")
+}
+
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
@@ -95,6 +104,14 @@ resource "aws_cloudfront_distribution" "main" {
 
     cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6" # CachingOptimized
     response_headers_policy_id = "67f7725c-6f97-4210-82d7-5512b31e9d03" # SecurityHeadersPolicy
+
+    # 画面の URL を /index.html に書き換える(SPA のルーティング)。
+    # custom_error_response はディストリビューション全体に効き、/api/* の 403 と 404 まで
+    # /index.html に置き換えてしまうため、既定の経路だけで書き換える。
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
   }
 
   # API behavior
@@ -120,21 +137,6 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = true
 
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6" # CachingOptimized
-  }
-
-  # Custom error responses for SPA
-  custom_error_response {
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
-  }
-
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
   }
 
   restrictions {
