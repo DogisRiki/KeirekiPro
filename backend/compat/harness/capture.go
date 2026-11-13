@@ -243,18 +243,29 @@ func (s *Session) expandJSON(step Step, v any) (any, error) {
 	}
 }
 
-// requestBody は、段 step の本文を、{名前} を置き換えてから JSON にする。本文が無ければ nil を返す。
-func (s *Session) requestBody(step Step) ([]byte, error) {
-	if step.Request.JSON == nil {
-		return nil, nil
+// requestBody は、段 step の本文と、その本文の Content-Type を返す。本文が無ければ nil を返す。
+// json は、{名前} を置き換えてから JSON にする。multipart は、multipartBody で組み立てる。
+// body_file は、fixtures/images の下のファイルをそのまま本文にし、Content-Type は筋書きのヘッダに任せて空を返す。
+func (s *Session) requestBody(step Step) ([]byte, string, error) {
+	switch {
+	case len(step.Request.Multipart) > 0:
+		return s.multipartBody(step)
+	case step.Request.BodyFile != "":
+		b, err := readImageFixture(step.Request.BodyFile)
+		if err != nil {
+			return nil, "", fmt.Errorf("harness: 段 %s の body_file %q を読めません: %w", step.Name, step.Request.BodyFile, err)
+		}
+		return b, "", nil
+	case step.Request.JSON == nil:
+		return nil, "", nil
 	}
 	v, err := s.expandJSON(step, step.Request.JSON)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	b, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("harness: 段 %s の本文を JSON にできません: %w", step.Name, err)
+		return nil, "", fmt.Errorf("harness: 段 %s の本文を JSON にできません: %w", step.Name, err)
 	}
-	return b, nil
+	return b, "application/json", nil
 }

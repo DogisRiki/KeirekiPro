@@ -210,7 +210,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1(画像の大きさ、縦と横の長さ、ファイルの形式の誤りを含む要求を筋書きに書ける)は、`scenario_test.go` の `TestScenarioValidate_UserFields` で確かめる
   - _要件: 5.1_
 
-- [ ] 5.2 multipart の本文を組み立てて送る
+- [x] 5.2 multipart の本文を組み立てて送る
 
   Claude は、`harness/multipart.go` に、筋書きの `request.multipart` から、決まった `boundary` で本文を組み立てる処理を作る。この処理は、`pad_to` を書いた `file` の部分の後ろに0のバイトを足して、ファイルを `pad_to` の大きさにする。Claude は、`send.go` に、`request.multipart` の本文と、絶対の URL の段の `request.body_file` の本文を送る処理を足す。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestMultipartBody|TestSend_BodyFile'` が通る
@@ -385,6 +385,7 @@
 - 小タスク3.9 の `password.go` の `ChangePassword` は、Java 版と同じくトランザクションを使わず、`SetEmailAndPassword` は1つのトランザクションの中で動く。4.x の受け口は、パスワードの変更には 204 で、メールアドレスとパスワードの設定には `GetUserInfo` の結果の 200 で答える。`password_integration_test.go` は、パスワードが合うかを確かめる `wantPhrase`、居ない利用者の 401 を確かめる `wantUserGone`、パスワードと `updated_at` と設定待ちのメールアドレスだけが変わったことを確かめる `wantPhraseChanged`、パスワードだけを持つ利用者を作る `phraseOnlyUser`、Google の連携だけを持つ利用者を作る `googleOnlyUser`、利用者ごとに違うメールアドレスを作る `newAddress` を持つ
 - テストの対象のコードを壊した写しで、変数を使う唯一の箇所を消すと、Go は使わない変数を誤りにしてビルドが通らない。Claude は、条件を `x || true` のように書き換えて壊す
 - 小タスク4.1 の `users_test.go` は、利用者の処理の偽物 `fakeUsers`(呼ばれた操作と引数を記録し、操作の名前ごとに決めた誤りを返す)、ログインした context を作る `loggedIn`、本文を読んだ結果を入れる `withForm`、7つの操作を並べた `userOps`、消す Cookie の文字列 `deleteSessionCookies` を持つ。小タスク4.2 と5.x のテストは、これらを使える。
+- 小タスク5.2 の `harness/multipart.go` は、筋書きの `file` の部分に `filename` が無ければファイルの名前を送り、`content_type` が無ければ部分の `Content-Type` を送らない。文字の部分の値の `{名前}` は置き換える。`request.body_file` の本文には `Content-Type` を付けないので、筋書きは `request.headers` に `Content-Type` を書く。テストの `multipart_test.go` は、受けた要求の本文の全体を記録するサーバ `bodyServer` と、画像のファイルを読む `imageFixture` を持つ
 
 ## 完了条件(全タスク共通)
 

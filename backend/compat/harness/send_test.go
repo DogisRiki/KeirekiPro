@@ -502,3 +502,44 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 		t.Errorf("送れない段で %d 件の要求を送りました", n)
 	}
 }
+
+func TestSend_BodyFile(t *testing.T) {
+	srv, reqs := bodyServer(t)
+	s := NewSession()
+	s.vars["key"] = "u-1.png"
+	put := Step{Name: "put-image", Request: Request{
+		Method: http.MethodPut, URL: srv.URL + "/keirekipro-storage/{key}",
+		Headers: map[string]string{"Content-Type": "image/png"}, BodyFile: "profile.png",
+	}, Expect: Expect{Status: http.StatusOK}}
+	if _, err := s.SendAbsolute(t.Context(), srv.Client(), "http://unused.invalid", put); err != nil {
+		t.Fatal(err)
+	}
+	// Content-Type を書かない段は、JSON の Content-Type を付けずに送る
+	plain := Step{Name: "put-gif", Request: Request{Method: http.MethodPut, URL: srv.URL + "/b/k.gif", BodyFile: "profile.gif"}}
+	if _, err := s.SendAbsolute(t.Context(), srv.Client(), "http://unused.invalid", plain); err != nil {
+		t.Fatal(err)
+	}
+	want := []recorded{
+		{Method: http.MethodPut, Path: "/keirekipro-storage/u-1.png", ContentType: "image/png", Body: string(imageFixture(t, "profile.png"))},
+		{Method: http.MethodPut, Path: "/b/k.gif", Body: string(imageFixture(t, "profile.gif"))},
+	}
+	got := reqs()
+	if len(got) != len(want) {
+		t.Fatalf("届いた要求 = %d 個, want %d", len(got), len(want))
+	}
+	for i, r := range got {
+		// 画像のバイトを報告に書かないよう、本文は大きさで示す
+		if r != want[i] {
+			t.Errorf("%d 個目の要求 = %s %s %q %d バイト, want %s %s %q %d バイト", i+1, r.Method, r.Path, r.ContentType, len(r.Body), want[i].Method, want[i].Path, want[i].ContentType, len(want[i].Body))
+		}
+	}
+
+	// 無いファイルは、送る前に段の誤りにする
+	missing := Step{Name: "bad", Request: Request{Method: http.MethodPut, URL: srv.URL + "/b/k", BodyFile: "none.png"}}
+	if _, err := s.SendAbsolute(t.Context(), srv.Client(), "http://unused.invalid", missing); err == nil || !strings.Contains(err.Error(), "段 bad ") {
+		t.Errorf("無いファイルの誤り = %v, want 段 bad の誤り", err)
+	}
+	if got := reqs(); len(got) != 2 {
+		t.Errorf("誤りの段の要求が届きました: %d 個", len(got))
+	}
+}

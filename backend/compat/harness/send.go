@@ -84,7 +84,7 @@ func (s *Session) send(ctx context.Context, client *http.Client, target string, 
 		}
 		headers[name] = v
 	}
-	b, err := s.requestBody(step)
+	b, contentType, err := s.requestBody(step)
 	if err != nil {
 		return Response{}, err
 	}
@@ -106,8 +106,8 @@ func (s *Session) send(ctx context.Context, client *http.Client, target string, 
 	if err != nil {
 		return Response{}, fmt.Errorf("harness: 段 %s の要求を作れません: %w", step.Name, err)
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	for _, name := range sortedKeys(headers) {
 		req.Header.Set(name, headers[name])
