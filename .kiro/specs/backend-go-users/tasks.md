@@ -203,7 +203,7 @@
   - _対象の部品: httpapi.New の変更_
 
 - [ ] 5. Java 版と Go 版を比べる検査を広げる
-- [ ] 5.1 筋書きの形に5つの欄を足し、読むときに確かめる
+- [x] 5.1 筋書きの形に5つの欄を足し、読むときに確かめる
 
   Claude は、`scenario.go` に、Java 版と Go 版を比べる検査の広げ方の節の `request.multipart` `request.body_file` `expect.values` `expect.body_file` `expect.content_type` の5つの欄を足す。harness は、筋書きを読むときに、`request.multipart` の `file` が `fixtures/images` に無いときと、`request.body_file` と `expect.body_file` と `expect.content_type` が絶対の URL の段に無いときを、段の名前を付けた誤りとして返す。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestScenarioValidate_UserFields'` が通る
