@@ -15,7 +15,9 @@
 #   5. 既存テストのアサーション変更・削除(PR本文に Test-Change-Justification: が無ければ赤。
 #      ユニットテスト .test. とE2E .spec. の両方が対象)
 #   6. ゲート隣接ファイルの変更(リポジトリ所有者のApproveが無ければ赤。
-#      CODEOWNERSの必須レビューと二重の防御。Go 版の品質チェックとコード生成の設定を含む)
+#      CODEOWNERSの必須レビューと二重の防御。品質チェックが何を調べるかを決めるファイルと、
+#      Go 版のコード生成の設定を含む。frontend/package.json と docker/terraform/Dockerfile は、
+#      依存の版のほかの欄や行が変わったときだけ赤にする。この2つは CODEOWNERS には載せない)
 #
 # 差分の読み方について:
 #   ファイル名は `git diff -z --name-only` でNUL区切りの生のパスとして取得し、
@@ -212,9 +214,112 @@ ${java_asserts}"
 fi
 
 # --- 6. ゲート隣接ファイルの変更(所有者Approveが必要) ---
+# 品質チェックが何を調べるかを決めるファイルを、ここに漏れなく並べる(#826)。
+# .github/CODEOWNERS とルートの CLAUDE.md の「人間の承認が必要な変更」にも、同じファイルを並べてある。
+#
+# 設定のファイルは、今は無い別の名前でも置ける。道具は、決まった名前の順に探して最初に
+# 見つけたファイルを読むか、調べるファイルに近い場所のファイルを読むため、別の名前や
+# 下のフォルダに新しく置いた設定が、今の設定より先に読まれることがある。
+# そのため、今あるファイルの名前だけでなく、道具が読む名前を広く並べる。
+#   - vitest は vitest.config.* を vite.config.* より先に読み、vite は vite.config.js を
+#     vite.config.ts より先に読む
+#   - prettier と、型の情報を使う eslint の検査は、調べるファイルに近いフォルダの
+#     .prettierrc* と tsconfig.json を読む
 # Go 版の品質チェックとコード生成の設定は、ファイルの名前で完全に一致させる($ で終える)。
 # .testcoverage.yml に除外を足す変更も、ここで所有者の承認を求める
-gate_files=$(echo "$changed_files" | grep -E '^(\.github/|\.claude/|frontend/eslint\.config\.js|frontend/vite\.config\.ts|frontend/playwright\.config\.ts|backend/gradle/quality\.gradle|backend/config/|backend/src/test/java/com/example/keirekipro/unit/architecture/|backend/(Makefile|\.golangci\.yml|\.testcoverage\.yml|\.gremlins\.yaml|api/oapi-codegen\.yaml|sqlc\.yaml)$)' || true)
+gate_patterns=(
+    '\.github/'
+    '\.claude/'
+    # 秘密の情報の検査(gitleaks)から外す一覧と、検査の規則
+    '\.gitleaks(ignore|\.toml)$'
+    # frontend の lint・単体テストとカバレッジ・E2E の設定
+    'frontend/(.*/)?eslint\.config\.[^/]+$'
+    'frontend/(vite|vitest)\.config\.[^/]+$'
+    'frontend/vitest\.workspace\.[^/]+$'
+    'frontend/playwright\.config\.[^/]+$'
+    # frontend の型チェックと書式チェックの設定
+    'frontend/(.*/)?tsconfig[^/]*\.json$'
+    'frontend/(.*/)?\.prettierrc[^/]*$'
+    'frontend/(.*/)?prettier\.config\.[^/]+$'
+    'frontend/\.prettierignore$'
+    '(frontend/(.*/)?)?\.editorconfig$'
+    # frontend の未使用のコードの報告(knip)と変異テスト(stryker)の設定
+    'frontend/\.?knip\.[^/]+$'
+    'frontend/\.?stryker\.conf[^/]*$'
+    # backend の Java 版の品質チェックの定義と設定と、アーキテクチャの境界のテスト
+    'backend/gradle/quality\.gradle$'
+    'backend/config/'
+    'backend/src/test/java/com/example/keirekipro/unit/architecture/'
+    # backend の Go 版の品質チェックとコード生成の設定
+    'backend/(Makefile|\.golangci\.yml|\.testcoverage\.yml|\.gremlins\.yaml|api/oapi-codegen\.yaml|sqlc\.yaml)$'
+    # terraform の静的検査(checkov と tflint)の設定と、checkov の既知の指摘の一覧
+    'terraform/(.*/)?\.checkov\.ya?ml$'
+    'terraform/(.*/)?\.tflint\.hcl$'
+    'terraform/\.checkov\.baseline$'
+)
+gate_pattern="^($(
+    IFS='|'
+    echo "${gate_patterns[*]}"
+))"
+gate_files=$(echo "$changed_files" | grep -E "$gate_pattern" || true)
+
+# 一部の欄や行だけが品質チェックを決めるファイル。
+# 依存の版を上げる変更(Dependabot の PR など)は、ルートの CLAUDE.md の決まりで
+# 所有者の承認の対象外にしてあるので、版の欄や行のほかが変わったときだけ承認を求める。
+# base と head のどちらかで中身を読めないとき(ファイルの追加・削除、JSON として読めない)は、
+# 変わったものとして承認を求める(読めないことを理由に素通りさせない)。
+show_at() {
+    git show "$1:$2"
+}
+
+# frontend/package.json: CI は scripts の欄のコマンド(pnpm run format / lint / coverage / build)で
+# 品質チェックを動かす。prettier と knip は package.json の欄の設定も読む。
+# 依存の版の欄(dependencies など)と packageManager を除いた残りを比べる
+package_json_settings() {
+    show_at "$1" frontend/package.json |
+        jq -S 'del(.dependencies, .devDependencies, .optionalDependencies, .peerDependencies, .packageManager)'
+}
+
+# docker/terraform/Dockerfile: CI の terraform の静的検査は、このファイルで作ったイメージの
+# tflint と checkov を動かす。FROM の行のイメージのタグと digest を除いた残りを比べる。
+# イメージの名前を変える変更は、承認を求める
+# awk のプログラムの中の $1 と $i は awk の変数であり、シェルに展開させない。
+# shellcheck disable=SC2016
+dockerfile_without_versions() {
+    show_at "$1" docker/terraform/Dockerfile |
+        awk '
+            toupper($1) == "FROM" {
+                for (i = 2; i <= NF; i++) {
+                    if (substr($i, 1, 2) == "--") continue
+                    sub(/@sha256:[0-9a-f]+$/, "", $i)
+                    sub(/:[^:\/]*$/, "", $i)
+                    break
+                }
+            }
+            { print }
+        '
+}
+
+# 使い方: partial_changed <中身を取り出す関数>
+# base と head で取り出した中身が違うか、どちらかを取り出せなければ 0(承認が要る)を返す
+partial_changed() {
+    local before after
+    before=$("$1" "$MERGE_BASE" 2>/dev/null) || return 0
+    after=$("$1" "$HEAD_SHA" 2>/dev/null) || return 0
+    [ "$before" != "$after" ]
+}
+
+if printf '%s\n' "$changed_files" | grep -qxF 'frontend/package.json' &&
+    partial_changed package_json_settings; then
+    gate_files="${gate_files:+$gate_files
+}frontend/package.json(依存の版の欄と packageManager のほかの欄)"
+fi
+if printf '%s\n' "$changed_files" | grep -qxF 'docker/terraform/Dockerfile' &&
+    partial_changed dockerfile_without_versions; then
+    gate_files="${gate_files:+$gate_files
+}docker/terraform/Dockerfile(FROM の行のイメージの版のほかの行)"
+fi
+
 if [ -n "$gate_files" ]; then
     if [ "$OWNER_APPROVED" != "true" ]; then
         report "ゲート設定ファイルの変更(所有者未承認)" "以下のゲート設定ファイルが変更されています。リポジトリ所有者のApproveレビュー後にこのチェックは緑になります。
