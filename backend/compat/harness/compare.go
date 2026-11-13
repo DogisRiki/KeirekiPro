@@ -422,8 +422,8 @@ const redisSeps = ":\"'{}[],= \t\n&/?\\"
 // CompareRedis は、Redis のキーの名前と型と値を比べ、残りの有効な時間は RedisTTLTolerance のずれを許して比べる。
 // 有効な時間の有無は、同じでなければならない。
 func (c *Comparer) CompareRedis(step StepRef, java, goEntries []RedisEntry) {
-	j := redisByKey(c.java, java)
-	g := redisByKey(c.goVer, goEntries)
+	j := redisByKey(c.java, sortRedisOrderOnly(c.Behaviors, step, java))
+	g := redisByKey(c.goVer, sortRedisOrderOnly(c.Behaviors, step, goEntries))
 	keys := sortedKeys(j)
 	for _, k := range sortedKeys(g) {
 		if _, ok := j[k]; !ok {

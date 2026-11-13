@@ -254,7 +254,15 @@
   java: 役割を順の決まらない集合で持つので、USER と ADMIN を持つ利用者の roles の並びが JVM ごとに変わる
   go: roles を、いつも USER、ADMIN の順に並べる
   画面に影響が無い理由: 画面は roles を読まない。どちらの版も、roles に ADMIN が含まれるかだけで管理者の経路を許し、並びの順を使わないので、画面の動きは変わらない。所有者が 2026-11-12 に受け入れた
-  # match を書かない。比べる検査の初期のデータの利用者は役割 USER だけを持つので、この違いは出ない。
+  # 利用者の操作の筋書きの管理者(users/users-ops.sql)は役割 USER と ADMIN を持つので、ログインを続けるための値の
+  # ハッシュの roles の並びが違うことがある。match は、この並びの順だけの違いを許す。ログインの状態の値は Cookie の値として
+  # 比べないので、match を書かない。利用者の情報の答えの roles の並びは CB-028 が許す。
+  match:
+    - operation: "*"
+      target: redis
+      path: refresh-token:*
+      field: roles
+      order_only: true
 
 - id: CB-023
   group: 1

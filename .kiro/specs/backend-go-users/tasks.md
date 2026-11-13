@@ -261,7 +261,7 @@
   - _要件: 5.3, 5.4_
 
 - [ ] 6. 利用者の操作の筋書きで Java 版と Go 版を比べる
-- [ ] 6.1 初期のデータと画像のファイルと、利用者の情報を見る筋書きを書く
+- [x] 6.1 初期のデータと画像のファイルと、利用者の情報を見る筋書きを書く
 
   Claude は、利用者の操作の筋書きの節の表の5人の利用者を置く `fixtures/users/users-ops.sql` と、`fixtures/images/wide.png` と `fixtures/images/not-image.png` を作る。Claude は、同じ節のとおりに、`get-user-info.yaml` を `group: 2` と `modes: [compare]` で書く。Claude は、利用者の操作の筋書きの `fixtures` に、`users/basic.sql` と `users/auth-users.sql` と `users/users-ops.sql` を書く。
   - 完了の確かめ方: `make compat` が `get-user-info.yaml` で通り、答え、Cookie、データベース、Redis、画像の置き場所に違いが出ない
@@ -396,3 +396,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 2. タスクで変えたファイルを使うテストが、すべて成功している。`1.` や `2.` の見出しのタスクを大きなまとまりと呼ぶ。大きなまとまりの最後のタスクでは、加えて、そのまとまりのタスクで変えた領域の verify のスキル(`/verify-frontend` `/verify-backend` `/verify-terraform`)が、すべて成功している。
 3. Claude は、テストを飛ばす設定、アサーションの削除、カバレッジや lint の対象からの除外を足して、完了条件を満たしたように見せない。CI の escape-hatch の検査が、これらの追加を機械で見つける。
 4. Claude は、新しく書いたテストについて、テストの対象のコードを一時的に壊してテストが失敗することを確かめる。Claude は、新しいテスト1件につき1か所だけを、作業フォルダの外の写しで壊し、そのテストだけを流す。壊した写しの作り方と流し方は、`.kiro/steering/tech.md` の「テストの完全性」に従う。
+- 小タスク6.1 で、比べる仕組みに、Redis のハッシュの1つの項目の並びの順だけを許す `match`(`target: redis` `order_only: true`、`path` にキーの形、`field` に項目の名前)を足した。Java 版は、ログインを続けるためのトークンの役割を、並びの順が起動ごとに変わる `Set.of` から書くので、役割を2つ持つ users-ops の管理者で、役割の並びが Java 版と Go 版で食い違うことがある。CB-022 にこの `match` を書いた。design.md にはこの仕組みが無いので、PR 本文と所有者への報告に書く。`TestFixtures_AllLoadable` は、画像として読めないことを確かめるファイルの一覧 `notImageFixtures` と、パスワードを持たず連携だけを持つ利用者を扱う。テストで Redis のキーを作るときは、正規化が `<token:N>` に置き換えるよう、トークンの形の文字列(`javaURLWord` など)を使う

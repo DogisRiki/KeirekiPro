@@ -1,0 +1,100 @@
+# 利用者の情報を見る筋書き。画像の無い利用者、画像のある利用者、パスワードの無い利用者、設定待ちのメールアドレスを持つ利用者、
+# 管理者の情報を、利用者を替えながら順に確かめる。
+# 画像のある利用者は、名前と画像と2段階認証の設定の変更の段で画像を置いて作る。答えの署名付きの URL は $.profileImage で
+# 取り出し、絶対の URL の段で読んで、置いた画像と同じことを確かめる。
+# 設定待ちのメールアドレスを持つ利用者は、パスワードの無い利用者がメールアドレスとパスワードを設定して作る。
+name: users-get-user-info
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql, users/users-ops.sql]
+modes: [compare]
+oidc_users:
+  google: {sub: google-sub-google-only, name: グーグル 五郎, email: google-only@example.com, email_verified: true}
+steps:
+  # 1つ目の場面: 画像の無い利用者。パスワードとメールアドレスを持ち、役割は USER だけである
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: get-user-info-without-image
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200, fields: [$.id, $.email, $.username, $.hasPassword, $.profileImage, $.roles]}
+  # 2つ目の場面: 画像のある利用者。画像を置いたあとの答えと、署名付きの URL で読んだ画像を比べる
+  - name: upload-profile-image
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.png, filename: profile.png, content_type: image/png}
+    expect: {status: 200}
+  - name: get-user-info-with-image
+    request:
+      method: GET
+      path: /api/users/me
+    capture: {imageURL: $.profileImage}
+    expect: {status: 200}
+  - name: read-profile-image
+    request:
+      method: GET
+      url: '{imageURL}'
+    expect: {status: 200, content_type: image/png, body_file: profile.png}
+  # 3つ目の場面: パスワードの無い利用者。Google のアカウントでログインする
+  - name: start-google-only
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=google
+    capture: {authURL: text}
+    expect: {status: 200}
+  - name: authorize-google-only
+    request:
+      method: GET
+      url: '{authURL}'
+    capture: {code: 'header:Location?code', state: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-google-only
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code}&state={state}
+    expect: {status: 302}
+  - name: get-user-info-without-password
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200}
+  # 4つ目の場面: 設定待ちのメールアドレスを持つ利用者。パスワードの無い利用者がメールアドレスとパスワードを設定すると、
+  # メールアドレスは確認が済むまで設定待ちになる
+  - name: set-email-and-password
+    request:
+      method: POST
+      path: /api/users/me/email-password
+      csrf: true
+      json: {email: pending-ops@example.com, password: Passw0rd!, confirmPassword: Passw0rd!}
+    expect: {status: 200}
+  - name: get-user-info-with-pending-email
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200}
+  # 5つ目の場面: 管理者。役割 USER と ADMIN を持ち、2段階認証を使う。確認のコードはログインの段のあとに届いたメールから取り出す
+  - name: login-admin
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: admin-ops@example.com, password: Passw0rd!}
+    capture: {adminCode: 'mail:(\d{6})'}
+    expect: {status: 202}
+  - name: verify-admin
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: '{adminCode}'}
+    expect: {status: 200}
+  - name: get-user-info-admin
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200}

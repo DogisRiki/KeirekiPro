@@ -327,9 +327,10 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	if len(got) != 29 {
 		t.Errorf("一覧の項目は29のはずですが、%d です", len(got))
 	}
+	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
 		"CB-005", "CB-007", "CB-008", "CB-009", "CB-010",
-		"CB-013", "CB-014", "CB-015", "CB-016", "CB-017", "CB-018", "CB-019", "CB-020", "CB-021", "CB-022", "CB-023", "CB-025", "CB-026",
+		"CB-013", "CB-014", "CB-015", "CB-016", "CB-017", "CB-018", "CB-019", "CB-020", "CB-021", "CB-023", "CB-025", "CB-026",
 		"CB-027",
 	} {
 		if m := byID[id].Matches; len(m) != 0 {
@@ -420,5 +421,117 @@ func TestChangedBehaviors_UserItems(t *testing.T) {
 				t.Errorf("%s の match = %+v, want %+v", id, b.Matches, want)
 			}
 		})
+	}
+}
+
+// refreshHash は、ログインを続けるための値のハッシュを、DumpRedis と同じ文字の形で作る。
+func refreshHash(key, roles, userID string) RedisEntry {
+	return RedisEntry{
+		Key: key, Type: "hash", TTL: -1,
+		Value: canonicalJSON(map[string]string{"roles": `"` + roles + `"`, "tokenVersion": `"0"`, "userId": `"` + userID + `"`}),
+	}
+}
+
+func TestMatch_RedisOrderOnly(t *testing.T) {
+	rolesOrder := cb("CB-022", Match{Operation: "*", Target: TargetRedis, Path: "refresh-token:*", Field: "roles", OrderOnly: true})
+	const javaKey, goKey = "refresh-token:" + javaURLWord, "refresh-token:" + goURLWord
+	const userID = "00000000-0000-4000-8000-000000000022"
+	compareRedis := func(behaviors []ChangedBehavior, java, goEntry RedisEntry) Report {
+		c := NewComparer("筋書き")
+		c.Behaviors = behaviors
+		c.CompareRedis(step1, []RedisEntry{java}, []RedisEntry{goEntry})
+		return c.Report()
+	}
+
+	t.Run("ハッシュの項目の、カンマで区切った要素の順だけが違うときは止めない", func(t *testing.T) {
+		for _, pair := range [][2]string{{"ADMIN,USER", "USER,ADMIN"}, {"USER,ADMIN", "ADMIN,USER"}} {
+			if r := compareRedis([]ChangedBehavior{rolesOrder}, refreshHash(javaKey, pair[0], userID), refreshHash(goKey, pair[1], userID)); r.Failed() {
+				t.Fatalf("%v: 違いが無いはずですが、%d 件ありました: %+v", pair, len(r.Diffs), r.Diffs)
+			}
+		}
+	})
+
+	t.Run("一覧に項目が無ければ、順の違いを止める", func(t *testing.T) {
+		if r := compareRedis(nil, refreshHash(javaKey, "ADMIN,USER", userID), refreshHash(goKey, "USER,ADMIN", userID)); len(r.Diffs) != 1 {
+			t.Fatalf("違いが1件のはずですが、違い = %+v", r.Diffs)
+		}
+	})
+
+	t.Run("要素の違いは止める", func(t *testing.T) {
+		if r := compareRedis([]ChangedBehavior{rolesOrder}, refreshHash(javaKey, "ADMIN,USER", userID), refreshHash(goKey, "USER", userID)); len(r.Diffs) != 1 {
+			t.Fatalf("違いが1件のはずですが、違い = %+v", r.Diffs)
+		}
+	})
+
+	t.Run("ほかの項目の違いは止める", func(t *testing.T) {
+		other := refreshHash(goKey, "USER,ADMIN", userID)
+		other.Value = strings.Replace(other.Value, `\"0\"`, `\"1\"`, 1)
+		if r := compareRedis([]ChangedBehavior{rolesOrder}, refreshHash(javaKey, "ADMIN,USER", userID), other); len(r.Diffs) != 1 {
+			t.Fatalf("違いが1件のはずですが、違い = %+v", r.Diffs)
+		}
+	})
+
+	t.Run("キーの形に当たらないハッシュの順の違いは止める", func(t *testing.T) {
+		if r := compareRedis([]ChangedBehavior{rolesOrder}, refreshHash("other:"+javaURLWord, "ADMIN,USER", userID), refreshHash("other:"+goURLWord, "USER,ADMIN", userID)); len(r.Diffs) != 1 {
+			t.Fatalf("違いが1件のはずですが、違い = %+v", r.Diffs)
+		}
+	})
+
+	t.Run("名前の違う項目の順の違いは止める", func(t *testing.T) {
+		other := cb("CB-022", Match{Operation: "*", Target: TargetRedis, Path: "refresh-token:*", Field: "scopes", OrderOnly: true})
+		if r := compareRedis([]ChangedBehavior{other}, refreshHash(javaKey, "ADMIN,USER", userID), refreshHash(goKey, "USER,ADMIN", userID)); len(r.Diffs) != 1 {
+			t.Fatalf("違いが1件のはずですが、違い = %+v", r.Diffs)
+		}
+	})
+
+	t.Run("ほかの操作の段の順の違いは止める", func(t *testing.T) {
+		other := cb("CB-022", Match{Operation: "login", Target: TargetRedis, Path: "refresh-token:*", Field: "roles", OrderOnly: true})
+		if r := compareRedis([]ChangedBehavior{other}, refreshHash(javaKey, "ADMIN,USER", userID), refreshHash(goKey, "USER,ADMIN", userID)); len(r.Diffs) != 1 {
+			t.Fatalf("違いが1件のはずですが、違い = %+v", r.Diffs)
+		}
+	})
+}
+
+func TestLoadChangedBehaviors_RedisOrderOnly(t *testing.T) {
+	t.Run("Redis の順だけの match は、キーの形と項目の名前を読める", func(t *testing.T) {
+		got, err := LoadChangedBehaviors(writeBehaviors(t, validItem+"  match:\n    operation: \"*\"\n    target: redis\n    path: refresh-token:*\n    field: roles\n    order_only: true\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := Match{Operation: "*", Target: TargetRedis, Path: "refresh-token:*", Field: "roles", OrderOnly: true}
+		if len(got) != 1 || !slices.Equal(got[0].Matches, Matches{want}) {
+			t.Fatalf("読んだ項目 = %+v", got)
+		}
+	})
+
+	broken := map[string]string{
+		"Redis の順だけの match にキーの形が無い":  "    target: redis\n    field: roles\n    order_only: true\n",
+		"Redis の順だけの match に項目の名前が無い": "    target: redis\n    path: refresh-token:*\n    order_only: true\n",
+		"Redis の順だけの match のキーの形が誤り":  "    target: redis\n    path: refresh-token:[\n    field: roles\n    order_only: true\n",
+		"順だけでない match に項目の名前がある":      "    target: redis\n    path: refresh-token:*\n    field: roles\n",
+		"本文の順だけの match に項目の名前がある":     "    target: body\n    path: $.roles[*]\n    field: roles\n    order_only: true\n",
+	}
+	for name, match := range broken {
+		t.Run(name, func(t *testing.T) {
+			if _, err := LoadChangedBehaviors(writeBehaviors(t, validItem+"  match:\n    operation: \"*\"\n"+match)); err == nil {
+				t.Fatal("誤りを返すはずですが、読めました")
+			}
+		})
+	}
+}
+
+func TestChangedBehaviors_RefreshTokenRoles(t *testing.T) {
+	got, err := LoadChangedBehaviors(filepath.Join("..", "changed-behaviors.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(got, func(b ChangedBehavior) bool { return b.ID == "CB-022" })
+	if i < 0 {
+		t.Fatal("CB-022 が一覧にありません")
+	}
+	// 役割 USER と ADMIN を持つ利用者がログインすると、ログインを続けるための値の roles の並びが、Java 版で決まらない
+	want := Matches{{Operation: "*", Target: TargetRedis, Path: "refresh-token:*", Field: "roles", OrderOnly: true}}
+	if got[i].Group != 1 || !slices.Equal(got[i].Matches, want) {
+		t.Fatalf("CB-022 の group = %d, match = %+v, want group 1, match %+v", got[i].Group, got[i].Matches, want)
 	}
 }
