@@ -86,7 +86,7 @@
   - 受入基準とテストの対応: 要件1の受入基準1(Java 版と同じ答え)のうち部分の分け方は、`multipart_test.go` の `TestMultipart_ControlCharInHeader` と `TestMultipart_Malformed` で確かめる
   - _要件: 1.1_
 
-- [ ] 2.4 名前と画像と2段階認証の設定の変更の要求の本文を読む中間処理を作る
+- [x] 2.4 名前と画像と2段階認証の設定の変更の要求の本文を読む中間処理を作る
 
   Claude は、`users.go` に、本文を読む中間処理と multipart の読み方の節の5つの手順のとおりの、生成したコードの中間処理を作る。この中間処理は、操作の名前が `UpdateUserInfo` のときだけ動き、読んだ項目を `context` に入れる。Claude は、小タスク1.2 で控えた3つの要求の Java 版の答えと、節の決まりが食い違えば、Java 版に合わせ、合わせた中身を research.md に書き足す。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestUpdateUserInfoBody` が通る。テストは、テストの方針の `multipart.go` と本文を読む中間処理の行の場合を含む。2つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
@@ -372,6 +372,8 @@
   - Tomcat は、multipart の本文を読めないとき、どの誤りでも例外を投げ、Spring はそれを `MultipartException` にする。そのため、Java 版は 500 で答えるはずである。小タスク2.4 は、この状態の番号を Java 版の答えで確かめる
   - Tomcat の `Request.parseParts` は、部分の数の上限を、`maxParameterCount`(1000)から URL の問い合わせの項目の数を引いた数と、`maxPartCount`(50)の小さいほうにする。`parseMultipart` は 50 だけを見る。小タスク2.4 は、問い合わせの項目が 950 を超える要求を扱うかを決める
   - Tomcat の `Request.parseParts` は、ファイルの名前の無い部分ごとに、解いたあとの名前と中身のバイト数に2を足して合計し、`maxPostSize`(Spring Boot の `server.tomcat.max-http-form-post-size`、既定は 2MB)を超えると例外を投げる。部分の名前を RFC 2047 の書き方で送ると、解いたあとのバイト数が本文の中のバイト数より大きくなるので、2MB に近い本文では Java 版だけが誤りになりうる。小タスク2.4 は、部分の数の上限と一緒に、この検査を写すかを決める
+- 小タスク2.4 は、問い合わせの項目の数の上限と、Tomcat の合計の上限の検査を、どちらも写した。中間処理は `users.go` の `updateUserInfoMiddleware` で、受け口は `updateUserInfoFormFrom(ctx)` で読んだ項目を受け取る。小タスク4.2 は、`server.go` の中間処理の並びにこの中間処理を足す。`Content-Type` の無い画像では、中間処理は `errImageWithoutContentType` を返し、生成したコードの `ResponseErrorHandlerFunc` が 500 と「予期せぬエラーが発生しました。」で答える。空の `Content-Type` の画像は、空の文字列のまま受け口に渡すので、小タスク3.1 の画像の検査が断る
+- 小タスク2.4 で、Java 版が 500 で答え、Go 版が 400 で答える要求が、design.md が名指しした4つのほかに7つ見つかった。要求の一覧は research.md の「小タスク2.4 の実装」の記録にある。変えた動きの一覧に項目を足す小タスクは、要求ごとに1つの項目を足す
 
 ## 完了条件(全タスク共通)
 
