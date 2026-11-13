@@ -202,7 +202,7 @@
   - _要件: 1.1, 5.4, 6.1_
   - _対象の部品: httpapi.New の変更_
 
-- [ ] 5. Java 版と Go 版を比べる検査を広げる
+- [x] 5. Java 版と Go 版を比べる検査を広げる
 - [x] 5.1 筋書きの形に5つの欄を足し、読むときに確かめる
 
   Claude は、`scenario.go` に、Java 版と Go 版を比べる検査の広げ方の節の `request.multipart` `request.body_file` `expect.values` `expect.body_file` `expect.content_type` の5つの欄を足す。harness は、筋書きを読むときに、`request.multipart` の `file` が `fixtures/images` に無いときと、`request.body_file` と `expect.body_file` と `expect.content_type` が絶対の URL の段に無いときを、段の名前を付けた誤りとして返す。
@@ -260,7 +260,7 @@
   - 受入基準とテストの対応: 要件5の受入基準3(要求のたびに違う値の比べ方)のうち並びの順は、`match_test.go` の `TestChangedBehaviors_UserItems` で確かめる。このテストは、2つの項目が `order_only: true` の match を持つことを確かめる
   - _要件: 5.3, 5.4_
 
-- [ ] 6. 利用者の操作の筋書きで Java 版と Go 版を比べる
+- [x] 6. 利用者の操作の筋書きで Java 版と Go 版を比べる
 - [x] 6.1 初期のデータと画像のファイルと、利用者の情報を見る筋書きを書く
 
   Claude は、利用者の操作の筋書きの節の表の5人の利用者を置く `fixtures/users/users-ops.sql` と、`fixtures/images/wide.png` と `fixtures/images/not-image.png` を作る。Claude は、同じ節のとおりに、`get-user-info.yaml` を `group: 2` と `modes: [compare]` で書く。Claude は、利用者の操作の筋書きの `fixtures` に、`users/basic.sql` と `users/auth-users.sql` と `users/users-ops.sql` を書く。
@@ -304,7 +304,7 @@
   - 受入基準とテストの対応: 要件4の受入基準1(変えたものがもう一方の版で見える)と要件2の受入基準1と2(一方の版で置いた画像をもう一方の版で表示する)は、`cross-update.yaml` の `expect.values` と `expect.body_file` で確かめる。要件4の受入基準2(もう一方の版で確認しログインする)は `cross-email-password.yaml` で、要件4の受入基準3(前のログインの状態がもう一方の版で使えない)は `cross-invalidate.yaml` で確かめる。要件4の受入基準4(両方の向きの筋書きを CI で動かす)は、`TestCrossRoute_UserSteps` と、CI で動く `make compat-cross` の `TestCross_` の検査で確かめる
   - _要件: 2.1, 2.2, 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 6.7 主な操作の応答の時間を測る
+- [x] 6.7 主な操作の応答の時間を測る
 
   Claude は、利用者の操作の筋書きの節のとおりに、`get-user-info-perf.yaml` と `update-username-perf.yaml` を `modes: [perf]` で書く。Claude は、置き換えの spec の測り方で2つの操作の応答の時間を測り、結果を `progress.md` の決まりのとおりに書く。
   - 完了の確かめ方: `make compat-perf` が2つの操作を測り、`progress.md` に結果が書かれる。6つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
