@@ -3,12 +3,14 @@
 package harness
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -37,7 +39,8 @@ const signedURLHost = "localhost:4566"
 // ホストとポートが localhost:4566 の URL は、送る先を targets.AWSURL(テストの処理から届く偽の AWS のアドレス)に置き換え、
 // 要求の Host を targets.AWSEndpoint のホストとポートにする。偽の AWS は、Host のホスト名で、どちらの版が置いた画像を読むかを選ぶ。
 // 転送は追わず、応答の Location を capture で次の段に渡す。版に送る要求ではないので、Cookie の束の Cookie は送らず、
-// 応答の Set-Cookie も覚えない。expect.status があれば、応答のステータスがそれに合うかを確かめる。応答は比べない。
+// 応答の Set-Cookie も覚えない。応答が expect の status と content_type と body_file に合うかを checkAbsoluteExpect で確かめ、
+// 合わなければ、合わないことを1つずつ誤りにして返す。応答は比べない。
 func (s *Session) SendAbsolute(ctx context.Context, client *http.Client, targets AbsoluteTargets, step Step) (Response, error) {
 	raw, err := s.expand(step, "url", step.Request.URL)
 	if err != nil {
@@ -77,10 +80,80 @@ func (s *Session) SendAbsolute(ctx context.Context, client *http.Client, targets
 	if err != nil {
 		return resp, err
 	}
-	if step.Expect.Status != 0 && resp.Status != step.Expect.Status {
-		return resp, fmt.Errorf("harness: 段 %s のステータスが %d でした。期待は %d です", step.Name, resp.Status, step.Expect.Status)
+	var errs []error
+	for _, p := range checkAbsoluteExpect(step, resp) {
+		errs = append(errs, errors.New("harness: "+p))
 	}
-	return resp, nil
+	return resp, errors.Join(errs...)
+}
+
+// CheckValues は、版に送る段 step の応答 resp の本文の JSON が、expect.values の場所ごとに期待する値を持つかを確かめ、
+// 合わないことを1つずつ文にして返す。合えば空を返す。期待する値の {名前} は、この Session で取り出した値に置き換える。
+// 合わないことの文には、段の名前と、JSON の場所と、受けた値と、期待した値を書く。値は、項目を名前の順に並べた JSON で書く。
+// 場所に値が無いときと、場所に値が2つ以上あるときも、合わないこととして書く。
+func (s *Session) CheckValues(step Step, resp Response) []string {
+	if len(step.Expect.Values) == 0 {
+		return nil
+	}
+	v, err := decodeJSON(resp.Body)
+	if err != nil {
+		return []string{fmt.Sprintf("段 %s の expect の values を確かめられません。本文を JSON として読めません: %v", step.Name, err)}
+	}
+	var problems []string
+	for _, path := range sortedKeys(step.Expect.Values) {
+		want, err := s.expandJSON(step, "expect の values の "+path+" の値", step.Expect.Values[path])
+		if err != nil {
+			problems = append(problems, strings.TrimPrefix(err.Error(), "harness: "))
+			continue
+		}
+		segments, err := splitJSONPath(path)
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("段 %s の expect の values: %v", step.Name, err))
+			continue
+		}
+		var found []any
+		walkJSONPath(v, segments, func(x any) { found = append(found, x) })
+		wantText := canonicalJSON(want)
+		var got string
+		switch len(found) {
+		case 0:
+			got = absent
+		case 1:
+			got = canonicalJSON(found[0])
+		default:
+			got = fmt.Sprintf("%d 個の値 %s", len(found), canonicalJSON(found))
+		}
+		if len(found) != 1 || got != wantText {
+			problems = append(problems, fmt.Sprintf("段 %s の %s の値が %s でした。期待は %s です", step.Name, path, got, wantText))
+		}
+	}
+	return problems
+}
+
+// checkAbsoluteExpect は、絶対の URL の段 step の応答 resp が、expect の status と content_type と body_file に合うかを確かめ、
+// 合わないことを1つずつ文にして返す。合えば空を返す。Content-Type は、文字の並びのまま比べる。
+// 本文が body_file と違うときは、画像の中身を書かず、受けた本文と期待したファイルの大きさと SHA-256 だけを書く。
+func checkAbsoluteExpect(step Step, resp Response) []string {
+	var problems []string
+	if step.Expect.Status != 0 && resp.Status != step.Expect.Status {
+		problems = append(problems, fmt.Sprintf("段 %s のステータスが %d でした。期待は %d です", step.Name, resp.Status, step.Expect.Status))
+	}
+	if step.Expect.ContentType != "" {
+		if got := resp.Header.Get("Content-Type"); got != step.Expect.ContentType {
+			problems = append(problems, fmt.Sprintf("段 %s の応答の Content-Type が %q でした。期待は %q です", step.Name, got, step.Expect.ContentType))
+		}
+	}
+	if step.Expect.BodyFile != "" {
+		want, err := readImageFixture(step.Expect.BodyFile)
+		switch {
+		case err != nil:
+			problems = append(problems, fmt.Sprintf("段 %s の expect の body_file %q を読めません: %v", step.Name, step.Expect.BodyFile, err))
+		case !bytes.Equal(resp.Body, want):
+			problems = append(problems, fmt.Sprintf("段 %s の応答の本文が %s でした。期待は fixtures/images/%s の %s です",
+				step.Name, describeBytes(resp.Body), step.Expect.BodyFile, describeBytes(want)))
+		}
+	}
+	return problems
 }
 
 // hostOf は、アドレス raw を読み、ホストのある絶対の URL なら返す。空のときと、読めないときと、ホストが無いときは誤りを返す。

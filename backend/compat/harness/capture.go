@@ -212,16 +212,16 @@ func (s *Session) expand(step Step, where, text string) (string, error) {
 	return expanded, nil
 }
 
-// expandJSON は、JSON の本文の値 v の文字列の値の {名前} を置き換えた写しを返す。項目の名前は置き換えない。
+// expandJSON は、JSON の値 v の文字列の値の {名前} を置き換えた写しを返す。where は、誤りに書く、値のある場所である。項目の名前は置き換えない。
 // 筋書きの段は Java 版と Go 版で同じものを使うので、v は書き換えない。
-func (s *Session) expandJSON(step Step, v any) (any, error) {
+func (s *Session) expandJSON(step Step, where string, v any) (any, error) {
 	switch x := v.(type) {
 	case string:
-		return s.expand(step, "本文の文字列", x)
+		return s.expand(step, where, x)
 	case map[string]any:
 		out := make(map[string]any, len(x))
 		for k, item := range x {
-			e, err := s.expandJSON(step, item)
+			e, err := s.expandJSON(step, where, item)
 			if err != nil {
 				return nil, err
 			}
@@ -231,7 +231,7 @@ func (s *Session) expandJSON(step Step, v any) (any, error) {
 	case []any:
 		out := make([]any, len(x))
 		for i, item := range x {
-			e, err := s.expandJSON(step, item)
+			e, err := s.expandJSON(step, where, item)
 			if err != nil {
 				return nil, err
 			}
@@ -259,7 +259,7 @@ func (s *Session) requestBody(step Step) ([]byte, string, error) {
 	case step.Request.JSON == nil:
 		return nil, "", nil
 	}
-	v, err := s.expandJSON(step, step.Request.JSON)
+	v, err := s.expandJSON(step, "本文の文字列", step.Request.JSON)
 	if err != nil {
 		return nil, "", err
 	}

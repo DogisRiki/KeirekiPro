@@ -224,7 +224,7 @@
   - 受入基準とテストの対応: 要件2の受入基準1から3(どちらの版でも同じ画像が表示される)を支える画像の読み方は、`steps_test.go` の `TestAbsoluteURL_FakeAWSRewrite` で確かめる。このテストは、`localhost:4566` のほかのホストの URL を書き換えないことも確かめる
   - _要件: 2.1, 2.2, 2.3_
 
-- [ ] 5.4 応答の値と画像のバイトと `Content-Type` を確かめる
+- [x] 5.4 応答の値と画像のバイトと `Content-Type` を確かめる
 
   Claude は、`steps.go` に、`expect.values` と `expect.body_file` と `expect.content_type` で応答を確かめる処理を足す。外れたときは、harness は、段の名前と、期待した値と、受けた値を報告に書く。画像の中身は報告に書かず、大きさと SHA-256 だけを書く。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestExpectValues|TestExpectBodyFile|TestExpectContentType'` が通る
@@ -386,6 +386,7 @@
 - テストの対象のコードを壊した写しで、変数を使う唯一の箇所を消すと、Go は使わない変数を誤りにしてビルドが通らない。Claude は、条件を `x || true` のように書き換えて壊す
 - 小タスク4.1 の `users_test.go` は、利用者の処理の偽物 `fakeUsers`(呼ばれた操作と引数を記録し、操作の名前ごとに決めた誤りを返す)、ログインした context を作る `loggedIn`、本文を読んだ結果を入れる `withForm`、7つの操作を並べた `userOps`、消す Cookie の文字列 `deleteSessionCookies` を持つ。小タスク4.2 と5.x のテストは、これらを使える。
 - 小タスク5.2 の `harness/multipart.go` は、筋書きの `file` の部分に `filename` が無ければファイルの名前を送り、`content_type` が無ければ部分の `Content-Type` を送らない。文字の部分の値の `{名前}` は置き換える。`request.body_file` の本文には `Content-Type` を付けないので、筋書きは `request.headers` に `Content-Type` を書く。テストの `multipart_test.go` は、受けた要求の本文の全体を記録するサーバ `bodyServer` と、画像のファイルを読む `imageFixture` を持つ
+- 小タスク5.4 で、絶対の URL の段の `expect` の status と `content_type` と `body_file` は、`SendAbsolute` が `checkAbsoluteExpect` で確かめ、外れをすべて誤りにして返す。そのため、絶対の URL の段を送るどの動かし方も、つなぎ直さずにこの確かめを使う。版に送る段の `expect.values` は `Session.CheckValues` が確かめるが、どの動かし方からもまだ呼ばれていない。小タスク5.7 は、版をまたぐ動かし方で、送り先の版の応答と、その版の `Session` で `CheckValues` を呼ぶ。`steps_test.go` は、要求を記録する送り方 `recordingTransport` と、パスごとに決めた `Content-Type` と本文で答えるサーバ `imageServer` を持つ
 
 ## 完了条件(全タスク共通)
 
