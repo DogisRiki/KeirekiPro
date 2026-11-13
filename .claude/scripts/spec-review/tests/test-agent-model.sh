@@ -202,7 +202,7 @@ t_agent_id_same_dir_two_forms() {
     if win=$(cd "$home" && pwd -W 2>/dev/null); then
         # C:/x/y を /c/x/y と C:\x\y の2つの書き方にする
         unix=$(printf '%s' "$win" | sed -E 's#^([A-Za-z]):#/\L\1#')
-        win=$(printf '%s' "$win" | tr '/' '\\')
+        win=${win//\//\\}
     else
         unix="$home"
         win="$home/"
