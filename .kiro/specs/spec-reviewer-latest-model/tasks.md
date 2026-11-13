@@ -101,7 +101,7 @@
   - _要件: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8_
   - _対象の部品: usage-report の手順_
 
-- [ ] 6. フックのファイルを本来の場所に置き、全体を確かめる
+- [x] 6. フックのファイルを本来の場所に置き、全体を確かめる
 
 - [x] 6.1 写しで3つのテストをまとめて流し、所有者に写すコマンドを示す
 
@@ -112,7 +112,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1・2・3(版によらず、新しいモデルの審査も、仕組みのファイルを直さずに記録し、Fable でも Opus でもない系統を記録しない)は、写しの `test-record-spec-review.sh` で確かめる。要件1の受入基準1(既定と Fable を選んだ spec では Fable の最新のモデルで起動する)と要件8の受入基準2(要約の決まりが版の番号を書かずに替えたかどうかを残すよう求める)は、写しの `test-restore-after-compact.sh` で確かめる。要件4の受入基準1・3・4(実際に動いたモデルを系統の名前と版の番号で書き、上限で止まった Fable の審査役のモデルを書き、読み取れなかったことを書く)は、写しの `test-agent-model.sh` で確かめる
   - _要件: 1.1, 4.1, 4.3, 4.4, 5.1, 5.2, 5.3, 8.2_
 
-- [ ] 6.2 本来の場所でテストを流し直し、実物の会話の記録からモデルを読めることを確かめる
+- [x] 6.2 本来の場所でテストを流し直し、実物の会話の記録からモデルを読めることを確かめる
 
   Claude は、作業フォルダの本来の場所で、この spec で変えたファイルを読むテストを1回ずつ流す。流すのは、`test-agent-model.sh`、`test-record-spec-review.sh`、`test-restore-after-compact.sh`、`test-usage.sh`、`test-report.sh`、`test-extract.sh` の6つである。`test-usage.sh` はスキルの SKILL.md と CLAUDE.md の行を読み、`test-report.sh` と `test-extract.sh` は料金表を読む。Claude は、実装の会話で動かした補助役の結果の `agentId` で `agent-model.pl --agent-id` を呼び、Claude Code が実際に書いた会話の記録から、モデルの名前を読めることを確かめる。Claude は、CLAUDE.md と `/spec-review` の SKILL.md を、審査役の定義と CLAUDE.md を直すタスク3と、`/spec-review` の手順を直すタスク4の、完了の確かめ方の `grep -n 'Fable 5\.1\|Opus 5\.5'` でもう一度探す。
   - 完了の確かめ方: 次の3つが起きる
