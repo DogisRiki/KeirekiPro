@@ -130,6 +130,12 @@ func (s *Session) CheckValues(step Step, resp Response) []string {
 	return problems
 }
 
+// checkStepExpect は、段 step の応答 resp が、expect の status と fields(CheckExpect)と、values(session の CheckValues)に
+// 合うかを確かめ、合わないことを1つずつ文にして返す。版をまたぐ動かし方と応答の時間の比べ方は、送り先の版の応答をこれで確かめる。
+func checkStepExpect(session *Session, step Step, resp Response) []string {
+	return append(CheckExpect(step, resp), session.CheckValues(step, resp)...)
+}
+
 // checkAbsoluteExpect は、絶対の URL の段 step の応答 resp が、expect の status と content_type と body_file に合うかを確かめ、
 // 合わないことを1つずつ文にして返す。合えば空を返す。Content-Type は、文字の並びのまま比べる。
 // 本文が body_file と違うときは、画像の中身を書かず、受けた本文と期待したファイルの大きさと SHA-256 だけを書く。
@@ -218,6 +224,10 @@ type stepTools struct {
 	client *http.Client
 	// oidcURL は、テストの処理から届く fakeoidc のアドレスである。絶対の URL の段の送る先にする。
 	oidcURL string
+	// awsURL は、テストの処理から届く偽の AWS のアドレスである。ホストが localhost:4566 の絶対の URL の段の送る先にする。
+	awsURL string
+	// awsEndpoint は、段を送る版の設定の AWS の接続先である。ホストが localhost:4566 の絶対の URL の段の要求の Host にする。
+	awsEndpoint string
 	// jwtKey は、値を期限切れにする段で署名し直す、版に渡した JWT.Secret の値である。
 	jwtKey string
 	// redis は、Redis を書き換える段で書き換える Redis である。
@@ -234,12 +244,14 @@ func (t stepTools) newSession() *Session {
 }
 
 // send は、段 step を種類に合わせて session で動かし、応答を返す。版に送る段は baseURL に送り、
-// 絶対の URL の段は fakeoidc に送る。Redis を書き換える段と値を期限切れにする段は、要求を送らずに、空の応答を返す。
-// 絶対の URL の段の応答は版の動きではないので、呼び出し元は比べない。絶対の URL の段の expect の status は、SendAbsolute が確かめる。
+// 絶対の URL の段は、SendAbsolute で、fakeoidc か、Host を t.awsEndpoint にして偽の AWS に送る。
+// Redis を書き換える段と値を期限切れにする段は、要求を送らずに、空の応答を返す。
+// 絶対の URL の段の応答は版の動きではないので、呼び出し元は比べない。絶対の URL の段の expect の status と content_type と
+// body_file は、SendAbsolute が確かめる。
 func (t stepTools) send(ctx context.Context, session *Session, baseURL string, step Step) (Response, error) {
 	switch step.Kind() {
 	case StepAbsoluteURL:
-		return session.SendAbsolute(ctx, t.client, AbsoluteTargets{OIDCURL: t.oidcURL}, step)
+		return session.SendAbsolute(ctx, t.client, AbsoluteTargets{OIDCURL: t.oidcURL, AWSURL: t.awsURL, AWSEndpoint: t.awsEndpoint}, step)
 	case StepRedis:
 		if t.redis == nil {
 			return Response{}, fmt.Errorf("harness: 段 %s で書き換える Redis がありません", step.Name)

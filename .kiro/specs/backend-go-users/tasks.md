@@ -245,7 +245,7 @@
   - 受入基準とテストの対応: 要件5の受入基準2(アップロードした画像の置き場所に残ったものを比べる)は、`compare_test.go` の `TestCompareObjects_ContentTypeAndMetadata` で確かめる
   - _要件: 5.2_
 
-- [ ] 5.7 新しい欄を3つの動かし方につなぐ
+- [x] 5.7 新しい欄を3つの動かし方につなぐ
 
   Claude は、`compareenv.go` `compare.go` `crossenv.go` `cross.go` `perfenv.go` を、小タスク5.1 から5.6 の欄と処理を使う形に変える。比べる動かし方では、harness は、絶対の URL の段を版ごとに1回ずつ送り、版ごとの AWS の接続先で `Host` を決める。版をまたぐ動かし方では、harness は、`expect.values` と `expect.body_file` を、送り先の版の応答で確かめる。Claude は、広げたあとに、認証の操作の筋書きを動かし直し、結果が変わらないことを確かめる。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestCompareEnv_UserFields|TestCrossEnv_UserFields|TestPerfEnv_UserFields'` が通る。Claude は、3つのテストを、今ある `TestCompareEnv_NewSteps` と同じ `modes_test.go` に置く。`make compat` と `make compat-cross` が、認証の操作の筋書きで通る

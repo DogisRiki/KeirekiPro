@@ -158,8 +158,8 @@ func (c *CompareEnv) runSteps(ctx context.Context, s Scenario, cmp *Comparer) er
 	tools := map[string]stepTools{}
 	sessions := map[string]*Session{}
 	for _, version := range []string{VersionJava, VersionGo} {
-		// メールは、版ごとの fakeaws の記録から読む
-		tools[version] = c.fakes.tools(c.client, c.Stores[version].Redis, version)
+		// メールは、版ごとの fakeaws の記録から読む。版が返す署名付きの URL は、版の AWS の接続先を Host にして読む
+		tools[version] = c.fakes.tools(c.client, c.Stores[version].Redis, version, awsEndpoint(awsHost(version)))
 		sessions[version] = tools[version].newSession()
 	}
 	seen := map[string]bool{}
