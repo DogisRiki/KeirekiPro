@@ -2,7 +2,7 @@
 name: spec-reviewer
 description: spec文書(requirements.md / design.md / tasks.md)を独立した立場でレビューする。/spec-review スキルから起動される。自分から起動しない。
 tools: Read, Grep, Glob, Write, Bash
-model: claude-fable-5-1
+model: fable
 ---
 
 # spec-reviewer

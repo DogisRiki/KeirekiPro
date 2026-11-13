@@ -413,7 +413,7 @@ echo "== 段階とモデルと役割ごとのトークン数と使用料"
 newrepo
 commit 2026-09-01T00:00:00Z "$CFGPATH={}" '.kiro/specs/feat-s/spec.json={"feature_name":"feat-s","issue":2001}'
 newgh tokens
-mkdb 'prs => [ closes("'"$SHA"'", 2001 .. 2005) ]'
+mkdb 'prs => [ closes("'"$SHA"'", 2001 .. 2006) ]'
 newstate
 # 段階の印: rst <記録の鍵> <時刻> <名前> [<spec-review の段階>]
 rst() {
@@ -471,12 +471,12 @@ rtk t4 20 b claude-opus-5-5 1000000 1000000 0 0 0 true false 0
 rtk t4 30 c claude-opus-5-5 1000000 0 0 1000000 0 false true 0
 rtk t4 40 d claude-haiku-5-5 100000 0 0 0 0
 rtk t4 50 e claude-haiku-5-5 50000 0 0 60000 0
-rtk t4 60 f claude-fable-5-2 1000 0 0 0 0
+rtk t4 60 f claude-fable-9-9 1000 0 0 0 0
 rtk t4 70 g claude-opus-4-20250514 0 0 0 0 1000000
 run 2003
 check "価格がデータのファイルに無いモデルの使用料が 価格が分からない になり、Haiku 5.5 の10万トークンを超える応答と fast と us の価格が当たる" \
     "$RC:$(rj 'J([M("model", "role", "in", "cw", "cr", "out", "usd"), R("totals", "tokens"), R("totals", "usd"), R("totals", "usd_unknown_models")])')" \
-    '0:[[["claude-opus-4-20250514","本体の会話",0,0,0,1000000,75],["claude-opus-5-5","本体の会話",3000000,2000000,1000000,0,34.64],["claude-haiku-5-5","本体の会話",150000,0,60000,0,0.038],["claude-fable-5-2","本体の会話",1000,0,0,0,null]],7211000,109.678,["claude-fable-5-2"]]'
+    '0:[[["claude-opus-4-20250514","本体の会話",0,0,0,1000000,75],["claude-opus-5-5","本体の会話",3000000,2000000,1000000,0,34.64],["claude-haiku-5-5","本体の会話",150000,0,60000,0,0.038],["claude-fable-9-9","本体の会話",1000,0,0,0,null]],7211000,109.678,["claude-fable-9-9"]]'
 # #2004: 2つの会話が同じ message.id の応答を持つ
 rv t5 0 2004; rtk t5 10 dup claude-opus-5-5 100 0 0 0 0
 rv t6 0 2004; rtk t6 10 dup claude-opus-5-5 100 0 0 0 0; rtk t6 20 u claude-opus-5-5 1 0 0 0 0
@@ -503,6 +503,15 @@ run 2005
 check "本体の会話と、agent_type と verdict から決めた役割と、別に起こしたセッションが、モデルと役割の組ごとに分かれる" \
     "$RC:$(rj 'J(M("model", "role", "in"))')" \
     '0:[["claude-sonnet-5-5","本体の会話",64],["claude-opus-5-5","別に起こしたセッション",16],["claude-sonnet-5-5","spec の審査役",16],["claude-opus-5-5","原因を調べる補助役",4],["claude-opus-5-5","タスクごとの確認役",2],["claude-opus-5-5","本体の会話",1],["claude-haiku-5-5","Explore",8]]'
+# #2006: Fable 5.2 の、本体の会話の通常の応答と、spec の審査役の速い出力の応答。どちらも入力100万と出力100万
+rv t9 0 2006
+rtk t9 10 n9 claude-fable-5-2 1000000 0 0 0 1000000
+rec t9.agent-s9 '{"k":"meta","session":"t9","agent_id":"s9","agent_type":"spec-reviewer"}'
+rtk t9.agent-s9 20 f9 claude-fable-5-2 1000000 0 0 0 1000000 true
+run 2006
+check "Fable 5.2 の、入力100万と出力100万の通常の行が48ドル、速い出力の行が96ドルになり、全体の合計に入る" \
+    "$RC:$(rj 'J([M("model", "role", "in", "out", "usd"), R("totals", "usd"), R("totals", "usd_unknown_models")])')" \
+    '0:[[["claude-fable-5-2","spec の審査役",1000000,1000000,96],["claude-fable-5-2","本体の会話",1000000,1000000,48]],144,[]]'
 
 echo "== 印と spec の記録と補助役の報告から数える往復と手戻り"
 # 時刻は T0 からの秒数で書く。#2010 は spec ありの Issue で、#2013 は spec 無しの Issue、#2015 は #2014 を分けた Issue である

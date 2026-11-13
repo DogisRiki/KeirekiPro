@@ -110,7 +110,8 @@ AIがIssueの本文とその時点のコードを調べ、4つの観点で判断
   AIは起動しない(`disable-model-invocation` により、AIからは起動できない)。必要なときは所有者に打つよう依頼する
 - Phase 1(仕様化):
   - `/kiro-spec-init #N`(既存の spec を新しいIssueのために直すときは `/kiro-spec-init #N <feature>`)→ `/kiro-spec-requirements {feature}` → `/kiro-spec-design {feature}` → `/kiro-spec-tasks {feature}`
-  - 審査役のモデルは、既定では Fable 5.1 で、所有者が spec ごとに Opus 5.5 を選べる。所有者は、spec を始めるときに、選んだモデルを会話で伝える。
+  - 審査役は Fable か Opus の系統の最新のモデルで動く。既定は Fable で、所有者は spec ごとに Opus を選べる。
+    本体の会話が同じ系統のときは、審査役は本体の会話と同じ版で動く。所有者は、選んだモデルを spec の始めに会話で伝える(版を付けて伝えたときは `/kiro-spec-init` の SKILL.md に従う)。
     所有者がモデルを伝えたときと、spec の途中で選び直したときに、実装セッションは、その spec の spec.json の `review_model` に `fable` か `opus` を書き、書いた値を所有者に1行で示す。
     spec.json がまだ無いときは、`/kiro-spec-init` が spec.json を作った直後に書く。所有者が選んでいない spec では `review_model` を書かない
   - 既存コードとの整合確認: `/kiro-validate-gap {feature}`(任意)。これはレビューではなく design 前の事前調査(research.md の作成)である
@@ -140,7 +141,7 @@ Claude Code は、会話の要約を作るとき、次のことを必ず要約�
 
 - 実行中のスキルの名前と、その手順のどこにいるか(Step の番号)
 - 進めている Issue の番号、spec の名前と段階、作業のブランチ、作った PR の番号
-- `/spec-review` の往復の途中なら、CYCLE(審査のサイクルの番号)と ROUND(往復の番号)と CHANGED(本文を直したあとの審査かどうか)、その往復で受け入れた指摘と却下した指摘の ID、まだ記録に書いていない「直さなかった外れ」、Fable 5.1 から Opus 5.5 に替えたかどうか
+- `/spec-review` の往復の途中なら、CYCLE(審査のサイクルの番号)と ROUND(往復の番号)と CHANGED(本文を直したあとの審査かどうか)、その往復で受け入れた指摘と却下した指摘の ID、まだ記録に書いていない「直さなかった外れ」、Fable の審査役から Opus の審査役に替えたかどうか
 - `/kiro-impl` の途中なら、検査のコマンド一式、確認役が差し戻した(REJECTED)往復の数、debug の補助役を動かした回数
 - `/ship` の途中なら、同じ失敗が続いた回数
 - `/memory-inspect-now` の点検の途中なら、どの手順にいるか、何番目の組まで尋ねたか、「消す」と答えたメモリファイルの名前と、示したときの SHA-256、尋ね直すメモリファイルと答えが無かったために残すメモリファイルの名前、「点検を中止する」を選んだかどうか
