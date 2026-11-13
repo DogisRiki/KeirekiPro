@@ -32,7 +32,7 @@
   - _対象の部品: Mail_
   - _依存: 1.2_
 
-- [ ] 1.4 退会で消す表の SQL の問い合わせを書いて生成する
+- [x] 1.4 退会で消す表の SQL の問い合わせを書いて生成する
 
   Claude は、Delete の部品の節の11の表から利用者の行を消す問い合わせを `backend/db/queries/users.sql` に書き、sqlc でコードを生成する。Claude は、消す表の順を、Java 版の `UserMapper.xml` の削除の問い合わせを開いて確かめてから書く。
   - 完了の確かめ方: `make generate` が `sqlcgen` に退会の問い合わせのコードを生成し、`make generate-check` が通る
