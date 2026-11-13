@@ -184,7 +184,7 @@
   - _対象の部品: Password_
   - _依存: 3.3_
 
-- [ ] 4. 利用者の受け口をつなぐ
+- [x] 4. 利用者の受け口をつなぐ
 - [x] 4.1 利用者の7つの操作の受け口と応答の型を作る
 
   Claude は、`users.go` に、利用者の受け口の節のとおりの型 `userHandlers` と7つの操作のメソッドを作り、`userresponses.go` に7つの操作の `Visit<操作の名前>Response` を作る。受け口は、利用者の処理をインタフェースで受ける。テストで処理の代わりを使うためである。`updateUserInfo` の受け口は、小タスク2.4 の中間処理が `context` に入れた項目を読む。
@@ -194,7 +194,7 @@
   - _対象の部品: 利用者の受け口_
   - _依存: 2.4, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9_
 
-- [ ] 4.2 受け口と中間処理を組み立てる関数と起動につなぐ
+- [x] 4.2 受け口と中間処理を組み立てる関数と起動につなぐ
 
   Claude は、httpapi.New の変更の節のとおりに、`server.go` の `Options` に `UserHandlers` を足し、`routes` に利用者の受け口を深さ1で埋め込み、生成したコードの中間処理の並びに本文を読む中間処理を足す。Claude は、`main.go` で、`users.New` で `Service` を作り、`httpapi.Options` に渡す。
   - 完了の確かめ方: `go test ./internal/httpapi/ ./cmd/keirekipro/` が通る。`server_test.go` の `TestNew_UserOperationsNotUnimplemented` は、7つの操作が未実装の答えでなく利用者の受け口に届くことと、ほかのまとまりの操作が未実装の答えのままであることを確かめる。4つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
