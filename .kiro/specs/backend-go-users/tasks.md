@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 利用者の処理の土台を作る
+- [x] 1. 利用者の処理の土台を作る
 - [x] 1.1 認証の処理を利用者の処理から呼べる形で公開する
 
   Claude は、`internal/auth` の利用者の行の型 `storedUser` を、外から使える型 `StoredUser` に改め、欄の名前を `Row` `Providers` `Roles` にする。Claude は、`storedUser` と `loadStoredUser` と `loadStoredUserOr` を使う `emailverification.go` と `oidccallback.go` と `passwordreset.go` を、新しい名前に合わせて直す。`internal/auth` の今あるテストのファイルは `storedUser` を使わないので、Claude は今あるテストのファイルを変えない。そのため、名前を改める前に通っていたテストが、名前を改めたあとも同じ中身で通るかを確かめられる。Claude は、`exported.go` に、公開した認証の処理の節の表の関数と型のうち、`SendUserDeletedMail` のほかのすべてを置く。Claude は、`exported.go` の関数を、今ある関数を呼ぶだけの関数にする。`SendUserDeletedMail` は、小タスク1.3 の、退会の完了のメールを足すタスクで足す。
@@ -54,7 +54,7 @@
   - 受入基準とテストの対応: 要件2の受入基準1から3(どちらの版でも同じ画像が表示される)を支える偽の AWS の読み方は、`s3_test.go` の `TestS3_DoubleSlashKey` で確かめる。今までの名前の画像を読めることは、今ある `fakeaws_test.go` のテストで確かめる
   - _要件: 2.1, 2.2, 2.3_
 
-- [ ] 1.7 利用者の処理の結合テストの土台を作る
+- [x] 1.7 利用者の処理の結合テストの土台を作る
 
   Claude は、`internal/users` の結合テストのための `TestMain` を作る。`TestMain` は、testcontainers-go で、Postgres と Valkey と偽の AWS のコンテナを起動し、`backend.Migrations()` を `migrate.Run` の `Apply` で流して表を作る。偽の AWS のコンテナは、`backend/compat/fakeaws/Dockerfile` から組み立てる。Claude は、結合テストのファイルを `_integration_test.go` で終わる名前にし、ビルドタグを付けない。
   - 完了の確かめ方: `go test ./internal/users/ -run TestIntegrationSetup` が、3つのコンテナを起動して通る。`TestIntegrationSetup` は、表があることと、Valkey に書けることと、偽の AWS の置き場所に、名前が `/` で始まる画像を置いて読めることを確かめる。1つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
@@ -362,6 +362,7 @@
 - 小タスク1.2 の Java 版の答えでは、UTF-8 のサロゲートの範囲の3バイト(`ED A0 80` と `ED BF BF`)を、Java 版は U+FFFD の1つに置き換える。3バイトの冗長な形(`E0 80 80`)は3つに置き換える。小タスク2.1 は、`internal/httpapi/testdata/jdkutf8/cases.json` の28通りのすべてと同じ結果にする
 - 小タスク1.5 の `internal/users/errors.go` は、Java 版のユースケースと `User` と要求の型の注釈の文言だけを持つ。メールアドレスとパスワードの設定で、ほかの利用者が使っているメールアドレスを断る文言「このメールアドレスは登録できません。」は、Java 版のドメインのサービス `UserEmailDuplicationCheckService` の文言である。Claude は、この文言に、認証の spec が公開した `auth.MessageEmailNotRegistrable` を使う
 - 小タスク1.6 で、偽の AWS の `fakeaws.go` の `ServeHTTP` は、`ServeMux` に渡す前に、URL のパスから置き場所の名前と画像の名前を取り出し、`r.SetPathValue` で要求に入れる。`s3.go` の処理は、今までどおり `r.PathValue` で、その取り出した名前を読む。そのため、`s3.go` は変えていない
+- 小タスク1.7 の `internal/users/main_integration_test.go` は、Postgres への接続の束 `testPool`、Valkey の「ホスト:ポート」`testRedisAddr`、偽の AWS の URL `testAWSEndpoint`、置き場所の名前 `testBucket` と、本番と同じ `awsclient.New` で S3 のクライアントを作る `newTestS3` を持つ。小タスク3.2 と3.4 から3.9 の結合テストは、これらを使う
 
 ## 完了条件(全タスク共通)
 
