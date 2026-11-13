@@ -39,7 +39,7 @@
   - 受入基準とテストの対応: この小タスクは土台であり、受入基準を直接は確かめない。要件1の受入基準5(退会で消すもの)は、小タスク3.8 の `delete_integration_test.go` と、小タスク6.3 の `delete-user.yaml` で確かめる
   - _要件: 1.5_
 
-- [ ] 1.5 利用者の処理の入口と文言を作り、depguard の規則を変える
+- [x] 1.5 利用者の処理の入口と文言を作り、depguard の規則を変える
 
   Claude は、`internal/users` に、Service の部品の節のとおりの入口の型 `Service` と、部品の束 `Deps` と、組み立ての関数 `New` を作る。Claude は、`errors.go` に、Java 版の利用者の操作の文言の定数を置く。Claude は、文言の定数を、Java 版の利用者の操作のユースケースと `User` と要求の型の注釈を開いて写す。Claude は、品質チェックの設定の変更の提案の節のとおりに、`backend/.golangci.yml` の depguard の機能のパッケージの規則の許す一覧に `internal/auth` を1行足す。depguard は、golangci-lint の中で、パッケージが読んでよいほかのパッケージを規則で決め、規則に無いパッケージを読むコードを止める機能である。この変更は所有者の承認が要るので、Claude は、PR の本文に、承認が要る理由と、変える中身と、main に入れたときに本番で起きることを書く。
   - 完了の確かめ方: `go test ./internal/users/ -run 'TestNew|TestErrors'` が通る。`make lint` が、`internal/users` が `internal/auth` を読んだ状態で通る
@@ -360,6 +360,7 @@
   - `profileImage` をファイルの名前の無い文字の部分で送ると、Java 版は、画像が無い要求として 200 で答え、画像を置かない
   - `Content-Type` の無い画像の部分を送ると、Java 版は、500 と「予期せぬエラーが発生しました。」で答え、画像を置かない。この要求は、design.md が Java 版の答えで確かめると名指しした3つの1つなので、「変えた動きの一覧の項目」の節の最後の箇条(実装で見つけたほかの形の誤った要求に項目を足す決まり)にはあたらない。Go 版も、500 と「予期せぬエラーが発生しました。」で答え、画像を置かない。変えた動きの一覧には項目を足さない
 - 小タスク1.2 の Java 版の答えでは、UTF-8 のサロゲートの範囲の3バイト(`ED A0 80` と `ED BF BF`)を、Java 版は U+FFFD の1つに置き換える。3バイトの冗長な形(`E0 80 80`)は3つに置き換える。小タスク2.1 は、`internal/httpapi/testdata/jdkutf8/cases.json` の28通りのすべてと同じ結果にする
+- 小タスク1.5 の `internal/users/errors.go` は、Java 版のユースケースと `User` と要求の型の注釈の文言だけを持つ。メールアドレスとパスワードの設定で、ほかの利用者が使っているメールアドレスを断る文言「このメールアドレスは登録できません。」は、Java 版のドメインのサービス `UserEmailDuplicationCheckService` の文言である。Claude は、この文言に、認証の spec が公開した `auth.MessageEmailNotRegistrable` を使う
 
 ## 完了条件(全タスク共通)
 
