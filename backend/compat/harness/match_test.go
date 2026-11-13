@@ -324,8 +324,8 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 27 {
-		t.Errorf("一覧の項目は27のはずですが、%d です", len(got))
+	if len(got) != 29 {
+		t.Errorf("一覧の項目は29のはずですが、%d です", len(got))
 	}
 	for _, id := range []string{
 		"CB-005", "CB-007", "CB-008", "CB-009", "CB-010",
@@ -374,5 +374,51 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	}
 	if m := byID["CB-024"].Matches; !slices.Equal(m, wantCB024) {
 		t.Errorf("CB-024 の match = %+v, want %+v", m, wantCB024)
+	}
+}
+
+// TestChangedBehaviors_UserItems は、利用者の操作の項目が、並びの順だけの違いを許すことを確かめる。
+func TestChangedBehaviors_UserItems(t *testing.T) {
+	got, err := LoadChangedBehaviors(filepath.Join("..", "changed-behaviors.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]ChangedBehavior{}
+	for _, b := range got {
+		byID[b.ID] = b
+	}
+	orderOnly := func(operation, path string) Match {
+		return Match{Operation: operation, Target: TargetBody, Path: path, OrderOnly: true}
+	}
+	tests := map[string]Matches{
+		// 利用者の情報の役割と連携の並びは、Java 版で決まった順を持たない
+		"CB-028": {
+			orderOnly("getUserInfo", "$.roles[*]"),
+			orderOnly("getUserInfo", "$.authProviders[*]"),
+			orderOnly("updateUserInfo", "$.roles[*]"),
+			orderOnly("updateUserInfo", "$.authProviders[*]"),
+			orderOnly("setEmailAndPassword", "$.roles[*]"),
+			orderOnly("setEmailAndPassword", "$.authProviders[*]"),
+		},
+		// 入力の誤りの文言の並びは、2つ以上の文言を持ちうる操作と項目だけを許す
+		"CB-029": {
+			orderOnly("changePassword", "$.errors.newPassword[*]"),
+			orderOnly("setEmailAndPassword", "$.errors.email[*]"),
+			orderOnly("setEmailAndPassword", "$.errors.password[*]"),
+		},
+	}
+	for id, want := range tests {
+		t.Run(id, func(t *testing.T) {
+			b, ok := byID[id]
+			if !ok {
+				t.Fatalf("%s が一覧にありません", id)
+			}
+			if b.Group != 2 {
+				t.Errorf("%s の group = %d, want 2", id, b.Group)
+			}
+			if !slices.Equal(b.Matches, want) {
+				t.Errorf("%s の match = %+v, want %+v", id, b.Matches, want)
+			}
+		})
 	}
 }

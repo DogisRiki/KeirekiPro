@@ -253,7 +253,7 @@
   - _要件: 4.4, 5.1, 5.2, 5.3_
   - _依存: 1.6_
 
-- [ ] 5.8 並びの順だけの違いを許す、変えた動きの項目を足す
+- [x] 5.8 並びの順だけの違いを許す、変えた動きの項目を足す
 
   Claude は、変えた動きの一覧の項目の節のうち、match を書く2つの項目を、`changed-behaviors.yaml` に `group: 2` で足す。1つは、`getUserInfo` `updateUserInfo` `setEmailAndPassword` の答えの `$.roles[*]` と `$.authProviders[*]` の並びの順の項目で、CB-028 とする。もう1つは、`changePassword` と `setEmailAndPassword` の入力の誤りの文言の並びの項目である。この2つを筋書きより前に足すのは、Java 版の並びの順が決まっていないためである。項目が無いと、小タスク6.1 から6.4 で書く利用者の操作の筋書きで、Java 版と Go 版の答えの比較が、並びの順の違いだけで外れる。Claude は、`match_test.go` に、本物の `changed-behaviors.yaml` を読み、利用者の操作の項目の番号と、項目ごとの match の有無と中身を確かめる `TestChangedBehaviors_UserItems` を作る。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestChangedBehaviors_UserItems|TestLoadChangedBehaviors'` が通る。5つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る。`/verify-backend` は `-tags compat` のテストを流さないので、加えて `go test -tags compat ./compat/harness/ ./compat/fakeaws/...` も通る

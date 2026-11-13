@@ -305,3 +305,58 @@
   go: Go の bcrypt は、$2$ で始まるハッシュでも鍵の末尾に0のバイトを足して計算し、Java 版と同じ値を作れないので、$2$ で始まるハッシュはパスワードと合わないとする
   画面に影響が無い理由: Java 版はハッシュを new BCryptPasswordEncoder() の既定の $2a$ の形で作るので、画面と API からは $2$ で始まるハッシュを持つ利用者ができず、ログインの動きは変わらない。所有者が 2026-11-12 に受け入れた
   # match を書かない。比べる検査の初期のデータの利用者は、どれも $2a$ で始まるハッシュを持つ。
+
+- id: CB-028
+  group: 2
+  変えた動き: 利用者の情報の役割と連携の並び順
+  java: roles と authProviders を、Set と HashMap の順で並べ、決まった順を持たない
+  go: roles と authProviders を、名前の順に並べる
+  画面に影響が無い理由: 画面は役割と連携の有無だけを見て、並びの順を使わないので、画面に出るものは変わらない
+  # 利用者の情報を返す3つの操作で、2つの並びの順だけの違いを許す。
+  match:
+    - operation: getUserInfo
+      target: body
+      path: $.roles[*]
+      order_only: true
+    - operation: getUserInfo
+      target: body
+      path: $.authProviders[*]
+      order_only: true
+    - operation: updateUserInfo
+      target: body
+      path: $.roles[*]
+      order_only: true
+    - operation: updateUserInfo
+      target: body
+      path: $.authProviders[*]
+      order_only: true
+    - operation: setEmailAndPassword
+      target: body
+      path: $.roles[*]
+      order_only: true
+    - operation: setEmailAndPassword
+      target: body
+      path: $.authProviders[*]
+      order_only: true
+
+- id: CB-029
+  group: 2
+  変えた動き: 利用者の操作の入力の誤りの文言の並び
+  java: 1つの項目に2つ以上の誤りがあるとき、項目の文言の並びが、Hibernate Validator の誤りの集まりの順で決まり、要求ごとに変わることがある
+  go: 1つの項目に2つ以上の誤りがあるとき、項目の文言を、Java 版の要求の型に注釈を書いた順に並べる
+  画面に影響が無い理由: 画面は項目ごとの文言を並びのまま出すので、文言の順だけが変わり、出る文言は変わらない
+  # CB-011 と同じ形である。2つ以上の文言を持ちうる項目だけを並べる。パスワードの変更の nowPassword は
+  # @NotBlank の文言だけを、メールアドレスとパスワードの設定の confirmPassword はパスワードの一致の文言だけを持つので並べない。
+  match:
+    - operation: changePassword
+      target: body
+      path: $.errors.newPassword[*]
+      order_only: true
+    - operation: setEmailAndPassword
+      target: body
+      path: $.errors.email[*]
+      order_only: true
+    - operation: setEmailAndPassword
+      target: body
+      path: $.errors.password[*]
+      order_only: true
