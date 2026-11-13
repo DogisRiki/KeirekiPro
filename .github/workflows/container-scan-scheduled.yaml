@@ -1,6 +1,17 @@
 name: Scheduled Container Image Vulnerability Scan
 
-# 稼働中の本番イメージを週1回再検査し、結果をIssueに反映する。
+# 稼働中の本番イメージを再検査し、結果をIssueに反映する。
+#
+# いつ動くか(#820):
+#   毎日1回           イメージが変わらないまま、入っている部品に脆弱性が
+#                     新しく公表されたときに、公表から1日以内に起票するため
+#   本番のリリースのあと  リリースで消えた脆弱性の Issue を、その日のうちに閉じるため
+#   main へのマージのあと Go 版のイメージは main から組み立てるので、マージで
+#                     消えた脆弱性の Issue を、その日のうちに閉じるため
+#   手動
+#
+#   動く回数が増えても、開いている Issue への追記は、深刻度か修正版の有無が
+#   前回の記録から変わったときだけにする。理由は container-scan-issue.sh の冒頭にある。
 #
 # PRゲート(container-scan.yaml)との違いは、イメージの入手方法と
 # 抑制の適用モードだけ。判定は同じ check-container-scan.sh が行う。
@@ -12,7 +23,7 @@ name: Scheduled Container Image Vulnerability Scan
 #   Go 版はまだ本番で動いていないので、ECR に稼働中のイメージが無い。そこで
 #   scheduled-go-image-scan が、main の docker/backend-go/Dockerfile.prod から
 #   arm64 のイメージを組み立てて調べる。稼働中のイメージと、main の Go 版のイメージの
-#   2つを毎週調べる。
+#   2つを毎回調べる。
 #
 #   2つの結果は、Issue を操作する前に1つにまとめる。container-scan-issue.sh は
 #   Issue を脆弱性の ID だけで突き合わせ、渡された結果に無い ID の Issue を閉じる。
@@ -20,7 +31,7 @@ name: Scheduled Container Image Vulnerability Scan
 #   もう片方の呼び出しが「検出されなくなった」として閉じてしまう。
 #
 # 抑制を適用しないのは、抑制が「マージを止めるかどうか」の判断であって
-# 「危険が無くなった」という意味ではないため。抑制中の脆弱性も毎週見える。
+# 「危険が無くなった」という意味ではないため。抑制中の脆弱性も毎回見える。
 #
 # ジョブの結論について:
 #   脆弱性の有無は結論に影響しない。結論が表すのは検査を完走できたかだけ。
@@ -41,17 +52,32 @@ name: Scheduled Container Image Vulnerability Scan
 
 on:
   schedule:
-    # 水曜 03:17 UTC(12:17 JST)。
+    # 毎日 03:17 UTC(12:17 JST)。土日も動かす。
     #
-    # 曜日は mutation-report.yaml(土曜)・canary.yaml(月初)・Dependabot(月曜)の
-    # いずれとも重ならないものを選ぶ。
-    #
-    # **時刻は稼働時間帯に合わせている。** このサービスは常時起動ではない。
-    # terraform/modules/scheduler/main.tf の ecs_start / ecs_stop により
-    # 平日 08:00〜20:00 JST だけ起動し、それ以外は desiredCount が 0 になる。
-    # 12:17 JST はその窓の中にある。この時刻を窓の外へ動かすと、
-    # 何も動いていない状態のタスク定義を検査することになる。
-    - cron: '17 3 * * 3'
+    # このサービスは常時起動ではない。terraform/modules/scheduler/main.tf の
+    # ecs_start / ecs_stop により平日 08:00〜20:00 JST だけ起動し、それ以外は
+    # desiredCount が 0 になる。平日の 12:17 JST はその窓の中にある。
+    # 土日は止まっているが、検査するのはタスク定義に書かれたイメージで、
+    # 次に起動するイメージそのものなので、土日も検査の対象として正しい。
+    # 止まっているときは「実行中のタスクが 0 件」の警告が出るだけで、失敗しない
+    # (Identify running image のステップ)。
+    - cron: '17 3 * * *'
+  # 本番のリリースが終わったら動かす。リリースが失敗で終わっても動かす。
+  # どちらでも、検査するのはその時点のタスク定義のイメージなので、結果は正しい。
+  # workflows には release.yaml の name を書く。
+  # workflow_run は既定のブランチ(main)で動くので、OIDC の sub は
+  # repo:OWNER/REPO:ref:refs/heads/main になり、スキャン用のロールの信頼条件に合う
+  # (https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)。
+  workflow_run:
+    workflows: [Production Release]
+    types: [completed]
+  # Go 版のイメージは main の docker/backend-go/Dockerfile.prod から、
+  # backend/ を文脈にして組み立てる。そのどちらかが変わるマージで動かす。
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'docker/backend-go/**'
   workflow_dispatch:
 
 permissions:
@@ -62,6 +88,8 @@ permissions:
 concurrency:
   # 実行中に次が走るとIssue操作が交錯する。走行中は後発を待たせる。
   # cancel-in-progress を true にすると、起票の途中で止まる経路ができる。
+  # 待っている実行は1つまでで、さらに後発が来ると、待っていたほうが
+  # cancelled で終わる。後発が同じ main とタスク定義を検査するので、取りこぼしは無い。
   group: container-scan-scheduled
   cancel-in-progress: false
 
@@ -249,7 +277,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          # 必要なのは ECS の参照と ECR からの取得だけ。無人で毎週動くジョブに
+          # 必要なのは ECS の参照と ECR からの取得だけ。無人で動くジョブに
           # 構築用の権限を持たせない(#222)。
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/keirekipro-github-actions-scan-role
           aws-region: ${{ env.AWS_REGION }}
