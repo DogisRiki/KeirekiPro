@@ -726,7 +726,7 @@ type UpdateResumeBasicRequest struct {
 
 // UpdateUserInfoRequest multipart/form-data の部品。どれも省略できる。
 type UpdateUserInfoRequest struct {
-	// ProfileImage プロフィール画像(JPEG・PNG・GIF、縦横 4096 ピクセル以下、2MB 以下)
+	// ProfileImage プロフィール画像(JPEG・PNG・GIF、縦横 4096 ピクセル以下、1MB 以下)
 	ProfileImage *openapi_types.File `json:"profileImage,omitempty"`
 
 	// TwoFactorAuthEnabled `true` か `false` の文字列
