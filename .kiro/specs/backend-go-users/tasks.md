@@ -121,7 +121,7 @@
   - _対象の部品: ObjectStore_
   - _依存: 1.6, 1.7_
 
-- [ ] 3.3 パスワードの要求の入力を検査する (並行可)
+- [x] 3.3 パスワードの要求の入力を検査する (並行可)
 
   Claude は、Validate の部品の節のとおりに、パスワードの変更と、メールアドレスとパスワードの設定の要求を検査する2つの関数を `validate.go` に作る。Claude は、検査の部品に、`exported.go` で公開した部品を使う。
   - 完了の確かめ方: `go test ./internal/users/ -run TestValidate` が通る
@@ -376,6 +376,7 @@
 - 小タスク2.4 で、Java 版が 500 で答え、Go 版が 400 で答える要求が、design.md が名指しした4つのほかに7つ見つかった。要求の一覧は research.md の「小タスク2.4 の実装」の記録にある。変えた動きの一覧に項目を足す小タスクは、要求ごとに1つの項目を足す
 - 小タスク3.1 の `ImageInput` は `image.go` にある。`internal/users` のテストのファイルは、`image/png` `image/jpeg` `image/gif` を読み込まない。読み込むと、テストの中でその形式が登録され、`image.go` が形式を読み込み忘れてもテストが通るためである。小タスク3.7 のテストも、PNG は `image_test.go` の `pngBytes` で組み立て、JPEG と GIF は `testdata/images` の見本のファイルを読む。`checkImage` のテストの端の場合(PNG のあとに 0 を足した 1048576 バイトの画像、途中で切れた PNG と JPEG と GIF、`BM` で始まる 66 バイト、ASCII でない字の拡張子)は、本物の Java の `ImageIO` と `toLowerCase` の答えと同じだった。手で組み立てた4つの画像(外枠と1枚目の絵の大きさが違う2つの GIF と、2つの4色の JPEG)では、答えが違った。違いの中身は research.md の「小タスク3.1 の実装」の記録にある。変えた動きの一覧に項目を足す小タスクは、所有者に項目の一覧を示すときに、この4つも示し、項目を足すか、Java 版に合わせる直しをするかを所有者に決めてもらう。PR の本文にも書く
 - 小タスク3.2 の `objectstore.go` は、画像を置く処理 `put` と消す処理 `delete` と署名付きの URL を作る処理 `presign` を、`Service` のメソッドとして持つ。`presign` は、資格情報を取るために、名前と時間のほかに `context.Context` を受け取る。署名の時刻は `Deps.Now` である。`testdata/presign/PresignExpected.java` を動かすには、AWS SDK for Java の jar のほかに、`reactive-streams` と `slf4j-api` の jar を `--class-path` に並べる。動かし方は、ファイルの先頭の注釈にある
+- 小タスク3.3 の `ValidateSetEmailAndPassword` は、項目 `password` を省いた本文を空の文字列の本文と同じに検査する。そのため、`password` を省き、空でない `confirmPassword` を送った要求には、Go 版だけが項目 `confirmPassword` に一致の文言を足す。Java 版の `@PasswordMatches` は、`password` が null のとき通すためである。Claude は、変えた動きの一覧に項目を省いた要求の違いを書くとき、この場合も名前を挙げて書く
 
 ## 完了条件(全タスク共通)
 
