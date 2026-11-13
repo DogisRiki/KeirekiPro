@@ -4,7 +4,10 @@
 #
 # mainブランチ上での git commit / git push、および強制pushを
 # 実行前にブロックする(exit 2 = ブロック)。
-# git -C <path> commit/push の形式も捕捉する。
+# git と commit / push の間に git の全体の指定(-C <path>、-c <name>=<value>、
+# --git-dir=<path>、--no-pager など)を置いた形も捕捉する。
+# mainへの直接pushは、push の行き先が main か refs/heads/main のときだけ止め、
+# 名前に main を含むほかのブランチ(feat/main-page など)は止めない。
 #
 # あわせて、git commit / git push は次の形の単独のコマンドだけを通す。
 #   git commit -F <メッセージのファイル>
@@ -36,19 +39,44 @@ extract() {
 command=$(extract tool_input command)
 [ -z "$command" ] && exit 0
 
-# git -C <path> 形式のオプションを許容する共通パターン
-GIT='git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?'
+# git と、commit / push の間に置ける git の全体の指定を読み飛ばす共通パターン(perl の正規表現)。
+# 引数を別の語で取る指定(-C -c --git-dir --work-tree --namespace --attr-source --config-env)は
+# 引数ごと読み飛ばす。引数は、引用符で囲んだ空白入りの形も読み飛ばす。
+# それ以外の - で始まる語(--no-pager、-P、--git-dir=<path> など)は1語として読み飛ばす。
+# 指定の一覧: https://git-scm.com/docs/git#_options
+GIT_RE='git((?:\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace|--attr-source|--config-env)\s+(?:"[^"]*"|\x27[^\x27]*\x27|[^\s"\x27;&|]+)+|-[^\s;&|]*))*)\s+'
+export GIT_RE
+
+# コマンドの文字列が、perl の正規表現 $1 に当たるかを返す(0 = 当たる)。
+# 正規表現の中の {GIT} は GIT_RE に置き換え、行ごとに ^ と $ を当てる。
+matches() {
+    printf '%s' "$command" | perl -e '
+        local $/; my $c = <STDIN>;
+        my $re = $ARGV[0]; $re =~ s/\{GIT\}/$ENV{GIT_RE}/g;
+        exit($c =~ /$re/m ? 0 : 1);
+    ' -- "$1"
+}
 
 # 強制pushは常にブロック
-if printf '%s' "$command" | grep -Eq "${GIT}push\b.*([[:space:]]--force([[:space:]]|\$)|--force-with-lease|[[:space:]]-f([[:space:]]|\$))"; then
+if matches '{GIT}push\b.*(?:\s--force(?:\s|$)|--force-with-lease|\s-f(?:\s|$))'; then
     echo "強制push(--force / -f)はブロックされています。履歴の書き換えが必要な場合は人間に相談してください。" >&2
     exit 2
 fi
 
 # git commit / git push はカレントブランチを確認
-if printf '%s' "$command" | grep -Eq "(^|[[:space:]]|&&|;)${GIT}(commit|push)\b"; then
-    # -C <path> が指定されていればそのリポジトリのブランチを見る
-    cpath=$(printf '%s' "$command" | perl -ne 'print $1 if /git\s+-C\s+(\S+)/' | head -1)
+if matches '(?:^|\s|&&|;){GIT}(?:commit|push)\b'; then
+    # -C <path> が指定されていればそのリポジトリのブランチを見る。
+    # -C を2つ以上並べたときは、git と同じく、相対の場所を前の場所につなげる。
+    cpath=$(printf '%s' "$command" | perl -e '
+        local $/; my $c = <STDIN>; my $g = $ENV{GIT_RE};
+        exit 0 unless $c =~ /(?:^|\s|&&|;)$g(?:commit|push)\b/m;
+        my $opts = $1; my $p = "";
+        while ($opts =~ /(?:^|\s)-C\s+((?:"[^"]*"|\x27[^\x27]*\x27|[^\s"\x27;&|]+)+)/g) {
+            (my $d = $1) =~ s/["\x27]//g;
+            $p = ($p eq "" || $d =~ m{\A(?:/|[A-Za-z]:|\\)}) ? $d : "$p/$d";
+        }
+        print $p;
+    ')
     if [ -n "$cpath" ]; then
         cpath=${cpath//\\//}
         branch=$(git -C "$cpath" branch --show-current 2>/dev/null)
@@ -64,8 +92,19 @@ if printf '%s' "$command" | grep -Eq "(^|[[:space:]]|&&|;)${GIT}(commit|push)\b"
         echo "mainブランチでのcommit/pushはブロックされています。.branch_name_template に従ってfeatureブランチを作成してください(例: git switch -c feat/xxx)。" >&2
         exit 2
     fi
-    # mainへの直接push(他ブランチからの明示指定)もブロック
-    if printf '%s' "$command" | grep -Eq "${GIT}push[[:space:]]+[^[:space:]]+[[:space:]]+.*\bmain\b"; then
+    # mainへの直接push(他ブランチからの明示指定)もブロック。
+    # push の後ろの語のうち、行き先が main か refs/heads/main の語
+    # (main、+main、HEAD:main、x:refs/heads/main など)だけを見る。
+    to_main=$(printf '%s' "$command" | perl -e '
+        local $/; my $c = <STDIN>; my $g = $ENV{GIT_RE};
+        while ($c =~ /(?:^|\s|&&|;)${g}push\b([^\n;&|)]*)/mg) {
+            for my $t (split /\s+/, $2) {
+                $t =~ s/["\x27]//g;
+                if ($t =~ m{(?:\A\+?|:)(?:refs/)?(?:heads/)?main\z}) { print "main"; exit 0 }
+            }
+        }
+    ')
+    if [ "$to_main" = "main" ]; then
         echo "mainブランチへの直接pushはブロックされています。featureブランチをpushしてPR経由でマージしてください。" >&2
         exit 2
     fi
@@ -75,12 +114,13 @@ fi
 # コマンドの先頭か区切り(&& || ; | 改行 ( { $( ` と、sh -c の引用符の直後)に
 # git commit / git push があるときだけ調べる。区切りの後の do / then / if /
 # command / env / time などの前置きと、変数の代入(X=1)は読み飛ばす。
+# git と commit / push の間の git の全体の指定も読み飛ばして見つける。
 # 引用符の中の文字列(grep "git push" など)は対象にしない。
 # コマンドの文字を見るだけなので、安全境界ではない(別のプログラムの中から
 # 起動する push などは見逃す)。目的は、形のずれによる事故を止めること。
 verdict=$(printf '%s' "$command" | perl -e '
     local $/; my $c = <STDIN>;
-    my $git = qr/git(?:\s+-C\s+\S+)?\s+(commit|push)\b/;
+    my $git = qr/$ENV{GIT_RE}(?:commit|push)\b/;
     my $sep = qr/\A|&&|\|\||[;|\n(`{]|\$\(|\b(?:ba|z)?sh\s+-c\s+["\x27]/;
     my $pre = qr/(?:(?:do|then|else|elif|if|while|until|!|command|builtin|exec|env|time|nice|nohup|xargs)\s+(?:-\S+\s+)*)*/;
     exit 0 unless $c =~ /(?:$sep)\s*$pre(?:\w+=\S*\s+)*$git/;
