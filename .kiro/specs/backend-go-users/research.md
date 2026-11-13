@@ -152,6 +152,22 @@ Go の試作は1つのプログラムで、確かめる動きごとの入口を�
 - 認証の spec の設計 `.kiro/specs/backend-go-auth/design.md`
 - 置き換えの spec の設計 `.kiro/specs/backend-go-replacement/design.md`
 
+## 実装で確かめた Java 版の動き
+
+この節は、実装のタスクで Claude が確かめた Java 版の動きのうち、ここまでの節に書いていないものを残す。Claude は、Java 版に要求を送るか、Java 版の部品に値を渡すか、Java 版のソースを読んで確かめた。項目ごとに、どの方法で確かめたかを書く。小タスク2.2 から3.1 で確かめた動きは、「ファイルの名前と拡張子(P4、P5)」の節に、試作の記録に続けて書いてある。
+
+- 小タスク1.2 の確認(2026-11-13): Claude は、design.md の「本文を読む中間処理と multipart の読み方」の節で Java 版の答えで確かめると決めた3つの要求を、Java 版に送った。答えは `backend/internal/httpapi/testdata/multipart/java-checks/cases.json` に入れた。`username` を URL の問い合わせと本文の両方で送ったときの並びの順は、小タスク2.4 の実装の記録に書いてある。ほかの2つの答えは次のとおりである
+  - `profileImage` を、ファイルの名前の無い文字の部分で送ると、Java 版は、画像が無い要求として 200 で答え、画像を置かない
+  - `Content-Type` の無い画像の部分を送ると、Java 版は、500 と「予期せぬエラーが発生しました。」で答え、画像を置かない。Go 版も同じ答えにしたので、変えた動きの一覧に項目を足していない
+- 小タスク1.2 と2.1 の確認: Java 版は、UTF-8 として誤ったバイトを U+FFFD に置き換えて読む。サロゲートの範囲の3バイト(`ED A0 80` と `ED BF BF`)は U+FFFD の1つに、3バイトの冗長な形(`E0 80 80`)は U+FFFD の3つに置き換える。Claude は、小タスク1.2 で、Java 版の `PUT /api/users/me` に、`username` の部分の中身を28通りのバイト列にした要求を送り、Java 版が保存した名前を `backend/internal/httpapi/testdata/jdkutf8/cases.json` に控えた。小タスク2.1 では、Claude は、Java 版の JDK の読み方にバイト列を直接渡し、Go 版の `jdkutf8.go` と30万通りのバイト列で比べた。すべて一致した
+- 小タスク2.3 の確認: Java 版の Spring は、`ContentDisposition.parse` の結果のうち、ファイルの名前だけを使う。部分の名前は、Tomcat の `Part.getName()` が Tomcat の読み方で読んだものである。Claude は、Spring 7.0.10 の `StandardMultipartHttpServletRequest.parseRequest` のソースを読んで確かめた。そのため、「ファイルの名前と拡張子(P4、P5)」の節の1つ目の箇条の「multipart の部分の名前を、Spring の `ContentDisposition.parse` で読む」は、正しくは、部分のファイルの名前を `ContentDisposition.parse` で読む、である。Spring がどれか1つの部分の `Content-Disposition` を読めないときに Java 版が 500 で答えることは、小タスク2.4 の実装の記録の、Java 版が 500 で答えた要求の一覧に書いてある
+- 小タスク3.4 の確認: Java 版は、利用者の行の `updated_at` に、`LocalDateTime.now()` の値を書く。`LocalDateTime.now()` は、Java 版が動くコンテナの時間帯の時刻を返す。本番の ECS のタスクは `TZ=Asia/Tokyo` を設定している(`terraform/modules/ecs/main.tf` 61〜63行)ので、本番の Java 版が書く値は東京の時刻の見た目である。開発環境の `spring` のコンテナと、比べる検査が組み立てる Java 版のイメージ(`docker/backend/Dockerfile.prod`)は時間帯を設定していないので、どちらの Java 版も協定世界時の見た目の値を書く。Go 版の `provider.go` の `javaNow` は、本番の Java 版と同じ、東京の時刻の見た目の値を返す。Claude は、Java 版のソースと、本番と開発環境の設定のファイルを読んで確かめた
+- 小タスク6.1 の確認: Java 版は、役割を2つ持つ利用者のログインを続けるためのトークンの、Redis のハッシュの `roles` の並びの順を決めない。並びの順は、JVM の起動ごとに変わる。Claude は、Java 版のソースを読んで、次のことを確かめた
+  - Java 版がハッシュの `roles` を書くのは、パスワードのログインと、OIDC のログインと、2段階認証のログインで、`AuthCookieIssuer` が `RedisRefreshTokenStore.issue` を呼ぶときだけである(`AuthCookieIssuer.java` 45行)
+  - そのとき、Java 版は、`User.getRoleNames()` が `Collectors.toUnmodifiableSet()` で作った役割の集合(`User.java` 374〜376行)を、`String.join` でハッシュに書く(`RedisRefreshTokenStore.java` 48行)。この集合の並びの順が、JVM の起動ごとに変わる
+  - ログインを続ける操作では、Java 版は、ハッシュの `roles` を `Set.of` で集合に読み直し(`RedisRefreshTokenStore.java` 78行)、作り直すログインの状態の値に入れるだけで、ハッシュを書き直さない(`RefreshAccessTokenController.java` 60〜77行)
+  - Go 版は、`roles` をいつも USER、ADMIN の順に並べる。Claude は、比べる仕組みに、Redis のハッシュの1つの項目の並びの順だけを許す `match`(`target: redis` `order_only: true` `field`)を足し、CB-022 に書いた。design.md には、この仕組みが無い
+
 ## 今あるものについて確かめた文
 
 J は `backend/src/main/java/com/example/keirekipro/` を指す。

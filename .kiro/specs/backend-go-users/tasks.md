@@ -319,7 +319,7 @@
   - 受入基準とテストの対応: 要件6の受入基準1(ログインした開発者の情報を返す)は、`GET /api/users/me` の「Try it out」の 200 と本文で確かめる
   - _要件: 6.1_
 
-- [ ] 7.2 進み具合の表と試作の記録を書き足す
+- [x] 7.2 進み具合の表と試作の記録を書き足す
 
   Claude は、このタスクで、次の4つをする。
 
@@ -387,7 +387,7 @@
 - 小タスク4.1 の `users_test.go` は、利用者の処理の偽物 `fakeUsers`(呼ばれた操作と引数を記録し、操作の名前ごとに決めた誤りを返す)、ログインした context を作る `loggedIn`、本文を読んだ結果を入れる `withForm`、7つの操作を並べた `userOps`、消す Cookie の文字列 `deleteSessionCookies` を持つ。小タスク4.2 と5.x のテストは、これらを使える。
 - 小タスク5.2 の `harness/multipart.go` は、筋書きの `file` の部分に `filename` が無ければファイルの名前を送り、`content_type` が無ければ部分の `Content-Type` を送らない。文字の部分の値の `{名前}` は置き換える。`request.body_file` の本文には `Content-Type` を付けないので、筋書きは `request.headers` に `Content-Type` を書く。テストの `multipart_test.go` は、受けた要求の本文の全体を記録するサーバ `bodyServer` と、画像のファイルを読む `imageFixture` を持つ
 - 小タスク5.4 で、絶対の URL の段の `expect` の status と `content_type` と `body_file` は、`SendAbsolute` が `checkAbsoluteExpect` で確かめ、外れをすべて誤りにして返す。そのため、絶対の URL の段を送るどの動かし方も、つなぎ直さずにこの確かめを使う。版に送る段の `expect.values` は `Session.CheckValues` が確かめるが、どの動かし方からもまだ呼ばれていない。小タスク5.7 は、版をまたぐ動かし方で、送り先の版の応答と、その版の `Session` で `CheckValues` を呼ぶ。`steps_test.go` は、要求を記録する送り方 `recordingTransport` と、パスごとに決めた `Content-Type` と本文で答えるサーバ `imageServer` を持つ
-- 小タスク6.1 で、比べる仕組みに、Redis のハッシュの1つの項目の並びの順だけを許す `match`(`target: redis` `order_only: true`、`path` にキーの形、`field` に項目の名前)を足した。Java 版は、ログインを続けるためのトークンの役割を、並びの順が起動ごとに変わる `Set.of` から書くので、役割を2つ持つ users-ops の管理者で、役割の並びが Java 版と Go 版で食い違うことがある。CB-022 にこの `match` を書いた。design.md にはこの仕組みが無いので、PR 本文と所有者への報告に書く。`TestFixtures_AllLoadable` は、画像として読めないことを確かめるファイルの一覧 `notImageFixtures` と、パスワードを持たず連携だけを持つ利用者を扱う。テストで Redis のキーを作るときは、正規化が `<token:N>` に置き換えるよう、トークンの形の文字列(`javaURLWord` など)を使う
+- 小タスク6.1 で、比べる仕組みに、Redis のハッシュの1つの項目の並びの順だけを許す `match`(`target: redis` `order_only: true`、`path` にキーの形、`field` に項目の名前)を足した。Java 版は、ログインを続けるためのトークンの役割を、並びの順が JVM の起動ごとに変わる集合から書く(research.md の「実装で確かめた Java 版の動き」の小タスク6.1 の確認)ので、役割を2つ持つ users-ops の管理者で、役割の並びが Java 版と Go 版で食い違うことがある。CB-022 にこの `match` を書いた。design.md にはこの仕組みが無いので、PR 本文と所有者への報告に書く。`TestFixtures_AllLoadable` は、画像として読めないことを確かめるファイルの一覧 `notImageFixtures` と、パスワードを持たず連携だけを持つ利用者を扱う。テストで Redis のキーを作るときは、正規化が `<token:N>` に置き換えるよう、トークンの形の文字列(`javaURLWord` など)を使う
 - 比べる検査は、画像の置き場所を、段のあとの状態で比べる。前の段と同じ名前と同じ中身の画像を置く段では、置いたかどうかが状態に表れない。Claude は、画像を置いたかどうかを確かめる段では、置き場所にまだ無い名前になる拡張子(小タスク6.2 では `profile.jpeg`)で送る
 - 比べるだけの筋書き(`modes: [compare]`)では、比べる検査は、版に送る段の `expect.status` を確かめない(版をまたいで確かめる検査のときに確かめる設計である)。Claude は、筋書きの `expect.status` を、作業フォルダの外の写しで比べる検査に段ごとの状態の番号を書き出させて、実際の答えに合わせる。小タスク6.3 では、名前の無い利用者の退会が、退会の完了のメールを作れずに両方の版で 500 になった
 - 小タスク6.4 で、筋書きの途中で偽の OIDC の Google の利用者を替えるときは、絶対の URL の段 `PUT http://fakeoidc/_compat/users/google` を送り、2回目のログインでは取り出す値に別の名前(`authURL2` など)を付ける。確認の済んでいない連携の利用者は、design.md のとおり `email_verified` を偽にする。Google のメールアドレスを利用者のメールアドレスと違う値にする仕方は、設計と違う道を通るので使わない
