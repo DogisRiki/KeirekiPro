@@ -23,6 +23,9 @@ import (
 //   - 2段階認証の確認のコード: <code:N>。N は、その版で現れた順の番号である。件名が「2段階認証コードのお知らせ」の
 //     メールの本文の1行目と、Redis のキー 2fa:<UUID> の値でだけ置き換える
 //   - JWT の lexp: <lexp:+秒>。メールアドレスの確認のリンクの値の期限を、その版の応答を受けた時刻からの秒の差にする
+//   - 署名付きの URL の署名の値: X-Amz-Date の値は <amz-date>、X-Amz-Credential の中の日付は <amz-credential-date>、
+//     X-Amz-Signature の値は <amz-signature>。問い合わせに X-Amz-Signature のある URL でだけ置き換え、
+//     X-Amz-Expires の値と項目の並ぶ順と URL のパスは変えない
 
 var (
 	uuidPattern     = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`)
@@ -39,6 +42,8 @@ var (
 	twoFactorKeyPattern = regexp.MustCompile(`(?i)^2fa:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	// lexpMarkerPattern は、JWT の lexp を置き換えた記号である。
 	lexpMarkerPattern = regexp.MustCompile(`<lexp:([+-][0-9]+)>`)
+	// amzCredentialDatePattern は、X-Amz-Credential の値の中の、/ か %2F で挟まれた8桁の日付である。
+	amzCredentialDatePattern = regexp.MustCompile(`(/|%2[Ff])[0-9]{8}(/|%2[Ff])`)
 )
 
 // twoFactorMailSubject は、Java 版が確認のコードを送るメールの件名に含まれる文字である。
@@ -148,10 +153,49 @@ func (n *Normalizer) Text(s string) string {
 }
 
 func (n *Normalizer) text(s string, assign bool) string {
+	s = urlPattern.ReplaceAllStringFunc(s, presignedURL)
 	s = jwtPattern.ReplaceAllStringFunc(s, func(m string) string { return n.jwt(m, assign) })
 	s = bcryptPattern.ReplaceAllString(s, "<bcrypt:$$$1$$$2$$>")
 	s = uuidPattern.ReplaceAllStringFunc(s, func(m string) string { return n.uuid(m, assign) })
 	return datetimePattern.ReplaceAllStringFunc(s, datetimeShape)
+}
+
+// presignedURL は、問い合わせに X-Amz-Signature のある URL u の、X-Amz-Date の値と、X-Amz-Credential の中の日付と、
+// X-Amz-Signature の値を記号に置き換える。署名の値は、署名した時刻で変わるので、比べない。
+// 使える時間(X-Amz-Expires)と、項目の並ぶ順と、パスは比べるので変えない。# のあとは問い合わせでないので見ない。
+// UUID より先に置き換えるのは、UUID を記号にすると、URL を見つける形が URL の途中で切れるためである。
+func presignedURL(u string) string {
+	rest, fragment, hasFragment := strings.Cut(u, "#")
+	base, query, ok := strings.Cut(rest, "?")
+	if !ok {
+		return u
+	}
+	params := strings.Split(query, "&")
+	if !slices.ContainsFunc(params, func(p string) bool {
+		name, _, _ := strings.Cut(p, "=")
+		return name == "X-Amz-Signature"
+	}) {
+		return u
+	}
+	for i, p := range params {
+		name, v, found := strings.Cut(p, "=")
+		if !found {
+			continue
+		}
+		switch name {
+		case "X-Amz-Date":
+			params[i] = name + "=<amz-date>"
+		case "X-Amz-Signature":
+			params[i] = name + "=<amz-signature>"
+		case "X-Amz-Credential":
+			params[i] = name + "=" + amzCredentialDatePattern.ReplaceAllString(v, "${1}<amz-credential-date>${2}")
+		}
+	}
+	out := base + "?" + strings.Join(params, "&")
+	if hasFragment {
+		out += "#" + fragment
+	}
+	return out
 }
 
 // datetimeShape は、日時を、形を確かめてから記号に置き換える。日付が暦に無いときは、形が誤っているので置き換えない。

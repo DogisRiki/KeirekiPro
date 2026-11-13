@@ -231,7 +231,7 @@
   - 受入基準とテストの対応: 要件4の受入基準1(一方の版で変えたものが、もう一方の版でも見える)を確かめる道具は、`steps_test.go` の `TestExpectValues_WithCapturedNames` で確かめる。要件2の受入基準1から3(同じ画像が表示される)を確かめる道具は、`TestExpectBodyFile_SizeAndSHA256Only` と `TestExpectContentType` で確かめる
   - _要件: 2.1, 2.2, 2.3, 4.1_
 
-- [ ] 5.5 署名付きの URL の値を正規化する
+- [x] 5.5 署名付きの URL の値を正規化する
 
   Claude は、`normalize.go` に、文字と JSON の本文の中の、問い合わせに `X-Amz-Signature` を持つ URL の、`X-Amz-Date` の値と `X-Amz-Credential` の中の日付と `X-Amz-Signature` の値を決まった文字列に置き換える処理を足す。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run TestNormalize_PresignedURL` が通る
