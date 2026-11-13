@@ -259,6 +259,7 @@ sub load_records {
         closedir $dh;
         $rec{$_} = read_jsonl("$dir/$_.jsonl") for @keys;
     }
+    relabel_host_resumes($_) for values %rec;
     $ctx->{rec} = \%rec;
     $ctx->{marks} = read_jsonl("$ctx->{state}/marks.jsonl");
     $ctx->{desktop} = read_jsonl("$dir/desktop.jsonl");
@@ -295,6 +296,30 @@ sub read_jsonl {
     }
     close $fh;
     return \@rows;
+}
+
+# 使う量の上限が戻ったあとに、デスクトップアプリが会話を再開させた行を、turn の from が limit の行に書き換える。
+# デスクトップアプリが自分で入れた行は、extract.pl が、raw が host_synthetic の unknown の行として残す。
+# デスクトップアプリは、同じ種類の行を、上限のあとの再開のほかに、worktree の場所を知らせる文にも使う。
+# そのため、上限の印のあとで、まだ応答が無いうちに来た行だけを、上限のあとの再開とみなす。
+# 上限の印と再開の行の間に、裏で動かした仕事の知らせの行が来ることがあるので、応答の行だけで見分けをやめる。
+# 抜き出し済みの記録の行も、読むたびにこの見分け方で扱うので、手元の記録のファイルは書き換えない
+sub relabel_host_resumes {
+    my ($rows) = @_;
+    my $after_limit;
+    for my $r (timed_rows($rows)) {
+        my $k = $r->{k} // '';
+        if ($k eq 'limit') {
+            $after_limit = 1;
+        } elsif ($k eq 'msg') {
+            undef $after_limit;
+        } elsif ($k eq 'turn' && $after_limit && ($r->{from} // '') eq 'unknown' && ($r->{raw} // '') eq 'host_synthetic') {
+            $r->{from} = 'limit';
+            delete $r->{raw};
+            undef $after_limit;
+        }
+    }
+    return 1;
 }
 
 # ---- 受け持ちの区切りと、行の Issue -----------------------------------------
