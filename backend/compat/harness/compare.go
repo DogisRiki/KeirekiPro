@@ -511,7 +511,8 @@ func sortedSetValue(typ, value string) string {
 	return canonicalJSON(members)
 }
 
-// CompareS3 は、S3 のオブジェクトのキーの形と中身のバイトを比べる。キーの中の UUID は番号に置き換える。
+// CompareS3 は、S3 のオブジェクトの、キーの形と、中身のバイトと、Content-Type と、利用者の付けた値(メタデータ)を比べる。
+// キーの中の UUID は番号に置き換える。違うときは、中身のバイトは大きさと SHA-256 だけを書く。
 func (c *Comparer) CompareS3(step StepRef, java, goObjects []fakeaws.Object) {
 	j := objectsByKey(c.java, java)
 	g := objectsByKey(c.goVer, goObjects)
@@ -523,31 +524,41 @@ func (c *Comparer) CompareS3(step StepRef, java, goObjects []fakeaws.Object) {
 	}
 	slices.Sort(keys)
 	for _, k := range keys {
-		jb, jok := j[k]
-		gb, gok := g[k]
+		jd, jok := j[k]
+		gd, gok := g[k]
 		switch {
 		case !jok:
-			c.add(step, TargetS3, k, absent, describeBytes(gb))
+			c.add(step, TargetS3, k, absent, gd)
 		case !gok:
-			c.add(step, TargetS3, k, describeBytes(jb), absent)
-		case !bytes.Equal(jb, gb):
-			c.add(step, TargetS3, k, describeBytes(jb), describeBytes(gb))
+			c.add(step, TargetS3, k, jd, absent)
+		case jd != gd:
+			c.add(step, TargetS3, k, jd, gd)
 		}
 	}
 }
 
-func objectsByKey(n *Normalizer, objects []fakeaws.Object) map[string][]byte {
+// objectsByKey は、オブジェクトを、UUID を番号に置き換えたキーごとに、describeObject の文にして返す。
+func objectsByKey(n *Normalizer, objects []fakeaws.Object) map[string]string {
 	records := normalizeRecords(objects, func(o fakeaws.Object, assign bool) string {
-		sum := sha256.Sum256(o.Body)
-		return n.uuidsIn(o.Bucket+"/"+o.Key, assign) + fmt.Sprintf("\n%x", sum)
+		return n.uuidsIn(o.Bucket+"/"+o.Key, assign) + "\n" + describeObject(o)
 	})
-	out := make(map[string][]byte, len(records))
+	out := make(map[string]string, len(records))
 	for _, r := range records {
-		key, _, _ := strings.Cut(r.Text, "\n")
+		key, description, _ := strings.Cut(r.Text, "\n")
 		key = uniqueKey(out, key)
-		out[key] = objects[r.Index].Body
+		out[key] = description
 	}
 	return out
+}
+
+// describeObject は、オブジェクト o の中身のバイトの大きさと SHA-256 と、Content-Type と、メタデータを1つの文にする。
+// メタデータは、項目を名前の順に並べた JSON で書く。メタデータが無いことと空のメタデータは、どちらも {} と書く。
+func describeObject(o fakeaws.Object) string {
+	metadata := o.Metadata
+	if metadata == nil {
+		metadata = map[string]string{}
+	}
+	return fmt.Sprintf("%s Content-Type %q メタデータ %s", describeBytes(o.Body), o.ContentType, canonicalJSON(metadata))
 }
 
 // uniqueKey は、正規化したあとのキーが、すでに置いたキーと重なるとき、重なった順の番号を付けたキーを返す。

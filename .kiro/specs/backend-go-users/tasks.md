@@ -238,7 +238,7 @@
   - 受入基準とテストの対応: 要件5の受入基準3(要求のたびに違う値の比べ方)は、`normalize_test.go` の `TestNormalize_PresignedURL` で確かめる。このテストは、`X-Amz-Expires` の値と項目の並ぶ順と URL のパスを置き換えないことと、項目の順が違う URL が違いとして残ることを確かめる
   - _要件: 5.3_
 
-- [ ] 5.6 画像の置き場所の比べ方に `Content-Type` とメタデータを足す
+- [x] 5.6 画像の置き場所の比べ方に `Content-Type` とメタデータを足す
 
   Claude は、Java 版と Go 版を比べる検査が画像の置き場所を比べるときに、今の置き場所の名前とバイトの並びに加えて、`Content-Type` と、利用者の付けた値(メタデータ)を比べるようにする。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run TestCompareObjects_ContentTypeAndMetadata` が通る
