@@ -324,8 +324,8 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 29 {
-		t.Errorf("一覧の項目は29のはずですが、%d です", len(got))
+	if len(got) != 46 {
+		t.Errorf("一覧の項目は46のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
@@ -378,7 +378,8 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	}
 }
 
-// TestChangedBehaviors_UserItems は、利用者の操作の項目が、並びの順だけの違いを許すことを確かめる。
+// TestChangedBehaviors_UserItems は、利用者の操作の項目が、並びの順だけの違いを許すことと、
+// match を書かない項目が match を持たないことを確かめる。
 func TestChangedBehaviors_UserItems(t *testing.T) {
 	got, err := LoadChangedBehaviors(filepath.Join("..", "changed-behaviors.yaml"))
 	if err != nil {
@@ -407,6 +408,11 @@ func TestChangedBehaviors_UserItems(t *testing.T) {
 			orderOnly("setEmailAndPassword", "$.errors.email[*]"),
 			orderOnly("setEmailAndPassword", "$.errors.password[*]"),
 		},
+	}
+	// CB-030 から CB-046 は、比べる検査が要求を送らないので match を持たない。本文の項目が無い要求、Java 版の 500 を Go 版の 400 にする要求、
+	// ファイルの名前の文字コード、画像の検査の違いの項目である
+	for n := 30; n <= 46; n++ {
+		tests[fmt.Sprintf("CB-%03d", n)] = nil
 	}
 	for id, want := range tests {
 		t.Run(id, func(t *testing.T) {

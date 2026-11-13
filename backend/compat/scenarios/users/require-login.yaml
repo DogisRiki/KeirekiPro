@@ -1,0 +1,207 @@
+# 利用者の操作のログインの状態と偽の送信の検査の筋書き。7つの操作への、ログインの Cookie の無い要求と、
+# 期限を切らしたログインの状態の値の要求が 401 で断られ、偽の送信の検査のヘッダを付けない書き込みの要求が
+# 403 で断られることを比べる。
+# ログインの Cookie の無い書き込みの要求と期限を切らした値の書き込みの要求は、偽の送信の検査のヘッダを付け、
+# ログインの状態の検査で断られることを確かめる。ヘッダの値は、最初の GET の答えが置く Cookie XSRF-TOKEN から写す。
+# 期限を切らした値の要求は、操作ごとにログインし直して期限を切らし、どの操作にも期限を切らした値を送る。
+# ヘッダを付けない書き込みの要求は、ログインした user1 で送る。退会の要求も断られるので、最後に利用者の情報を読める。
+name: users-require-login
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql, users/users-ops.sql]
+modes: [compare]
+steps:
+  # ログインの Cookie の無い要求
+  - name: get-user-info-no-cookie
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 401}
+  - name: update-user-info-no-cookie
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: 検査 太郎}
+    expect: {status: 401}
+  - name: delete-user-no-cookie
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 401}
+  - name: set-email-and-password-no-cookie
+    request:
+      method: POST
+      path: /api/users/me/email-password
+      csrf: true
+      json: {password: NewPass1word, confirmPassword: NewPass1word, currentPassword: Passw0rd!}
+    expect: {status: 401}
+  - name: change-password-no-cookie
+    request:
+      method: PATCH
+      path: /api/users/me/password
+      csrf: true
+      json: {nowPassword: Passw0rd!, newPassword: Changed1Pass}
+    expect: {status: 401}
+  - name: remove-auth-provider-no-cookie
+    request:
+      method: DELETE
+      path: /api/users/me/auth-provider/google
+      csrf: true
+    expect: {status: 401}
+  - name: send-email-verification-no-cookie
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    expect: {status: 401}
+  # 期限を切らしたログインの状態の値の要求
+  - name: login-before-get-user-info-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-get-user-info
+    expire: {cookie: accessToken}
+  - name: get-user-info-expired-token
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 401}
+  - name: login-before-update-user-info-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-update-user-info
+    expire: {cookie: accessToken}
+  - name: update-user-info-expired-token
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: 検査 太郎}
+    expect: {status: 401}
+  - name: login-before-delete-user-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-delete-user
+    expire: {cookie: accessToken}
+  - name: delete-user-expired-token
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 401}
+  - name: login-before-set-email-and-password-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-set-email-and-password
+    expire: {cookie: accessToken}
+  - name: set-email-and-password-expired-token
+    request:
+      method: POST
+      path: /api/users/me/email-password
+      csrf: true
+      json: {password: NewPass1word, confirmPassword: NewPass1word, currentPassword: Passw0rd!}
+    expect: {status: 401}
+  - name: login-before-change-password-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-change-password
+    expire: {cookie: accessToken}
+  - name: change-password-expired-token
+    request:
+      method: PATCH
+      path: /api/users/me/password
+      csrf: true
+      json: {nowPassword: Passw0rd!, newPassword: Changed1Pass}
+    expect: {status: 401}
+  - name: login-before-remove-auth-provider-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-remove-auth-provider
+    expire: {cookie: accessToken}
+  - name: remove-auth-provider-expired-token
+    request:
+      method: DELETE
+      path: /api/users/me/auth-provider/google
+      csrf: true
+    expect: {status: 401}
+  - name: login-before-send-email-verification-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-send-email-verification
+    expire: {cookie: accessToken}
+  - name: send-email-verification-expired-token
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    expect: {status: 401}
+  # 偽の送信の検査のヘッダを付けない書き込みの要求
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: update-user-info-without-csrf
+    request:
+      method: PUT
+      path: /api/users/me
+      multipart:
+        - {name: username, value: 検査 太郎}
+    expect: {status: 403}
+  - name: delete-user-without-csrf
+    request:
+      method: DELETE
+      path: /api/users/me
+    expect: {status: 403}
+  - name: set-email-and-password-without-csrf
+    request:
+      method: POST
+      path: /api/users/me/email-password
+      json: {password: NewPass1word, confirmPassword: NewPass1word, currentPassword: Passw0rd!}
+    expect: {status: 403}
+  - name: change-password-without-csrf
+    request:
+      method: PATCH
+      path: /api/users/me/password
+      json: {nowPassword: Passw0rd!, newPassword: Changed1Pass}
+    expect: {status: 403}
+  - name: remove-auth-provider-without-csrf
+    request:
+      method: DELETE
+      path: /api/users/me/auth-provider/google
+    expect: {status: 403}
+  - name: send-email-verification-without-csrf
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+    expect: {status: 403}
+  # 断られた要求は何も変えていないので、利用者の情報を読める
+  - name: get-user-info-after-refused-requests
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200}
