@@ -90,6 +90,19 @@
 #                 refs/remotes/origin/<branch>。どちらも無ければ飛ばす)
 #       読めない spec.json は飛ばし、「[parallel] 読めない spec.json: <場所>」を標準エラーに出す(終了コードは0のまま)。
 #       記録を書かず、prune も docker も呼ばない。呼ぶ git のコマンドは読むだけのもの。
+#   folder-kind
+#       いまの作業フォルダが本体のフォルダなら main、worktree なら worktree を標準出力に1行出す(終了コード0)。
+#       git のディレクトリと git の共通ディレクトリが同じなら本体のフォルダとする。
+#   entered-worktree [--session <ID>]
+#       本体のフォルダで開いた会話が worktree に移った直後に、移った先の worktree で呼ぶ。
+#       本体のフォルダの .worktreeinclude に当たり、本体の .gitignore でも無視されるファイルのうち、
+#       いまの作業フォルダに無いものを本体のフォルダから写す(あるものは上書きしない)。
+#       標準出力に「写したファイル:」と写したファイルの一覧、または「写したファイルは無い」を出す。
+#       続けて、記録の錠の中で、このセッションの記録 sessions/<ID>.json の folder と folder_key を、
+#       いまの作業フォルダのものに書き直す(記録が無ければ何もしない)。セッションのIDは --session か
+#       環境変数 KP_SESSION_ID で渡す。どちらも無ければ、書き直さなかったことを標準エラーに出す。
+#       いまの作業フォルダが本体のフォルダのとき、写せないファイルがあったとき(全部を試してから)、
+#       記録を書けないときは、理由を「[parallel]」で始まる文で標準エラーに出し、終了コード69で終わる。
 #   prune
 #       作業フォルダが無くなった記録と、古くなった spec の予約と、残った枠と、作業フォルダごとのボリュームと DB を片付け、
 #       片付けたことを標準出力に出す。所有者が手で打っても使える。
@@ -129,7 +142,8 @@
 # 終了コード: 0(成功)、1(claim がほかのセッションの記録を断った、takeover が引き継げなかった)、64(呼び方の誤り)、
 #             69(git のリポジトリの外、設定の値の誤り、記録を書けない、記録の錠を取れない、
 #             check-spec の origin/main が手元に無い、check-spec の調べの git のコマンドが失敗した、
-#             check-spec の差分のかたまりに前後の行が入った)。
+#             check-spec の差分のかたまりに前後の行が入った、
+#             entered-worktree を本体のフォルダで呼んだ、entered-worktree が写せないファイルがあった)。
 # 前提: bash・perl(JSON::PP)・git。jq には依存しない。
 # =====================================================================
 
@@ -1693,6 +1707,80 @@ kp_session_busy_issues() {
     printf '%s\n' "$out"
 }
 
+kp_session_folder_kind() {
+    local gd common
+    [ $# -eq 0 ] || _kp_ss_usage "folder-kind は引数を取らない"
+    gd=$(git rev-parse --path-format=absolute --git-dir 2>/dev/null) \
+        || _kp_die69 "[parallel] 調べられない: git のリポジトリの外で呼ばれた"
+    common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+        || _kp_die69 "[parallel] 調べられない: git のリポジトリの外で呼ばれた"
+    if [ "$(_kp_norm_path "${gd//\\//}")" = "$(_kp_norm_path "${common//\\//}")" ]; then
+        printf 'main\n'
+    else
+        printf 'worktree\n'
+    fi
+}
+
+kp_session_entered_worktree() {
+    local session="" kind main folder state sid key rec p failed=0 copied=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --session)
+                [ $# -ge 2 ] || _kp_ss_usage "--session の値が無い"
+                session=$2
+                shift 2
+                ;;
+            *) _kp_ss_usage "entered-worktree [--session <ID>]" ;;
+        esac
+    done
+    kind=$(kp_session_folder_kind) || exit $?
+    [ "$kind" = worktree ] \
+        || _kp_die69 "[parallel] 写せない: いまの作業フォルダは本体のフォルダで、worktree ではない"
+    main=$(kp_main_folder) || exit $?
+    folder=$(kp_folder) || exit $?
+    state=$(kp_state_dir) || exit $?
+
+    # 本体の .worktreeinclude に当たり、本体の .gitignore でも無視されるファイルのうち、
+    # いまの作業フォルダに無いものを写す(あるものは上書きしない)
+    if [ -f "$main/.worktreeinclude" ]; then
+        while IFS= read -r -d '' p; do
+            [ -n "$p" ] || continue
+            git -C "$main" check-ignore -q -- "$p" 2>/dev/null || continue
+            [ -e "$folder/$p" ] && continue
+            if mkdir -p "$(dirname "$folder/$p")" 2>/dev/null && cp -p "$main/$p" "$folder/$p" 2>/dev/null; then
+                copied="$copied$p"$'\n'
+            else
+                printf '[parallel] 写せない: %s を本体のフォルダから写せなかった\n' "$p" >&2
+                failed=1
+            fi
+        done < <(git -C "$main" ls-files -z --others --ignored --exclude-from="$main/.worktreeinclude" 2>/dev/null)
+    fi
+    if [ -n "$copied" ]; then
+        printf '写したファイル:\n%s' "$copied"
+    else
+        printf '写したファイルは無い\n'
+    fi
+
+    # このセッションの記録の作業フォルダを、いまの作業フォルダに書き直す
+    sid=${session:-${KP_SESSION_ID:-}}
+    if [ -z "$sid" ]; then
+        printf '[parallel] セッションのIDが渡されなかったので、セッションの記録の作業フォルダを書き直さなかった\n' >&2
+    else
+        case "$sid" in
+            . | .. | */* | *\\*) _kp_ss_usage "セッションのID '$sid' にパスの区切りが含まれる" ;;
+        esac
+        rec="$state/sessions/$sid.json"
+        key=$(kp_folder_key) || exit $?
+        _kp_ss_lock "$state"
+        if [ -f "$rec" ]; then
+            kp_json_write "$rec" folder="$folder" folder_key="$key" \
+                || _kp_ss_die69 "[parallel] 書けない: セッションの記録 $rec を書き直せない"
+        fi
+        _kp_ss_unlock
+    fi
+    [ "$failed" = 0 ] || exit 69
+}
+
 kp_session_main() {
     local cmd="${1:-}"
     [ $# -gt 0 ] && shift
@@ -1705,7 +1793,9 @@ kp_session_main() {
         takeover) kp_session_takeover "$@" ;;
         check-spec) kp_session_check_spec "$@" ;;
         busy-issues) kp_session_busy_issues "$@" ;;
-        *) _kp_ss_usage "サブコマンドは check-start / claim / end / takeover / check-spec / spec-names / busy-issues / prune のどれか" ;;
+        folder-kind) kp_session_folder_kind "$@" ;;
+        entered-worktree) kp_session_entered_worktree "$@" ;;
+        *) _kp_ss_usage "サブコマンドは check-start / claim / end / takeover / check-spec / spec-names / busy-issues / folder-kind / entered-worktree / prune のどれか" ;;
     esac
 }
 

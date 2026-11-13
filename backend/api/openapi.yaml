@@ -467,6 +467,7 @@ paths:
         multipart/form-data で受け取る。送った項目だけを変える。
         Java 版は `@RequestParam` で読むため、`username` と `twoFactorAuthEnabled` はクエリ文字列で送っても受け付ける。
         画像は JPEG・PNG・GIF だけ、縦横 4096 ピクセル以下(違えば 400)。
+        画像の大きさは 1MB(1,048,576 バイト)以下で、超えると 400 を返す。
         multipart の大きさの上限は 1ファイル 2MB・要求全体 2MB で、超えると Java 版は 500 を返す。
         multipart でない Content-Type も Java 版は 500 を返す。
       parameters:
@@ -1759,7 +1760,7 @@ components:
         profileImage:
           type: string
           format: binary
-          description: プロフィール画像(JPEG・PNG・GIF、縦横 4096 ピクセル以下、2MB 以下)
+          description: プロフィール画像(JPEG・PNG・GIF、縦横 4096 ピクセル以下、1MB 以下)
         twoFactorAuthEnabled:
           type: boolean
           description: '`true` か `false` の文字列'

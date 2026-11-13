@@ -2587,6 +2587,161 @@ run_test "busy-issues は記録の置き場所のファイルの一覧と中身�
 run_test "余計な引数、--session の値が無い、知らないオプションは終了コード64で、JSON を出さない" t_busy_usage
 run_test "錠がほかに持たれたままなら busy-issues は終了コード69で終わり、JSON を出さず、その錠を消さない" t_busy_lock_held
 
+# =====================================================================
+# folder-kind と entered-worktree: 本体のフォルダで開いた会話が worktree に移る(Issue #817)
+# =====================================================================
+# 写すテストで置いたファイルを、本体と worktree から消す(git clean は無視されるファイルを消さないため)
+clear_include_files() {
+    local d
+    for d in "$MAIN_DIR" "$WT_DIR"; do
+        rm -rf "$d/.gitignore" "$d/.worktreeinclude" "$d/secret.json" "$d/sub" "$d/notignored.txt" "$d/other.txt"
+    done
+}
+
+# 本体に .gitignore と .worktreeinclude と写す元のファイルを置く
+put_include_files() {
+    clear_include_files
+    printf 'secret.json\nsub/\nother.txt\n' >"$MAIN_DIR/.gitignore"
+    printf 'secret.json\nsub/conf.env\nnotignored.txt\nother.txt\n' >"$MAIN_DIR/.worktreeinclude"
+    printf 'main-secret\n' >"$MAIN_DIR/secret.json"
+    mkdir -p "$MAIN_DIR/sub"
+    printf 'main-conf\n' >"$MAIN_DIR/sub/conf.env"
+    printf 'main-notignored\n' >"$MAIN_DIR/notignored.txt"
+    printf 'main-other\n' >"$MAIN_DIR/other.txt"
+}
+
+t_folder_kind() {
+    local out rc
+    out=$(ss "$MAIN_DIR" folder-kind 2>&1)
+    [ "$out" = main ] || die "本体のフォルダで main が出ない: $out"
+    out=$(ss "$WT_DIR" folder-kind 2>&1)
+    [ "$out" = worktree ] || die "worktree で worktree が出ない: $out"
+    out=$(ss "$WT_DIR/.kiro" folder-kind 2>&1)
+    [ "$out" = worktree ] || die "worktree の下のディレクトリで worktree が出ない: $out"
+    out=$(ss "$MAIN_DIR" folder-kind extra 2>/dev/null)
+    rc=$?
+    [ "$rc" = 64 ] || die "余計な引数で終了コードが64でない: $rc"
+    [ -z "$out" ] || die "余計な引数で何かを出した: $out"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_entered_worktree_copies_and_moves_record() {
+    local out rc wt_secret wt_conf wt_other wt_notignored
+    put_include_files
+    printf 'wt-other\n' >"$WT_DIR/other.txt"
+    put_session s-me "$MAIN" "$(fkey "$MAIN_DIR")" 300
+    put_session s-other "$MAIN" "$(fkey "$MAIN_DIR")" 200
+    out=$(ss "$WT_DIR" entered-worktree --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    wt_secret=$(cat "$WT_DIR/secret.json" 2>/dev/null)
+    wt_conf=$(cat "$WT_DIR/sub/conf.env" 2>/dev/null)
+    wt_other=$(cat "$WT_DIR/other.txt" 2>/dev/null)
+    wt_notignored=no
+    [ -e "$WT_DIR/notignored.txt" ] && wt_notignored=yes
+    clear_include_files
+    [ "$rc" = 0 ] || die "終了コードが0でない: $rc: $out $(cat "$WORK/err.txt")"
+    [ "$wt_secret" = main-secret ] || die "secret.json が写されていない"
+    [ "$wt_conf" = main-conf ] || die "sub/conf.env が写されていない"
+    [ "$wt_notignored" = no ] || die "無視されていないファイルを写した"
+    [ "$wt_other" = wt-other ] || die "worktree にあるファイルを上書きした"
+    printf '%s\n' "$out" | grep -qx '写したファイル:' || die "写したファイルの見出しが無い: $out"
+    printf '%s\n' "$out" | grep -qx 'secret.json' || die "一覧に secret.json が無い: $out"
+    printf '%s\n' "$out" | grep -qx 'sub/conf.env' || die "一覧に sub/conf.env が無い: $out"
+    if printf '%s\n' "$out" | grep -q 'other.txt\|notignored'; then
+        die "写していないファイルが一覧にある: $out"
+    fi
+    out=$(cat "$STATE/sessions/s-me.json")
+    [ "$(pj "$out" '$d->{folder}')" = "$WT" ] || die "このセッションの記録の folder が worktree でない: $out"
+    [ "$(pj "$out" '$d->{folder_key}')" = "$(fkey "$WT_DIR")" ] || die "このセッションの記録の folder_key が worktree の鍵でない: $out"
+    [ "$(pj "$out" '$d->{started_at}')" = 300 ] || die "このセッションの記録のほかの欄が変わった: $out"
+    out=$(cat "$STATE/sessions/s-other.json")
+    [ "$(pj "$out" '$d->{folder}')" = "$MAIN" ] || die "ほかのセッションの記録を書き直した: $out"
+    [ ! -d "$LOCK" ] || die "記録の錠を残した"
+    # 2回目は写すものが無い
+    put_include_files
+    ss "$WT_DIR" entered-worktree --session s-me >/dev/null 2>&1
+    out=$(ss "$WT_DIR" entered-worktree --session s-me 2>&1)
+    clear_include_files
+    [ "$out" = '写したファイルは無い' ] || die "2回目に写したファイルは無いと出ない: $out"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_entered_worktree_in_main_refused() {
+    local out rc wt_secret=no
+    put_include_files
+    put_session s-me "$MAIN" "$(fkey "$MAIN_DIR")" 300
+    out=$(ss "$MAIN_DIR" entered-worktree --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    [ -e "$WT_DIR/secret.json" ] && wt_secret=yes
+    clear_include_files
+    [ "$rc" = 69 ] || die "本体のフォルダで終了コードが69でない: $rc: $out"
+    [ -z "$out" ] || die "本体のフォルダで何かを出した: $out"
+    grep -q '^\[parallel\] 写せない:' "$WORK/err.txt" || die "標準エラーに理由が無い: $(cat "$WORK/err.txt")"
+    [ "$wt_secret" = no ] || die "本体のフォルダで呼んだのに worktree に写した"
+    [ "$(pj "$(cat "$STATE/sessions/s-me.json")" '$d->{folder}')" = "$MAIN" ] || die "本体のフォルダで呼んだのに記録を書き直した"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_entered_worktree_without_session() {
+    local out rc
+    put_session s-me "$MAIN" "$(fkey "$MAIN_DIR")" 300
+    out=$(ss "$WT_DIR" entered-worktree 2>"$WORK/err.txt")
+    rc=$?
+    [ "$rc" = 0 ] || die "セッションのIDが無いときに終了コードが0でない: $rc: $out $(cat "$WORK/err.txt")"
+    [ "$out" = '写したファイルは無い' ] || die ".worktreeinclude が無いのに写したファイルは無いと出ない: $out"
+    grep -q '^\[parallel\] セッションのIDが渡されなかった' "$WORK/err.txt" || die "標準エラーに書き直さなかったことが無い: $(cat "$WORK/err.txt")"
+    [ "$(pj "$(cat "$STATE/sessions/s-me.json")" '$d->{folder}')" = "$MAIN" ] || die "セッションのIDが無いのに記録を書き直した"
+    # 環境変数 KP_SESSION_ID でも渡せる
+    out=$(cd "$WT_DIR" && KP_SESSION_ID=s-me bash "$SESSION" entered-worktree 2>"$WORK/err.txt")
+    rc=$?
+    [ "$rc" = 0 ] || die "KP_SESSION_ID で渡したときに終了コードが0でない: $rc: $(cat "$WORK/err.txt")"
+    [ "$(pj "$(cat "$STATE/sessions/s-me.json")" '$d->{folder}')" = "$WT" ] || die "KP_SESSION_ID で渡したのに記録を書き直さない"
+}
+
+t_entered_worktree_no_record() {
+    local out rc
+    out=$(ss "$WT_DIR" entered-worktree --session s-none 2>"$WORK/err.txt")
+    rc=$?
+    [ "$rc" = 0 ] || die "記録が無いときに終了コードが0でない: $rc: $out $(cat "$WORK/err.txt")"
+    [ ! -e "$STATE/sessions/s-none.json" ] || die "記録が無いのに記録を作った"
+}
+
+# shellcheck disable=SC2016 # $d などは pj に渡す perl の式の変数で、シェルの変数ではない
+t_entered_worktree_copy_failure() {
+    local out rc wt_secret
+    put_include_files
+    # worktree の sub をファイルにして、sub/conf.env を写せなくする
+    printf 'not-a-dir\n' >"$WT_DIR/sub"
+    put_session s-me "$MAIN" "$(fkey "$MAIN_DIR")" 300
+    out=$(ss "$WT_DIR" entered-worktree --session s-me 2>"$WORK/err.txt")
+    rc=$?
+    wt_secret=$(cat "$WT_DIR/secret.json" 2>/dev/null)
+    clear_include_files
+    [ "$rc" = 69 ] || die "写せないファイルがあるのに終了コードが69でない: $rc: $out"
+    grep -q '^\[parallel\] 写せない: sub/conf.env' "$WORK/err.txt" || die "標準エラーに写せないファイルが無い: $(cat "$WORK/err.txt")"
+    [ "$wt_secret" = main-secret ] || die "写せるファイルを写さなかった"
+    [ "$(pj "$(cat "$STATE/sessions/s-me.json")" '$d->{folder}')" = "$WT" ] || die "写せないファイルがあっても記録は書き直す"
+}
+
+t_entered_worktree_usage() {
+    local out rc a
+    for a in 'extra' '--session' '--bogus' '--session ../x'; do
+        # shellcheck disable=SC2086 # 空白で引数に分けて渡す
+        out=$(ss "$WT_DIR" entered-worktree $a 2>/dev/null)
+        rc=$?
+        [ "$rc" = 64 ] || die "entered-worktree $a の終了コードが64でない: $rc: $out"
+    done
+}
+
+echo "--- folder-kind と entered-worktree: 本体のフォルダで開いた会話が worktree に移る(Issue #817)"
+run_test "folder-kind は本体のフォルダで main、worktree とその下のディレクトリで worktree を出し、余計な引数は終了コード64" t_folder_kind
+run_test "entered-worktree は .worktreeinclude に当たり無視されるファイルのうち worktree に無いものだけを写し、このセッションの記録の作業フォルダを書き直す" t_entered_worktree_copies_and_moves_record
+run_test "entered-worktree を本体のフォルダで呼ぶと終了コード69で、写さず記録も書き直さない" t_entered_worktree_in_main_refused
+run_test "セッションのIDが無ければ記録を書き直さずに標準エラーに出し、KP_SESSION_ID でも渡せる" t_entered_worktree_without_session
+run_test "このセッションの記録が無ければ記録を作らずに終了コード0" t_entered_worktree_no_record
+run_test "写せないファイルがあれば、ほかのファイルを写し記録も書き直してから終了コード69" t_entered_worktree_copy_failure
+run_test "余計な引数、--session の値が無い、知らないオプション、パスを含むIDは終了コード64" t_entered_worktree_usage
+
 echo
 echo "結果: 成功 $pass / 失敗 $fail"
 [ "$fail" -eq 0 ]

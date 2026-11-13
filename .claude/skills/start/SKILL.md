@@ -61,7 +61,27 @@ AIは `subIssues.nodes` から、分けた部分のIssueの番号・題名・開
 | #<番号> | <題名> | 開いている / 閉じている |
 ````
 
-`subIssuesSummary.total` が0なら、AIは Step 1.5 へ進む。
+`subIssuesSummary.total` が0なら、AIは Step 1.4 へ進む。
+
+### Step 1.4: 本体のフォルダで開かれた会話を worktree に移す
+
+AIは、この Step を、Step 3 のあと、Step 1.5 より前に行う。本体のフォルダで開かれた会話のまま着手すると、本体のフォルダで開かれたほかの会話と作業フォルダが重なり、AIがほかの会話について所有者に尋ねることになって、所有者が答えるまで着手が進まないためである。
+
+1. AIは、次のコマンドで、いまの作業フォルダが本体のフォルダか worktree かを調べる。標準出力に `main`(本体のフォルダ)か `worktree` が1行出る。`worktree` と出たら、AIは何もせずに Step 1.5 へ進む
+
+   ```bash
+   bash .claude/scripts/parallel/session.sh folder-kind
+   ```
+
+2. `main` と出たら、AIは、所有者に尋ねずに、Claude Code の EnterWorktree ツールに `name` を渡して新しい worktree を作り、この会話の作業フォルダをその worktree に移す。`name` は `issue-<N>-<6桁>` にし、6桁は `head -c3 /dev/urandom | od -An -tx1 | tr -d ' \n'` の出力(16進数)にする。worktree の名前がほかの worktree と重ならないようにするためである。EnterWorktree が使えないとき、または失敗したときは、AIは本体のフォルダのまま着手を進めない。AIは、worktree に移れなかったことと、ツールが返したエラーの文をチャットに書いて止まる
+3. 移ったら、AIは、移った先の worktree で次のコマンドを呼ぶ。このコマンドは、本体のフォルダの `.worktreeinclude` に書いたファイルのうち、worktree に無いもの(ボットの資格情報の場所を書いた `.claude/settings.local.json` など)を本体のフォルダから写し、このセッションの記録の作業フォルダを、移った先の worktree に書き直す。写さないと、gh がボットとして動けず、PR を作れないためである。記録を書き直さないと、本体のフォルダで開いたほかの会話の `/start` に、もう本体のフォルダにいないこの会話が、同じ作業フォルダの会話として出るためである。`<ID>` は、Step 1.5 の1と同じく取り、取れなければ `--session <ID>` を付けずに呼ぶ
+
+   ```bash
+   bash .claude/scripts/parallel/session.sh entered-worktree --session <ID>
+   ```
+
+   終了コードが0でないときは、AIは先へ進まない。AIは、どのコマンドが失敗したかと、標準エラーに出た文を、チャットに書いて止まる。AIは、終了コードの番号を所有者への文に書かない
+4. AIは、この会話を worktree に移したことと、移った先の作業フォルダの場所を、所有者に1行で示し、Step 1.5 へ進む。AIは、この Step のあとのコマンドを、すべて移った先の worktree で動かす。EnterWorktree が作るブランチは使わず、ブランチは Step 7 のとおりに作る
 
 ### Step 1.5: ほかのセッションとIssueの作りかけを調べる
 

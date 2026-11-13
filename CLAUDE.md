@@ -104,6 +104,7 @@ AIがIssueの本文とその時点のコードを調べ、4つの観点で判断
   spec-reviewer と codex-review は本文だけを判定の基準にする。Issueのコメントは要望として読まない。
   `/kiro-discovery` は使わない
 - 着手: Issueへの着手は、所有者が `/start #N` を打って始める。所有者が「#N をやって」のように言葉で着手を頼んだときも、AIは `/start` に従う。
+  会話が worktree で開かれていないときは、AIは所有者に尋ねずに EnterWorktree で worktree に移ってから着手する(手順は `.claude/skills/start/SKILL.md` の「Step 1.4」)。
   所有者に尋ねる問いがあれば、AIは答えをIssueの本文の「決めた方式」に書き足してから実装する。AIは、着手のときに、まとめたほうがよいほかのIssueを探し、あれば所有者に提案する(進め方ごとの手順の全文は `.claude/skills/start/SKILL.md` の「Step 5.5」「Step 6」「Step 7」)
 - spec の各段階のコマンド(`/kiro-spec-init` `/kiro-spec-requirements` `/kiro-spec-design` `/kiro-spec-tasks` `/kiro-impl`)は所有者が打つ。
   AIは起動しない(`disable-model-invocation` により、AIからは起動できない)。必要なときは所有者に打つよう依頼する
