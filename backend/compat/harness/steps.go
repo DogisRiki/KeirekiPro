@@ -5,6 +5,7 @@ package harness
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -17,11 +18,27 @@ import (
 // 版のコンテナの中からはこの名前で届くが、テストの処理からは届かないので、テストの処理から届くアドレスに置き換える。
 const fakeoidcHost = "fakeoidc"
 
+// AbsoluteTargets は、絶対の URL の段の宛先を書き換えるときに使う、テストの処理から届くアドレスと、版の AWS の接続先である。
+type AbsoluteTargets struct {
+	// OIDCURL は、テストの処理から届く fakeoidc のアドレスである。
+	OIDCURL string
+	// AWSURL は、テストの処理から届く偽の AWS のアドレスである。
+	AWSURL string
+	// AWSEndpoint は、段を送る版の設定の AWS の接続先(例: http://fakeaws-go:4566)である。
+	AWSEndpoint string
+}
+
+// signedURLHost は、版が返す署名付きの URL のホストとポートである。比べる検査の環境は、2つの版を開発環境の設定で動かすので、
+// 版は、AWS の接続先のホストを localhost にした URL を返す。
+const signedURLHost = "localhost:4566"
+
 // SendAbsolute は、絶対の URL の段 step の要求を request.url に送り、応答を返す。url の {名前} は前の段で取り出した値に置き換え、
-// 名前が fakeoidc の URL は、送る先を oidcURL(テストの処理から届く fakeoidc のアドレス)に置き換える。
+// 名前が fakeoidc の URL は、送る先を targets.OIDCURL(テストの処理から届く fakeoidc のアドレス)に置き換える。
+// ホストとポートが localhost:4566 の URL は、送る先を targets.AWSURL(テストの処理から届く偽の AWS のアドレス)に置き換え、
+// 要求の Host を targets.AWSEndpoint のホストとポートにする。偽の AWS は、Host のホスト名で、どちらの版が置いた画像を読むかを選ぶ。
 // 転送は追わず、応答の Location を capture で次の段に渡す。版に送る要求ではないので、Cookie の束の Cookie は送らず、
 // 応答の Set-Cookie も覚えない。expect.status があれば、応答のステータスがそれに合うかを確かめる。応答は比べない。
-func (s *Session) SendAbsolute(ctx context.Context, client *http.Client, oidcURL string, step Step) (Response, error) {
+func (s *Session) SendAbsolute(ctx context.Context, client *http.Client, targets AbsoluteTargets, step Step) (Response, error) {
 	raw, err := s.expand(step, "url", step.Request.URL)
 	if err != nil {
 		return Response{}, err
@@ -35,15 +52,28 @@ func (s *Session) SendAbsolute(ctx context.Context, client *http.Client, oidcURL
 		return Response{}, fmt.Errorf("harness: 段 %s の差し込んだあとの url %q は絶対の URL ではありません", step.Name, raw)
 	}
 	if u.Hostname() == fakeoidcHost {
-		base, err := url.Parse(oidcURL)
+		base, err := url.Parse(targets.OIDCURL)
 		if err != nil {
-			return Response{}, fmt.Errorf("harness: 段 %s の送る先の fakeoidc のアドレス %q を読めません: %w", step.Name, oidcURL, err)
+			return Response{}, fmt.Errorf("harness: 段 %s の送る先の fakeoidc のアドレス %q を読めません: %w", step.Name, targets.OIDCURL, err)
 		}
 		u.Scheme, u.Host = base.Scheme, base.Host
 	}
+	host := ""
+	if u.Host == signedURLHost {
+		aws, err := hostOf(targets.AWSURL)
+		if err != nil {
+			return Response{}, fmt.Errorf("harness: 段 %s の送る先の偽の AWS のアドレス %q を使えません: %w", step.Name, targets.AWSURL, err)
+		}
+		endpoint, err := hostOf(targets.AWSEndpoint)
+		if err != nil {
+			return Response{}, fmt.Errorf("harness: 段 %s の版の AWS の接続先 %q を使えません: %w", step.Name, targets.AWSEndpoint, err)
+		}
+		u.Scheme, u.Host = aws.Scheme, aws.Host
+		host = endpoint.Host
+	}
 	noFollow := *client
 	noFollow.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	resp, err := s.send(ctx, &noFollow, u.String(), step, false)
+	resp, err := s.send(ctx, &noFollow, u.String(), host, step, false)
 	if err != nil {
 		return resp, err
 	}
@@ -51,6 +81,18 @@ func (s *Session) SendAbsolute(ctx context.Context, client *http.Client, oidcURL
 		return resp, fmt.Errorf("harness: 段 %s のステータスが %d でした。期待は %d です", step.Name, resp.Status, step.Expect.Status)
 	}
 	return resp, nil
+}
+
+// hostOf は、アドレス raw を読み、ホストのある絶対の URL なら返す。空のときと、読めないときと、ホストが無いときは誤りを返す。
+func hostOf(raw string) (*url.URL, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if !u.IsAbs() || u.Host == "" {
+		return nil, errors.New("ホストのある絶対の URL ではありません")
+	}
+	return u, nil
 }
 
 // ApplyRedis は、Redis の段 step の redis.del のキーを消し、redis.set のキーに value を ttl_seconds 秒の期限で書く。
@@ -124,7 +166,7 @@ func (t stepTools) newSession() *Session {
 func (t stepTools) send(ctx context.Context, session *Session, baseURL string, step Step) (Response, error) {
 	switch step.Kind() {
 	case StepAbsoluteURL:
-		return session.SendAbsolute(ctx, t.client, t.oidcURL, step)
+		return session.SendAbsolute(ctx, t.client, AbsoluteTargets{OIDCURL: t.oidcURL}, step)
 	case StepRedis:
 		if t.redis == nil {
 			return Response{}, fmt.Errorf("harness: 段 %s で書き換える Redis がありません", step.Name)

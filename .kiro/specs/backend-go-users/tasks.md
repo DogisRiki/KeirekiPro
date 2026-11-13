@@ -217,7 +217,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1(1MB を超える画像を含む要求)は、`multipart_test.go` の `TestMultipartBody_PadTo` と `TestMultipartBody_FixedBoundary` で確かめる。`TestMultipartBody_PadTo` は、1048577 バイトにした PNG を `image.DecodeConfig` で読めることを確かめる。要件2の受入基準1(Java 版で置いた画像を Go 版で見せる)を支える画像の置き方は、`send_test.go` の `TestSend_BodyFile` で確かめる
   - _要件: 2.1, 5.1_
 
-- [ ] 5.3 絶対の URL の段の宛先と Host を書き換える
+- [x] 5.3 絶対の URL の段の宛先と Host を書き換える
 
   Claude は、Java 版と Go 版を比べる検査の広げ方の節の「絶対の URL の書き換え」のとおりに、絶対の URL の段の宛先と `Host` を書き換える処理を作る。この処理は、絶対の URL の段の URL のホストが `localhost:4566` のときに、宛先を偽の AWS のアドレスにし、要求の `Host` を、その版の設定の AWS の接続先のホストとポートにする。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run TestAbsoluteURL_FakeAWSRewrite` が通る

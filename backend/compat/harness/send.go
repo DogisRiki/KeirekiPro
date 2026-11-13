@@ -70,12 +70,12 @@ func (s *Session) Send(ctx context.Context, client *http.Client, baseURL string,
 	if err != nil {
 		return Response{}, err
 	}
-	return s.send(ctx, client, strings.TrimSuffix(baseURL, "/")+path, step, true)
+	return s.send(ctx, client, strings.TrimSuffix(baseURL, "/")+path, "", step, true)
 }
 
-// send は、段 step の要求を target に送る。toVersion が真なら、版に送る要求として、Host を CompatHost にし、
+// send は、段 step の要求を target に送る。host が空でなければ、要求の Host を host にする。toVersion が真なら、版に送る要求として、Host を CompatHost にし、
 // Cookie の束の Cookie と csrf のヘッダを付け、応答の Set-Cookie を覚える。偽なら、Cookie の束を使わない。
-func (s *Session) send(ctx context.Context, client *http.Client, target string, step Step, toVersion bool) (Response, error) {
+func (s *Session) send(ctx context.Context, client *http.Client, target, host string, step Step, toVersion bool) (Response, error) {
 	headers := make(map[string]string, len(step.Request.Headers))
 	for _, name := range sortedKeys(step.Request.Headers) {
 		v, err := s.expand(step, "ヘッダ "+name+" の値", step.Request.Headers[name])
@@ -105,6 +105,9 @@ func (s *Session) send(ctx context.Context, client *http.Client, target string, 
 	req, err := http.NewRequestWithContext(ctx, step.Request.Method, target, body)
 	if err != nil {
 		return Response{}, fmt.Errorf("harness: 段 %s の要求を作れません: %w", step.Name, err)
+	}
+	if host != "" {
+		req.Host = host
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
