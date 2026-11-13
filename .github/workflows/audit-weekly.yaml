@@ -4,7 +4,8 @@ name: Audit Weekly
 # 機械判定できる8項目を自動判定に置き換える。
 #
 #   scan-freshness   定期スキャン(container-scan-scheduled.yaml)の直近成功が
-#                    8日未満かを確認する(旧・週次8)
+#                    2日未満かを確認する(旧・週次8)。毎日の実行が1回欠けたら
+#                    逸脱とする(#820)
 #   inventory-freshness
 #                    棚卸し(audit-inventory.yaml)の直近成功が35日未満かを
 #                    確認する。月1回の実行が1回欠けたら逸脱とする(新規。#415)
@@ -226,7 +227,7 @@ jobs:
             overall=undecidable
           else
             run_check scan-freshness "定期スキャンの稼働確認" \
-              .github/scripts/check-audit-scan-freshness.sh container-scan-scheduled.yaml 8
+              .github/scripts/check-audit-scan-freshness.sh container-scan-scheduled.yaml 2
             run_check inventory-freshness "棚卸しの稼働確認" \
               .github/scripts/check-audit-scan-freshness.sh audit-inventory.yaml 35 棚卸し
             run_check dependabot-stuck "Dependabot PRの滞留検知" \
