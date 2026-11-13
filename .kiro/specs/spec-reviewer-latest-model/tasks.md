@@ -126,9 +126,9 @@
     - 要件8の受入基準1と要件4の受入基準6(版の番号でなく系統で書き、前の往復の記録は書き換えない)は、grep で確かめる
   - _要件: 1.1, 4.1, 4.6, 5.1, 5.2, 5.3, 8.1, 8.2_
 
-- [ ] 7. CLAUDE.md を、origin/main と合わせても大きさの上限に収まる形にする
+- [x] 7. CLAUDE.md を、origin/main と合わせても大きさの上限に収まる形にする
 
-- [ ] 7.1 CLAUDE.md の審査役のモデルの決まりを短い2行にし、版を付けて伝えたときの扱いの文を `/kiro-spec-init` の SKILL.md に移す
+- [x] 7.1 CLAUDE.md の審査役のモデルの決まりを短い2行にし、版を付けて伝えたときの扱いの文を `/kiro-spec-init` の SKILL.md に移す
 
   Claude は、設計の「CLAUDE.md」の部品の節のとおりに、CLAUDE.md の審査役のモデルの決まりの2行を、設計に書いた短い2行に替える。替える2行は、「審査役のモデルは、Fable と Opus のどちらかの系統で選び」で始まる行と、「ただし、本体の会話が審査役と同じ系統で動いているときは」で始まる行である。Claude は、CLAUDE.md の「所有者が「Fable 5.1」のように版を付けて審査役のモデルを伝えたときは」で始まる行を消す。Claude は、設計の「kiro-spec-init の手順」の部品の節のとおりに、`/kiro-spec-init` の SKILL.md の「Update Mode Steps(更新の形)」の節と「Important Constraints」の節の間に、見出し「## 版を付けて審査役のモデルを伝えられたとき」の節を足し、消した行と同じ中身の文を書く。Claude は、`git fetch origin` と `git merge origin/main` を、それぞれ1つのコマンドとして順に流し、作業のブランチに origin/main を取り込む。そのあと、Claude は、CLAUDE.md の大きさの検査を流す。
   - 完了の確かめ方: 次の5つが起きる
