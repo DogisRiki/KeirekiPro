@@ -5,6 +5,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -85,6 +86,15 @@ func (s *Service) InvalidateSessions(ctx context.Context, userID uuid.UUID) erro
 // RemoveAllRefreshTokens は、利用者が持つログインを続けるための値をすべて消す。
 func (s *Service) RemoveAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
 	return s.removeAllRefreshTokens(ctx, userID)
+}
+
+// SendUserDeletedMail は、退会の完了のメールを to へ送る。Java 版の UserDeletedEventListener にあたる。
+// 名前が無いときは、Java 版のひな形と同じく本文を作れないので、送らずに誤りを返す。
+func (s *Service) SendUserDeletedMail(ctx context.Context, to string, username pgtype.Text) error {
+	if !username.Valid {
+		return errors.New("auth: 名前が無いので退会の完了のメールを作れない")
+	}
+	return s.sendMail(ctx, to, userDeletedMail(s.deps.App, username.String))
 }
 
 // ErrBusiness は、業務の決まりで断るときの 400 の誤りを作る。Java 版の UseCaseException にあたる。

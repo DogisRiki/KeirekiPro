@@ -23,7 +23,7 @@
   - 受入基準とテストの対応: この小タスクは確認に使う正解のファイルを作り、受入基準を直接は確かめない。正解のファイルは、小タスク1.3 の退会の完了のメール、2.1 から2.4 の要求の本文の読み方、3.7 の名前と画像と2段階認証の設定の変更の単体テストで使う
   - _要件: 1.1, 1.3, 1.4_
 
-- [ ] 1.3 退会の完了のメールを足す
+- [x] 1.3 退会の完了のメールを足す
 
   Claude は、`mail.go` に、Mail の部品の節のとおりの退会の完了のメールを足し、`exported.go` に `SendUserDeletedMail` を足す。
   - 完了の確かめ方: `go test ./internal/auth/ -run 'TestMail_UserDeleted'` が通る。`TestMail_UserDeletedMatchesJava` は、小タスク1.2 で控えた値を渡して作った件名と本文の全体を、`user-deleted.txt` と比べる
