@@ -312,3 +312,107 @@
 |---|---|---|---|
 
 - 往復: 3回で収束 / 未解決: 0件
+
+## サイクル3 往復1(2026-11-13)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 20行・122-123行・284-300行(扱いの文の本体を `/kiro-spec-init` の SKILL.md に移し、CLAUDE.md に1行を置く): 要件1の4を満たす部品が替わった。「1.4」「kiro-spec-init」「版を付けて」で design と requirements を検索し、部品「CLAUDE.md」「kiro-spec-init の手順」、テストの方針の手順書の確認(420-424行)、要件1の4・1の5・8の1・8の2を読んだ。今の kiro-spec-init の SKILL.md の節の並びと、作業フォルダの CLAUDE.md と、本体のフォルダの main の CLAUDE.md を読んだ
+- design.md 43行・59行・71行・287行・424行(CI の必須の検査 claude-md-size と、CLAUDE.md の大きさの数): 検査のスクリプト、guardrails.yaml の呼び方と上限、数えるファイル、`/ship` の手順7の main の取り込み、main の CLAUDE.md を読んで、数と確認の方法が成り立つかを確かめた
+- design.md 40行・66行・101行・220行・264行・306行・324行・357行・392行・402行・410行(書き方の点検の直し): 前の版と意味が同じかを確かめた。220行の matcher は settings.json と突き合わせた
+
+### 実ファイルで確かめた文
+
+- 43行「claude-md-size は、会話の始めに読み込まれる CLAUDE.md の大きさの合計が 21000 バイトを超えると失敗する。サブフォルダの CLAUDE.md とスキルの SKILL.md は数えない」: .github/scripts/check-claude-md-size.sh 9-21行・255-280行(ルートの CLAUDE.md と、あれば .claude/CLAUDE.md・CLAUDE.local.md・AGENTS.md・.claude/rules の下の .md と、@ の読み込みの先を数える。今のリポジトリにそれらのファイルは無く、CLAUDE.md に @ の読み込みも無い)、.github/workflows/guardrails.yaml 24行(`CLAUDE_MD_SIZE_LIMIT: '21000'`)・251-271行 / 合っていた
+- 424行「`CLAUDE_MD_SIZE_LIMIT=21000 bash .github/scripts/check-claude-md-size.sh` で確かめる」: check-claude-md-size.sh 31-34行・70行(引数を省くと今のフォルダを測る) / 合っていた。ただし、測るのがこのブランチの CLAUDE.md だけである点は D3-1-1
+- 287行「扱いの文の本体を CLAUDE.md に置くと 21494 バイト、移して1行を置くと 20998 バイト」: 作業フォルダの CLAUDE.md 116行(本体を置いた今の形)。審査役は Bash でバイトの数を測れない。116行と、置き換える1行の差を文字の数から概算すると約490バイトで、design の差(496バイト)と食い違わない。ただし、本体のフォルダの main の CLAUDE.md(origin/main を fast-forward で取り込んだもの。本体のフォルダの .git/logs/HEAD)には、このブランチに無い107行(`/start` の「Step 1.4」の EnterWorktree の行、文字の数からの概算で約210バイト)がある。ほかの行は、この spec が直す行を除いて同じである / このブランチの上の数としては合っていた。main を取り込んだあとの数とは食い違っていた(D3-1-1)
+- 297行「kiro-spec-init の SKILL.md の『Update Mode Steps(更新の形)』の節と『Important Constraints』の節の間」: .claude/skills/kiro-spec-init/SKILL.md 40行・105行(2つの節は隣り合う) / 合っていた
+- 289行「`/kiro-spec-init` の SKILL.md は、所有者が `/kiro-spec-init` を打ったときにしか会話に読み込まれない」: .claude/skills/kiro-spec-init/SKILL.md 4行(`disable-model-invocation: true`) / 合っていた
+- 420行「`/kiro-spec-init` の SKILL.md の grep で見つかる行は、扱いの文の1行だけになる」: 今の kiro-spec-init の SKILL.md に「Fable 5.1」「Opus 5.5」を含む行は無い / 合っていた
+- 420行「CLAUDE.md の grep で1行も見つからない」: 作業フォルダの CLAUDE.md で当たるのは116行(扱いの文の本体)だけで、design はこれを1行に替える。main の CLAUDE.md で当たる113行・143行は、このブランチではすでに直してある(112-113行・144行) / 合っていた
+- 122行・280行・284行・291行「CLAUDE.md 112行・113-114行・142行」: このブランチの元の CLAUDE.md の行の番号(サイクル1往復1で確かめた)。main の CLAUDE.md では107行が足されて113行・114-115行・143行になる / このブランチの上では合っていた(実装は文で場所を探すので、行の番号のずれは作業に影響しない)
+- 220行「証跡の7行、フックの登録の matcher は SubagentStop では `spec-reviewer`、PostToolUse では `SubagentHandback`」: .claude/settings.json 168-172行・322-326行 / 合っていた
+- 40行・101行「/ship の手順1・3・4・6・7」: 書き方だけの直しで、手順の番号は前の版と同じ。.claude/skills/ship/SKILL.md(サイクル1往復1で確かめた) / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 1.4 | CLAUDE.md の1行と、kiro-spec-init の SKILL.md の「版を付けて審査役のモデルを伝えられたとき」の節を読む確認 | 無し | 無し | 部品「CLAUDE.md」284-289行、部品「kiro-spec-init の手順」297-300行、テストの方針 423行 |
+| 1.5 | CLAUDE.md の決まりと SKILL.md の冒頭の説明を読む確認 | 無し | 無し | 部品「CLAUDE.md」280-282行、テストの方針 422行。D3-1-1 の直しで CLAUDE.md の文を減らすときに、この文を消すと要件8の1と1の5を満たさなくなる |
+| 8.1 | CLAUDE.md・kiro-spec-init の SKILL.md・spec-review の SKILL.md の grep と、文を読む確認 | ホストの Git Bash | 無し | テストの方針 420-422行 |
+| 8.2 | test-restore-after-compact.sh の t_claude_md_compact_instructions と CLAUDE.md の grep | ホストの Git Bash(写しと本来の場所) | 写しに重ねる CLAUDE.md | テストの方針 413行・420行、部品 291行 |
+| (受入基準ではない)claude-md-size を通ること | check-claude-md-size.sh | ホストの Git Bash | origin/main を取り込んだあとの CLAUDE.md | テストの方針 424行。origin/main を取り込んだあとに測ることは書かれていない(D3-1-1) |
+
+### 申告
+
+**1. 版を付けて伝えられたときの扱いを、CLAUDE.md の1行から `/kiro-spec-init` の SKILL.md に誘導すること** — 部品「CLAUDE.md」284-289行、部品「kiro-spec-init の手順」297-300行
+
+- Issue の記載: なし(起動の文によると、所有者が決めたのは扱いの文の本体を `/kiro-spec-init` の SKILL.md に移すことまでである。CLAUDE.md に誘導の1行を残すことと、SKILL.md のどの節の間に置くかは、design を書いた側が決めた)
+- 決めたこと: CLAUDE.md に「所有者が版を付けて伝えたら、`/kiro-spec-init` の SKILL.md に従う」の1行を残し、SKILL.md の Update Mode Steps と Important Constraints の間に節を足す
+- 他にありえた選択肢: 誘導の1行を置かず、SKILL.md だけに書く。または、往復ごとに読まれる spec-review の SKILL.md に置く
+- 外れていた場合: 誘導の1行が無いと、spec の途中で所有者が版を付けて選び直したときに、実装セッションが扱いの文を読まず、返事の3つのことが抜ける(要件1の4)。今の形は、誘導の1行の分(概算で約90バイト)だけ CLAUDE.md の残りの大きさを使う
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D3-1-1 | 中 | design.md 287行(「扱いの文の本体を移して上の1行を置くと、CLAUDE.md は 20998 バイトになる」)、71行(品質チェックの設定の7つ目)、424行(claude-md-size を手元で確かめる項) | 287行の数は、このブランチの CLAUDE.md の上の数である。本体のフォルダの main の CLAUDE.md(origin/main を fast-forward で取り込んだもの)には、このブランチに無い107行「会話が worktree で開かれていないときは、AIは所有者に尋ねずに EnterWorktree で worktree に移ってから着手する(手順は `.claude/skills/start/SKILL.md` の「Step 1.4」)。」がある。この行は文字の数からの概算で約210バイトで、20998 バイトとの余りは2バイトしかない。`/ship` の手順7の3・4の3・5(.claude/skills/ship/SKILL.md 135行・142行・174-181行)は、PR のブランチが main の最新を含まないと `gh pr update-branch` で main を取り込み、claude-md-size(guardrails.yaml 260-271行)は取り込んだあとの PR の head を測る。そのため、design のとおりに作ると、取り込んだあとの CLAUDE.md は約21200バイトになり、必須の検査が赤になってマージされない。424行の確認はこのブランチだけを測るので、手元では通り、PR を出したあとに CI で見つかって design に戻る | 大きさの数を、origin/main を取り込んだあとの CLAUDE.md で測り直して design に書く。上限に収めるために、さらにどの文をどこに移すか短くするかを design に書く(要件8の1により、審査役のモデルが系統の最新のモデルで動くことと、本体の会話と同じ系統のときは同じ版で動くことの文は CLAUDE.md に残す必要がある)。上限を上げるなら、ゲート設定の変更として所有者への提案に回すと書く。424行の確認は、origin/main を取り込んだあとに流すと書く。あわせて、実装の間に main の CLAUDE.md が伸びることがあるので、PR を出す前に main を取り込んで測り直すことを書く |
+| D3-1-2 | 低 | design.md 284-285行(CLAUDE.md に置く1行「所有者が版を付けて伝えたら、`/kiro-spec-init` の SKILL.md に従う」) | この1行には「審査役のモデルを」が無い。design は、この1行を審査役のモデルの決まりの箇条の続きの行として書くのか、`  - ` で始まる別の箇条として書くのかを決めていない。別の箇条として書くと、何に版を付けて伝えたときかが文から読めない | 審査役のモデルの決まりの箇条の続きの行として書くと決めて書く。または「審査役のモデルを」を足す(足すと大きさが増えるので、D3-1-1 の数と合わせて決める) |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+
+- 往復: 1回目 / 高0 中1 低1
+
+## サイクル3 往復2(2026-11-13)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 17行・19行・21行・240行(主語の書き足しと、冒頭の説明の見出しの言い換え): 前の版と意味が同じかを確かめた
+- design.md 71行(品質チェックの設定の7つ目を、部品の節を指す形にした): 指す先の見出し(276行「CLAUDE.md(審査役のモデルの決まりと、会話の要約の決まり)」)があり、その節(289-292行)に大きさの保ち方が書かれているかを確かめた
+- design.md 121行(Step 2 の手順1と手順4の中身を書き足した): 今の spec-review の SKILL.md の Step 2 の手順1と手順4と合っているかを確かめた
+- design.md 122行・280-296行・304行(CLAUDE.md の審査役のモデルの決まりを2行に替え、SKILL.md を指す言葉を2行目の括弧の中に入れ、本線と合わせた大きさを書いた。D3-1-1・D3-1-2 の直し): 要件1の4・1の5・8の1・8の2を満たす部品の文が替わった。「1.4」「1.5」「8.1」「kiro-spec-init」「本体の会話」「括弧」で design と requirements を検索し、部品「CLAUDE.md」「kiro-spec-init の手順」、59行の見直すきっかけ、テストの方針 427-431行、要件1の4・1の5・8の1・8の2を読んだ。作業フォルダの CLAUDE.md 110-116行・144行と、本体のフォルダの main の CLAUDE.md 107行・113行・121行・143行を読み、替える前と替えたあとの行の文字の数から大きさの差を概算した。2行に替えても test-restore-after-compact.sh の CLAUDE.md の確かめ(538-551行)に当たらないかも読んだ
+- design.md 431行(本線を取り込んでから大きさを測る): 取り込みのコマンドが許可されているかと、本線で足された行が、このブランチで直す行とぶつからないかを確かめた
+
+### 実ファイルで確かめた文
+
+- 121行「Step 2 の手順1は `review_model` を読み直す手順、手順4は `spec-reviewer` を起動する手順」: .claude/skills/spec-review/SKILL.md 98行・113行 / 合っていた
+- 280行「CLAUDE.md の112行『審査役のモデルは、既定では Fable 5.1 で、所有者が spec ごとに Opus 5.5 を選べる。所有者は、spec を始めるときに、選んだモデルを会話で伝える。』」: 本体のフォルダの main の CLAUDE.md 113行と一字ずつ合っている(作業フォルダでは、前の版の design のとおりに112-113行と116行をすでに直してある。実装は文で場所を探す) / 合っていた
+- 289行「本線は、この spec の分岐のあとに CLAUDE.md に1行を足した」: 本体のフォルダの main の CLAUDE.md 107行(EnterWorktree の行)。作業フォルダの CLAUDE.md に無く、ほかの行は1行ずれるだけで同じである(main 113行・121行・137行・143行が作業フォルダの元の112行・122行・138行・144行に当たる) / 合っていた
+- 289-292行「本線の CLAUDE.md は 20734 バイト。本線と合わせると、本体を置く形は 21703、別の1行の形は 21207、2行の形は 20948 バイト」: 審査役は Bash でバイトの数を測れないので、文字の数から概算した。本線の107行は約213バイト、作業フォルダの今の112-113行は約569バイト、別の1行は約87バイト、新しい2行は約401バイト(括弧を全角とした)、扱いの文の本体(作業フォルダ116行)は約575バイト。別の1行の形と2行の形の差は約255バイトで、design の差(259バイト)と合う。サイクル1で測った 21494 から逆算すると、本線は約20746バイト、2行の形は約20964バイトで、design の数と十数バイトの差の中にあり、どちらも 21000 以下である / 合っていた(概算の範囲で)
+- 294行「落とす文と同じ中身の文が `/spec-review` の SKILL.md の冒頭の説明にある」: .claude/skills/spec-review/SKILL.md 14行(「所有者は、レビュー役が実際に動いた版を、往復ごとの審査の記録(response)で確かめる。」) / 合っていた
+- 431行「`git fetch origin` と `git merge origin/main` で作業のブランチに本線を取り込む」: .claude/settings.json 27-28行(`Bash(git fetch *)`、`Bash(git merge origin/*)` が許可) / 合っていた。本線の107行と、このブランチが直す行(作業フォルダ112-116行)の間には直さない108-111行があり、取り込みで重ならない
+- 124行「test-restore-after-compact.sh は542行の要約の決まりの言葉を確かめる」(2行に替える審査役のモデルの決まりの行は確かめない): .claude/hooks/tests/test-restore-after-compact.sh 538-551行(要約の決まりの行だけを確かめる) / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 1.4 | CLAUDE.md の審査役のモデルの決まりの2行目の括弧の中の言葉と、kiro-spec-init の SKILL.md の「版を付けて審査役のモデルを伝えられたとき」の節を読む確認 | 無し | 無し | 部品「CLAUDE.md」282-287行・296行、部品「kiro-spec-init の手順」304-305行、テストの方針 430行 |
+| 1.5 | CLAUDE.md の2行目と、SKILL.md の冒頭の説明を読む確認 | 無し | 無し | 部品「CLAUDE.md」284行、部品「spec-review の手順」242行、テストの方針 429行 |
+| 8.1 | CLAUDE.md・kiro-spec-init の SKILL.md・spec-review の SKILL.md の grep と、文を読む確認 | ホストの Git Bash | 無し | テストの方針 427-429行、部品「CLAUDE.md」283-284行 |
+| 8.2 | test-restore-after-compact.sh の t_claude_md_compact_instructions と CLAUDE.md の grep | ホストの Git Bash(写しと本来の場所) | 写しに重ねる CLAUDE.md | テストの方針 420行・427行、部品 298行 |
+| (受入基準ではない)claude-md-size を通ること | check-claude-md-size.sh | ホストの Git Bash | origin/main を取り込んだ作業のブランチ | テストの方針 431行、部品「CLAUDE.md」289-292行 |
+
+### 申告
+
+無し(この往復の差分で、外れていたときの手戻りが大きい新しい決定は無い。CLAUDE.md から落とす「審査役が実際に動いた版は、往復ごとの審査の記録に残る。」は、同じ中身が spec-review の SKILL.md 14行に残り、要件8の1が CLAUDE.md に求める文ではない)
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+
+- 往復: 2回で収束 / 未解決: 0件
