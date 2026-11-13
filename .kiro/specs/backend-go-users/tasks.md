@@ -62,7 +62,7 @@
   - _要件: 1.5, 2.1_
   - _依存: 1.6_
 
-- [ ] 2. 名前と画像と2段階認証の設定の変更の要求の本文を読む部品を作る
+- [x] 2. 名前と画像と2段階認証の設定の変更の要求の本文を読む部品を作る
 - [x] 2.1 JDK の UTF-8 の読み方を写す
 
   Claude は、本文を読む中間処理と multipart の読み方の節のとおりに、JDK の UTF-8 の読み方を写した、バイトの並びを文字列にする処理を `jdkutf8.go` に作る。
@@ -96,7 +96,7 @@
   - _依存: 1.2_
 
 - [ ] 3. 利用者の操作の処理を作る
-- [ ] 3.1 画像を検査する (並行可)
+- [x] 3.1 画像を検査する (並行可)
 
   Claude は、ImageCheck の部品の節の6つの検査の順のとおりに、画像を検査する `checkImage` と、拡張子の取り出しを `image.go` に作る。
   - 完了の確かめ方: `go test ./internal/users/ -run TestCheckImage` が通る
@@ -374,6 +374,7 @@
   - Tomcat の `Request.parseParts` は、ファイルの名前の無い部分ごとに、解いたあとの名前と中身のバイト数に2を足して合計し、`maxPostSize`(Spring Boot の `server.tomcat.max-http-form-post-size`、既定は 2MB)を超えると例外を投げる。部分の名前を RFC 2047 の書き方で送ると、解いたあとのバイト数が本文の中のバイト数より大きくなるので、2MB に近い本文では Java 版だけが誤りになりうる。小タスク2.4 は、部分の数の上限と一緒に、この検査を写すかを決める
 - 小タスク2.4 は、問い合わせの項目の数の上限と、Tomcat の合計の上限の検査を、どちらも写した。中間処理は `users.go` の `updateUserInfoMiddleware` で、受け口は `updateUserInfoFormFrom(ctx)` で読んだ項目を受け取る。小タスク4.2 は、`server.go` の中間処理の並びにこの中間処理を足す。`Content-Type` の無い画像では、中間処理は `errImageWithoutContentType` を返し、生成したコードの `ResponseErrorHandlerFunc` が 500 と「予期せぬエラーが発生しました。」で答える。空の `Content-Type` の画像は、空の文字列のまま受け口に渡すので、小タスク3.1 の画像の検査が断る
 - 小タスク2.4 で、Java 版が 500 で答え、Go 版が 400 で答える要求が、design.md が名指しした4つのほかに7つ見つかった。要求の一覧は research.md の「小タスク2.4 の実装」の記録にある。変えた動きの一覧に項目を足す小タスクは、要求ごとに1つの項目を足す
+- 小タスク3.1 の `ImageInput` は `image.go` にある。`internal/users` のテストのファイルは、`image/png` `image/jpeg` `image/gif` を読み込まない。読み込むと、テストの中でその形式が登録され、`image.go` が形式を読み込み忘れてもテストが通るためである。小タスク3.7 のテストも、PNG は `image_test.go` の `pngBytes` で組み立て、JPEG と GIF は `testdata/images` の見本のファイルを読む。`checkImage` のテストの端の場合(PNG のあとに 0 を足した 1048576 バイトの画像、途中で切れた PNG と JPEG と GIF、`BM` で始まる 66 バイト、ASCII でない字の拡張子)は、本物の Java の `ImageIO` と `toLowerCase` の答えと同じだった。手で組み立てた4つの画像(外枠と1枚目の絵の大きさが違う2つの GIF と、2つの4色の JPEG)では、答えが違った。違いの中身は research.md の「小タスク3.1 の実装」の記録にある。変えた動きの一覧に項目を足す小タスクは、所有者に項目の一覧を示すときに、この4つも示し、項目を足すか、Java 版に合わせる直しをするかを所有者に決めてもらう。PR の本文にも書く
 
 ## 完了条件(全タスク共通)
 
