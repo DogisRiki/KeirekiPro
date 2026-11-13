@@ -157,7 +157,7 @@
   - _対象の部品: UserInfo_
   - _依存: 3.2_
 
-- [ ] 3.7 名前と画像と2段階認証の設定を変える
+- [x] 3.7 名前と画像と2段階認証の設定を変える
 
   Claude は、Update の部品の節の7つの手順のとおりに、`UpdateUserInfo` を `update.go` に作る。
   - 完了の確かめ方: `go test ./internal/users/ -run TestUpdateUserInfo` が通る
@@ -380,6 +380,7 @@
 - 小タスク3.4 の `provider.go` は、Java 版の `LocalDateTime.now()` と同じ見た目の今の時刻を返す `javaNow` と、東京の時間帯 `javaZone` を持つ。小タスク3.7 から3.9 で `updated_at` を書くときも、これを使う。経路の名前を小文字にする `asciiLower` は `image.go` にある。`provider_integration_test.go` は、利用者の行を作る `insertUser`、読む `loadUser`、時刻の見本 `oldStamp` と `testNow`、`testNow` を東京の時刻の見た目にする `javaWallClock`、`pgtype.Text` を作る `someText` を持つ。小タスク3.5 から3.9 の結合テストも、これらを使う
 - 小タスク3.5 の `emailverification_integration_test.go` は、送ったメールを記録する偽の SES `recordingSES`、本物の認証の `Service` と Valkey をつないだ組 `newVerificationEnv`、リンクの JWT の中身を読んで目的と宛先と利用者を確かめる `wantLink`、400 の業務の誤りを確かめる `wantBusinessError` を持つ。小タスク3.8 と3.9 の結合テストも、これらを使う。`insertUser` は、メールアドレスには利用者の ID を前に付けるが、設定待ちのメールアドレスには付けないので、テストは設定待ちのメールアドレスを利用者ごとに変える。認証の `VerifyEmail` は、メールアドレスをすでに持つ利用者の設定待ちのメールアドレスを、「設定待ちのメールアドレスが無いため確認できません。」で断る。そのため、そういう利用者のリンクは、`VerifyEmail` を呼ばずに `wantLink` で確かめる
 - 小タスク3.6 の `userinfo.go` の `UserInfo` は、JSON の名前を持たない Go の型である。小タスク4.1 は、受け口の応答の型にこの10の項目を同じ順で写す。nil のポインタは null に、空の並びは `[]` にする。値の有無で文字の列のポインタを作る `textPointer` も `userinfo.go` にある。`userinfo_integration_test.go` は、偽の AWS につなぐ `userInfoService` と、利用者の行を読んで変えて書き戻す `changeUser` を持つ。役割 ADMIN の利用者は2段階認証を使う設定でないと読めないので、テストは ADMIN を足す前に2段階認証を使う設定にする
+- 小タスク3.7 の `update.go` は、名前の前後の空白を除いて長さを確かめる `normalizeUsername`、画像の名前を作る `profileImageKey`、役割 ADMIN を持つかを返す `isAdmin` を持つ。`update_integration_test.go` は、どの項目の 400 の入力の誤りも確かめる `wantInputErrors`、偽の AWS の置き場所から画像を読む `storedObject`、2段階認証を使う設定の管理者を作る `adminUser` を持つ。小タスク3.8 の退会で画像が消えたかを確かめるときも、`storedObject` を使う。4.1 の受け口は、Java 版の受け口と同じく、`UpdateUserInfo` のあとで `GetUserInfo` を呼んで答える
 
 ## 完了条件(全タスク共通)
 
