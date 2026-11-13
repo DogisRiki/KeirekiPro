@@ -25,7 +25,10 @@ CALLS="$WORK/calls.log"
 API_FIXTURE="$WORK/api.json"
 
 # gh のシム。api の応答は $API_FIXTURE から返し、それ以外は記録だけする。
+# コメントの取得(パスに /comments を含む api)は $COMMENTS_FIXTURE から返し、
+# ファイルが無ければコメント0件を返す。
 # GH_FAIL_ON に指定したサブコマンドは失敗させる。
+# GH_FAIL_COMMENTS を付けると、コメントの取得だけを失敗させる。
 cat >"$WORK/bin/gh" <<'SHIM'
 #!/usr/bin/env bash
 sub="${1:-}"
@@ -51,13 +54,30 @@ if [ -n "${BODY_OUT:-}" ]; then
     done
 fi
 if [ "$sub" = "api" ]; then
-    cat "$API_FIXTURE_PATH"
+    case "${2:-}" in
+        */comments*)
+            if [ -n "${GH_FAIL_COMMENTS:-}" ]; then
+                echo "gh: コメントの取得の失敗をシミュレート" >&2
+                exit 1
+            fi
+            if [ -f "$COMMENTS_FIXTURE_PATH" ]; then
+                cat "$COMMENTS_FIXTURE_PATH"
+            else
+                printf '[[]]'
+            fi
+            ;;
+        *)
+            cat "$API_FIXTURE_PATH"
+            ;;
+    esac
 fi
 exit 0
 SHIM
 chmod +x "$WORK/bin/gh"
+COMMENTS_FIXTURE="$WORK/comments.json"
 export CALLS_LOG="$CALLS"
 export API_FIXTURE_PATH="$API_FIXTURE"
+export COMMENTS_FIXTURE_PATH="$COMMENTS_FIXTURE"
 
 # 使い方: setup <blocking json> <detected json> <open issues json>
 setup() {
@@ -66,7 +86,30 @@ setup() {
     # gh api --paginate --slurp は「ページの配列」を返す。
     # ページ1つの中にIssueの配列が入るので2段包む。
     printf '[[%s]]' "$3" >"$API_FIXTURE"
+    rm -f "$COMMENTS_FIXTURE"
     : >"$CALLS"
+}
+
+# 使い方: set_comments <コメントの JSON をカンマでつないだもの>
+set_comments() {
+    printf '[[%s]]' "$1" >"$COMMENTS_FIXTURE"
+}
+
+# 使い方: comment_json <利用者> <本文のファイル>
+comment_json() {
+    jq -cn --arg u "$1" --rawfile b "$2" '{user: {login: $u}, body: $b}'
+}
+
+# 使い方: issue_json <番号> <利用者> <本文のファイル>
+issue_json() {
+    jq -cn --argjson n "$1" --arg u "$2" --rawfile b "$3" \
+        '{number: $n, title: "コンテナ脆弱性: CVE-2026-1", user: {login: $u}, body: $b}'
+}
+
+# 使い方: state_file <状態の JSON> <書き出すファイル>
+# 本文の末尾に状態の記録を置いた文を書く。
+state_file() {
+    printf '本文\n\n<!-- container-scan-state: %s -->\n' "$1" >"$2"
 }
 
 run_script() {
@@ -99,6 +142,13 @@ check_calls() {
         echo "     実際: $(printf '%s' "$got" | tr '\n' '|')"
         FAILED=1
     fi
+}
+
+# 使い方: check_calls_after_run <期待する呼び出し(改行区切り)> <説明>
+# スクリプトを流してから、呼び出しを突き合わせる。
+check_calls_after_run() {
+    run_script
+    check_calls "$@"
 }
 
 ROW='{"id":"CVE-2026-1","severity":"HIGH","pkgName":"pkg","installedVersion":"1.0","fixedVersion":"1.1"}'
@@ -242,6 +292,129 @@ issue comment 43" "重複したIssueすべてに追記する"
 # ---------------------------------------------------------------------
 setup '[{"severity":"HIGH","pkgName":"pkg"}]' "[]" ""
 check 1 "id を欠く要素があれば赤"
+
+# ---------------------------------------------------------------------
+# 14. 状態が前回の記録と同じなら追記しない(#820)
+#     検査は毎日動く。変わらない状態を毎回追記すると、
+#     深刻度や修正版の変化が同じ内容のコメントに埋もれる。
+# ---------------------------------------------------------------------
+BOT="github-actions[bot]"
+SAME_STATE='{"kind":"recheck","rows":[{"fixed":true,"severity":"HIGH"}]}'
+CRITICAL_STATE='{"kind":"recheck","rows":[{"fixed":true,"severity":"CRITICAL"}]}'
+state_file "$SAME_STATE" "$WORK/same.txt"
+state_file "$CRITICAL_STATE" "$WORK/critical.txt"
+
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/same.txt")"
+check 0 "記録が同じでも正常終了する"
+check_calls "" "bot の記録と状態が同じなら追記しない"
+
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/critical.txt")"
+check 0 "深刻度が変わっても正常終了する"
+check_calls "issue comment 42" "深刻度が前回の記録と違えば追記する"
+
+# 修正版の有無だけが変わったときも追記する
+NOFIX_STATE='{"kind":"recheck","rows":[{"fixed":false,"severity":"HIGH"}]}'
+state_file "$NOFIX_STATE" "$WORK/nofix.txt"
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/nofix.txt")"
+check_calls_after_run "issue comment 42" "修正版の有無が前回の記録と違えば追記する"
+
+# 公開のリポジトリでは誰でもコメントを書ける。bot 以外が書いた記録で
+# 追記を止められないようにする。
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "someone" "$WORK/same.txt")"
+check_calls_after_run "issue comment 42" "bot 以外の利用者の記録は読まずに追記する"
+
+# bot の記録が違い、そのあとに bot 以外が同じ状態を書いても追記する
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/critical.txt"),$(comment_json "someone" "$WORK/same.txt")"
+check_calls_after_run "issue comment 42" "bot 以外があとから書いた記録で追記を止められない"
+
+# 記録が複数あるときは最後のものを使う
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/critical.txt"),$(comment_json "$BOT" "$WORK/same.txt")"
+check_calls_after_run "" "最後の記録が同じなら追記しない"
+
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/same.txt"),$(comment_json "$BOT" "$WORK/critical.txt")"
+check_calls_after_run "issue comment 42" "最後の記録が違えば追記する"
+
+# 読めない記録は、無いものとして扱い追記する
+printf '本文\n\n<!-- container-scan-state: {broken -->\n<!-- container-scan-state: {"kind": } -->\n' >"$WORK/broken.txt"
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/broken.txt")"
+check 0 "読めない記録があっても正常終了する"
+check_calls "issue comment 42" "読めない記録は無いものとして追記する"
+
+# ---------------------------------------------------------------------
+# 15. 起票の本文の記録を前回の記録として使う
+# ---------------------------------------------------------------------
+setup "[${ROW}]" "[${ROW}]" "$(issue_json 42 "$BOT" "$WORK/same.txt")"
+check_calls_after_run "" "起票の本文の記録が同じでコメントが無ければ追記しない"
+
+setup "[${ROW}]" "[${ROW}]" "$(issue_json 42 "someone" "$WORK/same.txt")"
+check_calls_after_run "issue comment 42" "bot 以外が起票した本文の記録は読まない"
+
+# コメントの記録は本文の記録より新しい
+setup "[${ROW}]" "[${ROW}]" "$(issue_json 42 "$BOT" "$WORK/same.txt")"
+set_comments "$(comment_json "$BOT" "$WORK/critical.txt")"
+check_calls_after_run "issue comment 42" "コメントの記録があれば本文の記録より優先する"
+
+# ---------------------------------------------------------------------
+# 16. 書いた本文の記録を次の検査が前回の記録として読める
+#     書く形と読む形が食い違うと、毎回追記するか、ずっと追記しなくなる。
+# ---------------------------------------------------------------------
+# 起票 -> 次の検査
+setup "[${ROW}]" "[${ROW}]" ""
+: >"$WORK/created.txt"
+BODY_OUT="$WORK/created.txt" run_script
+setup "[${ROW}]" "[${ROW}]" "$(issue_json 42 "$BOT" "$WORK/created.txt")"
+check_calls_after_run "" "起票した本文の記録で、次の検査は追記しない"
+
+# 追記 -> 次の検査
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+: >"$WORK/rechecked.txt"
+BODY_OUT="$WORK/rechecked.txt" run_script
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/rechecked.txt")"
+check_calls_after_run "" "追記した記録で、次の検査は追記しない"
+
+# 条件から外れた追記 -> 次の検査
+setup "[]" "[${DOWNGRADED}]" "${ISSUE}"
+: >"$WORK/downgraded.txt"
+BODY_OUT="$WORK/downgraded.txt" run_script
+setup "[]" "[${DOWNGRADED}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/downgraded.txt")"
+check_calls_after_run "" "条件から外れた状態が同じなら追記しない"
+
+# 条件から外れた状態の記録のまま、ふたたび条件に当たったら追記する
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/downgraded.txt")"
+check_calls_after_run "issue comment 42" "条件に当たるかが変われば追記する"
+
+# 条件に当たる状態の記録のまま、条件から外れたら追記する
+setup "[]" "[${DOWNGRADED}]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/rechecked.txt")"
+check_calls_after_run "issue comment 42" "条件から外れれば追記する"
+
+# 記録が同じでも、検出されなくなれば追記して閉じる
+setup "[]" "[]" "${ISSUE}"
+set_comments "$(comment_json "$BOT" "$WORK/rechecked.txt")"
+check_calls_after_run "issue comment 42
+issue close 42" "記録があっても、検出されなくなれば追記して閉じる"
+
+# ---------------------------------------------------------------------
+# 17. コメントを取得できなければ赤
+#     追記するかを決められないまま進めると、変化を見落とす。
+# ---------------------------------------------------------------------
+setup "[${ROW}]" "[${ROW}]" "${ISSUE}"
+GH_FAIL_COMMENTS=1 check 1 "コメントの取得に失敗したら赤"
+check_calls "" "コメントの取得に失敗したら追記しない"
+
+setup "[]" "[${DOWNGRADED}]" "${ISSUE}"
+GH_FAIL_COMMENTS=1 check 1 "条件から外れた側でもコメントの取得に失敗したら赤"
 
 # ---------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then
