@@ -39,7 +39,7 @@
   - _要件: 5.1, 5.2, 5.3_
   - _依存: 1_
 
-- [ ] 3. 審査役の定義と CLAUDE.md の決まりを、系統で書く形にする (並行可)
+- [x] 3. 審査役の定義と CLAUDE.md の決まりを、系統で書く形にする (並行可)
 
   Claude は、設計の「spec-reviewer.md」と「CLAUDE.md」の部品の節のとおりに、審査役の定義の `model` を `fable` にし、CLAUDE.md の審査役のモデルの決まりの文と、所有者が版を付けて審査役のモデルを伝えたときの扱いの文と、会話の要約に残すことの決まりの文を直す。Claude は、`.claude/hooks/tests/test-restore-after-compact.sh` の期待の値とテストの名前を直した版を、本来の場所ではなく、`.claude/.state/spec-reviewer-latest-model/place/.claude/hooks/tests/` の下に作る。直すのは、審査役の定義の `model` の期待の値と、要約の決まりの言葉と、`model` を確かめる場合のテストの名前の3か所である。このテストは審査役の定義と CLAUDE.md の両方を確かめるので、Claude は、2つの部品を1つのタスクで直す。審査役の定義を `fable` にしたあとは、作業フォルダの `test-restore-after-compact.sh` は古い期待の値のままなので、所有者が `place/` の下のファイルを写すまで失敗する。そのため、Claude は、このテストを、所有者が写すまでは写しでだけ流す。
   - 完了の確かめ方: 次の3つが起きる
