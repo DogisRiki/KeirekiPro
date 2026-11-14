@@ -22,19 +22,23 @@ export const useCreateCertification = (resumeId: string, options?: { onResumeNot
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { tempId: string; payload: CreateCertificationPayload }
+        { tempId: string; payload: CreateCertificationPayload },
+        { snapshot?: Resume["certifications"][number] }
     >({
         mutationFn: ({ payload }) => createCertification(resumeId, payload),
         onMutate: ({ tempId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(tempId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.certifications.find((e) => e.id === tempId) };
         },
-        onSuccess: (response, { tempId }) => {
+        onSuccess: (response, { tempId }, onMutateResult) => {
             const { certifications: serverCertifications, updatedAt } = response.data;
             const {
                 resume,
                 dirtyEntryIds,
                 updateResumeFromServer,
+                addDirtyEntryId,
                 removeDirtyEntryId,
                 setActiveEntryId,
                 clearEntryErrors,
@@ -45,10 +49,22 @@ export const useCreateCertification = (resumeId: string, options?: { onResumeNot
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があれば、そのエントリーを控える(保存を始めたあとにエントリーが置き換わったか)
+            const tempEntry = resume.certifications.find((e) => e.id === tempId);
+            const editedEntry = tempEntry !== onMutateResult?.snapshot ? tempEntry : undefined;
+
+            // サーバーから返された新規エントリーを特定
+            const createdCertification = serverCertifications.find(
+                (sc) => !resume.certifications.some((lc) => lc.id === sc.id && lc.id !== tempId),
+            );
+
             // 保存した一時ID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
                 resume.certifications.filter((c) => c.id !== tempId && dirtyEntryIds.has(c.id)).map((c) => [c.id, c]),
             );
+            // 保存中に打った文字は、作成されたエントリーのIDで残す
+            if (editedEntry && createdCertification)
+                localDirtyMap.set(createdCertification.id, { ...editedEntry, id: createdCertification.id });
 
             // サーバーに存在しないローカル専用エントリー（未保存の新規エントリー）を抽出
             const serverIds = new Set(serverCertifications.map((c) => c.id));
@@ -63,11 +79,6 @@ export const useCreateCertification = (resumeId: string, options?: { onResumeNot
             // ローカル専用エントリーを先頭に追加してマージ完了
             const finalCertifications = [...localOnlyEntries, ...mergedCertifications];
 
-            // サーバーから返された新規エントリーを特定
-            const createdCertification = serverCertifications.find(
-                (sc) => !resume.certifications.some((lc) => lc.id === sc.id && lc.id !== tempId),
-            );
-
             // ストアを更新
             updateResumeFromServer({ certifications: finalCertifications, updatedAt });
 
@@ -78,6 +89,8 @@ export const useCreateCertification = (resumeId: string, options?: { onResumeNot
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(tempId);
+            // 保存中に打った文字があれば、作成されたエントリーを未保存のまま残す
+            if (editedEntry && createdCertification) addDirtyEntryId(createdCertification.id);
             setNotification("資格を作成しました。", "success");
         },
         onError: (error, { tempId }) => {

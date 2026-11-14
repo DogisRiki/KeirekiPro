@@ -22,19 +22,23 @@ export const useCreateSelfPromotion = (resumeId: string, options?: { onResumeNot
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { tempId: string; payload: CreateSelfPromotionPayload }
+        { tempId: string; payload: CreateSelfPromotionPayload },
+        { snapshot?: Resume["selfPromotions"][number] }
     >({
         mutationFn: ({ payload }) => createSelfPromotion(resumeId, payload),
         onMutate: ({ tempId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(tempId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.selfPromotions.find((e) => e.id === tempId) };
         },
-        onSuccess: (response, { tempId }) => {
+        onSuccess: (response, { tempId }, onMutateResult) => {
             const { selfPromotions: serverSelfPromotions, updatedAt } = response.data;
             const {
                 resume,
                 dirtyEntryIds,
                 updateResumeFromServer,
+                addDirtyEntryId,
                 removeDirtyEntryId,
                 setActiveEntryId,
                 clearEntryErrors,
@@ -45,10 +49,22 @@ export const useCreateSelfPromotion = (resumeId: string, options?: { onResumeNot
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があれば、そのエントリーを控える(保存を始めたあとにエントリーが置き換わったか)
+            const tempEntry = resume.selfPromotions.find((e) => e.id === tempId);
+            const editedEntry = tempEntry !== onMutateResult?.snapshot ? tempEntry : undefined;
+
+            // サーバーから返された新規エントリーを特定
+            const createdSelfPromotion = serverSelfPromotions.find(
+                (ss) => !resume.selfPromotions.some((ls) => ls.id === ss.id && ls.id !== tempId),
+            );
+
             // 保存した一時ID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
                 resume.selfPromotions.filter((s) => s.id !== tempId && dirtyEntryIds.has(s.id)).map((s) => [s.id, s]),
             );
+            // 保存中に打った文字は、作成されたエントリーのIDで残す
+            if (editedEntry && createdSelfPromotion)
+                localDirtyMap.set(createdSelfPromotion.id, { ...editedEntry, id: createdSelfPromotion.id });
 
             // サーバーに存在しないローカル専用エントリー（未保存の新規エントリー）を抽出
             const serverIds = new Set(serverSelfPromotions.map((s) => s.id));
@@ -63,11 +79,6 @@ export const useCreateSelfPromotion = (resumeId: string, options?: { onResumeNot
             // ローカル専用エントリーを先頭に追加してマージ完了
             const finalSelfPromotions = [...localOnlyEntries, ...mergedSelfPromotions];
 
-            // サーバーから返された新規エントリーを特定
-            const createdSelfPromotion = serverSelfPromotions.find(
-                (ss) => !resume.selfPromotions.some((ls) => ls.id === ss.id && ls.id !== tempId),
-            );
-
             // ストアを更新
             updateResumeFromServer({ selfPromotions: finalSelfPromotions, updatedAt });
 
@@ -78,6 +89,8 @@ export const useCreateSelfPromotion = (resumeId: string, options?: { onResumeNot
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(tempId);
+            // 保存中に打った文字があれば、作成されたエントリーを未保存のまま残す
+            if (editedEntry && createdSelfPromotion) addDirtyEntryId(createdSelfPromotion.id);
             setNotification("自己PRを作成しました。", "success");
         },
         onError: (error, { tempId }) => {

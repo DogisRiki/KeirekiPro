@@ -5,7 +5,7 @@ vi.mock("@/lib", () => ({
 }));
 
 import type { Resume } from "@/features/resume";
-import { TEMP_ID_PREFIX, useCreateSnsPlatform, useResumeStore } from "@/features/resume";
+import { buildPayloadForEntry, TEMP_ID_PREFIX, useCreateSnsPlatform, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
@@ -172,5 +172,51 @@ describe("useCreateSnsPlatform", () => {
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
         expect(useResumeStore.getState().removeDirtyEntryId).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
+    });
+    it("保存中に打った文字は、保存が終わったあとも作成されたエントリーの欄に残り、未保存の変更として扱われること", async () => {
+        const entry = localResume.snsPlatforms.find((e) => e.id === tempId)!;
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("snsPlatform");
+        useResumeStore.getState().setActiveEntryId(tempId);
+        useResumeStore.getState().addDirtyEntryId(tempId);
+
+        let resolveSave: (value: unknown) => void = () => undefined;
+        vi.mocked(protectedApiClient.post).mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveSave = resolve;
+            }),
+        );
+
+        const { result } = renderHook(() => useCreateSnsPlatform("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({ tempId, payload: buildPayloadForEntry("snsPlatform", entry) });
+        });
+        await waitFor(() => expect(protectedApiClient.post).toHaveBeenCalled());
+
+        // 保存が終わる前に文字を打つ
+        act(() => {
+            useResumeStore.getState().updateEntry("snsPlatforms", tempId, { name: "保存中に打った文字" });
+        });
+        await act(async () => {
+            resolveSave({
+                status: 201,
+                data: {
+                    ...localResume,
+                    updatedAt: "2024-02-10T00:00:00.000Z",
+                    snsPlatforms: [{ ...entry, id: "sns-platform-new" }],
+                },
+            });
+        });
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        const { resume, dirtyEntryIds, activeEntryId, isDirty } = useResumeStore.getState();
+        expect(resume?.snsPlatforms.find((e) => e.id === "sns-platform-new")?.name).toBe("保存中に打った文字");
+        expect(resume?.snsPlatforms.some((e) => e.id === tempId)).toBe(false);
+        expect(resume?.updatedAt).toBe("2024-02-10T00:00:00.000Z");
+        expect(activeEntryId).toBe("sns-platform-new");
+        expect(dirtyEntryIds.has("sns-platform-new")).toBe(true);
+        expect(dirtyEntryIds.has(tempId)).toBe(false);
+        expect(isDirty).toBe(true);
     });
 });
