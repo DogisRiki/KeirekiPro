@@ -1,0 +1,53 @@
+{
+  "cases": [
+    {
+      "name": "username が URL の問い合わせと本文の両方にある",
+      "query": "username=%E5%95%8F%E3%81%84%E5%90%88%E3%82%8F%E3%81%9B",
+      "parts": [
+        {
+          "header": "Content-Disposition: form-data; name=\"username\"",
+          "body": "本文"
+        }
+      ],
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000003\",\"email\":\"cap-check@example.com\",\"username\":\"本文,問い合わせ\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "本文,問い合わせ",
+      "storedObjects": []
+    },
+    {
+      "name": "profileImage をファイルの名前の無い文字の部分で送る",
+      "query": "",
+      "parts": [
+        {
+          "header": "Content-Disposition: form-data; name=\"profileImage\"",
+          "body": "abc"
+        }
+      ],
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000003\",\"email\":\"cap-check@example.com\",\"username\":\"本文,問い合わせ\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "本文,問い合わせ",
+      "storedObjects": []
+    },
+    {
+      "name": "Content-Type の無い画像の部分を送る",
+      "query": "",
+      "parts": [
+        {
+          "header": "Content-Disposition: form-data; name=\"profileImage\"; filename=\"a.png\"",
+          "bodyFile": "../image.png"
+        }
+      ],
+      "answer": {
+        "status": 500,
+        "body": "{\"message\":\"予期せぬエラーが発生しました。\",\"errors\":{}}"
+      },
+      "storedUsername": null,
+      "storedObjects": []
+    }
+  ],
+  "userId": "11111111-1111-4111-8111-000000000003"
+}

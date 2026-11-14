@@ -1,0 +1,51 @@
+# 一方の版でパスワードを変えたあとと、退会したあとに、その前のログインの状態が、もう一方の版でも使えないことを確かめる、
+# 版をまたぐ筋書き。ログインのときにログインの状態の値を取り出しておき、変える段か退会する段のあとに、その値を Cookie ヘッダで、
+# 変えた版と違う版の利用者の情報を読む要求に付けて送り、断られることを確かめる。
+name: users-cross-invalidate
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql, users/users-ops.sql]
+modes: [cross]
+steps:
+  # パスワードを変える前のログインの状態
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    capture: {beforeChangeAccess: 'cookie:accessToken'}
+    expect: {status: 200}
+  - name: change-password
+    request:
+      method: PATCH
+      path: /api/users/me/password
+      csrf: true
+      json: {nowPassword: Passw0rd!, newPassword: Changed1Pass}
+    expect: {status: 204}
+  - name: get-user-info-with-before-change-access
+    to: other
+    request:
+      method: GET
+      path: /api/users/me
+      headers: {Cookie: 'accessToken={beforeChangeAccess}'}
+    expect: {status: 401}
+  # 退会する前のログインの状態
+  - name: login-user2
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user2@example.com, password: Passw0rd!}
+    capture: {beforeDeleteAccess: 'cookie:accessToken'}
+    expect: {status: 200}
+  - name: delete-user2
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 204}
+  - name: get-user-info-with-before-delete-access
+    to: other
+    request:
+      method: GET
+      path: /api/users/me
+      headers: {Cookie: 'accessToken={beforeDeleteAccess}'}
+    expect: {status: 401}

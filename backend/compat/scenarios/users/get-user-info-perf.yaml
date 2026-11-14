@@ -1,0 +1,17 @@
+# 利用者の情報を見る応答の時間を測る筋書き。ログインのあとに、利用者の情報を見る段を繰り返して測る。
+name: users-get-user-info-perf
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [perf]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: get-user-info
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200}

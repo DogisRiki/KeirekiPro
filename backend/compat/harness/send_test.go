@@ -419,7 +419,7 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 		Capture: map[string]string{"code": "header:Location?code"},
 		Expect:  Expect{Status: http.StatusFound},
 	}
-	resp, err := s.SendAbsolute(t.Context(), following, oidc.URL, step)
+	resp, err := s.SendAbsolute(t.Context(), following, AbsoluteTargets{OIDCURL: oidc.URL}, step)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 	direct := step
 	direct.Name = "direct"
 	direct.Request.URL = oidc.URL + "/direct?state={state}"
-	if _, err := s.SendAbsolute(t.Context(), following, "http://127.0.0.1:1", direct); err != nil {
+	if _, err := s.SendAbsolute(t.Context(), following, AbsoluteTargets{OIDCURL: "http://127.0.0.1:1"}, direct); err != nil {
 		t.Fatal(err)
 	}
 	if r := recordedReqs(); len(r) != 2 || r[1].uri != "/direct?state=st" {
@@ -454,13 +454,13 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 	wrong := step
 	wrong.Name = "wrong"
 	wrong.Expect = Expect{Status: http.StatusOK}
-	if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, wrong); err == nil || !strings.Contains(err.Error(), "段 wrong") || !strings.Contains(err.Error(), "302") {
+	if _, err := s.SendAbsolute(t.Context(), following, AbsoluteTargets{OIDCURL: oidc.URL}, wrong); err == nil || !strings.Contains(err.Error(), "段 wrong") || !strings.Contains(err.Error(), "302") {
 		t.Errorf("状態の違う段の誤り = %v", err)
 	}
 	free := step
 	free.Name = "free"
 	free.Expect = Expect{}
-	if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, free); err != nil {
+	if _, err := s.SendAbsolute(t.Context(), following, AbsoluteTargets{OIDCURL: oidc.URL}, free); err != nil {
 		t.Errorf("expect の無い段の誤り = %v", err)
 	}
 
@@ -469,7 +469,7 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 	whole := step
 	whole.Name = "whole"
 	whole.Request.URL = "{whole}"
-	if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, whole); err != nil {
+	if _, err := s.SendAbsolute(t.Context(), following, AbsoluteTargets{OIDCURL: oidc.URL}, whole); err != nil {
 		t.Fatal(err)
 	}
 	if r := recordedReqs(); r[len(r)-1].uri != "/whole?state=st" || r[len(r)-1].host != oidcHost {
@@ -481,10 +481,10 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 	missing := step
 	missing.Name = "missing"
 	missing.Request.URL = "http://fakeoidc:8080/x?state={nothing}"
-	if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, missing); err == nil || !strings.Contains(err.Error(), "段 missing") || !strings.Contains(err.Error(), "nothing") {
+	if _, err := s.SendAbsolute(t.Context(), following, AbsoluteTargets{OIDCURL: oidc.URL}, missing); err == nil || !strings.Contains(err.Error(), "段 missing") || !strings.Contains(err.Error(), "nothing") {
 		t.Errorf("差し込めない url の誤り = %v", err)
 	}
-	if _, err := s.SendAbsolute(t.Context(), following, "://bad", step); err == nil || !strings.Contains(err.Error(), "段 authorize") {
+	if _, err := s.SendAbsolute(t.Context(), following, AbsoluteTargets{OIDCURL: "://bad"}, step); err == nil || !strings.Contains(err.Error(), "段 authorize") {
 		t.Errorf("読めない fakeoidc のアドレスの誤り = %v", err)
 	}
 	// 差し込んだあとの url が絶対の URL でないときは、送らずに誤りにする
@@ -494,11 +494,52 @@ func TestAbsoluteURL_RewritesHostNoFollow(t *testing.T) {
 		bad := step
 		bad.Name = "bad-" + name
 		bad.Request.URL = "{" + name + "}"
-		if _, err := s.SendAbsolute(t.Context(), following, oidc.URL, bad); err == nil || !strings.Contains(err.Error(), "段 bad-"+name) || !strings.Contains(err.Error(), "絶対の URL ではありません") {
+		if _, err := s.SendAbsolute(t.Context(), following, AbsoluteTargets{OIDCURL: oidc.URL}, bad); err == nil || !strings.Contains(err.Error(), "段 bad-"+name) || !strings.Contains(err.Error(), "絶対の URL ではありません") {
 			t.Errorf("差し込んだあとの url が絶対でない段 %s の誤り = %v", name, err)
 		}
 	}
 	if n := len(recordedReqs()) - before; n != 0 {
 		t.Errorf("送れない段で %d 件の要求を送りました", n)
+	}
+}
+
+func TestSend_BodyFile(t *testing.T) {
+	srv, reqs := bodyServer(t)
+	s := NewSession()
+	s.vars["key"] = "u-1.png"
+	put := Step{Name: "put-image", Request: Request{
+		Method: http.MethodPut, URL: srv.URL + "/keirekipro-storage/{key}",
+		Headers: map[string]string{"Content-Type": "image/png"}, BodyFile: "profile.png",
+	}, Expect: Expect{Status: http.StatusOK}}
+	if _, err := s.SendAbsolute(t.Context(), srv.Client(), AbsoluteTargets{OIDCURL: "http://unused.invalid"}, put); err != nil {
+		t.Fatal(err)
+	}
+	// Content-Type を書かない段は、JSON の Content-Type を付けずに送る
+	plain := Step{Name: "put-gif", Request: Request{Method: http.MethodPut, URL: srv.URL + "/b/k.gif", BodyFile: "profile.gif"}}
+	if _, err := s.SendAbsolute(t.Context(), srv.Client(), AbsoluteTargets{OIDCURL: "http://unused.invalid"}, plain); err != nil {
+		t.Fatal(err)
+	}
+	want := []recorded{
+		{Method: http.MethodPut, Path: "/keirekipro-storage/u-1.png", ContentType: "image/png", Body: string(imageFixture(t, "profile.png"))},
+		{Method: http.MethodPut, Path: "/b/k.gif", Body: string(imageFixture(t, "profile.gif"))},
+	}
+	got := reqs()
+	if len(got) != len(want) {
+		t.Fatalf("届いた要求 = %d 個, want %d", len(got), len(want))
+	}
+	for i, r := range got {
+		// 画像のバイトを報告に書かないよう、本文は大きさで示す
+		if r != want[i] {
+			t.Errorf("%d 個目の要求 = %s %s %q %d バイト, want %s %s %q %d バイト", i+1, r.Method, r.Path, r.ContentType, len(r.Body), want[i].Method, want[i].Path, want[i].ContentType, len(want[i].Body))
+		}
+	}
+
+	// 無いファイルは、送る前に段の誤りにする
+	missing := Step{Name: "bad", Request: Request{Method: http.MethodPut, URL: srv.URL + "/b/k", BodyFile: "none.png"}}
+	if _, err := s.SendAbsolute(t.Context(), srv.Client(), AbsoluteTargets{OIDCURL: "http://unused.invalid"}, missing); err == nil || !strings.Contains(err.Error(), "段 bad ") {
+		t.Errorf("無いファイルの誤り = %v, want 段 bad の誤り", err)
+	}
+	if got := reqs(); len(got) != 2 {
+		t.Errorf("誤りの段の要求が届きました: %d 個", len(got))
 	}
 }
