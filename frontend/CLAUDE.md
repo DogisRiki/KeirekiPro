@@ -47,8 +47,9 @@ frontend配下を変更するとき常に適用する。ディレクトリ間の
 - 手元の vitest が時間切れや `Worker exited unexpectedly` で落ちたら、まずメモリ不足を疑う(`compose.yaml` の `VITEST_MAX_WORKERS` で並列の数を抑えている)
 - frontend のコンテナには `ps` と `kill` のコマンドが無い。プロセスを止めるときは `sh -c 'kill <pid>'` でシェルの組み込みを使う
 - 手元の frontend のコンテナで `pnpm exec stryker run` を動かすと、`ps` が無いため `spawn ps ENOENT` で落ち、`frontend/.stryker-tmp/` が残る(Git の無視の対象に入っていない)。
-  変異テストで効果を測るときは、ブランチで「Mutation Report」のワークフローを手動で実行する。新しいテストが効くかは、対象のコードを1か所ずつ壊して vitest を回し、`git checkout -- <file>` で戻して確かめる。
+  変異テストで効果を測るときは、ブランチで「Mutation Report」のワークフローを手動で実行する。新しいテストが効くかは、`.kiro/steering/tech.md` の「テストの完全性」のとおり、作業フォルダの外の写しのコードを1か所ずつ壊して vitest を回して確かめる。作業フォルダのファイルは壊さない。
   Git Bash の perl で壊すときは、改行を `\x5cn` で置き換える(`s/\\n/\n/` は効かなかった)
+  作業フォルダのファイルを `git checkout -- <file>` で戻さない。そのファイルのまだコミットしていない変更も消えるためである
 
 ## 完了前コマンド(この順で直列実行。coverageは必須でbuildで代替不可)
 
