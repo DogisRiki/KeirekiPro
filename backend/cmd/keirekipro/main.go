@@ -30,6 +30,7 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/migrate"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/pdf"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/redisstore"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/users"
 )
 
 // version は、動かしているイメージの版である。本番のイメージは、組み立てのときに -X main.version で git のコミットを入れる。
@@ -158,6 +159,16 @@ func run(ctx context.Context, d deps) int {
 		OIDC:          cfg.OIDC,
 		MailTemplates: templates,
 	})
+	usersService := users.New(users.Deps{
+		Pool:   pool,
+		Redis:  store,
+		Auth:   authService,
+		S3:     clients.S3,
+		Bucket: cfg.App.S3Bucket,
+		// dev では、Java 版の LocalstackPresignedUrlTransformer と同じく、署名付きの URL のホストを localhost にする
+		RewritePresignHost: cfg.Env == config.EnvDev,
+		AWSEndpoint:        cfg.AWS.Endpoint,
+	})
 
 	engine, err := d.newPDF(pdf.Options{Logger: logging.Named(logger, "pdf")})
 	if err != nil {
@@ -177,6 +188,7 @@ func run(ctx context.Context, d deps) int {
 			Identify:           auth.Identify(authService),
 			Auth:               auth.RequireLogin(),
 			AuthHandlers:       authService,
+			UserHandlers:       usersService,
 			CookieSecure:       cfg.App.CookieSecure,
 			APIBaseURL:         cfg.App.APIBaseURL,
 		}),

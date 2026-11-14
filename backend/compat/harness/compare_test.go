@@ -592,3 +592,91 @@ func TestCompareMail_TokenInURL(t *testing.T) {
 		}
 	})
 }
+
+func TestCompareObjects_ContentTypeAndMetadata(t *testing.T) {
+	png := []byte("\x89PNG\r\n\x1a\nimage")
+	object := func(user, contentType string, metadata map[string]string, body []byte) fakeaws.Object {
+		return fakeaws.Object{Bucket: "keirekipro-storage", Key: user + "/a.png", ContentType: contentType, Metadata: metadata, Body: body}
+	}
+	meta := func(contentType string) map[string]string { return map[string]string{"content-type": contentType} }
+	compare := func(java, goObject []fakeaws.Object) []Diff {
+		c := NewComparer("筋書き")
+		c.CompareS3(step1, java, goObject)
+		return c.Diffs()
+	}
+	const key = "keirekipro-storage/<uuid:1>/a.png"
+	pngText := describeBytes(png)
+
+	t.Run("置き場所の名前とバイトの並びと Content-Type とメタデータが同じなら、違いは無い", func(t *testing.T) {
+		assertNoDiff(t, compare(
+			[]fakeaws.Object{object(javaUser, "image/png", meta("image/png"), png)},
+			[]fakeaws.Object{object(goUser, "image/png", meta("image/png"), png)}))
+	})
+	t.Run("メタデータが無いことと、空のメタデータは同じとみなす", func(t *testing.T) {
+		assertNoDiff(t, compare(
+			[]fakeaws.Object{object(javaUser, "image/png", nil, png)},
+			[]fakeaws.Object{object(goUser, "image/png", map[string]string{}, png)}))
+	})
+
+	cases := []struct {
+		name        string
+		java, goVer []fakeaws.Object
+		wantJava    string
+		wantGo      string
+	}{
+		{
+			name:     "Content-Type だけが違う",
+			java:     []fakeaws.Object{object(javaUser, "image/png", meta("image/png"), png)},
+			goVer:    []fakeaws.Object{object(goUser, "image/png;charset=UTF-8", meta("image/png"), png)},
+			wantJava: pngText + ` Content-Type "image/png" メタデータ {"content-type":"image/png"}`,
+			wantGo:   pngText + ` Content-Type "image/png;charset=UTF-8" メタデータ {"content-type":"image/png"}`,
+		},
+		{
+			name:     "メタデータの値だけが違う",
+			java:     []fakeaws.Object{object(javaUser, "image/png", meta("image/png"), png)},
+			goVer:    []fakeaws.Object{object(goUser, "image/png", meta("image/jpeg"), png)},
+			wantJava: pngText + ` Content-Type "image/png" メタデータ {"content-type":"image/png"}`,
+			wantGo:   pngText + ` Content-Type "image/png" メタデータ {"content-type":"image/jpeg"}`,
+		},
+		{
+			name:     "メタデータの項目が片方の版にだけある",
+			java:     []fakeaws.Object{object(javaUser, "image/png", nil, png)},
+			goVer:    []fakeaws.Object{object(goUser, "image/png", meta("image/png"), png)},
+			wantJava: pngText + ` Content-Type "image/png" メタデータ {}`,
+			wantGo:   pngText + ` Content-Type "image/png" メタデータ {"content-type":"image/png"}`,
+		},
+		{
+			name:     "バイトの並びだけが違う",
+			java:     []fakeaws.Object{object(javaUser, "image/png", meta("image/png"), png)},
+			goVer:    []fakeaws.Object{object(goUser, "image/png", meta("image/png"), []byte("GIF89a"))},
+			wantJava: pngText + ` Content-Type "image/png" メタデータ {"content-type":"image/png"}`,
+			wantGo:   describeBytes([]byte("GIF89a")) + ` Content-Type "image/png" メタデータ {"content-type":"image/png"}`,
+		},
+		{
+			name:     "画像が Go 版にだけある",
+			java:     nil,
+			goVer:    []fakeaws.Object{object(goUser, "", meta("image/png"), png)},
+			wantJava: absent,
+			wantGo:   pngText + ` Content-Type "" メタデータ {"content-type":"image/png"}`,
+		},
+		{
+			name:     "画像が Java 版にだけある",
+			java:     []fakeaws.Object{object(javaUser, "image/gif", nil, png)},
+			goVer:    nil,
+			wantJava: pngText + ` Content-Type "image/gif" メタデータ {}`,
+			wantGo:   absent,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			diffs := compare(tc.java, tc.goVer)
+			if len(diffs) != 1 {
+				t.Fatalf("違い = %+v, want 1 つ", diffs)
+			}
+			d := diffs[0]
+			if d.Target != TargetS3 || d.Path != key || d.Java != tc.wantJava || d.Go != tc.wantGo {
+				t.Errorf("違い = %s %s\nJava %s\nGo   %s\nwant %s %s\nJava %s\nGo   %s", d.Target, d.Path, d.Java, d.Go, TargetS3, key, tc.wantJava, tc.wantGo)
+			}
+		})
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"testing/fstest"
 
 	"github.com/aws/aws-sdk-go-v2/service/ses"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/DogisRiki/KeirekiPro/backend"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
@@ -218,5 +219,108 @@ func TestMail_WrapsSESError(t *testing.T) {
 	}
 	if len(client.got) != 1 {
 		t.Errorf("SendEmail の呼び出し = %d 回, want 1 回(再試行しない)", len(client.got))
+	}
+}
+
+// testdata/mail/user-deleted.txt と user-deleted.json と user-deleted.values.json は、開発環境の Java 版で、確認の済んだメールアドレス
+// cap-mail@example.com と名前「退会太郎」を持つ利用者を退会させ、LocalStack の SES が受けたメールを書き写したものである。
+// user-deleted.txt は、1行目が件名で、空の行を1つはさんで、3行目から最後までが本文である。
+// user-deleted.values.json は、Java 版がそのメールに差し込んだ宛先と名前である。
+
+// userDeletedJava は、Java 版が送った退会の完了のメールの件名と本文と宛先と送り主と、差し込んだ名前である。
+type userDeletedJava struct {
+	subject, body, to, from, username string
+}
+
+func readUserDeletedJava(t *testing.T) userDeletedJava {
+	t.Helper()
+	b, err := fs.ReadFile(os.DirFS("testdata/mail"), "user-deleted.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject, body, ok := strings.Cut(string(b), "\n\n")
+	if !ok {
+		t.Fatal("user-deleted.txt に件名と本文の区切りの空の行が無い")
+	}
+	var rec struct {
+		Messages []struct {
+			Source      string
+			Subject     string
+			Destination struct{ ToAddresses []string }
+			Body        struct {
+				TextPart string  `json:"text_part"`
+				HTMLPart *string `json:"html_part"`
+			}
+		} `json:"messages"`
+	}
+	readMailJSON(t, "user-deleted.json", &rec)
+	if len(rec.Messages) != 1 || len(rec.Messages[0].Destination.ToAddresses) != 1 {
+		t.Fatalf("user-deleted.json のメール = %+v, want 宛先が1つのメール1通", rec.Messages)
+	}
+	var values map[string]string
+	readMailJSON(t, "user-deleted.values.json", &values)
+	m := rec.Messages[0]
+	if m.Destination.ToAddresses[0] != values["to"] || values["username"] == "" {
+		t.Fatalf("user-deleted.values.json = %v, want 宛先 %q と名前", values, m.Destination.ToAddresses[0])
+	}
+	if m.Subject != subject || m.Body.TextPart != body || m.Body.HTMLPart != nil {
+		t.Fatal("user-deleted.txt と user-deleted.json の件名か本文が食い違う")
+	}
+	return userDeletedJava{subject: subject, body: body, to: values["to"], from: m.Source, username: values["username"]}
+}
+
+func TestMail_UserDeletedMatchesJava(t *testing.T) {
+	templates, err := backend.MailTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := readUserDeletedJava(t)
+	client := &fakeSES{}
+	s := New(Deps{SES: client, App: javaDevApp(t), MailTemplates: templates})
+	if err := s.SendUserDeletedMail(context.Background(), want.to, pgtype.Text{String: want.username, Valid: true}); err != nil {
+		t.Fatalf("SendUserDeletedMail: %v", err)
+	}
+	if len(client.got) != 1 {
+		t.Fatalf("SendEmail の呼び出し = %d 回, want 1 回", len(client.got))
+	}
+	in := client.got[0]
+	if got := deref(in.Source); got != want.from {
+		t.Errorf("送り主 = %q, want %q", got, want.from)
+	}
+	if in.Destination == nil || strings.Join(in.Destination.ToAddresses, ",") != want.to ||
+		len(in.Destination.CcAddresses) != 0 || len(in.Destination.BccAddresses) != 0 {
+		t.Errorf("宛先 = %+v, want To %q だけ", in.Destination, want.to)
+	}
+	msg := in.Message
+	if msg == nil || msg.Subject == nil || msg.Body == nil || msg.Body.Text == nil {
+		t.Fatalf("Message = %+v, want 件名と文字の本文がある", msg)
+	}
+	if got := deref(msg.Subject.Data); got != want.subject {
+		t.Errorf("件名 = %q, want %q", got, want.subject)
+	}
+	if got := deref(msg.Body.Text.Data); got != want.body {
+		t.Errorf("本文 = %q\nwant %q", got, want.body)
+	}
+	if deref(msg.Subject.Charset) != "UTF-8" || deref(msg.Body.Text.Charset) != "UTF-8" {
+		t.Errorf("文字の符号 = 件名 %q 本文 %q, want UTF-8", deref(msg.Subject.Charset), deref(msg.Body.Text.Charset))
+	}
+	if msg.Body.Html != nil {
+		t.Errorf("HTML の本文 = %+v, want 無し", msg.Body.Html)
+	}
+}
+
+func TestMail_UserDeletedNoUsername(t *testing.T) {
+	templates, err := backend.MailTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &fakeSES{}
+	s := New(Deps{SES: client, App: javaDevApp(t), MailTemplates: templates})
+	err = s.SendUserDeletedMail(context.Background(), "a@example.com", pgtype.Text{})
+	if err == nil {
+		t.Fatal("SendUserDeletedMail(名前が無い) = nil, want 誤り")
+	}
+	if len(client.got) != 0 {
+		t.Errorf("SendEmail の呼び出し = %d 回, want 呼ばれない", len(client.got))
 	}
 }

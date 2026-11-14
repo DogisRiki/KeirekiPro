@@ -49,6 +49,7 @@ linters:
           # 機能のパッケージどうしの依存は、まとまりの spec で、ここに許可を足したものだけを許す
           allow:
             - github.com/DogisRiki/KeirekiPro/backend/internal/platform
+            - github.com/DogisRiki/KeirekiPro/backend/internal/auth
           deny:
             - pkg: github.com/DogisRiki/KeirekiPro/backend/internal
               desc: 機能のパッケージは、internal/httpapi と、許可していないほかの機能のパッケージを読まない
