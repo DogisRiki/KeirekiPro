@@ -1,0 +1,120 @@
+# 退会の筋書き。画像のある利用者(user1)、2つの連携を持つ利用者(two-providers)、名前の無い利用者(noname)が退会を求め、
+# 退会のあとのデータベースと画像の置き場所と、両方の版が送った退会の完了のメールを比べる。
+# 名前の無い利用者は、退会の完了のメールを作れないので、退会に失敗する。
+# user1 は、PNG の画像を置いてから GIF の画像に替え、拡張子の違う2つの画像を置き場所に残してから退会する。
+# two-providers の画像は、4つの拡張子に当たらない名前(.webp)で、筋書きの始めに偽の AWS に置く。
+#
+# 退会した利用者の要求は2つの場合を比べる。
+#   - user1 は、ログインしてから一度もパスワードを変えずに退会する。ログインのときのログインの状態の値を、
+#     退会のあとに送り、401 と「不正なアクセスです。」と2つの Cookie を消す Set-Cookie が返ることを比べる
+#   - user2 は、パスワードを変えてからログインし直して退会する。ログインし直したときのログインの状態の値を、
+#     退会のあとに送り、ログインの状態の検査で断られることを比べる
+name: users-delete-user
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql, users/users-ops.sql]
+modes: [compare]
+steps:
+  # two-providers の画像を偽の AWS に置く
+  - name: put-two-providers-image
+    request:
+      method: PUT
+      url: http://localhost:4566/keirekipro-storage//profile/image/00000000-0000-4000-8000-000000000025.webp
+      headers: {Content-Type: image/webp}
+      body_file: profile.png
+    expect: {status: 200}
+  # 画像のある利用者が、パスワードを変えずに退会する
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    capture: {user1Access: 'cookie:accessToken'}
+    expect: {status: 200}
+  - name: put-image-png-user1
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.png, filename: profile.png, content_type: image/png}
+    expect: {status: 200}
+  - name: put-image-gif-user1
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.gif, filename: profile.gif, content_type: image/gif}
+    expect: {status: 200}
+  - name: delete-user1
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 204}
+  - name: get-user-info-after-delete-user1
+    request:
+      method: GET
+      path: /api/users/me
+      headers: {Cookie: 'accessToken={user1Access}'}
+    expect: {status: 401}
+  # パスワードを変えてからログインし直して退会する
+  - name: login-user2
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user2@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: change-password-user2
+    request:
+      method: PATCH
+      path: /api/users/me/password
+      csrf: true
+      json: {nowPassword: Passw0rd!, newPassword: Changed1Pass}
+    expect: {status: 204}
+  - name: login-again-user2
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user2@example.com, password: Changed1Pass}
+    capture: {user2Access: 'cookie:accessToken'}
+    expect: {status: 200}
+  - name: delete-user2
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 204}
+  - name: get-user-info-after-delete-user2
+    request:
+      method: GET
+      path: /api/users/me
+      headers: {Cookie: 'accessToken={user2Access}'}
+    expect: {status: 401}
+  # 2つの連携と、4つの拡張子に当たらない名前の画像を持つ利用者が退会する
+  - name: login-two-providers
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: two-providers@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: delete-two-providers
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 204}
+  # 名前の無い利用者が退会する。退会の完了のメールの本文に名前を入れられないので、どちらの版も 500 で答え、
+  # データベースの変更を戻す。画像とログインを続けるための値は、メールを作る前に消しているので、戻らない
+  - name: login-noname
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: noname@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: delete-noname
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 500}

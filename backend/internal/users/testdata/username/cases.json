@@ -1,0 +1,569 @@
+{
+  "cases": [
+    {
+      "name": "普通の名前",
+      "input": "山田太郎",
+      "inputHex": "e5b1b1e794b0e5a4aae9838e",
+      "inputUtf16Len": 4,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田太郎\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田太郎",
+      "storedCodePoints": [
+        "U+5C71",
+        "U+7530",
+        "U+592A",
+        "U+90CE"
+      ]
+    },
+    {
+      "name": "空",
+      "input": "",
+      "inputHex": "",
+      "inputUtf16Len": 0,
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"username\":[\"ユーザー名は必ず指定してください。\"]}}"
+      },
+      "storedUsername": null
+    },
+    {
+      "name": "半角の空白だけ",
+      "input": "   ",
+      "inputHex": "202020",
+      "inputUtf16Len": 3,
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"username\":[\"ユーザー名は必ず指定してください。\"]}}"
+      },
+      "storedUsername": null
+    },
+    {
+      "name": "前後に半角の空白",
+      "input": "  山田  ",
+      "inputHex": "2020e5b1b1e794b02020",
+      "inputUtf16Len": 6,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田",
+      "storedCodePoints": [
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前にタブ、後ろに改行",
+      "input": "\t山田\n",
+      "inputHex": "09e5b1b1e794b00a",
+      "inputUtf16Len": 4,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田",
+      "storedCodePoints": [
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前後に全角の空白",
+      "input": "　山田　",
+      "inputHex": "e38080e5b1b1e794b0e38080",
+      "inputUtf16Len": 4,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田",
+      "storedCodePoints": [
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "全角の空白だけ",
+      "input": "　",
+      "inputHex": "e38080",
+      "inputUtf16Len": 1,
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"username\":[\"ユーザー名は必ず指定してください。\"]}}"
+      },
+      "storedUsername": null
+    },
+    {
+      "name": "前後にノーブレークスペース",
+      "input": " 山田 ",
+      "inputHex": "c2a0e5b1b1e794b0c2a0",
+      "inputUtf16Len": 4,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\" 山田 \",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": " 山田 ",
+      "storedCodePoints": [
+        "U+00A0",
+        "U+5C71",
+        "U+7530",
+        "U+00A0"
+      ]
+    },
+    {
+      "name": "前に数字幅の空白",
+      "input": " 山田",
+      "inputHex": "e28087e5b1b1e794b0",
+      "inputUtf16Len": 3,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\" 山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": " 山田",
+      "storedCodePoints": [
+        "U+2007",
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前にゼロ幅の空白",
+      "input": "​山田",
+      "inputHex": "e2808be5b1b1e794b0",
+      "inputUtf16Len": 3,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"​山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "​山田",
+      "storedCodePoints": [
+        "U+200B",
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前に NEL",
+      "input": "山田",
+      "inputHex": "c285e5b1b1e794b0",
+      "inputUtf16Len": 3,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田",
+      "storedCodePoints": [
+        "U+0085",
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前後に行と段落の区切り",
+      "input": "\u2028山田\u2029",
+      "inputHex": "e280a8e5b1b1e794b0e280a9",
+      "inputUtf16Len": 4,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田",
+      "storedCodePoints": [
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前後に情報の区切りの制御文字",
+      "input": "\u001c山田\u001f",
+      "inputHex": "1ce5b1b1e794b01f",
+      "inputUtf16Len": 4,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田",
+      "storedCodePoints": [
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前後に数式の空白とオガムの空白",
+      "input": " 山田 ",
+      "inputHex": "e2819fe5b1b1e794b0e19a80",
+      "inputUtf16Len": 4,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田",
+      "storedCodePoints": [
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前にモンゴル語の母音の区切り",
+      "input": "᠎山田",
+      "inputHex": "e1a08ee5b1b1e794b0",
+      "inputUtf16Len": 3,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"᠎山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "᠎山田",
+      "storedCodePoints": [
+        "U+180E",
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "前に BOM",
+      "input": "﻿山田",
+      "inputHex": "efbbbfe5b1b1e794b0",
+      "inputUtf16Len": 3,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"﻿山田\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "﻿山田",
+      "storedCodePoints": [
+        "U+FEFF",
+        "U+5C71",
+        "U+7530"
+      ]
+    },
+    {
+      "name": "間に空白",
+      "input": "山田 太郎",
+      "inputHex": "e5b1b1e794b020e5a4aae9838e",
+      "inputUtf16Len": 5,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"山田 太郎\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "山田 太郎",
+      "storedCodePoints": [
+        "U+5C71",
+        "U+7530",
+        "U+0020",
+        "U+592A",
+        "U+90CE"
+      ]
+    },
+    {
+      "name": "ASCII の50文字",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inputHex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "inputUtf16Len": 50,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "storedCodePoints": [
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061"
+      ]
+    },
+    {
+      "name": "ASCII の51文字",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inputHex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "inputUtf16Len": 51,
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"username\":[\"ユーザー名は50文字以内で入力してください。\"]}}"
+      },
+      "storedUsername": null
+    },
+    {
+      "name": "ひらがなの50文字",
+      "input": "ああああああああああああああああああああああああああああああああああああああああああああああああああ",
+      "inputHex": "e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182",
+      "inputUtf16Len": 50,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"ああああああああああああああああああああああああああああああああああああああああああああああああああ\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "ああああああああああああああああああああああああああああああああああああああああああああああああああ",
+      "storedCodePoints": [
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042",
+        "U+3042"
+      ]
+    },
+    {
+      "name": "ひらがなの51文字",
+      "input": "あああああああああああああああああああああああああああああああああああああああああああああああああああ",
+      "inputHex": "e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182e38182",
+      "inputUtf16Len": 51,
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"username\":[\"ユーザー名は50文字以内で入力してください。\"]}}"
+      },
+      "storedUsername": null
+    },
+    {
+      "name": "絵文字の25字",
+      "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "inputHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "inputUtf16Len": 50,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "storedCodePoints": [
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600",
+        "U+1F600"
+      ]
+    },
+    {
+      "name": "絵文字の25字と1文字",
+      "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀a",
+      "inputHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f988061",
+      "inputUtf16Len": 51,
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"username\":[\"ユーザー名は50文字以内で入力してください。\"]}}"
+      },
+      "storedUsername": null
+    },
+    {
+      "name": "前後の空白を除くと50文字",
+      "input": "  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ",
+      "inputHex": "202061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161612020",
+      "inputUtf16Len": 54,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "storedCodePoints": [
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061",
+        "U+0061"
+      ]
+    },
+    {
+      "name": "NUL を含む",
+      "input": "a\u0000b",
+      "inputHex": "610062",
+      "inputUtf16Len": 3,
+      "answer": {
+        "status": 500,
+        "body": "{\"message\":\"予期せぬエラーが発生しました。\",\"errors\":{}}"
+      },
+      "storedUsername": null
+    },
+    {
+      "name": "山かっこを含む",
+      "input": "\u003cscript\u003e",
+      "inputHex": "3c7363726970743e",
+      "inputUtf16Len": 8,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"\u003cscript\u003e\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "\u003cscript\u003e",
+      "storedCodePoints": [
+        "U+003C",
+        "U+0073",
+        "U+0063",
+        "U+0072",
+        "U+0069",
+        "U+0070",
+        "U+0074",
+        "U+003E"
+      ]
+    },
+    {
+      "name": "全角の英字",
+      "input": "Ｔｅｓｔ",
+      "inputHex": "efbcb4efbd85efbd93efbd94",
+      "inputUtf16Len": 4,
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"Ｔｅｓｔ\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "Ｔｅｓｔ",
+      "storedCodePoints": [
+        "U+FF34",
+        "U+FF45",
+        "U+FF53",
+        "U+FF54"
+      ]
+    }
+  ],
+  "userId": "11111111-1111-4111-8111-000000000002"
+}

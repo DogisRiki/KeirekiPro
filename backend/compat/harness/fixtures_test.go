@@ -28,8 +28,8 @@ import (
 const fixturePassword = "Passw0rd!"
 
 // unverifiedFixtureUsers は、メールアドレスの確認が済んでいないことを確かめる筋書きのために、
-// 確認を済ませずに置く利用者である(users/auth-users.sql)。ほかの利用者は確認を済ませている。
-var unverifiedFixtureUsers = map[string]bool{"unverified@example.com": true}
+// 確認を済ませずに置く利用者である(users/auth-users.sql と users/users-ops.sql)。メールアドレスを持つほかの利用者は確認を済ませている。
+var unverifiedFixtureUsers = map[string]bool{"unverified@example.com": true, "unverified-linked@example.com": true}
 
 // 経歴書の4種類の名前。resumes/ の SQL のファイルが、この名前の経歴書を作る。
 const (
@@ -288,6 +288,10 @@ func readExportSettings(t *testing.T, name string) exportSettings {
 // 筋書きは、画面が送れる PNG と JPEG と GIF だけを送る。
 var imageFormats = map[string]string{".png": "png", ".jpg": "jpeg", ".gif": "gif"}
 
+// notImageFixtures は、名前だけが画像の拡張子で、中身が画像でないファイルである。
+// 筋書きは、このファイルを送り、画像として読めない画像を断ることを確かめる。
+var notImageFixtures = map[string]bool{"images/not-image.png": true}
+
 // 初めのデータ: fixtures/ のすべてのファイルを読み込めることを確かめる。
 // SQL のファイルは表の形を適用したデータベースに読み込み、Java 版の経歴書の決まりと、筋書きの決まりに合うかを確かめる。
 func TestFixtures_AllLoadable(t *testing.T) {
@@ -316,6 +320,12 @@ func TestFixtures_AllLoadable(t *testing.T) {
 				return err
 			}
 			_, format, err := image.DecodeConfig(bytes.NewReader(data))
+			if notImageFixtures[name] {
+				if err == nil {
+					t.Errorf("%s: 画像として読めないはずですが、形 %q の画像として読めました", name, format)
+				}
+				return nil
+			}
 			if want, ok := imageFormats[ext]; !ok || err != nil || format != want {
 				t.Errorf("%s: 画像の形 %q(エラー %v)は、拡張子 %s の形 %q と合いません", name, format, err, ext, want)
 			}
@@ -331,21 +341,23 @@ func TestFixtures_AllLoadable(t *testing.T) {
 	db := fixtureDB(t)
 	ctx := t.Context()
 
-	t.Run("利用者が決まったパスワードでログインでき、USER の役割とログインの状態の世代の行を持つ", func(t *testing.T) {
-		rows, err := db.Query(ctx, `SELECT u.email, u.password, u.email_verified_at IS NOT NULL,
+	t.Run("パスワードを持つ利用者は決まったパスワードでログインでき、持たない利用者は連携でログインでき、どの利用者も USER の役割とログインの状態の世代の行を持つ", func(t *testing.T) {
+		// メールアドレスもパスワードも持たない利用者は、空の文字として読む(users/users-ops.sql の Google だけの利用者)
+		rows, err := db.Query(ctx, `SELECT u.id::text, coalesce(u.email, ''), coalesce(u.password, ''), u.email_verified_at IS NOT NULL,
 			EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id AND r.name = 'USER'),
-			EXISTS (SELECT 1 FROM user_token_versions v WHERE v.user_id = u.id)
-			FROM users u ORDER BY u.email`)
+			EXISTS (SELECT 1 FROM user_token_versions v WHERE v.user_id = u.id),
+			EXISTS (SELECT 1 FROM user_auth_providers p WHERE p.user_id = u.id)
+			FROM users u ORDER BY u.email, u.id`)
 		if err != nil {
 			t.Fatalf("利用者を読めません: %v", err)
 		}
 		type user struct {
-			email, hash               string
-			verified, member, version bool
+			id, email, hash                     string
+			verified, member, version, provider bool
 		}
 		users, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (user, error) {
 			var u user
-			err := r.Scan(&u.email, &u.hash, &u.verified, &u.member, &u.version)
+			err := r.Scan(&u.id, &u.email, &u.hash, &u.verified, &u.member, &u.version, &u.provider)
 			return u, err
 		})
 		if err != nil {
@@ -355,19 +367,29 @@ func TestFixtures_AllLoadable(t *testing.T) {
 			t.Fatalf("権限の無い操作を確かめるため、利用者が2人以上いるはずですが、%d 人です", len(users))
 		}
 		for _, u := range users {
-			if err := bcrypt.CompareHashAndPassword([]byte(u.hash), []byte(fixturePassword)); err != nil {
-				t.Errorf("%s: パスワード %s でログインできません: %v", u.email, fixturePassword, err)
+			switch {
+			case u.hash == "" && !u.provider:
+				t.Errorf("%s: パスワードも連携も無いので、ログインできません", u.id)
+			case u.hash != "":
+				if err := bcrypt.CompareHashAndPassword([]byte(u.hash), []byte(fixturePassword)); err != nil {
+					t.Errorf("%s: パスワード %s でログインできません: %v", u.email, fixturePassword, err)
+				}
 			}
-			if u.verified == unverifiedFixtureUsers[u.email] {
+			if u.email == "" {
+				// メールアドレスの無い利用者は、確かめるメールアドレスを持たない
+				if u.verified {
+					t.Errorf("%s: メールアドレスが無いのに、確認が済んでいます", u.id)
+				}
+			} else if u.verified == unverifiedFixtureUsers[u.email] {
 				t.Errorf("%s: メールアドレスの確認 = %v, want %v", u.email, u.verified, !unverifiedFixtureUsers[u.email])
 			}
 			if !u.member {
-				t.Errorf("%s: USER の役割がありません", u.email)
+				t.Errorf("%s: USER の役割がありません", u.id)
 			}
 			// 行が無い利用者では、ログアウトが世代を上げられず、古いアクセストークンが使えたままになる
 			// (Java 版は、メールアドレスの確認を終えたときに行を作る)
 			if !u.version {
-				t.Errorf("%s: ログインの状態の世代の行(user_token_versions)がありません", u.email)
+				t.Errorf("%s: ログインの状態の世代の行(user_token_versions)がありません", u.id)
 			}
 		}
 		// 確認を済ませずに置く利用者は、初めのデータに入っている

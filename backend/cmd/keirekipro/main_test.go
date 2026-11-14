@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -22,7 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/testcontainers/testcontainers-go"
@@ -32,6 +35,8 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/awsclient"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/database/sqlcgen"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/migrate"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/pdf"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/redisstore"
@@ -844,5 +849,89 @@ func TestSignalContext_SIGTERM(t *testing.T) {
 	case <-ctx.Done():
 	case <-time.After(5 * time.Second):
 		t.Fatal("SIGTERM を受けても context が終わりません")
+	}
+}
+
+// 入口が、組み立てた利用者の処理を受け口に渡すことを、ログインした利用者の情報の要求が、未実装の答えでなく、
+// データベースの行から作った利用者の情報の 200 で答えられることで確かめる。画像の署名付きの URL で、設定の画像の
+// 置き場所の名前と AWS の接続先が渡ることと、接続先のホストの名前を localhost に置き換えるのが dev だけであることも確かめる。
+func TestRun_PassesUserHandlers(t *testing.T) {
+	name := newDatabase(t)
+	pool := connect(t, name)
+	files, err := backend.Migrations()
+	if err != nil {
+		t.Fatalf("マイグレーションのファイルを読めません: %v", err)
+	}
+	if _, err := migrate.Run(t.Context(), pool, files, migrate.Apply); err != nil {
+		t.Fatalf("V1〜V7 を適用できません: %v", err)
+	}
+	userID := uuid.New()
+	image := "/" + uuid.NewString() + ".png"
+	stamp := pgtype.Timestamp{Time: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), Valid: true}
+	if err := sqlcgen.New(pool).UpsertUser(t.Context(), sqlcgen.UpsertUserParams{
+		ID:           pgtype.UUID{Bytes: userID, Valid: true},
+		Email:        pgtype.Text{String: "taro@example.com", Valid: true},
+		Username:     pgtype.Text{String: "山田太郎", Valid: true},
+		ProfileImage: pgtype.Text{String: image, Valid: true},
+		CreatedAt:    stamp,
+		UpdatedAt:    stamp,
+	}); err != nil {
+		t.Fatalf("利用者の行を足せません: %v", err)
+	}
+	secret := strings.Repeat("s", 64)
+	token, err := auth.New(auth.Deps{Pool: pool, JWT: config.JWT{Secret: secret, AccessTokenValidity: time.Hour}}).
+		IssueAccessToken(t.Context(), userID, []string{"USER"})
+	if err != nil {
+		t.Fatalf("ログインの状態の値を作れません: %v", err)
+	}
+
+	for _, env := range []string{"test", "dev"} {
+		t.Run(env, func(t *testing.T) {
+			vars := testEnv(t, name)
+			vars["KEIREKIPRO_ENV"] = env
+			vars["JWT_SECRET"] = secret
+			endpoint, err := url.Parse(vars["KEIREKIPRO_AWS_ENDPOINT"])
+			if err != nil {
+				t.Fatalf("AWS の接続先を読めません: %v", err)
+			}
+			if env == "dev" {
+				endpoint.Host = net.JoinHostPort("localhost", endpoint.Port())
+			}
+			wantImage := endpoint.String() + "/keirekipro-storage/" + image + "?X-Amz-"
+
+			h := newHarness(t, vars)
+			stop, done := h.start(t)
+			defer func() {
+				stop()
+				<-done
+			}()
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+h.addr+"/api/users/me", nil)
+			if err != nil {
+				t.Fatalf("要求を作れません: %v", err)
+			}
+			req.Header.Set("Cookie", "accessToken="+token)
+			res, err := httpClient.Do(req)
+			if err != nil {
+				t.Fatalf("利用者の情報の要求を送れません: %v", err)
+			}
+			body, _ := io.ReadAll(res.Body)
+			_ = res.Body.Close()
+			var got struct {
+				ProfileImage string `json:"profileImage"`
+			}
+			if err := json.Unmarshal(body, &got); err != nil {
+				t.Fatalf("利用者の情報 %d %s を読めません: %v", res.StatusCode, body, err)
+			}
+			if !strings.HasPrefix(got.ProfileImage, wantImage) {
+				t.Errorf("画像の URL = %s, want %s で始まる", got.ProfileImage, wantImage)
+			}
+			rest := strings.Replace(string(body), `"profileImage":"`+got.ProfileImage+`"`, `"profileImage":"URL"`, 1)
+			want := `{"id":"` + userID.String() + `","email":"taro@example.com","username":"山田太郎","hasPassword":false,` +
+				`"profileImage":"URL","twoFactorAuthEnabled":false,"authProviders":[],"roles":[],"emailVerified":false,` +
+				`"pendingEmail":null}`
+			if res.StatusCode != http.StatusOK || rest != want {
+				t.Errorf("利用者の情報 = %d %s, want 200 %s", res.StatusCode, rest, want)
+			}
+		})
 	}
 }
