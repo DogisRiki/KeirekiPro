@@ -33,8 +33,8 @@ Claude は、まとまりの状態と段階の行を、その状態にした PR 
 
 | まとまり | 子の Issue | spec | 状態 |
 |---|---|---|---|
-| 認証 | #770 | `.kiro/specs/backend-go-auth` | 作り終えた |
-| 利用者 | #771 | `.kiro/specs/backend-go-users` | 作り終えた |
+| 認証 | #770 | `.kiro/specs/backend-go-auth` | 比べる検査に通った |
+| 利用者 | #771 | `.kiro/specs/backend-go-users` | 比べる検査に通った |
 | マスタと経歴書 | #772 | 未定 | 未着手 |
 | 出力 | #773 | 未定 | 未着手 |
 | バックアップ | #774 | 未定 | 未着手 |
