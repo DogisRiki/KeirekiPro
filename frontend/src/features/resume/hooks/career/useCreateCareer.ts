@@ -35,7 +35,6 @@ export const useCreateCareer = (resumeId: string, options?: { onResumeNotFound?:
                 resume,
                 dirtyEntryIds,
                 updateResumeFromServer,
-                setDirty,
                 removeDirtyEntryId,
                 setActiveEntryId,
                 clearEntryErrors,
@@ -79,7 +78,6 @@ export const useCreateCareer = (resumeId: string, options?: { onResumeNotFound?:
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(tempId);
-            setDirty(false);
             setNotification("職歴を作成しました。", "success");
         },
         onError: (error, { tempId }) => {

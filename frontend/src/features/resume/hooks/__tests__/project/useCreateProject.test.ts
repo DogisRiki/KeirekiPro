@@ -120,7 +120,6 @@ describe("useCreateProject", () => {
         vi.mocked(protectedApiClient.post).mockReset();
         vi.spyOn(useNotificationStore.getState(), "setNotification");
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
         vi.spyOn(useResumeStore.getState(), "setEntryErrors");
@@ -241,7 +240,8 @@ describe("useCreateProject", () => {
         });
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith("project-2");
         expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(tempId);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().dirtyEntryIds.has(tempId)).toBe(false);
+        expect(useResumeStore.getState().isDirty).toBe(true); // ほかのエントリーが未保存のまま残る
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
             "プロジェクトを作成しました。",
             "success",
@@ -337,7 +337,7 @@ describe("useCreateProject", () => {
         expect(useResumeStore.getState().setEntryErrors).toHaveBeenCalledWith(tempId, mockErrorResponse.errors);
 
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
-        expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
+        expect(useResumeStore.getState().removeDirtyEntryId).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
     });
 });

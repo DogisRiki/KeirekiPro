@@ -56,7 +56,6 @@ describe("useUpdateCertification", () => {
         vi.mocked(protectedApiClient.get).mockReset();
         vi.spyOn(useNotificationStore.getState(), "setNotification");
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setEntryErrors");
         vi.spyOn(useResumeStore.getState(), "clearEntryErrors");
@@ -131,7 +130,8 @@ describe("useUpdateCertification", () => {
             updatedAt: serverResume.updatedAt,
         });
         expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(certificationId);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().dirtyEntryIds.has(certificationId)).toBe(false);
+        expect(useResumeStore.getState().isDirty).toBe(true); // ほかのエントリーが未保存のまま残る
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("資格を更新しました。", "success");
     });
 
@@ -179,7 +179,7 @@ describe("useUpdateCertification", () => {
         );
 
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
-        expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
+        expect(useResumeStore.getState().removeDirtyEntryId).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
     });
 

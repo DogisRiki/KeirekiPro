@@ -33,7 +33,7 @@ export const useUpdateCareer = (resumeId: string, options?: { onResumeNotFound?:
         },
         onSuccess: (response, { careerId }) => {
             const { careers: serverCareers, updatedAt } = response.data;
-            const { resume, dirtyEntryIds, updateResumeFromServer, setDirty, removeDirtyEntryId, clearEntryErrors } =
+            const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
 
             // 保存完了したエントリーのエラーをクリア
@@ -64,7 +64,6 @@ export const useUpdateCareer = (resumeId: string, options?: { onResumeNotFound?:
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(careerId);
-            setDirty(false);
             setNotification("職歴を更新しました。", "success");
         },
         onError: async (error, { careerId }) => {

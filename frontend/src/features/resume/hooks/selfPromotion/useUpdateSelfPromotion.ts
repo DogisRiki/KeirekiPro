@@ -33,7 +33,7 @@ export const useUpdateSelfPromotion = (resumeId: string, options?: { onResumeNot
         },
         onSuccess: (response, { selfPromotionId }) => {
             const { selfPromotions: serverSelfPromotions, updatedAt } = response.data;
-            const { resume, dirtyEntryIds, updateResumeFromServer, setDirty, removeDirtyEntryId, clearEntryErrors } =
+            const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
 
             // 保存完了したエントリーのエラーをクリア
@@ -66,7 +66,6 @@ export const useUpdateSelfPromotion = (resumeId: string, options?: { onResumeNot
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(selfPromotionId);
-            setDirty(false);
             setNotification("自己PRを更新しました。", "success");
         },
         onError: async (error, { selfPromotionId }) => {

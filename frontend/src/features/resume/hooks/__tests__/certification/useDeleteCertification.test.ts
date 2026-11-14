@@ -52,7 +52,7 @@ describe("useDeleteCertification", () => {
         vi.spyOn(useNotificationStore.getState(), "setNotification");
 
         vi.spyOn(useResumeStore.getState(), "updateResume");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
+        vi.spyOn(useResumeStore.getState(), "removeEntry");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
     });
@@ -78,12 +78,12 @@ describe("useDeleteCertification", () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
-        expect(useResumeStore.getState().updateResume).toHaveBeenCalledWith({
-            certifications: [localResume.certifications.find((c) => c.id === "cert-2")!],
-        });
-        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(certificationId);
+        expect(useResumeStore.getState().resume?.certifications).toEqual([
+            localResume.certifications.find((c) => c.id === "cert-2")!,
+        ]);
+        expect(useResumeStore.getState().removeEntry).toHaveBeenCalledWith("certifications", certificationId);
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().isDirty).toBe(false); // ほかに未保存のエントリーが無い
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("資格を削除しました。", "success");
     });
 
