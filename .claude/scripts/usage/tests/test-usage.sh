@@ -955,7 +955,7 @@ check "CLAUDE.md に mark same-failure の行と usage-report の行がある" \
 CCNAMES="stop_reason turnOrigin hook_event_name cliSessionId AskUserQuestion transcript_path agent_transcript_path
 permissionDecision toolUseResult tool_use_id duration_ms cache_read_input_tokens cache_creation_input_tokens
 input_tokens output_tokens quotaLimits SubagentHandback task_notification gitBranch end_turn run_in_background
-mcp__ccd_session__start_session prNumber resetsAt retryInMs agentType server_tool_use web_search_requests tool_result"
+mcp__ccd_session__start_session prNumber resetsAt retryInMs agentType server_tool_use web_search_requests tool_result host_synthetic"
 hits=""
 for f in "$SCRIPTS/report.pl" "$SCRIPTS/github.pl" "$SCRIPTS/usage.sh" "$SCRIPTS/usage-config.json" "$HOOK"; do
     if [ ! -f "$f" ]; then
