@@ -189,7 +189,8 @@ jobs:
           set -euo pipefail
           for t in check-dependency-cooldown cooldown-match-alerts cooldown-check-malware \
             cooldown-check-signer cooldown-check-pnpm-exclude record-cooldown-exception \
-            lib-notice-comment lib-ci-tool-releases check-ci-tool-release-age lib-gomod-index; do
+            lib-notice-comment lib-ci-tool-releases check-ci-tool-release-age lib-gomod-index \
+            lib-go-release check-go-release-age; do
             bash ".github/scripts/tests/test-${t}.sh"
           done
 
@@ -261,3 +262,15 @@ jobs:
             GITHUB_PATH="$(mktemp)" bash ".github/scripts/install-verified-${tool}.sh" "$version"
             echo "::endgroup::"
           done <"$CHANGED"
+
+      # backend の Go の版(go.mod の go と toolchain の行と、Dockerfile の FROM golang の行)の
+      # 公開からの時間の検査。72時間経っていない版を、セキュリティの修正の版でも止める。
+      # ほかの検査が失敗しても、この検査の結果を出す
+      - name: Check Go release age
+        if: ${{ !cancelled() && steps.cooldown_tests.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash .github/scripts/check-go-release-age.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
