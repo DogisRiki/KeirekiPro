@@ -13,9 +13,9 @@ backendの品質ゲートを規定の順序で直列実行し、PASS/FAILを判�
 backend には、Java 版と Go 版の2つがある。Claude は、変わったファイルを次の形で見分け、当たった版の手順を動かす。この見分けは、`ci.yaml` の見分け `backend_java` と `backend_go` と同じである。
 
 - Java 版のファイル: `backend/src/**` `backend/*.gradle` `backend/gradle/**` `backend/config/**` `backend/gradlew*` `docker/backend/**`
-- Go 版のファイル: `backend/**/*.go` `backend/go.mod` `backend/go.sum` `backend/Makefile` `backend/.golangci.yml` `backend/.testcoverage.yml` `backend/.gremlins.yaml` `backend/api/**` `backend/sqlc.yaml` `backend/assets/**` `backend/src/main/resources/db/migration/**` `docker/backend-go/**`
+- Go 版のファイル: `backend/**/*.go` `backend/go.mod` `backend/go.sum` `backend/Makefile` `backend/.golangci.yml` `backend/.testcoverage.yml` `backend/.gremlins.yaml` `backend/api/**` `backend/sqlc.yaml` `backend/db/queries/**` `backend/assets/**` `backend/src/main/resources/db/migration/**` `backend/src/main/resources/mail/**` `docker/backend-go/**`
 - Go 版のファイルの見分けは、作業フォルダに `backend/go.mod` があるときだけ当てる。`backend/go.mod` が無いときは、Go 版の品質チェックを動かせないためである
-- マイグレーションのファイル(`backend/src/main/resources/db/migration/**`)は、両方に当たる。Java 版と Go 版が同じマイグレーションのファイルを読むためである。Claude は、両方の手順を、Java 版、Go 版の順に動かす
+- マイグレーションのファイル(`backend/src/main/resources/db/migration/**`)とメールのひな形(`backend/src/main/resources/mail/**`)は、両方に当たる。Java 版と Go 版が同じマイグレーションのファイルとメールのひな形を読むためである。Claude は、両方の手順を、Java 版、Go 版の順に動かす
 - どちらにも当たらないファイル(`backend/CLAUDE.md` など)だけが変わったときは、Claude はコマンドを動かさず、その旨を報告する
 
 ## Steps(Java 版)
