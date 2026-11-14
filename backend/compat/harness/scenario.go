@@ -162,13 +162,62 @@ type Request struct {
 	CSRF bool `yaml:"csrf"`
 	// JSON は、本文に JSON で送る値である。
 	JSON any `yaml:"json"`
+	// Multipart は、版に送る段で、本文に multipart で送る部分の並びである。JSON と一緒には書けない。
+	Multipart []MultipartPart `yaml:"multipart"`
+	// BodyFile は、絶対の URL の段で、本文にそのまま入れて送る、fixtures/images の下のファイルの名前である。
+	// Headers の Content-Type と一緒に使う。JSON と一緒には書けない。
+	BodyFile string `yaml:"body_file"`
 }
 
-// Expect は、版をまたぐ動かし方で確かめる応答である。
+// MultipartPart は、multipart で送る本文の1つの部分である。Value と File のどちらか1つを書く。
+type MultipartPart struct {
+	// Name は、部分の名前である。
+	Name string `yaml:"name"`
+	// Value は、文字の値の部分で送る値である。空の文字列を送れるように、書かないときと区別する。
+	Value *string `yaml:"value"`
+	// File は、ファイルの部分で送る、fixtures/images の下のファイルの名前である。
+	File string `yaml:"file"`
+	// Filename は、ファイルの部分で送るファイルの名前である。File の部分にだけ書ける。
+	Filename string `yaml:"filename"`
+	// ContentType は、ファイルの部分の Content-Type である。File の部分にだけ書ける。
+	ContentType string `yaml:"content_type"`
+	// PadTo は、ファイルの後ろに 0 のバイトを足して、ファイルをこの大きさ(バイト)にする値である。File の部分にだけ書け、
+	// ファイルの大きさより小さくできない。
+	PadTo int `yaml:"pad_to"`
+}
+
+// Expect は、段の応答で確かめることである。
 type Expect struct {
 	Status int `yaml:"status"`
 	// Fields は、応答の本文の JSON に無ければならない項目の場所($ で始める)である。
 	Fields []string `yaml:"fields"`
+	// Values は、版に送る段で、応答の本文の JSON の場所($ で始める)と、そこにあるはずの値の組である。値には {名前} を差し込める。
+	Values map[string]any `yaml:"values"`
+	// BodyFile は、絶対の URL の段で、応答の本文とバイトの単位で同じはずの、fixtures/images の下のファイルの名前である。
+	BodyFile string `yaml:"body_file"`
+	// ContentType は、絶対の URL の段で、応答の Content-Type にあるはずの値である。
+	ContentType string `yaml:"content_type"`
+}
+
+// imagesFixtureDir は、筋書きが送る画像と、応答と比べる画像を置くフォルダ fixtures/images/ である。
+const imagesFixtureDir = "images"
+
+// imageFixtureSize は、fixtures/images の下のファイル name の大きさ(バイト)を返す。
+// fixtures/images の外を指す名前と、フォルダと、無いファイルは誤りにする。
+func imageFixtureSize(name string) (int64, error) {
+	root, err := os.OpenRoot(filepath.Join(FixturesDir(), imagesFixtureDir))
+	if err != nil {
+		return 0, fmt.Errorf("画像のフォルダ fixtures/images を開けません: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+	info, err := root.Stat(filepath.FromSlash(name))
+	if err != nil {
+		return 0, fmt.Errorf("fixtures/images にありません: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return 0, errors.New("fixtures/images のファイルではありません")
+	}
+	return info.Size(), nil
 }
 
 // HasMode は、筋書きがその動かし方で動くかを返す。
@@ -268,6 +317,11 @@ func (s Scenario) validate() error {
 				errs = append(errs, fmt.Errorf("段 %s の expect の fields: %w", step.Name, err))
 			}
 		}
+		for _, path := range sortedKeys(step.Expect.Values) {
+			if _, err := splitJSONPath(path); err != nil {
+				errs = append(errs, fmt.Errorf("段 %s の expect の values: %w", step.Name, err))
+			}
+		}
 	}
 	if s.HasMode(ModeCross) {
 		errs = append(errs, s.validateCross()...)
@@ -279,7 +333,8 @@ func (s Scenario) validate() error {
 // validateKind は、段が1つの種類の欄だけを持ち、その種類に要る欄があり、ほかの種類の欄が無いかを確かめる。
 func (s Step) validateKind() []error {
 	hasRequest := s.Request.Method != "" || s.Request.Path != "" || s.Request.URL != "" ||
-		len(s.Request.Headers) > 0 || s.Request.CSRF || s.Request.JSON != nil
+		len(s.Request.Headers) > 0 || s.Request.CSRF || s.Request.JSON != nil ||
+		len(s.Request.Multipart) > 0 || s.Request.BodyFile != ""
 	kinds := 0
 	for _, has := range []bool{hasRequest, s.Redis != nil, s.Expire != nil} {
 		if has {
@@ -295,7 +350,7 @@ func (s Step) validateKind() []error {
 		if s.Request.Method == "" || s.Request.Path == "" {
 			return []error{fmt.Errorf("段 %s の request に method と path がありません", s.Name)}
 		}
-		return nil
+		return s.validateVersionBody()
 	case StepAbsoluteURL:
 		return s.validateAbsoluteURL()
 	case StepRedis:
@@ -309,8 +364,56 @@ func (s Step) validateKind() []error {
 	}
 }
 
+// validateVersionBody は、版に送る段の本文の欄を確かめる。multipart の部分ごとの欄を確かめ、
+// 絶対の URL の段にだけ書ける request の body_file と、expect の body_file と content_type が無いかを確かめる。
+func (s Step) validateVersionBody() []error {
+	var errs []error
+	if s.Request.JSON != nil && len(s.Request.Multipart) > 0 {
+		errs = append(errs, fmt.Errorf("段 %s の request の json と multipart は一緒に書けません", s.Name))
+	}
+	for i, part := range s.Request.Multipart {
+		errs = append(errs, part.validate(s.Name, i+1)...)
+	}
+	if s.Request.BodyFile != "" {
+		errs = append(errs, fmt.Errorf("段 %s の request の body_file は、絶対の URL の段にだけ書けます", s.Name))
+	}
+	if s.Expect.BodyFile != "" {
+		errs = append(errs, fmt.Errorf("段 %s の expect の body_file は、絶対の URL の段にだけ書けます", s.Name))
+	}
+	if s.Expect.ContentType != "" {
+		errs = append(errs, fmt.Errorf("段 %s の expect の content_type は、絶対の URL の段にだけ書けます", s.Name))
+	}
+	return errs
+}
+
+// validate は、段 step の n 番目の multipart の部分の欄を確かめる。
+func (p MultipartPart) validate(step string, n int) []error {
+	var errs []error
+	if p.Name == "" {
+		errs = append(errs, fmt.Errorf("段 %s の multipart の %d 番目の部分に name がありません", step, n))
+	}
+	if (p.Value != nil) == (p.File != "") {
+		errs = append(errs, fmt.Errorf("段 %s の multipart の %d 番目の部分には value と file のどちらか1つを書きます", step, n))
+	}
+	if p.File == "" {
+		if p.Filename != "" || p.ContentType != "" || p.PadTo != 0 {
+			errs = append(errs, fmt.Errorf("段 %s の multipart の %d 番目の部分の filename と content_type と pad_to は、file の部分にだけ書けます", step, n))
+		}
+		return errs
+	}
+	size, err := imageFixtureSize(p.File)
+	if err != nil {
+		return append(errs, fmt.Errorf("段 %s の multipart の %d 番目の部分の file %q: %w", step, n, p.File, err))
+	}
+	if p.PadTo != 0 && int64(p.PadTo) < size {
+		errs = append(errs, fmt.Errorf("段 %s の multipart の %d 番目の部分の pad_to %d は、file %q の大きさ %d バイトより小さくできません", step, n, p.PadTo, p.File, size))
+	}
+	return errs
+}
+
 // validateAbsoluteURL は、絶対の URL の段の欄を確かめる。
-// この段の応答は偽のログインのサービスが作るので、版の Cookie の束から作る csrf と、版の応答の項目を確かめる fields を書けない。
+// この段の応答は偽のログインのサービスか偽の AWS が作るので、版の Cookie の束から作る csrf と、版の応答の項目を確かめる
+// fields と values を書けない。本文は、版に送る段の multipart の代わりに、body_file で送る。
 func (s Step) validateAbsoluteURL() []error {
 	var errs []error
 	if s.Request.Method == "" {
@@ -330,6 +433,25 @@ func (s Step) validateAbsoluteURL() []error {
 	}
 	if len(s.Expect.Fields) > 0 {
 		errs = append(errs, fmt.Errorf("段 %s の expect の fields は、版に送る段にだけ書けます", s.Name))
+	}
+	if len(s.Expect.Values) > 0 {
+		errs = append(errs, fmt.Errorf("段 %s の expect の values は、版に送る段にだけ書けます", s.Name))
+	}
+	if len(s.Request.Multipart) > 0 {
+		errs = append(errs, fmt.Errorf("段 %s の request の multipart は、版に送る段にだけ書けます", s.Name))
+	}
+	if s.Request.BodyFile != "" {
+		if s.Request.JSON != nil {
+			errs = append(errs, fmt.Errorf("段 %s の request の json と body_file は一緒に書けません", s.Name))
+		}
+		if _, err := imageFixtureSize(s.Request.BodyFile); err != nil {
+			errs = append(errs, fmt.Errorf("段 %s の request の body_file %q: %w", s.Name, s.Request.BodyFile, err))
+		}
+	}
+	if s.Expect.BodyFile != "" {
+		if _, err := imageFixtureSize(s.Expect.BodyFile); err != nil {
+			errs = append(errs, fmt.Errorf("段 %s の expect の body_file %q: %w", s.Name, s.Expect.BodyFile, err))
+		}
 	}
 	return errs
 }
@@ -373,7 +495,8 @@ func (s Step) notRequestFields() []error {
 	if len(s.Capture) > 0 {
 		errs = append(errs, fmt.Errorf("段 %s は要求を送らないので、capture を書けません", s.Name))
 	}
-	if s.Expect.Status != 0 || len(s.Expect.Fields) > 0 {
+	if s.Expect.Status != 0 || len(s.Expect.Fields) > 0 || len(s.Expect.Values) > 0 ||
+		s.Expect.BodyFile != "" || s.Expect.ContentType != "" {
 		errs = append(errs, fmt.Errorf("段 %s は要求を送らないので、expect を書けません", s.Name))
 	}
 	return errs

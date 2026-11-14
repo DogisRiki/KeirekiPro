@@ -19,8 +19,10 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/gen"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/authctx"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/logging"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/users"
 )
 
 const (
@@ -419,5 +421,220 @@ func TestNew_RecoverOutsideIdentify(t *testing.T) {
 	assertSecurityHeaders(t, "値を読む段のパニックの 500", rec)
 	if !strings.Contains(logs.String(), "unexpected_exception") {
 		t.Errorf("パニックのログがありません: %s", logs.String())
+	}
+}
+
+// loginUserID は、利用者の受け口のテストで、ログインした利用者として context に入れる ID である。
+var loginUserID = uuid.MustParse("6a0d2c4e-8b1f-4e3a-9d5c-7f2b1a0e3c4d")
+
+// wiredUsers は、受け口から呼ばれた利用者の処理の名前と利用者の ID を、呼ばれた順に記録する。
+type wiredUsers struct {
+	calls []string
+}
+
+func (f *wiredUsers) record(name string, userID uuid.UUID) {
+	f.calls = append(f.calls, name+"("+userID.String()+")")
+}
+
+func (f *wiredUsers) GetUserInfo(_ context.Context, userID uuid.UUID) (users.UserInfo, error) {
+	f.record("GetUserInfo", userID)
+	return users.UserInfo{ID: userID}, nil
+}
+
+func (f *wiredUsers) UpdateUserInfo(_ context.Context, in users.UpdateInput) error {
+	f.record("UpdateUserInfo", in.UserID)
+	return nil
+}
+
+func (f *wiredUsers) DeleteUser(_ context.Context, userID uuid.UUID) error {
+	f.record("DeleteUser", userID)
+	return nil
+}
+
+func (f *wiredUsers) SendAccountEmailVerification(_ context.Context, userID uuid.UUID) error {
+	f.record("SendAccountEmailVerification", userID)
+	return nil
+}
+
+func (f *wiredUsers) SetEmailAndPassword(_ context.Context, in users.SetEmailAndPasswordInput) error {
+	f.record("SetEmailAndPassword", in.UserID)
+	return nil
+}
+
+func (f *wiredUsers) ChangePassword(_ context.Context, userID uuid.UUID, _, _ string) error {
+	f.record("ChangePassword", userID)
+	return nil
+}
+
+func (f *wiredUsers) RemoveAuthProvider(_ context.Context, userID uuid.UUID, provider string) error {
+	f.record("RemoveAuthProvider:"+provider, userID)
+	return nil
+}
+
+// loginAs は、要求の context に、ログインした利用者として loginUserID を入れる段である。auth.Identify の代わりに使う。
+func loginAs(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(authctx.With(r.Context(), loginUserID, []string{"USER"})))
+	})
+}
+
+// userServer は、認証のまとまりと、利用者の処理 svc をつないだ HTTP の受け口を、loginUserID がログインした状態で作る。
+// svc が nil なら、UserHandlers を渡さない。
+func userServer(t *testing.T, svc *wiredUsers) http.Handler {
+	t.Helper()
+	handler, _ := authServer(t, func(o *httpapi.Options) {
+		o.Identify = loginAs
+		if svc != nil {
+			o.UserHandlers = svc
+		}
+	})
+	return handler
+}
+
+// multipartBoundary は、名前と画像と2段階認証の設定の変更の要求の本文の区切りである。
+const multipartBoundary = "keirekipro-test-boundary"
+
+// sendUpdateUserInfo は、偽の送信の検査に通る Cookie とヘッダを付けて、username だけを入れた multipart の本文で
+// PUT /api/users/me を送る。
+func sendUpdateUserInfo(handler http.Handler) *httptest.ResponseRecorder {
+	body := "--" + multipartBoundary + "\r\n" +
+		"Content-Disposition: form-data; name=\"username\"\r\n\r\n" +
+		"山田太郎\r\n" +
+		"--" + multipartBoundary + "--\r\n"
+	req := httptest.NewRequest(http.MethodPut, "/api/users/me", strings.NewReader(body))
+	req.Header.Set("Content-Type", "multipart/form-data; boundary="+multipartBoundary)
+	req.Header.Set("Cookie", "XSRF-TOKEN="+sampleCSRF)
+	req.Header.Set("X-XSRF-TOKEN", sampleCSRF)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	return rec
+}
+
+// userOperation は、利用者の7つの操作のうちの1つの要求と、利用者の受け口が答えたときの状態の番号と処理の呼び出しである。
+type userOperation struct {
+	name   string
+	send   func(http.Handler) *httptest.ResponseRecorder
+	status int
+	calls  []string
+}
+
+// userOperations は、利用者の7つの操作を、利用者の受け口が答えたときの状態の番号と処理の呼び出しとともに返す。
+func userOperations() []userOperation {
+	id := loginUserID.String()
+	jsonOp := func(method, path, body string) func(http.Handler) *httptest.ResponseRecorder {
+		return func(h http.Handler) *httptest.ResponseRecorder { return send(h, method, path, body) }
+	}
+	return []userOperation{
+		{
+			"GetUserInfo", jsonOp(http.MethodGet, "/api/users/me", ""), http.StatusOK,
+			[]string{"GetUserInfo(" + id + ")"},
+		},
+		{
+			"UpdateUserInfo", sendUpdateUserInfo, http.StatusOK,
+			[]string{"UpdateUserInfo(" + id + ")", "GetUserInfo(" + id + ")"},
+		},
+		{
+			"DeleteUser", jsonOp(http.MethodDelete, "/api/users/me", ""), http.StatusNoContent,
+			[]string{"DeleteUser(" + id + ")"},
+		},
+		{
+			"SendAccountEmailVerification", jsonOp(http.MethodPost, "/api/users/me/email-verification", ""),
+			http.StatusNoContent,
+			[]string{"SendAccountEmailVerification(" + id + ")"},
+		},
+		{
+			"SetEmailAndPassword", jsonOp(http.MethodPost, "/api/users/me/email-password",
+				`{"email":"taro@example.com","password":"Passw0rd!","confirmPassword":"Passw0rd!"}`),
+			http.StatusOK,
+			[]string{"SetEmailAndPassword(" + id + ")", "GetUserInfo(" + id + ")"},
+		},
+		{
+			"ChangePassword", jsonOp(http.MethodPatch, "/api/users/me/password",
+				`{"nowPassword":"Old-Passw0rd!","newPassword":"New-Passw0rd!"}`),
+			http.StatusNoContent,
+			[]string{"ChangePassword(" + id + ")"},
+		},
+		{
+			"RemoveAuthProvider", jsonOp(http.MethodDelete, "/api/users/me/auth-provider/google", ""),
+			http.StatusNoContent,
+			[]string{"RemoveAuthProvider:google(" + id + ")"},
+		},
+	}
+}
+
+// 利用者の7つの操作が、未実装の答えでなく利用者の受け口に届き、ほかのまとまりの操作は未実装の答えのまま、
+// 認証の操作は認証の受け口のままであることを確かめる。
+func TestNew_UserOperationsNotUnimplemented(t *testing.T) {
+	for _, op := range userOperations() {
+		t.Run(op.name, func(t *testing.T) {
+			svc := &wiredUsers{}
+			rec := op.send(userServer(t, svc))
+			if rec.Code != op.status {
+				t.Errorf("状態の番号 = %d %s, want %d", rec.Code, rec.Body.String(), op.status)
+			}
+			if !slices.Equal(svc.calls, op.calls) {
+				t.Errorf("利用者の処理の呼び出し = %q, want %q", svc.calls, op.calls)
+			}
+		})
+	}
+
+	handler := userServer(t, &wiredUsers{})
+	rec := send(handler, http.MethodGet, "/api/resumes", "")
+	assertBody(t, rec, http.StatusNotImplemented, "application/json", `{"message":"未実装です。"}`)
+	rec = send(handler, http.MethodPost, "/api/auth/login", `{"email":"","password":""}`)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"email":[`) {
+		t.Errorf("ログインの応答 = %d %s, want 認証の受け口の検査の 400", rec.Code, rec.Body.String())
+	}
+
+	t.Run("CookieSecure が、退会で消す Cookie に渡る", func(t *testing.T) {
+		for _, secure := range []bool{false, true} {
+			handler, _ := authServer(t, func(o *httpapi.Options) {
+				o.Identify = loginAs
+				o.UserHandlers = &wiredUsers{}
+				o.CookieSecure = secure
+			})
+			rec := send(handler, http.MethodDelete, "/api/users/me", "")
+			want := []string{auth.DeleteCookie("accessToken", "/", secure), auth.DeleteCookie("refreshToken", "/", secure)}
+			if got := rec.Header().Values("Set-Cookie"); rec.Code != http.StatusNoContent || !slices.Equal(got, want) {
+				t.Errorf("Secure %v の退会 = %d Set-Cookie %q, want 204 %q", secure, rec.Code, got, want)
+			}
+		}
+	})
+
+	t.Run("UserHandlers を渡さなければ、利用者の操作は未実装の答えのまま", func(t *testing.T) {
+		handler := userServer(t, nil)
+		for _, op := range userOperations() {
+			rec := op.send(handler)
+			if rec.Code != http.StatusNotImplemented || rec.Body.String() != `{"message":"未実装です。"}` {
+				t.Errorf("%s の応答 = %d %s, want 501 と未実装の本文", op.name, rec.Code, rec.Body.String())
+			}
+		}
+
+		handler, _ = authServer(t, func(o *httpapi.Options) {
+			o.Identify = loginAs
+			o.Handlers = failingUserInfo{}
+		})
+		rec := send(handler, http.MethodGet, "/api/users/me", "")
+		assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
+	})
+}
+
+// failingUserInfo は、利用者の情報の読み取りにだけ想定外の誤りを返し、ほかの操作には未実装の答えを返す Handlers である。
+type failingUserInfo struct {
+	httpapi.Unimplemented
+}
+
+func (failingUserInfo) GetUserInfo(context.Context, gen.GetUserInfoRequestObject) (gen.GetUserInfoResponseObject, error) {
+	return nil, errors.New("利用者の情報を読めません")
+}
+
+// 名前と画像と2段階認証の設定の変更の操作に multipart でない本文が届いたら、New が組み立てた受け口が、
+// 利用者の処理を呼ばずに 400 と Java 版の入力の誤りの本文で答えることを確かめる。
+func TestNew_UpdateUserInfoNonMultipart400(t *testing.T) {
+	svc := &wiredUsers{}
+	rec := send(userServer(t, svc), http.MethodPut, "/api/users/me", `{"username":"山田太郎"}`)
+	assertBody(t, rec, http.StatusBadRequest, "application/json", javaBadRequest)
+	if len(svc.calls) != 0 {
+		t.Errorf("利用者の処理の呼び出し = %q, want 呼び出し無し", svc.calls)
 	}
 }

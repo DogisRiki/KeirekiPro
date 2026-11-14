@@ -158,7 +158,7 @@ func sendExpect(ctx context.Context, tools stepTools, session *Session, baseURL 
 	if err != nil {
 		return err
 	}
-	if problems := CheckExpect(step, resp); len(problems) > 0 {
+	if problems := checkStepExpect(session, step, resp); len(problems) > 0 {
 		return fmt.Errorf("harness: 段 %s の応答が期待と違います: %s", step.Name, strings.Join(problems, "。"))
 	}
 	return nil
@@ -209,7 +209,7 @@ func measureLatency(ctx context.Context, tools stepTools, baseURL string, s Scen
 		if err != nil {
 			return nil, err
 		}
-		if problems := CheckExpect(last, resp); len(problems) > 0 {
+		if problems := checkStepExpect(sess, last, resp); len(problems) > 0 {
 			return nil, fmt.Errorf("harness: 段 %s の応答が期待と違います: %s", last.Name, strings.Join(problems, "。"))
 		}
 		durations = append(durations, elapsed)

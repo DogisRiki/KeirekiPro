@@ -1,0 +1,210 @@
+{
+  "cases": [
+    {
+      "name": "小文字の拡張子",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"a.png\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d22612e706e6722",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000001\",\"email\":\"cap-file@example.com\",\"username\":\"画像\",\"hasPassword\":true,\"profileImage\":\"http://localhost:4566/keirekipro-storage//profile/image/11111111-1111-4111-8111-000000000001.png?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Date=20261113T074958Z\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request\u0026X-Amz-Expires=600\u0026X-Amz-Signature=f8e94823e99c6f1e1d5062aa665fe8972797f5b9bfb7f7911bfa10efdfd8041b\",\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedObjects": [
+        {
+          "key": "/profile/image/11111111-1111-4111-8111-000000000001.png",
+          "contentType": "image/png",
+          "metadata": {
+            "x-amz-meta-content-type": "image/png"
+          },
+          "size": 84
+        }
+      ]
+    },
+    {
+      "name": "大文字の拡張子",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"a.PNG\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d22612e504e4722",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000001\",\"email\":\"cap-file@example.com\",\"username\":\"画像\",\"hasPassword\":true,\"profileImage\":\"http://localhost:4566/keirekipro-storage//profile/image/11111111-1111-4111-8111-000000000001.png?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Date=20261113T074958Z\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request\u0026X-Amz-Expires=600\u0026X-Amz-Signature=f8e94823e99c6f1e1d5062aa665fe8972797f5b9bfb7f7911bfa10efdfd8041b\",\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedObjects": [
+        {
+          "key": "/profile/image/11111111-1111-4111-8111-000000000001.png",
+          "contentType": "image/png",
+          "metadata": {
+            "x-amz-meta-content-type": "image/png"
+          },
+          "size": 84
+        }
+      ]
+    },
+    {
+      "name": "点付きの大文字のI",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"x.GİF\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d22782e47c4b04622",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"profileImage\":[\"許可されていないファイル形式です。jpg, jpeg, png, gifのみ許可されています。\"]}}"
+      },
+      "storedObjects": []
+    },
+    {
+      "name": "最後がスラッシュ",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"a.png/\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d22612e706e672f22",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"profileImage\":[\"許可されていないファイル形式です。jpg, jpeg, png, gifのみ許可されています。\"]}}"
+      },
+      "storedObjects": []
+    },
+    {
+      "name": "RFC 2047 の書き方",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"=?UTF-8?B?55S75YOPLnBuZw==?=\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d223d3f5554462d383f423f3535533735594f504c6e42755a773d3d3f3d22",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000001\",\"email\":\"cap-file@example.com\",\"username\":\"画像\",\"hasPassword\":true,\"profileImage\":\"http://localhost:4566/keirekipro-storage//profile/image/11111111-1111-4111-8111-000000000001.png?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Date=20261113T074958Z\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request\u0026X-Amz-Expires=600\u0026X-Amz-Signature=f8e94823e99c6f1e1d5062aa665fe8972797f5b9bfb7f7911bfa10efdfd8041b\",\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedObjects": [
+        {
+          "key": "/profile/image/11111111-1111-4111-8111-000000000001.png",
+          "contentType": "image/png",
+          "metadata": {
+            "x-amz-meta-content-type": "image/png"
+          },
+          "size": 84
+        }
+      ]
+    },
+    {
+      "name": "Windows のパス",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"C:\\dir\\a.JPG\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d22433a5c6469725c612e4a504722",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000001\",\"email\":\"cap-file@example.com\",\"username\":\"画像\",\"hasPassword\":true,\"profileImage\":\"http://localhost:4566/keirekipro-storage//profile/image/11111111-1111-4111-8111-000000000001.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Date=20261113T074958Z\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request\u0026X-Amz-Expires=600\u0026X-Amz-Signature=b3b56a4e2e2cecad9eff538552767a4061738fd829e396889e086e127e0d5e0b\",\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedObjects": [
+        {
+          "key": "/profile/image/11111111-1111-4111-8111-000000000001.jpg",
+          "contentType": "image/png",
+          "metadata": {
+            "x-amz-meta-content-type": "image/png"
+          },
+          "size": 84
+        }
+      ]
+    },
+    {
+      "name": "拡張子が無い",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"a\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d226122",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"profileImage\":[\"許可されていないファイル形式です。jpg, jpeg, png, gifのみ許可されています。\"]}}"
+      },
+      "storedObjects": []
+    },
+    {
+      "name": "拡張子が2つ",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"a.tar.gz\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d22612e7461722e677a22",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 400,
+        "body": "{\"message\":\"入力エラーがあります。\",\"errors\":{\"profileImage\":[\"許可されていないファイル形式です。jpg, jpeg, png, gifのみ許可されています。\"]}}"
+      },
+      "storedObjects": []
+    },
+    {
+      "name": "RFC 5987 の書き方",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename*=UTF-8''%E7%94%BB%E5%83%8F.gif",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d652a3d5554462d3827272545372539342542422545352538332538462e676966",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000001\",\"email\":\"cap-file@example.com\",\"username\":\"画像\",\"hasPassword\":true,\"profileImage\":\"http://localhost:4566/keirekipro-storage//profile/image/11111111-1111-4111-8111-000000000001.gif?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Date=20261113T074958Z\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request\u0026X-Amz-Expires=600\u0026X-Amz-Signature=9db943e4495534e356b0654a812d7a3effd47029e7665aa3be8ab16b2cc79dcb\",\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedObjects": [
+        {
+          "key": "/profile/image/11111111-1111-4111-8111-000000000001.gif",
+          "contentType": "image/png",
+          "metadata": {
+            "x-amz-meta-content-type": "image/png"
+          },
+          "size": 84
+        }
+      ]
+    },
+    {
+      "name": "逃がした二重引用符",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"a\\\"b.png\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d22615c22622e706e6722",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000001\",\"email\":\"cap-file@example.com\",\"username\":\"画像\",\"hasPassword\":true,\"profileImage\":\"http://localhost:4566/keirekipro-storage//profile/image/11111111-1111-4111-8111-000000000001.png?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Date=20261113T074958Z\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request\u0026X-Amz-Expires=600\u0026X-Amz-Signature=f8e94823e99c6f1e1d5062aa665fe8972797f5b9bfb7f7911bfa10efdfd8041b\",\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedObjects": [
+        {
+          "key": "/profile/image/11111111-1111-4111-8111-000000000001.png",
+          "contentType": "image/png",
+          "metadata": {
+            "x-amz-meta-content-type": "image/png"
+          },
+          "size": 84
+        }
+      ]
+    },
+    {
+      "name": "点で始まる",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\".png\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d222e706e6722",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000001\",\"email\":\"cap-file@example.com\",\"username\":\"画像\",\"hasPassword\":true,\"profileImage\":\"http://localhost:4566/keirekipro-storage//profile/image/11111111-1111-4111-8111-000000000001.png?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Date=20261113T074958Z\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request\u0026X-Amz-Expires=600\u0026X-Amz-Signature=f8e94823e99c6f1e1d5062aa665fe8972797f5b9bfb7f7911bfa10efdfd8041b\",\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedObjects": [
+        {
+          "key": "/profile/image/11111111-1111-4111-8111-000000000001.png",
+          "contentType": "image/png",
+          "metadata": {
+            "x-amz-meta-content-type": "image/png"
+          },
+          "size": 84
+        }
+      ]
+    },
+    {
+      "name": "制御文字を含む",
+      "contentDisposition": "form-data; name=\"profileImage\"; filename=\"a\u0007.png\"",
+      "contentDispositionHex": "666f726d2d646174613b206e616d653d2270726f66696c65496d616765223b2066696c656e616d653d2261072e706e6722",
+      "partContentType": "image/png",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000001\",\"email\":\"cap-file@example.com\",\"username\":\"画像\",\"hasPassword\":true,\"profileImage\":\"http://localhost:4566/keirekipro-storage//profile/image/11111111-1111-4111-8111-000000000001.png?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Date=20261113T074958Z\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request\u0026X-Amz-Expires=600\u0026X-Amz-Signature=f8e94823e99c6f1e1d5062aa665fe8972797f5b9bfb7f7911bfa10efdfd8041b\",\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedObjects": [
+        {
+          "key": "/profile/image/11111111-1111-4111-8111-000000000001.png",
+          "contentType": "image/png",
+          "metadata": {
+            "x-amz-meta-content-type": "image/png"
+          },
+          "size": 84
+        }
+      ]
+    }
+  ],
+  "image": "image.png",
+  "userId": "11111111-1111-4111-8111-000000000001"
+}

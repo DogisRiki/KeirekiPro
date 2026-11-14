@@ -218,6 +218,11 @@ func startFakes(ctx context.Context, env *Env, images Images, awsAliases ...stri
 	return f, nil
 }
 
+// awsEndpoint は、ネットワークの中の名前 awsHost の fakeaws につなぐ、版の設定の AWS の接続先を返す。
+func awsEndpoint(awsHost string) string {
+	return "http://" + awsHost + ":" + fakeaws.Port
+}
+
 // backingFor は、st の Postgres と Redis と、ネットワークの中の名前 awsHost の fakeaws につなぐ、版のつなぐ先を返す。
 // どの版も、同じ JWT の値と同じ外部のログインのクライアントを使う。
 // fakeoidc が api.github.com として TLS を受けるときは、版が信頼する認証局と信頼の束の置き場も渡す。
@@ -226,7 +231,7 @@ func (f *fakes) backingFor(st *Store, awsHost string) Backing {
 		DBHost: st.dbHost, DBPort: "5432", DBName: crossDBName, DBUser: crossDBUser, DBPassword: crossDBPassword,
 		RedisHost: st.redisHost, RedisPort: "6379",
 		JWTSecret:   f.jwtSecret,
-		AWSEndpoint: "http://" + awsHost + ":" + fakeaws.Port,
+		AWSEndpoint: awsEndpoint(awsHost),
 		OIDCBaseURL: "http://fakeoidc:" + fakeoidc.Port,
 		Google:      f.google,
 		GitHub:      f.github,
@@ -376,9 +381,13 @@ func (f *fakes) mailReader(version string) MailReader {
 	}
 }
 
-// tools は、client で fakeoidc に送り、rdb を書き換え、fakeaws の版 version のメールを読む stepTools を返す。
-func (f *fakes) tools(client *http.Client, rdb *redis.Client, version string) stepTools {
-	return stepTools{client: client, oidcURL: f.oidcURL, jwtKey: f.jwtSecret, redis: rdb, mail: f.mailReader(version)}
+// tools は、client で fakeoidc と fakeaws に送り、rdb を書き換え、fakeaws の版 version のメールを読む stepTools を返す。
+// awsEndpoint は、段を送る版の設定の AWS の接続先で、版が返す署名付きの URL を読む要求の Host にする。
+func (f *fakes) tools(client *http.Client, rdb *redis.Client, version, awsEndpoint string) stepTools {
+	return stepTools{
+		client: client, oidcURL: f.oidcURL, awsURL: f.AWSURL, awsEndpoint: awsEndpoint,
+		jwtKey: f.jwtSecret, redis: rdb, mail: f.mailReader(version),
+	}
 }
 
 // setOIDCUsers は、筋書きの oidc_users の利用者を、Google、GitHub の順に fakeoidc に登録する。users が nil なら何もしない。

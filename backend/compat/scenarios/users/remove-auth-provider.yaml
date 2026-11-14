@@ -1,0 +1,72 @@
+# 連携の解除の筋書き。2つの連携(Google と GitHub)を持つ利用者(two-providers)が、GitHub の連携を解除し、
+# もう連携していない GitHub の解除を送り、大文字の提供元の名前(GOOGLE)で Google の連携を解除する。
+# two-providers は確認の済んだメールアドレスとパスワードを持つので、最後の連携も解除できる。
+# Google だけの利用者(google-only)は、パスワードもメールアドレスも持たないので、最後の連携を解除できない。
+name: users-remove-auth-provider
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql, users/users-ops.sql]
+modes: [compare]
+oidc_users:
+  google: {sub: google-sub-google-only, name: グーグル 五郎, email: google-only@example.com, email_verified: true}
+steps:
+  - name: login-two-providers
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: two-providers@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 2つの連携のうち GitHub の連携を解除する
+  - name: remove-github
+    request:
+      method: DELETE
+      path: /api/users/me/auth-provider/github
+      csrf: true
+    expect: {status: 204}
+  # もう連携していない GitHub の解除は断られる
+  - name: remove-github-not-linked
+    request:
+      method: DELETE
+      path: /api/users/me/auth-provider/github
+      csrf: true
+    expect: {status: 400}
+  # 大文字の提供元の名前は小文字にして探す。確認の済んだメールアドレスとパスワードがあるので、最後の連携も解除できる
+  - name: remove-google-uppercase
+    request:
+      method: DELETE
+      path: /api/users/me/auth-provider/GOOGLE
+      csrf: true
+    expect: {status: 204}
+  - name: get-user-info-two-providers
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200, fields: [$.authProviders]}
+  # Google だけの利用者は、最後の連携を解除できない。Google のアカウントでログインする
+  - name: start-google-only
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=google
+    capture: {authURL: text}
+    expect: {status: 200}
+  - name: authorize-google-only
+    request:
+      method: GET
+      url: '{authURL}'
+    capture: {code: 'header:Location?code', state: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-google-only
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code}&state={state}
+    expect: {status: 302}
+  - name: remove-google-last-one
+    request:
+      method: DELETE
+      path: /api/users/me/auth-provider/google
+      csrf: true
+    expect: {status: 400}
+  - name: get-user-info-google-only
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200}

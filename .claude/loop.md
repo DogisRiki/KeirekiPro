@@ -7,9 +7,13 @@
 3. verify が FAIL なら修正する(ゴールハック禁止則に従う。skip・除外追加で誤魔化さない)。
 4. `doc/` の設計図(クラス図・ER図)と実装の乖離が変更範囲にあるか確認し、乖離があれば更新を提案する
    (勝手に大規模更新はしない。乖離箇所の指摘まで)。
-5. 開いているPRがあれば `gh pr checks` で状態を確認し、赤があれば修正、Codex指摘があれば `/review-loop` に従う。
-   チェックは緑なのにブランチが out of date でマージが進まない場合は、
-   `git fetch origin && git merge origin/main` してpushする(または `gh pr update-branch`)。
+5. 開いているPRがあれば、`gh pr checks` でPRの検査の状態を確かめ、次のことを所有者に報告する。
+   Claude は、報告するだけにし、PRのブランチを直さない。PRのブランチを直すには commit と push が要り、
+   このループの中では commit と push をしないためである。
+   - 赤の検査があれば、赤の検査の名前
+   - codex-review が赤なら、Codex の指摘があること
+   - 検査はすべて緑なのに、PRのブランチが main より古くてマージが進まないなら、そのこと。
+     Claude は、main を取り込まず、push もしない
 6. すべて正常なら「全ゲート正常 / PR状態」を1行で報告する。
 
 制約:

@@ -638,3 +638,262 @@ func TestAbsoluteStep_StatusChecked(t *testing.T) {
 		t.Errorf("測る動かし方の誤り = %v, want status の違い", err)
 	}
 }
+
+// userFieldsScenario は、画像を multipart で上げる段と、版が返す署名付きの形の URL から画像を読む絶対の URL の段と、
+// 上げた画像の値を expect.values で確かめる段を持つ、3つの動かし方で動く筋書きである。
+const userFieldsScenario = `name: 利用者の欄
+modes: [compare, cross, perf]
+steps:
+  - name: 画像を上げる
+    request:
+      method: POST
+      path: /image
+      multipart:
+        - {name: file, file: profile.png, filename: me.png, content_type: image/png}
+    capture: {url: "$.url"}
+    expect: {status: 200}
+  - name: 画像を読む
+    request: {method: GET, url: "{url}"}
+    expect: {status: 200, content_type: image/png, body_file: profile.png}
+  - name: 値を確かめる
+    to: other
+    request: {method: GET, path: /image}
+    expect:
+      status: 200
+      values: {"$.name": me.png, "$.url": "{url}"}
+`
+
+// userFieldsObject は、利用者の欄のテストで、偽の版が画像を置く置き場所の中の画像の名前である。
+const userFieldsObject = "images/profile/me.png"
+
+// userImage は、偽の版が最後に上げられた画像の名前と URL である。版をまたぐ動かし方では、2つの偽の版が1つを共有する。
+type userImage struct {
+	mu        sync.Mutex
+	name, url string
+}
+
+// userFieldsBackend は、利用者の欄のテストで、版の代わりをする HTTP のサーバである。上げられた画像を偽の AWS に置き、
+// ホストが localhost:4566 の、署名付きの形の URL を返す。署名の値と日時は、要求ごとに変わる。
+type userFieldsBackend struct {
+	// awsURL と awsHost は、画像を置く偽の AWS のアドレスと、要求の Host である。Host で偽の AWS の版が決まる。
+	awsURL, awsHost string
+	image           *userImage
+	// replace は、nil でなければ、上げられた画像の代わりに偽の AWS に置くバイトである。
+	replace []byte
+}
+
+func (b *userFieldsBackend) start(t *testing.T) string {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /image", b.upload)
+	mux.HandleFunc("GET /image", b.show)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
+func (b *userFieldsBackend) upload(w http.ResponseWriter, r *http.Request) {
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer func() { _ = file.Close() }()
+	body, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if b.replace != nil {
+		body = b.replace
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPut, b.awsURL+"/keirekipro/"+userFieldsObject, bytes.NewReader(body))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	req.Host = b.awsHost
+	req.Header.Set("Content-Type", header.Header.Get("Content-Type"))
+	req.Header.Set("X-Amz-Meta-Original-Name", header.Filename)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, "偽の AWS が画像を "+resp.Status+" で断りました", http.StatusInternalServerError)
+		return
+	}
+	now := time.Now().UTC()
+	signed := "http://localhost:4566/keirekipro/" + userFieldsObject + "?X-Amz-Algorithm=AWS4-HMAC-SHA256" +
+		"&X-Amz-Date=" + now.Format("20060102T150405Z") + "&X-Amz-SignedHeaders=host&X-Amz-Expires=300" +
+		"&X-Amz-Credential=test%2F" + now.Format("20060102") + "%2Fap-northeast-1%2Fs3%2Faws4_request" +
+		"&X-Amz-Signature=" + rand.Text()
+	b.image.mu.Lock()
+	b.image.name, b.image.url = header.Filename, signed
+	b.image.mu.Unlock()
+	b.writeImage(w)
+}
+
+func (b *userFieldsBackend) show(w http.ResponseWriter, _ *http.Request) {
+	b.writeImage(w)
+}
+
+// writeImage は、最後に上げられた画像の名前と URL を JSON で返す。
+func (b *userFieldsBackend) writeImage(w http.ResponseWriter) {
+	b.image.mu.Lock()
+	body := map[string]string{"name": b.image.name, "url": b.image.url}
+	b.image.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func loadUserFieldsScenario(t *testing.T) Scenario {
+	t.Helper()
+	s, err := LoadScenario(writeScenario(t, userFieldsScenario))
+	if err != nil {
+		t.Fatalf("筋書きを読めません: %v", err)
+	}
+	return s
+}
+
+// withValues は、筋書き s の段 index の expect.values を values にした写しを返す。s は変えない。
+func withValues(s Scenario, index int, values map[string]any) Scenario {
+	s.Steps = slices.Clone(s.Steps)
+	s.Steps[index].Expect.Values = values
+	return s
+}
+
+// sharedAWSEndpoint は、版をまたぐ動かし方と応答の時間の比べ方で、版がつなぐ偽の AWS の接続先である。
+var sharedAWSEndpoint = "http://fakeaws:" + fakeaws.Port
+
+func TestCompareEnv_UserFields(t *testing.T) {
+	s := loadUserFieldsScenario(t)
+	dbConn, addr := startModeStores(t)
+	f, _ := startModeFakes(t)
+	c := &CompareEnv{Stores: map[string]*Store{}, URLs: map[string]string{}, fakes: f, client: NewHTTPClient()}
+	backends := map[string]*userFieldsBackend{}
+	for i, version := range []string{VersionJava, VersionGo} {
+		c.Stores[version] = modeStore(t, dbConn, addr, i)
+		// 版ごとの偽の AWS の記録に置く
+		backends[version] = &userFieldsBackend{awsURL: f.AWSURL, awsHost: awsHost(version), image: &userImage{}}
+		c.URLs[version] = backends[version].start(t)
+	}
+
+	t.Run("版ごとの接続先から画像を読み、署名の値を正規化して比べる", func(t *testing.T) {
+		report, err := c.Run(t.Context(), s)
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		if report.Failed() {
+			t.Errorf("違いがあります:\n%s", report)
+		}
+	})
+
+	t.Run("版の画像は、その版の接続先を Host にして読む", func(t *testing.T) {
+		// Go 版だけが別の画像を置く。Java 版の接続先で読むと、Go 版の画像の違いを見落とす
+		gif, err := readImageFixture("profile.gif")
+		if err != nil {
+			t.Fatal(err)
+		}
+		backends[VersionGo].replace = gif
+		defer func() { backends[VersionGo].replace = nil }()
+		_, err = c.Run(t.Context(), s)
+		if err == nil || !strings.Contains(err.Error(), "を版 go で送れません") || !strings.Contains(err.Error(), "期待は fixtures/images/profile.png の") {
+			t.Errorf("Run の誤り = %v, want 版 go の画像を読む段の本文の違い", err)
+		}
+	})
+}
+
+func TestCrossEnv_UserFields(t *testing.T) {
+	s := loadUserFieldsScenario(t)
+	dbConn, addr := startModeStores(t)
+	f, _ := startModeFakes(t)
+	st := modeStore(t, dbConn, addr, 0)
+	image := &userImage{}
+	stack := &Stack{Store: st, fakes: f, backing: Backing{AWSEndpoint: sharedAWSEndpoint}}
+	c := &CrossEnv{Stack: stack, URLs: map[string]string{}, client: NewHTTPClient()}
+	for _, version := range []string{VersionJava, VersionGo} {
+		// 2つの版は、1つの画像の記録と、偽の AWS の共有の版に置く
+		b := &userFieldsBackend{awsURL: f.AWSURL, awsHost: "fakeaws", image: image}
+		c.URLs[version] = b.start(t)
+	}
+
+	t.Run("送り先の版の応答で画像と値を確かめる", func(t *testing.T) {
+		report, err := c.Run(t.Context(), s)
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		if report.Failed() {
+			t.Errorf("最後まで終わらなかった組があります:\n%s", report)
+		}
+	})
+
+	t.Run("値が違えば、送り先の版の段の失敗にする", func(t *testing.T) {
+		broken := withValues(s, 2, map[string]any{"$.name": "other.png"})
+		report, err := c.Run(t.Context(), broken)
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		if len(report.Failures) != len(CrossDirections) {
+			t.Fatalf("失敗 = %+v, want 組ごとに1つ", report.Failures)
+		}
+		want := `段 値を確かめる の $.name の値が "me.png" でした。期待は "other.png" です`
+		for _, failure := range report.Failures {
+			route, err := CrossRoute(broken, failure.Direction)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if failure.Step.Index != 3 || failure.Version != route[2] || len(failure.Problems) == 0 || failure.Problems[0] != want {
+				t.Errorf("組 %s の失敗 = %+v, want 段 3 を版 %s に送った値の違い %q", failure.Direction, failure, route[2], want)
+			}
+		}
+	})
+}
+
+func TestPerfEnv_UserFields(t *testing.T) {
+	s := loadUserFieldsScenario(t)
+	dbConn, addr := startModeStores(t)
+	envs := map[string]*PerfEnv{}
+	for i, version := range []string{VersionJava, VersionGo} {
+		// 版ごとの環境に、別々の偽の AWS がある
+		f, _ := startModeFakes(t)
+		st := modeStore(t, dbConn, addr, i)
+		b := &userFieldsBackend{awsURL: f.AWSURL, awsHost: "fakeaws", image: &userImage{}}
+		stack := &Stack{Store: st, fakes: f, backing: Backing{AWSEndpoint: sharedAWSEndpoint}}
+		envs[version] = &PerfEnv{Stack: stack, URL: b.start(t), client: NewHTTPClient()}
+	}
+	opts := PerfOptions{Warmup: 1, Samples: 2, Concurrency: 2}
+
+	t.Run("準備の段で画像を上げて読み、最後の段の値を確かめて測る", func(t *testing.T) {
+		report, err := RunPerf(t.Context(), envs, []Scenario{s}, opts)
+		if err != nil {
+			t.Fatalf("RunPerf: %v", err)
+		}
+		if len(report.Latencies) != 1 || report.Latencies[0].Java <= 0 || report.Latencies[0].Go <= 0 {
+			t.Errorf("測った時間 = %+v", report.Latencies)
+		}
+	})
+
+	t.Run("最後の段の値が違えば誤りにする", func(t *testing.T) {
+		broken := withValues(s, 2, map[string]any{"$.name": "other.png"})
+		want := `段 値を確かめる の $.name の値が "me.png" でした。期待は "other.png" です`
+		if _, err := RunPerf(t.Context(), envs, []Scenario{broken}, opts); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("RunPerf の誤り = %v, want 最後の段の値の違い", err)
+		}
+		// 慣らしの回を送らずに測る回だけを送っても、測った回の応答の値を確かめる
+		java := envs[VersionJava]
+		if _, err := measureLatency(t.Context(), java.stepTools(), java.URL, broken, 0, 1); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("測る回の誤り = %v, want 最後の段の値の違い", err)
+		}
+	})
+
+	t.Run("準備の段の値が違えば誤りにする", func(t *testing.T) {
+		broken := withValues(s, 0, map[string]any{"$.name": "other.png"})
+		_, err := RunPerf(t.Context(), envs, []Scenario{broken}, opts)
+		if err == nil || !strings.Contains(err.Error(), `段 画像を上げる の $.name の値が "me.png" でした。期待は "other.png" です`) {
+			t.Errorf("RunPerf の誤り = %v, want 準備の段の値の違い", err)
+		}
+	})
+}

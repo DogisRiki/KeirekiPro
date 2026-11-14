@@ -85,6 +85,19 @@ func userRegisteredMail(app config.App, username string) mail {
 	}
 }
 
+// userDeletedMail は、退会の完了のメールを作る(Java 版の UserDeletedNotification)。
+func userDeletedMail(app config.App, username string) mail {
+	return mail{
+		template: "user-deleted.ftl",
+		subject:  "【" + app.SiteName + "】退会手続き完了のお知らせ",
+		values: map[string]string{
+			"username": username,
+			"siteName": app.SiteName,
+			"siteUrl":  app.SiteURL,
+		},
+	}
+}
+
 // sendMail は、m のひな形に値を差し込み、送り主を App.SESFromAddress にして to へ SES で送る。
 // SES の誤りは包んで返す。Java 版と同じく、送り出しを再試行しない。
 func (s *Service) sendMail(ctx context.Context, to string, m mail) error {

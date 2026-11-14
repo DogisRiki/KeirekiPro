@@ -445,6 +445,58 @@ func TestLoadScenarios_AuthPerf(t *testing.T) {
 	}
 }
 
+// TestLoadScenarios_UsersPerf は、利用者の操作の筋書きのうち、応答の時間を測る筋書きが、ログインの段のあとに、
+// 利用者の情報を見る段と、名前を変える段を、最後の段で送ることを確かめる。名前を変える段は、毎回同じ名前の部分だけを送る。
+// どちらも回ごとに準備の段を送り直さず、メモリの最大を測らない。
+func TestLoadScenarios_UsersPerf(t *testing.T) {
+	scenarios, err := LoadScenarios(filepath.Join("..", "scenarios", "users"), ModePerf)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	wants := map[string]string{
+		"users-get-user-info-perf":   "GET /api/users/me",
+		"users-update-username-perf": "PUT /api/users/me",
+	}
+	got := map[string]Scenario{}
+	for _, s := range scenarios {
+		got[s.Name] = s
+	}
+	if len(got) != len(wants) {
+		t.Errorf("測る筋書きの数 = %d, want %d(読んだ筋書きは %v)", len(got), len(wants), slices.Sorted(maps.Keys(got)))
+	}
+	for name, op := range wants {
+		s, ok := got[name]
+		if !ok {
+			t.Errorf("測る筋書き %s がありません", name)
+			continue
+		}
+		if len(s.Steps) != 2 {
+			t.Errorf("筋書き %s の段の数 = %d, want 2", name, len(s.Steps))
+			continue
+		}
+		login, last := s.Steps[0], s.Steps[1]
+		if login.Request.Method+" "+login.Request.Path != "POST /api/auth/login" ||
+			jsonField(login.Request.JSON, "email") != "user1@example.com" {
+			t.Errorf("筋書き %s の準備の段 = %s %s %v, want user1@example.com のログイン",
+				name, login.Request.Method, login.Request.Path, login.Request.JSON)
+		}
+		if got := last.Request.Method + " " + last.Request.Path; got != op {
+			t.Errorf("筋書き %s の最後の段 = %s, want %s", name, got, op)
+		}
+		if s.PrepareEach || s.MeasureMemory {
+			t.Errorf("筋書き %s の prepare_each = %v、measure_memory = %v, want どちらも偽", name, s.PrepareEach, s.MeasureMemory)
+		}
+	}
+	if s, ok := got["users-update-username-perf"]; ok && len(s.Steps) == 2 {
+		parts := s.Steps[1].Request.Multipart
+		if len(parts) != 1 || parts[0].Name != "username" || parts[0].Value == nil ||
+			*parts[0].Value == "" || strings.Contains(*parts[0].Value, "{") || !s.Steps[1].Request.CSRF {
+			t.Errorf("名前を変える段の部分 = %+v、csrf = %v, want 置き換えの無い同じ名前の username の部分1つと csrf",
+				parts, s.Steps[1].Request.CSRF)
+		}
+	}
+}
+
 func TestWritePerfReport(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "report")
 	report := PerfReport{Latencies: []LatencyResult{{Operation: "login", Java: time.Millisecond, Go: time.Millisecond}}}

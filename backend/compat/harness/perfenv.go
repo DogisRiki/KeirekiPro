@@ -143,7 +143,7 @@ func (p *PerfEnv) measurePeak(ctx context.Context, s Scenario, opts PerfOptions)
 	return peak, err
 }
 
-// stepTools は、この環境の Redis と、fakeaws の版によらない記録のメールで段を動かす道具を返す。
+// stepTools は、この環境の Redis と、fakeaws の版によらない記録のメールと、版の AWS の接続先で段を動かす道具を返す。
 func (p *PerfEnv) stepTools() stepTools {
-	return p.tools(p.client, p.Redis, fakeaws.SharedVersion)
+	return p.tools(p.client, p.Redis, fakeaws.SharedVersion, p.backing.AWSEndpoint)
 }

@@ -65,7 +65,7 @@ func (c *CrossEnv) Run(ctx context.Context, s Scenario) (CrossReport, error) {
 		}
 		var failure *CrossFailure
 		err := c.withOIDC(ctx, s.OIDCUsers, func() error {
-			failure = runCross(ctx, c.tools(c.client, c.Redis, fakeaws.SharedVersion), s, direction, c.URLs)
+			failure = runCross(ctx, c.tools(c.client, c.Redis, fakeaws.SharedVersion, c.backing.AWSEndpoint), s, direction, c.URLs)
 			return nil
 		})
 		if err != nil {

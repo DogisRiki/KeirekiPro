@@ -212,16 +212,16 @@ func (s *Session) expand(step Step, where, text string) (string, error) {
 	return expanded, nil
 }
 
-// expandJSON は、JSON の本文の値 v の文字列の値の {名前} を置き換えた写しを返す。項目の名前は置き換えない。
+// expandJSON は、JSON の値 v の文字列の値の {名前} を置き換えた写しを返す。where は、誤りに書く、値のある場所である。項目の名前は置き換えない。
 // 筋書きの段は Java 版と Go 版で同じものを使うので、v は書き換えない。
-func (s *Session) expandJSON(step Step, v any) (any, error) {
+func (s *Session) expandJSON(step Step, where string, v any) (any, error) {
 	switch x := v.(type) {
 	case string:
-		return s.expand(step, "本文の文字列", x)
+		return s.expand(step, where, x)
 	case map[string]any:
 		out := make(map[string]any, len(x))
 		for k, item := range x {
-			e, err := s.expandJSON(step, item)
+			e, err := s.expandJSON(step, where, item)
 			if err != nil {
 				return nil, err
 			}
@@ -231,7 +231,7 @@ func (s *Session) expandJSON(step Step, v any) (any, error) {
 	case []any:
 		out := make([]any, len(x))
 		for i, item := range x {
-			e, err := s.expandJSON(step, item)
+			e, err := s.expandJSON(step, where, item)
 			if err != nil {
 				return nil, err
 			}
@@ -243,18 +243,29 @@ func (s *Session) expandJSON(step Step, v any) (any, error) {
 	}
 }
 
-// requestBody は、段 step の本文を、{名前} を置き換えてから JSON にする。本文が無ければ nil を返す。
-func (s *Session) requestBody(step Step) ([]byte, error) {
-	if step.Request.JSON == nil {
-		return nil, nil
+// requestBody は、段 step の本文と、その本文の Content-Type を返す。本文が無ければ nil を返す。
+// json は、{名前} を置き換えてから JSON にする。multipart は、multipartBody で組み立てる。
+// body_file は、fixtures/images の下のファイルをそのまま本文にし、Content-Type は筋書きのヘッダに任せて空を返す。
+func (s *Session) requestBody(step Step) ([]byte, string, error) {
+	switch {
+	case len(step.Request.Multipart) > 0:
+		return s.multipartBody(step)
+	case step.Request.BodyFile != "":
+		b, err := readImageFixture(step.Request.BodyFile)
+		if err != nil {
+			return nil, "", fmt.Errorf("harness: 段 %s の body_file %q を読めません: %w", step.Name, step.Request.BodyFile, err)
+		}
+		return b, "", nil
+	case step.Request.JSON == nil:
+		return nil, "", nil
 	}
-	v, err := s.expandJSON(step, step.Request.JSON)
+	v, err := s.expandJSON(step, "本文の文字列", step.Request.JSON)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	b, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("harness: 段 %s の本文を JSON にできません: %w", step.Name, err)
+		return nil, "", fmt.Errorf("harness: 段 %s の本文を JSON にできません: %w", step.Name, err)
 	}
-	return b, nil
+	return b, "application/json", nil
 }

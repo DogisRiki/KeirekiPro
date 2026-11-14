@@ -241,3 +241,57 @@ func TestNormalizeURLFragment_JWTWithoutEquals(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalize_PresignedURL(t *testing.T) {
+	const user = "0b9a3c1e-6f2d-4a8b-9c7e-1d2f3a4b5c6d"
+	// signed は、版が返す形の署名付きの URL である。date と credDate と sig は、要求のたびに違う値である
+	signed := func(date, credDate, sig, expires string) string {
+		return "http://localhost:4566/keirekipro-storage//" + user + "/a.png?X-Amz-Algorithm=AWS4-HMAC-SHA256" +
+			"&X-Amz-Credential=test%2F" + credDate + "%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=" + date +
+			"&X-Amz-Expires=" + expires + "&X-Amz-SignedHeaders=host&X-Amz-Signature=" + sig
+	}
+	java := signed("20261114T010203Z", "20261114", strings.Repeat("a", 64), "600")
+	goURL := signed("20261115T235959Z", "20261115", strings.Repeat("b", 64), "600")
+	// X-Amz-Date の値と X-Amz-Credential の中の日付と X-Amz-Signature の値だけを置き換え、
+	// X-Amz-Expires と項目の並ぶ順と URL のパスは変えない。パスの中の利用者の ID は、今の UUID の置き換えで比べる
+	want := "http://localhost:4566/keirekipro-storage//<uuid:1>/a.png?X-Amz-Algorithm=AWS4-HMAC-SHA256" +
+		"&X-Amz-Credential=test%2F<amz-credential-date>%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=<amz-date>" +
+		"&X-Amz-Expires=600&X-Amz-SignedHeaders=host&X-Amz-Signature=<amz-signature>"
+	if got := NewNormalizer().Text(java); got != want {
+		t.Errorf("Java 版の URL =\n%s\nwant\n%s", got, want)
+	}
+	if got := NewNormalizer().Text(goURL); got != want {
+		t.Errorf("Go 版の URL =\n%s\nwant\n%s", got, want)
+	}
+
+	// JSON の本文の値と、文字の本文の中の URL も置き換える。X-Amz-Credential の / が %2F でなくても日付を置き換える
+	raw := strings.ReplaceAll(java, "%2F", "/")
+	gotJSON := NewNormalizer().value(map[string]any{"profileImage": java, "list": []any{"画像は " + raw + " です"}}, true)
+	wantJSON := map[string]any{"profileImage": want, "list": []any{"画像は " + strings.ReplaceAll(want, "%2F", "/") + " です"}}
+	if canonicalJSON(gotJSON) != canonicalJSON(wantJSON) {
+		t.Errorf("JSON の本文 =\n%s\nwant\n%s", canonicalJSON(gotJSON), canonicalJSON(wantJSON))
+	}
+
+	// 使える時間と、項目の並ぶ順と、パスが違う URL は、置き換えたあとも違いとして残る
+	reordered := strings.Replace(java, "X-Amz-Algorithm=AWS4-HMAC-SHA256&", "", 1) + "&X-Amz-Algorithm=AWS4-HMAC-SHA256"
+	for name, other := range map[string]string{
+		"使える時間": signed("20261114T010203Z", "20261114", strings.Repeat("a", 64), "3600"),
+		"項目の順":  reordered,
+		"パス":    strings.Replace(java, "/a.png?", "/b.png?", 1),
+	} {
+		if got := NewNormalizer().Text(other); got == want {
+			t.Errorf("%s の違う URL が、置き換えたあとに同じになりました: %s", name, got)
+		}
+	}
+
+	// 問い合わせに X-Amz-Signature を持たない URL は、X-Amz-Date も変えない
+	for _, s := range []string{
+		"http://localhost:4566/b/k?X-Amz-Date=20261114T010203Z&X-Amz-Credential=test%2F20261114%2Fr",
+		"http://localhost:4566/b/k?X-Amz-Date=20261114T010203Z#a&X-Amz-Signature=" + strings.Repeat("a", 64),
+		"http://localhost:4566/b/k?X-Amz-Signature-Version=1&X-Amz-Date=20261114T010203Z",
+	} {
+		if got := NewNormalizer().Text(s); got != s {
+			t.Errorf("X-Amz-Signature の無い URL = %s, want そのまま %s", got, s)
+		}
+	}
+}

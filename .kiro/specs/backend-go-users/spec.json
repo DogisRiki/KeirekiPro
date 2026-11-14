@@ -1,0 +1,38 @@
+{
+  "feature_name": "backend-go-users",
+  "issue": 771,
+  "created_at": "2026-11-13T00:05:03Z",
+  "updated_at": "2026-11-13T07:34:28Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T02:52:40Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T06:21:26Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T07:34:28Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-13T04:26:43Z",
+      "issues": [771],
+      "revoked_at": "2026-11-13T04:51:38Z",
+      "revoked_for": "T1-1-4 と T1-1-5 による design への差し戻し: storedUser を使うテストのファイルが実際には無いことと、署名付きの URL の正解の出どころが research.md に無いこと"
+    }
+  ]
+}

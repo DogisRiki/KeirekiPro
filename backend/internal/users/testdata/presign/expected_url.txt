@@ -1,0 +1,1 @@
+http://localstack:4566/keirekipro-storage//profile/image/0b6f3c2e-6a1d-4f7e-9c58-2d4a7e1b9f03.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20261113T110939Z&X-Amz-SignedHeaders=host&X-Amz-Credential=dummy%2F20261113%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Expires=600&X-Amz-Signature=ec7deeb4688cf492342dc27258ab8228862577891dd3da44932326c00f836a35

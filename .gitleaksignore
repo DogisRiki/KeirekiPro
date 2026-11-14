@@ -23,3 +23,5 @@ d3cb6b715628d0b198a3999a2d23e012637881fb:backend/internal/auth/testdata/mail/ema
 81957c9cdfcb9948e8125169f8b0e9d101dc4e93:backend/internal/auth/passwordreset_integration_test.go:generic-api-key:289
 81957c9cdfcb9948e8125169f8b0e9d101dc4e93:backend/internal/auth/passwordreset_integration_test.go:generic-api-key:293
 81957c9cdfcb9948e8125169f8b0e9d101dc4e93:backend/internal/auth/passwordreset_integration_test.go:generic-api-key:495
+# Issue #771 の Go 版の利用者の操作のテストにある、同じイメージの名前(所有者が 2026-11-14 に受け入れた)
+81669095b73c73cf46dc57e56016a11aca4cb543:backend/internal/users/main_integration_test.go:generic-api-key:31

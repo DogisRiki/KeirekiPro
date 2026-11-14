@@ -117,8 +117,8 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 		if err != nil {
 			return fmt.Errorf("auth: パスワードのハッシュを作れない: %w", err)
 		}
-		u.row.Password = pgtype.Text{String: string(hash), Valid: true}
-		u.row.UpdatedAt = s.javaNow()
+		u.Row.Password = pgtype.Text{String: string(hash), Valid: true}
+		u.Row.UpdatedAt = s.javaNow()
 		if err := saveUser(ctx, q, u); err != nil {
 			return err
 		}

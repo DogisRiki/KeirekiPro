@@ -15,12 +15,45 @@
 # Claude Code ハーネス(permissions/hooks/skills/設定)
 /.claude/                                       @DogisRiki
 
-# frontend 品質ゲート定義
-/frontend/eslint.config.js                      @DogisRiki
-/frontend/vite.config.ts                        @DogisRiki
+# 品質チェックが何を調べるかを決めるファイル(#826)
+# .github/scripts/check-escape-hatches.sh の「6. ゲート隣接ファイルの変更」と、
+# ルートの CLAUDE.md の「人間の承認が必要な変更」にも、同じファイルを並べてある。
+# 道具は、今は無い別の名前のファイルや、下のフォルダのファイルを先に読むことがあるため、
+# 今あるファイルの名前だけでなく、道具が読む名前を広く並べる。
+# 下のフォルダも含める /<dir>/**/<name> の行には、/<dir>/<name> の行も並べる。
+# 直下のファイルを確実に含めるため。
+# frontend/package.json と docker/terraform/Dockerfile は、依存の版を上げる変更を
+# 承認の対象外にするため、ここには載せない(check-escape-hatches.sh が版のほかの変更を見る)
 
-# E2Eスモークの実行設定(スモークの無力化防止)
-/frontend/playwright.config.ts                  @DogisRiki
+# 秘密の情報の検査(gitleaks)から外す一覧と、検査の規則
+/.gitleaksignore                                @DogisRiki
+/.gitleaks.toml                                 @DogisRiki
+
+# frontend の lint・単体テストとカバレッジ・E2E の設定
+/frontend/eslint.config.*                       @DogisRiki
+/frontend/**/eslint.config.*                    @DogisRiki
+/frontend/vite.config.*                       @DogisRiki
+/frontend/vitest.config.*                       @DogisRiki
+/frontend/vitest.workspace.*                    @DogisRiki
+/frontend/playwright.config.*                   @DogisRiki
+
+# frontend の型チェックと書式チェックの設定
+/frontend/tsconfig*.json                        @DogisRiki
+/frontend/**/tsconfig*.json                     @DogisRiki
+/frontend/.prettierrc*                          @DogisRiki
+/frontend/**/.prettierrc*                       @DogisRiki
+/frontend/prettier.config.*                     @DogisRiki
+/frontend/**/prettier.config.*                  @DogisRiki
+/frontend/.prettierignore                       @DogisRiki
+/.editorconfig                                  @DogisRiki
+/frontend/.editorconfig                         @DogisRiki
+/frontend/**/.editorconfig                      @DogisRiki
+
+# frontend の未使用のコードの報告(knip)と変異テスト(stryker)の設定
+/frontend/knip.*                                @DogisRiki
+/frontend/.knip.*                               @DogisRiki
+/frontend/stryker.conf*                         @DogisRiki
+/frontend/.stryker.conf*                        @DogisRiki
 
 # backend 品質ゲート定義(build.gradle から分離。apply from 行の存在は guardrails CI が検証)
 /backend/gradle/quality.gradle                  @DogisRiki
@@ -45,6 +78,14 @@
 
 # checkovの既知指摘の凍結データ(抑止リスト。backend/config/ の各種除外設定と同格)
 /terraform/.checkov.baseline                    @DogisRiki
+
+# terraform の静的検査(checkov と tflint)の設定
+/terraform/.checkov.yaml                        @DogisRiki
+/terraform/**/.checkov.yaml                     @DogisRiki
+/terraform/.checkov.yml                         @DogisRiki
+/terraform/**/.checkov.yml                      @DogisRiki
+/terraform/.tflint.hcl                          @DogisRiki
+/terraform/**/.tflint.hcl                       @DogisRiki
 
 # このファイル自身
 /.github/CODEOWNERS                             @DogisRiki

@@ -1,0 +1,22 @@
+# 名前を変える応答の時間を測る筋書き。ログインのあとに、名前を変える段を繰り返して測る。
+# 名前を変える段は、毎回同じ名前を送る。1回目のあとは名前が変わらないが、どちらの版も、名前を検査し、利用者を読み、
+# 利用者を書き、利用者の情報を読み直す処理を、毎回行う。
+name: users-update-username-perf
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql]
+modes: [perf]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: update-username
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: 測定 一郎}
+    expect: {status: 200}

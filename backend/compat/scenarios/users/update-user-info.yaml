@@ -1,0 +1,144 @@
+# 名前と画像と2段階認証の設定の変更の筋書き。user1 が、名前だけ、画像だけ(PNG、JPEG、GIF)、2段階認証を使う設定と
+# 使わない設定、3つを一度に、前後に空白のある名前、今と同じ名前の順に変える。
+# 画像を拡張子の違う画像に替えたあとは、答えの署名付きの URL を $.profileImage で取り出し、絶対の URL の段で読んで、
+# 替えたあとの画像が返ることを確かめる。
+# 最後に、画像と誤った名前を一度に送り、名前の誤りで断られても、送った画像が画像の置き場所に残ることを、
+# 画像の置き場所を比べて確かめる。送る画像は、置き場所にまだ無い名前になるよう拡張子を jpeg にする。
+# 利用者の情報の画像は、断られる前の画像のままになる。
+name: users-update-user-info
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql, users/users-ops.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 名前だけを変える
+  - name: update-username-only
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: 更新 一郎}
+    expect: {status: 200, fields: [$.username]}
+  # 画像だけを変える。PNG を置き、JPEG と GIF に替える
+  - name: update-image-png
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.png, filename: profile.png, content_type: image/png}
+    capture: {pngURL: $.profileImage}
+    expect: {status: 200}
+  - name: read-image-png
+    request:
+      method: GET
+      url: '{pngURL}'
+    expect: {status: 200, content_type: image/png, body_file: profile.png}
+  - name: update-image-jpeg
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.jpg, filename: profile.jpg, content_type: image/jpeg}
+    capture: {jpegURL: $.profileImage}
+    expect: {status: 200}
+  - name: read-image-jpeg
+    request:
+      method: GET
+      url: '{jpegURL}'
+    expect: {status: 200, content_type: image/jpeg, body_file: profile.jpg}
+  - name: update-image-gif
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.gif, filename: profile.gif, content_type: image/gif}
+    capture: {gifURL: $.profileImage}
+    expect: {status: 200}
+  - name: read-image-gif
+    request:
+      method: GET
+      url: '{gifURL}'
+    expect: {status: 200, content_type: image/gif, body_file: profile.gif}
+  # 2段階認証を使う設定にし、使わない設定に戻す。user1 は確認の済んだメールアドレスとパスワードを持つ
+  - name: enable-two-factor
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: twoFactorAuthEnabled, value: 'true'}
+    expect: {status: 200, fields: [$.twoFactorAuthEnabled]}
+  - name: disable-two-factor
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: twoFactorAuthEnabled, value: 'false'}
+    expect: {status: 200}
+  # 名前と画像と2段階認証の設定の3つを一度に変える。画像は GIF から PNG に替える
+  - name: update-all-at-once
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: 一度に 三郎}
+        - {name: profileImage, file: profile.png, filename: profile.png, content_type: image/png}
+        - {name: twoFactorAuthEnabled, value: 'true'}
+    capture: {allURL: $.profileImage}
+    expect: {status: 200}
+  - name: read-image-all-at-once
+    request:
+      method: GET
+      url: '{allURL}'
+    expect: {status: 200, content_type: image/png, body_file: profile.png}
+  # 前後に空白のある名前は、空白を除いた名前になる
+  - name: update-username-with-spaces
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: '  空白 四郎  '}
+    expect: {status: 200}
+  # 今と同じ名前を送る
+  - name: update-username-same
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: 空白 四郎}
+    expect: {status: 200}
+  # 画像と空の名前を一度に送ると、名前の誤りで断られる。画像の名前は拡張子を jpeg にし、前の段で置いた .jpg と違う名前で置かせる。
+  # 送った画像は、まだ無かった .jpeg の名前で画像の置き場所に残るが、利用者の情報の画像は PNG のままになる
+  - name: update-image-with-invalid-username
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: ''}
+        - {name: profileImage, file: profile.jpg, filename: profile.jpeg, content_type: image/jpeg}
+    expect: {status: 400}
+  - name: get-user-info-after-rejected
+    request:
+      method: GET
+      path: /api/users/me
+    capture: {keptURL: $.profileImage}
+    expect: {status: 200}
+  - name: read-image-after-rejected
+    request:
+      method: GET
+      url: '{keptURL}'
+    expect: {status: 200, content_type: image/png, body_file: profile.png}

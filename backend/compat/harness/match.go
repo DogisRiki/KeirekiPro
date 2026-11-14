@@ -4,9 +4,11 @@ package harness
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -38,7 +40,11 @@ type Match struct {
 	// 本文の項目は、その場所と、その下の場所の違いに当たる。ヘッダの項目では、ヘッダの名前である。空ならどの場所にも当たる。
 	Path string `yaml:"path"`
 	// OrderOnly が true の項目は、Path の並びの、要素の順だけの違いを許す。Path は [*] で終わる本文の場所である。
+	// Target が redis のときは、Path はキーの形(path.Match の形)で、Field の名前のハッシュの項目の、
+	// カンマで区切った要素の順だけの違いを許す。
 	OrderOnly bool `yaml:"order_only"`
+	// Field は、Target が redis の OrderOnly の項目の、ハッシュの項目の名前である。ほかの項目には書かない。
+	Field string `yaml:"field"`
 	// Status を書いた項目は、Java 版と Go 版の応答のステータスがどちらもその値のときだけ当たる。0 は書いていないことを表す。
 	Status int `yaml:"status"`
 }
@@ -143,10 +149,64 @@ func (m Match) validate() error {
 			return fmt.Errorf("order_only の match の path %q は、[*] で終わる並びの場所にします", m.Path)
 		}
 	}
-	if m.OrderOnly && (m.Target != TargetBody || m.Path == "") {
-		return errors.New("order_only の match は、target を body にし、path に並びの場所を書きます")
+	switch {
+	case m.OrderOnly && m.Target == TargetRedis:
+		if m.Path == "" || m.Field == "" {
+			return errors.New("target が redis の order_only の match には、path にキーの形を、field にハッシュの項目の名前を書きます")
+		}
+		if _, err := path.Match(m.Path, ""); err != nil {
+			return fmt.Errorf("path %q はキーの形として読めません: %w", m.Path, err)
+		}
+	case m.Field != "":
+		return errors.New("field は、target が redis の order_only の match にだけ書きます")
+	case m.OrderOnly && (m.Target != TargetBody || m.Path == ""):
+		return errors.New("order_only の match は、target を body か redis にし、path に並びの場所を書きます")
 	}
 	return nil
+}
+
+// sortRedisOrderOnly は、Redis の順だけの違いを許す項目に当たるハッシュの項目の値を、カンマで区切った要素の順に
+// 並べ替えた写しを返す。両方の版で同じ規則で並べ替えるので、要素が同じなら、並べ替えたあとの値も同じになる。
+func sortRedisOrderOnly(behaviors []ChangedBehavior, step StepRef, entries []RedisEntry) []RedisEntry {
+	out := slices.Clone(entries)
+	for _, b := range behaviors {
+		for _, m := range b.Matches {
+			if !m.OrderOnly || m.Target != TargetRedis || !m.applies(step) {
+				continue
+			}
+			for i, e := range out {
+				if ok, err := path.Match(m.Path, e.Key); ok && err == nil && e.Type == "hash" {
+					out[i].Value = sortHashField(e.Value, m.Field)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// sortHashField は、DumpRedis の形のハッシュの値 value の、項目 field の値の要素を並べ替える。
+// 値が " で囲まれていれば(Java 版と Go 版が書く JSON の文字の形)、囲みの中を並べ替える。項目が無ければ元のまま返す。
+func sortHashField(value, field string) string {
+	var fields map[string]string
+	if json.Unmarshal([]byte(value), &fields) != nil {
+		return value
+	}
+	v, ok := fields[field]
+	if !ok {
+		return value
+	}
+	inner, quoted := v, false
+	if len(v) >= 2 && strings.HasPrefix(v, `"`) && strings.HasSuffix(v, `"`) {
+		inner, quoted = v[1:len(v)-1], true
+	}
+	items := strings.Split(inner, ",")
+	slices.Sort(items)
+	inner = strings.Join(items, ",")
+	if quoted {
+		inner = `"` + inner + `"`
+	}
+	fields[field] = inner
+	return canonicalJSON(fields)
 }
 
 // splitJSONPath は、$ で始まる JSON の場所を区切りに分ける。

@@ -131,9 +131,9 @@
 | 項目 | 設定値 |
 |------|--------|
 | VPC | keirekipro-vpc |
-| サブネット | keirekipro-private-1a, keirekipro-private-1c |
+| サブネット | keirekipro-public-1a, keirekipro-public-1c |
 | セキュリティグループ | keirekipro-ecs-sg |
-| パブリックIPの自動割り当て | 無効 |
+| パブリックIPの自動割り当て | 有効 |
 
 ### 4.3 ロードバランサー設定
 

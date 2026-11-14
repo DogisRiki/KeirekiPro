@@ -1,0 +1,446 @@
+{
+  "cases": [
+    {
+      "name": "試作の例: 3バイトの字の途中で切れる",
+      "inputHex": "61e38162",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb",
+      "storedHex": "61efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "試作の例: U+10FFFF を超える4バイト",
+      "inputHex": "61f490808062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffd\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffd\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbdefbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "2バイトの字の途中で切れる",
+      "inputHex": "61c262",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb",
+      "storedHex": "61efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "2バイトの冗長な形 C0 80",
+      "inputHex": "61c08062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "2バイトの冗長な形 C1 BF",
+      "inputHex": "61c1bf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "2バイトの最小 U+0080",
+      "inputHex": "61c28062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"ab\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "ab",
+      "storedHex": "61c28062",
+      "storedCodePoints": [
+        "U+0061",
+        "U+0080",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "2バイトの最大 U+07FF",
+      "inputHex": "61dfbf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a߿b\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a߿b",
+      "storedHex": "61dfbf62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+07FF",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "3バイトの冗長な形 E0 80 80",
+      "inputHex": "61e0808062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "3バイトの冗長な形 E0 9F BF",
+      "inputHex": "61e09fbf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "3バイトの最小 U+0800",
+      "inputHex": "61e0a08062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"aࠀb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "aࠀb",
+      "storedHex": "61e0a08062",
+      "storedCodePoints": [
+        "U+0061",
+        "U+0800",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "サロゲートの直前 U+D7FF",
+      "inputHex": "61ed9fbf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a퟿b\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a퟿b",
+      "storedHex": "61ed9fbf62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+D7FF",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "サロゲート U+D800",
+      "inputHex": "61eda08062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb",
+      "storedHex": "61efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "サロゲート U+DFFF",
+      "inputHex": "61edbfbf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb",
+      "storedHex": "61efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "サロゲートの直後 U+E000",
+      "inputHex": "61ee808062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"ab\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "ab",
+      "storedHex": "61ee808062",
+      "storedCodePoints": [
+        "U+0061",
+        "U+E000",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "3バイトの最大 U+FFFF",
+      "inputHex": "61efbfbf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a￿b\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a￿b",
+      "storedHex": "61efbfbf62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFF",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "4バイトの冗長な形 F0 80 80 80",
+      "inputHex": "61f080808062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffd\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffd\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbdefbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "4バイトの冗長な形 F0 8F BF BF",
+      "inputHex": "61f08fbfbf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffd\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffd\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbdefbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "4バイトの最小 U+10000",
+      "inputHex": "61f090808062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\\uD800\\uDC00b\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a𐀀b",
+      "storedHex": "61f090808062",
+      "storedCodePoints": [
+        "U+0061",
+        "U+10000",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "4バイトの最大 U+10FFFF",
+      "inputHex": "61f48fbfbf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\\uDBFF\\uDFFFb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a􏿿b",
+      "storedHex": "61f48fbfbf62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+10FFFF",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "4バイトの字の3バイト目までで切れる",
+      "inputHex": "61f0908062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb",
+      "storedHex": "61efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "4バイトの字の2バイト目までで切れる",
+      "inputHex": "61f09062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb",
+      "storedHex": "61efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "続きのバイトだけ 80",
+      "inputHex": "618062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb",
+      "storedHex": "61efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "続きのバイトだけ BF BF",
+      "inputHex": "61bfbf62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "使わない先頭のバイト F5",
+      "inputHex": "61f580808062",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\ufffd\ufffd\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd\ufffd\ufffd\ufffdb",
+      "storedHex": "61efbfbdefbfbdefbfbdefbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "使わない先頭のバイト FF",
+      "inputHex": "61ff62",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb",
+      "storedHex": "61efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "末尾で3バイトの字が切れる",
+      "inputHex": "61e381",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffd\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffd",
+      "storedHex": "61efbfbd",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD"
+      ]
+    },
+    {
+      "name": "3バイトの字の2バイト目が続きのバイトでない",
+      "inputHex": "61e3628162",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdb\ufffdb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdb\ufffdb",
+      "storedHex": "61efbfbd62efbfbd62",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+0062",
+        "U+FFFD",
+        "U+0062"
+      ]
+    },
+    {
+      "name": "誤ったバイトのあとに正しい字",
+      "inputHex": "61e381e3818262",
+      "answer": {
+        "status": 200,
+        "body": "{\"id\":\"11111111-1111-4111-8111-000000000002\",\"email\":\"cap-name@example.com\",\"username\":\"a\ufffdあb\",\"hasPassword\":true,\"profileImage\":null,\"twoFactorAuthEnabled\":false,\"authProviders\":[],\"roles\":[\"USER\"],\"emailVerified\":true,\"pendingEmail\":null}"
+      },
+      "storedUsername": "a\ufffdあb",
+      "storedHex": "61efbfbde3818262",
+      "storedCodePoints": [
+        "U+0061",
+        "U+FFFD",
+        "U+3042",
+        "U+0062"
+      ]
+    }
+  ],
+  "userId": "11111111-1111-4111-8111-000000000002"
+}

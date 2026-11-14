@@ -98,6 +98,25 @@ seed() {
         echo '}'
     } >"$GO_DIR/sample_test.go"
 
+    # 一部の欄や行だけが品質チェックを決めるファイル(#826)
+    {
+        echo '{'
+        echo '    "name": "sample",'
+        echo '    "packageManager": "pnpm@11.10.0",'
+        echo '    "scripts": { "lint": "eslint ./src", "format": "prettier --check ./src" },'
+        echo '    "dependencies": { "react": "^19.0.0" },'
+        echo '    "devDependencies": { "eslint": "^9.39.4" }'
+        echo '}'
+    } >frontend/package.json
+    mkdir -p docker/terraform
+    {
+        echo 'FROM ghcr.io/terraform-linters/tflint:v0.66.0@sha256:65b9944a9274c4989492c1d79998c2801664bf8a55fddb4bd3a9e6d73a006ddc AS tflint'
+        echo ''
+        echo 'FROM hashicorp/terraform:1.17.1@sha256:a5d5a5a892c98f60fcbfa81eac2a40fc19e7b3fa7719bccae10ff6111d22524a'
+        echo 'COPY --from=tflint /usr/local/bin/tflint /usr/local/bin/tflint'
+        echo 'RUN pip3 install -r /tmp/requirements.txt'
+    } >docker/terraform/Dockerfile
+
     git add -A && git commit -qm base
     BASE=$(git rev-parse HEAD)
     PR_BODY_VAL=""
@@ -205,6 +224,26 @@ go_gremlins() { printf 'unleash:\n  threshold:\n    efficacy: 80\n' >backend/.gr
 go_oapi() { mkdir -p backend/api && printf 'package: gen\n' >backend/api/oapi-codegen.yaml; }
 go_sqlc() { printf 'version: "2"\n' >backend/sqlc.yaml; }
 go_nested_makefile() { mkdir -p backend/tools && printf 'all:\n' >backend/tools/Makefile; }
+
+# 品質チェックが何を調べるかを決めるファイル(#826)
+# 使い方: touch_path <パス>。ファイルが無ければフォルダごと作る
+touch_path() { mkdir -p "$(dirname "$1")" && echo "# changed" >>"$1"; }
+
+# frontend/package.json の欄を書き換える。jq でなく sed で書くのは、テストが検査と同じ道具に
+# 頼らないようにするため
+pkg_bump_versions() { sed -i -e 's/"\^19.0.0"/"^19.1.0"/' -e 's/"\^9.39.4"/"^9.40.0"/' frontend/package.json; }
+pkg_bump_package_manager() { sed -i 's/pnpm@11.10.0/pnpm@11.11.0/' frontend/package.json; }
+pkg_add_dependency() { sed -i 's/"react": "\^19.0.0"/"react": "^19.0.0", "zod": "^4.0.0"/' frontend/package.json; }
+pkg_change_script() { sed -i 's/"eslint .\/src"/"echo ok"/' frontend/package.json; }
+pkg_add_tool_config() { sed -i 's/"name": "sample",/"name": "sample", "prettier": { "printWidth": 400 },/' frontend/package.json; }
+pkg_break_json() { echo '{' >frontend/package.json; }
+pkg_delete() { git rm -q frontend/package.json; }
+
+docker_bump_tag() { sed -i 's/tflint:v0.66.0/tflint:v0.67.0/' docker/terraform/Dockerfile; }
+docker_bump_digest() { sed -i 's/@sha256:a5d5a5a8[0-9a-f]*/@sha256:0000000000000000000000000000000000000000000000000000000000000000/' docker/terraform/Dockerfile; }
+docker_add_platform() { sed -i 's/^FROM hashicorp\/terraform:1.17.1/FROM --platform=linux\/amd64 hashicorp\/terraform:1.17.2/' docker/terraform/Dockerfile; }
+docker_change_image() { sed -i 's/hashicorp\/terraform:/example\/terraform:/' docker/terraform/Dockerfile; }
+docker_change_run() { echo 'RUN ln -sf /bin/true /usr/local/bin/tflint' >>docker/terraform/Dockerfile; }
 
 echo "--- 対象外の変更 ---"
 seed
@@ -407,6 +446,133 @@ run_check 1 "sqlc.yaml の変更は所有者の承認が無ければ失敗する
 seed
 go_nested_makefile
 run_check 0 "backend の直下でない Makefile の変更は通す"
+
+echo "--- 6c. 品質チェックが何を調べるかを決めるファイル ---"
+for p in \
+    .gitleaksignore \
+    .gitleaks.toml \
+    .editorconfig \
+    frontend/eslint.config.js \
+    frontend/src/feature/eslint.config.mjs \
+    frontend/vite.config.ts \
+    frontend/vite.config.js \
+    frontend/vitest.config.ts \
+    frontend/vitest.workspace.ts \
+    frontend/playwright.config.ts \
+    frontend/playwright.config.js \
+    frontend/tsconfig.json \
+    frontend/tsconfig.app.json \
+    frontend/tsconfig.node.json \
+    frontend/src/feature/tsconfig.json \
+    frontend/.prettierrc \
+    frontend/.prettierrc.json \
+    frontend/src/feature/.prettierrc \
+    frontend/prettier.config.js \
+    frontend/.prettierignore \
+    frontend/.editorconfig \
+    frontend/knip.json \
+    frontend/.knip.jsonc \
+    frontend/knip.config.ts \
+    frontend/stryker.config.json \
+    frontend/stryker.conf.mjs \
+    backend/gradle/quality.gradle \
+    backend/config/checkstyle.xml \
+    backend/src/test/java/com/example/keirekipro/unit/architecture/ArchTest.java \
+    terraform/.checkov.yaml \
+    terraform/modules/x/.checkov.yml \
+    terraform/.tflint.hcl \
+    terraform/modules/x/.tflint.hcl \
+    terraform/.checkov.baseline; do
+    seed
+    touch_path "$p"
+    run_check 1 "$p の変更は所有者の承認が無ければ失敗する"
+    check_summary "$p" "$p がゲート設定ファイルとして報告される"
+done
+
+seed
+touch_path frontend/tsconfig.app.json
+approve
+run_check 0 "tsconfig.app.json の変更は所有者の承認があれば通る"
+
+for p in \
+    frontend/src/knip.json \
+    frontend/src/stryker.config.json \
+    frontend/src/vite.config.ts \
+    doc/tsconfig.json \
+    doc/.prettierrc \
+    backend/.checkov.yaml \
+    frontend/vitest-setup.ts; do
+    seed
+    touch_path "$p"
+    run_check 0 "$p は品質チェックの設定でないので通す"
+done
+
+echo "--- 6d. frontend/package.json の依存の版のほかの欄 ---"
+seed
+pkg_bump_versions
+run_check 0 "依存の版だけを上げる変更は通す"
+
+seed
+pkg_bump_package_manager
+run_check 0 "packageManager の版だけを上げる変更は通す"
+
+seed
+pkg_add_dependency
+run_check 0 "依存を足す変更は通す(依存の検査が別に見る)"
+
+seed
+pkg_change_script
+run_check 1 "scripts の欄の変更は所有者の承認が無ければ失敗する"
+check_summary "frontend/package.json(依存の版の欄と packageManager のほかの欄)" "package.json がゲート設定ファイルとして報告される"
+
+seed
+pkg_change_script
+pkg_bump_versions
+run_check 1 "依存の版と一緒に scripts の欄を変えても失敗する"
+
+seed
+pkg_change_script
+approve
+run_check 0 "scripts の欄の変更は所有者の承認があれば通る"
+
+seed
+pkg_add_tool_config
+run_check 1 "道具の設定の欄を足す変更は所有者の承認が無ければ失敗する"
+
+seed
+pkg_break_json
+run_check 1 "JSON として読めない package.json は承認を求める"
+
+seed
+pkg_delete
+run_check 1 "package.json を消す変更は承認を求める"
+
+echo "--- 6e. docker/terraform/Dockerfile の FROM の行の版のほかの行 ---"
+seed
+docker_bump_tag
+run_check 0 "FROM の行のタグだけを上げる変更は通す"
+
+seed
+docker_bump_digest
+run_check 0 "FROM の行の digest だけを変える変更は通す"
+
+seed
+docker_add_platform
+run_check 1 "FROM の行に指定を足す変更は所有者の承認が無ければ失敗する"
+
+seed
+docker_change_image
+run_check 1 "FROM の行のイメージの名前を変える変更は所有者の承認が無ければ失敗する"
+
+seed
+docker_change_run
+run_check 1 "FROM のほかの行の変更は所有者の承認が無ければ失敗する"
+check_summary "docker/terraform/Dockerfile(FROM の行のイメージの版のほかの行)" "Dockerfile がゲート設定ファイルとして報告される"
+
+seed
+docker_change_run
+approve
+run_check 0 "FROM のほかの行の変更は所有者の承認があれば通る"
 
 echo "--- 変更ファイルの一覧が取れない場合 ---"
 seed

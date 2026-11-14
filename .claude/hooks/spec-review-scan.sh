@@ -18,19 +18,43 @@
 # 前提: bash と perl(JSON::PP)。jqには依存しない。
 # =====================================================================
 
-# spec.json から値を取り出す。$1=ファイル $2... = キーの並び
-_sr_json() {
-    local f="$1"; shift
+# 走査の対象の段階を、すべての spec.json から1回の perl でまとめて選ぶ。
+# 値を1つ読むたびに perl を起動すると、spec の数に比例して時間がかかり、
+# フックに与えられた時間を超えて、確かめが最後まで動かなくなるため(#828)。
+# 引数: spec.json のパスの並び。出力: 対象の段階がある spec を1行1件で
+#   "<feature>|<stage> <stage> ..."(段階は requirements design tasks の順)
+# 読めない spec.json と、JSON として読めない spec.json は飛ばす。
+_sr_targets() {
     perl -MJSON::PP -e '
-        my $f = shift @ARGV;
-        open my $fh, "<", $f or exit 0;
-        local $/; my $d = eval { JSON::PP::decode_json(<$fh>) };
-        exit 0 unless ref $d;
-        my $v = $d;
-        for my $k (@ARGV) { $v = eval { $v->{$k} }; last unless defined $v; }
-        if (JSON::PP::is_bool($v)) { print $v ? "true" : "false" }
-        elsif (defined $v && !ref $v) { print $v }
-    ' -- "$f" "$@" 2>/dev/null
+        # キーの並びをたどって値を文字列にする。真偽値は "true"/"false"、
+        # 文字列と数はそのまま、無い値と配列・オブジェクトは空にする
+        sub sr_val {
+            my $v = shift;
+            for my $k (@_) { $v = eval { $v->{$k} }; last unless defined $v; }
+            return $v ? "true" : "false" if JSON::PP::is_bool($v);
+            return (defined $v && !ref $v) ? $v : "";
+        }
+        for my $f (@ARGV) {
+            next unless -f $f;
+            open my $fh, "<", $f or next;
+            my $d = do { local $/; eval { JSON::PP::decode_json(<$fh>) } };
+            close $fh;
+            next unless ref $d;
+            next if sr_val($d, "phase") eq "initialized";
+            (my $feature = $f) =~ s{/spec\.json\z}{};
+            $feature =~ s{\A.*/}{};
+            my @stages;
+            for my $stage (qw(requirements design tasks)) {
+                next unless sr_val($d, "approvals", $stage, "generated") eq "true";
+                my $approved = sr_val($d, "approvals", $stage, "approved");
+                my $by = sr_val($d, "approvals", $stage, "approved_by");
+                # 人の承認がある段階は対象外
+                next if $approved eq "true" && $by ne "" && index($by, ":") < 0;
+                push @stages, $stage;
+            }
+            print "$feature|@stages\n" if @stages;
+        }
+    ' -- "$@" 2>/dev/null
 }
 
 # reviewファイルの最新の節で「新しく出た」指摘IDを列挙する。
@@ -55,26 +79,13 @@ spec_review_scan() {
     local specs_dir="$project_dir/.kiro/specs"
     [ -d "$specs_dir" ] || return 0
 
-    local spec_json feature phase stage gen approved by
+    local feature stages stage
     local review response evidence blockers unresolved
 
-    for spec_json in "$specs_dir"/*/spec.json; do
-        [ -f "$spec_json" ] || continue
-        feature=$(basename "$(dirname "$spec_json")")
-        phase=$(_sr_json "$spec_json" phase)
-        [ "$phase" = "initialized" ] && continue
+    while IFS='|' read -r feature stages; do
+        [ -z "$feature" ] && continue
 
-        for stage in requirements design tasks; do
-            gen=$(_sr_json "$spec_json" approvals "$stage" generated)
-            [ "$gen" = "true" ] || continue
-
-            approved=$(_sr_json "$spec_json" approvals "$stage" approved)
-            by=$(_sr_json "$spec_json" approvals "$stage" approved_by)
-            # 人の承認がある段階は対象外
-            if [ "$approved" = "true" ] && [ -n "$by" ] && ! printf '%s' "$by" | grep -q ':'; then
-                continue
-            fi
-
+        for stage in $stages; do
             review="$project_dir/.kiro/specs/$feature/reviews/${stage}-review.md"
             response="$project_dir/.kiro/specs/$feature/reviews/${stage}-response.md"
             evidence="$project_dir/.claude/.state/spec-review/${feature}__${stage}.evidence"
@@ -164,5 +175,7 @@ spec_review_scan() {
 
             printf '%s|%s|%s|%s\n' "$feature" "$stage" "$blockers" "$unresolved"
         done
-    done
+    done <<EOF
+$(_sr_targets "$specs_dir"/*/spec.json)
+EOF
 }

@@ -2,6 +2,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -42,6 +43,9 @@ type Options struct {
 	Auth func(http.Handler) http.Handler
 	// AuthHandlers は、認証の操作の処理である。*auth.Service を渡す。nil なら、認証の操作も Handlers が答える。
 	AuthHandlers AuthService
+	// UserHandlers は、利用者の7つの操作の処理である。*users.Service を渡す。利用者の操作はログインを求めるので、
+	// AuthHandlers があるときだけ使う。nil なら、利用者の操作も Handlers が答える。
+	UserHandlers UserService
 	// CookieSecure は、認証の操作が書く Cookie に Secure を付けるかである。config の App.CookieSecure を渡す。
 	CookieSecure bool
 	// APIBaseURL は、Google と GitHub から戻る先の URL の基底である。config の App.APIBaseURL を渡す。
@@ -49,12 +53,36 @@ type Options struct {
 	APIBaseURL string
 }
 
-// routes は、認証の操作の受け口を深さ1に、ほかの操作の答えを深さ2に埋め込んだ、仕様書の操作の受け口の束である。
-// Go は、同じ名前のメソッドが複数の深さにあるとき、浅い深さのメソッドを使うので、認証の操作には認証の受け口が答える。
-// ほかのまとまりの spec で作る受け口も、深さ1に足す。
+// routes は、認証の操作の受け口と利用者の操作の受け口を深さ1に、ほかの操作の答えを深さ2に埋め込んだ、仕様書の
+// 操作の受け口の束である。Go は、同じ名前のメソッドが複数の深さにあるとき、浅い深さのメソッドを使うので、
+// 認証の操作には認証の受け口が、利用者の操作には利用者の受け口が答える。認証の受け口と利用者の受け口は同じ名前の
+// メソッドを持たないので、深さ1に並べても曖昧にならない。ほかのまとまりの spec で作る受け口も、深さ1に足す。
 type routes struct {
 	*authHandlers
+	userOperations
 	fallback
+}
+
+// userOperations は、利用者の7つの操作のメソッドである。Options の UserHandlers が無いときは、ほかの操作の答えを入れ、
+// 利用者の操作にも、ほかの操作と同じ答え(Options の Handlers か未実装の答え)を返す。
+type userOperations interface {
+	GetUserInfo(ctx context.Context, request gen.GetUserInfoRequestObject) (gen.GetUserInfoResponseObject, error)
+	UpdateUserInfo(
+		ctx context.Context, request gen.UpdateUserInfoRequestObject,
+	) (gen.UpdateUserInfoResponseObject, error)
+	DeleteUser(ctx context.Context, request gen.DeleteUserRequestObject) (gen.DeleteUserResponseObject, error)
+	SendAccountEmailVerification(
+		ctx context.Context, request gen.SendAccountEmailVerificationRequestObject,
+	) (gen.SendAccountEmailVerificationResponseObject, error)
+	SetEmailAndPassword(
+		ctx context.Context, request gen.SetEmailAndPasswordRequestObject,
+	) (gen.SetEmailAndPasswordResponseObject, error)
+	ChangePassword(
+		ctx context.Context, request gen.ChangePasswordRequestObject,
+	) (gen.ChangePasswordResponseObject, error)
+	RemoveAuthProvider(
+		ctx context.Context, request gen.RemoveAuthProviderRequestObject,
+	) (gen.RemoveAuthProviderResponseObject, error)
 }
 
 // fallback は、ほかの操作の答え(Options の Handlers か未実装の答え)を、routes の深さ2に置くための型である。
@@ -72,14 +100,21 @@ func New(opts Options) http.Handler {
 		handlers = Unimplemented{}
 	}
 	if opts.AuthHandlers != nil {
+		var userOps userOperations = handlers
+		if opts.UserHandlers != nil {
+			userOps = newUserHandlers(opts.UserHandlers, opts.CookieSecure)
+		}
 		handlers = routes{
-			authHandlers: newAuthHandlers(opts.AuthHandlers, logger, opts.CookieSecure, opts.APIBaseURL, time.Now),
-			fallback:     fallback{handlers},
+			authHandlers:   newAuthHandlers(opts.AuthHandlers, logger, opts.CookieSecure, opts.APIBaseURL, time.Now),
+			userOperations: userOps,
+			fallback:       fallback{handlers},
 		}
 	}
 
 	mux := http.NewServeMux()
-	strict := gen.NewStrictHandlerWithOptions(handlers, []gen.StrictMiddlewareFunc{authRequestMiddleware}, gen.StrictHTTPServerOptions{
+	// 本文を読む中間処理 updateUserInfoMiddleware は、名前と画像と2段階認証の設定の変更の操作のときだけ働く
+	strictMiddlewares := []gen.StrictMiddlewareFunc{authRequestMiddleware, updateUserInfoMiddleware}
+	strict := gen.NewStrictHandlerWithOptions(handlers, strictMiddlewares, gen.StrictHTTPServerOptions{
 		// 要求の本文を JSON として読めないときは、Java 版の HttpMessageNotReadableException と同じ 400 にする
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
 			middleware.WriteError(w, http.StatusBadRequest, middleware.MessageBadRequest)
