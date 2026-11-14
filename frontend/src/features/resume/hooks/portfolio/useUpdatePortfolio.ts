@@ -33,7 +33,7 @@ export const useUpdatePortfolio = (resumeId: string, options?: { onResumeNotFoun
         },
         onSuccess: (response, { portfolioId }) => {
             const { portfolios: serverPortfolios, updatedAt } = response.data;
-            const { resume, dirtyEntryIds, updateResumeFromServer, setDirty, removeDirtyEntryId, clearEntryErrors } =
+            const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
 
             // 保存完了したエントリーのエラーをクリア
@@ -64,7 +64,6 @@ export const useUpdatePortfolio = (resumeId: string, options?: { onResumeNotFoun
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(portfolioId);
-            setDirty(false);
             setNotification("ポートフォリオを更新しました。", "success");
         },
         onError: async (error, { portfolioId }) => {

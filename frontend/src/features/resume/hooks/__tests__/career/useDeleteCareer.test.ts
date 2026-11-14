@@ -56,7 +56,7 @@ describe("useDeleteCareer", () => {
         vi.spyOn(useNotificationStore.getState(), "setNotification");
 
         vi.spyOn(useResumeStore.getState(), "updateResume");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
+        vi.spyOn(useResumeStore.getState(), "removeEntry");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
     });
@@ -82,13 +82,34 @@ describe("useDeleteCareer", () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
-        expect(useResumeStore.getState().updateResume).toHaveBeenCalledWith({
-            careers: [localResume.careers.find((c) => c.id === "career-2")!],
-        });
-        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(careerId);
+        expect(useResumeStore.getState().resume?.careers).toEqual([
+            localResume.careers.find((c) => c.id === "career-2")!,
+        ]);
+        expect(useResumeStore.getState().removeEntry).toHaveBeenCalledWith("careers", careerId);
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().isDirty).toBe(false); // ほかに未保存のエントリーが無い
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("職歴を削除しました。", "success");
+    });
+
+    it("ほかのエントリーが未保存のまま1件を削除したときは、未保存の変更が残ること", async () => {
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().addDirtyEntryId("career-1");
+        useResumeStore.getState().addDirtyEntryId("career-2");
+        vi.mocked(protectedApiClient.delete).mockResolvedValueOnce({
+            status: 200,
+            data: undefined,
+        } as AxiosResponse<void>);
+
+        const { result } = renderHook(() => useDeleteCareer("resume-1"), { wrapper });
+        act(() => {
+            result.current.mutate("career-1");
+        });
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        const state = useResumeStore.getState();
+        expect(state.dirtyEntryIds.has("career-1")).toBe(false);
+        expect(state.dirtyEntryIds.has("career-2")).toBe(true);
+        expect(state.isDirty).toBe(true);
     });
 
     it("選択中でないエントリーを削除した場合、選択中のエントリーは選ばれたままであること", async () => {

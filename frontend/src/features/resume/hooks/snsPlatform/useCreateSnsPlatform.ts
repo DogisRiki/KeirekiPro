@@ -35,7 +35,6 @@ export const useCreateSnsPlatform = (resumeId: string, options?: { onResumeNotFo
                 resume,
                 dirtyEntryIds,
                 updateResumeFromServer,
-                setDirty,
                 removeDirtyEntryId,
                 setActiveEntryId,
                 clearEntryErrors,
@@ -79,7 +78,6 @@ export const useCreateSnsPlatform = (resumeId: string, options?: { onResumeNotFo
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(tempId);
-            setDirty(false);
             setNotification("SNSを作成しました。", "success");
         },
         onError: (error, { tempId }) => {

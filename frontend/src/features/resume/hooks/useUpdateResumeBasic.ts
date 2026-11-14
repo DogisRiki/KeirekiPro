@@ -19,7 +19,7 @@ import type { AxiosError, AxiosResponse } from "axios";
  */
 export const useUpdateResumeBasic = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { setNotification } = useNotificationStore();
-    const { updateResumeFromServer, setDirty, setEntryErrors, clearEntryErrors } = useResumeStore();
+    const { updateResumeFromServer, removeDirtyEntryId, setEntryErrors, clearEntryErrors } = useResumeStore();
 
     return useMutation<AxiosResponse<Resume>, AxiosError<ErrorResponse>, UpdateResumeBasicPayload>({
         mutationFn: (payload) => updateResumeBasic(resumeId, payload),
@@ -32,7 +32,7 @@ export const useUpdateResumeBasic = (resumeId: string, options?: { onResumeNotFo
             // 基本情報のみ更新（他のセクションの編集中データを保持）
             const { resumeName, date, lastName, firstName, updatedAt } = response.data;
             updateResumeFromServer({ resumeName, date, lastName, firstName, updatedAt });
-            setDirty(false);
+            removeDirtyEntryId(BASIC_INFO_ENTRY_ID);
             setNotification("基本情報を保存しました。", "success");
         },
         onError: (error) => {

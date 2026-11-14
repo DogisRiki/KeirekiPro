@@ -35,7 +35,6 @@ export const useCreateSelfPromotion = (resumeId: string, options?: { onResumeNot
                 resume,
                 dirtyEntryIds,
                 updateResumeFromServer,
-                setDirty,
                 removeDirtyEntryId,
                 setActiveEntryId,
                 clearEntryErrors,
@@ -79,7 +78,6 @@ export const useCreateSelfPromotion = (resumeId: string, options?: { onResumeNot
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(tempId);
-            setDirty(false);
             setNotification("自己PRを作成しました。", "success");
         },
         onError: (error, { tempId }) => {

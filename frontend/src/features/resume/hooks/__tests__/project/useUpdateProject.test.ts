@@ -125,7 +125,6 @@ describe("useUpdateProject", () => {
         vi.mocked(protectedApiClient.get).mockReset();
         vi.spyOn(useNotificationStore.getState(), "setNotification");
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setEntryErrors");
         vi.spyOn(useResumeStore.getState(), "clearEntryErrors");
@@ -252,7 +251,8 @@ describe("useUpdateProject", () => {
             updatedAt: serverResume.updatedAt,
         });
         expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(projectId);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().dirtyEntryIds.has(projectId)).toBe(false);
+        expect(useResumeStore.getState().isDirty).toBe(true); // ほかのエントリーが未保存のまま残る
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
             "プロジェクトを更新しました。",
             "success",
@@ -349,7 +349,7 @@ describe("useUpdateProject", () => {
         expect(useResumeStore.getState().setEntryErrors).toHaveBeenCalledWith(projectId, mockErrorResponse.errors);
 
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
-        expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
+        expect(useResumeStore.getState().removeDirtyEntryId).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
     });
 

@@ -33,7 +33,7 @@ export const useUpdateCertification = (resumeId: string, options?: { onResumeNot
         },
         onSuccess: (response, { certificationId }) => {
             const { certifications: serverCertifications, updatedAt } = response.data;
-            const { resume, dirtyEntryIds, updateResumeFromServer, setDirty, removeDirtyEntryId, clearEntryErrors } =
+            const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
 
             // 保存完了したエントリーのエラーをクリア
@@ -66,7 +66,6 @@ export const useUpdateCertification = (resumeId: string, options?: { onResumeNot
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(certificationId);
-            setDirty(false);
             setNotification("資格を更新しました。", "success");
         },
         onError: async (error, { certificationId }) => {
