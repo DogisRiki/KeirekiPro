@@ -24,14 +24,17 @@ export const useUpdateSelfPromotion = (resumeId: string, options?: { onResumeNot
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { selfPromotionId: string; payload: UpdateSelfPromotionPayload }
+        { selfPromotionId: string; payload: UpdateSelfPromotionPayload },
+        { snapshot?: Resume["selfPromotions"][number] }
     >({
         mutationFn: ({ selfPromotionId, payload }) => updateSelfPromotion(resumeId, selfPromotionId, payload),
         onMutate: ({ selfPromotionId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(selfPromotionId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.selfPromotions.find((e) => e.id === selfPromotionId) };
         },
-        onSuccess: (response, { selfPromotionId }) => {
+        onSuccess: (response, { selfPromotionId }, onMutateResult) => {
             const { selfPromotions: serverSelfPromotions, updatedAt } = response.data;
             const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
@@ -41,10 +44,15 @@ export const useUpdateSelfPromotion = (resumeId: string, options?: { onResumeNot
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があるか(保存を始めたあとにエントリーが置き換わったか)
+            const editedDuringSave = resume.selfPromotions.some(
+                (e) => e.id === selfPromotionId && e !== onMutateResult?.snapshot,
+            );
+
             // 保存したID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
                 resume.selfPromotions
-                    .filter((s) => s.id !== selfPromotionId && dirtyEntryIds.has(s.id))
+                    .filter((s) => (s.id !== selfPromotionId || editedDuringSave) && dirtyEntryIds.has(s.id))
                     .map((s) => [s.id, s]),
             );
 
@@ -65,7 +73,8 @@ export const useUpdateSelfPromotion = (resumeId: string, options?: { onResumeNot
             updateResumeFromServer({ selfPromotions: finalSelfPromotions, updatedAt });
 
             // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(selfPromotionId);
+            // 保存中に打った文字があれば、未保存のまま残す
+            if (!editedDuringSave) removeDirtyEntryId(selfPromotionId);
             setNotification("自己PRを更新しました。", "success");
         },
         onError: async (error, { selfPromotionId }) => {
