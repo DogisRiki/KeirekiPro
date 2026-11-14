@@ -458,3 +458,105 @@ func TestRedisStep_DelAndSetWithVersionValues(t *testing.T) {
 		t.Errorf("つなげない Redis の誤り = %v", err)
 	}
 }
+
+// userFieldSteps は、利用者の操作の筋書きのために足した5つの欄を、正しく書いた段の並びである。
+const userFieldSteps = `  - name: upload
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: 新しい名前}
+        - {name: twoFactorAuthEnabled, value: ""}
+        - {name: profileImage, file: profile.png, filename: big.png, content_type: image/png, pad_to: 1048577}
+        - {name: other, file: profile.jpg}
+    capture: {imageURL: $.profileImage}
+    expect:
+      status: 200
+      values:
+        $.username: 新しい名前
+        $.twoFactorAuthEnabled: false
+        $.profileImage: null
+        "$.roles[0]": "{role}"
+  - name: put-image
+    request:
+      method: PUT
+      url: "http://localhost:4566/keirekipro-storage/x.png"
+      headers: {Content-Type: image/png}
+      body_file: profile.png
+    expect: {status: 200}
+  - name: read-image
+    request: {method: GET, url: "{imageURL}"}
+    expect: {status: 200, body_file: profile.gif, content_type: image/gif}
+  - name: last
+    request: {method: GET, path: /api/users/me}
+    expect: {status: 200}
+`
+
+func TestScenarioValidate_UserFields(t *testing.T) {
+	s, err := LoadScenario(writeScenario(t, kindsScenario("compare, cross", userFieldSteps)))
+	if err != nil {
+		t.Fatalf("5つの欄を書いた筋書き: %v", err)
+	}
+	newName, empty := "新しい名前", ""
+	wantParts := []MultipartPart{
+		{Name: "username", Value: &newName},
+		{Name: "twoFactorAuthEnabled", Value: &empty},
+		{Name: "profileImage", File: "profile.png", Filename: "big.png", ContentType: "image/png", PadTo: 1048577},
+		{Name: "other", File: "profile.jpg"},
+	}
+	if got := s.Steps[0].Request.Multipart; !reflect.DeepEqual(got, wantParts) {
+		t.Errorf("multipart = %+v, want %+v", got, wantParts)
+	}
+	wantValues := map[string]any{"$.username": "新しい名前", "$.twoFactorAuthEnabled": false, "$.profileImage": nil, "$.roles[0]": "{role}"}
+	if got := s.Steps[0].Expect.Values; !reflect.DeepEqual(got, wantValues) {
+		t.Errorf("expect の values = %#v, want %#v", got, wantValues)
+	}
+	if got := s.Steps[1].Request; got.BodyFile != "profile.png" || got.Headers["Content-Type"] != "image/png" || s.Steps[1].Kind() != StepAbsoluteURL {
+		t.Errorf("request の body_file の段 = %+v", got)
+	}
+	if got := s.Steps[2].Expect; got.BodyFile != "profile.gif" || got.ContentType != "image/gif" {
+		t.Errorf("expect の body_file と content_type = %+v", got)
+	}
+
+	const absURL = `    request: {method: GET, url: "http://localhost:4566/b/k"}` + "\n"
+	for name, tc := range map[string]struct{ step, want string }{
+		"multipart の file が無い":             {"    request: {method: PUT, path: /x, multipart: [{name: a, file: none.png}]}\n", `"none.png"`},
+		"multipart の file が画像のフォルダの外":      {"    request: {method: PUT, path: /x, multipart: [{name: a, file: ../users/basic.sql}]}\n", `"../users/basic.sql"`},
+		"multipart の file がフォルダ":           {"    request: {method: PUT, path: /x, multipart: [{name: a, file: .}]}\n", `file "."`},
+		"multipart の name が無い":             {"    request: {method: PUT, path: /x, multipart: [{value: v}]}\n", "1 番目の部分に name"},
+		"multipart の value と file の両方":     {"    request: {method: PUT, path: /x, multipart: [{name: a, value: v, file: profile.png}]}\n", "value と file のどちらか1つ"},
+		"multipart の value も file も無い":     {"    request: {method: PUT, path: /x, multipart: [{name: a}]}\n", "value と file のどちらか1つ"},
+		"value の部分の filename":              {"    request: {method: PUT, path: /x, multipart: [{name: a, value: v, filename: f.png}]}\n", "file の部分にだけ"},
+		"value の部分の content_type":          {"    request: {method: PUT, path: /x, multipart: [{name: a, value: v, content_type: image/png}]}\n", "file の部分にだけ"},
+		"value の部分の pad_to":                {"    request: {method: PUT, path: /x, multipart: [{name: a, value: v, pad_to: 10}]}\n", "file の部分にだけ"},
+		"pad_to が負":                        {"    request: {method: PUT, path: /x, multipart: [{name: a, file: profile.png, pad_to: -1}]}\n", "pad_to -1"},
+		"pad_to がファイルより小さい":                {"    request: {method: PUT, path: /x, multipart: [{name: a, file: profile.png, pad_to: 139}]}\n", "pad_to 139"},
+		"multipart と json":                 {"    request: {method: PUT, path: /x, json: {a: 1}, multipart: [{name: a, value: v}]}\n", "json と multipart"},
+		"絶対の URL の段の multipart":            {"    request: {method: PUT, url: \"http://localhost:4566/b/k\", multipart: [{name: a, value: v}]}\n", "multipart は、版に送る段にだけ"},
+		"redis の段の multipart":              {"    request: {multipart: [{name: a, value: v}]}\n    redis: {del: [k]}\n", "1つだけ"},
+		"版に送る段の request の body_file":       {"    request: {method: PUT, path: /x, body_file: profile.png}\n", "request の body_file は、絶対の URL の段にだけ"},
+		"request の body_file が無い":          {"    request: {method: PUT, url: \"http://localhost:4566/b/k\", body_file: none.png}\n", `"none.png"`},
+		"request の body_file が画像のフォルダの外":   {"    request: {method: PUT, url: \"http://localhost:4566/b/k\", body_file: ../users/basic.sql}\n", `"../users/basic.sql"`},
+		"request の body_file と json":       {"    request: {method: PUT, url: \"http://localhost:4566/b/k\", body_file: profile.png, json: {a: 1}}\n", "json と body_file"},
+		"expire の段の request の body_file":   {"    request: {body_file: profile.png}\n    expire: {var: link}\n", "1つだけ"},
+		"版に送る段の expect の body_file":        {"    request: {method: GET, path: /x}\n    expect: {body_file: profile.png}\n", "expect の body_file は、絶対の URL の段にだけ"},
+		"版に送る段の expect の content_type":     {"    request: {method: GET, path: /x}\n    expect: {content_type: image/png}\n", "expect の content_type は、絶対の URL の段にだけ"},
+		"expect の body_file が無い":           {absURL + "    expect: {body_file: none.png}\n", `"none.png"`},
+		"expect の body_file が画像のフォルダの外":    {absURL + "    expect: {body_file: ../users/basic.sql}\n", `"../users/basic.sql"`},
+		"絶対の URL の段の expect の values":      {absURL + "    expect: {values: {$.a: 1}}\n", "values は、版に送る段にだけ"},
+		"expect の values の場所":              {"    request: {method: GET, path: /x}\n    expect: {values: {a: 1}}\n", `values: 本文の path "a"`},
+		"redis の段の expect の values":        {"    redis: {del: [k]}\n    expect: {values: {$.a: 1}}\n", "expect を書けません"},
+		"redis の段の expect の body_file":     {"    redis: {del: [k]}\n    expect: {body_file: profile.png}\n", "expect を書けません"},
+		"expire の段の expect の content_type": {"    expire: {var: link}\n    expect: {content_type: image/png}\n", "expect を書けません"},
+	} {
+		steps := "  - name: bad\n" + tc.step + "  - name: last\n    request: {method: GET, path: /x}\n"
+		_, err := LoadScenario(writeScenario(t, kindsScenario("compare", steps)))
+		if err == nil || !strings.Contains(err.Error(), "段 bad ") || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: 誤り = %v, want 段 bad の %q を含む誤り", name, err, tc.want)
+		}
+		if err != nil && strings.Contains(err.Error(), "段 last ") {
+			t.Errorf("%s: 正しい段 last も誤りになりました: %v", name, err)
+		}
+	}
+}
