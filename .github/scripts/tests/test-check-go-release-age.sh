@@ -11,6 +11,9 @@
 # 外部への問い合わせを行わないため、実行にネットワークを必要としない。
 # =====================================================================
 set -uo pipefail
+# GitHub Actions がジョブに入れる環境変数を消す。消さないと、環境変数が無いときの場合を
+# 確かめられず、ジョブの Summary にテストの表が書かれる。場合ごとに要るものだけを入れる
+unset GITHUB_REPOSITORY GITHUB_STEP_SUMMARY NOW_EPOCH
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-go-release-age.sh"
 WORK=$(mktemp -d) || exit 1
