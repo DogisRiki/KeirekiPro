@@ -84,6 +84,8 @@ func NewServer() *Server {
 	mux.HandleFunc("GET /_compat/{version}/emails", s.listEmails)
 	mux.HandleFunc("DELETE /_compat/records", s.clearRecords)
 	mux.HandleFunc("POST /{$}", s.postRoot)
+	// 名前が空でないオブジェクトの要求は、ServeHTTP の objectHandler が先に受ける。
+	// 次の3つが受けるのは、/<置き場所>/ のように画像の名前が空の要求だけで、objectOnly が 501 で断る
 	mux.HandleFunc("PUT /{bucket}/{key...}", s.objectOnly(s.putObject))
 	mux.HandleFunc("GET /{bucket}/{key...}", s.objectOnly(s.getObject))
 	mux.HandleFunc("DELETE /{bucket}/{key...}", s.objectOnly(s.deleteObject))
@@ -95,8 +97,43 @@ func NewServer() *Server {
 }
 
 // ServeHTTP は、要求を操作ごとの処理に振り分ける。
+// オブジェクトの1つを読み書きする要求は、ServeMux に渡す前に、objectHandler が振り分ける。
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h, ok := s.objectHandler(r); ok {
+		h(w, r)
+		return
+	}
 	s.mux.ServeHTTP(w, r)
+}
+
+// objectHandler は、オブジェクトの1つを読み書きする要求の、URL のパスをそのまま読み、
+// 最初の / までを置き場所の名前に、残りを画像の名前にして、処理を返す。
+// 名前が / で始まる画像の path-style の URL は、/<置き場所>//profile/image/... と // を含む。
+// ServeMux は、// を含むパスを、/ を1つにしたパスへ移すように答えるので、この要求を ServeMux に渡さない。
+// 置き場所の名前か画像の名前が空の要求と、/_compat/ で始まる要求は、ServeMux に任せる。
+func (s *Server) objectHandler(r *http.Request) (http.HandlerFunc, bool) {
+	var next http.HandlerFunc
+	switch r.Method {
+	case http.MethodPut:
+		next = s.putObject
+	case http.MethodGet, http.MethodHead:
+		next = s.getObject
+	case http.MethodDelete:
+		next = s.deleteObject
+	default:
+		return nil, false
+	}
+	rest, ok := strings.CutPrefix(r.URL.Path, "/")
+	if !ok {
+		return nil, false
+	}
+	bucket, key, ok := strings.Cut(rest, "/")
+	if !ok || bucket == "" || bucket == "_compat" || key == "" {
+		return nil, false
+	}
+	r.SetPathValue("bucket", bucket)
+	r.SetPathValue("key", key)
+	return s.objectOnly(next), true
 }
 
 // versionOf は、要求の宛先のホスト名から版を決める。

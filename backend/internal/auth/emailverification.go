@@ -382,8 +382,8 @@ func (s *Service) completeRegistration(ctx context.Context, c emailVerificationC
 func (s *Service) createVerifiedUser(ctx context.Context, q *sqlcgen.Queries, r pendingRegistration) error {
 	now := s.javaNow()
 	id := pgtype.UUID{Bytes: r.ID, Valid: true}
-	u := storedUser{
-		row: sqlcgen.UpsertUserParams{
+	u := StoredUser{
+		Row: sqlcgen.UpsertUserParams{
 			ID:              id,
 			Email:           nullableText(r.Email),
 			Password:        nullableText(r.PasswordHash),
@@ -392,7 +392,7 @@ func (s *Service) createVerifiedUser(ctx context.Context, q *sqlcgen.Queries, r 
 			UpdatedAt:       now,
 			EmailVerifiedAt: now,
 		},
-		roles: []string{"USER"},
+		Roles: []string{"USER"},
 	}
 	if err := saveUser(ctx, q, u); err != nil {
 		return err
@@ -411,13 +411,13 @@ func (s *Service) verifyAccountEmail(ctx context.Context, id uuid.UUID, email st
 		if err != nil {
 			return err
 		}
-		if !u.row.Email.Valid || u.row.Email.String != email {
+		if !u.Row.Email.Valid || u.Row.Email.String != email {
 			return errBusiness(MessageInvalidVerificationLink)
 		}
-		if !u.row.EmailVerifiedAt.Valid {
+		if !u.Row.EmailVerifiedAt.Valid {
 			now := s.javaNow()
-			u.row.UpdatedAt = now
-			u.row.EmailVerifiedAt = now
+			u.Row.UpdatedAt = now
+			u.Row.EmailVerifiedAt = now
 		}
 		return saveUser(ctx, q, u)
 	})
@@ -431,17 +431,17 @@ func (s *Service) promotePendingEmail(ctx context.Context, id uuid.UUID, email s
 		if err != nil {
 			return err
 		}
-		if !u.row.PendingEmail.Valid || u.row.PendingEmail.String != email {
+		if !u.Row.PendingEmail.Valid || u.Row.PendingEmail.String != email {
 			return errBusiness(MessageInvalidVerificationLink)
 		}
-		if u.row.Email.Valid {
+		if u.Row.Email.Valid {
 			return errBusiness(MessagePendingEmailMissing)
 		}
 		now := s.javaNow()
-		u.row.Email = u.row.PendingEmail
-		u.row.PendingEmail = pgtype.Text{}
-		u.row.UpdatedAt = now
-		u.row.EmailVerifiedAt = now
+		u.Row.Email = u.Row.PendingEmail
+		u.Row.PendingEmail = pgtype.Text{}
+		u.Row.UpdatedAt = now
+		u.Row.EmailVerifiedAt = now
 		return saveUser(ctx, q, u)
 	})
 }
@@ -456,24 +456,24 @@ func nullableText(v string) pgtype.Text {
 	return pgtype.Text{String: v, Valid: v != ""}
 }
 
-// storedUser は、Java 版の UserRepository.save が書く、利用者1人の行である。
-type storedUser struct {
-	row       sqlcgen.UpsertUserParams
-	providers []sqlcgen.InsertUserAuthProviderParams
-	roles     []string
+// StoredUser は、Java 版の UserRepository.save が書く、利用者1人の行である。
+type StoredUser struct {
+	Row       sqlcgen.UpsertUserParams
+	Providers []sqlcgen.InsertUserAuthProviderParams
+	Roles     []string
 }
 
 // loadStoredUser は、トランザクションの中で利用者 id の行を読む。Java 版の UserRepository.findById と同じく、
 // User.reconstruct の確かめに反すれば 400 の誤りを返す。居なければ、確認のリンクが無効な 400 の誤りを返す。
-func loadStoredUser(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID) (storedUser, error) {
+func loadStoredUser(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID) (StoredUser, error) {
 	return loadStoredUserOr(ctx, q, id, errBusiness(MessageInvalidVerificationLink))
 }
 
 // loadStoredUserOr は、loadStoredUser と同じく利用者 id の行を読み、居なければ notFound を返す。
-func loadStoredUserOr(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID, notFound error) (storedUser, error) {
+func loadStoredUserOr(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID, notFound error) (StoredUser, error) {
 	rows, err := q.GetUserRowsByID(ctx, pgtype.UUID{Bytes: id, Valid: true})
 	if err != nil {
-		return storedUser{}, fmt.Errorf("auth: 利用者を読めない: %w", err)
+		return StoredUser{}, fmt.Errorf("auth: 利用者を読めない: %w", err)
 	}
 	converted := make([]sqlcgen.GetUserRowsByEmailRow, len(rows))
 	for i, r := range rows {
@@ -481,14 +481,14 @@ func loadStoredUserOr(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID, not
 	}
 	acc, found, err := accountFromRows(converted)
 	if err != nil {
-		return storedUser{}, err
+		return StoredUser{}, err
 	}
 	if !found {
-		return storedUser{}, notFound
+		return StoredUser{}, notFound
 	}
 	first := rows[0]
-	u := storedUser{
-		row: sqlcgen.UpsertUserParams{
+	u := StoredUser{
+		Row: sqlcgen.UpsertUserParams{
 			ID:                   first.UID,
 			Email:                first.UEmail,
 			Password:             first.UPassword,
@@ -500,7 +500,7 @@ func loadStoredUserOr(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID, not
 			EmailVerifiedAt:      first.UEmailVerifiedAt,
 			PendingEmail:         first.UPendingEmail,
 		},
-		roles: acc.Roles,
+		Roles: acc.Roles,
 	}
 	seen := map[[16]byte]bool{}
 	for _, r := range rows {
@@ -508,7 +508,7 @@ func loadStoredUserOr(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID, not
 			continue
 		}
 		seen[r.PID.Bytes] = true
-		u.providers = append(u.providers, sqlcgen.InsertUserAuthProviderParams{
+		u.Providers = append(u.Providers, sqlcgen.InsertUserAuthProviderParams{
 			ID:             r.PID,
 			UserID:         first.UID,
 			ProviderName:   r.PProviderName.String,
@@ -521,23 +521,23 @@ func loadStoredUserOr(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID, not
 }
 
 // saveUser は、Java 版の MyBatisUserRepository.save と同じ順で、利用者の行を書き、連携の行と役割の行を消して足し直す。
-func saveUser(ctx context.Context, q *sqlcgen.Queries, u storedUser) error {
-	if err := q.UpsertUser(ctx, u.row); err != nil {
+func saveUser(ctx context.Context, q *sqlcgen.Queries, u StoredUser) error {
+	if err := q.UpsertUser(ctx, u.Row); err != nil {
 		return fmt.Errorf("auth: 利用者の行を書けない: %w", err)
 	}
-	if err := q.DeleteUserAuthProviders(ctx, u.row.ID); err != nil {
+	if err := q.DeleteUserAuthProviders(ctx, u.Row.ID); err != nil {
 		return fmt.Errorf("auth: 連携の行を消せない: %w", err)
 	}
-	for _, p := range u.providers {
+	for _, p := range u.Providers {
 		if err := q.InsertUserAuthProvider(ctx, p); err != nil {
 			return fmt.Errorf("auth: 連携の行を足せない: %w", err)
 		}
 	}
-	if err := q.DeleteUserRoles(ctx, u.row.ID); err != nil {
+	if err := q.DeleteUserRoles(ctx, u.Row.ID); err != nil {
 		return fmt.Errorf("auth: 役割の行を消せない: %w", err)
 	}
-	for _, role := range u.roles {
-		if err := q.InsertUserRole(ctx, sqlcgen.InsertUserRoleParams{UserID: u.row.ID, RoleName: role}); err != nil {
+	for _, role := range u.Roles {
+		if err := q.InsertUserRole(ctx, sqlcgen.InsertUserRoleParams{UserID: u.Row.ID, RoleName: role}); err != nil {
 			return fmt.Errorf("auth: 役割の行を足せない: %w", err)
 		}
 	}

@@ -524,7 +524,7 @@ func (s *Service) oidcLogin(ctx context.Context, provider string, info oidcUserI
 				return err
 			}
 		}
-		id, roles = u.row.ID.Bytes, u.roles
+		id, roles = u.Row.ID.Bytes, u.Roles
 		return nil
 	})
 	if err != nil {
@@ -535,11 +535,11 @@ func (s *Service) oidcLogin(ctx context.Context, provider string, info oidcUserI
 
 // findOIDCAccount は、Java 版の OidcLoginUseCase と同じく、つなぐアカウントを探す。Google か GitHub の利用者の ID で
 // 見つけたアカウントには、返ってきたメールアドレスを当てはめる。
-func (s *Service) findOIDCAccount(ctx context.Context, q *sqlcgen.Queries, provider string, info oidcUserInfo, now pgtype.Timestamp) (storedUser, bool, error) {
+func (s *Service) findOIDCAccount(ctx context.Context, q *sqlcgen.Queries, provider string, info oidcUserInfo, now pgtype.Timestamp) (StoredUser, bool, error) {
 	if info.providerUserID != nil {
 		rows, err := q.GetUserRowsByProvider(ctx, sqlcgen.GetUserRowsByProviderParams{ProviderName: provider, ProviderUserID: *info.providerUserID})
 		if err != nil {
-			return storedUser{}, false, fmt.Errorf("auth: 連携の利用者を読めない: %w", err)
+			return StoredUser{}, false, fmt.Errorf("auth: 連携の利用者を読めない: %w", err)
 		}
 		var ids []uuid.UUID
 		for _, r := range rows {
@@ -548,36 +548,36 @@ func (s *Service) findOIDCAccount(ctx context.Context, q *sqlcgen.Queries, provi
 			}
 		}
 		if len(ids) > 1 {
-			return storedUser{}, false, errors.New("auth: 同じ連携の利用者が2人以上いる")
+			return StoredUser{}, false, errors.New("auth: 同じ連携の利用者が2人以上いる")
 		}
 		if len(ids) == 1 {
 			u, err := loadStoredUserOr(ctx, q, ids[0], errors.New("auth: 連携の利用者が居ない"))
 			if err != nil {
-				return storedUser{}, false, err
+				return StoredUser{}, false, err
 			}
 			if err := applyReturnedEmail(ctx, q, &u, info.email, now); err != nil {
-				return storedUser{}, false, err
+				return StoredUser{}, false, err
 			}
 			return u, true, nil
 		}
 	}
 	if info.email == nil {
-		return storedUser{}, false, nil
+		return StoredUser{}, false, nil
 	}
 	rows, err := q.GetUserRowsByEmail(ctx, pgtype.Text{String: *info.email, Valid: true})
 	if err != nil {
-		return storedUser{}, false, fmt.Errorf("auth: 利用者を読めない: %w", err)
+		return StoredUser{}, false, fmt.Errorf("auth: 利用者を読めない: %w", err)
 	}
 	acc, ok, err := accountFromRows(rows)
 	if err != nil || !ok {
-		return storedUser{}, false, err
+		return StoredUser{}, false, err
 	}
 	u, err := loadStoredUserOr(ctx, q, acc.ID, errors.New("auth: 同じメールアドレスの利用者が居ない"))
 	if err != nil {
-		return storedUser{}, false, err
+		return StoredUser{}, false, err
 	}
-	if !u.row.Email.Valid || !u.row.EmailVerifiedAt.Valid {
-		return storedUser{}, false, errOIDCUnverified
+	if !u.Row.Email.Valid || !u.Row.EmailVerifiedAt.Valid {
+		return StoredUser{}, false, errOIDCUnverified
 	}
 	return u, true, nil
 }
@@ -595,17 +595,17 @@ func containsUUID(ids []uuid.UUID, id uuid.UUID) bool {
 // applyReturnedEmail は、Java 版の OidcLoginUseCase の applyReturnedEmail と同じく、Google か GitHub が返した
 // メールアドレスを、つないだアカウントに当てはめる。メールアドレスがあるアカウントは、同じなら確認済みにする。
 // 無いアカウントは、設定待ちのメールアドレスと同じで、ほかの利用者が使っていなければ、メールアドレスに移す。
-func applyReturnedEmail(ctx context.Context, q *sqlcgen.Queries, u *storedUser, email *string, now pgtype.Timestamp) error {
+func applyReturnedEmail(ctx context.Context, q *sqlcgen.Queries, u *StoredUser, email *string, now pgtype.Timestamp) error {
 	if email == nil {
 		return nil
 	}
-	if u.row.Email.Valid {
-		if u.row.Email.String == *email && !u.row.EmailVerifiedAt.Valid {
-			u.row.UpdatedAt, u.row.EmailVerifiedAt = now, now
+	if u.Row.Email.Valid {
+		if u.Row.Email.String == *email && !u.Row.EmailVerifiedAt.Valid {
+			u.Row.UpdatedAt, u.Row.EmailVerifiedAt = now, now
 		}
 		return nil
 	}
-	if !u.row.PendingEmail.Valid || u.row.PendingEmail.String != *email {
+	if !u.Row.PendingEmail.Valid || u.Row.PendingEmail.String != *email {
 		return nil
 	}
 	rows, err := q.GetUserRowsByEmail(ctx, pgtype.Text{String: *email, Valid: true})
@@ -615,15 +615,15 @@ func applyReturnedEmail(ctx context.Context, q *sqlcgen.Queries, u *storedUser, 
 	if _, used, err := accountFromRows(rows); err != nil || used {
 		return err
 	}
-	u.row.Email, u.row.PendingEmail = u.row.PendingEmail, pgtype.Text{}
-	u.row.UpdatedAt, u.row.EmailVerifiedAt = now, now
+	u.Row.Email, u.Row.PendingEmail = u.Row.PendingEmail, pgtype.Text{}
+	u.Row.UpdatedAt, u.Row.EmailVerifiedAt = now, now
 	return nil
 }
 
 // linkOIDCProvider は、Java 版の User.addAuthProvider と同じく、名前の大文字と小文字を区別せずに同じ provider の
 // 連携が無ければ、連携を足して更新日時を今の時刻にする。
-func (s *Service) linkOIDCProvider(u *storedUser, provider string, info oidcUserInfo, now pgtype.Timestamp) error {
-	for _, p := range u.providers {
+func (s *Service) linkOIDCProvider(u *StoredUser, provider string, info oidcUserInfo, now pgtype.Timestamp) error {
+	for _, p := range u.Providers {
 		if strings.ToLower(p.ProviderName) == provider {
 			return nil
 		}
@@ -635,45 +635,45 @@ func (s *Service) linkOIDCProvider(u *storedUser, provider string, info oidcUser
 	if err != nil {
 		return fmt.Errorf("auth: 乱数を読めない: %w", err)
 	}
-	u.providers = append(u.providers, sqlcgen.InsertUserAuthProviderParams{
+	u.Providers = append(u.Providers, sqlcgen.InsertUserAuthProviderParams{
 		ID:             pgtype.UUID{Bytes: pid, Valid: true},
-		UserID:         u.row.ID,
+		UserID:         u.Row.ID,
 		ProviderName:   provider,
 		ProviderUserID: *info.providerUserID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	})
-	u.row.UpdatedAt = now
+	u.Row.UpdatedAt = now
 	return nil
 }
 
 // createOIDCUser は、Java 版の OidcLoginUseCase と同じく、連携の ID、利用者の ID の順に ID を作り、役割 USER の
 // 新しいアカウントと世代の番号の行を足す。メールアドレスがあれば確認済みにし、登録の完了のメールを送る。
-func (s *Service) createOIDCUser(ctx context.Context, q *sqlcgen.Queries, provider string, info oidcUserInfo, now pgtype.Timestamp) (storedUser, error) {
+func (s *Service) createOIDCUser(ctx context.Context, q *sqlcgen.Queries, provider string, info oidcUserInfo, now pgtype.Timestamp) (StoredUser, error) {
 	pid, err := uuid.NewRandomFromReader(readFunc(s.deps.Random))
 	if err != nil {
-		return storedUser{}, fmt.Errorf("auth: 乱数を読めない: %w", err)
+		return StoredUser{}, fmt.Errorf("auth: 乱数を読めない: %w", err)
 	}
 	uid, err := uuid.NewRandomFromReader(readFunc(s.deps.Random))
 	if err != nil {
-		return storedUser{}, fmt.Errorf("auth: 乱数を読めない: %w", err)
+		return StoredUser{}, fmt.Errorf("auth: 乱数を読めない: %w", err)
 	}
 	if info.providerUserID == nil || !notBlank(*info.providerUserID) {
-		return storedUser{}, errors.New("auth: Google か GitHub の利用者の ID が無い")
+		return StoredUser{}, errors.New("auth: Google か GitHub の利用者の ID が無い")
 	}
 	if info.email != nil && len(emailCreateErrors(*info.email)) > 0 {
-		return storedUser{}, errors.New("auth: Google か GitHub のメールアドレスの形が正しくない")
+		return StoredUser{}, errors.New("auth: Google か GitHub のメールアドレスの形が正しくない")
 	}
 	id := pgtype.UUID{Bytes: uid, Valid: true}
-	u := storedUser{
-		row: sqlcgen.UpsertUserParams{
+	u := StoredUser{
+		Row: sqlcgen.UpsertUserParams{
 			ID:        id,
 			Email:     optionalText(info.email),
 			Username:  optionalText(info.username),
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
-		providers: []sqlcgen.InsertUserAuthProviderParams{{
+		Providers: []sqlcgen.InsertUserAuthProviderParams{{
 			ID:             pgtype.UUID{Bytes: pid, Valid: true},
 			UserID:         id,
 			ProviderName:   provider,
@@ -681,26 +681,26 @@ func (s *Service) createOIDCUser(ctx context.Context, q *sqlcgen.Queries, provid
 			CreatedAt:      now,
 			UpdatedAt:      now,
 		}},
-		roles: []string{"USER"},
+		Roles: []string{"USER"},
 	}
 	if info.email != nil {
-		u.row.EmailVerifiedAt = now
+		u.Row.EmailVerifiedAt = now
 	}
 	if err := saveUser(ctx, q, u); err != nil {
-		return storedUser{}, err
+		return StoredUser{}, err
 	}
 	if err := q.InsertTokenVersion(ctx, sqlcgen.InsertTokenVersionParams{UserID: id, UpdatedAt: now}); err != nil {
-		return storedUser{}, fmt.Errorf("auth: 世代の番号の行を足せない: %w", err)
+		return StoredUser{}, fmt.Errorf("auth: 世代の番号の行を足せない: %w", err)
 	}
 	if info.email == nil {
 		return u, nil
 	}
 	// Java 版の FreeMarker は、null の名前を差し込めずに例外にする。
 	if info.username == nil {
-		return storedUser{}, errors.New("auth: 名前の無い利用者には登録の完了のメールを作れない")
+		return StoredUser{}, errors.New("auth: 名前の無い利用者には登録の完了のメールを作れない")
 	}
 	if err := s.sendMail(ctx, *info.email, userRegisteredMail(s.deps.App, *info.username)); err != nil {
-		return storedUser{}, err
+		return StoredUser{}, err
 	}
 	return u, nil
 }
