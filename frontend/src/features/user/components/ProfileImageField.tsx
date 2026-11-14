@@ -1,3 +1,4 @@
+import { PROFILE_IMAGE_TYPES } from "@/features/user";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import { Avatar, Box, IconButton } from "@mui/material";
 import { useRef, useState } from "react";
@@ -42,11 +43,18 @@ export const ProfileImageField = ({ currentImage, onChange }: ProfileImageFieldP
                     boxShadow: 1,
                     "&:hover": { bgcolor: "background.paper" },
                 }}
+                aria-label="プロフィール画像を変更"
                 onClick={handleClick}
             >
                 <PhotoCameraIcon />
             </IconButton>
-            <input ref={fileInputRef} hidden type="file" accept="image/*" onChange={handleFileChange} />
+            <input
+                ref={fileInputRef}
+                hidden
+                type="file"
+                accept={PROFILE_IMAGE_TYPES.join(",")}
+                onChange={handleFileChange}
+            />
         </Box>
     );
 };

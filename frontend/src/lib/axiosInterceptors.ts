@@ -17,6 +17,11 @@ const MAINTENANCE_STATUSES: readonly number[] = [502, 503, 504];
 export const createErrorInterceptor =
     () =>
     async (error: unknown): Promise<never> => {
+        // 呼び出し側が取り消した要求は、サーバーに届かなかったのではないので、画面を移さずに呼び出し側へ返す
+        if (axios.isCancel(error)) {
+            return Promise.reject(error);
+        }
+
         if (axios.isAxiosError(error)) {
             const { response } = error;
 
