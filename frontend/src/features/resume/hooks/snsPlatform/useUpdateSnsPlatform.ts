@@ -24,14 +24,17 @@ export const useUpdateSnsPlatform = (resumeId: string, options?: { onResumeNotFo
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { snsPlatformId: string; payload: UpdateSnsPlatformPayload }
+        { snsPlatformId: string; payload: UpdateSnsPlatformPayload },
+        { snapshot?: Resume["snsPlatforms"][number] }
     >({
         mutationFn: ({ snsPlatformId, payload }) => updateSnsPlatform(resumeId, snsPlatformId, payload),
         onMutate: ({ snsPlatformId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(snsPlatformId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.snsPlatforms.find((e) => e.id === snsPlatformId) };
         },
-        onSuccess: (response, { snsPlatformId }) => {
+        onSuccess: (response, { snsPlatformId }, onMutateResult) => {
             const { snsPlatforms: serverSnsPlatforms, updatedAt } = response.data;
             const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
@@ -41,10 +44,15 @@ export const useUpdateSnsPlatform = (resumeId: string, options?: { onResumeNotFo
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があるか(保存を始めたあとにエントリーが置き換わったか)
+            const editedDuringSave = resume.snsPlatforms.some(
+                (e) => e.id === snsPlatformId && e !== onMutateResult?.snapshot,
+            );
+
             // 保存したID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
                 resume.snsPlatforms
-                    .filter((s) => s.id !== snsPlatformId && dirtyEntryIds.has(s.id))
+                    .filter((s) => (s.id !== snsPlatformId || editedDuringSave) && dirtyEntryIds.has(s.id))
                     .map((s) => [s.id, s]),
             );
 
@@ -65,7 +73,8 @@ export const useUpdateSnsPlatform = (resumeId: string, options?: { onResumeNotFo
             updateResumeFromServer({ snsPlatforms: finalSnsPlatforms, updatedAt });
 
             // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(snsPlatformId);
+            // 保存中に打った文字があれば、未保存のまま残す
+            if (!editedDuringSave) removeDirtyEntryId(snsPlatformId);
             setNotification("SNSを更新しました。", "success");
         },
         onError: async (error, { snsPlatformId }) => {

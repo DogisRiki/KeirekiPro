@@ -5,7 +5,7 @@ vi.mock("@/lib", () => ({
 }));
 
 import type { Resume } from "@/features/resume";
-import { TEMP_ID_PREFIX, useResumeStore, useUpdateSelfPromotion } from "@/features/resume";
+import { buildPayloadForEntry, TEMP_ID_PREFIX, useResumeStore, useUpdateSelfPromotion } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
@@ -219,5 +219,40 @@ describe("useUpdateSelfPromotion", () => {
         await waitFor(() => expect(useResumeStore.getState().resume?.selfPromotions).toEqual([]));
         expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes/resume-1");
         expect(useResumeStore.getState().activeEntryId).toBeNull();
+    });
+
+    it("保存中に打った文字は、保存が終わったあとも欄に残り、未保存の変更として扱われること", async () => {
+        const entry = localResume.selfPromotions[0];
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().addDirtyEntryId(entry.id);
+
+        let resolveSave: (value: unknown) => void = () => undefined;
+        vi.mocked(protectedApiClient.put).mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveSave = resolve;
+            }),
+        );
+
+        const { result } = renderHook(() => useUpdateSelfPromotion("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({ selfPromotionId: entry.id, payload: buildPayloadForEntry("selfPromotion", entry) });
+        });
+        await waitFor(() => expect(protectedApiClient.put).toHaveBeenCalled());
+
+        // 保存が終わる前に文字を打つ
+        act(() => {
+            useResumeStore.getState().updateEntry("selfPromotions", entry.id, { title: "保存中に打った文字" });
+        });
+        await act(async () => {
+            resolveSave({ status: 200, data: { ...localResume, updatedAt: "2024-02-10T00:00:00.000Z" } });
+        });
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        const { resume, dirtyEntryIds, isDirty } = useResumeStore.getState();
+        expect(resume?.selfPromotions.find((e) => e.id === entry.id)?.title).toBe("保存中に打った文字");
+        expect(resume?.updatedAt).toBe("2024-02-10T00:00:00.000Z");
+        expect(dirtyEntryIds.has(entry.id)).toBe(true);
+        expect(isDirty).toBe(true);
     });
 });

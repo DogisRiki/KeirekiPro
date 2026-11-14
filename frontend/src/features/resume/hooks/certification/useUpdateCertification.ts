@@ -24,14 +24,17 @@ export const useUpdateCertification = (resumeId: string, options?: { onResumeNot
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { certificationId: string; payload: UpdateCertificationPayload }
+        { certificationId: string; payload: UpdateCertificationPayload },
+        { snapshot?: Resume["certifications"][number] }
     >({
         mutationFn: ({ certificationId, payload }) => updateCertification(resumeId, certificationId, payload),
         onMutate: ({ certificationId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(certificationId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.certifications.find((e) => e.id === certificationId) };
         },
-        onSuccess: (response, { certificationId }) => {
+        onSuccess: (response, { certificationId }, onMutateResult) => {
             const { certifications: serverCertifications, updatedAt } = response.data;
             const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
@@ -41,10 +44,15 @@ export const useUpdateCertification = (resumeId: string, options?: { onResumeNot
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があるか(保存を始めたあとにエントリーが置き換わったか)
+            const editedDuringSave = resume.certifications.some(
+                (e) => e.id === certificationId && e !== onMutateResult?.snapshot,
+            );
+
             // 保存したID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
                 resume.certifications
-                    .filter((c) => c.id !== certificationId && dirtyEntryIds.has(c.id))
+                    .filter((c) => (c.id !== certificationId || editedDuringSave) && dirtyEntryIds.has(c.id))
                     .map((c) => [c.id, c]),
             );
 
@@ -65,7 +73,8 @@ export const useUpdateCertification = (resumeId: string, options?: { onResumeNot
             updateResumeFromServer({ certifications: finalCertifications, updatedAt });
 
             // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(certificationId);
+            // 保存中に打った文字があれば、未保存のまま残す
+            if (!editedDuringSave) removeDirtyEntryId(certificationId);
             setNotification("資格を更新しました。", "success");
         },
         onError: async (error, { certificationId }) => {
