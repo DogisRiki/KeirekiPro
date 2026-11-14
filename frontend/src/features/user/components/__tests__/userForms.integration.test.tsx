@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
 import { Route, Routes } from "react-router";
 import { vi } from "vitest";
@@ -177,6 +177,67 @@ describe("user forms", () => {
 
         expect(await screen.findByRole("textbox", { name: /ユーザー名/ })).toBeInTheDocument();
         expect(screen.queryByText(/確認待ちのメールアドレス/)).not.toBeInTheDocument();
+    });
+
+    it("SettingUserContainerはサーバーから届いた二段階認証の設定を出し、スイッチを触らずに保存したときは送らないこと", async () => {
+        const latestUser = { ...baseUser, twoFactorAuthEnabled: true };
+        useUserAuthStore.getState().setLogin(baseUser);
+        vi.mocked(protectedApiClient.get).mockResolvedValue({ data: latestUser } as AxiosResponse<User>);
+        vi.mocked(protectedApiClient.put).mockResolvedValueOnce({
+            data: { ...latestUser, username: "updated-user" },
+        } as AxiosResponse<User>);
+
+        const { user } = renderWithProviders(<SettingUserContainer />);
+
+        await waitFor(() => expect(screen.getByRole("switch", { name: /二段階認証/ })).toBeChecked());
+        const usernameInput = screen.getByRole("textbox", { name: /ユーザー名/ });
+        await user.clear(usernameInput);
+        await user.type(usernameInput, "updated-user");
+        await user.click(screen.getByRole("button", { name: "保存" }));
+
+        await waitFor(() => expect(protectedApiClient.put).toHaveBeenCalledTimes(1));
+        const formData = vi.mocked(protectedApiClient.put).mock.calls[0][1] as FormData;
+        expect(formData.get("username")).toBe("updated-user");
+        expect(formData.has("twoFactorAuthEnabled")).toBe(false);
+    });
+
+    it("SettingUserContainerはJPEG、PNG、GIFのほかの画像を受け付けず、エラーを出すこと", async () => {
+        useUserAuthStore.getState().setLogin(baseUser);
+        const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview");
+        renderWithProviders(<SettingUserContainer />);
+        await screen.findByRole("textbox", { name: /ユーザー名/ });
+
+        fireEvent.change(screen.getByDisplayValue(""), {
+            target: { files: [new File(["image"], "me.webp", { type: "image/webp" })] },
+        });
+
+        expect(useErrorMessageStore.getState().message).toBe(
+            "プロフィール画像はJPEG、PNG、GIFのいずれかである必要があります。",
+        );
+        expect(createObjectURL).not.toHaveBeenCalled();
+    });
+
+    it("SettingUserContainerは画像を選び直したときと画面を離れるときに、前のプレビューをメモリから外すこと", async () => {
+        useUserAuthStore.getState().setLogin(baseUser);
+        vi.spyOn(URL, "createObjectURL").mockReturnValueOnce("blob:first").mockReturnValueOnce("blob:second");
+        const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+        const { unmount } = renderWithProviders(<SettingUserContainer />);
+        await screen.findByRole("textbox", { name: /ユーザー名/ });
+        const choose = (name: string) =>
+            fireEvent.change(screen.getByDisplayValue(""), {
+                target: { files: [new File(["image"], name, { type: "image/png" })] },
+            });
+
+        choose("first.png");
+        expect(screen.getByRole("img", { name: "プロフィール画像" })).toHaveAttribute("src", "blob:first");
+        expect(revokeObjectURL).not.toHaveBeenCalled();
+
+        choose("second.png");
+        expect(revokeObjectURL).toHaveBeenCalledWith("blob:first");
+        expect(revokeObjectURL).not.toHaveBeenCalledWith("blob:second");
+
+        unmount();
+        expect(revokeObjectURL).toHaveBeenCalledWith("blob:second");
     });
 
     it("ChangePasswordContainerは成功後に入力値をクリアしsuccess通知を設定すること", async () => {
