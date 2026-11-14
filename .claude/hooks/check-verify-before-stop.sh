@@ -97,7 +97,8 @@ is_java_file() {
 is_go_file() {
     case "$1" in
         backend/*.go | backend/api/* | backend/assets/* | docker/backend-go/*) return 0 ;;
-        backend/src/main/resources/db/migration/*) return 0 ;;
+        backend/src/main/resources/db/migration/* | backend/src/main/resources/mail/*) return 0 ;;
+        backend/db/queries/*) return 0 ;;
         backend/go.mod | backend/go.sum | backend/Makefile | backend/sqlc.yaml) return 0 ;;
         backend/.golangci.yml | backend/.testcoverage.yml | backend/.gremlins.yaml) return 0 ;;
     esac
