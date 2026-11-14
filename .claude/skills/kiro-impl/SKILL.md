@@ -130,7 +130,24 @@ For each task (one at a time):
 - Stage only the files actually changed for this task, plus tasks.md
 - **NEVER** use `git add -A` or `git add .`
 - Use `git add <file1> <file2> ...` with explicit file paths
-- Commit message format: `feat(<feature-name>): <task description>`
+- Commit message format: follow `.commit_template` at the repository root, and write every field it has. Write the message in Japanese, except for the prefix and the field names:
+
+  ```text
+  <prefix>(<feature-name>): <task description>
+
+  Changes:
+  <what this task changed>
+
+  Reason:
+  <why this task made the change>
+
+  BREAKING CHANGE: <the breaking change, or N/A>
+  Related: <URLs of related resources, or N/A>
+  Refs: #<issue> #<each of additional_issues>
+  ```
+
+  - `<prefix>`: choose the one that matches the kind of change in this task from the prefix list in `.commit_template` (for example `feat`, `fix`, `docs`, `test`). Do not use `feat` for every task
+  - `Refs:`: write the issue numbers in the `issue` and `additional_issues` fields of the feature's spec.json
 - Write the commit message to a file in the scratchpad first, then run `git commit -F <message-file>` as a standalone command. Do not use `-m`, a heredoc, extra options such as `-q`, or chain it with `&&` / `;` / `|` (e.g. `cd ... && git commit`). `.claude/hooks/protect-main.sh` blocks any other form, because only this form matches the `Bash(git commit *)` allow rule and stays out of the auto mode classifier. Run `git add` and `git log` as separate commands
 
 **f) Record learnings**:
