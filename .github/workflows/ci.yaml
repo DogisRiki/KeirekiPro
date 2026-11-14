@@ -62,7 +62,12 @@ jobs:
               - 'docker/backend*/**'
             # 下の3つは、backend の3つの仕事を動かすかを決めるもとの見分け。
             # ファイルの形は design.md の「CI の仕事」の一覧と同じにする。
-            # マイグレーションのファイルは、Java 版と Go 版が同じものを読むので、
+            # ただし backend_go には、一覧の形に加えて、Go 版が読む SQL の問い合わせのファイル
+            # (sqlc.yaml の queries が読む backend/db/queries/)と、Go 版が埋め込むメールのひな形
+            # (mailtemplates.go が埋め込む backend/src/main/resources/mail/)を含める(#835)。
+            # 含めないと、そのファイルだけを変えた PR で backend-go が動かず、Go 版の生成したコードの
+            # 食い違いやメールのテストの失敗を見落とすためである。
+            # マイグレーションのファイルとメールのひな形は、Java 版と Go 版が同じものを読むので、
             # backend_java(backend/src/** に含まれる)と backend_go の両方に当たる。
             backend_java:
               - 'backend/src/**'
@@ -81,8 +86,10 @@ jobs:
               - 'backend/.gremlins.yaml'
               - 'backend/api/**'
               - 'backend/sqlc.yaml'
+              - 'backend/db/queries/**'
               - 'backend/assets/**'
               - 'backend/src/main/resources/db/migration/**'
+              - 'backend/src/main/resources/mail/**'
               - 'docker/backend-go/**'
             backend_compat:
               - 'backend/compat/**'

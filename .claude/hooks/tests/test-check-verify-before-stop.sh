@@ -408,6 +408,32 @@ t_migration_requires_both() {
     expect_areas backend
 }
 
+t_sql_queries_require_go_record() {
+    commit_go_mod "$WT"
+    # Go 版が読む SQL の問い合わせのファイルだけが変わっても、Go 版の記録を求める(#835)
+    change "$WT" backend/db/queries/users.sql $((T0 + 20))
+    stamp "$WT" backend $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_areas backend-go
+    stamp "$WT" backend-go $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_pass
+}
+
+t_mail_templates_require_both() {
+    commit_go_mod "$WT"
+    # メールのひな形は Java 版と Go 版が同じものを読むので、両方の記録を求める(#835)
+    change "$WT" backend/src/main/resources/mail/user-deleted.ftl $((T0 + 20))
+    call_hook "$MAIN" "$WT"
+    expect_areas "backend, backend-go"
+    stamp "$WT" backend $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_areas backend-go
+    stamp "$WT" backend-go $((T0 + 30))
+    call_hook "$MAIN" "$WT"
+    expect_pass
+}
+
 # ---------------------------------------------------------------------
 
 # 知らない名前を選んだら、何も流さずに失敗する
@@ -440,6 +466,8 @@ echo "--- Java 版と Go 版の記録を分ける(backend-go-replacement の要�
 run_test "Go 版のファイルだけが変わったときは Go 版の記録で止めない" t_go_only_uses_go_record
 run_test "Java 版のファイルだけが変わったときは Java 版の記録を求める" t_java_only_requires_java_record
 run_test "マイグレーションのファイルが変わったときは両方の記録を求める" t_migration_requires_both
+run_test "SQL の問い合わせのファイルが変わったときは Go 版の記録を求める" t_sql_queries_require_go_record
+run_test "メールのひな形が変わったときは両方の記録を求める" t_mail_templates_require_both
 
 echo
 echo "結果: 成功 $pass / 失敗 $fail"

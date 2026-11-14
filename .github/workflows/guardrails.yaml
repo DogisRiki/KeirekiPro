@@ -212,8 +212,13 @@ jobs:
           # frontendはディレクトリではなくファイル名で判定する。__tests__ を丸ごと外すと、
           # そこへ実装を置いて上限を回避できてしまうため
           # .claude の下のテストも、ワイルドカードにせずディレクトリを1件ずつ足す(同じ理由)
+          # Go 版のテストもファイル名で判定する。Go は名前が _test.go で終わるファイルを
+          # go test のときだけ読み、本番のプログラムには入れないので、この名前に実装を置けない。
+          # 'backend/**/*_test.go' と書くと backend/ の直下のテスト(mailtemplates_test.go)に
+          # 当たらないので、'*' がディレクトリを跨ぐ形で書く
           test_excludes=(
             ':(exclude)backend/src/test/**'
+            ':(exclude)backend/*_test.go'
             ':(exclude)frontend/e2e/**'
             ':(exclude)frontend/**/*.test.ts'
             ':(exclude)frontend/**/*.test.tsx'
