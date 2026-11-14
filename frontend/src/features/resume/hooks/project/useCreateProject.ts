@@ -22,19 +22,23 @@ export const useCreateProject = (resumeId: string, options?: { onResumeNotFound?
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { tempId: string; payload: CreateProjectPayload }
+        { tempId: string; payload: CreateProjectPayload },
+        { snapshot?: Resume["projects"][number] }
     >({
         mutationFn: ({ payload }) => createProject(resumeId, payload),
         onMutate: ({ tempId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(tempId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.projects.find((e) => e.id === tempId) };
         },
-        onSuccess: (response, { tempId }) => {
+        onSuccess: (response, { tempId }, onMutateResult) => {
             const { projects: serverProjects, updatedAt } = response.data;
             const {
                 resume,
                 dirtyEntryIds,
                 updateResumeFromServer,
+                addDirtyEntryId,
                 removeDirtyEntryId,
                 setActiveEntryId,
                 clearEntryErrors,
@@ -45,10 +49,22 @@ export const useCreateProject = (resumeId: string, options?: { onResumeNotFound?
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があれば、そのエントリーを控える(保存を始めたあとにエントリーが置き換わったか)
+            const tempEntry = resume.projects.find((e) => e.id === tempId);
+            const editedEntry = tempEntry !== onMutateResult?.snapshot ? tempEntry : undefined;
+
+            // サーバーから返された新規エントリーを特定
+            const createdProject = serverProjects.find(
+                (sp) => !resume.projects.some((lp) => lp.id === sp.id && lp.id !== tempId),
+            );
+
             // 保存した一時ID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
                 resume.projects.filter((p) => p.id !== tempId && dirtyEntryIds.has(p.id)).map((p) => [p.id, p]),
             );
+            // 保存中に打った文字は、作成されたエントリーのIDで残す
+            if (editedEntry && createdProject)
+                localDirtyMap.set(createdProject.id, { ...editedEntry, id: createdProject.id });
 
             // サーバーに存在しないローカル専用エントリー（未保存の新規エントリー）を抽出
             const serverIds = new Set(serverProjects.map((p) => p.id));
@@ -63,11 +79,6 @@ export const useCreateProject = (resumeId: string, options?: { onResumeNotFound?
             // ローカル専用エントリーを先頭に追加してマージ完了
             const finalProjects = [...localOnlyEntries, ...mergedProjects];
 
-            // サーバーから返された新規エントリーを特定
-            const createdProject = serverProjects.find(
-                (sp) => !resume.projects.some((lp) => lp.id === sp.id && lp.id !== tempId),
-            );
-
             // ストアを更新
             updateResumeFromServer({ projects: finalProjects, updatedAt });
 
@@ -78,6 +89,8 @@ export const useCreateProject = (resumeId: string, options?: { onResumeNotFound?
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(tempId);
+            // 保存中に打った文字があれば、作成されたエントリーを未保存のまま残す
+            if (editedEntry && createdProject) addDirtyEntryId(createdProject.id);
             setNotification("プロジェクトを作成しました。", "success");
         },
         onError: (error, { tempId }) => {
