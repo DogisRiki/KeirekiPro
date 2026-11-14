@@ -110,7 +110,7 @@ describe("useDeleteProject", () => {
         vi.spyOn(useNotificationStore.getState(), "setNotification");
 
         vi.spyOn(useResumeStore.getState(), "updateResume");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
+        vi.spyOn(useResumeStore.getState(), "removeEntry");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
     });
@@ -136,12 +136,12 @@ describe("useDeleteProject", () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
-        expect(useResumeStore.getState().updateResume).toHaveBeenCalledWith({
-            projects: [localResume.projects.find((p: any) => p.id === "project-2")!],
-        });
-        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(projectId);
+        expect(useResumeStore.getState().resume?.projects).toEqual([
+            localResume.projects.find((p: any) => p.id === "project-2")!,
+        ]);
+        expect(useResumeStore.getState().removeEntry).toHaveBeenCalledWith("projects", projectId);
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().isDirty).toBe(false); // ほかに未保存のエントリーが無い
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
             "プロジェクトを削除しました。",
             "success",

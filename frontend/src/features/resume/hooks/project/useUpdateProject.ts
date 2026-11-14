@@ -33,7 +33,7 @@ export const useUpdateProject = (resumeId: string, options?: { onResumeNotFound?
         },
         onSuccess: (response, { projectId }) => {
             const { projects: serverProjects, updatedAt } = response.data;
-            const { resume, dirtyEntryIds, updateResumeFromServer, setDirty, removeDirtyEntryId, clearEntryErrors } =
+            const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
 
             // 保存完了したエントリーのエラーをクリア
@@ -64,7 +64,6 @@ export const useUpdateProject = (resumeId: string, options?: { onResumeNotFound?
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(projectId);
-            setDirty(false);
             setNotification("プロジェクトを更新しました。", "success");
         },
         onError: async (error, { projectId }) => {

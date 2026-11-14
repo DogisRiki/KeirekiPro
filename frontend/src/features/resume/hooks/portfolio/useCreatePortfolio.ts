@@ -35,7 +35,6 @@ export const useCreatePortfolio = (resumeId: string, options?: { onResumeNotFoun
                 resume,
                 dirtyEntryIds,
                 updateResumeFromServer,
-                setDirty,
                 removeDirtyEntryId,
                 setActiveEntryId,
                 clearEntryErrors,
@@ -79,7 +78,6 @@ export const useCreatePortfolio = (resumeId: string, options?: { onResumeNotFoun
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(tempId);
-            setDirty(false);
             setNotification("ポートフォリオを作成しました。", "success");
         },
         onError: (error, { tempId }) => {

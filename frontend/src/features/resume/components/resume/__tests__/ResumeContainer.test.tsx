@@ -11,7 +11,7 @@ vi.mock("@/lib", () => ({
 
 import { lightTheme } from "@/config/theme";
 import type { Resume, SectionName } from "@/features/resume";
-import { RESUME_NOT_FOUND_MESSAGE, ResumeContainer, useResumeStore } from "@/features/resume";
+import { BASIC_INFO_ENTRY_ID, RESUME_NOT_FOUND_MESSAGE, ResumeContainer, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { createAxiosResponse, createTestQueryClient, resetStoresAndMocks } from "@/test";
 import { ThemeProvider } from "@mui/material";
@@ -171,7 +171,7 @@ describe("ResumeContainer", () => {
             const request = deferredFailure();
             vi.mocked(protectedApiClient.put).mockReturnValue(request.promise);
             await renderLoaded();
-            act(() => store().setDirty(true));
+            act(() => store().addDirtyEntryId(BASIC_INFO_ENTRY_ID));
 
             const saveButton = screen.getByRole("button", { name: "基本情報を保存" });
             fireEvent.click(saveButton);
@@ -349,7 +349,11 @@ describe("ResumeContainer", () => {
             expect(saveButton).toBeDisabled();
             expect(screen.queryByRole("button", { name: "基本情報を削除" })).not.toBeInTheDocument();
 
-            act(() => store().setDirty(true));
+            // ほかのエントリーの編集では押せるようにならない
+            act(() => store().addDirtyEntryId("career-1"));
+            expect(saveButton).toBeDisabled();
+
+            act(() => store().addDirtyEntryId(BASIC_INFO_ENTRY_ID));
             expect(saveButton).toBeEnabled();
         });
 
@@ -371,7 +375,7 @@ describe("ResumeContainer", () => {
 
             // 基本情報の編集や、別のエントリーの編集では押せるようにならない
             act(() => {
-                store().setDirty(true);
+                store().addDirtyEntryId(BASIC_INFO_ENTRY_ID);
                 store().addDirtyEntryId("project-1");
             });
             expect(saveButton).toBeDisabled();

@@ -52,7 +52,7 @@ describe("useDeleteSelfPromotion", () => {
         vi.spyOn(useNotificationStore.getState(), "setNotification");
 
         vi.spyOn(useResumeStore.getState(), "updateResume");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
+        vi.spyOn(useResumeStore.getState(), "removeEntry");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
     });
@@ -78,12 +78,12 @@ describe("useDeleteSelfPromotion", () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
-        expect(useResumeStore.getState().updateResume).toHaveBeenCalledWith({
-            selfPromotions: [localResume.selfPromotions.find((s) => s.id === "self-promotion-2")!],
-        });
-        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(selfPromotionId);
+        expect(useResumeStore.getState().resume?.selfPromotions).toEqual([
+            localResume.selfPromotions.find((s) => s.id === "self-promotion-2")!,
+        ]);
+        expect(useResumeStore.getState().removeEntry).toHaveBeenCalledWith("selfPromotions", selfPromotionId);
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().isDirty).toBe(false); // ほかに未保存のエントリーが無い
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
             "自己PRを削除しました。",
             "success",

@@ -33,7 +33,7 @@ export const useUpdateSnsPlatform = (resumeId: string, options?: { onResumeNotFo
         },
         onSuccess: (response, { snsPlatformId }) => {
             const { snsPlatforms: serverSnsPlatforms, updatedAt } = response.data;
-            const { resume, dirtyEntryIds, updateResumeFromServer, setDirty, removeDirtyEntryId, clearEntryErrors } =
+            const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
 
             // 保存完了したエントリーのエラーをクリア
@@ -66,7 +66,6 @@ export const useUpdateSnsPlatform = (resumeId: string, options?: { onResumeNotFo
 
             // 後処理: dirty状態のリセットと通知
             removeDirtyEntryId(snsPlatformId);
-            setDirty(false);
             setNotification("SNSを更新しました。", "success");
         },
         onError: async (error, { snsPlatformId }) => {

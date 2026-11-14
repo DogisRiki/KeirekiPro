@@ -69,7 +69,7 @@ describe("useNavigationBlocker", () => {
     });
 
     it("保存していない変更があるときは、ほかの画面への移動を止め、ログアウトしたあとの移動は止めないこと", () => {
-        useResumeStore.getState().setDirty(true);
+        useResumeStore.getState().addDirtyEntryId("career-1");
         renderHook(() => useNavigationBlocker());
         const move = { currentLocation: { pathname: "/resume/1" }, nextLocation: { pathname: "/login" } };
 
@@ -86,7 +86,7 @@ describe("useNavigationBlocker", () => {
     });
 
     it("ログアウトの前の確かめで離れないほうを選ぶと、falseを返して確かめを閉じること", async () => {
-        useResumeStore.getState().setDirty(true);
+        useResumeStore.getState().addDirtyEntryId("career-1");
         const { result, unmount } = renderHook(() => useNavigationBlocker());
 
         let answer: Promise<boolean> | undefined;
@@ -108,7 +108,7 @@ describe("useNavigationBlocker", () => {
     });
 
     it("ログアウトの前の確かめで離れるほうを選ぶと、trueを返すこと", async () => {
-        useResumeStore.getState().setDirty(true);
+        useResumeStore.getState().addDirtyEntryId("career-1");
         const { result } = renderHook(() => useNavigationBlocker());
 
         let answer: Promise<boolean> | undefined;

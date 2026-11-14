@@ -37,7 +37,7 @@ describe("useUpdateResumeBasic", () => {
         vi.mocked(protectedApiClient.put).mockReset();
         vi.spyOn(useNotificationStore.getState(), "setNotification");
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
+        vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setEntryErrors");
         vi.spyOn(useResumeStore.getState(), "clearEntryErrors");
     });
@@ -70,7 +70,7 @@ describe("useUpdateResumeBasic", () => {
             firstName: mockResume.firstName,
             updatedAt: mockResume.updatedAt,
         });
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(BASIC_INFO_ENTRY_ID);
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
             "基本情報を保存しました。",
             "success",
@@ -114,7 +114,36 @@ describe("useUpdateResumeBasic", () => {
         );
 
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
-        expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
+        expect(useResumeStore.getState().removeDirtyEntryId).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
+    });
+
+    describe("ほかのエントリーの未保存", () => {
+        const sentPayload = {
+            resumeName: "更新後職務経歴書",
+            date: "2024-01-15",
+            lastName: "鈴木",
+            firstName: "次郎",
+        };
+
+        it("基本情報を保存しても、ほかのエントリーが未保存なら未保存の変更が残ること", async () => {
+            useResumeStore.getState().setResume(mockResume);
+            useResumeStore.getState().updateResume(sentPayload);
+            useResumeStore.getState().addDirtyEntryId("career-1");
+            vi.mocked(protectedApiClient.put).mockResolvedValueOnce({ status: 200, data: mockResume });
+
+            const { result } = renderHook(() => useUpdateResumeBasic("resume-1"), { wrapper });
+            act(() => {
+                result.current.mutate(sentPayload);
+            });
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            const state = useResumeStore.getState();
+            expect(state.dirtyEntryIds.has(BASIC_INFO_ENTRY_ID)).toBe(false);
+            expect(state.isDirty).toBe(true);
+
+            act(() => useResumeStore.getState().removeDirtyEntryId("career-1"));
+            expect(useResumeStore.getState().isDirty).toBe(false);
+        });
     });
 });

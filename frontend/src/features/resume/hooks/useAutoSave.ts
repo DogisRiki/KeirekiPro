@@ -1,5 +1,12 @@
 import type { SectionName } from "@/features/resume";
-import { AUTO_SAVE_INTERVAL_MS, buildPayloadForEntry, getResumeKey, isTempId, useResumeStore } from "@/features/resume";
+import {
+    AUTO_SAVE_INTERVAL_MS,
+    BASIC_INFO_ENTRY_ID,
+    buildPayloadForEntry,
+    getResumeKey,
+    isTempId,
+    useResumeStore,
+} from "@/features/resume";
 import dayjs from "dayjs";
 import { useEffect } from "react";
 import { useDebouncedCallback } from "use-debounce";
@@ -105,6 +112,8 @@ export const useAutoSave = ({
 
         // 基本情報セクションの場合
         if (activeSection === "basicInfo") {
+            // 基本情報に未保存の変更が無いときは保存しない(ほかのエントリーだけが未保存のとき)
+            if (!dirtyEntryIds.has(BASIC_INFO_ENTRY_ID)) return;
             updateBasicMutation.mutate({
                 resumeName: resume.resumeName,
                 date: formatDateSafe(resume.date),
