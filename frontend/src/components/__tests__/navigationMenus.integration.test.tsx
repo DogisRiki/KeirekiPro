@@ -12,7 +12,7 @@ vi.mock("@/lib", () => ({
 import { MainMenu, UserMenu } from "@/components/ui";
 import { paths } from "@/config/paths";
 import { protectedApiClient } from "@/lib";
-import { useUserAuthStore } from "@/stores";
+import { useLeaveGuardStore, useUserAuthStore } from "@/stores";
 import { renderWithProviders, resetStoresAndMocks } from "@/test";
 import type { User } from "@/types";
 
@@ -32,6 +32,7 @@ const user: User = {
 describe("navigation menus", () => {
     beforeEach(() => {
         resetStoresAndMocks([]);
+        useLeaveGuardStore.setState({ confirmLeave: null });
         vi.mocked(protectedApiClient.post).mockReset();
         vi.mocked(protectedApiClient.post).mockResolvedValue({ data: undefined } as AxiosResponse<void>);
     });
@@ -77,5 +78,43 @@ describe("navigation menus", () => {
         expect(await screen.findByText("login destination")).toBeInTheDocument();
         expect(protectedApiClient.post).toHaveBeenCalledWith("/auth/logout");
         expect(useUserAuthStore.getState().isAuthenticated).toBe(false);
+    });
+
+    it("UserMenuは保存していない変更があるとき、確かめで離れないほうを選ぶとログアウトしないこと", async () => {
+        useUserAuthStore.getState().setLogin(user);
+        const confirmLeave = vi.fn().mockResolvedValue(false);
+        useLeaveGuardStore.setState({ confirmLeave });
+
+        const { user: uiUser } = renderWithProviders(<UserMenu />);
+
+        await uiUser.click(screen.getByText("test-user"));
+        await uiUser.click(screen.getByRole("menuitem", { name: /ログアウト/ }));
+
+        expect(confirmLeave).toHaveBeenCalledTimes(1);
+        expect(protectedApiClient.post).not.toHaveBeenCalled();
+        expect(useUserAuthStore.getState().isAuthenticated).toBe(true);
+    });
+
+    it("UserMenuは保存していない変更があるとき、確かめで離れるほうを選ぶとログアウトすること", async () => {
+        useUserAuthStore.getState().setLogin(user);
+        const confirmLeave = vi.fn().mockResolvedValue(true);
+        useLeaveGuardStore.setState({ confirmLeave });
+
+        const { user: uiUser } = renderWithProviders(
+            <>
+                <UserMenu />
+                <Routes>
+                    <Route path="/" element={<div>top</div>} />
+                    <Route path={paths.login} element={<div>login destination</div>} />
+                </Routes>
+            </>,
+        );
+
+        await uiUser.click(screen.getByText("test-user"));
+        await uiUser.click(screen.getByRole("menuitem", { name: /ログアウト/ }));
+
+        expect(await screen.findByText("login destination")).toBeInTheDocument();
+        expect(confirmLeave).toHaveBeenCalledTimes(1);
+        expect(protectedApiClient.post).toHaveBeenCalledWith("/auth/logout");
     });
 });
