@@ -1,0 +1,159 @@
+# ログインしている利用者の確認のメールの送り直しの筋書き。
+# 確認の済んでいないメールアドレスを持つ利用者(unverified-linked)は、Google のアカウントでログインし、
+# 確認のメールを送り直す。送り直したあと、送り直せる間隔のキーを消してもう一度送り直し、前のリンクを確認に送ると
+# 使えず(結果は EXPIRED)、新しいリンクで確認が済む。
+# パスワードもメールアドレスも持たない利用者(google-only)は、メールアドレスとパスワードを設定した直後に送り直すと、
+# 送り直せる間隔の中なので断られ、間隔のキーを消してから送り直すと、設定待ちのメールアドレスへ送られる。
+# 確認の要るメールアドレスを持たない利用者(user1)の送り直しは断られる。
+# 送り直せる間隔は、メールアドレスごとの Redis のキー email-verification:rate:<メールアドレス> が持つ。
+# 1つの筋書きで Google のアカウントでログインする利用者を2人使うので、偽の OIDC の Google の利用者を途中で替える。
+# unverified-linked の Google の利用者は email_verified を偽にする。Google が確認の済んだメールアドレスを返さないので、
+# Java 版と Go 版は、ログインのときに利用者のメールアドレスを確認済みにしない。
+name: users-email-verification
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql, users/users-ops.sql]
+modes: [compare]
+oidc_users:
+  google: {sub: google-sub-unverified-linked, name: 未確認 七郎, email: unverified-linked@example.com, email_verified: false}
+steps:
+  # 確認の済んでいないメールアドレスを持つ利用者
+  - name: start-unverified-linked
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=google
+    capture: {authURL: text}
+    expect: {status: 200}
+  - name: authorize-unverified-linked
+    request:
+      method: GET
+      url: '{authURL}'
+    capture: {code: 'header:Location?code', state: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-unverified-linked
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code}&state={state}
+    expect: {status: 302}
+  - name: send-unverified-linked
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    capture: {linkA: 'mail:/email/verify#(\S+)'}
+    expect: {status: 204}
+  # 間隔の中の送り直しは断られる
+  - name: send-unverified-linked-rate-limited
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    expect: {status: 400}
+  - name: clear-rate-unverified-linked
+    redis: {del: ['email-verification:rate:unverified-linked@example.com']}
+  - name: send-unverified-linked-again
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    capture: {linkB: 'mail:/email/verify#(\S+)'}
+    expect: {status: 204}
+  # 前のリンクは、新しいリンクを送ったあとは使えない(結果は EXPIRED で、状態の番号は 200)
+  - name: verify-previous-link
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{linkA}"}
+    expect: {status: 200, fields: [$.result]}
+  - name: verify-latest-link
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{linkB}"}
+    expect: {status: 200, fields: [$.result]}
+  # 確認が済んだので、パスワードでログインできる
+  - name: login-unverified-linked-after-verification
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: unverified-linked@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 偽の OIDC の Google の利用者を、パスワードもメールアドレスも持たない利用者に替える
+  - name: switch-google-user
+    request:
+      method: PUT
+      url: http://fakeoidc/_compat/users/google
+      json: {sub: google-sub-google-only, name: グーグル 五郎, email: google-only@example.com, email_verified: true}
+    expect: {status: 204}
+  - name: start-google-only
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=google
+    capture: {authURL2: text}
+    expect: {status: 200}
+  - name: authorize-google-only
+    request:
+      method: GET
+      url: '{authURL2}'
+    capture: {code2: 'header:Location?code', state2: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-google-only
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code2}&state={state2}
+    expect: {status: 302}
+  # 確認の要るメールアドレスが無い
+  - name: send-google-only-nothing-to-verify
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    expect: {status: 400}
+  # メールアドレスとパスワードを設定する。設定のときに確認のメールが送られる
+  - name: set-email-and-password-google-only
+    request:
+      method: POST
+      path: /api/users/me/email-password
+      csrf: true
+      json: {email: google-only-set@example.com, password: Passw0rd!, confirmPassword: Passw0rd!}
+    expect: {status: 200}
+  # 設定の直後の送り直しは、間隔の中なので断られる
+  - name: send-pending-rate-limited
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    expect: {status: 400}
+  - name: clear-rate-pending
+    redis: {del: ['email-verification:rate:google-only-set@example.com']}
+  # 設定待ちのメールアドレスへの送り直し
+  - name: send-pending
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    capture: {linkC: 'mail:/email/verify#(\S+)'}
+    expect: {status: 204}
+  - name: verify-pending-link
+    request:
+      method: POST
+      path: /api/auth/email-verification/verify
+      json: {token: "{linkC}"}
+    expect: {status: 200, fields: [$.result]}
+  - name: get-user-info-google-only
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200}
+  # 確認の済んだメールアドレスだけを持つ利用者の送り直しは断られる
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: send-user1-nothing-to-verify
+    request:
+      method: POST
+      path: /api/users/me/email-verification
+      csrf: true
+    expect: {status: 400}

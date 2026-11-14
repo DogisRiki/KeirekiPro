@@ -160,7 +160,7 @@ func RunCross(ctx context.Context, client *http.Client, s Scenario, direction st
 }
 
 // runCross は、RunCross の動かし方で、版に送る段でない段も、tools で1回ずつ動かす。版に送る段でない段は版を持たないので、
-// 失敗の Version を空にする。版に送る段は、応答が expect に合うかを CheckExpect で確かめる。絶対の URL の段の expect の status は SendAbsolute が確かめ、要求を送らない段には expect が無い。
+// 失敗の Version を空にする。版に送る段は、応答が expect の status と fields と values に合うかを、送り先の版の応答で checkStepExpect で確かめる。絶対の URL の段の expect の status は SendAbsolute が確かめ、要求を送らない段には expect が無い。
 func runCross(ctx context.Context, tools stepTools, s Scenario, direction string, urls map[string]string) *CrossFailure {
 	route, err := CrossRoute(s, direction)
 	if err != nil {
@@ -181,7 +181,7 @@ func runCross(ctx context.Context, tools stepTools, s Scenario, direction string
 		// 絶対の URL の段の expect の status は、SendAbsolute が確かめて誤りを返すので、同じ違いを2回書かない
 		var problems []string
 		if step.Kind() == StepVersion {
-			problems = CheckExpect(step, resp)
+			problems = checkStepExpect(session, step, resp)
 		}
 		if err != nil {
 			problems = append(problems, err.Error())

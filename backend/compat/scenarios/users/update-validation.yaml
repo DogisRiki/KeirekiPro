@@ -1,0 +1,137 @@
+# 名前と画像と2段階認証の設定の変更の入力の誤りの筋書き。1つの段では1つの誤りだけを送る。
+# user1 で、名前の空と空白だけと51文字、画像の Content-Type の誤り、拡張子の誤り、1048577 バイトの画像、
+# 幅が 4096 ピクセルを超える画像、画像でないファイルを送る。
+# 管理者が2段階認証を使わない設定にする要求と、パスワードの無い利用者(Google だけの利用者)が2段階認証を
+# 使う設定にする要求も送る。どの段も断られ、利用者の情報と画像の置き場所は変わらない。
+name: users-update-validation
+group: 2
+fixtures: [users/basic.sql, users/auth-users.sql, users/users-ops.sql]
+modes: [compare]
+oidc_users:
+  google: {sub: google-sub-google-only, name: グーグル 五郎, email: google-only@example.com, email_verified: true}
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 名前の誤り
+  - name: username-empty
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: ''}
+    expect: {status: 400}
+  - name: username-blank
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: '   '}
+    expect: {status: 400}
+  - name: username-51-chars
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: username, value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+    expect: {status: 400}
+  # 画像の誤り
+  - name: image-wrong-content-type
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.png, filename: profile.png, content_type: text/plain}
+    expect: {status: 400}
+  - name: image-wrong-extension
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.png, filename: profile.bmp, content_type: image/png}
+    expect: {status: 400}
+  - name: image-too-large
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: profile.png, filename: profile.png, content_type: image/png, pad_to: 1048577}
+    expect: {status: 400}
+  - name: image-too-wide
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: wide.png, filename: wide.png, content_type: image/png}
+    expect: {status: 400}
+  - name: image-not-image
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: profileImage, file: not-image.png, filename: not-image.png, content_type: image/png}
+    expect: {status: 400}
+  - name: get-user-info-user1-unchanged
+    request:
+      method: GET
+      path: /api/users/me
+    expect: {status: 200}
+  # 管理者は2段階認証を使わない設定にできない。確認のコードはログインの段のあとに届いたメールから取り出す
+  - name: login-admin
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: admin-ops@example.com, password: Passw0rd!}
+    capture: {adminCode: 'mail:(\d{6})'}
+    expect: {status: 202}
+  - name: verify-admin
+    request:
+      method: POST
+      path: /api/auth/2fa/verify
+      json: {code: '{adminCode}'}
+    expect: {status: 200}
+  - name: admin-disable-two-factor
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: twoFactorAuthEnabled, value: 'false'}
+    expect: {status: 400}
+  # パスワードの無い利用者は2段階認証を使う設定にできない。Google のアカウントでログインする
+  - name: start-google-only
+    request:
+      method: GET
+      path: /api/auth/oidc/authorize?provider=google
+    capture: {authURL: text}
+    expect: {status: 200}
+  - name: authorize-google-only
+    request:
+      method: GET
+      url: '{authURL}'
+    capture: {code: 'header:Location?code', state: 'header:Location?state'}
+    expect: {status: 302}
+  - name: callback-google-only
+    request:
+      method: GET
+      path: /api/auth/oidc/callback?code={code}&state={state}
+    expect: {status: 302}
+  - name: google-only-enable-two-factor
+    request:
+      method: PUT
+      path: /api/users/me
+      csrf: true
+      multipart:
+        - {name: twoFactorAuthEnabled, value: 'true'}
+    expect: {status: 400}

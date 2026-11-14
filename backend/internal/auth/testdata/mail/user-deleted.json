@@ -1,0 +1,24 @@
+{
+  "deleteAnswer": {
+    "status": 204,
+    "body": ""
+  },
+  "messages": [
+    {
+      "Body": {
+        "html_part": null,
+        "text_part": "退会太郎 様\n\n退会手続きが完了しました。\nご利用ありがとうございました。\n\n※このメールの内容に心当たりがない方は、本メールを破棄してください。\n\nKeirekiPro\nhttps://app.keirekipro.click\n"
+      },
+      "Destination": {
+        "ToAddresses": [
+          "cap-mail@example.com"
+        ]
+      },
+      "Id": "uzimvrupebabwiil-bubmgwpo-pasp-sozi-myse-yybkzoukzdih-qnyomd",
+      "Region": "ap-northeast-1",
+      "Source": "no-reply@keirekipro.click",
+      "Subject": "【KeirekiPro】退会手続き完了のお知らせ",
+      "Timestamp": "2026-11-13T07:50:00"
+    }
+  ]
+}
