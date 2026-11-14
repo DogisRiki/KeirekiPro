@@ -24,14 +24,17 @@ export const useUpdatePortfolio = (resumeId: string, options?: { onResumeNotFoun
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { portfolioId: string; payload: UpdatePortfolioPayload }
+        { portfolioId: string; payload: UpdatePortfolioPayload },
+        { snapshot?: Resume["portfolios"][number] }
     >({
         mutationFn: ({ portfolioId, payload }) => updatePortfolio(resumeId, portfolioId, payload),
         onMutate: ({ portfolioId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(portfolioId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.portfolios.find((e) => e.id === portfolioId) };
         },
-        onSuccess: (response, { portfolioId }) => {
+        onSuccess: (response, { portfolioId }, onMutateResult) => {
             const { portfolios: serverPortfolios, updatedAt } = response.data;
             const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
@@ -41,9 +44,16 @@ export const useUpdatePortfolio = (resumeId: string, options?: { onResumeNotFoun
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があるか(保存を始めたあとにエントリーが置き換わったか)
+            const editedDuringSave = resume.portfolios.some(
+                (e) => e.id === portfolioId && e !== onMutateResult?.snapshot,
+            );
+
             // 保存したID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
-                resume.portfolios.filter((p) => p.id !== portfolioId && dirtyEntryIds.has(p.id)).map((p) => [p.id, p]),
+                resume.portfolios
+                    .filter((p) => (p.id !== portfolioId || editedDuringSave) && dirtyEntryIds.has(p.id))
+                    .map((p) => [p.id, p]),
             );
 
             // サーバーに存在しないローカル専用エントリー（未保存の新規エントリー）を抽出
@@ -63,7 +73,8 @@ export const useUpdatePortfolio = (resumeId: string, options?: { onResumeNotFoun
             updateResumeFromServer({ portfolios: finalPortfolios, updatedAt });
 
             // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(portfolioId);
+            // 保存中に打った文字があれば、未保存のまま残す
+            if (!editedDuringSave) removeDirtyEntryId(portfolioId);
             setNotification("ポートフォリオを更新しました。", "success");
         },
         onError: async (error, { portfolioId }) => {

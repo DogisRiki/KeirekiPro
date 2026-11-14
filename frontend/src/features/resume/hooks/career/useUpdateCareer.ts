@@ -24,14 +24,17 @@ export const useUpdateCareer = (resumeId: string, options?: { onResumeNotFound?:
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { careerId: string; payload: UpdateCareerPayload }
+        { careerId: string; payload: UpdateCareerPayload },
+        { snapshot?: Resume["careers"][number] }
     >({
         mutationFn: ({ careerId, payload }) => updateCareer(resumeId, careerId, payload),
         onMutate: ({ careerId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(careerId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.careers.find((e) => e.id === careerId) };
         },
-        onSuccess: (response, { careerId }) => {
+        onSuccess: (response, { careerId }, onMutateResult) => {
             const { careers: serverCareers, updatedAt } = response.data;
             const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
@@ -41,9 +44,14 @@ export const useUpdateCareer = (resumeId: string, options?: { onResumeNotFound?:
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があるか(保存を始めたあとにエントリーが置き換わったか)
+            const editedDuringSave = resume.careers.some((e) => e.id === careerId && e !== onMutateResult?.snapshot);
+
             // 保存したID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
-                resume.careers.filter((c) => c.id !== careerId && dirtyEntryIds.has(c.id)).map((c) => [c.id, c]),
+                resume.careers
+                    .filter((c) => (c.id !== careerId || editedDuringSave) && dirtyEntryIds.has(c.id))
+                    .map((c) => [c.id, c]),
             );
 
             // サーバーに存在しないローカル専用エントリー（未保存の新規エントリー）を抽出
@@ -63,7 +71,8 @@ export const useUpdateCareer = (resumeId: string, options?: { onResumeNotFound?:
             updateResumeFromServer({ careers: finalCareers, updatedAt });
 
             // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(careerId);
+            // 保存中に打った文字があれば、未保存のまま残す
+            if (!editedDuringSave) removeDirtyEntryId(careerId);
             setNotification("職歴を更新しました。", "success");
         },
         onError: async (error, { careerId }) => {

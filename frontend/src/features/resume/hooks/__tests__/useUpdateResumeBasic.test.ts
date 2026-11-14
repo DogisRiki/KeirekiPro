@@ -146,4 +146,47 @@ describe("useUpdateResumeBasic", () => {
             expect(useResumeStore.getState().isDirty).toBe(false);
         });
     });
+
+    it("保存中に打った文字は、保存が終わったあとも欄に残り、未保存の変更として扱われること", async () => {
+        useResumeStore.getState().setResume(mockResume);
+        useResumeStore.getState().addDirtyEntryId(BASIC_INFO_ENTRY_ID);
+
+        let resolveSave: (value: unknown) => void = () => undefined;
+        vi.mocked(protectedApiClient.put).mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveSave = resolve;
+            }),
+        );
+
+        const { result } = renderHook(() => useUpdateResumeBasic("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({
+                resumeName: mockResume.resumeName,
+                date: mockResume.date,
+                lastName: mockResume.lastName ?? "",
+                firstName: mockResume.firstName ?? "",
+            });
+        });
+        await waitFor(() => expect(protectedApiClient.put).toHaveBeenCalled());
+
+        // 保存が終わる前に別の欄へ文字を打つ
+        act(() => {
+            useResumeStore.getState().updateResume({ lastName: "保存中に打った文字" });
+        });
+        await act(async () => {
+            resolveSave({ status: 200, data: { ...mockResume, updatedAt: "2024-02-10T00:00:00.000Z" } });
+        });
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        const { resume, dirtyEntryIds, isDirty } = useResumeStore.getState();
+        expect(resume?.lastName).toBe("保存中に打った文字");
+        expect(resume?.updatedAt).toBe("2024-02-10T00:00:00.000Z");
+        expect(dirtyEntryIds.has(BASIC_INFO_ENTRY_ID)).toBe(true);
+        expect(isDirty).toBe(true);
+        expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
+            "基本情報を保存しました。",
+            "success",
+        );
+    });
 });

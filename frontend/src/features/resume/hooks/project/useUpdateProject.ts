@@ -24,14 +24,17 @@ export const useUpdateProject = (resumeId: string, options?: { onResumeNotFound?
     return useMutation<
         AxiosResponse<Resume>,
         AxiosError<ErrorResponse>,
-        { projectId: string; payload: UpdateProjectPayload }
+        { projectId: string; payload: UpdateProjectPayload },
+        { snapshot?: Resume["projects"][number] }
     >({
         mutationFn: ({ projectId, payload }) => updateProject(resumeId, projectId, payload),
         onMutate: ({ projectId }) => {
             // リクエスト開始時にエラーをクリア
             useResumeStore.getState().clearEntryErrors(projectId);
+            // 保存を始めたときのエントリーを控える(保存中に打った文字を見分けるため)
+            return { snapshot: useResumeStore.getState().resume?.projects.find((e) => e.id === projectId) };
         },
-        onSuccess: (response, { projectId }) => {
+        onSuccess: (response, { projectId }, onMutateResult) => {
             const { projects: serverProjects, updatedAt } = response.data;
             const { resume, dirtyEntryIds, updateResumeFromServer, removeDirtyEntryId, clearEntryErrors } =
                 useResumeStore.getState();
@@ -41,9 +44,14 @@ export const useUpdateProject = (resumeId: string, options?: { onResumeNotFound?
 
             if (!resume) return;
 
+            // 保存中にこのエントリーへ打った文字があるか(保存を始めたあとにエントリーが置き換わったか)
+            const editedDuringSave = resume.projects.some((e) => e.id === projectId && e !== onMutateResult?.snapshot);
+
             // 保存したID以外で、編集中のエントリーをマップ化
             const localDirtyMap = new Map(
-                resume.projects.filter((p) => p.id !== projectId && dirtyEntryIds.has(p.id)).map((p) => [p.id, p]),
+                resume.projects
+                    .filter((p) => (p.id !== projectId || editedDuringSave) && dirtyEntryIds.has(p.id))
+                    .map((p) => [p.id, p]),
             );
 
             // サーバーに存在しないローカル専用エントリー（未保存の新規エントリー）を抽出
@@ -63,7 +71,8 @@ export const useUpdateProject = (resumeId: string, options?: { onResumeNotFound?
             updateResumeFromServer({ projects: finalProjects, updatedAt });
 
             // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(projectId);
+            // 保存中に打った文字があれば、未保存のまま残す
+            if (!editedDuringSave) removeDirtyEntryId(projectId);
             setNotification("プロジェクトを更新しました。", "success");
         },
         onError: async (error, { projectId }) => {
