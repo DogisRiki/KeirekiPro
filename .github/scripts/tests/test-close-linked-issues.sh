@@ -12,11 +12,13 @@
 #
 # gh の偽物は実APIの形のJSONをそのまま返し、応答の解釈は本体に任せる
 # (応答の形は 2026-10-01 に実物の GraphQL で確かめたもの。存在しない番号と PR の番号は、
-#  どちらも errors に NOT_FOUND を持つ応答と終了コード 1 になる。Issue の子の数と親の番号は
-#  2026-10-02 に #472 で確かめたもの。subIssuesSummary は子が無くても {"total":0,"completed":0} で
-#  返り、親が無ければ parent は null になる。親のリポジトリ(parent.repository.nameWithOwner)は、同じ日に
-#  #472 の repository { nameWithOwner } で欄の形を確かめた。このリポジトリに親を持つ Issue が無いため、
-#  親の欄の中の形は GraphQL のスキーマ(parent は Issue 型)に合わせている)。
+#  どちらも errors に NOT_FOUND を持つ応答と終了コード 1 になる。Issue の親の番号は
+#  2026-10-02 に #472 で確かめたもの。親が無ければ parent は null になる。親のリポジトリ
+#  (parent.repository.nameWithOwner)は、同じ日に #472 の repository { nameWithOwner } で欄の形を確かめた。
+#  子の一覧(subIssues)は 2026-11-15 に #864 と #877 で確かめたもの。子があれば
+#  {"totalCount":2,"nodes":[{"number":869,"state":"CLOSED","repository":{"nameWithOwner":"<所有者>/<リポジトリ>"}}, ...]}、
+#  子が無ければ {"totalCount":0,"nodes":[]} で返る)。
+#  偽物の子の一覧は、family で置く子に 9000 からの番号を付ける(テストのほかの番号と重ならない番号)。
 # 想定していない呼び出しは失敗させ、記録を残す。
 #
 # 外部への問い合わせを行わないため、実行にネットワークを必要としない。
@@ -50,7 +52,9 @@ mkdir -p "$WORK/bin"
 #                 照会のクエリは $STUB_ISSUE_QUERY に保存する(最後の1件)
 #   Issue のクローズ: STUB_FAIL_CLOSE の番号なら失敗。
 #                     成功したら $STUB_ISSUES/<番号>.json の state を CLOSED にし、その Issue にこのリポジトリの親があれば、
-#                     親の応答の閉じた子の数(subIssuesSummary.completed)を1つ増やす(実物の照会の結果に合わせる)
+#                     親の応答の子の一覧(subIssues.nodes)で、閉じた Issue の行を CLOSED にする。行が無ければ、
+#                     family で置いた子(9000 からの番号)のうち最初の OPEN の行を CLOSED にする。
+#                     STUB_LAG が空でなければ、親の応答を変えない(閉じた直後に GitHub が古い一覧を返す #877 の場面)
 #   Issue へのコメント: 本文を $STUB_POSTED/comment_<番号>.md に保存(STUB_FAIL_COMMENT の番号なら失敗)
 #   コメントの一覧: $STUB_COMMENTS/<番号>.json があればその中身、無ければ [](STUB_FAIL_LIST の番号なら失敗)。
 #                   実物の REST の形(.user.login が github-actions[bot]、.created_at、.body)で置く
@@ -165,7 +169,8 @@ case "$*" in
         echo "gh: Resource not accessible by integration (HTTP 403)" >&2
         exit 1
     fi
-    # 実物と同じく、閉じた Issue のその後の照会は CLOSED を返し、親の閉じた子の数は1つ増える
+    # 実物と同じく、閉じた Issue のその後の照会は CLOSED を返し、親の子の一覧でもその子が閉じる。
+    # STUB_LAG が空でなければ、親の子の一覧は閉じる前のまま返す(閉じた直後の古い一覧。#877)
     issue_file="${STUB_ISSUES:?}/$3.json"
     if [ -f "$issue_file" ]; then
         parent=$(jq -r '.data.repository.issue.parent
@@ -173,8 +178,18 @@ case "$*" in
             jq '.data.repository.issue.state = "CLOSED"' "$issue_file" >"$issue_file.tmp" &&
             mv "$issue_file.tmp" "$issue_file" || unexpected "$@"
         parent_file="$STUB_ISSUES/${parent}.json"
-        if [ -n "$parent" ] && [ -f "$parent_file" ]; then
-            jq '.data.repository.issue.subIssuesSummary.completed += 1' "$parent_file" >"$parent_file.tmp" &&
+        if [ -z "${STUB_LAG:-}" ] && [ -n "$parent" ] && [ -f "$parent_file" ]; then
+            # 子の一覧の無い親の応答(形の違う応答の場面)は変えない
+            jq --argjson n "$3" '
+                if (.data.repository.issue.subIssues.nodes | type) != "array" then . else
+                .data.repository.issue.subIssues.nodes |= (
+                    (first(to_entries[]
+                        | select(.value.number == $n and (.value.repository.nameWithOwner | ascii_downcase) == "owner/repo")
+                        | .key)
+                     // first(to_entries[] | select(.value.state == "OPEN" and .value.number >= 9000) | .key)
+                     // null) as $i
+                    | if $i == null then . else .[$i].state = "CLOSED" end) end' \
+                "$parent_file" >"$parent_file.tmp" &&
                 mv "$parent_file.tmp" "$parent_file" || unexpected "$@"
         fi
     fi
@@ -223,22 +238,42 @@ issue() {
         {data: {repository: {issue: {
             state: $state,
             timelineItems: {nodes: (split("\n") | map(select(length > 0) | {createdAt: .}))},
-            subIssuesSummary: {total: 0, completed: 0},
+            subIssues: {totalCount: 0, nodes: []},
             parent: null}}}}' \
         >"$WORK/issues/${n}.json"
 }
 
 # 使い方: family <番号> <親の番号、親が無ければ -> <子の数> <閉じた子の数> [<親のリポジトリ>]
-# issue で置いた Issue の応答に、親の番号と子の数を書き込む。
+# issue で置いた Issue の応答に、親の番号と子の一覧を書き込む。
+# 子の一覧は、9000 からの番号の子を子の数だけ並べ、先頭から閉じた子の数だけを CLOSED、残りを OPEN にする。
 # 親のリポジトリを省くと、このリポジトリ(owner/repo)にする。
 family() {
     local file="$WORK/issues/$1.json"
     jq --arg parent "$2" --argjson total "$3" --argjson completed "$4" --arg repo "${5:-owner/repo}" '
         .data.repository.issue += {
-            subIssuesSummary: {total: $total, completed: $completed},
+            subIssues: {totalCount: $total,
+                        nodes: [range($total) as $k
+                                | {number: (9000 + $k),
+                                   state: (if $k < $completed then "CLOSED" else "OPEN" end),
+                                   repository: {nameWithOwner: "owner/repo"}}]},
             parent: (if $parent == "-" then null
                      else {number: ($parent | tonumber), repository: {nameWithOwner: $repo}} end)}' \
         "$file" >"$file.tmp" && mv "$file.tmp" "$file"
+}
+
+# 使い方: children <番号> <子の番号>:<OPEN|CLOSED>[:<子のリポジトリ>] ...
+# Issue の応答の子の一覧を、引数のとおりの子にする(子のリポジトリを省くと owner/repo)。
+# 親は変えない(family のあとに呼ぶ)。
+children() {
+    local file="$WORK/issues/$1.json"
+    shift
+    printf '%s\n' "$@" | jq -R -s '
+        split("\n") | map(select(length > 0) | split(":")
+            | {number: (.[0] | tonumber), state: .[1], repository: {nameWithOwner: (.[2] // "owner/repo")}})' \
+        >"$WORK/children.json" &&
+        jq --slurpfile c "$WORK/children.json" '
+            .data.repository.issue.subIssues = {totalCount: ($c[0] | length), nodes: $c[0]}' \
+            "$file" >"$file.tmp" && mv "$file.tmp" "$file"
 }
 
 # 使い方: comments <番号> <作成者> <本文のファイル>
@@ -269,6 +304,7 @@ reset_scenario() {
     FAIL_COMMENT=""
     FAIL_LIST=""
     FAIL_NOTICE=""
+    LAG=""
 }
 
 run() {
@@ -283,6 +319,7 @@ run() {
         STUB_COMMENTS="$WORK/comments" STUB_FAIL_LIST="$FAIL_LIST" STUB_FAIL_NOTICE="$FAIL_NOTICE" \
         STUB_PR_MODE="$PR_MODE" STUB_FAIL_CLOSE="$FAIL_CLOSE" STUB_FAIL_COMMENT="$FAIL_COMMENT" \
         STUB_PRS="$WORK/prs" STUB_PR_LIST="$WORK/pr-list.json" STUB_PR_LIST_MODE="$PR_LIST_MODE" \
+        STUB_LAG="$LAG" \
         GITHUB_REPOSITORY="owner/repo" GITHUB_REPOSITORY_OWNER="owner-name" GH_TOKEN="dummy" \
         bash "$SCRIPT" "${@:-7}" >"$WORK/out.txt" 2>"$WORK/err.txt"
     RC=$?
@@ -500,7 +537,7 @@ reset_scenario
 issue 21 OPEN
 run
 query_text=$(tr -s '[:space:]' ' ' <"$WORK/issue-query.txt")
-for want in 'subIssuesSummary { total completed }' 'parent { number repository { nameWithOwner } }'; do
+for want in 'subIssues(first: 100) { totalCount nodes { number state repository { nameWithOwner } } }' 'parent { number repository { nameWithOwner } }'; do
     case "$query_text" in
     *"$want"*) ok "Issue の照会で「$want」を求める" ;;
     *) ng "Issue の照会で「$want」を求める (照会: $query_text)" ;;
@@ -725,7 +762,7 @@ expect_err "たどる段の上限に達したことを標準エラーに出す" 
 # 使い方: keep_stub <番号>(実行の前の偽物の Issue の応答を残す)
 keep_stub() { cp "$WORK/issues/$1.json" "$WORK/before_$1.json"; }
 # 使い方: expect_untouched_stub <説明> <番号>
-# 偽物の Issue の応答が、keep_stub で残した実行の前と同じ(閉じられず、閉じた子の数も増えていない)ことを確かめる。
+# 偽物の Issue の応答が、keep_stub で残した実行の前と同じ(閉じられず、子の一覧も変わっていない)ことを確かめる。
 expect_untouched_stub() {
     if cmp -s "$WORK/before_$2.json" "$WORK/issues/$2.json"; then
         ok "$1"
@@ -982,6 +1019,142 @@ check "親の応答の親のリポジトリの名前が無ければ、親を閉�
     "$(printf '%s\napi POST comments 30' "$(closing 21)")"
 expect_queried "親の応答の形が違えば、親の親を照会しない" "21 30"
 
+# 子の一覧の件数と、読めた子の数が違う(101件以上の子がある親など)ときは、確かめられなかったとして知らせる
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 1 0
+jq '.data.repository.issue.subIssues.totalCount = 2' "$WORK/issues/30.json" >"$WORK/issues/30.tmp" &&
+    mv "$WORK/issues/30.tmp" "$WORK/issues/30.json"
+run
+check "親の子の件数と子の一覧の数が違えば、親を閉じずに知らせを付ける" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-close-failed')" \
+    "$(printf '%s\napi POST comments 30' "$(closing 21)")"
+expect_err "子の件数と一覧の数が違うことを、応答の形の違いとして標準エラーに出す" "親の Issue #30 の応答の形が想定と違います"
+
+# =====================================================================
+# 閉じた直後に GitHub が古い子の一覧を返しても、親を閉じる(#877)
+# =====================================================================
+# 子 #21 → 親 #30 → #40 → #50 の4段。どの親の子の一覧も、直前に閉じた子を開いたまま返す
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 40 0 0
+children 30 21:OPEN 22:CLOSED
+issue 40 OPEN
+family 40 50 0 0
+children 40 30:OPEN 31:CLOSED
+issue 50 OPEN
+family 50 - 0 0
+children 50 40:OPEN 41:CLOSED
+LAG=1
+run
+check "閉じた直後の子の一覧で子が開いたままでも、この実行で閉じた子と親を閉じたものとして数え、上の親まで閉じる(#877)" 0 \
+    "$(printf 'issue=21 result=closed\nissue=30 result=parent-closed\nissue=40 result=parent-closed\nissue=50 result=parent-closed')" \
+    "$(closing 21 30 40 50)"
+expect_record "4段目の親の記録には、最後に閉じた子として3段目の親の番号が書いてある" 50 "$(parent_record 40)"
+expect_queried "子から順に、4段目の親まで照会する" "21 30 40 50"
+
+# GitHub が先に閉じた子(untouched)が、親の子の一覧でまだ開いている
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 0 0
+children 30 21:OPEN 22:CLOSED
+run
+check "GitHub が先に閉じた子が親の子の一覧でまだ開いていても、照会で閉じていれば閉じたと数えて親を閉じる(#877)" 0 \
+    "$(printf 'issue=21 result=untouched\nissue=30 result=parent-closed')" "$(closing 30)"
+
+# 別のリポジトリの、同じ番号の子
+reset_scenario
+issue 21 OPEN
+family 21 30 0 0
+issue 30 OPEN
+family 30 - 0 0
+children 30 21:OPEN 21:OPEN:other-owner/other-repo
+LAG=1
+run
+check "別のリポジトリの子が開いていれば、この実行で閉じた子と同じ番号でも閉じたと数えず、親を閉じない" 0 \
+    "issue=21 result=closed" "$(closing 21)"
+expect_queried "別のリポジトリの子がある親も照会して確かめる" "21 30"
+
+# =====================================================================
+# 閉じている親より上の親も確かめる(定期の見直しで上の親を閉じる。#877)
+# =====================================================================
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 30 0 0
+issue 30 CLOSED "$AFTER_MERGE"
+family 30 40 1 1
+issue 40 OPEN
+family 40 - 0 0
+children 40 30:CLOSED 31:CLOSED
+run
+check "親が閉じていても、親の親の子がすべて閉じていれば親の親を閉じる(#877)" 0 \
+    "$(printf 'issue=21 result=untouched\nissue=40 result=parent-closed')" "$(closing 40)"
+expect_record "親の親の記録には、最後に閉じた子として閉じている親の番号が書いてある" 40 "$(parent_record 30)"
+expect_queried "閉じている親の上の親も照会する" "21 30 40"
+expect_err "閉じている親には書き込まず、その親を確かめることを標準エラーに出す" "親の Issue #30 は閉じています"
+
+# 閉じている親の親が、閉じた直後の古い一覧で、閉じている親を開いたまま返す
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 30 0 0
+issue 30 CLOSED "$AFTER_MERGE"
+family 30 40 1 1
+issue 40 OPEN
+family 40 - 0 0
+children 40 30:OPEN 31:CLOSED
+run
+check "親の親の子の一覧で閉じている親が開いたままでも、照会で閉じていれば数えて親の親を閉じる" 0 \
+    "$(printf 'issue=21 result=untouched\nissue=40 result=parent-closed')" "$(closing 40)"
+
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 30 0 0
+issue 30 CLOSED "$AFTER_MERGE"
+family 30 40 1 1
+issue 40 OPEN
+family 40 - 2 1
+run
+check "閉じている親の親に閉じていない子が残っていれば、どこにも書き込まない" 0 "issue=21 result=untouched" ""
+expect_queried "閉じている親の親も照会して確かめる" "21 30 40"
+
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 30 0 0
+issue 30 CLOSED "$AFTER_MERGE"
+family 30 40 1 1 other-owner/other-repo
+issue 40 OPEN
+family 40 - 1 1
+keep_stub 40
+run
+check "閉じている親の親が別のリポジトリにあれば、それより上を照会も書き込みもしない" 0 "issue=21 result=untouched" ""
+expect_queried "閉じている親の、別のリポジトリの親の番号で照会しない" "21 30"
+expect_untouched_stub "閉じている親の親と同じ番号の、このリポジトリの Issue に触れない" 40
+expect_err "閉じている親の親が別のリポジトリにあることを標準エラーに出す" "親の Issue #30 の親は別のリポジトリにあります"
+
+# 閉じている親も、たどる段に数える(子 #21 の上に、閉じた #31 から #38 の8段と、開いた #39)
+reset_scenario
+issue 21 CLOSED "$AFTER_MERGE"
+family 21 31 0 0
+for n in 31 32 33 34 35 36 37 38 39; do
+    if [ "$n" -lt 39 ]; then
+        issue "$n" CLOSED "$AFTER_MERGE"
+        family "$n" "$((n + 1))" 1 1
+    else
+        issue "$n" OPEN
+        family "$n" - 1 1
+    fi
+done
+run
+check "閉じている親も段に数え、9段目の親は閉じない" 0 "issue=21 result=untouched" ""
+expect_queried "閉じている親をたどっても、9段目の親は照会しない" "21 31 32 33 34 35 36 37 38"
+expect_err "閉じている親をたどって段の上限に達したことを標準エラーに出す" "親を8段たどりました"
+
 # =====================================================================
 # 複数の Issue(1.5)、存在しない番号・PR を指す番号
 # =====================================================================
@@ -1123,16 +1296,16 @@ bad_issue() {
 bad_issue "Issue の応答が JSON でなければ終了コード 1" json 'not json'
 bad_issue "Issue の応答に issue が無ければ終了コード 1" json '{"data":{"repository":{"issue":null}}}'
 bad_issue "Issue の state が想定と違えば終了コード 1" json \
-    '{"data":{"repository":{"issue":{"state":"LOCKED","timelineItems":{"nodes":[]},"subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}'
+    '{"data":{"repository":{"issue":{"state":"LOCKED","timelineItems":{"nodes":[]},"subIssues":{"totalCount":0,"nodes":[]},"parent":null}}}}'
 bad_issue "Issue の応答に閉じた記録の一覧が無ければ終了コード 1" json \
-    '{"data":{"repository":{"issue":{"state":"OPEN","subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}'
+    '{"data":{"repository":{"issue":{"state":"OPEN","subIssues":{"totalCount":0,"nodes":[]},"parent":null}}}}'
 bad_issue "閉じた記録の日時を読めなければ終了コード 1(閉じる側に倒さない)" json \
-    '{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[{"createdAt":null}]},"subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}'
+    '{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[{"createdAt":null}]},"subIssues":{"totalCount":0,"nodes":[]},"parent":null}}}}'
 bad_issue "照会の失敗が NOT_FOUND 以外の理由を含むなら、not-an-issue にせず終了コード 1" fail \
     '{"data":{"repository":{"issue":null}},"errors":[{"type":"NOT_FOUND","path":["repository","issue"],"message":"x"},{"type":"RATE_LIMITED","message":"y"}]}'
 bad_issue "リポジトリごと見つからない応答は、not-an-issue にせず終了コード 1" fail \
     '{"data":{"repository":null},"errors":[{"type":"NOT_FOUND","path":["repository"],"message":"x"}]}'
-ISSUE_DOC_OPEN='{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[]},"subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}'
+ISSUE_DOC_OPEN='{"data":{"repository":{"issue":{"state":"OPEN","timelineItems":{"nodes":[]},"subIssues":{"totalCount":0,"nodes":[]},"parent":null}}}}'
 ISSUE_DOC_NOT_FOUND='{"data":{"repository":{"issue":null}},"errors":[{"type":"NOT_FOUND","path":["repository","issue"],"message":"x"}]}'
 bad_issue "Issue の照会が成功したのに応答が空(改行だけ)なら終了コード 1" json ''
 bad_issue "Issue の応答に JSON が2つ並んでいれば終了コード 1" json "$(printf '%s\n%s' "$ISSUE_DOC_OPEN" "$ISSUE_DOC_OPEN")"
@@ -1299,7 +1472,7 @@ check "Refs だけの Issue を照会できなければ、Closes の開いてい
 reset_scenario
 pr_json true "$MERGED_AT" main "$(printf 'Closes #21\nRefs: #8\n')"
 issue 21 OPEN
-printf '%s\n' '{"data":{"repository":{"issue":{"state":"OPEN","subIssuesSummary":{"total":0,"completed":0},"parent":null}}}}' >"$WORK/issues/8.json"
+printf '%s\n' '{"data":{"repository":{"issue":{"state":"OPEN","subIssues":{"totalCount":0,"nodes":[]},"parent":null}}}}' >"$WORK/issues/8.json"
 run
 check "Refs だけの Issue の応答の形が想定と違えば、何も書き込まず終了コード 1" 1 "" ""
 
