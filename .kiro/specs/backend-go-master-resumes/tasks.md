@@ -76,7 +76,7 @@
   - _対象の部品: 入力の検査_
   - _依存: 1.1_
 
-- [ ] 2.4 要求の本文を Go の標準のライブラリ encoding/json で読む
+- [x] 2.4 要求の本文を Go の標準のライブラリ encoding/json で読む
 
   Claude は、本文の読み手の節のとおりに、`body.go` に `decodeBody` と、8つの要求の型と、誤り `errUnreadableBody` を作る。`decodeBody` は、本文を `json.Unmarshal` で読む。8つの要求の型は、年月と日付の欄を小タスク2.1 の年月の型と日付の型で読む。`decodeBody` は、経歴書の作成の `resumeId` を `*string` で読み、空の文字列と `null` と鍵が無いことのほかの値を、小タスク2.2 の `parseID` で読む。`decodeBody` は、UTF-8 として誤ったバイトと、対になっていないサロゲートの `\uXXXX` の書き方を、`encoding/json` のとおり U+FFFD に置き換えて読む。サロゲートとは、UTF-16 で1つの文字を2つの単位に分けて書くときの片方の単位であり、対になっていないサロゲートは、もう片方の単位が続かないものを指す。U+FFFD は、読めない文字の代わりに置く文字である。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestDecodeBody` が通る
@@ -336,6 +336,8 @@
 - `db/queries/resumes.sql` の問い合わせは、技術スタックの列 `TEXT[]` を、JSON を通して読み書きする。読むときは `to_jsonb(pts)` で行を JSON にし、書くときは `jsonb_populate_record(NULL::project_tech_stacks, ...)` で JSON を行にする。JSON を通すのは、次の2つのためである。sqlc v1.31.1 は、`TEXT[]` を `[]string` にする。pgx v5 は、要素の NULL を `[]string` に読めない。Claude は、`sqlc.yaml` の型の上書きを使わない。型の上書きは、ゲート設定の変更になるためである。`store.go` は、この JSON を `[]*string` の欄を持つ Go の構造体と読み書きし、35の鍵を全部送る。JSON に無い鍵の列は NULL になるためである。Claude は、このことを、マスタと経歴書の SQL の問い合わせを書いて生成する小タスク1.3 で確かめた。
 - 変えた動きの一覧 `changed-behaviors.yaml` に項目を足す小タスクは、一覧の項目の数を確かめる `match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` の期待する数も替える。替えないと、このテストが失敗する。Claude は、一覧の項目を、番号の順に並べる。
 - 項目の経路の ID の先頭にタブを付けた値も、Java 版は読み、Go 版は読まない。`ids_test.go` の表は、この違いを CB-051 に当てている。一方、`changed-behaviors.yaml` の CB-051 の java の欄は「片側にだけ半角の空白」と書くだけで、タブに触れていない。Claude は、一覧の項目を足す小タスク6.2 で、CB-051 の java の欄と go の欄に、タブを付けた値の読み方を書き足す。Claude は、このことを小タスク2.2 の審査で知った。
+- UTF-8 として誤ったバイトのうち、overlong の `c0 80` を文字列の欄に入れた本文に、Java 版は 500 で答え、Go 版は U+FFFD に置き換えて読む。`body_test.go` の表は、この3件を CB-055 に当てている。一方、`changed-behaviors.yaml` の CB-055 の java の欄は「一部を断り、一部を受けて ? で保存する」と書くだけで、500 で答えることに触れていない。Claude は、一覧の項目を足す小タスク6.2 で、CB-055 の java の欄に、500 で答える書き方を書き足す。Claude は、このことを小タスク2.4 の審査で知った。
+- Go の `encoding/json` は、`\u0000` の書き方を U+0000 として読む。PostgreSQL の `TEXT` の列は U+0000 を含む値を断る。Claude は、経歴書と6つの欄の項目を読み書きする小タスク3.1 で、U+0000 を含む値を書いたときの Go 版の答えを確かめ、Java 版と違えば変えた動きの一覧に載せる。Claude は、このことを小タスク2.4 の審査で知った。
 
 ## 完了条件(全タスク共通)
 
