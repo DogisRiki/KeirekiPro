@@ -283,3 +283,247 @@ func TestValidate_Certification(t *testing.T) {
 	})...)
 	runValidateCases(t, validateCertification, cases)
 }
+
+// optionalTextCases は、入力が要らない文字列の欄 field の境界の値の入力を作る。値が無い値と空白だけの値は誤りにしない。
+func optionalTextCases[T any](field string, limit int, tooLongMsg string, set func(*string) T) []validateCase[T] {
+	cases := []validateCase[T]{
+		{name: field + "_値なし", req: set(nil), want: nil},
+	}
+	for _, s := range blankCases() {
+		cases = append(cases, validateCase[T]{name: field + "_空白_" + quote(s), req: set(&s), want: nil})
+	}
+	blankOver := strings.Repeat(fullSpace, limit+1)
+	cases = append(cases, validateCase[T]{name: field + "_全角の空白だけで上限の1つ上", req: set(&blankOver), want: map[string][]string{field: {tooLongMsg}}})
+	ok, tooLong := lengthCases(limit)
+	for i, s := range ok {
+		cases = append(cases, validateCase[T]{name: field + "_上限_" + strconv.Itoa(i), req: set(&s), want: nil})
+	}
+	for i, s := range tooLong {
+		cases = append(cases, validateCase[T]{name: field + "_上限の1つ上_" + strconv.Itoa(i), req: set(&s), want: map[string][]string{field: {tooLongMsg}}})
+	}
+	return cases
+}
+
+// linkFieldCases は、リンクの欄の入力を作る。
+// testdata/link.json の値は、Java 版のポートフォリオの追加に送って控えた答えを期待する。SNS の要求の型のリンクの欄も、
+// 同じ3つの注釈(@NotBlank、@URL(protocol = "https")、@Size(max = 255))を持つので、同じ答えを期待する。
+// 加えて、値が無いときと、絵文字を含む値の長さの上限とその1つ上を確かめる。
+func linkFieldCases[T any](t *testing.T, set func(*string) T) []validateCase[T] {
+	t.Helper()
+	cases := []validateCase[T]{
+		{name: "link_値なし", req: set(nil), want: map[string][]string{"link": {MessageLinkRequired}}},
+	}
+	for _, c := range loadLinkJavaCases(t) {
+		var want map[string][]string
+		switch c.Status {
+		case http.StatusCreated:
+		case http.StatusBadRequest:
+			if len(c.Errors) != 1 || len(c.Errors["link"]) == 0 {
+				t.Fatalf("値 %q の Java 版の答えの errors %v は、link だけの形でない", c.Input, c.Errors)
+			}
+			want = c.Errors
+		default:
+			t.Fatalf("値 %q の Java 版の答え %d は、控えの形に無い", c.Input, c.Status)
+		}
+		cases = append(cases, validateCase[T]{name: "link_Java版_" + quote(c.Input), req: set(ptr(c.Input)), want: want})
+	}
+	// https://example.com/ は20の単位なので、絵文字1つを足して、255と256の単位の値を作る。
+	prefix := "https://example.com/"
+	ok := prefix + strings.Repeat("a", 255-len(prefix)-2) + emoji
+	over := prefix + strings.Repeat("a", 255-len(prefix)-1) + emoji
+	cases = append(cases,
+		validateCase[T]{name: "link_絵文字で上限", req: set(&ok), want: nil},
+		validateCase[T]{name: "link_絵文字で上限の1つ上", req: set(&over), want: map[string][]string{"link": {MessageLinkTooLong}}},
+	)
+	return cases
+}
+
+func TestValidate_Project(t *testing.T) {
+	base := projectRequest{
+		CompanyName:     ptr("A社"),
+		StartDate:       jsonYearMonth{Value: YearMonth{Year: 2020, Month: time.January}, Present: true},
+		EndDate:         jsonYearMonth{Value: YearMonth{Year: 2021, Month: time.March}, Present: true},
+		Active:          ptr(false),
+		Name:            ptr("案件"),
+		Overview:        ptr("概要"),
+		TeamComp:        ptr("5人"),
+		Role:            ptr("開発"),
+		Achievement:     ptr("成果"),
+		Requirements:    ptr(true),
+		BasicDesign:     ptr(false),
+		DetailedDesign:  ptr(true),
+		Implementation:  ptr(false),
+		IntegrationTest: ptr(true),
+		SystemTest:      ptr(false),
+		Maintenance:     ptr(true),
+	}
+	cases := []validateCase[projectRequest]{
+		{name: "正しい要求", req: base, want: nil},
+		{
+			name: "すべての欄が無い",
+			req:  projectRequest{},
+			want: map[string][]string{
+				"companyName":     {MessageCompanyNameRequired},
+				"startDate":       {MessageStartDateRequired},
+				"isActive":        {MessageProjectActiveRequired},
+				"name":            {MessageProjectNameRequired},
+				"overview":        {MessageProjectOverviewRequired},
+				"teamComp":        {MessageProjectTeamCompRequired},
+				"role":            {MessageProjectRoleRequired},
+				"achievement":     {MessageProjectAchievementRequired},
+				"requirements":    {MessageNotNull},
+				"basicDesign":     {MessageNotNull},
+				"detailedDesign":  {MessageNotNull},
+				"implementation":  {MessageNotNull},
+				"integrationTest": {MessageNotNull},
+				"systemTest":      {MessageNotNull},
+				"maintenance":     {MessageNotNull},
+			},
+		},
+	}
+	// 作業の工程の真偽の欄と継続中の欄は、1つずつ値を無くす。
+	flags := []struct {
+		field   string
+		message string
+		clear   func(*projectRequest)
+	}{
+		{"isActive", MessageProjectActiveRequired, func(r *projectRequest) { r.Active = nil }},
+		{"requirements", MessageNotNull, func(r *projectRequest) { r.Requirements = nil }},
+		{"basicDesign", MessageNotNull, func(r *projectRequest) { r.BasicDesign = nil }},
+		{"detailedDesign", MessageNotNull, func(r *projectRequest) { r.DetailedDesign = nil }},
+		{"implementation", MessageNotNull, func(r *projectRequest) { r.Implementation = nil }},
+		{"integrationTest", MessageNotNull, func(r *projectRequest) { r.IntegrationTest = nil }},
+		{"systemTest", MessageNotNull, func(r *projectRequest) { r.SystemTest = nil }},
+		{"maintenance", MessageNotNull, func(r *projectRequest) { r.Maintenance = nil }},
+	}
+	for _, fl := range flags {
+		r := base
+		fl.clear(&r)
+		cases = append(cases, validateCase[projectRequest]{name: fl.field + "_値なし", req: r, want: map[string][]string{fl.field: {fl.message}}})
+	}
+	texts := []struct {
+		field             string
+		limit             int
+		required, tooLong string
+		set               func(*projectRequest, *string)
+	}{
+		{"companyName", 50, MessageCompanyNameRequired, MessageCompanyNameTooLong, func(r *projectRequest, s *string) { r.CompanyName = s }},
+		{"name", 50, MessageProjectNameRequired, MessageProjectNameTooLong, func(r *projectRequest, s *string) { r.Name = s }},
+		{"overview", 1000, MessageProjectOverviewRequired, MessageProjectOverviewTooLong, func(r *projectRequest, s *string) { r.Overview = s }},
+		{"teamComp", 100, MessageProjectTeamCompRequired, MessageProjectTeamCompTooLong, func(r *projectRequest, s *string) { r.TeamComp = s }},
+		{"role", 1000, MessageProjectRoleRequired, MessageProjectRoleTooLong, func(r *projectRequest, s *string) { r.Role = s }},
+		{"achievement", 1000, MessageProjectAchievementRequired, MessageProjectAchievementTooLong, func(r *projectRequest, s *string) { r.Achievement = s }},
+	}
+	for _, tx := range texts {
+		cases = append(cases, stringFieldCases(tx.field, tx.limit, tx.required, tx.tooLong, func(s *string) projectRequest {
+			r := base
+			tx.set(&r, s)
+			return r
+		})...)
+	}
+	cases = append(cases, yearMonthFieldCases("startDate", MessageStartDateRequired, MessageStartDateInvalid, func(v jsonYearMonth) projectRequest {
+		r := base
+		r.StartDate = v
+		return r
+	})...)
+	cases = append(cases, yearMonthFieldCases("endDate", "", MessageEndDateInvalid, func(v jsonYearMonth) projectRequest {
+		r := base
+		r.EndDate = v
+		return r
+	})...)
+	runValidateCases(t, validateProject, cases)
+}
+
+func TestValidate_Portfolio(t *testing.T) {
+	base := portfolioRequest{
+		Name:      ptr("ポートフォリオ"),
+		Overview:  ptr("概要"),
+		TechStack: ptr("Go"),
+		Link:      ptr("https://example.com"),
+	}
+	cases := []validateCase[portfolioRequest]{
+		{name: "正しい要求", req: base, want: nil},
+		{
+			name: "すべての欄が無い",
+			req:  portfolioRequest{},
+			want: map[string][]string{
+				"name":     {MessagePortfolioNameRequired},
+				"overview": {MessagePortfolioOverviewRequired},
+				"link":     {MessageLinkRequired},
+			},
+		},
+	}
+	cases = append(cases, stringFieldCases("name", 50, MessagePortfolioNameRequired, MessagePortfolioNameTooLong, func(s *string) portfolioRequest {
+		r := base
+		r.Name = s
+		return r
+	})...)
+	cases = append(cases, stringFieldCases("overview", 1000, MessagePortfolioOverviewRequired, MessagePortfolioOverviewTooLong, func(s *string) portfolioRequest {
+		r := base
+		r.Overview = s
+		return r
+	})...)
+	cases = append(cases, optionalTextCases("techStack", 1000, MessagePortfolioTechStackTooLong, func(s *string) portfolioRequest {
+		r := base
+		r.TechStack = s
+		return r
+	})...)
+	cases = append(cases, linkFieldCases(t, func(s *string) portfolioRequest {
+		r := base
+		r.Link = s
+		return r
+	})...)
+	runValidateCases(t, validatePortfolio, cases)
+}
+
+func TestValidate_SnsPlatform(t *testing.T) {
+	base := snsPlatformRequest{Name: ptr("GitHub"), Link: ptr("https://github.com/example")}
+	cases := []validateCase[snsPlatformRequest]{
+		{name: "正しい要求", req: base, want: nil},
+		{
+			name: "すべての欄が無い",
+			req:  snsPlatformRequest{},
+			want: map[string][]string{
+				"name": {MessageSnsPlatformNameRequired},
+				"link": {MessageLinkRequired},
+			},
+		},
+	}
+	cases = append(cases, stringFieldCases("name", 50, MessageSnsPlatformNameRequired, MessageSnsPlatformNameTooLong, func(s *string) snsPlatformRequest {
+		r := base
+		r.Name = s
+		return r
+	})...)
+	cases = append(cases, linkFieldCases(t, func(s *string) snsPlatformRequest {
+		r := base
+		r.Link = s
+		return r
+	})...)
+	runValidateCases(t, validateSnsPlatform, cases)
+}
+
+func TestValidate_SelfPromotion(t *testing.T) {
+	base := selfPromotionRequest{Title: ptr("タイトル"), Content: ptr("内容")}
+	cases := []validateCase[selfPromotionRequest]{
+		{name: "正しい要求", req: base, want: nil},
+		{
+			name: "すべての欄が無い",
+			req:  selfPromotionRequest{},
+			want: map[string][]string{
+				"title":   {MessageSelfPromotionTitleRequired},
+				"content": {MessageSelfPromotionContentRequired},
+			},
+		},
+	}
+	cases = append(cases, stringFieldCases("title", 50, MessageSelfPromotionTitleRequired, MessageSelfPromotionTitleTooLong, func(s *string) selfPromotionRequest {
+		r := base
+		r.Title = s
+		return r
+	})...)
+	cases = append(cases, stringFieldCases("content", 1000, MessageSelfPromotionContentRequired, MessageSelfPromotionContentTooLong, func(s *string) selfPromotionRequest {
+		r := base
+		r.Content = s
+		return r
+	})...)
+	runValidateCases(t, validateSelfPromotion, cases)
+}

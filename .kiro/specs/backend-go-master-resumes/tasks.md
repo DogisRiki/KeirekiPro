@@ -95,7 +95,7 @@
   - 受入基準とテストの対応: 要件2の受入基準1のうち、4つの要求の型の入力欄ごとの、入力が要るかどうかと長さの上限と値の形は、`validate_test.go` の `TestValidate_Resume`、`TestValidate_Basic`、`TestValidate_Career`、`TestValidate_Certification` で確かめる。どのテストも、空白だけの値、全角の空白だけの値、長さの上限とその1つ上の値、1899年と1900年と2100年と2101年の値を含む。長さの上限とその1つ上の値は、絵文字を含む値で、UTF-16 の単位の境界を含む。UTF-16 の単位とは、文字を UTF-16 で書いたときの16ビットずつの区切りであり、絵文字の多くは2つの単位で書く
   - _要件: 2.1_
 
-- [ ] 2.6 プロジェクトとポートフォリオと SNS と自己PR の入力欄を検査する
+- [x] 2.6 プロジェクトとポートフォリオと SNS と自己PR の入力欄を検査する
 
   Claude は、入力の検査の節のとおりに、`validate.go` に、プロジェクトの項目、ポートフォリオの項目、SNS の項目、自己PR の項目の4つの要求の型の検査を作る。写す元は、`CreateProjectRequest`、`UpdateProjectRequest`、`CreatePortfolioRequest`、`UpdatePortfolioRequest`、`CreateSnsPlatformRequest`、`UpdateSnsPlatformRequest`、`CreateSelfPromotionRequest`、`UpdateSelfPromotionRequest` の注釈である。`validate.go` の検査は、リンクを小タスク2.3 の `isHibernateHTTPSURL` で判定する。
   - 完了の確かめ方: `go test ./internal/resume/ -run 'TestValidate_(Project|Portfolio|SnsPlatform|SelfPromotion)'` が通る
