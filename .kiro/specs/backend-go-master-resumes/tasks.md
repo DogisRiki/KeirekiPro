@@ -40,7 +40,7 @@
   - _要件: 2.1_
 
 - [ ] 2. 本文と入力と経歴書の決まりを Java 版と同じ規則で扱う部品を作る
-- [ ] 2.1 年月と日付を Jackson と同じ規則で読む
+- [x] 2.1 年月と日付を Jackson と同じ規則で読む
 
   Claude は、本文の読み手の節の年月と日付の欄の規則のとおりに、`jackdate.go` を作る。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestJackDate` が通る。`TestJackDate_MatchesJava` は、小タスク1.1 で控えたすべての年月と日付の書き方で、Java 版と同じ年月と日付を読むか、同じく読めないことを確かめる
@@ -313,6 +313,7 @@
 - `TestCompare_Scenarios` の副テストの名前は、筋書きの `name` である。Claude は、筋書きを1つずつ確かめるときは、`-run 'TestCompare_Scenarios/<name>'` で選んで流す。選んで流しても、Java 版と Go 版のイメージは毎回組み立てられるので、1回に長い時間がかかる
 - 仕様書の要求の型には `x-go-type: json.RawMessage` だけを足し、`x-go-type-import` は足さない。oapi-codegen v2.8.2 の生成したコードは元から `encoding/json` を読み込むので、`x-go-type-import` を足すと同じ読み込みが2つになり、コンパイルできない(design の「仕様書の変更」の節との違い。小タスク1.2 で確かめた)
 - 技術スタックの列 `TEXT[]` は、`db/queries/resumes.sql` の中で JSON を通して読み書きする。読むときは `to_jsonb(pts)` で行を JSON にし、書くときは `jsonb_populate_record(NULL::project_tech_stacks, ...)` で JSON を行にする。sqlc v1.31.1 は `TEXT[]` を `[]string` にし、pgx v5 は要素の NULL を `[]string` に読めないためである。`sqlc.yaml` の型の上書きはゲート設定の変更になるので使わない。`store.go` は、この JSON を `[]*string` の欄を持つ Go の構造体と読み書きし、35の鍵を全部送る。JSON に無い鍵の列は NULL になるためである(小タスク1.3 で確かめた)
+- Java 版の年月と日付の読み方のうち、控えの答えに無い書き方は、開発環境の spring のコンテナの jshell で、Java 版が読み込む jackson-databind 3.1.7(動いているプロセスのクラスパスで確かめる)の JsonMapper に、要求の型と同じ注釈の型を読ませて確かめられる。Jackson 3 の LocalDate は、末尾が Z の日時を Instant.parse で読まない(`T24:00:00Z` と `T23:59:60Z` を断り、`T10:00Z` を受ける)ので、`jackdate.go` は末尾の Z を1つ除いて日時として読む(小タスク2.1 で確かめた)
 
 ## 完了条件(全タスク共通)
 
