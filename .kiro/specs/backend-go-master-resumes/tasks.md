@@ -32,7 +32,7 @@
   - 受入基準とテストの対応: この小タスクは土台であり、受入基準を直接は確かめない。要件5の受入基準1と2(もう一方の版が保存した経歴書を読み書きし、日本の時刻で保存する)は、小タスク3.1 の `store_integration_test.go` と、小タスク6.7 の `cross-resume.yaml` で確かめる
   - _要件: 5.1, 5.2_
 
-- [ ] 1.4 マスタと経歴書の処理の入口と型と文言を作る
+- [x] 1.4 マスタと経歴書の処理の入口と型と文言を作る
 
   Claude は、`internal/resume` の `service.go` に、Service の部品の節のとおりの入口の型 `Service` と、部品の束 `Deps` と、組み立ての関数 `New` を作る。Claude は、`service_test.go` に、`internal/users` の `service_test.go` と同じ形で、`New` が `Now` の無い `Deps` に今の時刻を返す関数を入れることを確かめる `TestNew_DefaultsNowToTimeNow` と、渡した部品をそのまま持つことを確かめる `TestNew_KeepsGivenDeps` を作る。Claude は、`model.go` に経歴書と6つの欄の項目と技術スタックのマスタの型を置き、`errors.go` にマスタと経歴書の操作の文言と誤りを作る関数を置く。Claude は、文言を、Java 版の経歴書のユースケースと `domain/model/resume/` と `ResumeLimitChecker` と要求の型の注釈を開いて写す。Claude は、結合テストの入口 `main_integration_test.go` を、`internal/users` の結合テストの入口と同じ形で作る。この入口は、testcontainers-go で動かす PostgreSQL に Java 版のマイグレーションを当てる。
   - 完了の確かめ方: `go test ./internal/resume/ -run 'TestNew|TestErrors' -v` が通り、`TestNew_DefaultsNowToTimeNow` と `TestNew_KeepsGivenDeps` と `TestErrors_MessagesMatchJava` が出力に出る。`make lint` が、`internal/resume` が `internal/auth` と `internal/platform` を読む状態で通る。1つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る
