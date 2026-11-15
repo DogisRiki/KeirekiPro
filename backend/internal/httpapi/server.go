@@ -129,20 +129,8 @@ func New(opts Options) http.Handler {
 		},
 	})
 	gen.HandlerWithOptions(strict, gen.StdHTTPServerOptions{
-		BaseRouter: mux,
-		// 経路と問い合わせと Cookie とヘッダの値の形の誤りに、Java 版は 500 を返している。経路が /api/auth/ の下の
-		// 問い合わせの誤り(provider が無い、code や state が2つある)は、design のとおり 400 と入力の誤りの本文にする。
-		// Cookie の値は文字列のまま渡るので、Cookie の値の形の誤りはここに届かない。
-		// ほかの経路は Java 版と同じ 500 にする。誤りの文は値を含むことがあるので、ログには誤りの型だけを書く
-		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			if strings.HasPrefix(r.URL.Path, queryErrorAs400Prefix) {
-				middleware.WriteError(w, http.StatusBadRequest, middleware.MessageBadRequest)
-				return
-			}
-			logger.LogAttrs(r.Context(), slog.LevelError, "unexpected_exception",
-				slog.Group("error", slog.String("type", fmt.Sprintf("%T", err))))
-			middleware.WriteError(w, http.StatusInternalServerError, middleware.MessageUnexpected)
-		},
+		BaseRouter:       mux,
+		ErrorHandlerFunc: paramErrorHandler(logger),
 	})
 	health := healthHandler(opts.DB, logger)
 	mux.Handle("GET /actuator/health", health)
@@ -157,6 +145,23 @@ func New(opts Options) http.Handler {
 					identify(
 						middleware.CSRF(
 							requireLogin(middleware.RecordRoute(mux))))))))
+}
+
+// paramErrorHandler は、経路と問い合わせと Cookie とヘッダの値の形の誤りに答える関数を作る。
+// Java 版は、これらの誤りに 500 を返している。経路が /api/auth/ の下の問い合わせの誤り(provider が無い、code や
+// state が2つある)は、design のとおり 400 と入力の誤りの本文にする。Cookie の値は文字列のまま渡るので、Cookie の
+// 値の形の誤りはここに届かない。ほかの経路は Java 版と同じ 500 にする。誤りの文は値を含むことがあるので、ログには
+// 誤りの型だけを書く。
+func paramErrorHandler(logger *slog.Logger) func(w http.ResponseWriter, r *http.Request, err error) {
+	return func(w http.ResponseWriter, r *http.Request, err error) {
+		if strings.HasPrefix(r.URL.Path, queryErrorAs400Prefix) {
+			middleware.WriteError(w, http.StatusBadRequest, middleware.MessageBadRequest)
+			return
+		}
+		logger.LogAttrs(r.Context(), slog.LevelError, "unexpected_exception",
+			slog.Group("error", slog.String("type", fmt.Sprintf("%T", err))))
+		middleware.WriteError(w, http.StatusInternalServerError, middleware.MessageUnexpected)
+	}
 }
 
 // passThrough は、nil の中間処理を、何もせずに次の処理に渡す中間処理にする。

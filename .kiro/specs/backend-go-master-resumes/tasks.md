@@ -18,7 +18,7 @@
   - 受入基準とテストの対応: この小タスクは、確認に使う道具を作り、受入基準を直接は確かめない。正解のファイルは、本文と入力と経歴書の決まりを Java 版と同じ規則で扱う部品を作る2つ目の大きなまとまりの単体テストと、経歴書の受け口を経路と起動につなぐ小タスク5.2 のテストが使う。要件6の受入基準1と2(設計の前に試しに作り、同じにできない動きが見つかれば止まる)は、research.md の試作の記録と、この小タスクの書き足しで確かめる
   - _要件: 6.1, 6.2_
 
-- [ ] 1.2 仕様書の要求の本文と項目の ID の型を書き換え、経路の値の誤りを扱う関数に名前を付ける
+- [x] 1.2 仕様書の要求の本文と項目の ID の型を書き換え、経路の値の誤りを扱う関数に名前を付ける
 
   Claude は、仕様書の変更の節のとおりに、`backend/api/openapi.yaml` の要求の本文の8つの型と、項目の ID の6つの経路の値に `x-go-type` を足し、6つの経路の値の説明を書き直す。Claude は、`make generate` で生成したコードを作り直す。Claude は、httpapi.New と paramErrorHandler の節のとおりに、`server.go` の `ErrorHandlerFunc` の無名の関数を `paramErrorHandler` に出し、`server_test.go` の2つの副テストを消し、`server_internal_test.go` で同じことを確かめる。Go 版は、このタスクのあとも、マスタと経歴書の操作の要求に未実装の答えを返す。
   - 完了の確かめ方: `make generate-check` が通る。`go test ./internal/httpapi/` が通る。`server_internal_test.go` の `TestParamErrorHandler` が、`/api/auth/` の下の問い合わせの誤りを 400 にし、ほかの経路の値の誤りを 500 にし、ログに誤りの型だけを書くことを確かめる
@@ -311,6 +311,7 @@
 - `backend/compat/` の下のファイルは、すべて `//go:build compat` を持つ。Claude は、Java 版と Go 版を比べる検査を広げる4つ目の大きなまとまりと、筋書きで比べる6つ目の大きなまとまりで足すテストにも、同じビルドタグを付ける
 - `internal/resume` の結合テストは、ビルドタグを持たず、`make test` と CI の Go 版の検査で毎回動く
 - `TestCompare_Scenarios` の副テストの名前は、筋書きの `name` である。Claude は、筋書きを1つずつ確かめるときは、`-run 'TestCompare_Scenarios/<name>'` で選んで流す。選んで流しても、Java 版と Go 版のイメージは毎回組み立てられるので、1回に長い時間がかかる
+- 仕様書の要求の型には `x-go-type: json.RawMessage` だけを足し、`x-go-type-import` は足さない。oapi-codegen v2.8.2 の生成したコードは元から `encoding/json` を読み込むので、`x-go-type-import` を足すと同じ読み込みが2つになり、コンパイルできない(design の「仕様書の変更」の節との違い。小タスク1.2 で確かめた)
 
 ## 完了条件(全タスク共通)
 
