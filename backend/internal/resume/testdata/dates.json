@@ -511,6 +511,18 @@
         "errors": {},
         "message": "入力エラーがあります。"
       }
+    },
+    {
+      "input": "\"0000-01-15\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
     }
   ],
   "yearMonth": [
@@ -999,6 +1011,14 @@
     },
     {
       "input": "{\"year\":2024,\"month\":1}",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"Invalid Date\"",
       "status": 400,
       "body": {
         "errors": {},

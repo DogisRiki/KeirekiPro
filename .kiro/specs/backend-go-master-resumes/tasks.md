@@ -40,7 +40,7 @@
   - _要件: 2.1_
 
 - [ ] 2. 本文と入力と経歴書の決まりを扱う部品を作る
-- [ ] 2.1 年月と日付を Go の普通の読み方で読み、Java 版との違いを変えた動きの一覧に載せる
+- [x] 2.1 年月と日付を Go の普通の読み方で読み、Java 版との違いを変えた動きの一覧に載せる
 
   Claude は、本文の読み手の節の年月と日付の欄のとおりに、`dates.go` に年月の型と日付の型を作る。2つの型は `json.Unmarshaler` を持ち、年月を `time.Parse` の書式 `2006-01` で、日付を書式 `2006-01-02` で読む。Claude は、前の design で作った `jackdate.go` と `jackdate_test.go` を消し、年月と日付の正解のファイル `testdata/jackdate.json` の名前を `testdata/dates.json` に替え、ID の正解のファイル `testdata/javauuid.json` の名前を `testdata/ids.json` に替える。年月と日付の正解のファイルには、小タスク1.1 のコミットのあとに、日付の `0000-01-15` への Java 版の答えと、年月の `Invalid Date` への Java 版の答えの2つを足してある。Claude は、この2つの答えを、名前を替えるのと同じコミットに入れる。Claude は、正解のファイルの中身を、この2つの答えのほかは替えない。
 
