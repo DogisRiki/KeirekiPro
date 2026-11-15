@@ -24,8 +24,14 @@ func parseID(s string) (uuid.UUID, bool) {
 // 上位の64ビットと下位の64ビットを、それぞれ符号付きの整数として比べる。
 // 項目の並びは画面に見えるので、Go 版は Java 版と同じ順に並べる。
 func compareJavaUUID(a, b uuid.UUID) int {
-	if c := cmp.Compare(int64(binary.BigEndian.Uint64(a[:8])), int64(binary.BigEndian.Uint64(b[:8]))); c != 0 {
+	if c := cmp.Compare(signedOrder(a[:8]), signedOrder(b[:8])); c != 0 {
 		return c
 	}
-	return cmp.Compare(int64(binary.BigEndian.Uint64(a[8:])), int64(binary.BigEndian.Uint64(b[8:])))
+	return cmp.Compare(signedOrder(a[8:]), signedOrder(b[8:]))
+}
+
+// signedOrder は、8バイトを、符号付きの64ビットの整数として比べたときと同じ順になる符号無しの整数に直す。
+// 最上位のビット(符号のビット)を反転すると、負の数が正の数より小さくなる。
+func signedOrder(b []byte) uint64 {
+	return binary.BigEndian.Uint64(b) ^ (1 << 63)
 }
