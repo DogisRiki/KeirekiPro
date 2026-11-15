@@ -67,7 +67,7 @@
   - _要件: 1.1, 3.1, 3.2_
   - _依存: 1.1, 2.1_
 
-- [ ] 2.3 リンクが https の形かを Hibernate Validator と同じ規則で判定する (並行可)
+- [x] 2.3 リンクが https の形かを Hibernate Validator と同じ規則で判定する (並行可)
 
   Claude は、入力の検査の節のとおりに、`link.go` に `isHibernateHTTPSURL` を作る。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestLink` が通る。`TestLink_MatchesJava` は、小タスク1.1 で控えたすべてのリンクで、Java 版と同じ判定をすることを確かめる
