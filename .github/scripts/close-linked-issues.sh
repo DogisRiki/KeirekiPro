@@ -33,13 +33,21 @@
 #   対象は、Closes の Issue のうち closed になったものと、照会の時点で閉じていた untouched のもの
 #   (Refs だけの Issue と、開き直された Closes の Issue は対象にしない)の親。
 #   同じ親を持つ Issue が複数あれば、親は1回だけ判定する(記録には並びの最後の Issue を書く)。
-#   親は書き込みの後に照会し直す(閉じた子が子の数に入った状態で判定する)。
+#   親は書き込みの後に照会し直す(閉じた子が子の一覧で閉じた状態になってから判定する)。
+#   子がすべて閉じたかは、親の子の一覧(subIssues)の1件ずつの状態で判定する。
+#   この実行で閉じた Issue と、照会の時点で閉じていた Issue(この実行で閉じた親を含む)は、
+#   一覧の状態が開いたままでも閉じたものとして数える。GitHub は、Issue を閉じた直後の照会に、
+#   閉じる前の子の状態と子の数を返すことがある(PR #876 のマージで、閉じた直後の #870 を
+#   親の #864 の閉じた子に数えず、#864 と #832 が開いたまま残った。#877)。
 #   親が別のリポジトリにある                             → 何もしない(照会も書き込みも知らせもせず、上もたどらない。
 #                                                           このリポジトリの同じ番号の Issue・PR に触れないため)
-#   親がいま閉じている                                   → 何もしない
+#   親がいま閉じている                                   → 親には書き込まず、その親の親について同じ判定を行う。
+#                                                           マージのときに閉じられなかった上の親を、
+#                                                           定期の見直しで閉じるため(#877)
 #   親が開いていて、PR のマージ日時以降に閉じた記録がある → 何もしない(開き直された親)
 #   親が開いていて、子が1件以上あり、子がすべて閉じている → 閉じて記録する(parent-closed)。
-#                                                           閉じた親の親についても同じ判定を行う(最大8段)
+#                                                           閉じた親の親についても同じ判定を行う
+#   上へたどるのは、閉じている親と閉じた親を合わせて最大8段まで
 #   親が開いていて、閉じていない子がある、または子が0件   → 何もしない
 #   親を照会できない、応答の形が想定と違う、閉じられない  → 親に知らせを付ける(parent-close-failed。その親より上はたどらない)
 #
@@ -232,8 +240,11 @@ PR_QUERY='query($owner: String!, $name: String!, $number: Int!) {
   }
 }'
 # 閉じた記録は新しい側から100件を読む。マージ日時以降の記録があるかを見るには、新しい側で足りる。
-# 子の数(subIssuesSummary)と親の番号(parent)は、子がすべて閉じた親を閉じるために読む。
-# 親の照会にも同じクエリを使う。子が無ければ total と completed は 0、親が無ければ parent は null で返る。
+# 子の一覧(subIssues)と親の番号(parent)は、子がすべて閉じた親を閉じるために読む。
+# 親の照会にも同じクエリを使う。子が無ければ totalCount は 0 で nodes は空、親が無ければ parent は null で返る。
+# GitHub は1つの Issue に付けられる子を100件までに限るため、子の一覧は1回の照会(first: 100)で読み切れる。
+# 子は別のリポジトリにあることがあるため、子のリポジトリも読む(閉じたものとして数える Issue を番号で
+# 見分けるときに、別のリポジトリの同じ番号の子を取り違えないため)。
 # サブIssueの親は別のリポジトリにあることがあるため、親のリポジトリ(nameWithOwner)も読む。
 # 番号だけでこのリポジトリを引くと、同じ番号の無関係な Issue・PR に書き込むおそれがある。
 # shellcheck disable=SC2016
@@ -244,7 +255,7 @@ ISSUE_QUERY='query($owner: String!, $name: String!, $number: Int!) {
       timelineItems(itemTypes: [CLOSED_EVENT], last: 100) {
         nodes { ... on ClosedEvent { createdAt } }
       }
-      subIssuesSummary { total completed }
+      subIssues(first: 100) { totalCount nodes { number state repository { nameWithOwner } } }
       parent { number repository { nameWithOwner } }
     }
   }
@@ -395,6 +406,9 @@ MAX_NUMBER=2147483647
 DECISIONS=()
 STATES=()
 PARENTS=()
+# 閉じていると分かっている Issue(照会の時点で閉じていた Issue、この実行で閉じた Issue と親)の番号。
+# 親の子の一覧の状態が開いたままでも、この番号の子は閉じたものとして数える(冒頭の「親の判定」)。
+KNOWN_CLOSED=()
 i=0
 for n in "${NUMBERS[@]+"${NUMBERS[@]}"}"; do
     kind="${KINDS[$i]}"
@@ -463,6 +477,7 @@ for n in "${NUMBERS[@]+"${NUMBERS[@]}"}"; do
     esac
     STATES+=("$state")
     PARENTS+=("$parent")
+    [ "$state" != "CLOSED" ] || KNOWN_CLOSED+=("$n")
 done
 
 # --- クローズ・記録・知らせ ----------------------------------------------------------
@@ -522,6 +537,7 @@ for n in "${NUMBERS[@]+"${NUMBERS[@]}"}"; do
             printf 'issue=%s result=close-failed\n' "$n"
             continue
         fi
+        KNOWN_CLOSED+=("$n")
         {
             echo "PR #${PR} のマージにより閉じました。"
             echo ""
@@ -593,30 +609,46 @@ parent_failed() {
 
 # 使い方: close_ancestors <親の番号> <最後に閉じた子の番号>
 # 親を照会し直し、開いていて子がすべて閉じていれば閉じて記録する。閉じたら、その親の親について繰り返す。
+# 親がすでに閉じていれば、親には書き込まず、その親の親について繰り返す。
 close_ancestors() {
-    local parent="$1" child="$2" depth judged
+    local parent="$1" child="$2" depth judged known grandparent
     for ((depth = 1; depth <= MAX_PARENT_DEPTH; depth++)); do
         if ! graphql "$parent" "$ISSUE_QUERY" "$TMP/parent.json" "$TMP/parent.err"; then
             cat "$TMP/parent.err" >&2
             parent_failed "$parent" "$child" unchecked "親の Issue #${parent} を照会できません"
             return
         fi
+        # 閉じていると分かっている Issue の番号を、JSON の配列にする(番号は照会の前に数字だけと確かめてある)。
+        known="[$(
+            IFS=,
+            printf '%s' "${KNOWN_CLOSED[*]+"${KNOWN_CLOSED[*]}"}"
+        )]"
         # 子の Issue の照会と同じく、応答は「JSON がちょうど1つ」で、閉じた記録の日時をすべて読めることを確かめる。
+        # 子の一覧は、件数(totalCount)と読めた子の数が等しく、子ごとに番号・状態・リポジトリを読めることを確かめる。
+        # 子がすべて閉じたかは、一覧の状態が CLOSED か、このリポジトリの子で閉じていると分かっている番号かで判定する。
         # 判定と親の親の番号を、空白区切りの1行で出す。
-        if ! judged=$(jq -r -s --argjson merged "$MERGED_EPOCH" --arg repo "$REPO" "$JQ_PARENT_NUMBER"'
+        if ! judged=$(jq -r -s --argjson merged "$MERGED_EPOCH" --arg repo "$REPO" --argjson known "$known" "$JQ_PARENT_NUMBER"'
             if length == 1 then .[0] else error("形が想定と違う") end
             | .data.repository.issue
             | if type == "object" and (.timelineItems.nodes | type) == "array"
-                and (.subIssuesSummary.total | type) == "number"
-                and (.subIssuesSummary.completed | type) == "number"
+                and (.subIssues | type) == "object"
+                and (.subIssues.totalCount | type) == "number"
+                and (.subIssues.nodes | type) == "array"
+                and (.subIssues.nodes | length) == .subIssues.totalCount
+                and all(.subIssues.nodes[];
+                    type == "object" and (.number | type) == "number" and (.state | type) == "string"
+                    and (.repository | type) == "object" and (.repository.nameWithOwner | type) == "string")
               then . else error("形が想定と違う") end
             | (.timelineItems.nodes | map(.createdAt | fromdateiso8601)) as $closed
             | parent_number as $parent
             | (if .state == "CLOSED" then "already-closed"
                elif .state == "OPEN" then
                  (if any($closed[]; . >= $merged) then "reopened"
-                  elif .subIssuesSummary.total >= 1
-                    and .subIssuesSummary.completed == .subIssuesSummary.total then "close"
+                  elif .subIssues.totalCount >= 1
+                    and all(.subIssues.nodes[];
+                        .state == "CLOSED"
+                        or ((.repository.nameWithOwner | ascii_downcase) == ($repo | ascii_downcase)
+                            and (.number as $n | any($known[]; . == $n)))) then "close"
                   else "remaining" end)
                else error("state が想定と違う") end) as $decision
             | "\($decision) \($parent)"' "$TMP/parent.json" 2>/dev/null) ||
@@ -624,10 +656,19 @@ close_ancestors() {
             parent_failed "$parent" "$child" unchecked "親の Issue #${parent} の応答の形が想定と違います"
             return
         fi
+        grandparent="${BASH_REMATCH[2]}"
         case "${BASH_REMATCH[1]}" in
         already-closed)
-            echo "親の Issue #${parent} は閉じています。何も書き込みません。" >&2
-            return
+            echo "親の Issue #${parent} は閉じています。この Issue には書き込まず、その親を確かめます。" >&2
+            KNOWN_CLOSED+=("$parent")
+            [ "$grandparent" != "-" ] || return 0
+            if [ "$grandparent" = "other-repo" ]; then
+                echo "親の Issue #${parent} の親は別のリポジトリにあります。それより上を照会も書き込みもしません。" >&2
+                return 0
+            fi
+            child="$parent"
+            parent="$grandparent"
+            continue
             ;;
         reopened)
             echo "親の Issue #${parent} は PR #${PR} のマージの後に一度閉じられ、開き直されています。何も書き込みません。" >&2
@@ -638,16 +679,16 @@ close_ancestors() {
             return
             ;;
         esac
-        local grandparent="${BASH_REMATCH[2]}"
         if ! gh issue close "$parent" --repo "$REPO" >&2; then
             parent_failed "$parent" "$child" all-closed "親の Issue #${parent} を閉じられません"
             return
         fi
+        KNOWN_CLOSED+=("$parent")
         echo "この Issue から分けた Issue がすべて閉じたため閉じました(最後に閉じたのは #${child}、PR #${PR} のマージによる)。" >"$TMP/parent-record.md"
         if gh issue comment "$parent" --repo "$REPO" --body-file "$TMP/parent-record.md" >&2; then
             printf 'issue=%s result=parent-closed\n' "$parent"
         else
-            # 親は閉じたので、親の親の判定は続ける(次の見直しでは、閉じた親より上をたどらないため)。
+            # 親は閉じたので、親の親の判定は続ける(次の見直しを待たずに、親の親を閉じるため)。
             echo "親の Issue #${parent} に記録のコメントを付けられません(親の Issue は閉じました)。" >&2
             RC=1
         fi
