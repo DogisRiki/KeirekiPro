@@ -25,7 +25,7 @@
   - 受入基準とテストの対応: この小タスクは土台であり、受入基準を直接は確かめない。要件1の受入基準1(本文を Java 版と同じに読んで答える)と要件4の受入基準4(項目の ID が読めない要求に無い項目と同じ答えを返す)は、小タスク5.1 と5.2 の `resumes_test.go` と、6つ目の大きなまとまりの筋書きで確かめる
   - _要件: 1.1, 4.4_
 
-- [ ] 1.3 マスタと経歴書の SQL の問い合わせを書いて生成する
+- [x] 1.3 マスタと経歴書の SQL の問い合わせを書いて生成する
 
   Claude は、読み書きの節とマスタの読み出しの節のとおりの問い合わせを、`backend/db/queries/resumes.sql` と `backend/db/queries/masters.sql` に書き、sqlc でコードを生成する。Claude は、Java 版の `ResumeMapper.xml` と、3つのマスタの `*QueryMapper.xml` を開き、列の名前と並べ方を確かめてから、問い合わせを書く。
   - 完了の確かめ方: `make generate` が、`sqlcgen` に `resumes.sql.go` と `masters.sql.go` を生成し、`make generate-check` が通る
@@ -312,6 +312,7 @@
 - `internal/resume` の結合テストは、ビルドタグを持たず、`make test` と CI の Go 版の検査で毎回動く
 - `TestCompare_Scenarios` の副テストの名前は、筋書きの `name` である。Claude は、筋書きを1つずつ確かめるときは、`-run 'TestCompare_Scenarios/<name>'` で選んで流す。選んで流しても、Java 版と Go 版のイメージは毎回組み立てられるので、1回に長い時間がかかる
 - 仕様書の要求の型には `x-go-type: json.RawMessage` だけを足し、`x-go-type-import` は足さない。oapi-codegen v2.8.2 の生成したコードは元から `encoding/json` を読み込むので、`x-go-type-import` を足すと同じ読み込みが2つになり、コンパイルできない(design の「仕様書の変更」の節との違い。小タスク1.2 で確かめた)
+- 技術スタックの列 `TEXT[]` は、`db/queries/resumes.sql` の中で JSON を通して読み書きする。読むときは `to_jsonb(pts)` で行を JSON にし、書くときは `jsonb_populate_record(NULL::project_tech_stacks, ...)` で JSON を行にする。sqlc v1.31.1 は `TEXT[]` を `[]string` にし、pgx v5 は要素の NULL を `[]string` に読めないためである。`sqlc.yaml` の型の上書きはゲート設定の変更になるので使わない。`store.go` は、この JSON を `[]*string` の欄を持つ Go の構造体と読み書きし、35の鍵を全部送る。JSON に無い鍵の列は NULL になるためである(小タスク1.3 で確かめた)
 
 ## 完了条件(全タスク共通)
 
