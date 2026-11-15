@@ -285,3 +285,152 @@ T2-1-1 と T2-1-2 の直しを確かめた結果は、次のとおりである�
 無い。
 
 - 往復: 2回で収束 / 未解決: 0件
+
+## サイクル3 往復1(2026-11-15)
+
+### 審査の範囲
+
+範囲: 差分
+
+- tasks.md 小タスク2.1、2.2、2.4(年月と日付、ID、本文の読み方を Go の普通の読み方に替え、CB-051 から CB-055 とテストの中の表を足した): 差分の中心である。requirements.md の要件1の受入基準1の1つ目の例外と要件2の受入基準1の末尾の文、design.md の「本文の読み手」(279-305行)、「Java 版の答えの正解のファイル」(418-444行)、「変えた動きの一覧に載せる違い」(526-542行)、「テストの方針」(611-634行)、「ファイルの構成」(110-160行)を、食い違いが無いかを見るために読んだ
+- tasks.md 小タスク3.3、3.5(`parseID` の名前と `_依存:_`): 部品の名前が `springPathUUID` から `parseID` に替わったので、`parseID` と `springPathUUID` と `jacksonUUID` で tasks.md を検索した。古い名前は残っていない。経路の経歴書の ID を読む小タスク3.4 と、`editResume` を使う小タスク3.6 を、同じ読み方になっているかを見るために読んだ
+- tasks.md 小タスク5.2(本文の全体の扱いの表 CB-054 と `_依存: 2.1_`): design.md 444行、540行、630行と、`backend/internal/httpapi/testdata/resumebody/cases.json` を読んだ
+- tasks.md 小タスク6.2、6.3、6.6(筋書きに書かない要求、`Invalid Date` の段、CB-047 から CB-050 を足す場所と数): requirements.md の要件4の受入基準1、design.md の筋書きの節(491-503行)を読んだ。変えた動きの一覧に項目を足す小タスク(2.1、6.2、6.6)の数の足し算(46、51、52、55)を、実ファイルの数と照らした
+- tasks.md 小タスク7.2 と「実装のメモ」の3つの箇条: 今あるコードと設定について書いた文なので、実ファイルを開いた。design.md の「仕様書の変更」(391行)と「読み書き」(353行)を読んだ
+- tasks.md 小タスク1.1、2.5、2.7、4.1、6.4 の書き方の直しと、小タスク1.1〜1.4 の `- [x]`: 語と主語と説明の足しだけの行である。直す前と意味が変わっていないかを行ごとに比べた。小タスク1.1 の「この答えと Go 版の答えの違いを、小タスク2.4 のテストで確かめる」は、小タスク2.4 の `TestDecodeBody_InvalidUTF8` と合う
+- 差分で受入基準の番号が減った箇所(小タスク2.4 の `_要件:_` から 6.2 が消えた): 要件6の受入基準2が、ほかのタスク(1.1、7.2)の `_要件:_` に残ることを確かめた。すべての受入基準が、少なくとも1つのタスクの `_要件:_` にある
+
+### 実ファイルで確かめた文
+
+- 小タスク2.1「前の design で作った `jackdate.go` と `jackdate_test.go` と、正解のファイル `testdata/jackdate.json` と `testdata/javauuid.json` がある」: backend/internal/resume/ の一覧(Glob。`jackdate.go` `jackdate_test.go` `testdata/jackdate.json` `testdata/javauuid.json` と、`body.json` `link.json` `order.json` `utf8.json` の6つの正解のファイル) / 合っていた
+- 小タスク2.1「`jackdate.go` と正解のファイルを使うコードは、`jackdate_test.go` のほかに無い」(消して名前を替えても、ほかのコードが壊れないこと): backend/internal/resume/jackdate_test.go 90行(`testdata/jackdate.json` を読むのはここだけ)、`internal/resume` のほかの `.go` に `jackdate` と `javauuid` の語が無い / 合っていた
+- 小タスク2.1「正解のファイルの中身は替えない」: `git diff` で見た backend/internal/resume/testdata/jackdate.json は、コミットされた版(小タスク1.1 のコミット)に無い2つの答え(日付の `"0000-01-15"` と、年月の `"Invalid Date"`。作業フォルダの版の516行と1021行)を、まだコミットしていない変更として持つ / 食い違っていた(T3-1-1)
+- 小タスク2.1「`changed-behaviors.yaml` の末尾は CB-046 で、項目の数は46。`match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` が46を期待する」: backend/compat/changed-behaviors.yaml 501行(最後の `- id: CB-046`。`- id:` の行は46)、backend/compat/harness/match_test.go 313行、327-328行 / 合っていた
+- 小タスク2.1「5つの違いに match を書かなくても、一覧を読む処理は通る。欄の名前は `group` と『画面に影響が無い理由』である」: backend/compat/harness/match.go 84-129行(`id` の形と重なり、`group`、4つの文の欄だけを確かめる。番号が続いているかと並びの順は確かめない) / 合っていた
+- 小タスク2.1「`go.mod` は `go.yaml.in/yaml/v3` を直接読み込む」: backend/go.mod 34行(`// indirect` が無い) / 合っていた
+- 小タスク2.1「`internal/resume` のテストが `go.yaml.in/yaml/v3` を読んでも lint は通る」(本文には無いが、`difftable_test.go` の前提): backend/.golangci.yml 43-57行(機能のパッケージの決まりは `internal` と `cmd` の下だけを禁じる) / 合っていた
+- 小タスク2.2「`testdata/ids.json`(今の `javauuid.json`)に、経路の値の書き方 `paths` と、経歴書の作成の `resumeId` の書き方 `resumeIds` がある。`paths` には、前後に1つずつ半角の空白を付けた ID がまだ無い」: backend/internal/resume/testdata/javauuid.json 3行、38行(前だけ)、52行(後ろだけ)、66行(タブ)、80行(全角の空白)、537行(`resumeIds` には前後に空白のある値がある) / 合っていた
+- 小タスク2.2「`paths` は、経歴書の ID としての答えと項目の ID としての答えを別に持つ」(CB-051 の表と照らす前提): backend/internal/resume/testdata/javauuid.json 5-14行(`resumePath` と `itemPath`) / 合っていた
+- 小タスク2.4「`testdata/body.json` と `testdata/utf8.json` がある。`body.json` は、鍵の大文字、知らない鍵、同じ鍵の2つ目、文字列の欄の数と真偽、真偽の欄の文字列と整数と小数、技術スタックの並びの要素を含む」: backend/internal/resume/testdata/body.json(名前が `career-companyName-string-*` `career-isActive-*` `career-key-case-*` `career-key-unknown` `career-key-duplicate-*` `project-tech-*` の本文)、backend/internal/resume/testdata/utf8.json / 合っていた
+- 小タスク5.2「`internal/httpapi/testdata/resumebody/` に正解のファイルがあり、余りのある本文、空の本文、並びと `null` と文字列の本文を持つ」: backend/internal/httpapi/testdata/resumebody/cases.json(`resume-trailing-*` `resume-empty` `resume-array` `resume-null` `resume-string` と `career-*`) / 合っていた
+- 小タスク6.3「2つの版は、`Invalid Date` の段に、400 と空の `errors` で答える」(Java 版の答え): backend/internal/resume/testdata/jackdate.json 1021-1027行(作業フォルダの版。400 と `errors: {}`)、research.md 65行 / 合っていた
+- 小タスク6.2、6.6「期待する数を 51 から 52、52 から 55 に替える」: backend/compat/harness/match_test.go 327行(今は46。46+5=51、51+1=52、52+3=55) / 合っていた
+- 実装のメモ「仕様書の要求の型には `x-go-type: json.RawMessage` だけがあり、`x-go-type-import` は無い。oapi-codegen は v2.8.2 である」: backend/api/openapi.yaml(`x-go-type: json.RawMessage` が8か所、`x-go-type-import` が0か所、`x-go-type: string` が1458-1503行の6か所)、backend/go.mod 118行 / 合っていた。design.md 391行の文とは食い違う(T3-1-4)
+- 実装のメモ「`resumes.sql` は、技術スタックを `to_jsonb(pts)` で読み、`jsonb_populate_record(NULL::project_tech_stacks, ...)` で書く。sqlc は v1.31.1、pgx は v5 である。`project_tech_stacks` の `TEXT[]` の列は35」: backend/db/queries/resumes.sql 208-209行、231行、348行、415行、backend/go.mod 27行、144行、backend/src/main/resources/db/migration/ の `project_tech_stacks` の定義(`TEXT[]` が35) / 合っていた
+- 実装のメモ「`sqlc.yaml` の型の上書きは、ゲート設定の変更になる」: CLAUDE.md の「自律動作の境界」のゲート設定ファイルの一覧(backend の `sqlc.yaml`) / 合っていた
+
+### 確かめの道具を作るタスク
+
+| 道具 | 作るタスク | 確かめる成果物を作るタスク | 並び |
+|---|---|---|---|
+| 年月と日付の正解のファイル(`dates.json`)の、小タスク1.1 で控えた書き方 | 1.1 | 2.1 | 前 |
+| 年月と日付の正解のファイルの `Invalid Date` と `0000-01-15` の答え | 無い(作業フォルダにコミット前の変更としてあるだけで、足すタスクが無い。T3-1-1) | 2.1(`TestDates_MatchesJava` の2つ目)、6.3 | 道具を作るタスクが無い(T3-1-1) |
+| 変えた動きの一覧の CB-051 から CB-055 | 2.1 | 2.1、2.2、2.4、5.2 | 前(同じタスクか前のタスク) |
+| テストの共通の関数 `difftable_test.go` | 2.1 | 2.1、2.2、2.4 | 前(同じタスクか前のタスク) |
+| `TestDates_MatchesJava` `TestDates_DiffTableInChangedBehaviors` | 2.1 | 2.1 | 同じタスク |
+| `TestLoadChangedBehaviors_CB005HasNoMatch`(期待する数) | 今ある(2.1、6.2、6.6 が数を替える) | 2.1、6.2、6.6 | 同じタスク |
+| ID の正解のファイル(`ids.json`)の `paths` の、前後に空白を付けた ID への Java 版の答え | 2.2 | 2.2 | 同じタスク |
+| `TestParseID_MatchesJava` `TestParseID_DiffTableInChangedBehaviors` `TestCompareJavaUUID_SignedOrder` | 2.2 | 2.2 | 同じタスク |
+| ID の正解のファイルの `resumeIds`、`body.json`、`utf8.json` | 1.1 | 2.4 | 前 |
+| `TestDecodeBody_MatchesJava` `TestDecodeBody_ResumeID` `TestDecodeBody_InvalidUTF8` `TestDecodeBody_DiffTableInChangedBehaviors` | 2.4 | 2.4 | 同じタスク |
+| `parseID` | 2.2 | 3.3、3.5 | 前 |
+| 6つの欄の項目の並べ方 | 2.8 | 3.3 | 前 |
+| `TestService_(ListResumes|GetResume|DeleteResume)` `TestService_(EditResume|Career|Project)` | 3.3、3.5(それぞれ同じタスク) | 3.3、3.5 | 同じタスク |
+| `internal/httpapi/testdata/resumebody/` の正解のファイル | 1.1 | 5.2 | 前 |
+| `TestResumeRoutes_WholeBody` が表の番号を一覧と照らす処理 | 5.2(作り方が書かれていない。T3-1-2) | 5.2 | 同じタスク |
+| 変えた動きの一覧の CB-050 の match | 6.2 | 6.2、6.3、6.4 | 前 |
+| `TestCompare_Scenarios/<name>` | 今ある | 6.2、6.3、6.6 | 前 |
+| `TestCoverage_Operations` と `progress.md` の「作り終えた」 | 6.6 | 6.1〜6.6 | 同じまとまりの中(サイクル2と同じ) |
+
+### 申告
+
+**1. 画面が送らない書き方の値への Go 版の答えを、筋書きで送らず、部品の単体テストの表だけで確かめる** — 小タスク2.1、2.2、2.4、5.2、6.2、6.3
+
+- Issue の記載: なし(Issue は、置き換えの spec の要件4の受入基準5「同じ要求を送って比べる」を挙げる。requirements の要件1の受入基準1の例外は、違いを変えた動きの一覧に載せることだけを決めている)
+- 決めたこと: CB-051 から CB-055 に match を書かず、その書き方の要求を筋書きに書かない。Go 版の部品(`parseID`、年月と日付の型、`decodeBody`)の答えと Java 版の答えの違いを、テストの中の表と照らす
+- 他にありえた選択肢: CB-051 から CB-055 に match を書き、筋書きでもその書き方の要求を送って、Go 版が返す状態の番号(404 と 400)を確かめる
+- 外れていた場合: 部品が「読めない」と返した値を、`Service` と受け口が 404 か 400 にする経路は、項目の ID(`TestService_<欄>UnreadableItemID`)と本文の全体(`TestResumeRoutes_WholeBody`)でだけ確かめられる。年月と日付の読めない値と、`resumeId` の読めない値が 400 と空の `errors` になることは、`Invalid Date` の段(小タスク6.3)のほかでは、どの検査でも確かめられない
+
+**2. 前後に空白を付けた経路の ID への Java 版の答えを、Java 版をもう一度動かして控える** — 小タスク2.2
+
+- Issue の記載: なし
+- 決めたこと: 小タスク1.1 と同じ設定で Java 版をもう1つ動かし、答えを `ids.json` の `paths` に足す
+- 他にありえた選択肢: 正解のファイルに足さず、CB-051 の文だけに書く
+- 外れていた場合: 控えた答えが、小タスク2.1 で先に `changed-behaviors.yaml` に書く CB-051 の文(Java 版は 404 で答える)と違うと、小タスク2.2 で CB-051 の文を書き直すことになる
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| T3-1-1 | 中 | tasks.md 小タスク2.1 | 小タスク2.1 は、`testdata/jackdate.json` の名前を `testdata/dates.json` に替え、「正解のファイルの中身は替えない」と書く。作業フォルダの backend/internal/resume/testdata/jackdate.json は、小タスク1.1 のコミットに無い2つの答え(日付の `"0000-01-15"`、年月の `"Invalid Date"`。516行と1021行)を、コミット前の変更として持つ。この2つの答えを足すタスクは、tasks.md のどこにも無い(小タスク1.1 は `- [x]` で、控える書き方に `Invalid Date` を挙げていない)。一方、小タスク2.1 の `TestDates_MatchesJava` の2つ目(`Invalid Date` を Java 版と同じく読めないこと)と、小タスク6.3 の `Invalid Date` の段の期待は、この答えが正解のファイルにあることを前提にする。実装役が「中身は替えない」に従ってコミットされた版に戻すと、`Invalid Date` の答えが無くなり、2つ目の確かめがデータの無いまま通る。戻さなければ、名前を替えるコミットに20行の足しが入り、確認役と codex-review が「中身は替えない」と食い違う差分として差し戻す | 小タスク2.1 の説明の文に、年月と日付の正解のファイルには、2026-11-15 に Java 版に送って控えた `Invalid Date` と `0000-01-15` の2つの答えが足してあること(design.md の「試作の記録」の節と research.md の P5)と、この2つの答えを、名前を替えるのと同じコミットに入れることを書く。「中身は替えない」は、「この2つの答えのほかは替えない」に直す。完了の確かめ方に、`testdata/dates.json` に `Invalid Date` と `0000-01-15` の答えがあることを足す |
+| T3-1-2 | 低 | tasks.md 小タスク5.2 | 小タスク5.2 は、`TestResumeRoutes_WholeBody` が「表の番号が `backend/compat/changed-behaviors.yaml` にあること」も確かめると書く。小タスク2.1 の共通の関数は `internal/resume` の `difftable_test.go` にあり、`internal/httpapi` のテストからは呼べない。`internal/httpapi` の側で一覧をどう読むかが書かれていない。実装役が同じ読み方をもう1つ書けば済むので、実装の結果は変わらない | 小タスク5.2 の説明の文に、`resumes_test.go` が `go.yaml.in/yaml/v3` で一覧を読んで表の番号を確かめることを書く |
+| T3-1-3 | 低 | tasks.md 小タスク3.4、3.6 | 差分は、経路の経歴書の ID と項目の ID を `parseID` で読むことを小タスク3.3 と3.5 に書き、`_依存:_` に 2.2 を足した。経路の経歴書の ID を受ける `UpdateResumeBasic`(小タスク3.4)には、この文も `_依存: 2.2_` も無い。小タスク3.4 は本文の読み手(2.4)と経歴書の決まり(2.7)も使うが、`_依存:_` は 1.4 だけである。`/kiro-impl` はタスクを番号の順に進めるので、実装の順は変わらない。読めない経歴書の ID への答えは、小タスク6.5 の `not-found.yaml` で確かめられる | 小タスク3.4 の説明の文に、`UpdateResumeBasic` が経路の経歴書の ID を `parseID` で読み、読めなければ無い経歴書と同じ誤りを返すことを書き、`_依存:_` に 2.2 を足す |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| T3-1-4 | design | design.md「仕様書の変更」(391行) | design は、要求の本文の8つの型に `x-go-type: json.RawMessage` と `x-go-type-import: {path: encoding/json}` を足すと書く。実ファイルの backend/api/openapi.yaml には `x-go-type-import` が1つも無く(`x-go-type: json.RawMessage` は8か所)、tasks.md の「実装のメモ」は、足すと生成したコードで同じ読み込みが2つになりコンパイルできないので足さず、「design の『仕様書の変更』の節と違う」と書いている。design の文が、済んだ実装(小タスク1.2)と食い違ったまま、2026-11-15 に承認されている。design に戻る指摘である。PR の codex-review は design を基準にするので、仕様書の差分を design と違うものとして指摘しうる |
+| T3-1-5 | design | design.md `## ファイルの構成`(126行、143-160行) | tasks.md が作るか変えるファイルのうち、次の2つが design のファイルの構成に無い。(1) 小タスク2.1、6.2、6.6 が期待する数を替える `backend/compat/harness/match_test.go`。実ファイルの327行が項目の数を確かめるので、`changed-behaviors.yaml` に項目を足す design の変更(159行)は、このファイルを変えないと通らない。(2) 小タスク2.1 が作る `backend/internal/resume/difftable_test.go`。design の126行が挙げる単体テストのファイルの中に無く、表の番号を一覧と照らす処理をどこに置くかは、正解のファイルの節(442行)にも無い。design に戻る指摘である |
+
+- 往復: 1回目 / 高0 中1 低2
+
+## サイクル4 往復1(2026-11-15)
+
+### 審査の範囲
+
+範囲: 差分
+
+- tasks.md 小タスク2.1 の説明の文と完了の確かめ方(T3-1-1 の直し。年月と日付の正解のファイルに足してある2つの答えと、同じコミットに入れること): 差分の中で、中身が変わった行である。`0000-01-15` と `Invalid Date` で design.md と research.md と tasks.md を検索し、design.md 297行、418行、619行、research.md 65-66行、tasks.md 小タスク6.3 の `Invalid Date` の段を、食い違いが無いかを見るために読んだ
+- tasks.md 小タスク2.1 の「受入基準とテストの対応」の1つ目: 1つの文を3つの文に分けた行である。design.md 619行(画面が送る書き方と、年が `0000` の年月を除くこと)と照らし、直す前と意味が変わっていないことを確かめた
+- tasks.md 小タスク3.5 の説明の文(「経歴書の確認のあとに」を「`editResume` が経歴書の行を読んで固定したあとに」に替えた): 項目の ID を読む順が変わっていないかを見るために、`editResume` と `parseID` で design.md を検索し、257行と268行を読んだ。同じ `editResume` を使う小タスク3.6 は、順を書いていないので影響を受けない
+- tasks.md 小タスク4.3 の説明の文(偽の送信の検査の説明を足し、`compat_test.go` の直し方の1つの文を2つに分けた): 今あるコードについて書いた文なので、3つのファイルを開いた。直す前と、替える箇所と替えたあとの名前が同じことを確かめた
+- tasks.md「実装のメモ」の `x-go-type-import` の箇条(「design の『仕様書の変更』の節と違う」の文を消した): design.md の「仕様書の変更」(393行)が、`x-go-type-import` を足さないと書き直されていることを確かめた。T3-1-5 の2つのファイルが design.md の `## ファイルの構成`(127行、161行)に入ったことも確かめた。tasks.md に、design と違うと書いた文はほかに残っていない
+- tasks.md「実装のメモ」の `resumes.sql` の箇条、小タスク1.1、1.2、1.3、2.8、4.3 の「受入基準とテストの対応」と箇条の主語の直し: 主語と文の区切りだけが変わった行である。直す前と意味が変わっていないかを行ごとに比べた。意味の変わった行は無いので、ほかの箇所への影響は無いと判断した
+- 上のほかの箇所は、差分の語で検索しても影響を受けないので、読み直していない
+
+### 実ファイルで確かめた文
+
+- 小タスク2.1「年月と日付の正解のファイルには、小タスク1.1 のコミットのあとに、日付の `0000-01-15` への Java 版の答えと、年月の `Invalid Date` への Java 版の答えの2つを足してある」: backend/internal/resume/testdata/jackdate.json 515-526行(`date` の並びの最後。400 と「日付が不正です。」)、1020-1027行(`yearMonth` の並びの最後。400 と空の `errors`)。会話の始めの git の状態で、このファイルはコミット前の変更を持つ。research.md 65-66行(2026-11-15 に Java 版に送って控えた) / 合っていた
+- 小タスク2.1「`internal/resume` に `jackdate.go` と `jackdate_test.go` があり、`testdata/` に `jackdate.json` と `javauuid.json` がある」(消して名前を替える前の今の状態): backend/internal/resume/ の一覧(Glob) / 合っていた
+- 小タスク2.1「`go.mod` は `go.yaml.in/yaml/v3` を直接読み込む」: backend/go.mod 34行(`// indirect` が無い) / 合っていた
+- 小タスク4.3「3つのファイルが、段の名前 `delete-with-token` と経歴書の削除の経路を使い、『経歴書の操作はまだ 501 を返す』という注釈を持つ」: backend/compat/compat_test.go 92-93行、105-107行、backend/compat/cross_test.go 189-190行、202-205行、backend/compat/perf_test.go 15行、28-30行 / 合っていた
+- 小タスク4.3「`compat_test.go` に、検査が報告した違いの段の名前と操作の名前を確かめる箇所と、違いを許す範囲として書いた match の操作の名前がある」: backend/compat/compat_test.go 161-165行(段の名前 `delete-with-token` と操作の名前 `deleteResume`)、178行(`Matches` の `Operation: "deleteResume"`) / 合っていた
+- 小タスク4.3「経歴書の復元の要求は `POST /api/resumes/restore` で、操作の名前は `restoreResume` である」: backend/api/openapi.yaml 665行、668行 / 合っていた
+- 実装のメモ「仕様書の要求の型には `x-go-type: json.RawMessage` だけがあり、`x-go-type-import` は無い。oapi-codegen は v2.8.2 で、生成したコードは元から `encoding/json` を読み込む」: backend/api/openapi.yaml(`x-go-type: json.RawMessage` が1819-1905行の8か所、`x-go-type-import` が0か所)、backend/go.mod 118行、backend/internal/httpapi/gen/api.gen.go 11行 / 合っていた。design.md 393行の文とも合う
+- 実装のメモ「sqlc は v1.31.1、pgx は v5 である」: backend/go.mod 27行、144行 / 合っていた
+
+### 確かめの道具を作るタスク
+
+| 道具 | 作るタスク | 確かめる成果物を作るタスク | 並び |
+|---|---|---|---|
+| 年月と日付の正解のファイル(`dates.json`)の、小タスク1.1 で控えた書き方 | 1.1 | 2.1 | 前 |
+| 年月と日付の正解のファイルの `0000-01-15` と `Invalid Date` の答え | 2.1(作業フォルダにある2つの答えを、名前を替えるのと同じコミットに入れる) | 2.1(`TestDates_MatchesJava`)、6.3 | 同じタスクか前 |
+| `TestDates_MatchesJava` `TestDates_DiffTableInChangedBehaviors` | 2.1 | 2.1 | 同じタスク |
+| `TestLoadChangedBehaviors_CB005HasNoMatch`(期待する数) | 今ある(2.1 が数を替える) | 2.1 | 同じタスク |
+| `TestService_(EditResume|Career|Project)` | 3.5 | 3.5 | 同じタスク |
+| `parseID` | 2.2 | 3.5 | 前 |
+| 未実装の答えを確かめる3つのファイルのテスト(経歴書の復元に替えたもの) | 4.3 | 4.3、5.2 | 前 |
+| `make compat`(今ある認証と利用者の筋書き) | 今ある | 4.1、4.2 | 前(4.3 で流す) |
+
+### 申告
+
+差分の中に、新しく申告するものは無い。サイクル3 往復1 の2件は変わっていない。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| T4-1-1 | 低 | tasks.md 小タスク2.1、7.2 | research.md 65-66行は、`Invalid Date` と `0000-01-15` への Java 版の答えの置き場所を「正解のファイル `backend/internal/resume/testdata/jackdate.json`」と書く。小タスク2.1 がこのファイルの名前を `dates.json` に替えたあと、research.md のこの2行は無いファイルを指す。research.md の名前を直す作業は、小タスク2.1 にも、research.md に書き足す小タスク7.2 にも無い。今の時点では research.md の文は実ファイルと合っており、名前が古くなっても、テストと実装の結果は変わらない | 小タスク2.1 の説明の文に、research.md の「年月と日付(P5)」の節の正解のファイルの名前を `dates.json` に書き直すことを足す |
+
+T3-1-1 の直しを確かめた結果は、次のとおりである。
+
+- T3-1-1: 小タスク2.1 の説明の文が、2つの答えが足してあることと、名前を替えるのと同じコミットに入れることと、この2つの答えのほかは中身を替えないことを書く。完了の確かめ方が、`testdata/dates.json` に2つの答えがあることを確かめる。2つの答えは、作業フォルダの正解のファイルの516行と1021行にあり、「受入基準とテストの対応」の2つ目(`Invalid Date` を Java 版と同じく読めないこと)と、小タスク6.3 の `Invalid Date` の段の期待(400 と空の `errors`)と合う
+
+### 前の段階への指摘
+
+無い。
+
+T3-1-4 と T3-1-5 は、design.md の直しで解けている。design.md 393行は `x-go-type-import` を足さないと書き、127行に `difftable_test.go`、161行に `match_test.go` がある。
+
+- 往復: 1回で収束 / 未解決: 0件

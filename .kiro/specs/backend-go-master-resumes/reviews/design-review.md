@@ -431,3 +431,265 @@
 無い。
 
 - 往復: 1回で収束 / 未解決: 0件
+
+## サイクル4 往復1(2026-11-15)
+
+### 審査の範囲
+
+範囲: 差分
+
+- 記録の書き方: 審査役は、ファイルに書き足す道具を持たないので、このファイルの全体を書き直して、この節を末尾に足した。サイクル1からサイクル3の節は、読んだ文字のまま写した
+- design.md 概要の4段落目と5段落目(11行、13行)、「作るもの」の2つ目(22行)、「ファイルの構成」の `body.go` `dates.go` `ids.go` とテストの一覧(109-111行、119行)、「処理の流れ」の2つの図(171行、173行、199行): 差分が、Jackson と Java の読み方を写す文を、Go の普通の読み方の文に替えた。要件1の受入基準1の1つ目の例外と、要件2の受入基準1の末尾の段落に効く
+- design.md「本文の読み手(body.go、dates.go、ids.go)」の節の全体(272-298行): 差分が、読み方の規則を書き直した。語 `uuid.Parse` `time.Parse` `encoding/json` `parseID` `errUnreadableBody` で design.md を検索し、「Service」の「失敗したとき」(258-259行)、「入力の検査」の年月と日付の範囲の箇条(308行)、「失敗したときの扱い」の誤りを返す順(594行)と食い違わないかを見た。画面が送る値について書いた文は、正解のファイル `backend/internal/resume/testdata/` の Java 版の答えと1つずつ照らした
+- design.md「試作の記録(research.md)」の最後の3文(408行): 差分が、UTF-8 として誤ったバイトの確かめを済んだことにし、止まる文を消した。research.md 147-156行と、要件6の受入基準1と2に効く
+- design.md「Java 版の答えの正解のファイル(testdata)」の表と2つの比べ方(422-436行)、「テストの方針」の単体テストの箇条(599-606行、618行): 差分が、画面が送る値と送らない値で比べ方を分け、テストの中の表と変えた動きの一覧の番号を照らす仕組みを足した。要件1の受入基準1(「Java 版と答えが変わる書き方を、変えた動きの一覧に載せる」)に効く
+- design.md「マスタと経歴書の操作の筋書き」の入力の誤りの箇条と、無い経歴書と無い項目の箇条(481行、485行): 差分が、鍵を大文字で書いた要求と前後に空白のある ID を送らないことにし、`Invalid Date` を足した。要件4の受入基準1の2つ目の箇条に効く。残した要求(文字列の欄の並び、真偽の欄の読めない文字列、本文の全体が並びか文字列、大文字の ID)が、新しい読み方でも Java 版と同じ答えになるかを、正解のファイルで見た
+- design.md「変えた動きの一覧に載せる違い」の CB-051 から CB-055(517行、523-528行): 差分が5つの違いを足した。違いごとに、Java 版の側の文を正解のファイルと照らし、Go 版の側の文を「本文の読み手」の節と照らした
+- design.md「経歴書の受け口」の利用者の ID の箇条(357行): 差分が主語を足しただけで、中身は変わっていない。ほかの節には影響しない
+- 語 `jackdate` `javauuid` `jacksonUUID` `springPathUUID` `decodeBody(body []byte, fields` で design.md を検索し、古い部品の名前が残っていないことを見た。`jacksonJSON`(48行)は、認証の spec の今ある関数の名前で、差分の外である
+- 影響を受けないと判断した箇所: harness の広げ方、初期のデータ、読み書き、項目の並び(`compareJavaUUID` は残る)、受け口、仕様書の変更、main.go、進み具合の表。差分はこれらの節の動きを変えていないので、読み直していない
+
+### 実ファイルで確かめた文
+
+- design.md 概要(13行)「生成したコードは、UUID として読めない経路の値を経路の値の誤りとして 500 で答える」「項目の ID の経路の値を、文字列のまま受け取る型にする」: backend/internal/httpapi/server.go 131-134行、150-165行(`paramErrorHandler`)、backend/api/openapi.yaml 1441-1503行(経歴書の ID は `type: string` だけ。項目の ID の6つは `format: uuid` と `x-go-type: string`) / 合っていた
+- design.md 概要(13行)「`internal/resume` は生成した型を読まない決まり」: design.md 53行の依存の向きと同じ文である。今あるコードについての文ではない / 合っていた
+- design.md 本文の読み手(284行)「生成したコードが `runtime.BindJSONBody` を呼び、誤りのときは 400 と `errors` が空の答えにする」: backend/internal/httpapi/gen/api.gen.go 8538-8548行、backend/internal/httpapi/server.go 118-121行、backend/go.mod 30行(oapi-codegen/runtime v1.8.0) / 合っていた(`bindjson.go` は、前のサイクルと同じく、リポジトリにもホストにも無く、開けなかった)
+- design.md 本文の読み手(280行)「正解のファイルで、Java 版は、年月の `"2024-01"` と日付の `"2024-01-15"` をそのまま読み、空の文字列と `null` を入力が要る文言で断った」: backend/internal/resume/testdata/jackdate.json 4-8行、310-321行、342-353行、517-521行、763-774行、795-806行 / 合っていた
+- design.md 本文の読み手(280行)「この書き方(年月は `2024-01` の形)の値は、下の読み方でも、Java 版と同じ値になる」: backend/internal/resume/testdata/jackdate.json 602-609行。Java 版は、年月の `"0000-01"` を読めず、400 と空の `errors` で答えた。Go の `time.Parse` の書式 `2006-01` は、年が 0000 の値を読む / 食い違っていた(D4-1-2)
+- design.md 本文の読み手(288行)「画面が年月の入力欄から送る `Invalid Date` の文字列も、書式に合わないので読めない。Java 版がこの文字列にどう答えるかは、筋書きで確かめる」: backend/internal/resume/testdata/jackdate.json の全体と、.kiro/specs/backend-go-master-resumes/research.md を `Invalid Date` で検索し、どちらにも無かった。`backend/` の下にも無い。Java 版がこの文字列に返した答えの控えは、リポジトリに無い(D4-1-3)
+- design.md 本文の読み手(295行)「`uuid.Parse` は、大文字の値と、`{` と `}` で囲んだ値と、`urn:uuid:` で始まる値と、区切りの `-` の無い32桁の値も読む。前後に空白のある値と、区切りの間の桁が足りない値は読めない」: 版は backend/go.mod 26行(github.com/google/uuid v1.6.0)で確かめた。`uuid.go` は、リポジトリにもホストの Go のモジュールの置き場所(`C:/Users/dogis/go` は無い)にも無く、審査役は開けなかった。合っていたとも食い違っていたとも判定していない。公開されている v1.6.0 の `Parse` は、長さが38の値の最初と最後の1字を、`{` と `}` かを調べずに捨てる、と審査役は覚えている。そのとおりなら、前に1つ、後ろに1つの空白を付けた値(長さ38)は読める(D4-1-1)
+- design.md CB-051(524行)「区切りの間の桁が足りない値(`1-2-3-4-5`)と、全角の数字を含む値は、Java 版が経歴書の ID と項目の ID の両方で読み、前後に半角の空白のある値は、Java 版が項目の ID でだけ読む」「`{` `}` と `urn:uuid:` と32桁の値は、Java 版は読めない」: backend/internal/resume/testdata/javauuid.json 37-78行、96-106行、291-324行、446-473行 / 合っていた
+- design.md CB-052(525行)「Java 版は、前後の空白を除いて読み、空白だけの値をコピーしない作成にし、16バイトを base64 で書いた値も読む」「`{` `}` と `urn:uuid:` と32桁の値は、Java 版は読めない」: backend/internal/resume/testdata/javauuid.json 536-563行、591-645行、686-695行 / 合っていた
+- design.md CB-053(526行)「Java 版は、数の並び、日付の欄の日数の数、日付の欄の日時の文字列、前後に半角の空白のある値を読み、空白だけの値と空の並びを入力が要る文言で断り、`+12024-01` のような5桁の年の値を範囲の外の文言で断る」: backend/internal/resume/testdata/jackdate.json 9-18行、128-137行、322-333行、354-358行、395-406行、423-427行、570-581行、716-725行、807-811行、860-871行 / 合っていた
+- design.md CB-054(527行)「Java 版は、鍵の大文字と小文字を区別し、文字列の欄の数や真偽の欄の文字列を型に合わせて読み、本文の全体が `null` の要求を断る」: backend/internal/resume/testdata/body.json 5-8行、1021-1047行、2764-2776行、backend/internal/httpapi/testdata/resumebody/cases.json 151-160行、430-439行 / 合っていた
+- design.md CB-055(528行)と本文の読み手(291行)「Java 版は、誤ったバイトの一部を断り、一部を対になっていないサロゲートとして受けて、データベースに `?` で保存する」: .kiro/specs/backend-go-master-resumes/research.md 149-152行、backend/internal/resume/testdata/utf8.json 2行(控えの説明) / 合っていた
+- design.md 試作の記録(408行)「UTF-8 として誤ったバイトを含む本文への Java 版の答えは、小タスク1.1 で確かめ、research.md の『危うい点と備え』に書き足した」: research.md 147-156行、backend/internal/resume/testdata/utf8.json / 合っていた
+- design.md 正解のファイル(436行)「`resumebody/` には、余りのある本文、空の本文、並びと `null` と文字列の本文を、経歴書の作成と職歴の追加に送った答えを置く」: backend/internal/httpapi/testdata/resumebody/cases.json 4-489行 / 合っていた
+- design.md 正解のファイル(434行)「表の番号が `backend/compat/changed-behaviors.yaml` に無いときも、テストは失敗する」(テストがこのファイルを読めるか): backend/compat/changed-behaviors.yaml 493-507行(今の最後は CB-046。違いは `- id: CB-0NN` の行で始まる)、backend/go.mod 34行(`go.yaml.in/yaml/v3` は直接の依存) / 合っていた
+- design.md 筋書き(485行)「大文字の ID を送る」(新しい読み方でも Java 版と同じ答えか): backend/internal/resume/testdata/javauuid.json 15-36行(Java 版は、経歴書の ID でも項目の ID でも大文字の値を読む) / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 1.1(原則。画面が送る値) | `dates_test.go` `ids_test.go` `body_test.go` `link_test.go` `order_test.go` の「画面が送る値」の比べ方、`make compat` の筋書き | 開発環境の `backend-go` の領域の検査と CI の `backend-go` と `backend-compat` | `internal/resume/testdata/` の6つの正解のファイル(控えてある)。どの書き方を画面が送る値に数えるかの決まり | 「Java 版の答えの正解のファイル(testdata)」の1つ目の比べ方、「テストの方針」の `dates.go` の箇条。年が 0000 の年月は、画面が送る形に当たるのに Java 版と違う答えになる(D4-1-2) |
+| 1.1(1つ目の例外。画面が送らない値) | 単体テストの中の違いの表と、表の番号が `changed-behaviors.yaml` にあることの確かめ、CB-051 から CB-055 | 同上 | 正解のファイルの Java 版の答え、Go 版の部品の答え、`backend/compat/changed-behaviors.yaml` | 「Java 版の答えの正解のファイル(testdata)」の2つ目の比べ方、「変えた動きの一覧に載せる違い」。前後に1つずつ空白を付けた ID の Go 版の答えが、design の文と合わないおそれがある(D4-1-1) |
+| 2.1 | `validate_test.go` `rules_test.go` `link_test.go` と、入力の誤りの筋書き | 単体テストと比べる検査 | 読めた年月と日付の年の範囲(1900年から2100年)の境界の値 | 「入力の検査」、「マスタと経歴書の操作の筋書き」の入力の誤りの箇条 |
+| 4.1(2つ目の箇条 `Invalid Date`) | 年月の値の形の誤りの筋書きの段 | 比べる検査 | 本文の年月の欄に入れる文字列 `Invalid Date` | 「マスタと経歴書の操作の筋書き」の入力の誤りの箇条 |
+| 4.4 | CB-047 から CB-050 と、`resumes_test.go` `service_integration_test.go` | 単体テストと結合テスト | 読めない項目の ID | 「Service」の「失敗したとき」、概要の5段落目 |
+| 6.1(5つ目。年月と日付の読み方) | research.md の P5 と、正解のファイル `jackdate.json` | 設計の前に済んでいる | 画面が送る `2024-01` `2024-01-15` と空の文字列と `null` と `Invalid Date` への Java 版の答え | 「試作の記録(research.md)」、「本文の読み手」の年月と日付の箇条。`Invalid Date` への Java 版の答えの控えは無い(D4-1-3) |
+| 6.2 | research.md の「危うい点と備え」の UTF-8 の記録 | 済んでいる | 無い | 「試作の記録(research.md)」の最後の3文 |
+
+### 申告
+
+**1. Go の普通の読み方を、Go の部品の受ける値のままにし、Java 版が断る値も受ける** — design.md「本文の読み手」、CB-051、CB-052、CB-054
+
+- Issue の記載: なし(Issue #772 の本文は、置き換えの spec の要件を満たすことだけを求めている。画面が送らない値を Go の普通の読み方で読むことは、requirements の要件1の受入基準1の例外にある)
+- 決めたこと: 鍵の大文字と小文字を区別しない。本文の全体が `null` の要求を、すべての欄の値が無い要求として入力の検査に進める。`{` と `}` で囲んだ ID、`urn:uuid:` で始まる ID、区切りの無い32桁の ID を読む。Java 版はどれも断るか、別の答えを返す
+- 他にありえた選択肢: Go の部品で読む前に、画面が送る形(小文字と大文字の36字の ID、要求の型のとおりの鍵)だけを通す。この選択肢でも Java の部品の読み方は写さない
+- 外れていた場合: Go 版は、Java 版が 404 か 400 で断る要求に、経歴書を返すか、保存する。持ち主の確認は ID を読んだあとに働くので、ほかの利用者の経歴書は読めない。あとで狭めるときは、CB-051、CB-052、CB-054 と単体テストの表を書き直す
+
+**2. 読めない年月と日付を、欄ごとの文言でなく、本文が読めない要求として 400 と空の `errors` で断る** — design.md「本文の読み手」の年月と日付の箇条、CB-053
+
+- Issue の記載: なし
+- 決めたこと: 書式に合わない年月と日付は、`decodeBody` が `errUnreadableBody` で断る。Java 版が読んで範囲の外の文言か入力が要る文言で断る書き方(空白だけ、空の並び、5桁の年)にも、Go 版は空の `errors` で答える
+- 他にありえた選択肢: 読めない年月と日付を値が無いこととして入力の検査に進め、欄ごとの文言で断る
+- 外れていた場合: 画面が `Invalid Date` を送ったときの答えが Java 版と違えば、画面に出る文言が変わる。`Invalid Date` への Java 版の答えは、まだ控えていない(D4-1-3)
+
+**3. UTF-8 として誤ったバイトを U+FFFD に置き換えて保存する** — design.md「本文の読み手」の最後の箇条、CB-055
+
+- Issue の記載: なし
+- 決めたこと: Go 版は、誤ったバイトを含む本文を断らず、U+FFFD に置き換えた値を保存して答える。Java 版は、一部を 400 で断り、一部を `?` で保存する
+- 他にありえた選択肢: 誤ったバイトを含む本文を、本文が読めない要求として 400 で断る
+- 外れていた場合: データベースに U+FFFD を含む値が残る。画面は誤ったバイトを送らないので、手で作った要求でだけ起きる
+
+**4. 違いを、単体テストの中の表と変えた動きの一覧の番号で照らし、5つの違いにまとめる** — design.md「Java 版の答えの正解のファイル(testdata)」、「変えた動きの一覧に載せる違い」
+
+- Issue の記載: なし
+- 決めたこと: 画面が送らない書き方ごとの違いをテストの中の表に書き、表の番号が `changed-behaviors.yaml` にあることをテストが確かめる。変えた動きの一覧には、書き方ごとでなく、ID、`resumeId`、年月と日付、鍵と型、UTF-8 の5つにまとめて載せる
+- 他にありえた選択肢: 書き方ごとに1つの違いを載せる。または、違いの表を `changed-behaviors.yaml` の側に持つ
+- 外れていた場合: 所有者が変えた動きの一覧で読めるのは5つのまとまりの説明までで、書き方ごとの答えは Go のテストのコードにだけある
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D4-1-1 | 中 | design.md「本文の読み手」の `parseID` の箇条(295行)とその下の段落(298行)、CB-051(524行)、CB-052(525行) | design は「`uuid.Parse` は、前後に空白のある値を読めない」と書き、CB-051 は前後に半角の空白のある経路の値を Go 版が 404 で断ると書き、CB-052 は `resumeId` の前後の空白を Java 版だけが除いて読むと書く。google/uuid v1.6.0(backend/go.mod 26行)の `Parse` は、長さが38の値を `{…}` の形として扱うときに、最初と最後の1字が `{` と `}` かを調べずに捨てる、と審査役は覚えている(調べるのは同じライブラリの `Validate` だけである)。そのとおりなら、前に1つ、後ろに1つの空白を付けた ID(` 1b4e28ba-…-0016d3cca427 `、長さ38)と、前後に好きな1字を付けた ID を、`parseID` は読む。正解のファイルには、この形の `resumeId` がある(backend/internal/resume/testdata/javauuid.json 536-542行。Java 版は読んで 201)。すると、Go 版は Java 版と同じ答えになり、CB-052 の表に載せた書き方が「表にあるのに Java 版と同じ」でテストが落ちる。経路の経歴書の ID では、Java 版が 404 で断る値(前後に1つずつの空白)に、Go 版が経歴書を返す。この書き方は正解のファイルの `paths` に無いので(37-78行は片側だけの空白)、単体テストは見つけない。審査役は `uuid.go` を開けなかったので、まず動かして確かめてほしい | `backend-go` の領域で `uuid.Parse(" 1b4e28ba-2fa1-11d2-883f-0016d3cca427 ")` を1回動かして結果を research.md に書く。読めるなら、(a) `parseID` が、長さ38の値は最初が `{` で最後が `}` のときだけ `uuid.Parse` に渡す、と design に書く。または (b) 読めることを 295行と CB-051 と CB-052 に書き、正解のファイルの `paths` に前後に1つずつ空白を付けた値を足す、のどちらかにする |
+| D4-1-2 | 中 | design.md「本文の読み手」の画面が送る本文の段落(280行)、年月と日付の箇条(288行)、「テストの方針」の `dates.go` の箇条(604行)、CB-053(526行) | 280行は「この書き方(年月は `2024-01` の形、日付は `2024-01-15` の形)の値は、下の読み方でも、Java 版と同じ値になる」と書き、604行は、この形の値を Java 版と同じに読むことをテストで確かめると書く。正解のファイルでは、Java 版は年月の `"0000-01"` を読めず、400 と空の `errors` で答えた(backend/internal/resume/testdata/jackdate.json 602-609行)。Go の `time.Parse` の書式 `2006-01` は年が 0000 の値を読むので、Go 版は入力の検査に進み、範囲の外の文言「取得年月が不正です。」で答える(308行。1899年の値と同じ扱い。jackdate.json 682-693行)。状態の番号は同じ 400 だが、本文が違う。`"0000-01"` は書式に合うので、CB-053 の「書式に合わない値」にも当たらない。このまま作ると、`dates_test.go` が、画面が送る形の値で Java 版と違うとして落ちるか、表に載せる番号が無い違いとして落ち、design に戻る | 次のどちらかを design に書く。(a) `dates.go` の年月の型と日付の型は、`time.Parse` で読めても年が 0000 の値は読めないとする。(b) 年が 0000 の値を画面が送らない書き方に数え、CB-053 に「年が 0000 の値は、Java 版が読めず、Go 版は読んで範囲の外の文言で断る」を足す。あわせて、604行の「画面が送る書き方」の決まりを、形だけでなく年の範囲でも言い切る |
+| D4-1-3 | 中 | design.md「本文の読み手」の年月と日付の箇条の最後の2文(288行)、「試作の記録(research.md)」(408行)、「テストの方針」の `dates.go` の箇条(604行) | 要件6の受入基準1の5つ目は、設計を書く前に試す年月と日付の読み方に、画面が送る `Invalid Date` を挙げている。`Invalid Date` は画面が送る値なので、Go 版は Java 版と同じ答えを返さなければならない(要件1の受入基準1の原則)。design は「Java 版がこの文字列にどう答えるかは、筋書きで確かめる」と書き、実装のあとの比べる検査に回している。Java 版の答えの控えは、research.md にも正解のファイル(backend/internal/resume/testdata/jackdate.json)にも無い。408行は「9つの動きを試しに作り、方法と結果を research.md に書いた」と書くが、この値は入っていない。Java 版の答えが 400 と空の `errors` でなければ、年月の読み手の作り(読めない値を `errUnreadableBody` にする)を直すことになり、承認のあとに design に戻る。正解のファイルを控えた環境(`spring` のコンテナの中のもう1つの Java 版)で、今すぐ確かめられる | 正解のファイルを控えたのと同じ環境で、資格の追加の `date` と、職歴の `startDate` に `"Invalid Date"` を入れて Java 版に送り、答えを年月と日付の正解のファイルと research.md の P5 に足す。design の288行に Java 版の答えを書き、604行の `dates_test.go` の場合を「`Invalid Date` で Java 版と同じ答えになること」に直す |
+| D4-1-4 | 低 | design.md「変えた動きの一覧に載せる違い」の「対応する要件」(515行) | この節の「対応する要件」は 3.3 と 4.4 だけである。差分で足した CB-051 から CB-055 は、要件1の受入基準1の1つ目の例外(「Claude は、Java 版と答えが変わる書き方を、変えた動きの一覧に載せる」)を受け持つ。本文には「要件1の受入基準1の例外」と書いてある(11行)ので、実装には影響しない | 「対応する要件: 1.1, 3.3, 4.4」にする |
+| D4-1-5 | 低 | design.md「ファイルの構成」の `dates.go` `ids.go` と `testdata/`(110-111行、119行、123行) | 作業のブランチには、前の design で作った `backend/internal/resume/jackdate.go` `jackdate_test.go` と、正解のファイル `testdata/jackdate.json` `testdata/javauuid.json` がある。design は、新しい名前のファイルを作るとだけ書き、今あるファイルを消すか名前を替えるか、正解のファイルの名前をどうするかを書いていない。main には無いファイルで、PR の差分には残らないので、実装には影響しない | tasks で、今ある `jackdate.go` と `jackdate_test.go` を消すことと、正解のファイルの名前を替えるか残すかを書く |
+
+### 前の段階への指摘
+
+無い。
+
+- 往復: 1回目 / 高0 中3 低2
+
+## サイクル4 往復2(2026-11-15)
+
+### 審査の範囲
+
+範囲: 差分
+
+- 記録の書き方: 審査役は、ファイルに書き足す道具を持たないので、このファイルの全体を書き直して、この節を末尾に足した。サイクル1からサイクル4 往復1の節は、読んだ文字のまま写した
+- design.md「本文の読み手」の画面が送る本文の段落(287行)、年月と日付の箇条(295行)、CB-053(533行)、「テストの方針」の `dates.go` の箇条(611行): 差分が、年が `0000` の値を Java 版と違う答えになる値として足し、`Invalid Date` への Java 版の答えを書いた(D4-1-2 と D4-1-3 の直し)。語 `0000` `Invalid Date` `time.Parse` で design.md と research.md を検索し、「入力の検査」の年月と日付の範囲の箇条、筋書きの入力の誤りの箇条(488行)、research.md の「年月と日付(P5)」(62-65行)と食い違わないかを見た。Java 版の側の文は、正解のファイル `backend/internal/resume/testdata/jackdate.json` と、Java 版の要求の型と照らした。要件1の受入基準1と要件6の受入基準1に効く
+- design.md「本文の読み手」の `parseID` の箇条(302行)とその下の段落(305行)、CB-051(531行)、CB-052(532行): 差分が、`uuid.Parse` の長さごとの読み方と、前後に1つずつ空白のある値の扱いを書いた(D4-1-1 の直し)。語 `uuid.Parse` `空白` で design.md を検索し、筋書きの無い経歴書と無い項目の箇条(492行)、「テストの方針」の `ids.go` の箇条(612行)と食い違わないかを見た。Java 版の側の文は、正解のファイル `javauuid.json` と Java 版の `ResumeIdResolver` と照らした。要件1の受入基準1の1つ目の例外に効く
+- design.md「試作の記録(research.md)」の最後の文(415行): 差分が、UTF-8 の文の後ろの「変えた動きの一覧に載せる」の文を消し、`Invalid Date` を確かめた文を足した。消した中身は、「本文の読み手」の最後の箇条(298行)と CB-055 に残っている。要件6の受入基準1に効く
+- design.md「使う既存の仕組み」の `internal/auth` の公開した部品(47-54行): 差分が、1行の並びを7つの箇条に分けた。7つの名前が今のコードにあるかを見た
+- そのほかの差分(`json` のタグの説明、「入力の検査」の文言の並びの文、「仕様書の変更」の2つの箇条、正解のファイルの節の主語、筋書きの節の主語、「テストの方針」の harness の箇条、「性能」の経歴書1件の取得の文): 主語を足したか、語の説明を足したか、文を分けただけで、中身は変わっていない。ほかの節には影響しない
+- 影響を受けないと判断した箇所: harness の広げ方、初期のデータ、読み書き、項目の並び、受け口、main.go、進み具合の表。差分はこれらの節の動きを変えていないので、読み直していない
+- 語 `0000` `Invalid Date` で requirements.md を検索する代わりに、前の往復で確かめた要件6の受入基準1の5つ目(`Invalid Date` を挙げる)と要件1の受入基準1を基準にした。差分は前の段階の本文を変えていない
+
+### 実ファイルで確かめた文
+
+- design.md 使う既存の仕組み(47-54行)「`internal/auth` の公開した部品のうち、`auth.Error` `FieldErrors` `ErrBusiness` `ErrInvalidInput` `NotBlank` `UTF16Len` `IsJavaWhitespace` の7つを使う」: backend/internal/auth/exported.go 27行、101行、106行、116行、121行、126行(`Error` の型は、サイクル1 往復1で backend/internal/auth/errors.go 80-91行を開いて確かめた) / 合っていた
+- design.md 本文の読み手(295行)「Java 版も、`Invalid Date` を読めない値として、400 と空の `errors` で断る(年月と日付の正解のファイル)」: backend/internal/resume/testdata/jackdate.json 1008-1015行(`yearMonth` の末尾。400 と空の `errors`)、.kiro/specs/backend-go-master-resumes/research.md 65行 / 合っていた
+- design.md 試作の記録(415行)「`Invalid Date` への Java 版の答えは、2026-11-15 に Java 版に送って確かめ、research.md の『年月と日付(P5)』に書き足した」: research.md 65行、backend/internal/resume/testdata/jackdate.json 2行(控えの説明)と 1008-1015行 / 合っていた
+- design.md CB-053(533行)「Java 版は、年が `0000` の値(年月)を読めない値として 400 と空の `errors` で断る」: backend/internal/resume/testdata/jackdate.json 602-609行(年月の `"0000-01"`)、backend/src/main/java/com/example/keirekipro/presentation/resume/dto/UpdateCertificationRequest.java 31-33行(`@JsonFormat(pattern = "yyyy-MM")`) / 合っていた
+- design.md 本文の読み手(287行)「年が `0000` の年月と日付を除き、Java 版と同じ答えになる」、CB-053(533行)「年月と日付の書き方。…年が `0000` の値を読めない値として 400 と空の `errors` で断る」、テストの方針(611行)「年が `0000` の値を除き」のうち、日付についての部分: 正解のファイルの `date` の一覧(backend/internal/resume/testdata/jackdate.json 3-515行)に、年が `0000` の日付は無い。Java 版の日付の欄は書式の指定の無い `LocalDate` である(backend/src/main/java/com/example/keirekipro/presentation/resume/dto/UpdateResumeBasicRequest.java 31-34行。年月の欄だけが `yyyy-MM` の書式を持つ)。Java 版は、日付の `"-2024-01-15"` を読んで範囲の外の文言「日付が不正です。」で断っている(jackdate.json 236-247行)。同じ正解のファイルに合わせて作った今のコードも、年月だけを年が1より小さいときに読めないとし(backend/internal/resume/jackdate.go 160-165行)、日付の年には下限を置いていない(230-231行、305-308行)。日付の年が `0000` の値を、Java 版は読んで範囲の外の文言で断ると読める。Go 版も `time.Parse` で読んで範囲の外の文言で断るので、違いにならない / 食い違っていた(D4-2-1)
+- design.md 本文の読み手(302行)「`uuid.Parse` は、値の長さで読み方を決める。長さ36、長さ38(最初と最後の1字を除く。`{` と `}` でなくても除く)、長さ45(`urn:uuid:` の9字を除く)、長さ32。ほかの長さの値は読めない」: 版は backend/go.mod 26行(github.com/google/uuid v1.6.0)で確かめた。`uuid.go` は、前の往復と同じくリポジトリにもホストにも無く、審査役は開けなかった。実装セッションが Go のテストで、前後に1つずつ空白のある値と `x` と `y` で囲んだ値が読めることを確かめたと記録している(reviews/design-response.md 81行)。審査役が覚えている v1.6.0 の `Parse` の作りとも合う / 合っていた(審査役は自分では動かしていない)
+- design.md CB-051(531行)「片側にだけ半角の空白のある値は、Java 版が項目の ID でだけ読む」: backend/internal/resume/testdata/javauuid.json 37-64行(経歴書の ID は 404、項目の ID は 200) / 合っていた
+- design.md CB-051(531行)「前後に1つずつ空白のある経歴書の ID は、Go 版が読み、Java 版は 404 で答える」: backend/src/main/java/com/example/keirekipro/usecase/resume/ResumeIdResolver.java 23-28行(`trim` を呼ばずに `UUID.fromString` に渡し、読めなければ 404 の誤りにする)、research.md 79行、backend/internal/resume/testdata/javauuid.json 37-64行(片側の空白は 404)。前後に1つずつ空白を付けた経路の値そのものは、正解のファイルの `paths` に無い(D4-2-2) / 合っていた
+- design.md CB-052(532行)「前後に1つずつ空白のある `resumeId` は、Java 版と Go 版のどちらも読む」: backend/internal/resume/testdata/javauuid.json 536-542行(Java 版は 201 で、写した元の ID を読んでいる) / 合っていた
+- design.md 本文の読み手(305行)「区切りの間の桁が足りない経路の項目の ID(`1-2-3-4-5`)を、Java 版は読む」: backend/internal/resume/testdata/javauuid.json 96-106行(項目の ID で 200) / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 1.1(原則。画面が送る値) | `dates_test.go` の「画面が送る書き方」の比べ方(年が `0000` の値を除く)と `Invalid Date` の場合、`ids_test.go` の小文字の ID の場合、`make compat` の筋書き | 開発環境の `backend-go` の領域の検査と CI の `backend-go` と `backend-compat` | 正解のファイル `jackdate.json`(`Invalid Date` と年月の `0000-01` の答えがある。日付の年が `0000` の答えは無い)、`javauuid.json` | 「本文の読み手」の画面が送る本文の段落と年月と日付の箇条、「テストの方針」の `dates.go` の箇条。日付の年が `0000` の値を Java 版と違う答えに数える根拠が無い(D4-2-1) |
+| 1.1(1つ目の例外。画面が送らない値) | `dates_test.go` `ids_test.go` `body_test.go` の中の違いの表(CB-051、CB-052、CB-053)と、表の番号が `changed-behaviors.yaml` にあることの確かめ | 同上 | 正解のファイルの Java 版の答え、Go 版の部品の答え、`backend/compat/changed-behaviors.yaml` | 「Java 版の答えの正解のファイル(testdata)」の2つ目の比べ方、CB-051 から CB-053。CB-051 に足した、前後に1つずつ空白のある経歴書の ID の違いは、正解のファイルの `paths` に値が無いので、表と照らす値が無い(D4-2-2) |
+| 4.1(2つ目の箇条 `Invalid Date`) | 年月の値の形の誤りの筋書きの段 | 比べる検査 | 本文の年月の欄に入れる文字列 `Invalid Date`。2つの版の答えは、400 と空の `errors` で同じになる | 「マスタと経歴書の操作の筋書き」の入力の誤りの箇条、「本文の読み手」の年月と日付の箇条 |
+| 6.1(5つ目。年月と日付の読み方) | research.md の P5 と、正解のファイル `jackdate.json` | 設計の前に済んでいる | 画面が送る `2024-01` `2024-01-15` と空の文字列と `null` と `Invalid Date` への Java 版の答え(どれも控えてある) | 「試作の記録(research.md)」の最後の文、「本文の読み手」の年月と日付の箇条 |
+
+### 申告
+
+**1. 年が `0000` の値を Go 版の読み方のままにし、違いを変えた動きの一覧に載せる** — design.md「本文の読み手」の画面が送る本文の段落、CB-053
+
+- Issue の記載: なし
+- 決めたこと: `2024-01` の形に合う、年が `0000` の年月を、Go 版は読んで範囲の外の文言で断る。Java 版は読めない値として空の `errors` で断る。状態の番号はどちらも 400 で、本文の `errors` が違う
+- 他にありえた選択肢: `dates.go` が、年が `0000` の値を読めない値にして、Java 版と同じ答えにする(前の往復の D4-1-2 の直し方の案の (a))
+- 外れていた場合: 利用者が年月の入力欄に年 `0000` を打ち込めるなら、画面に出る文言が Java 版と変わる(Java 版は欄ごとの文言を出さず、Go 版は「取得年月が不正です。」の形の文言を出す)。あとで合わせるときは、`dates.go` と CB-053 とテストの表を直す
+
+**2. 長さ38の ID の最初と最後の1字を、`{` と `}` かを調べずに除く読み方を、そのまま使う** — design.md「本文の読み手」の `parseID` の箇条、CB-051
+
+- Issue の記載: なし
+- 決めたこと: `parseID` は `uuid.Parse` をそのまま呼ぶ。前後に好きな1字を付けた長さ38の値を、経歴書の ID と項目の ID と `resumeId` のどれでも読む
+- 他にありえた選択肢: `parseID` が、長さ38の値は最初が `{` で最後が `}` のときだけ `uuid.Parse` に渡す(前の往復の D4-1-1 の直し方の案の (a))
+- 外れていた場合: Java 版が 404 か 500 で答える経路の値に、Go 版が経歴書か項目を返す。持ち主の確認は ID を読んだあとに働くので、ほかの利用者の経歴書は読めない。あとで狭めるときは、`ids.go` と CB-051 を直す
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D4-2-1 | 中 | design.md「本文の読み手」の画面が送る本文の段落(287行)、CB-053(533行)、「テストの方針」の `dates.go` の箇条(611行) | 差分は、年が `0000` の値を「年月と日付」の両方で Java 版と違う答えになる値にした。287行は「年が `0000` の年月と日付を除き、…Java 版と同じ答えになる」と書き、CB-053 は、年月と日付の書き方の違いとして「Java 版は、年が `0000` の値を読めない値として 400 と空の `errors` で断る。Go 版は、年が `0000` の値を読み、範囲の外の文言で断る」と書く。Java 版の答えの控えがあるのは年月の `"0000-01"` だけである(backend/internal/resume/testdata/jackdate.json 602-609行)。日付の年が `0000` の値は、正解のファイルの `date` の一覧(3-515行)にも research.md にも無い。Java 版の日付の欄は、年月の欄と違い、書式 `yyyy-MM` の指定を持たない `LocalDate` である(UpdateResumeBasicRequest.java 31-34行、UpdateCertificationRequest.java 31-33行)。Java 版は日付の `"-2024-01-15"` を読んで「日付が不正です。」で断っており(jackdate.json 236-247行)、同じ正解のファイルに合わせて作った今のコードも、年が1より小さい値を読めないとするのは年月だけである(backend/internal/resume/jackdate.go 160-165行、230-231行、305-308行)。これらから、Java 版は日付の `"0000-01-15"` を読んで「日付が不正です。」で断ると読め、Go 版の答えと同じになる。このまま作ると、変えた動きの一覧の CB-053 に、日付について確かめていない(おそらく誤った)Java 版の動きが載る。あとで日付の年が `0000` の値を正解のファイルに足したときは、「表にあるのに Java 版と同じ書き方」として `dates_test.go` が落ちる | 次のどちらかにする。(a) 287行と CB-053 と 611行の、年が `0000` の値についての文を、年月だけに限る(「年が `0000` の年月」)。(b) 正解のファイルを控えたのと同じ環境で、基本の情報の更新の `date` に `"0000-01-15"` を入れて Java 版に送り、答えを `jackdate.json` の `date` と research.md の P5 に足し、その答えに合わせて3か所の文を直す |
+| D4-2-2 | 低 | design.md CB-051(531行)、「テストの方針」の `ids.go` の箇条(612行)、「Java 版の答えの正解のファイル(testdata)」の2つ目の比べ方 | CB-051 に足した「前後に1つずつ空白のある経歴書の ID は、Go 版が読み、Java 版は 404 で答える」の違いは、正解のファイルの `paths` に、この形の値が無い(backend/internal/resume/testdata/javauuid.json 37-78行は片側だけの空白)。`ids_test.go` は正解のファイルの書き方ごとに表と照らすので、この違いはテストの表に載らず、テストでは確かめられない。Java 版の側の動きは、`ResumeIdResolver.java` 23-28行と片側の空白の答えから読めるので、文は誤りではない。また、302行のとおり、Go 版は空白でない1字で囲んだ長さ38の値も、経歴書の ID と項目の ID の両方で読むが、CB-051 は空白の場合だけを書いている。どちらも画面が送らない値で、作るものは変わらないので、実装には影響しない | tasks で、正解のファイルの `paths` に、前後に1つずつ空白を付けた値を足すことを書く(D4-2-1 の (b) で Java 版を動かすなら、同じときに控える)。CB-051 の文を「前後に1字ずつ付けた長さ38の値」の形に広げる |
+
+### 前の段階への指摘
+
+無い。
+
+- 往復: 2回目 / 高0 中1 低1
+
+## サイクル4 往復3(2026-11-15)
+
+### 審査の範囲
+
+範囲: 差分
+
+- 記録の書き方: 審査役は、ファイルに書き足す道具を持たないので、このファイルの全体を書き直して、この節を末尾に足した。サイクル1からサイクル4 往復2の節は、読んだ文字のまま写した
+- design.md「本文の読み手」の画面が送る本文の段落(287行)、CB-053(539行)、「テストの方針」の `dates.go` の箇条(617行): 差分が、年が `0000` の値についての文を年月だけに限り、年が `0000` の日付は Java 版と Go 版の答えが同じで違いに当たらないと書いた(D4-2-1 の直し)。語 `0000` で design.md と research.md と tasks.md を検索し、ほかに年が `0000` の値を書く箇所が research.md の「年月と日付(P5)」(66行)だけであることと、3か所の文が互いに食い違わないことを見た。Java 版の側の文は、足された正解のファイルの行と照らした。要件1の受入基準1と要件6の受入基準1に効く
+- design.md「テストの方針」の単体テストの箇条から消えた行(「違いの表を持つテストは、表の番号が `backend/compat/changed-behaviors.yaml` にあることも確かめる」): 差分がこの行を消した。語 `表の番号` で design.md を検索し、同じ中身が「Java 版の答えの正解のファイル(testdata)」の2つ目の比べ方(442行。「表の番号が `backend/compat/changed-behaviors.yaml` に無いときも、テストは失敗する」)に残っていることを見た。確かめの仕組みは減っていない。要件1の受入基準1の1つ目の例外の確かめ方は変わらない
+- design.md「Java 版と Go 版を比べる検査の広げ方(harness)」の移し替えの段落(461-466行): 差分が、1つの段落を、前置きの文と4つの箇条に分けた。語 `delete-with-token` `deleteResume` `restoreResume` で design.md と `backend/compat` を検索し、替える箇所が直す前と同じであることを見た。要件4の受入基準3の確かめ方は変わらない
+- design.md「性能」の最後の箇条(670行): 差分が、Go 版が書く量が少ない理由を足した。語 `書く量` `消して` で design.md と research.md を検索し、「読み書き」の書き方の箇条(352行)と research.md 117行、132行と同じ中身であることを見た
+- design.md「失敗したときの扱い」の誤りを返す順(610行): 差分が、括弧と読点の並びを文に分けた。順(本文が読めない、入力欄の検査、経歴書の ID と経歴書、上限と名前の重なり、項目、期間の決まり)は直す前と同じである
+- そのほかの差分(「作るもの」の CB-047 の箇条(29行)、「Service」の退会した利用者の箇条(267行)、`BindJSONBody` の場所の文(291行)、「経歴書の受け口」のマスタの答えの表(369-370行)、CB-047 と CB-049 と CB-051 から CB-055 の「Claude は、…match を書かない」の文(532行、534行、536行)、CB-053 の Java 版の文の分け方): 主語を足したか、文と表の行を分けただけで、中身は変わっていない。ほかの節には影響しない
+- 影響を受けないと判断した箇所: `parseID` と CB-051 と CB-052、入力の検査、読み書き、項目の並び、初期のデータ、筋書き、main.go、進み具合の表。差分はこれらの節の動きを変えていないので、読み直していない
+- 語 `0000` で requirements.md を検索し、該当は無かった。差分は前の段階の本文を変えていない
+
+### 実ファイルで確かめた文
+
+- design.md 本文の読み手(287行)「年が `0000` の日付は、Java 版と Go 版のどちらも読み、範囲の外の文言で断る」: backend/internal/resume/testdata/jackdate.json 515-526行(`date` の末尾の `"0000-01-15"`。Java 版は 400 と `errors.date` の「日付が不正です。」で答えた。範囲の外の `"1899-12-31"` の答え(268-279行)と同じ本文である)、.kiro/specs/backend-go-master-resumes/research.md 66行 / 合っていた
+- design.md 本文の読み手(287行)、CB-053(539行)「Java 版は、年が `0000` の年月を、読めない値として 400 と空の `errors` で断る」: backend/internal/resume/testdata/jackdate.json 614-621行(`yearMonth` の `"0000-01"`。400 と空の `errors`) / 合っていた
+- design.md CB-053(539行)「Java 版は、数の並び(`[2024,1]`)と、日付の欄の日数の数(`19737`)と、日付の欄の日時の文字列と、前後に半角の空白のある値を読む」「空白だけの値と空の並びを、入力が要る文言で断る」「`+12024-01` のような5桁の年の値を、範囲の外の文言で断る」: backend/internal/resume/testdata/jackdate.json 819-823行、423-427行、128-132行、9-13行と728-732行、322-333行と787-798行、395-406行と872-883行、582-593行。差分は1つの文を4つに分けただけで、どの文も正解のファイルと合う / 合っていた
+- design.md 本文の読み手(287行)「正解のファイルで、Java 版は、年月の `"2024-01"` と日付の `"2024-01-15"` をそのまま読み、空の文字列と `null` を入力が要る文言で断った」: backend/internal/resume/testdata/jackdate.json 4-8行、310-321行、342-353行、529-533行、775-786行、807-818行(正解のファイルに1件足されたので、`yearMonth` の行の番号は前の往復から12行ずれている) / 合っていた
+- design.md harness の節(461-466行)「3つのファイルは、経歴書の削除の要求(`DELETE /api/resumes/00000000-0000-4000-8000-000000000201` と `csrf: true`)を使う」「3つのファイルの段の名前 `delete-with-token`」「`compat_test.go` で、違いの段の名前と操作の名前 `deleteResume` を確かめる箇所と、match の操作の名前」「経歴書の復元の操作の名前 `restoreResume`」: backend/compat/compat_test.go 105-106行、161-162行、165行、178行、backend/compat/cross_test.go 202-204行、backend/compat/perf_test.go 28-29行、backend/compat/harness/coverage_test.go 158行 / 合っていた
+- design.md 性能(670行)「Java 版は経歴書の保存のたびに6つの欄の行をすべて消して書き直す」: backend/src/main/java/com/example/keirekipro/infrastructure/repository/resume/MyBatisResumeRepository.java 80-123行(`save` は、`resumes` を upsert したあと、6つの欄ごとに `delete…ByResumeId` を呼んでから、項目を1件ずつ `insert…` する) / 合っていた
+- design.md 本文の読み手(291行)「`runtime.BindJSONBody` は、oapi-codegen/runtime v1.8.0 の `bindjson.go` の36-45行にある」: 版は backend/go.mod 30行で合っていた。`bindjson.go` は、前の往復までと同じく、リポジトリに無く(`backend/` の下を `func BindJSONBody` で検索して該当なし)、審査役は開けなかった。差分は括弧の中を別の文に出しただけで、中身は変わっていない。合っていたとも食い違っていたとも判定していない
+- design.md 失敗したときの扱い(610行)「経歴書の作成では、Java 版の `CreateResumeUseCase` と `CopyCreateResumeUseCase` のとおり、上限、名前の重なり、コピー元の読み出しの順にする」: サイクル1 往復1で CopyCreateResumeUseCase.java 50-66行と CreateResumeUseCase.java 44-65行を開いて確かめた文で、差分はこの文を変えていない / 合っていた
+- design.md Service(267行)「Java 版は、`resumes.user_id` の外部キーの違反で 500 と答える」: サイクル1 往復1で V1__create_tables.sql 69-77行を開いて確かめた文で、差分は最後の文の主語を足しただけである / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 1.1(原則。画面が送る値) | `dates_test.go` の「画面が送る書き方」の比べ方(年が `0000` の年月を除く。年が `0000` の日付は Java 版と同じ答えの側に入る)と `Invalid Date` の場合 | 開発環境の `backend-go` の領域の検査と CI の `backend-go` | 正解のファイル `jackdate.json`(年月の `"0000-01"` と日付の `"0000-01-15"` と `Invalid Date` の答えがどれも控えてある) | 「本文の読み手」の画面が送る本文の段落、「テストの方針」の `dates.go` の箇条 |
+| 1.1(1つ目の例外。画面が送らない値) | `dates_test.go` `ids_test.go` `body_test.go` の中の違いの表(年が `0000` の年月は CB-053)と、表の番号が `changed-behaviors.yaml` にあることの確かめ | 同上 | 正解のファイルの Java 版の答え、Go 版の部品の答え、`backend/compat/changed-behaviors.yaml` | 「Java 版の答えの正解のファイル(testdata)」の2つ目の比べ方(表の番号の確かめはこの箇所に残っている)、CB-053、「テストの方針」の `dates.go` の箇条 |
+| 4.3 | 経歴書の復元で 501 を確かめる3つのファイルのテスト | 開発環境と CI の `make compat` `make compat-cross`、開発環境の `make compat-perf` | 段の名前 `restore-with-token`、操作の名前 `restoreResume`、本文 `{}` と `csrf: true` を付けた `POST /api/resumes/restore`。経歴書の受け口を経路につなぐ前に替えること | 「Java 版と Go 版を比べる検査の広げ方」の移し替えの段落と4つの箇条 |
+| 6.1(5つ目。年月と日付の読み方) | research.md の P5 と、正解のファイル `jackdate.json` | 設計の前に済んでいる | 年が `0000` の日付への Java 版の答え(research.md 66行と jackdate.json 515-526行に控えてある) | 「試作の記録(research.md)」、「本文の読み手」の画面が送る本文の段落 |
+
+### 申告
+
+この往復の差分に、新しく決めたことは無い。年が `0000` の年月を Go 版の読み方のままにすることは、前の往復の申告の1つ目に書いた。
+
+### 指摘
+
+無い。
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+
+### 前の段階への指摘
+
+無い。
+
+- 往復: 3回で収束 / 未解決: 0件
+
+## サイクル5 往復1(2026-11-15)
+
+### 審査の範囲
+
+範囲: 差分
+
+- 記録の書き方: 審査役は、ファイルに書き足す道具を持たないので、このファイルの全体を書き直して、この節を末尾に足した。サイクル1からサイクル4 往復3の節は、読んだ文字のまま写した
+- design.md「仕様書の変更」の1つ目の箇条(393行): 差分が、`x-go-type-import` を足す文を、足さない文とその理由に替えた(T3-1-4 の直し)。語 `x-go-type` で design.md と requirements.md と tasks.md と research.md を検索し、「設計を見直すきっかけ」の箇条(69行)、「ファイルの構成」の `backend/api/openapi.yaml` の行(146行)、tasks.md の小タスク1.2(23行)と「実装のメモ」(335行)、research.md 124行と食い違わないかを見た。どれも `x-go-type` だけを書いており、`x-go-type-import` を足すと書く箇所は残っていない。requirements.md に該当は無い。要件1の受入基準1と要件4の受入基準4の確かめ方は変わらない
+- design.md「ファイルの構成」の `backend/internal/resume/difftable_test.go`(127行)と、「Java 版の答えの正解のファイル(testdata)」の2つ目の比べ方の最後の2文(444行): 差分が、表の番号を一覧と照らす共通の関数の置き場所と、一覧の読み方を足した(T3-1-5 の直し)。語 `difftable` `表の番号` で design.md と tasks.md を検索し、同じ節の次の段落(446行。`resumes_test.go` も「画面が送らない値の比べ方」で比べる)、「テストの方針」の表と照らす箇条(616-620行、632行)、tasks.md の小タスク2.1(49行、56行)と小タスク5.2(228行)と食い違わないかを見た。要件1の受入基準1の1つ目の例外に効く
+- design.md「ファイルの構成」の `backend/compat/harness/match_test.go`(161行): 差分が、項目の数を確かめるテストの期待する数を増やす行を足した(T3-1-5 の直し)。語 `match_test` `CB005HasNoMatch` で design.md と tasks.md と `backend/compat` を検索し、「変えた動きの一覧に載せる違い」の節(532-543行。CB-047 から CB-055 の9つ)、tasks.md の小タスク2.1(47行。46から51)、6.2(243行。51から52)、6.6(279行。52から55)、「実装のメモ」(337行)と数が合うかを見た。要件3の受入基準3と要件4の受入基準4と要件1の受入基準1の例外(変えた動きの一覧に載せること)に効く
+- design.md「ファイルの構成」の全体(112-166行): 差分の目的が、tasks が作るか変えるファイルを載せることなので、tasks.md に出てくるファイルの名前をすべて検索し、ファイルの構成の行と照らした。載っていないのは、小タスク1.4 の `service_test.go`(D5-1-2)と、小タスク2.1 が消す `jackdate.go` `jackdate_test.go` と名前を替える正解のファイルである。後ろのものは、サイクル4 往復1 の D4-1-5(低。記録のみ)で扱ってあるので、もう一度は出さない
+- 影響を受けないと判断した箇所: 本文の読み手、入力の検査、Service、読み書き、項目の並び、受け口、httpapi.New、main.go、harness の広げ方、筋書き、初期のデータ、進み具合の表、変えた動きの一覧に載せる違いの中身。差分はこれらの節の動きを変えていないので、読み直していない
+
+### 実ファイルで確かめた文
+
+- design.md 仕様書の変更(393行)「要求の本文の8つの型に `x-go-type: json.RawMessage` を足す。`x-go-type-import` を足さない」(済んだ実装と合うか): backend/api/openapi.yaml 1819行、1830行、1844行、1861行、1871行、1885行、1895行、1905行(8つの型に `x-go-type: json.RawMessage`)、1458-1503行(6つの経路の値に `x-go-type: string`)。ファイルを `x-go-type` で検索し、`x-go-type-import` は1つも無い / 合っていた
+- design.md 仕様書の変更(393行)「oapi-codegen v2.8.2 が生成したコードは元から `encoding/json` を読み込む」「生成したコードは、本文を読まずに `json.RawMessage` として受け口に渡す」: backend/go.mod 118行(oapi-codegen/v2 v2.8.2)、backend/Makefile 40行(`go tool oapi-codegen`)、backend/internal/httpapi/gen/api.gen.go 8-11行(`import` の中の `"encoding/json"`)、246行、267行、286行、404行、429行、555行、578行、630行(8つの型は `= json.RawMessage` の別名) / 合っていた
+- design.md 仕様書の変更(393行)「`x-go-type-import` を足すと同じ読み込みが2つになり、コンパイルできない」: 今あるファイルについての文ではなく、足したときにどうなるかの文である。審査役は `make generate` を動かせないので、自分では確かめていない。実装セッションが小タスク1.2 で確かめたと記録している(tasks.md 335行)。前提の「元から `encoding/json` を読み込む」は上の行で合っていた。足さない今の仕様書で生成したコードが8つの型を `json.RawMessage` にしていることも上の行で確かめたので、この文が外れていても作るものは変わらない。合っていたとも食い違っていたとも判定していない
+- design.md ファイルの構成(161行)「`backend/compat/harness/match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` は、変えた動きの一覧の項目の数を確かめる。増やさないと、このテストが失敗する」: backend/compat/harness/match_test.go 313-314行(`filepath.Join("..", "changed-behaviors.yaml")` を読む)、327-329行(`len(got) != 46` なら失敗)、1行(`//go:build compat`。`make compat` で動く)。backend/compat/changed-behaviors.yaml の `- id: CB-` の行は今46である。同じテストの、match を持たない番号の一覧(331-335行)は、挙げた番号だけを調べるので、足した違いを一覧に足さなくても失敗しない。`backend/` の `*.go` で実際の一覧を読むテストは、このファイルの314行、384行、530行だけで、数を確かめるのは327行だけである / 合っていた
+- design.md 正解のファイル(444行)「`go.mod` が直接読み込む `go.yaml.in/yaml/v3` で一覧を読む」: backend/go.mod 34行(`go.yaml.in/yaml/v3 v3.0.5`。`// indirect` の付かない側の `require`)、backend/compat/harness/match.go 18行(同じライブラリで同じ一覧を読んでいる) / 合っていた
+- design.md ファイルの構成(127行)と正解のファイル(444行)「`internal/resume` の単体テストが `backend/compat/changed-behaviors.yaml` を読む」(今の決まりと環境で読めるか): backend/.golangci.yml 43-57行(機能のパッケージの depguard の規則は lax で、禁じるのは `backend/internal` と `backend/cmd` の読み込みだけである。外のライブラリ `go.yaml.in/yaml/v3` は禁じていない)。`backend/compat/go.mod` は無く、`backend/internal/resume` と `backend/compat` は同じモジュールの同じ作業フォルダにあるので、テストは `../../compat/changed-behaviors.yaml` を読める。`difftable_test.go` は、まだリポジトリに無い(backend/internal/resume/ の一覧。小タスク2.1 が作る) / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 1.1(1つ目の例外。画面が送らない値の違いを、変えた動きの一覧に載せること) | `dates_test.go` `ids_test.go` `body_test.go` の中の違いの表と、表の番号を一覧と照らす `difftable_test.go` の共通の関数 | 開発環境の `backend-go` の領域の検査(`make check` のテスト)と CI の `backend-go` | `backend/compat/changed-behaviors.yaml`(同じ作業フォルダにある)、`go.yaml.in/yaml/v3`(go.mod の直接の依存。depguard は禁じていない) | 「ファイルの構成」の `difftable_test.go`(127行)、「Java 版の答えの正解のファイル(testdata)」の2つ目の比べ方(444行) |
+| 1.1(本文の全体の扱い。CB-054 の表) | `resumes_test.go` の中の違いの表と、表の番号が一覧にあることの確かめ | 同上 | `backend/compat/changed-behaviors.yaml`、`internal/httpapi` のテストの中で一覧を読む処理 | 「Java 版の答えの正解のファイル(testdata)」の最後の段落(446行)。`internal/httpapi` のテストが表の番号をどう照らすかは書かれていない(D5-1-1) |
+| 1.1 と 4.4(仕様書の型) | `make generate` のあとの `make check`(生成したコードの食い違いの検査とビルド)、`resumes_test.go`、`server_internal_test.go` | 開発環境の `backend-go` の領域の検査と CI の `backend-go` | `x-go-type: json.RawMessage` と `x-go-type: string` だけを足した仕様書(済んでいる) | 「仕様書の変更」の2つの箇条(393-394行) |
+| 3.3、4.4、1.1 の例外(変えた動きの一覧に載せること) | `changed-behaviors.yaml` の CB-047 から CB-055 と、`match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` | 開発環境と CI の `make compat`(`-tags compat`) | 期待する数を、足した違いの数だけ増やすこと(46 から、9つを足して 55) | 「ファイルの構成」の `match_test.go`(161行)、「変えた動きの一覧に載せる違い」(532-543行) |
+
+### 申告
+
+この往復の差分に、新しく決めたことは無い。`x-go-type-import` を足さないことは、済んだ実装(小タスク1.2)に本文を合わせた直しで、ほかの選択肢は無い。共通の関数の置き場所と一覧の読み方は、テストの中の作りで、外れていたときの手戻りは小さい。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D5-1-1 | 低 | design.md「Java 版の答えの正解のファイル(testdata)」の2つ目の比べ方(444行)と最後の段落(446行) | 差分は、表の番号を一覧と照らす共通の関数を「`internal/resume` の単体テストの共通の関数」として `difftable_test.go` に置くと書いた。446行は、`internal/httpapi` の `resumes_test.go` も「画面が送らない値の比べ方」で比べると書き、tasks.md の小タスク5.2(228行)は、`TestResumeRoutes_WholeBody` が表の番号を一覧と照らすと書く。`_test.go` の関数はほかのパッケージから呼べないので、`resumes_test.go` は `difftable_test.go` の関数を使えない。`internal/httpapi` の側で一覧をどう読むかは、design に書かれていない。`go.yaml.in/yaml/v3` は `internal/httpapi` のテストからも読め(backend/.golangci.yml 43-48行。`internal/httpapi` は機能のパッケージの規則の外)、実装役が同じ読み方をもう1つ書けば済むので、実装には影響しない。tasks の T3-1-2(低。記録のみ)と同じ中身である | 446行に、「`resumes_test.go` は、同じ読み方で一覧を読み、表の番号を確かめる」の1文を足す |
+| D5-1-2 | 低 | design.md「ファイルの構成」の単体テストの行(126行) | 126行の括弧の中の単体テストの名前(`body_test.go` から `errors_test.go` の8つ)に、tasks.md の小タスク1.4(37行)が作った `service_test.go` が無い(backend/internal/resume/service_test.go は、今リポジトリにある)。行の頭の `backend/internal/resume/*_test.go` と「上の各ファイルの単体テスト」の説明には当たる(`service.go` は114行にある)ので、載っていないファイルではなく、括弧の中の名前の並びが足りないだけである。実装には影響しない | 括弧の中に `service_test.go` を足す |
+
+### 前の段階への指摘
+
+無い。
+
+- 往復: 1回で収束 / 未解決: 0件
