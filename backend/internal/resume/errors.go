@@ -76,9 +76,9 @@ const (
 	MessageEndDateBeforeStart  = "終了年月は開始年月より後の日付を指定してください。"
 	MessageEndDateWhileOngoing = "継続中の場合、終了年月を設定できません。"
 
-	// MessageCareerActiveRequired は、職歴の在籍中の欄の注釈の文言である(CreateCareerRequest と UpdateCareerRequest、項目 active)。
+	// MessageCareerActiveRequired は、職歴の在籍中の欄の注釈の文言である(CreateCareerRequest と UpdateCareerRequest、項目 isActive)。
 	MessageCareerActiveRequired = "在籍中は入力必須です。"
-	// MessageProjectActiveRequired は、プロジェクトの継続中の欄の注釈の文言である(CreateProjectRequest と UpdateProjectRequest、項目 active)。
+	// MessageProjectActiveRequired は、プロジェクトの継続中の欄の注釈の文言である(CreateProjectRequest と UpdateProjectRequest、項目 isActive)。
 	MessageProjectActiveRequired = "継続中は入力必須です。"
 
 	// 次の10は、プロジェクトの文言である(CreateProjectRequest と UpdateProjectRequest の注釈と Project)。

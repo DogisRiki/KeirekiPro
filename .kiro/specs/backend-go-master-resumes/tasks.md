@@ -88,7 +88,7 @@
   - _要件: 1.1_
   - _依存: 1.1, 2.1, 2.2_
 
-- [ ] 2.5 経歴書の作成と基本の情報の更新と職歴と資格の入力欄を検査する
+- [x] 2.5 経歴書の作成と基本の情報の更新と職歴と資格の入力欄を検査する
 
   Claude は、入力の検査の節のとおりに、`validate.go` に、経歴書の作成、基本の情報の更新、職歴の項目、資格の項目の4つの要求の型の検査を作る。写す元は、`CreateResumeRequest`、`UpdateResumeBasicRequest`、`CreateCareerRequest`、`UpdateCareerRequest`、`CreateCertificationRequest`、`UpdateCertificationRequest` の注釈である。
   - 完了の確かめ方: `go test ./internal/resume/ -run 'TestValidate_(Resume|Basic|Career|Certification)'` が通る
@@ -338,6 +338,7 @@
 - 項目の経路の ID の先頭にタブを付けた値も、Java 版は読み、Go 版は読まない。`ids_test.go` の表は、この違いを CB-051 に当てている。一方、`changed-behaviors.yaml` の CB-051 の java の欄は「片側にだけ半角の空白」と書くだけで、タブに触れていない。Claude は、一覧の項目を足す小タスク6.2 で、CB-051 の java の欄と go の欄に、タブを付けた値の読み方を書き足す。Claude は、このことを小タスク2.2 の審査で知った。
 - UTF-8 として誤ったバイトのうち、overlong の `c0 80` を文字列の欄に入れた本文に、Java 版は 500 で答え、Go 版は U+FFFD に置き換えて読む。`body_test.go` の表は、この3件を CB-055 に当てている。一方、`changed-behaviors.yaml` の CB-055 の java の欄は「一部を断り、一部を受けて ? で保存する」と書くだけで、500 で答えることに触れていない。Claude は、一覧の項目を足す小タスク6.2 で、CB-055 の java の欄に、500 で答える書き方を書き足す。Claude は、このことを小タスク2.4 の審査で知った。
 - Go の `encoding/json` は、`\u0000` の書き方を U+0000 として読む。PostgreSQL の `TEXT` の列は U+0000 を含む値を断る。Claude は、経歴書と6つの欄の項目を読み書きする小タスク3.1 で、U+0000 を含む値を書いたときの Go 版の答えを確かめ、Java 版と違えば変えた動きの一覧に載せる。Claude は、このことを小タスク2.4 の審査で知った。
+- 小タスク2.5 の受入基準は、どのテストも1899年と1900年と2100年と2101年の値を含むと書く。経歴書の作成の要求(`CreateResumeRequest`)には年月と日付の欄が無いので、`TestValidate_Resume` は年の値を含まない。年の範囲の検査は、ほかの3つのテストが確かめる。Claude は、PR の本文に、この食い違いと、要件2の受入基準1を満たすと考える理由を書く。Claude は、このことを小タスク2.5 の審査で知った。
 
 ## 完了条件(全タスク共通)
 
