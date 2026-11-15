@@ -57,7 +57,7 @@
   - _要件: 1.1, 2.1_
   - _依存: 1.1_
 
-- [ ] 2.2 ID を Go の普通の読み方で読み、Java 版と同じ順に比べる
+- [x] 2.2 ID を Go の普通の読み方で読み、Java 版と同じ順に比べる
 
   Claude は、本文の読み手の節のとおりに、`ids.go` に、`uuid.Parse` で読む `parseID` と、`java.util.UUID.compareTo` を写した `compareJavaUUID` を作る。
 
@@ -335,6 +335,7 @@
 - Claude は、仕様書の要求の型に `x-go-type: json.RawMessage` だけを足し、`x-go-type-import` は足さない。oapi-codegen v2.8.2 の生成したコードは、元から `encoding/json` を読み込む。そのため、`x-go-type-import` を足すと、生成したコードは `encoding/json` を2回読み込み、Go のコンパイラはそのコードをコンパイルできない。Claude は、このことを、仕様書の要求の本文と項目の ID の型を書き換える小タスク1.2 で確かめた。
 - `db/queries/resumes.sql` の問い合わせは、技術スタックの列 `TEXT[]` を、JSON を通して読み書きする。読むときは `to_jsonb(pts)` で行を JSON にし、書くときは `jsonb_populate_record(NULL::project_tech_stacks, ...)` で JSON を行にする。JSON を通すのは、次の2つのためである。sqlc v1.31.1 は、`TEXT[]` を `[]string` にする。pgx v5 は、要素の NULL を `[]string` に読めない。Claude は、`sqlc.yaml` の型の上書きを使わない。型の上書きは、ゲート設定の変更になるためである。`store.go` は、この JSON を `[]*string` の欄を持つ Go の構造体と読み書きし、35の鍵を全部送る。JSON に無い鍵の列は NULL になるためである。Claude は、このことを、マスタと経歴書の SQL の問い合わせを書いて生成する小タスク1.3 で確かめた。
 - 変えた動きの一覧 `changed-behaviors.yaml` に項目を足す小タスクは、一覧の項目の数を確かめる `match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` の期待する数も替える。替えないと、このテストが失敗する。Claude は、一覧の項目を、番号の順に並べる。
+- 項目の経路の ID の先頭にタブを付けた値も、Java 版は読み、Go 版は読まない。`ids_test.go` の表は、この違いを CB-051 に当てている。一方、`changed-behaviors.yaml` の CB-051 の java の欄は「片側にだけ半角の空白」と書くだけで、タブに触れていない。Claude は、一覧の項目を足す小タスク6.2 で、CB-051 の java の欄と go の欄に、タブを付けた値の読み方を書き足す。Claude は、このことを小タスク2.2 の審査で知った。
 
 ## 完了条件(全タスク共通)
 
