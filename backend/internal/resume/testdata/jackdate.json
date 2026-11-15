@@ -1,0 +1,1009 @@
+{
+  "about": "Java 版(feat/go-master-resume-operations の 95aca2b2 の backend を、開発環境の spring のコンテナで、ポート 8090、データベース keireki_proto、Redis の DB 7、TZ=Asia/Tokyo で動かしたもの)に、2026-11-15 に送って控えた答え。yearMonth は、資格の追加 POST /api/resumes/{resumeId}/certifications の date に input を入れて送った答え。date は、基本の情報の更新 PUT /api/resumes/{resumeId}/basic の date に input を入れて送った答え。input は本文に入れた JSON の値の書き方そのもの。value は Java 版が読んで答えに返した値で、status が 201 か 200 のときだけある。body は、それ以外の答えの本文。",
+  "date": [
+    {
+      "input": "\"2024-01-15\"",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "\" 2024-01-15 \"",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "\"\\t2024-01-15\\n\"",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "\"　2024-01-15\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-1-15\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-5\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024/01/15\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"20240115\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-001\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-W03-1\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-02-29\"",
+      "status": 200,
+      "value": "2024-02-29"
+    },
+    {
+      "input": "\"2023-02-29\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-02-30\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-04-31\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-13-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-00-10\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15T10:00:00\"",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "\"2024-01-15T10:00\"",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "\"2024-01-15T10\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15T\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15T25:00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15T10:00:00.123456789\"",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "\"2024-01-15T10:00:00.1234567891\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15T10:00:00Z\"",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "\"2024-01-15T10:00:00+09:00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15+09:00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15Z\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15t10:00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15 10:00:00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"+2024-01-15\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"-2024-01-15\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"+12024-01-15\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"10000-01-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"1899-12-31\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"1900-01-01\"",
+      "status": 200,
+      "value": "1900-01-01"
+    },
+    {
+      "input": "\"2100-12-31\"",
+      "status": 200,
+      "value": "2100-12-31"
+    },
+    {
+      "input": "\"2101-01-01\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"２０２４-01-15\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付は入力必須です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"  \"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付は入力必須です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"null\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "null",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付は入力必須です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024,1,15]",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "[2024,2,30]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[1899,12,31]",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024,1]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024,1,15,0]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[]",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付は入力必須です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[\"2024\",\"1\",\"15\"]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024,1,15.0]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "19737",
+      "status": 200,
+      "value": "2024-01-15"
+    },
+    {
+      "input": "0",
+      "status": 200,
+      "value": "1970-01-01"
+    },
+    {
+      "input": "-1",
+      "status": 200,
+      "value": "1969-12-31"
+    },
+    {
+      "input": "-25567",
+      "status": 200,
+      "value": "1900-01-01"
+    },
+    {
+      "input": "73049",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "73050",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "日付が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"19737\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "1.5",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "19737.0",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "1e3",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "true",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "{}",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    }
+  ],
+  "yearMonth": [
+    {
+      "input": "\"2024-01\"",
+      "status": 201,
+      "value": "2024-01"
+    },
+    {
+      "input": "\"2024-1\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-001\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"24-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"02024-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"+2024-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"-2024-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"+12024-01\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"12024-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"9999-12\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"0000-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024/01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"202401\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01-15T00:00:00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01T00:00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01+09:00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01Z\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-13\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-00\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"1899-12\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"1900-01\"",
+      "status": 201,
+      "value": "1900-01"
+    },
+    {
+      "input": "\"2100-12\"",
+      "status": 201,
+      "value": "2100-12"
+    },
+    {
+      "input": "\"2101-01\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\" 2024-01 \"",
+      "status": 201,
+      "value": "2024-01"
+    },
+    {
+      "input": "\"\\t2024-01\\n\"",
+      "status": 201,
+      "value": "2024-01"
+    },
+    {
+      "input": "\"　2024-01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-01 \"",
+      "status": 201,
+      "value": "2024-01"
+    },
+    {
+      "input": "\"2024- 01\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"２０２４-０１\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"2024-1-1\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"\"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月は入力必須です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"  \"",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月は入力必須です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "\"null\"",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "null",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月は入力必須です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024,1]",
+      "status": 201,
+      "value": "2024-01"
+    },
+    {
+      "input": "[2024,13]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[1899,12]",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2101,1]",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月が不正です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024,1,1]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[]",
+      "status": 400,
+      "body": {
+        "errors": {
+          "date": [
+            "取得年月は入力必須です。"
+          ]
+        },
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[\"2024\",\"1\"]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[\"2024\",1]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[\" 2024 \",1]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024.0,1]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024,1.5]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[2024,null]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[null,1]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "[[2024],1]",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "202401",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "2024",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "0",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "-1",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "1.5",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "true",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "false",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "{}",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "input": "{\"year\":2024,\"month\":1}",
+      "status": 400,
+      "body": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    }
+  ]
+}

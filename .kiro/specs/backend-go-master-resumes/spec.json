@@ -1,0 +1,38 @@
+{
+  "feature_name": "backend-go-master-resumes",
+  "issue": 772,
+  "created_at": "2026-11-13T22:38:37Z",
+  "updated_at": "2026-11-15T02:13:42Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-14T02:00:05Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-15T01:49:40Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-15T02:13:42Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-14T06:59:38Z",
+      "issues": [772],
+      "revoked_at": "2026-11-14T07:13:41Z",
+      "revoked_for": "T1-1-6 と T1-1-7 による design への差し戻し: ファイルの構成に tasks が作る正解のファイルと cross_test.go が無く、テストの方針がリポジトリに無い試作の入力の件数で確かめると書いている"
+    }
+  ]
+}

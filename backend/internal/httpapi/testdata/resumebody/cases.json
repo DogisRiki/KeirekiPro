@@ -1,0 +1,491 @@
+{
+  "about": "Java 版(feat/go-master-resume-operations の 95aca2b2 の backend を、開発環境の spring のコンテナで、ポート 8090、データベース keireki_proto、Redis の DB 7、TZ=Asia/Tokyo で動かしたもの)に、2026-11-15 に送って控えた答え。本文の全体の扱いを確かめる本文を、経歴書の作成と職歴の追加に送った答え。response と db の作り方は、internal/resume/testdata/body.json と同じ。 body の鍵が無い場合は、空の本文を送った。",
+  "cases": [
+    {
+      "name": "resume-trailing-garbage",
+      "endpoint": "POST /api/resumes",
+      "body": "{\"resumeName\":\"余り1\"} xyz",
+      "status": 201,
+      "response": {
+        "date": "<today>",
+        "id": "<resumeId>",
+        "resumeName": "余り1"
+      },
+      "db": {
+        "resumes": {
+          "first_name": null,
+          "last_name": null,
+          "name": "余り1"
+        }
+      }
+    },
+    {
+      "name": "resume-trailing-object",
+      "endpoint": "POST /api/resumes",
+      "body": "{\"resumeName\":\"余り2\"}{\"a\":1}",
+      "status": 201,
+      "response": {
+        "date": "<today>",
+        "id": "<resumeId>",
+        "resumeName": "余り2"
+      },
+      "db": {
+        "resumes": {
+          "first_name": null,
+          "last_name": null,
+          "name": "余り2"
+        }
+      }
+    },
+    {
+      "name": "resume-trailing-bracket",
+      "endpoint": "POST /api/resumes",
+      "body": "{\"resumeName\":\"余り3\"} ]",
+      "status": 201,
+      "response": {
+        "date": "<today>",
+        "id": "<resumeId>",
+        "resumeName": "余り3"
+      },
+      "db": {
+        "resumes": {
+          "first_name": null,
+          "last_name": null,
+          "name": "余り3"
+        }
+      }
+    },
+    {
+      "name": "resume-trailing-comma",
+      "endpoint": "POST /api/resumes",
+      "body": "{\"resumeName\":\"余り4\"},",
+      "status": 201,
+      "response": {
+        "date": "<today>",
+        "id": "<resumeId>",
+        "resumeName": "余り4"
+      },
+      "db": {
+        "resumes": {
+          "first_name": null,
+          "last_name": null,
+          "name": "余り4"
+        }
+      }
+    },
+    {
+      "name": "resume-trailing-newlines",
+      "endpoint": "POST /api/resumes",
+      "body": "{\"resumeName\":\"余り5\"}\n\n",
+      "status": 201,
+      "response": {
+        "date": "<today>",
+        "id": "<resumeId>",
+        "resumeName": "余り5"
+      },
+      "db": {
+        "resumes": {
+          "first_name": null,
+          "last_name": null,
+          "name": "余り5"
+        }
+      }
+    },
+    {
+      "name": "resume-leading-spaces",
+      "endpoint": "POST /api/resumes",
+      "body": "  \n{\"resumeName\":\"余り6\"}",
+      "status": 201,
+      "response": {
+        "date": "<today>",
+        "id": "<resumeId>",
+        "resumeName": "余り6"
+      },
+      "db": {
+        "resumes": {
+          "first_name": null,
+          "last_name": null,
+          "name": "余り6"
+        }
+      }
+    },
+    {
+      "name": "resume-empty",
+      "endpoint": "POST /api/resumes",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-blank",
+      "endpoint": "POST /api/resumes",
+      "body": "  \n",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-array",
+      "endpoint": "POST /api/resumes",
+      "body": "[]",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-array-of-object",
+      "endpoint": "POST /api/resumes",
+      "body": "[{\"resumeName\":\"並び\"}]",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-null",
+      "endpoint": "POST /api/resumes",
+      "body": "null",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-string",
+      "endpoint": "POST /api/resumes",
+      "body": "\"文字列\"",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-number",
+      "endpoint": "POST /api/resumes",
+      "body": "123",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-true",
+      "endpoint": "POST /api/resumes",
+      "body": "true",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-truncated",
+      "endpoint": "POST /api/resumes",
+      "body": "{\"resumeName\":\"途中\"",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "resume-invalid-json",
+      "endpoint": "POST /api/resumes",
+      "body": "{resumeName:\"x\"}",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-trailing-garbage",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "{\"companyName\":\"A社\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":true} xyz",
+      "status": 201,
+      "response": {
+        "careers": [
+          {
+            "active": true,
+            "companyName": "A社",
+            "endDate": null,
+            "id": "<itemId>",
+            "startDate": "2020-01"
+          }
+        ],
+        "date": "1900-01-01",
+        "firstName": "太郎",
+        "id": "<resumeId>",
+        "lastName": "山田",
+        "resumeName": "控えの経歴書"
+      },
+      "db": {
+        "careers": {
+          "company_name": "A社",
+          "end_date": null,
+          "is_active": true,
+          "start_date": "2020-01-01"
+        }
+      }
+    },
+    {
+      "name": "career-trailing-object",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "{\"companyName\":\"A社\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":true}{\"a\":1}",
+      "status": 201,
+      "response": {
+        "careers": [
+          {
+            "active": true,
+            "companyName": "A社",
+            "endDate": null,
+            "id": "<itemId>",
+            "startDate": "2020-01"
+          }
+        ],
+        "date": "1900-01-01",
+        "firstName": "太郎",
+        "id": "<resumeId>",
+        "lastName": "山田",
+        "resumeName": "控えの経歴書"
+      },
+      "db": {
+        "careers": {
+          "company_name": "A社",
+          "end_date": null,
+          "is_active": true,
+          "start_date": "2020-01-01"
+        }
+      }
+    },
+    {
+      "name": "career-trailing-bracket",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "{\"companyName\":\"A社\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":true} ]",
+      "status": 201,
+      "response": {
+        "careers": [
+          {
+            "active": true,
+            "companyName": "A社",
+            "endDate": null,
+            "id": "<itemId>",
+            "startDate": "2020-01"
+          }
+        ],
+        "date": "1900-01-01",
+        "firstName": "太郎",
+        "id": "<resumeId>",
+        "lastName": "山田",
+        "resumeName": "控えの経歴書"
+      },
+      "db": {
+        "careers": {
+          "company_name": "A社",
+          "end_date": null,
+          "is_active": true,
+          "start_date": "2020-01-01"
+        }
+      }
+    },
+    {
+      "name": "career-trailing-comma",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "{\"companyName\":\"A社\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":true},",
+      "status": 201,
+      "response": {
+        "careers": [
+          {
+            "active": true,
+            "companyName": "A社",
+            "endDate": null,
+            "id": "<itemId>",
+            "startDate": "2020-01"
+          }
+        ],
+        "date": "1900-01-01",
+        "firstName": "太郎",
+        "id": "<resumeId>",
+        "lastName": "山田",
+        "resumeName": "控えの経歴書"
+      },
+      "db": {
+        "careers": {
+          "company_name": "A社",
+          "end_date": null,
+          "is_active": true,
+          "start_date": "2020-01-01"
+        }
+      }
+    },
+    {
+      "name": "career-trailing-newlines",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "{\"companyName\":\"A社\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":true}\n\n",
+      "status": 201,
+      "response": {
+        "careers": [
+          {
+            "active": true,
+            "companyName": "A社",
+            "endDate": null,
+            "id": "<itemId>",
+            "startDate": "2020-01"
+          }
+        ],
+        "date": "1900-01-01",
+        "firstName": "太郎",
+        "id": "<resumeId>",
+        "lastName": "山田",
+        "resumeName": "控えの経歴書"
+      },
+      "db": {
+        "careers": {
+          "company_name": "A社",
+          "end_date": null,
+          "is_active": true,
+          "start_date": "2020-01-01"
+        }
+      }
+    },
+    {
+      "name": "career-leading-spaces",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "  \n{\"companyName\":\"A社\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":true}",
+      "status": 201,
+      "response": {
+        "careers": [
+          {
+            "active": true,
+            "companyName": "A社",
+            "endDate": null,
+            "id": "<itemId>",
+            "startDate": "2020-01"
+          }
+        ],
+        "date": "1900-01-01",
+        "firstName": "太郎",
+        "id": "<resumeId>",
+        "lastName": "山田",
+        "resumeName": "控えの経歴書"
+      },
+      "db": {
+        "careers": {
+          "company_name": "A社",
+          "end_date": null,
+          "is_active": true,
+          "start_date": "2020-01-01"
+        }
+      }
+    },
+    {
+      "name": "career-empty",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-blank",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "  \n",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-array",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "[]",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-array-of-object",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "[{\"companyName\":\"A社\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":true}]",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-null",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "null",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-string",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "\"文字列\"",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-number",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "123",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-true",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "true",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-truncated",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "{\"companyName\":\"A社\"",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    },
+    {
+      "name": "career-invalid-json",
+      "endpoint": "POST /api/resumes/{resumeId}/careers",
+      "body": "{companyName:\"x\"}",
+      "status": 400,
+      "response": {
+        "errors": {},
+        "message": "入力エラーがあります。"
+      }
+    }
+  ]
+}
