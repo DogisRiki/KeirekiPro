@@ -1,5 +1,5 @@
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
-import { AxiosError, AxiosHeaders } from "axios";
+import { AxiosError, AxiosHeaders, CanceledError } from "axios";
 import { vi } from "vitest";
 
 import { toastMessage } from "@/config/messages";
@@ -48,6 +48,16 @@ describe("createErrorInterceptor", () => {
         await expect(createErrorInterceptor()(error)).rejects.toBe(error);
 
         expect(assign).toHaveBeenCalledWith(paths.serverError);
+        expect(replace).not.toHaveBeenCalled();
+        expect(useNotificationStore.getState().isShow).toBe(false);
+    });
+
+    it("呼び出し側が要求を取り消したときは、画面を移さずに、エラーを返すこと", async () => {
+        const error = new CanceledError(undefined, undefined, config);
+
+        await expect(createErrorInterceptor()(error)).rejects.toBe(error);
+
+        expect(assign).not.toHaveBeenCalled();
         expect(replace).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().isShow).toBe(false);
     });

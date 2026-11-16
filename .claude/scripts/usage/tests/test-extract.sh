@@ -394,6 +394,7 @@ mktoolrec() {
             $res->("toolu_g", perm => "user_permanent"),
             {$c->(), type => "assistant", message => {id => "msg_t6", model => "claude-opus-5-5", role => "assistant", stop_reason => "end_turn",
                 usage => {input_tokens => 1, output_tokens => 1}, content => [{type => "text", text => "SECRET-ASSISTANT-TEXT"}]}},
+            $u->("host_synthetic", "SECRET-HOST-TEXT"),
         );
         open my $f, ">", $file or die "$file: $!";
         print $f $j->encode($_), "\n" for @l;
@@ -403,11 +404,11 @@ mktoolrec "$D/s-tool.jsonl"
 run_all
 check "会話の相手と道具の行を抜き出して 0 で終わる" "$?" "0"
 T="$EX/s-tool.jsonl"
-check "turnOrigin の3つの値が owner・peer・notice になり、一覧に無い値が unknown と raw になり、41文字以上と記号を含む値の raw が空になる" \
+check "turnOrigin の値が owner・peer・notice・limit・host になり、一覧に無い値が unknown と raw になり、41文字以上と記号を含む値の raw が空になる" \
     "$(kall "$T" turn from)|$(kall "$T" turn raw)" \
-    "owner,peer,notice,notice,notice,limit,unknown,unknown,unknown,unknown|undef,undef,undef,undef,undef,undef,brand_new-1,$(perl -e 'print "y" x 40'),,"
+    "owner,peer,notice,notice,notice,limit,unknown,unknown,unknown,unknown,host|undef,undef,undef,undef,undef,undef,brand_new-1,$(perl -e 'print "y" x 40'),,,undef"
 check "turn の時刻は UNIX 秒" "$(kfield "$T" turn 1 ts)" "1792972861"
-check "task_notification の知らせの元の仕事の識別子が turn.job になる" "$(kall "$T" turn job)" "null,null,null,null,a0123456789abcdef,null,null,null,null,null"
+check "task_notification の知らせの元の仕事の識別子が turn.job になる" "$(kall "$T" turn job)" "null,null,null,null,a0123456789abcdef,null,null,null,null,null,null"
 check "turnOrigin が task_notification で文が [resume-after-usage-limit] を含む行が、turn.from が limit の行になり、文が手元の記録に残らない" \
     "$(kfield "$T" turn 6 from)/$(grep -c -e SECRET-RESUME-TEXT -e 'resume-after-usage-limit' "$T")" "limit/0"
 check "permissionDecision.source が user_ で始まる道具の perm が user になる" "$(kall "$T" tool perm)" "user,other,other,other,other,other,other,user"
@@ -422,7 +423,7 @@ check "裏で動かしたかどうかが tool.bg になる" "$(kall "$T" tool bg
 check "tool の時刻は呼び出しの時刻、result の時刻は結果の時刻" "$(kfield "$T" tool 1 ts)/$(kfield "$T" result 1 ts)" "1792972872/1792972873"
 check "失敗した道具の結果が result.err になる" "$(kall "$T" result err)" "false,false,false,true,false,false,false,false"
 check "抜き出した行に、元の欄の名前が残らない" \
-    "$(grep -c -e SECRET -e turnOrigin -e permissionDecision -e tool_use -e tool_result -e toolUseResult -e run_in_background -e agentId -e backgroundTaskId -e is_error -e task_notification -e human -e '"Bash"' -e '"Agent"' -e AskUserQuestion -e Monitor -e ExitPlanMode -e PowerShell -e SomeNewTool -e user_temporary -e '"source"' "$T")" "0"
+    "$(grep -c -e SECRET -e turnOrigin -e permissionDecision -e tool_use -e tool_result -e toolUseResult -e run_in_background -e agentId -e backgroundTaskId -e is_error -e task_notification -e human -e '"Bash"' -e '"Agent"' -e AskUserQuestion -e Monitor -e ExitPlanMode -e PowerShell -e SomeNewTool -e host_synthetic -e user_temporary -e '"source"' "$T")" "0"
 # 1行ずつ書き足しながら呼ぶ: 呼び出しと結果が別の呼び出しで読まれても、一度に読んだときと同じ行になる
 FULL="$D/s-tool.jsonl"
 lines=$(wc -l <"$FULL" | tr -d ' ')
@@ -727,8 +728,11 @@ check "錠を持って読んでいた呼び出しは最後まで読む" \
 # 古い extract.pl が書いた unknown の行を手で作る。human は今の値の一覧にあり、brand_new は無い
 UH='{"from":"unknown","job":null,"k":"turn","raw":"human","ts":1792972980}'
 UN='{"from":"unknown","job":null,"k":"turn","raw":"brand_new","ts":1792973040}'
+# デスクトップアプリが自分で入れた行を、host_synthetic を値の一覧に足す前の extract.pl が書いた形で作る
+UHS='{"from":"unknown","job":null,"k":"turn","raw":"host_synthetic","ts":1792973100}'
 addline "$LSTATE/extract/lk2.jsonl" "$UH"
 addline "$LSTATE/extract/lk2.jsonl" "$UN"
+addline "$LSTATE/extract/lk2.jsonl" "$UHS"
 addline "$LSTATE/extract/lk3.jsonl" "$UH"
 # lk3 には、UH を書き直した行と同じ行を、UH より後ろにも置く
 addline "$LSTATE/extract/lk3.jsonl" '{"from":"owner","job":null,"k":"turn","ts":1792972980}'
@@ -743,6 +747,8 @@ check "--all で呼ぶと、raw の値が値の一覧にある unknown の行が
     "owner/undef/1792972980"
 check "raw の値が値の一覧に無い unknown の行は書き直さない" \
     "$(kfield "$LSTATE/extract/lk2.jsonl" turn 2 from)/$(kfield "$LSTATE/extract/lk2.jsonl" turn 2 raw)" "unknown/brand_new"
+check "raw が host_synthetic の unknown の行は、デスクトップアプリが自分で入れた行の host に書き直される" \
+    "$(kfield "$LSTATE/extract/lk2.jsonl" turn 3 from)/$(kfield "$LSTATE/extract/lk2.jsonl" turn 3 raw)" "host/undef"
 check "元の会話の記録のファイルが無い記録の鍵でも、unknown の行が書き直される" \
     "$(kfield "$LSTATE/extract/lk3.jsonl" turn 2 from)/$(kfield "$LSTATE/extract/lk3.jsonl" turn 2 raw)" "owner/undef"
 check "書き直した行と同じ行がファイルの後ろにあるときは、同じ行を2つ残さない" "$(kcount "$LSTATE/extract/lk3.jsonl" turn)" "2"

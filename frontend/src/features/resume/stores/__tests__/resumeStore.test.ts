@@ -1,5 +1,5 @@
 import type { Resume } from "@/features/resume";
-import { useResumeStore } from "@/features/resume";
+import { BASIC_INFO_ENTRY_ID, useResumeStore } from "@/features/resume";
 
 describe("useResumeStore", () => {
     const mockResume: Resume = {
@@ -304,6 +304,7 @@ describe("useResumeStore", () => {
             });
 
             const { resume, isDirty } = useResumeStore.getState();
+            expect(useResumeStore.getState().dirtyEntryIds.has(BASIC_INFO_ENTRY_ID)).toBe(true);
             expect(resume?.resumeName).toBe("更新された職務経歴書");
             expect(resume?.lastName).toBe("鈴木");
             expect(resume?.firstName).toBe("太郎"); // 変更されていない
@@ -447,18 +448,13 @@ describe("useResumeStore", () => {
     });
 
     describe("removeEntry", () => {
-        it("removeEntryで特定エントリーを削除でき、dirtyEntryIdsからも削除され、isDirtyは変更されないこと", () => {
+        it("removeEntryで特定エントリーを削除でき、dirtyEntryIdsからも削除され、ほかに未保存が無ければisDirtyがfalseになること", () => {
             useResumeStore.getState().setResume(mockResume);
 
             // 一度dirtyにする
             useResumeStore.getState().updateEntry("careers", "career-1", { companyName: "更新" });
             expect(useResumeStore.getState().dirtyEntryIds.has("career-1")).toBe(true);
             expect(useResumeStore.getState().isDirty).toBe(true);
-
-            // isDirtyをfalseに戻しておき、removeEntryが触らないことを確認
-            useResumeStore.getState().setDirty(false);
-            expect(useResumeStore.getState().isDirty).toBe(false);
-
             useResumeStore.getState().removeEntry("careers", "career-1");
 
             const { resume, dirtyEntryIds, isDirty } = useResumeStore.getState();
@@ -496,18 +492,8 @@ describe("useResumeStore", () => {
         });
     });
 
-    describe("setDirty", () => {
-        it("setDirtyでisDirty状態を設定できること", () => {
-            useResumeStore.getState().setDirty(true);
-            expect(useResumeStore.getState().isDirty).toBe(true);
-
-            useResumeStore.getState().setDirty(false);
-            expect(useResumeStore.getState().isDirty).toBe(false);
-        });
-    });
-
     describe("addDirtyEntryId / removeDirtyEntryId", () => {
-        it("addDirtyEntryIdでdirtyEntryIdsに追加でき、isDirtyは変更されないこと", () => {
+        it("addDirtyEntryIdでdirtyEntryIdsに追加でき、isDirtyがtrueになること", () => {
             expect(useResumeStore.getState().isDirty).toBe(false);
             expect(useResumeStore.getState().dirtyEntryIds.size).toBe(0);
 
@@ -515,10 +501,10 @@ describe("useResumeStore", () => {
 
             const { dirtyEntryIds, isDirty } = useResumeStore.getState();
             expect(dirtyEntryIds.has("career-1")).toBe(true);
-            expect(isDirty).toBe(false);
+            expect(isDirty).toBe(true);
         });
 
-        it("removeDirtyEntryIdでdirtyEntryIdsから削除でき、isDirtyは変更されないこと", () => {
+        it("removeDirtyEntryIdでdirtyEntryIdsから削除でき、未保存が残る間はisDirtyがtrueのままであること", () => {
             useResumeStore.getState().addDirtyEntryId("career-1");
             useResumeStore.getState().addDirtyEntryId("career-2");
 
@@ -527,7 +513,10 @@ describe("useResumeStore", () => {
             const { dirtyEntryIds, isDirty } = useResumeStore.getState();
             expect(dirtyEntryIds.has("career-1")).toBe(false);
             expect(dirtyEntryIds.has("career-2")).toBe(true);
-            expect(isDirty).toBe(false);
+            expect(isDirty).toBe(true);
+
+            useResumeStore.getState().removeDirtyEntryId("career-2");
+            expect(useResumeStore.getState().isDirty).toBe(false);
         });
     });
 

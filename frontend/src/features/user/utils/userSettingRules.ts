@@ -29,3 +29,8 @@ export const isProviderRemovable = (user: User | null): boolean => {
     const count = Array.isArray(user?.authProviders) ? user.authProviders.length : 0;
     return count >= 2;
 };
+
+/**
+ * プロフィール画像として受け付けるファイルの種類(サーバーが受け付けるものと同じ)
+ */
+export const PROFILE_IMAGE_TYPES: readonly string[] = ["image/jpeg", "image/png", "image/gif"];

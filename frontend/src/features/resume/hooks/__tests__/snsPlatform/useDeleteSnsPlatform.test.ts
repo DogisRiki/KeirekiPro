@@ -52,7 +52,7 @@ describe("useDeleteSnsPlatform", () => {
         vi.spyOn(useNotificationStore.getState(), "setNotification");
 
         vi.spyOn(useResumeStore.getState(), "updateResume");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
+        vi.spyOn(useResumeStore.getState(), "removeEntry");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
     });
@@ -78,12 +78,12 @@ describe("useDeleteSnsPlatform", () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(useErrorMessageStore.getState().clearErrors).toHaveBeenCalledTimes(2);
-        expect(useResumeStore.getState().updateResume).toHaveBeenCalledWith({
-            snsPlatforms: [localResume.snsPlatforms.find((s) => s.id === "sns-platform-2")!],
-        });
-        expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(snsPlatformId);
+        expect(useResumeStore.getState().resume?.snsPlatforms).toEqual([
+            localResume.snsPlatforms.find((s) => s.id === "sns-platform-2")!,
+        ]);
+        expect(useResumeStore.getState().removeEntry).toHaveBeenCalledWith("snsPlatforms", snsPlatformId);
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith(null);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().isDirty).toBe(false); // ほかに未保存のエントリーが無い
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("SNSを削除しました。", "success");
     });
 

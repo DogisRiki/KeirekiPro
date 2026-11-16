@@ -49,6 +49,11 @@ type ErrorsByEntryId = {
 export const BASIC_INFO_ENTRY_ID = "__basicInfo__";
 
 /**
+ * 未保存のエントリーIDの集合と、未保存の変更があるかどうかを、そろえて返す
+ */
+const withDirtyEntryIds = (dirtyEntryIds: Set<string>) => ({ dirtyEntryIds, isDirty: dirtyEntryIds.size > 0 });
+
+/**
  * ストアの型
  */
 interface ResumeStoreState {
@@ -64,10 +69,10 @@ interface ResumeStoreState {
     // 職務経歴書全体のデータ
     resume: Resume | null;
 
-    // 未保存の変更があるかどうか
+    // 未保存の変更があるかどうか(dirtyEntryIdsが空でないとき真)
     isDirty: boolean;
 
-    // 編集されたエントリーIDのSet
+    // 編集されたエントリーIDのSet(基本情報はBASIC_INFO_ENTRY_ID)
     dirtyEntryIds: Set<string>;
 
     // エントリーIDごとのバリデーションエラー
@@ -89,7 +94,6 @@ interface ResumeStoreState {
     ) => void;
     removeEntry: (section: ResumeArrayKeys, entryId: string) => void;
     clearResume: () => void;
-    setDirty: (isDirty: boolean) => void;
     addDirtyEntryId: (entryId: string) => void;
     removeDirtyEntryId: (entryId: string) => void;
     clearDirtyEntryIds: (entryIds: string[]) => void;
@@ -219,12 +223,12 @@ export const useResumeStore = create<ResumeStoreState>()(
                     "syncResumeFromServer",
                 ),
 
-            // アクション: 職務経歴書の部分更新（変更時はdirtyをtrueに）
+            // アクション: 基本情報の部分更新（基本情報を未保存にする）
             updateResume: (patch) =>
                 set(
                     (state) => ({
                         resume: state.resume ? { ...state.resume, ...patch } : null,
-                        isDirty: true,
+                        ...withDirtyEntryIds(new Set(state.dirtyEntryIds).add(BASIC_INFO_ENTRY_ID)),
                     }),
                     false,
                     "updateResume",
@@ -256,8 +260,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                                       [section]: data,
                                   }
                                 : null,
-                            isDirty: true,
-                            dirtyEntryIds: newDirtyEntryIds,
+                            ...withDirtyEntryIds(newDirtyEntryIds),
                         };
                     },
                     false,
@@ -280,8 +283,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                                     entry.id === entryId ? { ...entry, ...updatedData } : entry,
                                 ),
                             },
-                            isDirty: true,
-                            dirtyEntryIds: newDirtyEntryIds,
+                            ...withDirtyEntryIds(newDirtyEntryIds),
                         };
                     },
                     false,
@@ -306,7 +308,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                                 ...state.resume,
                                 [section]: sectionData.filter((entry) => entry.id !== entryId),
                             },
-                            dirtyEntryIds: newDirtyEntryIds,
+                            ...withDirtyEntryIds(newDirtyEntryIds),
                             errorsByEntryId: newErrorsByEntryId,
                         };
                     },
@@ -330,16 +332,13 @@ export const useResumeStore = create<ResumeStoreState>()(
                     "clearResume",
                 ),
 
-            // アクション: dirty状態の設定
-            setDirty: (isDirty) => set({ isDirty }, false, "setDirty"),
-
             // アクション: 単一のエントリーIDをdirtyEntryIdsに追加
             addDirtyEntryId: (entryId) =>
                 set(
                     (state) => {
                         const newDirtyEntryIds = new Set(state.dirtyEntryIds);
                         newDirtyEntryIds.add(entryId);
-                        return { dirtyEntryIds: newDirtyEntryIds };
+                        return withDirtyEntryIds(newDirtyEntryIds);
                     },
                     false,
                     "addDirtyEntryId",
@@ -351,7 +350,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                     (state) => {
                         const newDirtyEntryIds = new Set(state.dirtyEntryIds);
                         newDirtyEntryIds.delete(entryId);
-                        return { dirtyEntryIds: newDirtyEntryIds };
+                        return withDirtyEntryIds(newDirtyEntryIds);
                     },
                     false,
                     "removeDirtyEntryId",
@@ -363,7 +362,7 @@ export const useResumeStore = create<ResumeStoreState>()(
                     (state) => {
                         const newDirtyEntryIds = new Set(state.dirtyEntryIds);
                         entryIds.forEach((id) => newDirtyEntryIds.delete(id));
-                        return { dirtyEntryIds: newDirtyEntryIds };
+                        return withDirtyEntryIds(newDirtyEntryIds);
                     },
                     false,
                     "clearDirtyEntryIds",

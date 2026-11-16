@@ -19,7 +19,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useDeletePortfolio = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { resume, updateResume, setDirty, removeDirtyEntryId, setActiveEntryId } = useResumeStore();
+    const { removeEntry, setActiveEntryId } = useResumeStore();
 
     return useMutation<AxiosResponse<void>, AxiosError<ErrorResponse>, string>({
         mutationFn: (portfolioId) => deletePortfolio(resumeId, portfolioId),
@@ -30,18 +30,12 @@ export const useDeletePortfolio = (resumeId: string, options?: { onResumeNotFoun
         onSuccess: (_, portfolioId) => {
             // エラーをクリア
             clearErrors();
-            // ローカルストアから削除したエントリーを除外
-            if (resume) {
-                const updatedPortfolios = resume.portfolios.filter((p) => p.id !== portfolioId);
-                updateResume({ portfolios: updatedPortfolios });
-            }
-            // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(portfolioId);
+            // ローカルストアから削除したエントリーを除外（未保存の印とエラーも外す）
+            removeEntry("portfolios", portfolioId);
             // 削除したエントリーを選択中だったときだけ選択を解除する
             if (useResumeStore.getState().activeEntryId === portfolioId) {
                 setActiveEntryId(null);
             }
-            setDirty(false);
             setNotification("ポートフォリオを削除しました。", "success");
         },
         onError: async (error) => {

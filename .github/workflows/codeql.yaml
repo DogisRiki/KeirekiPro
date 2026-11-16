@@ -84,6 +84,23 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # ci.yaml の backend-java が保存した Gradle の部品のキャッシュを読み込み、ビルドのたびの
+      # ダウンロードを省く。鍵と場所は ci.yaml の「Cache Gradle dependencies」と同じにする。
+      # 読み込むだけで保存しない(actions/cache/restore)。キャッシュに入っているのは部品の jar と
+      # Gradle の本体で、コンパイルの結果は入っていない(Gradle のビルドキャッシュは使っていない)。
+      # そのため、キャッシュがあっても Gradle は PR のコードを毎回コンパイルし、CodeQL が診断する
+      # 中身は変わらない。キャッシュが無いときは、今までどおりダウンロードして進む。
+      - name: Restore Gradle dependencies
+        if: matrix.language == 'java-kotlin'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'backend/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:

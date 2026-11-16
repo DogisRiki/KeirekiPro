@@ -1,6 +1,7 @@
 import { NotFound } from "@/components/errors";
 import { Button, Dialog, Loading } from "@/components/ui";
 import {
+    BASIC_INFO_ENTRY_ID,
     BottomMenu,
     buildPayloadForEntry,
     createCurrentSection,
@@ -59,7 +60,6 @@ export const ResumeContainer = () => {
     const activeEntryId = useResumeStore((state) => state.activeEntryId);
     const removeEntry = useResumeStore((state) => state.removeEntry);
     const setActiveEntryId = useResumeStore((state) => state.setActiveEntryId);
-    const isDirty = useResumeStore((state) => state.isDirty);
     const dirtyEntryIds = useResumeStore((state) => state.dirtyEntryIds);
 
     // タイトル取得
@@ -400,7 +400,9 @@ export const ResumeContainer = () => {
 
     // アクティブなエントリーが編集状態かどうかを判定
     const isActiveEntryDirty =
-        activeSection === "basicInfo" ? isDirty : activeEntryId !== null && dirtyEntryIds.has(activeEntryId);
+        activeSection === "basicInfo"
+            ? dirtyEntryIds.has(BASIC_INFO_ENTRY_ID)
+            : activeEntryId !== null && dirtyEntryIds.has(activeEntryId);
 
     return (
         <>

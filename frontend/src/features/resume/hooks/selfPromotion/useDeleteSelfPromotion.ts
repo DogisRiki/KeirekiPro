@@ -19,7 +19,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useDeleteSelfPromotion = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { resume, updateResume, setDirty, removeDirtyEntryId, setActiveEntryId } = useResumeStore();
+    const { removeEntry, setActiveEntryId } = useResumeStore();
 
     return useMutation<AxiosResponse<void>, AxiosError<ErrorResponse>, string>({
         mutationFn: (selfPromotionId) => deleteSelfPromotion(resumeId, selfPromotionId),
@@ -30,18 +30,12 @@ export const useDeleteSelfPromotion = (resumeId: string, options?: { onResumeNot
         onSuccess: (_, selfPromotionId) => {
             // エラーをクリア
             clearErrors();
-            // ローカルストアから削除したエントリーを除外
-            if (resume) {
-                const updatedSelfPromotions = resume.selfPromotions.filter((s) => s.id !== selfPromotionId);
-                updateResume({ selfPromotions: updatedSelfPromotions });
-            }
-            // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(selfPromotionId);
+            // ローカルストアから削除したエントリーを除外（未保存の印とエラーも外す）
+            removeEntry("selfPromotions", selfPromotionId);
             // 削除したエントリーを選択中だったときだけ選択を解除する
             if (useResumeStore.getState().activeEntryId === selfPromotionId) {
                 setActiveEntryId(null);
             }
-            setDirty(false);
             setNotification("自己PRを削除しました。", "success");
         },
         onError: async (error) => {

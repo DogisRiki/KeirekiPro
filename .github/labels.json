@@ -127,6 +127,12 @@
       "color": "ffa221"
     },
     {
+      "name": "go",
+      "group": "other",
+      "description": "Pull requests that update go code",
+      "color": "16e2e2"
+    },
+    {
       "name": "javascript",
       "group": "other",
       "description": "Pull requests that update javascript code",

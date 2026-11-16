@@ -18,6 +18,12 @@
 #      CODEOWNERSの必須レビューと二重の防御。品質チェックが何を調べるかを決めるファイルと、
 #      Go 版のコード生成の設定を含む。frontend/package.json と docker/terraform/Dockerfile は、
 #      依存の版のほかの欄や行が変わったときだけ赤にする。この2つは CODEOWNERS には載せない)
+#   7. 検査から一部を外す注釈の追加と、依存を別の部品に差し替える書き方への変更
+#      (リポジトリ所有者のApproveが無ければ赤。#856)
+#      - checkov と tflint の注釈(terraform/ の下)、gitleaks の注釈(すべてのファイル)、
+#        prettier の注釈(frontend/src/ の下)。道具が読まないファイルの注釈は何も外さないので見ない
+#      - frontend/package.json の依存の版の欄を、npm の公開の場所にある同じ名前の部品の版の
+#        ほかを指す書き方(npm: で別の名前を指す書き方、github: や file: などの指定、URL)に変える変更
 #
 # 差分の読み方について:
 #   ファイル名は `git diff -z --name-only` でNUL区切りの生のパスとして取得し、
@@ -326,6 +332,85 @@ if [ -n "$gate_files" ]; then
 $gate_files"
     else
         echo "ゲート設定ファイルの変更は所有者Approve済みのため通過します。" >>"${GITHUB_STEP_SUMMARY:-/dev/null}"
+    fi
+fi
+
+# --- 7. 検査から一部を外す注釈と、依存を別の部品に差し替える書き方(所有者Approveが必要) ---
+# どちらも、品質チェックの設定のファイルを変えずに、検査の対象を変えられる書き方である(#856)。
+# 注釈は足した行だけを見る。注釈を消す変更は検査を厳しくするので、承認を求めない
+approval_items=""
+add_approval_item() { # <見出し> <見つけた行>
+    [ -n "$2" ] || return 0
+    approval_items+="[$1]"$'\n'"$2"$'\n'
+}
+
+# checkov は checkov:skip= の注釈(古い名前の bridgecrew:skip= も読む)で、tflint は
+# tflint-ignore と tflint-ignore-file の注釈で、その箇所の検査を外す。どちらも terraform/ を調べる
+add_approval_item "checkov の検査を外す注釈" \
+    "$(added_lines_for '^terraform/' | grep -iE '(checkov|bridgecrew):skip' || true)"
+add_approval_item "tflint の検査を外す注釈" \
+    "$(added_lines_for '^terraform/' | grep -iE 'tflint-ignore' || true)"
+# gitleaks は、gitleaks:allow を書いた行を、秘密の情報の検査から外す。
+# gitleaks はリポジトリのすべてのファイルを調べるので、すべてのファイルで見る
+add_approval_item "gitleaks の検査を外す注釈" \
+    "$(added_lines_for '' | grep -iE 'gitleaks:allow' || true)"
+# prettier は、prettier-ignore を書いた次の箇所を、書式の検査から外す。prettier-ignore-start と、
+# Markdown の <!-- prettier-ignore --> も同じ文字で見つかる。CI の prettier は frontend/src/ を調べる
+add_approval_item "prettier の検査を外す注釈" \
+    "$(added_lines_for '^frontend/src/' | grep -iE 'prettier-ignore' || true)"
+
+# frontend/package.json の依存の版の欄のうち、npm の公開の場所にある同じ名前の部品の版を
+# 指さない書き方を、欄と依存の名前と指す先の組にして、1行に1つずつ出す。
+# 指す先は、npm: で名前を指す書き方で版が普通の書き方なら、その名前にする。
+# 指す名前を変えずに版だけを上げる変更を、承認なしで通すためである。
+# ほかの書き方(github: file: link: workspace: catalog:、git の指定、URL、ファイルの名前、
+# 利用者/リポジトリの形)は、書いた文字をそのまま指す先にし、少しでも変われば承認を求める
+package_json_substitutes() {
+    show_at "$1" frontend/package.json | jq -r '
+        # 普通の版の書き方: 版の範囲(^1.2.3、>=1 <2、1.x || 2 など)と、latest などの名札。
+        # . で始まる書き方と、.tgz と .tar と .tar.gz で終わる書き方は、ファイルを指すので除く
+        def plain:
+            type == "string"
+            and test("^[0-9A-Za-z.^~<>=|*+ -]*$")
+            and (test("^[.]") | not)
+            and (test("[.](tgz|tar|tar[.]gz)$"; "i") | not);
+        def target($name):
+            if type != "string" then tojson
+            elif plain then $name
+            elif test("^npm:(@[^@/]+/)?[^@/]+(@.*)?$") then
+                capture("^npm:(?<n>(@[^@/]+/)?[^@/]+)(@(?<v>.*))?$") as $m
+                | if (($m.v // "") | plain) then $m.n else . end
+            else . end;
+        ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"][] as $field
+        | (.[$field] // {}) | to_entries[]
+        | .key as $name
+        | (.value | target($name)) as $to
+        | select($to != $name)
+        | [$field, $name, $to] | @json
+    '
+}
+
+if printf '%s\n' "$changed_files" | grep -qxF 'frontend/package.json'; then
+    # head で読めないときは、読めないことを理由に素通りさせず、承認を求める。
+    # base で読めないとき(ファイルを足す PR など)は、head の差し替えをすべて新しいものとして扱う
+    if substitutes_after=$(package_json_substitutes "$HEAD_SHA" 2>/dev/null); then
+        substitutes_before=$(package_json_substitutes "$MERGE_BASE" 2>/dev/null) || substitutes_before=""
+        new_substitutes=$(LC_ALL=C comm -13 \
+            <(printf '%s\n' "$substitutes_before" | LC_ALL=C sort -u) \
+            <(printf '%s\n' "$substitutes_after" | LC_ALL=C sort -u) | grep . || true)
+        add_approval_item "frontend/package.json の依存を別の部品に差し替える書き方" "$new_substitutes"
+    else
+        add_approval_item "frontend/package.json の依存を別の部品に差し替える書き方" \
+            "frontend/package.json の依存の版の欄を読めませんでした"
+    fi
+fi
+
+if [ -n "$approval_items" ]; then
+    if [ "$OWNER_APPROVED" != "true" ]; then
+        report "検査から外す注釈と依存の差し替え(所有者未承認)" "以下の行は、品質チェックの対象から一部を外すか、依存を別の部品に差し替えます。リポジトリ所有者のApproveレビュー後にこのチェックは緑になります。
+$approval_items"
+    else
+        echo "検査から外す注釈と依存の差し替えは所有者Approve済みのため通過します。" >>"${GITHUB_STEP_SUMMARY:-/dev/null}"
     fi
 fi
 

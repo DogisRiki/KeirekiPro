@@ -19,7 +19,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useDeleteCareer = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { resume, updateResume, setDirty, removeDirtyEntryId, setActiveEntryId } = useResumeStore();
+    const { removeEntry, setActiveEntryId } = useResumeStore();
 
     return useMutation<AxiosResponse<void>, AxiosError<ErrorResponse>, string>({
         mutationFn: (careerId) => deleteCareer(resumeId, careerId),
@@ -30,18 +30,12 @@ export const useDeleteCareer = (resumeId: string, options?: { onResumeNotFound?:
         onSuccess: (_, careerId) => {
             // エラーをクリア
             clearErrors();
-            // ローカルストアから削除したエントリーを除外
-            if (resume) {
-                const updatedCareers = resume.careers.filter((c) => c.id !== careerId);
-                updateResume({ careers: updatedCareers });
-            }
-            // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(careerId);
+            // ローカルストアから削除したエントリーを除外（未保存の印とエラーも外す）
+            removeEntry("careers", careerId);
             // 削除したエントリーを選択中だったときだけ選択を解除する
             if (useResumeStore.getState().activeEntryId === careerId) {
                 setActiveEntryId(null);
             }
-            setDirty(false);
             setNotification("職歴を削除しました。", "success");
         },
         onError: async (error) => {

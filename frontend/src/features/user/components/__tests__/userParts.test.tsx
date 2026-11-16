@@ -60,11 +60,17 @@ describe("ProfileImageField", () => {
         expect(screen.getByTestId("PersonIcon")).toBeInTheDocument();
     });
 
+    it("ファイルの選択で、サーバーが受け付けるJPEG、PNG、GIFの画像だけを選べるようにすること", () => {
+        renderWithProviders(<ProfileImageField currentImage={null} onChange={vi.fn()} />);
+
+        expect(fileInput()).toHaveAttribute("accept", "image/jpeg,image/png,image/gif");
+    });
+
     it("カメラのボタンを押すと、ファイルの選択を開くこと", async () => {
         const openDialog = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
         const { user } = renderWithProviders(<ProfileImageField currentImage={null} onChange={vi.fn()} />);
 
-        await user.click(screen.getByRole("button"));
+        await user.click(screen.getByRole("button", { name: "プロフィール画像を変更" }));
 
         expect(openDialog).toHaveBeenCalledTimes(1);
     });

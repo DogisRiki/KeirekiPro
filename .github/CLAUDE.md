@@ -20,12 +20,27 @@
 `.github/scripts/tests/*.sh` は、必ずコンテナの中で流す。
 
 ```bash
-docker run --rm -v "$(pwd -W):/w:ro" alpine:3 sh -c 'apk add --no-cache bash jq >/dev/null 2>&1 && mkdir -p /t && cp -r /w/.github /t/ && chmod -R a-x /t/.github/scripts && bash /t/.github/scripts/tests/test-XXX.sh'
+docker run --rm -v "$(pwd -W):/w:ro" alpine:3 sh -c 'apk add --no-cache bash jq coreutils >/dev/null 2>&1 && mkdir -p /t && cp -r /w/.github /t/ && chmod -R a-x /t/.github/scripts && bash /t/.github/scripts/tests/test-XXX.sh'
 ```
 
 - ホストの前提は bash と perl だけで、`jq` が無いことがある。`jq` の無いホストで直に流すと、スクリプトがいつも失敗で終わり、失敗を期待するテストが誤った理由で通る。終了コードだけでなく、出力の中身も確かめる
 - `.github/scripts` のファイルには実行のビットが無い(`core.fileMode=false`)。テストからは `bash "$SCRIPT"` の形で起動する。直に起動すると、新しく clone した CI で `exit 126` になる
 - 作業フォルダをつなぐだけでは、CI のファイルの権限が再現しない。コンテナの中に写してから `chmod -R a-x` する
+- `apk add` の `coreutils` は、`timeout` と `date` を、CI の Ubuntu と同じ GNU の版にするために入れる。alpine の `timeout` と `date` は busybox の版で、時間切れのときの終了コードと、読める日時の形が GNU の版と違う。
+  `coreutils` が無いと、`test-close-linked-issues.sh` の時間切れのテストや、`test-check-audit-scan-freshness.sh` の日時を読むテストのように、CI では通るテストが手元でだけ落ちる
+
+PR を出す前には、GitHub Actions がジョブに入れる環境変数を入れた次の形でも、同じテストを流す。
+CI のジョブには、リポジトリの名前を入れる `GITHUB_REPOSITORY` や、ジョブの Summary のファイルの場所を入れる `GITHUB_STEP_SUMMARY` がいつも入っている。
+上の形のコンテナにはこれらの環境変数が無いので、環境変数を消し忘れたテストが、手元では通り、CI でだけ落ちる。
+
+```bash
+docker run --rm -v "$(pwd -W):/w:ro" -e CI=true -e GITHUB_ACTIONS=true -e GITHUB_REPOSITORY=DogisRiki/KeirekiPro -e GITHUB_REPOSITORY_OWNER=DogisRiki -e GITHUB_SERVER_URL=https://github.com -e GITHUB_RUN_ID=1 -e GITHUB_STEP_SUMMARY=/gha/step_summary -e GITHUB_OUTPUT=/gha/output -e GITHUB_ENV=/gha/env -e GITHUB_PATH=/gha/path -e RUNNER_TEMP=/gha/tmp alpine:3 sh -c 'apk add --no-cache bash jq git coreutils >/dev/null 2>&1 && mkdir -p /t /gha/tmp && touch /gha/step_summary /gha/output /gha/env /gha/path && cp -r /w/.github /t/ && chmod -R a-x /t/.github/scripts && bash /t/.github/scripts/tests/test-XXX.sh'
+```
+
+- 入れる環境変数は、`.github/scripts/` のスクリプトが読むものにそろえてある。スクリプトが GitHub Actions の別の環境変数を読むようになったら、このコマンドにも足す
+- CI のランナーでは、ファイルの場所を入れる環境変数が指すファイルが、ジョブの始めからある。このコマンドも、`touch` で先にファイルを作り、CI と同じ状態にしてからテストを流す
+- `apk add` の `git` は、テストの中で git のリポジトリを作るテスト(`test-check-go-release-age.sh` など)のために入れる。`git` が無いと、そのテストは環境変数と関係のない理由で落ち、環境変数で落ちるかを確かめられない
+- この形だけで落ちるテストは、テストの始めで `unset` を使い、そのテストが確かめない環境変数を消す
 
 shellcheck は、CI と同じく、すべての `.sh` を一度に渡す。変えたファイルだけを渡すと、`. "$LIB"` で読み込む先のファイルをたどらず、CI だけが警告を出す。CI は info と style の警告も失敗にする。
 

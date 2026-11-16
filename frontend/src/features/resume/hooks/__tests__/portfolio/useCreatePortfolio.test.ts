@@ -5,7 +5,7 @@ vi.mock("@/lib", () => ({
 }));
 
 import type { Resume } from "@/features/resume";
-import { TEMP_ID_PREFIX, useCreatePortfolio, useResumeStore } from "@/features/resume";
+import { buildPayloadForEntry, TEMP_ID_PREFIX, useCreatePortfolio, useResumeStore } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
@@ -62,7 +62,6 @@ describe("useCreatePortfolio", () => {
         vi.mocked(protectedApiClient.post).mockReset();
         vi.spyOn(useNotificationStore.getState(), "setNotification");
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setActiveEntryId");
         vi.spyOn(useResumeStore.getState(), "setEntryErrors");
@@ -138,7 +137,8 @@ describe("useCreatePortfolio", () => {
         });
         expect(useResumeStore.getState().setActiveEntryId).toHaveBeenCalledWith("portfolio-2");
         expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(tempId);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().dirtyEntryIds.has(tempId)).toBe(false);
+        expect(useResumeStore.getState().isDirty).toBe(true); // ほかのエントリーが未保存のまま残る
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith(
             "ポートフォリオを作成しました。",
             "success",
@@ -187,7 +187,53 @@ describe("useCreatePortfolio", () => {
         expect(useResumeStore.getState().setEntryErrors).toHaveBeenCalledWith(tempId, mockErrorResponse.errors);
 
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
-        expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
+        expect(useResumeStore.getState().removeDirtyEntryId).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
+    });
+    it("保存中に打った文字は、保存が終わったあとも作成されたエントリーの欄に残り、未保存の変更として扱われること", async () => {
+        const entry = localResume.portfolios.find((e) => e.id === tempId)!;
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().setActiveSection("portfolio");
+        useResumeStore.getState().setActiveEntryId(tempId);
+        useResumeStore.getState().addDirtyEntryId(tempId);
+
+        let resolveSave: (value: unknown) => void = () => undefined;
+        vi.mocked(protectedApiClient.post).mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveSave = resolve;
+            }),
+        );
+
+        const { result } = renderHook(() => useCreatePortfolio("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({ tempId, payload: buildPayloadForEntry("portfolio", entry) });
+        });
+        await waitFor(() => expect(protectedApiClient.post).toHaveBeenCalled());
+
+        // 保存が終わる前に文字を打つ
+        act(() => {
+            useResumeStore.getState().updateEntry("portfolios", tempId, { name: "保存中に打った文字" });
+        });
+        await act(async () => {
+            resolveSave({
+                status: 201,
+                data: {
+                    ...localResume,
+                    updatedAt: "2024-02-10T00:00:00.000Z",
+                    portfolios: [{ ...entry, id: "portfolio-new" }],
+                },
+            });
+        });
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        const { resume, dirtyEntryIds, activeEntryId, isDirty } = useResumeStore.getState();
+        expect(resume?.portfolios.find((e) => e.id === "portfolio-new")?.name).toBe("保存中に打った文字");
+        expect(resume?.portfolios.some((e) => e.id === tempId)).toBe(false);
+        expect(resume?.updatedAt).toBe("2024-02-10T00:00:00.000Z");
+        expect(activeEntryId).toBe("portfolio-new");
+        expect(dirtyEntryIds.has("portfolio-new")).toBe(true);
+        expect(dirtyEntryIds.has(tempId)).toBe(false);
+        expect(isDirty).toBe(true);
     });
 });

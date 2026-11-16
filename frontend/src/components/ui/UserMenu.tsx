@@ -1,6 +1,6 @@
 import { paths } from "@/config/paths";
 import { useLogout } from "@/hooks";
-import { useUserAuthStore } from "@/stores";
+import { useLeaveGuardStore, useUserAuthStore } from "@/stores";
 import LockIcon from "@mui/icons-material/Lock";
 import LogoutIcon from "@mui/icons-material/Logout";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
@@ -33,14 +33,17 @@ export const UserMenu = () => {
 
     const handleMenuClose = () => setAnchorEl(null);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         handleMenuClose();
+        // 保存していない変更があるときは、ログアウトする前に離れてよいかを確かめる
+        const { confirmLeave } = useLeaveGuardStore.getState();
+        if (confirmLeave && !(await confirmLeave())) return;
         logoutMutation.mutate();
     };
 
     const handleMenuItemClick = (item: (typeof userMenuItems)[0]) => {
         if (item.action === "logout") {
-            handleLogout();
+            void handleLogout();
         } else if (item.path) {
             navigate(item.path);
             handleMenuClose();

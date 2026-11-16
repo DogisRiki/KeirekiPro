@@ -245,6 +245,24 @@ docker_add_platform() { sed -i 's/^FROM hashicorp\/terraform:1.17.1/FROM --platf
 docker_change_image() { sed -i 's/hashicorp\/terraform:/example\/terraform:/' docker/terraform/Dockerfile; }
 docker_change_run() { echo 'RUN ln -sf /bin/true /usr/local/bin/tflint' >>docker/terraform/Dockerfile; }
 
+# 検査から一部を外す注釈と、依存を別の部品に差し替える書き方(#856)
+# 使い方: add_line <パス> <行>。ファイルが無ければフォルダごと作る
+add_line() { mkdir -p "$(dirname "$2")" && echo "$1" >>"$2"; }
+# いまの作業の状態を base にする。base にすでにある書き方を、消すか変える変更を試すため
+commit_as_base() {
+    git add -A && git commit -qm base2
+    BASE=$(git rev-parse HEAD)
+}
+# frontend/package.json の react の版の欄を、引数の文字に書き換える
+pkg_set_react() { sed -i "s#\"react\": \"\\^19.0.0\"#\"react\": \"$1\"#" frontend/package.json; }
+pkg_set_eslint() { sed -i "s#\"eslint\": \"\\^9.39.4\"#\"eslint\": \"$1\"#" frontend/package.json; }
+pkg_add_alias_dependency() { sed -i 's#"react": "\^19.0.0"#"react": "^19.0.0", "zod": "npm:zod-fork@^4.0.0"#' frontend/package.json; }
+# base にある npm: の書き方の、版か名前を書き換える
+pkg_alias_version_up() { sed -i 's#npm:preact-compat@3.0.0#npm:preact-compat@3.1.0#' frontend/package.json; }
+pkg_alias_rename() { sed -i 's#npm:preact-compat@3.0.0#npm:other-compat@3.0.0#' frontend/package.json; }
+pkg_alias_back_to_plain() { sed -i 's#"npm:preact-compat@3.0.0"#"^19.0.0"#' frontend/package.json; }
+pkg_url_version_up() { sed -i 's#react-19.0.0.tgz#react-19.1.0.tgz#' frontend/package.json; }
+
 echo "--- 対象外の変更 ---"
 seed
 touch_unrelated
@@ -573,6 +591,156 @@ seed
 docker_change_run
 approve
 run_check 0 "FROM のほかの行の変更は所有者の承認があれば通る"
+
+echo "--- 7. 検査から一部を外す注釈 ---"
+# 使い方: <期待exit> <パス> <足す行>
+for c in \
+    "1|terraform/main.tf|# checkov:skip=CKV_AWS_18: 理由" \
+    "1|terraform/modules/x/main.tf|  #checkov:skip=CKV_AWS_18" \
+    "1|terraform/main.tf|# bridgecrew:skip=CKV_AWS_18" \
+    "1|terraform/main.tf|# tflint-ignore: aws_instance_invalid_type" \
+    "1|terraform/modules/x/main.tf|# tflint-ignore-file: terraform_naming_convention" \
+    "1|README.md|token = \"abc\" # gitleaks:allow" \
+    "1|frontend/src/app.ts|const t = 'abc'; // gitleaks:allow" \
+    "1|backend/internal/sample/x.go|// GITLEAKS:ALLOW" \
+    "1|frontend/src/app.ts|// prettier-ignore" \
+    "1|frontend/src/feature/a.tsx|{/* prettier-ignore */}" \
+    "1|frontend/src/doc.md|<!-- prettier-ignore-start -->" \
+    "0|doc/main.tf|# checkov:skip=CKV_AWS_18" \
+    "0|doc/main.tf|# tflint-ignore: all" \
+    "0|doc/note.md|<!-- prettier-ignore -->" \
+    "0|frontend/e2e/a.spec.ts|// prettier-ignore" \
+    "0|terraform/main.tf|# checkov のことを書いた普通のコメント"; do
+    IFS='|' read -r want path line <<<"$c"
+    seed
+    add_line "$line" "$path"
+    run_check "$want" "$path に「$line」を足す変更は exit $want"
+done
+
+seed
+add_line "# checkov:skip=CKV_AWS_18" terraform/main.tf
+run_check 1 "checkov の注釈は所有者の承認が無ければ失敗する"
+check_summary "検査から外す注釈と依存の差し替え(所有者未承認)" "注釈が承認を求める変更として報告される"
+check_summary "checkov の検査を外す注釈" "checkov の注釈の見出しが報告される"
+check_summary "terraform/main.tf: # checkov:skip=CKV_AWS_18" "注釈を足したファイルと行が報告される"
+
+seed
+add_line "# tflint-ignore: all" terraform/main.tf
+run_check 1 "tflint の注釈は所有者の承認が無ければ失敗する"
+check_summary "tflint の検査を外す注釈" "tflint の注釈の見出しが報告される"
+
+seed
+add_line "x = 1 # gitleaks:allow" README.md
+run_check 1 "gitleaks の注釈は所有者の承認が無ければ失敗する"
+check_summary "gitleaks の検査を外す注釈" "gitleaks の注釈の見出しが報告される"
+
+seed
+add_line "// prettier-ignore" frontend/src/app.ts
+run_check 1 "prettier の注釈は所有者の承認が無ければ失敗する"
+check_summary "prettier の検査を外す注釈" "prettier の注釈の見出しが報告される"
+
+seed
+add_line "# checkov:skip=CKV_AWS_18" terraform/main.tf
+add_line "// prettier-ignore" frontend/src/app.ts
+approve
+run_check 0 "注釈は所有者の承認があれば通る"
+
+seed
+add_line "// prettier-ignore" frontend/src/app.ts
+add_line "# tflint-ignore: all" terraform/main.tf
+commit_as_base
+sed -i '/prettier-ignore/d' frontend/src/app.ts
+sed -i '/tflint-ignore/d' terraform/main.tf
+run_check 0 "注釈を消す変更は承認なしで通る"
+
+seed
+add_line "# tflint-ignore: all" terraform/main.tf
+commit_as_base
+add_line "resource \"x\" \"y\" {}" terraform/main.tf
+run_check 0 "注釈がすでにあるファイルのほかの行を変える変更は承認なしで通る"
+
+echo "--- 7b. 依存を別の部品に差し替える書き方 ---"
+# 使い方: <期待exit> <react の版の欄に書く文字>
+for c in \
+    "1|npm:evil-react@^19.0.0" \
+    "1|npm:@evil/react@^19.0.0" \
+    "1|npm:evil-react" \
+    "1|npm:react@github:evil/react" \
+    "1|github:evil/react" \
+    "1|evil/react" \
+    "1|git+https://example.com/evil/react.git" \
+    "1|https://example.com/react-19.0.0.tgz" \
+    "1|file:../vendor/react" \
+    "1|link:../vendor/react" \
+    "1|workspace:*" \
+    "1|catalog:" \
+    "1|react-19.0.0.tgz" \
+    "1|react-19.0.0.tar.gz" \
+    "0|npm:react@^19.1.0" \
+    "0|^19.1.0" \
+    "0|19.1.0" \
+    "0|~19.1.0" \
+    "0|>=19.0.0 <20.0.0" \
+    "0|19.x || 20.x" \
+    "0|19.1.0-rc.1" \
+    "0|latest" \
+    "0|*"; do
+    # 版の欄の文字が | を含むことがあるので、最初の | だけで分ける
+    want=${c%%|*}
+    spec=${c#*|}
+    seed
+    pkg_set_react "$spec"
+    run_check "$want" "依存の版の欄を「$spec」に変える変更は exit $want"
+done
+
+seed
+pkg_set_react "npm:evil-react@^19.0.0"
+run_check 1 "npm: で別の名前を指す変更は所有者の承認が無ければ失敗する"
+check_summary "frontend/package.json の依存を別の部品に差し替える書き方" "差し替えの見出しが報告される"
+check_summary '["dependencies","react","evil-react"]' "差し替えた欄と依存と、差し替えた先の名前が報告される"
+
+seed
+pkg_set_eslint "npm:evil-eslint@^9.39.4"
+run_check 1 "devDependencies の差し替えも所有者の承認が無ければ失敗する"
+
+seed
+pkg_add_alias_dependency
+run_check 1 "npm: で別の名前を指す依存を足す変更は所有者の承認が無ければ失敗する"
+
+seed
+pkg_set_react "npm:evil-react@^19.0.0"
+approve
+run_check 0 "依存の差し替えは所有者の承認があれば通る"
+
+seed
+pkg_set_react "npm:preact-compat@3.0.0"
+commit_as_base
+pkg_alias_version_up
+run_check 0 "npm: で指す名前を変えずに版だけを上げる変更は承認なしで通る"
+
+seed
+pkg_set_react "npm:preact-compat@3.0.0"
+commit_as_base
+pkg_alias_rename
+run_check 1 "npm: で指す名前を変える変更は所有者の承認が無ければ失敗する"
+
+seed
+pkg_set_react "npm:preact-compat@3.0.0"
+commit_as_base
+pkg_bump_versions
+run_check 0 "差し替えがすでにあるときに、ほかの依存の版を上げる変更は承認なしで通る"
+
+seed
+pkg_set_react "npm:preact-compat@3.0.0"
+commit_as_base
+pkg_alias_back_to_plain
+run_check 0 "差し替えを普通の版に戻す変更は承認なしで通る"
+
+seed
+pkg_set_react "https://example.com/react-19.0.0.tgz"
+commit_as_base
+pkg_url_version_up
+run_check 1 "URL の指定は版の部分だけを変えても所有者の承認が無ければ失敗する"
 
 echo "--- 変更ファイルの一覧が取れない場合 ---"
 seed

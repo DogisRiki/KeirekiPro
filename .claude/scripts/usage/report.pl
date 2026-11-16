@@ -299,10 +299,11 @@ sub read_jsonl {
 }
 
 # 使う量の上限が戻ったあとに、デスクトップアプリが会話を再開させた行を、turn の from が limit の行に書き換える。
-# デスクトップアプリが自分で入れた行は、extract.pl が、raw が host_synthetic の unknown の行として残す。
+# デスクトップアプリが自分で入れた行は、extract.pl が、turn の from が host の行として残す。
 # デスクトップアプリは、同じ種類の行を、上限のあとの再開のほかに、worktree の場所を知らせる文にも使う。
 # そのため、上限の印のあとで、まだ応答が無いうちに来た行だけを、上限のあとの再開とみなす。
 # 上限の印と再開の行の間に、裏で動かした仕事の知らせの行が来ることがあるので、応答の行だけで見分けをやめる。
+# 上限のあとの再開とみなさなかった host の行は、from を host のまま残し、idle_label がその前の時間を除く。
 # 抜き出し済みの記録の行も、読むたびにこの見分け方で扱うので、手元の記録のファイルは書き換えない
 sub relabel_host_resumes {
     my ($rows) = @_;
@@ -313,9 +314,8 @@ sub relabel_host_resumes {
             $after_limit = 1;
         } elsif ($k eq 'msg') {
             undef $after_limit;
-        } elsif ($k eq 'turn' && $after_limit && ($r->{from} // '') eq 'unknown' && ($r->{raw} // '') eq 'host_synthetic') {
+        } elsif ($k eq 'turn' && $after_limit && ($r->{from} // '') eq 'host') {
             $r->{from} = 'limit';
-            delete $r->{raw};
             undef $after_limit;
         }
     }
@@ -806,13 +806,14 @@ sub run_spans {
 }
 
 # 応答の終わりのあとの区間の分け方。次の行を始めた者が、所有者、ほかのセッションの知らせ、補助役の知らせ、
-# 上限が戻ったあとの再開の知らせなら除き、それ以外なら待ちにする。あとに行が無ければ除く
+# 上限が戻ったあとの再開の知らせ、デスクトップアプリが自分で入れた行なら除き、それ以外なら待ちにする。
+# デスクトップアプリが自分で入れた行の前は、AI が外の仕組みを待っていた時間ではないので除く。あとに行が無ければ除く
 sub idle_label {
     my ($r, $jobs) = @_;
     return 'skip' unless $r;
     return 'wait' unless ($r->{k} // '') eq 'turn';
     my $from = $r->{from} // '';
-    return 'skip' if $from eq 'owner' || $from eq 'peer' || $from eq 'limit';
+    return 'skip' if $from eq 'owner' || $from eq 'peer' || $from eq 'limit' || $from eq 'host';
     return 'skip' if $from eq 'notice' && defined $r->{job} && !ref $r->{job} && ($jobs->{ $r->{job} } // '') eq 'agent';
     return 'wait';
 }

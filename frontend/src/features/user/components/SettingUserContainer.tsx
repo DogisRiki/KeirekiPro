@@ -3,6 +3,7 @@ import {
     createUserSettingMessages,
     isProviderRemovable,
     isTwoFactorDisabled,
+    PROFILE_IMAGE_TYPES,
     SettingUserForm,
     useDeleteUser,
     useRemoveAuthProvider,
@@ -29,8 +30,11 @@ export const SettingUserContainer = () => {
 
     const [username, setUsername] = useState(user?.username ?? "");
     const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
-    const [profileImageUrl, setProfileImageUrl] = useState<string | null>(user?.profileImage ?? null);
-    const [twoFactor, setTwoFactor] = useState<boolean>(user?.twoFactorAuthEnabled ?? false);
+    // 選んだ画像のプレビュー。選んでいないときは今の画像を出す
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    // 利用者が触ったスイッチの値。触っていないときは、サーバーから届いた最新の設定を出す
+    const [twoFactorInput, setTwoFactorInput] = useState<boolean | null>(null);
+    const twoFactor = twoFactorInput ?? user?.twoFactorAuthEnabled ?? false;
 
     const twoFactorDisabled = isTwoFactorDisabled(user);
     const canRemoveProvider = isProviderRemovable(user);
@@ -53,11 +57,25 @@ export const SettingUserContainer = () => {
         }
     }, [isSuccess, data, setLogin]);
 
+    // 画像を選び直したときと画面を離れるときに、前のプレビューをブラウザのメモリから外す
+    useEffect(() => {
+        if (!previewUrl) return;
+        return () => URL.revokeObjectURL(previewUrl);
+    }, [previewUrl]);
+
     /**
      * 画像選択ハンドラ
      */
     const handleProfileImageChange = (file: File | null) => {
         if (!file) return;
+
+        if (!PROFILE_IMAGE_TYPES.includes(file.type)) {
+            setErrors({
+                message: "プロフィール画像はJPEG、PNG、GIFのいずれかである必要があります。",
+                errors: {},
+            });
+            return;
+        }
 
         if (file.size > MAX_FILE_SIZE) {
             setErrors({
@@ -68,7 +86,7 @@ export const SettingUserContainer = () => {
         }
 
         setProfileImageFile(file);
-        setProfileImageUrl(URL.createObjectURL(file));
+        setPreviewUrl(URL.createObjectURL(file));
     };
 
     const handleSave = useCallback(() => {
@@ -94,11 +112,11 @@ export const SettingUserContainer = () => {
             pendingEmail={user.pendingEmail}
             username={username}
             onUsernameChange={setUsername}
-            profileImageUrl={profileImageUrl}
+            profileImageUrl={previewUrl ?? user.profileImage}
             onProfileImageChange={handleProfileImageChange}
             twoFactorEnabled={twoFactor}
             twoFactorDisabled={twoFactorDisabled}
-            onToggleTwoFactor={setTwoFactor}
+            onToggleTwoFactor={setTwoFactorInput}
             authProviders={user.authProviders}
             canRemoveProvider={canRemoveProvider}
             onRemoveProvider={(p) => removeProviderMutation.mutate(p)}

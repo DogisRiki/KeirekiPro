@@ -19,7 +19,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useDeleteSnsPlatform = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { resume, updateResume, setDirty, removeDirtyEntryId, setActiveEntryId } = useResumeStore();
+    const { removeEntry, setActiveEntryId } = useResumeStore();
 
     return useMutation<AxiosResponse<void>, AxiosError<ErrorResponse>, string>({
         mutationFn: (snsPlatformId) => deleteSnsPlatform(resumeId, snsPlatformId),
@@ -30,18 +30,12 @@ export const useDeleteSnsPlatform = (resumeId: string, options?: { onResumeNotFo
         onSuccess: (_, snsPlatformId) => {
             // エラーをクリア
             clearErrors();
-            // ローカルストアから削除したエントリーを除外
-            if (resume) {
-                const updatedSnsPlatforms = resume.snsPlatforms.filter((s) => s.id !== snsPlatformId);
-                updateResume({ snsPlatforms: updatedSnsPlatforms });
-            }
-            // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(snsPlatformId);
+            // ローカルストアから削除したエントリーを除外（未保存の印とエラーも外す）
+            removeEntry("snsPlatforms", snsPlatformId);
             // 削除したエントリーを選択中だったときだけ選択を解除する
             if (useResumeStore.getState().activeEntryId === snsPlatformId) {
                 setActiveEntryId(null);
             }
-            setDirty(false);
             setNotification("SNSを削除しました。", "success");
         },
         onError: async (error) => {

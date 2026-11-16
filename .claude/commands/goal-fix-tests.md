@@ -1,6 +1,6 @@
 ---
 description: テスト修復ゴール。対象領域のテストが成功するまで修正を続ける(最大8ターン)
-argument-hint: [frontend|backend] [対象テストの説明(任意)]
+argument-hint: [frontend|backend|backend-go] [対象テストの説明(任意)]
 ---
 
 テスト修復に向けたゴール駆動の作業を開始する。対象: $ARGUMENTS
@@ -9,8 +9,10 @@ argument-hint: [frontend|backend] [対象テストの説明(任意)]
 
 - 対象領域のテストコマンドが exit 0 で成功している
   - frontend: `bash .claude/scripts/parallel/run-check.sh frontend pnpm test`
-  - backend: `bash .claude/scripts/parallel/run-check.sh backend ./gradlew test`
-  - 単発のテスト(`npx vitest run <ファイル>`、`./gradlew test --tests <テストクラス>` など)も、`run-check.sh` で打つ
+  - backend(Java 版): `bash .claude/scripts/parallel/run-check.sh backend ./gradlew test`
+  - backend-go(Go 版): `bash .claude/scripts/parallel/run-check.sh backend-go make test`
+  - 単発のテスト(`npx vitest run <ファイル>`、`./gradlew test --tests <テストクラス>`、`go test -race -run '<テスト関数の名前>' ./<パッケージのフォルダ>` など)も、`run-check.sh` で打つ
+  - Go 版のテストは、結合テストが testcontainers-go で Postgres と Redis を動かすので、`/verify-backend` の Go 版の手順と同じく Bash の `run_in_background` で呼ぶ
   - `run-check.sh` の終了コード10・69・75は、コマンドを動かしていない。これらの扱いは `/verify-frontend` と `/verify-backend` の「順番待ちと検査できないとき」に従う。Claude は、69と75をテストの成功として数えず、修正のターンを使わずに理由を所有者に報告する
 - 既存テストファイルの削除・skip化・アサーション削除を行っていない
 
@@ -21,7 +23,7 @@ argument-hint: [frontend|backend] [対象テストの説明(任意)]
 
 ## 禁止事項
 
-- テストのskip/only/@Disabledの追加
+- テストのskip/only/@Disabled/`t.Skip` の追加
 - アサーションの削除・弱体化(期待値をテストが通る値に書き換えるだけの修正を含む。
   期待値が誤っていた場合は、その根拠を報告に含める)
 - テストファイルそのものの削除

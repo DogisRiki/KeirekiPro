@@ -12,7 +12,7 @@ vi.mock("use-debounce", () => ({
 }));
 
 import type { Resume } from "@/features/resume";
-import { TEMP_ID_PREFIX, useAutoSave, useResumeStore } from "@/features/resume/";
+import { BASIC_INFO_ENTRY_ID, TEMP_ID_PREFIX, useAutoSave, useResumeStore } from "@/features/resume/";
 import { renderHook, waitFor } from "@testing-library/react";
 
 describe("useAutoSave", () => {
@@ -75,7 +75,7 @@ describe("useAutoSave", () => {
 
     it("enabledがtrueでisDirtyがtrueのとき、debouncedSaveが呼ばれ、basicInfoの場合はupdateBasicMutationが呼ばれること", async () => {
         useResumeStore.getState().setResume(baseResume);
-        useResumeStore.getState().setDirty(true); // activeSectionは初期値でbasicInfo
+        useResumeStore.getState().addDirtyEntryId(BASIC_INFO_ENTRY_ID); // activeSectionは初期値でbasicInfo
 
         const opts = buildOptions();
 
@@ -112,7 +112,7 @@ describe("useAutoSave", () => {
 
     it("isDirtyがfalseのとき、debouncedSaveが呼ばれないこと", async () => {
         useResumeStore.getState().setResume(baseResume);
-        useResumeStore.getState().setDirty(false);
+        useResumeStore.getState().clearDirtyEntryIds([...useResumeStore.getState().dirtyEntryIds]);
 
         const opts = buildOptions({ enabled: true });
 
@@ -124,12 +124,26 @@ describe("useAutoSave", () => {
         });
     });
 
+    it("basicInfoを表示中でも、基本情報が未保存でなくほかのエントリーだけが未保存なら、基本情報を保存しないこと", async () => {
+        useResumeStore.getState().setResume(baseResume);
+        useResumeStore.getState().addDirtyEntryId("career-1");
+
+        const opts = buildOptions();
+
+        renderHook(() => useAutoSave(opts));
+
+        await waitFor(() => {
+            expect(mockDebouncedFn).toHaveBeenCalled();
+        });
+
+        expect(opts.updateBasicMutation.mutate).not.toHaveBeenCalled();
+    });
+
     it("careerセクションでactiveEntryIdがdirtyの場合、既存IDならupdateCareerMutationが呼ばれること", async () => {
         useResumeStore.getState().setResume(baseResume);
         useResumeStore.getState().setActiveSection("career");
         useResumeStore.getState().setActiveEntryId("career-1");
         useResumeStore.getState().addDirtyEntryId("career-1");
-        useResumeStore.getState().setDirty(true);
 
         const opts = buildOptions();
 
@@ -171,7 +185,6 @@ describe("useAutoSave", () => {
         useResumeStore.getState().setActiveSection("career");
         useResumeStore.getState().setActiveEntryId(tempCareerId);
         useResumeStore.getState().addDirtyEntryId(tempCareerId);
-        useResumeStore.getState().setDirty(true);
 
         const opts = buildOptions();
 
@@ -211,7 +224,6 @@ describe("useAutoSave", () => {
         useResumeStore.getState().setActiveSection("snsPlatform");
         useResumeStore.getState().setActiveEntryId(tempSnsPlatformId);
         useResumeStore.getState().addDirtyEntryId(tempSnsPlatformId);
-        useResumeStore.getState().setDirty(true);
 
         const opts = buildOptions();
 
@@ -237,8 +249,8 @@ describe("useAutoSave", () => {
         useResumeStore.getState().setResume(baseResume);
         useResumeStore.getState().setActiveSection("career");
         useResumeStore.getState().setActiveEntryId("career-1");
-        // dirtyEntryIdsに入れない
-        useResumeStore.getState().setDirty(true);
+        // 表示中のエントリーはdirtyEntryIdsに入れず、ほかのエントリーだけを未保存にする
+        useResumeStore.getState().addDirtyEntryId("career-other");
 
         const opts = buildOptions();
 
@@ -257,7 +269,6 @@ describe("useAutoSave", () => {
         useResumeStore.getState().setActiveSection("career");
         useResumeStore.getState().setActiveEntryId("career-1");
         useResumeStore.getState().addDirtyEntryId("career-1");
-        useResumeStore.getState().setDirty(true);
 
         const opts = buildOptions({
             updateCareerMutation: createMockMutation(true), // pending

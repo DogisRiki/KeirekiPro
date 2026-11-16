@@ -5,7 +5,7 @@ vi.mock("@/lib", () => ({
 }));
 
 import type { Resume } from "@/features/resume";
-import { TEMP_ID_PREFIX, useResumeStore, useUpdateCertification } from "@/features/resume";
+import { buildPayloadForEntry, TEMP_ID_PREFIX, useResumeStore, useUpdateCertification } from "@/features/resume";
 import { protectedApiClient } from "@/lib";
 import { useNotificationStore } from "@/stores";
 import { createQueryWrapper, resetStoresAndMocks } from "@/test";
@@ -56,7 +56,6 @@ describe("useUpdateCertification", () => {
         vi.mocked(protectedApiClient.get).mockReset();
         vi.spyOn(useNotificationStore.getState(), "setNotification");
         vi.spyOn(useResumeStore.getState(), "updateResumeFromServer");
-        vi.spyOn(useResumeStore.getState(), "setDirty");
         vi.spyOn(useResumeStore.getState(), "removeDirtyEntryId");
         vi.spyOn(useResumeStore.getState(), "setEntryErrors");
         vi.spyOn(useResumeStore.getState(), "clearEntryErrors");
@@ -131,7 +130,8 @@ describe("useUpdateCertification", () => {
             updatedAt: serverResume.updatedAt,
         });
         expect(useResumeStore.getState().removeDirtyEntryId).toHaveBeenCalledWith(certificationId);
-        expect(useResumeStore.getState().setDirty).toHaveBeenCalledWith(false);
+        expect(useResumeStore.getState().dirtyEntryIds.has(certificationId)).toBe(false);
+        expect(useResumeStore.getState().isDirty).toBe(true); // ほかのエントリーが未保存のまま残る
         expect(useNotificationStore.getState().setNotification).toHaveBeenCalledWith("資格を更新しました。", "success");
     });
 
@@ -179,7 +179,7 @@ describe("useUpdateCertification", () => {
         );
 
         expect(useResumeStore.getState().updateResumeFromServer).not.toHaveBeenCalled();
-        expect(useResumeStore.getState().setDirty).not.toHaveBeenCalled();
+        expect(useResumeStore.getState().removeDirtyEntryId).not.toHaveBeenCalled();
         expect(useNotificationStore.getState().setNotification).not.toHaveBeenCalled();
     });
 
@@ -213,5 +213,40 @@ describe("useUpdateCertification", () => {
         await waitFor(() => expect(useResumeStore.getState().resume?.certifications).toEqual([]));
         expect(protectedApiClient.get).toHaveBeenCalledWith("/resumes/resume-1");
         expect(useResumeStore.getState().activeEntryId).toBeNull();
+    });
+
+    it("保存中に打った文字は、保存が終わったあとも欄に残り、未保存の変更として扱われること", async () => {
+        const entry = localResume.certifications[0];
+        useResumeStore.getState().setResume(localResume);
+        useResumeStore.getState().addDirtyEntryId(entry.id);
+
+        let resolveSave: (value: unknown) => void = () => undefined;
+        vi.mocked(protectedApiClient.put).mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveSave = resolve;
+            }),
+        );
+
+        const { result } = renderHook(() => useUpdateCertification("resume-1"), { wrapper });
+
+        act(() => {
+            result.current.mutate({ certificationId: entry.id, payload: buildPayloadForEntry("certification", entry) });
+        });
+        await waitFor(() => expect(protectedApiClient.put).toHaveBeenCalled());
+
+        // 保存が終わる前に文字を打つ
+        act(() => {
+            useResumeStore.getState().updateEntry("certifications", entry.id, { name: "保存中に打った文字" });
+        });
+        await act(async () => {
+            resolveSave({ status: 200, data: { ...localResume, updatedAt: "2024-02-10T00:00:00.000Z" } });
+        });
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        const { resume, dirtyEntryIds, isDirty } = useResumeStore.getState();
+        expect(resume?.certifications.find((e) => e.id === entry.id)?.name).toBe("保存中に打った文字");
+        expect(resume?.updatedAt).toBe("2024-02-10T00:00:00.000Z");
+        expect(dirtyEntryIds.has(entry.id)).toBe(true);
+        expect(isDirty).toBe(true);
     });
 });

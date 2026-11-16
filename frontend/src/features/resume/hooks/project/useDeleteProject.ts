@@ -19,7 +19,7 @@ import type { AxiosError, AxiosResponse } from "axios";
 export const useDeleteProject = (resumeId: string, options?: { onResumeNotFound?: ResumeNotFoundHandler }) => {
     const { clearErrors } = useErrorMessageStore();
     const { setNotification } = useNotificationStore();
-    const { resume, updateResume, setDirty, removeDirtyEntryId, setActiveEntryId } = useResumeStore();
+    const { removeEntry, setActiveEntryId } = useResumeStore();
 
     return useMutation<AxiosResponse<void>, AxiosError<ErrorResponse>, string>({
         mutationFn: (projectId) => deleteProject(resumeId, projectId),
@@ -30,18 +30,12 @@ export const useDeleteProject = (resumeId: string, options?: { onResumeNotFound?
         onSuccess: (_, projectId) => {
             // エラーをクリア
             clearErrors();
-            // ローカルストアから削除したエントリーを除外
-            if (resume) {
-                const updatedProjects = resume.projects.filter((p) => p.id !== projectId);
-                updateResume({ projects: updatedProjects });
-            }
-            // 後処理: dirty状態のリセットと通知
-            removeDirtyEntryId(projectId);
+            // ローカルストアから削除したエントリーを除外（未保存の印とエラーも外す）
+            removeEntry("projects", projectId);
             // 削除したエントリーを選択中だったときだけ選択を解除する
             if (useResumeStore.getState().activeEntryId === projectId) {
                 setActiveEntryId(null);
             }
-            setDirty(false);
             setNotification("プロジェクトを削除しました。", "success");
         },
         onError: async (error) => {
