@@ -1,6 +1,14 @@
 # タスク
 
-この spec のタスクは、design.md の「移行」の節の「段階ごとの PR」に合わせて、大タスク1つを PR 1つに当てる。大タスク1は PR 2-1、大タスク2は PR 2-2、大タスク3は PR 2-3、大タスク4は PR 2-4、大タスク5は PR 2-5、大タスク6は PR 4-1、大タスク7は PR 4-2、大タスク8は PR 4-3 である。大タスク9は段階5の確認と記録、大タスク10から14は段階6の PR 6-1 から 6-5 である。大タスク15は PR 2-6 である。大タスク15は、大タスク4の PR が main に入ったあとに足したタスクなので、番号が最後になっている。Claude は、大タスク15を大タスク5より先に行う。そのため、大タスク15は、この一覧の大タスク4と大タスク5の間に置いてある。段階3の機能のまとまりの Go 版は、まとまりの spec で作るので、この tasks.md には無い。この spec の進め方は、末尾の「実装のメモ」に書いてある。
+この spec のタスクは、design.md の「移行」の節の「段階ごとの PR」に合わせて、大タスク1つを PR 1つに当てる。大タスク1は PR 2-1、大タスク2は PR 2-2、大タスク3は PR 2-3、大タスク4は PR 2-4、大タスク5は PR 2-5、大タスク6は PR 4-1、大タスク7は PR 4-2、大タスク8は PR 4-3 である。大タスク9は段階5の確認と記録、大タスク10から14は段階6の PR 6-1 から 6-5 である。
+
+大タスク15は PR 2-6 である。大タスク15は、大タスク4の PR が main に入ったあとに足したタスクなので、番号が最後になっている。Claude は、大タスク15を大タスク5より先に行う。そのため、大タスク15は、この一覧の大タスク4と大タスク5の間に置いてある。
+
+大タスク16は、大タスク3の PR 2-3 が main に入ったあとに、所有者が要件9と要件10の直しを承認し、Claude が設計の「pdfcmp」と「changed-behaviors.yaml」の節を直したために足したタスクである。大タスク16の PR は、PR 2-3 で main に入れた PDF の比べ方と、比べるデータと、変えた動きの一覧を、直した要件と設計に合わせる。design.md の「段階ごとの PR」の表には、大タスク16の PR の行が無い。大タスク16の PR が変えるファイルは、`backend/compat/` の下のファイルと progress.md だけなので、所有者の承認は要らない。Claude は、大タスク16を、出力のまとまりの spec の実装と大タスク6より先に行う。出力のまとまりの spec は、大タスク16で直した PDF の比べ方と、足したデータを使うためである。そのため、大タスク16は、この一覧の大タスク5と大タスク6の間に置いてある。
+
+段階3の機能のまとまりの Go 版は、まとまりの spec で作るので、この tasks.md には無い。
+
+この spec の進め方は、末尾の「実装のメモ」に書いてある。
 
 - [x] 1. ゲート設定を Go 版に対応させる(PR 2-1)
 - [x] 1.1 run-check.sh に領域 backend-go を足す
@@ -140,7 +148,7 @@
 
   Claude は、`backend/internal/httpapi/server.go`、`middleware/`、`health.go` を作る。Claude は、中間処理を、パニックの受け止め、要求のログ、偽の送信の検査、ログインの状態の検査の差し込み口の順に並べる。パニックとは、Go のプログラムが、処理を続けられない誤りに当たって、その処理を途中で打ち切ることである。HTTP の受け口の共通部分は、まだ作っていない操作への要求に、501 と `{"message":"未実装です。"}` を返す。HTTP の受け口の共通部分は、仕様書に無い経路への要求に 404 を返す。HTTP の受け口の共通部分は、`/actuator/health` と `/healthz` への要求を受けると、データベースに `SELECT 1` を送り、200 と `{"status":"UP"}` か、503 と `{"status":"DOWN"}` を返す。HTTP の受け口の共通部分は、形の誤った要求に、Java 版と同じ `{message, errors}` の形の本文で 400 を返す。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/httpapi/...` が成功する
-  - 受入基準とテストの対応: 要件9の受入基準4(偽の要求を断る)は `csrf_test.go` の `TestCSRF_MismatchReturns403WithNewCookie`、`TestCSRF_GetPasses`、`TestCSRF_RunsBeforeAuth` で、要件9の受入基準1と2(同じ URL とエラーの形)は `server_test.go` の `TestUnimplementedReturns501`、`TestBadJSONReturns400MessageErrors` で、要件9の受入基準5(Go の標準の形への変更を許す)の土台は `TestPanicReturns500JavaBody` で、要件14の受入基準3(本番で説明画面を開けない)は `TestUnknownRouteReturns404`(`/swagger-ui/index.html` と `/v3/api-docs` に 404)で、生きているかの確認は `health_test.go` の `TestHealth_UpAndDown` で確かめる
+  - 受入基準とテストの対応: 要件9の受入基準4(偽の要求を断る)は `csrf_test.go` の `TestCSRF_MismatchReturns403WithNewCookie`、`TestCSRF_GetPasses`、`TestCSRF_RunsBeforeAuth` で、要件9の受入基準1と2(同じ URL とエラーの形)は `server_test.go` の `TestUnimplementedReturns501`、`TestBadJSONReturns400MessageErrors` で、要件9の受入基準5(Go の標準の形への変更を許す)の土台は `TestPanicReturns500JavaBody` で、要件14の受入基準3(本番で API の説明画面を開けない)は `TestUnknownRouteReturns404`(`/swagger-ui/index.html` と `/v3/api-docs` に 404)で、生きているかの確認は `health_test.go` の `TestHealth_UpAndDown` で確かめる
   - _要件: 9.1, 9.2, 9.4, 9.5, 14.2, 14.3_
 
 - [x] 2.9 PDF を作る部品を作る (並行可)
@@ -190,7 +198,7 @@
 - [x] 3. Java 版と Go 版を比べる検査を入れる(PR 2-3)
 - [x] 3.1 Java 版と Go 版を比べる検査の土台を作る
 
-  Claude は、`backend/compat/harness/`(ビルドタグ `compat`)に、次の3つの処理を作る。1つ目は、`KEIREKIPRO_REPO_ROOT` から design.md の6つのイメージを testcontainers-go の Dockerfile からの組み立てで作る処理である。2つ目は、検査ごとに Docker のネットワークを1つ作り、`java` `go` `fakeaws` `fakeoidc` などの名前でコンテナを入れる処理である。3つ目は、筋書きのファイルを読む処理である。harness は、コンテナの起動を5分で、1つの要求を60秒で打ち切り、失敗したら両方の版のコンテナのログを残す。harness は、検査の始めに、各データベースに migrate の `Apply` で V1〜V7 を適用する。harness は、Go 版のコンテナを起動するときに、起動から `/healthz` が 200 を返すまでの時間を測り、10秒を超えたら検査を失敗にする。
+  Claude は、`backend/compat/harness/`(ビルドタグ `compat`)に、次の3つの処理を作る。ビルドタグとは、組み立てるときに `-tags` でその名前を指定した場合だけ、そのファイルを組み立てに含める Go の指定である。1つ目は、`KEIREKIPRO_REPO_ROOT` から design.md の6つのイメージを testcontainers-go の Dockerfile からの組み立てで作る処理である。2つ目は、検査ごとに Docker のネットワークを1つ作り、`java` `go` `fakeaws` `fakeoidc` などの名前でコンテナを入れる処理である。3つ目は、筋書きのファイルを読む処理である。harness は、コンテナの起動を5分で、1つの要求を60秒で打ち切り、失敗したら両方の版のコンテナのログを残す。harness は、検査の始めに、各データベースに migrate の `Apply` で V1〜V7 を適用する。harness は、Go 版のコンテナを起動するときに、起動から `/healthz` が 200 を返すまでの時間を測り、10秒を超えたら検査を失敗にする。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` が成功する
   - 受入基準とテストの対応: 要件4の受入基準5(同じ要求を送って Java 版と Go 版を比べる検査を作る)の土台は、`harness_test.go` の `TestLoadScenario_ParsesSteps`、`TestLoadScenario_RejectsUnknownMode`、`TestNetwork_ContainersResolveByName` で、Go 版の本番のイメージの起動の時間は `TestStartup_Over10sFails` と `TestStartup_Within10sPasses` で確かめる
   - _要件: 4.5_
@@ -227,7 +235,7 @@
 
 - [x] 3.6 PDF の比べ方を作る (並行可)
 
-  Claude は、`backend/compat/pdfcmp/`(ビルドタグ `compat`)を作る。pdfcmp は、design.md の「pdfcmp」の表の6つを poppler-utils で読んで比べ、語の位置は 2pt、文字の大きさは 0.5pt、表の色は RGB のそれぞれ 2 まで許す。フォントの名前は先頭の6文字の付け足しを除き、ページの文字は「～」(U+FF5E)を「〜」(U+301C)に直してから比べる。
+  Claude は、`backend/compat/pdfcmp/`(ビルドタグ `compat`)を作る。pdfcmp は、design.md の「pdfcmp」の表の6つを poppler-utils で読んで比べ、語の位置は 2pt、文字の大きさは 0.5pt、表の色は RGB のそれぞれ 2 まで許す。Claude は、大タスク16で、文字の大きさ(語の箱の高さ)の違いとして許す大きさを 0.35pt に狭める。pdfcmp は、フォントの名前は先頭の6文字の付け足しを除き、ページの文字は「～」(U+FF5E)を「〜」(U+301C)に直してから比べる。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/pdfcmp/...` が成功する
   - 受入基準とテストの対応: 要件10の受入基準1と4(配置、フォント、文字の大きさ、表の色、改頁の位置を比べる方法と許す違い)は、`pdfcmp_test.go` の `TestCompare_Allows2ptShift`、`TestCompare_Rejects2_5ptShift`、`TestCompare_RejectsOneCharDiff`、`TestCompare_RejectsPageBreakDiff`、`TestCompare_FontSubsetPrefixIgnored`、`TestCompare_TableColorTolerance` で確かめる
   - _要件: 10.1, 10.3, 10.4_
@@ -235,7 +243,7 @@
 
 - [x] 3.7 比べる経歴書とバックアップと画像の初めのデータを置く
 
-  Claude は、`backend/compat/fixtures/` に、利用者の初めのデータと、`resumes/` の4種類の経歴書と、バックアップと画像のファイルを置く。4種類の経歴書は、項目が空の経歴書、職歴と案件が多く3ページ以上になる経歴書、長い文と改行を含む経歴書、2つのフォントのそれぞれを選んだ経歴書である。どのデータを使うかは、Claude が、まとまりの spec で作る筋書きに書く。
+  Claude は、`backend/compat/fixtures/` に、利用者の初めのデータと、`resumes/` の4種類の経歴書と、バックアップと画像のファイルを置く。4種類の経歴書は、項目が空の経歴書、職歴と案件が多く3ページ以上になる経歴書、長い文と改行を含む経歴書、2つのフォントのそれぞれを選んだ経歴書である。5種類目の、文字の大きさと表の見出しの色を既定と違う値にした経歴書は、Claude が大タスク16で足す。どのデータを使うかは、Claude が、まとまりの spec で作る筋書きに書く。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` の `TestFixtures_AllLoadable` が成功する
   - 受入基準とテストの対応: 要件10の受入基準3(いろいろな経歴書のデータで比べる)は、`fixtures_test.go` の `TestFixtures_AllLoadable` と `TestFixtures_ResumeKindsPresent` で確かめる
   - _要件: 10.3_
@@ -244,12 +252,12 @@
 
   Claude は、`backend/compat/cross_test.go` と harness の版をまたぐ動かし方を作る。harness は、版をまたぐ動かし方では、Java 版と Go 版を1つの Postgres と1つの Redis と1つの fakeaws につなぎ、筋書きごとに、Java 版から Go 版へ、Go 版から Java 版へ、2つの版へ交互に、の3つの送り先の組を試し、最後の段でもう一方の版から保存した内容を読む。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat -run Cross ./compat/...` が成功する
-  - 受入基準とテストの対応: 要件13の受入基準1から4と6(切り替えの間と後に、操作が失敗せず、保存が消えず、ログアウトされず、途中の手順をまたぐ操作を終えられることを、切り替えの前に版をまたいで確かめる)と要件5の受入基準6(戻してもログアウトされず保存が残る)の土台は、`cross_test.go` の `TestCross_SelfPairPasses`(同じイメージを両方の位置に置いた筋書きが通る)、`TestCross_WrongStatusFailsWithStepAndDirection`、`TestCross_ThreeDirectionsRun` で確かめる。10の操作の筋書きは、Claude が、まとまりの spec で足す
+  - 受入基準とテストの対応: 要件13の受入基準1から4と6(切り替えの間と後も、利用者の操作が成功し、保存が残り、利用者がログインしたままでいられ、途中の手順をまたぐ操作を終えられることを、切り替えの前に版をまたいで確かめる)と要件5の受入基準6(戻してもログアウトされず保存が残る)の土台は、`cross_test.go` の `TestCross_SelfPairPasses`(同じイメージを両方の位置に置いた筋書きが通る)、`TestCross_WrongStatusFailsWithStepAndDirection`、`TestCross_ThreeDirectionsRun` で確かめる。10の操作の筋書きは、Claude が、まとまりの spec で足す
   - _要件: 5.6, 13.1, 13.2, 13.3, 13.4, 13.6_
 
 - [x] 3.9 応答の時間の比べ方を作る
 
-  Claude は、`backend/compat/perf_test.go` と harness の時間の動かし方を作る。harness は、時間の動かし方では、20回の測らない要求のあと200回ずつ順に送り、操作ごとに95パーセンタイルを「Go 版 ≤ Java 版 × 1.2 + 20ミリ秒」で比べ、PDF の出力では同時2件のときのメモリの最大が 1792MB 以内かを確かめる。
+  Claude は、`backend/compat/perf_test.go` と harness の時間の動かし方を作る。harness は、時間の動かし方では、20回の測らない要求のあと200回ずつ順に送り、操作ごとに95パーセンタイルを「Go 版 ≤ Java 版 × 1.2 + 20ミリ秒」で比べ、PDF の出力では同時2件のときのメモリの最大が 1792MB 以内かを確かめる。95パーセンタイルとは、測った時間を短い順に並べたときに、短いほうから95%の位置にある時間である。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat ./compat/harness/...` の `TestPerfJudge_*` が成功する
   - 受入基準とテストの対応: 要件9の受入基準7(決めた幅で比べる)は、`perf_judge_test.go` の `TestPerfJudge_WithinTolerance`、`TestPerfJudge_ExceedsTolerance`、`TestPerfJudge_MemoryOver1792MBFails` で確かめる
   - _要件: 9.7_
@@ -293,7 +301,7 @@
   プリフライトとは、ブラウザが本当の要求を送る前に、送ってよいかを確かめるために送る `OPTIONS` の要求である。Claude は、記録した Java 版の応答を、Go 版のテストの期待にする。design.md の httpapi の節の CORS の処理の5つの箇条と記録が食い違うときは、Claude は、Java 版の応答に合わせ、食い違いを実装のメモに書く。design.md は、この処理が Java 版の CORS の設定と同じ応答を返すと決めているためである。
   Claude は、`backend/internal/httpapi/middleware/cors.go` を作り、`server.go` で、要求のログと偽の送信の検査の間に置く。Claude は、`backend/internal/platform/config/` の `dev` と `test` の CORS の許す送り元を、`http://localhost:5173` と `http://localhost:8082` の2つにする。`prod` の許す送り元は `https://app.keirekipro.click` だけのまま変えない。
   - 完了の確かめ方: `run-check.sh backend-go go test ./internal/httpapi/... ./internal/platform/config/...` が成功する
-  - 受入基準とテストの対応: 中間処理の順は、`server_test.go` の `TestCORS_RunsBeforeCSRF` で確かめる。このテストは、許す送り元からの、ヘッダ `X-XSRF-TOKEN` の無い `POST` に、偽の送信の検査が返す 403 の応答に `Access-Control-Allow-Origin` が付くことを確かめる。今の偽の送信の検査は、`OPTIONS` の要求を検査せずに次の処理に渡す。そのため、プリフライトが 200 になることを確かめても、テストは、CORS の処理が偽の送信の検査より前にあるかを見分けられない。環境ごとの許す送り元は、`config_test.go` の `TestLoad_CORSAllowedOriginsByEnv`(`prod` は1つ、`dev` と `test` は2つ)で確かめる。要件14の受入基準5(説明画面の「Try it out」の要求をブラウザが Go 版に送れる)の Go 版の側は、`cors_test.go` の次の8つのテストで確かめる。
+  - 受入基準とテストの対応: 中間処理の順は、`server_test.go` の `TestCORS_RunsBeforeCSRF` で確かめる。このテストは、許す送り元からの、ヘッダ `X-XSRF-TOKEN` の無い `POST` に、偽の送信の検査が返す 403 の応答に `Access-Control-Allow-Origin` が付くことを確かめる。今の偽の送信の検査は、`OPTIONS` の要求を検査せずに次の処理に渡す。そのため、プリフライトが 200 になることを確かめても、テストは、CORS の処理が偽の送信の検査より前にあるかを見分けられない。環境ごとの許す送り元は、`config_test.go` の `TestLoad_CORSAllowedOriginsByEnv`(`prod` は1つ、`dev` と `test` は2つ)で確かめる。要件14の受入基準5(API の説明画面の「Try it out」の要求をブラウザが Go 版に送れる)の Go 版の側は、`cors_test.go` の次の8つのテストで確かめる。
     - `TestCORS_PreflightAllowed` は、許す送り元のプリフライトに、CORS の処理が 200 と4つのヘッダを返し、`Access-Control-Max-Age` を付けず、次の処理に渡さないことを確かめる
     - `TestCORS_PreflightWithoutRequestHeaders` は、CORS の処理が `Access-Control-Allow-Headers` を Java 版の記録のとおりに扱うことを確かめる
     - `TestCORS_PreflightMethodNotAllowed` は、許す6つのメソッドのほかのメソッドのプリフライトに、CORS の処理が 403 と `Invalid CORS request` を返すことを確かめる
@@ -305,14 +313,14 @@
   - _要件: 14.5_
   - _対象の部品: httpapi、config_
 
-- [x] 15.2 説明画面に Cookie を付けて送らせ、変えた動きの一覧と手順の文書を直し、PR を出す
+- [x] 15.2 API の説明画面に Cookie を付けて送らせ、変えた動きの一覧と手順の文書を直し、PR を出す
 
-  Claude は、`compose.yaml` の `api-docs` に環境変数 `WITH_CREDENTIALS=true` を足す。Claude は、`backend/compat/changed-behaviors.yaml` に CB-010 を、`match` を持たない記録だけの項目として足す。Claude は、`doc/開発フロー/参加者セットアップ手順.md` に、design.md の api-docs の節の3つの手順を書き、Go 版のログインの API は認証のまとまりの spec で作るまで 501 を返すので、それまで手順1のログインは使えないことを書く。Claude は、`.kiro/specs/backend-go-replacement/progress.md` の認証のまとまりの決まりに、認証のまとまりの spec の確認で、説明画面の「Try it out」でログインし、ログインの要る API に要求を送って、ログインした開発者への応答が返ることを確かめると書く。
-  最後に、Claude は、`start-dev.sh` で開発環境を起動し、Claude Code の中のブラウザで `http://localhost:8082` を開いて、次の2つを確かめ、PR を出す。Claude Code の中のブラウザが使えないときも、Claude は、次の2つの確認に使うブラウザを Playwright のブラウザに替えない。Playwright のブラウザに替えない理由は、次のとおりである。Playwright のブラウザは別のコンテナで動き、説明画面を `http://localhost:8082` でなく別の送り元で開く。その送り元は Go 版の CORS の処理が許す送り元に当たらないので、Claude は、Playwright のブラウザでは次の2つを確かめられない。Claude Code の中のブラウザが使えないときは、Claude は、次の2つの確認の手順を所有者に示して止まり、所有者が確かめた結果を受けてから PR を出す。
+  Claude は、`compose.yaml` の `api-docs` に環境変数 `WITH_CREDENTIALS=true` を足す。Claude は、`backend/compat/changed-behaviors.yaml` に CB-010 を、`match` を持たない記録だけの項目として足す。Claude は、`doc/開発フロー/参加者セットアップ手順.md` に、design.md の api-docs の節の3つの手順を書き、Go 版のログインの API は認証のまとまりの spec で作るまで 501 を返すので、それまで手順1のログインは使えないことを書く。Claude は、`.kiro/specs/backend-go-replacement/progress.md` の認証のまとまりの決まりに、認証のまとまりの spec の確認で、API の説明画面の「Try it out」でログインし、ログインの要る API に要求を送って、ログインした開発者への応答が返ることを確かめると書く。
+  最後に、Claude は、`start-dev.sh` で開発環境を起動し、Claude Code の中のブラウザで `http://localhost:8082` を開いて、次の2つを確かめ、PR を出す。Claude Code の中のブラウザが使えないときも、Claude は、次の2つの確認に使うブラウザを Playwright のブラウザに替えない。Playwright のブラウザに替えない理由は、次のとおりである。Playwright のブラウザは別のコンテナで動き、API の説明画面を `http://localhost:8082` でなく別の送り元で開く。その送り元は Go 版の CORS の処理が許す送り元に当たらないので、Claude は、Playwright のブラウザでは次の2つを確かめられない。Claude Code の中のブラウザが使えないときは、Claude は、次の2つの確認の手順を所有者に示して止まり、所有者が確かめた結果を受けてから PR を出す。
   1. 読み取りの操作の「Try it out」の要求が、CORS のエラーで止まらずに Go 版に届き、Go 版の応答が画面に出る。Go 版は、この要求の応答で `XSRF-TOKEN` の Cookie を付ける
   2. Claude は、書き込みの操作の「Try it out」で、ヘッダ `X-XSRF-TOKEN` の欄に、読み取りの操作の応答で Go 版が付けた `XSRF-TOKEN` の Cookie の値を入れて送る。ブラウザは、この要求に Cookie を付けて送る。画面には、偽の送信の検査の 403 でなく、まだ作っていない操作の 501 が出る
   - 完了の確かめ方: Claude Code の中のブラウザでの2つの確認が上のとおりになり、`/verify-backend` の Go 版の手順が成功し、`backend/compat/` の自分を確かめる筋書きが変えた動きの一覧を読んで成功する
-  - 受入基準とテストの対応: 要件14の受入基準5(説明画面の「Try it out」の要求をブラウザが Go 版に送れる)は、上の1つ目の、読み取りの操作の「Try it out」の確認で確かめる。要件14の受入基準7(偽の送信を見分けるヘッダを付けて書き込みの要求を送れる)は、上の2つ目の、書き込みの操作の「Try it out」の確認で確かめる。要件14の受入基準6(ログインして、ログインの要る API の応答を受け取る)のうち、ブラウザがログインの状態の Cookie を要求に付けて送ることは、書き込みの操作の「Try it out」の確認で、要求に Cookie が付いて送られたことで確かめる。Go 版がログインした開発者への応答を返すことは、ログインの API が 501 を返す間は確かめられないので、progress.md に書いた決まりのとおり、認証のまとまりの spec の確認で確かめる
+  - 受入基準とテストの対応: 要件14の受入基準5(API の説明画面の「Try it out」の要求をブラウザが Go 版に送れる)は、上の1つ目の、読み取りの操作の「Try it out」の確認で確かめる。要件14の受入基準7(偽の送信を見分けるヘッダを付けて書き込みの要求を送れる)は、上の2つ目の、書き込みの操作の「Try it out」の確認で確かめる。要件14の受入基準6(ログインして、ログインの要る API の応答を受け取る)のうち、ブラウザがログインの状態の Cookie を要求に付けて送ることは、書き込みの操作の「Try it out」の確認で、要求に Cookie が付いて送られたことで確かめる。Go 版がログインした開発者への応答を返すことは、ログインの API が 501 を返す間は確かめられないので、progress.md に書いた決まりのとおり、認証のまとまりの spec の確認で確かめる
   - _要件: 14.5, 14.6, 14.7_
   - _依存: 15.1_
 
@@ -360,6 +368,45 @@
   - 完了の確かめ方: すべてのテストと shellcheck と actionlint が成功し、PR の本文に「承認が要る理由」と「main に入れたときに本番で起きること」の欄がある
   - 受入基準とテストの対応: 要件7の受入基準3(承認が要る理由と、main に入れたときに本番で起きることを示す)は、`gh pr view` で読んだ PR の本文で確かめる
   - _要件: 7.3_
+
+- [x] 16. PDF の比べ方と比べるデータと変えた動きの一覧を、直した要件と設計に合わせる
+- [x] 16.1 PDF の比べ方が許す語の箱の高さの違いを 0.35pt に狭める (並行可)
+
+  Claude は、先に `backend/compat/pdfcmp/pdfcmp_test.go` の語の箱の高さの2つの場合を直す。`TestCompare_Allows2ptShift` の場合は、違いが 0.35pt 以内の2つの PDF(文字の大きさが 12pt と 12.25pt で、語の箱の高さの違いが 0.325pt)を止めないことを確かめる。`TestCompare_Rejects2_5ptShift` の場合は、違いが 0.35pt を超えて 0.5pt 以内の2つの PDF(文字の大きさが 12pt と 12.3pt で、語の箱の高さの違いが 0.39pt)を止めることを確かめる。そのあと、Claude は、`backend/compat/pdfcmp/pdfcmp.go` の定数 `HeightTolerance` を 0.5 から 0.35 に変える。
+  - 完了の確かめ方: 定数を変える前は `TestCompare_Rejects2_5ptShift` の語の箱の高さの場合が失敗し、変えたあとは `run-check.sh backend-go go test -tags compat ./compat/pdfcmp/...` が成功する
+  - 受入基準とテストの対応: 要件10の受入基準1と4(文字の大きさの違いを 0.25pt 以内なら同じとみなし、設計の許す違いの大きさがこの範囲を超えない)は、`pdfcmp_test.go` の `TestCompare_Allows2ptShift` の場合「語の箱の高さの 0.35pt 以内の違いを止めない」と、`TestCompare_Rejects2_5ptShift` の場合「語の箱の高さが 0.35pt を超えて違う語を止める」で確かめる
+  - _要件: 10.1, 10.4_
+  - _対象の部品: pdfcmp_
+
+- [x] 16.2 文字の大きさと表の見出しの色を既定と違う値にした書き出しの設定を置く (並行可)
+
+  Claude は、先に `backend/compat/harness/fixtures_test.go` の `TestFixtures_ResumeKindsPresent` を直す。今の最後の場合は、`resumes/` のすべての JSON のファイルを、フォントだけを替えた設定として数えている。Claude は、この場合を、名前が `fonts-` で始まるファイルだけを数える形に直し、名前が `sizes-` で始まるファイルを確かめる場合を足す。足す場合は、次の3つを確かめる。1つ目は、`sizes-` で始まるファイルが2つのフォントに1つずつあることである。2つ目は、どちらのファイルも4つの文字の大きさが design.md の「pdfcmp」の節の値(タイトル 16.5、日付 10.5、氏名 9.5、見出し 12)であることである。3つ目は、どちらのファイルも表の見出しの色の赤と緑と青の少なくとも1つが、既定の色 `d9d9d9` の値と 2 を超えて違うことである。PDF の比べ方は表の色の違いを 2 まで許すので、違いが 2 以内の色では、Go 版が色の設定を読まなくても Java 版と Go 版を比べる検査が通るためである。
+
+  そのあと、Claude は、`backend/compat/fixtures/resumes/` に、`sizes-NotoSansJP.json` と `sizes-NotoSerifJP.json` を置く。2つのファイルは、今ある `fonts-NotoSansJP.json` と同じ形の書き出しの要求の本文で、4つの文字の大きさを上の値にし、表の見出しの色を `b4c7e7` にする。経歴書の初めのデータは、今ある `resumes/fonts.sql` を使うので、Claude は SQL のファイルを足さない。
+
+  Claude は、`fixtures_test.go` の `TestFixtures_ResumeKindsPresent` の前のコメントと、`backend/compat/harness/fixtures.go` の `FixturesDir` の注記に、文字の大きさと表の見出しの色を替えた設定の JSON があることを書き足す。SQL の経歴書は4種類のままなので、Claude は、経歴書の名前の定数のコメントと、場合「4種類の経歴書が1つずつある」を変えない。
+  - 完了の確かめ方: 2つのファイルを置く前は `TestFixtures_ResumeKindsPresent` の足した場合が失敗し、置いたあとは `run-check.sh backend-go go test -tags compat -run 'TestFixtures_(AllLoadable|ResumeKindsPresent)' ./compat/harness/...` が成功する
+  - 受入基準とテストの対応: 要件10の受入基準3(比べるデータに、文字の大きさと表の見出しの色を既定と違う値にした経歴書を含める)は、`fixtures_test.go` の `TestFixtures_AllLoadable` と、`TestFixtures_ResumeKindsPresent` の場合「文字の大きさと表の見出しの色を既定と違う値にした書き出しの設定が、2つのフォントに1つずつある」で確かめる。このデータで PDF を比べる筋書きは、Claude が、出力のまとまりの spec で足す
+  - _要件: 10.3_
+  - _対象の部品: compat harness_
+
+- [x] 16.3 変えた動きの一覧の2つの項目の理由を直し、PR を出す
+
+  Claude は、先に `backend/compat/harness/match_test.go` に、テスト `TestChangedBehaviors_OwnerDecidedItems` を足す。このテストは、`backend/compat/changed-behaviors.yaml` を読み、次の3つの場合を確かめる。場合「所有者が変えると決めた4つの動きの理由に、所有者が 2026-11-07 に受け入れたことが書いてある」は、CB-001 から CB-004 の「画面に影響が無い理由」を確かめる。場合「CB-001 と CB-004 の理由に、どこが変わるかが書いてある」は、CB-001 の理由が、並び順の変わる場所として画面、PDF、Markdown、バックアップの4つを書き、CB-004 の理由が、文字の位置のずれと、PDF から写した「〜」を書いていることを確かめる。場合「所有者が受け入れたと書いた理由は、どれも受け入れた日を持つ」は、理由に「所有者が」と書いたすべての項目が、受け入れた日を年月日で書いていることを確かめる。
+
+  そのあと、Claude は、`changed-behaviors.yaml` の CB-001 と CB-004 の「画面に影響が無い理由」を直す。CB-001 の理由は、design.md の「変えた動きの一覧の形」の節の見本の CB-001 の文にする。この文は「(Issue #445 の決めた方式)」を含む。YAML は、引用符で囲んでいない値の中の、空白のあとの `#` から行末までを注記として読む。そのため、今の CB-001 の理由は「(Issue」で切れて読まれる。Claude は、CB-001 の理由の値を引用符で囲み、文の最後まで読まれるようにする。
+
+  CB-004 の理由には、次の4つを書く。1つ目は、PDF の文字の位置が 1〜2pt ずれることである。2つ目は、PDF から写した文字が「～」(U+FF5E)でなく「〜」(U+301C)になることである。3つ目は、頁の数、フォント、文字の大きさ、表の色、改頁の位置、頁ごとの文字は、要件10の受入基準1に書いた範囲で Java 版と同じであることである。4つ目は、所有者が 2026-11-07 に受け入れたことである。今の CB-004 の理由は「配置」も同じと書いているが、文字の位置はずれるので、Claude は「配置」を外す。
+
+  Claude は、`changed-behaviors.yaml` の頭の注記に、design.md の「changed-behaviors.yaml」の節の3種類の項目と、種類ごとに「画面に影響が無い理由」に書くことを足す。まとまりの spec で項目を足す Claude が、この注記を読んで理由を書くためである。Claude は、項目の数と `match` を変えない。
+
+  Claude は、`.kiro/specs/backend-go-replacement/progress.md` の、段階2の PR の表の下に、大タスク16の PR で PDF の比べ方と比べるデータと変えた動きの一覧を直したことを1文で書く。
+
+  このタスクは、16.2 と同じ Go のパッケージ `backend/compat/harness` のテストを変えるので、Claude は、このタスクを 16.2 のあとに行う。最後に、Claude は `/verify-backend` の Go 版の手順(`run-check.sh backend-go make check`)と `run-check.sh backend-go make compat` と `run-check.sh backend-go make compat-cross` を通して PR を出す。
+  - 完了の確かめ方: 理由を直す前は `TestChangedBehaviors_OwnerDecidedItems` の場合「CB-001 と CB-004 の理由に、どこが変わるかが書いてある」が失敗し、直したあとは `make check` と `make compat` と `make compat-cross` が成功し、PR の CI の `backend-compat` と `backend-test` が成功する
+  - 受入基準とテストの対応: 要件9の受入基準8(所有者が変えると決めた4つの動きを一覧に載せ、違いが出る動きでは、どこが変わるかと所有者が受け入れたことを書く)は、`match_test.go` の `TestChangedBehaviors_OwnerDecidedItems` の場合「所有者が変えると決めた4つの動きの理由に、所有者が 2026-11-07 に受け入れたことが書いてある」と「CB-001 と CB-004 の理由に、どこが変わるかが書いてある」で確かめる。要件9の受入基準9(所有者が受け入れた違いを、どこが変わるかと受け入れた日を添えて一覧に載せる)は、同じテストの場合「所有者が受け入れたと書いた理由は、どれも受け入れた日を持つ」と、`changed-behaviors.yaml` の頭の注記を読んで確かめる。まとまりの spec を進める途中で見つかった違いを所有者に示して決めてもらう手順は、Claude の進め方の決まりなので、Claude は、まとまりの spec の PR の本文と変えた動きの一覧を読んで確かめる
+  - _要件: 9.8, 9.9_
+  - _依存: 16.1, 16.2_
 
 - [ ] 6. 切り替えの出荷より前に入れる本番の設定の変更を入れる(PR 4-1)
 - [ ] 6.1 タスク定義と Redis の秘密の値に Go 版が読む値を足し、PR を出す
@@ -652,8 +699,8 @@
 - Go のモジュールの索引の読み方(タスク1.8で分かったこと): index.golang.org は1回の問い合わせに約4秒かかり、73時間分を順に読むと約10分かかって、判定の手順の5分の上限に収まらない。そのため `lib-gomod-index.sh` は、73時間を4時間ずつの区間(`GOMOD_INDEX_SEGMENT_HOURS`)に分け、約19本を同時に読む。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」にも、この読み方を書いた。`lib-gomod-index.sh` は、区間の中で、最後の行の時刻を秒に切り上げた値が区間の終わりと同じときも、次のページを読む(`-le`)。check-release-age.sh は、go.mod の go・toolchain・module・exclude・retract・tool・godebug・ignore の行を照らさない。Dependabot が toolchain の行を変えるかは確かめていない
 - Go の検査の外しの検知(タスク1.9で決めたこと): `check-escape-hatches.sh` は、`backend/` の下のすべての `.go` で、足した `.Skip(` `.SkipNow(` `.Skipf(` と `//nolint` と `// coverage-ignore`(go-test-coverage がカバレッジから外すコメント)を見つける。受け手の名前は `t` に限らない。gosec の `// #nosec` は見つけない。そのため、Claude は、タスク2.3で `.golangci.yml` を作るとき、gosec が `#nosec` のコメントに従わない設定にする。Claude は、タスク2.3で `Makefile` から golangci-lint と gremlins を呼ぶとき、設定のファイルを名前で指定する。承認の対象の6つのファイルと別の名前の設定のファイルを、道具が読まないようにするためである
 - design の審査で残った記録: 次の5つを、それぞれ次のタスクで扱う。
-  - D3-3-1: 6-1 の `backend-vuln-fix` が版を上げる場所の一覧である。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」に書き足したとおりに、タスク10.7で扱う
-  - D5-1-1: 6-1 での `backend-vuln-fix.yaml` の Java 版の仕事の扱いである。タスク10.7で扱う
+  - D3-3-1: Java 版のコードを消す PR 6-1 の `backend-vuln-fix` が版を上げる場所の一覧である。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」に書き足したとおりに、タスク10.7で扱う
+  - D5-1-1: Java 版のコードを消す PR 6-1 での `backend-vuln-fix.yaml` の Java 版の仕事の扱いである。タスク10.7で扱う
   - D3-3-2: 表の形の履歴の `description` の書き方である。タスク2.4で扱う
   - D3-2-2: Dependabot の docker の項目の `open-pull-requests-limit` である。タスク5.1で扱う
   - D3-1-6: Java 版と Go 版を比べる検査のコードを `make lint` が読むかである。タスク2.3で扱う
@@ -685,7 +732,7 @@
   - 印刷までの手順: 部品は、HTML を `Page.setDocumentContent` で空のタブに置き、`Page.loadEventFired` を待ってから印刷する
   - 外への通信の止め方: 外への通信は `Fetch.enable` の型 `*` で止め、止めた要求をすべて `Fetch.failRequest` で断る。`data:` の読み込みは通信ではないので、Chromium は Fetch で止めずに通す。Claude は、このことをテストで確かめた
   - 紙の大きさ: 紙の大きさは、CSS の `@page` が無いページのために A4 を既定にし、`preferCSSPageSize` で CSS の大きさを優先する
-  - Chromium が落ちたことの見分け方: Chromium が落ちたかは、ブラウザの context の終わりと `Browser.LostConnection` で見る
+  - Chromium が異常で終わったことの見分け方: Chromium が異常で終わったかは、ブラウザの context の終わりと `Browser.LostConnection` で見る
   - DOM の追跡の知らせの扱い: chromedp の DOM の追跡は、`setDocumentContent` のたびに「top-level frame が無い」という知らせを誤りとして書く。部品は DOM の追跡を使わないので、chromedp の知らせを DEBUG のログに回す。同じ理由で、テストで DOM を読むときは `chromedp.Text` でなく `Runtime.evaluate` を使う(`chromedp.Text` は終わらない)
   - ブラウザが無いことの確かめ方: ブラウザが無いことを確かめるテストは、CI の機械に `/usr/bin/google-chrome` があり PATH を空にしても見つかるので、実行ファイルの場所を存在しない場所に替えて確かめる
   - 要求の期限切れの見分け方: 要求の context が部品の打ち切りより先に期限で終わったときは、`Render` は chromedp の Canceled を包んで返すので、呼び出し側は要求の期限切れを `ctx.Err()` で見分ける
@@ -769,18 +816,24 @@
   - 日本語の氏名の並びの違いを、Markdown と PDF の出力の比べ方では許せない
   - Google と GitHub のログインで、応答が示すログインの画面へ進む動き(送り直し)は作っていない。認証のまとまりの spec で作る
 - 作業フォルダで開発環境を起動するとき(タスク4.2で分かったこと): compose.yaml のコンテナの名前は固定で、compose のプロジェクトの名前は既定でフォルダの名前になる。そのため、git worktree の作業フォルダでそのまま `bash start-dev.sh` を打つと、本体フォルダのプロジェクト `keirekipro` の動いているコンテナと名前がぶつかり、起動に失敗する。Claude は、作業フォルダでは `COMPOSE_PROJECT_NAME=keirekipro bash start-dev.sh` で、本体フォルダと同じ開発環境を起動する。このとき、止まっていたコンテナは作業フォルダのファイルを読む形で作り直される
-- Java 版の CORS の応答と design の CORS の処理の5つの箇条の食い違い(タスク15.1で分かったこと): Claude は、次の4つを Java 版の応答に合わせた。1つ目に、Java 版は、`Vary` の3つの値を、1行でなく値ごとに別の行で返す。2つ目に、Java 版は、許したプリフライトの応答にも `Access-Control-Expose-Headers` を付けるので、プリフライトの応答のヘッダは4つでなく5つになる。3つ目に、Java 版は、`Invalid CORS request` の 403 に `Content-Type` を付けない。Go の標準の受け口は本文から推した `Content-Type` を付けるので、Go 版はその値を空にして止める。テストの記録用の応答の部品はこの推しをしないので、この動きは本物の受け口を立てて確かめる。4つ目に、Java 版は、`Access-Control-Allow-Headers` を、要求の名前を「, 」でつなぎ直した値で返す。このほかに、許す送り元からのプリフライトでない `TRACE` に、Java 版は 401 を返し、Go 版は design のとおり 403 を返す。Java 版の 401 の応答には `Vary` が無いので、この 401 は Java 版の CORS の処理より前で返っている。Go 版の CORS の処理ではこの 401 を作れない。8つの要求でメソッドを確かめる代表は `HEAD` で、`HEAD` では両方の版が 403 を返す
+- Java 版の CORS の応答と design の CORS の処理の5つの箇条の食い違い(タスク15.1で分かったこと): Claude は、次の4つを Java 版の応答に合わせた。
+  - 1つ目に、Java 版は、`Vary` の3つの値を、1行でなく値ごとに別の行で返す
+  - 2つ目に、Java 版は、許したプリフライトの応答にも `Access-Control-Expose-Headers` を付けるので、プリフライトの応答のヘッダは4つでなく5つになる
+  - 3つ目に、Java 版は、`Invalid CORS request` の 403 に `Content-Type` を付けない。Go の標準の受け口は本文から推した `Content-Type` を付けるので、Go 版はその値を空にして止める。テストの記録用の応答の部品はこの推しをしないので、この動きは本物の受け口を立てて確かめる
+  - 4つ目に、Java 版は、`Access-Control-Allow-Headers` を、要求の名前を「, 」でつなぎ直した値で返す
+  - このほかに、許す送り元からのプリフライトでない `TRACE` に、Java 版は 401 を返し、Go 版は design のとおり 403 を返す。Java 版の 401 の応答には `Vary` が無いので、この 401 は Java 版の CORS の処理より前で返っている。Go 版の CORS の処理ではこの 401 を作れない
+  - 8つの要求でメソッドを確かめる代表は `HEAD` で、`HEAD` では両方の版が 403 を返す
   - Java 版の応答の記録の取り方: 作業フォルダからは本体フォルダの開発環境の Java 版を動かせないので、Claude は、`run-check.sh backend sh -c './gradlew bootRun --args=--spring.profiles.active=dev & ... curl ...'` で、1回きりのコンテナの中で Java 版を起動して `curl` を送った。`curl -X HEAD` は本文を待って止まるので、`HEAD` は `curl -I` で送る
 - Dependabot の docker の項目の上限(タスク5.1で決めたこと): 公式の文書(https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#open-pull-requests-limit-)は、上限を、その項目で開いている version update の PR の数に掛け、security update の PR は別の固定の上限10で数え、上限に達すると開いている PR がマージか close されるまで新しい PR を作らないと書く。docker の項目のフォルダは、`docker/` の下の9つと `backend/compat/` の2つで11になる。digest の更新はフォルダごとに別の PR になり、docker の PR は close できないので、Claude は、今と同じ1つの余裕を足して上限を12にした。Claude は、この判断と根拠の URL を、タスク5.6で PR の本文に書く。フォルダの数が変わる PR 6-1 で、上限を見直す
 - 週次のイメージの検査の Go 版(タスク5.2で決めたこと): Go 版はまだ本番で動いておらず ECR に稼働中のイメージが無いので、`container-scan-scheduled.yaml` の新しい仕事 `scheduled-go-image-scan` が、main の `docker/backend-go/Dockerfile.prod` から arm64 のイメージを組み立てて report モードで調べ、結果を成果物で今の仕事に渡す。今の仕事は、稼働中のイメージの結果と Go 版の結果を `jq -s 'add'` で1つにまとめてから、`container-scan-issue.sh` を1回だけ呼ぶ。イメージごとに呼ぶと、Issue を ID だけで突き合わせるため、片方にだけある脆弱性の Issue を、もう片方の呼び出しが閉じてしまう。PR の検査は、必須の検査の名前を変えないよう、同じ `container-scan` の仕事の中で2つのイメージを組み立てて調べ、両方を判定してから失敗にする
-- `test-check-container-scan.sh` の場合の選び方(タスク5.2で足したこと): 今の確かめを、区切りの見出しごとに16の場合に分け、`if want <名前>; then` で囲んだ。囲むために字下げを足したので、差分の行数は大きいが、確かめの中身は変えていない(分ける前と後で、ok の行が同じことを Linux のコンテナで確かめた)
-- タスク5.2の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): `container-scan-issue.sh` が起票する Issue の本文は「稼働中の本番イメージから」で始まるので、main の Go 版のイメージにだけある脆弱性でもこの文で起票する(対象イメージの欄に2つのイメージを並べるので見分けられる。このスクリプトはタスク5.2で変えていない)。週次の検査を手で動かすときに main 以外のブランチを選ぶと、組み立てるのはそのブランチなのに、Summary と Issue の対象イメージの欄には「main の Go 版」と出る
+- `test-check-container-scan.sh` の場合の選び方(タスク5.2で足したこと): 今の確認を、区切りの見出しごとに16の場合に分け、`if want <名前>; then` で囲んだ。囲むために字下げを足したので、差分の行数は大きいが、確認の中身は変えていない。分ける前と後で、ok の行が同じことを Linux のコンテナで確かめた
+- タスク5.2の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): `container-scan-issue.sh` が起票する Issue の本文は「稼働中の本番イメージから」で始まるので、main の Go 版のイメージにだけある脆弱性でもこの文で起票する。対象イメージの欄に2つのイメージを並べるので見分けられる。このスクリプトはタスク5.2で変えていない。週次の検査を手で動かすときに main 以外のブランチを選ぶと、組み立てるのはそのブランチなのに、Summary と Issue の対象イメージの欄には「main の Go 版」と出る
 - govulncheck の出力(タスク5.3で実物を流して確かめた): `-format json` は、整形した複数行の JSON を並べて出し、脆弱性があっても0で終わる。finding は部品・package・関数の3つの深さで出て、呼ばれる箇所のある finding だけが `trace[0].function` を持つ。`make vuln` のテキストの形は、呼ばれる箇所のある脆弱性があれば3で終わり、呼ばれない脆弱性だけなら0で終わる。`GOTOOLCHAIN=auto` にすると、go のコマンドは go.mod の toolchain の行の Go に切り替わり、govulncheck もその Go の標準ライブラリを調べる。そのため、Go の仕事は、直したあとの調べ直しを `GOTOOLCHAIN=auto` で動かす
-- タスク5.3の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): ブランチがあるかを読む `git ls-remote` が通信の誤りで失敗すると、Go の仕事はブランチが無いと扱う(そのあとの push の失敗で仕事は失敗になるので、誤りは隠れない。Java の仕事と同じ作り)。呼ばれる箇所があっても直した版の無い脆弱性だけのときは、Go の仕事は warning を出して成功で終わるので、誰にも知らされない(design は、この場合を決めていない。Java の仕事も、修正版の無い警告を黙って除く)
+- タスク5.3の確認役が残した、止めない指摘(タスク5.6で PR の本文に書く): ブランチがあるかを読む `git ls-remote` が通信の誤りで失敗すると、Go の仕事はブランチが無いと扱う。そのあとの push の失敗で仕事は失敗になるので、誤りは隠れない。Java の仕事と同じ作りである。呼ばれる箇所があっても直した版の無い脆弱性だけのときは、Go の仕事は warning を出して成功で終わるので、誰にも知らされない。design は、この場合を決めていない。Java の仕事も、修正版の無い警告を黙って除く
 - gremlins v0.6.0 の JSON の報告(タスク5.4でソースの `internal/report` を読んで確かめた): 1行の JSON で、最上位に `mutants_killed` `mutants_lived` `mutants_not_covered` `mutants_not_viable` などの数を持つ。test efficacy は KILLED/(KILLED+LIVED)、変異のカバーは (KILLED+LIVED)/(KILLED+LIVED+NOT COVERED) で、TIMED OUT と NOT VIABLE はどちらにも数えない。変異が0件のときは報告のファイルを書かない。週次の台帳は、この2つの割合を Go 版の欄に書き、前回との差は test efficacy で比べる
 - 変異テストの台帳の表(タスク5.4): 既存の5列の表「記録(測定方式つき)」に6列の行を足すと、GitHub の表示が表の頭より多い欄を捨てて「実行」の欄が消える。そこで、見出し「記録(Go 版つき)」の6列の表を別に作って追記し、前回の全件の行は5列と6列の両方の表から探す。段階6で Java 版の欄を消すときは、この6列の表から PIT の列を消す形になる
 - Go 版の文の割合の数え方(タスク5.5で go-test-coverage v2.22.0 のソースを読んで確かめた): 週次の集計は、`make coverage` が下限と比べる値と同じ範囲で数える。数えるのは go.mod の module の名前に /internal/ を続けたパスの下だけで、`.testcoverage.yml` の exclude: の paths: の正規表現にモジュールの名前を除いたパスが当たるファイルは数えない。同じ箇所は1つとして数え、小数第1位に四捨五入する。go-test-coverage と違うのは、ソースのコメントで外す指定(coverage-ignore)を読まないことと、パッケージの最上位の関数リテラルの中の箇所も数えることの2つで、今のコードはどちらも使っていない
-- ci.yaml の backend-go の仕事に、成果物 backend-go-coverage(coverage.out)を残すステップを足した(タスク5.5)。週次の集計が Go 版の値を読む元が、ほかに無いためである。design の「PR 2-5 で変えるファイル」の一覧は collect-coverage.sh だけで、ci.yaml はその外にある。このことを、タスク5.6で所有者にファイルを置いてもらうときと PR の本文に書く
+- Claude は、ci.yaml の backend-go の仕事に、成果物 backend-go-coverage(coverage.out)を残すステップを足した(タスク5.5)。週次の集計が Go 版の値を読む元が、ほかに無いためである。design の「PR 2-5 で変えるファイル」の一覧は collect-coverage.sh だけで、ci.yaml はその外にある。Claude は、このことを、タスク5.6で所有者にファイルを置いてもらうときと PR の本文に書く
 
 ## 完了条件(全タスク共通)
 

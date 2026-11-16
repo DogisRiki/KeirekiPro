@@ -42,10 +42,10 @@ func TestCompare_Allows2ptShift(t *testing.T) {
 			}
 		}
 	})
-	t.Run("語の箱の高さの 0.5pt 以内の違いを止めない", func(t *testing.T) {
-		// 12pt の語の箱の高さは 15.6pt、12.3pt では 15.99pt で、違いは 0.39pt である
+	t.Run("語の箱の高さの 0.35pt 以内の違いを止めない", func(t *testing.T) {
+		// 12pt の語の箱の高さは 15.6pt、12.25pt では 15.925pt で、違いは 0.325pt である
 		java := makePDF(t, font, testPage{content: text(12, 72, 700, "I")})
-		goPDF := makePDF(t, font, testPage{content: text(12.3, 72, 700, "I")})
+		goPDF := makePDF(t, font, testPage{content: text(12.25, 72, 700, "I")})
 		if r := compare(t, java, goPDF); !r.Same() {
 			t.Errorf("違いが無いはずですが、%+v", r.Diffs)
 		}
@@ -67,10 +67,10 @@ func TestCompare_Rejects2_5ptShift(t *testing.T) {
 			}
 		})
 	}
-	t.Run("語の箱の高さが 0.5pt を超えて違う語を止める", func(t *testing.T) {
-		// 12pt の語の箱の高さは 15.6pt、13pt では 16.9pt である。「I」は細いので、箱の端のずれは 2pt に収まる
+	t.Run("語の箱の高さが 0.35pt を超えて違う語を止める", func(t *testing.T) {
+		// 12pt の語の箱の高さは 15.6pt、12.3pt では 15.99pt で、違いは 0.39pt である。「I」は細いので、箱の端のずれは 2pt に収まる
 		java := makePDF(t, font, testPage{content: text(12, 72, 700, "I")})
-		goPDF := makePDF(t, font, testPage{content: text(13, 72, 700, "I")})
+		goPDF := makePDF(t, font, testPage{content: text(12.3, 72, 700, "I")})
 		r := compare(t, java, goPDF)
 		if !hasDiff(r, KindFontSize, 1) || hasDiff(r, KindWordPos, 1) {
 			t.Errorf("文字の大きさの違いだけがあるはずですが、%+v", r.Diffs)

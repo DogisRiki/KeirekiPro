@@ -11,7 +11,7 @@ Claude は、Go 版のコードを、Java 版と同じ `backend/` に置く。�
 ### 作るもの
 
 - Go 版の土台: Claude は、Go のモジュール、起動の入口、設定と秘密の値を読み込む部品、表の形の履歴(`flyway_schema_history`)の部品、データベースと Redis と AWS へ接続する部品、ログの部品、PDF を作る部品を作る。Claude は、HTTP の受け口の共通部分として、CORS の処理と、偽の送信の検査と、エラーの応答の形と、要求のログを作る。CORS の処理とは、別の送り元の画面から API を呼んでよいかを、応答のヘッダでブラウザに伝える処理である。送り元とは、画面の URL のうち、方式(`http` か `https`)とホスト名とポートの組である。偽の送信の検査とは、ほかのサイトの画面から利用者になりすまして送られた要求を見分けて断る検査である。Claude は、API の仕様書 `backend/api/openapi.yaml` からコードを生成する
-- Go 版の品質チェック: Claude は、開発環境のイメージとサービス、`run-check.sh` の領域、`make check`、静的な検査と書式の検査と層の依存の検査の設定、カバレッジの下限、変更した箇所の変異テスト、CI の仕事を作る。Claude は、Dependabot と公開の時刻の検査と脆弱性の直しと、CodeQL とイメージの検査を、Go 版にも当てはまるように直す
+- Go 版の品質チェック: Claude は、開発環境のイメージとサービス、`run-check.sh` の領域、`make check`、静的な検査と書式の検査と層の依存の検査の設定、カバレッジの下限、変えた箇所の変異テスト、CI の仕事を作る。Claude は、Dependabot と公開の時刻の検査と脆弱性の直しと、CodeQL とイメージの検査を、Go 版にも当てはまるように直す
 - 比べる検査: Claude は、比べる検査の本体と、版をまたぐ確認と、応答の時間の比べ方と、PDF の比べ方と、AWS と外部のログインの代わりと、変えた動きの一覧を作る。比べる検査の本体は、筋書きのファイルから Java 版と Go 版に要求を送り、応答とデータベースと Redis と保存したファイルと送ったメールを比べる。筋書きとは、比べる検査が順に送る要求と、要求ごとの期待を書いたファイルであり、筋書きの中の1つの要求を段と呼ぶ
 - 出荷の仕組み: Claude は、Go 版の本番のイメージと、出荷のワークフローが出荷する版を選ぶ仕組みと、段階4の本番の設定の変更と、切り替えの手順書を作る
 - 進め方の記録: Claude は、機能のまとまりの分け方と順番と、まとまりごとの子の Issue と、進み具合の表を作る
@@ -22,14 +22,14 @@ Claude は、Go 版のコードを、Java 版と同じ `backend/` に置く。�
 
 - 機能のまとまりごとの Go 版の処理。Claude は、認証、利用者、マスタと経歴書、出力、バックアップの各操作の処理と SQL と、メールと PDF と Markdown のテンプレートを、まとまりの spec で作る。この spec は、その処理が使う土台だけを作る
 - 画面の変更。この spec は frontend のコードを変えない
-- 本番の作りの変更のうち、版の見分けに要る環境変数と、Redis の利用者の名前の秘密のキーと、段階6の生きているかの確認の経路と、Java 版だけが使う値の削除を超えるもの。この spec は、サーバの台数と、タスクの CPU とメモリと、時間割を変えない
+- 本番の作りの変更のうち、版の見分けに要る環境変数と、Redis の利用者の名前の秘密のキーと、段階6の生きているかの確認の経路と、Java 版だけが使う値の削除を超えるもの。この spec は、サーバの台数と、タスクの CPU とメモリと、本番を動かし始める時刻と止める時刻を変えない
 - データベースの表の形の変更。この spec はマイグレーションのファイルを足さない
 - 必須の検査の名前を増やす変更。この spec は、GitHub の ruleset に必須の検査を足さない
 - この spec が main に入った時点ですでに書かれていた spec の書き換え
 
 ## 使う既存の仕組み
 
-- 本番: この設計は、本番の次のものを作り直さずに使う。使うものは、ECS のサービス `keirekipro-backend` とそのタスク定義、ALB、デプロイのサーキットブレーカー、ECR のリポジトリ `keirekipro-backend`、CloudWatch Logs のロググループ `/ecs/keirekipro-backend`、Secrets Manager の秘密の値 `keirekipro/rds` `keirekipro/redis` `keirekipro/jwt` `keirekipro/oidc/google` `keirekipro/oidc/github`、EventBridge Scheduler の時間割である。デプロイのサーキットブレーカーとは、新しいタスクが起動に失敗し続けたときに、ECS がサービスを前のタスク定義に戻す仕組みである。
+- 本番: この設計は、本番の次のものを作り直さずに使う。使うものは、ECS のサービス `keirekipro-backend` とそのタスク定義、ALB、デプロイのサーキットブレーカー、ECR のリポジトリ `keirekipro-backend`、CloudWatch Logs のロググループ `/ecs/keirekipro-backend`、Secrets Manager の秘密の値 `keirekipro/rds` `keirekipro/redis` `keirekipro/jwt` `keirekipro/oidc/google` `keirekipro/oidc/github`、EventBridge Scheduler に置いた、本番を動かし始める時刻と止める時刻の設定である。デプロイのサーキットブレーカーとは、新しいタスクが起動に失敗し続けたときに、ECS がサービスを前のタスク定義に戻す仕組みである。
 - 出荷: 所有者は、`release.yaml` を起動し、出荷を承認する。`release.yaml` は、`backend-deploy.yaml` と `frontend-deploy.yaml` を呼ぶ。この2つのワークフローは `workflow_call` だけで動き、所有者が直接起動するものではない
 - 開発環境: この設計は、`compose.yaml` の `db` `redis` `localstack` `dind` のサービスを今のまま使う。この設計は、`run-check.sh` が品質チェックを1回きりのコンテナで動かすことと、`run-check.sh` が同時に動かす数を設定の数までに抑えることも、今のまま使う。
 - 品質の仕組み: この設計は、今の品質の仕組みのうち、次の11個を使う。
@@ -92,7 +92,7 @@ Claude は、次の変更を、所有者の承認が要る PR として出す。
 
 `ci.yaml`、`languages.tsv`、`dependabot.yml`、公開の時刻の検査、`container-scan`、`backend-vuln-fix`、`release.yaml` と `backend-deploy.yaml` の変更の中身と理由は、「部品」の節の「CI の仕事」「Dependabot と公開の時刻の検査と脆弱性の直し」「CodeQL とイメージの検査と組み立てて動かす検査」「backend-deploy.yaml と release.yaml」に書いた。部品の節に無い変更の中身と理由は、次のとおりである。
 
-- `run-check.sh`: Claude は、領域 `backend-go` を足し、その領域の最後の検査を `make check` にする。開発者がどの OS でも1つのコマンドで Go 版の品質チェックを動かせるようにするためである。`make check` が通ると、`run-check.sh` は Go 版の品質チェックを動かした記録を書く。Claude は、dind を起こす領域にも `backend-go` を足す。Claude は、領域 `backend-go` の1回きりのコンテナに、リポジトリの最上位を読み取り専用で `/repo` に差し込む。比べる検査が、`./backend` の外にある `docker/` の Dockerfile からイメージを組み立てるためである。段階6で、Claude は領域の名前を `backend` に戻し、リポジトリの最上位の差し込みを消す。比べる検査を消すと、`./backend` の外のファイルを読む処理が無くなるためである
+- `run-check.sh`: Claude は、領域 `backend-go` を足し、その領域の最後の検査を `make check` にする。開発者がどの OS でも1つのコマンドで Go 版の品質チェックを動かせるようにするためである。`make check` が通ると、`run-check.sh` は Go 版の品質チェックを動かした記録を書く。Claude は、dind を起動する領域にも `backend-go` を足す。Claude は、領域 `backend-go` の1回きりのコンテナに、リポジトリの最上位を読み取り専用で `/repo` に差し込む。比べる検査が、`./backend` の外にある `docker/` の Dockerfile からイメージを組み立てるためである。段階6で、Claude は領域の名前を `backend` に戻し、リポジトリの最上位の差し込みを消す。比べる検査を消すと、`./backend` の外のファイルを読む処理が無くなるためである
 - `check-verify-before-stop.sh` とそのテスト: このフックは、今は `backend/` の下のファイルが変わると、Java 版の品質チェック `./gradlew check` を動かした記録を求める。Claude は、このフックを次の5つのように変える。
   - 記録を分ける: Claude は、変わったファイルを Java 版のファイルと Go 版のファイルに分け、Java 版のファイルが変わったときは Java 版の記録を、Go 版のファイルが変わったときは Go 版の記録を求めるようにする。このフックが、変わったファイルを Java 版のファイルと Go 版のファイルに分けるのは、Go 版だけを直す会話で、Claude が Go 版の品質チェックを動かしたのに、作業を終えるときにこのフックに止められることが無いようにするためである
   - ファイルの見分け方: Java 版のファイルと Go 版のファイルの見分け方は、「CI の仕事」の見分け `backend_java` と `backend_go` と同じにする
@@ -404,7 +404,7 @@ config は、`dev` と `test` で次の5つのように動く。
 
 **状態の持ち方**: Chromium は、`--headless` `--disable-gpu` `--no-sandbox` `--disable-dev-shm-usage` `--font-render-hinting=none` で起動する。`--no-sandbox` にするのは、Fargate では、Chromium のサンドボックスが使う機能が使えないためである。サンドボックスとは、Chromium が、ページを表示する処理を、ほかのファイルや処理に触れられないように閉じ込める仕組みである。代わりに、この部品は、タブで JavaScript を止め、外への通信を断る。Go 版のコードが利用者の入力をどう置き換えるかは、「安全」の節に書いた。
 
-**失敗したとき**: Chromium が落ちたら、部品は次の要求の前に Chromium を起動し直し、落ちたときの要求には 500 を返す。30秒を超えた要求では、部品は、タブを閉じて 500 を返す。
+**失敗したとき**: Chromium が異常に終了したら、部品は次の要求の前に Chromium を起動し直し、異常に終了したときの要求には 500 を返す。30秒を超えた要求では、部品は、タブを閉じて 500 を返す。
 
 ### API の仕様書と説明画面
 
@@ -456,7 +456,7 @@ Claude は、Swagger UI に自分で書いた初期化のファイルを足し�
 - `make test` は `go test -race -coverprofile=coverage.out ./...` を動かす。結合テストは、testcontainers-go で Postgres と Redis を動かす
 - `make coverage` は、go-test-coverage で `.testcoverage.yml` の下限を確かめる
 - `make check` は、`fmt-check` `generate-check` `lint` `test` `coverage` `build` を順に動かす
-- `make mutation-diff` は、gremlins を `--diff <BASE> --threshold-efficacy 80 --threshold-mcover 93` で動かす。git の履歴が要るので、CI でだけ動かす
+- `make mutation-diff` は、gremlins を `--diff <BASE> --threshold-efficacy 80 --threshold-mcover 93` で動かす。`make mutation-diff` は git の履歴が要るので、CI だけが `make mutation-diff` を動かす
 - `make mutation-full` は、gremlins を全体に動かし、JSON の報告を書く。週次の報告がこの報告を使う
 - `make vuln` は `go tool govulncheck ./...` を動かす
 - 比べる検査の3つのタスクは、`go test -tags compat` で動く
@@ -471,13 +471,13 @@ Claude は、Swagger UI に自分で書いた初期化のファイルを足し�
 
 `.testcoverage.yml` は、`./internal/...` の文の割合の下限を全体で 93% にする。文の割合とは、Go のコードの文のうち、テストで動いた文の割合であり、Go のカバレッジの道具が測る割合である。数えないのは生成したコード(`internal/httpapi/gen/` と sqlc の出力のフォルダ)だけにする。
 
-分岐の割合の代わりは、変更した箇所の変異テストである。gremlins は、PR で変えた Go のコードだけに、条件の反転、条件の境目、算術の演算子、増減、符号の反転の変異を作る。テストが見逃した変異の割合が20%を超えるか(`--threshold-efficacy 80`)、テストで動かない箇所の変異が7%を超えたら(`--threshold-mcover 93`)、CI を止める。Java 版の分岐の割合の基準の73%は、条件が成り立つ側と成り立たない側のどちらの結果もテストが確かめていることを守る。条件を反転した変異をテストが見逃さなければ、条件のどちらの側の結果もテストが確かめていることが直接分かる。理由の詳細は research.md の「分岐の割合の代わりに、変えた箇所の変異テストで止める」に書いた。
+分岐の割合の代わりは、変えた箇所の変異テストである。gremlins は、PR で変えた Go のコードだけに、条件の反転、条件の境目、算術の演算子、増減、符号の反転の変異を作る。テストが見逃した変異の割合が20%を超えるか(`--threshold-efficacy 80`)、テストで動かない箇所の変異が7%を超えたら(`--threshold-mcover 93`)、CI を止める。Java 版の分岐の割合の基準の73%は、条件が成り立つ側と成り立たない側のどちらの結果もテストが確かめていることを守る。条件を反転した変異をテストが見逃さなければ、条件のどちらの側の結果もテストが確かめていることが直接分かる。理由の詳細は research.md の「分岐の割合の代わりに、変えた箇所の変異テストで止める」に書いた。
 
 #### backend-go(開発環境と品質チェックのサービス)
 
 対応する要件: 3.2
 
-**役割**: compose のサービス `backend-go` は、`docker/backend-go/Dockerfile` のイメージで、`./backend` を `/app` に差し込み、Go のモジュールとビルドのキャッシュをボリューム `backend-go-cache` に置く。開発サーバは `go run ./cmd/keirekipro` で 8080 を開き、ホストの 8081 に出す。環境変数は `KEIREKIPRO_ENV=dev` と、`db` と `redis` と `localstack` への接続と、testcontainers-go のための `DOCKER_HOST=tcp://dind:2375` と `TESTCONTAINERS_HOST_OVERRIDE=dind` である。`run-check.sh` の領域 `backend-go` は、このサービスで1回きりのコンテナを作り、dind を起こしてから `make check` を動かす。`run-check.sh` がこのコンテナにリポジトリの最上位を差し込む理由は、「所有者に提案するゲート設定の変更」の `run-check.sh` に書いた。
+**役割**: compose のサービス `backend-go` は、`docker/backend-go/Dockerfile` のイメージで、`./backend` を `/app` に差し込み、Go のモジュールとビルドのキャッシュをボリューム `backend-go-cache` に置く。開発サーバは `go run ./cmd/keirekipro` で 8080 を開き、ホストの 8081 に出す。環境変数は `KEIREKIPRO_ENV=dev` と、`db` と `redis` と `localstack` への接続と、testcontainers-go のための `DOCKER_HOST=tcp://dind:2375` と `TESTCONTAINERS_HOST_OVERRIDE=dind` である。`run-check.sh` の領域 `backend-go` は、このサービスで1回きりのコンテナを作り、dind を起動してから `make check` を動かす。`run-check.sh` がこのコンテナにリポジトリの最上位を差し込む理由は、「所有者に提案するゲート設定の変更」の `run-check.sh` に書いた。
 
 #### CI の仕事(ci.yaml の backend の仕事)
 
@@ -549,11 +549,11 @@ Java 版と比べる検査を消す PR 6-1 で、`backend/compat/` は消え、`
 
 #### compat harness(比べる検査の本体)
 
-対応する要件: 1.6, 4.4, 4.5, 4.6, 4.7, 8.2, 9.1, 9.2, 9.3, 9.4, 10.2, 11.1, 11.2, 11.3, 12.1, 12.2, 12.3
+対応する要件: 1.6, 4.4, 4.5, 4.6, 4.7, 8.2, 9.1, 9.2, 9.3, 9.4, 9.8, 9.9, 10.2, 11.1, 11.2, 11.3, 12.1, 12.2, 12.3
 
 **役割**: この部品は、`go test -tags compat ./compat/...` で動き、筋書きのファイルの要求を Java 版と Go 版に送って比べる。Java 版のコードと、Go 版の機能の処理のコードは読まず、両方の本番のイメージを動かす。Go 版のコードのうち使うのは、データベースの表を作る migrate の部品だけである。
 
-**使う部品**: この部品は、testcontainers-go で、`docker/db` の Postgres を2つ、`docker/redis` の Redis を2つ、fakeaws、fakeoidc、Java 版のイメージ、Go 版のイメージを動かす。Java 版と Go 版のイメージは、比べる検査を動かす機械の CPU 向けに組み立てたものを使う。PDF の比べには pdfcmp を使う。
+**使う部品**: この部品は、testcontainers-go で、`docker/db` の Postgres を2つ、`docker/redis` の Redis を2つ、fakeaws、fakeoidc、Java 版のイメージ、Go 版のイメージを動かす。Java 版と Go 版のイメージは、比べる検査を動かす機械の CPU 向けに組み立てたものを使う。この部品は、PDF を比べるときに pdfcmp を使う。
 
 **イメージの組み立て方**: 比べる検査は、検査の始めに、testcontainers-go の Dockerfile からの組み立ての機能で、次の6つのイメージを組み立てる。組み立てる先は、testcontainers-go がつなぐ Docker である。開発環境の `run-check.sh` の中では dind で、CI では GitHub の機械の Docker である。開発環境でホストの Docker が組み立てたイメージは dind から見えないので、比べる検査は、組み立て済みのイメージを使わず、毎回 Docker に組み立てさせる。
 
@@ -589,10 +589,12 @@ Java 版と比べる検査を消す PR 6-1 で、`backend/compat/` は消え、`
 - 比べる検査は、JSON の本文を、解析した値で比べる。UUID は、現れた順の番号に置き換える。日時は、形を確かめてから記号に置き換える。両方の版で同じ時刻にするのはむずかしいため、比べる検査は時刻を比べない。トークンは、中身を読み、トークンに書かれた項目のうち `iat` `exp` `jti` を除いた項目と、`exp` から `iat` を引いた長さを比べる
 - 比べる検査は、データベースのすべての表のすべての行を読み、UUID と日時を置き換えてから、置き換えたあとの値で行を並べ替えて比べる。主キーの順に並べないのは、主キーの UUID が版ごとに別の乱数なので、同じ内容の行でも並びが版ごとに違うためである。比べる検査は、応答に現れた UUID を、応答と同じ番号に置き換える。応答に現れない UUID は、その行のほかの列の値の順に番号を付けて置き換える。比べる検査は、`flyway_schema_history` を比べない
 - 比べる検査は、送ったメールの本文の URL の中のトークンを、記号に置き換える
+- 比べる検査は、経歴書の中の項目を名前で並べる順の違いを、JSON の本文でだけ許す。許す範囲は、変えた動きの一覧の CB-001 の `match` である。CB-001 の `match` は、経歴書を返す応答の本文と、バックアップの本文で、ポートフォリオ、SNS、自己PR の並びの順だけの違いを許す
+- 比べる検査は、PDF と Markdown では、名前で並べる順の違いを許す仕組みを持たない。順が違うと、PDF では語の位置が、Markdown では行の並びが、まとめてずれるので、順の違いだけを見分けて許すことがむずかしいためである。その代わりに Claude が PDF と Markdown を比べる経歴書のデータの名前をどう決めるかは、pdfcmp の節に書く
 
 比べる検査は、見つけた違いが、変えた動きの一覧のどれかの項目の `match` に当たれば、その違いでは失敗しない。どれにも当たらない違いがあれば失敗し、筋書きの名前、段、比べたもの、Java 版の値、Go 版の値を報告する。
 
-筋書きの全体について、次も確かめる。
+比べる検査は、筋書きの全体について、次も確かめる。
 
 - まとまりが完了と記した操作(`progress.md` の表)が、そのまとまりの筋書きに1回以上出てくること。出てこない操作があれば失敗する
 - 段階4の切り替えの準備では、仕様書の50の操作のすべてが筋書きに出てくること
@@ -609,7 +611,7 @@ Java 版と比べる検査を消す PR 6-1 で、`backend/compat/` は消え、`
 
 fakeoidc は、Google の認可と token と userinfo への要求と、GitHub の認可と `access_token` と `/user` と `/user/emails` への要求に、筋書きが決めた利用者の値で応答を返す。
 
-**使う部品**: 比べる検査は、Java 版を `dev` のプロファイル(`SPRING_PROFILES_ACTIVE=dev`)で動かし、Go 版を `KEIREKIPRO_ENV=dev` で動かす。どちらの版も、Cookie の `Secure` を付けず、Redis に TLS なしでつなぐ。両方の版の設定を Java 版の `application-dev.yaml` の値にそろえるのは、`Set-Cookie` の比べで、設定の違いによる偽の違いが出ないようにするためである。CORS の許す送り元は、Java 版と Go 版でそろっていない(CB-010)。ただし、比べる検査は、要求にヘッダ `Origin` を付けない。そのため、どちらの版の CORS の処理も、応答に `Vary` のヘッダを付けるだけである。比べる検査が比べる応答のヘッダは、CORS の処理では変わらない。そのため、この違いは比べる結果に出ない。比べる検査は、Java 版を、Spring の環境変数の `SPRING_CLOUD_AWS_ENDPOINT` と `OIDC_PROVIDERS_<GOOGLE|GITHUB>_*` で、fakeaws と fakeoidc につなぐ。
+**使う部品**: 比べる検査は、Java 版を `dev` のプロファイル(`SPRING_PROFILES_ACTIVE=dev`)で動かし、Go 版を `KEIREKIPRO_ENV=dev` で動かす。どちらの版も、Cookie の `Secure` を付けず、Redis に TLS なしでつなぐ。両方の版の設定を Java 版の `application-dev.yaml` の値にそろえるのは、比べる検査が `Set-Cookie` を比べるときに、設定の違いによる偽の違いが出ないようにするためである。CORS の許す送り元は、Java 版と Go 版でそろっていない(CB-010)。ただし、比べる検査は、要求にヘッダ `Origin` を付けない。そのため、どちらの版の CORS の処理も、応答に `Vary` のヘッダを付けるだけである。比べる検査が比べる応答のヘッダは、CORS の処理では変わらない。そのため、この違いは比べる結果に出ない。比べる検査は、Java 版を、Spring の環境変数の `SPRING_CLOUD_AWS_ENDPOINT` と `OIDC_PROVIDERS_<GOOGLE|GITHUB>_*` で、fakeaws と fakeoidc につなぐ。
 
 Java 版の `dev` は、データベースと Redis と JWT の値を、環境変数でなく Secrets Manager の `keirekipro/rds` `keirekipro/redis` `keirekipro/jwt` から読み、読めなければ起動しない。JWT とは、backend がログインの状態を表すために署名して渡すトークンの形式であり、JWT の値とは、その署名に使う秘密の値である。そのため、比べる検査は、Java 版を起動する前に、fakeaws に次の秘密の値を登録する。
 
@@ -631,7 +633,7 @@ JWT の秘密の値を両方の版でそろえるのは、版をまたぐ確認�
 - PDF の出力
 - ログアウト
 - トークンの更新
-- 2段階の認証
+- 2段階認証
 - パスワードの再設定
 - 新規の登録のメールアドレスの確認
 - Google と GitHub でのログイン
@@ -662,23 +664,50 @@ JWT の秘密の値を両方の版でそろえるのは、版をまたぐ確認�
 | フォント | `pdffonts` | 許さない |
 | ページごとの文字 | `pdftotext -layout` | 許さない |
 | 語の位置 | `pdftotext -bbox-layout` | 上下左右の端のずれがそれぞれ 2pt 以内 |
-| 文字の大きさ | 語の箱の高さ | 0.5pt 以内 |
+| 文字の大きさ | 語の箱の高さ | 0.35pt 以内 |
 | 表の色 | `pdftoppm -r 72` の画像 | RGB のそれぞれが 2 以内 |
 
 - この部品は、フォントを、`pdffonts` の名前から先頭の6文字の付け足しを除いて比べる
 - この部品は、ページごとの文字を、「～」(U+FF5E)を「〜」(U+301C)に直してから比べる。各ページの最後の行が同じになるので、改頁の位置も同じになる
 - この部品は、`pdftotext -bbox-layout` の語ごとの箱を、ページと出てくる順で組にして、語の位置を比べる。文字の大きさは、同じ箱の高さで比べる
+- この部品が語の箱の高さの違いを 0.35pt まで許す理由は、次の3つである
+  - 語の箱の高さは、文字の大きさに、フォントごとに決まった比を掛けた値になる。research.md の「語の箱の高さと文字の大きさ(2026-11-16)」のとおり、比は Noto Sans JP で約1.448、Noto Serif JP で約1.437 だった。同じ文字の大きさの語の箱の高さは、Java 版の PDF と Chromium の PDF で同じだった
+  - 箱の高さの 0.35pt は、文字の大きさでは、Noto Sans JP で約0.242pt、Noto Serif JP で約0.244pt に当たる。どちらも、要件10の受入基準1の 0.25pt を超えない
+  - 利用者が選ぶ文字の大きさの1刻みの違いは、PDF の上で 0.375pt である。この違いは、箱の高さでは 0.539pt 以上になるので、この部品は1刻みの違いを止める
+- この部品はフォントの違いを許さないので、比べる PDF のフォントは、Noto Sans JP と Noto Serif JP に限られる
 - この部品は、表の色を、表の見出しと罫線の箱の内側から文字の箱を除いた画素の、色の最頻値で比べる
 
-Claude は、比べる経歴書のデータとして、項目が空の経歴書と、職歴と案件が多く3ページ以上になる経歴書と、長い文と改行を含む経歴書と、2つのフォントのそれぞれを選んだ経歴書を、`backend/compat/fixtures/resumes/` に置く。Claude は、どのデータを使うかを、出力のまとまりの spec で筋書きに書く。
+Claude は、比べる経歴書のデータとして、次の5種類を `backend/compat/fixtures/resumes/` に置く。
+
+- 項目が空の経歴書
+- 職歴と案件が多く3ページ以上になる経歴書
+- 長い文と改行を含む経歴書
+- 2つのフォントのそれぞれを選んだ経歴書
+- 文字の大きさと表の見出しの色を、既定と違う値にした経歴書
+
+利用者は、フォントと、文字の大きさと、表の見出しの色を、PDF の書き出しの要求の本文で選ぶ。そのため、4種類目と5種類目のデータは、経歴書の初めのデータと、書き出しの要求の本文のファイルの組である。5種類目の経歴書の初めのデータには、4種類目と同じデータを使う。
+
+Claude は、5種類目の要求の本文で、タイトル、日付、氏名、見出しの4つの文字の大きさを、どれも既定の値から 0.5 だけ違う値にし、4つを互いに違う値にする。既定の値は、タイトルが 16、日付が 10、氏名が 10、見出しが 11.5 である。Claude は、タイトルを 16.5、日付を 10.5、氏名を 9.5、見出しを 12 にする。日付と氏名は既定の値が同じである。日付と氏名を同じ値にすると、Go 版が日付の設定と氏名の設定を取り違えても、2つの版の PDF が同じになり、比べる検査がこの取り違えを見つけられない。そのため、Claude は、日付と氏名を別の値にする。表の見出しの色は、既定の `#d9d9d9` と違う色にする。Claude は、5種類目の要求の本文を、2つのフォントのそれぞれに1つずつ置く。語の箱の高さと文字の大きさの比が、フォントごとに違うためである。
+
+今の画面は、文字の大きさを 0.5 刻みに丸めてから送る。そのため、Claude は、比べるデータに、0.5 刻みでない文字の大きさを入れない。
+
+Claude は、比べる経歴書のデータで、ポートフォリオ、SNS、自己PR の名前を、Java 版と Go 版が同じ順に並べる名前にする。research.md の「比べるデータの名前の並び順(2026-11-16)」のとおり、今あるデータの名前は、半角の英字で始まり、Java 版と Go 版で同じ順に並んだ。名前の順が版で違うデータを置くと、PDF と Markdown を比べる筋書きが失敗するので、Claude は、そのデータの名前を直す。
+
+Claude は、どのデータを使うかを、出力のまとまりの spec で筋書きに書く。
 
 #### changed-behaviors.yaml(変えた動きの一覧)
 
-対応する要件: 4.6, 9.5, 9.6
+対応する要件: 4.6, 9.5, 9.6, 9.8, 9.9
 
-**役割**: このファイルは、利用者が目にしない動きを意図して変えたものと、所有者が受け入れた違いを、1つの項目ずつ持つ。所有者は、この spec の設計の承認のときに、「データの形」の節に書いた初めの項目を見る。所有者は、まとまりの spec の設計の承認のときに、Claude がそのまとまりの spec で足す項目を見る。所有者は、切り替えの前に、Claude が示す一覧の全体を見る。
+**役割**: このファイルは、Go 版が Java 版と違う動きをするところを、1つの項目ずつ持つ。項目は、次の3種類である。項目の「画面に影響が無い理由」に書くことは、種類ごとに違う。
 
-**状態の持ち方**: Claude は、このファイルに項目を足すのを、まとまりの spec の PR だけにする。Claude は、項目を足す PR の本文に、足した項目の `id` を書く。
+- Claude が意図して変えた、利用者が目にしない動き: Claude は、画面に影響が無い理由を書く
+- 所有者が Issue #445 の決めた方式で Java 版から変えると決めた4つの動き: 画面か出力に違いが出る動きでは、Claude は、どこが変わるかと、所有者が受け入れたことを書く。画面にも出力にも違いが出ない動きでは、Claude は、画面に影響が無い理由を書く
+- まとまりの spec を進める途中で、所有者が受け入れた違い: Claude は、どこが変わるかと、所有者が受け入れた日を書く
+
+所有者は、この spec の設計の承認のときに、「データの形」の節に書いた初めの項目を見る。所有者は、まとまりの spec の設計の承認のときに、Claude がそのまとまりの spec で足す項目を見る。所有者は、切り替えの前に、Claude が示す一覧の全体を見る。
+
+**状態の持ち方**: Claude は、このファイルに項目を足すのを、まとまりの spec の PR だけにする。まとまりの spec を進める途中で、画面が送る要求への Go 版の答えを Java 版と同じにできないと分かったときは、Claude は、所有者が違いを受け入れたあとにだけ、その違いの項目を足す。Claude は、項目を足す PR の本文に、足した項目の `id` を書く。
 
 ### 出荷の仕組み
 
@@ -714,7 +743,7 @@ Claude は、比べる経歴書のデータとして、項目が空の経歴書�
 
 対応する要件: 5.3, 5.4, 5.5, 7.1
 
-**役割**: `.kiro/specs/backend-go-replacement/runbook.md` は、所有者がする操作を、切り替え、Java 版に戻す、もう一度切り替える、の3つの場面ごとに、順番に書く。手順書には、所有者が切り替えの出荷を平日の 08:00 から 20:00 の間に起動し、20:00 に本番が止まる30分前までに出荷を終えることも書く。手順書には次の操作を含める。
+**役割**: `.kiro/specs/backend-go-replacement/runbook.md` は、所有者がする操作を、切り替え、Java 版に戻す、もう一度切り替える、の3つの場面ごとに、順番に書く。Claude は、手順書に、所有者が切り替えの出荷を平日の 08:00 から 20:00 の間に起動し、20:00 に本番が止まる30分前までに出荷を終えることも書く。Claude は、手順書に次の操作を含める。
 
 1. 段階4の本番の設定の変更の反映: 所有者は、「移行」の節の「段階ごとの PR」に書いた、terraform のファイルだけを変える PR を本番に反映する2回の手順のとおりに、`terraform-apply.yaml` を動かす。手順書には、この2回の手順を順番に書く。見分け方は、`aws secretsmanager get-secret-value` で読んだ `keirekipro/redis` にキー `redis-username` があること
 2. 切り替えの出荷: Actions の `release` を、`backend_impl` に `go` を選んで起動し、承認する。見分け方は、ワークフローの要約の版が `go` で、`backend` と `frontend` の仕事が成功したこと
@@ -818,7 +847,7 @@ Claude は、PR の本文を次の決まりで書く。この spec の PR の本
   - `dependency-graph-submit` は、`actions/go-dependency-submission` に `go-mod-path: backend/go.mod` と `go-build-target: backend/cmd/keirekipro/main.go` を渡し、本番の実行ファイルが使う部品の一覧を GitHub に送る。Claude は、2026-11-08 に `gh api` で、この部品が GitHub の公式の組織 `actions` にあり、保管だけの状態になっていないことと、最新の版が v2.0.3 であることと、`go-build-target` が `main()` を持つファイルのパスを受け取ることを、README で確かめた。main への push で動く `dependency-graph.yaml` の Gradle の仕事も、同じ送信に替える
   - `dependency-review` と公開の時刻の検査は、`dependency-graph-generate` と `dependency-graph-submit` が成功したことを条件にしている。2つの仕事が名前を変えずに成功するので、Claude は、この2つの条件を変えない
   - `gradle-wrapper` は、Gradle の wrapper の配布元と公表されたチェックサムを確かめる検査であり、Gradle を消すと確かめる対象が無くなる。中身を別の検査に替えると、名前と中身が食い違う。そこで、Claude は、6-1 で `guardrails.yaml` の `gradle-wrapper` の仕事と `check-gradle-wrapper.sh` とそのテストを消し、期待一覧から `gradle-wrapper` の行を消す。所有者は、6-1 の PR を承認するときに、GitHub の ruleset から `gradle-wrapper` を外す。所有者が `gradle-wrapper` を外さないと、6-1 の PR は、結果の来ない必須の検査を待ったまま main に入らない。Claude は、6-1 の PR の本文の「承認が要る理由」の欄に、この操作と、GitHub の画面で押す場所と、外せたかの見分け方を書く
-- 6-1 で、Claude は、開発環境で backend が生きているかを確かめる経路を `/actuator/health` から `/healthz` に替える。替えるのは、`start-dev.sh`、`.claude/scripts/parallel/ui.sh`、そのテストの `.claude/scripts/parallel/tests/test-ui.sh`、`verify-ui` のスキルである。6-1 で compose の `backend` が Go 版になり、Go 版は `/healthz` を返すので、6-1 で替えられる。6-1 で替えないと、開発環境の起動と画面の確認が、backend の起動を確かめられずに失敗する。失敗するのは、Go 版の `/actuator/health` を消す 6-3 が main に入ってから、Java と Spring を前提にした記述を書き換える 6-4 が main に入るまでの間である
+- 6-1 で、Claude は、開発環境で backend が生きているかを確かめる経路を `/actuator/health` から `/healthz` に替える。替えるのは、`start-dev.sh`、`.claude/scripts/parallel/ui.sh`、そのテストの `.claude/scripts/parallel/tests/test-ui.sh`、`verify-ui` のスキルである。6-1 で compose の `backend` が Go 版になり、Go 版は `/healthz` を返すので、Claude は、この経路を 6-1 で替えられる。6-1 で替えないと、開発環境の起動と画面の確認が、backend の起動を確かめられずに失敗する。失敗するのは、Go 版の `/actuator/health` を消す 6-3 が main に入ってから、Java と Spring を前提にした記述を書き換える 6-4 が main に入るまでの間である
 - 6-2 で変える値は、「本番の設定の値の変わり方」の表の段階6の列である
 - Claude は、Go 版の `/actuator/health` を消す PR 6-3 を、段階6の terraform の変更の PR 6-2 を所有者が本番に反映したあとに、main に入れる。Claude は、6-3 の PR を作る前に、`git grep -n 'actuator/health'` を `.kiro/specs/` を除いて動かし、その経路を呼ぶ設定とスクリプトが残っていないことを確かめる。残ってよいのは、6-4 で書き換える文書の行だけである
 - 6-4 で書き換える記述は、「移行」の節の「段階6の書き換え」に書いた
@@ -842,7 +871,7 @@ Java と Spring を前提にした記述を書き換える PR 6-4 の検査と�
 - 検索から外すファイル: 言語を書いてよいファイルは、「移行」の節の「段階6の書き換え」に書いた、言語を書いてよい文書である
 - 残った行の扱い: Claude は、除いたあとに残った語の行のすべてを、残す理由を添えて PR の本文に並べる。残してよい行は、表の名前の `flyway_schema_history` のように、Java 版を消したあとも使う名前を書いた行だけである
 
-この検索の形は、語の前が英数字でないところから始まる語を、後ろに続く英数字と `_` まで含めて1語ずつ出す。そのため、この検索の形は、`gradlew` `SPRING_APPLICATION_JSON` `jacocoTestReport` `flyway_schema_history` のように、後ろに文字の続く名前も拾う。Claude は、2026-11-08 にこの一覧で検査を動かし、`.kiro/steering/structure.md` の `MyBatis〜Repository` と `Mockito単体` と `MockMvc契約テスト` の行と、`.claude/scripts/parallel/ui.sh` の `actuator/health` の行を拾うことを確かめた。
+この検索の形は、語の前が英数字でないところから始まる語を、後ろに続く英数字と `_` まで含めて1語ずつ出す。そのため、この検索の形は、`gradlew` `SPRING_APPLICATION_JSON` `jacocoTestReport` `flyway_schema_history` のように、後ろに文字の続く名前も出す。Claude は、2026-11-08 にこの一覧で検査を動かし、この検査が、`.kiro/steering/structure.md` の `MyBatis〜Repository` と `Mockito単体` と `MockMvc契約テスト` の行と、`.claude/scripts/parallel/ui.sh` の `actuator/health` の行を出すことを確かめた。
 
 ## データの形
 
@@ -856,7 +885,7 @@ Java と Spring を前提にした記述を書き換える PR 6-4 の検査と�
   変えた動き: 日本語の名前の並び順
   java: Java の日本語の並べ替えの規則で並べる
   go: golang.org/x/text/collate の日本語の規則で並べる
-  画面に影響が無い理由: 画面の並び順が変わる。所有者が 2026-11-07 に受け入れた(Issue #445 の決めた方式)
+  画面に影響が無い理由: 画面、PDF、Markdown、バックアップの並び順が変わる。所有者が 2026-11-07 に受け入れた(Issue #445 の決めた方式)
   match:                    # 比べる検査が違いを許す範囲
     operation: getResume
     target: body            # body / status / header / db / redis / s3 / mail / pdf
@@ -881,10 +910,10 @@ Java と Spring を前提にした記述を書き換える PR 6-4 の検査と�
 | CB-009 | API の説明画面の経路への要求の偽の送信の検査 |
 | CB-010 | 開発環境の CORS の許す送り元 |
 
-- CB-001: 並び順が変わるのは、ポートフォリオ、SNS、自己PR などの日本語の名前である。Java 版は、Java の日本語の並べ替えの規則で並べる。Go 版は、golang.org/x/text/collate の日本語の規則で並べる。画面と PDF の並び順が変わる。所有者は、この違いを受け入れた
+- CB-001: 並び順が変わるのは、ポートフォリオ、SNS、自己PR などの日本語の名前である。Java 版は、Java の日本語の並べ替えの規則で並べる。Go 版は、golang.org/x/text/collate の日本語の規則で並べる。画面、PDF、Markdown、バックアップの並び順が変わる。所有者は、この違いを受け入れた。比べる検査がこの違いを許す範囲は「compat harness(比べる検査の本体)」の節に、PDF と Markdown を比べる経歴書のデータの名前の決め方は「pdfcmp(PDF の比べ方)」の節に書いた
 - CB-002: Java 版は、中身が BMP と WBMP のファイルと、途中で切れた JPEG を受け入れる。Go 版は、中身が PNG、JPEG、GIF のファイルだけを受け入れ、途中で切れた JPEG を断る。画面は PNG、JPEG、GIF の選び方を案内しており、ほかのファイルを選んだときは画面にエラーが出る。所有者は、この違いを受け入れた
 - CB-003: Java 版は、`Accept` に `application/json` が無いと 401 と空の本文を返す。Go 版は、`Accept` によらず 400 と足りない項目の一覧を返す。画面は `Accept` に `application/json` を付けて送るので、画面の動きは変わらない
-- CB-004: Java 版は openhtmltopdf で文字を配置し、PDF から文字を写すと「～」(U+FF5E)になる。Go 版は Chromium で文字を配置するので位置が 1〜2pt ずれ、写すと「〜」(U+301C)のままになる。配置、フォント、文字の大きさ、表の色、改頁の位置は同じである。所有者は、この違いを受け入れた
+- CB-004: Java 版は openhtmltopdf で文字を配置し、PDF から文字を写すと「～」(U+FF5E)になる。Go 版は Chromium で文字を配置するので位置が 1〜2pt ずれ、写すと「〜」(U+301C)のままになる。頁の数、フォント、文字の大きさ、表の色、改頁の位置、頁ごとの文字は、要件10の受入基準1に書いた範囲で Java 版と同じである。pdfcmp は、文字の位置のずれを 2pt まで許し、「～」を「〜」に直してから文字を比べる。所有者は、この違いを受け入れた
 - CB-005: Java 版は、絵文字を `\uXXXX` の形で書き、`<>&` と U+2028 と U+2029 をそのままの文字で書く。Go 版は、絵文字をそのままの文字で書き、U+2028 と U+2029 を `\uXXXX` の形で書く。画面は JSON を解析してから使うので、表示される文字は同じである。比べる検査が解析した値で比べるので、Claude は、CB-005 を、`match` を持たない記録だけの項目にする
 - CB-006: Java 版は、偽の送信の検査で要求を断るとき、要求に Cookie `XSRF-TOKEN` が無い場合だけ、新しい Cookie を付ける。Go 版は、要求を断るたびに新しい Cookie を付ける。画面は次の要求で新しい Cookie の値をヘッダに写すので、画面の動きは変わらない。Claude は、CB-006 の `match` を、`operation: "*"`、`status: 403`、`target: header`、`path: Set-Cookie` にする。この `match` は、403 の応答の `Set-Cookie` のヘッダの違いだけを許す。そのため、検査を通った要求と検査しない要求で、Go 版が Cookie を付ける動きが Java 版と違えば、比べる検査はその違いを見つける
 - CB-007: Java 版は、`TRACE` の要求を偽の送信の検査にかけない。Go 版は、`GET` `HEAD` `OPTIONS` のほかのすべての要求を検査するので、`TRACE` の要求も検査する。画面は `TRACE` の要求を送らないので、画面の動きは変わらない。比べる検査は `TRACE` の要求を送らないので、Claude は、CB-007 を、`match` を持たない記録だけの項目にする
@@ -892,7 +921,7 @@ Java と Spring を前提にした記述を書き換える PR 6-4 の検査と�
 - CB-009: Java 版は、API の説明画面の経路 `/swagger-ui/**`、`/swagger-ui.html`、`/v3/api-docs`、`/v3/api-docs/**` への要求を、偽の送信の検査にかけない。Go 版は、本番では利用者が API の説明画面を開けないとした要件14の受入基準3のとおり、これらの経路を受け付けず、ほかの経路と同じく検査するので、`GET` `HEAD` `OPTIONS` のほかの要求に、404 の前に 403 を返す。画面はこれらの経路に要求を送らないので、画面の動きは変わらない。開発者は、API の説明画面を compose の `api-docs` で開く。比べる検査はこれらの経路に要求を送らないので、Claude は、CB-009 を、`match` を持たない記録だけの項目にする
 - CB-010: Java 版の開発環境は、CORS の許す送り元を `http://localhost:5173` だけにする。Go 版の開発環境は、API の説明画面の `http://localhost:8082` も許す。開発者が説明画面の「Try it out」で Go 版を呼べるようにするためである。本番の許す送り元は、どちらの版も `https://app.keirekipro.click` だけなので、利用者の画面の動きは変わらない。比べる検査は要求に `Origin` を付けないので、Claude は、CB-010 を、`match` を持たない記録だけの項目にする
 
-次の Java 版の動きは、変えた動きの一覧に項目を足す候補である。どれも Java 版は 500 を返している。
+次の Java 版の動きは、変えた動きの一覧に項目を足す候補である。どれも Java 版は 500 を返している。Claude は、まとまりの spec で、候補ごとに、今の画面を操作すると送られる要求かを確かめる。画面を操作しても送られない要求なら、Claude は、Go 版の答えを Go の標準の形に変え、変えた動きの一覧に項目を足す。画面を操作すると送られる要求なら、Go 版は、要件4の受入基準4のとおり、Java 版と同じ答えを返す。Claude は、その候補を、変えた動きの一覧に足さない。
 
 | 候補 | まとまり | Go の標準の形 |
 |---|---|---|
@@ -951,7 +980,7 @@ steps:
 
 ## 失敗したときの扱い
 
-- 比べる検査で一覧に無い違いが見つかったとき: `backend-test` が失敗し、PR は main に入らない。Claude は、違いが Go 版の誤りなら Go 版を直す。所有者が、Java 版と同じ動きにできない違いを受け入れたら、Claude は、変えた動きの一覧に項目を足す
+- 比べる検査で一覧に無い違いが見つかったとき: `backend-test` が失敗し、PR は main に入らない。Claude は、違いが Go 版の誤りなら Go 版を直す。違いが、利用者が目にしない動きを Claude が意図して変えたものなら、Claude は、変えた動きの一覧に項目を足す。違いが、画面が送る要求への答えで、Go 版を Java 版と同じにできないものなら、Claude は、自分の判断では答えを変えない。Claude は、違いと、Java 版と同じにできない理由を所有者に示す。所有者は、Go 版を直すか、違いを受け入れるかを決める。所有者が違いを受け入れたら、Claude は、変えた動きの一覧に項目を足し、どこが変わるかと、所有者が受け入れた日を書く
 - Java 版の不具合の直しで違いが見つかったとき: 片方だけを直した PR は main に入らない。理由は「CI の仕事」の「いつ動くか」に書いた
 - 切り替えの出荷で Go 版が起動しないとき: Claude は、Go 版のタスクの止まった理由とログを読み、所有者に報告する。止まった理由は、`aws ecs describe-tasks` の `stoppedReason` で読む
 - 切り替えのあとに Go 版で不具合が見つかったとき: 所有者が `backend_impl` に `java` を選んで出荷する。Java 版と Go 版は同じ表の形と同じ Redis の形を使うので、Go 版に届いた保存とログインの状態は残る。Claude は、Go 版を直して比べる検査に通したあと、もう一度切り替える手順を示す
@@ -964,7 +993,7 @@ steps:
   - config: `prod` で5つの秘密の値の決まったキーを読むこと。足りないキーのエラーに値を書かないこと。`dev` で Java 版と同じ名前の環境変数を読むこと
   - httpapi の偽の送信の検査: Cookie とヘッダが一致しない `POST` に 403 と決まった本文と新しい Cookie を返すこと。`GET` は通すこと。Cookie の無い `GET` と、経路が `/api/auth` の下の `POST` に、新しい Cookie を付けて通すこと。Cookie のある要求と `OPTIONS` の要求に Cookie を付けないこと。ログインの状態の検査より前に動くこと
   - pdf: 同時に3件を頼んだとき、3件目が1件目の終わりまで待つこと。30秒を超えた要求が 500 になること。Chromium を止めたあとの要求で Chromium を起動し直すこと
-  - pdfcmp: 2pt のずれを許し、2.5pt のずれと1文字の違いと改頁の位置の違いを失敗にすること
+  - pdfcmp: 2pt のずれを許し、2.5pt のずれと1文字の違いと改頁の位置の違いを失敗にすること。語の箱の高さの 0.35pt 以内の違いを許し、0.35pt を超える違いを失敗にすること
 - 結合テスト:
   - migrate: testcontainers-go の Postgres で、Java 版の Flyway が書いた形の表を作り、`ValidateOnly` で通ること。空のデータベースに `Apply` で V1〜V7 を適用した表を、Java 版の Flyway の `validate` が通すこと。この確認では、Java 版の Flyway を比べる検査の中で動かす
   - redisstore: 1台の Redis で、Java 版と同じ Lua のスクリプトが同じ結果を返すこと
@@ -972,7 +1001,7 @@ steps:
   - 版をまたぐ確認の土台: 同じイメージを両方の位置に置き、1つ目の要求と2つ目からの要求を別の位置に送る筋書きが通ること。期待と違うステータスを返す段がある筋書きが失敗し、報告に段と向きが出ること
 - 比べる検査と版をまたぐ確認: Claude は、まとまりの spec で、次の筋書きを足す。
   - Claude は、まとまりの spec で、まとまりごとに、画面が送る正しい要求と、入力に誤りのある要求と、権限の無い操作の要求と、ログインが切れたあとの要求と、偽の送信の検査に通らない要求を送る筋書きを足す
-  - 出力: Claude は、`fixtures/resumes/` の4種類の経歴書で、Java 版と Go 版の PDF と Markdown を比べる筋書きを足す
+  - 出力: Claude は、`fixtures/resumes/` の5種類の経歴書で、Java 版と Go 版の PDF と Markdown を比べる筋書きを足す
   - バックアップ: Claude は、Java 版で書き出したバックアップを Go 版で戻す筋書きと、Go 版で書き出したバックアップを Java 版で戻す筋書きと、形の誤ったバックアップと版の違うバックアップを戻そうとする筋書きを足す
   - 段階4: 仕様書の50の操作がすべて筋書きに出てくること
 - 性能と負荷のテスト:
@@ -983,7 +1012,7 @@ steps:
 
 ## 安全
 
-- 偽の送信の検査、Cookie の名前と性質、ログインの状態の有効な時間、2段階の認証、確認のメールを送り直せる間隔の制限は、比べる検査が Java 版と同じであることを確かめる。偽の送信の検査のうち、断るときの Cookie の作り直しと、`TRACE` の要求の検査と、`/actuator` の下の要求の検査と、API の説明画面の経路への要求の検査の4つは、Go 版の動きが Java 版と違う。この4つは、変えた動きの一覧の CB-006 から CB-009 に載せた
+- 偽の送信の検査、Cookie の名前と性質、ログインの状態の有効な時間、2段階認証、確認のメールを送り直せる間隔の制限は、比べる検査が Java 版と同じであることを確かめる。偽の送信の検査のうち、断るときの Cookie の作り直しと、`TRACE` の要求の検査と、`/actuator` の下の要求の検査と、API の説明画面の経路への要求の検査の4つは、Go 版の動きが Java 版と違う。この4つは、変えた動きの一覧の CB-006 から CB-009 に載せた
 - CORS の処理は、本番では、許す送り元とメソッドとヘッダと、Cookie を付けた要求を許すことと、ブラウザに見せるヘッダを、Java 版と同じにする。比べる検査は要求に `Origin` を付けないので、Claude は、CORS の処理が Java 版と同じ応答を返すことを、Go 版の単体テストで確かめる。Go 版の CORS の処理は、開発環境でだけ、API の説明画面の送り元も許す(CB-010)。開発環境の Go 版は開発者の PC の中だけで動くので、許す送り元を1つ足しても、利用者のデータは外に出ない
 - 出力のまとまりの spec で作る Go 版のコードは、テンプレートに入れる利用者の入力のうち、Java 版のテンプレートが置き換えているのと同じ5つの文字 `<` `>` `&` `"` `'` を、HTML の中でただの文字として表示される書き方に置き換える
 - 本番の組み立ては `-tags` を付けないので、`compat` のビルドタグの中にある AWS とログインの代わりは、本番の実行ファイルに入らない
@@ -1048,7 +1077,7 @@ flowchart TB
 
 ### 段階6の書き換え
 
-Java と Spring を前提にした記述は、ファイルの種類で書き換え方を分ける。
+Claude は、Java と Spring を前提にした記述の書き換え方を、ファイルの種類で分ける。
 
 | 種類 | 書き換え方 |
 |---|---|
@@ -1063,7 +1092,7 @@ Java と Spring を前提にした記述は、ファイルの種類で書き換�
   - `.kiro/settings/rules/` の決まりの `spec-writing.md` と `owner-writing.md`
   - `.kiro/settings/templates/specs/design.md` と、`.kiro/steering/structure.md` と `product.md`
   - `doc/開発フロー/` の手順書の `基盤構築手順.md` `監査手順.md` `参加者セットアップ手順.md` `並行作業の手順.md`
-- Claude は、言語に依存しない書き方にする文書を、「backend の品質チェック」「backend の変異テスト」のように書き、道具の名前は `backend/CLAUDE.md` に寄せる。Claude は、spec-writing.md の「`./gradlew check`」の例を、言語に依存しない例に替える
+- Claude は、言語に依存しない書き方にする文書を、「backend の品質チェック」「backend の変異テスト」のように書き、道具の名前は `backend/CLAUDE.md` に書く。Claude は、spec-writing.md の「`./gradlew check`」の例を、言語に依存しない例に替える
 - 設定とスクリプトは、`.claude/settings.json`、`.claude/scripts/` の `run-check.sh` `ui.sh` `session.sh` と vuln-watch のスクリプト、`.claude/hooks/check-encoding.sh`、`.github/` のワークフローとスクリプトと設定、`docker/`、`compose.yaml`、`start-dev.sh`、`terraform/`、`.gitignore` である。`check-encoding.sh` では、Claude は `.go` を対象に足し、`.java` を消す
 
 ### 消す一覧

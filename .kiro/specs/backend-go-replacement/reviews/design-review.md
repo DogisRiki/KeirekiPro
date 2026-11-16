@@ -882,3 +882,114 @@
 | (なし) | | | |
 
 - 往復: 1回で収束 / 未解決: 0件
+
+## サイクル12 往復1(2026-11-16)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md「pdfcmp(PDF の比べ方)」の表と、許す違いの理由の箇条、比べるデータの5種類と要求の本文の決め方、名前の並び順の段(661〜696行目): 語の箱の高さの許す違いを 0.5pt から 0.35pt に変え、5種類目のデータを足した。要件10の受入基準1・3・4と照らした
+- design.md「compat harness」の対応する要件と比べ方の最後の2つの箇条(552行目、592〜593行目): 名前で並べる順の違いを許す範囲が変わった。要件4の受入基準4・6、要件9の受入基準8・9、要件10の受入基準1・2、要件11の受入基準2と照らした
+- design.md「changed-behaviors.yaml」の役割と状態の持ち方(700〜710行目)、「データの形」の CB-001 と CB-004 と候補の段(888行目、913行目、916行目、924行目)、「失敗したときの扱い」の1つ目の箇条: 要件4の受入基準4、要件9の受入基準5・6・8・9が直されたことに合わせた直し。要件と照らし、「状態の持ち方」と「失敗したときの扱い」が食い違っていないかを確かめた
+- design.md「テストの方針」の pdfcmp と出力の行(996行目、1004行目): pdfcmp の節の 0.35pt と5種類に合うかを確かめた
+- design.md「作らないもの」「使う既存の仕組み」の時刻の言い換え(25行目、32行目): terraform の時刻の設定と照らした
+- そのほかの差分(「変更した」を「変えた」に、「起こす」を「起動する」に、「落ちた」を「異常に終了した」に、「2段階の認証」を「2段階認証」に変えたこと、主語を足しただけの文、「寄せる」を「書く」に変えたこと、検索の形の「拾う」を「出す」に変えたこと): 前後の文を読み、中身が変わっていないことを確かめた。影響なし
+
+### 実ファイルで確かめた文
+
+- 作らないもの・使う既存の仕組み「EventBridge Scheduler に置いた、本番を動かし始める時刻と止める時刻の設定」: terraform/modules/scheduler/main.tf 76〜178行(rds_start、ecs_start、ecs_stop、rds_stop の schedule_expression) / 合っていた
+- 所有者に提案するゲート設定の変更「dind を起動する領域」と backend-go の役割「dind を起動してから」: .claude/scripts/parallel/run-check.sh 156〜163行(backend と backend-go の dind を確かめ、止まっていれば起動する) / 合っていた
+- compat harness「CB-001 の match は、経歴書を返す応答の本文と、バックアップの本文で、ポートフォリオ、SNS、自己PR の並びの順だけの違いを許す」: backend/compat/changed-behaviors.yaml 6〜37行(operation "*" の3つの並びと、backupResume の $.resume の下の3つの並び) / 合っていた
+- compat harness「PDF と Markdown では、名前で並べる順の違いを許す仕組みを持たない」: backend/compat/harness/match.go 148〜163行(order_only は target が body か redis に限る)、279〜285行 / 合っていた
+- pdfcmp「比は Noto Sans JP で約1.448、Noto Serif JP で約1.437」「0.35pt は約0.242pt と約0.244pt」「1刻みは 0.375pt で、箱の高さでは 0.539pt 以上」: research.md 292〜316行の表の値で計算し直した(17.3760÷12=1.448、17.2440÷12=1.437、0.35÷1.448=0.2417、0.35÷1.437=0.2436、0.375×1.437=0.539) / 合っていた
+- pdfcmp「1刻みの違いは PDF の上で 0.375pt」: backend/src/main/resources/templates/resume/pdf/simple.html 39・48・57・69行(設定の文字の大きさを px で使う) / 合っていた
+- pdfcmp「比べる PDF のフォントは Noto Sans JP と Noto Serif JP に限られる」: backend/api/openapi.yaml 2057〜2059行(fontFamily の enum は NotoSansJP と NotoSerifJP)、ResumePdfExportSettings.java 53〜59行 / 合っていた
+- pdfcmp「利用者は、フォントと文字の大きさと表の見出しの色を、PDF の書き出しの要求の本文で選ぶ」: backend/api/openapi.yaml 2052〜2062行、backend/compat/fixtures/resumes/ に fonts-NotoSansJP.json と fonts-NotoSerifJP.json がある / 合っていた
+- pdfcmp「既定の値は 16、10、10、11.5、既定の色は #d9d9d9」: backend/src/main/java/com/example/keirekipro/usecase/resume/export/ResumePdfExportSettings.java 24〜32行、frontend/src/features/resume/utils/pdfPreview.ts 5〜16行 / 合っていた
+- pdfcmp「今の画面は、文字の大きさを 0.5 刻みに丸めてから送る」: frontend/src/features/resume/utils/pdfPreview.ts 21〜33行・77〜92行。pdfSettings を送る箇所は frontend/src/features/resume/hooks/useResumePdfPreview.ts 64行・79行だけで、どちらも buildResumePdfSettingsPayload を通る / 合っていた
+- pdfcmp「今あるデータの名前は半角の英字で始まる」: backend/compat/fixtures/resumes/fonts.sql 56〜67行、long-text.sql 36〜51行、resume-ops.sql 110〜126行、resume-limits.sql 67〜87行 / 合っていた(2つの並べ替えで順が同じだったことは research.md の実測による)
+- CB-004「pdfcmp は、文字の位置のずれを 2pt まで許し、「～」を「〜」に直してから文字を比べる」: backend/compat/pdfcmp/pdfcmp.go 33行、269行、341行 / 合っていた
+- research.md「PDF を比べる部品は、語の箱の高さの違いを 0.5pt まで許していた」: backend/compat/pdfcmp/pdfcmp.go 35行(HeightTolerance = 0.5)、458行 / 合っていた(design の 0.35pt は、これから直す値として書かれている)
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 4.4 | 比べる検査の筋書き(画面が送る正しい要求と、画面がエラーを見せる要求) | CI の backend-test、開発環境の run-check.sh backend-go | 筋書き、初めのデータ、両方の本番のイメージ。画面が送らない要求の扱いは候補の段で決める | 「compat harness」、「データの形」の候補の段、「テストの方針」の比べる検査の行 |
+| 4.6 | 比べる検査と、changed-behaviors.yaml の match | CI の backend-test | 変えた動きの一覧の項目と match | 「compat harness」の比べ方、「changed-behaviors.yaml」の役割、「変えた動きの一覧の形」 |
+| 9.8 | 比べる検査(JSON の本文は CB-001 の match、PDF と Markdown は名前の順が同じデータ) | CI の backend-test | CB-001 の match、名前の順が同じ比べるデータ | 「compat harness」の比べ方の最後の2つの箇条、「pdfcmp」の名前の並び順の段、CB-001〜CB-004 |
+| 9.9 | 所有者に示して受け入れを得る手順と、変えた動きの一覧に足す項目 | まとまりの spec の PR | 違いと理由、所有者が受け入れた日 | 「changed-behaviors.yaml」の役割と状態の持ち方、「失敗したときの扱い」の1つ目の箇条 |
+| 10.1 | pdfcmp(頁の数と大きさ、フォント、頁ごとの文字、語の位置 2pt、箱の高さ 0.35pt、表の色 RGB 2)と、その単体テスト | CI の backend-test(compat タグ) | poppler-utils、5種類の比べるデータ、2つのフォント | 「pdfcmp」の表と箇条、「テストの方針」の pdfcmp の行 |
+| 10.2 | 比べる検査の Markdown の本文の比べ(1文字も違わない) | CI の backend-test | 名前の順が同じ比べるデータ | 「compat harness」の比べ方の表、「pdfcmp」の名前の並び順の段 |
+| 10.3 | 出力の筋書き(5種類の経歴書) | CI の backend-test | fixtures/resumes の5種類と、2つのフォントの要求の本文、既定から 0.5 違う要求の本文 | 「pdfcmp」のデータの段、「テストの方針」の出力の行。ただし、日付と氏名の取り違えを見つけられる値が決まっていない(D12-1-1) |
+| 10.4 | pdfcmp の許す違いの決め方 | design と research.md | 箱の高さと文字の大きさの比の実測 | 「pdfcmp」の 0.35pt の理由の箇条、research.md「語の箱の高さと文字の大きさ」 |
+| 11.2 | 比べる検査のバックアップの本文の比べ(CB-001 の backupResume の match)と、版をまたぐ戻しの筋書き | CI の backend-test | Java 版と Go 版で書き出したバックアップ | 「compat harness」の比べ方、「cross」の対象の筋書き、「テストの方針」のバックアップの行 |
+
+### 申告
+
+**1. 5種類目のデータでは、4つの文字の大きさを既定から 0.5 だけ変える。互いに違う値にするかは決めていない** — design.md「pdfcmp」の5種類目の要求の本文の段(690行目)
+
+- Issue の記載: あり。「比べるデータには、利用者が PDF の書き出しで選べる文字の大きさと表の見出しの色を、既定と違う値にした経歴書を含める」
+- 決めたこと: タイトル、日付、氏名、見出しを、どれも既定から 0.5 違う値にする。表の見出しの色は既定と違う色にする。2つのフォントに1つずつ置く
+- 他にありえた選択肢: 4つを互いに違う値にする。大きく違う値も足す(たとえば 72 や 6)
+- 外れていた場合: 設定を取り違えた Go 版の誤りを、比べる検査が見逃す(D12-1-1)
+
+**2. PDF と Markdown では、名前の順の違いを許す仕組みを作らず、版で同じ順に並ぶ名前のデータだけで比べる** — design.md「compat harness」の比べ方の最後の箇条、「pdfcmp」の名前の並び順の段
+
+- Issue の記載: あり。並び順は Go の標準の日本語の並び順に変え、変えた動きの一覧に載せる
+- 決めたこと: 比べるデータの名前を、半角の英字で始まり、2つの版で同じ順に並ぶものに限る
+- 他にありえた選択肢: PDF と Markdown でも、順だけの違いを見分けて許す仕組みを作る
+- 外れていた場合: 並び順そのものを PDF と Markdown の出力で確かめられない。research.md では、並べ替えは Go 版の単体テストと JSON の比べで確かめるとしている
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D12-1-1 | 中 | design.md「pdfcmp(PDF の比べ方)」の5種類目の要求の本文の段(690行目) | 5種類目の要求の本文で決めているのは、4つの文字の大きさを「どれも既定の値から 0.5 だけ違う値にする」ことだけである。日付と氏名は、どちらも既定が 10 である。そのため、design のとおりに日付と氏名をどちらも 10.5 にしてもよい。そうすると、Go 版が日付の設定と氏名の設定を取り違えても、2つの PDF は同じになり、比べる検査は通る。既定のデータでも2つは同じ 10 なので、5種類のどのデータでもこの取り違えを見つけられない。要件10の受入基準3が5種類目のデータを足したのは、利用者が選んだ文字の大きさのとおりに PDF ができるかを確かめるためである。値の選び方が決まっていないと、確かめの穴が誰にも気づかれずに残る | 5種類目の要求の本文では、4つの文字の大きさを互いに違う値にすると design に書く。たとえば、日付を 10.5、氏名を 9.5 にする。2つの違いは文字の大きさで 0.75pt、箱の高さで約1.08pt になり、0.35pt で止まる |
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| (なし) | | | |
+
+- 往復: 1回目 / 高0 中1 低0
+
+## サイクル12 往復2(2026-11-16)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md「pdfcmp(PDF の比べ方)」の5種類目の要求の本文の段(690行目): D12-1-1 の直し。4つの値が、どれも既定の値から 0.5 だけ違い、互いに違い、受け付けられる範囲と 0.5 刻みに収まるかを確かめた。要件10の受入基準3(requirements.md 242行目)と照らした。同じ節の 680〜692行目(5種類のデータ、4種類目と5種類目の組、0.5 刻みの段)と、「テストの方針」の出力の行(1004行目)も、「5種類」「取り違え」「16.5」「9.5」で検索して読み、食い違わないことを確かめた
+- design.md「移行」の段階6の 6-1 の箇条(850行目): 主語「Claude は、この経路を」を足しただけである。前後の 6-1〜6-4 の箇条を読み、中身が変わっていないことを確かめた。ほかの節に影響は無い
+
+### 実ファイルで確かめた文
+
+- pdfcmp 690行目「既定の値は、タイトルが 16、日付が 10、氏名が 10、見出しが 11.5」: backend/src/main/java/com/example/keirekipro/usecase/resume/export/ResumePdfExportSettings.java 24〜32行、frontend/src/features/resume/utils/pdfPreview.ts 5〜16行 / 合っていた
+- pdfcmp 690行目「表の見出しの色の既定は #d9d9d9」: ResumePdfExportSettings.java 31行、pdfPreview.ts 13〜15行 / 合っていた
+- pdfcmp 690行目「16.5、10.5、9.5、12 を要求の本文で選べる」(受け付ける範囲と刻み): backend/src/main/java/com/example/keirekipro/presentation/resume/dto/ExportResumeRequest.java 104〜120行(6以上72以下)、ResumePdfExportSettings.java 61〜79行(0.5 刻みに丸める。4つの値は丸めても変わらない) / 合っていた
+- pdfcmp 690行目「日付と氏名は別の設定として PDF に効く」: backend/src/main/resources/templates/resume/pdf/simple.html 48行(dateFontSize)と57行(fullNameFontSize)。どちらも px で使うので、差の 1.0 は PDF の上で 0.75pt になり、箱の高さでは約1.08pt(比 1.437 以上)になって 0.35pt を超える / 合っていた
+- 移行 850行目「替えるのは start-dev.sh、.claude/scripts/parallel/ui.sh、.claude/scripts/parallel/tests/test-ui.sh、verify-ui のスキル」「Go 版は /healthz を返す」: `actuator/health` で検索した結果、4つのファイル(start-dev.sh、.claude/scripts/parallel/ui.sh、.claude/scripts/parallel/tests/test-ui.sh、.claude/skills/verify-ui/SKILL.md)に出てくる。backend/internal/httpapi/server.go 229〜230行で /actuator/health と /healthz の両方を登録している / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 10.1 | pdfcmp(語の箱の高さの違いを 0.35pt まで許す)と、5種類目のデータでの PDF の比べ | CI の backend-test(compat タグ) | 5種類目の要求の本文(2つのフォントに1つずつ。タイトル 16.5、日付 10.5、氏名 9.5、見出し 12、既定と違う表の見出しの色) | 「pdfcmp」の表と箇条、690行目の段 |
+| 10.3 | 出力の筋書き(5種類の経歴書) | CI の backend-test | fixtures/resumes の5種類と、既定から 0.5 違い、4つが互いに違う値を持つ要求の本文 | 「pdfcmp」の 680〜692行目、「テストの方針」の出力の行(1004行目) |
+
+### 申告
+
+この往復で新しく申告することは無い。
+
+### 指摘
+
+指摘なし
+
+### 前の段階への指摘
+
+なし
+
+- 往復: 2回で収束 / 未解決: 0件
