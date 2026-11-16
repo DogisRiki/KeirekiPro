@@ -1,0 +1,29 @@
+# 3つのマスタ(資格、SNS、技術スタック)の答えを比べる筋書き。資格と SNS の名前の並びも、答えの全体を比べて確かめる。
+# 経歴書の操作の筋書きが使う初めのデータ(resumes/resume-ops.sql と resumes/resume-limits.sql)を読み込み、
+# 読み込むときに誤りが出ないことと、Java 版と Go 版で同じデータベースになることも、この筋書きで確かめる。
+name: resumes-masters
+group: 3
+fixtures: [users/basic.sql, resumes/resume-ops.sql, resumes/resume-limits.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: get-certifications
+    request:
+      method: GET
+      path: /api/certifications
+    expect: {status: 200}
+  - name: get-sns-platforms
+    request:
+      method: GET
+      path: /api/sns-platforms
+    expect: {status: 200}
+  - name: get-tech-stacks
+    request:
+      method: GET
+      path: /api/tech-stacks
+    expect: {status: 200}

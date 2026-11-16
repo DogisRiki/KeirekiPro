@@ -230,7 +230,7 @@
   - _依存: 1.1, 2.1, 4.3_
 
 - [ ] 6. マスタと経歴書の操作の筋書きで Java 版と Go 版を比べる
-- [ ] 6.1 初期のデータと、マスタの筋書きを書く
+- [x] 6.1 初期のデータと、マスタの筋書きを書く
 
   Claude は、初期のデータの節のとおりに、`backend/compat/fixtures/resumes/resume-ops.sql` と `resume-limits.sql` を書く。Claude は、マスタと経歴書の操作の筋書きの節のとおりに、`backend/compat/scenarios/resumes/masters.yaml` を `group: 3` と `modes: [compare]` で書く。
   - 完了の確かめ方: `go test -tags compat -count=1 -run 'TestCompare_Scenarios/<masters.yaml の筋書きの名前>' ./compat/` が通る。`resume-ops.sql` と `resume-limits.sql` は、この筋書きの `fixtures` に書いてデータベースに入り、入れるときに誤りが出ない
