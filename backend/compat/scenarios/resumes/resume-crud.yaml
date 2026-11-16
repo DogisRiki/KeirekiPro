@@ -1,0 +1,158 @@
+# 経歴書の一覧、作成、コピーした作成、1件の取得、基本の情報の更新、削除の筋書き。
+# user1 が、resumes/resume-ops.sql の経歴書 A(000000000320)と経歴書 B(000000000330)を持つ状態から始める。
+# 作成は、画面が送る3つの形(resumeId の鍵が無い本文、null、空の文字列)と、経歴書 A をコピーする本文を送る。
+# 作った経歴書の ID は、版ごとに応答から取り出して、あとの段の経路に入れる。
+# どの段も、答えとデータベースを比べる。作成と更新の日時は <wallclock:形:+秒> で、ID は UUID の置き換えで比べる。
+name: resumes-crud
+group: 3
+fixtures: [users/basic.sql, resumes/resume-ops.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: list-resumes
+    request:
+      method: GET
+      path: /api/resumes
+    expect: {status: 200, fields: [$.resumes]}
+  - name: get-resume-a
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200, fields: [$.id, $.careers, $.projects, $.certifications, $.portfolios, $.snsPlatforms, $.selfPromotions]}
+  - name: get-resume-b
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000330
+    expect: {status: 200, fields: [$.id]}
+  # コピーしない作成
+  - name: create-without-resume-id
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 新しい経歴書}
+    capture: {newID: $.id}
+    expect: {status: 201, fields: [$.id, $.date, $.createdAt, $.updatedAt]}
+  - name: create-with-null-resume-id
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 二つ目の経歴書, resumeId: null}
+    capture: {nullID: $.id}
+    expect: {status: 201}
+  - name: create-with-empty-resume-id
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 三つ目の経歴書, resumeId: ''}
+    capture: {emptyID: $.id}
+    expect: {status: 201}
+  - name: get-created
+    request:
+      method: GET
+      path: /api/resumes/{newID}
+    expect: {status: 200}
+  # コピーした作成。経歴書 A の6つの欄の項目が、新しい ID で写る
+  - name: create-copy-of-a
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 写した経歴書, resumeId: 00000000-0000-4000-8000-000000000320}
+    capture: {copyID: $.id}
+    expect: {status: 201, fields: [$.careers, $.projects, $.certifications, $.portfolios, $.snsPlatforms, $.selfPromotions]}
+  - name: get-copy
+    request:
+      method: GET
+      path: /api/resumes/{copyID}
+    expect: {status: 200}
+  - name: get-resume-a-after-copy
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200}
+  - name: list-after-create
+    request:
+      method: GET
+      path: /api/resumes
+    expect: {status: 200}
+  # 基本の情報の更新
+  - name: update-basic-created
+    request:
+      method: PUT
+      path: /api/resumes/{newID}/basic
+      csrf: true
+      json: {resumeName: 直した経歴書, date: '2026-05-01', lastName: 山田, firstName: 太郎}
+    expect: {status: 200}
+  - name: update-basic-b
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000330/basic
+      csrf: true
+      json: {resumeName: 別の経歴書を直した, date: '2025-12-31', lastName: Smith, firstName: ジョン}
+    expect: {status: 200}
+  - name: update-basic-copy-keep-name
+    request:
+      method: PUT
+      path: /api/resumes/{copyID}/basic
+      csrf: true
+      json: {resumeName: 写した経歴書, date: '2026-04-01', lastName: やまだ, firstName: ハナコ}
+    expect: {status: 200}
+  - name: get-updated
+    request:
+      method: GET
+      path: /api/resumes/{newID}
+    expect: {status: 200}
+  - name: list-after-update
+    request:
+      method: GET
+      path: /api/resumes
+    expect: {status: 200}
+  # 削除。コピーした経歴書は、6つの欄の項目と一緒に消える
+  - name: delete-created
+    request:
+      method: DELETE
+      path: /api/resumes/{newID}
+      csrf: true
+    expect: {status: 204}
+  - name: get-deleted
+    request:
+      method: GET
+      path: /api/resumes/{newID}
+    expect: {status: 404}
+  - name: delete-copy
+    request:
+      method: DELETE
+      path: /api/resumes/{copyID}
+      csrf: true
+    expect: {status: 204}
+  - name: delete-null-created
+    request:
+      method: DELETE
+      path: /api/resumes/{nullID}
+      csrf: true
+    expect: {status: 204}
+  - name: delete-empty-created
+    request:
+      method: DELETE
+      path: /api/resumes/{emptyID}
+      csrf: true
+    expect: {status: 204}
+  - name: delete-copy-again
+    request:
+      method: DELETE
+      path: /api/resumes/{copyID}
+      csrf: true
+    expect: {status: 404}
+  - name: list-after-delete
+    request:
+      method: GET
+      path: /api/resumes
+    expect: {status: 200}

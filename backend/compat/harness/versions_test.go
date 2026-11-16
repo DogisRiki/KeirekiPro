@@ -59,8 +59,9 @@ func assertEnv(t *testing.T, got, want map[string]string) {
 
 func TestJavaEnv_DevProfileAndOIDCEndpoints(t *testing.T) {
 	assertEnv(t, JavaEnv(sampleBacking()), map[string]string{
-		"SPRING_PROFILES_ACTIVE":                      "dev",
-		"SPRING_CLOUD_AWS_ENDPOINT":                   "http://fakeaws-java:4566",
+		"SPRING_PROFILES_ACTIVE":    "dev",
+		"SPRING_CLOUD_AWS_ENDPOINT": "http://fakeaws-java:4566",
+		"TZ":                        "Asia/Tokyo",
 		"OIDC_PROVIDERS_GOOGLE_AUTHORIZATIONENDPOINT": oidcURL("/o/oauth2/v2/auth"),
 		"OIDC_PROVIDERS_GOOGLE_TOKENENDPOINT":         oidcURL("/token"),
 		"OIDC_PROVIDERS_GOOGLE_USERINFOENDPOINT":      oidcURL("/v1/userinfo"),

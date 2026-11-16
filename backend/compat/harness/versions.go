@@ -69,10 +69,13 @@ var oidcPaths = map[string][3]string{
 
 // JavaEnv は、Java 版のコンテナの環境変数を返す。Java 版は、dev のプロファイルで、データベースと Redis と JWT の値を
 // fakeaws の秘密の値から読む。そのため、比べる検査は、Java 版を起動する前に JavaSecrets を fakeaws に登録する。
+// Java 版は、本番の ECS のタスクと同じく、日本の時間帯で動かす。Java 版は経歴書の作成と更新の日時を、時差を付けずに、
+// 動いている時間帯の時刻で書くので、時間帯が本番と違うと、Go 版と比べる日時が9時間ずれるためである。
 func JavaEnv(b Backing) map[string]string {
 	env := map[string]string{
 		"SPRING_PROFILES_ACTIVE":    "dev",
 		"SPRING_CLOUD_AWS_ENDPOINT": b.AWSEndpoint,
+		"TZ":                        "Asia/Tokyo",
 	}
 	for _, provider := range []string{fakeoidc.Google, fakeoidc.GitHub} {
 		prefix := "OIDC_PROVIDERS_" + strings.ToUpper(provider) + "_"

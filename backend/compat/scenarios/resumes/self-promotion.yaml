@@ -1,0 +1,160 @@
+# 自己PR の項目の追加、更新、削除と、自己PR の入力の誤りの筋書き。
+# user1 が、resumes/resume-ops.sql の経歴書 A(000000000320)を持つ状態から始める。
+# 経歴書 A の自己PR は、A 粘り強く調べる(00000000032b)と、本文に改行を持つ B 文書を残す(00000000032c)である。
+# 自己PR はタイトルの順に並ぶ。Java 版と Go 版の並びの違いは、変えた動きの一覧の CB-001 の match が許す。
+# 足す自己PR のタイトルを「C 」で始めると、2つの版のどちらでも並びの3つ目に入る。足した自己PR の ID は、その場所から取り出す。
+# 1つの段では、確かめる誤りの種類を1つにする。
+# 鍵を大文字で書いた要求と、画面が送らない書き方の ID を入れた要求は、2つの版の答えが違う(変えた動きの一覧の CB-051 と CB-054)ので送らない。
+# 自己PR には真偽の欄が無いので、真偽の欄に読めない値を入れた要求は送らない。
+name: resumes-self-promotion
+group: 3
+fixtures: [users/basic.sql, resumes/resume-ops.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: get-resume-a
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200, fields: [$.selfPromotions]}
+  # 追加と更新と削除
+  - name: create-self-promotion
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: &promotion
+        title: C 最後までやり切る
+        content: "任された仕事を、最後までやり切ります。\n期限も守ります。"
+    capture: {newID: '$.selfPromotions[2].id'}
+    expect: {status: 201, fields: [$.selfPromotions, $.updatedAt]}
+  # タイトルは UTF-16 の単位で50、本文は1000
+  - name: update-self-promotion-new-boundary
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/{newID}
+      csrf: true
+      json: {title: 'ああああああああああああああああああああああああああああああああああああああああああああああああ😀', content: 'ああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああ😀'}
+    expect: {status: 200, fields: [$.selfPromotions]}
+  - name: update-self-promotion-existing
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-00000000032b
+      csrf: true
+      json: {title: A 粘り強く調べる, content: "障害の原因を、最後まで調べます。\n\n再発を防ぐ手も打ちます。"}
+    expect: {status: 200}
+  - name: get-resume-a-after-change
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200}
+  # 入力が要る欄
+  - name: create-all-missing
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: {}
+    expect: {status: 400, fields: [$.errors.title, $.errors.content]}
+  - name: create-all-null
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: {title: null, content: null}
+    expect: {status: 400}
+  - name: create-all-empty
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: {title: '', content: ''}
+    expect: {status: 400}
+  - name: update-all-missing
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/{newID}
+      csrf: true
+      json: {}
+    expect: {status: 400}
+  # 長さの上限。空白だけの値で上限を超えると、入力が要る文言と長さの文言の2つが付く(変えた動きの一覧の CB-050)
+  - name: create-blank-over-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: {title: '                                                   ', content: '                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         '}
+    expect: {status: 400, fields: [$.errors.title, $.errors.content]}
+  # 「あ」と絵文字で、UTF-16 の単位で上限より1つ多い
+  - name: create-over-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: {title: 'あああああああああああああああああああああああああああああああああああああああああああああああああ😀', content: 'あああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああ😀'}
+    expect: {status: 400, fields: [$.errors.title, $.errors.content]}
+  - name: update-over-limit
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/{newID}
+      csrf: true
+      json: {title: 'あああああああああああああああああああああああああああああああああああああああああああああああああ😀', content: 'あああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああ😀'}
+    expect: {status: 400, fields: [$.errors.title, $.errors.content]}
+  # 本文が読めない要求
+  - name: create-title-array
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: {<<: *promotion, title: [C 最後までやり切る]}
+    expect: {status: 400}
+  - name: update-content-array
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/{newID}
+      csrf: true
+      json: {<<: *promotion, content: [任された仕事を、最後までやり切ります。]}
+    expect: {status: 400}
+  - name: create-body-array
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: [*promotion]
+    expect: {status: 400}
+  - name: create-body-string
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: 読めない自己PR
+    expect: {status: 400}
+  # 削除
+  - name: delete-self-promotion-new
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/{newID}
+      csrf: true
+    expect: {status: 204}
+  - name: delete-self-promotion-new-again
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/{newID}
+      csrf: true
+    expect: {status: 404}
+  - name: delete-self-promotion-existing
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-00000000032c
+      csrf: true
+    expect: {status: 204}
+  - name: get-resume-a-after-delete
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200}

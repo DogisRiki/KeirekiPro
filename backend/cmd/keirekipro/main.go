@@ -30,6 +30,7 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/migrate"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/pdf"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/redisstore"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/resume"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/users"
 )
 
@@ -169,6 +170,7 @@ func run(ctx context.Context, d deps) int {
 		RewritePresignHost: cfg.Env == config.EnvDev,
 		AWSEndpoint:        cfg.AWS.Endpoint,
 	})
+	resumeService := resume.New(resume.Deps{Pool: pool, Now: time.Now})
 
 	engine, err := d.newPDF(pdf.Options{Logger: logging.Named(logger, "pdf")})
 	if err != nil {
@@ -189,6 +191,7 @@ func run(ctx context.Context, d deps) int {
 			Auth:               auth.RequireLogin(),
 			AuthHandlers:       authService,
 			UserHandlers:       usersService,
+			ResumeHandlers:     resumeService,
 			CookieSecure:       cfg.App.CookieSecure,
 			APIBaseURL:         cfg.App.APIBaseURL,
 		}),

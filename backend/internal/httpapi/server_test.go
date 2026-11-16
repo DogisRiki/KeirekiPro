@@ -132,14 +132,6 @@ func TestBadJSONReturns400MessageErrors(t *testing.T) {
 			assertBody(t, rec, http.StatusBadRequest, "application/json", javaBadRequest)
 		})
 	}
-	t.Run("経路の値の形の誤りは、Java 版と同じ 500 にし、ログに値を書かない", func(t *testing.T) {
-		handler, logs := server(nil, nil)
-		rec := send(handler, http.MethodDelete, "/api/resumes/"+sampleResumeID+"/careers/not-a-uuid", "")
-		assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
-		if !strings.Contains(logs.String(), `"type":"*gen.InvalidParamFormatError"`) || strings.Contains(logs.String(), "not-a-uuid") {
-			t.Errorf("ログ = %s, want 誤りの型だけ", logs.String())
-		}
-	})
 }
 
 // panicking は、経歴書の一覧の操作でパニックを起こし、経歴書を作る操作で誤りを返す。
@@ -319,8 +311,8 @@ func TestNew_AuthHandlersShadowUnimplemented(t *testing.T) {
 	})
 }
 
-// 経路が /api/auth/ の下の問い合わせの誤りに 400 と Java 版の入力の誤りの本文を返し、ほかの経路は 500 のままで
-// あることを確かめる。
+// 経路が /api/auth/ の下の問い合わせの誤りに 400 と Java 版の入力の誤りの本文を返すことを確かめる。
+// ほかの経路の値の誤りが 500 のままであることは、server_internal_test.go の TestParamErrorHandler で確かめる。
 func TestNew_AuthQueryError400(t *testing.T) {
 	handler, logs := authServer(t, nil)
 	for _, path := range []string{
@@ -334,12 +326,6 @@ func TestNew_AuthQueryError400(t *testing.T) {
 	if strings.Contains(logs.String(), "unexpected_exception") {
 		t.Errorf("問い合わせの誤りを想定外の誤りとしてログに書きました: %s", logs.String())
 	}
-
-	t.Run("ほかの経路の値の形の誤りは 500 のまま", func(t *testing.T) {
-		handler, _ := authServer(t, func(o *httpapi.Options) { o.Auth = nil })
-		rec := send(handler, http.MethodDelete, "/api/resumes/"+sampleResumeID+"/careers/not-a-uuid", "")
-		assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
-	})
 }
 
 // securityHeaders は、design の安全のヘッダの節の6つのヘッダである。

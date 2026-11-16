@@ -680,3 +680,118 @@ func TestCompareObjects_ContentTypeAndMetadata(t *testing.T) {
 		})
 	}
 }
+
+// compareWallclockResponses は、Java 版の応答を wallclockReceived に、Go 版の応答を goAt に受けたとして、2つの本文を比べる。
+func compareWallclockResponses(goAt time.Time, java, goBody string) []Diff {
+	c := NewComparer("筋書き")
+	j, g := jsonResponse(200, java), jsonResponse(200, goBody)
+	j.Received, g.Received = wallclockReceived, goAt
+	c.CompareResponse(step1, j, g)
+	return c.Diffs()
+}
+
+func TestCompareJSON_WallclockTolerance(t *testing.T) {
+	resumes := func(id, createdAt, updatedAt string) string {
+		return `{"resumes":[{"id":"` + id + `","createdAt":"` + createdAt + `","updatedAt":"` + updatedAt + `"}]}`
+	}
+	const at = "2026-11-16T10:00:00.123"
+
+	t.Run("同じ時刻に受けた応答の日時の、5秒までの差は違いにしない", func(t *testing.T) {
+		for _, goAt := range []string{at, "2026-11-16T10:00:05", "2026-11-16T09:59:55"} {
+			assertNoDiff(t, compareWallclockResponses(wallclockReceived, resumes(javaResume, at, at), resumes(goResume, at, goAt)))
+		}
+	})
+	t.Run("6秒の差は違いにする", func(t *testing.T) {
+		diffs := compareWallclockResponses(wallclockReceived, resumes(javaResume, at, at), resumes(goResume, at, "2026-11-16T10:00:06"))
+		assertOneDiff(t, diffs, TargetBody, "$.resumes[0].updatedAt", `"<wallclock:yyyy-MM-ddTHH:mm:ss:+0>"`, `"<wallclock:yyyy-MM-ddTHH:mm:ss:+6>"`)
+		diffs = compareWallclockResponses(wallclockReceived, resumes(javaResume, at, at), resumes(goResume, at, "2026-11-16T09:59:54"))
+		assertOneDiff(t, diffs, TargetBody, "$.resumes[0].updatedAt", `"<wallclock:yyyy-MM-ddTHH:mm:ss:+0>"`, `"<wallclock:yyyy-MM-ddTHH:mm:ss:-6>"`)
+	})
+	t.Run("UTC の時刻の見た目で書いた、9時間ずれた日時は違いにする", func(t *testing.T) {
+		diffs := compareWallclockResponses(wallclockReceived, resumes(javaResume, at, at), resumes(goResume, "2026-11-16T01:00:00.123", at))
+		assertOneDiff(t, diffs, TargetBody, "$.resumes[0].createdAt", `"<wallclock:yyyy-MM-ddTHH:mm:ss:+0>"`, `"<wallclock:yyyy-MM-ddTHH:mm:ss:-32400>"`)
+	})
+	t.Run("秒を除いた文字が違う日時は、秒の差が無くても違いにする", func(t *testing.T) {
+		diffs := compareWallclockResponses(wallclockReceived, resumes(javaResume, at, "2026-11-16T10:00:00"), resumes(goResume, at, "2026-11-16T10:00"))
+		assertOneDiff(t, diffs, TargetBody, "$.resumes[0].updatedAt", `"<wallclock:yyyy-MM-ddTHH:mm:ss:+0>"`, `"<wallclock:yyyy-MM-ddTHH:mm:+0>"`)
+	})
+	t.Run("2つの版で同じ固定の日時は、受けた時刻が2秒ずれても違いにしない", func(t *testing.T) {
+		const fixed = "2025-01-01T00:00:00"
+		assertNoDiff(t, compareWallclockResponses(wallclockReceived.Add(2*time.Second), resumes(javaResume, fixed, fixed), resumes(goResume, fixed, fixed)))
+	})
+}
+
+func TestCompareDB_WallclockTolerance(t *testing.T) {
+	resume := func(id, name, at string) map[string]any {
+		return map[string]any{"id": id, "name": name, "created_at": at, "updated_at": at}
+	}
+	// compare は、応答を受けた時刻を Java 版は wallclockReceived に、Go 版は goAt にしてから、2つのデータベースを比べる。
+	compare := func(goAt time.Time, java, goDB DBSnapshot) []Diff {
+		c := NewComparer("筋書き")
+		c.CompareResponse(step1, Response{Status: http.StatusNoContent, Received: wallclockReceived}, Response{Status: http.StatusNoContent, Received: goAt})
+		c.CompareDB(step1, java, goDB)
+		return c.Diffs()
+	}
+
+	t.Run("resumes の表の日時の、5秒までの差は違いにしない", func(t *testing.T) {
+		diffs := compare(wallclockReceived,
+			DBSnapshot{"resumes": {resume(javaResume, "a", "2026-11-16T10:00:00.5")}},
+			DBSnapshot{"resumes": {resume(goResume, "a", "2026-11-16T10:00:05.4")}})
+		assertNoDiff(t, diffs)
+	})
+	t.Run("6秒の差は違いにする", func(t *testing.T) {
+		diffs := compare(wallclockReceived,
+			DBSnapshot{"resumes": {resume(javaResume, "a", "2026-11-16T10:00:00")}},
+			DBSnapshot{"resumes": {resume(goResume, "a", "2026-11-16T10:00:06")}})
+		if len(diffs) != 1 || diffs[0].Target != TargetDB || diffs[0].Path != "resumes" ||
+			!strings.Contains(diffs[0].Java, `"created_at":"<wallclock:yyyy-MM-ddTHH:mm:ss:+0>"`) ||
+			!strings.Contains(diffs[0].Go, `"created_at":"<wallclock:yyyy-MM-ddTHH:mm:ss:+6>"`) {
+			t.Fatalf("違い = %+v", diffs)
+		}
+	})
+	t.Run("UTC の時刻の見た目で書いた、9時間ずれた日時は違いにする", func(t *testing.T) {
+		diffs := compare(wallclockReceived,
+			DBSnapshot{"resumes": {resume(javaResume, "a", "2026-11-16T10:00:00")}},
+			DBSnapshot{"resumes": {resume(goResume, "a", "2026-11-16T01:00:00")}})
+		if len(diffs) != 1 || diffs[0].Path != "resumes" || !strings.Contains(diffs[0].Go, `<wallclock:yyyy-MM-ddTHH:mm:ss:-32400>`) {
+			t.Fatalf("違い = %+v", diffs)
+		}
+	})
+	t.Run("秒を除いた文字が違う行は、秒の差が無くても違いにする", func(t *testing.T) {
+		diffs := compare(wallclockReceived,
+			DBSnapshot{"resumes": {resume(javaResume, "a", "2026-11-16T10:00:00")}},
+			DBSnapshot{"resumes": {resume(goResume, "b", "2026-11-16T10:00:00")}})
+		if len(diffs) != 1 || !strings.Contains(diffs[0].Java, `"name":"a"`) || !strings.Contains(diffs[0].Go, `"name":"b"`) {
+			t.Fatalf("違い = %+v", diffs)
+		}
+	})
+	t.Run("行は秒を除いた文字で組にし、秒の順で並びが変わっても違いにしない", func(t *testing.T) {
+		// 応答に現れない UUID の番号は、行のほかの値の順で付く。秒を含めて並べると、Java 版は a、Go 版は b が先になり、番号がずれる。
+		diffs := compare(wallclockReceived,
+			DBSnapshot{"resumes": {resume(javaResume, "a", "2026-11-16T10:00:01"), resume(javaOther, "b", "2026-11-16T10:00:02")}},
+			DBSnapshot{"resumes": {resume(goOther, "b", "2026-11-16T10:00:02"), resume(goResume, "a", "2026-11-16T10:00:03")}})
+		assertNoDiff(t, diffs)
+	})
+	t.Run("秒を除いた文字が同じ行は、秒の小さい順に組にする", func(t *testing.T) {
+		// 秒の文字の順では、Go 版の +12 が +2 より先になる。その順で組にすると、Java 版の +1 と Go 版の +12 を組にしてしまう。
+		row := func(at string) map[string]any { return map[string]any{"name": "a", "created_at": at} }
+		diffs := compare(wallclockReceived,
+			DBSnapshot{"resumes": {row("2026-11-16T10:00:01"), row("2026-11-16T10:00:08")}},
+			DBSnapshot{"resumes": {row("2026-11-16T10:00:02"), row("2026-11-16T10:00:12")}})
+		assertNoDiff(t, diffs)
+	})
+	t.Run("2つの版で同じ固定の日時は、受けた時刻が2秒ずれても違いにしない", func(t *testing.T) {
+		const fixed = "2025-01-01T00:00:00"
+		diffs := compare(wallclockReceived.Add(2*time.Second),
+			DBSnapshot{"resumes": {resume(javaResume, "a", fixed)}},
+			DBSnapshot{"resumes": {resume(goResume, "a", fixed)}})
+		assertNoDiff(t, diffs)
+	})
+	t.Run("ほかの表の日時は、今までどおり形だけを比べる", func(t *testing.T) {
+		user := func(id, at string) map[string]any { return map[string]any{"id": id, "created_at": at} }
+		diffs := compare(wallclockReceived,
+			DBSnapshot{"users": {user(javaUser, "2026-11-16T10:00:00")}},
+			DBSnapshot{"users": {user(goUser, "2020-01-01T00:00:00")}})
+		assertNoDiff(t, diffs)
+	})
+}

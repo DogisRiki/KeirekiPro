@@ -1,0 +1,215 @@
+# 資格の項目の追加、更新、削除と、資格の入力の誤りの筋書き。
+# user1 が、resumes/resume-ops.sql の経歴書 A(000000000320)と経歴書 B(000000000330)を持つ状態から始める。
+# 経歴書 A の資格は、基本情報技術者試験(000000000325、2014-11)と応用情報技術者試験(000000000326、2016-06)である。
+# 資格は取得の年月の新しい順に並ぶので、2014-10 までに取った資格を経歴書 A に足すと、資格の並びの3つ目に入る。足した資格の ID は、その場所から取り出す。
+# 1つの段では、確かめる誤りの種類を1つにする。年月の値の形の誤りには、画面の年月の入力欄で Home を押したときに画面が送る Invalid Date を送る。
+# 鍵を大文字で書いた要求と、画面が送らない書き方の ID と年月を入れた要求は、2つの版の答えが違う(変えた動きの一覧の CB-051 から CB-054)ので送らない。
+# 資格には真偽の欄が無いので、真偽の欄に読めない値を入れた要求は送らない。
+name: resumes-certification
+group: 3
+fixtures: [users/basic.sql, resumes/resume-ops.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: get-resume-a
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200, fields: [$.certifications]}
+  # 追加と更新と削除
+  - name: create-certification
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: ITパスポート試験, date: '2010-04'}
+    capture: {newID: '$.certifications[2].id'}
+    expect: {status: 201, fields: [$.certifications, $.updatedAt]}
+  # 資格名は UTF-16 の単位で50
+  - name: update-certification-new-boundary
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/{newID}
+      csrf: true
+      json: {name: 'ああああああああああああああああああああああああああああああああああああああああああああああああ😀', date: '2010-05'}
+    expect: {status: 200, fields: [$.certifications]}
+  # 取得の年月を変えると、資格の並びの順が変わる
+  - name: update-certification-existing
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/00000000-0000-4000-8000-000000000325
+      csrf: true
+      json: {name: 基本情報技術者試験(午後), date: '2017-04'}
+    expect: {status: 200, fields: [$.certifications]}
+  # 年月の下限の 1900-01 と上限の 2100-12
+  - name: create-certification-lower-bound
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: 古い資格, date: '1900-01'}
+    expect: {status: 201}
+  - name: create-certification-upper-bound-b
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000330/certifications
+      csrf: true
+      json: {name: 未来の資格, date: '2100-12'}
+    expect: {status: 201}
+  - name: get-resume-a-after-change
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200}
+  # 入力が要る欄
+  - name: create-all-missing
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {}
+    expect: {status: 400, fields: [$.errors.name, $.errors.date]}
+  - name: create-all-null
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: null, date: null}
+    expect: {status: 400}
+  - name: create-all-empty
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: '', date: ''}
+    expect: {status: 400}
+  - name: update-all-missing
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/{newID}
+      csrf: true
+      json: {}
+    expect: {status: 400}
+  # 長さの上限。空白51文字は、入力が要る文言と長さの文言の2つが付く(変えた動きの一覧の CB-050)
+  - name: create-blank-over-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: '                                                   ', date: '2000-04'}
+    expect: {status: 400, fields: [$.errors.name]}
+  # 「あ」49文字と絵文字で、UTF-16 の単位で51
+  - name: create-name-over-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: 'あああああああああああああああああああああああああああああああああああああああああああああああああ😀', date: '2000-04'}
+    expect: {status: 400, fields: [$.errors.name]}
+  - name: update-name-over-limit
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/{newID}
+      csrf: true
+      json: {name: 'あああああああああああああああああああああああああああああああああああああああああああああああああ😀', date: '2010-05'}
+    expect: {status: 400, fields: [$.errors.name]}
+  # 年月の範囲
+  - name: create-date-before-1900
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: 範囲の資格, date: '1899-12'}
+    expect: {status: 400, fields: [$.errors.date]}
+  - name: create-date-after-2100
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: 範囲の資格, date: '2101-01'}
+    expect: {status: 400, fields: [$.errors.date]}
+  - name: update-date-before-1900
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/{newID}
+      csrf: true
+      json: {name: 範囲の資格, date: '1899-12'}
+    expect: {status: 400, fields: [$.errors.date]}
+  # 年月の値の形。2つの版は、400 と空の errors で答える
+  - name: create-date-invalid-date
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: 形の資格, date: Invalid Date}
+    expect: {status: 400}
+  - name: update-date-invalid-date
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/{newID}
+      csrf: true
+      json: {name: 形の資格, date: Invalid Date}
+    expect: {status: 400}
+  # 本文が読めない要求
+  - name: create-name-array
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: {name: [ITパスポート試験], date: '2000-04'}
+    expect: {status: 400}
+  - name: update-name-array
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/{newID}
+      csrf: true
+      json: {name: [ITパスポート試験], date: '2010-05'}
+    expect: {status: 400}
+  - name: create-body-array
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: [{name: 読めない資格, date: '2000-04'}]
+    expect: {status: 400}
+  - name: create-body-string
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: 読めない資格
+    expect: {status: 400}
+  # 削除
+  - name: delete-certification-new
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/{newID}
+      csrf: true
+    expect: {status: 204}
+  - name: delete-certification-new-again
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/{newID}
+      csrf: true
+    expect: {status: 404}
+  - name: delete-certification-existing
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/00000000-0000-4000-8000-000000000326
+      csrf: true
+    expect: {status: 204}
+  - name: get-resume-a-after-delete
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200}
+  - name: get-resume-b-after-change
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000330
+    expect: {status: 200}

@@ -1,0 +1,782 @@
+{
+  "about": "Java 版(feat/go-master-resume-operations の 95aca2b2 の backend を、開発環境の spring のコンテナで、ポート 8090、データベース keireki_proto、Redis の DB 7、TZ=Asia/Tokyo で動かしたもの)に、2026-11-15 に送って控えた答え。ID の書き方ごとの答え。経歴書 1b4e28ba-2fa1-11d2-883f-0016d3cca427 00000001-0002-0003-0004-000000000005 0000000a-000b-000c-000d-00000000000e ffffffff-ffff-ffff-ffff-ffffffffffff fbfbfbfb-fbfb-fbfb-fbfb-fbfbfbfbfbfb と、経歴書 1b4e28ba-2fa1-11d2-883f-0016d3cca427 の下の、同じ ID の資格を用意して送った。paths の resumePath は GET /api/resumes/{value} の答え、itemPath は PUT /api/resumes/1b4e28ba-2fa1-11d2-883f-0016d3cca427/certifications/{value} の答え。value は経路の値を文字の単位でそのまま percent-encoding して送った。readId は Java 版が読んで、答えに返した経歴書か資格の ID。resumeIds は、経歴書の作成 POST /api/resumes の resumeId に input(JSON の値の書き方)を入れた答え。<absent> は鍵を入れなかった要求。readId は、写した元の経歴書の ID で、<no copy> は写さずに作ったことを表す。 経路の値の末尾に改行(%0A)を付けた場合は、Java 版の Spring Security の firewall が 401 を返し、ID を読む前に止まるので、この控えから除いた。 fromString は、Java 版が読めたものの、その ID の経歴書と資格が無いので 404 で答えた値について、Java 版が読んだ ID を、spring のコンテナの同じ JDK(21.0.11)の jshell で java.util.UUID.fromString に渡して控えたもの。 前後に1つずつ半角の空白を付けた ID の答えは、2026-11-16 に、同じ設定で別に動かした Java 版に送って足した。",
+  "paths": [
+    {
+      "value": "1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+      "resumePath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "value": "1B4E28BA-2FA1-11D2-883F-0016D3CCA427",
+      "resumePath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "value": "1B4E28ba-2FA1-11d2-883F-0016D3CCA427",
+      "resumePath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "value": " 1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "value": "1b4e28ba-2fa1-11d2-883f-0016d3cca427 ",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "value": " 1b4e28ba-2fa1-11d2-883f-0016d3cca427 ",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "value": "\t1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "value": "　1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1-2-3-4-5",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "+1-2-3-4-5",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "-1-2-3-4-5",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1-2-3-4-+5",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "a-b-c-d-e",
+      "resumePath": {
+        "status": 200,
+        "readId": "0000000a-000b-000c-000d-00000000000e"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "0000000a-000b-000c-000d-00000000000e"
+      }
+    },
+    {
+      "value": "A-B-C-D-E",
+      "resumePath": {
+        "status": 200,
+        "readId": "0000000a-000b-000c-000d-00000000000e"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "0000000a-000b-000c-000d-00000000000e"
+      }
+    },
+    {
+      "value": "00000001-2-3-4-5",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "000000001-2-3-4-5",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "1-00002-3-4-5",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "1-2-3-4-0000000000005",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "1-2-3-4-1000000000005",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "1-2-3-4-5-6",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1-2-3-4",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1--3-4-5",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1-2-3-4-",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1b4e28ba2fa111d2883f0016d3cca427",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "{1b4e28ba-2fa1-11d2-883f-0016d3cca427}",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1b4e28ba-2fa1-11d2-883f-0016d3cca42g",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1b4e28ba-2fa1-11d2-883f-0016d3cca4270",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1b4e28ba-2fa1-11d2-883f-0016d3cca42",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の資格が存在しません。"
+        }
+      },
+      "fromString": "1b4e28ba-2fa1-11d2-883f-00016d3cca42"
+    },
+    {
+      "value": "1b4e28ba-2fa1-11d2-883f0016d3cca427",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1b4e28ba2-fa1-11d2-883f-0016d3cca427",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の資格が存在しません。"
+        }
+      },
+      "fromString": "b4e28ba2-0fa1-11d2-883f-0016d3cca427"
+    },
+    {
+      "value": "0x1-2-3-4-5",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "1-2-3-4-0x5",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "１-2-3-4-5",
+      "resumePath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "00000001-0002-0003-0004-000000000005"
+      }
+    },
+    {
+      "value": "urn:uuid:1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    },
+    {
+      "value": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+      "resumePath": {
+        "status": 200,
+        "readId": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+      }
+    },
+    {
+      "value": "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF",
+      "resumePath": {
+        "status": 200,
+        "readId": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+      },
+      "itemPath": {
+        "status": 200,
+        "readId": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+      }
+    },
+    {
+      "value": "-1-2-3-4",
+      "resumePath": {
+        "status": 404,
+        "body": {
+          "errors": {},
+          "message": "対象の職務経歴書データが存在しません。"
+        }
+      },
+      "itemPath": {
+        "status": 500,
+        "body": {
+          "errors": {},
+          "message": "予期せぬエラーが発生しました。"
+        }
+      }
+    }
+  ],
+  "resumeIds": [
+    {
+      "input": "\"1b4e28ba-2fa1-11d2-883f-0016d3cca427\"",
+      "result": {
+        "status": 201,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "input": "\"1B4E28BA-2FA1-11D2-883F-0016D3CCA427\"",
+      "result": {
+        "status": 201,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "input": "\"1B4E28ba-2FA1-11d2-883F-0016D3CCA427\"",
+      "result": {
+        "status": 201,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "input": "\" 1b4e28ba-2fa1-11d2-883f-0016d3cca427 \"",
+      "result": {
+        "status": 201,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "input": "\"1b4e28ba-2fa1-11d2-883f-0016d3cca427 \"",
+      "result": {
+        "status": 201,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "input": "\"\"",
+      "result": {
+        "status": 201,
+        "readId": "<no copy>"
+      }
+    },
+    {
+      "input": "\"  \"",
+      "result": {
+        "status": 201,
+        "readId": "<no copy>"
+      }
+    },
+    {
+      "input": "null",
+      "result": {
+        "status": 201,
+        "readId": "<no copy>"
+      }
+    },
+    {
+      "input": "\"null\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"1-2-3-4-5\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"G04oui+hEdKIPwAW08ykJw==\"",
+      "result": {
+        "status": 201,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "input": "\"G04oui+hEdKIPwAW08ykJw\"",
+      "result": {
+        "status": 201,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "input": "\"+/v7+/v7+/v7+/v7+/v7+w==\"",
+      "result": {
+        "status": 201,
+        "readId": "fbfbfbfb-fbfb-fbfb-fbfb-fbfbfbfbfbfb"
+      }
+    },
+    {
+      "input": "\"-_v7-_v7-_v7-_v7-_v7-w==\"",
+      "result": {
+        "status": 201,
+        "readId": "fbfbfbfb-fbfb-fbfb-fbfb-fbfbfbfbfbfb"
+      }
+    },
+    {
+      "input": "\" G04oui+hEdKIPwAW08ykJw==\"",
+      "result": {
+        "status": 201,
+        "readId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+      }
+    },
+    {
+      "input": "\"1b4e28ba2fa111d2883f0016d3cca427\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"{1b4e28ba-2fa1-11d2-883f-0016d3cca427}\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"1b4e28ba-2fa1-11d2-883f-0016d3cca42g\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"1b4e28ba-2fa1-11d2-883f-0016d3cca4270\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"1b4e28ba-2fa1-11d2-883f-0016d3cca42\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"1b4e28ba2-fa1-11d2-883f-0016d3cca427\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"urn:uuid:1b4e28ba-2fa1-11d2-883f-0016d3cca427\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "\"ffffffff-ffff-ffff-ffff-ffffffffffff\"",
+      "result": {
+        "status": 201,
+        "readId": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+      }
+    },
+    {
+      "input": "\"FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF\"",
+      "result": {
+        "status": 201,
+        "readId": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+      }
+    },
+    {
+      "input": "\"1b4e28ba_2fa1_11d2_883f_0016d3cca427\"",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "123",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "true",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "[]",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "{}",
+      "result": {
+        "status": 400,
+        "body": {
+          "errors": {},
+          "message": "入力エラーがあります。"
+        }
+      }
+    },
+    {
+      "input": "<absent>",
+      "result": {
+        "status": 201,
+        "readId": "<no copy>"
+      }
+    }
+  ]
+}

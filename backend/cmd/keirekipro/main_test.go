@@ -935,3 +935,57 @@ func TestRun_PassesUserHandlers(t *testing.T) {
 		})
 	}
 }
+
+// 入口が、組み立てた経歴書の処理を受け口に渡すことを、ログインした利用者の経歴書の一覧の要求が、未実装の答えでなく、
+// 200 と空の並びで答えられることで確かめる。internal/httpapi のテストは httpapi.New に自分で ResumeHandlers を
+// 渡すので、main.go が渡し忘れても通ってしまうためである。
+func TestRun_PassesResumeHandlers(t *testing.T) {
+	name := newDatabase(t)
+	pool := connect(t, name)
+	files, err := backend.Migrations()
+	if err != nil {
+		t.Fatalf("マイグレーションのファイルを読めません: %v", err)
+	}
+	if _, err := migrate.Run(t.Context(), pool, files, migrate.Apply); err != nil {
+		t.Fatalf("V1〜V7 を適用できません: %v", err)
+	}
+	userID := uuid.New()
+	stamp := pgtype.Timestamp{Time: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), Valid: true}
+	if err := sqlcgen.New(pool).UpsertUser(t.Context(), sqlcgen.UpsertUserParams{
+		ID:        pgtype.UUID{Bytes: userID, Valid: true},
+		Email:     pgtype.Text{String: "hanako@example.com", Valid: true},
+		CreatedAt: stamp,
+		UpdatedAt: stamp,
+	}); err != nil {
+		t.Fatalf("利用者の行を足せません: %v", err)
+	}
+	secret := strings.Repeat("s", 64)
+	token, err := auth.New(auth.Deps{Pool: pool, JWT: config.JWT{Secret: secret, AccessTokenValidity: time.Hour}}).
+		IssueAccessToken(t.Context(), userID, []string{"USER"})
+	if err != nil {
+		t.Fatalf("ログインの状態の値を作れません: %v", err)
+	}
+
+	vars := testEnv(t, name)
+	vars["JWT_SECRET"] = secret
+	h := newHarness(t, vars)
+	stop, done := h.start(t)
+	defer func() {
+		stop()
+		<-done
+	}()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+h.addr+"/api/resumes", nil)
+	if err != nil {
+		t.Fatalf("要求を作れません: %v", err)
+	}
+	req.Header.Set("Cookie", "accessToken="+token)
+	res, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("経歴書の一覧の要求を送れません: %v", err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK || string(body) != `{"resumes":[]}` {
+		t.Errorf("経歴書の一覧 = %d %s, want 200 {\"resumes\":[]}", res.StatusCode, body)
+	}
+}

@@ -1,0 +1,258 @@
+# ほかの利用者の経歴書と、その経歴書の項目の筋書き。
+# resumes/resume-ops.sql の、user1 の経歴書 A(000000000320)に、user2 が要求を送る。user2 は経歴書を持たない。
+# user2 は、経歴書 A の取得、基本の情報の更新、コピーした作成、6つの欄の項目の追加と更新と削除、経歴書 A の削除を送る。どの要求も経歴書 A を返さず、変えない。
+# 経歴書 A は、どの欄も上限に達していない。上限に達した経歴書に項目を足す要求は、2つの版の答えが違う(変えた動きの一覧の CB-047)ので送らない。
+# 最後に user1 でログインし直し、経歴書 A が変わっていないことを確かめる。
+name: resumes-other-user
+group: 3
+fixtures: [users/basic.sql, resumes/resume-ops.sql]
+modes: [compare]
+steps:
+  - name: login-user2
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user2@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: list-resumes-user2
+    request:
+      method: GET
+      path: /api/resumes
+    expect: {status: 200, fields: [$.resumes]}
+  - name: get-resume-a
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 404}
+  - name: update-basic-resume-a
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/basic
+      csrf: true
+      json: &basic {resumeName: ほかの人が直した経歴書, date: '2026-05-01', lastName: 比較, firstName: 二郎}
+    expect: {status: 404}
+  - name: update-basic-resume-a-invalid
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/basic
+      csrf: true
+      json: {<<: *basic, resumeName: ''}
+    expect: {status: 400}
+  - name: create-copy-of-resume-a
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: ほかの人の経歴書を写す, resumeId: 00000000-0000-4000-8000-000000000320}
+    expect: {status: 404}
+  # 6つの欄の項目の追加
+  - name: create-career
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers
+      csrf: true
+      json: &career {companyName: 株式会社ほかのひと, startDate: '1980-04', endDate: '1985-03', isActive: false}
+    expect: {status: 404}
+  - name: create-career-invalid
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers
+      csrf: true
+      json: {}
+    expect: {status: 400}
+  - name: create-project
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/projects
+      csrf: true
+      json: &project
+        companyName: 株式会社ほかのひと
+        startDate: '2012-04'
+        endDate: '2013-03'
+        isActive: false
+        name: ほかの人のプロジェクト
+        overview: ほかの人が足すプロジェクト
+        teamComp: 全体3名
+        role: 開発の担当
+        achievement: 予定どおりに終えた。
+        requirements: true
+        basicDesign: true
+        detailedDesign: true
+        implementation: true
+        integrationTest: true
+        systemTest: true
+        maintenance: false
+        frontendLanguages: [TypeScript]
+        frontendFrameworks: [React]
+        frontendLibraries: []
+        frontendBuildTools: []
+        frontendPackageManagers: []
+        frontendLinters: []
+        frontendFormatters: []
+        frontendTestingTools: []
+        backendLanguages: [Go]
+        backendFrameworks: []
+        backendLibraries: []
+        backendBuildTools: []
+        backendPackageManagers: []
+        backendLinters: []
+        backendFormatters: []
+        backendTestingTools: []
+        ormTools: []
+        auth: []
+        clouds: [AWS]
+        operatingSystems: []
+        containers: []
+        databases: [PostgreSQL]
+        webServers: []
+        ciCdTools: []
+        iacTools: []
+        monitoringTools: []
+        loggingTools: []
+        sourceControls: [Git]
+        projectManagements: []
+        communicationTools: []
+        documentationTools: []
+        apiDevelopmentTools: []
+        designTools: []
+        editors: []
+        developmentEnvironments: []
+    expect: {status: 404}
+  - name: create-certification
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications
+      csrf: true
+      json: &certification {name: ほかの人の資格, date: '2020-04'}
+    expect: {status: 404}
+  - name: create-portfolio
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/portfolios
+      csrf: true
+      json: &portfolio {name: Z ほかの人の作品, overview: ほかの人が足す作品, techStack: Go, link: 'https://example.com/portfolio/other'}
+    expect: {status: 404}
+  - name: create-sns-platform
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/sns-platforms
+      csrf: true
+      json: &sns {name: Zenn, link: 'https://zenn.dev/example-other'}
+    expect: {status: 404}
+  - name: create-self-promotion
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions
+      csrf: true
+      json: &promotion {title: Z ほかの人の自己PR, content: ほかの人が足す自己PR}
+    expect: {status: 404}
+  # 6つの欄の項目の更新と削除
+  - name: update-career
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers/00000000-0000-4000-8000-000000000321
+      csrf: true
+      json: *career
+    expect: {status: 404}
+  - name: update-career-invalid
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers/00000000-0000-4000-8000-000000000321
+      csrf: true
+      json: {}
+    expect: {status: 400}
+  - name: delete-career
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers/00000000-0000-4000-8000-000000000321
+      csrf: true
+    expect: {status: 404}
+  - name: update-project
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/projects/00000000-0000-4000-8000-000000000323
+      csrf: true
+      json: *project
+    expect: {status: 404}
+  - name: delete-project
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/projects/00000000-0000-4000-8000-000000000323
+      csrf: true
+    expect: {status: 404}
+  - name: update-certification
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/00000000-0000-4000-8000-000000000325
+      csrf: true
+      json: *certification
+    expect: {status: 404}
+  - name: delete-certification
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/00000000-0000-4000-8000-000000000325
+      csrf: true
+    expect: {status: 404}
+  - name: update-portfolio
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/portfolios/00000000-0000-4000-8000-000000000327
+      csrf: true
+      json: *portfolio
+    expect: {status: 404}
+  - name: delete-portfolio
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/portfolios/00000000-0000-4000-8000-000000000327
+      csrf: true
+    expect: {status: 404}
+  - name: update-sns-platform
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/sns-platforms/00000000-0000-4000-8000-000000000329
+      csrf: true
+      json: *sns
+    expect: {status: 404}
+  - name: delete-sns-platform
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/sns-platforms/00000000-0000-4000-8000-000000000329
+      csrf: true
+    expect: {status: 404}
+  - name: update-self-promotion
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-00000000032b
+      csrf: true
+      json: *promotion
+    expect: {status: 404}
+  - name: delete-self-promotion
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-00000000032b
+      csrf: true
+    expect: {status: 404}
+  # 経歴書の削除
+  - name: delete-resume-a
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+      csrf: true
+    expect: {status: 404}
+  - name: list-resumes-user2-after
+    request:
+      method: GET
+      path: /api/resumes
+    expect: {status: 200}
+  # user1 から見て、経歴書 A は変わっていない
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: get-resume-a-as-user1
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200, fields: [$.careers, $.projects, $.certifications, $.portfolios, $.snsPlatforms, $.selfPromotions]}

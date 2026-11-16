@@ -295,3 +295,92 @@ func TestNormalize_PresignedURL(t *testing.T) {
 		}
 	}
 }
+
+// wallclockReceived は、日時の置き換えのテストで、応答を受けた時刻にする時刻である。日本の時刻では 2026-11-16 10:00:00 である。
+var wallclockReceived = time.Date(2026, 11, 16, 1, 0, 0, 0, time.UTC)
+
+// normalizedJSON は、JSON の本文 body を Normalizer n で正規化し、項目の名前の順の JSON にして返す。
+func normalizedJSON(t *testing.T, n *Normalizer, body string) string {
+	t.Helper()
+	v, err := decodeJSON([]byte(body))
+	if err != nil {
+		t.Fatalf("JSON を読めません: %v", err)
+	}
+	return canonicalJSON(n.value(v, true))
+}
+
+func TestNormalizeWallclock_SecondsFromReceived(t *testing.T) {
+	newNormalizer := func(received time.Time) *Normalizer {
+		n := NewNormalizer()
+		n.received = received
+		return n
+	}
+
+	t.Run("経歴書の答えの作成と更新の日時を、日本の時刻として読み、受けた時刻からの秒の差にする", func(t *testing.T) {
+		tests := []struct {
+			name, value, want string
+		}{
+			{"受けた時刻の5秒あと", "2026-11-16T10:00:05", "<wallclock:yyyy-MM-ddTHH:mm:ss:+5>"},
+			{"受けた時刻の6秒あと。小数の秒は四捨五入する", "2026-11-16T10:00:06.4", "<wallclock:yyyy-MM-ddTHH:mm:ss:+6>"},
+			{"受けた時刻の2秒まえ", "2026-11-16T09:59:58.123456", "<wallclock:yyyy-MM-ddTHH:mm:ss:-2>"},
+			{"日本の時刻でなく、UTC の時刻の見た目で書いた値", "2026-11-16T01:00:00", "<wallclock:yyyy-MM-ddTHH:mm:ss:-32400>"},
+			{"秒の無い値", "2026-11-16T10:01", "<wallclock:yyyy-MM-ddTHH:mm:+60>"},
+			{"時差の Z の付いた値は、その時差で読む", "2026-11-16T01:00:03Z", "<wallclock:yyyy-MM-ddTHH:mm:ssZ:+3>"},
+			{"時差の +0900 の付いた値は、その時差で読む", "2026-11-16T10:00:03+0900", "<wallclock:yyyy-MM-ddTHH:mm:ss+hhmm:+3>"},
+			{"暦に無い日付は置き換えない", "2026-02-30T10:00:00", "2026-02-30T10:00:00"},
+			{"日時でない文字は置き換えない", "経歴書", "経歴書"},
+			{"日時を一部に含む文字は、ほかの文字と同じく、日時の形だけにする", "2026-11-16T10:00:00 に作成", "<datetime:yyyy-MM-ddTHH:mm:ss> に作成"},
+		}
+		n := newNormalizer(wallclockReceived)
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got := normalizedJSON(t, n, `{"createdAt":"`+tt.value+`","updatedAt":"`+tt.value+`"}`)
+				want := `{"createdAt":"` + tt.want + `","updatedAt":"` + tt.want + `"}`
+				if got != want {
+					t.Fatalf("正規化した本文 = %s, want %s", got, want)
+				}
+			})
+		}
+	})
+	t.Run("経歴書の一覧の答えの日時も置き換え、ほかの鍵の日時は形だけにする", func(t *testing.T) {
+		n := newNormalizer(wallclockReceived)
+		got := normalizedJSON(t, n, `{"resumes":[{"id":"`+javaResume+`","createdAt":"2026-11-16T10:00:03","updatedAt":"2026-11-16T10:00:04","expiresAt":"2026-11-16T10:00:03","date":"2026-11-16"}]}`)
+		want := `{"resumes":[{"createdAt":"<wallclock:yyyy-MM-ddTHH:mm:ss:+3>","date":"2026-11-16","expiresAt":"<datetime:yyyy-MM-ddTHH:mm:ss>","id":"<uuid:1>","updatedAt":"<wallclock:yyyy-MM-ddTHH:mm:ss:+4>"}]}`
+		if got != want {
+			t.Fatalf("正規化した本文 = %s, want %s", got, want)
+		}
+	})
+	t.Run("値の無い日時は置き換えない", func(t *testing.T) {
+		n := newNormalizer(wallclockReceived)
+		if got, want := normalizedJSON(t, n, `{"createdAt":null}`), `{"createdAt":null}`; got != want {
+			t.Fatalf("正規化した本文 = %s, want %s", got, want)
+		}
+	})
+	t.Run("同じ固定の日時は、受けた時刻が2秒遅いと、秒の差が2秒小さくなる", func(t *testing.T) {
+		body := `{"createdAt":"2025-01-01T00:00:00"}`
+		java := normalizedJSON(t, newNormalizer(wallclockReceived), body)
+		goVer := normalizedJSON(t, newNormalizer(wallclockReceived.Add(2*time.Second)), body)
+		if want := `{"createdAt":"<wallclock:yyyy-MM-ddTHH:mm:ss:-59133600>"}`; java != want {
+			t.Fatalf("Java 版の正規化した本文 = %s, want %s", java, want)
+		}
+		if want := `{"createdAt":"<wallclock:yyyy-MM-ddTHH:mm:ss:-59133602>"}`; goVer != want {
+			t.Fatalf("Go 版の正規化した本文 = %s, want %s", goVer, want)
+		}
+	})
+	t.Run("データベースは、resumes の表の作成と更新の日時だけを置き換える", func(t *testing.T) {
+		n := newNormalizer(wallclockReceived)
+		const at = "2026-11-16T10:00:03.123456"
+		resume := canonicalJSON(n.record("resumes", map[string]any{"id": javaResume, "name": "a", "created_at": at, "updated_at": at}, true))
+		if want := `{"created_at":"<wallclock:yyyy-MM-ddTHH:mm:ss:+3>","id":"<uuid:1>","name":"a","updated_at":"<wallclock:yyyy-MM-ddTHH:mm:ss:+3>"}`; resume != want {
+			t.Fatalf("resumes の行 = %s, want %s", resume, want)
+		}
+		user := canonicalJSON(n.record("users", map[string]any{"id": javaUser, "created_at": at, "updated_at": at}, true))
+		if want := `{"created_at":"<datetime:yyyy-MM-ddTHH:mm:ss>","id":"<uuid:2>","updated_at":"<datetime:yyyy-MM-ddTHH:mm:ss>"}`; user != want {
+			t.Fatalf("users の行 = %s, want %s", user, want)
+		}
+		empty := canonicalJSON(n.record("resumes", map[string]any{"created_at": nil}, true))
+		if want := `{"created_at":null}`; empty != want {
+			t.Fatalf("値の無い resumes の行 = %s, want %s", empty, want)
+		}
+	})
+}

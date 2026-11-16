@@ -1,0 +1,505 @@
+# 無い経歴書と無い項目と、別の経歴書の項目の筋書き。
+# user1 が、resumes/resume-ops.sql の経歴書 A(000000000320)と経歴書 B(000000000330)を持つ状態から始める。
+# 無い経歴書の ID は、ID の形をした無い値(0000000003ff)と、大文字で書いた無い値(0000000003FE)と、ID の形でない値(not-a-uuid)を送る。
+# 大文字で書いた ID は、経歴書 A の項目の ID(00000000032A から 00000000032C)を大文字で書いて、項目の更新と削除にも送る。
+# 別の経歴書の項目は、経歴書 A の経路に、経歴書 B の項目の ID(000000000331 から 000000000336)を組にして送る。経歴書 B の項目は変わらない。
+# 前後に空白のある ID と、画面が送らない書き方の ID は、2つの版の答えが違う(変えた動きの一覧の CB-051)ので送らない。
+# 項目の ID が ID の形でない、項目の更新と削除の要求は、2つの版の答えが違う(変えた動きの一覧の CB-048)ので送らない。
+name: resumes-not-found
+group: 3
+fixtures: [users/basic.sql, resumes/resume-ops.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 無い経歴書
+  - name: get-missing-resume
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff
+    expect: {status: 404}
+  - name: update-basic-missing-resume
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/basic
+      csrf: true
+      json: &basic {resumeName: 無い経歴書を直す, date: '2026-05-01', lastName: 山田, firstName: 太郎}
+    expect: {status: 404}
+  - name: update-basic-missing-resume-invalid
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/basic
+      csrf: true
+      json: {<<: *basic, resumeName: ''}
+    expect: {status: 400}
+  - name: delete-missing-resume
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff
+      csrf: true
+    expect: {status: 404}
+  - name: create-copy-of-missing-resume
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 無い経歴書を写す, resumeId: 00000000-0000-4000-8000-0000000003ff}
+    expect: {status: 404}
+  - name: create-career-missing-resume
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/careers
+      csrf: true
+      json: &career {companyName: 株式会社あたらしい, startDate: '1980-04', endDate: '1985-03', isActive: false}
+    expect: {status: 404}
+  - name: create-career-missing-resume-invalid
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/careers
+      csrf: true
+      json: {}
+    expect: {status: 400}
+  - name: create-project-missing-resume
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/projects
+      csrf: true
+      json: &project
+        companyName: 株式会社あたらしい
+        startDate: '2012-04'
+        endDate: '2013-03'
+        isActive: false
+        name: 無い経歴書のプロジェクト
+        overview: 無い経歴書に足すプロジェクト
+        teamComp: 全体3名
+        role: 開発の担当
+        achievement: 予定どおりに終えた。
+        requirements: true
+        basicDesign: true
+        detailedDesign: true
+        implementation: true
+        integrationTest: true
+        systemTest: true
+        maintenance: false
+        frontendLanguages: [TypeScript]
+        frontendFrameworks: [React]
+        frontendLibraries: []
+        frontendBuildTools: []
+        frontendPackageManagers: []
+        frontendLinters: []
+        frontendFormatters: []
+        frontendTestingTools: []
+        backendLanguages: [Go]
+        backendFrameworks: []
+        backendLibraries: []
+        backendBuildTools: []
+        backendPackageManagers: []
+        backendLinters: []
+        backendFormatters: []
+        backendTestingTools: []
+        ormTools: []
+        auth: []
+        clouds: [AWS]
+        operatingSystems: []
+        containers: []
+        databases: [PostgreSQL]
+        webServers: []
+        ciCdTools: []
+        iacTools: []
+        monitoringTools: []
+        loggingTools: []
+        sourceControls: [Git]
+        projectManagements: []
+        communicationTools: []
+        documentationTools: []
+        apiDevelopmentTools: []
+        designTools: []
+        editors: []
+        developmentEnvironments: []
+    expect: {status: 404}
+  - name: create-certification-missing-resume
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/certifications
+      csrf: true
+      json: &certification {name: 無い経歴書の資格, date: '2020-04'}
+    expect: {status: 404}
+  - name: create-portfolio-missing-resume
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/portfolios
+      csrf: true
+      json: &portfolio {name: Z 無い経歴書の作品, overview: 無い経歴書に足す作品, techStack: Go, link: 'https://example.com/portfolio/missing'}
+    expect: {status: 404}
+  - name: create-sns-platform-missing-resume
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/sns-platforms
+      csrf: true
+      json: &sns {name: Zenn, link: 'https://zenn.dev/example-missing'}
+    expect: {status: 404}
+  - name: create-self-promotion-missing-resume
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/self-promotions
+      csrf: true
+      json: &promotion {title: Z 無い経歴書の自己PR, content: 無い経歴書に足す自己PR}
+    expect: {status: 404}
+  # 無い経歴書の経路に、経歴書 A の項目の ID を組にする
+  - name: update-career-missing-resume
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/careers/00000000-0000-4000-8000-000000000321
+      csrf: true
+      json: *career
+    expect: {status: 404}
+  - name: delete-career-missing-resume
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/careers/00000000-0000-4000-8000-000000000321
+      csrf: true
+    expect: {status: 404}
+  - name: update-project-missing-resume
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/projects/00000000-0000-4000-8000-000000000323
+      csrf: true
+      json: *project
+    expect: {status: 404}
+  - name: delete-project-missing-resume
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/projects/00000000-0000-4000-8000-000000000323
+      csrf: true
+    expect: {status: 404}
+  - name: update-certification-missing-resume
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/certifications/00000000-0000-4000-8000-000000000325
+      csrf: true
+      json: *certification
+    expect: {status: 404}
+  - name: delete-certification-missing-resume
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/certifications/00000000-0000-4000-8000-000000000325
+      csrf: true
+    expect: {status: 404}
+  - name: update-portfolio-missing-resume
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/portfolios/00000000-0000-4000-8000-000000000327
+      csrf: true
+      json: *portfolio
+    expect: {status: 404}
+  - name: delete-portfolio-missing-resume
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/portfolios/00000000-0000-4000-8000-000000000327
+      csrf: true
+    expect: {status: 404}
+  - name: update-sns-platform-missing-resume
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/sns-platforms/00000000-0000-4000-8000-000000000329
+      csrf: true
+      json: *sns
+    expect: {status: 404}
+  - name: delete-sns-platform-missing-resume
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/sns-platforms/00000000-0000-4000-8000-000000000329
+      csrf: true
+    expect: {status: 404}
+  - name: update-self-promotion-missing-resume
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/self-promotions/00000000-0000-4000-8000-00000000032b
+      csrf: true
+      json: *promotion
+    expect: {status: 404}
+  - name: delete-self-promotion-missing-resume
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-0000000003ff/self-promotions/00000000-0000-4000-8000-00000000032b
+      csrf: true
+    expect: {status: 404}
+  # 大文字で書いた無い経歴書の ID
+  - name: get-missing-resume-upper
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-0000000003FE
+    expect: {status: 404}
+  - name: update-basic-missing-resume-upper
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-0000000003FE/basic
+      csrf: true
+      json: *basic
+    expect: {status: 404}
+  - name: delete-missing-resume-upper
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-0000000003FE
+      csrf: true
+    expect: {status: 404}
+  - name: create-copy-of-missing-resume-upper
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 大文字の無い経歴書を写す, resumeId: 00000000-0000-4000-8000-0000000003FE}
+    expect: {status: 404}
+  - name: create-sns-platform-missing-resume-upper
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000003FE/sns-platforms
+      csrf: true
+      json: *sns
+    expect: {status: 404}
+  # ID の形でない経歴書の ID
+  - name: get-resume-not-uuid
+    request:
+      method: GET
+      path: /api/resumes/not-a-uuid
+    expect: {status: 404}
+  - name: update-basic-resume-not-uuid
+    request:
+      method: PUT
+      path: /api/resumes/not-a-uuid/basic
+      csrf: true
+      json: *basic
+    expect: {status: 404}
+  - name: delete-resume-not-uuid
+    request:
+      method: DELETE
+      path: /api/resumes/not-a-uuid
+      csrf: true
+    expect: {status: 404}
+  - name: create-career-resume-not-uuid
+    request:
+      method: POST
+      path: /api/resumes/not-a-uuid/careers
+      csrf: true
+      json: *career
+    expect: {status: 404}
+  - name: update-career-resume-not-uuid
+    request:
+      method: PUT
+      path: /api/resumes/not-a-uuid/careers/00000000-0000-4000-8000-000000000321
+      csrf: true
+      json: *career
+    expect: {status: 404}
+  - name: delete-career-resume-not-uuid
+    request:
+      method: DELETE
+      path: /api/resumes/not-a-uuid/careers/00000000-0000-4000-8000-000000000321
+      csrf: true
+    expect: {status: 404}
+  - name: create-self-promotion-resume-not-uuid
+    request:
+      method: POST
+      path: /api/resumes/not-a-uuid/self-promotions
+      csrf: true
+      json: *promotion
+    expect: {status: 404}
+  # 経歴書 A の無い項目
+  - name: update-career-missing-item
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+      json: *career
+    expect: {status: 404}
+  - name: update-career-missing-item-invalid
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+      json: {}
+    expect: {status: 400}
+  - name: delete-career-missing-item
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+    expect: {status: 404}
+  - name: update-project-missing-item
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/projects/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+      json: *project
+    expect: {status: 404}
+  - name: delete-project-missing-item
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/projects/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+    expect: {status: 404}
+  - name: update-certification-missing-item
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+      json: *certification
+    expect: {status: 404}
+  - name: delete-certification-missing-item
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+    expect: {status: 404}
+  - name: update-portfolio-missing-item
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/portfolios/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+      json: *portfolio
+    expect: {status: 404}
+  - name: delete-portfolio-missing-item
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/portfolios/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+    expect: {status: 404}
+  - name: update-sns-platform-missing-item
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/sns-platforms/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+      json: *sns
+    expect: {status: 404}
+  - name: delete-sns-platform-missing-item
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/sns-platforms/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+    expect: {status: 404}
+  - name: update-self-promotion-missing-item
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+      json: *promotion
+    expect: {status: 404}
+  - name: delete-self-promotion-missing-item
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-0000000003fd
+      csrf: true
+    expect: {status: 404}
+  # 経歴書 A の経路に、経歴書 B の項目の ID を組にする
+  - name: update-career-of-resume-b
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers/00000000-0000-4000-8000-000000000331
+      csrf: true
+      json: *career
+    expect: {status: 404}
+  - name: delete-career-of-resume-b
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/careers/00000000-0000-4000-8000-000000000331
+      csrf: true
+    expect: {status: 404}
+  - name: update-project-of-resume-b
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/projects/00000000-0000-4000-8000-000000000332
+      csrf: true
+      json: *project
+    expect: {status: 404}
+  - name: delete-project-of-resume-b
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/projects/00000000-0000-4000-8000-000000000332
+      csrf: true
+    expect: {status: 404}
+  - name: update-certification-of-resume-b
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/00000000-0000-4000-8000-000000000333
+      csrf: true
+      json: *certification
+    expect: {status: 404}
+  - name: delete-certification-of-resume-b
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/certifications/00000000-0000-4000-8000-000000000333
+      csrf: true
+    expect: {status: 404}
+  - name: update-portfolio-of-resume-b
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/portfolios/00000000-0000-4000-8000-000000000334
+      csrf: true
+      json: *portfolio
+    expect: {status: 404}
+  - name: delete-portfolio-of-resume-b
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/portfolios/00000000-0000-4000-8000-000000000334
+      csrf: true
+    expect: {status: 404}
+  - name: update-sns-platform-of-resume-b
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/sns-platforms/00000000-0000-4000-8000-000000000335
+      csrf: true
+      json: *sns
+    expect: {status: 404}
+  - name: delete-sns-platform-of-resume-b
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/sns-platforms/00000000-0000-4000-8000-000000000335
+      csrf: true
+    expect: {status: 404}
+  - name: update-self-promotion-of-resume-b
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-000000000336
+      csrf: true
+      json: *promotion
+    expect: {status: 404}
+  - name: delete-self-promotion-of-resume-b
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-000000000336
+      csrf: true
+    expect: {status: 404}
+  - name: get-resume-b-after
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000330
+    expect: {status: 200, fields: [$.careers, $.projects, $.certifications, $.portfolios, $.snsPlatforms, $.selfPromotions]}
+  # 大文字で書いた、経歴書 A の項目の ID は、その項目を指す
+  - name: update-sns-platform-upper-id
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/sns-platforms/00000000-0000-4000-8000-00000000032A
+      csrf: true
+      json: {name: Qiita, link: 'https://qiita.com/example-ops-upper'}
+    expect: {status: 200}
+  - name: update-self-promotion-upper-id
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-00000000032B
+      csrf: true
+      json: {title: A 粘り強く調べる, content: 大文字の ID で直した自己PR}
+    expect: {status: 200}
+  - name: delete-self-promotion-upper-id
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000320/self-promotions/00000000-0000-4000-8000-00000000032C
+      csrf: true
+    expect: {status: 204}
+  - name: get-resume-a-after
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000320
+    expect: {status: 200}

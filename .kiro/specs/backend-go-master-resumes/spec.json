@@ -1,0 +1,70 @@
+{
+  "feature_name": "backend-go-master-resumes",
+  "issue": 772,
+  "created_at": "2026-11-13T22:38:37Z",
+  "updated_at": "2026-11-15T22:09:38Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-15T11:13:00Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-15T13:54:29Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-15T22:09:38Z"
+    }
+  },
+  "approval_history": [
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-14T06:59:38Z",
+      "issues": [772],
+      "revoked_at": "2026-11-14T07:13:41Z",
+      "revoked_for": "T1-1-6 と T1-1-7 による design への差し戻し: ファイルの構成に tasks が作る正解のファイルと cross_test.go が無く、テストの方針がリポジトリに無い試作の入力の件数で確かめると書いている"
+    },
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-14T02:00:05Z",
+      "issues": [772],
+      "revoked_at": "2026-11-15T06:17:31Z",
+      "revoked_for": "所有者が 2026-11-15 に、画面が送らない値の読み方を Java 版に合わせないと決めたことによる requirements への差し戻し: 要件1の受入基準1が、画面が送らない ID と年月と日付の書き方まで Java 版の答えを正解としている"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-15T01:49:40Z",
+      "issues": [772],
+      "revoked_at": "2026-11-15T06:17:31Z",
+      "revoked_for": "所有者が 2026-11-15 に、画面が送らない値の読み方を Java 版に合わせないと決めたことによる requirements への差し戻し: 要件1の受入基準1が、画面が送らない ID と年月と日付の書き方まで Java 版の答えを正解としている"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-15T02:13:42Z",
+      "issues": [772],
+      "revoked_at": "2026-11-15T06:17:31Z",
+      "revoked_for": "所有者が 2026-11-15 に、画面が送らない値の読み方を Java 版に合わせないと決めたことによる requirements への差し戻し: 要件1の受入基準1が、画面が送らない ID と年月と日付の書き方まで Java 版の答えを正解としている"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-15T12:25:15Z",
+      "issues": [772],
+      "revoked_at": "2026-11-15T12:47:59Z",
+      "revoked_for": "T3-1-4 と T3-1-5 による design への差し戻し: 仕様書の変更の節が、済んだ実装に無い x-go-type-import を足すと書き、ファイルの構成に match_test.go と difftable_test.go が無い"
+    }
+  ]
+}
