@@ -494,3 +494,188 @@ func (s *Service) DeleteProject(ctx context.Context, userID uuid.UUID, resumeID,
 		return st.deleteProject(ctx, resumeID, id)
 	})
 }
+
+func certificationIDOf(c Certification) uuid.UUID { return c.ID }
+func portfolioIDOf(p Portfolio) uuid.UUID         { return p.ID }
+func snsPlatformIDOf(p SnsPlatform) uuid.UUID     { return p.ID }
+func selfPromotionIDOf(p SelfPromotion) uuid.UUID { return p.ID }
+
+// certification は、検査を通った資格の要求から、ID が id の資格を作る。
+func (req certificationRequest) certification(id uuid.UUID) Certification {
+	return Certification{ID: id, Name: *req.Name, Date: req.Date.Value}
+}
+
+// portfolio は、検査を通ったポートフォリオの要求から、ID が id のポートフォリオを作る。技術スタックは任意の欄で、値が無ければ nil のまま写す。
+func (req portfolioRequest) portfolio(id uuid.UUID) Portfolio {
+	return Portfolio{ID: id, Name: *req.Name, Overview: *req.Overview, TechStack: req.TechStack, Link: *req.Link}
+}
+
+// snsPlatform は、検査を通った SNS の要求から、ID が id の SNS を作る。
+func (req snsPlatformRequest) snsPlatform(id uuid.UUID) SnsPlatform {
+	return SnsPlatform{ID: id, Name: *req.Name, Link: *req.Link}
+}
+
+// selfPromotion は、検査を通った自己PR の要求から、ID が id の自己PR を作る。
+func (req selfPromotionRequest) selfPromotion(id uuid.UUID) SelfPromotion {
+	return SelfPromotion{ID: id, Title: *req.Title, Content: *req.Content}
+}
+
+// CreateCertification は、利用者の経歴書に資格を1つ足し、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、資格の数の上限である。
+func (s *Service) CreateCertification(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateCertification)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		if e := certificationLimit.check(len(r.Certifications)); e != nil {
+			return e
+		}
+		return st.insertCertification(ctx, r.ID, req.certification(uuid.New()))
+	})
+}
+
+// UpdateCertification は、利用者の経歴書の資格を書き換え、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、資格である。
+func (s *Service) UpdateCertification(ctx context.Context, userID uuid.UUID, resumeID, certificationID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateCertification)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		id, e := entryID(certificationID, r.Certifications, certificationIDOf, MessageCertificationNotFound)
+		if e != nil {
+			return e
+		}
+		// 経歴書の行を固定しているので、entryID で確かめた資格は、書き換えるまで消えない。
+		_, err := st.updateCertification(ctx, r.ID, req.certification(id))
+		return err
+	})
+}
+
+// DeleteCertification は、利用者の経歴書の資格を消す。
+func (s *Service) DeleteCertification(ctx context.Context, userID uuid.UUID, resumeID, certificationID string) error {
+	return s.deleteEntry(ctx, userID, resumeID, certificationID, MessageCertificationNotFound, func(st store, resumeID, id uuid.UUID) (bool, error) {
+		return st.deleteCertification(ctx, resumeID, id)
+	})
+}
+
+// CreatePortfolio は、利用者の経歴書にポートフォリオを1つ足し、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、ポートフォリオの数の上限である。
+func (s *Service) CreatePortfolio(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validatePortfolio)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		if e := portfolioLimit.check(len(r.Portfolios)); e != nil {
+			return e
+		}
+		return st.insertPortfolio(ctx, r.ID, req.portfolio(uuid.New()))
+	})
+}
+
+// UpdatePortfolio は、利用者の経歴書のポートフォリオを書き換え、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、ポートフォリオである。
+func (s *Service) UpdatePortfolio(ctx context.Context, userID uuid.UUID, resumeID, portfolioID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validatePortfolio)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		id, e := entryID(portfolioID, r.Portfolios, portfolioIDOf, MessagePortfolioNotFound)
+		if e != nil {
+			return e
+		}
+		// 経歴書の行を固定しているので、entryID で確かめたポートフォリオは、書き換えるまで消えない。
+		_, err := st.updatePortfolio(ctx, r.ID, req.portfolio(id))
+		return err
+	})
+}
+
+// DeletePortfolio は、利用者の経歴書のポートフォリオを消す。
+func (s *Service) DeletePortfolio(ctx context.Context, userID uuid.UUID, resumeID, portfolioID string) error {
+	return s.deleteEntry(ctx, userID, resumeID, portfolioID, MessagePortfolioNotFound, func(st store, resumeID, id uuid.UUID) (bool, error) {
+		return st.deletePortfolio(ctx, resumeID, id)
+	})
+}
+
+// CreateSnsPlatform は、利用者の経歴書に SNS を1つ足し、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、SNS の数の上限である。
+func (s *Service) CreateSnsPlatform(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateSnsPlatform)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		if e := snsPlatformLimit.check(len(r.SnsPlatforms)); e != nil {
+			return e
+		}
+		return st.insertSnsPlatform(ctx, r.ID, req.snsPlatform(uuid.New()))
+	})
+}
+
+// UpdateSnsPlatform は、利用者の経歴書の SNS を書き換え、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、SNS である。
+func (s *Service) UpdateSnsPlatform(ctx context.Context, userID uuid.UUID, resumeID, snsPlatformID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateSnsPlatform)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		id, e := entryID(snsPlatformID, r.SnsPlatforms, snsPlatformIDOf, MessageSnsPlatformNotFound)
+		if e != nil {
+			return e
+		}
+		// 経歴書の行を固定しているので、entryID で確かめた SNS は、書き換えるまで消えない。
+		_, err := st.updateSnsPlatform(ctx, r.ID, req.snsPlatform(id))
+		return err
+	})
+}
+
+// DeleteSnsPlatform は、利用者の経歴書の SNS を消す。
+func (s *Service) DeleteSnsPlatform(ctx context.Context, userID uuid.UUID, resumeID, snsPlatformID string) error {
+	return s.deleteEntry(ctx, userID, resumeID, snsPlatformID, MessageSnsPlatformNotFound, func(st store, resumeID, id uuid.UUID) (bool, error) {
+		return st.deleteSnsPlatform(ctx, resumeID, id)
+	})
+}
+
+// CreateSelfPromotion は、利用者の経歴書に自己PR を1つ足し、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、自己PR の数の上限である。
+func (s *Service) CreateSelfPromotion(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateSelfPromotion)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		if e := selfPromotionLimit.check(len(r.SelfPromotions)); e != nil {
+			return e
+		}
+		return st.insertSelfPromotion(ctx, r.ID, req.selfPromotion(uuid.New()))
+	})
+}
+
+// UpdateSelfPromotion は、利用者の経歴書の自己PR を書き換え、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、自己PR である。
+func (s *Service) UpdateSelfPromotion(ctx context.Context, userID uuid.UUID, resumeID, selfPromotionID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateSelfPromotion)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		id, e := entryID(selfPromotionID, r.SelfPromotions, selfPromotionIDOf, MessageSelfPromotionNotFound)
+		if e != nil {
+			return e
+		}
+		// 経歴書の行を固定しているので、entryID で確かめた自己PR は、書き換えるまで消えない。
+		_, err := st.updateSelfPromotion(ctx, r.ID, req.selfPromotion(id))
+		return err
+	})
+}
+
+// DeleteSelfPromotion は、利用者の経歴書の自己PR を消す。
+func (s *Service) DeleteSelfPromotion(ctx context.Context, userID uuid.UUID, resumeID, selfPromotionID string) error {
+	return s.deleteEntry(ctx, userID, resumeID, selfPromotionID, MessageSelfPromotionNotFound, func(st store, resumeID, id uuid.UUID) (bool, error) {
+		return st.deleteSelfPromotion(ctx, resumeID, id)
+	})
+}

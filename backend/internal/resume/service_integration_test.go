@@ -1471,3 +1471,395 @@ func waitForLockWaiters(t *testing.T, n int) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+// entrySection は、資格、ポートフォリオ、SNS、自己PR の4つの欄の項目の変更のテストが使う、欄ごとの違いである。
+type entrySection[E any] struct {
+	entries  func(r *Resume) *[]E
+	id       func(E) uuid.UUID
+	notFound string
+	limit    limitRule
+	// empty は、{} の本文への入力欄の誤りである。
+	empty *auth.Error
+	// body は i 番目の正しい本文を書き、entry は i 番目の本文から作る項目を返す。
+	body  func(t *testing.T, i int) []byte
+	entry func(id uuid.UUID, i int) E
+	// many は、n 個の項目を作る。
+	many   func(n int) []E
+	create func(s *Service, ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (Resume, error)
+	update func(s *Service, ctx context.Context, userID uuid.UUID, resumeID, itemID string, body []byte) (Resume, error)
+	del    func(s *Service, ctx context.Context, userID uuid.UUID, resumeID, itemID string) error
+}
+
+// manyEntries は、i 番目の項目を f で作る n 個の項目を返す。
+func manyEntries[E any](n int, f func(i int) E) []E {
+	es := make([]E, n)
+	for i := range es {
+		es[i] = f(i)
+	}
+	return es
+}
+
+var certificationSection = entrySection[Certification]{
+	entries:  func(r *Resume) *[]Certification { return &r.Certifications },
+	id:       certificationIDOf,
+	notFound: MessageCertificationNotFound,
+	limit:    certificationLimit,
+	empty: auth.ErrInvalidInput(map[string][]string{
+		"name": {MessageCertificationNameRequired}, "date": {MessageCertificationDateRequired},
+	}),
+	body: func(t *testing.T, i int) []byte {
+		return jsonBody(t, map[string]any{"name": fmt.Sprintf("資格%d", i), "date": fmt.Sprintf("2020-%02d", i+1)})
+	},
+	entry: func(id uuid.UUID, i int) Certification {
+		return Certification{ID: id, Name: fmt.Sprintf("資格%d", i), Date: YearMonth{2020, time.Month(i + 1)}}
+	},
+	many: func(n int) []Certification {
+		return manyEntries(n, func(i int) Certification {
+			return Certification{ID: uuid.New(), Name: fmt.Sprintf("資格%d", i), Date: YearMonth{2000, time.January}}
+		})
+	},
+	create: (*Service).CreateCertification,
+	update: (*Service).UpdateCertification,
+	del:    (*Service).DeleteCertification,
+}
+
+// portfolioSection の本文は、0番目だけが技術スタックの鍵を持つ。技術スタックの値の有る無しを、追加と更新の両方で写すことを確かめるためである。
+var portfolioSection = entrySection[Portfolio]{
+	entries:  func(r *Resume) *[]Portfolio { return &r.Portfolios },
+	id:       portfolioIDOf,
+	notFound: MessagePortfolioNotFound,
+	limit:    portfolioLimit,
+	empty: auth.ErrInvalidInput(map[string][]string{
+		"name": {MessagePortfolioNameRequired}, "overview": {MessagePortfolioOverviewRequired}, "link": {MessageLinkRequired},
+	}),
+	body: func(t *testing.T, i int) []byte {
+		m := map[string]any{
+			"name": fmt.Sprintf("作品%d", i), "overview": fmt.Sprintf("作品の概要%d", i), "link": fmt.Sprintf("https://example.com/p%d", i),
+		}
+		if i == 0 {
+			m["techStack"] = "Go, React"
+		}
+		return jsonBody(t, m)
+	},
+	entry: func(id uuid.UUID, i int) Portfolio {
+		p := Portfolio{
+			ID: id, Name: fmt.Sprintf("作品%d", i), Overview: fmt.Sprintf("作品の概要%d", i), Link: fmt.Sprintf("https://example.com/p%d", i),
+		}
+		if i == 0 {
+			p.TechStack = ptr("Go, React")
+		}
+		return p
+	},
+	many: func(n int) []Portfolio {
+		return manyEntries(n, func(i int) Portfolio {
+			return Portfolio{ID: uuid.New(), Name: fmt.Sprintf("作品%d", i), Overview: "概要", Link: fmt.Sprintf("https://example.com/%d", i)}
+		})
+	},
+	create: (*Service).CreatePortfolio,
+	update: (*Service).UpdatePortfolio,
+	del:    (*Service).DeletePortfolio,
+}
+
+var snsPlatformSection = entrySection[SnsPlatform]{
+	entries:  func(r *Resume) *[]SnsPlatform { return &r.SnsPlatforms },
+	id:       snsPlatformIDOf,
+	notFound: MessageSnsPlatformNotFound,
+	limit:    snsPlatformLimit,
+	empty: auth.ErrInvalidInput(map[string][]string{
+		"name": {MessageSnsPlatformNameRequired}, "link": {MessageLinkRequired},
+	}),
+	body: func(t *testing.T, i int) []byte {
+		return jsonBody(t, map[string]any{"name": fmt.Sprintf("SNS%d", i), "link": fmt.Sprintf("https://sns.example.com/%d", i)})
+	},
+	entry: func(id uuid.UUID, i int) SnsPlatform {
+		return SnsPlatform{ID: id, Name: fmt.Sprintf("SNS%d", i), Link: fmt.Sprintf("https://sns.example.com/%d", i)}
+	},
+	many: func(n int) []SnsPlatform {
+		return manyEntries(n, func(i int) SnsPlatform {
+			return SnsPlatform{ID: uuid.New(), Name: fmt.Sprintf("SNS%d", i), Link: fmt.Sprintf("https://example.com/%d", i)}
+		})
+	},
+	create: (*Service).CreateSnsPlatform,
+	update: (*Service).UpdateSnsPlatform,
+	del:    (*Service).DeleteSnsPlatform,
+}
+
+var selfPromotionSection = entrySection[SelfPromotion]{
+	entries:  func(r *Resume) *[]SelfPromotion { return &r.SelfPromotions },
+	id:       selfPromotionIDOf,
+	notFound: MessageSelfPromotionNotFound,
+	limit:    selfPromotionLimit,
+	empty: auth.ErrInvalidInput(map[string][]string{
+		"title": {MessageSelfPromotionTitleRequired}, "content": {MessageSelfPromotionContentRequired},
+	}),
+	body: func(t *testing.T, i int) []byte {
+		return jsonBody(t, map[string]any{"title": fmt.Sprintf("題%d", i), "content": fmt.Sprintf("本文%d", i)})
+	},
+	entry: func(id uuid.UUID, i int) SelfPromotion {
+		return SelfPromotion{ID: id, Title: fmt.Sprintf("題%d", i), Content: fmt.Sprintf("本文%d", i)}
+	},
+	many: func(n int) []SelfPromotion {
+		return manyEntries(n, func(i int) SelfPromotion {
+			return SelfPromotion{ID: uuid.New(), Title: fmt.Sprintf("題%d", i), Content: "本文"}
+		})
+	},
+	create: (*Service).CreateSelfPromotion,
+	update: (*Service).UpdateSelfPromotion,
+	del:    (*Service).DeleteSelfPromotion,
+}
+
+// entryCreateUpdateDelete は、項目の追加と更新と削除が、経歴書の欄の項目と更新の日時を書き換え、並べた経歴書を返すことを確かめる。
+// 項目の ID と経歴書の ID は、大文字で書いても読む。
+func entryCreateUpdateDelete[E any](t *testing.T, sec entrySection[E]) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	clock := &testClock{now: japanTime(2026, time.December, 1, 9, 0, 0, 0)}
+	svc := New(Deps{Pool: testPool, Now: clock.Now})
+	ctx := t.Context()
+
+	got, err := sec.create(svc, ctx, userID, strings.ToUpper(r.ID.String()), sec.body(t, 0))
+	if err != nil {
+		t.Fatalf("項目を足せません: %v", err)
+	}
+	id := addedID(t, *sec.entries(&got), *sec.entries(&r), sec.id)
+	want := r
+	*sec.entries(&want) = append(slicesClone(*sec.entries(&r)), sec.entry(id, 0))
+	want = sorted(want)
+	want.UpdatedAt = clock.now
+	assertResume(t, got, want)
+	assertResume(t, mustFind(t, userID, r.ID), want)
+
+	clock.now = japanTime(2026, time.December, 2, 9, 0, 0, 0)
+	got, err = sec.update(svc, ctx, userID, r.ID.String(), strings.ToUpper(id.String()), sec.body(t, 1))
+	if err != nil {
+		t.Fatalf("項目を更新できません: %v", err)
+	}
+	*sec.entries(&want) = replaceEntry(*sec.entries(&want), sec.entry(id, 1), sec.id)
+	want = sorted(want)
+	want.UpdatedAt = clock.now
+	assertResume(t, got, want)
+	assertResume(t, mustFind(t, userID, r.ID), want)
+
+	clock.now = japanTime(2026, time.December, 3, 9, 0, 0, 0)
+	if err := sec.del(svc, ctx, userID, r.ID.String(), strings.ToUpper(id.String())); err != nil {
+		t.Fatalf("項目を消せません: %v", err)
+	}
+	want = sorted(r)
+	want.UpdatedAt = clock.now
+	assertResume(t, mustFind(t, userID, r.ID), want)
+}
+
+// entryErrors は、項目の追加と更新と削除が、本文、入力欄、経歴書、項目の順に誤りを確かめ、誤りのときは何も書かないことを確かめる。
+func entryErrors[E any](t *testing.T, sec entrySection[E]) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	id, item, missing := r.ID.String(), sec.id((*sec.entries(&r))[1]).String(), uuid.NewString()
+	otherSection := r.Careers[0].ID.String()
+	valid := sec.body(t, 0)
+	create := func(resumeID string, body []byte) error {
+		_, err := sec.create(svc, ctx, userID, resumeID, body)
+		return err
+	}
+	update := func(resumeID, itemID string, body []byte) error {
+		_, err := sec.update(svc, ctx, userID, resumeID, itemID, body)
+		return err
+	}
+	itemMissing := errNotFound(sec.notFound)
+
+	for _, c := range []struct {
+		name string
+		err  error
+		want *auth.Error
+	}{
+		{"追加: 読めない本文と読めない ID", create("abc", []byte(`{`)), errUnreadableInput()},
+		{"追加: 入力欄の誤りと読めない ID", create("abc", []byte(`{}`)), sec.empty},
+		{"追加: 読めない ID", create("abc", valid), errResumeNotFound()},
+		{"追加: 無い経歴書", create(missing, valid), errResumeNotFound()},
+		{"更新: 読めない本文", update("abc", "abc", []byte(`{`)), errUnreadableInput()},
+		{"更新: 入力欄の誤りと無い項目", update(id, missing, []byte(`{}`)), sec.empty},
+		{"更新: 無い経歴書", update(missing, item, valid), errResumeNotFound()},
+		{"更新: 無い項目", update(id, missing, valid), itemMissing},
+		{"更新: 職歴の ID", update(id, otherSection, valid), itemMissing},
+		{"削除: 無い経歴書", sec.del(svc, ctx, userID, missing, item), errResumeNotFound()},
+		{"削除: 無い項目", sec.del(svc, ctx, userID, id, missing), itemMissing},
+		{"削除: 職歴の ID", sec.del(svc, ctx, userID, id, otherSection), itemMissing},
+	} {
+		assertError(t, c.name, c.err, c.want)
+	}
+	assertResume(t, mustFind(t, userID, r.ID), sorted(r))
+}
+
+// entryOtherUser は、ほかの利用者の経歴書の項目を足しも書き換えも消しもせず、無い経歴書と同じ誤りを返すことを確かめる(要件3の受入基準1)。
+func entryOtherUser[E any](t *testing.T, sec entrySection[E]) {
+	owner := insertTestUser(t)
+	r := fullResume(owner)
+	saveResume(t, r)
+	other := insertTestUser(t)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	id, item := r.ID.String(), sec.id((*sec.entries(&r))[1]).String()
+
+	_, err := sec.create(svc, ctx, other, id, sec.body(t, 0))
+	assertResumeNotFound(t, err)
+	_, err = sec.update(svc, ctx, other, id, item, sec.body(t, 0))
+	assertResumeNotFound(t, err)
+	assertResumeNotFound(t, sec.del(svc, ctx, other, id, item))
+	assertResume(t, mustFind(t, owner, r.ID), sorted(r))
+}
+
+// entryOfOtherResume は、経路の経歴書と別の経歴書の項目を書き換えも消しもせず、無い項目と同じ誤りを返すことを確かめる(要件3の受入基準2)。
+func entryOfOtherResume[E any](t *testing.T, sec entrySection[E]) {
+	userID := insertTestUser(t)
+	r1, r2 := fullResume(userID), fullResume(userID)
+	r2.Name = "経歴書2"
+	saveResume(t, r1)
+	saveResume(t, r2)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	item := sec.id((*sec.entries(&r1))[1]).String()
+
+	_, err := sec.update(svc, ctx, userID, r2.ID.String(), item, sec.body(t, 0))
+	assertError(t, "更新", err, errNotFound(sec.notFound))
+	assertError(t, "削除", sec.del(svc, ctx, userID, r2.ID.String(), item), errNotFound(sec.notFound))
+	assertResume(t, mustFind(t, userID, r1.ID), sorted(r1))
+	assertResume(t, mustFind(t, userID, r2.ID), sorted(r2))
+}
+
+// entryCreateOtherUserAtLimit は、ほかの利用者の上限に達した経歴書への項目の追加に、上限の誤りではなく無い経歴書の誤りを返し、
+// 持ち主の追加には上限の誤りを返すことを確かめる(要件3の受入基準3)。
+func entryCreateOtherUserAtLimit[E any](t *testing.T, sec entrySection[E]) {
+	owner := insertTestUser(t)
+	r := emptyResume(owner, "経歴書")
+	*sec.entries(&r) = sec.many(sec.limit.limit)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+
+	_, err := sec.create(svc, t.Context(), insertTestUser(t), r.ID.String(), sec.body(t, 0))
+	assertResumeNotFound(t, err)
+	_, err = sec.create(svc, t.Context(), owner, r.ID.String(), sec.body(t, 0))
+	assertError(t, "持ち主の追加", err, errLimitReached(sec.limit.format, sec.limit.limit, sec.limit.limit))
+	assertResume(t, mustFind(t, owner, r.ID), sorted(r))
+}
+
+// entryUnreadableItemID は、項目の ID が読めない更新と削除に、無い項目と同じ誤りを返すことを確かめる(要件4の受入基準4)。
+// 経歴書の ID も読めなければ、無い経歴書の誤りを返す。
+func entryUnreadableItemID[E any](t *testing.T, sec entrySection[E]) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	body := sec.body(t, 0)
+
+	for _, item := range unreadableIDs {
+		_, err := sec.update(svc, ctx, userID, r.ID.String(), item, body)
+		assertError(t, "更新 "+item, err, errNotFound(sec.notFound))
+		assertError(t, "削除 "+item, sec.del(svc, ctx, userID, r.ID.String(), item), errNotFound(sec.notFound))
+	}
+	_, err := sec.update(svc, ctx, userID, "abc", "abc", body)
+	assertResumeNotFound(t, err)
+	assertResumeNotFound(t, sec.del(svc, ctx, userID, "abc", "abc"))
+	assertResume(t, mustFind(t, userID, r.ID), sorted(r))
+}
+
+// TestService_CertificationCreateUpdateDelete は、資格の追加と更新と削除を確かめる。
+func TestService_CertificationCreateUpdateDelete(t *testing.T) {
+	entryCreateUpdateDelete(t, certificationSection)
+}
+
+// TestService_CertificationErrors は、資格の変更の誤りの順を確かめる。
+func TestService_CertificationErrors(t *testing.T) { entryErrors(t, certificationSection) }
+
+// TestService_CertificationOtherUser は、ほかの利用者の経歴書の資格を変えないことを確かめる(要件3の受入基準1)。
+func TestService_CertificationOtherUser(t *testing.T) { entryOtherUser(t, certificationSection) }
+
+// TestService_CertificationOfOtherResume は、別の経歴書の資格を変えないことを確かめる(要件3の受入基準2)。
+func TestService_CertificationOfOtherResume(t *testing.T) {
+	entryOfOtherResume(t, certificationSection)
+}
+
+// TestService_CertificationCreateOtherUserAtLimit は、ほかの利用者の上限に達した経歴書への資格の追加を確かめる(要件3の受入基準3)。
+func TestService_CertificationCreateOtherUserAtLimit(t *testing.T) {
+	entryCreateOtherUserAtLimit(t, certificationSection)
+}
+
+// TestService_CertificationUnreadableItemID は、資格の ID が読めない更新と削除を確かめる(要件4の受入基準4)。
+func TestService_CertificationUnreadableItemID(t *testing.T) {
+	entryUnreadableItemID(t, certificationSection)
+}
+
+// TestService_PortfolioCreateUpdateDelete は、ポートフォリオの追加と更新と削除を確かめる。
+func TestService_PortfolioCreateUpdateDelete(t *testing.T) {
+	entryCreateUpdateDelete(t, portfolioSection)
+}
+
+// TestService_PortfolioErrors は、ポートフォリオの変更の誤りの順を確かめる。
+func TestService_PortfolioErrors(t *testing.T) { entryErrors(t, portfolioSection) }
+
+// TestService_PortfolioOtherUser は、ほかの利用者の経歴書のポートフォリオを変えないことを確かめる(要件3の受入基準1)。
+func TestService_PortfolioOtherUser(t *testing.T) { entryOtherUser(t, portfolioSection) }
+
+// TestService_PortfolioOfOtherResume は、別の経歴書のポートフォリオを変えないことを確かめる(要件3の受入基準2)。
+func TestService_PortfolioOfOtherResume(t *testing.T) { entryOfOtherResume(t, portfolioSection) }
+
+// TestService_PortfolioCreateOtherUserAtLimit は、ほかの利用者の上限に達した経歴書へのポートフォリオの追加を確かめる(要件3の受入基準3)。
+func TestService_PortfolioCreateOtherUserAtLimit(t *testing.T) {
+	entryCreateOtherUserAtLimit(t, portfolioSection)
+}
+
+// TestService_PortfolioUnreadableItemID は、ポートフォリオの ID が読めない更新と削除を確かめる(要件4の受入基準4)。
+func TestService_PortfolioUnreadableItemID(t *testing.T) { entryUnreadableItemID(t, portfolioSection) }
+
+// TestService_SnsPlatformCreateUpdateDelete は、SNS の追加と更新と削除を確かめる。
+func TestService_SnsPlatformCreateUpdateDelete(t *testing.T) {
+	entryCreateUpdateDelete(t, snsPlatformSection)
+}
+
+// TestService_SnsPlatformErrors は、SNS の変更の誤りの順を確かめる。
+func TestService_SnsPlatformErrors(t *testing.T) { entryErrors(t, snsPlatformSection) }
+
+// TestService_SnsPlatformOtherUser は、ほかの利用者の経歴書の SNS を変えないことを確かめる(要件3の受入基準1)。
+func TestService_SnsPlatformOtherUser(t *testing.T) { entryOtherUser(t, snsPlatformSection) }
+
+// TestService_SnsPlatformOfOtherResume は、別の経歴書の SNS を変えないことを確かめる(要件3の受入基準2)。
+func TestService_SnsPlatformOfOtherResume(t *testing.T) { entryOfOtherResume(t, snsPlatformSection) }
+
+// TestService_SnsPlatformCreateOtherUserAtLimit は、ほかの利用者の上限に達した経歴書への SNS の追加を確かめる(要件3の受入基準3)。
+func TestService_SnsPlatformCreateOtherUserAtLimit(t *testing.T) {
+	entryCreateOtherUserAtLimit(t, snsPlatformSection)
+}
+
+// TestService_SnsPlatformUnreadableItemID は、SNS の ID が読めない更新と削除を確かめる(要件4の受入基準4)。
+func TestService_SnsPlatformUnreadableItemID(t *testing.T) {
+	entryUnreadableItemID(t, snsPlatformSection)
+}
+
+// TestService_SelfPromotionCreateUpdateDelete は、自己PR の追加と更新と削除を確かめる。
+func TestService_SelfPromotionCreateUpdateDelete(t *testing.T) {
+	entryCreateUpdateDelete(t, selfPromotionSection)
+}
+
+// TestService_SelfPromotionErrors は、自己PR の変更の誤りの順を確かめる。
+func TestService_SelfPromotionErrors(t *testing.T) { entryErrors(t, selfPromotionSection) }
+
+// TestService_SelfPromotionOtherUser は、ほかの利用者の経歴書の自己PR を変えないことを確かめる(要件3の受入基準1)。
+func TestService_SelfPromotionOtherUser(t *testing.T) { entryOtherUser(t, selfPromotionSection) }
+
+// TestService_SelfPromotionOfOtherResume は、別の経歴書の自己PR を変えないことを確かめる(要件3の受入基準2)。
+func TestService_SelfPromotionOfOtherResume(t *testing.T) {
+	entryOfOtherResume(t, selfPromotionSection)
+}
+
+// TestService_SelfPromotionCreateOtherUserAtLimit は、ほかの利用者の上限に達した経歴書への自己PR の追加を確かめる(要件3の受入基準3)。
+func TestService_SelfPromotionCreateOtherUserAtLimit(t *testing.T) {
+	entryCreateOtherUserAtLimit(t, selfPromotionSection)
+}
+
+// TestService_SelfPromotionUnreadableItemID は、自己PR の ID が読めない更新と削除を確かめる(要件4の受入基準4)。
+func TestService_SelfPromotionUnreadableItemID(t *testing.T) {
+	entryUnreadableItemID(t, selfPromotionSection)
+}
