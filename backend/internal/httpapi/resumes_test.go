@@ -5,16 +5,31 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"net"
 	"net/http"
+	"net/http/httptest"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"go.yaml.in/yaml/v3"
 
+	"github.com/DogisRiki/KeirekiPro/backend"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/gen"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/authctx"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/database"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/migrate"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/resume"
 )
 
@@ -824,4 +839,377 @@ func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 	for name, visit := range visits {
 		checkResponse(t, name, recordResponse(t, visit), want)
 	}
+}
+
+// routeCSRF は、経路のテストで、偽の送信の検査に通す Cookie とヘッダの値である。
+const routeCSRF = "resume-route-csrf"
+
+// resumeServer は、認証のまとまりと経歴書の処理 svc をつないだ受け口を、userID の利用者がログインした状態で作る。
+// svc が nil なら ResumeHandlers を渡さない。認証の処理には、つながらないデータベースを渡す。
+func resumeServer(t *testing.T, svc ResumeService, userID uuid.UUID) http.Handler {
+	t.Helper()
+	pool, err := pgxpool.New(t.Context(), "postgres://keirekipro@127.0.0.1:1/keirekipro?connect_timeout=2")
+	if err != nil {
+		t.Fatalf("接続の束を作れません: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	return New(Options{
+		Logger: slog.New(slog.DiscardHandler),
+		Identify: func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				next.ServeHTTP(w, r.WithContext(authctx.With(r.Context(), userID, []string{"USER"})))
+			})
+		},
+		Auth: auth.RequireLogin(),
+		AuthHandlers: auth.New(auth.Deps{
+			Pool: pool, JWT: config.JWT{Secret: strings.Repeat("k", 64), AccessTokenValidity: time.Hour},
+		}),
+		ResumeHandlers: svc,
+	})
+}
+
+// sendRoute は、偽の送信の検査に通る Cookie とヘッダを付けて、要求を1つ送る。body が nil なら本文を付けない。
+func sendRoute(h http.Handler, method, path string, body *string) *httptest.ResponseRecorder {
+	var reader io.Reader
+	if body != nil {
+		reader = strings.NewReader(*body)
+	}
+	req := httptest.NewRequest(method, path, reader)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Cookie", "XSRF-TOKEN="+routeCSRF)
+	req.Header.Set("X-XSRF-TOKEN", routeCSRF)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// resumeRoute は、経歴書の26の操作の1つの、仕様書の経路への要求と、経歴書の処理の呼び出しである。
+type resumeRoute struct {
+	name, method, path, body, call string
+}
+
+// resumeRoutes は、経歴書の26の操作の要求を、resumeOps と同じ名前で返す。
+func resumeRoutes() []resumeRoute {
+	user := handlerUserID.String()
+	base := "/api/resumes/" + testResumeID
+	routes := []resumeRoute{
+		{"ListCertificationNames", http.MethodGet, "/api/certifications", "", "ListCertificationNames()"},
+		{"ListSnsPlatformNames", http.MethodGet, "/api/sns-platforms", "", "ListSnsPlatformNames()"},
+		{"ListTechStacks", http.MethodGet, "/api/tech-stacks", "", "ListTechStacks()"},
+		{"ListResumes", http.MethodGet, "/api/resumes", "", "ListResumes(" + user + ")"},
+		{
+			"CreateResume", http.MethodPost, "/api/resumes", `{"resumeName":"作成"}`,
+			"CreateResume(" + user + `, {"resumeName":"作成"})`,
+		},
+		{"GetResume", http.MethodGet, base, "", "GetResume(" + user + ", " + testResumeID + ")"},
+		{"DeleteResume", http.MethodDelete, base, "", "DeleteResume(" + user + ", " + testResumeID + ")"},
+		{
+			"UpdateResumeBasic", http.MethodPut, base + "/basic", `{"date":"2026-11-14"}`,
+			"UpdateResumeBasic(" + user + ", " + testResumeID + `, {"date":"2026-11-14"})`,
+		},
+	}
+	segments := map[string]string{
+		"Career": "careers", "Project": "projects", "Certification": "certifications",
+		"Portfolio": "portfolios", "SnsPlatform": "sns-platforms", "SelfPromotion": "self-promotions",
+	}
+	for _, it := range itemOps() {
+		list := base + "/" + segments[it.name]
+		item := list + "/" + it.itemID
+		createBody := `{"create":"` + it.name + `"}`
+		updateBody := `{"update":"` + it.name + `"}`
+		routes = append(routes,
+			resumeRoute{
+				"Create" + it.name, http.MethodPost, list, createBody,
+				"Create" + it.name + "(" + user + ", " + testResumeID + ", " + createBody + ")",
+			},
+			resumeRoute{
+				"Update" + it.name, http.MethodPut, item, updateBody,
+				"Update" + it.name + "(" + user + ", " + testResumeID + ", " + it.itemID + ", " + updateBody + ")",
+			},
+			resumeRoute{
+				"Delete" + it.name, http.MethodDelete, item, "",
+				"Delete" + it.name + "(" + user + ", " + testResumeID + ", " + it.itemID + ")",
+			},
+		)
+	}
+	return routes
+}
+
+// TestResumeRoutes_Wired は、New に ResumeHandlers を渡すと、仕様書の経路への26の操作の要求が経歴書の受け口に届き、
+// 受け口の答えで答えることを確かめる(要件1の受入基準2)。
+func TestResumeRoutes_Wired(t *testing.T) {
+	wants := map[string]wantResponse{}
+	for _, op := range resumeOps() {
+		wants[op.name] = op.want
+	}
+	routes := resumeRoutes()
+	if len(routes) != 26 || len(wants) != 26 {
+		t.Fatalf("操作の数 = 経路 %d、受け口 %d, want 26", len(routes), len(wants))
+	}
+	for _, rt := range routes {
+		t.Run(rt.name, func(t *testing.T) {
+			want, ok := wants[rt.name]
+			if !ok {
+				t.Fatalf("操作 %s が resumeOps に無い", rt.name)
+			}
+			svc := newFakeResumes()
+			rec := sendRoute(resumeServer(t, svc, handlerUserID), rt.method, rt.path, &rt.body)
+			if rec.Code != want.status || rec.Body.String() != want.body {
+				t.Errorf("応答 = %d %s, want %d %s", rec.Code, rec.Body.String(), want.status, want.body)
+			}
+			if want.contentType != "" && rec.Header().Get("Content-Type") != want.contentType {
+				t.Errorf("Content-Type = %q, want %q", rec.Header().Get("Content-Type"), want.contentType)
+			}
+			checkResumeCalls(t, rt.name, svc, rt.call)
+		})
+	}
+}
+
+// TestResumeRoutes_Unimplemented は、New に ResumeHandlers を渡さなければ、マスタと経歴書の26の操作の要求に、
+// 今と同じ未実装の答えを返すことを確かめる。
+func TestResumeRoutes_Unimplemented(t *testing.T) {
+	handler := resumeServer(t, nil, handlerUserID)
+	for _, rt := range resumeRoutes() {
+		rec := sendRoute(handler, rt.method, rt.path, &rt.body)
+		if rec.Code != http.StatusNotImplemented || rec.Body.String() != `{"message":"未実装です。"}` {
+			t.Errorf("%s の応答 = %d %s, want 501 と未実装の本文", rt.name, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// wholeBodyCase は、testdata/resumebody/cases.json の1つの本文と、Java 版の答えである。
+type wholeBodyCase struct {
+	Name     string                    `json:"name"`
+	Endpoint string                    `json:"endpoint"`
+	Body     *string                   `json:"body"`
+	Status   int                       `json:"status"`
+	Response any                       `json:"response"`
+	DB       map[string]map[string]any `json:"db"`
+}
+
+// wholeBodyDiffs は、cases.json の本文のうち、Go 版の答えが Java 版と違う本文と、違いを載せた一覧の番号である。
+// Java 版は本文の全体が null の要求を断るが、Go 版は encoding/json のとおりにすべての欄の値が無いことにして、
+// 入力の検査の誤りで答える(CB-054)。
+var wholeBodyDiffs = map[string]string{
+	"resume-null": "CB-054",
+	"career-null": "CB-054",
+}
+
+// wholeBodyTables は、正解の db に書かれた表の、ログインした利用者の行を選ぶ問い合わせである。
+var wholeBodyTables = map[string]string{
+	"resumes": "SELECT to_jsonb(t) FROM resumes t WHERE t.user_id = $1",
+	"careers": "SELECT to_jsonb(t) FROM careers t JOIN resumes r ON r.id = t.resume_id WHERE r.user_id = $1",
+}
+
+// TestResumeRoutes_WholeBody は、New で作った経路に、最初の値のあとに余りのある本文、空の本文、並びと null と文字列の
+// 本文を送り、Java 版の答えと比べる(要件1の受入基準1)。本文の全体の扱いは、internal/resume の本文の読み手ではなく、
+// 生成したコードが決める。Java 版と違う答えになる本文が wholeBodyDiffs と合うこと、表の番号が変えた動きの一覧に
+// あること、ほかの本文に Java 版と同じ状態の番号と本文で答え、同じ行をデータベースに書くことを確かめる。
+func TestResumeRoutes_WholeBody(t *testing.T) {
+	b, err := os.ReadFile("testdata/resumebody/cases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file struct {
+		Cases []wholeBodyCase `json:"cases"`
+	}
+	if err := json.Unmarshal(b, &file); err != nil {
+		t.Fatal(err)
+	}
+	checkWholeBodyDiffTable(t, file.Cases)
+	pool := startResumeDB(t)
+	svc := resume.New(resume.Deps{Pool: pool, Now: time.Now})
+	for _, c := range file.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			userID, resumeID := seedWholeBody(t, pool, c.Endpoint)
+			method, path, _ := strings.Cut(strings.ReplaceAll(c.Endpoint, "{resumeId}", resumeID), " ")
+			before := time.Now().In(jst).Format(time.DateOnly)
+			rec := sendRoute(resumeServer(t, svc, userID), method, path, c.Body)
+			after := time.Now().In(jst).Format(time.DateOnly)
+			diffs := wholeBodyDiff(t, pool, c, rec, userID, resumeID, before, after)
+			id, listed := wholeBodyDiffs[c.Name]
+			switch {
+			case len(diffs) > 0 && !listed:
+				t.Errorf("Java 版と違うのに表に無い: %s", strings.Join(diffs, "; "))
+			case len(diffs) == 0 && listed:
+				t.Errorf("表に %s で載っているのに、Java 版と同じ答え", id)
+			}
+		})
+	}
+}
+
+// checkWholeBodyDiffTable は、wholeBodyDiffs の本文が cases.json にあり、番号が変えた動きの一覧にあることを確かめる。
+func checkWholeBodyDiffTable(t *testing.T, cases []wholeBodyCase) {
+	t.Helper()
+	names := map[string]bool{}
+	for _, c := range cases {
+		names[c.Name] = true
+	}
+	for name := range wholeBodyDiffs {
+		if !names[name] {
+			t.Errorf("表の本文 %s が cases.json に無い", name)
+		}
+	}
+	b, err := os.ReadFile("../../compat/changed-behaviors.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var items []struct {
+		ID string `yaml:"id"`
+	}
+	if err := yaml.Unmarshal(b, &items); err != nil {
+		t.Fatal(err)
+	}
+	known := map[string]bool{}
+	for _, it := range items {
+		known[it.ID] = true
+	}
+	for name, id := range wholeBodyDiffs {
+		if !known[id] {
+			t.Errorf("本文 %s の番号 %q は、変えた動きの一覧に無い", name, id)
+		}
+	}
+}
+
+// wholeBodyDiff は、Go 版の答えと書いた行を、Java 版の答えと比べ、違いを返す。答えの本文は、作成と更新の日時を除き、
+// 経歴書の ID を <resumeId>、ほかの ID を <itemId>、今日の日付を <today> に置き換えて比べる。
+func wholeBodyDiff(
+	t *testing.T, pool *pgxpool.Pool, c wholeBodyCase, rec *httptest.ResponseRecorder,
+	userID uuid.UUID, resumeID, before, after string,
+) []string {
+	t.Helper()
+	var diffs []string
+	if rec.Code != c.Status {
+		diffs = append(diffs, fmt.Sprintf("状態の番号 = %d, want %d", rec.Code, c.Status))
+	}
+	var got any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		return append(diffs, fmt.Sprintf("本文 %q を JSON として読めない", rec.Body.String()))
+	}
+	if m, ok := got.(map[string]any); ok {
+		delete(m, "createdAt")
+		delete(m, "updatedAt")
+		if id, ok := m["id"].(string); ok && resumeID == "" {
+			resumeID = id
+		}
+	}
+	got = maskWholeBody(got, resumeID, before, after)
+	if !reflect.DeepEqual(got, c.Response) {
+		gotJSON, _ := json.Marshal(got)
+		wantJSON, _ := json.Marshal(c.Response)
+		diffs = append(diffs, fmt.Sprintf("本文 = %s, want %s", gotJSON, wantJSON))
+	}
+	if rec.Code != http.StatusCreated {
+		return diffs
+	}
+	for table, want := range c.DB {
+		query, ok := wholeBodyTables[table]
+		if !ok {
+			t.Fatalf("表 %s の行の選び方が無い", table)
+		}
+		var row map[string]any
+		if err := pool.QueryRow(t.Context(), query, userID).Scan(&row); err != nil {
+			t.Fatalf("表 %s の行を読めません: %v", table, err)
+		}
+		for column, v := range want {
+			if !reflect.DeepEqual(row[column], v) {
+				diffs = append(diffs, fmt.Sprintf("%s.%s = %v, want %v", table, column, row[column], v))
+			}
+		}
+	}
+	return diffs
+}
+
+// maskWholeBody は、答えの本文の値のうち、経歴書の ID と、ほかの UUID と、今日の日付を、正解のファイルの置き換えの形にする。
+func maskWholeBody(v any, resumeID, before, after string) any {
+	switch x := v.(type) {
+	case map[string]any:
+		for k, e := range x {
+			x[k] = maskWholeBody(e, resumeID, before, after)
+		}
+	case []any:
+		for i, e := range x {
+			x[i] = maskWholeBody(e, resumeID, before, after)
+		}
+	case string:
+		if x == resumeID {
+			return "<resumeId>"
+		}
+		if _, err := uuid.Parse(x); err == nil {
+			return "<itemId>"
+		}
+		if x == before || x == after {
+			return "<today>"
+		}
+	}
+	return v
+}
+
+// seedWholeBody は、本文ごとに新しい利用者を足す。職歴の追加の本文なら、Java 版に送ったときと同じ、項目の無い
+// 経歴書も足し、その ID を返す。
+func seedWholeBody(t *testing.T, pool *pgxpool.Pool, endpoint string) (uuid.UUID, string) {
+	t.Helper()
+	userID := uuid.New()
+	if _, err := pool.Exec(t.Context(),
+		`INSERT INTO users (id, created_at, updated_at) VALUES ($1, now(), now())`, userID); err != nil {
+		t.Fatalf("利用者の行を足せません: %v", err)
+	}
+	if !strings.Contains(endpoint, "{resumeId}") {
+		return userID, ""
+	}
+	resumeID := uuid.New()
+	if _, err := pool.Exec(t.Context(),
+		`INSERT INTO resumes (id, user_id, name, date, last_name, first_name, created_at, updated_at)
+		 VALUES ($1, $2, '控えの経歴書', '1900-01-01', '山田', '太郎', now(), now())`, resumeID, userID); err != nil {
+		t.Fatalf("経歴書の行を足せません: %v", err)
+	}
+	return userID, resumeID.String()
+}
+
+// startResumeDB は、テストの Postgres を動かし、backend.Migrations() のマイグレーションを流して表を作る。
+// Docker が無いときは、テストを飛ばさずに失敗させる。
+func startResumeDB(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	ctx := t.Context()
+	pg, err := postgres.Run(ctx, "postgres:17.11-alpine",
+		postgres.WithDatabase("keireki_pro"),
+		postgres.WithUsername("postgres"),
+		postgres.WithPassword("postgres"),
+		postgres.BasicWaitStrategies(),
+	)
+	t.Cleanup(func() {
+		if err := testcontainers.TerminateContainer(pg); err != nil {
+			t.Errorf("Postgres のコンテナを止められません: %v", err)
+		}
+	})
+	if err != nil {
+		t.Fatalf("Postgres のコンテナを動かせません: %v", err)
+	}
+	endpoint, err := pg.PortEndpoint(ctx, "5432/tcp", "")
+	if err != nil {
+		t.Fatalf("テストの Postgres のつなぎ先を読めません: %v", err)
+	}
+	host, portText, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		t.Fatalf("つなぎ先 %s を読めません: %v", endpoint, err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatalf("ポート %s を読めません: %v", portText, err)
+	}
+	pool, err := database.Open(ctx, database.Options{
+		Host: host, Port: port, Database: "keireki_pro", User: "postgres", Password: "postgres",
+	})
+	if err != nil {
+		t.Fatalf("Postgres につなげません: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	files, err := backend.Migrations()
+	if err != nil {
+		t.Fatalf("マイグレーションのファイルを読めません: %v", err)
+	}
+	if _, err := migrate.Run(ctx, pool, files, migrate.Apply); err != nil {
+		t.Fatalf("マイグレーションを流せません: %v", err)
+	}
+	return pool
 }

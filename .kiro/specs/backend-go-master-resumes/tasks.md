@@ -221,7 +221,7 @@
     - 要件4の受入基準4のうち、項目の ID が読めない要求に無い項目と同じ 404 と文言で答えることは、`TestResumeHandlers_UnreadableItemID` で確かめる
   - _要件: 1.1, 4.4_
 
-- [ ] 5.2 経歴書の受け口を経路と起動につなぐ
+- [x] 5.2 経歴書の受け口を経路と起動につなぐ
 
   Claude は、httpapi.New と paramErrorHandler の節のとおりに、`server.go` の `Options` に `ResumeHandlers` を足し、`routes` で経歴書の受け口を組み込む。Claude は、main.go の節のとおりに、`main.go` で `resume.New` で `Service` を作り、`httpapi.Options` に渡し、`main_test.go` に `TestRun_PassesResumeHandlers` を足す。手本は、同じファイルの `TestRun_PassesUserHandlers` である。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run 'TestResumeRoutes|TestNew'` が通る。`go test ./cmd/keirekipro/ -run TestRun_PassesResumeHandlers` が通る。このテストは、入口を起動し、ログインした利用者の経歴書の一覧の要求が、未実装の答えでなく、200 と空の並びで答えられることを確かめる。`TestResumeRoutes_Unimplemented` は、`ResumeHandlers` が無いときに、Go 版が、マスタと経歴書の操作の要求に今と同じ未実装の答えを返すことを確かめる。5つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る

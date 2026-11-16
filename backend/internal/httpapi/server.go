@@ -46,6 +46,9 @@ type Options struct {
 	// UserHandlers は、利用者の7つの操作の処理である。*users.Service を渡す。利用者の操作はログインを求めるので、
 	// AuthHandlers があるときだけ使う。nil なら、利用者の操作も Handlers が答える。
 	UserHandlers UserService
+	// ResumeHandlers は、マスタと経歴書の26の操作の処理である。*resume.Service を渡す。マスタと経歴書の操作は
+	// ログインを求めるので、AuthHandlers があるときだけ使う。nil なら、マスタと経歴書の操作も Handlers が答える。
+	ResumeHandlers ResumeService
 	// CookieSecure は、認証の操作が書く Cookie に Secure を付けるかである。config の App.CookieSecure を渡す。
 	CookieSecure bool
 	// APIBaseURL は、Google と GitHub から戻る先の URL の基底である。config の App.APIBaseURL を渡す。
@@ -53,13 +56,15 @@ type Options struct {
 	APIBaseURL string
 }
 
-// routes は、認証の操作の受け口と利用者の操作の受け口を深さ1に、ほかの操作の答えを深さ2に埋め込んだ、仕様書の
-// 操作の受け口の束である。Go は、同じ名前のメソッドが複数の深さにあるとき、浅い深さのメソッドを使うので、
-// 認証の操作には認証の受け口が、利用者の操作には利用者の受け口が答える。認証の受け口と利用者の受け口は同じ名前の
-// メソッドを持たないので、深さ1に並べても曖昧にならない。ほかのまとまりの spec で作る受け口も、深さ1に足す。
+// routes は、認証の操作の受け口と利用者の操作の受け口とマスタと経歴書の操作の受け口を深さ1に、ほかの操作の答えを
+// 深さ2に埋め込んだ、仕様書の操作の受け口の束である。Go は、同じ名前のメソッドが複数の深さにあるとき、浅い深さの
+// メソッドを使うので、認証の操作には認証の受け口が、利用者の操作には利用者の受け口が、マスタと経歴書の操作には
+// 経歴書の受け口が答える。深さ1の受け口どうしは同じ名前のメソッドを持たないので、深さ1に並べても曖昧にならない。
+// ほかのまとまりの spec で作る受け口も、深さ1に足す。
 type routes struct {
 	*authHandlers
 	userOperations
+	resumeOperations
 	fallback
 }
 
@@ -85,6 +90,89 @@ type userOperations interface {
 	) (gen.RemoveAuthProviderResponseObject, error)
 }
 
+// resumeOperations は、マスタと経歴書の26の操作のメソッドである。Options の ResumeHandlers が無いときは、ほかの操作の答えを
+// 入れ、マスタと経歴書の操作にも、ほかの操作と同じ答え(Options の Handlers か未実装の答え)を返す。
+type resumeOperations interface {
+	ListCertificationNames(
+		ctx context.Context, request gen.ListCertificationNamesRequestObject,
+	) (gen.ListCertificationNamesResponseObject, error)
+	ListSnsPlatformNames(
+		ctx context.Context, request gen.ListSnsPlatformNamesRequestObject,
+	) (gen.ListSnsPlatformNamesResponseObject, error)
+	ListTechStacks(
+		ctx context.Context, request gen.ListTechStacksRequestObject,
+	) (gen.ListTechStacksResponseObject, error)
+	ListResumes(
+		ctx context.Context, request gen.ListResumesRequestObject,
+	) (gen.ListResumesResponseObject, error)
+	CreateResume(
+		ctx context.Context, request gen.CreateResumeRequestObject,
+	) (gen.CreateResumeResponseObject, error)
+	GetResume(
+		ctx context.Context, request gen.GetResumeRequestObject,
+	) (gen.GetResumeResponseObject, error)
+	DeleteResume(
+		ctx context.Context, request gen.DeleteResumeRequestObject,
+	) (gen.DeleteResumeResponseObject, error)
+	UpdateResumeBasic(
+		ctx context.Context, request gen.UpdateResumeBasicRequestObject,
+	) (gen.UpdateResumeBasicResponseObject, error)
+	CreateCareer(
+		ctx context.Context, request gen.CreateCareerRequestObject,
+	) (gen.CreateCareerResponseObject, error)
+	UpdateCareer(
+		ctx context.Context, request gen.UpdateCareerRequestObject,
+	) (gen.UpdateCareerResponseObject, error)
+	DeleteCareer(
+		ctx context.Context, request gen.DeleteCareerRequestObject,
+	) (gen.DeleteCareerResponseObject, error)
+	CreateProject(
+		ctx context.Context, request gen.CreateProjectRequestObject,
+	) (gen.CreateProjectResponseObject, error)
+	UpdateProject(
+		ctx context.Context, request gen.UpdateProjectRequestObject,
+	) (gen.UpdateProjectResponseObject, error)
+	DeleteProject(
+		ctx context.Context, request gen.DeleteProjectRequestObject,
+	) (gen.DeleteProjectResponseObject, error)
+	CreateCertification(
+		ctx context.Context, request gen.CreateCertificationRequestObject,
+	) (gen.CreateCertificationResponseObject, error)
+	UpdateCertification(
+		ctx context.Context, request gen.UpdateCertificationRequestObject,
+	) (gen.UpdateCertificationResponseObject, error)
+	DeleteCertification(
+		ctx context.Context, request gen.DeleteCertificationRequestObject,
+	) (gen.DeleteCertificationResponseObject, error)
+	CreatePortfolio(
+		ctx context.Context, request gen.CreatePortfolioRequestObject,
+	) (gen.CreatePortfolioResponseObject, error)
+	UpdatePortfolio(
+		ctx context.Context, request gen.UpdatePortfolioRequestObject,
+	) (gen.UpdatePortfolioResponseObject, error)
+	DeletePortfolio(
+		ctx context.Context, request gen.DeletePortfolioRequestObject,
+	) (gen.DeletePortfolioResponseObject, error)
+	CreateSnsPlatform(
+		ctx context.Context, request gen.CreateSnsPlatformRequestObject,
+	) (gen.CreateSnsPlatformResponseObject, error)
+	UpdateSnsPlatform(
+		ctx context.Context, request gen.UpdateSnsPlatformRequestObject,
+	) (gen.UpdateSnsPlatformResponseObject, error)
+	DeleteSnsPlatform(
+		ctx context.Context, request gen.DeleteSnsPlatformRequestObject,
+	) (gen.DeleteSnsPlatformResponseObject, error)
+	CreateSelfPromotion(
+		ctx context.Context, request gen.CreateSelfPromotionRequestObject,
+	) (gen.CreateSelfPromotionResponseObject, error)
+	UpdateSelfPromotion(
+		ctx context.Context, request gen.UpdateSelfPromotionRequestObject,
+	) (gen.UpdateSelfPromotionResponseObject, error)
+	DeleteSelfPromotion(
+		ctx context.Context, request gen.DeleteSelfPromotionRequestObject,
+	) (gen.DeleteSelfPromotionResponseObject, error)
+}
+
 // fallback は、ほかの操作の答え(Options の Handlers か未実装の答え)を、routes の深さ2に置くための型である。
 type fallback struct {
 	gen.StrictServerInterface
@@ -104,10 +192,15 @@ func New(opts Options) http.Handler {
 		if opts.UserHandlers != nil {
 			userOps = newUserHandlers(opts.UserHandlers, opts.CookieSecure)
 		}
+		var resumeOps resumeOperations = handlers
+		if opts.ResumeHandlers != nil {
+			resumeOps = newResumeHandlers(opts.ResumeHandlers, opts.CookieSecure)
+		}
 		handlers = routes{
-			authHandlers:   newAuthHandlers(opts.AuthHandlers, logger, opts.CookieSecure, opts.APIBaseURL, time.Now),
-			userOperations: userOps,
-			fallback:       fallback{handlers},
+			authHandlers:     newAuthHandlers(opts.AuthHandlers, logger, opts.CookieSecure, opts.APIBaseURL, time.Now),
+			userOperations:   userOps,
+			resumeOperations: resumeOps,
+			fallback:         fallback{handlers},
 		}
 	}
 
