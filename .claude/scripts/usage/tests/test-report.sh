@@ -427,11 +427,11 @@ check "上限の印のあとに応答が来てから、デスクトップアプ�
     "$(tot 1015)" "0:[190,0,0,1,1000,0]"
 
 echo "== 段階とモデルと役割ごとのトークン数と使用料"
-# 時刻は T0 からの秒数で書く。#2001 だけが spec ありの Issue である
+# 時刻は T0 からの秒数で書く。#2001 と #2007 だけが spec ありの Issue である
 newrepo
-commit 2026-09-01T00:00:00Z "$CFGPATH={}" '.kiro/specs/feat-s/spec.json={"feature_name":"feat-s","issue":2001}'
+commit 2026-09-01T00:00:00Z "$CFGPATH={}" '.kiro/specs/feat-s/spec.json={"feature_name":"feat-s","issue":2001,"additional_issues":[2007]}'
 newgh tokens
-mkdb 'prs => [ closes("'"$SHA"'", 2001 .. 2006) ]'
+mkdb 'prs => [ closes("'"$SHA"'", 2001 .. 2007) ]'
 newstate
 # 段階の印: rst <記録の鍵> <時刻> <名前> [<spec-review の段階>]
 rst() {
@@ -530,6 +530,25 @@ run 2006
 check "Fable 5.2 の、入力100万と出力100万の通常の行が48ドル、速い出力の行が96ドルになり、全体の合計に入る" \
     "$RC:$(rj 'J([M("model", "role", "in", "out", "usd"), R("totals", "usd"), R("totals", "usd_unknown_models")])')" \
     '0:[[["claude-fable-5-2","spec の審査役",1000000,1000000,96],["claude-fable-5-2","本体の会話",1000000,1000000,48]],144,[]]'
+# #2007: タスクの審査の終わり(80)は段階を変えない。実装の途中の要件の審査の終わり(350)で実装に戻り、
+# そのあとに起動した補助役の会話も実装に入る。出荷の途中の設計の審査の終わり(650)は、会話の ID の無い印で、出荷とレビュー対応に戻る。
+# ほかの会話の印(660)と、ほかの Issue の印(670)は段階を変えない
+# 審査の終わりの印: rend <時刻> <会話か null> <Issue か null>
+rend() {
+    local s=null
+    [ "$2" != null ] && s="\"$2\""
+    mark "{\"ts\":$((T0 + $1)),\"session\":$s,\"kind\":\"spec-review-end\",\"stage\":null,\"issue\":$3,\"branch\":null}"
+}
+rec w1 "{\"k\":\"stage\",\"ts\":$T0,\"name\":\"start\",\"issue\":2007,\"spec_stage\":null}"
+rm1 w1 30 false; rst w1 50 spec-review tasks; rm1 w1 60 false; rend 80 w1 null; rm1 w1 100 false
+rst w1 150 kiro-impl; rm1 w1 200 false; rst w1 250 spec-review requirements; rm1 w1 300 false; rend 350 w1 null; rm1 w1 400 false
+rec w1.agent-x '{"k":"meta","session":"w1","agent_id":"x","agent_type":"general-purpose"}'
+rm1 w1.agent-x 380 false; rm1 w1.agent-x 390 true
+rst w1 450 ship; rm1 w1 500 false; rst w1 550 spec-review design; rm1 w1 600 false
+rend 650 null 2007; rend 660 w2 2007; rend 670 w1 2099; rm1 w1 700 true
+check "実装の途中で動かした spec の審査が終わった印のあとが、spec を直し始める前の段階に戻り、spec を作る途中の審査の終わりの印は段階を変えない" \
+    "$(stg 2007)" \
+    '0:[[["着手の判断",50,0,1],["要件",0,0,0],["要件の審査",0,0,0],["設計",0,0,0],["設計の審査",0,0,0],["タスク",0,0,0],["タスクの審査",100,0,2],["実装",200,10,4],["実装中の spec の直し",200,0,2],["出荷とレビュー対応",150,0,2],["その他",0,0,0]],700,10,11]'
 
 echo "== 印と spec の記録と補助役の報告から数える往復と手戻り"
 # 時刻は T0 からの秒数で書く。#2010 は spec ありの Issue で、#2013 は spec 無しの Issue、#2015 は #2014 を分けた Issue である

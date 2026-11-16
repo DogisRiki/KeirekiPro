@@ -878,7 +878,8 @@ sub is_limit_turn {
 # 会話ごとに、段階が変わる時刻と段階の名前の組 [時刻, 名前] を、時刻の順に並べる。
 # 本体の会話と別に起こしたセッションは、段階の印と、spec 無しの Issue の claim で段階を変える。
 # spec の審査役と書き方の点検役は、依頼文の STAGE の段階、ほかの補助役は、起動した時刻の親の会話の段階を通して使う。
-# Issue に kiro-impl の段階の印が現れたあとの、spec を作る段階は、実装中の spec の直しにする
+# Issue に kiro-impl の段階の印が現れたあとの、spec を作る段階は、実装中の spec の直しにする。
+# 実装中の spec の直しの途中で spec の審査が終わった印があれば、印の時刻からを、spec を直し始める前の段階に戻す
 sub stage_lines {
     my ($ctx) = @_;
     my $irec = $ctx->{irec};
@@ -893,6 +894,19 @@ sub stage_lines {
         my ($name, $t) = @_;
         return defined $name && SPEC_MAKING->{$name} && defined $impl && $t > $impl ? SPEC_FIX_STAGE : $name;
     };
+    # spec の審査が終わった印の時刻を、印の会話ごとに集める。会話の ID の無い印は、どの会話にも当てる
+    my (%ends, @ends_any);
+    if (defined $impl) {
+        for my $m (@{ $ctx->{marks} || [] }) {
+            next unless ($m->{kind} // '') eq 'spec-review-end' && mark_in_issue($ctx, $m);
+            my $s = $m->{session};
+            if (defined $s && !ref $s && length $s) {
+                push @{ $ends{$s} }, row_ts($m);
+            } else {
+                push @ends_any, row_ts($m);
+            }
+        }
+    }
     my %lines;
     for my $key (sort grep { !defined parent_key($_) } keys %$irec) {
         my @l;
@@ -904,6 +918,7 @@ sub stage_lines {
                 push @l, [ $t, IMPL_STAGE ];
             }
         }
+        back_after_review(\@l, $_, $impl) for sort { $a <=> $b } @{ $ends{$key} || [] }, @ends_any;
         $lines{$key} = \@l;
     }
     my $types = $ctx->{cfg}{roles}{agent_types} || {};
@@ -922,6 +937,22 @@ sub stage_lines {
         $lines{$key} = [ [ -FAR, $name // OTHER_STAGE ] ];
     }
     return \%lines;
+}
+
+# spec の審査が終わった印の時刻 $t で、その時点の段階が実装中の spec の直しなら、段階の並び $l に、spec を直し始める前の段階を足す。
+# 直し始める前の段階は、kiro-impl の段階の印の時刻 $impl 以後で $t 以前の、実装中の spec の直しでない最も後の段階とし、無ければ実装とする
+sub back_after_review {
+    my ($l, $t, $impl) = @_;
+    my $now = stage_at($l, $t);
+    return unless defined $now && $now eq SPEC_FIX_STAGE;
+    my $back;
+    my $at = 0;
+    for my $i (0 .. $#$l) {
+        last if $l->[$i][0] > $t;
+        $at = $i + 1;
+        $back = $l->[$i][1] if $l->[$i][0] >= $impl && $l->[$i][1] ne SPEC_FIX_STAGE;
+    }
+    splice @$l, $at, 0, [ $t, $back // IMPL_STAGE ];
 }
 
 # 段階の印の段階の名前。stage_marks の名前と同じ名前か、* で終わる名前の頭に当たる名前を使う。

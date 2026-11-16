@@ -3,8 +3,8 @@
 # 集計の入口のコマンド
 #
 # 使い方: bash .claude/scripts/usage/usage.sh <サブコマンド> [引数] [--session <ID>]
-#   mark <spec-fix|same-failure|switch-to-spec> [--stage <段階>] [--issue <N>]
-#     往復と手戻りの印を marks.jsonl に1行足す。標準出力には何も出さない
+#   mark <spec-fix|same-failure|switch-to-spec|spec-review-end> [--stage <段階>] [--issue <N>]
+#     往復と手戻りの印と、spec の審査が終わった印(spec-review-end)を marks.jsonl に1行足す。標準出力には何も出さない
 #   pending
 #     まだ出していない Issue と、一覧か案の索引への書き込みが残った Issue の番号を
 #     {"issues":[<番号>, ...]} の1行で出す
@@ -157,8 +157,8 @@ edit_issue() {
 cmd_mark() {
     local kind=${1-} stage='' issue='' branch
     case "$kind" in
-    spec-fix | same-failure | switch-to-spec) shift ;;
-    *) fail "mark の種類を spec-fix・same-failure・switch-to-spec のどれかにする。" ;;
+    spec-fix | same-failure | switch-to-spec | spec-review-end) shift ;;
+    *) fail "mark の種類を spec-fix・same-failure・switch-to-spec・spec-review-end のどれかにする。" ;;
     esac
     while [ $# -gt 0 ]; do
         case "$1" in
