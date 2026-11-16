@@ -194,7 +194,7 @@
   - 受入基準とテストの対応: 要件4の受入基準3のうち、日時を、形と、2つの版が保存した日時の差で比べることは、`normalize_test.go` の `TestNormalizeWallclock_SecondsFromReceived` と、`compare_test.go` の `TestCompareJSON_WallclockTolerance` と `TestCompareDB_WallclockTolerance` で確かめる。要件5の受入基準2のうち、日本の時間帯でない時刻を書くと Java 版と Go 版を比べる検査が止まることは、9時間ずれた値の場合で確かめる
   - _要件: 4.3, 5.2_
 
-- [ ] 4.2 Java 版を日本の時間帯で動かす
+- [x] 4.2 Java 版を日本の時間帯で動かす
 
   Claude は、Java 版と Go 版を比べる検査の広げ方の節のとおりに、`versions.go` の `JavaEnv` に `"TZ": "Asia/Tokyo"` を足し、`versions_test.go` の `TestJavaEnv_DevProfileAndOIDCEndpoints` の期待する環境の値に `TZ=Asia/Tokyo` を足す。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run TestJavaEnv` が通る
