@@ -4,6 +4,7 @@
 package resume
 
 import (
+	"context"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,4 +31,19 @@ func New(d Deps) *Service {
 		d.Now = time.Now
 	}
 	return &Service{deps: d}
+}
+
+// ListCertificationNames は、資格のマスタの名前を返す。
+func (s *Service) ListCertificationNames(ctx context.Context) ([]string, error) {
+	return poolStore(s.deps.Pool).listCertificationNames(ctx)
+}
+
+// ListSnsPlatformNames は、SNS のマスタの名前を返す。
+func (s *Service) ListSnsPlatformNames(ctx context.Context) ([]string, error) {
+	return poolStore(s.deps.Pool).listSnsPlatformNames(ctx)
+}
+
+// ListTechStacks は、技術スタックのマスタの名前を、答えの大分類と小分類に振り分けて返す。
+func (s *Service) ListTechStacks(ctx context.Context) (TechStackMaster, error) {
+	return poolStore(s.deps.Pool).listTechStacks(ctx)
 }
