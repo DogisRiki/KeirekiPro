@@ -233,6 +233,8 @@ gitq worktree add -q "$WORK/mark-wt" -b feat/wt
 runin "$WORK/mark-wt" mark switch-to-spec --issue 7 --session S2
 check "worktree の作業フォルダから呼んだ mark が、git の共通ディレクトリの下の記録の置き場所に、その worktree のブランチで書く" \
     "$RC/$(lastmark)/$([ -e "$WORK/mark-wt/.git/keirekipro-usage" ] && printf wt || printf none)" "0/3/S2/switch-to-spec/null/7/feat/wt/now/none"
+run mark spec-review-end --stage requirements --session S3
+check "mark が spec の審査が終わった印を受ける" "$RC/$(lastmark)" "0/4/S3/spec-review-end/requirements/null/feat/usage-test/now"
 check "mark が gh を呼ばない" "$(calls)" ""
 
 echo "== まだ出していない Issue"
@@ -946,6 +948,8 @@ check "ship の SKILL.md の MERGED の行が usage-report の手順を指し、
     "$(hasline "$SK/ship/SKILL.md" 'MERGED.*usage-report のスキル.*マージを見届けたとき')$(hasnear "$SK/ship/SKILL.md" '同じ失敗が3回続いたとき' 2 'usage\.sh mark same-failure')" "yesyes"
 check "spec-review の SKILL.md が changed のときに mark spec-fix を呼ぶ" \
     "$(hasline "$SK/spec-review/SKILL.md" 'changed.*usage\.sh mark spec-fix --stage')" "yes"
+check "spec-review の SKILL.md の所有者への報告の箇所が mark spec-review-end を呼ぶ" \
+    "$(hasnear "$SK/spec-review/SKILL.md" '^### Step 7: 所有者への報告$' 2 'usage\.sh mark spec-review-end --stage <STAGE> --session <ID>')" "yes"
 check "start の SKILL.md の spec に切り替えるときの箇所が mark switch-to-spec を呼ぶ" \
     "$(hasnear "$SK/start/SKILL.md" 'spec に切り替えるとき' 2 'usage\.sh mark switch-to-spec --issue')" "yes"
 check "CLAUDE.md に mark same-failure の行と usage-report の行がある" \
