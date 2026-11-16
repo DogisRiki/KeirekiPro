@@ -136,7 +136,7 @@
   - _要件: 1.1, 1.2_
   - _依存: 1.3, 1.4_
 
-- [ ] 3.3 経歴書の一覧と1件の取得と削除を作る
+- [x] 3.3 経歴書の一覧と1件の取得と削除を作る
 
   Claude は、Service の部品の節のとおりに、`service.go` に、`ListResumes`、`GetResume`、`DeleteResume` を作る。`GetResume` と `DeleteResume` は、経路の経歴書の ID を小タスク2.2 の `parseID` で読み、読めなければ無い経歴書と同じ誤りを返す。`GetResume` は、経歴書1件の6つの欄の項目を、小タスク2.8 の並べ方で並べる。
   - 完了の確かめ方: `go test ./internal/resume/ -run 'TestService_(ListResumes|GetResume|DeleteResume)'` が通る

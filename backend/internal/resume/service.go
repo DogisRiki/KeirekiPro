@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -46,4 +47,44 @@ func (s *Service) ListSnsPlatformNames(ctx context.Context) ([]string, error) {
 // ListTechStacks は、技術スタックのマスタの名前を、答えの大分類と小分類に振り分けて返す。
 func (s *Service) ListTechStacks(ctx context.Context) (TechStackMaster, error) {
 	return poolStore(s.deps.Pool).listTechStacks(ctx)
+}
+
+// ListResumes は、利用者の経歴書を作成の日時の順に返す。6つの欄の項目は読まない。
+func (s *Service) ListResumes(ctx context.Context, userID uuid.UUID) ([]Resume, error) {
+	return poolStore(s.deps.Pool).listResumes(ctx, userID)
+}
+
+// GetResume は、利用者の経歴書1件を、6つの欄の項目と一緒に返す。項目は Java 版と同じ順に並べる。
+// 経歴書の ID が読めないとき、経歴書が無いとき、ほかの利用者の経歴書のときは、無い経歴書の誤りを返す。
+func (s *Service) GetResume(ctx context.Context, userID uuid.UUID, resumeID string) (Resume, error) {
+	id, ok := parseID(resumeID)
+	if !ok {
+		return Resume{}, errResumeNotFound()
+	}
+	r, found, err := poolStore(s.deps.Pool).findResume(ctx, userID, id)
+	if err != nil {
+		return Resume{}, err
+	}
+	if !found {
+		return Resume{}, errResumeNotFound()
+	}
+	return r, nil
+}
+
+// DeleteResume は、利用者の経歴書1件を、6つの欄の項目と一緒に消す。
+// 経歴書の ID が読めないとき、経歴書が無いとき、ほかの利用者の経歴書のときは、何も消さずに無い経歴書の誤りを返す。
+// 経歴書の行に鍵をかけてから消すので、同じ経歴書への項目の変更と同時に動いても、消したあとに項目の行が残らない。
+func (s *Service) DeleteResume(ctx context.Context, userID uuid.UUID, resumeID string) error {
+	id, ok := parseID(resumeID)
+	if !ok {
+		return errResumeNotFound()
+	}
+	return inTx(ctx, s.deps.Pool, func(st store) error {
+		if _, found, err := st.lockResume(ctx, userID, id); err != nil {
+			return err
+		} else if !found {
+			return errResumeNotFound()
+		}
+		return st.deleteResume(ctx, id)
+	})
 }
