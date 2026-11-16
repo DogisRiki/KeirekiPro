@@ -238,7 +238,7 @@
   - _要件: 1.1, 1.2, 4.1_
   - _依存: 4.1, 4.2_
 
-- [ ] 6.2 経歴書の作成と取得と更新と削除の筋書きと、入力の誤りの筋書きを書く
+- [x] 6.2 経歴書の作成と取得と更新と削除の筋書きと、入力の誤りの筋書きを書く
 
   Claude は、マスタと経歴書の操作の筋書きの節のとおりに、`resume-crud.yaml` と `resume-validation.yaml` を書く。Claude は、Java 版の要求の型の注釈を開き、1つの入力欄に2つ以上の文言が付きうる入力欄を確かめ、変えた動きの一覧の節の、入力の誤りの文言の並びの違い CB-050 を、`changed-behaviors.yaml` の CB-051 の前に足す。Claude は、`match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` の期待する数を、51 から 52 に替える。Claude は、`resume-validation.yaml` に、鍵を大文字で書いた要求と、画面が送らない書き方の ID と年月と日付を入れた要求を書かない。2つの版の答えが違い、変えた動きの一覧の CB-051 から CB-054 に match を書かないためである。
   - 完了の確かめ方: `go test -tags compat -count=1 -run 'TestCompare_Scenarios/(<resume-crud.yaml の筋書きの名前>|<resume-validation.yaml の筋書きの名前>)' ./compat/` が通る

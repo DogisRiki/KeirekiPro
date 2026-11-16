@@ -1,0 +1,182 @@
+# 経歴書の作成と基本の情報の更新の、入力の誤りと、名前の重なりと、名前と姓と名の文字の筋書き。1つの段では、確かめる誤りの種類を1つにする。
+# user1 が、resumes/resume-ops.sql の経歴書 A(000000000320、名前「操作を確かめる経歴書」)と経歴書 B(000000000330)を持つ状態から始める。
+# 長さの上限は、絵文字(UTF-16 の2単位)を含む値で、UTF-16 の単位の境界の値を送る。境界の内の値の作成と更新は通る。
+# 本文が読めない要求は、文字列の欄に並びを入れた要求と、本文の全体が並びか文字列の要求を送る。作成と基本の情報の更新には真偽の欄が無いので、
+# 真偽の欄に読めない文字列を入れた要求は、職歴とプロジェクトの筋書きで送る。
+# 鍵を大文字で書いた要求と、画面が送らない書き方の ID と日付を入れた要求は、2つの版の答えが違う(変えた動きの一覧の CB-051 から CB-054)ので送らない。
+name: resumes-validation
+group: 3
+fixtures: [users/basic.sql, resumes/resume-ops.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 作成の、経歴書の名前の入力
+  - name: create-name-missing
+    request: {method: POST, path: /api/resumes, csrf: true, json: {}}
+    expect: {status: 400}
+  - name: create-name-null
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: null}}
+    expect: {status: 400}
+  - name: create-name-empty
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: ''}}
+    expect: {status: 400}
+  - name: create-name-blank
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '   '}}
+    expect: {status: 400}
+  # 空白だけで上限を超える値には、入力が要る文言と長さの文言の2つが付く(変えた動きの一覧の CB-050)
+  - name: create-name-blank-51
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '                                                   '}}
+    expect: {status: 400}
+  # 49 文字の「あ」と絵文字で、UTF-16 の単位で 51、文字の数で 50
+  - name: create-name-emoji-51-units
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: 'あああああああああああああああああああああああああああああああああああああああああああああああああ😀'}}
+    expect: {status: 400}
+  # 48 文字の「あ」と絵文字で、UTF-16 の単位で 50
+  - name: create-name-emoji-50-units
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: 'ああああああああああああああああああああああああああああああああああああああああああああああああ😀'}}
+    expect: {status: 201}
+  # 名前の重なりと、名前の文字
+  - name: create-name-duplicated
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: 操作を確かめる経歴書}}
+    expect: {status: 400}
+  - name: create-name-duplicated-copy
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: 別の経歴書, resumeId: 00000000-0000-4000-8000-000000000320}}
+    expect: {status: 400}
+  - name: create-name-backslash
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '経歴書\名前'}}
+    expect: {status: 400}
+  - name: create-name-slash
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: 経歴書/名前}}
+    expect: {status: 400}
+  - name: create-name-colon
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '経歴書:名前'}}
+    expect: {status: 400}
+  - name: create-name-asterisk
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '経歴書*名前'}}
+    expect: {status: 400}
+  - name: create-name-question
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '経歴書?名前'}}
+    expect: {status: 400}
+  - name: create-name-quote
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '経歴書"名前'}}
+    expect: {status: 400}
+  - name: create-name-angle
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '経歴書<名前>'}}
+    expect: {status: 400}
+  - name: create-name-pipe
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: '経歴書|名前'}}
+    expect: {status: 400}
+  - name: create-name-dot-head
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: .経歴書}}
+    expect: {status: 400}
+  - name: create-name-dot-tail
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: 経歴書.}}
+    expect: {status: 400}
+  - name: create-name-dot-middle
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: 経歴書.v2}}
+    expect: {status: 201}
+  # 作成の、本文が読めない要求
+  - name: create-name-array
+    request: {method: POST, path: /api/resumes, csrf: true, json: {resumeName: [経歴書]}}
+    expect: {status: 400}
+  - name: create-body-array
+    request: {method: POST, path: /api/resumes, csrf: true, json: [{resumeName: 経歴書}]}
+    expect: {status: 400}
+  - name: create-body-string
+    request: {method: POST, path: /api/resumes, csrf: true, json: 経歴書}
+    expect: {status: 400}
+  # 基本の情報の更新の入力。経歴書 B に送る
+  - name: update-all-missing
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {}}
+    expect: {status: 400}
+  - name: update-all-empty
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: '', date: '', lastName: '', firstName: ''}}
+    expect: {status: 400}
+  - name: update-all-null
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: null, date: null, lastName: null, firstName: null}}
+    expect: {status: 400}
+  # 空白だけで上限を超える値(CB-050)
+  - name: update-blank-over-limit
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: '                                                   ', date: '2026-01-01', lastName: '           ', firstName: '           '}}
+    expect: {status: 400}
+  - name: update-name-emoji-51-units
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 'あああああああああああああああああああああああああああああああああああああああああああああああああ😀', date: '2026-01-01', lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  # 姓と名の長さ。9 文字の漢字と絵文字で UTF-16 の単位で 11、8 文字の漢字と絵文字で 10(長さは通り、文字の決まりで断られる)
+  - name: update-person-emoji-11-units
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-01-01', lastName: '漢漢漢漢漢漢漢漢漢😀', firstName: '漢漢漢漢漢漢漢漢漢😀'}}
+    expect: {status: 400}
+  - name: update-person-emoji-10-units
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-01-01', lastName: '漢漢漢漢漢漢漢漢😀', firstName: '漢漢漢漢漢漢漢漢😀'}}
+    expect: {status: 400}
+  - name: update-person-11-chars
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-01-01', lastName: '漢漢漢漢漢漢漢漢漢漢漢', firstName: '漢漢漢漢漢漢漢漢漢漢漢'}}
+    expect: {status: 400}
+  # 姓と名の文字
+  - name: update-person-digit
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-01-01', lastName: 山田1, firstName: 太郎2}}
+    expect: {status: 400}
+  - name: update-person-space
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-01-01', lastName: 山 田, firstName: 太 郎}}
+    expect: {status: 400}
+  - name: update-person-symbol
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-01-01', lastName: 'O''Brien', firstName: 太郎・次郎}}
+    expect: {status: 400}
+  - name: update-person-halfwidth-kana
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-01-01', lastName: ﾔﾏﾀﾞ, firstName: ﾀﾛｳ}}
+    expect: {status: 400}
+  # 経歴書の名前の文字
+  - name: update-name-invalid-chars
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 経歴書/名前, date: '2026-01-01', lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  - name: update-name-dot-tail
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 経歴書., date: '2026-01-01', lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  # 日付の範囲と値の形
+  - name: update-date-1899
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '1899-12-31', lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  - name: update-date-2101
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2101-01-01', lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  - name: update-date-month-13
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-13-01', lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  - name: update-date-feb-30
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-02-30', lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  - name: update-date-slash
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: 2026/01/01, lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  - name: update-date-invalid-date
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: Invalid Date, lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  # 基本の情報の更新の、本文が読めない要求
+  - name: update-last-name-array
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2026-01-01', lastName: [山田], firstName: 太郎}}
+    expect: {status: 400}
+  - name: update-body-array
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: [{resumeName: 別の経歴書}]}
+    expect: {status: 400}
+  - name: update-body-string
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: 別の経歴書}
+    expect: {status: 400}
+  # 境界の内の値は通る
+  - name: update-boundary-ok
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 'いいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいいい😀', date: '1900-01-01', lastName: '漢漢漢漢漢漢漢漢漢漢', firstName: Abcdefghij}}
+    expect: {status: 200}
+  - name: update-date-2100
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 別の経歴書, date: '2100-12-31', lastName: やまだ, firstName: タロウ}}
+    expect: {status: 200}
+  # 基本の情報の更新で、名前を、同じ利用者のほかの経歴書と同じ名前に変える
+  - name: update-name-same-as-other
+    request: {method: PUT, path: /api/resumes/00000000-0000-4000-8000-000000000330/basic, csrf: true, json: {resumeName: 操作を確かめる経歴書, date: '2026-01-01', lastName: 山田, firstName: 太郎}}
+    expect: {status: 400}
+  - name: list-after-validation
+    request: {method: GET, path: /api/resumes}
+    expect: {status: 200}

@@ -7,7 +7,7 @@
   group: 3
   変えた動き: 日本語の名前の並び順
   java: ポートフォリオ、SNS、自己PR を、Java の日本語の並べ替えの規則(java.text.Collator)で並べる
-  go: ポートフォリオ、SNS、自己PR を、golang.org/x/text/collate の日本語の規則で並べる
+  go: ポートフォリオ、SNS、自己PR を、golang.org/x/text/collate の日本語の規則で並べる。半角のカタカナの名前(ｱｲｳ)は、Java 版が最後に並べるのに対して、英字の名前とひらがなの名前のあいだに並べる
   画面に影響が無い理由: 画面と PDF の並び順が変わる。所有者が 2026-11-07 に受け入れた(Issue #445 の決めた方式)
   # 経歴書の JSON の並びは、経歴書を返すすべての操作で順だけの違いを許す。バックアップの JSON では、並びが resume の下にある。
   match:
@@ -506,11 +506,158 @@
   画面に影響が無い理由: 色の変換の種類を 1 にした4色の JPEG は手で組み立てた画像で、利用者が画面で普通に選ぶ画像ではない。所有者が 2026-11-14 に受け入れた
   # match を書かない。比べる検査はこの画像を送らない。違いは research.md の小タスク3.1 の実装の記録で確かめた。
 
+- id: CB-050
+  group: 3
+  変えた動き: 経歴書と項目の操作の、入力の誤りの文言の並び
+  java: 1つの入力欄に2つ以上の誤りがあるとき、入力欄の文言の並びが、Hibernate Validator の誤りの集まりの順で決まり、要求ごとに変わることがある
+  go: 1つの入力欄に2つ以上の誤りがあるとき、入力欄の文言を、Java 版の要求の型に注釈を書いた順に並べる
+  画面に影響が無い理由: 画面は入力欄ごとの文言を並びのまま出すので、文言の順だけが変わり、出る文言は変わらない。所有者が 2026-11-14 に受け入れた(requirements の承認)
+  # 2つ以上の文言を持ちうる入力欄だけを並べる。@NotBlank と @Size を持つ文字列の欄と、@NotBlank と @URL と @Size を持つリンクの欄である。
+  # 年月と日付の欄は @NotNull と範囲の注釈を持つが、値が無いときは範囲の注釈が誤りにしないので、文言は1つしか付かない。
+  # 技術スタックの欄(@Size だけ)と在籍中と継続中と作業の工程の欄(@NotNull だけ)は、文言を1つしか持たないので並べない。
+  match:
+    - operation: createResume
+      target: body
+      path: $.errors.resumeName[*]
+      order_only: true
+    - operation: updateResumeBasic
+      target: body
+      path: $.errors.resumeName[*]
+      order_only: true
+    - operation: updateResumeBasic
+      target: body
+      path: $.errors.lastName[*]
+      order_only: true
+    - operation: updateResumeBasic
+      target: body
+      path: $.errors.firstName[*]
+      order_only: true
+    - operation: createCareer
+      target: body
+      path: $.errors.companyName[*]
+      order_only: true
+    - operation: updateCareer
+      target: body
+      path: $.errors.companyName[*]
+      order_only: true
+    - operation: createProject
+      target: body
+      path: $.errors.companyName[*]
+      order_only: true
+    - operation: createProject
+      target: body
+      path: $.errors.name[*]
+      order_only: true
+    - operation: createProject
+      target: body
+      path: $.errors.overview[*]
+      order_only: true
+    - operation: createProject
+      target: body
+      path: $.errors.teamComp[*]
+      order_only: true
+    - operation: createProject
+      target: body
+      path: $.errors.role[*]
+      order_only: true
+    - operation: createProject
+      target: body
+      path: $.errors.achievement[*]
+      order_only: true
+    - operation: updateProject
+      target: body
+      path: $.errors.companyName[*]
+      order_only: true
+    - operation: updateProject
+      target: body
+      path: $.errors.name[*]
+      order_only: true
+    - operation: updateProject
+      target: body
+      path: $.errors.overview[*]
+      order_only: true
+    - operation: updateProject
+      target: body
+      path: $.errors.teamComp[*]
+      order_only: true
+    - operation: updateProject
+      target: body
+      path: $.errors.role[*]
+      order_only: true
+    - operation: updateProject
+      target: body
+      path: $.errors.achievement[*]
+      order_only: true
+    - operation: createCertification
+      target: body
+      path: $.errors.name[*]
+      order_only: true
+    - operation: updateCertification
+      target: body
+      path: $.errors.name[*]
+      order_only: true
+    - operation: createPortfolio
+      target: body
+      path: $.errors.name[*]
+      order_only: true
+    - operation: createPortfolio
+      target: body
+      path: $.errors.overview[*]
+      order_only: true
+    - operation: createPortfolio
+      target: body
+      path: $.errors.link[*]
+      order_only: true
+    - operation: updatePortfolio
+      target: body
+      path: $.errors.name[*]
+      order_only: true
+    - operation: updatePortfolio
+      target: body
+      path: $.errors.overview[*]
+      order_only: true
+    - operation: updatePortfolio
+      target: body
+      path: $.errors.link[*]
+      order_only: true
+    - operation: createSnsPlatform
+      target: body
+      path: $.errors.name[*]
+      order_only: true
+    - operation: createSnsPlatform
+      target: body
+      path: $.errors.link[*]
+      order_only: true
+    - operation: updateSnsPlatform
+      target: body
+      path: $.errors.name[*]
+      order_only: true
+    - operation: updateSnsPlatform
+      target: body
+      path: $.errors.link[*]
+      order_only: true
+    - operation: createSelfPromotion
+      target: body
+      path: $.errors.title[*]
+      order_only: true
+    - operation: createSelfPromotion
+      target: body
+      path: $.errors.content[*]
+      order_only: true
+    - operation: updateSelfPromotion
+      target: body
+      path: $.errors.title[*]
+      order_only: true
+    - operation: updateSelfPromotion
+      target: body
+      path: $.errors.content[*]
+      order_only: true
+
 - id: CB-051
   group: 3
   変えた動き: 経歴書と項目の操作の、経路の経歴書の ID と項目の ID の、画面が送らない書き方
-  java: 区切りの間の桁が足りない値(1-2-3-4-5)と、全角の数字を含む値を、経歴書の ID と項目の ID の両方で読む。片側にだけ半角の空白のある値を、項目の ID でだけ読む。前後に1つずつ空白のある経歴書の ID には 404 で答える。波括弧で囲んだ値と、urn:uuid で始まる値と、区切りの「-」の無い32桁の値は読めない
-  go: uuid.Parse で読む。区切りの間の桁が足りない値と、全角の数字を含む値と、片側にだけ空白のある値は、読めない ID として 404 で答える。前後に1つずつ空白のある経歴書の ID は、最初と最後の1字を除いて読む。波括弧で囲んだ値と、urn:uuid で始まる値と、区切りの「-」の無い32桁の値を読む
+  java: 区切りの間の桁が足りない値(1-2-3-4-5)と、全角の数字を含む値を、経歴書の ID と項目の ID の両方で読む。片側にだけ半角の空白のある値と、先頭にタブのある値を、項目の ID でだけ読む。前後に1つずつ空白のある経歴書の ID には 404 で答える。波括弧で囲んだ値と、urn:uuid で始まる値と、区切りの「-」の無い32桁の値は読めない
+  go: uuid.Parse で読む。区切りの間の桁が足りない値と、全角の数字を含む値と、片側にだけ空白のある値と、先頭にタブのある値は、読めない ID として 404 で答える。前後に1つずつ空白のある経歴書の ID は、最初と最後の1字を除いて読む。波括弧で囲んだ値と、urn:uuid で始まる値と、区切りの「-」の無い32桁の値を読む
   画面に影響が無い理由: 画面は、答えに返った小文字の形の ID だけを経路に入れて送る。所有者が 2026-11-15 に決めた(requirements の承認)
   # match を書かない。比べる検査はこの書き方の要求を送らない。Go 版の答えは internal/resume/ids_test.go が、テストの中の表と照らして確かめる。
 
@@ -541,7 +688,7 @@
 - id: CB-055
   group: 3
   変えた動き: 経歴書と項目の操作の、UTF-8 として誤ったバイトと、対になっていないサロゲートの \uXXXX の書き方
-  java: 誤ったバイトの一部を断り、一部を対になっていないサロゲートとして受けて、データベースに ? で保存する
+  java: 誤ったバイトの一部を断り、一部を対になっていないサロゲートとして受けて、データベースに ? で保存する。overlong の c0 80 を文字列の欄に入れた本文には、500 と「予期せぬエラーが発生しました。」で答える
   go: encoding/json のとおり、U+FFFD に置き換えて読み、保存する
   画面に影響が無い理由: 画面は、ブラウザが UTF-8 として正しく組み立てた本文を送る。所有者が 2026-11-15 に決めた(requirements の承認)
   # match を書かない。比べる検査はこの書き方の要求を送らない。Go 版の答えは internal/resume/body_test.go が、テストの中の表と照らして確かめる。
