@@ -137,11 +137,29 @@ After all findings return, synthesize in main context before proceeding.
 
 ### Step 6: Finalize Design Document
 
-1. **Write Final Design**:
+1. **Revoke the approvals before rewriting the body** (CLAUDE.md requires this before an approved stage is regenerated; without it, the regenerated body stays treated as approved). Do this only after the design review gate passes, right before writing `design.md`, so that a run that stops earlier leaves the approvals as they are:
+   - For each of the stages `design` and `tasks` in `approvals` whose `approved` is `true`, append one element to `approval_history` in spec.json (create the array if missing). Do not touch the `requirements` approval. The format is the same as the update form of kiro-spec-init:
+     ```json
+     {
+       "stage": "design",
+       "approved_by": "<approvals.design.approved_by>",
+       "approved_at": "<approvals.design.approved_at>",
+       "issues": [<issue>, <each number in additional_issues>],
+       "revoked_at": "<current ISO 8601 timestamp>",
+       "revoked_for": "/kiro-spec-design による作り直し"
+     }
+     ```
+     - `issues` = the Issues the spec covered when it was approved: `issue` followed by the current `additional_issues`
+     - `approval_history` is append-only. Never rewrite or remove an existing element
+   - For the same stages, set `approved: false` and delete the `approved_by` and `approved_at` keys
+   - Write spec.json. **If this write fails, stop and report the error. Do NOT write `design.md`.**
+   - If neither stage is approved, skip this item and write nothing for it
+
+2. **Write Final Design**:
    - Write `.kiro/specs/{feature}/design.md` only after the design review gate passes
    - Write research.md with discovery findings and synthesis outcomes (if not already written)
 
-2. **Update Metadata** in spec.json:
+3. **Update Metadata** in spec.json:
 
    - Set `phase: "design-generated"`
    - Set `approvals.design.generated: true, approved: false`

@@ -76,6 +76,23 @@ After all research completes, synthesize findings in main context before generat
 - If the draft exposes a real scope ambiguity or contradiction, stop and ask the user to clarify instead of writing guessed requirements
 
 ### Step 5: Finalize and Update Metadata
+- **Revoke the approvals before rewriting the body** (CLAUDE.md requires this before an approved stage is regenerated; without it, the regenerated body stays treated as approved). Do this only after the requirements review gate passes, right before writing `requirements.md`, so that a run that stops earlier leaves the approvals as they are:
+  - For each stage in `approvals` (`requirements`, `design`, `tasks`) whose `approved` is `true`, append one element to `approval_history` in spec.json (create the array if missing). The format is the same as the update form of kiro-spec-init:
+    ```json
+    {
+      "stage": "requirements",
+      "approved_by": "<approvals.requirements.approved_by>",
+      "approved_at": "<approvals.requirements.approved_at>",
+      "issues": [<issue>, <each number in additional_issues>],
+      "revoked_at": "<current ISO 8601 timestamp>",
+      "revoked_for": "/kiro-spec-requirements による作り直し"
+    }
+    ```
+    - `issues` = the Issues the spec covered when it was approved: `issue` followed by the current `additional_issues`
+    - `approval_history` is append-only. Never rewrite or remove an existing element
+  - For the same stages, set `approved: false` and delete the `approved_by` and `approved_at` keys
+  - Write spec.json. **If this write fails, stop and report the error. Do NOT write `requirements.md`.**
+  - If no stage is approved, skip this item and write nothing for it
 - Write `.kiro/specs/{feature}/requirements.md` only after the requirements review gate passes
 - Set `phase: "requirements-generated"`
 - Set `approvals.requirements.generated: true`
