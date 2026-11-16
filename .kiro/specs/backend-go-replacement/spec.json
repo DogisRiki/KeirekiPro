@@ -2,28 +2,22 @@
   "feature_name": "backend-go-replacement",
   "issue": 445,
   "created_at": "2026-11-07T11:52:44Z",
-  "updated_at": "2026-11-10T05:30:04Z",
+  "updated_at": "2026-11-16T10:39:07Z",
   "language": "ja",
   "review_model": "opus",
   "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": true,
-      "approved_by": "DogisRiki",
-      "approved_at": "2026-11-10T03:53:12Z"
+      "approved": false
     },
     "design": {
       "generated": true,
-      "approved": true,
-      "approved_by": "DogisRiki",
-      "approved_at": "2026-11-10T05:10:09Z"
+      "approved": false
     },
     "tasks": {
       "generated": true,
-      "approved": true,
-      "approved_by": "DogisRiki",
-      "approved_at": "2026-11-10T05:30:04Z"
+      "approved": false
     }
   },
   "approval_history": [
@@ -82,6 +76,30 @@
       "issues": [445],
       "revoked_at": "2026-11-10T04:46:05Z",
       "revoked_for": "T5-1-5 による design への差し戻し: CORS の処理の5つ目の箇条が、プリフライトでない要求をメソッドによらず次の処理に渡すとしていて、許す6つのメソッドのほかに 403 を返す Java 版と食い違う"
+    },
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-10T03:53:12Z",
+      "issues": [445],
+      "revoked_at": "2026-11-16T10:39:07Z",
+      "revoked_for": "Issue #901 による requirements の直し: 要件4の受入基準4を、Go 版が Java 版と同じ答えを返すのは画面が送る要求に限る、と読める文に直す"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-10T05:10:09Z",
+      "issues": [445],
+      "revoked_at": "2026-11-16T10:39:07Z",
+      "revoked_for": "Issue #901 による requirements の直しに伴う取り消し"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-10T05:30:04Z",
+      "issues": [445],
+      "revoked_at": "2026-11-16T10:39:07Z",
+      "revoked_for": "Issue #901 による requirements の直しに伴う取り消し"
     }
   ]
 }
