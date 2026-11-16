@@ -254,7 +254,7 @@
   - _要件: 1.1, 2.1, 4.1, 4.2, 4.3_
   - _依存: 6.1_
 
-- [ ] 6.4 資格とポートフォリオと SNS と自己PR の項目の筋書きを書く
+- [x] 6.4 資格とポートフォリオと SNS と自己PR の項目の筋書きを書く
 
   Claude は、マスタと経歴書の操作の筋書きの節のとおりに、`certification.yaml`、`portfolio.yaml`、`sns-platform.yaml`、`self-promotion.yaml` を書く。
   - 完了の確かめ方: `go test -tags compat -count=1 -run 'TestCompare_Scenarios/(<4つの筋書きの名前を | でつないだもの>)' ./compat/` が通る
