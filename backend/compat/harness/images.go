@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/moby/moby/client"
 	"github.com/moby/patternmatcher"
@@ -191,40 +192,59 @@ type Images map[string]string
 // BuildImages は、名前のイメージを、testcontainers-go がつなぐ Docker に組み立てさせる。
 // 開発環境でホストの Docker が組み立てたイメージは dind から見えないので、毎回 Docker に組み立てさせる。
 // タグには検査ごとの乱数を付け、同じ dind を使うほかの検査が組み立てたイメージと取り違えないようにする。
-// 組み立ての記録は buildLog に書く。
+// イメージは同時に組み立てる。Java 版と Go 版の本番のイメージの組み立てが長く、順に待つと検査の時間の大半を占めるためである。
+// 組み立ての記録は、names の順に buildLog に書く。失敗したイメージがあっても、組み立てられたイメージは結果に入れて返す。
 func BuildImages(ctx context.Context, repoRoot string, buildLog io.Writer, names ...string) (Images, error) {
+	tag := strings.ToLower(rand.Text())
+	refs := make([]string, len(names))
+	logs := make([]bytes.Buffer, len(names))
+	errs := make([]error, len(names))
+	var wg sync.WaitGroup
+	for i, name := range names {
+		wg.Go(func() { refs[i], errs[i] = buildImage(ctx, repoRoot, name, tag, &logs[i]) })
+	}
+	wg.Wait()
+
+	images := Images{}
+	for i, name := range names {
+		if _, err := buildLog.Write(logs[i].Bytes()); err != nil {
+			errs = append(errs, fmt.Errorf("harness: イメージ %s の組み立ての記録を書けません: %w", name, err))
+		}
+		if refs[i] != "" {
+			images[name] = refs[i]
+		}
+	}
+	return images, errors.Join(errs...)
+}
+
+// buildImage は、名前のイメージを1つ組み立て、参照を返す。Docker へのつなぎは、イメージごとに作って閉じる。
+func buildImage(ctx context.Context, repoRoot, name, tag string, buildLog io.Writer) (string, error) {
+	spec, err := FindImageSpec(name)
+	if err != nil {
+		return "", err
+	}
 	provider, err := testcontainers.NewDockerProvider()
 	if err != nil {
-		return nil, fmt.Errorf("harness: Docker につなげません: %w", err)
+		return "", fmt.Errorf("harness: Docker につなげません: %w", err)
 	}
 	defer func() { _ = provider.Close() }()
-
-	tag := strings.ToLower(rand.Text())
-	images := Images{}
-	for _, name := range names {
-		spec, err := FindImageSpec(name)
-		if err != nil {
-			return images, err
-		}
-		archive, err := BuildContextArchive(repoRoot, spec)
-		if err != nil {
-			return images, err
-		}
-		req := testcontainers.ContainerRequest{FromDockerfile: testcontainers.FromDockerfile{
-			ContextArchive: archive,
-			Dockerfile:     archiveDockerfile,
-			Repo:           "keirekipro-compat-" + spec.Name,
-			Tag:            tag,
-			KeepImage:      true,
-			BuildLogWriter: buildLog,
-		}}
-		ref, err := provider.BuildImage(ctx, &req)
-		if err != nil {
-			return images, fmt.Errorf("harness: イメージ %s を組み立てられません: %w", spec.Name, err)
-		}
-		images[spec.Name] = ref
+	archive, err := BuildContextArchive(repoRoot, spec)
+	if err != nil {
+		return "", err
 	}
-	return images, nil
+	req := testcontainers.ContainerRequest{FromDockerfile: testcontainers.FromDockerfile{
+		ContextArchive: archive,
+		Dockerfile:     archiveDockerfile,
+		Repo:           "keirekipro-compat-" + spec.Name,
+		Tag:            tag,
+		KeepImage:      true,
+		BuildLogWriter: buildLog,
+	}}
+	ref, err := provider.BuildImage(ctx, &req)
+	if err != nil {
+		return "", fmt.Errorf("harness: イメージ %s を組み立てられません: %w", spec.Name, err)
+	}
+	return ref, nil
 }
 
 // Remove は、組み立てたイメージのタグを消す。途中の層は消さずに残し、次の組み立てで使い回させる。
