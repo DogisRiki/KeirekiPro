@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -540,4 +541,71 @@ func TestChangedBehaviors_RefreshTokenRoles(t *testing.T) {
 	if got[i].Group != 1 || !slices.Equal(got[i].Matches, want) {
 		t.Fatalf("CB-022 の group = %d, match = %+v, want group 1, match %+v", got[i].Group, got[i].Matches, want)
 	}
+}
+
+// TestChangedBehaviors_OwnerDecidedItems は、所有者が変えると決めた動きと受け入れた違いの理由に、
+// どこが変わるかと、所有者が受け入れた日が書いてあることを確かめる。
+func TestChangedBehaviors_OwnerDecidedItems(t *testing.T) {
+	got, err := LoadChangedBehaviors(filepath.Join("..", "changed-behaviors.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]ChangedBehavior{}
+	for _, b := range got {
+		byID[b.ID] = b
+	}
+	reason := func(t *testing.T, id string) string {
+		t.Helper()
+		b, ok := byID[id]
+		if !ok {
+			t.Fatalf("%s が一覧にありません", id)
+		}
+		return b.Reason
+	}
+
+	t.Run("所有者が変えると決めた4つの動きの理由に、所有者が 2026-11-07 に受け入れたことが書いてある", func(t *testing.T) {
+		for _, id := range []string{"CB-001", "CB-002", "CB-003", "CB-004"} {
+			if r := reason(t, id); !strings.Contains(r, "所有者が 2026-11-07 に受け入れた") {
+				t.Errorf("%s の理由 = %q, want 「所有者が 2026-11-07 に受け入れた」を含む", id, r)
+			}
+		}
+	})
+
+	t.Run("CB-001 と CB-004 の理由に、どこが変わるかが書いてある", func(t *testing.T) {
+		wants := map[string][]string{
+			// 並び順の変わる4つの場所と、引用符が無いと注記として切れて読まれる括弧書き
+			"CB-001": {"画面", "PDF", "Markdown", "バックアップ", "並び順が変わる", "(Issue #445 の決めた方式)"},
+			// 文字の位置のずれと、PDF から写した「〜」
+			"CB-004": {"1〜2pt ずれる", "「〜」(U+301C)"},
+		}
+		for id, words := range wants {
+			r := reason(t, id)
+			for _, w := range words {
+				if !strings.Contains(r, w) {
+					t.Errorf("%s の理由 = %q, want 「%s」を含む", id, r, w)
+				}
+			}
+		}
+		// 文字の位置はずれるので、CB-004 の理由は配置が同じとは書かない
+		if r := reason(t, "CB-004"); strings.Contains(r, "配置") {
+			t.Errorf("CB-004 の理由 = %q, want 「配置」を含まない", r)
+		}
+	})
+
+	t.Run("所有者が受け入れたと書いた理由は、どれも受け入れた日を持つ", func(t *testing.T) {
+		dated := regexp.MustCompile(`所有者が \d{4}-\d{2}-\d{2} に`)
+		n := 0
+		for _, b := range got {
+			if !strings.Contains(b.Reason, "所有者が") {
+				continue
+			}
+			n++
+			if !dated.MatchString(b.Reason) {
+				t.Errorf("%s の理由 = %q, want 「所有者が YYYY-MM-DD に」を含む", b.ID, b.Reason)
+			}
+		}
+		if n == 0 {
+			t.Fatal("「所有者が」と書いた理由が1つもありません")
+		}
+	})
 }

@@ -254,3 +254,69 @@
 (なし)
 
 - 往復: 1回で収束 / 未解決: 0件
+
+## サイクル7 往復1(2026-11-17)
+
+### 審査の範囲
+
+範囲: 差分
+
+- tasks.md 冒頭の段落(大タスク15と大タスク16を置く位置と理由)、design.md 「移行」の「段階ごとの PR」の表(1049〜1063行目)、`.github/CODEOWNERS`、progress.md の段階2の PR の表(17〜26行目)を見た。大タスク16の PR が表に無いこと、`backend/compat/` が CODEOWNERS の対象でないこと、段階2の6つの PR が main に入っていることを確かめた。表に行が無い点は、前の段階への指摘 T7-1-1 に書いた
+- tasks.md タスク16.1、タスク3.6 に足した文、requirements.md 要件10の受入基準1と4、design.md 「pdfcmp」の表と箇条(661〜677行目)と「テストの方針」の pdfcmp(996行目)、`backend/compat/pdfcmp/pdfcmp.go`(30〜38行目、458行目)、`pdfcmp_test.go`(36〜79行目)を見た。理由は、許す違いの値が 0.5 から 0.35 に変わり、受入基準1の 0.25pt との関係が変わるためである。テストの PDF は箱の高さが文字の大きさの1.3倍になる(コメントの 12pt→15.6pt)。そのため、12pt と 12.25pt の差は 0.325pt で通り、12pt と 12.3pt の差は 0.39pt で止まる。今の定数 0.5 では 0.39pt を止めないので、16.1 が書く「定数を変える前は失敗する」も成り立つ
+- tasks.md タスク16.2、タスク3.7 に足した文、requirements.md 要件10の受入基準3、design.md 「pdfcmp」の5種類のデータと文字の大きさの値(680〜692行目)、`backend/compat/harness/fixtures_test.go`(34〜40行目、256〜285行目、297〜310行目、491〜551行目)、`fixtures.go`(16〜22行目)、`fixtures/resumes/` の今のファイル、`fonts-NotoSansJP.json` を見た。理由は、比べるデータの5種類目が足されたためである
+- tasks.md タスク16.3、requirements.md 要件9の受入基準8と9、design.md 「changed-behaviors.yaml」の節(698〜710行目)と「変えた動きの一覧の形」(880〜916行目)、`backend/compat/changed-behaviors.yaml`(1〜64行目と、「所有者が」を含むすべての項目)、`backend/compat/harness/match.go`(24〜30行目)、`match_test.go` のテストの一覧、`backend/Makefile`(126〜132行目)、`.github/workflows/ci.yaml`(94〜95行目、481〜548行目)を見た。理由は、一覧の2つの項目の理由と頭の注記を直すタスクが足されたためである
+- tasks.md タスク2.8、15.1、15.2、3.8、3.9 と、実装のメモの差分(「API の説明画面」への言い換え、語の説明の追加、括弧の文と長い箇条の分割、主語の追加)を、前後の文と名指す design の部品と照らした。書き方の点検の直しで、数・名前・値・条件は前と同じであり、影響は無い
+
+### 実ファイルで確かめた文
+
+- タスク16.1「`pdfcmp.go` の定数 `HeightTolerance` は今 0.5 である」: `backend/compat/pdfcmp/pdfcmp.go` 34〜35行目 / 合っていた
+- タスク16.1「`TestCompare_Allows2ptShift` と `TestCompare_Rejects2_5ptShift` に語の箱の高さの場合がある」: `pdfcmp_test.go` 45〜52行目、70〜78行目 / 合っていた
+- タスク3.6「pdfcmp は語の位置で 2pt、文字の大きさで 0.5pt、表の色で 2 まで許す」: `pdfcmp.go` 33〜37行目 / 合っていた
+- タスク16.2「今の最後の場合は、`resumes/` のすべての JSON を、フォントだけを替えた設定として数えている」: `fixtures_test.go` 541〜549行目 / 合っていた
+- タスク16.2「今ある `fonts-NotoSansJP.json` と同じ形の書き出しの要求の本文。既定の色は `d9d9d9`」: `fixtures/resumes/fonts-NotoSansJP.json` 1〜16行目(16、10、10、11.5、`d9d9d9`)/ 合っていた
+- タスク16.2「経歴書の初めのデータは、今ある `resumes/fonts.sql` を使う」: `backend/compat/fixtures/resumes/fonts.sql`(ファイルがある)/ 合っていた
+- タスク16.2「`FixturesDir` の注記と、経歴書の名前の定数のコメントと、場合「4種類の経歴書が1つずつある」」: `fixtures.go` 16〜22行目、`fixtures_test.go` 34〜40行目と505行目 / 合っていた
+- タスク16.3「引用符で囲んでいない今の CB-001 の理由は「(Issue」で切れて読まれる」: `changed-behaviors.yaml` 11行目(空白のあとに `#445` がある)/ 合っていた
+- タスク16.3「今の CB-004 の理由は「配置」も同じと書いている」: `changed-behaviors.yaml` 62行目 / 合っていた
+- タスク16.3「理由に「所有者が」と書いた項目」: `changed-behaviors.yaml` の全項目。「所有者が」を含む理由は、どれも年月日を持つ / 合っていた
+- タスク16.3「`match_test.go` は `../changed-behaviors.yaml` を読むテストを持つ」: `match_test.go` 314行目、384行目、530行目。`match.go` 29行目に `yaml:"画面に影響が無い理由"` がある / 合っていた
+- タスク16.3「`make compat` と `make compat-cross`」: `backend/Makefile` 127〜132行目(`./compat/...` を `-tags compat` で流すので、harness と pdfcmp のテストを含む)/ 合っていた
+- タスク16.3「PR の CI の `backend-compat` と `backend-test`」: `.github/workflows/ci.yaml` 94〜95行目(`backend/compat/**` で `backend_compat` が当たる)、481行目、531行目 / 合っていた
+- 冒頭の段落「大タスク16の PR が変えるファイルは承認が要らない」: `.github/CODEOWNERS` 58〜79行目(`backend/compat/` と `.kiro/specs/` は対象でない)/ 合っていた
+- 冒頭の段落「design.md の「段階ごとの PR」の表には、大タスク16の PR の行が無い」: design.md 1051〜1063行目 / 合っていた
+- タスク16.3「progress.md の段階2の PR の表」: progress.md 17〜26行目 / 合っていた
+
+### 確かめの道具を作るタスク
+
+| 道具 | 作るタスク | 確かめる成果物を作るタスク | 並び |
+|---|---|---|---|
+| `run-check.sh` の領域 `backend-go` | 1.1 | 16.1、16.2、16.3 | 前 |
+| `pdfcmp_test.go` の `TestCompare_Allows2ptShift` と `TestCompare_Rejects2_5ptShift`(語の箱の高さの場合) | 3.6(16.1 で直す。定数より先に直す) | 16.1(`HeightTolerance`) | 前 |
+| `fixtures_test.go` の `TestFixtures_AllLoadable` と `TestFixtures_ResumeKindsPresent`(足す場合) | 3.7(16.2 で直す。ファイルを置く前に直す) | 16.2(`sizes-*.json`) | 前 |
+| `match_test.go` の `TestChangedBehaviors_OwnerDecidedItems` | 16.3(理由を直す前に足す) | 16.3(CB-001 と CB-004 の理由) | 前 |
+| `make check` | 2.3 | 16.3 | 前 |
+| `make compat` と `make compat-cross` | 3.x(2.3 の Makefile と 3.1〜3.8) | 16.1、16.2、16.3 | 前 |
+| CI の `backend-compat` と `backend-test` | 1.5 | 16.3 | 前 |
+
+### 申告
+
+(今回の差分で新しく申告するものは無い。大タスク16の中身は、所有者が承認した requirements の要件9と要件10の直しと、design の「pdfcmp」と「changed-behaviors.yaml」の節で決まっており、tasks が新しく決めたことは無い。テストを省略してよい印(`- [ ]*`)を付けたタスクも無い)
+
+### 指摘
+
+(指摘なし)
+
+要件と設計の扱いを確かめた結果は次のとおりである。
+
+- 要件10の受入基準1と4は 16.1 の `_要件:_` にあり、受入基準3は 16.2 の `_要件:_` にある。要件9の受入基準8と9は 16.3 の `_要件:_` にある
+- 16.1 と 16.2 は、変えるパッケージが別(pdfcmp と harness)なので、並行にしても衝突しない。16.3 は 16.2 と同じパッケージを変え、`_依存: 16.1, 16.2_` を持つので、並びの指定は合っている
+- 16.2 の色 `b4c7e7` は、既定の `d9d9d9` と赤で 37 違う。足す場合の3つ目(2 を超えて違う)を満たす
+
+### 前の段階への指摘
+
+| ID | 対象 | 該当箇所 | 内容 |
+|---|---|---|---|
+| T7-1-1 | design | 「移行」の「段階ごとの PR」の表(1051〜1063行目)と、その下の箇条 | この表は、この spec の PR ごとに中身と所有者の承認の要否を決めている。大タスク16の PR(PDF の比べ方と比べるデータと変えた動きの一覧の直し)の行は無い。tasks の冒頭の段落は、行が無いことを書いたうえで、承認は要らないと書いている。この判断は、CODEOWNERS が `backend/compat/` を対象にしていないことと合う。ただし、PR の判定(codex-review)は design を基準にするので、design に無い PR に見える。PR 2-6 と同じ形で行と箇条を足すかを、所有者に確かめてもらう(実装への影響は無い) |
+| T7-1-2 | design | 「変えた動きの一覧の形」の YAML の見本(888行目。`画面に影響が無い理由: …受け入れた(Issue #445 の決めた方式)`) | 見本の値は引用符で囲んでいない。そのため、YAML として読むと「(Issue」のあとの `#445 …` が注記になり、値が切れる。今の `changed-behaviors.yaml` の CB-001 はこの見本のとおりに書かれ、実際に切れている。tasks の 16.3 は値を引用符で囲むと決めているので、実装は正しくなる。まとまりの spec で項目を足す Claude が見本を写すと、同じ誤りが起きうる。見本の値を引用符で囲むかを、所有者に確かめてもらう(実装への影響は無い) |
+
+- 往復: 1回で収束 / 未解決: 0件

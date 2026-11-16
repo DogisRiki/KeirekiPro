@@ -289,6 +289,52 @@ Claude は、同じにできない4つの動きを所有者に報告した。所
   - 要求では `isActive`、応答とバックアップでは `active` の名前を使う
   - 確かめきれなかった細部(日時の秒の下の桁の数、XSRF-TOKEN の Cookie の `Secure` の付き方、ファイルの名前を返すヘッダの形など)は、比べる検査で確かめる
 
+### 語の箱の高さと文字の大きさ(2026-11-16)
+
+- 調べたきっかけ: 要件10の受入基準1は、PDF の文字の大きさの違いを 0.25pt まで許す。PDF を比べる部品は、文字の大きさを語の箱の高さで比べる。そのため、箱の高さの違いをどこまで許せば、文字の大きさの 0.25pt を超えないかを決める必要があった
+- 測った環境: 開発環境のコンテナ `backend-go`(イメージ `keirekipro-backend-go`、`pdftotext version 25.03.0`)
+- 測り方:
+  - Go 版の側は、`backend/src/main/resources/fonts/` の4つの Noto のフォントを `@font-face` で読む HTML を、`chromium --headless --no-sandbox --disable-gpu --no-pdf-header-footer --print-to-pdf=<出力先>` で PDF にした
+  - Java 版の側は、一時のテストで `new OpenHtmlToPdfRenderer(new DefaultResourceLoader()).render(html)` を呼び、同じ HTML から PDF を作った。一時のテストと PDF は、リポジトリに残していない
+  - どちらの PDF も、`pdftotext -bbox-layout` が出す語の `yMax` から `yMin` を引いた値を、語の箱の高さとして読んだ
+- 分かったこと:
+  - 測った28語のすべてで、Java 版の PDF と Chromium の PDF の語の箱の高さの差は 0.0000pt だった
+  - 語の箱の高さは、次の表のとおりだった
+
+    | フォント | 文字の大きさ(px) | 語の箱の高さ(pt) |
+    |---|---|---|
+    | Noto Sans JP の Regular | 10 / 10.5 / 11 / 11.5 / 16 / 16.5 | 10.8600 / 11.4030 / 11.9460 / 12.4890 / 17.3760 / 17.9190 |
+    | Noto Sans JP の Bold | 16 / 16.5 | 17.3760 / 17.9190 |
+    | Noto Serif JP の Regular | 10 / 10.5 / 16 / 16.5 | 10.7775 / 11.3164 / 17.2440 / 17.7829 |
+    | Noto Serif JP の Bold | 16 / 16.5 | 17.2440 / 17.7829 |
+
+  - テンプレートは、設定の文字の大きさを px で使う。PDF の上の文字の大きさ(pt)は、px の値の 0.75倍である
+  - 語の箱の高さは、PDF の上の文字の大きさ(pt)の、Noto Sans JP で約1.448倍、Noto Serif JP で約1.437倍だった。この比は、英数字の語と日本語の語で同じで、Regular と Bold でも同じだった
+  - 利用者が選ぶ文字の大きさの1刻みは 0.5 で、PDF の上では 0.375pt である。この違いは、語の箱の高さでは、Noto Sans JP で 0.543pt、Noto Serif JP で 0.539pt になる
+  - テンプレートが決めて使う文字の大きさは、10.4px、11px、9.8px である。隣り合う大きさの違い(10.4px と 11px の 0.45pt、10.4px と 9.8px の 0.45pt)は、語の箱の高さでは約 0.65pt になる
+  - `pdffonts` で見たフォントの名前は、Chromium の PDF では `AAAAAA+NotoSansJP-Regular` などで、Java 版の PDF では `AAAWZY+NotoSansJP-Regular` などだった。どちらも、種類は CID TrueType、符号化は Identity-H で、PDF に埋め込まれていた
+- まだ確かめていないこと: Go 版が PDF を作る操作は、出力のまとまりの spec(Issue #773)で作る。そのため、実際の経歴書の PDF で語の箱の高さの違いが 0.35pt に収まるかは、出力のまとまりの spec の比べる検査で初めて確かめる
+
+### 比べるデータの名前の並び順(2026-11-16)
+
+- 調べたきっかけ: 要件9の受入基準8と9は、名前で並べる順の違いを、変えた動きの一覧に載せて許す。比べる検査は、PDF と Markdown では、順の違いだけを見分けて許すことがむずかしい。そのため、今ある比べるデータの名前が、Java 版と Go 版で同じ順に並ぶかを確かめた
+- 調べ方:
+  - `backend/compat/fixtures/resumes/` の `fonts.sql` `long-text.sql` `resume-ops.sql` `resume-limits.sql` から、ポートフォリオ、SNS、自己PR の名前84個を集めた
+  - 84個を、Java 版と同じ並べ替え(openjdk 21.0.11 の `Collator.getInstance(Locale.JAPANESE)`。イメージ `keirekipro-backend:latest` で動かした)で並べた
+  - 84個を、Go 版と同じ並べ替え(`golang.org/x/text` v0.43.0 の `collate.New(language.Japanese)`。コンテナ `backend-go` で動かした)で並べた
+- 分かったこと:
+  - 84個の順は、2つの並べ替えで1つも違わなかった
+  - 名前は、「A 天気の通知」「B 献立の提案」「GitHub」「Qiita」「Zenn」「X」「A 設計から運用まで」「Portfolio 01」「SNS 01」「Title 1」のように、どれも半角の英字で始まる
+  - `many-pages.sql` と `empty.sql` には、名前で並べる項目が無い
+
+### 画面が送る文字の大きさ(2026-11-16)
+
+- 調べたきっかけ: 要件の審査で、文字の大きさを丸める前の境の数(x.2、x.3、x.7、x.8)を選んだ経歴書を、比べるデータに足すかが残っていた。要件4の受入基準4は、Go 版が Java 版と同じ答えを返す範囲を、今の画面を操作すると送られる要求に限る
+- 分かったこと:
+  - 今の画面は、PDF の書き出しの要求とプレビューの要求を送る前に、タイトル、日付、氏名、見出しの4つの文字の大きさを 0.5 刻みに丸める。小数第1位が 2 以下なら切り捨て、7 以下なら 0.5 を足し、それより上なら 1 を足す
+  - そのため、0.5 刻みでない文字の大きさを持つ要求は、今の画面を操作しても送られない
+  - Java 版も、受け取った文字の大きさを、画面と同じ規則で 0.5 刻みに丸める
+
 ## 設計で比べた案
 
 | 案 | 中身 | 良い点 | 危うい点 | 結論 |
@@ -346,6 +392,25 @@ Claude は、同じにできない4つの動きを所有者に報告した。所
 - 選んだ案: 出荷のワークフローに、`current`、`java`、`go` から選ぶ入力を足し、既定を `current` にする。`current` は、今のタスク定義のイメージのタグから、今の版を読む。Go 版のイメージのタグは `go-<SHA>` にする
 - 理由: 既定を `java` にすると、切り替えたあとに所有者がいつもどおり出荷したとき、本番が知らないうちに Java 版に戻る。既定を `current` にすれば、所有者が明示的に選んだときだけ版が替わる。今の版を覚えておく場所を、本番のタスク定義のほかに作らずに済む
 
+### 決めたこと: PDF の語の箱の高さの違いを 0.35pt まで許す
+
+- きっかけ: 要件10の受入基準1は、文字の大きさの違いを 0.25pt まで許す。要件10の受入基準4は、利用者が選んだ文字の大きさのとおりに Go 版が PDF を作ることを求める。PDF を比べる部品は、語の箱の高さの違いを 0.5pt まで許していた
+- 比べた案:
+  - 0.5pt のままにする: 0.5pt は、文字の大きさでは約 0.35pt に当たり、要件の 0.25pt を超える。採らない
+  - 語の箱の高さを文字の大きさに直してから 0.25pt で比べる: フォントごとの比を部品が持つことになり、比べる PDF のフォントが増えるたびに比を足す必要がある。採らない
+  - 語の箱の高さの違いを 0.35pt まで許す: 採る
+- 理由: 「語の箱の高さと文字の大きさ(2026-11-16)」のとおり、箱の高さの 0.35pt は、文字の大きさでは Noto Sans JP で約0.242pt、Noto Serif JP で約0.244pt に当たり、どちらも 0.25pt を超えない。利用者が選ぶ1刻みの違いは、箱の高さでは 0.539pt 以上になるので、0.35pt で止まる。同じ文字の大きさの箱の高さは、Java 版の PDF と Chromium の PDF で同じだったので、0.35pt に狭めても、正しい PDF を止めない見込みである
+- 実装で確かめること: `backend/compat/pdfcmp/pdfcmp.go` の `HeightTolerance` を 0.35 に直す。`pdfcmp_test.go` の、0.5pt 以内の違いを止めないテストと、0.5pt を超える違いを止めるテストを、0.35pt の境に合わせて直す
+
+### 決めたこと: PDF と Markdown では、名前で並べる順の違いを許す仕組みを作らない
+
+- きっかけ: 要件9の受入基準8と9は、名前で並べる順の違いを、画面、PDF、Markdown、バックアップのどこに出ても許す。比べる検査は、JSON の本文では、変えた動きの一覧の CB-001 の `match` で順だけの違いを許している
+- 比べた案:
+  - PDF と Markdown でも、順だけの違いを許す仕組みを作る: 順が違うと、PDF では語の位置が、Markdown では行の並びが、まとめてずれる。順の違いによるずれと、ほかの誤りによるずれを見分ける仕組みは、大きく、見落としを生みやすい。採らない
+  - 比べる経歴書のデータの名前を、Java 版と Go 版が同じ順に並べる名前にする: 採る
+- 理由: 「比べるデータの名前の並び順(2026-11-16)」のとおり、今あるデータの84個の名前は、2つの版で同じ順に並んだ。名前の並べ替えそのものは、Go 版の単体テストと、JSON の本文の比べで確かめている。PDF と Markdown の比べは、並んだあとの項目を正しく書き出すことを確かめれば足りる
+- あわせて決めたこと: 文字の大きさを丸める前の境の数を選んだ経歴書は、比べるデータに足さない。「画面が送る文字の大きさ(2026-11-16)」のとおり、今の画面は 0.5 刻みに丸めた値だけを送るので、境の数の要求は、要件4の受入基準4の「今の画面を操作すると送られる要求」に当たらない
+
 ### 共通化と簡素化で決めたこと
 
 - 共通化: 比べる検査の手順の形を1つにし、Java 版と Go 版の同じ要求の比べ方(要件4)、版をまたぐ操作の確かめ(要件13)、応答の時間の比べ方(要件9の7)の3つを、同じ筋書きのファイルから動かす
@@ -359,6 +424,31 @@ Claude は、同じにできない4つの動きを所有者に報告した。所
 - index.golang.org を順に読む公開の時刻の検査が、問い合わせの数で遅くなること。備えとして、72時間の分の索引を1回の検査で1度だけ読み、PR のすべての部品をまとめて照らす
 - Java 版の細かい動きの見落とし。備えとして、比べる検査は、仕様書のすべての操作が筋書きに1回以上出てくることを確かめ、出てこない操作があれば失敗する
 - gremlins の版が 0.x であること。備えとして、版を固定し、版を上げる PR で変異テストの結果が変わらないことを確かめる
+
+## 今あるものについて確かめた文
+
+- design.md 作らないものの節「本番を動かし始める時刻と止める時刻を変えない」と、使う既存の仕組みの節「EventBridge Scheduler に置いた、本番を動かし始める時刻と止める時刻の設定」: terraform/modules/scheduler/main.tf 85行、113行、147行、177行
+- design.md compat harness の節「CB-001 の `match` は、経歴書を返す応答の本文と、バックアップの本文で、ポートフォリオ、SNS、自己PR の並びの順だけの違いを許す」: backend/compat/changed-behaviors.yaml 6-38行
+- design.md compat harness の節「比べる検査は、PDF と Markdown では、名前で並べる順の違いを許す仕組みを持たない」: backend/compat/harness/match.go 148-163行、279-285行。backend/compat/harness/compare.go 224-225行
+- design.md pdfcmp の節「同じ文字の大きさの語の箱の高さは、Java 版の PDF と Chromium の PDF で同じだった」: research.md の「語の箱の高さと文字の大きさ(2026-11-16)」。Java 版の PDF を作る入口は backend/src/main/java/com/example/keirekipro/infrastructure/shared/pdf/OpenHtmlToPdfRenderer.java 29行
+- design.md pdfcmp の節「利用者が選ぶ文字の大きさの1刻みの違いは、PDF の上で 0.375pt である」: backend/src/main/resources/templates/resume/pdf/simple.html 39行、48行、57行、69行
+- design.md pdfcmp の節「利用者は、フォントと、文字の大きさと、表の見出しの色を、PDF の書き出しの要求の本文で選ぶ」: backend/api/openapi.yaml 2054-2076行。backend/compat/fixtures/resumes/fonts-NotoSansJP.json と fonts-NotoSerifJP.json の全体
+- design.md pdfcmp の節「既定の値は、タイトルが 16、日付が 10、氏名が 10、見出しが 11.5 である」と「既定の `#d9d9d9`」: backend/src/main/java/com/example/keirekipro/usecase/resume/export/ResumePdfExportSettings.java 24-32行
+- design.md pdfcmp の節「今の画面は、文字の大きさを 0.5 刻みに丸めてから送る」: frontend/src/features/resume/utils/pdfPreview.ts 21-33行、77-92行。frontend/src/features/resume/hooks/useResumePdfPreview.ts 64行、79行
+- design.md pdfcmp の節「今あるデータの名前は、半角の英字で始まり、Java 版と Go 版で同じ順に並んだ」: backend/compat/fixtures/resumes/fonts.sql 56-67行、long-text.sql 36-49行、resume-ops.sql 110-126行、resume-limits.sql 67-88行。Java 版の並べ替えは backend/src/main/java/com/example/keirekipro/domain/policy/resume/ResumeEntryOrderPolicy.java 36行、118行、140行、162行。Go 版の並べ替えは backend/internal/resume/order.go 28-31行
+- design.md changed-behaviors.yaml の節の CB-004「pdfcmp は、文字の位置のずれを 2pt まで許し、「～」を「〜」に直してから文字を比べる」: backend/compat/pdfcmp/pdfcmp.go 33行、269行、341行
+- research.md 語の箱の高さと文字の大きさの節「テンプレートが決めて使う文字の大きさは、10.4px、11px、9.8px である」: backend/src/main/resources/templates/resume/pdf/simple.html 26行、109行、168行
+- research.md 画面が送る文字の大きさの節「Java 版も、受け取った文字の大きさを、画面と同じ規則で 0.5 刻みに丸める」: backend/src/main/java/com/example/keirekipro/usecase/resume/export/ResumePdfExportSettings.java 61-79行
+- research.md 決めたことの節「PDF を比べる部品は、語の箱の高さの違いを 0.5pt まで許していた」: backend/compat/pdfcmp/pdfcmp.go 35行、458行
+- tasks.md タスク16.1「`HeightTolerance` を 0.5 から 0.35 に変える」と、語の箱の高さの2つの場合: backend/compat/pdfcmp/pdfcmp.go 35行、458行。backend/compat/pdfcmp/pdfcmp_test.go 45-46行、70-71行
+- tasks.md タスク16.2「今の最後の場合は、`resumes/` のすべての JSON のファイルを、フォントだけを替えた設定として数えている」: backend/compat/harness/fixtures_test.go 541-550行
+- tasks.md タスク16.2「今ある `fonts-NotoSansJP.json` と同じ形」「今ある `resumes/fonts.sql`」「既定の色 `d9d9d9`」: backend/compat/fixtures/resumes/fonts-NotoSansJP.json の全体、backend/compat/fixtures/resumes/fonts.sql、backend/api/openapi.yaml 2052-2086行
+- tasks.md タスク16.2「SQL の経歴書は4種類のまま」と、直すコメントと注記: backend/compat/harness/fixtures_test.go 34行、491行、505行。backend/compat/harness/fixtures.go 16-21行
+- tasks.md タスク16.2「PDF の比べ方は表の色の違いを 2 まで許す」: backend/compat/pdfcmp/pdfcmp.go 36-37行
+- tasks.md タスク16.3「今の CB-004 の理由は「配置」も同じと書いている」と、CB-001 の今の理由と、頭の注記: backend/compat/changed-behaviors.yaml 1-4行、11行、62行
+- tasks.md タスク16.3「今の CB-001 の理由は「(Issue」で切れて読まれる」: backend/compat/changed-behaviors.yaml 11行(引用符で囲んでいない値の中に、空白のあとの `#` がある)
+- tasks.md タスク16.3「理由に「所有者が」と書いたすべての項目が、受け入れた日を年月日で書いている」: backend/compat/changed-behaviors.yaml の「画面に影響が無い理由」の55行のうち、「所有者が」を含む53行がどれも「所有者が YYYY-MM-DD に」の形(grep で数えた)
+- tasks.md 見出し「タスク」の下の、大タスク16の段落「design.md の「段階ごとの PR」の表には、大タスク16の PR の行が無い」: design.md の「段階ごとの PR」の表。progress.md 17-26行(段階2の PR の表)
 
 ## 参考にしたもの
 

@@ -32,7 +32,7 @@ const (
 	// PositionTolerance は、語の箱の上下左右の端のずれとして許す大きさ(pt)である。
 	PositionTolerance = 2.0
 	// HeightTolerance は、語の箱の高さ(文字の大きさ)の違いとして許す大きさ(pt)である。
-	HeightTolerance = 0.5
+	HeightTolerance = 0.35
 	// ColorTolerance は、表の色の R、G、B のそれぞれの違いとして許す大きさである。
 	ColorTolerance = 2
 )
