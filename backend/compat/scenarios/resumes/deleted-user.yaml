@@ -1,0 +1,316 @@
+# 退会してすでに居ない利用者の筋書き。
+# resumes/resume-ops.sql の退会用の利用者(000000000340)がログインし、ログインの状態の値を取り出してから退会する。
+# 退会用の利用者は、退会の前に経歴書(000000000350)と、6つの欄に1つずつ項目(000000000351 から 000000000356)を持つ。
+# 退会用の利用者は、パスワードを変えていないので、ログインの状態の世代の番号が 0 のままであり、取り出した値は退会のあとも
+# ログインの状態の検査を通る。退会の答えは Cookie の XSRF-TOKEN を残すので、退会のあとの csrf の段は、残った XSRF-TOKEN を使う。
+# 退会のあとの段は、取り出した値を Cookie のヘッダで送り、3つのマスタ、経歴書の一覧、退会の前の経歴書をコピー元にした作成、
+# 退会の前の経歴書と項目への取得と更新と削除と項目の追加を送る。
+# コピーしない作成は、2つの版の答えが違う(変えた動きの一覧の CB-049)ので送らない。
+name: resumes-deleted-user
+group: 3
+fixtures: [users/basic.sql, resumes/resume-ops.sql]
+modes: [compare]
+steps:
+  - name: login-withdraw
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: resume-withdraw@example.com, password: Passw0rd!}
+    capture: {withdrawAccess: 'cookie:accessToken'}
+    expect: {status: 200}
+  - name: get-resume-before-delete
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000350
+    expect: {status: 200, fields: [$.careers, $.projects, $.certifications, $.portfolios, $.snsPlatforms, $.selfPromotions]}
+  - name: delete-withdraw-user
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 204}
+  # 3つのマスタ
+  - name: get-certifications-master
+    request:
+      method: GET
+      path: /api/certifications
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 200}
+  - name: get-sns-platforms-master
+    request:
+      method: GET
+      path: /api/sns-platforms
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 200}
+  - name: get-tech-stacks-master
+    request:
+      method: GET
+      path: /api/tech-stacks
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 200}
+  # 経歴書の一覧と、退会の前の経歴書
+  - name: list-resumes
+    request:
+      method: GET
+      path: /api/resumes
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 200}
+  - name: get-resume
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000350
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 404}
+  - name: create-copy-of-resume
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: {resumeName: 退会したあとに写す経歴書, resumeId: 00000000-0000-4000-8000-000000000350}
+    expect: {status: 404}
+  - name: create-copy-of-resume-invalid
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: {resumeName: '', resumeId: 00000000-0000-4000-8000-000000000350}
+    expect: {status: 400}
+  - name: update-basic
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/basic
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: &basic {resumeName: 退会したあとに直した経歴書, date: '2026-05-01', lastName: 退会, firstName: 三郎}
+    expect: {status: 404}
+  - name: update-basic-invalid
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/basic
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: {<<: *basic, resumeName: ''}
+    expect: {status: 400}
+  # 6つの欄の項目の追加
+  - name: create-career
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/careers
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: &career {companyName: 株式会社たいかいご, startDate: '1980-04', endDate: '1985-03', isActive: false}
+    expect: {status: 404}
+  - name: create-career-invalid
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/careers
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: {}
+    expect: {status: 400}
+  - name: create-project
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/projects
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: &project
+        companyName: 株式会社たいかいご
+        startDate: '2012-04'
+        endDate: '2013-03'
+        isActive: false
+        name: 退会したあとのプロジェクト
+        overview: 退会したあとに足すプロジェクト
+        teamComp: 全体3名
+        role: 開発の担当
+        achievement: 予定どおりに終えた。
+        requirements: true
+        basicDesign: true
+        detailedDesign: true
+        implementation: true
+        integrationTest: true
+        systemTest: true
+        maintenance: false
+        frontendLanguages: [TypeScript]
+        frontendFrameworks: [React]
+        frontendLibraries: []
+        frontendBuildTools: []
+        frontendPackageManagers: []
+        frontendLinters: []
+        frontendFormatters: []
+        frontendTestingTools: []
+        backendLanguages: [Go]
+        backendFrameworks: []
+        backendLibraries: []
+        backendBuildTools: []
+        backendPackageManagers: []
+        backendLinters: []
+        backendFormatters: []
+        backendTestingTools: []
+        ormTools: []
+        auth: []
+        clouds: [AWS]
+        operatingSystems: []
+        containers: []
+        databases: [PostgreSQL]
+        webServers: []
+        ciCdTools: []
+        iacTools: []
+        monitoringTools: []
+        loggingTools: []
+        sourceControls: [Git]
+        projectManagements: []
+        communicationTools: []
+        documentationTools: []
+        apiDevelopmentTools: []
+        designTools: []
+        editors: []
+        developmentEnvironments: []
+    expect: {status: 404}
+  - name: create-certification
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/certifications
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: &certification {name: 退会したあとの資格, date: '2020-04'}
+    expect: {status: 404}
+  - name: create-portfolio
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/portfolios
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: &portfolio {name: Z 退会したあとの作品, overview: 退会したあとに足す作品, techStack: Go, link: 'https://example.com/portfolio/withdrawn'}
+    expect: {status: 404}
+  - name: create-sns-platform
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/sns-platforms
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: &sns {name: Zenn, link: 'https://zenn.dev/example-withdrawn'}
+    expect: {status: 404}
+  - name: create-self-promotion
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/self-promotions
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: &promotion {title: Z 退会したあとの自己PR, content: 退会したあとに足す自己PR}
+    expect: {status: 404}
+  # 6つの欄の項目の更新と削除
+  - name: update-career
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/careers/00000000-0000-4000-8000-000000000351
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: *career
+    expect: {status: 404}
+  - name: update-career-invalid
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/careers/00000000-0000-4000-8000-000000000351
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: {}
+    expect: {status: 400}
+  - name: delete-career
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/careers/00000000-0000-4000-8000-000000000351
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 404}
+  - name: update-project
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/projects/00000000-0000-4000-8000-000000000352
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: *project
+    expect: {status: 404}
+  - name: delete-project
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/projects/00000000-0000-4000-8000-000000000352
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 404}
+  - name: update-certification
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/certifications/00000000-0000-4000-8000-000000000353
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: *certification
+    expect: {status: 404}
+  - name: delete-certification
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/certifications/00000000-0000-4000-8000-000000000353
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 404}
+  - name: update-portfolio
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/portfolios/00000000-0000-4000-8000-000000000354
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: *portfolio
+    expect: {status: 404}
+  - name: delete-portfolio
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/portfolios/00000000-0000-4000-8000-000000000354
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 404}
+  - name: update-sns-platform
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/sns-platforms/00000000-0000-4000-8000-000000000355
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: *sns
+    expect: {status: 404}
+  - name: delete-sns-platform
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/sns-platforms/00000000-0000-4000-8000-000000000355
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 404}
+  - name: update-self-promotion
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/self-promotions/00000000-0000-4000-8000-000000000356
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+      json: *promotion
+    expect: {status: 404}
+  - name: delete-self-promotion
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/self-promotions/00000000-0000-4000-8000-000000000356
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 404}
+  # 経歴書の削除
+  - name: delete-resume
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000350
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 404}
+  - name: list-resumes-after
+    request:
+      method: GET
+      path: /api/resumes
+      headers: {Cookie: 'accessToken={withdrawAccess}'}
+    expect: {status: 200}
