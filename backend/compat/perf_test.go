@@ -12,7 +12,7 @@ import (
 
 // selfPerf は、Go 版のイメージを両方の位置に置いて、応答の時間の比べ方を確かめる筋書きである。
 // 1つ目の段でログインし、2つ目の段で偽の送信の検査の Cookie を受け取り、最後の段を測る。
-// Go 版の経歴書の操作はまだ 501 を返すので、ログインの確かめと偽の送信の検査を通ったことを 501 で確かめる。
+// Go 版の経歴書の復元はまだ作られておらず 501 を返すので、ログインの確かめと偽の送信の検査を通ったことを 501 で確かめる。
 const selfPerf = `name: self-perf
 group: 0
 fixtures: [users/basic.sql]
@@ -25,8 +25,8 @@ steps:
   - name: get-token
     request: {method: GET, path: /healthz}
     expect: {status: 200}
-  - name: delete-with-token
-    request: {method: DELETE, path: /api/resumes/00000000-0000-4000-8000-000000000201, csrf: true}
+  - name: restore-with-token
+    request: {method: POST, path: /api/resumes/restore, json: {}, csrf: true}
     expect: {status: 501}
 `
 
