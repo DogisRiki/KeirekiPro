@@ -1,0 +1,367 @@
+# 一方の版で保存した経歴書と項目を、もう一方の版で読み、直し、消せることを確かめる、版をまたぐ筋書き。
+# user1 が、最初の版で経歴書を作り、6つの欄に項目を足す(資格だけは2つ足す)。最初の版で経歴書を読み、経歴書の ID と
+# 項目の ID と、作成と更新の日時を取り出す。もう一方の版(to: other)で同じ経歴書を読み、expect の values で、
+# 項目の値と、作成と更新の日時が、取り出した値と同じことを確かめる。真偽と並びの値は、送った値をそのまま期待する値に書く。
+# 続けてもう一方の版で、基本の情報と6つの欄の項目を直し、2つ目の資格を消す。もう一方の版で読み直して更新の日時を取り出し、
+# 最初の版(to: other)で読み、直した値と、資格が1つだけ残ったことと、作成と更新の日時が同じことを確かめる。
+# 最後にもう一方の版(to: other)で経歴書を消し、最初の版(to: other)で読むと 404 になることを確かめる。
+# プロジェクトの作業の工程の systemTest と maintenance は、どちらの版も、送った値を入れ替えて答える(Java 版の答えの型の誤りに、
+# Go 版も合わせている。design.md の受け口の節)。そのため、この2つの期待する値は、送った値を入れ替えて書く。
+# 資格は取得の年月の新しい順に並ぶので、2つ目に足す資格(2021-04)は、足したときの答えの資格の並びの1つ目に入る。
+name: resumes-cross-resume
+group: 3
+fixtures: [users/basic.sql]
+modes: [cross]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 最初の版で、経歴書を作り、6つの欄に項目を足す
+  - name: create-resume
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 版をまたぐ経歴書}
+    capture: {resumeID: $.id}
+    expect: {status: 201}
+  - name: create-career
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/careers
+      csrf: true
+      json: {companyName: 株式会社またぐ, startDate: '2015-04', endDate: '2019-03', isActive: false}
+    expect: {status: 201}
+  - name: create-project
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/projects
+      csrf: true
+      json:
+        companyName: 株式会社またぐ
+        startDate: '2016-04'
+        endDate: '2018-03'
+        isActive: false
+        name: 版をまたぐプロジェクト
+        overview: 一方の版で足すプロジェクト
+        teamComp: 全体5名
+        role: 開発の担当
+        achievement: 予定どおりに終えた。
+        requirements: true
+        basicDesign: true
+        detailedDesign: false
+        implementation: true
+        integrationTest: false
+        systemTest: true
+        maintenance: false
+        frontendLanguages: [TypeScript, JavaScript]
+        frontendFrameworks: [React]
+        frontendLibraries: []
+        frontendBuildTools: []
+        frontendPackageManagers: []
+        frontendLinters: []
+        frontendFormatters: []
+        frontendTestingTools: []
+        backendLanguages: [Go]
+        backendFrameworks: []
+        backendBuildTools: []
+        backendPackageManagers: []
+        backendLinters: []
+        backendFormatters: []
+        backendTestingTools: []
+        ormTools: []
+        auth: []
+        clouds: [AWS]
+        operatingSystems: []
+        containers: []
+        databases: [PostgreSQL]
+        webServers: []
+        ciCdTools: []
+        iacTools: []
+        monitoringTools: []
+        loggingTools: []
+        sourceControls: [Git]
+        projectManagements: []
+        communicationTools: []
+        documentationTools: []
+        apiDevelopmentTools: []
+        designTools: []
+        editors: []
+        developmentEnvironments: []
+    expect: {status: 201}
+  - name: create-certification
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/certifications
+      csrf: true
+      json: {name: 基本情報技術者試験, date: '2020-04'}
+    expect: {status: 201}
+  - name: create-certification-second
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/certifications
+      csrf: true
+      json: {name: 応用情報技術者試験, date: '2021-04'}
+    capture: {secondCertificationID: '$.certifications[0].id'}
+    expect: {status: 201}
+  - name: create-portfolio
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/portfolios
+      csrf: true
+      json: {name: 版をまたぐ作品, overview: 一方の版で足す作品, techStack: Go, link: 'https://example.com/portfolio/cross'}
+    expect: {status: 201}
+  - name: create-sns-platform
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/sns-platforms
+      csrf: true
+      json: {name: GitHub, link: 'https://github.com/example-cross'}
+    expect: {status: 201}
+  - name: create-self-promotion
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/self-promotions
+      csrf: true
+      json: {title: 版をまたぐ自己PR, content: 一方の版で足す自己PR}
+    expect: {status: 201}
+  # 保存した版で読み、ID と日時を取り出す
+  - name: get-resume-saved-version
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}
+    capture:
+      createdAt: $.createdAt
+      updatedAt: $.updatedAt
+      careerID: '$.careers[0].id'
+      projectID: '$.projects[0].id'
+      certificationID: '$.certifications[1].id'
+      portfolioID: '$.portfolios[0].id'
+      snsPlatformID: '$.snsPlatforms[0].id'
+      selfPromotionID: '$.selfPromotions[0].id'
+    expect: {status: 200}
+  # もう一方の版で読む
+  - name: get-resume-other-version
+    to: other
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}
+    expect:
+      status: 200
+      values:
+        $.id: '{resumeID}'
+        $.resumeName: 版をまたぐ経歴書
+        $.createdAt: '{createdAt}'
+        $.updatedAt: '{updatedAt}'
+        '$.careers[0].id': '{careerID}'
+        '$.careers[0].companyName': 株式会社またぐ
+        '$.careers[0].startDate': '2015-04'
+        '$.careers[0].endDate': '2019-03'
+        '$.careers[0].active': false
+        '$.projects[0].id': '{projectID}'
+        '$.projects[0].name': 版をまたぐプロジェクト
+        '$.projects[0].startDate': '2016-04'
+        '$.projects[0].endDate': '2018-03'
+        '$.projects[0].active': false
+        '$.projects[0].teamComp': 全体5名
+        '$.projects[0].process.requirements': true
+        '$.projects[0].process.basicDesign': true
+        '$.projects[0].process.detailedDesign': false
+        '$.projects[0].process.implementation': true
+        '$.projects[0].process.integrationTest': false
+        '$.projects[0].process.systemTest': false
+        '$.projects[0].process.maintenance': true
+        '$.projects[0].techStack.frontend.languages': [TypeScript, JavaScript]
+        '$.projects[0].techStack.frontend.frameworks': [React]
+        '$.projects[0].techStack.frontend.libraries': []
+        '$.projects[0].techStack.backend.languages': [Go]
+        '$.projects[0].techStack.infrastructure.clouds': [AWS]
+        '$.projects[0].techStack.infrastructure.databases': [PostgreSQL]
+        '$.projects[0].techStack.tools.sourceControls': [Git]
+        '$.certifications[0].id': '{secondCertificationID}'
+        '$.certifications[0].name': 応用情報技術者試験
+        '$.certifications[1].id': '{certificationID}'
+        '$.certifications[1].date': '2020-04'
+        '$.portfolios[0].id': '{portfolioID}'
+        '$.portfolios[0].link': 'https://example.com/portfolio/cross'
+        '$.snsPlatforms[0].id': '{snsPlatformID}'
+        '$.snsPlatforms[0].name': GitHub
+        '$.selfPromotions[0].id': '{selfPromotionID}'
+        '$.selfPromotions[0].content': 一方の版で足す自己PR
+  # もう一方の版で、基本の情報と6つの欄の項目を直し、2つ目の資格を消す
+  - name: update-basic
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/basic
+      csrf: true
+      json: {resumeName: もう一方の版で直した経歴書, date: '2026-05-01', lastName: 横断, firstName: 花子}
+    expect: {status: 200}
+  - name: update-career
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/careers/{careerID}
+      csrf: true
+      json: {companyName: 株式会社またいだ, startDate: '2015-04', endDate: null, isActive: true}
+    expect: {status: 200}
+  - name: update-project
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/projects/{projectID}
+      csrf: true
+      json:
+        companyName: 株式会社またいだ
+        startDate: '2016-04'
+        endDate: null
+        isActive: true
+        name: もう一方の版で直したプロジェクト
+        overview: もう一方の版で直したプロジェクト
+        teamComp: 全体8名
+        role: 設計の担当
+        achievement: 期限より早く終えた。
+        requirements: false
+        basicDesign: false
+        detailedDesign: true
+        implementation: false
+        integrationTest: true
+        systemTest: false
+        maintenance: true
+        frontendLanguages: [TypeScript]
+        frontendFrameworks: []
+        frontendLibraries: [Zustand]
+        frontendBuildTools: [Vite]
+        frontendPackageManagers: []
+        frontendLinters: []
+        frontendFormatters: []
+        frontendTestingTools: []
+        backendLanguages: [Go, Java]
+        backendFrameworks: []
+        backendBuildTools: []
+        backendPackageManagers: []
+        backendLinters: []
+        backendFormatters: []
+        backendTestingTools: []
+        ormTools: []
+        auth: []
+        clouds: []
+        operatingSystems: []
+        containers: [Docker]
+        databases: [PostgreSQL, Redis]
+        webServers: []
+        ciCdTools: []
+        iacTools: []
+        monitoringTools: []
+        loggingTools: []
+        sourceControls: [Git]
+        projectManagements: []
+        communicationTools: []
+        documentationTools: []
+        apiDevelopmentTools: []
+        designTools: []
+        editors: []
+        developmentEnvironments: []
+    expect: {status: 200}
+  - name: update-certification
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/certifications/{certificationID}
+      csrf: true
+      json: {name: 情報処理安全確保支援士試験, date: '2020-10'}
+    expect: {status: 200}
+  - name: update-portfolio
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/portfolios/{portfolioID}
+      csrf: true
+      json: {name: もう一方の版で直した作品, overview: もう一方の版で直した作品, techStack: Go と React, link: 'https://example.com/portfolio/cross-updated'}
+    expect: {status: 200}
+  - name: update-sns-platform
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/sns-platforms/{snsPlatformID}
+      csrf: true
+      json: {name: Zenn, link: 'https://zenn.dev/example-cross'}
+    expect: {status: 200}
+  - name: update-self-promotion
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/self-promotions/{selfPromotionID}
+      csrf: true
+      json: {title: もう一方の版で直した自己PR, content: もう一方の版で直した自己PR}
+    expect: {status: 200}
+  - name: delete-certification-second
+    request:
+      method: DELETE
+      path: /api/resumes/{resumeID}/certifications/{secondCertificationID}
+      csrf: true
+    expect: {status: 204}
+  # 直した版で読み、更新の日時を取り出す
+  - name: get-resume-edited-version
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}
+    capture: {editedUpdatedAt: $.updatedAt}
+    expect: {status: 200}
+  # 最初の版で読み直す
+  - name: get-resume-first-version
+    to: other
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}
+    expect:
+      status: 200
+      values:
+        $.id: '{resumeID}'
+        $.resumeName: もう一方の版で直した経歴書
+        $.date: '2026-05-01'
+        $.lastName: 横断
+        $.firstName: 花子
+        $.createdAt: '{createdAt}'
+        $.updatedAt: '{editedUpdatedAt}'
+        '$.careers[0].id': '{careerID}'
+        '$.careers[0].companyName': 株式会社またいだ
+        '$.careers[0].endDate': null
+        '$.careers[0].active': true
+        '$.projects[0].id': '{projectID}'
+        '$.projects[0].name': もう一方の版で直したプロジェクト
+        '$.projects[0].role': 設計の担当
+        '$.projects[0].active': true
+        '$.projects[0].process.requirements': false
+        '$.projects[0].process.detailedDesign': true
+        '$.projects[0].process.systemTest': true
+        '$.projects[0].process.maintenance': false
+        '$.projects[0].techStack.frontend.frameworks': []
+        '$.projects[0].techStack.frontend.libraries': [Zustand]
+        '$.projects[0].techStack.frontend.buildTools': [Vite]
+        '$.projects[0].techStack.backend.languages': [Go, Java]
+        '$.projects[0].techStack.infrastructure.clouds': []
+        '$.projects[0].techStack.infrastructure.containers': [Docker]
+        '$.projects[0].techStack.infrastructure.databases': [PostgreSQL, Redis]
+        '$.certifications[*].id': '{certificationID}'
+        '$.certifications[0].name': 情報処理安全確保支援士試験
+        '$.certifications[0].date': '2020-10'
+        '$.portfolios[0].id': '{portfolioID}'
+        '$.portfolios[0].name': もう一方の版で直した作品
+        '$.portfolios[0].techStack': Go と React
+        '$.portfolios[0].link': 'https://example.com/portfolio/cross-updated'
+        '$.snsPlatforms[0].id': '{snsPlatformID}'
+        '$.snsPlatforms[0].name': Zenn
+        '$.snsPlatforms[0].link': 'https://zenn.dev/example-cross'
+        '$.selfPromotions[0].id': '{selfPromotionID}'
+        '$.selfPromotions[0].title': もう一方の版で直した自己PR
+  # もう一方の版で経歴書を消し、最初の版で読む
+  - name: delete-resume
+    to: other
+    request:
+      method: DELETE
+      path: /api/resumes/{resumeID}
+      csrf: true
+    expect: {status: 204}
+  - name: get-resume-after-delete
+    to: other
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}
+    expect: {status: 404}

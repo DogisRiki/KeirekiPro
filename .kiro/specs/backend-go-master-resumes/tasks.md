@@ -283,7 +283,7 @@
   - _要件: 3.3, 3.4, 4.1, 4.4, 6.3_
   - _依存: 6.1_
 
-- [ ] 6.7 版をまたいで確かめる筋書きを書いて通す
+- [x] 6.7 版をまたいで確かめる筋書きを書いて通す
 
   Claude は、まず、版をまたいで確かめる筋書きの送り先を確かめるテスト `TestCrossRoute_ResumeSteps` を `backend/compat/harness/cross_test.go` に作る。このテストは、`scenarios/resumes/` の、`modes` に `cross` を書いた筋書きを読み、Java 版から Go 版の向きと Go 版から Java 版の向きのそれぞれで、`expect.values` を持つ段が、その前の変える段と違う版に送られることを確かめる。このテストは、`cross-resume.yaml` が無ければ失敗する。Claude は、次に、マスタと経歴書の操作の筋書きの節のとおりに、`cross-resume.yaml` を書く。
   - 完了の確かめ方: `go test -tags compat -run TestCrossRoute_ResumeSteps ./compat/harness/` が通る。`make compat-cross` が、Java 版から Go 版の向きと Go 版から Java 版の向きで通る

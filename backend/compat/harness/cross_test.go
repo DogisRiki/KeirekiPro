@@ -246,3 +246,65 @@ func TestCrossRoute_UserSteps(t *testing.T) {
 		}
 	}
 }
+
+// resumeCrossFiles は、マスタと経歴書の操作の、版をまたいで確かめる筋書きのファイルである。
+var resumeCrossFiles = []string{"cross-resume.yaml"}
+
+// resumeChangingStep は、経歴書と項目を変える段かを返す。GET でない、版に送る段である。
+func resumeChangingStep(step Step) bool {
+	return step.Kind() == StepVersion && step.Request.Method != "GET"
+}
+
+// TestCrossRoute_ResumeSteps は、マスタと経歴書の操作の版をまたぐ筋書きを読み、Java 版から Go 版の向きと Go 版から
+// Java 版の向きのそれぞれで、expect の values を持つ段が、その前の変える段(GET でない、版に送る段)と違う版から答えを
+// 受けることを確かめる。段の to: other が外れると、保存した版と同じ版で読み直すことになり、一方の版が保存した経歴書と項目を
+// もう一方の版が読めるかを確かめなくなるためである。筋書きの最後の段は、CrossRoute が、その前の版に送る段と違う版に送る。
+// 筋書きのファイルが無いときと、expect の values を持つ段が1つも無いときは失敗する。
+func TestCrossRoute_ResumeSteps(t *testing.T) {
+	dir := filepath.Join("..", "scenarios", "resumes")
+	for _, file := range resumeCrossFiles {
+		if _, err := os.Stat(filepath.Join(dir, file)); err != nil {
+			t.Errorf("版をまたぐ筋書き %s がありません: %v", file, err)
+		}
+	}
+	scenarios, err := LoadScenarios(dir, ModeCross)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	if len(scenarios) == 0 {
+		t.Fatalf("%s に、版をまたぐ動かし方の筋書きがありません", dir)
+	}
+	for _, s := range scenarios {
+		checkedSteps := 0
+		for _, step := range s.Steps {
+			if len(step.Expect.Values) > 0 {
+				checkedSteps++
+			}
+		}
+		if checkedSteps == 0 {
+			t.Errorf("筋書き %s に、expect の values を持つ段がありません", s.Name)
+		}
+		for _, direction := range []string{CrossJavaToGo, CrossGoToJava} {
+			route, err := CrossRoute(s, direction)
+			if err != nil {
+				t.Errorf("CrossRoute(%s, %s): %v", s.Name, direction, err)
+				continue
+			}
+			changed := -1
+			for i, step := range s.Steps {
+				if len(step.Expect.Values) > 0 {
+					switch {
+					case changed < 0:
+						t.Errorf("筋書き %s の段「%s」は expect の values を持ちますが、その前に変える段がありません", s.Name, step.Name)
+					case route[i] == "" || route[i] == route[changed]:
+						t.Errorf("筋書き %s の向き %s で、確かめる段「%s」が、その前の変える段「%s」と同じ版 %s から答えを受けます",
+							s.Name, direction, step.Name, s.Steps[changed].Name, route[changed])
+					}
+				}
+				if resumeChangingStep(step) {
+					changed = i
+				}
+			}
+		}
+	}
+}
