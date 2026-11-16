@@ -1,0 +1,22 @@
+# 経歴書の基本の情報を更新する応答の時間を測る筋書き。user1 がログインしたあとに、resumes/fonts.sql の、6つの欄のすべてに
+# 項目を持つ経歴書の基本の情報を更新する段を繰り返して測る。
+# 更新する段は、毎回、経歴書の今の名前と同じ名前を送る。どちらの版も、名前が変わらないときは名前の重なりを確かめないので、
+# どの回も、入力を検査し、経歴書を読み、経歴書を書き、経歴書を読み直す同じ処理を行う。
+name: resumes-perf-update-basic
+group: 3
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [perf]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: update-basic
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/basic
+      csrf: true
+      json: {resumeName: フォントを比べる経歴書, date: '2026-05-01', lastName: 測定, firstName: 一郎}
+    expect: {status: 200}

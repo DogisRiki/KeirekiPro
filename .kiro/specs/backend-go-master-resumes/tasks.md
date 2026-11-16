@@ -290,7 +290,7 @@
   - 受入基準とテストの対応: 要件5の受入基準1(一方の版で作った経歴書と足した項目を、もう一方の版で読み、直し、消せる)と要件5の受入基準2(もう一方の版が同じ時刻として返す)は、`cross-resume.yaml` の `expect.values` で確かめる。要件5の受入基準3(両方の向きの筋書きを CI で動かす)は、`make compat-cross` の `TestCross_Scenarios` と、`TestCrossRoute_ResumeSteps` で確かめる
   - _要件: 5.1, 5.2, 5.3_
 
-- [ ] 6.8 主な操作の応答の時間を測る
+- [x] 6.8 主な操作の応答の時間を測る
 
   Claude は、マスタと経歴書の操作の筋書きの節のとおりに、5つの `perf-*.yaml` を `modes: [perf]` で書く。Claude は、5つの `perf-*.yaml` で測る経歴書に、`fixtures/resumes/fonts.sql` の、6つの欄のすべてに項目を持つ経歴書を使う。Claude は、置き換えの spec の測り方で5つの操作の応答の時間を測り、結果を、`progress.md` の決まりのとおりに `progress.md` に書く。
   - 完了の確かめ方: `make compat-perf` が5つの操作を測り、`progress.md` に結果が書かれる。6つ目の大きなまとまりの最後のタスクなので、完了条件の2つ目のとおり `/verify-backend` も通る

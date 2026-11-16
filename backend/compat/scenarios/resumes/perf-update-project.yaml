@@ -1,0 +1,73 @@
+# プロジェクトの項目を更新する応答の時間を測る筋書き。user1 がログインしたあとに、resumes/fonts.sql の、6つの欄のすべてに
+# 項目を持つ経歴書の、2つ目のプロジェクト(000000402002)を更新する段を繰り返して測る。
+# 更新する段は、技術スタックの4つの大分類のすべての並びに値を入れた本文を、毎回同じ値で送る。どちらの版も、どの回も、
+# 入力を検査し、経歴書と項目を読み、プロジェクトと技術スタックの行を書き、経歴書を読み直す同じ処理を行う。
+name: resumes-perf-update-project
+group: 3
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [perf]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: update-project
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/projects/00000000-0000-4000-8000-000000402002
+      csrf: true
+      json:
+        companyName: Compare Systems 合同会社
+        startDate: '2018-04'
+        endDate: '2021-12'
+        isActive: false
+        name: 予約のサイトの新規開発
+        overview: "受発注を管理するシステムを作った。\n帳票の出力も作った。"
+        teamComp: 全体8名
+        role: 開発の担当として、画面と API を作った。
+        achievement: 受注の処理の時間を3割減らした。
+        requirements: true
+        basicDesign: true
+        detailedDesign: false
+        implementation: true
+        integrationTest: false
+        systemTest: true
+        maintenance: false
+        frontendLanguages: [TypeScript, JavaScript]
+        frontendFrameworks: [React]
+        frontendLibraries: [Redux, React Router]
+        frontendBuildTools: [Vite]
+        frontendPackageManagers: [pnpm]
+        frontendLinters: [ESLint]
+        frontendFormatters: [Prettier]
+        frontendTestingTools: [Vitest, Playwright]
+        backendLanguages: [Java, Kotlin]
+        backendFrameworks: [Spring Boot]
+        backendLibraries: [Lombok]
+        backendBuildTools: [Gradle]
+        backendPackageManagers: [Maven]
+        backendLinters: [Checkstyle]
+        backendFormatters: [Spotless]
+        backendTestingTools: [JUnit, Mockito]
+        ormTools: [MyBatis]
+        auth: [Spring Security]
+        clouds: [AWS]
+        operatingSystems: [Linux]
+        containers: [Docker]
+        databases: [PostgreSQL, Redis]
+        webServers: [Nginx]
+        ciCdTools: [GitHub Actions]
+        iacTools: [Terraform]
+        monitoringTools: [CloudWatch]
+        loggingTools: [Fluent Bit]
+        sourceControls: [Git]
+        projectManagements: [Jira]
+        communicationTools: [Slack]
+        documentationTools: [Confluence]
+        apiDevelopmentTools: [Postman]
+        designTools: [Figma]
+        editors: [VS Code]
+        developmentEnvironments: [Dev Containers]
+    expect: {status: 200}

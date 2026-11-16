@@ -1,0 +1,18 @@
+# 技術スタックのマスタの応答の時間を測る筋書き。user1 がログインしたあとに、技術スタックのマスタを見る段を繰り返して測る。
+# 経歴書は使わないが、ほかの4つの操作の筋書きと同じ初めのデータで測る。
+name: resumes-perf-tech-stacks
+group: 3
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [perf]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: get-tech-stacks-master
+    request:
+      method: GET
+      path: /api/tech-stacks
+    expect: {status: 200}
