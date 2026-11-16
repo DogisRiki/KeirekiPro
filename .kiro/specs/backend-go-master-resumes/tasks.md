@@ -209,7 +209,7 @@
   - _要件: 4.2_
 
 - [ ] 5. 経歴書の受け口をつなぐ
-- [ ] 5.1 26の操作の受け口と答えの形を作る
+- [x] 5.1 26の操作の受け口と答えの形を作る
 
   Claude は、経歴書の受け口の節のとおりに、`internal/httpapi/resumes.go` に `ResumeService` のインタフェースと `resumeHandlers` を作り、`resumeresponses.go` に経歴書の答えとマスタの答えの JSON の型と、答えを作る関数を作る。Claude は、`var _ ResumeService = (*resume.Service)(nil)` を置く。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestResumeHandlers` が通る
