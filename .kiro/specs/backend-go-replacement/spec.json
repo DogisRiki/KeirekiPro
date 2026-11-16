@@ -2,22 +2,28 @@
   "feature_name": "backend-go-replacement",
   "issue": 445,
   "created_at": "2026-11-07T11:52:44Z",
-  "updated_at": "2026-11-16T10:39:07Z",
+  "updated_at": "2026-11-16T23:14:51Z",
   "language": "ja",
   "review_model": "opus",
-  "phase": "tasks-generated",
+  "phase": "tasks-approved",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-16T13:16:56Z"
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-16T21:59:58Z"
     },
     "tasks": {
       "generated": true,
-      "approved": false
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-16T23:14:51Z"
     }
   },
   "approval_history": [
@@ -100,6 +106,14 @@
       "issues": [445],
       "revoked_at": "2026-11-16T10:39:07Z",
       "revoked_for": "Issue #901 による requirements の直しに伴う取り消し"
+    },
+    {
+      "stage": "requirements",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-16T11:55:00Z",
+      "issues": [445],
+      "revoked_at": "2026-11-16T12:36:14Z",
+      "revoked_for": "設計の見直しで見つかった食い違いによる requirements の直し: 要件10の受入基準1に、PDF の文字の大きさの違いを 0.5pt 以内、表の色の違いを赤と緑と青のそれぞれで 2 以内まで許すことを書き足す"
     }
   ]
 }
