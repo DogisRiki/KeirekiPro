@@ -573,6 +573,9 @@ jobs:
       - name: Build changed Dockerfiles
         env:
           DOCKERFILES: ${{ needs.detect-changes.outputs.dockerfile_files }}
+          # docker/terraform/Dockerfile の tflint --init がログインして GitHub の API に問い合わせるためのトークン。
+          # ログインしない問い合わせの回数はランナーの IP アドレスをほかの利用者と分け合い、上限に当たって落ちる
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -599,7 +602,13 @@ jobs:
               *) context="." ;;
             esac
 
+            # トークンは、それを読む docker/terraform/Dockerfile のビルドにだけ渡す
+            secret_args=()
+            if [ "$f" = docker/terraform/Dockerfile ]; then
+              secret_args=(--secret "id=github_token,env=GITHUB_TOKEN")
+            fi
+
             echo "::group::docker build -f $f $context"
-            docker build --file "$f" "$context"
+            docker build "${secret_args[@]}" --file "$f" "$context"
             echo "::endgroup::"
           done < <(jq -r '.[]' <<<"$DOCKERFILES")

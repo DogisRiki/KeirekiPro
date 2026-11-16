@@ -18,7 +18,13 @@ RUN apk add --no-cache \
 WORKDIR /workspace
 
 COPY terraform/.tflint.hcl /root/.tflint.hcl
-RUN tflint --init --config /root/.tflint.hcl
+# tflint --init は、ルールの部品の版を GitHub の API に問い合わせる。ログインしない問い合わせは
+# IP アドレスごとに1時間60回までで、GitHub Actions のランナーはこの回数をほかの利用者と分け合う。
+# そのため、CI は自動で付くトークンを github_token の名前で渡し、ログインして問い合わせる
+# (https://github.com/terraform-linters/tflint/blob/master/docs/user-guide/plugins.md の Avoiding rate limiting)。
+# トークンはこの RUN の間だけ環境変数に入り、イメージには残らない。トークンを渡さない手元の
+# compose のビルドでは、環境変数が空になり、tflint はこれまでどおりログインせずに問い合わせる。
+RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN tflint --init --config /root/.tflint.hcl
 
 ENTRYPOINT []
 CMD ["sh"]
