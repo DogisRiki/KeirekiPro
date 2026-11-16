@@ -144,7 +144,7 @@
   - _要件: 3.1, 3.4_
   - _依存: 1.4, 2.2, 2.8_
 
-- [ ] 3.4 経歴書の作成とコピーした作成と基本の情報の更新を作る
+- [x] 3.4 経歴書の作成とコピーした作成と基本の情報の更新を作る
 
   Claude は、Service の部品の節と、経歴書をコピーして作る処理の流れのとおりに、`service.go` に `CreateResume` と `UpdateResumeBasic` を作る。上限と名前の重なりと名前と姓と名の決まりは、小タスク2.7 の部品で確かめる。`CreateResume` は、Java 版と同じく、作成の答えの作成と更新の日時に、データベースに書いた丸めた値ではなく、`Now` から得た丸める前の値を返す。`UpdateResumeBasic` は、基本の情報の更新の答えの更新の日時に丸める前の値を返し、作成の日時にデータベースから読んだ値を返す。
   - 完了の確かめ方: `go test ./internal/resume/ -run 'TestService_(CreateResume|UpdateResumeBasic)'` が通る
@@ -344,6 +344,7 @@
 - Go の `golang.org/x/text/collate` の日本語の並べ方は、半角のカタカナの「ｱｲｳ」を「Zenn」と「あいう」のあいだに並べる。Java 版の `java.text.Collator` は「ｱｲｳ」を最後に並べる。`order_test.go` の `goNameOrder` がこの順を確かめる。Claude は、小タスク6.2 で、変えた動きの一覧の CB-001 の Go 版の欄にこの違いが書かれているかを確かめ、書かれていなければ書き足す。
 - 小タスク3.1 で、U+0000 を含む値の書き込みを PostgreSQL が断り、書き込みが失敗することを確かめた(`store_integration_test.go` の `TestStore_NullCharacter`)。research.md の155行のとおり Java 版も 500 で答え、design.md の607行のとおり Go 版もデータベースの誤りを 500 で答える。同じ動きなので、変えた動きの一覧には載せない。上の小タスク2.4 のメモへの答えである
 - `db/queries/resumes.sql` の374行の注記「Java 版と同じく、技術スタックの行が無ければ何も書かない」は誤りである。Java 版の `MyBatisResumeRepository.save` はプロジェクトの行を消して書き直すので、技術スタックの行を作る。Go 版の `updateProject` は、技術スタックの行が無いと技術スタックの変更を捨てる。どちらの版もプロジェクトを作るときに技術スタックの行を書くので、行が無いことは手で直したデータでしか起きない。注記は小タスク1.3 の範囲なので直さず、PR 本文に書く。Claude は、このことを小タスク3.1 の審査で知った
+- 経歴書の作成と基本の情報の更新は、名前の重なりを、`store.go` の `resumeNameExists`(データベースへの問い合わせ。名前が完全に一致する経歴書を探す)で確かめる。design.md の経歴書をコピーして作る処理の流れの図も、同じ名前の経歴書があるかをデータベースに尋ねると書く。そのため、`rules.go` の `checkResumeNameDuplicated` は本番のコードから呼ばれず、テストだけが使う。tasks.md の小タスク3.4 の本文は、名前の重なりを小タスク2.7 の部品で確かめると書くが、Go 版は2.7 の部品のうち誤りの値 `errResumeNameDuplicated` だけを使う。Claude は、このことを小タスク3.4 の審査で知った
 
 ## 完了条件(全タスク共通)
 

@@ -5,10 +5,14 @@ package resume
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 )
 
 // Deps は、Service が使う部品の束である。
@@ -87,4 +91,147 @@ func (s *Service) DeleteResume(ctx context.Context, userID uuid.UUID, resumeID s
 		}
 		return st.deleteResume(ctx, id)
 	})
+}
+
+// CreateResume は、利用者の経歴書を1件作る。要求の本文の resumeId に経歴書の ID があれば、その経歴書の日付と姓と名と6つの欄の項目を写す。
+// 確かめる順は Java 版と同じく、経歴書の数の上限、名前の重なり、コピー元の経歴書、名前の値の決まりである。
+// 答えの作成と更新の日時は、データベースに書くときに丸める前の今の時刻である。
+func (s *Service) CreateResume(ctx context.Context, userID uuid.UUID, body []byte) (Resume, error) {
+	req, err := decodeBody[createResumeRequest](body)
+	if err != nil {
+		return Resume{}, errUnreadableInput()
+	}
+	if e := validateCreateResume(req); e != nil {
+		return Resume{}, e
+	}
+	name := *req.ResumeName
+	now := s.deps.Now().In(japanZone)
+	var created Resume
+	err = inTx(ctx, s.deps.Pool, func(st store) error {
+		count, err := st.countResumes(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if e := resumeLimit.check(count); e != nil {
+			return e
+		}
+		if exists, err := st.resumeNameExists(ctx, userID, name); err != nil {
+			return err
+		} else if exists {
+			return errResumeNameDuplicated()
+		}
+		r := Resume{
+			ID: uuid.New(), UserID: userID, Name: name,
+			Date:      Date{Year: now.Year(), Month: now.Month(), Day: now.Day()},
+			CreatedAt: now, UpdatedAt: now,
+			Careers: []Career{}, Projects: []Project{}, Certifications: []Certification{},
+			Portfolios: []Portfolio{}, SnsPlatforms: []SnsPlatform{}, SelfPromotions: []SelfPromotion{},
+		}
+		if req.ResumeID.Present {
+			src, found, err := st.findResume(ctx, userID, req.ResumeID.Value)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return errResumeNotFound()
+			}
+			copyEntries(&r, src)
+		}
+		f := auth.FieldErrors{}
+		checkResumeName(f, name)
+		if e := f.Result(); e != nil {
+			return e
+		}
+		if err := st.insertResume(ctx, r); err != nil {
+			if isUserMissing(err) {
+				return errResumeNotFound()
+			}
+			return err
+		}
+		created = r
+		return nil
+	})
+	if err != nil {
+		return Resume{}, err
+	}
+	return created, nil
+}
+
+// copyEntries は、コピー元の経歴書の日付と姓と名と6つの欄の項目を r に写す。項目には新しい ID を付け、新しい ID で項目を並べ直す。
+func copyEntries(r *Resume, src Resume) {
+	r.Date, r.LastName, r.FirstName = src.Date, src.LastName, src.FirstName
+	r.Careers = withNewIDs(src.Careers, func(e *Career) *uuid.UUID { return &e.ID })
+	r.Projects = withNewIDs(src.Projects, func(e *Project) *uuid.UUID { return &e.ID })
+	r.Certifications = withNewIDs(src.Certifications, func(e *Certification) *uuid.UUID { return &e.ID })
+	r.Portfolios = withNewIDs(src.Portfolios, func(e *Portfolio) *uuid.UUID { return &e.ID })
+	r.SnsPlatforms = withNewIDs(src.SnsPlatforms, func(e *SnsPlatform) *uuid.UUID { return &e.ID })
+	r.SelfPromotions = withNewIDs(src.SelfPromotions, func(e *SelfPromotion) *uuid.UUID { return &e.ID })
+	sortEntries(r)
+}
+
+// withNewIDs は、項目の並びを写し、写した項目のそれぞれに新しい ID を付ける。並びが空でも nil にしない。
+func withNewIDs[E any](entries []E, id func(*E) *uuid.UUID) []E {
+	out := append(make([]E, 0, len(entries)), entries...)
+	for i := range out {
+		*id(&out[i]) = uuid.New()
+	}
+	return out
+}
+
+// isUserMissing は、err が、経歴書の行の利用者が居ないための外部キーの違反かを返す。利用者が退会したあとに届いた作成の要求で起きる。
+func isUserMissing(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.TableName == "resumes"
+}
+
+// UpdateResumeBasic は、利用者の経歴書の名前と日付と姓と名を書き換え、6つの欄の項目を持つ経歴書を返す。
+// 名前を変えるときだけ、ほかの経歴書との名前の重なりを確かめる。名前と姓と名の値の決まりの誤りは、まとめて返す。
+// 答えの更新の日時は丸める前の今の時刻であり、作成の日時はデータベースの値である。
+func (s *Service) UpdateResumeBasic(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (Resume, error) {
+	req, err := decodeBody[updateResumeBasicRequest](body)
+	if err != nil {
+		return Resume{}, errUnreadableInput()
+	}
+	if e := validateUpdateResumeBasic(req); e != nil {
+		return Resume{}, e
+	}
+	id, ok := parseID(resumeID)
+	if !ok {
+		return Resume{}, errResumeNotFound()
+	}
+	name := *req.ResumeName
+	var updated Resume
+	err = inTx(ctx, s.deps.Pool, func(st store) error {
+		r, found, err := st.lockResume(ctx, userID, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return errResumeNotFound()
+		}
+		if name != r.Name {
+			if exists, err := st.resumeNameExists(ctx, userID, name); err != nil {
+				return err
+			} else if exists {
+				return errResumeNameDuplicated()
+			}
+		}
+		f := auth.FieldErrors{}
+		checkResumeName(f, name)
+		checkFullName(f, req.LastName, req.FirstName)
+		if e := f.Result(); e != nil {
+			return e
+		}
+		r.Name, r.Date, r.LastName, r.FirstName = name, req.Date.Value, req.LastName, req.FirstName
+		r.UpdatedAt = s.deps.Now().In(japanZone)
+		if err := st.updateResumeBasic(ctx, r); err != nil {
+			return err
+		}
+		updated = r
+		return nil
+	})
+	if err != nil {
+		return Resume{}, err
+	}
+	return updated, nil
 }
