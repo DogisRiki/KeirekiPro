@@ -291,6 +291,11 @@ func diffJSON(path string, j, g any, emit func(path string, j, g any)) {
 		}
 		return
 	}
+	if js, ok := j.(string); ok {
+		if gs, ok := g.(string); ok && sameWallclock(js, gs) {
+			return
+		}
+	}
 	if !reflect.DeepEqual(j, g) {
 		emit(path, j, g)
 	}
@@ -335,6 +340,7 @@ func (c *Comparer) comparePDF(step StepRef, java, goBody []byte) {
 type DBSnapshot map[string][]map[string]any
 
 // CompareDB は、データベースのすべての表のすべての行を、UUID と日時を置き換えてから、置き換えたあとの値で並べ替えて比べる。
+// 経歴書の表の作成と更新の日時は、<wallclock:形:+秒> の秒を除いた文字で行を組にし、秒の差が RedisTTLTolerance の内側なら同じとする。
 // 応答に現れた UUID は応答と同じ番号に、応答に現れない UUID は行のほかの列の値の順の番号に置き換える。
 // 表ごとに、片方の版にしか無い行を1つの違いにして報告する。
 func (c *Comparer) CompareDB(step StepRef, java, goDB DBSnapshot) {
@@ -352,9 +358,9 @@ func (c *Comparer) CompareDB(step StepRef, java, goDB DBSnapshot) {
 			c.add(step, TargetDB, table, tablePresence(jok), tablePresence(gok))
 			continue
 		}
-		j := rowTexts(c.java, jRows)
-		g := rowTexts(c.goVer, gRows)
-		onlyJ, onlyG := sortedDifference(j, g)
+		j := rowTexts(c.java, table, jRows)
+		g := rowTexts(c.goVer, table, gRows)
+		onlyJ, onlyG := wallclockDifference(j, g)
 		if len(onlyJ) > 0 || len(onlyG) > 0 {
 			c.add(step, TargetDB, table, joinOrAbsent(onlyJ), joinOrAbsent(onlyG))
 		}
@@ -368,9 +374,15 @@ func tablePresence(ok bool) string {
 	return "表が無い"
 }
 
-func rowTexts(n *Normalizer, rows []map[string]any) []string {
+// rowTexts は、表 table の行を正規化した文字の並びにする。応答に現れない UUID の番号を決めるための並べ替えでは、
+// <wallclock:形:+秒> の秒を除いた文字で並べる。秒を含めて並べると、同じ行でも、版ごとに書いた時刻の違いで順が変わり、番号がずれるためである。
+func rowTexts(n *Normalizer, table string, rows []map[string]any) []string {
 	records := normalizeRecords(rows, func(row map[string]any, assign bool) string {
-		return canonicalJSON(n.value(row, assign))
+		t := canonicalJSON(n.record(table, row, assign))
+		if !assign {
+			return wallclockKey(t)
+		}
+		return t
 	})
 	out := make([]string, len(records))
 	for i, r := range records {
@@ -379,18 +391,78 @@ func rowTexts(n *Normalizer, rows []map[string]any) []string {
 	return out
 }
 
-// sortedDifference は、並べ替えた2つの並びを多重集合として比べ、片方にしか無いものを返す。
-func sortedDifference(a, b []string) (onlyA, onlyB []string) {
+// wallclockKey は、s の中の <wallclock:形:+秒> から秒を除く。
+func wallclockKey(s string) string {
+	return wallclockMarkerPattern.ReplaceAllString(s, "<wallclock:$1>")
+}
+
+// wallclockSeconds は、s の中の <wallclock:形:+秒> の秒を、現れた順に返す。
+func wallclockSeconds(s string) []int64 {
+	var out []int64
+	for _, m := range wallclockMarkerPattern.FindAllStringSubmatch(s, -1) {
+		v, err := strconv.ParseInt(m[2], 10, 64)
+		if err != nil {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+// sameWallclock は、j と g の、<wallclock:形:+秒> の秒を除いた文字が同じで、秒の差がどれも RedisTTLTolerance の内側かを返す。
+func sameWallclock(j, g string) bool {
+	if wallclockKey(j) != wallclockKey(g) {
+		return false
+	}
+	js, gs := wallclockSeconds(j), wallclockSeconds(g)
+	if len(js) != len(gs) {
+		return false
+	}
+	tolerance := int64(RedisTTLTolerance / time.Second)
+	for i := range js {
+		if d := js[i] - gs[i]; d > tolerance || d < -tolerance {
+			return false
+		}
+	}
+	return true
+}
+
+// wallclockDifference は、2つの行の並びを、秒を除いた文字と秒の順に並べ、秒を除いた文字が同じ行を前から組にする。
+// 組にできなかった行と、組にしたが sameWallclock でない行を、片方にしか無い行として返す。
+func wallclockDifference(a, b []string) (onlyA, onlyB []string) {
+	type row struct {
+		key     string
+		seconds []int64
+		text    string
+	}
+	sorted := func(texts []string) []row {
+		rows := make([]row, len(texts))
+		for i, t := range texts {
+			rows[i] = row{key: wallclockKey(t), seconds: wallclockSeconds(t), text: t}
+		}
+		slices.SortStableFunc(rows, func(x, y row) int {
+			if c := strings.Compare(x.key, y.key); c != 0 {
+				return c
+			}
+			return slices.Compare(x.seconds, y.seconds)
+		})
+		return rows
+	}
+	ra, rb := sorted(a), sorted(b)
 	i, k := 0, 0
-	for i < len(a) || k < len(b) {
+	for i < len(ra) || k < len(rb) {
 		switch {
-		case k == len(b) || (i < len(a) && a[i] < b[k]):
-			onlyA = append(onlyA, a[i])
+		case k == len(rb) || (i < len(ra) && ra[i].key < rb[k].key):
+			onlyA = append(onlyA, ra[i].text)
 			i++
-		case i == len(a) || b[k] < a[i]:
-			onlyB = append(onlyB, b[k])
+		case i == len(ra) || rb[k].key < ra[i].key:
+			onlyB = append(onlyB, rb[k].text)
 			k++
 		default:
+			if !sameWallclock(ra[i].text, rb[k].text) {
+				onlyA = append(onlyA, ra[i].text)
+				onlyB = append(onlyB, rb[k].text)
+			}
 			i++
 			k++
 		}
