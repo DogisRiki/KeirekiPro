@@ -16,6 +16,7 @@ import (
 	"path"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -488,7 +489,7 @@ func TestFixtures_AllLoadable(t *testing.T) {
 	})
 }
 
-// 初めのデータ: 4種類の経歴書と、2つのフォントの書き出しの設定があることを確かめる。
+// 初めのデータ: 4種類の経歴書と、2つのフォントの書き出しの設定と、2つのフォントのそれぞれで文字の大きさと表の見出しの色を替えた書き出しの設定があることを確かめる。
 func TestFixtures_ResumeKindsPresent(t *testing.T) {
 	db := fixtureDB(t)
 	children := func(resume string) int {
@@ -538,14 +539,59 @@ func TestFixtures_ResumeKindsPresent(t *testing.T) {
 			}
 		}
 	})
-	t.Run("2つのフォントのそれぞれを選んだ書き出しの設定がある", func(t *testing.T) {
-		var fonts []string
+	// settingsFonts は、resumes/ の JSON のうち、名前が prefix で始まる書き出しの設定を読み、フォントの名前の順に返す。
+	settingsFonts := func(t *testing.T, prefix string) (fonts []string, settings []exportSettings) {
+		t.Helper()
 		for _, name := range fixtureFiles(t, "resumes", ".json") {
-			fonts = append(fonts, readExportSettings(t, name).PdfSettings.FontFamily)
+			if strings.HasPrefix(path.Base(name), prefix) {
+				settings = append(settings, readExportSettings(t, name))
+			}
 		}
-		slices.Sort(fonts)
-		if !slices.Equal(fonts, []string{"NotoSansJP", "NotoSerifJP"}) {
+		slices.SortFunc(settings, func(a, b exportSettings) int {
+			return strings.Compare(a.PdfSettings.FontFamily, b.PdfSettings.FontFamily)
+		})
+		for _, s := range settings {
+			fonts = append(fonts, s.PdfSettings.FontFamily)
+		}
+		return fonts, settings
+	}
+	t.Run("2つのフォントのそれぞれを選んだ書き出しの設定がある", func(t *testing.T) {
+		if fonts, _ := settingsFonts(t, "fonts-"); !slices.Equal(fonts, []string{"NotoSansJP", "NotoSerifJP"}) {
 			t.Errorf("書き出しの設定のフォント = %v, want NotoSansJP と NotoSerifJP の1つずつ", fonts)
 		}
 	})
+	t.Run("文字の大きさと表の見出しの色を既定と違う値にした書き出しの設定が、2つのフォントに1つずつある", func(t *testing.T) {
+		fonts, settings := settingsFonts(t, "sizes-")
+		if !slices.Equal(fonts, []string{"NotoSansJP", "NotoSerifJP"}) {
+			t.Errorf("書き出しの設定のフォント = %v, want NotoSansJP と NotoSerifJP の1つずつ", fonts)
+		}
+		// 既定の値から 0.5 だけ違い、日付と氏名を別の値にした文字の大きさ(design.md の「pdfcmp」の節)
+		const title, date, fullName, sectionHeading = 16.5, 10.5, 9.5, 12
+		// defaultHeaderColor は、表の見出しの色の既定の値の赤と緑と青である(d9d9d9)
+		defaultHeaderColor := [3]int{0xd9, 0xd9, 0xd9}
+		for _, s := range settings {
+			sizes := s.PdfSettings.FontSizes
+			if sizes.Title != title || sizes.Date != date || sizes.FullName != fullName || sizes.SectionHeading != sectionHeading {
+				t.Errorf("%s: 文字の大きさ = %+v, want タイトル %v、日付 %v、氏名 %v、見出し %v",
+					s.PdfSettings.FontFamily, sizes, title, date, fullName, sectionHeading)
+			}
+			var rgb [3]int
+			if _, err := fmt.Sscanf(s.PdfSettings.TableHeaderColor.Hex, "%02x%02x%02x", &rgb[0], &rgb[1], &rgb[2]); err != nil {
+				t.Errorf("%s: 表の見出しの色 %q を読めません: %v", s.PdfSettings.FontFamily, s.PdfSettings.TableHeaderColor.Hex, err)
+				continue
+			}
+			// PDF の比べ方は表の色の違いを 2 まで許すので、2 を超えて違う値が1つも無い色では、色の設定の読み落としを見つけられない
+			if !slices.ContainsFunc([]int{0, 1, 2}, func(i int) bool { return abs(rgb[i]-defaultHeaderColor[i]) > 2 }) {
+				t.Errorf("%s: 表の見出しの色 %s が、既定の d9d9d9 と 2 を超えて違う値を持ちません", s.PdfSettings.FontFamily, s.PdfSettings.TableHeaderColor.Hex)
+			}
+		}
+	})
+}
+
+// abs は、整数の絶対値を返す。
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
