@@ -91,6 +91,10 @@ jobs:
       - name: Test close linked issues
         run: bash .github/scripts/tests/test-close-linked-issues.sh
 
+      # main の最新に合わせる PR を選ぶスクリプト(update-pr-branches)のテスト
+      - name: Test select PRs to update
+        run: bash .github/scripts/tests/test-select-prs-to-update.sh
+
       # ci.yaml の必須の検査 backend-test が、backend の3つの仕事の結果から合否を決める
       # スクリプトのテスト。判定を誤ると、失敗した仕事や飛ばされた仕事を見逃したまま
       # PR が main に入るので、PR の時点で流す。外部の道具もネットワークも使わない
