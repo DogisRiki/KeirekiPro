@@ -243,18 +243,7 @@ type BackupSnsPlatform struct {
 }
 
 // CareerRequest 職歴の追加と更新の本文(Java の `CreateCareerRequest` と `UpdateCareerRequest`。項目は同じ)。
-type CareerRequest struct {
-	CompanyName string     `json:"companyName"`
-	EndDate     *YearMonth `json:"endDate,omitempty"`
-
-	// IsActive 在籍中か。要求では `isActive`、応答では `active` という名前になる。
-	IsActive bool `json:"isActive"`
-
-	// StartDate 年月(`yyyy-MM`)。
-	//
-	// Examples: 2026-11
-	StartDate YearMonth `json:"startDate"`
-}
+type CareerRequest = json.RawMessage
 
 // CareerResponse 職歴。`endDate` は在籍中なら null として書く。
 type CareerResponse struct {
@@ -275,13 +264,7 @@ type CertificationListResponse struct {
 }
 
 // CertificationRequest 資格の追加と更新の本文(Java の `CreateCertificationRequest` と `UpdateCertificationRequest`)。
-type CertificationRequest struct {
-	// Date 年月(`yyyy-MM`)。
-	//
-	// Examples: 2026-11
-	Date YearMonth `json:"date"`
-	Name string    `json:"name"`
-}
+type CertificationRequest = json.RawMessage
 
 // CertificationResponse defines model for CertificationResponse.
 type CertificationResponse struct {
@@ -300,11 +283,7 @@ type ChangePasswordRequest struct {
 }
 
 // CreateResumeRequest defines model for CreateResumeRequest.
-type CreateResumeRequest struct {
-	// ResumeId 写し元の職務経歴書の ID。指定すると写して作る。UUID として読めない値は 400(JSON が読めない扱い)。
-	ResumeId   *openapi_types.UUID `json:"resumeId,omitempty"`
-	ResumeName string              `json:"resumeName"`
-}
+type CreateResumeRequest = json.RawMessage
 
 // EmailNotVerifiedErrorResponse メールアドレスの確認が済んでいないときの本文。`message` は常に「メールアドレスの確認が済んでいません。」、`errors` は常に空。
 type EmailNotVerifiedErrorResponse struct {
@@ -422,12 +401,7 @@ type PdfSettings struct {
 type PdfSettingsFontFamily string
 
 // PortfolioRequest ポートフォリオの追加と更新の本文(Java の `CreatePortfolioRequest` と `UpdatePortfolioRequest`)。`link` は https の URL。
-type PortfolioRequest struct {
-	Link      string  `json:"link"`
-	Name      string  `json:"name"`
-	Overview  string  `json:"overview"`
-	TechStack *string `json:"techStack,omitempty"`
-}
+type PortfolioRequest = json.RawMessage
 
 // PortfolioResponse defines model for PortfolioResponse.
 type PortfolioResponse struct {
@@ -452,65 +426,7 @@ type Process struct {
 // ProjectRequest プロジェクトの追加と更新の本文(Java の `CreateProjectRequest` と `UpdateProjectRequest`。項目は同じ)。
 // 作業工程は真偽値の平らな項目で、技術スタックは分類ごとの文字列の配列の平らな項目で受け取る
 // (応答では `process` と `techStack` の入れ子になる)。技術スタックの配列は省略でき、省略すると null のまま保存される。
-type ProjectRequest struct {
-	Achievement             string              `json:"achievement"`
-	ApiDevelopmentTools     *NullableStringList `json:"apiDevelopmentTools,omitempty"`
-	Auth                    *NullableStringList `json:"auth,omitempty"`
-	BackendBuildTools       *NullableStringList `json:"backendBuildTools,omitempty"`
-	BackendFormatters       *NullableStringList `json:"backendFormatters,omitempty"`
-	BackendFrameworks       *NullableStringList `json:"backendFrameworks,omitempty"`
-	BackendLanguages        *NullableStringList `json:"backendLanguages,omitempty"`
-	BackendLibraries        *NullableStringList `json:"backendLibraries,omitempty"`
-	BackendLinters          *NullableStringList `json:"backendLinters,omitempty"`
-	BackendPackageManagers  *NullableStringList `json:"backendPackageManagers,omitempty"`
-	BackendTestingTools     *NullableStringList `json:"backendTestingTools,omitempty"`
-	BasicDesign             bool                `json:"basicDesign"`
-	CiCdTools               *NullableStringList `json:"ciCdTools,omitempty"`
-	Clouds                  *NullableStringList `json:"clouds,omitempty"`
-	CommunicationTools      *NullableStringList `json:"communicationTools,omitempty"`
-	CompanyName             string              `json:"companyName"`
-	Containers              *NullableStringList `json:"containers,omitempty"`
-	Databases               *NullableStringList `json:"databases,omitempty"`
-	DesignTools             *NullableStringList `json:"designTools,omitempty"`
-	DetailedDesign          bool                `json:"detailedDesign"`
-	DevelopmentEnvironments *NullableStringList `json:"developmentEnvironments,omitempty"`
-	DocumentationTools      *NullableStringList `json:"documentationTools,omitempty"`
-	Editors                 *NullableStringList `json:"editors,omitempty"`
-	EndDate                 *YearMonth          `json:"endDate,omitempty"`
-	FrontendBuildTools      *NullableStringList `json:"frontendBuildTools,omitempty"`
-	FrontendFormatters      *NullableStringList `json:"frontendFormatters,omitempty"`
-	FrontendFrameworks      *NullableStringList `json:"frontendFrameworks,omitempty"`
-	FrontendLanguages       *NullableStringList `json:"frontendLanguages,omitempty"`
-	FrontendLibraries       *NullableStringList `json:"frontendLibraries,omitempty"`
-	FrontendLinters         *NullableStringList `json:"frontendLinters,omitempty"`
-	FrontendPackageManagers *NullableStringList `json:"frontendPackageManagers,omitempty"`
-	FrontendTestingTools    *NullableStringList `json:"frontendTestingTools,omitempty"`
-	IacTools                *NullableStringList `json:"iacTools,omitempty"`
-	Implementation          bool                `json:"implementation"`
-	IntegrationTest         bool                `json:"integrationTest"`
-
-	// IsActive 継続中か。要求では `isActive`、応答では `active` という名前になる。
-	IsActive           bool                `json:"isActive"`
-	LoggingTools       *NullableStringList `json:"loggingTools,omitempty"`
-	Maintenance        bool                `json:"maintenance"`
-	MonitoringTools    *NullableStringList `json:"monitoringTools,omitempty"`
-	Name               string              `json:"name"`
-	OperatingSystems   *NullableStringList `json:"operatingSystems,omitempty"`
-	OrmTools           *NullableStringList `json:"ormTools,omitempty"`
-	Overview           string              `json:"overview"`
-	ProjectManagements *NullableStringList `json:"projectManagements,omitempty"`
-	Requirements       bool                `json:"requirements"`
-	Role               string              `json:"role"`
-	SourceControls     *NullableStringList `json:"sourceControls,omitempty"`
-
-	// StartDate 年月(`yyyy-MM`)。
-	//
-	// Examples: 2026-11
-	StartDate  YearMonth           `json:"startDate"`
-	SystemTest bool                `json:"systemTest"`
-	TeamComp   string              `json:"teamComp"`
-	WebServers *NullableStringList `json:"webServers,omitempty"`
-}
+type ProjectRequest = json.RawMessage
 
 // ProjectResponse defines model for ProjectResponse.
 type ProjectResponse struct {
@@ -636,10 +552,7 @@ type Rgb struct {
 }
 
 // SelfPromotionRequest 自己 PR の追加と更新の本文(Java の `CreateSelfPromotionRequest` と `UpdateSelfPromotionRequest`)。
-type SelfPromotionRequest struct {
-	Content string `json:"content"`
-	Title   string `json:"title"`
-}
+type SelfPromotionRequest = json.RawMessage
 
 // SelfPromotionResponse defines model for SelfPromotionResponse.
 type SelfPromotionResponse struct {
@@ -662,10 +575,7 @@ type SnsPlatformListResponse struct {
 }
 
 // SnsPlatformRequest SNS の追加と更新の本文(Java の `CreateSnsPlatformRequest` と `UpdateSnsPlatformRequest`)。`link` は https の URL。
-type SnsPlatformRequest struct {
-	Link string `json:"link"`
-	Name string `json:"name"`
-}
+type SnsPlatformRequest = json.RawMessage
 
 // SnsPlatformResponse defines model for SnsPlatformResponse.
 type SnsPlatformResponse struct {
@@ -717,12 +627,7 @@ type TwoFactorAuthRequest struct {
 }
 
 // UpdateResumeBasicRequest defines model for UpdateResumeBasicRequest.
-type UpdateResumeBasicRequest struct {
-	Date       openapi_types.Date `json:"date"`
-	FirstName  string             `json:"firstName"`
-	LastName   string             `json:"lastName"`
-	ResumeName string             `json:"resumeName"`
-}
+type UpdateResumeBasicRequest = json.RawMessage
 
 // UpdateUserInfoRequest multipart/form-data の部品。どれも省略できる。
 type UpdateUserInfoRequest struct {
@@ -782,16 +687,16 @@ type YearMonth = string
 type AccessTokenCookie = string
 
 // CareerId defines model for CareerId.
-type CareerId = openapi_types.UUID
+type CareerId = string
 
 // CertificationId defines model for CertificationId.
-type CertificationId = openapi_types.UUID
+type CertificationId = string
 
 // PortfolioId defines model for PortfolioId.
-type PortfolioId = openapi_types.UUID
+type PortfolioId = string
 
 // ProjectId defines model for ProjectId.
-type ProjectId = openapi_types.UUID
+type ProjectId = string
 
 // RefreshTokenCookie defines model for RefreshTokenCookie.
 type RefreshTokenCookie = string
@@ -800,10 +705,10 @@ type RefreshTokenCookie = string
 type ResumeId = string
 
 // SelfPromotionId defines model for SelfPromotionId.
-type SelfPromotionId = openapi_types.UUID
+type SelfPromotionId = string
 
 // SnsPlatformId defines model for SnsPlatformId.
-type SnsPlatformId = openapi_types.UUID
+type SnsPlatformId = string
 
 // TwoFactorChallengeCookie defines model for TwoFactorChallengeCookie.
 type TwoFactorChallengeCookie = string

@@ -431,13 +431,20 @@ func TestFixtures_AllLoadable(t *testing.T) {
 			WHERE over`,
 		"リンクが https で始まらない": `SELECT count(*) FROM (SELECT link FROM portfolios UNION ALL SELECT link FROM sns_platforms) l WHERE link NOT LIKE 'https://%'`,
 		// CB-001: ポートフォリオ、SNS、自己PR は、日本語の並べ替えの規則によらず順が決まる名前にする
-		// 英大文字で始め、同じ並びの中で頭の文字を重ねなければ、どちらの規則でも頭の文字の ABC の順に並ぶ
+		// 英大文字で始め、同じ並びの中で頭の文字を重ねなければ、どちらの規則でも頭の文字の ABC の順に並ぶ。
+		// 上限の数の項目を持つ経歴書(resumes/resume-limits.sql)は、英字の数より項目が多いので、頭の文字を重ねずには置けない。
+		// そのため、同じ並びのすべての名前が「英大文字で始まる英字、空白、同じ桁数の数字」で、数字のほかが同じなら、確かめから外す。
+		// 名前どうしの違いが同じ桁の数字だけなので、どちらの規則でも数字の順に並ぶ。
 		"並べ替えの規則で順が変わりうる名前": `WITH x AS (
 			SELECT 'portfolio' AS kind, resume_id, name AS n FROM portfolios
 			UNION ALL SELECT 'sns', resume_id, name FROM sns_platforms
-			UNION ALL SELECT 'self', resume_id, title FROM self_promotions)
-			SELECT count(*) FROM x WHERE n !~ '^[A-Z]' OR EXISTS (
-				SELECT 1 FROM x y WHERE y.kind = x.kind AND y.resume_id = x.resume_id AND y.n <> x.n AND left(y.n, 1) = left(x.n, 1))`,
+			UNION ALL SELECT 'self', resume_id, title FROM self_promotions),
+			numbered AS (SELECT kind, resume_id FROM x GROUP BY 1, 2
+				HAVING bool_and(n ~ '^[A-Z][A-Za-z]* [0-9]+$') AND count(DISTINCT regexp_replace(n, '[0-9]+$', '')) = 1
+				   AND count(DISTINCT char_length(n)) = 1)
+			SELECT count(*) FROM x WHERE NOT EXISTS (SELECT 1 FROM numbered m WHERE m.kind = x.kind AND m.resume_id = x.resume_id)
+			AND (n !~ '^[A-Z]' OR EXISTS (
+				SELECT 1 FROM x y WHERE y.kind = x.kind AND y.resume_id = x.resume_id AND y.n <> x.n AND left(y.n, 1) = left(x.n, 1)))`,
 	} {
 		t.Run(name+"行が無い", func(t *testing.T) {
 			if n := queryInt(t, db, sql); n != 0 {

@@ -1,0 +1,357 @@
+# 経歴書の数の上限と、6つの欄の項目の数の上限の筋書き。
+# resumes/resume-limits.sql の利用者(000000000500)が、上限の50件の経歴書を持つ状態から始める。
+# 経歴書 000000000501 は、6つの欄の項目を、それぞれ上限の数だけ持つ(職歴30、プロジェクト100、資格50、ポートフォリオ50、SNS 10、自己PR 5)。
+# 欄ごとに、上限に達した欄への追加と、1件を消したあとの追加と、また上限に達した欄への追加を送る。
+# 上限に達した欄の項目の更新と、上限に達したときの入力の誤りと、上限に達したときのコピーした作成も送る。
+# 足す職歴の期間は、000000000501 の職歴(1990年1月から2019年12月)と重ならないようにする。
+name: resumes-limits
+group: 3
+fixtures: [users/basic.sql, resumes/resume-limits.sql]
+modes: [compare]
+steps:
+  - name: login-limits-user
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: resume-limits@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: list-resumes
+    request:
+      method: GET
+      path: /api/resumes
+    expect: {status: 200, fields: [$.resumes]}
+  # 経歴書の数の上限
+  - name: create-resume-at-limit
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 51件目の経歴書}
+    expect: {status: 400}
+  - name: create-copy-at-limit
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 51件目の写した経歴書, resumeId: 00000000-0000-4000-8000-000000000502}
+    expect: {status: 400}
+  - name: create-copy-of-missing-at-limit
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 無い経歴書を写す, resumeId: 00000000-0000-4000-8000-0000000005ff}
+    expect: {status: 400}
+  - name: create-invalid-at-limit
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: ''}
+    expect: {status: 400}
+  - name: delete-resume-50
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000550
+      csrf: true
+    expect: {status: 204}
+  - name: create-resume-after-delete
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 消したあとの経歴書}
+    expect: {status: 201}
+  - name: create-copy-at-limit-again
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: また51件目の写した経歴書, resumeId: 00000000-0000-4000-8000-000000000502}
+    expect: {status: 400}
+  - name: get-full-resume
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000501
+    expect: {status: 200, fields: [$.careers, $.projects, $.certifications, $.portfolios, $.snsPlatforms, $.selfPromotions]}
+  # 職歴の上限(30)
+  - name: create-career-at-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/careers
+      csrf: true
+      json: &career {companyName: 株式会社あたらしい, startDate: '1980-04', endDate: '1985-03', isActive: false}
+    expect: {status: 400}
+  - name: create-career-invalid-at-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/careers
+      csrf: true
+      json: {}
+    expect: {status: 400}
+  - name: update-career-at-limit
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/careers/00000000-0000-4000-8000-000000501030
+      csrf: true
+      json: {companyName: 株式会社じょうげん30の改, startDate: '2019-01', endDate: '2019-12', isActive: false}
+    expect: {status: 200}
+  - name: delete-career-1
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/careers/00000000-0000-4000-8000-000000501001
+      csrf: true
+    expect: {status: 204}
+  - name: create-career-after-delete
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/careers
+      csrf: true
+      json: *career
+    expect: {status: 201}
+  - name: create-career-at-limit-again
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/careers
+      csrf: true
+      json: {companyName: 株式会社もうひとつ, startDate: '1975-04', endDate: '1979-03', isActive: false}
+    expect: {status: 400}
+  # プロジェクトの上限(100)
+  - name: create-project-at-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/projects
+      csrf: true
+      json: &project
+        companyName: 株式会社じょうげん01
+        startDate: '2012-04'
+        endDate: '2013-03'
+        isActive: false
+        name: 上限を超えるプロジェクト
+        overview: 上限を超えて足すプロジェクト
+        teamComp: 全体3名
+        role: 開発の担当
+        achievement: 予定どおりに終えた。
+        requirements: true
+        basicDesign: true
+        detailedDesign: true
+        implementation: true
+        integrationTest: true
+        systemTest: true
+        maintenance: false
+        frontendLanguages: [TypeScript]
+        frontendFrameworks: [React]
+        frontendLibraries: []
+        frontendBuildTools: []
+        frontendPackageManagers: []
+        frontendLinters: []
+        frontendFormatters: []
+        frontendTestingTools: []
+        backendLanguages: [Go]
+        backendFrameworks: []
+        backendLibraries: []
+        backendBuildTools: []
+        backendPackageManagers: []
+        backendLinters: []
+        backendFormatters: []
+        backendTestingTools: []
+        ormTools: []
+        auth: []
+        clouds: [AWS]
+        operatingSystems: []
+        containers: []
+        databases: [PostgreSQL]
+        webServers: []
+        ciCdTools: []
+        iacTools: []
+        monitoringTools: []
+        loggingTools: []
+        sourceControls: [Git]
+        projectManagements: []
+        communicationTools: []
+        documentationTools: []
+        apiDevelopmentTools: []
+        designTools: []
+        editors: []
+        developmentEnvironments: []
+    expect: {status: 400}
+  - name: update-project-at-limit
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/projects/00000000-0000-4000-8000-000000502100
+      csrf: true
+      json: {<<: *project, startDate: '2008-04', endDate: '2008-04', name: プロジェクト100の改}
+    expect: {status: 200}
+  - name: delete-project-1
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/projects/00000000-0000-4000-8000-000000502001
+      csrf: true
+    expect: {status: 204}
+  - name: create-project-after-delete
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/projects
+      csrf: true
+      json: *project
+    expect: {status: 201}
+  - name: create-project-at-limit-again
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/projects
+      csrf: true
+      json: {<<: *project, startDate: '2014-04', endDate: '2015-03'}
+    expect: {status: 400}
+  # 資格の上限(50)
+  - name: create-certification-at-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/certifications
+      csrf: true
+      json: &certification {name: 上限を超える資格, date: '2020-04'}
+    expect: {status: 400}
+  - name: update-certification-at-limit
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/certifications/00000000-0000-4000-8000-000000503050
+      csrf: true
+      json: {name: 資格50の改, date: '2004-02'}
+    expect: {status: 200}
+  - name: delete-certification-1
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/certifications/00000000-0000-4000-8000-000000503001
+      csrf: true
+    expect: {status: 204}
+  - name: create-certification-after-delete
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/certifications
+      csrf: true
+      json: *certification
+    expect: {status: 201}
+  - name: create-certification-at-limit-again
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/certifications
+      csrf: true
+      json: {name: もう1つの資格, date: '2021-04'}
+    expect: {status: 400}
+  # ポートフォリオの上限(50)
+  - name: create-portfolio-at-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/portfolios
+      csrf: true
+      json: &portfolio {name: Portfolio 99, overview: 上限を超えるポートフォリオ, techStack: Go, link: 'https://example.com/limits/portfolio/99'}
+    expect: {status: 400}
+  - name: update-portfolio-at-limit
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/portfolios/00000000-0000-4000-8000-000000504050
+      csrf: true
+      json: {name: Portfolio 50, overview: 直したポートフォリオ, techStack: null, link: 'https://example.com/limits/portfolio/50'}
+    expect: {status: 200}
+  - name: delete-portfolio-1
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/portfolios/00000000-0000-4000-8000-000000504001
+      csrf: true
+    expect: {status: 204}
+  - name: create-portfolio-after-delete
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/portfolios
+      csrf: true
+      json: *portfolio
+    expect: {status: 201}
+  - name: create-portfolio-at-limit-again
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/portfolios
+      csrf: true
+      json: {<<: *portfolio, name: Portfolio 98}
+    expect: {status: 400}
+  # SNS の上限(10)
+  - name: create-sns-platform-at-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/sns-platforms
+      csrf: true
+      json: &sns {name: SNS 99, link: 'https://example.com/limits/sns/99'}
+    expect: {status: 400}
+  - name: update-sns-platform-at-limit
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/sns-platforms/00000000-0000-4000-8000-000000505010
+      csrf: true
+      json: {name: SNS 10, link: 'https://example.com/limits/sns/ten'}
+    expect: {status: 200}
+  - name: delete-sns-platform-1
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/sns-platforms/00000000-0000-4000-8000-000000505001
+      csrf: true
+    expect: {status: 204}
+  - name: create-sns-platform-after-delete
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/sns-platforms
+      csrf: true
+      json: *sns
+    expect: {status: 201}
+  - name: create-sns-platform-at-limit-again
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/sns-platforms
+      csrf: true
+      json: {<<: *sns, name: SNS 98}
+    expect: {status: 400}
+  # 自己PR の上限(5)
+  - name: create-self-promotion-at-limit
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/self-promotions
+      csrf: true
+      json: &promotion {title: Title 9, content: 上限を超える自己PR}
+    expect: {status: 400}
+  - name: update-self-promotion-at-limit
+    request:
+      method: PUT
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/self-promotions/00000000-0000-4000-8000-000000506005
+      csrf: true
+      json: {title: Title 5, content: 直した自己PR}
+    expect: {status: 200}
+  - name: delete-self-promotion-1
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/self-promotions/00000000-0000-4000-8000-000000506001
+      csrf: true
+    expect: {status: 204}
+  - name: create-self-promotion-after-delete
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/self-promotions
+      csrf: true
+      json: *promotion
+    expect: {status: 201}
+  - name: create-self-promotion-at-limit-again
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000501/self-promotions
+      csrf: true
+      json: {<<: *promotion, title: Title 8}
+    expect: {status: 400}
+  # 上限に達していない経歴書には、項目を足せる
+  - name: create-career-in-other-resume
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000502/careers
+      csrf: true
+      json: *career
+    expect: {status: 201}
+  - name: get-full-resume-after
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000501
+    expect: {status: 200}

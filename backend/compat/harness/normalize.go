@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strings"
@@ -17,6 +18,9 @@ import (
 // 置き換えのあとの記号は次の形である。
 //   - UUID: <uuid:N>。N は、その版で現れた順の番号である
 //   - 日時: <datetime:形>。形は、日付と時刻の区切り、秒の有無、時差の書き方である。小数の秒の桁は形に入れない
+//   - 経歴書の作成と更新の日時: <wallclock:形:+秒>。形は <datetime:形> と同じである。秒は、時差の無い値を日本の時刻として読み、
+//     その版の応答を受けた時刻を引いた秒数である。経歴書の答えと一覧の答えの JSON の鍵 createdAt と updatedAt と、
+//     データベースの resumes の表の列 created_at と updated_at でだけ置き換える
 //   - JWT: <jwt:{...}>。中身の項目のうち iat と exp と jti を除き、exp から iat を引いた長さを exp-iat に入れる
 //   - URL の中のトークン: <token:N>。N は、その版で現れた順の番号である
 //   - bcrypt のハッシュ: <bcrypt:$2a$10$>。版と強さだけを残す
@@ -44,7 +48,19 @@ var (
 	lexpMarkerPattern = regexp.MustCompile(`<lexp:([+-][0-9]+)>`)
 	// amzCredentialDatePattern は、X-Amz-Credential の値の中の、/ か %2F で挟まれた8桁の日付である。
 	amzCredentialDatePattern = regexp.MustCompile(`(/|%2[Ff])[0-9]{8}(/|%2[Ff])`)
+	// wallclockMarkerPattern は、経歴書の作成と更新の日時を置き換えた記号である。1つ目の組が形、2つ目の組が秒である。
+	wallclockMarkerPattern = regexp.MustCompile(`<wallclock:([^<>]*):([+-][0-9]+)>`)
 )
+
+// wallclockZone は、時差の無い経歴書の日時を読む時間帯である。Java 版は、本番と同じく、日本の時間帯で動く。
+var wallclockZone = time.FixedZone("Asia/Tokyo", 9*60*60)
+
+// wallclockJSONKeys は、<wallclock:形:+秒> に置き換える JSON の鍵である。答えのうち、経歴書の答えと経歴書の一覧の答えだけが、
+// この鍵を持つ。
+var wallclockJSONKeys = []string{"createdAt", "updatedAt"}
+
+// wallclockColumns は、表の名前ごとの、<wallclock:形:+秒> に置き換える列である。
+var wallclockColumns = map[string][]string{"resumes": {"created_at", "updated_at"}}
 
 // twoFactorMailSubject は、Java 版が確認のコードを送るメールの件名に含まれる文字である。
 const twoFactorMailSubject = "2段階認証コードのお知らせ"
@@ -201,12 +217,20 @@ func presignedURL(u string) string {
 // datetimeShape は、日時を、形を確かめてから記号に置き換える。日付が暦に無いときは、形が誤っているので置き換えない。
 // 両方の版で同じ時刻にするのはむずかしいので、時刻そのものは比べない。
 func datetimeShape(m string) string {
-	parts := datetimePattern.FindStringSubmatch(m)
-	if _, err := time.Parse(time.DateOnly, parts[1]); err != nil {
+	shape, ok := datetimeForm(datetimePattern.FindStringSubmatch(m))
+	if !ok {
 		return m
 	}
+	return "<datetime:" + shape + ">"
+}
+
+// datetimeForm は、datetimePattern に合った部分 parts から、日時の形を返す。日付が暦に無いときと、時刻が読めないときは false を返す。
+func datetimeForm(parts []string) (string, bool) {
+	if _, err := time.Parse(time.DateOnly, parts[1]); err != nil {
+		return "", false
+	}
 	if _, err := time.Parse("15:04", parts[3]); err != nil {
-		return m
+		return "", false
 	}
 	shape := "yyyy-MM-dd" + parts[2] + "HH:mm"
 	if parts[4] != "" {
@@ -220,7 +244,53 @@ func datetimeShape(m string) string {
 	case zone != "":
 		shape += "+hhmm"
 	}
-	return "<datetime:" + shape + ">"
+	return shape, true
+}
+
+// wallclock は、経歴書の作成と更新の日時 s を <wallclock:形:+秒> に置き換える。時差の無い値は日本の時刻として読み、
+// 時差のある値はその時差で読む。秒は、読んだ時刻から、その版の応答を受けた時刻を引いた秒数を、四捨五入したものである。
+// 2つの版の値を秒の差で比べるのは、どちらの版も自分の時刻を書くので、時刻そのものは版ごとに違うためである。
+// 値の全体が日時でないときと、暦に無い日時のときは、ほかの文字と同じく正規化する。
+func (n *Normalizer) wallclock(s string, assign bool) string {
+	parts := datetimePattern.FindStringSubmatch(s)
+	if parts == nil || parts[0] != s {
+		return n.text(s, assign)
+	}
+	shape, ok := datetimeForm(parts)
+	if !ok {
+		return n.text(s, assign)
+	}
+	seconds := parts[4]
+	if seconds == "" {
+		seconds = ":00"
+	}
+	layout := "2006-01-02T15:04:05.999999999"
+	value := parts[1] + "T" + parts[3] + seconds + parts[5]
+	if zone := parts[6]; zone != "" {
+		if zone != "Z" && !strings.Contains(zone, ":") {
+			zone = zone[:3] + ":" + zone[3:]
+		}
+		layout += "Z07:00"
+		value += zone
+	}
+	at, err := time.ParseInLocation(layout, value, wallclockZone)
+	if err != nil {
+		return n.text(s, assign)
+	}
+	return fmt.Sprintf("<wallclock:%s:%+d>", shape, int64(math.Round(at.Sub(n.received).Seconds())))
+}
+
+// record は、データベースの表 table の1つの行 row を正規化する。経歴書の表の作成と更新の日時は <wallclock:形:+秒> に置き換える。
+func (n *Normalizer) record(table string, row map[string]any, assign bool) map[string]any {
+	out := make(map[string]any, len(row))
+	for _, k := range sortedKeys(row) {
+		if s, ok := row[k].(string); ok && slices.Contains(wallclockColumns[table], k) {
+			out[k] = n.wallclock(s, assign)
+			continue
+		}
+		out[k] = n.value(row[k], assign)
+	}
+	return out
 }
 
 // jwt は、JWT を中身の項目に置き換える。頭の部分に alg の無いものと、読めないものは、JWT でないとみなして元のまま返す。
@@ -267,6 +337,7 @@ func decodeSegment(segment string, v any) bool {
 }
 
 // value は、JSON を解析した値の中の文字列を正規化する。オブジェクトの項目は、名前の順にたどる。
+// 鍵 createdAt と updatedAt の文字列は、経歴書の作成と更新の日時なので、<wallclock:形:+秒> に置き換える。
 func (n *Normalizer) value(v any, assign bool) any {
 	switch t := v.(type) {
 	case string:
@@ -280,6 +351,10 @@ func (n *Normalizer) value(v any, assign bool) any {
 	case map[string]any:
 		out := make(map[string]any, len(t))
 		for _, k := range sortedKeys(t) {
+			if s, ok := t[k].(string); ok && slices.Contains(wallclockJSONKeys, k) {
+				out[k] = n.wallclock(s, assign)
+				continue
+			}
 			out[k] = n.value(t[k], assign)
 		}
 		return out

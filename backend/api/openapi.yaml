@@ -1451,50 +1451,56 @@ components:
       name: careerId
       in: path
       required: true
-      description: 職歴の ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      description: 職歴の ID。UUID として読めない値には、無い項目と同じ 404 を返す。Java 版は 500 を返す(変えた動きの一覧の CB-047 から)。存在しなければ 404。
       schema:
         type: string
         format: uuid
+        x-go-type: string
     ProjectId:
       name: projectId
       in: path
       required: true
-      description: プロジェクトの ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      description: プロジェクトの ID。UUID として読めない値には、無い項目と同じ 404 を返す。Java 版は 500 を返す(変えた動きの一覧の CB-047 から)。存在しなければ 404。
       schema:
         type: string
         format: uuid
+        x-go-type: string
     CertificationId:
       name: certificationId
       in: path
       required: true
-      description: 資格の ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      description: 資格の ID。UUID として読めない値には、無い項目と同じ 404 を返す。Java 版は 500 を返す(変えた動きの一覧の CB-047 から)。存在しなければ 404。
       schema:
         type: string
         format: uuid
+        x-go-type: string
     PortfolioId:
       name: portfolioId
       in: path
       required: true
-      description: ポートフォリオの ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      description: ポートフォリオの ID。UUID として読めない値には、無い項目と同じ 404 を返す。Java 版は 500 を返す(変えた動きの一覧の CB-047 から)。存在しなければ 404。
       schema:
         type: string
         format: uuid
+        x-go-type: string
     SnsPlatformId:
       name: snsPlatformId
       in: path
       required: true
-      description: SNS の ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      description: SNS の ID。UUID として読めない値には、無い項目と同じ 404 を返す。Java 版は 500 を返す(変えた動きの一覧の CB-047 から)。存在しなければ 404。
       schema:
         type: string
         format: uuid
+        x-go-type: string
     SelfPromotionId:
       name: selfPromotionId
       in: path
       required: true
-      description: 自己 PR の ID。Java 版は UUID として受け取り、UUID として読めない値には 500 を返す。存在しなければ 404。
+      description: 自己 PR の ID。UUID として読めない値には、無い項目と同じ 404 を返す。Java 版は 500 を返す(変えた動きの一覧の CB-047 から)。存在しなければ 404。
       schema:
         type: string
         format: uuid
+        x-go-type: string
   headers:
     SetCookieAuthTokens:
       description: |
@@ -1810,6 +1816,7 @@ components:
           description: 確認を待っている新しいメールアドレス。無ければ null。
     CreateResumeRequest:
       type: object
+      x-go-type: json.RawMessage
       required: [resumeName]
       properties:
         resumeName:
@@ -1820,6 +1827,7 @@ components:
           description: 写し元の職務経歴書の ID。指定すると写して作る。UUID として読めない値は 400(JSON が読めない扱い)。
     UpdateResumeBasicRequest:
       type: object
+      x-go-type: json.RawMessage
       required: [resumeName, date, lastName, firstName]
       properties:
         resumeName:
@@ -1833,6 +1841,7 @@ components:
           type: string
     CareerRequest:
       type: object
+      x-go-type: json.RawMessage
       description: 職歴の追加と更新の本文(Java の `CreateCareerRequest` と `UpdateCareerRequest`。項目は同じ)。
       required: [companyName, startDate, isActive]
       properties:
@@ -1849,6 +1858,7 @@ components:
           description: 在籍中か。要求では `isActive`、応答では `active` という名前になる。
     CertificationRequest:
       type: object
+      x-go-type: json.RawMessage
       description: 資格の追加と更新の本文(Java の `CreateCertificationRequest` と `UpdateCertificationRequest`)。
       required: [name, date]
       properties:
@@ -1858,6 +1868,7 @@ components:
           $ref: '#/components/schemas/YearMonth'
     PortfolioRequest:
       type: object
+      x-go-type: json.RawMessage
       description: ポートフォリオの追加と更新の本文(Java の `CreatePortfolioRequest` と `UpdatePortfolioRequest`)。`link` は https の URL。
       required: [name, overview, link]
       properties:
@@ -1871,6 +1882,7 @@ components:
           type: string
     SnsPlatformRequest:
       type: object
+      x-go-type: json.RawMessage
       description: SNS の追加と更新の本文(Java の `CreateSnsPlatformRequest` と `UpdateSnsPlatformRequest`)。`link` は https の URL。
       required: [name, link]
       properties:
@@ -1880,6 +1892,7 @@ components:
           type: string
     SelfPromotionRequest:
       type: object
+      x-go-type: json.RawMessage
       description: 自己 PR の追加と更新の本文(Java の `CreateSelfPromotionRequest` と `UpdateSelfPromotionRequest`)。
       required: [title, content]
       properties:
@@ -1889,6 +1902,7 @@ components:
           type: string
     ProjectRequest:
       type: object
+      x-go-type: json.RawMessage
       description: |
         プロジェクトの追加と更新の本文(Java の `CreateProjectRequest` と `UpdateProjectRequest`。項目は同じ)。
         作業工程は真偽値の平らな項目で、技術スタックは分類ごとの文字列の配列の平らな項目で受け取る
