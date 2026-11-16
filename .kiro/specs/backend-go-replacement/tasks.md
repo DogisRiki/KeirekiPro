@@ -370,7 +370,7 @@
   - _要件: 7.3_
 
 - [ ] 16. PDF の比べ方と比べるデータと変えた動きの一覧を、直した要件と設計に合わせる
-- [ ] 16.1 PDF の比べ方が許す語の箱の高さの違いを 0.35pt に狭める (並行可)
+- [x] 16.1 PDF の比べ方が許す語の箱の高さの違いを 0.35pt に狭める (並行可)
 
   Claude は、先に `backend/compat/pdfcmp/pdfcmp_test.go` の語の箱の高さの2つの場合を直す。`TestCompare_Allows2ptShift` の場合は、違いが 0.35pt 以内の2つの PDF(文字の大きさが 12pt と 12.25pt で、語の箱の高さの違いが 0.325pt)を止めないことを確かめる。`TestCompare_Rejects2_5ptShift` の場合は、違いが 0.35pt を超えて 0.5pt 以内の2つの PDF(文字の大きさが 12pt と 12.3pt で、語の箱の高さの違いが 0.39pt)を止めることを確かめる。そのあと、Claude は、`backend/compat/pdfcmp/pdfcmp.go` の定数 `HeightTolerance` を 0.5 から 0.35 に変える。
   - 完了の確かめ方: 定数を変える前は `TestCompare_Rejects2_5ptShift` の語の箱の高さの場合が失敗し、変えたあとは `run-check.sh backend-go go test -tags compat ./compat/pdfcmp/...` が成功する
