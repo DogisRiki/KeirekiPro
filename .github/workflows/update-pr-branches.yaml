@@ -6,6 +6,14 @@
 # ブランチを自動で最新化せず、Dependabot も衝突が無い限り rebase しない。
 # 人間が Update branch を押す運用を避けるため、mainへのpushを起点にここで更新する。
 #
+# mainへのpushでは、検査が通ったPRだけを更新する。更新するとPRの検査が最初からやり直しに
+# なるため、検査の途中や赤のPRを更新すると、マージされないのにやり直しだけが増える(#889)。
+# 更新するPRは select-prs-to-update.sh が選ぶ(「検査が通った」の決め方はその冒頭)。
+# mainが進んだ時点で検査が通っていなかったPRは、検査が終わったとき(workflow_run)に
+# 選び直す。この起点が無いと、検査が通ったあとも古いままで、次にmainへpushされるまで止まる。
+# workflow_run は main のワークフローとスクリプトで動き、PRのコードを実行しない。
+# https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run
+#
 # PRを出したとき(opened / reopened / ready_for_review)にも、そのPRだけを更新する。
 # mainへのpushだけを起点にすると、最後のpushのあとに古いmainから作ったブランチで
 # 出したPRは、次にmainへpushされるまで out-of-date のまま止まるため。
@@ -13,7 +21,7 @@
 # PRの起点では動かない。衝突の解消は、PRを出した側(/ship の見届け)が受け持つ。
 # https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
 #
-# 同時実行の組は、pushの実行とPRの起点の実行で分ける。同じ組では待てる実行が1つだけで、
+# 同時実行の組は、pushの実行と、PRの起点の実行と、検査が終わったときの実行で分ける。同じ組では待てる実行が1つだけで、
 # 新しい実行が待ちに入るとそれまで待っていた実行が取り消されるため、PRの起点の実行が
 # 待っているpushの実行を取り消し、ほかのPRが更新されないまま残る。
 # https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
@@ -38,34 +46,59 @@ on:
   pull_request:
     branches: [main]
     types: [opened, reopened, ready_for_review]
+  # 必須の検査(承認で結果が変わるものを除く)を持つワークフロー。必須の検査を別のワークフローに
+  # 足したら、ここにも足す(足さないと、その検査が最後に終わったPRが古いまま止まる)
+  workflow_run:
+    workflows: [CI Workflow, Guardrails, CodeQL, Container Image Vulnerability Scan, Dependency Review, Terraform]
+    types: [completed]
 
-# GITHUB_TOKEN には何も与えない。更新は BOT_GITHUB_TOKEN で行う
-permissions: {}
+# GITHUB_TOKEN は読み取りだけに使う(スクリプトの取得と、PR・検査の結果の照会)。
+# 更新は BOT_GITHUB_TOKEN で行う
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
 
-# pushの実行は1つの組で順に動かす。PRの起点の実行はPRごとの組に入れ、
-# 待っているpushの実行を取り消さない
+# pushの実行は1つの組で順に動かす。PRの起点の実行はPRごとの組に、検査が終わったときの実行は
+# コミットごとの組に入れ、待っているpushの実行を取り消さない
 concurrency:
-  group: ${{ github.event_name == 'push' && 'update-pr-branches' || format('update-pr-branches-pr-{0}', github.event.pull_request.number) }}
+  group: ${{ github.event_name == 'push' && 'update-pr-branches' || github.event_name == 'workflow_run' && format('update-pr-branches-head-{0}', github.event.workflow_run.head_sha) || format('update-pr-branches-pr-{0}', github.event.pull_request.number) }}
   cancel-in-progress: false
 
 jobs:
   update:
     name: update-pr-branches
-    # forkのPRにはシークレットが渡らず、forkのブランチには書き込めないため外す
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    # forkのPRにはシークレットが渡らず、forkのブランチには書き込めないため外す。
+    # 検査が終わったときの起点は、PRの検査の実行だけを受ける(mainへのpushや定期実行の検査を外す)。
+    # 取り消された実行も外す(新しいコミットが積まれたときで、新しいコミットの実行が終わると起動する)
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && startsWith(github.event.workflow_run.event, 'pull_request') && github.event.workflow_run.conclusion != 'cancelled') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      # checkout しない。APIを呼ぶだけで、PRのコードを一切実行しない
+      # 更新するPRを選ぶスクリプトを main から取る。PRの起点では使わないので取らない
+      # (PRの起点の既定の取得先はPRのコードで、それを実行しないためでもある)
+      - name: Checkout (main)
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
       - name: Update out-of-date PR branches
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          READ_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
-          # 対象の判定の式。pushの起点とPRの起点の両方がこの式だけを使う。
+          # 対象の判定の式。どの起点もこの式だけを使う。
           # forkのブランチには書き込めないため同一リポジトリのPRに限る。
           # draft は検査を回す段階に無いため除く。
           # カナリアPRはマージしないため除く(ブランチ名かラベルのどちらかで判定する)。
@@ -99,14 +132,11 @@ jobs:
             esac
           }
 
-          if [ "$EVENT_NAME" = "push" ]; then
-            # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
-            numbers=$(gh api "repos/${REPO}/pulls?state=open&base=main&per_page=100" --paginate --slurp | jq -r "[.[][] | ${TARGET_FILTER} | .number] | .[]")
-
-            if [ -z "$numbers" ]; then
-              echo "対象のPRはありません。"
-              exit 0
-            fi
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            # 検査が通っていて main より古いPRを選ぶ。検査が終わったときの起点では、
+            # 最新のコミットが HEAD_SHA のPRだけを見る(pushの起点では HEAD_SHA は空)。
+            # 判定できないPRがあっても、選ばれたPRは更新し、最後にジョブを赤にする。
+            numbers=$(GH_TOKEN="$READ_TOKEN" TARGET_FILTER="$TARGET_FILTER" bash .github/scripts/select-prs-to-update.sh) || failed=$((failed + 1))
 
             for n in $numbers; do
               update_branch "$n"
