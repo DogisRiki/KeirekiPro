@@ -2,7 +2,7 @@
 
 ## 試作の記録
 
-この節は、要件6の受入基準1のとおり、設計を書く前に Claude が試しに作って確かめた方法と結果を残す。設計の段階で調べたことは、この節のあとの「設計の段階の記録」に書く。
+この節は、要件6の受入基準1のとおり、設計を書く前に Claude が試しに作って確かめた方法と結果を残す。実装の小タスクで確かめた Java 版の動きは、この節の最後の「実装で確かめた Java 版の動き」に書く。設計の段階で調べたことは、この節のあとの「設計の段階の記録」に書く。
 
 試した結果、Java 版と同じにできない動きは見つからなかった。そのため、Claude は、要件6の受入基準2のとおりに止まらず、設計を書いた。
 
@@ -105,6 +105,20 @@ Claude は、世代の行を持たない利用者 `00000000-0000-4000-8000-00000
 ### 同じにできない動き
 
 無い。P2、P4、P5、P8、P9、P10〜P12 は、Go の標準の部品のままでは Java 版と違うが、Java 版と同じ読み方と並べ方で書けば同じになると、試作で確かめた。
+
+### 実装で確かめた Java 版の動き
+
+この節は、要件6の受入基準1のとおり、試作のあとの実装の小タスクで Claude が確かめた Java 版の動きを残す。試作の記録と同じく、Java 版と同じにできない動きは見つからなかった。画面が送らない書き方の値は、所有者が 2026-11-15 に決めたとおり Java 版に合わせず、違いを変えた動きの一覧(`backend/compat/changed-behaviors.yaml`)に載せた。パスの `J/` は `backend/src/main/java/com/example/keirekipro/` を指す。
+
+- 項目の経路の ID: Java 版は、項目の ID の先頭にタブを付けた値も読む。経歴書の ID では読まない。Go 版は `uuid.Parse` で読み、読めない ID として 404 で答える。変えた動きの一覧の CB-051 の java の欄と go の欄に書いた(小タスク2.2 と6.2 で確かめた。表は `backend/internal/resume/ids_test.go`)
+- 経路の ID の末尾の改行: 経路の ID の末尾に改行(`%0A`)を付けた要求に、Java 版は、Spring Security の firewall が ID を読む前に 401 で答える。この動きは経歴書の操作の処理に届く前に起きるので、ID の書き方ごとの答えの正解のファイル `backend/internal/resume/testdata/ids.json` から除いた(小タスク1.1 で確かめた)。Go 版の `internal/httpapi/middleware` には、この firewall にあたる処理が無い。firewall はすべての経路の要求を調べるので、この違いは経歴書の操作だけの違いではない。そのため、この spec では変えた動きの一覧に載せず、範囲の外の違いとして PR の本文に書く
+- 経歴書の名前の使えない文字: Java 版の `J/domain/model/resume/ResumeName.java` の66行は、`value.matches(".*" + INVALID_PATTERN + ".*")` で調べる。Java の `.` は改行の文字に当たらないので、名前に5つの改行の文字(`\n` `\r` U+0085 U+2028 U+2029)のどれかがあると、使えない文字を断らない。Go 版の `rules.go` は、要件2のとおり Java 版と同じ条件で断る(小タスク2.7 で確かめた)
+- 経歴書の名前の重なり: Java 版の `J/usecase/resume/UpdateResumeBasicUseCase.java` の57行は、名前が変わったときだけ名前の重なりを確かめる。Go 版も同じ順にした。応答の時間を測る筋書き `perf-update-basic.yaml` は、このことを使って、毎回、経歴書の今の名前を送る(小タスク6.8 で確かめた)
+- 名前の並べ方: Java 版の `J/domain/policy/resume/ResumeEntryOrderPolicy.java` の36行は `Collator.getInstance(Locale.JAPANESE)` で並べ、半角のカタカナの「ｱｲｳ」を最後に並べる。Go 版の `golang.org/x/text/collate` は「ｱｲｳ」を「Zenn」と「あいう」のあいだに並べる。この違いは、所有者が受け入れた並び順の違い(CB-001)に含まれ、CB-001 の go の欄に書き足した(小タスク6.2 で確かめた。`backend/internal/resume/order_test.go` の `goNameOrder`)
+- プロジェクトの技術スタックの行: Java 版の `J/infrastructure/repository/resume/MyBatisResumeRepository.java` の95〜98行は、経歴書の保存のたびにプロジェクトの行を消して書き直し、`J/infrastructure/repository/resume/ResumeMapper.xml` の `insertProject`(275行から)が、317行の INSERT で技術スタックの行も書く。そのため、技術スタックの行が無いプロジェクトを直すと、Java 版は技術スタックの行を作る。Go 版の `updateProject` は、技術スタックの行が無いと技術スタックの変更を捨てる。どちらの版もプロジェクトを作るときに技術スタックの行を書くので、行が無いことは手で直したデータでしか起きない(小タスク3.1 で確かめた)
+- U+0000 を含む値: 本文の文字列の欄に `\u0000` を書いた要求に、Java 版は 500 で答える(この文書の「危うい点と備え」)。Go 版も、PostgreSQL が書き込みを断るので 500 で答える。同じ動きなので、変えた動きの一覧には載せない(小タスク3.1 の `store_integration_test.go` の `TestStore_NullCharacter`)
+- overlong の `c0 80`: 文字列の欄に入れた本文に、Java 版は 500 と「予期せぬエラーが発生しました。」で答える。Go 版は `encoding/json` のとおり U+FFFD に置き換えて読む。変えた動きの一覧の CB-055 の java の欄に書き足した(小タスク2.4 と6.2 で確かめた。表は `backend/internal/resume/body_test.go`)
+- 作業の工程の `systemTest` と `maintenance`: 版をまたぐ筋書き `cross-resume.yaml` で、Java 版で保存した値を Go 版で読んだときも、Go 版で保存した値を Java 版で読んだときも、答えでこの2つの値が入れ替わることを確かめた。データベースには送った値のとおりに書かれる(小タスク6.7 で確かめた)
 
 ## 設計の段階の記録
 
