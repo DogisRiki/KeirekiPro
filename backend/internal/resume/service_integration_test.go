@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -828,4 +829,645 @@ func TestService_CreateResumeCopyOrdersByNewIDs(t *testing.T) {
 		t.Errorf("写した資格の数: got %d, want %d", len(got.Certifications), len(src.Certifications))
 	}
 	assertResume(t, mustFind(t, userID, got.ID), got)
+}
+
+// testClock は、テストが進める時刻である。Now を Deps.Now に渡す。
+type testClock struct{ now time.Time }
+
+// Now は、テストが決めた今の時刻を返す。
+func (c *testClock) Now() time.Time { return c.now }
+
+// careerBody は、職歴の追加と更新の要求の本文を書く。end が空なら、終了の年月の鍵を書かない。
+func careerBody(t *testing.T, company, start, end string, active bool) []byte {
+	t.Helper()
+	m := map[string]any{"companyName": company, "startDate": start, "isActive": active}
+	if end != "" {
+		m["endDate"] = end
+	}
+	return jsonBody(t, m)
+}
+
+// projectFields は、プロジェクトの追加と更新の要求の本文の値である。技術スタックは、null の要素を持つ並びと、空の並びと、
+// 1つの名前の並びを持ち、ほかの小分類の鍵を書かない。end が空なら、終了の年月の鍵を書かない。
+func projectFields(name, start, end string, active bool) map[string]any {
+	m := map[string]any{
+		"companyName": "株式会社P", "startDate": start, "isActive": active,
+		"name": name, "overview": "概要P", "teamComp": "4名", "role": "開発", "achievement": "成果P",
+		"requirements": true, "basicDesign": false, "detailedDesign": true, "implementation": true,
+		"integrationTest": false, "systemTest": false, "maintenance": true,
+		"frontendLanguages": []any{"TypeScript", nil}, "backendFrameworks": []any{}, "editors": []any{"Vim"},
+	}
+	if end != "" {
+		m["endDate"] = end
+	}
+	return m
+}
+
+// projectBody は、projectFields の値を JSON に書く。
+func projectBody(t *testing.T, name, start, end string, active bool) []byte {
+	t.Helper()
+	return jsonBody(t, projectFields(name, start, end, active))
+}
+
+// fieldsProject は、projectFields の本文から作るプロジェクトである。
+func fieldsProject(id uuid.UUID, name string, period Period) Project {
+	tech := TechStack{}
+	tech.Frontend.Languages = []*string{ptr("TypeScript"), nil}
+	tech.Backend.Frameworks = []*string{}
+	tech.Tools.Editors = []*string{ptr("Vim")}
+	return Project{
+		ID: id, CompanyName: "株式会社P", Period: period,
+		Name: name, Overview: "概要P", TeamComp: "4名", Role: "開発", Achievement: "成果P",
+		Process:   Process{Requirements: true, DetailedDesign: true, Implementation: true, Maintenance: true},
+		TechStack: tech,
+	}
+}
+
+// addedID は、項目の並び got のうち、old に無い項目の ID を返す。そういう項目がちょうど1つでなければ、テストを止める。
+func addedID[E any](t *testing.T, got, old []E, id func(E) uuid.UUID) uuid.UUID {
+	t.Helper()
+	var added []uuid.UUID
+	for _, e := range got {
+		if !slices.ContainsFunc(old, func(o E) bool { return id(o) == id(e) }) {
+			added = append(added, id(e))
+		}
+	}
+	if len(added) != 1 {
+		t.Fatalf("足した項目の ID: got %v, want 1つ", added)
+	}
+	return added[0]
+}
+
+// replaceEntry は、項目の並びの、e と同じ ID の項目を e に置き換えた写しを返す。
+func replaceEntry[E any](entries []E, e E, id func(E) uuid.UUID) []E {
+	out := slicesClone(entries)
+	for i := range out {
+		if id(out[i]) == id(e) {
+			out[i] = e
+		}
+	}
+	return out
+}
+
+// manyCareers は、期間が重ならない n 個の職歴を作る。
+func manyCareers(n int) []Career {
+	cs := make([]Career, n)
+	for i := range cs {
+		cs[i] = Career{
+			ID: uuid.New(), CompanyName: fmt.Sprintf("会社%d", i),
+			Period: Period{StartDate: YearMonth{1980 + i, time.January}, EndDate: yearMonth(1980+i, time.June)},
+		}
+	}
+	return cs
+}
+
+// manyProjects は、n 個のプロジェクトを作る。
+func manyProjects(n int) []Project {
+	ps := make([]Project, n)
+	for i := range ps {
+		ps[i] = Project{
+			ID: uuid.New(), CompanyName: "会社", Period: Period{StartDate: YearMonth{2000, time.January}, Active: true},
+			Name: fmt.Sprintf("案件%d", i), Overview: "概要", TeamComp: "1名", Role: "開発", Achievement: "成果",
+		}
+	}
+	return ps
+}
+
+// countTechStackRows は、プロジェクトの技術スタックの行の数を返す。
+func countTechStackRows(t *testing.T, projectID uuid.UUID) int {
+	t.Helper()
+	var n int
+	if err := testPool.QueryRow(t.Context(), `SELECT count(*) FROM project_tech_stacks WHERE project_id = $1::uuid`,
+		projectID.String()).Scan(&n); err != nil {
+		t.Fatalf("技術スタックの行を数えられません: %v", err)
+	}
+	return n
+}
+
+// TestService_CareerCreateUpdateDelete は、職歴の追加と更新と削除が、経歴書の職歴と更新の日時を書き換え、並べた経歴書を返すことを確かめる。
+// 更新では、直す職歴の今の期間とは重なりを比べない。終了の月と開始の月が同じ職歴は重ならない。
+func TestService_CareerCreateUpdateDelete(t *testing.T) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	clock := &testClock{now: japanTime(2026, time.December, 1, 9, 0, 0, 0)}
+	svc := New(Deps{Pool: testPool, Now: clock.Now})
+	ctx := t.Context()
+
+	got, err := svc.CreateCareer(ctx, userID, strings.ToUpper(r.ID.String()), careerBody(t, "株式会社C", "2010-04", "2015-03", false))
+	if err != nil {
+		t.Fatalf("職歴を足せません: %v", err)
+	}
+	id := addedID(t, got.Careers, r.Careers, careerIDOf)
+	want := r
+	want.Careers = append(slicesClone(r.Careers), Career{
+		ID: id, CompanyName: "株式会社C", Period: Period{StartDate: YearMonth{2010, time.April}, EndDate: yearMonth(2015, time.March)},
+	})
+	want = sorted(want)
+	want.UpdatedAt = clock.now
+	assertResume(t, got, want)
+	assertResume(t, mustFind(t, userID, r.ID), want)
+
+	clock.now = japanTime(2026, time.December, 2, 9, 0, 0, 0)
+	got, err = svc.UpdateCareer(ctx, userID, r.ID.String(), strings.ToUpper(id.String()), careerBody(t, "株式会社D", "2009-10", "2015-04", false))
+	if err != nil {
+		t.Fatalf("職歴を更新できません: %v", err)
+	}
+	want.Careers = replaceEntry(want.Careers, Career{
+		ID: id, CompanyName: "株式会社D", Period: Period{StartDate: YearMonth{2009, time.October}, EndDate: yearMonth(2015, time.April)},
+	}, careerIDOf)
+	want = sorted(want)
+	want.UpdatedAt = clock.now
+	assertResume(t, got, want)
+	assertResume(t, mustFind(t, userID, r.ID), want)
+
+	clock.now = japanTime(2026, time.December, 3, 9, 0, 0, 0)
+	if err := svc.DeleteCareer(ctx, userID, r.ID.String(), id.String()); err != nil {
+		t.Fatalf("職歴を消せません: %v", err)
+	}
+	want = sorted(r)
+	want.UpdatedAt = clock.now
+	assertResume(t, mustFind(t, userID, r.ID), want)
+}
+
+// TestService_CareerErrors は、職歴の追加と更新と削除が、本文、入力欄、経歴書、上限、職歴、期間の順に誤りを確かめ、
+// 誤りのときは何も書かないことを確かめる。
+func TestService_CareerErrors(t *testing.T) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	id, item, missing := r.ID.String(), r.Careers[1].ID.String(), uuid.NewString()
+	valid := careerBody(t, "株式会社C", "2010-04", "2015-03", false)
+	create := func(resumeID string, body []byte) error {
+		_, err := svc.CreateCareer(ctx, userID, resumeID, body)
+		return err
+	}
+	update := func(resumeID, careerID string, body []byte) error {
+		_, err := svc.UpdateCareer(ctx, userID, resumeID, careerID, body)
+		return err
+	}
+	fieldsErr := auth.ErrInvalidInput(map[string][]string{
+		"companyName": {MessageCompanyNameRequired}, "startDate": {MessageStartDateRequired}, "isActive": {MessageCareerActiveRequired},
+	})
+	careerMissing := errNotFound(MessageCareerNotFound)
+
+	for _, c := range []struct {
+		name string
+		err  error
+		want *auth.Error
+	}{
+		{"追加: 読めない本文と読めない ID", create("abc", []byte(`{`)), errUnreadableInput()},
+		{"追加: 入力欄の誤りと読めない ID", create("abc", []byte(`{}`)), fieldsErr},
+		{"追加: 読めない ID", create("abc", valid), errResumeNotFound()},
+		{"追加: 無い経歴書", create(missing, valid), errResumeNotFound()},
+		{"追加: 終了の年月が無い", create(id, careerBody(t, "株式会社C", "2010-04", "", false)), fieldError("endDate", MessageEndDateRequired)},
+		{"追加: 終了が開始より前", create(id, careerBody(t, "株式会社C", "2010-04", "2010-03", false)), fieldError("endDate", MessageEndDateBeforeStart)},
+		{"追加: 在籍中で終了の年月がある", create(id, careerBody(t, "株式会社C", "2010-04", "2011-03", true)), fieldError("endDate", MessageEndDateWhileOngoing)},
+		{"更新: 読めない本文", update("abc", "abc", []byte(`{`)), errUnreadableInput()},
+		{"更新: 入力欄の誤りと無い職歴", update(id, missing, []byte(`{}`)), fieldsErr},
+		{"更新: 無い経歴書", update(missing, item, valid), errResumeNotFound()},
+		{"更新: 無い職歴", update(id, missing, valid), careerMissing},
+		{"更新: 無い職歴と期間の誤り", update(id, missing, careerBody(t, "株式会社C", "2010-04", "", false)), careerMissing},
+		{"更新: プロジェクトの ID", update(id, r.Projects[0].ID.String(), valid), careerMissing},
+		{"更新: 期間の誤り", update(id, item, careerBody(t, "株式会社B", "2015-04", "", false)), fieldError("endDate", MessageEndDateRequired)},
+		{"削除: 無い経歴書", svc.DeleteCareer(ctx, userID, missing, item), errResumeNotFound()},
+		{"削除: 無い職歴", svc.DeleteCareer(ctx, userID, id, missing), careerMissing},
+		{"削除: プロジェクトの ID", svc.DeleteCareer(ctx, userID, id, r.Projects[0].ID.String()), careerMissing},
+	} {
+		assertError(t, c.name, c.err, c.want)
+	}
+	assertResume(t, mustFind(t, userID, r.ID), sorted(r))
+}
+
+// TestService_CareerOverlap は、職歴どうしの期間の重なりを断り、文言に重なる職歴の会社名を経歴書の並びの順に並べることを確かめる(要件2の受入基準1)。
+func TestService_CareerOverlap(t *testing.T) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	id := r.ID.String()
+
+	_, err := svc.CreateCareer(ctx, userID, id, careerBody(t, "株式会社C", "2019-01", "2021-01", false))
+	assertError(t, "追加", err, errCareerPeriodOverlap("株式会社C", []string{"株式会社A", "株式会社B"}))
+	_, err = svc.UpdateCareer(ctx, userID, id, r.Careers[1].ID.String(), careerBody(t, "株式会社B2", "2015-04", "2020-05", false))
+	assertError(t, "更新", err, errCareerPeriodOverlap("株式会社B2", []string{"株式会社A"}))
+	_, err = svc.CreateCareer(ctx, userID, id, careerBody(t, "株式会社C", "2022-01", "", true))
+	assertError(t, "在籍中どうし", err, errCareerPeriodOverlap("株式会社C", []string{"株式会社A"}))
+	assertResume(t, mustFind(t, userID, r.ID), sorted(r))
+}
+
+// TestService_CareerOtherUser は、ほかの利用者の経歴書の職歴を足しも書き換えも消しもせず、無い経歴書と同じ誤りを返すことを確かめる(要件3の受入基準1)。
+func TestService_CareerOtherUser(t *testing.T) {
+	owner := insertTestUser(t)
+	r := fullResume(owner)
+	saveResume(t, r)
+	other := insertTestUser(t)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	id, item := r.ID.String(), r.Careers[1].ID.String()
+	body := careerBody(t, "株式会社C", "2010-04", "2015-03", false)
+
+	_, err := svc.CreateCareer(ctx, other, id, body)
+	assertResumeNotFound(t, err)
+	_, err = svc.UpdateCareer(ctx, other, id, item, body)
+	assertResumeNotFound(t, err)
+	assertResumeNotFound(t, svc.DeleteCareer(ctx, other, id, item))
+	assertResume(t, mustFind(t, owner, r.ID), sorted(r))
+}
+
+// TestService_CareerOfOtherResume は、経路の経歴書と別の経歴書の職歴を書き換えも消しもせず、無い職歴と同じ誤りを返すことを確かめる(要件3の受入基準2)。
+func TestService_CareerOfOtherResume(t *testing.T) {
+	userID := insertTestUser(t)
+	r1, r2 := fullResume(userID), fullResume(userID)
+	r2.Name = "経歴書2"
+	saveResume(t, r1)
+	saveResume(t, r2)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	item := r1.Careers[1].ID.String()
+
+	_, err := svc.UpdateCareer(ctx, userID, r2.ID.String(), item, careerBody(t, "株式会社C", "2010-04", "2015-03", false))
+	assertError(t, "更新", err, errNotFound(MessageCareerNotFound))
+	assertError(t, "削除", svc.DeleteCareer(ctx, userID, r2.ID.String(), item), errNotFound(MessageCareerNotFound))
+	assertResume(t, mustFind(t, userID, r1.ID), sorted(r1))
+	assertResume(t, mustFind(t, userID, r2.ID), sorted(r2))
+}
+
+// TestService_CareerCreateOtherUserAtLimit は、ほかの利用者の上限に達した経歴書への職歴の追加に、上限の誤りではなく無い経歴書の誤りを返し、
+// 持ち主の追加には上限の誤りを返すことを確かめる(要件3の受入基準3)。
+func TestService_CareerCreateOtherUserAtLimit(t *testing.T) {
+	owner := insertTestUser(t)
+	r := emptyResume(owner, "経歴書")
+	r.Careers = manyCareers(careerLimit.limit)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	// 本文の期間は決まりに外れる。経歴書と上限の誤りは、期間の誤りより先に返る。
+	body := careerBody(t, "株式会社C", "2010-04", "", false)
+
+	_, err := svc.CreateCareer(t.Context(), insertTestUser(t), r.ID.String(), body)
+	assertResumeNotFound(t, err)
+	_, err = svc.CreateCareer(t.Context(), owner, r.ID.String(), body)
+	assertError(t, "持ち主の追加", err, errLimitReached(MessageCareerLimitFormat, 30, 30))
+	assertResume(t, mustFind(t, owner, r.ID), sorted(r))
+}
+
+// TestService_CareerUnreadableItemID は、職歴の ID が読めない更新と削除に、無い職歴と同じ誤りを返すことを確かめる(要件4の受入基準4)。
+// 経歴書の ID も読めなければ、無い経歴書の誤りを返す。
+func TestService_CareerUnreadableItemID(t *testing.T) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	body := careerBody(t, "株式会社C", "2010-04", "2015-03", false)
+
+	for _, item := range unreadableIDs {
+		_, err := svc.UpdateCareer(ctx, userID, r.ID.String(), item, body)
+		assertError(t, "更新 "+item, err, errNotFound(MessageCareerNotFound))
+		assertError(t, "削除 "+item, svc.DeleteCareer(ctx, userID, r.ID.String(), item), errNotFound(MessageCareerNotFound))
+	}
+	_, err := svc.UpdateCareer(ctx, userID, "abc", "abc", body)
+	assertResumeNotFound(t, err)
+	assertResumeNotFound(t, svc.DeleteCareer(ctx, userID, "abc", "abc"))
+	assertResume(t, mustFind(t, userID, r.ID), sorted(r))
+}
+
+// TestService_EditResumeConcurrentLimit は、上限の1つ下の経歴書に職歴の追加を同時に送っても、1つだけが通り、上限を超えないことを確かめる(要件2の受入基準1)。
+// 4つの追加を確実に重ねるため、別のトランザクションが経歴書の行に鍵をかけておき、4つの追加がすべて鍵を待ってから鍵を外す。
+// 追加が経歴書の行に鍵をかけずに職歴を数えると、4つとも鍵を待つ前に29件を数えるので、4つとも通る。
+func TestService_EditResumeConcurrentLimit(t *testing.T) {
+	ctx := t.Context()
+	userID := insertTestUser(t)
+	r := emptyResume(userID, "経歴書")
+	r.Careers = manyCareers(careerLimit.limit - 1)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+
+	const n = 4
+	bodies := make([][]byte, n)
+	for i := range bodies {
+		bodies[i] = careerBody(t, fmt.Sprintf("並行%d", i), fmt.Sprintf("201%d-01", i), fmt.Sprintf("201%d-06", i), false)
+	}
+	holder, err := testPool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("鍵をかけるトランザクションを始められない: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := holder.Rollback(context.Background()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			t.Errorf("鍵をかけたトランザクションを閉じられない: %v", err)
+		}
+	})
+	if _, err := holder.Exec(ctx, `SELECT id FROM resumes WHERE id = $1::uuid FOR UPDATE`, r.ID.String()); err != nil {
+		t.Fatalf("経歴書の行に鍵をかけられない: %v", err)
+	}
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() {
+			_, errs[i] = svc.CreateCareer(ctx, userID, r.ID.String(), bodies[i])
+		})
+	}
+	waitForLockWaiters(t, n)
+	if err := holder.Commit(ctx); err != nil {
+		t.Errorf("経歴書の行の鍵を外せない: %v", err)
+	}
+	wg.Wait()
+
+	ok := 0
+	for i, err := range errs {
+		if err == nil {
+			ok++
+			continue
+		}
+		assertError(t, fmt.Sprintf("追加%d", i), err, errLimitReached(MessageCareerLimitFormat, 30, 30))
+	}
+	if ok != 1 {
+		t.Errorf("通った追加の数: got %d, want 1", ok)
+	}
+	if got := len(mustFind(t, userID, r.ID).Careers); got != careerLimit.limit {
+		t.Errorf("職歴の数: got %d, want %d", got, careerLimit.limit)
+	}
+}
+
+// TestService_EditResumeReturnsUnroundedUpdatedAt は、項目の追加と更新の答えの更新の日時が、Java 版と同じく丸める前の値であり、
+// 作成の日時がデータベースの値であることを確かめる(要件1の受入基準1)。
+func TestService_EditResumeReturnsUnroundedUpdatedAt(t *testing.T) {
+	userID := insertTestUser(t)
+	r := emptyResume(userID, "経歴書")
+	r.CreatedAt = japanTime(2026, time.November, 1, 9, 0, 0, 654321000)
+	saveResume(t, r)
+	now := japanTime(2026, time.November, 14, 10, 23, 45, 123456500)
+	svc := New(Deps{Pool: testPool, Now: fixedNow(now)})
+	ctx := t.Context()
+	id := r.ID.String()
+
+	check := func(name string, got Resume, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if !got.UpdatedAt.Equal(now) || got.UpdatedAt.Location() != japanZone {
+			t.Errorf("%s: 答えの更新の日時: got %v, want %v", name, got.UpdatedAt, now)
+		}
+		if !got.CreatedAt.Equal(r.CreatedAt) || got.CreatedAt.Location() != japanZone {
+			t.Errorf("%s: 答えの作成の日時: got %v, want データベースの値 %v", name, got.CreatedAt, r.CreatedAt)
+		}
+		created, updated, _ := storedTimes(t, r.ID)
+		if created != "2026-11-01 09:00:00.654321" || updated != "2026-11-14 10:23:45.123457" {
+			t.Errorf("%s: 表の日時: 作成=%s 更新=%s", name, created, updated)
+		}
+	}
+	got, err := svc.CreateCareer(ctx, userID, id, careerBody(t, "株式会社C", "2010-04", "2015-03", false))
+	check("職歴の追加", got, err)
+	got, err = svc.UpdateCareer(ctx, userID, id, got.Careers[0].ID.String(), careerBody(t, "株式会社D", "2010-04", "2015-03", false))
+	check("職歴の更新", got, err)
+	got, err = svc.CreateProject(ctx, userID, id, projectBody(t, "案件", "2010-04", "", true))
+	check("プロジェクトの追加", got, err)
+	got, err = svc.UpdateProject(ctx, userID, id, got.Projects[0].ID.String(), projectBody(t, "案件2", "2010-04", "", true))
+	check("プロジェクトの更新", got, err)
+}
+
+// TestService_ProjectCreateUpdateDelete は、プロジェクトの追加と更新と削除が、経歴書のプロジェクトと更新の日時を書き換え、並べた経歴書を返すことを確かめる。
+// プロジェクトどうしの期間は重なってよい。
+func TestService_ProjectCreateUpdateDelete(t *testing.T) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	clock := &testClock{now: japanTime(2026, time.December, 1, 9, 0, 0, 0)}
+	svc := New(Deps{Pool: testPool, Now: clock.Now})
+	ctx := t.Context()
+
+	got, err := svc.CreateProject(ctx, userID, strings.ToUpper(r.ID.String()), projectBody(t, "新案件", "2021-02", "", true))
+	if err != nil {
+		t.Fatalf("プロジェクトを足せません: %v", err)
+	}
+	id := addedID(t, got.Projects, r.Projects, projectIDOf)
+	want := r
+	want.Projects = append(slicesClone(r.Projects), fieldsProject(id, "新案件", Period{StartDate: YearMonth{2021, time.February}, Active: true}))
+	want = sorted(want)
+	want.UpdatedAt = clock.now
+	assertResume(t, got, want)
+	assertResume(t, mustFind(t, userID, r.ID), want)
+
+	clock.now = japanTime(2026, time.December, 2, 9, 0, 0, 0)
+	got, err = svc.UpdateProject(ctx, userID, r.ID.String(), strings.ToUpper(id.String()), projectBody(t, "新案件2", "2016-06", "2019-12", false))
+	if err != nil {
+		t.Fatalf("プロジェクトを更新できません: %v", err)
+	}
+	want.Projects = replaceEntry(want.Projects, fieldsProject(id, "新案件2", Period{StartDate: YearMonth{2016, time.June}, EndDate: yearMonth(2019, time.December)}), projectIDOf)
+	want = sorted(want)
+	want.UpdatedAt = clock.now
+	assertResume(t, got, want)
+	assertResume(t, mustFind(t, userID, r.ID), want)
+
+	clock.now = japanTime(2026, time.December, 3, 9, 0, 0, 0)
+	if err := svc.DeleteProject(ctx, userID, r.ID.String(), id.String()); err != nil {
+		t.Fatalf("プロジェクトを消せません: %v", err)
+	}
+	want = sorted(r)
+	want.UpdatedAt = clock.now
+	assertResume(t, mustFind(t, userID, r.ID), want)
+	if n := countTechStackRows(t, id); n != 0 {
+		t.Errorf("消したプロジェクトの技術スタックの行: got %d, want 0", n)
+	}
+}
+
+// TestService_ProjectErrors は、プロジェクトの追加と更新と削除が、本文、入力欄、経歴書、上限、プロジェクト、期間の順に誤りを確かめ、
+// 誤りのときは何も書かないことを確かめる。
+func TestService_ProjectErrors(t *testing.T) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	id, item, missing := r.ID.String(), r.Projects[1].ID.String(), uuid.NewString()
+	valid := projectBody(t, "新案件", "2021-02", "", true)
+	create := func(resumeID string, body []byte) error {
+		_, err := svc.CreateProject(ctx, userID, resumeID, body)
+		return err
+	}
+	update := func(resumeID, projectID string, body []byte) error {
+		_, err := svc.UpdateProject(ctx, userID, resumeID, projectID, body)
+		return err
+	}
+	noMaintenance := projectFields("新案件", "2021-02", "", true)
+	delete(noMaintenance, "maintenance")
+	projectMissing := errNotFound(MessageProjectNotFound)
+
+	for _, c := range []struct {
+		name string
+		err  error
+		want *auth.Error
+	}{
+		{"追加: 読めない本文と読めない ID", create("abc", []byte(`{`)), errUnreadableInput()},
+		{"追加: 入力欄の誤りと読めない ID", create("abc", jsonBody(t, noMaintenance)), fieldError("maintenance", MessageNotNull)},
+		{"追加: 読めない ID", create("abc", valid), errResumeNotFound()},
+		{"追加: 無い経歴書", create(missing, valid), errResumeNotFound()},
+		{"追加: 終了が開始より前", create(id, projectBody(t, "新案件", "2021-02", "2021-01", false)), fieldError("endDate", MessageEndDateBeforeStart)},
+		{"更新: 読めない本文", update("abc", "abc", []byte(`{`)), errUnreadableInput()},
+		{"更新: 入力欄の誤りと無いプロジェクト", update(id, missing, jsonBody(t, noMaintenance)), fieldError("maintenance", MessageNotNull)},
+		{"更新: 無い経歴書", update(missing, item, valid), errResumeNotFound()},
+		{"更新: 無いプロジェクト", update(id, missing, valid), projectMissing},
+		{"更新: 無いプロジェクトと期間の誤り", update(id, missing, projectBody(t, "新案件", "2021-02", "", false)), projectMissing},
+		{"更新: 職歴の ID", update(id, r.Careers[0].ID.String(), valid), projectMissing},
+		{"更新: 期間の誤り", update(id, item, projectBody(t, "新案件", "2021-02", "2022-01", true)), fieldError("endDate", MessageEndDateWhileOngoing)},
+		{"削除: 無い経歴書", svc.DeleteProject(ctx, userID, missing, item), errResumeNotFound()},
+		{"削除: 無いプロジェクト", svc.DeleteProject(ctx, userID, id, missing), projectMissing},
+		{"削除: 職歴の ID", svc.DeleteProject(ctx, userID, id, r.Careers[0].ID.String()), projectMissing},
+	} {
+		assertError(t, c.name, c.err, c.want)
+	}
+	assertResume(t, mustFind(t, userID, r.ID), sorted(r))
+}
+
+// TestService_ProjectOtherUser は、ほかの利用者の経歴書のプロジェクトを足しも書き換えも消しもせず、無い経歴書と同じ誤りを返すことを確かめる(要件3の受入基準1)。
+func TestService_ProjectOtherUser(t *testing.T) {
+	owner := insertTestUser(t)
+	r := fullResume(owner)
+	saveResume(t, r)
+	other := insertTestUser(t)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	id, item := r.ID.String(), r.Projects[1].ID.String()
+	body := projectBody(t, "新案件", "2021-02", "", true)
+
+	_, err := svc.CreateProject(ctx, other, id, body)
+	assertResumeNotFound(t, err)
+	_, err = svc.UpdateProject(ctx, other, id, item, body)
+	assertResumeNotFound(t, err)
+	assertResumeNotFound(t, svc.DeleteProject(ctx, other, id, item))
+	assertResume(t, mustFind(t, owner, r.ID), sorted(r))
+}
+
+// TestService_ProjectOfOtherResume は、経路の経歴書と別の経歴書のプロジェクトを書き換えも消しもせず、無いプロジェクトと同じ誤りを返すことを確かめる(要件3の受入基準2)。
+func TestService_ProjectOfOtherResume(t *testing.T) {
+	userID := insertTestUser(t)
+	r1, r2 := fullResume(userID), fullResume(userID)
+	r2.Name = "経歴書2"
+	saveResume(t, r1)
+	saveResume(t, r2)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	item := r1.Projects[1].ID.String()
+
+	_, err := svc.UpdateProject(ctx, userID, r2.ID.String(), item, projectBody(t, "新案件", "2021-02", "", true))
+	assertError(t, "更新", err, errNotFound(MessageProjectNotFound))
+	assertError(t, "削除", svc.DeleteProject(ctx, userID, r2.ID.String(), item), errNotFound(MessageProjectNotFound))
+	assertResume(t, mustFind(t, userID, r1.ID), sorted(r1))
+	assertResume(t, mustFind(t, userID, r2.ID), sorted(r2))
+}
+
+// TestService_ProjectCreateOtherUserAtLimit は、ほかの利用者の上限に達した経歴書へのプロジェクトの追加に、上限の誤りではなく無い経歴書の誤りを返し、
+// 持ち主の追加には上限の誤りを返すことを確かめる(要件3の受入基準3)。
+func TestService_ProjectCreateOtherUserAtLimit(t *testing.T) {
+	owner := insertTestUser(t)
+	r := emptyResume(owner, "経歴書")
+	r.Projects = manyProjects(projectLimit.limit)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	// 本文の期間は決まりに外れる。経歴書と上限の誤りは、期間の誤りより先に返る。
+	body := projectBody(t, "新案件", "2021-02", "2021-01", false)
+
+	_, err := svc.CreateProject(t.Context(), insertTestUser(t), r.ID.String(), body)
+	assertResumeNotFound(t, err)
+	_, err = svc.CreateProject(t.Context(), owner, r.ID.String(), body)
+	assertError(t, "持ち主の追加", err, errLimitReached(MessageProjectLimitFormat, 100, 100))
+	assertResume(t, mustFind(t, owner, r.ID), sorted(r))
+}
+
+// TestService_ProjectUnreadableItemID は、プロジェクトの ID が読めない更新と削除に、無いプロジェクトと同じ誤りを返すことを確かめる(要件4の受入基準4)。
+// 経歴書の ID も読めなければ、無い経歴書の誤りを返す。
+func TestService_ProjectUnreadableItemID(t *testing.T) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	svc := New(Deps{Pool: testPool})
+	ctx := t.Context()
+	body := projectBody(t, "新案件", "2021-02", "", true)
+
+	for _, item := range unreadableIDs {
+		_, err := svc.UpdateProject(ctx, userID, r.ID.String(), item, body)
+		assertError(t, "更新 "+item, err, errNotFound(MessageProjectNotFound))
+		assertError(t, "削除 "+item, svc.DeleteProject(ctx, userID, r.ID.String(), item), errNotFound(MessageProjectNotFound))
+	}
+	_, err := svc.UpdateProject(ctx, userID, "abc", "abc", body)
+	assertResumeNotFound(t, err)
+	assertResumeNotFound(t, svc.DeleteProject(ctx, userID, "abc", "abc"))
+	assertResume(t, mustFind(t, userID, r.ID), sorted(r))
+}
+
+// TestService_ProjectWithTechStack は、プロジェクトの行と技術スタックの行を1つのトランザクションで書くことを確かめる。
+// 技術スタックが書けないときは、プロジェクトの行も経歴書の更新の日時も書かない。
+func TestService_ProjectWithTechStack(t *testing.T) {
+	userID := insertTestUser(t)
+	r := fullResume(userID)
+	saveResume(t, r)
+	clock := &testClock{now: japanTime(2026, time.December, 1, 9, 0, 0, 0)}
+	svc := New(Deps{Pool: testPool, Now: clock.Now})
+	ctx := t.Context()
+	id := r.ID.String()
+
+	got, err := svc.CreateProject(ctx, userID, id, projectBody(t, "新案件", "2021-02", "", true))
+	if err != nil {
+		t.Fatalf("プロジェクトを足せません: %v", err)
+	}
+	pid := addedID(t, got.Projects, r.Projects, projectIDOf)
+	if n := countTechStackRows(t, pid); n != 1 {
+		t.Errorf("足したプロジェクトの技術スタックの行: got %d, want 1", n)
+	}
+	m := projectFields("新案件", "2021-02", "", true)
+	m["frontendLanguages"] = []any{"Go"}
+	delete(m, "editors")
+	got, err = svc.UpdateProject(ctx, userID, id, pid.String(), jsonBody(t, m))
+	if err != nil {
+		t.Fatalf("プロジェクトを更新できません: %v", err)
+	}
+	want := fieldsProject(pid, "新案件", Period{StartDate: YearMonth{2021, time.February}, Active: true})
+	want.TechStack.Frontend.Languages = []*string{ptr("Go")}
+	want.TechStack.Tools.Editors = nil
+	stored := mustFind(t, userID, r.ID)
+	for name, ps := range map[string][]Project{"答え": got.Projects, "読み直し": stored.Projects} {
+		if i := slices.IndexFunc(ps, func(p Project) bool { return p.ID == pid }); i < 0 || !reflect.DeepEqual(ps[i], want) {
+			t.Errorf("%s: 更新したプロジェクトが違う\n got: %+v\nwant: %+v", name, ps, want)
+		}
+	}
+
+	clock.now = japanTime(2026, time.December, 2, 9, 0, 0, 0)
+	broken := projectFields("壊れた案件", "2021-02", "", true)
+	broken["editors"] = []any{"a\x00b"}
+	_, err = svc.CreateProject(ctx, userID, id, jsonBody(t, broken))
+	_, err2 := svc.UpdateProject(ctx, userID, id, pid.String(), jsonBody(t, broken))
+	for name, e := range map[string]error{"追加": err, "更新": err2} {
+		var ae *auth.Error
+		if e == nil || errors.As(e, &ae) {
+			t.Errorf("%s: 技術スタックが書けない要求の誤り: got %v, want データベースの誤り", name, e)
+		}
+	}
+	assertResume(t, mustFind(t, userID, r.ID), stored)
+}
+
+// waitForLockWaiters は、テストのデータベースで行の鍵を待つ接続が n 個以上になるまで待つ。10秒待っても届かなければ、テストを失敗にして戻る。
+func waitForLockWaiters(t *testing.T, n int) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var waiting int
+		if err := testPool.QueryRow(t.Context(),
+			`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+		).Scan(&waiting); err != nil {
+			t.Errorf("鍵を待つ接続を数えられない: %v", err)
+			return
+		}
+		if waiting >= n {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Errorf("鍵を待つ接続の数: got %d, want %d 以上", waiting, n)
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }

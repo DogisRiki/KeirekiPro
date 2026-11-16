@@ -6,6 +6,7 @@ package resume
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -234,4 +235,262 @@ func (s *Service) UpdateResumeBasic(ctx context.Context, userID uuid.UUID, resum
 		return Resume{}, err
 	}
 	return updated, nil
+}
+
+// editResume は、6つの欄の項目の追加と更新が使う共通の流れである。1つのトランザクションの中で経歴書の行を利用者の ID と組で
+// 読んで固定し、欄ごとの関数 fn を呼び、fn が誤りを返さなければ経歴書の更新の日時を新しくする。確定したあとで経歴書を読み直して返す。
+// 答えの更新の日時は丸める前の今の時刻であり、作成の日時はデータベースの値である。
+// 経歴書の ID が読めないとき、経歴書が無いとき、ほかの利用者の経歴書のときは、無い経歴書の誤りを返す。
+func (s *Service) editResume(ctx context.Context, userID uuid.UUID, resumeID string, fn func(st store, r Resume) error) (Resume, error) {
+	id, now, err := s.editInTx(ctx, userID, resumeID, fn)
+	if err != nil {
+		return Resume{}, err
+	}
+	r, found, err := poolStore(s.deps.Pool).findResume(ctx, userID, id)
+	if err != nil {
+		return Resume{}, err
+	}
+	if !found {
+		return Resume{}, errResumeNotFound()
+	}
+	r.UpdatedAt = now
+	return r, nil
+}
+
+// editInTx は、editResume の、経歴書を読み直す前までの流れである。項目の削除は、経歴書を返さないので、これを直に使う。
+// 経歴書の ID と、書いた更新の日時の丸める前の値を返す。
+func (s *Service) editInTx(ctx context.Context, userID uuid.UUID, resumeID string, fn func(st store, r Resume) error) (uuid.UUID, time.Time, error) {
+	id, ok := parseID(resumeID)
+	if !ok {
+		return uuid.UUID{}, time.Time{}, errResumeNotFound()
+	}
+	var now time.Time
+	err := inTx(ctx, s.deps.Pool, func(st store) error {
+		r, found, err := st.lockResume(ctx, userID, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return errResumeNotFound()
+		}
+		if err := fn(st, r); err != nil {
+			return err
+		}
+		now = s.deps.Now().In(japanZone)
+		return st.touchResume(ctx, id, now)
+	})
+	return id, now, err
+}
+
+// decodeEntry は、項目の追加と更新の要求の本文を読み、入力欄を検査する。本文が読めなければ、項目ごとの文言を持たない 400 の誤りを返す。
+func decodeEntry[T any](body []byte, validate func(T) *auth.Error) (T, *auth.Error) {
+	req, err := decodeBody[T](body)
+	if err != nil {
+		return req, errUnreadableInput()
+	}
+	return req, validate(req)
+}
+
+// entryID は、経路の項目の ID を読み、経歴書の項目の並び entries にあるかを確かめる。読めないときと無いときは、
+// 欄ごとの文言 notFound の 404 の誤りを返す。
+func entryID[E any](s string, entries []E, id func(E) uuid.UUID, notFound string) (uuid.UUID, *auth.Error) {
+	v, ok := parseID(s)
+	if !ok || !slices.ContainsFunc(entries, func(e E) bool { return id(e) == v }) {
+		return uuid.UUID{}, errNotFound(notFound)
+	}
+	return v, nil
+}
+
+// deleteEntry は、項目の削除の共通の流れである。項目の ID が読めないときと、経歴書に項目が無いときは、欄ごとの文言 notFound の
+// 404 の誤りを返す。del は、経歴書に項目が無ければ false を返す。
+func (s *Service) deleteEntry(ctx context.Context, userID uuid.UUID, resumeID, itemID, notFound string,
+	del func(st store, resumeID, id uuid.UUID) (bool, error),
+) error {
+	_, _, err := s.editInTx(ctx, userID, resumeID, func(st store, r Resume) error {
+		id, ok := parseID(itemID)
+		if !ok {
+			return errNotFound(notFound)
+		}
+		if found, err := del(st, r.ID, id); err != nil {
+			return err
+		} else if !found {
+			return errNotFound(notFound)
+		}
+		return nil
+	})
+	return err
+}
+
+// requestPeriod は、要求の開始と終了の年月と継続中の値から期間を作り、期間の決まりを検査する。
+func requestPeriod(start, end jsonYearMonth, active bool) (Period, *auth.Error) {
+	p := Period{StartDate: start.Value, Active: active}
+	if end.Present {
+		p.EndDate = &end.Value
+	}
+	var startDate *YearMonth
+	if start.Present {
+		startDate = &p.StartDate
+	}
+	f := auth.FieldErrors{}
+	checkPeriod(f, startDate, p.EndDate, active)
+	if e := f.Result(); e != nil {
+		return Period{}, e
+	}
+	return p, nil
+}
+
+func careerIDOf(c Career) uuid.UUID   { return c.ID }
+func projectIDOf(p Project) uuid.UUID { return p.ID }
+
+// career は、検査を通った職歴の要求から、ID が id の職歴を作る。期間の決まりに外れれば、400 の誤りを返す。
+func (req careerRequest) career(id uuid.UUID) (Career, *auth.Error) {
+	p, e := requestPeriod(req.StartDate, req.EndDate, *req.Active)
+	if e != nil {
+		return Career{}, e
+	}
+	return Career{ID: id, CompanyName: *req.CompanyName, Period: p}, nil
+}
+
+// CreateCareer は、利用者の経歴書に職歴を1つ足し、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、職歴の数の上限、期間の決まり、ほかの職歴との期間の重なりである。
+func (s *Service) CreateCareer(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateCareer)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		if e := careerLimit.check(len(r.Careers)); e != nil {
+			return e
+		}
+		c, e := req.career(uuid.New())
+		if e != nil {
+			return e
+		}
+		if e := checkCareerOverlap(c, r.Careers); e != nil {
+			return e
+		}
+		return st.insertCareer(ctx, r.ID, c)
+	})
+}
+
+// UpdateCareer は、利用者の経歴書の職歴を書き換え、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、職歴、期間の決まり、ほかの職歴との期間の重なりである。直す職歴の今の期間とは比べない。
+func (s *Service) UpdateCareer(ctx context.Context, userID uuid.UUID, resumeID, careerID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateCareer)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		id, e := entryID(careerID, r.Careers, careerIDOf, MessageCareerNotFound)
+		if e != nil {
+			return e
+		}
+		c, e := req.career(id)
+		if e != nil {
+			return e
+		}
+		if e := checkCareerOverlap(c, r.Careers); e != nil {
+			return e
+		}
+		// 経歴書の行を固定しているので、entryID で確かめた職歴は、書き換えるまで消えない。
+		_, err := st.updateCareer(ctx, r.ID, c)
+		return err
+	})
+}
+
+// DeleteCareer は、利用者の経歴書の職歴を消す。
+func (s *Service) DeleteCareer(ctx context.Context, userID uuid.UUID, resumeID, careerID string) error {
+	return s.deleteEntry(ctx, userID, resumeID, careerID, MessageCareerNotFound, func(st store, resumeID, id uuid.UUID) (bool, error) {
+		return st.deleteCareer(ctx, resumeID, id)
+	})
+}
+
+// project は、検査を通ったプロジェクトの要求から、ID が id のプロジェクトを作る。期間の決まりに外れれば、400 の誤りを返す。
+// 技術スタックの並びは、要求の値のまま写す。
+func (req projectRequest) project(id uuid.UUID) (Project, *auth.Error) {
+	p, e := requestPeriod(req.StartDate, req.EndDate, *req.Active)
+	if e != nil {
+		return Project{}, e
+	}
+	return Project{
+		ID: id, CompanyName: *req.CompanyName, Period: p,
+		Name: *req.Name, Overview: *req.Overview, TeamComp: *req.TeamComp, Role: *req.Role, Achievement: *req.Achievement,
+		Process: Process{
+			Requirements: *req.Requirements, BasicDesign: *req.BasicDesign, DetailedDesign: *req.DetailedDesign,
+			Implementation: *req.Implementation, IntegrationTest: *req.IntegrationTest, SystemTest: *req.SystemTest,
+			Maintenance: *req.Maintenance,
+		},
+		TechStack: TechStack{
+			Frontend: FrontendStacks[*string]{
+				Languages: req.FrontendLanguages, Frameworks: req.FrontendFrameworks, Libraries: req.FrontendLibraries,
+				BuildTools: req.FrontendBuildTools, PackageManagers: req.FrontendPackageManagers, Linters: req.FrontendLinters,
+				Formatters: req.FrontendFormatters, TestingTools: req.FrontendTestingTools,
+			},
+			Backend: BackendStacks[*string]{
+				Languages: req.BackendLanguages, Frameworks: req.BackendFrameworks, Libraries: req.BackendLibraries,
+				BuildTools: req.BackendBuildTools, PackageManagers: req.BackendPackageManagers, Linters: req.BackendLinters,
+				Formatters: req.BackendFormatters, TestingTools: req.BackendTestingTools, OrmTools: req.OrmTools, Auth: req.Auth,
+			},
+			Infrastructure: InfrastructureStacks[*string]{
+				Clouds: req.Clouds, OperatingSystems: req.OperatingSystems, Containers: req.Containers, Databases: req.Databases,
+				WebServers: req.WebServers, CiCdTools: req.CiCdTools, IacTools: req.IacTools,
+				MonitoringTools: req.MonitoringTools, LoggingTools: req.LoggingTools,
+			},
+			Tools: ToolStacks[*string]{
+				SourceControls: req.SourceControls, ProjectManagements: req.ProjectManagements,
+				CommunicationTools: req.CommunicationTools, DocumentationTools: req.DocumentationTools,
+				APIDevelopmentTools: req.APIDevelopmentTools, DesignTools: req.DesignTools,
+				Editors: req.Editors, DevelopmentEnvironments: req.DevelopmentEnvironments,
+			},
+		},
+	}, nil
+}
+
+// CreateProject は、利用者の経歴書にプロジェクトを1つ足し、6つの欄の項目を持つ経歴書を返す。
+// プロジェクトの行と技術スタックの行は、editResume の1つのトランザクションの中で書く。
+// 確かめる順は、本文、入力欄、経歴書、プロジェクトの数の上限、期間の決まりである。
+func (s *Service) CreateProject(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateProject)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		if e := projectLimit.check(len(r.Projects)); e != nil {
+			return e
+		}
+		p, e := req.project(uuid.New())
+		if e != nil {
+			return e
+		}
+		return st.insertProject(ctx, r.ID, p)
+	})
+}
+
+// UpdateProject は、利用者の経歴書のプロジェクトと技術スタックを書き換え、6つの欄の項目を持つ経歴書を返す。
+// 確かめる順は、本文、入力欄、経歴書、プロジェクト、期間の決まりである。
+func (s *Service) UpdateProject(ctx context.Context, userID uuid.UUID, resumeID, projectID string, body []byte) (Resume, error) {
+	req, e := decodeEntry(body, validateProject)
+	if e != nil {
+		return Resume{}, e
+	}
+	return s.editResume(ctx, userID, resumeID, func(st store, r Resume) error {
+		id, e := entryID(projectID, r.Projects, projectIDOf, MessageProjectNotFound)
+		if e != nil {
+			return e
+		}
+		p, e := req.project(id)
+		if e != nil {
+			return e
+		}
+		// 経歴書の行を固定しているので、entryID で確かめたプロジェクトは、書き換えるまで消えない。
+		_, err := st.updateProject(ctx, r.ID, p)
+		return err
+	})
+}
+
+// DeleteProject は、利用者の経歴書のプロジェクトと技術スタックを消す。
+func (s *Service) DeleteProject(ctx context.Context, userID uuid.UUID, resumeID, projectID string) error {
+	return s.deleteEntry(ctx, userID, resumeID, projectID, MessageProjectNotFound, func(st store, resumeID, id uuid.UUID) (bool, error) {
+		return st.deleteProject(ctx, resumeID, id)
+	})
 }
