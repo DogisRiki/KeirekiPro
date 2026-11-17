@@ -107,3 +107,57 @@
 | 上限で替えたら spec.json の選んだモデルも Opus 5.5 に書き換える | 要件9.6 に反する。上限が解けても Fable 5.1 に戻らない |
 | 本文の控えを `reviews/` に置いてコミットする | 本文の写しがリポジトリに残り続ける。作業フォルダをまたぐ続きは少なく、そのときは全体を審査すれば足りる |
 | 差分を実装セッションの説明(どこを直したか)で渡す | 書き方の点検の直しが記録に残らず、審査されないまま承認に進む(R4-1-1) |
+
+## Issue #900 のための調査(2026-11-17)(#900)
+
+### 今あるものについて確かめた文
+
+- requirements.md 要件13の段落「今は、食い違いが小さくても design の承認が取り消される」: `.claude/skills/spec-review/SKILL.md` 240-262行(Step 6 は前の段階への指摘で往復を止め、所有者が直すと判断したら戻る段階と後続の段階の承認を取り消す。食い違いの大きさで分けていない) / 合っていた
+- requirements.md 要件13の9「承認済みの段階の本文を直す前にその段階と後続の段階の承認を取り消すという規約」: `CLAUDE.md` 129行 / 合っていた
+- requirements.md 要件14の7「要件7の7は、判定する対象を、生成済みで人間の承認が無い段階に限っている」: requirements.md 要件7の7 / 合っていた
+- design.md「spec-review-scan.sh」の節「段階ごとの出力 `<feature>|<stage>|<理由>|<未解決の件数>`」と「人の承認がある段階を対象から外す」: `.claude/hooks/spec-review-scan.sh` 27-58行(`_sr_targets` が全部の spec.json を1回の perl で読み、`<feature>|<段階の並び>` を出す。`approved` が true で `approved_by` が空でなく `:` を含まない段階を外す)と 176行 / 合っていた
+- design.md「spec-review-scan.sh」の節「最新の往復の指摘に処置が無ければ止め、処置が修正なら再レビューを求める」: `.claude/hooks/spec-review-scan.sh` 60-75行(`_sr_latest_ids` は最新の節の見出しのサイクルと往復の番号で始まるIDを全部拾う。前の段階への指摘のIDも同じ記号で拾う)と 119-141行 / 合っていた
+- design.md「spec-review-scan.sh」の節「本文がレビューより新しいかは、ファイルの変更日時で比べる」: `.claude/hooks/spec-review-scan.sh` 162-166行(`[ "$body" -nt "$review" ]`) / 合っていた
+- design.md「check-spec-review-before-stop.sh」と「notify-spec-review.sh」の節「走査の出力の1行ずつを読み、理由の欄が空でない行で止めるか示す」: `.claude/hooks/check-spec-review-before-stop.sh` 45-54行、`.claude/hooks/notify-spec-review.sh` 31-46行 / 合っていた
+- design.md「テストの方針」の「走査のテストは、場合の名前で選んで流す形になっていない」: `.claude/hooks/tests/test-spec-review-scan.sh` 全271行(`KP_TEST_CASE` の扱いが無く、場合は `echo "--- <番号>. ..."` で区切られ、全部が順に流れる) / 合っていた
+- design.md「テストの方針」の「フックのテストは CI で流れない」: `.github/workflows/guardrails.yaml` 230行(`.claude/hooks/tests/**` を対象から外している。ほかのワークフローに `hooks/tests` を呼ぶ行は無い) / 合っていた
+- design.md「プロジェクトの決まり」の「`.claude/hooks/**` と `.claude/settings.json` は Claude が書けない」: `.claude/settings.json` 70-75行 / 合っていた
+- design.md「rules/common.md」の節「前の段階への指摘は別の節に書き、表は `| ID | 対象 | 該当箇所 | 内容 |` である」「メインセッションはこれを直さず、所有者に報告する」: `.claude/skills/spec-review/rules/common.md` 58-60行、112-118行 / 合っていた
+- design.md「rules/common.md」の節「処置の『所有者判断待ち』は前の段階への指摘に使う」: `.claude/skills/spec-review/rules/common.md` 137-147行 / 合っていた
+- design.md「rules/design.md と rules/tasks.md」の節「前の段階への指摘の観点は design では9、tasks では8である」: `.claude/skills/spec-review/rules/design.md` 76-78行、`.claude/skills/spec-review/rules/tasks.md` 56-58行 / 合っていた
+- design.md「spec-reviewer」の節「STATUS は高と中の指摘が0件なら converged」「当該段階の本文と前の段階の本文を読む」: `.claude/agents/spec-reviewer.md` 32行、89行 / 合っていた
+- design.md「spec-reviewer」の節「定義の model は系統の別名 fable」: `.claude/agents/spec-reviewer.md` 5行 / 合っていた
+- design.md「spec-review スキル」の節「Step 4 は前の段階への指摘を直さず、処置を所有者判断待ちにして Step 6 へ進む」: `.claude/skills/spec-review/SKILL.md` 192-198行 / 合っていた
+- design.md「spec-review スキル」の節「Step 2 は fable でも opus でも、起動のたびに model を指定する」: `.claude/skills/spec-review/SKILL.md` 113-115行 / 合っていた
+- design.md「spec-review スキル」の節「差し戻しの回数は review ファイルの再レビューの節を数える」: `.claude/skills/spec-review/SKILL.md` 245行 / 合っていた
+- design.md「spec-review スキル」の節「Step 6 は承認を approval_history に写してから取り消し、戻る段階を新しいサイクルで changed 付きで審査する」: `.claude/skills/spec-review/SKILL.md` 247-265行 / 合っていた
+- design.md「record-spec-review.sh」の節「記録のフックは agent-model.pl で系統を読み、Fable と Opus の系統のレビューの証跡を版によらず書く」: `.claude/hooks/record-spec-review.sh` 85-97行 / 合っていた
+- design.md「CLAUDE.md の spec 駆動開発の節」の「承認を取り消す前に approval_history に追記する決まり」: `CLAUDE.md` 131-133行 / 合っていた
+- design.md「テストの方針」の「過去の回の記録は main にある」: `git show main:.kiro/specs/backend-go-users/spec.json` の `approval_history`(design を 2026-11-13T04:51:38Z に T1-1-4 と T1-1-5 で取り消した)と `reviews/tasks-review.md` 112-118行。`git show main:.kiro/specs/backend-go-master-resumes/spec.json` の `approval_history`(design を 2026-11-14T07:13:41Z に T1-1-6 と T1-1-7 で、2026-11-15T12:47:59Z に T3-1-4 と T3-1-5 で取り消した。2026-11-15T06:17:31Z の取り消しは所有者の決定による requirements への差し戻しで、tasks の審査によらない)と `reviews/tasks-review.md` 120-127行、369-376行 / 合っていた
+- design.md「テストの方針」の「#725 の spec は、2026-11-17 の時点で main に無い」: `git ls-tree main --name-only .kiro/specs/` / 合っていた
+- design.md「spec 無しのPRの食い違い」: `gh pr list --state merged --limit 1000` の結果(total 462、`- 食い違う spec: .kiro/specs/spec-review/` の行を持つPRは0件) / 合っていた
+- design.md「作らないもの」の「審査役の版の選び方と、実際に動いた版の読み方は spec `spec-reviewer-latest-model` が決める」: `.kiro/specs/spec-reviewer-latest-model/design.md` 13-30行 / 合っていた
+- design.md「失敗したときの扱い」の「今の `_sr_targets` は、読めない spec.json と JSON として読めない spec.json を飛ばす」: `.claude/hooks/spec-review-scan.sh` 25行のコメントと 37-41行(`next unless -f $f` `open ... or next` `next unless ref $d`) / 合っていた
+- design.md「spec-review-scan.sh」の節「`spec_review_scan` は `_sr_targets` の行を `IFS='|' read -r feature stages` で読み、段階ごとに判定して1行を出す」: `.claude/hooks/spec-review-scan.sh` 85-176行 / 合っていた
+- design.md「テストの方針」の「`KP_TEST_CASE` に空白で区切って書いた名前の場合だけを流し、知らない名前があれば何も流さずに失敗する形」: `.claude/scripts/spec-review/tests/test-agent-model.sh` 6-7行、24-25行、243行 / 合っていた
+- design.md「作らないもの」の「今の書き方の点検は、いまの段階の本文だけを見る」: `.claude/skills/spec-review/SKILL.md` 62-75行(Step 1.5 は本文のパスに `.kiro/specs/{FEATURE}/{STAGE}.md` だけを渡す) / 合っていた
+- design.md「テストの方針」の「backend-go-users は #771、backend-go-master-resumes は #772 の spec で、どちらも spec.json に `review_model` が無い」: `git show main:.kiro/specs/backend-go-users/spec.json` と `git show main:.kiro/specs/backend-go-master-resumes/spec.json`(`issue` が 771 と 772、`review_model` のキーが無い) / 合っていた
+- design.md「CLAUDE.md の spec 駆動開発の節のルール」の「承認済みの段階の本文を再生成または修正する前に承認を取り消す決まりは129行目」: `CLAUDE.md` 129行 / 合っていた
+- design.md「テストの方針」の「場合の名前は、`t_` で始まる関数の名前にする」: `.claude/scripts/spec-review/tests/test-agent-model.sh` 243-249行(`KP_TEST_CASE` の名前は `t_*` に合い、その名前の関数があるときだけ受け付ける)/ 合っていた
+- design.md「CLAUDE.md の spec 駆動開発の節のルール」の「必須のチェック `claude-md-size` の上限は 21,700 バイトで、今の `CLAUDE.md` は 21,688 バイト」: `.github/workflows/guardrails.yaml` 24行(`CLAUDE_MD_SIZE_LIMIT: '21700'`)と、`wc -c CLAUDE.md` の結果(21688)/ 合っていた
+- design.md「CLAUDE.md の spec 駆動開発の節のルール」の「`approval_history` の要素の欄の一覧は、`/spec-review` の Step 6 と `/kiro-spec-init` の更新の形に書いてある」: `.claude/skills/spec-review/SKILL.md` 247-262行、`.claude/skills/kiro-spec-init/SKILL.md` 76-84行 / 合っていた
+- design.md「CLAUDE.md の spec 駆動開発の節のルール」の「2つの直しのあとの `CLAUDE.md` は約 21,682 バイト」: scratchpad の写しに例外の1行を足して132行目を消し、`wc -c` で、130行目の末尾に足す「。」の3バイトを合わせて 21,682 バイトを測った。例外の文は、直しを戻すときも覆う文(design-review のサイクル7 往復1 の D7-1-1) / 合っていた
+
+### 調べたことと設計への影響
+
+- 走査のライブラリは、人の承認がある段階を判定から外す。承認を残して直した段階は人の承認があるので、今のままでは、直したあとに審査されたかを判定できない。そこで、直したことを spec.json に機械で読める形で残し、`_sr_targets` がその記録を読む形にする
+- 前の段階への指摘のIDは、後ろの段階の記号(`D` か `T`)で振られ、`_sr_latest_ids` に拾われる。そのため、承認を残して直した穴の処置を「修正」にすると、次の往復の審査が無い間は、今ある「修正後の再レビューがない」の理由で止まる。往復の途中で直した穴は、今の判定で足りる。足りないのは、往復が終わったあと(3往復目のあとに所有者が直すと決めたとき)に前の段階の本文を直した場合である
+- 過去の回の design の本文は、出荷のときに1回だけコミットされたので、取り消した時点の design の本文は git に無い。過去の回の確かめでは、審査役は、記録(tasks の審査と対応の記録、`approval_history` の `revoked_for`、取り消したあとの design の審査と対応の記録)と、今の requirements と design から判定する
+- 過去の記録で後ろの段階に回した食い違いは、決まった書き方で書かれていない。後ろの段階の審査役は、前の段階の記録を後ろの段階の名前(`design` `tasks`)で検索し、当たった行を読んで判断する。これからの記録では、メインセッションが対応の記録に決まった書き出しで書き、検索で拾いやすくする
+
+### 採らなかった案(#900)
+
+- 承認を残して直した段階の審査を、前の段階のレビューの新しいサイクルとして行う案: 前の段階の review のファイルに節が増え、所有者が承認した段階の記録が後から伸びる。後ろの段階の往復の中で直しを審査させれば、要件13の5の「次の往復で審査する」とそろい、往復の数も増えない
+- 承認を残して直した記録を Markdown のファイルだけに書き、フックがそのファイルを読む案: フックが Markdown の書式に依存する。spec.json は走査のライブラリがすでに1回の perl で読んでいるので、そこに配列を足すほうが速く、壊れにくい
+- 承認を残して直した段階の本文と承認の時点の本文を、ハッシュで比べる案: 承認の時点の本文のハッシュは今どこにも残っていない。今ある「本文がレビューより新しい」と同じ、ファイルの変更日時の比べ方にそろえる
+- 作るものが変わるかどうかを、実装セッションが決めて審査役が確かめる案: 要件13の4が、本文を書いた実装セッションが自分で決めることを禁じている

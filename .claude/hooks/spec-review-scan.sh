@@ -15,6 +15,12 @@
 #     (auto:-y / auto:batch / unknown:pre-existing はいずれも ':' を含む)
 #   phase が initialized の spec は対象外(/kiro-spec-init 直後)
 #
+# 承認を残して直した段階の判定(#900): spec.json の kept_approval_fixes の要素ごとに、
+#   直した段階(stage)が人の承認ありで、見つけた段階(found_in)が生成済みで人の承認ありで
+#   ないとき、reviews/<見つけた段階>-review.md が無いか、<直した段階>.md がそれより新しければ、
+#   <feature>|<直した段階>|承認を残して直したあとの審査がない(<見つけた段階> の審査)|0
+#   の1行を出す。同じ組の要素が2つ以上あっても1行にまとめる。
+#
 # 前提: bash と perl(JSON::PP)。jqには依存しない。
 # =====================================================================
 
@@ -22,7 +28,9 @@
 # 値を1つ読むたびに perl を起動すると、spec の数に比例して時間がかかり、
 # フックに与えられた時間を超えて、確かめが最後まで動かなくなるため(#828)。
 # 引数: spec.json のパスの並び。出力: 対象の段階がある spec を1行1件で
-#   "<feature>|<stage> <stage> ..."(段階は requirements design tasks の順)
+#   "<feature>|<stage> <stage> ...|<直した段階>:<見つけた段階> ..."
+#   (段階は requirements design tasks の順。3つ目の欄は承認を残して直した段階の組で、
+#    組が無い spec では空)
 # 読めない spec.json と、JSON として読めない spec.json は飛ばす。
 _sr_targets() {
     perl -MJSON::PP -e '
@@ -43,16 +51,37 @@ _sr_targets() {
             next if sr_val($d, "phase") eq "initialized";
             (my $feature = $f) =~ s{/spec\.json\z}{};
             $feature =~ s{\A.*/}{};
-            my @stages;
+            my (@stages, %human);
             for my $stage (qw(requirements design tasks)) {
                 next unless sr_val($d, "approvals", $stage, "generated") eq "true";
                 my $approved = sr_val($d, "approvals", $stage, "approved");
                 my $by = sr_val($d, "approvals", $stage, "approved_by");
                 # 人の承認がある段階は対象外
-                next if $approved eq "true" && $by ne "" && index($by, ":") < 0;
+                if ($approved eq "true" && $by ne "" && index($by, ":") < 0) {
+                    $human{$stage} = 1;
+                    next;
+                }
                 push @stages, $stage;
             }
-            print "$feature|@stages\n" if @stages;
+            # 承認を残して直した段階と、見つけた段階の組(#900)。
+            # 直した段階が人の承認ありで、見つけた段階が生成済みで人の承認ありでない組だけを残す。
+            # 見つけた段階は @stages に入るので、組がある spec は必ず出力される。
+            # 配列でない値と、stage か found_in が段階の名前でない要素は読み飛ばす
+            my (@kept, %seen);
+            my $fixes = eval { $d->{kept_approval_fixes} };
+            if (ref $fixes eq "ARRAY") {
+                for my $e (@$fixes) {
+                    next unless ref $e eq "HASH";
+                    my ($fixed, $found) = ($e->{stage}, $e->{found_in});
+                    next unless defined $fixed && !ref $fixed && $fixed =~ /\A(?:requirements|design|tasks)\z/;
+                    next unless defined $found && !ref $found && $found =~ /\A(?:requirements|design|tasks)\z/;
+                    next unless $human{$fixed};
+                    next unless grep { $_ eq $found } @stages;
+                    my $pair = "$fixed:$found";
+                    push @kept, $pair unless $seen{$pair}++;
+                }
+            }
+            print "$feature|@stages|@kept\n" if @stages;
         }
     ' -- "$@" 2>/dev/null
 }
@@ -79,10 +108,10 @@ spec_review_scan() {
     local specs_dir="$project_dir/.kiro/specs"
     [ -d "$specs_dir" ] || return 0
 
-    local feature stages stage
+    local feature stages kept stage pair fixed found
     local review response evidence blockers unresolved
 
-    while IFS='|' read -r feature stages; do
+    while IFS='|' read -r feature stages kept; do
         [ -z "$feature" ] && continue
 
         for stage in $stages; do
@@ -174,6 +203,18 @@ spec_review_scan() {
             fi
 
             printf '%s|%s|%s|%s\n' "$feature" "$stage" "$blockers" "$unresolved"
+        done
+
+        # 6. 承認を残して直した段階が、見つけた段階でまだ審査されていない(#900)。
+        # 見つけた段階の審査は <見つけた段階>-review.md に追記されるので、
+        # 直した段階の本文がそれより新しければ、直しはまだ審査されていない
+        for pair in $kept; do
+            fixed="${pair%%:*}"
+            found="${pair#*:}"
+            review="$project_dir/.kiro/specs/$feature/reviews/${found}-review.md"
+            if [ ! -f "$review" ] || [ "$project_dir/.kiro/specs/$feature/${fixed}.md" -nt "$review" ]; then
+                printf '%s|%s|%s|%s\n' "$feature" "$fixed" "承認を残して直したあとの審査がない(${found} の審査)" 0
+            fi
         done
     done <<EOF
 $(_sr_targets "$specs_dir"/*/spec.json)

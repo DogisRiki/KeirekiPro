@@ -127,9 +127,9 @@ AIがIssueの本文とその時点のコードを調べ、4つの観点で判断
 - 3段階承認: Requirements → Design → Tasks の各段階で人間の承認を得る。`-y` による自動承認は使用しない(/kiro-spec-batch 等による同等の自動承認も同様)。承認を記録するときは spec.json に承認者名と日時(`approved_by` / `approved_at`)を残す
 - **次の段階へ進む前に、前の段階の記録の未解決を一覧で提示し、人間の了承を得る。** 未解決があっても機械的には止めない(判断は人間)
 - **承認済みの段階の本文を再生成または修正する前に、その段階と後続の段階の承認を取り消す**(`approved: false` にし `approved_by` / `approved_at` を削除)。
-  cc-sdd は既存の `approved_by` を上書きしないため、取り消さないと再生成した本文が承認済みのまま扱われる
+  cc-sdd は既存の `approved_by` を上書きしないため、取り消さないと再生成した本文が承認済みのまま扱われる。
+  ただし、後ろの段階の審査で見つかった前の段階の穴がすべて作るものが変わらない穴のときと、その直しを戻すときは、承認を残す(手順は `/spec-review` のスキル)
 - **承認を取り消す前に、取り消す段階のうち `approved` が `true` の段階ごとに、その承認を spec.json の `approval_history` に1つずつ追記する**(配列が無ければ作る)。
-  要素は `stage` `approved_by` `approved_at` `issues`(その承認のときに spec が対象にしていたIssue。`issue` と、その時点の `additional_issues`)`revoked_at` `revoked_for`(取り消した理由)を持つ。
   `approval_history` は追記だけにし、書いてある要素を書き換えたり消したりしない。手順は spec-review の Step 6(差し戻し)と kiro-spec-init の更新の形(新しいIssueのための更新)にある
 - 人間が承認前に spec を直した場合も `/spec-review` の対象になる。承認後に直す場合は、上のとおり承認を取り消してから直す(取り消せばレビューの対象に戻る)
 - spec で進めている途中で、ごく小さい変更だと分かっても、spec の段階を省かず spec で最後まで進める。spec 無しへの切り替えを所有者に提案しない
