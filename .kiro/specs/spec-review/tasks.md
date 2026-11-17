@@ -277,7 +277,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - _要件: 12.2_
   - _依存: 11.1, 11.2_
 
-- [ ] 13. 承認を残した直しがレビューされるまで終了を止める (#900)
+- [x] 13. 承認を残した直しがレビューされるまで終了を止める (#900)
 - [x] 13.1 走査のテストを場合の名前で選べる形にし、承認を残した直しの場合を足す (#900)
 
   Claude は、`.claude/hooks/tests/test-spec-review-scan.sh` を scratchpad に写し、今ある場合を `t_` で始まる関数に分け、環境変数 `KP_TEST_CASE` に空白で区切って書いた名前の場合だけを流せる形にし、design.md のテストの方針の項目23〜30 の場合を足す。Claude は、場合を `t_` で始まる関数に分けて `KP_TEST_CASE` で選んで流す形を、`.claude/scripts/spec-review/tests/test-agent-model.sh` と同じにする。`.claude/hooks/**` は書き込みが禁止されているので、Claude は、テストのファイルを scratchpad で作る。作ったテストのファイルは、走査に判定を足すタスク13.2 で、所有者が置く。
@@ -285,7 +285,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - 完了の確かめ方: Git Bash で、今の版の走査に対して、今ある場合がすべて通り、足した場合のうち `t_kept_fix_unreviewed`・`t_kept_fix_no_review_file`・`t_kept_fix_two_stages`・`t_kept_fix_hooks` が失敗する。`KP_TEST_CASE` に、テストのファイルに無い場合の名前を書くと、テストのファイルは、場合を1つも流さずに失敗する
   - _要件: 14.7_
   - _対象の部品: spec-review-scan.sh_
-- [ ] 13.2 走査に承認を残して直した段階の判定を足し、所有者に置いてもらう (#900)
+- [x] 13.2 走査に承認を残して直した段階の判定を足し、所有者に置いてもらう (#900)
 
   Claude は、scratchpad の `spec-review-scan.sh` に、design.md の spec-review-scan.sh の節の「承認を残して直した段階の判定」を足す。そのあと、Claude は、所有者に、走査とテストの2つのファイルを置くコピーのコマンドを1つ示し、置いてもらう。
   - Claude は、`kept_approval_fixes` が配列でないときと、要素の `stage` か `found_in` が段階の名前でないときに、その要素を読み飛ばす(design.md の「失敗したときの扱い」)
