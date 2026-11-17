@@ -278,7 +278,7 @@ Claude は、各タスクを終えたと判断する前に、次のすべてを�
   - _依存: 11.1, 11.2_
 
 - [ ] 13. 承認を残した直しがレビューされるまで終了を止める (#900)
-- [ ] 13.1 走査のテストを場合の名前で選べる形にし、承認を残した直しの場合を足す (#900)
+- [x] 13.1 走査のテストを場合の名前で選べる形にし、承認を残した直しの場合を足す (#900)
 
   Claude は、`.claude/hooks/tests/test-spec-review-scan.sh` を scratchpad に写し、今ある場合を `t_` で始まる関数に分け、環境変数 `KP_TEST_CASE` に空白で区切って書いた名前の場合だけを流せる形にし、design.md のテストの方針の項目23〜30 の場合を足す。Claude は、場合を `t_` で始まる関数に分けて `KP_TEST_CASE` で選んで流す形を、`.claude/scripts/spec-review/tests/test-agent-model.sh` と同じにする。`.claude/hooks/**` は書き込みが禁止されているので、Claude は、テストのファイルを scratchpad で作る。作ったテストのファイルは、走査に判定を足すタスク13.2 で、所有者が置く。
   - Claude は、scratchpad に `hooks/` と `hooks/tests/` のフォルダを作り、`spec-review-scan.sh`・`check-spec-review-before-stop.sh`・`notify-spec-review.sh` を今の版のまま写す。テストがフックを相対の場所で読む形を変えないためである
