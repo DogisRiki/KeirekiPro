@@ -140,7 +140,7 @@
   - _対象の部品: prompt.md, claude-auto-fix-materials.sh_
   - _依存: 2.1_
 
-- [ ] 4.2 Claude を動かし、結果を見分け、変更を差分に書き出すスクリプトを作る (並行可)
+- [x] 4.2 Claude を動かし、結果を見分け、変更を差分に書き出すスクリプトを作る (並行可)
 
   Claude は、置き場所に、設計の「claude-auto-fix-run-claude.sh」の部品の節と、本物の CLI の結果を確かめたタスク 1.2 の結果のとおりに、Claude を動かすスクリプトと、そのテスト `test-claude-auto-fix-run-claude.sh` を作る。テストは、偽の `claude` で CLI を置き換え、指示の文のファイルのパスを環境変数で渡す。指示の文を作るタスク 4.1 を待たずにこのタスクを進められるようにするためである。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-run-claude.sh` の場合が、すべて通る
@@ -462,3 +462,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - vuln-fix の PR を作る処理のテスト(タスク 3.3): `test-frontend-vuln-fix.sh` は、偽の gh・git・curl・pnpm を PATH の先頭に置き、環境変数で成功と失敗を選んで `run` を流す。偽の git は `ls-remote` の5つ目の引数をブランチ名として読む。backend の同じテストを足すときも、この形にそろえる
 - origin のブランチの有無の確かめ(タスク 3.4): `git ls-remote --exit-code` は、ブランチが無いときに 2 で終わる。ほかの失敗を 2 で返す関数の中で使うときは、ブランチが無いときを 1 などの別の値に直してから返す
 - 材料を集めるスクリプト(タスク 4.1): `claude-auto-fix-materials.sh` は、材料を `$RUNNER_TEMP/claude-auto-fix-materials.txt` に書き、標準出力に `materials=<場所>` の1行だけを書く。`red-check` の PR は、作り手が環境変数 `CAF_SHIP_LOGIN`(既定は DogisRiki-bot)のときだけ読む。edit ジョブを書くタスクでは、この環境変数をワークフローに明示する。期待一覧は `CAF_REQUIRED_CHECKS` で替えられる
+- Claude を動かすスクリプト(タスク 4.2): `claude-auto-fix-run-claude.sh` は、作業のフォルダの index と作業のフォルダの違いを Claude の変更として書き出し、追っていない新しいファイルは intent-to-add で差分に入れる。そのため、edit ジョブは、起点のコードの差分 `base.patch` を `git apply --index` で当てる(またはコミットする)ことを、このスクリプトを呼ぶ前に行う。指示の文は環境変数 `CAF_PROMPT`、作業のフォルダは `CAF_TARGET_DIR`(既定は `target`)で替えられる
