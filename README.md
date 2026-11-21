@@ -52,7 +52,7 @@ GitHub ActionsとAWS OIDCを組み合わせた、セキュアで効率的なCI/C
 
 ```mermaid
 flowchart LR
-    PR[プルリクエスト<br>Claude Code・Dependabot・<br>frontend-vuln-fix・backend-vuln-fix・<br>ci-tool-version-update]
+    PR[プルリクエスト<br>Claude Code・Dependabot・<br>frontend-vuln-fix・backend-vuln-fix・<br>ci-tool-version-update・<br>claude-auto-fix]
 
     subgraph s1[系統1: 品質の検査]
         Q[テスト・Lint・カバレッジ・<br>ビルド・E2Eスモーク・<br>Java版とGo版の比べる検査・<br>依存の脆弱性検査・<br>Java版とGo版のコンテナイメージの<br>脆弱性検査・<br>ソースコードの脆弱性の診断・<br>公開直後のライブラリとGoの版の遮断]
@@ -93,13 +93,15 @@ flowchart LR
 
 4つの系統がすべて緑になるまで、プルリクエストはマージされません。プルリクエストのブランチは、承認のほかの必須の検査が通ったあとに、自動でmainの最新に合わせられ、検査が再実行されます。出したときにmainより古いプルリクエストは、検査を待たずに合わせられます。マージされても本番への反映は行われず、人間による手動実行だけが本番を更新できます。
 
-Node.jsを使うワークフロー(ci.yaml・guardrails.yaml・codex-review.yml・mutation-report.yaml・frontend-vuln-fix.yaml)は、Node.jsをnodejs.orgから取り、配布元の署名を確かめてから使います。確かめられなければ、Node.jsを使う前に失敗します。
+Node.jsを使うワークフロー(ci.yaml・guardrails.yaml・codex-review.yml・mutation-report.yaml・frontend-vuln-fix.yaml・claude-auto-fix-target.yaml)は、Node.jsをnodejs.orgから取り、配布元の署名を確かめてから使います。確かめられなければ、Node.jsを使う前に失敗します。
 
 terraform-apply.yamlは、Terraformをreleases.hashicorp.comから取り、配布元の署名を確かめてから使います。確かめられなければ、Terraformを使う前に失敗します。
 
-Trivyを使うワークフロー(container-scan.yaml・container-scan-scheduled.yaml)は、TrivyをGitHubのリリースから取り、aquasecurity/trivyのリリースのワークフローが指定の版のタグで署名したことを確かめてから使います。確かめられなければ、Trivyを使う前に失敗します。
+Trivyを使うワークフロー(container-scan.yaml・container-scan-scheduled.yaml・claude-auto-fix-target.yaml)は、TrivyをGitHubのリリースから取り、aquasecurity/trivyのリリースのワークフローが指定の版のタグで署名したことを確かめてから使います。確かめられなければ、Trivyを使う前に失敗します。
 
 codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリリースのワークフローが作ったことを示す来歴を確かめてから使います。確かめられなければ、Codex CLIを使う前に失敗します。
+
+claude-auto-fix-target.yamlは、Claude CodeのCLIをdownloads.claude.aiから取り、配布元の鍵で署名された一覧と照らして、実行ファイルのSHA-256が合うことを確かめてから使います。確かめられなければ、CLIを使う前に失敗します。
 
 各ワークフローの詳細は次のとおりです。
 
@@ -124,6 +126,8 @@ codex-review.ymlは、Codex CLIをnpmのregistryから取り、配布元のリ�
 | 依存の更新 | frontend-vuln-fix.yaml | 日次 (schedule) / 手動 | Dependabotが修正のプルリクエストを作らないfrontendの間接依存の脆弱性の警告を読み、部品と最初の修正版の組ごとに、警告が消える版に上げるプルリクエストを作る。まずlockfileだけを直し、それでも脆弱な版が残るときは`pnpm-workspace.yaml`のoverridesに版の指定を足す(所有者の承認が要る)。修正版が公開から72時間経っていないときは、本番で動く部品のhighかcriticalの警告なら`minimumReleaseAgeExclude`に足して作り、それ以外は72時間経ってからの実行で作る。修正版の無い警告と、同じ組のブランチがすでにある警告では作らない。プルリクエストを作る前にci.yamlのfrontend-testと同じ検査を流し、通らなければ作らない。上げられなかったときと、上げると検査が通らないときは、消せなかった警告を実行の記録に出して、実行が失敗で終わる |
 | 依存の更新 | backend-vuln-fix.yaml | 日次 (schedule) / 手動 | Dependabotが修正のプルリクエストを作らないbackendの部品(Spring BootのBOMが版を決める部品や間接依存)の脆弱性の警告を読み、部品と最初の修正版の組ごとに、警告が消える版に上げるプルリクエストを作る。`backend/gradle/libs.versions.toml`の`vuln-fix-`の行に部品と版を書くだけなので、所有者の承認は要らない。修正版が公開から72時間経っていないときは、本番で動く部品のhighかcriticalの警告なら作り(dependency-cooldownが所有者の承認を求める)、それ以外は72時間経ってからの実行で作る。版の一覧に書いた部品とGradleのプラグイン、Dependabotのプルリクエストが開いている部品、修正版の無い警告、同じ組のブランチがすでにある警告では作らない。ビルド用のプラグインが持ち込む部品など、上げられなかったときは実行が失敗で終わる。Go版は、govulncheck(make vuln)が呼ばれる箇所を見つけた脆弱性を、部品ごとと標準ライブラリごとに直すプルリクエストを作る。部品はgo getとgo mod tidyで上げ、標準ライブラリはgo.modのtoolchainの行とgolangのイメージの版を1つのプルリクエストで上げる。同じ組のブランチかDependabotのプルリクエストがあるときと、直した版の無い脆弱性では作らない |
 | 依存の更新 | ci-tool-version-update.yaml | 週次 (schedule) / 手動 | CIの道具(Node.js・Trivy・Codex CLI・Terraform)の版を上げるプルリクエストを、道具ごとに作る。上げる先は、今の版と同じメジャー版で公開から72時間経った版のうち、最も新しい版とする。Node.jsとTerraformでは、その版を入れた配布元のイメージも公開から72時間経っている版に限り、開発環境の版も同じ版にそろえる。同じ道具の更新のプルリクエストが開いていれば、それを書き換える。更新のプルリクエストは、検査がすべて通っても所有者が承認するまでマージされない。プルリクエストを作る前にスクリプトのテストを流し、テストが失敗したときか、版を上げられなかった道具があるときは、Issue「CI の道具の版の更新: 判定不能」で所有者に知らせ、次に成功した実行でIssueを自動でクローズする |
+| 自動の修正 | claude-auto-fix.yaml | workflow_run (frontend-vuln-fix.yaml・backend-vuln-fix.yaml・audit-weekly.yaml・container-scan-scheduled.yamlの完了) / 1時間ごと (schedule) / 手動 | 今ある検査とワークフローが自分では直せずに残した警告と脆弱性と、止まったDependabotのプルリクエストから、Claudeに直させる対象を選び、対象ごとにclaude-auto-fix-target.yamlを起動する。1時間ごとの実行では、Claudeが動けなかった対象を動かし直す実行と、Claudeの変更のプルリクエストの赤の検査を直させる実行も起動し、対象が消えたClaudeの変更のプルリクエストと、直せなかったことを知らせるIssueを閉じる。このワークフローはClaudeを動かさない |
+| 自動の修正 | claude-auto-fix-target.yaml | claude-auto-fix.yamlからの起動 (workflow_dispatch) | 1つの対象について材料を集め、Claude CodeのCLIに直させる。Claude CodeのCLIは配布元の署名を確かめてから使い、ClaudeにはGitHubの中身を変える権限を渡さない。警告か脆弱性を直す新しいプルリクエストは、その警告か脆弱性が残らないことと、変えた領域の品質チェックに通ることを確かめた変更だけで作る。新しいプルリクエストには、ラベル`claude-auto-fix`を付ける。Claudeの変更に、ゲートの設定のファイルの変更か検査を弱める変更が含まれるときは、その変更をプルリクエストに出さない。直せなかった対象と、Claudeを動かす鍵が無いか切れていることは、Issueかコメントで所有者に知らせる |
 | ラベル | sync-labels.yaml | push (main、`.github/labels.json` などの変更) / 手動 | ラベルの一覧のファイル`.github/labels.json`のとおりに、GitHubのラベルを作り・直し・名前を変え・消す。ファイルに前の名前が書かれたラベルは、消さずに名前だけを変える。先に合わせ込みのスクリプトのテストを流し、ファイルが検証に通らなければラベルを1つも変えずに失敗で終わる |
 | リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
 | リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。Terraformは配布元の署名を確かめてから使う。apply直前にplanで差分を表示し、そのplanをそのまま適用。plan_onlyを選んで動かすと、差分を表示したところで止まり、適用しない |
