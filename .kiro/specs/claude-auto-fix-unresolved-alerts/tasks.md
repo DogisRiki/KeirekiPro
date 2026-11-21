@@ -42,7 +42,7 @@
   - _対象の部品: claude-auto-fix-target.yaml_
 
 - [ ] 2. どのスクリプトも使う共通の関数とガードを作る
-- [ ] 2.1 種類と識別子の key とブランチ名と表示名を作る関数、目印を書く関数と読む関数、直しても緑にならない検査を除く関数を作る
+- [x] 2.1 種類と識別子の key とブランチ名と表示名を作る関数、目印を書く関数と読む関数、直しても緑にならない検査を除く関数を作る
 
   Claude は、置き場所に、設計の「lib-claude-auto-fix.sh」の部品の節の10個の関数のうち、key を作る関数、ブランチ名と表示名を作る関数、目印を書く関数、目印を読む関数、`fixable_red_checks` と、そのテスト `test-lib-claude-auto-fix.sh` を作る。Claude は、テストを `KP_TEST_CASE` で場合を選んで流せる形にする。
   - 完了の確かめ方: Linux のコンテナで流した `test-lib-claude-auto-fix.sh` の場合が、すべて通る。`KP_TEST_CASE` に場合の名前を入れると、その場合だけが流れる
@@ -455,3 +455,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - この spec は `frontend/` `backend/` `terraform/` を変えないので、大きなまとまりの最後のタスクで流す verify のスキルは無い。代わりに、Claude は、シェルのスクリプトを作るか変えたタスクごとに、`.github/CLAUDE.md` のとおり、置き場所とリポジトリの写しの中のすべての `.sh` を一度に shellcheck に渡し、指摘が0件であることをタスクの完了の確かめ方に加える。変えたファイルだけを渡すと、shellcheck が `. "$LIB"` で読み込む先のファイルをたどらず、CI だけが警告を出すためである。
 - 実物での確認のために Claude が所有者に頼むことは、本物の鍵が要る CLI の確認のタスク 1.2 のコマンド、Gradle のスナップショットの確認のタスク 1.4 の push、ファイルを置くタスク 8.1 のコマンドの3つである。Claude は、1回の返事に依頼を1つだけ書く
 - 所有者に push を頼むとき: このリポジトリへの push は、bot のアカウント DogisRiki-bot の gh の設定でしか通らない。所有者の個人のアカウントでは 403 で断られた(タスク 1.4 の確認のブランチの push)。Claude は、所有者に push か GitHub の操作を頼むコマンドの先頭で、`$env:GH_CONFIG_DIR = "$env:USERPROFILE\.gh-bot"` を設定する(タスク 8.1 のコマンドも同じ)
+- `lib-claude-auto-fix.sh` の目印の関数(タスク 2.1): `marker_line` と `latest_marker` は `<欄>=<値>` の形の目印だけを扱う。PR の本文の `<!-- claude-auto-fix-detail <base64 の JSON> -->` は値だけの形なので、PR を作るタスクで別に書いて読む。`latest_marker` は `created_at` が同じ項目を渡された順で並べるので、呼び出す側は Issue の本文を先に、コメントをその後ろに並べて渡す
