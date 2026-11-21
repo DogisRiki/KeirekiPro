@@ -72,7 +72,7 @@
   - _要件: 3.1, 3.2_
   - _対象の部品: claude-auto-fix-guard.sh_
 
-- [ ] 2.4 dependency-cooldown の判定が要るかを決める関数と、3つの判定の終わり方から扱いを決める関数を足す
+- [x] 2.4 dependency-cooldown の判定が要るかを決める関数と、3つの判定の終わり方から扱いを決める関数を足す
 
   Claude は、置き場所の `lib-claude-auto-fix.sh` に、設計の10個の関数のうち `cooldown_needed` と `cooldown_outcome` を足し、その場合を `test-lib-claude-auto-fix.sh` に足す。`cooldown_needed` は、Go の版を書くファイルを見分けるために、今ある `lib-go-release.sh` を読み込んで `go_release_is_target` をそのまま呼ぶ。テストは、偽の `ci-tool-versions.json` を一時のフォルダに置いて `cooldown_needed` に渡す。
   - 完了の確かめ方: Linux のコンテナで流した `test-lib-claude-auto-fix.sh` の場合が、key とブランチ名と目印を扱う関数を作るタスク 2.1 と、Claude の変更の PR を探す関数などを足すタスク 2.2 で作った場合も含めて、すべて通る
@@ -457,3 +457,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 所有者に push を頼むとき: このリポジトリへの push は、bot のアカウント DogisRiki-bot の gh の設定でしか通らない。所有者の個人のアカウントでは 403 で断られた(タスク 1.4 の確認のブランチの push)。Claude は、所有者に push か GitHub の操作を頼むコマンドの先頭で、`$env:GH_CONFIG_DIR = "$env:USERPROFILE\.gh-bot"` を設定する(タスク 8.1 のコマンドも同じ)
 - `lib-claude-auto-fix.sh` の目印の関数(タスク 2.1): `marker_line` と `latest_marker` は `<欄>=<値>` の形の目印だけを扱う。PR の本文の `<!-- claude-auto-fix-detail <base64 の JSON> -->` は値だけの形なので、PR を作るタスクで別に書いて読む。`latest_marker` は `created_at` が同じ項目を渡された順で並べるので、呼び出す側は Issue の本文を先に、コメントをその後ろに並べて渡す
 - ガードの種類の渡し方(タスク 2.3): `claude-auto-fix-guard.sh <base> <head>` は、対象の種類を環境変数 `CAF_KIND` で受け取る。`CAF_KIND` が無いか知らない種類のときは、ガードは調べずに失敗する。種類が `codeql` のときに見つけた行を出さないことを、呼び出す側が種類を渡し忘れても破らないためである。確認のスクリプトの `apply` の形と出荷のスクリプトは、ガードを呼ぶときに `CAF_KIND` を渡し、今のフォルダを調べるリポジトリの最上位にする
+- Go の版を書くファイルの見分け方(タスク 2.4): `go_release_is_target` は、名前が `Dockerfile.<何か>` のファイルをすべて Go の版を書くファイルとみなす。`Dockerfile.md` のような説明のファイルも当たるので、`cooldown_needed` は、そのファイルだけを変えた変更でも dependency-cooldown の判定が要るとする。テストで「判定が要らない」場合のファイルに、この形の名前を使わない
