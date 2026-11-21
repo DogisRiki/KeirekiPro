@@ -203,7 +203,7 @@
   - _対象の部品: claude-auto-fix-ship.sh_
   - _依存: 2.1, 2.3_
 
-- [ ] 4.7 実行の結果と、直せなかったときの Issue とコメントと、鍵の Issue を書くスクリプトを作る (並行可)
+- [x] 4.7 実行の結果と、直せなかったときの Issue とコメントと、鍵の Issue を書くスクリプトを作る (並行可)
 
   Claude は、置き場所に、結果を書くスクリプトと、そのテスト `test-claude-auto-fix-report.sh` を作る。このスクリプトは、設計の「claude-auto-fix-report.sh」の部品の節の `record` と `notify` の2つの形を持つ。
   - `record` の形: `record` の形は、結果を `$RUNNER_TEMP/outcome/outcome.json` に書き、標準出力に `result=` を出し、Issue の API を呼ばない。`record` の形は、GITHUB_STEP_SUMMARY に、実行の結果を1行書く。種類が `codeql` の行には、警告の番号と結果だけを書く。
@@ -475,3 +475,6 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - ship の起点の main(タスク 4.6): `claude-auto-fix-ship.sh` は、新しい PR のコミットの親にする main のコミットを、環境変数 `CAF_MAIN_SHA` で受け取る。9つの引数の形に main_sha の欄が無いためである。red-check のとき以外は必須で、起点のコミットの祖先でなければ失敗する。ワークフローのタスク 6.2 は、prepare ジョブの出力の `main_sha` を ship の手順に `CAF_MAIN_SHA` として渡す
 - detail の目印の読み方(タスク 4.6): ship は、`<!-- claude-auto-fix-detail … -->` の目印を、detail が空でないとき(種類が npm・maven・go のとき)だけ本文に書く。dispatch で本文から detail を読む関数(タスク 5.x)は、目印が無ければ detail を空として扱い、行の始めから始まる最初の目印だけを読む。本文の後ろの変えたファイルの一覧には、Claude が作ったファイルの名前が入るためである
 - ship ジョブの checkout(タスク 4.6): ship ジョブが `target/` を取り出す `actions/checkout` には `persist-credentials: false` を付ける。既定のままだと GITHUB_TOKEN が http.extraheader に残り、`gh auth setup-git` の資格情報より先に使われて、push が bot の PAT にならないためである
+- 知らせの Issue の起票(タスク 4.7): `claude-auto-fix-report.sh` は、知らせの Issue と鍵の Issue を、`lib-ledger-issue.sh` の `ledger_find_or_create` を使わずに、`gh issue create` で起票し、`ledger_assign_owner` で所有者を担当者にする。`ledger_find_or_create` は、閉じた Issue でも題名が同じなら使い続けるため、「開いていなければ起票する」決まりを守れないからである。コメントは `ledger_comment` と `lib-notice-comment.sh` の `notice_post` で付ける。タスクの本文と design の「lib-ledger-issue.sh で探し、起票し」との食い違いとして、PR の本文に書く
+- report の起点のコミット(タスク 4.7): `claude-auto-fix-report.sh record` は、結果のファイルの `head_sha` を、環境変数 `CAF_HEAD_SHA`(40桁の16進)から読む。10の引数の形に欄が無いためである。無ければ null を書く。ワークフローのタスク 6.2 は、prepare ジョブの出力の起点のコミットを report の手順に `CAF_HEAD_SHA` として渡す
+- Issue の一覧の渡し方(タスク 4.7): 開いている Issue の一覧とコメントの一覧は、jq に引数(`--argjson`)で渡さず、標準入力かファイル(`--slurpfile`)で渡す。Linux の1つの引数の長さの上限は 128KiB で、知らせの Issue が20件ほど開くと超えるためである
