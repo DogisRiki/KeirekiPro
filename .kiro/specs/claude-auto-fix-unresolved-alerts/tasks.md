@@ -30,7 +30,7 @@
   - _要件: 2.9_
   - _対象の部品: claude-auto-fix-verify.sh_
 
-- [ ] 1.4 一時のブランチのコミットの Gradle のスナップショットで、maven の差が返るかを確かめる (並行可)
+- [x] 1.4 一時のブランチのコミットの Gradle のスナップショットで、maven の差が返るかを確かめる (並行可)
 
   Claude は、設計の「プロジェクトの決まりを守っているか」の節の「使う外部の機能がこのリポジトリで使えるか」の maven の項のとおりに、確認に使う2つのブランチと、確認のワークフロー `tmp-gradle-snapshot-check.yaml` を用意する。Claude は、1つ目のブランチ `chore/tmp-gradle-snapshot-target` を作って push し、確認のワークフローを `.claude/.state/claude-auto-fix-unresolved-alerts/gradle-check/` に作る。確認のワークフローは main に入れないので、Claude は、このファイルを置き場所の `place-1/` に置かない。Claude は `.github/` に書けないので、Claude は、所有者に、2つ目のブランチ `chore/tmp-gradle-snapshot-check` に確認のワークフローを置いて push するコマンドを1つ示し、打つよう頼む。確認のワークフローの実行が終わったら、Claude は、差分比較の API の結果と、2つ目のブランチのコミットにスナップショットが結び付いていないことを読み、確かめた日とコミットと結果を、research.md の見出し `## 一時のブランチの Gradle のスナップショットの確認` の下に書く。そのあと、Claude は2つのブランチと `gradle-check/` のフォルダを消す。
   - 完了の確かめ方: 次の3つが起きる

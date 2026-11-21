@@ -291,3 +291,17 @@
 - 終わり方の番号: 1
 - エラーの文: 1行目は `[ERR_PNPM_NO_MATURE_MATCHING_VERSION] 8 versions do not meet the minimumReleaseAge constraint:` だった。続く8行に、版ごとに `<名前>@<版> was published at <公開の日時>, within the minimumReleaseAge cutoff (<境の日時>)` の形で、固定した `typescript@7.1.0-dev.20261120.1` と、その版が持つ7つの部品の版が並んだ
 - 結論: エラーの文は `ERR_PNPM_NO_MATURE_MATCHING_VERSION` を含む。design.md の claude-auto-fix-verify.sh の節の pnpm の項の見分け方と合う。設計を見直すきっかけには当たらない
+
+## 一時のブランチの Gradle のスナップショットの確認
+
+- 確かめた日: 2026-11-21
+- 確認に使ったコミット: main のコミット `c2661468` から、2つのブランチを作った
+  - 1つ目のブランチ `chore/tmp-gradle-snapshot-target` のコミット `03b6fb72` は、`backend/gradle/libs.versions.toml` の `commons-validator` を 1.11.0 から 1.10.0 に変えた
+  - 2つ目のブランチ `chore/tmp-gradle-snapshot-check` のコミット `3414652e` は、確認のワークフロー `.github/workflows/tmp-gradle-snapshot-check.yaml` を足した
+- 確認のワークフロー: 2つ目のブランチへの push で動いた(実行の番号 44861146192)。generate と submit の2つのジョブは、どちらも成功した。2つのジョブの組み立ては `dependency-review.yaml` の generate と submit と同じで、`gradle/actions/dependency-submission` の版も同じ v6.4.1 である。generate のジョブは1つ目のブランチのコミットを checkout した。2つのジョブには、環境変数 `GITHUB_DEPENDENCY_GRAPH_SHA` に `03b6fb72a6b34d9d03515a5073b8e5204644dc76` を、`GITHUB_DEPENDENCY_GRAPH_REF` に `refs/heads/chore/tmp-gradle-snapshot-target` を渡した
+- スナップショットの中身: generate のジョブが作ったスナップショットの `sha` は `03b6fb72a6b34d9d03515a5073b8e5204644dc76`、`ref` は `refs/heads/chore/tmp-gradle-snapshot-target` だった
+- 差分比較の API の結果:
+  - main のコミット `c2661468` と1つ目のブランチのコミット `03b6fb72` の比較は、maven の差を2行返した。`backend/settings.gradle` の `commons-validator:commons-validator` について、1.10.0 の `added` と 1.11.0 の `removed` で、どちらも scope は `runtime` だった
+  - main のコミット `c2661468` と2つ目のブランチのコミット `3414652e` の比較は、`actions` の差を3行だけ返し、maven の差を返さなかった
+  - 1つ目のブランチのコミット `03b6fb72` と2つ目のブランチのコミット `3414652e` の比較も、maven の差を返さなかった。2つ目のブランチのコミットに Gradle のスナップショットが結び付いていれば、そのスナップショットの `commons-validator` は 1.10.0 になり、main のコミットとの比較で maven の差が出るはずである。main のコミットとの比較で maven の差が出なかったので、2つ目のブランチのコミットには Gradle のスナップショットが結び付いていない
+- 結論: 2つの環境変数を渡すと、Gradle のスナップショットは、ワークフローを動かしたブランチのコミットではなく、渡したコミットとブランチに結び付く。差分比較の API は、main に無く一時のブランチにだけあるコミットでも、maven の差を返す。design.md の cooldown-generate と cooldown-submit の組み立てのとおりでよく、設計を見直すきっかけには当たらない
