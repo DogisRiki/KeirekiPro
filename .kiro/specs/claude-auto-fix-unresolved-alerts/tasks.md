@@ -41,7 +41,7 @@
   - _要件: 2.9_
   - _対象の部品: claude-auto-fix-target.yaml_
 
-- [ ] 2. どのスクリプトも使う共通の関数とガードを作る
+- [x] 2. どのスクリプトも使う共通の関数とガードを作る
 - [x] 2.1 種類と識別子の key とブランチ名と表示名を作る関数、目印を書く関数と読む関数、直しても緑にならない検査を除く関数を作る
 
   Claude は、置き場所に、設計の「lib-claude-auto-fix.sh」の部品の節の10個の関数のうち、key を作る関数、ブランチ名と表示名を作る関数、目印を書く関数、目印を読む関数、`fixable_red_checks` と、そのテスト `test-lib-claude-auto-fix.sh` を作る。Claude は、テストを `KP_TEST_CASE` で場合を選んで流せる形にする。
@@ -81,7 +81,7 @@
   - _依存: 2.2_
 
 - [ ] 3. 今ある検査とワークフローに、この仕組みが読む出力を足す
-- [ ] 3.1 止まった Dependabot の PR の一覧を JSON で書き出す (並行可)
+- [x] 3.1 止まった Dependabot の PR の一覧を JSON で書き出す (並行可)
 
   Claude は、`check-audit-dependabot-stuck.sh` とそのテストの今の版を置き場所に写し、設計の「check-audit-dependabot-stuck.sh の変更」の節のとおりに、環境変数 `STUCK_JSON_OUT` で止まった PR の一覧を書き出す形を足す。Claude は、テストに場合を足す。
   - 完了の確かめ方: Linux のコンテナで流した `test-check-audit-dependabot-stuck.sh` の場合が、前からある場合も含めてすべて通る
