@@ -318,7 +318,7 @@ case_two_cves() {
     local f="$CASE/ipa.rdf" n
     perl -pe 's{ </rdf:RDF>}{}; s{^</rdf:RDF>}{ <item rdf:about="https://www.ipa.go.jp/security/security-alert/2026/1103-react.html">\n  <title>React の脆弱性対策について(CVE-2026-2050、CVE-2026-2051)</title>\n  <link>https://www.ipa.go.jp/security/security-alert/2026/1103-react.html</link>\n  <dc:date>2026-11-03T00:00:00+09:00</dc:date>\n </item>\n</rdf:RDF>}' "$VFIX/ipa.rdf" >"$f"
     put "$IPA_URL" 200 "$f"
-    printf '<html><body><p>React の脆弱性(CVE-2026-2050、CVE-2026-2051)</p></body></html>\n' >"$CASE/article-1103.html"
+    printf '<html><body><main class="container--col2__main"><p>React の脆弱性(CVE-2026-2050、CVE-2026-2051)</p></main></body></html>\n' >"$CASE/article-1103.html"
     put https://www.ipa.go.jp/security/security-alert/2026/1103-react.html 200 "$CASE/article-1103.html"
     for n in 2050 2051; do
         perl -pe "s/CVE-2026-2040/CVE-2026-$n/g; s/GHSA-aaaa-2040-reac/GHSA-aaaa-$n-reac/g" "$VFIX/records/cve-CVE-2026-2040.json" >"$CASE/cve-$n.json"
