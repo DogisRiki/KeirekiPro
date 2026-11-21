@@ -58,8 +58,8 @@ my $big = qq{  <item rdf:about="$article_url">\n}
     . qq{  </item>\n};
 $jpcert =~ s{(  <item )}{$big$1} or die "JPCERT/CC の一覧に項目が無い\n";
 put('https://www.jpcert.or.jp/rss/jpcert.rdf', 200, $jpcert);
-put($article_url, 200, "<html><body><h1>複数の製品の脆弱性</h1><ul>\n"
-    . join('', map { "<li>CVE-2026-$_</li>\n" } 5000 .. 5299) . "</ul></body></html>\n");
+put($article_url, 200, "<html><body><article class=\"\"><h1>複数の製品の脆弱性</h1><ul>\n"
+    . join('', map { "<li>CVE-2026-$_</li>\n" } 5000 .. 5299) . "</ul></article></body></html>\n");
 
 my $ipa = slurp("$fix/ipa.rdf");
 my $ipa_items = '';
@@ -68,7 +68,7 @@ for my $n (0 .. 29) {
     my $cve = sprintf 'CVE-2026-40%02d', $n;
     $ipa_items .= qq{ <item rdf:about="$url">\n  <title>製品$n の脆弱性対策について($cve)</title>\n}
         . qq{  <link>$url</link>\n  <dc:date>2026-11-03T00:00:00+09:00</dc:date>\n </item>\n};
-    put($url, 200, "<html><body><p>$cve について。" . ('この製品の脆弱性について、修正した版の情報を説明します。' x 100) . "</p></body></html>\n");
+    put($url, 200, "<html><body><main class=\"container--col2__main\"><p>$cve について。" . ('この製品の脆弱性について、修正した版の情報を説明します。' x 100) . "</p></main></body></html>\n");
 }
 $ipa =~ s{</rdf:RDF>}{$ipa_items</rdf:RDF>} or die "IPA の一覧の終わりが無い\n";
 put('https://www.ipa.go.jp/security/alert-rss.rdf', 200, $ipa);

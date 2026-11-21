@@ -30,6 +30,7 @@ my $FEEDS_WINDOW = 7 * 24 * 3600; # 直近7日
 my $FEEDS_JST = 9 * 3600;         # IPA の日付を読む時間帯(UTC+9)
 my $FEEDS_ARTICLES = 20;          # 2回目の curl の呼び出しで取る記事のページの数の上限
 my $FEEDS_ARTICLE_CHARS = 2500;   # 記事の本文を持つ文字数の上限
+my %FEEDS_ARTICLE_TAG = (ipa => 'main', jpcert => 'article'); # 出どころごとの、記事の本文を囲む要素
 
 sub feeds_collect {
     my ($now, $work_dir) = @_;
@@ -63,7 +64,8 @@ sub feeds_collect {
 }
 
 # 直近7日の JPCERT/CC と IPA の記事のページを2回目の curl の呼び出しで取り、項目に記事の本文と CVE の番号を足す。
-# 記事のページを取れなかった項目は、題名から拾った番号だけを持ち、article_ok が偽のままになる
+# 番号と本文は、記事の本文の囲みの中だけから取る。ページの上のメニューと横の過去の記事の一覧には、ほかの記事の番号と文が載るためである。
+# 記事のページを取れなかった項目と、本文の囲みが見つからないページの項目は、題名から拾った番号だけを持ち、article_ok が偽のままになる
 sub _feeds_articles {
     my ($work_dir, $items, $deadline) = @_;
     my @targets = grep {
@@ -82,11 +84,21 @@ sub _feeds_articles {
         close $f;
         next unless utf8::decode($html);
         my $item = $targets[$n];
-        $item->{cves} = [ _feeds_cves($item->{sources}[0]{title}, $html) ];
+        my $body = _feeds_article_body($item->{sources}[0]{source}, $html);
+        next unless defined $body;
+        $item->{cves} = [ _feeds_cves($item->{sources}[0]{title}, $body) ];
         ($item->{key}) = sort { _feeds_cve_cmp($a, $b) } @{ $item->{cves} } if @{ $item->{cves} };
-        $item->{article_text} = substr(_feeds_html_text($html), 0, $FEEDS_ARTICLE_CHARS);
+        $item->{article_text} = substr(_feeds_html_text($body), 0, $FEEDS_ARTICLE_CHARS);
         $item->{article_ok} = JSON::PP::true;
     }
+}
+
+# 記事の HTML から、出どころの記事の本文を囲む要素の中を返す。コメントの中の要素は数えない。囲む要素が無ければ undef を返す
+sub _feeds_article_body {
+    my ($source, $html) = @_;
+    my $tag = $FEEDS_ARTICLE_TAG{$source} or return undef;
+    $html =~ s{<!--.*?-->}{ }gs;
+    return $html =~ m{<$tag(?=[\s>])[^>]*>(.*?)</$tag\s*>}is ? $1 : undef;
 }
 
 # 記事の HTML から、head と script と style とコメントとタグを外し、空白を1つにまとめた本文を返す
