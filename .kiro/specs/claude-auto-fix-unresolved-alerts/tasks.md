@@ -153,7 +153,7 @@
   - _対象の部品: claude-auto-fix-run-claude.sh_
   - _依存: 1.2_
 
-- [ ] 4.3 対象を読み直し、作業の起点のコードを作るスクリプトを作る (並行可)
+- [x] 4.3 対象を読み直し、作業の起点のコードを作るスクリプトを作る (並行可)
 
   Claude は、置き場所に、設計の「claude-auto-fix-prepare.sh」の部品の節のとおりに、対象を読み直すスクリプトと、そのテスト `test-claude-auto-fix-prepare.sh` を作る。種類が `container` のとき、スクリプトは、環境変数 `TRIVY_RESULTS_DIR` のフォルダから、設計の「claude-auto-fix-target.yaml」の部品の節の prepare ジョブの項に書いた `trivy-java.json` と `trivy-go.json` を読む。テストは、偽の `gh` と偽の Trivy の結果を使い、一時のフォルダの Git のリポジトリで起点のコードを作る。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-prepare.sh` の場合が、すべて通る
@@ -463,3 +463,6 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - origin のブランチの有無の確かめ(タスク 3.4): `git ls-remote --exit-code` は、ブランチが無いときに 2 で終わる。ほかの失敗を 2 で返す関数の中で使うときは、ブランチが無いときを 1 などの別の値に直してから返す
 - 材料を集めるスクリプト(タスク 4.1): `claude-auto-fix-materials.sh` は、材料を `$RUNNER_TEMP/claude-auto-fix-materials.txt` に書き、標準出力に `materials=<場所>` の1行だけを書く。`red-check` の PR は、作り手が環境変数 `CAF_SHIP_LOGIN`(既定は DogisRiki-bot)のときだけ読む。edit ジョブを書くタスクでは、この環境変数をワークフローに明示する。期待一覧は `CAF_REQUIRED_CHECKS` で替えられる
 - Claude を動かすスクリプト(タスク 4.2): `claude-auto-fix-run-claude.sh` は、作業のフォルダの index と作業のフォルダの違いを Claude の変更として書き出し、追っていない新しいファイルは intent-to-add で差分に入れる。そのため、edit ジョブは、起点のコードの差分 `base.patch` を `git apply --index` で当てる(またはコミットする)ことを、このスクリプトを呼ぶ前に行う。指示の文は環境変数 `CAF_PROMPT`、作業のフォルダは `CAF_TARGET_DIR`(既定は `target`)で替えられる
+- 対象を読み直すスクリプト(タスク 4.3): `claude-auto-fix-prepare.sh` は、`$RUNNER_TEMP/claude-auto-fix-base.patch` を書き、続けるときは `main_sha` `base_sha` `base_sha256` `base_patch` を出し、止めるときは `outcome` と `cause` の2行だけを出す。origin から main と `refs/pull/<番号>/head` を取り込むので、prepare ジョブは fetch-depth: 0 で checkout する。止める理由は claude-pr-open、pr-not-open、unfixed-issue、not-stuck、no-fixable-check、head-moved、merge-conflict、target-gone、gone-on-main で、gone-on-main のときに report ジョブがラベル `container-vuln` の Issue にコメントを書く
+- red-check と種類 dependabot の組(タスク 4.3): reason が red-check のときは、種類が dependabot でも起点は Claude の変更の PR の head で、base.patch は空にし、`checks` を出さない。design.md の prepare ジョブの項と prepare.sh の節の呼び出し方は「種類が dependabot なら checks を出す」と書くが、red-check の赤の検査は Claude の変更の PR のものなので、ワークフローのタスクでは、種類が dependabot で reason が red-check でないときだけ prepare の出力の `checks` を使い、red-check では入力の `checks` を使う
+- 設計と要件の食い違い(タスク 4.3、PR の本文に書いて所有者に決めてもらう): design.md の prepare.sh の節の止める決まりは「reason が manual でなく、知らせの Issue の状態が unfixed なら skipped」と書くが、実装は reason が trigger か retry のときだけ止める。要件4の4が止めるのは要件1の1から4の4つのきっかけだけで、要件2の4は Claude の変更の PR の赤で Claude を動かすと決めているためである。設計の文のとおりにすると、unfixed の Issue が開いたまま所有者が手で動かして作った PR が赤になったときに、Claude がその赤を直せない
