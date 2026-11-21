@@ -189,7 +189,7 @@
     - 要件5の受入基準2(CodeQL の警告を直す PR は、警告が消えて品質チェックに通ると確かめたときだけ作る)は、テストの「confirm が CODEQL_SARIF_DIR の偽の SARIF を読み、警告と同じ規則の ID の結果が同じファイルにあれば unfixed、無ければ ok になる」「SARIF の結果のパスが target/ で始まるときも同じファイルとみなして unfixed になる」「種類が codeql のとき品質チェックと CodeQL の出力を標準出力に出さない」で確かめる
   - _要件: 2.2, 5.2_
 
-- [ ] 4.6 確かめた差分をコミットして push し、PR を作るスクリプトを作る (並行可)
+- [x] 4.6 確かめた差分をコミットして push し、PR を作るスクリプトを作る (並行可)
 
   Claude は、置き場所に、設計の「claude-auto-fix-ship.sh」の部品の節のとおりに、PR を作るスクリプトと、そのテスト `test-claude-auto-fix-ship.sh` を作る。テストは、偽の `gh` と、一時のフォルダの Git のリポジトリと、push 先の裸のリポジトリを使う。裸のリポジトリとは、作業のファイルを持たず、push を受けるだけの Git のリポジトリである。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-ship.sh` の場合が、すべて通る
@@ -472,3 +472,6 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - reason の渡し方(タスク 4.5): `confirm` は、対象ごとの実行の reason を環境変数 `CAF_REASON` で受け取り、`red-check` のときは対象を調べずに `ok` を出す。5つの引数の形には reason の欄が無いためである。verify ジョブを書くタスクでは、`confirm` を呼ぶ手順に `CAF_REASON` を渡す。渡し忘れたときは対象を調べるので、Claude の変更の PR の赤を直した実行が `unfixed` で止まる
 - Dockerfile の組み立て(タスク 4.5): `check` は、ci.yaml の docker-smoke と同じ文脈で `docker build` を流すが、terraform の Dockerfile に `github_token` の secret を渡さない。verify ジョブは秘密の値を持たないためである。terraform の Dockerfile の secret の mount は必須ではないので組み立ては進むが、ログインしない問い合わせの回数の上限に当たると tflint の準備が失敗し、`unfixed` になることがある
 - frontend の対象の確かめ(タスク 4.5): `frontend-vuln-fix.sh vulnerable` は、lockfile が無いときも「範囲に入る版が無い」と同じ1で終わる。そのため、`confirm` は、`frontend/pnpm-lock.yaml` が無いときを `unfixed` にする
+- ship の起点の main(タスク 4.6): `claude-auto-fix-ship.sh` は、新しい PR のコミットの親にする main のコミットを、環境変数 `CAF_MAIN_SHA` で受け取る。9つの引数の形に main_sha の欄が無いためである。red-check のとき以外は必須で、起点のコミットの祖先でなければ失敗する。ワークフローのタスク 6.2 は、prepare ジョブの出力の `main_sha` を ship の手順に `CAF_MAIN_SHA` として渡す
+- detail の目印の読み方(タスク 4.6): ship は、`<!-- claude-auto-fix-detail … -->` の目印を、detail が空でないとき(種類が npm・maven・go のとき)だけ本文に書く。dispatch で本文から detail を読む関数(タスク 5.x)は、目印が無ければ detail を空として扱い、行の始めから始まる最初の目印だけを読む。本文の後ろの変えたファイルの一覧には、Claude が作ったファイルの名前が入るためである
+- ship ジョブの checkout(タスク 4.6): ship ジョブが `target/` を取り出す `actions/checkout` には `persist-credentials: false` を付ける。既定のままだと GITHUB_TOKEN が http.extraheader に残り、`gh auth setup-git` の資格情報より先に使われて、push が bot の PAT にならないためである
