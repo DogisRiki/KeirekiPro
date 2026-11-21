@@ -80,7 +80,7 @@
   - _要件: 2.9_
   - _依存: 2.2_
 
-- [ ] 3. 今ある検査とワークフローに、この仕組みが読む出力を足す
+- [x] 3. 今ある検査とワークフローに、この仕組みが読む出力を足す
 - [x] 3.1 止まった Dependabot の PR の一覧を JSON で書き出す (並行可)
 
   Claude は、`check-audit-dependabot-stuck.sh` とそのテストの今の版を置き場所に写し、設計の「check-audit-dependabot-stuck.sh の変更」の節のとおりに、環境変数 `STUCK_JSON_OUT` で止まった PR の一覧を書き出す形を足す。Claude は、テストに場合を足す。
@@ -120,7 +120,7 @@
   - _対象の部品: frontend-vuln-fix.sh と backend-vuln-fix.sh の変更_
   - _依存: 2.1_
 
-- [ ] 3.5 CI の道具の版の公開からの時間を調べるスクリプトに、PR の本文を読まずに判定する形を足す (並行可)
+- [x] 3.5 CI の道具の版の公開からの時間を調べるスクリプトに、PR の本文を読まずに判定する形を足す (並行可)
 
   Claude は、`check-ci-tool-release-age.sh` とそのテストの今の版を置き場所に写し、設計の「check-ci-tool-release-age.sh の変更」の節のとおりに、環境変数 `COOLDOWN_MODE=predict` の形を足す。Claude は、テストに場合を足す。
   - 完了の確かめ方: Linux のコンテナで流した `test-check-ci-tool-release-age.sh` の場合が、前からある場合も含めてすべて通る
