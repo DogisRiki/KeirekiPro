@@ -89,7 +89,7 @@
   - _要件: 1.4_
   - _対象の部品: check-audit-dependabot-stuck.sh の変更_
 
-- [ ] 3.2 dependency-cooldown の判定のスクリプトに、PR を作る前に判定だけを行う形を足す (並行可)
+- [x] 3.2 dependency-cooldown の判定のスクリプトに、PR を作る前に判定だけを行う形を足す (並行可)
 
   Claude は、`check-dependency-cooldown.sh` とそのテストの今の版を置き場所に写し、設計の「check-dependency-cooldown.sh の変更」の節のとおりに、環境変数 `COOLDOWN_MODE=predict` の形を足す。Claude は、テストに場合を足す。
   - 完了の確かめ方: Linux のコンテナで流した `test-check-dependency-cooldown.sh` の場合が、前からある場合も含めてすべて通る
@@ -458,3 +458,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - `lib-claude-auto-fix.sh` の目印の関数(タスク 2.1): `marker_line` と `latest_marker` は `<欄>=<値>` の形の目印だけを扱う。PR の本文の `<!-- claude-auto-fix-detail <base64 の JSON> -->` は値だけの形なので、PR を作るタスクで別に書いて読む。`latest_marker` は `created_at` が同じ項目を渡された順で並べるので、呼び出す側は Issue の本文を先に、コメントをその後ろに並べて渡す
 - ガードの種類の渡し方(タスク 2.3): `claude-auto-fix-guard.sh <base> <head>` は、対象の種類を環境変数 `CAF_KIND` で受け取る。`CAF_KIND` が無いか知らない種類のときは、ガードは調べずに失敗する。種類が `codeql` のときに見つけた行を出さないことを、呼び出す側が種類を渡し忘れても破らないためである。確認のスクリプトの `apply` の形と出荷のスクリプトは、ガードを呼ぶときに `CAF_KIND` を渡し、今のフォルダを調べるリポジトリの最上位にする
 - Go の版を書くファイルの見分け方(タスク 2.4): `go_release_is_target` は、名前が `Dockerfile.<何か>` のファイルをすべて Go の版を書くファイルとみなす。`Dockerfile.md` のような説明のファイルも当たるので、`cooldown_needed` は、そのファイルだけを変えた変更でも dependency-cooldown の判定が要るとする。テストで「判定が要らない」場合のファイルに、この形の名前を使わない
+- dependency-cooldown の判定の予測の形(タスク 3.2): `COOLDOWN_MODE=predict` の `check-dependency-cooldown.sh` は、PR の番号を求めず、72時間経っていない版が無ければ0、判定の4つをすべて通れば3、止める版があるか判定できなければ1で終わる。`COOLDOWN_MODE` が空か predict のほかの値なら、何も読まずに1で終わる。`test-check-dependency-cooldown.sh` を Linux のコンテナで流すときは、bash と jq のほかに openssl と gzip と perl が要る(来歴の証明書を作るのと、署名した者を比べるため)
