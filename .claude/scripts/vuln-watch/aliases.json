@@ -1,8 +1,8 @@
 {
   "version": 1,
   "aliases": {
-    "image:eclipse-temurin": ["oracle:java_se", "oracle:java_runtime_environment_(jre)", "oracle:java_se_jdk_and_jre", "oracle_corporation:java_se_jdk_and_jre", "oracle:openjdk", "eclipse:temurin"],
-    "runtime:java": ["oracle:java_se", "oracle:java_runtime_environment_(jre)", "oracle:java_se_jdk_and_jre", "oracle_corporation:java_se_jdk_and_jre", "oracle:openjdk", "eclipse:temurin"],
+    "image:eclipse-temurin": ["oracle:java_se", "oracle:java_runtime_environment_(jre)", "oracle:java_se_jdk_and_jre", "oracle_corporation:java_se_jdk_and_jre", "oracle_corporation:oracle_java_se", "oracle:openjdk", "eclipse:temurin"],
+    "runtime:java": ["oracle:java_se", "oracle:java_runtime_environment_(jre)", "oracle:java_se_jdk_and_jre", "oracle_corporation:java_se_jdk_and_jre", "oracle_corporation:oracle_java_se", "oracle:openjdk", "eclipse:temurin"],
     "image:postgres": ["postgresql:postgresql", "n/a:postgresql"],
     "aws:rds": ["postgresql:postgresql", "n/a:postgresql"],
     "image:valkey/valkey": ["lfprojects:valkey", "valkey-io:valkey"],

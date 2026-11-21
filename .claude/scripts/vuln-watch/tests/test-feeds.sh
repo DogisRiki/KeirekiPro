@@ -253,6 +253,31 @@ case_article_cves() {
 }
 addcase article_cves
 
+# ---------------------------------------------------------------------
+# 要件4の受入基準5: 記事ごとに、その記事が対象にした脆弱性だけを1つの項目に入れる
+# 記事のページの上のメニューと横の一覧は、本文の囲み(IPA は main、JPCERT/CC は article)の外にあり、ほかの記事の番号と文が載る
+# ---------------------------------------------------------------------
+case_article_body() {
+    run_feeds
+    check "記事のページの横の一覧に載った番号は拾われず、関係の無い記事とまとめられない" \
+        "$(out "$(item_with ipa https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html 'join " ", $i->{key}, (sort map { "$_->{source}=$_->{id}" } @{ $i->{sources} }), @{ $i->{cves} }')")" \
+        "CVE-2026-109618 ipa=https://www.ipa.go.jp/security/security-alert/2026/alert20261022.html jpcert=at260033 CVE-2026-109619 CVE-2026-109618"
+    check "コメントの中の要素は、本文の囲みに数えない" \
+        "$(out 'scalar grep { grep { $_ eq "CVE-2026-199999" } @{ $_->{cves} } } @{ $d->{items} }')" "0"
+    check "記事の本文に、ページの上のメニューと横の一覧の文が入らない" \
+        "$(out 'scalar grep { ($_->{article_text} // "") =~ /グローバルナビゲーション|お問い合わせ|過去の注意情報|最新情報/ } @{ $d->{items} }')" "0"
+}
+addcase article_body
+
+case_article_no_body() {
+    put https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html 200 "$FIX/test-feeds/article-ipa-no-main.html"
+    run_feeds
+    check "本文の囲みが無いページの項目は、題名の番号だけを持ち、article_ok が偽になり、記事の本文を持たない" \
+        "$(out "$(item_with ipa https://www.ipa.go.jp/security/security-alert/2026/1021-jre.html 'join "|", scalar @{ $i->{cves} }, ($i->{article_ok} ? "true" : "false"), (defined $i->{article_text} ? "text" : "none")')")" \
+        "0|false|none"
+}
+addcase article_no_body
+
 # 偽の curl の記録が、ほかのサイトの URL を持たない
 case_no_other_site() {
     run_feeds
