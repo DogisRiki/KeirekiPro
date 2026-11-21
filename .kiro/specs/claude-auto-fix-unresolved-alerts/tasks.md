@@ -391,7 +391,7 @@
   - _要件: 4.3_
   - _依存: 6.3, 6.4_
 
-- [ ] 7. 基盤構築手順に、Claude を動かす鍵の登録と取り替えの手順を書く (並行可)
+- [x] 7. 基盤構築手順に、Claude を動かす鍵の登録と取り替えの手順を書く (並行可)
 
   Claude は、設計の「基盤構築手順と PR の本文の変更」の部品の節のとおりに、`doc/開発フロー/基盤構築手順.md` の 3-1 の Actions secrets の表に Secret `CLAUDE_CODE_OAUTH_TOKEN` の行を足し、bot の PAT の復旧の節と同じ形で、鍵を作り直して登録し直す節を、設計の同じ節に書いた見出し `## Claude を動かす鍵の取り替え` で足す。PAT は、GitHub の個人用のアクセストークンである。
   - 完了の確かめ方: 次の5つが起きる
@@ -499,3 +499,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 一時のブランチの push の権限(タスク 6.3 の審査で分かった、所有者が 2026-11-21 に決めた): GITHUB_TOKEN は `.github/workflows/` のファイルを変えるコミットを push できず、権限の欄に `workflows: write` を書くこともできない。そのため、直す前の design のとおりに cooldown-push ジョブが GITHUB_TOKEN で一時のブランチを push すると、ワークフローのファイルの CI の道具の版を変える変更と、ワークフローのファイルを変える Dependabot の PR の対象では、cooldown-push ジョブが毎回失敗する。所有者は、cooldown-push の push の手順にだけ bot の PAT を渡すよう、design と tasks を直すことにした
 - 振り分けのワークフローのきっかけの渡し方(タスク 6.4): dispatch の手順は、きっかけの名前とワークフローの名前を env で受け、run の中に `${{ }}` を書かない。きっかけのワークフローの名前を通して、手順に命令を差し込まれないためである。知らないきっかけでは、スクリプトを呼ばずに失敗する
 - 実際の実行でしか確かめられない2つの動き(タスク 6.3 の審査で分かった、タスク 8.3 で見る): cooldown-push の `gh auth setup-git` が、環境変数 `GH_TOKEN` だけで git の認証の手段になること。cooldown-judge が GITHUB_TOKEN で、`.github/workflows/` を変えるコミットを持つ一時のブランチを消せること
+- 置き場所のスクリプトのテストを流すとき(タスク 7 の審査で分かった): 置き場所の `lib-claude-auto-fix.sh` は、本体の `.github/scripts/` にだけある `lib-go-release.sh` を読み込む。テストは、本体の `.github/` を写した上に置き場所の `dot-github/` を重ねた入れ物で流す
