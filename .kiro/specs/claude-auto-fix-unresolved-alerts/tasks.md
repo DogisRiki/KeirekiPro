@@ -252,7 +252,7 @@
   - _対象の部品: claude-auto-fix-dispatch.sh_
   - _依存: 2.2, 3.1, 3.3, 3.4_
 
-- [ ] 5.2 所有者の手での起動と、1時間ごとの動かし直しを、振り分けのスクリプトに足す
+- [x] 5.2 所有者の手での起動と、1時間ごとの動かし直しを、振り分けのスクリプトに足す
 
   Claude は、置き場所の振り分けのスクリプトに、設計の「claude-auto-fix-dispatch.sh」の部品の節の `manual` と `retry` の集め方と、鍵の Issue が開いているときの決まりを足し、その場合を `test-claude-auto-fix-dispatch.sh` に足す。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-dispatch.sh` の場合が、すべて通る。同じ偽の応答で振り分けのスクリプトを2回呼んでも、起動される実行が増えない
@@ -481,3 +481,5 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 3日続けて動けなかった知らせ(タスク 4.8): `claude-auto-fix-report.sh notify` は、同じ key の知らせの Issue が状態によらず1つでも開いていれば、新しく起票しない。数える3回には、実行の途中の今の実行の結果を、今の UTC の日時で足す。`recent_outcomes` は終わった実行しか返さないためである。題名は、種類が codeql でも `Claude が3日続けて動けなかった CodeQL の警告 #<番号>` にする。design の「claude-auto-fix-report.sh」の節の codeql の題名 `Claude が直せなかった …` を使うと、動けなかった知らせが直せなかった知らせに見えるためである。design の文面との食い違いとして、PR の本文に書く。種類が codeql のときは、理由を決まった文だけで書き、理由の種類を書かない(要件5.1)。種類が container のときも Issue を起票し、対象の URL にラベル container-vuln の Issue の URL を書く
 - 結果を出さずに止まった実行(タスク 4.8): `claude-auto-fix-report.sh record` は、結果が空のとき、環境変数 `JOB_RESULTS`(ジョブの名前から結論への JSON)を読み、design の「失敗したとき」の表の順で最初に失敗したか取り消されたジョブから結果を決める。止まったジョブが1つも無いときは `unavailable` と理由の種類 `no-outcome` を書く。結果のファイルの無い、取り消されていない実行があると `recent_outcomes` が失敗するため、結果のファイルを必ず書く。ワークフローのタスク 6.2 は、report の手順に `JOB_RESULTS` を渡す
 - 振り分けのきっかけの形(タスク 5.1): `claude-auto-fix-dispatch.sh trigger` は、入力 `pr` を渡さない。種類 dependabot の key が PR の番号で、red-check はきっかけの対象ではないためである。vuln-fix の成果物は、きっかけの実行の名前に加えて、きっかけの種類が schedule か workflow_dispatch であること、このリポジトリのブランチの実行であること、ワークフローのファイルが `frontend-vuln-fix.yaml` か `backend-vuln-fix.yaml` であることを確かめてから読む(要件1.6)。design の「claude-auto-fix-dispatch.sh」の節に無い確かめとして、PR の本文に書く。成果物に形の違う行が1行でもあれば、その成果物の組を1つも起動しない。Go の標準ライブラリの組が成果物に複数あっても、最も新しい版と OSV の ID のすべてで1つの対象にする。同じ回の中で起動した表示名を覚え、同じ対象を2回起動しない
+- 実行の出どころ(タスク 5.2): `lib-claude-auto-fix.sh` の `recent_outcomes` と、`claude-auto-fix-dispatch.sh` の対象ごとの実行の一覧は、このリポジトリの main から、`claude-auto-fix-target.yaml` のファイルで手で起動された実行だけを数える(jq の定義 `own_run`)。fork の PR が同じワークフローに別のきっかけを足すと、同じ一覧に、好きな表示名と結果のファイルを持つ実行を残せるためである(要件1.6)。design の「claude-auto-fix-dispatch.sh」の節に無い確かめとして、PR の本文に書く。後始末のスクリプト(タスク 5.3)と、ワークフローのきっかけ(タスク 6.x)でも、対象ごとの実行の一覧を読むときは同じ定義を使う
+- manual と retry の決めごと(タスク 5.2、PR の本文に書く): 鍵の Issue が開いていて、結果が key の対象が直近4日に無いときに4つの集め方から1つを選ぶときは、unfixed の Issue がある対象と、1度扱ったコンテナの Issue を外す。外さないと、prepare が飛ばす対象を選び、鍵を確かめられないまま鍵の Issue が開いたまま残るためである。design の「manual と同じ4つの集め方」との食い違いとして書く。そのほかの決めごとは次のとおりである。赤の検査を直す実行の動かし直しは、番号とブランチが合う開いた Claude の変更の PR の今の head で起動し、決まりの1を掛けない。赤の検査の名前が無ければ起動しない。集め直さない retry では決まりの2を掛けない。鍵の Issue が開いている間は、対象ごとの実行が動いているか今日すでにあれば、retry は何も起動しない。入力 reason は結果のファイルの reason にし、空なら retry にする。鍵の Issue の題名と目印は `lib-claude-auto-fix.sh` に移した
