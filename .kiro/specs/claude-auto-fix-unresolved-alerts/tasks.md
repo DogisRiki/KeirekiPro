@@ -328,7 +328,7 @@
     - 要件2の受入基準4から受入基準7と要件4の受入基準5と要件6の受入基準4のうち後始末と動かし直しが1時間ごとに動くことは、テストの「定期実行で dispatch ジョブと sweep ジョブが動き、手での起動では dispatch ジョブだけが動く」で確かめる
   - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.3, 3.5, 4.5, 5.2, 6.1, 6.4_
 
-- [ ] 6.2 1つの対象を直して PR にする対象ごとのワークフローの、cooldown のジョブのほかのジョブを作る
+- [x] 6.2 1つの対象を直して PR にする対象ごとのワークフローの、cooldown のジョブのほかのジョブを作る
 
   Claude は、置き場所に、設計の「claude-auto-fix-target.yaml」の部品の節のとおりに、ワークフロー `claude-auto-fix-target.yaml` の、prepare、edit、verify、verify-image、ship、report、cleanup の各ジョブを作る。各ジョブは、それぞれのスクリプトのテストを流してからスクリプトを呼ぶ。
   - prepare ジョブ: 種類が `container` のとき、prepare ジョブは、2つのイメージの Trivy の結果を、設計の prepare ジョブの項のとおりに `trivy-java.json` と `trivy-go.json` に書き、成果物 `trivy-results` として上げる。
@@ -488,3 +488,7 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - ワークフローのテストとの約束(タスク 6.1、6.2 から 6.4 で守る): 手順の id と、手順の出力の名前は、`test-claude-auto-fix-workflows.sh` の頭の説明の一覧のとおりにする。cooldown-push は出力 `sha` と `branch` を出し、judge_npm judge_go judge_ci_tool はスクリプトの終わり方を出力 `rc` に書き、cleanup の手順の id は `cleanup` にする。テストは base final materials alert notify scan_check cleanup と judge の手順を、使うコマンドを差し替えたフォルダで実際に動かすので、手順の中で別のスクリプトを呼ぶと失敗する。正しい形の見本のワークフローは、会話の作業用フォルダの `wf61/target.yaml` と `wf61/dispatch.yaml` にある(消えていれば、テストの頭の説明から作り直す)
 - ワークフローを作るときに決めること(タスク 6.1 の審査で分かった、PR の本文に書く): red-check の実行は空の base.patch を当てるので、base の手順は `git apply --allow-empty` を使うか、空なら当てない。design の red-check の run-name は head の SHA の先頭12文字で終わるが、対象ごとのワークフローの入力は6つで、後始末のスクリプト(タスク 5.3)は `pr` しか渡さないため、run-name に head の SHA を入れられない。タスク 6.2 で所有者に決めてもらう。cooldown-submit の権限は `contents: write` だけにした(成果物を読むなら `actions: read` を足し、テストも直す)。verify の権限は、種類によらず `security-events: read` を持つ(ジョブの権限は入力で変えられないため)
 - ワークフローのテストの書き方(タスク 6.1 の debug で分かった): YAML の中の文字を探すだけの確かめは、正しい名前を違う場所に書いたワークフローや、違うスクリプトを呼ぶワークフローを通してしまう。手順は差し替えたコマンドを置いたフォルダで実際に動かし、差し替えたコマンドに自分の名前と引数と環境変数を記録させて確かめる。shellcheck の検査を外す書き込みは使わず、単語の分割は `read -r a b <<<"$c"` に、一重引用符の中の `$` は perl の `\x24` に直す。yq の `sub` は一致をすべて置き換え、置き換えの文字列の `$名前` を一致の組として読むので、`$` の文字は `$$` と書く。busybox の `grep -o` は1行の中の2つ目からの一致を出さないので、数えるときは perl を使う。jq の `//` は false も無い値とみなすので、false を残したいときは使わない
+- 対象ごとのワークフローの決めごと(タスク 6.2、PR の本文に書く): red-check の run-name に head の SHA を入れるため、7つ目の入力 `head`(既定は空)を足し、後始末のスクリプトは `head=${sha:0:12}` を渡す。base.patch と Claude の差分と final.patch は、ジョブごとに別の機械で動くため、成果物(1日で消える)で渡し、受け取るジョブは SHA-256 を前のジョブの出力と比べる。verify と ship は main_sha に base.patch をコミットしたものを起点にする(verify.sh apply と ship.sh が、起点がコミットであることを求めるため)。report の notify の引数は、ジョブの env で渡す。record の OUTCOME は、最も後ろで結果を出したジョブの outcome にし、edit と verify の ok は渡さない(途中の結果のため)
+- ship の if(タスク 6.2 の審査で分かった): ship は `!cancelled()` で verify-image の暗黙の success() を外したので、`needs.verify.result == 'success'` も読む。verify の check の手順が ok を出したあとに CodeQL か confirm の手順が失敗すると、出力 outcome は ok のまま残るためである。タスク 6.3 の cooldown-push の if にも同じ項が要る。actionlint.yaml の先頭の説明には、6.3 で cooldown-judge ジョブを足す
+- ワークフローのテストの読み方(タスク 6.2): テストの `step_env` は `${{ }}` を外した形を返すので、式を `subst_expr` で評価するときは、jq で env の生の値を読む
+- テストを流さずに呼ぶスクリプト(タスク 6.2 の審査の気づき、6.3 で直す): prepare と verify-image は `check-trivy-version.sh` を、そのテスト `test-check-trivy-version.sh` を流さずに呼んでいる(今の container-scan.yaml と同じ形)。design の「各ジョブは、スクリプトを呼ぶ前に、そのスクリプトのテストを流す」に合わせ、6.3 で同じファイルを直すときに、呼ぶ前にテストを流す手順を足す
