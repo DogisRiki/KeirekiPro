@@ -129,7 +129,7 @@
   - _対象の部品: check-ci-tool-release-age.sh の変更_
 
 - [ ] 4. 1つの対象を直して PR にするまでの各段のスクリプトを作る
-- [ ] 4.1 Claude に渡す指示の文と、材料を集めるスクリプトを作る (並行可)
+- [x] 4.1 Claude に渡す指示の文と、材料を集めるスクリプトを作る (並行可)
 
   Claude は、置き場所に、設計の「prompt.md」の部品の節の7つのことを書いた指示の文 `prompt.md` と、設計の「claude-auto-fix-materials.sh」の部品の節のとおりに材料を集めるスクリプトと、そのテスト `test-claude-auto-fix-materials.sh` を作る。種類が `container` のとき、スクリプトは、環境変数 `TRIVY_RESULTS_DIR` のフォルダから、設計の「claude-auto-fix-target.yaml」の部品の節の prepare ジョブの項に書いた `trivy-java.json` と `trivy-go.json` を読む。テストは、偽の `gh` で、github-actions[bot]、dependabot[bot]、この仕組みの bot、ほかの利用者が書いた Issue と PR とコメントを返し、`TRIVY_RESULTS_DIR` のフォルダに偽の Trivy の結果を置く。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-materials.sh` の場合が、すべて通る。`prompt.md` に、設計の7つのことがすべて書いてある
@@ -461,3 +461,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - dependency-cooldown の判定の予測の形(タスク 3.2): `COOLDOWN_MODE=predict` の `check-dependency-cooldown.sh` は、PR の番号を求めず、72時間経っていない版が無ければ0、判定の4つをすべて通れば3、止める版があるか判定できなければ1で終わる。`COOLDOWN_MODE` が空か predict のほかの値なら、何も読まずに1で終わる。`test-check-dependency-cooldown.sh` を Linux のコンテナで流すときは、bash と jq のほかに openssl と gzip と perl が要る(来歴の証明書を作るのと、署名した者を比べるため)
 - vuln-fix の PR を作る処理のテスト(タスク 3.3): `test-frontend-vuln-fix.sh` は、偽の gh・git・curl・pnpm を PATH の先頭に置き、環境変数で成功と失敗を選んで `run` を流す。偽の git は `ls-remote` の5つ目の引数をブランチ名として読む。backend の同じテストを足すときも、この形にそろえる
 - origin のブランチの有無の確かめ(タスク 3.4): `git ls-remote --exit-code` は、ブランチが無いときに 2 で終わる。ほかの失敗を 2 で返す関数の中で使うときは、ブランチが無いときを 1 などの別の値に直してから返す
+- 材料を集めるスクリプト(タスク 4.1): `claude-auto-fix-materials.sh` は、材料を `$RUNNER_TEMP/claude-auto-fix-materials.txt` に書き、標準出力に `materials=<場所>` の1行だけを書く。`red-check` の PR は、作り手が環境変数 `CAF_SHIP_LOGIN`(既定は DogisRiki-bot)のときだけ読む。edit ジョブを書くタスクでは、この環境変数をワークフローに明示する。期待一覧は `CAF_REQUIRED_CHECKS` で替えられる
