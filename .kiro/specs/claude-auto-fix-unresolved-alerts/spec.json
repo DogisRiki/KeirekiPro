@@ -39,13 +39,31 @@
       "revoked_at" : "2026-11-21T01:34:30Z",
       "revoked_for" : "main の取り込みによる design の直し: PR #857 で dependency-cooldown に Go の版の公開からの時間の検査が加わったが、cooldown-judge ジョブは check-dependency-cooldown.sh の判定しか呼ばず、Go の版を72時間経っていない版に変える変更を PR にする",
       "stage" : "design"
+    },
+    {
+      "approved_at" : "2026-11-21T02:23:42Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        725
+      ],
+      "revoked_at" : "2026-11-21T14:09:10Z",
+      "revoked_for" : "所有者の指示による design と tasks の直し: GitHub は GITHUB_TOKEN で .github/workflows/ のファイルを変えるコミットを push させないため、cooldown-push ジョブが CI の道具の版を変える変更とワークフローのファイルを変える Dependabot の PR の対象で毎回失敗する。一時のブランチの push に bot の PAT を使うよう直す",
+      "stage" : "design"
+    },
+    {
+      "approved_at" : "2026-11-21T02:49:46Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        725
+      ],
+      "revoked_at" : "2026-11-21T14:09:10Z",
+      "revoked_for" : "所有者の指示による design と tasks の直し: GitHub は GITHUB_TOKEN で .github/workflows/ のファイルを変えるコミットを push させないため、cooldown-push ジョブが CI の道具の版を変える変更とワークフローのファイルを変える Dependabot の PR の対象で毎回失敗する。一時のブランチの push に bot の PAT を使うよう直す",
+      "stage" : "tasks"
     }
   ],
   "approvals" : {
     "design" : {
-      "approved" : true,
-      "approved_at" : "2026-11-21T02:23:42Z",
-      "approved_by" : "DogisRiki",
+      "approved" : false,
       "generated" : true
     },
     "requirements" : {
@@ -55,9 +73,7 @@
       "generated" : true
     },
     "tasks" : {
-      "approved" : true,
-      "approved_at" : "2026-11-21T02:49:46Z",
-      "approved_by" : "DogisRiki",
+      "approved" : false,
       "generated" : true
     }
   },
@@ -66,5 +82,5 @@
   "issue" : 725,
   "language" : "ja",
   "phase" : "tasks-generated",
-  "updated_at" : "2026-11-21T02:49:46Z"
+  "updated_at" : "2026-11-21T14:09:10Z"
 }

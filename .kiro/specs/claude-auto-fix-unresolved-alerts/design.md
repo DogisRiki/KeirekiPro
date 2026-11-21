@@ -4,7 +4,7 @@
 
 この設計は、GitHub Actions の中で Claude の CLI を動かし、今ある検査とワークフローが自分では直せずに残した警告と止まった Dependabot の PR を、直す PR にする仕組みを作る。
 
-仕組みは2つのワークフローに分かれる。振り分けのワークフロー `claude-auto-fix.yaml` は、今ある4つのワークフローが終わったときと、1時間ごとの定期実行と、所有者の手での起動で動き、直す対象を1つずつ見つけて、対象ごとのワークフロー `claude-auto-fix-target.yaml` を起動する。対象ごとのワークフローは、Claude に直させるジョブ、変更を確認するジョブ、PR にするジョブ、結果を知らせるジョブを分けて持つ。
+仕組みは2つのワークフローに分かれる。振り分けのワークフロー `claude-auto-fix.yaml` は、直す対象を1つずつ見つけて、対象ごとのワークフロー `claude-auto-fix-target.yaml` を起動する。対象ごとのワークフローは、Claude に直させるジョブ、変更を確認するジョブ、PR にするジョブ、結果を知らせるジョブを分けて持つ。
 
 仕組みは、対象ごとの状態を別の場所に保存せず、実行ごとの結果のファイル、github-actions[bot] が書いた Issue とコメントの目印、Claude の変更のコミットの末尾の行から、毎回読み直す。
 
@@ -133,7 +133,7 @@ graph TB
 
 `claude-auto-fix-run-claude.sh` は、Claude の CLI を、claude-code-action を使わずに直接動かす。claude-code-action は、浮動のタグで壊れる変更を取り込んだことがあり、起動者が人の利用者でないと動かない設定を持ち、GitHub のトークンを自分で用意する。浮動のタグとは、同じ名前のまま、指す版があとから替わるタグである。CLI を直接動かすと、Claude が使える道具と読む設定を、このリポジトリの側で決め切れ、GitHub のトークンを Claude のジョブに置かずに済む。
 
-対象ごとのワークフローは、秘密の値と、Claude が変えたコードを、同じジョブに置かない。edit ジョブは Claude の鍵を持つが、リポジトリのコードを動かさない。verify ジョブは Claude が変えたコード(テストとビルドスクリプト)を動かすが、秘密の値を持たない。ship ジョブは bot の PAT を持つが、Claude を動かさず、コードも動かさない。この分け方は、dependency-review.yaml が、PR のビルドスクリプトを動かすジョブと、依存グラフを GitHub に送信するジョブを分けているのと同じ考え方である。各ジョブは、次のジョブに渡すものを、成果物(artifact)とジョブの出力で受け渡す。
+対象ごとのワークフローは、秘密の値と、Claude が変えたコードを、同じジョブに置かない。edit ジョブは Claude の鍵を持つが、リポジトリのコードを動かさない。verify ジョブは Claude が変えたコード(テストとビルドスクリプト)を動かすが、秘密の値を持たない。ship ジョブは bot の PAT を持つが、Claude を動かさず、コードも動かさない。cooldown-push ジョブも、一時のブランチを push する手順にだけ bot の PAT を持つが、Claude を動かさず、コードも動かさない。この分け方は、dependency-review.yaml が、PR のビルドスクリプトを動かすジョブと、依存グラフを GitHub に送信するジョブを分けているのと同じ考え方である。各ジョブは、次のジョブに渡すものを、成果物(artifact)とジョブの出力で受け渡す。
 
 対象ごとのワークフローは、どのジョブでも、ワークフローのコミット(`github.sha`、既定のブランチの main)をフォルダの最上位に checkout し、スクリプトとアクションをそこから使う。直す対象のコードは、フォルダ `target/` に checkout する。Claude の変更の PR の head や Dependabot の PR の head のコードが、スクリプトとアクションの代わりに動くことはない。
 
@@ -248,7 +248,7 @@ stateDiagram-v2
 
 **使う部品**: このワークフローは、最上位に checkout したワークフローのコミットの `claude-auto-fix-dispatch.sh` と `claude-auto-fix-sweep.sh` を呼ぶ。スクリプトを呼ぶ前に、それぞれのテスト(`test-claude-auto-fix-dispatch.sh` と `test-claude-auto-fix-sweep.sh` と `test-lib-claude-auto-fix.sh`)を流す。dispatch ジョブは、さらに、スクリプトの前に `test-claude-auto-fix-workflows.sh` を流す。このテストが0以外で終われば、dispatch ジョブは対象ごとの実行を起動せずに失敗する。権限か秘密の値の渡し方が設計と違うワークフローで、Claude を動かさないためである。
 
-**失敗したとき**: このワークフローは、dispatch ジョブと sweep ジョブを、それぞれ30分で打ち切る。スクリプトは1件の失敗で止まらずに残りの対象を続け、最後に1件でも失敗があればジョブを失敗にする。
+**失敗したとき**: このワークフローは、dispatch ジョブと sweep ジョブを、それぞれ30分で打ち切る。
 
 ### claude-auto-fix-dispatch.sh(対象を見つけて対象ごとの実行を起動するスクリプト)
 
@@ -287,7 +287,7 @@ stateDiagram-v2
 
 **使う部品**: `lib-claude-auto-fix.sh`、`check-audit-dependabot-stuck.sh`、`gh`(`api`、`run list`、`run download`、`workflow run`)。
 
-**失敗したとき**: 1つの集め方が失敗しても、このスクリプトは、ほかの集め方を続ける。成果物を読めないか API が失敗したときは、その対象を起動せず、`::error::` の行を出してジョブを失敗にする。このスクリプトは、起動しなかった対象を、次のきっかけか所有者の手での起動で動いたときに扱う。
+**失敗したとき**: 1つの集め方が失敗しても、このスクリプトは、ほかの集め方を続ける。1つの対象を起動できなくても、このスクリプトは残りの対象を続け、最後に1件でも失敗があればジョブを失敗にする。成果物を読めないか API が失敗したときは、その対象を起動せず、`::error::` の行を出してジョブを失敗にする。このスクリプトは、起動しなかった対象を、次のきっかけか所有者の手での起動で動いたときに扱う。
 
 ### claude-auto-fix-sweep.sh(Claude の変更の PR と、知らせの Issue の後始末をするスクリプト)
 
@@ -343,18 +343,22 @@ stateDiagram-v2
     6. `claude-auto-fix-verify.sh confirm` を呼ぶ。種類が `codeql` のときは、環境変数 `CODEQL_SARIF_DIR` に `$RUNNER_TEMP/codeql-sarif` を渡す
   - `apply` が書いた最後の差分 `final.patch` と、その SHA-256 と、`apply` が出した `cooldown` を出力する
 - verify-image: 種類が `container` のときだけ動く。権限は `contents: read` だけで、秘密の値を持たない。`final.patch` を当てたコードから、prepare ジョブと同じランナーと組み立て方で2つのイメージを作り、Trivy で調べ、`check-container-scan.sh` の `report` の結果にその脆弱性の ID が無いことを確かめる
-- cooldown-push: このジョブは、次の3つのとおりに動く
+- cooldown-push: このジョブは、次の4つのとおりに動く
   - このジョブは、verify ジョブの出力 `cooldown` が `true` のときだけ動く。`apply` が `cooldown` を決める決まりは、`lib-claude-auto-fix.sh` の節の `cooldown_needed` の項のとおりである
-  - 権限は `contents: write`
-  - このジョブは、起点のコードに `final.patch` を当てたコミットを、一時のブランチ `fix/claude-auto-fix-cooldown-<kind>-<key のスラグ>` に GITHUB_TOKEN で push する。GITHUB_TOKEN の push は、ワークフローを起こさない。main のほかへの push で動くワークフローもない
+  - 権限は `contents: read`。checkout は `persist-credentials: false` にする。秘密の値は `secrets.BOT_GITHUB_TOKEN` だけを、push の手順にだけ渡す
+  - このジョブは、push の前に、`final.patch` の SHA-256 を verify ジョブの出力 `final_sha256` と比べる。違えば、このジョブは push せずに失敗する。`final_sha256` は、verify ジョブの `apply` の手順が、ガードを通した `final.patch` から出す値である。verify ジョブは、Claude が変えたテストとビルドスクリプトを、`check` の手順で動かす。`check` の手順は、`apply` の手順と、`final.patch` を成果物に上げる手順のあとに動く。そのため、この SHA-256 の比較を通った `final.patch` は、ガードを通った差分と同じである
+  - このジョブは、起点のコードに `final.patch` を当てたコミットを、一時のブランチ `fix/claude-auto-fix-cooldown-<kind>-<key のスラグ>` に bot の PAT で push する。このジョブは、次の3つの理由で、この push の仕方をとる
+    - GITHUB_TOKEN で push しないのは、GitHub が、`.github/workflows/` のファイルを変えるコミットを GITHUB_TOKEN で push させず、ワークフローの権限の欄にもそれを許す権限が無いためである。CI の道具の版を変える変更と、ワークフローのファイルを変える Dependabot の PR の対象は、そのようなコミットになる。bot の PAT は、基盤構築手順のとおり `workflow` の権限を持つ
+    - このジョブは Claude を動かさず、Claude が変えたコードも動かさないので、Claude の変更が bot の PAT を読み出すことはない
+    - push のきっかけで動くワークフローは、push したコミットの中のワークフローのファイルで決まる。このジョブが push するコミットのワークフローのファイルは、main のワークフローのファイルに、`base.patch` と `final.patch` の変更を足したものである。main のワークフローは、どれも main への push だけで動く。`base.patch` は Dependabot の PR の変更であり、Dependabot は、ワークフローのファイルの中では版だけを変える。`final.patch` の `.github/` のファイルの変更は、ガードが止める。push する `final.patch` がガードを通った差分と同じであることは、このジョブが、上の SHA-256 の比較で確かめる。そのため、一時のブランチへの push で動くワークフローはない
 - cooldown-generate: 権限は `contents: read`。一時のブランチを checkout し、`gradle/actions/dependency-submission` を `dependency-graph: generate-and-upload` で動かす。このジョブは、`dependency-review.yaml` と同じく、`productionRuntimeClasspath` と `detachedConfiguration` の除外の設定を渡す。スナップショットのコミットとブランチは、スナップショットを作るこのジョブで決まる。そのため、このワークフローは、このジョブに、環境変数 `GITHUB_DEPENDENCY_GRAPH_SHA` と `GITHUB_DEPENDENCY_GRAPH_REF` で、一時のブランチのコミットとブランチ(`refs/heads/<一時のブランチ>`)を渡す。何も渡さないと、`workflow_dispatch` の実行のコミットとブランチ(main)になる
 - cooldown-submit: 権限は `contents: write`。checkout しない。`dependency-graph: download-and-submit` で送る。このジョブにも、cooldown-generate と同じ2つの環境変数を渡す
 - cooldown-judge: このジョブは、次の7つのとおりに動く
   - 権限は `contents: write`(一時のブランチを消す)と `vulnerability-alerts: read`
   - 一時のブランチのコミットをフォルダ `target/` に checkout する
   - このジョブは、次の3つの判定の手順を、前の手順の終わり方によらず、すべて動かす。dependency-review の dependency-cooldown の検査が、Claude の変更の PR で、3つのスクリプトを別々の手順で呼び、どの手順も前の手順の結果によらず動くためである
-  - `COOLDOWN_MODE=predict PNPM_WORKSPACE_FILE=target/frontend/pnpm-workspace.yaml check-dependency-cooldown.sh <main_sha> <一時のブランチの SHA>` を呼ぶ。`PNPM_WORKSPACE_FILE` を渡すのは、4つの判定のうちの pnpm の除外の欄の判定が、verify ジョブが除外の欄に足した版を読むためである。`PNPM_WORKSPACE_FILE` を渡さないと、pnpm の除外の欄の判定は、最上位に checkout した main の除外の欄を読む。比べる相手を `main_sha` にするので、種類が `dependabot` のときは、Dependabot の版上げも判定に入る
-  - フォルダ `target/` の中で、環境変数 `GH_TOKEN` に GITHUB_TOKEN を渡して、`check-go-release-age.sh <main_sha> <一時のブランチの SHA>` を呼ぶ。`target/` の中で呼ぶのは、このスクリプトが、今のフォルダを、head のコミットを checkout したフォルダの最上位とみなして、コミットのファイルを読むためである。このスクリプトには例外が無いので、このスクリプトは、セキュリティの修正の Go の版に変える変更も、公開から72時間経つまで止める
+  - `COOLDOWN_MODE=predict PNPM_WORKSPACE_FILE=target/frontend/pnpm-workspace.yaml check-dependency-cooldown.sh <main_sha> <一時のブランチの SHA>` を呼ぶ。`PNPM_WORKSPACE_FILE` を渡すのは、`check-dependency-cooldown.sh` の4つの判定のうちの pnpm の除外の欄の判定が、verify ジョブが除外の欄に足した版を読むためである。`PNPM_WORKSPACE_FILE` を渡さないと、pnpm の除外の欄の判定は、最上位に checkout した main の除外の欄を読む。比べる相手を `main_sha` にするので、種類が `dependabot` のときは、Dependabot の版上げも判定に入る
+  - フォルダ `target/` の中で、環境変数 `GH_TOKEN` に GITHUB_TOKEN を渡して、`check-go-release-age.sh <main_sha> <一時のブランチの SHA>` を呼ぶ。`target/` の中で呼ぶのは、このスクリプトが、今のフォルダを、head のコミットを checkout したフォルダの最上位とみなして、コミットのファイルを読むためである。このスクリプトは、公開から72時間経っていない Go の版に変える変更を、例外なく止める。そのため、このスクリプトは、セキュリティの修正の Go の版に変える変更も、公開から72時間経つまで止める
   - フォルダ `target/` の中で、環境変数 `GH_TOKEN` に GITHUB_TOKEN を、`COOLDOWN_MODE` に `predict` を、`CI_TOOL_CHANGED_FILE` に `$RUNNER_TEMP/ci-tool-changed.tsv` を渡して、`check-ci-tool-release-age.sh <main_sha> <一時のブランチの SHA>` を呼ぶ。このスクリプトが0で終わり、`CI_TOOL_CHANGED_FILE` に版が書かれていれば、このジョブは、dependency-review の手順「Verify CI tool signatures」と同じく、版ごとに `install-verified-<道具>.sh` を使い捨ての `GITHUB_PATH` で呼び、配布元の署名を確かめる。署名を確かめられなかったときは、このジョブは、この判定の終わり方を1とする
   - このジョブは、3つの判定の終わり方を `lib-claude-auto-fix.sh` の `cooldown_outcome` に渡す。`cooldown_outcome` が `ship` を出せば ship に進み、`blocked` を出せば結果を `blocked` にし、`fail` を出せばこのジョブを失敗にする。失敗したときの結果は、下の表のとおり `unavailable` である。どの終わり方でも、最後に一時のブランチを消す
 - ship: 権限は `contents: read`。秘密の値は `secrets.BOT_GITHUB_TOKEN` だけを渡す。`claude-auto-fix-ship.sh` を呼ぶ
@@ -500,7 +504,7 @@ report ジョブと cleanup ジョブが失敗しても、結果は変わらな�
    - `maven`: `backend-vuln-fix.sh tree` と `vulnerable` で、組の範囲に入る版が依存の木に無いことを確かめる
    - `go-stdlib`: `vulncheck` と `go_plan` の `.stdlib` が null であることを確かめる
    - `go-module`: `go_plan` の `.modules` にその部品が無いことを確かめる
-   - `codeql`: SARIF に、警告と同じ規則の ID の結果が警告と同じファイルに無いことを確かめる。SARIF は、CodeQL の `analyze` が診断の結果を書き出すファイルの形式である
+   - `codeql`: SARIF に、警告と同じ規則の ID の結果が警告と同じファイルに無いことを確かめる
    - `container`: verify-image ジョブで確かめる
    - `dependabot` と `red-check`: 変えた領域の品質チェックが通ることを確かめ、ほかの検査は PR の必須の検査に任せる
 
@@ -586,7 +590,7 @@ sweep は、`record` を呼ばず、`claude-auto-fix-report.sh notify unfixed �
   - CI の道具の版を書くファイル: 渡された `ci-tool-versions.json` の `.tools[].ci[].file` と `.tools[].dev.file` のパス。開発環境の版のファイルは、`docker/frontend/Dockerfile` と `docker/terraform/Dockerfile` である
   - この3つを含めるのは、これらのファイルが変わると、dependency-cooldown の検査の3つの判定の手順のどれかが版を調べるためである。たとえば、種類が `go-stdlib` のときの `go_bump`、Claude が Dockerfile の golang のイメージを上げる変更、種類が `dependabot` の `base.patch` が開発環境の Dockerfile の node のイメージの版を上げる変更が、これに当たる
 - `cooldown_outcome <check-dependency-cooldown.sh の終わり方> <check-go-release-age.sh の終わり方> <check-ci-tool-release-age.sh の終わり方>`: 次の順で、`ship` か `blocked` か `fail` を出す
-  - `check-dependency-cooldown.sh` の終わり方が0と1と3のどれでもないときと、`check-go-release-age.sh` か `check-ci-tool-release-age.sh` の終わり方が0と1のどちらでもないときは、`fail` を出す。判定できなかったスクリプトがあるときは、ほかのスクリプトの終わり方によらず、このジョブを失敗にする
+  - `check-dependency-cooldown.sh` の終わり方が0と1と3のどれでもないときと、`check-go-release-age.sh` か `check-ci-tool-release-age.sh` の終わり方が0と1のどちらでもないときは、`fail` を出す。判定できなかったスクリプトがあるときは、ほかのスクリプトの終わり方によらず、cooldown-judge ジョブは失敗する
   - そうでなく、どれかが1なら、`blocked` を出す
   - そのほかは `ship` を出す
 
@@ -628,7 +632,7 @@ Go の版の公開からの時間は、このスクリプトの4つの判定に�
 
 対応する要件: 2.9
 
-**役割**: このスクリプトは、環境変数 `COOLDOWN_MODE=predict` のとき、`PR_NUMBER` を求めず、PR の本文の記録の目印の行を読まない。そのため、このスクリプトは、例外を1つも当てず、変わった CI の版も、公開からの時間で調べる。仕組みは、Claude の変更の PR の本文に記録の目印の行を書かないので、PR の検査でも例外は当たらず、2つの判定は同じ結果になる。終わり方と、`CI_TOOL_CHANGED_FILE` に書くものは、今と同じである。
+**役割**: このスクリプトは、環境変数 `COOLDOWN_MODE=predict` のとき、`PR_NUMBER` を求めず、PR の本文の記録の目印の行を読まない。そのため、このスクリプトは、例外を1つも当てず、変わった CI の版も、公開からの時間で調べる。`claude-auto-fix-ship.sh` は、Claude の変更の PR の本文に記録の目印の行を書かないので、PR の検査でも例外は当たらず、`COOLDOWN_MODE=predict` の判定と PR の検査の判定は同じ結果になる。終わり方と、`CI_TOOL_CHANGED_FILE` に書くものは、今と同じである。
 
 `COOLDOWN_MODE` が無ければ、今と同じに動く。
 
@@ -636,7 +640,12 @@ Go の版の公開からの時間は、このスクリプトの4つの判定に�
 
 対応する要件: 7.1, 7.2, 7.3
 
-**役割**: この spec を実装する Claude は、`doc/開発フロー/基盤構築手順.md` の 3-1 の Actions secrets の表に、Secret `CLAUDE_CODE_OAUTH_TOKEN` の行を足す。値の欄には、Claude の契約を持つ開発者が `claude setup-token` で作ることを書く。失効したときの欄には、Claude の変更の PR が作られなくなり、仕組みが鍵を取り替えるよう求める Issue を起票することを書く。bot の PAT の復旧の節と同じ形で、鍵を作り直して登録し直す節を、見出し `## Claude を動かす鍵の取り替え` で足す。`claude-auto-fix-report.sh` は、鍵の Issue の本文に、この見出しへのリンクを書く。そのため、見出しの文を変えるときは、`claude-auto-fix-report.sh` も変える。節のコマンドは `claude setup-token` と `gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>` の2つである。Claude の契約を持つ開発者は、この2つのコマンドを、Windows・macOS・Linux のどれでも同じに打てる。初めて鍵を登録する手順は、この spec の仕組みを入れる PR の本文の「マージのあとにすること」に書く。
+**役割**: この spec を実装する Claude は、次の4つを行う。
+
+- Claude は、`doc/開発フロー/基盤構築手順.md` の 3-1 の Actions secrets の表に、Secret `CLAUDE_CODE_OAUTH_TOKEN` の行を足す。値の欄には、Claude の契約を持つ開発者が `claude setup-token` で作ることを書く。失効したときの欄には、Claude の変更の PR が作られなくなり、仕組みが鍵を取り替えるよう求める Issue を起票することを書く。
+- Claude は、bot の PAT の復旧の節と同じ形で、鍵を作り直して登録し直す節を、見出し `## Claude を動かす鍵の取り替え` で足す。節のコマンドは `claude setup-token` と `gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>` の2つである。Claude の契約を持つ開発者は、この2つのコマンドを、Windows・macOS・Linux のどれでも同じに打てる。
+- `claude-auto-fix-report.sh` は、鍵の Issue の本文に、この見出しへのリンクを書く。そのため、見出しの文を変えるときは、`claude-auto-fix-report.sh` も変える。
+- 初めて鍵を登録する手順は、この spec の仕組みを入れる PR の本文の「マージのあとにすること」に書く。
 
 ## データの形
 
@@ -679,7 +688,7 @@ vuln-fix の種類のブランチ名の、`fix/claude-auto-fix-` より後ろの
 
 ## 失敗したときの扱い
 
-- 振り分けのワークフローが動かなかったとき: 1時間ごとの定期実行が遅れるか取りやめられても、次に動いたときに、待っている対象をまとめて扱う。dispatch と sweep は、状態をすべて GitHub から読み直すので、前の実行の取りこぼしを引き継がない
+- 振り分けのワークフローが動かなかったとき: 1時間ごとの定期実行が遅れるか取りやめられても、次に動いたときに、待っている対象をまとめて扱う。dispatch と sweep は、状態をすべて GitHub から読み直すので、前の実行が扱えなかった対象も、次の実行で扱う
 - 失敗の追跡: すべての実行の結果は、成果物 `outcome` と、GITHUB_STEP_SUMMARY の1行に残る。種類が `codeql` の実行は、警告の番号と結果だけを残す
 
 ## テストの方針
@@ -747,26 +756,32 @@ vuln-fix の種類のブランチ名の、`fix/claude-auto-fix-` より後ろの
     - Claude が Dockerfile の `FROM` の行を digest の無いタグに変えたとき、偽の `digest` の値で `@sha256:` の digest が足されること(2.2)
   - `test-claude-auto-fix-workflows.sh`: 次の場合を確かめる
     - `yq` で2つのワークフローの YAML を読み、ジョブごとの権限、秘密の値を渡すジョブ、ジョブの順番と `if` が、部品の節の claude-auto-fix-target.yaml の「ジョブごとの権限と動き」と同じであること
-    - `secrets.CLAUDE_CODE_OAUTH_TOKEN` が edit ジョブにだけ、`secrets.BOT_GITHUB_TOKEN` が ship ジョブにだけ現れること
+    - `secrets.CLAUDE_CODE_OAUTH_TOKEN` が edit ジョブにだけ、`secrets.BOT_GITHUB_TOKEN` が ship ジョブと cooldown-push ジョブの push の手順にだけ現れること
     - edit ジョブに書き込みの権限が無いこと
     - 種類が `dependabot` のとき、edit ジョブが材料の `checks` に prepare ジョブの出力を渡すこと
     - cooldown-generate と cooldown-submit に `GITHUB_DEPENDENCY_GRAPH_SHA` と `GITHUB_DEPENDENCY_GRAPH_REF` が渡されること
     - cooldown-judge が `PNPM_WORKSPACE_FILE=target/frontend/pnpm-workspace.yaml` を渡すこと(1.4, 2.3, 2.9, 3.3)
     - cooldown-judge が、`target/` の中で `check-go-release-age.sh` と `check-ci-tool-release-age.sh` を呼び、`check-dependency-cooldown.sh` と `check-ci-tool-release-age.sh` に `COOLDOWN_MODE=predict` を渡し、3つの判定の手順が前の手順の終わり方によらず動き、3つの終わり方を `cooldown_outcome` に渡すこと。終わり方から結果を決める処理は、`test-lib-claude-auto-fix.sh` の `cooldown_outcome` の場合で確かめる(2.9)
     - cooldown-push の `if` が、verify ジョブの出力 `cooldown` を読むこと(2.9)
+    - cooldown-push の push の手順が、`final.patch` の SHA-256 を verify ジョブの出力 `final_sha256` と比べ、同じときだけ `final.patch` を当てて push すること(3.1)
     - verify ジョブの手順が、作り直しの道具、`apply`、変わった領域の道具、`check`、CodeQL の `init` と `analyze`、`confirm` の順に並び、前の形が `ok` 以外の `outcome` を出したときに、あとの手順が飛ばされ、`ok` を出したときは次の手順が動くこと
     - verify ジョブの CodeQL の手順で、`init` に `source-root: target` が渡され、ビルドの手順が `working-directory: target` で動き、`analyze` に `checkout_path` として `target/` のパスが渡されること(2.2, 5.2)
     - report ジョブの手順が、`record`、成果物 `outcome` を上げる手順、`notify` の順に並ぶこと(2.2, 5.2, 6.1)
-    - CI では、このテストは、dispatch ジョブのランナー `ubuntu-24.04` に入っている yq を使う。ランナーのイメージ 20261111.370.1 の一覧に、yq 4.54.3 がある。手元では、`.github/CLAUDE.md` の alpine のコンテナの `apk add` に `yq` を足して流す
-  - `test-claude-auto-fix-ship.sh`: 差分の SHA-256 が違えば push しないこと。`final.patch` に `.github/` のファイルの変更か、足した `@SuppressWarnings` の行があれば、push の前のガードで止まり、push せずに `unfixed` になること。種類が `dependabot` で、`base.patch` が `.github/workflows/` のファイルを変え、`final.patch` が変えないときは、ガードを通って push されること(3.1, 3.2)。種類が `codeql` の題名と本文とコミットのメッセージが決まった文と警告の URL だけになること。`red-check` でブランチの head が起点と違えば push しないこと(2.4, 5.1)
+    - CI では、このテストは、dispatch ジョブのランナー `ubuntu-24.04` に入っている yq を使う。ランナーのイメージ 20261111.370.1 の一覧に、yq 4.54.3 がある。手元では、この spec を実装する Claude が、`.github/CLAUDE.md` の alpine のコンテナの `apk add` に `yq` を足して、このテストを流す
+  - `test-claude-auto-fix-ship.sh`: 次の場合を確かめる
+    - 差分の SHA-256 が違えば push しないこと
+    - `final.patch` に `.github/` のファイルの変更か、足した `@SuppressWarnings` の行があれば、push の前のガードで止まり、push せずに `unfixed` になること
+    - 種類が `dependabot` で、`base.patch` が `.github/workflows/` のファイルを変え、`final.patch` が変えないときは、ガードを通って push されること(3.1, 3.2)
+    - 種類が `codeql` の題名と本文とコミットのメッセージが決まった文と警告の URL だけになること
+    - `red-check` でブランチの head が起点と違えば push しないこと(2.4, 5.1)
 - マージのあとの確認: 鍵と bot の PAT を使う実行と、Claude の CLI の実際の動きは、偽のコマンドのテストでは確かめられない。そのため、この spec を実装する Claude は、この spec の仕組みを入れる PR の本文の「マージのあとにすること」に、次の確認の手順を書く。所有者が鍵を登録したあと、この spec を実装した Claude が、claude-auto-fix-target.yaml を、開いている対象の1つで手で起動する。Claude は、実行の結果の成果物の `outcome`、PR ができたときはその PR の作り手が bot であることと auto-merge の予約、ジョブごとの権限が実行の記録のとおりであることを読む。読んだ結果は、この spec の Issue にコメントで書く
 
 ## 安全
 
-- 想定する脅威: このリポジトリは公開されている。誰でも Issue とコメントと fork の PR を書ける。対象の選び方は、`claude-auto-fix-dispatch.sh` の節のとおりである。材料に入れる Issue、PR、コメントの書き手は、`claude-auto-fix-materials.sh` の節のとおりである。きっかけは、このリポジトリのワークフローの実行の終わり、定期実行、所有者の手での起動、Claude の変更の PR の必須の検査に限る
+- 想定する脅威: このリポジトリは公開されている。誰でも Issue とコメントと fork の PR を書ける。対象の選び方は、`claude-auto-fix-dispatch.sh` の節のとおりである。材料に入れる Issue、PR、コメントの書き手は、`claude-auto-fix-materials.sh` の節のとおりである。きっかけは、claude-auto-fix.yaml の節の「いつ動くか」と、claude-auto-fix-sweep.sh の節の「赤の検査の扱い」に書いたものに限る
 - 材料に書かれた指示: 材料の中の Dependabot の PR の本文、実行の記録、警告の説明に、Claude への指示が書かれているおそれがある。Claude が使える道具と読み書きできる範囲は、`claude-auto-fix-run-claude.sh` の節のとおりである。Claude の変更は、ガードと品質チェックと対象の確認に通らない限り PR にならず、PR になっても必須の検査と所有者の承認の仕組みを通る
 - 鍵の保護: 鍵の渡し方と Claude の環境の作り方は、claude-auto-fix-target.yaml の節の edit ジョブと、claude-auto-fix-run-claude.sh の節のとおりである
-- 書き込みの権限: 秘密の値とコードを同じジョブに置かない分け方と、スクリプトとアクションを main から使うことは、全体の構成の節のとおりである。bot の PAT の渡し方と push の前の確かめ方は、claude-auto-fix-target.yaml の節の ship ジョブと、claude-auto-fix-ship.sh の節のとおりである
+- 書き込みの権限: 秘密の値とコードを同じジョブに置かない分け方と、スクリプトとアクションを main から使うことは、全体の構成の節のとおりである。bot の PAT の渡し方と push の前の確かめ方は、claude-auto-fix-target.yaml の節の ship ジョブと cooldown-push ジョブと、claude-auto-fix-ship.sh の節のとおりである
 - CodeQL の警告の中身: 種類が `codeql` の実行は、表示名に警告の番号だけを書く。材料は edit ジョブの中で集め、成果物として受け渡さない。Claude の変更の差分は、ジョブの間を受け渡すために成果物にするが、保存の期間を1日にし、cleanup ジョブが実行の最後に消す。品質チェックと CodeQL の出力の扱いは、`claude-auto-fix-verify.sh` の節のとおりである。PR、コミット、Issue、コメントの文の書き方は、`claude-auto-fix-ship.sh` の節と `claude-auto-fix-report.sh` の節のとおりである
 - CLI の入手: CLI の確かめ方と版は、verified-claude と install-verified-claude.sh の節のとおりである
 

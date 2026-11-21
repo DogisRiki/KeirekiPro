@@ -939,3 +939,107 @@
 なし
 
 - 往復: 2回で収束 / 未解決: 0件
+
+## サイクル7 往復1(2026-11-21)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 全体の構成(136行)、部品 claude-auto-fix-target.yaml の cooldown-push(346-349行)、テストの方針の test-claude-auto-fix-workflows.sh(755行)、安全の「書き込みの権限」(774行): 差分が、一時のブランチの push を GITHUB_TOKEN から bot の PAT に変えた行そのもの。語 `cooldown-push` `一時のブランチ` `BOT_GITHUB_TOKEN` `bot の PAT` `SHA-256` で design.md を検索した
+- design.md 部品 claude-auto-fix-target.yaml の verify の出力(344行)、ship(360行)、部品 claude-auto-fix-prepare.sh の「起点の作り直し」(390行)、部品 claude-auto-fix-verify.sh の `apply`(509行)、部品 claude-auto-fix-ship.sh の役割と「push の前のガード」(521行、526-530行): bot の PAT で push する前に、push するコミットの中身を何で確かめるかを、ship ジョブと比べるため(D7-1-1)
+- design.md プロジェクトの決まりを守っているか(81行): 「`push` のきっかけでは、GitHub は push されたブランチのワークフローのファイルを動かす」と書いてあり、差分の349行の「一時のブランチへの push で動くワークフローはない」の理由に関わるため(D7-1-1)
+- design.md 全体の構成の図(104-111行): ジョブごとに持つ秘密の値を書いた札が、差分の136行と合うかを見るため(D7-1-2)
+- design.md 部品 claude-auto-fix-target.yaml の cooldown-judge(353行、359行)と「失敗したとき」の表(371-376行): 一時のブランチを消すのは GITHUB_TOKEN のままで、cooldown-push が bot の PAT の失効で止まったときの結果が表のとおり `unavailable` になるかを見るため。表は合っている
+- requirements.md 要件3の受入基準3(103行)、要件2の9: 差分の節が関わる受入基準のため。語 `PAT` `GITHUB_TOKEN` `権限` で requirements.md を検索した。受入基準は、仕組みがどのトークンで push するかを決めていないので、差分と食い違わない
+- reviews/requirements-review.md と requirements-response.md: 差分に関わる、後ろの段階で書くと記録された食い違いは無い(語 `cooldown-push` `一時のブランチ` `bot の PAT` で検索し、0件)
+- 言い回しだけを直した行(357行、503行、589行、639-644行、765行): 直す前の文と比べ、意味が変わっていないことを確かめた。503行から消した SARIF の説明は、342行に残っている
+- そのほかの節は、差分の語が出てこないので、読み直していない
+
+### 実ファイルで確かめた文
+
+- cooldown-push(349行)「bot の PAT は、基盤構築手順のとおり `workflow` の権限を持つ」: doc/開発フロー/基盤構築手順.md 17-22行(classic PAT、scopes は `repo`、`read:org`、`workflow`)、76行(Secret `BOT_GITHUB_TOKEN`) / 合っていた
+- cooldown-push(349行)「push で動くワークフローは、どれも main への push だけで動く」: .github/workflows/ の `push:` を持つ6つのワークフロー(ci.yaml 8-9行、codeql.yaml 31-32行、container-scan-scheduled.yaml 76-77行、dependency-graph.yaml 35-36行、sync-labels.yaml 32-33行、update-pr-branches.yaml 44-45行)は、どれも `branches: [main]`。`create:` と `delete:` のきっかけを持つワークフローは無い / main にあるワークフローについては合っていた。push するコミットの中のワークフローのファイルについては、349行の理由が足りない(D7-1-1)
+- cooldown-push(349行)「GitHub が、`.github/workflows/` のファイルを変えるコミットを GITHUB_TOKEN で push させず、ワークフローの権限の欄にもそれを許す権限が無い」: リポジトリの実ファイルでは確かめられない(GitHub の側の動き)。tasks.md 498行に、タスク 6.3 の審査で分かったこととして同じことが書いてある。食い違う実ファイルは無い
+- cooldown-push(349行)「ワークフローのファイルを変える Dependabot の PR の対象」: .github/scripts/check-audit-dependabot-stuck.sh 154-167行(止まった PR は、作り手が `dependabot[bot]` の PR に絞る) / 合っていた
+- テストの方針(765行)「`.github/CLAUDE.md` の alpine のコンテナの `apk add`」: .github/CLAUDE.md 23行(`apk add --no-cache bash jq coreutils`。yq は無い) / 合っていた
+- cooldown-judge(357行)「このスクリプトは、公開から72時間経っていない Go の版に変える変更を、例外なく止める」: サイクル6 往復1で .github/scripts/check-go-release-age.sh 20-21行、24行を確かめた文と同じ意味で、この差分は言い回しだけを変えた / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 3.3(Claude に GitHub の中身を変える権限を渡さない。bot の PAT を Claude が変えたコードに渡さない) | test-claude-auto-fix-workflows.sh(`secrets.BOT_GITHUB_TOKEN` が ship ジョブと cooldown-push ジョブの push の手順にだけ現れる。ジョブごとの権限が部品の節と同じ) | CI は dispatch ジョブのランナー `ubuntu-24.04`、手元は alpine のコンテナ(yq を足す) | yq | 755行、754行、765行、348行 |
+| 3.1、3.2、3.3(ガードを通っていない変更を、bot の PAT で push しない) | 無い | 無い | 無い | 無い(D7-1-1)。ship ジョブでは521行と527行と766行にあるが、cooldown-push ジョブには、push の前に `final.patch` を確かめる手順も、それを確かめるテストも無い |
+| 2.9(ワークフローのファイルを変えるコミットでも、一時のブランチを push して判定できる) | マージのあとの確認(767行)。偽のコマンドのテストでは、GitHub が push を断るかを確かめられない | 対象ごとのワークフローの手での起動 | bot の PAT、開いている対象 | 767行。ただし、767行は、ワークフローのファイルを変える対象で確かめるとは決めていない(D7-1-3。低) |
+
+### 申告
+
+なし。一時のブランチを bot の PAT で push することは、所有者が決めた(tasks.md 498行)。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D7-1-1 | 高 | design.md 部品 claude-auto-fix-target.yaml の cooldown-push(348-349行)、安全の「書き込みの権限」(774行)、テストの方針の test-claude-auto-fix-workflows.sh(753-765行) | cooldown-push は、`final.patch` を当てたコミットを bot の PAT で push するが、push の前に `final.patch` を確かめる手順が design に無い。390行が決めているのは `base.patch` の SHA-256 だけで、`final.patch` の SHA-256 を verify ジョブの出力と比べるのは ship(521行)だけである。529行は「verify ジョブでは、ガードのあとに Claude が変えたテストとビルドスクリプトが動くので、そのコードが `final.patch` を書き換えるおそれがある」と書く。GITHUB_TOKEN のときは、書き換えられた `final.patch` がワークフローのファイルを足しても、GitHub が push を断り、push でワークフローも動かなかった。bot の PAT は `workflow` の権限を持ち、PAT の push はワークフローを動かす。81行のとおり、`push` のきっかけでは、GitHub は push されたブランチのワークフローのファイルを動かす。そのため、Claude が変えたコードが verify ジョブの `check` で `final.patch` を書き換え、`on: push` のワークフローのファイルを足すと、cooldown-push がそれを push し、そのワークフローが、リポジトリの秘密の値(bot の PAT と Claude の鍵)を読める実行として動く。ship は SHA-256 の違いで止まるが、そのときには動いたあとである。349行の理由「このジョブは Claude が変えたコードを動かさないので、Claude の変更が bot の PAT を読み出すことはない」「push で動くワークフローは、どれも main への push だけで動く」は、main にあるワークフローのファイルだけを見ていて、push するコミットの中のワークフローのファイルを見ていない。774行は「push の前の確かめ方は、ship ジョブと cooldown-push ジョブ…の節のとおり」と書くが、cooldown-push の節に確かめ方が無い。偽のコマンドのテストでは見つからず、design のとおりに作っても誰も気づかない。置き場所にある実装(`.claude/.state/claude-auto-fix-unresolved-alerts/place-1/dot-github/workflows/claude-auto-fix-target.yaml` 676行、682行)は `final.patch` の SHA-256 を比べているが、design とテストの方針が求めていないので、あとの変更でこの手順が消えても、テストも codex-review も止めない | cooldown-push の節に、次を書く。(a) このジョブは、bot の PAT を渡す前に、`final.patch` の SHA-256 が verify ジョブの出力(`apply` が、Claude が変えたコードを動かす前に書いた値)と同じであることを確かめ、違えば push せずに失敗する。(b) 349行の理由を、「SHA-256 が同じ `final.patch` は `apply` のガードを通っているので、`.github/` のファイルを変えない。そのため、push するコミットのワークフローのファイルの変更は、prepare ジョブの出力の SHA-256 で確かめた `base.patch`(dependabot[bot] の PR の変更)か、`red-check` の起点の PR の head にあるものだけである」という形に直す。ship と同じく push の前にガードをもう一度呼ぶかも決めて書く。(c) テストの方針の test-claude-auto-fix-workflows.sh に、「cooldown-push が、push の手順で `final.patch` の SHA-256 を verify ジョブの出力と比べ、違えば push しないこと」を足す |
+| D7-1-2 | 低 | design.md 全体の構成の図(108-109行) | 図は、秘密の値を持つジョブに札を付けている(`ship ジョブ bot の PAT`、`edit ジョブ Claude の鍵だけ`)。`cooldown のジョブ` には札が無く、136行と348行(cooldown-push が bot の PAT を持つ)と合わない。実装には影響しない | 108行を `Cooldown[cooldown のジョブ push だけ bot の PAT]` のように直す |
+| D7-1-3 | 低 | design.md cooldown-judge(353行、359行)、マージのあとの確認(767行) | cooldown-judge は、一時のブランチを GITHUB_TOKEN(`contents: write`)で消す。この差分で、一時のブランチに、ワークフローのファイルを変えるコミットが載るようになった。GitHub が断るのはワークフローのファイルを作るか変える push で、ブランチを消す操作は断らないと考えられるが、リポジトリの実ファイルでは確かめられず、design にも確かめた記録が無い。断られたときは、cooldown-judge が失敗して結果が `unavailable` になり、3日後に知らせの Issue で分かる | 767行のマージのあとの確認に、ワークフローのファイルを変える Dependabot の PR の対象があるときに、cooldown-push の push と cooldown-judge のブランチの削除が通ることを読む、と足す |
+
+### 前の段階への指摘
+
+なし
+
+- 往復: 1回目 / 高1 中0 低2
+
+## サイクル7 往復2(2026-11-21)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 部品 claude-auto-fix-target.yaml の cooldown-push(346-353行)、テストの方針の test-claude-auto-fix-workflows.sh(766行): 差分が、D7-1-1 の直しとして足した行そのもの。語 `final_sha256` `成果物に上げ` `cooldown-push` で design.md と tasks.md を検索した
+- design.md verify ジョブの6つの手順と出力(337-344行)、部品 claude-auto-fix-verify.sh の `apply` の出力(513行)、部品 claude-auto-fix-ship.sh の役割と「push の前のガード」(525行、530-534行)、部品 claude-auto-fix-guard.sh(471-478行): 349行の「`final_sha256` は `apply` の手順がガードを通した `final.patch` から出す値」「`check` は `apply` のあとに動く」と、353行の「`.github/` のファイルの変更はガードが止める」が、これらの節と合うかを見るため。合っている
+- design.md 部品 claude-auto-fix-prepare.sh の「起点のコード」「起点の作り直し」(393-394行)、lib-claude-auto-fix.sh の節の Claude の変更の PR の見分け方(597行): 353行の「push するコミットのワークフローのファイルは、main のワークフローのファイルに `base.patch` と `final.patch` の変更を足したもの」が、`red-check` の起点(PR の head)でも成り立つかを見るため(D7-2-1)
+- design.md 概要(7行)と claude-auto-fix.yaml の「いつ動くか」(243-247行): 概要から消した、きっかけの3つが、部品の節に残っているかを見るため。残っている
+- design.md claude-auto-fix.yaml と dispatch と sweep の「失敗したとき」(251行、290行、310行): claude-auto-fix.yaml から消した文が、2つのスクリプトの節に同じ意味で残っているかを見るため。残っている
+- design.md 失敗したときの扱い(691行)と、dispatch の `retry`(263行)と「失敗したとき」(290行): 書き換えた文が、dispatch の節と合うかを見るため(D7-2-2)
+- design.md 安全の「想定する脅威」(781行)と、claude-auto-fix.yaml の「いつ動くか」、sweep の「赤の検査の扱い」(298行)、マージのあとの確認(777行): きっかけの並びを節の名前に替えた文が、もとの4つのきっかけと同じものを指すかを見るため(D7-2-3)
+- design.md cooldown-judge(360行)と check-dependency-cooldown.sh の変更(621行、629行)、check-ci-tool-release-age.sh の変更(635行)と ship の「新しい PR」(528行): スクリプトの名前を足した文が、もとの意味のままかを見るため。意味は変わっていない
+- design.md テストの方針の test-claude-auto-fix-ship.sh(771-776行): 1つの文を5つの箇条に分けた直しで、場合の数と要件の番号が変わっていないことを確かめた
+- requirements.md 要件3の1と3: 差分の節が関わる受入基準のため。受入基準は、push の前の確かめ方を決めていないので、差分と食い違わない
+- reviews/requirements-review.md と requirements-response.md: 語 `design` で検索した。差分に関わる、後ろの段階で書くと記録された食い違いは無い
+- そのほかの節は、差分の語が出てこないので、読み直していない
+
+### 実ファイルで確かめた文
+
+- cooldown-push(353行)「main のワークフローは、どれも main への push だけで動く」: .github/workflows/ の `push:` のきっかけを持つ6つのワークフロー(ci.yaml 8-9行、codeql.yaml 31-32行、container-scan-scheduled.yaml 76-77行、dependency-graph.yaml 35-36行、sync-labels.yaml 32-33行、update-pr-branches.yaml 44-45行)は、どれも `branches: [main]`。`create:` `delete:` のきっかけと、`on: push` を1行で書いたワークフローは無い / 合っていた
+- cooldown-push(353行)「`final.patch` の `.github/` のファイルの変更は、ガードが止める」: .github/scripts/check-escape-hatches.sh 237行(ゲートの設定のファイルの一覧に `\.github/`) / 合っていた
+- cooldown-push(353行)「Dependabot は、ワークフローのファイルの中では版だけを変える」: .github/dependabot.yml 85-86行(`package-ecosystem: "github-actions"`、`directory: "/"`)。Dependabot が版のほかを変えないことは GitHub の側の動きで、リポジトリの実ファイルでは確かめられない。食い違う実ファイルは無い
+- cooldown-push(349行)「`final_sha256` は、verify ジョブの `apply` の手順が…出す値」「`check` の手順は、`apply` の手順と、`final.patch` を成果物に上げる手順のあとに動く」: 置き場所の .claude/.state/claude-auto-fix-unresolved-alerts/place-1/dot-github/workflows/claude-auto-fix-target.yaml 292行(`final_sha256: ${{ steps.apply.outputs.sha256 }}`)、380行(Apply Claude patch)、390行(Upload final patch)、432行(Check changed areas)、672-682行(push の手順が `final.patch` の SHA-256 を `FINAL_SHA256` と比べる) / 合っていた
+- design-response.md サイクル7 往復1 D7-1-1「置き場所のテストには、この場合が既にある」: 置き場所の scripts/tests/test-claude-auto-fix-workflows.sh 721行、939-940行 / 合っていた
+- lib-claude-auto-fix.sh の節(597行)「Claude の変更の PR とみなすのは、このリポジトリのブランチから出され…」: 置き場所の scripts/lib-claude-auto-fix.sh 281-296行(head のリポジトリがこのリポジトリであることを求める) / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 3.1、3.3(ガードを通っていない変更を、bot の PAT で一時のブランチに push しない) | test-claude-auto-fix-workflows.sh(cooldown-push の push の手順が、`final.patch` の SHA-256 を verify ジョブの出力 `final_sha256` と比べ、同じときだけ当てて push する。`secrets.BOT_GITHUB_TOKEN` が ship ジョブと cooldown-push ジョブの push の手順にだけ現れる) | CI は dispatch ジョブのランナー `ubuntu-24.04`、手元は alpine のコンテナ(yq を足す) | yq、偽の `git` の push | 766行、759行、770行、349行 |
+| 3.1、3.2(ship ジョブが、ガードを通っていない変更を push しない) | test-claude-auto-fix-ship.sh(差分の SHA-256 が違えば push しない。`.github/` の変更か `@SuppressWarnings` の行でガードが止める) | 同じ | 偽の `gh` と `git` の push | 771-774行。箇条に分けただけで、場合は変わっていない |
+
+### 申告
+
+なし。この往復の差分は、前の往復の指摘の直しと、書き方の直しだけである。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D7-2-1 | 低 | design.md 部品 claude-auto-fix-target.yaml の cooldown-push(353行) | 353行は「このジョブが push するコミットのワークフローのファイルは、main のワークフローのファイルに、`base.patch` と `final.patch` の変更を足したものである」と書く。`reason` が `red-check` のときは、393-394行のとおり、cooldown-push は `base_sha`(Claude の変更の PR の head)を checkout し、`base.patch` は無い。このときの push するコミットのワークフローのファイルは、PR の head のファイルに `final.patch` の変更を足したものである。PR の head は、597行のとおり、このリポジトリのブランチにあり、ship ジョブがガードを通して push したコミットと、main の取り込みでできている。そのため、「一時のブランチへの push で動くワークフローはない」という結論は変わらず、SHA-256 の比較とガードの作りも変わらない。理由の文が `red-check` の場合を書いていないだけで、実装には影響しない | 353行に、「`red-check` のときは、起点が Claude の変更の PR の head で、その head のワークフローのファイルは、ship ジョブがガードを通して push したコミットと main の取り込みでできている」を足す |
+| D7-2-2 | 低 | design.md 失敗したときの扱い(691行) | 書き換えた文は「前の実行が扱えなかった対象も、次の実行で扱う」と書く。dispatch の節は、起動しなかった対象を「次のきっかけか所有者の手での起動で動いたときに扱う」と書き(290行)、1時間ごとの定期実行は「ふだんは対象を新しく集めず」、結果のファイルから選ぶと書く(263行)。起動できなかった対象には結果のファイルが無いので、次の1時間ごとの実行では扱われない。691行の「次の実行」は、290行より広く読める。作るものは部品の節が決めるので、実装には影響しない | 691行の終わりを、「前の実行が起動できなかった対象は、dispatch の節の「失敗したとき」のとおり、次のきっかけか所有者の手での起動で扱う」のように、290行と同じ範囲にする |
+| D7-2-3 | 低 | design.md 安全の「想定する脅威」(781行) | 書き換えた文は、きっかけを「claude-auto-fix.yaml の節の「いつ動くか」と、claude-auto-fix-sweep.sh の節の「赤の検査の扱い」に書いたものに限る」と書く。対象ごとのワークフローは `workflow_dispatch` で動き(318行)、777行は、この spec を実装した Claude が claude-auto-fix-target.yaml を手で起動すると書く。この手での起動は、挙げた2つの節のどちらにも書かれていない。直す前の文の「所有者の手での起動」は、これも含めて読めた。書き込みの権限を持つ者しか `workflow_dispatch` を起動できないので、想定する脅威の範囲は変わらず、実装には影響しない | 781行に、「claude-auto-fix-target.yaml を、書き込みの権限を持つ者が手で起動したとき」を足す |
+
+### 前の段階への指摘
+
+なし
+
+- 往復: 2回で収束 / 未解決: 0件

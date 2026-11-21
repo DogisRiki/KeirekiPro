@@ -483,3 +483,73 @@
 無い。
 
 - 往復: 1回で収束 / 未解決: 0件
+
+## サイクル5 往復1(2026-11-21)
+
+### 審査の範囲
+
+範囲: 差分
+
+差分の取り方: 起動の文は `git diff --no-index` の実行を求めたが、審査役が実行してよい Bash は `gh issue view` だけなので、実行していない。代わりに、控えの `.claude/.state/spec-review/claude-auto-fix-unresolved-alerts__tasks.reviewed.md` と `…__tasks.pending.md` の全文を Read で読み、2つを突き合わせた。機械の差分ではないので、下に挙げた行のほかに、目で見分けられなかった1文字の違いが残っているおそれがある。見分けた差分は次のとおりである。
+
+- タスク 6.1 の受入基準とテストの対応(要件3の受入基準3の箇条): 場合の名前が「secrets.BOT_GITHUB_TOKEN が ship ジョブにだけ現れる」から「ship ジョブと cooldown-push ジョブの push の手順にだけ現れる」に変わった
+- タスク 6.3: 箱が `- [x]` から `- [ ]` に変わった。本文に、`final.patch` の SHA-256 を verify ジョブの出力 `final_sha256` と比べる文と、checkout を `persist-credentials: false` にして push の手順にだけ `secrets.BOT_GITHUB_TOKEN` を渡す文が足された。受入基準とテストの対応が3つから5つになり、`_要件:_` に 3.1 と 3.3 が足された
+- タスク 7 の完了の確かめ方の5つ目: 言い回しだけが変わった(タスク 4.7 のテストで確かめるので、どちらを先に進めてもよい、という意味は同じ)
+- 実装のメモ: 「所有者に push を頼むとき」「dependency-cooldown の判定の予測の形」「origin のブランチの有無の確認」「Claude を動かすスクリプト」「frontend の対象の確認」「振り分けのきっかけの形」「実行の出どころ」「後始末のスクリプトの決めごと」「後始末のスクリプトで、検証のときに見直すこと」「ワークフローのテストとの約束」「ワークフローを作るときに決めること」「ワークフローのテストの書き方」「対象ごとのワークフローの決めごと」「cooldown のジョブの決めごと」「ワークフローの壊し方の確認」の行は、言い回しだけが変わった(かっこの中の理由を文に出した、「確かめ」を「確認」にした)。直す前の文と1行ずつ比べ、意味が変わっていないことを確かめた
+- 実装のメモ「一時のブランチの push の権限」: 「所有者に尋ねる」が「所有者が 2026-11-21 に決めた」に変わり、所有者が決めた中身が足された
+
+影響を受けると判断した箇所は次のとおりである。
+
+- design.md 全体の構成(136行)、部品 claude-auto-fix-target.yaml の cooldown-push(346-353行)、verify の出力(344行)、cooldown-judge(357行、363行)、ship(364行)、「失敗したとき」の表(375-380行)、テストの方針の test-claude-auto-fix-workflows.sh(757-770行)、安全の「書き込みの権限」(784行): タスク 6.3 と 6.1 の差分が、design のこの箇所の直しをタスクに写したものであるため。語 `cooldown-push` `BOT_GITHUB_TOKEN` `final_sha256` で design.md を検索した
+- requirements.md 要件3の受入基準1(101行)と受入基準3(103行)、要件2の受入基準1と3と9: タスク 6.3 の `_要件:_` に 3.1 と 3.3 が足されたため
+- tasks.md タスク 6.1 の本文と28の偽の YAML と11の対応、タスク 6.2 の完了の確かめ方、タスク 6.5 の `_依存:_`、タスク 8.1 の `_要件:_`、実装のメモ「ship の if」「ワークフローのテストとの約束」: タスク 6.3 が名指しするテストの場合を、どのタスクが作るかを見るため(T5-1-1、T5-1-2)
+- reviews/design-review.md と design-response.md(サイクル6とサイクル7): 語 `tasks` で検索した。サイクル7の D7-1-1 から D7-2-3 に、tasks で書くと記録された食い違いは無い。サイクル5までの記録の D3-1-2、D3-1-3、D3-2-1、D4-1-2、D5-1-1 が指すタスク(5.3、4.7、4.1、4.3、6.2)は、この差分で変わっていない
+- そのほかのタスク(1.1 から 5.3、6.4、6.5、8.1 から 8.3)と完了条件の節は、2つの控えで同じだったので、読み直していない
+
+### 実ファイルで確かめた文
+
+- タスク 6.3「push の前に、`final.patch` の SHA-256 を verify ジョブの出力 `final_sha256` と比べ、違えば push せずに失敗する」: design.md 349行。置き場所の `.claude/.state/claude-auto-fix-unresolved-alerts/place-1/dot-github/workflows/claude-auto-fix-target.yaml` 292行(`final_sha256: ${{ steps.apply.outputs.sha256 }}`)、676行、682行 / 合っていた
+- タスク 6.3「checkout を `persist-credentials: false` にし、一時のブランチを push する手順にだけ `secrets.BOT_GITHUB_TOKEN` を渡して push する」: design.md 348行。置き場所の同じファイル 629-630行(権限は `contents: read`)、638行、675行(`BOT_GITHUB_TOKEN` は id が `final` の手順の env にだけある)、689-690行 / 合っていた
+- タスク 6.3「タスク 6.2 で起点のコードを作るジョブと同じ形で、起点のコードを作り、`base.patch` の SHA-256 を確かめる」: design.md 394行。置き場所の同じファイル 654-668行 / 合っていた
+- タスク 6.1 と 6.3 のテスト「secrets.BOT_GITHUB_TOKEN が ship ジョブと cooldown-push ジョブの push の手順にだけ現れる」: design.md 759行。置き場所の `scripts/tests/test-claude-auto-fix-workflows.sh` 478-485行 / 合っていた
+- タスク 6.3 のテスト「cooldown-push ジョブの checkout が persist-credentials: false である」: 置き場所の同じテスト 504-507行(場合の名前は「すべてのジョブの checkout が、cooldown-push と cooldown-generate と cooldown-judge を含めて、persist-credentials: false である」) / 合っていた
+- タスク 6.3 のテスト「cooldown-push の final の手順が final.patch の SHA-256 を verify の出力と比べ、同じときだけ当てて push する」: design.md 766行。置き場所の同じテスト 336-339行、939-940行 / 合っていた
+- 実装のメモ「cooldown のジョブの決めごと」の「一時のブランチは、cooldown-judge の最後の手順が `always()` で GITHUB_TOKEN を使って消す」: design.md 357行、363行。置き場所のテスト 1092行(`delete_branch` の手順に `github.token` を渡す)。この差分は言い回しだけを変えた / 合っていた
+- 実装のメモ「一時のブランチの push の権限」の「所有者が 2026-11-21 に決めた」「design と tasks を直すことにした」: spec.json 46-61行(`revoked_at` が 2026-11-21T14:09:10Z で、`revoked_for` が同じ中身の design と tasks の2つの要素) / 合っていた
+- 実装のメモ「一時のブランチの push の権限」の「GITHUB_TOKEN は `.github/workflows/` のファイルを変えるコミットを push できず、権限の欄に `workflows: write` を書くこともできない」: GitHub の側の動きで、リポジトリの実ファイルでは確かめられない。design.md 351行と同じ中身で、食い違う実ファイルは見つけていない(この往復では、`.github/workflows/` を検索していない。design-review.md 963行も、同じ文を「実ファイルでは確かめられない」と記録している)
+- 実装のメモ「所有者に push を頼むとき」の「タスク 1.4 で…push が 403 で断られた」: research.md を `403` で検索したが、この出来事の記録は無い。リポジトリの実ファイルでは確かめられない。この差分は言い回しだけを変えた。食い違う実ファイルは無い
+
+### 確かめの道具を作るタスク
+
+| 道具 | 作るタスク | 確かめる成果物を作るタスク | 並び |
+|---|---|---|---|
+| `test-claude-auto-fix-workflows.sh` の場合「secrets.BOT_GITHUB_TOKEN が ship ジョブと cooldown-push ジョブの push の手順にだけ現れる」 | 6.1(対応の箇条に名前がある) | 6.2(ship)、6.3(cooldown-push) | 前 |
+| 同じテストの場合「cooldown-push ジョブの checkout が persist-credentials: false である」 | 無い(6.1 の対応にも 6.3 の本文にも、作ると書いていない。置き場所のテストの504行には既にある。T5-1-1) | 6.3 | 前(置き場所には既にある) |
+| 同じテストの場合「cooldown-push の final の手順が final.patch の SHA-256 を verify の出力と比べ、同じときだけ当てて push する」 | 無い(同じ。置き場所のテストの939行には既にある。T5-1-1) | 6.3 | 前(置き場所には既にある) |
+| 同じテストの、タスク 6.3 が名指しするほかの8つの場合(cooldown-generate と cooldown-submit の環境変数、cooldown-judge の4つ、cooldown-push の if、ジョブの順番と if、JOB_RESULTS、起点のコード) | 6.1 | 6.3 | 前 |
+| actionlint(`rhysd/actionlint:1.7.12`)と置き場所の `dot-github/actionlint.yaml` | 6.2(イメージは今あるもの) | 6.3 | 前 |
+| タスク 1.4 の research.md の記録(環境変数の渡し方) | 1.4 | 6.3(依存に 1.4 がある) | 前 |
+| タスク 4.7 のテスト「鍵の Issue の本文のリンクが基盤構築手順の見出しを指す」(タスク 7 の完了の確かめ方の5つ目) | 4.7 | 4.7(タスク 7 は手順書を読んで確かめる) | 前 |
+
+確かめる成果物より後ろで作る道具は無かった。
+
+### 申告
+
+なし。一時のブランチを bot の PAT で push することと、push の前に `final.patch` の SHA-256 を比べることは、所有者が決め、design のサイクル7で審査済みである。サイクル4 往復1の申告1から申告4が指すタスク(8.3、1.2、実装のメモ)は、この差分で中身が変わっていない。
+
+### 指摘
+
+タスク 6.3 の本文と完了の確かめ方と `_要件:_` は、design.md 348-350行(権限、`persist-credentials: false`、push の手順にだけ bot の PAT、`final_sha256` との比較)と759行と766行のとおりである。受入基準とテストの対応の数(5)は箇条の数と合う。足された 3.1 と 3.3 は requirements.md にあり、design.md 766行と759行が同じ要件に結び付けている。箱を `- [ ]` に戻したタスク 6.3 は、タスク 6.5 の `_依存:_` にあり、タスク 6.5 は `- [ ]` のままなので、並びは崩れていない。高と中の指摘は無い。
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| T5-1-1 | 低 | tasks.md タスク 6.1 の本文と受入基準とテストの対応、タスク 6.3 の受入基準とテストの対応 | タスク 6.3 は、テストの場合「cooldown-push ジョブの checkout が persist-credentials: false である」と「cooldown-push の final の手順が final.patch の SHA-256 を verify の出力と比べ、同じときだけ当てて push する」で確かめると書く。タスク 6.1 は「2つのワークフローの場合をすべてこのタスクで作る」と書くが、タスク 6.1 の11の対応にこの2つの場合は無く、28の偽の YAML にも、cooldown-push が `final_sha256` を比べない YAML と、bot の PAT を push のほかの手順に渡す YAML は無い。タスク 6.3 の本文も、テストに場合を足すとは書いていない。そのため、tasks.md だけを読むと、この2つの場合を作るタスクが決まらない。ただし、置き場所のテスト(`test-claude-auto-fix-workflows.sh` 504行、939行)にはどちらの場合も既にあり、タスク 6.3 の完了の確かめ方と対応が名前を挙げているので、場合が無ければタスク 6.3 の中で分かる。前のタスクに戻ることにはならず、実装には影響しない | タスク 6.3 の本文に、「Claude は、`test-claude-auto-fix-workflows.sh` に、この2つの場合を足し、`secrets.BOT_GITHUB_TOKEN` の場合を、cooldown-push ジョブの push の手順を含む形に直す」を足す。または、タスク 6.1 の対応にこの2つの場合を足す |
+| T5-1-2 | 低 | tasks.md タスク 6.2 の完了の確かめ方 | タスク 6.2 は「次の9つのほかがすべて通り」「9つの場合は、タスク 6.3 のあとに通る」と書く。この差分で足された2つの場合と、名前が変わった `secrets.BOT_GITHUB_TOKEN` の場合は、cooldown-push ジョブがあって初めて通る(置き場所のテスト 483行は cooldown-push の手順に `BOT_GITHUB_TOKEN` が1つ以上あることを求め、506行は cooldown-push ジョブに checkout があることを求める)。そのため、タスク 6.3 のあとに通る場合は9つではなく12になるが、タスク 6.2 の一覧は9つのままである。タスク 6.2 は完了していて、置き場所のワークフローには cooldown-push ジョブが既にあるので、実装には影響しない | タスク 6.2 の「9つ」を「12」にし、一覧に3つの場合を足す |
+
+サイクル4までに「記録のみ」になった低の指摘(T2-1-4、T3-1-2 から T3-1-6、T3-2-1、T4-1-1 から T4-1-3)は、出し直していない。
+
+### 前の段階への指摘
+
+無い。
+
+- 往復: 1回で収束 / 未解決: 0件
