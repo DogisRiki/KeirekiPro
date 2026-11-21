@@ -356,7 +356,7 @@
   - _要件: 2.1, 2.2, 2.3, 2.8, 3.3, 5.2_
   - _依存: 4.8_
 
-- [ ] 6.3 1つの対象を直して PR にする対象ごとのワークフローに、cooldown の4つのジョブを足す
+- [x] 6.3 1つの対象を直して PR にする対象ごとのワークフローに、cooldown の4つのジョブを足す
 
   Claude は、置き場所の `claude-auto-fix-target.yaml` に、設計の「claude-auto-fix-target.yaml」の部品の節の cooldown-push、cooldown-generate、cooldown-submit、cooldown-judge の4つのジョブを足し、ship ジョブを cooldown-judge ジョブのあとに動かす。cooldown-push ジョブは、verify ジョブの出力 `cooldown` が `true` のときだけ動く。cooldown-push ジョブは、cooldown のジョブのほかのジョブを作るタスク 6.2 で起点のコードを作るジョブと同じ形で、起点のコードを作り、`base.patch` の SHA-256 を確かめる。cooldown-push ジョブは、push の前に、`final.patch` の SHA-256 を verify ジョブの出力 `final_sha256` と比べ、違えば push せずに失敗する。cooldown-push ジョブは、checkout を `persist-credentials: false` にし、一時のブランチを push する手順にだけ `secrets.BOT_GITHUB_TOKEN` を渡して push する。cooldown-judge ジョブは、判定の手順の前に、dependency-review の手順「Test dependency cooldown check」が流すテストと `test-lib-claude-auto-fix.sh` を流す。cooldown-judge ジョブは、設計の cooldown-judge の項のとおりに、`check-dependency-cooldown.sh` と `check-go-release-age.sh` と `check-ci-tool-release-age.sh` の3つの判定の手順を、前の手順の終わり方によらずすべて動かし、`check-ci-tool-release-age.sh` が書いた版の配布元の署名を確かめ、署名を確かめられなかったときは3つ目の判定の終わり方を1にする。cooldown-judge ジョブは、3つの終わり方を `cooldown_outcome` に渡して、ship に進むか、結果を `blocked` にするか、ジョブを失敗にするかを決める。Claude は、report ジョブの `needs` と `JOB_RESULTS` に、4つのジョブを足す。cooldown-generate ジョブと cooldown-submit ジョブへの環境変数の渡し方は、一時のブランチのコミットの Gradle のスナップショットを確かめたタスク 1.4 で確かめた渡し方にする。
   - 完了の確かめ方: 置き場所の `claude-auto-fix-target.yaml` で、`test-claude-auto-fix-workflows.sh` の対象ごとのワークフローの場合がすべて通り、actionlint が指摘を出さない
@@ -498,3 +498,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - ワークフローの壊し方の確認(タスク 6.3 で分かった): 偽の正しいワークフローの文字に合わせて書いた壊し方は、本物のファイルでは yq の整形だけになり、壊せていないことがある。6.3 からは本物のファイルに壊し方を当て、yq で整形しただけの写しと比べて、壊し方がワークフローを変えたことを先に確かめる
 - 一時のブランチの push の権限(タスク 6.3 の審査で分かった、所有者が 2026-11-21 に決めた): GITHUB_TOKEN は `.github/workflows/` のファイルを変えるコミットを push できず、権限の欄に `workflows: write` を書くこともできない。そのため、直す前の design のとおりに cooldown-push ジョブが GITHUB_TOKEN で一時のブランチを push すると、ワークフローのファイルの CI の道具の版を変える変更と、ワークフローのファイルを変える Dependabot の PR の対象では、cooldown-push ジョブが毎回失敗する。所有者は、cooldown-push の push の手順にだけ bot の PAT を渡すよう、design と tasks を直すことにした
 - 振り分けのワークフローのきっかけの渡し方(タスク 6.4): dispatch の手順は、きっかけの名前とワークフローの名前を env で受け、run の中に `${{ }}` を書かない。きっかけのワークフローの名前を通して、手順に命令を差し込まれないためである。知らないきっかけでは、スクリプトを呼ばずに失敗する
+- 実際の実行でしか確かめられない2つの動き(タスク 6.3 の審査で分かった、タスク 8.3 で見る): cooldown-push の `gh auth setup-git` が、環境変数 `GH_TOKEN` だけで git の認証の手段になること。cooldown-judge が GITHUB_TOKEN で、`.github/workflows/` を変えるコミットを持つ一時のブランチを消せること
