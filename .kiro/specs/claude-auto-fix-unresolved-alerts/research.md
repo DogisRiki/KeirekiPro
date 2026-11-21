@@ -282,3 +282,12 @@
 - [Gradle の依存グラフのプラグイン](https://github.com/gradle/github-dependency-graph-gradle-plugin)
 - [gradle/actions の dependency-submission](https://github.com/gradle/actions/blob/main/docs/dependency-submission.md)
 - [依存の差分比較の API](https://docs.github.com/en/rest/dependency-graph/dependency-review)
+
+## pnpm が72時間の待ちで止まったときのエラーの文
+
+- 確かめた日: 2026-11-21
+- 使った部品と版: 開発環境の frontend のイメージ `keirekipro-frontend:latest`。pnpm 11.10.0(`frontend/package.json` の `packageManager` のとおりに corepack が入れた版)。Node.js v24.16.0
+- 確かめ方: main のコミット `2edd4686` の `frontend/` を作業フォルダの外に写し、写しの `package.json` の `typescript` を、2026-11-20T08:08:34Z に公開された `7.1.0-dev.20261120.1` に固定した。写しの `pnpm-workspace.yaml` は変えず、`minimumReleaseAge: 4320` のままにした。写しで `pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts` を動かした
+- 終わり方の番号: 1
+- エラーの文: 1行目は `[ERR_PNPM_NO_MATURE_MATCHING_VERSION] 8 versions do not meet the minimumReleaseAge constraint:` だった。続く8行に、版ごとに `<名前>@<版> was published at <公開の日時>, within the minimumReleaseAge cutoff (<境の日時>)` の形で、固定した `typescript@7.1.0-dev.20261120.1` と、その版が持つ7つの部品の版が並んだ
+- 結論: エラーの文は `ERR_PNPM_NO_MATURE_MATCHING_VERSION` を含む。design.md の claude-auto-fix-verify.sh の節の pnpm の項の見分け方と合う。設計を見直すきっかけには当たらない
