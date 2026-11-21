@@ -1,0 +1,70 @@
+{
+  "approval_history" : [
+    {
+      "approved_at" : "2026-11-13T14:49:51Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        725
+      ],
+      "revoked_at" : "2026-11-13T21:52:16Z",
+      "revoked_for" : "D1-1-12 による requirements への差し戻し: 要件1の4が、要件2の4で外す承認か時間を待つ4つの検査の赤を、止まった Dependabot の PR では外していない",
+      "stage" : "requirements"
+    },
+    {
+      "approved_at" : "2026-11-13T23:55:42Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        725
+      ],
+      "revoked_at" : "2026-11-14T00:13:04Z",
+      "revoked_for" : "T1-1-9 から T1-1-11 による design への差し戻し: report の節の PR を閉じる扱いが report ジョブの権限と sweep の節と食い違い、report と prepare の呼び出し方に3つの環境変数の入力が無く、外から呼ぶ関数の数と sweep の箇条の数と .github/ のファイルの置き場所が節によって違う",
+      "stage" : "design"
+    },
+    {
+      "approved_at" : "2026-11-14T06:50:01Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        725
+      ],
+      "revoked_at" : "2026-11-14T07:11:31Z",
+      "revoked_for" : "T2-1-6 と T2-1-7 による design への差し戻し: verify ジョブの手順を飛ばす条件が、通ったときも ok を出す check と confirm と食い違い、種類が codeql の知らせに PR の URL を書くかが report の節の2つの文で食い違う。あわせて、tasks の実装のメモで補っていた Trivy の結果のファイルの名前、鍵の取り替えの節の見出し、CodeQL の警告のファイルの形を design に書く",
+      "stage" : "design"
+    },
+    {
+      "approved_at" : "2026-11-14T07:30:43Z",
+      "approved_by" : "DogisRiki",
+      "issues" : [
+        725
+      ],
+      "revoked_at" : "2026-11-21T01:34:30Z",
+      "revoked_for" : "main の取り込みによる design の直し: PR #857 で dependency-cooldown に Go の版の公開からの時間の検査が加わったが、cooldown-judge ジョブは check-dependency-cooldown.sh の判定しか呼ばず、Go の版を72時間経っていない版に変える変更を PR にする",
+      "stage" : "design"
+    }
+  ],
+  "approvals" : {
+    "design" : {
+      "approved" : true,
+      "approved_at" : "2026-11-21T02:23:42Z",
+      "approved_by" : "DogisRiki",
+      "generated" : true
+    },
+    "requirements" : {
+      "approved" : true,
+      "approved_at" : "2026-11-13T22:34:45Z",
+      "approved_by" : "DogisRiki",
+      "generated" : true
+    },
+    "tasks" : {
+      "approved" : true,
+      "approved_at" : "2026-11-21T02:49:46Z",
+      "approved_by" : "DogisRiki",
+      "generated" : true
+    }
+  },
+  "created_at" : "2026-11-13T12:20:03Z",
+  "feature_name" : "claude-auto-fix-unresolved-alerts",
+  "issue" : 725,
+  "language" : "ja",
+  "phase" : "tasks-generated",
+  "updated_at" : "2026-11-21T02:49:46Z"
+}
