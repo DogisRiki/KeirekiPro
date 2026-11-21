@@ -237,7 +237,7 @@
   - _要件: 2.2, 2.8, 6.1, 6.2_
 
 - [ ] 5. 対象を見つけて実行を起こすスクリプトと、後始末のスクリプトを作る
-- [ ] 5.1 4つのきっかけで対象を集め、絞り込みの決まりで絞って実行を起動するスクリプトを作る (並行可)
+- [x] 5.1 4つのきっかけで対象を集め、絞り込みの決まりで絞って実行を起動するスクリプトを作る (並行可)
 
   Claude は、置き場所に、設計の「claude-auto-fix-dispatch.sh」の部品の節のうち、`trigger` の4つの集め方と絞り込みの決まりを行う振り分けのスクリプトと、そのテスト `test-claude-auto-fix-dispatch.sh` を作る。振り分けのスクリプトは、止まった Dependabot の PR を、一覧を書き出す形を足したタスク 3.1 の `STUCK_JSON_OUT` で読む。振り分けのスクリプトは、vuln-fix の組を、frontend-vuln-fix と backend-vuln-fix が PR を作れなかった組を書くタスク 3.3 と 3.4 の vuln-fix の結果のファイルの形で読む。テストは、偽の `gh` で、成果物と API の応答と `gh workflow run` を置き換える。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-dispatch.sh` の場合が、すべて通る
@@ -480,3 +480,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - Issue の一覧の渡し方(タスク 4.7): 開いている Issue の一覧とコメントの一覧は、jq に引数(`--argjson`)で渡さず、標準入力かファイル(`--slurpfile`)で渡す。Linux の1つの引数の長さの上限は 128KiB で、知らせの Issue が20件ほど開くと超えるためである
 - 3日続けて動けなかった知らせ(タスク 4.8): `claude-auto-fix-report.sh notify` は、同じ key の知らせの Issue が状態によらず1つでも開いていれば、新しく起票しない。数える3回には、実行の途中の今の実行の結果を、今の UTC の日時で足す。`recent_outcomes` は終わった実行しか返さないためである。題名は、種類が codeql でも `Claude が3日続けて動けなかった CodeQL の警告 #<番号>` にする。design の「claude-auto-fix-report.sh」の節の codeql の題名 `Claude が直せなかった …` を使うと、動けなかった知らせが直せなかった知らせに見えるためである。design の文面との食い違いとして、PR の本文に書く。種類が codeql のときは、理由を決まった文だけで書き、理由の種類を書かない(要件5.1)。種類が container のときも Issue を起票し、対象の URL にラベル container-vuln の Issue の URL を書く
 - 結果を出さずに止まった実行(タスク 4.8): `claude-auto-fix-report.sh record` は、結果が空のとき、環境変数 `JOB_RESULTS`(ジョブの名前から結論への JSON)を読み、design の「失敗したとき」の表の順で最初に失敗したか取り消されたジョブから結果を決める。止まったジョブが1つも無いときは `unavailable` と理由の種類 `no-outcome` を書く。結果のファイルの無い、取り消されていない実行があると `recent_outcomes` が失敗するため、結果のファイルを必ず書く。ワークフローのタスク 6.2 は、report の手順に `JOB_RESULTS` を渡す
+- 振り分けのきっかけの形(タスク 5.1): `claude-auto-fix-dispatch.sh trigger` は、入力 `pr` を渡さない。種類 dependabot の key が PR の番号で、red-check はきっかけの対象ではないためである。vuln-fix の成果物は、きっかけの実行の名前に加えて、きっかけの種類が schedule か workflow_dispatch であること、このリポジトリのブランチの実行であること、ワークフローのファイルが `frontend-vuln-fix.yaml` か `backend-vuln-fix.yaml` であることを確かめてから読む(要件1.6)。design の「claude-auto-fix-dispatch.sh」の節に無い確かめとして、PR の本文に書く。成果物に形の違う行が1行でもあれば、その成果物の組を1つも起動しない。Go の標準ライブラリの組が成果物に複数あっても、最も新しい版と OSV の ID のすべてで1つの対象にする。同じ回の中で起動した表示名を覚え、同じ対象を2回起動しない
