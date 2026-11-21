@@ -108,7 +108,7 @@
   - _対象の部品: frontend-vuln-fix.sh と backend-vuln-fix.sh の変更_
   - _依存: 2.1_
 
-- [ ] 3.4 backend-vuln-fix が PR を作れなかった組を vuln-fix の結果のファイルに書き、確認に使う関数を外から呼べるようにする (並行可)
+- [x] 3.4 backend-vuln-fix が PR を作れなかった組を vuln-fix の結果のファイルに書き、確認に使う関数を外から呼べるようにする (並行可)
 
   Claude は、`backend-vuln-fix.sh` と `backend-vuln-fix.yaml` とそのテストの今の版を置き場所に写し、設計の「frontend-vuln-fix.sh と backend-vuln-fix.sh の変更」の節のとおりに直す。スクリプトは、`run` の4か所と `go_run` の4か所で vuln-fix の結果のファイルに1行を足し、`run` が main の依存を解決できずに止まるときは計画したすべての組を書く。スクリプトは、Claude の変更のブランチがある組では PR を作らない。Claude は、スクリプトの関数 `tree` `vulncheck` `go_bump` `digest` を、引数で呼べるようにする。ワークフローは、vuln-fix の結果のファイルを成果物 `vuln-fix-unresolved-java` と `vuln-fix-unresolved-go` として上げる。
   - 完了の確かめ方: Linux のコンテナで流した `test-backend-vuln-fix.sh` の場合が、前からある場合も含めてすべて通る。actionlint が、置き場所の `backend-vuln-fix.yaml` に指摘を出さない
@@ -460,3 +460,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - Go の版を書くファイルの見分け方(タスク 2.4): `go_release_is_target` は、名前が `Dockerfile.<何か>` のファイルをすべて Go の版を書くファイルとみなす。`Dockerfile.md` のような説明のファイルも当たるので、`cooldown_needed` は、そのファイルだけを変えた変更でも dependency-cooldown の判定が要るとする。テストで「判定が要らない」場合のファイルに、この形の名前を使わない
 - dependency-cooldown の判定の予測の形(タスク 3.2): `COOLDOWN_MODE=predict` の `check-dependency-cooldown.sh` は、PR の番号を求めず、72時間経っていない版が無ければ0、判定の4つをすべて通れば3、止める版があるか判定できなければ1で終わる。`COOLDOWN_MODE` が空か predict のほかの値なら、何も読まずに1で終わる。`test-check-dependency-cooldown.sh` を Linux のコンテナで流すときは、bash と jq のほかに openssl と gzip と perl が要る(来歴の証明書を作るのと、署名した者を比べるため)
 - vuln-fix の PR を作る処理のテスト(タスク 3.3): `test-frontend-vuln-fix.sh` は、偽の gh・git・curl・pnpm を PATH の先頭に置き、環境変数で成功と失敗を選んで `run` を流す。偽の git は `ls-remote` の5つ目の引数をブランチ名として読む。backend の同じテストを足すときも、この形にそろえる
+- origin のブランチの有無の確かめ(タスク 3.4): `git ls-remote --exit-code` は、ブランチが無いときに 2 で終わる。ほかの失敗を 2 で返す関数の中で使うときは、ブランチが無いときを 1 などの別の値に直してから返す
