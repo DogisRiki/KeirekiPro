@@ -128,7 +128,7 @@
   - _要件: 2.9_
   - _対象の部品: check-ci-tool-release-age.sh の変更_
 
-- [ ] 4. 1つの対象を直して PR にするまでの各段のスクリプトを作る
+- [x] 4. 1つの対象を直して PR にするまでの各段のスクリプトを作る
 - [x] 4.1 Claude に渡す指示の文と、材料を集めるスクリプトを作る (並行可)
 
   Claude は、置き場所に、設計の「prompt.md」の部品の節の7つのことを書いた指示の文 `prompt.md` と、設計の「claude-auto-fix-materials.sh」の部品の節のとおりに材料を集めるスクリプトと、そのテスト `test-claude-auto-fix-materials.sh` を作る。種類が `container` のとき、スクリプトは、環境変数 `TRIVY_RESULTS_DIR` のフォルダから、設計の「claude-auto-fix-target.yaml」の部品の節の prepare ジョブの項に書いた `trivy-java.json` と `trivy-go.json` を読む。テストは、偽の `gh` で、github-actions[bot]、dependabot[bot]、この仕組みの bot、ほかの利用者が書いた Issue と PR とコメントを返し、`TRIVY_RESULTS_DIR` のフォルダに偽の Trivy の結果を置く。
@@ -225,7 +225,7 @@
   - _対象の部品: claude-auto-fix-report.sh_
   - _依存: 2.1, 2.2_
 
-- [ ] 4.8 動けなかったことが3日続いたときと、main で消えていたときと、ジョブが結果を出さずに止まったときの扱いを足す
+- [x] 4.8 動けなかったことが3日続いたときと、main で消えていたときと、ジョブが結果を出さずに止まったときの扱いを足す
 
   Claude は、置き場所の結果を書くスクリプトの `notify` の形に、設計の「claude-auto-fix-report.sh」の部品の節の `unavailable` と `blocked` と `gone` の扱いを足す。Claude は、`record` の形に、設計の「claude-auto-fix-target.yaml」の部品の節の「失敗したとき」の表のとおりに、止まったジョブから結果を決める扱いを足す。Claude は、その場合を `test-claude-auto-fix-report.sh` に足す。`record` の形は、結果の引数が空で、環境変数 `JOB_RESULTS` に `failure` か `cancelled` のジョブがあるときに、設計の「失敗したとき」の表で結果を決める。`JOB_RESULTS` は、needs の各ジョブの result を入れた JSON である。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-report.sh` の場合が、すべて通る
@@ -478,3 +478,5 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 知らせの Issue の起票(タスク 4.7): `claude-auto-fix-report.sh` は、知らせの Issue と鍵の Issue を、`lib-ledger-issue.sh` の `ledger_find_or_create` を使わずに、`gh issue create` で起票し、`ledger_assign_owner` で所有者を担当者にする。`ledger_find_or_create` は、閉じた Issue でも題名が同じなら使い続けるため、「開いていなければ起票する」決まりを守れないからである。コメントは `ledger_comment` と `lib-notice-comment.sh` の `notice_post` で付ける。タスクの本文と design の「lib-ledger-issue.sh で探し、起票し」との食い違いとして、PR の本文に書く
 - report の起点のコミット(タスク 4.7): `claude-auto-fix-report.sh record` は、結果のファイルの `head_sha` を、環境変数 `CAF_HEAD_SHA`(40桁の16進)から読む。10の引数の形に欄が無いためである。無ければ null を書く。ワークフローのタスク 6.2 は、prepare ジョブの出力の起点のコミットを report の手順に `CAF_HEAD_SHA` として渡す
 - Issue の一覧の渡し方(タスク 4.7): 開いている Issue の一覧とコメントの一覧は、jq に引数(`--argjson`)で渡さず、標準入力かファイル(`--slurpfile`)で渡す。Linux の1つの引数の長さの上限は 128KiB で、知らせの Issue が20件ほど開くと超えるためである
+- 3日続けて動けなかった知らせ(タスク 4.8): `claude-auto-fix-report.sh notify` は、同じ key の知らせの Issue が状態によらず1つでも開いていれば、新しく起票しない。数える3回には、実行の途中の今の実行の結果を、今の UTC の日時で足す。`recent_outcomes` は終わった実行しか返さないためである。題名は、種類が codeql でも `Claude が3日続けて動けなかった CodeQL の警告 #<番号>` にする。design の「claude-auto-fix-report.sh」の節の codeql の題名 `Claude が直せなかった …` を使うと、動けなかった知らせが直せなかった知らせに見えるためである。design の文面との食い違いとして、PR の本文に書く。種類が codeql のときは、理由を決まった文だけで書き、理由の種類を書かない(要件5.1)。種類が container のときも Issue を起票し、対象の URL にラベル container-vuln の Issue の URL を書く
+- 結果を出さずに止まった実行(タスク 4.8): `claude-auto-fix-report.sh record` は、結果が空のとき、環境変数 `JOB_RESULTS`(ジョブの名前から結論への JSON)を読み、design の「失敗したとき」の表の順で最初に失敗したか取り消されたジョブから結果を決める。止まったジョブが1つも無いときは `unavailable` と理由の種類 `no-outcome` を書く。結果のファイルの無い、取り消されていない実行があると `recent_outcomes` が失敗するため、結果のファイルを必ず書く。ワークフローのタスク 6.2 は、report の手順に `JOB_RESULTS` を渡す
