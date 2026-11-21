@@ -305,3 +305,26 @@
   - main のコミット `c2661468` と2つ目のブランチのコミット `3414652e` の比較は、`actions` の差を3行だけ返し、maven の差を返さなかった
   - 1つ目のブランチのコミット `03b6fb72` と2つ目のブランチのコミット `3414652e` の比較も、maven の差を返さなかった。2つ目のブランチのコミットに Gradle のスナップショットが結び付いていれば、そのスナップショットの `commons-validator` は 1.10.0 になり、main のコミットとの比較で maven の差が出るはずである。main のコミットとの比較で maven の差が出なかったので、2つ目のブランチのコミットには Gradle のスナップショットが結び付いていない
 - 結論: 2つの環境変数を渡すと、Gradle のスナップショットは、ワークフローを動かしたブランチのコミットではなく、渡したコミットとブランチに結び付く。差分比較の API は、main に無く一時のブランチにだけあるコミットでも、maven の差を返す。design.md の cooldown-generate と cooldown-submit の組み立てのとおりでよく、設計を見直すきっかけには当たらない
+
+## Claude の CLI の結果の JSON の確認
+
+- 確かめた日: 2026-11-21
+- 使った部品と版: glibc の Linux のコンテナ `debian:bookworm-slim`。Claude Code の CLI 2.1.323(タスク 1.1 の `install-verified-claude.sh` が、配布元の署名と SHA-256 を確かめてから入れた版)
+- 確かめ方: 所有者が、所有者の端末で、`claude setup-token` で作った鍵を `read -s` で読み、`docker run -e CLAUDE_CODE_OAUTH_TOKEN` でコンテナに名前だけを渡した。コンテナの中で、design.md の claude-auto-fix-run-claude.sh の節の起動のしかたと設定のファイルのとおりに、作業のフォルダ `target/` で CLI を3回動かした。設定のファイルは、`disableAllHooks` と `permissions.blockReadsOutsideWorkingDirectories` と `permissions.blockWritesOutsideWorkingDirectories` を true にし、`permissions.deny` に `Bash` と `WebFetch` と `WebSearch` と `Read(//proc/**)` と `Read(//sys/**)` と `$RUNNER_TEMP` の下を読む決まりを書いた。結果の JSON からは、すべての欄の名前と、`type` `subtype` `is_error` `api_error_status` `num_turns` `stop_reason` の値と、`result` の文の先頭の80文字と、`permission_denials` の道具の名前を書き出した。鍵の値は書き出していない。版 2.1.323 は、`install-verified-claude.sh` に版を渡して入れ、このスクリプトが入れた CLI の版を確かめた
+- Bash で、`/tmp` にファイルを作るコマンドを動かすよう求めた場合:
+  - 終わり方の番号は0、`subtype` は `success`、`is_error` は false、`api_error_status` は null、`num_turns` は1だった
+  - `result` の文の先頭は `I can't run that command. This session has no Bash tool.` だった
+  - `permission_denials` は空だった。`--tools` に Bash を入れていないので、CLI は Bash の道具を持たず、断る前の段階で使えなかった
+  - コマンドが作るはずのファイルは無く、コマンドは動かなかった
+- `target/` の外のファイル `/probe-outside/secret.txt` を読んで中身を答えるよう求めた場合:
+  - 終わり方の番号は0、`subtype` は `success`、`is_error` は false、`api_error_status` は null、`num_turns` は2だった
+  - `result` の文の先頭は ``I couldn't read `/probe-outside/secret.txt`. It's outside the working directory`` だった
+  - `permission_denials` には `Read` が1つ入った。CLI は Read の道具で読もうとし、設定に断られた
+  - ファイルに書いた、実行のたびに作る乱数の文は、結果の JSON にも標準エラーにも出なかった
+- 誤った鍵で動かした場合:
+  - 終わり方の番号は1、`subtype` は `success`、`is_error` は true、`api_error_status` は401、`num_turns` は1だった
+  - `result` の文の先頭は `Failed to authenticate. API Error: 401 OAuth access token is invalid.` だった
+  - 結果の JSON には、ほかの2つの場合に無い `api_error_origin` の欄があった
+  - `subtype` が `success` でも `is_error` が true なので、design.md の見分け方の `ok` には当たらない。`result` の文が `Failed to authenticate` で始まり、`api_error_status` が401なので、見分け方は `key` にする
+- 結果の JSON の欄: 3つの場合のどれにも、`type` `subtype` `is_error` `api_error_status` `result` `num_turns` `stop_reason` `permission_denials` があった
+- 結論: Claude はコマンドを動かせず、`target/` の外のファイルを読めなかった。誤った鍵は、design.md の見分け方で `key` になる。design.md の claude-auto-fix-run-claude.sh の節の起動のしかたと見分け方のとおりでよく、設計を見直すきっかけには当たらない。誤った鍵の場合に CLI が0以外で終わるので、run-claude.sh は、CLI の終わり方の番号ではなく結果の JSON で見分ける
