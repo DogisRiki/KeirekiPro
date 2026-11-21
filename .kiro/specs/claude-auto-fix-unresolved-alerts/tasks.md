@@ -367,7 +367,7 @@
   - _要件: 2.1, 2.3, 2.9_
   - _依存: 1.4, 2.4, 3.2, 3.5_
 
-- [ ] 6.4 対象を見つけて対象ごとの実行を起こす振り分けのワークフローを作る
+- [x] 6.4 対象を見つけて対象ごとの実行を起こす振り分けのワークフローを作る
 
   Claude は、置き場所に、設計の「claude-auto-fix.yaml」の部品の節のとおりに、ワークフロー `claude-auto-fix.yaml` を作る。dispatch ジョブは、`test-claude-auto-fix-workflows.sh` と、振り分けのスクリプトと共通の関数のテストを流してから、振り分けのスクリプトを呼ぶ。sweep ジョブは、後始末のスクリプトと共通の関数のテストを流してから、後始末のスクリプトを呼ぶ。
   - 完了の確かめ方: 置き場所の `claude-auto-fix.yaml` で、`test-claude-auto-fix-workflows.sh` の振り分けのワークフローの場合がすべて通り、actionlint が指摘を出さない
@@ -495,3 +495,4 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - cooldown のジョブの決めごと(タスク 6.3、PR の本文に書く): cooldown-push は、一時のブランチに同じ名前のブランチが残っていても置き換えるため、`--force` を付けて push し、一時のブランチは cooldown-judge の最後の手順が `always()` で GITHUB_TOKEN を使って消す。cooldown-generate は、dependency-review の generate ジョブと同じく、Java を入れてからスナップショットを作り、空のスナップショットを送らないことを確かめる。cooldown-generate の dependency-submission は `cache-disabled: true` でキャッシュを読み書きしない(Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くため)。cooldown-judge は、cooldown-submit が通っていなければ、判定の手順を動かしたうえでジョブを失敗にする。ship の if は、cooldown-judge の出力 result が ship であることに加えて、ジョブが通ったことも読む。report の OUTCOME は、cooldown-judge のジョブが通ったときだけ blocked を渡す。同じスラグになる2つの key は1つの一時のブランチを使い、取り消された実行は一時のブランチを残す(どちらも PR の本文に、分かっている限りとして書く)
 - ワークフローの壊し方の確かめ(タスク 6.3 で分かった): 偽の正しいワークフローの文字に合わせて書いた壊し方は、本物のファイルでは yq の整形だけになり、壊せていないことがある。6.3 からは本物のファイルに壊し方を当て、yq で整形しただけの写しと比べて、壊し方がワークフローを変えたことを先に確かめる
 - 一時のブランチの push の権限(タスク 6.3 の審査で分かった、所有者に尋ねる): GITHUB_TOKEN は `.github/workflows/` のファイルを変えるコミットを push できず、権限の欄に `workflows: write` を書くこともできない。そのため、ワークフローのファイルの CI の道具の版を変える変更と、ワークフローのファイルを変える dependabot の PR の対象は、design のとおり GITHUB_TOKEN で push すると、cooldown-push で毎回失敗する
+- 振り分けのワークフローのきっかけの渡し方(タスク 6.4): dispatch の手順は、きっかけの名前とワークフローの名前を env で受け、run の中に `${{ }}` を書かない。きっかけのワークフローの名前を通して、手順に命令を差し込まれないためである。知らないきっかけでは、スクリプトを呼ばずに失敗する
