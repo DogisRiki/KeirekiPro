@@ -63,7 +63,9 @@
   ],
   "approvals" : {
     "design" : {
-      "approved" : false,
+      "approved" : true,
+      "approved_at" : "2026-11-21T22:41:11Z",
+      "approved_by" : "DogisRiki",
       "generated" : true
     },
     "requirements" : {
@@ -73,7 +75,9 @@
       "generated" : true
     },
     "tasks" : {
-      "approved" : false,
+      "approved" : true,
+      "approved_at" : "2026-11-21T22:41:11Z",
+      "approved_by" : "DogisRiki",
       "generated" : true
     }
   },
@@ -82,5 +86,5 @@
   "issue" : 725,
   "language" : "ja",
   "phase" : "tasks-generated",
-  "updated_at" : "2026-11-21T14:09:10Z"
+  "updated_at" : "2026-11-21T22:41:11Z"
 }
