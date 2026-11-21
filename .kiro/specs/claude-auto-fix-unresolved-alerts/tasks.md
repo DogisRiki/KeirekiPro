@@ -179,7 +179,7 @@
   - _対象の部品: claude-auto-fix-verify.sh_
   - _依存: 1.3, 2.3, 2.4, 3.3, 3.4_
 
-- [ ] 4.5 確認のスクリプトに、変えた領域の品質チェックを流す `check` の形と、対象が消えたかを確かめる `confirm` の形を足す
+- [x] 4.5 確認のスクリプトに、変えた領域の品質チェックを流す `check` の形と、対象が消えたかを確かめる `confirm` の形を足す
 
   Claude は、置き場所の確認のスクリプトに、設計の「claude-auto-fix-verify.sh」の部品の節の 手順3の `check` の形と、手順4の `confirm` の形を足し、その場合を `test-claude-auto-fix-verify.sh` に足す。`check` の形は、`final.patch` から変わった領域を決め直し、その領域の品質チェックだけを流して、`outcome` に `ok` か `unfixed` を出す。`confirm` の形は、種類が `codeql` のとき、環境変数 `CODEQL_SARIF_DIR` の SARIF と、設計の verify ジョブの項に書いた警告のファイル `$RUNNER_TEMP/codeql-alert.json` を読み、SARIF の結果のパスの先頭の `target/` を外してから、警告のファイルに書かれた規則の ID とファイルと比べる。SARIF は、CodeQL などの静的解析の道具が、見つけた結果を書く JSON の形式である。テストは、偽の品質チェックのコマンドと、偽の `vulnerable` `tree` `vulncheck` `go_plan` の結果と、偽の SARIF を使う。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-verify.sh` の場合が、すべて通る
@@ -468,3 +468,7 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - 設計と要件の食い違い(タスク 4.3、PR の本文に書いて所有者に決めてもらう): design.md の prepare.sh の節の止める決まりは「reason が manual でなく、知らせの Issue の状態が unfixed なら skipped」と書くが、実装は reason が trigger か retry のときだけ止める。要件4の4が止めるのは要件1の1から4の4つのきっかけだけで、要件2の4は Claude の変更の PR の赤で Claude を動かすと決めているためである。設計の文のとおりにすると、unfixed の Issue が開いたまま所有者が手で動かして作った PR が赤になったときに、Claude がその赤を直せない
 - 確認のスクリプトの apply の形(タスク 4.4): `claude-auto-fix-verify.sh apply` は、ガードと vuln-fix のスクリプトを作業のフォルダではなく自分と同じフォルダから呼ぶ。`base.patch` のファイルは必須で、空なら起点のコードに変更が無いものとして扱う。種類が codeql のときは説明の文を `$RUNNER_TEMP/claude-auto-fix-verify.log` に書く。領域の見分けは配列 `CAF_AREA_FILTERS` に ci.yaml の filters を写してあり、テストの filters の場合が ci.yaml と食い違えば落ちるので、ci.yaml の filters を変えるときは配列も直す。名前を変えた差分の元のパスは `git apply --numstat` では取れないので、一時の index に `base.patch` を逆に当てて取る
 - 設計の文との食い違い(タスク 4.4、PR の本文に書く): design.md の verify.sh の節の pnpm のコマンドは `pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts` だが、実装は `--ignore-pnpmfile` を足した。`--ignore-scripts` だけでは Claude が書いた `.pnpmfile.cjs` が apply の中で読み込まれて動き、同じ節の「Claude が変えたコードは apply の出力を書き換えられない」が成り立たないためである(pnpm の docs/cli/install.md)。リポジトリに pnpmfile は無いので、今の動きは変わらない
+- 確認のスクリプトの check と confirm の形(タスク 4.5): `check` と `confirm` は、起点のコミットに `final.patch` を当てた木を一時の index で作り、動かす前に作業のフォルダをその木に戻す。追跡するファイルは `read-tree -u --reset` で戻し、追跡しないファイルと無視するファイルは `clean -ffdxq` で消す。`check` は終わりにももう一度戻す。品質チェックやビルドが作業のフォルダのファイルを変えても、CodeQL と `confirm` が PR にする木を診断するためである。そのため、verify ジョブは、ログインのトークンや道具や SARIF を `target/` の外に置く
+- reason の渡し方(タスク 4.5): `confirm` は、対象ごとの実行の reason を環境変数 `CAF_REASON` で受け取り、`red-check` のときは対象を調べずに `ok` を出す。5つの引数の形には reason の欄が無いためである。verify ジョブを書くタスクでは、`confirm` を呼ぶ手順に `CAF_REASON` を渡す。渡し忘れたときは対象を調べるので、Claude の変更の PR の赤を直した実行が `unfixed` で止まる
+- Dockerfile の組み立て(タスク 4.5): `check` は、ci.yaml の docker-smoke と同じ文脈で `docker build` を流すが、terraform の Dockerfile に `github_token` の secret を渡さない。verify ジョブは秘密の値を持たないためである。terraform の Dockerfile の secret の mount は必須ではないので組み立ては進むが、ログインしない問い合わせの回数の上限に当たると tflint の準備が失敗し、`unfixed` になることがある
+- frontend の対象の確かめ(タスク 4.5): `frontend-vuln-fix.sh vulnerable` は、lockfile が無いときも「範囲に入る版が無い」と同じ1で終わる。そのため、`confirm` は、`frontend/pnpm-lock.yaml` が無いときを `unfixed` にする
