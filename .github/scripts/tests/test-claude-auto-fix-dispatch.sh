@@ -184,10 +184,19 @@ reset() {
     unset FAIL_EP FAIL_DISPATCH
 }
 # 振り分けを動かす: run_dispatch <きっかけのワークフロー> <きっかけの実行の ID> [引数...]
+# Audit Weekly と Scheduled Container Image Vulnerability Scan のきっかけの実行は、場合が FX/run-<ID>.json を
+# 書いていなければ、このリポジトリの決まった時刻の実行にする
 run_dispatch() {
     local wf="$1" id="$2"
     shift 2
     [ $# -gt 0 ] || set -- trigger
+    case "$wf" in
+    "$AW" | "$CW")
+        if [[ "$id" =~ ^[0-9]+$ ]] && [ ! -f "$FX/run-${id}.json" ]; then
+            trigger_run "$wf" success | jq -c --argjson id "$id" '.id = $id' >"$FX/run-${id}.json"
+        fi
+        ;;
+    esac
     TRIGGER_WORKFLOW="$wf" TRIGGER_RUN_ID="$id" bash "$SCRIPT" "$@" >"$WORK/out" 2>"$WORK/err"
     RC=$?
 }
@@ -207,9 +216,11 @@ no_write() {
 # きっかけの実行の JSON: trigger_run <ワークフローの名前> <結論> [きっかけの種類] [head のリポジトリ]
 # backend のワークフローの path は、@ と ref を付けた形にする(どちらの形でも読めることを確かめるため)
 trigger_run() {
-    jq -nc --arg w "$1" --arg c "$2" --arg ev "${3:-schedule}" --arg head "${4:-owner/repo}" '
-        {id: 1, name: $w, conclusion: $c, status: "completed", event: $ev,
+    jq -nc --arg w "$1" --arg c "$2" --arg ev "${3:-schedule}" --arg head "${4:-owner/repo}" --arg br "${5:-main}" '
+        {id: 1, name: $w, conclusion: $c, status: "completed", event: $ev, head_branch: $br,
          path: (if $w == "Backend Vulnerability Fix" then ".github/workflows/backend-vuln-fix.yaml@refs/heads/main"
+                elif $w == "Audit Weekly" then ".github/workflows/audit-weekly.yaml"
+                elif $w == "Scheduled Container Image Vulnerability Scan" then ".github/workflows/container-scan-scheduled.yaml@refs/heads/main"
                 else ".github/workflows/frontend-vuln-fix.yaml" end),
          repository: {full_name: "owner/repo"}, head_repository: {full_name: $head}}'
 }
@@ -422,6 +433,58 @@ if want trigger_source; then
     run_dispatch "$FW" 907
     expect_eq "同じ名前のほかのワークフローのファイルの実行では起動しない" "$(dispatched)" ""
     if grep -q '^run download' "$FAKE_LOG"; then ng "出どころの違う実行の成果物を読まない"; else ok "出どころの違う実行の成果物を読まない"; fi
+fi
+
+if want trigger_source_audit; then
+    echo "[trigger_source_audit] Audit Weekly と Scheduled Container Image Vulnerability Scan のきっかけの実行が、このリポジトリのそのワークフローの、認める起動のしかたの実行でなければ起動しない(要件1の6)"
+    reset
+    alerts 30 >"$FX/codeql-alerts.json"
+    trigger_run "$AW" success workflow_dispatch | jq -c '.id = 908' >"$FX/run-908.json"
+    run_dispatch "$AW" 908
+    expect_eq "手で起動された Audit Weekly の実行では起動する" "$(dispatched)" "codeql 30"
+    reset
+    alerts 30 >"$FX/codeql-alerts.json"
+    trigger_run "$AW" success pull_request someone/repo | jq -c '.id = 909' >"$FX/run-909.json"
+    run_dispatch "$AW" 909
+    expect_eq "PR で動いた同じ名前のワークフローの実行では起動しない" "$(dispatched)" ""
+    expect_eq "PR で動いた実行のときは 1 で終わる" "$RC" 1
+    if grep -q 'code-scanning/alerts' "$FAKE_LOG"; then ng "PR で動いた実行のときは CodeQL の警告を読まない"; else ok "PR で動いた実行のときは CodeQL の警告を読まない"; fi
+    reset
+    alerts 30 >"$FX/codeql-alerts.json"
+    trigger_run "$AW" success | jq -c '.id = 911 | .path = ".github/workflows/other.yaml"' >"$FX/run-911.json"
+    run_dispatch "$AW" 911
+    expect_eq "同じ名前のほかのワークフローのファイルの実行では起動しない" "$(dispatched)" ""
+    reset
+    trigger_run "$CW" success schedule someone/repo | jq -c '.id = 912' >"$FX/run-912.json"
+    run_dispatch "$CW" 912
+    expect_eq "ほかのリポジトリのブランチの、コンテナの検査の実行のときは 1 で終わる" "$RC" 1
+    if grep -Fq 'issues?labels=container-vuln' "$FAKE_LOG"; then ng "ほかのリポジトリのブランチの実行のときはコンテナの検査の Issue を読まない"; else ok "ほかのリポジトリのブランチの実行のときはコンテナの検査の Issue を読まない"; fi
+    # コンテナの定期検査は、本番のリリースのあと(workflow_run)と main への push のあとにも動く(要件1の3)
+    for ev in push workflow_run; do
+        reset
+        arr "$(issue 300 "$BOT" "コンテナ脆弱性: CVE-2026-0001" "本文 $(state true)")" >"$FX/issues-cv.json"
+        trigger_run "$CW" success "$ev" | jq -c '.id = 913' >"$FX/run-913.json"
+        run_dispatch "$CW" 913
+        expect_eq "main で動いた ${ev} のコンテナの検査の実行では起動する" "$(dispatched)" "container CVE-2026-0001"
+        expect_eq "main で動いた ${ev} のコンテナの検査の実行のときは 0 で終わる" "$RC" 0
+    done
+    reset
+    arr "$(issue 300 "$BOT" "コンテナ脆弱性: CVE-2026-0001" "本文 $(state true)")" >"$FX/issues-cv.json"
+    trigger_run "$CW" success push owner/repo feature/x | jq -c '.id = 914' >"$FX/run-914.json"
+    run_dispatch "$CW" 914
+    expect_eq "main でないブランチの push のコンテナの検査の実行では起動しない" "$(dispatched)" ""
+    expect_eq "main でないブランチの push のコンテナの検査の実行のときは 1 で終わる" "$RC" 1
+    reset
+    arr "$(issue 300 "$BOT" "コンテナ脆弱性: CVE-2026-0001" "本文 $(state true)")" >"$FX/issues-cv.json"
+    trigger_run "$CW" success pull_request | jq -c '.id = 915' >"$FX/run-915.json"
+    run_dispatch "$CW" 915
+    expect_eq "このリポジトリの PR で動いたコンテナの検査の実行では起動しない" "$(dispatched)" ""
+    expect_eq "このリポジトリの PR で動いたコンテナの検査の実行のときは 1 で終わる" "$RC" 1
+    reset
+    alerts 30 >"$FX/codeql-alerts.json"
+    trigger_run "$AW" success push | jq -c '.id = 916' >"$FX/run-916.json"
+    run_dispatch "$AW" 916
+    expect_eq "Audit Weekly は push の実行を認めない" "$(dispatched)" ""
 fi
 
 # --- CodeQL の警告 -----------------------------------------------------------------------
@@ -770,6 +833,7 @@ if want retry_unavailable; then
     expect_eq "入力 checks は結果のファイルのまま" "$(input dependabot 64 checks)" '["frontend-test"]'
     expect_eq "赤の検査を直す実行は、PR の番号と赤の検査を渡す" \
         "$(input codeql 74 reason) $(input codeql 74 pr) $(input codeql 74 checks)" 'red-check 520 ["frontend-test"]'
+    expect_eq "赤の検査を直す実行は、表示名に使う PR の今の head の SHA の先頭12文字を渡す" "$(input codeql 74 head)" 747474747474
     no_write "Issue と PR とコメントを書かない"
     run_mode retry
     expect_eq "同じ偽の応答で2回呼んでも、起動される実行が増えない" "$(count)" 4

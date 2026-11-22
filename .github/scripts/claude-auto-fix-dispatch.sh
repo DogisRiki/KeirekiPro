@@ -276,6 +276,8 @@ consider() {
     [ -z "$pr" ] || inputs+=(-f "pr=${pr}")
     [ -z "$checks" ] || inputs+=(-f "checks=${checks}")
     [ -z "$detail" ] || inputs+=(-f "detail=${detail}")
+    # 赤の検査を直す実行の表示名は、PR の head の SHA の先頭12文字を持つ。対象ごとの実行は、SHA を表示名にだけ使う
+    [ -z "$sha" ] || inputs+=(-f "head=${sha:0:12}")
     if ! gh workflow run "$CAF_TARGET_WORKFLOW" --ref main -R "$REPO" "${inputs[@]}" </dev/null >/dev/null; then
         err "${label}: 対象ごとの実行を起動できません"
         return 0
@@ -289,28 +291,45 @@ consider() {
     summary "- 起動した: ${label}"
 }
 
-# --- vuln-fix の組 -------------------------------------------------------------------------
-# read_vuln_run <実行の ID> <ワークフローの名前> <ワークフローのファイル> <出すファイル> <成果物の名前>...
-#   実行が、このリポジトリのそのワークフローのファイルの、決まった時刻か手で起動された実行のときだけ、
-#   成果物を読み、組を1行に1つの {kind, group} で出すファイルに書く。ワークフローの名前は、ほかのリポジトリからの
-#   PR のワークフローでも同じ名前を付けられるので、名前だけでは、利用者が作った成果物を対象を選ぶ材料にする
-#   おそれがあるためである(要件1の6)。実行の結論が failure でなければ、組を書かない
-read_vuln_run() {
-    local id="$1" wname="$2" file="$3" out="$4" run conclusion art dir kinds
-    shift 4
-    : >"$out"
+# --- きっかけの実行 ------------------------------------------------------------------------
+# own_trigger_run <実行の ID> <ワークフローの名前> <ワークフローのファイル> [認める起動のしかた]
+#   きっかけの実行が、このリポジトリのそのワークフローのファイルの、認める起動のしかたの実行のときだけ、
+#   実行の結論を TRIGGER_CONCLUSION に入れる。そうでなければ、理由を書いて1を返す。ワークフローの名前は、ほかのリポジトリからの
+#   PR のワークフローでも同じ名前を付けられるので、名前だけで実行を信じると、利用者が書いた PR をきっかけにして
+#   Claude を動かすおそれがあるためである(要件1の6)。err の FAILED=1 を残すため、$(...) の中で呼ばない
+#   認める起動のしかたは、空白で区切った event の名前で、既定は決まった時刻(schedule)と手の起動(workflow_dispatch)。
+#   push と workflow_run は、このリポジトリの main のブランチで動いた実行だけを認める。コンテナの定期検査は、
+#   本番のリリースのあとと main への push のあとにも動くためである
+own_trigger_run() {
+    local id="$1" wname="$2" file="$3" events="${4:-schedule workflow_dispatch}" run
+    TRIGGER_CONCLUSION=
     run=$(gh api "repos/${REPO}/actions/runs/${id}") || {
         err "${wname} の実行 ${id} を読めません"
-        return 0
+        return 1
     }
-    conclusion=$(jq -r --arg w "$wname" --arg repo "$REPO" --arg path ".github/workflows/${file}" '
-        if .name == $w and (.event | IN("schedule", "workflow_dispatch"))
+    TRIGGER_CONCLUSION=$(jq -r --arg w "$wname" --arg repo "$REPO" --arg path ".github/workflows/${file}" --arg events "$events" '
+        ($events | split(" ")) as $evs
+        | if .name == $w and ((.event // "") | type) == "string" and (.event as $e | $evs | index($e)) != null
+            and ((.event | IN("push", "workflow_run") | not) or (.head_branch // "") == "main")
             and (.repository.full_name? // "") == $repo and (.head_repository.full_name? // "") == $repo
             and ((.path // "") | type) == "string" and ((.path // "") | split("@")[0]) == $path
         then (.conclusion // "") else error("x") end' <<<"$run" 2>/dev/null) || {
-        err "実行 ${id} は、このリポジトリの ${file} の、決まった時刻か手で起動された実行ではありません"
-        return 0
+        err "実行 ${id} は、このリポジトリの ${file} の、認める起動のしかた(${events})の実行ではありません"
+        return 1
     }
+}
+
+# --- vuln-fix の組 -------------------------------------------------------------------------
+# read_vuln_run <実行の ID> <ワークフローの名前> <ワークフローのファイル> <出すファイル> <成果物の名前>...
+#   実行が、このリポジトリのそのワークフローのファイルの、決まった時刻か手で起動された実行のときだけ(own_trigger_run)、
+#   成果物を読み、組を1行に1つの {kind, group} で出すファイルに書く。名前だけで実行を信じると、利用者が作った
+#   成果物を対象を選ぶ材料にするおそれがあるためである(要件1の6)。実行の結論が failure でなければ、組を書かない
+read_vuln_run() {
+    local id="$1" wname="$2" file="$3" out="$4" conclusion art dir kinds
+    shift 4
+    : >"$out"
+    own_trigger_run "$id" "$wname" "$file" || return 0
+    conclusion=$TRIGGER_CONCLUSION
     if [ "$conclusion" != failure ]; then
         summary "- ${wname} の実行 ${id} の結論が failure でない(${conclusion:-未定})ので、vuln-fix の組を集めません"
         return 0
@@ -762,10 +781,16 @@ trigger)
     "Frontend Transitive Vulnerability Fix") collect_vuln_trigger frontend-vuln-fix.yaml vuln-fix-unresolved ;;
     "Backend Vulnerability Fix") collect_vuln_trigger backend-vuln-fix.yaml vuln-fix-unresolved-java vuln-fix-unresolved-go ;;
     "Audit Weekly")
-        collect_codeql trigger yes
-        collect_stuck trigger yes
+        if own_trigger_run "$TRIGGER_RUN_ID" "$TRIGGER_WORKFLOW" audit-weekly.yaml; then
+            collect_codeql trigger yes
+            collect_stuck trigger yes
+        fi
         ;;
-    "Scheduled Container Image Vulnerability Scan") collect_container unhandled trigger yes ;;
+    "Scheduled Container Image Vulnerability Scan")
+        if own_trigger_run "$TRIGGER_RUN_ID" "$TRIGGER_WORKFLOW" container-scan-scheduled.yaml "schedule workflow_dispatch push workflow_run"; then
+            collect_container unhandled trigger yes
+        fi
+        ;;
     esac
     ;;
 manual)

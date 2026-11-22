@@ -1032,6 +1032,7 @@ jobs:
           name: outcome
           path: ${{ runner.temp }}/outcome
           if-no-files-found: error
+          retention-days: 7
 
       - name: Notify owner
         id: notify

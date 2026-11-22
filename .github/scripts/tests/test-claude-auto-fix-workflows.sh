@@ -832,8 +832,8 @@ if want target_report_steps; then
     check "record、成果物 outcome を上げる手順、notify の順に並ぶ" "$([ "$r" -ge 0 ] && [ "$u" -gt "$r" ] && [ "$n" -gt "$u" ] && echo true || echo false)"
     check "record の手順が claude-auto-fix-report.sh record を呼び、JOB_RESULTS を受け取る" \
         "$(if has "$(step_text "$TJ" report record)" "claude-auto-fix-report.sh record" && jr=$(step_env "$TJ" report record JOB_RESULTS) && [ -n "$jr" ] && [ "$jr" != null ] && has "$jr" "needs.prepare.result"; then echo true; else echo false; fi)"
-    check "upload_outcome の手順が成果物 outcome を上げる" \
-        "$(if [ "$(step_with "$TJ" report upload_outcome name)" = outcome ] && has "$(jq -r ".jobs.report.steps[]? | select(.id == \"upload_outcome\") | .uses // \"\"" "$TJ")" "actions/upload-artifact@"; then echo true; else echo false; fi)"
+    check "upload_outcome の手順が成果物 outcome を、保存の期間7日で上げる" \
+        "$(if [ "$(step_with "$TJ" report upload_outcome name)" = outcome ] && [ "$(step_with "$TJ" report upload_outcome retention-days)" = 7 ] && has "$(jq -r ".jobs.report.steps[]? | select(.id == \"upload_outcome\") | .uses // \"\"" "$TJ")" "actions/upload-artifact@"; then echo true; else echo false; fi)"
     # record に渡す OUTCOME は、最も後ろで結果を出したジョブの outcome である。edit と verify の ok は途中の結果なので渡さず、
     # どのジョブも結果を出していなければ空にする(record が JOB_RESULTS から決める)。
     # cooldown-judge の出力 result は、ジョブが通り、blocked のときだけ結果にする(ship は ship に進むこと、fail と
