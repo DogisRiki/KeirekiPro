@@ -464,7 +464,7 @@
   - _対象の部品: claude-auto-fix-dispatch.sh, claude-auto-fix-sweep.sh_
   - _依存: 9.1_
 
-- [ ] 9.4 2つのワークフローのテストを、専用のブランチとキャッシュと run-branch ジョブに合わせて直し、場合を足す
+- [x] 9.4 2つのワークフローのテストを、専用のブランチとキャッシュと run-branch ジョブに合わせて直し、場合を足す
 
   Claude は、置き場所の `test-claude-auto-fix-workflows.sh` に、設計の「テストの方針」の `test-claude-auto-fix-workflows.sh` の項で足した場合と直した場合を書く。このテストは、ワークフローを直すタスク 9.5 と 9.6 の完了を確かめる道具なので、Claude は、ワークフローを直す前に、このタスクで場合を直し、足す。Claude は、cooldown-generate の dependency-submission の場合の前の説明の行(976行目あたり)のうち、Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くと書いた行も直す。Claude は、タスク 9.5 で YAML の説明の行を直すのと同じく、その行を、この実行が保存したキャッシュをほかのワークフローの実行に読ませないためにキャッシュを読み書きしない、と書き直す。直す場合と足す場合は、次の5つのまとまりである。
   - 振り分けのワークフローの秘密の値の場合: 前からある2つの場合は、claude-auto-fix.yaml に `secrets.BOT_GITHUB_TOKEN` が現れることを禁じているので、Claude は、2つの場合を次の形に直す。対象ごとのワークフローの秘密の値の場合は、claude-auto-fix-target.yaml の秘密の値が変わらないので、Claude は変えない。
