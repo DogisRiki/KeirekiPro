@@ -231,6 +231,10 @@ fixable_red_checks() {
 CAF_LABEL="claude-auto-fix"
 CAF_BRANCH_PREFIX="fix/claude-auto-fix-"
 CAF_TARGET_WORKFLOW="claude-auto-fix-target.yaml"
+# 対象ごとの実行を起動する専用のブランチ。claude-auto-fix-run-branch.sh が main の最新のコミットに合わせ、
+# claude-auto-fix-dispatch.sh と claude-auto-fix-sweep.sh が gh workflow run --ref に渡す。
+# fix/claude-auto-fix- で始まらないので、Claude の変更のブランチと vuln-fix のブランチの名前と重ならない
+CAF_RUN_BRANCH="claude-auto-fix/run"
 # container-scan-issue.sh が起票する Issue の題名の前の部分
 CAF_CONTAINER_TITLE_PREFIX="コンテナ脆弱性: "
 # 鍵の取り替えを求める Issue の題名と本文の目印。claude-auto-fix-report.sh が起票し、claude-auto-fix-dispatch.sh が読む
@@ -262,12 +266,14 @@ _caf_repo() {
 # gh api --paginate --slurp の応答(ページごとの配列の配列)を1つの配列にする jq の定義
 _CAF_JQ_PAGES='def pages: if type == "array" and all(type == "array") then add // [] else error("ページの配列ではありません") end;'
 
-# 対象ごとの実行の一覧の1件が、このリポジトリの main で、claude-auto-fix-target.yaml を手で起動した実行かを見る
-# jq の定義。使い方: own_run($repo)。fork の PR は、claude-auto-fix-target.yaml に pull_request のきっかけを足すと、
-# 同じワークフローの一覧に実行を残せる。その実行は、好きな表示名と結果のファイルを持てるので、数えると、
-# 利用者が対象と入力を選べてしまう(要件1の6)。この仕組みは対象ごとの実行を gh workflow run --ref main で起動する
+# 対象ごとの実行の一覧の1件が、このリポジトリの専用のブランチ CAF_RUN_BRANCH で、claude-auto-fix-target.yaml を
+# 手で起動した実行かを見る jq の定義。使い方: own_run($repo)。fork の PR は、claude-auto-fix-target.yaml に
+# pull_request のきっかけを足すと、同じワークフローの一覧に実行を残せる。その実行は、好きな表示名と結果のファイルを
+# 持てるので、数えると、利用者が対象と入力を選べてしまう(要件1の6)。この仕組みは対象ごとの実行を
+# gh workflow run --ref "$CAF_RUN_BRANCH" で起動する。専用のブランチのほかで起動された実行は、ref-check ジョブで
+# 止まり、結果のファイルを書かないので、数えない
 # (引数は jq の式で受ける。呼ぶ側で $repo を渡す)
-_CAF_JQ_OWN_RUN='def own_run(repo): .event? == "workflow_dispatch" and .head_branch? == "main"
+_CAF_JQ_OWN_RUN='def own_run(repo): .event? == "workflow_dispatch" and .head_branch? == "'"$CAF_RUN_BRANCH"'"
     and (.repository.full_name? // "") == repo and (.head_repository.full_name? // "") == repo
     and (((.path? // "") | if type == "string" then split("@")[0] else "" end) == ".github/workflows/claude-auto-fix-target.yaml");'
 

@@ -23,9 +23,9 @@
 #      d. そのほかで赤があり、head のコミットについての対象ごとの実行(表示名が
 #         claude-auto-fix <種類> <key> pr#<番号>@<head の SHA の先頭12文字>)が無ければ、
 #         reason=red-check と PR の番号と赤の検査の名前と head の SHA の先頭12文字(入力 head)を入力にして、
-#         対象ごとの実行を起動する。対象ごとのワークフローは、入力 head で表示名の末尾を作る。
-#         実行は、head のコミットの日時の1時間前より後に作られたものを、このリポジトリの main で
-#         claude-auto-fix-target.yaml を手で起動した実行だけ数える(own_run)
+#         対象ごとの実行を、専用のブランチ claude-auto-fix/run で起動する。対象ごとのワークフローは、入力 head で表示名の末尾を作る。
+#         実行は、head のコミットの日時の1時間前より後に作られたものを、このリポジトリの専用のブランチ
+#         claude-auto-fix/run で claude-auto-fix-target.yaml を手で起動した実行だけ数える(own_run)
 #   2. 直近7日にマージされた、種類が container の Claude の変更の PR ごとに、ラベル container-vuln の
 #      Issue に、本番で脆弱性が消えるのは所有者がリリースしたあとであることを書いたコメントを、
 #      目印 <!-- claude-auto-fix-notice kind=merged pr=<番号> --> を付けて1回だけ付ける
@@ -240,7 +240,7 @@ sweep_pr() {
     fi
     inputs=(-f "kind=${kind}" -f "key=${key}" -f "reason=red-check" -f "pr=${n}" -f "checks=${red}" -f "head=${sha:0:12}")
     [ -z "$detail" ] || inputs+=(-f "detail=${detail}")
-    gh workflow run "$CAF_TARGET_WORKFLOW" --ref main -R "$REPO" "${inputs[@]}" </dev/null >/dev/null || {
+    gh workflow run "$CAF_TARGET_WORKFLOW" --ref "$CAF_RUN_BRANCH" -R "$REPO" "${inputs[@]}" </dev/null >/dev/null || {
         err "PR #${n} の赤の検査を直す実行を起動できません"
         return 1
     }

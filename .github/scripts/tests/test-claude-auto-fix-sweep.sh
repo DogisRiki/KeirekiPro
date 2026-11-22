@@ -14,7 +14,7 @@
 # 確かめる。
 #
 # 場合の名前を KP_TEST_CASE に入れると、その場合だけを流す(例: KP_TEST_CASE=red_check)。
-# 名前は red_check gated_only pending same_head three_strikes gone_pr merged_container notice_gone fails args。
+# 名前は red_check red_check_ref gated_only pending same_head three_strikes gone_pr merged_container notice_gone fails args。
 # =====================================================================
 set -uo pipefail
 
@@ -68,7 +68,7 @@ ST="$CAP/state.json"
 save() { mv "$ST.tmp" "$ST"; }
 op() { printf '%s\n' "$1" >>"$CAP/ops"; }
 fail_on() { [ -n "${FAIL_EP:-}" ] && grep -qF -- "$FAIL_EP" <<<"$1"; }
-OWN='{event: "workflow_dispatch", head_branch: "main", repository: {full_name: "o/r"}, head_repository: {full_name: "o/r"},
+OWN='{event: "workflow_dispatch", head_branch: "claude-auto-fix/run", repository: {full_name: "o/r"}, head_repository: {full_name: "o/r"},
     path: ".github/workflows/claude-auto-fix-target.yaml"}'
 PRVIEW='{number, state, merged_at, updated_at, html_url: ("https://github.com/o/r/pull/" + (.number | tostring)), body,
     user: {login: .author}, labels: [.labels[] | {name: .}], head: {ref: .branch, sha: .sha, repo: {full_name: .repo}}}'
@@ -85,7 +85,7 @@ case "$1 ${2:-}" in
     in='{}'
     while [ "$#" -gt 0 ]; do
         case "$1" in
-        --ref) [ "$2" = main ] || exit 1; shift 2 ;;
+        --ref) [ "$2" = claude-auto-fix/run ] || { echo "偽の gh: --ref が claude-auto-fix/run でない: $2" >&2; exit 1; }; shift 2 ;;
         -R) shift 2 ;;
         -f) in=$(jq -c --arg k "${2%%=*}" --arg v "${2#*=}" '. + {($k): $v}' <<<"$in"); shift 2 ;;
         *) echo "偽の gh: 知らない引数 $1" >&2; exit 1 ;;
@@ -248,7 +248,7 @@ checks() {
     done
     jq --arg s "$sha" --argjson a "$arr" '.checkruns[$s] = $a' "$CAP/state.json" | store
 }
-OWN_RUN='{"event": "workflow_dispatch", "head_branch": "main", "repository": {"full_name": "o/r"},
+OWN_RUN='{"event": "workflow_dispatch", "head_branch": "claude-auto-fix/run", "repository": {"full_name": "o/r"},
   "head_repository": {"full_name": "o/r"}, "path": ".github/workflows/claude-auto-fix-target.yaml"}'
 # 対象ごとの実行を足す: add_run <表示名> <状態> [足す欄の JSON]
 add_run() {
@@ -342,6 +342,19 @@ if want red_check; then
     expect_eq "timed_out も赤に数える" "$(input npm lodash@4.17.21 checks)" '["backend-test"]'
     expect_not_has "PR を閉じない" "$(ops)" "close-pr"
     expect_eq "結果を書くスクリプトを呼ばない" "$(cat "$CAP/report.calls")" ""
+    safety
+fi
+
+if want red_check_ref; then
+    reset
+    # 赤の検査で起動する実行は、専用のブランチ claude-auto-fix/run で起動する(偽の gh は、ほかの --ref では失敗する)
+    add_pr 506 fix/claude-auto-fix-codeql-14 "$SHA_A" "$(pr_body codeql 14)"
+    put '.codeql["14"] = "open"'
+    checks "$SHA_A" frontend-test:completed:failure
+    run_sweep
+    refs=$(grep '^workflow run ' "$CAP/gh.calls" | grep -oE -- '--ref [^ ]+' | sort -u | paste -sd, -)
+    expect_eq "赤の検査で起動する実行が --ref claude-auto-fix/run で起動される" "$(dispatched) / ${refs}" \
+        "codeql 14 / --ref claude-auto-fix/run"
     safety
 fi
 

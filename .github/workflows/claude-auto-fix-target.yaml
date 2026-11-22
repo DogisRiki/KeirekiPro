@@ -1,11 +1,13 @@
 # 1つの対象を Claude に直させ、確かめて PR にするワークフロー
 # (design.md の claude-auto-fix-target.yaml の節)
 #
-# claude-auto-fix.yaml(振り分け)が対象ごとに workflow_dispatch で起動する。所有者が手で起動してもよい。
+# claude-auto-fix.yaml(振り分け)が対象ごとに workflow_dispatch で、専用のブランチ claude-auto-fix/run の
+# 上で起動する。所有者が手で動かすときは claude-auto-fix.yaml を起動する。専用のブランチのほかで起動された実行は、
+# ref-check ジョブが失敗で終え、ほかのジョブは動かない。
 # 直すかどうかの判定はスクリプトが行い、このワークフローはジョブの順番と権限だけを決める。
 # 前のジョブが結果(outcome)を出して止まったときは、あとのジョブを飛ばして report ジョブに進む。
 #
-# ジョブの順番:
+# ジョブの順番(専用のブランチの実行のとき。ほかのブランチの実行は ref-check ジョブだけが動く):
 #   prepare → edit → verify → verify-image(種類が container のとき)
 #     → cooldown-push → cooldown-generate → cooldown-submit → cooldown-judge(verify の出力 cooldown が true のとき)
 #     → ship → report → cleanup
@@ -79,8 +81,26 @@ env:
   TRIVY_VERSION: '0.76.2'
 
 jobs:
+  # 専用のブランチ claude-auto-fix/run のほかで起動された実行を、対象を扱わずに失敗で終える。
+  # 権限を持たず、checkout しない。ほかのすべてのジョブは、if で専用のブランチの実行のときだけ動くので、
+  # この実行は Claude を動かさず、Issue とコメントも書かず、結果のファイルも書かない
+  ref-check:
+    if: github.ref != 'refs/heads/claude-auto-fix/run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Check run branch
+        id: ref_check
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::このワークフローは専用のブランチ claude-auto-fix/run で起動されていません(起動したブランチ: $REF)。手で動かすときは claude-auto-fix.yaml を起動してください"
+          exit 1
+
   # 対象を読み直し、作業の起点の差分 base.patch と、起点のコミットの SHA を出す
   prepare:
+    if: github.ref == 'refs/heads/claude-auto-fix/run'
     runs-on: ${{ inputs.kind == 'container' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 45
     permissions:
@@ -176,7 +196,7 @@ jobs:
   # 材料を集め、Claude に target/ のファイルを直させる
   edit:
     needs: [prepare]
-    if: needs.prepare.outputs.outcome == ''
+    if: needs.prepare.outputs.outcome == '' && github.ref == 'refs/heads/claude-auto-fix/run'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -280,7 +300,7 @@ jobs:
   # 秘密の値を持たず、依存のキャッシュを保存しない。GITHUB_TOKEN は、Claude の変更を当てる前の alert の手順にだけ渡す
   verify:
     needs: [prepare, edit]
-    if: needs.edit.outputs.outcome == 'ok'
+    if: needs.edit.outputs.outcome == 'ok' && github.ref == 'refs/heads/claude-auto-fix/run'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:
@@ -469,10 +489,15 @@ jobs:
         id: codeql_init
         if: steps.check.outputs.outcome == 'ok' && inputs.kind == 'codeql'
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        # この実行が保存したキャッシュをほかのワークフローの実行に読ませないため、診断のデータベースのキャッシュと
+        # TRAP のキャッシュを読み書きしない。入力 dependency-caching は、渡さなければキャッシュを使わない
+        env:
+          CODEQL_OVERLAY_DATABASE_MODE: none
         with:
           languages: ${{ steps.codeql_lang.outputs.language }}
           build-mode: ${{ steps.codeql_lang.outputs.build_mode }}
           source-root: target
+          trap-caching: false
 
       # ビルドの命令は env で受け取り、run の中では変数として読む。出力は公開の記録に出さず、
       # claude-auto-fix-verify.sh と同じ記録のファイルに書く
@@ -488,6 +513,8 @@ jobs:
         id: codeql_analyze
         if: steps.check.outputs.outcome == 'ok' && inputs.kind == 'codeql'
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        env:
+          CODEQL_OVERLAY_DATABASE_MODE: none
         with:
           category: /language:${{ steps.codeql_lang.outputs.language }}
           checkout_path: ${{ github.workspace }}/target
@@ -511,7 +538,7 @@ jobs:
   # 入力 key の脆弱性が消えたかを確かめる。秘密の値を持たない
   verify-image:
     needs: [prepare, verify]
-    if: inputs.kind == 'container' && needs.verify.outputs.outcome == 'ok'
+    if: inputs.kind == 'container' && needs.verify.outputs.outcome == 'ok' && github.ref == 'refs/heads/claude-auto-fix/run'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     permissions:
@@ -623,7 +650,7 @@ jobs:
   cooldown-push:
     needs: [prepare, verify, verify-image]
     # ship と同じく、verify ジョブの結果も読み、確かめ終えていない変更を push しない
-    if: "!cancelled() && needs.verify.result == 'success' && needs.verify.outputs.outcome == 'ok' && needs.verify.outputs.cooldown == 'true' && (needs.verify-image.result == 'success' || needs.verify-image.result == 'skipped')"
+    if: "!cancelled() && needs.verify.result == 'success' && needs.verify.outputs.outcome == 'ok' && needs.verify.outputs.cooldown == 'true' && (needs.verify-image.result == 'success' || needs.verify-image.result == 'skipped') && github.ref == 'refs/heads/claude-auto-fix/run'"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -693,10 +720,11 @@ jobs:
 
   # 一時のブランチのコミットの Gradle の依存のスナップショットを作る。Claude が変えたビルドのスクリプトが動くので、
   # 書き込みの権限を持たせない。スナップショットは、2つの環境変数で、一時のブランチのコミットとブランチに結び付ける
-  # (何も渡さないと main に結び付く。タスク 1.4 で、渡したコミットとブランチに結び付くことを確かめた)
+  # (何も渡さないと、この実行のコミットとブランチである、専用のブランチ claude-auto-fix/run のコミットとブランチに
+  # 結び付く。タスク 1.4 で、渡したコミットとブランチに結び付くことを確かめた)
   cooldown-generate:
     needs: [cooldown-push]
-    if: "!cancelled() && needs.cooldown-push.result == 'success'"
+    if: "!cancelled() && needs.cooldown-push.result == 'success' && github.ref == 'refs/heads/claude-auto-fix/run'"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -727,7 +755,7 @@ jobs:
           dependency-graph: generate-and-upload
           dependency-graph-report-dir: ${{ runner.temp }}/dependency-graph-reports
           dependency-graph-exclude-configurations: 'detachedConfiguration[0-9]+'
-          # Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くので、キャッシュを読み書きしない
+          # この実行が保存したキャッシュをほかのワークフローの実行に読ませないため、キャッシュを読み書きしない
           # (このジョブは1回きりなので、キャッシュが無くても困らない)
           cache-disabled: true
 
@@ -743,7 +771,7 @@ jobs:
   # workflow_run のきっかけのときだけ GITHUB_TOKEN で成果物を探す。sources/src/dependency-graph.ts の downloadDependencyGraphs)
   cooldown-submit:
     needs: [cooldown-push, cooldown-generate]
-    if: "!cancelled() && needs.cooldown-generate.result == 'success'"
+    if: "!cancelled() && needs.cooldown-generate.result == 'success' && github.ref == 'refs/heads/claude-auto-fix/run'"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -756,12 +784,14 @@ jobs:
         uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           dependency-graph: download-and-submit
+          # この実行が保存したキャッシュをほかのワークフローの実行に読ませないため、キャッシュを読み書きしない
+          cache-disabled: true
 
   # dependency-review.yaml の dependency-cooldown ジョブと同じ3つの判定を、PR を作る前の形(COOLDOWN_MODE=predict)で行う。
   # 3つの判定の手順は、PR の検査と同じく、前の手順の終わり方によらずすべて動かす。どの終わり方でも、最後に一時のブランチを消す
   cooldown-judge:
     needs: [prepare, cooldown-push, cooldown-submit]
-    if: "!cancelled() && needs.cooldown-push.result == 'success'"
+    if: "!cancelled() && needs.cooldown-push.result == 'success' && github.ref == 'refs/heads/claude-auto-fix/run'"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -905,7 +935,7 @@ jobs:
     # verify ジョブの結果も読み、確かめ終えていない変更を PR にしない。
     # cooldown の判定が要るときは、cooldown-judge が ship を出し、そのうえでジョブが通ったときだけ動く
     # (判定のあとに一時のブランチを消せないか、スナップショットを送れていないと、出力 result が ship でもジョブは失敗する)
-    if: "!cancelled() && needs.verify.result == 'success' && needs.verify.outputs.outcome == 'ok' && (needs.verify-image.result == 'success' || needs.verify-image.result == 'skipped') && (needs.verify.outputs.cooldown != 'true' || needs.cooldown-judge.outputs.result == 'ship') && (needs.verify.outputs.cooldown != 'true' || needs.cooldown-judge.result == 'success')"
+    if: "!cancelled() && needs.verify.result == 'success' && needs.verify.outputs.outcome == 'ok' && (needs.verify-image.result == 'success' || needs.verify-image.result == 'skipped') && (needs.verify.outputs.cooldown != 'true' || needs.cooldown-judge.outputs.result == 'ship') && (needs.verify.outputs.cooldown != 'true' || needs.cooldown-judge.result == 'success') && github.ref == 'refs/heads/claude-auto-fix/run'"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -984,7 +1014,7 @@ jobs:
   # 結果のファイルを書いて上げ、所有者に Issue で知らせる。前のジョブがどう終わっても動く
   report:
     needs: [prepare, edit, verify, verify-image, cooldown-push, cooldown-generate, cooldown-submit, cooldown-judge, ship]
-    if: always()
+    if: always() && github.ref == 'refs/heads/claude-auto-fix/run'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -1047,7 +1077,7 @@ jobs:
   # この実行の成果物のうち、結果のファイル outcome のほかを消す
   cleanup:
     needs: [report]
-    if: always()
+    if: always() && github.ref == 'refs/heads/claude-auto-fix/run'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

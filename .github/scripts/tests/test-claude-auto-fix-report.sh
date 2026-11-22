@@ -153,7 +153,7 @@ if [ "$1" = api ]; then
     "GET repos/o/r/actions/workflows/claude-auto-fix-target.yaml/runs")
         out=$(jq -c '{workflow_runs: [.runs[] | {id, display_title: .title, status: "completed", conclusion,
             created_at: .at, updated_at: .at, html_url: ("https://github.com/o/r/actions/runs/" + (.id | tostring)),
-            event: "workflow_dispatch", head_branch: "main", repository: {full_name: "o/r"}, head_repository: {full_name: "o/r"},
+            event: "workflow_dispatch", head_branch: "claude-auto-fix/run", repository: {full_name: "o/r"}, head_repository: {full_name: "o/r"},
             path: ".github/workflows/claude-auto-fix-target.yaml"}]}' "$S") ;;
     GET\ repos/o/r/actions/runs/*/artifacts)
         n="${p#repos/o/r/actions/runs/}"

@@ -37,6 +37,10 @@
 #   振り分けのワークフローの dispatch ジョブ: dispatch(きっかけに合う形で claude-auto-fix-dispatch.sh を呼ぶ)
 #   振り分けのワークフローの sweep ジョブ: sweep(claude-auto-fix-sweep.sh を呼ぶ)
 #   このテストは、dispatch と sweep を、スクリプトを差し替えたフォルダで実際に動かして確かめる
+#   対象ごとのワークフローの ref-check ジョブ: ref_check(::error:: の行を出して失敗する。ジョブの手順はこの1つだけ。
+#     このテストは、この手順を実際に動かして確かめる)
+#   振り分けのワークフローの run-branch ジョブの手順は、id ではなく、run の中身で見分ける。tests/test- を含む手順が
+#   テストを流す手順で、claude-auto-fix-run-branch.sh を tests/ の外から呼ぶ手順がスクリプトを呼ぶ手順である
 #   base と final は、RUNNER_TEMP の下の base.patch と final.patch を読む。このテストは、base と final と、
 #   judge の4つの手順と scan_check と cleanup と、ほかのいくつかの手順を、使うコマンドを差し替えたフォルダで実際に動かす。
 #   手順の中の ${{ 式 }} は、テストが決めた値で置き換え、== != && || ! と括弧を評価する。差し替えたコマンドは、
@@ -47,8 +51,9 @@
 #     target_base target_tests_first target_prepare_trivy target_edit target_verify_order target_verify_outputs
 #     target_verify_codeql target_verify_checkout target_verify_image target_report_steps target_job_results
 #     target_cleanup target_timeouts target_cooldown_push_if target_cooldown_graph target_cooldown_pnpm
-#     target_cooldown_judge target_cooldown_signature target_cooldown_signature_fail
+#     target_cooldown_judge target_cooldown_signature target_cooldown_signature_fail target_ref_branch target_cache
 #   振り分けのワークフロー: dispatch_on dispatch_permissions dispatch_secrets dispatch_conditions dispatch_steps
+#     dispatch_run_branch
 #   cooldown の4つのジョブがそろってから通る場合(タスク 6.3): target_order target_base target_job_results
 #     target_cooldown_push_if target_cooldown_graph target_cooldown_pnpm target_cooldown_judge
 #     target_cooldown_signature target_cooldown_signature_fail
@@ -146,6 +151,12 @@ top_conj() {
 }
 # 正規化した式が、2つ目の文字列を、括弧の外の && の項として持つか
 conj_has() { top_conj "$1" | grep -qxF -- "$2"; }
+# 正規化した式の、括弧の外の && の項が、2つ目から先の引数とちょうど同じか(順は問わない)
+conj_is() {
+    local e=$1
+    shift
+    [ "$(top_conj "$e" | sort)" = "$(printf '%s\n' "$@" | sort)" ]
+}
 # 正規化した式が、「(2つ目 || 3つ目)」を、どちらの順でも、括弧の外の && の項として持つか
 conj_has_or() { conj_has "$1" "($2||$3)" || conj_has "$1" "($3||$2)"; }
 # ジョブの if が、前のジョブの結果を読む形か。always() と failure() を使わず、括弧の外に || が無く、
@@ -414,6 +425,8 @@ scan_run() {
 
 TARGET_JOBS='["prepare","edit","verify","verify-image","cooldown-push","cooldown-generate","cooldown-submit","cooldown-judge","ship","report","cleanup"]'
 RESULT_JOBS=(prepare edit verify verify-image cooldown-push cooldown-generate cooldown-submit cooldown-judge ship)
+# 専用のブランチの実行だけで動くジョブの if が、括弧の外の && の項として持つ条件(正規化した形)
+RUN_REF="github.ref=='refs/heads/claude-auto-fix/run'"
 
 # ---------------------------------------------------------------------
 # 対象ごとのワークフロー
@@ -508,7 +521,8 @@ if want target_secrets; then
 fi
 
 if want target_order; then
-    check "ジョブは prepare から cleanup までの11である" "$(jq --argjson j "$TARGET_JOBS" '(.jobs // {} | keys | sort) == ($j | sort)' "$TJ")"
+    check "ジョブは ref-check と、prepare から cleanup までの12である" \
+        "$(jq --argjson j "$TARGET_JOBS" '(.jobs // {} | keys | sort) == ($j + ["ref-check"] | sort)' "$TJ")"
     check "edit は prepare のあと" "$(yes_if needs_has "$TJ" edit prepare)"
     check "verify は edit のあと" "$(yes_if needs_has "$TJ" verify prepare edit)"
     check "verify-image は verify のあと" "$(yes_if needs_has "$TJ" verify-image prepare verify)"
@@ -567,7 +581,8 @@ if want target_skip_to_report; then
     for j in edit verify verify-image ship; do job_if_ok "$(job_if "$TJ" "$j")" || bad="$bad $j"; done
     check "edit verify verify-image ship の if が always() と failure() を使わず、括弧の外に || が無く、cancelled() を !cancelled() の && の項としてだけ使う(外れ:${bad:- なし})" \
         "$([ -z "$bad" ] && echo true || echo false)"
-    check "report は always() で動く" "$([ "$(job_if "$TJ" report)" = 'always()' ] && echo true || echo false)"
+    check "report の if が always() と github.ref == 'refs/heads/claude-auto-fix/run' を && でつないだ形である(if: $(job_if "$TJ" report))" \
+        "$(yes_if conj_is "$(job_if "$TJ" report)" "always()" "$RUN_REF")"
     check "report は prepare edit verify verify-image ship のあと" "$(yes_if needs_has "$TJ" report prepare edit verify verify-image ship)"
 fi
 
@@ -896,8 +911,8 @@ if want target_job_results; then
 fi
 
 if want target_cleanup; then
-    check "cleanup は report のあとに always() で動く" \
-        "$(if needs_has "$TJ" cleanup report && [ "$(job_if "$TJ" cleanup)" = "always()" ]; then echo true; else echo false; fi)"
+    check "cleanup は report のあとに、always() と github.ref == 'refs/heads/claude-auto-fix/run' を && でつないだ if で動く(if: $(job_if "$TJ" cleanup))" \
+        "$(if needs_has "$TJ" cleanup report && conj_is "$(job_if "$TJ" cleanup)" "always()" "$RUN_REF"; then echo true; else echo false; fi)"
     check "cleanup の権限は actions: write だけである" "$(yes_if perm_is "$TJ" cleanup '{"actions":"write"}')"
     cd_=$(stub_tree cleanup bin/gh)
     echo '{"artifacts":[{"name":"outcome","id":101},{"name":"trivy-results","id":102},{"name":"base-patch","id":103}]}' >"$cd_/gh_json"
@@ -973,7 +988,7 @@ if want target_cooldown_graph; then
     sr=$(jq -r --argjson i "$si" "$JQ_NORM"' if $i >= 0 then .jobs."cooldown-generate".steps[$i].run | norm else "" end' "$TJ")
     check "cooldown-generate が、Java を入れてからスナップショットを作り、作ったあとに check-dependency-snapshot.sh に出力先のフォルダを渡して、空でないことを確かめる" \
         "$(if [ "$ji" -ge 0 ] && [ "$gi" -gt "$ji" ] && [ "$si" -gt "$gi" ] && [ -n "$rd" ] && has "$sr" "$rd"; then echo true; else echo false; fi)"
-    # Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くので、キャッシュを読み書きさせない
+    # この実行が保存したキャッシュをほかのワークフローの実行に読ませないため、キャッシュを読み書きさせない
     check "cooldown-generate の dependency-submission が cache-disabled: true でキャッシュを読み書きしない" \
         "$(jq '(first(.jobs."cooldown-generate".steps[]? | select(.uses // "" | startswith("gradle/actions/dependency-submission@"))) // {}
             | .with["cache-disabled"] | tostring) == "true"' "$TJ")"
@@ -1143,6 +1158,63 @@ EOF
         "$([ -z "$bad" ] && echo true || echo false)"
 fi
 
+if want target_ref_branch; then
+    check "ref-check ジョブの if が github.ref != 'refs/heads/claude-auto-fix/run' で、権限を持たず、1分で打ち切られる(if: $(job_if "$TJ" ref-check))" \
+        "$(if [ "$(job_if "$TJ" ref-check)" = "github.ref!='refs/heads/claude-auto-fix/run'" ] &&
+            jq -e '.jobs["ref-check"] as $r | ($r | type) == "object" and $r.permissions == {} and ($r."timeout-minutes" | tostring) == "1"' "$TJ" >/dev/null 2>&1; then echo true; else echo false; fi)"
+    bad=""
+    for j in $(jq -r '.jobs // {} | keys[] | select(. != "ref-check")' "$TJ"); do
+        conj_has "$(job_if "$TJ" "$j")" "$RUN_REF" || bad="$bad $j"
+    done
+    check "ほかのすべてのジョブの if が github.ref == 'refs/heads/claude-auto-fix/run' を含む(外れ:${bad:- なし})" \
+        "$([ -z "$bad" ] && [ "$(jq '.jobs // {} | length' "$TJ")" -gt 1 ] && echo true || echo false)"
+    # ref_check の手順を、main で起動された実行の値で動かす。手順は ref_check の1つだけで、checkout も、ほかのアクションも使わない
+    rd=$(stub_tree ref_check)
+    run_step ref-check ref_check "$rd" github.ref=refs/heads/main github.ref_name=main github.event_name=workflow_dispatch \
+        "runner.temp=$rd/rt" "github.workspace=$rd" >"$WORK/ref_check.out" 2>&1
+    e=$?
+    el=$(grep -E '^::error::' "$WORK/ref_check.out" | grep -F 'claude-auto-fix/run' | grep -F 'claude-auto-fix.yaml')
+    check "ref-check ジョブの手順が、専用のブランチで起動されていないことと claude-auto-fix.yaml を起動することを書いた ::error:: の行を出して0以外で終わる(終わり方 $e)" \
+        "$(if [ "$e" -ne 0 ] && [ "$e" -ne 98 ] && [ "$e" -ne 99 ] && [ -n "$el" ] &&
+            jq -e '[.jobs["ref-check"].steps[]?] | length == 1 and .[0].id == "ref_check" and (.[0] | has("uses") | not)' "$TJ" >/dev/null 2>&1; then echo true; else echo false; fi)"
+    lb=$(bash -c '. "$1" >/dev/null 2>&1 </dev/null; printf "%s" "${CAF_RUN_BRANCH:-}"' _ "$HERE/lib-claude-auto-fix.sh")
+    yb=$(jq -r '.jobs // {} | .[] | .if // "" | tostring' "$TJ" | while IFS= read -r l; do all_of "$l" 'refs/heads/[A-Za-z0-9_./-]+'; done |
+        sed 's|^refs/heads/||' | sort -u | tr '\n' ' ')
+    check "YAML に書いたブランチの名前が lib-claude-auto-fix.sh の CAF_RUN_BRANCH と同じである(YAML: ${yb:-なし}、CAF_RUN_BRANCH: ${lb:-なし})" \
+        "$([ -n "$lb" ] && [ "$yb" = "$lb " ] && echo true || echo false)"
+fi
+
+if want target_cache; then
+    # ジョブの名前(空ならすべてのジョブ)の、uses が2つ目の引数で始まる手順の配列
+    JQ_ST='def st(j; p): [(if j == "" then (.jobs // {} | .[]) else .jobs[j] end) | .steps[]? | select((.uses // "") | startswith(p))];'
+    cache_check() { check "$1" "$(jq "$JQ_ST $2" "$TJ" 2>/dev/null || echo false)"; }
+    cache_check "verify ジョブの setup-go のすべての手順に cache: false が渡される" \
+        '(st("verify"; "actions/setup-go@") | length) > 0 and all(st(""; "actions/setup-go@")[]; (.with.cache | tostring) == "false")'
+    cache_check "verify ジョブの golangci-lint-action に skip-cache: true が渡される" \
+        '(st("verify"; "golangci/golangci-lint-action@") | length) > 0
+            and all(st(""; "golangci/golangci-lint-action@")[]; (.with["skip-cache"] | tostring) == "true")'
+    for j in cooldown-generate cooldown-submit; do
+        cache_check "$j ジョブの dependency-submission に cache-disabled: true が渡される" \
+            "(st(\"$j\"; \"gradle/actions/dependency-submission@\") | length) > 0
+                and all(st(\"$j\"; \"gradle/actions/dependency-submission@\")[]; (.with[\"cache-disabled\"] | tostring) == \"true\")"
+    done
+    cache_check "setup-java のすべての手順と pnpm/action-setup にキャッシュの入力が無い" \
+        '(st(""; "actions/setup-java@") | length) > 0 and (st(""; "pnpm/action-setup@") | length) > 0
+            and all((st(""; "actions/setup-java@") + st(""; "pnpm/action-setup@"))[]; .with // {} | keys | any(test("cache"; "i")) | not)'
+    cache_check "どのジョブにも actions/cache の手順が無い" \
+        '[.jobs // {} | .[] | .steps[]? | select((.uses // "") | test("^actions/cache(/|@)"))] | length == 0'
+    cache_check "どのジョブにも type=gha が無い" '.jobs // {} | tojson | test("type\\s*=\\s*gha") | not'
+    for s in init analyze; do
+        cache_check "CodeQL の $s に CODEQL_OVERLAY_DATABASE_MODE: none が渡される" \
+            "(st(\"\"; \"github/codeql-action/$s@\") | length) > 0
+                and all(st(\"\"; \"github/codeql-action/$s@\")[]; (.env.CODEQL_OVERLAY_DATABASE_MODE | tostring) == \"none\")"
+    done
+    cache_check "CodeQL の init に trap-caching: false が渡される" \
+        '(st(""; "github/codeql-action/init@") | length) > 0 and all(st(""; "github/codeql-action/init@")[]; (.with["trap-caching"] | tostring) == "false")'
+    cache_check "CodeQL の init に dependency-caching が無い" \
+        '(st(""; "github/codeql-action/init@") | length) > 0 and all(st(""; "github/codeql-action/init@")[]; .with // {} | has("dependency-caching") | not)'
+fi
+
 # ---------------------------------------------------------------------
 # 振り分けのワークフロー
 # ---------------------------------------------------------------------
@@ -1162,7 +1234,7 @@ fi
 
 if want dispatch_permissions; then
     check "ワークフローの既定の権限は contents: read だけである" "$(jq '.permissions == {"contents":"read"}' "$DJ")"
-    check "ジョブは dispatch と sweep である" "$(jq '(.jobs // {} | keys) == ["dispatch","sweep"]' "$DJ")"
+    check "ジョブは run-branch と dispatch と sweep である" "$(jq '(.jobs // {} | keys) == ["dispatch","run-branch","sweep"]' "$DJ")"
     check "dispatch の権限" "$(yes_if perm_is "$DJ" dispatch \
         '{"contents":"read","actions":"write","issues":"read","pull-requests":"read","checks":"read","security-events":"read","vulnerability-alerts":"read"}')"
     check "sweep の権限" "$(yes_if perm_is "$DJ" sweep \
@@ -1172,9 +1244,16 @@ fi
 if want dispatch_secrets; then
     all=$(jq -c '.' "$DJ")
     check "secrets.CLAUDE_CODE_OAUTH_TOKEN が現れない" "$(if ! has "$all" "CLAUDE_CODE_OAUTH_TOKEN"; then echo true; else echo false; fi)"
-    check "secrets.BOT_GITHUB_TOKEN が現れない" "$(if ! has "$all" "BOT_GITHUB_TOKEN"; then echo true; else echo false; fi)"
-    bad=$(all_of "$all" 'secrets[^A-Za-z0-9_]?[A-Za-z0-9_]*' | grep -vxF 'secrets.GITHUB_TOKEN' | sort -u | tr '\n' ' ')
-    check "秘密の値は GITHUB_TOKEN だけである(外れ: ${bad:-なし})" "$([ -z "$bad" ] && echo true || echo false)"
+    # run-branch ジョブの、claude-auto-fix-run-branch.sh を tests/ の外から呼ぶ手順
+    rbs=$(jq -c 'first(.jobs["run-branch"].steps[]? | select((.run // "") | test("(^|[^-[:alnum:]_])claude-auto-fix-run-branch\\.sh"))) // empty' "$DJ")
+    n_all=$(count_of "$all" BOT_GITHUB_TOKEN)
+    n_rb=$(count_of "$rbs" BOT_GITHUB_TOKEN)
+    [ -n "$rbs" ] || rbs='{}'
+    gt=$(jq -r "$JQ_NORM"' .env.GH_TOKEN | norm' <<<"$rbs")
+    check "secrets.BOT_GITHUB_TOKEN は run-branch ジョブの claude-auto-fix-run-branch.sh を呼ぶ手順にだけ現れる(全体 $n_all、手順 $n_rb、手順の GH_TOKEN: ${gt:-なし})" \
+        "$([ "$n_rb" -gt 0 ] && [ "$n_all" = "$n_rb" ] && [ "$gt" = secrets.BOT_GITHUB_TOKEN ] && echo true || echo false)"
+    bad=$(all_of "$all" 'secrets[^A-Za-z0-9_]?[A-Za-z0-9_]*' | grep -vxE 'secrets\.(GITHUB_TOKEN|BOT_GITHUB_TOKEN)' | sort -u | tr '\n' ' ')
+    check "秘密の値は GITHUB_TOKEN と BOT_GITHUB_TOKEN のほかに無い(外れ: ${bad:-なし})" "$([ -z "$bad" ] && echo true || echo false)"
 fi
 
 if want dispatch_conditions; then
@@ -1274,6 +1353,35 @@ if want dispatch_steps; then
     check "checkout は persist-credentials: false である" \
         "$(jq '[.jobs | (.dispatch, .sweep) | .steps[]? | select((.uses // "") | startswith("actions/checkout@"))] as $c
             | ($c | length) == 2 and all($c[]; (.with["persist-credentials"] | tostring) == "false")' "$DJ")"
+fi
+
+if want dispatch_run_branch; then
+    check "dispatch ジョブと sweep ジョブが needs: [run-branch] を持つ" \
+        "$(if needs_has "$DJ" dispatch run-branch && needs_has "$DJ" sweep run-branch; then echo true; else echo false; fi)"
+    # run-branch ジョブは、どのきっかけでも動くので if を持たない。テストの手順にも、ジョブの env にも、秘密の値とトークンを渡さない
+    check "run-branch ジョブが if を持たず、権限が contents: read だけで、checkout が persist-credentials: false で、テストを流す手順に秘密の値が無く、5分で打ち切られる" \
+        "$(jq '.jobs["run-branch"] as $r | ($r | type) == "object" and ($r | has("if") | not)
+            and $r.permissions == {"contents":"read"} and ($r."timeout-minutes" | tostring) == "5"
+            and ($r.env // {} | tojson | test("secrets|github\\.token") | not)
+            and ([$r.steps[]? | select((.uses // "") | startswith("actions/checkout@"))] as $c
+                | ($c | length) > 0 and all($c[]; (.with["persist-credentials"] | tostring) == "false"))
+            and ([$r.steps[]? | select((.run // "") | test("tests/test-"))] as $t
+                | ($t | length) > 0 and all($t[]; tojson | test("secrets|github\\.token") | not))' "$DJ" 2>/dev/null || echo false)"
+    # テストの手順が失敗したら、run-branch ジョブはスクリプトを呼ばずに止まる
+    rb_idx() { jq -r --arg p "$1" '[.jobs["run-branch"].steps[]? | .run // "" | test($p)] | index(true) // -1' "$DJ"; }
+    s=$(rb_idx '(^|[^-[:alnum:]_])claude-auto-fix-run-branch\.sh')
+    bad=""
+    for t in test-claude-auto-fix-run-branch test-lib-claude-auto-fix; do
+        i=$(rb_idx "tests/$t\\.sh")
+        { [ "$i" -ge 0 ] && [ "$s" -gt "$i" ]; } || bad="$bad 順番:$t"
+    done
+    jq -e '[.jobs["run-branch"].steps[]? | select((.run // "") | test("tests/test-")) | select(has("if") or has("continue-on-error"))]
+        | length == 0' "$DJ" >/dev/null 2>&1 || bad="$bad if/continue-on-error"
+    tb=$(jq -r '[.jobs["run-branch"].steps[]? | .run // "" | select(test("tests/test-"))] | .[]' "$DJ" |
+        sed 's/[[:space:]]*$//' | grep -vxE 'bash \.github/scripts/tests/test-[a-z-]+\.sh( && bash \.github/scripts/tests/test-[a-z-]+\.sh)*' | tr '\n' ' ')
+    [ -z "$tb" ] || bad="$bad テストの呼び方:$tb"
+    check "run-branch ジョブが、テストを流す手順のあとに claude-auto-fix-run-branch.sh を呼び、テストを流す手順に if と continue-on-error が無い(外れ:${bad:- なし})" \
+        "$([ -z "$bad" ] && echo true || echo false)"
 fi
 
 if [ "$RAN" -eq 0 ]; then

@@ -1,21 +1,29 @@
 # 対象を見つけて、対象ごとの実行(claude-auto-fix-target.yaml)を起こすワークフロー
 # (design.md の claude-auto-fix.yaml の節)
 #
-# dispatch ジョブは claude-auto-fix-dispatch.sh を呼び、sweep ジョブは claude-auto-fix-sweep.sh を呼ぶ。
+# run-branch ジョブは claude-auto-fix-run-branch.sh を呼び、対象ごとの実行を起動する専用のブランチ
+# claude-auto-fix/run を main の最新のコミットに合わせる。dispatch ジョブは claude-auto-fix-dispatch.sh を呼び、
+# sweep ジョブは claude-auto-fix-sweep.sh を呼ぶ。dispatch ジョブと sweep ジョブは、run-branch ジョブが通ったあとにだけ動く。
+# run-branch ジョブが失敗すると、main の最新のコミットに合っていない専用のブランチで対象ごとの実行を起動しないよう、
+# 2つのジョブは動かない。次の1時間ごとの定期実行で、run-branch ジョブが専用のブランチを合わせ直す。
 # 対象を選ぶのと、同じ対象の実行の重複を防ぐのはスクリプトが行い、このワークフローは選ばない。
-# このワークフローは Claude を動かさず、Claude の鍵を持たない。トークンは GITHUB_TOKEN だけを使う
+# このワークフローは Claude を動かさず、Claude の鍵を持たない。
+# dispatch ジョブと sweep ジョブは、トークンに GITHUB_TOKEN だけを使う
 # (GITHUB_TOKEN での workflow_dispatch は新しい実行を作るので、対象ごとの実行を起動できる)。
+# run-branch ジョブだけは、bot の PAT(secrets.BOT_GITHUB_TOKEN)を、スクリプトを呼ぶ手順にだけ渡す。
+# GitHub は、.github/workflows/ のファイルを変えるブランチの更新を GITHUB_TOKEN では断るためである。
 #
 # いつ動くか:
 #   workflow_run      4つのワークフローが終わったとき。dispatch ジョブを trigger で動かす。
 #                     vuln-fix の2つのワークフローは、結論が failure のときだけ動かす
 #   schedule          1時間ごと。dispatch ジョブを retry で動かし、sweep ジョブを動かす
 #   workflow_dispatch 所有者の手での起動。dispatch ジョブだけを manual で動かす
+# run-branch ジョブは if を持たず、どのきっかけでも、dispatch ジョブか sweep ジョブより先に動く。
 # 同時実行の組は付けない。同じ対象の実行の重複は、claude-auto-fix-dispatch.sh が、待っている実行と
 # 動いている実行を読んで防ぐ。
 #
-# スクリプトを呼ぶ前に、ワークフローのテストとスクリプトのテストを流す。テストが失敗すれば、スクリプトを
-# 動かさずにジョブを失敗にする。権限か秘密の値の渡し方が設計と違うワークフローで、Claude を動かさないためである。
+# どのジョブも、スクリプトを呼ぶ前にスクリプトのテストを流し、dispatch ジョブはワークフローのテストも流す。
+# テストが失敗すれば、スクリプトを動かさずにジョブを失敗にする。権限か秘密の値の渡し方が設計と違うワークフローで、Claude を動かさないためである。
 #
 # テスト: .github/scripts/tests/test-claude-auto-fix-workflows.sh
 name: Claude Auto Fix
@@ -36,8 +44,31 @@ permissions:
   contents: read
 
 jobs:
+  # 対象ごとの実行を起動する専用のブランチ claude-auto-fix/run を、main の最新のコミットに合わせる。
+  # 秘密の値を渡さない手順でテストを流してから、bot の PAT を渡した手順でスクリプトを呼ぶ。
+  # このワークフローのコミットのスクリプトだけを動かし、Claude が変えたコードを動かさない
+  run-branch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test run-branch script
+        run: bash .github/scripts/tests/test-lib-claude-auto-fix.sh && bash .github/scripts/tests/test-claude-auto-fix-run-branch.sh
+
+      - name: Update run branch
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: bash .github/scripts/claude-auto-fix-run-branch.sh
+
   # 対象を集めて絞り、対象ごとの実行を起動する
   dispatch:
+    needs: [run-branch]
     if: >-
       github.event_name != 'workflow_run' ||
       (github.event.workflow_run.name != 'Frontend Transitive Vulnerability Fix' && github.event.workflow_run.name != 'Backend Vulnerability Fix') ||
@@ -84,6 +115,7 @@ jobs:
 
   # Claude の変更の PR の赤と、対象の消えた PR と知らせの Issue を扱う
   sweep:
+    needs: [run-branch]
     if: github.event_name == 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 30

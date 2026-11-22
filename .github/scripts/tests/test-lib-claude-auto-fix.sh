@@ -393,29 +393,32 @@ if selected target_gone_each; then
     expect_rc1 "go.mod に go の版が無ければ失敗する" target_gone go-stdlib 1.27.4
 fi
 
+# 結果のファイルを読む関数(recent_outcomes)の場合が使う、偽の対象ごとの実行と結果のファイルを作る関数
+now=$(date -u +%s)
+ago() { date -u -d "@$((now - $1 * 3600))" +%Y-%m-%dT%H:%M:%SZ; }
+# 仕組みが専用のブランチ claude-auto-fix/run で起動した実行: wrun <実行の ID> <表示名> <状態> <結論> <日時>
+wrun() {
+    jq -cn --argjson id "$1" --arg title "$2" --arg status "$3" --arg c "$4" --arg at "$5" '
+        {id: $id, display_title: $title, status: $status, conclusion: (if $c == "" then null else $c end),
+         created_at: $at, updated_at: $at, html_url: "https://github.com/owner/repo/actions/runs/\($id)",
+         event: "workflow_dispatch", head_branch: "claude-auto-fix/run", repository: {full_name: "owner/repo"},
+         head_repository: {full_name: "owner/repo"}, path: ".github/workflows/claude-auto-fix-target.yaml"}'
+}
+# 別のリポジトリ(フォークの PR)から動いた実行: fork_run <実行の ID> <表示名> <結論> <日時>
+fork_run() {
+    wrun "$1" "$2" completed "$3" "$4" | jq -c '. + {event: "pull_request", head_branch: "fix",
+        head_repository: {full_name: "someone/repo"}}'
+}
+outcome() {
+    jq -cn --arg kind "$1" --arg key "$2" --arg result "$3" '
+        {kind: $kind, key: $key, reason: "trigger", pr: null, checks: null, detail: null, result: $result,
+         cause: null, pr_url: null, run_url: null, head_sha: null, finished_at: "2026-11-20T00:00:00Z"}'
+}
+RUNS_PATH="repos/owner/repo/actions/workflows/claude-auto-fix-target.yaml/runs"
+
 if selected recent_outcomes; then
     # 直近4日の結果のファイルを読み、取り消されて結果のファイルが無い実行を unavailable と数える
     reset_fx
-    now=$(date -u +%s)
-    ago() { date -u -d "@$((now - $1 * 3600))" +%Y-%m-%dT%H:%M:%SZ; }
-    wrun() {
-        jq -cn --argjson id "$1" --arg title "$2" --arg status "$3" --arg c "$4" --arg at "$5" '
-            {id: $id, display_title: $title, status: $status, conclusion: (if $c == "" then null else $c end),
-             created_at: $at, updated_at: $at, html_url: "https://github.com/owner/repo/actions/runs/\($id)",
-             event: "workflow_dispatch", head_branch: "main", repository: {full_name: "owner/repo"},
-             head_repository: {full_name: "owner/repo"}, path: ".github/workflows/claude-auto-fix-target.yaml"}'
-    }
-    # 別のリポジトリ(フォークの PR)から動いた実行: fork_run <実行の ID> <表示名> <結論> <日時>
-    fork_run() {
-        wrun "$1" "$2" completed "$3" "$4" | jq -c '. + {event: "pull_request", head_branch: "fix",
-            head_repository: {full_name: "someone/repo"}}'
-    }
-    outcome() {
-        jq -cn --arg kind "$1" --arg key "$2" --arg result "$3" '
-            {kind: $kind, key: $key, reason: "trigger", pr: null, checks: null, detail: null, result: $result,
-             cause: null, pr_url: null, run_url: null, head_sha: null, finished_at: "2026-11-20T00:00:00Z"}'
-    }
-    RUNS_PATH="repos/owner/repo/actions/workflows/claude-auto-fix-target.yaml/runs"
     fx "$RUNS_PATH" "[{\"workflow_runs\": [$(wrun 101 'claude-auto-fix npm lodash@4.17.21' completed success "$(ago 48)"),$(wrun 102 'claude-auto-fix codeql 42' completed cancelled "$(ago 24)"),$(wrun 103 'claude-auto-fix codeql 43' completed success "$(ago 120)")]},
         {\"workflow_runs\": [$(wrun 104 'claude-auto-fix codeql 44' in_progress '' "$(ago 3)"),$(wrun 105 'claude-auto-fix container CVE-2026-1111' completed cancelled "$(ago 12)"),$(wrun 106 'claude-auto-fix dependabot 7 pr#99@0123456789ab' completed cancelled "$(ago 6)")]}]"
     for id in 101 105; do fx "repos/owner/repo/actions/runs/${id}/artifacts?name=outcome" '{"artifacts": [{"name": "outcome", "expired": false}]}'; done
@@ -446,20 +449,39 @@ if selected recent_outcomes; then
     fx "$RUNS_PATH" "[{\"workflow_runs\": [$(wrun 108 'something else' completed cancelled "$(ago 2)")]}]"
     fx "repos/owner/repo/actions/runs/108/artifacts?name=outcome" '{"artifacts": []}'
     expect_rc1 "取り消された実行の表示名が形から外れていれば失敗する" recent_outcomes
-    # フォークの PR から動いた実行と、main 以外や別のファイルから動いた実行は、結果のファイルがあってもなくても数えない
-    fx "$RUNS_PATH" "[{\"workflow_runs\": [$(fork_run 109 'claude-auto-fix codeql 46' failure "$(ago 2)"),$(fork_run 110 'claude-auto-fix codeql 47' success "$(ago 2)"),$(wrun 111 'claude-auto-fix codeql 48' completed cancelled "$(ago 2)" | jq -c '.head_branch = "fix"'),$(wrun 112 'claude-auto-fix codeql 49' completed cancelled "$(ago 2)" | jq -c '.path = ".github/workflows/other.yaml@main"'),$(wrun 113 'claude-auto-fix codeql 50' completed cancelled "$(ago 1)" | jq -c '.path = ".github/workflows/claude-auto-fix-target.yaml@refs/heads/main"')]}]"
+    # フォークの PR から動いた実行と、claude-auto-fix/run 以外や別のファイルから動いた実行は、結果のファイルがあってもなくても数えない
+    fx "$RUNS_PATH" "[{\"workflow_runs\": [$(fork_run 109 'claude-auto-fix codeql 46' failure "$(ago 2)"),$(fork_run 110 'claude-auto-fix codeql 47' success "$(ago 2)"),$(wrun 111 'claude-auto-fix codeql 48' completed cancelled "$(ago 2)" | jq -c '.head_branch = "fix"'),$(wrun 112 'claude-auto-fix codeql 49' completed cancelled "$(ago 2)" | jq -c '.path = ".github/workflows/other.yaml@main"'),$(wrun 113 'claude-auto-fix codeql 50' completed cancelled "$(ago 1)" | jq -c '.path = ".github/workflows/claude-auto-fix-target.yaml@refs/heads/claude-auto-fix/run"')]}]"
     fx "repos/owner/repo/actions/runs/109/artifacts?name=outcome" '{"artifacts": []}'
     fx "repos/owner/repo/actions/runs/110/artifacts?name=outcome" '{"artifacts": [{"name": "outcome", "expired": false}]}'
     outcome codeql 47 unavailable >"$WORK/fx/outcome-110.json"
     for id in 111 112 113; do fx "repos/owner/repo/actions/runs/${id}/artifacts?name=outcome" '{"artifacts": []}'; done
     out=$(recent_outcomes 2>"$WORK/err")
     rc=$?
-    expect_eq "このリポジトリの main から手で起動された実行でなければ、数えずに0で終わる" "0" "$rc"
-    expect_eq "数えるのは、対象ごとのワークフローのファイルから main で手で起動された実行だけ(@ の後ろは見ない)" 'codeql:50:unavailable' \
+    expect_eq "このリポジトリの claude-auto-fix/run から手で起動された実行でなければ、数えずに0で終わる" "0" "$rc"
+    expect_eq "数えるのは、対象ごとのワークフローのファイルから claude-auto-fix/run で手で起動された実行だけ(@ の後ろは見ない)" 'codeql:50:unavailable' \
         "$(jq -r 'map("\(.kind):\(.key):\(.result)") | join(" ")' <<<"$out")"
     if grep -qE 'runs/1(09|10|11|12)/' "$STUB_CALLS"; then ng "出どころが違う実行の結果のファイルは読まない"; else ok "出どころが違う実行の結果のファイルは読まない"; fi
     reset_fx
     expect_rc1 "実行の一覧を読めなければ失敗する" recent_outcomes
+fi
+
+if selected recent_outcomes_run_branch; then
+    # 実行のブランチが main の実行は、結果のファイルがあっても読まない。main で手で起動された実行は、
+    # 仕組みが起動した実行ではなく、ref-check ジョブで止まるためである。ほかのワークフローの実行も読まない
+    reset_fx
+    fx "$RUNS_PATH" "[{\"workflow_runs\": [$(wrun 121 'claude-auto-fix codeql 61' completed failure "$(ago 3)" | jq -c '.head_branch = "main"'),$(wrun 122 'claude-auto-fix codeql 62' completed success "$(ago 2)" | jq -c '.path = ".github/workflows/other.yaml"'),$(wrun 123 'claude-auto-fix codeql 63' completed success "$(ago 1)")]}]"
+    for id in 121 122 123; do fx "repos/owner/repo/actions/runs/${id}/artifacts?name=outcome" '{"artifacts": [{"name": "outcome", "expired": false}]}'; done
+    outcome codeql 61 pr >"$WORK/fx/outcome-121.json"
+    outcome codeql 62 pr >"$WORK/fx/outcome-122.json"
+    outcome codeql 63 unfixed >"$WORK/fx/outcome-123.json"
+    out=$(recent_outcomes 2>"$WORK/err")
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ "$(jq -r 'map("\(.kind):\(.key):\(.result)") | join(" ")' <<<"$out")" = 'codeql:63:unfixed' ] &&
+        ! grep -qE 'runs/12[12]/' "$STUB_CALLS"; then
+        ok "結果のファイルを読む関数が、実行のブランチが claude-auto-fix/run の実行だけを読み、実行のブランチが main の実行と、ほかのワークフローの実行を読まない"
+    else
+        ng "結果のファイルを読む関数が、実行のブランチが claude-auto-fix/run の実行だけを読み、実行のブランチが main の実行と、ほかのワークフローの実行を読まない(終了コード $rc、出力 '$out'、呼び出し $(tr '\n' ' ' <"$STUB_CALLS"))"
+    fi
 fi
 
 # --- 鍵の取り替えを求める Issue(key_issues) -------------------------------------------------

@@ -86,7 +86,7 @@ workflow)
         title="${title} pr#${pr}@${sha:0:12}"
     fi
     jq -c --arg t "$title" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        '.workflow_runs += [{id: 0, display_title: $t, status: "queued", created_at: $at, event: "workflow_dispatch", head_branch: "main",
+        '.workflow_runs += [{id: 0, display_title: $t, status: "queued", created_at: $at, event: "workflow_dispatch", head_branch: "claude-auto-fix/run",
           repository: {full_name: "owner/repo"}, head_repository: {full_name: "owner/repo"},
           path: ".github/workflows/claude-auto-fix-target.yaml"}]' "$FX/target-runs.json" >"$FX/target-runs.tmp" &&
         mv "$FX/target-runs.tmp" "$FX/target-runs.json"
@@ -259,8 +259,8 @@ target_run() { # 表示名 状態 作成日時
 # 今から指定の秒数だけ前の日時: ago <秒>
 ago() { date -u -d "@$(($(date -u +%s) - $1))" +%Y-%m-%dT%H:%M:%SZ; }
 TWO_DAYS_AGO=$(ago 172800)
-# このリポジトリの main から、対象ごとのワークフローのファイルで手で起動された実行の欄
-OWN_RUN='{"event": "workflow_dispatch", "head_branch": "main", "repository": {"full_name": "owner/repo"},
+# このリポジトリの専用のブランチ claude-auto-fix/run から、対象ごとのワークフローのファイルで手で起動された実行の欄
+OWN_RUN='{"event": "workflow_dispatch", "head_branch": "claude-auto-fix/run", "repository": {"full_name": "owner/repo"},
   "head_repository": {"full_name": "owner/repo"}, "path": ".github/workflows/claude-auto-fix-target.yaml"}'
 # 振り分けを、きっかけの環境変数を付けずに動かす: run_mode <manual|retry>
 run_mode() {
@@ -270,7 +270,7 @@ run_mode() {
 # 起動した実行の数
 count() { jq -s 'length' "$DISPATCH_LOG"; }
 # 対象ごとの実行の一覧に実行を足す: add_run <実行の JSON>
-# このリポジトリの main から手で起動された実行の欄を、書いていなければ足す
+# このリポジトリの専用のブランチ claude-auto-fix/run から手で起動された実行の欄を、書いていなければ足す
 add_run() {
     jq -c --argjson r "$1" --argjson own "$OWN_RUN" '.workflow_runs += [$own + $r]' "$FX/target-runs.json" >"$FX/target-runs.tmp" &&
         mv "$FX/target-runs.tmp" "$FX/target-runs.json"
@@ -358,8 +358,8 @@ if want vuln_fix; then
     run_dispatch "$FW" 900
     expect_eq "終わり方は 0" "$RC" 0
     expect_eq "組ごとに1つの実行が起動される(同じ組は1つにまとまる)" "$(dispatched)" "npm @scope/pkg@1.2.3,npm lodash@4.17.21"
-    expect_eq "対象ごとのワークフローを main で起動する" "$(jq -rs 'map("\(.workflow) \(.ref)") | unique | join(",")' "$DISPATCH_LOG")" \
-        "claude-auto-fix-target.yaml main"
+    expect_eq "実行が --ref claude-auto-fix/run で起動される" "$(jq -rs 'map("\(.workflow) \(.ref)") | unique | join(",")' "$DISPATCH_LOG")" \
+        "claude-auto-fix-target.yaml claude-auto-fix/run"
     expect_eq "入力 reason は trigger" "$(input npm lodash@4.17.21 reason)" trigger
     expect_eq "入力 detail は組の JSON" "$(input npm @scope/pkg@1.2.3 detail | jq -c .)" \
         '{"name":"@scope/pkg","version":"1.2.3","ranges":["<1.2.3"],"urgent":true,"alerts":[2,3]}'
@@ -885,7 +885,7 @@ if want retry_cancelled; then
 fi
 
 if want retry_origin; then
-    echo "[retry_origin] このリポジトリの main から手で起動された実行だけを数え、赤の検査の名前が無い赤の検査の実行は起動しない"
+    echo "[retry_origin] このリポジトリの claude-auto-fix/run から手で起動された実行だけを数え、赤の検査の名前が無い赤の検査の実行は起動しない"
     reset
     fork='{"event": "pull_request", "head_branch": "fix", "head_repository": {"full_name": "someone/repo"}}'
     # フォークの PR から動いた、表示名が対象ごとの実行と同じ実行。結果のファイルがあってもなくても数えない
@@ -904,7 +904,7 @@ if want retry_origin; then
     cancelled 2045 'claude-auto-fix codeql 113 pr#530@757575757575' "$YESTERDAY"
     run_mode retry
     expect_eq "終わり方は 0" "$RC" 0
-    expect_eq "このリポジトリの main から手で起動された実行の対象だけが起動される" "$(dispatched)" "codeql 112"
+    expect_eq "このリポジトリの claude-auto-fix/run から手で起動された実行の対象だけが起動される" "$(dispatched)" "codeql 112"
     if summary_has "起動しなかった: CodeQL の警告 #113(赤の検査を直す PR #530 の、赤の検査の名前が結果のファイルに無い)"; then
         ok "赤の検査の名前が無い赤の検査の実行は、理由を GITHUB_STEP_SUMMARY に書いて起動しない"
     else

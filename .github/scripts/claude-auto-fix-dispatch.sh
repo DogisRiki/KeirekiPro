@@ -57,7 +57,8 @@
 # 利用者が書いた Issue、PR、コメントの中身は、対象を選ぶ材料にしない。github-actions[bot] が書いた
 # 目印だけを読み、PR はこのリポジトリのブランチから出されてラベル claude-auto-fix を持つものだけを数える。
 #
-# 起動は gh workflow run claude-auto-fix-target.yaml --ref main で行い、入力 kind key reason と、
+# 起動は gh workflow run claude-auto-fix-target.yaml --ref "$CAF_RUN_BRANCH" で、専用のブランチ claude-auto-fix/run から行う。
+# 起動では、入力 kind key reason と、
 # 空でなければ pr(赤の検査を直す実行の PR の番号)と checks(種類 dependabot の、5つの検査を除いた赤の検査の
 # 名前か、赤の検査を直す実行の赤の検査の名前)と detail(vuln-fix の組)を渡す。
 # 入力 reason は、trigger と manual では形の名前、retry では結果のファイルの reason(空なら retry)にする。
@@ -126,7 +127,7 @@ if ! claude_prs >"$TMP/prs.json"; then
 fi
 cutoff=$(date -u -d "@$(($(date -u +%s) - 4 * 86400))" +%Y-%m-%dT%H:%M:%SZ)
 # 対象ごとの実行の一覧は、直近4日に作られたものを読む。終わっていない実行と、今日の実行を数えるためである。
-# 数えるのは、このリポジトリの main で手で起動された実行だけにする(lib-claude-auto-fix.sh の own_run)。
+# 数えるのは、このリポジトリの専用のブランチ claude-auto-fix/run で手で起動された実行だけにする(lib-claude-auto-fix.sh の own_run)。
 # fork の PR の実行を数えると、PR の題名にした表示名で、利用者が対象の起動を止められるためである
 #   active.txt  終わっていない実行の表示名
 #   today.txt   UTC の今日に作られた実行の表示名
@@ -278,7 +279,7 @@ consider() {
     [ -z "$detail" ] || inputs+=(-f "detail=${detail}")
     # 赤の検査を直す実行の表示名は、PR の head の SHA の先頭12文字を持つ。対象ごとの実行は、SHA を表示名にだけ使う
     [ -z "$sha" ] || inputs+=(-f "head=${sha:0:12}")
-    if ! gh workflow run "$CAF_TARGET_WORKFLOW" --ref main -R "$REPO" "${inputs[@]}" </dev/null >/dev/null; then
+    if ! gh workflow run "$CAF_TARGET_WORKFLOW" --ref "$CAF_RUN_BRANCH" -R "$REPO" "${inputs[@]}" </dev/null >/dev/null; then
         err "${label}: 対象ごとの実行を起動できません"
         return 0
     fi
