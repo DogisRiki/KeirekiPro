@@ -439,7 +439,7 @@
   - 受入基準とテストの対応: 要件1の受入基準6と要件6の受入基準1のうち、仕組みが起動した対象ごとの実行の結果のファイルだけを読むことは、テストの「結果のファイルを読む関数が、実行のブランチが claude-auto-fix/run の実行だけを読み、実行のブランチが main の実行と、ほかのワークフローの実行を読まない」で確かめる
   - _要件: 1.6, 6.1_
 
-- [ ] 9.2 専用のブランチを main の最新のコミットに合わせるスクリプトを作る (並行可)
+- [x] 9.2 専用のブランチを main の最新のコミットに合わせるスクリプトを作る (並行可)
 
   Claude は、置き場所に、設計の「claude-auto-fix-run-branch.sh」の部品の節のとおりに、スクリプト `claude-auto-fix-run-branch.sh` と、そのテスト `test-claude-auto-fix-run-branch.sh` を作る。スクリプトは、ブランチの名前を `lib-claude-auto-fix.sh` の `CAF_RUN_BRANCH` から読む。テストは、偽の `gh` で GitHub の応答を置き換え、偽の `gh` に呼ばれた API と引数を記録させる。Claude は、テストを `KP_TEST_CASE` で場合を選んで流せる形にする。
   - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-run-branch.sh` の場合が、すべて通る。`KP_TEST_CASE` に場合の名前を入れると、その場合だけが流れる
