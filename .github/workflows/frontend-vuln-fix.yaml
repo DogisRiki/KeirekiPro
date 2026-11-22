@@ -39,4 +39,15 @@ jobs:
       - name: Create pull requests
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          # PR を作れなかった組を書くファイル(runner の文脈はジョブの env では使えないので、ここで渡す)
+          VULN_FIX_UNRESOLVED: ${{ runner.temp }}/vuln-fix-unresolved.jsonl
         run: bash .github/scripts/frontend-vuln-fix.sh run
+      # PR を作れなかった組を、claude-auto-fix の dispatch が読む成果物として上げる。
+      # 失敗した実行でも上げる(PR を作れなかった組は、失敗した実行にしかない)
+      - name: Upload unresolved groups
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vuln-fix-unresolved
+          path: ${{ runner.temp }}/vuln-fix-unresolved.jsonl
+          retention-days: 7

@@ -534,6 +534,74 @@ $(mark '{"schema":1,"entries":[{"tool":"node","version":"24.2.0"}]}')"
         summary "| Trivy | CI | 0.61.0 | - | - | 記録の例外で通しました |" no-log "gh repos/aquasecurity"
 fi
 
+# --- PR を作る前の判定(COOLDOWN_MODE=predict)----------------------------------
+
+# 使い方: run_predict [<今の時刻>]。run と同じに流すが、COOLDOWN_MODE=predict を渡し、PR_NUMBER を渡さない
+run_predict() {
+    : >"$FAKE_LOG"
+    : >"$WORK/summary.md"
+    rm -f "$WORK/changed.tsv"
+    (cd "$G/head" && env -u PR_NUMBER COOLDOWN_MODE=predict GITHUB_REPOSITORY=o/r \
+        CI_TOOL_CHANGED_FILE="$WORK/changed.tsv" GITHUB_STEP_SUMMARY="$WORK/summary.md" NOW_EPOCH="${1:-$NOW}" \
+        bash "$SCRIPT" "$MAIN_SHA" "$HEAD_SHA") >"$WORK/out.txt" 2>"$WORK/err.txt"
+    RC=$?
+}
+
+if want predict_no_pr; then
+    new_repo
+    base_commit
+    branch_head
+    edit .github/workflows/a.yaml "TRIVY_VERSION: 0.60.0" "TRIVY_VERSION: 0.61.0"
+    finish
+    trivy_rel 0.61.0 "$YOUNG"
+    run_predict "$LATER"
+    expect "predict で PR_NUMBER が無くても2で終わらず PR の API を呼ばない(72時間経った版は通す)" 0 \
+        summary "| Trivy | CI | 0.61.0 | 2026-11-03T00:00:00Z | 2026-11-06T00:00:00Z | 通しました |" \
+        changed "$(printf 'trivy\t0.61.0')" lines-changed 1 no-log "gh repos/o/r/pulls"
+    run_predict
+    expect "predict で PR_NUMBER が無くても、72時間経っていない CI の版で1になる" 1 \
+        summary "| Trivy | CI | 0.61.0 | 2026-11-03T00:00:00Z | 2026-11-06T00:00:00Z | 止めました(公開から72時間経っていません) |" \
+        changed "$(printf 'trivy\t0.61.0')" no-log "gh repos/o/r/pulls"
+fi
+
+if want predict_exception; then
+    new_repo
+    base_commit
+    branch_head
+    edit .github/workflows/a.yaml "node-version: '24.1.0'" "node-version: '24.2.0'"
+    finish
+    node_rel 24.2.0 "$YOUNG"
+    pr_body "Node.js を急いで上げます
+$(mark "{\"schema\":1,\"entries\":[$(entry node v24.2.0 verified)]}")"
+    run
+    expect "PR の検査では、記録の目印の行の例外で通す(predict の場合と比べる元)" 0 \
+        summary "| Node.js | CI | 24.2.0 | - | - | 記録の例外で通しました |"
+    run_predict
+    expect "predict では PR の本文に記録の目印の行があっても72時間経っていない CI の版で1になる" 1 \
+        summary "| Node.js | CI | 24.2.0 | 2026-11-03T00:00:00Z | 2026-11-06T00:00:00Z | 止めました(公開から72時間経っていません) |" \
+        no-summary "記録の例外で通しました" no-log "gh repos/o/r/pulls" \
+        changed "$(printf 'node\t24.2.0')" lines-changed 1
+fi
+
+if want predict_mode_value; then
+    new_repo
+    base_commit
+    branch_head
+    edit README.md readme "readme の変更"
+    finish
+    : >"$FAKE_LOG"
+    (cd "$G/head" && COOLDOWN_MODE=other GITHUB_REPOSITORY=o/r PR_NUMBER=7 CI_TOOL_CHANGED_FILE="$WORK/changed.tsv" \
+        bash "$SCRIPT" "$MAIN_SHA" "$HEAD_SHA") >"$WORK/out.txt" 2>&1
+    RC=$?
+    expect "COOLDOWN_MODE が空と predict のほかの値なら終了コード 2 になる" 2 lines-log 0 \
+        out "::error::COOLDOWN_MODE が知らない値です: other(使い方: check-ci-tool-release-age.sh <base> <head>。環境変数 GITHUB_REPOSITORY PR_NUMBER CI_TOOL_CHANGED_FILE が要ります)"
+    : >"$FAKE_LOG"
+    (cd "$G/head" && env -u PR_NUMBER COOLDOWN_MODE= GITHUB_REPOSITORY=o/r CI_TOOL_CHANGED_FILE="$WORK/changed.tsv" \
+        bash "$SCRIPT" "$MAIN_SHA" "$HEAD_SHA") >"$WORK/out.txt" 2>&1
+    RC=$?
+    expect "COOLDOWN_MODE が無いときは、今と同じに PR_NUMBER を求める" 2 lines-log 0
+fi
+
 # --- 読まないもの -------------------------------------------------------------
 
 if want no_author; then

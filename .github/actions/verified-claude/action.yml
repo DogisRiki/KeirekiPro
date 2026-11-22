@@ -1,0 +1,17 @@
+name: Verified Claude Code CLI
+description: >-
+  Claude Code の CLI を配布元から取り、配布元の GPG の署名と SHA-256 を確かめてから PATH に足す。
+  確かめられなければ、CLI を PATH に足さずに失敗する。
+  中身は .github/scripts/install-verified-claude.sh にある。
+inputs:
+  claude-version:
+    description: '入れる Claude Code の CLI の版(例: 2.1.323)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Claude Code の CLI の署名を確かめてから PATH に足す
+      shell: bash
+      env:
+        CLAUDE_VERSION: ${{ inputs.claude-version }}
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/install-verified-claude.sh" "$CLAUDE_VERSION"

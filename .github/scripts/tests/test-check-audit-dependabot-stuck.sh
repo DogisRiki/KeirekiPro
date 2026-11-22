@@ -94,10 +94,15 @@ STUB
 chmod +x "$WORK/bin/jq"
 
 # 使い方: run <期待一覧パス> [pulls失敗] [check-runs失敗] [jq失敗]
+# 変数 STUCK_OUT にパスがあるときだけ、本体に環境変数 STUCK_JSON_OUT としてそのパスを渡す。
+# 無いときは、STUCK_JSON_OUT を消してから本体を起動し、書き出しの無い今の動きを確かめる
 run() {
     : >"$WORK/calls.log"
     : >"$WORK/summary.md"
-    PATH="$WORK/bin:$PATH" \
+    local out_env=()
+    [ -z "${STUCK_OUT:-}" ] || out_env=("STUCK_JSON_OUT=$STUCK_OUT")
+    env -u STUCK_JSON_OUT ${out_env[@]+"${out_env[@]}"} \
+        PATH="$WORK/bin:$PATH" \
         STUB_CALLS="$WORK/calls.log" STUB_PULLS="$WORK/pulls.json" STUB_DIR="$WORK" \
         STUB_FAIL_PULLS="${2:-}" STUB_FAIL_CHECKRUNS="${3:-}" STUB_JQ_FAIL="${4:-}" \
         STUB_FAIL_COMMENTS="${STUB_FAIL_COMMENTS:-}" \
@@ -492,6 +497,104 @@ if want cooldown; then
     set_checkruns sha101 "$(runs "$(crun 1 dependency-cooldown completed '"success"' "2026-01-01T00:00:00Z")")"
     check 0 "dependency-cooldown が緑なら緑にする"
     check_no_calls "comments" "dependency-cooldown が緑なら PR のコメントの一覧を読まない"
+fi
+
+# 止まった PR の一覧の書き出し(STUCK_JSON_OUT)
+# 使い方: check_json <説明> <期待する JSON>。書き出したファイルを、キーを並べ替えて比べる
+check_json() {
+    local want got
+    want=$(jq -cS '.' <<<"$2")
+    if [ ! -f "$STUCK_OUT" ]; then
+        echo "FAIL: $1 (STUCK_JSON_OUT のファイルが無い)"
+        FAILED=1
+        return
+    fi
+    got=$(jq -cS '.' "$STUCK_OUT" 2>/dev/null) || got="(JSON として読めない)"
+    if [ "$got" = "$want" ]; then
+        echo "PASS: $1"
+    else
+        echo "FAIL: $1 (期待: $want / 実際: $got)"
+        FAILED=1
+    fi
+}
+# 使い方: check_no_file <説明>。STUCK_JSON_OUT のファイルが書かれていないことを確かめる
+check_no_file() {
+    if [ -e "$WORK/stuck.json" ]; then
+        echo "FAIL: $1 (STUCK_JSON_OUT のファイルが書かれている)"
+        FAILED=1
+    else
+        echo "PASS: $1"
+    fi
+}
+
+if want json_out; then
+    # 101: 止まった PR。承認待ちに分けた dependency-gate の赤と、緑の backend-test を持つ
+    # 102: 承認待ちの赤だけの PR。103: 緑の PR。104: 止まった PR(cancelled)
+    set_pulls "[$(pull 101 "$DEPENDABOT" sha101),$(pull 102 "$DEPENDABOT" sha102),$(pull 103 "$DEPENDABOT" sha103),$(pull 104 "$DEPENDABOT" sha104)]"
+    set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"failure"' "2026-01-01T00:00:00Z"),$(crun 2 dependency-gate completed '"failure"' "2026-01-01T00:00:00Z"),$(crun 3 backend-test completed '"success"' "2026-01-01T00:00:00Z"),$(crun 4 container-scan completed '"failure"' "2026-01-01T00:00:00Z")")"
+    set_checkruns sha102 "$(runs "$(crun 1 escape-hatch completed '"failure"' "2026-01-01T00:00:00Z")")"
+    set_checkruns sha103 "$(runs "$(crun 1 gitleaks completed '"success"' "2026-01-01T00:00:00Z")")"
+    set_checkruns sha104 "$(runs "$(crun 1 backend-test completed '"cancelled"' "2026-01-01T00:00:00Z"),$(crun 2 backend-test completed '"failure"' "2025-12-31T00:00:00Z")")"
+    STUCK_OUT="$WORK/stuck.json"
+    rm -f "$STUCK_OUT"
+    check 1 "STUCK_JSON_OUT があっても、止まった PR があれば終了コード 1 になる"
+    check_json "STUCK_JSON_OUT に止まった PR の番号と、承認待ちに分けた赤も含む赤の検査の名前と結論が書かれる" \
+        '[{"number":101,"sha":"sha101","red":[{"name":"dependency-gate","conclusion":"failure"},{"name":"gitleaks","conclusion":"failure"}]},
+          {"number":104,"sha":"sha104","red":[{"name":"backend-test","conclusion":"cancelled"}]}]'
+    check_summary "#101: gitleaks (failure)" "STUCK_JSON_OUT があっても、止まった PR が報告に出る"
+    cp "$WORK/summary.md" "$WORK/summary-with-out.md"
+
+    # 承認待ちの赤だけの PR は書かれない
+    set_pulls "[$(pull 102 "$DEPENDABOT" sha102),$(pull 103 "$DEPENDABOT" sha103)]"
+    rm -f "$STUCK_OUT"
+    check 0 "止まった PR が無ければ、STUCK_JSON_OUT があっても終了コード 0 になる"
+    check_json "承認待ちの赤だけの PR が書かれない" '[]'
+    check_summary "#102: escape-hatch (failure)" "承認待ちの赤だけの PR は承認待ちの一覧に出る"
+
+    # dependency-cooldown の赤は、記録のコメントで分けたあとの扱いで書く
+    set_pulls "[$(pull 101 "$DEPENDABOT" sha101)]"
+    set_checkruns sha101 "$(runs "$(crun 1 dependency-cooldown completed '"failure"' "2026-01-01T00:00:00Z"),$(crun 2 escape-hatch completed '"failure"' "2026-01-01T00:00:00Z")")"
+    rm -f "$STUCK_OUT"
+    check 1 "記録のコメントが無い dependency-cooldown の赤は、STUCK_JSON_OUT があっても終了コード 1 になる"
+    check_json "記録のコメントが無い dependency-cooldown の赤の PR は、escape-hatch の赤も含めて書かれる" \
+        '[{"number":101,"sha":"sha101","red":[{"name":"dependency-cooldown","conclusion":"failure"},{"name":"escape-hatch","conclusion":"failure"}]}]'
+    set_comments 101 "$(record_comment 1 "$BOT" sha101)"
+    rm -f "$STUCK_OUT"
+    check 0 "記録のコメントがある dependency-cooldown の赤は、STUCK_JSON_OUT があっても終了コード 0 になる"
+    check_json "記録のコメントがある dependency-cooldown の赤だけの PR は書かれない" '[]'
+    rm -f "$WORK/comments_101.json"
+
+    # PR が無いときは空の配列を書く
+    set_pulls "[]"
+    rm -f "$STUCK_OUT"
+    check 0 "open の PR が無ければ、STUCK_JSON_OUT があっても終了コード 0 になる"
+    check_json "open の PR が無ければ空の配列が書かれる" '[]'
+
+    # 判定できないときは書かない
+    set_pulls "[$(pull 101 "$DEPENDABOT" sha101)]"
+    set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"failure"' "2026-01-01T00:00:00Z")")"
+    rm -f "$STUCK_OUT"
+    check 2 "check-runs を読めなければ、STUCK_JSON_OUT があっても終了コード 2 になる" "$WORK/checks.json" "" "yes"
+    check_no_file "判定できないときは STUCK_JSON_OUT のファイルを書かない"
+
+    # 書き出しに失敗したら、止まった PR の有無を報告せずに判定不能にする
+    STUCK_OUT="$WORK/no-such-dir/stuck.json"
+    check 2 "STUCK_JSON_OUT のファイルを書けなければ終了コード 2 になる"
+    check_lacks "$STUCK_HEADING" "STUCK_JSON_OUT のファイルを書けなければ、止まった PR を報告しない"
+
+    # STUCK_JSON_OUT が無いときは、今と同じに動く
+    unset STUCK_OUT
+    set_pulls "[$(pull 101 "$DEPENDABOT" sha101),$(pull 102 "$DEPENDABOT" sha102),$(pull 103 "$DEPENDABOT" sha103),$(pull 104 "$DEPENDABOT" sha104)]"
+    set_checkruns sha101 "$(runs "$(crun 1 gitleaks completed '"failure"' "2026-01-01T00:00:00Z"),$(crun 2 dependency-gate completed '"failure"' "2026-01-01T00:00:00Z"),$(crun 3 backend-test completed '"success"' "2026-01-01T00:00:00Z"),$(crun 4 container-scan completed '"failure"' "2026-01-01T00:00:00Z")")"
+    rm -f "$WORK/stuck.json"
+    check 1 "STUCK_JSON_OUT が無いときも、止まった PR があれば終了コード 1 になる"
+    if cmp -s "$WORK/summary.md" "$WORK/summary-with-out.md"; then
+        echo "PASS: STUCK_JSON_OUT が無いときの報告は、STUCK_JSON_OUT があるときの報告と同じになる"
+    else
+        echo "FAIL: STUCK_JSON_OUT が無いときの報告は、STUCK_JSON_OUT があるときの報告と同じになる"
+        FAILED=1
+    fi
+    check_no_file "STUCK_JSON_OUT が無いときは一覧のファイルを書かない"
 fi
 
 if [ "$RAN" -eq 0 ]; then

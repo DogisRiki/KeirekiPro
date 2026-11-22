@@ -91,6 +91,12 @@
       "color": "b60205"
     },
     {
+      "name": "claude-auto-fix",
+      "group": "other",
+      "description": "仕組みがClaudeに直させたPRと、Claudeが直せなかったことやClaudeを動かす鍵の取り替えを所有者に知らせるIssue",
+      "color": "5319e7"
+    },
+    {
       "name": "canary",
       "group": "other",
       "description": "ゲート健康診断用カナリアPR(マージ禁止)",

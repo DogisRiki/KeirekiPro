@@ -37,7 +37,7 @@
       "name": "Trivy",
       "declarations": [
         {
-          "files": [".github/workflows/container-scan.yaml", ".github/workflows/container-scan-scheduled.yaml"],
+          "files": [".github/workflows/claude-auto-fix-target.yaml", ".github/workflows/container-scan.yaml", ".github/workflows/container-scan-scheduled.yaml"],
           "pattern": "(?m)^[ \\t]*TRIVY_VERSION:[ \\t]*['\"]?(?<version>[0-9][0-9.]*)"
         }
       ],
@@ -83,7 +83,8 @@
             ".github/workflows/mutation-report.yaml",
             ".github/workflows/codex-review.yml",
             ".github/workflows/frontend-vuln-fix.yaml",
-            ".github/workflows/guardrails.yaml"
+            ".github/workflows/guardrails.yaml",
+            ".github/workflows/claude-auto-fix-target.yaml"
           ],
           "pattern": "(?m)^[ \\t]*node-version:[ \\t]*['\"]?(?<version>[0-9][0-9.]*)"
         }

@@ -7,6 +7,7 @@
       "keys": ["node-version", "NODE_VERSION", "node"],
       "ci": [
         { "file": ".github/workflows/ci.yaml", "key": "node-version" },
+        { "file": ".github/workflows/claude-auto-fix-target.yaml", "key": "node-version" },
         { "file": ".github/workflows/codex-review.yml", "key": "node-version" },
         { "file": ".github/workflows/frontend-vuln-fix.yaml", "key": "node-version" },
         { "file": ".github/workflows/guardrails.yaml", "key": "node-version" },
@@ -25,6 +26,7 @@
       "keys": ["trivy-version", "TRIVY_VERSION", "aquasec/trivy"],
       "ci": [
         { "file": ".github/workflows/container-scan.yaml", "key": "TRIVY_VERSION" },
+        { "file": ".github/workflows/claude-auto-fix-target.yaml", "key": "TRIVY_VERSION" },
         { "file": ".github/workflows/container-scan-scheduled.yaml", "key": "TRIVY_VERSION" }
       ]
     },
@@ -55,6 +57,9 @@
     { "file": ".github/workflows/backend-vuln-fix.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/ci.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/ci.yaml", "key": "version", "reason": "golangci-lint の版は、開発環境のイメージ docker/backend-go/Dockerfile の版とそろえて手で上げるため。週1回の自動の更新は Node.js・Trivy・Codex CLI・Terraform の版だけを上げる" },
+    { "file": ".github/workflows/claude-auto-fix-target.yaml", "key": "claude-version", "reason": "Claude の CLI は、週1回の自動の更新が上げる Node.js・Trivy・Codex CLI・Terraform に入らず、配布元の署名で確かめる版を所有者が起票して個別に上げるため" },
+    { "file": ".github/workflows/claude-auto-fix-target.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
+    { "file": ".github/workflows/claude-auto-fix-target.yaml", "key": "version", "reason": "golangci-lint の版は、開発環境のイメージ docker/backend-go/Dockerfile の版とそろえて手で上げるため。週1回の自動の更新は Node.js・Trivy・Codex CLI・Terraform の版だけを上げる" },
     { "file": ".github/workflows/codeql.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/dependency-graph.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },
     { "file": ".github/workflows/dependency-review.yaml", "key": "java-version", "reason": "Java はメジャー版だけを書き、CI が動くたびにそのメジャー版の最新のパッチ版を入れるため" },

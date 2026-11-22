@@ -4,8 +4,16 @@
 # 行を書いても脆弱な版が残れば失敗で終える。修正版が公開から72時間未満なら、本番で動く部品の high か critical だけ作る。
 # go_run は、Go 版の部品と標準ライブラリの脆弱性のうち、make vuln(govulncheck)が呼ばれる箇所を見つけたものを直す PR を作る。
 # 部品は go get と go mod tidy で直し、標準ライブラリは go.mod の toolchain と golang のイメージの版を1つの PR で上げる。
-# 使い方: backend-vuln-fix.sh run(GH_TOKEN と GITHUB_REPOSITORY が要る)か go_run(GH_TOKEN が要る)。ほかはテストが呼ぶ
+# run と go_run は、Claude の変更のブランチ(lib-claude-auto-fix.sh の target_names の名前)が origin にある組でも作らない。
+# PR を作れなかった組は、環境変数 VULN_FIX_UNRESOLVED のファイルに、1行に1つの JSON {kind, group, reason} で書く
+# (claude-auto-fix の dispatch が成果物で読む)。run と go_run は、始めにファイルを空にする。
+# 書くのは、run の4か所と go_run の4か所。run が main の依存を解決できずに止まるときは、計画したすべての組を書く。
+# go_run が組を読む前に止まる2か所は、組が無いので書かない。
+# 使い方: backend-vuln-fix.sh run(GH_TOKEN と GITHUB_REPOSITORY が要る)か go_run(GH_TOKEN が要る)。
+# tree vulncheck go_bump digest は claude-auto-fix の確認のスクリプトが呼ぶ。ほかはテストが呼ぶ
 set -euo pipefail
+# shellcheck source=.github/scripts/lib-claude-auto-fix.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib-claude-auto-fix.sh"
 BACKEND=backend
 CATALOG=$BACKEND/gradle/libs.versions.toml
 plan() {
@@ -95,31 +103,56 @@ pr_body() {
     jq -r '.alerts[] | "- \(.html_url)(深刻度 \(.severity)、\(.scope // "scope 不明"))"' <<<"$1"
     printf '\nRefs: N/A\n'
 }
+# PR を作れなかった組 $2(種類 $1)を、VULN_FIX_UNRESOLVED のファイルに理由 $3 と1行の JSON で足す。
+# 環境変数が無ければ書かない
+unresolved() {
+    [ -n "${VULN_FIX_UNRESOLVED:-}" ] || return 0
+    jq -nc --arg k "$1" --argjson g "$2" --arg r "$3" '{kind: $k, group: $g, reason: $r}' >>"$VULN_FIX_UNRESOLVED" ||
+        echo "::error::vuln-fix の結果のファイルに書けませんでした(${3})。"
+}
+# 種類 $1 の組 $2 の Claude の変更のブランチが origin にあれば 0、無ければ 1、名前を作れなければ 2 を返す
+# (git ls-remote --exit-code はブランチが無いときに 2 で終わるので、そのまま返さない)
+claude_exists() {
+    local b
+    b=$(target_names "$1" "$(target_key "$1" "$2")" | jq -er .branch) || return 2
+    git ls-remote --exit-code --heads origin "$b" >/dev/null || return 1
+    echo "::notice::Claude の変更のブランチ ${b} があるので作りません。"
+}
 run() {
-    local alerts groups base after open group name ver branch path lm how title failed=0
+    local alerts groups base after open group name ver branch path lm how title rc failed=0
+    [ -z "${VULN_FIX_UNRESOLVED:-}" ] || : >"$VULN_FIX_UNRESOLVED"
     alerts=$(mktemp); base=$(mktemp); after=$(mktemp)
     gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/dependabot/alerts?state=open&ecosystem=maven&per_page=100" >"$alerts"
     groups=$(plan "$alerts" "$CATALOG" | jq -c '.[]')
     if [ -z "$groups" ]; then echo "PR を作る警告はありません。"; return 0; fi
     open=$(gh pr list --author app/dependabot --state open --limit 200 --json title --jq '.[].title')
-    tree "$base" || { echo "::error::main の依存を解決できませんでした。"; return 1; }
+    if ! tree "$base"; then
+        echo "::error::main の依存を解決できませんでした。"
+        while IFS= read -r group; do unresolved maven "$group" "main の依存を解決できなかった"; done <<<"$groups"
+        return 1
+    fi
     gh auth setup-git
     git config user.name "keirekipro-vuln-fix-bot" && git config user.email "vuln-fix-bot@users.noreply.github.com"
     while IFS= read -r group <&3; do
         name=$(jq -r .name <<<"$group"); ver=$(jq -r .version <<<"$group")
         branch="chore/backend-vuln-fix-$(slug "${name}-${ver}")"; title="chore: backend の ${name} を ${ver} 以上に上げる"
         git switch -q -f --detach origin/main
+        rc=0; claude_exists maven "$group" || rc=$?
+        if [ "$rc" -eq 0 ]; then continue; fi
+        if [ "$rc" -eq 2 ]; then echo "::error::${name} ${ver}: Claude の変更のブランチの名前を作れませんでした。"; failed=1; continue; fi
         if grep -qF " ${name} " <<<"$open" || git ls-remote --exit-code --heads origin "$branch" >/dev/null ||
             ! vulnerable "$base" "$name" "" "$group" >/dev/null; then
             echo "::notice::${name} ${ver}: Dependabot の PR かブランチ ${branch} があるか、main に脆弱な版が無いので作りません。"; continue; fi
         path="$(tr '.' '/' <<<"${name%%:*}")/${name##*:}/${ver}/${name##*:}-${ver}.pom"
         lm=$(curl -fsSI -L --max-time 20 "https://repo1.maven.org/maven2/${path}" | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified:[[:space:]]*//p' | tail -n 1) || lm=""
-        if [ -z "$lm" ]; then echo "::error::${name} ${ver} の公開日時を読めませんでした。"; failed=1; continue; fi
+        if [ -z "$lm" ]; then echo "::error::${name} ${ver} の公開日時を読めませんでした。"
+            unresolved maven "$group" "公開日時を読めなかった"; failed=1; continue; fi
         how=$(decide "$lm" "$(date +%s)" "$(jq -r .urgent <<<"$group")")
         if [ "$how" = wait ]; then echo "::notice::${name} ${ver} は公開から72時間経ってから作ります。"; continue; fi
         pin "$CATALOG" "$name" "$ver"
         if ! tree "$after" || vulnerable "$after" "$name" "" "$group" >/dev/null || git diff --quiet; then
-            echo "::error::${name} を ${ver} 以上に上げられませんでした。手で直してください。"; failed=1; continue; fi
+            echo "::error::${name} を ${ver} 以上に上げられませんでした。手で直してください。"
+            unresolved maven "$group" "警告が消える版に上げられなかった"; failed=1; continue; fi
         git switch -q -c "$branch" && git add "$CATALOG"
         git commit -q -m "$title" -m "Changes:
 - backend の部品 ${name} を、脆弱性の警告が消える ${ver} 以上に上げる
@@ -128,9 +161,11 @@ Reason:
 BREAKING CHANGE: N/A
 Related: N/A
 Refs: N/A"
-        git push -q -u origin "$branch" </dev/null || { failed=1; continue; }
+        git push -q -u origin "$branch" </dev/null ||
+            { unresolved maven "$group" "ブランチを push できなかった"; failed=1; continue; }
         gh pr create --base main --head "$branch" --title "$title" \
-            --body "$(pr_body "$group" "$name" "$ver" "$how")" </dev/null || failed=1
+            --body "$(pr_body "$group" "$name" "$ver" "$how")" </dev/null ||
+            { unresolved maven "$group" "PR を作れなかった"; failed=1; }
     done 3<<<"$groups"
     return "$failed"
 }
@@ -203,7 +238,8 @@ go_exists() {
     { [ -n "$2" ] && grep -qF " $2 " <<<"$open"; } || git ls-remote --exit-code --heads origin "$1" >/dev/null
 }
 go_run() {
-    local json plan open group mod ver branch title failed=0
+    local json plan open group mod ver branch title rc failed=0
+    [ -z "${VULN_FIX_UNRESOLVED:-}" ] || : >"$VULN_FIX_UNRESOLVED"
     json=$(mktemp)
     if (cd "$BACKEND" && env -u GH_TOKEN GOTOOLCHAIN=auto make vuln </dev/null); then
         echo "呼ばれる箇所のある Go の脆弱性はありません。"; return 0; fi
@@ -220,30 +256,40 @@ go_run() {
     if [ -n "$group" ]; then
         ver=$(jq -r .version <<<"$group"); branch="chore/backend-vuln-fix-go-stdlib-$(slug "$ver")"
         title="chore: backend の Go を ${ver} に上げる"
-        if go_exists "$branch" ""; then echo "::notice::Go ${ver}: ブランチ ${branch} があるので作りません。"
+        rc=0; claude_exists go-stdlib "$group" || rc=$?
+        if [ "$rc" -eq 2 ]; then echo "::error::Go ${ver}: Claude の変更のブランチの名前を作れませんでした。"; failed=1
+        elif [ "$rc" -eq 0 ]; then :
+        elif go_exists "$branch" ""; then echo "::notice::Go ${ver}: ブランチ ${branch} があるので作りません。"
         else
             git switch -q -f --detach origin/main
             if go_bump "$ver"; then
                 go_ship '.stdlib == null' "$branch" "$title" \
-                    "go.mod の toolchain と4つの Dockerfile の golang のイメージを Go ${ver} に上げ、標準ライブラリの脆弱性を消す" "$group" || failed=1
-            else echo "::error::Go を ${ver} に上げられませんでした。手で直してください。"; failed=1; fi
+                    "go.mod の toolchain と4つの Dockerfile の golang のイメージを Go ${ver} に上げ、標準ライブラリの脆弱性を消す" "$group" ||
+                    { unresolved go-stdlib "$group" "Go を上げた変更を PR にできなかった"; failed=1; }
+            else echo "::error::Go を ${ver} に上げられませんでした。手で直してください。"
+                unresolved go-stdlib "$group" "Go の版を上げられなかった"; failed=1; fi
         fi
     fi
     while IFS= read -r group <&3; do
         mod=$(jq -r .module <<<"$group"); ver=$(jq -r .version <<<"$group")
         branch="chore/backend-vuln-fix-go-$(slug "${mod}-${ver}")"; title="chore: backend の Go の部品 ${mod} を ${ver} 以上に上げる"
+        rc=0; claude_exists go-module "$group" || rc=$?
+        if [ "$rc" -eq 0 ]; then continue; fi
+        if [ "$rc" -eq 2 ]; then echo "::error::${mod} ${ver}: Claude の変更のブランチの名前を作れませんでした。"; failed=1; continue; fi
         if go_exists "$branch" "$mod"; then
             echo "::notice::${mod} ${ver}: Dependabot の PR かブランチ ${branch} があるので作りません。"; continue; fi
         git switch -q -f --detach origin/main
         if (cd "$BACKEND" && env -u GH_TOKEN GOTOOLCHAIN=auto go get "${mod}@${ver}" </dev/null &&
             env -u GH_TOKEN GOTOOLCHAIN=auto go mod tidy </dev/null); then
             go_ship "[.modules[] | select(.module == \"${mod}\")] | length == 0" "$branch" "$title" \
-                "Go の部品 ${mod} を、go get と go mod tidy で ${ver} に上げ、脆弱性を消す" "$group" || failed=1
-        else echo "::error::${mod} を ${ver} に上げられませんでした。手で直してください。"; failed=1; fi
+                "Go の部品 ${mod} を、go get と go mod tidy で ${ver} に上げ、脆弱性を消す" "$group" ||
+                { unresolved go-module "$group" "部品を上げた変更を PR にできなかった"; failed=1; }
+        else echo "::error::${mod} を ${ver} に上げられませんでした。手で直してください。"
+            unresolved go-module "$group" "go get か go mod tidy が失敗した"; failed=1; fi
     done 3< <(jq -c '.modules[]' <<<"$plan")
     return "$failed"
 }
 case "${1:-}" in
-    run | go_run | plan | resolved | vulnerable | decide | pin | go_plan) "$@" ;;
-    *) echo "使い方: backend-vuln-fix.sh run | go_run | plan | resolved | vulnerable | decide | pin | go_plan" >&2; exit 2 ;;
+    run | go_run | plan | resolved | vulnerable | decide | pin | go_plan | tree | vulncheck | go_bump | digest) "$@" ;;
+    *) echo "使い方: backend-vuln-fix.sh run | go_run | plan | resolved | vulnerable | decide | pin | go_plan | tree | vulncheck | go_bump | digest" >&2; exit 2 ;;
 esac

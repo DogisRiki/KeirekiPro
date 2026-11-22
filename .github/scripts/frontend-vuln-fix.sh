@@ -7,12 +7,18 @@
 #   3. それでも残れば PR を作らず、失敗で終える
 #   4. ci.yaml の frontend-test と同じ検査を流し、通らなければ PR を作らず、消せなかった警告を
 #      実行の記録に出して失敗で終える(overrides が、ほかの部品が使う古い版まで置き換えることがある)
-# 同じ組のブランチが origin にあれば作らない。修正版が公開から72時間経っていないときは、
-# 本番で動く部品の high か critical の警告なら minimumReleaseAgeExclude に足して進み、
+# 同じ組のブランチか、Claude の変更のブランチ(lib-claude-auto-fix.sh の target_names の名前)が
+# origin にあれば作らない。PR を作れなかった組は、環境変数 VULN_FIX_UNRESOLVED のファイルに
+# 1行に1つの JSON {kind: "npm", group, reason} で書く(claude-auto-fix の dispatch が成果物で読む)。
+# 書くのは failed=1 にする7か所で、run の始めにファイルを空にする。
+# 修正版が公開から72時間経っていないときは、本番で動く部品の high か critical の警告なら minimumReleaseAgeExclude に足して進み、
 # それ以外は経ってからの実行に回す(pnpm-workspace.yaml の minimumReleaseAge の決まり)。
 # 使い方: frontend-vuln-fix.sh run(GH_TOKEN と GITHUB_REPOSITORY が要る)。ほかはテストが呼ぶ
 # =====================================================================
 set -euo pipefail
+
+# shellcheck source=.github/scripts/lib-claude-auto-fix.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib-claude-auto-fix.sh"
 
 FRONTEND=frontend
 # ci.yaml の frontend-test が流す pnpm のコマンドを、同じ順に並べる(そろっていることはテストが確かめる)
@@ -125,8 +131,16 @@ pr_body() {
     printf '\nRefs: N/A\n'
 }
 
+# PR を作れなかった組を、VULN_FIX_UNRESOLVED のファイルに1行の JSON で足す。環境変数が無ければ書かない
+unresolved() {
+    [ -n "${VULN_FIX_UNRESOLVED:-}" ] || return 0
+    jq -nc --argjson g "$1" --arg r "$2" '{kind: "npm", group: $g, reason: $r}' >>"$VULN_FIX_UNRESOLVED" ||
+        echo "::error::vuln-fix の結果のファイルに書けませんでした($2)。"
+}
+
 run() {
-    local alerts group name ver branch published how range title failed=0
+    local alerts group name ver branch claude_branch published how range title failed=0
+    [ -z "${VULN_FIX_UNRESOLVED:-}" ] || : >"$VULN_FIX_UNRESOLVED"
     alerts=$(mktemp)
     gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/dependabot/alerts?state=open&ecosystem=npm&per_page=100" >"$alerts"
     gh auth setup-git
@@ -135,25 +149,33 @@ run() {
         name=$(jq -r .name <<<"$group"); ver=$(jq -r .version <<<"$group")
         branch="chore/frontend-vuln-fix-$(printf '%s-%s' "$name" "$ver" | tr -c 'a-z0-9' '-' | sed -E 's/-+/-/g; s/^-//')"
         title="chore: frontend の ${name} を ${ver} 以上に上げる"
+        if ! claude_branch=$(target_names npm "$(target_key npm "$group")" | jq -er .branch); then
+            echo "::error::${name} ${ver}: Claude の変更のブランチの名前を作れませんでした。"; failed=1; continue; fi
         git switch -q -f --detach origin/main
+        if git ls-remote --exit-code --heads origin "$claude_branch" >/dev/null; then
+            echo "::notice::${name} ${ver}: Claude の変更のブランチ ${claude_branch} があるので作りません。"; continue; fi
         if git ls-remote --exit-code --heads origin "$branch" >/dev/null || ! still_vulnerable "$name" "$group"; then
             echo "::notice::${name} ${ver}: ブランチ ${branch} があるか、main に脆弱な版が無いので作りません。"; continue; fi
         published=$(curl -fsS "https://registry.npmjs.org/${name/\//%2F}" | jq -r --arg v "$ver" '.time[$v] // ""') || published=""
-        if [ -z "$published" ]; then echo "::error::${name} ${ver} の公開日時を読めませんでした。"; failed=1; continue; fi
+        if [ -z "$published" ]; then echo "::error::${name} ${ver} の公開日時を読めませんでした。"
+            unresolved "$group" "公開日時を読めなかった"; failed=1; continue; fi
         how=$(decide "$published" "$(date +%s)" "$(jq -r .urgent <<<"$group")")
         if [ "$how" = wait ]; then echo "::notice::${name} ${ver} は公開から72時間経ってから作ります。"; continue; fi
         [ "$how" != exclude ] || exclude "$FRONTEND/pnpm-workspace.yaml" "${name}@${ver}"
-        env -u GH_TOKEN pnpm --dir "$FRONTEND" update "$name" --lockfile-only </dev/null || { failed=1; continue; }
+        env -u GH_TOKEN pnpm --dir "$FRONTEND" update "$name" --lockfile-only </dev/null ||
+            { unresolved "$group" "pnpm update が失敗した"; failed=1; continue; }
         if still_vulnerable "$name" "$group"; then
             while IFS= read -r range; do override "$FRONTEND/pnpm-workspace.yaml" "$name" "$ver" "$range"
             done < <(jq -r '.ranges[]' <<<"$group")
-            env -u GH_TOKEN pnpm --dir "$FRONTEND" install --lockfile-only --no-frozen-lockfile </dev/null || { failed=1; continue; }
+            env -u GH_TOKEN pnpm --dir "$FRONTEND" install --lockfile-only --no-frozen-lockfile </dev/null ||
+                { unresolved "$group" "pnpm install が失敗した"; failed=1; continue; }
         fi
         if still_vulnerable "$name" "$group" || git diff --quiet; then
-            echo "::error::${name} を ${ver} 以上に上げられませんでした。手で直してください。"; failed=1; continue; fi
+            echo "::error::${name} を ${ver} 以上に上げられませんでした。手で直してください。"
+            unresolved "$group" "警告が消える版に上げられなかった"; failed=1; continue; fi
         if ! frontend_test; then
             echo "::error::${name} を ${ver} 以上に上げると frontend-test の検査が通らないので、PR を作りません。手で直してください。消せなかった警告: $(jq -r '[.alerts[].html_url] | join(" ")' <<<"$group")"
-            failed=1; continue; fi
+            unresolved "$group" "frontend-test の検査が通らなかった"; failed=1; continue; fi
         git switch -q -c "$branch"
         git add "$FRONTEND/pnpm-lock.yaml" "$FRONTEND/pnpm-workspace.yaml"
         git commit -q -m "$title" -m "Changes:
@@ -163,9 +185,11 @@ Reason:
 BREAKING CHANGE: N/A
 Related: N/A
 Refs: N/A"
-        git push -q -u origin "$branch" </dev/null || { failed=1; continue; }
+        git push -q -u origin "$branch" </dev/null ||
+            { unresolved "$group" "ブランチを push できなかった"; failed=1; continue; }
         gh pr create --base main --head "$branch" --title "$title" \
-            --body "$(pr_body "$group" "$name" "$ver" "$how")" </dev/null || failed=1
+            --body "$(pr_body "$group" "$name" "$ver" "$how")" </dev/null ||
+            { unresolved "$group" "PR を作れなかった"; failed=1; }
     done 3< <(plan "$alerts" | jq -c '.[]')
     return "$failed"
 }
